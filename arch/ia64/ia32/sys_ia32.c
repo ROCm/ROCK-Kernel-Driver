@@ -207,9 +207,8 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
 
 
 static int
-get_page_prot (unsigned long addr)
+get_page_prot (struct vm_area_struct *vma, unsigned long addr)
 {
-	struct vm_area_struct *vma = find_vma(current->mm, addr);
 	int prot = 0;
 
 	if (!vma || vma->vm_start > addr)
@@ -232,14 +231,26 @@ static unsigned long
 mmap_subpage (struct file *file, unsigned long start, unsigned long end, int prot, int flags,
 	      loff_t off)
 {
-	void *page = (void *) get_zeroed_page(GFP_KERNEL);
+	void *page = NULL;
 	struct inode *inode;
-	unsigned long ret;
-	int old_prot = get_page_prot(start);
+	unsigned long ret = 0;
+	struct vm_area_struct *vma = find_vma(current->mm, start);
+	int old_prot = get_page_prot(vma, start);
 
 	DBG("mmap_subpage(file=%p,start=0x%lx,end=0x%lx,prot=%x,flags=%x,off=0x%llx)\n",
 	    file, start, end, prot, flags, off);
 
+
+	/* Optimize the case where the old mmap and the new mmap are both anonymous */
+	if ((old_prot & PROT_WRITE) && (flags & MAP_ANONYMOUS) && !vma->vm_file) {
+		if (clear_user((void *) start, end - start)) {
+			ret = -EFAULT;
+			goto out;
+		}
+		goto skip_mmap;
+	}
+
+	page = (void *) get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
@@ -264,6 +275,7 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 			copy_to_user((void *) end, page + PAGE_OFF(end),
 				     PAGE_SIZE - PAGE_OFF(end));
 	}
+
 	if (!(flags & MAP_ANONYMOUS)) {
 		/* read the file contents */
 		inode = file->f_dentry->d_inode;
@@ -274,10 +286,13 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 			goto out;
 		}
 	}
+
+ skip_mmap:
 	if (!(prot & PROT_WRITE))
 		ret = sys_mprotect(PAGE_START(start), PAGE_SIZE, prot | old_prot);
   out:
-	free_page((unsigned long) page);
+	if (page)
+		free_page((unsigned long) page);
 	return ret;
 }
 
@@ -533,11 +548,12 @@ static long
 mprotect_subpage (unsigned long address, int new_prot)
 {
 	int old_prot;
+	struct vm_area_struct *vma;
 
 	if (new_prot == PROT_NONE)
 		return 0;		/* optimize case where nothing changes... */
-
-	old_prot = get_page_prot(address);
+	vma = find_vma(current->mm, address);
+	old_prot = get_page_prot(vma, address);
 	return sys_mprotect(address, PAGE_SIZE, new_prot | old_prot);
 }
 
