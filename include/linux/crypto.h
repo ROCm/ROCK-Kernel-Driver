@@ -221,17 +221,20 @@ static inline size_t crypto_tfm_alg_digestsize(struct crypto_tfm *tfm)
  */
 static inline void crypto_digest_init(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_init(tfm);
 }
 
 static inline void crypto_digest_update(struct crypto_tfm *tfm,
                                         struct scatterlist *sg, size_t nsg)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_update(tfm, sg, nsg);
 }
 
 static inline void crypto_digest_final(struct crypto_tfm *tfm, u8 *out)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_final(tfm, out);
 }
 
@@ -239,6 +242,7 @@ static inline void crypto_digest_digest(struct crypto_tfm *tfm,
                                         struct scatterlist *sg,
                                         size_t nsg, u8 *out)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_digest(tfm, sg, nsg, out);
 }
                                         
@@ -247,40 +251,47 @@ static inline void crypto_digest_hmac(struct crypto_tfm *tfm, u8 *key,
                                       size_t nsg, u8 *out)
                                       
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_hmac(tfm, key, keylen, sg, nsg, out);
 }
 
 static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,
                                        const u8 *key, size_t keylen)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_setkey(tfm, key, keylen);
 }
 
 static inline int crypto_cipher_encrypt(struct crypto_tfm *tfm,
                                         struct scatterlist *sg, size_t nsg)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_encrypt(tfm, sg, nsg);
 }                                        
 
 static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
                                         struct scatterlist *sg, size_t nsg)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_decrypt(tfm, sg, nsg);
 }
 
 static inline void crypto_cipher_copy_iv(struct crypto_tfm *tfm,
                                          u8 *src, size_t len)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	memcpy(tfm->crt_cipher.cit_iv, src, len);
 }
 
 static inline void crypto_comp_compress(struct crypto_tfm *tfm)
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMP);
 	tfm->crt_compress.cot_compress(tfm);
 }
 
 static inline void crypto_comp_decompress(struct crypto_tfm *tfm) 
 {
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMP);
 	tfm->crt_compress.cot_decompress(tfm);
 }
 
