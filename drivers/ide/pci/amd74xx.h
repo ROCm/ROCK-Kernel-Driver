@@ -123,7 +123,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 	{	/* 8 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
 		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE2S_SATA,
-		.name		= "NFORCE2S_SATA",
+		.name		= "NFORCE2S-SATA",
 		.init_chipset	= init_chipset_amd74xx,
 		.init_hwif	= init_hwif_amd74xx,
 		.channels	= 2,
@@ -156,7 +156,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 	{	/* 11 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
 		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA,
-		.name		= "NFORCE3S_SATA",
+		.name		= "NFORCE3S-SATA",
 		.init_chipset	= init_chipset_amd74xx,
 		.init_hwif	= init_hwif_amd74xx,
 		.channels	= 2,
@@ -167,7 +167,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 	{	/* 12 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
 		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA2,
-		.name		= "NFORCE3S_SATA2",
+		.name		= "NFORCE3S-SATA2",
 		.init_chipset	= init_chipset_amd74xx,
 		.init_hwif	= init_hwif_amd74xx,
 		.channels	= 2,
