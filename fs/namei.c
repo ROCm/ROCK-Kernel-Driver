@@ -988,6 +988,80 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	return error;
 }
 
+int may_open(struct nameidata *nd, int acc_mode, int flag)
+{
+	struct dentry *dentry = nd->dentry;
+	struct inode *inode = dentry->d_inode;
+	int error;
+
+	if (!inode)
+		return -ENOENT;
+
+	if (S_ISLNK(inode->i_mode))
+		return -ELOOP;
+	
+	if (S_ISDIR(inode->i_mode) && (flag & FMODE_WRITE))
+		return -EISDIR;
+
+	error = permission(inode, acc_mode);
+	if (error)
+		return error;
+
+	/*
+	 * FIFO's, sockets and device files are special: they don't
+	 * actually live on the filesystem itself, and as such you
+	 * can write to them even if the filesystem is read-only.
+	 */
+	if (S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
+	    	flag &= ~O_TRUNC;
+	} else if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
+		if (nd->mnt->mnt_flags & MNT_NODEV)
+			return -EACCES;
+
+		flag &= ~O_TRUNC;
+	} else if (IS_RDONLY(inode) && (flag & FMODE_WRITE))
+		return -EROFS;
+	/*
+	 * An append-only file must be opened in append mode for writing.
+	 */
+	if (IS_APPEND(inode)) {
+		if  ((flag & FMODE_WRITE) && !(flag & O_APPEND))
+			return -EPERM;
+		if (flag & O_TRUNC)
+			return -EPERM;
+	}
+
+	/*
+	 * Ensure there are no outstanding leases on the file.
+	 */
+	error = get_lease(inode, flag);
+	if (error)
+		return error;
+
+	if (flag & O_TRUNC) {
+		error = get_write_access(inode);
+		if (error)
+			return error;
+
+		/*
+		 * Refuse to truncate files with mandatory locks held on them.
+		 */
+		error = locks_verify_locked(inode);
+		if (!error) {
+			DQUOT_INIT(inode);
+			
+			error = do_truncate(dentry, 0);
+		}
+		put_write_access(inode);
+		if (error)
+			return error;
+	} else
+		if (flag & FMODE_WRITE)
+			DQUOT_INIT(inode);
+
+	return 0;
+}
+
 /*
  *	open_namei()
  *
@@ -1005,7 +1079,6 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 {
 	int acc_mode, error = 0;
-	struct inode *inode;
 	struct dentry *dentry;
 	struct dentry *dir;
 	int count = 0;
@@ -1092,80 +1165,9 @@ do_last:
 	if (dentry->d_inode && S_ISDIR(dentry->d_inode->i_mode))
 		goto exit;
 ok:
-	error = -ENOENT;
-	inode = dentry->d_inode;
-	if (!inode)
-		goto exit;
-
-	error = -ELOOP;
-	if (S_ISLNK(inode->i_mode))
-		goto exit;
-	
-	error = -EISDIR;
-	if (S_ISDIR(inode->i_mode) && (flag & FMODE_WRITE))
-		goto exit;
-
-	error = permission(inode,acc_mode);
+	error = may_open(nd, acc_mode, flag);
 	if (error)
 		goto exit;
-
-	/*
-	 * FIFO's, sockets and device files are special: they don't
-	 * actually live on the filesystem itself, and as such you
-	 * can write to them even if the filesystem is read-only.
-	 */
-	if (S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
-	    	flag &= ~O_TRUNC;
-	} else if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
-		error = -EACCES;
-		if (nd->mnt->mnt_flags & MNT_NODEV)
-			goto exit;
-
-		flag &= ~O_TRUNC;
-	} else {
-		error = -EROFS;
-		if (IS_RDONLY(inode) && (flag & 2))
-			goto exit;
-	}
-	/*
-	 * An append-only file must be opened in append mode for writing.
-	 */
-	error = -EPERM;
-	if (IS_APPEND(inode)) {
-		if  ((flag & FMODE_WRITE) && !(flag & O_APPEND))
-			goto exit;
-		if (flag & O_TRUNC)
-			goto exit;
-	}
-
-	/*
-	 * Ensure there are no outstanding leases on the file.
-	 */
-	error = get_lease(inode, flag);
-	if (error)
-		goto exit;
-
-	if (flag & O_TRUNC) {
-		error = get_write_access(inode);
-		if (error)
-			goto exit;
-
-		/*
-		 * Refuse to truncate files with mandatory locks held on them.
-		 */
-		error = locks_verify_locked(inode);
-		if (!error) {
-			DQUOT_INIT(inode);
-			
-			error = do_truncate(dentry, 0);
-		}
-		put_write_access(inode);
-		if (error)
-			goto exit;
-	} else
-		if (flag & FMODE_WRITE)
-			DQUOT_INIT(inode);
-
 	return 0;
 
 exit_dput:

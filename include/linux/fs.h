@@ -1233,6 +1233,7 @@ static inline void allow_write_access(struct file *file)
 extern int do_pipe(int *);
 
 extern int open_namei(const char *, int, int, struct nameidata *);
+extern int may_open(struct nameidata *, int, int);
 
 extern int kernel_read(struct file *, unsigned long, char *, unsigned long);
 extern struct file * open_exec(const char *);
