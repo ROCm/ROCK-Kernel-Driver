@@ -344,26 +344,8 @@ static struct chipset_bus_clock_list_entry thirty_three_base_hpt374[] = {
 	{	0,		0x06814e93	}
 };
 
-#if 0
-static struct chipset_bus_clock_list_entry fifty_base_hpt374[] = {
-	{	XFER_UDMA_6,	},
-	{	XFER_UDMA_5,	},
-	{	XFER_UDMA_4,	},
-	{	XFER_UDMA_3,	},
-	{	XFER_UDMA_2,	},
-	{	XFER_UDMA_1,	},
-	{	XFER_UDMA_0,	},
-	{	XFER_MW_DMA_2,	},
-	{	XFER_MW_DMA_1,	},
-	{	XFER_MW_DMA_0,	},
-	{	XFER_PIO_4,	},
-	{	XFER_PIO_3,	},
-	{	XFER_PIO_2,	},
-	{	XFER_PIO_1,	},
-	{	XFER_PIO_0,	},
-	{	0,	}
-};
-#endif
+/* FIXME: 50MHz timings for HPT374 */
+
 #if 0
 static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 	{	XFER_UDMA_6,	0x12406231	},	/* checkme */
