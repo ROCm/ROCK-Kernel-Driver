@@ -1154,6 +1154,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 	/* a stale NFS handle can trigger this without it being an error */
 	pathrelse (&path_to_sd);
 	make_bad_inode(inode) ;
+	inode->i_nlink = 0;
 	return;
     }
 
@@ -1186,6 +1187,27 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 
 }
 
+/**
+ * reiserfs_find_actor() - "find actor" reiserfs supplies to iget4().
+ *
+ * @inode:    inode from hash table to check
+ * @inode_no: inode number we are looking for
+ * @opaque:   "cookie" passed to iget4(). This is &reiserfs_iget4_args.
+ *
+ * This function is called by iget4() to distinguish reiserfs inodes
+ * having the same inode numbers. Such inodes can only exist due to some
+ * error condition. One of them should be bad. Inodes with identical
+ * inode numbers (objectids) are distinguished by parent directory ids.
+ *
+ */
+static int reiserfs_find_actor( struct inode *inode, 
+				unsigned long inode_no, void *opaque )
+{
+    struct reiserfs_iget4_args *args;
+
+    args = opaque;
+    return INODE_PKEY( inode ) -> k_dir_id == args -> objectid;
+}
 
 struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key)
 {
@@ -1193,7 +1215,8 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
     struct reiserfs_iget4_args args ;
 
     args.objectid = key->on_disk_key.k_dir_id ;
-    inode = iget4 (s, key->on_disk_key.k_objectid, 0, (void *)(&args));
+    inode = iget4 (s, key->on_disk_key.k_objectid, 
+		   reiserfs_find_actor, (void *)(&args));
     if (!inode) 
 	return ERR_PTR(-ENOMEM) ;
 
