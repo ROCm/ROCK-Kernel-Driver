@@ -234,6 +234,11 @@ struct iw_mgmt_ds_pset {
 	u8 			    chan;
 } __attribute__ ((packed));
 
+struct iw_mgmt_ibss_pset {
+	struct iw_mgmt_info_element el;
+	u16 			    atim_window;
+} __attribute__ ((packed));
+
 struct wl3501_tx_hdr {
 	u16	tx_cnt;
 	u8	sync[16];
@@ -285,7 +290,7 @@ struct wl3501_start_req {
 	u8			    operational_rate_set[10];
 	u8			    cf_pset[8];
 	struct iw_mgmt_ds_pset	    ds_pset;
-	u8			    ibss_pset[4];
+	struct iw_mgmt_ibss_pset    ibss_pset;
 };
 
 struct wl3501_assoc_req {
@@ -363,7 +368,7 @@ struct wl3501_join_req {
 	struct iw_mgmt_essid_pset   ssid;
 	struct iw_mgmt_ds_pset	    ds_pset;
 	u8			    cf_pset[8];
-	u8			    ibss_pset[4];
+	struct iw_mgmt_ibss_pset    ibss_pset;
 	u8			    bss_basic_rate_set[10];
 };
 
@@ -417,7 +422,7 @@ struct wl3501_scan_confirm {
 	struct iw_mgmt_essid_pset   ssid;
 	struct iw_mgmt_ds_pset	    ds_pset;
 	u8			    cf_pset[8];
-	u8			    ibss_pset[4];
+	struct iw_mgmt_ibss_pset    ibss_pset;
 	u8			    bss_basic_rate_set[10];
 	u8			    rssi;
 };

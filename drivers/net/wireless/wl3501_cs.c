@@ -639,11 +639,9 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 		.sig_id		  = WL3501_SIG_JOIN_REQ,
 		.timeout	  = 10,
 		.ds_pset = {
-			.el = {
-				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-				.len = 1,
-			},
-			.chan = this->chan,
+			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.el.len = 1,
+			.chan	= this->chan,
 		},
 	};
 
@@ -658,11 +656,9 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.beacon_period		= 400,
 		.dtim_period		= 1,
 		.ds_pset = {
-			.el = {
-				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-				.len = 1,
-			},
-			.chan = this->chan,
+			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.el.len = 1,
+			.chan	= this->chan,
 		},
 		.bss_basic_rate_set	= {
 			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
@@ -671,7 +667,9 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
 		},
 		.ibss_pset		= {
-			[0] = 6, [1] = 2, [2] = 10,
+			.el.id	     = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
+			.el.len	     = 2,
+			.atim_window = 10,
 		},
 		.bss_type		= wl3501_fw_bss_type(this),
 		.cap_info		= wl3501_fw_cap_info(this),
