@@ -237,6 +237,7 @@ struct mthca_dev {
 	struct semaphore cap_mask_mutex;
 
 	void __iomem    *hcr;
+	void __iomem    *ecr_base;
 	void __iomem    *clr_base;
 	void __iomem    *kar;
 

@@ -699,57 +699,83 @@ static int __devinit mthca_request_regions(struct pci_dev *pdev,
 	 */
 	if (!request_mem_region(pci_resource_start(pdev, 0) +
 				MTHCA_HCR_BASE,
-				MTHCA_MAP_HCR_SIZE,
-				DRV_NAME))
-		return -EBUSY;
+				MTHCA_HCR_SIZE,
+				DRV_NAME)) {
+		err = -EBUSY;
+		goto err_hcr_failed;
+	}
+
+	if (!request_mem_region(pci_resource_start(pdev, 0) +
+				MTHCA_ECR_BASE,
+				MTHCA_MAP_ECR_SIZE,
+				DRV_NAME)) {
+		err = -EBUSY;
+		goto err_ecr_failed;
+	}
 
 	if (!request_mem_region(pci_resource_start(pdev, 0) +
 				MTHCA_CLR_INT_BASE,
 				MTHCA_CLR_INT_SIZE,
 				DRV_NAME)) {
 		err = -EBUSY;
-		goto err_bar0_beg;
+		goto err_int_failed;
 	}
+
 
 	err = pci_request_region(pdev, 2, DRV_NAME);
 	if (err)
-		goto err_bar0_end;
+		goto err_bar2_failed;
 
 	if (!ddr_hidden) {
 		err = pci_request_region(pdev, 4, DRV_NAME);
 		if (err)
-			goto err_bar2;
+			goto err_bar4_failed;
 	}
 
 	return 0;
 
-err_bar0_beg:
-	release_mem_region(pci_resource_start(pdev, 0) +
-			   MTHCA_HCR_BASE,
-			   MTHCA_MAP_HCR_SIZE);
+err_bar4_failed:
 
-err_bar0_end:
+	pci_release_region(pdev, 2);
+err_bar2_failed:
+
 	release_mem_region(pci_resource_start(pdev, 0) +
 			   MTHCA_CLR_INT_BASE,
 			   MTHCA_CLR_INT_SIZE);
+err_int_failed:
 
-err_bar2:
-	pci_release_region(pdev, 2);
+	release_mem_region(pci_resource_start(pdev, 0) +
+			   MTHCA_ECR_BASE,
+			   MTHCA_MAP_ECR_SIZE);
+err_ecr_failed:
+
+	release_mem_region(pci_resource_start(pdev, 0) +
+			   MTHCA_HCR_BASE,
+			   MTHCA_HCR_SIZE);
+err_hcr_failed:
+
 	return err;
 }
 
 static void mthca_release_regions(struct pci_dev *pdev,
 				  int ddr_hidden)
 {
-	release_mem_region(pci_resource_start(pdev, 0) +
-			   MTHCA_HCR_BASE,
-			   MTHCA_MAP_HCR_SIZE);
+	if (!ddr_hidden)
+		pci_release_region(pdev, 4);
+
+	pci_release_region(pdev, 2);
+
 	release_mem_region(pci_resource_start(pdev, 0) +
 			   MTHCA_CLR_INT_BASE,
 			   MTHCA_CLR_INT_SIZE);
-	pci_release_region(pdev, 2);
-	if (!ddr_hidden)
-		pci_release_region(pdev, 4);
+
+	release_mem_region(pci_resource_start(pdev, 0) +
+			   MTHCA_ECR_BASE,
+			   MTHCA_MAP_ECR_SIZE);
+
+	release_mem_region(pci_resource_start(pdev, 0) +
+			   MTHCA_HCR_BASE,
+			   MTHCA_HCR_SIZE);
 }
 
 static int __devinit mthca_enable_msi_x(struct mthca_dev *mdev)
@@ -911,20 +937,30 @@ static int __devinit mthca_init_one(struct pci_dev *pdev,
 	mdev->cmd.use_events = 0;
 
 	mthca_base = pci_resource_start(pdev, 0);
-	mdev->hcr = ioremap(mthca_base + MTHCA_HCR_BASE, MTHCA_MAP_HCR_SIZE);
+	mdev->hcr = ioremap(mthca_base + MTHCA_HCR_BASE, MTHCA_HCR_SIZE);
 	if (!mdev->hcr) {
 		mthca_err(mdev, "Couldn't map command register, "
 			  "aborting.\n");
 		err = -ENOMEM;
 		goto err_free_dev;
 	}
+
 	mdev->clr_base = ioremap(mthca_base + MTHCA_CLR_INT_BASE,
 				 MTHCA_CLR_INT_SIZE);
 	if (!mdev->clr_base) {
-		mthca_err(mdev, "Couldn't map command register, "
+		mthca_err(mdev, "Couldn't map interrupt clear register, "
 			  "aborting.\n");
 		err = -ENOMEM;
 		goto err_iounmap;
+	}
+
+	mdev->ecr_base = ioremap(mthca_base + MTHCA_ECR_BASE,
+				 MTHCA_ECR_SIZE + MTHCA_ECR_CLR_SIZE);
+	if (!mdev->ecr_base) {
+		mthca_err(mdev, "Couldn't map ecr register, "
+			  "aborting.\n");
+		err = -ENOMEM;
+		goto err_iounmap_clr;
 	}
 
 	mthca_base = pci_resource_start(pdev, 2);
@@ -933,7 +969,7 @@ static int __devinit mthca_init_one(struct pci_dev *pdev,
 		mthca_err(mdev, "Couldn't map kernel access region, "
 			  "aborting.\n");
 		err = -ENOMEM;
-		goto err_iounmap_clr;
+		goto err_iounmap_ecr;
 	}
 
 	err = mthca_tune_pci(mdev);
@@ -981,6 +1017,9 @@ err_close:
 
 err_iounmap_kar:
 	iounmap(mdev->kar);
+
+err_iounmap_ecr:
+	iounmap(mdev->ecr_base);
 
 err_iounmap_clr:
 	iounmap(mdev->clr_base);
@@ -1033,6 +1072,7 @@ static void __devexit mthca_remove_one(struct pci_dev *pdev)
 		mthca_close_hca(mdev);
 
 		iounmap(mdev->hcr);
+		iounmap(mdev->ecr_base);
 		iounmap(mdev->clr_base);
 
 		if (mdev->mthca_flags & MTHCA_FLAG_MSI_X)

@@ -366,10 +366,11 @@ static irqreturn_t mthca_interrupt(int irq, void *dev_ptr, struct pt_regs *regs)
 	if (dev->eq_table.clr_mask)
 		writel(dev->eq_table.clr_mask, dev->eq_table.clr_int);
 
-	if ((ecr = readl(dev->hcr + MTHCA_ECR_OFFSET + 4)) != 0) {
+	if ((ecr = readl(dev->ecr_base + 4)) != 0) {
 		work = 1;
 
-		writel(ecr, dev->hcr + MTHCA_ECR_CLR_OFFSET + 4);
+		writel(ecr, dev->ecr_base +
+		       MTHCA_ECR_CLR_BASE - MTHCA_ECR_BASE + 4);
 
 		for (i = 0; i < MTHCA_NUM_EQ; ++i)
 			if (ecr & dev->eq_table.eq[i].ecr_mask)
