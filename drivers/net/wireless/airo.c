@@ -970,7 +970,7 @@ typedef struct {
  * Host receive descriptor
  */
 typedef struct {
-	unsigned char *card_ram_off;	     /* offset into card memory of the
+	unsigned char __iomem *card_ram_off; /* offset into card memory of the
 						desc */
 	RxFid         rx_desc;		     /* card receive descriptor */
 	char          *virtual_host_addr;    /* virtual address of host receive
@@ -982,7 +982,7 @@ typedef struct {
  * Host transmit descriptor
  */
 typedef struct {
-	unsigned char *card_ram_off;	     /* offset into card memory of the
+	unsigned char __iomem *card_ram_off;	     /* offset into card memory of the
 						desc */
 	TxFid         tx_desc;		     /* card transmit descriptor */
 	char          *virtual_host_addr;    /* virtual address of host receive
@@ -994,7 +994,7 @@ typedef struct {
  * Host RID descriptor
  */
 typedef struct {
-	unsigned char *card_ram_off;      /* offset into card memory of the
+	unsigned char __iomem *card_ram_off;      /* offset into card memory of the
 					     descriptor */
 	Rid           rid_desc;		  /* card RID descriptor */
 	char          *virtual_host_addr; /* virtual address of host receive
@@ -1203,8 +1203,8 @@ struct airo_info {
 	unsigned long ridbus; // phys addr of config_desc
 	struct sk_buff_head txq;// tx queue used by mpi350 code
 	struct pci_dev          *pci;
-	unsigned char		*pcimem;
-	unsigned char		*pciaux;
+	unsigned char		__iomem *pcimem;
+	unsigned char		__iomem *pciaux;
 	unsigned char		*shared;
 	dma_addr_t		shared_dma;
 	int			power;
@@ -2029,8 +2029,8 @@ static int mpi_send_packet (struct net_device *dev)
 		memcpy(sendbuf, buffer, len);
 	}
 
-	memcpy((char *)ai->txfids[0].card_ram_off,
-		(char *)&ai->txfids[0].tx_desc, sizeof(TxFid));
+	memcpy_toio(ai->txfids[0].card_ram_off,
+		&ai->txfids[0].tx_desc, sizeof(TxFid));
 
 	OUT4500(ai, EVACK, 8);
 
@@ -2460,7 +2460,7 @@ static int mpi_init_descriptors (struct airo_info *ai)
 	}
 
 	for (i=0; i<MPI_MAX_FIDS; i++) {
-		memcpy(ai->rxfids[i].card_ram_off,
+		memcpy_toio(ai->rxfids[i].card_ram_off,
 			&ai->rxfids[i].rx_desc, sizeof(RxFid));
 	}
 
@@ -2476,7 +2476,7 @@ static int mpi_init_descriptors (struct airo_info *ai)
 
 	for (i=0; i<MPI_MAX_FIDS; i++) {
 		ai->txfids[i].tx_desc.valid = 1;
-		memcpy((char *)ai->txfids[i].card_ram_off,
+		memcpy_toio(ai->txfids[i].card_ram_off,
 			&ai->txfids[i].tx_desc, sizeof(TxFid));
 	}
 	ai->txfids[i-1].tx_desc.eoc = 1; /* Last descriptor has EOC set */
@@ -2501,8 +2501,8 @@ static int mpi_init_descriptors (struct airo_info *ai)
 		return rc;
 	}
 
-	memcpy((char *)ai->config_desc.card_ram_off,
-		(char *)&ai->config_desc.rid_desc, sizeof(Rid));
+	memcpy_toio(ai->config_desc.card_ram_off,
+		&ai->config_desc.rid_desc, sizeof(Rid));
 
 	return rc;
 }
@@ -2520,7 +2520,7 @@ static int mpi_map_card(struct airo_info *ai, struct pci_dev *pci,
 	int rc = -1;
 	int i;
 	unsigned char *busaddroff,*vpackoff;
-	unsigned char *pciaddroff;
+	unsigned char __iomem *pciaddroff;
 
 	mem_start = pci_resource_start(pci, 1);
 	mem_len = pci_resource_len(pci, 1);
@@ -3441,7 +3441,7 @@ static void mpi_receive_802_3(struct airo_info *ai)
 	MICBuffer micbuf;
 #endif
 
-	memcpy ((char *)&rxd, ai->rxfids[0].card_ram_off, sizeof(rxd));
+	memcpy_fromio(&rxd, ai->rxfids[0].card_ram_off, sizeof(rxd));
 	/* Make sure we got something */
 	if (rxd.rdy && rxd.valid == 0) {
 		len = rxd.len + 12;
@@ -3504,7 +3504,7 @@ badrx:
 		rxd.valid = 1;
 		rxd.rdy = 0;
 		rxd.len = PKTSIZE;
-		memcpy (ai->rxfids[0].card_ram_off, (char *)&rxd, sizeof(rxd));
+		memcpy_toio(ai->rxfids[0].card_ram_off, &rxd, sizeof(rxd));
 	}
 }
 
@@ -3526,7 +3526,7 @@ void mpi_receive_802_11 (struct airo_info *ai)
 	u16 *buffer;
 	char *ptr = ai->rxfids[0].virtual_host_addr+4;
 
-	memcpy ((char *)&rxd, ai->rxfids[0].card_ram_off, sizeof(rxd));
+	memcpy_fromio(&rxd, ai->rxfids[0].card_ram_off, sizeof(rxd));
 	memcpy ((char *)&hdr, ptr, sizeof(hdr));
 	ptr += sizeof(hdr);
 	/* Bad CRC. Ignore packet */
@@ -3610,7 +3610,7 @@ badrx:
 		rxd.valid = 1;
 		rxd.rdy = 0;
 		rxd.len = PKTSIZE;
-		memcpy (ai->rxfids[0].card_ram_off, (char *)&rxd, sizeof(rxd));
+		memcpy_toio(ai->rxfids[0].card_ram_off, &rxd, sizeof(rxd));
 	}
 }
 
@@ -3990,8 +3990,8 @@ static int PC4500_readrid(struct airo_info *ai, u16 rid, void *pBuf, int len, in
 		cmd.cmd = CMD_ACCESS;
 		cmd.parm0 = rid;
 
-		memcpy((char *)ai->config_desc.card_ram_off,
-			(char *)&ai->config_desc.rid_desc, sizeof(Rid));
+		memcpy_toio(ai->config_desc.card_ram_off,
+			&ai->config_desc.rid_desc, sizeof(Rid));
 
 		rc = issuecommand(ai, &cmd, &rsp);
 
@@ -4062,8 +4062,8 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
 		cmd.cmd = CMD_WRITERID;
 		cmd.parm0 = rid;
 
-		memcpy((char *)ai->config_desc.card_ram_off,
-			(char *)&ai->config_desc.rid_desc, sizeof(Rid));
+		memcpy_toio(ai->config_desc.card_ram_off,
+			&ai->config_desc.rid_desc, sizeof(Rid));
 
 		if (len < 4 || len > 2047) {
 			printk(KERN_ERR "%s: len=%d\n",__FUNCTION__,len);
@@ -7591,7 +7591,7 @@ int flashputbuf(struct airo_info *ai){
 
 	/* Write stuff */
 	if (test_bit(FLAG_MPI,&ai->flags))
-		memcpy(ai->pciaux + 0x8000, ai->flash, FLASHSIZE);
+		memcpy_toio(ai->pciaux + 0x8000, ai->flash, FLASHSIZE);
 	else {
 		OUT4500(ai,AUXPAGE,0x100);
 		OUT4500(ai,AUXOFF,0);
