@@ -292,6 +292,62 @@ static inline void write_super(struct super_block *sb)
 }
 
 /*
+ * triggered by the device mapper code to lock a filesystem and force
+ * it into a consistent state.
+ *
+ * This takes the block device bd_mount_sem to make sure no new mounts
+ * happen on bdev until unlockfs is called.  If a super is found on this
+ * block device, we hould a read lock on the s->s_umount sem to make sure
+ * nobody unmounts until the snapshot creation is done
+ */
+void sync_super_lockfs(struct block_device *bdev) 
+{
+	struct super_block *sb;
+	down(&bdev->bd_mount_sem);
+	sb = get_super(bdev);
+	if (sb) {
+		lock_super(sb);
+		if (sb->s_dirt && sb->s_op->write_super)
+			sb->s_op->write_super(sb);
+		if (sb->s_op->write_super_lockfs)
+			sb->s_op->write_super_lockfs(sb);
+		unlock_super(sb);
+	}
+	/* unlockfs releases s->s_umount and bd_mount_sem */
+}
+
+void unlockfs(struct block_device *bdev)
+{
+	struct list_head *p;
+	/*
+	 * copied from get_super, but we need to
+	 * do special things since lockfs left the
+	 * s_umount sem held
+	 */
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = sb_entry(p);
+		/*
+		 * if there is a super for this block device
+		 * in the list, get_super must have found it
+		 * during sync_super_lockfs, so our drop_super
+		 * will drop the reference created there.
+		 */
+		if (s->s_bdev == bdev && s->s_root) {
+			spin_unlock(&sb_lock);
+			if (s->s_op->unlockfs)
+				s->s_op->unlockfs(s);
+			drop_super(s);
+			goto unlock;
+		}
+	}
+	spin_unlock(&sb_lock);
+unlock:
+	up(&bdev->bd_mount_sem);
+}
+EXPORT_SYMBOL(unlockfs);
+
+/*
  * Note: check the dirty flag before waiting, so we don't
  * hold up the sync while mounting a device. (The newly
  * mounted device won't need syncing.)
@@ -612,7 +668,14 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	if (IS_ERR(bdev))
 		return (struct super_block *)bdev;
 
+	/*
+	 * once the super is inserted into the list by sget, s_umount
+	 * will protect the lockfs code from trying to start a snapshot
+	 * while we are mounting
+	 */
+	down(&bdev->bd_mount_sem);
 	s = sget(fs_type, test_bdev_super, set_bdev_super, bdev);
+	up(&bdev->bd_mount_sem);
 	if (IS_ERR(s))
 		goto out;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 Sistina Software (UK) Limited.
+ * Copyright (C) 2001-2003 Sistina Software (UK) Limited.
  *
  * This file is released under the GPL.
  */
@@ -166,7 +166,8 @@ static void stripe_dtr(struct dm_target *ti)
 	kfree(sc);
 }
 
-static int stripe_map(struct dm_target *ti, struct bio *bio)
+static int stripe_map(struct dm_target *ti, struct bio *bio,
+		      union map_info *map_context)
 {
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
 
@@ -211,6 +212,7 @@ static int stripe_status(struct dm_target *ti,
 
 static struct target_type stripe_target = {
 	.name   = "striped",
+	.version= {1, 0, 1},
 	.module = THIS_MODULE,
 	.ctr    = stripe_ctr,
 	.dtr    = stripe_dtr,

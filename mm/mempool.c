@@ -89,11 +89,6 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 }
 EXPORT_SYMBOL(mempool_create);
 
-/*
- * mempool_resize is disabled for now, because it has no callers.  Feel free
- * to turn it back on if needed.
- */
-#if 0
 /**
  * mempool_resize - resize an existing memory pool
  * @pool:       pointer to the memory pool which was allocated via
@@ -163,7 +158,6 @@ out:
 	return 0;
 }
 EXPORT_SYMBOL(mempool_resize);
-#endif
 
 /**
  * mempool_destroy - deallocate a memory pool

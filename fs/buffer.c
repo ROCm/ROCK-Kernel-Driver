@@ -260,6 +260,17 @@ int fsync_bdev(struct block_device *bdev)
 	return sync_blockdev(bdev);
 }
 
+int fsync_bdev_lockfs(struct block_device *bdev)
+{
+	int res;
+	res = fsync_bdev(bdev);
+	if (res)
+		return res;
+	sync_super_lockfs(bdev);
+	return sync_blockdev(bdev);
+}
+EXPORT_SYMBOL(fsync_bdev_lockfs);
+
 /*
  * sync everything.  Start out by waking pdflush, because that writes back
  * all queues in parallel.
