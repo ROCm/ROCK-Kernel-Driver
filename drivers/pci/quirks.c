@@ -33,7 +33,7 @@ static void __devinit quirk_passive_release(struct pci_dev *dev)
 	while ((d = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, d))) {
 		pci_read_config_byte(d, 0x82, &dlc);
 		if (!(dlc & 1<<1)) {
-			printk(KERN_ERR "PCI: PIIX3: Enabling Passive Release on %s\n", d->slot_name);
+			printk(KERN_ERR "PCI: PIIX3: Enabling Passive Release on %s\n", pci_name(d));
 			dlc |= 1<<1;
 			pci_write_config_byte(d, 0x82, dlc);
 		}
@@ -437,7 +437,7 @@ static void __devinit quirk_via_irqpic(struct pci_dev *dev)
 
 	if (new_irq != irq) {
 		printk(KERN_INFO "PCI: Via IRQ fixup for %s, from %d to %d\n",
-		       dev->slot_name, irq, new_irq);
+		       pci_name(dev), irq, new_irq);
 
 		udelay(15);
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, new_irq);
@@ -598,7 +598,7 @@ static void __devinit quirk_ide_bases(struct pci_dev *dev)
                return;
 
        printk(KERN_INFO "PCI: Ignoring BAR%d-%d of IDE controller %s\n",
-              first_bar, last_bar, dev->slot_name);
+              first_bar, last_bar, pci_name(dev));
 }
 
 /*
@@ -856,7 +856,7 @@ static void pci_do_fixups(struct pci_dev *dev, int pass, struct pci_fixup *f)
  		    (f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
  		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
 #ifdef DEBUG
-			printk(KERN_INFO "PCI: Calling quirk %p for %s\n", f->hook, dev->slot_name);
+			printk(KERN_INFO "PCI: Calling quirk %p for %s\n", f->hook, pci_name(dev));
 #endif
 			f->hook(dev);
 		}

@@ -212,7 +212,7 @@ static int detect_used_resource (struct acpiphp_bridge *bridge, struct pci_dev *
 	int count;
 	struct pci_resource *res;
 
-	dbg("Device %s\n", dev->slot_name);
+	dbg("Device %s\n", pci_name(dev));
 
 	for (count = 0; address[count]; count++) {	/* for 6 BARs */
 		pci_read_config_dword(dev, address[count], &bar);
@@ -337,7 +337,7 @@ int acpiphp_init_func_resource (struct acpiphp_func *func)
 	struct pci_dev *dev;
 
 	dev = func->pci_dev;
-	dbg("Hot-pluggable device %s\n", dev->slot_name);
+	dbg("Hot-pluggable device %s\n", pci_name(dev));
 
 	for (count = 0; address[count]; count++) {	/* for 6 BARs */
 		pci_read_config_dword(dev, address[count], &bar);
