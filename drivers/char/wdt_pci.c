@@ -15,7 +15,7 @@
  *
  *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
- *	Release 0.08.
+ *	Release 0.09.
  *
  *	Fixes
  *		Dave Gregorich	:	Modularisation and minor bugs
@@ -30,6 +30,7 @@
  *		Alan Cox	:	Split ISA and PCI cards into two drivers
  *		Jeff Garzik	:	PCI cleanups
  *		Tigran Aivazian	:	Restructured wdtpci_init_one() to handle failures
+ *		Matt Domsch	:	added nowayout and timeout module options
  */
 
 #include <linux/config.h>
@@ -82,6 +83,26 @@ static int io=0x240;
 static int irq=11;
 
 #define WD_TIMO (100*60)		/* 1 minute */
+
+static int timeout_val = WD_TIMO;	/* value passed to card */
+static int timeout = 60;	        /* in seconds */
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=60)");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
+static void __init
+wdtpci_validate_timeout(void)
+{
+	timeout_val = timeout * 100;
+}
 
 #ifndef MODULE
 
@@ -232,7 +253,7 @@ static void wdtpci_ping(void)
 	/* Write a watchdog value */
 	inb_p(WDT_DC);
 	wdtpci_ctr_mode(1,2);
-	wdtpci_ctr_load(1,WD_TIMO);		/* Timeout */
+	wdtpci_ctr_load(1,timeout_val);		/* Timeout */
 	outb_p(0, WDT_DC);
 }
 
@@ -357,9 +378,9 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 			{
 				return -EBUSY;
 			}
-#ifdef CONFIG_WATCHDOG_NOWAYOUT	
-			MOD_INC_USE_COUNT;
-#endif
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/*
 			 *	Activate 
 			 */
@@ -385,7 +406,7 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 			wdtpci_ctr_mode(1,2);
 			wdtpci_ctr_mode(2,1);
 			wdtpci_ctr_load(0,20833);	/* count at 100Hz */
-			wdtpci_ctr_load(1,WD_TIMO);/* Timeout 60 seconds */
+			wdtpci_ctr_load(1,timeout_val); /* Timeout */
 			/* DO NOT LOAD CTR2 on PCI card! -- JPN */
 			outb_p(0, WDT_DC);	/* Enable */
 			return 0;
@@ -412,10 +433,10 @@ static int wdtpci_release(struct inode *inode, struct file *file)
 {
 	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
 	{
-#ifndef CONFIG_WATCHDOG_NOWAYOUT	
-		inb_p(WDT_DC);		/* Disable counters */
-		wdtpci_ctr_load(2,0);	/* 0 length reset pulses now */
-#endif		
+		if (!nowayout) {
+			inb_p(WDT_DC);		/* Disable counters */
+			wdtpci_ctr_load(2,0);	/* 0 length reset pulses now */
+		}
 		clear_bit(0, &wdt_is_open );
 	}
 	return 0;
@@ -617,6 +638,8 @@ static int __init wdtpci_init(void)
 	
 	if (rc < 1)
 		return -ENODEV;
+
+	wdtpci_validate_timeout();
 	
 	return 0;
 }
