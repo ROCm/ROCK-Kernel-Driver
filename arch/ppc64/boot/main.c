@@ -134,7 +134,9 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 	for(claim_addr = PROG_START; 
 	    claim_addr <= PROG_START * 8; 
 	    claim_addr += 0x100000) {
+#ifdef DEBUG
 		printf("    trying: 0x%08lx\n\r", claim_addr);
+#endif
 		vmlinux.addr = (unsigned long)claim(claim_addr, claim_size, 0);
 		if ((void *)vmlinux.addr != (void *)-1) break;
 	}
@@ -180,8 +182,10 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 		if (elf64ph->p_type == PT_LOAD && elf64ph->p_offset != 0)
 			break;
 	}
+#ifdef DEBUG
 	printf("... skipping 0x%lx bytes of ELF header\n\r",
 			(unsigned long)elf64ph->p_offset);
+#endif
 	vmlinux.addr += (unsigned long)elf64ph->p_offset;
 	vmlinux.size -= (unsigned long)elf64ph->p_offset;
 
@@ -190,6 +194,7 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 	bi_recs = make_bi_recs(vmlinux.addr + vmlinux.memsize);
 
 	kernel_entry = (kernel_entry_t)vmlinux.addr;
+#ifdef DEBUG
 	printf( "kernel:\n\r"
 		"        entry addr = 0x%lx\n\r"
 		"        a1         = 0x%lx,\n\r"
@@ -198,6 +203,7 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 		"        bi_recs    = 0x%lx,\n\r",
 		(unsigned long)kernel_entry, a1, a2,
 		(unsigned long)prom, (unsigned long)bi_recs);
+#endif
 
 	kernel_entry( a1, a2, prom, bi_recs );
 
