@@ -35,7 +35,7 @@
 
 u8 llc_mac_null_var[IFHWADDRLEN];
 
-static void fix_up_incoming_skb(struct sk_buff *skb);
+static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
 static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
@@ -69,7 +69,8 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb)
 		goto out;
-	fix_up_incoming_skb(skb);
+	if (!fix_up_incoming_skb(skb))
+		goto drop;
 	pdu = llc_pdu_sn_hdr(skb);
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
 		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
@@ -172,11 +173,15 @@ drop:
  *	by looking at the two lowest-order bits of the first control field
  *	byte; field is either 3 or 4 bytes long.
  */
-static void fix_up_incoming_skb(struct sk_buff *skb)
+static int fix_up_incoming_skb(struct sk_buff *skb)
 {
 	u8 llc_len = 2;
-	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->data;
+	struct llc_pdu_sn *pdu;
 
+	if (!pskb_may_pull(skb, sizeof(*pdu)))
+		return 0;
+
+	pdu = (struct llc_pdu_sn *)skb->data;
 	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) == LLC_PDU_TYPE_U)
 		llc_len = 1;
 	llc_len += 2;
@@ -188,6 +193,7 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
 
 		skb_trim(skb, data_size);
 	}
+	return 1;
 }
 
 /*
