@@ -128,12 +128,29 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 	}
 }
 
+static void xrun(snd_pcm_substream_t *substream)
+{
+	snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+#ifdef CONFIG_SND_DEBUG
+	if (substream->pstr->xrun_debug) {
+		snd_printd(KERN_DEBUG "XRUN: pcmC%dD%d%c\n",
+			   substream->pcm->card->number,
+			   substream->pcm->device,
+			   substream->stream ? 'c' : 'p');
+		if (substream->pstr->xrun_debug > 1)
+			dump_stack();
+	}
+#endif
+}
+
 static inline snd_pcm_uframes_t snd_pcm_update_hw_ptr_pos(snd_pcm_substream_t *substream,
 							  snd_pcm_runtime_t *runtime)
 {
 	snd_pcm_uframes_t pos;
 
 	pos = substream->ops->pointer(substream);
+	if (pos == SNDRV_PCM_POS_XRUN)
+		return pos; /* XRUN */
 	if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
 		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp, runtime->tstamp_timespec);
 #ifdef CONFIG_SND_DEBUG
@@ -158,19 +175,10 @@ static inline int snd_pcm_update_hw_ptr_post(snd_pcm_substream_t *substream,
 	if (avail > runtime->avail_max)
 		runtime->avail_max = avail;
 	if (avail >= runtime->stop_threshold) {
-		snd_pcm_stop(substream,
-			     runtime->status->state == SNDRV_PCM_STATE_DRAINING ?
-			     SNDRV_PCM_STATE_SETUP : SNDRV_PCM_STATE_XRUN);
-#ifdef CONFIG_SND_DEBUG
-		if (substream->pstr->xrun_debug) {
-			snd_printd(KERN_DEBUG "XRUN: pcmC%dD%d%c\n",
-				   substream->pcm->card->number,
-				   substream->pcm->device,
-				   substream->stream ? 'c' : 'p');
-			if (substream->pstr->xrun_debug > 1)
-				dump_stack();
-		}
-#endif
+		if (substream->runtime->status->state == SNDRV_PCM_STATE_DRAINING)
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
+		else
+			xrun(substream);
 		return -EPIPE;
 	}
 	if (avail >= runtime->control->avail_min)
@@ -186,6 +194,10 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	snd_pcm_sframes_t delta;
 
 	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (pos == SNDRV_PCM_POS_XRUN) {
+		xrun(substream);
+		return -EPIPE;
+	}
 	if (runtime->period_size == runtime->buffer_size)
 		goto __next_buf;
 	new_hw_ptr = runtime->hw_ptr_base + pos;
@@ -230,6 +242,10 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 
 	old_hw_ptr = runtime->status->hw_ptr;
 	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (pos == SNDRV_PCM_POS_XRUN) {
+		xrun(substream);
+		return -EPIPE;
+	}
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 
 	delta = old_hw_ptr - new_hw_ptr;
