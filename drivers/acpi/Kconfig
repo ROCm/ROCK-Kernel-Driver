@@ -175,6 +175,21 @@ config ACPI_ASUS
           driver is still under development, so if your laptop is unsupported or
           something works not quite as expected, please use the mailing list
           available on the above page (acpi4asus-user@lists.sourceforge.net)
+
+config ACPI_SONY
+        tristate "Sony Laptop Extras"
+	depends on X86
+	depends on ACPI_INTERPRETER
+	default m
+        ---help---
+	  This mini-driver drives the ACPI SNC device present in the
+	  ACPI BIOS of the Sony Vaio laptops.
+
+	  It gives access to some extra laptop functionalities. In
+	  its current form, the only thing this driver does is letting
+	  the user set or query the screen brightness.
+
+	  Read <Documentation/sony_acpi.txt> for more information.
           
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
