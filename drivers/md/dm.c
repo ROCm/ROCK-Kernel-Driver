@@ -27,11 +27,6 @@ struct dm_io {
 	atomic_t io_count;
 };
 
-struct deferred_io {
-	struct bio *bio;
-	struct deferred_io *next;
-};
-
 /*
  * Bits for the md->flags field.
  */
@@ -52,7 +47,7 @@ struct mapped_device {
 	 */
 	atomic_t pending;
 	wait_queue_head_t wait;
-	struct deferred_io *deferred;
+	struct bio *deferred;
 
 	/*
 	 * The current mapping.
@@ -188,38 +183,20 @@ static inline void free_io(struct mapped_device *md, struct dm_io *io)
 	mempool_free(io, md->io_pool);
 }
 
-static inline struct deferred_io *alloc_deferred(void)
-{
-	return kmalloc(sizeof(struct deferred_io), GFP_NOIO);
-}
-
-static inline void free_deferred(struct deferred_io *di)
-{
-	kfree(di);
-}
-
 /*
  * Add the bio to the list of deferred io.
  */
 static int queue_io(struct mapped_device *md, struct bio *bio)
 {
-	struct deferred_io *di;
-
-	di = alloc_deferred();
-	if (!di)
-		return -ENOMEM;
-
 	down_write(&md->lock);
 
 	if (!test_bit(DMF_BLOCK_IO, &md->flags)) {
 		up_write(&md->lock);
-		free_deferred(di);
 		return 1;
 	}
 
-	di->bio = bio;
-	di->next = md->deferred;
-	md->deferred = di;
+	bio->bi_next = md->deferred;
+	md->deferred = bio;
 
 	up_write(&md->lock);
 	return 0;		/* deferred successfully */
@@ -743,14 +720,14 @@ void dm_put(struct mapped_device *md)
 /*
  * Requeue the deferred bios by calling generic_make_request.
  */
-static void flush_deferred_io(struct deferred_io *c)
+static void flush_deferred_io(struct bio *c)
 {
-	struct deferred_io *n;
+	struct bio *n;
 
 	while (c) {
-		n = c->next;
-		generic_make_request(c->bio);
-		free_deferred(c);
+		n = c->bi_next;
+		c->bi_next = NULL;
+		generic_make_request(c);
 		c = n;
 	}
 }
@@ -832,7 +809,7 @@ int dm_suspend(struct mapped_device *md)
 
 int dm_resume(struct mapped_device *md)
 {
-	struct deferred_io *def;
+	struct bio *def;
 
 	down_write(&md->lock);
 	if (!md->map ||
