@@ -112,6 +112,7 @@ struct usb_skel {
 	struct completion	write_finished;		/* wait for the write to finish */
 
 	int			open;			/* if the port is open or not */
+	int			present;		/* if the device is not disconnected */
 	struct semaphore	sem;			/* locks this structure */
 };
 
@@ -296,7 +297,7 @@ static int skel_release (struct inode *inode, struct file *file)
 
 	dev->open = 0;
 
-	if (dev->udev == NULL) {
+	if (!dev->present) {
 		/* the device was unplugged before the file was released */
 		up (&dev->sem);
 		skel_delete (dev);
@@ -326,7 +327,7 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 	down (&dev->sem);
 
 	/* verify that the device wasn't unplugged */
-	if (dev->udev == NULL) {
+	if (!dev->present) {
 		up (&dev->sem);
 		return -ENODEV;
 	}
@@ -382,7 +383,7 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 	down (&dev->sem);
 
 	/* verify that the device wasn't unplugged */
-	if (dev->udev == NULL) {
+	if (!dev->present) {
 		retval = -ENODEV;
 		goto exit;
 	}
@@ -452,7 +453,7 @@ static int skel_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	down (&dev->sem);
 
 	/* verify that the device wasn't unplugged */
-	if (dev->udev == NULL) {
+	if (!dev->present) {
 		up (&dev->sem);
 		return -ENODEV;
 	}
@@ -507,8 +508,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	size_t buffer_size;
 	int i;
 	int retval;
-	char name[14];
-
 
 	/* See if the device offered us matches what we can accept */
 	if ((udev->descriptor.idVendor != USB_SKEL_VENDOR_ID) ||
@@ -580,7 +579,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 			 */
 			buffer_size = endpoint->wMaxPacketSize;
 			dev->bulk_out_size = buffer_size;
-			dev->write_urb->transfer_flags = (URB_NO_DMA_MAP |
+			dev->write_urb->transfer_flags = (URB_NO_TRANSFER_DMA_MAP |
 					URB_ASYNC_UNLINK);
 			dev->bulk_out_buffer = usb_buffer_alloc (udev,
 					buffer_size, GFP_KERNEL,
@@ -600,6 +599,9 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		err("Couldn't find both bulk-in and bulk-out endpoints");
 		goto error;
 	}
+
+	/* allow device read, write and ioctl */
+	dev->present = 1;
 
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
@@ -663,10 +665,12 @@ static void skel_disconnect(struct usb_interface *interface)
 		wait_for_completion (&dev->write_finished);
 	}
 
-	dev->udev = NULL;
+	/* prevent device read, write and ioctl */
+	dev->present = 0;
+
 	up (&dev->sem);
 
-	/* if the device is not opened, then we clean up right now */
+	/* if the device is opened, skel_release will clean this up */
 	if (!dev->open)
 		skel_delete (dev);
 
