@@ -21,6 +21,7 @@
 #define EXT2_XATTR_INDEX_USER			1
 #define EXT2_XATTR_INDEX_POSIX_ACL_ACCESS	2
 #define EXT2_XATTR_INDEX_POSIX_ACL_DEFAULT	3
+#define EXT2_XATTR_INDEX_TRUSTED		4
 
 struct ext2_xattr_header {
 	__u32	h_magic;	/* magic number for identification */
@@ -132,4 +133,5 @@ exit_ext2_xattr(void)
 # endif  /* CONFIG_EXT2_FS_XATTR */
 
 extern struct ext2_xattr_handler ext2_xattr_user_handler;
+extern struct ext2_xattr_handler ext2_xattr_trusted_handler;
 
