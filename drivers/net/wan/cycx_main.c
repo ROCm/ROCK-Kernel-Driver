@@ -220,7 +220,7 @@ static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 	}
 
 	/* Configure hardware, load firmware, etc. */
-	memset(&card->hw, 0, sizeof(cycxhw_t));
+	memset(&card->hw, 0, sizeof(card->hw));
 	card->hw.irq	 = irq;
 	card->hw.dpmbase = conf->maddr;
 	card->hw.dpmsize = CYCX_WINDOWSIZE;

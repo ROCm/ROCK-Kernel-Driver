@@ -44,8 +44,8 @@
  * static data would do it.
  */
 struct cycx_device {
-	char devname[WAN_DRVNAME_SZ+1];	/* card name */
-	cycxhw_t hw;			/* hardware configuration */
+	char devname[WAN_DRVNAME_SZ + 1];/* card name */
+	struct cycx_hw hw;		/* hardware configuration */
 	struct wan_device wandev;	/* WAN device data space */
 	u32 state_tick;			/* link state timestamp */
 	spinlock_t lock;

@@ -3,7 +3,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2000 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on sdladrv.h by Gene Kozin <genek@compuserve.com>
 *
@@ -41,24 +41,29 @@
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
 
-/* Data Structures */
-/* Adapter hardware configuration. Pointer to this structure is passed to all
- * APIs.  */
-typedef struct cycxhw {
-	u32 fwid;		/* firmware ID */
-	int irq;		/* interrupt request level */
-	u32 dpmbase;		/* dual-port memory base */
-	u32 dpmsize;		/* dual-port memory size */
+/**
+ *	struct cycx_hw - Adapter hardware configuration
+ *	@fwid - firmware ID
+ *	@irq - interrupt request level
+ *	@dpmbase - dual-port memory base
+ *	@dpmsize - dual-port memory size
+ *	@reserved - reserved for future use
+ */
+struct cycx_hw {
+	u32 fwid;
+	int irq;
+	u32 dpmbase;
+	u32 dpmsize;
 	u32 reserved[5];
-} cycxhw_t;
+};
 
 /* Function Prototypes */
-extern int cycx_setup (cycxhw_t *hw, void *sfm, u32 len);
-extern int cycx_down (cycxhw_t *hw);
-extern int cycx_peek (cycxhw_t *hw, u32 addr, void *buf, u32 len);
-extern int cycx_poke (cycxhw_t *hw, u32 addr, void *buf, u32 len);
-extern int cycx_exec (u32 addr);
+extern int cycx_setup(struct cycx_hw *hw, void *sfm, u32 len);
+extern int cycx_down(struct cycx_hw *hw);
+extern int cycx_peek(struct cycx_hw *hw, u32 addr, void *buf, u32 len);
+extern int cycx_poke(struct cycx_hw *hw, u32 addr, void *buf, u32 len);
+extern int cycx_exec(u32 addr);
 
-extern void cycx_inten (cycxhw_t *hw);
-extern void cycx_intr (cycxhw_t *hw);
+extern void cycx_inten(struct cycx_hw *hw);
+extern void cycx_intr(struct cycx_hw *hw);
 #endif	/* _CYCX_DRV_H */
