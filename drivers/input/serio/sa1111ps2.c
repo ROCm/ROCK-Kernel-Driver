@@ -145,6 +145,8 @@ static int ps2_open(struct serio *io)
 
 	ps2if->open = 1;
 
+	enable_irq_wake(ps2if->dev->irq[0]);
+
 	sa1111_writel(PS2CR_ENA, ps2if->base + SA1111_PS2CR);
 	return 0;
 }
@@ -154,6 +156,8 @@ static void ps2_close(struct serio *io)
 	struct ps2if *ps2if = io->driver;
 
 	sa1111_writel(0, ps2if->base + SA1111_PS2CR);
+
+	disable_irq_wake(ps2if->dev->irq[0]);
 
 	ps2if->open = 0;
 

@@ -88,6 +88,15 @@ static inline void __init neponset_init_irq(void)
 	set_irq_chained_handler(IRQ_GPIO25, neponset_irq_handler);
 
 	/*
+	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but
+	 * unfortunately something on the Neponset activates
+	 * this IRQ on sleep (ethernet?)
+	 */
+#if 0
+	enable_irq_wake(IRQ_GPIO25);
+#endif
+
+	/*
 	 * Setup other Neponset IRQs.  SA1111 will be done by the
 	 * generic SA1111 code.
 	 */
