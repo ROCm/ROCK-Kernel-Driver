@@ -63,6 +63,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 				   __u32 highest_new_tsn);
 
 static void sctp_mark_missing(struct sctp_outq *q,
+			      struct list_head *transmitted_queue,
 			      struct sctp_transport *transport,
 			      __u32 highest_new_tsn,
 			      int count_of_newacks);
@@ -1304,6 +1305,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	 * and free those chunks that we can.
 	 */
 	sctp_check_transmitted(q, &q->retransmit, NULL, sack, highest_new_tsn);
+	sctp_mark_missing(q, &q->retransmit, NULL, highest_new_tsn, 0);
 
 	/* Run through the transmitted queue.
 	 * Credit bytes received and free those chunks which we can.
@@ -1327,8 +1329,8 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	list_for_each(pos, transport_list) {
 		transport  = list_entry(pos, struct sctp_transport,
 					transports);
-		sctp_mark_missing(q, transport, highest_new_tsn,
-				  count_of_newacks);
+		sctp_mark_missing(q, &transport->transmitted, transport, 
+				  highest_new_tsn, count_of_newacks);
 	}
 
 	/* Move the Cumulative TSN Ack Point if appropriate.  */
@@ -1731,6 +1733,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 /* Mark chunks as missing and consequently may get retransmitted. */
 static void sctp_mark_missing(struct sctp_outq *q,
+			      struct list_head *transmitted_queue,
 			      struct sctp_transport *transport,
 			      __u32 highest_new_tsn_in_sack,
 			      int count_of_newacks)
@@ -1741,7 +1744,7 @@ static void sctp_mark_missing(struct sctp_outq *q,
 	char do_fast_retransmit = 0;
 	struct sctp_transport *primary = q->asoc->peer.primary_path;
 
-	list_for_each(pos, &transport->transmitted) {
+	list_for_each(pos, transmitted_queue) {
 
 		chunk = list_entry(pos, struct sctp_chunk, transmitted_list);
 		tsn = ntohl(chunk->subh.data_hdr->tsn);
@@ -1760,7 +1763,7 @@ static void sctp_mark_missing(struct sctp_outq *q,
 			/* SFR-CACC may require us to skip marking
 			 * this chunk as missing. 
 			 */
-			if (!sctp_cacc_skip(primary, transport,
+			if (!transport || !sctp_cacc_skip(primary, transport,
 					    count_of_newacks, tsn)) {
 				chunk->tsn_missing_report++;
 				
