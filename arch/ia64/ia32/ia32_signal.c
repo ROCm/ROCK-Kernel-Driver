@@ -219,6 +219,7 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	struct _fpreg_ia32 *fpregp;
 	char buf[32];
 	unsigned long fsr, fcr, fir, fdr;
+	unsigned long new_fsr;
 	unsigned long num128[2];
 	unsigned long mxcsr=0;
 	int fp_tos, fr8_st_map;
@@ -231,6 +232,13 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
 	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
 	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
+	/*
+	 * We need to clear the exception state before calling the signal
+	 * handler. Clear the bits 15, bits 0-7 in fp status word. Similar
+	 * to the functionality of fnclex instruction.
+	 */ 
+	new_fsr = fsr & (~0x80ff) ;
+	asm volatile ( "mov ar.fsr=%0;" :: "r"(new_fsr));
 
 	__put_user(fcr & 0xffff, &save->cw);
 	__put_user(fsr & 0xffff, &save->sw);
