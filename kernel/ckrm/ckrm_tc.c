@@ -140,7 +140,6 @@ ckrm_task_unlock(struct task_struct *tsk)
  * Function is also called with a ckrm_core_grab on the new core, hence
  * it needs to be dropped if no assignment takes place.
  */
-
 static void
 ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls, 
 		   ckrm_task_class_t *oldcls, enum ckrm_event event)
@@ -154,6 +153,21 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 
 	ckrm_task_lock(tsk);
 	curcls = tsk->taskclass;
+
+	if ((void *) -1 == curcls) {
+		// task is disassociated from ckrm... don't bother it.
+		ckrm_task_unlock(tsk);
+		ckrm_core_drop(class_core(newcls));
+		return;
+	}
+
+	if ((curcls == NULL) && (newcls == (void *) -1)) {
+		// task need to disassociated from ckrm and has no curcls
+		// just disassociate and return.
+		tsk->taskclass = newcls;
+		ckrm_task_unlock(tsk);
+		return;
+	}
 
 	// check whether compare_and_exchange should
 	if (oldcls && (oldcls != curcls)) {
@@ -188,6 +202,11 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 		INIT_LIST_HEAD(&tsk->taskclass_link);
 		tsk->taskclass = NULL;
 		class_unlock(class_core(curcls));
+		if (newcls == (void*) -1) {
+			tsk->taskclass = newcls;
+			ckrm_task_unlock(tsk);
+			goto out;
+		}
 	}	
 
 	// put into new class 
@@ -308,25 +327,8 @@ cb_taskclass_fork(struct task_struct *tsk)
 static void
 cb_taskclass_exit(struct task_struct *tsk)
 {
-	ckrm_task_class_t *cls;
-
-	// Remove the task from the current core class
-	
-	ECB_PRINTK("%p:%d:%s\n",tsk,tsk->pid,tsk->comm);
-	ckrm_task_lock(tsk);
-
-	CE_CLASSIFY_NORET( &CT_taskclass, CKRM_EVENT_EXIT, tsk);
-
-	if ((cls = tsk->taskclass) != NULL) {
-		class_lock(class_core(cls));
-		tsk->taskclass = NULL;
-		list_del(&tsk->taskclass_link);
-		class_unlock(class_core(cls));
-		ckrm_core_drop(class_core(cls));
-	} else {
-		INIT_LIST_HEAD(&tsk->taskclass_link);
-	}
-	ckrm_task_unlock(tsk);
+	CE_CLASSIFY_NORET(&CT_taskclass, CKRM_EVENT_EXIT, tsk);
+	ckrm_set_taskclass(tsk, (void *)-1, NULL, CKRM_EVENT_EXIT);
 }
 
 static void
@@ -606,9 +608,12 @@ ckrm_forced_reclassify_pid(pid_t pid, struct ckrm_task_class *cls)
 
 	/* Check permissions */
 	if ((!capable(CAP_SYS_NICE)) &&
-		(!capable(CAP_SYS_RESOURCE)) && 
-		(current->user != tsk->user))
+			(!capable(CAP_SYS_RESOURCE)) && 
+			(current->user != tsk->user)) {
+		ckrm_core_drop(class_core(cls));
+		put_task_struct(tsk);
 		return -EPERM;
+	}
 	
 	down(&async_serializer);   // protect again race condition
 	

@@ -227,7 +227,6 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 	if (!dn) {
 		printk(KERN_WARNING "PCI: no pci dn found for dev=%s %s\n",
 			pci_name(dev), pci_pretty_name(dev));
-		pci_dev_put(dev);
 		return;
 	}
 
@@ -238,9 +237,9 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 		printk(KERN_INFO "PCI: skip building address cache for=%s %s\n",
 		       pci_name(dev), pci_pretty_name(dev));
 #endif
-		pci_dev_put(dev);
 		return;
 	}
+	pci_dev_get(dev);
 
 	/* Walk resources on this device, poke them into the tree */
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -330,7 +329,6 @@ void __init pci_addr_cache_build(void)
 	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/* Ignore PCI bridges ( XXX why ??) */
 		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE) {
-			pci_dev_put(dev);
 			continue;
 		}
 		pci_addr_cache_insert_device(dev);
@@ -785,7 +783,6 @@ void eeh_add_device_late(struct pci_dev *dev)
 	       pci_pretty_name(dev));
 #endif
 
-	pci_dev_get (dev);
 	pci_addr_cache_insert_device (dev);
 }
 EXPORT_SYMBOL(eeh_add_device_late);
