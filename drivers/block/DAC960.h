@@ -2282,8 +2282,8 @@ DAC960_Command_T;
 
 typedef struct DAC960_Controller
 {
-  void *BaseAddress;
-  void *MemoryMappedAddress;
+  void __iomem *BaseAddress;
+  void __iomem *MemoryMappedAddress;
   DAC960_FirmwareType_T FirmwareType;
   DAC960_HardwareType_T HardwareType;
   DAC960_IO_Address_T IO_Address;
@@ -2527,7 +2527,7 @@ DAC960_Controller_T;
  * dma_addr_t.
  */
 static inline
-void dma_addr_writeql(dma_addr_t addr, void *write_address)
+void dma_addr_writeql(dma_addr_t addr, void __iomem *write_address)
 {
 	union {
 		u64 wq;
@@ -2643,7 +2643,7 @@ DAC960_BA_ErrorStatusRegister_T;
 */
 
 static inline
-void DAC960_BA_HardwareMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_BA_HardwareMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2653,7 +2653,7 @@ void DAC960_BA_HardwareMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
+void DAC960_BA_AcknowledgeHardwareMailboxStatus(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2663,7 +2663,7 @@ void DAC960_BA_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_GenerateInterrupt(void *ControllerBaseAddress)
+void DAC960_BA_GenerateInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2673,7 +2673,7 @@ void DAC960_BA_GenerateInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_ControllerReset(void *ControllerBaseAddress)
+void DAC960_BA_ControllerReset(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2683,7 +2683,7 @@ void DAC960_BA_ControllerReset(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_MemoryMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_BA_MemoryMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2693,7 +2693,7 @@ void DAC960_BA_MemoryMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_BA_HardwareMailboxFullP(void *ControllerBaseAddress)
+boolean DAC960_BA_HardwareMailboxFullP(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -2702,7 +2702,7 @@ boolean DAC960_BA_HardwareMailboxFullP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_BA_InitializationInProgressP(void *ControllerBaseAddress)
+boolean DAC960_BA_InitializationInProgressP(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -2711,7 +2711,7 @@ boolean DAC960_BA_InitializationInProgressP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_BA_AcknowledgeHardwareMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -2721,7 +2721,7 @@ void DAC960_BA_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_BA_AcknowledgeMemoryMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -2731,7 +2731,7 @@ void DAC960_BA_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_AcknowledgeInterrupt(void *ControllerBaseAddress)
+void DAC960_BA_AcknowledgeInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -2742,7 +2742,7 @@ void DAC960_BA_AcknowledgeInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_BA_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_BA_HardwareMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -2751,7 +2751,7 @@ boolean DAC960_BA_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_BA_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_BA_MemoryMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -2760,7 +2760,7 @@ boolean DAC960_BA_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_EnableInterrupts(void *ControllerBaseAddress)
+void DAC960_BA_EnableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -2771,7 +2771,7 @@ void DAC960_BA_EnableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_BA_DisableInterrupts(void *ControllerBaseAddress)
+void DAC960_BA_DisableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -2782,7 +2782,7 @@ void DAC960_BA_DisableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_BA_InterruptsEnabledP(void *ControllerBaseAddress)
+boolean DAC960_BA_InterruptsEnabledP(void __iomem *ControllerBaseAddress)
 {
   DAC960_BA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All =
@@ -2805,7 +2805,7 @@ void DAC960_BA_WriteCommandMailbox(DAC960_V2_CommandMailbox_T
 
 
 static inline
-void DAC960_BA_WriteHardwareMailbox(void *ControllerBaseAddress,
+void DAC960_BA_WriteHardwareMailbox(void __iomem *ControllerBaseAddress,
 				    dma_addr_t CommandMailboxDMA)
 {
 	dma_addr_writeql(CommandMailboxDMA,
@@ -2814,19 +2814,19 @@ void DAC960_BA_WriteHardwareMailbox(void *ControllerBaseAddress,
 }
 
 static inline DAC960_V2_CommandIdentifier_T
-DAC960_BA_ReadCommandIdentifier(void *ControllerBaseAddress)
+DAC960_BA_ReadCommandIdentifier(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_BA_CommandStatusOffset);
 }
 
 static inline DAC960_V2_CommandStatus_T
-DAC960_BA_ReadCommandStatus(void *ControllerBaseAddress)
+DAC960_BA_ReadCommandStatus(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_BA_CommandStatusOffset + 2);
 }
 
 static inline boolean
-DAC960_BA_ReadErrorStatus(void *ControllerBaseAddress,
+DAC960_BA_ReadErrorStatus(void __iomem *ControllerBaseAddress,
 			  unsigned char *ErrorStatus,
 			  unsigned char *Parameter0,
 			  unsigned char *Parameter1)
@@ -2948,7 +2948,7 @@ DAC960_LP_ErrorStatusRegister_T;
 */
 
 static inline
-void DAC960_LP_HardwareMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_LP_HardwareMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2958,7 +2958,7 @@ void DAC960_LP_HardwareMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
+void DAC960_LP_AcknowledgeHardwareMailboxStatus(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2968,7 +2968,7 @@ void DAC960_LP_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_GenerateInterrupt(void *ControllerBaseAddress)
+void DAC960_LP_GenerateInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2978,7 +2978,7 @@ void DAC960_LP_GenerateInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_ControllerReset(void *ControllerBaseAddress)
+void DAC960_LP_ControllerReset(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2988,7 +2988,7 @@ void DAC960_LP_ControllerReset(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_MemoryMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_LP_MemoryMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -2998,7 +2998,7 @@ void DAC960_LP_MemoryMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LP_HardwareMailboxFullP(void *ControllerBaseAddress)
+boolean DAC960_LP_HardwareMailboxFullP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3007,7 +3007,7 @@ boolean DAC960_LP_HardwareMailboxFullP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LP_InitializationInProgressP(void *ControllerBaseAddress)
+boolean DAC960_LP_InitializationInProgressP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3016,7 +3016,7 @@ boolean DAC960_LP_InitializationInProgressP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_LP_AcknowledgeHardwareMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3026,7 +3026,7 @@ void DAC960_LP_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_LP_AcknowledgeMemoryMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3036,7 +3036,7 @@ void DAC960_LP_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_AcknowledgeInterrupt(void *ControllerBaseAddress)
+void DAC960_LP_AcknowledgeInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3047,7 +3047,7 @@ void DAC960_LP_AcknowledgeInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LP_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_LP_HardwareMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3056,7 +3056,7 @@ boolean DAC960_LP_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LP_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_LP_MemoryMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3065,7 +3065,7 @@ boolean DAC960_LP_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_EnableInterrupts(void *ControllerBaseAddress)
+void DAC960_LP_EnableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -3075,7 +3075,7 @@ void DAC960_LP_EnableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LP_DisableInterrupts(void *ControllerBaseAddress)
+void DAC960_LP_DisableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -3085,7 +3085,7 @@ void DAC960_LP_DisableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LP_InterruptsEnabledP(void *ControllerBaseAddress)
+boolean DAC960_LP_InterruptsEnabledP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LP_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All =
@@ -3107,7 +3107,7 @@ void DAC960_LP_WriteCommandMailbox(DAC960_V2_CommandMailbox_T
 }
 
 static inline
-void DAC960_LP_WriteHardwareMailbox(void *ControllerBaseAddress,
+void DAC960_LP_WriteHardwareMailbox(void __iomem *ControllerBaseAddress,
 				    dma_addr_t CommandMailboxDMA)
 {
 	dma_addr_writeql(CommandMailboxDMA,
@@ -3116,19 +3116,19 @@ void DAC960_LP_WriteHardwareMailbox(void *ControllerBaseAddress,
 }
 
 static inline DAC960_V2_CommandIdentifier_T
-DAC960_LP_ReadCommandIdentifier(void *ControllerBaseAddress)
+DAC960_LP_ReadCommandIdentifier(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_LP_CommandStatusOffset);
 }
 
 static inline DAC960_V2_CommandStatus_T
-DAC960_LP_ReadCommandStatus(void *ControllerBaseAddress)
+DAC960_LP_ReadCommandStatus(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_LP_CommandStatusOffset + 2);
 }
 
 static inline boolean
-DAC960_LP_ReadErrorStatus(void *ControllerBaseAddress,
+DAC960_LP_ReadErrorStatus(void __iomem *ControllerBaseAddress,
 			  unsigned char *ErrorStatus,
 			  unsigned char *Parameter0,
 			  unsigned char *Parameter1)
@@ -3262,7 +3262,7 @@ DAC960_LA_ErrorStatusRegister_T;
 */
 
 static inline
-void DAC960_LA_HardwareMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_LA_HardwareMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3272,7 +3272,7 @@ void DAC960_LA_HardwareMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
+void DAC960_LA_AcknowledgeHardwareMailboxStatus(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3282,7 +3282,7 @@ void DAC960_LA_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_GenerateInterrupt(void *ControllerBaseAddress)
+void DAC960_LA_GenerateInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3292,7 +3292,7 @@ void DAC960_LA_GenerateInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_ControllerReset(void *ControllerBaseAddress)
+void DAC960_LA_ControllerReset(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3302,7 +3302,7 @@ void DAC960_LA_ControllerReset(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_MemoryMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_LA_MemoryMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3312,7 +3312,7 @@ void DAC960_LA_MemoryMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LA_HardwareMailboxFullP(void *ControllerBaseAddress)
+boolean DAC960_LA_HardwareMailboxFullP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3321,7 +3321,7 @@ boolean DAC960_LA_HardwareMailboxFullP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LA_InitializationInProgressP(void *ControllerBaseAddress)
+boolean DAC960_LA_InitializationInProgressP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3330,7 +3330,7 @@ boolean DAC960_LA_InitializationInProgressP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_LA_AcknowledgeHardwareMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3340,7 +3340,7 @@ void DAC960_LA_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_LA_AcknowledgeMemoryMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3350,7 +3350,7 @@ void DAC960_LA_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_AcknowledgeInterrupt(void *ControllerBaseAddress)
+void DAC960_LA_AcknowledgeInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3361,7 +3361,7 @@ void DAC960_LA_AcknowledgeInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LA_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_LA_HardwareMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3370,7 +3370,7 @@ boolean DAC960_LA_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LA_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_LA_MemoryMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3379,7 +3379,7 @@ boolean DAC960_LA_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_EnableInterrupts(void *ControllerBaseAddress)
+void DAC960_LA_EnableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -3389,7 +3389,7 @@ void DAC960_LA_EnableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_LA_DisableInterrupts(void *ControllerBaseAddress)
+void DAC960_LA_DisableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0xFF;
@@ -3399,7 +3399,7 @@ void DAC960_LA_DisableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_LA_InterruptsEnabledP(void *ControllerBaseAddress)
+boolean DAC960_LA_InterruptsEnabledP(void __iomem *ControllerBaseAddress)
 {
   DAC960_LA_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All =
@@ -3422,7 +3422,7 @@ void DAC960_LA_WriteCommandMailbox(DAC960_V1_CommandMailbox_T
 }
 
 static inline
-void DAC960_LA_WriteHardwareMailbox(void *ControllerBaseAddress,
+void DAC960_LA_WriteHardwareMailbox(void __iomem *ControllerBaseAddress,
 				    DAC960_V1_CommandMailbox_T *CommandMailbox)
 {
   writel(CommandMailbox->Words[0],
@@ -3436,20 +3436,20 @@ void DAC960_LA_WriteHardwareMailbox(void *ControllerBaseAddress,
 }
 
 static inline DAC960_V1_CommandIdentifier_T
-DAC960_LA_ReadStatusCommandIdentifier(void *ControllerBaseAddress)
+DAC960_LA_ReadStatusCommandIdentifier(void __iomem *ControllerBaseAddress)
 {
   return readb(ControllerBaseAddress
 	       + DAC960_LA_StatusCommandIdentifierRegOffset);
 }
 
 static inline DAC960_V1_CommandStatus_T
-DAC960_LA_ReadStatusRegister(void *ControllerBaseAddress)
+DAC960_LA_ReadStatusRegister(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_LA_StatusRegisterOffset);
 }
 
 static inline boolean
-DAC960_LA_ReadErrorStatus(void *ControllerBaseAddress,
+DAC960_LA_ReadErrorStatus(void __iomem *ControllerBaseAddress,
 			  unsigned char *ErrorStatus,
 			  unsigned char *Parameter0,
 			  unsigned char *Parameter1)
@@ -3583,7 +3583,7 @@ DAC960_PG_ErrorStatusRegister_T;
 */
 
 static inline
-void DAC960_PG_HardwareMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_PG_HardwareMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3593,7 +3593,7 @@ void DAC960_PG_HardwareMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
+void DAC960_PG_AcknowledgeHardwareMailboxStatus(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3603,7 +3603,7 @@ void DAC960_PG_AcknowledgeHardwareMailboxStatus(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_GenerateInterrupt(void *ControllerBaseAddress)
+void DAC960_PG_GenerateInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3613,7 +3613,7 @@ void DAC960_PG_GenerateInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_ControllerReset(void *ControllerBaseAddress)
+void DAC960_PG_ControllerReset(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3623,7 +3623,7 @@ void DAC960_PG_ControllerReset(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_MemoryMailboxNewCommand(void *ControllerBaseAddress)
+void DAC960_PG_MemoryMailboxNewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3633,7 +3633,7 @@ void DAC960_PG_MemoryMailboxNewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PG_HardwareMailboxFullP(void *ControllerBaseAddress)
+boolean DAC960_PG_HardwareMailboxFullP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3642,7 +3642,7 @@ boolean DAC960_PG_HardwareMailboxFullP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PG_InitializationInProgressP(void *ControllerBaseAddress)
+boolean DAC960_PG_InitializationInProgressP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3651,7 +3651,7 @@ boolean DAC960_PG_InitializationInProgressP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_PG_AcknowledgeHardwareMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3661,7 +3661,7 @@ void DAC960_PG_AcknowledgeHardwareMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
+void DAC960_PG_AcknowledgeMemoryMailboxInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3671,7 +3671,7 @@ void DAC960_PG_AcknowledgeMemoryMailboxInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_AcknowledgeInterrupt(void *ControllerBaseAddress)
+void DAC960_PG_AcknowledgeInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3682,7 +3682,7 @@ void DAC960_PG_AcknowledgeInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PG_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_PG_HardwareMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3691,7 +3691,7 @@ boolean DAC960_PG_HardwareMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PG_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_PG_MemoryMailboxStatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3700,7 +3700,7 @@ boolean DAC960_PG_MemoryMailboxStatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_EnableInterrupts(void *ControllerBaseAddress)
+void DAC960_PG_EnableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0;
@@ -3712,7 +3712,7 @@ void DAC960_PG_EnableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PG_DisableInterrupts(void *ControllerBaseAddress)
+void DAC960_PG_DisableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All = 0;
@@ -3724,7 +3724,7 @@ void DAC960_PG_DisableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PG_InterruptsEnabledP(void *ControllerBaseAddress)
+boolean DAC960_PG_InterruptsEnabledP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PG_InterruptMaskRegister_T InterruptMaskRegister;
   InterruptMaskRegister.All =
@@ -3747,7 +3747,7 @@ void DAC960_PG_WriteCommandMailbox(DAC960_V1_CommandMailbox_T
 }
 
 static inline
-void DAC960_PG_WriteHardwareMailbox(void *ControllerBaseAddress,
+void DAC960_PG_WriteHardwareMailbox(void __iomem *ControllerBaseAddress,
 				    DAC960_V1_CommandMailbox_T *CommandMailbox)
 {
   writel(CommandMailbox->Words[0],
@@ -3761,20 +3761,20 @@ void DAC960_PG_WriteHardwareMailbox(void *ControllerBaseAddress,
 }
 
 static inline DAC960_V1_CommandIdentifier_T
-DAC960_PG_ReadStatusCommandIdentifier(void *ControllerBaseAddress)
+DAC960_PG_ReadStatusCommandIdentifier(void __iomem *ControllerBaseAddress)
 {
   return readb(ControllerBaseAddress
 	       + DAC960_PG_StatusCommandIdentifierRegOffset);
 }
 
 static inline DAC960_V1_CommandStatus_T
-DAC960_PG_ReadStatusRegister(void *ControllerBaseAddress)
+DAC960_PG_ReadStatusRegister(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_PG_StatusRegisterOffset);
 }
 
 static inline boolean
-DAC960_PG_ReadErrorStatus(void *ControllerBaseAddress,
+DAC960_PG_ReadErrorStatus(void __iomem *ControllerBaseAddress,
 			  unsigned char *ErrorStatus,
 			  unsigned char *Parameter0,
 			  unsigned char *Parameter1)
@@ -3903,7 +3903,7 @@ DAC960_PD_ErrorStatusRegister_T;
 */
 
 static inline
-void DAC960_PD_NewCommand(void *ControllerBaseAddress)
+void DAC960_PD_NewCommand(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3913,7 +3913,7 @@ void DAC960_PD_NewCommand(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_AcknowledgeStatus(void *ControllerBaseAddress)
+void DAC960_PD_AcknowledgeStatus(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3923,7 +3923,7 @@ void DAC960_PD_AcknowledgeStatus(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_GenerateInterrupt(void *ControllerBaseAddress)
+void DAC960_PD_GenerateInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3933,7 +3933,7 @@ void DAC960_PD_GenerateInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_ControllerReset(void *ControllerBaseAddress)
+void DAC960_PD_ControllerReset(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All = 0;
@@ -3943,7 +3943,7 @@ void DAC960_PD_ControllerReset(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PD_MailboxFullP(void *ControllerBaseAddress)
+boolean DAC960_PD_MailboxFullP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3952,7 +3952,7 @@ boolean DAC960_PD_MailboxFullP(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PD_InitializationInProgressP(void *ControllerBaseAddress)
+boolean DAC960_PD_InitializationInProgressP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InboundDoorBellRegister_T InboundDoorBellRegister;
   InboundDoorBellRegister.All =
@@ -3961,7 +3961,7 @@ boolean DAC960_PD_InitializationInProgressP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_AcknowledgeInterrupt(void *ControllerBaseAddress)
+void DAC960_PD_AcknowledgeInterrupt(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All = 0;
@@ -3971,7 +3971,7 @@ void DAC960_PD_AcknowledgeInterrupt(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PD_StatusAvailableP(void *ControllerBaseAddress)
+boolean DAC960_PD_StatusAvailableP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_OutboundDoorBellRegister_T OutboundDoorBellRegister;
   OutboundDoorBellRegister.All =
@@ -3980,7 +3980,7 @@ boolean DAC960_PD_StatusAvailableP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_EnableInterrupts(void *ControllerBaseAddress)
+void DAC960_PD_EnableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InterruptEnableRegister_T InterruptEnableRegister;
   InterruptEnableRegister.All = 0;
@@ -3990,7 +3990,7 @@ void DAC960_PD_EnableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_DisableInterrupts(void *ControllerBaseAddress)
+void DAC960_PD_DisableInterrupts(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InterruptEnableRegister_T InterruptEnableRegister;
   InterruptEnableRegister.All = 0;
@@ -4000,7 +4000,7 @@ void DAC960_PD_DisableInterrupts(void *ControllerBaseAddress)
 }
 
 static inline
-boolean DAC960_PD_InterruptsEnabledP(void *ControllerBaseAddress)
+boolean DAC960_PD_InterruptsEnabledP(void __iomem *ControllerBaseAddress)
 {
   DAC960_PD_InterruptEnableRegister_T InterruptEnableRegister;
   InterruptEnableRegister.All =
@@ -4009,7 +4009,7 @@ boolean DAC960_PD_InterruptsEnabledP(void *ControllerBaseAddress)
 }
 
 static inline
-void DAC960_PD_WriteCommandMailbox(void *ControllerBaseAddress,
+void DAC960_PD_WriteCommandMailbox(void __iomem *ControllerBaseAddress,
 				   DAC960_V1_CommandMailbox_T *CommandMailbox)
 {
   writel(CommandMailbox->Words[0],
@@ -4023,20 +4023,20 @@ void DAC960_PD_WriteCommandMailbox(void *ControllerBaseAddress,
 }
 
 static inline DAC960_V1_CommandIdentifier_T
-DAC960_PD_ReadStatusCommandIdentifier(void *ControllerBaseAddress)
+DAC960_PD_ReadStatusCommandIdentifier(void __iomem *ControllerBaseAddress)
 {
   return readb(ControllerBaseAddress
 	       + DAC960_PD_StatusCommandIdentifierRegOffset);
 }
 
 static inline DAC960_V1_CommandStatus_T
-DAC960_PD_ReadStatusRegister(void *ControllerBaseAddress)
+DAC960_PD_ReadStatusRegister(void __iomem *ControllerBaseAddress)
 {
   return readw(ControllerBaseAddress + DAC960_PD_StatusRegisterOffset);
 }
 
 static inline boolean
-DAC960_PD_ReadErrorStatus(void *ControllerBaseAddress,
+DAC960_PD_ReadErrorStatus(void __iomem *ControllerBaseAddress,
 			  unsigned char *ErrorStatus,
 			  unsigned char *Parameter0,
 			  unsigned char *Parameter1)
