@@ -358,13 +358,12 @@ static struct file_operations coda_psdev_fops = {
 static int init_coda_psdev(void)
 {
 	int i, err = 0;
-	if (register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
-				 &coda_psdev_fops)) {
+	if (register_chrdev(CODA_PSDEV_MAJOR, "coda", &coda_psdev_fops)) {
               printk(KERN_ERR "coda_psdev: unable to get major %d\n", 
 		     CODA_PSDEV_MAJOR);
               return -EIO;
 	}
-	coda_psdev_class = class_simple_create(THIS_MODULE, "coda_psdev");
+	coda_psdev_class = class_simple_create(THIS_MODULE, "coda");
 	if (IS_ERR(coda_psdev_class)) {
 		err = PTR_ERR(coda_psdev_class);
 		goto out_chrdev;
@@ -386,7 +385,7 @@ out_class:
 		class_simple_device_remove(MKDEV(CODA_PSDEV_MAJOR, i));
 	class_simple_destroy(coda_psdev_class);
 out_chrdev:
-	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
+	unregister_chrdev(CODA_PSDEV_MAJOR, "coda");
 out:
 	return err;
 }
@@ -431,7 +430,7 @@ out:
 	}
 	class_simple_destroy(coda_psdev_class);
 	devfs_remove("coda");
-	unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
+	unregister_chrdev(CODA_PSDEV_MAJOR, "coda");
 	coda_sysctl_clean();
 out1:
 	coda_destroy_inodecache();
@@ -453,7 +452,7 @@ static void __exit exit_coda(void)
 	}
 	class_simple_destroy(coda_psdev_class);
 	devfs_remove("coda");
-	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
+	unregister_chrdev(CODA_PSDEV_MAJOR, "coda");
 	coda_sysctl_clean();
 	coda_destroy_inodecache();
 }
