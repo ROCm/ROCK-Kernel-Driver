@@ -112,14 +112,9 @@ static struct op_counter_config ctr[NR_CNTRS];
  */
 
 static int sh7750_timer_notify(struct notifier_block *self,
-			       unsigned long val, void *data)
+			       unsigned long val, void *regs)
 {
-	struct pt_regs *regs = data;
-	unsigned long pc;
-
-	pc = instruction_pointer(regs);
-	oprofile_add_sample(pc, !user_mode(regs), 0, smp_processor_id());
-
+	oprofile_add_sample((struct pt_regs *)regs, 0);
 	return 0;
 }
 
