@@ -37,7 +37,8 @@
 #include <asm/io.h>
 
 #include "ide-timing.h"
-#include "via82cxxx.h"
+
+#define DISPLAY_VIA_TIMINGS
 
 #define VIA_IDE_ENABLE		0x40
 #define VIA_IDE_CONFIG		0x41
@@ -607,9 +608,19 @@ static void __init init_hwif_via82cxxx(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t via82cxxx_chipset __devinitdata = {
+	.name		= "VP_IDE",
+	.init_chipset	= init_chipset_via82cxxx,
+	.init_hwif	= init_hwif_via82cxxx,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &via82cxxx_chipsets[id->driver_data]);
+	ide_setup_pci_device(dev, &via82cxxx_chipset);
 	return 0;
 }
 

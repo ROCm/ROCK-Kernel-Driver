@@ -23,6 +23,7 @@
 #include <asm/mach-types.h>
 #include <asm/hardware/amba.h>
 #include <asm/hardware/amba_kmi.h>
+#include <asm/hardware/icst525.h>
 
 #include <asm/arch/lm.h>
 
@@ -32,11 +33,15 @@
 #include <asm/mach/mmc.h>
 #include <asm/mach/map.h>
 
+#include "clock.h"
+
 #define INTCP_PA_MMC_BASE		0x1c000000
 #define INTCP_PA_AACI_BASE		0x1d000000
 
 #define INTCP_PA_FLASH_BASE		0x24000000
 #define INTCP_FLASH_SIZE		SZ_32M
+
+#define INTCP_PA_CLCD_BASE		0xc0000000
 
 #define INTCP_VA_CIC_BASE		0xf1000040
 #define INTCP_VA_PIC_BASE		0xf1400000
@@ -210,6 +215,44 @@ static void __init intcp_init_irq(void)
 }
 
 /*
+ * Clock handling
+ */
+#define CM_LOCK (IO_ADDRESS(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
+#define CM_AUXOSC (IO_ADDRESS(INTEGRATOR_HDR_BASE)+0x1c)
+
+static const struct icst525_params cp_auxvco_params = {
+	.ref		= 24000,
+	.vco_max	= 320000,
+	.vd_min 	= 8,
+	.vd_max 	= 263,
+	.rd_min 	= 3,
+	.rd_max 	= 65,
+};
+
+static void cp_auxvco_set(struct clk *clk, struct icst525_vco vco)
+{
+	u32 val;
+
+	val = readl(CM_AUXOSC) & ~0x7ffff;
+	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+
+	writel(0xa05f, CM_LOCK);
+	writel(val, CM_AUXOSC);
+	writel(0, CM_LOCK);
+}
+
+static struct clk cp_clcd_clk = {
+	.name	= "CLCDCLK",
+	.params	= &cp_auxvco_params,
+	.setvco = cp_auxvco_set,
+};
+
+static struct clk cp_mmci_clk = {
+	.name	= "MCLK",
+	.rate	= 33000000,
+};
+
+/*
  * Flash handling.
  */
 static int intcp_flash_init(void)
@@ -340,14 +383,33 @@ static struct amba_device aaci_device = {
 	.periphid	= 0,
 };
 
+static struct amba_device clcd_device = {
+	.dev		= {
+		.bus_id	= "mb:c0",
+		.coherent_dma_mask = ~0,
+	},
+	.res		= {
+		.start	= INTCP_PA_CLCD_BASE,
+		.end	= INTCP_PA_CLCD_BASE + SZ_4K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	.dma_mask	= ~0,
+	.irq		= { IRQ_CP_CLCDCINT, NO_IRQ },
+	.periphid	= 0,
+};
+
 static struct amba_device *amba_devs[] __initdata = {
 	&mmc_device,
 	&aaci_device,
+	&clcd_device,
 };
 
 static void __init intcp_init(void)
 {
 	int i;
+
+	clk_register(&cp_clcd_clk);
+	clk_register(&cp_mmci_clk);
 
 	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
 

@@ -233,27 +233,6 @@ static int proc_ide_write_config(struct file *file, const char __user *buffer,
 			}
 #endif	/* CONFIG_BLK_DEV_IDEPCI */
 		} else {	/* not pci */
-#if !defined(__mc68000__) && !defined(CONFIG_APUS)
-
-/*
-* Geert Uytterhoeven
-*
-* unless you can explain me what it really does.
-* On m68k, we don't have outw() and outl() yet,
-* and I need a good reason to implement it.
-* 
-* BTW, IMHO the main remaining portability problem with the IDE driver 
-* is that it mixes IO (ioport) and MMIO (iomem) access on different platforms.
-* 
-* I think all accesses should be done using
-* 
-*     ide_in[bwl](ide_device_instance, offset)
-*     ide_out[bwl](ide_device_instance, value, offset)
-* 
-* so the architecture specific code can #define ide_{in,out}[bwl] to the
-* appropriate function.
-* 
-*/
 			switch (r->size) {
 				case 1:	hwif->OUTB(val, reg);
 					break;
@@ -262,7 +241,6 @@ static int proc_ide_write_config(struct file *file, const char __user *buffer,
 				case 4:	hwif->OUTL(val, reg);
 					break;
 			}
-#endif /* !__mc68000__ && !CONFIG_APUS */
 		}
 	}
 	spin_unlock_irqrestore(&ide_lock, flags);

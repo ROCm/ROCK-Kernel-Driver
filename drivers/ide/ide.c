@@ -2003,6 +2003,7 @@ done:
 	return 1;
 }
 
+extern void pnpide_init(void);
 extern void h8300_ide_init(void);
 
 /*
@@ -2069,12 +2070,9 @@ static void __init probe_for_hwifs (void)
 		buddha_init();
 	}
 #endif /* CONFIG_BLK_DEV_BUDDHA */
-#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP)
-	{
-		extern void pnpide_init(int enable);
-		pnpide_init(1);
-	}
-#endif /* CONFIG_BLK_DEV_IDEPNP */
+#ifdef CONFIG_BLK_DEV_IDEPNP
+	pnpide_init();
+#endif
 #ifdef CONFIG_H8300
 	h8300_ide_init();
 #endif
@@ -2212,9 +2210,6 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 		up(&ide_setting_sem);
 		return 1;
 	}
-#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
-	pnpide_init(0);
-#endif /* CONFIG_BLK_DEV_IDEPNP */
 #ifdef CONFIG_PROC_FS
 	ide_remove_proc_entries(drive->proc, DRIVER(drive)->proc);
 	ide_remove_proc_entries(drive->proc, generic_subdriver_entries);

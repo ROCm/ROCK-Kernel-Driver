@@ -565,7 +565,8 @@
 		.macro  addruart,rx
 		mrc     p15, 0, \rx, c1, c0
 		tst     \rx, #1                 @ MMU enabled?
-		ldr     \rx, =0x80000700        @ physical base address
+		mov     \rx, #0x00000700        @ offset from base
+		orreq   \rx, \rx, #0x80000000   @ physical base
 		orrne   \rx, \rx, #0xf8000000   @ virtual base
 		.endm
 

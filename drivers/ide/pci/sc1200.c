@@ -29,8 +29,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "sc1200.h"
-
 #define SC1200_REV_A	0x00
 #define SC1200_REV_B1	0x01
 #define SC1200_REV_B3	0x02
@@ -545,9 +543,18 @@ static void __init init_hwif_sc1200 (ide_hwif_t *hwif)
         hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t sc1200_chipset __devinitdata = {
+	.name		= "SC1200",
+	.init_chipset	= init_chipset_sc1200,
+	.init_hwif	= init_hwif_sc1200,
+	.channels	= 2,
+	.autodma	= AUTODMA,
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit sc1200_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &sc1200_chipsets[id->driver_data]);
+	ide_setup_pci_device(dev, &sc1200_chipset);
 	return 0;
 }
 
