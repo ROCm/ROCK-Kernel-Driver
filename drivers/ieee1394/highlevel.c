@@ -493,7 +493,7 @@ int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
 	return 0;
 }
 
-void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 
+void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                            unsigned int channel)
 {
         if (channel > 63) {

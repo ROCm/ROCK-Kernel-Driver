@@ -12,9 +12,13 @@
 struct hpsb_packet {
         /* This struct is basically read-only for hosts with the exception of
          * the data buffer contents and xnext - see below. */
-        struct list_head list;
 
-        /* This can be used for host driver internal linking. */
+	/* This can be used for host driver internal linking.
+	 *
+	 * NOTE: This must be left in init state when the driver is done
+	 * with it (e.g. by using list_del_init()), since the core does
+	 * some sanity checks to make sure the packet is not on a
+	 * driver_list when free'ing it. */
 	struct list_head driver_list;
 
         nodeid_t node_id;
@@ -27,10 +31,9 @@ struct hpsb_packet {
          * queued   = queued for sending
          * pending  = sent, waiting for response
          * complete = processing completed, successful or not
-         * incoming = incoming packet
          */
-        enum { 
-                hpsb_unused, hpsb_queued, hpsb_pending, hpsb_complete, hpsb_incoming 
+        enum {
+                hpsb_unused, hpsb_queued, hpsb_pending, hpsb_complete
         } __attribute__((packed)) state;
 
         /* These are core internal. */
@@ -66,6 +69,9 @@ struct hpsb_packet {
 	 * packet is completed.  */
 	void (*complete_routine)(void *);
 	void *complete_data;
+
+	/* XXX This is just a hack at the moment */
+	struct sk_buff *skb;
 
         /* Store jiffies for implementing bus timeouts. */
         unsigned long sendtime;
@@ -141,7 +147,7 @@ int hpsb_bus_reset(struct hpsb_host *host);
  */
 void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid);
 
-/* 
+/*
  * Notify completion of SelfID stage to the core and report new physical ID
  * and whether host is root now.
  */

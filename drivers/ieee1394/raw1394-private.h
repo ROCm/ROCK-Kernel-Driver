@@ -33,7 +33,7 @@ struct file_info {
         spinlock_t reqlists_lock;
         wait_queue_head_t poll_wait_complete;
 
-        struct list_head addr_list;           
+        struct list_head addr_list;
 
         u8 *fcp_buffer;
 

@@ -169,7 +169,7 @@ struct hpsb_host *hpsb_get_host_by_ne(struct node_entry *ne);
 /*
  * This will fill in the given, pre-initialised hpsb_packet with the current
  * information from the node entry (host, node ID, generation number).  It will
- * return false if the node owning the GUID is not accessible (and not modify the 
+ * return false if the node owning the GUID is not accessible (and not modify the
  * hpsb_packet) and return true otherwise.
  *
  * Note that packet sending may still fail in hpsb_send_packet if a bus reset
@@ -181,9 +181,9 @@ void hpsb_node_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt);
 
 int hpsb_node_read(struct node_entry *ne, u64 addr,
 		   quadlet_t *buffer, size_t length);
-int hpsb_node_write(struct node_entry *ne, u64 addr, 
+int hpsb_node_write(struct node_entry *ne, u64 addr,
 		    quadlet_t *buffer, size_t length);
-int hpsb_node_lock(struct node_entry *ne, u64 addr, 
+int hpsb_node_lock(struct node_entry *ne, u64 addr,
 		   int extcode, quadlet_t *data, quadlet_t arg);
 
 

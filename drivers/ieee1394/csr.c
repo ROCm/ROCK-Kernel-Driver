@@ -130,23 +130,23 @@ static void host_reset(struct hpsb_host *host)
                 host->csr.state &= ~0x100;
         }
 
-        host->csr.topology_map[1] = 
+        host->csr.topology_map[1] =
                 cpu_to_be32(be32_to_cpu(host->csr.topology_map[1]) + 1);
-        host->csr.topology_map[2] = cpu_to_be32(host->node_count << 16 
+        host->csr.topology_map[2] = cpu_to_be32(host->node_count << 16
                                                 | host->selfid_count);
-        host->csr.topology_map[0] = 
+        host->csr.topology_map[0] =
                 cpu_to_be32((host->selfid_count + 2) << 16
                             | csr_crc16(host->csr.topology_map + 1,
                                         host->selfid_count + 2));
 
-        host->csr.speed_map[1] = 
+        host->csr.speed_map[1] =
                 cpu_to_be32(be32_to_cpu(host->csr.speed_map[1]) + 1);
-        host->csr.speed_map[0] = cpu_to_be32(0x3f1 << 16 
+        host->csr.speed_map[0] = cpu_to_be32(0x3f1 << 16
                                              | csr_crc16(host->csr.speed_map+1,
                                                          0x3f1));
 }
 
-/* 
+/*
  * HI == seconds (bits 0:2)
  * LO == fraction units of 1/8000 of a second, as per 1394 (bits 19:31)
  *
@@ -161,7 +161,7 @@ static void host_reset(struct hpsb_host *host)
 static inline void calculate_expire(struct csr_control *csr)
 {
 	unsigned long units;
-	
+
 	/* Take the seconds, and convert to units */
 	units = (unsigned long)(csr->split_timeout_hi & 0x07) << 13;
 
@@ -288,7 +288,7 @@ static void remove_host(struct hpsb_host *host)
 }
 
 
-int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom, 
+int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom,
 	size_t buffersize, unsigned char rom_version)
 {
 	unsigned long flags;
@@ -296,7 +296,7 @@ int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom,
 
 	HPSB_NOTICE("hpsb_update_config_rom() is deprecated");
 
-        spin_lock_irqsave(&host->csr.lock, flags); 
+        spin_lock_irqsave(&host->csr.lock, flags);
 	if (rom_version != host->csr.generation)
                 ret = -1;
 	else if (buffersize > host->csr.rom->cache_head->size)
@@ -329,10 +329,10 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
         int csraddr = addr - CSR_REGISTER_BASE;
         const char *src;
 
-        spin_lock_irqsave(&host->csr.lock, flags); 
+        spin_lock_irqsave(&host->csr.lock, flags);
 
 	if (csraddr < CSR_SPEED_MAP) {
-                src = ((char *)host->csr.topology_map) + csraddr 
+                src = ((char *)host->csr.topology_map) + csraddr
                         - CSR_TOPOLOGY_MAP;
         } else {
                 src = ((char *)host->csr.speed_map) + csraddr - CSR_SPEED_MAP;
@@ -352,7 +352,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
         int csraddr = addr - CSR_REGISTER_BASE;
         int oldcycle;
         quadlet_t ret;
-        
+
         if ((csraddr | length) & 0x3)
                 return RCODE_TYPE_ERROR;
 
@@ -404,7 +404,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
                         /* cycle time wrapped around */
                         host->csr.bus_time += (1 << 7);
                 }
-                *(buf++) = cpu_to_be32(host->csr.bus_time 
+                *(buf++) = cpu_to_be32(host->csr.bus_time
                                        | (host->csr.cycle_time >> 25));
                 out;
 
@@ -464,7 +464,7 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
 		      quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
-        
+
         if ((csraddr | length) & 0x3)
                 return RCODE_TYPE_ERROR;
 
@@ -494,12 +494,12 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
                 return RCODE_ADDRESS_ERROR;
 
         case CSR_SPLIT_TIMEOUT_HI:
-                host->csr.split_timeout_hi = 
+                host->csr.split_timeout_hi =
                         be32_to_cpu(*(data++)) & 0x00000007;
 		calculate_expire(&host->csr);
                 out;
         case CSR_SPLIT_TIMEOUT_LO:
-                host->csr.split_timeout_lo = 
+                host->csr.split_timeout_lo =
                         be32_to_cpu(*(data++)) & 0xfff80000;
 		calculate_expire(&host->csr);
                 out;
