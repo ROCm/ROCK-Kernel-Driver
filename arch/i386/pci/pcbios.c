@@ -185,7 +185,7 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 	return (int) (ret & 0xff00) >> 8;
 }
 
-static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int __pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	unsigned long result = 0;
 	unsigned long flags;
@@ -240,7 +240,7 @@ static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u
 	return (int)((result & 0xff00) >> 8);
 }
 
-static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int __pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	unsigned long result = 0;
 	unsigned long flags;
@@ -295,63 +295,16 @@ static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, 
 	return (int)((result & 0xff00) >> 8);
 }
 
-static int pci_bios_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+static int pci_bios_read(struct pci_dev *dev, int where, int size, u32 *value)
 {
-	int result; 
-	u32 data;
-
-	if (!value) 
-		return -EINVAL;
-
-	result = pci_bios_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 1, &data);
-
-	*value = (u8)data;
-
-	return result;
+	return __pci_bios_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
+		PCI_FUNC(dev->devfn), where, size, value);
 }
 
-static int pci_bios_read_config_word(struct pci_dev *dev, int where, u16 *value)
+static int pci_bios_write(struct pci_dev *dev, int where, int size, u32 value)
 {
-	int result; 
-	u32 data;
-
-	if (!value) 
-		return -EINVAL;
-
-	result = pci_bios_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 2, &data);
-
-	*value = (u16)data;
-
-	return result;
-}
-
-static int pci_bios_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	if (!value) 
-		return -EINVAL;
-	
-	return pci_bios_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 4, value);
-}
-
-static int pci_bios_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	return pci_bios_write(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 1, value);
-}
-
-static int pci_bios_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	return pci_bios_write(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 2, value);
-}
-
-static int pci_bios_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	return pci_bios_write(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 4, value);
+	return __pci_bios_write(0, dev->bus->number, PCI_SLOT(dev->devfn),
+		PCI_FUNC(dev->devfn), where, size, value);
 }
 
 
@@ -360,12 +313,8 @@ static int pci_bios_write_config_dword(struct pci_dev *dev, int where, u32 value
  */
 
 static struct pci_ops pci_bios_access = {
-      pci_bios_read_config_byte,
-      pci_bios_read_config_word,
-      pci_bios_read_config_dword,
-      pci_bios_write_config_byte,
-      pci_bios_write_config_word,
-      pci_bios_write_config_dword
+	.read =		pci_bios_read,
+	.write =	pci_bios_write
 };
 
 /*
@@ -551,8 +500,6 @@ static int __init pci_pcbios_init(void)
 		&& ((pci_root_ops = pci_find_bios()))) {
 		pci_probe |= PCI_BIOS_SORT;
 		pci_bios_present = 1;
-		pci_config_read = pci_bios_read;
-		pci_config_write = pci_bios_write;
 	}
 	return 0;
 }

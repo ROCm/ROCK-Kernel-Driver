@@ -456,12 +456,8 @@ extern struct bus_type pci_bus_type;
 /* Low-level architecture-dependent routines */
 
 struct pci_ops {
-	int (*read_byte)(struct pci_dev *, int where, u8 *val);
-	int (*read_word)(struct pci_dev *, int where, u16 *val);
-	int (*read_dword)(struct pci_dev *, int where, u32 *val);
-	int (*write_byte)(struct pci_dev *, int where, u8 val);
-	int (*write_word)(struct pci_dev *, int where, u16 val);
-	int (*write_dword)(struct pci_dev *, int where, u32 val);
+	int (*read)(struct pci_dev *, int where, int size, u32 *val);
+	int (*write)(struct pci_dev *, int where, int size, u32 val);
 };
 
 struct pbus_set_ranges_data

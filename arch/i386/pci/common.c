@@ -25,9 +25,6 @@ int pcibios_last_bus = -1;
 struct pci_bus *pci_root_bus = NULL;
 struct pci_ops *pci_root_ops = NULL;
 
-int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value) = NULL;
-int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value) = NULL;
-
 /*
  * legacy, numa, and acpi all want to call pcibios_scan_root
  * from their initcalls. This flag prevents that.
