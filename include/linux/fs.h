@@ -1311,6 +1311,12 @@ extern int simple_rmdir(struct inode *, struct dentry *);
 extern int simple_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
 extern int simple_sync_file(struct file *, struct dentry *, int);
 extern int simple_empty(struct dentry *);
+extern int simple_readpage(struct file *file, struct page *page);
+extern int simple_prepare_write(struct file *file, struct page *page,
+			unsigned offset, unsigned to);
+extern int simple_commit_write(struct file *file, struct page *page,
+				unsigned offset, unsigned to);
+
 extern struct dentry *simple_lookup(struct inode *, struct dentry *);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;

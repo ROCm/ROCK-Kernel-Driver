@@ -277,3 +277,47 @@ int simple_rename(struct inode *old_dir, struct dentry *old_dentry, struct inode
 	}
 	return 0;
 }
+
+int simple_readpage(struct file *file, struct page *page)
+{
+	void *kaddr;
+
+	if (PageUptodate(page))
+		goto out;
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr, 0, PAGE_CACHE_SIZE);
+	kunmap_atomic(kaddr, KM_USER0);
+	flush_dcache_page(page);
+	SetPageUptodate(page);
+out:
+	unlock_page(page);
+	return 0;
+}
+
+int simple_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	void *kaddr;
+
+	if (PageUptodate(page))
+		goto out;
+	
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr, 0, PAGE_CACHE_SIZE);
+	kunmap_atomic(kaddr, KM_USER0);
+	SetPageUptodate(page);
+out:
+	set_page_dirty(page);
+	return 0;
+}
+
+int simple_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	struct inode *inode = page->mapping->host;
+	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+
+	if (pos > inode->i_size)
+		inode->i_size = pos;
+
+	return 0;
+}
