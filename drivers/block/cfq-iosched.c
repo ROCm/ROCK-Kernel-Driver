@@ -596,6 +596,7 @@ cfq_latter_request(request_queue_t *q, struct request *rq)
 
 static int cfq_may_queue(request_queue_t *q, int rw)
 {
+#if 0
 	struct cfq_data *cfqd = q->elevator.elevator_data;
 	struct cfq_queue *cfqq;
 	int ret = 1;
@@ -617,6 +618,9 @@ static int cfq_may_queue(request_queue_t *q, int rw)
 	}
 out:
 	return ret;
+#else
+	return 1;
+#endif
 }
 
 static void cfq_put_request(request_queue_t *q, struct request *rq)
@@ -728,7 +732,7 @@ static int cfq_init(request_queue_t *q, elevator_t *e)
 	 * some requests. fairness is handled differently
 	 */
 	cfqd->max_queued = q->nr_requests;
-	q->nr_requests = 8192;
+	//q->nr_requests = 8192;
 
 	cfqd->cfq_queued = cfq_queued;
 	cfqd->cfq_quantum = cfq_quantum;

@@ -1006,9 +1006,6 @@ static inline void idedisk_check_hpa(ide_drive_t *drive)
 			 capacity, sectors_to_MB(capacity),
 			 set_max, sectors_to_MB(set_max));
 
-	if (!drive->stroke)
-		return;
-
 	if (lba48)
 		set_max = idedisk_set_max_address_ext(drive, set_max);
 	else
@@ -1495,11 +1492,6 @@ static void idedisk_setup (ide_drive_t *drive)
 
 	if (drive->id_read == 0)
 		return;
-
-	/*
-	 * default to stroke enabled
-	 */
-	drive->stroke = 1;
 
 	/*
 	 * CompactFlash cards and their brethern look just like hard drives
