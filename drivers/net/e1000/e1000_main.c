@@ -155,8 +155,14 @@ static void e1000_update_stats(struct e1000_adapter *adapter);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
 static void e1000_intr(int irq, void *data, struct pt_regs *regs);
-static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
+#ifdef CONFIG_E1000_NAPI
+static int e1000_clean(struct net_device *netdev, int *budget);
+static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter,
+                                    int *work_done, int work_to_do);
+#else
 static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter);
+#endif
+static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
@@ -418,6 +424,10 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = 5 * HZ;
+#ifdef CONFIG_E1000_NAPI
+	netdev->poll = &e1000_clean;
+	netdev->weight = 64;
+#endif
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
@@ -1977,7 +1987,9 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t icr = E1000_READ_REG(&adapter->hw, ICR);
+#ifndef CONFIG_E1000_NAPI
 	int i;
+#endif
 
 	if(!icr)
 		return;  /* Not our interrupt */
@@ -1987,12 +1999,46 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		mod_timer(&adapter->watchdog_timer, jiffies);
 	}
 
+#ifdef CONFIG_E1000_NAPI
+	/* Don't disable interrupts - rely on h/w interrupt
+	 * moderation to keep interrupts low.  netif_rx_schedule
+	 * is NOP if already polling. */
+	netif_rx_schedule(netdev);
+#else
 	for(i = 0; i < E1000_MAX_INTR; i++)
 		if(!e1000_clean_rx_irq(adapter) &&
 		   !e1000_clean_tx_irq(adapter))
 			break;
-
+#endif
 }
+
+#ifdef CONFIG_E1000_NAPI
+/**
+ * e1000_clean - NAPI Rx polling callback
+ * @adapter: board private structure
+ **/
+
+static int
+e1000_clean(struct net_device *netdev, int *budget)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	int work_to_do = min(*budget, netdev->quota);
+	int work_done = 0;
+	
+	while(work_done < work_to_do)
+		if(!e1000_clean_rx_irq(adapter, &work_done, work_to_do) &&
+		   !e1000_clean_tx_irq(adapter))
+			break;
+
+	*budget -= work_done;
+	netdev->quota -= work_done;
+	
+	if(work_done < work_to_do)
+		netif_rx_complete(netdev);
+
+	return (work_done >= work_to_do);
+}
+#endif
 
 /**
  * e1000_clean_tx_irq - Reclaim resources after transmit completes
@@ -2054,7 +2100,12 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
  **/
 
 static boolean_t
+#ifdef CONFIG_E1000_NAPI
+e1000_clean_rx_irq(struct e1000_adapter *adapter, int *work_done,
+                   int work_to_do)
+#else
 e1000_clean_rx_irq(struct e1000_adapter *adapter)
+#endif
 {
 	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
 	struct net_device *netdev = adapter->netdev;
@@ -2070,6 +2121,13 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 	rx_desc = E1000_RX_DESC(*rx_ring, i);
 
 	while(rx_desc->status & E1000_RXD_STAT_DD) {
+
+#ifdef CONFIG_E1000_NAPI
+		if(*work_done >= work_to_do)
+			break;
+
+		(*work_done)++;
+#endif
 
 		cleaned = TRUE;
 
@@ -2133,12 +2191,22 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		e1000_rx_checksum(adapter, rx_desc, skb);
 
 		skb->protocol = eth_type_trans(skb, netdev);
+#ifdef CONFIG_E1000_NAPI
+		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
+			vlan_hwaccel_receive_skb(skb, adapter->vlgrp,
+				(rx_desc->special & E1000_RXD_SPC_VLAN_MASK));
+		} else {
+			netif_receive_skb(skb);
+		}
+#else /* CONFIG_E1000_NAPI */
 		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
 			vlan_hwaccel_rx(skb, adapter->vlgrp,
 				(rx_desc->special & E1000_RXD_SPC_VLAN_MASK));
 		} else {
 			netif_rx(skb);
 		}
+#endif /* CONFIG_E1000_NAPI */
+
 		netdev->last_rx = jiffies;
 
 		rx_desc->status = 0;
