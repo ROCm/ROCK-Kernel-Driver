@@ -955,7 +955,7 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
-	pol->policy = CPUFREQ_DEFAULT_GOVERNOR;
+	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
 	/* Take a crude guess here. */
 	pol->cpuinfo.transition_latency = ((rvo + 8) * vstable * VST_UNITS_20US)
