@@ -12,17 +12,7 @@
 #include <linux/ioport.h>
 #include <linux/skbuff.h>
 
-#define TX_2X_PAGES 12
-#define TX_1X_PAGES 6
-
-/* Should always use two Tx slots to get back-to-back transmits. */
-#define EI_PINGPONG
-
-#ifdef EI_PINGPONG
-#define TX_PAGES TX_2X_PAGES
-#else
-#define TX_PAGES TX_1X_PAGES
-#endif
+#define TX_PAGES 12	/* Two Tx slots */
 
 #define ETHER_ADDR_LEN 6
 
