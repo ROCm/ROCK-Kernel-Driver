@@ -772,6 +772,8 @@ static inline int e100_exec_cmd(struct nic *nic, u8 cmd, dma_addr_t dma_addr)
 
 	spin_lock_irqsave(&nic->cmd_lock, flags);
 
+	mb();
+
 	/* Previous command is accepted when SCB clears */
 	for(i = 0; i < E100_WAIT_SCB_TIMEOUT; i++) {
 		if(likely(!readb(&nic->csr->scb.cmd_lo)))
