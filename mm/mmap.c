@@ -750,6 +750,13 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	int accountable = 1;
 	unsigned long charged = 0;
 
+	/*
+	 * Does the application expect PROT_READ to imply PROT_EXEC:
+	 */
+	if (unlikely((prot & PROT_READ) &&
+			(current->personality & READ_IMPLIES_EXEC)))
+		prot |= PROT_EXEC;
+
 	if (file) {
 		if (is_file_hugepages(file))
 			accountable = 0;
@@ -791,12 +798,6 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	 */
 	vm_flags = calc_vm_prot_bits(prot) | calc_vm_flag_bits(flags) |
 			mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
-
-	/*
-	 * mm->def_flags might have VM_EXEC set, which PROT_NONE does NOT want.
-	 */
-	if (prot == PROT_NONE)
-		vm_flags &= ~VM_EXEC;
 
 	if (flags & MAP_LOCKED) {
 		if (!capable(CAP_IPC_LOCK))
