@@ -820,7 +820,7 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 	struct list_head      *devs, *mdevs;
 	struct usb_midi_state *s;
 	struct usb_mididev    *m;
-	int flags;
+	unsigned long flags;
 	int succeed = 0;
 
 #if 0

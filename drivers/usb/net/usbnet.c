@@ -314,8 +314,12 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 			: (in_interrupt () ? "in_interrupt" : "can sleep"))
 
 #ifdef DEBUG
-#define devdbg(usbnet, fmt, arg...) \
-	printk(KERN_DEBUG "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+#define devdbg(usbnet, fmt, arg...)				\
+	do {							\
+		printk(KERN_DEBUG "%s:", (usbnet)->net.name);	\
+		printk(fmt, ## arg);				\
+		printk("\n");					\
+	} while (0)
 #else
 #define devdbg(usbnet, fmt, arg...) do {} while(0)
 #endif
