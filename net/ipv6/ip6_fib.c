@@ -1241,12 +1241,8 @@ void __init fib6_init(void)
 					   NULL, NULL);
 }
 
-#ifdef MODULE
-void fib6_gc_cleanup(void)
+void __exit fib6_gc_cleanup(void)
 {
 	del_timer(&ip6_fib_timer);
 	kmem_cache_destroy(fib6_node_kmem);
 }
-#endif
-
-
