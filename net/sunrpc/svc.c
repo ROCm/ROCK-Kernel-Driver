@@ -44,6 +44,9 @@ svc_create(struct svc_program *prog, unsigned int bufsize, unsigned int xdrsize)
 	serv->sv_stats     = prog->pg_stats;
 	serv->sv_bufsz	   = bufsize? bufsize : 4096;
 	serv->sv_xdrsize   = xdrsize;
+	INIT_LIST_HEAD(&serv->sv_threads);
+	INIT_LIST_HEAD(&serv->sv_sockets);
+	INIT_LIST_HEAD(&serv->sv_allsocks);
 	spin_lock_init(&serv->sv_lock);
 
 	serv->sv_name      = prog->pg_name;
@@ -72,8 +75,12 @@ svc_destroy(struct svc_serv *serv)
 	} else
 		printk("svc_destroy: no threads for serv=%p!\n", serv);
 
-	while ((svsk = serv->sv_allsocks) != NULL)
+	while (!list_empty(&serv->sv_allsocks)) {
+		svsk = list_entry(serv->sv_allsocks.next,
+				  struct svc_sock,
+				  sk_list);
 		svc_delete_socket(svsk);
+	}
 
 	/* Unregister service with the portmapper */
 	svc_register(serv, 0, 0);

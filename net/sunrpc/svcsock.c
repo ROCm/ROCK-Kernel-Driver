@@ -63,11 +63,14 @@ static int		svc_udp_sendto(struct svc_rqst *);
 
 /*
  * Queue up an idle server thread.  Must have serv->sv_lock held.
+ * Note: this is really a stack rather than a queue, so that we only
+ * use as many different threads as we need, and the rest don't polute
+ * the cache.
  */
 static inline void
 svc_serv_enqueue(struct svc_serv *serv, struct svc_rqst *rqstp)
 {
-	rpc_append_list(&serv->sv_threads, rqstp);
+	list_add(&rqstp->rq_list, &serv->sv_threads);
 }
 
 /*
@@ -76,7 +79,7 @@ svc_serv_enqueue(struct svc_serv *serv, struct svc_rqst *rqstp)
 static inline void
 svc_serv_dequeue(struct svc_serv *serv, struct svc_rqst *rqstp)
 {
-	rpc_remove_list(&serv->sv_threads, rqstp);
+	list_del(&rqstp->rq_list);
 }
 
 /*
@@ -110,7 +113,8 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	/* NOTE: Local BH is already disabled by our caller. */
 	spin_lock(&serv->sv_lock);
 
-	if (serv->sv_threads && serv->sv_sockets)
+	if (!list_empty(&serv->sv_threads) && 
+	    !list_empty(&serv->sv_sockets))
 		printk(KERN_ERR
 			"svc_sock_enqueue: threads and sockets both waiting??\n");
 
@@ -126,7 +130,10 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	 */
 	svsk->sk_busy = 1;
 
-	if ((rqstp = serv->sv_threads) != NULL) {
+	if (!list_empty(&serv->sv_threads)) {
+		rqstp = list_entry(serv->sv_threads.next,
+				   struct svc_rqst,
+				   rq_list);
 		dprintk("svc: socket %p served by daemon %p\n",
 			svsk->sk_sk, rqstp);
 		svc_serv_dequeue(serv, rqstp);
@@ -139,7 +146,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 		wake_up(&rqstp->rq_wait);
 	} else {
 		dprintk("svc: socket %p put into queue\n", svsk->sk_sk);
-		rpc_append_list(&serv->sv_sockets, svsk);
+		list_add_tail(&svsk->sk_ready, &serv->sv_sockets);
 		svsk->sk_qued = 1;
 	}
 
@@ -155,14 +162,16 @@ svc_sock_dequeue(struct svc_serv *serv)
 {
 	struct svc_sock	*svsk;
 
-	if ((svsk = serv->sv_sockets) != NULL)
-		rpc_remove_list(&serv->sv_sockets, svsk);
+	if (list_empty(&serv->sv_sockets))
+		return NULL;
 
-	if (svsk) {
-		dprintk("svc: socket %p dequeued, inuse=%d\n",
-			svsk->sk_sk, svsk->sk_inuse);
-		svsk->sk_qued = 0;
-	}
+	svsk = list_entry(serv->sv_sockets.next,
+			  struct svc_sock, sk_ready);
+	list_del(&svsk->sk_ready);
+
+	dprintk("svc: socket %p dequeued, inuse=%d\n",
+		svsk->sk_sk, svsk->sk_inuse);
+	svsk->sk_qued = 0;
 
 	return svsk;
 }
@@ -238,7 +247,10 @@ svc_wake_up(struct svc_serv *serv)
 	struct svc_rqst	*rqstp;
 
 	spin_lock_bh(&serv->sv_lock);
-	if ((rqstp = serv->sv_threads) != NULL) {
+	if (!list_empty(&serv->sv_threads)) {
+		rqstp = list_entry(serv->sv_threads.next,
+				   struct svc_rqst,
+				   rq_list);
 		dprintk("svc: daemon %p woken up.\n", rqstp);
 		/*
 		svc_serv_dequeue(serv, rqstp);
@@ -958,8 +970,7 @@ if (svsk->sk_sk == NULL)
 	}
 
 	spin_lock_bh(&serv->sv_lock);
-	svsk->sk_list = serv->sv_allsocks;
-	serv->sv_allsocks = svsk;
+	list_add(&svsk->sk_list, &serv->sv_allsocks);
 	spin_unlock_bh(&serv->sv_lock);
 
 	dprintk("svc: svc_setup_socket created %p (inet %p)\n",
@@ -1020,7 +1031,6 @@ bummer:
 void
 svc_delete_socket(struct svc_sock *svsk)
 {
-	struct svc_sock	**rsk;
 	struct svc_serv	*serv;
 	struct sock	*sk;
 
@@ -1034,17 +1044,9 @@ svc_delete_socket(struct svc_sock *svsk)
 
 	spin_lock_bh(&serv->sv_lock);
 
-	for (rsk = &serv->sv_allsocks; *rsk; rsk = &(*rsk)->sk_list) {
-		if (*rsk == svsk)
-			break;
-	}
-	if (!*rsk) {
-		spin_unlock_bh(&serv->sv_lock);
-		return;
-	}
-	*rsk = svsk->sk_list;
+	list_del(&svsk->sk_list);
 	if (svsk->sk_qued)
-		rpc_remove_list(&serv->sv_sockets, svsk);
+		list_del(&svsk->sk_ready);
 
 
 	svsk->sk_dead = 1;

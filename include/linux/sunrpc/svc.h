@@ -27,8 +27,8 @@
  * We currently do not support more than one RPC program per daemon.
  */
 struct svc_serv {
-	struct svc_rqst *	sv_threads;	/* idle server threads */
-	struct svc_sock *	sv_sockets;	/* pending sockets */
+	struct list_head	sv_threads;	/* idle server threads */
+	struct list_head	sv_sockets;	/* pending sockets */
 	struct svc_program *	sv_program;	/* RPC program */
 	struct svc_stat *	sv_stats;	/* RPC statistics */
 	spinlock_t		sv_lock;
@@ -36,7 +36,7 @@ struct svc_serv {
 	unsigned int		sv_bufsz;	/* datagram buffer size */
 	unsigned int		sv_xdrsize;	/* XDR buffer size */
 
-	struct svc_sock *	sv_allsocks;	/* all sockets */
+	struct list_head	sv_allsocks;	/* all sockets */
 
 	char *			sv_name;	/* service name */
 };
@@ -89,8 +89,7 @@ struct svc_buf {
  * NOTE: First two items must be prev/next.
  */
 struct svc_rqst {
-	struct svc_rqst *	rq_prev;	/* idle list */
-	struct svc_rqst *	rq_next;
+	struct list_head	rq_list;	/* idle list */
 	struct svc_sock *	rq_sock;	/* socket */
 	struct sockaddr_in	rq_addr;	/* peer address */
 	int			rq_addrlen;

@@ -50,7 +50,7 @@
 /*
  * This is the wait queue all cluster daemons sleep on
  */
-static struct rpc_wait_queue    flushd_queue = RPC_INIT_WAITQ("nfs_flushd");
+static RPC_WAITQ(flushd_queue, "nfs_flushd");
 
 /*
  * Local function declarations.

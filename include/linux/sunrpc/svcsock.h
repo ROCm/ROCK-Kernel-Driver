@@ -13,12 +13,10 @@
 
 /*
  * RPC server socket.
- * NOTE: First two items must be prev/next.
  */
 struct svc_sock {
-	struct svc_sock *	sk_prev;	/* list of ready sockets */
-	struct svc_sock *	sk_next;
-	struct svc_sock *	sk_list;	/* list of all sockets */
+	struct list_head	sk_ready;	/* list of ready sockets */
+	struct list_head	sk_list;	/* list of all sockets */
 	struct socket *		sk_sock;	/* berkeley socket layer */
 	struct sock *		sk_sk;		/* INET layer */
 	spinlock_t		sk_lock;
