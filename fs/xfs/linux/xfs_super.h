@@ -92,12 +92,6 @@ extern void xfs_qm_exit(void);
 # define XFS_TRACE_STRING
 #endif
 
-#ifdef CONFIG_XFS_DMAPI
-# define XFS_DMAPI_STRING	"dmapi support, "
-#else
-# define XFS_DMAPI_STRING
-#endif
-
 #ifdef XFSDEBUG
 # define XFS_DBG_STRING		"debug"
 #else
@@ -109,7 +103,6 @@ extern void xfs_qm_exit(void);
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
-				XFS_DMAPI_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 #define LINVFS_GET_VFS(s) \
