@@ -3,7 +3,9 @@
 
 #ifndef CONFIG_SUN3
 
-extern inline void flush_tlb_kernel_page(unsigned long addr)
+#include <asm/current.h>
+
+static inline void flush_tlb_kernel_page(void *addr)
 {
 	if (CPU_IS_040_OR_060) {
 		mm_segment_t old_fs = get_fs();
@@ -91,6 +93,13 @@ extern inline void flush_tlb_pgtables(struct mm_struct *mm,
 }
 
 #else
+
+
+/* Reserved PMEGs. */
+extern char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
+extern unsigned long pmeg_vaddr[SUN3_PMEGS_NUM];
+extern unsigned char pmeg_alloc[SUN3_PMEGS_NUM];
+extern unsigned char pmeg_ctx[SUN3_PMEGS_NUM];
 
 /* Flush all userspace mappings one by one...  (why no flush command,
    sun?) */
