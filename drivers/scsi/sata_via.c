@@ -148,17 +148,6 @@ static unsigned long svia_scr_addr(unsigned long addr, unsigned int port)
 	return addr + (port * 128);
 }
 
-/**
- *	svia_init_one -
- *	@pdev:
- *	@ent:
- *
- *	LOCKING:
- *
- *	RETURNS:
- *
- */
-
 static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
@@ -289,26 +278,10 @@ err_out:
 	return rc;
 }
 
-/**
- *	svia_init -
- *
- *	LOCKING:
- *
- *	RETURNS:
- *
- */
-
 static int __init svia_init(void)
 {
 	return pci_module_init(&svia_pci_driver);
 }
-
-/**
- *	svia_exit -
- *
- *	LOCKING:
- *
- */
 
 static void __exit svia_exit(void)
 {

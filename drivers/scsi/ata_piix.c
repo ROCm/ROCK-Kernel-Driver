@@ -272,7 +272,7 @@ static void piix_pata_phy_reset(struct ata_port *ap)
 
 /**
  *	piix_sata_probe - Probe PCI device for present SATA devices
- *	@pdev: PCI device to probe
+ *	@ap: Port associated with the PCI device we wish to probe
  *
  *	Reads SATA PCI device's PCI config register Port Configuration
  *	and Status (PCS) to determine port and device availability.
