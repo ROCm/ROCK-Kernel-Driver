@@ -63,6 +63,31 @@ static inline void i8042_write_command(int val)
 	return;
 }
 
+#if defined(__i386__)
+
+#include <linux/dmi.h>
+
+static struct dmi_system_id __initdata i8042_dmi_table[] = {
+	{
+		.ident = "Compaq Proliant 8500",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Compaq"),
+			DMI_MATCH(DMI_PRODUCT_NAME , "ProLiant"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "8500"),
+		},
+	},
+	{
+		.ident = "Compaq Proliant DL760",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Compaq"),
+			DMI_MATCH(DMI_PRODUCT_NAME , "ProLiant"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "DL760"),
+		},
+	},
+	{ }
+};
+#endif
+
 static inline int i8042_platform_init(void)
 {
 /*
@@ -77,6 +102,12 @@ static inline int i8042_platform_init(void)
 #if !defined(__i386__) && !defined(__x86_64__)
         i8042_reset = 1;
 #endif
+
+#if defined(__i386__)
+	if (dmi_check_system(i8042_dmi_table))
+		i8042_noloop = 1;
+#endif
+
 	return 0;
 }
 

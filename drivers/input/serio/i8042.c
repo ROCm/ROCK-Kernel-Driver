@@ -52,10 +52,9 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
-#ifdef __i386__
-extern unsigned int i8042_dmi_noloop;
-#endif
 static unsigned int i8042_noloop;
+module_param_named(noloop, i8042_noloop, bool, 0);
+MODULE_PARM_DESC(dumbkbd, "Disable the AUX Loopback command while probing for the AUX port");
 
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
@@ -966,13 +965,6 @@ int __init i8042_init(void)
 
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
-
-#ifdef __i386__
-	if (i8042_dmi_noloop) {
-		printk(KERN_INFO "i8042.c: AUX LoopBack command disabled by DMI.\n");
-		i8042_noloop = 1;
-	}
-#endif
 
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
 		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
