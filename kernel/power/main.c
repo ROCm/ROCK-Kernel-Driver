@@ -99,7 +99,7 @@ static int suspend_enter(u32 state)
  *	@state:		State we're coming out of.
  *
  *	Call platform code to clean up, restart processes, and free the 
- *	console that we've allocated.
+ *	console that we've allocated. This is not called for suspend-to-disk.
  */
 
 static void suspend_finish(suspend_state_t state)

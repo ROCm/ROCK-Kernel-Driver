@@ -163,7 +163,7 @@ static int prepare(void)
  *
  *	If we're going through the firmware, then get it over with quickly.
  *
- *	If not, then call swsusp to do it's thing, then figure out how
+ *	If not, then call swsusp to do its thing, then figure out how
  *	to power down the system.
  */
 
@@ -201,7 +201,7 @@ int pm_suspend_disk(void)
  *	software_resume - Resume from a saved image.
  *
  *	Called as a late_initcall (so all devices are discovered and
- *	initialized), we call pmdisk to see if we have a saved image or not.
+ *	initialized), we call swsusp to see if we have a saved image or not.
  *	If so, we quiesce devices, the restore the saved image. We will
  *	return above (in pm_suspend_disk() ) if everything goes well.
  *	Otherwise, we fail gracefully and return to the normally
@@ -221,7 +221,7 @@ static int software_resume(void)
 		return 0;
 	}
 
-	pr_debug("PM: Reading pmdisk image.\n");
+	pr_debug("PM: Reading swsusp image.\n");
 
 	if ((error = swsusp_read()))
 		goto Done;
@@ -284,7 +284,7 @@ static char * pm_disk_modes[] = {
 
 static ssize_t disk_show(struct subsystem * subsys, char * buf)
 {
-	return sprintf(buf,"%s\n",pm_disk_modes[pm_disk_mode]);
+	return sprintf(buf, "%s\n", pm_disk_modes[pm_disk_mode]);
 }
 
 

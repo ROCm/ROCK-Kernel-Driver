@@ -420,7 +420,7 @@ struct highmem_page {
 	struct highmem_page *next;
 };
 
-struct highmem_page *highmem_copy = NULL;
+static struct highmem_page *highmem_copy;
 
 static int save_highmem_zone(struct zone *zone)
 {
@@ -753,11 +753,11 @@ static int swsusp_alloc(void)
 		return -ENOSPC;
 
 	if ((error = alloc_pagedir())) {
-		pr_debug("suspend: Allocating pagedir failed.\n");
+		printk(KERN_ERR "suspend: Allocating pagedir failed.\n");
 		return error;
 	}
 	if ((error = alloc_image_pages())) {
-		pr_debug("suspend: Allocating image pages failed.\n");
+		printk(KERN_ERR "suspend: Allocating image pages failed.\n");
 		swsusp_free();
 		return error;
 	}
@@ -767,7 +767,7 @@ static int swsusp_alloc(void)
 	return 0;
 }
 
-int suspend_prepare_image(void)
+static int suspend_prepare_image(void)
 {
 	int error;
 
@@ -1050,12 +1050,12 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	return error;
 }
 
-int bio_read_page(pgoff_t page_off, void * page)
+static int bio_read_page(pgoff_t page_off, void * page)
 {
 	return submit(READ, page_off, page);
 }
 
-int bio_write_page(pgoff_t page_off, void * page)
+static int bio_write_page(pgoff_t page_off, void * page)
 {
 	return submit(WRITE, page_off, page);
 }
@@ -1172,7 +1172,7 @@ static int __init read_pagedir(void)
 		return -ENOMEM;
 	pagedir_nosave = (struct pbe *)addr;
 
-	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
+	pr_debug("swsusp: Reading pagedir (%d Pages)\n",n);
 
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
 		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);
