@@ -765,11 +765,7 @@ static /* const */ struct usb_driver hiddev_driver = {
 
 int __init hiddev_init(void)
 {
-	devfs_handle_t de;
-
-	de = devfs_get_handle(NULL, "usb", 0, 0, 0, 0);
-	hiddev_devfs_handle = devfs_mk_dir(de, "hid", NULL);
-	devfs_put(de);
+	hiddev_devfs_handle = devfs_mk_dir(NULL, "usb/hid", NULL);
 	usb_register(&hiddev_driver);
 	return 0;
 }

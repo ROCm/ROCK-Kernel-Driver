@@ -1586,7 +1586,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	int drive = minor(inode->i_rdev) & 3;
 	int system =  (minor(inode->i_rdev) & 4) >> 2;
 	int old_dev;
-	int system;
 	unsigned long flags;
 
 	old_dev = fd_device[drive];
@@ -1621,7 +1620,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	restore_flags(flags);
 
 	if (old_dev != system)
-		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (system << 2));
+		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (system << 2)));
 
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
