@@ -23,7 +23,6 @@
 #include <linux/config.h>	/* CONFIG_PROC_FS */
 #include <linux/module.h>
 #include <linux/interrupt.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>

@@ -674,7 +674,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/smp.h>
-#include <linux/version.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 

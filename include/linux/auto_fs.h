@@ -15,7 +15,6 @@
 #define _LINUX_AUTO_FS_H
 
 #ifdef __KERNEL__
-#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/limits.h>
 #include <asm/types.h>

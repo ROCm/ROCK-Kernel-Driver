@@ -24,8 +24,6 @@
 #ifndef _LINUX_NTFS_H
 #define _LINUX_NTFS_H
 
-#include <linux/version.h>
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/compiler.h>

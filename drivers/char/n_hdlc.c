@@ -81,7 +81,6 @@
 #define HDLC_MAGIC 0x239e
 #define HDLC_VERSION "$Revision: 4.8 $"
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>

@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
-#include <linux/version.h>
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/smp_lock.h>

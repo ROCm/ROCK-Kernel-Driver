@@ -54,7 +54,6 @@
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
-#include <linux/version.h>
 #include <linux/pci.h>
 
 #include <asm/current.h>
@@ -63,7 +62,6 @@
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
-#include <asm/io.h>
 #include <asm/scatterlist.h>
 
 #include "../scsi/scsi.h"
@@ -74,7 +72,6 @@
 #include "ieee1394_core.h"
 #include "nodemgr.h"
 #include "hosts.h"
-#include "nodemgr.h"
 #include "highlevel.h"
 #include "ieee1394_transactions.h"
 #include "sbp2.h"

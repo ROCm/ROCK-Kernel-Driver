@@ -20,7 +20,6 @@
 #define DAC960_DriverDate			"14 November 2002"
 
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>

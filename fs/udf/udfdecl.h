@@ -12,10 +12,6 @@
 #include <linux/udf_fs_sb.h>
 #include <linux/buffer_head.h>
 
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #include "udfend.h"
 
 #define udf_fixed_to_variable(x) ( ( ( (x) >> 5 ) * 39 ) + ( (x) & 0x0000001F ) )

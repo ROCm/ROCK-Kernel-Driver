@@ -2,8 +2,6 @@
 #define __PRESTO_JOURNAL_H
 
 
-#include <linux/version.h>
-
 struct journal_prefix {
 	int len;
         u32 version;

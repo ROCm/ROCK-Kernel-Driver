@@ -46,7 +46,6 @@
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
-#include "nodemgr.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"

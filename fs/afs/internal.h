@@ -12,7 +12,6 @@
 #ifndef AFS_INTERNAL_H
 #define AFS_INTERNAL_H
 
-#include <linux/version.h>
 #include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>

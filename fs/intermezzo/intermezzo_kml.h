@@ -1,7 +1,6 @@
 #ifndef __INTERMEZZO_KML_H
 #define __INTERMEZZO_KML_H
 
-#include <linux/version.h>
 #include "intermezzo_psdev.h"
 #include <linux/fs.h>
 #include "intermezzo_journal.h"

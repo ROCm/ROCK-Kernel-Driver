@@ -97,7 +97,6 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/workqueue.h>
 #include <linux/bootmem.h>
 #include <linux/pm.h>

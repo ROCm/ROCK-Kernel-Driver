@@ -4,7 +4,6 @@
 
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/version.h>
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>

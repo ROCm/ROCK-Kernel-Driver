@@ -9,7 +9,6 @@
 #define PROCNAME_SIZE 32
 #include <linux/smp_lock.h>
 #include <linux/smp_lock.h>
-#include <linux/version.h>
 
 /* represents state of an instance reached with /dev/intermezzo */
 /* communication pending & processing queues */

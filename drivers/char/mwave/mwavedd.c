@@ -46,7 +46,6 @@
 *	First release to the public
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>

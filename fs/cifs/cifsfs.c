@@ -28,7 +28,6 @@
 #include <linux/mount.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/version.h>
 #include <linux/list.h>
 #include <linux/seq_file.h>
 #include <linux/vfs.h>

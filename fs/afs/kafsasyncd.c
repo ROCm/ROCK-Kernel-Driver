@@ -16,7 +16,6 @@
  * - poll volume location servers to keep up to date volume location lists
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
