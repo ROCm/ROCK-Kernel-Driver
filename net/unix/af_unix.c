@@ -57,7 +57,7 @@
  *	[TO FIX]
  *	ECONNREFUSED is not returned from one end of a connected() socket to the
  *		other the moment one end closes.
- *	fstat() doesn't return st_dev=NODEV, and give the blksize as high water mark
+ *	fstat() doesn't return st_dev=0, and give the blksize as high water mark
  *		and a fake inode identifier (nor the BSD first socket fstat twice bug).
  *	[NOT TO FIX]
  *	accept() returns a path name even if the connecting socket has closed
