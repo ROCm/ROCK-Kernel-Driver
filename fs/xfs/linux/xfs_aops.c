@@ -398,6 +398,12 @@ map_unwritten(
 		nblocks++;
 	} while ((bh = bh->b_this_page) != head);
 
+	if (unlikely(nblocks == 0)) {
+		printk("XFS: bad unwritten extent map: bh=0x%p, mp=0x%p\n",
+			curr, mp);
+		BUG();
+	}
+
 	atomic_add(nblocks, &pb->pb_io_remaining);
 
 	/* If we reached the end of the page, map forwards in any
