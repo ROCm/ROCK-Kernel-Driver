@@ -209,7 +209,7 @@
 #define MAX_OUTSTANDING_COMMANDS	1024
 
 /* ISP request and response entry counts (37-65535) */
-#define REQUEST_ENTRY_CNT		1024	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT		2048	/* Number of request entries. */
 #define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
 #define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
 

@@ -603,7 +603,10 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	ha->product_id[3] = mb[4];
 
 	/* Adjust fw RISC transfer size */
-	ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
+	if (REQUEST_ENTRY_CNT > 1024)
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * 1024;
+	else
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
 
 	if (IS_QLA2200(ha) &&
 	    RD_MAILBOX_REG(ha, reg, 7) == QLA2200A_RISC_ROM_VER) {
