@@ -672,8 +672,13 @@ static struct inet_protosw sctpv6_stream_protosw = {
 	.flags         = SCTP_PROTOSW_FLAG
 };
 
+static int sctp6_rcv(struct sk_buff **pskb)
+{
+	return sctp_rcv(*pskb);
+}
+
 static struct inet6_protocol sctpv6_protocol = {
-	.handler      = sctp_rcv,
+	.handler      = sctp6_rcv,
 	.err_handler  = sctp_v6_err,
 };
 
