@@ -1,11 +1,12 @@
 /*****************************************************************************/
-/* ips.c -- driver for the IBM ServeRAID controller                          */
+/* ips.c -- driver for the Adaptec / IBM ServeRAID controller                */
 /*                                                                           */
 /* Written By: Keith Mitchell, IBM Corporation                               */
 /*             Jack Hammer, Adaptec, Inc.                                    */
 /*             David Jeffery, Adaptec, Inc.                                  */
 /*                                                                           */
-/* Copyright (C) 2000 IBM Corporation                                        */
+/* Copyright (C) 2000 IBM Corporation                                        */ 
+/* Copyright (C) 2002 Adaptec, Inc.                                          */ 
 /*                                                                           */
 /* This program is free software; you can redistribute it and/or modify      */
 /* it under the terms of the GNU General Public License as published by      */
@@ -42,7 +43,7 @@
 /* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 /*                                                                           */
 /* Bugs/Comments/Suggestions about this driver should be mailed to:          */
-/*      ipslinux@us.ibm.com          	                                      */
+/*      ipslinux@adaptec.com        	                                     */
 /*                                                                           */
 /* For system support issues, contact your local IBM Customer support.       */
 /* Directions to find IBM Customer Support for each country can be found at: */
@@ -66,9 +67,8 @@
 /* 0.99.05  - Fix an oops when we get certain passthru commands              */
 /* 1.00.00  - Initial Public Release                                         */
 /*            Functionally equivalent to 0.99.05                             */
-/* 3.60.00  - Bump max commands to 128 for use with ServeRAID firmware 3.60  */
-/*          - Change version to 3.60 to coincide with ServeRAID release      */
-/*            numbering.                                                     */
+/* 3.60.00  - Bump max commands to 128 for use with firmware 3.60            */
+/*          - Change version to 3.60 to coincide with release numbering.     */
 /* 3.60.01  - Remove bogus error check in passthru routine                   */
 /* 3.60.02  - Make DCDB direction based on lookup table                      */
 /*          - Only allow one DCDB command to a SCSI ID at a time             */
@@ -76,7 +76,7 @@
 /* 4.00.01  - Add support for First Failure Data Capture                     */
 /* 4.00.02  - Fix problem with PT DCDB with no buffer                        */
 /* 4.00.03  - Add alternative passthru interface                             */
-/*          - Add ability to flash ServeRAID BIOS                            */
+/*          - Add ability to flash BIOS                                      */
 /* 4.00.04  - Rename structures/constants to be prefixed with IPS_           */
 /* 4.00.05  - Remove wish_block from init routine                            */
 /*          - Use linux/spinlock.h instead of asm/spinlock.h for kernels     */
@@ -220,7 +220,7 @@ struct proc_dir_entry proc_scsi_ips = {
                                              dma_addr_t *dmahandle) {
        void * ptr = kmalloc(size, GFP_ATOMIC); 
        if(ptr){     
-          *dmahandle = VIRT_TO_BUS(ptr);
+          *dmahandle = (uint32_t)virt_to_bus(ptr);
        }
        return ptr;
     }
@@ -229,10 +229,10 @@ struct proc_dir_entry proc_scsi_ips = {
     
     #define pci_map_sg(a,b,n,z)       (n)
     #define pci_unmap_sg(a,b,c,d)     
-    #define pci_map_single(a,b,c,d)   (VIRT_TO_BUS(b))
+    #define pci_map_single(a,b,c,d)   ((uint32_t)virt_to_bus(b))
     #define pci_unmap_single(a,b,c,d) 
     #ifndef sg_dma_address
-      #define sg_dma_address(x)         (VIRT_TO_BUS((x)->address))
+      #define sg_dma_address(x)         ((uint32_t)virt_to_bus((x)->address))
       #define sg_dma_len(x)             ((x)->length)
     #endif
     #define pci_unregister_driver(x)

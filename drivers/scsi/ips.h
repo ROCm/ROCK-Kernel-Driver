@@ -1,9 +1,12 @@
 /*****************************************************************************/
-/* ips.h -- driver for the IBM ServeRAID controller                          */
+/* ips.h -- driver for the Adaptec / IBM ServeRAID controller                */
 /*                                                                           */
 /* Written By: Keith Mitchell, IBM Corporation                               */
+/*             Jack Hammer, Adaptec, Inc.                                    */
+/*             David Jeffery, Adaptec, Inc.                                  */
 /*                                                                           */
 /* Copyright (C) 1999 IBM Corporation                                        */
+/* Copyright (C) 2003 Adaptec, Inc.                                          */ 
 /*                                                                           */
 /* This program is free software; you can redistribute it and/or modify      */
 /* it under the terms of the GNU General Public License as published by      */
@@ -40,7 +43,7 @@
 /* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 /*                                                                           */
 /* Bugs/Comments/Suggestions should be mailed to:                            */
-/*      ipslinux@us.ibm.com                                                  */
+/*      ipslinux@adaptec.com                                                 */
 /*                                                                           */
 /*****************************************************************************/
 
@@ -84,20 +87,8 @@
                                          ((IPS_IS_TROMBONE(ha) || IPS_IS_CLARINET(ha)) && \
                                           (ips_force_memio))) ? 1 : 0)
 
-   #ifndef VIRT_TO_BUS
-      #define VIRT_TO_BUS(x)           (uint32_t) virt_to_bus((void *) x)
-   #endif
-
    #ifndef MDELAY
       #define MDELAY mdelay
-   #endif
-
-   #ifndef verify_area_20
-      #define verify_area_20(t,a,sz)   (0) /* success */
-   #endif
-
-   #ifndef DECLARE_MUTEX_LOCKED
-      #define DECLARE_MUTEX_LOCKED(sem) struct semaphore sem = MUTEX_LOCKED;
    #endif
    
    /*
