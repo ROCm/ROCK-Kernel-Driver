@@ -2444,9 +2444,11 @@ static int uhci_suspend(struct usb_hcd *hcd, u32 state)
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
 	/* Don't try to suspend broken motherboards, reset instead */
-	if (suspend_allowed(uhci))
+	if (suspend_allowed(uhci)) {
 		suspend_hc(uhci);
-	else
+		uhci->saved_framenumber =
+				inw(uhci->io_addr + USBFRNUM) & 0x3ff;
+	} else
 		reset_hc(uhci);
 	return 0;
 }
@@ -2460,9 +2462,13 @@ static int uhci_resume(struct usb_hcd *hcd)
 	if (uhci->state == UHCI_SUSPENDED) {
 
 		/*
-		 * Some systems clear the Interrupt Enable register during
-		 * PM suspend/resume, so reinitialize it.
+		 * Some systems don't maintain the UHCI register values
+		 * during a PM suspend/resume cycle, so reinitialize
+		 * the Frame Number, the Framelist Base Address, and the
+		 * Interrupt Enable registers.
 		 */
+		outw(uhci->saved_framenumber, uhci->io_addr + USBFRNUM);
+		outl(uhci->fl->dma_handle, uhci->io_addr + USBFLBASEADD);
 		outw(USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC |
 				USBINTR_SP, uhci->io_addr + USBINTR);
 		uhci->resume_detect = 1;

@@ -350,6 +350,7 @@ struct uhci_hcd {
 	enum uhci_state state;			/* FIXME: needs a spinlock */
 	unsigned long state_end;		/* Time of next transition */
 	int resume_detect;			/* Need a Global Resume */
+	unsigned int saved_framenumber;		/* Save during PM suspend */
 
 	/* Main list of URB's currently controlled by this HC */
 	spinlock_t urb_list_lock;
