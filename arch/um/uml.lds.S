@@ -1,3 +1,5 @@
+#include <asm-generic/vmlinux.lds.h>
+	
 OUTPUT_FORMAT(ELF_FORMAT)
 OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
@@ -31,21 +33,15 @@ SECTIONS
     *(.gnu.warning)
     *(.gnu.linkonce.t*)
   }
-  .kstrtab : { *(.kstrtab) }
-  __vermagic : { *(__vermagic) }
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(64);
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
+  RODATA
+
   .fini      : { *(.fini)    } =0x9090
-  .rodata    : { *(.rodata) *(.gnu.linkonce.r*) }
-  .rodata1   : { *(.rodata1) }
   _etext = .;
   PROVIDE (etext = .);
 

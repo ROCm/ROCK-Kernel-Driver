@@ -1,4 +1,7 @@
 /* ld script to make UltraLinux kernel */
+
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT("elf64-sparc", "elf64-sparc", "elf64-sparc")
 OUTPUT_ARCH(sparc:v9a)
 ENTRY(_start)
@@ -16,8 +19,9 @@ SECTIONS
   } =0
   _etext = .;
   PROVIDE (etext = .);
-  .rodata    : { *(.rodata) *(.rodata.*) }
-  .rodata1   : { *(.rodata1) }
+
+  RODATA
+
   .data    :
   {
     *(.data)
@@ -35,18 +39,6 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(64);
-  __start___ksymtab = .;
-  __ksymtab  : { *(__ksymtab) }
-  __stop___ksymtab = .;
-  __start___gpl_ksymtab = .;
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-  __kstrtab  : { *(.kstrtab) }
-  __vermagic : { *(__vermagic) }
-  __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
   . = ALIGN(8192);
   __init_begin = .;
   .init.text : { *(.init.text) }

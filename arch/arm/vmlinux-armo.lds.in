@@ -2,6 +2,9 @@
  * taken from the i386 version by Russell King
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
  */
+
+#include <asm-generic/vmlinux.lds.h>
+	
 OUTPUT_ARCH(arm)
 ENTRY(stext)
 jiffies = jiffies_64;
@@ -63,9 +66,6 @@ SECTIONS
 		_etext = .;		/* End of text section		*/
 	}
 
-	.kstrtab : { *(.kstrtab) }
-	__vermagic : { *(__vermagic) }
-
 	. = ALIGN(16);
 	__ex_table : {			/* Exception table		*/
 		__start___ex_table = .;
@@ -73,17 +73,7 @@ SECTIONS
 		__stop___ex_table = .;
 	}
 
-	__ksymtab : {			/* Kernel symbol table		*/
-		__start___ksymtab = .;
-			*(__ksymtab)
-		__stop___ksymtab = .;
-	}
-
-	__gpl_ksymtab : {		/* Kernel symbol table: GPL-only */
-		__start___gpl_ksymtab = .;
-			*(__gpl_ksymtab)
-		__stop___gpl_ksymtab = .;
-	}
+	RODATA
 
 	.data : {
 		/*

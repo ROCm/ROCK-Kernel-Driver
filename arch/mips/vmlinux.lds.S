@@ -1,3 +1,5 @@
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
 SECTIONS
@@ -9,13 +11,9 @@ SECTIONS
   {
     _ftext = . ;
     *(.text)
-    *(.rodata)
-    *(.rodata1)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
   } =0
-  .kstrtab : { *(.kstrtab) }
-  __vermagic : { *(__vermagic) }
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
@@ -26,14 +24,8 @@ SECTIONS
   __dbe_table : { *(__dbe_table) }
   __stop___dbe_table = .;
 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
+  RODATA
+	
   _etext = .;
 
   . = ALIGN(8192);

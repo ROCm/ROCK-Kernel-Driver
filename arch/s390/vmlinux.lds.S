@@ -1,6 +1,9 @@
 /* ld script to make s390 Linux kernel
  * Written by Martin Schwidefsky (schwidefsky@de.ibm.com)
  */
+
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT("elf32-s390", "elf32-s390", "elf32-s390")
 OUTPUT_ARCH(s390)
 ENTRY(_start)
@@ -17,23 +20,12 @@ SECTIONS
 
   _etext = .;			/* End of text section */
 
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
-  __vermagic : { *(__vermagic) }
-
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(64);
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
+  RODATA
 
 #ifdef CONFIG_SHARED_KERNEL
   . = ALIGN(1048576);		/* VM shared segments are 1MB aligned */

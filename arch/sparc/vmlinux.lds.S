@@ -1,4 +1,7 @@
 /* ld script to make SparcLinux kernel */
+
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT("elf32-sparc", "elf32-sparc", "elf32-sparc")
 OUTPUT_ARCH(sparc)
 ENTRY(_start)
@@ -13,8 +16,7 @@ SECTIONS
   } =0
   _etext = .;
   PROVIDE (etext = .);
-  .rodata    : { *(.rodata) *(.rodata.*) }
-  .rodata1   : { *(.rodata1) }
+  RODATA
   .data    :
   {
     *(.data)
@@ -29,19 +31,6 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
-
-  . = ALIGN(64);
-  __start___ksymtab = .;
-  __ksymtab  : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
 
   . = ALIGN(4096);
   __init_begin = .;

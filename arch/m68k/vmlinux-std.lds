@@ -1,4 +1,7 @@
 /* ld script to make m68k Linux kernel */
+
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT("elf32-m68k", "elf32-m68k", "elf32-m68k")
 OUTPUT_ARCH(m68k)
 ENTRY(_start)
@@ -12,22 +15,13 @@ SECTIONS
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x4e75
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
-  __vermagic : { *(__vermagic) }
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;	/* Kernel symbol table: GPL only */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
+  RODATA
 
   _etext = .;			/* End of text section */
 
