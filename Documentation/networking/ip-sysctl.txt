@@ -723,13 +723,13 @@ temp_valid_lft - INTEGER
 	Default: 604800 (7 days)
 
 temp_prefered_lft - INTEGER
-	Preferred lifetime (in seconds) for temorary addresses.
+	Preferred lifetime (in seconds) for temporary addresses.
 	Default: 86400 (1 day)
 
 max_desync_factor - INTEGER
 	Maximum value for DESYNC_FACTOR, which is a random value
 	that ensures that clients don't synchronize with each 
-	other and generage new addresses at exactly the same time.
+	other and generate new addresses at exactly the same time.
 	value is in seconds.
 	Default: 600
 	
