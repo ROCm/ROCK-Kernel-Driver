@@ -16,14 +16,14 @@
 #include <asm/proto.h>
 #include <asm/numa.h>
 
-static DECLARE_BITMAP(nodes_parsed, MAXNODE) __initdata;
-static struct node nodes[MAXNODE] __initdata;
+static DECLARE_BITMAP(nodes_parsed, MAX_NUMNODES) __initdata;
+static struct node nodes[MAX_NUMNODES] __initdata;
 static __u8  pxm2node[256] __initdata = { [0 ... 255] = 0xff };
 
 static __init int setup_node(int pxm)
 {
 	if (pxm2node[pxm] == 0xff) {
-		if (numnodes > MAXNODE)
+		if (numnodes > MAX_NUMNODES)
 			return -1;
 		pxm2node[pxm] = numnodes - 1;
 		numnodes++;
@@ -169,7 +169,7 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 		bad_srat();
 		return -1;
 	}
-	for (i = 0; i < MAXNODE; i++) {
+	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (!test_bit(i, &nodes_parsed))
 			continue;
 		cutoff_node(i, start, end);
