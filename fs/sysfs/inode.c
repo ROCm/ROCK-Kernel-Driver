@@ -167,14 +167,15 @@ subsys_attr_show(struct kobject * kobj, struct attribute * attr, char * page)
 }
 
 static ssize_t 
-subsys_attr_store(struct kobject * kobj, struct attribute * attr, const char * page)
+subsys_attr_store(struct kobject * kobj, struct attribute * attr, 
+		  const char * page, size_t count)
 {
 	struct subsystem * s = to_subsys(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = 0;
 
 	if (sattr->store)
-		ret = sattr->store(s,page);
+		ret = sattr->store(s,page,count);
 	return ret;
 }
 
@@ -322,13 +323,14 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char * buf, size_t count)
  *	passing the buffer that we acquired in fill_write_buffer().
  */
 
-static int flush_write_buffer(struct file * file, struct sysfs_buffer * buffer)
+static int 
+flush_write_buffer(struct file * file, struct sysfs_buffer * buffer, size_t count)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
 	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	struct sysfs_ops * ops = buffer->ops;
 
-	return ops->store(kobj,attr,buffer->page);
+	return ops->store(kobj,attr,buffer->page,count);
 }
 
 
@@ -356,7 +358,7 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 
 	count = fill_write_buffer(buffer,buf,count);
 	if (count > 0)
-		count = flush_write_buffer(file,buffer);
+		count = flush_write_buffer(file,buffer,count);
 	if (count > 0)
 		*ppos += count;
 	return count;
