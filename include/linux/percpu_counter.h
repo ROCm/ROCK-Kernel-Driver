@@ -7,7 +7,7 @@
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
-#include <linux/preempt.h>
+#include <linux/threads.h>
 
 #ifdef CONFIG_SMP
 
