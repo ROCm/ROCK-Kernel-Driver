@@ -121,8 +121,8 @@ struct bonding {
  * Caller must hold bond->lock
  */
 #define bond_for_each_slave_from(bond, pos, cnt, start)	\
-	for (cnt = 0, pos = start;			\
-	     cnt < (bond)->slave_cnt;			\
+	for (cnt = 0, pos = start;				\
+	     cnt < (bond)->slave_cnt;				\
              cnt++, pos = (pos)->next)
 
 /**
@@ -156,8 +156,7 @@ struct bonding {
  *
  * Caller must hold bond lock for read
  */
-extern inline struct slave *
-bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
+extern inline struct slave *bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
 {
 	struct slave *slave = NULL;
 	int i;
@@ -171,8 +170,7 @@ bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
 	return slave;
 }
 
-extern inline struct bonding *
-bond_get_bond_by_slave(struct slave *slave)
+extern inline struct bonding *bond_get_bond_by_slave(struct slave *slave)
 {
 	if (!slave || !slave->dev->master) {
 		return NULL;

@@ -112,8 +112,7 @@ struct arp_pkt {
 /* Forward declaration */
 static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[]);
 
-static inline u8
-_simple_hash(u8 *hash_start, int hash_size)
+static inline u8 _simple_hash(u8 *hash_start, int hash_size)
 {
 	int i;
 	u8 hash = 0;
@@ -127,21 +126,18 @@ _simple_hash(u8 *hash_start, int hash_size)
 
 /*********************** tlb specific functions ***************************/
 
-static inline void
-_lock_tx_hashtbl(struct bonding *bond)
+static inline void _lock_tx_hashtbl(struct bonding *bond)
 {
 	spin_lock(&(BOND_ALB_INFO(bond).tx_hashtbl_lock));
 }
 
-static inline void
-_unlock_tx_hashtbl(struct bonding *bond)
+static inline void _unlock_tx_hashtbl(struct bonding *bond)
 {
 	spin_unlock(&(BOND_ALB_INFO(bond).tx_hashtbl_lock));
 }
 
 /* Caller must hold tx_hashtbl lock */
-static inline void
-tlb_init_table_entry(struct tlb_client_info *entry, u8 save_load)
+static inline void tlb_init_table_entry(struct tlb_client_info *entry, u8 save_load)
 {
 	if (save_load) {
 		entry->load_history = 1 + entry->tx_bytes /
@@ -153,16 +149,14 @@ tlb_init_table_entry(struct tlb_client_info *entry, u8 save_load)
 	entry->prev = TLB_NULL_INDEX;
 }
 
-static inline void
-tlb_init_slave(struct slave *slave)
+static inline void tlb_init_slave(struct slave *slave)
 {
 	SLAVE_TLB_INFO(slave).load = 0;
 	SLAVE_TLB_INFO(slave).head = TLB_NULL_INDEX;
 }
 
 /* Caller must hold bond lock for read */
-static inline void
-tlb_clear_slave(struct bonding *bond, struct slave *slave, u8 save_load)
+static void tlb_clear_slave(struct bonding *bond, struct slave *slave, u8 save_load)
 {
 	struct tlb_client_info *tx_hash_table = NULL;
 	u32 index;
@@ -183,8 +177,7 @@ tlb_clear_slave(struct bonding *bond, struct slave *slave, u8 save_load)
 }
 
 /* Must be called before starting the monitor timer */
-static int
-tlb_initialize(struct bonding *bond)
+static int tlb_initialize(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	int i;
@@ -214,8 +207,7 @@ tlb_initialize(struct bonding *bond)
 }
 
 /* Must be called only after all slaves have been released */
-static void
-tlb_deinitialize(struct bonding *bond)
+static void tlb_deinitialize(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
@@ -226,8 +218,7 @@ tlb_deinitialize(struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-static struct slave *
-tlb_get_least_loaded_slave(struct bonding *bond)
+static struct slave *tlb_get_least_loaded_slave(struct bonding *bond)
 {
 	struct slave *slave;
 	struct slave *least_loaded;
@@ -266,8 +257,7 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-struct slave *
-tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
+struct slave *tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct tlb_client_info *hash_table = NULL;
@@ -309,14 +299,12 @@ tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 }
 
 /*********************** rlb specific functions ***************************/
-static inline void
-_lock_rx_hashtbl(struct bonding *bond)
+static inline void _lock_rx_hashtbl(struct bonding *bond)
 {
 	spin_lock(&(BOND_ALB_INFO(bond).rx_hashtbl_lock));
 }
 
-static inline void
-_unlock_rx_hashtbl(struct bonding *bond)
+static inline void _unlock_rx_hashtbl(struct bonding *bond)
 {
 	spin_unlock(&(BOND_ALB_INFO(bond).rx_hashtbl_lock));
 }
@@ -324,8 +312,7 @@ _unlock_rx_hashtbl(struct bonding *bond)
 /* when an ARP REPLY is received from a client update its info
  * in the rx_hashtbl
  */
-static void
-rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
+static void rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 {
 	u32 hash_index;
 	struct rlb_client_info *client_info = NULL;
@@ -349,10 +336,7 @@ rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 	_unlock_rx_hashtbl(bond);
 }
 
-static int
-rlb_arp_recv(struct sk_buff *skb,
-	     struct net_device *dev,
-	     struct packet_type *ptype)
+static int rlb_arp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *ptype)
 {
 	struct bonding *bond = (struct bonding *)dev->priv;
 	int ret = NET_RX_DROP;
@@ -387,8 +371,7 @@ out:
 }
 
 /* Caller must hold bond lock for read */
-static struct slave *
-rlb_next_rx_slave(struct bonding *bond)
+static struct slave *rlb_next_rx_slave(struct bonding *bond)
 {
 	struct slave *rx_slave = NULL, *slave = NULL;
 	unsigned int i = 0;
@@ -422,8 +405,7 @@ rlb_next_rx_slave(struct bonding *bond)
  *
  * Caller must hold bond->ptrlock for write or bond lock for write
  */
-static void
-rlb_teach_disabled_mac_on_primary(struct bonding *bond, u8 addr[])
+static void rlb_teach_disabled_mac_on_primary(struct bonding *bond, u8 addr[])
 {
 	if (!bond->current_slave) {
 		return;
@@ -441,8 +423,7 @@ rlb_teach_disabled_mac_on_primary(struct bonding *bond, u8 addr[])
  *
  * Caller must hold bond lock for read
  */
-static void
-rlb_clear_slave(struct bonding *bond, struct slave *slave)
+static void rlb_clear_slave(struct bonding *bond, struct slave *slave)
 {
 	struct rlb_client_info *rx_hash_table = NULL;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
@@ -491,8 +472,7 @@ rlb_clear_slave(struct bonding *bond, struct slave *slave)
 	write_unlock(&bond->ptrlock);
 }
 
-static void
-rlb_update_client(struct rlb_client_info *client_info)
+static void rlb_update_client(struct rlb_client_info *client_info)
 {
 	int i = 0;
 
@@ -512,8 +492,7 @@ rlb_update_client(struct rlb_client_info *client_info)
 }
 
 /* sends ARP REPLIES that update the clients that need updating */
-static void
-rlb_update_rx_clients(struct bonding *bond)
+static void rlb_update_rx_clients(struct bonding *bond)
 {
 	u32 hash_index;
 	struct rlb_client_info *client_info = NULL;
@@ -541,8 +520,7 @@ rlb_update_rx_clients(struct bonding *bond)
 }
 
 /* The slave was assigned a new mac address - update the clients */
-static void
-rlb_req_update_slave_clients(struct bonding *bond, struct slave *slave)
+static void rlb_req_update_slave_clients(struct bonding *bond, struct slave *slave)
 {
 	u32 hash_index;
 	u8 ntt = 0;
@@ -574,8 +552,7 @@ rlb_req_update_slave_clients(struct bonding *bond, struct slave *slave)
 }
 
 /* mark all clients using src_ip to be updated */
-static void
-rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
+static void rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 {
 	u32 hash_index;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
@@ -611,8 +588,7 @@ rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 }
 
 /* Caller must hold both bond and ptr locks for read */
-struct slave *
-rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
+struct slave *rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct rlb_client_info *client_info = NULL;
@@ -694,8 +670,7 @@ rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
  * does not choose channel for other arp types since they are
  * sent on the current_slave
  */
-static struct slave *
-rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
+static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 {
 	struct arp_pkt *arp = (struct arp_pkt *)skb->nh.raw;
 	struct slave *tx_slave = NULL;
@@ -736,8 +711,7 @@ rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-static void
-rlb_rebalance(struct bonding *bond)
+static void rlb_rebalance(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *assigned_slave = NULL;
@@ -766,16 +740,14 @@ rlb_rebalance(struct bonding *bond)
 }
 
 /* Caller must hold rx_hashtbl lock */
-static inline void
-rlb_init_table_entry(struct rlb_client_info *entry)
+static void rlb_init_table_entry(struct rlb_client_info *entry)
 {
 	memset(entry, 0, sizeof(struct rlb_client_info));
 	entry->next = RLB_NULL_INDEX;
 	entry->prev = RLB_NULL_INDEX;
 }
 
-static int
-rlb_initialize(struct bonding *bond)
+static int rlb_initialize(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct packet_type *pk_type = &(BOND_ALB_INFO(bond).rlb_pkt_type);
@@ -814,8 +786,7 @@ rlb_initialize(struct bonding *bond)
 	return 0;
 }
 
-static void
-rlb_deinitialize(struct bonding *bond)
+static void rlb_deinitialize(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
@@ -829,8 +800,7 @@ rlb_deinitialize(struct bonding *bond)
 
 /*********************** tlb/rlb shared functions *********************/
 
-static void
-alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
+static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 {
 	struct sk_buff *skb = NULL;
 	struct learning_pkt pkt;
@@ -866,8 +836,7 @@ alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
  * set the hw address of the device as well as the hw address of the
  * net_device
  */
-static int
-alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
+static int alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
 {
 	struct net_device *dev = NULL;
 	struct sockaddr s_addr;
@@ -896,10 +865,7 @@ alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
 }
 
 /* Caller must hold bond lock for write or ptrlock for write*/
-static void
-alb_swap_mac_addr(struct bonding *bond,
-		  struct slave *slave1,
-		  struct slave *slave2)
+static void alb_swap_mac_addr(struct bonding *bond, struct slave *slave1, struct slave *slave2)
 {
 	u8 tmp_mac_addr[ETH_ALEN];
 	struct slave *disabled_slave = NULL;
@@ -959,8 +925,7 @@ alb_swap_mac_addr(struct bonding *bond,
  *
  * Caller must hold bond lock
  */
-static void
-alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
+static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
 {
 	struct slave *tmp_slave;
 	int perm_curr_diff;
@@ -1014,8 +979,7 @@ alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
  * caller must hold the bond lock for write since the mac addresses are compared
  * and may be swapped.
  */
-static int
-alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
+static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 {
 	struct slave *tmp_slave1, *tmp_slave2, *free_mac_slave;
 	int i, j, found = 0;
@@ -1109,8 +1073,7 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
  * 
  * Unwinding assumes bond's mac address has not yet changed.
  */
-static inline int
-alb_set_mac_address(struct bonding *bond, void *addr)
+static int alb_set_mac_address(struct bonding *bond, void *addr)
 {
 	struct sockaddr sa;
 	struct slave *slave, *stop_at;
@@ -1160,8 +1123,7 @@ unwind:
 
 /************************ exported alb funcions ************************/
 
-int
-bond_alb_initialize(struct bonding *bond, int rlb_enabled)
+int bond_alb_initialize(struct bonding *bond, int rlb_enabled)
 {
 	int res;
 
@@ -1183,8 +1145,7 @@ bond_alb_initialize(struct bonding *bond, int rlb_enabled)
 	return 0;
 }
 
-void
-bond_alb_deinitialize(struct bonding *bond)
+void bond_alb_deinitialize(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
@@ -1195,8 +1156,7 @@ bond_alb_deinitialize(struct bonding *bond)
 	}
 }
 
-int
-bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
+int bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct bonding *bond = (struct bonding *)dev->priv;
 	struct ethhdr *eth_data = (struct ethhdr *)skb->data;
@@ -1314,8 +1274,7 @@ bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-void
-bond_alb_monitor(struct bonding *bond)
+void bond_alb_monitor(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *slave = NULL;
@@ -1421,8 +1380,7 @@ out:
 /* assumption: called before the slave is attched to the bond
  * and not locked by the bond lock
  */
-int
-bond_alb_init_slave(struct bonding *bond, struct slave *slave)
+int bond_alb_init_slave(struct bonding *bond, struct slave *slave)
 {
 	int err = 0;
 
@@ -1458,8 +1416,7 @@ bond_alb_init_slave(struct bonding *bond, struct slave *slave)
 }
 
 /* Caller must hold bond lock for write */
-void
-bond_alb_deinit_slave(struct bonding *bond, struct slave *slave)
+void bond_alb_deinit_slave(struct bonding *bond, struct slave *slave)
 {
 	if (bond->slave_cnt > 1) {
 		alb_change_hw_addr_on_detach(bond, slave);
@@ -1474,9 +1431,7 @@ bond_alb_deinit_slave(struct bonding *bond, struct slave *slave)
 }
 
 /* Caller must hold bond lock for read */
-void
-bond_alb_handle_link_change(struct bonding *bond, struct slave *slave,
-			    char link)
+void bond_alb_handle_link_change(struct bonding *bond, struct slave *slave, char link)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
@@ -1500,7 +1455,7 @@ bond_alb_handle_link_change(struct bonding *bond, struct slave *slave,
 }
 
 /**
- * bond_alb_assign_current_slave - assign new current_slave
+ * bond_alb_handle_active_change - assign new current_slave
  * @bond: our bonding struct
  * @new_slave: new slave to assign
  *
@@ -1509,8 +1464,7 @@ bond_alb_handle_link_change(struct bonding *bond, struct slave *slave,
  *
  * Caller must hold bond ptrlock for write (or bond lock for write)
  */
-void
-bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
+void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave)
 {
 	struct slave *swap_slave = bond->current_slave;
 	int i, found = 0;
@@ -1558,8 +1512,7 @@ bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
 	}
 }
 
-int
-bond_alb_set_mac_address(struct net_device *dev, void *addr)
+int bond_alb_set_mac_address(struct net_device *dev, void *addr)
 {
 	struct bonding *bond = (struct bonding *)dev->priv;
 	struct sockaddr *sa = addr;
