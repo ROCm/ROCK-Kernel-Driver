@@ -8,31 +8,29 @@
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 
-#define local_bh_disable()			\
-do {						\
-	preempt_disable();			\
-	local_bh_count(smp_processor_id())++;	\
-	barrier();				\
+#define local_bh_disable()		\
+do {					\
+	preempt_count() += IRQ_OFFSET;	\
+	barrier();			\
 } while (0)
 
-#define __local_bh_enable()			\
-do {						\
-	barrier();				\
-	local_bh_count(smp_processor_id())--;	\
-	preempt_enable();			\
+#define __local_bh_enable()		\
+do {					\
+	barrier();			\
+	preempt_count() -= IRQ_OFFSET;	\
 } while (0)
 
-#define local_bh_enable()				\
-do {							\
-	barrier();					\
-	if (!--local_bh_count(smp_processor_id())	\
-	    && softirq_pending(smp_processor_id())) {	\
-		do_softirq();				\
-	}						\
-	preempt_enable();				\
+#define local_bh_enable()					\
+do {								\
+	barrier();						\
+	if ((preempt_count() -= IRQ_OFFSET) < IRQ_OFFSET	\
+	    && softirq_pending(smp_processor_id()))		\
+		do_softirq();					\
+	if (preempt_count() == 0)				\
+		preempt_check_resched(); 			\
 } while (0)
 
-#define in_softirq() (local_bh_count(smp_processor_id()) != 0)
+#define in_softirq() in_interrupt()
 
 #endif	/* __ASM_SOFTIRQ_H */
 #endif /* __KERNEL__ */

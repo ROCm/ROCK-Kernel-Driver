@@ -246,6 +246,23 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_KERNEL	_PAGE_BASE | _PAGE_WRENABLE | _PAGE_SHARED | _PAGE_HWEXEC
 #define _PAGE_IO	_PAGE_KERNEL | _PAGE_NO_CACHE | _PAGE_GUARDED
 
+#define _PAGE_RAM	_PAGE_KERNEL
+
+#if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
+/* We want the debuggers to be able to set breakpoints anywhere, so
+ * don't write protect the kernel text */
+#define _PAGE_RAM_TEXT	_PAGE_RAM
+#else
+#ifdef CONFIG_PPC_STD_MMU
+/* On standard PPC MMU, no user access implies kernel read/write
+ * access, so to write-protect the kernel text we must turn on user
+ * access */
+#define _PAGE_RAM_TEXT	(_PAGE_RAM & ~_PAGE_WRENABLE) | _PAGE_USER
+#else
+#define _PAGE_RAM_TEXT	(_PAGE_RAM & ~_PAGE_WRENABLE)
+#endif
+#endif
+
 #define PAGE_NONE	__pgprot(_PAGE_BASE)
 #define PAGE_READONLY	__pgprot(_PAGE_BASE | _PAGE_USER)
 #define PAGE_READONLY_X	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_EXEC)

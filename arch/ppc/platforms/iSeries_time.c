@@ -117,7 +117,7 @@ int timer_interrupt(struct pt_regs * regs)
 	else
 	  timerRetDisabled++;
 	
-	hardirq_enter(cpu);
+	irq_enter();
 
 	if (!user_mode(regs))
 		ppc_do_profile(instruction_pointer(regs));
@@ -149,7 +149,7 @@ int timer_interrupt(struct pt_regs * regs)
 	paca->xLpPacaPtr->xDecrInt = 0;
 	set_dec( (unsigned)next_dec );
 
-	hardirq_exit(cpu);
+	irq_exit();
 
 	if (softirq_pending(cpu))
 		do_softirq();
