@@ -297,8 +297,15 @@ static int __init agp_init(void)
 	return 0;
 }
 
+void __exit agp_exit(void)
+{
+}
+
+
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION("AGP GART driver");
 MODULE_LICENSE("GPL and additional rights");
 
 module_init(agp_init);
+module_exit(agp_exit);
+
