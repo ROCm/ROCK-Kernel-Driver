@@ -1321,3 +1321,139 @@ err_out:
 		err = -EIO;
 	return err;
 }
+
+/**
+ * ntfs_rl_truncate_nolock - truncate a runlist starting at a specified vcn
+ * @runlist:	runlist to truncate
+ * @new_length:	the new length of the runlist in VCNs
+ *
+ * Truncate the runlist described by @runlist as well as the memory buffer
+ * holding the runlist elements to a length of @new_length VCNs.
+ *
+ * If @new_length lies within the runlist, the runlist elements with VCNs of
+ * @new_length and above are discarded.
+ *
+ * If @new_length lies beyond the runlist, a sparse runlist element is added to
+ * the end of the runlist @runlist or if the last runlist element is a sparse
+ * one already, this is extended.
+ *
+ * Return 0 on success and -errno on error.
+ *
+ * Locking: The caller must hold @runlist->lock for writing.
+ */
+int ntfs_rl_truncate_nolock(const ntfs_volume *vol, runlist *const runlist,
+		const s64 new_length)
+{
+	runlist_element *rl;
+	int old_size;
+
+	ntfs_debug("Entering for new_length 0x%llx.", (long long)new_length);
+	BUG_ON(!runlist);
+	BUG_ON(new_length < 0);
+	rl = runlist->rl;
+	if (unlikely(!rl)) {
+		/*
+		 * Create a runlist consisting of a sparse runlist element of
+		 * length @new_length followed by a terminator runlist element.
+		 */
+		rl = ntfs_malloc_nofs(PAGE_SIZE);
+		if (unlikely(!rl)) {
+			ntfs_error(vol->sb, "Not enough memory to allocate "
+					"runlist element buffer.");
+			return -ENOMEM;
+		}
+		runlist->rl = rl;
+		rl[1].length = rl->vcn = 0;
+		rl->lcn = LCN_HOLE;
+		rl[1].vcn = rl->length = new_length;
+		rl[1].lcn = LCN_ENOENT;
+		return 0;
+	}
+	BUG_ON(new_length < rl->vcn);
+	/* Find @new_length in the runlist. */
+	while (likely(rl->length && new_length >= rl[1].vcn))
+		rl++;
+	/*
+	 * If not at the end of the runlist we need to shrink it.
+	 * If at the end of the runlist we need to expand it.
+	 */
+	if (rl->length) {
+		runlist_element *trl;
+		BOOL is_end;
+
+		ntfs_debug("Shrinking runlist.");
+		/* Determine the runlist size. */
+		trl = rl + 1;
+		while (likely(trl->length))
+			trl++;
+		old_size = trl - runlist->rl + 1;
+		/* Truncate the run. */
+		rl->length = new_length - rl->vcn;
+		/*
+		 * If a run was partially truncated, make the following runlist
+		 * element a terminator.
+		 */
+		is_end = FALSE;
+		if (rl->length) {
+			rl++;
+			if (!rl->length)
+				is_end = TRUE;
+			rl->vcn = new_length;
+			rl->length = 0;
+		}
+		rl->lcn = LCN_ENOENT;
+		/* Reallocate memory if necessary. */
+		if (!is_end) {
+			int new_size = rl - runlist->rl + 1;
+			rl = ntfs_rl_realloc(runlist->rl, old_size, new_size);
+			if (IS_ERR(rl))
+				ntfs_warning(vol->sb, "Failed to shrink "
+						"runlist buffer.  This just "
+						"wastes a bit of memory "
+						"temporarily so we ignore it "
+						"and return success.");
+			else
+				runlist->rl = rl;
+		}
+	} else if (likely(/* !rl->length && */ new_length > rl->vcn)) {
+		ntfs_debug("Expanding runlist.");
+		/*
+		 * If there is a previous runlist element and it is a sparse
+		 * one, extend it.  Otherwise need to add a new, sparse runlist
+		 * element.
+		 */
+		if ((rl > runlist->rl) && ((rl - 1)->lcn == LCN_HOLE))
+			(rl - 1)->length = new_length - (rl - 1)->vcn;
+		else {
+			/* Determine the runlist size. */
+			old_size = rl - runlist->rl + 1;
+			/* Reallocate memory if necessary. */
+			rl = ntfs_rl_realloc(runlist->rl, old_size,
+					old_size + 1);
+			if (IS_ERR(rl)) {
+				ntfs_error(vol->sb, "Failed to expand runlist "
+						"buffer, aborting.");
+				return PTR_ERR(rl);
+			}
+			runlist->rl = rl;
+			/*
+			 * Set @rl to the same runlist element in the new
+			 * runlist as before in the old runlist.
+			 */
+			rl += old_size - 1;
+			/* Add a new, sparse runlist element. */
+			rl->lcn = LCN_HOLE;
+			rl->length = new_length - rl->vcn;
+			/* Add a new terminator runlist element. */
+			rl++;
+			rl->length = 0;
+		}
+		rl->vcn = new_length;
+		rl->lcn = LCN_ENOENT;
+	} else /* if (unlikely(!rl->length && new_length == rl->vcn)) */ {
+		/* Runlist already has same size as requested. */
+		rl->lcn = LCN_ENOENT;
+	}
+	ntfs_debug("Done.");
+	return 0;
+}
