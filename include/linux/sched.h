@@ -640,7 +640,7 @@ struct sched_domain {
 	.parent			= NULL,			\
 	.groups			= NULL,			\
 	.min_interval		= 8,			\
-	.max_interval		= 256*fls(num_online_cpus()),\
+	.max_interval		= 32,			\
 	.busy_factor		= 32,			\
 	.imbalance_pct		= 125,			\
 	.cache_hot_time		= (10*1000000),		\
