@@ -1,5 +1,5 @@
 /*
- * IP Payload Compression Protocol (IPComp) - RFC3713.
+ * IP Payload Compression Protocol (IPComp) - RFC3173.
  *
  * Copyright (c) 2003 James Morris <jmorris@intercode.com.au>
  *
@@ -420,6 +420,6 @@ module_init(ipcomp4_init);
 module_exit(ipcomp4_fini);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3713");
+MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3173");
 MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
 
