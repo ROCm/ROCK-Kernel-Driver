@@ -5843,7 +5843,7 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 		return -ENODEV;
 	}
 	io_port_base = pci_resource_start(dev, 0) & PCI_BASE_ADDRESS_IO_MASK;
-	io_port_len = 0x80;	/* XXX: use pci_resource_len? */
+	io_port_len = pci_resource_len(dev, 0);
 	irq = dev->irq;
 	dprintkdbg(DBG_0, "IO_PORT=%04x, IRQ=%x\n", io_port_base, dev->irq);
 
