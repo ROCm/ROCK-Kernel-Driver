@@ -126,13 +126,17 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 		 * or you set a timer to go off in the past
 		 */
 		vec = base->tv1.vec + (base->timer_jiffies & TVR_MASK);
-	} else if (idx <= 0xffffffffUL) {
-		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
-		vec = base->tv5.vec + i;
 	} else {
-		/* Can only get here on architectures with 64-bit jiffies */
-		INIT_LIST_HEAD(&timer->entry);
-		return;
+		int i;
+		/* If the timeout is larger than 0xffffffff on 64-bit
+		 * architectures then we use the maximum timeout:
+		 */
+		if (idx > 0xffffffffUL) {
+			idx = 0xffffffffUL;
+			expires = idx + base->timer_jiffies;
+		}
+		i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
+		vec = base->tv5.vec + i;
 	}
 	/*
 	 * Timers are FIFO:
