@@ -114,12 +114,9 @@ typedef struct dm_tokevent {
 #define DM_TEF_LOCKED	0x0001		/* event "locked" by dm_get_events() */
 #define DM_TEF_INTERMED 0x0002		/* a dm_pending reply was received */
 #define DM_TEF_FINAL	0x0004		/* dm_respond_event has been received */
-#ifdef __sgi
 #define DM_TEF_HASHED	0x0010		/* event is on hash chain  */
-#endif
 
 
-#ifdef __sgi
 #ifdef DEBUG
 #define DM_SHASH_DEBUG
 #endif
@@ -134,7 +131,6 @@ typedef struct dm_sesshash {
 	int		dup_hits;
 #endif
 } dm_sesshash_t;
-#endif
 
 
 typedef struct dm_eventq {
@@ -156,12 +152,10 @@ typedef struct dm_session {
 	dm_eventq_t	sn_newq;	/* undelivered event queue */
 	dm_eventq_t	sn_delq;	/* delivered event queue */
 	dm_eventq_t	sn_evt_writerq; /* events of thrds in sn_writerq */
-#ifdef __sgi
 	dm_sesshash_t	*sn_sesshash;	/* buckets for tokevent hash chains */
 #ifdef DM_SHASH_DEBUG
 	int		sn_buckets_in_use;
 	int		sn_max_buckets_in_use;
-#endif
 #endif
 	char		sn_info[DM_SESSION_INFO_LEN];	/* user-supplied info */
 } dm_session_t;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -940,7 +940,8 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 void
 xlog_iodone(xfs_buf_t *bp)
 {
-	xlog_in_core_t *iclog;
+	xlog_in_core_t	*iclog;
+	xlog_t		*l;
 	int		aborted;
 
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
@@ -949,18 +950,19 @@ xlog_iodone(xfs_buf_t *bp)
 	aborted = 0;
 
 	/*
+	 * Some versions of cpp barf on the recursive definition of
+	 * ic_log -> hic_fields.ic_log and expand ic_log twice when
+	 * it is passed through two macros.  Workaround broken cpp.
+	 */
+	l = iclog->ic_log;
+
+	/*
 	 * Race to shutdown the filesystem if we see an error.
 	 */
-	if (XFS_BUF_GETERROR(bp)) {
-		/* Some versions of cpp barf on the recursive definition of
-		 * ic_log -> hic_fields.ic_log and expand ic_log twice when
-		 * it is passed through two macros.  Workaround for broken cpp
-		 */
-		struct log *l;
-		xfs_ioerror_alert("xlog_iodone",
-				  iclog->ic_log->l_mp, bp, XFS_BUF_ADDR(bp));
+	if (XFS_TEST_ERROR((XFS_BUF_GETERROR(bp)), l->l_mp,
+			XFS_ERRTAG_IODONE_IOERR, XFS_RANDOM_IODONE_IOERR)) {
+		xfs_ioerror_alert("xlog_iodone", l->l_mp, bp, XFS_BUF_ADDR(bp));
 		XFS_BUF_STALE(bp);
-		l = iclog->ic_log;
 		xfs_force_shutdown(l->l_mp, XFS_LOG_IO_ERROR);
 		/*
 		 * This flag will be propagated to the trans-committed

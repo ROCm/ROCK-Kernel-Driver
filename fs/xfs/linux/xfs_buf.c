@@ -31,14 +31,10 @@
  */
 
 /*
- *	page_buf.c
- *
- *	The page_buf module provides an abstract buffer cache model on top of
- *	the Linux page cache.  Cached metadata blocks for a file system are
- *	hashed to the inode for the block device.  The page_buf module
- *	assembles buffer (xfs_buf_t) objects on demand to aggregate such
- *	cached pages for I/O.
- *
+ *	The xfs_buf.c code provides an abstract buffer cache model on top
+ *	of the Linux page cache.  Cached metadata blocks for a file system
+ *	are hashed to the inode for the block device.  xfs_buf.c assembles
+ *	buffers (xfs_buf_t) on demand to aggregate such cached pages for I/O.
  *
  *      Written by Steve Lord, Jim Mostek, Russell Cattelan
  *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
@@ -251,7 +247,7 @@ _pagebuf_initialize(
 	pb->pb_file_offset = range_base;
 	/*
 	 * Set buffer_length and count_desired to the same value initially.
-	 * IO routines should use count_desired, which will be the same in
+	 * I/O routines should use count_desired, which will be the same in
 	 * most cases but may be reset (e.g. XFS recovery).
 	 */
 	pb->pb_buffer_length = pb->pb_count_desired = range_length;
@@ -356,104 +352,74 @@ pagebuf_free(
 }
 
 /*
- *	_pagebuf_lookup_pages
- *
- *	_pagebuf_lookup_pages finds all pages which match the buffer
- *	in question and the range of file offsets supplied,
- *	and builds the page list for the buffer, if the
- *	page list is not already formed or if not all of the pages are
- *	already in the list. Invalid pages (pages which have not yet been
- *	read in from disk) are assigned for any pages which are not found.
+ *	Finds all pages for buffer in question and builds it's page list.
  */
 STATIC int
 _pagebuf_lookup_pages(
-	xfs_buf_t		*pb,
-	struct address_space	*aspace,
-	page_buf_flags_t	flags)
+	xfs_buf_t		*bp,
+	uint			flags)
 {
-	loff_t			next_buffer_offset;
-	unsigned long		page_count, pi, index;
-	struct page		*page;
+	struct address_space	*mapping = bp->pb_target->pbr_mapping;
+	unsigned int		sectorshift = bp->pb_target->pbr_sshift;
+	size_t			blocksize = bp->pb_target->pbr_bsize;
+	size_t			size = bp->pb_count_desired;
+	size_t			nbytes, offset;
 	int			gfp_mask = pb_to_gfp(flags);
-	int			all_mapped, good_pages, nbytes, rval, retries;
-	unsigned int		blocksize, sectorshift;
-	size_t			size, offset;
+	unsigned short		page_count, i;
+	pgoff_t			first;
+	loff_t			end;
+	int			error;
 
-	next_buffer_offset = pb->pb_file_offset + pb->pb_buffer_length;
-	good_pages = page_count = (page_buf_btoc(next_buffer_offset) -
-				   page_buf_btoct(pb->pb_file_offset));
+	end = bp->pb_file_offset + bp->pb_buffer_length;
+	page_count = page_buf_btoc(end) - page_buf_btoct(bp->pb_file_offset);
 
-	if (pb->pb_flags & _PBF_ALL_PAGES_MAPPED) {
-		/* Bring pages forward in cache */
-		for (pi = 0; pi < page_count; pi++) {
-			mark_page_accessed(pb->pb_pages[pi]);
-		}
-		if ((flags & PBF_MAPPED) && !(pb->pb_flags & PBF_MAPPED)) {
-			all_mapped = 1;
-			rval = 0;
-			goto mapit;
-		}
-		return 0;
-	}
+	error = _pagebuf_get_pages(bp, page_count, flags);
+	if (unlikely(error))
+		return error;
 
-	/* Ensure pb_pages field has been initialised */
-	rval = _pagebuf_get_pages(pb, page_count, flags);
-	if (rval)
-		return rval;
+	offset = bp->pb_offset;
+	first = bp->pb_file_offset >> PAGE_CACHE_SHIFT;
 
-	all_mapped = 1;
-	blocksize = pb->pb_target->pbr_bsize;
-	sectorshift = pb->pb_target->pbr_sshift;
-	size = pb->pb_count_desired;
-	offset = pb->pb_offset;
+	for (i = 0; i < bp->pb_page_count; i++) {
+		struct page	*page;
+		uint		retries = 0;
 
-	/* Enter the pages in the page list */
-	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
-	for (pi = 0; pi < page_count; pi++, index++) {
-		if (pb->pb_pages[pi] == 0) {
-			retries = 0;
-		      retry:
-			page = find_or_create_page(aspace, index, gfp_mask);
-			if (!page) {
-				if (flags & PBF_READ_AHEAD)
-					return -ENOMEM;
-				/*
-				 * This could deadlock.  But until all the
-				 * XFS lowlevel code is revamped to handle
-				 * buffer allocation failures we can't do
-				 * much.
-				 */
-				if (!(++retries % 100)) {
-					printk(KERN_ERR
-					       "possibly deadlocking in %s\n",
-					       __FUNCTION__);
-				}
-				XFS_STATS_INC(pb_page_retries);
-				pagebuf_daemon_wakeup();
-				current->state = TASK_UNINTERRUPTIBLE;
-				schedule_timeout(10);
-				goto retry;
+	      retry:
+		page = find_or_create_page(mapping, first + i, gfp_mask);
+		if (unlikely(page == NULL)) {
+			if (flags & PBF_READ_AHEAD)
+				return -ENOMEM;
+
+			/*
+			 * This could deadlock.
+			 *
+			 * But until all the XFS lowlevel code is revamped to
+			 * handle buffer allocation failures we can't do much.
+			 */
+			if (!(++retries % 100)) {
+				printk(KERN_ERR "possibly deadlocking in %s\n",
+						__FUNCTION__);
 			}
-			XFS_STATS_INC(pb_page_found);
-			mark_page_accessed(page);
-			pb->pb_pages[pi] = page;
-		} else {
-			page = pb->pb_pages[pi];
-			lock_page(page);
+
+			XFS_STATS_INC(pb_page_retries);
+			pagebuf_daemon_wakeup();
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(10);
+			goto retry;
 		}
 
-		nbytes = PAGE_CACHE_SIZE - offset;
-		if (nbytes > size)
-			nbytes = size;
+		XFS_STATS_INC(pb_page_found);
+
+		nbytes = min_t(size_t, size, PAGE_CACHE_SIZE - offset);
 		size -= nbytes;
 
 		if (!PageUptodate(page)) {
+			page_count--;
 			if (blocksize == PAGE_CACHE_SIZE) {
 				if (flags & PBF_READ)
-					pb->pb_locked = 1;
-				good_pages--;
+					bp->pb_locked = 1;
 			} else if (!PagePrivate(page)) {
-				unsigned long	i, range;
+				unsigned long	j, range;
 
 				/*
 				 * In this case page->private holds a bitmap
@@ -461,60 +427,62 @@ _pagebuf_lookup_pages(
 				 */
 				ASSERT(blocksize < PAGE_CACHE_SIZE);
 				range = (offset + nbytes) >> sectorshift;
-				for (i = offset >> sectorshift; i < range; i++)
-					if (!test_bit(i, &page->private))
+				for (j = offset >> sectorshift; j < range; j++)
+					if (!test_bit(j, &page->private))
 						break;
-				if (i != range)
-					good_pages--;
-			} else {
-				good_pages--;
+				if (j == range)
+					page_count++;
 			}
 		}
+
+		bp->pb_pages[i] = page;
 		offset = 0;
 	}
 
-	if (!pb->pb_locked) {
-		for (pi = 0; pi < page_count; pi++) {
-			if (pb->pb_pages[pi])
-				unlock_page(pb->pb_pages[pi]);
-		}
+	if (!bp->pb_locked) {
+		for (i = 0; i < bp->pb_page_count; i++)
+			unlock_page(bp->pb_pages[i]);
 	}
 
-	pb->pb_flags |= _PBF_PAGECACHE;
-mapit:
-	pb->pb_flags |= _PBF_MEM_ALLOCATED;
-	if (all_mapped) {
-		pb->pb_flags |= _PBF_ALL_PAGES_MAPPED;
+	bp->pb_flags |= (_PBF_PAGECACHE|_PBF_MEM_ALLOCATED);
 
-		/* A single page buffer is always mappable */
-		if (page_count == 1) {
-			pb->pb_addr = (caddr_t)
-				page_address(pb->pb_pages[0]) + pb->pb_offset;
-			pb->pb_flags |= PBF_MAPPED;
-		} else if (flags & PBF_MAPPED) {
-			if (as_list_len > 64)
-				purge_addresses();
-			pb->pb_addr = vmap(pb->pb_pages, page_count,
-					VM_MAP, PAGE_KERNEL);
-			if (pb->pb_addr == NULL)
-				return -ENOMEM;
-			pb->pb_addr += pb->pb_offset;
-			pb->pb_flags |= PBF_MAPPED | _PBF_ADDR_ALLOCATED;
-		}
-	}
-	/* If some pages were found with data in them
-	 * we are not in PBF_NONE state.
-	 */
-	if (good_pages != 0) {
-		pb->pb_flags &= ~(PBF_NONE);
-		if (good_pages != page_count) {
-			pb->pb_flags |= PBF_PARTIAL;
-		}
+	if (page_count) {
+		/* if we have any uptodate pages, mark that in the buffer */
+		bp->pb_flags &= ~PBF_NONE;
+
+		/* if some pages aren't uptodate, mark that in the buffer */
+		if (page_count != bp->pb_page_count)
+			bp->pb_flags |= PBF_PARTIAL;
 	}
 
-	PB_TRACE(pb, "lookup_pages", (long)good_pages);
+	PB_TRACE(bp, "lookup_pages", (long)page_count);
+	return error;
+}
 
-	return rval;
+/*
+ *	Map buffer into kernel address-space if nessecary.
+ */
+STATIC int
+_pagebuf_map_pages(
+	xfs_buf_t		*bp,
+	uint			flags)
+{
+	/* A single page buffer is always mappable */
+	if (bp->pb_page_count == 1) {
+		bp->pb_addr = page_address(bp->pb_pages[0]) + bp->pb_offset;
+		bp->pb_flags |= PBF_MAPPED;
+	} else if (flags & PBF_MAPPED) {
+		if (as_list_len > 64)
+			purge_addresses();
+		bp->pb_addr = vmap(bp->pb_pages, bp->pb_page_count,
+				VM_MAP, PAGE_KERNEL);
+		if (unlikely(bp->pb_addr == NULL))
+			return -ENOMEM;
+		bp->pb_addr += bp->pb_offset;
+		bp->pb_flags |= PBF_MAPPED | _PBF_ADDR_ALLOCATED;
+	}
+
+	return 0;
 }
 
 /*
@@ -543,8 +511,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	size_t			range_length;
 	int			hval;
 	pb_hash_t		*h;
-	struct list_head	*p;
-	xfs_buf_t		*pb;
+	xfs_buf_t		*pb, *n;
 	int			not_locked;
 
 	range_base = (ioff << BBSHIFT);
@@ -560,9 +527,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	h = &pbhash[hval];
 
 	spin_lock(&h->pb_hash_lock);
-	list_for_each(p, &h->pb_hash) {
-		pb = list_entry(p, xfs_buf_t, pb_hash_list);
-
+	list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
 		if (pb->pb_target == target &&
 		    pb->pb_file_offset == range_base &&
 		    pb->pb_buffer_length == range_length) {
@@ -621,7 +586,6 @@ found:
 
 	if (pb->pb_flags & PBF_STALE)
 		pb->pb_flags &= PBF_MAPPED | \
-				_PBF_ALL_PAGES_MAPPED | \
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED | \
 				_PBF_MEM_SLAB;
@@ -669,28 +633,39 @@ pagebuf_get(				/* allocate a buffer		*/
 	page_buf_flags_t	flags)	/* PBF_TRYLOCK			*/
 {
 	xfs_buf_t		*pb, *new_pb;
-	int			error;
+	int			error = 0, i;
 
 	new_pb = pagebuf_allocate(flags);
 	if (unlikely(!new_pb))
-		return (NULL);
+		return NULL;
 
 	pb = _pagebuf_find(target, ioff, isize, flags, new_pb);
-	if (pb != new_pb) {
+	if (pb == new_pb) {
+		error = _pagebuf_lookup_pages(pb, flags);
+		if (unlikely(error)) {
+			printk(KERN_WARNING
+			       "pagebuf_get: failed to lookup pages\n");
+			goto no_buffer;
+		}
+	} else {
 		pagebuf_deallocate(new_pb);
-		if (unlikely(!pb))
-			return (NULL);
+		if (unlikely(pb == NULL))
+			return NULL;
+	}
+
+	for (i = 0; i < pb->pb_page_count; i++)
+		mark_page_accessed(pb->pb_pages[i]);
+
+	if (!(pb->pb_flags & PBF_MAPPED)) {
+		error = _pagebuf_map_pages(pb, flags);
+		if (unlikely(error)) {
+			printk(KERN_WARNING
+			       "pagebuf_get: failed to map pages\n");
+			goto no_buffer;
+		}
 	}
 
 	XFS_STATS_INC(pb_get);
-
-	/* fill in any missing pages */
-	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
-	if (unlikely(error)) {
-		printk(KERN_WARNING
-			"pagebuf_get: warning, failed to lookup pages\n");
-		goto no_buffer;
-	}
 
 	/*
 	 * Always fill in the block number now, the mapped cases can do
@@ -1135,18 +1110,12 @@ void
 pagebuf_iodone_work(
 	void			*v)
 {
-	xfs_buf_t		*pb = (xfs_buf_t *)v;
+	xfs_buf_t		*bp = (xfs_buf_t *)v;
 
-	if (pb->pb_iodone) {
-		(*(pb->pb_iodone)) (pb);
-		return;
-	}
-
-	if (pb->pb_flags & PBF_ASYNC) {
-		if (!pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
-	}
+	if (bp->pb_iodone)
+		(*(bp->pb_iodone))(bp);
+	else if (bp->pb_flags & PBF_ASYNC)
+		xfs_buf_relse(bp);
 }
 
 void
@@ -1294,7 +1263,7 @@ bio_end_io_pagebuf(
 		} else if (blocksize == PAGE_CACHE_SIZE) {
 			SetPageUptodate(page);
 		} else if (!PagePrivate(page)) {
-			unsigned int	j, range;
+			unsigned long	j, range;
 
 			ASSERT(blocksize < PAGE_CACHE_SIZE);
 			range = (bvec->bv_offset + bvec->bv_len) >> sectorshift;
@@ -1416,22 +1385,7 @@ submit_io:
 }
 
 /*
- *	pagebuf_iorequest
- *
- *	pagebuf_iorequest is the core I/O request routine.
- *	It assumes that the buffer is well-formed and
- *	mapped and ready for physical I/O, unlike
- *	pagebuf_iostart() and pagebuf_iophysio().  Those
- *	routines call the pagebuf_ioinitiate routine to start I/O,
- *	if it is present, or else call pagebuf_iorequest()
- *	directly if the pagebuf_ioinitiate routine is not present.
- *
- *	This function will be responsible for ensuring access to the
- *	pages is restricted whilst I/O is in progress - for locking
- *	pagebufs the pagebuf lock is the mediator, for non-locking
- *	pagebufs the pages will be locked. In the locking case we
- *	need to use the pagebuf lock as multiple meta-data buffers
- *	will reference the same page.
+ *	pagebuf_iorequest -- the core I/O request routine.
  */
 int
 pagebuf_iorequest(			/* start real I/O		*/
@@ -1568,6 +1522,8 @@ pagebuf_delwri_queue(
 	int			unlock)
 {
 	PB_TRACE(pb, "delwri_q", (long)unlock);
+	ASSERT(pb->pb_flags & PBF_DELWRI);
+
 	spin_lock(&pbd_delwrite_lock);
 	/* If already in the queue, dequeue and place at tail */
 	if (!list_empty(&pb->pb_list)) {
@@ -1621,8 +1577,8 @@ STATIC int
 pagebuf_daemon(
 	void			*data)
 {
-	xfs_buf_t		*pb;
-	struct list_head	*curr, *next, tmp;
+	struct list_head	tmp;
+	xfs_buf_t		*pb, *n;
 
 	/*  Set up the thread  */
 	daemonize("xfsbufd");
@@ -1642,14 +1598,11 @@ pagebuf_daemon(
 		schedule_timeout(xfs_flush_interval);
 
 		spin_lock(&pbd_delwrite_lock);
-
-		list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-			pb = list_entry(curr, xfs_buf_t, pb_list);
-
+		list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 			PB_TRACE(pb, "walkq1", (long)pagebuf_ispin(pb));
+			ASSERT(pb->pb_flags & PBF_DELWRI);
 
-			if ((pb->pb_flags & PBF_DELWRI) &&
-			     !pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
+			if (!pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
 				if (!force_flush &&
 				    time_before(jiffies, pb->pb_flushtime)) {
 					pagebuf_unlock(pb);
@@ -1661,12 +1614,11 @@ pagebuf_daemon(
 				list_move(&pb->pb_list, &tmp);
 			}
 		}
-
 		spin_unlock(&pbd_delwrite_lock);
+
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, xfs_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
-
 			pagebuf_iostrategy(pb);
 			blk_run_address_space(pb->pb_target->pbr_mapping);
 		}
@@ -1683,31 +1635,24 @@ pagebuf_daemon(
 void
 pagebuf_delwri_flush(
 	xfs_buftarg_t		*target,
-	u_long			flags,
+	int			wait,
 	int			*pinptr)
 {
-	xfs_buf_t		*pb;
-	struct list_head	*curr, *next, tmp;
+	struct list_head	tmp;
+	xfs_buf_t		*pb, *n;
 	int			pincount = 0;
 
 	pagebuf_runall_queues(pagebuf_dataio_workqueue);
 	pagebuf_runall_queues(pagebuf_logio_workqueue);
 
-	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
+	spin_lock(&pbd_delwrite_lock);
+	list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 
-	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-		pb = list_entry(curr, xfs_buf_t, pb_list);
-
-		/*
-		 * Skip other targets, markers and in progress buffers
-		 */
-
-		if ((pb->pb_flags == 0) || (pb->pb_target != target) ||
-		    !(pb->pb_flags & PBF_DELWRI)) {
+		if (pb->pb_target != target)
 			continue;
-		}
 
+		ASSERT(pb->pb_flags & PBF_DELWRI);
 		PB_TRACE(pb, "walkq2", (long)pagebuf_ispin(pb));
 		if (pagebuf_ispin(pb)) {
 			pincount++;
@@ -1718,33 +1663,33 @@ pagebuf_delwri_flush(
 		pb->pb_flags |= PBF_WRITE;
 		list_move(&pb->pb_list, &tmp);
 	}
-	/* ok found all the items that can be worked on 
-	 * drop the lock and process the private list */
 	spin_unlock(&pbd_delwrite_lock);
 
-	list_for_each_safe(curr, next, &tmp) {
-		pb = list_entry(curr, xfs_buf_t, pb_list);
-
-		if (flags & PBDF_WAIT)
+	/*
+	 * Dropped the delayed write list lock, now walk the temporary list
+	 */
+	list_for_each_entry_safe(pb, n, &tmp, pb_list) {
+		if (wait)
 			pb->pb_flags &= ~PBF_ASYNC;
 		else
-			list_del_init(curr);
+			list_del_init(&pb->pb_list);
 
 		pagebuf_lock(pb);
 		pagebuf_iostrategy(pb);
 	}
 
+	/*
+	 * Remaining list items must be flushed before returning
+	 */
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, xfs_buf_t, pb_list);
 
 		list_del_init(&pb->pb_list);
-		pagebuf_iowait(pb);
-		if (!pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
+		xfs_iowait(pb);
+		xfs_buf_relse(pb);
 	}
 
-	if (flags & PBDF_WAIT)
+	if (wait)
 		blk_run_address_space(target->pbr_mapping);
 
 	if (pinptr)

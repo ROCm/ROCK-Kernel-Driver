@@ -2242,3 +2242,12 @@ xlog_grant_sub_space(xlog_t *log, int bytes, int type)
 	XLOG_GRANT_SUB_SPACE(log, bytes, type);
 }
 #endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASMOREBITS)
+int
+xfs_sb_version_hasmorebits(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASMOREBITS(sbp);
+}
+#endif
+

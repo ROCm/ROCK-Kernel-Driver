@@ -48,13 +48,10 @@ lock_t		dm_token_lock = SPIN_LOCK_UNLOCKED;/* dm_next_token/dm_next_sequence loc
 
 int	dm_max_queued_msgs = 2048;	/* max # undelivered msgs/session */
 
-#ifdef __sgi
 int	dm_hash_buckets = 1009;		/* prime -- number of buckets */
 
-/* XXX floating point not allowed in Linux kernel. */
-#define DM_SHASH(sess,inodenum)	 ((sess)->sn_sesshash + \
-				  ((inodenum) % dm_hash_buckets))
-#endif
+#define DM_SHASH(sess,inodenum)	\
+		((sess)->sn_sesshash + do_mod((inodenum), dm_hash_buckets))
 
 
 #ifdef CONFIG_PROC_FS
@@ -225,7 +222,6 @@ dm_unlink_event(
    The tokevent must be for a regular file object--DM_TDT_REG.
 */
 
-#ifdef __sgi
 static void
 hash_event(
 	dm_session_t	*s,
@@ -255,7 +251,6 @@ hash_event(
 	tevp->te_hashnext = sh->h_next;
 	sh->h_next = tevp;
 }
-#endif
 
 
 /* Remove a regular file event from a hash bucket.  The caller must have
@@ -263,7 +258,6 @@ hash_event(
    The tokevent must be for a regular file object--DM_TDT_REG.
 */
 
-#ifdef __sgi
 static void
 unhash_event(
 	dm_session_t	*s,
@@ -298,7 +292,6 @@ unhash_event(
 	sh->num_dels++;
 #endif
 }
-#endif
 
 
 /* Determine if this is a repeat event.	 The caller MUST be holding
@@ -309,7 +302,6 @@ unhash_event(
 	1 == match found
 */
 
-#ifdef __sgi
 static int
 repeated_event(
 	dm_session_t	*s,
@@ -367,7 +359,6 @@ repeated_event(
 	/* No match found */
 	return(0);
 }
-#endif
 
 
 /* Return a pointer to a session given its session ID, or EINVAL if no session
@@ -607,10 +598,8 @@ dm_destroy_session(
 	spinlock_destroy(&s->sn_qlock);
 	sv_destroy(&s->sn_readerq);
 	sv_destroy(&s->sn_writerq);
-#ifdef __sgi
 	if (s->sn_sesshash)
 		kmem_free(s->sn_sesshash, dm_hash_buckets * sizeof(dm_sesshash_t));
-#endif
 	kmem_cache_free(dm_session_cachep, s);
 	return(0);
 }
@@ -878,9 +867,7 @@ dm_move_event(
 	dm_tokevent_t	*tevp;
 	int		error;
 	unsigned long		lc;		/* lock cookie */
-#ifdef __sgi
-	int		hash_it;
-#endif
+	int		hash_it = 0;
 
 	lc = mutex_spinlock(&dm_session_lock);
 
@@ -891,17 +878,13 @@ dm_move_event(
 		return(error);
 	}
 	dm_unlink_event(tevp, &s1->sn_delq);
-#ifdef __sgi
 	if (tevp->te_flags & DM_TEF_HASHED) {
 		unhash_event(s1, tevp);
 		hash_it = 1;
 	}
-#endif
 	dm_link_event(tevp, &s2->sn_delq);
-#ifdef __sgi
 	if (hash_it)
 		hash_event(s2, tevp);
-#endif
 	mutex_spinunlock(&dm_session_lock, lc);
 
 	if (copy_to_user(rtokenp, &token, sizeof(token)))
@@ -1093,10 +1076,8 @@ dm_get_events(
 			mutex_spinunlock(&tevp->te_lock, lc2);
 		} else {
 			tevp->te_flags |= DM_TEF_FINAL;
-#ifdef __sgi
 			if (tevp->te_flags & DM_TEF_HASHED)
 				unhash_event(s, tevp);
-#endif
 			mutex_spinunlock(&tevp->te_lock, lc2);
 			dm_put_tevp(tevp, NULL);/* can't cause destroy events */
 		}
@@ -1192,10 +1173,8 @@ dm_respond_event(
 		mutex_spinunlock(&s->sn_qlock, lc);
 	} else {
 		dm_unlink_event(tevp, &s->sn_delq);
-#ifdef __sgi
 		if (tevp->te_flags & DM_TEF_HASHED)
 			unhash_event(s, tevp);
-#endif
 		tevp->te_reply = reterror;
 		tevp->te_flags |= DM_TEF_FINAL;
 		if (tevp->te_evt_ref)
@@ -1232,12 +1211,9 @@ dm_enqueue(
 	int		interruptable)
 {
 	int		is_unmount = 0;
-#ifdef __sgi
 	int		is_hashable = 0;
-#endif
 	int		reply;
 
-#ifdef __sgi
 	/* If the caller isn't planning to stick around for the result
 	   and this request is identical to one that is already on the
 	   queues then just give the caller an EAGAIN.	Release the
@@ -1255,7 +1231,6 @@ dm_enqueue(
 		}
 		is_hashable = 1;
 	}
-#endif
 
 	if (tevp->te_msg.ev_type == DM_EVENT_UNMOUNT)
 		is_unmount = 1;
@@ -1305,10 +1280,8 @@ dm_enqueue(
 	*/
 
 	dm_link_event(tevp, &s->sn_newq);
-#ifdef __sgi
 	if (is_hashable)
 		hash_event(s, tevp);
-#endif
 
 	if (s->sn_readercnt)
 		sv_signal(&s->sn_readerq);

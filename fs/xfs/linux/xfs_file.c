@@ -68,16 +68,15 @@ __linvfs_read(
 {
 	struct iovec		iov = {buf, count};
 	struct file		*file = iocb->ki_filp;
-	vnode_t			*vp;
-	int			error;
+	vnode_t			*vp = LINVFS_GET_VP(file->f_dentry->d_inode);
+	ssize_t			rval;
 
 	BUG_ON(iocb->ki_pos != pos);
 
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
-	vp = LINVFS_GET_VP(file->f_dentry->d_inode);
-	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, ioflags, NULL, error);
-	return error;
+	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, ioflags, NULL, rval);
+	return rval;
 }
 
 
@@ -114,20 +113,21 @@ __linvfs_write(
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	int		error;
+	ssize_t		rval;
 
 	BUG_ON(iocb->ki_pos != pos);
 	if (unlikely(file->f_flags & O_DIRECT)) {
 		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
-				ioflags, NULL, error);
+				ioflags, NULL, rval);
 	} else {
 		down(&inode->i_sem);
 		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
-				ioflags, NULL, error);
+				ioflags, NULL, rval);
 		up(&inode->i_sem);
 	}
-	return error;
+
+	return rval;
 }
 
 
@@ -163,19 +163,19 @@ __linvfs_readv(
 	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
-	int		error;
+	ssize_t		rval;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
 
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
-	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, error);
-	if (-EIOCBQUEUED == error)
-		error = wait_on_sync_kiocb(&kiocb);
-	*ppos = kiocb.ki_pos;
+	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, rval);
+	if (rval == -EIOCBQUEUED)
+		rval = wait_on_sync_kiocb(&kiocb);
 
-	return error;
+	*ppos = kiocb.ki_pos;
+	return rval;
 }
 
 STATIC ssize_t
@@ -210,25 +210,26 @@ __linvfs_writev(
 	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
-	int		error;
+	ssize_t		rval;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
 	if (unlikely(file->f_flags & O_DIRECT)) {
 		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, error);
+				ioflags, NULL, rval);
 	} else {
 		down(&inode->i_sem);
 		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, error);
+				ioflags, NULL, rval);
 		up(&inode->i_sem);
 	}
-	if (-EIOCBQUEUED == error)
-		error = wait_on_sync_kiocb(&kiocb);
-	*ppos = kiocb.ki_pos;
 
-	return error;
+	if (rval == -EIOCBQUEUED)
+		rval = wait_on_sync_kiocb(&kiocb);
+
+	*ppos = kiocb.ki_pos;
+	return rval;
 }
 
 
