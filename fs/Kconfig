@@ -1361,7 +1361,6 @@ config NFS_FS
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFS_ACL
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1454,7 +1453,6 @@ config NFSD
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFSD_ACL
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1497,6 +1495,8 @@ config NFSD_ACL
 
 config NFS_ACL_SUPPORT
 	tristate
+	default y if (NFSD=y || NFS_FS=y) && (NFSD_ACL || NFS_ACL)
+	default m if (NFSD!=y && NFS_FS!=y) && (NFSD=m || NFS_FS=m) && (NFSD_ACL || NFS_ACL)
 
 config NFSD_V4
 	bool "Provide NFSv4 server support (EXPERIMENTAL)"
