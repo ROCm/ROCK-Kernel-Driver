@@ -46,6 +46,7 @@
 #include "aureon.h"
 #include "vt1720_mobo.h"
 #include "pontis.h"
+#include "prodigy192.h"
 
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -57,6 +58,7 @@ MODULE_SUPPORTED_DEVICE("{"
 	       AUREON_DEVICE_DESC
 	       VT1720_MOBO_DEVICE_DESC
 	       PONTIS_DEVICE_DESC
+	       PRODIGY192_DEVICE_DESC
 		"{VIA,VT1720},"
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
@@ -1864,6 +1866,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_aureon_cards,
 	snd_vt1720_mobo_cards,
 	snd_vt1720_pontis_cards,
+	snd_vt1724_prodigy192_cards,
 	NULL,
 };
 
