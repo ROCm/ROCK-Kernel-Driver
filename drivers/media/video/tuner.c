@@ -960,9 +960,11 @@ static struct i2c_driver driver = {
 };
 static struct i2c_client client_template =
 {
-        .dev.name   = "(tuner unset)",
-	.flags      = I2C_CLIENT_ALLOW_USE,
-        .driver     = &driver,
+	.flags  = I2C_CLIENT_ALLOW_USE,
+	.driver = &driver,
+	.dev  = {
+		.name   = "(tuner unset)",
+	},
 };
 
 static int tuner_init_module(void)
