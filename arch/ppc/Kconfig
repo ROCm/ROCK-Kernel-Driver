@@ -181,7 +181,7 @@ config CPU_FREQ_TABLE
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
-	depends on 6xx
+	depends on 6xx && (PPC_PREP || PPC_PMAC)
 	help
 	  Some versions of the PPC601 (the first PowerPC chip) have bugs which
 	  mean that extra synchronization instructions are required near
