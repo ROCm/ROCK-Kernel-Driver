@@ -17,7 +17,8 @@
 
 #include <linux/vmalloc.h>
 
-asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs);
+asmlinkage irqreturn_t floppy_hardint(int irq, void *dev_id,
+				      struct pt_regs *regs);
 
 /* constants... */
 
@@ -183,7 +184,8 @@ static void fd_disable_dma(void)
 
 /* this is the only truly Q40 specific function */
 
-asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
+asmlinkage irqreturn_t floppy_hardint(int irq, void *dev_id,
+				      struct pt_regs *regs)
 {
 	register unsigned char st;
 
@@ -197,7 +199,7 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 	if(!doing_pdma) {
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 
 #ifdef TRACE_FLPY_INT
@@ -232,7 +234,7 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	calls++;
 #endif
 	if(st == 0x20)
-		return;
+		return IRQ_HANDLED;
 	if(!(st & 0x20)) {
 		virtual_dma_residue += virtual_dma_count;
 		virtual_dma_count=0;
@@ -245,12 +247,13 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 		doing_pdma = 0;
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 #ifdef TRACE_FLPY_INT
 	if(!virtual_dma_count)
 		dma_wait++;
 #endif
+	return IRQ_HANDLED;
 }
 
 #define EXTRA_FLOPPY_PARAMS
