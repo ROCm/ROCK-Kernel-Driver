@@ -126,7 +126,7 @@ static struct block_device_operations md_fops;
 
 /*
  * Enables to iterate over all existing md arrays
- * all_mddevs_lock protects this list as well as mddev_map.
+ * all_mddevs_lock protects this list.
  */
 static LIST_HEAD(all_mddevs);
 static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
@@ -154,8 +154,6 @@ static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
 		tmp = tmp->next;})					\
 		)
 
-static mddev_t *mddev_map[MAX_MD_DEVS];
-
 static int md_fail_request (request_queue_t *q, struct bio *bio)
 {
 	bio_io_error(bio, bio->bi_size);
@@ -174,7 +172,6 @@ static void mddev_put(mddev_t *mddev)
 		return;
 	if (!mddev->raid_disks && list_empty(&mddev->disks)) {
 		list_del(&mddev->all_mddevs);
-		mddev_map[mdidx(mddev)] = NULL;
 		blk_put_queue(mddev->queue);
 		kfree(mddev);
 	}
@@ -187,15 +184,16 @@ static mddev_t * mddev_find(int unit)
 
  retry:
 	spin_lock(&all_mddevs_lock);
-	if (mddev_map[unit]) {
-		mddev =  mddev_get(mddev_map[unit]);
-		spin_unlock(&all_mddevs_lock);
-		if (new)
-			kfree(new);
-		return mddev;
-	}
+	list_for_each_entry(mddev, &all_mddevs, all_mddevs)
+		if (mdidx(mddev) == unit) {
+			mddev_get(mddev);
+			spin_unlock(&all_mddevs_lock);
+			if (new)
+				kfree(new);
+			return mddev;
+		}
+
 	if (new) {
-		mddev_map[unit] = new;
 		list_add(&new->all_mddevs, &all_mddevs);
 		spin_unlock(&all_mddevs_lock);
 		return new;
