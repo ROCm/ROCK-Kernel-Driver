@@ -411,7 +411,7 @@ void sched_exit(task_t * p)
 }
 
 #if CONFIG_SMP
-asmlinkage void schedule_tail(task_t *prev)
+asmlinkage void schedule_tail(void)
 {
 	spin_unlock_irq(&this_rq()->lock);
 }
