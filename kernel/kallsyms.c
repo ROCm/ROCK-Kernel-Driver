@@ -190,7 +190,7 @@ static int update_iter(struct kallsym_iter *iter, loff_t pos)
 		reset_iter(iter);
 
 	/* We need to iterate through the previous symbols. */
-	for (; iter->pos <= pos; iter->pos++)
+	for (; iter->pos != pos; iter->pos++)
 		get_ksymbol_core(iter);
 	return 1;
 }
