@@ -436,8 +436,15 @@ void accel_clear(struct vc_data *vc, struct fb_info *info, int sy,
 }	
 
 void accel_putcs(struct vc_data *vc, struct fb_info *info,
-			const unsigned short *s, int count, int yy, int xx)
+		 const unsigned short *s, int count, int yy, int xx)
 {
+	void (*move_unaligned)(struct fb_info *info, struct fb_pixmap *buf,
+			       u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+			       u32 height, u32 shift_high, u32 shift_low,
+			       u32 mod);
+	void (*move_aligned)(struct fb_info *info, struct fb_pixmap *buf,
+			     u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+			     u32 height);
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	unsigned int width = (vc->vc_font.width + 7) >> 3;
 	unsigned int cellsize = vc->vc_font.height * width;
@@ -446,20 +453,26 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
 	unsigned int shift_high = 8, pitch, cnt, size, k;
-	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
-	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
 	unsigned int idx = vc->vc_font.width >> 3;
 	struct fb_image image;
-	u16 c = scr_readw(s);
-	u8 *src, *dst, *dst0;
+	u8 *src, *dst;
 
-	image.fg_color = attr_fgcol(fgshift, c);
-	image.bg_color = attr_bgcol(bgshift, c);
+	image.fg_color = attr_fgcol((vc->vc_hi_font_mask) ? 9 : 8,
+				    scr_readw(s));
+	image.bg_color = attr_bgcol((vc->vc_hi_font_mask) ? 13 : 12,
+				    scr_readw(s));
 	image.dx = xx * vc->vc_font.width;
 	image.dy = yy * vc->vc_font.height;
 	image.height = vc->vc_font.height;
 	image.depth = 1;
 
+	if (info->pixmap.outbuf && info->pixmap.inbuf) {
+		move_aligned = fb_iomove_buf_aligned;
+		move_unaligned = fb_iomove_buf_unaligned;
+	} else {
+		move_aligned = fb_sysmove_buf_aligned;
+		move_unaligned = fb_sysmove_buf_unaligned;
+	}
 	while (count) {
 		if (count > maxcnt)
 			cnt = k = maxcnt;
@@ -471,24 +484,27 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 		pitch &= ~scan_align;
 		size = pitch * image.height + buf_align;
 		size &= ~buf_align;
-		dst0 = fb_get_buffer_offset(info, &info->pixmap, size);
-		image.data = dst0;
-		while (k--) {
-			src = vc->vc_font.data + (scr_readw(s++) & charmask)*cellsize;
-			dst = dst0;
-
-			if (mod) {
-				fb_move_buf_unaligned(info, &info->pixmap, dst, pitch,
-						   src, idx, image.height, shift_high,
-						   shift_low, mod);
+		dst = fb_get_buffer_offset(info, &info->pixmap, size);
+		image.data = dst;
+		if (mod) {
+			while (k--) {
+				src = vc->vc_font.data + (scr_readw(s++)&
+							  charmask)*cellsize;
+				move_unaligned(info, &info->pixmap, dst, pitch,
+					       src, idx, image.height,
+					       shift_high, shift_low, mod);
 				shift_low += mod;
-				dst0 += (shift_low >= 8) ? width : width - 1;
+				dst += (shift_low >= 8) ? width : width - 1;
 				shift_low &= 7;
 				shift_high = 8 - shift_low;
-			} else {
-				fb_move_buf_aligned(info, &info->pixmap, dst, pitch,
-						 src, idx, image.height);
-				dst0 += width;
+			}
+		} else {
+			while (k--) {
+				src = vc->vc_font.data + (scr_readw(s++)&
+							  charmask)*cellsize;
+				move_aligned(info, &info->pixmap, dst, pitch,
+					     src, idx, image.height);
+				dst += width;
 			}
 		}
 		info->fbops->fb_imageblit(info, &image);
@@ -950,7 +966,10 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	dst = fb_get_buffer_offset(info, &info->pixmap, size);
 	image.data = dst;
 
-	fb_move_buf_aligned(info, &info->pixmap, dst, pitch, src, width, image.height);
+	if (info->pixmap.outbuf)
+		fb_iomove_buf_aligned(info, &info->pixmap, dst, pitch, src, width, image.height);
+	else
+		fb_sysmove_buf_aligned(info, &info->pixmap, dst, pitch, src, width, image.height);
 
 	info->fbops->fb_imageblit(info, &image);
 }
