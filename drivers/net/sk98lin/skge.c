@@ -233,12 +233,27 @@ static int      SkDrvDeInitAdapter(SK_AC *pAC, int devNbr);
  * Extern Function Prototypes
  *
  ******************************************************************************/
-
-#ifdef CONFIG_PROC_FS
-static const char 	SK_Root_Dir_entry[] = "sk98lin";
+static const char 	SKRootName[] = "sk98lin";
 static struct		proc_dir_entry *pSkRootDir;
 extern struct	file_operations sk_proc_fops;
-#endif
+
+static inline void SkGeProcCreate(struct net_device *dev)
+{
+	struct proc_dir_entry *pe;
+
+	if (pSkRootDir && 
+	    (pe = create_proc_entry(dev->name, S_IRUGO, pSkRootDir))) {
+		pe->proc_fops = &sk_proc_fops;
+		pe->data = dev;
+		pe->owner = THIS_MODULE;
+	}
+}
+ 
+static inline void SkGeProcRemove(struct net_device *dev)
+{
+	if (pSkRootDir)
+		remove_proc_entry(dev->name, pSkRootDir);
+}
 
 extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);	
 extern void SkDimDisplayModerationSettings(SK_AC *pAC);
@@ -252,7 +267,6 @@ static void	DumpLong(char*, int);
 #endif
 
 /* global variables *********************************************************/
-struct SK_NET_DEVICE *SkGeRootDev = NULL;
 static SK_BOOL DoPrintInterfaceChange = SK_TRUE;
 
 /* local variables **********************************************************/
@@ -600,12 +614,6 @@ SK_BOOL	DualNet;
 		printk("sk98lin: SkGeInitAssignRamToQueues failed.\n");
 		return(-EAGAIN);
 	}
-
-	/*
-	 * Register the device here
-	 */
-	pAC->Next = SkGeRootDev;
-	SkGeRootDev = dev;
 
 	return (0);
 } /* SkGeBoardInit */
@@ -4876,9 +4884,6 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 	SK_AC			*pAC;
 	DEV_NET			*pNet = NULL;
 	struct net_device	*dev = NULL;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry	*pProcFile;
-#endif
 	static int boards_found = 0;
 	int error = -ENODEV;
 
@@ -4974,14 +4979,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 
 	memcpy(&dev->dev_addr, &pAC->Addr.Net[0].CurrentMacAddress, 6);
 
-#ifdef CONFIG_PROC_FS
-	pProcFile = create_proc_entry(dev->name, S_IRUGO, pSkRootDir);
-	if (pProcFile) {
-		pProcFile->proc_fops = &sk_proc_fops;
-		pProcFile->data = dev;
-		pProcFile->owner = THIS_MODULE;
-	}
-#endif
+	SkGeProcCreate(dev);
 
 	pNet->PortNr = 0;
 	pNet->NetNr  = 0;
@@ -5028,16 +5026,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 			free_netdev(dev);
 			pAC->dev[1] = pAC->dev[0];
 		} else {
-#ifdef CONFIG_PROC_FS
-			pProcFile = create_proc_entry(dev->name, S_IRUGO,
-					pSkRootDir);
-			if (pProcFile) {
-				pProcFile->proc_fops = &sk_proc_fops;
-				pProcFile->data = dev;
-				pProcFile->owner = THIS_MODULE;
-			}
-#endif
-
+			SkGeProcCreate(dev);
 			memcpy(&dev->dev_addr,
 					&pAC->Addr.Net[1].CurrentMacAddress, 6);
 	
@@ -5075,17 +5064,12 @@ static void __devexit skge_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	DEV_NET *pNet = (DEV_NET *) dev->priv;
 	SK_AC *pAC = pNet->pAC;
-	int have_second_mac = 0;
+	struct net_device *otherdev = pAC->dev[1];
 
-	if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2)
-		have_second_mac = 1;
-
-	remove_proc_entry(dev->name, pSkRootDir);
+	SkGeProcRemove(dev);
 	unregister_netdev(dev);
-	if (have_second_mac) {
-		remove_proc_entry(pAC->dev[1]->name, pSkRootDir);
-		unregister_netdev(pAC->dev[1]);
-	}
+	if (otherdev != dev)
+		SkGeProcRemove(otherdev);
 
 	SkGeYellowLED(pAC, pAC->IoBase, 0);
 
@@ -5118,8 +5102,8 @@ static void __devexit skge_remove_one(struct pci_dev *pdev)
 
 	FreeResources(dev);
 	free_netdev(dev);
-	if (have_second_mac)
-		free_netdev(pAC->dev[1]);
+	if (otherdev != dev)
+		free_netdev(otherdev);
 	kfree(pAC);
 }
 
@@ -5152,34 +5136,21 @@ static int __init skge_init(void)
 {
 	int error;
 
-#ifdef CONFIG_PROC_FS
-	memcpy(&SK_Root_Dir_entry, BOOT_STRING, sizeof(SK_Root_Dir_entry) - 1);
-
-	pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
-	if (!pSkRootDir) {
-		printk(KERN_WARNING "Unable to create /proc/net/%s",
-				SK_Root_Dir_entry);
-		return -ENOMEM;
-	}
-	pSkRootDir->owner = THIS_MODULE;
-#endif
-
-	error = pci_module_init(&skge_driver);
-	if (error) {
-#ifdef CONFIG_PROC_FS
-		remove_proc_entry(pSkRootDir->name, proc_net);
-#endif
-	}
-
+	pSkRootDir = proc_mkdir(SKRootName, proc_net);
+	if (pSkRootDir) 
+		pSkRootDir->owner = THIS_MODULE;
+	
+	error = pci_register_driver(&skge_driver);
+	if (error)
+		proc_net_remove(SKRootName);
 	return error;
 }
 
 static void __exit skge_exit(void)
 {
-	 pci_unregister_driver(&skge_driver);
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry(pSkRootDir->name, proc_net);
-#endif
+	pci_unregister_driver(&skge_driver);
+	proc_net_remove(SKRootName);
+
 }
 
 module_init(skge_init);
