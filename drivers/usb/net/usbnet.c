@@ -1701,6 +1701,15 @@ static const struct driver_info	zaurus_slb500_info = {
 
 	.in = 1, .out = 2,
 };
+static const struct driver_info zaurus_slc700_info = {
+    .description =  "Sharp Zaurus SL-C700",
+    .flags =    FLAG_FRAMING_Z,
+    .check_connect = always_connected,
+    .tx_fixup =     zaurus_tx_fixup,
+
+    .in = 1, .out = 2,
+};
+
 
 // SL-5600 and C-700 are PXA based; should resemble A300
 
@@ -2751,6 +2760,15 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceSubClass	= 0x0a,
 	.bInterfaceProtocol	= 0x00,
 	.driver_info =  (unsigned long) &zaurus_slb500_info,
+}, {
+	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
+	          | USB_DEVICE_ID_MATCH_DEVICE,
+	.idVendor       = 0x04DD,
+	.idProduct      = 0x8007,
+	.bInterfaceClass    = 0x02,
+	.bInterfaceSubClass = 0x0a,
+	.bInterfaceProtocol = 0x00,
+	.driver_info =  (unsigned long) &zaurus_slc700_info,
 },
 #endif
 

@@ -338,10 +338,16 @@ static int usb_stor_control_thread(void * __us)
 		/* lock the device pointers */
 		down(&(us->dev_semaphore));
 
+		/* don't do anything if we are disconnecting */
+		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+			US_DEBUGP("No command during disconnect\n");
+			us->srb->result = DID_BAD_TARGET << 16;
+		}
+
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
-		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+		else if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
 		}
@@ -421,12 +427,44 @@ static int usb_stor_control_thread(void * __us)
  * Device probing and disconnecting
  ***********************************************************************/
 
+/* Associate our private data with the USB device */
+static int associate_dev(struct us_data *us, struct usb_interface *intf)
+{
+	US_DEBUGP("-- %s\n", __FUNCTION__);
+
+	/* Fill in the device-related fields */
+	us->pusb_dev = interface_to_usbdev(intf);
+	us->pusb_intf = intf;
+	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
+
+	/* Store our private data in the interface and increment the
+	 * device's reference count */
+	usb_set_intfdata(intf, us);
+	usb_get_dev(us->pusb_dev);
+
+	/* Allocate the device-related DMA-mapped buffers */
+	us->cr = usb_buffer_alloc(us->pusb_dev, sizeof(*us->cr),
+			GFP_KERNEL, &us->cr_dma);
+	if (!us->cr) {
+		US_DEBUGP("usb_ctrlrequest allocation failed\n");
+		return -ENOMEM;
+	}
+
+	us->iobuf = usb_buffer_alloc(us->pusb_dev, US_IOBUF_SIZE,
+			GFP_KERNEL, &us->iobuf_dma);
+	if (!us->iobuf) {
+		US_DEBUGP("I/O buffer allocation failed\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
 /* Get the unusual_devs entries and the string descriptors */
 static void get_device_info(struct us_data *us, int id_index)
 {
 	struct usb_device *dev = us->pusb_dev;
-	struct usb_host_interface *altsetting =
-		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+	struct usb_interface_descriptor *idesc =
+		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting].desc;
 	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
 	struct usb_device_id *id = &storage_usb_ids[id_index];
 
@@ -438,10 +476,10 @@ static void get_device_info(struct us_data *us, int id_index)
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
 	us->subclass = (unusual_dev->useProtocol == US_SC_DEVICE) ?
-			altsetting->desc.bInterfaceSubClass :
+			idesc->bInterfaceSubClass :
 			unusual_dev->useProtocol;
 	us->protocol = (unusual_dev->useTransport == US_PR_DEVICE) ?
-			altsetting->desc.bInterfaceProtocol :
+			idesc->bInterfaceProtocol :
 			unusual_dev->useTransport;
 	us->flags = unusual_dev->flags;
 
@@ -455,20 +493,26 @@ static void get_device_info(struct us_data *us, int id_index)
 			"an unneeded SubClass entry",
 			"an unneeded Protocol entry",
 			"unneeded SubClass and Protocol entries"};
+		struct usb_device_descriptor *ddesc = &dev->descriptor;
 		int msg = -1;
 
 		if (unusual_dev->useProtocol != US_SC_DEVICE &&
-			us->subclass == altsetting->desc.bInterfaceSubClass)
+			us->subclass == idesc->bInterfaceSubClass)
 			msg += 1;
 		if (unusual_dev->useTransport != US_PR_DEVICE &&
-			us->protocol == altsetting->desc.bInterfaceProtocol)
+			us->protocol == idesc->bInterfaceProtocol)
 			msg += 2;
 		if (msg >= 0)
 			printk(KERN_NOTICE USB_STORAGE "This device "
-				"(%04x,%04x) has %s in unusual_devs.h\n"
+				"(%04x,%04x,%04x S %02x P %02x)"
+				" has %s in unusual_devs.h\n"
 				"   Please send a copy of this message to "
 				"<linux-usb-devel@lists.sourceforge.net>\n",
-				id->idVendor, id->idProduct, msgs[msg]);
+				ddesc->idVendor, ddesc->idProduct,
+				ddesc->bcdDevice,
+				idesc->bInterfaceSubClass,
+				idesc->bInterfaceProtocol,
+				msgs[msg]);
 	}
 
 	/* Read the device's string descriptors */
@@ -485,15 +529,15 @@ static void get_device_info(struct us_data *us, int id_index)
 	/* Use the unusual_dev strings if the device didn't provide them */
 	if (strlen(us->vendor) == 0) {
 		if (unusual_dev->vendorName)
-			strncpy(us->vendor, unusual_dev->vendorName,
-				sizeof(us->vendor) - 1);
+			strlcpy(us->vendor, unusual_dev->vendorName,
+				sizeof(us->vendor));
 		else
 			strcpy(us->vendor, "Unknown");
 	}
 	if (strlen(us->product) == 0) {
 		if (unusual_dev->productName)
-			strncpy(us->product, unusual_dev->productName,
-				sizeof(us->product) - 1);
+			strlcpy(us->product, unusual_dev->productName,
+				sizeof(us->product));
 		else
 			strcpy(us->product, "Unknown");
 	}
@@ -714,18 +758,9 @@ static int usb_stor_acquire_resources(struct us_data *us)
 {
 	int p;
 
-	/* Allocate the USB control blocks */
-	US_DEBUGP("Allocating usb_ctrlrequest\n");
-	us->dr = kmalloc(sizeof(*us->dr), GFP_KERNEL);
-	if (!us->dr) {
-		US_DEBUGP("allocation failed\n");
-		return -ENOMEM;
-	}
-
-	US_DEBUGP("Allocating URB\n");
 	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!us->current_urb) {
-		US_DEBUGP("allocation failed\n");
+		US_DEBUGP("URB allocation failed\n");
 		return -ENOMEM;
 	}
 
@@ -778,8 +813,24 @@ static void dissociate_dev(struct us_data *us)
 {
 	US_DEBUGP("-- %s\n", __FUNCTION__);
 	down(&us->dev_semaphore);
+
+	/* Free the device-related DMA-mapped buffers */
+	if (us->cr) {
+		usb_buffer_free(us->pusb_dev, sizeof(*us->cr), us->cr,
+				us->cr_dma);
+		us->cr = NULL;
+	}
+	if (us->iobuf) {
+		usb_buffer_free(us->pusb_dev, US_IOBUF_SIZE, us->iobuf,
+				us->iobuf_dma);
+		us->iobuf = NULL;
+	}
+
+	/* Remove our private data from the interface and decrement the
+	 * device's reference count */
 	usb_set_intfdata(us->pusb_intf, NULL);
 	usb_put_dev(us->pusb_dev);
+
 	us->pusb_dev = NULL;
 	us->pusb_intf = NULL;
 	up(&us->dev_semaphore);
@@ -818,16 +869,11 @@ void usb_stor_release_resources(struct us_data *us)
 		us->extra_destructor(us->extra);
 	}
 
-	/* Destroy the extra data */
-	if (us->extra) {
+	/* Free the extra data and the URB */
+	if (us->extra)
 		kfree(us->extra);
-	}
-
-	/* Free the USB control blocks */
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
-	if (us->dr)
-		kfree(us->dr);
 
 	/* Free the structure itself */
 	kfree(us);
@@ -857,15 +903,10 @@ static int storage_probe(struct usb_interface *intf,
 	init_MUTEX_LOCKED(&(us->sema));
 	init_completion(&(us->notify));
 
-	/* Fill in the device-related fields */
-	us->pusb_dev = interface_to_usbdev(intf);
-	us->pusb_intf = intf;
-	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
-
-	/* Store our private data in the interface and increment the
-	 * device's reference count */
-	usb_set_intfdata(intf, us);
-	usb_get_dev(us->pusb_dev);
+	/* Associate the us_data structure with the USB device */
+	result = associate_dev(us, intf);
+	if (result)
+		goto BadDevice;
 
 	/*
 	 * Get the unusual_devs entries and the descriptors

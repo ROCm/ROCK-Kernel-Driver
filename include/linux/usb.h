@@ -207,8 +207,10 @@ struct usb_bus {
 	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the bus */
 	struct dentry *usbdevfs_dentry;	/* usbdevfs dentry entry for the bus */
 
-	atomic_t refcnt;
+	struct class_device class_dev;	/* class device for this bus */
+	void (*release)(struct usb_bus *bus);	/* function to destroy this bus's memory */
 };
+#define	to_usb_bus(d) container_of(d, struct usb_bus, class_dev)
 
 
 /* -------------------------------------------------------------------------- */
