@@ -743,17 +743,21 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	int p;
 
 	/* Allocate the USB control blocks */
-	US_DEBUGP("Allocating usb_ctrlrequest\n");
 	us->dr = kmalloc(sizeof(*us->dr), GFP_KERNEL);
 	if (!us->dr) {
-		US_DEBUGP("allocation failed\n");
+		US_DEBUGP("usb_ctrlrequest allocation failed\n");
 		return -ENOMEM;
 	}
 
-	US_DEBUGP("Allocating URB\n");
 	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!us->current_urb) {
-		US_DEBUGP("allocation failed\n");
+		US_DEBUGP("URB allocation failed\n");
+		return -ENOMEM;
+	}
+
+	us->iobuf = kmalloc(US_IOBUF_SIZE, GFP_KERNEL);
+	if (!us->iobuf) {
+		US_DEBUGP("I/O buffer allocation failed\n");
 		return -ENOMEM;
 	}
 
@@ -852,6 +856,8 @@ void usb_stor_release_resources(struct us_data *us)
 	}
 
 	/* Free the USB control blocks */
+	if (us->iobuf)
+		kfree(us->iobuf);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
 	if (us->dr)

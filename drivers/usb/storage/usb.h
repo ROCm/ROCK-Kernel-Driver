@@ -92,6 +92,8 @@ struct us_unusual_dev {
 
 #define USB_STOR_STRING_LEN 32
 
+#define US_IOBUF_SIZE		32	/* Big enough for bulk-only CBW */
+
 typedef int (*trans_cmnd)(Scsi_Cmnd*, struct us_data*);
 typedef int (*trans_reset)(struct us_data*);
 typedef void (*proto_cmnd)(Scsi_Cmnd*, struct us_data*);
@@ -139,13 +141,11 @@ struct us_data {
 	int			pid;		 /* control thread	 */
 	int			sm_state;	 /* what we are doing	 */
 
-	/* interrupt communications data */
-	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
-
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
 	struct usb_sg_request	current_sg;	 /* scatter-gather USB   */
+	unsigned char		*iobuf;		 /* I/O buffer		 */
 
 	/* the semaphore for sleeping the control thread */
 	struct semaphore	sema;		 /* to sleep thread on   */
