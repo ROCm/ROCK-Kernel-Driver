@@ -11,7 +11,7 @@
  */
 #include <stdarg.h>
 
-int (*prom)();
+int (*prom)(void *args);
 
 void *chosen_handle;
 void *stdin;
@@ -30,7 +30,7 @@ extern int strlen(const char *s);
 void
 start(int a1, int a2, void *promptr)
 {
-    prom = (int (*)()) promptr;
+    prom = promptr;
     chosen_handle = finddevice("/chosen");
     if (chosen_handle == (void *) -1)
 	exit();
@@ -65,7 +65,7 @@ write(void *handle, void *ptr, int nb)
     args.addr = ptr;
     args.len = nb;
     args.actual = -1;
-    (*prom)(&args);
+    prom(&args);
     return args.actual;
 }
 
@@ -211,7 +211,7 @@ fputs(char *str, void *f)
 }
 
 int
-readchar()
+readchar(void)
 {
     char ch;
 
