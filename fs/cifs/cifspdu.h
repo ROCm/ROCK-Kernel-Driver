@@ -1708,8 +1708,8 @@ typedef struct {
 	__le64 EndOfFile;
 	__le64 AllocationSize;
 	__le32 ExtFileAttributes;
-	__le32 EaSize; /* length of the xattrs */
 	__le32 FileNameLength;
+	__le32 EaSize; /* length of the xattrs */
 	char FileName[1];
 } FILE_FULL_DIRECTORY_INFO;   /* level 258 FF response data area */
 
@@ -1723,9 +1723,10 @@ typedef struct {
 	__le64 EndOfFile;
 	__le64 AllocationSize;
 	__le32 ExtFileAttributes;
-	__le32 EaSize; /* length of the xattrs */
-	__le64  UniqueId; /* inode num - le since Samba puts ino in low 32 bit*/
 	__le32 FileNameLength;
+	__le32 EaSize; /* EA size */
+	__le32 Reserved;
+	__le64 UniqueId; /* inode num - le since Samba puts ino in low 32 bit*/
 	char FileName[1];
 } SEARCH_ID_FULL_DIR_INFO;   /* level 261 FF response data area */
 
@@ -1739,7 +1740,7 @@ typedef struct {
 	__le64 EndOfFile;
 	__le64 AllocationSize;
 	__le32 ExtFileAttributes;
-	__le32 FileNameLength; /* this should be right before FileName despite what spec says - spec probably wrong */
+	__le32 FileNameLength; 
 	__le32 EaSize; /* length of the xattrs */
 	__u8   ShortNameLength;
 	__u8   Reserved;
