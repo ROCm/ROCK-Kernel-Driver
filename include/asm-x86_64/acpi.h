@@ -109,6 +109,8 @@ extern int acpi_strict;
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
 
+extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
+
 #else	/* !CONFIG_ACPI_BOOT */
 #define acpi_lapic 0
 #define acpi_ioapic 0
