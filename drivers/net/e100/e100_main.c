@@ -165,7 +165,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.22-pre1"
+#define E100_VERSION  "2.0.23-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -186,8 +186,7 @@ static int e100_resume(struct pci_dev *pcid);
  *  See the item "Labeled Elements in Initializers" in the section
  *  "Extensions to the C Language Family" of the GCC documentation.
  *********************************************************************/
-
-#define E100_PARAM_INIT { [0 ... E100_MAX_NIC-1] = -1 }
+#define E100_PARAM_INIT { [0 ... E100_MAX_NIC] = -1 }
 
 /* All parameters are treated the same, as an integer array of values.
  * This macro just reduces the need to repeat the same declaration code
@@ -801,79 +800,66 @@ module_exit(e100_cleanup_module);
 void __devinit
 e100_check_options(int board, struct e100_private *bdp)
 {
-	int val;
-
 	if (board >= E100_MAX_NIC) {
 		printk(KERN_NOTICE "No configuration available for board #%d\n",
 		       board);
 		printk(KERN_NOTICE "Using defaults for all values\n");
+		board = E100_MAX_NIC;
 	}
 
-	val = (board < E100_MAX_NIC) ? TxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.TxDescriptors), val, E100_MIN_TCB,
-			    E100_MAX_TCB, E100_DEFAULT_TCB,
+	e100_set_int_option(&(bdp->params.TxDescriptors), TxDescriptors[board],
+			    E100_MIN_TCB, E100_MAX_TCB, E100_DEFAULT_TCB,
 			    "TxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? RxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.RxDescriptors), val, E100_MIN_RFD,
-			    E100_MAX_RFD, E100_DEFAULT_RFD,
+	e100_set_int_option(&(bdp->params.RxDescriptors), RxDescriptors[board],
+			    E100_MIN_RFD, E100_MAX_RFD, E100_DEFAULT_RFD,
 			    "RxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? e100_speed_duplex[board] : -1;
-	e100_set_int_option(&(bdp->params.e100_speed_duplex), val, 0, 4,
+	e100_set_int_option(&(bdp->params.e100_speed_duplex),
+			    e100_speed_duplex[board], 0, 4,
 			    E100_DEFAULT_SPEED_DUPLEX, "speed/duplex mode");
 
-	val = (board < E100_MAX_NIC) ? ber[board] : -1;
-	e100_set_int_option(&(bdp->params.ber), val, 0, ZLOCK_MAX_ERRORS,
+	e100_set_int_option(&(bdp->params.ber), ber[board], 0, ZLOCK_MAX_ERRORS,
 			    E100_DEFAULT_BER, "Bit Error Rate count");
 
-	val = (board < E100_MAX_NIC) ? XsumRX[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_XSUMRX, E100_DEFAULT_XSUM,
+	e100_set_bool_option(bdp, XsumRX[board], PRM_XSUMRX, E100_DEFAULT_XSUM,
 			     "XsumRX value");
 
 	/* Default ucode value depended on controller revision */
-	val = (board < E100_MAX_NIC) ? ucode[board] : -1;
 	if (bdp->rev_id >= D101MA_REV_ID) {
-		e100_set_bool_option(bdp, val, PRM_UCODE, E100_DEFAULT_UCODE,
-				     "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE,
+				     E100_DEFAULT_UCODE, "ucode value");
 	} else {
-		e100_set_bool_option(bdp, val, PRM_UCODE, false, "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE, false,
+				     "ucode value");
 	}
 
-	val = (board < E100_MAX_NIC) ? flow_control[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_FC, E100_DEFAULT_FC,
+	e100_set_bool_option(bdp, flow_control[board], PRM_FC, E100_DEFAULT_FC,
 			     "flow control value");
 
-	val = (board < E100_MAX_NIC) ? IFS[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_IFS, E100_DEFAULT_IFS, "IFS value");
+	e100_set_bool_option(bdp, IFS[board], PRM_IFS, E100_DEFAULT_IFS,
+			     "IFS value");
 
-	val = (board < E100_MAX_NIC) ? BundleSmallFr[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_BUNDLE_SMALL,
+	e100_set_bool_option(bdp, BundleSmallFr[board], PRM_BUNDLE_SMALL,
 			     E100_DEFAULT_BUNDLE_SMALL_FR,
 			     "CPU saver bundle small frames value");
 
-	val = (board < E100_MAX_NIC) ? IntDelay[board] : -1;
-	e100_set_int_option(&(bdp->params.IntDelay), val, 0x0, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
+	e100_set_int_option(&(bdp->params.IntDelay), IntDelay[board], 0x0,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
 			    "CPU saver interrupt delay value");
 
-	val = (board < E100_MAX_NIC) ? BundleMax[board] : -1;
-	e100_set_int_option(&(bdp->params.BundleMax), val, 0x1, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
+	e100_set_int_option(&(bdp->params.BundleMax), BundleMax[board], 0x1,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
 			    "CPU saver bundle max value");
 
-	val = (board < E100_MAX_NIC) ? RxCongestionControl[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_RX_CONG,
+	e100_set_bool_option(bdp, RxCongestionControl[board], PRM_RX_CONG,
 			     E100_DEFAULT_RX_CONGESTION_CONTROL,
 			     "Rx Congestion Control value");
 
-	val = (board < E100_MAX_NIC) ? PollingMaxWork[board] : -1;
-	e100_set_int_option(&(bdp->params.PollingMaxWork), val, 1, E100_MAX_RFD,
-			    RxDescriptors[board], "Polling Max Work value");
-
-	if (val <= 0) {
-		bdp->params.b_params &= ~PRM_RX_CONG;
-	}
+	e100_set_int_option(&(bdp->params.PollingMaxWork),
+			    PollingMaxWork[board], 1, E100_MAX_RFD,
+			    bdp->params.RxDescriptors,
+			    "Polling Max Work value");
 }
 
 /**

@@ -118,26 +118,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  defaults as considerably less data will be queued.
  */
 
-#define MAX_TCB        64	/* number of transmit control blocks */
-#define MAX_TBD        MAX_TCB
 #define TX_FRAME_CNT   8	/* consecutive transmit frames per interrupt */
 /* TX_FRAME_CNT must be less than MAX_TCB    */
-#define MAX_RFD      64
 
-#define E100_DEFAULT_TCB   MAX_TCB
+#define E100_DEFAULT_TCB   64
 #define E100_MIN_TCB       2*TX_FRAME_CNT + 3	/* make room for at least 2 interrupts */
-
 #define E100_MAX_TCB       1024
 
-#define E100_DEFAULT_RFD   MAX_RFD
+#define E100_DEFAULT_RFD   64
 #define E100_MIN_RFD       8
-
-#ifdef __ia64__
- /* We can't use too many DMAble buffers on IA64 machines with >4 GB mem */
-#define E100_MAX_RFD       64
-#else
 #define E100_MAX_RFD       1024
-#endif /*  __ia64__ */
 
 #define E100_DEFAULT_XSUM         true
 #define E100_DEFAULT_BER          ZLOCK_MAX_ERRORS
@@ -528,8 +518,6 @@ typedef struct net_device_stats net_dev_stats_t;
 
 #define RFD_POINTER(skb,bdp)      ((rfd_t *) (((unsigned char *)((skb)->data))-((bdp)->rfd_size)))
 #define SKB_RFD_STATUS(skb,bdp)   ((RFD_POINTER((skb),(bdp)))->rfd_header.cb_status)
-#define GET_SKB_DMA_ADDR(skb)		( *(dma_addr_t *)( (skb)->cb) )
-#define SET_SKB_DMA_ADDR(skb,dma_addr)	( *(dma_addr_t *)( (skb)->cb) = (dma_addr) )
 
 /* ====================================================================== */
 /*                              82557                                     */
