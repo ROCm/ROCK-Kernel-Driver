@@ -63,7 +63,6 @@ config MEGARAID_MAILBOX
 	To compile this driver as a module, choose M here: the
 	module will be called megaraid_mbox
 
-if MEGARAID_NEWGEN=n
 config MEGARAID_LEGACY
 	tristate "LSI Logic Legacy MegaRAID Driver"
 	depends on PCI && SCSI
@@ -74,4 +73,3 @@ config MEGARAID_LEGACY
 
 	To compile this driver as a module, choose M here: the
 	module will be called megaraid
-endif
