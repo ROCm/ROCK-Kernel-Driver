@@ -146,7 +146,7 @@ Searching by vendor and device ID:
 
 Searching by class ID (iterate in a similar way):
 
-	pci_find_class(CLASS_ID, dev)
+	pci_get_class(CLASS_ID, dev)
 
 Searching by both vendor/device and subsystem vendor/device ID:
 
@@ -281,5 +281,6 @@ pci_for_each_dev_reverse()	Superseded by pci_find_device_reverse()
 pci_for_each_bus()		Superseded by pci_find_next_bus()
 pci_find_device()		Superseded by pci_get_device()
 pci_find_subsys()		Superseded by pci_get_subsys()
-pcibios_find_class()		Superseded by pci_find_class()
+pcibios_find_class()		Superseded by pci_get_class()
+pci_find_class()		Superseded by pci_get_class()
 pci_(read|write)_*_nodev()	Superseded by pci_bus_(read|write)_*()

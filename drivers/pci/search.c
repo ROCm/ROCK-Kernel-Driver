@@ -348,6 +348,43 @@ exit:
 	return dev;
 }
 
+/**
+ * pci_get_class - begin or continue searching for a PCI device by class
+ * @class: search for a PCI device with this class designation
+ * @from: Previous PCI device found in search, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI devices.  If a PCI device is
+ * found with a matching @class, the reference count to the device is
+ * incremented and a pointer to its device structure is returned.
+ * Otherwise, %NULL is returned.
+ * A new search is initiated by passing %NULL to the @from argument.
+ * Otherwise if @from is not %NULL, searches continue from next device
+ * on the global list.  The reference count for @from is always decremented
+ * if it is not %NULL.
+ */
+struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from)
+{
+	struct list_head *n;
+	struct pci_dev *dev;
+
+	WARN_ON(in_interrupt());
+	spin_lock(&pci_bus_lock);
+	n = from ? from->global_list.next : pci_devices.next;
+
+	while (n && (n != &pci_devices)) {
+		dev = pci_dev_g(n);
+		if (dev->class == class)
+			goto exit;
+		n = n->next;
+	}
+	dev = NULL;
+exit:
+	pci_dev_put(from);
+	dev = pci_dev_get(dev);
+	spin_unlock(&pci_bus_lock);
+	return dev;
+}
+
 EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
@@ -356,3 +393,4 @@ EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_get_device);
 EXPORT_SYMBOL(pci_get_subsys);
 EXPORT_SYMBOL(pci_get_slot);
+EXPORT_SYMBOL(pci_get_class);

@@ -730,6 +730,7 @@ struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
 				unsigned int ss_vendor, unsigned int ss_device,
 				struct pci_dev *from);
 struct pci_dev *pci_get_slot (struct pci_bus *bus, unsigned int devfn);
+struct pci_dev *pci_get_class (unsigned int class, struct pci_dev *from);
 
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
@@ -890,6 +891,9 @@ static inline struct pci_dev *pci_get_device (unsigned int vendor, unsigned int 
 
 static inline struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
 unsigned int ss_vendor, unsigned int ss_device, struct pci_dev *from)
+{ return NULL; }
+
+static inline struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from)
 { return NULL; }
 
 static inline void pci_set_master(struct pci_dev *dev) { }
