@@ -639,7 +639,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 			nfs_renew_times(dentry);
 			error = 0;
 		}
-		goto out;
+		goto out_unlock;
 	}
 
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
@@ -655,6 +655,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 		}
 		nfs_renew_times(dentry);
 	}
+out_unlock:
 	unlock_kernel();
 out:
 	return ERR_PTR(error);
