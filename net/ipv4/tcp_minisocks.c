@@ -309,7 +309,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	write_lock(&ehead->lock);
 
 	/* Step 2: Remove SK from established hash. */
-	if (sk_del_node_init(sk))
+	if (__sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
 
 	/* Step 3: Hash TW into TIMEWAIT half of established hash table. */
