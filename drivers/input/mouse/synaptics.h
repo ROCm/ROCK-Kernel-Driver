@@ -50,7 +50,7 @@ extern void synaptics_reset(struct psmouse *psmouse);
 #define SYN_CAP_MULTIFINGER(c)		((c) & (1 << 1))
 #define SYN_CAP_PALMDETECT(c)		((c) & (1 << 0))
 #define SYN_CAP_VALID(c)		((((c) & 0x00ff00) >> 8) == 0x47)
-#define SYN_EXT_CAP_REQUESTS(c)		((((c) & 0x700000) >> 20) == 1)
+#define SYN_EXT_CAP_REQUESTS(c)		(((c) & 0x700000) >> 20)
 #define SYN_CAP_MULTI_BUTTON_NO(ec)	(((ec) & 0x00f000) >> 12)
 
 /* synaptics modes query bits */
@@ -86,18 +86,11 @@ struct synaptics_hw_state {
 	int y;
 	int z;
 	int w;
-	int left;
-	int right;
-	int up;
-	int down;
-	int b0;
-	int b1;
-	int b2;
-	int b3;
-	int b4;
-	int b5;
-	int b6;
-	int b7;
+	unsigned int left:1;
+	unsigned int right:1;
+	unsigned int up:1;
+	unsigned int down:1;
+	unsigned char ext_buttons;
 };
 
 struct synaptics_data {
