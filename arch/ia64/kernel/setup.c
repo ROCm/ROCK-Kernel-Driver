@@ -330,16 +330,9 @@ setup_arch (char **cmdline_p)
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
-	/*
-	 * Without HCDP, we won't discover any serial ports until the serial driver looks
-	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
-	 * the legacy COM ports so serial console works earlier.  This is slightly dangerous
-	 * because we don't *really* know whether there's anything there, but we hope that
-	 * all new boxes will implement HCDP.
-	 */
 	{
 		extern unsigned char acpi_legacy_devices;
-		if (!efi.hcdp && acpi_legacy_devices)
+		if (!efi.hcdp)
 			setup_serial_legacy();
 	}
 #endif
