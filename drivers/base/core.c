@@ -293,7 +293,8 @@ struct device * get_device(struct device * dev)
  */
 void put_device(struct device * dev)
 {
-	kobject_put(&dev->kobj);
+	if (dev)
+		kobject_put(&dev->kobj);
 }
 
 
