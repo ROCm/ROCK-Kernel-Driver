@@ -1,19 +1,10 @@
-#define __KERNEL_SYSCALLS__
-#include <linux/config.h>
-#include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/devfs_fs_kernel.h>
-#include <linux/unistd.h>
 #include <linux/ctype.h>
 #include <linux/blk.h>
 #include <linux/fd.h>
 #include <linux/tty.h>
-#include <linux/init.h>
 #include <linux/suspend.h>
 #include <linux/root_dev.h>
-#include <linux/mount.h>
-#include <linux/dirent.h>
 #include <linux/security.h>
 
 #include <linux/nfs_fs.h>
@@ -25,26 +16,18 @@
 
 #include <linux/raid/md.h>
 
+#include "do_mounts.h"
+
 #define BUILD_CRAMDISK
 
 extern int get_filesystem_list(char * buf);
 
-extern asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
-	 unsigned long flags, void *data);
 extern asmlinkage long sys_mkdir(const char *name, int mode);
 extern asmlinkage long sys_rmdir(const char *name);
 extern asmlinkage long sys_chdir(const char *name);
 extern asmlinkage long sys_fchdir(int fd);
 extern asmlinkage long sys_chroot(const char *name);
-extern asmlinkage long sys_unlink(const char *name);
-extern asmlinkage long sys_symlink(const char *old, const char *new);
-extern asmlinkage long sys_mknod(const char *name, int mode, dev_t dev);
-extern asmlinkage long sys_umount(char *name, int flags);
 extern asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
-extern asmlinkage long sys_access(const char * filename, int mode);
-extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_getdents64(unsigned int fd, void * dirent,
-	unsigned int count);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
@@ -69,8 +52,6 @@ static char saved_root_name[64];
 
 /* this is initialized in init/main.c */
 dev_t ROOT_DEV;
-
-static int do_devfs = 0;
 
 static int __init load_ramdisk(char *str)
 {
@@ -323,131 +304,6 @@ static int __init mount_nfs_root(void)
 	return 0;
 }
 #endif
-
-#ifdef CONFIG_DEVFS_FS
-
-/*
- * If the dir will fit in *buf, return its length.  If it won't fit, return
- * zero.  Return -ve on error.
- */
-static int __init do_read_dir(int fd, void *buf, int len)
-{
-	long bytes, n;
-	char *p = buf;
-	lseek(fd, 0, 0);
-
-	for (bytes = 0; bytes < len; bytes += n) {
-		n = sys_getdents64(fd, p + bytes, len - bytes);
-		if (n < 0)
-			return n;
-		if (n == 0)
-			return bytes;
-	}
-	return 0;
-}
-
-/*
- * Try to read all of a directory.  Returns the contents at *p, which
- * is kmalloced memory.  Returns the number of bytes read at *len.  Returns
- * NULL on error.
- */
-static void * __init read_dir(char *path, int *len)
-{
-	int size;
-	int fd = open(path, 0, 0);
-
-	*len = 0;
-	if (fd < 0)
-		return NULL;
-
-	for (size = 1 << 9; size <= (1 << MAX_ORDER); size <<= 1) {
-		void *p = kmalloc(size, GFP_KERNEL);
-		int n;
-		if (!p)
-			break;
-		n = do_read_dir(fd, p, size);
-		if (n > 0) {
-			close(fd);
-			*len = n;
-			return p;
-		}
-		kfree(p);
-		if (n == -EINVAL)
-			continue;	/* Try a larger buffer */
-		if (n < 0)
-			break;
-	}
-	close(fd);
-	return NULL;
-}
-#endif
-
-static int __init find_in_devfs(char *path, dev_t dev)
-{
-#ifdef CONFIG_DEVFS_FS
-	struct stat buf;
-	char *end = path + strlen(path);
-	int rest = path + 64 - end;
-	int size;
-	char *p = read_dir(path, &size);
-	char *s;
-
-	if (!p)
-		return -1;
-	for (s = p; s < p + size; s += ((struct linux_dirent64 *)s)->d_reclen) {
-		struct linux_dirent64 *d = (struct linux_dirent64 *)s;
-		if (strlen(d->d_name) + 2 > rest)
-			continue;
-		switch (d->d_type) {
-			case DT_BLK:
-				sprintf(end, "/%s", d->d_name);
-				if (sys_newstat(path, &buf) < 0)
-					break;
-				if (!S_ISBLK(buf.st_mode))
-					break;
-				if (buf.st_rdev != dev)
-					break;
-				kfree(p);
-				return 0;
-			case DT_DIR:
-				if (strcmp(d->d_name, ".") == 0)
-					break;
-				if (strcmp(d->d_name, "..") == 0)
-					break;
-				sprintf(end, "/%s", d->d_name);
-				if (find_in_devfs(path, dev) < 0)
-					break;
-				kfree(p);
-				return 0;
-		}
-	}
-	kfree(p);
-#endif
-	return -1;
-}
-
-static int __init create_dev(char *name, dev_t dev, char *devfs_name)
-{
-	char path[64];
-
-	sys_unlink(name);
-	if (!do_devfs)
-		return sys_mknod(name, S_IFBLK|0600, dev);
-
-	if (devfs_name && devfs_name[0]) {
-		if (strncmp(devfs_name, "/dev/", 5) == 0)
-			devfs_name += 5;
-		sprintf(path, "/dev/%s", devfs_name);
-		if (sys_access(path, 0) == 0)
-			return sys_symlink(devfs_name, name);
-	}
-	if (!dev)
-		return -1;
-	strcpy(path, "/dev");
-	if (find_in_devfs(path, dev) < 0)
-		return -1;
-	return sys_symlink(path + 5, name);
-}
 
 #if defined(CONFIG_BLK_DEV_RAM) || defined(CONFIG_BLK_DEV_FD)
 static void __init change_floppy(char *fmt, ...)
@@ -804,7 +660,7 @@ static void __init handle_initrd(void)
 	sys_chroot(".");
 	close(old_fd);
 	close(root_fd);
-	sys_umount("/old/dev", 0);
+	umount_devfs("/old/dev");
 
 	if (real_root_dev == Root_RAM0) {
 		sys_chdir("/old");
@@ -853,10 +709,7 @@ void prepare_namespace(void)
 {
 	int is_floppy;
 
-#ifdef CONFIG_DEVFS_FS
-	sys_mount("devfs", "/dev", "devfs", 0, NULL);
-	do_devfs = 1;
-#endif
+	mount_devfs();
 
 	md_run_setup();
 
@@ -891,7 +744,7 @@ void prepare_namespace(void)
 		ROOT_DEV = Root_RAM0;
 	mount_root();
 out:
-	sys_umount("/dev", 0);
+	umount_devfs("/dev");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
 	security_sb_post_mountroot();
