@@ -3384,10 +3384,11 @@ xlog_pack_data_checksum(
 void
 xlog_pack_data(
 	xlog_t			*log,
-	xlog_in_core_t		*iclog)
+	xlog_in_core_t		*iclog,
+	int			roundoff)
 {
 	int			i, j, k;
-	int			size = iclog->ic_offset + iclog->ic_roundoff;
+	int			size = iclog->ic_offset + roundoff;
 	uint			cycle_lsn;
 	xfs_caddr_t		dp;
 	xlog_in_core_2_t	*xhdr;
