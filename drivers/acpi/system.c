@@ -92,7 +92,7 @@ acpi_system_read_dsdt (
 {
 	acpi_status		status = AE_OK;
 	struct acpi_buffer	dsdt = {ACPI_ALLOCATE_BUFFER, NULL};
-	void			*data = 0;
+	void			*data = NULL;
 	size_t			size = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_system_read_dsdt");
@@ -135,7 +135,7 @@ acpi_system_read_fadt (
 {
 	acpi_status		status = AE_OK;
 	struct acpi_buffer	fadt = {ACPI_ALLOCATE_BUFFER, NULL};
-	void			*data = 0;
+	void			*data = NULL;
 	size_t			size = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_system_read_fadt");
