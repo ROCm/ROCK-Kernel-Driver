@@ -514,9 +514,12 @@ int extFill(struct inode *ip, xad_t * xp)
 static int
 extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 {
+	struct jfs_inode_info *ji = JFS_IP(ip);
+	struct jfs_sb_info *sbi = JFS_SBI(ip->i_sb);
 	s64 nb, nblks, daddr, max;
-	int rc, nbperpage = JFS_SBI(ip->i_sb)->nbperpage;
-	struct bmap *mp = JFS_SBI(ip->i_sb)->bmap;
+	int rc, nbperpage = sbi->nbperpage;
+	struct bmap *bmp = sbi->bmap;
+	int ag;
 
 	/* get the number of blocks to initially attempt to allocate.
 	 * we'll first try the number of blocks requested unless this
@@ -524,7 +527,7 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 	 * blocks in the map. in that case, we'll start off with the 
 	 * maximum free.
 	 */
-	max = (s64) 1 << mp->db_maxfreebud;
+	max = (s64) 1 << bmp->db_maxfreebud;
 	if (*nblocks >= max && *nblocks > nbperpage)
 		nb = nblks = (max > nbperpage) ? max : nbperpage;
 	else
@@ -548,6 +551,18 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 
 	*nblocks = nb;
 	*blkno = daddr;
+
+	if (S_ISREG(ip->i_mode) && (ji->fileset == FILESYSTEM_I)) {
+		ag = BLKTOAG(daddr, sbi);
+		if (ji->active_ag == -1) {
+			atomic_inc(&bmp->db_active[ag]);
+			ji->active_ag = ag;
+		} else if (ji->active_ag != ag) {
+			atomic_dec(&bmp->db_active[ji->active_ag]);
+			atomic_inc(&bmp->db_active[ag]);
+			ji->active_ag = ag;
+		}
+	}
 
 	return (0);
 }

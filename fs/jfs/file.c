@@ -19,6 +19,7 @@
 
 #include <linux/fs.h>
 #include "jfs_incore.h"
+#include "jfs_dmap.h"
 #include "jfs_txnmgr.h"
 #include "jfs_xattr.h"
 #include "jfs_debug.h"
@@ -94,6 +95,42 @@ static void jfs_truncate(struct inode *ip)
 	IWRITE_UNLOCK(ip);
 }
 
+static int jfs_open(struct inode *inode, struct file *file)
+{
+	int rc;
+
+	if ((rc = generic_file_open(inode, file)))
+		return rc;
+
+	/*
+	 * We attempt to allow only one "active" file open per aggregate
+	 * group.  Otherwise, appending to files in parallel can cause
+	 * fragmentation within the files.
+	 */
+	if (S_ISREG(inode->i_mode) && file->f_mode & FMODE_WRITE) {
+		struct jfs_inode_info *ji = JFS_IP(inode);
+		if (ji->active_ag == -1) {
+			ji->active_ag = ji->agno;
+			atomic_inc(
+			    &JFS_SBI(inode->i_sb)->bmap->db_active[ji->agno]);
+		}
+	}
+
+	return 0;
+}
+static int jfs_release(struct inode *inode, struct file *file)
+{
+	struct jfs_inode_info *ji = JFS_IP(inode);
+
+	if (ji->active_ag != -1) {
+		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
+		atomic_dec(&bmap->db_active[ji->active_ag]);
+		ji->active_ag = -1;
+	}
+
+	return 0;
+}
+
 struct inode_operations jfs_file_inode_operations = {
 	.truncate	= jfs_truncate,
 	.setxattr	= jfs_setxattr,
@@ -103,7 +140,7 @@ struct inode_operations jfs_file_inode_operations = {
 };
 
 struct file_operations jfs_file_operations = {
-	.open		= generic_file_open,
+	.open		= jfs_open,
 	.llseek		= generic_file_llseek,
 	.write		= generic_file_write,
 	.read		= generic_file_read,
@@ -112,4 +149,5 @@ struct file_operations jfs_file_operations = {
 	.writev		= generic_file_writev,
  	.sendfile	= generic_file_sendfile,
 	.fsync		= jfs_fsync,
+	.release	= jfs_release,
 };

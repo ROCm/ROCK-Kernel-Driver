@@ -241,6 +241,7 @@ int dbMount(struct inode *ipbmap)
 	bmp->db_ipbmap = ipbmap;
 	JFS_SBI(ipbmap->i_sb)->bmap = bmp;
 
+	memset(bmp->db_active, 0, sizeof(bmp->db_active));
 	DBINITMAP(bmp->db_mapsize, ipbmap, &bmp->db_DBmap);
 
 	/*
@@ -271,6 +272,7 @@ int dbMount(struct inode *ipbmap)
 int dbUnmount(struct inode *ipbmap, int mounterror)
 {
 	struct bmap *bmp = JFS_SBI(ipbmap->i_sb)->bmap;
+	int i;
 
 	if (!(mounterror || isReadOnly(ipbmap)))
 		dbSync(ipbmap);
@@ -279,6 +281,14 @@ int dbUnmount(struct inode *ipbmap, int mounterror)
 	 * Invalidate the page cache buffers
 	 */
 	truncate_inode_pages(ipbmap->i_mapping, 0);
+
+	/*
+	 * Sanity Check
+	 */
+	for (i = 0; i < bmp->db_numag; i++)
+		if (atomic_read(&bmp->db_active[i]))
+			printk(KERN_ERR "dbUnmount: db_active[%d] = %d\n",
+			       i, atomic_read(&bmp->db_active[i]));
 
 	/* free the memory for the in-memory bmap. */
 	kfree(bmp);
@@ -598,109 +608,83 @@ dbUpdatePMap(struct inode *ipbmap,
  *
  * FUNCTION:    find the preferred allocation group for new allocations.
  *
- *		we try to keep the trailing (rightmost) allocation groups
- *		free for large allocations.  we try to do this by targeting
- *		new inode allocations towards the leftmost or 'active'
- *		allocation groups while keeping the rightmost or 'inactive'
- *		allocation groups free. once the active allocation groups
- *		have dropped to a certain percentage of free space, we add
- *		the leftmost inactive allocation group to the active set.
- *
- *		within the active allocation groups, we maintain a preferred
+ *		Within the allocation groups, we maintain a preferred
  *		allocation group which consists of a group with at least
- *		average free space over the active set. it is the preferred
- *		group that we target new inode allocation towards.  the 
- *		tie-in between inode allocation and block allocation occurs
- *		as we allocate the first (data) block of an inode and specify
- *		the inode (block) as the allocation hint for this block.
+ *		average free space.  It is the preferred group that we target
+ *		new inode allocation towards.  The tie-in between inode
+ *		allocation and block allocation occurs as we allocate the
+ *		first (data) block of an inode and specify the inode (block)
+ *		as the allocation hint for this block.
+ *
+ *		We try to avoid having more than one open file growing in
+ *		an allocation group, as this will lead to fragmentation.
+ *		This differs from the old OS/2 method of trying to keep
+ *		empty ags around for large allocations.
  *
  * PARAMETERS:
  *      ipbmap	-  pointer to in-core inode for the block map.
  *
  * RETURN VALUES:
  *      the preferred allocation group number.
- *
- * note: only called by dbAlloc();
  */
 int dbNextAG(struct inode *ipbmap)
 {
-	s64 avgfree, inactfree, actfree, rem;
-	int actags, inactags, l2agsize;
+	s64 avgfree;
+	int agpref;
+	s64 hwm = 0;
+	int i;
+	int next_best = -1;
 	struct bmap *bmp = JFS_SBI(ipbmap->i_sb)->bmap;
 
 	BMAP_LOCK(bmp);
 
-	/* determine the number of active allocation groups (i.e.
-	 * the number of allocation groups up to and including
-	 * the rightmost allocation group with blocks allocated
-	 * in it.
-	 */
-	actags = bmp->db_maxag + 1;
-	assert(actags <= bmp->db_numag);
+	/* determine the average number of free blocks within the ags. */
+	avgfree = (u32)bmp->db_nfree / bmp->db_numag;
 
-	/* get the number of inactive allocation groups (i.e. the
-	 * number of allocation group following the rightmost group
-	 * with allocation in it.
+	/*
+	 * if the current preferred ag does not have an active allocator
+	 * and has at least average freespace, return it
 	 */
-	inactags = bmp->db_numag - actags;
+	agpref = bmp->db_agpref;
+	if ((atomic_read(&bmp->db_active[agpref]) == 0) &&
+	    (bmp->db_agfree[agpref] >= avgfree))
+		goto found;
 
-	/* determine how many blocks are in the inactive allocation
-	 * groups. in doing this, we must account for the fact that
-	 * the rightmost group might be a partial group (i.e. file
-	 * system size is not a multiple of the group size).
+	/* From the last preferred ag, find the next one with at least
+	 * average free space.
 	 */
-	l2agsize = bmp->db_agl2size;
-	rem = bmp->db_mapsize & (bmp->db_agsize - 1);
-	inactfree = (inactags
-		     && rem) ? ((inactags - 1) << l2agsize) +
-	    rem : inactags << l2agsize;
+	for (i = 0 ; i < bmp->db_numag; i++, agpref++) {
+		if (agpref == bmp->db_numag)
+			agpref = 0;
 
-	/* now determine how many free blocks are in the active
-	 * allocation groups plus the average number of free blocks
-	 * within the active ags.
-	 */
-	actfree = bmp->db_nfree - inactfree;
-	avgfree = (u32) actfree / (u32) actags;
-
-	/* check if not all of the allocation groups are active.
-	 */
-	if (actags < bmp->db_numag) {
-		/* not all of the allocation groups are active.  determine
-		 * if we should extend the active set by 1 (i.e. add the
-		 * group following the current active set).  we do so if
-		 * the number of free blocks within the active set is less
-		 * than the allocation group set and average free within
-		 * the active set is less than 60%.  we activate a new group
-		 * by setting the allocation group preference to the new
-		 * group.
-		 */
-		if (actfree < bmp->db_agsize &&
-		    ((avgfree * 100) >> l2agsize) < 60)
-			bmp->db_agpref = actags;
-	} else {
-		/* all allocation groups are in the active set.  check if
-		 * the preferred allocation group has average free space.
-		 * if not, re-establish the preferred group as the leftmost
-		 * group with average free space.
-		 */
-		if (bmp->db_agfree[bmp->db_agpref] < avgfree) {
-			for (bmp->db_agpref = 0; bmp->db_agpref < actags;
-			     bmp->db_agpref++) {
-				if (bmp->db_agfree[bmp->db_agpref] <=
-				    avgfree)
-					break;
-			}
-			assert(bmp->db_agpref < bmp->db_numag);
+		if (atomic_read(&bmp->db_active[agpref]))
+			/* open file is currently growing in this ag */
+			continue;
+		if (bmp->db_agfree[agpref] >= avgfree)
+			goto found;
+		else if (bmp->db_agfree[agpref] > hwm) {
+			hwm = bmp->db_agfree[agpref];
+			next_best = agpref;
 		}
 	}
 
+	/*
+	 * If no inactive ag was found with average freespace, use the
+	 * next best
+	 */
+	if (next_best != -1)
+		agpref = next_best;
+
+	/* else agpref should be back to its original value */
+
+found:
+	bmp->db_agpref = agpref;
 	BMAP_UNLOCK(bmp);
 
 	/* return the preferred group.
 	 */
 	return (bmp->db_agpref);
 }
-
 
 /*
  * NAME:	dbAlloc()
@@ -750,6 +734,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	struct dmap *dp;
 	int l2nb;
 	s64 mapSize;
+	int writers;
 
 	/* assert that nblocks is valid */
 	assert(nblocks > 0);
@@ -774,11 +759,10 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	/* the hint should be within the map */
 	assert(hint < mapSize);
 
-	/* if no hint was specified or the number of blocks to be
-	 * allocated is greater than the allocation group size, try
-	 * to allocate anywhere.
+	/* if the number of blocks to be allocated is greater than the
+	 * allocation group size, try to allocate anywhere.
 	 */
-	if (hint == 0 || l2nb > bmp->db_agl2size) {
+	if (l2nb > bmp->db_agl2size) {
 		IWRITE_LOCK(ipbmap);
 
 		rc = dbAllocAny(bmp, nblocks, l2nb, results);
@@ -790,39 +774,34 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		goto write_unlock;
 	}
 
+	/*
+	 * If no hint, let dbNextAG recommend an allocation group
+	 */
+	if (hint == 0)
+		goto pref_ag;
+
 	/* we would like to allocate close to the hint.  adjust the
 	 * hint to the block following the hint since the allocators
 	 * will start looking for free space starting at this point.
-	 * if the hint was the last block of the file system, try to
-	 * allocate in the same allocation group as the hint.
 	 */
 	blkno = hint + 1;
-	if (blkno >= bmp->db_mapsize) {
-		blkno--;
-		goto tryag;
-	}
+
+	if (blkno >= bmp->db_mapsize)
+		goto pref_ag;
+
+	agno = blkno >> bmp->db_agl2size;
 
 	/* check if blkno crosses over into a new allocation group.
 	 * if so, check if we should allow allocations within this
-	 * allocation group.  we try to keep the trailing (rightmost)
-	 * allocation groups of the file system free for large
-	 * allocations and may want to prevent this allocation from
-	 * spilling over into this space.
+	 * allocation group.
 	 */
-	if ((blkno & (bmp->db_agsize - 1)) == 0) {
-		/* check if the AG is beyond the rightmost AG with
-		 * allocations in it.  if so, call dbNextAG() to
-		 * determine if the allocation should be allowed
-		 * to proceed within this AG or should be targeted
-		 * to another AG.
+	if ((blkno & (bmp->db_agsize - 1)) == 0)
+		/* check if the AG is currenly being written to.
+		 * if so, call dbNextAG() to find a non-busy
+		 * AG with sufficient free space.
 		 */
-		agno = blkno >> bmp->db_agl2size;
-		if (agno > bmp->db_maxag) {
-			agno = dbNextAG(ipbmap);
-			blkno = (s64) agno << bmp->db_agl2size;
-			goto tryag;
-		}
-	}
+		if (atomic_read(&bmp->db_active[agno]))
+			goto pref_ag;
 
 	/* check if the allocation request size can be satisfied from a
 	 * single dmap.  if so, try to allocate from the dmap containing
@@ -844,9 +823,8 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		/* first, try to satisfy the allocation request with the
 		 * blocks beginning at the hint.
 		 */
-		if ((rc =
-		     dbAllocNext(bmp, dp, blkno,
-				 (int) nblocks)) != ENOSPC) {
+		if ((rc = dbAllocNext(bmp, dp, blkno, (int) nblocks))
+		    != ENOSPC) {
 			if (rc == 0) {
 				*results = blkno;
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
@@ -858,12 +836,23 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 			goto read_unlock;
 		}
 
+		writers = atomic_read(&bmp->db_active[agno]);
+		if ((writers > 1) ||
+		    ((writers == 1) && (JFS_IP(ip)->active_ag != agno))) {
+			/*
+			 * Someone else is writing in this allocation
+			 * group.  To avoid fragmenting, try another ag
+			 */
+			release_metapage(mp);
+			IREAD_UNLOCK(ipbmap);
+			goto pref_ag;
+		}
+
 		/* next, try to satisfy the allocation request with blocks
 		 * near the hint.
 		 */
 		if ((rc =
-		     dbAllocNear(bmp, dp, blkno, (int) nblocks, l2nb,
-				 results))
+		     dbAllocNear(bmp, dp, blkno, (int) nblocks, l2nb, results))
 		    != ENOSPC) {
 			if (rc == 0) {
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
@@ -876,10 +865,9 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		}
 
 		/* try to satisfy the allocation request with blocks within
-		 * the same allocation group as the hint.
+		 * the same dmap as the hint.
 		 */
-		if ((rc =
-		     dbAllocDmapLev(bmp, dp, (int) nblocks, l2nb, results))
+		if ((rc = dbAllocDmapLev(bmp, dp, (int) nblocks, l2nb, results))
 		    != ENOSPC) {
 			if (rc == 0) {
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
@@ -895,14 +883,30 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		IREAD_UNLOCK(ipbmap);
 	}
 
-      tryag:
+	/* try to satisfy the allocation request with blocks within
+	 * the same allocation group as the hint.
+	 */
+	IWRITE_LOCK(ipbmap);
+	if ((rc = dbAllocAG(bmp, agno, nblocks, l2nb, results))
+	    != ENOSPC) {
+		if (rc == 0)
+			DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
+				*results, nblocks);
+		goto write_unlock;
+	}
+	IWRITE_UNLOCK(ipbmap);
+
+
+      pref_ag:
+	/*
+	 * Let dbNextAG recommend a preferred allocation group
+	 */
+	agno = dbNextAG(ipbmap);
 	IWRITE_LOCK(ipbmap);
 
-	/* determine the allocation group number of the hint and try to
-	 * allocate within this allocation group.  if that fails, try to
+	/* Try to allocate within this allocation group.  if that fails, try to
 	 * allocate anywhere in the map.
 	 */
-	agno = blkno >> bmp->db_agl2size;
 	if ((rc = dbAllocAG(bmp, agno, nblocks, l2nb, results)) == ENOSPC)
 		rc = dbAllocAny(bmp, nblocks, l2nb, results);
 	if (rc == 0) {
@@ -2314,11 +2318,9 @@ static void dbFreeBits(struct bmap * bmp, struct dmap * dp, s64 blkno,
 	 * if so, establish the new maximum allocation group number by
 	 * searching left for the first allocation group with allocation.
 	 */
-	if ((bmp->db_agfree[agno] == bmp->db_agsize
-	     && agno == bmp->db_maxag) || (agno == bmp->db_numag - 1
-					   && bmp->db_agfree[agno] ==
-					   (bmp-> db_mapsize &
-					    (BPERDMAP - 1)))) {
+	if ((bmp->db_agfree[agno] == bmp->db_agsize && agno == bmp->db_maxag) ||
+	    (agno == bmp->db_numag - 1 &&
+	     bmp->db_agfree[agno] == (bmp-> db_mapsize & (BPERDMAP - 1)))) {
 		while (bmp->db_maxag > 0) {
 			bmp->db_maxag -= 1;
 			if (bmp->db_agfree[bmp->db_maxag] !=

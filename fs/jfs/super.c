@@ -406,6 +406,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
 		jfs_ip->atlhead = 0;
+		jfs_ip->active_ag = -1;
 		inode_init_once(&jfs_ip->vfs_inode);
 	}
 }
