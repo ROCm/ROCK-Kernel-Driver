@@ -1,6 +1,5 @@
 #ifndef _MSDOS_FS_SB
 #define _MSDOS_FS_SB
-#include<linux/fat_cvf.h>
 
 /*
  * MS-DOS file system in-core superblock data
@@ -15,7 +14,6 @@ struct fat_mount_options {
 	char *iocharset;          /* Charset used for filename input/display */
 	unsigned short shortname; /* flags for shortname display/create rule */
 	unsigned char name_check; /* r = relaxed, n = normal, s = strict */
-	unsigned char conversion; /* b = binary, t = text, a = auto */
 	unsigned quiet:1,         /* set = fake successful chmods and chowns */
 		 showexec:1,      /* set = only set x bit for com/exe/bat */
 		 sys_immutable:1, /* set = system files are immutable */
@@ -46,9 +44,7 @@ struct msdos_sb_info {
 	struct fat_mount_options options;
 	struct nls_table *nls_disk;  /* Codepage used on disk */
 	struct nls_table *nls_io;    /* Charset used for input and display */
-	struct cvf_format* cvf_format;
 	void *dir_ops;		     /* Opaque; default directory operations */
-	void *private_data;
 	int dir_per_block;	     /* dir entries per block */
 	int dir_per_block_bits;	     /* log2(dir_per_block) */
 };
