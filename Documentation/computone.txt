@@ -60,12 +60,11 @@ c) Set address on ISA cards then:
 	or
    edit /etc/modules.conf if needed (module).
 	or both to match this setting.
-d) Run "make dep"
-e) Run "make modules"
-f) Run "make modules_install"
-g) Run "/sbin/depmod -a"
-h) install driver using `modprobe ip2 <options>` (options listed below)
-i) run ip2mkdev (either the script below or the binary version)
+d) Run "make modules"
+e) Run "make modules_install"
+f) Run "/sbin/depmod -a"
+g) install driver using `modprobe ip2 <options>` (options listed below)
+h) run ip2mkdev (either the script below or the binary version)
 
 
 Kernel installation:
@@ -77,13 +76,12 @@ b) Run "make config" or "make menuconfig" or "make xconfig"
 c) Set address on ISA cards then:
 	   edit /usr/src/linux/drivers/char/ip2.c  
            (Optional - may be specified on kernel command line now)
-d) Run "make dep"
-e) Run "make zImage" or whatever target you prefer.
-f) mv /usr/src/linux/arch/i386/boot/zImage to /boot.
-g) Add new config for this kernel into /etc/lilo.conf, run "lilo"
+d) Run "make zImage" or whatever target you prefer.
+e) mv /usr/src/linux/arch/i386/boot/zImage to /boot.
+f) Add new config for this kernel into /etc/lilo.conf, run "lilo"
 	or copy to a floppy disk and boot from that floppy disk.
-h) Reboot using this kernel
-i) run ip2mkdev (either the script below or the binary version)
+g) Reboot using this kernel
+h) run ip2mkdev (either the script below or the binary version)
 
 Kernel command line options:
 
@@ -176,7 +174,6 @@ all cards will operate in polled mode.
 
 If you select the driver as part of the kernel run :
 
-	make depend
 	make zlilo (or whatever you do to create a bootable kernel)
 
 If you selected a module run :

@@ -26,7 +26,6 @@ will suffice:
 
    make cerf_config
    make xconfig
-   make dep
    make zImage
    cp arch/arm/boot/zImage <TFTP directory>
 

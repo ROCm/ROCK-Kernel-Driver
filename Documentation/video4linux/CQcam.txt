@@ -50,8 +50,7 @@ configuration.  The appropriate flags are:
   With these flags, the kernel should compile and install the modules.
 To record and monitor the compilation, I use:
 
- (make dep; \
-  make zlilo ; \
+ (make zlilo ; \
   make modules; \
   make modules_install ; 
   depmod -a ) &>log &

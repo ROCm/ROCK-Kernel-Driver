@@ -23,8 +23,6 @@ AS              := $(AS) -32
 LDFLAGS		:= -m elf32_sparc
 endif
 
-LDFLAGS_BLOB	:= --format binary --oformat elf32-sparc
-
 #CFLAGS := $(CFLAGS) -g -pipe -fcall-used-g5 -fcall-used-g7
 ifneq ($(IS_EGCS),y)
 CFLAGS := $(CFLAGS) -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7

@@ -85,8 +85,6 @@ CFLAGS += -O2 -g
 CFLAGS += -D__linux__
 CFLAGS += -DUTS_SYSNAME=\"uClinux\"
 
-LDFLAGS_BLOB	:= --format binary --oformat elf32-m68k
-
 head-y := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
 CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h \
