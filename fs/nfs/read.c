@@ -367,9 +367,11 @@ static int
 readpage_async_filler(void *data, struct page *page)
 {
 	struct nfs_readdesc *desc = (struct nfs_readdesc *)data;
+	struct inode *inode = page->mapping->host;
 	struct nfs_page *new;
-	new = nfs_create_request(nfs_file_cred(desc->filp),
-				page->mapping->host, page,
+
+	nfs_wb_page(inode, page);
+	new = nfs_create_request(nfs_file_cred(desc->filp), inode, page,
 				0, PAGE_CACHE_SIZE);
 	if (IS_ERR(new)) {
 			SetPageError(page);
