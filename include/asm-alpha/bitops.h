@@ -315,6 +315,20 @@ static inline int ffs(int word)
 	return word ? result+1 : 0;
 }
 
+/*
+ * fls: find last bit set.
+ */
+#if defined(__alpha_cix__) && defined(__alpha_fix__)
+static inline int fls(int word)
+{
+	long result;
+	__asm__("ctlz %1,%0" : "=r"(result) : "r"(word & 0xffffffff));
+	return 64 - result;
+}
+#else
+#define fls	generic_fls
+#endif
+
 /* Compute powers of two for the given integer.  */
 static inline int floor_log2(unsigned long word)
 {

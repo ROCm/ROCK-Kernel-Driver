@@ -20,6 +20,7 @@ BPOBJECTS = head.o bootp.o
 TARGETS = vmlinux.gz tools/objstrip # also needed by aboot & milo
 VMLINUX = $(TOPDIR)/vmlinux
 OBJSTRIP = tools/objstrip
+LIBS := $(patsubst lib/%,$(TOPDIR)/lib/%,$(LIBS))
 
 all:	$(TARGETS)
 	@echo Ready to install kernel in $(shell pwd)/vmlinux.gz

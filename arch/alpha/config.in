@@ -12,7 +12,7 @@ define_bool CONFIG_GENERIC_ISA_DMA y
 source init/Config.in
 
 mainmenu_option next_comment
-comment 'General setup'
+comment 'System setup'
 
 choice 'Alpha system type' \
 	"Generic		CONFIG_ALPHA_GENERIC		\
