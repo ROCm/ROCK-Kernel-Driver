@@ -61,7 +61,7 @@
 
 static struct proto_ops l2cap_sock_ops;
 
-struct bt_sock_list l2cap_sk_list = {
+static struct bt_sock_list l2cap_sk_list = {
 	.lock = RW_LOCK_UNLOCKED
 };
 
