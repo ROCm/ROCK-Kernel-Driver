@@ -20,6 +20,5 @@ obj-$(CONFIG_INET_AH) += ah.o
 obj-$(CONFIG_INET_ESP) += esp.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
-obj-$(CONFIG_XFRM_USER) += xfrm_user.o
 
-obj-y += xfrm_policy.o xfrm4_policy.o xfrm_state.o xfrm4_state.o xfrm_input.o xfrm4_input.o xfrm_algo.o
+obj-y += xfrm4_policy.o xfrm4_state.o xfrm4_input.o
