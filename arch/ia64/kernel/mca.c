@@ -81,8 +81,6 @@ u64				ia64_init_stack[KERNEL_STACK_SIZE/8] __attribute__((aligned(16)));
 u64				ia64_mca_sal_data_area[1356];
 u64				ia64_tlb_functional;
 u64				ia64_os_mca_recovery_successful;
-/* TODO: need to assign min-state structure to UC memory */
-u64				ia64_mca_min_state_save_info[MIN_STATE_AREA_SIZE] __attribute__((aligned(512)));
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
@@ -464,26 +462,6 @@ ia64_mca_register_cpev (int cpev)
 #endif /* CONFIG_ACPI */
 
 #endif /* PLATFORM_MCA_HANDLERS */
-
-/*
- * routine to process and prepare to dump min_state_save
- * information for debugging purposes.
- */
-void
-ia64_process_min_state_save (pal_min_state_area_t *pmss)
-{
-	int i, max = MIN_STATE_AREA_SIZE;
-	u64 *tpmss_ptr = (u64 *)pmss;
-	u64 *return_min_state_ptr = ia64_mca_min_state_save_info;
-
-	for (i=0;i<max;i++) {
-
-		/* copy min-state register info for eventual return to PAL */
-		*return_min_state_ptr++ = *tpmss_ptr;
-
-		tpmss_ptr++;  /* skip to next entry */
-	}
-}
 
 /*
  * ia64_mca_cmc_vector_setup
@@ -961,9 +939,8 @@ ia64_return_to_sal_check(void)
 	/* Default = tell SAL to return to same context */
 	ia64_os_to_sal_handoff_state.imots_context = IA64_MCA_SAME_CONTEXT;
 
-	/* Register pointer to new min state values */
 	ia64_os_to_sal_handoff_state.imots_new_min_state =
-		ia64_mca_min_state_save_info;
+		(u64 *)ia64_sal_to_os_handoff_state.pal_min_state;
 }
 
 /*
@@ -2153,9 +2130,6 @@ ia64_log_proc_dev_err_info_print (sal_log_processor_info_t  *slpi,
 	/* Print processor static info if any */
 	if (slpi->valid.psi_static_struct) {
 		spsi = (sal_processor_static_info_t *)p_data;
-
-		/* copy interrupted context PAL min-state info */
-		ia64_process_min_state_save(&spsi->min_state_area);
 
 		/* Print branch register contents if valid */
 		if (spsi->valid.br)
