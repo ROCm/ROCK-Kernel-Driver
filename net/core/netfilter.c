@@ -550,6 +550,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		 unsigned int verdict)
 {
 	struct list_head *elem = &info->elem->list;
+	struct list_head *i;
 
 	rcu_read_lock();
 
