@@ -42,10 +42,6 @@
 #include <asm/nvram.h>
 #include <asm/mmu_context.h>
 #include <asm/backlight.h>
-#ifdef CONFIG_SMP
-#include <asm/smplock.h>
-#include <asm/smp.h>
-#endif /* CONFIG_SMP */
 #include <asm/time.h>
 #include <asm/cputable.h>
 #include <asm/btext.h>
