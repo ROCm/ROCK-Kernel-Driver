@@ -77,6 +77,20 @@ static int voltage_table[32];
 static unsigned int highest_speed, lowest_speed; /* kHz */
 static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
+static char speedbuffer[8];
+
+static char *print_speed(int speed)
+{
+	if (speed > 1000) {
+		if (speed%1000 == 0)
+			sprintf (speedbuffer, "%dGHz", speed/1000);
+		else
+			sprintf (speedbuffer, "%d.%dGHz", speed/1000, (speed%1000)/100);
+	} else
+		sprintf (speedbuffer, "%dMHz", speed);
+
+	return speedbuffer;
+}
 
 
 static unsigned int calc_speed(int mult, int fsb)
@@ -165,7 +179,8 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb, mult/10, mult%10);
+	dprintk (KERN_INFO PFX "Setting to FSB:%dMHz Mult:%d.%dx (%s)\n",
+					fsb, mult/10, mult%10, print_speed(speed/1000));
 
 	switch (longhaul_version) {
 
@@ -329,7 +344,7 @@ static int __init longhaul_get_ranges(void)
 		}
 	}
 
-	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
+	dprintk (KERN_INFO PFX "MinMult:%d.%dx MaxMult:%d.%dx\n",
 		 minmult/10, minmult%10, maxmult/10, maxmult%10);
 
 	if (fsb == -1) {
@@ -339,8 +354,9 @@ static int __init longhaul_get_ranges(void)
 
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
-	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
-		 fsb, lowest_speed/1000, highest_speed/1000);
+	dprintk (KERN_INFO PFX "FSB:%dMHz  ", fsb);
+	dprintk ("Lowest speed:%s  ", print_speed(lowest_speed/1000));
+	dprintk ("Highest speed:%s\n", print_speed(highest_speed/1000));
 
 	if (lowest_speed == highest_speed) {
 		printk (KERN_INFO PFX "highestspeed == lowest, aborting.\n");
