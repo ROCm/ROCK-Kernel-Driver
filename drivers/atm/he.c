@@ -2363,7 +2363,7 @@ he_tasklet(unsigned long data)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,69)
-static irq_return_t
+static irqreturn_t
 #else
 static void
 #endif
