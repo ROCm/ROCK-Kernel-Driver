@@ -294,7 +294,7 @@ static ssize_t part_attr_show(struct kobject * kobj, struct attribute * attr,
 	struct part_attribute * part_attr = container_of(attr,struct part_attribute,attr);
 	ssize_t ret = 0;
 	if (part_attr->show)
-		part_attr->show(p,page,count,off);
+		ret = part_attr->show(p,page,count,off);
 	return ret;
 }
 
