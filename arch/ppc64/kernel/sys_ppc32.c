@@ -2018,6 +2018,7 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 
 	bprm.file = file;
 	bprm.filename = filename;
+	bprm.interp = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;

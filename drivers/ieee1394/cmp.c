@@ -159,7 +159,7 @@ static void cmp_host_reset(struct hpsb_host *host)
 }
 
 static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
-		    u64 addr, unsigned int length, u16 flags)
+		    u64 addr, size_t length, u16 flags)
 {
 	int csraddr = addr - CSR_REGISTER_BASE;
 	int plug;

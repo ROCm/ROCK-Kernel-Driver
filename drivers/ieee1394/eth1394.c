@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1010 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1020 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -130,7 +130,7 @@ static const int hdr_type_len[] = {
 
 static const u16 eth1394_speedto_maxpayload[] = {
 /*     S100, S200, S400, S800, S1600, S3200 */
-	512, 1024, 2048, 4096,  8192, 16384
+	512, 1024, 2048, 4096,  4096,  4096
 };
 
 MODULE_AUTHOR("Ben Collins (bcollins@debian.org)");
@@ -1086,7 +1086,7 @@ bad_proto:
 }
 
 static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
-			   quadlet_t *data, u64 addr, unsigned int len, u16 flags)
+			   quadlet_t *data, u64 addr, size_t len, u16 flags)
 {
 	struct host_info *hi = hpsb_get_hostinfo(&eth1394_highlevel, host);
 
@@ -1283,7 +1283,7 @@ static inline int ether1394_prep_write_packet(struct hpsb_packet *p,
 	p->header_size = 16;
 	p->expect_response = 1;
 
-	if (hpsb_get_tlabel(p, !in_interrupt())) {
+	if (hpsb_get_tlabel(p)) {
 		ETH1394_PRINT_G(KERN_ERR, "No more tlabels left while sending "
 				"to node " NODE_BUS_FMT "\n", NODE_BUS_ARGS(host, node));
 		return -1;
@@ -1600,7 +1600,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1010 $");
+			strcpy (info.version, "$Rev: 1020 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

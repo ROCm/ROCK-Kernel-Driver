@@ -80,7 +80,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1010 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1018 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -944,6 +944,16 @@ alloc_fail:
 		return -EBUSY;
 	}
 
+	/* Schedule a timeout here. The reason is that we may be so close
+	 * to a bus reset, that the device is not available for logins.
+	 * This can happen when the bus reset is caused by the host
+	 * connected to the sbp2 device being removed. That host would
+	 * have a certain amount of time to relogin before the sbp2 device
+	 * allows someone else to login instead. One second makes sense. */
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout(HZ);
+						
+
 	/*
 	 * Login to the sbp-2 device
 	 */
@@ -1060,7 +1070,7 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
  * physical dma in hardware). Mostly just here for debugging...
  */
 static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, int destid, quadlet_t *data,
-                                     u64 addr, unsigned int length, u16 flags)
+                                     u64 addr, size_t length, u16 flags)
 {
 
         /*
@@ -1076,7 +1086,7 @@ static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, int des
  * physical dma in hardware). Mostly just here for debugging...
  */
 static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_t *data,
-                                    u64 addr, unsigned int length, u16 flags)
+                                    u64 addr, size_t length, u16 flags)
 {
 
         /*
@@ -2399,7 +2409,7 @@ static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id,
  * This function deals with status writes from the SBP-2 device
  */
 static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int destid,
-				    quadlet_t *data, u64 addr, unsigned int length, u16 fl)
+				    quadlet_t *data, u64 addr, size_t length, u16 fl)
 {
 	struct sbp2scsi_host_info *hi = NULL;
 	struct scsi_id_instance_data *scsi_id = NULL;
