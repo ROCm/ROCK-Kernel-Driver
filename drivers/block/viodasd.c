@@ -68,7 +68,7 @@ MODULE_LICENSE("GPL");
 
 enum {
 	PARTITION_SHIFT = 3,
-	MAX_DISKNO = 32,
+	MAX_DISKNO = HVMAXARCHITECTEDVIRTUALDISKS,
 	MAX_DISK_NAME = sizeof(((struct gendisk *)0)->disk_name)
 };
 
@@ -168,6 +168,7 @@ struct viodasd_device {
 	int		read_only;
 	spinlock_t	q_lock;
 	struct gendisk	*disk;
+	struct device	*dev;
 } viodasd_devices[MAX_DISKNO];
 
 /*
@@ -342,7 +343,7 @@ static int send_request(struct request *req)
 
 	/* Now build the scatter-gather list */
 	nsg = blk_rq_map_sg(req->q, req, sg);
-	nsg = dma_map_sg(iSeries_vio_dev, sg, nsg, direction);
+	nsg = dma_map_sg(d->dev, sg, nsg, direction);
 
 	spin_lock_irqsave(&viodasd_spinlock, flags);
 	num_req_outstanding++;
@@ -422,7 +423,7 @@ static int send_request(struct request *req)
 error_ret:
 	num_req_outstanding--;
 	spin_unlock_irqrestore(&viodasd_spinlock, flags);
-	dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
+	dma_unmap_sg(d->dev, sg, nsg, direction);
 	return -1;
 }
 
@@ -557,6 +558,7 @@ retry:
 	g->fops = &viodasd_fops;
 	g->queue = q;
 	g->private_data = d;
+	g->driverfs_dev = d->dev;
 	set_capacity(g, d->size >> 9);
 
 	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
@@ -623,7 +625,7 @@ static int viodasd_handle_read_write(struct vioblocklpevent *bevent)
 	struct scatterlist sg[VIOMAXBLOCKDMA];
 	struct HvLpEvent *event = &bevent->event;
 	unsigned long irq_flags;
-	int device_no;
+	struct viodasd_device *d;
 	int error;
 	spinlock_t *qlock;
 
@@ -633,7 +635,10 @@ static int viodasd_handle_read_write(struct vioblocklpevent *bevent)
 		pci_direction = DMA_FROM_DEVICE;
 	else
 		pci_direction = DMA_TO_DEVICE;
-	dma_unmap_sg(iSeries_vio_dev, sg, num_sg, pci_direction);
+	req = (struct request *)bevent->event.xCorrelationToken;
+	d = req->rq_disk->private_data;
+
+	dma_unmap_sg(d->dev, sg, num_sg, pci_direction);
 
 	/*
 	 * Since this is running in interrupt mode, we need to make sure
@@ -642,9 +647,6 @@ static int viodasd_handle_read_write(struct vioblocklpevent *bevent)
 	spin_lock_irqsave(&viodasd_spinlock, irq_flags);
 	num_req_outstanding--;
 	spin_unlock_irqrestore(&viodasd_spinlock, irq_flags);
-
-	req = (struct request *)bevent->event.xCorrelationToken;
-	device_no = DEVICE_NO(req->rq_disk->private_data);
 
 	error = event->xRc != HvLpEvent_Rc_Good;
 	if (error) {
@@ -660,7 +662,7 @@ static int viodasd_handle_read_write(struct vioblocklpevent *bevent)
 	spin_unlock_irqrestore(qlock, irq_flags);
 
 	/* Finally, try to get more requests off of this device's queue */
-	viodasd_restart_all_queues_starting_from(device_no);
+	viodasd_restart_all_queues_starting_from(DEVICE_NO(d));
 
 	return 0;
 }
@@ -744,8 +746,47 @@ static ssize_t probe_disks(struct device_driver *drv, const char *buf,
 }
 static DRIVER_ATTR(probe, S_IWUSR, NULL, probe_disks);
 
+static int viodasd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
+{
+	struct viodasd_device *d = &viodasd_devices[vdev->unit_address];
+
+	d->dev = &vdev->dev;
+	probe_disk(d);
+	if (d->disk == NULL)
+		return -ENODEV;
+	return 0;
+}
+
+static int viodasd_remove(struct vio_dev *vdev)
+{
+	struct viodasd_device *d;
+
+	d = &viodasd_devices[vdev->unit_address];
+	if (d->disk) {
+		del_gendisk(d->disk);
+		put_disk(d->disk);
+		blk_cleanup_queue(d->disk->queue);
+		d->disk = NULL;
+	}
+	d->dev = NULL;
+	return 0;
+}
+
+/**
+ * viodasd_device_table: Used by vio.c to match devices that we
+ * support.
+ */
+static struct vio_device_id viodasd_device_table[] __devinitdata = {
+	{ "viodasd", "" },
+	{ 0, }
+};
+
+MODULE_DEVICE_TABLE(vio, viodasd_device_table);
 static struct vio_driver viodasd_driver = {
-	.name = "viodasd"
+	.name = "viodasd",
+	.id_table = viodasd_device_table,
+	.probe = viodasd_probe,
+	.remove = viodasd_remove
 };
 
 /*
@@ -754,7 +795,7 @@ static struct vio_driver viodasd_driver = {
  */
 static int __init viodasd_init(void)
 {
-	int i;
+	int rc;
 
 	/* Try to open to our host lp */
 	if (viopath_hostLp == HvLpIndexInvalid)
@@ -788,33 +829,17 @@ static int __init viodasd_init(void)
 	/* Initialize our request handler */
 	vio_setHandler(viomajorsubtype_blockio, handle_block_event);
 
-	for (i = 0; i < MAX_DISKNO; i++)
-		probe_disk(&viodasd_devices[i]);
-
-	vio_register_driver(&viodasd_driver);	/* FIX ME - error checking */
-	driver_create_file(&viodasd_driver.driver, &driver_attr_probe);
-
-	return 0;
+	rc = vio_register_driver(&viodasd_driver);
+	if (rc == 0)
+		driver_create_file(&viodasd_driver.driver, &driver_attr_probe);
+	return rc;
 }
 module_init(viodasd_init);
 
 void viodasd_exit(void)
 {
-	int i;
-	struct viodasd_device *d;
-
 	driver_remove_file(&viodasd_driver.driver, &driver_attr_probe);
 	vio_unregister_driver(&viodasd_driver);
-
-        for (i = 0; i < MAX_DISKNO; i++) {
-		d = &viodasd_devices[i];
-		if (d->disk) {
-			del_gendisk(d->disk);
-			put_disk(d->disk);
-			blk_cleanup_queue(d->disk->queue);
-			d->disk = NULL;
-		}
-	}
 	vio_clearHandler(viomajorsubtype_blockio);
 	unregister_blkdev(VIODASD_MAJOR, VIOD_GENHD_NAME);
 	viopath_close(viopath_hostLp, viomajorsubtype_blockio, VIOMAXREQ + 2);

@@ -233,6 +233,8 @@ static void probe_bus_iseries(void)
 		/* veth is special and has it own iommu_table */
 		viodev->iommu_table = &veth_iommu_table;
 	}
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALDISKS; i++)
+		vio_register_device_iseries("viodasd", i);
 }
 #endif
 
