@@ -104,11 +104,11 @@
  *		  Now fixed.
  * 05/07/99 bv	- v1.03g
  *		- Changed the assumption that HZ = 100
+ * 10/17/03 mc	- v1.04
+ *		- added new DMA API support
  **************************************************************************/
 
 #define CVT_LINUX_VERSION(V,P,S)        (V * 65536 + P * 256 + S)
-
-#error Please convert me to Documentation/DMA-mapping.txt
 
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
@@ -143,13 +143,12 @@ unsigned int i91u_debug = DEBUG_DEFAULT;
 
 static Scsi_Host_Template driver_template = {
 	.proc_name	= "INI9100U",
-	.proc_info	= "INI9100U",
 	.name		= i91u_REVID,
 	.detect		= i91u_detect,
 	.release	= i91u_release,
 	.queuecommand	= i91u_queue,
-	.abort		= i91u_abort,
-	.reset		= i91u_reset,
+//	.abort		= i91u_abort,
+//	.reset		= i91u_reset,
 	.bios_param	= i91u_biosparam,
 	.can_queue	= 1,
 	.this_id	= 1,
@@ -162,7 +161,7 @@ static Scsi_Host_Template driver_template = {
 char *i91uCopyright = "Copyright (C) 1996-98";
 char *i91uInitioName = "by Initio Corporation";
 char *i91uProductName = "INI-9X00U/UW";
-char *i91uVersion = "v1.03g";
+char *i91uVersion = "v1.04";
 
 #define TULSZ(sz)     (sizeof(sz) / sizeof(sz[0]))
 #define TUL_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
@@ -238,12 +237,12 @@ static void i91uAppendSRBToQueue(HCS * pHCB, Scsi_Cmnd * pSRB)
 	ULONG flags;
 	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
 
-	pSRB->next = NULL;	/* Pointer to next              */
+	pSRB->host_scribble = NULL;	/* Pointer to next */
 
 	if (pHCB->pSRB_head == NULL)
 		pHCB->pSRB_head = pSRB;
 	else
-		pHCB->pSRB_tail->next = pSRB;	/* Pointer to next              */
+		pHCB->pSRB_tail->host_scribble = (char *)pSRB;	/* Pointer to next */
 	pHCB->pSRB_tail = pSRB;
 
 	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
@@ -265,8 +264,8 @@ static Scsi_Cmnd *i91uPopSRBFromQueue(HCS * pHCB)
 	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
 
 	if ((pSRB = pHCB->pSRB_head) != NULL) {
-		pHCB->pSRB_head = pHCB->pSRB_head->next;
-		pSRB->next = NULL;
+		pHCB->pSRB_head = (struct scsi_cmnd *)pHCB->pSRB_head->host_scribble;
+		pSRB->host_scribble = NULL;
 	}
 	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
 
@@ -308,6 +307,12 @@ int tul_NewReturnNumberOfAdapters(void)
 			if (((dRegValue & 0xFF00) >> 8) == 0xFF)
 				dRegValue = 0;
 			wBIOS = (wBIOS << 8) + ((UWORD) ((dRegValue & 0xFF00) >> 8));
+			if (pci_set_dma_mask(pDev, 0xffffffff)) {
+				printk(KERN_WARNING 
+				       "i91u: Could not set 32 bit DMA mask\n");
+				continue;
+			}
+
 			if (Addi91u_into_Adapter_table(wBIOS,
 							(pDev->resource[0].start),
 						       	pDev->irq,
@@ -346,12 +351,7 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 #endif
 	}
 	/* Get total number of adapters in the motherboard */
-#ifdef CONFIG_PCI
 	iAdapters = tul_NewReturnNumberOfAdapters();
-#else
-	iAdapters = tul_ReturnNumberOfAdapters();
-#endif
-
 	if (iAdapters == 0)	/* If no tulip founded, return */
 		return (0);
 
@@ -370,7 +370,7 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 
 	for (; tul_num_scb >= MAX_TARGETS + 3; tul_num_scb--) {
 		i = tul_num_ch * tul_num_scb * sizeof(SCB);
-		if ((tul_scb = (SCB *) kmalloc(i, GFP_ATOMIC | GFP_DMA)) != NULL)
+		if ((tul_scb = (SCB *) kmalloc(i, GFP_ATOMIC)) != NULL)
 			break;
 	}
 	if (tul_scb == NULL) {
@@ -381,7 +381,7 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 
 	pSCB = tul_scb;
 	for (i = 0; i < tul_num_ch * tul_num_scb; i++, pSCB++) {
-		pSCB->SCB_SGPAddr = (U32) VIRT_TO_BUS(&pSCB->SCB_SGList[0]);
+		pSCB->SCB_SGPAddr = (u32)&pSCB->SCB_SGList[0];
 	}
 
 	for (i = 0, pHCB = &tul_hcs[0];		/* Get pointer for control block */
@@ -476,6 +476,7 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	SG *pSG;		/* Pointer to SG list           */
 	int i;
 	long TotalLen;
+	dma_addr_t dma_addr;
 
 	pSCB->SCB_Post = i91uSCBPost;	/* i91u's callback routine      */
 	pSCB->SCB_Srb = SCpnt;
@@ -484,11 +485,13 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	pSCB->SCB_Target = SCpnt->device->id;
 	pSCB->SCB_Lun = SCpnt->device->lun;
 	pSCB->SCB_Ident = SCpnt->device->lun | DISC_ALLOW;
+
 	pSCB->SCB_Flags |= SCF_SENSE;	/* Turn on auto request sense   */
-
-	pSCB->SCB_SensePtr = (U32) VIRT_TO_BUS(SCpnt->sense_buffer);
-
+	dma_addr = dma_map_single(&pHCB->pci_dev->dev, SCpnt->sense_buffer,
+				  SENSE_SIZE, DMA_FROM_DEVICE);
+	pSCB->SCB_SensePtr = cpu_to_le32((u32)dma_addr);
 	pSCB->SCB_SenseLen = SENSE_SIZE;
+	SCpnt->SCp.ptr = (char *)(unsigned long)dma_addr;
 
 	pSCB->SCB_CDBLen = SCpnt->cmd_len;
 	pSCB->SCB_HaStat = 0;
@@ -503,30 +506,32 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 
 	if (SCpnt->use_sg) {
 		pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
-		if (SCpnt->use_sg == 1) {	/* If only one entry in the list *//*      treat it as regular I/O */
-			pSCB->SCB_BufPtr = (U32) VIRT_TO_BUS(pSrbSG->address);
-			TotalLen = pSrbSG->length;
-			pSCB->SCB_SGLen = 0;
-		} else {	/* Assign SG physical address   */
-			pSCB->SCB_BufPtr = pSCB->SCB_SGPAddr;
-			pSCB->SCB_Flags |= SCF_SG;	/* Turn on SG list flag       */
-			for (i = 0, TotalLen = 0, pSG = &pSCB->SCB_SGList[0];	/* 1.01g */
-			     i < SCpnt->use_sg;
-			     i++, pSG++, pSrbSG++) {
-				pSG->SG_Ptr = (U32) VIRT_TO_BUS(pSrbSG->address);
-				TotalLen += pSG->SG_Len = pSrbSG->length;
-			}
-			pSCB->SCB_SGLen = i;
+
+		pSCB->SCB_SGLen = dma_map_sg(&pHCB->pci_dev->dev, pSrbSG,
+					     SCpnt->use_sg, SCpnt->sc_data_direction);
+
+		pSCB->SCB_BufPtr = pSCB->SCB_SGPAddr;
+		pSCB->SCB_Flags |= SCF_SG;	/* Turn on SG list flag       */
+		for (i = 0, TotalLen = 0, pSG = &pSCB->SCB_SGList[0];	/* 1.01g */
+		     i < pSCB->SCB_SGLen; i++, pSG++, pSrbSG++) {
+			pSG->SG_Ptr = cpu_to_le32((u32)sg_dma_address(pSrbSG));
+			TotalLen += pSG->SG_Len = cpu_to_le32((u32)sg_dma_len(pSrbSG));
 		}
+
 		pSCB->SCB_BufLen = (SCpnt->request_bufflen > TotalLen) ?
 		    TotalLen : SCpnt->request_bufflen;
-	} else {		/* Non SG                       */
-		pSCB->SCB_BufPtr = (U32) VIRT_TO_BUS(SCpnt->request_buffer);
-		pSCB->SCB_BufLen = SCpnt->request_bufflen;
+	} else if (SCpnt->request_bufflen) {		/* Non SG */
+		dma_addr = dma_map_single(&pHCB->pci_dev->dev, SCpnt->request_buffer,
+					  SCpnt->request_bufflen,
+					  SCpnt->sc_data_direction);
+		SCpnt->SCp.dma_handle = dma_addr;
+		pSCB->SCB_BufPtr = cpu_to_le32((u32)dma_addr);
+		pSCB->SCB_BufLen = cpu_to_le32((u32)SCpnt->request_bufflen);
+		pSCB->SCB_SGLen = 0;
+	} else {
+		pSCB->SCB_BufLen = 0;
 		pSCB->SCB_SGLen = 0;
 	}
-
-	return;
 }
 
 /* 
@@ -623,6 +628,28 @@ int i91u_biosparam(struct scsi_device *sdev, struct block_device *dev,
 	return 0;
 }
 
+static void i91u_unmap_cmnd(struct pci_dev *pci_dev, struct scsi_cmnd *cmnd)
+{
+	/* auto sense buffer */
+	if (cmnd->SCp.ptr) {
+		dma_unmap_single(&pci_dev->dev,
+				 (dma_addr_t)((unsigned long)cmnd->SCp.ptr),
+				 SENSE_SIZE, SCSI_DATA_READ);
+		cmnd->SCp.ptr = NULL;
+	}
+
+	/* request buffer */
+	if (cmnd->use_sg) {
+		dma_unmap_sg(&pci_dev->dev, cmnd->request_buffer,
+			     cmnd->use_sg,
+			     scsi_to_pci_dma_dir(cmnd->sc_data_direction));
+	} else if (cmnd->request_bufflen) {
+		dma_unmap_single(&pci_dev->dev, cmnd->SCp.dma_handle,
+				 cmnd->request_bufflen,
+				 scsi_to_pci_dma_dir(cmnd->sc_data_direction));
+	}
+}
+
 /*****************************************************************************
  Function name  : i91uSCBPost
  Description    : This is callback routine be called when tulip finish one
@@ -686,6 +713,8 @@ static void i91uSCBPost(BYTE * pHcb, BYTE * pScb)
 	if (pSRB == NULL) {
 		printk("pSRB is NULL\n");
 	}
+
+	i91u_unmap_cmnd(pHCB->pci_dev, pSRB);
 	pSRB->scsi_done(pSRB);	/* Notify system DONE           */
 	if ((pSRB = i91uPopSRBFromQueue(pHCB)) != NULL)
 		/* Find the next pending SRB    */
