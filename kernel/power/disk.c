@@ -9,6 +9,8 @@
  *
  */
 
+#define DEBUG
+
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/reboot.h>
@@ -25,6 +27,7 @@ extern struct pm_ops * pm_ops;
 
 extern int swsusp_suspend(void);
 extern int swsusp_write(void);
+extern int swsusp_check(void);
 extern int swsusp_read(void);
 extern int swsusp_resume(void);
 extern int swsusp_free(void);
@@ -32,6 +35,7 @@ extern int swsusp_free(void);
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
+dev_t swsusp_resume_device;
 
 /**
  *	power_down - Shut machine down for hibernate.
@@ -121,44 +125,53 @@ static void finish(void)
 }
 
 
-static int prepare(void)
+static int prepare_processes(void)
 {
 	int error;
 
 	pm_prepare_console();
 
 	sys_sync();
-	if (freeze_processes()) {
+
+	if (freeze_processes() > 1) {
 		error = -EBUSY;
-		goto Thaw;
+		return error;
 	}
 
 	if (pm_disk_mode == PM_DISK_PLATFORM) {
 		if (pm_ops && pm_ops->prepare) {
 			if ((error = pm_ops->prepare(PM_SUSPEND_DISK)))
-				goto Thaw;
+				return error;
 		}
 	}
 
 	/* Free memory before shutting down devices. */
 	free_some_memory();
 
-	disable_nonboot_cpus();
-	if ((error = device_suspend(PMSG_FREEZE))) {
-		printk("Some devices failed to suspend\n");
-		goto Finish;
-	}
-
 	return 0;
- Finish:
-	platform_finish();
- Thaw:
+}
+
+static void unprepare_processes(void)
+{
 	enable_nonboot_cpus();
 	thaw_processes();
 	pm_restore_console();
-	return error;
 }
 
+static int prepare_devices(void)
+{
+	int error;
+
+	disable_nonboot_cpus();
+	if ((error = device_suspend(PMSG_FREEZE))) {
+		printk("Some devices failed to suspend\n");
+		platform_finish();
+		enable_nonboot_cpus();
+		return error;
+	}
+
+	return 0;
+}
 
 /**
  *	pm_suspend_disk - The granpappy of power management.
@@ -173,8 +186,15 @@ int pm_suspend_disk(void)
 {
 	int error;
 
-	if ((error = prepare()))
+	error = prepare_processes();
+	if (!error) {
+		error = prepare_devices();
+	}
+
+	if (error) {
+		unprepare_processes();
 		return error;
+	}
 
 	pr_debug("PM: Attempting to suspend to disk.\n");
 	if (pm_disk_mode == PM_DISK_FIRMWARE)
@@ -223,15 +243,28 @@ static int software_resume(void)
 		return 0;
 	}
 
+	pr_debug("PM: Checking swsusp image.\n");
+
+	if ((error = swsusp_check()))
+		goto Done;
+
+	pr_debug("PM: Preparing processes for restore.\n");
+
+	if ((error = prepare_processes())) {
+		unprepare_processes();
+		goto Done;
+	}
+
 	pr_debug("PM: Reading swsusp image.\n");
 
 	if ((error = swsusp_read()))
 		goto Done;
 
-	pr_debug("PM: Preparing system for restore.\n");
+	pr_debug("PM: Preparing devices for restore.\n");
 
-	if ((error = prepare()))
+	if ((error = prepare_devices())) {
 		goto Free;
+	}
 
 	barrier();
 	mb();
@@ -329,8 +362,43 @@ static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 
 power_attr(disk);
 
+static ssize_t resume_show(struct subsystem * subsys, char *buf)
+{
+	return sprintf(buf,"%d:%d\n", MAJOR(swsusp_resume_device),
+		       MINOR(swsusp_resume_device));
+}
+
+static ssize_t resume_store(struct subsystem * subsys, const char * buf, size_t n)
+{
+	int len;
+	char *p;
+	unsigned int maj, min;
+	int error = -EINVAL;
+	dev_t res;
+
+	p = memchr(buf, '\n', n);
+	len = p ? p - buf : n;
+
+	if (sscanf(buf, "%u:%u", &maj, &min) == 2) {
+		res = MKDEV(maj,min);
+		if (maj == MAJOR(res) && min == MINOR(res)) {
+			swsusp_resume_device = res;
+			printk("Attempting manual resume\n");
+			noresume = 0;
+			set_current_state(TASK_STOPPED);
+			software_resume();
+			set_current_state(TASK_RUNNING);
+		}
+	}
+
+	return error >= 0 ? n : error;
+}
+
+power_attr(resume);
+
 static struct attribute * g[] = {
 	&disk_attr.attr,
+	&resume_attr.attr,
 	NULL,
 };
 

@@ -53,7 +53,7 @@ static int __init readwrite(char *str)
 __setup("ro", readonly);
 __setup("rw", readwrite);
 
-static dev_t __init try_name(char *name, int part)
+static dev_t try_name(char *name, int part)
 {
 	char path[64];
 	char buf[32];
@@ -135,7 +135,7 @@ fail:
  *	is mounted on rootfs /sys.
  */
 
-dev_t __init name_to_dev_t(char *name)
+dev_t name_to_dev_t(char *name)
 {
 	char s[32];
 	char *p;
@@ -144,7 +144,8 @@ dev_t __init name_to_dev_t(char *name)
 
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
-	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
+	int mount_err = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
+	if (mount_err < 0 && mount_err != -EBUSY)
 		goto out;
 #endif
 
@@ -196,7 +197,8 @@ dev_t __init name_to_dev_t(char *name)
 	res = try_name(s, part);
 done:
 #ifdef CONFIG_SYSFS
-	sys_umount("/sys", 0);
+	if (!mount_err)
+		sys_umount("/sys", 0);
 out:
 	if (!mkdir_err)
 		sys_rmdir("/sys");

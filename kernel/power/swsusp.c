@@ -36,6 +36,8 @@
  * For TODOs,FIXMEs also look in Documentation/power/swsusp.txt
  */
 
+#define DEBUG
+
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/suspend.h>
@@ -80,7 +82,7 @@ static int pagedir_order_check;
 static int nr_copy_pages_check;
 
 extern char resume_file[];
-static dev_t resume_device;
+
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
 
@@ -170,7 +172,7 @@ static int is_resume_device(const struct swap_info_struct *swap_info)
 	struct inode *inode = file->f_dentry->d_inode;
 
 	return S_ISBLK(inode->i_mode) &&
-		resume_device == MKDEV(imajor(inode), iminor(inode));
+		swsusp_resume_device == MKDEV(imajor(inode), iminor(inode));
 }
 
 static int swsusp_swap_check(void) /* This is called before saving image */
@@ -898,7 +900,7 @@ int swsusp_resume(void)
 /*
  * Returns true if given address/order collides with any orig_address 
  */
-static int __init does_collide_order(unsigned long addr, int order)
+static int does_collide_order(unsigned long addr, int order)
 {
 	int i;
 	
@@ -912,7 +914,7 @@ static int __init does_collide_order(unsigned long addr, int order)
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-static int __init check_pagedir(void)
+static int check_pagedir(void)
 {
 	int i;
 
@@ -930,7 +932,7 @@ static int __init check_pagedir(void)
 	return 0;
 }
 
-static int __init swsusp_pagedir_relocate(void)
+static int swsusp_pagedir_relocate(void)
 {
 	/*
 	 * We have to avoid recursion (not to overflow kernel stack),
@@ -1075,7 +1077,7 @@ static int bio_write_page(pgoff_t page_off, void * page)
  * I really don't think that it's foolproof but more than nothing..
  */
 
-static const char * __init sanity_check(void)
+static const char * sanity_check(void)
 {
 	dump_info();
 	if(swsusp_info.version_code != LINUX_VERSION_CODE)
@@ -1096,7 +1098,7 @@ static const char * __init sanity_check(void)
 }
 
 
-static int __init check_header(void)
+static int check_header(void)
 {
 	const char * reason = NULL;
 	int error;
@@ -1114,7 +1116,7 @@ static int __init check_header(void)
 	return error;
 }
 
-static int __init check_sig(void)
+static int check_sig(void)
 {
 	int error;
 
@@ -1144,7 +1146,7 @@ static int __init check_sig(void)
  *	already did that.
  */
 
-static int __init data_read(void)
+static int data_read(void)
 {
 	struct pbe * p;
 	int error;
@@ -1169,9 +1171,9 @@ static int __init data_read(void)
 
 }
 
-extern dev_t __init name_to_dev_t(const char *line);
+extern dev_t name_to_dev_t(const char *line);
 
-static int __init read_pagedir(void)
+static int read_pagedir(void)
 {
 	unsigned long addr;
 	int i, n = swsusp_info.pagedir_pages;
@@ -1196,7 +1198,7 @@ static int __init read_pagedir(void)
 	return error;
 }
 
-static int __init read_suspend_image(void)
+static int check_suspend_image(void)
 {
 	int error = 0;
 
@@ -1204,6 +1206,13 @@ static int __init read_suspend_image(void)
 		return error;
 	if ((error = check_header()))
 		return error;
+	return error;
+}
+
+static int read_suspend_image(void)
+{
+	int error = 0;
+
 	if ((error = read_pagedir()))
 		return error;
 	if ((error = data_read()))
@@ -1212,29 +1221,56 @@ static int __init read_suspend_image(void)
 }
 
 /**
- *	swsusp_read - Read saved image from swap.
+ *      swsusp_check - Check for saved image in swap
  */
 
-int __init swsusp_read(void)
+int swsusp_check(void)
 {
 	int error;
 
-	if (!strlen(resume_file))
-		return -ENOENT;
+	if (!swsusp_resume_device) {
+		if (!strlen(resume_file))
+			return -ENOENT;
+		swsusp_resume_device = name_to_dev_t(resume_file);
+		pr_debug("swsusp: Resume From Partition %s\n", resume_file);
+	} else {
+		pr_debug("swsusp: Resume From Partition %d:%d\n",
+			 MAJOR(swsusp_resume_device),MINOR(swsusp_resume_device));
+	}
 
-	resume_device = name_to_dev_t(resume_file);
-	pr_debug("swsusp: Resume From Partition: %s\n", resume_file);
-
-	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
+	resume_bdev = open_by_devnum(swsusp_resume_device, FMODE_READ);
 	if (!IS_ERR(resume_bdev)) {
 		set_blocksize(resume_bdev, PAGE_SIZE);
-		error = read_suspend_image();
-		blkdev_put(resume_bdev);
+		if((error = check_suspend_image()))
+		    blkdev_put(resume_bdev);
 	} else
 		error = PTR_ERR(resume_bdev);
 
 	if (!error)
-		pr_debug("Reading resume file was successful\n");
+		pr_debug("swsusp: resume file found\n");
+	else
+		pr_debug("swsusp: Error %d check for resume file\n", error);
+	return error;
+}
+
+/**
+ *	swsusp_read - Read saved image from swap.
+ */
+
+int swsusp_read(void)
+{
+	int error;
+
+	if (IS_ERR(resume_bdev)) {
+		pr_debug("swsusp: block device not initialised\n");
+		return PTR_ERR(resume_bdev);
+	}
+
+	error = read_suspend_image();
+	blkdev_put(resume_bdev);
+
+	if (!error)
+		pr_debug("swsusp: Reading resume file was successful\n");
 	else
 		pr_debug("swsusp: Error %d resuming\n", error);
 	return error;
