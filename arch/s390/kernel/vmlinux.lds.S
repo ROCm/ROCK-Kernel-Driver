@@ -117,10 +117,7 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.exit.text)
-	*(.exit.data)
 	*(.exitcall.exit)
-	*(.eh_frame)
 	}
 
   /* Stabs debugging sections.  */

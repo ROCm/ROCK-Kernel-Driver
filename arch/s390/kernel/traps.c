@@ -25,6 +25,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
@@ -156,9 +157,10 @@ void show_registers(struct pt_regs *regs)
 	int i;
 
 	mode = (regs->psw.mask & PSW_MASK_PSTATE) ? "User" : "Krnl";
-	printk("%s PSW : %p %p\n",
+	printk("%s PSW : %p %p",
 	       mode, (void *) regs->psw.mask,
 	       (void *) regs->psw.addr);
+	print_symbol(" (%s)\n", regs->psw.addr & PSW_ADDR_INSN);
 	printk("%s GPRS: " FOURLONG, mode,
 	       regs->gprs[0], regs->gprs[1], regs->gprs[2], regs->gprs[3]);
 	printk("           " FOURLONG,
@@ -250,6 +252,10 @@ void die(const char * str, struct pt_regs * regs, long err)
         show_regs(regs);
 	bust_spinlocks(0);
         spin_unlock_irq(&die_lock);
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
+	if (panic_on_oops)
+		panic("Fatal exception: panic_on_oops");
         do_exit(SIGSEGV);
 }
 
