@@ -156,6 +156,7 @@ extern void FASTCALL(unlock_page(struct page *page));
 
 static inline void lock_page(struct page *page)
 {
+	might_sleep();
 	if (TestSetPageLocked(page))
 		__lock_page(page);
 }

@@ -351,4 +351,7 @@ long strlen_user(const char __user *str);
 unsigned long clear_user(void __user *mem, unsigned long len);
 unsigned long __clear_user(void __user *mem, unsigned long len);
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 #endif /* __X86_64_UACCESS_H */

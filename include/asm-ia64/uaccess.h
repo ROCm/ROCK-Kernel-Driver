@@ -202,7 +202,8 @@ extern unsigned long __copy_user (void *to, const void *from, unsigned long coun
 
 #define __copy_to_user(to, from, n)	__copy_user((to), (from), (n))
 #define __copy_from_user(to, from, n)	__copy_user((to), (from), (n))
-
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 #define copy_to_user(to, from, n)	__copy_tofrom_user((to), (from), (n), 1)
 #define copy_from_user(to, from, n)	__copy_tofrom_user((to), (from), (n), 0)
 

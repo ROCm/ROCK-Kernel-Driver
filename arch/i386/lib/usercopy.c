@@ -31,6 +31,7 @@ static inline int __movsl_is_ok(unsigned long a1, unsigned long a2, unsigned lon
 #define __do_strncpy_from_user(dst,src,count,res)			   \
 do {									   \
 	int __d0, __d1, __d2;						   \
+	might_sleep();							   \
 	__asm__ __volatile__(						   \
 		"	testl %1,%1\n"					   \
 		"	jz 2f\n"					   \
@@ -119,6 +120,7 @@ strncpy_from_user(char *dst, const char __user *src, long count)
 #define __do_clear_user(addr,size)					\
 do {									\
 	int __d0;							\
+	might_sleep();							\
   	__asm__ __volatile__(						\
 		"0:	rep; stosl\n"					\
 		"	movl %2,%0\n"					\

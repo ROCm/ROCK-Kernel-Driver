@@ -463,6 +463,9 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 /*
  * copy_to_user: - Copy a block of data into user space.
  * @to:   Destination address, in user space.

@@ -112,6 +112,9 @@ extern int bad_user_access_length (void);
 #define __copy_from_user(to, from, n)	(memcpy (to, from, n), 0)
 #define __copy_to_user(to, from, n)	(memcpy(to, from, n), 0)
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 #define copy_from_user(to, from, n)	__copy_from_user (to, from, n)
 #define copy_to_user(to, from, n) 	__copy_to_user(to, from, n)
 

@@ -394,6 +394,9 @@ static inline unsigned long __copy_to_user(void __user *to, const void *from, un
 	return __arch_copy_to_user(to, from, n);
 }
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 static inline unsigned long clear_user (void __user *to, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))

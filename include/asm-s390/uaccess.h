@@ -272,6 +272,9 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 	return __copy_to_user_asm(from, n, to);
 }
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 /**
  * copy_to_user: - Copy a block of data into user space.
  * @to:   Destination address, in user space.

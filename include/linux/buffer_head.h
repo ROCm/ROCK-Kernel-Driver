@@ -272,12 +272,14 @@ map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
  */
 static inline void wait_on_buffer(struct buffer_head *bh)
 {
+	might_sleep();
 	if (buffer_locked(bh) || atomic_read(&bh->b_count) == 0)
 		__wait_on_buffer(bh);
 }
 
 static inline void lock_buffer(struct buffer_head *bh)
 {
+	might_sleep();
 	if (test_set_buffer_locked(bh))
 		__lock_buffer(bh);
 }

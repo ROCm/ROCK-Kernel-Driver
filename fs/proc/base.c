@@ -1529,6 +1529,7 @@ struct dentry *proc_pid_unhash(struct task_struct *p)
 	
 void proc_pid_flush(struct dentry *proc_dentry)
 {
+	might_sleep();
 	if(proc_dentry != NULL) {
 		shrink_dcache_parent(proc_dentry);
 		dput(proc_dentry);
