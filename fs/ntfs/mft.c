@@ -122,6 +122,9 @@ struct address_space_operations ntfs_mft_aops = {
 #ifdef NTFS_RW
 	.writepage	= ntfs_mft_writepage,	/* Write out the dirty mft
 						   records in a page. */
+	.set_page_dirty	= __set_page_dirty_nobuffers,	/* Set the page dirty
+						   without touching the buffers
+						   belonging to the page. */
 #endif /* NTFS_RW */
 };
 
@@ -741,7 +744,6 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	BUG_ON(NInoAttr(ni));
 	BUG_ON(!max_bhs);
-	BUG_ON(!page);
 	BUG_ON(!PageLocked(page));
 	/*
 	 * If the ntfs_inode is clean no need to do anything.  If it is dirty,
@@ -916,6 +918,7 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 	BOOL is_dirty = FALSE;
 
 	BUG_ON(!PageLocked(page));
+	BUG_ON(PageWriteback(page));
 	BUG_ON(mft_vi != vol->mft_ino);
 	/* The first mft record number in the page. */
 	mft_no = page->index << (PAGE_CACHE_SHIFT - vol->mft_record_size_bits);

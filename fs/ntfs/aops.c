@@ -1841,5 +1841,8 @@ struct address_space_operations ntfs_mst_aops = {
 						   disk request queue. */
 #ifdef NTFS_RW
 	.writepage	= ntfs_writepage,	/* Write dirty page to disk. */
+	.set_page_dirty	= __set_page_dirty_nobuffers,	/* Set the page dirty
+						   without touching the buffers
+						   belonging to the page. */
 #endif /* NTFS_RW */
 };
