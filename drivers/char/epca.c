@@ -3868,7 +3868,7 @@ static struct {
 };
 
 
-static int __init epca_init_one (struct pci_dev *pdev,
+static int __devinit epca_init_one (struct pci_dev *pdev,
 				 const struct pci_device_id *ent)
 {
 	static int board_num = -1;

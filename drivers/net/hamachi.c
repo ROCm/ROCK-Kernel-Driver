@@ -178,7 +178,7 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/unaligned.h>
 #include <asm/cache.h>
 
-static char version[] __initdata =
+static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE "  Written by Donald Becker\n"
 KERN_INFO "   Some modifications by Eric kasten <kasten@nscl.msu.edu>\n"
 KERN_INFO "   Further modifications by Keith Underwood <keithu@parl.clemson.edu>\n";
@@ -569,7 +569,7 @@ static struct net_device_stats *hamachi_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
 
 
-static int __init hamachi_init_one (struct pci_dev *pdev,
+static int __devinit hamachi_init_one (struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
 {
 	struct hamachi_private *hmp;
@@ -794,7 +794,7 @@ err_out:
 	return ret;
 }
 
-static int __init read_eeprom(long ioaddr, int location)
+static int __devinit read_eeprom(long ioaddr, int location)
 {
 	int bogus_cnt = 1000;
 

@@ -14,7 +14,7 @@
 #ifndef __I810_MAIN_H__
 #define __I810_MAIN_H__
 
-static int  __init i810fb_init_pci (struct pci_dev *dev, 
+static int  __devinit i810fb_init_pci (struct pci_dev *dev, 
 				       const struct pci_device_id *entry);
 static void __exit i810fb_remove_pci(struct pci_dev *dev);
 static int i810fb_resume(struct pci_dev *dev);
@@ -95,7 +95,7 @@ inline void flush_cache(void)
 
 #ifdef CONFIG_MTRR
 #define KERNEL_HAS_MTRR 1
-static inline void __init set_mtrr(struct i810fb_par *par)
+static inline void __devinit set_mtrr(struct i810fb_par *par)
 {
 	par->mtrr_reg = mtrr_add((u32) par->aperture.physical, 
 		 par->aperture.size, MTRR_TYPE_WRCOMB, 1);

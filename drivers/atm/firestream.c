@@ -250,7 +250,7 @@ struct reginit_item {
 };
 
 
-struct reginit_item PHY_NTC_INIT[] __initdata = {
+struct reginit_item PHY_NTC_INIT[] __devinitdata = {
 	{ PHY_CLEARALL, 0x40 }, 
 	{ 0x12,  0x0001 },
 	{ 0x13,  0x7605 },
@@ -1296,7 +1296,7 @@ static const struct atmdev_ops ops = {
 };
 
 
-static void __init undocumented_pci_fix (struct pci_dev *pdev)
+static void __devinit undocumented_pci_fix (struct pci_dev *pdev)
 {
 	int tint;
 
@@ -1320,13 +1320,13 @@ static void __init undocumented_pci_fix (struct pci_dev *pdev)
  *                              PHY routines                              *
  **************************************************************************/
 
-static void __init write_phy (struct fs_dev *dev, int regnum, int val)
+static void __devinit write_phy (struct fs_dev *dev, int regnum, int val)
 {
 	submit_command (dev,  &dev->hp_txq, QE_CMD_PRP_WR | QE_CMD_IMM_INQ,
 			regnum, val, 0);
 }
 
-static int __init init_phy (struct fs_dev *dev, struct reginit_item *reginit)
+static int __devinit init_phy (struct fs_dev *dev, struct reginit_item *reginit)
 {
 	int i;
 
@@ -1382,7 +1382,7 @@ static void reset_chip (struct fs_dev *dev)
 	}
 }
 
-static void __init *aligned_kmalloc (int size, int flags, int alignment)
+static void __devinit *aligned_kmalloc (int size, int flags, int alignment)
 {
 	void  *t;
 
@@ -1399,7 +1399,7 @@ static void __init *aligned_kmalloc (int size, int flags, int alignment)
 	return NULL;
 }
 
-static int __init init_q (struct fs_dev *dev, 
+static int __devinit init_q (struct fs_dev *dev, 
 			  struct queue *txq, int queue, int nentries, int is_rq)
 {
 	int sz = nentries * sizeof (struct FS_QENTRY);
@@ -1435,7 +1435,7 @@ static int __init init_q (struct fs_dev *dev,
 }
 
 
-static int __init init_fp (struct fs_dev *dev, 
+static int __devinit init_fp (struct fs_dev *dev, 
 			   struct freepool *fp, int queue, int bufsize, int nr_buffers)
 {
 	func_enter ();
@@ -1655,7 +1655,7 @@ static void fs_poll (unsigned long data)
 }
 #endif
 
-static int __init fs_init (struct fs_dev *dev)
+static int __devinit fs_init (struct fs_dev *dev)
 {
 	struct pci_dev  *pci_dev;
 	int isr, to;
@@ -1890,7 +1890,7 @@ static int __init fs_init (struct fs_dev *dev)
 	return 0;
 }
 
-static int __init firestream_init_one (struct pci_dev *pci_dev,
+static int __devinit firestream_init_one (struct pci_dev *pci_dev,
 				       const struct pci_device_id *ent) 
 {
 	struct atm_dev *atm_dev;
