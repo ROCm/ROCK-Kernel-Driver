@@ -149,7 +149,7 @@ static void cyberjack_shutdown (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	for (i=0; i < serial->num_ports; ++i) {
-		usb_unlink_urb (serial->port[i]->interrupt_in_urb);
+		usb_kill_urb(serial->port[i]->interrupt_in_urb);
 		/* My special items, the standard routines free my urbs */
 		kfree(usb_get_serial_port_data(serial->port[i]));
 		usb_set_serial_port_data(serial->port[i], NULL);
@@ -189,8 +189,8 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 
 	if (port->serial->dev) {
 		/* shutdown any bulk reads that might be going on */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
+		usb_kill_urb(port->write_urb);
+		usb_kill_urb(port->read_urb);
 	}
 }
 

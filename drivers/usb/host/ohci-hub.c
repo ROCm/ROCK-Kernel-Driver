@@ -2,7 +2,7 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2004 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under GPL
  */
@@ -11,33 +11,7 @@
 
 /*
  * OHCI Root Hub ... the nonsharable stuff
- *
- * Registers don't need cpu_to_le32, that happens transparently
  */
-
-/* AMD-756 (D2 rev) reports corrupt register contents in some cases.
- * The erratum (#4) description is incorrect.  AMD's workaround waits
- * till some bits (mostly reserved) are clear; ok for all revs.
- */
-#define read_roothub(hc, register, mask) ({ \
-	u32 temp = ohci_readl (&hc->regs->roothub.register); \
-	if (temp == -1) \
-		disable (hc); \
-	else if (hc->flags & OHCI_QUIRK_AMD756) \
-		while (temp & mask) \
-			temp = ohci_readl (&hc->regs->roothub.register); \
-	temp; })
-
-static u32 roothub_a (struct ohci_hcd *hc)
-	{ return read_roothub (hc, a, 0xfc0fe000); }
-static inline u32 roothub_b (struct ohci_hcd *hc)
-	{ return ohci_readl (&hc->regs->roothub.b); }
-static inline u32 roothub_status (struct ohci_hcd *hc)
-	{ return ohci_readl (&hc->regs->roothub.status); }
-static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
-	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }
-
-/*-------------------------------------------------------------------------*/
 
 #define dbg_port(hc,label,num,value) \
 	ohci_dbg (hc, \
@@ -146,10 +120,11 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	ohci->next_statechange = jiffies + msecs_to_jiffies (5);
 
 succeed:
-	/* it's not USB_STATE_SUSPENDED unless access to this
+	/* it's not HCD_STATE_SUSPENDED unless access to this
 	 * hub from the non-usb side (PCI, SOC, etc) stopped 
 	 */
 	root->dev.power.power_state = 3;
+	usb_set_device_state (root, USB_STATE_SUSPENDED);
 done:
 	spin_unlock_irq (&ohci->lock);
 	return status;
@@ -163,9 +138,7 @@ static inline struct ed *find_head (struct ed *ed)
 	return ed;
 }
 
-static int hc_restart (struct ohci_hcd *ohci);
-
-/* caller owns root->serialize */
+/* caller has locked the root hub */
 static int ohci_hub_resume (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
@@ -180,7 +153,12 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 
 	spin_lock_irq (&ohci->lock);
 	ohci->hc_control = ohci_readl (&ohci->regs->control);
-	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
+	if (ohci->hc_control & (OHCI_CTRL_IR | OHCI_SCHED_ENABLES)) {
+		/* this can happen after suspend-to-disk */
+		ohci_dbg (ohci, "BIOS/SMM active, control %03x\n",
+				ohci->hc_control);
+		status = -EBUSY;
+	} else switch (ohci->hc_control & OHCI_CTRL_HCFS) {
 	case OHCI_USB_SUSPEND:
 		ohci->hc_control &= ~(OHCI_CTRL_HCFS|OHCI_SCHED_ENABLES);
 		ohci->hc_control |= OHCI_USB_RESUME;
@@ -202,8 +180,10 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		status = -EBUSY;
 	}
 	spin_unlock_irq (&ohci->lock);
-	if (status == -EBUSY)
-		return hc_restart (ohci);
+	if (status == -EBUSY) {
+		(void) ohci_init (ohci);
+		return ohci_restart (ohci);
+	}
 	if (status != -EINPROGRESS)
 		return status;
 
@@ -260,6 +240,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	/* TRSMRCY */
 	msleep (10);
 	root->dev.power.power_state = 0;
+	usb_set_device_state (root, USB_STATE_CONFIGURED);
 
 	/* keep it alive for ~5x suspend + resume costs */
 	ohci->next_statechange = jiffies + msecs_to_jiffies (250);
@@ -289,7 +270,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		ohci->hc_control |= enables;
 		writel (ohci->hc_control, &ohci->regs->control);
 		if (temp)
-			writel (status, &ohci->regs->cmdstatus);
+			writel (temp, &ohci->regs->cmdstatus);
 		(void) ohci_readl (&ohci->regs->control);
 	}
 
@@ -301,9 +282,9 @@ static void ohci_rh_resume (void *_hcd)
 {
 	struct usb_hcd	*hcd = _hcd;
 
-	down (&hcd->self.root_hub->serialize);
+	usb_lock_device (hcd->self.root_hub);
 	(void) ohci_hub_resume (hcd);
-	up (&hcd->self.root_hub->serialize);
+	usb_unlock_device (hcd->self.root_hub);
 }
 
 #else
@@ -381,12 +362,12 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			&& ((OHCI_CTRL_HCFS | OHCI_SCHED_ENABLES)
 					& ohci->hc_control)
 				== OHCI_USB_OPER
-			&& down_trylock (&hcd->self.root_hub->serialize) == 0
+			&& usb_trylock_device (hcd->self.root_hub)
 			) {
 		ohci_vdbg (ohci, "autosuspend\n");
 		(void) ohci_hub_suspend (&ohci->hcd);
 		ohci->hcd.state = USB_STATE_RUNNING;
-		up (&hcd->self.root_hub->serialize);
+		usb_unlock_device (hcd->self.root_hub);
 	}
 #endif
 
@@ -481,8 +462,8 @@ static void start_hnp(struct ohci_hcd *ohci);
 /* this timer value might be vendor-specific ... */
 #define	PORT_RESET_HW_MSEC	10
 
-/* wrap-aware logic stolen from <linux/jiffies.h> */
-#define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
+/* wrap-aware logic morphed from <linux/jiffies.h> */
+#define tick_before(t1,t2) ((s16)(((s16)(t1))-((s16)(t2))) < 0)
 
 /* called from some task, normally khubd */
 static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)

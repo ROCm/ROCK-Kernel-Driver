@@ -640,14 +640,14 @@ show_registers (struct class_device *class_dev, char *buf)
 	rdata = ohci_readl (&regs->fminterval);
 	temp = scnprintf (next, size,
 			"fmintvl 0x%08x %sFSMPS=0x%04x FI=0x%04x\n",
-			rdata, (rdata >> 31) ? " FIT" : "",
+			rdata, (rdata >> 31) ? "FIT " : "",
 			(rdata >> 16) & 0xefff, rdata & 0xffff);
 	size -= temp;
 	next += temp;
 
 	rdata = ohci_readl (&regs->fmremaining);
 	temp = scnprintf (next, size, "fmremaining 0x%08x %sFR=0x%04x\n",
-			rdata, (rdata >> 31) ? " FRT" : "",
+			rdata, (rdata >> 31) ? "FRT " : "",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;

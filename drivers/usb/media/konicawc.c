@@ -362,8 +362,8 @@ static void konicawc_isoc_irq(struct urb *urb, struct pt_regs *regs)
 		else if (!urb->status && !cam->last_data_urb->status)
 			len = konicawc_compress_iso(uvd, cam->last_data_urb, urb);
 
-		resubmit_urb(uvd, urb);
 		resubmit_urb(uvd, cam->last_data_urb);
+		resubmit_urb(uvd, urb);
 		cam->last_data_urb = NULL;
 		uvd->stats.urb_length = len;
 		uvd->stats.data_count += len;
@@ -474,13 +474,8 @@ static void konicawc_stop_data(struct uvd *uvd)
 
 	/* Unschedule all of the iso td's */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		j = usb_unlink_urb(uvd->sbuf[i].urb);
-		if (j < 0)
-			err("usb_unlink_urb() error %d.", j);
-
-		j = usb_unlink_urb(cam->sts_urb[i]);
-		if (j < 0)
-			err("usb_unlink_urb() error %d.", j);
+		usb_kill_urb(uvd->sbuf[i].urb);
+		usb_kill_urb(cam->sts_urb[i]);
 	}
 
 	if (!uvd->remove_pending) {

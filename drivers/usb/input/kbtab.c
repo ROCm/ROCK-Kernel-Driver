@@ -122,7 +122,7 @@ static void kbtab_close(struct input_dev *dev)
 	struct kbtab *kbtab = dev->private;
 
 	if (!--kbtab->open)
-		usb_unlink_urb(kbtab->irq);
+		usb_kill_urb(kbtab->irq);
 }
 
 static int kbtab_probe(struct usb_interface *intf, const struct usb_device_id *id)
@@ -205,7 +205,7 @@ static void kbtab_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 	if (kbtab) {
-		usb_unlink_urb(kbtab->irq);
+		usb_kill_urb(kbtab->irq);
 		input_unregister_device(&kbtab->dev);
 		usb_free_urb(kbtab->irq);
 		usb_buffer_free(interface_to_usbdev(intf), 10, kbtab->data, kbtab->data_dma);

@@ -76,7 +76,6 @@
 #define	EP_DONTUSE		13	/* nonzero */
 
 #define USE_RDK_LEDS		/* GPIO pins control three LEDs */
-#define USE_SYSFS_DEBUG_FILES
 
 
 static const char driver_name [] = "net2280";
@@ -117,7 +116,7 @@ module_param (fifo_mode, ushort, 0644);
 
 #define	DIR_STRING(bAddress) (((bAddress) & USB_DIR_IN) ? "in" : "out")
 
-#if defined(USE_SYSFS_DEBUG_FILES) || defined (DEBUG)
+#if defined(CONFIG_USB_GADGET_DEBUG_FILES) || defined (DEBUG)
 static char *type_string (u8 bmAttributes)
 {
 	switch ((bmAttributes) & USB_ENDPOINT_XFERTYPE_MASK) {
@@ -303,13 +302,16 @@ static void ep_reset (struct net2280_regs __iomem *regs, struct net2280_ep *ep)
 	/* init to our chosen defaults, notably so that we NAK OUT
 	 * packets until the driver queues a read (+note erratum 0112)
 	 */
-	writel (  (1 << SET_NAK_OUT_PACKETS_MODE)
+	tmp = (1 << SET_NAK_OUT_PACKETS_MODE)
 		| (1 << SET_NAK_OUT_PACKETS)
 		| (1 << CLEAR_EP_HIDE_STATUS_PHASE)
-		| (1 << CLEAR_INTERRUPT_MODE)
-		| (1 << CLEAR_ENDPOINT_TOGGLE)
-		| (1 << CLEAR_ENDPOINT_HALT)
-		, &ep->regs->ep_rsp);
+		| (1 << CLEAR_INTERRUPT_MODE);
+
+	if (ep->num != 0) {
+		tmp |= (1 << CLEAR_ENDPOINT_TOGGLE)
+			| (1 << CLEAR_ENDPOINT_HALT);
+	}
+	writel (tmp, &ep->regs->ep_rsp);
 
 	/* scrub most status bits, and flush any fifo state */
 	writel (  (1 << TIMEOUT)
@@ -1447,7 +1449,12 @@ static const struct usb_gadget_ops net2280_ops = {
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	USE_SYSFS_DEBUG_FILES
+#ifdef	CONFIG_USB_GADGET_DEBUG_FILES
+
+/* FIXME move these into procfs, and use seq_file.
+ * Sysfs _still_ doesn't behave for arbitrarily sized files,
+ * and also doesn't help products using this with 2.4 kernels.
+ */
 
 /* "function" sysfs attribute */
 static ssize_t
@@ -1920,8 +1927,6 @@ static void ep0_start (struct net2280 *dev)
 		, &dev->usb->stdrsp);
 	writel (  (1 << USB_ROOT_PORT_WAKEUP_ENABLE)
 		| (1 << SELF_POWERED_USB_DEVICE)
-		/* erratum 0102 workaround */
-		| ((dev->chiprev == 0100) ? 0 : 1) << SUSPEND_IMMEDIATELY
 		| (1 << REMOTE_WAKEUP_SUPPORT)
 		| (dev->softconnect << USB_DETECT_ENABLE)
 		| (1 << SELF_POWERED_STATUS)
@@ -2046,6 +2051,8 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 	spin_lock_irqsave (&dev->lock, flags);
 	stop_activity (dev, driver);
 	spin_unlock_irqrestore (&dev->lock, flags);
+
+	net2280_pullup (&dev->gadget, 0);
 
 	driver->unbind (&dev->gadget);
 	dev->gadget.dev.driver = NULL;
@@ -2552,8 +2559,6 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 		if (stat & (1 << SUSPEND_REQUEST_INTERRUPT)) {
 			if (dev->driver->suspend)
 				dev->driver->suspend (&dev->gadget);
-			/* we use SUSPEND_IMMEDIATELY */
-			stat &= ~(1 << SUSPEND_REQUEST_INTERRUPT);
 		} else {
 			if (dev->driver->resume)
 				dev->driver->resume (&dev->gadget);

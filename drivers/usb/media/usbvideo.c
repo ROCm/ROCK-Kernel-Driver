@@ -1910,9 +1910,7 @@ static void usbvideo_StopDataPump(struct uvd *uvd)
 
 	/* Unschedule all of the iso td's */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		j = usb_unlink_urb(uvd->sbuf[i].urb);
-		if (j < 0)
-			err("%s: usb_unlink_urb() error %d.", __FUNCTION__, j);
+		usb_kill_urb(uvd->sbuf[i].urb);
 	}
 	if (uvd->debug > 1)
 		info("%s: streaming=0", __FUNCTION__);
