@@ -21,10 +21,6 @@
 #include <linux/serio.h>
 #include <linux/sched.h>
 
-#undef DEBUG
-
-#include "i8042.h"
-
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
@@ -40,6 +36,9 @@ static int i8042_unlock;
 static int i8042_reset;
 static int i8042_direct;
 static int i8042_dumbkbd;
+
+#undef DEBUG
+#include "i8042.h"
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
 
@@ -161,7 +160,7 @@ static int i8042_command(unsigned char *param, int command)
 				param[i] = ~i8042_read_data();
 			else
 				param[i] = i8042_read_data();
-			dbg("%02x <- i8042 (return)\n", param[i]);
+			dbg("%02x <- i8042 (return)", param[i]);
 		}
 
 	spin_unlock_irqrestore(&i8042_lock, flags);
@@ -287,7 +286,6 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	.irq =		I8042_KBD_IRQ,
 	.irqen =	I8042_CTR_KBDINT,
 	.disable =	I8042_CTR_KBDDIS,
 	.name =		"KBD",
@@ -306,7 +304,6 @@ static struct serio i8042_kbd_port =
 };
 
 static struct i8042_values i8042_aux_values = {
-	.irq =		I8042_AUX_IRQ,
 	.irqen =	I8042_CTR_AUXINT,
 	.disable =	I8042_CTR_AUXDIS,
 	.name =		"AUX",
@@ -655,24 +652,26 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	i8042_flush();
 
 /*
- * Internal loopback test - filters out AT-type i8042's
+ * Internal loopback test - filters out AT-type i8042's. Unfortunately
+ * SiS screwed up and their 5597 doesn't support the LOOP command even
+ * though it has an AUX port.
  */
 
 	param = 0x5a;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa5)
-		return -1;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa5) {
 
 /*
  * External connection test - filters out AT-soldered PS/2 i8042's
  * 0x00 - no error, 0x01-0x03 - clock/data stuck, 0xff - general error
  * 0xfa - no error on some notebooks which ignore the spec
- * We ignore general error, since some chips report it even under normal
- * operation.
+ * Because it's common for chipsets to return error on perfectly functioning
+ * AUX ports, we test for this only when the LOOP command failed.
  */
 
-	if (i8042_command(&param, I8042_CMD_AUX_TEST)
-	    || (param && param != 0xfa && param != 0xff))
-		return -1;
+		if (i8042_command(&param, I8042_CMD_AUX_TEST)
+		    	|| (param && param != 0xfa && param != 0xff))
+				return -1;
+	}
 
 /*
  * Bit assignment test - filters out PS/2 i8042's in AT mode
@@ -809,6 +808,9 @@ int __init i8042_init(void)
 
 	if (i8042_platform_init())
 		return -EBUSY;
+
+	i8042_aux_values.irq =	I8042_AUX_IRQ;
+	i8042_kbd_values.irq =	I8042_KBD_IRQ;
 
 	if (i8042_controller_init())
 		return -ENODEV;
