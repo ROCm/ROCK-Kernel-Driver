@@ -46,8 +46,12 @@
 
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_hw.c,v 1.8 2000/02/08 17:19:11 dawes Exp $ */
 
+#include <linux/pci_ids.h>
+#include <linux/pci.h>
 #include "riva_hw.h"
 #include "riva_tbl.h"
+#include "nv_type.h"
+
 /*
  * This file is an OS-agnostic file used to make RIVA 128 and RIVA TNT
  * operate identically (except TNT has more memory and better 3D quality.
@@ -76,29 +80,29 @@ static int nv10Busy
 static void nv3LockUnlock
 (
     RIVA_HW_INST *chip,
-    int           LockUnlock
+    int           Lock
 )
 {
     VGA_WR08(chip->PVIO, 0x3C4, 0x06);
-    VGA_WR08(chip->PVIO, 0x3C5, LockUnlock ? 0x99 : 0x57);
+    VGA_WR08(chip->PVIO, 0x3C5, Lock ? 0x99 : 0x57);
 }
 static void nv4LockUnlock
 (
     RIVA_HW_INST *chip,
-    int           LockUnlock
+    int           Lock
 )
 {
     VGA_WR08(chip->PCIO, 0x3D4, 0x1F);
-    VGA_WR08(chip->PCIO, 0x3D5, LockUnlock ? 0x99 : 0x57);
+    VGA_WR08(chip->PCIO, 0x3D5, Lock ? 0x99 : 0x57);
 }
 static void nv10LockUnlock
 (
     RIVA_HW_INST *chip,
-    int           LockUnlock
+    int           Lock
 )
 {
     VGA_WR08(chip->PCIO, 0x3D4, 0x1F);
-    VGA_WR08(chip->PCIO, 0x3D5, LockUnlock ? 0x99 : 0x57);
+    VGA_WR08(chip->PCIO, 0x3D5, Lock ? 0x99 : 0x57);
 }
 
 static int ShowHideCursor
@@ -107,13 +111,13 @@ static int ShowHideCursor
     int           ShowHide
 )
 {
-    int current;
-    current                     =  chip->CurrentState->cursor1;
+    int cursor;
+    cursor                      =  chip->CurrentState->cursor1;
     chip->CurrentState->cursor1 = (chip->CurrentState->cursor1 & 0xFE) |
 	                          (ShowHide & 0x01);
     VGA_WR08(chip->PCIO, 0x3D4, 0x31);
     VGA_WR08(chip->PCIO, 0x3D5, chip->CurrentState->cursor1);
-    return (current & 0x01);
+    return (cursor & 0x01);
 }
 
 /****************************************************************************\
@@ -1285,6 +1289,7 @@ static void UpdateFifoState
             chip->Tri05 = (RivaTexturedTriangle05 *)&(chip->FIFO[0x0000E000/4]);
             break;
         case NV_ARCH_10:
+	case NV_ARCH_20:
             /*
              * Initialize state for the RivaTriangle3D05 routines.
              */
