@@ -655,14 +655,19 @@ static char *rq_flags[] = {
 	"REQ_PC",
 	"REQ_BLOCK_PC",
 	"REQ_SENSE",
+	"REQ_FAILED",
+	"REQ_QUIET",
 	"REQ_SPECIAL"
+	"REQ_DRIVE_CMD",
+	"REQ_DRIVE_TASK",
+	"REQ_DRIVE_TASKFILE",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {
 	int bit;
 
-	printk("%s: dev %02x:%02x: ", msg, major(rq->rq_dev), minor(rq->rq_dev));
+	printk("%s: dev %02x:%02x: flags = ", msg, major(rq->rq_dev), minor(rq->rq_dev));
 	bit = 0;
 	do {
 		if (rq->flags & (1 << bit))
@@ -670,10 +675,17 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 		bit++;
 	} while (bit < __REQ_NR_BITS);
 
-	printk("sector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
+	printk("\nsector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
 						       rq->nr_sectors,
 						       rq->current_nr_sectors);
-	printk("bio %p, biotail %p\n", rq->bio, rq->biotail);
+	printk("bio %p, biotail %p, buffer %p, data %p, len %u\n", rq->bio, rq->biotail, rq->buffer, rq->data, rq->data_len);
+
+	if (rq->flags & (REQ_BLOCK_PC | REQ_PC)) {
+		printk("cdb: ");
+		for (bit = 0; bit < sizeof(rq->cmd); bit++)
+			printk("%02x ", rq->cmd[bit]);
+		printk("\n");
+	}
 }
 
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
