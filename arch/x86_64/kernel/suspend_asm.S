@@ -1,6 +1,9 @@
-/* Originally gcc generated, modified by hand
+/* Copyright 2004,2005 Pavel Machek <pavel@suse.cz>, Andi Kleen <ak@suse.de>, Rafael J. Wysocki <rjw@sisk.pl>
  *
- * This may not use any stack, nor any variable that is not "NoSave":
+ * Distribute under GPLv2.
+ *
+ * swsusp_arch_resume may not use any stack, nor any variable that is
+ * not "NoSave" during copying pages:
  *
  * Its rewriting one kernel image with another. What is stack in "old"
  * image could very well be data page in "new" image, and overwriting
