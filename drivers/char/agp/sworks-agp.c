@@ -160,8 +160,8 @@ static int serverworks_create_gatt_table(void)
 		return retval;
 	}
 
-	agp_bridge.gatt_table_real = (unsigned long *)page_dir.real;
-	agp_bridge.gatt_table = (unsigned long *)page_dir.remapped;
+	agp_bridge.gatt_table_real = (u32 *)page_dir.real;
+	agp_bridge.gatt_table = (u32 *)page_dir.remapped;
 	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
