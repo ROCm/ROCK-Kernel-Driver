@@ -2815,8 +2815,10 @@ static void md_do_sync(void *data)
 				printk(KERN_INFO "md: delaying resync of md%d until md%d "
 				       "has finished resync (they share one or more physical units)\n",
 				       mdidx(mddev), mdidx(mddev2));
-				if (mddev < mddev2) /* arbitrarily yield */
+				if (mddev < mddev2) {/* arbitrarily yield */
 					mddev->curr_resync = 1;
+					yield();
+				}
 				if (wait_event_interruptible(resync_wait,
 							     mddev2->curr_resync < 2)) {
 					flush_curr_signals();
