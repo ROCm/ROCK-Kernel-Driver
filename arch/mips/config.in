@@ -444,7 +444,7 @@ if [ "$CONFIG_SGI_IP22" = "y" ]; then
 	 define_bool CONFIG_FONT_8x16 y
       fi
    fi
-   bool 'PS/2 mouse support' CONFIG_PSMOUSE
+   bool 'PS/2 mouse support (aka "auxiliary device")' CONFIG_PSMOUSE
    if [ "$CONFIG_PSMOUSE" != "n" ]; then
       define_bool CONFIG_MOUSE y
    fi
