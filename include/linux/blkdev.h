@@ -11,6 +11,7 @@
 #include <linux/backing-dev.h>
 #include <linux/wait.h>
 #include <linux/mempool.h>
+#include <linux/bio.h>
 
 #include <asm/scatterlist.h>
 
@@ -36,9 +37,28 @@ struct request {
 				     * blkdev_dequeue_request! */
 	unsigned long flags;		/* see REQ_ bits below */
 
-	sector_t sector;
-	unsigned long nr_sectors;
+	/* Maintain bio traversal state for part by part I/O submission.
+	 * hard_* are block layer internals, no driver should touch them!
+	 */
+
+	sector_t sector;		/* next sector to submit */
+	unsigned long nr_sectors;	/* no. of sectors left to submit */
+	/* no. of sectors left to submit in the current segment */
 	unsigned int current_nr_sectors;
+
+	sector_t hard_sector;		/* next sector to complete */
+	unsigned long hard_nr_sectors;	/* no. of sectors left to complete */
+	/* no. of sectors left to complete in the current segment */
+	unsigned int hard_cur_sectors;
+
+	/* no. of segments left to submit in the current bio */
+	unsigned short nr_cbio_segments;
+	/* no. of sectors left to submit in the current bio */
+	unsigned long nr_cbio_sectors;
+
+	struct bio *cbio;		/* next bio to submit */
+	struct bio *bio;		/* next unfinished bio to complete */
+	struct bio *biotail;
 
 	void *elevator_private;
 
@@ -46,15 +66,6 @@ struct request {
 	struct gendisk *rq_disk;
 	int errors;
 	unsigned long start_time;
-	sector_t hard_sector;		/* the hard_* are block layer
-					 * internals, no driver should
-					 * touch them
-					 */
-	unsigned long hard_nr_sectors;
-	unsigned int hard_cur_sectors;
-
-	struct bio *bio;
-	struct bio *biotail;
 
 	/* Number of scatter-gather DMA addr+len pairs after
 	 * physical address coalescing is performed.
@@ -284,6 +295,32 @@ struct request_queue
  */
 #define blk_queue_headactive(q, head_active)
 
+/* current index into bio being processed for submission */
+#define blk_rq_idx(rq)	((rq)->cbio->bi_vcnt - (rq)->nr_cbio_segments)
+
+/* current bio vector being processed */
+#define blk_rq_vec(rq)	(bio_iovec_idx((rq)->cbio, blk_rq_idx(rq)))
+
+/* current offset with respect to start of the segment being submitted */
+#define blk_rq_offset(rq) \
+	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
+
+/*
+ * temporarily mapping a (possible) highmem bio (typically for PIO transfer)
+ */
+
+/* Assumes rq->cbio != NULL */
+static inline char * rq_map_buffer(struct request *rq, unsigned long *flags)
+{
+	return (__bio_kmap_irq(rq->cbio, blk_rq_idx(rq), flags)
+		+ blk_rq_offset(rq));
+}
+
+static inline void rq_unmap_buffer(char *buffer, unsigned long *flags)
+{
+	__bio_kunmap_irq(buffer, flags);
+}
+
 /*
  * q->prep_rq_fn return values
  */
@@ -362,6 +399,7 @@ static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 extern int end_that_request_first(struct request *, int, int);
 extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
+extern int process_that_request_first(struct request *, unsigned int);
 extern void end_request(struct request *req, int uptodate);
 
 static inline void blkdev_dequeue_request(struct request *req)
