@@ -1213,7 +1213,7 @@ extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
 #endif
 
-int ide_reinit_drive (ide_drive_t *drive);
+int ata_attach(ide_drive_t *drive);
 
 #ifdef _IDE_C
 #ifdef CONFIG_BLK_DEV_IDE

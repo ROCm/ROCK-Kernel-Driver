@@ -988,9 +988,6 @@ static ide_module_t ideprobe_module = {
 	NULL
 };
 
-extern struct list_head ata_unused;	/* temporary */
-extern spinlock_t ata_drives_lock;	/* temporary */
-
 int ideprobe_init (void)
 {
 	unsigned int index;
@@ -1016,12 +1013,8 @@ int ideprobe_init (void)
 			int unit;
 			if (!hwif->present)
 				continue;
-			for (unit = 0; unit < MAX_DRIVES; ++unit) {
-				ide_drive_t *drive = &hwif->drives[unit];
-				spin_lock(&ata_drives_lock);
-				list_add(&drive->list, &ata_unused);
-				spin_unlock(&ata_drives_lock);
-			}
+			for (unit = 0; unit < MAX_DRIVES; ++unit)
+				ata_attach(&hwif->drives[unit]);
 		}
 	if (!ide_probe)
 		ide_probe = &ideprobe_module;
