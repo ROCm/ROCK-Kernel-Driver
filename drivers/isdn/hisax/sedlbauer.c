@@ -618,7 +618,7 @@ setup_sedlbauer(struct IsdnCard *card)
 		}
 #endif
 /* Probe for Sedlbauer speed pci */
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		if ((dev_sedl = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 				PCI_DEVICE_ID_TIGERJET_100, dev_sedl))) {
 			if (pci_enable_device(dev_sedl))

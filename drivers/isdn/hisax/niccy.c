@@ -309,7 +309,7 @@ setup_niccy(struct IsdnCard *card)
 			return (0);
 		}
 	} else {
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		u_int pci_ioaddr;
 		cs->subtyp = 0;
 		if ((niccy_dev = pci_find_device(PCI_VENDOR_ID_SATSAGEM,

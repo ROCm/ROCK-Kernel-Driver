@@ -137,7 +137,7 @@ setup_netjet_u(struct IsdnCard *card)
 	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 #endif
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
@@ -148,7 +148,7 @@ setup_netjet_u(struct IsdnCard *card)
 		return(0);
 	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 
 	for ( ;; )
 	{
