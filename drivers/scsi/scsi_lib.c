@@ -781,11 +781,8 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	printk(KERN_ERR "req nr_sec %lu, cur_nr_sec %u\n", req->nr_sectors,
 			req->current_nr_sectors);
 
-	/*
-	 * kill it. there should be no leftover blocks in this request
-	 */
-	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors, 1);
-	BUG_ON(SCpnt);
+	/* release the command and kill it */
+	scsi_put_command(SCpnt);
 	ret = BLKPREP_KILL;
 out:
 	return ret;
@@ -884,6 +881,7 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 * required).
 		 */
 		if ((ret = scsi_init_io(SCpnt)))
+			/* BLKPREP_KILL return also releases the command */
 			return ret;
 		
 		/*
@@ -891,6 +889,7 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 */
 		if (!STpnt->init_command(SCpnt)) {
 			scsi_release_buffers(SCpnt);
+			scsi_put_command(SCpnt);
 			return BLKPREP_KILL;
 		}
 	}
