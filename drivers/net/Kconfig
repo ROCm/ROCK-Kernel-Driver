@@ -1676,8 +1676,8 @@ config VIA_RHINE
 	select CRC32
 	select MII
 	help
-	  If you have a VIA "rhine" based network card (Rhine-I (3043) or
-	  Rhine-2 (VT86c100A)), say Y here.
+	  If you have a VIA "rhine" based network card (Rhine-I (3043),
+	  Rhine-2 (VT86c100A) or Rhine-III (VT6105)), say Y here.
 
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>. The module
