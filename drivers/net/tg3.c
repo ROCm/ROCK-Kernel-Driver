@@ -55,8 +55,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.4c"
-#define DRV_MODULE_RELDATE	"Feb 18, 2003"
+#define DRV_MODULE_VERSION	"1.5"
+#define DRV_MODULE_RELDATE	"March 21, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -6581,11 +6581,11 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 
+	ret = 0;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
 	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701)
-		return 0;
+		goto out;
 
-	ret = 0;
 	while (1) {
 		u32 *p, i;
 
