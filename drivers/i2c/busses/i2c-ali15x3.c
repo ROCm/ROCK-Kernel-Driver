@@ -170,7 +170,7 @@ int ali15x3_setup(struct pci_dev *ALI15X3_dev)
 	if(force_addr)
 		ali15x3_smba = force_addr & ~(ALI15X3_SMB_IOSIZE - 1);
 
-	if (check_region(ali15x3_smba, ALI15X3_SMB_IOSIZE)) {
+	if (!request_region(ali15x3_smba, ALI15X3_SMB_IOSIZE, "ali15x3-smb")) {
 		dev_err(&ALI15X3_dev->dev,
 			"ALI15X3_smb region 0x%x already in use!\n",
 			ali15x3_smba);
@@ -209,9 +209,6 @@ int ali15x3_setup(struct pci_dev *ALI15X3_dev)
 
 /* set SMB clock to 74KHz as recommended in data sheet */
 	pci_write_config_byte(ALI15X3_dev, SMBCLK, 0x20);
-
-	/* Everything is happy, let's grab the memory and set things up. */
-	request_region(ali15x3_smba, ALI15X3_SMB_IOSIZE, "ali15x3-smb");
 
 /*
   The interrupt routing for SMB is set up in register 0x77 in the
