@@ -398,7 +398,7 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 
 err_short_len:
 #ifdef RPC_PARANOIA
-	printk("svc: short len %d, dropping request\n", argv->iov_len);
+	printk("svc: short len %Zd, dropping request\n", argv->iov_len);
 #endif
 	goto dropit;			/* drop request */
 
