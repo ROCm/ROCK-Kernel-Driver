@@ -761,28 +761,29 @@ static int catc_stop(struct net_device *netdev)
  * USB probe, disconnect.
  */
 
-static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const struct usb_device_id *id)
+static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *usbdev = interface_to_usbdev(intf);
 	struct net_device *netdev;
 	struct catc *catc;
 	u8 broadcast[6];
 	int i, pktsz;
 
-	if (usb_set_interface(usbdev, ifnum, 1)) {
+	if (usb_set_interface(usbdev, intf->altsetting->bInterfaceNumber, 1)) {
                 err("Can't set altsetting 1.");
-		return NULL;
+		return -EIO;
 	}
 
 	catc = kmalloc(sizeof(struct catc), GFP_KERNEL);
 	if (!catc)
-		return NULL;
+		return -ENOMEM;
 
 	memset(catc, 0, sizeof(struct catc));
 
 	netdev = init_etherdev(0, 0);
 	if (!netdev) {
 		kfree(catc);
-		return NULL;
+		return -EIO;
 	}
 
 	netdev->open = catc_open;
@@ -818,7 +819,7 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 		if (catc->irq_urb)  usb_free_urb(catc->irq_urb);
 		kfree(netdev);
 		kfree(catc);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	/* The F5U011 has the same vendor/product as the netmate but a device version of 0x130 */
@@ -907,24 +908,29 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 		f5u011_rxmode(catc, catc->rxmode);
 	}
 	dbg("Init done.");
-	printk(KERN_INFO "%s: %s USB Ethernet at usb-%s-%s/%d, ",
+	printk(KERN_INFO "%s: %s USB Ethernet at usb-%s-%s, ",
 	       netdev->name, (catc->is_f5u011) ? "Belkin F5U011" : "CATC EL1210A NetMate",
-	       usbdev->bus->bus_name, usbdev->devpath, ifnum);
+	       usbdev->bus->bus_name, usbdev->devpath);
 	for (i = 0; i < 5; i++) printk("%2.2x:", netdev->dev_addr[i]);
 	printk("%2.2x.\n", netdev->dev_addr[i]);
-	return catc;
+	dev_set_drvdata (&intf->dev, catc);
+	return 0;
 }
 
-static void catc_disconnect(struct usb_device *usbdev, void *dev_ptr)
+static void catc_disconnect(struct usb_interface *intf)
 {
-	struct catc *catc = dev_ptr;
-	unregister_netdev(catc->netdev);
-	usb_free_urb(catc->ctrl_urb);
-	usb_free_urb(catc->tx_urb);
-	usb_free_urb(catc->rx_urb);
-	usb_free_urb(catc->irq_urb);
-	kfree(catc->netdev);
-	kfree(catc);
+	struct catc *catc = dev_get_drvdata (&intf->dev);
+
+	dev_set_drvdata (&intf->dev, NULL);
+	if (catc) {
+		unregister_netdev(catc->netdev);
+		usb_free_urb(catc->ctrl_urb);
+		usb_free_urb(catc->tx_urb);
+		usb_free_urb(catc->rx_urb);
+		usb_free_urb(catc->irq_urb);
+		kfree(catc->netdev);
+		kfree(catc);
+	}
 }
 
 /*

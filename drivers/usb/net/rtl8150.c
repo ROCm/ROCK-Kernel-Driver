@@ -109,9 +109,9 @@ unsigned long multicast_filter_limit = 32;
 static void fill_skb_pool(rtl8150_t *);
 static void free_skb_pool(rtl8150_t *);
 static inline struct sk_buff *pull_skb(rtl8150_t *);
-static void rtl8150_disconnect(struct usb_device *dev, void *ptr);
-static void *rtl8150_probe(struct usb_device *dev, unsigned int ifnum,
-			   const struct usb_device_id *id);
+static void rtl8150_disconnect(struct usb_interface *intf);
+static int rtl8150_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id);
 
 static struct usb_driver rtl8150_driver = {
 	.name =		"rtl8150",
@@ -723,20 +723,21 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 	return res;
 }
 
-static void *rtl8150_probe(struct usb_device *udev, unsigned int ifnum,
-			   const struct usb_device_id *id)
+static int rtl8150_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	rtl8150_t *dev;
 	struct net_device *netdev;
 
 	if (usb_set_configuration(udev, udev->config[0].bConfigurationValue)) {
 		err("usb_set_configuration() failed");
-		return NULL;
+		return -EIO;
 	}
 	dev = kmalloc(sizeof(rtl8150_t), GFP_KERNEL);
 	if (!dev) {
 		err("Out of memory");
-		return NULL;
+		return -ENOMEM;
 	} else
 		memset(dev, 0, sizeof(rtl8150_t));
 
@@ -744,7 +745,7 @@ static void *rtl8150_probe(struct usb_device *udev, unsigned int ifnum,
 	if (!netdev) {
 		kfree(dev);
 		err("Oh boy, out of memory again?!?");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	init_MUTEX(&dev->sem);
@@ -781,31 +782,35 @@ static void *rtl8150_probe(struct usb_device *udev, unsigned int ifnum,
 	info("%s: rtl8150 is detected", netdev->name);
 	
 	up(&dev->sem);
-	return dev;
+	dev_set_drvdata (&intf->dev, dev);
+	return 0;
 err:
 	unregister_netdev(dev->netdev);
 	up(&dev->sem);
 	kfree(netdev);
 	kfree(dev);
-	return NULL;
+	return -EIO;
 }
 
-static void rtl8150_disconnect(struct usb_device *udev, void *ptr)
+static void rtl8150_disconnect(struct usb_interface *intf)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = dev_get_drvdata (&intf->dev);
 
-	dev = ptr;
-	set_bit(RTL8150_UNPLUG, &dev->flags);
-	unregister_netdev(dev->netdev);
-	unlink_all_urbs(dev);
-	free_all_urbs(dev);
-	free_skb_pool(dev);
-	if (dev->rx_skb)
-		dev_kfree_skb(dev->rx_skb);
-	kfree(dev->netdev);
-	kfree(dev);
-	dev->netdev = NULL;
-	dev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
+
+	if (dev) {
+		set_bit(RTL8150_UNPLUG, &dev->flags);
+		unregister_netdev(dev->netdev);
+		unlink_all_urbs(dev);
+		free_all_urbs(dev);
+		free_skb_pool(dev);
+		if (dev->rx_skb)
+			dev_kfree_skb(dev->rx_skb);
+		kfree(dev->netdev);
+		kfree(dev);
+		dev->netdev = NULL;
+		dev = NULL;
+	}
 }
 
 int __init usb_rtl8150_init(void)

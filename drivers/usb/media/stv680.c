@@ -1448,8 +1448,9 @@ static struct video_device stv680_template = {
 	.fops =         &stv680_fops,
 };
 
-static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
+static int stv680_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_stv *stv680;
 	char *camera_name = NULL;
@@ -1457,10 +1458,10 @@ static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const str
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1) {
 		PDEBUG (0, "STV(e): Number of Configurations != 1");
-		return NULL;
+		return -ENODEV;
 	}
 
-	interface = &dev->actconfig->interface[ifnum].altsetting[0];
+	interface = &intf->altsetting[0];
 	/* Is it a STV680? */
 	if ((dev->descriptor.idVendor == USB_PENCAM_VENDOR_ID) && (dev->descriptor.idProduct == USB_PENCAM_PRODUCT_ID)) {
 		camera_name = "STV0680";
@@ -1468,12 +1469,12 @@ static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const str
 	} else {
 		PDEBUG (0, "STV(e): Vendor/Product ID do not match STV0680 values.");
 		PDEBUG (0, "STV(e): Check that the STV0680 camera is connected to the computer.");
-		return NULL;
+		return -ENODEV;
 	}
 	/* We found one */
 	if ((stv680 = kmalloc (sizeof (*stv680), GFP_KERNEL)) == NULL) {
 		PDEBUG (0, "STV(e): couldn't kmalloc stv680 struct.");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	memset (stv680, 0, sizeof (*stv680));
@@ -1490,14 +1491,15 @@ static void *stv680_probe (struct usb_device *dev, unsigned int ifnum, const str
 	if (video_register_device (&stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		kfree (stv680);
 		PDEBUG (0, "STV(e): video_register_device failed");
-		return NULL;
+		return -EIO;
 	}
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	create_proc_stv680_cam (stv680);
 #endif
 	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev.minor);
 
-	return stv680;
+	dev_set_drvdata (&intf->dev, stv680);
+	return 0;
 }
 
 static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
@@ -1531,16 +1533,20 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 	kfree (stv680);
 }
 
-static void stv680_disconnect (struct usb_device *dev, void *ptr)
+static void stv680_disconnect (struct usb_interface *intf)
 {
-	struct usb_stv *stv680 = (struct usb_stv *) ptr;
+	struct usb_stv *stv680 = dev_get_drvdata (&intf->dev);
 
-	/* We don't want people trying to open up the device */
-	video_unregister_device (&stv680->vdev);
-	if (!stv680->user) {
-		usb_stv680_remove_disconnected (stv680);
-	} else {
-		stv680->removed = 1;
+	dev_set_drvdata (&intf->dev, NULL);
+
+	if (stv680) {
+		/* We don't want people trying to open up the device */
+		video_unregister_device (&stv680->vdev);
+		if (!stv680->user) {
+			usb_stv680_remove_disconnected (stv680);
+		} else {
+			stv680->removed = 1;
+		}
 	}
 }
 

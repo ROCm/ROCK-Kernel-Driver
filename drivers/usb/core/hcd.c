@@ -722,12 +722,10 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 {
 	int retval;
 
-	usb_dev->dev.parent = parent_dev;
-	strcpy (&usb_dev->dev.name[0], "usb_name");
-	strcpy (&usb_dev->dev.bus_id[0], "usb_bus");
-	retval = usb_new_device (usb_dev);
+	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
+	retval = usb_new_device (usb_dev, parent_dev);
 	if (retval)
-		put_device (&usb_dev->dev);
+		err("%s - usb_new_device failed with value %d", __FUNCTION__, retval);
 	return retval;
 }
 EXPORT_SYMBOL (usb_register_root_hub);

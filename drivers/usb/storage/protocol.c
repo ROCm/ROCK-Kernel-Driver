@@ -65,7 +65,7 @@ find_data_location(Scsi_Cmnd *srb) {
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) srb->request_buffer;
-		return (void *) page_address(sg[0].page) + sg[0].offset;
+		return (void *) sg_address(sg[0]);
 	} else
 		return (void *) srb->request_buffer;
 }

@@ -43,7 +43,7 @@ static inline void delay(long ticks)
 static inline void nanotime(struct timespec *tvp)
 {
 	tvp->tv_sec = xtime.tv_sec;
-	tvp->tv_nsec = xtime.tv_usec * 1000;
+	tvp->tv_nsec = xtime.tv_nsec;
 }
 
 #endif /* __XFS_SUPPORT_TIME_H__ */

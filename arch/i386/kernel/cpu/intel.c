@@ -156,7 +156,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	}
 #endif
 
-	get_model_name(c);
 
 	if (c->cpuid_level > 1) {
 		/* supports eax=2  call */

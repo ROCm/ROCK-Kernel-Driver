@@ -139,6 +139,12 @@ static struct usb_device_id id_table_combined [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
+static struct usb_driver mct_u232_driver = {
+	.name =		"mct_u232",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 static struct usb_serial_device_type mct_u232_device = {
 	.owner =	     THIS_MODULE,
@@ -782,6 +788,7 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 static int __init mct_u232_init (void)
 {
 	usb_serial_register (&mct_u232_device);
+	usb_register (&mct_u232_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -789,6 +796,7 @@ static int __init mct_u232_init (void)
 
 static void __exit mct_u232_exit (void)
 {
+	usb_deregister (&mct_u232_driver);
 	usb_serial_deregister (&mct_u232_device);
 }
 

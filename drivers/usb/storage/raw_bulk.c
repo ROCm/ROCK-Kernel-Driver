@@ -67,12 +67,9 @@ usb_storage_send_control(struct us_data *us,
 	// Check the return code for the command.
 	if (result < 0) {
 
-		/* a stall is a fatal condition from the device */
+		/* a stall indicates a protocol error */
 		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us, pipe);
-			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n",
-				  result);
+			US_DEBUGP("-- Stall on control pipe\n");
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -102,7 +99,8 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 		US_DEBUGP("EPIPE: clearing endpoint halt for"
 			  " pipe 0x%x, stalled at %d bytes\n",
 			  pipe, *act_len);
-		usb_stor_clear_halt(us, pipe);
+		if (usb_stor_clear_halt(us, pipe) < 0)
+			return US_BULK_TRANSFER_FAILED;
 		/* return US_BULK_TRANSFER_SHORT; */
 	}
 
@@ -191,7 +189,7 @@ usb_storage_bulk_transport(struct us_data *us, int direction,
 			unsigned char *buf;
 			unsigned int length;
 
-			buf = page_address(sg[i].page) + sg[i].offset;
+			buf = sg_address(sg[i]);
 			length = len-transferred;
 			if (length > sg[i].length)
 				length = sg[i].length;
@@ -261,7 +259,7 @@ us_copy_from_sgbuf(unsigned char *content, int len,
 		unsigned char *ptr;
 		unsigned int length, room;
 
-		ptr = page_address(sg[i].page) + sg[i].offset + *offset;
+		ptr = sg_address(sg[i]) + *offset;
 
 		room = sg[i].length - *offset;
 		length = len - transferred;
@@ -310,7 +308,7 @@ us_copy_to_sgbuf(unsigned char *buffer, int buflen,
 		unsigned char *ptr;
 		unsigned int length, room;
 
-		ptr = page_address(sg[i].page) + sg[i].offset + *offset;
+		ptr = sg_address(sg[i]) + *offset;
 
 		room = sg[i].length - *offset;
 		length = buflen - transferred;

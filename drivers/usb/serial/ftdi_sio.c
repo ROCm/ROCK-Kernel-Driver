@@ -140,7 +140,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 };
 
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
 	{ USB_DEVICE(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID) },
@@ -148,6 +148,13 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+static struct usb_driver ftdi_driver = {
+	.name =		"ftdi_sio",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 
 struct ftdi_private {
@@ -944,6 +951,7 @@ static int __init ftdi_sio_init (void)
 	dbg("%s", __FUNCTION__);
 	usb_serial_register (&ftdi_sio_device);
 	usb_serial_register (&ftdi_8U232AM_device);
+	usb_register (&ftdi_driver);
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
 }
@@ -952,6 +960,7 @@ static int __init ftdi_sio_init (void)
 static void __exit ftdi_sio_exit (void)
 {
 	dbg("%s", __FUNCTION__);
+	usb_deregister (&ftdi_driver);
 	usb_serial_deregister (&ftdi_sio_device);
 	usb_serial_deregister (&ftdi_8U232AM_device);
 }

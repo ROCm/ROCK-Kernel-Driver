@@ -717,38 +717,40 @@ static void konicawc_configure_video(struct uvd *uvd)
 }
 
 
-static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *devid)
+static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id *devid)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct uvd *uvd = NULL;
 	int i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
 
-	DEBUG(1, "konicawc_probe(%p,%u.)", dev, ifnum);
+	DEBUG(1, "konicawc_probe(%p)", intf);
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
 	info("Konica Webcam (rev. 0x%04x)", dev->descriptor.bcdDevice);
 	RESTRICT_TO_RANGE(speed, 0, MAX_SPEED);
 
 	/* Validate found interface: must have one ISO endpoint */
-	nas = dev->actconfig->interface[ifnum].num_altsetting;
+	nas = intf->num_altsetting;
 	if (nas != 8) {
 		err("Incorrect number of alternate settings (%d) for this camera!", nas);
-		return NULL;
+		return -ENODEV;
 	}
 	/* Validate all alternate settings */
 	for (i=0; i < nas; i++) {
 		const struct usb_interface_descriptor *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
-		interface = &dev->actconfig->interface[ifnum].altsetting[i];
+		interface = &intf->altsetting[i];
 		if (interface->bNumEndpoints != 2) {
 			err("Interface %d. has %u. endpoints!",
-			    ifnum, (unsigned)(interface->bNumEndpoints));
-			return NULL;
+			    interface->bInterfaceNumber,
+			    (unsigned)(interface->bNumEndpoints));
+			return -ENODEV;
 		}
 		endpoint = &interface->endpoint[1];
 		DEBUG(1, "found endpoint: addr: 0x%2.2x maxps = 0x%4.4x",
@@ -757,22 +759,24 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
 			err("Alternate settings have different endpoint addresses!");
-			return NULL;
+			return -ENODEV;
 		}
 		if ((endpoint->bmAttributes & 0x03) != 0x01) {
-			err("Interface %d. has non-ISO endpoint!", ifnum);
-			return NULL;
+			err("Interface %d. has non-ISO endpoint!",
+			    interface->bInterfaceNumber);
+			return -ENODEV;
 		}
 		if ((endpoint->bEndpointAddress & 0x80) == 0) {
-			err("Interface %d. has ISO OUT endpoint!", ifnum);
-			return NULL;
+			err("Interface %d. has ISO OUT endpoint!",
+			    interface->bInterfaceNumber);
+			return -ENODEV;
 		}
 		if (endpoint->wMaxPacketSize == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
 				err("More than one inactive alt. setting!");
-				return NULL;
+				return -ENODEV;
 			}
 		} else {
 			if (i == spd_to_iface[speed]) {
@@ -785,7 +789,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 	}
 	if(actInterface == -1) {
 		err("Cant find required endpoint");
-		return NULL;
+		return -ENODEV;
 	}
 
 	DEBUG(1, "Selecting requested active setting=%d. maxPS=%d.", actInterface, maxPS);
@@ -803,7 +807,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 					usb_free_urb(cam->sts_urb[i]);
 				}
 				err("cant allocate urbs");
-				return NULL;
+				return -ENOMEM;
 			}
 		}
 		cam->speed = speed;
@@ -815,7 +819,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 		uvd->flags = 0;
 		uvd->debug = debug;
 		uvd->dev = dev;
-		uvd->iface = ifnum;
+		uvd->iface = intf->altsetting->bInterfaceNumber;
 		uvd->ifaceAltInactive = inactInterface;
 		uvd->ifaceAltActive = actInterface;
 		uvd->video_endp = video_ep;
@@ -854,7 +858,12 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 #endif
 	}
 	MOD_DEC_USE_COUNT;
-	return uvd;
+
+	if (uvd) {
+		dev_set_drvdata (&intf->dev, uvd);
+		return 0;
+	}
+	return -EIO;
 }
 
 

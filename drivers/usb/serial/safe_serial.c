@@ -161,6 +161,13 @@ static struct usb_device_id id_table[] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver safe_driver = {
+	.name =		"safe_serial",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 static __u16 crc10_table[256] = {
 	0x000, 0x233, 0x255, 0x066, 0x299, 0x0aa, 0x0cc, 0x2ff, 0x301, 0x132, 0x154, 0x367, 0x198, 0x3ab, 0x3cd, 0x1fe,
 	0x031, 0x202, 0x264, 0x057, 0x2a8, 0x09b, 0x0fd, 0x2ce, 0x330, 0x103, 0x165, 0x356, 0x1a9, 0x39a, 0x3fc, 0x1cf,
@@ -434,12 +441,14 @@ static int __init safe_init (void)
 	}
 
 	usb_serial_register (&safe_device);
+	usb_register (&safe_driver);
 
 	return 0;
 }
 
 static void __exit safe_exit (void)
 {
+	usb_deregister (&safe_driver);
 	usb_serial_deregister (&safe_device);
 }
 

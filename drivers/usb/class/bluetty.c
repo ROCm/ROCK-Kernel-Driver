@@ -221,9 +221,9 @@ static void bluetooth_ctrl_callback		(struct urb *urb);
 static void bluetooth_read_bulk_callback	(struct urb *urb);
 static void bluetooth_write_bulk_callback	(struct urb *urb);
 
-static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
-			 	  const struct usb_device_id *id);
-static void usb_bluetooth_disconnect	(struct usb_device *dev, void *ptr);
+static int usb_bluetooth_probe (struct usb_interface *intf, 
+				const struct usb_device_id *id);
+static void usb_bluetooth_disconnect	(struct usb_interface *intf);
 
 
 static struct usb_device_id usb_bluetooth_ids [] = {
@@ -1033,9 +1033,10 @@ static void bluetooth_softint(void *private)
 }
 
 
-static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
-			 	  const struct usb_device_id *id)
+static int usb_bluetooth_probe (struct usb_interface *intf, 
+				const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_bluetooth *bluetooth = NULL;
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
@@ -1051,7 +1052,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	int num_bulk_in = 0;
 	int num_bulk_out = 0;
 
-	interface = &dev->actconfig->interface[ifnum].altsetting[0];
+	interface = &intf->altsetting[0];
 	control_out_endpoint = interface->bInterfaceNumber;
 
 	/* find the endpoints that we need */
@@ -1088,7 +1089,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	    (num_bulk_out != 1) ||
 	    (num_interrupt_in != 1)) {
 		dbg ("%s - improper number of endpoints. Bluetooth driver not bound.", __FUNCTION__);
-		return NULL;
+		return -EIO;
 	}
 
 	MOD_INC_USE_COUNT;
@@ -1099,13 +1100,13 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	if (bluetooth_table[minor]) {
 		err("No more free Bluetooth devices");
 		MOD_DEC_USE_COUNT;
-		return NULL;
+		return -ENODEV;
 	}
 
 	if (!(bluetooth = kmalloc(sizeof(struct usb_bluetooth), GFP_KERNEL))) {
 		err("Out of memory");
 		MOD_DEC_USE_COUNT;
-		return NULL;
+		return -ENOMEM;
 	}
 
 	memset(bluetooth, 0, sizeof(struct usb_bluetooth));
@@ -1191,7 +1192,9 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 
 	bluetooth_table[minor] = bluetooth;
 
-	return bluetooth; /* success */
+	/* success */
+	dev_set_drvdata (&intf->dev, bluetooth);
+	return 0;
 
 probe_error:
 	if (bluetooth->read_urb)
@@ -1220,15 +1223,16 @@ probe_error:
 	/* free up any memory that we allocated */
 	kfree (bluetooth);
 	MOD_DEC_USE_COUNT;
-	return NULL;
+	return -EIO;
 }
 
 
-static void usb_bluetooth_disconnect(struct usb_device *dev, void *ptr)
+static void usb_bluetooth_disconnect(struct usb_interface *intf)
 {
-	struct usb_bluetooth *bluetooth = (struct usb_bluetooth *) ptr;
+	struct usb_bluetooth *bluetooth = dev_get_drvdata (&intf->dev);
 	int i;
 
+	dev_set_drvdata (&intf->dev, NULL);
 	if (bluetooth) {
 		if ((bluetooth->open_count) && (bluetooth->tty))
 			tty_hangup(bluetooth->tty);
@@ -1274,7 +1278,6 @@ static void usb_bluetooth_disconnect(struct usb_device *dev, void *ptr)
 
 		/* free up any memory that we allocated */
 		kfree (bluetooth);
-
 	} else {
 		info("device disconnected");
 	}

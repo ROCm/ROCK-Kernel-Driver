@@ -189,7 +189,7 @@ void usb_stor_print_Scsi_Cmnd( Scsi_Cmnd* cmd )
 	US_DEBUGP("Buffer has %d scatterlists.\n", cmd->use_sg );
 	for ( i=0; i<cmd->use_sg; i++ )
 	{
-		char *adr = page_address(sg[i].page) + sg[i].offset;
+		char *adr = sg_address(sg[i]);
 		
 		US_DEBUGP("Length of scatterlist %d is %d.\n",i,sg[i].length);
 		US_DEBUGP("%02x %02x %02x %02x %02x %02x %02x %02x\n"

@@ -78,9 +78,9 @@
 
 #define TB_LEN 16
 
-static void *usb_dsbr100_probe(struct usb_device *dev, unsigned int ifnum,
-			 const struct usb_device_id *id);
-static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr);
+static int usb_dsbr100_probe(struct usb_interface *intf,
+			     const struct usb_device_id *id);
+static void usb_dsbr100_disconnect(struct usb_interface *intf);
 static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
 			     unsigned int cmd, unsigned long arg);
 static int usb_dsbr100_open(struct inode *inode, struct file *file);
@@ -95,7 +95,6 @@ typedef struct
 	unsigned char transfer_buffer[TB_LEN];
 	int curfreq;
 	int stereo;
-	int ifnum;
 } usb_dsbr100;
 
 
@@ -181,32 +180,36 @@ static void dsbr100_getstat(usb_dsbr100 *radio)
 }
 
 
-static void *usb_dsbr100_probe(struct usb_device *dev, unsigned int ifnum,
+static int usb_dsbr100_probe(struct usb_interface *intf, 
 			 const struct usb_device_id *id)
 {
 	usb_dsbr100 *radio;
 
 	if (!(radio = kmalloc(sizeof(usb_dsbr100),GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 	usb_dsbr100_radio.priv = radio;
-	radio->dev = dev;
-	radio->ifnum = ifnum;
+	radio->dev = interface_to_usbdev (intf);
 	radio->curfreq = 1454000;
-	return (void*)radio;
+	dev_set_drvdata (&intf->dev, radio);
+	return 0;
 }
 
-static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr)
+static void usb_dsbr100_disconnect(struct usb_interface *intf)
 {
-	usb_dsbr100 *radio=ptr;
+	usb_dsbr100 *radio = dev_get_drvdata (&intf->dev);
 
-	lock_kernel();
-	if (users) {
+	dev_set_drvdata (&intf->dev, NULL);
+
+	if (radio) {
+		lock_kernel();
+		if (users) {
+			unlock_kernel();
+			return;
+		}
+		kfree(radio);
+		usb_dsbr100_radio.priv = NULL;
 		unlock_kernel();
-		return;
 	}
-	kfree(radio);
-	usb_dsbr100_radio.priv = NULL;
-	unlock_kernel();
 }
 
 static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,

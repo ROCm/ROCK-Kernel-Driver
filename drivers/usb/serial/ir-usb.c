@@ -129,6 +129,13 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver ir_driver = {
+	.name =		"ir-usb",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 
 struct usb_serial_device_type ir_device = {
 	.owner =		THIS_MODULE,
@@ -606,6 +613,7 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 static int __init ir_init (void)
 {
 	usb_serial_register (&ir_device);
+	usb_register (&ir_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -613,6 +621,7 @@ static int __init ir_init (void)
 
 static void __exit ir_exit (void)
 {
+	usb_deregister (&ir_driver);
 	usb_serial_deregister (&ir_device);
 }
 
