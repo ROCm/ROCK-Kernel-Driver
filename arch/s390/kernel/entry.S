@@ -177,11 +177,11 @@ do_call_base:
 system_call:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_SVC_OLD_PSW,1
-	lh	%r8,0x8a	  # get svc number from lowcore
-        sll     %r8,2
+	lh	%r7,0x8a	  # get svc number from lowcore
         GET_THREAD_INFO           # load pointer to task_struct to R9
+	sll	%r7,2
         stosm   24(%r15),0x03     # reenable interrupts
-        l       %r8,sys_call_table-entry_base(%r8,%r13) # get system call addr.
+        l       %r8,sys_call_table-entry_base(%r7,%r13) # get system call addr.
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
         bo      BASED(sysc_tracesys)
         basr    %r14,%r8          # call sys_xxxx
@@ -241,13 +241,13 @@ sysc_sigpending:
 #
 sysc_tracesys:
         l       %r1,BASED(.Ltrace)
-	mvc	SP_R2(4,%r15),BASED(.Lc_ENOSYS)
+	srl	%r7,2
+	st	%r7,SP_R2(4,%r15)
 	basr	%r14,%r1
-	clc	SP_R2(4,%r15),BASED(.Lc256)
-	bnl	BASED(sysc_tracego)
-	l	%r8,SP_R2(%r15)   # strace changed the syscall
-	sll     %r8,2
-	l	%r8,sys_call_table-entry_base(%r8,%r13)
+	l	%r7,SP_R2(4,%r15)      # strace might have changed the 
+	n	%r7,BASED(.Lc256)      #  system call
+	sll	%r7,2
+	l	%r8,sys_call_table-entry_base(%r7,%r13)
 sysc_tracego:
 	lm	%r3,%r6,SP_R3(%r15)
 	l	%r2,SP_ORIG_R2(%r15)
