@@ -56,17 +56,17 @@ MODULE_SUPPORTED_DEVICE("sound");
 static int boot_devs;
 module_param_array(seq_client_load, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_client_load, "The numbers of global (system) clients to load through kmod.");
-module_param(seq_default_timer_class, int, 0444);
+module_param(seq_default_timer_class, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_class, "The default timer class.");
-module_param(seq_default_timer_sclass, int, 0444);
+module_param(seq_default_timer_sclass, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_sclass, "The default timer slave class.");
-module_param(seq_default_timer_card, int, 0444);
+module_param(seq_default_timer_card, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_card, "The default timer card number.");
-module_param(seq_default_timer_device, int, 0444);
+module_param(seq_default_timer_device, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_device, "The default timer device number.");
-module_param(seq_default_timer_subdevice, int, 0444);
+module_param(seq_default_timer_subdevice, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_subdevice, "The default timer subdevice number.");
-module_param(seq_default_timer_resolution, int, 0444);
+module_param(seq_default_timer_resolution, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_resolution, "The default timer resolution in Hz.");
 
 /*
