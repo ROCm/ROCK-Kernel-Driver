@@ -135,6 +135,14 @@ static inline unsigned long dm_round_up(unsigned long n, unsigned long size)
 }
 
 /*
+ * Ceiling(n / size)
+ */
+static inline unsigned long dm_div_up(unsigned long n, unsigned long size)
+{
+	return dm_round_up(n, size) / size;
+}
+
+/*
  * The device-mapper can be driven through one of two interfaces;
  * ioctl or filesystem, depending which patch you have applied.
  */

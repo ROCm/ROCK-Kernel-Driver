@@ -56,14 +56,6 @@ struct dm_table {
 };
 
 /*
- * Ceiling(n / size)
- */
-static inline unsigned long div_up(unsigned long n, unsigned long size)
-{
-	return dm_round_up(n, size) / size;
-}
-
-/*
  * Similar to ceiling(log_size(n))
  */
 static unsigned int int_log(unsigned long n, unsigned long base)
@@ -71,7 +63,7 @@ static unsigned int int_log(unsigned long n, unsigned long base)
 	int result = 0;
 
 	while (n > 1) {
-		n = div_up(n, base);
+		n = dm_div_up(n, base);
 		result++;
 	}
 
@@ -664,7 +656,7 @@ static int setup_indexes(struct dm_table *t)
 
 	/* allocate the space for *all* the indexes */
 	for (i = t->depth - 2; i >= 0; i--) {
-		t->counts[i] = div_up(t->counts[i + 1], CHILDREN_PER_NODE);
+		t->counts[i] = dm_div_up(t->counts[i + 1], CHILDREN_PER_NODE);
 		total += t->counts[i];
 	}
 
@@ -691,7 +683,7 @@ int dm_table_complete(struct dm_table *t)
 	unsigned int leaf_nodes;
 
 	/* how many indexes will the btree have ? */
-	leaf_nodes = div_up(t->num_targets, KEYS_PER_NODE);
+	leaf_nodes = dm_div_up(t->num_targets, KEYS_PER_NODE);
 	t->depth = 1 + int_log(leaf_nodes, CHILDREN_PER_NODE);
 
 	/* leaf layer has already been set up */
