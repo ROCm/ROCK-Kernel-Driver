@@ -47,8 +47,8 @@ static int __initdata mount_initrd = 0;
 int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_VERBOSE;
-static char root_device_name[64];
-static char saved_root_name[64];
+static char * __initdata root_device_name;
+static char __initdata saved_root_name[64];
 
 /* this is initialized in init/main.c */
 dev_t ROOT_DEV;
@@ -79,7 +79,7 @@ static int __init readwrite(char *str)
 __setup("ro", readonly);
 __setup("rw", readwrite);
 
-static __init dev_t try_name(char *name, int part)
+static dev_t __init try_name(char *name, int part)
 {
 	char path[64];
 	char buf[32];
@@ -148,7 +148,7 @@ fail:
  *	is mounted on rootfs /sys.
  */
 
-__init dev_t name_to_dev_t(char *name)
+dev_t name_to_dev_t(char *name)
 {
 	char s[32];
 	char *p;
@@ -206,8 +206,7 @@ fail:
 
 static int __init root_dev_setup(char *line)
 {
-	strncpy(saved_root_name, line, 64);
-	saved_root_name[63] = '\0';
+	strncpy(saved_root_name, line, 63);
 	return 1;
 }
 
@@ -611,8 +610,8 @@ static void __init mount_root(void)
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
-static int old_fd, root_fd;
-static int do_linuxrc(void * shell)
+static int __initdata old_fd, root_fd;
+static int __init do_linuxrc(void * shell)
 {
 	static char *argv[] = { "linuxrc", NULL, };
 	extern char * envp_init[];
@@ -705,7 +704,7 @@ static void __init md_run_setup(void);
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
  */
-void prepare_namespace(void)
+void __init prepare_namespace(void)
 {
 	int is_floppy;
 
@@ -714,11 +713,10 @@ void prepare_namespace(void)
 	md_run_setup();
 
 	if (saved_root_name[0]) {
-		char *p = saved_root_name;
-		ROOT_DEV = name_to_dev_t(p);
-		if (strncmp(p, "/dev/", 5) == 0)
-			p += 5;
-		strcpy(root_device_name, p);
+		root_device_name = saved_root_name;
+		ROOT_DEV = name_to_dev_t(root_device_name);
+		if (strncmp(root_device_name, "/dev/", 5) == 0)
+			root_device_name += 5;
 	}
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
