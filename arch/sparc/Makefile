@@ -34,17 +34,12 @@ endif
 
 HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
 
-SUBDIRS += arch/sparc/kernel arch/sparc/lib arch/sparc/prom \
-	arch/sparc/mm arch/sparc/math-emu
-
-CORE_FILES := arch/sparc/kernel/kernel.o arch/sparc/mm/mm.o $(CORE_FILES) \
-	arch/sparc/math-emu/math-emu.o
-
-LIBS := $(LIBS) arch/sparc/prom/lib.a arch/sparc/lib/lib.a
+core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
+libs-y += arch/sparc/prom/ arch/sparc/lib/
 
 # This one has to come last
 SUBDIRS += arch/sparc/boot
-CORE_FILES_NO_BTFIX := $(CORE_FILES)
+CORE_FILES_NO_BTFIX := $(addsuffix built-in.o,$(core-y))
 CORE_FILES += arch/sparc/boot/btfix.o
 
 # Export what is needed by arch/sparc/boot/Makefile
