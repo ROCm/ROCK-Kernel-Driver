@@ -688,6 +688,12 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	int set_reply;
 	int ret;
 
+	/* Previously seen (loopback or untracked)?  Ignore. */
+	if ((*pskb)->nfct) {
+		CONNTRACK_STAT_INC(ignore);
+		return NF_ACCEPT;
+	}
+
 	/* Never happen */
 	if ((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) {
 		if (net_ratelimit()) {
@@ -714,12 +720,6 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 		       (*pskb)->sk, (*pskb)->pkt_type);
 	}
 #endif
-
-	/* Previously seen (loopback or untracked)?  Ignore. */
-	if ((*pskb)->nfct) {
-		CONNTRACK_STAT_INC(ignore);
-		return NF_ACCEPT;
-	}
 
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 
