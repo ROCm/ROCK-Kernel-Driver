@@ -51,8 +51,8 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <sound/core.h>
@@ -60,6 +60,8 @@
 #include <sound/initval.h>
 #include <sound/rawmidi.h>
 #include <linux/delay.h>
+
+#include <asm/io.h>
 
 /*
  *      globals
