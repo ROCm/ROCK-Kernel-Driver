@@ -93,33 +93,6 @@ struct isa_range {
 	unsigned int size;
 };
 
-struct pci_range32 {
-	struct pci_address child_addr;
-	unsigned int  parent_addr;
-  	unsigned long size; 
-};
-
-struct pci_range64 {
-	struct pci_address child_addr;
-  	unsigned long parent_addr;
-        unsigned long size; 
-};
-
-union pci_range {
-	struct {
-		struct pci_address addr;
-		u32 phys;
-		u32 size_hi;
-	} pci32;
-	struct {
-		struct pci_address addr;
-		u32 phys_hi;
-		u32 phys_lo;
-		u32 size_hi;
-		u32 size_lo;
-	} pci64;
-};
-
 struct of_tce_table {
 	phandle node;
 	unsigned long base;
