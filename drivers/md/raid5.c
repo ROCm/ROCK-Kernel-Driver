@@ -1458,7 +1458,7 @@ static int run (mddev_t *mddev)
 				  GFP_KERNEL);
 	if ((conf = mddev->private) == NULL)
 		goto abort;
-	memset (conf, 0, sizeof (*conf));
+	memset (conf, 0, sizeof (*conf) + mddev->raid_disks * sizeof(struct disk_info) );
 	conf->mddev = mddev;
 
 	if ((conf->stripe_hashtbl = (struct stripe_head **) __get_free_pages(GFP_ATOMIC, HASH_PAGES_ORDER)) == NULL)
