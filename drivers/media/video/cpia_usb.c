@@ -167,7 +167,7 @@ static void cpia_usb_complete(struct urb *urb)
 	/* resubmit */
 	urb->dev = ucpia->dev;
 	if ((i = usb_submit_urb(urb, GFP_ATOMIC)) != 0)
-		printk(KERN_ERR __FUNCTION__ ": usb_submit_urb ret %d\n", i);
+		printk(KERN_ERR "%s: usb_submit_urb ret %d\n", __FUNCTION__,  i);
 }
 
 static int cpia_usb_open(void *privdata)
