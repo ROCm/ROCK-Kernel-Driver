@@ -1557,7 +1557,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	struct page	*page;
 	struct page	*cached_page = NULL;
 	ssize_t		written;
-	int		err;
+	ssize_t		err;
 	size_t		bytes;
 	struct pagevec	lru_pvec;
 	const struct iovec *cur_iov = iov; /* current iovec */
@@ -1817,7 +1817,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
-	int err;
+	ssize_t err;
 	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
 
 	BUG_ON(iocb->ki_pos != pos);
@@ -1836,7 +1836,7 @@ ssize_t generic_file_write(struct file *file, const char *buf,
 			   size_t count, loff_t *ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
-	int		err;
+	ssize_t		err;
 	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
 
 	down(&inode->i_sem);
