@@ -73,7 +73,6 @@
 #include <linux/genhd.h>
 #include <asm/bitops.h>
 
-
 int devfs_register_tape(const char *name)
 {
 	char tname[32], dest[64];
@@ -86,6 +85,7 @@ int devfs_register_tape(const char *name)
 
 	return n;
 }
+
 EXPORT_SYMBOL(devfs_register_tape);
 
 void devfs_unregister_tape(int num)
