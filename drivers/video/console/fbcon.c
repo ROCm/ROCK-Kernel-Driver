@@ -335,14 +335,15 @@ int set_all_vcs(int fbidx, struct fb_ops *fb, struct fb_var_screeninfo *var,
     int unit, err;
 
     var->activate |= FB_ACTIVATE_TEST;
-    err = gen_set_var(var, PROC_CONSOLE(info), info);
+    err = fb_set_var(var, info);
     var->activate &= ~FB_ACTIVATE_TEST;
     gen_set_disp(PROC_CONSOLE(info), info);	
     if (err)
             return err;
     for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
             if (fb_display[unit].conp && con2fb_map[unit] == fbidx) {
-                    gen_set_var(var, unit, info);
+		    if (CON_IS_VISIBLE(fb_display[unit].conp))	
+                    	fb_set_var(var, info);
 		    gen_set_disp(unit, info);
 	    }	
     return 0;
@@ -983,6 +984,19 @@ static int scrollback_phys_max = 0;
 static int scrollback_max = 0;
 static int scrollback_current = 0;
 
+int update_var(int con, struct fb_info *info)
+{
+        int err;
+
+        if (con == info->currcon) {
+                if (info->fbops->fb_pan_display) {
+                        if ((err = info->fbops->fb_pan_display(&info->var, info)))
+                                return err;
+                }
+        }
+        return 0;
+}
+
 static __inline__ void ywrap_up(int unit, struct vc_data *conp,
 				struct display *p, int count)
 {
@@ -994,7 +1008,7 @@ static __inline__ void ywrap_up(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode |= FB_VMODE_YWRAP;
-    gen_update_var(unit, info);
+    update_var(unit, info);
     scrollback_max += count;
     if (scrollback_max > scrollback_phys_max)
 	scrollback_max = scrollback_phys_max;
@@ -1012,7 +1026,7 @@ static __inline__ void ywrap_down(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode |= FB_VMODE_YWRAP;
-    gen_update_var(unit, info);
+    update_var(unit, info);
     scrollback_max -= count;
     if (scrollback_max < 0)
 	scrollback_max = 0;
@@ -1033,7 +1047,7 @@ static __inline__ void ypan_up(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode &= ~FB_VMODE_YWRAP;
-    gen_update_var(unit, info);
+    update_var(unit, info);
     if (p->dispsw->clear_margins)
 	p->dispsw->clear_margins(conp, p, 1);
     scrollback_max += count;
@@ -1057,7 +1071,7 @@ static __inline__ void ypan_down(int unit, struct vc_data *conp,
     info->var.xoffset = 0;
     info->var.yoffset = p->yscroll*fontheight(p);
     info->var.vmode &= ~FB_VMODE_YWRAP;
-    gen_update_var(unit, info);
+    update_var(unit, info);
     if (p->dispsw->clear_margins)
 	p->dispsw->clear_margins(conp, p, 1);
     scrollback_max -= count;
@@ -2148,7 +2162,7 @@ static int fbcon_scrolldelta(struct vc_data *conp, int lines)
 	offset -= limit;
     info->var.xoffset = 0;
     info->var.yoffset = offset*fontheight(p);
-    gen_update_var(unit, info);
+    update_var(unit, info);
     if (!scrollback_current)
 	fbcon_cursor(conp, CM_DRAW);
     return 0;

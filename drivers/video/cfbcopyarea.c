@@ -38,9 +38,11 @@
 
 void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 {
-	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx, old_dy;
+	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx,
+	    old_dy;
 	int j, linesize = p->fix.line_length, bpl = sizeof(unsigned long);
-	unsigned long start_index, end_index, start_mask, end_mask, last, tmp;
+	unsigned long start_index, end_index, start_mask, end_mask, last,
+	    tmp;
 	unsigned long *dst = NULL, *src = NULL;
 	char *src1, *dst1;
 	int height;
@@ -84,10 +86,16 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 		lineincr = linesize;
 	} else {
 		/* start at the bottom */
-		src1 = p->screen_base + (area->sy + area->height-1) * linesize
-			+ (((area->sx + area->width - 1) * p->var.bits_per_pixel) >> 3);
-		dst1 = p->screen_base + (area->dy + area->height-1) * linesize
-			+ (((area->dx + area->width - 1) * p->var.bits_per_pixel) >> 3);
+		src1 =
+		    p->screen_base + (area->sy + area->height -
+				      1) * linesize +
+		    (((area->sx + area->width -
+		       1) * p->var.bits_per_pixel) >> 3);
+		dst1 =
+		    p->screen_base + (area->dy + area->height -
+				      1) * linesize +
+		    (((area->dx + area->width -
+		       1) * p->var.bits_per_pixel) >> 3);
 		lineincr = -linesize;
 	}
 
@@ -98,7 +106,7 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 		start_index = ((unsigned long) src1 & (bpl - 1));
 		end_index = ((unsigned long) (src1 + n) & (bpl - 1));
 		shift = ((unsigned long) dst1 & (bpl - 1)) -
-		    	((unsigned long) src1 & (bpl - 1));
+		    ((unsigned long) src1 & (bpl - 1));
 		start_mask = end_mask = 0;
 
 		if (start_index) {
@@ -111,7 +119,6 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 			n -= end_index;
 		}
 		n /= bpl;
-
 		if (n <= 0) {
 			if (start_mask) {
 				if (end_mask)
@@ -148,16 +155,25 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					last = (FB_READ(src) & start_mask);
 
 					if (shift > 0)
-						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
+						FB_WRITE(FB_READ(dst) |
+							 (last >>
+							  shift_right),
+							 dst);
 					for (j = 0; j < n; j++) {
 						dst++;
 						tmp = FB_READ(src);
 						src++;
-						FB_WRITE((last << shift_left) | (tmp >> shift_right), dst);
+						FB_WRITE((last <<
+							  shift_left) |
+							 (tmp >>
+							  shift_right),
+							 dst);
 						last = tmp;
 						src++;
 					}
-					FB_WRITE(FB_READ(dst) | (last << shift_left), dst);
+					FB_WRITE(FB_READ(dst) |
+						 (last << shift_left),
+						 dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -172,16 +188,25 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					last = (FB_READ(src) & end_mask);
 
 					if (shift < 0)
-						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
+						FB_WRITE(FB_READ(dst) |
+							 (last >>
+							  shift_right),
+							 dst);
 					for (j = 0; j < n; j++) {
 						dst--;
 						tmp = FB_READ(src);
 						src--;
-						FB_WRITE((tmp << shift_left) | (last >> shift_right), dst);
+						FB_WRITE((tmp <<
+							  shift_left) |
+							 (last >>
+							  shift_right),
+							 dst);
 						last = tmp;
 						src--;
 					}
-					FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
+					FB_WRITE(FB_READ(dst) |
+						 (last >> shift_right),
+						 dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -191,20 +216,27 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 			if (lineincr > 0) {
 				/* positive increment */
 				do {
-					dst = (unsigned long *) (dst1 - start_index);
-					src = (unsigned long *) (src1 - start_index);
+					dst =
+					    (unsigned long *) (dst1 -
+							       start_index);
+					src =
+					    (unsigned long *) (src1 -
+							       start_index);
 
 					if (start_mask)
-						FB_WRITE(FB_READ(src) | start_mask, dst);
+						FB_WRITE(FB_READ(src) |
+							 start_mask, dst);
 
 					for (j = 0; j < n; j++) {
-						FB_WRITE(FB_READ(src), dst);
+						FB_WRITE(FB_READ(src),
+							 dst);
 						dst++;
 						src++;
 					}
 
 					if (end_mask)
-						FB_WRITE(FB_READ(src) | end_mask, dst);
+						FB_WRITE(FB_READ(src) |
+							 end_mask, dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -215,15 +247,45 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					src = (unsigned long *) src1;
 
 					if (start_mask)
-						FB_WRITE(FB_READ(src) | start_mask, dst);
+						FB_WRITE(FB_READ(src) |
+							 start_mask, dst);
 					for (j = 0; j < n; j++) {
-						FB_WRITE(FB_READ(src), dst);
+						FB_WRITE(FB_READ(src),
+							 dst);
 						dst--;
 						src--;
 					}
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
+			}
+		}
+	} else {
+		int n = ((area->width * p->var.bits_per_pixel) >> 3);
+		int n16 = (n >> 4) << 4;
+		int n_fract = n - n16;
+		int rows;
+
+		if (area->dy < area->sy
+		    || (area->dy == area->sy && area->dx < area->sx)) {
+			for (rows = height; rows--;) {
+				if (n16)
+					fast_memmove(dst1, src1, n16);
+				if (n_fract)
+					fb_memmove(dst1 + n16, src1 + n16,
+						   n_fract);
+				dst1 += linesize;
+				src1 += linesize;
+			}
+		} else {
+			for (rows = height; rows--;) {
+				if (n16)
+					fast_memmove(dst1, src1, n16);
+				if (n_fract)
+					fb_memmove(dst1 + n16, src1 + n16,
+						   n_fract);
+				dst1 -= linesize;
+				src1 -= linesize;
 			}
 		}
 	}

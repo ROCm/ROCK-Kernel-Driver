@@ -317,6 +317,9 @@ struct fb_ops {
     struct module *owner;
     int (*fb_open)(struct fb_info *info, int user);
     int (*fb_release)(struct fb_info *info, int user);
+    /* For framebuffers with strange non linear layouts */	
+    ssize_t (*fb_read)(struct file *file, char *buf, size_t count, loff_t *ppos);
+    ssize_t (*fb_write)(struct file *file, const char *buf, size_t count, loff_t *ppos);	
     /* checks var and creates a par based on it */
     int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* set the video mode according to par */
@@ -336,6 +339,8 @@ struct fb_ops {
     void (*fb_imageblit)(struct fb_info *info, struct fb_image *image);
     /* perform polling on fb device */
     int (*fb_poll)(struct fb_info *info, poll_table *wait);
+    /* wait for blit idle, optional */
+    void (*fb_sync)(struct fb_info *info);		
     /* perform fb specific ioctl (optional) */
     int (*fb_ioctl)(struct inode *inode, struct file *file, unsigned int cmd,
 		    unsigned long arg, struct fb_info *info);
@@ -414,22 +419,12 @@ struct fb_info {
      *  `Generic' versions of the frame buffer device operations
      */
 
-extern int gen_set_var(struct fb_var_screeninfo *var, int con,
-		       struct fb_info *info);
-extern int fb_pan_display(struct fb_var_screeninfo *var, int con,
-			     struct fb_info *info);
+extern int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info); 
+extern int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info); 
+extern int fb_blank(int blank, struct fb_info *info);
 extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
 extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
 extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
-
-    /*
-     *  Helper functions
-     */
-
-extern void do_install_cmap(int con, struct fb_info *info);
-extern int gen_update_var(int con, struct fb_info *info);
-extern int fb_blank(int blank, struct fb_info *info);
-extern void gen_set_disp(int con, struct fb_info *info);
 
 /* drivers/video/fbmem.c */
 extern int register_framebuffer(struct fb_info *fb_info);
@@ -447,10 +442,6 @@ extern int fbmon_dpms(const struct fb_info *fb_info);
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
 extern void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to,
 			 int fsfromto);
-extern int fb_get_cmap(struct fb_cmap *cmap, int kspc,
-		       int (*getcolreg)(u_int, u_int *, u_int *, u_int *,
-					u_int *, struct fb_info *),
-		       struct fb_info *fb_info);
 extern int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *fb_info);
 extern struct fb_cmap *fb_default_cmap(int len);
 extern void fb_invert_cmaps(void);

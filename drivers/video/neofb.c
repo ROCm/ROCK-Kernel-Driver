@@ -1870,8 +1870,6 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 	if (err)
 		goto failed;
 
-	gen_set_var(neofb_var, -1, info);
-
 	/*
 	 * Calculate the hsync and vsync frequencies.  Note that
 	 * we split the 1e12 constant up so that we can preserve

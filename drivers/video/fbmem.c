@@ -466,10 +466,10 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int fbidx = GET_FB_IDX(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
-	struct fb_cmap cmap;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
 	struct fb_con2fbmap con2fb;
+	struct fb_cmap cmap;
 	int i;
 	
 	if (! fb)
@@ -485,9 +485,8 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			i = set_all_vcs(fbidx, fb, &var, info);
 			if (i) return i;
 		} else {
-			i = gen_set_var(&var, PROC_CONSOLE(info), info);
+			i = fb_set_var(&var, info);
 			if (i) return i;
-			gen_set_disp(PROC_CONSOLE(info), info);
 		}
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -512,6 +511,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return i;
+#ifdef CONFIG_VT
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
 			return -EFAULT;
@@ -540,6 +540,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		    for (i = 0; i < MAX_NR_CONSOLES; i++)
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
+#endif
 	case FBIOBLANK:
 		if (fb->fb_blank == NULL)
 			return -EINVAL;

@@ -35,7 +35,7 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	unsigned long height, ppw, fg, fgcolor;
 	int i, n, x2, y2, linesize = p->fix.line_length;
 	int bpl = sizeof(unsigned long);
-	unsigned long *dst;
+	unsigned long *dst = NULL;
 	char *dst1;
 
 	if (!rect->width || !rect->height)
@@ -55,7 +55,7 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	ppw = BITS_PER_LONG / p->var.bits_per_pixel;
 
 	dst1 = p->screen_base + (rect->dy * linesize) +
-	    	(rect->dx * (p->var.bits_per_pixel >> 3));
+	    (rect->dx * (p->var.bits_per_pixel >> 3));
 	start_index = ((unsigned long) dst1 & (bpl - 1));
 	end_index = ((unsigned long) (dst1 + n) & (bpl - 1));
 
@@ -97,11 +97,12 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 		case ROP_COPY:
 			do {
 				/* Word align to increases performace :-) */
-				dst = (unsigned long *) (dst1 - start_index);
+				dst =
+				    (unsigned long *) (dst1 - start_index);
 
 				if (start_mask) {
 					FB_WRITE(FB_READ(dst) |
-						  start_mask, dst);
+						 start_mask, dst);
 					dst++;
 				}
 
@@ -112,17 +113,18 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 
 				if (end_mask)
 					FB_WRITE(FB_READ(dst) | end_mask,
-						  dst);
+						 dst);
 				dst1 += linesize;
 			} while (--height);
 			break;
 		case ROP_XOR:
 			do {
-				dst = (unsigned long *) (dst1 - start_index);
+				dst =
+				    (unsigned long *) (dst1 - start_index);
 
 				if (start_mask) {
 					FB_WRITE(FB_READ(dst) ^
-						  start_mask, dst);
+						 start_mask, dst);
 					dst++;
 				}
 
@@ -133,56 +135,92 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 
 				if (end_mask) {
 					FB_WRITE(FB_READ(dst) ^ end_mask,
-						  dst);
+						 dst);
 				}
 				dst1 += linesize;
 			} while (--height);
 			break;
 		}
 	} else {
-		/* Odd modes like 24 or 80 bits per pixel */
-		start_mask = fg >> (start_index * p->var.bits_per_pixel);
-		end_mask = fg << (end_index * p->var.bits_per_pixel);
-		/* start_mask =& PFILL24(x1,fg);
-		   end_mask_or = end_mask & PFILL24(x1+width-1,fg); */
+		/* 
+		 * Slow Method:  The aim is to find the number of pixels to
+		 * pack in order to write doubleword multiple data.
+		 * For 24 bpp, 4 pixels are packed which are written as 
+		 * 3 dwords.
+		 */
+		char *dst2, *dst3;
+		int bytes = (p->var.bits_per_pixel + 7) >> 3;
+		int read, write, total, pack_size;
+		u32 pixarray[BITS_PER_LONG >> 3], m;
 
-		n = (rect->width - start_index - end_index) / ppw;
+		fg = fgcolor;
+		read = (bytes + (bpl - 1)) & ~(bpl - 1);
+		write = bytes;
+		total = (rect->width * bytes);
+
+		pack_size = bpl * write;
+
+		dst3 = (char *) pixarray;
+
+		for (n = read; n--;) {
+			*(u32 *) dst3 = fg;
+			dst3 += bytes;
+		}
 
 		switch (rect->rop) {
 		case ROP_COPY:
 			do {
-				dst = (unsigned long *) dst1;
-				if (start_mask)
-					*dst |= start_mask;
-				if ((start_index + rect->width) > ppw)
-					dst++;
+				dst2 = dst1;
+				n = total;
 
-				/* XXX: slow */
-				for (i = 0; i < n; i++) {
-					*dst++ = fg;
+				while (n >= pack_size) {
+					for (m = 0; m < write; m++) {
+						fb_writel(pixarray[m],
+							  (u32 *) dst2);
+						dst2 += 4;
+					}
+					n -= pack_size;
 				}
-				if (end_mask)
-					*dst |= end_mask;
+				if (n) {
+					m = 0;
+					while (n--)
+						fb_writeb(((u8 *)
+							   pixarray)[m++],
+							  dst2++);
+				}
 				dst1 += linesize;
 			} while (--height);
 			break;
 		case ROP_XOR:
 			do {
-				dst = (unsigned long *) dst1;
-				if (start_mask)
-					*dst ^= start_mask;
-				if ((start_mask + rect->width) > ppw)
-					dst++;
+				dst2 = dst1;
+				n = total;
 
-				for (i = 0; i < n; i++) {
-					*dst++ ^= fg;	/* PFILL24(fg,x1+i); */
+				while (n >= pack_size) {
+					for (m = 0; m < write; m++) {
+						fb_writel(fb_readl
+							  ((u32 *) dst2) ^
+							  pixarray[m],
+							  (u32 *) dst2);
+						dst2 += 4;
+					}
+					n -= pack_size;
 				}
-				if (end_mask)
-					*dst ^= end_mask;
+				if (n) {
+					m = 0;
+					while (n--) {
+						fb_writeb(fb_readb(dst2) ^
+							  ((u8 *)
+							   pixarray)[m++],
+							  dst2);
+						dst2++;
+					}
+				}
 				dst1 += linesize;
 			} while (--height);
 			break;
 		}
+
 	}
 	return;
 }

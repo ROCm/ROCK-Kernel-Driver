@@ -99,7 +99,6 @@ static int sgivwfb_mmap(struct fb_info *info, struct file *file,
 
 static struct fb_ops sgivwfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_check_var	= sgivwfb_check_var,
 	.fb_set_par	= sgivwfb_set_par,
 	.fb_setcolreg	= sgivwfb_setcolreg,

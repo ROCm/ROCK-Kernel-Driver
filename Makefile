@@ -668,7 +668,7 @@ defconfig:
 CLEAN_FILES += \
 	include/linux/compile.h \
 	vmlinux System.map \
-	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
+	drivers/char/consolemap_deftbl.c drivers/video/console/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
 	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
