@@ -438,17 +438,15 @@ static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
 {
 	if (fn) {
 		struct list_head *head = &fn->fn_alias;
-		struct fib_alias *fa, *prev_fa;
+		struct fib_alias *fa;
 
-		prev_fa = NULL;
 		list_for_each_entry(fa, head, fa_list) {
-			if (fa->fa_tos != tos)
+			if (fa->fa_tos > tos)
 				continue;
-			prev_fa = fa;
-			if (prio <= fa->fa_info->fib_priority)
-				break;
+			if (fa->fa_info->fib_priority >= prio ||
+			    fa->fa_tos < tos)
+				return fa;
 		}
-		return prev_fa;
 	}
 	return NULL;
 }
@@ -505,7 +503,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	 * and we need to allocate a new one of those as well.
 	 */
 
-	if (fa &&
+	if (fa && fa->fa_tos == tos &&
 	    fa->fa_info->fib_priority == fi->fib_priority) {
 		struct fib_alias *fa_orig;
 
@@ -537,7 +535,8 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 * information.
 		 */
 		fa_orig = fa;
-		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
+		fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+		list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 			if (fa->fa_tos != tos)
 				break;
 			if (fa->fa_info->fib_priority != fi->fib_priority)
@@ -585,7 +584,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	write_lock_bh(&fib_hash_lock);
 	if (new_f)
 		fib_insert_node(fz, new_f);
-	list_add(&new_fa->fa_list,
+	list_add_tail(&new_fa->fa_list,
 		 (fa ? &fa->fa_list : &f->fn_alias));
 	write_unlock_bh(&fib_hash_lock);
 
@@ -611,7 +610,6 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	struct fn_hash *table = (struct fn_hash*)tb->tb_data;
 	struct fib_node *f;
 	struct fib_alias *fa, *fa_to_delete;
-	struct list_head *fa_head;
 	int z = r->rtm_dst_len;
 	struct fn_zone *fz;
 	u32 key;
@@ -637,8 +635,8 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		return -ESRCH;
 
 	fa_to_delete = NULL;
-	fa_head = fa->fa_list.prev;
-	list_for_each_entry(fa, fa_head, fa_list) {
+	fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+	list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 		struct fib_info *fi = fa->fa_info;
 
 		if (fa->fa_tos != tos)
