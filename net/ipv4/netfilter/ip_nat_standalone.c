@@ -85,7 +85,8 @@ ip_nat_fn(unsigned int hooknum,
 
 	/* If we had a hardware checksum before, it's now invalid */
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
-		(*pskb)->ip_summed = CHECKSUM_NONE;
+		if (skb_checksum_help(pskb, (out == NULL)))
+			return NF_DROP;
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
 	/* Can't track?  It's not due to stress, or conntrack would
