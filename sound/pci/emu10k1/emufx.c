@@ -468,11 +468,11 @@ int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
 static int snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 				u32 op, u32 r, u32 a, u32 x, u32 y)
 {
-	snd_assert(*ptr < 512, return);
+	snd_assert(*ptr < 512, return -EINVAL);
 	set_bit(*ptr, icode->code_valid);
 	x = ((x & 0x3ff) << 10) | (y & 0x3ff);
 	y = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
-	a = *ptr++ * 2;
+	a = (*ptr)++ * 2;
 	if (put_user(x, &icode->code[a + 0]) ||
             put_user(y, &icode->code[a + 1]))
 		return -EFAULT;
@@ -485,11 +485,11 @@ static int snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 static int snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 				       u32 op, u32 r, u32 a, u32 x, u32 y)
 {
-	snd_assert(*ptr < 1024, return);
+	snd_assert(*ptr < 1024, return -EINVAL);
 	set_bit(*ptr, icode->code_valid);
 	x = ((x & 0x7ff) << 12) | (y & 0x7ff);
 	y = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
-	a = *ptr++ * 2;
+	a = (*ptr)++ * 2;
 	if (put_user(x, &icode->code[a + 0]) ||
 	    put_user(y, &icode->code[a + 1]))
 		return -EFAULT;
@@ -1010,7 +1010,7 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
 	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL ||
-	    (icode->gpr_map = kcalloc(512 + 256 + 256, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
+	    (icode->gpr_map = kcalloc(512 + 256 + 256 + 2 * 1024, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
 	    (controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(*controls), GFP_KERNEL)) == NULL) {
 		err = -ENOMEM;
 		goto __err;
@@ -1018,6 +1018,7 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 
 	icode->tram_data_map = icode->gpr_map + 512;
 	icode->tram_addr_map = icode->tram_data_map + 256;
+	icode->code = icode->tram_addr_map + 256;
 
 	/* clear free GPRs */
 	for (i = 0; i < 512; i++)
@@ -1460,7 +1461,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 
 	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((icode->gpr_map = kcalloc(256 + 160 + 160, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
+	if ((icode->gpr_map = kcalloc(256 + 160 + 160 + 2 * 512, sizeof(u_int32_t), GFP_KERNEL)) == NULL ||
             (controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(emu10k1_fx8010_control_gpr_t), GFP_KERNEL)) == NULL ||
 	    (ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL)) == NULL) {
 		err = -ENOMEM;
@@ -1469,6 +1470,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 
 	icode->tram_data_map = icode->gpr_map + 256;
 	icode->tram_addr_map = icode->tram_data_map + 160;
+	icode->code = icode->tram_addr_map + 160;
 	
 	/* clear free GPRs */
 	for (i = 0; i < 256; i++)
