@@ -44,7 +44,7 @@ struct atmarp_entry {
 };
 
 
-#define PRIV(dev) ((struct clip_priv *) ((struct net_device *) (dev)+1))
+#define PRIV(dev) ((struct clip_priv *) netdev_priv(dev))
 
 
 struct clip_priv {
