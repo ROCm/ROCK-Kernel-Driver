@@ -113,6 +113,8 @@ extern firmware_feature_t firmware_features_table[];
 #define CPU_FTR_TLBIEL         		0x0000000400000000
 #define CPU_FTR_NOEXECUTE     		0x0000000800000000
 #define CPU_FTR_NODSISRALIGN  		0x0000001000000000
+#define CPU_FTR_DABR  			0x0000002000000000
+#define CPU_FTR_IABR  			0x0000004000000000
 
 /* Platform firmware features */
 #define FW_FTR_                         0x0000000000000001

@@ -26,6 +26,7 @@
 #include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
+#include <asm/cputable.h>
 #include "nonstdio.h"
 #include "privinst.h"
 
@@ -469,9 +470,9 @@ insert_bpts()
 		}
 	}
 
-	if (cpu_has_dabr() && dabr.enabled)
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR) && dabr.enabled)
 		set_dabr(dabr.address);
-	if (cpu_has_iabr() && iabr.enabled)
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR) && iabr.enabled)
 		set_iabr(iabr.address);
 }
 
@@ -485,9 +486,9 @@ remove_bpts()
 	if (systemcfg->platform != PLATFORM_PSERIES)
 		return;
 
-	if (cpu_has_dabr())
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR))
 		set_dabr(0);
-	if (cpu_has_iabr())
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
 		set_iabr(0);
 
 	bp = bpts;
@@ -777,7 +778,7 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (cpu_has_dabr()) {
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_DABR)) {
 			printf("Not implemented on this cpu\n");
 			break;
 		}
@@ -797,7 +798,7 @@ bpt_cmds(void)
 			dabr.address = (dabr.address & ~7) | mode;
 		break;
 	case 'i':	/* bi - hardware instr breakpoint */
-		if (cpu_has_iabr()) {
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_IABR)) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}

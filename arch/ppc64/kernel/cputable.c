@@ -37,7 +37,8 @@ extern void __setup_cpu_power4(unsigned long offset, struct cpu_spec* spec);
 struct cpu_spec	cpu_specs[] = {
     {	/* Power3 */
 	    0xffff0000, 0x00400000, "Power3 (630)",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -45,7 +46,8 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* Power3+ */
 	    0xffff0000, 0x00410000, "Power3 (630+)",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -53,7 +55,8 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* Northstar */
 	    0xffff0000, 0x00330000, "Northstar",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -61,7 +64,8 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* Pulsar */
 	    0xffff0000, 0x00340000, "Pulsar",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -69,7 +73,8 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* I-star */
 	    0xffff0000, 0x00360000, "I-star",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -77,7 +82,8 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* S-star */
 	    0xffff0000, 0x00370000, "S-star",
-	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+		    CPU_FTR_DABR | CPU_FTR_IABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power3,
@@ -86,7 +92,7 @@ struct cpu_spec	cpu_specs[] = {
     {	/* Power4 */
 	    0xffff0000, 0x00350000, "Power4",
 	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
-	    CPU_FTR_PPCAS_ARCH_V2,
+	    CPU_FTR_PPCAS_ARCH_V2 | CPU_FTR_DABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power4,
@@ -95,7 +101,7 @@ struct cpu_spec	cpu_specs[] = {
     {	/* Power4+ */
 	    0xffff0000, 0x00380000, "Power4+",
 	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
-	    CPU_FTR_PPCAS_ARCH_V2,
+	    CPU_FTR_PPCAS_ARCH_V2 | CPU_FTR_DABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power4,
@@ -104,7 +110,7 @@ struct cpu_spec	cpu_specs[] = {
     {	/* default match */
 	    0x00000000, 0x00000000, "(Power4-Compatible)",
   	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
-	    CPU_FTR_PPCAS_ARCH_V2,
+	    CPU_FTR_PPCAS_ARCH_V2 | CPU_FTR_DABR,
 	    COMMON_USER_PPC64,
 	    128, 128,
 	    __setup_cpu_power4,

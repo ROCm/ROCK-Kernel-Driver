@@ -115,13 +115,6 @@ static inline int __is_processor(unsigned long pv)
 	return(PVR_VER(pvr) == pv);
 }
 
-static inline int processor_type(void)
-{
-	unsigned long pvr;
-	asm ("mfspr %0, 0x11F" : "=r" (pvr)); 
-	return(PVR_VER(pvr));
-}
-
 /*
  * Atomic exchange
  *
