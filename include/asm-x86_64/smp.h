@@ -144,5 +144,13 @@ static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
 })
 #endif
 
+#ifndef __ASSEMBLY__
+static __inline int logical_smp_processor_id(void)
+{
+	/* we don't want to mark this access volatile - bad code generation */
+	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
+}
+#endif
+
 #endif
 
