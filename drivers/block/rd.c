@@ -78,7 +78,6 @@ int initrd_below_start_ok;
  */
 
 static struct gendisk *rd_disks[NUM_RAMDISKS];
-static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
 /*
@@ -380,12 +379,13 @@ static void __exit rd_cleanup (void)
 		}
 		del_gendisk(rd_disks[i]);
 		put_disk(rd_disks[i]);
+		devfs_remove("rd/%d", i);
 	}
 #ifdef CONFIG_BLK_DEV_INITRD
 	put_disk(initrd_disk);
+	devfs_remove("rd/initrd");
 #endif
-
-	devfs_unregister (devfs_handle);
+	devfs_remove("rd");
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
 }
 
@@ -426,8 +426,11 @@ static int __init rd_init (void)
 
 	blk_queue_make_request(&rd_queue, &rd_make_request);
 
+	devfs_mk_dir (NULL, "rd", NULL);
+
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		struct gendisk *disk = rd_disks[i];
+		char name[16];
 		/* rd_size is given in kB */
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
@@ -435,12 +438,12 @@ static int __init rd_init (void)
 		disk->queue = &rd_queue;
 		sprintf(disk->disk_name, "ram%d", i);
 		set_capacity(disk, rd_size * 2);
-	}
-	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);
-	devfs_register_series (devfs_handle, "%u", NUM_RAMDISKS,
-			       DEVFS_FL_DEFAULT, MAJOR_NR, 0,
+		sprintf(name, "rd/%d", i);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       disk->major, disk->first_minor,
 			       S_IFBLK | S_IRUSR | S_IWUSR,
-			       &rd_bd_op, NULL);
+			       disk->fops, NULL);
+	}
 
 	for (i = 0; i < NUM_RAMDISKS; i++)
 		add_disk(rd_disks[i]);
@@ -449,7 +452,7 @@ static int __init rd_init (void)
 	/* We ought to separate initrd operations here */
 	set_capacity(initrd_disk, (initrd_end-initrd_start+511)>>9);
 	add_disk(initrd_disk);
-	devfs_register(devfs_handle, "initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
+	devfs_register(NULL, "rd/initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
 
