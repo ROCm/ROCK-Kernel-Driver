@@ -300,38 +300,10 @@ void tasklet_kill(struct tasklet_struct *t)
 
 EXPORT_SYMBOL(tasklet_kill);
 
-static void tasklet_init_cpu(int cpu)
-{
-	per_cpu(tasklet_vec, cpu).list = NULL;
-	per_cpu(tasklet_hi_vec, cpu).list = NULL;
-}
-	
-static int tasklet_cpu_notify(struct notifier_block *self, 
-				unsigned long action, void *hcpu)
-{
-	long cpu = (long)hcpu;
-	switch(action) {
-	case CPU_UP_PREPARE:
-		tasklet_init_cpu(cpu);
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
-static struct notifier_block tasklet_nb = {
-	.notifier_call	= tasklet_cpu_notify,
-	.next		= NULL,
-};
-
 void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
-	tasklet_cpu_notify(&tasklet_nb, (unsigned long)CPU_UP_PREPARE,
-				(void *)(long)smp_processor_id());
-	register_cpu_notifier(&tasklet_nb);
 }
 
 static int ksoftirqd(void * __bind_cpu)

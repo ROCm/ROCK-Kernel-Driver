@@ -2987,33 +2987,6 @@ init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long flags)
 	}
 }
 
-static void buffer_init_cpu(int cpu)
-{
-	struct bh_accounting *bha = &per_cpu(bh_accounting, cpu);
-	struct bh_lru *bhl = &per_cpu(bh_lrus, cpu);
-
-	bha->nr = 0;
-	bha->ratelimit = 0;
-	memset(bhl, 0, sizeof(*bhl));
-}
-	
-static int __devinit buffer_cpu_notify(struct notifier_block *self, 
-				unsigned long action, void *hcpu)
-{
-	long cpu = (long)hcpu;
-	switch(action) {
-	case CPU_UP_PREPARE:
-		buffer_init_cpu(cpu);
-		break;
-	default:
-		break;
-	}
-	return NOTIFY_OK;
-}
-
-static struct notifier_block __devinitdata buffer_nb = {
-	.notifier_call	= buffer_cpu_notify,
-};
 
 void __init buffer_init(void)
 {
@@ -3031,9 +3004,6 @@ void __init buffer_init(void)
 	 */
 	nrpages = (nr_free_buffer_pages() * 10) / 100;
 	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
-	buffer_cpu_notify(&buffer_nb, (unsigned long)CPU_UP_PREPARE,
-				(void *)(long)smp_processor_id());
-	register_cpu_notifier(&buffer_nb);
 }
 
 EXPORT_SYMBOL(__bforget);
