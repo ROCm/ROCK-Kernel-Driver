@@ -326,12 +326,12 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, m68k_probes, base_addr == 0) &&
-	probe_list2(unit, mips_probes, base_addr == 0) &&
-	probe_list2(unit, eisa_probes, base_addr == 0) &&
-	probe_list2(unit, mca_probes, base_addr == 0) &&
-	probe_list2(unit, isa_probes, base_addr == 0) &&
-	probe_list2(unit, parport_probes, base_addr == 0);
+	(void)(	probe_list2(unit, m68k_probes, base_addr == 0) &&
+		probe_list2(unit, mips_probes, base_addr == 0) &&
+		probe_list2(unit, eisa_probes, base_addr == 0) &&
+		probe_list2(unit, mca_probes, base_addr == 0) &&
+		probe_list2(unit, isa_probes, base_addr == 0) &&
+		probe_list2(unit, parport_probes, base_addr == 0));
 }
 
 #ifdef CONFIG_TR
