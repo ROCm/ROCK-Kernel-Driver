@@ -483,7 +483,7 @@ shrink_zone(struct zone *zone, int priority,
 	ratio = (unsigned long)nr_pages * zone->nr_active /
 				((zone->nr_inactive | 1) * 2);
 	atomic_add(ratio+1, &zone->refill_counter);
-	if (atomic_read(&zone->refill_counter) > SWAP_CLUSTER_MAX) {
+	while (atomic_read(&zone->refill_counter) > SWAP_CLUSTER_MAX) {
 		atomic_sub(SWAP_CLUSTER_MAX, &zone->refill_counter);
 		refill_inactive_zone(zone, SWAP_CLUSTER_MAX);
 	}
@@ -517,7 +517,7 @@ shrink_caches(struct zone *classzone, int priority,
 
 	first_classzone = classzone->zone_pgdat->node_zones;
 	zone = classzone;
-	while (zone >= first_classzone) {
+	while (zone >= first_classzone && nr_pages > 0) {
 		if (zone->free_pages <= zone->pages_high) {
 			nr_pages = shrink_zone(zone, priority,
 					gfp_mask, nr_pages);

@@ -59,9 +59,11 @@ static int mount_count = 0;
 static int driverfs_readpage(struct file *file, struct page * page)
 {
 	if (!PageUptodate(page)) {
-		memset(kmap(page), 0, PAGE_CACHE_SIZE);
-		kunmap(page);
+		void *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
 	unlock_page(page);
@@ -70,10 +72,12 @@ static int driverfs_readpage(struct file *file, struct page * page)
 
 static int driverfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
-	void *addr = kmap(page);
 	if (!PageUptodate(page)) {
-		memset(addr, 0, PAGE_CACHE_SIZE);
+		void *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
 	return 0;
@@ -85,7 +89,6 @@ static int driverfs_commit_write(struct file *file, struct page *page, unsigned 
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
 	set_page_dirty(page);
-	kunmap(page);
 	if (pos > inode->i_size)
 		inode->i_size = pos;
 	return 0;

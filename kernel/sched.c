@@ -1336,6 +1336,15 @@ int task_nice(task_t *p)
 }
 
 /**
+ * task_curr - is this task currently executing on a CPU?
+ * @p: the task in question.
+ */
+int task_curr(task_t *p)
+{
+	return cpu_curr(task_cpu(p)) == p;
+}
+
+/**
  * idle_cpu - is a given cpu idle currently?
  * @cpu: the processor in question.
  */

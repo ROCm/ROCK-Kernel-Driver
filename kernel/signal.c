@@ -6,6 +6,8 @@
  *  1997-11-02  Modified for POSIX.1b signals by Richard Henderson
  */
 
+#define __KERNEL_SYSCALLS__
+
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -16,7 +18,7 @@
 #include <linux/fs.h>
 #include <linux/tty.h>
 #include <linux/binfmts.h>
-
+#include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
 
@@ -24,18 +26,105 @@
  * SLAB caches for signal bits.
  */
 
-#define DEBUG_SIG 0
-
-#if DEBUG_SIG
-#define SIG_SLAB_DEBUG	(SLAB_RED_ZONE /* | SLAB_POISON */)
-#else
-#define SIG_SLAB_DEBUG	0
-#endif
-
 static kmem_cache_t *sigqueue_cachep;
 
 atomic_t nr_queued_signals;
 int max_queued_signals = 1024;
+
+/*********************************************************
+
+    POSIX thread group signal behavior:
+
+----------------------------------------------------------
+|                    |  userspace       |  kernel        |
+----------------------------------------------------------
+|  SIGHUP            |  load-balance    |  kill-all      |
+|  SIGINT            |  load-balance    |  kill-all      |
+|  SIGQUIT           |  load-balance    |  kill-all+core |
+|  SIGILL            |  specific        |  kill-all+core |
+|  SIGTRAP           |  specific        |  kill-all+core |
+|  SIGABRT/SIGIOT    |  specific        |  kill-all+core |
+|  SIGBUS            |  specific        |  kill-all+core |
+|  SIGFPE            |  specific        |  kill-all+core |
+|  SIGKILL           |  n/a             |  kill-all      |
+|  SIGUSR1           |  load-balance    |  kill-all      |
+|  SIGSEGV           |  specific        |  kill-all+core |
+|  SIGUSR2           |  load-balance    |  kill-all      |
+|  SIGPIPE           |  specific        |  kill-all      |
+|  SIGALRM           |  load-balance    |  kill-all      |
+|  SIGTERM           |  load-balance    |  kill-all      |
+|  SIGCHLD           |  load-balance    |  ignore        |
+|  SIGCONT           |  specific        |  continue-all  |
+|  SIGSTOP           |  n/a             |  stop-all      |
+|  SIGTSTP           |  load-balance    |  stop-all      |
+|  SIGTTIN           |  load-balance    |  stop-all      |
+|  SIGTTOU           |  load-balance    |  stop-all      |
+|  SIGURG            |  load-balance    |  ignore        |
+|  SIGXCPU           |  specific        |  kill-all+core |
+|  SIGXFSZ           |  specific        |  kill-all+core |
+|  SIGVTALRM         |  load-balance    |  kill-all      |
+|  SIGPROF           |  specific        |  kill-all      |
+|  SIGPOLL/SIGIO     |  load-balance    |  kill-all      |
+|  SIGSYS/SIGUNUSED  |  specific        |  kill-all+core |
+|  SIGSTKFLT         |  specific        |  kill-all      |
+|  SIGWINCH          |  load-balance    |  ignore        |
+|  SIGPWR            |  load-balance    |  kill-all      |
+|  SIGRTMIN-SIGRTMAX |  load-balance    |  kill-all      |
+----------------------------------------------------------
+*/
+
+#define M(sig) (1UL << (sig))
+
+#define SIG_USER_SPECIFIC_MASK (\
+	M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    | \
+	M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGPIPE)   |  M(SIGXFSZ)   | \
+	M(SIGPROF)   |  M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGCONT)   )
+
+#define SIG_USER_LOAD_BALANCE_MASK (\
+        M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGUSR1)   | \
+        M(SIGUSR2)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGCHLD)   | \
+        M(SIGURG)    |  M(SIGVTALRM) |  M(SIGPOLL)   |  M(SIGWINCH)  | \
+        M(SIGPWR)    |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
+
+#define SIG_KERNEL_SPECIFIC_MASK (\
+        M(SIGCHLD)   |   M(SIGURG)   |  M(SIGWINCH)                  )
+
+#define SIG_KERNEL_BROADCAST_MASK (\
+	M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGILL)    | \
+	M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    |  M(SIGFPE)    | \
+	M(SIGKILL)   |  M(SIGUSR1)   |  M(SIGSEGV)   |  M(SIGUSR2)   | \
+	M(SIGPIPE)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGXCPU)   | \
+	M(SIGXFSZ)   |  M(SIGVTALRM) |  M(SIGPROF)   |  M(SIGPOLL)   | \
+	M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGPWR)    |  M(SIGCONT)   | \
+        M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
+
+#define SIG_KERNEL_ONLY_MASK (\
+	M(SIGKILL)   |  M(SIGSTOP)                                   )
+
+#define SIG_KERNEL_COREDUMP_MASK (\
+        M(SIGQUIT)   |  M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   | \
+        M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGBUS)    |  M(SIGSYS)    | \
+        M(SIGXCPU)   |  M(SIGXFSZ)                                   )
+
+#define T(sig, mask) \
+	((1UL << (sig)) & mask)
+
+#define sig_user_specific(sig)		T(sig, SIG_USER_SPECIFIC_MASK)
+#define sig_user_load_balance(sig) \
+		(T(sig, SIG_USER_LOAD_BALANCE_MASK) || ((sig) >= SIGRTMIN))
+#define sig_kernel_specific(sig)	T(sig, SIG_KERNEL_SPECIFIC_MASK)
+#define sig_kernel_broadcast(sig) \
+		(T(sig, SIG_KERNEL_BROADCAST_MASK) || ((sig) >= SIGRTMIN))
+#define sig_kernel_only(sig)		T(sig, SIG_KERNEL_ONLY_MASK)
+#define sig_kernel_coredump(sig)	T(sig, SIG_KERNEL_COREDUMP_MASK)
+
+#define sig_user_defined(t, sig) \
+	(((t)->sig->action[(sig)-1].sa.sa_handler != SIG_DFL) &&	\
+	 ((t)->sig->action[(sig)-1].sa.sa_handler != SIG_IGN))
+
+#define sig_ignored(t, sig) \
+	(((sig) != SIGCHLD) && \
+		((t)->sig->action[(sig)-1].sa.sa_handler == SIG_IGN))
 
 void __init signals_init(void)
 {
@@ -43,21 +132,40 @@ void __init signals_init(void)
 		kmem_cache_create("sigqueue",
 				  sizeof(struct sigqueue),
 				  __alignof__(struct sigqueue),
-				  SIG_SLAB_DEBUG, NULL, NULL);
+				  0, NULL, NULL);
 	if (!sigqueue_cachep)
 		panic("signals_init(): cannot create sigqueue SLAB cache");
 }
 
+#define PENDING(p,b) has_pending_signals(&(p)->signal, (b))
+
+void recalc_sigpending_tsk(struct task_struct *t)
+{
+	if (PENDING(&t->pending, &t->blocked) ||
+			PENDING(&t->sig->shared_pending, &t->blocked))
+		set_tsk_thread_flag(t, TIF_SIGPENDING);
+	else
+		clear_tsk_thread_flag(t, TIF_SIGPENDING);
+}
+
+void recalc_sigpending(void)
+{
+	if (PENDING(&current->pending, &current->blocked) ||
+		    PENDING(&current->sig->shared_pending, &current->blocked))
+		set_thread_flag(TIF_SIGPENDING);
+	else
+		clear_thread_flag(TIF_SIGPENDING);
+}
 
 /* Given the mask, find the first available signal that should be serviced. */
 
 static int
-next_signal(struct task_struct *tsk, sigset_t *mask)
+next_signal(struct sigpending *pending, sigset_t *mask)
 {
 	unsigned long i, *s, *m, x;
 	int sig = 0;
 	
-	s = tsk->pending.signal.sig;
+	s = pending->signal.sig;
 	m = mask->sig;
 	switch (_NSIG_WORDS) {
 	default:
@@ -113,15 +221,36 @@ flush_signals(struct task_struct *t)
 	flush_sigqueue(&t->pending);
 }
 
+void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig)
+{
+	write_lock_irq(&tasklist_lock);
+	spin_lock(&tsk->sig->siglock);
+
+	if (tsk == sig->curr_target)
+		sig->curr_target = next_thread(tsk);
+	list_del_init(&tsk->thread_group);
+
+	spin_unlock(&tsk->sig->siglock);
+	write_unlock_irq(&tasklist_lock);
+}
+
 void exit_sighand(struct task_struct *tsk)
 {
 	struct signal_struct * sig = tsk->sig;
 
+	if (!sig)
+		BUG();
+	if (!atomic_read(&sig->count))
+		BUG();
+	remove_thread_group(tsk, sig);
+
 	spin_lock_irq(&tsk->sigmask_lock);
 	if (sig) {
 		tsk->sig = NULL;
-		if (atomic_dec_and_test(&sig->count))
+		if (atomic_dec_and_test(&sig->count)) {
+			flush_sigqueue(&sig->shared_pending);
 			kmem_cache_free(sigact_cachep, sig);
+		}
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
@@ -153,23 +282,9 @@ flush_signal_handlers(struct task_struct *t)
 void
 sig_exit(int sig, int exit_code, struct siginfo *info)
 {
-	struct task_struct *t;
-
 	sigaddset(&current->pending.signal, sig);
 	recalc_sigpending();
 	current->flags |= PF_SIGNALED;
-
-	/* Propagate the signal to all the tasks in
-	 *  our thread group
-	 */
-	if (info && (unsigned long)info != 1
-	    && info->si_code != SI_TKILL) {
-		read_lock(&tasklist_lock);
-		for_each_thread(t) {
-			force_sig_info(sig, info, t);
-		}
-		read_unlock(&tasklist_lock);
-	}
 
 	do_exit(exit_code);
 	/* NOTREACHED */
@@ -209,7 +324,7 @@ unblock_all_signals(void)
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 }
 
-static int collect_signal(int sig, struct sigpending *list, siginfo_t *info)
+static inline int collect_signal(int sig, struct sigpending *list, siginfo_t *info)
 {
 	if (sigismember(&list->signal, sig)) {
 		/* Collect the siginfo appropriate to this signal.  */
@@ -221,9 +336,10 @@ static int collect_signal(int sig, struct sigpending *list, siginfo_t *info)
 			pp = &q->next;
 		}
 
-		/* Ok, it wasn't in the queue.  We must have
-		   been out of queue space.  So zero out the
-		   info.  */
+		/* Ok, it wasn't in the queue.  This must be
+		   a fast-pathed signal or we must have been
+		   out of queue space.  So zero out the info.
+		 */
 		sigdelset(&list->signal, sig);
 		info->si_signo = sig;
 		info->si_errno = 0;
@@ -261,20 +377,14 @@ found_another:
  * Dequeue a signal and return the element to the caller, which is 
  * expected to free it.
  *
- * All callers must be holding current->sigmask_lock.
+ * All callers have to hold the siglock and the sigmask_lock.
  */
 
-int
-dequeue_signal(sigset_t *mask, siginfo_t *info)
+int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info)
 {
 	int sig = 0;
 
-#if DEBUG_SIG
-printk(KERN_DEBUG "SIG dequeue (%s:%d): %d ", current->comm, current->pid,
-	signal_pending(current));
-#endif
-
-	sig = next_signal(current, mask);
+	sig = next_signal(pending, mask);
 	if (sig) {
 		if (current->notifier) {
 			if (sigismember(current->notifier_mask, sig)) {
@@ -285,17 +395,13 @@ printk(KERN_DEBUG "SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 			}
 		}
 
-		if (!collect_signal(sig, &current->pending, info))
+		if (!collect_signal(sig, pending, info))
 			sig = 0;
 				
 		/* XXX: Once POSIX.1b timers are in, if si_code == SI_TIMER,
 		   we need to xchg out the timer overrun values.  */
 	}
 	recalc_sigpending();
-
-#if DEBUG_SIG
-printk(KERN_DEBUG " %d -> %d\n", signal_pending(current), sig);
-#endif
 
 	return sig;
 }
@@ -338,9 +444,10 @@ static int rm_sig_from_queue(int sig, struct task_struct *t)
 /*
  * Bad permissions for sending the signal
  */
-int bad_signal(int sig, struct siginfo *info, struct task_struct *t)
+static inline int bad_signal(int sig, struct siginfo *info, struct task_struct *t)
 {
-	return (!info || ((unsigned long)info != 1 && SI_FROMUSER(info)))
+	return (!info || ((unsigned long)info != 1 &&
+			(unsigned long)info != 2 && SI_FROMUSER(info)))
 	    && ((sig != SIGCONT) || (current->session != t->session))
 	    && (current->euid ^ t->suid) && (current->euid ^ t->uid)
 	    && (current->uid ^ t->suid) && (current->uid ^ t->uid)
@@ -436,6 +543,13 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
 {
 	struct sigqueue * q = NULL;
 
+	/*
+	 * fast-pathed signals for kernel-internal things like SIGSTOP
+	 * or SIGKILL.
+	 */
+	if ((unsigned long)info == 2)
+		goto out_set;
+
 	/* Real-time signals must be queued if sent by sigqueue, or
 	   some other real-time mechanism.  It is implementation
 	   defined whether kill() does so.  We attempt to do so, on
@@ -444,9 +558,8 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
 	   make sure at least one signal gets delivered and don't
 	   pass on the info struct.  */
 
-	if (atomic_read(&nr_queued_signals) < max_queued_signals) {
+	if (atomic_read(&nr_queued_signals) < max_queued_signals)
 		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
-	}
 
 	if (q) {
 		atomic_inc(&nr_queued_signals);
@@ -473,14 +586,14 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
 				break;
 		}
 	} else if (sig >= SIGRTMIN && info && (unsigned long)info != 1
-		   && info->si_code != SI_USER) {
+		   && info->si_code != SI_USER)
 		/*
 		 * Queue overflow, abort.  We may abort if the signal was rt
 		 * and sent by user using something other than kill().
 		 */
 		return -EAGAIN;
-	}
 
+out_set:
 	sigaddset(&signals->signal, sig);
 	return 0;
 }
@@ -528,17 +641,17 @@ static int deliver_signal(int sig, struct siginfo *info, struct task_struct *t)
 	return retval;
 }
 
-int
-send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
+static int
+__send_sig_info(int sig, struct siginfo *info, struct task_struct *t, int shared)
 {
-	unsigned long flags;
 	int ret;
 
-
-#if DEBUG_SIG
-printk(KERN_DEBUG "SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
+	if (!irqs_disabled())
+		BUG();
+#if CONFIG_SMP
+	if (!spin_is_locked(&t->sig->siglock))
+		BUG();
 #endif
-
 	ret = -EINVAL;
 	if (sig < 0 || sig > _NSIG)
 		goto out_nolock;
@@ -556,7 +669,7 @@ printk(KERN_DEBUG "SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
 	if (!sig || !t->sig)
 		goto out_nolock;
 
-	spin_lock_irqsave(&t->sigmask_lock, flags);
+	spin_lock(&t->sigmask_lock);
 	handle_stop_signal(sig, t);
 
 	/* Optimize away the signal, if it's a signal that can be
@@ -566,20 +679,25 @@ printk(KERN_DEBUG "SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
 	if (ignored_signal(sig, t))
 		goto out;
 
-	/* Support queueing exactly one non-rt signal, so that we
-	   can get more detailed information about the cause of
-	   the signal. */
-	if (sig < SIGRTMIN && sigismember(&t->pending.signal, sig))
-		goto out;
+#define LEGACY_QUEUE(sigptr, sig) \
+	(((sig) < SIGRTMIN) && sigismember(&(sigptr)->signal, (sig)))
 
-	ret = deliver_signal(sig, info, t);
+	if (!shared) {
+		/* Support queueing exactly one non-rt signal, so that we
+		   can get more detailed information about the cause of
+		   the signal. */
+		if (LEGACY_QUEUE(&t->pending, sig))
+			goto out;
+
+		ret = deliver_signal(sig, info, t);
+	} else {
+		if (LEGACY_QUEUE(&t->sig->shared_pending, sig))
+			goto out;
+		ret = send_signal(sig, info, &t->sig->shared_pending);
+	}
 out:
-	spin_unlock_irqrestore(&t->sigmask_lock, flags);
+	spin_unlock(&t->sigmask_lock);
 out_nolock:
-#if DEBUG_SIG
-printk(KERN_DEBUG " %d -> %d\n", signal_pending(t), ret);
-#endif
-
 	return ret;
 }
 
@@ -605,7 +723,157 @@ force_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 	recalc_sigpending_tsk(t);
 	spin_unlock_irqrestore(&t->sigmask_lock, flags);
 
-	return send_sig_info(sig, info, t);
+	return send_sig_info(sig, (void *)1, t);
+}
+
+static int
+__force_sig_info(int sig, struct task_struct *t)
+{
+	unsigned long int flags;
+
+	spin_lock_irqsave(&t->sigmask_lock, flags);
+	if (t->sig == NULL) {
+		spin_unlock_irqrestore(&t->sigmask_lock, flags);
+		return -ESRCH;
+	}
+
+	if (t->sig->action[sig-1].sa.sa_handler == SIG_IGN)
+		t->sig->action[sig-1].sa.sa_handler = SIG_DFL;
+	sigdelset(&t->blocked, sig);
+	recalc_sigpending_tsk(t);
+	spin_unlock_irqrestore(&t->sigmask_lock, flags);
+
+	return __send_sig_info(sig, (void *)2, t, 0);
+}
+
+#define can_take_signal(p, sig)	\
+	(((unsigned long) p->sig->action[sig-1].sa.sa_handler > 1) && \
+	!sigismember(&p->blocked, sig) && (task_curr(p) || !signal_pending(p)))
+
+static inline
+int load_balance_thread_group(struct task_struct *p, int sig,
+				struct siginfo *info)
+{
+	struct task_struct *tmp;
+	int ret;
+
+	/*
+	 * if the specified thread is not blocking this signal
+	 * then deliver it.
+	 */
+	if (can_take_signal(p, sig))
+		return __send_sig_info(sig, info, p, 0);
+
+	/*
+	 * Otherwise try to find a suitable thread.
+	 * If no such thread is found then deliver to
+	 * the original thread.
+	 */
+
+	tmp = p->sig->curr_target;
+
+	if (!tmp || tmp->tgid != p->tgid)
+		/* restart balancing at this thread */
+		p->sig->curr_target = p;
+
+	else for (;;) {
+		if (list_empty(&p->thread_group))
+			BUG();
+		if (!tmp || tmp->tgid != p->tgid)
+			BUG();
+
+		/*
+		 * Do not send signals that are ignored or blocked,
+		 * or to not-running threads that are overworked:
+		 */
+		if (!can_take_signal(tmp, sig)) {
+			tmp = next_thread(tmp);
+			p->sig->curr_target = tmp;
+			if (tmp == p)
+				break;
+			continue;
+		}
+		ret = __send_sig_info(sig, info, tmp, 0);
+		return ret;
+	}
+	/*
+	 * No suitable thread was found - put the signal
+	 * into the shared-pending queue.
+	 */
+	return __send_sig_info(sig, info, p, 1);
+}
+
+int __broadcast_thread_group(struct task_struct *p, int sig)
+{
+	struct task_struct *tmp;
+	struct list_head *entry;
+	int err = 0;
+
+	/* send a signal to the head of the list */
+	err = __force_sig_info(sig, p);
+
+	/* send a signal to all members of the list */
+	list_for_each(entry, &p->thread_group) {
+		tmp = list_entry(entry, task_t, thread_group);
+		err = __force_sig_info(sig, tmp);
+	}
+	return err;
+}
+
+int
+send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	if (!p)
+		BUG();
+	if (!p->sig)
+		BUG();
+	spin_lock_irqsave(&p->sig->siglock, flags);
+
+	/* not a thread group - normal signal behavior */
+	if (list_empty(&p->thread_group) || !sig)
+		goto out_send;
+
+	if (sig_user_defined(p, sig)) {
+		if (sig_user_specific(sig))
+			goto out_send;
+		if (sig_user_load_balance(sig)) {
+			ret = load_balance_thread_group(p, sig, info);
+			goto out_unlock;
+		}
+
+		/* must not happen */
+		BUG();
+	}
+	/* optimize away ignored signals: */
+	if (sig_ignored(p, sig))
+		goto out_unlock;
+
+	/* blocked (or ptraced) signals get posted */
+	spin_lock(&p->sigmask_lock);
+	if ((p->ptrace & PT_PTRACED) || sigismember(&p->blocked, sig) ||
+					sigismember(&p->real_blocked, sig)) {
+		spin_unlock(&p->sigmask_lock);
+		goto out_send;
+	}
+	spin_unlock(&p->sigmask_lock);
+
+	if (sig_kernel_broadcast(sig) || sig_kernel_coredump(sig)) {
+		ret = __broadcast_thread_group(p, sig);
+		goto out_unlock;
+	}
+	if (sig_kernel_specific(sig))
+		goto out_send;
+
+	/* must not happen */
+	BUG();
+out_send:
+	ret = __send_sig_info(sig, info, p, 0);
+out_unlock:
+	spin_unlock_irqrestore(&p->sig->siglock, flags);
+	return ret;
 }
 
 /*
@@ -670,15 +938,8 @@ kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 	read_lock(&tasklist_lock);
 	p = find_task_by_pid(pid);
 	error = -ESRCH;
-	if (p) {
-		if (!thread_group_leader(p)) {
-                       struct task_struct *tg;
-                       tg = find_task_by_pid(p->tgid);
-                       if (tg)
-                               p = tg;
-                }
+	if (p)
 		error = send_sig_info(sig, info, p);
-	}
 	read_unlock(&tasklist_lock);
 	return error;
 }
@@ -755,25 +1016,36 @@ kill_proc(pid_t pid, int sig, int priv)
  * Joy. Or not. Pthread wants us to wake up every thread
  * in our parent group.
  */
-static void wake_up_parent(struct task_struct *parent)
+static inline void wake_up_parent(struct task_struct *p)
 {
-	struct task_struct *tsk = parent;
+	struct task_struct *parent = p->parent, *tsk = parent;
 
+	/*
+	 * Fortunately this is not necessary for thread groups:
+	 */
+	if (p->tgid == tsk->tgid) {
+		wake_up_interruptible(&tsk->wait_chldexit);
+		return;
+	}
+	spin_lock_irq(&parent->sig->siglock);
 	do {
 		wake_up_interruptible(&tsk->wait_chldexit);
 		tsk = next_thread(tsk);
+		if (tsk->sig != parent->sig)
+			BUG();
 	} while (tsk != parent);
+	spin_unlock_irq(&parent->sig->siglock);
 }
 
 /*
  * Let a parent know about a status change of a child.
  */
+
 void do_notify_parent(struct task_struct *tsk, int sig)
 {
 	struct siginfo info;
 	int why, status;
 
-	/* is the thread detached? */
 	if (sig == -1)
 		BUG();
 
@@ -812,7 +1084,7 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_status = status;
 
 	send_sig_info(sig, &info, tsk->parent);
-	wake_up_parent(tsk->parent);
+	wake_up_parent(tsk);
 }
 
 
@@ -837,13 +1109,24 @@ notify_parent(struct task_struct *tsk, int sig)
 
 int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 {
+	sigset_t *mask = &current->blocked;
+
 	for (;;) {
-		unsigned long signr;
+		unsigned long signr = 0;
 		struct k_sigaction *ka;
 
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, info);
-		spin_unlock_irq(&current->sigmask_lock);
+		local_irq_disable();
+		if (current->sig->shared_pending.head) {
+			spin_lock(&current->sig->siglock);
+			signr = dequeue_signal(&current->sig->shared_pending, mask, info);
+			spin_unlock(&current->sig->siglock);
+		}
+		if (!signr) {
+			spin_lock(&current->sigmask_lock);
+			signr = dequeue_signal(&current->pending, mask, info);
+			spin_unlock(&current->sigmask_lock);
+		}
+		local_irq_enable();
 
 		if (!signr)
 			break;
@@ -1137,8 +1420,11 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			return -EINVAL;
 	}
 
-	spin_lock_irq(&current->sigmask_lock);
-	sig = dequeue_signal(&these, &info);
+	spin_lock_irq(&current->sig->siglock);
+	spin_lock(&current->sigmask_lock);
+	sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+	if (!sig)
+		sig = dequeue_signal(&current->pending, &these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1149,21 +1435,27 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			/* None ready -- temporarily unblock those we're
 			 * interested while we are sleeping in so that we'll
 			 * be awakened when they arrive.  */
-			sigset_t oldblocked = current->blocked;
+			current->real_blocked = current->blocked;
 			sigandsets(&current->blocked, &current->blocked, &these);
 			recalc_sigpending();
-			spin_unlock_irq(&current->sigmask_lock);
+			spin_unlock(&current->sigmask_lock);
+			spin_unlock_irq(&current->sig->siglock);
 
 			current->state = TASK_INTERRUPTIBLE;
 			timeout = schedule_timeout(timeout);
 
-			spin_lock_irq(&current->sigmask_lock);
-			sig = dequeue_signal(&these, &info);
-			current->blocked = oldblocked;
+			spin_lock_irq(&current->sig->siglock);
+			spin_lock(&current->sigmask_lock);
+			sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+			if (!sig)
+				sig = dequeue_signal(&current->pending, &these, &info);
+			current->blocked = current->real_blocked;
+			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();
 		}
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (sig) {
 		ret = sig;
@@ -1195,33 +1487,35 @@ sys_kill(int pid, int sig)
 }
 
 /*
- *  Kill only one task, even if it's a CLONE_THREAD task.
+ *  Send a signal to only one task, even if it's a CLONE_THREAD task.
  */
 asmlinkage long
 sys_tkill(int pid, int sig)
 {
-       struct siginfo info;
-       int error;
-       struct task_struct *p;
+	struct siginfo info;
+	int error;
+	struct task_struct *p;
 
-       /* This is only valid for single tasks */
-       if (pid <= 0)
-           return -EINVAL;
+	/* This is only valid for single tasks */
+	if (pid <= 0)
+		return -EINVAL;
 
-       info.si_signo = sig;
-       info.si_errno = 0;
-       info.si_code = SI_TKILL;
-       info.si_pid = current->pid;
-       info.si_uid = current->uid;
+	info.si_signo = sig;
+	info.si_errno = 0;
+	info.si_code = SI_TKILL;
+	info.si_pid = current->pid;
+	info.si_uid = current->uid;
 
-       read_lock(&tasklist_lock);
-       p = find_task_by_pid(pid);
-       error = -ESRCH;
-       if (p) {
-               error = send_sig_info(sig, &info, p);
-       }
-       read_unlock(&tasklist_lock);
-       return error;
+	read_lock(&tasklist_lock);
+	p = find_task_by_pid(pid);
+	error = -ESRCH;
+	if (p) {
+		spin_lock_irq(&p->sig->siglock);
+		error = __send_sig_info(sig, &info, p, 0);
+		spin_unlock_irq(&p->sig->siglock);
+	}
+	read_unlock(&tasklist_lock);
+	return error;
 }
 
 asmlinkage long
@@ -1247,13 +1541,12 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 {
 	struct k_sigaction *k;
 
-	if (sig < 1 || sig > _NSIG ||
-	    (act && (sig == SIGKILL || sig == SIGSTOP)))
+	if (sig < 1 || sig > _NSIG || (act && sig_kernel_only(sig)))
 		return -EINVAL;
 
 	k = &current->sig->action[sig-1];
 
-	spin_lock(&current->sig->siglock);
+	spin_lock_irq(&current->sig->siglock);
 
 	if (oact)
 		*oact = *k;
@@ -1292,7 +1585,7 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		}
 	}
 
-	spin_unlock(&current->sig->siglock);
+	spin_unlock_irq(&current->sig->siglock);
 	return 0;
 }
 

@@ -113,6 +113,12 @@ do {                                                                    \
 #define irq_exit()		br_read_unlock(BR_GLOBALIRQ_LOCK)
 #endif
 
+#if CONFIG_PREEMPT
+# define in_atomic()	(preempt_count() != kernel_locked())
+#else
+# define in_atomic()	(preempt_count() != 0)
+#endif
+
 #ifndef CONFIG_SMP
 
 #define synchronize_irq()	barrier()

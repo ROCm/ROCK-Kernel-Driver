@@ -65,7 +65,7 @@
 #define DATASEGS_PER_COMMAND 2
 #define DATASEGS_PER_CONT 5
 
-#define QLOGICFC_REQ_QUEUE_LEN	127	/* must be power of two - 1 */
+#define QLOGICFC_REQ_QUEUE_LEN 255     /* must be power of two - 1 */
 #define QLOGICFC_MAX_SG(ql)	(DATASEGS_PER_COMMAND + (((ql) > 0) ? DATASEGS_PER_CONT*((ql) - 1) : 0))
 #define QLOGICFC_CMD_PER_LUN    8
 

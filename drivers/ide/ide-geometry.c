@@ -214,7 +214,7 @@ int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 		ret = 1;
 	}
 
-	drive->part[0].nr_sects = current_capacity(drive);
+	set_capacity(drive->disk, current_capacity(drive));
 
 	if (ret)
 		printk("%s%s [%d/%d/%d]", msg, msg1,

@@ -17,6 +17,7 @@
 #include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/pagemap.h>
+#include <linux/highmem.h>
 #include <linux/crc32.h>
 #include <linux/jffs2.h>
 #include "nodelist.h"
@@ -381,9 +382,10 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	ri->isize = (uint32_t)inode->i_size;
 	ri->atime = ri->ctime = ri->mtime = CURRENT_TIME;
 
-	/* We rely on the fact that generic_file_write() currently kmaps the page for us. */
+	kmap(pg);
 	ret = jffs2_write_inode_range(c, f, ri, page_address(pg) + start,
 				      (pg->index << PAGE_CACHE_SHIFT) + start, end - start, &writtenlen);
+	kunmap(pg);
 
 	if (ret) {
 		/* There was an error writing. */

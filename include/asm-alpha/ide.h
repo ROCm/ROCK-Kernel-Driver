@@ -80,6 +80,17 @@ static __inline__ void ide_init_default_hwifs(void)
 #endif
 }
 
+#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
+#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
+#define ide_check_region(from,extent)		check_region((from), (extent))
+#define ide_request_region(from,extent,name)	request_region((from), (extent), (name))
+#define ide_release_region(from,extent)		release_region((from), (extent))
+
+#define ide_ack_intr(hwif)		(1)
+#define ide_fix_driveid(id)		do {} while (0)
+#define ide_release_lock(lock)		do {} while (0)
+#define ide_get_lock(lock, hdlr, data)	do {} while (0)
+
 #endif /* __KERNEL__ */
 
 #endif /* __ASMalpha_IDE_H */

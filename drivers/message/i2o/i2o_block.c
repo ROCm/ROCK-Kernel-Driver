@@ -186,7 +186,6 @@ static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 
 static struct i2ob_device i2ob_dev[MAX_I2OB<<4];
 static int i2ob_dev_count = 0;
-static struct hd_struct i2ob[MAX_I2OB<<4];
 static struct gendisk i2o_disk[MAX_I2OB];
 static char i2o_names[MAX_I2OB * 8];
 
@@ -248,7 +247,7 @@ static u32 i2ob_get(struct i2ob_device *dev)
  *	Turn a Linux block request into an I2O block read/write.
  */
 
-static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, u32 base, int unit)
+static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, int unit)
 {
 	struct i2o_controller *c = dev->controller;
 	int tid = dev->tid;
@@ -279,7 +278,7 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 		
 	/* This can be optimised later - just want to be sure its right for
 	   starters */
-	offset = ((u64)(req->sector+base)) << 9;
+	offset = ((u64)req->sector) << 9;
 	__raw_writel( offset & 0xFFFFFFFF, msg+24);
 	__raw_writel(offset>>32, msg+28);
 	mptr=msg+32;
@@ -724,7 +723,7 @@ static int i2ob_evt(void *dummy)
 				register_disk(p,
 					      mk_kdev(p->major, p->first_minor),
 					      1<<p->minor_shift, p->fops,
-					      i2ob[unit].nr_sects);
+					      get_capacity(p));
 				break;
 			}
 
@@ -737,7 +736,6 @@ static int i2ob_evt(void *dummy)
 			case I2O_EVT_IND_BSA_VOLUME_UNLOAD:
 			{
 				struct gendisk *p = &i2o_disk[unit>>4];
-				wipe_partitions(mk_kdev(MAJOR_NR, unit));
 				del_gendisk(p);
 				for(i = unit; i <= unit+15; i++)
 					blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
@@ -769,7 +767,7 @@ static int i2ob_evt(void *dummy)
 					i2ob_query_device(&i2ob_dev[unit], 0x0000, 4, &size, 8);
 
 				spin_lock_irqsave(I2O_LOCK(unit), flags);	
-				i2ob[unit].nr_sects = size>>9;
+				set_capacity(&i2o_disk[unit>>4], size>>9);
 				spin_unlock_irqrestore(I2O_LOCK(unit), flags);	
 				break;
 			}
@@ -870,7 +868,7 @@ static int i2ob_backlog_request(struct i2o_controller *c, struct i2ob_device *de
 			i2ob_backlog_tail[c->unit] = NULL;
 			
 		unit = minor(ireq->req->rq_dev);
-		i2ob_send(m, dev, ireq, i2ob[unit].start_sect, unit);
+		i2ob_send(m, dev, ireq, unit);
 	}
 	if(i2ob_backlog[c->unit])
 		return 1;
@@ -970,7 +968,7 @@ static void i2ob_request(request_queue_t *q)
 		i2ob_queues[dev->unit]->i2ob_qhead = ireq->next;
 		ireq->req = req;
 
-		i2ob_send(m, dev, ireq, i2ob[unit].start_sect, (unit&0xF0));
+		i2ob_send(m, dev, ireq, (unit&0xF0));
 	}
 }
 
@@ -1039,7 +1037,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
 	struct hd_geometry g;
-	int u = minor(inode->i_rdev) & 0xF0;
+	int u = minor(inode->i_rdev) >> 4;
 	/* Anyone capable of this syscall can do *real bad* things */
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -1047,7 +1045,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	i2o_block_biosparam(i2ob[u].nr_sects, 
+	i2o_block_biosparam(get_capacity(&i2o_disk[u]),
 				&g.cylinders, &g.heads, &g.sectors);
 	g.start = get_start_sect(inode->i_bdev);
 	return copy_to_user((void *)arg, &g, sizeof(g)) ? -EFAULT : 0;
@@ -1223,7 +1221,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
-	i2ob[unit].nr_sects = size>>9;
+	set_capacity(&i2o_disk[unit>>4], size>>9);
 
 	/* Set limit based on inbound frame size */
 	limit = (d->controller->status_block->inbound_frame_size - 8)/2;
@@ -1327,7 +1325,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	i2o_event_register(c, d->lct_data.tid, i2ob_context, unit, 
 		(I2OB_EVENT_MASK & d->lct_data.event_capabilities));
 
-	i2ob[unit].nr_sects = size>>9;
+	set_capacity(i2o_disk[unit>>4], size>>9);
 	return 0;
 }
 
@@ -1472,7 +1470,7 @@ static void i2ob_scan(int bios)
 					register_disk(p,
 						      mk_kdev(p->major, p->first_minor),
 						      1<<p->minor_shift, p->fops,
-						      i2ob[scan_unit].nr_sects);
+						      get_capacity(p));
 					scan_unit+=16;
 					i2ob_dev_count++;
 
@@ -1565,7 +1563,7 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		register_disk(p,
 			      mk_kdev(p->major, p->first_minor),
 			      1<<p->minor_shift, p->fops,
-			      i2ob[unit].nr_sects);
+			      get_capacity(p));
 		i2ob_dev_count++;
 		i2o_device_notify_on(d, &i2o_block_handler);
 	}
@@ -1616,7 +1614,6 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	 * This will force errors when i2ob_get_queue() is called
 	 * by the kenrel.
 	 */
-	wipe_partitions(mk_kdev(MAJOR_NR, unit));
 	del_gendisk(&i2o_disk[unit>>4]);
 	i2ob_dev[unit].req_queue = NULL;
 	for(i = unit; i <= unit+15; i++)
@@ -1773,9 +1770,7 @@ int i2o_block_init(void)
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<4;
 		disk->minor_shift = 4;
-		disk->part = i2ob + (i<<4);
 		disk->fops = &i2ob_fops;
-		disk->nr_real = 1;
 		disk->major_name = i2o_names + i*8;
 		sprintf(disk->major_name, "i2o/hd%c", 'a' + i);
 	}
