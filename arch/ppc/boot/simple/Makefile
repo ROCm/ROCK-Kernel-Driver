@@ -66,7 +66,7 @@ zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
   entrypoint-$(CONFIG_OCOTEA)		:= 0x01000000
      extra.o-$(CONFIG_OCOTEA)		:= pibs.o
 
-     extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
+     extra.o-$(CONFIG_EV64260)		:= misc-ev64260.o
          end-$(CONFIG_EV64260)		:= ev64260
    cacheflag-$(CONFIG_EV64260)		:= -include $(clear_L2_L3)
 
