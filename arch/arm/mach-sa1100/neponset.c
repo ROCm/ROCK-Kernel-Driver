@@ -13,6 +13,7 @@
 #include <linux/device.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
