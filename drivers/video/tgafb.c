@@ -41,6 +41,7 @@ static int tgafb_blank(int, struct fb_info *);
 static void tgafb_init_fix(struct fb_info *);
 
 static void tgafb_imageblit(struct fb_info *, struct fb_image *);
+static void tgafb_fillrect(struct fb_info *, struct fb_fillrect *);
 
 static int tgafb_pci_register(struct pci_dev *, const struct pci_device_id *);
 #ifdef MODULE
@@ -60,7 +61,7 @@ static struct fb_ops tgafb_ops = {
 	.fb_set_par		= tgafb_set_par,
 	.fb_setcolreg		= tgafb_setcolreg,
 	.fb_blank		= tgafb_blank,
-	.fb_fillrect		= cfb_fillrect,
+	.fb_fillrect		= tgafb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= tgafb_imageblit,
 	.fb_cursor		= soft_cursor,
@@ -203,8 +204,6 @@ tgafb_set_par(struct fb_info *info)
 	/* Write some more registers.  */
 	TGA_WRITE_REG(par, 0xffffffff, TGA_PLANEMASK_REG);
 	TGA_WRITE_REG(par, 0xffffffff, TGA_PIXELMASK_REG);
-	TGA_WRITE_REG(par, 0x12345678, TGA_BLOCK_COLOR0_REG);
-	TGA_WRITE_REG(par, 0x12345678, TGA_BLOCK_COLOR1_REG);
 
 	/* Init video timing regs.  */
 	TGA_WRITE_REG(par, htimings, TGA_HORIZ_REG);
@@ -547,7 +546,7 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 	struct tga_par *par = (struct tga_par *) info->par;
 	u32 fgcolor, bgcolor, dx, dy, width, height, vxres, vyres, pixelmask;
 	unsigned long rincr, line_length, shift, pos, is8bpp;
-	unsigned long i, j, k;
+	unsigned long i, j;
 	const unsigned char *data;
 	void *regs_base, *fb_base;
 
@@ -592,19 +591,23 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 		bgcolor |= bgcolor << 8;
 		bgcolor |= bgcolor << 16;
 	} else {
-		fgcolor = ((u32 *)info->pseudo_palette)[fgcolor];
-		bgcolor = ((u32 *)info->pseudo_palette)[bgcolor];
+		if (fgcolor < 16)
+			fgcolor = ((u32 *)info->pseudo_palette)[fgcolor];
+		if (bgcolor < 16)
+			bgcolor = ((u32 *)info->pseudo_palette)[bgcolor];
 	}
 	__raw_writel(fgcolor, regs_base + TGA_FOREGROUND_REG);
 	__raw_writel(bgcolor, regs_base + TGA_BACKGROUND_REG);
 
 	/* Acquire proper alignment; set up the PIXELMASK register
 	   so that we only write the proper character cell.  */
-	pos = dy * line_length + dx;
+	pos = dy * line_length;
 	if (is8bpp) {
+		pos += dx;
 		shift = pos & 3;
 		pos &= -4;
 	} else {
+		pos += dx * 4;
 		shift = (pos & 7) >> 2;
 		pos &= -8;
 	}
@@ -663,8 +666,10 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 		for (i = 0; i < height; ++i) {
 			for (j = 0; j < bwidth; j += 4) {
 				u32 mask = 0;
-				for (k = 0; k < 4; ++k)
-					mask |= bitrev[data[j+k]] << (k * 8);
+				mask |= bitrev[data[j+0]] << (0 * 8);
+				mask |= bitrev[data[j+1]] << (1 * 8);
+				mask |= bitrev[data[j+2]] << (2 * 8);
+				mask |= bitrev[data[j+3]] << (3 * 8);
 				__raw_writel(mask, fb_base + pos + j*bincr);
 			}
 			pos += line_length;
@@ -683,8 +688,8 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 
 			for (i = 0; i < height; ++i) {
 				u32 mask = 0;
-				for (k = 0; k < bwidth; ++k)
-					mask |= bitrev[data[k]] << (k * 8);
+				for (j = 0; j < bwidth; ++j)
+					mask |= bitrev[data[j]] << (j * 8);
 				__raw_writel(mask, fb_base + pos);
 				pos += line_length;
 				data += rincr;
@@ -710,9 +715,9 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 		bwidth = (width / 8) & -2;
 		for (i = 0; i < height; ++i) {
 			for (j = 0; j < bwidth; j += 2) {
-				u32 mask;
-				mask = bitrev[data[j]];
-				mask |= bitrev[data[j+1]] << 8;
+				u32 mask = 0;
+				mask |= bitrev[data[j+0]] << (0 * 8);
+				mask |= bitrev[data[j+1]] << (1 * 8);
 				mask <<= shift;
 				__raw_writel(mask, fb_base + pos + j*bincr);
 			}
@@ -751,6 +756,121 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
 		     regs_base + TGA_MODE_REG);
 }
 
+static void
+tgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	struct tga_par *par = (struct tga_par *) info->par;
+	int is8bpp = par->tga_type == TGA_TYPE_8PLANE;
+	u32 dx, dy, width, height, vxres, vyres, color;
+	unsigned long pos, align, line_length, i, j;
+	void *regs_base, *fb_base;
+
+	dx = rect->dx;
+	dy = rect->dy;
+	width = rect->width;
+	height = rect->height;
+	vxres = info->var.xres_virtual;
+	vyres = info->var.yres_virtual;
+	line_length = info->fix.line_length;
+	regs_base = par->tga_regs_base;
+	fb_base = par->tga_fb_base;
+
+	/* Crop the rectangle to the screen.  */
+	if (dx > vxres || dy > vyres || !width || !height)
+		return;
+	if (dx + width > vxres)
+		width = vxres - dx;
+	if (dy + height > vyres)
+		height = vyres - dy;
+
+	pos = dy * line_length + dx * (is8bpp ? 1 : 4);
+
+	/* ??? We could implement ROP_XOR with opaque fill mode
+	   and a RasterOp setting of GXxor, but as far as I can
+	   tell, this mode is not actually used in the kernel.
+	   Thus I am ignoring it for now.  */
+	if (rect->rop != ROP_COPY) {
+		printk(KERN_DEBUG "tgafb: fillrect saw rop != ROP_COPY\n");
+		cfb_fillrect(info, rect);
+		return;
+	}
+
+	/* Expand the color value to fill 8 pixels.  */
+	color = rect->color;
+	if (is8bpp) {
+		color |= color << 8;
+		color |= color << 16;
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR0_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR1_REG);
+	} else {
+		if (color < 16)
+			color = ((u32 *)info->pseudo_palette)[color];
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR0_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR1_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR2_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR3_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR4_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR5_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR6_REG);
+		__raw_writel(color, regs_base + TGA_BLOCK_COLOR7_REG);
+	}
+
+	/* The DATA register holds the fill mask for block fill mode.
+	   Since we're not stippling, this is all ones.  */
+	__raw_writel(0xffffffff, regs_base + TGA_DATA_REG);
+
+	/* Enable block fill mode.  */
+	__raw_writel((is8bpp
+		      ? TGA_MODE_SBM_8BPP | TGA_MODE_BLOCK_FILL
+		      : TGA_MODE_SBM_24BPP | TGA_MODE_BLOCK_FILL),
+		     regs_base + TGA_MODE_REG);
+	wmb();
+
+	/* We can fill 2k pixels per operation.  Notice blocks that fit
+	   the width of the screen so that we can take advantage of this
+	   and fill more than one line per write.  */
+	if (width == line_length)
+		width *= height, height = 1;
+
+	/* The write into the frame buffer must be aligned to 4 bytes,
+	   but we are allowed to encode the offset within the word in
+	   the data word written.  */
+	align = (pos & 3) << 16;
+	pos &= -4;
+
+	if (width <= 2048) {
+		u32 data;
+
+		data = (width - 1) | align;
+
+		for (i = 0; i < height; ++i) {
+			__raw_writel(data, fb_base + pos);
+			pos += line_length;
+		}
+	} else {
+		unsigned long Bpp = (is8bpp ? 1 : 4);
+		unsigned long nwidth = width & -2048;
+		u32 fdata, ldata;
+
+		fdata = (2048 - 1) | align;
+		ldata = ((width & 2047) - 1) | align;
+
+		for (i = 0; i < height; ++i) {
+			for (j = 0; j < nwidth; j += 2048)
+				__raw_writel(fdata, fb_base + pos + j*Bpp);
+			if (j < width)
+				__raw_writel(ldata, fb_base + pos + j*Bpp);
+			pos += line_length;
+		}
+	}
+	wmb();
+
+	/* Disable block fill mode.  */
+	__raw_writel((is8bpp
+		      ? TGA_MODE_SBM_8BPP | TGA_MODE_SIMPLE
+		      : TGA_MODE_SBM_24BPP | TGA_MODE_SIMPLE),
+		     regs_base + TGA_MODE_REG);
+}
 
 /*
  *  Initialisation
