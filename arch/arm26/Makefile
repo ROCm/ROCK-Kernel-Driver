@@ -8,7 +8,6 @@
 # Copyright (C) 1995-2001 by Russell King
 
 LDFLAGS_vmlinux	:=-p -X
-LDFLAGS_BLOB	:=--format binary
 CPPFLAGS_vmlinux.lds = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
@@ -28,7 +27,6 @@ CFLAGS		+=-mapcs-26 -mcpu=arm3 -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uar
 AFLAGS		+=-mapcs-26 -mcpu=arm3 -mno-fpu -msoft-float -Wa,-mno-fpu
 
 head-y		:= arch/arm26/machine/head.o arch/arm26/kernel/init_task.o
-LDFLAGS_BLOB	+= --oformat elf32-littlearm
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
   TEXTADDR	 := 0x03880000

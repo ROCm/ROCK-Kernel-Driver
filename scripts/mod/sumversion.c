@@ -1,5 +1,9 @@
 #include <netinet/in.h>
+#ifdef __sun__
+#include <inttypes.h>
+#else
 #include <stdint.h>
+#endif
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>

@@ -9,7 +9,6 @@ ELF_ARCH = $(SUBARCH)
 ELF_FORMAT = elf32-$(SUBARCH)
 
 OBJCOPYFLAGS  := -O binary -R .note -R .comment -S
-LDFLAGS_BLOB	:= --format binary --oformat elf32-i386
 
 SYS_DIR		:= $(ARCH_DIR)/include/sysdep-i386
 SYS_UTIL_DIR	:= $(ARCH_DIR)/sys-i386/util

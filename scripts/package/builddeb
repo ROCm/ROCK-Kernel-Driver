@@ -12,7 +12,7 @@
 set -e
 
 # Some variables and settings used throughout the script
-version="$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+version=$KERNELRELEASE
 tmpdir="$objtree/debian/tmp"
 
 # Setup the directory structure

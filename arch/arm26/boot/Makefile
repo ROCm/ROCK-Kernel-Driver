@@ -67,12 +67,12 @@ initrd:
 
 install: $(obj)/Image
 	$(CONFIG_SHELL) $(obj)/install.sh \
-	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(KERNELRELEASE) \
 	$(obj)/Image System.map "$(INSTALL_PATH)"
 
 zinstall: $(obj)/zImage
 	$(CONFIG_SHELL) $(obj)/install.sh \
-	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(KERNELRELEASE) \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
 subdir-	    := compressed
