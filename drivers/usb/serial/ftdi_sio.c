@@ -1999,17 +1999,42 @@ static void ftdi_unthrottle (struct usb_serial_port *port)
 
 static int __init ftdi_init (void)
 {
+	int retval;
 
 	dbg("%s", __FUNCTION__);
-	usb_serial_register (&ftdi_SIO_device);
-	usb_serial_register (&ftdi_8U232AM_device);
-	usb_serial_register (&ftdi_FT232BM_device);
-	usb_serial_register (&ftdi_USB_UIRT_device);
-	usb_serial_register (&ftdi_HE_TIRA1_device);
-	usb_register (&ftdi_driver);
+	retval = usb_serial_register(&ftdi_SIO_device);
+	if (retval)
+		goto failed_SIO_register;
+	retval = usb_serial_register(&ftdi_8U232AM_device);
+	if (retval)
+		goto failed_8U232AM_register;
+	retval = usb_serial_register(&ftdi_FT232BM_device);
+	if (retval)
+		goto failed_FT232BM_register;
+	retval = usb_serial_register(&ftdi_USB_UIRT_device);
+	if (retval)
+		goto failed_USB_UIRT_register;
+	retval = usb_serial_register(&ftdi_HE_TIRA1_device);
+	if (retval)
+		goto failed_HE_TIRA1_register;
+	retval = usb_register(&ftdi_driver);
+	if (retval) 
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&ftdi_HE_TIRA1_device);
+failed_HE_TIRA1_register:
+	usb_serial_deregister(&ftdi_USB_UIRT_device);
+failed_USB_UIRT_register:
+	usb_serial_deregister(&ftdi_FT232BM_device);
+failed_FT232BM_register:
+	usb_serial_deregister(&ftdi_8U232AM_device);
+failed_8U232AM_register:
+	usb_serial_deregister(&ftdi_SIO_device);
+failed_SIO_register:
+	return retval;
 }
 
 
