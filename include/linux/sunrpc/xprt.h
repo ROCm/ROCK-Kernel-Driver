@@ -69,8 +69,7 @@ extern unsigned int xprt_tcp_slot_table_entries;
  * This describes a timeout strategy
  */
 struct rpc_timeout {
-	unsigned long		to_current,		/* current timeout */
-				to_initval,		/* initial timeout */
+	unsigned long		to_initval,		/* initial timeout */
 				to_maxval,		/* max timeout */
 				to_increment;		/* if !exponential */
 	unsigned int		to_retries;		/* max # of retries */
@@ -85,7 +84,6 @@ struct rpc_rqst {
 	 * This is the user-visible part
 	 */
 	struct rpc_xprt *	rq_xprt;		/* RPC client */
-	struct rpc_timeout	rq_timeout;		/* timeout parms */
 	struct xdr_buf		rq_snd_buf;		/* send buffer */
 	struct xdr_buf		rq_rcv_buf;		/* recv buffer */
 
@@ -103,6 +101,9 @@ struct rpc_rqst {
 	struct xdr_buf		rq_private_buf;		/* The receive buffer
 							 * used in the softirq.
 							 */
+	unsigned long		rq_majortimeo;	/* major timeout alarm */
+	unsigned long		rq_timeout;	/* Current timeout value */
+	unsigned int		rq_retries;	/* # of retries */
 	/*
 	 * For authentication (e.g. auth_des)
 	 */
@@ -115,7 +116,6 @@ struct rpc_rqst {
 	u32			rq_bytes_sent;	/* Bytes we have sent */
 
 	unsigned long		rq_xtime;	/* when transmitted */
-	int			rq_ntimeo;
 	int			rq_ntrans;
 };
 #define rq_svec			rq_snd_buf.head
@@ -210,7 +210,7 @@ void			xprt_reserve(struct rpc_task *);
 int			xprt_prepare_transmit(struct rpc_task *);
 void			xprt_transmit(struct rpc_task *);
 void			xprt_receive(struct rpc_task *);
-int			xprt_adjust_timeout(struct rpc_timeout *);
+int			xprt_adjust_timeout(struct rpc_rqst *req);
 void			xprt_release(struct rpc_task *);
 void			xprt_connect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);

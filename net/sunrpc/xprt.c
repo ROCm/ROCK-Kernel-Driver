@@ -352,35 +352,57 @@ xprt_adjust_cwnd(struct rpc_xprt *xprt, int result)
 }
 
 /*
+ * Reset the major timeout value
+ */
+static void xprt_reset_majortimeo(struct rpc_rqst *req)
+{
+	struct rpc_timeout *to = &req->rq_xprt->timeout;
+
+	req->rq_majortimeo = req->rq_timeout;
+	if (to->to_exponential)
+		req->rq_majortimeo <<= to->to_retries;
+	else
+		req->rq_majortimeo += to->to_increment * to->to_retries;
+	if (req->rq_majortimeo > to->to_maxval || req->rq_majortimeo == 0)
+		req->rq_majortimeo = to->to_maxval;
+	req->rq_majortimeo += jiffies;
+}
+
+/*
  * Adjust timeout values etc for next retransmit
  */
-int
-xprt_adjust_timeout(struct rpc_timeout *to)
+int xprt_adjust_timeout(struct rpc_rqst *req)
 {
-	if (to->to_retries > 0) {
+	struct rpc_xprt *xprt = req->rq_xprt;
+	struct rpc_timeout *to = &xprt->timeout;
+	int status = 0;
+
+	if (time_before(jiffies, req->rq_majortimeo)) {
 		if (to->to_exponential)
-			to->to_current <<= 1;
+			req->rq_timeout <<= 1;
 		else
-			to->to_current += to->to_increment;
-		if (to->to_maxval && to->to_current >= to->to_maxval)
-			to->to_current = to->to_maxval;
+			req->rq_timeout += to->to_increment;
+		if (to->to_maxval && req->rq_timeout >= to->to_maxval)
+			req->rq_timeout = to->to_maxval;
+		req->rq_retries++;
+		pprintk("RPC: %lu retrans\n", jiffies);
 	} else {
-		if (to->to_exponential)
-			to->to_initval <<= 1;
-		else
-			to->to_initval += to->to_increment;
-		if (to->to_maxval && to->to_initval >= to->to_maxval)
-			to->to_initval = to->to_maxval;
-		to->to_current = to->to_initval;
+		req->rq_timeout = to->to_initval;
+		req->rq_retries = 0;
+		xprt_reset_majortimeo(req);
+		/* Reset the RTT counters == "slow start" */
+		spin_lock_bh(&xprt->sock_lock);
+		rpc_init_rtt(req->rq_task->tk_client->cl_rtt, to->to_initval);
+		spin_unlock_bh(&xprt->sock_lock);
+		pprintk("RPC: %lu timeout\n", jiffies);
+		status = -ETIMEDOUT;
 	}
 
-	if (!to->to_current) {
-		printk(KERN_WARNING "xprt_adjust_timeout: to_current = 0!\n");
-		to->to_current = 5 * HZ;
+	if (req->rq_timeout == 0) {
+		printk(KERN_WARNING "xprt_adjust_timeout: rq_timeout = 0!\n");
+		req->rq_timeout = 5 * HZ;
 	}
-	pprintk("RPC: %lu %s\n", jiffies,
-			to->to_retries? "retrans" : "timeout");
-	return to->to_retries-- > 0;
+	return status;
 }
 
 /*
@@ -1174,6 +1196,7 @@ xprt_transmit(struct rpc_task *task)
 			/* Add request to the receive list */
 			list_add_tail(&req->rq_list, &xprt->recv);
 			spin_unlock_bh(&xprt->sock_lock);
+			xprt_reset_majortimeo(req);
 		}
 	} else if (!req->rq_bytes_sent)
 		return;
@@ -1229,7 +1252,7 @@ xprt_transmit(struct rpc_task *task)
 			if (!xprt_connected(xprt))
 				task->tk_status = -ENOTCONN;
 			else if (test_bit(SOCK_NOSPACE, &xprt->sock->flags)) {
-				task->tk_timeout = req->rq_timeout.to_current;
+				task->tk_timeout = req->rq_timeout;
 				rpc_sleep_on(&xprt->pending, task, NULL, NULL);
 			}
 			spin_unlock_bh(&xprt->sock_lock);
@@ -1256,13 +1279,11 @@ xprt_transmit(struct rpc_task *task)
 	if (!xprt->nocong) {
 		int timer = task->tk_msg.rpc_proc->p_timer;
 		task->tk_timeout = rpc_calc_rto(clnt->cl_rtt, timer);
-		task->tk_timeout <<= rpc_ntimeo(clnt->cl_rtt, timer);
-		task->tk_timeout <<= clnt->cl_timeout.to_retries
-			- req->rq_timeout.to_retries;
-		if (task->tk_timeout > req->rq_timeout.to_maxval)
-			task->tk_timeout = req->rq_timeout.to_maxval;
+		task->tk_timeout <<= rpc_ntimeo(clnt->cl_rtt, timer) + req->rq_retries;
+		if (task->tk_timeout > xprt->timeout.to_maxval || task->tk_timeout == 0)
+			task->tk_timeout = xprt->timeout.to_maxval;
 	} else
-		task->tk_timeout = req->rq_timeout.to_current;
+		task->tk_timeout = req->rq_timeout;
 	/* Don't race with disconnect */
 	if (!xprt_connected(xprt))
 		task->tk_status = -ENOTCONN;
@@ -1332,7 +1353,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 {
 	struct rpc_rqst	*req = task->tk_rqstp;
 
-	req->rq_timeout = xprt->timeout;
+	req->rq_timeout = xprt->timeout.to_initval;
 	req->rq_task	= task;
 	req->rq_xprt    = xprt;
 	req->rq_xid     = xprt_alloc_xid(xprt);
@@ -1389,7 +1410,6 @@ xprt_default_timeout(struct rpc_timeout *to, int proto)
 void
 xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long incr)
 {
-	to->to_current   = 
 	to->to_initval   = 
 	to->to_increment = incr;
 	to->to_maxval    = incr * retr;
@@ -1454,7 +1474,6 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	/* Set timeout parameters */
 	if (to) {
 		xprt->timeout = *to;
-		xprt->timeout.to_current = to->to_initval;
 	} else
 		xprt_default_timeout(&xprt->timeout, xprt->prot);
 

@@ -736,10 +736,8 @@ static int
 gss_refresh(struct rpc_task *task)
 {
 	struct rpc_clnt *clnt = task->tk_client;
-	struct rpc_xprt *xprt = task->tk_xprt;
 	struct rpc_cred *cred = task->tk_msg.rpc_cred;
 
-	task->tk_timeout = xprt->timeout.to_current;
 	if (!gss_cred_is_uptodate_ctx(cred))
 		return gss_upcall(clnt, task, cred);
 	return 0;
