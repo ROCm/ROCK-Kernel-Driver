@@ -93,9 +93,7 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 	}
 	mixcomwd_ping();
 	
-	if (nowayout) {
-		MOD_INC_USE_COUNT;
-	} else {
+	if (!nowayout) {
 		if(mixcomwd_timer_alive) {
 			del_timer(&mixcomwd_timer);
 			mixcomwd_timer_alive=0;
