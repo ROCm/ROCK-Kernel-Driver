@@ -4100,9 +4100,9 @@ megaraid_sysfs_get_ldmap(adapter_t *adapter)
 	mbox64	= raid_dev->sysfs_mbox64;
 	ldmap	= raid_dev->sysfs_buffer;
 
-	memset(uioc, sizeof(uioc_t), 0);
-	memset(mbox64, sizeof(mbox64_t), 0);
-	memset(ldmap, sizeof(raid_dev->curr_ldmap), 0);
+	memset(uioc, 0, sizeof(uioc_t));
+	memset(mbox64, 0, sizeof(mbox64_t));
+	memset(ldmap, 0, sizeof(raid_dev->curr_ldmap));
 
 	mbox		= &mbox64->mbox32;
 	raw_mbox	= (char *)mbox;
