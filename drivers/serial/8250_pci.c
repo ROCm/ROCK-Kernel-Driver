@@ -1809,13 +1809,6 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 		pbn_b1_1_115200 },
 
 	/*
-	 * 3Com US Robotics 56k Voice Internal PCI model 5610
-	 */
-	{	PCI_VENDOR_ID_USR, 0x1008,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
-		pbn_b0_1_115200 },
-
-	/*
 	 * Titan Electronic cards
 	 *  The 400L and 800L have a custom setup quirk.
 	 */

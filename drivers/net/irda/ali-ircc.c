@@ -854,7 +854,7 @@ static void ali_ircc_sir_receive(struct ali_ircc_cb *self)
 		async_unwrap_char(self->netdev, &self->stats, &self->rx_buff, 
 				  inb(iobase+UART_RX));
 
-		/* Make sure we don't stay here to long */
+		/* Make sure we don't stay here too long */
 		if (boguscount++ > 32) {
 			IRDA_DEBUG(2,"%s(), breaking!\n", __FUNCTION__);
 			break;

@@ -188,9 +188,9 @@ struct hpsb_host_driver {
                                  quadlet_t data, quadlet_t compare);
 };
 
-/* high level internal use */
-struct hpsb_highlevel;
-void hl_all_hosts(void (*function)(struct hpsb_host*));
+
+extern struct list_head hpsb_hosts;
+extern struct semaphore hpsb_hosts_lock;
 
 
 /*
