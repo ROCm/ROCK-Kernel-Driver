@@ -688,15 +688,16 @@ static ssize_t mapbase_read(struct file * file, char * buf,
 	struct task_struct *task = proc_task(file->f_dentry->d_inode);
 	char buffer[64];
 	size_t len;
+	loff_t __ppos = *ppos;
 
-	len = sprintf(buffer, "%li\n", task->map_base) + 1;
-	if (*ppos >= len)
+	len = sprintf(buffer, "%li\n", task->map_base);
+	if (__ppos >= len)
 		return 0;
-	if (count > len-*ppos)
-		count = len-*ppos;
-	if (copy_to_user(buf, buffer + *ppos, count)) 
+	if (count > len-__ppos)
+		count = len-__ppos;
+	if (copy_to_user(buf, buffer + __ppos, count)) 
 		return -EFAULT;
-	*ppos += count;
+	*ppos = __ppos + count;
 	return count;
 }
 
@@ -737,15 +738,16 @@ static ssize_t oom_adjust_read(struct file * file, char * buf,
 	char buffer[8];
 	size_t len;
 	int oom_adjust = task->oomkilladj;
+	loff_t __ppos = *ppos;
 
-	len = sprintf(buffer, "%i\n", oom_adjust) + 1;
-	if (*ppos >= len)
+	len = sprintf(buffer, "%i\n", oom_adjust);
+	if (__ppos >= len)
 		return 0;
-	if (count > len-*ppos)
-		count = len-*ppos;
-	if (copy_to_user(buf, buffer + *ppos, count)) 
+	if (count > len-__ppos)
+		count = len-__ppos;
+	if (copy_to_user(buf, buffer + __ppos, count)) 
 		return -EFAULT;
-	*ppos += count;
+	*ppos = __ppos + count;
 	return count;
 }
 
