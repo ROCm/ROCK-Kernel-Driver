@@ -1992,7 +1992,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	}
 #else
 	for(i = 0; i < E1000_MAX_INTR; i++)
-		if(!e1000_clean_rx_irq(adapter) &&
+		if(!e1000_clean_rx_irq(adapter) &
 		   !e1000_clean_tx_irq(adapter))
 			break;
 #endif
