@@ -263,7 +263,7 @@ UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
 UNUSUAL_DEV(  0x054c, 0x002d, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick MSAC-US1",
-		US_SC_UFI, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
 
 /* Submitted by Klaus Mueller <k.mueller@intershop.de> */
