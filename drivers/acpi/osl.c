@@ -50,11 +50,11 @@ ACPI_MODULE_NAME	("osl")
 
 #define PREFIX		"ACPI: "
 
-typedef struct
+struct acpi_os_dpc
 {
     OSD_EXECUTION_CALLBACK  function;
     void		    *context;
-} ACPI_OS_DPC;
+};
 
 
 #ifdef ENABLE_DEBUGGER
@@ -547,57 +547,25 @@ acpi_os_read_pci_configuration (
 
 #endif /*CONFIG_ACPI_PCI*/
 
-
-/*
- * See acpi_os_queue_for_execution()
- */
-static int
-acpi_os_queue_exec (
-	void *context)
-{
-	ACPI_OS_DPC		*dpc = (ACPI_OS_DPC*)context;
-
-	ACPI_FUNCTION_TRACE ("os_queue_exec");
-
-	daemonize();
-	strcpy(current->comm, "kacpidpc");
-
-	if (!dpc || !dpc->function)
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Executing function [%p(%p)].\n", dpc->function, dpc->context));
-
-	dpc->function(dpc->context);
-
-	kfree(dpc);
-
-	return_ACPI_STATUS (AE_OK);
-}
-
 static void
-acpi_os_schedule_exec (
+acpi_os_execute_deferred (
 	void *context)
 {
-	ACPI_OS_DPC		*dpc = NULL;
-	int			thread_pid = -1;
+	struct acpi_os_dpc	*dpc = NULL;
 
-	ACPI_FUNCTION_TRACE ("os_schedule_exec");
+	ACPI_FUNCTION_TRACE ("os_execute_deferred");
 
-	dpc = (ACPI_OS_DPC*)context;
+	dpc = (struct acpi_os_dpc *) context;
 	if (!dpc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
 		return_VOID;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
+	dpc->function(dpc->context);
 
-	thread_pid = kernel_thread(acpi_os_queue_exec, dpc,
-		(CLONE_FS | CLONE_FILES | SIGCHLD));
-	if (thread_pid < 0) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to kernel_thread() failed.\n"));
-		acpi_os_free(dpc);
-	}
-    return_VOID;
+	kfree(dpc);
+
+	return_VOID;
 }
 
 acpi_status
@@ -607,7 +575,8 @@ acpi_os_queue_for_execution(
 	void			*context)
 {
 	acpi_status 		status = AE_OK;
-	ACPI_OS_DPC 		*dpc = NULL;
+	struct acpi_os_dpc	*dpc;
+	struct work_struct	*task;
 
 	ACPI_FUNCTION_TRACE ("os_queue_for_execution");
 
@@ -617,61 +586,30 @@ acpi_os_queue_for_execution(
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	/*
-	 * Queue via DPC:
-	 * --------------
-	 * Note that we have to use two different processes for queuing DPCs:
-	 *	 Interrupt-Level: Use schedule_work; can't spawn a new thread.
-	 *	    Kernel-Level: Spawn a new kernel thread, as schedule_work has
-	 *			  its limitations (e.g. single-threaded model), and
-	 *			  all other task queues run at interrupt-level.
+	 * Allocate/initialize DPC structure.  Note that this memory will be
+	 * freed by the callee.  The kernel handles the tq_struct list  in a
+	 * way that allows us to also free its memory inside the callee.
+	 * Because we may want to schedule several tasks with different
+	 * parameters we can't use the approach some kernel code uses of
+	 * having a static tq_struct.
+	 * We can save time and code by allocating the DPC and tq_structs
+	 * from the same memory.
 	 */
-	switch (priority) {
 
-	case OSD_PRIORITY_GPE:
-	{
-		/*
-		 * Allocate/initialize DPC structure.  Note that this memory will be
-		 * freed by the callee.  The kernel handles the tq_struct list  in a
-		 * way that allows us to also free its memory inside the callee.
-		 * Because we may want to schedule several tasks with different
-		 * parameters we can't use the approach some kernel code uses of
-		 * having a static tq_struct.
-		 * We can save time and code by allocating the DPC and tq_structs
-		 * from the same memory.
-		 */
-		struct work_struct *task;
+	dpc = kmalloc(sizeof(struct acpi_os_dpc)+sizeof(struct work_struct), GFP_ATOMIC);
+	if (!dpc)
+		return_ACPI_STATUS (AE_NO_MEMORY);
 
-		dpc = kmalloc(sizeof(ACPI_OS_DPC)+sizeof(struct work_struct), GFP_ATOMIC);
-		if (!dpc)
-			return_ACPI_STATUS (AE_NO_MEMORY);
+	dpc->function = function;
+	dpc->context = context;
 
-		dpc->function = function;
-		dpc->context = context;
+	task = (void *)(dpc+1);
+	INIT_WORK(task, acpi_os_execute_deferred, (void*)dpc);
 
-		task = (void *)(dpc+1);
-		INIT_WORK(task, acpi_os_schedule_exec, (void*)dpc);
-
-		if (!schedule_work(task)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
-			kfree(dpc);
-			status = AE_ERROR;
-		}
-	}
-	break;
-	default:
-		/*
-		 * Allocate/initialize DPC structure.  Note that this memory will be
-		 * freed by the callee.
-		 */
-		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_KERNEL);
-		if (!dpc)
-			return_ACPI_STATUS (AE_NO_MEMORY);
-
-		dpc->function = function;
-		dpc->context = context;
-
-		acpi_os_schedule_exec(dpc);
-		break;
+	if (!schedule_work(task)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
+		kfree(dpc);
+		status = AE_ERROR;
 	}
 
 	return_ACPI_STATUS (status);
