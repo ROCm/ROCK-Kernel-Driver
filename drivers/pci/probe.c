@@ -505,23 +505,30 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, max, pass;
 	struct list_head *ln;
-	struct pci_dev *dev, dev0;
+	struct pci_dev *dev;
+
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev) {
+		printk(KERN_ERR "Out of memory in %s\n", __FUNCTION__);
+		return 0;
+	}
 
 	DBG("Scanning bus %02x\n", bus->number);
 	max = bus->secondary;
 
 	/* Create a device template */
-	memset(&dev0, 0, sizeof(dev0));
-	dev0.bus = bus;
-	dev0.sysdata = bus->sysdata;
-	dev0.dev.parent = bus->dev;
-	dev0.dev.bus = &pci_bus_type;
+	memset(dev, 0, sizeof(*dev));
+	dev->bus = bus;
+	dev->sysdata = bus->sysdata;
+	dev->dev.parent = bus->dev;
+	dev->dev.bus = &pci_bus_type;
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8) {
-		dev0.devfn = devfn;
-		pci_scan_slot(&dev0);
+		dev->devfn = devfn;
+		pci_scan_slot(dev);
 	}
+	kfree(dev);
 
 	/*
 	 * After performing arch-dependent fixup of the bus, look behind
