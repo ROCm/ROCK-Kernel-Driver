@@ -11,6 +11,7 @@
 #include <asm/sn/iograph.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/simulator.h>
 
 extern int bridge_rev_b_data_check_disable;
 
@@ -801,8 +802,8 @@ sn_pci_init (void)
 	int i = 0;
 	struct pci_controller *controller;
 
-	if (!ia64_platform_is("sn2"))
-	    return 0;
+	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_SIMULATOR())
+		return 0;
 
 	/*
 	 * set pci_raw_ops, etc.
