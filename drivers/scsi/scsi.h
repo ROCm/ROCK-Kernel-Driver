@@ -461,11 +461,6 @@ extern void scsi_initialize_merge_fn(Scsi_Device *SDpnt);
 extern int scsi_init_io(Scsi_Cmnd *SCpnt);
 
 /*
- * Prototypes for functions in scsi_queue.c
- */
-extern int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason);
-
-/*
  * Prototypes for functions in scsi_lib.c
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
