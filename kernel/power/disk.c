@@ -29,6 +29,7 @@ extern int swsusp_suspend(void);
 extern int swsusp_write(void);
 extern int swsusp_check(void);
 extern int swsusp_read(void);
+extern void swsusp_close(void);
 extern int swsusp_resume(void);
 extern int swsusp_free(void);
 
@@ -133,7 +134,7 @@ static int prepare_processes(void)
 
 	sys_sync();
 
-	if (freeze_processes() > 1) {
+	if (freeze_processes()) {
 		error = -EBUSY;
 		return error;
 	}
@@ -251,20 +252,19 @@ static int software_resume(void)
 	pr_debug("PM: Preparing processes for restore.\n");
 
 	if ((error = prepare_processes())) {
-		unprepare_processes();
-		goto Done;
+		swsusp_close();
+		goto Cleanup;
 	}
 
 	pr_debug("PM: Reading swsusp image.\n");
 
 	if ((error = swsusp_read()))
-		goto Done;
+		goto Cleanup;
 
 	pr_debug("PM: Preparing devices for restore.\n");
 
-	if ((error = prepare_devices())) {
+	if ((error = prepare_devices()))
 		goto Free;
-	}
 
 	barrier();
 	mb();
@@ -275,6 +275,8 @@ static int software_resume(void)
 	finish();
  Free:
 	swsusp_free();
+ Cleanup:
+	unprepare_processes();
  Done:
 	pr_debug("PM: Resume from disk failed.\n");
 	return 0;
@@ -385,9 +387,7 @@ static ssize_t resume_store(struct subsystem * subsys, const char * buf, size_t 
 			swsusp_resume_device = res;
 			printk("Attempting manual resume\n");
 			noresume = 0;
-			set_current_state(TASK_STOPPED);
 			software_resume();
-			set_current_state(TASK_RUNNING);
 		}
 	}
 

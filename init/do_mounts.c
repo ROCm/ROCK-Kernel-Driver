@@ -144,8 +144,7 @@ dev_t name_to_dev_t(char *name)
 
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
-	int mount_err = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
-	if (mount_err < 0 && mount_err != -EBUSY)
+	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
 		goto out;
 #endif
 
@@ -197,8 +196,7 @@ dev_t name_to_dev_t(char *name)
 	res = try_name(s, part);
 done:
 #ifdef CONFIG_SYSFS
-	if (!mount_err)
-		sys_umount("/sys", 0);
+	sys_umount("/sys", 0);
 out:
 	if (!mkdir_err)
 		sys_rmdir("/sys");

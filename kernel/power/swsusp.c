@@ -1235,13 +1235,14 @@ int swsusp_check(void)
 		pr_debug("swsusp: Resume From Partition %s\n", resume_file);
 	} else {
 		pr_debug("swsusp: Resume From Partition %d:%d\n",
-			 MAJOR(swsusp_resume_device),MINOR(swsusp_resume_device));
+			 MAJOR(swsusp_resume_device), MINOR(swsusp_resume_device));
 	}
 
 	resume_bdev = open_by_devnum(swsusp_resume_device, FMODE_READ);
 	if (!IS_ERR(resume_bdev)) {
 		set_blocksize(resume_bdev, PAGE_SIZE);
-		if((error = check_suspend_image()))
+		error = check_suspend_image();
+		if (error)
 		    blkdev_put(resume_bdev);
 	} else
 		error = PTR_ERR(resume_bdev);
@@ -1274,4 +1275,20 @@ int swsusp_read(void)
 	else
 		pr_debug("swsusp: Error %d resuming\n", error);
 	return error;
+}
+
+/**
+ *	swsusp_close - close swap device.
+ */
+
+int swsusp_close(void)
+{
+	int error;
+
+	if (IS_ERR(resume_bdev)) {
+		pr_debug("swsusp: block device not initialised\n");
+		return;
+	}
+
+	blkdev_put(resume_bdev);
 }
