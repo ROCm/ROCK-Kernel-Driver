@@ -14,7 +14,7 @@
 
 #define DEBUG
 
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -25,10 +25,47 @@
 
 extern struct subsystem devices_subsys;
 
+#define to_sysdev(k) container_of(k,struct sys_device,kobj)
+#define to_sysdev_attr(a) container_of(a,struct sysdev_attribute,attr)
+
+
+static ssize_t 
+sysdev_show(struct kobject * kobj, struct attribute * attr, char * buffer)
+{
+	struct sys_device * sysdev = to_sysdev(kobj);
+	struct sysdev_attribute * sysdev_attr = to_sysdev_attr(attr);
+
+	if (sysdev_attr->show)
+		return sysdev_attr->show(sysdev,buffer);
+	return 0;
+}
+
+
+static ssize_t
+sysdev_store(struct kobject * kobj, struct attribute * attr, 
+	     const char * buffer, size_t count)
+{
+	struct sys_device * sysdev = to_sysdev(kobj);
+	struct sysdev_attribute * sysdev_attr = to_sysdev_attr(attr);
+
+	if (sysdev_attr->store)
+		return sysdev_attr->store(sysdev,buffer,count);
+	return 0;
+}
+
+static struct sysfs_ops sysfs_ops = {
+	.show	= sysdev_show,
+	.store	= sysdev_store,
+};
+
+static struct kobj_type ktype_sysdev = {
+	.sysfs_ops	= &sysfs_ops,
+};
+
 /* 
  * declare system_subsys 
  */
-decl_subsys(system,NULL,NULL);
+decl_subsys(system,&ktype_sysdev,NULL);
 
 int sysdev_class_register(struct sysdev_class * cls)
 {
