@@ -2091,6 +2091,9 @@ static void hp100_update_stats(struct net_device *dev)
 
 static void hp100_misc_interrupt(struct net_device *dev)
 {
+#ifdef HP100_DEBUG_B
+	int ioaddr = dev->base_addr;
+#endif
 	struct hp100_private *lp = (struct hp100_private *) dev->priv;
 
 #ifdef HP100_DEBUG_B
