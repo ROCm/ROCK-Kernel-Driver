@@ -101,7 +101,7 @@
 #define UDF_SB_LASTBLOCK(X)				( UDF_SB(X)->s_lastblock )
 #define UDF_SB_LVIDBH(X)				( UDF_SB(X)->s_lvidbh )
 #define UDF_SB_LVID(X)					( (struct LogicalVolIntegrityDesc *)UDF_SB_LVIDBH(X)->b_data )
-#define UDF_SB_LVIDIU(X)				( (struct LogicalVolIntegrityDescImpUse *)&(UDF_SB_LVID(X)->impUse[UDF_SB_LVID(X)->numOfPartitions * 2 * sizeof(Uint32)/sizeof(Uint8)]) )
+#define UDF_SB_LVIDIU(X)				( (struct LogicalVolIntegrityDescImpUse *)&(UDF_SB_LVID(X)->impUse[le32_to_cpu(UDF_SB_LVID(X)->numOfPartitions) * 2 * sizeof(Uint32)/sizeof(Uint8)]) )
 
 #define UDF_SB_UMASK(X)					( UDF_SB(X)->s_umask )
 #define UDF_SB_GID(X)					( UDF_SB(X)->s_gid )
