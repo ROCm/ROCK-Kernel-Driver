@@ -30,8 +30,6 @@
 	* Constants (module parms?) for Rx work limit
 	* Complete reset on PciErr
 	* Consider Rx interrupt mitigation using TimerIntr
-	* Implement 8139C+ statistics dump; maybe not...
-	  h/w stats can be reset only by software reset
 	* Handle netif_rx return value
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
@@ -41,14 +39,13 @@
 	  Tx descriptor bit
 	* The real minimum of CP_MIN_MTU is 4 bytes.  However,
 	  for this to be supported, one must(?) turn on packet padding.
-	* Support 8169 GMII
 	* Support external MII transceivers
 
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.3.0"
-#define DRV_RELDATE		"Sep 29, 2002"
+#define DRV_VERSION		"0.5"
+#define DRV_RELDATE		"Aug 26, 2003"
 
 
 #include <linux/config.h>
@@ -1304,8 +1301,8 @@ static void mdio_write(struct net_device *dev, int phy_id, int location,
 }
 
 /* Set the ethtool Wake-on-LAN settings */
-static void netdev_set_wol (struct cp_private *cp,
-                     const struct ethtool_wolinfo *wol)
+static int netdev_set_wol (struct cp_private *cp,
+			   const struct ethtool_wolinfo *wol)
 {
 	u8 options;
 
@@ -1332,6 +1329,8 @@ static void netdev_set_wol (struct cp_private *cp,
 	cpw8 (Config5, options);
 
 	cp->wol_enabled = (wol->wolopts) ? 1 : 0;
+
+	return 0;
 }
 
 /* Get the ethtool Wake-on-LAN settings */
@@ -1357,308 +1356,215 @@ static void netdev_get_wol (struct cp_private *cp,
 	if (options & MWF)           wol->wolopts |= WAKE_MCAST;
 }
 
-static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
+static void cp_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
+	struct cp_private *cp = dev->priv;
 
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+	strcpy (info->driver, DRV_NAME);
+	strcpy (info->version, DRV_VERSION);
+	strcpy (info->bus_info, pci_name(cp->pdev));
+}
 
-	if (get_user(ethcmd, (u32 *)useraddr))
-		return -EFAULT;
+static int cp_get_regs_len(struct net_device *dev)
+{
+	return CP_REGS_SIZE;
+}
 
-	switch (ethcmd) {
+static int cp_get_stats_count (struct net_device *dev)
+{
+	return CP_NUM_STATS;
+}
 
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, pci_name(cp->pdev));
-		info.regdump_len = CP_REGS_SIZE;
-		info.n_stats = CP_NUM_STATS;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
+static int cp_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct cp_private *cp = dev->priv;
+	int rc;
 
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&cp->lock);
-		mii_ethtool_gset(&cp->mii_if, &ecmd);
-		spin_unlock_irq(&cp->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&cp->lock);
-		r = mii_ethtool_sset(&cp->mii_if, &ecmd);
-		spin_unlock_irq(&cp->lock);
-		return r;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&cp->mii_if);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		edata.data = mii_link_ok(&cp->mii_if);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
+	spin_lock_irq(&cp->lock);
+	rc = mii_ethtool_gset(&cp->mii_if, cmd);
+	spin_unlock_irq(&cp->lock);
 
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = cp->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		cp->msg_enable = edata.data;
-		return 0;
-	}
+	return rc;
+}
 
-	/* NIC register dump */
-	case ETHTOOL_GREGS: {
-                struct ethtool_regs regs;
-                u8 *regbuf = kmalloc(CP_REGS_SIZE, GFP_KERNEL);
-                int rc;
+static int cp_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct cp_private *cp = dev->priv;
+	int rc;
 
-		if (!regbuf)
-			return -ENOMEM;
-		memset(regbuf, 0, CP_REGS_SIZE);
+	spin_lock_irq(&cp->lock);
+	rc = mii_ethtool_sset(&cp->mii_if, cmd);
+	spin_unlock_irq(&cp->lock);
 
-                rc = copy_from_user(&regs, useraddr, sizeof(regs));
-		if (rc) {
-			rc = -EFAULT;
-			goto err_out_gregs;
-		}
-                
-                if (regs.len > CP_REGS_SIZE)
-                        regs.len = CP_REGS_SIZE;
-                if (regs.len < CP_REGS_SIZE) {
-			rc = -EINVAL;
-			goto err_out_gregs;
-		}
+	return rc;
+}
 
-                regs.version = CP_REGS_VER;
-                rc = copy_to_user(useraddr, &regs, sizeof(regs));
-		if (rc) {
-			rc = -EFAULT;
-			goto err_out_gregs;
-		}
+static int cp_nway_reset(struct net_device *dev)
+{
+	struct cp_private *cp = dev->priv;
+	return mii_nway_restart(&cp->mii_if);
+}
 
-                useraddr += offsetof(struct ethtool_regs, data);
+static u32 cp_get_msglevel(struct net_device *dev)
+{
+	struct cp_private *cp = dev->priv;
+	return cp->msg_enable;
+}
 
-                spin_lock_irq(&cp->lock);
-                memcpy_fromio(regbuf, cp->regs, CP_REGS_SIZE);
-                spin_unlock_irq(&cp->lock);
+static void cp_set_msglevel(struct net_device *dev, u32 value)
+{
+	struct cp_private *cp = dev->priv;
+	cp->msg_enable = value;
+}
 
-                if (copy_to_user(useraddr, regbuf, regs.len))
-                        rc = -EFAULT;
+static u32 cp_get_rx_csum(struct net_device *dev)
+{
+	struct cp_private *cp = dev->priv;
+	return (cpr16(CpCmd) & RxChkSum) ? 1 : 0;
+}
 
-err_out_gregs:
-		kfree(regbuf);
-		return rc;
-	}
+static int cp_set_rx_csum(struct net_device *dev, u32 data)
+{
+	struct cp_private *cp = dev->priv;
+	u16 cmd = cpr16(CpCmd), newcmd;
 
-	/* get/set RX checksumming */
-	case ETHTOOL_GRXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
-		u16 cmd = cpr16(CpCmd) & RxChkSum;
+	newcmd = cmd;
 
-		edata.data = cmd ? 1 : 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRXCSUM: {
-		struct ethtool_value edata;
-		u16 cmd = cpr16(CpCmd), newcmd;
+	if (data)
+		newcmd |= RxChkSum;
+	else
+		newcmd &= ~RxChkSum;
 
-		newcmd = cmd;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (edata.data)
-			newcmd |= RxChkSum;
-		else
-			newcmd &= ~RxChkSum;
-
-		if (newcmd == cmd)
-			return 0;
-
+	if (newcmd != cmd) {
 		spin_lock_irq(&cp->lock);
 		cpw16_f(CpCmd, newcmd);
 		spin_unlock_irq(&cp->lock);
 	}
 
-	/* get/set TX checksumming */
-	case ETHTOOL_GTXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
-
-		edata.data = (cp->dev->features & NETIF_F_IP_CSUM) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_STXCSUM: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (edata.data)
-			cp->dev->features |= NETIF_F_IP_CSUM;
-		else
-			cp->dev->features &= ~NETIF_F_IP_CSUM;
-
-		return 0;
-	}
-
-	/* get/set scatter-gather */
-	case ETHTOOL_GSG: {
-		struct ethtool_value edata = { ETHTOOL_GSG };
-
-		edata.data = (cp->dev->features & NETIF_F_SG) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSG: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (edata.data)
-			cp->dev->features |= NETIF_F_SG;
-		else
-			cp->dev->features &= ~NETIF_F_SG;
-
-		return 0;
-	}
-
-	/* get string list(s) */
-	case ETHTOOL_GSTRINGS: {
-		struct ethtool_gstrings estr = { ETHTOOL_GSTRINGS };
-
-		if (copy_from_user(&estr, useraddr, sizeof(estr)))
-			return -EFAULT;
-		if (estr.string_set != ETH_SS_STATS)
-			return -EINVAL;
-
-		estr.len = CP_NUM_STATS;
-		if (copy_to_user(useraddr, &estr, sizeof(estr)))
-			return -EFAULT;
-		if (copy_to_user(useraddr + sizeof(estr),
-				 &ethtool_stats_keys,
-				 sizeof(ethtool_stats_keys)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get NIC-specific statistics */
-	case ETHTOOL_GSTATS: {
-		struct ethtool_stats estats = { ETHTOOL_GSTATS };
-		u64 *tmp_stats;
-		unsigned int work = 100;
-		const unsigned int sz = sizeof(u64) * CP_NUM_STATS;
-		int i;
-
-		/* begin NIC statistics dump */
-		cpw32(StatsAddr + 4, 0); /* FIXME: 64-bit PCI */
-		cpw32(StatsAddr, cp->nic_stats_dma | DumpStats);
-		cpr32(StatsAddr);
-
-		estats.n_stats = CP_NUM_STATS;
-		if (copy_to_user(useraddr, &estats, sizeof(estats)))
-			return -EFAULT;
-
-		while (work-- > 0) {
-			if ((cpr32(StatsAddr) & DumpStats) == 0)
-				break;
-			cpu_relax();
-		}
-
-		if (cpr32(StatsAddr) & DumpStats)
-			return -EIO;
-
-		tmp_stats = kmalloc(sz, GFP_KERNEL);
-		if (!tmp_stats)
-			return -ENOMEM;
-		memset(tmp_stats, 0, sz);
-
-		i = 0;
-		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_ok);
-		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok);
-		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_err);
-		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_err);
-		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->rx_fifo);
-		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->frame_align);
-		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_1col);
-		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_mcol);
-		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_phys);
-		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_bcast);
-		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_ok_mcast);
-		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_abort);
-		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_underrun);
-		tmp_stats[i++] = cp->cp_stats.rx_frags;
-		if (i != CP_NUM_STATS)
-			BUG();
-
-		i = copy_to_user(useraddr + sizeof(estats),
-				 tmp_stats, sz);
-		kfree(tmp_stats);
-
-		if (i)
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get/set Wake-on-LAN settings */
-	case ETHTOOL_GWOL: {
-		struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-		
-		spin_lock_irq (&cp->lock);
-		netdev_get_wol (cp, &wol);
-		spin_unlock_irq (&cp->lock);
-		return ((copy_to_user (useraddr, &wol, sizeof (wol)))? -EFAULT : 0);
-	}
-	
-	case ETHTOOL_SWOL: {
-		struct ethtool_wolinfo wol;
-
-		if (copy_from_user (&wol, useraddr, sizeof (wol)))
-			return -EFAULT;
-		spin_lock_irq (&cp->lock);
-		netdev_set_wol (cp, &wol);
-		spin_unlock_irq (&cp->lock);
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	return 0;
 }
 
+/* move this to net/core/ethtool.c */
+static int ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+
+static void cp_get_regs(struct net_device *dev, struct ethtool_regs *regs,
+		        void *p)
+{
+	struct cp_private *cp = dev->priv;
+
+	if (regs->len < CP_REGS_SIZE)
+		return /* -EINVAL */;
+
+	regs->version = CP_REGS_VER;
+
+	spin_lock_irq(&cp->lock);
+	memcpy_fromio(p, cp->regs, CP_REGS_SIZE);
+	spin_unlock_irq(&cp->lock);
+}
+
+static void cp_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct cp_private *cp = dev->priv;
+
+	spin_lock_irq (&cp->lock);
+	netdev_get_wol (cp, wol);
+	spin_unlock_irq (&cp->lock);
+}
+
+static int cp_set_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct cp_private *cp = dev->priv;
+	int rc;
+
+	spin_lock_irq (&cp->lock);
+	rc = netdev_set_wol (cp, wol);
+	spin_unlock_irq (&cp->lock);
+
+	return rc;
+}
+
+static void cp_get_strings (struct net_device *dev, u32 stringset, u8 *buf)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		memcpy(buf, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
+		break;
+	default:
+		BUG();
+		break;
+	}
+}
+
+static void cp_get_ethtool_stats (struct net_device *dev,
+				  struct ethtool_stats *estats, u64 *tmp_stats)
+{
+	struct cp_private *cp = dev->priv;
+	unsigned int work = 100;
+	int i;
+
+	/* begin NIC statistics dump */
+	cpw32(StatsAddr + 4, 0); /* FIXME: 64-bit PCI */
+	cpw32(StatsAddr, cp->nic_stats_dma | DumpStats);
+	cpr32(StatsAddr);
+
+	while (work-- > 0) {
+		if ((cpr32(StatsAddr) & DumpStats) == 0)
+			break;
+		cpu_relax();
+	}
+
+	if (cpr32(StatsAddr) & DumpStats)
+		return /* -EIO */;
+
+	i = 0;
+	tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_ok);
+	tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok);
+	tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_err);
+	tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_err);
+	tmp_stats[i++] = le16_to_cpu(cp->nic_stats->rx_fifo);
+	tmp_stats[i++] = le16_to_cpu(cp->nic_stats->frame_align);
+	tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_1col);
+	tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_mcol);
+	tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_phys);
+	tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_bcast);
+	tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_ok_mcast);
+	tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_abort);
+	tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_underrun);
+	tmp_stats[i++] = cp->cp_stats.rx_frags;
+	if (i != CP_NUM_STATS)
+		BUG();
+}
+
+static struct ethtool_ops cp_ethtool_ops = {
+	.get_drvinfo		= cp_get_drvinfo,
+	.get_regs_len		= cp_get_regs_len,
+	.get_stats_count	= cp_get_stats_count,
+	.get_settings		= cp_get_settings,
+	.set_settings		= cp_set_settings,
+	.nway_reset		= cp_nway_reset,
+	.get_link		= ethtool_op_get_link,
+	.get_msglevel		= cp_get_msglevel,
+	.set_msglevel		= cp_set_msglevel,
+	.get_rx_csum		= cp_get_rx_csum,
+	.set_rx_csum		= cp_set_rx_csum,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.set_tx_csum		= ethtool_op_set_tx_csum, /* local! */
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
+	.get_regs		= cp_get_regs,
+	.get_wol		= cp_get_wol,
+	.set_wol		= cp_set_wol,
+	.get_strings		= cp_get_strings,
+	.get_ethtool_stats	= cp_get_ethtool_stats,
+};
 
 static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -1668,9 +1574,6 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	if (!netif_running(dev))
 		return -EINVAL;
-
-	if (cmd == SIOCETHTOOL)
-		return cp_ethtool_ioctl(cp, (void *) rq->ifr_data);
 
 	spin_lock_irq(&cp->lock);
 	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd, NULL);
@@ -1885,6 +1788,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 #ifdef BROKEN
 	dev->change_mtu = cp_change_mtu;
 #endif
+	dev->ethtool_ops = &cp_ethtool_ops;
 #if 0
 	dev->tx_timeout = cp_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
