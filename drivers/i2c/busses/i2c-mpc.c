@@ -23,6 +23,7 @@
 #include <asm/ocp.h>
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #define MPC_I2C_ADDR  0x00
 #define MPC_I2C_FDR 	0x04
@@ -91,9 +92,9 @@ static int i2c_wait(struct mpc_i2c *i2c, unsigned timeout, int writing)
 		x = readb(i2c->base + MPC_I2C_SR);
 		writeb(0, i2c->base + MPC_I2C_SR);
 	} else {
+		set_current_state(TASK_INTERRUPTIBLE);
 		add_wait_queue(&i2c->queue, &wait);
 		while (!(i2c->interrupt & CSR_MIF)) {
-			set_current_state(TASK_INTERRUPTIBLE);
 			if (signal_pending(current)) {
 				pr_debug("I2C: Interrupted\n");
 				result = -EINTR;
@@ -104,9 +105,9 @@ static int i2c_wait(struct mpc_i2c *i2c, unsigned timeout, int writing)
 				result = -EIO;
 				break;
 			}
-			schedule_timeout(timeout);
+			msleep_interruptible(jiffies_to_msecs(timeout));
 		}
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&i2c->queue, &wait);
 		x = i2c->interrupt;
 		i2c->interrupt = 0;
