@@ -4070,9 +4070,10 @@ static int snd_ice1712_free(ice1712_t *ice)
 	/* --- */
       __hw_end:
 	snd_ice1712_proc_done(ice);
-	synchronize_irq();
-	if (ice->irq)
+	if (ice->irq) {
+		synchronize_irq(ice->irq);
 		free_irq(ice->irq, (void *) ice);
+	}
 	if (ice->res_port) {
 		release_resource(ice->res_port);
 		kfree_nocheck(ice->res_port);
@@ -4143,7 +4144,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	pci_write_config_word(ice->pci, 0x40, 0x807f);
 	pci_write_config_word(ice->pci, 0x42, 0x0006);
 	snd_ice1712_proc_init(ice);
-	synchronize_irq();
+	synchronize_irq(ice->irq);
 
 	if ((ice->res_port = request_region(ice->port, 32, "ICE1712 - Controller")) == NULL) {
 		snd_ice1712_free(ice);
