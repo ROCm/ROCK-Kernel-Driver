@@ -53,6 +53,7 @@
 #include <linux/mman.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
+#include <linux/security.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>

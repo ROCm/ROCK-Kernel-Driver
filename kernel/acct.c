@@ -49,6 +49,7 @@
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/tty.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 /*

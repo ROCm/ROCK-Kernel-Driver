@@ -13,6 +13,7 @@
 #include <linux/file.h>
 #include <linux/xattr.h>
 #include <linux/namei.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 /*

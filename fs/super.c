@@ -29,9 +29,9 @@
 #include <linux/quotaops.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>		/* for fsync_super() */
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
-#include <linux/security.h>
 
 void get_filesystem(struct file_system_type *fs);
 void put_filesystem(struct file_system_type *fs);

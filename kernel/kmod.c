@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/file.h>
 #include <linux/workqueue.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 

@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/suspend.h>
 #include <linux/root_dev.h>
+#include <linux/security.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>

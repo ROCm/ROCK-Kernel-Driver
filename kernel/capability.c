@@ -8,6 +8,7 @@
  */ 
 
 #include <linux/mm.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */

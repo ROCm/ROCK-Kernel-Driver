@@ -122,6 +122,7 @@
 #include <linux/timer.h>
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/security.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
