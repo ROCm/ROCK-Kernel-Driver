@@ -359,7 +359,7 @@ void rose_destroy_socket(struct sock *sk)
 		sk->sk_timer.data     = (unsigned long)sk;
 		add_timer(&sk->sk_timer);
 	} else
-		sk_free(sk);
+		sock_put(sk);
 }
 
 /*
@@ -634,7 +634,6 @@ static int rose_release(struct socket *sock)
 	}
 
 	sock->sk = NULL;
-	sk->sk_socket = NULL;	/* Not used, but we should do this. **/
 
 	return 0;
 }
