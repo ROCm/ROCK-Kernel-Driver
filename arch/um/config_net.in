@@ -1,0 +1,45 @@
+mainmenu_option next_comment
+comment 'Network Devices'
+
+# UML virtual driver
+bool 'Virtual network device' CONFIG_UML_NET
+
+dep_bool '  Ethertap transport' CONFIG_UML_NET_ETHERTAP $CONFIG_UML_NET
+dep_bool '  TUN/TAP transport' CONFIG_UML_NET_TUNTAP $CONFIG_UML_NET
+dep_bool '  SLIP transport' CONFIG_UML_NET_SLIP $CONFIG_UML_NET
+dep_bool '  Daemon transport' CONFIG_UML_NET_DAEMON $CONFIG_UML_NET
+dep_bool '  Multicast transport' CONFIG_UML_NET_MCAST $CONFIG_UML_NET
+
+# Below are hardware-independent drivers mirrored from
+# drivers/net/Config.in. It would be nice if Linux
+# had HW independent drivers separated from the other
+# but it does not. Until then each non-ISA/PCI arch
+# needs to provide it's own menu of network drivers
+
+tristate 'Dummy net driver support' CONFIG_DUMMY
+tristate 'Bonding driver support' CONFIG_BONDING
+tristate 'EQL (serial line load balancing) support' CONFIG_EQUALIZER
+tristate 'Universal TUN/TAP device driver support' CONFIG_TUN
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   if [ "$CONFIG_NETLINK" = "y" ]; then
+      tristate 'Ethertap network tap (OBSOLETE)' CONFIG_ETHERTAP
+   fi
+fi
+
+tristate 'PPP (point-to-point protocol) support' CONFIG_PPP
+if [ ! "$CONFIG_PPP" = "n" ]; then
+   dep_bool '  PPP multilink support (EXPERIMENTAL)' CONFIG_PPP_MULTILINK $CONFIG_EXPERIMENTAL
+   dep_bool '  PPP filtering' CONFIG_PPP_FILTER $CONFIG_FILTER
+   dep_tristate '  PPP support for async serial ports' CONFIG_PPP_ASYNC $CONFIG_PPP
+   dep_tristate '  PPP support for sync tty ports' CONFIG_PPP_SYNC_TTY $CONFIG_PPP
+   dep_tristate '  PPP Deflate compression' CONFIG_PPP_DEFLATE $CONFIG_PPP
+   dep_tristate '  PPP BSD-Compress compression' CONFIG_PPP_BSDCOMP $CONFIG_PPP
+   dep_tristate '  PPP over Ethernet (EXPERIMENTAL)' CONFIG_PPPOE $CONFIG_PPP $CONFIG_EXPERIMENTAL
+fi
+
+tristate 'SLIP (serial line) support' CONFIG_SLIP
+dep_bool '  CSLIP compressed headers' CONFIG_SLIP_COMPRESSED $CONFIG_SLIP
+dep_bool '  Keepalive and linefill' CONFIG_SLIP_SMART $CONFIG_SLIP
+dep_bool '  Six bit SLIP encapsulation' CONFIG_SLIP_MODE_SLIP6 $CONFIG_SLIP
+
+endmenu
