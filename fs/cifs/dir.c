@@ -178,7 +178,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 }
 
 struct dentry *
-cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry)
+cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct nameidata *nd)
 {
 	int rc, xid;
 	struct cifs_sb_info *cifs_sb;
@@ -262,7 +262,7 @@ cifs_dir_open(struct inode *inode, struct file *file)
 }
 
 static int
-cifs_d_revalidate(struct dentry *direntry, int flags)
+cifs_d_revalidate(struct dentry *direntry, struct nameidata *nd)
 {
 	int isValid = 1;
 

@@ -50,7 +50,7 @@
 kmem_cache_t * presto_dentry_slab;
 
 /* called when a cache lookup succeeds */
-static int presto_d_revalidate(struct dentry *de, int flag)
+static int presto_d_revalidate(struct dentry *de, struct nameidata *nd)
 {
         struct inode *inode = de->d_inode;
         struct presto_file_set * root_fset;

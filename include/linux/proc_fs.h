@@ -92,7 +92,7 @@ extern struct proc_dir_entry *proc_root_kcore;
 extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
-struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry);
+struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *);
 struct dentry *proc_pid_unhash(struct task_struct *p);
 void proc_pid_flush(struct dentry *proc_dentry);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
@@ -115,7 +115,7 @@ extern int proc_match(int, const char *,struct proc_dir_entry *);
  * of the /proc/<pid> subdirectories.
  */
 extern int proc_readdir(struct file *, void *, filldir_t);
-extern struct dentry *proc_lookup(struct inode *, struct dentry *);
+extern struct dentry *proc_lookup(struct inode *, struct dentry *, struct nameidata *);
 
 extern struct file_operations proc_kcore_operations;
 extern struct file_operations proc_kmsg_operations;

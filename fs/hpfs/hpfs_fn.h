@@ -216,7 +216,7 @@ void hpfs_set_dentry_operations(struct dentry *);
 int hpfs_dir_release(struct inode *, struct file *);
 loff_t hpfs_dir_lseek(struct file *, loff_t, int);
 int hpfs_readdir(struct file *, void *, filldir_t);
-struct dentry *hpfs_lookup(struct inode *, struct dentry *);
+struct dentry *hpfs_lookup(struct inode *, struct dentry *, struct nameidata *);
 
 /* dnode.c */
 

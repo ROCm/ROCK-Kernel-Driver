@@ -117,7 +117,8 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(library, &nd);
+	nd.intent.open.flags = O_RDONLY;
+	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	if (error)
 		goto out;
 

@@ -192,7 +192,8 @@ linvfs_mkdir(
 STATIC struct dentry *
 linvfs_lookup(
 	struct inode	*dir,
-	struct dentry	*dentry)
+	struct dentry	*dentry,
+	struct nameidata *nd)
 {
 	struct inode	*ip = NULL;
 	vnode_t		*vp, *cvp = NULL;

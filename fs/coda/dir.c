@@ -30,7 +30,7 @@
 /* dir inode-ops */
 static int coda_create(struct inode *dir, struct dentry *new, int mode);
 static int coda_mknod(struct inode *dir, struct dentry *new, int mode, dev_t rdev);
-static struct dentry *coda_lookup(struct inode *dir, struct dentry *target);
+static struct dentry *coda_lookup(struct inode *dir, struct dentry *target, struct nameidata *nd);
 static int coda_link(struct dentry *old_dentry, struct inode *dir_inode, 
 		     struct dentry *entry);
 static int coda_unlink(struct inode *dir_inode, struct dentry *entry);
@@ -45,7 +45,7 @@ static int coda_rename(struct inode *old_inode, struct dentry *old_dentry,
 static int coda_readdir(struct file *file, void *dirent, filldir_t filldir);
 
 /* dentry ops */
-static int coda_dentry_revalidate(struct dentry *de, int);
+static int coda_dentry_revalidate(struct dentry *de, struct nameidata *nd);
 static int coda_dentry_delete(struct dentry *);
 
 /* support routines */
@@ -90,7 +90,7 @@ struct file_operations coda_dir_operations = {
 
 /* inode operations for directories */
 /* access routines: lookup, readlink, permission */
-static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
+static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry, struct nameidata *nd)
 {
 	struct inode *res_inode = NULL;
 	struct ViceFid resfid = {0,0,0};
@@ -627,7 +627,7 @@ static int coda_venus_readdir(struct file *filp, filldir_t filldir,
 }
 
 /* called when a cache lookup succeeds */
-static int coda_dentry_revalidate(struct dentry *de, int flags)
+static int coda_dentry_revalidate(struct dentry *de, struct nameidata *nd)
 {
 	struct inode *inode = de->d_inode;
 	struct coda_inode_info *cii;

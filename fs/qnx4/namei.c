@@ -107,7 +107,7 @@ static struct buffer_head *qnx4_find_entry(int len, struct inode *dir,
 	return NULL;
 }
 
-struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry)
+struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	int ino;
 	struct qnx4_inode_entry *de;

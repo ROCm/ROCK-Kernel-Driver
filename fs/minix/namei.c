@@ -54,7 +54,7 @@ struct dentry_operations minix_dentry_operations = {
 	.d_hash		= minix_hash,
 };
 
-static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode * inode = NULL;
 	ino_t ino;

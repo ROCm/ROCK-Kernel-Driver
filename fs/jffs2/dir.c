@@ -33,7 +33,7 @@ typedef dev_t mknod_arg_t;
 static int jffs2_readdir (struct file *, void *, filldir_t);
 
 static int jffs2_create (struct inode *,struct dentry *,int);
-static struct dentry *jffs2_lookup (struct inode *,struct dentry *);
+static struct dentry *jffs2_lookup (struct inode *,struct dentry *, struct nameidata *);
 static int jffs2_link (struct dentry *,struct inode *,struct dentry *);
 static int jffs2_unlink (struct inode *,struct dentry *);
 static int jffs2_symlink (struct inode *,struct dentry *,const char *);
@@ -73,7 +73,7 @@ struct inode_operations jffs2_dir_inode_operations =
    and we use the same hash function as the dentries. Makes this 
    nice and simple
 */
-static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target)
+static struct dentry *jffs2_lookup(struct inode *dir_i, struct dentry *target, struct nameidata *nd)
 {
 	struct jffs2_inode_info *dir_f;
 	struct jffs2_sb_info *c;

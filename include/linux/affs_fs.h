@@ -41,7 +41,7 @@ extern int	affs_init_bitmap(struct super_block *sb);
 /* namei.c */
 
 extern int	affs_hash_name(struct super_block *sb, const u8 *name, unsigned int len);
-extern struct dentry *affs_lookup(struct inode *dir, struct dentry *dentry);
+extern struct dentry *affs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
 extern int	affs_unlink(struct inode *dir, struct dentry *dentry);
 extern int	affs_create(struct inode *dir, struct dentry *dentry, int mode);
 extern int	affs_mkdir(struct inode *dir, struct dentry *dentry, int mode);

@@ -273,7 +273,7 @@ void path_release(struct nameidata *nd)
  * Internal lookup() using the new generic dcache.
  * SMP-safe
  */
-static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name, int flags)
+static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name, struct nameidata *nd)
 {
 	struct dentry * dentry = __d_lookup(parent, name);
 
@@ -284,7 +284,7 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
 		dentry = d_lookup(parent, name);
 
 	if (dentry && dentry->d_op && dentry->d_op->d_revalidate) {
-		if (!dentry->d_op->d_revalidate(dentry, flags) && !d_invalidate(dentry)) {
+		if (!dentry->d_op->d_revalidate(dentry, nd) && !d_invalidate(dentry)) {
 			dput(dentry);
 			dentry = NULL;
 		}
@@ -336,7 +336,7 @@ ok:
  * make sure that nobody added the entry to the dcache in the meantime..
  * SMP-safe
  */
-static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, int flags)
+static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, struct nameidata *nd)
 {
 	struct dentry * result;
 	struct inode *dir = parent->d_inode;
@@ -361,7 +361,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 		struct dentry * dentry = d_alloc(parent, name);
 		result = ERR_PTR(-ENOMEM);
 		if (dentry) {
-			result = dir->i_op->lookup(dir, dentry);
+			result = dir->i_op->lookup(dir, dentry, nd);
 			if (result)
 				dput(dentry);
 			else
@@ -377,7 +377,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 	 */
 	up(&dir->i_sem);
 	if (result->d_op && result->d_op->d_revalidate) {
-		if (!result->d_op->d_revalidate(result, flags) && !d_invalidate(result)) {
+		if (!result->d_op->d_revalidate(result, nd) && !d_invalidate(result)) {
 			dput(result);
 			result = ERR_PTR(-ENOENT);
 		}
@@ -524,7 +524,7 @@ struct path {
  *  It _is_ time-critical.
  */
 static int do_lookup(struct nameidata *nd, struct qstr *name,
-		     struct path *path, int flags)
+		     struct path *path)
 {
 	struct vfsmount *mnt = nd->mnt;
 	struct dentry *dentry = __d_lookup(nd->dentry, name);
@@ -539,13 +539,13 @@ done:
 	return 0;
 
 need_lookup:
-	dentry = real_lookup(nd->dentry, name, LOOKUP_CONTINUE);
+	dentry = real_lookup(nd->dentry, name, nd);
 	if (IS_ERR(dentry))
 		goto fail;
 	goto done;
 
 need_revalidate:
-	if (dentry->d_op->d_revalidate(dentry, flags))
+	if (dentry->d_op->d_revalidate(dentry, nd))
 		goto done;
 	if (d_invalidate(dentry))
 		goto done;
@@ -638,8 +638,9 @@ int link_path_walk(const char * name, struct nameidata *nd)
 			if (err < 0)
 				break;
 		}
+		nd->flags |= LOOKUP_CONTINUE;
 		/* This does the actual lookups.. */
-		err = do_lookup(nd, &this, &next, LOOKUP_CONTINUE);
+		err = do_lookup(nd, &this, &next);
 		if (err)
 			break;
 		/* Check mountpoints.. */
@@ -681,6 +682,7 @@ int link_path_walk(const char * name, struct nameidata *nd)
 last_with_slashes:
 		lookup_flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
 last_component:
+		nd->flags &= ~LOOKUP_CONTINUE;
 		if (lookup_flags & LOOKUP_PARENT)
 			goto lookup_parent;
 		if (this.name[0] == '.') switch (this.len) {
@@ -700,7 +702,7 @@ last_component:
 			if (err < 0)
 				break;
 		}
-		err = do_lookup(nd, &this, &next, 0);
+		err = do_lookup(nd, &this, &next);
 		if (err)
 			break;
 		follow_mount(&next.mnt, &next.dentry);
@@ -769,6 +771,7 @@ static int __emul_lookup_dentry(const char *name, struct nameidata *nd)
 		 */
 		nd_root.last_type = LAST_ROOT;
 		nd_root.flags = nd->flags;
+		memcpy(&nd_root.intent, &nd->intent, sizeof(nd_root.intent));
 		read_lock(&current->fs->lock);
 		nd_root.mnt = mntget(current->fs->rootmnt);
 		nd_root.dentry = dget(current->fs->root);
@@ -866,7 +869,7 @@ int path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
  * needs parent already locked. Doesn't follow mounts.
  * SMP-safe.
  */
-struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
+static struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, struct nameidata *nd)
 {
 	struct dentry * dentry;
 	struct inode *inode;
@@ -889,13 +892,13 @@ struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
 			goto out;
 	}
 
-	dentry = cached_lookup(base, name, 0);
+	dentry = cached_lookup(base, name, nd);
 	if (!dentry) {
 		struct dentry *new = d_alloc(base, name);
 		dentry = ERR_PTR(-ENOMEM);
 		if (!new)
 			goto out;
-		dentry = inode->i_op->lookup(inode, new);
+		dentry = inode->i_op->lookup(inode, new, nd);
 		if (!dentry)
 			dentry = new;
 		else
@@ -903,6 +906,11 @@ struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
 	}
 out:
 	return dentry;
+}
+
+struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
+{
+	return __lookup_hash(name, base, NULL);
 }
 
 /* SMP-safe */
@@ -1222,11 +1230,15 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 	if (flag & O_APPEND)
 		acc_mode |= MAY_APPEND;
 
+	/* Fill in the open() intent data */
+	nd->intent.open.flags = flag;
+	nd->intent.open.create_mode = mode;
+
 	/*
 	 * The simplest case - just a plain lookup.
 	 */
 	if (!(flag & O_CREAT)) {
-		error = path_lookup(pathname, lookup_flags(flag), nd);
+		error = path_lookup(pathname, lookup_flags(flag)|LOOKUP_OPEN, nd);
 		if (error)
 			return error;
 		dentry = nd->dentry;
@@ -1236,7 +1248,7 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 	/*
 	 * Create - we need to know the parent.
 	 */
-	error = path_lookup(pathname, LOOKUP_PARENT, nd);
+	error = path_lookup(pathname, LOOKUP_PARENT|LOOKUP_OPEN|LOOKUP_CREATE, nd);
 	if (error)
 		return error;
 
@@ -1250,8 +1262,9 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 		goto exit;
 
 	dir = nd->dentry;
+	nd->flags &= ~LOOKUP_PARENT;
 	down(&dir->d_inode->i_sem);
-	dentry = lookup_hash(&nd->last, nd->dentry);
+	dentry = __lookup_hash(&nd->last, nd->dentry, nd);
 
 do_last:
 	error = PTR_ERR(dentry);
@@ -1354,7 +1367,7 @@ do_link:
 	}
 	dir = nd->dentry;
 	down(&dir->d_inode->i_sem);
-	dentry = lookup_hash(&nd->last, nd->dentry);
+	dentry = __lookup_hash(&nd->last, nd->dentry, nd);
 	putname(nd->last.name);
 	goto do_last;
 }
@@ -1368,6 +1381,7 @@ static struct dentry *lookup_create(struct nameidata *nd, int is_dir)
 	dentry = ERR_PTR(-EEXIST);
 	if (nd->last_type != LAST_NORM)
 		goto fail;
+	nd->flags &= ~LOOKUP_PARENT;
 	dentry = lookup_hash(&nd->last, nd->dentry);
 	if (IS_ERR(dentry))
 		goto fail;

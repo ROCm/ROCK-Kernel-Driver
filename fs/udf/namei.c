@@ -289,6 +289,7 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
  * PRE-CONDITIONS
  *	dir			Pointer to inode of parent directory.
  *	dentry			Pointer to dentry to complete.
+ *	nd			Pointer to lookup nameidata
  *
  * POST-CONDITIONS
  *	<return>		Zero on success.
@@ -299,7 +300,7 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
  */
 
 static struct dentry *
-udf_lookup(struct inode *dir, struct dentry *dentry)
+udf_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct fileIdentDesc cfi, *fi;

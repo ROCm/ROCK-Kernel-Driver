@@ -336,7 +336,7 @@ static struct dentry_operations proc_dentry_operations =
  * Don't create negative dentries here, return -ENOENT by hand
  * instead.
  */
-struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry)
+struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct proc_dir_entry * de;

@@ -101,7 +101,7 @@ struct dentry *umsdos_rlookup_x ( struct inode *dir, struct dentry *dentry, int 
 		goto out;
 	}
 
-	ret = msdos_lookup (dir, dentry);
+	ret = msdos_lookup (dir, dentry, NULL);
 	if (ret) {
 		printk(KERN_WARNING
 			"umsdos_rlookup_x: %s/%s failed, ret=%ld\n",
@@ -129,7 +129,7 @@ out:
 }
 
 
-struct dentry *UMSDOS_rlookup ( struct inode *dir, struct dentry *dentry)
+struct dentry *UMSDOS_rlookup ( struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	return umsdos_rlookup_x (dir, dentry, 0);
 }

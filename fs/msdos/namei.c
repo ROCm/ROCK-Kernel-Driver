@@ -193,7 +193,7 @@ static struct dentry_operations msdos_dentry_operations = {
  */
 
 /***** Get inode using directory and name */
-struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry)
+struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry, struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;

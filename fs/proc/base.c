@@ -864,7 +864,7 @@ out_unlock:
  * directory. In this case, however, we can do it - no aliasing problems
  * due to the way we treat inodes.
  */
-static int pid_revalidate(struct dentry * dentry, int flags)
+static int pid_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	if (pid_alive(proc_task(dentry->d_inode)))
 		return 1;
@@ -872,7 +872,7 @@ static int pid_revalidate(struct dentry * dentry, int flags)
 	return 0;
 }
 
-static int pid_fd_revalidate(struct dentry * dentry, int flags)
+static int pid_fd_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task = proc_task(dentry->d_inode);
 	int fd = proc_type(dentry->d_inode) - PROC_PID_FD_DIR;
@@ -961,7 +961,7 @@ out:
 }
 
 /* SMP-safe */
-static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
+static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task = proc_task(dir);
 	unsigned fd = name_to_int(dentry);
@@ -1219,7 +1219,7 @@ out:
 	return ERR_PTR(error);
 }
 
-static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry){
+static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd){
 	return proc_pident_lookup(dir, dentry, base_stuff);
 }
 
@@ -1326,7 +1326,7 @@ void proc_pid_flush(struct dentry *proc_dentry)
 }
 
 /* SMP-safe */
-struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
+struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task;
 	struct inode *inode;

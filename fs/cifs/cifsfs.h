@@ -47,7 +47,7 @@ extern void cifs_delete_inode(struct inode *);
 /* Functions related to inodes */
 extern struct inode_operations cifs_dir_inode_ops;
 extern int cifs_create(struct inode *, struct dentry *, int);
-extern struct dentry *cifs_lookup(struct inode *, struct dentry *);
+extern struct dentry *cifs_lookup(struct inode *, struct dentry *, struct nameidata *);
 extern int cifs_unlink(struct inode *, struct dentry *);
 extern int cifs_hardlink(struct dentry *, struct inode *, struct dentry *);
 extern int cifs_mkdir(struct inode *, struct dentry *, int);

@@ -1373,7 +1373,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	return -rc;
 }
 
-static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
+static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry, struct nameidata *nd)
 {
 	struct btstack btstack;
 	ino_t inum;

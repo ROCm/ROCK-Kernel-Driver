@@ -28,7 +28,7 @@
 
 /*================ Forward declarations ================*/
 
-static struct dentry *cap_lookup(struct inode *, struct dentry *);
+static struct dentry *cap_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int cap_readdir(struct file *, void *, filldir_t);
 
 /*================ Global variables ================*/
@@ -95,7 +95,7 @@ struct inode_operations hfs_cap_rdir_inode_operations = {
  * inode corresponding to an entry in a directory, given the inode for
  * the directory and the name (and its length) of the entry.
  */
-static struct dentry *cap_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *cap_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	ino_t dtype;
 	struct hfs_name cname;

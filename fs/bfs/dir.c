@@ -127,7 +127,7 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
 	return 0;
 }
 
-static struct dentry * bfs_lookup(struct inode * dir, struct dentry * dentry)
+static struct dentry * bfs_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode * inode = NULL;
 	struct buffer_head * bh;

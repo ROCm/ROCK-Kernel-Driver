@@ -46,7 +46,7 @@ extern int efs_statfs(struct super_block *, struct kstatfs *);
 extern void efs_read_inode(struct inode *);
 extern efs_block_t efs_map_block(struct inode *, efs_block_t);
 
-extern struct dentry *efs_lookup(struct inode *, struct dentry *);
+extern struct dentry *efs_lookup(struct inode *, struct dentry *, struct nameidata *);
 extern int efs_bmap(struct inode *, int);
 
 #endif /* __EFS_FS_H__ */

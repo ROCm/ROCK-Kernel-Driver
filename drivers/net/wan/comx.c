@@ -86,7 +86,7 @@ static struct comx_protocol *comx_lines = NULL;
 
 static int comx_mkdir(struct inode *, struct dentry *, int);
 static int comx_rmdir(struct inode *, struct dentry *);
-static struct dentry *comx_lookup(struct inode *, struct dentry *);
+static struct dentry *comx_lookup(struct inode *, struct dentry *, struct nameidata *);
 
 static struct inode_operations comx_root_inode_ops = {
 	.lookup = comx_lookup,
@@ -922,7 +922,7 @@ static int comx_rmdir(struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct proc_dir_entry *de;
 	struct inode *inode = NULL;

@@ -316,7 +316,7 @@ static int reiserfs_find_entry (struct inode * dir, const char * name, int namel
 }
 
 
-static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dentry)
+static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
     int retval;
     struct inode * inode = NULL;

@@ -210,7 +210,7 @@ affs_find_entry(struct inode *dir, struct dentry *dentry)
 }
 
 struct dentry *
-affs_lookup(struct inode *dir, struct dentry *dentry)
+affs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct buffer_head *bh;

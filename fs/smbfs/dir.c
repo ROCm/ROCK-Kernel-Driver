@@ -24,7 +24,7 @@
 static int smb_readdir(struct file *, void *, filldir_t);
 static int smb_dir_open(struct inode *, struct file *);
 
-static struct dentry *smb_lookup(struct inode *, struct dentry *);
+static struct dentry *smb_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int smb_create(struct inode *, struct dentry *, int);
 static int smb_mkdir(struct inode *, struct dentry *, int);
 static int smb_rmdir(struct inode *, struct dentry *);
@@ -268,7 +268,7 @@ smb_dir_open(struct inode *dir, struct file *file)
 /*
  * Dentry operations routines
  */
-static int smb_lookup_validate(struct dentry *, int);
+static int smb_lookup_validate(struct dentry *, struct nameidata *);
 static int smb_hash_dentry(struct dentry *, struct qstr *);
 static int smb_compare_dentry(struct dentry *, struct qstr *, struct qstr *);
 static int smb_delete_dentry(struct dentry *);
@@ -292,7 +292,7 @@ static struct dentry_operations smbfs_dentry_operations_case =
  * This is the callback when the dcache has a lookup hit.
  */
 static int
-smb_lookup_validate(struct dentry * dentry, int flags)
+smb_lookup_validate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct smb_sb_info *server = server_from_dentry(dentry);
 	struct inode * inode = dentry->d_inode;
@@ -420,7 +420,7 @@ smb_renew_times(struct dentry * dentry)
 }
 
 static struct dentry *
-smb_lookup(struct inode *dir, struct dentry *dentry)
+smb_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct smb_fattr finfo;
 	struct inode *inode;

@@ -62,7 +62,7 @@ static inline int ufs_add_nondir(struct dentry *dentry, struct inode *inode)
 	return err;
 }
 
-static struct dentry *ufs_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *ufs_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode * inode = NULL;
 	ino_t ino;

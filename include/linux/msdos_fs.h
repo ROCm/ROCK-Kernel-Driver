@@ -307,7 +307,7 @@ extern int fat_scan(struct inode *dir, const char *name,
 		    struct msdos_dir_entry **res_de, loff_t *i_pos);
 
 /* msdos/namei.c  - these are for Umsdos */
-extern struct dentry *msdos_lookup(struct inode *dir, struct dentry *);
+extern struct dentry *msdos_lookup(struct inode *dir, struct dentry *, struct nameidata *);
 extern int msdos_create(struct inode *dir, struct dentry *dentry, int mode);
 extern int msdos_rmdir(struct inode *dir, struct dentry *dentry);
 extern int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode);
@@ -317,7 +317,7 @@ extern int msdos_rename(struct inode *old_dir, struct dentry *old_dentry,
 extern int msdos_fill_super(struct super_block *sb, void *data, int silent);
 
 /* vfat/namei.c - these are for dmsdos */
-extern struct dentry *vfat_lookup(struct inode *dir, struct dentry *);
+extern struct dentry *vfat_lookup(struct inode *dir, struct dentry *, struct nameidata *);
 extern int vfat_create(struct inode *dir, struct dentry *dentry, int mode);
 extern int vfat_rmdir(struct inode *dir, struct dentry *dentry);
 extern int vfat_unlink(struct inode *dir, struct dentry *dentry);

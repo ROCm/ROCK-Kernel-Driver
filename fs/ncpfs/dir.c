@@ -35,7 +35,7 @@ static void ncp_do_readdir(struct file *, void *, filldir_t,
 static int ncp_readdir(struct file *, void *, filldir_t);
 
 static int ncp_create(struct inode *, struct dentry *, int);
-static struct dentry *ncp_lookup(struct inode *, struct dentry *);
+static struct dentry *ncp_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int ncp_unlink(struct inode *, struct dentry *);
 static int ncp_mkdir(struct inode *, struct dentry *, int);
 static int ncp_rmdir(struct inode *, struct dentry *);
@@ -72,7 +72,7 @@ struct inode_operations ncp_dir_inode_operations =
 /*
  * Dentry operations routines
  */
-static int ncp_lookup_validate(struct dentry *, int);
+static int ncp_lookup_validate(struct dentry *, struct nameidata *);
 static int ncp_hash_dentry(struct dentry *, struct qstr *);
 static int ncp_compare_dentry (struct dentry *, struct qstr *, struct qstr *);
 static int ncp_delete_dentry(struct dentry *);
@@ -264,7 +264,7 @@ leave_me:;
 
 
 static int
-__ncp_lookup_validate(struct dentry * dentry, int flags)
+__ncp_lookup_validate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct ncp_server *server;
 	struct dentry *parent;
@@ -333,11 +333,11 @@ finished:
 }
 
 static int
-ncp_lookup_validate(struct dentry * dentry, int flags)
+ncp_lookup_validate(struct dentry * dentry, struct nameidata *nd)
 {
 	int res;
 	lock_kernel();
-	res = __ncp_lookup_validate(dentry, flags);
+	res = __ncp_lookup_validate(dentry, nd);
 	unlock_kernel();
 	return res;
 }
@@ -797,7 +797,7 @@ out:
 	return result;
 }
 
-static struct dentry *ncp_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *ncp_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct ncp_server *server = NCP_SERVER(dir);
 	struct inode *inode = NULL;

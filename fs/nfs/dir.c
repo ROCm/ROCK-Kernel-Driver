@@ -37,7 +37,7 @@
 
 static int nfs_opendir(struct inode *, struct file *);
 static int nfs_readdir(struct file *, void *, filldir_t);
-static struct dentry *nfs_lookup(struct inode *, struct dentry *);
+static struct dentry *nfs_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int nfs_cached_lookup(struct inode *, struct dentry *,
 				struct nfs_fh *, struct nfs_fattr *);
 static int nfs_create(struct inode *, struct dentry *, int);
@@ -515,7 +515,7 @@ static inline int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry)
  * If the parent directory is seen to have changed, we throw out the
  * cached dentry and do a new lookup.
  */
-static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
+static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode *dir;
 	struct inode *inode;
@@ -630,7 +630,7 @@ struct dentry_operations nfs_dentry_operations = {
 	.d_iput		= nfs_dentry_iput,
 };
 
-static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
+static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	int error;

@@ -239,7 +239,7 @@ struct dentry *presto_add_ilookup_dentry(struct dentry *parent,
         return de;
 }
 
-struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry)
+struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
         int rc = 0;
         struct dentry *de;
@@ -286,7 +286,7 @@ struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry)
                                 (dir, dentry, ino, generation);
                         is_ilookup = 1;
                 } else
-                        de = iops->lookup(dir, dentry);
+                        de = iops->lookup(dir, dentry, nd);
 #if 0
         }
 #endif

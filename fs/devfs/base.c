@@ -2175,7 +2175,7 @@ static struct dentry_operations devfs_dops =
     .d_iput       = devfs_d_iput,
 };
 
-static int devfs_d_revalidate_wait (struct dentry *dentry, int flags);
+static int devfs_d_revalidate_wait (struct dentry *dentry, struct nameidata *);
 
 static struct dentry_operations devfs_wait_dops =
 {
@@ -2212,7 +2212,7 @@ struct devfs_lookup_struct
 
 /* XXX: this doesn't handle the case where we got a negative dentry
         but a devfs entry has been registered in the meanwhile */
-static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
+static int devfs_d_revalidate_wait (struct dentry *dentry, struct nameidata *nd)
 {
     struct inode *dir = dentry->d_parent->d_inode;
     struct fs_info *fs_info = dir->i_sb->s_fs_info;
@@ -2265,7 +2265,7 @@ static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
 
 /*  Inode operations for device entries follow  */
 
-static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
+static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
     struct devfs_entry tmp;  /*  Must stay in scope until devfsd idle again  */
     struct devfs_lookup_struct lookup_info;

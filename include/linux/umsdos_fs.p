@@ -10,7 +10,7 @@ char * umsdos_d_path(struct dentry *, char *, int);
 void umsdos_lookup_patch_new(struct dentry *, struct umsdos_info *);
 int umsdos_is_pseudodos (struct inode *dir, struct dentry *dentry);
 struct dentry *umsdos_lookup_x ( struct inode *dir, struct dentry *dentry, int nopseudo);
-struct dentry *UMSDOS_lookup(struct inode *, struct dentry *);
+struct dentry *UMSDOS_lookup(struct inode *, struct dentry *, struct nameidata *);
 struct dentry *umsdos_lookup_dentry(struct dentry *, char *, int, int);
 struct dentry *umsdos_covered(struct dentry *, char *, int);
 
@@ -92,7 +92,7 @@ int UMSDOS_rename (struct inode *old_dir,
 
 /* rdir.c 22/03/95 03.31.42 */
 struct dentry *umsdos_rlookup_x (struct inode *dir, struct dentry *dentry, int nopseudo);
-struct dentry *UMSDOS_rlookup (struct inode *dir, struct dentry *dentry);
+struct dentry *UMSDOS_rlookup (struct inode *dir, struct dentry *dentry, struct nameidata *nd);
 
 static inline struct umsdos_inode_info *UMSDOS_I(struct inode *inode)
 {
