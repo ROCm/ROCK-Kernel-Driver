@@ -253,8 +253,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		/* FIXME: ->OUTBSYNC ? */
 		hwif->OUTB(command, IDE_COMMAND_REG);
 
-		pre_task_out_intr(drive, rq);
-		return ide_started;
+		return pre_task_out_intr(drive, rq);
 	}
 }
 EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
