@@ -17,7 +17,7 @@ endif
 
 all: vmlinux.ecoff addinitrd
 
-vmlinux.ecoff:	$(CONFIGURE) elf2ecoff $(TOPDIR)/vmlinux
+vmlinux.ecoff:	elf2ecoff $(TOPDIR)/vmlinux
 	./elf2ecoff $(TOPDIR)/vmlinux vmlinux.ecoff $(E2EFLAGS)
 
 elf2ecoff: elf2ecoff.c

@@ -61,7 +61,7 @@ extern initcall_t __initcall_start, __initcall_end;
 	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".initcall" level ".init"))) = fn
 
 #define core_initcall(fn)		__define_initcall("1",fn)
-#define unused_initcall(fn)		__define_initcall("2",fn)
+#define postcore_initcall(fn)		__define_initcall("2",fn)
 #define arch_initcall(fn)		__define_initcall("3",fn)
 #define subsys_initcall(fn)		__define_initcall("4",fn)
 #define fs_initcall(fn)			__define_initcall("5",fn)
@@ -160,7 +160,7 @@ typedef void (*__cleanup_module_func_t)(void);
 #define __setup(str,func) /* nothing */
 
 #define core_initcall(fn)		module_init(fn)
-#define unused_initcall(fn)		module_init(fn)
+#define postcore_initcall(fn)		module_init(fn)
 #define arch_initcall(fn)		module_init(fn)
 #define subsys_initcall(fn)		module_init(fn)
 #define fs_initcall(fn)			module_init(fn)

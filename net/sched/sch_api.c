@@ -1117,7 +1117,7 @@ static void psched_tick(unsigned long dummy)
 	psched_timer.expires = jiffies + 1*HZ;
 #else
 	unsigned long now = jiffies;
-	psched_time_base = ((u64)now)<<PSCHED_JSCALE;
+	psched_time_base += ((u64)(now-psched_time_mark))<<PSCHED_JSCALE;
 	psched_time_mark = now;
 	psched_timer.expires = now + 60*60*HZ;
 #endif

@@ -96,9 +96,6 @@ extern kmem_cache_t *ntfs_inode_cache;
 extern kmem_cache_t *ntfs_big_inode_cache;
 extern kmem_cache_t *ntfs_attr_ctx_cache;
 
-/* The little endian Unicode string $I30 as a global constant. */
-extern const uchar_t I30[5];
-
 /* The various operations structs defined throughout the driver files. */
 extern struct super_operations ntfs_mount_sops;
 extern struct super_operations ntfs_sops;
@@ -222,10 +219,6 @@ extern void post_write_mst_fixup(NTFS_RECORD *b);
 extern inline s64 utc2ntfs(const time_t time);
 extern inline s64 get_current_ntfs_time(void);
 extern inline time_t ntfs2utc(const s64 time);
-
-/* From fs/ntfs/dir.c */
-extern u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
-		const int uname_len);
 
 /* From fs/ntfs/unistr.c */
 extern BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,

@@ -12,6 +12,9 @@
  * 
  * History:
  * 
+ * 2002/06/01 remember frame when HC won't see EDs any more; use that info
+ *	to fix urb unlink races caused by interrupt latency assumptions;
+ *	minor ED field and function naming updates
  * 2002/01/18 package as a patch for 2.5.3; this should match the
  *	2.4.17 kernel modulo some bugs being fixed.
  *
@@ -106,7 +109,7 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "$Revision: 1.9 $"
+#define DRIVER_VERSION "2002-Jun-01"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -287,7 +290,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		}
 			
 		urb_priv->state = URB_DEL; 
-		ed_unlink (urb->dev, urb_priv->ed);
+		start_urb_unlink (ohci, urb_priv->ed);
 		spin_unlock_irqrestore (&ohci->lock, flags);
 	} else {
 		/*
@@ -508,16 +511,15 @@ static void ohci_irq (struct usb_hcd *hcd)
   
 	/* could track INTR_SO to reduce available PCI/... bandwidth */
 
-	// FIXME:  this assumes SOF (1/ms) interrupts don't get lost...
-	if (ints & OHCI_INTR_SF) { 
-		unsigned int frame = le16_to_cpu (ohci->hcca->frame_no) & 1;
+	/* handle any pending URB/ED unlinks, leaving INTR_SF enabled
+	 * when there's still unlinking to be done (next frame).
+	 */
+	spin_lock (&ohci->lock);
+	if (ohci->ed_rm_list)
+		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no));
+	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list)
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
-		if (ohci->ed_rm_list [!frame] != NULL) {
-			dl_del_list (ohci, !frame);
-		}
-		if (ohci->ed_rm_list [frame] != NULL)
-			writel (OHCI_INTR_SF, &regs->intrenable);	
-	}
+	spin_unlock (&ohci->lock);
 
 	writel (ints, &regs->intrstatus);
 	writel (OHCI_INTR_MIE, &regs->intrenable);	
@@ -719,8 +721,7 @@ static int hc_restart (struct ohci_hcd *ohci)
 	for (i = 0; i < NUM_INTS; i++) ohci->hcca->int_table [i] = 0;
 	
 	/* no EDs to remove */
-	ohci->ed_rm_list [0] = NULL;
-	ohci->ed_rm_list [1] = NULL;
+	ohci->ed_rm_list = NULL;
 
 	/* empty control and bulk lists */	 
 	ohci->ed_isotail     = NULL;
@@ -802,7 +803,7 @@ static int ohci_resume (struct usb_hcd *hcd)
 		ohci->disabled = 0;
 		ohci->sleeping = 0;
 		ohci->hc_control = OHCI_CONTROL_INIT | OHCI_USB_OPER;
-		if (!ohci->ed_rm_list [0] && !ohci->ed_rm_list [1]) {
+		if (!ohci->ed_rm_list) {
 			if (ohci->ed_controltail)
 				ohci->hc_control |= OHCI_CTRL_CLE;
 			if (ohci->ed_bulktail)

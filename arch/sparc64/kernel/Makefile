@@ -31,11 +31,6 @@ else
   endif
 endif
 
-#
-# This is just to get the dependencies...
-#
-binfmt_elf32.o: $(TOPDIR)/fs/binfmt_elf.c
-
 ifneq ($(NEW_GCC),y)
   CMODEL_CFLAG := -mmedlow
 else
