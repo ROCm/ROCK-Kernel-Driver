@@ -378,8 +378,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 /* interrupt control.. */
-#define local_save_flags(x)	__asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */)
-#define local_irq_restore(x) 	__asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc")
+#define local_save_flags(x)	do { typecheck(unsigned long,x); __asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */); } while (0)
+#define local_irq_restore(x) 	do { typecheck(unsigned long,x); __asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc"); } while (0)
 #define local_irq_disable() 	__asm__ __volatile__("cli": : :"memory")
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
