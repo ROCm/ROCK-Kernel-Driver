@@ -1187,6 +1187,18 @@ out:
 	return rc;
 }
 
+static int match_ipv6_addrmask(u32 *input, u32 *addr, u32 *mask)
+{
+	int i, fail = 0;
+
+	for(i = 0; i < 4; i++)
+		if(addr[i] != (input[i] & mask[i])) {
+			fail = 1;
+			break;
+		}
+
+	return !fail;
+}
 
 /**
  * security_node_sid - Obtain the SID for a node (host).
@@ -1201,22 +1213,47 @@ int security_node_sid(u16 domain,
 		      u32 *out_sid)
 {
 	int rc = 0;
-	u32 addr;
 	struct ocontext *c;
 
 	POLICY_RDLOCK;
 
-	if (domain != AF_INET || addrlen != sizeof(u32)) {
+	switch (domain) {
+	case AF_INET: {
+		u32 addr;
+
+		if (addrlen != sizeof(u32)) {
+			rc = -EINVAL;
+			goto out;
+		}
+
+		addr = *((u32 *)addrp);
+
+		c = policydb.ocontexts[OCON_NODE];
+		while (c) {
+			if (c->u.node.addr == (addr & c->u.node.mask))
+				break;
+			c = c->next;
+		}
+		break;
+	}
+
+	case AF_INET6:
+		if (addrlen != sizeof(u64) * 2) {
+			rc = -EINVAL;
+			goto out;
+		}
+		c = policydb.ocontexts[OCON_NODE6];
+		while (c) {
+			if (match_ipv6_addrmask(addrp, c->u.node6.addr,
+						c->u.node6.mask))
+				break;
+			c = c->next;
+		}
+		break;
+
+	default:
 		*out_sid = SECINITSID_NODE;
 		goto out;
-	}
-	addr = *((u32 *)addrp);
-
-	c = policydb.ocontexts[OCON_NODE];
-	while (c) {
-		if (c->u.node.addr == (addr & c->u.node.mask))
-			break;
-		c = c->next;
 	}
 
 	if (c) {
