@@ -830,9 +830,6 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 		return -ENODEV;
 	}
 
-	if (!instance->firmware_loaded)
-		return -EAGAIN;
-
 	if (vcc->qos.aal != ATM_AAL5) {
 		dbg ("unsupported ATM type %d!", vcc->qos.aal);
 		return -EINVAL;
