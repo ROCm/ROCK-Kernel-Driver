@@ -135,12 +135,78 @@ static void ip_map_request(struct cache_detail *cd,
 	(*bpp)[-1] = '\n';
 }
 
+static struct ip_map *ip_map_lookup(struct ip_map *, int);
+static int ip_map_parse(struct cache_detail *cd,
+			  char *mesg, int mlen)
+{
+	/* class ipaddress [domainname] */
+	char class[50], buf[50];
+	int len;
+	int b1,b2,b3,b4;
+	char c;
+	struct ip_map ipm, *ipmp;
+	struct auth_domain *dom;
+	time_t expiry;
+
+	if (mesg[mlen-1] != '\n')
+		return -EINVAL;
+	mesg[mlen-1] = 0;
+
+	/* class */
+	len = get_word(&mesg, class, 50);
+	if (len <= 0) return -EINVAL;
+
+	/* ip address */
+	len = get_word(&mesg, buf, 50);
+	if (len <= 0) return -EINVAL;
+
+	if (sscanf(buf, "%u.%u.%u.%u%c", &b1, &b2, &b3, &b4, &c) != 4)
+		return -EINVAL;
+	
+	expiry = get_expiry(&mesg);
+	if (expiry ==0)
+		return -EINVAL;
+
+	/* domainname, or empty for NEGATIVE */
+	len = get_word(&mesg, buf, 50);
+	if (len < 0) return -EINVAL;
+
+	if (len) {
+		dom = unix_domain_find(buf);
+		if (dom == NULL)
+			return -ENOENT;
+	} else
+		dom = NULL;
+
+	ipm.m_class = class;
+	ipm.m_addr.s_addr =
+		htonl((((((b1<<8)|b2)<<8)|b3)<<8)|b4);
+	ipm.h.flags = 0;
+	if (dom)
+		ipm.m_client = container_of(dom, struct unix_domain, h);
+	else
+		set_bit(CACHE_NEGATIVE, &ipm.h.flags);
+	ipm.h.expiry_time = expiry;
+	ipm.m_add_change = ipm.m_client->addr_changes;
+
+	ipmp = ip_map_lookup(&ipm, 1);
+	if (ipmp)
+		ip_map_put(&ipmp->h, &ip_map_cache);
+	if (dom)
+		auth_domain_put(dom);
+	if (!ipmp)
+		return -ENOMEM;
+
+	return 0;
+}
+
 struct cache_detail ip_map_cache = {
 	.hash_size	= IP_HASHMAX,
 	.hash_table	= ip_table,
 	.name		= "auth.unix.ip",
 	.cache_put	= ip_map_put,
 	.cache_request	= ip_map_request,
+	.cache_parse	= ip_map_parse,
 };
 
 static DefineSimpleCacheLookup(ip_map)
