@@ -41,7 +41,7 @@ static char *rtas_log_buf;
 static unsigned long rtas_log_start;
 static unsigned long rtas_log_size;
 
-static int surveillance_requested;
+static int surveillance_timeout = -1;
 static unsigned int rtas_event_scan_rate;
 static unsigned int rtas_error_log_max;
 static unsigned int rtas_error_log_buffer_max;
@@ -287,19 +287,17 @@ struct file_operations proc_rtas_log_operations = {
 	.release =	rtas_log_release,
 };
 
-static int enable_surveillance(void)
+static int enable_surveillance(int timeout)
 {
 	int error;
 
 	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
-			  SURVEILLANCE_TOKEN, 0, SURVEILLANCE_TIMEOUT);
+			  SURVEILLANCE_TOKEN, 0, timeout);
 
 	if (error) {
 		printk(KERN_ERR "rtasd: could not enable surveillance\n");
 		return -1;
 	}
-
-	rtas_event_scan_rate = SURVEILLANCE_SCANRATE;
 
 	return 0;
 }
@@ -414,9 +412,9 @@ repeat:
 		schedule_timeout(first_pass ? HZ : (HZ*60/rtas_event_scan_rate) / 2);
 	}
 
-	if (first_pass && surveillance_requested) {
+	if (first_pass && (surveillance_timeout != -1)) {
 		DEBUG("enabling surveillance\n");
-		if (enable_surveillance())
+		if (enable_surveillance(surveillance_timeout))
 			goto error_vfree;
 		DEBUG("surveillance enabled\n");
 	}
@@ -466,8 +464,8 @@ static int __init surveillance_setup(char *str)
 	int i;
 
 	if (get_option(&str,&i)) {
-		if (i == 1)
-			surveillance_requested = 1;
+		if (i >= 0 && i <= 255)
+			surveillance_timeout = i;
 	}
 
 	return 1;
