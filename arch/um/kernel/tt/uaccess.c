@@ -4,6 +4,7 @@
  */
 
 #include "linux/sched.h"
+#include "linux/module.h"
 #include "asm/uaccess.h"
 
 int copy_from_user_tt(void *to, const void *from, int n)
@@ -60,6 +61,7 @@ int strnlen_user_tt(const void *str, int len)
 				 &current->thread.fault_addr,
 				 &current->thread.fault_catcher));
 }
+EXPORT_SYMBOL(strnlen_user_tt);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -8,6 +8,7 @@
 #include "linux/string.h"
 #include "linux/fs.h"
 #include "linux/highmem.h"
+#include "linux/module.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/uaccess.h"
@@ -206,6 +207,7 @@ int strnlen_user_skas(const void *str, int len)
 		return(count + 1);
 	return(-EFAULT);
 }
+EXPORT_SYMBOL(strnlen_user_skas);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
