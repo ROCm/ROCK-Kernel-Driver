@@ -1109,25 +1109,27 @@ int psched_clock_scale;
 EXPORT_SYMBOL(psched_clock_per_hz);
 EXPORT_SYMBOL(psched_clock_scale);
 
-#ifdef PSCHED_WATCHER
 psched_time_t psched_time_base;
-PSCHED_WATCHER psched_time_mark;
+cycles_t psched_time_mark;
 EXPORT_SYMBOL(psched_time_mark);
 EXPORT_SYMBOL(psched_time_base);
 
+/*
+ * Periodically adjust psched_time_base to avoid overflow
+ * with 32-bit get_cycles(). Safe up to 4GHz CPU.
+ */
 static void psched_tick(unsigned long);
-
 static struct timer_list psched_timer = TIMER_INITIALIZER(psched_tick, 0, 0);
 
 static void psched_tick(unsigned long dummy)
 {
-	psched_time_t dummy_stamp;
-	PSCHED_GET_TIME(dummy_stamp);
-	/* It is OK up to 4GHz cpu */
-	psched_timer.expires = jiffies + 1*HZ;
-	add_timer(&psched_timer);
+	if (sizeof(cycles_t) == sizeof(u32)) {
+		psched_time_t dummy_stamp;
+		PSCHED_GET_TIME(dummy_stamp);
+		psched_timer.expires = jiffies + 1*HZ;
+		add_timer(&psched_timer);
+	}
 }
-#endif
 
 int __init psched_calibrate_clock(void)
 {
@@ -1137,9 +1139,7 @@ int __init psched_calibrate_clock(void)
 	long rdelay;
 	unsigned long stop;
 
-#ifdef PSCHED_WATCHER
 	psched_tick(0);
-#endif
 	stop = jiffies + HZ/10;
 	PSCHED_GET_TIME(stamp);
 	do_gettimeofday(&tv);

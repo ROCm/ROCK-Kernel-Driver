@@ -16,11 +16,6 @@
 #include <linux/module.h>
 #include <linux/rtnetlink.h>
 
-#ifdef CONFIG_X86_TSC
-#include <asm/msr.h>
-#endif
-
-
 struct rtattr;
 struct Qdisc;
 
@@ -235,41 +230,27 @@ typedef long	psched_tdiff_t;
 #define PSCHED_JIFFIE2US(delay) ((delay)<<PSCHED_JSCALE)
 
 #elif PSCHED_CLOCK_SOURCE == PSCHED_CPU
+#include <asm/timex.h>
 
 extern psched_tdiff_t psched_clock_per_hz;
 extern int psched_clock_scale;
+extern psched_time_t psched_time_base;
+extern cycles_t psched_time_mark;
 
+#define PSCHED_GET_TIME(stamp)						\
+do {									\
+	cycles_t cur = get_cycles();					\
+	if (sizeof(cycles_t) == sizeof(u32)) {				\
+		if (cur <= psched_time_mark)				\
+			psched_time_base += 0x100000000ULL;		\
+		psched_time_mark = cur;					\
+		(stamp) = (psched_time_base + cur)>>psched_clock_scale;	\
+	} else {							\
+		(stamp) = cur>>psched_clock_scale;			\
+	}								\
+} while (0)
 #define PSCHED_US2JIFFIE(delay) (((delay)+psched_clock_per_hz-1)/psched_clock_per_hz)
 #define PSCHED_JIFFIE2US(delay) ((delay)*psched_clock_per_hz)
-
-#ifdef CONFIG_X86_TSC
-
-#define PSCHED_GET_TIME(stamp) \
-({ u64 __cur; \
-   rdtscll(__cur); \
-   (stamp) = __cur>>psched_clock_scale; \
-})
-
-#elif defined (__alpha__)
-
-#define PSCHED_WATCHER u32
-
-extern psched_time_t psched_time_base;
-extern PSCHED_WATCHER psched_time_mark;
-
-#define PSCHED_GET_TIME(stamp) \
-({ u32 __res; \
-   __asm__ __volatile__ ("rpcc %0" : "r="(__res)); \
-   if (__res <= psched_time_mark) psched_time_base += 0x100000000UL; \
-   psched_time_mark = __res; \
-   (stamp) = (psched_time_base + __res)>>psched_clock_scale; \
-})
-
-#else
-
-#error PSCHED_CLOCK_SOURCE=PSCHED_CPU is not supported on this arch.
-
-#endif /* ARCH */
 
 #endif /* PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES */
 
