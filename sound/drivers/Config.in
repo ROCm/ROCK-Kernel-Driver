@@ -1,0 +1,7 @@
+# ALSA generic drivers
+
+dep_tristate 'Dummy (/dev/null) soundcard' CONFIG_SND_DUMMY $CONFIG_SND
+dep_tristate 'Virtual MIDI soundcard' CONFIG_SND_VIRMIDI $CONFIG_SND $CONFIG_SND_SEQUENCER
+dep_tristate 'MOTU MidiTimePiece AV multiport MIDI' CONFIG_SND_MTPAV $CONFIG_SND
+dep_tristate 'UART16550 - MIDI only driver' CONFIG_SND_SERIAL_U16550 $CONFIG_SND
+dep_tristate 'Generic MPU-401 UART driver' CONFIG_SND_MPU401 $CONFIG_SND

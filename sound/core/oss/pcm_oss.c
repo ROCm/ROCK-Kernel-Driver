@@ -1,0 +1,2177 @@
+/*
+ *  Digital Audio (PCM) abstract layer / OSS compatible
+ *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
+ *
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ *
+ */
+
+#if 0
+#define PLUGIN_DEBUG
+#endif
+
+#include <sound/driver.h>
+#include <linux/init.h>
+#include <sound/core.h>
+#include <sound/minors.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
+#include "pcm_plugin.h"
+#include <sound/info.h>
+#include <linux/soundcard.h>
+#include <sound/initval.h>
+
+static int snd_dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
+static int snd_adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
+static int snd_nonblock_open = 0;
+
+MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
+MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
+MODULE_LICENSE("GPL");
+MODULE_PARM(snd_dsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(snd_dsp_map, "PCM device number assigned to 1st OSS device.");
+MODULE_PARM_SYNTAX(snd_dsp_map, "default:0,skill:advanced");
+MODULE_PARM(snd_adsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(snd_adsp_map, "PCM device number assigned to 2nd OSS device.");
+MODULE_PARM_SYNTAX(snd_adsp_map, "default:1,skill:advanced");
+MODULE_PARM(snd_nonblock_open, "i");
+MODULE_PARM_DESC(snd_nonblock_open, "Don't block opening busy PCM devices.");
+MODULE_PARM_SYNTAX(snd_nonblock_open, "default:0,skill:advanced");
+
+extern int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long arg);
+static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file);
+static int snd_pcm_oss_get_channels(snd_pcm_oss_file_t *pcm_oss_file);
+static int snd_pcm_oss_get_format(snd_pcm_oss_file_t *pcm_oss_file);
+
+EXPORT_NO_SYMBOLS;
+
+static inline mm_segment_t snd_enter_user(void)
+{
+	mm_segment_t fs = get_fs();
+	set_fs(get_ds());
+	return fs;
+}
+
+static inline void snd_leave_user(mm_segment_t fs)
+{
+	set_fs(fs);
+}
+
+static inline void dec_mod_count(struct module *module)
+{
+	if (module)
+		__MOD_DEC_USE_COUNT(module);
+}
+
+int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_plugin_t *plugin, *next;
+	
+	plugin = runtime->oss.plugin_first;
+	while (plugin) {
+		next = plugin->next;
+		snd_pcm_plugin_free(plugin);
+		plugin = next;
+	}
+	runtime->oss.plugin_first = runtime->oss.plugin_last = NULL;
+	return 0;
+}
+
+int snd_pcm_plugin_insert(snd_pcm_plugin_t *plugin)
+{
+	snd_pcm_runtime_t *runtime = plugin->plug->runtime;
+	plugin->next = runtime->oss.plugin_first;
+	plugin->prev = NULL;
+	if (runtime->oss.plugin_first) {
+		runtime->oss.plugin_first->prev = plugin;
+		runtime->oss.plugin_first = plugin;
+	} else {
+		runtime->oss.plugin_last =
+		runtime->oss.plugin_first = plugin;
+	}
+	return 0;
+}
+
+int snd_pcm_plugin_append(snd_pcm_plugin_t *plugin)
+{
+	snd_pcm_runtime_t *runtime = plugin->plug->runtime;
+	plugin->next = NULL;
+	plugin->prev = runtime->oss.plugin_last;
+	if (runtime->oss.plugin_last) {
+		runtime->oss.plugin_last->next = plugin;
+		runtime->oss.plugin_last = plugin;
+	} else {
+		runtime->oss.plugin_last =
+		runtime->oss.plugin_first = plugin;
+	}
+	return 0;
+}
+
+static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (runtime->period_size == runtime->oss.period_bytes)
+		return frames;
+	if (runtime->period_size < runtime->oss.period_bytes)
+		return frames * (runtime->oss.period_bytes / runtime->period_size);
+	return frames / (runtime->period_size / runtime->oss.period_bytes);
+}
+
+static int snd_pcm_oss_format_from(int format)
+{
+	switch (format) {
+	case AFMT_MU_LAW:	return SNDRV_PCM_FORMAT_MU_LAW;
+	case AFMT_A_LAW:	return SNDRV_PCM_FORMAT_A_LAW;
+	case AFMT_IMA_ADPCM:	return SNDRV_PCM_FORMAT_IMA_ADPCM;
+	case AFMT_U8:		return SNDRV_PCM_FORMAT_U8;
+	case AFMT_S16_LE:	return SNDRV_PCM_FORMAT_S16_LE;
+	case AFMT_S16_BE:	return SNDRV_PCM_FORMAT_S16_BE;
+	case AFMT_S8:		return SNDRV_PCM_FORMAT_S8;
+	case AFMT_U16_LE:	return SNDRV_PCM_FORMAT_U16_LE;
+	case AFMT_U16_BE:	return SNDRV_PCM_FORMAT_U16_BE;
+	case AFMT_MPEG:		return SNDRV_PCM_FORMAT_MPEG;
+	default:			return SNDRV_PCM_FORMAT_U8;
+	}
+}
+
+static int snd_pcm_oss_format_to(int format)
+{
+	switch (format) {
+	case SNDRV_PCM_FORMAT_MU_LAW:	return AFMT_MU_LAW;
+	case SNDRV_PCM_FORMAT_A_LAW:	return AFMT_A_LAW;
+	case SNDRV_PCM_FORMAT_IMA_ADPCM:	return AFMT_IMA_ADPCM;
+	case SNDRV_PCM_FORMAT_U8:		return AFMT_U8;
+	case SNDRV_PCM_FORMAT_S16_LE:	return AFMT_S16_LE;
+	case SNDRV_PCM_FORMAT_S16_BE:	return AFMT_S16_BE;
+	case SNDRV_PCM_FORMAT_S8:		return AFMT_S8;
+	case SNDRV_PCM_FORMAT_U16_LE:	return AFMT_U16_LE;
+	case SNDRV_PCM_FORMAT_U16_BE:	return AFMT_U16_BE;
+	case SNDRV_PCM_FORMAT_MPEG:		return AFMT_MPEG;
+	default:			return -EINVAL;
+	}
+}
+
+static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream, 
+				   snd_pcm_hw_params_t *oss_params,
+				   snd_pcm_hw_params_t *slave_params)
+{
+	size_t s;
+	size_t oss_buffer_size, oss_period_size, oss_periods;
+	size_t min_period_size, max_period_size;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	size_t oss_frame_size;
+
+	oss_frame_size = snd_pcm_format_physical_width(params_format(oss_params)) *
+			 params_channels(oss_params) / 8;
+
+	oss_buffer_size = snd_pcm_plug_client_size(substream,
+						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0)) * oss_frame_size;
+	oss_buffer_size = 1 << ld2(oss_buffer_size);
+	if (atomic_read(&runtime->mmap_count)) {
+		if (oss_buffer_size > runtime->oss.mmap_bytes)
+			oss_buffer_size = runtime->oss.mmap_bytes;
+	}
+
+	if (substream->oss.setup &&
+	    substream->oss.setup->period_size > 16)
+		oss_period_size = substream->oss.setup->period_size;
+	else if (runtime->oss.fragshift) {
+		oss_period_size = 1 << runtime->oss.fragshift;
+		if (oss_period_size > oss_buffer_size / 2)
+			oss_period_size = oss_buffer_size / 2;
+	} else {
+		int sd;
+		size_t bytes_per_sec = params_rate(oss_params) * snd_pcm_format_physical_width(params_format(oss_params)) * params_channels(oss_params) / 8;
+
+		oss_period_size = oss_buffer_size;
+		do {
+			oss_period_size /= 2;
+		} while (oss_period_size > bytes_per_sec);
+		if (runtime->oss.subdivision == 0) {
+			sd = 4;
+			if (oss_period_size / sd > 4096)
+				sd *= 2;
+			if (oss_period_size / sd < 4096)
+				sd = 1;
+		} else
+			sd = runtime->oss.subdivision;
+		oss_period_size /= sd;
+		if (oss_period_size < 16)
+			oss_period_size = 16;
+	}
+
+	min_period_size = snd_pcm_plug_client_size(substream,
+						   snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 0));
+	min_period_size *= oss_frame_size;
+	min_period_size = 1 << (ld2(min_period_size - 1) + 1);
+	if (oss_period_size < min_period_size)
+		oss_period_size = min_period_size;
+
+	max_period_size = snd_pcm_plug_client_size(substream,
+						   snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 0));
+	max_period_size *= oss_frame_size;
+	max_period_size = 1 << ld2(max_period_size);
+	if (oss_period_size > max_period_size)
+		oss_period_size = max_period_size;
+
+	oss_periods = oss_buffer_size / oss_period_size;
+
+	if (substream->oss.setup) {
+		if (substream->oss.setup->periods > 1)
+			oss_periods = substream->oss.setup->periods;
+	}
+
+	s = snd_pcm_hw_param_value_max(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, 0);
+	if (runtime->oss.maxfrags && s > runtime->oss.maxfrags)
+		s = runtime->oss.maxfrags;
+	if (oss_periods > s)
+		oss_periods = s;
+
+	s = snd_pcm_hw_param_value_min(slave_params, SNDRV_PCM_HW_PARAM_PERIODS, 0);
+	if (s < 2)
+		s = 2;
+	if (oss_periods < s)
+		oss_periods = s;
+
+	while (oss_period_size * oss_periods > oss_buffer_size)
+		oss_period_size /= 2;
+
+	snd_assert(oss_period_size >= 16, return -EINVAL);
+	runtime->oss.period_bytes = oss_period_size;
+	runtime->oss.periods = oss_periods;
+	return 0;
+}
+
+static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_hw_params_t params, sparams;
+	snd_pcm_sw_params_t sw_params;
+	ssize_t oss_buffer_size, oss_period_size;
+	size_t oss_frame_size;
+	int err;
+	int direct;
+	int format, sformat, n;
+	unsigned int sformat_mask;
+	unsigned int mask;
+
+	if (atomic_read(&runtime->mmap_count)) {
+		direct = 1;
+	} else {
+		snd_pcm_oss_setup_t *setup = substream->oss.setup;
+		direct = (setup != NULL && setup->direct);
+	}
+
+	_snd_pcm_hw_params_any(&sparams);
+	_snd_pcm_hw_param_setinteger(&sparams, SNDRV_PCM_HW_PARAM_PERIODS);
+	_snd_pcm_hw_param_min(&sparams, SNDRV_PCM_HW_PARAM_PERIODS, 2, 0);
+	if (atomic_read(&runtime->mmap_count))
+		mask = 1 << SNDRV_PCM_ACCESS_MMAP_INTERLEAVED;
+	else {
+		mask = 1 << SNDRV_PCM_ACCESS_RW_INTERLEAVED;
+		if (!direct)
+			mask |= 1 << SNDRV_PCM_ACCESS_RW_NONINTERLEAVED;
+	}
+	err = snd_pcm_hw_param_mask(substream, &sparams, SNDRV_PCM_HW_PARAM_ACCESS, &mask);
+	if (err < 0) {
+		snd_printd("No usable accesses\n");
+		return -EINVAL;
+	}
+	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_RATE, runtime->oss.rate, 0);
+	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_CHANNELS, runtime->oss.channels, 0);
+
+	format = snd_pcm_oss_format_from(runtime->oss.format);
+
+	sformat_mask = *hw_param_mask(&sparams, SNDRV_PCM_HW_PARAM_FORMAT);
+	if (direct)
+		sformat = format;
+	else
+		sformat = snd_pcm_plug_slave_format(format, sformat_mask);
+
+	if (sformat < 0 || !(sformat_mask & (1 << sformat))) {
+		for (sformat = 0; sformat <= SNDRV_PCM_FORMAT_LAST; sformat++) {
+			if ((sformat_mask & (1 << sformat)) &&
+			    snd_pcm_oss_format_to(sformat) >= 0)
+				break;
+		}
+		if (sformat > SNDRV_PCM_FORMAT_LAST) {
+			snd_printd("Cannot find a format!!!\n");
+			return -EINVAL;
+		}
+	}
+	err = _snd_pcm_hw_param_set(&sparams, SNDRV_PCM_HW_PARAM_FORMAT, sformat, 0);
+	snd_assert(err >= 0, return err);
+
+	if (direct) {
+		params = sparams;
+	} else {
+		_snd_pcm_hw_params_any(&params);
+		_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_ACCESS,
+				      SNDRV_PCM_ACCESS_RW_INTERLEAVED, 0);
+		_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_FORMAT,
+				      snd_pcm_oss_format_from(runtime->oss.format), 0);
+		_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_CHANNELS,
+				      runtime->oss.channels, 0);
+		_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_RATE,
+				      runtime->oss.rate, 0);
+		pdprintf("client: access = %i, format = %i, channels = %i, rate = %i\n",
+			 params_access(&params), params_format(&params),
+			 params_channels(&params), params_rate(&params));
+	}
+	pdprintf("slave: access = %i, format = %i, channels = %i, rate = %i\n",
+		 params_access(&sparams), params_format(&sparams),
+		 params_channels(&sparams), params_rate(&sparams));
+
+	oss_frame_size = snd_pcm_format_physical_width(params_format(&params)) *
+			 params_channels(&params) / 8;
+
+	snd_pcm_oss_plugin_clear(substream);
+	if (!direct) {
+		/* add necessary plugins */
+		snd_pcm_oss_plugin_clear(substream);
+		if ((err = snd_pcm_plug_format_plugins(substream,
+						       &params, 
+						       &sparams)) < 0) {
+			snd_printd("snd_pcm_plug_format_plugins failed: %i\n", err);
+			snd_pcm_oss_plugin_clear(substream);
+			return err;
+		}
+		if (runtime->oss.plugin_first) {
+			snd_pcm_plugin_t *plugin;
+			if ((err = snd_pcm_plugin_build_io(substream, &sparams, &plugin)) < 0) {
+				snd_printd("snd_pcm_plugin_build_io failed: %i\n", err);
+				snd_pcm_oss_plugin_clear(substream);
+				return err;
+			}
+			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+				err = snd_pcm_plugin_append(plugin);
+			} else {
+				err = snd_pcm_plugin_insert(plugin);
+			}
+			if (err < 0) {
+				snd_pcm_oss_plugin_clear(substream);
+				return err;
+			}
+		}
+	}
+
+	err = snd_pcm_oss_period_size(substream, &params, &sparams);
+	if (err < 0)
+		return err;
+
+	n = snd_pcm_plug_slave_size(substream, runtime->oss.period_bytes / oss_frame_size);
+	err = snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, n, 0);
+	snd_assert(err >= 0, return err);
+
+	err = snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_PERIODS,
+				     runtime->oss.periods, 0);
+	snd_assert(err >= 0, return err);
+
+	snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+
+	if ((err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_HW_PARAMS, &sparams)) < 0) {
+		snd_printd("HW_PARAMS failed: %i\n", err);
+		return err;
+	}
+
+	memset(&sw_params, 0, sizeof(sw_params));
+	if (runtime->oss.trigger) {
+		sw_params.start_threshold = 1;
+	} else {
+		sw_params.start_threshold = runtime->boundary;
+	}
+	if (atomic_read(&runtime->mmap_count))
+		sw_params.stop_threshold = runtime->boundary;
+	else
+		sw_params.stop_threshold = runtime->buffer_size;
+	sw_params.tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
+	sw_params.period_step = 1;
+	sw_params.sleep_min = 0;
+	sw_params.avail_min = runtime->period_size;
+	sw_params.xfer_align = 1;
+	sw_params.silence_threshold = 0;
+	sw_params.silence_size = 0;
+
+	if ((err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_SW_PARAMS, &sw_params)) < 0) {
+		snd_printd("SW_PARAMS failed: %i\n", err);
+		return err;
+	}
+	runtime->control->avail_min = runtime->period_size;
+
+	runtime->oss.periods = params_periods(&sparams);
+	oss_period_size = snd_pcm_plug_client_size(substream, params_period_size(&sparams));
+	snd_assert(oss_period_size >= 0, return -EINVAL);
+	if (runtime->oss.plugin_first) {
+		err = snd_pcm_plug_alloc(substream, oss_period_size);
+		if (err < 0)
+			return err;
+	}
+	oss_period_size *= oss_frame_size;
+
+	oss_buffer_size = oss_period_size * runtime->oss.periods;
+	snd_assert(oss_buffer_size >= 0, return -EINVAL);
+
+	runtime->oss.period_bytes = oss_period_size;
+	runtime->oss.buffer_bytes = oss_buffer_size;
+
+	pdprintf("oss: period bytes = %i, buffer bytes = %i\n",
+		 runtime->oss.period_bytes,
+		 runtime->oss.buffer_bytes);
+	pdprintf("slave: period_size = %i, buffer_size = %i\n",
+		 params_period_size(&sparams),
+		 params_buffer_size(&sparams));
+
+	runtime->oss.format = snd_pcm_oss_format_to(params_format(&params));
+	runtime->oss.channels = params_channels(&params);
+	runtime->oss.rate = params_rate(&params);
+
+	runtime->oss.params = 0;
+	runtime->oss.prepare = 1;
+	if (runtime->oss.buffer != NULL)
+		vfree(runtime->oss.buffer);
+	runtime->oss.buffer = vmalloc(runtime->oss.period_bytes);
+	runtime->oss.buffer_used = 0;
+	snd_assert(runtime->dma_area != NULL, return -EIO);
+	snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
+	return 0;
+}
+
+static int snd_pcm_oss_get_active_substream(snd_pcm_oss_file_t *pcm_oss_file, snd_pcm_substream_t **r_substream)
+{
+	int idx, err;
+	snd_pcm_substream_t *asubstream = NULL, *substream;
+
+	for (idx = 0; idx < 2; idx++) {
+		substream = pcm_oss_file->streams[idx];
+		if (substream == NULL)
+			continue;
+		if (asubstream == NULL)
+			asubstream = substream;
+		if (substream->runtime->oss.params) {
+			err = snd_pcm_oss_change_params(substream);
+			if (err < 0)
+				return err;
+		}
+	}
+	snd_assert(asubstream != NULL, return -EIO);
+	if (r_substream)
+		*r_substream = asubstream;
+	return 0;
+}
+
+static int snd_pcm_oss_prepare(snd_pcm_substream_t *substream)
+{
+	int err;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_PREPARE, 0);
+	if (err < 0) {
+		snd_printd("snd_pcm_oss_prepare: SNDRV_PCM_IOCTL_PREPARE failed\n");
+		return err;
+	}
+	runtime->oss.prepare = 0;
+	runtime->oss.prev_hw_ptr_interrupt = 0;
+
+	return 0;
+}
+
+static int snd_pcm_oss_make_ready(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime;
+	int err;
+
+	if (substream == NULL)
+		return 0;
+	runtime = substream->runtime;
+	if (runtime->oss.params) {
+		err = snd_pcm_oss_change_params(substream);
+		if (err < 0)
+			return err;
+	}
+	if (runtime->oss.prepare) {
+		err = snd_pcm_oss_prepare(substream);
+		if (err < 0)
+			return err;
+	}
+	return 0;
+}
+
+snd_pcm_sframes_t snd_pcm_oss_write3(snd_pcm_substream_t *substream, const char *ptr, snd_pcm_uframes_t frames, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	mm_segment_t fs;
+	int ret;
+	while (1) {
+		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
+		    runtime->status->state == SNDRV_PCM_STATE_SUSPENDED) {
+			ret = snd_pcm_oss_prepare(substream);
+			if (ret < 0)
+				break;
+		}
+		if (in_kernel)
+			fs = snd_enter_user();
+		ret = snd_pcm_lib_write(substream, ptr, frames);
+		if (in_kernel)
+			snd_leave_user(fs);
+		if (ret != -EPIPE && ret != -ESTRPIPE)
+			break;
+		/* test, if we can't store new data, because the stream */
+		/* has not been started */
+		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED)
+			return -EAGAIN;
+	}
+	return ret;
+}
+
+snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, snd_pcm_uframes_t frames, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	mm_segment_t fs;
+	int ret;
+	while (1) {
+		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
+		    runtime->status->state == SNDRV_PCM_STATE_SUSPENDED) {
+			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+			if (ret < 0)
+				break;
+		} else if (runtime->status->state == SNDRV_PCM_STATE_SETUP) {
+			ret = snd_pcm_oss_prepare(substream);
+			if (ret < 0)
+				break;
+		}
+		if (in_kernel)
+			fs = snd_enter_user();
+		ret = snd_pcm_lib_read(substream, ptr, frames);
+		if (in_kernel)
+			snd_leave_user(fs);
+		if (ret != -EPIPE && ret != -ESTRPIPE)
+			break;
+	}
+	return ret;
+}
+
+snd_pcm_sframes_t snd_pcm_oss_writev3(snd_pcm_substream_t *substream, void **bufs, snd_pcm_uframes_t frames, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	mm_segment_t fs;
+	int ret;
+	while (1) {
+		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
+		    runtime->status->state == SNDRV_PCM_STATE_SUSPENDED) {
+			ret = snd_pcm_oss_prepare(substream);
+			if (ret < 0)
+				break;
+		}
+		if (in_kernel)
+			fs = snd_enter_user();
+		ret = snd_pcm_lib_writev(substream, bufs, frames);
+		if (in_kernel)
+			snd_leave_user(fs);
+		if (ret != -EPIPE && ret != -ESTRPIPE)
+			break;
+		/* test, if we can't store new data, because the stream */
+		/* has not been started */
+		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED)
+			return -EAGAIN;
+	}
+	return ret;
+}
+	
+snd_pcm_sframes_t snd_pcm_oss_readv3(snd_pcm_substream_t *substream, void **bufs, snd_pcm_uframes_t frames, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	mm_segment_t fs;
+	int ret;
+	while (1) {
+		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
+		    runtime->status->state == SNDRV_PCM_STATE_SUSPENDED) {
+			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+			if (ret < 0)
+				break;
+		} else if (runtime->status->state == SNDRV_PCM_STATE_SETUP) {
+			ret = snd_pcm_oss_prepare(substream);
+			if (ret < 0)
+				break;
+		}
+		if (in_kernel)
+			fs = snd_enter_user();
+		ret = snd_pcm_lib_readv(substream, bufs, frames);
+		if (in_kernel)
+			snd_leave_user(fs);
+		if (ret != -EPIPE && ret != -ESTRPIPE)
+			break;
+	}
+	return ret;
+}
+
+static ssize_t snd_pcm_oss_write2(snd_pcm_substream_t *substream, const char *buf, size_t bytes, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t frames, frames1;
+	if (runtime->oss.plugin_first) {
+		snd_pcm_plugin_channel_t *channels;
+		size_t oss_frame_bytes = (runtime->oss.plugin_first->src_width * runtime->oss.plugin_first->src_format.channels) / 8;
+		if (!in_kernel) {
+			if (copy_from_user(runtime->oss.buffer, buf, bytes))
+				return -EFAULT;
+			buf = runtime->oss.buffer;
+		}
+		frames = bytes / oss_frame_bytes;
+		frames1 = snd_pcm_plug_client_channels_buf(substream, (char *)buf, frames, &channels);
+		if (frames1 < 0)
+			return frames1;
+		frames1 = snd_pcm_plug_write_transfer(substream, channels, frames1);
+		if (frames1 <= 0)
+			return frames1;
+		bytes = frames1 * oss_frame_bytes;
+	} else {
+		frames = bytes_to_frames(runtime, bytes);
+		frames1 = snd_pcm_oss_write3(substream, buf, frames, in_kernel);
+		if (frames1 <= 0)
+			return frames1;
+		bytes = frames_to_bytes(runtime, frames1);
+	}
+	return bytes;
+}
+
+static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *buf, size_t bytes)
+{
+	size_t xfer = 0;
+	ssize_t tmp;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	if (atomic_read(&runtime->mmap_count))
+		return -ENXIO;
+
+	if ((tmp = snd_pcm_oss_make_ready(substream)) < 0)
+		return tmp;
+	while (bytes > 0) {
+		if (bytes < runtime->oss.period_bytes || runtime->oss.buffer_used > 0) {
+			tmp = bytes;
+			if (tmp + runtime->oss.buffer_used > runtime->oss.period_bytes)
+				tmp = runtime->oss.period_bytes - runtime->oss.buffer_used;
+			if (tmp > 0) {
+				if (copy_from_user(runtime->oss.buffer + runtime->oss.buffer_used, buf, tmp))
+					return xfer > 0 ? xfer : -EFAULT;
+			}
+			runtime->oss.buffer_used += tmp;
+			buf += tmp;
+			bytes -= tmp;
+			xfer += tmp;
+			if (runtime->oss.buffer_used == runtime->oss.period_bytes) {
+				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
+				if (tmp <= 0)
+					return xfer > 0 ? xfer : tmp;
+				runtime->oss.bytes += tmp;
+				runtime->oss.buffer_used = 0;
+			}
+		} else {
+			tmp = snd_pcm_oss_write2(substream, (char *)buf, runtime->oss.period_bytes, 0);
+			if (tmp <= 0)
+				return xfer > 0 ? xfer : tmp;
+			runtime->oss.bytes += tmp;
+			buf += tmp;
+			bytes -= tmp;
+			xfer += tmp;
+		}
+	}
+	return xfer;
+}
+
+static ssize_t snd_pcm_oss_read2(snd_pcm_substream_t *substream, char *buf, size_t bytes, int in_kernel)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t frames, frames1;
+	char *final_dst = buf;
+	if (runtime->oss.plugin_first) {
+		snd_pcm_plugin_channel_t *channels;
+		size_t oss_frame_bytes = (runtime->oss.plugin_last->dst_width * runtime->oss.plugin_last->dst_format.channels) / 8;
+		if (!in_kernel)
+			buf = runtime->oss.buffer;
+		frames = bytes / oss_frame_bytes;
+		frames1 = snd_pcm_plug_client_channels_buf(substream, buf, frames, &channels);
+		if (frames1 < 0)
+			return frames1;
+		frames1 = snd_pcm_plug_read_transfer(substream, channels, frames1);
+		if (frames1 <= 0)
+			return frames1;
+		bytes = frames1 * oss_frame_bytes;
+		if (!in_kernel && copy_to_user(final_dst, buf, bytes))
+			return -EFAULT;
+	} else {
+		frames = bytes_to_frames(runtime, bytes);
+		frames1 = snd_pcm_oss_read3(substream, buf, frames, in_kernel);
+		if (frames1 <= 0)
+			return frames1;
+		bytes = frames_to_bytes(runtime, frames1);
+	}
+	return bytes;
+}
+
+static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size_t bytes)
+{
+	size_t xfer = 0;
+	ssize_t tmp;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	if (atomic_read(&runtime->mmap_count))
+		return -ENXIO;
+
+	if ((tmp = snd_pcm_oss_make_ready(substream)) < 0)
+		return tmp;
+	while (bytes > 0) {
+		if (bytes < runtime->oss.period_bytes || runtime->oss.buffer_used > 0) {
+			if (runtime->oss.buffer_used == 0) {
+				tmp = snd_pcm_oss_read2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
+				if (tmp <= 0)
+					return xfer > 0 ? xfer : tmp;
+				runtime->oss.bytes += tmp;
+				runtime->oss.buffer_used = runtime->oss.period_bytes;
+			}
+			tmp = bytes;
+			if ((size_t) tmp > runtime->oss.buffer_used)
+				tmp = runtime->oss.buffer_used;
+			if (copy_to_user(buf, runtime->oss.buffer + (runtime->oss.period_bytes - runtime->oss.buffer_used), tmp))
+				return xfer > 0 ? xfer : -EFAULT;
+			buf += tmp;
+			bytes -= tmp;
+			xfer += tmp;
+			runtime->oss.buffer_used -= tmp;
+		} else {
+			tmp = snd_pcm_oss_read2(substream, (char *)buf, runtime->oss.period_bytes, 0);
+			if (tmp <= 0)
+				return xfer > 0 ? xfer : tmp;
+			runtime->oss.bytes += tmp;
+			buf += tmp;
+			bytes -= tmp;
+			xfer += tmp;
+		}
+	}
+	return xfer;
+}
+
+static int snd_pcm_oss_reset(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	if (substream != NULL) {
+		snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		substream->runtime->oss.prepare = 1;
+	}
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+	if (substream != NULL) {
+		snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		substream->runtime->oss.prepare = 1;
+	}
+	return 0;
+}
+
+static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	int err = 0;
+	unsigned int saved_f_flags;
+	snd_pcm_substream_t *substream;
+	snd_pcm_runtime_t *runtime;
+	ssize_t result;
+	wait_queue_t wait;
+
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	if (substream != NULL) {
+		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
+			return err;
+		
+		runtime = substream->runtime;
+		if (runtime->oss.buffer_used > 0) {
+			snd_pcm_format_set_silence(runtime->format,
+						   runtime->oss.buffer + runtime->oss.buffer_used,
+						   bytes_to_samples(runtime, runtime->oss.period_bytes - runtime->oss.buffer_used));
+			init_waitqueue_entry(&wait, current);
+			add_wait_queue(&runtime->sleep, &wait);
+			while (1) {
+				result = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
+				if (result > 0) {
+					runtime->oss.buffer_used = 0;
+					break;
+				}
+				if (result != 0 && result != -EAGAIN)
+					break;
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule();
+				if (signal_pending(current)) {
+					result = -ERESTARTSYS;
+					break;
+				}
+			}
+			set_current_state(TASK_RUNNING);
+			remove_wait_queue(&runtime->sleep, &wait);
+			if (result < 0)
+				return result;
+		}
+		saved_f_flags = substream->ffile->f_flags;
+		substream->ffile->f_flags &= ~O_NONBLOCK;
+		err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+		substream->ffile->f_flags = saved_f_flags;
+		if (err < 0)
+			return err;
+		runtime->oss.prepare = 1;
+	}
+
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+	if (substream != NULL) {
+		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
+			return err;
+		runtime = substream->runtime;
+		err = snd_pcm_kernel_capture_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+		if (err < 0)
+			return err;
+		runtime->oss.buffer_used = 0;
+		runtime->oss.prepare = 1;
+	}
+	return 0;
+}
+
+static int snd_pcm_oss_set_rate(snd_pcm_oss_file_t *pcm_oss_file, int rate)
+{
+	int idx;
+
+	for (idx = 1; idx >= 0; --idx) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+		snd_pcm_runtime_t *runtime;
+		if (substream == NULL)
+			continue;
+		runtime = substream->runtime;
+		if (rate < 1000)
+			rate = 1000;
+		else if (rate > 48000)
+			rate = 48000;
+		if (runtime->oss.rate != rate) {
+			runtime->oss.params = 1;
+			runtime->oss.rate = rate;
+		}
+	}
+	return snd_pcm_oss_get_rate(pcm_oss_file);
+}
+
+static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	int err;
+	
+	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
+		return err;
+	return substream->runtime->oss.rate;
+}
+
+static int snd_pcm_oss_set_channels(snd_pcm_oss_file_t *pcm_oss_file, int channels)
+{
+	int idx;
+	if (channels < 1)
+		channels = 1;
+	if (channels > 128)
+		return -EINVAL;
+	for (idx = 1; idx >= 0; --idx) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+		snd_pcm_runtime_t *runtime;
+		if (substream == NULL)
+			continue;
+		runtime = substream->runtime;
+		if (runtime->oss.channels != channels) {
+			runtime->oss.params = 1;
+			runtime->oss.channels = channels;
+		}
+	}
+	return snd_pcm_oss_get_channels(pcm_oss_file);
+}
+
+static int snd_pcm_oss_get_channels(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	int err;
+	
+	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
+		return err;
+	return substream->runtime->oss.channels;
+}
+
+static int snd_pcm_oss_get_block_size(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	int err;
+	
+	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
+		return err;
+	return substream->runtime->oss.period_bytes;
+}
+
+static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	int err;
+	int direct;
+	snd_pcm_hw_params_t params;
+	unsigned int formats = 0;
+	unsigned int format_mask;
+	int fmt;
+	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
+		return err;
+	if (atomic_read(&substream->runtime->mmap_count)) {
+		direct = 1;
+	} else {
+		snd_pcm_oss_setup_t *setup = substream->oss.setup;
+		direct = (setup != NULL && setup->direct);
+	}
+	if (!direct)
+		return AFMT_MU_LAW | AFMT_U8 |
+		       AFMT_S16_LE | AFMT_S16_BE |
+		       AFMT_S8 | AFMT_U16_LE |
+		       AFMT_U16_BE;
+	_snd_pcm_hw_params_any(&params);
+	err = snd_pcm_hw_refine(substream, &params);
+	snd_assert(err >= 0, return err);
+	format_mask = *hw_param_mask(&params, SNDRV_PCM_HW_PARAM_FORMAT); 
+	for (fmt = 0; fmt < 32; ++fmt) {
+		if (format_mask & (1 << fmt)) {
+			int f = snd_pcm_oss_format_to(fmt);
+			if (f >= 0)
+				formats |= f;
+		}
+	}
+	return formats;
+}
+
+static int snd_pcm_oss_set_format(snd_pcm_oss_file_t *pcm_oss_file, int format)
+{
+	int formats, idx;
+	
+	if (format != AFMT_QUERY) {
+		formats = snd_pcm_oss_get_formats(pcm_oss_file);
+		if (!(formats & format))
+			format = AFMT_U8;
+		for (idx = 1; idx >= 0; --idx) {
+			snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+			snd_pcm_runtime_t *runtime;
+			if (substream == NULL)
+				continue;
+			runtime = substream->runtime;
+			if (runtime->oss.format != format) {
+				runtime->oss.params = 1;
+				runtime->oss.format = format;
+			}
+		}
+	}
+	return snd_pcm_oss_get_format(pcm_oss_file);
+}
+
+static int snd_pcm_oss_get_format(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	int err;
+	
+	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
+		return err;
+	return substream->runtime->oss.format;
+}
+
+static int snd_pcm_oss_set_subdivide1(snd_pcm_substream_t *substream, int subdivide)
+{
+	snd_pcm_runtime_t *runtime;
+
+	if (substream == NULL)
+		return 0;
+	runtime = substream->runtime;
+	if (subdivide == 0) {
+		subdivide = runtime->oss.subdivision;
+		if (subdivide == 0)
+			subdivide = 1;
+		return subdivide;
+	}
+	if (runtime->oss.subdivision || runtime->oss.fragshift)
+		return -EINVAL;
+	if (subdivide != 1 && subdivide != 2 && subdivide != 4 &&
+	    subdivide != 8 && subdivide != 16)
+		return -EINVAL;
+	runtime->oss.subdivision = subdivide;
+	runtime->oss.params = 1;
+	return subdivide;
+}
+
+static int snd_pcm_oss_set_subdivide(snd_pcm_oss_file_t *pcm_oss_file, int subdivide)
+{
+	int err = -EINVAL, idx;
+
+	for (idx = 1; idx >= 0; --idx) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+		if (substream == NULL)
+			continue;
+		if ((err = snd_pcm_oss_set_subdivide1(substream, subdivide)) < 0)
+			return err;
+	}
+	return err;
+}
+
+static int snd_pcm_oss_set_fragment1(snd_pcm_substream_t *substream, unsigned int val)
+{
+	snd_pcm_runtime_t *runtime;
+
+	if (substream == NULL)
+		return 0;
+	runtime = substream->runtime;
+	if (runtime->oss.subdivision || runtime->oss.fragshift)
+		return -EINVAL;
+	runtime->oss.fragshift = val & 0xffff;
+	runtime->oss.maxfrags = (val >> 16) & 0xffff;
+	if (runtime->oss.fragshift < 4)		/* < 16 */
+		runtime->oss.fragshift = 4;
+	if (runtime->oss.maxfrags < 2)
+		runtime->oss.maxfrags = 2;
+	runtime->oss.params = 1;
+	return 0;
+}
+
+static int snd_pcm_oss_set_fragment(snd_pcm_oss_file_t *pcm_oss_file, unsigned int val)
+{
+	int err = -EINVAL, idx;
+
+	for (idx = 1; idx >= 0; --idx) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+		if (substream == NULL)
+			continue;
+		if ((err = snd_pcm_oss_set_fragment1(substream, val)) < 0)
+			return err;
+	}
+	return err;
+}
+
+static int snd_pcm_oss_nonblock(struct file * file)
+{
+	file->f_flags |= O_NONBLOCK;
+	return 0;
+}
+
+static int snd_pcm_oss_get_caps1(snd_pcm_substream_t *substream, int res)
+{
+
+	if (substream == NULL) {
+		res &= ~DSP_CAP_DUPLEX;
+		return res;
+	}
+#ifdef DSP_CAP_MULTI
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (substream->pstr->substream_count > 1)
+			res |= DSP_CAP_MULTI;
+#endif
+	/* DSP_CAP_REALTIME is set all times: */
+	/* all ALSA drivers can return actual pointer in ring buffer */
+#if defined(DSP_CAP_REALTIME) && 0
+	{
+		snd_pcm_runtime_t *runtime = substream->runtime;
+		if (runtime->info & (SNDRV_PCM_INFO_BLOCK_TRANSFER|SNDRV_PCM_INFO_BATCH))
+			res &= ~DSP_CAP_REALTIME;
+	}
+#endif
+	return res;
+}
+
+static int snd_pcm_oss_get_caps(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	int result, idx;
+	
+	result = DSP_CAP_TRIGGER | DSP_CAP_MMAP	| DSP_CAP_DUPLEX | DSP_CAP_REALTIME;
+	for (idx = 0; idx < 2; idx++) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[idx];
+		result = snd_pcm_oss_get_caps1(substream, result);
+	}
+	result |= 0x0001;	/* revision - same as SB AWE 64 */
+	return result;
+}
+
+static void snd_pcm_oss_simulate_fill(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t appl_ptr;
+	appl_ptr = runtime->hw_ptr_interrupt + runtime->buffer_size;
+	appl_ptr %= runtime->boundary;
+	runtime->control->appl_ptr = appl_ptr;
+}
+
+static int snd_pcm_oss_set_trigger(snd_pcm_oss_file_t *pcm_oss_file, int trigger)
+{
+	snd_pcm_runtime_t *runtime;
+	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
+	int err, cmd;
+	
+	psubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	csubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+
+	if (psubstream) {
+		if ((err = snd_pcm_oss_make_ready(psubstream)) < 0)
+			return err;
+		if (atomic_read(&psubstream->runtime->mmap_count))
+			snd_pcm_oss_simulate_fill(psubstream);
+	}
+	if (csubstream) {
+		if ((err = snd_pcm_oss_make_ready(csubstream)) < 0)
+			return err;
+	}
+      	if (psubstream) {
+      		runtime = psubstream->runtime;
+		if (trigger & PCM_ENABLE_OUTPUT) {
+			if (runtime->oss.trigger)
+				goto _skip1;
+			runtime->oss.trigger = 1;
+			runtime->start_threshold = 1;
+			cmd = SNDRV_PCM_IOCTL_START;
+		} else {
+			if (!runtime->oss.trigger)
+				goto _skip1;
+			runtime->oss.trigger = 0;
+			runtime->start_threshold = runtime->boundary;
+			cmd = SNDRV_PCM_IOCTL_DROP;
+			runtime->oss.prepare = 1;
+		}
+		err = snd_pcm_kernel_playback_ioctl(psubstream, cmd, 0);
+		if (err < 0)
+			return err;
+	}
+ _skip1:
+	if (csubstream) {
+      		runtime = csubstream->runtime;
+		if (trigger & PCM_ENABLE_INPUT) {
+			if (runtime->oss.trigger)
+				goto _skip2;
+			runtime->oss.trigger = 1;
+			runtime->start_threshold = 1;
+			cmd = SNDRV_PCM_IOCTL_START;
+		} else {
+			if (!runtime->oss.trigger)
+				goto _skip2;
+			runtime->oss.trigger = 0;
+			runtime->start_threshold = runtime->boundary;
+			cmd = SNDRV_PCM_IOCTL_DROP;
+			runtime->oss.prepare = 1;
+		}
+		err = snd_pcm_kernel_capture_ioctl(csubstream, cmd, 0);
+		if (err < 0)
+			return err;
+	}
+ _skip2:
+	return 0;
+}
+
+static int snd_pcm_oss_get_trigger(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
+	int result = 0;
+
+	psubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	csubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+	if (psubstream && psubstream->runtime && psubstream->runtime->oss.trigger)
+		result |= PCM_ENABLE_OUTPUT;
+	if (csubstream && csubstream->runtime && csubstream->runtime->oss.trigger)
+		result |= PCM_ENABLE_INPUT;
+	return result;
+}
+
+static int snd_pcm_oss_get_odelay(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	snd_pcm_substream_t *substream;
+	snd_pcm_runtime_t *runtime;
+	snd_pcm_sframes_t delay;
+	int err;
+
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	if (substream == NULL)
+		return -EINVAL;
+	if ((err = snd_pcm_oss_make_ready(substream)) < 0)
+		return err;
+	runtime = substream->runtime;
+	if (runtime->oss.params || runtime->oss.prepare)
+		return 0;
+	err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &delay);
+	if (err < 0)
+		return err;
+	return snd_pcm_oss_bytes(substream, delay);
+}
+
+static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, struct count_info * _info)
+{	
+	snd_pcm_substream_t *substream;
+	snd_pcm_runtime_t *runtime;
+	snd_pcm_status_t status;
+	struct count_info info;
+	int err;
+
+	if (_info == NULL)
+		return -EFAULT;
+	substream = pcm_oss_file->streams[stream];
+	if (substream == NULL)
+		return -EINVAL;
+	if ((err = snd_pcm_oss_make_ready(substream)) < 0)
+		return err;
+	runtime = substream->runtime;
+	if (runtime->oss.params || runtime->oss.prepare) {
+		memset(&info, 0, sizeof(info));
+		if (copy_to_user(_info, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	memset(&status, 0, sizeof(status));
+	err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_STATUS, &status);
+	if (err < 0)
+		return err;
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		info.bytes = runtime->oss.bytes - snd_pcm_oss_bytes(substream, runtime->buffer_size - status.avail);
+	} else {
+		info.bytes = runtime->oss.bytes + snd_pcm_oss_bytes(substream, status.avail);
+	}
+	info.ptr = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr % runtime->buffer_size);
+	if (atomic_read(&runtime->mmap_count)) {
+		snd_pcm_sframes_t n;
+		n = runtime->hw_ptr_interrupt - runtime->oss.prev_hw_ptr_interrupt;
+		if (n < 0)
+			n += runtime->boundary;
+		info.blocks = n / runtime->period_size;
+		runtime->oss.prev_hw_ptr_interrupt = runtime->hw_ptr_interrupt;
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_pcm_oss_simulate_fill(substream);
+	} else {
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			info.blocks = (runtime->buffer_size - status.avail) / runtime->period_size;
+		else
+			info.blocks = status.avail / runtime->period_size;
+	}
+	if (copy_to_user(_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, struct audio_buf_info *_info)
+{
+	snd_pcm_substream_t *substream;
+	snd_pcm_runtime_t *runtime;
+	snd_pcm_status_t status;
+	struct audio_buf_info info;
+	int err;
+
+	if (_info == NULL)
+		return -EFAULT;
+	substream = pcm_oss_file->streams[stream];
+	if (substream == NULL)
+		return -EINVAL;
+	runtime = substream->runtime;
+
+	if (runtime->oss.params &&
+	    (err = snd_pcm_oss_change_params(substream)) < 0)
+		return err;
+
+	info.fragsize = runtime->oss.period_bytes;
+	info.fragstotal = runtime->periods;
+	memset(&status, 0, sizeof(status));
+	if (runtime->oss.prepare) {
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			info.bytes = runtime->oss.period_bytes * runtime->periods;
+			info.fragments = runtime->periods;
+		} else {
+			info.bytes = 0;
+			info.fragments = 0;
+		}
+	} else {
+		err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_STATUS, &status);
+		if (err < 0)
+			return err;
+		info.bytes = snd_pcm_oss_bytes(substream, status.avail);
+		info.fragments = status.avail / runtime->period_size;
+	}
+
+#if 0
+	/* very experimental stuff to get Quake2 working */
+	runtime->oss.period = (info.periods - 1) << 16;
+	for (tmp = info.fragsize; tmp > 1; tmp >>= 1)
+		runtime->oss.period++;
+	runtime->oss.subdivision = 1;	/* disable SUBDIVIDE */
+#endif
+	// printk("space: bytes = %i, periods = %i, fragstotal = %i, fragsize = %i\n", info.bytes, info.periods, info.fragstotal, info.fragsize);
+	if (copy_to_user(_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int snd_pcm_oss_get_mapbuf(snd_pcm_oss_file_t *pcm_oss_file, int stream, struct buffmem_desc * _info)
+{
+	// it won't be probably implemented
+	// snd_printd("TODO: snd_pcm_oss_get_mapbuf\n");
+	return -EINVAL;
+}
+
+static snd_pcm_oss_setup_t *snd_pcm_oss_look_for_setup(snd_pcm_t *pcm, int stream, const char *task_name)
+{
+	const char *ptr, *ptrl;
+	snd_pcm_oss_setup_t *setup;
+
+	down(&pcm->streams[stream].oss.setup_mutex);
+	for (setup = pcm->streams[stream].oss.setup_list; setup; setup = setup->next) {
+		if (!strcmp(setup->task_name, task_name)) {
+			up(&pcm->streams[stream].oss.setup_mutex);
+			return setup;
+		}
+	}
+	ptr = ptrl = task_name;
+	while (*ptr) {
+		if (*ptr == '/')
+			ptrl = ptr + 1;
+		ptr++;
+	}
+	if (ptrl == task_name) {
+		goto __not_found;
+		return NULL;
+	}
+	for (setup = pcm->streams[stream].oss.setup_list; setup; setup = setup->next) {
+		if (!strcmp(setup->task_name, ptrl)) {
+			up(&pcm->streams[stream].oss.setup_mutex);
+			return setup;
+		}
+	}
+      __not_found:
+	up(&pcm->streams[stream].oss.setup_mutex);
+	return NULL;
+}
+
+static void snd_pcm_oss_init_substream(snd_pcm_substream_t *substream,
+				       snd_pcm_oss_setup_t *setup,
+				       int minor)
+{
+	snd_pcm_runtime_t *runtime;
+
+	substream->oss.oss = 1;
+	substream->oss.setup = setup;
+	runtime = substream->runtime;
+	runtime->oss.params = 1;
+	runtime->oss.trigger = 1;
+	runtime->oss.rate = 8000;
+	switch (SNDRV_MINOR_OSS_DEVICE(minor)) {
+	case SNDRV_MINOR_OSS_PCM_8:
+		runtime->oss.format = AFMT_U8;
+		break;
+	case SNDRV_MINOR_OSS_PCM_16:
+		runtime->oss.format = AFMT_S16_LE;
+		break;
+	default:
+		runtime->oss.format = AFMT_MU_LAW;
+	}
+	runtime->oss.channels = 1;
+	runtime->oss.fragshift = 0;
+	runtime->oss.maxfrags = 0;
+	runtime->oss.subdivision = 0;
+}
+
+static void snd_pcm_oss_release_substream(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime;
+	runtime = substream->runtime;
+	if (runtime->oss.buffer)
+		vfree(runtime->oss.buffer);
+	snd_pcm_oss_plugin_clear(substream);
+	substream->oss.file = NULL;
+	substream->oss.oss = 0;
+}
+
+static int snd_pcm_oss_release_file(snd_pcm_oss_file_t *pcm_oss_file)
+{
+	int cidx;
+	snd_assert(pcm_oss_file != NULL, return -ENXIO);
+	for (cidx = 0; cidx < 2; ++cidx) {
+		snd_pcm_substream_t *substream = pcm_oss_file->streams[cidx];
+		snd_pcm_runtime_t *runtime;
+		if (substream == NULL)
+			continue;
+		runtime = substream->runtime;
+		
+		spin_lock_irq(&runtime->lock);
+		if (snd_pcm_running(substream))
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
+		spin_unlock_irq(&runtime->lock);
+		if (substream->ops->hw_free != NULL)
+			substream->ops->hw_free(substream);
+		substream->ops->close(substream);
+		substream->ffile = NULL;
+		snd_pcm_oss_release_substream(substream);
+		snd_pcm_release_substream(substream);
+	}
+	snd_magic_kfree(pcm_oss_file);
+	return 0;
+}
+
+static int snd_pcm_oss_open_file(struct file *file,
+				 snd_pcm_t *pcm,
+				 snd_pcm_oss_file_t **rpcm_oss_file,
+				 int minor,
+				 snd_pcm_oss_setup_t *psetup,
+				 snd_pcm_oss_setup_t *csetup)
+{
+	int err = 0;
+	snd_pcm_oss_file_t *pcm_oss_file;
+	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
+	unsigned int f_mode = file->f_mode;
+
+	snd_assert(rpcm_oss_file != NULL, return -EINVAL);
+	*rpcm_oss_file = NULL;
+
+	pcm_oss_file = snd_magic_kcalloc(snd_pcm_oss_file_t, 0, GFP_KERNEL);
+	if (pcm_oss_file == NULL)
+		return -ENOMEM;
+
+	if ((f_mode & (FMODE_WRITE|FMODE_READ)) == (FMODE_WRITE|FMODE_READ) &&
+	    (pcm->info_flags & SNDRV_PCM_INFO_HALF_DUPLEX))
+		f_mode = FMODE_WRITE;
+	if ((f_mode & FMODE_WRITE) && !(psetup && psetup->disable)) {
+		if ((err = snd_pcm_open_substream(pcm, SNDRV_PCM_STREAM_PLAYBACK,
+					       &psubstream)) < 0) {
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK] = psubstream;
+	}
+	if ((f_mode & FMODE_READ) && !(csetup && csetup->disable)) {
+		if ((err = snd_pcm_open_substream(pcm, SNDRV_PCM_STREAM_CAPTURE, 
+					       &csubstream)) < 0) {
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE] = csubstream;
+	}
+	
+	if (psubstream == NULL && csubstream == NULL) {
+		snd_pcm_oss_release_file(pcm_oss_file);
+		return -EINVAL;
+	}
+	if (psubstream != NULL) {
+		psubstream->oss.file = pcm_oss_file;
+		err = snd_pcm_hw_constraints_init(psubstream);
+		if (err < 0) {
+			snd_printd("snd_pcm_hw_constraint_init failed\n");
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		if ((err = psubstream->ops->open(psubstream)) < 0) {
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		err = snd_pcm_hw_constraints_complete(psubstream);
+		if (err < 0) {
+			snd_printd("snd_pcm_hw_constraint_complete failed\n");
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		psubstream->ffile = file;
+		snd_pcm_oss_init_substream(psubstream, psetup, minor);
+	}
+	if (csubstream != NULL) {
+		csubstream->oss.file = pcm_oss_file;
+		err = snd_pcm_hw_constraints_init(csubstream);
+		if (err < 0) {
+			snd_printd("snd_pcm_hw_constraint_init failed\n");
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		if ((err = csubstream->ops->open(csubstream)) < 0) {
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		err = snd_pcm_hw_constraints_complete(csubstream);
+		if (err < 0) {
+			snd_printd("snd_pcm_hw_constraint_complete failed\n");
+			snd_pcm_oss_release_file(pcm_oss_file);
+			return err;
+		}
+		csubstream->ffile = file;
+		snd_pcm_oss_init_substream(csubstream, csetup, minor);
+	}
+
+	file->private_data = pcm_oss_file;
+	*rpcm_oss_file = pcm_oss_file;
+	return 0;
+}
+
+
+static int snd_pcm_oss_open(struct inode *inode, struct file *file)
+{
+	int minor = minor(inode->i_rdev);
+	int cardnum = SNDRV_MINOR_OSS_CARD(minor);
+	int device;
+	int err;
+	char task_name[32];
+	snd_pcm_t *pcm;
+	snd_pcm_oss_file_t *pcm_oss_file;
+	snd_pcm_oss_setup_t *psetup = NULL, *csetup = NULL;
+	int nonblock;
+	wait_queue_t wait;
+
+	snd_assert(cardnum >= 0 && cardnum < SNDRV_CARDS, return -ENXIO);
+	device = SNDRV_MINOR_OSS_DEVICE(minor) == SNDRV_MINOR_OSS_PCM1 ?
+		snd_adsp_map[cardnum] : snd_dsp_map[cardnum];
+
+#ifdef LINUX_2_2
+	MOD_INC_USE_COUNT;
+#endif
+	pcm = snd_pcm_devices[(cardnum * SNDRV_PCM_DEVICES) + device];
+	if (pcm == NULL) {
+		err = -ENODEV;
+		goto __error1;
+	}
+	if (!try_inc_mod_count(pcm->card->module)) {
+		err = -EFAULT;
+		goto __error1;
+	}
+	if (snd_task_name(current, task_name, sizeof(task_name)) < 0) {
+		err = -EFAULT;
+		goto __error1;
+	}
+	if (file->f_mode & FMODE_WRITE)
+		psetup = snd_pcm_oss_look_for_setup(pcm, SNDRV_PCM_STREAM_PLAYBACK, task_name);
+	if (file->f_mode & FMODE_READ)
+		csetup = snd_pcm_oss_look_for_setup(pcm, SNDRV_PCM_STREAM_CAPTURE, task_name);
+
+	nonblock = !!(file->f_flags & O_NONBLOCK);
+	if (psetup && !psetup->disable) {
+		if (psetup->nonblock)
+			nonblock = 1;
+		else if (psetup->block)
+			nonblock = 0;
+		else if (!nonblock)
+			nonblock = snd_nonblock_open;
+	} else if (csetup && !csetup->disable) {
+		if (csetup->nonblock)
+			nonblock = 1;
+		else if (csetup->block)
+			nonblock = 0;
+		else if (!nonblock)
+			nonblock = snd_nonblock_open;
+	}
+
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&pcm->open_wait, &wait);
+	while (1) {
+		down(&pcm->open_mutex);
+		err = snd_pcm_oss_open_file(file, pcm, &pcm_oss_file,
+					    minor, psetup, csetup);
+		if (err >= 0)
+			break;
+		up(&pcm->open_mutex);
+		if (err == -EAGAIN) {
+			if (nonblock) {
+				err = -EBUSY;
+				break;
+			}
+		} else
+			break;
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule();
+		if (signal_pending(current)) {
+			err = -ERESTARTSYS;
+			break;
+		}
+	}
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&pcm->open_wait, &wait);
+	if (err < 0)
+		goto __error;
+	up(&pcm->open_mutex);
+	return err;
+
+      __error:
+      	dec_mod_count(pcm->card->module);
+      __error1:
+#ifdef LINUX_2_2
+	MOD_DEC_USE_COUNT;
+#endif
+	return err;
+}
+
+static int snd_pcm_oss_release(struct inode *inode, struct file *file)
+{
+	snd_pcm_t *pcm;
+	snd_pcm_substream_t *substream;
+	snd_pcm_oss_file_t *pcm_oss_file;
+
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	if (substream == NULL)
+		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+	snd_assert(substream != NULL, return -ENXIO);
+	pcm = substream->pcm;
+	snd_pcm_oss_sync(pcm_oss_file);
+	down(&pcm->open_mutex);
+	snd_pcm_oss_release_file(pcm_oss_file);
+	up(&pcm->open_mutex);
+	wake_up(&pcm->open_wait);
+	dec_mod_count(pcm->card->module);
+#ifdef LINUX_2_2
+	MOD_DEC_USE_COUNT;
+#endif
+	return 0;
+}
+
+static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
+                             unsigned int cmd, unsigned long arg)
+{
+	snd_pcm_oss_file_t *pcm_oss_file;
+	int res;
+
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	if (cmd == OSS_GETVERSION)
+		return put_user(SNDRV_OSS_VERSION, (int *)arg) ? -EFAULT : 0;
+	if (((cmd >> 8) & 0xff) == 'M')	{	/* mixer ioctl - for OSS (grrr) compatibility */
+		snd_pcm_substream_t *substream;
+		int idx;
+		for (idx = 0; idx < 2; ++idx) {
+			substream = pcm_oss_file->streams[idx];
+			if (substream != NULL)
+				break;
+		}
+		snd_assert(substream != NULL, return -ENXIO);
+		return snd_mixer_oss_ioctl_card(substream->pcm->card, cmd, arg);
+	}
+	if (((cmd >> 8) & 0xff) != 'P')
+		return -EINVAL;
+	switch (cmd) {
+	case SNDCTL_DSP_RESET:
+		return snd_pcm_oss_reset(pcm_oss_file);
+	case SNDCTL_DSP_SYNC:
+		return snd_pcm_oss_sync(pcm_oss_file);
+	case SNDCTL_DSP_SPEED:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		if ((res = snd_pcm_oss_set_rate(pcm_oss_file, res))<0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SOUND_PCM_READ_RATE:
+		res = snd_pcm_oss_get_rate(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_STEREO:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		res = res > 0 ? 2 : 1;
+		if ((res = snd_pcm_oss_set_channels(pcm_oss_file, res)) < 0)
+			return res;
+		return put_user(--res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_GETBLKSIZE:
+		res = snd_pcm_oss_get_block_size(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_SETFMT:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		res = snd_pcm_oss_set_format(pcm_oss_file, res);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SOUND_PCM_READ_BITS:
+		res = snd_pcm_oss_get_format(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_CHANNELS:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		res = snd_pcm_oss_set_channels(pcm_oss_file, res);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SOUND_PCM_READ_CHANNELS:
+		res = snd_pcm_oss_get_channels(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SOUND_PCM_WRITE_FILTER:
+	case SOUND_PCM_READ_FILTER:
+		return -EIO;
+	case SNDCTL_DSP_POST:	/* to do */
+		return 0;
+	case SNDCTL_DSP_SUBDIVIDE:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		res = snd_pcm_oss_set_subdivide(pcm_oss_file, res);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_SETFRAGMENT:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		return snd_pcm_oss_set_fragment(pcm_oss_file, res);
+	case SNDCTL_DSP_GETFMTS:
+		res = snd_pcm_oss_get_formats(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_GETOSPACE:
+	case SNDCTL_DSP_GETISPACE:
+		return snd_pcm_oss_get_space(pcm_oss_file,
+			cmd == SNDCTL_DSP_GETISPACE ?
+				SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK,
+			(struct audio_buf_info *) arg);
+	case SNDCTL_DSP_NONBLOCK:
+		return snd_pcm_oss_nonblock(file);
+	case SNDCTL_DSP_GETCAPS:
+		res = snd_pcm_oss_get_caps(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_GETTRIGGER:
+		res = snd_pcm_oss_get_trigger(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_SETTRIGGER:
+		if (get_user(res, (int *)arg))
+			return -EFAULT;
+		return snd_pcm_oss_set_trigger(pcm_oss_file, res);
+	case SNDCTL_DSP_GETIPTR:
+	case SNDCTL_DSP_GETOPTR:
+		return snd_pcm_oss_get_ptr(pcm_oss_file,
+			cmd == SNDCTL_DSP_GETIPTR ?
+				SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK,
+			(struct count_info *) arg);
+	case SNDCTL_DSP_MAPINBUF:
+	case SNDCTL_DSP_MAPOUTBUF:
+		return snd_pcm_oss_get_mapbuf(pcm_oss_file,
+			cmd == SNDCTL_DSP_MAPINBUF ?
+				SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK,
+			(struct buffmem_desc *) arg);
+	case SNDCTL_DSP_SETSYNCRO:
+		/* stop DMA now.. */
+		return 0;
+	case SNDCTL_DSP_SETDUPLEX:
+		if (snd_pcm_oss_get_caps(pcm_oss_file) & DSP_CAP_DUPLEX)
+			return 0;
+		return -EIO;
+	case SNDCTL_DSP_GETODELAY:
+		res = snd_pcm_oss_get_odelay(pcm_oss_file);
+		if (res < 0)
+			return res;
+		return put_user(res, (int *)arg) ? -EFAULT : 0;
+	case SNDCTL_DSP_PROFILE:
+		return 0;	/* silently ignore */
+	default:
+		snd_printd("pcm_oss: unknown command = 0x%x\n", cmd);
+	}
+	return -EINVAL;
+}
+
+static ssize_t snd_pcm_oss_read(struct file *file, char *buf, size_t count, loff_t *offset)
+{
+	snd_pcm_oss_file_t *pcm_oss_file;
+	snd_pcm_substream_t *substream;
+
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+	if (substream == NULL)
+		return -ENXIO;
+	return snd_pcm_oss_read1(substream, buf, count);
+}
+
+static ssize_t snd_pcm_oss_write(struct file *file, const char *buf, size_t count, loff_t *offset)
+{
+	snd_pcm_oss_file_t *pcm_oss_file;
+	snd_pcm_substream_t *substream;
+	long result;
+
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	if (substream == NULL)
+		return -ENXIO;
+	up(&file->f_dentry->d_inode->i_sem);
+	result = snd_pcm_oss_write1(substream, buf, count);
+	down(&file->f_dentry->d_inode->i_sem);
+	return result;
+}
+
+static int snd_pcm_oss_playback_ready(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (atomic_read(&runtime->mmap_count))
+		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
+	else
+		return snd_pcm_playback_ready(substream);
+}
+
+static int snd_pcm_oss_capture_ready(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (atomic_read(&runtime->mmap_count))
+		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
+	else
+		return snd_pcm_capture_ready(substream);
+}
+
+static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
+{
+	snd_pcm_oss_file_t *pcm_oss_file;
+	unsigned int mask;
+	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
+	
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return 0);
+
+	psubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+	csubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+
+	mask = 0;
+	if (psubstream != NULL) {
+		snd_pcm_runtime_t *runtime = psubstream->runtime;
+		spin_lock_irq(&runtime->lock);
+		poll_wait(file, &runtime->sleep, wait);
+		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING &&
+		    (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
+		     snd_pcm_oss_playback_ready(psubstream)))
+			mask |= POLLOUT | POLLWRNORM;
+		spin_unlock_irq(&runtime->lock);
+	}
+	if (csubstream != NULL) {
+		snd_pcm_runtime_t *runtime = csubstream->runtime;
+		spin_lock_irq(&runtime->lock);
+		poll_wait(file, &runtime->sleep, wait);
+		if (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
+		    snd_pcm_oss_capture_ready(csubstream))
+			mask |= POLLIN | POLLRDNORM;
+		spin_unlock_irq(&runtime->lock);
+	}
+
+	return mask;
+}
+
+static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
+{
+	snd_pcm_oss_file_t *pcm_oss_file;
+	snd_pcm_substream_t *substream = NULL;
+	snd_pcm_runtime_t *runtime;
+	int err;
+
+	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	switch ((area->vm_flags & (VM_READ | VM_WRITE))) {
+	case VM_READ | VM_WRITE:
+		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+		if (substream)
+			break;
+		/* Fall through */
+	case VM_READ:
+		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
+		break;
+	case VM_WRITE:
+		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
+		break;
+	default:
+		return -EINVAL;
+	}
+	/* set VM_READ access as well to fix memset() routines that do
+	   reads before writes (to improve performance) */
+	area->vm_flags |= VM_READ;
+	if (substream == NULL)
+		return -ENXIO;
+	runtime = substream->runtime;
+	if (!(runtime->info & SNDRV_PCM_INFO_MMAP_VALID))
+		return -EIO;
+	if (runtime->info & SNDRV_PCM_INFO_INTERLEAVED)
+		runtime->access = SNDRV_PCM_ACCESS_MMAP_INTERLEAVED;
+	else
+		return -EIO;
+	
+	if (runtime->oss.params) {
+		if ((err = snd_pcm_oss_change_params(substream)) < 0)
+			return err;
+	}
+	if (runtime->oss.plugin_first != NULL)
+		return -EIO;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
+	if (area->vm_pgoff != 0)
+#else
+	if (area->vm_offset != 0)
+#endif
+		return -EINVAL;
+
+	err = snd_pcm_mmap_data(substream, file, area);
+	if (err < 0)
+		return err;
+	runtime->oss.mmap_bytes = area->vm_end - area->vm_start;
+	/* In mmap mode we never stop */
+	runtime->stop_threshold = runtime->boundary;
+
+	return 0;
+}
+
+/*
+ *  /proc interface
+ */
+
+static void snd_pcm_oss_proc_read(snd_info_entry_t *entry,
+				  snd_info_buffer_t * buffer)
+{
+	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
+	snd_pcm_oss_setup_t *setup = pstr->oss.setup_list;
+	down(&pstr->oss.setup_mutex);
+	while (setup) {
+		snd_iprintf(buffer, "%s %u %u%s%s%s%s\n",
+			    setup->task_name,
+			    setup->periods,
+			    setup->period_size,
+			    setup->disable ? " disable" : "",
+			    setup->direct ? " direct" : "",
+			    setup->block ? " block" : "",
+			    setup->nonblock ? " non-block" : "");
+		setup = setup->next;
+	}
+	up(&pstr->oss.setup_mutex);
+}
+
+static void snd_pcm_oss_proc_free_setup_list(snd_pcm_str_t * pstr)
+{
+	unsigned int idx;
+	snd_pcm_substream_t *substream;
+	snd_pcm_oss_setup_t *setup, *setupn;
+
+	for (idx = 0, substream = pstr->substream;
+	     idx < pstr->substream_count; idx++, substream = substream->next)
+		substream->oss.setup = NULL;
+	for (setup = pstr->oss.setup_list, pstr->oss.setup_list = NULL;
+	     setup; setup = setupn) {
+		setupn = setup->next;
+		kfree(setup->task_name);
+		kfree(setup);
+	}
+	pstr->oss.setup_list = NULL;
+}
+
+static void snd_pcm_oss_proc_write(snd_info_entry_t *entry,
+				   snd_info_buffer_t * buffer)
+{
+	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
+	char line[512], str[32], task_name[32], *ptr;
+	int idx1;
+	snd_pcm_oss_setup_t *setup, *setup1, template;
+
+	while (!snd_info_get_line(buffer, line, sizeof(line))) {
+		down(&pstr->oss.setup_mutex);
+		memset(&template, 0, sizeof(template));
+		ptr = snd_info_get_str(task_name, line, sizeof(task_name));
+		if (!strcmp(task_name, "clear") || !strcmp(task_name, "erase")) {
+			snd_pcm_oss_proc_free_setup_list(pstr);
+			up(&pstr->oss.setup_mutex);
+			continue;
+		}
+		for (setup = pstr->oss.setup_list; setup; setup = setup->next) {
+			if (!strcmp(setup->task_name, task_name)) {
+				template = *setup;
+				break;
+			}
+		}
+		ptr = snd_info_get_str(str, ptr, sizeof(str));
+		template.periods = simple_strtoul(str, NULL, 10);
+		ptr = snd_info_get_str(str, ptr, sizeof(str));
+		template.period_size = simple_strtoul(str, NULL, 10);
+		for (idx1 = 31; idx1 >= 0; idx1--)
+			if (template.period_size & (1 << idx1))
+				break;
+		for (idx1--; idx1 >= 0; idx1--)
+			template.period_size &= ~(1 << idx1);
+		do {
+			ptr = snd_info_get_str(str, ptr, sizeof(str));
+			if (!strcmp(str, "disable")) {
+				template.disable = 1;
+			} else if (!strcmp(str, "direct")) {
+				template.direct = 1;
+			} else if (!strcmp(str, "block")) {
+				template.block = 1;
+			} else if (!strcmp(str, "non-block")) {
+				template.nonblock = 1;
+			}
+		} while (*str);
+		if (setup == NULL) {
+			setup = (snd_pcm_oss_setup_t *) kmalloc(sizeof(snd_pcm_oss_setup_t), GFP_KERNEL);
+			if (setup) {
+				if (pstr->oss.setup_list == NULL) {
+					pstr->oss.setup_list = setup;
+				} else {
+					for (setup1 = pstr->oss.setup_list; setup1->next; setup1 = setup1->next);
+					setup1->next = setup;
+				}
+				template.task_name = snd_kmalloc_strdup(task_name, GFP_KERNEL);
+			} else {
+				buffer->error = -ENOMEM;
+			}
+		}
+		if (setup)
+			*setup = template;
+		up(&pstr->oss.setup_mutex);
+	}
+}
+
+static void snd_pcm_oss_proc_init(snd_pcm_t *pcm)
+{
+	int stream;
+	for (stream = 0; stream < 2; ++stream) {
+		snd_info_entry_t *entry;
+		snd_pcm_str_t *pstr = &pcm->streams[stream];
+		if (pstr->substream_count == 0)
+			continue;
+		if ((entry = snd_info_create_card_entry(pcm->card, "oss", pstr->proc_root)) != NULL) {
+			entry->content = SNDRV_INFO_CONTENT_TEXT;
+			entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+			entry->c.text.read_size = 8192;
+			entry->c.text.read = snd_pcm_oss_proc_read;
+			entry->c.text.write_size = 8192;
+			entry->c.text.write = snd_pcm_oss_proc_write;
+			entry->private_data = pstr;
+			if (snd_info_register(entry) < 0) {
+				snd_info_free_entry(entry);
+				entry = NULL;
+			}
+		}
+		pstr->oss.proc_entry = entry;
+	}
+}
+
+static void snd_pcm_oss_proc_done(snd_pcm_t *pcm)
+{
+	int stream;
+	for (stream = 0; stream < 2; ++stream) {
+		snd_pcm_str_t *pstr = &pcm->streams[stream];
+		if (pstr->oss.proc_entry) {
+			snd_info_unregister(pstr->oss.proc_entry);
+			pstr->oss.proc_entry = NULL;
+			snd_pcm_oss_proc_free_setup_list(pstr);
+		}
+	}
+}
+
+/*
+ *  ENTRY functions
+ */
+
+static struct file_operations snd_pcm_oss_f_reg =
+{
+#ifndef LINUX_2_2
+	owner:		THIS_MODULE,
+#endif
+	read:		snd_pcm_oss_read,
+	write:		snd_pcm_oss_write,
+	open:		snd_pcm_oss_open,
+	release:	snd_pcm_oss_release,
+	poll:		snd_pcm_oss_poll,
+	ioctl:		snd_pcm_oss_ioctl,
+	mmap:		snd_pcm_oss_mmap,
+};
+
+static snd_minor_t snd_pcm_oss_reg =
+{
+	comment:	"digital audio",
+	f_ops:		&snd_pcm_oss_f_reg,
+};
+
+static void register_oss_dsp(unsigned short native_minor, snd_pcm_t *pcm, int index)
+{
+	char name[128];
+	sprintf(name, "dsp%i%i", pcm->card->number, pcm->device);
+	if (snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
+				    pcm->card, index, &snd_pcm_oss_reg,
+				    name) < 0) {
+		snd_printk("unable to register OSS PCM device %i:%i\n", pcm->card->number, pcm->device);
+	}
+}
+
+static int snd_pcm_oss_register_minor(unsigned short native_minor,
+				      snd_pcm_t * pcm)
+{
+	pcm->oss.reg = 0;
+	if (snd_dsp_map[pcm->card->number] == pcm->device) {
+		char name[128];
+		int duplex;
+		register_oss_dsp(native_minor, pcm, 0);
+		duplex = (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream_count > 0 && 
+			      pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream_count && 
+			      !(pcm->info_flags & SNDRV_PCM_INFO_HALF_DUPLEX));
+		sprintf(name, "%s%s", pcm->name, duplex ? " (DUPLEX)" : "");
+		snd_oss_info_register(SNDRV_OSS_INFO_DEV_AUDIO,
+				      pcm->card->number,
+				      name);
+		pcm->oss.reg++;
+	}
+	if (snd_adsp_map[pcm->card->number] == pcm->device) {
+		register_oss_dsp(native_minor, pcm, 1);
+		pcm->oss.reg++;
+	}
+
+	if (pcm->oss.reg)
+		snd_pcm_oss_proc_init(pcm);
+
+	return 0;
+}
+
+static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
+				        snd_pcm_t * pcm)
+{
+	if (pcm->oss.reg) {
+		if (snd_dsp_map[pcm->card->number] == pcm->device) {
+			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
+						  pcm->card, 0);
+			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_AUDIO, pcm->card->number);
+		}
+		if (snd_adsp_map[pcm->card->number] == pcm->device)
+			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
+						  pcm->card, 1);
+		pcm->oss.reg = 0;
+		snd_pcm_oss_proc_done(pcm);
+	}
+	return 0;
+}
+
+static snd_pcm_notify_t snd_pcm_oss_notify =
+{
+	n_register:	snd_pcm_oss_register_minor,
+	n_unregister:	snd_pcm_oss_unregister_minor,
+};
+
+static int __init alsa_pcm_oss_init(void)
+{
+	int i;
+	int err;
+
+	if ((err = snd_pcm_notify(&snd_pcm_oss_notify, 0)) < 0)
+		return err;
+	/* check device map table */
+	for (i = 0; i < SNDRV_CARDS; i++) {
+		if (snd_dsp_map[i] < 0 || snd_dsp_map[i] >= SNDRV_PCM_DEVICES) {
+			snd_printk("invalid dsp_map[%d] = %d\n", i, snd_dsp_map[i]);
+			snd_dsp_map[i] = 0;
+		}
+		if (snd_adsp_map[i] < 0 || snd_adsp_map[i] >= SNDRV_PCM_DEVICES) {
+			snd_printk("invalid adsp_map[%d] = %d\n", i, snd_adsp_map[i]);
+			snd_adsp_map[i] = 1;
+		}
+	}
+	return 0;
+}
+
+static void __exit alsa_pcm_oss_exit(void)
+{
+	snd_pcm_notify(&snd_pcm_oss_notify, 1);
+}
+
+module_init(alsa_pcm_oss_init)
+module_exit(alsa_pcm_oss_exit)

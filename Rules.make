@@ -208,6 +208,8 @@ ifdef CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
 MODINCL = $(TOPDIR)/include/linux/modules
+MODCURDIR = $(subst $(TOPDIR)/,,$(shell /bin/pwd))
+MODPREFIX = $(subst /,-,$(MODCURDIR))__
 
 # The -w option (enable warnings) for genksyms will return here in 2.1
 # So where has it gone?
@@ -222,20 +224,20 @@ else
 	genksyms_smp_prefix := 
 endif
 
-$(MODINCL)/%.ver: %.c
-	@if [ ! -r $(MODINCL)/$*.stamp -o $(MODINCL)/$*.stamp -ot $< ]; then \
+$(MODINCL)/$(MODPREFIX)%.ver: %.c
+	@if [ ! -r $(MODINCL)/$(MODPREFIX)$*.stamp -o $(MODINCL)/$(MODPREFIX)$*.stamp -ot $< ]; then \
 		echo '$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $<'; \
 		echo '| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp'; \
 		$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< \
 		| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
 		if [ -r $@ ] && cmp -s $@ $@.tmp; then echo $@ is unchanged; rm -f $@.tmp; \
 		else echo mv $@.tmp $@; mv -f $@.tmp $@; fi; \
-	fi; touch $(MODINCL)/$*.stamp
+	fi; touch $(MODINCL)/$(MODPREFIX)$*.stamp
 	
-$(addprefix $(MODINCL)/,$(export-objs:.o=.ver)): $(TOPDIR)/include/linux/autoconf.h
+$(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver)): $(TOPDIR)/include/linux/autoconf.h
 
 # updates .ver files but not modversions.h
-fastdep: $(addprefix $(MODINCL)/,$(export-objs:.o=.ver))
+fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
 
 # updates .ver files and modversions.h like before (is this needed?)
 dep: fastdep update-modverfile

@@ -511,7 +511,7 @@ comment 'Sound support'
 
 tristate 'Sound support' CONFIG_SOUND
 if [ "$CONFIG_SOUND" != "n" ]; then
-   source drivers/sound/dmasound/Config.in
+   source sound/oss/dmasound/Config.in
 fi
 endmenu
 
