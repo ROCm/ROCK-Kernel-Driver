@@ -892,9 +892,9 @@ load_up_altivec:
 	add	r4,r4,r6
 	addi	r4,r4,THREAD	/* want THREAD of last_task_used_altivec */
 	SAVE_32VR(0,r10,r4)
-	MFVSCR(vr0)
+	mfvscr	vr0
 	li	r10,THREAD_VSCR
-	STVX(vr0,r10,r4)
+	stvx	vr0,r10,r4
 	lwz	r5,PT_REGS(r4)
 	add	r5,r5,r6
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
@@ -907,8 +907,8 @@ load_up_altivec:
 	oris	r9,r9,MSR_VEC@h
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
 	li	r10,THREAD_VSCR
-	LVX(vr0,r10,r5)
-	MTVSCR(vr0)
+	lvx	vr0,r10,r5
+	mtvscr	vr0
 	REST_32VR(0,r10,r5)
 #ifndef CONFIG_SMP
 	subi	r4,r5,THREAD
@@ -956,9 +956,9 @@ giveup_altivec:
 	lwz	r5,PT_REGS(r3)
 	cmpi	0,r5,0
 	SAVE_32VR(0, r4, r3)
-	MFVSCR(vr0)
+	mfvscr	vr0
 	li	r4,THREAD_VSCR
-	STVX(vr0, r4, r3)
+	stvx	vr0,r4,r3
 	beq	1f
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 	lis	r3,MSR_VEC@h
