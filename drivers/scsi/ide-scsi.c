@@ -271,7 +271,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
-	ide_end_drive_cmd (drive, 0, 0);
+	ide_end_drive_cmd(drive, rq, 0, 0);
 	if (rq->errors >= ERROR_MAX) {
 		pc->scsi_cmd->result = DID_ERROR << 16;
 		if (log)
@@ -401,7 +401,7 @@ static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct requ
 	byte ireason;
 	ide_startstop_t startstop;
 
-	if (ide_wait_stat (&startstop,drive,DRQ_STAT,BUSY_STAT,WAIT_READY)) {
+	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
 		printk (KERN_ERR "ide-scsi: Strange, packet command initiated yet DRQ isn't asserted\n");
 		return startstop;
 	}
@@ -489,20 +489,6 @@ static void idescsi_ide_release(struct inode *inode, struct file *filp, struct a
 static ide_drive_t *idescsi_drives[MAX_HWIFS * MAX_DRIVES];
 static int idescsi_initialized = 0;
 
-static void idescsi_add_settings(ide_drive_t *drive)
-{
-	idescsi_scsi_t *scsi = drive->driver_data;
-
-/*
- *			drive	setting name	read/write	ioctl	ioctl		data type	min	max	mul_factor	div_factor	data pointer		set function
- */
-	ide_add_setting(drive,	"bios_cyl",	SETTING_RW,	-1,	-1,		TYPE_INT,	0,	1023,	1,		1,		&drive->bios_cyl,	NULL);
-	ide_add_setting(drive,	"bios_head",	SETTING_RW,	-1,	-1,		TYPE_BYTE,	0,	255,	1,		1,		&drive->bios_head,	NULL);
-	ide_add_setting(drive,	"bios_sect",	SETTING_RW,	-1,	-1,		TYPE_BYTE,	0,	63,	1,		1,		&drive->bios_sect,	NULL);
-	ide_add_setting(drive,	"transform",	SETTING_RW,	-1,	-1,		TYPE_INT,	0,	3,	1,		1,		&scsi->transform,	NULL);
-	ide_add_setting(drive,	"log",		SETTING_RW,	-1,	-1,		TYPE_INT,	0,	1,	1,		1,		&scsi->log,		NULL);
-}
-
 /*
  *	Driver initialization.
  */
@@ -521,8 +507,7 @@ static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi, int id)
 	clear_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 #if IDESCSI_DEBUG_LOG
 	set_bit(IDESCSI_LOG_CMD, &scsi->log);
-#endif /* IDESCSI_DEBUG_LOG */
-	idescsi_add_settings(drive);
+#endif
 }
 
 static int idescsi_cleanup (ide_drive_t *drive)

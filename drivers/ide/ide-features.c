@@ -393,7 +393,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 	enable_irq(hwif->irq);
 
 	if (error) {
-		ide_dump_status(drive, "set_drive_speed_status", stat);
+		ide_dump_status(drive, NULL, "set_drive_speed_status", stat);
 		return error;
 	}
 
