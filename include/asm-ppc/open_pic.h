@@ -25,19 +25,6 @@
 #define OPENPIC_VEC_IPI		72	/* and up */
 #define OPENPIC_VEC_SPURIOUS	127
 
-/*
- * For the OpenPIC_InitSenses table, we include both the sense
- * and polarity in one number and mask out the value we want
- * later on. -- Tom
- */
-#define IRQ_SENSE_MASK		0x1
-#define IRQ_SENSE_LEVEL		0x1
-#define IRQ_SENSE_EDGE		0x0
-
-#define IRQ_POLARITY_MASK	0x2
-#define IRQ_POLARITY_POSITIVE	0x2
-#define IRQ_POLARITY_NEGATIVE	0x0
-
 /* OpenPIC IRQ controller structure */
 extern struct hw_interrupt_type open_pic;
 
