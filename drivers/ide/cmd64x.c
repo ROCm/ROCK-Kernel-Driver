@@ -88,7 +88,6 @@
 static int cmd64x_get_info(char *, char **, off_t, int);
 static int cmd680_get_info(char *, char **, off_t, int);
 extern int (*cmd64x_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int cmd64x_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -448,7 +447,8 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, byte speed)
 	u8 regU			= 0;
 	u8 regD			= 0;
 
-	if ((drive->media != ide_disk) && (speed < XFER_SW_DMA_0))	return 1;
+	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
+		return 1;
 
 	(void) pci_read_config_byte(dev, pciD, &regD);
 	(void) pci_read_config_byte(dev, pciU, &regU);
@@ -641,8 +641,8 @@ static int config_cmd64x_chipset_for_dma (ide_drive_t *drive, unsigned int rev, 
 			break;
 	}
 
-	if (drive->media != ide_disk) {
-		cmdprintk("CMD64X: drive->media != ide_disk at double check, inital check failed!!\n");
+	if (drive->type != ATA_DISK) {
+		cmdprintk("CMD64X: drive is not a disk at double check, inital check failed!!\n");
 		return ((int) ide_dma_off);
 	}
 
@@ -788,7 +788,7 @@ static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 	}
 
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
-	    hwif->autodma && (drive->media == ide_disk)) {
+	    hwif->autodma && (drive->type == ATA_DISK)) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;

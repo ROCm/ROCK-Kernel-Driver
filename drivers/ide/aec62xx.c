@@ -48,7 +48,6 @@
 
 static int aec62xx_get_info(char *, char **, off_t, int);
 extern int (*aec62xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
@@ -310,8 +309,8 @@ static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	unsigned long dma_base	= hwif->dma_base;
 	byte speed		= -1;
 
-	if (drive->media != ide_disk)
-		return ((int) ide_dma_off_quietly);
+	if (drive->type != ATA_DISK)
+		return ide_dma_off_quietly;
 
 	if (((id->dma_ultra & 0x0010) ||
 	     (id->dma_ultra & 0x0008) ||
@@ -356,7 +355,7 @@ static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte speed		= -1;
 	byte ultra66		= eighty_ninty_three(drive);
 
-	if (drive->media != ide_disk)
+	if (drive->type != ATA_DISK)
 		return ((int) ide_dma_off_quietly);
 
 	if ((id->dma_ultra & 0x0010) && (ultra) && (ultra66)) {

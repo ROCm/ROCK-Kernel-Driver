@@ -238,7 +238,7 @@ static void config_drive_art_rwp (ide_drive_t *drive)
 	byte rw_prefetch	= (0x11 << drive->dn);
 
 	pci_read_config_byte(dev, 0x4b, &reg4bh);
-	if (drive->media != ide_disk)
+	if (drive->type != ATA_DISK)
 		return;
 	
 	if ((reg4bh & rw_prefetch) != rw_prefetch)

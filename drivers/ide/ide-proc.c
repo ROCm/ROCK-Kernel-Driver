@@ -202,7 +202,7 @@ static int proc_ide_get_identify(ide_drive_t *drive, byte *buf)
 	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 
 	taskfile.sector_count = 0x01;
-	taskfile.command = (drive->media == ide_disk) ? WIN_IDENTIFY : WIN_PIDENTIFY ;
+	taskfile.command = (drive->type == ATA_DISK) ? WIN_IDENTIFY : WIN_PIDENTIFY ;
 
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
 }
@@ -346,9 +346,9 @@ parse_error:
 int proc_ide_read_capacity
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = data;
-	ide_driver_t    *driver = drive->driver;
-	int		len;
+	ide_drive_t *drive = data;
+	struct ata_operations *driver = drive->driver;
+	int len;
 
 	if (!driver)
 		len = sprintf(page, "(none)\n");
@@ -381,58 +381,31 @@ static int proc_ide_read_dmodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_driver
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = (ide_drive_t *) data;
-	ide_driver_t	*driver = drive->driver;
-	int		len;
-
-	if (!driver)
-		len = sprintf(page, "(none)\n");
-	else
-		len = sprintf(page, "%s\n", driver->name);
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_ide_write_driver
-	(struct file *file, const char *buffer, unsigned long count, void *data)
-{
-	ide_drive_t	*drive = data;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-	if (ide_replace_subdriver(drive, buffer))
-		return -EINVAL;
-	return count;
-}
-
 static int proc_ide_read_media
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = data;
-	const char	*media;
+	const char	*type;
 	int		len;
 
-	switch (drive->media) {
-		case ide_disk:	media = "disk\n";
+	switch (drive->type) {
+		case ATA_DISK:	type = "disk\n";
 				break;
-		case ide_cdrom:	media = "cdrom\n";
+		case ATA_ROM:	type = "cdrom\n";
 				break;
-		case ide_tape:	media = "tape\n";
+		case ATA_TAPE:	type = "tape\n";
 				break;
-		case ide_floppy:media = "floppy\n";
+		case ATA_FLOPPY:type = "floppy\n";
 				break;
-		default:	media = "UNKNOWN\n";
+		default:	type = "UNKNOWN\n";
 				break;
 	}
-	strcpy(page,media);
-	len = strlen(media);
+	strcpy(page,type);
+	len = strlen(type);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
 static ide_proc_entry_t generic_drive_entries[] = {
-	{ "driver",	S_IFREG|S_IRUGO,	proc_ide_read_driver,	proc_ide_write_driver },
 	{ "identify",	S_IFREG|S_IRUSR,	proc_ide_read_identify,	NULL },
 	{ "media",	S_IFREG|S_IRUGO,	proc_ide_read_media,	NULL },
 	{ "model",	S_IFREG|S_IRUGO,	proc_ide_read_dmodel,	NULL },
@@ -476,7 +449,7 @@ static void create_proc_ide_drives(ide_hwif_t *hwif)
 
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
-		ide_driver_t *driver = drive->driver;
+		struct ata_operations *driver = drive->driver;
 
 		if (!drive->present)
 			continue;
@@ -497,35 +470,9 @@ static void create_proc_ide_drives(ide_hwif_t *hwif)
 	}
 }
 
-void recreate_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
+static void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 {
-	struct proc_dir_entry *ent;
-	struct proc_dir_entry *parent = hwif->proc;
-	char name[64];
-
-	if (drive->present && !drive->proc) {
-		drive->proc = proc_mkdir(drive->name, parent);
-		if (drive->proc)
-			ide_add_proc_entries(drive->proc, generic_drive_entries, drive);
-
-/*
- * assume that we have these already, however, should test FIXME!
- * if (driver) {
- *      ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
- *      ide_add_proc_entries(drive->proc, driver->proc, drive);
- * }
- *
- */
-		sprintf(name,"ide%d/%s", (drive->name[2]-'a')/2, drive->name);
-		ent = proc_symlink(drive->name, proc_ide_root, name);
-		if (!ent)
-			return;
-	}
-}
-
-void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
-{
-	ide_driver_t *driver = drive->driver;
+	struct ata_operations *driver = drive->driver;
 
 	if (drive->proc) {
 		if (driver)

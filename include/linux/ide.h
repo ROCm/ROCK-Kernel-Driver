@@ -1,9 +1,7 @@
 #ifndef _IDE_H
 #define _IDE_H
 /*
- *  linux/include/linux/ide.h
- *
- *  Copyright (C) 1994-1998  Linus Torvalds & authors
+ *  Copyright (C) 1994-2002  Linus Torvalds & authors
  */
 
 #include <linux/config.h>
@@ -350,12 +348,13 @@ void ide_setup_ports(	hw_regs_t *hw,
  * Now for the data we need to maintain per-drive:  ide_drive_t
  */
 
-#define ide_scsi	0x21
-#define ide_disk	0x20
-#define ide_optical	0x7
-#define ide_cdrom	0x5
-#define ide_tape	0x1
-#define ide_floppy	0x0
+#define ATA_DISK        0x20
+#define ATA_TAPE        0x01
+#define ATA_ROM         0x05	/* CD-ROM */
+#define ATA_MOD		0x07    /* optical */
+#define ATA_FLOPPY	0x00
+#define ATA_SCSI	0x21
+#define ATA_NO_LUN      0x7f
 
 typedef union {
 	unsigned all			: 8;	/* all of the bits together */
@@ -371,7 +370,14 @@ typedef union {
 struct ide_settings_s;
 
 typedef struct ide_drive_s {
-	request_queue_t		 queue;	/* request queue */
+	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
+
+	/* NOTE: If we had proper separation between channel and host chip, we
+	 * could move this to the chanell and many sync problems would
+	 * magically just go away.
+	 */
+	request_queue_t		 queue;	/* per device request queue */
+
 	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
 	unsigned long sleep;		/* sleep until this time */
 	unsigned long service_start;	/* time we started last request */
@@ -406,7 +412,6 @@ typedef struct ide_drive_s {
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
-	byte		media;		/* disk, cdrom, tape, floppy, ... */
 	select_t	select;		/* basic drive/head select reg value */
 	byte		ctl;		/* "normal" value for IDE_CONTROL_REG */
 	byte		ready_stat;	/* min status value for drive ready */
@@ -432,7 +437,7 @@ typedef struct ide_drive_s {
 	struct hd_driveid *id;		/* drive model identification info */
 	struct hd_struct  *part;	/* drive partition table */
 	char		name[4];	/* drive name, such as "hda" */
-	struct ide_driver_s *driver;	/* (ide_driver_t *) */
+	struct ata_operations *driver;
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
@@ -570,7 +575,6 @@ typedef struct hwif_s {
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
 	byte		straight8;	/* Alan's straight 8 check */
-	void		*hwif_data;	/* extra hwif data */
 	ide_busproc_t	*busproc;	/* driver soft-power interface */
 	byte		bus_state;	/* power state of the IDE bus */
 	struct device	device;		/* global device tree handle */
@@ -663,8 +667,6 @@ typedef struct {
 #ifdef CONFIG_PROC_FS
 void proc_ide_create(void);
 void proc_ide_destroy(void);
-void recreate_proc_ide_device(ide_hwif_t *, ide_drive_t *);
-void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 void destroy_proc_ide_drives(ide_hwif_t *);
 void create_proc_ide_interfaces(void);
 void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
@@ -692,32 +694,54 @@ read_proc_t proc_ide_read_geometry;
 #endif
 
 /*
- * Subdrivers support.
+ * This structure describes the operations possible on a particular device type
+ * (CD-ROM, tape, DISK and so on).
+ *
+ * This is the main hook for device type support submodules.
  */
-typedef struct ide_driver_s {
-	const char			*name;
-	byte				media;
-	unsigned busy			: 1;
-	unsigned supports_dma		: 1;
-	unsigned supports_dsc_overlap	: 1;
+
+struct ata_operations {
+	struct module *owner;
+	unsigned busy: 1; /* FIXME: this will go soon away... */
 	int (*cleanup)(ide_drive_t *);
 	int (*standby)(ide_drive_t *);
 	int (*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
 	int (*end_request)(ide_drive_t *drive, int uptodate);
+
 	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	int (*open)(struct inode *, struct file *, ide_drive_t *);
 	void (*release)(struct inode *, struct file *, ide_drive_t *);
 	int (*media_change)(ide_drive_t *);
 	void (*revalidate)(ide_drive_t *);
+
 	void (*pre_reset)(ide_drive_t *);
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t		*proc;
 	int (*driver_reinit)(ide_drive_t *);
-} ide_driver_t;
+};
 
-#define DRIVER(drive)		((drive)->driver)
+/* Alas, no aliases. Too much hassle with bringing module.h everywhere */
+#define ata_get(ata) \
+	(((ata) && (ata)->owner)	\
+		? ( try_inc_mod_count((ata)->owner) ? (ata) : NULL ) \
+		: (ata))
+
+#define ata_put(ata) \
+do {	\
+	if ((ata) && (ata)->owner) \
+		__MOD_DEC_USE_COUNT((ata)->owner);	\
+} while(0)
+
+
+/* FIXME: Actually implement and use them as soon as possible!  to make the
+ * ide_scan_devices() go away! */
+
+extern int unregister_ata_driver(unsigned int type, struct ata_operations *driver);
+extern int register_ata_driver(unsigned int type, struct ata_operations *driver);
+
+#define ata_ops(drive)		((drive)->driver)
 
 /*
  * ide_hwifs[] is the master data structure used to keep track
@@ -994,30 +1018,24 @@ extern ide_proc_entry_t generic_subdriver_entries[];
 extern int ideprobe_init (void);
 #endif
 #ifdef CONFIG_BLK_DEV_IDEDISK
-extern int idedisk_reinit (ide_drive_t *drive);
 extern int idedisk_init (void);
-#endif /* CONFIG_BLK_DEV_IDEDISK */
+#endif
 #ifdef CONFIG_BLK_DEV_IDECD
-extern int ide_cdrom_reinit (ide_drive_t *drive);
 extern int ide_cdrom_init (void);
-#endif /* CONFIG_BLK_DEV_IDECD */
+#endif
 #ifdef CONFIG_BLK_DEV_IDETAPE
-extern int idetape_reinit (ide_drive_t *drive);
 extern int idetape_init (void);
-#endif /* CONFIG_BLK_DEV_IDETAPE */
+#endif
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
-extern int idefloppy_reinit (ide_drive_t *drive);
 extern int idefloppy_init (void);
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
+#endif
 #ifdef CONFIG_BLK_DEV_IDESCSI
-extern int idescsi_reinit (ide_drive_t *drive);
 extern int idescsi_init (void);
-#endif /* CONFIG_BLK_DEV_IDESCSI */
+#endif
 
-ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n);
-extern int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver);
+ide_drive_t *ide_scan_devices (byte media, const char *name, struct ata_operations *driver, int n);
+extern int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver);
 extern int ide_unregister_subdriver(ide_drive_t *drive);
-extern int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #define ON_BOARD		1

@@ -278,7 +278,7 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	 * PIO mode => ATA FIFO on, ATAPI FIFO off
 	 */
 	pci_read_config_byte(dev, portFIFO, &cd_dma_fifo);
-	if (drive->media==ide_disk) {
+	if (drive->type == ATA_DISK) {
 		if (hwif->index) {
 			pci_write_config_byte(dev, portFIFO, (cd_dma_fifo & 0x0F) | 0x50);
 		} else {
@@ -424,9 +424,9 @@ static byte ali15x3_can_ultra (ide_drive_t *drive)
 	} else if ((m5229_revision < 0xC2) &&
 #ifndef CONFIG_WDC_ALI15X3
 		   ((chip_is_1543c_e && strstr(id->model, "WDC ")) ||
-		    (drive->media!=ide_disk))) {
+		    (drive->type != ATA_DISK))) {
 #else /* CONFIG_WDC_ALI15X3 */
-		   (drive->media!=ide_disk)) {
+		   (drive->type != ATA_DISK)) {
 #endif /* CONFIG_WDC_ALI15X3 */
 		return 0;
 	} else {
@@ -441,7 +441,7 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 	ide_dma_action_t dma_func	= ide_dma_on;
 	byte can_ultra_dma		= ali15x3_can_ultra(drive);
 
-	if ((m5229_revision<=0x20) && (drive->media!=ide_disk))
+	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
 		return hwif->dmaproc(ide_dma_off_quietly, drive);
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
@@ -494,7 +494,7 @@ static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_check:
 			return ali15x3_config_drive_for_dma(drive);
 		case ide_dma_write:
-			if ((m5229_revision < 0xC2) && (drive->media != ide_disk))
+			if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
 				return 1;	/* try PIO instead of DMA */
 			break;
 		default:

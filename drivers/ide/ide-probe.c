@@ -130,17 +130,17 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		}
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 		switch (type) {
-			case ide_floppy:
+			case ATA_FLOPPY:
 				if (!strstr(id->model, "CD-ROM")) {
 					if (!strstr(id->model, "oppy") && !strstr(id->model, "poyp") && !strstr(id->model, "ZIP"))
 						printk("cdrom or floppy?, assuming ");
-					if (drive->media != ide_cdrom) {
+					if (drive->type != ATA_ROM) {
 						printk ("FLOPPY");
 						break;
 					}
 				}
-				type = ide_cdrom;	/* Early cdrom models used zero */
-			case ide_cdrom:
+				type = ATA_ROM;	/* Early cdrom models used zero */
+			case ATA_ROM:
 				drive->removable = 1;
 #ifdef CONFIG_PPC
 				/* kludge for Apple PowerBook internal zip */
@@ -152,10 +152,10 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 #endif
 				printk ("CD/DVD-ROM");
 				break;
-			case ide_tape:
+			case ATA_TAPE:
 				printk ("TAPE");
 				break;
-			case ide_optical:
+			case ATA_MOD:
 				printk ("OPTICAL");
 				drive->removable = 1;
 				break;
@@ -164,7 +164,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 				break;
 		}
 		printk (" drive\n");
-		drive->media = type;
+		drive->type = type;
 		return;
 	}
 
@@ -184,7 +184,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 			mate->noprobe = 1;
 		}
 	}
-	drive->media = ide_disk;
+	drive->type = ATA_DISK;
 	printk("ATA DISK drive\n");
 	QUIRK_LIST(HWIF(drive),drive);
 	return;
@@ -327,12 +327,12 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 	int rc;
 	ide_hwif_t *hwif = HWIF(drive);
 	if (drive->present) {	/* avoid waiting for inappropriate probes */
-		if ((drive->media != ide_disk) && (cmd == WIN_IDENTIFY))
+		if ((drive->type != ATA_DISK) && (cmd == WIN_IDENTIFY))
 			return 4;
 	}
 #ifdef DEBUG
-	printk("probing for %s: present=%d, media=%d, probetype=%s\n",
-		drive->name, drive->present, drive->media,
+	printk("probing for %s: present=%d, type=%d, probetype=%s\n",
+		drive->name, drive->present, drive->type,
 		(cmd == WIN_IDENTIFY) ? "ATA" : "ATAPI");
 #endif
 	ide_delay_50ms();	/* needed for some systems (e.g. crw9624 as drive0 with disk as slave) */
@@ -421,10 +421,10 @@ static inline void probe_for_drive (ide_drive_t *drive)
 	if (!drive->present)
 		return;			/* drive not found */
 	if (drive->id == NULL) {		/* identification failed? */
-		if (drive->media == ide_disk) {
+		if (drive->type == ATA_DISK) {
 			printk ("%s: non-IDE drive, CHS=%d/%d/%d\n",
 			 drive->name, drive->cyl, drive->head, drive->sect);
-		} else if (drive->media == ide_cdrom) {
+		} else if (drive->type == ATA_ROM) {
 			printk("%s: ATAPI cdrom (?)\n", drive->name);
 		} else {
 			drive->present = 0;	/* nuke it */
@@ -481,33 +481,31 @@ static void hwif_register (ide_hwif_t *hwif)
 	    ((unsigned long)hwif->io_ports[IDE_STATUS_OFFSET])) {
 		ide_request_region(hwif->io_ports[IDE_DATA_OFFSET], 8, hwif->name);
 		hwif->straight8 = 1;
-		goto jump_straight8;
+	} else {
+		if (hwif->io_ports[IDE_DATA_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_DATA_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_ERROR_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_ERROR_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_NSECTOR_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_NSECTOR_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_SECTOR_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_SECTOR_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_LCYL_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_LCYL_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_HCYL_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_HCYL_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_SELECT_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_SELECT_OFFSET], 1, hwif->name);
+		if (hwif->io_ports[IDE_STATUS_OFFSET])
+			ide_request_region(hwif->io_ports[IDE_STATUS_OFFSET], 1, hwif->name);
+
 	}
-
-	if (hwif->io_ports[IDE_DATA_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_DATA_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_ERROR_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_ERROR_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_NSECTOR_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_NSECTOR_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_SECTOR_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_SECTOR_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_LCYL_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_LCYL_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_HCYL_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_HCYL_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_SELECT_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_SELECT_OFFSET], 1, hwif->name);
-	if (hwif->io_ports[IDE_STATUS_OFFSET])
-		ide_request_region(hwif->io_ports[IDE_STATUS_OFFSET], 1, hwif->name);
-
-jump_straight8:
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
 		ide_request_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1, hwif->name);
 #if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
 	if (hwif->io_ports[IDE_IRQ_OFFSET])
 		ide_request_region(hwif->io_ports[IDE_IRQ_OFFSET], 1, hwif->name);
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+#endif
 }
 
 /*
@@ -521,13 +519,6 @@ static void probe_hwif (ide_hwif_t *hwif)
 
 	if (hwif->noprobe)
 		return;
-#ifdef CONFIG_BLK_DEV_IDE
-	if (hwif->io_ports[IDE_DATA_OFFSET] == HD_DATA) {
-		extern void probe_cmos_for_drives(ide_hwif_t *);
-
-		probe_cmos_for_drives (hwif);
-	}
-#endif
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate->present) &&
 #if CONFIG_BLK_DEV_PDC4030
@@ -545,7 +536,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 		}
 		if (!msgout)
 			printk("%s: ports already in use, skipping probe\n", hwif->name);
-		return;	
+		return;
 	}
 
 	__save_flags(flags);	/* local CPU only */
@@ -796,60 +787,51 @@ static int init_irq (ide_hwif_t *hwif)
 static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
-	unsigned int unit, units, minors, i;
+	unsigned int unit, minors, i;
 	extern devfs_handle_t ide_devfs_handle;
 
-#if 1
-	units = MAX_DRIVES;
-#else
-	/* figure out maximum drive number on the interface */
-	for (units = MAX_DRIVES; units > 0; --units) {
-		if (hwif->drives[units-1].present)
-			break;
-	}
-#endif
-
-	minors = units * (1<<PARTN_BITS);
+	minors = MAX_DRIVES * (1 << PARTN_BITS);
 
 	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
 	if (!gd)
 		goto err_kmalloc_gd;
+
 	gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;
+
 	gd->part = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
 	if (!gd->part)
 		goto err_kmalloc_gd_part;
+	memset(gd->part, 0, minors * sizeof(struct hd_struct));
+
 	blksize_size[hwif->major] = kmalloc (minors*sizeof(int), GFP_KERNEL);
 	if (!blksize_size[hwif->major])
 		goto err_kmalloc_bs;
-
-	memset(gd->part, 0, minors * sizeof(struct hd_struct));
-
 	for (i = 0; i < minors; ++i)
 	    blksize_size[hwif->major][i] = BLOCK_SIZE;
-	for (unit = 0; unit < units; ++unit)
+
+	for (unit = 0; unit < MAX_DRIVES; ++unit)
 		hwif->drives[unit].part = &gd->part[unit << PARTN_BITS];
 
 	gd->major	= hwif->major;		/* our major device number */
 	gd->major_name	= IDE_MAJOR_NAME;	/* treated special in genhd.c */
 	gd->minor_shift	= PARTN_BITS;		/* num bits for partitions */
-	gd->nr_real	= units;		/* current num real drives */
+	gd->nr_real	= MAX_DRIVES;		/* current num real drives */
 	gd->next	= NULL;			/* linked list of major devs */
 	gd->fops        = ide_fops;             /* file operations */
-	gd->de_arr	= kmalloc (sizeof *gd->de_arr * units, GFP_KERNEL);
-	gd->flags	= kmalloc (sizeof *gd->flags * units, GFP_KERNEL);
+	gd->de_arr	= kmalloc(sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
+	gd->flags	= kmalloc(sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
 	if (gd->de_arr)
-		memset (gd->de_arr, 0, sizeof *gd->de_arr * units);
+		memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
 	if (gd->flags)
-		memset (gd->flags, 0, sizeof *gd->flags * units);
+		memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
 
 	hwif->gd = gd;
 	add_gendisk(gd);
 
-	for (unit = 0; unit < units; ++unit) {
-#if 1
-		char name[64];
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		char name[80];
 		ide_add_generic_settings(hwif->drives + unit);
 		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
 		sprintf (name, "host%d/bus%d/target%d/lun%d",
@@ -858,19 +840,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 			hwif->channel, unit, hwif->drives[unit].lun);
 		if (hwif->drives[unit].present)
 			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
-#else
-		if (hwif->drives[unit].present) {
-			char name[64];
-
-			ide_add_generic_settings(hwif->drives + unit);
-			hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
-			sprintf (name, "host%d/bus%d/target%d/lun%d",
-				 (hwif->channel && hwif->mate) ? hwif->mate->index : hwif->index,
-				 hwif->channel, unit, hwif->drives[unit].lun);
-			hwif->drives[unit].de =
-				devfs_mk_dir (ide_devfs_handle, name, NULL);
-		}
-#endif
 	}
 	return;
 
@@ -881,7 +850,7 @@ err_kmalloc_gd_part:
 err_kmalloc_gd_sizes:
 	kfree(gd);
 err_kmalloc_gd:
-	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");
+	printk(KERN_CRIT "(ide::init_gendisk) Out of memory\n");
 	return;
 }
 

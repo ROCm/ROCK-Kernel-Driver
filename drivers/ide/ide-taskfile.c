@@ -648,7 +648,7 @@ ide_startstop_t taskfile_error (ide_drive_t *drive, const char *msg, byte stat)
 
 	if (rq->errors >= ERROR_MAX) {
 		if (drive->driver != NULL)
-			DRIVER(drive)->end_request(0, HWGROUP(drive));
+			ata_ops(drive)->end_request(0, HWGROUP(drive));
 		else
 			ide_end_request(drive, 0);
 	} else {

@@ -105,7 +105,6 @@ static byte svwks_revision = 0;
 
 static int svwks_get_info(char *, char **, off_t, int);
 extern int (*svwks_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 
 static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 {

@@ -1697,9 +1697,6 @@ int __init blk_dev_init(void)
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
-#if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_IDE)
-	ide_init();		/* this MUST precede hd_init */
-#endif
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
 	hd_init();
 #endif

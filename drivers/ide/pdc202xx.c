@@ -63,7 +63,6 @@
 
 static int pdc202xx_get_info(char *, char **, off_t, int);
 extern int (*pdc202xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
 static struct pci_dev *bmide_dev;
 
 char *pdc202xx_pio_verbose (u32 drive_pci)
@@ -412,7 +411,8 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 		default: return -1;
 	}
 
-	if ((drive->media != ide_disk) && (speed < XFER_SW_DMA_0))	return -1;
+	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
+		return -1;
 
 	pci_read_config_dword(dev, drive_pci, &drive_conf);
 	pci_read_config_byte(dev, (drive_pci), &AP);
@@ -820,7 +820,8 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	}
 
 	if (jumpbit) {
-		if (drive->media != ide_disk)	return ide_dma_off_quietly;
+		if (drive->type != ATA_DISK)
+			return ide_dma_off_quietly;
 		if (id->capability & 4) {	/* IORDY_EN & PREFETCH_EN */
 			OUT_BYTE((iordy + adj), indexreg);
 			OUT_BYTE((IN_BYTE(datareg)|0x03), datareg);
@@ -869,13 +870,14 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 chipset_is_set:
 
-	if (drive->media != ide_disk)	return ide_dma_off_quietly;
+	if (drive->type != ATA_DISK)
+		return ide_dma_off_quietly;
 
 	pci_read_config_byte(dev, (drive_pci), &AP);
 	if (id->capability & 4)	/* IORDY_EN */
 		pci_write_config_byte(dev, (drive_pci), AP|IORDY_EN);
 	pci_read_config_byte(dev, (drive_pci), &AP);
-	if (drive->media == ide_disk)	/* PREFETCH_EN */
+	if (drive->type == ATA_DISK)	/* PREFETCH_EN */
 		pci_write_config_byte(dev, (drive_pci), AP|PREFETCH_EN);
 
 jumpbit_is_set:

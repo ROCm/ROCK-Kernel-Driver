@@ -143,7 +143,7 @@ static void ht6560b_selectproc (ide_drive_t *drive)
 	if (select != current_select || timing != current_timing) {
 		current_select = select;
 		current_timing = timing;
-		if (drive->media != ide_disk || !drive->present)
+		if (drive->type != ATA_DISK || !drive->present)
 			select |= HT_PREFETCH_MODE;
 		(void) inb(HT_CONFIG_PORT);
 		(void) inb(HT_CONFIG_PORT);

@@ -293,7 +293,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 		printk(KERN_INFO "%s: PIO mode%d\n",drive->name,pio);
 	}
 
-	if (!HWIF(drive)->channel && drive->media != ide_disk) {
+	if (!HWIF(drive)->channel && drive->type != ATA_DISK) {
 		qd_write_reg(0x5f,QD_CONTROL_PORT);
 		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name,HWIF(drive)->name);
 	}

@@ -70,22 +70,6 @@ char *ide_xfer_verbose (byte xfer_rate)
 }
 
 /*
- *
- */
-char *ide_media_verbose (ide_drive_t *drive)
-{
-	switch (drive->media) {
-		case ide_scsi:		return("scsi   ");
-		case ide_disk:		return("disk   ");
-		case ide_optical:	return("optical");
-		case ide_cdrom:		return("cdrom  ");
-		case ide_tape:		return("tape   ");
-		case ide_floppy:	return("floppy ");
-		default:		return("???????");
-	}
-}
-
-/*
  * A Verbose noise maker for debugging on the attempted dmaing calls.
  */
 char *ide_dmafunc_verbose (ide_dma_action_t dmafunc)
