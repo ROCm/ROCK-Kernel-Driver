@@ -319,31 +319,30 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-#ifdef CONFIG_SERIAL_8250_HCDP
-	if (efi.hcdp) {
-		void setup_serial_hcdp(void *);
-		setup_serial_hcdp(efi.hcdp);
-	}
+#ifdef CONFIG_EFI_PCDP
+	efi_setup_pcdp_console(*cmdline_p);
 #endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
 	if (!efi.hcdp)
 		setup_serial_legacy();
 #endif
 
 #ifdef CONFIG_VT
+	if (!conswitchp) {
 # if defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
+		conswitchp = &dummy_con;
 # endif
 # if defined(CONFIG_VGA_CONSOLE)
-	/*
-	 * Non-legacy systems may route legacy VGA MMIO range to system
-	 * memory.  vga_con probes the MMIO hole, so memory looks like
-	 * a VGA device to it.  The EFI memory map can tell us if it's
-	 * memory so we can avoid this problem.
-	 */
-	if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
-		conswitchp = &vga_con;
+		/*
+		 * Non-legacy systems may route legacy VGA MMIO range to system
+		 * memory.  vga_con probes the MMIO hole, so memory looks like
+		 * a VGA device to it.  The EFI memory map can tell us if it's
+		 * memory so we can avoid this problem.
+		 */
+		if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
+			conswitchp = &vga_con;
 # endif
+	}
 #endif
 
 	/* enable IA-64 Machine Check Abort Handling */
