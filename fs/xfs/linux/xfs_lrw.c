@@ -205,7 +205,7 @@ xfs_read(
 		}
 	}
 
-	n = XFS_MAX_FILE_OFFSET - *offp;
+	n = XFS_MAXIOFFSET(mp) - *offp;
 	if ((n <= 0) || (size == 0))
 		return 0;
 
@@ -265,7 +265,7 @@ xfs_sendfile(
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 
-	n = XFS_MAX_FILE_OFFSET - *offp;
+	n = XFS_MAXIOFFSET(mp) - *offp;
 	if ((n <= 0) || (count == 0))
 		return 0;
 
@@ -527,7 +527,7 @@ xfs_write(
 	ssize_t			ret;
 	int			error = 0;
 	xfs_fsize_t		isize, new_size;
-	xfs_fsize_t		n, limit = XFS_MAX_FILE_OFFSET;
+	xfs_fsize_t		n, limit;
 	xfs_iocore_t		*io;
 	vnode_t			*vp;
 	unsigned long		seg;
@@ -593,6 +593,7 @@ xfs_write(
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 	isize = xip->i_d.di_size;
+	limit = XFS_MAXIOFFSET(mp);
 
 	if (file->f_flags & O_APPEND)
 		*offset = isize;
