@@ -52,7 +52,6 @@
 
 #include <linux/fcntl.h>        /* O_ACCMODE */
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
-#include <linux/devfs_fs_kernel.h>
 
 #include <linux/umem.h>
 
@@ -1204,11 +1203,10 @@ int __init mm_init(void)
 			goto out;
 	}
 
-	devfs_mk_dir("umem");
-
 	for (i = 0; i < num_cards; i++) {
 		struct gendisk *disk = mm_gendisk[i];
 		sprintf(disk->disk_name, "umem%c", 'a'+i);
+		sprintf(disk->devfs_name, "umem/card%d", i);
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
@@ -1245,7 +1243,6 @@ void __exit mm_cleanup(void)
 		del_gendisk(mm_gendisk[i]);
 		put_disk(mm_gendisk[i]);
 	}
-	devfs_remove("umem");
 
 	pci_unregister_driver(&mm_pci_driver);
 

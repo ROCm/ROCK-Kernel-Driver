@@ -1729,10 +1729,14 @@ int acsi_init( void )
 	for( i = 0; i < NDevices; ++i ) {
 		struct gendisk *disk = acsi_gendisk[i];
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
+		aip = &acsi_info[NDevices];
+		sprintf(disk->devfs_name, "ad/target%d/lun%d", aip->target, aip->lun);
 		disk->major = ACSI_MAJOR;
 		disk->first_minor = i << 4;
-		if (acsi_info[i].type != HARDDISK)
+		if (acsi_info[i].type != HARDDISK) {
 			disk->minors = 1;
+			strcat(disk->devfs_name, "/disc");
+		}
 		disk->fops = &acsi_fops;
 		disk->private_data = &acsi_info[i];
 		set_capacity(disk, acsi_info[i].size);
