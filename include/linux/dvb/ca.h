@@ -26,7 +26,7 @@
 
 /* slot interface types and info */
 
-typedef struct ca_slot_info_s {
+typedef struct ca_slot_info {
         int num;               /* slot number */
 
         int type;              /* CA interface this slot supports */
@@ -43,7 +43,7 @@ typedef struct ca_slot_info_s {
 
 /* descrambler types and info */
 
-typedef struct ca_descr_info_s {
+typedef struct ca_descr_info {
         unsigned int num;          /* number of available descramblers (keys) */ 
         unsigned int type;         /* type of supported scrambling system */
 #define CA_ECD           1
@@ -51,29 +51,29 @@ typedef struct ca_descr_info_s {
 #define CA_DSS           4
 } ca_descr_info_t;
 
-typedef struct ca_cap_s {
+typedef struct ca_caps {
         unsigned int slot_num;     /* total number of CA card and module slots */
         unsigned int slot_type;    /* OR of all supported types */
         unsigned int descr_num;    /* total number of descrambler slots (keys) */
         unsigned int descr_type;   /* OR of all supported types */
-} ca_cap_t;
+} ca_caps_t;
 
 /* a message to/from a CI-CAM */
-typedef struct ca_msg_s {   
+typedef struct ca_msg {   
         unsigned int index;         
         unsigned int type;
         unsigned int length;
         unsigned char msg[256];
 } ca_msg_t;
 
-typedef struct ca_descr_s {
+typedef struct ca_descr {
         unsigned int index;    
         unsigned int parity;
         unsigned char cw[8];
 } ca_descr_t;
 
 #define CA_RESET          _IO('o', 128)
-#define CA_GET_CAP        _IOR('o', 129, ca_cap_t)
+#define CA_GET_CAP        _IOR('o', 129, ca_caps_t)
 #define CA_GET_SLOT_INFO  _IOR('o', 130, ca_slot_info_t)
 #define CA_GET_DESCR_INFO _IOR('o', 131, ca_descr_info_t)
 #define CA_GET_MSG        _IOR('o', 132, ca_msg_t)

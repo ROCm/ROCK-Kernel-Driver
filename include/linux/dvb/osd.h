@@ -26,7 +26,7 @@
 
 typedef enum {
 	// All functions return -2 on "not open"
-	OSD_Close = 1,		// ()
+  OSD_Close=1,    // ()
 	// Disables OSD and releases the buffers
 	// returns 0 on success
 	OSD_Open,		// (x0,y0,x1,y1,BitPerPixel[2/4/8](color&0x0F),mix[0..15](color&0xF0))
@@ -108,3 +108,4 @@ typedef struct osd_cmd_s {
 #define OSD_SEND_CMD       _IOW('o', 160, osd_cmd_t)
 
 #endif
+
