@@ -1218,6 +1218,7 @@ static int __init inet_init(void)
 #endif
 
 	ipv4_proc_init();
+	udp_proc_init();
 	fib_proc_init();
 	return 0;
 }
