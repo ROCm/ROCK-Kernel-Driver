@@ -13,14 +13,9 @@
  *  Added needed MAJORS for new pairs, {hdi,hdj}, {hdk,hdl}
  */
 
-#include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/blk.h>
 #include <linux/init.h>
-#include <linux/raid/md.h>
+#include <linux/fs.h>
+#include <linux/blk.h>
 #include <linux/buffer_head.h>	/* for invalidate_bdev() */
 #include <linux/kmod.h>
 

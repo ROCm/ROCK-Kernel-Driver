@@ -305,6 +305,16 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 #define NOPAGE_SIGBUS	(NULL)
 #define NOPAGE_OOM	((struct page *) (-1))
 
+/*
+ * Different kinds of faults, as returned by handle_mm_fault().
+ * Used to decide whether a process gets delivered SIGBUS or
+ * just gets major/minor fault counters bumped up.
+ */
+#define VM_FAULT_OOM	(-1)
+#define VM_FAULT_SIGBUS	0
+#define VM_FAULT_MINOR	1
+#define VM_FAULT_MAJOR	2
+
 /* The array of struct pages */
 extern struct page *mem_map;
 

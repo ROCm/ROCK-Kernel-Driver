@@ -66,7 +66,7 @@ extern struct hd_struct md_hd_struct[MAX_MD_DEVS];
 extern char * partition_name (kdev_t dev);
 extern inline char * bdev_partition_name (struct block_device *bdev)
 {
-	return partition_name(to_kdev_t(bdev->bd_dev));
+	return partition_name(bdev ? to_kdev_t(bdev->bd_dev) : NODEV);
 }
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);
@@ -77,7 +77,7 @@ extern void md_wakeup_thread(mdk_thread_t *thread);
 extern void md_interrupt_thread (mdk_thread_t *thread);
 extern void md_update_sb (mddev_t *mddev);
 extern void md_done_sync(mddev_t *mddev, int blocks, int ok);
-extern void md_sync_acct(kdev_t dev, unsigned long nr_sectors);
+extern void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors);
 extern int md_error (mddev_t *mddev, struct block_device *bdev);
 extern int md_run_setup(void);
 

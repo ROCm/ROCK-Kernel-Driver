@@ -303,15 +303,15 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 
 #ifdef	CONFIG_DEBUG_SLAB
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%lx\n",
+		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%Lx\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, (unsigned long) dma);
+			pool->name, vaddr, (unsigned long long) dma);
 		return;
 	}
 	if (page->bitmap [map] & (1UL << block)) {
-		printk (KERN_ERR "pci_pool_free %s/%s, dma %x already free\n",
+		printk (KERN_ERR "pci_pool_free %s/%s, dma %Lx already free\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, dma);
+			pool->name, (unsigned long long)dma);
 		return;
 	}
 	memset (vaddr, POOL_POISON_BYTE, pool->size);

@@ -70,7 +70,7 @@ struct svc_export {
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;
 	struct dentry *		ex_dentry;
-	kdev_t			ex_dev;
+	dev_t			ex_dev;
 	ino_t			ex_ino;
 	uid_t			ex_anon_uid;
 	gid_t			ex_anon_gid;
@@ -94,7 +94,7 @@ void			exp_readlock(void);
 void			exp_readunlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
-struct svc_export *	exp_get(struct svc_client *clp, kdev_t dev, ino_t ino);
+struct svc_export *	exp_get(struct svc_client *clp, dev_t dev, ino_t ino);
 struct svc_export *	exp_get_fsid(struct svc_client *clp, int fsid);
 struct svc_export *	exp_get_by_name(struct svc_client *clp,
 					struct vfsmount *mnt,

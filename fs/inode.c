@@ -101,7 +101,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		struct address_space * const mapping = &inode->i_data;
 
 		inode->i_sb = sb;
-		inode->i_dev = to_kdev_t(sb->s_dev);
+		inode->i_dev = sb->s_dev;
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_flags = 0;
 		atomic_set(&inode->i_count, 1);

@@ -219,7 +219,7 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))
 		p = xdr_encode_hyper(p, (u64) fhp->fh_export->ex_fsid);
 	else
-		p = xdr_encode_hyper(p, (u64) kdev_t_to_nr(inode->i_dev));
+		p = xdr_encode_hyper(p, (u64) inode->i_dev);
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
 	p = encode_time3(p, fhp->fh_post_atime);
 	p = encode_time3(p, fhp->fh_post_mtime);

@@ -2467,7 +2467,9 @@ struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
 
 	sgp = scsi_sg_pools + SCpnt->sglist_len;
 
+	current->flags |= PF_NOWARN;
 	sgl = mempool_alloc(sgp->pool, gfp_mask);
+	current->flags &= ~PF_NOWARN;
 	if (sgl) {
 		memset(sgl, 0, sgp->size);
 		return sgl;

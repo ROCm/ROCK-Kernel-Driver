@@ -15,37 +15,26 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/bio.h>
-#include <linux/buffer_head.h>
-#include <asm/pgtable.h>
 #include <linux/swapops.h>
-
-static int
-swap_get_block(struct inode *inode, sector_t iblock,
-		struct buffer_head *bh_result, int create)
-{
-	struct swap_info_struct *sis;
-	swp_entry_t entry;
-
-	entry.val = iblock;
-	sis = get_swap_info_struct(swp_type(entry));
-	bh_result->b_bdev = sis->bdev;
-	bh_result->b_blocknr = map_swap_page(sis, swp_offset(entry));
-	bh_result->b_size = PAGE_SIZE;
-	set_buffer_mapped(bh_result);
-	return 0;
-}
+#include <linux/buffer_head.h>	/* for block_sync_page() */
+#include <asm/pgtable.h>
 
 static struct bio *
 get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
 {
 	struct bio *bio;
-	struct buffer_head bh;
 
 	bio = bio_alloc(gfp_flags, 1);
 	if (bio) {
-		swap_get_block(NULL, page->index, &bh, 1);
-		bio->bi_sector = bh.b_blocknr * (PAGE_SIZE >> 9);
-		bio->bi_bdev = bh.b_bdev;
+		struct swap_info_struct *sis;
+		swp_entry_t entry;
+
+		entry.val = page->index;
+		sis = get_swap_info_struct(swp_type(entry));
+
+		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
+					(PAGE_SIZE >> 9);
+		bio->bi_bdev = sis->bdev;
 		bio->bi_io_vec[0].bv_page = page;
 		bio->bi_io_vec[0].bv_len = PAGE_SIZE;
 		bio->bi_io_vec[0].bv_offset = 0;
@@ -98,6 +87,7 @@ int swap_writepage(struct page *page)
 	}
 	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
 	if (bio == NULL) {
+		set_page_dirty(page);
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -129,7 +119,7 @@ out:
  * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
  * so we don't need swap special cases in generic_vm_writeback().
  *
- * Swap pages are PageLocked and PageWriteback while under writeout so that
+ * Swap pages are !PageLocked and PageWriteback while under writeout so that
  * memory allocators will throttle against them.
  */
 static int swap_vm_writeback(struct page *page, int *nr_to_write)

@@ -57,6 +57,7 @@ static transaction_t * get_transaction (journal_t * journal, int is_try)
 	transaction->t_state = T_RUNNING;
 	transaction->t_tid = journal->j_transaction_sequence++;
 	transaction->t_expires = jiffies + journal->j_commit_interval;
+	INIT_LIST_HEAD(&transaction->t_jcb);
 
 	/* Set up the commit timer for the new transaction. */
 	J_ASSERT (!journal->j_commit_timer_active);
@@ -90,7 +91,14 @@ static int start_this_handle(journal_t *journal, handle_t *handle)
 	transaction_t *transaction;
 	int needed;
 	int nblocks = handle->h_buffer_credits;
-	
+
+	if (nblocks > journal->j_max_transaction_buffers) {
+		printk(KERN_ERR "JBD: %s wants too many credits (%d > %d)\n",
+		       current->comm, nblocks,
+		       journal->j_max_transaction_buffers);
+		return -ENOSPC;
+	}
+
 	jbd_debug(3, "New handle %p going live.\n", handle);
 
 repeat:
@@ -200,6 +208,20 @@ repeat_locked:
 	return 0;
 }
 
+/* Allocate a new handle.  This should probably be in a slab... */
+static handle_t *new_handle(int nblocks)
+{
+	handle_t *handle = jbd_kmalloc(sizeof (handle_t), GFP_NOFS);
+	if (!handle)
+		return NULL;
+	memset(handle, 0, sizeof (handle_t));
+	handle->h_buffer_credits = nblocks;
+	handle->h_ref = 1;
+	INIT_LIST_HEAD(&handle->h_jcb);
+
+	return handle;
+}
+
 /*
  * Obtain a new handle.  
  *
@@ -226,14 +248,11 @@ handle_t *journal_start(journal_t *journal, int nblocks)
 		handle->h_ref++;
 		return handle;
 	}
-	
-	handle = jbd_kmalloc(sizeof (handle_t), GFP_NOFS);
+
+	handle = new_handle(nblocks);
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
-	memset (handle, 0, sizeof (handle_t));
 
-	handle->h_buffer_credits = nblocks;
-	handle->h_ref = 1;
 	current->journal_info = handle;
 
 	err = start_this_handle(journal, handle);
@@ -332,14 +351,11 @@ handle_t *journal_try_start(journal_t *journal, int nblocks)
 	
 	if (is_journal_aborted(journal))
 		return ERR_PTR(-EIO);
-	
-	handle = jbd_kmalloc(sizeof (handle_t), GFP_NOFS);
+
+	handle = new_handle(nblocks);
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
-	memset (handle, 0, sizeof (handle_t));
 
-	handle->h_buffer_credits = nblocks;
-	handle->h_ref = 1;
 	current->journal_info = handle;
 
 	err = try_start_this_handle(journal, handle);
@@ -1348,6 +1364,28 @@ out:
 #endif
 
 /*
+ * Register a callback function for this handle.  The function will be
+ * called when the transaction that this handle is part of has been
+ * committed to disk with the original callback data struct and the
+ * error status of the journal as parameters.  There is no guarantee of
+ * ordering between handles within a single transaction, nor between
+ * callbacks registered on the same handle.
+ *
+ * The caller is responsible for allocating the journal_callback struct.
+ * This is to allow the caller to add as much extra data to the callback
+ * as needed, but reduce the overhead of multiple allocations.  The caller
+ * allocated struct must start with a struct journal_callback at offset 0,
+ * and has the caller-specific data afterwards.
+ */
+void journal_callback_set(handle_t *handle,
+			  void (*func)(struct journal_callback *jcb, int error),
+			  struct journal_callback *jcb)
+{
+	list_add_tail(&jcb->jcb_list, &handle->h_jcb);
+	jcb->jcb_func = func;
+}
+
+/*
  * All done for a particular handle.
  *
  * There is not much action needed here.  We just return any remaining
@@ -1411,7 +1449,10 @@ int journal_stop(handle_t *handle)
 			wake_up(&journal->j_wait_transaction_locked);
 	}
 
-	/* 
+	/* Move callbacks from the handle to the transaction. */
+	list_splice(&handle->h_jcb, &transaction->t_jcb);
+
+	/*
 	 * If the handle is marked SYNC, we need to set another commit
 	 * going!  We also want to force a commit if the current
 	 * transaction is occupying too much of the log, or if the

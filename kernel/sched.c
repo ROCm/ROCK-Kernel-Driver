@@ -1447,6 +1447,18 @@ asmlinkage long sys_sched_yield(void)
 	return 0;
 }
 
+void __cond_resched(void)
+{
+	set_current_state(TASK_RUNNING);
+	schedule();
+}
+
+void yield(void)
+{
+	set_current_state(TASK_RUNNING);
+	sys_sched_yield();
+}
+
 asmlinkage long sys_sched_get_priority_max(int policy)
 {
 	int ret = -EINVAL;
