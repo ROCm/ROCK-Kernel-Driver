@@ -270,6 +270,8 @@ struct task_struct {
 	unsigned int time_slice, first_time_slice;
 
 	struct list_head tasks;
+	struct list_head ptrace_children;
+	struct list_head ptrace_list;
 
 	struct mm_struct *mm, *active_mm;
 	struct list_head local_pages;

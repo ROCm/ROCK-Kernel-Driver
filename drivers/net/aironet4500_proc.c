@@ -18,7 +18,6 @@
 
 #include <linux/sched.h>
 #include <linux/tqueue.h>
-#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>

@@ -20,7 +20,6 @@ static char *version = "bagetlance.c: v1.1 11/10/98\n";
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>

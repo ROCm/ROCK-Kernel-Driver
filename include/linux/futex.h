@@ -6,4 +6,6 @@
 #define FUTEX_WAKE (1)
 #define FUTEX_FD (2)
 
+extern asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime);
+
 #endif

@@ -18,6 +18,7 @@
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -65,6 +66,8 @@ static void release_task(struct task_struct * p)
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
+	BUG_ON(p->ptrace || !list_empty(&p->ptrace_list) ||
+					!list_empty(&p->ptrace_children));
 	unhash_process(p);
 
 	release_thread(p);
@@ -177,6 +180,7 @@ void reparent_to_init(void)
 {
 	write_lock_irq(&tasklist_lock);
 
+	ptrace_unlink(current);
 	/* Reparent to init */
 	REMOVE_LINKS(current);
 	current->parent = child_reaper;
@@ -231,45 +235,20 @@ void daemonize(void)
 	atomic_inc(&current->files->count);
 }
 
-/*
- * When we die, we re-parent all our children.
- * Try to give them to another thread in our thread
- * group, and if no such member exists, give it to
- * the global child reaper process (ie "init")
- */
-static inline void forget_original_parent(struct task_struct * father)
+static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
 {
-	struct task_struct * p, *reaper;
+	/* We dont want people slaying init */
+	p->exit_signal = SIGCHLD;
+	p->self_exec_id++;
 
-	read_lock(&tasklist_lock);
+	/* Make sure we're not reparenting to ourselves */
+	if (p == reaper)
+		p->real_parent = child_reaper;
+	else
+		p->real_parent = reaper;
 
-	/* Next in our thread group, if they're not already exiting */
-	reaper = father;
-	do {
-		reaper = next_thread(reaper);
-		if (!(reaper->flags & PF_EXITING))
-			break;
-	} while (reaper != father);
-
-	if (reaper == father)
-		reaper = child_reaper;
-
-	for_each_task(p) {
-		if (p->real_parent == father) {
-			/* We dont want people slaying init */
-			p->exit_signal = SIGCHLD;
-			p->self_exec_id++;
-
-			/* Make sure we're not reparenting to ourselves */
-			if (p == reaper)
-				p->real_parent = child_reaper;
-			else
-				p->real_parent = reaper;
-
-			if (p->pdeath_signal) send_sig(p->pdeath_signal, p, 0);
-		}
-	}
-	read_unlock(&tasklist_lock);
+	if (p->pdeath_signal)
+		send_sig(p->pdeath_signal, p, 0);
 }
 
 static inline void close_files(struct files_struct * files)
@@ -420,12 +399,85 @@ void exit_mm(struct task_struct *tsk)
 }
 
 /*
+ * When we die, we re-parent all our children.
+ * Try to give them to another thread in our thread
+ * group, and if no such member exists, give it to
+ * the global child reaper process (ie "init")
+ */
+static inline void forget_original_parent(struct task_struct * father)
+{
+	struct task_struct *p, *reaper;
+	list_t *_p;
+
+	read_lock(&tasklist_lock);
+
+	/* Next in our thread group, if they're not already exiting */
+	reaper = father;
+	do {
+		reaper = next_thread(reaper);
+		if (!(reaper->flags & PF_EXITING))
+			break;
+	} while (reaper != father);
+
+	if (reaper == father)
+		reaper = child_reaper;
+
+	/*
+	 * There are only two places where our children can be:
+	 *
+	 * - in our child list
+	 * - in the global ptrace list
+	 *
+	 * Search them and reparent children.
+	 */
+	list_for_each(_p, &father->children) {
+		p = list_entry(_p,struct task_struct,sibling);
+		reparent_thread(p, reaper, child_reaper);
+	}
+	list_for_each(_p, &father->ptrace_children) {
+		p = list_entry(_p,struct task_struct,ptrace_list);
+		reparent_thread(p, reaper, child_reaper);
+	}
+	read_unlock(&tasklist_lock);
+}
+
+static inline void zap_thread(task_t *p, task_t *father)
+{
+	ptrace_unlink(p);
+	list_del_init(&p->sibling);
+	p->ptrace = 0;
+
+	p->parent = p->real_parent;
+	list_add_tail(&p->sibling, &p->parent->children);
+	if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
+		do_notify_parent(p, p->exit_signal);
+	/*
+	 * process group orphan check
+	 * Case ii: Our child is in a different pgrp
+	 * than we are, and it was the only connection
+	 * outside, so the child pgrp is now orphaned.
+	 */
+	if ((p->pgrp != current->pgrp) &&
+	    (p->session == current->session)) {
+		int pgrp = p->pgrp;
+
+		write_unlock_irq(&tasklist_lock);
+		if (is_orphaned_pgrp(pgrp) && has_stopped_jobs(pgrp)) {
+			kill_pg(pgrp,SIGHUP,1);
+			kill_pg(pgrp,SIGCONT,1);
+		}
+		write_lock_irq(&tasklist_lock);
+	}
+}
+
+/*
  * Send signals to all our closest relatives so that they know
  * to properly mourn us..
  */
 static void exit_notify(void)
 {
-	struct task_struct * p, *t;
+	struct task_struct *t;
+	list_t *_p, *_n;
 
 	forget_original_parent(current);
 	/*
@@ -484,33 +536,20 @@ static void exit_notify(void)
 	current->state = TASK_ZOMBIE;
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
-	while ((p = eldest_child(current))) {
-		list_del_init(&p->sibling);
-		p->ptrace = 0;
 
-		p->parent = p->real_parent;
-		list_add_tail(&p->sibling,&p->parent->children);
-		if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
-			do_notify_parent(p, p->exit_signal);
-		/*
-		 * process group orphan check
-		 * Case ii: Our child is in a different pgrp
-		 * than we are, and it was the only connection
-		 * outside, so the child pgrp is now orphaned.
-		 */
-		if ((p->pgrp != current->pgrp) &&
-		    (p->session == current->session)) {
-			int pgrp = p->pgrp;
-
-			write_unlock_irq(&tasklist_lock);
-			if (is_orphaned_pgrp(pgrp) && has_stopped_jobs(pgrp)) {
-				kill_pg(pgrp,SIGHUP,1);
-				kill_pg(pgrp,SIGCONT,1);
-			}
-			write_lock_irq(&tasklist_lock);
-		}
-	}
-
+zap_again:
+	list_for_each_safe(_p, _n, &current->children)
+		zap_thread(list_entry(_p,struct task_struct,sibling), current);
+	list_for_each_safe(_p, _n, &current->ptrace_children)
+		zap_thread(list_entry(_p,struct task_struct,ptrace_list), current);
+	/*
+	 * reparent_thread might drop the tasklist lock, thus we could
+	 * have new children queued back from the ptrace list into the
+	 * child list:
+	 */
+	if (unlikely(!list_empty(&current->children) ||
+			!list_empty(&current->ptrace_children)))
+		goto zap_again;
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
@@ -623,6 +662,12 @@ repeat:
 				if (p->pgrp != -pid)
 					continue;
 			}
+			/*
+			 * Do not consider detached threads that are
+			 * not ptraced:
+			 */
+			if (p->exit_signal == -1 && !p->ptrace)
+				continue;
 			/* Wait for all children (clone and not) if __WALL is set;
 			 * otherwise, wait for clone children *only* if __WCLONE is
 			 * set; otherwise, wait for non-clone children *only*.  (Note:
@@ -667,7 +712,7 @@ repeat:
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;
-				if (p->real_parent != p->parent) {
+				if (p->real_parent != p->parent || p->ptrace) {
 					write_lock_irq(&tasklist_lock);
 					remove_parent(p);
 					p->parent = p->real_parent;

@@ -73,7 +73,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/slab.h>

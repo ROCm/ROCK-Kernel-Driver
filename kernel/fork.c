@@ -26,6 +26,8 @@
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/security.h>
+#include <linux/futex.h>
+#include <linux/ptrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -370,12 +372,14 @@ void mm_release(void)
 		tsk->vfork_done = NULL;
 		complete(vfork_done);
 	}
-	if (tsk->user_tid)
+	if (tsk->user_tid) {
 		/*
 		 * We dont check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
 		put_user(0UL, tsk->user_tid);
+		sys_futex(tsk->user_tid, FUTEX_WAKE, 1, NULL);
+	}
 }
 
 static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
@@ -805,6 +809,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	p->tgid = p->pid;
 	INIT_LIST_HEAD(&p->thread_group);
+	INIT_LIST_HEAD(&p->ptrace_children);
+	INIT_LIST_HEAD(&p->ptrace_list);
 
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
@@ -824,6 +830,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	}
 
 	SET_LINKS(p);
+	ptrace_link(p, p->parent);
 	hash_pid(p);
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

@@ -103,7 +103,6 @@ static const char version[] =
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
