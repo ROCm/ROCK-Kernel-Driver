@@ -23,6 +23,7 @@
 #define PIRQ_VERSION 0x0100
 
 int pci_use_acpi_routing = 0;
+int broken_hp_bios_irq9;
 
 static struct irq_routing_table *pirq_table;
 
@@ -613,6 +614,15 @@ static int pirq_lookup_irq(struct pci_dev *dev, u8 pin, int assign)
 	}
 	DBG(" -> PIRQ %02x, mask %04x, excl %04x", pirq, mask, pirq_table->exclusive_irqs);
 	mask &= pcibios_irq_mask;
+
+	/* Work around broken HP Pavilion Notebooks which assign USB to
+	   IRQ 9 even though it is actually wired to IRQ 11 */
+
+	if (broken_hp_bios_irq9 && pirq == 0x59 && dev->irq == 9) {
+		dev->irq = 11;
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, 11);
+		r->set(pirq_router_dev, dev, pirq, 11);
+	}
 
 	/*
 	 * Find the best IRQ to assign: use the one
