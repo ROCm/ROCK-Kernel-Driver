@@ -141,7 +141,7 @@ struct sk_buff *dn_alloc_skb(struct sock *sk, int size, int pri)
  * whole size thats been asked for (plus 11 bytes of header). If this
  * fails, then we try for any size over 16 bytes for SOCK_STREAMS.
  */
-struct sk_buff *dn_alloc_send_skb(struct sock *sk, int *size, int noblock, int *err)
+struct sk_buff *dn_alloc_send_skb(struct sock *sk, size_t *size, int noblock, int *err)
 {
 	int space;
 	int len;
