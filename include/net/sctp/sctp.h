@@ -39,6 +39,7 @@
  *    Daisy Chang           <daisyc@us.ibm.com>
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
+ *    Ryan Layer            <rmlayer@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -311,6 +312,11 @@ void sctp_sysctl_unregister(void);
 #else
 static inline void sctp_sysctl_register(void) { return; }
 static inline void sctp_sysctl_unregister(void) { return; }
+static inline int sctp_sysctl_jiffies_ms(ctl_table *table, int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen, void **context) {
+	return -ENOSYS;
+}
 #endif
 
 /* Size of Supported Address Parameter for 'x' address types. */
@@ -470,7 +476,7 @@ for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
 		    WORD_ROUND(ntohs(err->length));\
      err = (sctp_errhdr_t *)((void *)err + \
 	    WORD_ROUND(ntohs(err->length))))
-     
+
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)
 
@@ -592,7 +598,7 @@ int static inline __sctp_style(const struct sock *sk, sctp_socket_type_t style)
 
 /* Is the association in this state? */
 #define sctp_state(asoc, state) __sctp_state((asoc), (SCTP_STATE_##state))
-int static inline __sctp_state(const struct sctp_association *asoc, 
+int static inline __sctp_state(const struct sctp_association *asoc,
 			       sctp_state_t state)
 {
 	return asoc->state == state;
