@@ -192,6 +192,9 @@ int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_
 
 			*minors = (drm_minor_t){.dev = dev, .type=DRM_MINOR_PRIMARY};
 			dev->minor = minor;
+
+			pci_enable_device(pdev);
+
 			if ((ret=drm_fill_in_dev(dev, pdev, ent, driver))) {
 				printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
 				goto err_g1;
@@ -201,7 +204,6 @@ int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_
 				goto err_g1;
 			}
 
-			pci_enable_device(pdev);
 			
 			dev_class = class_simple_device_add(drm_class, 
 							    MKDEV(DRM_MAJOR, minor), &pdev->dev, "card%d", minor);
