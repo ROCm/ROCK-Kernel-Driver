@@ -672,6 +672,10 @@ nonrecoverable:
 	mr	r12,r11		/* restart at exc_exit_restart */
 	blr
 3:	/* OK, we can't recover, kill this process */
+	/* but the 601 doesn't implement the RI bit, so assume it's OK */
+BEGIN_FTR_SECTION
+	blr
+END_FTR_SECTION_IFSET(CPU_FTR_601)
 	lwz	r3,TRAP(r1)
 	andi.	r0,r3,1
 	beq	4f

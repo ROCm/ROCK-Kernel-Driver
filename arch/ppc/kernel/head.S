@@ -832,7 +832,12 @@ fast_exception_return:
 
 /* aargh, a nonrecoverable interrupt, panic */
 /* aargh, we don't know which trap this is */
-3:	li	r10,0
+/* but the 601 doesn't implement the RI bit, so assume it's OK */
+3:
+BEGIN_FTR_SECTION
+	b	2b
+END_FTR_SECTION_IFSET(CPU_FTR_601)
+	li	r10,-1
 	stw	r10,TRAP(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r10,MSR_KERNEL
