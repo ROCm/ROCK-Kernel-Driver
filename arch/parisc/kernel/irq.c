@@ -215,7 +215,7 @@ EXPORT_SYMBOL(enable_irq);
 int show_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_PROC_FS
-	unsigned int regnr = *(loff_t *) v, i;
+	unsigned int regnr = *(loff_t *) v, i = 0;
 
 	if (regnr == 0) {
 		seq_puts(p, "     ");
