@@ -895,7 +895,7 @@ static void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
     *buff++ = a->read_csr(ioaddr, 114);
 
     for (i = 0; i <= 35; i++) {
-	*buff++ = a->read_bcr(ioaddr, i);
+	*buff++ = (i == 34) ? 0xdead : a->read_bcr(ioaddr, i);
     }
 
     if (!(csr0 & 0x0004)) {	/* If not stopped */
