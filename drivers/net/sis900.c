@@ -2238,7 +2238,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 	/* Stop the chip's Tx and Rx Status Machine */
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);
 
-	pci_set_power_state(pci_dev, PCI_D3);
+	pci_set_power_state(pci_dev, PCI_D3hot);
 	pci_save_state(pci_dev);
 
 	return 0;
