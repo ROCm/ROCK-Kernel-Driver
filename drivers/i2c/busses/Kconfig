@@ -164,6 +164,17 @@ config I2C_IXP4XX
 	  This support is also available as a module. If so, the module
 	  will be called i2c-ixp4xx.
 
+config I2C_IXP2000
+	tristate "IXP2000 GPIO-Based I2C Interface"
+	depends on I2C && ARCH_IXP2000
+	select I2C_ALGOBIT
+	help
+	  Say Y here if you have an Intel IXP2000(2400, 2800, 2850) based 
+	  system and are using GPIO lines for an I2C bus.
+
+	  This support is also available as a module. If so, the module
+	  will be called i2c-ixp2000.
+
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"
 	depends on I2C && PPC_PMAC
