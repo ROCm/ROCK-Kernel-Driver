@@ -1429,10 +1429,8 @@ static void ixgb_tx_timeout_task(struct net_device *netdev)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
 
-	netif_device_detach(netdev);
 	ixgb_down(adapter, TRUE);
 	ixgb_up(adapter);
-	netif_device_attach(netdev);
 }
 
 /**
