@@ -27,6 +27,7 @@
 #include <linux/swap.h>
 #include <linux/buffer_head.h>
 
+#include "aops.h"
 #include "ntfs.h"
 
 /**
@@ -2028,3 +2029,44 @@ struct address_space_operations ntfs_mst_aops = {
 						   belonging to the page. */
 #endif /* NTFS_RW */
 };
+
+#ifdef NTFS_RW
+
+/**
+ * mark_ntfs_record_dirty - mark an ntfs record dirty
+ * @ni:		ntfs inode to which the ntfs record to be marked dirty belongs
+ * @page:	page containing the ntfs record to mark dirty
+ * @rec_start:	byte offset within @page at which the ntfs record begins
+ *
+ * If the ntfs record is the same size as the page cache page @page, set all
+ * buffers in the page dirty.  Otherwise, set only the buffers in which the
+ * ntfs record is located dirty.
+ *
+ * Also, set the page containing the ntfs record dirty, which also marks the
+ * vfs inode the ntfs record belongs to dirty (I_DIRTY_PAGES).
+ */
+void mark_ntfs_record_dirty(ntfs_inode *ni, struct page *page,
+		unsigned int rec_start) {
+	struct buffer_head *bh, *head;
+	unsigned int rec_end, bh_size, bh_start, bh_end;
+
+	BUG_ON(!page);
+	BUG_ON(!page_has_buffers(page));
+	if (ni->itype.index.block_size == PAGE_CACHE_SIZE) {
+		__set_page_dirty_buffers(page);
+		return;
+	}
+	rec_end = rec_start + ni->itype.index.block_size;
+	bh_size = ni->vol->sb->s_blocksize;
+	bh_start = 0;
+	bh = head = page_buffers(page);
+	do {
+		bh_end = bh_start + bh_size;
+		if ((bh_start >= rec_start) && (bh_end <= rec_end))
+			set_buffer_dirty(bh);
+		bh_start = bh_end;
+	} while ((bh = bh->b_this_page) != head);
+	__set_page_dirty_nobuffers(page);
+}
+
+#endif /* NTFS_RW */
