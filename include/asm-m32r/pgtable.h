@@ -90,6 +90,7 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_BIT_USER		8	/* software: user space access
 					   allowed */
 #define _PAGE_BIT_ACCESSED	9	/* software: page referenced */
+#define _PAGE_BIT_PROTNONE	10	/* software: if not present */
 
 #define _PAGE_DIRTY		(1UL << _PAGE_BIT_DIRTY)
 #define _PAGE_FILE		(1UL << _PAGE_BIT_FILE)
@@ -102,6 +103,7 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_NONCACHABLE	(1UL << _PAGE_BIT_NONCACHABLE)
 #define _PAGE_USER		(1UL << _PAGE_BIT_USER)
 #define _PAGE_ACCESSED		(1UL << _PAGE_BIT_ACCESSED)
+#define _PAGE_PROTNONE		(1UL << _PAGE_BIT_PROTNONE)
 
 #define _PAGE_TABLE	\
 	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
@@ -114,7 +116,7 @@ extern unsigned long empty_zero_page[1024];
 
 #ifdef CONFIG_MMU
 #define PAGE_NONE	\
-	__pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
+	__pgprot(_PAGE_PROTNONE | _PAGE_ACCESSED)
 #define PAGE_SHARED	\
 	__pgprot(_PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
 		| _PAGE_ACCESSED)
@@ -179,7 +181,7 @@ extern unsigned long empty_zero_page[1024];
 
 /* page table for 0-4MB for everybody */
 
-#define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
+#define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
 #define pmd_none(x)	(!pmd_val(x))
@@ -381,10 +383,10 @@ static inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 #define pte_unmap_nested(pte)	do { } while (0)
 
 /* Encode and de-code a swap entry */
-#define __swp_type(x)			(((x).val >> 1) & 0x3f)
-#define __swp_offset(x)			((x).val >> 8)
+#define __swp_type(x)			(((x).val >> 2) & 0x3f)
+#define __swp_offset(x)			((x).val >> 11)
 #define __swp_entry(type, offset)	\
-	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
+	((swp_entry_t) { ((type) << 2) | ((offset) << 11) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
