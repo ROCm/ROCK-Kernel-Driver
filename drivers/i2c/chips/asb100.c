@@ -468,7 +468,7 @@ static ssize_t set_##reg(struct device *dev, const char *buf, \
 		data->reg[nr] = TEMP_TO_REG(val); \
 		break; \
 	} \
-	asb100_write_value(client, ASB100_REG_TEMP_##REG(nr), \
+	asb100_write_value(client, ASB100_REG_TEMP_##REG(nr+1), \
 			data->reg[nr]); \
 	return count; \
 }
