@@ -144,11 +144,13 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 					usb_pipeendpoint (pipe),
 					usb_pipeout (pipe));
 			if (urb->dev->tt && !usb_pipeint (pipe)) {
+#ifdef DEBUG
 				struct usb_device *tt = urb->dev->tt->hub;
 				dbg ("clear tt %s-%s p%d buffer, a%d ep%d",
 					tt->bus->bus_name, tt->devpath,
     					urb->dev->ttport, urb->dev->devnum,
     					usb_pipeendpoint (pipe));
+#endif /* DEBUG */
 				usb_hub_tt_clear_buffer (urb->dev, pipe);
 			}
 		}
