@@ -2995,7 +2995,7 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 		kaddr = kmap(page);
 		status = mapping->a_ops->prepare_write(file, page, offset, offset+bytes);
 		if (status)
-			goto unlock;
+			goto sync_failure;
 		page_fault = __copy_from_user(kaddr+offset, buf, bytes);
 		flush_dcache_page(page);
 		status = mapping->a_ops->commit_write(file, page, offset, offset+bytes);
@@ -3020,6 +3020,7 @@ unlock:
 		if (status < 0)
 			break;
 	} while (count);
+done:
 	*ppos = pos;
 
 	if (cached_page)
@@ -3041,6 +3042,18 @@ out:
 fail_write:
 	status = -EFAULT;
 	goto unlock;
+
+sync_failure:
+	/*
+	 * If blocksize < pagesize, prepare_write() may have instantiated a
+	 * few blocks outside i_size.  Trim these off again.
+	 */
+	kunmap(page);
+	UnlockPage(page);
+	page_cache_release(page);
+	if (pos + bytes > inode->i_size)
+		vmtruncate(inode, inode->i_size);
+	goto done;
 
 o_direct:
 	written = generic_file_direct_IO(WRITE, file, (char *) buf, count, pos);
