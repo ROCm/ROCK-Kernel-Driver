@@ -1461,21 +1461,27 @@ static inline void raid6_activate_delayed(raid6_conf_t *conf)
 
 static void unplug_slaves(mddev_t *mddev)
 {
-	/* note: this is always called with device_lock held */
 	raid6_conf_t *conf = mddev_to_conf(mddev);
 	int i;
+	unsigned long flags;
 
+	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->disks[i].rdev;
-		if (rdev && !rdev->faulty) {
-			struct block_device *bdev = rdev->bdev;
-			if (bdev) {
-				request_queue_t *r_queue = bdev_get_queue(bdev);
-				if (r_queue && r_queue->unplug_fn)
-					r_queue->unplug_fn(r_queue);
-			}
+		if (rdev && atomic_read(&rdev->nr_pending)) {
+			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+
+			atomic_inc(&rdev->nr_pending);
+			spin_unlock_irqrestore(&conf->device_lock, flags);
+
+			if (r_queue && r_queue->unplug_fn)
+				r_queue->unplug_fn(r_queue);
+
+			spin_lock_irqsave(&conf->device_lock, flags);
+			atomic_dec(&rdev->nr_pending);
 		}
 	}
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 }
 
 static void raid6_unplug_device(request_queue_t *q)
