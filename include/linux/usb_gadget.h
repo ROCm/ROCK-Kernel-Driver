@@ -465,6 +465,8 @@ struct usb_gadget_ops {
  * 	driver setup() requests
  * @ep_list: List of other endpoints supported by the device.
  * @speed: Speed of current connection to USB host.
+ * @is_dualspeed: True if the controller supports both high and full speed
+ *	operation.  If it does, the gadget driver must also support both.
  * @name: Identifies the controller hardware type.  Used in diagnostics
  * 	and sometimes configuration.
  * @dev: Driver model state for this abstract device.
@@ -488,6 +490,7 @@ struct usb_gadget {
 	struct usb_ep			*ep0;
 	struct list_head		ep_list;	/* of usb_ep */
 	enum usb_device_speed		speed;
+	unsigned			is_dualspeed:1;
 	const char			*name;
 	struct device			dev;
 };

@@ -52,6 +52,7 @@ choice
 config USB_GADGET_NET2280
 	boolean "NetChip 2280"
 	depends on PCI
+	select USB_GADGET_DUALSPEED
 	help
 	   NetChip 2280 is a PCI based USB peripheral controller which
 	   supports both full and high speed USB 2.0 data transfers.  
@@ -135,6 +136,13 @@ config USB_SA1100
 
 endchoice
 
+config USB_GADGET_DUALSPEED
+	bool
+	depends on USB_GADGET
+	default n
+	help
+	  Means that gadget drivers should include extra descriptors
+	  and code to handle dual-speed controllers.
 
 #
 # USB Gadget Drivers

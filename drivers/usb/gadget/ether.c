@@ -124,7 +124,6 @@ struct eth_dev {
  * DRIVER_VERSION_NUM ... alerts the host side driver to differences
  * EP_*_NAME ... which endpoints do we use for which purpose?
  * EP_*_NUM ... numbers for them (often limited by hardware)
- * HIGHSPEED ... define if ep0 and descriptors need high speed support
  * WAKEUP ... if hardware supports remote wakeup AND we will issue the
  * 	usb_gadget_wakeup() call to initiate it, USB_CONFIG_ATT_WAKEUP
  *
@@ -162,7 +161,6 @@ static const char EP_IN_NAME [] = "ep-b";
 #define EP_IN_NUM	2
 static const char EP_STATUS_NAME [] = "ep-f";
 #define EP_STATUS_NUM	3
-#define HIGHSPEED
 /* supports remote wakeup, but this driver doesn't */
 
 extern int net2280_set_fifo_mode (struct usb_gadget *gadget, int mode);
@@ -311,7 +309,7 @@ static const char EP_IN_NAME[] = "ep2in-bulk";
 #define DEFAULT_QLEN	2	/* double buffering by default */
 #endif
 
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 
 static unsigned qmult = 5;
 module_param (qmult, uint, S_IRUGO|S_IWUSR);
@@ -324,7 +322,7 @@ module_param (qmult, uint, S_IRUGO|S_IWUSR);
 /* also defer IRQs on highspeed TX */
 #define TX_DELAY	DEFAULT_QLEN
 
-#else	/* !HIGHSPEED ... full speed: */
+#else	/* full speed (low speed doesn't do bulk) */
 #define qlen(gadget) DEFAULT_QLEN
 #endif
 
@@ -626,7 +624,7 @@ static const struct usb_descriptor_header *fs_function [] = {
 	0,
 };
 
-#ifdef	HIGHSPEED
+#ifdef	CONFIG_USB_GADGET_DUALSPEED
 
 /*
  * usb 2.0 devices need to expose both high speed and full speed
@@ -707,7 +705,7 @@ static const struct usb_descriptor_header *hs_function [] = {
 /* if there's no high speed support, maxpacket doesn't change. */
 #define ep_desc(g,hs,fs) fs
 
-#endif	/* !HIGHSPEED */
+#endif	/* !CONFIG_USB_GADGET_DUALSPEED */
 
 /*-------------------------------------------------------------------------*/
 
@@ -744,7 +742,7 @@ config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
 {
 	int				len;
 	const struct usb_descriptor_header **function = fs_function;
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	int				hs = (speed == USB_SPEED_HIGH);
 
 	if (type == USB_DT_OTHER_SPEED_CONFIG)
@@ -969,7 +967,7 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 
 		switch (gadget->speed) {
 		case USB_SPEED_FULL:	speed = "full"; break;
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 		case USB_SPEED_HIGH:	speed = "high"; break;
 #endif
 		default: 		speed = "?"; break;
@@ -1140,15 +1138,19 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			value = min (ctrl->wLength, (u16) sizeof device_desc);
 			memcpy (req->buf, &device_desc, value);
 			break;
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 		case USB_DT_DEVICE_QUALIFIER:
+			if (!gadget->is_dualspeed)
+				break;
 			value = min (ctrl->wLength, (u16) sizeof dev_qualifier);
 			memcpy (req->buf, &dev_qualifier, value);
 			break;
 
 		case USB_DT_OTHER_SPEED_CONFIG:
+			if (!gadget->is_dualspeed)
+				break;
 			// FALLTHROUGH
-#endif /* HIGHSPEED */
+#endif /* CONFIG_USB_GADGET_DUALSPEED */
 		case USB_DT_CONFIG:
 			value = config_buf (gadget->speed, req->buf,
 					ctrl->wValue >> 8,
@@ -1652,7 +1654,7 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 #endif
 	req->length = length;
 
-#ifdef	HIGHSPEED
+#ifdef	CONFIG_USB_GADGET_DUALSPEED
 	/* throttle highspeed IRQ rate back slightly */
 	req->no_interrupt = (dev->gadget->speed == USB_SPEED_HIGH)
 		? ((atomic_read (&dev->tx_qlen) % TX_DELAY) != 0)
@@ -1775,7 +1777,7 @@ eth_bind (struct usb_gadget *gadget)
 #endif
 
 	device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
-#ifdef	HIGHSPEED
+#ifdef	CONFIG_USB_GADGET_DUALSPEED
 	/* assumes ep0 uses the same value for both speeds ... */
 	dev_qualifier.bMaxPacketSize0 = device_desc.bMaxPacketSize0;
 #endif
@@ -1871,7 +1873,7 @@ fail:
 /*-------------------------------------------------------------------------*/
 
 static struct usb_gadget_driver eth_driver = {
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed		= USB_SPEED_HIGH,
 #else
 	.speed		= USB_SPEED_FULL,
