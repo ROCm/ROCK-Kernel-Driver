@@ -35,7 +35,7 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include <linux/smp_lock.h>
-#include "../../arch/i386/pci/pci.h"	/* for struct irq_routing_table */
+#include "../../../arch/i386/pci/pci.h"	/* for struct irq_routing_table */
 #include "ibmphp.h"
 
 #define attn_on(sl)  ibmphp_hpc_writeslot (sl, HPC_SLOT_ATTNON)
