@@ -346,6 +346,27 @@ static void	TLan_EeReceiveByte( u16, u8 *, int );
 static int	TLan_EeReadByte( struct net_device *, u8, u8 * );
 
 
+static void 
+TLan_StoreSKB( struct tlan_list_tag *tag, struct sk_buff *skb)
+{
+	unsigned long addr = (unsigned long)skb;
+	tag->buffer[9].address = (u32)addr;
+	addr >>= 31;	/* >>= 32 is undefined for 32bit arch, stupid C */
+	addr >>= 1;
+	tag->buffer[8].address = (u32)addr;
+}
+
+static struct sk_buff *
+TLan_GetSKB( struct tlan_list_tag *tag)
+{
+	unsigned long addr = tag->buffer[8].address;
+	addr <<= 31;
+	addr <<= 1;
+	addr |= tag->buffer[9].address;
+	return (struct sk_buff *) addr;
+}
+
+
 static TLanIntVectorFunc *TLanIntVector[TLAN_INT_NUMBER_OF_INTS] = {
 	TLan_HandleInvalid,
 	TLan_HandleTxEOF,
@@ -424,7 +445,7 @@ static void __devexit tlan_remove_one( struct pci_dev *pdev)
 		pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage, priv->dmaStorageDMA );
 	}
 
-	release_region( dev->base_addr, 0x10 );
+	pci_release_regions(pdev);
 	
 	kfree( dev );
 		
@@ -510,15 +531,25 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 	TLanPrivateInfo    *priv;
 	u8		   pci_rev;
 	u16		   device_id;
-	int		   reg;
+	int		   reg, rc = -ENODEV;
 
-	if (pdev && pci_enable_device(pdev))
-		return -EIO;
+	if (pdev) {
+		rc = pci_enable_device(pdev);
+		if (rc)
+			return rc;
 
-	dev = init_etherdev(NULL, sizeof(TLanPrivateInfo));
+		rc = pci_request_regions(pdev, TLanSignature);
+		if (rc) {
+			printk(KERN_ERR "TLAN: Could not reserve IO regions\n");
+			goto err_out;
+		}
+	}
+
+	dev = alloc_etherdev(sizeof(TLanPrivateInfo));
 	if (dev == NULL) {
 		printk(KERN_ERR "TLAN: Could not allocate memory for device.\n");
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_out_regions;
 	}
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -533,12 +564,10 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 
 		priv->adapter = &board_info[ent->driver_data];
 
-		if(pci_set_dma_mask(pdev, 0xFFFFFFFF))
-		{
+		rc = pci_set_dma_mask(pdev, 0xFFFFFFFF);
+		if (rc) {
 			printk(KERN_ERR "TLAN: No suitable PCI mapping available.\n");
-			unregister_netdev(dev);
-			kfree(dev);
-			return -ENODEV;
+			goto err_out_free_dev;
 		}
 
 		pci_read_config_byte ( pdev, PCI_REVISION_ID, &pci_rev);
@@ -553,9 +582,8 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 		}
 		if (!pci_io_base) {
 			printk(KERN_ERR "TLAN: No IO mappings available\n");
-			unregister_netdev(dev);
-			kfree(dev);
-			return -ENODEV;
+			rc = -EIO;
+			goto err_out_free_dev;
 		}
 		
 		dev->base_addr = pci_io_base;
@@ -605,12 +633,18 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 
 	spin_lock_init(&priv->lock);
 	
-	if (TLan_Init(dev)) {
+	rc = TLan_Init(dev);
+	if (rc) {
+		printk(KERN_ERR "TLAN: Could not set up device.\n");
+		goto err_out_free_dev;
+	}
+
+	rc = register_netdev(dev);
+	if (rc) {
 		printk(KERN_ERR "TLAN: Could not register device.\n");
-		unregister_netdev(dev);
-		kfree(dev);
-		return -EAGAIN;
-	} else {
+		goto err_out_uninit;
+	}
+
 	
 	TLanDevicesInstalled++;
 	boards_found++;
@@ -631,8 +665,19 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 			priv->adapter->deviceLabel,
 			priv->adapterRev);
 	return 0;
-	}
 
+err_out_uninit:
+	pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage,
+			    priv->dmaStorageDMA );
+err_out_free_dev:
+	kfree(dev);
+err_out_regions:
+	if (pdev)
+		pci_release_regions(pdev);
+err_out:
+	if (pdev)
+		pci_disable_device(pdev);
+	return rc;
 }
 
 
@@ -798,15 +843,6 @@ static int TLan_Init( struct net_device *dev )
 
 	priv = dev->priv;
 	
-	if (!priv->is_eisa)	/* EISA devices have already requested IO */
-		if (!request_region( dev->base_addr, 0x10, TLanSignature )) {
-			printk(KERN_ERR "TLAN: %s: IO port region 0x%lx size 0x%x in use.\n",
-				dev->name,
-				dev->base_addr,
-				0x10 );
-			return -EIO;
-		}
-	
 	if ( bbuf ) {
 		dma_size = ( TLAN_NUM_RX_LISTS + TLAN_NUM_TX_LISTS )
 	           * ( sizeof(TLanList) + TLAN_MAX_FRAME_SIZE );
@@ -820,7 +856,6 @@ static int TLan_Init( struct net_device *dev )
 	if ( priv->dmaStorage == NULL ) {
 		printk(KERN_ERR "TLAN:  Could not allocate lists and buffers for %s.\n",
 			dev->name );
-		release_region( dev->base_addr, 0x10 );
 		return -ENOMEM;
 	}
 	memset( priv->dmaStorage, 0, dma_size );
@@ -1039,7 +1074,7 @@ static int TLan_StartTx( struct sk_buff *skb, struct net_device *dev )
 		memcpy( tail_buffer, skb->data, skb->len );
 	} else {
 		tail_list->buffer[0].address = pci_map_single(priv->pciDev, skb->data, skb->len, PCI_DMA_TODEVICE);
-		tail_list->buffer[9].address = (u32) skb;
+		TLan_StoreSKB(tail_list, skb);
 	}
 
 	pad = TLAN_MIN_FRAME_SIZE - skb->len;
@@ -1365,9 +1400,10 @@ u32 TLan_HandleTxEOF( struct net_device *dev, u16 host_int )
 	while (((tmpCStat = head_list->cStat ) & TLAN_CSTAT_FRM_CMP) && (ack < 255)) {
 		ack++;
 		if ( ! bbuf ) {
-			struct sk_buff *skb = (struct sk_buff *) head_list->buffer[9].address;
+			struct sk_buff *skb = TLan_GetSKB(head_list);
 			pci_unmap_single(priv->pciDev, head_list->buffer[0].address, skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb_any(skb);
+			head_list->buffer[8].address = 0;
 			head_list->buffer[9].address = 0;
 		}
 	
@@ -1523,7 +1559,7 @@ u32 TLan_HandleRxEOF( struct net_device *dev, u16 host_int )
 			new_skb = dev_alloc_skb( TLAN_MAX_FRAME_SIZE + 7 );
 			
 			if ( new_skb != NULL ) {
-				skb = (struct sk_buff *) head_list->buffer[9].address;
+				skb = TLan_GetSKB(head_list);
 				pci_unmap_single(priv->pciDev, head_list->buffer[0].address, TLAN_MAX_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 				skb_trim( skb, frameSize );
 
@@ -1537,10 +1573,7 @@ u32 TLan_HandleRxEOF( struct net_device *dev, u16 host_int )
 				t = (void *) skb_put( new_skb, TLAN_MAX_FRAME_SIZE );
 				head_list->buffer[0].address = pci_map_single(priv->pciDev, new_skb->data, TLAN_MAX_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 				head_list->buffer[8].address = (u32) t;
-#if BITS_PER_LONG==64
-#error "Not 64bit clean"
-#endif				
-				head_list->buffer[9].address = (u32) new_skb;
+				TLan_StoreSKB(head_list, new_skb);
 			} else 
 				printk(KERN_WARNING "TLAN:  Couldn't allocate memory for received data.\n" );
 		}
@@ -1926,6 +1959,7 @@ void TLan_ResetLists( struct net_device *dev )
 		}
 		list->buffer[2].count = 0;
 		list->buffer[2].address = 0;
+		list->buffer[8].address = 0;
 		list->buffer[9].address = 0;
 	}
 
@@ -1951,7 +1985,7 @@ void TLan_ResetLists( struct net_device *dev )
 			}
 			list->buffer[0].address = pci_map_single(priv->pciDev, t, TLAN_MAX_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 			list->buffer[8].address = (u32) t;
-			list->buffer[9].address = (u32) skb;
+			TLan_StoreSKB(list, skb);
 		}
 		list->buffer[1].count = 0;
 		list->buffer[1].address = 0;
@@ -1974,20 +2008,22 @@ void TLan_FreeLists( struct net_device *dev )
 	if ( ! bbuf ) {
 		for ( i = 0; i < TLAN_NUM_TX_LISTS; i++ ) {
 			list = priv->txList + i;
-			skb = (struct sk_buff *) list->buffer[9].address;
+			skb = TLan_GetSKB(list);
 			if ( skb ) {
 				pci_unmap_single(priv->pciDev, list->buffer[0].address, skb->len, PCI_DMA_TODEVICE);
 				dev_kfree_skb_any( skb );
+				list->buffer[8].address = 0;
 				list->buffer[9].address = 0;
 			}
 		}
 
 		for ( i = 0; i < TLAN_NUM_RX_LISTS; i++ ) {
 			list = priv->rxList + i;
-			skb = (struct sk_buff *) list->buffer[9].address;
+			skb = TLan_GetSKB(list);
 			if ( skb ) {
 				pci_unmap_single(priv->pciDev, list->buffer[0].address, TLAN_MAX_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 				dev_kfree_skb_any( skb );
+				list->buffer[8].address = 0;
 				list->buffer[9].address = 0;
 			}
 		}

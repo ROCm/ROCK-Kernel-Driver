@@ -365,8 +365,8 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	*ioaddr_out = NULL;
 	*dev_out = NULL;
 
-	// dev zeroed in init_etherdev 
-	dev = init_etherdev(NULL, sizeof (*tp));
+	// dev zeroed in alloc_etherdev 
+	dev = alloc_etherdev(sizeof (*tp));
 	if (dev == NULL) {
 		printk(KERN_ERR PFX "unable to alloc new ethernet\n");
 		return -ENOMEM;
@@ -391,18 +391,18 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		printk(KERN_ERR PFX
 		       "region #1 not an MMIO resource, aborting\n");
 		rc = -ENODEV;
-		goto err_out;
+		goto err_out_disable;
 	}
 	// check for weird/broken PCI region reporting
 	if (mmio_len < RTL_MIN_IO_SIZE) {
 		printk(KERN_ERR PFX "Invalid PCI region size(s), aborting\n");
 		rc = -ENODEV;
-		goto err_out;
+		goto err_out_disable;
 	}
 
 	rc = pci_request_regions(pdev, dev->name);
 	if (rc)
-		goto err_out;
+		goto err_out_disable;
 
 	// enable PCI bus-mastering
 	pci_set_master(pdev);
@@ -450,8 +450,10 @@ match:
 err_out_free_res:
 	pci_release_regions(pdev);
 
+err_out_disable:
+	pci_disable_device(pdev);
+
 err_out:
-	unregister_netdev(dev);
 	kfree(dev);
 	return rc;
 }
@@ -464,7 +466,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	void *ioaddr = NULL;
 	static int board_idx = -1;
 	static int printed_version = 0;
-	int i;
+	int i, rc;
 	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
 	assert(pdev != NULL);
@@ -477,20 +479,18 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		printed_version = 1;
 	}
 
-	i = rtl8169_init_board(pdev, &dev, &ioaddr);
-	if (i < 0) {
-		return i;
-	}
+	rc = rtl8169_init_board(pdev, &dev, &ioaddr);
+	if (rc)
+		return rc;
 
 	tp = dev->priv;
 	assert(ioaddr != NULL);
 	assert(dev != NULL);
 	assert(tp != NULL);
 
-	// Get MAC address //
-	for (i = 0; i < MAC_ADDR_LEN; i++) {
+	// Get MAC address.  FIXME: read EEPROM
+	for (i = 0; i < MAC_ADDR_LEN; i++)
 		dev->dev_addr[i] = RTL_R8(MAC0 + i);
-	}
 
 	dev->open = rtl8169_open;
 	dev->hard_start_xmit = rtl8169_start_xmit;
@@ -507,10 +507,19 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tp->pci_dev = pdev;
 	tp->mmio_addr = ioaddr;
 
+	spin_lock_init(&tp->lock);
+
+	rc = register_netdev(dev);
+	if (rc) {
+		iounmap(ioaddr);
+		pci_release_regions(pdev);
+		pci_disable_device(pdev);
+		kfree(dev);
+		return rc;
+	}
+
 	printk(KERN_DEBUG "%s: Identified chip type is '%s'.\n", dev->name,
 	       rtl_chip_info[tp->chipset].name);
-
-	spin_lock_init(&tp->lock);
 
 	pci_set_drvdata(pdev, dev);
 
@@ -623,7 +632,7 @@ static void __devexit
 rtl8169_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct rtl8169_private *tp = (struct rtl8169_private *) (dev->priv);
+	struct rtl8169_private *tp = dev->priv;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
@@ -636,6 +645,7 @@ rtl8169_remove_one(struct pci_dev *pdev)
 	memset(dev, 0xBC,
 	       sizeof (struct net_device) + sizeof (struct rtl8169_private));
 
+	pci_disable_device(pdev);
 	kfree(dev);
 	pci_set_drvdata(pdev, NULL);
 }
