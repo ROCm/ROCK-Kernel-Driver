@@ -123,7 +123,6 @@ static void mem_translate(void);
 static void mem_check(void);
 static void mem_find_real(void);
 static void mem_find_vsid(void);
-static void mem_check_full_group(void);
 static void mem_check_pagetable_vsids (void);
 
 static void mem_map_check_slab(void);
@@ -643,9 +642,6 @@ cmds(struct pt_regs *excp)
 				break;
 			case 'c':
 				mem_check();
-				break;
-			case 'g':
-				mem_check_full_group();
 				break;
 			case 'j':
 				mem_map_check_slab();
@@ -2704,70 +2700,6 @@ void mem_check_pagetable_vsids ()
 
 	printf("\nDone -------------------\n");
 
-}
-
-
-void mem_check_full_group()
-{
-	unsigned long htab_size_bytes;
-	unsigned count;
-	unsigned count_array[] = {0,0,0,0,0,0,0,0,0}; 
-	unsigned i;
-	unsigned long htab_end;
-	HPTE *hpte1, *hpte2, *hpte3;
-	u64  rpn = 0;
-
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-
-	printf("\nHardware Page Find full groups \n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-	for (hpte1 = htab_data.htab; (unsigned long)hpte1 < htab_end; hpte1= hpte1 + 8)
-	{
-		count = 0;
-		hpte2 = hpte1;
-		for (i=0; i<8; ++i)
-		{
-			if ( hpte2->dw0.dw0.v != 0 )
-			{
-				count++;
-			}
-			hpte2++;
-		}
-		if (count == 8 )
-		{
-			printf("  full group starting with entry %lx \n", hpte1);
-			hpte3 = hpte1;
-			for (i=0; i<8; ++i)
-			{
-				if ( hpte3->dw0.dw0.v != 0 )
-				{
-					printf(" entry number %d   \n",i);
-					printf("          vsid: %.13lx   api: %.2lx  hash: %.1lx\n", 
-					       (hpte3->dw0.dw0.avpn)>>5, 
-					       (hpte3->dw0.dw0.avpn) & 0x1f,
-					       (hpte3->dw0.dw0.h));
-					printf("          rpn: %.13lx \n", (hpte3->dw1.dw1.rpn)); 
-					// Dump out the memmap array entry address, corresponding virtual address, and reference count.
-					rpn = hpte3->dw1.dw1.rpn;
-					printf("          mem_map+rpn=%p, virtual@=%p, count=%lx \n", mem_map+rpn, (mem_map+rpn)->virtual, (mem_map+rpn)->count);
-				}
-				hpte3++;
-			}
-			if (xmon_interrupted())
-				return;
-		}
-
-		count_array[count]++;
-	}
-	for (i=1; i<9; ++i)
-	{
-		printf("  group count for size  %i = %lx \n", i, count_array[i]);
-	}
-
-	printf("\nDone -------------------\n");
 }
 
 static void debug_trace(void) {
