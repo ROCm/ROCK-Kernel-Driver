@@ -80,6 +80,9 @@ static struct pci_driver airo_driver = {
 #include <linux/delay.h>
 #endif
 
+/* Hack to do some power saving */
+#define POWER_ON_DOWN
+
 /* As you can see this list is HUGH!
    I really don't know what a lot of these counts are about, but they
    are all here for completeness.  If the IGNLABEL macro is put in
@@ -891,9 +894,10 @@ struct airo_info {
 	struct airo_info *next;
         spinlock_t aux_lock;
         unsigned long flags;
-#define FLAG_PROMISC   IFF_PROMISC
-#define FLAG_RADIO_OFF 0x02
-#define FLAG_LOCKED    2
+#define FLAG_PROMISC   IFF_PROMISC	/* 0x100 - include/linux/if.h */
+#define FLAG_RADIO_OFF 0x02		/* User disabling of MAC */
+#define FLAG_RADIO_DOWN 0x08		/* ifup/ifdown disabling of MAC */
+#define FLAG_LOCKED    2		/* 0x04 - use as a bit offset */
 #define FLAG_FLASHING  0x10
 #define FLAG_802_11    0x200
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
@@ -1132,14 +1136,16 @@ static int airo_open(struct net_device *dev) {
 	 * is open (to pipeline changes and speed-up card setup). If
 	 * those changes are not yet commited, do it now - Jean II */
 	if(info->need_commit) {
-		Resp rsp;
 		disable_MAC(info);
 		writeConfigRid(info);
-		enable_MAC(info, &rsp);
 	}
 
-	if (info->wifidev != dev)
+	if (info->wifidev != dev) {
+		/* Power on the MAC controller (which may have been disabled) */
+		info->flags &= ~FLAG_RADIO_DOWN;
 		enable_interrupts(info);
+	}
+	enable_MAC(info, &rsp);
 
 	netif_start_queue(dev);
 	return 0;
@@ -1418,8 +1424,18 @@ static int airo_close(struct net_device *dev) {
 
 	netif_stop_queue(dev);
 
-	if (ai->wifidev != dev)
+	if (ai->wifidev != dev) {
+#ifdef POWER_ON_DOWN
+		/* Shut power to the card. The idea is that the user can save
+		 * power when he doesn't need the card with "ifconfig down".
+		 * That's the method that is most friendly towards the network
+		 * stack (i.e. the network stack won't try to broadcast
+		 * anything on the interface and routes are gone. Jean II */
+		ai->flags |= FLAG_RADIO_DOWN;
+		disable_MAC(ai);
+#endif
 		disable_interrupts( ai );
+	}
 	return 0;
 }
 
@@ -1999,7 +2015,13 @@ static int enable_MAC( struct airo_info *ai, Resp *rsp ) {
 	int rc;
         Cmd cmd;
 
-        if (ai->flags&FLAG_RADIO_OFF) return SUCCESS;
+	/* FLAG_RADIO_OFF : Radio disabled via /proc or Wireless Extensions
+	 * FLAG_RADIO_DOWN : Radio disabled via "ifconfig ethX down"
+	 * Note : we could try to use !netif_running(dev) in enable_MAC()
+	 * instead of this flag, but I don't trust it *within* the
+	 * open/close functions, and testing both flags together is
+	 * "cheaper" - Jean II */
+	if (ai->flags & (FLAG_RADIO_OFF|FLAG_RADIO_DOWN)) return SUCCESS;
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.cmd = MAC_ENABLE;
 	if (test_bit(FLAG_LOCKED, &ai->flags) != 0)
@@ -5743,6 +5765,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
  */
 
 static int writerids(struct net_device *dev, aironet_ioctl *comp) {
+	struct airo_info *ai = dev->priv;
 	int  ridcode;
 	Resp      rsp;
 	static int (* writer)(struct airo_info *, u16 rid, const void *, int);
