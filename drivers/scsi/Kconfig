@@ -1535,7 +1535,7 @@ config OKTAGON_SCSI
 
 config ATARI_SCSI
 	tristate "Atari native SCSI support"
-	depends on ATARI && SCSI
+	depends on ATARI && SCSI && BROKEN
 	---help---
 	  If you have an Atari with built-in NCR5380 SCSI controller (TT,
 	  Falcon, ...) say Y to get it supported. Of course also, if you have
