@@ -98,11 +98,6 @@ static int check_powernow(void)
 		return 0;
 	}
 
-	if ((c->x86_model == 6) && (c->x86_mask == 0)) {
-		printk (KERN_INFO PFX "K7 660[A0] core detected, enabling errata workarounds\n");
-		have_a0 = 1;
-	}
-
 	/* Get maximum capabilities */
 	maxei = cpuid_eax (0x80000000);
 	if (maxei < 0x80000007) {	/* Any powernow info ? */
@@ -110,6 +105,11 @@ static int check_powernow(void)
 		printk (KERN_INFO PFX "No powernow capabilities detected\n");
 #endif
 		return 0;
+	}
+
+	if ((c->x86_model == 6) && (c->x86_mask == 0)) {
+		printk (KERN_INFO PFX "K7 660[A0] core detected, enabling errata workarounds\n");
+		have_a0 = 1;
 	}
 
 	cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
