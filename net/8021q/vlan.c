@@ -69,6 +69,10 @@ static struct packet_type vlan_packet_type = {
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
 
+/* Bits of netdev state that are propogated from real device to virtual */
+#define VLAN_LINK_STATE_MASK \
+	((1<<__LINK_STATE_PRESENT)|(1<<__LINK_STATE_NOCARRIER))
+
 /* End of global variables definitions. */
 
 /*
@@ -472,6 +476,8 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	new_dev->flags = real_dev->flags;
 	new_dev->flags &= ~IFF_UP;
 
+	new_dev->state = real_dev->state & VLAN_LINK_STATE_MASK;
+
 	/* need 4 bytes for extra VLAN header info,
 	 * hope the underlying device can handle it.
 	 */
@@ -598,9 +604,20 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 	 */
 
 	switch (event) {
-	case NETDEV_CHANGEADDR:
-	case NETDEV_GOING_DOWN:
-		/* Ignore for now */
+	case NETDEV_CHANGE:
+		/* Propogate real device state to vlan devices */
+		flgs = dev->state & VLAN_LINK_STATE_MASK;
+		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
+			vlandev = grp->vlan_devices[i];
+			if (!vlandev)
+				continue;
+
+			if ((vlandev->state & VLAN_LINK_STATE_MASK) != flgs) {
+				vlandev->state = (vlandev->state &~ VLAN_LINK_STATE_MASK) 
+					| flgs;
+				netdev_state_change(vlandev);
+			}
+		}
 		break;
 
 	case NETDEV_DOWN:
