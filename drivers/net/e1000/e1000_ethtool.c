@@ -38,6 +38,7 @@ extern char e1000_driver_version[];
 extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
+extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 
 static char e1000_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
@@ -129,30 +130,9 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 		hw->autoneg = 1;
 		hw->autoneg_advertised = 0x002F;
 		ecmd->advertising = 0x002F;
-	} else {
-		hw->autoneg = 0;
-		switch(ecmd->speed + ecmd->duplex) {
-		case SPEED_10 + DUPLEX_HALF:
-			hw->forced_speed_duplex = e1000_10_half;
-			break;
-		case SPEED_10 + DUPLEX_FULL:
-			hw->forced_speed_duplex = e1000_10_full;
-			break;
-		case SPEED_100 + DUPLEX_HALF:
-			hw->forced_speed_duplex = e1000_100_half;
-			break;
-		case SPEED_100 + DUPLEX_FULL:
-			hw->forced_speed_duplex = e1000_100_full;
-			break;
-		case SPEED_1000 + DUPLEX_FULL:
-			hw->autoneg = 1;
-			hw->autoneg_advertised = ADVERTISE_1000_FULL;
-			break;
-		case SPEED_1000 + DUPLEX_HALF: /* not supported */
-		default:
+	} else
+		if(e1000_set_spd_dplx(adapter, ecmd->speed + ecmd->duplex))
 			return -EINVAL;
-		}
-	}
 
 	/* reset the link */
 
@@ -542,13 +522,12 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	}
 	case ETHTOOL_GEEPROM: {
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
+		struct e1000_hw *hw = &adapter->hw;
 		uint16_t *eeprom_buff;
 		void *ptr;
-		int max_len, err = 0;
+		int err = 0;
 
-		max_len = e1000_eeprom_size(&adapter->hw);
-
-		eeprom_buff = kmalloc(max_len, GFP_KERNEL);
+		eeprom_buff = kmalloc(hw->eeprom.word_size * 2, GFP_KERNEL);
 
 		if(eeprom_buff == NULL)
 			return -ENOMEM;

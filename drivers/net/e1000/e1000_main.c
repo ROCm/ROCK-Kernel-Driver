@@ -123,6 +123,7 @@ static char *e1000_strings[] = {
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
 void e1000_reset(struct e1000_adapter *adapter);
+int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 
 static int e1000_init_module(void);
 static void e1000_exit_module(void);
@@ -2402,6 +2403,35 @@ e1000_restore_vlan(struct e1000_adapter *adapter)
 			e1000_vlan_rx_add_vid(adapter->netdev, vid);
 		}
 	}
+}
+
+int
+e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx)
+{
+	adapter->hw.autoneg = 0;
+
+	switch(spddplx) {
+	case SPEED_10 + DUPLEX_HALF:
+		adapter->hw.forced_speed_duplex = e1000_10_half;
+		break;
+	case SPEED_10 + DUPLEX_FULL:
+		adapter->hw.forced_speed_duplex = e1000_10_full;
+		break;
+	case SPEED_100 + DUPLEX_HALF:
+		adapter->hw.forced_speed_duplex = e1000_100_half;
+		break;
+	case SPEED_100 + DUPLEX_FULL:
+		adapter->hw.forced_speed_duplex = e1000_100_full;
+		break;
+	case SPEED_1000 + DUPLEX_FULL:
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
+		break;
+	case SPEED_1000 + DUPLEX_HALF: /* not supported */
+	default:
+		return -EINVAL;
+	}
+	return 0;
 }
 
 static int
