@@ -31,6 +31,7 @@
 #include <asm/user32.h>
 #include <asm/sigcontext32.h>
 #include <asm/fpu32.h>
+#include <asm/proto.h>
 
 #define ptr_to_u32(x) ((u32)(u64)(x))	/* avoid gcc warning */ 
 
@@ -405,18 +406,30 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		err |= __put_user((u32)(u64)ka->sa.sa_restorer, &frame->pretcode);
-	} else {
-		err |= __put_user((u32)(u64)frame->retcode, &frame->pretcode);
-		/* This is popl %eax ; movl $,%eax ; int $0x80 */
-		err |= __put_user((u16)0xb858, (short *)(frame->retcode+0));
-		err |= __put_user((u32)__NR_ia32_sigreturn, (int *)(frame->retcode+2));
-		err |= __put_user((u16)0x80cd, (short *)(frame->retcode+6));
+	/* Return stub is in 32bit vsyscall page */
+	{ 
+		void *restorer = syscall32_page + 32; 
+		if (ka->sa.sa_flags & SA_RESTORER)
+			restorer = ka->sa.sa_restorer;       
+		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);
 	}
-
+	/* These are actually not used anymore, but left because some 
+	   gdb versions depend on them as a marker. */
+	{ 
+		/* copy_to_user optimizes that into a single 8 byte store */
+		static const struct { 
+			u16 poplmovl;
+			u32 val;
+			u16 int80;    
+			u16 pad; 
+		} __attribute__((packed)) code = { 
+			0xb858,		 /* popl %eax ; movl $...,%eax */
+			__NR_ia32_sigreturn,   
+			0x80cd,		/* int $0x80 */
+			0,
+		}; 
+		err |= __copy_to_user(frame->retcode, &code, 8); 
+	}
 	if (err)
 		goto give_sigsegv;
 
@@ -486,18 +499,33 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		err |= __put_user((u32)(u64)ka->sa.sa_restorer, &frame->pretcode);
-	} else {
-		err |= __put_user(ptr_to_u32(frame->retcode), &frame->pretcode);
-		/* This is movl $,%eax ; int $0x80 */
-		err |= __put_user(0xb8, (char *)(frame->retcode+0));
-		err |= __put_user((u32)__NR_ia32_rt_sigreturn, (int *)(frame->retcode+1));
-		err |= __put_user(0x80cd, (short *)(frame->retcode+5));
+	
+	{ 
+		void *restorer = syscall32_page + 32; 
+		if (ka->sa.sa_flags & SA_RESTORER)
+			restorer = ka->sa.sa_restorer;       
+		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);
 	}
 
+	/* This is movl $,%eax ; int $0x80 */
+	/* Not actually used anymore, but left because some gdb versions
+	   need it. */ 
+	{ 
+		/* __copy_to_user optimizes that into a single 8 byte store */
+		static const struct { 
+			u8 movl; 
+			u32 val; 
+			u16 int80; 
+			u16 pad;
+			u8  pad2;				
+		} __attribute__((packed)) code = { 
+			0xb8,
+			__NR_ia32_rt_sigreturn,
+			0x80cd,
+			0,
+		}; 
+		err |= __copy_to_user(frame->retcode, &code, 8); 
+	} 
 	if (err)
 		goto give_sigsegv;
 

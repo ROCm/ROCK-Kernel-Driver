@@ -54,35 +54,31 @@ libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
-# FIXME: is drivers- right ?
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/x86_64/boot $(1)
+boot := arch/x86_64/boot
 
-.PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
-		clean archclean archmrproper
+.PHONY: bzImage bzlilo bzdisk install archmrproper
 
-BOOTIMAGE=arch/x86_64/boot/bzImage
-zImage zlilo zdisk: BOOTIMAGE=arch/x86_64/boot/zImage
+#Default target when executing "make"
+all: bzImage
 
-zImage bzImage: vmlinux
-	$(call makeboot,$(BOOTIMAGE))
+BOOTIMAGE                     := arch/x86_64/boot/bzImage
 
-compressed: zImage
+bzImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
 
-zlilo bzlilo: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
+bzlilo: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zlilo
 
-zdisk bzdisk: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
+bzdisk: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
 
 install: vmlinux
-	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
 
 archclean:
-	$(Q)$(MAKE) $(clean)=arch/i386/boot
-
-archmrproper:
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 prepare: include/asm-$(ARCH)/offset.h
 
@@ -90,10 +86,10 @@ arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/offset.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
 
-include/asm-$(ARCH)/offset.h: include/asm-$(ARCH)/offset.h.tmp
+include/asm-$(ARCH)/offset.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
 CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \

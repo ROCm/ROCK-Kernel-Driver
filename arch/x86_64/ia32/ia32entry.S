@@ -248,7 +248,7 @@ ia32_sys_call_table:
 	.quad sys_brk		/* 45 */
 	.quad sys_setgid16
 	.quad sys_getgid16
-	.quad ni_syscall	/* signal */
+	.quad sys_signal
 	.quad sys_geteuid16
 	.quad sys_getegid16	/* 50 */
 	.quad sys_acct
@@ -299,8 +299,8 @@ ia32_sys_call_table:
 	.quad sys_getpriority
 	.quad sys_setpriority
 	.quad ni_syscall			/* old profil syscall holder */
-	.quad sys32_statfs
-	.quad sys32_fstatfs		/* 100 */
+	.quad compat_sys_statfs
+	.quad compat_sys_fstatfs		/* 100 */
 	.quad sys_ioperm
 	.quad sys32_socketcall
 	.quad sys_syslog

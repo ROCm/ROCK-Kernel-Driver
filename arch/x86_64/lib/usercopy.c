@@ -109,19 +109,34 @@ unsigned long clear_user(void *to, unsigned long n)
 
 long strnlen_user(const char *s, long n)
 {
-	unsigned long res = 0;
+	long res = 0;
 	char c;
 
 	if (!access_ok(VERIFY_READ, s, n))
 		return 0;
 
 	while (1) {
+		if (res>n)
+			return n+1;
+		if (__get_user(c, s))
+			return 0;
+		if (!c)
+			return res+1;
+		res++;
+		s++;
+	}
+}
+
+long strlen_user(const char *s)
+{
+	long res = 0;
+	char c;
+
+	for (;;) {
 		if (get_user(c, s))
 			return 0;
 		if (!c)
 			return res+1;
-		if (res>n)
-			return n+1;
 		res++;
 		s++;
 	}
