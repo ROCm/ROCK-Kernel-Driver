@@ -13,12 +13,6 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef CONFIG_SMP
-#include <asm/smp.h>
-#else
-extern unsigned long loops_per_jiffy;
-#endif 
-
 static __inline__ void __delay(unsigned long loops)
 {
 	__asm__ __volatile__(
