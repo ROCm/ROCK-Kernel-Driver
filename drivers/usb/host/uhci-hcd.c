@@ -1034,9 +1034,13 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 			usb_pipeout(urb->pipe));
 	}
 
-	/* Set the flag on the last packet */
-	if (!(urb->transfer_flags & URB_NO_INTERRUPT))
-		td->status |= cpu_to_le32(TD_CTRL_IOC);
+	/* Set the interrupt-on-completion flag on the last packet.
+	 * A more-or-less typical 4 KB URB (= size of one memory page)
+	 * will require about 3 ms to transfer; that's a little on the
+	 * fast side but not enough to justify delaying an interrupt
+	 * more than 2 or 3 URBs, so we will ignore the URB_NO_INTERRUPT
+	 * flag setting. */
+	td->status |= cpu_to_le32(TD_CTRL_IOC);
 
 	qh = uhci_alloc_qh(uhci, urb->dev);
 	if (!qh)
