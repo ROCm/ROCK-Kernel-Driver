@@ -303,13 +303,12 @@ static const unsigned int cp_rx_config =
 struct cp_desc {
 	u32		opts1;
 	u32		opts2;
-	u32		addr_lo;
-	u32		addr_hi;
+	u64		addr;
 };
 
 struct ring_info {
 	struct sk_buff		*skb;
-	dma64_addr_t		mapping;
+	dma_addr_t		mapping;
 	unsigned		frag;
 };
 
@@ -579,7 +578,7 @@ static void cp_rx (struct cp_private *cp)
 
 	while (rx_work--) {
 		u32 status, len;
-		dma64_addr_t mapping;
+		dma_addr_t mapping;
 		struct sk_buff *skb, *new_skb;
 		struct cp_desc *desc;
 		unsigned buflen;
@@ -646,8 +645,7 @@ rx_next:
 		else
 			desc->opts1 = cpu_to_le32(DescOwn | cp->rx_buf_sz);
 		cp->rx_ring[rx_tail].opts2 = 0;
-		cp->rx_ring[rx_tail].addr_lo = cpu_to_le32(mapping & 0xffffffff);
-		cp->rx_ring[rx_tail].addr_hi = cpu_to_le32(mapping >> 32);
+		cp->rx_ring[rx_tail].addr = cpu_to_le64(mapping);
 		rx_tail = NEXT_RX(rx_tail);
 	}
 
@@ -779,14 +777,13 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	if (skb_shinfo(skb)->nr_frags == 0) {
 		struct cp_desc *txd = &cp->tx_ring[entry];
 		u32 len;
-		dma64_addr_t mapping;
+		dma_addr_t mapping;
 
 		len = skb->len;
 		mapping = pci_map_single(cp->pdev, skb->data, len, PCI_DMA_TODEVICE);
 		eor = (entry == (CP_TX_RING_SIZE - 1)) ? RingEnd : 0;
 		CP_VLAN_TX_TAG(txd, vlan_tag);
-		txd->addr_lo = cpu_to_le32(mapping & 0xffffffff);
-		txd->addr_hi = cpu_to_le32(mapping >> 32);
+		txd->addr = cpu_to_le64(mapping);
 		wmb();
 
 #ifdef CP_TX_CHECKSUM
@@ -815,7 +812,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	} else {
 		struct cp_desc *txd;
 		u32 first_len;
-		dma64_addr_t first_mapping;
+		dma_addr_t first_mapping;
 		int frag, first_entry = entry;
 #ifdef CP_TX_CHECKSUM
 		const struct iphdr *ip = skb->nh.iph;
@@ -836,7 +833,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 			skb_frag_t *this_frag = &skb_shinfo(skb)->frags[frag];
 			u32 len;
 			u32 ctrl;
-			dma64_addr_t mapping;
+			dma_addr_t mapping;
 
 			len = this_frag->size;
 			mapping = pci_map_single(cp->pdev,
@@ -862,8 +859,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 			txd = &cp->tx_ring[entry];
 			CP_VLAN_TX_TAG(txd, vlan_tag);
-			txd->addr_lo = cpu_to_le32(mapping & 0xffffffff);
-			txd->addr_hi = cpu_to_le32(mapping >> 32);
+			txd->addr = cpu_to_le64(mapping);
 			wmb();
 
 			txd->opts1 = cpu_to_le32(ctrl);
@@ -877,8 +873,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 		txd = &cp->tx_ring[first_entry];
 		CP_VLAN_TX_TAG(txd, vlan_tag);
-		txd->addr_lo = cpu_to_le32(first_mapping & 0xffffffff);
-		txd->addr_hi = cpu_to_le32(first_mapping >> 32);
+		txd->addr = cpu_to_le64(first_mapping);
 		wmb();
 
 #ifdef CP_TX_CHECKSUM
@@ -1100,10 +1095,7 @@ static int cp_refill_rx (struct cp_private *cp)
 			cp->rx_ring[i].opts1 =
 				cpu_to_le32(DescOwn | cp->rx_buf_sz);
 		cp->rx_ring[i].opts2 = 0;
-		cp->rx_ring[i].addr_lo =
-			cpu_to_le32(cp->rx_skb[i].mapping & 0xffffffff);
-		cp->rx_ring[i].addr_hi =
-			cpu_to_le32(cp->rx_skb[i].mapping >> 32);
+		cp->rx_ring[i].addr = cpu_to_le64(cp->rx_skb[i].mapping);
 	}
 
 	return 0;
