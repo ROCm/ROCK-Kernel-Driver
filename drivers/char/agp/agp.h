@@ -398,7 +398,9 @@ void get_agp_version(struct agp_bridge_data *bridge);
 /* Standard agp registers */
 #define AGPSTAT			0x4
 #define AGPCMD			0x8
+#define AGPNISTAT		0xc
 #define AGPNEPG			0x16
+#define AGPNICMD		0x20
 
 #define AGP_MAJOR_VERSION_SHIFT	(20)
 #define AGP_MINOR_VERSION_SHIFT	(16)

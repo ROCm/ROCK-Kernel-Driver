@@ -44,7 +44,7 @@ static void agp_3_5_dev_list_sort(struct agp_3_5_dev *list, unsigned int ndevs)
 		cur = list_entry(pos, struct agp_3_5_dev, list);
 		dev = cur->dev;
 
-		pci_read_config_dword(dev, cur->capndx + 0x0c, &nistat);
+		pci_read_config_dword(dev, cur->capndx+AGPNISTAT, &nistat);
 		cur->maxbw = (nistat >> 16) & 0xff;
 
 		tmp = pos;
@@ -114,7 +114,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	 */
 	agp_3_5_dev_list_sort(dev_list, ndevs);
 
-	pci_read_config_dword(td, bridge->capndx + 0x0c, &tnistat);
+	pci_read_config_dword(td, bridge->capndx+AGPNISTAT, &tnistat);
 	pci_read_config_dword(td, bridge->capndx+AGPSTAT, &tstatus);
 
 	/* Extract power-on defaults from the target */
@@ -137,7 +137,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 
 		mcapndx = cur->capndx;
 
-		pci_read_config_dword(dev, cur->capndx + 0x0c, &mnistat);
+		pci_read_config_dword(dev, cur->capndx+AGPNISTAT, &mnistat);
 
 		master[cdev].maxbw = (mnistat >> 16) & 0xff;
 		master[cdev].n     = (mnistat >> 8)  & 0xff;
@@ -167,13 +167,13 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 	 * in the target's NISTAT register, so we need to do this now
 	 * to get an accurate value for ISOCH_N later.
 	 */
-	pci_read_config_word(td, bridge->capndx + 0x20, &tnicmd);
+	pci_read_config_word(td, bridge->capndx+AGPNICMD, &tnicmd);
 	tnicmd &= ~(0x3 << 6);
 	tnicmd |= target.y << 6;
-	pci_write_config_word(td, bridge->capndx + 0x20, tnicmd);
+	pci_write_config_word(td, bridge->capndx+AGPNICMD, tnicmd);
 
 	/* Reread the target's ISOCH_N */
-	pci_read_config_dword(td, bridge->capndx + 0x0c, &tnistat);
+	pci_read_config_dword(td, bridge->capndx+AGPNISTAT, &tnistat);
 	target.n = (tnistat >> 8) & 0xff;
 
 	/* Calculate the minimum ISOCH_N needed by each master */
@@ -256,7 +256,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 		master[cdev].rq += (cdev == ndevs - 1)
 		              ? (rem_async + rem_isoch) : step;
 
-		pci_read_config_word(dev, cur->capndx + 0x20, &mnicmd);
+		pci_read_config_word(dev, cur->capndx+AGPNICMD, &mnicmd);
 		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
 
 		mnicmd &= ~(0xff << 8);
@@ -268,7 +268,7 @@ static int agp_3_5_isochronous_node_enable(struct agp_bridge_data *bridge,
 		mcmd   |= master[cdev].rq << 24;
 
 		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
-		pci_write_config_word(dev, cur->capndx + 0x20, mnicmd);
+		pci_write_config_word(dev, cur->capndx+AGPNICMD, mnicmd);
 	}
 
 free_and_exit:
@@ -294,7 +294,7 @@ static void agp_3_5_nonisochronous_node_enable(struct agp_bridge_data *bridge,
 	u32 trq, mrq, rem;
 	unsigned int cdev = 0;
 
-	pci_read_config_dword(bridge->dev, bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(bridge->dev, bridge->capndx+AGPSTAT, &tstatus);
 
 	trq = (tstatus >> 24) & 0xff;
 	mrq = trq / ndevs;
@@ -377,7 +377,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 	}
 
 	/* Extract some power-on defaults from the target */
-	pci_read_config_dword(td, bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(td, bridge->capndx+AGPSTAT, &tstatus);
 	isoch     = (tstatus >> 17) & 0x1;
 	arqsz     = (tstatus >> 13) & 0x7;
 	cal_cycle = (tstatus >> 10) & 0x7;
@@ -426,7 +426,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode)
 
 		cur->capndx = mcapndx;
 
-		pci_read_config_dword(dev, cur->capndx + 0x04, &mstatus);
+		pci_read_config_dword(dev, cur->capndx+AGPSTAT, &mstatus);
 
 		if(((mstatus >> 3) & 0x1) == 0) {
 			printk(KERN_ERR PFX "woah!  AGP 3.x device "
