@@ -974,6 +974,8 @@ sunzilog_set_termios(struct uart_port *port, struct termios *termios,
 
 	sunzilog_maybe_update_regs(up, ZILOG_CHANNEL_FROM_PORT(port));
 
+	uart_update_timeout(port, termios->c_cflag, baud);
+
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
