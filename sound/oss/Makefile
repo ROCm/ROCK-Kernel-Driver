@@ -6,10 +6,9 @@
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs	:=  ad1848.o audio_syms.o midi_syms.o mpu401.o \
-		    msnd.o opl3.o sb_common.o sequencer_syms.o \
-		    sound_syms.o uart401.o	\
-		    nm256_audio.o ac97.o ac97_codec.o aci.o
+export-objs	:=  ad1848.o audio_syms.o midi_syms.o mpu401.o ac97_codec.o \
+		    msnd.o opl3.o sb_common.o sequencer_syms.o ac97.o aci.o \
+		    sound_syms.o uart401.o
 
 # Each configuration option enables a list of files.
 
