@@ -458,7 +458,7 @@ static struct ethtool_ops netdev_ethtool_ops;
 static int netdev_close(struct net_device *dev);
 static void reset_rx_descriptors(struct net_device *dev);
 
-void stop_nic_tx(long ioaddr, long crvalue)
+static void stop_nic_tx(long ioaddr, long crvalue)
 {
 	writel(crvalue & (~CR_W_TXEN), ioaddr + TCRRCR);
 
@@ -473,7 +473,7 @@ void stop_nic_tx(long ioaddr, long crvalue)
 }
 
 
-void stop_nic_rx(long ioaddr, long crvalue)
+static void stop_nic_rx(long ioaddr, long crvalue)
 {
 	writel(crvalue & (~CR_W_RXEN), ioaddr + TCRRCR);
 
@@ -734,7 +734,8 @@ static void __devexit fealnx_remove_one(struct pci_dev *pdev)
 
 unsigned int m80x_read_tick(void)
 /* function: Reads the Timer tick count register which decrements by 2 from  */
-/*           65536 to 0 every 1/36.414 of a second. Each 2 decrements of the *//*           count represents 838 nsec's.                                    */
+/*           65536 to 0 every 1/36.414 of a second. Each 2 decrements of the */
+/*           count represents 838 nsec's.                                    */
 /* input   : none.                                                           */
 /* output  : none.                                                           */
 {
@@ -884,8 +885,6 @@ static void mdio_write(struct net_device *dev, int phyad, int regad, int data)
 	/* low MDC */
 	miir &= ~MASK_MIIR_MII_MDC;
 	writel(miir, miiport);
-
-	return;
 }
 
 
@@ -1246,8 +1245,6 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-
-	return;
 }
 
 
@@ -1392,7 +1389,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-void free_one_rx_descriptor(struct netdev_private *np)
+static void free_one_rx_descriptor(struct netdev_private *np)
 {
 	if (np->really_rx_count == RX_RING_SIZE)
 		np->cur_rx->status = RXOWN;
@@ -1407,7 +1404,7 @@ void free_one_rx_descriptor(struct netdev_private *np)
 }
 
 
-void reset_rx_descriptors(struct net_device *dev)
+static void reset_rx_descriptors(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 
