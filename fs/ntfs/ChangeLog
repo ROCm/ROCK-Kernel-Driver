@@ -23,6 +23,17 @@ ToDo:
 	  them cleaner and make code reuse easier.
 	- Want to use dummy inodes for address space i/o.
 
+2.0.10 - There can only be 2^32 - 1 inodes on an NTFS volume.
+
+	- Add check at mount time to verify that the number of inodes on the
+	  volume does not exceed 2^32 - 1, which is the maximum allowed for
+	  NTFS according to Microsoft.
+	- Change mft_no member of ntfs_inode structure to be unsigned long.
+	  Update all users. This makes ntfs_inode->mft_no just a copy of struct
+	  inode->i_ino. But we can't just always use struct inode->i_ino and
+	  remove mft_no because extent inodes do not have an attached struct
+	  inode.
+
 2.0.9 - Decompression engine now uses a single buffer and other cleanups.
 
 	- Change decompression engine to use a single buffer protected by a

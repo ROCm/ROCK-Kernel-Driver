@@ -278,9 +278,9 @@ typedef enum {
 
 typedef u64 MFT_REF;
 
-#define MREF(x)		((u64)((x) & MFT_REF_MASK_CPU))
+#define MREF(x)		((unsigned long)((x) & MFT_REF_MASK_CPU))
 #define MSEQNO(x)	((u16)(((x) >> 48) & 0xffff))
-#define MREF_LE(x)	((u64)(le64_to_cpu(x) & MFT_REF_MASK_CPU))
+#define MREF_LE(x)	((unsigned long)(le64_to_cpu(x) & MFT_REF_MASK_CPU))
 #define MSEQNO_LE(x)	((u16)((le64_to_cpu(x) >> 48) & 0xffff))
 
 #define IS_ERR_MREF(x)	(((x) & 0x0000800000000000ULL) ? 1 : 0)

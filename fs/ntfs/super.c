@@ -1236,14 +1236,13 @@ handle_partial_page:
  * Errors are ignored and we just return the number of free inodes we have
  * found. This means we return an underestimate on error.
  */
-s64 get_nr_free_mft_records(ntfs_volume *vol)
+unsigned long get_nr_free_mft_records(ntfs_volume *vol)
 {
 	struct address_space *mapping;
 	filler_t *readpage;
 	struct page *page;
-	unsigned long index, max_index;
+	unsigned long index, max_index, nr_free = 0;
 	unsigned int max_size, i;
-	s64 nr_free = 0LL;
 	u32 *b;
 
 	ntfs_debug("Entering.");
@@ -1285,7 +1284,7 @@ handle_partial_page:
 		b = (u32*)kmap(page);
 		/* For each 4 bytes, add up the number of zero bits. */
 	  	for (i = 0; i < max_size; i++)
-			nr_free += (s64)(32 - hweight32(b[i]));
+			nr_free += 32 - hweight32(b[i]);
 		kunmap(page);
 		page_cache_release(page);
 	}
@@ -1300,7 +1299,7 @@ handle_partial_page:
 		if (max_size) {
 			/* Compensate for out of bounds zero bits. */
 			if ((i = vol->_VMM(nr_mft_records) & 31))
-				nr_free -= (s64)(32 - i);
+				nr_free -= 32 - i;
 			ntfs_debug("Handling partial page, max_size = 0x%x",
 					max_size);
 			goto handle_partial_page;
@@ -1358,10 +1357,7 @@ int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
 	/* Total file nodes in file system (at this moment in time). */
 	sfs->f_files  = vol->mft_ino->i_size >> vol->mft_record_size_bits;
 	/* Free file nodes in fs (based on current total count). */
-	size	      = get_nr_free_mft_records(vol);
-	if (size < 0LL)
-		size = 0LL;
-	sfs->f_ffree = size;
+	sfs->f_ffree = get_nr_free_mft_records(vol);
 	/*
 	 * File system id. This is extremely *nix flavour dependent and even
 	 * within Linux itself all fs do their own thing. I interpret this to

@@ -64,7 +64,7 @@ const uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
  * work but we don't care for how quickly one can access them. This also fixes
  * the dcache aliasing issues.
  */
-u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
+MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		const int uname_len, ntfs_name **res)
 {
 	ntfs_volume *vol = dir_ni->vol;
@@ -98,8 +98,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
 			ctx)) {
 		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%Lx.",
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx.", dir_ni->mft_no);
 		err = -EIO;
 		goto put_unm_err_out;
 	}
@@ -278,9 +277,8 @@ found_it:
 	/* Consistency check: Verify that an index allocation exists. */
 	if (!NInoIndexAllocPresent(dir_ni)) {
 		ntfs_error(sb, "No index allocation attribute but index entry "
-				"requires one. Directory inode 0x%Lx is "
-				"corrupt or driver bug.",
-				(unsigned long long)dir_ni->mft_no);
+				"requires one. Directory inode 0x%lx is "
+				"corrupt or driver bug.", dir_ni->mft_no);
 		err = -EIO;
 		goto put_unm_err_out;
 	}
@@ -308,30 +306,27 @@ fast_descend_into_child_node:
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
-				"inode 0x%Lx or driver bug.",
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx or driver bug.", dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
 		ntfs_error(sb, "Actual VCN (0x%Lx) of index buffer is "
 				"different from expected VCN (0x%Lx). "
-				"Directory inode 0x%Lx is corrupt or driver "
+				"Directory inode 0x%lx is corrupt or driver "
 				"bug.",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				(long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
 			dir_ni->_IDM(index_block_size)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx has a size (%u) differing from the "
+				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no,
+				(long long)vcn, dir_ni->mft_no,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				dir_ni->_IDM(index_block_size));
 		err = -EIO;
@@ -340,19 +335,17 @@ fast_descend_into_child_node:
 	index_end = (u8*)ia + dir_ni->_IDM(index_block_size);
 	if (index_end > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx crosses page boundary. Impossible! "
+				"0x%lx crosses page boundary. Impossible! "
 				"Cannot access! This is probably a bug in the "
-				"driver.", (long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				"driver.", (long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + dir_ni->_IDM(index_block_size)) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
-				"inode 0x%Lx exceeds maximum size.",
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx exceeds maximum size.",
+				(long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
@@ -371,8 +364,8 @@ fast_descend_into_child_node:
 				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
 				index_end) {
 			ntfs_error(sb, "Index entry out of bounds in "
-					"directory inode 0x%Lx.",
-					(unsigned long long)dir_ni->mft_no);
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
 			err = -EIO;
 			goto unm_unm_err_out;
 		}
@@ -523,8 +516,8 @@ found_it2:
 	if (ie->_IEH(flags) & INDEX_ENTRY_NODE) {
 		if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 			ntfs_error(sb, "Index entry with child node found in "
-					"a leaf node in directory inode 0x%Lx.",
-					(unsigned long long)dir_ni->mft_no);
+					"a leaf node in directory inode 0x%lx.",
+					dir_ni->mft_no);
 			err = -EIO;
 			goto unm_unm_err_out;
 		}
@@ -544,7 +537,7 @@ found_it2:
 			goto descend_into_child_node;
 		}
 		ntfs_error(sb, "Negative child node vcn in directory inode "
-				"0x%Lx.", (unsigned long long)dir_ni->mft_no);
+				"0x%lx.", dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
@@ -643,8 +636,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
 			ctx)) {
 		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%Lx.",
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx.", dir_ni->mft_no);
 		err = -EIO;
 		goto put_unm_err_out;
 	}
@@ -750,9 +742,8 @@ found_it:
 	/* Consistency check: Verify that an index allocation exists. */
 	if (!NInoIndexAllocPresent(dir_ni)) {
 		ntfs_error(sb, "No index allocation attribute but index entry "
-				"requires one. Directory inode 0x%Lx is "
-				"corrupt or driver bug.",
-				(unsigned long long)dir_ni->mft_no);
+				"requires one. Directory inode 0x%lx is "
+				"corrupt or driver bug.", dir_ni->mft_no);
 		err = -EIO;
 		goto put_unm_err_out;
 	}
@@ -780,30 +771,27 @@ fast_descend_into_child_node:
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
-				"inode 0x%Lx or driver bug.",
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx or driver bug.", dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
 		ntfs_error(sb, "Actual VCN (0x%Lx) of index buffer is "
 				"different from expected VCN (0x%Lx). "
-				"Directory inode 0x%Lx is corrupt or driver "
+				"Directory inode 0x%lx is corrupt or driver "
 				"bug.",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				(long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
 			dir_ni->_IDM(index_block_size)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx has a size (%u) differing from the "
+				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no,
+				(long long)vcn, dir_ni->mft_no,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				dir_ni->_IDM(index_block_size));
 		err = -EIO;
@@ -812,19 +800,17 @@ fast_descend_into_child_node:
 	index_end = (u8*)ia + dir_ni->_IDM(index_block_size);
 	if (index_end > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx crosses page boundary. Impossible! "
+				"0x%lx crosses page boundary. Impossible! "
 				"Cannot access! This is probably a bug in the "
-				"driver.", (long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				"driver.", (long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + dir_ni->_IDM(index_block_size)) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
-				"inode 0x%Lx exceeds maximum size.",
-				(long long)vcn,
-				(unsigned long long)dir_ni->mft_no);
+				"inode 0x%lx exceeds maximum size.",
+				(long long)vcn, dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
@@ -843,8 +829,8 @@ fast_descend_into_child_node:
 				(u8*)ie + le16_to_cpu(ie->_IEH(key_length)) >
 				index_end) {
 			ntfs_error(sb, "Index entry out of bounds in "
-					"directory inode 0x%Lx.",
-					(unsigned long long)dir_ni->mft_no);
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
 			err = -EIO;
 			goto unm_unm_err_out;
 		}
@@ -928,8 +914,8 @@ found_it2:
 	if (ie->_IEH(flags) & INDEX_ENTRY_NODE) {
 		if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 			ntfs_error(sb, "Index entry with child node found in "
-					"a leaf node in directory inode 0x%Lx.",
-					(unsigned long long)dir_ni->mft_no);
+					"a leaf node in directory inode 0x%lx.",
+					dir_ni->mft_no);
 			err = -EIO;
 			goto unm_unm_err_out;
 		}
@@ -949,7 +935,7 @@ found_it2:
 			goto descend_into_child_node;
 		}
 		ntfs_error(sb, "Negative child node vcn in directory inode "
-				"0x%Lx.", (unsigned long long)dir_ni->mft_no);
+				"0x%lx.", dir_ni->mft_no);
 		err = -EIO;
 		goto unm_unm_err_out;
 	}
@@ -1044,12 +1030,11 @@ static inline int ntfs_filldir(ntfs_volume *vol, struct file *filp,
 	else
 		dt_type = DT_REG;
 	ntfs_debug("Calling filldir for %s with len %i, f_pos 0x%Lx, inode "
-			"0x%Lx, DT_%s.", name, name_len, filp->f_pos,
-			(unsigned long long)MREF_LE(ie->_IIF(indexed_file)),
+			"0x%lx, DT_%s.", name, name_len, filp->f_pos,
+			MREF_LE(ie->_IIF(indexed_file)),
 			dt_type == DT_DIR ? "DIR" : "REG");
 	return filldir(dirent, name, name_len, filp->f_pos,
-			(unsigned long)MREF_LE(ie->_IIF(indexed_file)),
-			dt_type);
+			MREF_LE(ie->_IIF(indexed_file)), dt_type);
 }
 
 /*
@@ -1083,8 +1068,8 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	u8 *kaddr, *bmp, *index_end;
 	attr_search_context *ctx;
 
-	ntfs_debug("Entering for inode 0x%Lx, f_pos 0x%Lx.",
-			(unsigned long long)ndir->mft_no, filp->f_pos);
+	ntfs_debug("Entering for inode 0x%lx, f_pos 0x%Lx.",
+			vdir->i_ino, filp->f_pos);
 	rc = err = 0;
 	/* Are we at end of dir yet? */
 	if (filp->f_pos >= vdir->i_size + vol->mft_record_size)
@@ -1092,8 +1077,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* Emulate . and .. for all directories. */
 	if (!filp->f_pos) {
 		ntfs_debug("Calling filldir for . with len 1, f_pos 0x0, "
-				"inode 0x%Lx, DT_DIR.",
-				(unsigned long long)ndir->mft_no);
+				"inode 0x%lx, DT_DIR.", vdir->i_ino);
 		rc = filldir(dirent, ".", 1, filp->f_pos, vdir->i_ino, DT_DIR);
 		if (rc)
 			goto done;
@@ -1141,8 +1125,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
 			ctx)) {
 		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%Lx.",
-				(unsigned long long)ndir->mft_no);
+				"inode 0x%lx.", vdir->i_ino);
 		err = -EIO;
 		goto kf_unm_err_out;
 	}
@@ -1201,8 +1184,7 @@ skip_index_root:
 		if (!lookup_attr(AT_BITMAP, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
 				ctx)) {
 			ntfs_error(sb, "Index bitmap attribute missing in "
-					"directory inode 0x%Lx.",
-					(unsigned long long)ndir->mft_no);
+					"directory inode 0x%lx.", vdir->i_ino);
 			err = -EIO;
 			goto kf_unm_err_out;
 		}
@@ -1251,8 +1233,7 @@ find_next_index_buffer:
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
-				"inode 0x%Lx or driver bug.",
-				(unsigned long long)ndir->mft_no);
+				"inode 0x%lx or driver bug.", vdir->i_ino);
 		err = -EIO;
 		goto unm_dir_err_out;
 	}
@@ -1261,23 +1242,22 @@ find_next_index_buffer:
 			ndir->_IDM(index_vcn_size_bits)) {
 		ntfs_error(sb, "Actual VCN (0x%Lx) of index buffer is "
 				"different from expected VCN (0x%Lx). "
-				"Directory inode 0x%Lx is corrupt or driver "
+				"Directory inode 0x%lx is corrupt or driver "
 				"bug. ",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits),
-				(unsigned long long)ndir->mft_no);
+				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
 		err = -EIO;
 		goto unm_dir_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
 			ndir->_IDM(index_block_size)) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx has a size (%u) differing from the "
+				"0x%lx has a size (%u) differing from the "
 				"directory specified size (%u). Directory "
 				"inode is corrupt or driver bug.",
-				(long long)ia_pos >> ndir->_IDM(index_vcn_size_bits),
-				(unsigned long long)ndir->mft_no,
+				(long long)ia_pos >>
+				ndir->_IDM(index_vcn_size_bits), vdir->i_ino,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				ndir->_IDM(index_block_size));
 		err = -EIO;
@@ -1286,11 +1266,10 @@ find_next_index_buffer:
 	index_end = (u8*)ia + ndir->_IDM(index_block_size);
 	if (index_end > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx crosses page boundary. Impossible! "
+				"0x%lx crosses page boundary. Impossible! "
 				"Cannot access! This is probably a bug in the "
 				"driver.", (long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits),
-				(unsigned long long)ndir->mft_no);
+				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
 		err = -EIO;
 		goto unm_dir_err_out;
 	}
@@ -1298,10 +1277,9 @@ find_next_index_buffer:
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + ndir->_IDM(index_block_size)) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
-				"inode 0x%Lx exceeds maximum size.",
+				"inode 0x%lx exceeds maximum size.",
 				(long long)ia_pos >>
-				ndir->_IDM(index_vcn_size_bits),
-				(unsigned long long)ndir->mft_no);
+				ndir->_IDM(index_vcn_size_bits), vdir->i_ino);
 		err = -EIO;
 		goto unm_dir_err_out;
 	}

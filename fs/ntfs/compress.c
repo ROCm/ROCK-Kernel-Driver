@@ -748,9 +748,9 @@ retry_remap:
 		 */
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
-					"0x%Lx with error code %i. Skipping "
+					"0x%lx with error code %i. Skipping "
 					"this compression block.\n",
-					(unsigned long long)ni->mft_no, -err);
+					ni->mft_no, -err);
 			/* Release the unfinished pages. */
 			for (; prev_cur_page < cur_page; prev_cur_page++) {
 				page = pages[prev_cur_page];
