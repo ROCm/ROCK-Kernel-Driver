@@ -2218,9 +2218,6 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int status = 0;
 	int handled = 0;
 
-	if (unlikely(!netif_running(dev)))
-		goto out;
-
 	do {
 		status = RTL_R16(IntrStatus);
 
@@ -2233,6 +2230,9 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		status &= tp->intr_mask;
 		RTL_W16(IntrStatus,
 			(status & RxFIFOOver) ? (status | RxOverflow) : status);
+
+		if (unlikely(!netif_running(dev)))
+			break;
 
 		if (!(status & rtl8169_intr_mask))
 			break;
@@ -2275,7 +2275,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		/* Clear all interrupt sources. */
 		RTL_W16(IntrStatus, 0xffff);
 	}
-out:
+
 	return IRQ_RETVAL(handled);
 }
 
@@ -2335,8 +2335,6 @@ static void rtl8169_down(struct net_device *dev)
 	spin_unlock_irq(&tp->lock);
 
 	synchronize_irq(dev->irq);
-
-	netif_poll_disable(dev);
 
 	/* Give a racing hard_start_xmit a few cycles to complete. */
 	set_current_state(TASK_UNINTERRUPTIBLE);
