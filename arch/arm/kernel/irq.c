@@ -165,17 +165,22 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;
 	struct irqaction * action;
+	unsigned long flags;
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_controller_lock, flags);
 	    	action = irq_desc[i].action;
 		if (!action)
-			continue;
+			goto unlock;
+
 		seq_printf(p, "%3d: %10u ", i, kstat_irqs(i));
 		seq_printf(p, "  %s", action->name);
-		for (action = action->next; action; action = action->next) {
+		for (action = action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
-		}
+
 		seq_putc(p, '\n');
+unlock:
+		spin_unlock_irqrestore(&irq_controller_lock, flags);
 	}
 
 #ifdef CONFIG_ARCH_ACORN

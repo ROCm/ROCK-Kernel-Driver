@@ -339,11 +339,9 @@ static int __init cpqarray_init(void)
 	for(i=0; i < nr_ctlr; i++) {
 	  	/* If this successful it should insure that we are the only */
 		/* instance of the driver */	
-		if (register_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname, &ida_fops)) {
-                        printk(KERN_ERR "cpqarray: Unable to get major number %d for ida\n",
-                                COMPAQ_SMART2_MAJOR+i);
+		if (register_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname))
                         continue;
-                }
+
 		hba[i]->access.set_intr_mask(hba[i], 0);
 		if (request_irq(hba[i]->intr, do_ida_intr,
 			SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i])) {

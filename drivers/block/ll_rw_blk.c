@@ -1475,17 +1475,17 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		return;
 
 	if (rw == READ) {
-		rq->rq_disk->read_sectors += nr_sectors;
+		disk_stat_add(rq->rq_disk, read_sectors, nr_sectors);
 		if (!new_io)
-			rq->rq_disk->read_merges++;
+			disk_stat_inc(rq->rq_disk, read_merges);
 	} else if (rw == WRITE) {
-		rq->rq_disk->write_sectors += nr_sectors;
+		disk_stat_add(rq->rq_disk, write_sectors, nr_sectors);
 		if (!new_io)
-			rq->rq_disk->write_merges++;
+			disk_stat_inc(rq->rq_disk, write_merges);
 	}
 	if (new_io) {
 		disk_round_stats(rq->rq_disk);
-		rq->rq_disk->in_flight++;
+		disk_stat_inc(rq->rq_disk, in_flight);
 	}
 }
 
@@ -1525,11 +1525,12 @@ void disk_round_stats(struct gendisk *disk)
 {
 	unsigned long now = jiffies;
 
-	disk->time_in_queue += disk->in_flight * (now - disk->stamp);
+	disk_stat_add(disk, time_in_queue, 
+			disk_stat_read(disk, in_flight) * (now - disk->stamp));
 	disk->stamp = now;
 
-	if (disk->in_flight)
-		disk->io_ticks += (now - disk->stamp_idle);
+	if (disk_stat_read(disk, in_flight))
+		disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
 	disk->stamp_idle = now;
 }
 
@@ -1647,7 +1648,7 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 
 		if (req->rq_disk) {
 			disk_round_stats(req->rq_disk);
-			req->rq_disk->in_flight--;
+			disk_stat_dec(req->rq_disk, in_flight);
 		}
 
 		__blk_put_request(q, next);
@@ -2199,16 +2200,16 @@ void end_that_request_last(struct request *req)
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:
-			disk->writes++;
-			disk->write_ticks += duration;
+			disk_stat_inc(disk, writes);
+			disk_stat_add(disk, write_ticks, duration);
 			break;
 		    case READ:
-			disk->reads++;
-			disk->read_ticks += duration;
+			disk_stat_inc(disk, reads);
+			disk_stat_add(disk, read_ticks, duration);
 			break;
 		}
 		disk_round_stats(disk);
-		disk->in_flight--;
+		disk_stat_dec(disk, in_flight);
 	}
 	__blk_put_request(req->q, req);
 }

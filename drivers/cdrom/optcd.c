@@ -2047,8 +2047,7 @@ static int __init optcd_init(void)
 		put_disk(optcd_disk);
 		return -EIO;
 	}
-	if (register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0) {
-		printk(KERN_ERR "optcd: unable to get major %d\n", MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "optcd")) {
 		release_region(optcd_port, 4);
 		put_disk(optcd_disk);
 		return -EIO;

@@ -564,9 +564,7 @@ static int __init nbd_init(void)
 		nbd_dev[i].disk = disk;
 	}
 
-	if (register_blkdev(NBD_MAJOR, "nbd", &nbd_fops)) {
-		printk("Unable to get major number %d for NBD\n",
-		       NBD_MAJOR);
+	if (register_blkdev(NBD_MAJOR, "nbd")) {
 		err = -EIO;
 		goto out;
 	}

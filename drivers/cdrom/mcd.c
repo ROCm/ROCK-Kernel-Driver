@@ -1068,8 +1068,7 @@ int __init mcd_init(void)
 		put_disk(disk);
 		return -EIO;
 	}
-	if (register_blkdev(MAJOR_NR, "mcd", &mcd_bdops) != 0) {
-		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "mcd")) {
 		put_disk(disk);
 		return -EIO;
 	}

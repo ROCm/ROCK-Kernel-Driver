@@ -5795,15 +5795,14 @@ int __init sbpcd_init(void)
 	OUT(MIXER_data,0xCC); /* one nibble per channel, max. value: 0xFF */
 #endif /* SOUND_BASE */
 
-	if (register_blkdev(MAJOR_NR, major_name, &sbpcd_bdops) != 0)
-	{
-		msg(DBG_INF, "Can't get MAJOR %d for Matsushita CDROM\n", MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, major_name)) {
 #ifdef MODULE
 		return -EIO;
 #else
 		goto init_done;
 #endif /* MODULE */
 	}
+
 	blk_init_queue(&sbpcd_queue, do_sbpcd_request, &sbpcd_lock);
 
 	devfs_mk_dir (NULL, "sbp", NULL);

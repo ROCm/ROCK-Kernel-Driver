@@ -515,6 +515,7 @@ show_interrupts(struct seq_file *p, void *v)
 #endif
 	int i;
 	struct irqaction * action;
+	unsigned long flags;
 
 #ifdef CONFIG_SMP
 	seq_puts(p, "           ");
@@ -525,9 +526,10 @@ show_interrupts(struct seq_file *p, void *v)
 #endif
 
 	for (i = 0; i < ACTUAL_NR_IRQS; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto unlock;
 		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -538,15 +540,18 @@ show_interrupts(struct seq_file *p, void *v)
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %c%s",
-			     (action->flags & SA_INTERRUPT)?'+':' ',
-			     action->name);
+			(action->flags & SA_INTERRUPT)?'+':' ',
+			action->name);
 
 		for (action=action->next; action; action = action->next) {
 			seq_printf(p, ", %c%s",
-				     (action->flags & SA_INTERRUPT)?'+':' ',
-				     action->name);
+				  (action->flags & SA_INTERRUPT)?'+':' ',
+				   action->name);
 		}
+
 		seq_putc(p, '\n');
+unlock:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 #if CONFIG_SMP
 	seq_puts(p, "IPI: ");

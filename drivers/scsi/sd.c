@@ -1197,7 +1197,7 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 		return;
 	}
 
-	buffer = kmalloc(512, GFP_DMA);
+	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer) {
 		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation "
 		       "failure.\n");
@@ -1389,14 +1389,9 @@ static int __init init_sd(void)
 
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
 
-	for (i = 0; i < SD_MAJORS; i++) {
-		if (register_blkdev(sd_major(i), "sd", &sd_fops))
-			printk(KERN_NOTICE
-			       "Unable to get major %d for SCSI disk\n",
-			       sd_major(i));
-		else
+	for (i = 0; i < SD_MAJORS; i++)
+		if (register_blkdev(sd_major(i), "sd") == 0)
 			majors++;
-	}
 
 	if (!majors)
 		return -ENODEV;
@@ -1409,7 +1404,7 @@ static int __init init_sd(void)
 }
 
 /**
- *	exit_sd - exit point for this driver (when it is	a module).
+ *	exit_sd - exit point for this driver (when it is a module).
  *
  *	Note: this function unregisters this driver from the scsi mid-level.
  **/

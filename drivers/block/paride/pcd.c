@@ -942,8 +942,7 @@ static int __init pcd_init(void)
 	/* get the atapi capabilities page */
 	pcd_probe_capabilities();
 
-	if (register_blkdev(major, name, &pcd_bdops)) {
-		printk("pcd: unable to get major number %d\n", major);
+	if (register_blkdev(major, name)) {
 		for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++)
 			put_disk(cd->disk);
 		return -1;

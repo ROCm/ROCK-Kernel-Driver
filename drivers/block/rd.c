@@ -409,8 +409,7 @@ static int __init rd_init (void)
 			goto out;
 	}
 
-	if (register_blkdev(RAMDISK_MAJOR, "ramdisk", &rd_bd_op)) {
-		printk("RAMDISK: Could not get major %d", RAMDISK_MAJOR);
+	if (register_blkdev(RAMDISK_MAJOR, "ramdisk")) {
 		err = -EIO;
 		goto out;
 	}

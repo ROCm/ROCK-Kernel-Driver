@@ -240,20 +240,13 @@ static struct mtd_notifier notifier = {
 
 int __init init_mtdblock(void)
 {
-	int err;
-
-	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
-		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
-		       MTD_BLOCK_MAJOR);
-		err = -EAGAIN;
-		goto out;
-	}
+	if (register_blkdev(MAJOR_NR, DEVICE_NAME))
+		return -EAGAIN;
 
 	blk_init_queue(&mtdro_queue, &mtdblock_request, &mtdro_lock);
 	register_mtd_user(&notifier);
-	err = 0;
- out:
-	return err;
+
+	return 0;
 }
 
 static void __exit cleanup_mtdblock(void)

@@ -1017,11 +1017,8 @@ int __init loop_init(void)
 		max_loop = 8;
 	}
 
-	if (register_blkdev(LOOP_MAJOR, "loop", &lo_fops)) {
-		printk(KERN_WARNING "Unable to get major number %d for loop"
-				    " device\n", LOOP_MAJOR);
+	if (register_blkdev(LOOP_MAJOR, "loop"))
 		return -EIO;
-	}
 
 	devfs_mk_dir(NULL, "loop", NULL);
 
