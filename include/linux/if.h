@@ -21,6 +21,7 @@
 
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+#include <linux/compiler.h>		/* for "__user" et al           */
 
 #define	IFNAMSIZ	16
 #include <linux/hdlc/ioctl.h>
