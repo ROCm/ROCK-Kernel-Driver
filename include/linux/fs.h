@@ -736,6 +736,24 @@ struct block_device_operations {
 };
 
 /*
+ * "descriptor" for what we're up to with a read for sendfile().
+ * This allows us to use the same read code yet
+ * have multiple different users of the data that
+ * we read from a file.
+ *
+ * The simplest case just copies the data to user
+ * mode.
+ */
+typedef struct {
+	size_t written;
+	size_t count;
+	char * buf;
+	int error;
+} read_descriptor_t;
+
+typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, unsigned long);
+
+/*
  * NOTE:
  * read, write, poll, fsync, readv, writev can be called
  *   without the big kernel lock held in all filesystems.
@@ -761,7 +779,7 @@ struct file_operations {
 	int (*lock) (struct file *, int, struct file_lock *);
 	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
-	ssize_t (*sendfile) (struct file *, struct file *, loff_t *, size_t);
+	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t, void *);
 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 };
@@ -1176,24 +1194,6 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 
 #include <linux/err.h>
 
-/*
- * "descriptor" for what we're up to with a read for sendfile().
- * This allows us to use the same read code yet
- * have multiple different users of the data that
- * we read from a file.
- *
- * The simplest case just copies the data to user
- * mode.
- */
-typedef struct {
-	size_t written;
-	size_t count;
-	char * buf;
-	int error;
-} read_descriptor_t;
-
-typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, unsigned long);
-
 /* needed for stackable file system support */
 extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
 
@@ -1256,7 +1256,7 @@ extern ssize_t do_sync_read(struct file *filp, char *buf, size_t len, loff_t *pp
 extern ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
-extern ssize_t generic_file_sendfile(struct file *, struct file *, loff_t *, size_t);
+extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
 extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern void

@@ -565,7 +565,7 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		count = max - pos;
 	}
 
-	retval = in_file->f_op->sendfile(out_file, in_file, ppos, count);
+	retval = in_file->f_op->sendfile(in_file, ppos, count, file_send_actor, out_file);
 
 	if (*ppos > max)
 		retval = -EOVERFLOW;

@@ -572,7 +572,6 @@ found:
 	return ra;
 }
 
-#if 0 /* don't poke into fs code directly */
 /*
  * Grab and keep cached pages assosiated with a file in the svc_rqst
  * so that they can be passed to the netowork sendmsg/sendpage routines
@@ -605,30 +604,6 @@ nfsd_read_actor(read_descriptor_t *desc, struct page *page, unsigned long offset
 	return size;
 }
 
-static inline ssize_t
-nfsd_getpages(struct file *filp, struct svc_rqst *rqstp, unsigned long count)
-{
-	read_descriptor_t desc;
-	ssize_t	retval;
-
-	if (!count)
-		return 0;
-
-	svc_pushback_unused_pages(rqstp);
-
-	desc.written = 0;
-	desc.count = count;
-	desc.buf = (char *)rqstp;
-	desc.error = 0;
-	do_generic_file_read(filp, &filp->f_pos, &desc, nfsd_read_actor);
-
-	retval = desc.written;
-	if (!retval)
-		retval = desc.error;
-	return retval;
-}
-#endif
-
 /*
  * Read data from a file. count must contain the requested read count
  * on entry. On return, *count contains the number of bytes actually read.
@@ -660,13 +635,11 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (ra)
 		file.f_ra = ra->p_ra;
 
-#if 0 /* don't poke into fs code directly */
-	if (inode->i_mapping->a_ops->readpage) {
-		file.f_pos = offset;
-		err = nfsd_getpages(&file, rqstp, *count);
-	} else
-#endif
-	{
+	if (file.f_op->sendfile) {
+		svc_pushback_unused_pages(rqstp);
+		err = file.f_op->sendfile(&file, &offset, *count,
+						 nfsd_read_actor, rqstp);
+	} else {
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
 		err = vfs_readv(&file, vec, vlen, &offset);
