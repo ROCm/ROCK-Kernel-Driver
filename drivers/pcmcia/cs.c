@@ -647,6 +647,8 @@ static int send_event(socket_info_t *s, event_t event, int priority)
     DEBUG(1, "cs: send_event(sock %d, event %d, pri %d)\n",
 	  s->sock, event, priority);
     ret = 0;
+    if (s->state & SOCKET_CARDBUS)
+	    return 0;
     for (; client; client = client->next) { 
 	if (client->state & (CLIENT_UNBOUND|CLIENT_STALE))
 	    continue;
