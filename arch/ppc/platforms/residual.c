@@ -802,7 +802,7 @@ PPC_DEVICE __init *residual_find_device(unsigned long BusMask,
 		     !(n--) ) return res->Devices+i;
 #undef Dev
 	}
-	return 0;
+	return NULL;
 }
 
 PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
@@ -824,7 +824,7 @@ PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
 		     !(n--) ) return res->Devices+i;
 #undef Dev
 	}
-	return 0;
+	return NULL;
 }
 
 PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
@@ -832,7 +832,7 @@ PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 				int n)
 {
 	unsigned mask, masked_tag, size;
-	if(!p) return 0;
+	if(!p) return NULL;
 	if (tag_type(packet_tag)) mask=0xff; else mask=0xF8;
 	masked_tag = packet_tag&mask;
 	for(; *p != END_TAG; p+=size) {
@@ -843,7 +843,7 @@ PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 		else
 			size=tag_small_count(*p)+1;
 	}
-	return 0; /* not found */
+	return NULL; /* not found */
 }
 
 PnP_TAG_PACKET __init *PnP_find_small_vendor_packet(unsigned char *p,
@@ -857,7 +857,7 @@ PnP_TAG_PACKET __init *PnP_find_small_vendor_packet(unsigned char *p,
 			return (PnP_TAG_PACKET *) p;
 		next = 1;
 	};
-	return 0; /* not found */
+	return NULL; /* not found */
 }
 
 PnP_TAG_PACKET __init *PnP_find_large_vendor_packet(unsigned char *p,
@@ -871,7 +871,7 @@ PnP_TAG_PACKET __init *PnP_find_large_vendor_packet(unsigned char *p,
 			return (PnP_TAG_PACKET *) p;
 		next = 1;
 	};
-	return 0; /* not found */
+	return NULL; /* not found */
 }
 
 #ifdef CONFIG_PROC_PREPRESIDUAL

@@ -142,8 +142,8 @@ EXPORT_SYMBOL(_raw_spin_lock_flags);
 EXPORT_SYMBOL(synchronize_irq);
 
 #if defined(CONFIG_MCOUNT)
-extern void mcount(void);
-EXPORT_SYMBOL_NOVERS(mcount);
+extern void _mcount(void);
+EXPORT_SYMBOL_NOVERS(_mcount);
 #endif
 
 /* CPU online map and active count.  */
@@ -350,9 +350,10 @@ EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_sparc64);
 EXPORT_SYMBOL(ip_fast_csum);
 
-/* Moving data to/from userspace. */
+/* Moving data to/from/in userspace. */
 EXPORT_SYMBOL(__copy_to_user);
 EXPORT_SYMBOL(__copy_from_user);
+EXPORT_SYMBOL(__copy_in_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__bzero_noasi);
 

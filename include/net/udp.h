@@ -64,8 +64,6 @@ extern struct proto udp_prot;
 
 
 extern void	udp_err(struct sk_buff *, u32);
-extern int	udp_connect(struct sock *sk,
-			    struct sockaddr *usin, int addr_len);
 
 extern int	udp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			    struct msghdr *msg, size_t len);

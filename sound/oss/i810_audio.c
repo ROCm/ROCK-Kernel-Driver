@@ -1396,7 +1396,7 @@ static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static ssize_t i810_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct i810_state *state = (struct i810_state *)file->private_data;
-	struct i810_card *card=state ? state->card : 0;
+	struct i810_card *card=state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
@@ -1536,7 +1536,7 @@ static ssize_t i810_read(struct file *file, char __user *buffer, size_t count, l
 static ssize_t i810_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct i810_state *state = (struct i810_state *)file->private_data;
-	struct i810_card *card=state ? state->card : 0;
+	struct i810_card *card=state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;

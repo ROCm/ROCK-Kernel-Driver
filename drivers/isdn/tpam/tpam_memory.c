@@ -30,7 +30,7 @@ void copy_to_pam_dword(tpam_card *card, const void *addr, u32 val) {
 	       card->bar0 + TPAM_PAGE_REGISTER);
 
 	/* write the value */
-	writel(val, card->bar0 + (((u32)addr) & TPAM_PAGE_SIZE));
+	writel(val, card->bar0 + (((unsigned long)addr) & TPAM_PAGE_SIZE));
 }
 
 /*

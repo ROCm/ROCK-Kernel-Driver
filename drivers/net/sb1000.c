@@ -799,7 +799,7 @@ skipped_frame:
 			skb ? session_id : session_id | 0x40, frame_id);
 	if (skb) {
 		dev_kfree_skb(skb);
-		skb = 0;
+		skb = NULL;
 	}
 
 good_frame:
@@ -875,7 +875,7 @@ printk("cm0: IP identification: %02x%02x  fragment offset: %02x%02x\n", buffer[3
 	dev->last_rx = jiffies;
 	stats->rx_bytes+=dlen;
 	stats->rx_packets++;
-	lp->rx_skb[ns] = 0;
+	lp->rx_skb[ns] = NULL;
 	lp->rx_session_id[ns] |= 0x40;
 	return 0;
 
@@ -893,7 +893,7 @@ dropped_frame:
 	if (ns < NPIDS) {
 		if ((skb = lp->rx_skb[ns])) {
 			dev_kfree_skb(skb);
-			lp->rx_skb[ns] = 0;
+			lp->rx_skb[ns] = NULL;
 		}
 		lp->rx_session_id[ns] |= 0x40;
 	}

@@ -674,7 +674,7 @@ static void snd_uart16550_output_write(snd_rawmidi_substream_t * substream)
 				break;
 			if (snd_rawmidi_transmit(substream, &midi_byte, 1) != 1)
 				break;
-#if SNDRV_SERIAL_MS124W_MB_NOCOMBO
+#ifdef SNDRV_SERIAL_MS124W_MB_NOCOMBO
 			/* select exactly one of the four ports */
 			addr_byte = (1 << (substream->number + 4)) | 0x08;
 #else

@@ -851,7 +851,7 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 static int __init socal_probe(void)
 {
 	struct sbus_bus *sbus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 	struct socal *s;
 	int cards = 0;
 

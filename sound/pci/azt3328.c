@@ -843,7 +843,7 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 		snd_azf3328_setdmaa(chip, runtime->dma_addr, snd_pcm_lib_period_bytes(substream), snd_pcm_lib_buffer_bytes(substream), 0);
 
 		spin_lock_irqsave(&chip->reg_lock, flags);
-#if WIN9X
+#ifdef WIN9X
 		/* FIXME: enable playback/recording??? */
 		status1 |= DMA_PLAY_SOMETHING1 | DMA_PLAY_SOMETHING2;
 		outw(status1, chip->codec_port+IDX_IO_PLAY_FLAGS);
@@ -933,7 +933,7 @@ static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 		snd_azf3328_setdmaa(chip, runtime->dma_addr, snd_pcm_lib_period_bytes(substream), snd_pcm_lib_buffer_bytes(substream), 1);
 
 		spin_lock_irqsave(&chip->reg_lock, flags);
-#if WIN9X
+#ifdef WIN9X
 		/* FIXME: enable playback/recording??? */
 		status1 |= DMA_PLAY_SOMETHING1 | DMA_PLAY_SOMETHING2;
 		outw(status1, chip->codec_port+IDX_IO_REC_FLAGS);
@@ -993,7 +993,7 @@ static snd_pcm_uframes_t snd_azf3328_playback_pointer(snd_pcm_substream_t * subs
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-#if QUERY_HARDWARE
+#ifdef QUERY_HARDWARE
 	bufptr = inl(chip->codec_port+IDX_IO_PLAY_DMA_START_1);
 #else
 	bufptr = substream->runtime->dma_addr;
@@ -1016,7 +1016,7 @@ static snd_pcm_uframes_t snd_azf3328_capture_pointer(snd_pcm_substream_t * subst
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-#if QUERY_HARDWARE
+#ifdef QUERY_HARDWARE
 	bufptr = inl(chip->codec_port+IDX_IO_REC_DMA_START_1);
 #else
 	bufptr = substream->runtime->dma_addr;

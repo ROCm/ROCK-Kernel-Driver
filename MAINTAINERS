@@ -1494,6 +1494,8 @@ P:	James Morris
 M:	jmorris@redhat.com
 P:	Hideaki YOSHIFUJI
 M:	yoshfuji@linux-ipv6.org
+P:	Patrick McHardy
+M:	kaber@coreworks.de
 L:	netdev@oss.sgi.com
 S:	Maintained
 
@@ -1945,8 +1947,8 @@ L:	ultralinux@vger.kernel.org
 S:	Maintained
 
 SPARC (sparc32):
-P:	Keith M. Wesolowski
-M:	wesolows@foobazco.org
+P:	William L. Irwin
+M:	wli@holomorphy.com
 L:	sparclinux@vger.kernel.org
 S:	Maintained
 

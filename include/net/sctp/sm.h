@@ -322,6 +322,9 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 				const struct sctp_chunk *chunk,
 				sctp_cmd_seq_t *commands,
 				struct sctp_chunk *err_chunk);
+int sctp_eat_data(const struct sctp_association *asoc,
+		  struct sctp_chunk *chunk,
+		  sctp_cmd_seq_t *commands);
 
 /* 3rd level prototypes */
 __u32 sctp_generate_tag(const struct sctp_endpoint *);

@@ -481,7 +481,7 @@ void sym_mfree(void *m, int size, char *name);
 
 static __inline m_addr_t sym_m_get_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
 {
-	void *vaddr = 0;
+	void *vaddr = NULL;
 	dma_addr_t baddr = 0;
 
 	vaddr = pci_alloc_consistent(mp->dev_dmat,SYM_MEM_CLUSTER_SIZE, &baddr);

@@ -99,7 +99,7 @@ MODULE_PARM(wss,"i");
 MODULE_PARM_DESC(wss,"change between ACI/WSS-mixer; use 0 and 1 - untested"
 		 " default: do nothing; for PCM1-pro only");
 
-#if DEBUG
+#ifdef DEBUG
 static void print_bits(unsigned char c)
 {
 	int j;
@@ -184,7 +184,7 @@ static int busy_wait(void)
 static inline int aci_rawwrite(unsigned char byte)
 {
 	if (busy_wait() >= 0) {
-#if DEBUG
+#ifdef DEBUG
 		printk(KERN_DEBUG "aci_rawwrite(%d)\n", byte);
 #endif
 		outb(byte, COMMAND_REGISTER);
@@ -199,7 +199,7 @@ static inline int aci_rawread(void)
 
 	if (busy_wait() >= 0) {
 		byte=inb(STATUS_REGISTER);
-#if DEBUG
+#ifdef DEBUG
 		printk(KERN_DEBUG "%d = aci_rawread()\n", byte);
 #endif
 		return byte;

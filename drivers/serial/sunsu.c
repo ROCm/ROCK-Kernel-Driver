@@ -1045,7 +1045,7 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 {
 	unsigned char status1, status2, scratch, scratch2, scratch3;
 	unsigned char save_lcr, save_mcr;
-	struct linux_ebus_device *dev = 0;
+	struct linux_ebus_device *dev = NULL;
 	struct linux_ebus *ebus;
 #ifdef CONFIG_SPARC64
 	struct sparc_isa_bridge *isa_br;

@@ -98,9 +98,9 @@ static int pc110pad_open(struct input_dev *dev)
 	if (pc110pad_used++)
 		return 0;
 
-	pc110pad_interrupt(0,0,0);
-	pc110pad_interrupt(0,0,0);
-	pc110pad_interrupt(0,0,0);
+	pc110pad_interrupt(0,NULL,NULL);
+	pc110pad_interrupt(0,NULL,NULL);
+	pc110pad_interrupt(0,NULL,NULL);
 	outb(PC110PAD_ON, pc110pad_io + 2);
 	pc110pad_count = 0;
 
@@ -117,7 +117,7 @@ static int __init pc110pad_init(void)
 
 	outb(PC110PAD_OFF, pc110pad_io + 2);
 
-	if (request_irq(pc110pad_irq, pc110pad_interrupt, 0, "pc110pad", 0))
+	if (request_irq(pc110pad_irq, pc110pad_interrupt, 0, "pc110pad", NULL))
 	{
 		release_region(pc110pad_io, 4);
 		printk(KERN_ERR "pc110pad: Unable to get irq %d.\n", pc110pad_irq);
@@ -155,7 +155,7 @@ static void __exit pc110pad_exit(void)
 
 	outb(PC110PAD_OFF, pc110pad_io + 2);
 
-	free_irq(pc110pad_irq, 0);
+	free_irq(pc110pad_irq, NULL);
 	release_region(pc110pad_io, 4);
 }
 

@@ -426,7 +426,7 @@ static int arp_filter(__u32 sip, __u32 tip, struct net_device *dev)
 	if (ip_route_output_key(&rt, &fl) < 0) 
 		return 1;
 	if (rt->u.dst.dev != dev) { 
-		NET_INC_STATS_BH(ArpFilter);
+		NET_INC_STATS_BH(LINUX_MIB_ARPFILTER);
 		flag = 1;
 	} 
 	ip_rt_put(rt); 

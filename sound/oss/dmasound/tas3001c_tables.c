@@ -3,12 +3,12 @@
 
 static struct tas_drce_t eqp_0e_2_1_drce = {
   .enable     = 1,
-  .above      { .val = 3.0 * (1<<8), .expand = 0 },
-  .below      { .val = 1.0 * (1<<8), .expand = 0 },
-  .threshold  -15.33  * (1<<8),
-  .energy     2.4     * (1<<12),
-  .attack     0.013   * (1<<12),
-  .decay      0.212   * (1<<12),
+  .above      = { .val = 3.0 * (1<<8), .expand = 0 },
+  .below      = { .val = 1.0 * (1<<8), .expand = 0 },
+  .threshold  = -15.33  * (1<<8),
+  .energy     = 2.4     * (1<<12),
+  .attack     = 0.013   * (1<<12),
+  .decay      = 0.212   * (1<<12),
 };
 
 static struct tas_biquad_ctrl_t eqp_0e_2_1_biquads[]={
