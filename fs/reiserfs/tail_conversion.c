@@ -143,6 +143,16 @@ void reiserfs_unmap_buffer(struct buffer_head *bh) {
     }
     clear_buffer_dirty(bh) ;
     lock_buffer(bh) ;
+    /* Remove the buffer from whatever list it belongs to. We are mostly
+       interested in removing it from per-sb j_dirty_buffers list, to avoid
+        BUG() on attempt to write not mapped buffer */
+    if ( !list_empty(&bh->b_assoc_buffers) && bh->b_page) {
+	struct inode *inode = bh->b_page->mapping->host;
+	struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb);
+	spin_lock(&j->j_dirty_buffers_lock);
+	list_del_init(&bh->b_assoc_buffers);
+	spin_unlock(&j->j_dirty_buffers_lock);
+    }
     clear_buffer_mapped(bh) ;
     clear_buffer_req(bh) ;
     clear_buffer_new(bh);
@@ -180,6 +190,9 @@ unmap_buffers(struct page *page, loff_t pos) {
         }
 	bh = next ;
       } while (bh != head) ;
+      if ( PAGE_SIZE == bh->b_size ) {
+	ClearPageDirty(page);
+      }
     }
   } 
 }

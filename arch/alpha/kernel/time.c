@@ -371,6 +371,9 @@ time_init(void)
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_nsec = 0;
 
+        wall_to_monotonic.tv_sec -= xtime.tv_sec;
+        wall_to_monotonic.tv_nsec = 0;
+
 	if (HZ > (1<<16)) {
 		extern void __you_loose (void);
 		__you_loose();
@@ -485,6 +488,16 @@ do_settimeofday(struct timespec *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
+
+        wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
+        wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
+        if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
+                wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
+                wall_to_monotonic.tv_sec++;
+        } else if (wall_to_monotonic.tv_nsec < 0) {
+                wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
+                wall_to_monotonic.tv_sec--;
+        }
 
 	write_sequnlock_irq(&xtime_lock);
 	return 0;

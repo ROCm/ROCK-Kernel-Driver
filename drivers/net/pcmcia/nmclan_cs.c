@@ -710,7 +710,7 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 static void nmclan_config(dev_link_t *link)
 {
   client_handle_t handle = link->handle;
-  struct net_device *dev = link->priv;;
+  struct net_device *dev = link->priv;
   mace_private *lp = dev->priv;
   tuple_t tuple;
   cisparse_t parse;

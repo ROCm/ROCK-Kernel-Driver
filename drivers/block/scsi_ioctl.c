@@ -450,7 +450,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			close = 1;
 		case CDROMEJECT:
 			rq = blk_get_request(q, WRITE, __GFP_WAIT);
-			rq->flags = REQ_BLOCK_PC;
+			rq->flags |= REQ_BLOCK_PC;
 			rq->data = NULL;
 			rq->data_len = 0;
 			rq->timeout = BLK_DEFAULT_TIMEOUT;

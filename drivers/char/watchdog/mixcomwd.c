@@ -95,7 +95,12 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 	mixcomwd_ping();
 	
 	if (nowayout) {
-		MOD_INC_USE_COUNT;
+		/*
+		 * fops_get() code via open() has already done
+		 * a try_module_get() so it is safe to do the
+		 * __module_get().
+		 */
+		__module_get(THIS_MODULE);
 	} else {
 		if(mixcomwd_timer_alive) {
 			del_timer(&mixcomwd_timer);
@@ -211,30 +216,34 @@ static int __init mixcomwd_checkcard(int port)
 {
 	int id;
 
-	if(check_region(port+MIXCOM_WATCHDOG_OFFSET,1)) {
+	port += MIXCOM_WATCHDOG_OFFSET;
+	if (!request_region(port, 1, "MixCOM watchdog")) {
 		return 0;
 	}
 	
-	id=inb_p(port + MIXCOM_WATCHDOG_OFFSET) & 0x3f;
+	id=inb_p(port) & 0x3f;
 	if(id!=MIXCOM_ID) {
+		release_region(port, 1);
 		return 0;
 	}
-	return 1;
+	return port;
 }
 
 static int __init flashcom_checkcard(int port)
 {
 	int id;
 	
-	if(check_region(port + FLASHCOM_WATCHDOG_OFFSET,1)) {
+	port += FLASHCOM_WATCHDOG_OFFSET;
+	if (!request_region(port, 1, "MixCOM watchdog")) {
 		return 0;
 	}
 	
-	id=inb_p(port + FLASHCOM_WATCHDOG_OFFSET);
+	id=inb_p(port);
  	if(id!=FLASHCOM_ID) {
+		release_region(port, 1);
 		return 0;
 	}
- 	return 1;
+ 	return port;
  }
  
 static int __init mixcomwd_init(void)
@@ -244,17 +253,17 @@ static int __init mixcomwd_init(void)
 	int found=0;
 
 	for (i = 0; !found && mixcomwd_ioports[i] != 0; i++) {
-		if (mixcomwd_checkcard(mixcomwd_ioports[i])) {
+		watchdog_port = mixcomwd_checkcard(mixcomwd_ioports[i]);
+		if (watchdog_port) {
 			found = 1;
-			watchdog_port = mixcomwd_ioports[i] + MIXCOM_WATCHDOG_OFFSET;
 		}
 	}
 	
 	/* The FlashCOM card can be set up at 0x300 -> 0x378, in 0x8 jumps */
 	for (i = 0x300; !found && i < 0x380; i+=0x8) {
-		if (flashcom_checkcard(i)) {
+		watchdog_port = flashcom_checkcard(i);
+		if (watchdog_port) {
 			found = 1;
-			watchdog_port = i + FLASHCOM_WATCHDOG_OFFSET;
 		}
 	}
 	
@@ -263,9 +272,6 @@ static int __init mixcomwd_init(void)
 		return -ENODEV;
 	}
 
-	if (!request_region(watchdog_port,1,"MixCOM watchdog"))
-		return -EIO;
-		
 	ret = misc_register(&mixcomwd_miscdev);
 	if (ret)
 	{

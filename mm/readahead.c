@@ -260,6 +260,9 @@ int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 {
 	int ret = 0;
 
+	if (unlikely(!mapping->a_ops->readpage && !mapping->a_ops->readpages))
+		return -EINVAL;
+
 	while (nr_to_read) {
 		int err;
 

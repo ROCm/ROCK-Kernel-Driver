@@ -1207,7 +1207,8 @@ static void smp_call_function_all_cpus(void (*func) (void *arg), void *arg)
 }
 
 static void free_block (kmem_cache_t* cachep, void** objpp, int len);
-static void drain_array_locked(kmem_cache_t* cachep, struct array_cache *ac);
+static void drain_array_locked(kmem_cache_t* cachep,
+				struct array_cache *ac, int force);
 
 static void do_drain(void *arg)
 {
@@ -1228,7 +1229,7 @@ static void drain_cpu_caches(kmem_cache_t *cachep)
 	check_irq_on();
 	spin_lock_irq(&cachep->spinlock);
 	if (cachep->lists.shared)
-		drain_array_locked(cachep, cachep->lists.shared);
+		drain_array_locked(cachep, cachep->lists.shared, 1);
 	spin_unlock_irq(&cachep->spinlock);
 }
 
@@ -2267,7 +2268,8 @@ static void drain_array(kmem_cache_t *cachep, struct array_cache *ac)
 	}
 }
 
-static void drain_array_locked(kmem_cache_t *cachep, struct array_cache *ac)
+static void drain_array_locked(kmem_cache_t *cachep,
+				struct array_cache *ac, int force)
 {
 	int tofree;
 
@@ -2275,7 +2277,7 @@ static void drain_array_locked(kmem_cache_t *cachep, struct array_cache *ac)
 	if (ac->touched) {
 		ac->touched = 0;
 	} else if (ac->avail) {
-		tofree = (ac->limit+4)/5;
+		tofree = force ? ac->avail : (ac->limit+4)/5;
 		if (tofree > ac->avail) {
 			tofree = (ac->avail+1)/2;
 		}
@@ -2285,7 +2287,6 @@ static void drain_array_locked(kmem_cache_t *cachep, struct array_cache *ac)
 					sizeof(void*)*ac->avail);
 	}
 }
-
 
 /**
  * cache_reap - Reclaim memory from caches.
@@ -2334,7 +2335,7 @@ static inline void cache_reap (void)
 		searchp->lists.next_reap = jiffies + REAPTIMEOUT_LIST3;
 
 		if (searchp->lists.shared)
-			drain_array_locked(searchp, searchp->lists.shared);
+			drain_array_locked(searchp, searchp->lists.shared, 0);
 
 		if (searchp->lists.free_touched) {
 			searchp->lists.free_touched = 0;

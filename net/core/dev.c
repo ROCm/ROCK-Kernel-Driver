@@ -2346,7 +2346,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 				return -EEXIST;
 			memcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
 			dev->name[IFNAMSIZ - 1] = 0;
-			snprintf(dev->class_dev.class_id, BUS_ID_SIZE, dev->name);
+			strlcpy(dev->class_dev.class_id, dev->name, BUS_ID_SIZE);
 			notifier_call_chain(&netdev_chain,
 					    NETDEV_CHANGENAME, dev);
 			return 0;
