@@ -47,7 +47,7 @@ MODULE_DESCRIPTION("HFC PCI ISDN driver");
           .class_mask  = 0,                      \
 	  .driver_data = (unsigned long) name }
 
-static struct pci_device_id hfcpci_ids[] __devinitdata = {
+static struct pci_device_id hfcpci_ids[] = {
 	ID(CCD,     CCD_2BD0,         "CCD/Billion/Asuscom 2BD0"),
 	ID(CCD,     CCD_B000,         "Billion B000"),
 	ID(CCD,     CCD_B006,         "Billion B006"),

@@ -1647,7 +1647,7 @@ static int pciserial_resume_one(struct pci_dev *dev)
 	return 0;
 }
 
-static struct pci_device_id serial_pci_tbl[] __devinitdata = {
+static struct pci_device_id serial_pci_tbl[] = {
 	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
 		PCI_SUBVENDOR_ID_CONNECT_TECH,
 		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232, 0, 0,

@@ -46,7 +46,7 @@ MODULE_PARM(debug, "i");
 MODULE_AUTHOR("Kai Germaschewski <kai.germaschewski@gmx.de>/Karsten Keil <kkeil@suse.de>");
 MODULE_DESCRIPTION("AVM Fritz!PCI/PnP ISDN driver");
 
-static struct pci_device_id fcpci_ids[] __devinitdata = {
+static struct pci_device_id fcpci_ids[] = {
 	{ .vendor      = PCI_VENDOR_ID_AVM,
 	  .device      = PCI_DEVICE_ID_AVM_A1,
 	  .subvendor   = PCI_ANY_ID,

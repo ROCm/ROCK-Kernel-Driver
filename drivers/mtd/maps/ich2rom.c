@@ -260,7 +260,7 @@ static void __devexit ich2rom_remove_one (struct pci_dev *pdev)
 #endif
 }
 
-static struct pci_device_id ich2rom_pci_tbl[] __devinitdata = {
+static struct pci_device_id ich2rom_pci_tbl[] = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_0, 
 	  PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_0, 

@@ -3496,7 +3496,7 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
         return;
 }
 
-static struct pci_device_id bttv_pci_tbl[] __devinitdata = {
+static struct pci_device_id bttv_pci_tbl[] = {
         {PCI_VENDOR_ID_BROOKTREE, PCI_DEVICE_ID_BT848,
          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_BROOKTREE, PCI_DEVICE_ID_BT849,

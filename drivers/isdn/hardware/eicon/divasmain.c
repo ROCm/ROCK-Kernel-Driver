@@ -119,7 +119,7 @@ typedef struct _diva_os_thread_dpc {
 /*
   This table should be sorted by PCI device ID
   */
-static struct pci_device_id divas_pci_tbl[] __devinitdata = {
+static struct pci_device_id divas_pci_tbl[] = {
 /* Diva Server BRI-2M PCI 0xE010 */
 	{PCI_VENDOR_ID_EICON, PCI_DEVICE_ID_EICON_MAESTRA,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, CARDTYPE_MAESTRA_PCI},
