@@ -77,20 +77,22 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	   for those three - in the calling routine */
 	if(tcon) {
 		if((tcon->ses) && (tcon->ses->server)){
+			struct nls_table *nls_codepage = load_nls_default();
 			if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
 				/* Give Demultiplex thread up to 10 seconds to 
 					reconnect, should be greater than cifs socket
 					timeout which is 7 seconds */
 				wait_event_interruptible_timeout(tcon->ses->server->response_q,
 					(tcon->ses->server->tcpStatus == CifsGood), 10 * HZ);
-				if(tcon->ses->server->tcpStatus == CifsNeedReconnect)
+				if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+					unload_nls(nls_codepage);
 					return -EHOSTDOWN;
+				}
 			}
 			
 		/* need to prevent multiple threads trying to
 		simultaneously reconnect the same SMB session */
 			down(&tcon->ses->sesSem);
-			struct nls_table *nls_codepage = load_nls_default();
 			if(tcon->ses->status == CifsNeedReconnect)
 				rc = setup_session(0, tcon->ses, nls_codepage);
 			if(!rc && (tcon->tidStatus == CifsNeedReconnect)) {
