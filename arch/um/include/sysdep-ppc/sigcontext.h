@@ -9,7 +9,7 @@
 #define DSISR_WRITE 0x02000000
 
 #define SC_FAULT_ADDR(sc) ({ \
-		struct sigcontext_struct *_sc = (sc); \
+		struct sigcontext *_sc = (sc); \
 		long retval = -1; \
 		switch (_sc->regs->trap) { \
 		case 0x300: \
@@ -27,7 +27,7 @@
 	})
 
 #define SC_FAULT_WRITE(sc) ({ \
-		struct sigcontext_struct *_sc = (sc); \
+		struct sigcontext *_sc = (sc); \
 		long retval = -1; \
 		switch (_sc->regs->trap) { \
 		case 0x300: \

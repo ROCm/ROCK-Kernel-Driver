@@ -880,6 +880,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 			return(-EFAULT);
 		return(0);
 	}
+	return(-EINVAL);
 }
 
 static int ubd_revalidate(kdev_t rdev)
