@@ -33,6 +33,14 @@ static struct cpufreq_driver   	*cpufreq_driver;
 static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
 static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
 
+
+/* we keep a copy of all ->add'ed CPU's struct sys_device here;
+ * as it is only accessed in ->add and ->remove, no lock or reference
+ * count is necessary.
+ */
+static struct sys_device	*cpu_sys_devices[NR_CPUS];
+
+
 /* internal prototypes */
 static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event);
 static void handle_update(void *data);
@@ -517,6 +525,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		goto err_out_unregister;
 
 	module_put(cpufreq_driver->owner);
+	cpu_sys_devices[cpu] = sys_dev;
 	return 0;
 
 
@@ -547,6 +556,8 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	unsigned int cpu = sys_dev->id;
 	unsigned long flags;
 	struct cpufreq_policy *data;
+
+	cpu_sys_devices[cpu] = NULL;
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	data = cpufreq_cpu_data[cpu];
