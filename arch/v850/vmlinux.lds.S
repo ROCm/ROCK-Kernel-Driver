@@ -247,3 +247,8 @@ _jiffies = _jiffies_64 ;
 #  include "rte_nb85e_cb.ld"
 # endif
 #endif
+
+#ifdef CONFIG_RTE_CB_ME2
+#  include "rte_me2_cb.ld"
+#endif
+

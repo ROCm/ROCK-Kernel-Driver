@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/machdep.h -- Machine-dependent definitions
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -20,6 +20,9 @@
 #ifdef CONFIG_V850E_MA1
 #include <asm/ma1.h>
 #endif
+#ifdef CONFIG_V850E_ME2
+#include <asm/me2.h>
+#endif
 #ifdef CONFIG_V850E_TEG
 #include <asm/teg.h>
 #endif
@@ -35,6 +38,9 @@
 /* platforms */
 #ifdef CONFIG_RTE_CB_MA1
 #include <asm/rte_ma1_cb.h>
+#endif
+#ifdef CONFIG_RTE_CB_ME2
+#include <asm/rte_me2_cb.h>
 #endif
 #ifdef CONFIG_RTE_CB_NB85E
 #include <asm/rte_nb85e_cb.h>
