@@ -343,7 +343,7 @@ static inline unsigned long __clear_user(void __user *addr, unsigned long size)
 
 static inline unsigned long clear_user(void __user *addr, unsigned long n)
 {
-	if (n && __access_ok((unsigned long) addr, n)) {
+	if (n && __access_ok((unsigned long) addr, n))
 		return __clear_user(addr, n);
 	else
 		return n;
