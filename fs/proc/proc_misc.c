@@ -38,6 +38,7 @@
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/times.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

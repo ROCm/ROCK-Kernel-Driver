@@ -8,6 +8,17 @@
 #include <linux/init.h>
 #include <asm/errno.h>
  
+/* parse command line */
+int __init profile_setup(char * str);
+ 
+/* init basic kernel profiler */
+void __init profile_init(void);
+
+extern unsigned int * prof_buffer;
+extern unsigned long prof_len;
+extern unsigned long prof_shift;
+
+
 enum profile_type {
 	EXIT_TASK,
 	EXIT_MMAP,

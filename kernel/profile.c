@@ -9,6 +9,36 @@
 #include <linux/notifier.h>
 #include <linux/mm.h>
 
+extern char _stext, _etext;
+
+unsigned int * prof_buffer;
+unsigned long prof_len;
+unsigned long prof_shift;
+
+int __init profile_setup(char * str)
+{
+	int par;
+	if (get_option(&str,&par))
+		prof_shift = par;
+	return 1;
+}
+
+
+void __init profile_init(void)
+{
+	unsigned int size;
+ 
+	if (!prof_shift) 
+		return;
+ 
+	/* only text is profiled */
+	prof_len = (unsigned long) &_etext - (unsigned long) &_stext;
+	prof_len >>= prof_shift;
+		
+	size = prof_len * sizeof(unsigned int) + PAGE_SIZE - 1;
+	prof_buffer = (unsigned int *) alloc_bootmem(size);
+}
+
 /* Profile event notifications */
  
 #ifdef CONFIG_PROFILING

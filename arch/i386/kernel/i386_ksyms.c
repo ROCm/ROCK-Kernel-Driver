@@ -167,6 +167,9 @@ EXPORT_SYMBOL(get_wchan);
 
 EXPORT_SYMBOL(rtc_lock);
 
+EXPORT_SYMBOL_GPL(register_profile_notifier);
+EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+ 
 #undef memcpy
 #undef memset
 extern void * memset(void *,int,__kernel_size_t);
