@@ -39,10 +39,15 @@
 
 #ifdef CONFIG_SMP
 volatile cpumask_t cpus_in_xmon = CPU_MASK_NONE;
-static unsigned long got_xmon = 0;
-static volatile int take_xmon = -1;
-static volatile int leaving_xmon = 0;
+static unsigned long xmon_taken = 1;
+static int xmon_owner;
+static int xmon_gate;
 #endif /* CONFIG_SMP */
+
+#define TRAP(regs)	((regs)->trap)
+#define FULL_REGS(regs)	1
+
+static unsigned long in_xmon = 0;
 
 static unsigned long adrs;
 static int size = 1;
@@ -52,23 +57,38 @@ static unsigned long ncsum = 4096;
 static int termch;
 static char tmpstr[128];
 
-static u_int bus_error_jmp[100];
+#define JMP_BUF_LEN	(184/sizeof(long))
+static long bus_error_jmp[JMP_BUF_LEN];
+static int catch_memory_errors;
+static long *xmon_fault_jmp[NR_CPUS];
 #define setjmp xmon_setjmp
 #define longjmp xmon_longjmp
 
 /* Breakpoint stuff */
 struct bpt {
-	unsigned long address;
-	unsigned instr;
-	unsigned long count;
-	unsigned char enabled;
+	unsigned long	address;
+	unsigned int	instr[2];
+	atomic_t	ref_count;
+	int		enabled;
+	unsigned long	pad;
 };
 
-#define NBPTS	16
+/* Bits in bpt.enabled */
+#define BP_IABR_TE	1		/* IABR translation enabled */
+#define BP_IABR		2
+#define BP_TRAP		8
+#define BP_DABR		0x10
+
+#define NBPTS	256
 static struct bpt bpts[NBPTS];
 static struct bpt dabr;
-static struct bpt iabr;
+static struct bpt *iabr;
 static unsigned bpinstr = 0x7fe00008;	/* trap */
+
+#define BP_NUM(bp)	((bp) - bpts + 1)
+
+/* Bits in SRR1 that are copied from MSR */
+#define MSR_MASK	0xffffffff87c0ffff
 
 /* Prototypes */
 static int cmds(struct pt_regs *);
@@ -80,7 +100,7 @@ static void memex(void);
 static int bsesc(void);
 static void dump(void);
 static void prdump(unsigned long, long);
-static int ppc_inst_dump(unsigned long, long);
+static int ppc_inst_dump(unsigned long, long, int);
 void print_address(unsigned long);
 static void backtrace(struct pt_regs *);
 static void excprint(struct pt_regs *);
@@ -97,34 +117,40 @@ void getstring(char *, int);
 static void flush_input(void);
 static int inchar(void);
 static void take_input(char *);
-/* static void openforth(void); */
 static unsigned long read_spr(int);
 static void write_spr(int, unsigned long);
 static void super_regs(void);
 static void remove_bpts(void);
 static void insert_bpts(void);
+static void remove_cpu_bpts(void);
+static void insert_cpu_bpts(void);
 static struct bpt *at_breakpoint(unsigned long pc);
+static struct bpt *in_breakpoint_table(unsigned long pc, unsigned long *offp);
+static int  do_step(struct pt_regs *);
 static void bpt_cmds(void);
 static void cacheflush(void);
-#ifdef CONFIG_SMP
-static void cpu_cmd(void);
-#endif /* CONFIG_SMP */
+static int  cpu_cmd(void);
 static void csum(void);
 static void bootcmds(void);
 void dump_segments(void);
 static void symbol_lookup(void);
+static int emulate_step(struct pt_regs *regs, unsigned int instr);
+static void xmon_print_symbol(unsigned long address, const char *mid,
+			      const char *after);
+static const char *getvecname(unsigned long vec);
 
 static void debug_trace(void);
 
-extern int print_insn_big_powerpc(FILE *, unsigned long, unsigned long);
+extern int print_insn_powerpc(unsigned long, unsigned long, int);
 extern void printf(const char *fmt, ...);
 extern void xmon_vfprintf(void *f, const char *fmt, va_list ap);
 extern int xmon_putc(int c, void *f);
 extern int putchar(int ch);
 extern int xmon_read_poll(void);
-extern int setjmp(u_int *);
-extern void longjmp(u_int *, int);
+extern int setjmp(long *);
+extern void longjmp(long *, int);
 extern unsigned long _ASR;
+extern char SystemCall_common[];
 
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
@@ -147,7 +173,6 @@ Commands:\n\
 #ifdef CONFIG_SMP
   "\
   c	print cpus stopped in xmon\n\
-  ci	send xmon interrupt to all other cpus\n\
   c#	try to switch to cpu number h (in hex)\n"
 #endif
   "\
@@ -182,22 +207,8 @@ Commands:\n\
   zh	halt\n"
 ;
 
-static int xmon_trace[NR_CPUS];
-#define SSTEP	1		/* stepping because of 's' command */
-#define BRSTEP	2		/* stepping over breakpoint */
+static struct pt_regs *xmon_regs;
 
-static struct pt_regs *xmon_regs[NR_CPUS];
-
-void __xmon_print_symbol(const char *fmt, unsigned long address);
-#define xmon_print_symbol(fmt, addr)		\
-do {						\
-	__check_printsym_format(fmt, "");	\
-	__xmon_print_symbol(fmt, addr);		\
-} while(0)
-
-/*
- * Stuff for reading and writing memory safely
- */
 extern inline void sync(void)
 {
 	asm volatile("sync; isync");
@@ -223,22 +234,276 @@ extern inline void sync(void)
  no functions have been called from the current function.
  */
 
+/*
+ * We don't allow single-stepping an mtmsrd that would clear
+ * MSR_RI, since that would make the exception unrecoverable.
+ * Since we need to single-step to proceed from a breakpoint,
+ * we don't allow putting a breakpoint on an mtmsrd instruction.
+ * Similarly we don't allow breakpoints on rfid instructions.
+ * These macros tell us if an instruction is a mtmsrd or rfid.
+ */
+#define IS_MTMSRD(instr)	(((instr) & 0xfc0007fe) == 0x7c000164)
+#define IS_RFID(instr)		(((instr) & 0xfc0007fe) == 0x4c000024)
+
+/*
+ * Disable surveillance (the service processor watchdog function)
+ * while we are in xmon.
+ * XXX we should re-enable it when we leave. :)
+ */
 #define SURVEILLANCE_TOKEN	9000
 
 static inline void disable_surveillance(void)
 {
 #ifndef CONFIG_PPC_ISERIES
-        rtas_call(rtas_token("set-indicator"), 3, 1, NULL, SURVEILLANCE_TOKEN,
-		  0, 0);
+	/* Since this can't be a module, args should end up below 4GB. */
+	static struct rtas_args args;
+
+	if (systemcfg->platform & PLATFORM_PSERIES) {
+		/*
+		 * At this point we have got all the cpus we can into
+		 * xmon, so there is hopefully no other cpu calling RTAS
+		 * at the moment, even though we don't take rtas.lock.
+		 * If we did try to take rtas.lock there would be a
+		 * real possibility of deadlock.
+		 */
+		args.token = rtas_token("set-indicator");
+		args.nargs = 3;
+		args.nret = 1;
+		args.rets = &args.args[3];
+		args.args[0] = SURVEILLANCE_TOKEN;
+		args.args[1] = 0;
+		args.args[2] = 0;
+		enter_rtas((void *) __pa(&args));
+	}
 #endif
 }
 
-int
-xmon(struct pt_regs *excp)
+#ifdef CONFIG_SMP
+static int xmon_speaker;
+
+static void get_output_lock(void)
 {
-	struct pt_regs regs;
+	int me = smp_processor_id() + 0x100;
+	int last_speaker = 0, prev;
+	long timeout;
+
+	if (xmon_speaker == me)
+		return;
+	for (;;) {
+		if (xmon_speaker == 0) {
+			last_speaker = cmpxchg(&xmon_speaker, 0, me);
+			if (last_speaker == 0)
+				return;
+		}
+		timeout = 10000000;
+		while (xmon_speaker == last_speaker) {
+			if (--timeout > 0)
+				continue;
+			/* hostile takeover */
+			prev = cmpxchg(&xmon_speaker, last_speaker, me);
+			if (prev == last_speaker)
+				return;
+			break;
+		}
+	}
+}
+
+static void release_output_lock(void)
+{
+	xmon_speaker = 0;
+}
+#endif
+
+int xmon_core(struct pt_regs *regs, int fromipi)
+{
 	int cmd = 0;
 	unsigned long msr;
+	struct bpt *bp;
+	long recurse_jmp[JMP_BUF_LEN];
+	unsigned long offset;
+#ifdef CONFIG_SMP
+	int cpu;
+	int secondary;
+	unsigned long timeout;
+#endif
+
+	msr = get_msr();
+	set_msrd(msr & ~MSR_EE);	/* disable interrupts */
+
+	bp = in_breakpoint_table(regs->nip, &offset);
+	if (bp != NULL) {
+		regs->nip = bp->address + offset;
+		atomic_dec(&bp->ref_count);
+	}
+
+	remove_cpu_bpts();
+
+#ifdef CONFIG_SMP
+	cpu = smp_processor_id();
+	if (cpu_isset(cpu, cpus_in_xmon)) {
+		get_output_lock();
+		excprint(regs);
+		printf("cpu 0x%s: Exception %lx %s in xmon, "
+		       "returning to main loop\n",
+		       cpu, regs->trap, getvecname(TRAP(regs)));
+		longjmp(xmon_fault_jmp[cpu], 1);
+	}
+
+	if (setjmp(recurse_jmp) != 0) {
+		if (!in_xmon || !xmon_gate) {
+			printf("xmon: WARNING: bad recursive fault "
+			       "on cpu 0x%x\n", cpu);
+			goto waiting;
+		}
+		secondary = !(xmon_taken && cpu == xmon_owner);
+		goto cmdloop;
+	}
+
+	xmon_fault_jmp[cpu] = recurse_jmp;
+	cpu_set(cpu, cpus_in_xmon);
+
+	bp = NULL;
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) == (MSR_IR|MSR_SF))
+		bp = at_breakpoint(regs->nip);
+	if (bp || (regs->msr & MSR_RI) == 0)
+		fromipi = 0;
+
+	if (!fromipi) {
+		get_output_lock();
+		excprint(regs);
+		if (bp) {
+			printf("cpu 0x%x stopped at breakpoint 0x%x (",
+			       cpu, BP_NUM(bp));
+			xmon_print_symbol(regs->nip, " ", ")\n");
+		}
+		if ((regs->msr & MSR_RI) == 0)
+			printf("WARNING: exception is not recoverable, "
+			       "can't continue\n");
+		release_output_lock();
+	}
+
+ waiting:
+	secondary = 1;
+	while (secondary && !xmon_gate) {
+		if (in_xmon == 0) {
+			if (fromipi)
+				goto leave;
+			secondary = test_and_set_bit(0, &in_xmon);
+		}
+		barrier();
+	}
+
+	if (!secondary && !xmon_gate) {
+		/* we are the first cpu to come in */
+		/* interrupt other cpu(s) */
+		int ncpus = num_online_cpus();
+
+		xmon_owner = cpu;
+		mb();
+		if (ncpus > 1) {
+			smp_send_debugger_break(MSG_ALL_BUT_SELF);
+			/* wait for other cpus to come in */
+			for (timeout = 100000000; timeout != 0; --timeout)
+				if (cpus_weight(cpus_in_xmon) >= ncpus)
+					break;
+		}
+		remove_bpts();
+		disable_surveillance();
+		/* for breakpoint or single step, print the current instr. */
+		if (bp || TRAP(regs) == 0xd00)
+			ppc_inst_dump(regs->nip, 1, 0);
+		printf("enter ? for help\n");
+		mb();
+		xmon_gate = 1;
+		barrier();
+	}
+
+ cmdloop:
+	while (in_xmon) {
+		if (secondary) {
+			if (cpu == xmon_owner) {
+				if (!test_and_set_bit(0, &xmon_taken)) {
+					secondary = 0;
+					continue;
+				}
+				/* missed it */
+				while (cpu == xmon_owner)
+					barrier();
+			}
+			barrier();
+		} else {
+			cmd = cmds(regs);
+			if (cmd != 0) {
+				/* exiting xmon */
+				insert_bpts();
+				xmon_gate = 0;
+				wmb();
+				in_xmon = 0;
+				break;
+			}
+			/* have switched to some other cpu */
+			secondary = 1;
+		}
+	}
+ leave:
+	cpu_clear(cpu, cpus_in_xmon);
+	xmon_fault_jmp[cpu] = NULL;
+
+#else
+	/* UP is simple... */
+	if (in_xmon) {
+		printf("Exception %lx %s in xmon, returning to main loop\n",
+		       regs->trap, getvecname(TRAP(regs)));
+		longjmp(xmon_fault_jmp[0], 1);
+	}
+	if (setjmp(recurse_jmp) == 0) {
+		xmon_fault_jmp[0] = recurse_jmp;
+		in_xmon = 1;
+
+		excprint(regs);
+		bp = at_breakpoint(regs->nip);
+		if (bp) {
+			printf("Stopped at breakpoint %x (", BP_NUM(bp));
+			xmon_print_symbol(regs->nip, " ", ")\n");
+		}
+		if ((regs->msr & MSR_RI) == 0)
+			printf("WARNING: exception is not recoverable, "
+			       "can't continue\n");
+		remove_bpts();
+		disable_surveillance();
+		/* for breakpoint or single step, print the current instr. */
+		if (bp || TRAP(regs) == 0xd00)
+			ppc_inst_dump(regs->nip, 1, 0);
+		printf("enter ? for help\n");
+	}
+
+	cmd = cmds(regs);
+
+	insert_bpts();
+	in_xmon = 0;
+#endif
+
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) == (MSR_IR|MSR_SF)) {
+		bp = at_breakpoint(regs->nip);
+		if (bp != NULL) {
+			int stepped = emulate_step(regs, bp->instr[0]);
+			if (stepped == 0) {
+				regs->nip = (unsigned long) &bp->instr[0];
+				atomic_inc(&bp->ref_count);
+			}
+		}
+	}
+
+	insert_cpu_bpts();
+
+	set_msrd(msr);		/* restore interrupt enable */
+
+	return cmd != 'X';
+}
+
+int xmon(struct pt_regs *excp)
+{
+	struct pt_regs regs;
 
 	if (excp == NULL) {
 		/* Ok, grab regs as they are now.
@@ -289,142 +554,95 @@ xmon(struct pt_regs *excp)
 		regs.trap = 0;
 		excp = &regs;
 	}
-
-	msr = get_msr();
-	set_msrd(msr & ~MSR_EE);	/* disable interrupts */
-	xmon_regs[smp_processor_id()] = excp;
-	excprint(excp);
-#ifdef CONFIG_SMP
-	leaving_xmon = 0;
-	/* possible race condition here if a CPU is held up and gets
-	 * here while we are exiting */
-	if (cpu_test_and_set(smp_processor_id(), cpus_in_xmon)) {
-		/* xmon probably caused an exception itself */
-		printf("We are already in xmon\n");
-		for (;;)
-			cpu_relax();
-	}
-	while (test_and_set_bit(0, &got_xmon)) {
-		if (take_xmon == smp_processor_id()) {
-			take_xmon = -1;
-			break;
-		}
-		cpu_relax();
-	}
-	/*
-	 * XXX: breakpoints are removed while any cpu is in xmon
-	 */
-#endif /* CONFIG_SMP */
-	remove_bpts();
-	disable_surveillance();
-	printf("press ? for help ");
-	cmd = cmds(excp);
-	if (cmd == 's') {
-		xmon_trace[smp_processor_id()] = SSTEP;
-		excp->msr |= MSR_SE;
-#ifdef CONFIG_SMP		
-		take_xmon = smp_processor_id();
-#endif		
-	} else if (at_breakpoint(excp->nip)) {
-		xmon_trace[smp_processor_id()] = BRSTEP;
-		excp->msr |= MSR_SE;
-	} else {
-		xmon_trace[smp_processor_id()] = 0;
-		insert_bpts();
-	}
-	xmon_regs[smp_processor_id()] = 0;
-#ifdef CONFIG_SMP
-	leaving_xmon = 1;
-	if (cmd != 's')
-		clear_bit(0, &got_xmon);
-	cpu_clear(smp_processor_id(), cpus_in_xmon);
-#endif /* CONFIG_SMP */
-	set_msrd(msr);		/* restore interrupt enable */
-
-	if (cmd == 'X')
-		return 0;
-
-	return 1;
+	return xmon_core(excp, 0);
 }
 
-int
-xmon_bpt(struct pt_regs *regs)
+int xmon_bpt(struct pt_regs *regs)
 {
 	struct bpt *bp;
+	unsigned long offset;
 
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
+		return 0;
+
+	/* Are we at the trap at bp->instr[1] for some bp? */
+	bp = in_breakpoint_table(regs->nip, &offset);
+	if (bp != NULL && offset == 4) {
+		regs->nip = bp->address + 4;
+		atomic_dec(&bp->ref_count);
+		return 1;
+	}
+
+	/* Are we at a breakpoint? */
 	bp = at_breakpoint(regs->nip);
 	if (!bp)
 		return 0;
-	if (bp->count) {
-		--bp->count;
-		remove_bpts();
-		excprint(regs);
-		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= MSR_SE;
-	} else {
-		printf("Stopped at breakpoint %x (%lx ", (bp - bpts) + 1,
-			bp->address);
-		xmon_print_symbol("%s)\n", bp->address);
-		xmon(regs);
-	}
+
+	xmon_core(regs, 0);
+
 	return 1;
 }
 
-int
-xmon_sstep(struct pt_regs *regs)
+int xmon_sstep(struct pt_regs *regs)
 {
-	if (!xmon_trace[smp_processor_id()])
+	if (user_mode(regs))
 		return 0;
-	if (xmon_trace[smp_processor_id()] == BRSTEP) {
-		xmon_trace[smp_processor_id()] = 0;
-		insert_bpts();
-	} else {
-		xmon(regs);
-	}
+	xmon_core(regs, 0);
 	return 1;
 }
 
-int
-xmon_dabr_match(struct pt_regs *regs)
+int xmon_dabr_match(struct pt_regs *regs)
 {
-	if (dabr.enabled && dabr.count) {
-		--dabr.count;
-		remove_bpts();
-		excprint(regs);
-		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= MSR_SE;
-	} else {
-		dabr.instr = regs->nip;
-		xmon(regs);
-	}
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
+		return 0;
+	xmon_core(regs, 0);
 	return 1;
 }
 
-int
-xmon_iabr_match(struct pt_regs *regs)
+int xmon_iabr_match(struct pt_regs *regs)
 {
-	if (iabr.enabled && iabr.count) {
-		--iabr.count;
-		remove_bpts();
-		excprint(regs);
-		xmon_trace[smp_processor_id()] = BRSTEP;
-		regs->msr |= MSR_SE;
-	} else {
-		xmon(regs);
-	}
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
+		return 0;
+	if (iabr == 0)
+		return 0;
+	xmon_core(regs, 0);
 	return 1;
 }
 
-static struct bpt *
-at_breakpoint(unsigned long pc)
+int xmon_ipi(struct pt_regs *regs)
+{
+#ifdef CONFIG_SMP
+	if (in_xmon && !cpu_isset(smp_processor_id(), cpus_in_xmon))
+		xmon_core(regs, 1);
+#endif
+	return 0;
+}
+
+int xmon_fault_handler(struct pt_regs *regs)
+{
+	struct bpt *bp;
+	unsigned long offset;
+
+	if (in_xmon && catch_memory_errors)
+		handle_fault(regs);	/* doesn't return */
+
+	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) == (MSR_IR|MSR_SF)) {
+		bp = in_breakpoint_table(regs->nip, &offset);
+		if (bp != NULL) {
+			regs->nip = bp->address + offset;
+			atomic_dec(&bp->ref_count);
+		}
+	}
+
+	return 0;
+}
+
+
+static struct bpt *at_breakpoint(unsigned long pc)
 {
 	int i;
 	struct bpt *bp;
 
-	if (dabr.enabled && pc == dabr.instr)
-		return &dabr;
-	if (iabr.enabled && pc == iabr.address)
-		return &iabr;
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp)
 		if (bp->enabled && pc == bp->address)
@@ -432,73 +650,228 @@ at_breakpoint(unsigned long pc)
 	return 0;
 }
 
-static void
-insert_bpts()
+static struct bpt *in_breakpoint_table(unsigned long nip, unsigned long *offp)
+{
+	unsigned long off;
+
+	off = nip - (unsigned long) bpts;
+	if (off >= sizeof(bpts))
+		return NULL;
+	off %= sizeof(struct bpt);
+	if (off != offsetof(struct bpt, instr[0])
+	    && off != offsetof(struct bpt, instr[1]))
+		return NULL;
+	*offp = off - offsetof(struct bpt, instr[0]);
+	return (struct bpt *) (nip - off);
+}
+
+static struct bpt *new_breakpoint(unsigned long a)
+{
+	struct bpt *bp;
+
+	a &= ~3UL;
+	bp = at_breakpoint(a);
+	if (bp)
+		return bp;
+
+	for (bp = bpts; bp < &bpts[NBPTS]; ++bp) {
+		if (!bp->enabled && atomic_read(&bp->ref_count) == 0) {
+			bp->address = a;
+			bp->instr[1] = bpinstr;
+			store_inst(&bp->instr[1]);
+			return bp;
+		}
+	}
+
+	printf("Sorry, no free breakpoints.  Please clear one first.\n");
+	return NULL;
+}
+
+static void insert_bpts(void)
 {
 	int i;
 	struct bpt *bp;
 
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
-		if (!bp->enabled)
+		if ((bp->enabled & (BP_TRAP|BP_IABR)) == 0)
 			continue;
-		if (mread(bp->address, &bp->instr, 4) != 4
-		    || mwrite(bp->address, &bpinstr, 4) != 4) {
-			printf("Couldn't insert breakpoint at %x, disabling\n",
-			       bp->address);
+		if (mread(bp->address, &bp->instr[0], 4) != 4) {
+			printf("Couldn't read instruction at %lx, "
+			       "disabling breakpoint there\n", bp->address);
 			bp->enabled = 0;
-		} else {
-			store_inst((void *)bp->address);
+			continue;
 		}
+		if (IS_MTMSRD(bp->instr[0]) || IS_RFID(bp->instr[0])) {
+			printf("Breakpoint at %lx is on an mtmsrd or rfid "
+			       "instruction, disabling it\n", bp->address);
+			bp->enabled = 0;
+			continue;
+		}
+		store_inst(&bp->instr[0]);
+		if (bp->enabled & BP_IABR)
+			continue;
+		if (mwrite(bp->address, &bpinstr, 4) != 4) {
+			printf("Couldn't write instruction at %lx, "
+			       "disabling breakpoint there\n", bp->address);
+			bp->enabled &= ~BP_TRAP;
+			continue;
+		}
+		store_inst((void *)bp->address);
 	}
-
-	if (dabr.enabled)
-		set_dabr(dabr.address);
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR) && iabr.enabled)
-		set_iabr(iabr.address);
 }
 
-static void
-remove_bpts()
+static void insert_cpu_bpts(void)
+{
+	if (dabr.enabled)
+		set_dabr(dabr.address | (dabr.enabled & 7));
+	if (iabr && (cur_cpu_spec->cpu_features & CPU_FTR_IABR))
+		set_iabr(iabr->address
+			 | (iabr->enabled & (BP_IABR|BP_IABR_TE)));
+}
+
+static void remove_bpts(void)
 {
 	int i;
 	struct bpt *bp;
 	unsigned instr;
 
-	set_dabr(0);
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
-		set_iabr(0);
-
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
-		if (!bp->enabled)
+		if ((bp->enabled & (BP_TRAP|BP_IABR)) != BP_TRAP)
 			continue;
 		if (mread(bp->address, &instr, 4) == 4
 		    && instr == bpinstr
 		    && mwrite(bp->address, &bp->instr, 4) != 4)
-			printf("Couldn't remove breakpoint at %x\n",
+			printf("Couldn't remove breakpoint at %lx\n",
 			       bp->address);
 		else
 			store_inst((void *)bp->address);
 	}
 }
 
-static char *last_cmd;
+static void remove_cpu_bpts(void)
+{
+	set_dabr(0);
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
+		set_iabr(0);
+}
+
+static int branch_taken(unsigned int instr, struct pt_regs *regs)
+{
+	unsigned int bo = (instr >> 21) & 0x1f;
+	unsigned int bi;
+
+	if ((bo & 4) == 0) {
+		/* decrement counter */
+		--regs->ctr;
+		if (((bo >> 1) & 1) ^ (regs->ctr == 0))
+			return 0;
+	}
+	if ((bo & 0x10) == 0) {
+		/* check bit from CR */
+		bi = (instr >> 16) & 0x1f;
+		if (((regs->ccr >> (31 - bi)) & 1) != ((bo >> 3) & 1))
+			return 0;
+	}
+	return 1;
+}
+
+/*
+ * Emulate instructions that cause a transfer of control.
+ * Returns 1 if the step was emulated, 0 if not,
+ * or -1 if the instruction is one that should not be stepped,
+ * such as an rfid, or a mtmsrd that would clear MSR_RI.
+ */
+static int emulate_step(struct pt_regs *regs, unsigned int instr)
+{
+	unsigned int opcode, rd;
+	unsigned long int imm;
+
+	opcode = instr >> 26;
+	switch (opcode) {
+	case 16:	/* bc */
+		imm = (signed short)(instr & 0xfffc);
+		if ((instr & 2) == 0)
+			imm += regs->nip;
+		regs->nip += 4;		/* XXX check 32-bit mode */
+		if (instr & 1)
+			regs->link = regs->nip;
+		if (branch_taken(instr, regs))
+			regs->nip = imm;
+		return 1;
+	case 17:	/* sc */
+		regs->gpr[9] = regs->gpr[13];
+		regs->gpr[11] = regs->nip + 4;
+		regs->gpr[12] = regs->msr & MSR_MASK;
+		regs->gpr[13] = (unsigned long) get_paca();
+		regs->nip = (unsigned long) &SystemCall_common;
+		regs->msr = MSR_KERNEL;
+		return 1;
+	case 18:	/* b */
+		imm = instr & 0x03fffffc;
+		if (imm & 0x02000000)
+			imm -= 0x04000000;
+		if ((instr & 2) == 0)
+			imm += regs->nip;
+		if (instr & 1)
+			regs->link = regs->nip + 4;
+		regs->nip = imm;
+		return 1;
+	case 19:
+		switch (instr & 0x7fe) {
+		case 0x20:	/* bclr */
+		case 0x420:	/* bcctr */
+			imm = (instr & 0x400)? regs->ctr: regs->link;
+			regs->nip += 4;		/* XXX check 32-bit mode */
+			if (instr & 1)
+				regs->link = regs->nip;
+			if (branch_taken(instr, regs))
+				regs->nip = imm;
+			return 1;
+		case 0x24:	/* rfid, scary */
+			printf("Can't single-step an rfid instruction\n");
+			return -1;
+		}
+	case 31:
+		rd = (instr >> 21) & 0x1f;
+		switch (instr & 0x7fe) {
+		case 0xa6:	/* mfmsr */
+			regs->gpr[rd] = regs->msr & MSR_MASK;
+			regs->nip += 4;
+			return 1;
+		case 0x164:	/* mtmsrd */
+			/* only MSR_EE and MSR_RI get changed if bit 15 set */
+			/* mtmsrd doesn't change MSR_HV and MSR_ME */
+			imm = (instr & 0x10000)? 0x8002: 0xefffffffffffefffUL;
+			imm = (regs->msr & MSR_MASK & ~imm)
+				| (regs->gpr[rd] & imm);
+			if ((imm & MSR_RI) == 0) {
+				printf("Can't step an instruction that would "
+				       "clear MSR.RI\n");
+				return -1;
+			}
+			regs->msr = imm;
+			regs->nip += 4;
+			return 1;
+		}
+	}
+	return 0;
+}
 
 /* Command interpreting routine */
+static char *last_cmd;
+
 static int
 cmds(struct pt_regs *excp)
 {
 	int cmd = 0;
 
 	last_cmd = NULL;
+	xmon_regs = excp;
 	for(;;) {
 #ifdef CONFIG_SMP
-		/* Need to check if we should take any commands on
-		   this CPU. */
-		if (leaving_xmon)
-			return cmd;
-		printf("%d:", smp_processor_id());
+		printf("%x:", smp_processor_id());
 #endif /* CONFIG_SMP */
 		printf("mon> ");
 		fflush(stdout);
@@ -545,10 +918,7 @@ cmds(struct pt_regs *excp)
 			prregs(excp);	/* print regs */
 			break;
 		case 'e':
-			if (excp == NULL)
-				printf("No exception information\n");
-			else
-				excprint(excp);
+			excprint(excp);
 			break;
 		case 'S':
 			super_regs();
@@ -560,6 +930,9 @@ cmds(struct pt_regs *excp)
 			cacheflush();
 			break;
 		case 's':
+			if (do_step(excp))
+				return cmd;
+			break;
 		case 'x':
 		case 'X':
 		case EOF:
@@ -576,13 +949,13 @@ cmds(struct pt_regs *excp)
 		case 'C':
 			csum();
 			break;
-#ifdef CONFIG_SMP
 		case 'c':
-			cpu_cmd();
+			if (cpu_cmd())
+				return 0;
 			break;
-#endif /* CONFIG_SMP */
 		case 'z':
 			bootcmds();
+			break;
 		case 'T':
 			debug_trace();
 			break;
@@ -592,7 +965,7 @@ cmds(struct pt_regs *excp)
 		default:
 			printf("Unrecognized command: ");
 		        do {
-				if( ' ' < cmd && cmd <= '~' )
+				if (' ' < cmd && cmd <= '~')
 					putchar(cmd);
 				else
 					printf("\\x%x", cmd);
@@ -601,8 +974,35 @@ cmds(struct pt_regs *excp)
 			printf(" (type ? for help)\n");
 			break;
 		}
-		cpu_relax();
 	}
+}
+
+/*
+ * Step a single instruction.
+ * Some instructions we emulate, others we execute with MSR_SE set.
+ */
+static int do_step(struct pt_regs *regs)
+{
+	unsigned int instr;
+	int stepped;
+
+	/* check we are in 64-bit kernel mode, translation enabled */
+	if ((regs->msr & (MSR_SF|MSR_PR|MSR_IR)) == (MSR_SF|MSR_IR)) {
+		if (mread(regs->nip, &instr, 4) == 4) {
+			stepped = emulate_step(regs, instr);
+			if (stepped < 0)
+				return 0;
+			if (stepped > 0) {
+				regs->trap = 0xd00 | (regs->trap & 1);
+				printf("stepped to ");
+				xmon_print_symbol(regs->nip, " ", "\n");
+				ppc_inst_dump(regs->nip, 1, 0);
+				return 0;
+			}
+		}
+	}
+	regs->msr |= MSR_SE;
+	return 1;
 }
 
 static void bootcmds(void)
@@ -618,56 +1018,59 @@ static void bootcmds(void)
 		ppc_md.power_off();
 }
 
-#ifdef CONFIG_SMP
-static void cpu_cmd(void)
+static int cpu_cmd(void)
 {
+#ifdef CONFIG_SMP
 	unsigned long cpu;
 	int timeout;
-	int cmd;
+	int count;
 
-	cmd = inchar();
-	if (cmd == 'i') {
-		printf("stopping all cpus\n");
-		/* interrupt other cpu(s) */
-		cpu = MSG_ALL_BUT_SELF;
-		smp_send_debugger_break(cpu);
-		return;
-	}
-	termch = cmd;
 	if (!scanhex(&cpu)) {
 		/* print cpus waiting or in xmon */
 		printf("cpus stopped:");
+		count = 0;
 		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
 			if (cpu_isset(cpu, cpus_in_xmon)) {
-				printf(" %x", cpu);
-				if (cpu == smp_processor_id())
-					printf("*", cpu);
+				if (count == 0)
+					printf(" %x", cpu);
+				++count;
+			} else {
+				if (count > 1)
+					printf("-%x", cpu - 1);
+				count = 0;
 			}
 		}
+		if (count > 1)
+			printf("-%x", NR_CPUS - 1);
 		printf("\n");
-		return;
+		return 0;
 	}
 	/* try to switch to cpu specified */
-	take_xmon = cpu;
+	if (!cpu_isset(cpu, cpus_in_xmon)) {
+		printf("cpu 0x%x isn't in xmon\n", cpu);
+		return 0;
+	}
+	xmon_taken = 0;
+	mb();
+	xmon_owner = cpu;
 	timeout = 10000000;
-	while (take_xmon >= 0) {
+	while (!xmon_taken) {
 		if (--timeout == 0) {
-			/* yes there's a race here */
-			take_xmon = -1;
+			if (test_and_set_bit(0, &xmon_taken))
+				break;
+			/* take control back */
+			mb();
+			xmon_owner = smp_processor_id();
 			printf("cpu %u didn't take control\n", cpu);
-			return;
+			return 0;
 		}
+		barrier();
 	}
-	/* now have to wait to be given control back */
-	while (test_and_set_bit(0, &got_xmon)) {
-		if (take_xmon == smp_processor_id()) {
-			take_xmon = -1;
-			break;
-		}
-		cpu_relax();
-	}
-}
+	return 1;
+#else
+	return 0;
 #endif /* CONFIG_SMP */
+}
 
 static unsigned short fcstab[256] = {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
@@ -728,6 +1131,30 @@ csum(void)
 	printf("%x\n", fcs);
 }
 
+/*
+ * Check if this is a suitable place to put a breakpoint.
+ */
+static long check_bp_loc(unsigned long addr)
+{
+	unsigned int instr;
+
+	addr &= ~3;
+	if (addr < KERNELBASE) {
+		printf("Breakpoints may only be placed at kernel addresses\n");
+		return 0;
+	}
+	if (!mread(addr, &instr, sizeof(instr))) {
+		printf("Can't read instruction at address %lx\n", addr);
+		return 0;
+	}
+	if (IS_MTMSRD(instr) || IS_RFID(instr)) {
+		printf("Breakpoints may not be placed on mtmsrd or rfid "
+		       "instructions\n");
+		return 0;
+	}
+	return 1;
+}
+
 static char *breakpoint_help_string = 
     "Breakpoint command usage:\n"
     "b                show breakpoints\n"
@@ -745,6 +1172,8 @@ bpt_cmds(void)
 	unsigned long a;
 	int mode, i;
 	struct bpt *bp;
+	const char badaddr[] = "Only kernel addresses are permitted "
+		"for breakpoints\n";
 
 	cmd = inchar();
 	switch (cmd) {
@@ -758,54 +1187,66 @@ bpt_cmds(void)
 		else
 			termch = cmd;
 		dabr.address = 0;
-		dabr.count = 0;
-		dabr.enabled = scanhex(&dabr.address);
-		scanhex(&dabr.count);
-		if (dabr.enabled)
-			dabr.address = (dabr.address & ~7) | mode;
+		dabr.enabled = 0;
+		if (scanhex(&dabr.address)) {
+			if (dabr.address < KERNELBASE) {
+				printf(badaddr);
+				break;
+			}
+			dabr.address &= ~7;
+			dabr.enabled = mode | BP_DABR;
+		}
 		break;
+
 	case 'i':	/* bi - hardware instr breakpoint */
 		if (!(cur_cpu_spec->cpu_features & CPU_FTR_IABR)) {
-			printf("Not implemented on POWER4\n");
+			printf("Hardware instruction breakpoint "
+			       "not supported on this cpu\n");
 			break;
 		}
-		iabr.address = 0;
-		iabr.count = 0;
-		iabr.enabled = scanhex(&iabr.address);
-		if (iabr.enabled)
-			iabr.address |= 3;
-		scanhex(&iabr.count);
+		if (iabr) {
+			iabr->enabled &= ~(BP_IABR | BP_IABR_TE);
+			iabr = NULL;
+		}
+		if (!scanhex(&a))
+			break;
+		if (!check_bp_loc(a))
+			break;
+		bp = new_breakpoint(a);
+		if (bp != NULL) {
+			bp->enabled |= BP_IABR | BP_IABR_TE;
+			iabr = bp;
+		}
 		break;
+
 	case 'c':
 		if (!scanhex(&a)) {
 			/* clear all breakpoints */
 			for (i = 0; i < NBPTS; ++i)
 				bpts[i].enabled = 0;
-			iabr.enabled = 0;
+			iabr = NULL;
 			dabr.enabled = 0;
 			printf("All breakpoints cleared\n");
+			break;
+		}
+
+		if (a <= NBPTS && a >= 1) {
+			/* assume a breakpoint number */
+			bp = &bpts[a-1];	/* bp nums are 1 based */
 		} else {
-			if (a <= NBPTS && a >= 1) {
-				/* assume a breakpoint number */
-				--a;	/* bp nums are 1 based */
-				bp = &bpts[a];
-			} else {
-				/* assume a breakpoint address */
-				bp = at_breakpoint(a);
-			}
+			/* assume a breakpoint address */
+			bp = at_breakpoint(a);
 			if (bp == 0) {
 				printf("No breakpoint at %x\n", a);
-			} else {
-				printf("Cleared breakpoint %x (%lx ", 
-					(bp - bpts) + 1, bp->address);
-				xmon_print_symbol("%s)\n", bp->address);
-				bp->enabled = 0;
+				break;
 			}
 		}
+
+		printf("Cleared breakpoint %x (", BP_NUM(bp));
+		xmon_print_symbol(bp->address, " ", ")\n");
+		bp->enabled = 0;
 		break;
-	case '?':
-	        printf(breakpoint_help_string);
-	        break;
+
 	default:
 		termch = cmd;
 	        cmd = skipbl();
@@ -816,53 +1257,30 @@ bpt_cmds(void)
 		termch = cmd;
 		if (!scanhex(&a)) {
 			/* print all breakpoints */
-			int bpnum;
-
-			printf("   type            address    count\n");
+			printf("   type            address\n");
 			if (dabr.enabled) {
-				printf("   data   %.16lx %8x [", dabr.address & ~7,
-				       dabr.count);
-				if (dabr.address & 1)
+				printf("   data   %.16lx  [", dabr.address);
+				if (dabr.enabled & 1)
 					printf("r");
-				if (dabr.address & 2)
+				if (dabr.enabled & 2)
 					printf("w");
 				printf("]\n");
 			}
-			if (iabr.enabled)
-				printf("   inst   %.16lx %8x\n", iabr.address & ~3,
-				       iabr.count);
-			for (bp = bpts, bpnum = 1; bp < &bpts[NBPTS]; ++bp, ++bpnum)
-				if (bp->enabled) {
-					printf("%2x trap   %.16lx %8x  ",
-						bpnum, bp->address, bp->count);
-					xmon_print_symbol("%s\n", bp->address);
-				}
-			break;
-		}
-		
-		if (systemcfg->platform != PLATFORM_POWERMAC &&
-		   !(systemcfg->platform & PLATFORM_PSERIES)) {
-			printf("Not supported for this platform\n");
+			for (bp = bpts; bp < &bpts[NBPTS]; ++bp) {
+				if (!bp->enabled)
+					continue;
+				printf("%2x %s   ", BP_NUM(bp),
+				    (bp->enabled & BP_IABR)? "inst": "trap");
+				xmon_print_symbol(bp->address, "  ", "\n");
+			}
 			break;
 		}
 
-		bp = at_breakpoint(a);
-		if (bp == 0) {
-			for (bp = bpts; bp < &bpts[NBPTS]; ++bp)
-				if (!bp->enabled)
-					break;
-			if (bp >= &bpts[NBPTS]) {
-				printf("Sorry, no free breakpoints.  Please clear one first.\n");
-				break;
-			}
-		}
-		bp->enabled = 1;
-		bp->address = a;
-		bp->count = 0;
-		scanhex(&bp->count);
-		printf("Set breakpoint %2x trap   %.16lx %8x  ", (bp-bpts) + 1, 
-			bp->address, bp->count);
-		xmon_print_symbol("%s\n", bp->address);
+		if (!check_bp_loc(a))
+			break;
+		bp = new_breakpoint(a);
+		if (bp != NULL)
+			bp->enabled |= BP_TRAP;
 		break;
 	}
 }
@@ -872,77 +1290,139 @@ static
 const char *getvecname(unsigned long vec)
 {
 	char *ret;
+
 	switch (vec) {
-	case 0x100:	ret = "(System Reset)"; break; 
-	case 0x200:	ret = "(Machine Check)"; break; 
-	case 0x300:	ret = "(Data Access)"; break; 
+	case 0x100:	ret = "(System Reset)"; break;
+	case 0x200:	ret = "(Machine Check)"; break;
+	case 0x300:	ret = "(Data Access)"; break;
 	case 0x380:	ret = "(Data SLB Access)"; break;
-	case 0x400:	ret = "(Instruction Access)"; break; 
+	case 0x400:	ret = "(Instruction Access)"; break;
 	case 0x480:	ret = "(Instruction SLB Access)"; break;
-	case 0x500:	ret = "(Hardware Interrupt)"; break; 
-	case 0x600:	ret = "(Alignment)"; break; 
-	case 0x700:	ret = "(Program Check)"; break; 
-	case 0x800:	ret = "(FPU Unavailable)"; break; 
-	case 0x900:	ret = "(Decrementer)"; break; 
-	case 0xc00:	ret = "(System Call)"; break; 
-	case 0xd00:	ret = "(Single Step)"; break; 
-	case 0xf00:	ret = "(Performance Monitor)"; break; 
+	case 0x500:	ret = "(Hardware Interrupt)"; break;
+	case 0x600:	ret = "(Alignment)"; break;
+	case 0x700:	ret = "(Program Check)"; break;
+	case 0x800:	ret = "(FPU Unavailable)"; break;
+	case 0x900:	ret = "(Decrementer)"; break;
+	case 0xc00:	ret = "(System Call)"; break;
+	case 0xd00:	ret = "(Single Step)"; break;
+	case 0xf00:	ret = "(Performance Monitor)"; break;
+	case 0xf20:	ret = "(Altivec Unavailable)"; break;
+	case 0x1300:	ret = "(Instruction Breakpoint)"; break;
 	default: ret = "";
 	}
 	return ret;
 }
 
-/*
- * Most of our exceptions are in the form:
- *    bl handler
- *    b .ret_from_exception
- * and this currently fails to catch them.
- */
-static inline int exception_frame(unsigned long ip)
+static void get_function_bounds(unsigned long pc, unsigned long *startp,
+				unsigned long *endp)
 {
-	extern void *ret_from_syscall_1, *ret_from_syscall_2, *ret_from_except;
+	unsigned long size, offset;
+	const char *name;
+	char *modname;
 
-	if ((ip == (unsigned long)ret_from_syscall_1) ||
-	    (ip == (unsigned long)ret_from_syscall_2) ||
-	    (ip == (unsigned long)ret_from_except))
-		return 1;
-
-	return 0;
+	*startp = *endp = 0;
+	if (pc == 0)
+		return;
+	if (setjmp(bus_error_jmp) == 0) {
+		catch_memory_errors = 1;
+		sync();
+		name = kallsyms_lookup(pc, &size, &offset, &modname, tmpstr);
+		if (name != NULL) {
+			*startp = pc - offset;
+			*endp = pc - offset + size;
+		}
+		sync();
+	}
+	catch_memory_errors = 0;
 }
 
 static int xmon_depth_to_print = 64;
 
-static void xmon_show_stack(unsigned long sp)
+static void xmon_show_stack(unsigned long sp, unsigned long lr,
+			    unsigned long pc)
 {
 	unsigned long ip;
 	unsigned long newsp;
+	unsigned long marker;
 	int count = 0;
 	struct pt_regs regs;
 
 	do {
 		if (sp < PAGE_OFFSET) {
-			printf("SP in userspace\n");
+			if (sp != 0)
+				printf("SP (%lx) is in userspace\n", sp);
 			break;
 		}
 
-		if (!mread((sp + 16), &ip, sizeof(unsigned long)))
+		if (!mread(sp + 16, &ip, sizeof(unsigned long))
+		    || !mread(sp, &newsp, sizeof(unsigned long))) {
+			printf("Couldn't read stack frame at %lx\n", sp);
 			break;
+		}
 
-		printf("[%016lx] [%016lx] ", sp, ip);
-		xmon_print_symbol("%s\n", ip);
+		/*
+		 * For the first stack frame, try to work out if
+		 * LR and/or the saved LR value in the bottommost
+		 * stack frame are valid.
+		 */
+		if ((pc | lr) != 0) {
+			unsigned long fnstart, fnend;
+			unsigned long nextip;
+			int printip = 1;
 
-		if (exception_frame(ip)) {
-			if (mread(sp+112, &regs, sizeof(regs)) != sizeof(regs))
+			get_function_bounds(pc, &fnstart, &fnend);
+			nextip = 0;
+			if (newsp > sp)
+				mread(newsp + 16, &nextip,
+				      sizeof(unsigned long));
+			if (lr == ip) {
+				if (lr < PAGE_OFFSET
+				    || (fnstart <= lr && lr < fnend))
+					printip = 0;
+			} else if (lr == nextip) {
+				printip = 0;
+			} else if (lr >= PAGE_OFFSET
+				   && !(fnstart <= lr && lr < fnend)) {
+				printf("[link register   ] ");
+				xmon_print_symbol(lr, " ", "\n");
+			}
+			if (printip) {
+				printf("[%.16lx] ", sp);
+				xmon_print_symbol(ip, " ", " (unreliable)\n");
+			}
+			pc = lr = 0;
+
+		} else {
+			printf("[%.16lx] ", sp);
+			xmon_print_symbol(ip, " ", "\n");
+		}
+
+		/* Look for "regshere" marker to see if this is
+		   an exception frame. */
+		if (newsp - sp == sizeof(struct pt_regs) + 400
+		    && mread(sp + 0x60, &marker, sizeof(unsigned long))
+		    && marker == 0x7265677368657265) {
+			if (mread(sp + 0x70, &regs, sizeof(regs))
+			    != sizeof(regs)) {
+				printf("Couldn't read registers at %lx\n",
+				       sp + 0x70);
 				break;
-
-                        printf("  exception: %lx %s regs %lx\n", regs.trap,
-			       getvecname(regs.trap), sp+112);
+			}
+                        printf("--- Exception: %lx %s at ", regs.trap,
+			       getvecname(TRAP(&regs)));
+			pc = regs.nip;
+			lr = regs.link;
+			xmon_print_symbol(pc, " ", "\n");
 		}
 
-		if (!mread(sp, &newsp, sizeof(unsigned long)))
+		if (newsp == 0)
 			break;
-		if (newsp < sp)
+		if (newsp < sp) {
+			printf("Stack chain goes %s: %.16lx\n",
+			       (newsp < KERNELBASE? "into userspace":
+				"backwards"), newsp);
 			break;
+		}
 
 		sp = newsp;
 	} while (count++ < xmon_depth_to_print);
@@ -952,42 +1432,36 @@ static void backtrace(struct pt_regs *excp)
 {
 	unsigned long sp;
 
-	if (excp == NULL)
-		sp = __get_SP();
+	if (scanhex(&sp))
+		xmon_show_stack(sp, 0, 0);
 	else
-		sp = excp->gpr[1];
-
-	scanhex(&sp);
+		xmon_show_stack(excp->gpr[1], excp->link, excp->nip);
 	scannl();
-
-	xmon_show_stack(sp);
 }
-
-spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;
 
 void excprint(struct pt_regs *fp)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&exception_print_lock, flags);
+	unsigned long trap;
 
 #ifdef CONFIG_SMP
-	printf("cpu %d: ", smp_processor_id());
+	printf("cpu 0x%x: ", smp_processor_id());
 #endif /* CONFIG_SMP */
 
-	printf("Vector: %lx %s at [%lx]\n", fp->trap, getvecname(fp->trap), fp);
-	printf("    pc: %lx", fp->nip);
-	xmon_print_symbol(" (%s)\n", fp->nip);
+	trap = TRAP(fp);
+	printf("Vector: %lx %s at [%lx]\n", fp->trap, getvecname(trap), fp);
+	printf("    pc: ");
+	xmon_print_symbol(fp->nip, ": ", "\n");
 
-	printf("    lr: %lx", fp->link);
-	xmon_print_symbol(" (%s)\n", fp->link);
+	printf("    lr: ", fp->link);
+	xmon_print_symbol(fp->link, ": ", "\n");
 
 	printf("    sp: %lx\n", fp->gpr[1]);
 	printf("   msr: %lx\n", fp->msr);
 
-	if (fp->trap == 0x300 || fp->trap == 0x380 || fp->trap == 0x600) {
+	if (trap == 0x300 || trap == 0x380 || trap == 0x600) {
 		printf("   dar: %lx\n", fp->dar);
-		printf(" dsisr: %lx\n", fp->dsisr);
+		if (trap != 0x380)
+			printf(" dsisr: %lx\n", fp->dsisr);
 	}
 
 	printf("  current = 0x%lx\n", current);
@@ -996,39 +1470,50 @@ void excprint(struct pt_regs *fp)
 		printf("    pid   = %ld, comm = %s\n",
 		       current->pid, current->comm);
 	}
-
-	spin_unlock_irqrestore(&exception_print_lock, flags);
 }
 
 void prregs(struct pt_regs *fp)
 {
 	int n;
 	unsigned long base;
+	struct pt_regs regs;
 
-	if (scanhex((void *)&base))
-		fp = (struct pt_regs *) base;
-
-	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
-		sync();
-		for (n = 0; n < 16; ++n)
-			printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n", n,
-			       fp->gpr[n], n+16, fp->gpr[n+16]);
-		printf("pc  = %.16lx   msr = %.16lx\nlr  = %.16lx   "
-		       "cr  = %.16lx\n", fp->nip, fp->msr, fp->link, fp->ccr);
-		printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
-		       fp->ctr, fp->xer, fp->trap);
-
-		sync();
-		/* wait a little while to see if we get a machine check */
-		__delay(200);
-	} else {
-		printf("*** Error reading regs\n");
+	if (scanhex(&base)) {
+		if (setjmp(bus_error_jmp) == 0) {
+			catch_memory_errors = 1;
+			sync();
+			regs = *(struct pt_regs *)base;
+			sync();
+			__delay(200);
+		} else {
+			catch_memory_errors = 0;
+			printf("*** Error reading registers from %.16lx\n",
+			       base);
+			return;
+		}
+		catch_memory_errors = 0;
+		fp = &regs;
 	}
+
+	if (FULL_REGS(fp)) {
+		for (n = 0; n < 16; ++n)
+			printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n",
+			       n, fp->gpr[n], n+16, fp->gpr[n+16]);
+	} else {
+		for (n = 0; n < 7; ++n)
+			printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n",
+			       n, fp->gpr[n], n+7, fp->gpr[n+7]);
+	}
+	printf("pc  = ");
+	xmon_print_symbol(fp->nip, " ", "\n");
+	printf("lr  = ");
+	xmon_print_symbol(fp->link, " ", "\n");
+	printf("msr = %.16lx   cr  = %.8lx\n", fp->msr, fp->ccr);
+	printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
+	       fp->ctr, fp->xer, fp->trap);
 }
 
-void
-cacheflush(void)
+void cacheflush(void)
 {
 	int cmd;
 	unsigned long nflush;
@@ -1043,7 +1528,7 @@ cacheflush(void)
 	scanhex(&nflush);
 	nflush = (nflush + L1_CACHE_BYTES - 1) / L1_CACHE_BYTES;
 	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
+		catch_memory_errors = 1;
 		sync();
 
 		if (cmd != 'i') {
@@ -1057,7 +1542,7 @@ cacheflush(void)
 		/* wait a little while to see if we get a machine check */
 		__delay(200);
 	}
-	__debugger_fault_handler = 0;
+	catch_memory_errors = 0;
 }
 
 unsigned long
@@ -1077,20 +1562,7 @@ read_spr(int n)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(void)) opd;
 
-	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
-		sync();
-
-		ret = code();
-
-		sync();
-		/* wait a little while to see if we get a machine check */
-		__delay(200);
-	} else {
-		printf("*** Error reading spr %x\n", n);
-	}
-
-	__debugger_fault_handler = 0;
+	ret = code();
 
 	return ret;
 }
@@ -1111,20 +1583,7 @@ write_spr(int n, unsigned long val)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(unsigned long)) opd;
 
-	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
-		sync();
-
-		code(val);
-
-		sync();
-		/* wait a little while to see if we get a machine check */
-		__delay(200);
-	} else {
-		printf("*** Error writing spr %x\n", n);
-	}
-
-	__debugger_fault_handler = 0;
+	code(val);
 }
 
 static unsigned long regno;
@@ -1161,15 +1620,20 @@ super_regs()
     
 		printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->xLpPacaPtr;
-		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n", ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
-		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n", ptrLpPaca->xSavedGpr3, ptrLpPaca->xSavedGpr4);
+		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n",
+		       ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
+		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
+		       ptrLpPaca->xSavedGpr3, ptrLpPaca->xSavedGpr4);
 		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->xSavedGpr5);
     
 		printf("  Local Processor Register Save Area (LpRegSave): \n");
 		ptrLpRegSave = ptrPaca->xLpRegSavePtr;
-		printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n", ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
-		printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n", ptrLpRegSave->xSPRG2, ptrLpRegSave->xSPRG3);
-		printf("    Saved Msr  =%.16lx  Saved Nia  =%.16lx \n", ptrLpRegSave->xMSR, ptrLpRegSave->xNIA);
+		printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n",
+		       ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
+		printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n",
+		       ptrLpRegSave->xSPRG2, ptrLpRegSave->xSPRG3);
+		printf("    Saved Msr  =%.16lx  Saved Nia  =%.16lx \n",
+		       ptrLpRegSave->xMSR, ptrLpRegSave->xNIA);
 #endif
 
 		return;
@@ -1194,6 +1658,9 @@ super_regs()
 	scannl();
 }
 
+/*
+ * Stuff for reading and writing memory safely
+ */
 int
 mread(unsigned long adrs, void *buf, int size)
 {
@@ -1202,7 +1669,7 @@ mread(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
+		catch_memory_errors = 1;
 		sync();
 		p = (char *)adrs;
 		q = (char *)buf;
@@ -1227,7 +1694,7 @@ mread(unsigned long adrs, void *buf, int size)
 		__delay(200);
 		n = size;
 	}
-	__debugger_fault_handler = 0;
+	catch_memory_errors = 0;
 	return n;
 }
 
@@ -1239,7 +1706,7 @@ mwrite(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
+		catch_memory_errors = 1;
 		sync();
 		p = (char *) adrs;
 		q = (char *) buf;
@@ -1266,7 +1733,7 @@ mwrite(unsigned long adrs, void *buf, int size)
 	} else {
 		printf("*** Error writing address %x\n", adrs + n);
 	}
-	__debugger_fault_handler = 0;
+	catch_memory_errors = 0;
 	return n;
 }
 
@@ -1276,7 +1743,7 @@ static char *fault_chars[] = { "--", "**", "##" };
 static int
 handle_fault(struct pt_regs *regs)
 {
-	switch (regs->trap) {
+	switch (TRAP(regs)) {
 	case 0x200:
 		fault_type = 0;
 		break;
@@ -1541,7 +2008,7 @@ dump()
 		scanhex(&nidump);
 		if( nidump == 0 )
 			nidump = 16;
-		adrs += ppc_inst_dump(adrs, nidump);
+		adrs += ppc_inst_dump(adrs, nidump, 1);
 		last_cmd = "di\n";
 	} else {
 		scanhex(&ndump);
@@ -1559,41 +2026,43 @@ prdump(unsigned long adrs, long ndump)
 	long n, m, c, r, nr;
 	unsigned char temp[16];
 
-	for( n = ndump; n > 0; ){
+	for (n = ndump; n > 0;) {
 		printf("%.16lx", adrs);
 		putchar(' ');
 		r = n < 16? n: 16;
 		nr = mread(adrs, temp, r);
 		adrs += nr;
-		for( m = 0; m < r; ++m ){
+		for (m = 0; m < r; ++m) {
 		        if ((m & 7) == 0 && m > 0)
 			    putchar(' ');
-			if( m < nr )
+			if (m < nr)
 				printf("%.2x", temp[m]);
 			else
 				printf("%s", fault_chars[fault_type]);
 		}
-		for(; m < 16; ++m )
-			printf("   ");
+		if (m <= 8)
+			printf(" ");
+		for (; m < 16; ++m)
+			printf("  ");
 		printf("  |");
-		for( m = 0; m < r; ++m ){
-			if( m < nr ){
+		for (m = 0; m < r; ++m) {
+			if (m < nr) {
 				c = temp[m];
 				putchar(' ' <= c && c <= '~'? c: '.');
 			} else
 				putchar(' ');
 		}
 		n -= r;
-		for(; m < 16; ++m )
+		for (; m < 16; ++m)
 			putchar(' ');
 		printf("|\n");
-		if( nr < r )
+		if (nr < r)
 			break;
 	}
 }
 
 int
-ppc_inst_dump(unsigned long adr, long count)
+ppc_inst_dump(unsigned long adr, long count, int praddr)
 {
 	int nr, dotted;
 	unsigned long first_adr;
@@ -1601,11 +2070,13 @@ ppc_inst_dump(unsigned long adr, long count)
 	unsigned char val[4];
 
 	dotted = 0;
-	for (first_adr = adr; count > 0; --count, adr += 4){
+	for (first_adr = adr; count > 0; --count, adr += 4) {
 		nr = mread(adr, val, 4);
-		if( nr == 0 ){
-			const char *x = fault_chars[fault_type];
-			printf("%.16lx  %s%s%s%s\n", adr, x, x, x, x);
+		if (nr == 0) {
+			if (praddr) {
+				const char *x = fault_chars[fault_type];
+				printf("%.16lx  %s%s%s%s\n", adr, x, x, x, x);
+			}
 			break;
 		}
 		inst = GETWORD(val);
@@ -1618,9 +2089,10 @@ ppc_inst_dump(unsigned long adr, long count)
 		}
 		dotted = 0;
 		last_inst = inst;
-		printf("%.16lx  ", adr);
-		printf("%.8x\t", inst);
-		print_insn_big_powerpc(stdout, inst, adr);	/* always returns 4 */
+		if (praddr)
+			printf("%.16lx  %.8x", adr, inst);
+		printf("\t");
+		print_insn_powerpc(inst, adr, 0);	/* always returns 4 */
 		printf("\n");
 	}
 	return adr - first_adr;
@@ -1629,19 +2101,7 @@ ppc_inst_dump(unsigned long adr, long count)
 void
 print_address(unsigned long addr)
 {
-	const char *name;
-	char *modname;
-	long size, offset;
-
-	name = kallsyms_lookup(addr, &size, &offset, &modname, tmpstr);
-
-	if (name) {
-		if (modname)
-			printf("0x%lx\t# %s:%s+0x%lx", addr, modname, name, offset);
-		else
-			printf("0x%lx\t# %s+0x%lx", addr, name, offset);
-	} else
-		printf("0x%lx", addr);
+	xmon_print_symbol(addr, "\t# ", "");
 }
 
 
@@ -1781,7 +2241,7 @@ static char *regnames[N_PTREGS] = {
 	"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
 	"r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23",
 	"r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31",
-	"pc", "msr", "or3", "ctr", "lr", "xer", "ccr", "mq",
+	"pc", "msr", "or3", "ctr", "lr", "xer", "ccr", "softe",
 	"trap", "dar", "dsisr", "res"
 };
 
@@ -1809,13 +2269,11 @@ unsigned long *vp;
 		regname[i] = 0;
 		for (i = 0; i < N_PTREGS; ++i) {
 			if (strcmp(regnames[i], regname) == 0) {
-				unsigned long *rp = (unsigned long *)
-					xmon_regs[smp_processor_id()];
-				if (rp == NULL) {
+				if (xmon_regs == NULL) {
 					printf("regs not available\n");
 					return 0;
 				}
-				*vp = rp[i];
+				*vp = ((unsigned long *)xmon_regs)[i];
 				return 1;
 			}
 		}
@@ -1827,8 +2285,16 @@ unsigned long *vp;
 
 	if (c == '0') {
 		c = inchar();
-		if (c == 'x')
+		if (c == 'x') {
 			c = inchar();
+		} else {
+			d = hexdigit(c);
+			if (d == EOF) {
+				termch = c;
+				*vp = 0;
+				return 1;
+			}
+		}
 	} else if (c == '$') {
 		int i;
 		for (i=0; i<63; i++) {
@@ -1943,16 +2409,14 @@ symbol_lookup(void)
 
 	switch (type) {
 	case 'a':
-		if (scanhex(&addr)) {
-			printf("%lx: ", addr);
-			xmon_print_symbol("%s\n", addr);
-		}
+		if (scanhex(&addr))
+			xmon_print_symbol(addr, ": ", "\n");
 		termch = 0;
 		break;
 	case 's':
 		getstring(tmp, 64);
 		if (setjmp(bus_error_jmp) == 0) {
-			__debugger_fault_handler = handle_fault;
+			catch_memory_errors = 1;
 			sync();
 			addr = kallsyms_lookup_name(tmp);
 			if (addr)
@@ -1961,58 +2425,40 @@ symbol_lookup(void)
 				printf("Symbol '%s' not found.\n", tmp);
 			sync();
 		}
-		__debugger_fault_handler = 0;
+		catch_memory_errors = 0;
 		termch = 0;
 		break;
 	}
 }
 
 
-/* xmon version of __print_symbol */
-void __xmon_print_symbol(const char *fmt, unsigned long address)
+/* Print an address in numeric and symbolic form (if possible) */
+static void xmon_print_symbol(unsigned long address, const char *mid,
+			      const char *after)
 {
 	char *modname;
-	const char *name;
+	const char *name = NULL;
 	unsigned long offset, size;
 
+	printf("%.16lx", address);
 	if (setjmp(bus_error_jmp) == 0) {
-		__debugger_fault_handler = handle_fault;
+		catch_memory_errors = 1;
 		sync();
 		name = kallsyms_lookup(address, &size, &offset, &modname,
 				       tmpstr);
 		sync();
 		/* wait a little while to see if we get a machine check */
 		__delay(200);
-	} else {
-		name = "symbol lookup failed";
 	}
 
-	__debugger_fault_handler = 0;
+	catch_memory_errors = 0;
 
-	if (!name) {
-		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
-
-		sprintf(addrstr, "0x%lx", address);
-		printf(fmt, addrstr);
-		return;
+	if (name) {
+		printf("%s%s+%#lx/%#lx", mid, name, offset, size);
+		if (modname)
+			printf(" [%s]", modname);
 	}
-
-	if (modname) {
-		/* This is pretty small. */
-		char buffer[sizeof("%s+%#lx/%#lx [%s]")
-			   + strlen(name) + 2*(BITS_PER_LONG*3/10)
-			   + strlen(modname)];
-
-		sprintf(buffer, "%s+%#lx/%#lx [%s]",
-			name, offset, size, modname);
-		printf(fmt, buffer);
-	} else {
-		char buffer[sizeof("%s+%#lx/%#lx")
-			   + strlen(name) + 2*(BITS_PER_LONG*3/10)];
-
-		sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
-		printf(fmt, buffer);
-	}
+	printf("%s", after);
 }
 
 static void debug_trace(void)
@@ -2069,7 +2515,7 @@ static void dump_slb(void)
 	int i;
 	unsigned long tmp;
 
-	printf("SLB contents of cpu %d\n", smp_processor_id());
+	printf("SLB contents of cpu %x\n", smp_processor_id());
 
 	for (i = 0; i < naca->slb_size; i++) {
 		asm volatile("slbmfee  %0,%1" : "=r" (tmp) : "r" (i));
@@ -2085,7 +2531,7 @@ static void dump_stab(void)
 	int i;
 	unsigned long *tmp = (unsigned long *)get_paca()->xStab_data.virt;
 
-	printf("Segment table contents of cpu %d\n", smp_processor_id());
+	printf("Segment table contents of cpu %x\n", smp_processor_id());
 
 	for (i = 0; i < PAGE_SIZE/16; i++) {
 		unsigned long a, b;
@@ -2103,10 +2549,12 @@ static void dump_stab(void)
 void xmon_init(void)
 {
 	__debugger = xmon;
+	__debugger_ipi = xmon_ipi;
 	__debugger_bpt = xmon_bpt;
 	__debugger_sstep = xmon_sstep;
 	__debugger_iabr_match = xmon_iabr_match;
 	__debugger_dabr_match = xmon_dabr_match;
+	__debugger_fault_handler = xmon_fault_handler;
 }
 
 void dump_segments(void)

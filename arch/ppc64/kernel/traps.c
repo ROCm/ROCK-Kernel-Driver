@@ -44,6 +44,7 @@ extern int fwnmi_active;
 
 #ifdef CONFIG_DEBUGGER
 int (*__debugger)(struct pt_regs *regs);
+int (*__debugger_ipi)(struct pt_regs *regs);
 int (*__debugger_bpt)(struct pt_regs *regs);
 int (*__debugger_sstep)(struct pt_regs *regs);
 int (*__debugger_iabr_match)(struct pt_regs *regs);
@@ -51,6 +52,7 @@ int (*__debugger_dabr_match)(struct pt_regs *regs);
 int (*__debugger_fault_handler)(struct pt_regs *regs);
 
 EXPORT_SYMBOL(__debugger);
+EXPORT_SYMBOL(__debugger_ipi);
 EXPORT_SYMBOL(__debugger_bpt);
 EXPORT_SYMBOL(__debugger_sstep);
 EXPORT_SYMBOL(__debugger_iabr_match);
@@ -68,9 +70,6 @@ int die(const char *str, struct pt_regs *regs, long err)
 {
 	static int die_counter;
 	int nl = 0;
-
-	if (debugger_fault_handler(regs))
-		return 1;
 
 	if (debugger(regs))
 		return 1;
@@ -266,6 +265,8 @@ MachineCheckException(struct pt_regs *regs)
 	}
 #endif
 
+	if (debugger_fault_handler(regs))
+		return;
 	die("Machine check", regs, 0);
 
 	/* Must die if the interrupt is not recoverable */
