@@ -292,6 +292,7 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 		}
 	}
 	if (rt->rt_src == 0) {
+		kfree_skb(skb);
 		ip_rt_put(rt);
 		return 0;
 	}
