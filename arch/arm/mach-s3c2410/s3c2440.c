@@ -15,6 +15,7 @@
  *	01-Nov-2004 BJD  Fixed clock build code
  *	09-Nov-2004 BJD  Added sysdev for power management
  *	04-Nov-2004 BJD  New serial registration
+ *	15-Nov-2004 BJD  Rename the i2c device for the s3c2440
 */
 
 #include <linux/kernel.h>
@@ -264,6 +265,10 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 
 	clk_disable(&s3c2440_clk_ac97);
 	clk_disable(&s3c2440_clk_cam);
+
+	/* rename any peripherals used differing from the s3c2410 */
+
+	s3c_device_i2c.name = "s3c2440-i2c";
 }
 
 int __init s3c2440_init(void)
