@@ -90,7 +90,7 @@ static inline int sctp_wspace(struct sctp_association *asoc);
 static inline void sctp_set_owner_w(struct sctp_chunk *chunk);
 static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
-				int msg_len);
+				size_t msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
@@ -943,7 +943,7 @@ static int sctp_error(struct sock *sk, int flags, int err)
 SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 
 SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
-			     struct msghdr *msg, int msg_len)
+			     struct msghdr *msg, size_t msg_len)
 {
 	struct sctp_opt *sp;
 	struct sctp_endpoint *ep;
@@ -965,7 +965,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct list_head *pos;
 	int msg_flags = msg->msg_flags;
 
-	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
+	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %u)\n",
 			  sk, msg, msg_len);
 
 	err = 0;
@@ -1021,7 +1021,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		associd = sinfo->sinfo_assoc_id;
 	}
 
-	SCTP_DEBUG_PRINTK("msg_len: %d, sinfo_flags: 0x%x\n",
+	SCTP_DEBUG_PRINTK("msg_len: %u, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
 	/* MSG_EOF or MSG_ABORT cannot be set on a TCP-style socket. */
@@ -1377,7 +1377,7 @@ static int sctp_skb_pull(struct sk_buff *skb, int len)
 static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 
 SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
-			     struct msghdr *msg, int len, int noblock,
+			     struct msghdr *msg, size_t len, int noblock,
 			     int flags, int *addr_len)
 {
 	struct sctp_ulpevent *event = NULL;
@@ -4157,14 +4157,14 @@ static void sctp_wfree(struct sk_buff *skb)
 
 /* Helper function to wait for space in the sndbuf.  */
 static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
-				int msg_len)
+				size_t msg_len)
 {
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	long current_timeo = *timeo_p;
 	DEFINE_WAIT(wait);
 
-	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%d\n",
+	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%u\n",
 	                  asoc, (long)(*timeo_p), msg_len);
 
 	/* Increment the association's refcnt.  */
