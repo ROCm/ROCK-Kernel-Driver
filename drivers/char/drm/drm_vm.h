@@ -33,27 +33,27 @@
 #include "drmP.h"
 
 struct vm_operations_struct   DRM(vm_ops) = {
-	nopage:	 DRM(vm_nopage),
-	open:	 DRM(vm_open),
-	close:	 DRM(vm_close),
+	.nopage = DRM(vm_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_close),
 };
 
 struct vm_operations_struct   DRM(vm_shm_ops) = {
-	nopage:	 DRM(vm_shm_nopage),
-	open:	 DRM(vm_open),
-	close:	 DRM(vm_shm_close),
+	.nopage = DRM(vm_shm_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_shm_close),
 };
 
 struct vm_operations_struct   DRM(vm_dma_ops) = {
-	nopage:	 DRM(vm_dma_nopage),
-	open:	 DRM(vm_open),
-	close:	 DRM(vm_close),
+	.nopage = DRM(vm_dma_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_close),
 };
 
 struct vm_operations_struct   DRM(vm_sg_ops) = {
-	nopage:  DRM(vm_sg_nopage),
-	open:    DRM(vm_open),
-	close:   DRM(vm_close),
+	.nopage = DRM(vm_sg_nopage),
+	.open   = DRM(vm_open),
+	.close  = DRM(vm_close),
 };
 
 struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
@@ -343,7 +343,7 @@ int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 
 	vma->vm_ops   = &DRM(vm_dma_ops);
 
-#if LINUX_VERSION_CODE <= 0x020414
+#if LINUX_VERSION_CODE <= 0x02040e /* KERNEL_VERSION(2,4,14) */
 	vma->vm_flags |= VM_LOCKED | VM_SHM; /* Don't swap */
 #else
 	vma->vm_flags |= VM_RESERVED; /* Don't swap */
@@ -473,7 +473,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_private_data = (void *)map;
 				/* Don't let this area swap.  Change when
 				   DRM_KERNEL advisory is supported. */
-#if LINUX_VERSION_CODE <= 0x020414
+#if LINUX_VERSION_CODE <= 0x02040e /* KERNEL_VERSION(2,4,14) */
 		vma->vm_flags |= VM_LOCKED;
 #else
 		vma->vm_flags |= VM_RESERVED;
@@ -482,7 +482,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 	case _DRM_SCATTER_GATHER:
 		vma->vm_ops = &DRM(vm_sg_ops);
 		vma->vm_private_data = (void *)map;
-#if LINUX_VERSION_CODE <= 0x020414
+#if LINUX_VERSION_CODE <= 0x02040e /* KERNEL_VERSION(2,4,14) */
 		vma->vm_flags |= VM_LOCKED;
 #else
 		vma->vm_flags |= VM_RESERVED;
@@ -491,7 +491,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 	default:
 		return -EINVAL;	/* This should never happen. */
 	}
-#if LINUX_VERSION_CODE <= 0x020414
+#if LINUX_VERSION_CODE <= 0x02040e /* KERNEL_VERSION(2,4,14) */
 	vma->vm_flags |= VM_LOCKED | VM_SHM; /* Don't swap */
 #else
 	vma->vm_flags |= VM_RESERVED; /* Don't swap */

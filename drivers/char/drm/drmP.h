@@ -165,7 +165,7 @@
 #define pte_unmap(pte)
 #endif
 
-#if LINUX_VERSION_CODE < 0x020500
+#if LINUX_VERSION_CODE < 0x020413 /* KERNEL_VERSION(2,4,19) */
 static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 {
 	unsigned long addr = (unsigned long) vmalloc_addr;
