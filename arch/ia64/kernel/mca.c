@@ -542,7 +542,7 @@ ia64_mca_register_cpev (int cpev)
 	}
 
 	IA64_MCA_DEBUG("%s: corrected platform error "
-		       "vector %#x setup and enabled\n", __FUNCTION__, cpev);
+		       "vector %#x registered\n", __FUNCTION__, cpev);
 }
 #endif /* CONFIG_ACPI */
 
@@ -551,8 +551,9 @@ ia64_mca_register_cpev (int cpev)
 /*
  * ia64_mca_cmc_vector_setup
  *
- *  Setup the corrected machine check vector register in the processor and
- *  unmask interrupt.  This function is invoked on a per-processor basis.
+ *  Setup the corrected machine check vector register in the processor.
+ *  (The interrupt is masked on boot. ia64_mca_late_init unmask this.)
+ *  This function is invoked on a per-processor basis.
  *
  * Inputs
  *      None
@@ -566,12 +567,12 @@ ia64_mca_cmc_vector_setup (void)
 	cmcv_reg_t	cmcv;
 
 	cmcv.cmcv_regval	= 0;
-	cmcv.cmcv_mask		= 0;        /* Unmask/enable interrupt */
+	cmcv.cmcv_mask		= 1;        /* Mask/disable interrupt at first */
 	cmcv.cmcv_vector	= IA64_CMC_VECTOR;
 	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
-		       "machine check vector %#x setup and enabled.\n",
+		       "machine check vector %#x registered.\n",
 		       __FUNCTION__, smp_processor_id(), IA64_CMC_VECTOR);
 
 	IA64_MCA_DEBUG("%s: CPU %d CMCV = %#016lx\n",
@@ -1293,7 +1294,7 @@ ia64_mca_init(void)
 	 */
 	register_percpu_irq(IA64_CMC_VECTOR, &cmci_irqaction);
 	register_percpu_irq(IA64_CMCP_VECTOR, &cmcp_irqaction);
-	ia64_mca_cmc_vector_setup();       /* Setup vector on BSP & enable */
+	ia64_mca_cmc_vector_setup();       /* Setup vector on BSP */
 
 	/* Setup the MCA rendezvous interrupt vector */
 	register_percpu_irq(IA64_MCA_RENDEZ_VECTOR, &mca_rdzv_irqaction);
@@ -1303,23 +1304,8 @@ ia64_mca_init(void)
 
 #ifdef CONFIG_ACPI
 	/* Setup the CPEI/P vector and handler */
-	{
-		irq_desc_t *desc;
-		unsigned int irq;
-
-		cpe_vector = acpi_request_vector(ACPI_INTERRUPT_CPEI);
-
-		if (cpe_vector >= 0) {
-			for (irq = 0; irq < NR_IRQS; ++irq)
-				if (irq_to_vector(irq) == cpe_vector) {
-					desc = irq_descp(irq);
-					desc->status |= IRQ_PER_CPU;
-					setup_irq(irq, &mca_cpe_irqaction);
-				}
-			ia64_mca_register_cpev(cpe_vector);
-		}
-		register_percpu_irq(IA64_CPEP_VECTOR, &mca_cpep_irqaction);
-	}
+	cpe_vector = acpi_request_vector(ACPI_INTERRUPT_CPEI);
+	register_percpu_irq(IA64_CPEP_VECTOR, &mca_cpep_irqaction);
 #endif
 
 	/* Initialize the areas set aside by the OS to buffer the
@@ -1347,21 +1333,43 @@ ia64_mca_init(void)
 static int __init
 ia64_mca_late_init(void)
 {
+	/* Setup the CMCI/P vector and handler */
 	init_timer(&cmc_poll_timer);
 	cmc_poll_timer.function = ia64_mca_cmc_poll;
 
-	/* Reset to the correct state */
+	/* Unmask/enable the vector */
 	cmc_polling_enabled = 0;
+	schedule_work(&cmc_enable_work);
 
+	IA64_MCA_DEBUG("%s: CMCI/P setup and enabled.\n", __FUNCTION__);
+
+#ifdef CONFIG_ACPI
+	/* Setup the CPEI/P vector and handler */
 	init_timer(&cpe_poll_timer);
 	cpe_poll_timer.function = ia64_mca_cpe_poll;
 
-#ifdef CONFIG_ACPI
-	/* If platform doesn't support CPEI, get the timer going. */
-	if (cpe_vector < 0 && cpe_poll_enabled) {
-		ia64_mca_cpe_poll(0UL);
-	} else {
-		cpe_poll_enabled = 0;
+	{
+		irq_desc_t *desc;
+		unsigned int irq;
+
+		if (cpe_vector >= 0) {
+			/* If platform supports CPEI, enable the irq. */
+			cpe_poll_enabled = 0;
+			for (irq = 0; irq < NR_IRQS; ++irq)
+				if (irq_to_vector(irq) == cpe_vector) {
+					desc = irq_descp(irq);
+					desc->status |= IRQ_PER_CPU;
+					setup_irq(irq, &mca_cpe_irqaction);
+				}
+			ia64_mca_register_cpev(cpe_vector);
+			IA64_MCA_DEBUG("%s: CPEI/P setup and enabled.\n", __FUNCTION__);
+		} else {
+			/* If platform doesn't support CPEI, get the timer going. */
+			if (cpe_poll_enabled) {
+				ia64_mca_cpe_poll(0UL);
+				IA64_MCA_DEBUG("%s: CPEP setup and enabled.\n", __FUNCTION__);
+			}
+		}
 	}
 #endif
 
