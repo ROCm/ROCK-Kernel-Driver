@@ -229,8 +229,8 @@ static void background_writeout(unsigned long _min_pages)
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
 		writeback_inodes(&wbc);
 		min_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
-		if (wbc.nr_to_write == MAX_WRITEBACK_PAGES) {
-			/* Wrote nothing */
+		if (wbc.nr_to_write > 0) {
+			/* Wrote less than expected */
 			if (wbc.encountered_congestion)
 				blk_congestion_wait(WRITE, HZ/10);
 			else
