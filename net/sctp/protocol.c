@@ -5,42 +5,42 @@
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * Initialization/cleanup for SCTP protocol support.  
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * Initialization/cleanup for SCTP protocol support.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson <karl@athena.chicago.il.us>
  *    Jon Grimm <jgrimm@us.ibm.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -103,7 +103,7 @@ void sctp_proc_exit(void)
 /* Private helper to extract ipv4 address and stash them in
  * the protocol structure.
  */
-static void sctp_v4_copy_addrlist(struct list_head *addrlist, 
+static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 				  struct net_device *dev)
 {
 	struct in_device *in_dev;
@@ -227,10 +227,10 @@ struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
 	struct rtable *rt;
-	struct flowi fl = { 
-		.nl_u = { 
+	struct flowi fl = {
+		.nl_u = {
 			.ip4_u = { .daddr =
-				   daddr->v4.sin_addr.s_addr, }}, 
+				   daddr->v4.sin_addr.s_addr, }},
 		.proto = IPPROTO_SCTP,
 	};
 
@@ -280,7 +280,52 @@ int sctp_v4_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
 {
 	struct rtable *rt = (struct rtable *)dst;
 
-	return (rt->rt_src == saddr->v4.sin_addr.s_addr); 
+	return (rt->rt_src == saddr->v4.sin_addr.s_addr);
+}
+
+/* This function checks if the address is a valid address to be used for
+ * SCTP.
+ *
+ * Output:
+ * Return 0 - If the address is a non-unicast or an illegal address.
+ * Return 1 - If the address is a unicast.
+ */
+static int sctp_v4_addr_valid(union sctp_addr *addr)
+{
+	/* Is this a non-unicast address or a unusable SCTP address? */
+	if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
+		return 0;
+
+	return 1;
+}
+
+/* Checking the loopback, private and other address scopes as defined in
+ * RFC 1918.   The IPv4 scoping is based on the draft for SCTP IPv4
+ * scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>.
+ */
+static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
+{
+	sctp_scope_t retval;
+
+	/* Should IPv4 scoping be a sysctl configurable option
+	 * so users can turn it off (default on) for certain
+	 * unconventional networking environments?
+	 */
+
+	/* Check for unusable SCTP addresses. */
+	if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
+		retval =  SCTP_SCOPE_UNUSABLE;
+	} else if (LOOPBACK(addr->v4.sin_addr.s_addr)) {
+		retval = SCTP_SCOPE_LOOPBACK;
+	} else if (IS_IPV4_LINK_ADDRESS(&addr->v4.sin_addr.s_addr)) {
+		retval = SCTP_SCOPE_LINK;
+	} else if (IS_IPV4_PRIVATE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
+		retval = SCTP_SCOPE_PRIVATE;
+	} else {
+		retval = SCTP_SCOPE_GLOBAL;
+	}
+
+	return retval;
 }
 
 /* Event handler for inet device events.
@@ -352,13 +397,13 @@ sctp_func_t *sctp_get_af_specific(sa_family_t family)
 static void sctp_inet_msgname(char *msgname, int *addr_len)
 {
 	struct sockaddr_in *sin;
-	
+
 	sin = (struct sockaddr_in *)msgname;
 	*addr_len = sizeof(struct sockaddr_in);
 	sin->sin_family = AF_INET;
 	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 }
- 
+
 /* Copy the primary address of the peer primary address as the msg_name. */
 static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname, int *addr_len)
 {
@@ -371,26 +416,34 @@ static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname, int *
 		sin->sin_port = htons(event->asoc->peer.port);
 		sin->sin_addr.s_addr = sinfrom->sin_addr.s_addr;
 	}
-} 
+}
 
 /* Initialize and copy out a msgname from an inbound skb. */
-static void sctp_inet_skb_msgname(struct sk_buff *skb, char *msgname, int *addr_len)
+static void sctp_inet_skb_msgname(struct sk_buff *skb, char *msgname, int *len)
 {
-	struct sctphdr *sh; 
+	struct sctphdr *sh;
 	struct sockaddr_in *sin;
 
 	if (msgname) {
-		sctp_inet_msgname(msgname, addr_len);
+		sctp_inet_msgname(msgname, len);
 		sin = (struct sockaddr_in *)msgname;
 		sh = (struct sctphdr *)skb->h.raw;
 		sin->sin_port = sh->source;
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
 	}
-} 
+}
+
+/* Do we support this AF? */
+static int sctp_inet_af_supported(sa_family_t family)
+{
+	/* PF_INET only supports AF_INET addresses. */
+	return (AF_INET == family);
+}
 
 static sctp_pf_t sctp_pf_inet = {
 	.event_msgname = sctp_inet_event_msgname,
-	.skb_msgname = sctp_inet_skb_msgname,
+	.skb_msgname   = sctp_inet_skb_msgname,
+	.af_supported  = sctp_inet_af_supported,
 };
 
 
@@ -446,6 +499,8 @@ struct sctp_func sctp_ipv4_specific = {
 	.copy_addrlist  = sctp_v4_copy_addrlist,
 	.from_skb       = sctp_v4_from_skb,
 	.cmp_saddr	= sctp_v4_cmp_saddr,
+	.addr_valid     = sctp_v4_addr_valid,
+	.scope          = sctp_v4_scope,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,

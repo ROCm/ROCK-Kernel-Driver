@@ -132,7 +132,7 @@ int sctp_rcv(struct sk_buff *skb)
 	 * IP broadcast addresses cannot be used in an SCTP transport
 	 * address."
 	 */
-	if (!sctp_addr_is_valid(&src) || !sctp_addr_is_valid(&dest))
+	if (!af->addr_valid(&src) || !af->addr_valid(&dest))
 		goto discard_it;
 
 	asoc = __sctp_rcv_lookup(skb, &src, &dest, &transport);
@@ -172,7 +172,7 @@ int sctp_rcv(struct sk_buff *skb)
 	chunk->sctp_hdr = sh;
 
 	/* Set the source and destination addresses of the incoming chunk.  */
-	sctp_init_addrs(chunk);
+	sctp_init_addrs(chunk, &src, &dest);
 
 	/* Remember where we came from.  */
 	chunk->transport = transport;

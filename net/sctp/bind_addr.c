@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) Cisco 1999,2000
  * Copyright (c) Motorola 1999,2000,2001
- * Copyright (c) International Business Machines Corp., 2001
+ * Copyright (c) International Business Machines Corp., 2001,2002
  * Copyright (c) La Monte H.P. Yarroll 2001
  *
  * This file is part of the SCTP kernel reference implementation.
@@ -196,7 +196,7 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
  *
  * The second argument is the return value for the length.
  */
-union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, 
+union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 					 int *addrs_len, int priority)
 {
 	union sctp_params addrparms;
@@ -252,7 +252,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 		rawaddr = (sctp_addr_param_t *)raw_addr_list;
 
 		switch (param->type) {
-		case SCTP_PARAM_IPV4_ADDRESS:			
+		case SCTP_PARAM_IPV4_ADDRESS:
 		case SCTP_PARAM_IPV6_ADDRESS:
 			sctp_param2sockaddr(&addr, rawaddr, port);
 			retval = sctp_add_bind_addr(bp, &addr, priority);
@@ -422,110 +422,11 @@ int sctp_in_scope(const union sctp_addr *addr, sctp_scope_t scope)
 /* What is the scope of 'addr'?  */
 sctp_scope_t sctp_scope(const union sctp_addr *addr)
 {
-	sctp_scope_t retval = SCTP_SCOPE_GLOBAL;
+	struct sctp_func *af;
 
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		/* We are checking the loopback, private and other address
-		 * scopes as defined in RFC 1918.
-		 * The IPv4 scoping is based on the draft for SCTP IPv4
-		 * scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>.
-		 * The set of SCTP address scope hopefully can cover both
-		 * types of addresses.
-		 */
+	af = sctp_get_af_specific(addr->sa.sa_family);
+	if (!af)
+		return SCTP_SCOPE_UNUSABLE;
 
-		/* Should IPv4 scoping be a sysctl configurable option
-		 * so users can turn it off (default on) for certain
-		 * unconventional networking environments?
-		 */
-
-		/* Check for unusable SCTP addresses. */
-		if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval =  SCTP_SCOPE_UNUSABLE;
-		} else if (LOOPBACK(addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_LOOPBACK;
-		} else if (IS_IPV4_LINK_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_LINK;
-		} else if (IS_IPV4_PRIVATE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_PRIVATE;
-		} else {
-			retval = SCTP_SCOPE_GLOBAL;
-		}
-		break;
-
-	case AF_INET6:
-		{
-			SCTP_V6(
-				int v6scope;
-				v6scope = ipv6_addr_scope((struct in6_addr *)
-						 &addr->v6.sin6_addr);
-				/* The IPv6 scope is really a set of bit
-				 * fields. See IFA_* in <net/if_inet6.h>.
-				 * Mapping them to the generic SCTP scope
-				 * set is an attempt to have code
-				 * consistencies with the IPv4 scoping.
-				 */
-				switch (v6scope) {
-				case IFA_HOST:
-					retval = SCTP_SCOPE_LOOPBACK;
-					break;
-
-				case IFA_LINK:
-					retval = SCTP_SCOPE_LINK;
-					break;
-
-				case IFA_SITE:
-					retval = SCTP_SCOPE_PRIVATE;
-					break;
-
-				default:
-					retval = SCTP_SCOPE_GLOBAL;
-					break;
-				};
-			);
-			break;
-		}
-
-	default:
-		retval = SCTP_SCOPE_GLOBAL;
-		break;
-	};
-
-	return retval;
-}
-
-/* This function checks if the address is a valid address to be used for
- * SCTP.
- *
- * Output:
- * Return 0 - If the address is a non-unicast or an illegal address.
- * Return 1 - If the address is a unicast.
- */
-int sctp_addr_is_valid(const union sctp_addr *addr)
-{
-	unsigned short sa_family = addr->sa.sa_family;
-
-	switch (sa_family) {
-	case AF_INET:
-		/* Is this a non-unicast address or a unusable SCTP address? */
-		if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
-			return 0;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-		{
-			int ret = sctp_ipv6_addr_type(&addr->v6.sin6_addr);
-
-			/* Is this a non-unicast address */
-			if (!(ret & IPV6_ADDR_UNICAST))
-				return 0;
-			break;
-		});
-
-	default:
-		return 0;
-	};
-
-	return 1;
+	return af->scope((union sctp_addr *)addr);
 }
