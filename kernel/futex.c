@@ -70,6 +70,14 @@ static inline void tell_waiter(struct futex_q *q)
 	wake_up_all(&q->waiters);
 }
 
+static inline void unpin_page(struct page *page)
+{
+	/* Avoid releasing the page which is on the LRU list.  I don't
+           know if this is correct, but it stops the BUG() in
+           __free_pages_ok(). */
+	page_cache_release(page);
+}
+
 static int futex_wake(struct list_head *head,
 		      struct page *page,
 		      unsigned int offset,
@@ -130,9 +138,9 @@ static struct page *pin_page(unsigned long page_start)
 	int err;
 
 	down_read(&mm->mmap_sem);
-	err = get_user_pages(current, current->mm, page_start,
+	err = get_user_pages(current, mm, page_start,
 			     1 /* one page */,
-			     1 /* writable */,
+			     0 /* writable not important */,
 			     0 /* don't force */,
 			     &page,
 			     NULL /* don't return vmas */);
@@ -223,7 +231,7 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 	default:
 		ret = -EINVAL;
 	}
-	page_cache_release(page);
+	unpin_page(page);
 
 	return ret;
 }
