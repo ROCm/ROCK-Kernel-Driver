@@ -455,6 +455,7 @@ acpi_numa_arch_fixup (void)
 	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
 		if (pxm_bit_test(i)) {
 			pxm_to_nid_map[i] = numnodes;
+			node_set_online(numnodes);
 			nid_to_pxm_map[numnodes++] = i;
 		}
 	}
