@@ -3,7 +3,7 @@
  * Per Intel EFI Specification v1.02
  * http://developer.intel.com/technology/efi/efi.htm
  * efi.[ch] by Matt Domsch <Matt_Domsch@dell.com>
- *   Copyright 2000,2001,2002 Dell Computer Corporation
+ *   Copyright 2000,2001,2002 Dell Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

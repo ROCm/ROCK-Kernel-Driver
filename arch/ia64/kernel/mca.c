@@ -6,7 +6,7 @@
  * Copyright (C) 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
- * Copyright (C) 2002 Dell Computer Corporation
+ * Copyright (C) 2002 Dell Inc.
  * Copyright (C) Matt Domsch (Matt_Domsch@dell.com)
  *
  * Copyright (C) 2002 Intel
