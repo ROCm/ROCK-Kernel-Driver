@@ -1715,7 +1715,7 @@ static inline int __ide_dma_queued_off(ide_drive_t *drive)
 #endif
 
 #else
-static inline void ide_release_dma(ide_hwif_t *) {;}
+static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
 
 extern void hwif_unregister(ide_hwif_t *);
