@@ -168,7 +168,7 @@ void __init vr41xx_dsiu_init(void)
 	if (port.membase != NULL) {
 		if (early_serial_setup(&port) == 0) {
 			vr41xx_supply_clock(DSIU_CLOCK);
-			vr41xx_enable_dsiuint();
+			vr41xx_enable_dsiuint(DSIUINT_ALL);
 			vr41xx_serial_ports++;
 			return;
 		}

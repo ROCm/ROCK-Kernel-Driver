@@ -115,6 +115,7 @@ CONFIG_CPU_MIPS32=y
 # CONFIG_CPU_RM9000 is not set
 # CONFIG_CPU_SB1 is not set
 CONFIG_PAGE_SIZE_4KB=y
+# CONFIG_PAGE_SIZE_8KB is not set
 # CONFIG_PAGE_SIZE_16KB is not set
 # CONFIG_PAGE_SIZE_64KB is not set
 CONFIG_CPU_HAS_PREFETCH=y
@@ -129,6 +130,7 @@ CONFIG_CPU_HAS_SYNC=y
 #
 # Bus options (PCI, PCMCIA, EISA, ISA, TC)
 #
+CONFIG_HW_HAS_PCI=y
 CONFIG_PCI=y
 CONFIG_PCI_LEGACY_PROC=y
 CONFIG_PCI_NAMES=y
@@ -197,7 +199,6 @@ CONFIG_BLK_DEV_RAM_SIZE=4096
 #
 # Fusion MPT device support
 #
-# CONFIG_FUSION is not set
 
 #
 # IEEE 1394 (FireWire) support
@@ -357,7 +358,6 @@ CONFIG_PCNET32=y
 # CONFIG_HIPPI is not set
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
-# CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
 # CONFIG_NETCONSOLE is not set
 
@@ -580,7 +580,6 @@ CONFIG_SUNRPC=y
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -615,3 +614,4 @@ CONFIG_CMDLINE=""
 # Library routines
 #
 CONFIG_CRC32=y
+CONFIG_LIBCRC32C=m

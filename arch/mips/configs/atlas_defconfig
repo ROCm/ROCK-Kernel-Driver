@@ -107,6 +107,7 @@ CONFIG_CPU_MIPS32=y
 # CONFIG_CPU_RM9000 is not set
 # CONFIG_CPU_SB1 is not set
 CONFIG_PAGE_SIZE_4KB=y
+# CONFIG_PAGE_SIZE_8KB is not set
 # CONFIG_PAGE_SIZE_16KB is not set
 # CONFIG_PAGE_SIZE_64KB is not set
 CONFIG_CPU_HAS_PREFETCH=y
@@ -121,6 +122,7 @@ CONFIG_CPU_HAS_SYNC=y
 #
 # Bus options (PCI, PCMCIA, EISA, ISA, TC)
 #
+CONFIG_HW_HAS_PCI=y
 CONFIG_PCI=y
 CONFIG_PCI_LEGACY_PROC=y
 CONFIG_PCI_NAMES=y
@@ -197,7 +199,6 @@ CONFIG_BLK_DEV_SD=y
 # Some SCSI devices (e.g. CD jukebox) support multiple LUNs
 #
 # CONFIG_SCSI_MULTI_LUN is not set
-# CONFIG_SCSI_REPORT_LUNS is not set
 # CONFIG_SCSI_CONSTANTS is not set
 # CONFIG_SCSI_LOGGING is not set
 
@@ -216,11 +217,11 @@ CONFIG_BLK_DEV_SD=y
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_AIC79XX is not set
+# CONFIG_SCSI_DPT_I2O is not set
 # CONFIG_SCSI_ADVANSYS is not set
 # CONFIG_SCSI_MEGARAID is not set
 # CONFIG_SCSI_SATA is not set
 # CONFIG_SCSI_BUSLOGIC is not set
-# CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
 # CONFIG_SCSI_EATA is not set
 # CONFIG_SCSI_EATA_PIO is not set
@@ -229,6 +230,7 @@ CONFIG_BLK_DEV_SD=y
 # CONFIG_SCSI_IPS is not set
 # CONFIG_SCSI_INIA100 is not set
 # CONFIG_SCSI_SYM53C8XX_2 is not set
+# CONFIG_SCSI_IPR is not set
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
@@ -395,7 +397,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
 # CONFIG_NET_FC is not set
-# CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
 # CONFIG_NETCONSOLE is not set
 
@@ -616,7 +617,6 @@ CONFIG_SUNRPC=y
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -651,3 +651,4 @@ CONFIG_CMDLINE=""
 # Library routines
 #
 # CONFIG_CRC32 is not set
+# CONFIG_LIBCRC32C is not set

@@ -2,11 +2,14 @@
 #define _ASM_MODULE_H
 
 #include <linux/config.h>
+#include <linux/list.h>
+#include <asm/uaccess.h>
 
 struct mod_arch_specific {
 	/* Data Bus Error exception tables */
-	const struct exception_table_entry *dbe_table_start;
-	const struct exception_table_entry *dbe_table_end;
+	struct list_head dbe_list;
+	const struct exception_table_entry *dbe_start;
+	const struct exception_table_entry *dbe_end;
 };
 
 typedef uint8_t Elf64_Byte;		/* Type for a 8-bit quantity.  */
@@ -36,6 +39,18 @@ typedef struct
 #define Elf_Sym		Elf64_Sym
 #define Elf_Ehdr	Elf64_Ehdr
 
+#endif
+
+#ifdef CONFIG_MODULES
+/* Given an address, look for it in the exception tables. */
+const struct exception_table_entry*search_module_dbetables(unsigned long addr);
+#else
+/* Given an address, look for it in the exception tables. */
+static inline const struct exception_table_entry *
+search_module_dbetables(unsigned long addr)
+{
+	return NULL;
+}
 #endif
 
 #endif /* _ASM_MODULE_H */

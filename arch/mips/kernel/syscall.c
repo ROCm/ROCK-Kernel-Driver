@@ -36,7 +36,7 @@
 #include <asm/sysmips.h>
 #include <asm/uaccess.h>
 
-asmlinkage int sys_pipe(nabi_no_regargs struct pt_regs regs)
+asmlinkage int sys_pipe(nabi_no_regargs volatile struct pt_regs regs)
 {
 	int fd[2];
 	int error, res;

@@ -272,14 +272,3 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 
 	return 0;
 }
-
-int module_finalize(const Elf_Ehdr *hdr,
-		    const Elf_Shdr *sechdrs,
-		    struct module *me)
-{
-	return 0;
-}
-
-void module_arch_cleanup(struct module *mod)
-{
-}

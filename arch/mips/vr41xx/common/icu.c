@@ -28,10 +28,12 @@
  *  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *  - Coped with INTASSIGN of NEC VR4133.
  */
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/types.h>
 
@@ -43,11 +45,8 @@
 
 extern asmlinkage void vr41xx_handle_interrupt(void);
 
-extern void vr41xx_giuint_init(void);
-extern void vr41xx_enable_giuint(int pin);
-extern void vr41xx_disable_giuint(int pin);
-extern void vr41xx_clear_giuint(int pin);
-extern unsigned int giuint_do_IRQ(int pin, struct pt_regs *regs);
+extern void init_vr41xx_giuint_irq(void);
+extern void giuint_irq_dispatch(struct pt_regs *regs);
 
 static uint32_t icu1_base;
 static uint32_t icu2_base;
@@ -64,11 +63,17 @@ static unsigned char sysint2_assign[16] = {
 #define SYSINT2REG_TYPE2	KSEG1ADDR(0x0f0000a0)
 
 #define SYSINT1REG	0x00
+#define PIUINTREG	0x02
 #define INTASSIGN0	0x04
 #define INTASSIGN1	0x06
 #define GIUINTLREG	0x08
+#define DSIUINTREG	0x0a
 #define MSYSINT1REG	0x0c
+#define MPIUINTREG	0x0e
+#define MAIUINTREG	0x10
+#define MKIUINTREG	0x12
 #define MGIUINTLREG	0x14
+#define MDSIUINTREG	0x16
 #define NMIREG		0x18
 #define SOFTREG		0x1a
 #define INTASSIGN2	0x1c
@@ -76,11 +81,21 @@ static unsigned char sysint2_assign[16] = {
 
 #define SYSINT2REG	0x00
 #define GIUINTHREG	0x02
+#define FIRINTREG	0x04
 #define MSYSINT2REG	0x06
 #define MGIUINTHREG	0x08
-
-#define MDSIUINTREG	KSEG1ADDR(0x0f000096)
- #define INTDSIU	0x0800
+#define MFIRINTREG	0x0a
+#define PCIINTREG	0x0c
+ #define PCIINT0	0x0001
+#define SCUINTREG	0x0e
+ #define SCUINT0	0x0001
+#define CSIINTREG	0x10
+#define MPCIINTREG	0x12
+#define MSCUINTREG	0x14
+#define MCSIINTREG	0x16
+#define BCUINTREG	0x18
+ #define BCUINTR	0x0001
+#define MBCUINTREG	0x1a
 
 #define SYSINT1_IRQ_TO_PIN(x)	((x) - SYSINT1_IRQ_BASE)	/* Pin 0-15 */
 #define SYSINT2_IRQ_TO_PIN(x)	((x) - SYSINT2_IRQ_BASE)	/* Pin 0-15 */
@@ -140,27 +155,223 @@ static inline uint16_t clear_icu2(uint8_t offset, uint16_t clear)
 
 /*=======================================================================*/
 
-void vr41xx_enable_dsiuint(void)
+void vr41xx_enable_piuint(uint16_t mask)
 {
-	writew(INTDSIU, MDSIUINTREG);
+	irq_desc_t *desc = irq_desc + PIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MPIUINTREG);
+	val |= mask;
+	write_icu1(val, MPIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-void vr41xx_disable_dsiuint(void)
+void vr41xx_disable_piuint(uint16_t mask)
 {
-	writew(0, MDSIUINTREG);
+	irq_desc_t *desc = irq_desc + PIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MPIUINTREG);
+	val &= ~mask;
+	write_icu1(val, MPIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_aiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + AIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MAIUINTREG);
+	val |= mask;
+	write_icu1(val, MAIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_aiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + AIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MAIUINTREG);
+	val &= ~mask;
+	write_icu1(val, MAIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_kiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + KIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MKIUINTREG);
+	val |= mask;
+	write_icu1(val, MKIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_kiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + KIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MKIUINTREG);
+	val &= ~mask;
+	write_icu1(val, MKIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_dsiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + DSIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MDSIUINTREG);
+	val |= mask;
+	write_icu1(val, MDSIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_dsiuint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + DSIU_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu1(MDSIUINTREG);
+	val &= ~mask;
+	write_icu1(val, MDSIUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_firint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + FIR_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu2(MFIRINTREG);
+	val |= mask;
+	write_icu2(val, MFIRINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_firint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + FIR_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu2(MFIRINTREG);
+	val &= ~mask;
+	write_icu2(val, MFIRINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_pciint(void)
+{
+	irq_desc_t *desc = irq_desc + PCI_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(PCIINT0, MPCIINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_pciint(void)
+{
+	irq_desc_t *desc = irq_desc + PCI_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(0, MPCIINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_scuint(void)
+{
+	irq_desc_t *desc = irq_desc + SCU_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(SCUINT0, MSCUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_scuint(void)
+{
+	irq_desc_t *desc = irq_desc + SCU_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(0, MSCUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_csiint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + CSI_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu2(MCSIINTREG);
+	val |= mask;
+	write_icu2(val, MCSIINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_csiint(uint16_t mask)
+{
+	irq_desc_t *desc = irq_desc + CSI_IRQ;
+	unsigned long flags;
+	uint16_t val;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	val = read_icu2(MCSIINTREG);
+	val &= ~mask;
+	write_icu2(val, MCSIINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_enable_bcuint(void)
+{
+	irq_desc_t *desc = irq_desc + BCU_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(BCUINTR, MBCUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
+void vr41xx_disable_bcuint(void)
+{
+	irq_desc_t *desc = irq_desc + BCU_IRQ;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	write_icu2(0, MBCUINTREG);
+	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 /*=======================================================================*/
-
-static void enable_sysint1_irq(unsigned int irq)
-{
-	set_icu1(MSYSINT1REG, (uint16_t)1 << SYSINT1_IRQ_TO_PIN(irq));
-}
-
-static void disable_sysint1_irq(unsigned int irq)
-{
-	clear_icu1(MSYSINT1REG, (uint16_t)1 << SYSINT1_IRQ_TO_PIN(irq));
-}
 
 static unsigned int startup_sysint1_irq(unsigned int irq)
 {
@@ -169,8 +380,18 @@ static unsigned int startup_sysint1_irq(unsigned int irq)
 	return 0; /* never anything pending */
 }
 
-#define shutdown_sysint1_irq	disable_sysint1_irq
-#define ack_sysint1_irq		disable_sysint1_irq
+static void shutdown_sysint1_irq(unsigned int irq)
+{
+	clear_icu1(MSYSINT1REG, (uint16_t)1 << SYSINT1_IRQ_TO_PIN(irq));
+}
+
+static void enable_sysint1_irq(unsigned int irq)
+{
+	set_icu1(MSYSINT1REG, (uint16_t)1 << SYSINT1_IRQ_TO_PIN(irq));
+}
+
+#define disable_sysint1_irq	shutdown_sysint1_irq
+#define ack_sysint1_irq		shutdown_sysint1_irq
 
 static void end_sysint1_irq(unsigned int irq)
 {
@@ -190,16 +411,6 @@ static struct hw_interrupt_type sysint1_irq_type = {
 
 /*=======================================================================*/
 
-static void enable_sysint2_irq(unsigned int irq)
-{
-	set_icu2(MSYSINT2REG, (uint16_t)1 << SYSINT2_IRQ_TO_PIN(irq));
-}
-
-static void disable_sysint2_irq(unsigned int irq)
-{
-	clear_icu2(MSYSINT2REG, (uint16_t)1 << SYSINT2_IRQ_TO_PIN(irq));
-}
-
 static unsigned int startup_sysint2_irq(unsigned int irq)
 {
 	set_icu2(MSYSINT2REG, (uint16_t)1 << SYSINT2_IRQ_TO_PIN(irq));
@@ -207,8 +418,18 @@ static unsigned int startup_sysint2_irq(unsigned int irq)
 	return 0; /* never anything pending */
 }
 
-#define shutdown_sysint2_irq	disable_sysint2_irq
-#define ack_sysint2_irq		disable_sysint2_irq
+static void shutdown_sysint2_irq(unsigned int irq)
+{
+	clear_icu2(MSYSINT2REG, (uint16_t)1 << SYSINT2_IRQ_TO_PIN(irq));
+}
+
+static void enable_sysint2_irq(unsigned int irq)
+{
+	set_icu2(MSYSINT2REG, (uint16_t)1 << SYSINT2_IRQ_TO_PIN(irq));
+}
+
+#define disable_sysint2_irq	shutdown_sysint2_irq
+#define ack_sysint2_irq		shutdown_sysint2_irq
 
 static void end_sysint2_irq(unsigned int irq)
 {
@@ -225,126 +446,6 @@ static struct hw_interrupt_type sysint2_irq_type = {
 	.ack		= ack_sysint2_irq,
 	.end		= end_sysint2_irq,
 };
-
-/*=======================================================================*/
-
-static void enable_giuint_irq(unsigned int irq)
-{
-	int pin;
-
-	pin = GIU_IRQ_TO_PIN(irq);
-	if (pin < 16)
-		set_icu1(MGIUINTLREG, (uint16_t)1 << pin);
-	else
-		set_icu2(MGIUINTHREG, (uint16_t)1 << (pin - 16));
-	vr41xx_enable_giuint(pin);
-}
-
-static void disable_giuint_irq(unsigned int irq)
-{
-	int pin;
-
-	pin = GIU_IRQ_TO_PIN(irq);
-	vr41xx_disable_giuint(pin);
-	if (pin < 16)
-		clear_icu1(MGIUINTLREG, (uint16_t)1 << pin);
-	else
-		clear_icu2(MGIUINTHREG, (uint16_t)1 << (pin - 16));
-}
-
-static unsigned int startup_giuint_irq(unsigned int irq)
-{
-	vr41xx_clear_giuint(GIU_IRQ_TO_PIN(irq));
-
-	enable_giuint_irq(irq);
-
-	return 0; /* never anything pending */
-}
-
-#define shutdown_giuint_irq	disable_giuint_irq
-
-static void ack_giuint_irq(unsigned int irq)
-{
-	disable_giuint_irq(irq);
-
-	vr41xx_clear_giuint(GIU_IRQ_TO_PIN(irq));
-}
-
-static void end_giuint_irq(unsigned int irq)
-{
-	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
-		enable_giuint_irq(irq);
-}
-
-static struct hw_interrupt_type giuint_irq_type = {
-	.typename	= "GIUINT",
-	.startup	= startup_giuint_irq,
-	.shutdown	= shutdown_giuint_irq,
-	.enable		= enable_giuint_irq,
-	.disable	= disable_giuint_irq,
-	.ack		= ack_giuint_irq,
-	.end		= end_giuint_irq,
-};
-
-/*=======================================================================*/
-
-static struct irqaction icu_cascade = {no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL};
-
-static void __init vr41xx_icu_init(void)
-{
-	int i;
-
-	switch (current_cpu_data.cputype) {
-	case CPU_VR4111:
-	case CPU_VR4121:
-		icu1_base = SYSINT1REG_TYPE1;
-		icu2_base = SYSINT2REG_TYPE1;
-		break;
-	case CPU_VR4122:
-	case CPU_VR4131:
-	case CPU_VR4133:
-		icu1_base = SYSINT1REG_TYPE2;
-		icu2_base = SYSINT2REG_TYPE2;
-		break;
-	default:
-		panic("Unexpected CPU of NEC VR4100 series");
-		break;
-	}
-
-	write_icu1(0, MSYSINT1REG);
-	write_icu1(0, MGIUINTLREG);
-
-	write_icu2(0, MSYSINT2REG);
-	write_icu2(0, MGIUINTHREG);
-
-	for (i = SYSINT1_IRQ_BASE; i <= GIU_IRQ_LAST; i++) {
-		if (i >= SYSINT1_IRQ_BASE && i <= SYSINT1_IRQ_LAST)
-			irq_desc[i].handler = &sysint1_irq_type;
-		else if (i >= SYSINT2_IRQ_BASE && i <= SYSINT2_IRQ_LAST)
-			irq_desc[i].handler = &sysint2_irq_type;
-		else if (i >= GIU_IRQ_BASE && i <= GIU_IRQ_LAST)
-			irq_desc[i].handler = &giuint_irq_type;
-	}
-
-	setup_irq(INT0_CASCADE_IRQ, &icu_cascade);
-	setup_irq(INT1_CASCADE_IRQ, &icu_cascade);
-	setup_irq(INT2_CASCADE_IRQ, &icu_cascade);
-	setup_irq(INT3_CASCADE_IRQ, &icu_cascade);
-	setup_irq(INT4_CASCADE_IRQ, &icu_cascade);
-}
-
-void __init init_IRQ(void)
-{
-	memset(irq_desc, 0, sizeof(irq_desc));
-
-	init_generic_irq();
-	mips_cpu_irq_init(MIPS_CPU_IRQ_BASE);
-	vr41xx_icu_init();
-
-	vr41xx_giuint_init();
-
-	set_except_vector(0, vr41xx_handle_interrupt);
-}
 
 /*=======================================================================*/
 
@@ -492,34 +593,14 @@ int vr41xx_set_intassign(unsigned int irq, unsigned char intassign)
 	return retval;
 }
 
+EXPORT_SYMBOL(vr41xx_set_intassign);
+
 /*=======================================================================*/
-
-static inline void giuint_irq_dispatch(uint16_t pendl, uint16_t pendh,
-                                       struct pt_regs *regs)
-{
-	int i;
-
-	if (pendl) {
-		for (i = 0; i < 16; i++) {
-			if (pendl & ((uint16_t)1 << i)) {
-				giuint_do_IRQ(i, regs);
-				return;
-			}
-		}
-	} else {
-		for (i = 0; i < 16; i++) {
-			if (pendh & ((uint16_t)1 << i)) {
-				giuint_do_IRQ(i + 16, regs);
-				return;
-			}
-		}
-	}
-}
 
 asmlinkage void irq_dispatch(unsigned char intnum, struct pt_regs *regs)
 {
-	uint16_t pend1, pend2, pendl, pendh;
-	uint16_t mask1, mask2, maskl, maskh;
+	uint16_t pend1, pend2;
+	uint16_t mask1, mask2;
 	int i;
 
 	pend1 = read_icu1(SYSINT1REG);
@@ -528,28 +609,18 @@ asmlinkage void irq_dispatch(unsigned char intnum, struct pt_regs *regs)
 	pend2 = read_icu2(SYSINT2REG);
 	mask2 = read_icu2(MSYSINT2REG);
 
-	pendl = read_icu1(GIUINTLREG);
-	maskl = read_icu1(MGIUINTLREG);
-
-	pendh = read_icu2(GIUINTHREG);
-	maskh = read_icu2(MGIUINTHREG);
-
 	mask1 &= pend1;
 	mask2 &= pend2;
-	maskl &= pendl;
-	maskh &= pendh;
 
 	if (mask1) {
 		for (i = 0; i < 16; i++) {
 			if (intnum == sysint1_assign[i] &&
 			    (mask1 & ((uint16_t)1 << i))) {
-				if (i == 8 && (maskl | maskh)) {
-					giuint_irq_dispatch(maskl, maskh, regs);
-					return;
-				} else {
+				if (i == 8)
+					giuint_irq_dispatch(regs);
+				else
 					do_IRQ(SYSINT1_IRQ(i), regs);
-					return;
-				}
+				return;
 			}
 		}
 	}
@@ -564,6 +635,72 @@ asmlinkage void irq_dispatch(unsigned char intnum, struct pt_regs *regs)
 		}
 	}
 
-	printk(KERN_ERR "spurious interrupt: %04x,%04x,%04x,%04x\n", pend1, pend2, pendl, pendh);
+	printk(KERN_ERR "spurious ICU interrupt: %04x,%04x\n", pend1, pend2);
+
 	atomic_inc(&irq_err_count);
+}
+
+/*=======================================================================*/
+
+static int __init vr41xx_icu_init(void)
+{
+	switch (current_cpu_data.cputype) {
+	case CPU_VR4111:
+	case CPU_VR4121:
+		icu1_base = SYSINT1REG_TYPE1;
+		icu2_base = SYSINT2REG_TYPE1;
+		break;
+	case CPU_VR4122:
+	case CPU_VR4131:
+	case CPU_VR4133:
+		icu1_base = SYSINT1REG_TYPE2;
+		icu2_base = SYSINT2REG_TYPE2;
+		break;
+	default:
+		printk(KERN_ERR "ICU: Unexpected CPU of NEC VR4100 series\n");
+		return -EINVAL;
+	}
+
+	write_icu1(0, MSYSINT1REG);
+	write_icu1(0xffff, MGIUINTLREG);
+
+	write_icu2(0, MSYSINT2REG);
+	write_icu2(0xffff, MGIUINTHREG);
+
+	return 0;
+}
+
+early_initcall(vr41xx_icu_init);
+
+/*=======================================================================*/
+
+static struct irqaction icu_cascade = {no_action, 0, 0, "cascade", NULL, NULL};
+
+static inline void init_vr41xx_icu_irq(void)
+{
+	int i;
+
+	for (i = SYSINT1_IRQ_BASE; i <= SYSINT1_IRQ_LAST; i++)
+		irq_desc[i].handler = &sysint1_irq_type;
+
+	for (i = SYSINT2_IRQ_BASE; i <= SYSINT2_IRQ_LAST; i++)
+		irq_desc[i].handler = &sysint2_irq_type;
+
+	setup_irq(INT0_CASCADE_IRQ, &icu_cascade);
+	setup_irq(INT1_CASCADE_IRQ, &icu_cascade);
+	setup_irq(INT2_CASCADE_IRQ, &icu_cascade);
+	setup_irq(INT3_CASCADE_IRQ, &icu_cascade);
+	setup_irq(INT4_CASCADE_IRQ, &icu_cascade);
+}
+
+void __init init_IRQ(void)
+{
+	memset(irq_desc, 0, sizeof(irq_desc));
+
+	init_generic_irq();
+	mips_cpu_irq_init(MIPS_CPU_IRQ_BASE);
+	init_vr41xx_icu_irq();
+	init_vr41xx_giuint_irq();
+
+	set_except_vector(0, vr41xx_handle_interrupt);
 }

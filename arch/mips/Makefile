@@ -406,6 +406,13 @@ core-$(CONFIG_MOMENCO_OCELOT_C)	+= arch/mips/momentum/ocelot_c/
 load-$(CONFIG_MOMENCO_OCELOT_C)	+= 0x80100000
 
 #
+# PMC-Sierra Yosemite
+#
+core-$(CONFIG_PMC_YOSEMITE)	+= arch/mips/pmc-sierra/yosemite/
+cflags-$(CONFIG_PMC_YOSEMITE)	+= -Iinclude/asm-mips/mach-yosemite
+load-$(CONFIG_PMC_YOSEMITE)	+= 0x80100000
+
+#
 # Momentum Jaguar ATX
 #
 core-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= arch/mips/momentum/jaguar_atx/
@@ -659,8 +666,6 @@ libs-$(CONFIG_MIPS32)	+= arch/mips/lib-32/
 libs-$(CONFIG_MIPS64)	+= arch/mips/lib-64/
 
 core-y			+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/
-core-$(CONFIG_MIPS32)	+= arch/mips/mm-32/
-core-$(CONFIG_MIPS64)	+= arch/mips/mm-64/
 
 ifdef CONFIG_BAGET_MIPS
 

@@ -44,8 +44,9 @@
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
-#include <asm/irq.h>
+#include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
+#include <asm/mv64340.h>
 #include <asm/system.h>
 
 extern asmlinkage void ocelot_handle_int(void);

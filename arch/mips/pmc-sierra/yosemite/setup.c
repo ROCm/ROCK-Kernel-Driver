@@ -1,6 +1,4 @@
 /*
- *  arch/mips/pmc-sierra/yosemite/setup.c
- *
  *  Copyright (C) 2003 PMC-Sierra Inc.
  *  Author: Manish Lachwani (lachwani@pmc-sierra.com)
  *
@@ -24,19 +22,18 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <linux/bcd.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/mc146818rtc.h>
 #include <linux/mm.h>
+#include <linux/bootmem.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/pci.h>
 #include <linux/timex.h>
-#include <linux/vmalloc.h>
+
 #include <asm/time.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
@@ -46,36 +43,46 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
-#include <linux/version.h>
-#include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <asm/pci_channel.h>
+#include <asm/serial.h>
+#include <linux/termios.h>
+#include <linux/tty.h>
+#include <linux/serial.h>
+#include <linux/serial_core.h>
+#include <asm/titan_dep.h>
 
 #include "setup.h"
+
+unsigned char titan_ge_mac_addr_base[6] = {
+	0x00, 0x03, 0xcc, 0x1d, 0x22, 0x00
+};
 
 unsigned long cpu_clock;
 unsigned long yosemite_base;
 
-void __init bus_error_init(void) 
-{ 
-	/* Do nothing */ 
+void __init bus_error_init(void)
+{
+	/* Do nothing */
 }
 
 unsigned long m48t37y_get_time(void)
 {
-	unsigned char	*rtc_base = YOSEMITE_RTC_BASE;
-	unsigned int	year, month, day, hour, min, sec;
+	//unsigned char *rtc_base = (unsigned char *) YOSEMITE_RTC_BASE;
+	unsigned char *rtc_base = (unsigned char *) 0xfc000000UL;
+	unsigned int year, month, day, hour, min, sec;
+return;
 
 	/* Stop the update to the time */
 	rtc_base[0x7ff8] = 0x40;
 
-	year = CONV_BCD_TO_BIN(rtc_base[0x7fff]);
-	year += CONV_BCD_TO_BIN(rtc_base[0x7fff1]) * 100;
+	year = BCD2BIN(rtc_base[0x7fff]);
+	year += BCD2BIN(rtc_base[0x7fff1]) * 100;
 
-	month = CONV_BCD_TO_BIN(rtc_base[0x7ffe]);
-	day = CONV_BCD_TO_BIN(rtc_base[0x7ffd]);
-	hour = CONV_BCD_TO_BIN(rtc_base[0x7ffb]);
-	min = CONV_BCD_TO_BIN(rtc_base[0x7ffa]);
-	sec = CONV_BCD_TO_BIN(rtc_base[0x7ff9]);
+	month = BCD2BIN(rtc_base[0x7ffe]);
+	day = BCD2BIN(rtc_base[0x7ffd]);
+	hour = BCD2BIN(rtc_base[0x7ffb]);
+	min = BCD2BIN(rtc_base[0x7ffa]);
+	sec = BCD2BIN(rtc_base[0x7ff9]);
 
 	/* Start the update to the time again */
 	rtc_base[0x7ff8] = 0x00;
@@ -85,83 +92,119 @@ unsigned long m48t37y_get_time(void)
 
 int m48t37y_set_time(unsigned long sec)
 {
-	unsigned char   *rtc_base = YOSEMITE_RTC_BASE;
-        unsigned int    year, month, day, hour, min, sec;
+	unsigned char *rtc_base = (unsigned char *) YOSEMITE_RTC_BASE;
+	struct rtc_time tm;
+return;
 
-        struct rtc_time tm;
+	/* convert to a more useful format -- note months count from 0 */
+	to_tm(sec, &tm);
+	tm.tm_mon += 1;
 
-        /* convert to a more useful format -- note months count from 0 */
-        to_tm(sec, &tm);
-        tm.tm_mon += 1;
+	/* enable writing */
+	rtc_base[0x7ff8] = 0x80;
 
-        /* enable writing */
-        rtc_base[0x7ff8] = 0x80;
+	/* year */
+	rtc_base[0x7fff] = BIN2BCD(tm.tm_year % 100);
+	rtc_base[0x7ff1] = BIN2BCD(tm.tm_year / 100);
 
-        /* year */
-        rtc_base[0x7fff] = CONV_BIN_TO_BCD(tm.tm_year % 100);
-        rtc_base[0x7ff1] = CONV_BIN_TO_BCD(tm.tm_year / 100);
+	/* month */
+	rtc_base[0x7ffe] = BIN2BCD(tm.tm_mon);
 
-        /* month */
-        rtc_base[0x7ffe] = CONV_BIN_TO_BCD(tm.tm_mon);
+	/* day */
+	rtc_base[0x7ffd] = BIN2BCD(tm.tm_mday);
 
-        /* day */
-        rtc_base[0x7ffd] = CONV_BIN_TO_BCD(tm.tm_mday);
+	/* hour/min/sec */
+	rtc_base[0x7ffb] = BIN2BCD(tm.tm_hour);
+	rtc_base[0x7ffa] = BIN2BCD(tm.tm_min);
+	rtc_base[0x7ff9] = BIN2BCD(tm.tm_sec);
 
-        /* hour/min/sec */
-        rtc_base[0x7ffb] = CONV_BIN_TO_BCD(tm.tm_hour);
-        rtc_base[0x7ffa] = CONV_BIN_TO_BCD(tm.tm_min);
-        rtc_base[0x7ff9] = CONV_BIN_TO_BCD(tm.tm_sec);
+	/* day of week -- not really used, but let's keep it up-to-date */
+	rtc_base[0x7ffc] = BIN2BCD(tm.tm_wday + 1);
 
-        /* day of week -- not really used, but let's keep it up-to-date */
-        rtc_base[0x7ffc] = CONV_BIN_TO_BCD(tm.tm_wday + 1);
+	/* disable writing */
+	rtc_base[0x7ff8] = 0x00;
 
-        /* disable writing */
-        rtc_base[0x7ff8] = 0x00;
-
-        return 0;
+	return 0;
 }
 
 void yosemite_timer_setup(struct irqaction *irq)
 {
-	setup_irq(6, irq);
+	setup_irq(7, irq);
 }
 
 void yosemite_time_init(void)
 {
-	mips_counter_frequency = cpu_clock / 2;
 	board_timer_setup = yosemite_timer_setup;
+	mips_hpt_frequency = cpu_clock / 2;
 
 	rtc_get_time = m48t37y_get_time;
 	rtc_set_time = m48t37y_set_time;
 }
 
+unsigned long uart_base = 0xfd000000L;
+
+/* No other usable initialization hook than this ...  */
+extern void (*late_time_init)(void);
+
+unsigned long ocd_base;
+
+EXPORT_SYMBOL(ocd_base);
+
+/*
+ * Common setup before any secondaries are started
+ */
+
+#define TITAN_UART_CLK		3686400
+#define TITAN_SERIAL_BASE_BAUD	(TITAN_UART_CLK / 16)
+#define TITAN_SERIAL_IRQ	4
+#define TITAN_SERIAL_BASE	0xfd000008UL
+
+static void __init py_map_ocd(void)
+{
+        struct uart_port up;
+
+	/*
+	 * Not specifically interrupt stuff but in case of SMP core_send_ipi
+	 * needs this first so I'm mapping it here ...
+	 */
+	ocd_base = (unsigned long) ioremap(OCD_BASE, OCD_SIZE);
+	if (!ocd_base)
+		panic("Mapping OCD failed - game over.  Your score is 0.");
+
+	/*
+	 * Register to interrupt zero because we share the interrupt with
+	 * the serial driver which we don't properly support yet.
+	 */
+	memset(&up, 0, sizeof(up));
+	up.membase      = (unsigned char *) ioremap(TITAN_SERIAL_BASE, 8);
+	up.irq          = TITAN_SERIAL_IRQ;
+	up.uartclk      = TITAN_UART_CLK;
+	up.regshift     = 0;
+	up.iotype       = UPIO_MEM;
+	up.flags        = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
+	up.line         = 0;
+
+	if (early_serial_setup(&up))
+		printk(KERN_ERR "Early serial init of port 0 failed\n");
+}
+
 static int __init pmc_yosemite_setup(void)
 {
-	unsigned long	val = 0;
+	extern void pmon_smp_bootstrap(void);
 
-	printk("PMC-Sierra Yosemite Board Setup  \n");
 	board_time_init = yosemite_time_init;
+	late_time_init = py_map_ocd;
 
 	/* Add memory regions */
 	add_memory_region(0x00000000, 0x10000000, BOOT_MEM_RAM);
-	add_memory_region(0x10000000, 0x10000000, BOOT_MEM_RAM);
 
-	/* Setup the HT controller */
-	val = *(volatile uint32_t *)(HYPERTRANSPORT_CONFIG_REG);
-	val |= HYPERTRANSPORT_ENABLE;
-        *(volatile uint32_t *)(HYPERTRANSPORT_CONFIG_REG) = val;
+#if 0 /* XXX Crash ...  */
+	OCD_WRITE(RM9000x2_OCD_HTSC,
+	          OCD_READ(RM9000x2_OCD_HTSC) | HYPERTRANSPORT_ENABLE);
 
-        /* Set the BAR. Shifted mode */
-        *(volatile uint32_t *)(HYPERTRANSPORT_BAR0_REG) = HYPERTRANSPORT_BAR0_ADDR;
-        *(volatile uint32_t *)(HYPERTRANSPORT_SIZE0_REG) = HYPERTRANSPORT_SIZE0;
-
-#ifdef CONFIG_PCI
-	ioport_resource.start = 0xe0000000;
-	ioport_resource.end   = 0xe0000000 + 0x20000000 - 1;
-	iomem_resource.start  = 0xc0000000;
-	iomem_resource.end    = 0xc0000000 + 0x20000000 - 1;
-
-	pci_scan_bus(0, &titan_pci_ops, NULL);
+	/* Set the BAR. Shifted mode */
+	OCD_WRITE(RM9000x2_OCD_HTBAR0, HYPERTRANSPORT_BAR0_ADDR);
+	OCD_WRITE(RM9000x2_OCD_HTMASK0, HYPERTRANSPORT_SIZE0);
 #endif
 
 	return 0;
