@@ -232,6 +232,8 @@ void daemonize(void)
  	exit_files(current);
 	current->files = init_task.files;
 	atomic_inc(&current->files->count);
+
+	reparent_to_init();
 }
 
 static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
