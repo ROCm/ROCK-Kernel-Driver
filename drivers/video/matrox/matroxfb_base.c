@@ -77,6 +77,9 @@
  *               "Uns Lider" <unslider@miranda.org>
  *                     G100 PLNWT fixes
  *
+ *               "Denis Zaitsev" <zzz@cd-club.ru>
+ *                     Fixes
+ *
  * (following author is not in any relation with this code, but his code
  *  is included in this driver)
  *
@@ -406,12 +409,43 @@ static int matroxfb_get_cmap_len(struct fb_var_screeninfo *var) {
 }
 
 static int matroxfb_decode_var(CPMINFO struct display* p, struct fb_var_screeninfo *var, int *visual, int *video_cmap_len, unsigned int* ydstorg) {
+	struct RGBT {
+		unsigned char bpp;
+		struct {
+			unsigned char offset,
+				      length;
+		} red,
+		  green,
+		  blue,
+		  transp;
+		signed char visual;
+	};
+	static const struct RGBT table[]= {
+#if defined FBCON_HAS_VGATEXT
+		{ 0,{ 0,6},{0,6},{0,6},{ 0,0},MX_VISUAL_PSEUDOCOLOR},
+#endif
+#if defined FBCON_HAS_CFB4 || defined FBCON_HAS_CFB8
+		{ 8,{ 0,8},{0,8},{0,8},{ 0,0},MX_VISUAL_PSEUDOCOLOR},
+#endif
+#if defined FBCON_HAS_CFB16
+		{15,{10,5},{5,5},{0,5},{15,1},MX_VISUAL_DIRECTCOLOR},
+		{16,{11,5},{5,6},{0,5},{ 0,0},MX_VISUAL_DIRECTCOLOR},
+#endif
+#if defined FBCON_HAS_CFB24
+		{24,{16,8},{8,8},{0,8},{ 0,0},MX_VISUAL_DIRECTCOLOR},
+#endif
+#if defined FBCON_HAS_CFB32
+		{32,{16,8},{8,8},{0,8},{24,8},MX_VISUAL_DIRECTCOLOR}
+#endif
+	};
+	struct RGBT const *rgbt;
+	unsigned int bpp = var->bits_per_pixel;
 	unsigned int vramlen;
 	unsigned int memlen;
 
 	DBG("matroxfb_decode_var")
 
-	switch (var->bits_per_pixel) {
+	switch (bpp) {
 #ifdef FBCON_HAS_VGATEXT
 		case 0:	 if (!ACCESS_FBINFO(capable.text)) return -EINVAL;
 			 break;
@@ -440,22 +474,22 @@ static int matroxfb_decode_var(CPMINFO struct display* p, struct fb_var_screenin
 		var->yres_virtual = var->yres;
 	if (var->xres_virtual < var->xres)
 		var->xres_virtual = var->xres;
-	if (var->bits_per_pixel) {
-		var->xres_virtual = matroxfb_pitch_adjust(PMINFO var->xres_virtual, var->bits_per_pixel);
-		memlen = var->xres_virtual * var->bits_per_pixel * var->yres_virtual / 8;
+	if (bpp) {
+		var->xres_virtual = matroxfb_pitch_adjust(PMINFO var->xres_virtual, bpp);
+		memlen = var->xres_virtual * bpp * var->yres_virtual / 8;
 		if (memlen > vramlen) {
-			var->yres_virtual = vramlen * 8 / (var->xres_virtual * var->bits_per_pixel);
-			memlen = var->xres_virtual * var->bits_per_pixel * var->yres_virtual / 8;
+			var->yres_virtual = vramlen * 8 / (var->xres_virtual * bpp);
+			memlen = var->xres_virtual * bpp * var->yres_virtual / 8;
 		}
 		/* There is hardware bug that no line can cross 4MB boundary */
 		/* give up for CFB24, it is impossible to easy workaround it */
 		/* for other try to do something */
 		if (!ACCESS_FBINFO(capable.cross4MB) && (memlen > 0x400000)) {
-			if (var->bits_per_pixel == 24) {
+			if (bpp == 24) {
 				/* sorry */
 			} else {
 				unsigned int linelen;
-				unsigned int m1 = linelen = var->xres_virtual * var->bits_per_pixel / 8;
+				unsigned int m1 = linelen = var->xres_virtual * bpp / 8;
 				unsigned int m2 = PAGE_SIZE;	/* or 128 if you do not need PAGE ALIGNED address */
 				unsigned int max_yres;
 
@@ -499,88 +533,27 @@ static int matroxfb_decode_var(CPMINFO struct display* p, struct fb_var_screenin
 	if (var->yoffset + var->yres > var->yres_virtual)
 		var->yoffset = var->yres_virtual - var->yres;
 
-	if (var->bits_per_pixel == 0) {
-		var->red.offset = 0;
-		var->red.length = 6;
-		var->green.offset = 0;
-		var->green.length = 6;
-		var->blue.offset = 0;
-		var->blue.length = 6;
-		var->transp.offset = 0;
-		var->transp.length = 0;
-		*visual = MX_VISUAL_PSEUDOCOLOR;
-	} else if (var->bits_per_pixel == 4) {
-		var->red.offset = 0;
-		var->red.length = 8;
-		var->green.offset = 0;
-		var->green.length = 8;
-		var->blue.offset = 0;
-		var->blue.length = 8;
-		var->transp.offset = 0;
-		var->transp.length = 0;
-		*visual = MX_VISUAL_PSEUDOCOLOR;
-	} else if (var->bits_per_pixel <= 8) {
-		var->red.offset = 0;
-		var->red.length = 8;
-		var->green.offset = 0;
-		var->green.length = 8;
-		var->blue.offset = 0;
-		var->blue.length = 8;
-		var->transp.offset = 0;
-		var->transp.length = 0;
-		*visual = MX_VISUAL_PSEUDOCOLOR;
-	} else {
-		if (var->bits_per_pixel <= 16) {
-			if (var->green.length == 5) {
-				var->red.offset    = 10;
-				var->red.length    = 5;
-				var->green.offset  = 5;
-				var->green.length  = 5;
-				var->blue.offset   = 0;
-				var->blue.length   = 5;
-				var->transp.offset = 15;
-				var->transp.length = 1;
-			} else {
-				var->red.offset    = 11;
-				var->red.length    = 5;
-				var->green.offset  = 5;
-				var->green.length  = 6;
-				var->blue.offset   = 0;
-				var->blue.length   = 5;
-				var->transp.offset = 0;
-				var->transp.length = 0;
-			}
-		} else if (var->bits_per_pixel <= 24) {
-			var->red.offset    = 16;
-			var->red.length    = 8;
-			var->green.offset  = 8;
-			var->green.length  = 8;
-			var->blue.offset   = 0;
-			var->blue.length   = 8;
-			var->transp.offset = 0;
-			var->transp.length = 0;
-		} else {
-			var->red.offset    = 16;
-			var->red.length    = 8;
-			var->green.offset  = 8;
-			var->green.length  = 8;
-			var->blue.offset   = 0;
-			var->blue.length   = 8;
-			var->transp.offset = 24;
-			var->transp.length = 8;
-		}
-		dprintk("matroxfb: truecolor: "
-		       "size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
-		       var->transp.length,
-		       var->red.length,
-		       var->green.length,
-		       var->blue.length,
-		       var->transp.offset,
-		       var->red.offset,
-		       var->green.offset,
-		       var->blue.offset);
-		*visual = MX_VISUAL_DIRECTCOLOR;
+	if (bpp == 16 && var->green.length == 5) {
+		bpp--; /* an artifical value - 15 */
 	}
+
+	for (rgbt = table; rgbt->bpp < bpp; rgbt++);
+#define	SETCLR(clr)\
+	var->clr.offset = rgbt->clr.offset;\
+	var->clr.length = rgbt->clr.length
+	SETCLR(red);
+	SETCLR(green);
+	SETCLR(blue);
+	SETCLR(transp);
+#undef	SETCLR
+	*visual = rgbt->visual;
+
+	if (bpp > 8)
+		dprintk("matroxfb: truecolor: "
+			"size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
+			var->transp.length, var->red.length, var->green.length, var->blue.length,
+			var->transp.offset, var->red.offset, var->green.offset, var->blue.offset);
+
 	*video_cmap_len = matroxfb_get_cmap_len(var);
 	dprintk(KERN_INFO "requested %d*%d/%dbpp (%d*%d)\n", var->xres, var->yres, var->bits_per_pixel,
 				var->xres_virtual, var->yres_virtual);
