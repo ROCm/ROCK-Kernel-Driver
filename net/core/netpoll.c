@@ -528,7 +528,7 @@ int netpoll_setup(struct netpoll *np)
 	if (!ndev) {
 		printk(KERN_ERR "%s: %s doesn't exist, aborting.\n",
 		       np->name, np->dev_name);
-		goto release;
+		return -1;
 	}
 	if (!ndev->poll_controller) {
 		printk(KERN_ERR "%s: %s doesn't support polling, aborting.\n",
