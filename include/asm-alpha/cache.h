@@ -20,6 +20,6 @@
 
 #define L1_CACHE_ALIGN(x)  (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 #define SMP_CACHE_BYTES    L1_CACHE_BYTES
-#define L1_CACHE_SHIFT_MAX 6	/* largest L1 which this arch supports */
+#define L1_CACHE_SHIFT_MAX L1_CACHE_SHIFT
 
 #endif
