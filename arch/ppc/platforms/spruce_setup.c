@@ -127,8 +127,9 @@ spruce_early_serial_map(void)
 	serial_req.membase = (u_char *)UART0_IO_BASE;
 	serial_req.regshift = 0;
 
+#if defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG)
 	gen550_init(0, &serial_req);
-
+#endif
 #ifdef CONFIG_SERIAL_8250
 	if (early_serial_setup(&serial_req) != 0)
 		printk("Early serial init of port 0 failed\n");
@@ -139,8 +140,9 @@ spruce_early_serial_map(void)
 	serial_req.irq = UART1_INT;
 	serial_req.membase = (u_char *)UART1_IO_BASE;
 
+#if defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG)
 	gen550_init(1, &serial_req);
-
+#endif
 #ifdef CONFIG_SERIAL_8250
 	if (early_serial_setup(&serial_req) != 0)
 		printk("Early serial init of port 1 failed\n");
