@@ -14,3 +14,7 @@ config 3_LEVEL_PGTABLES
 	Three-level pagetables will let UML have more than 4G of physical
 	memory.  All the memory that can't be mapped directly will be treated
 	as high memory.
+
+config ARCH_HAS_SC_SIGNALS
+	bool
+	default y

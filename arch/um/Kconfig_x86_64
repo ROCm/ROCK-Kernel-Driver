@@ -5,3 +5,7 @@ config 64_BIT
 config 3_LEVEL_PGTABLES
        bool
        default y
+
+config ARCH_HAS_SC_SIGNALS
+	bool
+	default n

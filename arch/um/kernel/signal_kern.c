@@ -74,10 +74,12 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	if(ka->sa.sa_flags & SA_SIGINFO)
-		err = setup_signal_stack_si(sp, signr, ka, regs, info, oldset);
-	else
+#ifdef CONFIG_ARCH_HAS_SC_SIGNALS
+	if(!(ka->sa.sa_flags & SA_SIGINFO))
 		err = setup_signal_stack_sc(sp, signr, ka, regs, oldset);
+	else
+#endif
+		err = setup_signal_stack_si(sp, signr, ka, regs, info, oldset);
 
 	if(err){
 		spin_lock_irq(&current->sighand->siglock);
