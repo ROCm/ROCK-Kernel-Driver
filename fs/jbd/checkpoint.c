@@ -162,12 +162,12 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		}
 
 		if (jh->b_transaction != NULL) {
-			transaction_t *transaction = jh->b_transaction;
-			tid_t tid = transaction->t_tid;
+			transaction_t *t = jh->b_transaction;
+			tid_t tid = t->t_tid;
 
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
-			log_start_commit(journal, transaction);
+			log_start_commit(journal, t);
 			log_wait_commit(journal, tid);
 			goto out_return_1;
 		}
@@ -213,7 +213,7 @@ __flush_batch(journal_t *journal, struct buffer_head **bhs, int *batch_count)
 	spin_lock(&journal->j_list_lock);
 	for (i = 0; i < *batch_count; i++) {
 		struct buffer_head *bh = bhs[i];
-		clear_bit(BH_JWrite, &bh->b_state);
+		clear_buffer_jwrite(bh);
 		BUFFER_TRACE(bh, "brelse");
 		__brelse(bh);
 	}
@@ -290,7 +290,6 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 /* @@@ `nblocks' is unused.  Should it be used? */
 int log_do_checkpoint(journal_t *journal, int nblocks)
 {
-	transaction_t *transaction, *last_transaction, *next_transaction;
 	int result;
 	int batch_count = 0;
 	struct buffer_head *bhs[NR_BATCH];
@@ -316,20 +315,15 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 	 * degenerates into a busy loop at unmount time.
 	 */
 	spin_lock(&journal->j_list_lock);
-repeat:
-	transaction = journal->j_checkpoint_transactions;
-	if (transaction == NULL)
-		goto done;
-	last_transaction = transaction->t_cpprev;
-	next_transaction = transaction;
-
-	do {
+	while (journal->j_checkpoint_transactions) {
+		transaction_t *transaction;
 		struct journal_head *jh, *last_jh, *next_jh;
 		int drop_count = 0;
 		int cleanup_ret, retry = 0;
+		tid_t this_tid;
 
-		transaction = next_transaction;
-		next_transaction = transaction->t_cpnext;
+		transaction = journal->j_checkpoint_transactions->t_cpprev;
+		this_tid = transaction->t_tid;
 		jh = transaction->t_checkpoint_list;
 		last_jh = jh->b_cpprev;
 		next_jh = jh;
@@ -342,6 +336,7 @@ repeat:
 			if (!jbd_trylock_bh_state(bh)) {
 				jbd_sync_bh(journal, bh);
 				spin_lock(&journal->j_list_lock);
+				retry = 1;
 				break;
 			}
 			retry = __flush_buffer(journal, jh, bhs, &batch_count,
@@ -349,10 +344,29 @@ repeat:
 		} while (jh != last_jh && !retry);
 		if (batch_count) {
 			__flush_batch(journal, bhs, &batch_count);
-			goto repeat;
+			continue;
 		}
 		if (retry)
-			goto repeat;
+			continue;
+
+		/*
+		 * If someone emptied the checkpoint list while we slept, we're
+		 * done.
+		 */
+		if (!journal->j_checkpoint_transactions)
+			break;
+		/*
+		 * If someone cleaned up this transaction while we slept, we're
+		 * done
+		 */
+		if (journal->j_checkpoint_transactions->t_cpprev != transaction)
+			continue;
+		/*
+		 * Maybe it's a new transaction, but it fell at the same
+		 * address
+		 */
+		if (transaction->t_tid != this_tid)
+			continue;
 		/*
 		 * We have walked the whole transaction list without
 		 * finding anything to write to disk.  We had better be
@@ -360,10 +374,7 @@ repeat:
 		 */
 		cleanup_ret = __cleanup_transaction(journal, transaction);
 		J_ASSERT(drop_count != 0 || cleanup_ret != 0);
-		goto repeat;	/* __cleanup may have dropped lock */
-	} while (transaction != last_transaction);
-
-done:
+	}
 	spin_unlock(&journal->j_list_lock);
 	result = cleanup_journal_tail(journal);
 	if (result < 0)
