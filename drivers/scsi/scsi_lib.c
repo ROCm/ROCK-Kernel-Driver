@@ -787,6 +787,22 @@ out:
 	return ret;
 }
 
+/*
+ * The target associated with myself can only handle one active command at
+ * a time. Scan through all of the luns on the same target as myself,
+ * return 1 if any are active.
+ */
+static int check_all_luns(struct scsi_device *myself)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &myself->same_target_siblings,
+			    same_target_siblings)
+		if (sdev->device_busy)
+			return 1;
+	return 0;
+}
+
 int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct Scsi_Device_Template *STpnt;
@@ -948,6 +964,9 @@ void scsi_request_fn(request_queue_t * q)
 		req = elv_next_request(q);
 
 		if (SDpnt->device_busy >= SDpnt->queue_depth)
+			break;
+
+		if (SDpnt->single_lun && check_all_luns(SDpnt))
 			break;
 
 		if(SHpnt->host_busy == 0 && SHpnt->host_blocked) {

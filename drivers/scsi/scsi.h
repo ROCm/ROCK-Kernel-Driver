@@ -570,7 +570,6 @@ struct scsi_device {
 					   device is busy */
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
-        atomic_t                device_active; /* commands checked out for device */
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	struct list_head free_cmnds;    /* list of available Scsi_Cmnd structs */
 	struct list_head busy_cmnds;    /* list of Scsi_Cmnd structs in use */
