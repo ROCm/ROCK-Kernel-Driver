@@ -659,7 +659,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		fl.oif = np->mcast_oif;
 
 	dst = ip6_dst_lookup(sk, &fl);
-	if (dst->error)
+	if ((err = dst->error))
 		goto out;
 
 	if (hlimit < 0) {

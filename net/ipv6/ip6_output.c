@@ -209,7 +209,6 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	int seg_len = skb->len;
 	int hlimit;
 	u32 mtu;
-	int err = 0;
 
 	if (opt) {
 		int head_room;
