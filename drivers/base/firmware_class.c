@@ -34,6 +34,14 @@ struct firmware_priv {
 	struct timer_list timeout;
 };
 
+static inline void
+fw_load_abort(struct firmware_priv *fw_priv)
+{
+	fw_priv->abort = 1;
+	wmb();
+	complete(&fw_priv->completion);
+}
+
 static ssize_t
 firmware_timeout_show(struct class *class, char *buf)
 {
@@ -113,11 +121,6 @@ firmware_loading_store(struct class_device *class_dev,
 	fw_priv->loading = simple_strtol(buf, NULL, 10);
 
 	switch (fw_priv->loading) {
-	case -1:
-		fw_priv->abort = 1;
-		wmb();
-		complete(&fw_priv->completion);
-		break;
 	case 1:
 		vfree(fw_priv->fw->data);
 		fw_priv->fw->data = NULL;
@@ -125,8 +128,17 @@ firmware_loading_store(struct class_device *class_dev,
 		fw_priv->alloc_size = 0;
 		break;
 	case 0:
-		if (prev_loading == 1)
+		if (prev_loading == 1) {
 			complete(&fw_priv->completion);
+			break;
+		}
+		/* fallthrough */
+	default:
+		printk(KERN_ERR "%s: unexpected value (%d)\n", __FUNCTION__,
+		       fw_priv->loading);
+		/* fallthrough */
+	case -1:
+		fw_load_abort(fw_priv);
 		break;
 	}
 
@@ -164,7 +176,7 @@ fw_realloc_buffer(struct firmware_priv *fw_priv, int min_size)
 	if (!new_data) {
 		printk(KERN_ERR "%s: unable to alloc buffer\n", __FUNCTION__);
 		/* Make sure that we don't keep incomplete data */
-		fw_priv->abort = 1;
+		fw_load_abort(fw_priv);
 		return -ENOMEM;
 	}
 	fw_priv->alloc_size += PAGE_SIZE;
@@ -221,17 +233,14 @@ static void
 firmware_class_timeout(u_long data)
 {
 	struct firmware_priv *fw_priv = (struct firmware_priv *) data;
-	fw_priv->abort = 1;
-	wmb();
-	complete(&fw_priv->completion);
+	fw_load_abort(fw_priv);
 }
 
 static inline void
 fw_setup_class_device_id(struct class_device *class_dev, struct device *dev)
 {
 	/* XXX warning we should watch out for name collisions */
-	strncpy(class_dev->class_id, dev->bus_id, BUS_ID_SIZE);
-	class_dev->class_id[BUS_ID_SIZE - 1] = '\0';
+	strlcpy(class_dev->class_id, dev->bus_id, BUS_ID_SIZE);
 }
 static int
 fw_setup_class_device(struct class_device **class_dev_p,
@@ -244,6 +253,7 @@ fw_setup_class_device(struct class_device **class_dev_p,
 						 GFP_KERNEL);
 
 	if (!fw_priv || !class_dev) {
+		printk(KERN_ERR "%s: kmalloc failed\n", __FUNCTION__);
 		retval = -ENOMEM;
 		goto error_kfree;
 	}
@@ -251,12 +261,8 @@ fw_setup_class_device(struct class_device **class_dev_p,
 	memset(class_dev, 0, sizeof (*class_dev));
 
 	init_completion(&fw_priv->completion);
-	memcpy(&fw_priv->attr_data, &firmware_attr_data_tmpl,
-	       sizeof (firmware_attr_data_tmpl));
-
-	strncpy(&fw_priv->fw_id[0], fw_name, FIRMWARE_NAME_MAX);
-	fw_priv->fw_id[FIRMWARE_NAME_MAX - 1] = '\0';
-
+	fw_priv->attr_data = firmware_attr_data_tmpl;
+	strlcpy(fw_priv->fw_id, fw_name, FIRMWARE_NAME_MAX);
 	fw_setup_class_device_id(class_dev, device);
 	class_dev->dev = device;
 
