@@ -86,8 +86,6 @@ int idled(void)
 	mtspr(CTRLT, CTRL);
 #endif
 
-	printk("cpu %d hits idle loop\n", smp_processor_id());
-
 	paca = (struct Paca *)mfspr(SPRG3);
 
 	while(1) {
