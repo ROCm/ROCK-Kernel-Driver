@@ -473,7 +473,7 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);

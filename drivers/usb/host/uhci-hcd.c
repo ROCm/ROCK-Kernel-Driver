@@ -2315,7 +2315,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	uhci->rh_numports = port;
 
-	hcd->self.root_hub = udev = usb_alloc_dev(NULL, &hcd->self);
+	hcd->self.root_hub = udev = usb_alloc_dev(NULL, &hcd->self, 0);
 	if (!udev) {
 		err("unable to allocate root hub");
 		goto err_alloc_root_hub;

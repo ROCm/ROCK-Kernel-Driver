@@ -678,17 +678,19 @@ static void usb_release_dev(struct device *dev)
 }
 
 /**
- * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
- * @parent: hub to which device is connected
+ * usb_alloc_dev - usb device constructor (usbcore-internal)
+ * @parent: hub to which device is connected; null to allocate a root hub
  * @bus: bus used to access the device
+ * @port: zero based index of port; ignored for root hubs
  * Context: !in_interrupt ()
  *
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
  *
- * This call is synchronous, and may not be used in an interrupt context.
+ * This call may not be used in a non-sleeping context.
  */
-struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
+struct usb_device *
+usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 {
 	struct usb_device *dev;
 
@@ -705,11 +707,42 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	}
 
 	device_initialize(&dev->dev);
+	dev->dev.bus = &usb_bus_type;
+	dev->dev.dma_mask = bus->controller->dma_mask;
+	dev->dev.driver_data = &usb_generic_driver_data;
+	dev->dev.driver = &usb_generic_driver;
 	dev->dev.release = usb_release_dev;
 	dev->state = USB_STATE_ATTACHED;
 
-	if (!parent)
+	/* Save readable and stable topology id, distinguishing devices
+	 * by location for diagnostics, tools, driver model, etc.  The
+	 * string is a path along hub ports, from the root.  Each device's
+	 * dev->devpath will be stable until USB is re-cabled, and hubs
+	 * are often labeled with these port numbers.  The bus_id isn't
+	 * as stable:  bus->busnum changes easily from modprobe order,
+	 * cardbus or pci hotplugging, and so on.
+	 */
+	if (unlikely (!parent)) {
 		dev->devpath [0] = '0';
+
+		dev->dev.parent = bus->controller;
+		sprintf (&dev->dev.bus_id[0], "usb%d", bus->busnum);
+	} else {
+		/* match any labeling on the hubs; it's one-based */
+		if (parent->devpath [0] == '0')
+			snprintf (dev->devpath, sizeof dev->devpath,
+				"%d", port + 1);
+		else
+			snprintf (dev->devpath, sizeof dev->devpath,
+				"%s.%d", parent->devpath, port + 1);
+
+		dev->dev.parent = &parent->dev;
+		sprintf (&dev->dev.bus_id[0], "%d-%s",
+			bus->busnum, dev->devpath);
+
+		/* hub driver sets up TT records */
+	}
+
 	dev->bus = bus;
 	dev->parent = parent;
 	INIT_LIST_HEAD(&dev->filelist);
@@ -1011,32 +1044,12 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
  */
 #define NEW_DEVICE_RETRYS	2
 #define SET_ADDRESS_RETRYS	2
-int usb_new_device(struct usb_device *dev, struct device *parent)
+int usb_new_device(struct usb_device *dev)
 {
 	int err = -EINVAL;
 	int i;
 	int j;
 	int config;
-
-	/*
-	 * Set the driver for the usb device to point to the "generic" driver.
-	 * This prevents the main usb device from being sent to the usb bus
-	 * probe function.  Yes, it's a hack, but a nice one :)
-	 *
-	 * Do it asap, so more driver model stuff (like the device.h message
-	 * utilities) can be used in hcd submit/unlink code paths.
-	 */
-	usb_generic_driver.bus = &usb_bus_type;
-	dev->dev.parent = parent;
-	dev->dev.driver = &usb_generic_driver;
-	dev->dev.bus = &usb_bus_type;
-	dev->dev.driver_data = &usb_generic_driver_data;
-	if (dev->dev.bus_id[0] == 0)
-		sprintf (&dev->dev.bus_id[0], "%d-%s",
-			 dev->bus->busnum, dev->devpath);
-
-	/* dma masks come from the controller; readonly, except to hcd */
-	dev->dev.dma_mask = parent->dma_mask;
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.

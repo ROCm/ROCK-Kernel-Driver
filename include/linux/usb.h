@@ -274,7 +274,6 @@ struct usb_device {
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
-extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
 extern void usb_put_dev(struct usb_device *dev);
 

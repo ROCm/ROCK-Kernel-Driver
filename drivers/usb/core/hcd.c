@@ -738,7 +738,7 @@ EXPORT_SYMBOL (usb_deregister_bus);
  *
  * The USB host controller calls this function to register the root hub
  * properly with the USB subsystem.  It sets up the device properly in
- * the driverfs tree, and then calls usb_new_device() to register the
+ * the device model tree, and then calls usb_new_device() to register the
  * usb device.  It also assigns the root hub's USB address (always 1).
  */
 int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev)
@@ -746,14 +746,14 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	const int devnum = 1;
 	int retval;
 
-	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
-	usb_dev->state = USB_STATE_DEFAULT;
-
 	usb_dev->devnum = devnum;
 	usb_dev->bus->devnum_next = devnum + 1;
+	memset (&usb_dev->bus->devmap.devicemap, 0,
+			sizeof usb_dev->bus->devmap.devicemap);
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
+	usb_dev->state = USB_STATE_ADDRESS;
 
-	retval = usb_new_device (usb_dev, parent_dev);
+	retval = usb_new_device (usb_dev);
 	if (retval)
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				usb_dev->dev.bus_id, retval);

@@ -536,7 +536,7 @@ static int hc_start (struct ohci_hcd *ohci)
  
 	/* connect the virtual root hub */
 	bus = hcd_to_bus (&ohci->hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
 	ohci->hcd.state = USB_STATE_RUNNING;
 	if (!udev) {
 		disable (ohci);
