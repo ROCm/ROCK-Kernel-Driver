@@ -923,6 +923,7 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			   struct device_node *dev, int primary)
 {
 	unsigned int *ranges, *prev;
+	unsigned int size;
 	int rlen = 0;
 	int memno = 0;
 	struct resource *res;
@@ -963,12 +964,16 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
 	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
 		res = NULL;
+		size = ranges[na+4];
 		switch (ranges[0] >> 24) {
 		case 1:		/* I/O space */
 			if (ranges[2] != 0)
 				break;
 			hose->io_base_phys = ranges[na+2];
-			hose->io_base_virt = ioremap(ranges[na+2], ranges[na+4]);
+			/* limit I/O space to 16MB */
+			if (size > 0x01000000)
+				size = 0x01000000;
+			hose->io_base_virt = ioremap(ranges[na+2], size);
 			if (primary)
 				isa_io_base = (unsigned long) hose->io_base_virt;
 			res = &hose->io_resource;
@@ -997,7 +1002,7 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 		}
 		if (res != NULL) {
 			res->name = dev->full_name;
-			res->end = res->start + ranges[na+4] - 1;
+			res->end = res->start + size - 1;
 			res->parent = NULL;
 			res->sibling = NULL;
 			res->child = NULL;
