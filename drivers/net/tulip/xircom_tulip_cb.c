@@ -1471,7 +1471,7 @@ static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct xircom_private *tp = dev->priv;
-	u16 *data = (u16 *)&rq->ifr_data;
+	u16 *data = (u16 *)&rq->ifr_ifru;
 	int phy = tp->phys[0] & 0x1f;
 	unsigned long flags;
 

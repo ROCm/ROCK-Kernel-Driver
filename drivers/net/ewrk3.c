@@ -1707,7 +1707,7 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
-	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_data;
+	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_ifru;
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
 	u_char csr;

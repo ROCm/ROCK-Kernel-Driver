@@ -241,10 +241,10 @@ static ssize_t tun_chr_writev(struct file * file, const struct iovec *iv,
 }
 
 /* Write */
-static ssize_t tun_chr_write(struct file * file, const char * buf, 
+static ssize_t tun_chr_write(struct file * file, const char __user * buf, 
 			     size_t count, loff_t *pos)
 {
-	struct iovec iv = { (void *) buf, count };
+	struct iovec iv = { (void __user *) buf, count };
 	return tun_chr_writev(file, &iv, 1, pos);
 }
 
@@ -333,7 +333,7 @@ static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 }
 
 /* Read */
-static ssize_t tun_chr_read(struct file * file, char * buf, 
+static ssize_t tun_chr_read(struct file * file, char __user * buf, 
 			    size_t count, loff_t *pos)
 {
 	struct iovec iv = { buf, count };
@@ -462,7 +462,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 		struct ifreq ifr;
 		int err;
 
-		if (copy_from_user(&ifr, (void *)arg, sizeof(ifr)))
+		if (copy_from_user(&ifr, (void __user *)arg, sizeof(ifr)))
 			return -EFAULT;
 		ifr.ifr_name[IFNAMSIZ-1] = '\0';
 
@@ -473,7 +473,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 		if (err)
 			return err;
 
-		if (copy_to_user((void *)arg, &ifr, sizeof(ifr)))
+		if (copy_to_user((void __user *)arg, &ifr, sizeof(ifr)))
 			return -EFAULT;
 		return 0;
 	}

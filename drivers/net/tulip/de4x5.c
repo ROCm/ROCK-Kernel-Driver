@@ -5535,7 +5535,7 @@ static int
 de4x5_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     struct de4x5_private *lp = netdev_priv(dev);
-    struct de4x5_ioctl *ioc = (struct de4x5_ioctl *) &rq->ifr_data;
+    struct de4x5_ioctl *ioc = (struct de4x5_ioctl *) &rq->ifr_ifru;
     u_long iobase = dev->base_addr;
     int i, j, status = 0;
     s32 omr;
