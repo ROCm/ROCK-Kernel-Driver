@@ -536,11 +536,24 @@ void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
 	sock_put(sk);
 }
 
+static inline void netlink_trim(struct sk_buff *skb, int allocation)
+{
+	int delta = skb->end - skb->tail;
+
+	if (delta * 2 < skb->truesize)
+		return;
+	if (pskb_expand_head(skb, 0, -delta, allocation))
+		return;
+	skb->truesize -= delta;
+}
+
 int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
 {
 	struct sock *sk;
 	int err;
 	long timeo;
+
+	netlink_trim(skb, gfp_any());
 
 	timeo = sock_sndtimeo(ssk, nonblock);
 retry:
@@ -587,6 +600,8 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	struct sk_buff *skb2 = NULL;
 	int protocol = ssk->sk_protocol;
 	int failure = 0, delivered = 0;
+
+	netlink_trim(skb, allocation);
 
 	/* While we sleep in clone, do not allow to change socket list */
 
