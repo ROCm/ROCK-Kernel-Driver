@@ -239,9 +239,17 @@ xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 	va_end(ap);
 }
 
+#ifdef __KERNEL__
+void
+xfs_stack_trace(void)
+{
+	dump_stack();
+}
+#endif /* __KERNEL__ */
+
 #ifndef __KERNEL__
-int	xfs_error_level = XFS_ERRLEVEL_HIGH;
-#endif /* __KERNEL */
+int	xfs_error_level = XFS_ERRLEVEL_HIGH;	/* systune in SIM library */
+#endif /* ! __KERNEL */
 
 void
 xfs_error_report(
@@ -263,6 +271,9 @@ xfs_error_report(
 		"XFS internal error %s at line %d of file %s.  Caller 0x%x\n",
 				tag, linenum, fname, ra);
 		}
+#ifdef __KERNEL__
+		xfs_stack_trace();
+#endif /* __KERNEL__ */
 	}
 }
 

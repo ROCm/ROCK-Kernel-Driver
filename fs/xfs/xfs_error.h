@@ -52,6 +52,8 @@ extern int	xfs_error_trap(int);
 #define XFS_ERROR(e)	(e)
 #endif
 
+struct xfs_mount;
+
 extern void
 xfs_error_report(
 	char		*tag,
