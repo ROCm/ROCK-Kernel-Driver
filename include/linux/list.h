@@ -156,9 +156,7 @@ static inline void __list_splice(list_t *list, list_t *head)
  */
 static inline void list_splice(list_t *list, list_t *head)
 {
-	list_t *first = list->next;
-
-	if (first != list)
+	if (!list_empty(list))
 		__list_splice(list, head);
 }
 

@@ -205,6 +205,8 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 	}
 	printk("\n");
 	printk(KERN_ERR "page_remove_rmap: driver cleared PG_reserved ?\n");
+#else
+	BUG();
 #endif
 
 out:
