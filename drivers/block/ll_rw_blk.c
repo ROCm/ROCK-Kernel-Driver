@@ -2187,6 +2187,15 @@ void end_that_request_last(struct request *req)
 		complete(waiting);
 }
 
+void end_request(struct request *req, int uptodate)
+{
+	if (!end_that_request_first(req, uptodate, req->hard_cur_sectors)) {
+		add_disk_randomness(req->rq_disk);
+		blkdev_dequeue_request(req);
+		end_that_request_last(req);
+	}
+}
+
 int __init blk_dev_init(void)
 {
 	int total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
@@ -2229,6 +2238,7 @@ int __init blk_dev_init(void)
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_chunk);
 EXPORT_SYMBOL(end_that_request_last);
+EXPORT_SYMBOL(end_request);
 EXPORT_SYMBOL(blk_init_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);

@@ -10,8 +10,6 @@
  * $Revision: 1.94 $
  */
 
-#define LOCAL_END_REQUEST /* Don't generate end_request in blk.h */
-
 #include <linux/config.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
