@@ -1397,12 +1397,8 @@ void ide_add_generic_settings (ide_drive_t *drive)
  */
 void ide_delay_50ms (void)
 {
-#ifndef CONFIG_BLK_DEV_IDECS
-	mdelay(50);
-#else
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(1+HZ/20);
-#endif /* CONFIG_BLK_DEV_IDECS */
 }
 
 EXPORT_SYMBOL(ide_delay_50ms);
