@@ -2341,6 +2341,7 @@ static int snd_pcm_sync_ptr(snd_pcm_substream_t *substream, struct sndrv_pcm_syn
 	struct sndrv_pcm_sync_ptr sync_ptr;
 	volatile struct sndrv_pcm_mmap_status *status;
 	volatile struct sndrv_pcm_mmap_control *control;
+	int err;
 
 	memset(&sync_ptr, 0, sizeof(sync_ptr));
 	if (get_user(sync_ptr.flags, (unsigned int *) &(_sync_ptr->flags)))
@@ -2349,6 +2350,11 @@ static int snd_pcm_sync_ptr(snd_pcm_substream_t *substream, struct sndrv_pcm_syn
 		return -EFAULT;	
 	status = runtime->status;
 	control = runtime->control;
+	if (sync_ptr.flags & SNDRV_PCM_SYNC_PTR_HWSYNC) {
+		err = snd_pcm_hwsync(substream);
+		if (err < 0)
+			return err;
+	}
 	snd_pcm_stream_lock_irq(substream);
 	control->appl_ptr = sync_ptr.c.control.appl_ptr;
 	control->avail_min = sync_ptr.c.control.avail_min;
@@ -2357,12 +2363,8 @@ static int snd_pcm_sync_ptr(snd_pcm_substream_t *substream, struct sndrv_pcm_syn
 	sync_ptr.s.status.tstamp = status->tstamp;
 	sync_ptr.s.status.suspended_state = status->suspended_state;
 	snd_pcm_stream_unlock_irq(substream);
-	if (copy_to_user(_sync_ptr, &sync_ptr, sizeof(sync_ptr))) {
+	if (copy_to_user(_sync_ptr, &sync_ptr, sizeof(sync_ptr)))
 		return -EFAULT;
-	} else {
-		if (sync_ptr.flags & SNDRV_PCM_SYNC_PTR_HWSYNC)
-			return snd_pcm_hwsync(substream);
-	}
 	return 0;
 }
 		
