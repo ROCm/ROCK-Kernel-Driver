@@ -22,6 +22,7 @@
  *
  */
 
+#include <linux/interrupt.h>
 #include "rawmidi.h"
 
 #define MPU401_HW_MPU401		1	/* native MPU401 */
