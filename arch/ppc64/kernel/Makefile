@@ -30,3 +30,4 @@ obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_PROFILING)		+= profile.o
 obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o
 obj-$(CONFIG_PPC_RTAS)		+= rtas-proc.o
+obj-$(CONFIG_SCANLOG)		+= scanlog.o

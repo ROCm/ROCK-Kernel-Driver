@@ -56,6 +56,9 @@ struct rtas_t rtas = {
 
 extern unsigned long reloc_offset(void);
 
+spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
+char rtas_data_buf[RTAS_DATA_BUF_SIZE];
+
 void
 phys_call_rtas(int token, int nargs, int nret, ...)
 {
@@ -278,3 +281,10 @@ rtas_halt(void)
 		rtas_flash_bypass_warning();
         rtas_power_off();
 }
+
+EXPORT_SYMBOL(rtas_proc_dir);
+EXPORT_SYMBOL(rtas_firmware_flash_list);
+EXPORT_SYMBOL(rtas_token);
+EXPORT_SYMBOL(rtas_call);
+EXPORT_SYMBOL(rtas_data_buf);
+EXPORT_SYMBOL(rtas_data_buf_lock);
