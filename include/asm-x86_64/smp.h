@@ -7,6 +7,7 @@
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <linux/bitops.h>
 extern int disable_apic;
 #endif
@@ -35,8 +36,8 @@ struct pt_regs;
  */
  
 extern void smp_alloc_memory(void);
-extern unsigned long phys_cpu_present_map;
-extern unsigned long cpu_online_map;
+extern cpumask_t phys_cpu_present_map;
+extern cpumask_t cpu_online_map;
 extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;
 extern void smp_flush_tlb(void);
@@ -56,35 +57,15 @@ void smp_stop_cpu(void);
  * compresses data structures.
  */
 
-extern volatile unsigned long cpu_callout_map;
+extern cpumask_t cpu_callout_map;
 
-#define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
-
-#define for_each_cpu(cpu, mask) \
-	for(mask = cpu_online_map; \
-	    cpu = __ffs(mask), mask != 0; \
-	    mask &= ~(1UL<<cpu))
-
-extern inline unsigned int any_online_cpu(unsigned int mask)
-{
-	if (mask & cpu_online_map)
-		return __ffs(mask & cpu_online_map);
-
-	return NR_CPUS; 
-} 
-
-extern inline unsigned int num_online_cpus(void)
-{ 
-	return hweight32(cpu_online_map);
-} 
+#define cpu_possible(cpu) cpu_isset(cpu, cpu_callout_map)
+#define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 
 static inline int num_booting_cpus(void)
 {
-	return hweight32(cpu_callout_map);
+	return cpus_weight(cpu_callout_map);
 }
-
-extern volatile unsigned long cpu_callout_map;
 
 #define smp_processor_id() read_pda(cpunumber)
 
@@ -104,7 +85,7 @@ extern inline int safe_smp_processor_id(void)
 		return hard_smp_processor_id();
 } 
 
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+#define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 #endif /* !ASSEMBLY */
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
@@ -113,11 +94,16 @@ extern inline int safe_smp_processor_id(void)
 #define INT_DELIVERY_MODE 1     /* logical delivery */
 #define TARGET_CPUS 1
 
+#ifndef ASSEMBLY
+static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
+{
+	return cpus_coerce_const(cpumask);
+}
+#endif
 
 #ifndef CONFIG_SMP
 #define stack_smp_processor_id() 0
 #define safe_smp_processor_id() 0
-#define for_each_cpu(x,mask) (void)(mask), (x)=0;
 #define cpu_logical_map(x) (x)
 #else
 #include <asm/thread_info.h>

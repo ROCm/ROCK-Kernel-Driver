@@ -47,7 +47,7 @@ atomic_t ipi_sent;
 DEFINE_PER_CPU(unsigned int, prof_multiplier);
 DEFINE_PER_CPU(unsigned int, prof_counter);
 unsigned long cache_decay_ticks = HZ/100;
-unsigned long cpu_online_map = 1UL;
+unsigned long cpu_online_map = cpumask_of_cpu(0);
 unsigned long cpu_possible_map = 1UL;
 int smp_hw_index[NR_CPUS];
 struct thread_info *secondary_ti;
@@ -361,8 +361,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
-	set_bit(smp_processor_id(), &cpu_possible_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_possible_map);
 }
 
 int __init setup_profiling_timer(unsigned int multiplier)
@@ -444,7 +444,7 @@ int __cpu_up(unsigned int cpu)
 	printk("Processor %d found.\n", cpu);
 
 	smp_ops->give_timebase();
-	set_bit(cpu, &cpu_online_map);
+	cpu_set(cpu, cpu_online_map);
 	return 0;
 }
 

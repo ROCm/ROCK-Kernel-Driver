@@ -56,7 +56,7 @@ struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
 int cpus_initialized = 0;
-unsigned long cpu_initialized = 0;
+static cpumask_t cpu_initialized;
 volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
 
 /*
@@ -86,7 +86,7 @@ void __devinit cpu_init (void)
         int nr = smp_processor_id();
         int addr = hard_smp_processor_id();
 
-        if (test_and_set_bit(nr,&cpu_initialized)) {
+        if (cpu_test_and_set(nr,cpu_initialized)) {
                 printk("CPU#%d ALREADY INITIALIZED!!!!!!!!!\n", nr);
                 for (;;) local_irq_enable();
         }
@@ -565,7 +565,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 			       num_online_cpus(), loops_per_jiffy/(500000/HZ),
 			       (loops_per_jiffy/(5000/HZ))%100);
 	}
-	if (cpu_online_map & (1 << n)) {
+	if (cpu_online(n)) {
 #ifdef CONFIG_SMP
 		if (smp_processor_id() == n)
 			cpuinfo = &S390_lowcore.cpu_data;

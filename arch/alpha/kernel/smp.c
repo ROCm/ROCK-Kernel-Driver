@@ -71,7 +71,7 @@ static int smp_secondary_alive __initdata = 0;
 
 /* Which cpus ids came online.  */
 unsigned long cpu_present_mask;
-volatile unsigned long cpu_online_map;
+cpumask_t cpu_online_map;
 
 /* cpus reported in the hwrpb */
 static unsigned long hwrpb_cpu_present_mask __initdata = 0;
@@ -132,7 +132,7 @@ smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
 
-	if (test_and_set_bit(cpuid, &cpu_online_map)) {
+	if (cpu_test_and_set(cpuid, cpu_online_map)) {
 		printk("??, cpu 0x%x already present??\n", cpuid);
 		BUG();
 	}
@@ -575,8 +575,8 @@ smp_prepare_boot_cpu(void)
 	/*
 	 * Mark the boot cpu (current cpu) as both present and online
 	 */ 
-	set_bit(smp_processor_id(), &cpu_present_mask);
-	set_bit(smp_processor_id(), &cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_present_mask);
+	cpu_set(smp_processor_id(), cpu_online_map);
 }
 
 int __devinit

@@ -249,14 +249,14 @@ static void clear_IO_APIC (void)
 			clear_IO_APIC_pin(apic, pin);
 }
 
-static void set_ioapic_affinity (unsigned int irq, unsigned long cpu_mask)
+static void set_ioapic_affinity(unsigned int irq, cpumask_t cpumask)
 {
 	unsigned long flags;
 	int pin;
 	struct irq_pin_list *entry = irq_2_pin + irq;
 	unsigned int apicid_value;
 	
-	apicid_value = cpu_mask_to_apicid(cpu_mask);
+	apicid_value = cpu_mask_to_apicid(mk_cpumask_const(cpumask));
 	/* Prepare to do the io_apic_write */
 	apicid_value = apicid_value << 24;
 	spin_lock_irqsave(&ioapic_lock, flags);
@@ -286,9 +286,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long cpu_mask)
 #  define Dprintk(x...) 
 # endif
 
-extern unsigned long irq_affinity[NR_IRQS];
+extern cpumask_t irq_affinity[NR_IRQS];
 
-static int __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
+static cpumask_t __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
 
 #define IRQBALANCE_CHECK_ARCH -999
 static int irqbalance_disabled = IRQBALANCE_CHECK_ARCH;
@@ -307,8 +307,7 @@ struct irq_cpu_info {
 #define IDLE_ENOUGH(cpu,now) \
 		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
 
-#define IRQ_ALLOWED(cpu,allowed_mask) \
-		((1 << cpu) & (allowed_mask))
+#define IRQ_ALLOWED(cpu, allowed_mask)	cpu_isset(cpu, allowed_mask)
 
 #define CPU_TO_PACKAGEINDEX(i) \
 		((physical_balance && i > cpu_sibling_map[i]) ? cpu_sibling_map[i] : i)
@@ -320,7 +319,7 @@ struct irq_cpu_info {
 
 long balanced_irq_interval = MAX_BALANCED_IRQ_INTERVAL;
 
-static unsigned long move(int curr_cpu, unsigned long allowed_mask,
+static unsigned long move(int curr_cpu, cpumask_t allowed_mask,
 			unsigned long now, int direction)
 {
 	int search_idle = 1;
@@ -350,20 +349,20 @@ inside:
 static inline void balance_irq(int cpu, int irq)
 {
 	unsigned long now = jiffies;
-	unsigned long allowed_mask;
+	cpumask_t allowed_mask;
 	unsigned int new_cpu;
 		
 	if (irqbalance_disabled)
 		return; 
 
-	allowed_mask = cpu_online_map & irq_affinity[irq];
+	cpus_and(allowed_mask, cpu_online_map, irq_affinity[irq]);
 	new_cpu = move(cpu, allowed_mask, now, 1);
 	if (cpu != new_cpu) {
 		irq_desc_t *desc = irq_desc + irq;
 		unsigned long flags;
 
 		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_cpumask[irq] = 1 << new_cpu;
+		pending_irq_balance_cpumask[irq] = cpumask_of_cpu(new_cpu);
 		spin_unlock_irqrestore(&desc->lock, flags);
 	}
 }
@@ -399,8 +398,7 @@ static void do_irq_balance(void)
 	int tmp_loaded, first_attempt = 1;
 	unsigned long tmp_cpu_irq;
 	unsigned long imbalance = 0;
-	unsigned long allowed_mask;
-	unsigned long target_cpu_mask;
+	cpumask_t allowed_mask, target_cpu_mask, tmp;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		int package_index;
@@ -549,10 +547,11 @@ tryanotherirq:
 					CPU_IRQ(cpu_sibling_map[min_loaded]))
 		min_loaded = cpu_sibling_map[min_loaded];
 
-	allowed_mask = cpu_online_map & irq_affinity[selected_irq];
-	target_cpu_mask = 1 << min_loaded;
+	cpus_and(allowed_mask, cpu_online_map, irq_affinity[selected_irq]);
+	target_cpu_mask = cpumask_of_cpu(min_loaded);
+	cpus_and(tmp, target_cpu_mask, allowed_mask);
 
-	if (target_cpu_mask & allowed_mask) {
+	if (!cpus_empty(tmp)) {
 		irq_desc_t *desc = irq_desc + selected_irq;
 		unsigned long flags;
 
@@ -560,7 +559,8 @@ tryanotherirq:
 				selected_irq, min_loaded);
 		/* mark for change destination */
 		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_cpumask[selected_irq] = 1 << min_loaded;
+		pending_irq_balance_cpumask[selected_irq] =
+					cpumask_of_cpu(min_loaded);
 		spin_unlock_irqrestore(&desc->lock, flags);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
@@ -591,8 +591,9 @@ int balanced_irq(void *unused)
 	daemonize("kirqd");
 	
 	/* push everything to CPU 0 to give us a starting point.  */
-	for (i = 0 ; i < NR_IRQS ; i++)
-		pending_irq_balance_cpumask[i] = 1;
+	for (i = 0 ; i < NR_IRQS ; i++) {
+		pending_irq_balance_cpumask[i] = cpumask_of_cpu(0);
+	}
 
 repeat:
 	set_current_state(TASK_INTERRUPTIBLE);
@@ -611,7 +612,9 @@ static int __init balanced_irq_init(void)
 {
 	int i;
 	struct cpuinfo_x86 *c;
+	cpumask_t tmp;
 
+	cpus_shift_right(tmp, cpu_online_map, 2);
         c = &boot_cpu_data;
 	/* When not overwritten by the command line ask subarchitecture. */
 	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH)
@@ -628,7 +631,7 @@ static int __init balanced_irq_init(void)
 	 * Enable physical balance only if more than 1 physical processor
 	 * is present
 	 */
-	if (smp_num_siblings > 1 && cpu_online_map >> 2)
+	if (smp_num_siblings > 1 && !cpus_empty(tmp))
 		physical_balance = 1;
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -667,14 +670,14 @@ static int __init irqbalance_disable(char *str)
 
 __setup("noirqbalance", irqbalance_disable);
 
-static void set_ioapic_affinity (unsigned int irq, unsigned long mask);
+static void set_ioapic_affinity(unsigned int irq, cpumask_t mask);
 
 static inline void move_irq(int irq)
 {
 	/* note - we hold the desc->lock */
-	if (unlikely(pending_irq_balance_cpumask[irq])) {
+	if (unlikely(!cpus_empty(pending_irq_balance_cpumask[irq]))) {
 		set_ioapic_affinity(irq, pending_irq_balance_cpumask[irq]);
-		pending_irq_balance_cpumask[irq] = 0;
+		cpus_clear(pending_irq_balance_cpumask[irq]);
 	}
 }
 
@@ -837,7 +840,7 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
  * we need to reprogram the ioredtbls to cater for the cpus which have come online
  * so mask in all cases should simply be TARGET_CPUS
  */
-void __init setup_ioapic_dest (unsigned long mask)
+void __init setup_ioapic_dest(cpumask_t mask)
 {
 	int pin, ioapic, irq, irq_entry;
 
@@ -1613,7 +1616,7 @@ void disable_IO_APIC(void)
 static void __init setup_ioapic_ids_from_mpc(void)
 {
 	union IO_APIC_reg_00 reg_00;
-	unsigned long phys_id_present_map;
+	physid_mask_t phys_id_present_map;
 	int apic;
 	int i;
 	unsigned char old_id;
@@ -1623,6 +1626,10 @@ static void __init setup_ioapic_ids_from_mpc(void)
 		/* This gets done during IOAPIC enumeration for ACPI. */
 		return;
 
+	/*
+	 * This is broken; anything with a real cpu count has to
+	 * circumvent this idiocy regardless.
+	 */
 	phys_id_present_map = ioapic_phys_id_map(phys_cpu_present_map);
 
 	/*
@@ -1654,18 +1661,20 @@ static void __init setup_ioapic_ids_from_mpc(void)
 					mp_ioapics[apic].mpc_apicid)) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
 				apic, mp_ioapics[apic].mpc_apicid);
-			for (i = 0; i < 0xf; i++)
-				if (!(phys_id_present_map & (1 << i)))
+			for (i = 0; i < APIC_BROADCAST_ID; i++)
+				if (!physid_isset(i, phys_id_present_map))
 					break;
-			if (i >= 0xf)
+			if (i >= APIC_BROADCAST_ID)
 				panic("Max APIC ID exceeded!\n");
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				i);
-			phys_id_present_map |= 1 << i;
+			physid_set(i, phys_id_present_map);
 			mp_ioapics[apic].mpc_apicid = i;
 		} else {
+			physid_mask_t tmp;
+			tmp = apicid_to_cpu_present(mp_ioapics[apic].mpc_apicid);
 			printk("Setting %d in the phys_id_present_map\n", mp_ioapics[apic].mpc_apicid);
-			phys_id_present_map |= apicid_to_cpu_present(mp_ioapics[apic].mpc_apicid);
+			physids_or(phys_id_present_map, phys_id_present_map, tmp);
 		}
 
 
@@ -2235,7 +2244,8 @@ late_initcall(io_apic_bug_finalize);
 int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
 	union IO_APIC_reg_00 reg_00;
-	static unsigned long apic_id_map = 0;
+	static physid_mask_t apic_id_map = PHYSID_MASK_NONE;
+	physid_mask_t tmp;
 	unsigned long flags;
 	int i = 0;
 
@@ -2248,8 +2258,8 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 	 *      advantage of new APIC bus architecture.
 	 */
 
-	if (!apic_id_map)
-		apic_id_map = phys_cpu_present_map;
+	if (physids_empty(apic_id_map))
+		apic_id_map = ioapic_phys_id_map(phys_cpu_present_map);
 
 	spin_lock_irqsave(&ioapic_lock, flags);
 	reg_00.raw = io_apic_read(ioapic, 0);
@@ -2281,7 +2291,8 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 		apic_id = i;
 	} 
 
-	apic_id_map |= apicid_to_cpu_present(apic_id);
+	tmp = apicid_to_cpu_present(apic_id);
+	physids_or(apic_id_map, apic_id_map, tmp);
 
 	if (reg_00.bits.ID != apic_id) {
 		reg_00.bits.ID = apic_id;

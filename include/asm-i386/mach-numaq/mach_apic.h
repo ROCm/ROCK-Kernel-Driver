@@ -6,7 +6,13 @@
 
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 
-#define TARGET_CPUS (~0UL)
+static inline cpumask_t target_cpus(void)
+{
+	cpumask_t tmp = CPU_MASK_ALL;
+	return tmp;
+}
+
+#define TARGET_CPUS (target_cpus())
 
 #define NO_BALANCE_IRQ (1)
 #define esr_disable (1)
@@ -15,13 +21,13 @@
 #define INT_DEST_MODE 0     /* physical delivery on LOCAL quad */
  
 #define APIC_BROADCAST_ID      0x0F
-#define check_apicid_used(bitmap, apicid) ((bitmap) & (1 << (apicid)))
-#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
+#define check_apicid_used(bitmap, apicid) physid_isset(apicid, bitmap)
+#define check_apicid_present(bit) physid_isset(bit, phys_cpu_present_map)
 #define apicid_cluster(apicid) (apicid & 0xF0)
 
 static inline int apic_id_registered(void)
 {
-	return (1);
+	return 1;
 }
 
 static inline void init_apic_ldr(void)
@@ -41,17 +47,17 @@ static inline void clustered_apic_check(void)
  */
 static inline int multi_timer_check(int apic, int irq)
 {
-	return (apic != 0 && irq == 0);
+	return apic != 0 && irq == 0;
 }
 
-static inline ulong ioapic_phys_id_map(ulong phys_map)
+static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
 {
 	/* We don't have a good way to do this yet - hack */
-	return 0xf;
+	return physids_promote(0xFUL);
 }
 
 /* Mapping from cpu number to logical apicid */
-extern volatile u8 cpu_2_logical_apicid[];
+extern u8 cpu_2_logical_apicid[];
 static inline int cpu_to_logical_apicid(int cpu)
 {
 	return (int)cpu_2_logical_apicid[cpu];
@@ -59,22 +65,25 @@ static inline int cpu_to_logical_apicid(int cpu)
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return ( ((mps_cpu/4)*16) + (1<<(mps_cpu%4)) );
+	return ((mps_cpu >> 2) << 4) | (1 << (mps_cpu & 0x3));
 }
 
 static inline int generate_logical_apicid(int quad, int phys_apicid)
 {
-	return ( (quad << 4) + (phys_apicid ? phys_apicid << 1 : 1) );
+	return (quad << 4) + (phys_apicid ? phys_apicid << 1 : 1);
 }
 
 static inline int apicid_to_node(int logical_apicid) 
 {
-	return (logical_apicid >> 4);
+	return logical_apicid >> 4;
 }
 
-static inline unsigned long apicid_to_cpu_present(int logical_apicid)
+static inline physid_mask_t apicid_to_cpu_present(int logical_apicid)
 {
-	return ( (logical_apicid&0xf) << (4*apicid_to_node(logical_apicid)) );
+	int node = apicid_to_node(logical_apicid);
+	int cpu = __ffs(logical_apicid & 0xf);
+
+	return physid_mask_of_physid(cpu + 4*node);
 }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, 
@@ -115,7 +124,7 @@ static inline void enable_apic_mode(void)
  * We use physical apicids here, not logical, so just return the default
  * physical broadcast to stop people from breaking us
  */
-static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 {
 	return (int) 0xF;
 }

@@ -54,11 +54,11 @@
 #include <asm/proto.h>
 
 /* Bitmask of currently online CPUs */
-unsigned long cpu_online_map = 1;
+cpumask_t cpu_online_map;
 
-static volatile unsigned long cpu_callin_map;
-volatile unsigned long cpu_callout_map;
-static unsigned long smp_commenced_mask;
+static cpumask_t cpu_callin_map;
+cpumask_t cpu_callout_map;
+static cpumask_t smp_commenced_mask;
 
 /* Per CPU bogomips and other parameters */
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
@@ -174,7 +174,7 @@ static void __init synchronize_tsc_bp (void)
 
 	sum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (test_bit(i, &cpu_callout_map)) {
+		if (cpu_isset(i, cpu_callout_map)) {
 		t0 = tsc_values[i];
 		sum += t0;
 	}
@@ -183,7 +183,7 @@ static void __init synchronize_tsc_bp (void)
 
 	sum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (!test_bit(i, &cpu_callout_map))
+		if (!cpu_isset(i, cpu_callout_map))
 			continue;
 
 		delta = tsc_values[i] - avg;
@@ -258,7 +258,7 @@ void __init smp_callin(void)
 	 */
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
 	cpuid = smp_processor_id();
-	if (test_and_set_bit(cpuid, &cpu_callin_map)) {
+	if (cpu_test_and_set(cpuid, cpu_callin_map)) {
 		panic("smp_callin: phys CPU#%d, CPU#%d already present??\n",
 					phys_id, cpuid);
 	}
@@ -280,7 +280,7 @@ void __init smp_callin(void)
 		/*
 		 * Has the boot CPU finished it's STARTUP sequence?
 		 */
-		if (test_bit(cpuid, &cpu_callout_map))
+		if (cpu_isset(cpuid, cpu_callout_map))
 			break;
 		rep_nop();
 	}
@@ -320,7 +320,7 @@ void __init smp_callin(void)
 	/*
 	 * Allow the master to continue.
 	 */
-	set_bit(cpuid, &cpu_callin_map);
+	cpu_set(cpuid, cpu_callin_map);
 
 	/*
 	 *      Synchronize the TSC with the BP
@@ -348,7 +348,7 @@ void __init start_secondary(void)
 	barrier();
 
 	Dprintk("cpu %d: waiting for commence\n", smp_processor_id()); 
-	while (!test_bit(smp_processor_id(), &smp_commenced_mask))
+	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
 
 	Dprintk("cpu %d: setting up apic clock\n", smp_processor_id()); 	
@@ -372,7 +372,7 @@ void __init start_secondary(void)
 	local_flush_tlb();
 
 	Dprintk("cpu %d eSetting cpu_online_map\n", smp_processor_id()); 
-	set_bit(smp_processor_id(), &cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
 	
 	cpu_idle();
@@ -630,19 +630,19 @@ static void __init do_boot_cpu (int apicid)
 		 * allow APs to start initializing.
 		 */
 		Dprintk("Before Callout %d.\n", cpu);
-		set_bit(cpu, &cpu_callout_map);
+		cpu_set(cpu, cpu_callout_map);
 		Dprintk("After Callout %d.\n", cpu);
 
 		/*
 		 * Wait 5s total for a response
 		 */
 		for (timeout = 0; timeout < 50000; timeout++) {
-			if (test_bit(cpu, &cpu_callin_map))
+			if (cpu_isset(cpu, cpu_callin_map))
 				break;	/* It has booted */
 			udelay(100);
 		}
 
-		if (test_bit(cpu, &cpu_callin_map)) {
+		if (cpu_isset(cpu, cpu_callin_map)) {
 			/* number CPUs logically, starting from 1 (BSP is 0) */
 			Dprintk("OK.\n");
 			printk(KERN_INFO "CPU%d: ", cpu);
@@ -663,7 +663,7 @@ static void __init do_boot_cpu (int apicid)
 		}
 	}
 	if (boot_error) {
-		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
+		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
 	}
@@ -734,10 +734,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 
-	if (!test_bit(hard_smp_processor_id(), &phys_cpu_present_map)) {
+	if (!cpu_isset(hard_smp_processor_id(), phys_cpu_present_map)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
 		       hard_smp_processor_id());
-		phys_cpu_present_map |= (1 << hard_smp_processor_id());
+		cpu_set(hard_smp_processor_id(), phys_cpu_present_map);
 	}
 
 	/*
@@ -747,8 +747,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (!smp_found_config) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		io_apic_irqs = 0;
-		cpu_online_map = phys_cpu_present_map = 1;
-		phys_cpu_present_map = 1;
+		cpu_online_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = cpumask_of_cpu(0);
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
@@ -759,10 +759,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 */
-	if (!test_bit(boot_cpu_id, &phys_cpu_present_map)) {
+	if (!cpu_isset(boot_cpu_id, phys_cpu_present_map)) {
 		printk(KERN_NOTICE "weird, boot CPU (#%d) not listed by the BIOS.\n",
 								 boot_cpu_id);
-		phys_cpu_present_map |= (1 << hard_smp_processor_id());
+		cpu_set(hard_smp_processor_id(), phys_cpu_present_map);
 	}
 
 	/*
@@ -773,8 +773,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			boot_cpu_id);
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
 		io_apic_irqs = 0;
-		cpu_online_map = phys_cpu_present_map = 1;
-		phys_cpu_present_map = 1;
+		cpu_online_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = cpumask_of_cpu(0);
 		disable_apic = 1;
 		goto smp_done;
 	}
@@ -788,8 +788,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		smp_found_config = 0;
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
 		io_apic_irqs = 0;
-		cpu_online_map = phys_cpu_present_map = 1;
-		phys_cpu_present_map = 1;
+		cpu_online_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = cpumask_of_cpu(0);
 		disable_apic = 1;
 		goto smp_done;
 	}
@@ -812,7 +812,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (apicid == boot_cpu_id)
 			continue;
 
-		if (!(phys_cpu_present_map & (1 << apicid)))
+		if (!cpu_isset(apicid, phys_cpu_present_map))
 			continue;
 		if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
 			continue;
@@ -848,7 +848,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	} else {
 		unsigned long bogosum = 0;
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
-			if (cpu_callout_map & (1<<cpu))
+			if (cpu_isset(cpu, cpu_callout_map))
 				bogosum += cpu_data[cpu].loops_per_jiffy;
 		printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
 			cpucount+1,
@@ -889,20 +889,20 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
-	set_bit(smp_processor_id(), &cpu_callout_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_callout_map);
 }
 
 int __devinit __cpu_up(unsigned int cpu)
 {
 	/* This only works at boot for x86.  See "rewrite" above. */
-	if (test_bit(cpu, &smp_commenced_mask)) { 
+	if (cpu_isset(cpu, smp_commenced_mask)) {
 		local_irq_enable();
 		return -ENOSYS;
 	}
 
 	/* In case one didn't come up */
-	if (!test_bit(cpu, &cpu_callin_map)) { 
+	if (!cpu_isset(cpu, cpu_callin_map)) {
 		local_irq_enable();
 		return -EIO;
 	}
@@ -911,8 +911,8 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* Unleash the CPU! */
 	Dprintk("waiting for cpu %d\n", cpu);
 
-	set_bit(cpu, &smp_commenced_mask);
-	while (!test_bit(cpu, &cpu_online_map))
+	cpu_set(cpu, smp_commenced_mask);
+	while (!cpu_isset(cpu, cpu_online_map))
 		mb();
 	return 0;
 }

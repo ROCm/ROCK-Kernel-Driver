@@ -298,8 +298,8 @@ void __init setup_local_APIC (void)
 	 * Double-check whether this APIC is really registered.
 	 * This is meaningless in clustered apic mode, so we skip it.
 	 */
-	if (!clustered_apic_mode && 
-	    !test_bit(GET_APIC_ID(apic_read(APIC_ID)), &phys_cpu_present_map))
+	if (!clustered_apic_mode &&
+		!cpu_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map))
 		BUG();
 
 	/*
@@ -993,7 +993,7 @@ int __init APIC_init_uniprocessor (void)
 
 	connect_bsp_APIC();
 
-	phys_cpu_present_map = 1;
+	phys_cpu_present_map = cpumask_of_cpu(0);
 	apic_write_around(APIC_ID, boot_cpu_id);
 
 	setup_local_APIC();

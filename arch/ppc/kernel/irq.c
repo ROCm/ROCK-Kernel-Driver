@@ -44,6 +44,7 @@
 #include <linux/proc_fs.h>
 #include <linux/random.h>
 #include <linux/seq_file.h>
+#include <linux/cpumask.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -539,18 +540,6 @@ unsigned int probe_irq_mask(unsigned long irqs)
 	return 0;
 }
 
-void __init init_IRQ(void)
-{
-	static int once = 0;
-
-	if ( once )
-		return;
-	else
-		once++;
-	
-	ppc_md.init_IRQ();
-}
-
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irq)
 {
@@ -564,29 +553,40 @@ static struct proc_dir_entry *irq_dir[NR_IRQS];
 static struct proc_dir_entry *smp_affinity_entry[NR_IRQS];
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-#define DEFAULT_CPU_AFFINITY 0xffffffff
+#define DEFAULT_CPU_AFFINITY CPU_MASK_ALL
 #else
-#define DEFAULT_CPU_AFFINITY 0x00000001
+#define DEFAULT_CPU_AFFINITY cpumask_of_cpu(0)
 #endif
 
-unsigned int irq_affinity [NR_IRQS] =
-	{ [0 ... NR_IRQS-1] = DEFAULT_CPU_AFFINITY };
+cpumask_t irq_affinity [NR_IRQS];
 
-#define HEX_DIGITS 8
+#define HEX_DIGITS (2*sizeof(cpumask_t))
 
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
+	cpumask_t tmp = irq_affinity[(long)data];
+	int k, len = 0;
+
 	if (count < HEX_DIGITS+1)
 		return -EINVAL;
-	return sprintf (page, "%08x\n", irq_affinity[(int)data]);
+
+	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
+		int j = sprintf(page, "%04hx", (u16)cpus_coerce(tmp));
+		len += j;
+		page += j;
+		cpus_shift_right(tmp, tmp, 16);
+	}
+
+	len += sprintf(page, "\n");
+	return len;
 }
 
 static unsigned int parse_hex_value (const char __user *buffer,
-		unsigned long count, unsigned long *ret)
+		unsigned long count, cpumask_t *ret)
 {
 	unsigned char hexnum [HEX_DIGITS];
-	unsigned long value;
+	cpumask_t value = CPU_MASK_NONE;
 	int i;
 
 	if (!count)
@@ -600,10 +600,9 @@ static unsigned int parse_hex_value (const char __user *buffer,
 	 * Parse the first 8 characters as a hex string, any non-hex char
 	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
-	value = 0;
-
 	for (i = 0; i < count; i++) {
 		unsigned int c = hexnum[i];
+		int k;
 
 		switch (c) {
 			case '0' ... '9': c -= '0'; break;
@@ -612,7 +611,10 @@ static unsigned int parse_hex_value (const char __user *buffer,
 		default:
 			goto out;
 		}
-		value = (value << 4) | c;
+		cpus_shift_left(value, value, 4);
+		for (k = 0; k < 4; ++k)
+			if (c & (1 << k))
+				cpu_set(k, value);
 	}
 out:
 	*ret = value;
@@ -623,7 +625,7 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 					unsigned long count, void *data)
 {
 	int irq = (int) data, full_count = count, err;
-	unsigned long new_value;
+	cpumask_t new_value, tmp;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
@@ -640,7 +642,8 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 	 * are actually logical cpu #'s then we have no problem.
 	 *  -- Cort <cort@fsmlabs.com>
 	 */
-	if (!(new_value & cpu_online_map))
+	cpus_and(tmp, new_value, cpu_online_map);
+	if (cpus_empty(tmp))
 		return -EINVAL;
 
 	irq_affinity[irq] = new_value;
@@ -652,17 +655,27 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	unsigned long *mask = (unsigned long *) data;
+	cpumask_t mask = *(cpumask_t *)data;
+	int k, len = 0;
+
 	if (count < HEX_DIGITS+1)
 		return -EINVAL;
-	return sprintf (page, "%08lx\n", *mask);
+
+	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
+		int j = sprintf(page, "%04hx", (u16)cpus_coerce(mask));
+		len += j;
+		page += j;
+		cpus_shift_right(mask, mask, 16);
+	}
+	len += sprintf(page, "\n");
+	return len;
 }
 
 static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
-	unsigned long *mask = (unsigned long *) data, full_count = count, err;
-	unsigned long new_value;
+	cpumask_t *mask = (cpumask_t *)data, full_count = count, err;
+	cpumask_t new_value;
 
 	err = parse_hex_value(buffer, count, &new_value);
 	if (err)
@@ -730,4 +743,14 @@ void init_irq_proc (void)
 irqreturn_t no_action(int irq, void *dev, struct pt_regs *regs)
 {
 	return IRQ_NONE;
+}
+
+void __init init_IRQ(void)
+{
+	int i;
+
+	for (i = 0; i < NR_IRQS; ++i)
+		irq_affinity[i] = DEFAULT_CPU_AFFINITY;
+
+	ppc_md.init_IRQ();
 }

@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/bitops.h>
 #include <linux/errno.h>
+#include <linux/cpumask.h>
 #include <linux/threads.h>
 
 #ifdef CONFIG_SMP
@@ -29,8 +30,8 @@ struct cpuinfo_PPC {
 };
 
 extern struct cpuinfo_PPC cpu_data[];
-extern unsigned long cpu_online_map;
-extern unsigned long cpu_possible_map;
+extern cpumask_t cpu_online_map;
+extern cpumask_t cpu_possible_map;
 extern unsigned long smp_proc_in_lock[];
 extern volatile unsigned long cpu_callin_map[];
 extern int smp_tb_synchronized;
@@ -46,21 +47,8 @@ extern void smp_local_timer_interrupt(struct pt_regs *);
 
 #define smp_processor_id() (current_thread_info()->cpu)
 
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
-#define cpu_possible(cpu) (cpu_possible_map & (1<<(cpu)))
-
-extern inline unsigned int num_online_cpus(void)
-{
-	return hweight32(cpu_online_map);
-}
-
-extern inline unsigned int any_online_cpu(unsigned int mask)
-{
-	if (mask & cpu_online_map)
-		return __ffs(mask & cpu_online_map);
-
-	return NR_CPUS;
-}
+#define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
+#define cpu_possible(cpu) cpu_isset(cpu, cpu_possible_map)
 
 extern int __cpu_up(unsigned int cpu);
 

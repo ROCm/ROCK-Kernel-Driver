@@ -8,6 +8,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -31,9 +32,7 @@
  */
  
 extern void smp_alloc_memory(void);
-extern unsigned long phys_cpu_present_map;
-extern unsigned long cpu_online_map;
-extern volatile unsigned long smp_invalidate_needed;
+extern physid_mask_t phys_cpu_present_map;
 extern int pic_mode;
 extern int smp_num_siblings;
 extern int cpu_sibling_map[];
@@ -54,37 +53,19 @@ extern void zap_low_mappings (void);
  */
 #define smp_processor_id() (current_thread_info()->cpu)
 
-extern volatile unsigned long cpu_callout_map;
+extern cpumask_t cpu_callout_map;
 
-#define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
-
-#define for_each_cpu(cpu, mask) \
-	for(mask = cpu_online_map; \
-	    cpu = __ffs(mask), mask != 0; \
-	    mask &= ~(1<<cpu))
-
-extern inline unsigned int num_online_cpus(void)
-{
-	return hweight32(cpu_online_map);
-}
+#define cpu_possible(cpu) cpu_isset(cpu, cpu_callout_map)
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)
 {
-	return hweight32(cpu_callout_map);
+	return cpus_weight(cpu_callout_map);
 }
 
 extern void map_cpu_to_logical_apicid(void);
 extern void unmap_cpu_to_logical_apicid(int cpu);
 
-extern inline unsigned int any_online_cpu(unsigned int mask)
-{
-	if (mask & cpu_online_map)
-		return __ffs(mask & cpu_online_map);
-
-	return NR_CPUS;
-}
 #ifdef CONFIG_X86_LOCAL_APIC
 
 #ifdef APIC_DEFINITION

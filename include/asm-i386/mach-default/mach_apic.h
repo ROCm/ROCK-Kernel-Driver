@@ -5,12 +5,12 @@
 
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
-static inline unsigned long target_cpus(void)
+static inline cpumask_t target_cpus(void)
 { 
 #ifdef CONFIG_SMP
 	return cpu_online_map;
 #else
-	return 1; 
+	return cpumask_of_cpu(0);
 #endif
 } 
 #define TARGET_CPUS (target_cpus())
@@ -21,16 +21,20 @@ static inline unsigned long target_cpus(void)
 #define INT_DELIVERY_MODE dest_LowestPrio
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
+/*
+ * this isn't really broadcast, just a (potentially inaccurate) upper
+ * bound for valid physical APIC id's
+ */
 #define APIC_BROADCAST_ID      0x0F
 
-static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
-{ 
-	return (bitmap & (1UL << apicid)); 
-} 
-
-static inline unsigned long check_apicid_present(int bit) 
+static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 {
-	return (phys_cpu_present_map & (1UL << bit));
+	return physid_isset(apicid, bitmap);
+}
+
+static inline unsigned long check_apicid_present(int bit)
+{
+	return physid_isset(bit, phys_cpu_present_map);
 }
 
 /*
@@ -50,7 +54,7 @@ static inline void init_apic_ldr(void)
 	apic_write_around(APIC_LDR, val);
 }
 
-static inline unsigned long ioapic_phys_id_map(unsigned long phys_map)
+static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
 {
 	return phys_map;
 }
@@ -82,9 +86,9 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 	return  mps_cpu;
 }
 
-static inline unsigned long apicid_to_cpu_present(int phys_apicid)
+static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
 {
-	return (1ul << phys_apicid);
+	return physid_mask_of_physid(phys_apicid);
 }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, 
@@ -104,18 +108,17 @@ static inline void setup_portio_remap(void)
 
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
-	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
+	return physid_isset(boot_cpu_physical_apicid, phys_cpu_present_map);
 }
 
 static inline int apic_id_registered(void)
 {
-	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
-						&phys_cpu_present_map));
+	return physid_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map);
 }
 
-static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 {
-	return cpumask;
+	return cpus_coerce_const(cpumask);
 }
 
 static inline void enable_apic_mode(void)

@@ -482,7 +482,7 @@ static int stopref(void *cpu)
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	setscheduler(current->pid, SCHED_FIFO, &param);
 #endif
-	set_cpus_allowed(current, 1UL << (unsigned long)cpu);
+	set_cpus_allowed(current, cpumask_of_cpu((int)(long)cpu));
 
 	/* Ack: we are alive */
 	atomic_inc(&stopref_thread_ack);
@@ -535,7 +535,7 @@ static void stopref_set_state(enum stopref_state state, int sleep)
 static int stop_refcounts(void)
 {
 	unsigned int i, cpu;
-	unsigned long old_allowed;
+	cpumask_t old_allowed;
 	int ret = 0;
 
 	/* One thread per cpu.  We'll do our own. */
@@ -543,7 +543,7 @@ static int stop_refcounts(void)
 
 	/* FIXME: racy with set_cpus_allowed. */
 	old_allowed = current->cpus_allowed;
-	set_cpus_allowed(current, 1UL << (unsigned long)cpu);
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 
 	atomic_set(&stopref_thread_ack, 0);
 	stopref_num_threads = 0;

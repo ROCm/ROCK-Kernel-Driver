@@ -71,7 +71,7 @@ unsigned int boot_cpu_logical_apicid = -1U;
 static unsigned int __initdata num_processors;
 
 /* Bitmask of physically existing CPUs */
-unsigned long phys_cpu_present_map;
+physid_mask_t phys_cpu_present_map;
 
 u8 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
@@ -106,6 +106,7 @@ static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdat
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, apicid;
+	physid_mask_t tmp;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
@@ -176,7 +177,8 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	phys_cpu_present_map |= apicid_to_cpu_present(apicid);
+	tmp = apicid_to_cpu_present(apicid);
+	physids_or(phys_cpu_present_map, phys_cpu_present_map, tmp);
 	
 	/*
 	 * Validate version

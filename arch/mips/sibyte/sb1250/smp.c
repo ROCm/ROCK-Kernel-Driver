@@ -107,8 +107,8 @@ void __init smp_boot_cpus(void)
 	current_thread_info()->cpu = 0;
 	cpu_data[0].udelay_val = loops_per_jiffy;
 	cpu_data[0].asid_cache = ASID_FIRST_VERSION;
-	CPUMASK_CLRALL(cpu_online_map);
-	CPUMASK_SETB(cpu_online_map, 0);
+	cpus_clear(cpu_online_map);
+	cpu_set(0, cpu_online_map);
 	atomic_set(&cpus_booted, 1);  /* Master CPU is already booted... */
 	smp_tune_scheduling();
 

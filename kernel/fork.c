@@ -233,7 +233,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	mm->map_count = 0;
 	mm->rss = 0;
-	mm->cpu_vm_mask = 0;
+	cpus_clear(mm->cpu_vm_mask);
 	pprev = &mm->mmap;
 
 	/*

@@ -49,6 +49,7 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[cpu];
 	unsigned long i = batch->index;
 	pte_t pte;
+	cpumask_t local_cpumask = cpumask_of_cpu(cpu);
 
 	if (pte_val(*ptep) & _PAGE_HASHPTE) {
 		pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
@@ -61,7 +62,7 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 			if (i == PPC64_TLB_BATCH_NR) {
 				int local = 0;
 
-				if (tlb->mm->cpu_vm_mask == (1UL << cpu))
+				if (cpus_equal(tlb->mm->cpu_vm_mask, local_cpumask))
 					local = 1;
 
 				flush_hash_range(tlb->mm->context, i, local);
@@ -78,8 +79,9 @@ static inline void tlb_flush(struct mmu_gather *tlb)
 	int cpu = smp_processor_id();
 	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[cpu];
 	int local = 0;
+	cpumask_t local_cpumask = cpumask_of_cpu(smp_processor_id());
 
-	if (tlb->mm->cpu_vm_mask == (1UL << smp_processor_id()))
+	if (cpus_equal(tlb->mm->cpu_vm_mask, local_cpumask))
 		local = 1;
 
 	flush_hash_range(tlb->mm->context, batch->index, local);

@@ -12,17 +12,16 @@
 #ifdef CONFIG_SMP
  #define TARGET_CPUS cpu_online_map
 #else
- #define TARGET_CPUS 0x01
+ #define TARGET_CPUS cpumask_of_cpu(0)
 #endif
 
 #define APIC_BROADCAST_ID      0x0F
-#define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
-#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
+#define check_apicid_used(bitmap, apicid)	physid_isset(apicid, bitmap)
+#define check_apicid_present(bit)		physid_isset(bit, phys_cpu_present_map)
 
 static inline int apic_id_registered(void)
 {
-	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
-						&phys_cpu_present_map));
+	return physid_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map);
 }
 
 /*
@@ -61,9 +60,9 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 	return mps_cpu;
 }
 
-static inline unsigned long apicid_to_cpu_present(int apicid)
+static inline physid_mask_t apicid_to_cpu_present(int apicid)
 {
-	return (1ul << apicid);
+	return physid_mask_of_physid(apicid);
 }
 
 #define WAKE_SECONDARY_VIA_INIT
@@ -78,11 +77,11 @@ static inline void enable_apic_mode(void)
 
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
-	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
+	return physid_isset(boot_cpu_physical_apicid, phys_cpu_present_map);
 }
 
-static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 {
-	return cpumask;
+	return cpus_coerce_const(cpumask);
 }
 #endif /* __ASM_MACH_APIC_H */

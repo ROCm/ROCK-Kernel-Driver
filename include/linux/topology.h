@@ -27,6 +27,7 @@
 #ifndef _LINUX_TOPOLOGY_H
 #define _LINUX_TOPOLOGY_H
 
+#include <linux/cpumask.h>
 #include <linux/bitops.h>
 #include <linux/mmzone.h>
 #include <linux/smp.h>
@@ -34,7 +35,12 @@
 #include <asm/topology.h>
 
 #ifndef nr_cpus_node
-#define nr_cpus_node(node)	(hweight_long(node_to_cpumask(node)))
+#define nr_cpus_node(node)							\
+	({									\
+		cpumask_t __tmp__;						\
+		__tmp__ = node_to_cpumask(node);				\
+		cpus_weight(__tmp__);						\
+	})
 #endif
 
 static inline int __next_node_with_cpus(int node)
