@@ -135,8 +135,7 @@ static unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 	unsigned short cmd;
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 
 	pci_write_config_byte(dev, HPT34X_PCI_INIT_REG, 0x00);
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
@@ -167,7 +166,7 @@ static unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 	pci_write_config_dword(dev, PCI_BASE_ADDRESS_3, dev->resource[3].start);
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
 
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 
 	return dev->irq;
 }
@@ -202,13 +201,13 @@ static void __init ide_init_hpt34x(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_TTI,
-	device: PCI_DEVICE_ID_TTI_HPT343,
-	init_chipset: pci_init_hpt34x,
-	init_channel:	ide_init_hpt34x,
-	bootable: NEVER_BOARD,
-	extra: 16,
-	flags: ATA_F_DMA
+	.vendor = PCI_VENDOR_ID_TTI,
+	.device = PCI_DEVICE_ID_TTI_HPT343,
+	.init_chipset = pci_init_hpt34x,
+	.init_channel =	ide_init_hpt34x,
+	.bootable = NEVER_BOARD,
+	.extra = 16,
+	.flags = ATA_F_DMA
 };
 
 int __init init_hpt34x(void)

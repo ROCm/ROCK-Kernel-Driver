@@ -140,7 +140,7 @@ static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq
 		--rq->current_nr_sectors;
 
 		if (rq->current_nr_sectors <= 0) {
-			if (!__ata_end_request(drive, rq, 1, 0)) {
+			if (!ata_end_request(drive, rq, 1, 0)) {
 			//		printk("Request Ended stat: %02x\n", drive->status);
 
 				return ATA_OP_FINISHED;
@@ -166,7 +166,7 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
 	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat))
 		return ata_error(drive, rq, __FUNCTION__);
 
-	if (!rq->current_nr_sectors && !__ata_end_request(drive, rq, 1, 0)) {
+	if (!rq->current_nr_sectors && !ata_end_request(drive, rq, 1, 0)) {
 		ret = ATA_OP_FINISHED;
 	} else {
 		if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
@@ -235,7 +235,7 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 
 			/* FIXME: this seems buggy */
 			if (rq->current_nr_sectors <= 0) {
-				if (!__ata_end_request(drive, rq, 1, 0))
+				if (!ata_end_request(drive, rq, 1, 0))
 					return ATA_OP_FINISHED;
 			}
 			msect -= nsect;
@@ -269,7 +269,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 			return ata_error(drive, rq, __FUNCTION__);
 	}
 	if (!rq->nr_sectors) {
-		__ata_end_request(drive, rq, 1, rq->hard_nr_sectors);
+		ata_end_request(drive, rq, 1, rq->hard_nr_sectors);
 		rq->bio = NULL;
 		ret = ATA_OP_FINISHED;
 	} else if (!ok) {
@@ -349,7 +349,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		/* FIXME: this check doesn't make sense */
 		if (!(rq->flags & REQ_CMD)) {
 			blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
-			__ata_end_request(drive, rq, 0, 0);
+			ata_end_request(drive, rq, 0, 0);
 
 			return ATA_OP_FINISHED;
 		}
@@ -514,8 +514,8 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		printk("sectors=%ld, ", rq->nr_sectors);
 		printk("buffer=%p\n", rq->buffer);
 #endif
-	ar->cmd = cmd;
-	rq->special = ar;
+		ar->cmd = cmd;
+		rq->special = ar;
 	}
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands.
@@ -548,10 +548,9 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 			return ATA_OP_CONTINUES;
 		}
 
-		/* FIXME: Warning check for race between handler and prehandler
-		 * for writing first block of data.  however since we are well
-		 * inside the boundaries of the seek, we should be okay.
-		 * FIXME: should be fixed  --bzolnier
+		/* FIXME: Warning check for race between handlers for writing
+		 * first block of data.  However since we are well inside the
+		 * boundaries of the seek, we should be okay.
 		 */
 		if (ar->command_type == IDE_DRIVE_TASK_RAW_WRITE) {
 			ide_startstop_t ret;
@@ -596,13 +595,15 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 				 *
 				 * FIXME: Replace hard-coded 100, what about
 				 * error handling?
+				 *
+				 * FIXME: Whatabout the IRE clearing and not clearing case?!
 				 */
 
 				for (i = 0; i < 100; ++i) {
-					if (drive_is_ready(drive))
+					if (ata_status_irq(drive))
 						break;
 				}
-				if (!drive_is_ready(drive)) {
+				if (!ata_status_irq(drive)) {
 					/* We are compleatly missing an error
 					 * return path here.
 					 * FIXME: We have only one? -alat
@@ -1290,7 +1291,9 @@ static int idedisk_cleanup(struct ata_device *drive)
 	return ret;
 }
 
-static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+static int idedisk_ioctl(struct ata_device *drive,
+		struct inode *inode, struct file *__fp,
+		unsigned int cmd, unsigned long arg)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -1440,18 +1443,18 @@ static void idedisk_attach(struct ata_device *drive);
  * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
-	owner:			THIS_MODULE,
-	attach:			idedisk_attach,
-	cleanup:		idedisk_cleanup,
-	standby:		idedisk_standby,
-	do_request:		idedisk_do_request,
-	end_request:		NULL,
-	ioctl:			idedisk_ioctl,
-	open:			idedisk_open,
-	release:		idedisk_release,
-	check_media_change:	idedisk_check_media_change,
-	revalidate:		NULL, /* use default method */
-	capacity:		idedisk_capacity,
+	.owner =		THIS_MODULE,
+	.attach =		idedisk_attach,
+	.cleanup =		idedisk_cleanup,
+	.standby =		idedisk_standby,
+	.do_request =		idedisk_do_request,
+	.end_request =		NULL,
+	.ioctl =		idedisk_ioctl,
+	.open =			idedisk_open,
+	.release =		idedisk_release,
+	.check_media_change =	idedisk_check_media_change,
+	.revalidate =		NULL, /* use default method */
+	.capacity =		idedisk_capacity,
 };
 
 static void idedisk_attach(struct ata_device *drive)

@@ -25,8 +25,6 @@
 # endif
 #endif
 
-#define ide__sti()	__sti()
-
 static __inline__ int
 ide_default_irq (ide_ioreg_t base)
 {

@@ -46,7 +46,7 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 
 	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
-			__ata_end_request(drive, rq, 1, rq->nr_sectors);
+			ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 			return ATA_OP_FINISHED;
 		}
@@ -510,7 +510,7 @@ int udma_pci_irq_status(struct ata_device *drive)
 
 void udma_pci_timeout(struct ata_device *drive)
 {
-	printk(KERN_ERR "ATA: UDMA timeout occured %s!\n", drive->name);
+	printk(KERN_ERR "%s: UDMA timeout!\n", drive->name);
 }
 
 void udma_pci_irq_lost(struct ata_device *drive)

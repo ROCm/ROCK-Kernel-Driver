@@ -135,8 +135,7 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
 	/*
 	 * Now that everything is ready, program the new timings
 	 */
-	__save_flags (flags);
-	__cli();
+	local_irq_save(flags);
 	/*
 	 * Program the address_setup clocks into ARTTIM reg,
 	 * and then the active/recovery counts into the DRWTIM reg
@@ -148,7 +147,7 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
 		(byte) ((active_count << 4) | recovery_count));
 	cmdprintk ("Write %x to %x\n", ((byte) setup_count) | (temp_b & 0x3f), arttim_regs[channel][slave]);
 	cmdprintk ("Write %x to %x\n", (byte) ((active_count << 4) | recovery_count), drwtim_regs[channel][slave]);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -808,45 +807,45 @@ static void __init cmd64x_init_channel(struct ata_channel *hwif)
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_643,
-		init_chipset: cmd64x_init_chipset,
-		init_channel: cmd64x_init_channel,
-		bootable: ON_BOARD,
-		flags: ATA_F_SIMPLEX,
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_643,
+		.init_chipset = cmd64x_init_chipset,
+		.init_channel = cmd64x_init_channel,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_SIMPLEX,
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_646,
-		init_chipset: cmd64x_init_chipset,
-		init_channel: cmd64x_init_channel,
-		enablebits: {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
-		bootable: ON_BOARD,
-		flags: ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_646,
+		.init_chipset = cmd64x_init_chipset,
+		.init_channel = cmd64x_init_channel,
+		.enablebits = {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
+		.bootable = ON_BOARD,
+		.flags = ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_648,
-		init_chipset: cmd64x_init_chipset,
-		init_channel: cmd64x_init_channel,
-		bootable: ON_BOARD,
-		flags: ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_648,
+		.init_chipset = cmd64x_init_chipset,
+		.init_channel = cmd64x_init_channel,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_649,
-		init_chipset: cmd64x_init_chipset,
-		init_channel: cmd64x_init_channel,
-		bootable: ON_BOARD,
-		flags: ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_649,
+		.init_chipset = cmd64x_init_chipset,
+		.init_channel = cmd64x_init_channel,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_680,
-		init_chipset: cmd64x_init_chipset,
-		init_channel: cmd64x_init_channel,
-		bootable: ON_BOARD,
-		flags: ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_680,
+		.init_chipset = cmd64x_init_chipset,
+		.init_channel = cmd64x_init_channel,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_DMA
 	},
 };
 

@@ -74,15 +74,6 @@ struct atapi_packet_command {
 	} s;
 };
 
-extern void atapi_init_pc(struct atapi_packet_command *pc);
-
-extern void atapi_discard_data(struct ata_device *, unsigned int);
-extern void atapi_write_zeros(struct ata_device *, unsigned int);
-
-extern void atapi_read(struct ata_device *, u8 *, unsigned int);
-extern void atapi_write(struct ata_device *, u8 *, unsigned int);
-
-
 /*
  *	ATAPI Status Register.
  */
@@ -360,3 +351,20 @@ typedef struct atapi_request_sense {
 	u8	sk_specific[2];		/* Sense Key Specific */
 	u8	pad[2];			/* Padding to 20 bytes */
 } atapi_request_sense_result_t;
+
+
+extern void atapi_init_pc(struct atapi_packet_command *pc);
+
+extern void atapi_discard_data(struct ata_device *, unsigned int);
+extern void atapi_write_zeros(struct ata_device *, unsigned int);
+
+extern void atapi_read(struct ata_device *, u8 *, unsigned int);
+extern void atapi_write(struct ata_device *, u8 *, unsigned int);
+
+typedef enum {
+	ide_wait,	/* insert rq at end of list, and wait for it */
+	ide_preempt,	/* insert rq in front of current request */
+	ide_end		/* insert rq at end of list, but don't wait for it */
+} ide_action_t;
+
+extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t);

@@ -37,7 +37,7 @@
 #define RPC_MAXREQS		RPC_MAXCONG
 #define RPC_CWNDSCALE		(256)
 #define RPC_MAXCWND		(RPC_MAXCONG * RPC_CWNDSCALE)
-#define RPC_INITCWND		(RPC_MAXCWND >> 1)
+#define RPC_INITCWND		RPC_CWNDSCALE
 #define RPCXPRT_CONGESTED(xprt) ((xprt)->cong >= (xprt)->cwnd)
 
 /* Default timeout values */

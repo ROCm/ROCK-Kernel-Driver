@@ -225,12 +225,12 @@ static void __init ide_init_it8172(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-        vendor:	PCI_VENDOR_ID_ITE,
-	device: PCI_DEVICE_ID_ITE_IT8172G,
-	init_chipset: pci_init_it8172,
-	init_channel: ide_init_it8172,
-	exnablebits: {{0x00,0x00,0x00}, {0x40,0x00,0x01} },
-	bootable: ON_BOARD
+        .vendor = PCI_VENDOR_ID_ITE,
+	.device = PCI_DEVICE_ID_ITE_IT8172G,
+	.init_chipset = pci_init_it8172,
+	.init_channel = ide_init_it8172,
+	.exnablebits = {{0x00,0x00,0x00}, {0x40,0x00,0x01} },
+	.bootable = ON_BOARD
 };
 
 int __init init_it8172(void)
