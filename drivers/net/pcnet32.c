@@ -323,7 +323,7 @@ struct pcnet32_private {
 
 static void pcnet32_probe_vlbus(void);
 static int  pcnet32_probe_pci(struct pci_dev *, const struct pci_device_id *);
-static int  pcnet32_probe1(unsigned long, unsigned char, int, struct pci_dev *);
+static int  pcnet32_probe1(unsigned long, unsigned int, int, struct pci_dev *);
 static int  pcnet32_open(struct net_device *);
 static int  pcnet32_init_ring(struct net_device *);
 static int  pcnet32_start_xmit(struct sk_buff *, struct net_device *);
@@ -507,7 +507,7 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
  *  pdev will be NULL when called from pcnet32_probe_vlbus.
  */
 static int __devinit
-pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared,
+pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 		struct pci_dev *pdev)
 {
     struct pcnet32_private *lp;
@@ -1022,7 +1022,7 @@ static void
 pcnet32_tx_timeout (struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned int ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr;
 
     /* Transmitter timeout, serious problems. */
 	printk(KERN_ERR "%s: transmit timed out, status %4.4x, resetting.\n",
@@ -1055,7 +1055,7 @@ static int
 pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
-    unsigned int ioaddr = dev->base_addr;
+    unsigned long ioaddr = dev->base_addr;
     u16 status;
     int entry;
     unsigned long flags;
