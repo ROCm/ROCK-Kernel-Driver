@@ -1001,6 +1001,7 @@ struct pci_fixup {
 enum pci_fixup_pass {
 	pci_fixup_header,	/* Called immediately after reading configuration header */
 	pci_fixup_final,	/* Final phase of device fixups */
+	pci_fixup_enable,	/* pci_enable_device() time */
 };
 
 /* Anonymous variables would be nice... */
@@ -1013,6 +1014,12 @@ enum pci_fixup_pass {
 	static struct pci_fixup __pci_fixup_##vendor##device##hook __attribute_used__	\
 	__attribute__((__section__(".pci_fixup_final"))) = {				\
 		vendor, device, hook };
+
+#define DECLARE_PCI_FIXUP_ENABLE(vendor, device, hook)				\
+	static struct pci_fixup __pci_fixup_##vendor##device##hook __attribute_used__	\
+	__attribute__((__section__(".pci_fixup_enable"))) = {				\
+		vendor, device, hook };
+
 
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev);
 
