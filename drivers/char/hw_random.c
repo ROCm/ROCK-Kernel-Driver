@@ -366,7 +366,7 @@ enum {
 	VIA_RNG_CHUNK_1_MASK	= 0xFF,
 };
 
-u32 via_rng_datum;
+static u32 via_rng_datum;
 
 /*
  * Investigate using the 'rep' prefix to obtain 32 bits of random data
