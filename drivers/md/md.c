@@ -3284,7 +3284,7 @@ static void md_do_sync(mddev_t *mddev)
 		j += sectors;
 		if (j>1) mddev->curr_resync = j;
 
-		if (last_check + window > j)
+		if (last_check + window > j || j == max_sectors)
 			continue;
 
 		last_check = j;

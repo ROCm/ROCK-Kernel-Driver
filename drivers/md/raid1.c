@@ -979,6 +979,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	sector_t max_sector, nr_sectors;
 	int disk;
 	int i;
+	int write_targets = 0;
 
 	if (!conf->r1buf_pool)
 		if (init_resync(conf))
@@ -1055,12 +1056,24 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 			    sector_nr + RESYNC_SECTORS > mddev->recovery_cp)) {
 			bio->bi_rw = WRITE;
 			bio->bi_end_io = end_sync_write;
+			write_targets ++;
 		} else
 			continue;
 		bio->bi_sector = sector_nr + conf->mirrors[i].rdev->data_offset;
 		bio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		bio->bi_private = r1_bio;
 	}
+	if (write_targets == 0) {
+		/* There is nowhere to write, so all non-sync
+		 * drives must be failed - so we are finished
+		 */
+		int rv = max_sector - sector_nr;
+		md_done_sync(mddev, rv, 1);
+		put_buf(r1_bio);
+		atomic_dec(&conf->mirrors[disk].rdev->nr_pending);
+		return rv;
+	}
+
 	nr_sectors = 0;
 	do {
 		struct page *page;
