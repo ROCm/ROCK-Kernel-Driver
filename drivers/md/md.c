@@ -555,6 +555,7 @@ static int super_90_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev)
 	}
 
 	rdev->preferred_minor = sb->md_minor;
+	rdev->data_offset = 0;
 
 	if (refdev == 0)
 		ret = 1;
@@ -1137,6 +1138,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
 	rdev->in_sync = 0;
+	rdev->data_offset = 0;
 	atomic_set(&rdev->nr_pending, 0);
 
 	size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;

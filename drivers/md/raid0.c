@@ -349,7 +349,7 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	 * is the only IO operation happening on this bh.
 	 */
 	bio->bi_bdev = tmp_dev->bdev;
-	bio->bi_sector = rsect;
+	bio->bi_sector = rsect + tmp_dev->data_offset;
 
 	/*
 	 * Let the main block layer submit the IO and resolve recursion:

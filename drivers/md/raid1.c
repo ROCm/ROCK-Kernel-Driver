@@ -493,7 +493,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 			BUG();
 		r1_bio->read_bio = read_bio;
 
-		read_bio->bi_sector = r1_bio->sector;
+		read_bio->bi_sector = r1_bio->sector + mirror->rdev->data_offset;
 		read_bio->bi_bdev = mirror->rdev->bdev;
 		read_bio->bi_end_io = end_request;
 		read_bio->bi_rw = r1_bio->cmd;
@@ -528,7 +528,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		mbio = bio_clone(bio, GFP_NOIO);
 		r1_bio->write_bios[i] = mbio;
 
-		mbio->bi_sector	= r1_bio->sector;
+		mbio->bi_sector	= r1_bio->sector + conf->mirrors[i].rdev->data_offset;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_end_io	= end_request;
 		mbio->bi_rw = r1_bio->cmd;
@@ -856,7 +856,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		mbio = bio_clone(bio, GFP_NOIO);
 		r1_bio->write_bios[i] = mbio;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
-		mbio->bi_sector = r1_bio->sector;
+		mbio->bi_sector = r1_bio->sector | conf->mirrors[i].rdev->data_offset;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
 		mbio->bi_private = r1_bio;
@@ -934,7 +934,7 @@ static void raid1d(mddev_t *mddev)
 			printk(REDIRECT_SECTOR,
 				bdev_partition_name(rdev->bdev), (unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
-			bio->bi_sector = r1_bio->sector;
+			bio->bi_sector = r1_bio->sector + rdev->data_offset;
 			bio->bi_rw = r1_bio->cmd;
 
 			generic_make_request(bio);
@@ -1045,7 +1045,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 
 	read_bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 
-	read_bio->bi_sector = sector_nr;
+	read_bio->bi_sector = sector_nr + mirror->rdev->data_offset;
 	read_bio->bi_bdev = mirror->rdev->bdev;
 	read_bio->bi_end_io = end_sync_read;
 	read_bio->bi_rw = READ;

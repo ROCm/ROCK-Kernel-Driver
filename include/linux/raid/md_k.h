@@ -155,6 +155,7 @@ struct mdk_rdev_s
 
 	struct page	*sb_page;
 	int		sb_loaded;
+	sector_t	data_offset;	/* start of data in array */
 	sector_t	sb_offset;
 	int		preferred_minor;	/* autorun support */
 

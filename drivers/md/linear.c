@@ -203,7 +203,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		return 0;
 	}
 	bio->bi_bdev = tmp_dev->rdev->bdev;
-	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1);
+	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1) + tmp_dev->rdev->data_offset;
 
 	return 1;
 }
