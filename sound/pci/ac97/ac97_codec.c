@@ -1793,7 +1793,7 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 
 	if (!ac97_is_audio(ac97) && !ac97_is_modem(ac97)) {
 		if (!(ac97->scaps & (AC97_SCAP_SKIP_AUDIO|AC97_SCAP_SKIP_MODEM)))
-			snd_printk(KERN_ERR "AC'97 %d access error (not audio or modem codec)\n", ac97->num, ac97->id);
+			snd_printk(KERN_ERR "AC'97 %d access error (not audio or modem codec)\n", ac97->num);
 		snd_ac97_free(ac97);
 		return -EACCES;
 	}

@@ -377,7 +377,8 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			const struct ac97_pcm *pcms)
 {
 	int i, j, k;
-	struct ac97_pcm *pcm, *rpcms, *rpcm;
+	const struct ac97_pcm *pcm;
+	struct ac97_pcm *rpcms, *rpcm;
 	unsigned short avail_slots[2][4];
 	unsigned short all_slots[2][4];
 	unsigned char rate_table[2][4];
