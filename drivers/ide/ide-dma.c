@@ -207,65 +207,21 @@ int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
-	int nents;
 
-	nents = blk_rq_map_sg(drive->queue, rq, hwif->sg_table);
-		
+	if ((rq->flags & REQ_DRIVE_TASKFILE) && rq->nr_sectors > 256)
+		BUG();
+
+	ide_map_sg(drive, rq);
+
 	if (rq_data_dir(rq) == READ)
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 	else
 		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
 
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
+	return pci_map_sg(hwif->pci_dev, sg, hwif->sg_nents, hwif->sg_dma_direction);
 }
 
 EXPORT_SYMBOL_GPL(ide_build_sglist);
-
-/**
- *	ide_raw_build_sglist	-	map IDE scatter gather for DMA
- *	@drive: the drive to build the DMA table for
- *	@rq: the request holding the sg list
- *
- *	Perform the PCI mapping magic necessary to access the source or
- *	target buffers of a taskfile request via PCI DMA. The lower layers 
- *	of the  kernel provide the necessary cache management so that we can
- *	operate in a portable fashion
- */
-
-int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	struct scatterlist *sg = hwif->sg_table;
-	int nents = 0;
-	ide_task_t *args = rq->special;
-	u8 *virt_addr = rq->buffer;
-	int sector_count = rq->nr_sectors;
-
-	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-	else
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
-
-#if 1
-	if (sector_count > 256)
-		BUG();
-
-	if (sector_count > 128) {
-#else
-	while (sector_count > 128) {
-#endif
-		sg_init_one(&sg[nents], virt_addr, 128 * SECTOR_SIZE);
-		nents++;
-		virt_addr = virt_addr + (128 * SECTOR_SIZE);
-		sector_count -= 128;
-	}
-	sg_init_one(&sg[nents], virt_addr, sector_count * SECTOR_SIZE);
-	nents++;
-
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
-}
-
-EXPORT_SYMBOL_GPL(ide_raw_build_sglist);
 
 /**
  *	ide_build_dmatable	-	build IDE DMA table
@@ -288,10 +244,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 	int i;
 	struct scatterlist *sg;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE)
-		hwif->sg_nents = i = ide_raw_build_sglist(drive, rq);
-	else
-		hwif->sg_nents = i = ide_build_sglist(drive, rq);
+	hwif->sg_nents = i = ide_build_sglist(drive, rq);
 
 	if (!i)
 		return 0;
@@ -728,17 +681,14 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
-int __ide_dma_verbose (ide_drive_t *drive)
+void ide_dma_verbose(ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
 	ide_hwif_t *hwif	= HWIF(drive);
 
 	if (id->field_valid & 4) {
-		if ((id->dma_ultra >> 8) && (id->dma_mword >> 8)) {
-			printk(", BUG DMA OFF");
-			return hwif->ide_dma_off_quietly(drive);
-		}
+		if ((id->dma_ultra >> 8) && (id->dma_mword >> 8))
+			goto bug_dma_off;
 		if (id->dma_ultra & ((id->dma_ultra >> 8) & hwif->ultra_mask)) {
 			if (((id->dma_ultra >> 11) & 0x1F) &&
 			    eighty_ninty_three(drive)) {
@@ -768,19 +718,22 @@ int __ide_dma_verbose (ide_drive_t *drive)
 			printk(", (U)DMA");	/* Can be BIOS-enabled! */
 		}
 	} else if (id->field_valid & 2) {
-		if ((id->dma_mword >> 8) && (id->dma_1word >> 8)) {
-			printk(", BUG DMA OFF");
-			return hwif->ide_dma_off_quietly(drive);
-		}
+		if ((id->dma_mword >> 8) && (id->dma_1word >> 8))
+			goto bug_dma_off;
 		printk(", DMA");
 	} else if (id->field_valid & 1) {
 		printk(", BUG");
 	}
-	return 1;
+	return;
+bug_dma_off:
+	printk(", BUG DMA OFF");
+	hwif->ide_dma_off_quietly(drive);
+	return;
 }
 
-EXPORT_SYMBOL(__ide_dma_verbose);
+EXPORT_SYMBOL(ide_dma_verbose);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 int __ide_dma_lostirq (ide_drive_t *drive)
 {
 	printk("%s: DMA interrupt recovery\n", drive->name);
@@ -955,8 +908,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)
 		hwif->ide_dma_test_irq = &__ide_dma_test_irq;
-	if (!hwif->ide_dma_verbose)
-		hwif->ide_dma_verbose = &__ide_dma_verbose;
 	if (!hwif->ide_dma_timeout)
 		hwif->ide_dma_timeout = &__ide_dma_timeout;
 	if (!hwif->ide_dma_lostirq)
