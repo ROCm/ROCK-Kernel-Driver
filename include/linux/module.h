@@ -265,6 +265,7 @@ struct module *module_text_address(unsigned long addr);
 
 #ifdef CONFIG_MODULE_UNLOAD
 
+unsigned int module_refcount(struct module *mod);
 void __symbol_put(const char *symbol);
 #define symbol_put(x) __symbol_put(MODULE_SYMBOL_PREFIX #x)
 void symbol_put_addr(void *addr);
@@ -274,6 +275,17 @@ void symbol_put_addr(void *addr);
 #define local_inc(x) atomic_inc(x)
 #define local_dec(x) atomic_dec(x)
 #endif
+
+/* Sometimes we know we already have a refcount, and it's easier not
+   to handle the error case (which only happens with rmmod --wait). */
+static inline void __module_get(struct module *module)
+{
+	if (module) {
+		BUG_ON(module_refcount(module) == 0);
+		local_inc(&module->ref[get_cpu()].count);
+		put_cpu();
+	}
+}
 
 static inline int try_module_get(struct module *module)
 {
@@ -308,6 +320,9 @@ static inline int try_module_get(struct module *module)
 	return !module || module_is_live(module);
 }
 static inline void module_put(struct module *module)
+{
+}
+static inline void __module_get(struct module *module)
 {
 }
 #define symbol_put(x) do { } while(0)
@@ -366,6 +381,10 @@ static inline struct module *module_text_address(unsigned long addr)
 #define symbol_get(x) ({ extern typeof(x) x __attribute__((weak)); &(x); })
 #define symbol_put(x) do { } while(0)
 #define symbol_put_addr(x) do { } while(0)
+
+static inline void __module_get(struct module *module)
+{
+}
 
 static inline int try_module_get(struct module *module)
 {

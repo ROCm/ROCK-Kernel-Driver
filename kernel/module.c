@@ -431,7 +431,7 @@ static inline void restart_refcounts(void)
 }
 #endif
 
-static unsigned int module_refcount(struct module *mod)
+unsigned int module_refcount(struct module *mod)
 {
 	unsigned int i, total = 0;
 
@@ -439,6 +439,7 @@ static unsigned int module_refcount(struct module *mod)
 		total += atomic_read(&mod->ref[i].count);
 	return total;
 }
+EXPORT_SYMBOL(module_refcount);
 
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
