@@ -2,7 +2,9 @@ Version 1.06
 ------------
 Send NTCreateX with ATTR_POSIX if Linux/Unix extensions negotiated with server.
 This allows files that differ only in case and improves performance of file
-creation and file open to such servers.
+creation and file open to such servers.  Fix semaphore conflict which causes 
+slow delete of open file to Samba (which unfortunately can cause an oplock
+break to self while vfs_unlink held i_sem) which can hang for 20 seconds.
 
 Version 1.05
 ------------

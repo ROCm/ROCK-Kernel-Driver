@@ -924,7 +924,6 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 			break;
 
 		page = list_entry(pages->prev, struct page, list);
-/*cERROR(1,("copy_cache_pages page %p index %ld data %p",page,page->index,data));*/ /* BB removeme */
 		list_del(&page->list);
 
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
@@ -1009,18 +1008,12 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				break; 
 			}
 		}
-/*		cERROR(1,("ended with contig_pages %d since expected_index %d not matched",contig_pages,expected_index)); */
 		if(contig_pages + i >  num_pages) {
-/*			cERROR(1,("reducing contig_pages from %d with i: %d",contig_pages,i));*/
 			contig_pages = num_pages - i;
 		}
 
 		/* for reads over a certain size could initiate async read ahead */
 
-/*		cERROR(1,("Read %d pages out of %d into cache at offset %ld ",
-			contig_pages, num_pages-i, (unsigned long) offset));*/  /* BB removeme BB */
-	
-			
 		read_size = contig_pages * PAGE_CACHE_SIZE;
 		/* Read size needs to be in multiples of one page */
 		read_size = min_t(const unsigned int,read_size,cifs_sb->rsize & PAGE_CACHE_MASK);
@@ -1038,7 +1031,6 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				read_size, offset,
 				&bytes_read, &smb_read_data);
 			/* BB need to check return code here */
-/*			cERROR(1,("read size: %d bytes read: %d rc: %d",read_size,bytes_read,rc)); */ /* BB removeme BB */
 		}
 		if ((rc < 0) || (smb_read_data == NULL)) {
 			cERROR(1,("Read error in readpages: %d",rc)); 
