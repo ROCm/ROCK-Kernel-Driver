@@ -81,7 +81,7 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_fsinfores_sz	(1+NFS3_post_op_attr_sz+12)
 #define NFS3_pathconfres_sz	(1+NFS3_post_op_attr_sz+6)
 #define NFS3_commitres_sz	(1+NFS3_wcc_data_sz+2)
-#define NFS3_getaclres_sz	(1+NFS3_post_op_attr_sz+1)
+#define NFS3_getaclres_sz	(1+NFS3_post_op_attr_sz+1+4)
 #define NFS3_setaclres_sz	(1+NFS3_post_op_attr_sz)
 
 /*

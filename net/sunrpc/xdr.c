@@ -1064,11 +1064,11 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 	if (!desc->xcode)
 		return 0;
 
+	todo = desc->array_len * desc->elem_size;
 	if (base < buf->head->iov_len) {
 		c = buf->head->iov_base + base;
-		avail_here = min(desc->array_len * desc->elem_size,
-				 (unsigned int)buf->head->iov_len - base);
-		todo = desc->array_len * desc->elem_size - avail_here;
+		avail_here = min(todo, (unsigned int)buf->head->iov_len - base);
+		todo -= avail_here;
 		while (avail_here >= desc->elem_size) {
 			err = desc->xcode(desc, c);
 			if (err)
@@ -1087,31 +1087,25 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			copied = avail_here;
 		}
 		if (todo) {
-			if (buf->page_len) {
-				avail_here = min(todo, buf->page_len);
-				ppages = buf->pages;
-				c = kmap(*ppages) + buf->page_base;
+			base = 0;
+			if (buf->page_len)
 				goto process_pages;
-			} else {
-				c = (char *) buf->tail->iov_base;
+			else
 				goto process_tail;
-			}
 		}
 	} else {
 		base -= buf->head->iov_len;
 		if (base < buf->page_len) {
+		    process_pages:
+			avail_here = min(todo, buf->page_len - base);
+			todo -= avail_here;
+
 			base += buf->page_base;
 			ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
-			todo  = desc->array_len * desc->elem_size;
-			avail_here = min(todo, buf->page_len - base);
-			unsigned int avail_page = PAGE_CACHE_SIZE -
-						  (base & ~PAGE_CACHE_MASK);
-			avail_page = min(avail_here, avail_page);
-			c = kmap(*ppages) + (base & ~PAGE_CACHE_MASK);
-			base -= buf->page_base;
-
-		    process_pages:
-			todo -= avail_here;
+			base &= ~PAGE_CACHE_MASK;
+			unsigned int avail_page = min(PAGE_CACHE_SIZE - base,
+						      avail_here);
+			c = kmap(*ppages) + base;
 			while (avail_here) {
 				avail_here -= avail_page;
 				if (copied || avail_page < desc->elem_size) {
@@ -1141,7 +1135,7 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 					c += desc->elem_size;
 					avail_page -= desc->elem_size;
 				}
-				if (avail_page != 0) {
+				if (avail_page) {
 					unsigned int l = min(avail_page,
 						    desc->elem_size - copied);
 					if (encode) {
@@ -1166,14 +1160,13 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 					 (unsigned int) PAGE_CACHE_SIZE);
 			}
 			if (todo) {
-				c = buf->tail->iov_base;
+				base = 0;
 				goto process_tail;
 			}
 		} else {
 			base -= buf->page_len;
-			c = buf->tail->iov_base + base;
-			todo = desc->array_len * desc->elem_size;
 		    process_tail:
+			c = buf->tail->iov_base + base;
 			if (copied) {
 				unsigned int l = desc->elem_size - copied;
 

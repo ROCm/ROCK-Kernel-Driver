@@ -21,7 +21,7 @@ enum FShook {
 typedef enum {
 	false,
 	true
-} __attribute__((__mode__(__QI__))) boolean_t;
+} boolean_t __attribute__((__mode__(__QI__)));
 
 typedef union fshook_info {
 	struct fshook_generic_info {
