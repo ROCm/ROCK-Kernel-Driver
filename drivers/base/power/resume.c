@@ -150,4 +150,4 @@ void device_resume(u32 level)
 	printk("%s is deprecated. Called from:\n",__FUNCTION__);
 	dump_stack();
 }
-
+EXPORT_SYMBOL(device_resume);
