@@ -13,9 +13,30 @@ extern rwlock_t unix_table_lock;
 
 extern atomic_t unix_tot_inflight;
 
+static inline unix_socket *first_unix_socket(int *i)
+{
+	for (*i = 0; *i <= UNIX_HASH_SIZE; (*i)++) {
+		if (unix_socket_table[*i])
+			return unix_socket_table[*i];
+	}
+	return NULL;
+}
 
-#define forall_unix_sockets(i, s) for (i=0; i<=UNIX_HASH_SIZE; i++) \
-                                    for (s=unix_socket_table[i]; s; s=s->next)
+static inline unix_socket *next_unix_socket(int *i, unix_socket *s)
+{
+	/* More in this chain? */
+	if (s->next)
+		return s->next;
+	/* Look for next non-empty chain. */
+	for ((*i)++; *i <= UNIX_HASH_SIZE; (*i)++) {
+		if (unix_socket_table[*i])
+			return unix_socket_table[*i];
+	}
+	return NULL;
+}
+
+#define forall_unix_sockets(i, s) \
+	for (s = first_unix_socket(&(i)); s; s = next_unix_socket(&(i),(s)))
 
 struct unix_address
 {

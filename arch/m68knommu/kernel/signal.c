@@ -768,7 +768,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	for (;;) {
 		int signr;
 
-		signr = get_signal_to_deliver(&info, regs);
+		signr = get_signal_to_deliver(&info, regs, NULL);
 
 		if (!signr)
 			break;

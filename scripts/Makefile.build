@@ -94,7 +94,7 @@ define rule_vcc_o_c
 	else								      \
 		$(CPP) -D__GENKSYMS__ $(c_flags) $<			      \
 		| $(GENKSYMS) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)	      \
-		| sed -n 's/\#define __ver_\(\w*\)\W*\(\w*\)/__crc_\1 = 0x\2 ;/gp' \
+		| sed -n 's/\#define __ver_\([^ 	]*\)[ 	]*\([^ 	]*\)/__crc_\1 = 0x\2 ;/gp' \
 		> $(@D)/.tmp_$(@F:.o=.ver);				      \
 									      \
 		$(LD) $(LDFLAGS) -r -o $@ $(@D)/.tmp_$(@F) 		      \

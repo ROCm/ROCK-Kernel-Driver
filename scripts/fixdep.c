@@ -277,6 +277,8 @@ void do_config_file(char *filename)
 	parse_config_file(map, st.st_size);
 
 	munmap(map, st.st_size);
+
+	close(fd);
 }
 
 void parse_dep_file(void *map, size_t len)
@@ -346,6 +348,8 @@ void print_deps(void)
 	parse_dep_file(map, st.st_size);
 
 	munmap(map, st.st_size);
+
+	close(fd);
 }
 
 void traps(void)

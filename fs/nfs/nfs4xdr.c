@@ -1385,13 +1385,14 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr)
                 dprintk("read_attrs: gid=%d\n", (int)nfp->gid);
         }
         if (bmval1 & FATTR4_WORD1_RAWDEV) {
-                READ_BUF(8);
-                len += 8;
-                READ32(dummy32);
-		nfp->rdev = (dummy32 << MINORBITS);
-                READ32(dummy32);
-		nfp->rdev |= (dummy32 & MINORMASK);
-                dprintk("read_attrs: rdev=%d\n", nfp->rdev);
+		uint32_t major, minor;
+
+		READ_BUF(8);
+		len += 8;
+		READ32(major);
+		READ32(minor);
+		nfp->rdev = MKDEV(major, minor);
+		dprintk("read_attrs: rdev=0x%x\n", nfp->rdev);
         }
         if (bmval1 & FATTR4_WORD1_SPACE_AVAIL) {
                 READ_BUF(8);

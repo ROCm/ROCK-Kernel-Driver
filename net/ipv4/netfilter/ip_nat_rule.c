@@ -56,12 +56,12 @@ static struct
 } nat_initial_table __initdata
 = { { "nat", NAT_VALID_HOOKS, 4,
       sizeof(struct ipt_standard) * 3 + sizeof(struct ipt_error),
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_POST_ROUTING] sizeof(struct ipt_standard),
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) * 2 },
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_POST_ROUTING] sizeof(struct ipt_standard),
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) * 2 },
+      { [NF_IP_PRE_ROUTING] = 0,
+	[NF_IP_POST_ROUTING] = sizeof(struct ipt_standard),
+	[NF_IP_LOCAL_OUT] = sizeof(struct ipt_standard) * 2 },
+      { [NF_IP_PRE_ROUTING] = 0,
+	[NF_IP_POST_ROUTING] = sizeof(struct ipt_standard),
+	[NF_IP_LOCAL_OUT] = sizeof(struct ipt_standard) * 2 },
       0, NULL, { } },
     {
 	    /* PRE_ROUTING */

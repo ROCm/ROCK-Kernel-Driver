@@ -200,6 +200,9 @@ extern __inline__ int sigfindinword(unsigned long word)
 }
 #endif
 #endif
+
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #endif /* __KERNEL__ */
 
 #endif

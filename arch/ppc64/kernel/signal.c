@@ -551,7 +551,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 	newsp = frame = 0;
 
-	signr = get_signal_to_deliver(&info, regs);
+	signr = get_signal_to_deliver(&info, regs, NULL);
 	if (signr > 0) {
 		ka = &current->sighand->action[signr-1];
 		if ((ka->sa.sa_flags & SA_ONSTACK)

@@ -168,6 +168,9 @@ typedef struct sigaltstack {
 #define BRK_NORLD	10	/* No rld found - not used by Linux/MIPS */
 #define _BRK_THREADBP	11	/* For threads, user bp (used by debuggers) */
 #define BRK_MULOVF	1023	/* Multiply overflow */
+
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #endif /* defined (__KERNEL__) || defined (__USE_MISC) */
 
 #endif /* !defined (_ASM_SIGNAL_H) */

@@ -1405,7 +1405,7 @@ do_signal_stop(int signr)
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
-int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
+int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
 {
 	sigset_t *mask = &current->blocked;
 
@@ -1443,6 +1443,8 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 			break;
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
+			ptrace_signal_deliver(regs, cookie);
+
 			/*
 			 * If there is a group stop in progress,
 			 * we must participate in the bookkeeping.

@@ -150,6 +150,7 @@ typedef struct sigaltstack {
 
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 #endif /* __KERNEL__ */
 
 #endif
