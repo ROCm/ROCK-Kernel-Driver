@@ -51,7 +51,7 @@
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/pci-bridge.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>

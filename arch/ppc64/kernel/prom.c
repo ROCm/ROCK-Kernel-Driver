@@ -47,7 +47,7 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
@@ -516,6 +516,9 @@ prom_initialize_naca(unsigned long mem)
 	return mem;
 }
 
+#ifdef CONFIG_PMAC_DART
+static int dart_force_on;
+#endif
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -528,6 +531,30 @@ prom_initialize_lmb(unsigned long mem)
 	union lmb_reg_property reg;
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
+	int nodart = 0;
+
+#ifdef CONFIG_PMAC_DART
+	char *opt;
+
+	opt = strstr(RELOC(cmd_line), RELOC("iommu="));
+	if (opt) {
+		prom_print(RELOC("opt is:"));
+		prom_print(opt);
+		prom_print(RELOC("\n"));
+		opt += 6;
+		while (*opt && *opt == ' ')
+			opt++;
+		if (!strncmp(opt, RELOC("off"), 3))
+			nodart = 1;
+		else if (!strncmp(opt, RELOC("force"), 5))
+			RELOC(dart_force_on) = 1;
+	}
+#else
+	nodart = 1;
+#endif /* CONFIG_PMAC_DART */
+
+	if (nodart)
+		prom_print(RELOC("DART disabled on PowerMac !\n"));
 
 	lmb_init();
 
@@ -553,8 +580,9 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_base = ((unsigned long)reg.addrPM[i].address_hi) << 32;
 				lmb_base |= (unsigned long)reg.addrPM[i].address_lo;
 				lmb_size = reg.addrPM[i].size;
-				if (lmb_base > 0x80000000ull) {
-					prom_print(RELOC("Skipping memory above 2Gb for now, not yet supported\n"));
+				if (nodart && lmb_base > 0x80000000ull) {
+					prom_print(RELOC("Skipping memory above 2Gb for "
+							 "now, DART support disabled\n"));
 					continue;
 				}
 			} else if (_prom->encode_phys_size == 32) {
@@ -731,6 +759,34 @@ prom_dump_lmb(void)
         }
 }
 #endif /* DEBUG_PROM */
+
+
+#ifdef CONFIG_PMAC_DART
+void prom_initialize_dart_table(void)
+{
+	unsigned long offset = reloc_offset();
+	extern unsigned long dart_tablebase;
+	extern unsigned long dart_tablesize;
+
+	/* Only reserve DART space if machine has more than 2GB of RAM
+	 * or if requested with iommu=on on cmdline.
+	 */
+	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(dart_force_on))
+		return;
+
+	/* 512 pages is max DART tablesize. */
+	RELOC(dart_tablesize) = 1UL << 19;
+	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
+	 * will blow up an entire large page anyway in the kernel mapping
+	 */
+	RELOC(dart_tablebase) =
+		absolute_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
+
+	prom_print(RELOC("Dart at: "));
+	prom_print_hex(RELOC(dart_tablebase));
+	prom_print(RELOC("\n"));
+}
+#endif /* CONFIG_PMAC_DART */
 
 
 void
@@ -1541,6 +1597,11 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
+
+#ifdef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		prom_initialize_dart_table();
+#endif
 
 #ifdef CONFIG_BOOTX_TEXT
 	if(_prom->disp_node) {
@@ -3003,15 +3064,15 @@ static int of_finish_dynamic_node(struct device_node *node)
                node->devfn = (regs[0] >> 8) & 0xff;
        }
 
-	/* fixing up tce_table */
+	/* fixing up iommu_table */
 
 	if(strcmp(node->name, "pci") == 0 &&
                 get_property(node, "ibm,dma-window", NULL)) {
                 node->bussubno = node->busno;
-                create_pci_bus_tce_table((unsigned long)node);
+                iommu_devnode_init(node);
         }
 	else
-		node->tce_table = parent->tce_table;
+		node->iommu_table = parent->iommu_table;
 
 out:
 	of_node_put(parent);

@@ -1147,7 +1147,7 @@ config SOUND_RME96XX
 	help
 	  Say Y or M if you have a Hammerfall or Hammerfall light
 	  multichannel card from RME. If you want to acess advanced
-	  features of the card, read Documentation/sound/rme96xx.
+	  features of the card, read Documentation/sound/oss/rme96xx.
 
 config SOUND_AD1980
 	tristate "AD1980 front/back switch plugin"

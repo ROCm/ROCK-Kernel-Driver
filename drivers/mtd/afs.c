@@ -57,6 +57,17 @@ struct image_info_struct {
 	u32 checksum;		/* Image checksum (inc. this struct)     */
 };
 
+static u32 word_sum(void *words, int num)
+{
+	u32 *p = words;
+	u32 sum = 0;
+
+	while (num--)
+		sum += *p++;
+
+	return sum;
+}
+
 static int
 afs_read_footer(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
 		u_int off, u_int mask)
@@ -82,6 +93,12 @@ afs_read_footer(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
 	 * Does it contain the magic number?
 	 */
 	if (fs.signature != 0xa0ffff9f)
+		ret = 0;
+
+	/*
+	 * Check the checksum.
+	 */
+	if (word_sum(&fs, sizeof(fs) / sizeof(u32)) != 0xffffffff)
 		ret = 0;
 
 	/*
@@ -114,16 +131,35 @@ static int
 afs_read_iis(struct mtd_info *mtd, struct image_info_struct *iis, u_int ptr)
 {
 	size_t sz;
-	int ret;
+	int ret, i;
 
 	memset(iis, 0, sizeof(*iis));
 	ret = mtd->read(mtd, ptr, sizeof(*iis), &sz, (u_char *) iis);
-	if (ret >= 0 && sz != sizeof(*iis))
-		ret = -EINVAL;
 	if (ret < 0)
-		printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
-			ptr, ret);
+		goto failed;
 
+	if (sz != sizeof(*iis)) {
+		ret = -EINVAL;
+		goto failed;
+	}
+
+	ret = 0;
+
+	/*
+	 * Validate the name - it must be NUL terminated.
+	 */
+	for (i = 0; i < sizeof(iis->name); i++)
+		if (iis->name[i] == '\0')
+			break;
+
+	if (i < sizeof(iis->name))
+		ret = 1;
+
+	return ret;
+
+ failed:
+	printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
+		ptr, ret);
 	return ret;
 }
 
@@ -160,6 +196,8 @@ static int parse_afs_partitions(struct mtd_info *mtd,
 		ret = afs_read_iis(mtd, &iis, iis_ptr);
 		if (ret < 0)
 			break;
+		if (ret == 0)
+			continue;
 
 		sz += sizeof(struct mtd_partition);
 		sz += strlen(iis.name) + 1;
@@ -194,6 +232,8 @@ static int parse_afs_partitions(struct mtd_info *mtd,
 		ret = afs_read_iis(mtd, &iis, iis_ptr);
 		if (ret < 0)
 			break;
+		if (ret == 0)
+			continue;
 
 		strcpy(str, iis.name);
 		size = mtd->erasesize + off - img_ptr;

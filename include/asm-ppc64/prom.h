@@ -134,7 +134,7 @@ struct property {
  * indication of a real PCI node.  Other nodes leave these fields zeroed.
  */
 struct pci_controller;
-struct TceTable;
+struct iommu_table;
 struct device_node {
 	char	*name;
 	char	*type;
@@ -155,7 +155,7 @@ struct device_node {
 	int	eeh_mode;		/* See eeh.h for possible EEH_MODEs */
 	int	eeh_config_addr;
 	struct  pci_controller *phb;	/* for pci devices */
-	struct	TceTable *tce_table;	/* for phb's or bridges */
+	struct	iommu_table *iommu_table;	/* for phb's or bridges */
 
 	struct	property *properties;
 	struct	device_node *parent;

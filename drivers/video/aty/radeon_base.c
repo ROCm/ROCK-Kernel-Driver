@@ -222,16 +222,7 @@ static reg_val common_regs[] = {
 	{ I2C_CNTL_1, 0 },
 	{ GEN_INT_CNTL, 0 },
 	{ CAP0_TRIG_CNTL, 0 },
-};
-
-static reg_val common_regs_m6[] = {
-	{ OVR_CLR,      0 },
-	{ OVR_WID_LEFT_RIGHT,   0 },
-	{ OVR_WID_TOP_BOTTOM,   0 },
-	{ OV0_SCALE_CNTL,   0 },
-	{ SUBPIC_CNTL,      0 },
-	{ GEN_INT_CNTL,     0 },
-	{ CAP0_TRIG_CNTL,   0 } 
+	{ CAP1_TRIG_CNTL, 0 },
 };
 
 /*
@@ -1230,7 +1221,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 	radeon_screen_blank(rinfo, VESA_POWERDOWN);
 
-	for (i=0; i<9; i++)
+	for (i=0; i<10; i++)
 		OUTREG(common_regs[i].reg, common_regs[i].val);
 
 	/* Apply surface registers */

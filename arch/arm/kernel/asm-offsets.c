@@ -47,6 +47,10 @@ int main(void)
 {
   DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
   BLANK();
+#if __LINUX_ARM_ARCH__ >= 6
+  DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
+#endif
+  BLANK();
   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
   DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
   BLANK();

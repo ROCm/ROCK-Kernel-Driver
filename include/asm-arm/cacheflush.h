@@ -69,6 +69,14 @@
 # endif
 #endif
 
+#if defined(CONFIG_CPU_V6)
+//# ifdef _CACHE
+#  define MULTI_CACHE 1
+//# else
+//#  define _CACHE v6
+//# endif
+#endif
+
 #if !defined(_CACHE) && !defined(MULTI_CACHE)
 #error Unknown cache maintainence model
 #endif
