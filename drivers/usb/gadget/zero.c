@@ -137,7 +137,7 @@ static const char loopback [] = "loop input to output";
  */
 #ifdef	CONFIG_USB_ZERO_NET2280
 #define CHIP			"net2280"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0101)
+#define DRIVER_VERSION_NUM	0x0101
 #define EP0_MAXPACKET		64
 static const char EP_OUT_NAME [] = "ep-a";
 #define EP_OUT_NUM	2
@@ -172,7 +172,7 @@ static inline void hw_optimize (struct usb_gadget *gadget)
  */
 #ifdef	CONFIG_USB_ZERO_PXA250
 #define CHIP			"pxa250"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0103)
+#define DRIVER_VERSION_NUM	0x0103
 #define EP0_MAXPACKET		16
 static const char EP_OUT_NAME [] = "ep12out-bulk";
 #define EP_OUT_NUM	12
@@ -199,7 +199,7 @@ static const char EP_IN_NAME [] = "ep11in-bulk";
  */
 #ifdef	CONFIG_USB_ZERO_SA1100
 #define CHIP			"sa1100"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0105)
+#define DRIVER_VERSION_NUM	0x0105
 #define EP0_MAXPACKET		8
 static const char EP_OUT_NAME [] = "ep1out-bulk";
 #define EP_OUT_NUM	1
@@ -340,13 +340,13 @@ device_desc = {
 	.bLength =		sizeof device_desc,
 	.bDescriptorType =	USB_DT_DEVICE,
 
-	.bcdUSB =		cpu_to_le16 (0x0200),
+	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
 	.bMaxPacketSize0 =	EP0_MAXPACKET,
 
-	.idVendor =		cpu_to_le16 (DRIVER_VENDOR_NUM),
-	.idProduct =		cpu_to_le16 (DRIVER_PRODUCT_NUM),
-	.bcdDevice =		cpu_to_le16 (DRIVER_VERSION_NUM),
+	.idVendor =		__constant_cpu_to_le16 (DRIVER_VENDOR_NUM),
+	.idProduct =		__constant_cpu_to_le16 (DRIVER_PRODUCT_NUM),
+	.bcdDevice =		__constant_cpu_to_le16 (DRIVER_VERSION_NUM),
 	.iManufacturer =	STRING_MANUFACTURER,
 	.iProduct =		STRING_PRODUCT,
 	.iSerialNumber =	STRING_SERIAL,
@@ -410,7 +410,7 @@ fs_source_desc = {
 
 	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (64),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
 static const struct usb_endpoint_descriptor
@@ -420,7 +420,7 @@ fs_sink_desc = {
 
 	.bEndpointAddress =	EP_OUT_NUM,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (64),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
 #ifdef	HIGHSPEED
@@ -441,7 +441,7 @@ hs_source_desc = {
 
 	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (512),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
 };
 
 static const struct usb_endpoint_descriptor
@@ -451,7 +451,7 @@ hs_sink_desc = {
 
 	.bEndpointAddress =	EP_OUT_NUM,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (512),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
 };
 
 static const struct usb_qualifier_descriptor
@@ -459,7 +459,7 @@ dev_qualifier = {
 	.bLength =		sizeof dev_qualifier,
 	.bDescriptorType =	USB_DT_DEVICE_QUALIFIER,
 
-	.bcdUSB =		cpu_to_le16 (0x0200),
+	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
 
 	/* assumes ep0 uses the same value for both speeds ... */
@@ -538,7 +538,7 @@ config_buf (enum usb_device_speed speed,
 		memcpy (buf, &loopback_config, USB_DT_CONFIG_SIZE);
 	buf [1] = type;
 	((struct usb_config_descriptor *) buf)->wTotalLength
-		= cpu_to_le16 (config_len);
+		= __constant_cpu_to_le16 (config_len);
 	buf += USB_DT_CONFIG_SIZE;
 
 	/* one interface */

@@ -168,7 +168,7 @@ module_param (qmult, uint, S_IRUGO|S_IWUSR);
  */
 #ifdef	CONFIG_USB_ETH_NET2280
 #define CHIP			"net2280"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0101)
+#define DRIVER_VERSION_NUM	0x0101
 #define EP0_MAXPACKET		64
 static const char EP_OUT_NAME [] = "ep-a";
 #define EP_OUT_NUM	2
@@ -201,7 +201,7 @@ static inline void hw_optimize (struct usb_gadget *gadget)
  */
 #ifdef	CONFIG_USB_ETH_PXA250
 #define CHIP			"pxa250"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0103)
+#define DRIVER_VERSION_NUM	0x0103
 #define EP0_MAXPACKET		16
 static const char EP_OUT_NAME [] = "ep12out-bulk";
 #define EP_OUT_NUM	12
@@ -225,7 +225,7 @@ static const char EP_STATUS_NAME [] = "ep6in-bulk";
  */
 #ifdef	CONFIG_USB_ETH_SA1100
 #define CHIP			"sa1100"
-#define DRIVER_VERSION_NUM	cpu_to_le16(0x0105)
+#define DRIVER_VERSION_NUM	0x0105
 #define EP0_MAXPACKET		8
 static const char EP_OUT_NAME [] = "ep1out-bulk";
 #define EP_OUT_NUM	1
@@ -329,15 +329,15 @@ device_desc = {
 	.bLength =		sizeof device_desc,
 	.bDescriptorType =	USB_DT_DEVICE,
 
-	.bcdUSB =		cpu_to_le16 (0x0200),
+	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_COMM,
 	.bDeviceSubClass =	0,
 	.bDeviceProtocol =	0,
 	.bMaxPacketSize0 =	EP0_MAXPACKET,
 
-	.idVendor =		cpu_to_le16 (DRIVER_VENDOR_NUM),
-	.idProduct =		cpu_to_le16 (DRIVER_PRODUCT_NUM),
-	.bcdDevice =		cpu_to_le16 (DRIVER_VERSION_NUM),
+	.idVendor =		__constant_cpu_to_le16 (DRIVER_VENDOR_NUM),
+	.idProduct =		__constant_cpu_to_le16 (DRIVER_PRODUCT_NUM),
+	.bcdDevice =		__constant_cpu_to_le16 (DRIVER_VERSION_NUM),
 	.iManufacturer =	STRING_MANUFACTURER,
 	.iProduct =		STRING_PRODUCT,
 	.bNumConfigurations =	1,
@@ -389,7 +389,7 @@ static const struct header_desc header_desc = {
 	.bDescriptorType =	0x24,
 	.bDescriptorSubType =	0,
 
-	.bcdCDC =		cpu_to_le16 (0x0110),
+	.bcdCDC =		__constant_cpu_to_le16 (0x0110),
 };
 
 /* "Union Functional Descriptor" from CDC spec 5.2.3.X */
@@ -432,9 +432,9 @@ static const struct ether_desc ether_desc = {
 
 	/* this descriptor actually adds value, surprise! */
 	.iMACAddress =		STRING_ETHADDR,
-	.bmEthernetStatistics =	cpu_to_le32 (0),	/* no statistics */
-	.wMaxSegmentSize =	cpu_to_le16 (MAX_PACKET + ETH_HLEN),
-	.wNumberMCFilters =	cpu_to_le16 (0),
+	.bmEthernetStatistics =	__constant_cpu_to_le32 (0), /* no statistics */
+	.wMaxSegmentSize =	__constant_cpu_to_le16 (MAX_PACKET + ETH_HLEN),
+	.wNumberMCFilters =	__constant_cpu_to_le16 (0),
 	.bNumberPowerFilters =	0,
 };
 
@@ -457,7 +457,7 @@ fs_status_desc = {
 
 	.bEndpointAddress =	EP_STATUS_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
-	.wMaxPacketSize =	cpu_to_le16 (STATUS_BYTECOUNT),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (STATUS_BYTECOUNT),
 	.bInterval =		1 << LOG2_STATUS_INTERVAL_MSEC,
 };
 #endif
@@ -501,7 +501,7 @@ fs_source_desc = {
 
 	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (64),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
 static const struct usb_endpoint_descriptor
@@ -511,7 +511,7 @@ fs_sink_desc = {
 
 	.bEndpointAddress =	EP_OUT_NUM,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (64),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
 #ifdef	HIGHSPEED
@@ -529,7 +529,7 @@ hs_status_desc = {
 
 	.bEndpointAddress =	EP_STATUS_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
-	.wMaxPacketSize =	cpu_to_le16 (STATUS_BYTECOUNT),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (STATUS_BYTECOUNT),
 	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 3,
 };
 #endif
@@ -541,7 +541,7 @@ hs_source_desc = {
 
 	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (512),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
 	.bInterval =		1,
 };
 
@@ -552,7 +552,7 @@ hs_sink_desc = {
 
 	.bEndpointAddress =	EP_OUT_NUM,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	cpu_to_le16 (512),
+	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
 	.bInterval =		1,
 };
 
@@ -561,7 +561,7 @@ dev_qualifier = {
 	.bLength =		sizeof dev_qualifier,
 	.bDescriptorType =	USB_DT_DEVICE_QUALIFIER,
 
-	.bcdUSB =		cpu_to_le16 (0x0200),
+	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
 
 	/* assumes ep0 uses the same value for both speeds ... */
@@ -627,7 +627,7 @@ config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
 	memcpy (buf, &eth_config, USB_DT_CONFIG_SIZE);
 	buf [1] = type;
 	((struct usb_config_descriptor *) buf)->wTotalLength
-		= cpu_to_le16 (config_len);
+		= __constant_cpu_to_le16 (config_len);
 	buf += USB_DT_CONFIG_SIZE;
 #ifdef	HIGHSPEED
 	hs = (speed == USB_SPEED_HIGH);
@@ -858,9 +858,9 @@ static void eth_status_complete (struct usb_ep *ep, struct usb_request *req)
 			&& value == 0) {
 		event->bmRequestType = 0xA1;
 		event->bNotificationType = CDC_NOTIFY_SPEED_CHANGE;
-		event->wValue = cpu_to_le16 (0);
-		event->wIndex = cpu_to_le16 (1);
-		event->wLength = cpu_to_le16 (8);
+		event->wValue = __constant_cpu_to_le16 (0);
+		event->wIndex = __constant_cpu_to_le16 (1);
+		event->wLength = __constant_cpu_to_le16 (8);
 
 		/* SPEED_CHANGE data is up/down speeds in bits/sec */
 		event->data [0] = event->data [1] =
@@ -920,8 +920,8 @@ free_req:
 	event = req->buf;
 	event->bmRequestType = 0xA1;
 	event->bNotificationType = CDC_NOTIFY_NETWORK_CONNECTION;
-	event->wValue = cpu_to_le16 (1);	/* connected */
-	event->wIndex = cpu_to_le16 (1);
+	event->wValue = __constant_cpu_to_le16 (1);	/* connected */
+	event->wIndex = __constant_cpu_to_le16 (1);
 	event->wLength = 0;
 
 	req->length = 8;

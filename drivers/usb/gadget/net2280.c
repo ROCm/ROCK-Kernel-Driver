@@ -114,8 +114,8 @@ static char *type_string (u8 bmAttributes)
 
 #include "net2280.h"
 
-#define valid_bit	cpu_to_le32 (1 << VALID_BIT)
-#define dma_done_ie	cpu_to_le32 (1 << DMA_DONE_INTERRUPT_ENABLE)
+#define valid_bit	__constant_cpu_to_le32 (1 << VALID_BIT)
+#define dma_done_ie	__constant_cpu_to_le32 (1 << DMA_DONE_INTERRUPT_ENABLE)
 
 /*-------------------------------------------------------------------------*/
 
@@ -371,7 +371,7 @@ net2280_alloc_request (struct usb_ep *_ep, int gfp_flags)
 			return 0;
 		}
 		td->dmacount = 0;	/* not VALID */
-		td->dmaaddr = cpu_to_le32 (DMA_ADDR_INVALID);
+		td->dmaaddr = __constant_cpu_to_le32 (DMA_ADDR_INVALID);
 		req->td = td;
 	}
 	return &req->req;
@@ -756,7 +756,7 @@ static void start_dma (struct net2280_ep *ep, struct net2280_request *req)
 		| (ep->is_in << DMA_DIRECTION)
 		| 0, &dma->dmacount);
 #else
-	req->td->dmacount |= cpu_to_le32 (1 << END_OF_CHAIN);
+	req->td->dmacount |= __constant_cpu_to_le32 (1 << END_OF_CHAIN);
 #endif
 
 	writel (req->td_dma, &dma->dmadesc);
@@ -2157,9 +2157,9 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 
 			if (readl (&e->regs->ep_rsp)
 					& (1 << SET_ENDPOINT_HALT))
-				status = cpu_to_le16 (1);
+				status = __constant_cpu_to_le16 (1);
 			else
-				status = cpu_to_le16 (0);
+				status = __constant_cpu_to_le16 (0);
 
 			/* don't bother with a request object! */
 			writel (0, &dev->epregs [0].ep_irqenb);
@@ -2574,7 +2574,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 			goto done;
 		}
 		td->dmacount = 0;	/* not VALID */
-		td->dmaaddr = cpu_to_le32 (DMA_ADDR_INVALID);
+		td->dmaaddr = __constant_cpu_to_le32 (DMA_ADDR_INVALID);
 		dev->ep [i].dummy = td;
 	}
 
