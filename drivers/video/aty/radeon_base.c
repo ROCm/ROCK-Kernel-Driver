@@ -883,7 +883,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			if (!rinfo->is_mobility)
 				return -EINVAL;
 
-			rc = get_user(value, (__u32*)arg);
+			rc = get_user(value, (__u32 __user *)arg);
 
 			if (rc)
 				return rc;
@@ -928,7 +928,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			if (CRTC_CRT_ON & tmp)
 				value |= 0x02;
 
-			return put_user(value, (__u32*)arg);
+			return put_user(value, (__u32 __user *)arg);
 		default:
 			return -EINVAL;
 	}
@@ -1707,7 +1707,7 @@ int radeonfb_set_par(struct fb_info *info)
 
 
 
-static ssize_t radeonfb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t radeonfb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
@@ -1734,7 +1734,7 @@ static ssize_t radeonfb_read(struct file *file, char *buf, size_t count, loff_t 
 	return count;
 }
 
-static ssize_t radeonfb_write(struct file *file, const char *buf, size_t count,
+static ssize_t radeonfb_write(struct file *file, const char __user *buf, size_t count,
 			      loff_t *ppos)
 {
 	unsigned long p = *ppos;
