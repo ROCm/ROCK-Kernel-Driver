@@ -399,12 +399,17 @@ int line_remove(struct line *lines, int num, char *str)
 	return(line_setup(lines, num, config, 0));
 }
 
-void line_register_devfs(struct lines *set, struct line_driver *line_driver, 
-			 struct tty_driver *driver, struct line *lines,
+struct tty_driver *line_register_devfs(struct lines *set,
+			 struct line_driver *line_driver, 
+			 struct tty_operations *ops, struct line *lines,
 			 int nlines)
 {
 	int err, i;
 	char *from, *to;
+	struct tty_driver *driver = alloc_tty_driver(nlines);
+
+	if (!driver)
+		return NULL;
 
 	driver->driver_name = line_driver->name;
 	driver->name = line_driver->devfs_name;
@@ -412,11 +417,9 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 	driver->minor_start = line_driver->minor_start;
 	driver->type = line_driver->type;
 	driver->subtype = line_driver->subtype;
-	driver->magic = TTY_DRIVER_MAGIC;
 	driver->flags = TTY_DRIVER_REAL_RAW;
-	driver->num = set->num;
-	driver->write_room = line_write_room;
 	driver->init_termios = tty_std_termios;
+	tty_set_operations(driver, ops);
 
 	if (tty_register_driver(driver))
 		panic("line_register_devfs : Couldn't register driver\n");
@@ -433,6 +436,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 	}
 
 	mconsole_register_dev(&line_driver->mc);
+	return driver;
 }
 
 void lines_init(struct line *lines, int nlines)
