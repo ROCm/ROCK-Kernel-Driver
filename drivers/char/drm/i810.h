@@ -97,12 +97,4 @@
 /* XXX: Add vblank support? */
 #define __HAVE_IRQ		0
 
-/* Buffer customization:
- */
-
-#define DRIVER_BUF_PRIV_T	drm_i810_buf_priv_t
-
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_i810_private_t *)((dev)->dev_private))->buffer_map
-
 #endif

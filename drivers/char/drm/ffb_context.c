@@ -570,10 +570,29 @@ static void ffb_driver_postcleanup(drm_device_t *dev)
 	if (ffb_position != NULL) kfree(ffb_position);
 }
 
+static int ffb_driver_kernel_context_switch_unlock(struct drm_device *dev)
+{
+	dev->lock.filp = 0;
+	{
+		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
+		unsigned int old, new, prev, ctx;
+		
+		ctx = lock.context;
+		do {
+			old  = *plock;
+			new  = ctx;
+			prev = cmpxchg(plock, old, new);
+		} while (prev != old);
+	}
+	wake_up_interruptible(&dev->lock.lock_queue);
+}
+
 static void ffb_driver_register_fns(drm_device_t *dev)
 {
 	dev->fn_tbl.release = ffb_driver_release;
 	dev->fn_tbl.presetup = ffb_driver_presetup;
 	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;
 	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
+	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
+	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
 }

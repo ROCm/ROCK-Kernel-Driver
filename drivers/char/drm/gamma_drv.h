@@ -35,7 +35,6 @@
 typedef struct drm_gamma_private {
 	drm_gamma_sarea_t *sarea_priv;
 	drm_map_t *sarea;
-	drm_map_t *buffers;
 	drm_map_t *mmio0;
 	drm_map_t *mmio1;
 	drm_map_t *mmio2;

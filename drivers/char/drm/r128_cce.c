@@ -488,8 +488,8 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		r128_do_cleanup_cce( dev );
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-	if(!dev_priv->buffers) {
+	DRM_FIND_MAP( dev->agp_buffer_map, init->buffers_offset );
+	if(!dev->agp_buffer_map) {
 		DRM_ERROR("could not find dma buffer region!\n");
 		dev->dev_private = (void *)dev_priv;
 		r128_do_cleanup_cce( dev );
@@ -515,10 +515,10 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	if ( !dev_priv->is_pci ) {
 		DRM_IOREMAP( dev_priv->cce_ring, dev );
 		DRM_IOREMAP( dev_priv->ring_rptr, dev );
-		DRM_IOREMAP( dev_priv->buffers, dev );
+		DRM_IOREMAP( dev->agp_buffer_map, dev );
 		if(!dev_priv->cce_ring->handle ||
 		   !dev_priv->ring_rptr->handle ||
-		   !dev_priv->buffers->handle) {
+		   !dev->agp_buffer_map->handle) {
 			DRM_ERROR("Could not ioremap agp regions!\n");
 			dev->dev_private = (void *)dev_priv;
 			r128_do_cleanup_cce( dev );
@@ -531,7 +531,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			(void *)dev_priv->cce_ring->offset;
 		dev_priv->ring_rptr->handle =
 			(void *)dev_priv->ring_rptr->offset;
-		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
+		dev->agp_buffer_map->handle = (void *)dev->agp_buffer_map->offset;
 	}
 
 #if __REALLY_HAVE_AGP
@@ -604,8 +604,8 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 				DRM_IOREMAPFREE( dev_priv->cce_ring, dev );
 			if ( dev_priv->ring_rptr != NULL )
 				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
-			if ( dev_priv->buffers != NULL )
-				DRM_IOREMAPFREE( dev_priv->buffers, dev );
+			if ( dev->agp_buffer_map != NULL )
+				DRM_IOREMAPFREE( dev->agp_buffer_map, dev );
 		} else
 #endif
 		{

@@ -1247,7 +1247,7 @@ static void radeon_cp_dispatch_indirect( drm_device_t *dev,
 		 */
 		if ( dwords & 1 ) {
 			u32 *data = (u32 *)
-				((char *)dev_priv->buffers->handle
+				((char *)dev->agp_buffer_map->handle
 				 + buf->offset + start);
 			data[dwords++] = RADEON_CP_PACKET2;
 		}
@@ -1301,7 +1301,7 @@ static void radeon_cp_dispatch_indices( drm_device_t *dev,
 
 	dwords = (prim->finish - prim->start + 3) / sizeof(u32);
 
-	data = (u32 *)((char *)dev_priv->buffers->handle +
+	data = (u32 *)((char *)dev->agp_buffer_map->handle +
 		       elt_buf->offset + prim->start);
 
 	data[0] = CP_PACKET3( RADEON_3D_RNDR_GEN_INDX_PRIM, dwords-2 );
@@ -1445,7 +1445,7 @@ static int radeon_cp_dispatch_texture( DRMFILE filp,
 
 		/* Dispatch the indirect buffer.
 		 */
-		buffer = (u32*)((char*)dev_priv->buffers->handle + buf->offset);
+		buffer = (u32*)((char*)dev->agp_buffer_map->handle + buf->offset);
 		dwords = size / 4;
 		buffer[0] = CP_PACKET3( RADEON_CNTL_HOSTDATA_BLT, dwords + 6 );
 		buffer[1] = (RADEON_GMC_DST_PITCH_OFFSET_CNTL |
@@ -2548,6 +2548,12 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 	return 0;
 }
 
+/* When a client dies:
+ *    - Check for and clean up flipped page state
+ *    - Free any alloced GART memory.
+ *
+ * DRM infrastructure takes care of reclaiming dma buffers.
+ */
 static void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 {
 	if ( dev->dev_private ) {				
@@ -2576,6 +2582,7 @@ static void radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
 
 void radeon_driver_register_fns(struct drm_device *dev)
 {	
+	dev->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
 	dev->fn_tbl.prerelease = radeon_driver_prerelease;
 	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;
 	dev->fn_tbl.open_helper = radeon_driver_open_helper;

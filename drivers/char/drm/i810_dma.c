@@ -371,8 +371,8 @@ static int i810_dma_initialize(drm_device_t *dev,
 	   	DRM_ERROR("can not find mmio map!\n");
 	   	return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->buffer_map, init->buffers_offset );
-	if (!dev_priv->buffer_map) {
+	DRM_FIND_MAP( dev->agp_buffer_map, init->buffers_offset );
+	if (!dev->agp_buffer_map) {
 		dev->dev_private = (void *)dev_priv;
 	   	i810_dma_cleanup(dev);
 	   	DRM_ERROR("can not find dma buffer map!\n");
@@ -1407,6 +1407,7 @@ static int i810_driver_dma_quiescent(drm_device_t *dev)
 
 void i810_driver_register_fns(drm_device_t *dev)
 {
+	dev->dev_priv_size = sizeof(drm_i810_buf_priv_t);
 	dev->fn_tbl.pretakedown = i810_driver_pretakedown;
 	dev->fn_tbl.release = i810_driver_release;
 	dev->fn_tbl.dma_quiescent = i810_driver_dma_quiescent;

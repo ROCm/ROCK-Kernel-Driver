@@ -326,7 +326,7 @@ int sis_ioctl_agp_free( DRM_IOCTL_ARGS )
 	return 0;
 }
 
-int sis_init_context(int context)
+int sis_init_context(struct drm_device *dev, int context)
 {
 	int i;
 
@@ -358,7 +358,7 @@ int sis_init_context(int context)
 	return 1;
 }
 
-int sis_final_context(int context)
+int sis_final_context(struct drm_device *dev, int context)
 {
 	int i;
 
@@ -407,4 +407,6 @@ int sis_final_context(int context)
 
 void DRM(driver_register_fns)(drm_device_t *dev)
 {
+	dev->fn_tbl.context_ctor = sis_init_context;
+	dev->fn_tbl.context_dtor = sis_final_context;
 }

@@ -138,7 +138,6 @@ typedef struct drm_radeon_private {
 	drm_local_map_t *mmio;
 	drm_local_map_t *cp_ring;
 	drm_local_map_t *ring_rptr;
-	drm_local_map_t *buffers;
 	drm_local_map_t *gart_textures;
 
 	struct mem_block *gart_heap;

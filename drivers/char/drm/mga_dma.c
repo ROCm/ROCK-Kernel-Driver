@@ -533,8 +533,8 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		mga_do_cleanup_dma( dev );
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-	if(!dev_priv->buffers) {
+	DRM_FIND_MAP( dev->agp_buffer_map, init->buffers_offset );
+	if(!dev->agp_buffer_map) {
 		DRM_ERROR( "failed to find dma buffer region!\n" );
 		/* Assign dev_private so we can do cleanup. */
 		dev->dev_private = (void *)dev_priv;
@@ -548,11 +548,11 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	DRM_IOREMAP( dev_priv->warp, dev );
 	DRM_IOREMAP( dev_priv->primary, dev );
-	DRM_IOREMAP( dev_priv->buffers, dev );
+	DRM_IOREMAP( dev->agp_buffer_map, dev );
 
 	if(!dev_priv->warp->handle ||
 	   !dev_priv->primary->handle ||
-	   !dev_priv->buffers->handle ) {
+	   !dev->agp_buffer_map->handle ) {
 		DRM_ERROR( "failed to ioremap agp regions!\n" );
 		/* Assign dev_private so we can do cleanup. */
 		dev->dev_private = (void *)dev_priv;
@@ -646,8 +646,8 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 			DRM_IOREMAPFREE( dev_priv->warp, dev );
 		if ( dev_priv->primary != NULL )
 			DRM_IOREMAPFREE( dev_priv->primary, dev );
-		if ( dev_priv->buffers != NULL )
-			DRM_IOREMAPFREE( dev_priv->buffers, dev );
+		if ( dev->agp_buffer_map != NULL )
+			DRM_IOREMAPFREE( dev->agp_buffer_map, dev );
 
 		if ( dev_priv->head != NULL ) {
 			mga_freelist_cleanup( dev );

@@ -76,11 +76,4 @@
 #define __HAVE_VBL_IRQ		1
 #define __HAVE_SHARED_IRQ       1
 
-/* Buffer customization:
- */
-#define DRIVER_BUF_PRIV_T	drm_mga_buf_priv_t
-
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_mga_private_t *)((dev)->dev_private))->buffers
-
 #endif
