@@ -149,7 +149,7 @@ static void unhandled_fault(unsigned long address, struct task_struct *tsk,
 	       (tsk->mm ? (unsigned long) tsk->mm->pgd :
 		          (unsigned long) tsk->active_mm->pgd));
 	if (notify_die(DIE_GPF, "general protection fault", regs,
-		       0, 0, SIGSEGV) == NOTIFY_OK)
+		       0, 0, SIGSEGV) == NOTIFY_STOP)
 		return;
 	die_if_kernel("Oops", regs);
 }
@@ -325,7 +325,7 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	fault_code = get_thread_fault_code();
 
 	if (notify_die(DIE_PAGE_FAULT, "page_fault", regs,
-		       fault_code, 0, SIGSEGV) == NOTIFY_OK)
+		       fault_code, 0, SIGSEGV) == NOTIFY_STOP)
 		return;
 
 	si_code = SEGV_MAPERR;

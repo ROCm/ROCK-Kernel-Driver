@@ -459,7 +459,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info); \
 }
@@ -528,7 +528,7 @@ gp_in_vm86:
 gp_in_kernel:
 	if (!fixup_exception(regs)) {
 		if (notify_die(DIE_GPF, "general protection fault", regs,
-				error_code, 13, SIGSEGV) == NOTIFY_OK);
+				error_code, 13, SIGSEGV) == NOTIFY_STOP);
 			return;
 		die("general protection fault", regs, error_code);
 	}
@@ -602,7 +602,7 @@ static void default_do_nmi(struct pt_regs * regs)
  
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
-							== NOTIFY_BAD)
+							== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -617,7 +617,7 @@ static void default_do_nmi(struct pt_regs * regs)
 		unknown_nmi_error(reason, regs);
 		return;
 	}
-	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return;
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
@@ -666,7 +666,7 @@ void unset_nmi_callback(void)
 asmlinkage int do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
-			== NOTIFY_OK)
+			== NOTIFY_STOP)
 		return 1;
 	/* This is an interrupt gate, because kprobes wants interrupts
 	disabled.  Normal trap handlers don't. */
@@ -707,7 +707,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
-					SIGTRAP) == NOTIFY_OK)
+					SIGTRAP) == NOTIFY_STOP)
 		return;
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->eflags & X86_EFLAGS_IF)

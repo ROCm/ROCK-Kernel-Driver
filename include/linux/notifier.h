@@ -29,6 +29,10 @@ extern int notifier_call_chain(struct notifier_block **n, unsigned long val, voi
 #define NOTIFY_OK		0x0001		/* Suits me */
 #define NOTIFY_STOP_MASK	0x8000		/* Don't call further */
 #define NOTIFY_BAD		(NOTIFY_STOP_MASK|0x0002)	/* Bad/Veto action	*/
+/*
+ * Clean way to return from the notifier and stop further calls.
+ */
+#define NOTIFY_STOP		(NOTIFY_OK|NOTIFY_STOP_MASK)
 
 /*
  *	Declared notifiers so far. I can imagine quite a few more chains
