@@ -464,23 +464,32 @@ void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
  */
 u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 {
-	u32 align = info->pixmap.buf_align - 1;
-	u32 offset, count = 1000;
+	struct fb_pixmap *buf = &info->pixmap;
+	u32 align = buf->buf_align - 1, offset;
 
-	spin_lock(&info->pixmap.lock);
-	offset = info->pixmap.offset + align;
+	/* If IO mapped, we need to sync before access, no sharing of
+	 * the pixmap is done
+	 */
+	if (buf->flags & FB_PIXMAP_IO) {
+		if (info->fbops->fb_sync && (buf->flags & FB_PIXMAP_SYNC))
+			info->fbops->fb_sync(info);
+		return 0;
+	}
+
+	/* See if we fit in the remaining pixmap space */
+	offset = buf->offset + align;
 	offset &= ~align;
-	if (offset + size > info->pixmap.size) {
-		while (atomic_read(&info->pixmap.count) && count--);
-		if (info->fbops->fb_sync && 
-		    info->pixmap.flags & FB_PIXMAP_SYNC)
+	if (offset + size > buf->size) {
+		/* We do not fit. In order to be able to re-use the buffer,
+		 * we must ensure no asynchronous DMA'ing or whatever operation
+		 * is in progress, we sync for that.
+		 */
+		if (info->fbops->fb_sync && (buf->flags & FB_PIXMAP_SYNC))
 			info->fbops->fb_sync(info);
 		offset = 0;
 	}
-	info->pixmap.offset = offset + size;
-	atomic_inc(&info->pixmap.count);	
-	smp_mb__after_atomic_inc();
-	spin_unlock(&info->pixmap.lock);
+	buf->offset = offset + size;
+
 	return offset;
 }
 
@@ -733,8 +742,6 @@ int fb_show_logo(struct fb_info *info)
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;
 		info->fbops->fb_imageblit(info, &image);
-		//atomic_dec(&info->pixmap.count);
-		//smp_mb__after_atomic_dec();
 	}
 	
 	if (palette != NULL)
@@ -1254,7 +1261,6 @@ register_framebuffer(struct fb_info *fb_info)
 		fb_info->pixmap.outbuf = sys_outbuf;
 	if (fb_info->pixmap.inbuf == NULL)
 		fb_info->pixmap.inbuf = sys_inbuf;
-	spin_lock_init(&fb_info->pixmap.lock);
 
 	registered_fb[i] = fb_info;
 

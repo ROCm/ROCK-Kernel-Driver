@@ -363,8 +363,6 @@ struct fb_pixmap {
 					  /* access methods                */
 	void (*outbuf)(u8 *dst, u8 *addr, unsigned int size); 
 	u8   (*inbuf) (u8 *addr);
-	spinlock_t lock;                  /* spinlock                      */
-	atomic_t count;
 };
 
     /*

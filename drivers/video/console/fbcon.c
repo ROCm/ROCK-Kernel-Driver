@@ -354,8 +354,6 @@ static void putcs_unaligned(struct vc_data *vc, struct fb_info *info,
 		info->fbops->fb_imageblit(info, image);
 		image->dx += cnt * vc->vc_font.width;
 		count -= cnt;
-		atomic_dec(&info->pixmap.count);
-		smp_mb__after_atomic_dec();
 	}
 }
 
@@ -394,8 +392,6 @@ static void putcs_aligned(struct vc_data *vc, struct fb_info *info,
 		info->fbops->fb_imageblit(info, image);
 		image->dx += cnt * vc->vc_font.width;
 		count -= cnt;
-		atomic_dec(&info->pixmap.count);
-		smp_mb__after_atomic_dec();
 	}
 }
 
@@ -466,8 +462,6 @@ static void accel_putc(struct vc_data *vc, struct fb_info *info,
 	move_buf_aligned(info, dst, src, pitch, width, image.height);
 
 	info->fbops->fb_imageblit(info, &image);
-	atomic_dec(&info->pixmap.count);
-	smp_mb__after_atomic_dec();
 }
 
 void accel_putcs(struct vc_data *vc, struct fb_info *info,

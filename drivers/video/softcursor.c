@@ -74,8 +74,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	info->cursor.image.data = dst;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);
-	atomic_dec(&info->pixmap.count);
-	smp_mb__after_atomic_dec();
 	return 0;
 }
 
