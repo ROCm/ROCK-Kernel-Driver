@@ -49,6 +49,7 @@
 
 static int eurwdt_is_open;
 static spinlock_t eurwdt_lock;
+static char eur_expect_close;
  
 /*
  * You must set these - there is no sane way to probe for this board.
@@ -235,6 +236,19 @@ loff_t *ppos)
 	return -ESPIPE;
  
 	if (count) 	{
+		if (!nowayout) {
+			size_t i;
+
+			eur_expect_close = 0;
+
+			for (i = 0; i != count; i++) {
+				char c;
+				if(get_user(c, buf+i))
+					return -EFAULT;
+				if (c == 'V')
+					eur_expect_close = 42;
+			}
+		}
 		eurwdt_ping();	/* the default timeout */
 		return 1;
 	}
