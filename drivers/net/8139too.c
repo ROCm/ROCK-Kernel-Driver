@@ -87,8 +87,6 @@
 		"rtl8139-diag -mmmaaavvveefN" output
 		enable RTL8139_DEBUG below, and look at 'dmesg' or kernel log
 
-		See 8139too.txt for more details.
-
 */
 
 #define DRV_NAME	"8139too"

@@ -4,8 +4,6 @@
 	- information on the 3Com EtherLink Plus (3c505) driver.
 6pack.txt
 	- info on the 6pack protocol, an alternative to KISS for AX.25
-8139too.txt
-	- info on the 8139too driver for RTL-8139 based network cards.
 Configurable
 	- info on some of the configurable network parameters
 DLINK.txt
