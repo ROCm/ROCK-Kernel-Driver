@@ -17,15 +17,17 @@
 static int via_fetch_size(void)
 {
 	int i;
-	u8 temp;
+	u16 temp;
 	struct aper_size_info_16 *values;
 
 	values = A_SIZE_16(agp_bridge.aperture_sizes);
-	pci_read_config_byte(agp_bridge.dev, VIA_AGP3_APSIZE, &temp);
+	pci_read_config_word(agp_bridge.dev, VIA_AGP3_APSIZE, &temp);
+	temp &= 0xfff;
+
 	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge.previous_size =
-			agp_bridge.current_size = (void *) (values + i);
+				agp_bridge.current_size = (void *) (values + i);
 			agp_bridge.aperture_size_idx = i;
 			return values[i].size;
 		}
