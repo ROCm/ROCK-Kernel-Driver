@@ -15,81 +15,17 @@
  *	liability nor provide warranty for any of this software. This material
  *	is provided as is and at no charge.
  *
- *	Revision 0.21:	Uses the new generic socket option code.
- *	Revision 0.22:	Gcc clean ups and drop out device registration. Use the
- *			new multi-protocol edition of hard_header
- *	Revision 0.23:  IPX /proc by Mark Evans. Adding a route will
- *     			will overwrite any existing route to the same network.
- *	Revision 0.24:	Supports new /proc with no 4K limit
- *	Revision 0.25:	Add ephemeral sockets, passive local network
- *			identification, support for local net 0 and
- *			multiple datalinks <Greg Page>
- *	Revision 0.26:  Device drop kills IPX routes via it. (needed for module)
- *	Revision 0.27:  Autobind <Mark Evans>
- *	Revision 0.28:  Small fix for multiple local networks <Thomas Winder>
- *	Revision 0.29:  Assorted major errors removed <Mark Evans>
- *			Small correction to promisc mode error fix <Alan Cox>
- *			Asynchronous I/O support. Changed to use notifiers
- *			and the newer packet_type stuff. Assorted major
- *			fixes <Alejandro Liu>
- *	Revision 0.30:	Moved to net/ipx/...	<Alan Cox>
- *			Don't set address length on recvfrom that errors.
- *			Incorrect verify_area.
- *	Revision 0.31:	New sk_buffs. This still needs a lot of 
- *			testing. <Alan Cox>
- *	Revision 0.32:  Using sock_alloc_send_skb, firewall hooks. <Alan Cox>
- *			Supports sendmsg/recvmsg
- *	Revision 0.33:	Internal network support, routing changes, uses a
- *			protocol private area for ipx data.
- *	Revision 0.34:	Module support. <Jim Freeman>
- *	Revision 0.35:  Checksum support. <Neil Turton>, hooked in by <Alan Cox>
- *			Handles WIN95 discovery packets <Volker Lendecke>
- *	Revision 0.36:	Internal bump up for 2.1
- *	Revision 0.37:	Began adding POSIXisms.
- *	Revision 0.38:  Asynchronous socket stuff made current.
- *	Revision 0.39:  SPX interfaces
- *	Revision 0.40:  Tiny SIOCGSTAMP fix (chris@cybernet.co.nz)
- *      Revision 0.41:  802.2TR removed (p.norton@computer.org)
- *			Fixed connecting to primary net,
- *			Automatic binding on send & receive,
- *			Martijn van Oosterhout <kleptogimp@geocities.com>
- *	Revision 042:   Multithreading - use spinlocks and refcounting to
- *			protect some structures: ipx_interface sock list, list
- *			of ipx interfaces, etc. 
- *			Bugfixes - do refcounting on net_devices, check function
- *			results, etc. Thanks to davem and freitag for
- *			suggestions and guidance.
- *			Arnaldo Carvalho de Melo <acme@conectiva.com.br>,
- *			November, 2000
- *	Revision 043:	Shared SKBs, don't mangle packets, some cleanups
- *			Arnaldo Carvalho de Melo <acme@conectiva.com.br>,
- *			December, 2000
- *	Revision 044:	Call ipxitf_hold on NETDEV_UP (acme)
- *	Revision 045:	fix PPROP routing bug (acme)
- *	Revision 046:	Further fixes to PPROP, ipxitf_create_internal was
- *			doing an unneeded MOD_INC_USE_COUNT, implement
- *			sysctl for ipx_pprop_broacasting, fix the ipx sysctl
- *			handling, making it dynamic, some cleanups, thanks to
- *			Petr Vandrovec for review and good suggestions. (acme)
- *	Revision 047:	Cleanups, CodingStyle changes, move the ncp connection
- *			hack out of line (acme)
- *	Revision 048:	Use sk->protinfo to store the pointer to IPX private
- *			area, remove af_ipx from sk->protinfo and move ipx_opt
- *			to include/net/ipx.h, use IPX_SK like DecNET, etc
- *	Revision 049:	SPX support dropped, see comment in ipx_create
- *
- *	Protect the module by a MOD_INC_USE_COUNT/MOD_DEC_USE_COUNT
- *	pair. Also, now usage count is managed this way
- *	-Count one if the auto_interface mode is on
- *      -Count one per configured interface
- *
- *	Jacques Gelinas (jacques@solucorp.qc.ca)
- *
+ *	Portions Copyright (c) 2000-2002 Conectiva, Inc. <acme@conectiva.com.br>
+ *	Neither Arnaldo Carvalho de Melo nor Conectiva, Inc. admit liability nor
+ *	provide warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  * 	Portions Copyright (c) 1995 Caldera, Inc. <greg@caldera.com>
  *	Neither Greg Page nor Caldera, Inc. admit liability nor provide
  *	warranty for any of this software. This material is provided
  *	"AS-IS" and at no charge.
+ *
+ *	See net/ipx/ChangeLog.
  */
 
 #include <linux/config.h>
@@ -145,13 +81,13 @@ static struct datalink_proto *pSNAP_datalink;
 
 static struct proto_ops ipx_dgram_ops;
 
-static struct ipx_route *ipx_routes;
-static rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
+struct ipx_route *ipx_routes;
+rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
 
-static struct ipx_interface *ipx_interfaces;
-static spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
+struct ipx_interface *ipx_interfaces;
+spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
 
-static struct ipx_interface *ipx_primary_net;
+struct ipx_interface *ipx_primary_net;
 static struct ipx_interface *ipx_internal_net;
 
 #undef IPX_REFCNT_DEBUG
@@ -791,8 +727,6 @@ static int ipxitf_add_local_route(struct ipx_interface *intrfc)
 	return ipxrtr_add_route(intrfc->if_netnum, intrfc, NULL);
 }
 
-static const char *ipx_frame_name(unsigned short);
-static const char *ipx_device_name(struct ipx_interface *);
 static void ipxitf_discover_netnum(struct ipx_interface *intrfc,
 				   struct sk_buff *skb);
 static int ipxitf_pprop(struct ipx_interface *intrfc, struct sk_buff *skb);
@@ -1656,7 +1590,7 @@ static int ipxrtr_ioctl(unsigned int cmd, void *arg)
 out:	return ret;
 }
 
-static const char *ipx_frame_name(unsigned short frame)
+const char *ipx_frame_name(unsigned short frame)
 {
 	char* ret = "None";
 
@@ -1671,187 +1605,10 @@ static const char *ipx_frame_name(unsigned short frame)
 	return ret;
 }
 
-static const char *ipx_device_name(struct ipx_interface *intrfc)
+const char *ipx_device_name(struct ipx_interface *intrfc)
 {
 	return intrfc->if_internal ? "Internal" :
 		intrfc->if_dev ? intrfc->if_dev->name : "Unknown";
-}
-
-/* Called from proc fs */
-static int ipx_interface_get_info(char *buffer, char **start, off_t offset,
-				  int length)
-{
-	struct ipx_interface *i;
-	off_t begin = 0, pos = 0;
-	int len = 0;
-
-	/* Theory.. Keep printing in the same place until we pass offset */
-
-	len += sprintf(buffer, "%-11s%-15s%-9s%-11s%s", "Network",
-		"Node_Address", "Primary", "Device", "Frame_Type");
-#ifdef IPX_REFCNT_DEBUG
-	len += sprintf(buffer + len, "  refcnt");
-#endif
-	strcat(buffer + len++, "\n");
-	spin_lock_bh(&ipx_interfaces_lock);
-	for (i = ipx_interfaces; i; i = i->if_next) {
-		len += sprintf(buffer + len, "%08lX   ",
-				(long unsigned int) ntohl(i->if_netnum));
-		len += sprintf(buffer + len, "%02X%02X%02X%02X%02X%02X   ",
-				i->if_node[0], i->if_node[1], i->if_node[2],
-				i->if_node[3], i->if_node[4], i->if_node[5]);
-		len += sprintf(buffer + len, "%-9s", i == ipx_primary_net ?
-			"Yes" : "No");
-		len += sprintf(buffer + len, "%-11s", ipx_device_name(i));
-		len += sprintf(buffer + len, "%-9s",
-			ipx_frame_name(i->if_dlink_type));
-#ifdef IPX_REFCNT_DEBUG
-		len += sprintf(buffer + len, "%6d", atomic_read(&i->refcnt));
-#endif
-		strcat(buffer + len++, "\n");
-		/* Are we still dumping unwanted data then discard the record */
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;	/* Keep dumping into the buffer start */
-			begin = pos;
-		}
-		if (pos > offset + length)	/* We have dumped enough */
-			break;
-	}
-	spin_unlock_bh(&ipx_interfaces_lock);
-
-	/* The data in question runs from begin to begin+len */
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin); /* Remove unwanted header data from length */
-	if (len > length)
-		len = length;	/* Remove unwanted tail data from length */
-
-	return len;
-}
-
-static int ipx_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	struct sock *s;
-	struct ipx_interface *i;
-	off_t begin = 0, pos = 0;
-	int len = 0;
-
-	/* Theory.. Keep printing in the same place until we pass offset */
-
-#ifdef CONFIG_IPX_INTERN
-	len += sprintf(buffer, "%-28s%-28s%-10s%-10s%-7s%s\n", "Local_Address",
-#else
-	len += sprintf(buffer, "%-15s%-28s%-10s%-10s%-7s%s\n", "Local_Address",
-#endif	/* CONFIG_IPX_INTERN */
-			"Remote_Address", "Tx_Queue", "Rx_Queue",
-			"State", "Uid");
-
-	spin_lock_bh(&ipx_interfaces_lock);
-	for (i = ipx_interfaces; i; i = i->if_next) {
-		ipxitf_hold(i);
-		spin_lock_bh(&i->if_sklist_lock);
-		for (s = i->if_sklist; s; s = s->next) {
-			struct ipx_opt *ipxs = ipx_sk(s);
-#ifdef CONFIG_IPX_INTERN
-			len += sprintf(buffer + len,
-				       "%08lX:%02X%02X%02X%02X%02X%02X:%04X  ",
-                             (unsigned long)htonl(ipxs->intrfc->if_netnum),
-				       ipxs->node[0], ipxs->node[1],
-				       ipxs->node[2], ipxs->node[3],
-				       ipxs->node[4], ipxs->node[5],
-				       htons(ipxs->port));
-#else
-			len += sprintf(buffer + len, "%08lX:%04X  ",
-				       (unsigned long) htonl(i->if_netnum),
-				       htons(ipxs->port));
-#endif	/* CONFIG_IPX_INTERN */
-			if (s->state != TCP_ESTABLISHED)
-				len += sprintf(buffer + len, "%-28s",
-						"Not_Connected");
-			else {
-				len += sprintf(buffer + len,
-					"%08lX:%02X%02X%02X%02X%02X%02X:%04X  ",
-				      (unsigned long)htonl(ipxs->dest_addr.net),
-					ipxs->dest_addr.node[0],
-					ipxs->dest_addr.node[1],
-					ipxs->dest_addr.node[2],
-					ipxs->dest_addr.node[3],
-					ipxs->dest_addr.node[4],
-					ipxs->dest_addr.node[5],
-					htons(ipxs->dest_addr.sock));
-			}
-
-			len += sprintf(buffer + len, "%08X  %08X  ",
-				atomic_read(&s->wmem_alloc),
-				atomic_read(&s->rmem_alloc));
-			len += sprintf(buffer + len, "%02X     %03d\n",
-				s->state, SOCK_INODE(s->socket)->i_uid);
-
-			pos = begin + len;
-			if (pos < offset) {
-				len   = 0;
-				begin = pos;
-			}
-
-			if (pos > offset + length)  /* We have dumped enough */
-				break;
-		}
-		spin_unlock_bh(&i->if_sklist_lock);
-		ipxitf_put(i);
-	}
-	spin_unlock_bh(&ipx_interfaces_lock);
-
-	/* The data in question runs from begin to begin+len */
-	*start = buffer + offset - begin;
-	len -= (offset - begin);
-	if (len > length)
-		len = length;
-
-	return len;
-}
-
-static int ipx_rt_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	struct ipx_route *rt;
-	off_t begin = 0, pos = 0;
-	int len = 0;
-
-	len += sprintf(buffer, "%-11s%-13s%s\n",
-			"Network", "Router_Net", "Router_Node");
-	read_lock_bh(&ipx_routes_lock);
-	for (rt = ipx_routes; rt; rt = rt->ir_next) {
-		len += sprintf(buffer + len, "%08lX   ",
-				(long unsigned int) ntohl(rt->ir_net));
-		if (rt->ir_routed) {
-			len += sprintf(buffer + len,
-					"%08lX     %02X%02X%02X%02X%02X%02X\n",
-			(long unsigned int) ntohl(rt->ir_intrfc->if_netnum),
-				rt->ir_router_node[0], rt->ir_router_node[1],
-				rt->ir_router_node[2], rt->ir_router_node[3],
-				rt->ir_router_node[4], rt->ir_router_node[5]);
-		} else {
-			len += sprintf(buffer + len, "%-13s%s\n",
-					"Directly", "Connected");
-		}
-
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
-	}
-	read_unlock_bh(&ipx_routes_lock);
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-	if (len > length)
-		len = length;
-
-	return len;
 }
 
 /* Handling for system calls applied via the various interfaces to an IPX
@@ -2516,9 +2273,9 @@ extern void destroy_8023_client(struct datalink_proto *);
 static unsigned char ipx_8022_type = 0xE0;
 static unsigned char ipx_snap_id[5] = { 0x0, 0x0, 0x0, 0x81, 0x37 };
 static char ipx_banner[] __initdata =
-	KERN_INFO "NET4: Linux IPX 0.49 for NET4.0\n"
+	KERN_INFO "NET4: Linux IPX 0.50 for NET4.0\n"
 	KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n" \
-	KERN_INFO "IPX Portions Copyright (c) 2000, 2001 Conectiva, Inc.\n";
+	KERN_INFO "IPX Portions Copyright (c) 2000-2002 Conectiva, Inc.\n";
 static char ipx_EII_err_msg[] __initdata =
 	KERN_CRIT "IPX: Unable to register with Ethernet II\n";
 static char ipx_8023_err_msg[] __initdata =
@@ -2554,11 +2311,7 @@ static int __init ipx_init(void)
 
 	register_netdevice_notifier(&ipx_dev_notifier);
 	ipx_register_sysctl();
-#ifdef CONFIG_PROC_FS
-	proc_net_create("ipx", 0, ipx_get_info);
-	proc_net_create("ipx_interface", 0, ipx_interface_get_info);
-	proc_net_create("ipx_route", 0, ipx_rt_get_info);
-#endif
+	ipx_proc_init();
 	printk(ipx_banner);
 	return 0;
 }
@@ -2580,14 +2333,13 @@ module_init(ipx_init);
 
 static void __exit ipx_proto_finito(void)
 {
-	/* no need to worry about having anything on the ipx_interfaces
-	 * list, when a interface is created we increment the module
-	 * usage count, so the module will only be unloaded when there
-	 * are no more interfaces */
+	/*
+	 * No need to worry about having anything on the ipx_interfaces list,
+	 * when a interface is created we increment the module usage count, so
+	 * the module will only be unloaded when there are no more interfaces
+	 */
 
-	proc_net_remove("ipx_route");
-	proc_net_remove("ipx_interface");
-	proc_net_remove("ipx");
+	ipx_proc_exit();
 	ipx_unregister_sysctl();
 
 	unregister_netdevice_notifier(&ipx_dev_notifier);
