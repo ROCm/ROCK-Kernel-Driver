@@ -225,6 +225,22 @@ static void __init get_fs_names(char *page)
 	}
 	*s = '\0';
 }
+
+static int __init do_mount_root(char *name, char *fs, int flags, void *data)
+{
+	int err = sys_mount(name, "/root", fs, flags, data);
+	if (err)
+		return err;
+
+	sys_chdir("/root");
+	ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
+	printk("VFS: Mounted root (%s filesystem)%s.\n",
+	       current->fs->pwdmnt->mnt_sb->s_type->name,
+	       current->fs->pwdmnt->mnt_sb->s_flags & MS_RDONLY ? 
+	       " readonly" : "");
+	return 0;
+}
+
 void __init mount_block_root(char *name, int flags)
 {
 	char *fs_names = __getname();
@@ -233,7 +249,7 @@ void __init mount_block_root(char *name, int flags)
 	get_fs_names(fs_names);
 retry:
 	for (p = fs_names; *p; p += strlen(p)+1) {
-		int err = sys_mount(name, "/root", p, flags, root_mount_data);
+		int err = do_mount_root(name, p, flags, root_mount_data);
 		switch (err) {
 			case 0:
 				goto out;
@@ -256,11 +272,6 @@ retry:
 	panic("VFS: Unable to mount root fs on %s", kdevname(to_kdev_t(ROOT_DEV)));
 out:
 	putname(fs_names);
-	sys_chdir("/root");
-	ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
-	printk("VFS: Mounted root (%s filesystem)%s.\n",
-		current->fs->pwdmnt->mnt_sb->s_type->name,
-		(current->fs->pwdmnt->mnt_sb->s_flags & MS_RDONLY) ? " readonly" : "");
 }
  
 #ifdef CONFIG_ROOT_NFS
@@ -268,7 +279,8 @@ static int __init mount_nfs_root(void)
 {
 	void *data = nfs_root_data();
 
-	if (data && sys_mount("/dev/root","/root","nfs",root_mountflags,data) == 0)
+	if (data &&
+	    do_mount_root("/dev/root", "nfs", root_mountflags, data) == 0)
 		return 1;
 	return 0;
 }
@@ -308,12 +320,9 @@ void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
 	if (MAJOR(ROOT_DEV) == UNNAMED_MAJOR) {
-		if (mount_nfs_root()) {
-			sys_chdir("/root");
-			ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
-			printk("VFS: Mounted root (nfs filesystem).\n");
+		if (mount_nfs_root())
 			return;
-		}
+
 		printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
 		ROOT_DEV = Root_FD0;
 	}
