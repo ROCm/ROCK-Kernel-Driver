@@ -1095,6 +1095,49 @@ static inline int dscc4_check_clock_ability(int port)
 	return ret;
 }
 
+/*
+ * DS1 p.137: "There are a total of 13 different clocking modes..."
+ *                                  ^^
+ * Design choices:
+ * - by default, assume a clock is provided on pin RxClk/TxClk (clock mode 0a).
+ *   Clock mode 3b _should_ work but the testing seems to make this point
+ *   dubious (DIY testing requires setting CCR0 at 0x00000033).
+ *   This is supposed to provide least surprise "DTE like" behavior.
+ * - if line rate is specified, clocks are assumed to be locally generated.
+ *   A quartz must be available (on pin XTAL1). Modes 6b/7b are used. Choosing
+ *   between these it automagically done according on the required frequency
+ *   scaling. Of course some rounding may take place.
+ * - no high speed mode (40Mb/s). May be trivial to do but I don't have an
+ *   appropriate external clocking device for testing.
+ * - no time-slot/clock mode 5: shameless lazyness.
+ *
+ * The clock signals wiring can be (is ?) manufacturer dependant. Good luck.
+ *
+ * BIG FAT WARNING: if the device isn't provided enough clocking signal, it
+ * won't pass the init sequence. For example, straight back-to-back DTE without
+ * external clock will fail when dscc4_open() (<- 'ifconfig hdlcx xxx') is
+ * called.
+ *
+ * Typos lurk in datasheet (missing divier in clock mode 7a figure 51 p.153
+ * DS0 for example)
+ *
+ * Clock mode related bits of CCR0:
+ *     +------------ TOE: output TxClk (0b/2b/3a/3b/6b/7a/7b only)
+ *     | +---------- SSEL: sub-mode select 0 -> a, 1 -> b
+ *     | | +-------- High Speed: say 0
+ *     | | | +-+-+-- Clock Mode: 0..7
+ *     | | | | | |
+ * -+-+-+-+-+-+-+-+
+ * x|x|5|4|3|2|1|0| lower bits
+ *
+ * Division factor of BRR: k = (N+1)x2^M (total divider = 16xk in mode 6b)
+ *            +-+-+-+------------------ M (0..15)
+ *            | | | |     +-+-+-+-+-+-- N (0..63)
+ *    0 0 0 0 | | | | 0 0 | | | | | |
+ * ...-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0| lower bits
+ *
+ */
 static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
@@ -1137,7 +1180,7 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 	} else {
 		/*
 		 * External clock - DTE
-		 * "state" already reflects Clock mode 0a.
+		 * "state" already reflects Clock mode 0a (CCR0 = 0xzzzzzz00).
 		 * Nothing more to be done
 		 */
 		brr = 0;
@@ -1234,7 +1277,7 @@ static int dscc4_clock_setting(struct dscc4_dev_priv *dpriv,
 			settings->clock_rate = bps;
 		}
 	} else { /* DTE */
-		state = 0x80001000;
+		state |= 0x80001000;
 		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
 	}
 	scc_writel(state, dpriv, dev, CCR0);
