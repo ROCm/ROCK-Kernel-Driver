@@ -10,7 +10,7 @@
 #include <linux/spinlock.h>
 #include <asm/system.h>
 
-#if defined(CONFIG_SMP) && defined(CONFIG_DEBUG_SPINLOCK)
+#ifdef CONFIG_SMP
 
 #define GET_CALLER(PC) __asm__ __volatile__("mov %%i7, %0" : "=r" (PC))
 
@@ -296,4 +296,4 @@ wlock_again:
 	}
 }
 
-#endif /* CONFIG_SMP && CONFIG_DEBUG_SPINLOCK */
+#endif /* CONFIG_SMP */
