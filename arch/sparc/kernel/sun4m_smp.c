@@ -458,9 +458,9 @@ void __init smp4m_blackbox_current(unsigned *addr)
 
 void __init sun4m_init_smp(void)
 {
-	BTFIXUPSET_BLACKBOX(smp_processor_id, smp4m_blackbox_id);
+	BTFIXUPSET_BLACKBOX(hard_smp_processor_id, smp4m_blackbox_id);
 	BTFIXUPSET_BLACKBOX(load_current, smp4m_blackbox_current);
 	BTFIXUPSET_CALL(smp_cross_call, smp4m_cross_call, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(smp_message_pass, smp4m_message_pass, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(__smp_processor_id, __smp4m_processor_id, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__hard_smp_processor_id, __smp4m_processor_id, BTFIXUPCALL_NORM);
 }

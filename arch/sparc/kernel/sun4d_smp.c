@@ -496,11 +496,11 @@ void __init sun4d_init_smp(void)
 	t_nmi[1] = t_nmi[1] + (linux_trap_ipi15_sun4d - linux_trap_ipi15_sun4m);
 	
 	/* And set btfixup... */
-	BTFIXUPSET_BLACKBOX(smp_processor_id, smp4d_blackbox_id);
+	BTFIXUPSET_BLACKBOX(hard_smp_processor_id, smp4d_blackbox_id);
 	BTFIXUPSET_BLACKBOX(load_current, smp4d_blackbox_current);
 	BTFIXUPSET_CALL(smp_cross_call, smp4d_cross_call, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(smp_message_pass, smp4d_message_pass, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(__smp_processor_id, __smp4d_processor_id, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__hard_smp_processor_id, __smp4d_processor_id, BTFIXUPCALL_NORM);
 	
 	for (i = 0; i < NR_CPUS; i++) {
 		ccall_info.processors_in[i] = 1;
