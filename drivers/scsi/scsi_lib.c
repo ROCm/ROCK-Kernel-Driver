@@ -1060,7 +1060,7 @@ void scsi_request_fn(request_queue_t * q)
  */
 void scsi_block_requests(struct Scsi_Host * SHpnt)
 {
-	SHpnt->host_self_blocked = TRUE;
+	SHpnt->host_self_blocked = 1;
 }
 
 /*
@@ -1087,7 +1087,7 @@ void scsi_unblock_requests(struct Scsi_Host * SHpnt)
 {
 	Scsi_Device *SDloop;
 
-	SHpnt->host_self_blocked = FALSE;
+	SHpnt->host_self_blocked = 0;
 	/* Now that we are unblocked, try to start the queues. */
 	list_for_each_entry(SDloop, &SHpnt->my_devices, siblings)
 		scsi_queue_next_request(SDloop->request_queue, NULL);
