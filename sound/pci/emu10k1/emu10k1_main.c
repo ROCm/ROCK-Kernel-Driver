@@ -683,8 +683,14 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		 * (for both input and output), so we skip the AC97 detections
 		 */
 		snd_printdd(KERN_INFO "Audigy2 EX is detected. skpping ac97.\n");
-		emu->no_ac97 = 1;
+		emu->no_ac97 = 1;	
 	}
+	
+	if (emu->revision == 4) {
+		/*  FIXME - Audigy 2 ZS detection */
+		emu->spk71 = 1;
+	}
+	
 	
 	emu->fx8010.fxbus_mask = 0x303f;
 	if (extin_mask == 0)
