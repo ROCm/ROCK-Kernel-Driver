@@ -37,31 +37,34 @@
 
 #include "mthca_profile.h"
 
-static int default_profile[MTHCA_RES_NUM] = {
-	[MTHCA_RES_QP]    = 1 << 16,
-	[MTHCA_RES_EQP]   = 1 << 16,
-	[MTHCA_RES_CQ]    = 1 << 16,
-	[MTHCA_RES_EQ]    = 32,
-	[MTHCA_RES_RDB]   = 1 << 18,
-	[MTHCA_RES_MCG]   = 1 << 13,
-	[MTHCA_RES_MPT]   = 1 << 17,
-	[MTHCA_RES_MTT]   = 1 << 20,
-	[MTHCA_RES_UDAV]  = 1 << 15
+enum {
+	MTHCA_RES_QP,
+	MTHCA_RES_EEC,
+	MTHCA_RES_SRQ,
+	MTHCA_RES_CQ,
+	MTHCA_RES_EQP,
+	MTHCA_RES_EEEC,
+	MTHCA_RES_EQ,
+	MTHCA_RES_RDB,
+	MTHCA_RES_MCG,
+	MTHCA_RES_MPT,
+	MTHCA_RES_MTT,
+	MTHCA_RES_UAR,
+	MTHCA_RES_UDAV,
+	MTHCA_RES_UARC,
+	MTHCA_RES_NUM
 };
 
 enum {
-	MTHCA_MTT_SEG_SIZE   = 64
-};
-
-enum {
+	MTHCA_NUM_EQS = 32,
 	MTHCA_NUM_PDS = 1 << 15
 };
 
 int mthca_make_profile(struct mthca_dev *dev,
+		       struct mthca_profile *request,
 		       struct mthca_dev_lim *dev_lim,
 		       struct mthca_init_hca_param *init_hca)
 {
-	/* just use default profile for now */
 	struct mthca_resource {
 		u64 size;
 		u64 start;
@@ -70,16 +73,17 @@ int mthca_make_profile(struct mthca_dev *dev,
 		int log_num;
 	};
 
+	u64 mem_base, mem_avail;
 	u64 total_size = 0;
 	struct mthca_resource *profile;
 	struct mthca_resource tmp;
 	int i, j;
 
-	default_profile[MTHCA_RES_UAR] = dev_lim->uar_size / PAGE_SIZE;
-
 	profile = kmalloc(MTHCA_RES_NUM * sizeof *profile, GFP_KERNEL);
 	if (!profile)
 		return -ENOMEM;
+
+	memset(profile, 0, MTHCA_RES_NUM * sizeof *profile);
 
 	profile[MTHCA_RES_QP].size   = dev_lim->qpc_entry_sz;
 	profile[MTHCA_RES_EEC].size  = dev_lim->eec_entry_sz;
@@ -90,16 +94,36 @@ int mthca_make_profile(struct mthca_dev *dev,
 	profile[MTHCA_RES_EQ].size   = dev_lim->eqc_entry_sz;
 	profile[MTHCA_RES_RDB].size  = MTHCA_RDB_ENTRY_SIZE;
 	profile[MTHCA_RES_MCG].size  = MTHCA_MGM_ENTRY_SIZE;
-	profile[MTHCA_RES_MPT].size  = MTHCA_MPT_ENTRY_SIZE;
-	profile[MTHCA_RES_MTT].size  = MTHCA_MTT_SEG_SIZE;
+	profile[MTHCA_RES_MPT].size  = dev_lim->mpt_entry_sz;
+	profile[MTHCA_RES_MTT].size  = dev_lim->mtt_seg_sz;
 	profile[MTHCA_RES_UAR].size  = dev_lim->uar_scratch_entry_sz;
 	profile[MTHCA_RES_UDAV].size = MTHCA_AV_SIZE;
+	profile[MTHCA_RES_UARC].size = request->uarc_size;
+
+	profile[MTHCA_RES_QP].num    = request->num_qp;
+	profile[MTHCA_RES_EQP].num   = request->num_qp;
+	profile[MTHCA_RES_RDB].num   = request->num_qp * request->rdb_per_qp;
+	profile[MTHCA_RES_CQ].num    = request->num_cq;
+	profile[MTHCA_RES_EQ].num    = MTHCA_NUM_EQS;
+	profile[MTHCA_RES_MCG].num   = request->num_mcg;
+	profile[MTHCA_RES_MPT].num   = request->num_mpt;
+	profile[MTHCA_RES_MTT].num   = request->num_mtt;
+	profile[MTHCA_RES_UAR].num   = request->num_uar;
+	profile[MTHCA_RES_UARC].num  = request->num_uar;
+	profile[MTHCA_RES_UDAV].num  = request->num_udav;
 
 	for (i = 0; i < MTHCA_RES_NUM; ++i) {
 		profile[i].type     = i;
-		profile[i].num      = default_profile[i];
-		profile[i].log_num  = max(ffs(default_profile[i]) - 1, 0);
-		profile[i].size    *= default_profile[i];
+		profile[i].log_num  = max(ffs(profile[i].num) - 1, 0);
+		profile[i].size    *= profile[i].num;
+	}
+
+	if (dev->hca_type == ARBEL_NATIVE) {
+		mem_base  = 0;
+		mem_avail = dev_lim->hca.arbel.max_icm_sz;
+	} else {
+		mem_base  = dev->ddr_start;
+		mem_avail = dev->fw.tavor.fw_start - dev->ddr_start;
 	}
 
 	/*
@@ -119,16 +143,14 @@ int mthca_make_profile(struct mthca_dev *dev,
 
 	for (i = 0; i < MTHCA_RES_NUM; ++i) {
 		if (profile[i].size) {
-			profile[i].start = dev->ddr_start + total_size;
+			profile[i].start = mem_base + total_size;
 			total_size      += profile[i].size;
 		}
-		if (total_size > dev->fw.tavor.fw_start - dev->ddr_start) {
+		if (total_size > mem_avail) {
 			mthca_err(dev, "Profile requires 0x%llx bytes; "
-				  "won't fit between DDR start at 0x%016llx "
-				  "and FW start at 0x%016llx.\n",
+				  "won't in 0x%llx bytes of context memory.\n",
 				  (unsigned long long) total_size,
-				  (unsigned long long) dev->ddr_start,
-				  (unsigned long long) dev->fw.tavor.fw_start);
+				  (unsigned long long) mem_avail);
 			kfree(profile);
 			return -ENOMEM;
 		}
@@ -141,10 +163,13 @@ int mthca_make_profile(struct mthca_dev *dev,
 				  (unsigned long long) profile[i].size);
 	}
 
-	mthca_dbg(dev, "HCA memory: allocated %d KB/%d KB (%d KB free)\n",
-		  (int) (total_size >> 10),
-		  (int) ((dev->fw.tavor.fw_start - dev->ddr_start) >> 10),
-		  (int) ((dev->fw.tavor.fw_start - dev->ddr_start - total_size) >> 10));
+	if (dev->hca_type == ARBEL_NATIVE)
+		mthca_dbg(dev, "HCA context memory: reserving %d KB\n",
+			  (int) (total_size >> 10));
+	else
+		mthca_dbg(dev, "HCA memory: allocated %d KB/%d KB (%d KB free)\n",
+			  (int) (total_size >> 10), (int) (mem_avail >> 10),
+			  (int) ((mem_avail - total_size) >> 10));
 
 	for (i = 0; i < MTHCA_RES_NUM; ++i) {
 		switch (profile[i].type) {
@@ -203,10 +228,10 @@ int mthca_make_profile(struct mthca_dev *dev,
 			break;
 		case MTHCA_RES_MTT:
 			dev->limits.num_mtt_segs = profile[i].num;
-			dev->limits.mtt_seg_size = MTHCA_MTT_SEG_SIZE;
+			dev->limits.mtt_seg_size = dev_lim->mtt_seg_sz;
 			dev->mr_table.mtt_base   = profile[i].start;
 			init_hca->mtt_base       = profile[i].start;
-			init_hca->mtt_seg_sz     = ffs(MTHCA_MTT_SEG_SIZE) - 7;
+			init_hca->mtt_seg_sz     = ffs(dev_lim->mtt_seg_sz) - 7;
 			break;
 		case MTHCA_RES_UAR:
 			init_hca->uar_scratch_base = profile[i].start;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -959,9 +959,9 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_RSZ_SRQ_OFFSET);
 		dev_lim->hca.arbel.resize_srq = field & 1;
 		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MTT_ENTRY_SZ_OFFSET);
-		dev_lim->hca.arbel.mtt_entry_sz = size;
+		dev_lim->mtt_seg_sz = size;
 		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MPT_ENTRY_SZ_OFFSET);
-		dev_lim->hca.arbel.mpt_entry_sz = size;
+		dev_lim->mpt_entry_sz = size;
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_PBL_SZ_OFFSET);
 		dev_lim->hca.arbel.max_pbl_sz = 1 << (field & 0x3f);
 		MTHCA_GET(dev_lim->hca.arbel.bmme_flags, outbox,
@@ -987,6 +987,8 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 	} else {
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_MAX_AV_OFFSET);
 		dev_lim->hca.tavor.max_avs = 1 << (field & 0x3f);
+		dev_lim->mtt_seg_sz   = MTHCA_MTT_SEG_SIZE;
+		dev_lim->mpt_entry_sz = MTHCA_MPT_ENTRY_SIZE;
 	}
 
 out:

@@ -76,6 +76,20 @@ static const char mthca_version[] __devinitdata =
 	"ib_mthca: Mellanox InfiniBand HCA driver v"
 	DRV_VERSION " (" DRV_RELDATE ")\n";
 
+static struct mthca_profile default_profile = {
+	.num_qp     = 1 << 16,
+	.rdb_per_qp = 4,
+	.num_cq     = 1 << 16,
+	.num_mcg    = 1 << 13,
+	.num_mpt    = 1 << 17,
+	.num_mtt    = 1 << 20
+};
+
+enum {
+	MTHCA_TAVOR_NUM_UDAV  = 1 << 15,
+	MTHCA_ARBEL_UARC_SIZE = 1 << 18
+};
+
 static int __devinit mthca_tune_pci(struct mthca_dev *mdev)
 {
 	int cap;
@@ -175,6 +189,7 @@ static int __devinit mthca_init_tavor(struct mthca_dev *mdev)
 	u8 status;
 	int err;
 	struct mthca_dev_lim        dev_lim;
+	struct mthca_profile        profile;
 	struct mthca_init_hca_param init_hca;
 	struct mthca_adapter        adapter;
 
@@ -214,7 +229,11 @@ static int __devinit mthca_init_tavor(struct mthca_dev *mdev)
 
 	err = mthca_dev_lim(mdev, &dev_lim);
 
-	err = mthca_make_profile(mdev, &dev_lim, &init_hca);
+	profile = default_profile;
+	profile.num_uar  = dev_lim.uar_size / PAGE_SIZE;
+	profile.num_udav = MTHCA_TAVOR_NUM_UDAV;
+
+	err = mthca_make_profile(mdev, &profile, &dev_lim, &init_hca);
 	if (err)
 		goto err_out_disable;
 
