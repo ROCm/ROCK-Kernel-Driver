@@ -108,8 +108,7 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	long err;
 
 	/* restore scratch that always needs gets updated during signal delivery: */
-	err = __get_user(flags, &sc->sc_flags);
-
+	err  = __get_user(flags, &sc->sc_flags);
 	err |= __get_user(nat, &sc->sc_nat);
 	err |= __get_user(ip, &sc->sc_ip);			/* instruction pointer */
 	err |= __get_user(cfm, &sc->sc_cfm);
@@ -120,20 +119,11 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	err |= __get_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __get_user(scr->pt.pr, &sc->sc_pr);		/* predicates */
 	err |= __get_user(scr->pt.b0, &sc->sc_br[0]);		/* b0 (rp) */
+	err |= __get_user(scr->pt.b6, &sc->sc_br[6]);		/* b6 */
 	err |= __copy_from_user(&scr->pt.r1, &sc->sc_gr[1], 8);	/* r1 */
 	err |= __copy_from_user(&scr->pt.r8, &sc->sc_gr[8], 4*8);	/* r8-r11 */
 	err |= __copy_from_user(&scr->pt.r12, &sc->sc_gr[12], 2*8);	/* r12-r13 */
 	err |= __copy_from_user(&scr->pt.r15, &sc->sc_gr[15], 8);	/* r15 */
-
-	if (!(flags & IA64_SC_FLAG_IN_SYSCALL)) {
-		/* Restore most scratch-state only when not in syscall. */
-		err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
-		err |= __copy_from_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
-		err |= __copy_from_user(&scr->pt.b6, &sc->sc_br[6], 2*8);	/* b6-b7 */
-		err |= __copy_from_user(&scr->pt.r2, &sc->sc_gr[2], 2*8);	/* r2-r3 */
-		err |= __copy_from_user(&scr->pt.r14, &sc->sc_gr[14], 8);	/* r14 */
-		err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
-	}
 
 	scr->pt.cr_ifs = cfm | (1UL << 63);
 
@@ -143,6 +133,16 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	scr->pt.cr_ipsr = (scr->pt.cr_ipsr & ~IA64_PSR_UM) | (um & IA64_PSR_UM);
 
 	scr->scratch_unat = ia64_put_scratch_nat_bits(&scr->pt, nat);
+
+	if (!(flags & IA64_SC_FLAG_IN_SYSCALL)) {
+		/* Restore most scratch-state only when not in syscall. */
+		err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
+		err |= __get_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
+		err |= __get_user(scr->pt.r14, &sc->sc_gr[14]);			/* r14 */
+		err |= __copy_from_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
+		err |= __copy_from_user(&scr->pt.r2, &sc->sc_gr[2], 2*8);	/* r2-r3 */
+		err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
+	}
 
 	if ((flags & IA64_SC_FLAG_FPH_VALID) != 0) {
 		struct ia64_psr *psr = ia64_psr(&scr->pt);
@@ -358,7 +358,6 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	nat = ia64_get_scratch_nat_bits(&scr->pt, scr->scratch_unat);
 
 	err  = __put_user(flags, &sc->sc_flags);
-
 	err |= __put_user(nat, &sc->sc_nat);
 	err |= PUT_SIGSET(mask, &sc->sc_mask);
 	err |= __put_user(cfm, &sc->sc_cfm);
@@ -369,6 +368,7 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	err |= __put_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __put_user(scr->pt.pr, &sc->sc_pr);			/* predicates */
 	err |= __put_user(scr->pt.b0, &sc->sc_br[0]);			/* b0 (rp) */
+	err |= __put_user(scr->pt.b6, &sc->sc_br[6]);			/* b6 */
 	err |= __copy_to_user(&sc->sc_gr[1], &scr->pt.r1, 8);		/* r1 */
 	err |= __copy_to_user(&sc->sc_gr[8], &scr->pt.r8, 4*8);		/* r8-r11 */
 	err |= __copy_to_user(&sc->sc_gr[12], &scr->pt.r12, 2*8);	/* r12-r13 */
@@ -377,19 +377,19 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 
 	if (flags & IA64_SC_FLAG_IN_SYSCALL) {
 		/* Clear scratch registers if the signal interrupted a system call. */
-		err |= __clear_user(&sc->sc_ar_ccv, 8);
+		err |= __put_user(0, &sc->sc_ar_ccv);				/* ar.ccv */
+		err |= __put_user(0, &sc->sc_br[7]);				/* b7 */
+		err |= __put_user(0, &sc->sc_gr[14]);				/* r14 */
 		err |= __clear_user(&sc->sc_ar25, 2*8);			/* ar.csd & ar.ssd */
-		err |= __clear_user(&sc->sc_br[6], 2*8);			/* b6-b7 */
 		err |= __clear_user(&sc->sc_gr[2], 2*8);			/* r2-r3 */
-		err |= __clear_user(&sc->sc_gr[14], 8);				/* r14 */
 		err |= __clear_user(&sc->sc_gr[16], 16*8);			/* r16-r31 */
 	} else {
 		/* Copy scratch regs to sigcontext if the signal didn't interrupt a syscall. */
-		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
+		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
+		err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
+		err |= __put_user(sc->sc_gr[14], &scr->pt.r14);			/* r14 */
 		err |= __copy_to_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
-		err |= __copy_to_user(&scr->pt.b6, &sc->sc_br[6], 2*8);		/* b6-b7 */
 		err |= __copy_to_user(&sc->sc_gr[2], &scr->pt.r2, 2*8);		/* r2-r3 */
-		err |= __copy_to_user(&sc->sc_gr[14], &scr->pt.r14, 8);		/* r14 */
 		err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
 	}
 	return err;

@@ -74,8 +74,15 @@ GLOBAL_ENTRY(syscall_via_break)
 	.prologue
 	.altrp b6
 	.body
+	/*
+	 * Note: for (fast) syscall restart to work, the break instruction must be
+	 *	 the first one in the bundle addressed by syscall_via_break.
+	 */
+{ .mib
 	break 0x100000
+	nop.i 0
 	br.ret.sptk.many b6
+}
 END(syscall_via_break)
 
 GLOBAL_ENTRY(fsys_fallback_syscall)

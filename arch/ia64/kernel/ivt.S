@@ -645,7 +645,7 @@ ENTRY(break_fault)
 	 *   Registers to be saved & restored:
 	 *	CR registers: cr.ipsr, cr.iip, cr.ifs
 	 *	AR registers: ar.unat, ar.pfs, ar.rsc, ar.rnat, ar.bspstore, ar.fpsr
-	 * 	others: pr, b0, loadrs, r1, r12, r13, r15
+	 * 	others: pr, b0, b6, loadrs, r1, r11, r12, r13, r15
 	 *   Registers to be restored only:
 	 * 	r8-r11: output value from the system call.
 	 *
@@ -658,12 +658,13 @@ ENTRY(break_fault)
 	mov r18=__IA64_BREAK_SYSCALL
 	mov r21=ar.fpsr
 	mov r29=cr.ipsr
-	mov r20=r1
+	mov r19=b6
 	mov r25=ar.unat
 	mov r27=ar.rsc
 	mov r26=ar.pfs
 	mov r28=cr.iip
 	mov r31=pr				// prepare to save predicates
+	mov r20=r1
 	;;
 	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
 	cmp.eq p0,p7=r18,r17			// is this a system call? (p7 <- false, if so)
@@ -672,53 +673,51 @@ ENTRY(break_fault)
 	ld1 r17=[r16]				// load current->thread.on_ustack flag
 	st1 [r16]=r0				// clear current->thread.on_ustack flag
 	adds r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
-	// switch from user to kernel RBS:
 	;;
 	invala
 	cmp.eq pKStk,pUStk=r0,r17		// are we in kernel mode already?
 	;;
-	mov r30=r0
+	// switch from user to kernel RBS:
 	MINSTATE_START_SAVE_MIN_VIRT
 	br.call.sptk.many b7=setup_syscall_via_break
 	;;
 	mov r3=255
-	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
-	;;
-	cmp.geu p6,p7=r3,r15			// (syscall > 0 && syscall <= 1024+255) ?
 	movl r16=sys_call_table
-	;;
-(p6)	shladd r16=r15,3,r16
-	movl r15=ia64_ret_from_syscall
-(p7)	adds r16=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
-	;;
-	ld8 r16=[r16]				// load address of syscall entry point
-	mov rp=r15				// set the real return addr
-	;;
-	mov b6=r16
 
-	// arrange things so we skip over break instruction when returning:
-
-	adds r16=PT(CR_IPSR)+16,sp		// get pointer to cr_ipsr
-	adds r17=PT(CR_IIP)+16,sp		// get pointer to cr_iip
+	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
+	movl r2=ia64_ret_from_syscall
+	;;
+	shladd r20=r15,3,r16			// r20 = sys_call_table + 8*(syscall-1024)
+	cmp.geu p0,p7=r3,r15			// (syscall > 0 && syscall <= 1024+255) ?
+	mov rp=r2				// set the real return addr
+	;;
+(p7)	add r20=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
+	add r16=PT(CR_IPSR)+16,sp		// get pointer to cr_ipsr
 	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
+	ld8 r20=[r20]				// load address of syscall entry point
 	ld8 r18=[r16]				// fetch cr_ipsr
-	ld4 r2=[r2]				// r2 = current_thread_info()->flags
+
+	// arrange things so we skip over break instruction when returning:
+	adds r17=PT(CR_IIP)+16,sp		// get pointer to cr_iip
 	;;
+	ld4 r2=[r2]				// r2 = current_thread_info()->flags
 	ld8 r19=[r17]				// fetch cr_iip
+	mov b6=r20
+	;;
 	extr.u r20=r18,41,2			// extract ei field
+	adds r19=16,r19				// compute address of next bundle
 	;;
 	cmp.eq p6,p7=2,r20			// isr.ei==2?
-	adds r19=16,r19				// compute address of next bundle
 	;;
 (p6)	mov r20=0				// clear ei to 0
 (p7)	adds r20=1,r20				// increment ei to next slot
 	;;
-(p6)	st8 [r17]=r19				// store new cr.iip if cr.isr.ei wrapped around
-	dep r18=r20,r18,41,2			// insert new ei into cr.isr
+(p6)	st8 [r17]=r19				// store new cr.iip if cr.ipsr.ei wrapped around
+	dep r18=r20,r18,41,2			// insert new ei into cr.ipsr
 	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
 	;;
-	st8 [r16]=r18				// store new value for cr.isr
+	st8 [r16]=r18				// store new value for cr.ipsr
 
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
 	br.cond.sptk ia64_trace_syscall
@@ -774,80 +773,88 @@ END(interrupt)
 	 *	potential NaT values from the input registers.
 	 */
 ENTRY(setup_syscall_via_break)
-	alloc r19=ar.pfs,8,0,0,0
+#if PT(B6) != 0
+# error This code assumes that b6 is the first field in pt_regs.
+#endif
+	st8 [r1]=r19				// save b6
+	add r16=PT(CR_IPSR),r1			// initialize first base pointer
+	add r17=PT(R11),r1			// initialize second base pointer
+	;;
+	alloc r19=ar.pfs,8,0,0,0		// ensur in0-in7 are writable
+	st8 [r16]=r29,PT(CR_IFS)-PT(CR_IPSR)	// save cr.ipsr
 	tnat.nz p8,p0=in0
-	add r16=PT(CR_IPSR),r1	/* initialize first base pointer */
-	;;
-	st8 [r16]=r29,16	/* save cr.ipsr */
-	adds r17=PT(CR_IIP),r1	/* initialize second base pointer */
-	;;
-(p8)	mov in0=-1
+
+	st8.spill [r17]=r11,PT(CR_IIP)-PT(R11)	// save r11
 	tnat.nz p9,p0=in1
-	st8 [r17]=r28,16	/* save cr.iip */
+(pKStk)	mov r18=r0				// make sure r18 isn't NaT
+	;;
+
+	st8 [r17]=r28,PT(AR_UNAT)-PT(CR_IIP)	// save cr.iip
 	mov r28=b0
-(pKStk)	mov r18=r0		/* make sure r18 isn't NaT */
+(p8)	mov in0=-1
 	;;
+
+	st8 [r16]=r0,PT(AR_PFS)-PT(CR_IFS)	// clear cr.ifs
+	st8 [r17]=r25,PT(AR_RSC)-PT(AR_UNAT)	// save ar.unat
 (p9)	mov in1=-1
+	;;
+
+	st8 [r16]=r26,PT(AR_RNAT)-PT(AR_PFS)	// save ar.pfs
+	st8 [r17]=r27,PT(AR_BSPSTORE)-PT(AR_RSC)// save ar.rsc
 	tnat.nz p10,p0=in2
-	st8 [r16]=r30,16	/* save cr.ifs */
-	st8 [r17]=r25,16	/* save ar.unat */
-(pUStk) sub r18=r18,r22		/* r18=RSE.ndirty*8 */
-	;;
-	st8 [r16]=r26,16	/* save ar.pfs */
-	st8 [r17]=r27,16	/* save ar.rsc */
+
+(pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
 	tbit.nz p15,p0=r29,IA64_PSR_I_BIT
-	;;			/* avoid RAW on r16 & r17 */
-(p10)	mov in2=-1
-	nop.f 0
 	tnat.nz p11,p0=in3
-(pKStk) adds r16=16,r16		/* skip over ar_rnat field */
-(pKStk) adds r17=16,r17		/* skip over ar_bspstore field */
-	shl r18=r18,16		/* compute ar.rsc to be used for "loadrs" */
 	;;
+(pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
+(pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
+(p10)	mov in2=-1
+
 (p11)	mov in3=-1
 	tnat.nz p12,p0=in4
-(pUStk) st8 [r16]=r24,16		/* save ar.rnat */
-(pUStk) st8 [r17]=r23,16		/* save ar.bspstore */
-	;;
-(p12)	mov in4=-1
 	tnat.nz p13,p0=in5
-	st8 [r16]=r31,16		/* save predicates */
-	st8 [r17]=r28,16		/* save b0 */
-	dep r14=-1,r0,61,3
 	;;
-	st8 [r16]=r18,16		/* save ar.rsc value for "loadrs" */
-	st8.spill [r17]=r20,16		/* save original r1 */
-	adds r2=IA64_PT_REGS_R16_OFFSET,r1
+(pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
+(pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
+	shl r18=r18,16				// compute ar.rsc to be used for "loadrs"
 	;;
+	st8 [r16]=r31,PT(LOADRS)-PT(PR)		// save predicates
+	st8 [r17]=r28,PT(R1)-PT(B0)		// save b0
+(p12)	mov in4=-1
+	;;
+	st8 [r16]=r18,PT(R12)-PT(LOADRS)	// save ar.rsc value for "loadrs"
+	st8.spill [r17]=r20,PT(R13)-PT(R1)	// save original r1
 (p13)	mov in5=-1
-	tnat.nz p14,p0=in6
-.mem.offset 0,0; st8.spill [r16]=r12,16
-.mem.offset 8,0; st8.spill [r17]=r13,16
-	cmp.eq pNonSys,pSys=r0,r0	/* initialize pSys=0, pNonSys=1 */
 	;;
-(p14)	mov in6=-1
-	tnat.nz p8,p0=in7
-.mem.offset 0,0; st8 [r16]=r21,16	/* ar.fpsr */
-.mem.offset 8,0; st8.spill [r17]=r15,16
-	adds r12=-16,r1		/* switch to kernel memory stack (with 16 bytes of scratch) */
-	;;
-	mov r13=IA64_KR(CURRENT)	/* establish `current' */
-	movl r1=__gp			/* establish kernel global pointer */
-	;;
-	MINSTATE_END_SAVE_MIN_VIRT
 
-	tnat.nz p9,p0=r15
+.mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12) // save r12
+.mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13) // save r13
+	tnat.nz p14,p0=in6
+	;;
+	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
+	st8.spill [r17]=r15			// save r15
+	tnat.nz p8,p0=in7
+	;;
+	stf8 [r16]=f1		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
+	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
+(p14)	mov in6=-1
+
+	mov r13=IA64_KR(CURRENT)		// establish `current'
+	movl r1=__gp				// establish kernel global pointer
+	;;
 (p8)	mov in7=-1
+	tnat.nz p9,p0=r15
+	MINSTATE_END_SAVE_MIN_VIRT		// switch to bank 1
+
 	ssm psr.ic | PSR_DEFAULT_BITS
 	movl r17=FPSR_DEFAULT
-	adds r8=(IA64_PT_REGS_R8_OFFSET-IA64_PT_REGS_R16_OFFSET),r2
 	;;
 	srlz.i					// guarantee that interruption collection is on
 	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 (p9)	mov r15=-1
-(p15)	ssm psr.i			// restore psr.i
-	mov.m ar.fpsr=r17
-	stf8 [r8]=f1			// ensure pt_regs.r8 != 0 (see handle_syscall_error)
+(p15)	ssm psr.i				// restore psr.i
+	mov.m ar.fpsr=r17			// set ar.fpsr to kernel default value
 	br.ret.sptk.many b7
 END(setup_syscall_via_break)
 

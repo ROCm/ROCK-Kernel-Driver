@@ -602,7 +602,8 @@ END(ia64_ret_from_syscall)
  *	      f6-f11: cleared
  *		  pr: restored (user-level pr)
  *		  b0: restored (user-level rp)
- *	       b6-b7: cleared
+ *	          b6: restored
+ *		  b7: cleared
  *	     ar.unat: restored (user-level ar.unat)
  *	      ar.pfs: restored (user-level ar.pfs)
  *	      ar.rsc: restored (user-level ar.rsc)
@@ -615,6 +616,10 @@ END(ia64_ret_from_syscall)
  */
 GLOBAL_ENTRY(ia64_leave_syscall)
 	PT_REGS_UNWIND_INFO(0)
+	/*
+	 * work.need_resched etc. mustn't get changed by this CPU before it returns to
+	 * user- or fsys-mode, hence we disable interrupts early on:
+	 */
 #ifdef CONFIG_PREEMPT
 	rsm psr.i				// disable interrupts
 #else
@@ -622,46 +627,37 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 #endif
 	cmp.eq pLvSys,p0=r0,r0			// pLvSys=1: leave from syscall
 (pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
-	/*
-	 * work.need_resched etc. mustn't get changed by this CPU before it returns to
-	 * user- or fsys-mode, hence we disable interrupts early on:
-	 */
+.work_processed_syscall:
 #ifdef CONFIG_PREEMPT
-	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 (pKStk) adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
-(pKStk) ld4 r21=[r20]			// preempt_count ->r21
+	.pred.rel.mutex pUStk,pKStk
+(pKStk) ld4 r21=[r20]			// r21 <- preempt_count
+(pUStk)	mov r21=0			// r21 <- 0
 	;;
-(pKStk)	cmp4.eq	p6,p0=r21,r0		// p6 <- preempt_count == 0
-	;;
-#else /* CONFIG_PREEMPT */
-	;;
-(pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
-	;;
+(p6)	cmp.eq.unc p6,p0=r21,r0		// p6 <- p6 && (r21 == 0)
 #endif /* CONFIG_PREEMPT */
-.work_processed_syscall:
-(p6)	ld4 r31=[r17]				// load current_thread_info()->flags
 	adds r16=PT(LOADRS)+16,r12
-	adds r18=PT(AR_BSPSTORE)+16,r12
+	adds r17=PT(AR_BSPSTORE)+16,r12
+	adds r18=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
-	ld8 r19=[r16]				// load ar.rsc value for "loadrs"
-	ld8 r23=[r18],16			// load ar.bspstore (may be garbage)
+(p6)	ld4 r31=[r18]				// load current_thread_info()->flags
+	ld8 r19=[r16],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
+	nop.i 0
+	;;
+	ld8 r23=[r17],PT(R9)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
+	ld8 r22=[r16],PT(R8)-PT(B6)		// load b6
 (p6)	and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 	;;
-	mov ar.ssd=r0
-	mov f6=f0				// clear f6
+
+	mov.m ar.ccv=r0		// clear ar.ccv
 (p6)	cmp4.ne.unc p6,p0=r15, r0		// any special work pending?
-	;;
-	mov ar.ccv=r0				// clear ar.ccv
-	mov b6=r0		// clear b6
 (p6)	br.cond.spnt .work_pending
-	;;
-	adds r16=PT(R8)+16,r12
-	adds r17=PT(R9)+16,r12
 	;;
 	// start restoring the state saved on the kernel stack (struct pt_regs):
 	ld8.fill r8=[r16],16
 	ld8.fill r9=[r17],16
+	mov f6=f0		// clear f6
 	;;
 	ld8.fill r10=[r16],16
 	ld8.fill r11=[r17],16
@@ -669,6 +665,7 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	;;
 	ld8 r29=[r16],16	// load cr.ipsr
 	ld8 r28=[r17],16	// load cr.iip
+	mov f8=f0		// clear f8
 	;;
 	ld8 r30=[r16],16	// load cr.ifs
 	ld8 r25=[r17],16	// load ar.unat
@@ -676,18 +673,19 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	;;
 	rsm psr.i | psr.ic	// initiate turning off of interrupt and interruption collection
 	invala			// invalidate ALAT
-	mov f8=f0		// clear f8
-
-	mov ar.csd=r0		// clear ar.csd
 	mov f9=f0		// clear f9
+
+	mov.m ar.ssd=r0		// clear ar.ssd
+	mov.m ar.csd=r0		// clear ar.csd
+	mov f10=f0		// clear f10
 	;;
 	ld8 r26=[r16],16	// load ar.pfs
 	ld8 r27=[r17],PT(PR)-PT(AR_RSC)	// load ar.rsc
-	mov f10=f0		// clear f10
+	mov f11=f0		// clear f11
 	;;
 	ld8 r24=[r16],PT(B0)-PT(AR_RNAT)	// load ar.rnat (may be garbage)
 	ld8 r31=[r17],PT(R1)-PT(PR)		// load predicates
-	mov f11=f0		// clear f11
+	mov b6=r22				// restore b6
 	;;
 	ld8 r21=[r16],PT(R12)-PT(B0) // load b0
 	ld8.fill r1=[r17],16	// load r1
@@ -703,7 +701,6 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
 	srlz.i			// ensure interruption collection is off
-	mov r22=r0		// clear r22
 (pUStk) mov r3=1
 	;;
 (pUStk) st1 [r14]=r3
@@ -729,41 +726,44 @@ END(ia64_ret_from_execve_syscall)
 	// fall through
 GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
-	cmp.eq p0,pLvSys=r0,r0			// pLvSys=0: leave from kernel
-(pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
 	/*
 	 * work.need_resched etc. mustn't get changed by this CPU before it returns to
 	 * user- or fsys-mode, hence we disable interrupts early on:
 	 */
 #ifdef CONFIG_PREEMPT
 	rsm psr.i				// disable interrupts
-	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
-(pKStk) adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
-	;;
-(pKStk) ld4 r21=[r20]			// preempt_count ->r21
-	;;
-(pKStk)	cmp4.eq	p6,p0=r21,r0		// p6 <- preempt_count == 0
-	;;
-#else /* CONFIG_PREEMPT */
+#else
 (pUStk)	rsm psr.i
+#endif
+	cmp.eq p0,pLvSys=r0,r0			// pLvSys=0: leave from kernel
+(pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
 	;;
-(pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
-	;;
-#endif /* CONFIG_PREEMPT */
 .work_processed_kernel:
+#ifdef CONFIG_PREEMPT
+	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+	;;
+	.pred.rel.mutex pUStk,pKStk
+(pKStk)	ld4 r21=[r20]			// r21 <- preempt_count
+(pUStk)	mov r21=0			// r21 <- 0
+	;;
+(p6)	cmp.eq.unc p6,p0=r21,r0		// p6 <- p6 && (r21 == 0)
+#endif /* CONFIG_PREEMPT */
+	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+	;;
 (p6)	ld4 r31=[r17]				// load current_thread_info()->flags
-	adds r22=PT(CR_IPSR)+16,r12
 	adds r21=PT(PR)+16,r12
+	;;
+
+	lfetch [r21],PT(CR_IPSR)-PT(PR)
 	adds r2=PT(B6)+16,r12
 	adds r3=PT(R16)+16,r12
 	;;
-	ld8 r28=[r2],8		// b6
-	ld8.fill r16=[r3],PT(AR_CSD)-PT(R16)
-	adds r29=PT(R24)+16,r12
-	adds r30=PT(AR_CCV)+16,r12
-	;;
-	lfetch [r22]
 	lfetch [r21]
+	ld8 r28=[r2],8		// load b6
+	adds r29=PT(R24)+16,r12
+
+	ld8.fill r16=[r3],PT(AR_CSD)-PT(R16)
+	adds r30=PT(AR_CCV)+16,r12
 (p6)	and r19=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 	;;
 	ld8.fill r24=[r29]
@@ -1008,7 +1008,6 @@ skip_rbs_switch:
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
 	rsm psr.i		// disable interrupts
 	;;
-	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 #if CONFIG_PREEMPT
 (pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
