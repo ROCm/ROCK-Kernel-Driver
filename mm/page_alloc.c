@@ -65,10 +65,13 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  * at the bottom level available, and propagating the changes upward
  * as necessary, plus some accounting needed to play nicely with other
  * parts of the VM system.
- *
- * TODO: give references to descriptions of buddy system allocators,
- * describe precisely the silly trick buddy allocators use to avoid
- * storing an extra bit, utilizing entry point information.
+ * At each level, we keep one bit for each pair of blocks, which
+ * is set to 1 iff only one of the pair is allocated.  So when we
+ * are allocating or freeing one, we can derive the state of the
+ * other.  That is, if we allocate a small block, and both were   
+ * free, the remainder of the region must be split into blocks.   
+ * If a block is freed, and its buddy is also free, then this
+ * triggers coalescing into a block of larger size.            
  *
  * -- wli
  */
