@@ -92,7 +92,7 @@ static char *hw = NULL;	/* pointer to hw=xxx command line string */
 
 
 typedef struct port_s {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	struct card_s *card;
 	spinlock_t lock;	/* TX lock */
 	sync_serial_settings settings;
@@ -324,6 +324,10 @@ static void n2_destroy_card(card_t *card)
 
 	if (card->io)
 		release_region(card->io, N2_IOPORTS);
+	if (card->ports[0].dev)
+		free_hdlcdev(card->ports[0].dev);
+	if (card->ports[1].dev)
+		free_hdlcdev(card->ports[1].dev);
 	kfree(card);
 }
 
@@ -357,6 +361,14 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		return -ENOBUFS;
 	}
 	memset(card, 0, sizeof(card_t));
+
+	card->ports[0].dev = alloc_hdlcdev(&card->ports[0]);
+	card->ports[1].dev = alloc_hdlcdev(&card->ports[1]);
+	if (!card->ports[0].dev || !card->ports[1].dev) {
+		printk(KERN_ERR "n2: unable to allocate memory\n");
+		n2_destroy_card(card);
+		return -ENOMEM;
+	}
 
 	if (!request_region(io, N2_IOPORTS, devname)) {
 		printk(KERN_ERR "n2: I/O port region in use\n");
@@ -458,14 +470,15 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		hdlc->attach = sca_attach;
 		hdlc->xmit = sca_xmit;
 		port->settings.clock_type = CLOCK_EXT;
+		port->card = card;
 
 		if (register_hdlc_device(dev)) {
 			printk(KERN_WARNING "n2: unable to register hdlc "
 			       "device\n");
+			port->card = NULL;
 			n2_destroy_card(card);
 			return -ENOBUFS;
 		}
-		port->card = card;
 		sca_init_sync_port(port); /* Set up SCA memory */
 
 		printk(KERN_INFO "%s: RISCom/N2 node %d\n",

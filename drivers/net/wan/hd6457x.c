@@ -75,7 +75,7 @@
 
 static inline struct net_device *port_to_dev(port_t *port)
 {
-	return hdlc_to_dev(&port->hdlc);
+	return port->dev;
 }
 
 static inline int sca_intr_status(card_t *card)
@@ -117,7 +117,7 @@ static inline int sca_intr_status(card_t *card)
 
 static inline port_t* dev_to_port(struct net_device *dev)
 {
-	return (port_t *)(dev_to_hdlc(dev));
+	return dev_to_hdlc(dev)->priv;
 }
 
 static inline u16 next_desc(port_t *port, u16 desc, int transmit)

@@ -54,7 +54,7 @@ static char *hw;		/* pointer to hw=xxx command line string */
 
 
 typedef struct card_s {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	spinlock_t lock;	/* TX lock */
 	u8 *win0base;		/* ISA window base address */
 	u32 phy_winbase;	/* ISA physical base address */
@@ -287,6 +287,8 @@ static void c101_destroy_card(card_t *card)
 		release_mem_region(card->phy_winbase, C101_MAPPED_RAM_SIZE);
 	}
 
+	free_hdlcdev(card->dev);
+
 	kfree(card);
 }
 
@@ -315,6 +317,13 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 		return -ENOBUFS;
 	}
 	memset(card, 0, sizeof(card_t));
+
+	card->dev = alloc_hdlcdev(card);
+	if (!card->dev) {
+		printk(KERN_ERR "c101: unable to allocate memory\n");
+		kfree(card);
+		return -ENOBUFS;
+	}
 
 	if (request_irq(irq, sca_intr, 0, devname, card)) {
 		printk(KERN_ERR "c101: could not allocate IRQ\n");
@@ -369,6 +378,8 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 		c101_destroy_card(card);
 		return result;
 	}
+
+	/* XXX: are we OK with having that done when card is already up? */
 
 	sca_init_sync_port(card); /* Set up C101 memory */
 	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD), dev);
