@@ -912,7 +912,7 @@ static int storage_probe(struct usb_interface *intf,
 
 	/* now register	*/
 	ss->host = scsi_register(&usb_stor_host_template, sizeof(ss));
-	if (ss->host) {
+	if (!ss->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");
 
