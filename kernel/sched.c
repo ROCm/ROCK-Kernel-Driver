@@ -37,6 +37,7 @@
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
 #include <linux/percpu.h>
+#include <linux/kthread.h>
 
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -2749,12 +2750,6 @@ out:
 	local_irq_restore(flags);
 }
 
-typedef struct {
-	int cpu;
-	struct completion startup_done;
-	task_t *task;
-} migration_startup_t;
-
 /*
  * migration_thread - this is a highprio system thread that performs
  * thread migration by bumping thread off CPU then 'pushing' onto
@@ -2764,27 +2759,17 @@ static int migration_thread(void * data)
 {
 	/* Marking "param" __user is ok, since we do a set_fs(KERNEL_DS); */
 	struct sched_param __user param = { .sched_priority = MAX_RT_PRIO-1 };
-	migration_startup_t *startup = data;
-	int cpu = startup->cpu;
 	runqueue_t *rq;
+	int cpu = (long)data;
 	int ret;
 
-	startup->task = current;
-	complete(&startup->startup_done);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule();
-
 	BUG_ON(smp_processor_id() != cpu);
-
-	daemonize("migration/%d", cpu);
-	set_fs(KERNEL_DS);
-
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
 	rq = this_rq();
-	rq->migration_thread = current;
+	BUG_ON(rq->migration_thread != current);
 
-	for (;;) {
+	while (!kthread_should_stop()) {
 		struct list_head *head;
 		migration_req_t *req;
 
@@ -2807,6 +2792,7 @@ static int migration_thread(void * data)
 			       any_online_cpu(req->task->cpus_allowed));
 		complete(&req->done);
 	}
+	return 0;
 }
 
 /*
@@ -2816,37 +2802,27 @@ static int migration_thread(void * data)
 static int migration_call(struct notifier_block *nfb, unsigned long action,
 			  void *hcpu)
 {
-	long cpu = (long)hcpu;
-	migration_startup_t startup;
+	int cpu = (long)hcpu;
+	struct task_struct *p;
 
 	switch (action) {
 	case CPU_ONLINE:
-
-		printk("Starting migration thread for cpu %li\n", cpu);
-
-		startup.cpu = cpu;
-		startup.task = NULL;
-		init_completion(&startup.startup_done);
-
-		kernel_thread(migration_thread, &startup, CLONE_KERNEL);
-		wait_for_completion(&startup.startup_done);
-		wait_task_inactive(startup.task);
-
-		startup.task->thread_info->cpu = cpu;
-		startup.task->cpus_allowed = cpumask_of_cpu(cpu);
-
-		wake_up_process(startup.task);
-
-		while (!cpu_rq(cpu)->migration_thread)
-			yield();
-
+		p = kthread_create(migration_thread, hcpu, "migration/%d",cpu);
+		if (IS_ERR(p))
+			return NOTIFY_BAD;
+		kthread_bind(p, cpu);
+		cpu_rq(cpu)->migration_thread = p;
+		wake_up_process(p);
 		break;
 	}
 	return NOTIFY_OK;
 }
 
-static struct notifier_block migration_notifier
-			= { .notifier_call = &migration_call };
+/* Want this before the other threads, so they can use set_cpus_allowed. */
+static struct notifier_block migration_notifier = {
+	.notifier_call = &migration_call,
+	.priority = 10,
+};
 
 __init int migration_init(void)
 {

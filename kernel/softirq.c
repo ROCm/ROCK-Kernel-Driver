@@ -14,6 +14,7 @@
 #include <linux/notifier.h>
 #include <linux/percpu.h>
 #include <linux/cpu.h>
+#include <linux/kthread.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -337,20 +338,14 @@ static int ksoftirqd(void * __bind_cpu)
 {
 	int cpu = (int) (long) __bind_cpu;
 
-	daemonize("ksoftirqd/%d", cpu);
 	set_user_nice(current, 19);
 	current->flags |= PF_IOTHREAD;
 
-	/* Migrate to the right CPU */
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(smp_processor_id() != cpu);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	mb();
+	set_current_state(TASK_INTERRUPTIBLE);
 
-	__get_cpu_var(ksoftirqd) = current;
-
-	for (;;) {
+	while (!kthread_should_stop()) {
 		if (!local_softirq_pending())
 			schedule();
 
@@ -363,6 +358,7 @@ static int ksoftirqd(void * __bind_cpu)
 
 		__set_current_state(TASK_INTERRUPTIBLE);
 	}
+	return 0;
 }
 
 static int __devinit cpu_callback(struct notifier_block *nfb,
@@ -370,15 +366,17 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 				  void *hcpu)
 {
 	int hotcpu = (unsigned long)hcpu;
+	struct task_struct *p;
 
 	if (action == CPU_ONLINE) {
-		if (kernel_thread(ksoftirqd, hcpu, CLONE_KERNEL) < 0) {
+		p = kthread_create(ksoftirqd, hcpu, "ksoftirqd/%d", hotcpu);
+		if (IS_ERR(p)) {
 			printk("ksoftirqd for %i failed\n", hotcpu);
 			return NOTIFY_BAD;
 		}
-
-		while (!per_cpu(ksoftirqd, hotcpu))
-			yield();
+		per_cpu(ksoftirqd, hotcpu) = p;
+		kthread_bind(p, hotcpu);
+		wake_up_process(p);
  	}
 	return NOTIFY_OK;
 }
