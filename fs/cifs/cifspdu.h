@@ -68,6 +68,8 @@
 #define NT_TRANSACT_NOTIFY_CHANGE     0x04
 #define NT_TRANSACT_RENAME            0x05
 #define NT_TRANSACT_QUERY_SECURITY_DESC 0x06
+#define NT_TRANSACT_GET_USER_QUOTA    0x07
+#define NT_TRANSACT_SET_USER_QUOTA    0x08
 
 #define MAX_CIFS_HDR_SIZE 256	/* chained NTCreateXReadX will probably be biggest */
 
@@ -877,6 +879,21 @@ struct reparse_data {
 	__u16	TargetNameLen;
 	char	LinkNamesBuf[1];
 };
+
+struct cifs_quota_data {
+	__u32	rsrvd1;  /* 0 */
+	__u32	sid_size;
+	__u64	rsrvd2;  /* 0 */
+	__u64	space_used;
+	__u64	soft_limit;
+	__u64	hard_limit;
+	char	sid[1];  /* variable size? */
+};
+
+/* quota sub commands */
+#define QUOTA_LIST_CONTINUE	    0
+#define QUOTA_LIST_START	0x100
+#define QUOTA_FOR_SID		0x101
 
 typedef union smb_com_transaction2 {
 	struct {

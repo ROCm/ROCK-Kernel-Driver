@@ -247,6 +247,108 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 	return 0;
 }
 
+int cifs_xquota_set(struct super_block * sb, int quota_type, qid_t qid,
+		struct fs_disk_quota * pdquota)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+	
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+
+	xid = GetXid();
+	if(pTcon)
+		rc = -EIO;
+	else {
+
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xquota_get(struct super_block * sb, int quota_type, qid_t qid,
+                struct fs_disk_quota * pdquota)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+	xid = GetXid();
+	if(pTcon)
+		rc = -EIO;
+	else {
+
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xstate_set(struct super_block * sb, unsigned int flags, int operation)
+{
+	int xid; 
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+	xid = GetXid();
+	if(pTcon)
+		rc = -EIO;
+	else {
+
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xstate_get(struct super_block * sb, struct fs_quota_stat *qstats)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+	xid = GetXid();
+	if(pTcon)
+		rc = -EIO;
+	else {
+
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+static struct quotactl_ops cifs_quotactl_ops = {
+	.set_xquota	= cifs_xquota_set,
+	.get_xquota	= cifs_xquota_set,
+	.set_xstate	= cifs_xstate_set,
+	.get_xstate	= cifs_xstate_get,
+};
+
 struct super_operations cifs_super_ops = {
 	.read_inode = cifs_read_inode,
 	.put_super = cifs_put_super,
