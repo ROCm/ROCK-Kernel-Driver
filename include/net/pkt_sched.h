@@ -64,6 +64,7 @@ struct Qdisc_ops
 	int			(*change)(struct Qdisc *, struct rtattr *arg);
 
 	int			(*dump)(struct Qdisc *, struct sk_buff *);
+	int			(*dump_stats)(struct Qdisc *, struct gnet_dump *);
 
 	struct module		*owner;
 };

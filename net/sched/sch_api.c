@@ -767,6 +767,9 @@ static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 			TCA_XSTATS, q->stats_lock, &d) < 0)
 		goto rtattr_failure;
 
+	if (q->ops->dump_stats && q->ops->dump_stats(q, &d) < 0)
+		goto rtattr_failure;
+
 	if (gnet_stats_copy_basic(&d, &q->bstats) < 0 ||
 #ifdef CONFIG_NET_ESTIMATOR
 	    gnet_stats_copy_rate_est(&d, &q->rate_est) < 0 ||
