@@ -1877,8 +1877,12 @@ int patch_cm9739(ac97_t * ac97)
 	/* bit 12: disable center/lfe (swithable) */
 	/* bit 10: disable surround/line (switchable) */
 	/* bit 9: mix 2 surround off */
+	/* bit 4: undocumented; 0 mutes the CM9739A, which defaults to 1 */
+	/* bit 3: undocumented; surround? */
 	/* bit 0: dB */
-	val = (1 << 13);
+	val = snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) & (1 << 4);
+	val |= (1 << 3);
+	val |= (1 << 13);
 	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		val |= (1 << 14);
 	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);

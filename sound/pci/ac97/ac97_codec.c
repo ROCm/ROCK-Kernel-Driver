@@ -118,6 +118,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4770, 0xfffffff0, "ALC203",		NULL,		NULL },
 { 0x434d4941, 0xffffffff, "CMI9738",		patch_cm9738,	NULL },
 { 0x434d4961, 0xffffffff, "CMI9739",		patch_cm9739,	NULL },
+{ 0x434d4983, 0xffffffff, "CMI9739A",		patch_cm9739,	NULL },
 { 0x434d4978, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
 { 0x434d4982, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
 { 0x434d4983, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
