@@ -325,7 +325,7 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 		 */
 			if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
 			    mddev->queue->max_sectors > (PAGE_SIZE>>9))
-				mddev->queue->max_sectors = (PAGE_SIZE>>9);
+				blk_queue_max_sectors(mddev->queue, PAGE_SIZE>>9);
 
 			conf->working_disks++;
 			rdev->raid_disk = path;
@@ -479,7 +479,7 @@ static int multipath_run (mddev_t *mddev)
 		 * a merge_bvec_fn to be involved in multipath */
 		if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
 		    mddev->queue->max_sectors > (PAGE_SIZE>>9))
-			mddev->queue->max_sectors = (PAGE_SIZE>>9);
+			blk_queue_max_sectors(mddev->queue, PAGE_SIZE>>9);
 
 		if (!rdev->faulty) 
 			conf->working_disks++;
