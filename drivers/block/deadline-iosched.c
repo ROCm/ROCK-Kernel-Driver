@@ -608,6 +608,12 @@ deadline_insert_request(request_queue_t *q, struct request *rq,
 	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
 		DL_INVALIDATE_HASH(dd);
 		q->last_merge = NULL;
+
+		while (deadline_dispatch_requests(dd))
+			;
+
+		list_add_tail(&rq->queuelist, dd->dispatch);
+		return;
 	}
 
 	if (unlikely(!blk_fs_request(rq))) {
