@@ -64,21 +64,21 @@ static __u32 baud_rates[] = { 9600, 19200, 57600, 115200, 38400 };
 #define MAX_SPEEDS 5
 
 static struct dongle_reg dongle = {
-	Q_NULL,
-	IRDA_ACTISYS_DONGLE,
-	actisys_open,
-	actisys_close,
-	actisys_reset,
-	actisys_change_speed,
+	.type = IRDA_ACTISYS_DONGLE,
+	.open = actisys_open,
+	.close = actisys_close,
+	.reset = actisys_reset,
+	.change_speed = actisys_change_speed,
+	.owner = THIS_MODULE,
 };
 
 static struct dongle_reg dongle_plus = {
-	Q_NULL,
-	IRDA_ACTISYS_PLUS_DONGLE,
-	actisys_open,
-	actisys_close,
-	actisys_reset,
-	actisys_change_speed,
+	.type = IRDA_ACTISYS_PLUS_DONGLE,
+	.open = actisys_open,
+	.close = actisys_close,
+	.reset = actisys_reset,
+	.change_speed = actisys_change_speed,
+	.owner = THIS_MODULE,
 };
 
 /*
@@ -128,16 +128,12 @@ static void actisys_open(dongle_t *self, struct qos_info *qos)
 		qos->baud_rate.bits &= ~IR_38400;
 	
 	qos->min_turn_time.bits = 0x7f; /* Needs 0.01 ms */
-
-	MOD_INC_USE_COUNT;
 }
 
 static void actisys_close(dongle_t *self)
 {
 	/* Power off the dongle */
 	self->set_dtr_rts(self->dev, FALSE, FALSE);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /*
