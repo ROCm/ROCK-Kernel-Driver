@@ -3,7 +3,7 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o rtctimer.o hwdep.o
+export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o
 
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o

@@ -151,7 +151,7 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	(__KSTK_PTREGS(tsk)->psw.addr)
 #define KSTK_ESP(tsk)	(__KSTK_PTREGS(tsk)->gprs[15])
 
-#define cpu_relax()	do { } while (0)
+#define cpu_relax()	barrier()
 
 /*
  * Set of msr bits that gdb can change on behalf of a process.

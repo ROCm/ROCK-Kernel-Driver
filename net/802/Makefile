@@ -6,6 +6,7 @@ export-objs		:= llc_macinit.o p8022.o psnap.o
 
 obj-y			:= p8023.o
 
+# Check the p8022 selections against net/core/Makefile.
 obj-$(CONFIG_SYSCTL)	+= sysctl_net_802.o
 obj-$(CONFIG_LLC)	+= p8022.o psnap.o llc_sendpdu.o llc_utility.o \
 			   		   cl2llc.o llc_macinit.o	

@@ -213,7 +213,7 @@ void use_config(char *m, int slen)
 void parse_config_file(char *map, size_t len)
 {
 	int *end = (int *) (map + len);
-	// start at +1, so that p can never be < map
+	/* start at +1, so that p can never be < map */
 	int *m   = (int *) map + 1;
 	char *p, *q;
 
@@ -283,7 +283,7 @@ void do_config_file(char *filename)
 void parse_dep_file(void *map, size_t len)
 {
 	char *m = map;
-	char *end = map + len;
+	char *end = m + len;
 	char *p;
 	char s[PATH_MAX];
 
