@@ -1058,7 +1058,9 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	total_swap_pages -= p->pages;
 	p->flags &= ~SWP_WRITEOK;
 	swap_list_unlock();
+	current->flags |= PF_SWAPOFF;
 	err = try_to_unuse(type);
+	current->flags &= ~PF_SWAPOFF;
 	if (err) {
 		/* re-insert swap space back into swap_list */
 		swap_list_lock();
