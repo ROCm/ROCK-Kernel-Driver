@@ -209,9 +209,15 @@ A partial list of the supported mount options follows:
   suid          Allow remote files on this mountpoint with suid enabled to 
 		be executed (default for mounts when executed as root,
 		nosuid is default for user mounts).
-  credentials   (allow valid when the cifs mount helper, mount.cifs, is
-		installed. Specifies the name of the credential file which 
-		will be read to obtain the userid and password.
+  credentials   Although ignored by the cifs kernel component, it is used by 
+		the mount helper, mount.cifs. When mount.cifs is installed it
+		opens and reads the credential file specified in order  
+		to obtain the userid and password arguments which are passed to
+		the cifs vfs.
+  guest         Although ignored by the kernel component, the mount.cifs
+		mount helper will not prompt the user for a password
+		if guest is specified on the mount options.  If no
+		password is specified a null password will be used.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================

@@ -822,7 +822,10 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
-		cERROR(1, ("Send error in Close = %d", rc));
+		if(rc!=-EINTR) {
+			/* EINTR is expected when user ctl-c to kill app */
+			cERROR(1, ("Send error in Close = %d", rc));
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);

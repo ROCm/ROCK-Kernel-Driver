@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/connect.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -36,6 +36,7 @@
 #include "cifs_fs_sb.h"
 #include "ntlmssp.h"
 #include "nterr.h"
+#include "rfc1002pdu.h"
 
 #define CIFS_PORT 445
 #define RFC1001_PORT 139
@@ -222,6 +223,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			csocket = server->ssocket;
 			continue;
 		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
@@ -233,12 +235,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					smb negprot error in which case reconnecting here is
 					not going to help - return error to mount */
 				server->tcpStatus = CifsExiting;
+				wake_up(&server->response_q);
 				break;
 			}
 
 			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
+			wake_up(&server->response_q);
 			continue;
 		}
 
@@ -249,23 +253,46 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 
 		temp = (char *) smb_buffer;
 		if (length > 3) {
-			if (temp[0] == (char) 0x85) {
+			if (temp[0] == (char) RFC1002_SESSION_KEEP_ALIVE) {
 				iov.iov_base = smb_buffer;
 				iov.iov_len = 4;
 				length = sock_recvmsg(csocket, &smb_msg, 4, 0);
-				cFYI(0,
-				     ("Received 4 byte keep alive packet "));
-			} else if ((temp[0] == (char) 0x83)
+				cFYI(0,("Received 4 byte keep alive packet"));
+			} else if (temp[0] == (char) RFC1002_POSITIVE_SESSION_RESPONSE) {
+				iov.iov_base = smb_buffer;
+					iov.iov_len = 4;
+					length = sock_recvmsg(csocket, &smb_msg, 4, 0);
+					cFYI(1,("Good RFC 1002 session rsp"));
+			} else if ((temp[0] == (char)RFC1002_NEGATIVE_SESSION_RESPONSE)
 				   && (length == 5)) {
 				/* we get this from Windows 98 instead of error on SMB negprot response */
-				cERROR(1,
-				       ("Negative RFC 1002 Session response. Error = 0x%x",
-					temp[4]));
-				break;
-
+				cFYI(1,("Negative RFC 1002 Session Response Error 0x%x)",temp[4]));
+				if(server->tcpStatus == CifsNew) {
+					/* if nack on negprot (rather than 
+					ret of smb negprot error) reconnecting
+					not going to help, ret error to mount */
+					server->tcpStatus = CifsExiting;
+					/* wake up thread doing negprot */
+					wake_up(&server->response_q);
+					break;
+				} else {
+					/* give server a second to
+					clean up before reconnect attempt */
+					set_current_state(TASK_INTERRUPTIBLE);
+					schedule_timeout(HZ);
+					/* always try 445 first on reconnect
+					since we get NACK on some if we ever
+					connected to port 139 (the NACK is 
+					since we do not begin with RFC1001
+					session initialize frame) */
+					server->addr.sockAddr.sin_port = CIFS_PORT;
+					cifs_reconnect(server);
+					csocket = server->ssocket;
+					wake_up(&server->response_q);
+					continue;
+				}
 			} else if (temp[0] != (char) 0) {
-				cERROR(1,
-				       ("Unknown RFC 1001 frame not 0x00 nor 0x85"));
+				cERROR(1,("Unknown RFC 1002 frame"));
 				cifs_dump_mem(" Received Data: ", temp, length);
 				cifs_reconnect(server);
 				csocket = server->ssocket;
@@ -823,6 +850,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 {
 	int rc = 0;
 	int connected = 0;
+	unsigned short int orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -847,6 +875,10 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	} 
 
 	if(!connected) {
+		/* save original port so we can retry user specified port  
+			later if fall back ports fail this time  */
+		orig_port = psin_server->sin_port;
+
 		/* do not retry on the same port we just failed on */
 		if(psin_server->sin_port != htons(CIFS_PORT)) {
 			psin_server->sin_port = htons(CIFS_PORT);
@@ -869,6 +901,8 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	/* give up here - unless we want to retry on different
 		protocol families some day */
 	if (!connected) {
+		if(orig_port)
+			psin_server->sin_port = orig_port;
 		cFYI(1,("Error %d connecting to server via ipv4",rc));
 		sock_release(*csocket);
 		*csocket = NULL;
@@ -2652,11 +2686,11 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 		if(rc == 0)
 			pSesInfo->server->tcpStatus = CifsGood;
 	}
-	pSesInfo->capabilities = pSesInfo->server->capabilities;
-	if(linuxExtEnabled == 0)
-		pSesInfo->capabilities &= (~CAP_UNIX);
-	pSesInfo->sequence_number = 0;
 	if (!rc) {
+		pSesInfo->capabilities = pSesInfo->server->capabilities;
+		if(linuxExtEnabled == 0)
+			pSesInfo->capabilities &= (~CAP_UNIX);
+		pSesInfo->sequence_number = 0;
 		cFYI(1,("Security Mode: 0x%x Capabilities: 0x%x Time Zone: %d",
 			pSesInfo->server->secMode,
 			pSesInfo->server->capabilities,

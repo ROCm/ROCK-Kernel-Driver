@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsfs.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   Common Internet FileSystem (CIFS) client
@@ -375,6 +375,12 @@ static struct quotactl_ops cifs_quotactl_ops = {
 };
 #endif
 
+static int cifs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 struct super_operations cifs_super_ops = {
 	.read_inode = cifs_read_inode,
 	.put_super = cifs_put_super,
@@ -387,6 +393,7 @@ struct super_operations cifs_super_ops = {
    us with the same number of releases (closes) as opens */
 	.show_options = cifs_show_options,
 /*    .umount_begin   = cifs_umount_begin, *//* consider adding in the future */
+	.remount_fs = cifs_remount,
 };
 
 static struct super_block *
@@ -530,12 +537,18 @@ struct file_operations cifs_file_ops = {
 	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.sendfile = generic_file_sendfile,
+#ifdef CIFS_FCNTL
+	.fcntl = cifs_fcntl,
+#endif
 };
 
 struct file_operations cifs_dir_ops = {
 	.readdir = cifs_readdir,
 	.release = cifs_closedir,
 	.read    = generic_read_dir,
+#ifdef CIFS_FCNTL
+	.fcntl   = cifs_fcntl,
+#endif
 };
 
 static void
@@ -640,6 +653,7 @@ static int cifs_oplock_thread(void * dummyarg)
 		spin_lock(&GlobalMid_Lock);
 		if(list_empty(&GlobalOplock_Q)) {
 			spin_unlock(&GlobalMid_Lock);
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(39*HZ);
 		} else {
 			oplock_item = list_entry(GlobalOplock_Q.next, 

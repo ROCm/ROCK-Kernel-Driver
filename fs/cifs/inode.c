@@ -582,12 +582,14 @@ cifs_revalidate(struct dentry *direntry)
 
 	full_path = build_path_from_dentry(direntry);
 	cFYI(1,
-	     ("Revalidate full path: %s for inode 0x%p with count %d dentry: 0x%p d_time %ld at time %ld ",
+	     ("Revalidate: %s inode 0x%p count %d dentry: 0x%p d_time %ld jiffies %ld",
 	      full_path, direntry->d_inode,
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
-	if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
+	if (cifsInode->time == 0){
+		/* was set to zero previously to force revalidate */
+	} else if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
 			(direntry->d_inode->i_nlink == 1)) {  
 			if (full_path)

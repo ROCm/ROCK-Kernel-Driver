@@ -310,7 +310,7 @@ cifs_proc_clean(void)
 
 	remove_proc_entry("DebugData", proc_fs_cifs);
 	remove_proc_entry("cifsFYI", proc_fs_cifs);
-	remove_proc_entry("TraceSMB", proc_fs_cifs);
+	remove_proc_entry("traceSMB", proc_fs_cifs);
 	remove_proc_entry("SimultaneousOps", proc_fs_cifs);
 	remove_proc_entry("Stats", proc_fs_cifs);
 	remove_proc_entry("MultiuserMount", proc_fs_cifs);

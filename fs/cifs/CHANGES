@@ -1,3 +1,17 @@
+Version 1.10
+------------
+Fix reconnection (and certain failed mounts) to properly wake up the
+blocked users thread so it does not seem hung (in some cases was blocked
+until the cifs receive timeout expired). Fix spurious error logging
+to kernel log when application with open network files killed. 
+
+Version 1.09
+------------
+Fix /proc/fs module unload warning message (that could be logged
+to the kernel log). Fix intermittent failure in connectathon
+test7 (hardlink count not immediately refreshed in case in which
+inode metadata can be incorrectly kept cached when time near zero)
+
 Version 1.08
 ------------
 Allow file_mode and dir_mode (specified at mount time) to be enforced
