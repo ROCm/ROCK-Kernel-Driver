@@ -348,18 +348,9 @@ _GLOBAL(_nmask_and_or_msr)
  */
 _GLOBAL(_tlbia)
 #if defined(CONFIG_40x)
-	/* This needs to be coordinated with other pinning functions since
-	 * we don't keep a memory location of number of entries to reduce
-	 * cache pollution during these operations.
-	 */
-	lis	r3, 0
-	sync
-1:
-	tlbwe	r3, r3, TLB_TAG		/* just ensure V is clear */
-	addi	r3, r3, 1		/*   so r3 works fine for that */
-	cmpwi	0, r3, 61		/* reserve last two entries */
-	ble	1b
-	isync
+	sync			/* Flush to memory before changing mapping */
+	tlbia
+	isync			/* Flush shadow TLB */
 #else /* ! defined(CONFIG_40x) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18

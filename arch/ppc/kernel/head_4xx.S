@@ -555,33 +555,40 @@ label:
 4:
 	tophys(r11, r11)
 	rlwimi	r11, r10, 12, 20, 29	/* Create L1 (pgdir/pmd) address */
-	lwz	r11, 0(r11)		/* Get L1 entry */
-	rlwinm.	r12, r11, 0, 0, 19	/* Extract L2 (pte) base address */
+	lwz	r12, 0(r11)		/* Get L1 entry */
+	andi.	r9, r12, _PMD_PRESENT	/* Check if it points to a PTE page */
 	beq	2f			/* Bail if no table */
 
 	rlwimi	r12, r10, 22, 20, 29	/* Compute PTE address */
 	lwz	r11, 0(r12)		/* Get Linux PTE */
 	andi.	r9, r11, _PAGE_PRESENT
-	beq	2f
+	beq	5f
 
 	ori	r11, r11, _PAGE_ACCESSED
 	stw	r11, 0(r12)
 
-	/* Most of the Linux PTE is ready to load into the TLB LO.
-	 * We set ZSEL, where only the LS-bit determines user access.
-	 * We set execute, because we don't have the granularity to
-	 * properly set this at the page level (Linux problem).
-	 * If shared is set, we cause a zero PID->TID load.
-	 * Many of these bits are software only.  Bits we don't set
-	 * here we (properly should) assume have the appropriate value.
-	 */
-	li	r12, 0x0ce2
-	andc	r11, r11, r12		/* Make sure 20, 21 are zero */
+	/* Create TLB tag.  This is the faulting address plus a static
+	 * set of bits.  These are size, valid, E, U0.
+	*/
+	li	r12, 0x00c0
+	rlwimi	r10, r12, 0, 20, 31
 
 	b	finish_tlb_load
 
+2:	/* Check for possible large-page pmd entry */
+	rlwinm.	r9, r12, 2, 22, 24
+	beq	5f
 
-2:
+	/* Create TLB tag.  This is the faulting address, plus a static
+	 * set of bits (valid, E, U0) plus the size from the PMD.
+	 */
+	ori	r9, r9, 0x40
+	rlwimi	r10, r9, 0, 20, 31
+	mr	r11, r12
+
+	b	finish_tlb_load
+
+5:
 	/* The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
 	 */
@@ -647,55 +654,40 @@ label:
 4:
 	tophys(r11, r11)
 	rlwimi	r11, r10, 12, 20, 29	/* Create L1 (pgdir/pmd) address */
-	lwz	r11, 0(r11)		/* Get L1 entry */
-	rlwinm.	r12, r11, 0, 0, 19	/* Extract L2 (pte) base address */
+	lwz	r12, 0(r11)		/* Get L1 entry */
+	andi.	r9, r12, _PMD_PRESENT	/* Check if it points to a PTE page */
 	beq	2f			/* Bail if no table */
 
 	rlwimi	r12, r10, 22, 20, 29	/* Compute PTE address */
 	lwz	r11, 0(r12)		/* Get Linux PTE */
 	andi.	r9, r11, _PAGE_PRESENT
-	beq	2f
+	beq	5f
 
 	ori	r11, r11, _PAGE_ACCESSED
 	stw	r11, 0(r12)
 
-	/* Most of the Linux PTE is ready to load into the TLB LO.
-	 * We set ZSEL, where only the LS-bit determines user access.
-	 * We set execute, because we don't have the granularity to
-	 * properly set this at the page level (Linux problem).
-	 * If shared is set, we cause a zero PID->TID load.
-	 * Many of these bits are software only.  Bits we don't set
-	 * here we (properly should) assume have the appropriate value.
-	 */
-	li	r12, 0x0ce2
-	andc	r11, r11, r12		/* Make sure 20, 21 are zero */
+	/* Create TLB tag.  This is the faulting address plus a static
+	 * set of bits.  These are size, valid, E, U0.
+	*/
+	li	r12, 0x00c0
+	rlwimi	r10, r12, 0, 20, 31
 
 	b	finish_tlb_load
 
-	/* Done...restore registers and get out of here.
-	*/
-#ifdef CONFIG_403GCX
-	lwz     r12, 12(r0)
-	lwz     r11, 8(r0)
-	mtspr   SPRN_PID, r12
-	mtcr    r11
-	lwz     r9, 4(r0)
-	lwz     r12, 0(r0)
-#else
-	mfspr	r12, SPRG6
-	mfspr	r11, SPRG7
-	mtspr	SPRN_PID, r12
-	mtcr	r11
-	mfspr	r9, SPRG5
-	mfspr	r12, SPRG4
-#endif
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
-	PPC405_ERR77_SYNC
-	rfi			/* Should sync shadow TLBs */
-	b	.		/* prevent prefetch past rfi */
+2:	/* Check for possible large-page pmd entry */
+	rlwinm.	r9, r12, 2, 22, 24
+	beq	5f
 
-2:
+	/* Create TLB tag.  This is the faulting address, plus a static
+	 * set of bits (valid, E, U0) plus the size from the PMD.
+	 */
+	ori	r9, r9, 0x40
+	rlwimi	r10, r9, 0, 20, 31
+	mr	r11, r12
+
+	b	finish_tlb_load
+	
+5:
 	/* The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
 	 */
@@ -818,8 +810,8 @@ check_single_step_in_exception:
 	/* Damn, I came up one instruction too many to fit into the
 	 * exception space :-).  Both the instruction and data TLB
 	 * miss get to this point to load the TLB.
-	 * 	r10 - EA of fault
-	 * 	r11 - TLB LO (info from Linux PTE)
+	 * 	r10 - TLB_TAG value
+	 * 	r11 - Linux PTE
 	 *	r12, r9 - avilable to use
 	 *	PID - loaded with proper value when we get here
 	 *	Upon exit, we reload everything and RFI.
@@ -833,21 +825,19 @@ finish_tlb_load:
 	*/
 	lwz	r9, tlb_4xx_index@l(0)
 	addi	r9, r9, 1
-	cmpwi	0, r9, 61		/* reserve entries 62, 63 for kernel */
-	ble	7f
-	li	r9, 0
-7:
+	andi.	r9, r9, (PPC4XX_TLB_SIZE-1)
 	stw	r9, tlb_4xx_index@l(0)
 
 6:
-	tlbwe	r11, r9, TLB_DATA		/* Load TLB LO */
-
-	/* Create EPN.  This is the faulting address plus a static
-	 * set of bits.  These are size, valid, E, U0, and ensure
-	 * bits 20 and 21 are zero.
+	/*
+	 * Clear out the software-only bits in the PTE to generate the
+	 * TLB_DATA value.  These are the bottom 2 bits of the RPM, the
+	 * top 3 bits of the zone field, and M.
 	 */
-	li	r12, 0x00c0
-	rlwimi	r10, r12, 0, 20, 31
+	li	r12, 0x0ce2
+	andc	r11, r11, r12
+
+	tlbwe	r11, r9, TLB_DATA		/* Load TLB LO */
 	tlbwe	r10, r9, TLB_TAG		/* Load TLB HI */
 
 	/* Done...restore registers and get out of here.
@@ -929,7 +919,9 @@ start_here:
 
 /* Load up the kernel context */
 2:
-	SYNC			/* Force all PTE updates to finish */
+	sync			/* Flush to memory before changing TLB */
+	tlbia
+	isync			/* Flush shadow TLBs */
 
 	/* set up the PTE pointers for the Abatron bdiGDB.
 	*/
@@ -956,7 +948,7 @@ start_here:
  */
 initial_mmu:
 	tlbia			/* Invalidate all TLB entries */
-	sync 
+	isync 
 
 	/* We should still be executing code at physical address 0x0000xxxx
 	 * at this point. However, start_here is at virtual address
@@ -985,18 +977,30 @@ initial_mmu:
 	clrrwi	r3,r3,10		/* Mask off the effective page number */
 	ori	r3,r3,(TLB_VALID | TLB_PAGESZ(PAGESZ_16M))
 
-        li      r0,62                    /* TLB slot 62 */
+        li      r0,63                    /* TLB slot 63 */
 
 	tlbwe	r4,r0,TLB_DATA		/* Load the data portion of the entry */
 	tlbwe	r3,r0,TLB_TAG		/* Load the tag portion of the entry */
 
-	addis	r4, r4, 0x0100		/* Map next 16 M entries */
-	addis	r3, r3, 0x0100
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) && defined(SERIAL_DEBUG_IO_BASE)
+	
+	/* Load a TLB entry for the UART, so that ppc4xx_progress() can use
+	 * the UARTs nice and early.  We use a 4k real==virtual mapping. */
 
-        li      r0,63                    /* TLB slot 63 */
+	lis	r3,SERIAL_DEBUG_IO_BASE@h
+	ori	r3,r3,SERIAL_DEBUG_IO_BASE@l
+	mr	r4,r3
+	clrrwi	r4,r4,12
+	ori	r4,r4,(TLB_WR|TLB_I|TLB_M|TLB_G)
 
+	clrrwi	r3,r3,12
+	ori	r3,r3,(TLB_VALID | TLB_PAGESZ(PAGESZ_4K))
+
+	li	r0,0			/* TLB slot 0 */
 	tlbwe	r4,r0,TLB_DATA
 	tlbwe	r3,r0,TLB_TAG
+#endif /* CONFIG_SERIAL_DEBUG_TEXT && SERIAL_DEBUG_IO_BASE */
+
 	isync
 
 	/* Establish the exception vector base
