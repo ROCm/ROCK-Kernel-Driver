@@ -30,5 +30,8 @@ extern int fib_nh_match(struct rtmsg *r, struct nlmsghdr *,
 extern int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 			 u8 tb_id, u8 type, u8 scope, void *dst,
 			 int dst_len, u8 tos, struct fib_info *fi);
+extern void rtmsg_fib(int event, u32 key, struct fib_alias *fa,
+		      int z, int tb_id,
+		      struct nlmsghdr *n, struct netlink_skb_parms *req);
 
 #endif /* _FIB_LOOKUP_H */
