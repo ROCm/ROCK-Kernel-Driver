@@ -391,7 +391,7 @@ ia32_sys_call_table:
 	.quad sys_uselib
 	.quad sys_swapon
 	.quad sys_reboot
-	.quad sys32_oldreaddir
+	.quad compat_old_readdir
 	.quad sys32_mmap		/* 90 */
 	.quad sys_munmap
 	.quad sys_truncate
@@ -443,7 +443,7 @@ ia32_sys_call_table:
 	.quad sys_setfsuid16
 	.quad sys_setfsgid16
 	.quad sys_llseek		/* 140 */
-	.quad sys32_getdents
+	.quad compat_sys_getdents
 	.quad compat_sys_select
 	.quad sys_flock
 	.quad sys_msync
@@ -522,7 +522,7 @@ ia32_sys_call_table:
 	.quad sys_pivot_root
 	.quad sys_mincore
 	.quad sys_madvise
-	.quad sys_getdents64	/* 220 getdents64 */ 
+	.quad compat_sys_getdents64	/* 220 getdents64 */
 	.quad compat_sys_fcntl64	
 	.quad quiet_ni_syscall		/* tux */
 	.quad quiet_ni_syscall    	/* security */
@@ -549,8 +549,8 @@ ia32_sys_call_table:
 	.quad sys32_get_thread_area
 	.quad compat_sys_io_setup	/* 245 */
 	.quad sys_io_destroy
-	.quad sys32_io_getevents
-	.quad sys32_io_submit
+	.quad compat_sys_io_getevents
+	.quad compat_sys_io_submit
 	.quad sys_io_cancel
 	.quad sys_fadvise64		/* 250 */
 	.quad quiet_ni_syscall 	/* free_huge_pages */
