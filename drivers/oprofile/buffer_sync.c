@@ -19,17 +19,17 @@
  * objects.
  */
 
-#include <linux/fs.h>
 #include <linux/mm.h>
-#include <linux/timer.h>
-#include <linux/dcookies.h>
-#include <linux/notifier.h>
-#include <linux/profile.h>
 #include <linux/workqueue.h>
-
+#include <linux/notifier.h>
+#include <linux/dcookies.h>
+#include <linux/profile.h>
+#include <linux/fs.h>
+ 
+#include "oprofile_stats.h"
 #include "event_buffer.h"
 #include "cpu_buffer.h"
-#include "oprofile_stats.h"
+#include "buffer_sync.h"
  
 #define DEFAULT_EXPIRE (HZ / 4)
  
