@@ -109,6 +109,9 @@ struct percpu_struct {
 	unsigned long ipc_buffer[21];
 	unsigned long palcode_avail[16];
 	unsigned long compatibility;
+	unsigned long console_data_log_pa;
+	unsigned long console_data_log_length;
+	unsigned long bcache_info;
 };
 
 struct procdesc_struct {

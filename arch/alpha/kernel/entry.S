@@ -452,7 +452,8 @@ sys_fork:
 	bsr	$1,do_switch_stack
 	bis	$31,SIGCHLD,$16
 	mov	$31,$17
-	mov	$30,$18
+	mov	$31,$18
+	mov	$30,$19
 	jsr	$26,alpha_clone
 	bsr	$1,undo_switch_stack
 	ret	$31,($26),1
@@ -463,8 +464,9 @@ sys_fork:
 .ent	sys_clone
 sys_clone:
 	bsr	$1,do_switch_stack
-	/* arg1 and arg2 come from the user */
-	mov	$30,$18
+	/* $16, $17, $18, $19 come from the user; $19 is used later
+	   via pt_regs->r19.  */
+	mov	$30,$19
 	jsr	$26,alpha_clone
 	bsr	$1,undo_switch_stack
 	ret	$31,($26),1

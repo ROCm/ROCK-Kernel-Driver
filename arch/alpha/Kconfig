@@ -522,6 +522,9 @@ config ALPHA_LARGE_VMALLOC
 
 	  Say N unless you know you need gobs and gobs of vmalloc space.
 
+config VERBOSE_MCHECK
+	bool "Verbose Machine Checks"
+
 source "drivers/pci/Kconfig"
 
 config HOTPLUG

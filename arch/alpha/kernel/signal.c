@@ -293,8 +293,16 @@ do_sigreturn(struct sigframe *frame, struct pt_regs *regs,
 		goto give_sigsegv;
 
 	/* Send SIGTRAP if we're single-stepping: */
-	if (ptrace_cancel_bpt (current))
-		send_sig(SIGTRAP, current, 1);
+	if (ptrace_cancel_bpt (current)) {
+		siginfo_t info;
+
+		info.si_signo = SIGTRAP;
+		info.si_errno = 0;
+		info.si_code = TRAP_BRKPT;
+		info.si_addr = (void *) regs->pc;
+		info.si_trapno = 0;
+		send_sig_info(SIGTRAP, &info, current);
+	}
 	return;
 
 give_sigsegv:
@@ -330,8 +338,16 @@ do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
 	do_sigaltstack(&st, NULL, rdusp());
 
 	/* Send SIGTRAP if we're single-stepping: */
-	if (ptrace_cancel_bpt (current))
-		send_sig(SIGTRAP, current, 1);
+	if (ptrace_cancel_bpt (current)) {
+		siginfo_t info;
+
+		info.si_signo = SIGTRAP;
+		info.si_errno = 0;
+		info.si_code = TRAP_BRKPT;
+		info.si_addr = (void *) regs->pc;
+		info.si_trapno = 0;
+		send_sig_info(SIGTRAP, &info, current);
+	}
 	return;
 
 give_sigsegv:
