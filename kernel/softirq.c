@@ -280,7 +280,7 @@ static int ksoftirqd(void * __bind_cpu)
 	if (smp_processor_id() != cpu)
 		BUG();
 
-	sprintf(current->comm, "ksoftirqd_CPU%d", cpu);
+	sprintf(current->comm, "ksoftirqd/%d", cpu);
 
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();

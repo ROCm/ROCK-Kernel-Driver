@@ -2014,7 +2014,7 @@ static int migration_thread(void * data)
 	rq = this_rq();
 	rq->migration_thread = current;
 
-	sprintf(current->comm, "migration_CPU%d", smp_processor_id());
+	sprintf(current->comm, "migration/%d", smp_processor_id());
 
 	for (;;) {
 		runqueue_t *rq_src, *rq_dest;
