@@ -41,11 +41,6 @@
 
 #include "generic.h"
 
-static unsigned int __devinit init_chipset_generic (struct pci_dev *dev, const char *name)
-{
-	return 0;
-}
-
 static void __devinit init_hwif_generic (ide_hwif_t *hwif)
 {
 	switch(hwif->pci_dev->device) {
