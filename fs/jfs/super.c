@@ -97,6 +97,11 @@ static void jfs_destroy_inode(struct inode *inode)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 
+	if (ji->active_ag != -1) {
+		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
+		atomic_dec(&bmap->db_active[ji->active_ag]);
+	}
+
 #ifdef CONFIG_JFS_POSIX_ACL
 	if (ji->i_acl && (ji->i_acl != JFS_ACL_NOT_CACHED))
 		posix_acl_release(ji->i_acl);
