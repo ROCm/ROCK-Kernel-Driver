@@ -327,6 +327,7 @@
  *      Vlasov <vsu@mivlgu.murom.ru>).
  *    - Accept devices with more than one interface. Only use interfaces that
  *      look like belonging to scanners.
+ *    - Fix compilation error when debugging is enabled.
  *
  * TODO
  *    - Remove the 2/3 endpoint limitation
@@ -860,7 +861,6 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 	dbg("probe_scanner: USB dev address:%p", dev);
-	dbg("probe_scanner: ifnum:%u", ifnum);
 
 /*
  * 1. Check Vendor/Product
