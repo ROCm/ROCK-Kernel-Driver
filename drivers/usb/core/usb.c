@@ -1461,6 +1461,152 @@ int usb_new_device(struct usb_device *dev)
 }
 
 
+/**
+ * usb_buffer_alloc - allocate dma-consistent buffer for URB_NO_DMA_MAP
+ * @dev: device the buffer will be used with
+ * @size: requested buffer size
+ * @mem_flags: affect whether allocation may block
+ * @dma: used to return DMA address of buffer
+ *
+ * Return value is either null (indicating no buffer could be allocated), or
+ * the cpu-space pointer to a buffer that may be used to perform DMA to the
+ * specified device.  Such cpu-space buffers are returned along with the DMA
+ * address (through the pointer provided).
+ *
+ * These buffers are used with URB_NO_DMA_MAP set in urb->transfer_flags to
+ * avoid behaviors like using "DMA bounce buffers", or tying down I/O mapping
+ * hardware for long idle periods.  The implementation varies between
+ * platforms, depending on details of how DMA will work to this device.
+ *
+ * When the buffer is no longer used, free it with usb_buffer_free().
+ */
+void *usb_buffer_alloc (
+	struct usb_device *dev,
+	size_t size,
+	int mem_flags,
+	dma_addr_t *dma
+)
+{
+	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->buffer_alloc)
+		return 0;
+	return dev->bus->op->buffer_alloc (dev->bus, size, mem_flags, dma);
+}
+
+/**
+ * usb_buffer_free - free memory allocated with usb_buffer_alloc()
+ * @dev: device the buffer was used with
+ * @size: requested buffer size
+ * @addr: CPU address of buffer
+ * @dma: DMA address of buffer
+ *
+ * This reclaims an I/O buffer, letting it be reused.  The memory must have
+ * been allocated using usb_buffer_alloc(), and the parameters must match
+ * those provided in that allocation request. 
+ */
+void usb_buffer_free (
+	struct usb_device *dev,
+	size_t size,
+	void *addr,
+	dma_addr_t dma
+)
+{
+	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->buffer_free)
+	    	return;
+	dev->bus->op->buffer_free (dev->bus, size, addr, dma);
+}
+
+/**
+ * usb_buffer_map - create DMA mapping(s) for an urb
+ * @urb: urb whose transfer_buffer will be mapped
+ *
+ * Return value is either null (indicating no buffer could be mapped), or
+ * the parameter.  URB_NO_DMA_MAP is added to urb->transfer_flags if the
+ * operation succeeds.
+ *
+ * This call would normally be used for an urb which is reused, perhaps
+ * as the target of a large periodic transfer, with usb_buffer_dmasync()
+ * calls to synchronize memory and dma state.  It may not be used for
+ * control requests.
+ *
+ * Reverse the effect of this call with usb_buffer_unmap().
+ */
+struct urb *usb_buffer_map (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| usb_pipecontrol (urb->pipe)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_map)
+		return 0;
+
+	if (op->buffer_map (bus,
+			urb->transfer_buffer,
+			&urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT))
+		return 0;
+	urb->transfer_flags |= URB_NO_DMA_MAP;
+	return urb;
+}
+
+/**
+ * usb_buffer_dmasync - synchronize DMA and CPU view of buffer(s)
+ * @urb: urb whose transfer_buffer will be synchronized
+ */
+void usb_buffer_dmasync (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_dmasync)
+		return;
+
+	op->buffer_dmasync (bus,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT);
+}
+
+/**
+ * usb_buffer_unmap - free DMA mapping(s) for an urb
+ * @urb: urb whose transfer_buffer will be unmapped
+ *
+ * Reverses the effect of usb_buffer_map().
+ */
+void usb_buffer_unmap (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_unmap)
+		return;
+
+	op->buffer_unmap (bus,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT);
+}
+
 #ifdef CONFIG_PROC_FS
 struct list_head *usb_driver_get_list(void)
 {
@@ -1539,5 +1685,12 @@ EXPORT_SYMBOL(usb_unbind_driver);
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 
 EXPORT_SYMBOL(usb_get_current_frame_number);
+
+EXPORT_SYMBOL (usb_buffer_alloc);
+EXPORT_SYMBOL (usb_buffer_free);
+
+EXPORT_SYMBOL (usb_buffer_map);
+EXPORT_SYMBOL (usb_buffer_dmasync);
+EXPORT_SYMBOL (usb_buffer_unmap);
 
 MODULE_LICENSE("GPL");

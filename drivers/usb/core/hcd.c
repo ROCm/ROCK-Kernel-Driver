@@ -1245,6 +1245,11 @@ struct usb_operations usb_hcd_operations = {
 	.submit_urb =		hcd_submit_urb,
 	.unlink_urb =		hcd_unlink_urb,
 	.deallocate =		hcd_free_dev,
+	.buffer_alloc =		hcd_buffer_alloc,
+	.buffer_free =		hcd_buffer_free,
+	.buffer_map =		hcd_buffer_map,
+	.buffer_dmasync =	hcd_buffer_dmasync,
+	.buffer_unmap =		hcd_buffer_unmap,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 
