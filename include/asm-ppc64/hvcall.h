@@ -59,9 +59,6 @@
 #define H_XIRR			0x74
 #define H_PERFMON		0x7c
 
-#define HSC			".long 0x44000022\n"
-#define H_ENTER_r3		"li	3, 0x08\n"
-
 /* plpar_hcall() -- Generic call interface using above opcodes
  *
  * The actual call interface is a hypervisor call instruction with

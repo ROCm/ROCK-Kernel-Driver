@@ -18,6 +18,12 @@
 /* Default "unsigned long" context */
 typedef unsigned long mm_context_t;
 
+#ifdef CONFIG_HUGETLB_PAGE
+#define CONTEXT_LOW_HPAGES	(1UL<<63)
+#else
+#define CONTEXT_LOW_HPAGES	0
+#endif
+
 /*
  * Define the size of the cache used for segment table entries.  The first
  * entry is used as a cache pointer, therefore the actual number of entries

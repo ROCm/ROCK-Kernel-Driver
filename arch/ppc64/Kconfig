@@ -69,6 +69,17 @@ config PPC64
 	bool
 	default y
 
+config HUGETLB_PAGE
+	bool "Huge TLB Page Support"
+	help
+	  This enables support for huge pages.  User space applications
+	  can make use of this support with the sys_alloc_hugepages and
+	  sys_free_hugepages system calls.  If your applications are
+	  huge page aware and your processor supports this (only POWER4,
+	  then say Y here.
+
+	  Otherwise, say N.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---

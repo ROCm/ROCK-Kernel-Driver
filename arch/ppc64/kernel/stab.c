@@ -221,15 +221,18 @@ write_entry:
 }
 
 static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
-				  int kernel_segment)
+				  int kernel_segment, mm_context_t context)
 {
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
+		int large = 0;
+
 #ifndef CONFIG_PPC_ISERIES
 		if (REGION_ID(esid << SID_SHIFT) == KERNEL_REGION_ID)
-			make_slbe(esid, vsid, 1, kernel_segment); 
-		else
+			large = 1;
+		else if (REGION_ID(esid << SID_SHIFT) == USER_REGION_ID)
+			large = in_hugepage_area(context, esid << SID_SHIFT);
 #endif
-			make_slbe(esid, vsid, 0, kernel_segment);
+		make_slbe(esid, vsid, large, kernel_segment);
 	} else {
 		unsigned char top_entry, stab_entry, *segments; 
 
@@ -255,6 +258,7 @@ int ste_allocate(unsigned long ea)
 {
 	unsigned long vsid, esid;
 	int kernel_segment = 0;
+	mm_context_t context;
 
 	PMC_SW_PROCESSOR(stab_faults); 
 
@@ -266,16 +270,18 @@ int ste_allocate(unsigned long ea)
 	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
 		kernel_segment = 1;
 		vsid = get_kernel_vsid(ea);
+		context = REGION_ID(ea);
 	} else {
-		struct mm_struct *mm = current->mm;
-		if (mm)
-			vsid = get_vsid(mm->context, ea);
-		else
+		if (! current->mm)
 			return 1;
+
+		context = current->mm->context;
+		
+		vsid = get_vsid(context, ea);
 	}
 
 	esid = GET_ESID(ea);
-	__ste_allocate(esid, vsid, kernel_segment);
+	__ste_allocate(esid, vsid, kernel_segment, context);
 	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
 		/* Order update */
 		asm volatile("sync":::"memory"); 
@@ -302,7 +308,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 		for (esid = 0; esid < 16; esid++) {
 			unsigned long ea = esid << SID_SHIFT;
 			vsid = get_vsid(mm->context, ea);
-			__ste_allocate(esid, vsid, 0);
+			__ste_allocate(esid, vsid, 0, mm->context);
 		}
 	} else {
 		unsigned long pc = KSTK_EIP(tsk);
@@ -316,7 +322,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 			    (REGION_ID(pc) >= KERNEL_REGION_ID))
 				return;
 			vsid = get_vsid(mm->context, pc);
-			__ste_allocate(GET_ESID(pc), vsid, 0);
+			__ste_allocate(GET_ESID(pc), vsid, 0, mm->context);
 		}
 
 		if (stack && (pc_segment != stack_segment)) {
@@ -324,7 +330,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 			    (REGION_ID(stack) >= KERNEL_REGION_ID))
 				return;
 			vsid = get_vsid(mm->context, stack);
-			__ste_allocate(GET_ESID(stack), vsid, 0);
+			__ste_allocate(GET_ESID(stack), vsid, 0, mm->context);
 		}
 	}
 
