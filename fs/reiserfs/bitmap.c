@@ -12,6 +12,7 @@
 #include <linux/pagemap.h>
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/reiserfs_fs_i.h>
+#include <linux/quotaops.h>
 
 #define PREALLOCATION_SIZE 9
 
@@ -281,7 +282,8 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
 }
 
 static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
-				  b_blocknr_t block)
+				  struct inode *inode, b_blocknr_t block,
+				  int for_unformatted)
 {
     struct super_block * s = th->t_super;
     struct reiserfs_super_block * rs;
@@ -323,11 +325,13 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
     set_sb_free_blocks( rs, sb_free_blocks(rs) + 1 );
 
     journal_mark_dirty (th, s, sbh);
-  s->s_dirt = 1;
+    if (for_unformatted)
+        DQUOT_FREE_BLOCK_NODIRTY(inode, 1);
 }
 
 void reiserfs_free_block (struct reiserfs_transaction_handle *th, 
-                          b_blocknr_t block)
+			  struct inode *inode, b_blocknr_t block,
+			  int for_unformatted)
 {
     struct super_block * s = th->t_super;
 
@@ -335,42 +339,46 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
     RFALSE(is_reusable (s, block, 1) == 0, "vs-4071: can not free such block");
     /* mark it before we clear it, just in case */
     journal_mark_freed(th, s, block) ;
-    _reiserfs_free_block(th, block) ;
+    _reiserfs_free_block(th, inode, block, for_unformatted) ;
 }
 
 /* preallocated blocks don't need to be run through journal_mark_freed */
 void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th, 
-                          b_blocknr_t block) {
+			  struct inode *inode, b_blocknr_t block) {
     RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
     RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
-    _reiserfs_free_block(th, block) ;
+    _reiserfs_free_block(th, inode, block, 1) ;
 }
 
 static void __discard_prealloc (struct reiserfs_transaction_handle * th,
 				struct reiserfs_inode_info *ei)
 {
     unsigned long save = ei->i_prealloc_block ;
+    int dirty = 0;
+    struct inode *inode = &ei->vfs_inode;
 #ifdef CONFIG_REISERFS_CHECK
     if (ei->i_prealloc_count < 0)
 	reiserfs_warning("zam-4001:%s: inode has negative prealloc blocks count.\n", __FUNCTION__ );
 #endif
     while (ei->i_prealloc_count > 0) {
-	reiserfs_free_prealloc_block(th,ei->i_prealloc_block);
+	reiserfs_free_prealloc_block(th, inode, ei->i_prealloc_block);
 	ei->i_prealloc_block++;
 	ei->i_prealloc_count --;
+	dirty = 1;
     }
+    if (dirty)
+    	reiserfs_update_sd(th, inode);
     ei->i_prealloc_block = save;
     list_del_init(&(ei->i_prealloc_list));
 }
 
 /* FIXME: It should be inline function */
 void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th, 
-				struct inode * inode)
+				struct inode *inode)
 {
     struct reiserfs_inode_info *ei = REISERFS_I(inode);
-    if (ei->i_prealloc_count) {
+    if (ei->i_prealloc_count)
 	__discard_prealloc(th, ei);
-    }
 }
 
 void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
@@ -772,6 +780,24 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
     int nr_allocated = 0;
 
     determine_prealloc_size(hint);
+    if (!hint->formatted_node) {
+        int quota_ret;
+#ifdef REISERQUOTA_DEBUG
+	printk(KERN_DEBUG "reiserquota: allocating %d blocks id=%u\n", amount_needed, hint->inode->i_uid);
+#endif
+	quota_ret = DQUOT_ALLOC_BLOCK_NODIRTY(hint->inode, amount_needed);
+	if (quota_ret)    /* Quota exceeded? */
+	    return QUOTA_EXCEEDED;
+	if (hint->preallocate && hint->prealloc_size ) {
+#ifdef REISERQUOTA_DEBUG
+	    printk(KERN_DEBUG "reiserquota: allocating (prealloc) %d blocks id=%u\n", hint->prealloc_size, hint->inode->i_uid);
+#endif
+	    quota_ret = DQUOT_PREALLOC_BLOCK_NODIRTY(hint->inode, hint->prealloc_size);
+	    if (quota_ret)
+		hint->preallocate=hint->prealloc_size=0;
+	}
+    }
+
     while((nr_allocated
 	  += allocate_without_wrapping_disk(hint, new_blocknrs + nr_allocated, start, finish,
 					  amount_needed - nr_allocated, hint->prealloc_size))
@@ -779,8 +805,14 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 
 	/* not all blocks were successfully allocated yet*/
 	if (second_pass) {	/* it was a second pass; we must free all blocks */
+	    if (!hint->formatted_node) {
+#ifdef REISERQUOTA_DEBUG
+		printk(KERN_DEBUG "reiserquota: freeing (nospace) %d blocks id=%u\n", amount_needed + hint->prealloc_size - nr_allocated, hint->inode->i_uid);
+#endif
+		DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed + hint->prealloc_size - nr_allocated);     /* Free not allocated blocks */
+	    }
 	    while (nr_allocated --)
-		reiserfs_free_block(hint->th, new_blocknrs[nr_allocated]);
+		reiserfs_free_block(hint->th, hint->inode, new_blocknrs[nr_allocated], !hint->formatted_node);
 
 	    return NO_DISK_SPACE;
 	} else {		/* refine search parameters for next pass */
@@ -789,7 +821,19 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 	    start = 0;
 	    continue;
 	}
-      }
+    }
+    if ( !hint->formatted_node &&
+         amount_needed + hint->prealloc_size >
+	 nr_allocated + REISERFS_I(hint->inode)->i_prealloc_count) {
+    /* Some of preallocation blocks were not allocated */
+#ifdef REISERQUOTA_DEBUG
+	printk(KERN_DEBUG "reiserquota: freeing (failed prealloc) %d blocks id=%u\n", amount_needed + hint->prealloc_size - nr_allocated - INODE_INFO(hint->inode)->i_prealloc_count, hint->inode->i_uid);
+#endif
+	DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed +
+	                         hint->prealloc_size - nr_allocated -
+				 REISERFS_I(hint->inode)->i_prealloc_count);
+    }
+
     return CARRY_ON;
 }
 
@@ -858,7 +902,7 @@ int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *hint,
 
     if (ret != CARRY_ON) {
 	while (amount_needed ++ < initial_amount_needed) {
-	    reiserfs_free_block(hint->th, *(--new_blocknrs));
+	    reiserfs_free_block(hint->th, hint->inode, *(--new_blocknrs), 1);
 	}
     }
     return ret;

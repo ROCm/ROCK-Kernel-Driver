@@ -66,11 +66,11 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	set_ih_free_space (&ind_ih, 0); /* delete at nearest future */
         put_ih_item_len( &ind_ih, UNFM_P_SIZE );
 	PATH_LAST_POSITION (path)++;
-	n_retval = reiserfs_insert_item (th, path, &end_key, &ind_ih, 
+	n_retval = reiserfs_insert_item (th, path, &end_key, &ind_ih, inode,
 					 (char *)&unfm_ptr);
     } else {
 	/* Paste into last indirect item of an object. */
-	n_retval = reiserfs_paste_into_item(th, path, &end_key,
+	n_retval = reiserfs_paste_into_item(th, path, &end_key, inode,
 					    (char *)&unfm_ptr, UNFM_P_SIZE);
     }
     if ( n_retval ) {
@@ -274,7 +274,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     set_cpu_key_k_type (&key, TYPE_DIRECT);
     key.key_length = 4;
     /* Insert tail as new direct item in the tree */
-    if ( reiserfs_insert_item(th, p_s_path, &key, &s_ih,
+    if ( reiserfs_insert_item(th, p_s_path, &key, &s_ih, p_s_inode,
 			      tail ? tail : NULL) < 0 ) {
 	/* No disk memory. So we can not convert last unformatted node
 	   to the direct item.  In this case we used to adjust
@@ -292,13 +292,15 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     */
     unmap_buffers(page, pos1) ;
 
+    /* make sure to get the i_blocks changes from reiserfs_insert_item */
+    reiserfs_update_sd(th, p_s_inode);
+
     // note: we have now the same as in above direct2indirect
     // conversion: there are two keys which have matching first three
     // key components. They only differ by the fouhth one.
 
     /* We have inserted new direct item and must remove last
        unformatted node. */
-    p_s_inode->i_blocks += (p_s_sb->s_blocksize / 512);
     *p_c_mode = M_CUT;
 
     /* we store position of first direct item in the in-core inode */

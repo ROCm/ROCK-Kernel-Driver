@@ -268,6 +268,7 @@ int is_reiserfs_jr (struct reiserfs_super_block * rs);
 #define NO_DISK_SPACE -3
 #define NO_BALANCING_NEEDED  (-4)
 #define NO_MORE_UNUSED_CONTIGUOUS_BLOCKS (-5)
+#define QUOTA_EXCEEDED -6
 
 typedef __u32 b_blocknr_t;
 typedef __u32 unp_t;
@@ -1238,7 +1239,6 @@ excessive effort to avoid disturbing the precious VFS code.:-( The
 gods only know how we are going to SMP the code that uses them.
 znodes are the way! */
 
-
 struct  path {
   int                   path_length;                      	/* Length of the array above.   */
   struct  path_element  path_elements[EXTENDED_MAX_HEIGHT];	/* Array of the path elements.  */
@@ -1889,11 +1889,13 @@ void pathrelse_and_restore (struct super_block *s, struct path * p_s_search_path
 int reiserfs_insert_item (struct reiserfs_transaction_handle *th, 
 			  struct path * path, 
 			  const struct cpu_key * key,
-			  struct item_head * ih, const char * body);
+			  struct item_head * ih,
+			  struct inode *inode, const char * body);
 
 int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
 			      struct path * path,
 			      const struct cpu_key * key,
+			      struct inode *inode,
 			      const char * body, int paste_size);
 
 int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
@@ -1910,7 +1912,7 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 			  struct buffer_head  * p_s_un_bh);
 
 void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
-                                                                struct key * key);
+				 struct inode *inode, struct key * key);
 void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * p_s_inode);
 void reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
 			   struct  inode * p_s_inode, struct page *, 
@@ -1955,8 +1957,18 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 				   struct inode * dir, int mode, 
 				   const char * symname, loff_t i_size,
 				   struct dentry *dentry, struct inode *inode);
-int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * inode);
-void reiserfs_update_sd (struct reiserfs_transaction_handle *th, struct inode * inode);
+
+int reiserfs_sync_inode (struct reiserfs_transaction_handle *th,
+                         struct inode * inode);
+
+void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
+                              struct inode * inode, loff_t size);
+
+static inline void reiserfs_update_sd(struct reiserfs_transaction_handle *th,
+                                      struct inode *inode)
+{
+    reiserfs_update_sd_size(th, inode, inode->i_size) ;
+}
 
 void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode );
 void i_attrs_to_sd_attrs( struct inode *inode, __u16 *sd_attrs );
@@ -2139,7 +2151,7 @@ typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;
 
 int reiserfs_parse_alloc_options (struct super_block *, char *);
 int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value);
-void reiserfs_free_block (struct reiserfs_transaction_handle *th, b_blocknr_t);
+void reiserfs_free_block (struct reiserfs_transaction_handle *th, struct inode *, b_blocknr_t, int for_unformatted);
 int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *, b_blocknr_t * , int, int);
 extern inline int reiserfs_new_form_blocknrs (struct tree_balance * tb,
 					      b_blocknr_t *new_blocknrs, int amount_needed)

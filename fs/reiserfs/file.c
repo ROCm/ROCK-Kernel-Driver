@@ -13,6 +13,7 @@
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/quotaops.h>
 
 /*
 ** We pack the tails of files on file close, not at the time they are written.
@@ -274,7 +275,7 @@ int reiserfs_allocate_blocks_for_region(
 		    /* Ok, there is existing indirect item already. Need to append it */
 		    /* Calculate position past inserted item */
 		    make_cpu_key( &key, inode, le_key_k_offset( get_inode_item_key_version(inode), &(ih->ih_key)) + op_bytes_number(ih, inode->i_sb->s_blocksize), TYPE_INDIRECT, 3);
-		    res = reiserfs_paste_into_item( th, &path, &key, (char *)zeros, UNFM_P_SIZE*to_paste);
+		    res = reiserfs_paste_into_item( th, &path, &key, inode, (char *)zeros, UNFM_P_SIZE*to_paste);
 		    if ( res ) {
 			kfree(zeros);
 			goto error_exit_free_blocks;
@@ -304,7 +305,7 @@ int reiserfs_allocate_blocks_for_region(
 		        kfree(zeros);
 			goto error_exit_free_blocks;
 		    }
-		    res = reiserfs_insert_item( th, &path, &key, &ins_ih, (char *)zeros);
+		    res = reiserfs_insert_item( th, &path, &key, &ins_ih, inode, (char *)zeros);
 		} else {
 		    reiserfs_panic(inode->i_sb, "green-9011: Unexpected key type %K\n", &key);
 		}
@@ -421,7 +422,7 @@ retry:
 	    // position. We do not need to recalculate path as it should
 	    // already point to correct place.
 	    make_cpu_key( &key, inode, le_key_k_offset( get_inode_item_key_version(inode), &(ih->ih_key)) + op_bytes_number(ih, inode->i_sb->s_blocksize), TYPE_INDIRECT, 3);
-	    res = reiserfs_paste_into_item( th, &path, &key, (char *)(allocated_blocks+curr_block), UNFM_P_SIZE*(blocks_to_allocate-curr_block));
+	    res = reiserfs_paste_into_item( th, &path, &key, inode, (char *)(allocated_blocks+curr_block), UNFM_P_SIZE*(blocks_to_allocate-curr_block));
 	    if ( res ) {
 		goto error_exit_free_blocks;
 	    }
@@ -452,7 +453,7 @@ retry:
 		goto error_exit_free_blocks;
 	    }
 	    /* Insert item into the tree with the data as its body */
-	    res = reiserfs_insert_item( th, &path, &key, &ins_ih, (char *)(allocated_blocks+curr_block));
+	    res = reiserfs_insert_item( th, &path, &key, &ins_ih, inode, (char *)(allocated_blocks+curr_block));
 	} else {
 	    reiserfs_panic(inode->i_sb, "green-9010: unexpected item type for key %K\n",&key);
 	}
@@ -462,7 +463,6 @@ retry:
     // unless we return an error, they are also responsible for logging
     // the inode.
     //
-    inode->i_blocks += blocks_to_allocate << (inode->i_blkbits - 9);
     pathrelse(&path);
     reiserfs_write_unlock(inode->i_sb);
 
@@ -508,7 +508,7 @@ error_exit_free_blocks:
     pathrelse(&path);
     // free blocks
     for( i = 0; i < blocks_to_allocate; i++ )
-	reiserfs_free_block(th, le32_to_cpu(allocated_blocks[i]));
+	reiserfs_free_block(th, inode, le32_to_cpu(allocated_blocks[i]), 1);
 
 error_exit:
     reiserfs_update_sd(th, inode); // update any changes we made to blk count

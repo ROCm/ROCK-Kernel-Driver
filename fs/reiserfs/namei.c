@@ -18,6 +18,7 @@
 #include <linux/reiserfs_acl.h>
 #include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
+#include <linux/quotaops.h>
 
 #define INC_DIR_INODE_NLINK(i) if (i->i_nlink != 1) { i->i_nlink++; if (i->i_nlink >= REISERFS_LINK_MAX) i->i_nlink=1; }
 #define DEC_DIR_INODE_NLINK(i) if (i->i_nlink != 1) i->i_nlink--;
@@ -519,7 +520,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     }
   
     /* perform the insertion of the entry that we have prepared */
-    retval = reiserfs_paste_into_item (th, &path, &entry_key, buffer, paste_size);
+    retval = reiserfs_paste_into_item (th, &path, &entry_key, dir, buffer, paste_size);
     if (buffer != small_buf)
 	reiserfs_kfree (buffer, buflen, dir->i_sb);
     if (retval) {
@@ -528,7 +529,6 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     }
 
     dir->i_size += paste_size;
-    dir->i_blocks = ((dir->i_size + 511) >> 9);
     dir->i_mtime = dir->i_ctime = CURRENT_TIME;
     if (!S_ISDIR (inode->i_mode) && visible)
 	// reiserfs_mkdir or reiserfs_rename will do that by itself
@@ -544,7 +544,9 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 ** inserted into the tree yet.
 */
 static int drop_new_inode(struct inode *inode) {
+    DQUOT_DROP(inode);
     make_bad_inode(inode) ;
+    inode->i_flags |= S_NOQUOTA;
     iput(inode) ;
     return 0 ;
 }
@@ -569,6 +571,11 @@ static int new_inode_init(struct inode *inode, struct inode *dir, int mode) {
             inode->i_mode |= S_ISGID;
     } else {
         inode->i_gid = current->fsgid;
+    }
+    DQUOT_INIT(inode);
+    if (DQUOT_ALLOC_INODE(inode)) {
+        drop_new_inode(inode);
+	return -EDQUOT;
     }
     return 0 ;
 }
@@ -836,7 +843,6 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 
     DEC_DIR_INODE_NLINK(dir)
     dir->i_size -= (DEH_SIZE + de.de_entrylen);
-    dir->i_blocks = ((dir->i_size + 511) >> 9);
     reiserfs_update_sd (&th, dir);
 
     /* prevent empty directory from getting lost */
@@ -919,7 +925,6 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
     reiserfs_update_sd (&th, inode);
 
     dir->i_size -= (de.de_entrylen + DEH_SIZE);
-    dir->i_blocks = ((dir->i_size + 511) >> 9);
     dir->i_ctime = dir->i_mtime = CURRENT_TIME;
     reiserfs_update_sd (&th, dir);
 
@@ -1335,7 +1340,6 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	reiserfs_warning ("vs-7060: reiserfs_rename: couldn't not cut old name. Fsck later?\n");
 
     old_dir->i_size -= DEH_SIZE + old_de.de_entrylen;
-    old_dir->i_blocks = ((old_dir->i_size + 511) >> 9);
 
     reiserfs_update_sd (&th, old_dir);
     reiserfs_update_sd (&th, new_dir);

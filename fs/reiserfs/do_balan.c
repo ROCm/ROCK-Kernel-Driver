@@ -1234,7 +1234,7 @@ static void free_thrown(struct tree_balance *tb) {
 	    if (buffer_dirty (tb->thrown[i]))
 	      printk ("free_thrown deals with dirty buffer %d\n", blocknr);
 	    brelse(tb->thrown[i]) ; /* incremented in store_thrown */
-	    reiserfs_free_block (tb->transaction_handle, blocknr);
+	    reiserfs_free_block (tb->transaction_handle, NULL, blocknr, 0);
 	}
     }
 }
@@ -1247,10 +1247,6 @@ void reiserfs_invalidate_buffer (struct tree_balance * tb, struct buffer_head * 
     set_blkh_nr_item( blkh, 0 );
     
     clear_buffer_dirty(bh);
-    /* reiserfs_free_block is no longer schedule safe 
-    reiserfs_free_block (tb->transaction_handle, tb->tb_sb, bh->b_blocknr);
-    */
-
     store_thrown (tb, bh);
 }
 

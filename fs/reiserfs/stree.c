@@ -60,6 +60,7 @@
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/quotaops.h>
 
 /* Does the buffer contain a disk block which is in the tree. */
 inline int B_IS_IN_TREE (const struct buffer_head * p_s_bh)
@@ -70,9 +71,6 @@ inline int B_IS_IN_TREE (const struct buffer_head * p_s_bh)
 
   return ( B_LEVEL (p_s_bh) != FREE_LEVEL );
 }
-
-
-
 
 inline void copy_short_key (void * to, const void * from)
 {
@@ -1125,8 +1123,7 @@ static char  prepare_for_delete_or_cut(
 		tmp = get_block_num(p_n_unfm_pointer,0);
 		put_block_num(p_n_unfm_pointer, 0, 0);
 		journal_mark_dirty (th, p_s_sb, p_s_bh);
-		inode->i_blocks -= p_s_sb->s_blocksize / 512;
-		reiserfs_free_block(th, tmp);
+		reiserfs_free_block(th, inode, tmp, 1);
 		if ( item_moved (&s_ih, p_s_path) )  {
 			need_research = 1;
 			break ;
@@ -1155,8 +1152,7 @@ static char  prepare_for_delete_or_cut(
     }
 }
 
-
-/* Calculate bytes number which will be deleted or cutted in the balance. */
+/* Calculate number of bytes which will be deleted or cut during balance */
 int calc_deleted_bytes_number(
     struct  tree_balance  * p_s_tb,
     char                    c_mode
@@ -1167,14 +1163,14 @@ int calc_deleted_bytes_number(
     if ( is_statdata_le_ih (p_le_ih) )
 	return 0;
 
+    n_del_size = ( c_mode == M_DELETE ) ? ih_item_len(p_le_ih) : -p_s_tb->insert_size[0];
     if ( is_direntry_le_ih (p_le_ih) ) {
 	// return EMPTY_DIR_SIZE; /* We delete emty directoris only. */
 	// we can't use EMPTY_DIR_SIZE, as old format dirs have a different
 	// empty size.  ick. FIXME, is this right?
 	//
-	return ih_item_len(p_le_ih);
+	return n_del_size ;
     }
-    n_del_size = ( c_mode == M_DELETE ) ? ih_item_len(p_le_ih) : -p_s_tb->insert_size[0];
 
     if ( is_indirect_le_ih (p_le_ih) )
 	n_del_size = (n_del_size/UNFM_P_SIZE)*
@@ -1208,17 +1204,46 @@ void padd_item (char * item, int total_length, int length)
 	item [--i] = 0;
 }
 
+#ifdef REISERQUOTA_DEBUG
+char key2type(struct key *ih)
+{
+  if (is_direntry_le_key(2, ih))
+    return 'd';
+  if (is_direct_le_key(2, ih))
+    return 'D';
+  if (is_indirect_le_key(2, ih))
+    return 'i';
+  if (is_statdata_le_key(2, ih))
+    return 's';
+  return 'u';
+}
+
+char head2type(struct item_head *ih)
+{
+  if (is_direntry_le_ih(ih))
+    return 'd';
+  if (is_direct_le_ih(ih))
+    return 'D';
+  if (is_indirect_le_ih(ih))
+    return 'i';
+  if (is_statdata_le_ih(ih))
+    return 's';
+  return 'u';
+}
+#endif
 
 /* Delete object item. */
 int reiserfs_delete_item (struct reiserfs_transaction_handle *th, 
 			  struct path * p_s_path, /* Path to the deleted item. */
 			  const struct cpu_key * p_s_item_key, /* Key to search for the deleted item.  */
-			  struct inode * p_s_inode,/* inode is here just to update i_blocks */
+			  struct inode * p_s_inode,/* inode is here just to update i_blocks and quotas */
 			  struct buffer_head  * p_s_un_bh)    /* NULL or unformatted node pointer.    */
 {
     struct super_block * p_s_sb = p_s_inode->i_sb;
     struct tree_balance   s_del_balance;
     struct item_head      s_ih;
+    struct item_head      *q_ih;
+    int			  quota_cut_bytes;
     int                   n_ret_value,
 	n_del_size,
 	n_removed;
@@ -1268,6 +1293,22 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 
     // reiserfs_delete_item returns item length when success
     n_ret_value = calc_deleted_bytes_number(&s_del_balance, M_DELETE);
+    q_ih = get_ih(p_s_path) ;
+    quota_cut_bytes = ih_item_len(q_ih) ;
+
+    /* hack so the quota code doesn't have to guess if the file
+    ** has a tail.  On tail insert, we allocate quota for 1 unformatted node.
+    ** We test the offset because the tail might have been
+    ** split into multiple items, and we only want to decrement for
+    ** the unfm node once
+    */
+    if (!S_ISLNK (p_s_inode->i_mode) && is_direct_le_ih(q_ih)) {
+        if ((le_ih_k_offset(q_ih) & (p_s_sb->s_blocksize - 1)) == 1) {
+            quota_cut_bytes = p_s_sb->s_blocksize + UNFM_P_SIZE;
+        } else {
+	    quota_cut_bytes = 0 ;
+	}
+    }
 
     if ( p_s_un_bh )  {
 	int off;
@@ -1299,9 +1340,13 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 	       B_I_PITEM(PATH_PLAST_BUFFER(p_s_path), &s_ih), n_ret_value);
 	kunmap_atomic(data, KM_USER0);
     }
-
     /* Perform balancing after all resources have been collected at once. */ 
     do_balance(&s_del_balance, NULL, NULL, M_DELETE);
+
+#ifdef REISERQUOTA_DEBUG
+    printk(KERN_DEBUG "reiserquota delete_item(): freeing %u, id=%u type=%c\n", quota_cut_bytes, p_s_inode->i_uid, head2type(&s_ih));
+#endif
+    DQUOT_FREE_SPACE_NODIRTY(p_s_inode, quota_cut_bytes);
 
     /* Return deleted body length */
     return n_ret_value;
@@ -1327,14 +1372,16 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 
 /* this deletes item which never gets split */
 void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
+				 struct inode *inode,
 				 struct key * key)
 {
     struct tree_balance tb;
     INITIALIZE_PATH (path);
-    int item_len;
+    int item_len = 0;
     int tb_init = 0 ;
     struct cpu_key cpu_key;
     int retval;
+    int quota_cut_bytes = 0;
     
     le_key2cpu_key (&cpu_key, key);
     
@@ -1358,6 +1405,7 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	    item_len = ih_item_len( PATH_PITEM_HEAD(&path) );
 	    init_tb_struct (th, &tb, th->t_super, &path, - (IH_SIZE + item_len));
 	}
+	quota_cut_bytes = ih_item_len(PATH_PITEM_HEAD(&path)) ;
 
 	retval = fix_nodes (M_DELETE, &tb, NULL, 0);
 	if (retval == REPEAT_SEARCH) {
@@ -1367,6 +1415,12 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 
 	if (retval == CARRY_ON) {
 	    do_balance (&tb, 0, 0, M_DELETE);
+	    if (inode) {	/* Should we count quota for item? (we don't count quotas for save-links) */
+#ifdef REISERQUOTA_DEBUG
+		printk(KERN_DEBUG "reiserquota delete_solid_item(): freeing %u id=%u type=%c\n", quota_cut_bytes, inode->i_uid, key2type(key));
+#endif
+		DQUOT_FREE_SPACE_NODIRTY(inode, quota_cut_bytes);
+	    }
 	    break;
 	}
 
@@ -1399,7 +1453,7 @@ void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inod
       }
 /* USE_INODE_GENERATION_COUNTER */
 #endif
-    reiserfs_delete_solid_item (th, INODE_PKEY (inode));
+    reiserfs_delete_solid_item (th, inode, INODE_PKEY (inode));
 }
 
 
@@ -1486,12 +1540,14 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
        structure by using the init_tb_struct and fix_nodes functions.
        After that we can make tree balancing. */
     struct tree_balance s_cut_balance;
+    struct item_head *p_le_ih;
     int n_cut_size = 0,        /* Amount to be cut. */
 	n_ret_value = CARRY_ON,
 	n_removed = 0,     /* Number of the removed unformatted nodes. */
 	n_is_inode_locked = 0;
     char                c_mode;            /* Mode of the balance. */
     int retval2 = -1;
+    int quota_cut_bytes;
     
     
     init_tb_struct(th, &s_cut_balance, p_s_inode->i_sb, p_s_path, n_cut_size);
@@ -1579,23 +1635,27 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     RFALSE( c_mode == M_PASTE || c_mode == M_INSERT, "invalid mode");
 
     /* Calculate number of bytes that need to be cut from the item. */
+    quota_cut_bytes = ( c_mode == M_DELETE ) ? ih_item_len(get_ih(p_s_path)) : -s_cut_balance.insert_size[0];
     if (retval2 == -1)
 	n_ret_value = calc_deleted_bytes_number(&s_cut_balance, c_mode);
     else
 	n_ret_value = retval2;
-    
-    if ( c_mode == M_DELETE ) {
-	struct item_head * p_le_ih = PATH_PITEM_HEAD (s_cut_balance.tb_path);
-	
-	if ( is_direct_le_ih (p_le_ih) && (le_ih_k_offset (p_le_ih) & (p_s_sb->s_blocksize - 1)) == 1 ) {
-	    /* we delete first part of tail which was stored in direct
-               item(s) */
+
+
+    /* For direct items, we only change the quota when deleting the last
+    ** item.
+    */
+    p_le_ih = PATH_PITEM_HEAD (s_cut_balance.tb_path);
+    if (!S_ISLNK (p_s_inode->i_mode) && is_direct_le_ih(p_le_ih)) {
+        if (c_mode == M_DELETE &&
+	   (le_ih_k_offset (p_le_ih) & (p_s_sb->s_blocksize - 1)) == 1 ) {
 	    // FIXME: this is to keep 3.5 happy
 	    REISERFS_I(p_s_inode)->i_first_direct_byte = U32_MAX;
-	    p_s_inode->i_blocks -= p_s_sb->s_blocksize / 512;
+	    quota_cut_bytes = p_s_sb->s_blocksize + UNFM_P_SIZE ;
+        } else {
+	    quota_cut_bytes = 0 ;
 	}
     }
-
 #ifdef CONFIG_REISERFS_CHECK
     if (n_is_inode_locked) {
 	struct item_head * le_ih = PATH_PITEM_HEAD (s_cut_balance.tb_path);
@@ -1630,9 +1690,12 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	*/
 	REISERFS_I(p_s_inode)->i_flags &= ~i_pack_on_close_mask ;
     }
+#ifdef REISERQUOTA_DEBUG
+    printk(KERN_DEBUG "reiserquota cut_from_item(): freeing %u id=%u type=%c\n", quota_cut_bytes, p_s_inode->i_uid, '?');
+#endif
+    DQUOT_FREE_SPACE_NODIRTY(p_s_inode, quota_cut_bytes);
     return n_ret_value;
 }
-
 
 static void truncate_directory (struct reiserfs_transaction_handle *th, struct inode * inode)
 {
@@ -1641,8 +1704,8 @@ static void truncate_directory (struct reiserfs_transaction_handle *th, struct i
 
     set_le_key_k_offset (KEY_FORMAT_3_5, INODE_PKEY (inode), DOT_OFFSET);
     set_le_key_k_type (KEY_FORMAT_3_5, INODE_PKEY (inode), TYPE_DIRENTRY);
-    reiserfs_delete_solid_item (th, INODE_PKEY (inode));
-
+    reiserfs_delete_solid_item (th, inode, INODE_PKEY (inode));
+    reiserfs_update_sd(th, inode) ;
     set_le_key_k_offset (KEY_FORMAT_3_5, INODE_PKEY (inode), SD_OFFSET);
     set_le_key_k_type (KEY_FORMAT_3_5, INODE_PKEY (inode), TYPE_STAT_DATA);    
 }
@@ -1809,18 +1872,37 @@ static void check_research_for_paste (struct path * path,
 int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th, 
 			      struct path         * p_s_search_path,	/* Path to the pasted item.          */
 			      const struct cpu_key      * p_s_key,        	/* Key to search for the needed item.*/
+			      struct inode	  * inode,		/* Inode item belongs to */
 			      const char          * p_c_body,       	/* Pointer to the bytes to paste.    */
 			      int                   n_pasted_size)  	/* Size of pasted bytes.             */
 {
     struct tree_balance s_paste_balance;
     int                 retval;
+    int			fs_gen;
 
+    fs_gen = get_generation(inode->i_sb) ;
+
+#ifdef REISERQUOTA_DEBUG
+    printk(KERN_DEBUG "reiserquota paste_into_item(): allocating %u id=%u type=%c\n", n_pasted_size, inode->i_uid, key2type(&(p_s_key->on_disk_key)));
+#endif
+
+    if (DQUOT_ALLOC_SPACE_NODIRTY(inode, n_pasted_size)) {
+	pathrelse(p_s_search_path);
+	return -EDQUOT;
+    }
     init_tb_struct(th, &s_paste_balance, th->t_super, p_s_search_path, n_pasted_size);
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
     s_paste_balance.key = p_s_key->on_disk_key;
 #endif
-    
-    while ( (retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) == REPEAT_SEARCH ) {
+
+    /* DQUOT_* can schedule, must check before the fix_nodes */
+    if (fs_changed(fs_gen, inode->i_sb)) {
+	goto search_again;
+    }
+
+    while ((retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) ==
+REPEAT_SEARCH ) {
+search_again:
 	/* file system changed while we were in the fix_nodes */
 	PROC_INFO_INC( th -> t_super, paste_into_item_restarted );
 	retval = search_for_position_by_key (th->t_super, p_s_key, p_s_search_path);
@@ -1849,6 +1931,10 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
 error_out:
     /* this also releases the path */
     unfix_nodes(&s_paste_balance);
+#ifdef REISERQUOTA_DEBUG
+    printk(KERN_DEBUG "reiserquota paste_into_item(): freeing %u id=%u type=%c\n", n_pasted_size, inode->i_uid, key2type(&(p_s_key->on_disk_key)));
+#endif
+    DQUOT_FREE_SPACE_NODIRTY(inode, n_pasted_size);
     return retval ;
 }
 
@@ -1858,23 +1944,45 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 			 struct path         * 	p_s_path,         /* Path to the inserteded item.         */
 			 const struct cpu_key      * key,
 			 struct item_head    * 	p_s_ih,           /* Pointer to the item header to insert.*/
+			 struct inode        * inode,
 			 const char          * 	p_c_body)         /* Pointer to the bytes to insert.      */
 {
     struct tree_balance s_ins_balance;
     int                 retval;
+    int fs_gen = 0 ;
+    int quota_bytes = 0 ;
 
+    if (inode) {      /* Do we count quotas for item? */
+	fs_gen = get_generation(inode->i_sb);
+	quota_bytes = ih_item_len(p_s_ih);
+
+	/* hack so the quota code doesn't have to guess if the file has
+	 ** a tail, links are always tails, so there's no guessing needed
+	 */
+	if (!S_ISLNK (inode->i_mode) && is_direct_le_ih(p_s_ih)) {
+	    quota_bytes = inode->i_sb->s_blocksize + UNFM_P_SIZE ;
+	}
+#ifdef REISERQUOTA_DEBUG
+	printk(KERN_DEBUG "reiserquota insert_item(): allocating %u id=%u type=%c\n", quota_bytes, inode->i_uid, head2type(p_s_ih));
+#endif
+	/* We can't dirty inode here. It would be immediately written but
+	 * appropriate stat item isn't inserted yet... */
+	if (DQUOT_ALLOC_SPACE_NODIRTY(inode, quota_bytes)) {
+	    pathrelse(p_s_path);
+	    return -EDQUOT;
+	}
+    }
     init_tb_struct(th, &s_ins_balance, th->t_super, p_s_path, IH_SIZE + ih_item_len(p_s_ih));
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
     s_ins_balance.key = key->on_disk_key;
 #endif
-
-    /*
-    if (p_c_body == 0)
-      n_zeros_num = ih_item_len(p_s_ih);
-    */
-    //    le_key2cpu_key (&key, &(p_s_ih->ih_key));
+    /* DQUOT_* can schedule, must check to be sure calling fix_nodes is safe */
+    if (inode && fs_changed(fs_gen, inode->i_sb)) {
+	goto search_again;
+    }
 
     while ( (retval = fix_nodes(M_INSERT, &s_ins_balance, p_s_ih, p_c_body)) == REPEAT_SEARCH) {
+search_again:
 	/* file system changed while we were in the fix_nodes */
 	PROC_INFO_INC( th -> t_super, insert_item_restarted );
 	retval = search_item (th->t_super, key, p_s_path);
@@ -1900,6 +2008,11 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 error_out:
     /* also releases the path */
     unfix_nodes(&s_ins_balance);
+#ifdef REISERQUOTA_DEBUG
+    printk(KERN_DEBUG "reiserquota insert_item(): freeing %u id=%u type=%c\n", quota_bytes, inode->i_uid, head2type(p_s_ih));
+#endif
+    if (inode)
+	DQUOT_FREE_SPACE_NODIRTY(inode, quota_bytes) ;
     return retval; 
 }
 

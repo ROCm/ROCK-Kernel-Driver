@@ -115,7 +115,7 @@ static void remove_save_link_only (struct super_block * s, struct key * key, int
      /* we are going to do one balancing */
      journal_begin (&th, s, JOURNAL_PER_BALANCE_CNT);
  
-     reiserfs_delete_solid_item (&th, key);
+     reiserfs_delete_solid_item (&th, NULL, key);
      if (oid_free)
         /* removals are protected by direct items */
         reiserfs_release_objectid (&th, le32_to_cpu (key->k_objectid));
@@ -301,8 +301,8 @@ void add_save_link (struct reiserfs_transaction_handle * th,
     /* body of "save" link */
     link = INODE_PKEY (inode)->k_dir_id;
 
-    /* put "save" link inot tree */
-    retval = reiserfs_insert_item (th, &path, &key, &ih, (char *)&link);
+    /* put "save" link inot tree, don't charge quota to anyone */
+    retval = reiserfs_insert_item (th, &path, &key, &ih, NULL, (char *)&link);
     if (retval) {
 	if (retval != -ENOSPC)
 	    reiserfs_warning ("vs-2120: add_save_link: insert_item returned %d\n",
@@ -344,7 +344,8 @@ void remove_save_link (struct inode * inode, int truncate)
           ( REISERFS_I(inode) -> i_flags & i_link_saved_truncate_mask ) ) ||
         ( !truncate && 
           ( REISERFS_I(inode) -> i_flags & i_link_saved_unlink_mask ) ) )
-	reiserfs_delete_solid_item (&th, &key);
+	/* don't take quota bytes from anywhere */
+	reiserfs_delete_solid_item (&th, NULL, &key);
     if (!truncate) {
 	reiserfs_release_objectid (&th, inode->i_ino);
 	REISERFS_I(inode) -> i_flags &= ~i_link_saved_unlink_mask;
@@ -714,6 +715,8 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"jdev", 'j', 0, 0, 0},
 	{"nolargeio", 'w', 0, 0, 0},
 	{"commit", 'c', 0, 0, 0},
+	{"usrquota", 0, 0, 0, 0},
+	{"grpquota", 0, 0, 0, 0},
 	{NULL, 0, 0, 0, 0}
     };
 	
