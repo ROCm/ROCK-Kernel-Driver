@@ -121,7 +121,9 @@ int jfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	}
 #endif
 	
-	inode_setattr(inode, iattr);
+	rc = inode_setattr(inode, iattr);
+	if (rc)
+		return rc;
 
 #ifdef CONFIG_JFS_POSIX_ACL
 	if (iattr->ia_valid & ATTR_MODE)
