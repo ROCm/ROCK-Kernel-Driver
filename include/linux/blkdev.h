@@ -293,7 +293,7 @@ extern void grok_partitions(kdev_t dev, long size);
 extern int wipe_partitions(kdev_t dev);
 extern void register_disk(struct gendisk *dev, kdev_t first, unsigned minors, struct block_device_operations *ops, long size);
 extern void generic_make_request(struct bio *bio);
-extern inline request_queue_t *blk_get_queue(kdev_t dev);
+extern inline request_queue_t *bdev_get_queue(struct block_device *bdev);
 extern void blkdev_release_request(struct request *);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
@@ -373,14 +373,9 @@ extern inline int queue_hardsect_size(request_queue_t *q)
 	return retval;
 }
 
-extern inline int get_hardsect_size(kdev_t dev)
-{
-	return queue_hardsect_size(blk_get_queue(dev));
-}
-
 extern inline int bdev_hardsect_size(struct block_device *bdev)
 {
-	return queue_hardsect_size(blk_get_queue(to_kdev_t(bdev->bd_dev)));
+	return queue_hardsect_size(bdev_get_queue(bdev));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)

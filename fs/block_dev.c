@@ -56,14 +56,13 @@ static void kill_bdev(struct block_device *bdev)
 int set_blocksize(struct block_device *bdev, int size)
 {
 	int oldsize;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
 		return -EINVAL;
 
 	/* Size cannot be smaller than the size supported by the device */
-	if (size < get_hardsect_size(dev))
+	if (size < bdev_hardsect_size(bdev))
 		return -EINVAL;
 
 	oldsize = bdev->bd_block_size;

@@ -2285,7 +2285,7 @@ static int hot_generate_error(mddev_t * mddev, kdev_t dev)
 	if (!disk_active(disk))
 		return -ENODEV;
 
-	q = blk_get_queue(rdev->dev);
+	q = bdev_get_queue(rdev->bdev);
 	if (!q) {
 		MD_BUG();
 		return -ENODEV;

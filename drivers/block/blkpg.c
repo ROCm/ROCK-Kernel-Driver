@@ -260,7 +260,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 						(long *)arg);
 
 		case BLKSECTGET:
-			if ((q = blk_get_queue(dev)) == NULL)
+			if ((q = bdev_get_queue(bdev)) == NULL)
 				return -EINVAL;
 
 			usval = q->max_sectors;

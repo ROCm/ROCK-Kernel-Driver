@@ -80,8 +80,8 @@ unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
 
 /**
- * blk_get_queue: - return the queue that matches the given device
- * @dev:    device
+ * bdev_get_queue: - return the queue that matches the given device
+ * @bdev:    device
  *
  * Description:
  *     Given a specific device, return the queue that will hold I/O
@@ -90,12 +90,12 @@ int blk_nohighio = 0;
  *     stored in the same location.
  *
  **/
-inline request_queue_t *blk_get_queue(kdev_t dev)
+inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
-	struct blk_dev_struct *bdev = blk_dev + major(dev);
-
-	if (bdev->queue)
-		return bdev->queue(dev);
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct blk_dev_struct *p = blk_dev + major(dev);
+	if (p->queue)
+		return p->queue(dev);
 	else
 		return &blk_dev[major(dev)].request_queue;
 }
@@ -112,7 +112,7 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
 	struct backing_dev_info *ret = NULL;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	request_queue_t *q = bdev_get_queue(bdev);
 
 	if (q)
 		ret = &q->backing_dev_info;
@@ -1482,7 +1482,7 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
-		q = blk_get_queue(to_kdev_t(bio->bi_bdev->bd_dev));
+		q = bdev_get_queue(bio->bi_bdev);
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
@@ -1885,7 +1885,7 @@ int __init blk_dev_init(void)
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(blk_init_queue);
-EXPORT_SYMBOL(blk_get_queue);
+EXPORT_SYMBOL(bdev_get_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);
