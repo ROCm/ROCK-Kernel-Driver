@@ -527,7 +527,7 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 		int leftover = req->hard_nr_sectors << 9;
 
 		if (blk_pc_request(req))
-			leftover = req->data_len - bytes;
+			leftover = req->data_len;
 
 		/* kill remainder if no retrys */
 		if (!uptodate && blk_noretry_request(req))
