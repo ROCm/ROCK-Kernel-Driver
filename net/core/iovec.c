@@ -192,7 +192,7 @@ int csum_partial_copy_fromiovecend(unsigned char *kdata, struct iovec *iov,
 	}
 
 	while (len > 0) {
-		u8 *base = iov->iov_base + offset;
+		u8 __user *base = iov->iov_base + offset;
 		int copy = min_t(unsigned int, len, iov->iov_len - offset);
 
 		offset = 0;
