@@ -11,8 +11,6 @@
 #ifndef _ASM_THREAD_INFO_H
 #define _ASM_THREAD_INFO_H
 
-// XXX todo: comment thread_info components and see what breaks.
-
 #ifdef __KERNEL__
 
 #ifndef __ASSEMBLY__

@@ -4,38 +4,35 @@
 # Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
 # Copyright (C) 1997,1998 Jakub Jelinek (jj@ultra.linux.cz)
 
-ROOT_IMG	=/usr/src/root.img
-ELFTOAOUT	=elftoaout
+ROOT_IMG	:= /usr/src/root.img
+ELFTOAOUT	:= elftoaout
 
-all: btfix.o
+host-progs	:= piggyback btfixupprep
+EXTRA_TARGETS	:= tftpboot.img btfix.o btfix.s image
 
-tftpboot.img: piggyback
-	$(ELFTOAOUT) $(TOPDIR)/vmlinux -o tftpboot.img
-	./piggyback tftpboot.img $(TOPDIR)/System.map $(ROOT_IMG)
-
-piggyback: piggyback.c
-	$(HOSTCC) $(HOSTCFLAGS) -o piggyback piggyback.c
-
-btfixupprep: btfixupprep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o btfixupprep btfixupprep.c
-
-clean:
-	rm -f btfixupprep piggyback tftpboot.img btfix.o btfix.s image
+quiet_cmd_elftoaout	= ELFTOAOUT $@
+      cmd_elftoaout	= $(ELFTOAOUT) $(obj)/image -o $@
+quiet_cmd_piggy		= PIGGY $@
+      cmd_piggy		= $(obj)/piggyback $@ $(obj)/System.map $(ROOT_IMG)
+quiet_cmd_btfix		= BTFIX $@
+      cmd_btfix		= $(OBJDUMP) -x vmlinux | $(obj)/btfixupprep > $@
 
 BTOBJS := $(HEAD) $(INIT_Y)
 BTLIBS := $(CORE_Y) $(LIBS_Y) $(DRIVERS_Y) $(NET_Y)
+LDFLAGS_image := -T arch/sparc/vmlinux.lds.s $(BTOBJS) --start-group $(BTLIBS) --end-group
 
 # Actual linking
-image: btfix.o
-	$(LD) $(LDFLAGS) -T ../vmlinux.lds.s \
-		$(patsubst %,$(TOPDIR)/%,$(BTOBJS)) \
-		--start-group \
-		$(patsubst %,$(TOPDIR)/%,$(BTLIBS)) \
-		btfix.o \
-		--end-group -o image
+$(obj)/image: $(obj)/btfix.o FORCE
+	$(call if_changed,ld)
+	$(NM) $@ | grep -v  '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > $(obj)/System.map
 
-btfix.s: btfixupprep $(TOPDIR)/vmlinux
-	$(OBJDUMP) -x $(TOPDIR)/vmlinux | ./btfixupprep > btfix.s
+$(obj)/tftpboot.img: $(obj)/piggyback $(obj)/System.map $(obj)/image FORCE
+	$(call if_changed,elftoaout)
+	$(call if_changed,piggy)
 
-btfix.o: btfix.s
-	$(CC) -c -o btfix.o btfix.s
+$(obj)/btfix.s: $(obj)/btfixupprep vmlinux FORCE
+	$(call if_changed,btfix)
+
+archhelp:
+	@echo '* image		- kernel image ($(obj)/image)'
+	@echo '  tftpboot.img	- image prepared for tftp'
