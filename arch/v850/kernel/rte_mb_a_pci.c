@@ -251,10 +251,10 @@ int __nomods_init pcibios_enable_device (struct pci_dev *dev, int mask)
 /* Resource allocation.  */
 static void __devinit pcibios_assign_resources (void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	struct resource *r;
 
-	pci_for_each_dev (dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		unsigned di_num;
 		unsigned class = dev->class >> 8;
 
