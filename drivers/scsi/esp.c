@@ -1309,6 +1309,7 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 
 static int esp_host_info(struct esp *esp, char *ptr, off_t offset, int len)
 {
+	struct scsi_device *sdev;
 	struct info_str info;
 	int i;
 
@@ -1384,25 +1385,23 @@ static int esp_host_info(struct esp *esp, char *ptr, off_t offset, int len)
 	
 	/* Now describe the state of each existing target. */
 	copy_info(&info, "Target #\tconfig3\t\tSync Capabilities\tDisconnect\tWide\n");
-	for (i = 0; i < 15; i++) {
-		if (esp->targets_present & (1 << i)) {
-			Scsi_Device *SDptr;
-			struct esp_device *esp_dev;
 
-			list_for_each_entry(SDptr, &esp->ehost->my_devices,
-					siblings)
-				if(SDptr->id == i)
-					break;
+	shost_for_each_device(sdev, esp->ehost) {
+		struct esp_device *esp_dev = sdev->hostdata;
+		uint id = sdev->id;
 
-			esp_dev = SDptr->hostdata;
-			copy_info(&info, "%d\t\t", i);
-			copy_info(&info, "%08lx\t", esp->config3[i]);
-			copy_info(&info, "[%02lx,%02lx]\t\t\t", esp_dev->sync_max_offset,
-				  esp_dev->sync_min_period);
-			copy_info(&info, "%s\t\t", esp_dev->disconnect ? "yes" : "no");
-			copy_info(&info, "%s\n",
-				  (esp->config3[i] & ESP_CONFIG3_EWIDE) ? "yes" : "no");
-		}
+		if (!(esp->targets_present & (1 << id)))
+			continue;
+
+		copy_info(&info, "%d\t\t", id);
+		copy_info(&info, "%08lx\t", esp->config3[id]);
+		copy_info(&info, "[%02lx,%02lx]\t\t\t",
+			esp_dev->sync_max_offset,
+			esp_dev->sync_min_period);
+		copy_info(&info, "%s\t\t",
+			esp_dev->disconnect ? "yes" : "no");
+		copy_info(&info, "%s\n",
+			(esp->config3[id] & ESP_CONFIG3_EWIDE) ? "yes" : "no");
 	}
 	return info.pos > info.offset? info.pos - info.offset : 0;
 }

@@ -90,6 +90,7 @@ static Scsi_Host_Template sim710_driver_template = {
 	.name			= "LSI (Symbios) 710 MCA/EISA",
 	.proc_name		= "sim710",
 	.this_id		= 7,
+	.module			= THIS_MODULE,
 };
 
 static __devinit int
