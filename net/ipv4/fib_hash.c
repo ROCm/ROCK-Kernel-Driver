@@ -448,7 +448,7 @@ static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
 			if (prio <= fa->fa_info->fib_priority)
 				break;
 		}
-		return fa;
+		return prev_fa;
 	}
 	return NULL;
 }
