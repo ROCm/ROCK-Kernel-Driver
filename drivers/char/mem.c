@@ -79,6 +79,22 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 #endif
 }
 
+#ifndef ARCH_HAS_VALID_PHYS_ADDR_RANGE
+static inline int valid_phys_addr_range(unsigned long addr, size_t *count)
+{
+	unsigned long end_mem;
+
+	end_mem = __pa(high_memory);
+	if (addr >= end_mem)
+		return 0;
+
+	if (*count > end_mem - addr)
+		*count = end_mem - addr;
+
+	return 1;
+}
+#endif
+
 static ssize_t do_write_mem(struct file * file, void *p, unsigned long realp,
 			    const char * buf, size_t count, loff_t *ppos)
 {
@@ -113,14 +129,10 @@ static ssize_t read_mem(struct file * file, char * buf,
 			size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
-	unsigned long end_mem;
 	ssize_t read;
 
-	end_mem = __pa(high_memory);
-	if (p >= end_mem)
-		return 0;
-	if (count > end_mem - p)
-		count = end_mem - p;
+	if (!valid_phys_addr_range(p, &count))
+		return -EFAULT;
 	read = 0;
 #if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 	/* we don't have page 0 mapped on sparc and m68k.. */
@@ -149,13 +161,9 @@ static ssize_t write_mem(struct file * file, const char * buf,
 			 size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
-	unsigned long end_mem;
 
-	end_mem = __pa(high_memory);
-	if (p >= end_mem)
-		return 0;
-	if (count > end_mem - p)
-		count = end_mem - p;
+	if (!valid_phys_addr_range(p, &count))
+		return -EFAULT;
 	return do_write_mem(file, __va(p), p, buf, count, ppos);
 }
 
