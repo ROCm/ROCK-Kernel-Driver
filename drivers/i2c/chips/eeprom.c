@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
@@ -62,6 +63,7 @@ struct eeprom_data {
 	char valid;			/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
 	u8 data[EEPROM_SIZE];		/* Register values */
+	enum eeprom_nature nature;
 };
 
 
@@ -127,7 +129,16 @@ static ssize_t eeprom_read(struct kobject *kobj, char *buf, loff_t off, size_t c
 	if (off + count > EEPROM_SIZE)
 		count = EEPROM_SIZE - off;
 
-	memcpy(buf, &data->data[off], count);
+	/* Hide Vaio security settings to regular users (16 first bytes) */
+	if (data->nature == VAIO && off < 16 && !capable(CAP_SYS_ADMIN)) {
+		int in_row1 = 16 - off;
+		memset(buf, 0, in_row1);
+		if (count - in_row1 > 0)
+			memcpy(buf + in_row1, &data->data[16], count - in_row1);
+	} else {
+		memcpy(buf, &data->data[off], count);
+	}
+
 	return count;
 }
 
@@ -151,7 +162,6 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 	int i, cs;
 	struct i2c_client *new_client;
 	struct eeprom_data *data;
-	enum eeprom_nature nature = UNKNOWN;
 	int err = 0;
 
 	/* Make sure we aren't probing the ISA bus!! This is just a safety check
@@ -199,6 +209,7 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 			goto exit_kfree;
 	}
 
+	data->nature = UNKNOWN;
 	/* Detect the Vaio nature of EEPROMs.
 	   We use the "PCG-" prefix as the signature. */
 	if (address == 0x57) {
@@ -206,17 +217,7 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 		    i2c_smbus_read_byte_data(new_client, 0x81) == 'C' && 
 		    i2c_smbus_read_byte_data(new_client, 0x82) == 'G' &&
 		    i2c_smbus_read_byte_data(new_client, 0x83) == '-')
-			nature = VAIO;
-	}
-
-	/* If this is a VIAO, then we only allow root to read from this file,
-	   as BIOS passwords can be present here in plaintext */
-	switch (nature) {
- 	case VAIO:
-		eeprom_attr.attr.mode = S_IRUSR;
-		break;
-	default:
-		eeprom_attr.attr.mode = S_IRUGO;
+			data->nature = VAIO;
 	}
 
 	/* Fill in the remaining client fields */
