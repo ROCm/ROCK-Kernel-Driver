@@ -87,10 +87,6 @@ void initrd_init(void);
 
 static inline void blkdev_dequeue_request(struct request * req)
 {
-	if (req->e) {
-		req->e->dequeue_fn(req);
-		req->e = NULL;
-	}
 	list_del(&req->queue);
 }
 

@@ -18,6 +18,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <asm/uaccess.h>
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>

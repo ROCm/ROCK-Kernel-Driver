@@ -1820,7 +1820,6 @@ static int DAC960_BackMergeFunction(RequestQueue_T *RequestQueue,
       Request->nr_segments < Controller->DriverScatterGatherLimit)
     {
       Request->nr_segments++;
-      RequestQueue->elevator.nr_segments++;
       return true;
     }
   return false;
@@ -1844,7 +1843,6 @@ static int DAC960_FrontMergeFunction(RequestQueue_T *RequestQueue,
       Request->nr_segments < Controller->DriverScatterGatherLimit)
     {
       Request->nr_segments++;
-      RequestQueue->elevator.nr_segments++;
       return true;
     }
   return false;
@@ -1874,7 +1872,6 @@ static int DAC960_MergeRequestsFunction(RequestQueue_T *RequestQueue,
   if (TotalSegments > MaxSegments ||
       TotalSegments > Controller->DriverScatterGatherLimit)
     return false;
-  RequestQueue->elevator.nr_segments -= SameSegment;
   Request->nr_segments = TotalSegments;
   return true;
 }

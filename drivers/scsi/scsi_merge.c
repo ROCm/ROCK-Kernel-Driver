@@ -324,7 +324,6 @@ static inline int scsi_new_mergeable(request_queue_t * q,
 	    req->nr_segments >= SHpnt->sg_tablesize)
 		return 0;
 	req->nr_segments++;
-	q->elevator.nr_segments++;
 	return 1;
 }
 
@@ -341,11 +340,8 @@ static inline int scsi_new_segment(request_queue_t * q,
 	if (req->nr_hw_segments >= SHpnt->sg_tablesize ||
 	     req->nr_segments >= SHpnt->sg_tablesize)
 		return 0;
-	if (req->nr_segments >= max_segments)
-		return 0;
 	req->nr_hw_segments++;
 	req->nr_segments++;
-	q->elevator.nr_segments++;
 	return 1;
 }
 #else
@@ -361,7 +357,6 @@ static inline int scsi_new_segment(request_queue_t * q,
 		 * counter.
 		 */
 		req->nr_segments++;
-		q->elevator.nr_segments++;
 		return 1;
 	} else {
 		return 0;
@@ -417,8 +412,10 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
 
+#ifdef DMA_CHUNK_SIZE
 	if (max_segments > 64)
 		max_segments = 64;
+#endif
 
 	if (use_clustering) {
 		/* 
@@ -471,8 +468,10 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
 
+#ifdef DMA_CHUNK_SIZE
 	if (max_segments > 64)
 		max_segments = 64;
+#endif
 
 	if (use_clustering) {
 		/* 
@@ -601,10 +600,10 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
 
+#ifdef DMA_CHUNK_SIZE
 	if (max_segments > 64)
 		max_segments = 64;
 
-#ifdef DMA_CHUNK_SIZE
 	/* If it would not fit into prepared memory space for sg chain,
 	 * then don't allow the merge.
 	 */
@@ -664,7 +663,6 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 			 * This one is OK.  Let it go.
 			 */
 			req->nr_segments += next->nr_segments - 1;
-			q->elevator.nr_segments--;
 #ifdef DMA_CHUNK_SIZE
 			req->nr_hw_segments += next->nr_hw_segments - 1;
 #endif

@@ -50,6 +50,50 @@
  * This entire source file deals with the new queueing code.
  */
 
+/*
+ * Function:	__scsi_insert_special()
+ *
+ * Purpose:	worker for scsi_insert_special_*()
+ *
+ * Arguments:	q - request queue where request should be inserted
+ *		rq - request to be inserted
+ * 		data - private data
+ *		at_head - insert request at head or tail of queue
+ *
+ * Lock status:	Assumed that io_request_lock is not held upon entry.
+ *
+ * Returns:	Nothing
+ */
+static void __scsi_insert_special(request_queue_t *q, struct request *rq,
+				  void *data, int at_head)
+{
+	unsigned long flags;
+
+	ASSERT_LOCK(&io_request_lock, 0);
+
+	rq->cmd = SPECIAL;
+	rq->special = data;
+	rq->q = NULL;
+	rq->nr_segments = 0;
+	rq->elevator_sequence = 0;
+
+	/*
+	 * We have the option of inserting the head or the tail of the queue.
+	 * Typically we use the tail for new ioctls and so forth.  We use the
+	 * head of the queue for things like a QUEUE_FULL message from a
+	 * device, or a host that is unable to accept a particular command.
+	 */
+	spin_lock_irqsave(&io_request_lock, flags);
+
+	if (at_head)
+		list_add(&rq->queue, &q->queue_head);
+	else
+		list_add_tail(&rq->queue, &q->queue_head);
+
+	q->request_fn(q);
+	spin_unlock_irqrestore(&io_request_lock, flags);
+}
+
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -73,52 +117,9 @@
  */
 int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
 {
-	unsigned long flags;
-	request_queue_t *q;
+	request_queue_t *q = &SCpnt->device->request_queue;
 
-	ASSERT_LOCK(&io_request_lock, 0);
-
-	/*
-	 * The SCpnt already contains a request structure - we will doctor the
-	 * thing up with the appropriate values and use that in the actual
-	 * request queue.
-	 */
-	q = &SCpnt->device->request_queue;
-	SCpnt->request.cmd = SPECIAL;
-	SCpnt->request.special = (void *) SCpnt;
-	SCpnt->request.q = NULL;
-	SCpnt->request.free_list = NULL;
-	SCpnt->request.nr_segments = 0;
-
-	/*
-	 * We have the option of inserting the head or the tail of the queue.
-	 * Typically we use the tail for new ioctls and so forth.  We use the
-	 * head of the queue for things like a QUEUE_FULL message from a
-	 * device, or a host that is unable to accept a particular command.
-	 */
-	spin_lock_irqsave(&io_request_lock, flags);
-
-	if (at_head) {
-		list_add(&SCpnt->request.queue, &q->queue_head);
-	} else {
-		/*
-		 * FIXME(eric) - we always insert at the tail of the
-		 * list.  Otherwise ioctl commands would always take
-		 * precedence over normal I/O.  An ioctl on a busy
-		 * disk might be delayed indefinitely because the
-		 * request might not float high enough in the queue
-		 * to be scheduled.
-		 */
-		list_add_tail(&SCpnt->request.queue, &q->queue_head);
-	}
-
-	/*
-	 * Now hit the requeue function for the queue.  If the host is
-	 * already busy, so be it - we have nothing special to do.  If
-	 * the host can queue it, then send it off.  
-	 */
-	q->request_fn(q);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	__scsi_insert_special(q, &SCpnt->request, SCpnt, at_head);
 	return 0;
 }
 
@@ -144,51 +145,9 @@ int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
  */
 int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
 {
-	unsigned long flags;
-	request_queue_t *q;
+	request_queue_t *q = &SRpnt->sr_device->request_queue;
 
-	ASSERT_LOCK(&io_request_lock, 0);
-
-	/*
-	 * The SCpnt already contains a request structure - we will doctor the
-	 * thing up with the appropriate values and use that in the actual
-	 * request queue.
-	 */
-	q = &SRpnt->sr_device->request_queue;
-	SRpnt->sr_request.cmd = SPECIAL;
-	SRpnt->sr_request.special = (void *) SRpnt;
-	SRpnt->sr_request.q = NULL;
-	SRpnt->sr_request.nr_segments = 0;
-
-	/*
-	 * We have the option of inserting the head or the tail of the queue.
-	 * Typically we use the tail for new ioctls and so forth.  We use the
-	 * head of the queue for things like a QUEUE_FULL message from a
-	 * device, or a host that is unable to accept a particular command.
-	 */
-	spin_lock_irqsave(&io_request_lock, flags);
-
-	if (at_head) {
-		list_add(&SRpnt->sr_request.queue, &q->queue_head);
-	} else {
-		/*
-		 * FIXME(eric) - we always insert at the tail of the
-		 * list.  Otherwise ioctl commands would always take
-		 * precedence over normal I/O.  An ioctl on a busy
-		 * disk might be delayed indefinitely because the
-		 * request might not float high enough in the queue
-		 * to be scheduled.
-		 */
-		list_add_tail(&SRpnt->sr_request.queue, &q->queue_head);
-	}
-
-	/*
-	 * Now hit the requeue function for the queue.  If the host is
-	 * already busy, so be it - we have nothing special to do.  If
-	 * the host can queue it, then send it off.  
-	 */
-	q->request_fn(q);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	__scsi_insert_special(q, &SRpnt->sr_request, SRpnt, at_head);
 	return 0;
 }
 
@@ -863,17 +822,6 @@ void scsi_request_fn(request_queue_t * q)
 	SHpnt = SDpnt->host;
 
 	/*
-	 * If the host for this device is in error recovery mode, don't
-	 * do anything at all here.  When the host leaves error recovery
-	 * mode, it will automatically restart things and start queueing
-	 * commands again.  Same goes if the queue is actually plugged,
-	 * if the device itself is blocked, or if the host is fully
-	 * occupied.
-	 */
-	if (SHpnt->in_recovery || q->plugged)
-		return;
-
-	/*
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
 	 */
@@ -896,10 +844,11 @@ void scsi_request_fn(request_queue_t * q)
 		    || (SHpnt->host_blocked) 
 		    || (SHpnt->host_self_blocked)) {
 			/*
-			 * If we are unable to process any commands at all for this
-			 * device, then we consider it to be starved.  What this means
-			 * is that there are no outstanding commands for this device
-			 * and hence we need a little help getting it started again
+			 * If we are unable to process any commands at all for
+			 * this device, then we consider it to be starved.
+			 * What this means is that there are no outstanding
+			 * commands for this device and hence we need a
+			 * little help getting it started again
 			 * once the host isn't quite so busy.
 			 */
 			if (SDpnt->device_busy == 0) {
@@ -1000,8 +949,8 @@ void scsi_request_fn(request_queue_t * q)
 			}
 			/*
 			 * If so, we are ready to do something.  Bump the count
-			 * while the queue is locked and then break out of the loop.
-			 * Otherwise loop around and try another request.
+			 * while the queue is locked and then break out of the
+			 * loop. Otherwise loop around and try another request.
 			 */
 			if (!SCpnt) {
 				break;
@@ -1029,8 +978,9 @@ void scsi_request_fn(request_queue_t * q)
 			memcpy(&SCpnt->request, req, sizeof(struct request));
 
 			/*
-			 * We have copied the data out of the request block - it is now in
-			 * a field in SCpnt.  Release the request block.
+			 * We have copied the data out of the request block -
+			 * it is now in a field in SCpnt.  Release the request
+			 * block.
 			 */
 			blkdev_release_request(req);
 		}
@@ -1047,12 +997,14 @@ void scsi_request_fn(request_queue_t * q)
 			/*
 			 * This will do a couple of things:
 			 *  1) Fill in the actual SCSI command.
-			 *  2) Fill in any other upper-level specific fields (timeout).
+			 *  2) Fill in any other upper-level specific fields
+			 * (timeout).
 			 *
-			 * If this returns 0, it means that the request failed (reading
-			 * past end of disk, reading offline device, etc).   This won't
-			 * actually talk to the device, but some kinds of consistency
-			 * checking may cause the request to be rejected immediately.
+			 * If this returns 0, it means that the request failed
+			 * (reading past end of disk, reading offline device,
+			 * etc).   This won't actually talk to the device, but
+			 * some kinds of consistency checking may cause the	
+			 * request to be rejected immediately.
 			 */
 			if (STpnt == NULL) {
 				STpnt = scsi_get_request_dev(req);
@@ -1103,8 +1055,8 @@ void scsi_request_fn(request_queue_t * q)
 		scsi_dispatch_cmd(SCpnt);
 
 		/*
-		 * Now we need to grab the lock again.  We are about to mess with
-		 * the request queue and try to find another command.
+		 * Now we need to grab the lock again.  We are about to mess
+		 * with the request queue and try to find another command.
 		 */
 		spin_lock_irq(&io_request_lock);
 	}

@@ -4,6 +4,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -142,6 +143,10 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		if (!d_name[d_reclen - 1])
 		    d_reclen = strlen (d_name);
 	
+		if (d_reclen > REISERFS_MAX_NAME_LEN(inode->i_sb->s_blocksize)){
+		    /* too big to send back to VFS */
+		    continue ;
+		}
 		d_off = deh_offset (deh);
 		filp->f_pos = d_off ;
 		d_ino = deh_objectid (deh);

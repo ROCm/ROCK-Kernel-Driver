@@ -64,7 +64,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 	   item(s) had to be converted, then it may have to be
 	   indirect2direct converted */
 	windex = push_journal_writer("file_release") ;
-	reiserfs_truncate_file(inode) ;
+	reiserfs_truncate_file(inode, 0) ;
 	pop_journal_writer(windex) ;
     }
     up (&inode->i_sem); 
@@ -72,6 +72,9 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
     return 0;
 }
 
+static void reiserfs_vfs_truncate_file(struct inode *inode) {
+    reiserfs_truncate_file(inode, 1) ;
+}
 
 /* Sync a reiserfs file. */
 static int reiserfs_sync_file(
@@ -115,7 +118,7 @@ struct file_operations reiserfs_file_operations = {
 
 
 struct  inode_operations reiserfs_file_inode_operations = {
-    truncate:	reiserfs_truncate_file,
+    truncate:	reiserfs_vfs_truncate_file,
 };
 
 

@@ -346,7 +346,6 @@ static inline int pf_new_segment(request_queue_t *q, struct request *req, int ma
 
 	if (req->nr_segments < max_segments) {
 		req->nr_segments++;
-		q->elevator.nr_segments++;
 		return 1;
 	}
 	return 0;
@@ -386,7 +385,6 @@ static int pf_merge_requests_fn(request_queue_t *q, struct request *req,
 	if (total_segments > max_segments)
 		return 0;
 
-	q->elevator.nr_segments -= same_segment;
 	req->nr_segments = total_segments;
 	return 1;
 }

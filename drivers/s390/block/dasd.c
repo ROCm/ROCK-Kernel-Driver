@@ -952,7 +952,6 @@ do_dasd_request (request_queue_t *queue)
         go = 1;
         while (go && !list_empty(&queue->queue_head)) {
                 req = blkdev_entry_next_request(&queue->queue_head);
-                req = blkdev_entry_next_request(&queue->queue_head);
 		di = DEVICE_NR (req->rq_dev);
 		dasd_debug ((unsigned long) req);	/* req */
 		dasd_debug (0xc4d90000 +	/* DR## */

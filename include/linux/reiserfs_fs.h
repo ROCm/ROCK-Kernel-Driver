@@ -926,8 +926,7 @@ extern inline int entry_length (struct buffer_head * bh, struct item_head * ih,
 //((block_size - BLKH_SIZE - IH_SIZE - DEH_SIZE * 2) / 2)
 
 // two entries per block (at least)
-#define REISERFS_MAX_NAME_LEN(block_size) \
-((block_size - BLKH_SIZE - IH_SIZE - DEH_SIZE))
+#define REISERFS_MAX_NAME_LEN(block_size) 255
 
 
 
@@ -1753,7 +1752,6 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 			   struct  inode * p_s_inode, struct page *, 
 			   int update_timestamps);
 //
-void reiserfs_vfs_truncate_file (struct  inode * p_s_inode);
 //void lock_inode_to_convert (struct inode * p_s_inode);
 //void unlock_inode_after_convert (struct inode * p_s_inode);
 //void increment_i_read_sync_counter (struct inode * p_s_inode);
@@ -1792,7 +1790,7 @@ void padd_item (char * item, int total_length, int length);
 /* inode.c */
 
 int reiserfs_prepare_write(struct file *, struct page *, unsigned, unsigned) ;
-void reiserfs_truncate_file(struct inode *) ;
+void reiserfs_truncate_file(struct inode *, int update_timestamps) ;
 void make_cpu_key (struct cpu_key * cpu_key, const struct inode * inode, loff_t offset,
 		   int type, int key_length);
 void make_le_item_head (struct item_head * ih, struct cpu_key * key, int version,

@@ -537,6 +537,8 @@ CONFIG_PCMCIA_SERIAL=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 CONFIG_AUTOFS4_FS=y
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set

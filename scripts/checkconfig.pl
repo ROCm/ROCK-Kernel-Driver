@@ -14,6 +14,7 @@ foreach $file (@ARGV)
 
     # Initialize variables.
     my $fInComment   = 0;
+    my $fInString    = 0;
     my $fUseConfig   = 0;
     my $iLinuxConfig = 0;
     my %configList   = ();
@@ -23,6 +24,10 @@ foreach $file (@ARGV)
 	# Strip comments.
 	$fInComment && (s+^.*?\*/+ +o ? ($fInComment = 0) : next);
 	m+/\*+o && (s+/\*.*?\*/+ +go, (s+/\*.*$+ +o && ($fInComment = 1)));
+
+	# Strip strings.
+	$fInString && (s+^.*?"+ +o ? ($fInString = 0) : next);
+	m+"+o && (s+".*?"+ +go, (s+".*$+ +o && ($fInString = 1)));
 
 	# Pick up definitions.
 	if ( m/^\s*#/o )

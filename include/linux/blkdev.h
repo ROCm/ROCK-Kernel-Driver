@@ -23,8 +23,6 @@ struct request {
 	int elevator_sequence;
 	struct list_head table;
 
-	struct list_head *free_list;
-
 	volatile int rq_status;	/* should split this into a few status bits */
 #define RQ_INACTIVE		(-1)
 #define RQ_ACTIVE		1
@@ -47,7 +45,6 @@ struct request {
 	struct buffer_head * bh;
 	struct buffer_head * bhtail;
 	request_queue_t *q;
-	elevator_t *e;
 };
 
 #include <linux/elevator.h>
@@ -69,7 +66,7 @@ typedef void (unplug_device_fn) (void *q);
 /*
  * Default nr free requests per queue
  */
-#define QUEUE_NR_REQUESTS	256
+#define QUEUE_NR_REQUESTS	512
 
 struct request_queue
 {
@@ -77,6 +74,8 @@ struct request_queue
 	 * the queue request freelist, one for reads and one for writes
 	 */
 	struct list_head	request_freelist[2];
+	struct list_head	pending_freelist[2];
+	int			pending_free[2];
 
 	/*
 	 * Together with queue_head for cacheline sharing
@@ -116,7 +115,7 @@ struct request_queue
 	 * Is meant to protect the queue in the future instead of
 	 * io_request_lock
 	 */
-	spinlock_t		request_lock;
+	spinlock_t		queue_lock;
 
 	/*
 	 * Tasks wait here for free request
@@ -152,6 +151,7 @@ extern void grok_partitions(struct gendisk *dev, int drive, unsigned minors, lon
 extern void register_disk(struct gendisk *dev, kdev_t first, unsigned minors, struct block_device_operations *ops, long size);
 extern void generic_make_request(int rw, struct buffer_head * bh);
 extern request_queue_t *blk_get_queue(kdev_t dev);
+extern inline request_queue_t *__blk_get_queue(kdev_t dev);
 extern void blkdev_release_request(struct request *);
 
 /*
@@ -162,6 +162,7 @@ extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_headactive(request_queue_t *, int);
 extern void blk_queue_pluggable(request_queue_t *, plug_device_fn *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
+extern void generic_unplug_device(void *);
 
 extern int * blk_size[MAX_BLKDEV];
 
@@ -175,9 +176,8 @@ extern int * max_sectors[MAX_BLKDEV];
 
 extern int * max_segments[MAX_BLKDEV];
 
-#define MAX_SECTORS 254
-
-#define MAX_SEGMENTS MAX_SECTORS
+#define MAX_SEGMENTS 128
+#define MAX_SECTORS (MAX_SEGMENTS*8)
 
 #define PageAlignSize(size) (((size) + PAGE_SIZE -1) & PAGE_MASK)
 

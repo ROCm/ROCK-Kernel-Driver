@@ -974,10 +974,6 @@ static void generic_file_readahead(int reada_ok,
  *   accessed sequentially.
  */
 	if (ahead) {
-		if (reada_ok == 2) {
-			run_task_queue(&tq_disk);
-		}
-
 		filp->f_ralen += ahead;
 		filp->f_rawin += filp->f_ralen;
 		filp->f_raend = raend + ahead + 1;

@@ -43,6 +43,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -415,7 +416,7 @@ inline int mark_buffer_not_journaled(struct buffer_head *bh) {
 ** kernel lock held.  caller is the string printed just before calling BUG()
 */
 void reiserfs_check_lock_depth(char *caller) {
-#ifdef __SMP__
+#ifdef CONFIG_SMP
   if (current->lock_depth < 0) {
     printk("%s called without kernel lock held\n", caller) ;
     show_reiserfs_locks() ;
@@ -865,14 +866,20 @@ static int flush_older_journal_lists(struct super_block *p_s_sb, struct reiserfs
   return 0 ;
 }
 
-static void submit_logged_buffer(struct buffer_head *bh) {
-    mark_buffer_notjournal_new(bh) ;
+static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
     if (buffer_journaled(bh)) {
         reiserfs_warning("clm-2084: pinned buffer %u:%s sent to disk\n",
 	                 bh->b_blocknr, kdevname(bh->b_dev)) ;
     }
-    set_bit(BH_Dirty, &bh->b_state) ;
-    ll_rw_block(WRITE, 1, &bh) ;
+    mark_buffer_uptodate(bh, uptodate) ;
+    unlock_buffer(bh) ;
+}
+static void submit_logged_buffer(struct buffer_head *bh) {
+    lock_buffer(bh) ;
+    bh->b_end_io = reiserfs_end_buffer_io_sync ;
+    mark_buffer_notjournal_new(bh) ;
+    clear_bit(BH_Dirty, &bh->b_state) ;
+    submit_bh(WRITE, bh) ;
 }
 
 /* flush a journal list, both commit and real blocks

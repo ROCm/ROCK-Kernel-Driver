@@ -3,7 +3,7 @@
  */
 #ifdef __KERNEL__
 
-#include <stdarg.h>
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/reiserfs_fs.h>
@@ -12,11 +12,11 @@
 #else
 
 #include "nokernel.h"
-#include <stdarg.h>
 #include <limits.h>
 
 #endif
 
+#include <stdarg.h>
 
 static char error_buf[1024];
 static char fmt_buf[1024];

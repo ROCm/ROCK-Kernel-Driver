@@ -776,7 +776,7 @@ void print_sense_internal(const char * devclass,
 	    printk("%s%s: sns = %2x %2x\n", devclass,
 	      kdevname(dev), sense_buffer[0], sense_buffer[2]);
 	
-	printk("Non-extended sense class %d code 0x%0x ", sense_class, code);
+	printk("Non-extended sense class %d code 0x%0x\n", sense_class, code);
 	s = 4;
     }
     

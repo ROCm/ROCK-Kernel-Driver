@@ -24,125 +24,115 @@
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/blk.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 
-/*
- * Order ascending, but only allow a request to be skipped a certain
- * number of times
- */
-void elevator_linus(struct request *req, elevator_t *elevator,
-		    struct list_head *real_head,
-		    struct list_head *head, int orig_latency)
-{
-	struct list_head *entry = real_head;
-	struct request *tmp;
-
-	req->elevator_sequence = orig_latency;
-
-	while ((entry = entry->prev) != head) {
-		tmp = blkdev_entry_to_request(entry);
-		if (IN_ORDER(tmp, req))
-			break;
-		if (!tmp->elevator_sequence)
-			break;
-		tmp->elevator_sequence--;
-	}
-	list_add(&req->queue, entry);
-}
-
 int elevator_linus_merge(request_queue_t *q, struct request **req,
+			 struct list_head * head,
 			 struct buffer_head *bh, int rw,
-			 int *max_sectors, int *max_segments)
+			 int max_sectors, int max_segments)
 {
-	struct list_head *entry, *head = &q->queue_head;
+	struct list_head *entry = &q->queue_head;
 	unsigned int count = bh->b_size >> 9, ret = ELEVATOR_NO_MERGE;
 
-	entry = head;
-	if (q->head_active && !q->plugged)
-		head = head->next;
-
 	while ((entry = entry->prev) != head) {
-		struct request *__rq = *req = blkdev_entry_to_request(entry);
+		struct request *__rq = blkdev_entry_to_request(entry);
+
+		/*
+		 * simply "aging" of requests in queue
+		 */
+		if (__rq->elevator_sequence-- <= 0) {
+			*req = __rq;
+			break;
+		}
+
 		if (__rq->sem)
 			continue;
 		if (__rq->cmd != rw)
 			continue;
-		if (__rq->nr_sectors + count > *max_sectors)
-			continue;
 		if (__rq->rq_dev != bh->b_rdev)
 			continue;
+		if (__rq->nr_sectors + count > max_sectors)
+			continue;
+		if (__rq->elevator_sequence < count)
+			break;
 		if (__rq->sector + __rq->nr_sectors == bh->b_rsector) {
 			ret = ELEVATOR_BACK_MERGE;
+			*req = __rq;
 			break;
-		}
-		if (!__rq->elevator_sequence)
-			break;
-		if (__rq->sector - count == bh->b_rsector) {
-			__rq->elevator_sequence--;
+		} else if (__rq->sector - count == bh->b_rsector) {
 			ret = ELEVATOR_FRONT_MERGE;
+			__rq->elevator_sequence -= count;
+			*req = __rq;
 			break;
-		}
-	}
-
-	/*
-	 * second pass scan of requests that got passed over, if any
-	 */
-	if (ret != ELEVATOR_NO_MERGE && *req) {
-		while ((entry = entry->next) != &q->queue_head) {
-			struct request *tmp = blkdev_entry_to_request(entry);
-			tmp->elevator_sequence--;
-		}
+		} else if (!*req && BHRQ_IN_ORDER(bh, __rq))
+			*req = __rq;
 	}
 
 	return ret;
 }
 
-/*
- * No request sorting, just add it to the back of the list
- */
-void elevator_noop(struct request *req, elevator_t *elevator,
-		   struct list_head *real_head, struct list_head *head,
-		   int orig_latency)
+void elevator_linus_merge_cleanup(request_queue_t *q, struct request *req, int count)
 {
-	list_add_tail(&req->queue, real_head);
+	struct list_head *entry = &req->queue, *head = &q->queue_head;
+
+	/*
+	 * second pass scan of requests that got passed over, if any
+	 */
+	while ((entry = entry->next) != head) {
+		struct request *tmp = blkdev_entry_to_request(entry);
+		tmp->elevator_sequence -= count;
+	}
+}
+
+void elevator_linus_merge_req(struct request *req, struct request *next)
+{
+	if (next->elevator_sequence < req->elevator_sequence)
+		req->elevator_sequence = next->elevator_sequence;
 }
 
 /*
- * See if we can find a request that is buffer can be coalesced with.
+ * See if we can find a request that this buffer can be coalesced with.
  */
 int elevator_noop_merge(request_queue_t *q, struct request **req,
+			struct list_head * head,
 			struct buffer_head *bh, int rw,
-			int *max_sectors, int *max_segments)
+			int max_sectors, int max_segments)
 {
-	struct list_head *entry, *head = &q->queue_head;
+	struct list_head *entry;
 	unsigned int count = bh->b_size >> 9;
 
-	if (q->head_active && !q->plugged)
-		head = head->next;
+	if (list_empty(&q->queue_head))
+		return ELEVATOR_NO_MERGE;
 
-	entry = head;
+	entry = &q->queue_head;
 	while ((entry = entry->prev) != head) {
-		struct request *__rq = *req = blkdev_entry_to_request(entry);
-		if (__rq->sem)
-			continue;
+		struct request *__rq = blkdev_entry_to_request(entry);
+
 		if (__rq->cmd != rw)
-			continue;
-		if (__rq->nr_sectors + count > *max_sectors)
 			continue;
 		if (__rq->rq_dev != bh->b_rdev)
 			continue;
-		if (__rq->sector + __rq->nr_sectors == bh->b_rsector)
+		if (__rq->nr_sectors + count > max_sectors)
+			continue;
+		if (__rq->sem)
+			continue;
+		if (__rq->sector + __rq->nr_sectors == bh->b_rsector) {
+			*req = __rq;
 			return ELEVATOR_BACK_MERGE;
-		if (__rq->sector - count == bh->b_rsector)
+		} else if (__rq->sector - count == bh->b_rsector) {
+			*req = __rq;
 			return ELEVATOR_FRONT_MERGE;
+		}
 	}
+
+	*req = blkdev_entry_to_request(q->queue_head.prev);
 	return ELEVATOR_NO_MERGE;
 }
 
-/*
- * The noop "elevator" does not do any accounting
- */
-void elevator_noop_dequeue(struct request *req) {}
+void elevator_noop_merge_cleanup(request_queue_t *q, struct request *req, int count) {}
+
+void elevator_noop_merge_req(struct request *req, struct request *next) {}
 
 int blkelvget_ioctl(elevator_t * elevator, blkelv_ioctl_arg_t * arg)
 {

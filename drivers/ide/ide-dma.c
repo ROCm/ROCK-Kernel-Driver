@@ -226,6 +226,9 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 		unsigned char *virt_addr = bh->b_data;
 		unsigned int size = bh->b_size;
 
+		if (nents >= PRD_ENTRIES)
+			return 0;
+
 		while ((bh = bh->b_reqnext) != NULL) {
 			if ((virt_addr + size) != (unsigned char *) bh->b_data)
 				break;
@@ -259,6 +262,9 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 
 	HWIF(drive)->sg_nents = i = ide_build_sglist(HWIF(drive), HWGROUP(drive)->rq);
 
+	if (!i)
+		return 0;
+
 	sg = HWIF(drive)->sg_table;
 	while (i && sg_dma_len(sg)) {
 		u32 cur_addr;
@@ -274,7 +280,7 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 		 */
 
 		while (cur_len) {
-			if (++count >= PRD_ENTRIES) {
+			if (count++ >= PRD_ENTRIES) {
 				printk("%s: DMA table too small\n", drive->name);
 				pci_unmap_sg(HWIF(drive)->pci_dev,
 					     HWIF(drive)->sg_table,

@@ -3,6 +3,7 @@
  */
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/locks.h>
@@ -1538,7 +1539,7 @@ unlock:
 **
 ** some code taken from block_truncate_page
 */
-void reiserfs_truncate_file(struct inode *p_s_inode) {
+void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct reiserfs_transaction_handle th ;
     int windex ;
 
@@ -1571,7 +1572,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode) {
     prevent_flush_page_lock(page, p_s_inode) ;
     journal_begin(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 ) ;
     windex = push_journal_writer("reiserfs_vfs_truncate_file") ;
-    reiserfs_do_truncate (&th, p_s_inode, page, 1/*update timestamps*/) ;
+    reiserfs_do_truncate (&th, p_s_inode, page, update_timestamps) ;
     pop_journal_writer(windex) ;
     journal_end(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 ) ;
     allow_flush_page_lock(page, p_s_inode) ;

@@ -671,12 +671,14 @@ void get_capabilities(int i)
 	cmd[3] = cmd[5] = 0;
 	rc = sr_do_ioctl(i, cmd, buffer, 128, 1, SCSI_DATA_READ, NULL);
 
-	if (-EINVAL == rc) {
-		/* failed, drive has'nt this mode page */
+	if (rc) {
+		/* failed, drive doesn't have capabilities mode page */
 		scsi_CDs[i].cdi.speed = 1;
-		/* disable speed select, drive probably can't do this either */
-		scsi_CDs[i].cdi.mask |= CDC_SELECT_SPEED;
+		scsi_CDs[i].cdi.mask |= (CDC_CD_R | CDC_CD_RW | CDC_DVD_R |
+					 CDC_DVD | CDC_DVD_RAM |
+					 CDC_SELECT_DISC | CDC_SELECT_SPEED);
 		scsi_free(buffer, 512);
+		printk("sr%i: scsi-1 drive\n");
 		return;
 	}
 	n = buffer[3] + 4;

@@ -4,6 +4,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <asm/uaccess.h>

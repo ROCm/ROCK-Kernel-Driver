@@ -690,19 +690,15 @@ scheduling_in_interrupt:
 }
 
 static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
-				     unsigned int wq_mode, const int sync)
+			 	     int nr_exclusive, const int sync)
 {
 	struct list_head *tmp, *head;
-	struct task_struct *p, *best_exclusive;
+	struct task_struct *p;
 	unsigned long flags;
-	int best_cpu, irq;
 
 	if (!q)
 		goto out;
 
-	best_cpu = smp_processor_id();
-	irq = in_interrupt();
-	best_exclusive = NULL;
 	wq_write_lock_irqsave(&q->lock, flags);
 
 #if WAITQUEUE_DEBUG
@@ -730,47 +726,27 @@ static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
 #if WAITQUEUE_DEBUG
 			curr->__waker = (long)__builtin_return_address(0);
 #endif
-			/*
-			 * If waking up from an interrupt context then
-			 * prefer processes which are affine to this
-			 * CPU.
-			 */
-			if (irq && (curr->flags & wq_mode & WQ_FLAG_EXCLUSIVE)) {
-				if (!best_exclusive)
-					best_exclusive = p;
-				if (p->processor == best_cpu) {
-					best_exclusive = p;
-					break;
-				}
-			} else {
-				if (sync)
-					wake_up_process_synchronous(p);
-				else
-					wake_up_process(p);
-				if (curr->flags & wq_mode & WQ_FLAG_EXCLUSIVE)
-					break;
-			}
+			if (sync)
+				wake_up_process_synchronous(p);
+			else
+				wake_up_process(p);
+			if ((curr->flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+				break;
 		}
-	}
-	if (best_exclusive) {
-		if (sync)
-			wake_up_process_synchronous(best_exclusive);
-		else
-			wake_up_process(best_exclusive);
 	}
 	wq_write_unlock_irqrestore(&q->lock, flags);
 out:
 	return;
 }
 
-void __wake_up(wait_queue_head_t *q, unsigned int mode, unsigned int wq_mode)
+void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr)
 {
-	__wake_up_common(q, mode, wq_mode, 0);
+	__wake_up_common(q, mode, nr, 0);
 }
 
-void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, unsigned int wq_mode)
+void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr)
 {
-	__wake_up_common(q, mode, wq_mode, 1);
+	__wake_up_common(q, mode, nr, 1);
 }
 
 #define	SLEEP_ON_VAR				\

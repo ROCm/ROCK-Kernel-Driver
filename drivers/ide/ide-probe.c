@@ -134,7 +134,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 					break;
 				}
 #endif
-				printk ("CDROM");
+				printk ("CD/DVD-ROM");
 				break;
 			case ide_tape:
 				printk ("TAPE");
@@ -761,9 +761,10 @@ static void init_gendisk (ide_hwif_t *hwif)
 	for (unit = 0; unit < minors; ++unit) {
 		*bs++ = BLOCK_SIZE;
 #ifdef CONFIG_BLK_DEV_PDC4030
-		*max_sect++ = ((hwif->chipset == ide_pdc4030) ? 127 : MAX_SECTORS);
+		*max_sect++ = ((hwif->chipset == ide_pdc4030) ? 127 : 256);
 #else
-		*max_sect++ = MAX_SECTORS;
+		/* IDE can do up to 128K per request. */
+		*max_sect++ = 256;
 #endif
 		*max_ra++ = MAX_READAHEAD;
 	}

@@ -37,6 +37,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/locks.h>

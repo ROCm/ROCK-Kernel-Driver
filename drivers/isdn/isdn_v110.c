@@ -102,7 +102,7 @@ isdn_v110_open(unsigned char key, int hdrlen, int maxsize)
 	int i;
 	isdn_v110_stream *v;
 
-	if ((v = kmalloc(sizeof(isdn_v110_stream), GFP_KERNEL)) == NULL)
+	if ((v = kmalloc(sizeof(isdn_v110_stream), GFP_ATOMIC)) == NULL)
 		return NULL;
 	memset(v, 0, sizeof(isdn_v110_stream));
 	v->key = key;
@@ -134,7 +134,7 @@ isdn_v110_open(unsigned char key, int hdrlen, int maxsize)
 	v->b = 0;
 	v->skbres = hdrlen;
 	v->maxsize = maxsize - hdrlen;
-	if ((v->encodebuf = kmalloc(maxsize, GFP_KERNEL)) == NULL) {
+	if ((v->encodebuf = kmalloc(maxsize, GFP_ATOMIC)) == NULL) {
 		kfree(v);
 		return NULL;
 	}
