@@ -459,6 +459,8 @@ struct ata_channel {
 
 	int (*XXX_udma)(struct ata_device *);
 
+	void (*udma_enable)(struct ata_device *, int, int);
+
 	int (*udma_start) (struct ata_device *, struct request *rq);
 	int (*udma_stop) (struct ata_device *);
 

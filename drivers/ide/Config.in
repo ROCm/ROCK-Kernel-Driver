@@ -103,7 +103,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       dep_mbool '    Amiga IDE Doubler support (EXPERIMENTAL)' CONFIG_BLK_DEV_IDEDOUBLER $CONFIG_BLK_DEV_GAYLE $CONFIG_EXPERIMENTAL
    fi
    if [ "$CONFIG_ZORRO" = "y" -a "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      dep_mbool '  Buddha/Catweasel IDE interface support (EXPERIMENTAL)' CONFIG_BLK_DEV_BUDDHA $CONFIG_ZORRO $CONFIG_EXPERIMENTAL
+      dep_mbool '  Buddha/Catweasel/X-Surf IDE interface support (EXPERIMENTAL)' CONFIG_BLK_DEV_BUDDHA $CONFIG_ZORRO $CONFIG_EXPERIMENTAL
    fi
    if [ "$CONFIG_ATARI" = "y" ]; then
       dep_bool '  Falcon IDE interface support' CONFIG_BLK_DEV_FALCON_IDE $CONFIG_ATARI

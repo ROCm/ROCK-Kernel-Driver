@@ -39,8 +39,6 @@
 #define DTF(x...)
 #endif
 
-#define SUPPORT_VLB_SYNC 1
-
 /*
  * for now, taskfile requests are special :/
  */

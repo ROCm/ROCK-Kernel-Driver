@@ -2097,6 +2097,7 @@ void ide_unregister(struct ata_channel *ch)
 	ch->atapi_read = old.atapi_read;
 	ch->atapi_write = old.atapi_write;
 	ch->XXX_udma = old.XXX_udma;
+	ch->udma_enable = old.udma_enable;
 	ch->udma_start = old.udma_start;
 	ch->udma_stop = old.udma_stop;
 	ch->udma_read = old.udma_read;
