@@ -54,7 +54,7 @@ struct device_class;
 
 struct bus_type {
 	char			* name;
-	rwlock_t		lock;
+	struct rw_semaphore	rwsem;
 	atomic_t		refcount;
 	u32			present;
 

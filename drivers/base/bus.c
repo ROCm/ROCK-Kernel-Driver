@@ -47,23 +47,21 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 	int error = 0;
 
 	get_bus(bus);
-	spin_lock(&device_lock);
+	down_write(&bus->rwsem);
 	list_for_each(node,&bus->devices) {
-		struct device * dev = get_device_locked(to_dev(node));
+		struct device * dev = get_device(to_dev(node));
 		if (dev) {
-			spin_unlock(&device_lock);
 			error = callback(dev,data);
 			if (prev)
 				put_device(prev);
 			prev = dev;
-			spin_lock(&device_lock);
 			if (error)
 				break;
 		}
 	}
-	spin_unlock(&device_lock);
 	if (prev)
 		put_device(prev);
+	up_write(&bus->rwsem);
 	put_bus(bus);
 	return error;
 }
@@ -77,24 +75,21 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 
 	/* pin bus in memory */
 	get_bus(bus);
-
-	spin_lock(&device_lock);
+	down_write(&bus->rwsem);
 	list_for_each(node,&bus->drivers) {
 		struct device_driver * drv = get_driver(to_drv(node));
 		if (drv) {
-			spin_unlock(&device_lock);
 			error = callback(drv,data);
 			if (prev)
 				put_driver(prev);
 			prev = drv;
-			spin_lock(&device_lock);
 			if (error)
 				break;
 		}
 	}
-	spin_unlock(&device_lock);
 	if (prev)
 		put_driver(prev);
+	up_write(&bus->rwsem);
 	put_bus(bus);
 	return error;
 }
@@ -111,11 +106,11 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 int bus_add_device(struct device * dev)
 {
 	if (dev->bus) {
+		down_write(&dev->bus->rwsem);
 		pr_debug("registering %s with bus '%s'\n",dev->bus_id,dev->bus->name);
 		get_bus(dev->bus);
-		spin_lock(&device_lock);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
-		spin_unlock(&device_lock);
+		up_write(&dev->bus->rwsem);
 		device_bus_link(dev);
 	}
 	return 0;
@@ -131,7 +126,10 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
+		down_write(&dev->bus->rwsem);
+		list_del_init(&dev->bus_list);
 		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
+		up_write(&dev->bus->rwsem);
 		put_bus(dev->bus);
 	}
 }
@@ -160,7 +158,7 @@ void put_bus(struct bus_type * bus)
 
 int bus_register(struct bus_type * bus)
 {
-	rwlock_init(&bus->lock);
+	init_rwsem(&bus->rwsem);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->drivers);
 	atomic_set(&bus->refcount,2);

@@ -263,7 +263,6 @@ void put_device(struct device * dev)
 		return;
 	list_del_init(&dev->node);
 	list_del_init(&dev->g_list);
-	list_del_init(&dev->bus_list);
 	list_del_init(&dev->driver_list);
 	spin_unlock(&device_lock);
 
