@@ -91,8 +91,8 @@ int esp_output(struct sk_buff *skb)
 		top_iph->ttl = iph->ttl;	/* TTL disclosed */
 		top_iph->protocol = IPPROTO_ESP;
 		top_iph->check = 0;
-		top_iph->saddr = x->props.saddr.xfrm4_addr;
-		top_iph->daddr = x->id.daddr.xfrm4_addr;
+		top_iph->saddr = x->props.saddr.a4;
+		top_iph->daddr = x->id.daddr.a4;
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 	} else {
 		esph = (struct ip_esp_hdr*)skb_push(skb, x->props.header_len);
@@ -276,7 +276,7 @@ void esp4_err(struct sk_buff *skb, u32 info)
 	    skb->h.icmph->code != ICMP_FRAG_NEEDED)
 		return;
 
-	x = xfrm4_state_lookup(iph->daddr, esph->spi, IPPROTO_ESP);
+	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, esph->spi, IPPROTO_ESP, AF_INET);
 	if (!x)
 		return;
 	printk(KERN_DEBUG "pmtu discvovery on SA ESP/%08x/%08x\n",
@@ -405,13 +405,13 @@ static struct inet_protocol esp4_protocol = {
 int __init esp4_init(void)
 {
 	SET_MODULE_OWNER(&esp_type);
-	if (xfrm_register_type(&esp_type) < 0) {
+	if (xfrm_register_type(&esp_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip esp init: can't add xfrm type\n");
 		return -EAGAIN;
 	}
 	if (inet_add_protocol(&esp4_protocol, IPPROTO_ESP) < 0) {
 		printk(KERN_INFO "ip esp init: can't add protocol\n");
-		xfrm_unregister_type(&esp_type);
+		xfrm_unregister_type(&esp_type, AF_INET);
 		return -EAGAIN;
 	}
 	return 0;
@@ -421,7 +421,7 @@ static void __exit esp4_fini(void)
 {
 	if (inet_del_protocol(&esp4_protocol, IPPROTO_ESP) < 0)
 		printk(KERN_INFO "ip esp close: can't remove protocol\n");
-	if (xfrm_unregister_type(&esp_type) < 0)
+	if (xfrm_unregister_type(&esp_type, AF_INET) < 0)
 		printk(KERN_INFO "ip esp close: can't remove xfrm type\n");
 }
 

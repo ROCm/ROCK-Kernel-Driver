@@ -56,6 +56,7 @@ static struct ebt_table frame_nat =
 	.valid_hooks	= NAT_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.check		= check,
+	.me		= THIS_MODULE,
 };
 
 static unsigned int

@@ -969,8 +969,10 @@ static int do_replace(void *user, unsigned int len)
 		goto free_counterstmp;
 
 	t = find_table_lock(tmp.name, &ret, &ebt_mutex);
-	if (!t)
+	if (!t) {
+		ret = -ENOENT;
 		goto free_iterate;
+	}
 
 	/* the table doesn't like it */
 	if (t->check && (ret = t->check(newinfo, tmp.valid_hooks)))
@@ -984,6 +986,12 @@ static int do_replace(void *user, unsigned int len)
 
 	/* we have the mutex lock, so no danger in reading this pointer */
 	table = t->private;
+	/* make sure the table can only be rmmod'ed if it contains no rules */
+	if (!table->nentries && newinfo->nentries && !try_module_get(t->me)) {
+		ret = -ENOENT;
+		goto free_unlock;
+	} else if (table->nentries && !newinfo->nentries)
+		module_put(t->me);
 	/* we need an atomic snapshot of the counters */
 	write_lock_bh(&t->lock);
 	if (tmp.num_counters)
@@ -1168,6 +1176,11 @@ int ebt_register_table(struct ebt_table *table)
 		goto free_unlock;
 	}
 
+	/* Hold a reference count if the chains aren't empty */
+	if (newinfo->nentries && !try_module_get(table->me)) {
+		ret = -ENOENT;
+		goto free_unlock;
+	}
 	list_prepend(&ebt_tables, table);
 	up(&ebt_mutex);
 	return 0;
@@ -1196,8 +1209,6 @@ void ebt_unregister_table(struct ebt_table *table)
 	down(&ebt_mutex);
 	LIST_DELETE(&ebt_tables, table);
 	up(&ebt_mutex);
-	EBT_ENTRY_ITERATE(table->private->entries,
-	   table->private->entries_size, ebt_cleanup_entry, NULL);
 	if (table->private->entries)
 		vfree(table->private->entries);
 	if (table->private->chainstack) {

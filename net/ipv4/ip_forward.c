@@ -60,7 +60,7 @@ int ip_forward(struct sk_buff *skb)
 	struct rtable *rt;	/* Route we use */
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
-	if (!xfrm_policy_check(NULL, XFRM_POLICY_FWD, skb))
+	if (!xfrm4_policy_check(NULL, XFRM_POLICY_FWD, skb))
 		goto drop;
 
 	if (IPCB(skb)->opt.router_alert && ip_call_ra_chain(skb))
@@ -82,7 +82,7 @@ int ip_forward(struct sk_buff *skb)
 	if (iph->ttl <= 1)
                 goto too_many_hops;
 
-	if (!xfrm_route_forward(skb))
+	if (!xfrm4_route_forward(skb))
 		goto drop;
 
 	iph = skb->nh.iph;

@@ -110,6 +110,7 @@ int sctp_rcv(struct sk_buff *skb)
 	struct sctphdr *sh;
 	union sctp_addr src;
 	union sctp_addr dest;
+	int family;
 	struct sctp_af *af;
 	int ret = 0;
 
@@ -129,7 +130,8 @@ int sctp_rcv(struct sk_buff *skb)
 
 	skb_pull(skb, sizeof(struct sctphdr));	
 
-	af = sctp_get_af_specific(ipver2af(skb->nh.iph->version));
+	family = ipver2af(skb->nh.iph->version);
+	af = sctp_get_af_specific(family);
 	if (unlikely(!af)) 
 		goto bad_packet;
 
@@ -173,7 +175,7 @@ int sctp_rcv(struct sk_buff *skb)
 	rcvr = asoc ? &asoc->base : &ep->base;
 	sk = rcvr->sk;
 
-	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
+	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb, family))
 		goto discard_release;
 
 	ret = sk_filter(sk, skb, 1);
