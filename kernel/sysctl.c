@@ -585,7 +585,7 @@ static ctl_table kern_table[] = {
 
 /* Constants for minimum and maximum testing in vm_table.
    We use these as one-element integer vectors. */
-static int zero = 0;
+static int zero;
 static int one_hundred = 100;
 
 

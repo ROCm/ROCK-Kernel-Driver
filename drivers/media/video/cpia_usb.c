@@ -621,7 +621,7 @@ static void cpia_disconnect(struct usb_interface *intf)
 
 	udev = interface_to_usbdev(intf);
 	usb_driver_release_interface(&cpia_driver,
-				     &udev->actconfig->interface[0]);
+				     udev->actconfig->interface[0]);
 
 	ucpia->curbuff = ucpia->workbuff = NULL;
 

@@ -325,7 +325,7 @@ static int __init pcibios_init(void)
 	/* Cache the location of the ISA bridge (if we have one) */
 	ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
 	if (ppc64_isabridge_dev != NULL)
-		printk("ISA bridge at %s\n", ppc64_isabridge_dev->slot_name);
+		printk("ISA bridge at %s\n", pci_name(ppc64_isabridge_dev));
 
 	printk("PCI: Probing PCI hardware done\n");
 	//ppc64_boot_msg(0x41, "PCI Done");
@@ -363,7 +363,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	if (cmd != oldcmd) {
 		printk(KERN_DEBUG "PCI: Enabling device: (%s), cmd %x\n",
-		       dev->slot_name, cmd);
+		       pci_name(dev), cmd);
                 /* Enable the appropriate bits in the PCI command register.  */
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}

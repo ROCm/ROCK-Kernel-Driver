@@ -97,7 +97,7 @@ static char * card_names[] = {
 	"SiS 900 PCI Fast Ethernet",
 	"SiS 7016 PCI Fast Ethernet"
 };
-static struct pci_device_id sis900_pci_tbl [] __devinitdata = {
+static struct pci_device_id sis900_pci_tbl [] = {
 	{PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_900,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, SIS_900},
 	{PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_7016,
@@ -1874,7 +1874,7 @@ static int netdev_ethtool_ioctl (struct net_device *net_dev, void *useraddr)
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, SIS900_MODULE_NAME);
 			strcpy (info.version, SIS900_DRV_VERSION);
-			strcpy (info.bus_info, sis_priv->pci_dev->slot_name);
+			strcpy (info.bus_info, pci_name(sis_priv->pci_dev));
 			if (copy_to_user (useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;

@@ -777,7 +777,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 
 	s = GRANT_LOCK(log);
 
-	/* Also an illegal lsn.  1 implies that we aren't passing in a legal
+	/* Also an invalid lsn.  1 implies that we aren't passing in a valid
 	 * tail_lsn.
 	 */
 	if (tail_lsn != 1)
@@ -1066,7 +1066,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	if (mp->m_logbufs == 0) {
 		xlog_debug = 0;
 		xlog_devt = log->l_dev;
-		log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+		log->l_iclog_bufs = XLOG_MIN_ICLOGS;
 	} else
 #endif
 	{
@@ -1074,9 +1074,16 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		 * This is the normal path.  If m_logbufs == -1, then the
 		 * admin has chosen to use the system defaults for logbuffers.
 		 */
-		if (mp->m_logbufs == -1)
-			log->l_iclog_bufs = XLOG_NUM_ICLOGS;
-		else
+		if (mp->m_logbufs == -1) { 
+			if (xfs_physmem <= btoc(128*1024*1024)) { 
+				log->l_iclog_bufs = XLOG_MIN_ICLOGS; 
+			} else if (xfs_physmem <= btoc(400*1024*1024)) { 
+				log->l_iclog_bufs = XLOG_MED_ICLOGS;; 
+			} else {
+				/* 256K with 32K bufs */
+				log->l_iclog_bufs = XLOG_MAX_ICLOGS;
+			}
+		} else
 			log->l_iclog_bufs = mp->m_logbufs;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
@@ -1153,7 +1160,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 				log->l_iclog_bufs = 8;
 				break;
 			    default:
-				xlog_panic("XFS: Illegal blocksize");
+				xlog_panic("XFS: Invalid blocksize");
 				break;
 			}
 		}
@@ -1219,15 +1226,14 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	xlog_get_iclog_buffer_size(mp, log);
 
-	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp needed for pagebuf/linux only */
-
-	XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
-	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
+	bp = xfs_buf_get_empty(log->l_iclog_size, mp->m_logdev_targp);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
-	ASSERT(XFS_BUF_ISBUSY(log->l_xbuf));
-	ASSERT(XFS_BUF_VALUSEMA(log->l_xbuf) <= 0);
+	ASSERT(XFS_BUF_ISBUSY(bp));
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
+	log->l_xbuf = bp;
+
 	spinlock_init(&log->l_icloglock, "iclog");
 	spinlock_init(&log->l_grant_lock, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
@@ -1267,12 +1273,11 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		INT_SET(head->h_fmt, ARCH_CONVERT, XLOG_FMT);
 		memcpy(&head->h_fs_uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t));
 
-		bp = iclog->ic_bp = XFS_getrbuf(0,mp);		/* my locked buffer */ /* mp need for pagebuf/linux only */
-		XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
-		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
+		bp = xfs_buf_get_empty(log->l_iclog_size, mp->m_logdev_targp);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
+		iclog->ic_bp = bp;
 
 		iclog->ic_size = XFS_BUF_SIZE(bp) - log->l_iclog_hsize;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
@@ -1572,7 +1577,7 @@ xlog_unalloc_log(xlog_t *log)
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		sv_destroy(&iclog->ic_forcesema);
 		sv_destroy(&iclog->ic_writesema);
-		XFS_freerbuf(iclog->ic_bp);
+		xfs_buf_free(iclog->ic_bp);
 #ifdef DEBUG
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
@@ -1603,7 +1608,7 @@ xlog_unalloc_log(xlog_t *log)
 			tic = next_tic;
 		}
 	}
-	XFS_freerbuf(log->l_xbuf);
+	xfs_buf_free(log->l_xbuf);
 #ifdef DEBUG
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);
@@ -3375,6 +3380,7 @@ xlog_verify_iclog(xlog_t	 *log,
 {
 	xlog_op_header_t	*ophead;
 	xlog_in_core_t		*icptr;
+	xlog_in_core_2_t	*xhdr;
 	xfs_caddr_t		ptr;
 	xfs_caddr_t		base_ptr;
 	__psint_t		field_offset;
@@ -3383,17 +3389,12 @@ xlog_verify_iclog(xlog_t	 *log,
 	int			idx;
 	SPLDECL(s);
 
-	union ich {
-		xlog_rec_ext_header_t	hic_xheader;
-		char			hic_sector[XLOG_HEADER_SIZE];
-	}*xhdr;
-
 	/* check validity of iclog pointers */
 	s = LOG_LOCK(log);
 	icptr = log->l_iclog;
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		if (icptr == 0)
-			xlog_panic("xlog_verify_iclog: illegal ptr");
+			xlog_panic("xlog_verify_iclog: invalid ptr");
 		icptr = icptr->ic_next;
 	}
 	if (icptr != log->l_iclog)
@@ -3403,7 +3404,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	/* check log magic numbers */
 	ptr = (xfs_caddr_t) &(iclog->ic_header);
 	if (INT_GET(*(uint *)ptr, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM)
-		xlog_panic("xlog_verify_iclog: illegal magic num");
+		xlog_panic("xlog_verify_iclog: invalid magic num");
 
 	for (ptr += BBSIZE; ptr < ((xfs_caddr_t)&(iclog->ic_header))+count;
 	     ptr += BBSIZE) {
@@ -3416,7 +3417,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	ptr = iclog->ic_datap;
 	base_ptr = ptr;
 	ophead = (xlog_op_header_t *)ptr;
-	xhdr = (union ich*)&iclog->ic_header;
+	xhdr = (xlog_in_core_2_t *)&iclog->ic_header;
 	for (i = 0; i < len; i++) {
 		ophead = (xlog_op_header_t *)ptr;
 
@@ -3436,7 +3437,7 @@ xlog_verify_iclog(xlog_t	 *log,
 			}
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
-			cmn_err(CE_WARN, "xlog_verify_iclog: illegal clientid %d op 0x%p offset 0x%x", clientid, ophead, field_offset);
+			cmn_err(CE_WARN, "xlog_verify_iclog: invalid clientid %d op 0x%p offset 0x%x", clientid, ophead, field_offset);
 
 		/* check length */
 		field_offset = (__psint_t)

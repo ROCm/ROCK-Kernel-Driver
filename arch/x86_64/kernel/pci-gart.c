@@ -262,7 +262,7 @@ static void iommu_full(struct pci_dev *dev, void *addr, size_t size, int dir)
 	
 	printk(KERN_ERR 
   "PCI-DMA: Out of IOMMU space for %p size %lu at device %s[%s]\n",
-	       addr,size, dev ? dev->dev.name : "?", dev ? dev->slot_name : "?");
+	       addr,size, dev ? dev->dev.name : "?", dev ? pci_name(dev) : "?");
 
 	if (size > PAGE_SIZE*EMERGENCY_PAGES) {
 		if (dir == PCI_DMA_FROMDEVICE || dir == PCI_DMA_BIDIRECTIONAL)

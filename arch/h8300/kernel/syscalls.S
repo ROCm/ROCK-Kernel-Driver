@@ -312,3 +312,7 @@ SYMBOL_NAME_LABEL(sys_fork)
 	mov.l	#SYMBOL_NAME(h8300_fork),er0
 	jmp	@SYMBOL_NAME(syscall_trampoline)
 
+SYMBOL_NAME_LABEL(sys_vfork)
+	mov.l	#SYMBOL_NAME(h8300_vfork),er0
+	jmp	@SYMBOL_NAME(syscall_trampoline)
+

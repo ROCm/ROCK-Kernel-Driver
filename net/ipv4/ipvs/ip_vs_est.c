@@ -77,6 +77,8 @@ static void estimation_timer(unsigned long arg)
 	read_lock(&est_lock);
 	for (e = est_list; e; e = e->next) {
 		s = e->stats;
+
+		spin_lock(&s->lock);
 		n_conns = s->conns;
 		n_inpkts = s->inpkts;
 		n_outpkts = s->outpkts;
@@ -108,6 +110,7 @@ static void estimation_timer(unsigned long arg)
 		e->last_outbytes = n_outbytes;
 		e->outbps += ((long)rate - (long)e->outbps)>>2;
 		s->outbps = (e->outbps+0xF)>>5;
+		spin_unlock(&s->lock);
 	}
 	read_unlock(&est_lock);
 	mod_timer(&est_timer, jiffies + 2*HZ);

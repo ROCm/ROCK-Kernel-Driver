@@ -3718,7 +3718,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 	} while (0);
 
 	/* Validate found interface: must have one ISO endpoint */
-	nas = dev->actconfig->interface[ifnum].num_altsetting;
+	nas = dev->actconfig->interface[ifnum]->num_altsetting;
 	if (debug > 0)
 		info("Number of alternate settings=%d.", nas);
 	if (nas < 2) {
@@ -3730,7 +3730,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 		const struct usb_host_interface *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
-		interface = &dev->actconfig->interface[ifnum].altsetting[i];
+		interface = &dev->actconfig->interface[ifnum]->altsetting[i];
 		if (interface->desc.bNumEndpoints != 1) {
 			err("Interface %d. has %u. endpoints!",
 			    ifnum, (unsigned)(interface->desc.bNumEndpoints));

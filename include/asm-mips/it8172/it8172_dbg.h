@@ -1,7 +1,7 @@
 /*
  *
  * BRIEF MODULE DESCRIPTION
- *	Function prototypes for low level uart routines to 
+ *	Function prototypes for low level uart routines to
  *	directly access a 16550 uart.
  *
  * Copyright 2000 MontaVista Software Inc.

@@ -33,7 +33,7 @@
 #include <linux/hdlc.h>
 
 
-static const char* version = "HDLC support module revision 1.15";
+static const char* version = "HDLC support module revision 1.16";
 
 #undef DEBUG_LINK
 
@@ -60,12 +60,11 @@ static int hdlc_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	if (hdlc->proto.netif_rx)
-		hdlc->proto.netif_rx(skb);
-	else {
-		hdlc->stats.rx_dropped++; /* Shouldn't happen */
-		dev_kfree_skb(skb);
-	}
-	return 0;
+		return hdlc->proto.netif_rx(skb);
+
+	hdlc->stats.rx_dropped++; /* Shouldn't happen */
+	dev_kfree_skb(skb);
+	return NET_RX_DROP;
 }
 
 
@@ -280,10 +279,11 @@ EXPORT_SYMBOL(hdlc_ioctl);
 EXPORT_SYMBOL(register_hdlc_device);
 EXPORT_SYMBOL(unregister_hdlc_device);
 
-struct packet_type hdlc_packet_type=
+static struct packet_type hdlc_packet_type =
 {
 	.type = __constant_htons(ETH_P_HDLC),
 	.func = hdlc_rcv,
+	.data = (void *)1,
 };
 
 

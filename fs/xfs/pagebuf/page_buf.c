@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -130,11 +130,11 @@ STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
  */
 
 pagebuf_param_t pb_params = {
-			/*	MIN	DFLT	MAX	*/
-	flush_interval:	{	HZ/2,	HZ,	30*HZ	},
-	age_buffer:	{	1*HZ,	15*HZ,	300*HZ	},
-	stats_clear:	{	0,	0,	1	},
-	debug:		{	0,	0,	1	},
+			  /*	MIN	DFLT	MAX	*/
+	.flush_interval	= {	HZ/2,	HZ,	30*HZ	},
+	.age_buffer	= {	1*HZ,	15*HZ,	300*HZ	},
+	.stats_clear	= {	0,	0,	1	},
+	.debug		= {	0,	0,	1	},
 };
 
 /*
@@ -834,13 +834,14 @@ pagebuf_readahead(
 
 page_buf_t *
 pagebuf_get_empty(
+	size_t			len,
 	pb_target_t		*target)
 {
 	page_buf_t		*pb;
 
 	pb = pagebuf_allocate(_PBF_LOCKABLE);
 	if (pb)
-		_pagebuf_initialize(pb, target, 0, 0, _PBF_LOCKABLE);
+		_pagebuf_initialize(pb, target, 0, len, _PBF_LOCKABLE);
 	return pb;
 }
 
@@ -1250,6 +1251,28 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 /*
  * Helper routine for pagebuf_iorequest
  */
+
+STATIC __inline__ int
+_pagebuf_iolocked(
+	page_buf_t		*pb)
+{
+	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
+	if (pb->pb_flags & PBF_READ)
+		return pb->pb_locked;
+	return ((pb->pb_flags & _PBF_LOCKABLE) == 0);
+}
+
+STATIC __inline__ void
+_pagebuf_iodone(
+	page_buf_t		*pb,
+	int			schedule)
+{
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pb->pb_locked = 0;
+		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), schedule);
+	}
+}
+
 STATIC int
 bio_end_io_pagebuf(
 	struct bio		*bio,
@@ -1285,20 +1308,116 @@ bio_end_io_pagebuf(
 				SetPageUptodate(page);
 		}
 
-		if (pb->pb_locked) {
+		if (_pagebuf_iolocked(pb)) {
 			unlock_page(page);
-		} else {
-			BUG_ON(PageLocked(page));
 		}
 	}
 
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		pb->pb_locked = 0;
-		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
-	}
-
+	_pagebuf_iodone(pb, 1);
 	bio_put(bio);
 	return 0;
+}
+
+void
+_pagebuf_ioapply(
+	page_buf_t		*pb)
+{
+	int			i, map_i, total_nr_pages, nr_pages;
+	struct bio		*bio;
+	int			offset = pb->pb_offset;
+	int			size = pb->pb_count_desired;
+	sector_t		sector = pb->pb_bn;
+	unsigned int		blocksize = pb->pb_target->pbr_bsize;
+	int			locking = _pagebuf_iolocked(pb);
+
+	total_nr_pages = pb->pb_page_count;
+	map_i = 0;
+
+	/* Special code path for reading a sub page size pagebuf in --
+	 * we populate up the whole page, and hence the other metadata
+	 * in the same page.  This optimization is only valid when the
+	 * filesystem block size and the page size are equal.
+	 */
+	if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
+	    (pb->pb_flags & PBF_READ) && locking &&
+	    (blocksize == PAGE_CACHE_SIZE)) {
+		bio = bio_alloc(GFP_NOIO, 1);
+
+		bio->bi_bdev = pb->pb_target->pbr_bdev;
+		bio->bi_sector = sector - (offset >> BBSHIFT);
+		bio->bi_end_io = bio_end_io_pagebuf;
+		bio->bi_private = pb;
+
+		bio_add_page(bio, pb->pb_pages[0], PAGE_CACHE_SIZE, 0);
+		size = 0;
+
+		atomic_inc(&pb->pb_io_remaining);
+
+		goto submit_io;
+	}
+
+	/* Lock down the pages which we need to for the request */
+	if (locking && (pb->pb_flags & PBF_WRITE) && (pb->pb_locked == 0)) {
+		for (i = 0; size; i++) {
+			int		nbytes = PAGE_CACHE_SIZE - offset;
+			struct page	*page = pb->pb_pages[i];
+
+			if (nbytes > size)
+				nbytes = size;
+
+			lock_page(page);
+
+			size -= nbytes;
+			offset = 0;
+		}
+		offset = pb->pb_offset;
+		size = pb->pb_count_desired;
+	}
+
+next_chunk:
+	atomic_inc(&pb->pb_io_remaining);
+	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
+	if (nr_pages > total_nr_pages)
+		nr_pages = total_nr_pages;
+
+	bio = bio_alloc(GFP_NOIO, nr_pages);
+
+	BUG_ON(bio == NULL);
+	bio->bi_bdev = pb->pb_target->pbr_bdev;
+	bio->bi_sector = sector;
+	bio->bi_end_io = bio_end_io_pagebuf;
+	bio->bi_private = pb;
+
+	for (; size && nr_pages; nr_pages--, map_i++) {
+		int	nbytes = PAGE_CACHE_SIZE - offset;
+
+		if (nbytes > size)
+			nbytes = size;
+
+		if (bio_add_page(bio, pb->pb_pages[map_i],
+					nbytes, offset) < nbytes)
+			break;
+
+		offset = 0;
+
+		sector += nbytes >> BBSHIFT;
+		size -= nbytes;
+		total_nr_pages--;
+	}
+
+submit_io:
+	if (likely(bio->bi_size)) {
+		if (pb->pb_flags & PBF_READ) {
+			submit_bio(READ, bio);
+		} else {
+			submit_bio(WRITE, bio);
+		}
+
+		if (size)
+			goto next_chunk;
+	} else {
+		pagebuf_ioerror(pb, EIO);
+	}
 }
 
 /*
@@ -1323,16 +1442,6 @@ int
 pagebuf_iorequest(			/* start real I/O		*/
 	page_buf_t		*pb)	/* buffer to convey to device	*/
 {
-	int			i, map_i, total_nr_pages, nr_pages;
-	struct bio		*bio;
-	int			offset = pb->pb_offset;
-	int			size = pb->pb_count_desired;
-	sector_t		sector = pb->pb_bn;
-	unsigned int		blocksize = pb->pb_target->pbr_bsize;
-	int			locking;
-
-	locking = (pb->pb_flags & _PBF_LOCKABLE) == 0 && (pb->pb_locked == 0);
-
 	PB_TRACE(pb, PB_TRACE_REC(ioreq), 0);
 
 	if (pb->pb_flags & PBF_DELWRI) {
@@ -1340,107 +1449,17 @@ pagebuf_iorequest(			/* start real I/O		*/
 		return 0;
 	}
 
+	if (pb->pb_flags & PBF_WRITE) {
+		_pagebuf_wait_unpin(pb);
+	}
+
 	/* Set the count to 1 initially, this will stop an I/O
 	 * completion callout which happens before we have started
 	 * all the I/O from calling pagebuf_iodone too early.
 	 */
 	atomic_set(&pb->pb_io_remaining, 1);
-
-	/* Special code path for reading a sub page size pagebuf in --
-	 * we populate up the whole page, and hence the other metadata
-	 * in the same page.  This optimization is only valid when the
-	 * filesystem block size and the page size are equal.
-	 */
-	if (unlikely((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-	    (pb->pb_flags & PBF_READ) && pb->pb_locked &&
-	    (blocksize == PAGE_CACHE_SIZE))) {
-		bio = bio_alloc(GFP_NOIO, 1);
-
-		bio->bi_bdev = pb->pb_target->pbr_bdev;
-		bio->bi_sector = sector - (offset >> BBSHIFT);
-		bio->bi_end_io = bio_end_io_pagebuf;
-		bio->bi_private = pb;
-
-		bio_add_page(bio, pb->pb_pages[0], PAGE_CACHE_SIZE, 0);
-
-		atomic_inc(&pb->pb_io_remaining);
-		submit_bio(READ, bio);
-
-		goto io_submitted;
-	}
-
-	if (pb->pb_flags & PBF_WRITE) {
-		_pagebuf_wait_unpin(pb);
-	}
-
-	/* Lock down the pages which we need to for the request */
-	if (locking) {
-		for (i = 0; size; i++) {
-			int		nbytes = PAGE_CACHE_SIZE - offset;
-			struct page	*page = pb->pb_pages[i];
-
-			if (nbytes > size)
-				nbytes = size;
-
-			lock_page(page);
-
-			size -= nbytes;
-			offset = 0;
-		}
-		offset = pb->pb_offset;
-		size = pb->pb_count_desired;
-		pb->pb_locked = 1;
-	}
-
-	total_nr_pages = pb->pb_page_count;
-	map_i = 0;
-
-next_chunk:
-	atomic_inc(&pb->pb_io_remaining);
-	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
-	if (nr_pages > total_nr_pages)
-		nr_pages = total_nr_pages;
-
-	bio = bio_alloc(GFP_NOIO, nr_pages);
-
-	BUG_ON(bio == NULL);
-	bio->bi_bdev = pb->pb_target->pbr_bdev;
-	bio->bi_sector = sector;
-	bio->bi_end_io = bio_end_io_pagebuf;
-	bio->bi_private = pb;
-
-	for (; size && nr_pages; nr_pages--, map_i++) {
-		int	nbytes = PAGE_CACHE_SIZE - offset;
-
-		if (nbytes > size)
-			nbytes = size;
-
-		if (bio_add_page(bio, pb->pb_pages[map_i], nbytes, offset) < nbytes)
-			break;
-
-		offset = 0;
-
-		sector += nbytes >> BBSHIFT;
-		size -= nbytes;
-		total_nr_pages--;
-	}
-
-	if (pb->pb_flags & PBF_READ) {
-		submit_bio(READ, bio);
-	} else {
-		submit_bio(WRITE, bio);
-	}
-
-	if (size)
-		goto next_chunk;
-
-io_submitted:
-
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		pb->pb_locked = 0;
-		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
-	}
-
+	_pagebuf_ioapply(pb);
+	_pagebuf_iodone(pb, 0);
 	return 0;
 }
 

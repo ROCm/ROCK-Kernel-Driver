@@ -1,5 +1,4 @@
 /*
- *
  * BRIEF MODULE DESCRIPTION
  *	IT8172/QED5231 board setup.
  *
@@ -32,35 +31,33 @@
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/console.h>
-#include <linux/mc146818rtc.h>
 #include <linux/serial_reg.h>
+#include <linux/major.h>
+#include <linux/kdev_t.h>
 #include <linux/root_dev.h>
 
 #include <asm/cpu.h>
+#include <asm/time.h>
+#include <asm/io.h>
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
 #include <asm/mipsregs.h>
 #include <asm/reboot.h>
+#include <asm/traps.h>
 #include <asm/it8172/it8172.h>
 #include <asm/it8712.h>
-#ifdef CONFIG_PC_KEYB
-#include <asm/keyboard.h>
-#endif
 
 #if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_PROM_CONSOLE)
 extern void console_setup(char *, int *);
 char serial_console[20];
 #endif
 
-extern struct rtc_ops it8172_rtc_ops;
 extern struct resource ioport_resource;
-extern unsigned long mips_io_port_base;
 #ifdef CONFIG_BLK_DEV_IDE
 extern struct ide_ops std_ide_ops;
 extern struct ide_ops *ide_ops;
 #endif
 #ifdef CONFIG_PC_KEYB
-extern struct kbd_ops std_kbd_ops;
 int init_8712_keyboard(void);
 #endif
 
@@ -70,6 +67,11 @@ extern char * __init prom_getcmdline(void);
 extern void it8172_restart(char *command);
 extern void it8172_halt(void);
 extern void it8172_power_off(void);
+
+extern void (*board_time_init)(void);
+extern void (*board_timer_setup)(struct irqaction *irq);
+extern void it8172_time_init(void);
+extern void it8172_timer_setup(struct irqaction *irq);
 
 #ifdef CONFIG_IT8172_REVC
 struct {
@@ -124,21 +126,23 @@ void __init it8172_setup(void)
 		argptr = prom_getcmdline();
 		strcat(argptr, " console=ttyS0,115200");
 	}
-#endif	  
+#endif
 
-	clear_cp0_status(ST0_FR);
-	rtc_ops = &it8172_rtc_ops;
+	clear_c0_status(ST0_FR);
+
+	board_time_init = it8172_time_init;
+	board_timer_setup = it8172_timer_setup;
 
 	_machine_restart = it8172_restart;
 	_machine_halt = it8172_halt;
 	_machine_power_off = it8172_power_off;
 
 	/*
-	* IO/MEM resources. 
+	* IO/MEM resources.
 	*
 	* revisit this area.
 	*/
-	mips_io_port_base = KSEG1;
+	set_io_port_base(KSEG1);
 	ioport_resource.start = it8172_resources.pci_io.start;
 	ioport_resource.end = it8172_resources.pci_io.end;
 #ifdef CONFIG_IT8172_REVC
@@ -161,7 +165,7 @@ void __init it8172_setup(void)
 	dsr &= ~IT_PM_DSR_ACSB;
 #else
 	dsr |= IT_PM_DSR_ACSB;
-#endif	
+#endif
 #ifdef CONFIG_BLK_DEV_IT8172
 	dsr &= ~IT_PM_DSR_IDESB;
 	ide_ops = &std_ide_ops;
@@ -197,8 +201,8 @@ void __init it8172_setup(void)
 			LPCSetConfig(0x4, 0x30, 0x1);
 			LPCSetConfig(0x4, 0xf4, LPCGetConfig(0x4, 0xf4) | 0x80);
 
-			if ((LPCGetConfig(LDN_KEYBOARD, 0x30) == 0) || 
-					(LPCGetConfig(LDN_MOUSE, 0x30) == 0)) 
+			if ((LPCGetConfig(LDN_KEYBOARD, 0x30) == 0) ||
+					(LPCGetConfig(LDN_MOUSE, 0x30) == 0))
 				printk("Error: keyboard or mouse not enabled\n");
 
 			kbd_ops = &std_kbd_ops;
@@ -222,7 +226,7 @@ void __init it8172_setup(void)
 #endif
 #ifdef CONFIG_IT8172_SCR0
 	{
-		unsigned i; 
+		unsigned i;
 		/* Enable Smart Card Reader 0 */
 		/* First power it up */
 		IT_IO_READ16(IT_PM_DSR, i);
@@ -241,7 +245,7 @@ void __init it8172_setup(void)
 #endif /* CONFIG_IT8172_SCR0 */
 #ifdef CONFIG_IT8172_SCR1
 	{
-		unsigned i; 
+		unsigned i;
 		/* Enable Smart Card Reader 1 */
 		/* First power it up */
 		IT_IO_READ16(IT_PM_DSR, i);
@@ -263,7 +267,7 @@ void __init it8172_setup(void)
 
 #ifdef CONFIG_PC_KEYB
 /*
- * According to the ITE Special BIOS Note for waking up the 
+ * According to the ITE Special BIOS Note for waking up the
  * keyboard controller...
  */
 int init_8712_keyboard()

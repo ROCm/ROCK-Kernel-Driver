@@ -6,7 +6,7 @@
 
 #if defined(__KERNEL__)
 
-#define DASTCR *(volatile unsigned char *)0xFEE01A
+#define DASTCR 0xFEE01A
 #define DADR0  0xFEE09C
 #define DADR1  0xFEE09D
 #define DACR   0xFEE09E

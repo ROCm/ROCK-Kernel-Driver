@@ -258,8 +258,8 @@ void fat_cache_add(struct inode *inode, int f_clu, int d_clu)
 		if (walk->start_cluster == first &&
 		    walk->file_cluster == f_clu) {
 			if (walk->disk_cluster != d_clu) {
-				printk(KERN_ERR "FAT: cache corruption"
-				       " (ino %lu)\n", inode->i_ino);
+				printk(KERN_ERR "FAT: cache corruption "
+				       "(i_pos %lld)\n", MSDOS_I(inode)->i_pos);
 				__fat_cache_inval_inode(inode);
 				goto out;
 			}
@@ -307,7 +307,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 		/* prevent the infinite loop of cluster chain */
 		if (*fclus > limit) {
 			fat_fs_panic(sb, "%s: detected the cluster chain loop"
-				     " (i_pos %llu)", __FUNCTION__,
+				     " (i_pos %lld)", __FUNCTION__,
 				     MSDOS_I(inode)->i_pos);
 			return -EIO;
 		}
@@ -317,7 +317,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
  			return nr;
 		else if (nr == FAT_ENT_FREE) {
 			fat_fs_panic(sb, "%s: invalid cluster chain"
-				     " (i_pos %llu)", __FUNCTION__,
+				     " (i_pos %lld)", __FUNCTION__,
 				     MSDOS_I(inode)->i_pos);
 			return -EIO;
 		} else if (nr == FAT_ENT_EOF) {
@@ -343,7 +343,7 @@ static int fat_bmap_cluster(struct inode *inode, int cluster)
 	if (ret < 0)
 		return ret;
 	else if (ret == FAT_ENT_EOF) {
-		fat_fs_panic(sb, "%s: request beyond EOF (i_pos %llu)",
+		fat_fs_panic(sb, "%s: request beyond EOF (i_pos %lld)",
 			     __FUNCTION__, MSDOS_I(inode)->i_pos);
 		return -EIO;
 	}
@@ -427,8 +427,8 @@ int fat_free(struct inode *inode, int skip)
 		if (nr < 0)
 			goto error;
 		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: deleting beyond EOF (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
+			fat_fs_panic(sb, "%s: deleting beyond EOF (i_pos %lld)",
+				     __FUNCTION__, MSDOS_I(inode)->i_pos);
 			nr = -EIO;
 			goto error;
 		}

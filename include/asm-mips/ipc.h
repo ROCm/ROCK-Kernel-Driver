@@ -1,5 +1,5 @@
-#ifndef __ASM_MIPS_IPC_H
-#define __ASM_MIPS_IPC_H
+#ifndef _ASM_IPC_H
+#define _ASM_IPC_H
 
 /*
  * These are used to wrap system calls on MIPS.
@@ -30,4 +30,4 @@ struct ipc_kludge {
 
 #define IPCCALL(version,op)	((version)<<16 | (op))
 
-#endif /* __ASM_MIPS_IPC_H */
+#endif /* _ASM_IPC_H */

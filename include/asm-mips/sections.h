@@ -1,9 +1,9 @@
-#ifndef __ASM_SECTIONS_H
-#define __ASM_SECTIONS_H
+#ifndef _ASM_SECTIONS_H
+#define _ASM_SECTIONS_H
 
 #include <asm-generic/sections.h>
 
-extern char _stext, _etext;
+extern char _fdata;
 extern char _end;
 
-#endif /* __ASM_SECTIONS_H */
+#endif /* _ASM_SECTIONS_H */

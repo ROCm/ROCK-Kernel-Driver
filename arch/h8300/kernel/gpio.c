@@ -6,7 +6,7 @@
  */
 
 /*
- * H8/300H Internal I/O Port Management
+ * Internal I/O Port Management
  */
 
 #include <linux/config.h>
@@ -15,50 +15,56 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/fs.h>
+#include <linux/init.h>
 
+#define _(addr) (volatile unsigned char *)(addr)
 #if defined(CONFIG_H83007) || defined(CONFIG_H83068)
-#define P1DDR (unsigned char *)0xfee000
-#define P2DDR (unsigned char *)0xfee001
-#define P3DDR (unsigned char *)0xfee002
-#define P4DDR (unsigned char *)0xfee003
-#define P5DDR (unsigned char *)0xfee004
-#define P6DDR (unsigned char *)0xfee005
-#define P8DDR (unsigned char *)0xfee007
-#define P9DDR (unsigned char *)0xfee008
-#define PADDR (unsigned char *)0xfee009
-#define PBDDR (unsigned char *)0xfee00A
-#endif
-#if defined(CONFIG_H83002) || defined(CONFIG_H8048)
-#define P1DDR (unsigned char *)0xffffc0
-#define P2DDR (unsigned char *)0xffffc1
-#define P3DDR (unsigned char *)0xffffc4
-#define P4DDR (unsigned char *)0xffffc5
-#define P5DDR (unsigned char *)0xffffc8
-#define P6DDR (unsigned char *)0xffffc9
-#define P8DDR (unsigned char *)0xffffcd
-#define P9DDR (unsigned char *)0xffffd0
-#define PADDR (unsigned char *)0xffffd1
-#define PBDDR (unsigned char *)0xffffd4
-#endif
-
-#if defined(P1DDR)
-
+#include <asm/regs306x.h>
+static volatile unsigned char *ddrs[] = {
+	_(P1DDR),_(P2DDR),_(P3DDR),_(P4DDR),_(P5DDR),_(P6DDR),
+	NULL,    _(P8DDR),_(P9DDR),_(PADDR),_(PBDDR),
+};
 #define MAX_PORT 11
+#endif
+
+ #if defined(CONFIG_H83002) || defined(CONFIG_H8048)
+/* Fix me!! */
+#include <asm/regs306x.h>
+static volatile unsigned char *ddrs[] = {
+	_(P1DDR),_(P2DDR),_(P3DDR),_(P4DDR),_(P5DDR),_(P6DDR),
+	NULL,    _(P8DDR),_(P9DDR),_(PADDR),_(PBDDR),
+};
+#define MAX_PORT 11
+#endif
+
+#if defined(CONFIG_H8S2678)
+#include <asm/regs267x.h>
+static volatile unsigned char *ddrs[] = {
+	_(P1DDR),_(P2DDR),_(P3DDR),NULL    ,_(P5DDR),_(P6DDR),
+	_(P7DDR),_(P8DDR),NULL,    _(PADDR),_(PBDDR),_(PCDDR),
+	_(PDDDR),_(PEDDR),_(PFDDR),_(PGDDR),_(PHDDR),
+	_(PADDR),_(PBDDR),_(PCDDR),_(PDDDR),_(PEDDR),_(PFDDR),
+	_(PGDDR),_(PHDDR)
+};
+#define MAX_PORT 17
+#endif
+#undef _
+ 
+#if !defined(P1DDR)
+#error Unsuppoted CPU Selection
+#endif
 
 static struct {
 	unsigned char used;
 	unsigned char ddr;
 } gpio_regs[MAX_PORT];
 
-static volatile unsigned char *ddrs[] = {
-	P1DDR,P2DDR,P3DDR,P4DDR,P5DDR,P6DDR,NULL,P8DDR,P9DDR,PADDR,PBDDR,
-};
-
 extern char *_platform_gpio_table(int length);
 
 int h8300_reserved_gpio(int port, unsigned int bits)
 {
 	unsigned char *used;
+
 	if (port < 0 || port >= MAX_PORT)
 		return -1;
 	used = &(gpio_regs[port].used);
@@ -71,6 +77,7 @@ int h8300_reserved_gpio(int port, unsigned int bits)
 int h8300_free_gpio(int port, unsigned int bits)
 {
 	unsigned char *used;
+
 	if (port < 0 || port >= MAX_PORT)
 		return -1;
 	used = &(gpio_regs[port].used);
@@ -82,16 +89,16 @@ int h8300_free_gpio(int port, unsigned int bits)
 
 int h8300_set_gpio_dir(int port_bit,int dir)
 {
-	const unsigned char mask[]={0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};
 	int port = (port_bit >> 8) & 0xff;
-	int bit  = port_bit & 0x07;
+	int bit  = port_bit & 0xff;
+
 	if (ddrs[port] == NULL)
 		return 0;
-	if (gpio_regs[port].used & mask[bit]) {
+	if (gpio_regs[port].used & bit) {
 		if (dir)
-			gpio_regs[port].ddr |= mask[bit];
+			gpio_regs[port].ddr |= bit;
 		else
-			gpio_regs[port].ddr &= ~mask[bit];
+			gpio_regs[port].ddr &= ~bit;
 		*ddrs[port] = gpio_regs[port].ddr;
 		return 1;
 	} else
@@ -100,13 +107,13 @@ int h8300_set_gpio_dir(int port_bit,int dir)
 
 int h8300_get_gpio_dir(int port_bit)
 {
-	const unsigned char mask[]={0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};
 	int port = (port_bit >> 8) & 0xff;
-	int bit  = port_bit & 0x07;
+	int bit  = port_bit & 0xff;
+
 	if (ddrs[port] == NULL)
 		return 0;
-	if (gpio_regs[port].used & mask[bit]) {
-		return (gpio_regs[port].ddr & mask[bit]) != 0;
+	if (gpio_regs[port].used & bit) {
+		return (gpio_regs[port].ddr & bit) != 0;
 	} else
 		return -1;
 }
@@ -132,10 +139,11 @@ static char *port_status(int portno)
 	return result;
 }
 
-static int gpio_proc_read(char *buf, char **start, off_t offset, int len, int unused)
+static int gpio_proc_read(char *buf, char **start, off_t offset, 
+                          int len, int *unused_i, void *unused_v)
 {
 	int c,outlen;
-	const static char port_name[]="123456789AB";
+	const static char port_name[]="123456789ABCDEFGH";
 	outlen = 0;
 	for (c = 0; c < MAX_PORT; c++) {
 		if (ddrs[c] == NULL)
@@ -147,20 +155,20 @@ static int gpio_proc_read(char *buf, char **start, off_t offset, int len, int un
 	return outlen;
 }
 
-static const struct proc_dir_entry proc_gpio = {
-	0, 4,"gpio",S_IFREG | S_IRUGO, 1, 0, 0, 0, NULL, gpio_proc_read,
-};
-#endif
-
-int h8300_gpio_init(void)
+static __init int register_proc(void)
 {
-	memcpy(gpio_regs,_platform_gpio_table(sizeof(gpio_regs)),sizeof(gpio_regs));
-#if 0 && defined(CONFIG_PROC_FS)
-	proc_register(&proc_root,&proc_gpio);
-#endif
-	return 0;
+	struct proc_dir_entry *proc_gpio;
+
+	proc_gpio = create_proc_entry("gpio", S_IRUGO, NULL);
+	if (proc_gpio) 
+		proc_gpio->read_proc = gpio_proc_read;
+	return proc_gpio != NULL;
 }
 
-#else
-#error Unsuppoted CPU Selection
+__initcall(register_proc);
 #endif
+
+void __init h8300_gpio_init(void)
+{
+	memcpy(gpio_regs,_platform_gpio_table(sizeof(gpio_regs)),sizeof(gpio_regs));
+}

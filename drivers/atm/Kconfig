@@ -164,18 +164,6 @@ config ATM_ZATM_DEBUG
 	  Note that extended debugging may create certain race conditions
 	  itself. Enable this ONLY if you suspect problems with the driver.
 
-config ATM_ZATM_EXACT_TS
-	bool "Enable usec resolution timestamps"
-	depends on ATM_ZATM && X86
-	help
-	  The uPD98401 SAR chip supports a high-resolution timer (approx. 30
-	  MHz) that is used for very accurate reception timestamps. Because
-	  that timer overflows after 140 seconds, and also to avoid timer
-	  drift, time measurements need to be periodically synchronized with
-	  the normal system time. Enabling this feature will add some general
-	  overhead for timer synchronization and also per-packet overhead for
-	  time conversion.
-
 #   bool 'Rolfs TI TNETA1570' CONFIG_ATM_TNETA1570 y
 #   if [ "$CONFIG_ATM_TNETA1570" = "y" ]; then
 #      bool '  Enable extended debugging' CONFIG_ATM_TNETA1570_DEBUG n

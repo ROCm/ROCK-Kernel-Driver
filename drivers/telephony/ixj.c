@@ -2250,8 +2250,6 @@ static int ixj_open(struct phone_device *p, struct file *file_p)
 	j->flags.cidplay = 0;
 	j->flags.cidcw_ack = 0;
 
-	MOD_INC_USE_COUNT;
-
 	if (ixjdebug & 0x0002)
 		printk(KERN_INFO "Opening board %d\n", p->board);
 
@@ -2463,7 +2461,6 @@ int ixj_release(struct inode *inode, struct file *file_p)
 
 	file_p->private_data = NULL;
 	clear_bit(board, &j->busyflags);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

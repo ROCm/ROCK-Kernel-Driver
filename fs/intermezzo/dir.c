@@ -82,7 +82,7 @@ static inline void presto_unlock(struct inode *dir)
  * these are initialized in super.c
  */
 extern int presto_permission(struct inode *inode, int mask, struct nameidata *nd);
-static int izo_authorized_uid = 0;
+static int izo_authorized_uid;
 
 int izo_dentry_is_ilookup(struct dentry *dentry, ino_t *id,
                           unsigned int *generation)

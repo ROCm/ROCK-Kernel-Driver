@@ -278,7 +278,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 		struct ip_conntrack_tuple tuple;
 	} best = { NULL,  0xFFFFFFFF };
 	u_int32_t *var_ipp, *other_ipp, saved_ip, orig_dstip;
-	static unsigned int randomness = 0;
+	static unsigned int randomness;
 
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC) {
 		var_ipp = &tuple->src.ip;

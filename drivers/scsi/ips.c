@@ -280,7 +280,7 @@ IPS_DEFINE_COMPAT_TABLE( Compatable );               /* Version Compatability Ta
 
 
    /* This table describes all ServeRAID Adapters */
-   static struct  pci_device_id  ips_pci_table[]  __devinitdata = {
+   static struct  pci_device_id  ips_pci_table[] = {
            { 0x1014, 0x002E, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
            { 0x1014, 0x01BD, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
            { 0x9005, 0x0250, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },

@@ -139,7 +139,7 @@ static void __devexit com20020pci_remove(struct pci_dev *pdev)
 	com20020_remove(pci_get_drvdata(pdev));
 }
 
-static struct pci_device_id com20020pci_id_table[] __devinitdata = {
+static struct pci_device_id com20020pci_id_table[] = {
 	{ 0x1571, 0xa001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0x1571, 0xa002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0x1571, 0xa003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },

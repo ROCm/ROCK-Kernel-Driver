@@ -223,7 +223,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 
 	printk(KERN_DEBUG
 	       "Detected Orinoco/Prism2 PCI device at %s, mem:0x%lX to 0x%lX -> 0x%p, irq:%d\n",
-	       pdev->slot_name, dev->mem_start, dev->mem_end, pci_ioaddr, pdev->irq);
+	       pci_name(pdev), dev->mem_start, dev->mem_end, pci_ioaddr, pdev->irq);
 
 	hermes_struct_init(&priv->hw, dev->base_addr,
 			   HERMES_MEM, HERMES_32BIT_REGSPACING);
@@ -359,7 +359,7 @@ static int orinoco_pci_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-static struct pci_device_id orinoco_pci_pci_id_table[] __devinitdata = {
+static struct pci_device_id orinoco_pci_pci_id_table[] = {
 	{0x1260, 0x3873, PCI_ANY_ID, PCI_ANY_ID,},
 	{0,},
 };

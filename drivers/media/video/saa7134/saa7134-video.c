@@ -1503,7 +1503,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
                 strcpy(cap->driver, "saa7134");
 		strlcpy(cap->card, saa7134_boards[dev->board].name,
 			sizeof(cap->card));
-		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
+		sprintf(cap->bus_info,"PCI:%s",pci_name(dev->pci));
 		cap->version = SAA7134_VERSION_CODE;
 		cap->capabilities =
 			V4L2_CAP_VIDEO_CAPTURE |
@@ -1903,7 +1903,7 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
                 strcpy(cap->driver, "saa7134");
 		strlcpy(cap->card, saa7134_boards[dev->board].name,
 			sizeof(cap->card));
-		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
+		sprintf(cap->bus_info,"PCI:%s",pci_name(dev->pci));
 		cap->version = SAA7134_VERSION_CODE;
 		cap->capabilities = V4L2_CAP_TUNER;
 		return 0;

@@ -115,7 +115,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
         memset(vortex, 0, sizeof(struct vortex));
 
 	vortex->dev = dev;
-	sprintf(vortex->phys, "pci%s/gameport0", dev->slot_name);
+	sprintf(vortex->phys, "pci%s/gameport0", pci_name(dev));
 
 	pci_set_drvdata(dev, vortex);
 
@@ -146,7 +146,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 	gameport_register_port(&vortex->gameport);
 	
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		dev->dev.name, dev->slot_name, vortex->gameport.speed);
+		dev->dev.name, pci_name(dev), vortex->gameport.speed);
 
 	return 0;
 }
@@ -159,7 +159,7 @@ static void __devexit vortex_remove(struct pci_dev *dev)
 	kfree(vortex);
 }
 
-static struct pci_device_id vortex_id_table[] __devinitdata =
+static struct pci_device_id vortex_id_table[] =
 {{ 0x12eb, 0x0001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x11000 },
  { 0x12eb, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x28800 },
  { 0 }};

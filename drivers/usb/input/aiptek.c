@@ -367,10 +367,12 @@ static struct usb_driver aiptek_driver = {
 static int __init
 aiptek_init(void)
 {
-	usb_register(&aiptek_driver);
-	info(DRIVER_VERSION " " DRIVER_AUTHOR);
-	info(DRIVER_DESC);
-	return 0;
+	int result = usb_register(&aiptek_driver);
+	if (result == 0) {
+		info(DRIVER_VERSION " " DRIVER_AUTHOR);
+		info(DRIVER_DESC);
+	}
+	return result;
 }
 
 static void __exit

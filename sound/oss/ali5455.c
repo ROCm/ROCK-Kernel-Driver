@@ -216,7 +216,7 @@ static char *card_names[] = {
 	"ALI 5455"
 };
 
-static struct pci_device_id ali_pci_tbl[] __initdata = {
+static struct pci_device_id ali_pci_tbl[] = {
 	{PCI_VENDOR_ID_ALI, PCI_DEVICE_ID_ALI_5455,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ALI5455},
 	{0,}

@@ -1,10 +1,8 @@
 /*
- * linux/include/asm-mips/namei.h
- *
  * Included from linux/fs/namei.c
  */
-#ifndef __ASM_NAMEI_H
-#define __ASM_NAMEI_H
+#ifndef _ASM_NAMEI_H
+#define _ASM_NAMEI_H
 
 #include <linux/config.h>
 
@@ -26,4 +24,4 @@ static inline char *__emul_prefix(void)
 
 #endif /* !defined(CONFIG_BINFMT_IRIX) */
 
-#endif /* __ASM_NAMEI_H */
+#endif /* _ASM_NAMEI_H */

@@ -66,15 +66,11 @@ static void snd_sf_clear(snd_sf_list_t *sflist);
 static int
 lock_preset(snd_sf_list_t *sflist, int nonblock)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&sflist->lock, flags);
-	if (sflist->sf_locked && nonblock) {
-		spin_unlock_irqrestore(&sflist->lock, flags);
-		return -EBUSY;
-	}
-	spin_unlock_irqrestore(&sflist->lock, flags);
-	down(&sflist->presets_mutex);
-	sflist->sf_locked = 1;
+	if (nonblock) {
+		if (down_trylock(&sflist->presets_mutex))
+			return -EBUSY;
+	} else 
+		down(&sflist->presets_mutex);
 	return 0;
 }
 
@@ -86,7 +82,6 @@ static void
 unlock_preset(snd_sf_list_t *sflist)
 {
 	up(&sflist->presets_mutex);
-	sflist->sf_locked = 0;
 }
 
 
@@ -1356,7 +1351,6 @@ snd_sf_new(snd_sf_callback_t *callback, snd_util_memhdr_t *hdr)
 
 	init_MUTEX(&sflist->presets_mutex);
 	spin_lock_init(&sflist->lock);
-	sflist->sf_locked = 0;
 	sflist->memhdr = hdr;
 
 	if (callback)
@@ -1403,7 +1397,7 @@ snd_soundfont_remove_samples(snd_sf_list_t *sflist)
 
 /*
  * Remove unlocked samples.
- * The soundcard should be silet before calling this function.
+ * The soundcard should be silent before calling this function.
  */
 int
 snd_soundfont_remove_unlocked(snd_sf_list_t *sflist)

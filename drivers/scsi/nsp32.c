@@ -1977,7 +1977,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	ret = nsp32_detect(pdev);
 
 	nsp32_msg(KERN_INFO, "nsp32 irq: %i mmio: 0x%lx slot: %s model: %s",
-		  pdev->irq, data->MmioAddress, pdev->slot_name,
+		  pdev->irq, data->MmioAddress, pci_name(pdev),
 		  nsp32_model[id->driver_data]);
 
 	nsp32_dbg(NSP32_DEBUG_REGISTER, "exit");
@@ -2001,7 +2001,7 @@ static void __devexit nsp32_remove(struct pci_dev *pdev)
 	iounmap((void *)(data->MmioAddress));
 }
 
-static struct pci_device_id nsp32_pci_table[] __devinitdata = {
+static struct pci_device_id nsp32_pci_table[] = {
 	{
 		.vendor      = PCI_VENDOR_ID_IODATA,
 		.device      = PCI_DEVICE_ID_NINJASCSI_32BI_CBSC_II,

@@ -382,6 +382,7 @@ static void jfs_write_super_lockfs(struct super_block *sb)
 	if (!(sb->s_flags & MS_RDONLY)) {
 		txQuiesce(sb);
 		lmLogShutdown(log);
+		updateSuper(sb, FM_CLEAN);
 	}
 }
 
@@ -392,6 +393,7 @@ static void jfs_unlockfs(struct super_block *sb)
 	int rc = 0;
 
 	if (!(sb->s_flags & MS_RDONLY)) {
+		updateSuper(sb, FM_MOUNT);
 		if ((rc = lmLogInit(log)))
 			jfs_err("jfs_unlock failed with return code %d", rc);
 		else
@@ -457,6 +459,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		INIT_LIST_HEAD(&jfs_ip->anon_inode_list);
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
+		init_rwsem(&jfs_ip->xattr_sem);
 		jfs_ip->atlhead = 0;
 		jfs_ip->active_ag = -1;
 #ifdef CONFIG_JFS_POSIX_ACL

@@ -1,7 +1,7 @@
 /*
  * ip22-berr.c: Bus error handling.
  *
- * Copyright (C) 2002 Ladislav Michl
+ * Copyright (C) 2002, 2003 Ladislav Michl (ladis@linux-mips.org)
  */
 
 #include <linux/init.h>
@@ -14,20 +14,26 @@
 #include <asm/branch.h>
 #include <asm/sgi/mc.h>
 #include <asm/sgi/hpc3.h>
+#include <asm/sgi/ioc.h>
+#include <asm/sgi/ip22.h>
 
 
 static unsigned int cpu_err_stat;	/* Status reg for CPU */
 static unsigned int gio_err_stat;	/* Status reg for GIO */
 static unsigned int cpu_err_addr;	/* Error address reg for CPU */
 static unsigned int gio_err_addr;	/* Error address reg for GIO */
+static unsigned int extio_stat;
+static unsigned int hpc3_berr_stat;	/* Bus error interrupt status */
 
 static void save_and_clear_buserr(void)
 {
-	/* save memory controler's error status registers */
+	/* save status registers */
 	cpu_err_addr = sgimc->cerr;
 	cpu_err_stat = sgimc->cstat;
 	gio_err_addr = sgimc->gerr;
 	gio_err_stat = sgimc->gstat;
+	extio_stat = ip22_is_fullhouse() ? sgioc->extio : (sgint->errstat << 4);
+	hpc3_berr_stat = hpc3c0->bestat;
 
 	sgimc->cstat = sgimc->gstat = 0;
 }
@@ -37,6 +43,17 @@ static void save_and_clear_buserr(void)
 
 static void print_buserr(void)
 {
+	if (extio_stat & EXTIO_MC_BUSERR)
+		printk(KERN_ALERT "MC Bus Error\n");
+	if (extio_stat & EXTIO_HPC3_BUSERR)
+		printk(KERN_ALERT "HPC3 Bus Error 0x%x:<id=0x%x,%s,lane=0x%x>\n",
+			hpc3_berr_stat,
+			(hpc3_berr_stat & HPC3_BESTAT_PIDMASK) >>
+					  HPC3_BESTAT_PIDSHIFT,
+			(hpc3_berr_stat & HPC3_BESTAT_CTYPE) ? "PIO" : "DMA",
+			hpc3_berr_stat & HPC3_BESTAT_BLMASK);
+	if (extio_stat & EXTIO_EISA_BUSERR)
+		printk(KERN_ALERT "EISA Bus Error\n");
 	if (cpu_err_stat & CPU_ERRMASK)
 		printk(KERN_ALERT "CPU error 0x%x<%s%s%s%s%s%s> @ 0x%08x\n",
 			cpu_err_stat,

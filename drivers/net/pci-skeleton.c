@@ -212,7 +212,7 @@ static struct {
 };
 
 
-static struct pci_device_id netdrv_pci_tbl[] __devinitdata = {
+static struct pci_device_id netdrv_pci_tbl[] = {
 	{0x10ec, 0x8139, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
 	{0x10ec, 0x8138, PCI_ANY_ID, PCI_ANY_ID, 0, 0, NETDRV_CB },
 	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, SMC1211TX },
@@ -704,8 +704,8 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 
 	/* if unknown chip, assume array element #0, original RTL-8139 in this case */
 	printk (KERN_DEBUG PFX "PCI device %s: unknown chip version, assuming RTL-8139\n",
-		pdev->slot_name);
-	printk (KERN_DEBUG PFX "PCI device %s: TxConfig = 0x%lx\n", pdev->slot_name, NETDRV_R32 (TxConfig));
+		pci_name(pdev));
+	printk (KERN_DEBUG PFX "PCI device %s: TxConfig = 0x%lx\n", pci_name(pdev), NETDRV_R32 (TxConfig));
 	tp->chipset = 0;
 
 match:

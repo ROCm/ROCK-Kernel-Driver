@@ -45,14 +45,20 @@ static unsigned int timerhi, timerlo;
 #define USECS_PER_JIFFY (1000000/HZ)
 
 
+static irqreturn_t cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+
 void __init ip32_timer_setup (struct irqaction *irq)
 {
 	u64 crime_time;
 	u32 cc_tick;
 
+
+	write_c0_count(0);
+	irq->handler = cc_timer_interrupt;
+
 	printk("Calibrating system timer... ");
 
-	crime_time = crime_read_64 (CRIME_TIME) & CRIME_TIME_MASK;
+	crime_time = crime_read_64(CRIME_TIME) & CRIME_TIME_MASK;
 	cc_tick = read_c0_count();
 
 	while ((crime_read_64 (CRIME_TIME) & CRIME_TIME_MASK) - crime_time
@@ -60,7 +66,8 @@ void __init ip32_timer_setup (struct irqaction *irq)
 		;
 	cc_tick = read_c0_count() - cc_tick;
 	cc_interval = cc_tick / HZ * (1000 / WAIT_MS);
-	/* The round-off seems unnecessary; in testing, the error of the
+	/*
+	 * The round-off seems unnecessary; in testing, the error of the
 	 * above procedure is < 100 ticks, which means it gets filtered
 	 * out by the HZ adjustment.
 	 */
@@ -69,12 +76,14 @@ void __init ip32_timer_setup (struct irqaction *irq)
 	printk("%d MHz CPU detected\n", (int) (cc_interval / PER_MHZ));
 
 	setup_irq (CLOCK_IRQ, irq);
+#define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
+	/* Set ourselves up for future interrupts */
+	write_c0_compare(read_c0_count() + cc_interval);
+        change_c0_status(ST0_IM, ALLINTS);
+	local_irq_enable();
 }
 
-struct irqaction irq0  = { NULL, SA_INTERRUPT, 0,
-			   "timer", NULL, NULL};
-
-void cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	u32 count;
 
@@ -86,13 +95,11 @@ void cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	timerhi += (count < timerlo);	/* Wrap around */
 	timerlo = count;
 
-	write_c0_compare(
-				  (u32) (count + cc_interval));
-	kstat_cpu(0).irqs[irq]++;
-	do_timer (regs);
+	write_c0_compare((u32) (count + cc_interval));
+	kstat_this_cpu.irqs[irq]++;
+	do_timer(regs);
 
-	if (!jiffies)
-	{
+	if (!jiffies) {
 		/*
 		 * If jiffies has overflowed in this timer_interrupt we must
 		 * update the timer[hi]/[lo] to make do_fast_gettimeoffset()
@@ -100,78 +107,7 @@ void cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		 */
 		timerhi = timerlo = 0;
 	}
-}
-
-/*
- * On MIPS only R4000 and better have a cycle counter.
- *
- * FIXME: Does playing with the RP bit in c0_status interfere with this code?
- */
-static unsigned long do_gettimeoffset(void)
-{
-	u32 count;
-	unsigned long res, tmp;
-
-	/* Last jiffy when do_fast_gettimeoffset() was called. */
-	static unsigned long last_jiffies;
-	u32 quotient;
-
-	/*
-	 * Cached "1/(clocks per usec)*2^32" value.
-	 * It has to be recalculated once each jiffy.
-	 */
-	static u32 cached_quotient;
-
-	tmp = jiffies;
-
-	quotient = cached_quotient;
-
-	if (tmp && last_jiffies != tmp) {
-		last_jiffies = tmp;
-		__asm__(".set\tnoreorder\n\t"
-			".set\tnoat\n\t"
-			".set\tmips3\n\t"
-			"lwu\t%0,%2\n\t"
-			"dsll32\t$1,%1,0\n\t"
-			"or\t$1,$1,%0\n\t"
-			"ddivu\t$0,$1,%3\n\t"
-			"mflo\t$1\n\t"
-			"dsll32\t%0,%4,0\n\t"
-			"nop\n\t"
-			"ddivu\t$0,%0,$1\n\t"
-			"mflo\t%0\n\t"
-			".set\tmips0\n\t"
-			".set\tat\n\t"
-			".set\treorder"
-			:"=&r" (quotient)
-			:"r" (timerhi),
-			 "m" (timerlo),
-			 "r" (tmp),
-			 "r" (USECS_PER_JIFFY)
-			:"$1");
-		cached_quotient = quotient;
-	}
-
-	/* Get last timer tick in absolute kernel time */
-	count = read_c0_count();
-
-	/* .. relative to previous jiffy (32 bits is enough) */
-	count -= timerlo;
-
-	__asm__("multu\t%1,%2\n\t"
-		"mfhi\t%0"
-		:"=r" (res)
-		:"r" (count),
-		 "r" (quotient));
-
-	/*
- 	 * Due to possible jiffies inconsistencies, we need to check
-	 * the result so that we'll get a timer that is monotonic.
-	 */
-	if (res >= USECS_PER_JIFFY)
-		res = USECS_PER_JIFFY-1;
-
-	return res;
+	return IRQ_HANDLED;
 }
 
 void __init ip32_time_init(void)
@@ -222,17 +158,4 @@ void __init ip32_time_init(void)
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_nsec = 0;
 	write_sequnlock_irq(&xtime_lock);
-
-	write_c0_count(0);
-	irq0.handler = cc_timer_interrupt;
-
-	ip32_timer_setup (&irq0);
-
-#define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
-	/* Set ourselves up for future interrupts */
-        write_c0_compare(
-				 read_c0_count()
-				 + cc_interval);
-        change_c0_status(ST0_IM, ALLINTS);
-	sti ();
 }

@@ -256,7 +256,7 @@ ipt_do_table(struct sk_buff **pskb,
 	     struct ipt_table *table,
 	     void *userdata)
 {
-	static const char nulldevname[IFNAMSIZ] = { 0 };
+	static const char nulldevname[IFNAMSIZ];
 	u_int16_t offset;
 	struct iphdr *ip;
 	u_int16_t datalen;

@@ -591,7 +591,7 @@ hycapi_rx_capipkt(hysdn_card * card, uchar * buf, word len)
 					       " current state\n", card->myid);
 					break;
 				case 0x2002:
-					printk(KERN_ERR "HYSDN Card%d: illegal PLCI\n", card->myid);
+					printk(KERN_ERR "HYSDN Card%d: invalid PLCI\n", card->myid);
 					break;		
 				case 0x2004:
 					printk(KERN_ERR "HYSDN Card%d: out of NCCI\n", card->myid);

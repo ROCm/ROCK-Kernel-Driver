@@ -817,7 +817,7 @@ int fs ;			/* frame status */
 #endif
 	}
 	if (illegal) {
-		DB_SMT("SMT: discarding illegal frame, reason = %d\n",
+		DB_SMT("SMT: discarding invalid frame, reason = %d\n",
 			illegal,0) ;
 	}
 	smt_free_mbuf(smc,mb) ;

@@ -116,7 +116,7 @@ static int __devinit fm801_gp_probe(struct pci_dev *pci, const struct pci_device
 	gameport_register_port(&gp->gameport);
 
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		pci->dev.name, pci->slot_name, gp->gameport.speed);
+		pci->dev.name, pci_name(pci), gp->gameport.speed);
 
 	return 0;
 }
@@ -131,7 +131,7 @@ static void __devexit fm801_gp_remove(struct pci_dev *pci)
 	}
 }
 
-static struct pci_device_id fm801_gp_id_table[] __devinitdata = {
+static struct pci_device_id fm801_gp_id_table[] = {
 	{ PCI_VENDOR_ID_FORTEMEDIA, PCI_DEVICE_ID_FM801_GP, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0  },
 	{ 0 }
 };

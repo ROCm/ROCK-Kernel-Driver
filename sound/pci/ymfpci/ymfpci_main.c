@@ -84,7 +84,7 @@ static inline void snd_ymfpci_writel(ymfpci_t *chip, u32 offset, u32 val)
 	writel(val, chip->reg_area_virt + offset);
 }
 
-static int snd_ymfpci_codec_ready(ymfpci_t *chip, int secondary, int sched)
+static int snd_ymfpci_codec_ready(ymfpci_t *chip, int secondary)
 {
 	signed long end_time;
 	u32 reg = secondary ? YDSXGR_SECSTATUSADR : YDSXGR_PRISTATUSADR;
@@ -93,10 +93,8 @@ static int snd_ymfpci_codec_ready(ymfpci_t *chip, int secondary, int sched)
 	do {
 		if ((snd_ymfpci_readw(chip, reg) & 0x8000) == 0)
 			return 0;
-		if (sched) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
-		}
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
 	} while (end_time - (signed long)jiffies >= 0);
 	snd_printk("codec_ready: codec %i is not ready [0x%x]\n", secondary, snd_ymfpci_readw(chip, reg));
 	return -EBUSY;
@@ -107,7 +105,7 @@ static void snd_ymfpci_codec_write(ac97_t *ac97, u16 reg, u16 val)
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return);
 	u32 cmd;
 	
-	snd_ymfpci_codec_ready(chip, 0, 0);
+	snd_ymfpci_codec_ready(chip, 0);
 	cmd = ((YDSXG_AC97WRITECMD | reg) << 16) | val;
 	snd_ymfpci_writel(chip, YDSXGR_AC97CMDDATA, cmd);
 }
@@ -116,10 +114,10 @@ static u16 snd_ymfpci_codec_read(ac97_t *ac97, u16 reg)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return -ENXIO);
 
-	if (snd_ymfpci_codec_ready(chip, 0, 0))
+	if (snd_ymfpci_codec_ready(chip, 0))
 		return ~0;
 	snd_ymfpci_writew(chip, YDSXGR_AC97CMDADR, YDSXG_AC97READCMD | reg);
-	if (snd_ymfpci_codec_ready(chip, 0, 0))
+	if (snd_ymfpci_codec_ready(chip, 0))
 		return ~0;
 	if (chip->device_id == PCI_DEVICE_ID_YAMAHA_744 && chip->rev < 2) {
 		int i;
@@ -1708,22 +1706,63 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
  * joystick support
  */
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 static int ymfpci_joystick_ports[4] = {
 	0x201, 0x202, 0x204, 0x205
 };
 
+static int snd_ymfpci_get_joystick_port(ymfpci_t *chip, int index)
+{
+	if (index < 4)
+		return ymfpci_joystick_ports[index];
+	else
+		return pci_resource_start(chip->pci, 2);
+}
+
 static void setup_joystick_base(ymfpci_t *chip)
 {
-	if (chip->pci->device >= 0x0010) /* YMF 744/754 */
+	if (chip->device_id >= 0x0010) /* YMF 744/754 */
 		pci_write_config_word(chip->pci, PCIR_DSXG_JOYBASE,
-				      ymfpci_joystick_ports[chip->joystick_port]);
+				      snd_ymfpci_get_joystick_port(chip, chip->joystick_port));
 	else {
 		u16 legacy_ctrl2;
 		pci_read_config_word(chip->pci, PCIR_DSXG_ELEGACY, &legacy_ctrl2);
-		legacy_ctrl2 &= ~(3 << 6);
+		legacy_ctrl2 &= ~YMFPCI_LEGACY2_JSIO;
 		legacy_ctrl2 |= chip->joystick_port << 6;
 		pci_write_config_word(chip->pci, PCIR_DSXG_ELEGACY, legacy_ctrl2);
 	}
+}
+
+static int snd_ymfpci_enable_joystick(ymfpci_t *chip)
+{
+	u16 val;
+
+	chip->gameport.io = snd_ymfpci_get_joystick_port(chip, chip->joystick_port);
+	chip->joystick_res = request_region(chip->gameport.io, 1, "YMFPCI gameport");
+	if (!chip->joystick_res) {
+		snd_printk(KERN_WARNING "gameport port %#x in use\n", chip->gameport.io);
+		return 0;
+	}
+	setup_joystick_base(chip);
+	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
+	val |= YMFPCI_LEGACY_JPEN;
+	pci_write_config_word(chip->pci, PCIR_DSXG_LEGACY, val);
+	gameport_register_port(&chip->gameport);
+	return 1;
+}
+
+static int snd_ymfpci_disable_joystick(ymfpci_t *chip)
+{
+	u16 val;
+
+	gameport_unregister_port(&chip->gameport);
+	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
+	val &= ~YMFPCI_LEGACY_JPEN;
+	pci_write_config_word(chip->pci, PCIR_DSXG_LEGACY, val);
+	release_resource(chip->joystick_res);
+	kfree_nocheck(chip->joystick_res);
+	chip->joystick_res = NULL;
+	return 1;
 }
 
 static int snd_ymfpci_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -1741,36 +1780,41 @@ static int snd_ymfpci_joystick_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	u16 val;
 
 	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
-	ucontrol->value.integer.value[0] = (val & 0x04) ? 1 : 0;
+	ucontrol->value.integer.value[0] = (val & YMFPCI_LEGACY_JPEN) ? 1 : 0;
 	return 0;
 }
 
 static int snd_ymfpci_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val, oval;
+	int enabled, change;
 
-	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &oval);
-	val = oval & ~0x04;
-	if (ucontrol->value.integer.value[0])
-		val |= 0x04;
-	if (val != oval) {
-		setup_joystick_base(chip);
-		pci_write_config_word(chip->pci, PCIR_DSXG_LEGACY, val);
-		return 1;
+	down(&chip->joystick_mutex);
+	enabled = chip->joystick_res != NULL;
+	change = enabled != !! ucontrol->value.integer.value[0];
+	if (change) {
+		if (!enabled)
+			change = snd_ymfpci_enable_joystick(chip);
+		else
+			change = snd_ymfpci_disable_joystick(chip);
 	}
-	return 0;
+	up(&chip->joystick_mutex);
+	return change;
 }
 
 static int snd_ymfpci_joystick_addr_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
-        uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-        uinfo->count = 1;
-        uinfo->value.enumerated.items = 4;
-	if (uinfo->value.enumerated.item >= 4)
-		uinfo->value.enumerated.item = 3;
-	sprintf(uinfo->value.enumerated.name, "port 0x%x", ymfpci_joystick_ports[uinfo->value.enumerated.item]);
-        return 0;
+	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
+	int ports = chip->device_id >= 0x0010 ? 5 : 4;
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = ports;
+	if (uinfo->value.enumerated.item >= ports)
+		uinfo->value.enumerated.item = ports - 1;
+	sprintf(uinfo->value.enumerated.name, "port 0x%x",
+		snd_ymfpci_get_joystick_port(chip, uinfo->value.enumerated.item));
+	return 0;
 }
 
 static int snd_ymfpci_joystick_addr_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
@@ -1783,13 +1827,20 @@ static int snd_ymfpci_joystick_addr_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 static int snd_ymfpci_joystick_addr_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	if (ucontrol->value.enumerated.item[0] != chip->joystick_port) {
-		snd_assert(ucontrol->value.enumerated.item[0] >= 0 && ucontrol->value.enumerated.item[0] < 4, return -EINVAL);
+	int change, enabled;
+
+	down(&chip->joystick_mutex);
+	change = ucontrol->value.enumerated.item[0] != chip->joystick_port;
+	if (change) {
+		enabled = chip->joystick_res != NULL;
+		if (enabled)
+			snd_ymfpci_disable_joystick(chip);
 		chip->joystick_port = ucontrol->value.enumerated.item[0];
-		setup_joystick_base(chip);
-		return 1;
+		if (enabled)
+			snd_ymfpci_enable_joystick(chip);
 	}
-	return 0;
+	up(&chip->joystick_mutex);
+	return change;
 }
 
 static snd_kcontrol_new_t snd_ymfpci_control_joystick __devinitdata = {
@@ -1819,6 +1870,7 @@ int __devinit snd_ymfpci_joystick(ymfpci_t *chip)
 		return err;
 	return 0;
 }
+#endif /* CONFIG_GAMEPORT */
 
 
 /*
@@ -2067,6 +2119,10 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 		release_resource(chip->fm_res);
 		kfree_nocheck(chip->fm_res);
 	}
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+	if (chip->joystick_res)
+		snd_ymfpci_disable_joystick(chip);
+#endif
 	if (chip->reg_area_virt)
 		iounmap((void *)chip->reg_area_virt);
 	if (chip->work_ptr)
@@ -2151,7 +2207,7 @@ void snd_ymfpci_resume(ymfpci_t *chip)
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 	snd_ymfpci_aclink_reset(chip->pci);
-	snd_ymfpci_codec_ready(chip, 0, 0);
+	snd_ymfpci_codec_ready(chip, 0);
 	snd_ymfpci_download_image(chip);
 	udelay(100);
 
@@ -2216,6 +2272,9 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	spin_lock_init(&chip->voice_lock);
 	init_waitqueue_head(&chip->interrupt_sleep);
 	atomic_set(&chip->interrupt_sleep_count, 0);
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+	init_MUTEX(&chip->joystick_mutex);
+#endif
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
@@ -2238,7 +2297,7 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	chip->irq = pci->irq;
 
 	snd_ymfpci_aclink_reset(pci);
-	if (snd_ymfpci_codec_ready(chip, 0, 1) < 0) {
+	if (snd_ymfpci_codec_ready(chip, 0) < 0) {
 		snd_ymfpci_free(chip);
 		return -EIO;
 	}

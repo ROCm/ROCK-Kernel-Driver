@@ -35,5 +35,3 @@ config DECNET_ROUTE_FWMARK
 	  packets with different FWMARK ("firewalling mark") values
 	  (see ipchains(8), "-m" argument).
 
-source "net/decnet/netfilter/Kconfig"
-

@@ -208,11 +208,11 @@ vn_revalidate(
 		inode->i_nlink	    = va.va_nlink;
 		inode->i_uid	    = va.va_uid;
 		inode->i_gid	    = va.va_gid;
-		inode->i_size	    = va.va_size;
 		inode->i_blocks	    = va.va_nblocks;
 		inode->i_mtime	    = va.va_mtime;
 		inode->i_ctime	    = va.va_ctime;
 		inode->i_atime	    = va.va_atime;
+		i_size_write(inode, va.va_size);
 		VUNMODIFY(vp);
 	}
 	return -error;

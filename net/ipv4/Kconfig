@@ -374,6 +374,5 @@ config INET_IPCOMP
 	  
 	  If unsure, say Y.
 
-source "net/ipv4/netfilter/Kconfig"
 source "net/ipv4/ipvs/Kconfig"
 

@@ -43,6 +43,8 @@
  * We don't need to worry about SMP or not here.
  */
 
+#define SPLDECL(s)		unsigned long s
+
 typedef spinlock_t lock_t;
 
 #define spinlock_init(lock, name)	spin_lock_init(lock)

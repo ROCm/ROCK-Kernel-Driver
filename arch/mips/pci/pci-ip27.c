@@ -267,7 +267,7 @@ static void __init pci_fixup_ioc3(struct pci_dev *d)
 	unsigned long bus_id = (unsigned) d->bus->number;
 
 	printk("PCI: Fixing base addresses for IOC3 device %s\n",
-	       d->slot_name);
+	       pci_name(d));
 
 	d->resource[0].start |= NODE_OFFSET(bus_to_nid[bus_id]);
 	d->resource[0].end |= NODE_OFFSET(bus_to_nid[bus_id]);
@@ -281,7 +281,7 @@ static void __init pci_fixup_isp1020(struct pci_dev *d)
 
 	d->resource[0].start |=
 	    ((unsigned long) (bus_to_nid[d->bus->number]) << 32);
-	printk("PCI: Fixing isp1020 in [bus:slot.fn] %s\n", d->slot_name);
+	printk("PCI: Fixing isp1020 in [bus:slot.fn] %s\n", pci_name(d));
 
 	/*
 	 * Configure device to allow bus mastering, i/o and memory mapping.
@@ -311,7 +311,7 @@ static void __init pci_fixup_isp2x00(struct pci_dev *d)
 	unsigned int start;
 	unsigned short command;
 
-	printk("PCI: Fixing isp2x00 in [bus:slot.fn] %s\n", d->slot_name);
+	printk("PCI: Fixing isp2x00 in [bus:slot.fn] %s\n", pci_name(d));
 
 	/* set the resource struct for this device */
 	start = (u32) (u64) bridge;	/* yes, we want to lose the upper 32 bits here */

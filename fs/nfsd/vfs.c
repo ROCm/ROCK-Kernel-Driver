@@ -761,7 +761,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	if (err >= 0 && stable) {
 		static ino_t	last_ino;
-		static dev_t	last_dev = 0;
+		static dev_t	last_dev;
 
 		/*
 		 * Gathered writes: If another process is currently

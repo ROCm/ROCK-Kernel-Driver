@@ -693,12 +693,13 @@ static void snd_usbmidi_free(snd_usb_midi_t* umidi)
 /*
  * Unlinks all URBs (must be done before the usb_device is deleted).
  */
-void snd_usbmidi_disconnect(struct list_head* p)
+void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 {
 	snd_usb_midi_t* umidi;
 	int i;
 
 	umidi = list_entry(p, snd_usb_midi_t, list);
+	usb_driver_release_interface(driver, umidi->iface);
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
 		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
 		if (ep->out && ep->out->urb)

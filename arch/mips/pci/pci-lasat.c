@@ -239,7 +239,4 @@ static int __init pcibios_init(void)
 	return 0;
 }
 
-unsigned __init int pcibios_assign_all_busses(void)
-{
-	return 1;
-}
+subsys_initcall(pcibios_init);

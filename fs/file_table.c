@@ -61,7 +61,7 @@ static inline void file_free(struct file *f)
  */
 struct file *get_empty_filp(void)
 {
-static int old_max = 0;
+static int old_max;
 	struct file * f;
 
 	/*

@@ -149,18 +149,18 @@ int pci_read_irq_line(struct pci_dev *pci_dev)
     	pci_read_config_byte(pci_dev, PCI_INTERRUPT_PIN, &intpin);
 
 	if (intpin == 0) {
-		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Interrupt used by device.\n", pci_dev->slot_name);
+		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Interrupt used by device.\n", pci_name(pci_dev));
 		return 0;	
 	}
 
 	node = pci_device_to_OF_node(pci_dev);
 	if (node == NULL) { 
 		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s Device Node not found.\n",
-		       pci_dev->slot_name);
+		       pci_name(pci_dev));
 		return -1;	
 	}
 	if (node->n_intrs == 0) 	{
-		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Device OF interrupts defined.\n", pci_dev->slot_name);
+		PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s No Device OF interrupts defined.\n", pci_name(pci_dev));
 		return -1;	
 	}
 	pci_dev->irq = node->intrs[0].line;
@@ -173,7 +173,7 @@ int pci_read_irq_line(struct pci_dev *pci_dev)
 	pci_write_config_byte(pci_dev, PCI_INTERRUPT_LINE, pci_dev->irq);
 	
 	PPCDBG(PPCDBG_BUSWALK,"\tDevice: %s pci_dev->irq = 0x%02X\n",
-	       pci_dev->slot_name, pci_dev->irq);
+	       pci_name(pci_dev), pci_dev->irq);
 	return 0;
 }
 

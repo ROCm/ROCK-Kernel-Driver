@@ -1172,7 +1172,7 @@ retry:
 	}
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		fat_fs_panic(sb, "unable to read i-node block (i_pos %llu)",
+		fat_fs_panic(sb, "unable to read i-node block (i_pos %lld)",
 			     i_pos);
 		unlock_kernel();
 		return;

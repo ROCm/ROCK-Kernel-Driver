@@ -60,7 +60,10 @@ static inline void str2eaddr(unsigned char *ea, unsigned char *str)
 #endif
 
 extern void ip32_time_init(void);
-extern void ip32_reboot_setup(void);
+extern void ip32_be_init(void);                                                
+extern void __init ip32_timer_setup (struct irqaction *irq);                   
+extern void __init crime_init (void);                                          
+
 
 void __init ip32_setup(void)
 {
@@ -94,12 +97,7 @@ void __init ip32_setup(void)
 	rtc_ops = &ip32_rtc_ops;
 	board_be_init = ip32_be_init;
 	board_time_init = ip32_time_init;
+	board_timer_setup = ip32_timer_setup;
 
-	crime_init ();
-}
-
-int __init page_is_ram (unsigned long pagenr)
-{
-	/* XXX: to do? */
-	return 1;
+	crime_init();
 }

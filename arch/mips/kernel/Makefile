@@ -4,11 +4,15 @@
 
 extra-y		:= head.o init_task.o
 
-obj-y		+= branch.o cpu-probe.o process.o signal.o entry.o traps.o \
-		   ptrace.o irq.o reset.o semaphore.o setup.o syscall.o \
-		   sysmips.o ipc.o scall_o32.o time.o unaligned.o
+obj-y		+= cpu-probe.o branch.o entry.o genex.o irq.o process.o \
+		   ptrace.o reset.o semaphore.o setup.o signal.o syscall.o \
+		   time.o traps.o unaligned.o
 
-obj-$(CONFIG_MODULES)		+= mips_ksyms.o
+ifdef CONFIG_MODULES
+obj-y				+= mips_ksyms.o
+obj-$(CONFIG_MIPS32)		+= module-elf32.o
+obj-$(CONFIG_MIPS64)		+= module-elf64.o
+endif
 
 obj-$(CONFIG_CPU_R3000)		+= r2300_fpu.o r2300_switch.o
 obj-$(CONFIG_CPU_TX39XX)	+= r2300_fpu.o r2300_switch.o
@@ -32,15 +36,23 @@ obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_I8259)		+= i8259.o
 obj-$(CONFIG_IRQ_CPU)		+= irq_cpu.o
 
+obj-$(CONFIG_MIPS32)		+= scall32-o32.o
+obj-$(CONFIG_MIPS64)		+= scall64-64.o
 obj-$(CONFIG_BINFMT_IRIX)	+= irixelf.o irixioctl.o irixsig.o sysirix.o \
 				   irixinv.o
+obj-$(CONFIG_MIPS32_COMPAT)	+= ioctl32.o linux32.o signal32.o
+obj-$(CONFIG_MIPS32_N32)	+= binfmt_elfn32.o scall64-n32.o signal_n32.o
+obj-$(CONFIG_MIPS32_O32)	+= binfmt_elfo32.o scall64-o32.o ptrace32.o
+
 obj-$(CONFIG_KGDB)		+= gdb-low.o gdb-stub.o
 obj-$(CONFIG_PROC_FS)		+= proc.o
 
-ifndef CONFIG_MAPPED_PCI_IO
+ifndef CONFIG_MAPPED_DMA_IO
 obj-y				+= pci-dma.o
 endif
 
-obj-$(CONFIG_MODULES)		+= module.o
+obj-$(CONFIG_MIPS64)		+= cpu-bugs64.o
+
+CFLAGS_cpu-bugs64.o	= $(shell if $(CC) $(CFLAGS) -Wa,-mdaddi -c -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-DHAVE_AS_SET_DADDI"; fi)
 
 EXTRA_AFLAGS := $(CFLAGS)

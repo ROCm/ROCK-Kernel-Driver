@@ -103,7 +103,7 @@ static void moan_device(const char *str, struct pci_dev *dev)
 	       KERN_WARNING "message (0x%04x,0x%04x,0x%04x,0x%04x), the\n"
 	       KERN_WARNING "manufacturer and name of serial board or\n"
 	       KERN_WARNING "modem board to rmk+serial@arm.linux.org.uk.\n",
-	       dev->slot_name, str, dev->vendor, dev->device,
+	       pci_name(dev), str, dev->vendor, dev->device,
 	       dev->subsystem_vendor, dev->subsystem_device);
 }
 
@@ -1647,7 +1647,7 @@ static int pciserial_resume_one(struct pci_dev *dev)
 	return 0;
 }
 
-static struct pci_device_id serial_pci_tbl[] __devinitdata = {
+static struct pci_device_id serial_pci_tbl[] = {
 	{	PCI_VENDOR_ID_V3, PCI_DEVICE_ID_V3_V960,
 		PCI_SUBVENDOR_ID_CONNECT_TECH,
 		PCI_SUBDEVICE_ID_CONNECT_TECH_BH8_232, 0, 0,

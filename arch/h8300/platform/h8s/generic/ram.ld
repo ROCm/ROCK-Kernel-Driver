@@ -1,0 +1,8 @@
+OUTPUT_ARCH(h8300s)
+ENTRY("__start")
+
+MEMORY 
+	{
+	ram    : ORIGIN = 0x400000, LENGTH = 0x200000
+	eram   : ORIGIN = 0x600000, LENGTH = 0
+	}

@@ -1,6 +1,4 @@
 /*
- * Branch and jump emulation.
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -16,7 +14,6 @@
 #include <asm/inst.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
-#include <asm/processor.h>
 
 /*
  * Compute the return address and do emulate branch simulation, if required.
@@ -34,7 +31,7 @@ int __compute_return_epc(struct pt_regs *regs)
 	/*
 	 * Read the instruction
 	 */
-	addr = (unsigned int *) (unsigned long) epc;
+	addr = (unsigned int *) epc;
 	if (__get_user(insn.word, addr)) {
 		force_sig(SIGSEGV, current);
 		return -EFAULT;
@@ -164,7 +161,7 @@ int __compute_return_epc(struct pt_regs *regs)
 	 */
 	case cop1_op:
 		if (!cpu_has_fpu)
-			fcr31 = current->thread.fpu.soft.sr;
+			fcr31 = current->thread.fpu.soft.fcr31;
 		else
 			asm volatile("cfc1\t%0,$31" : "=r" (fcr31));
 		bit = (insn.i_format.rt >> 2);

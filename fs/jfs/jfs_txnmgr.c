@@ -178,7 +178,7 @@ void inlineLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	       struct tlock * tlck);
 void mapLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	    struct tlock * tlck);
-void txAbortCommit(struct commit * cd, int exval);
+static void txAbortCommit(struct commit * cd);
 static void txAllocPMap(struct inode *ip, struct maplock * maplock,
 			struct tblock * tblk);
 void txForce(struct tblock * tblk);
@@ -1113,7 +1113,7 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	jfs_info("txCommit, tid = %d, flag = %d", tid, flag);
 	/* is read-only file system ? */
 	if (isReadOnly(iplist[0])) {
-		rc = EROFS;
+		rc = -EROFS;
 		goto TheEnd;
 	}
 
@@ -1317,7 +1317,7 @@ int txCommit(tid_t tid,		/* transaction identifier */
 
       out:
 	if (rc != 0)
-		txAbortCommit(&cd, rc);
+		txAbortCommit(&cd);
 
       TheEnd:
 	jfs_info("txCommit: tid = %d, returning %d", tid, rc);
@@ -2672,14 +2672,13 @@ void txAbort(tid_t tid, int dirty)
  * log age of page-frames in memory for which caller has
  * are reset to 0 (to avoid logwarap).
  */
-void txAbortCommit(struct commit * cd, int exval)
+static void txAbortCommit(struct commit * cd)
 {
 	struct tblock *tblk;
 	tid_t tid;
 	lid_t lid, next;
 	struct metapage *mp;
 
-	assert(exval == EIO || exval == ENOMEM);
 	jfs_warn("txAbortCommit: cd:0x%p", cd);
 
 	/*

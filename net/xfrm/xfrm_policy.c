@@ -1218,5 +1218,6 @@ void __init xfrm_init(void)
 {
 	xfrm_state_init();
 	xfrm_policy_init();
+	xfrm_input_init();
 }
 

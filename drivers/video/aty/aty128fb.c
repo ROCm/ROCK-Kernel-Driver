@@ -148,7 +148,7 @@ static int aty128_probe(struct pci_dev *pdev,
 static void aty128_remove(struct pci_dev *pdev);
 
 /* supported Rage128 chipsets */
-static struct pci_device_id aty128_pci_tbl[] __devinitdata = {
+static struct pci_device_id aty128_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RE,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RF,

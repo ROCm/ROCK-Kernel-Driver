@@ -405,8 +405,39 @@ type name(atype a, btype b, ctype c, dtype d, etype e)				\
 			  "g" ((long)b),					\
 			  "g" ((long)c),					\
 			  "g" ((long)d),					\
-			  "g" ((long)e)						\
-			: "cc", "er1", "er2", "er3", "er4");			\
+			  "m" ((long)e)						\
+			: "cc", "er1", "er2", "er3", "er4", "er5");		\
+  if ((unsigned long)(__res) >= (unsigned long)(-125)) {		       	\
+    errno = -__res;								\
+    __res = -1;									\
+  }										\
+  return (type)__res;								\
+}
+		
+#define _syscall6(type, name, atype, a, btype, b, ctype, c, dtype, d,           \
+                              etype, e, ftype, f)	                        \
+type name(atype a, btype b, ctype c, dtype d, etype e, ftype f)			\
+{										\
+  register long __res __asm__("er0");						\
+  __asm__ __volatile__ ("mov.l	er6,@-sp\n\t"					\
+                        "mov.l	%7, er6\n\t"					\
+                        "mov.l	%6, er5\n\t"					\
+			"mov.l	%5, er4\n\t"					\
+			"mov.l	%4, er3\n\t"					\
+			"mov.l	%3, er2\n\t"					\
+  			"mov.l	%2, er1\n\t"					\
+			"mov.l	%1, er0\n\t"					\
+  			"trapa	#0\n\t"						\
+  			"mov.l	@sp+,er6"					\
+			: "=r" (__res)						\
+			: "ir" (__NR_##name),					\
+			  "g" ((long)a),					\
+			  "g" ((long)b),					\
+			  "g" ((long)c),					\
+			  "g" ((long)d),					\
+			  "m" ((long)e),					\
+			  "m" ((long)e)						\
+			: "cc", "er1", "er2", "er3", "er4", "er5");		\
   if ((unsigned long)(__res) >= (unsigned long)(-125)) {		       	\
     errno = -__res;								\
     __res = -1;									\

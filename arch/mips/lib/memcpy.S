@@ -266,7 +266,7 @@ less_than_4units:
 	beq	rem, len, copy_bytes
 	 nop
 1:
-EXC(	LOAD	 t0, 0(src),		l_exc)
+EXC(	LOAD	t0, 0(src),		l_exc)
 	ADD	src, src, NBYTES
 	SUB	len, len, NBYTES
 EXC(	STORE	t0, 0(dst),		s_exc_p1u)
@@ -340,10 +340,10 @@ EXC(	LDFIRST	t2, FIRST(2)(src),	l_exc_copy)
 EXC(	LDFIRST	t3, FIRST(3)(src),	l_exc_copy)
 EXC(	LDREST	t2, REST(2)(src),	l_exc_copy)
 EXC(	LDREST	t3, REST(3)(src),	l_exc_copy)
-	PREF(	0, 9*32(src) )	   	# 0 is PREF_LOAD  (not streamed)
+	PREF(	0, 9*32(src) )		# 0 is PREF_LOAD  (not streamed)
 	ADD	src, src, 4*NBYTES
 #ifdef CONFIG_CPU_SB1
-	nop			   	# improves slotting
+	nop				# improves slotting
 #endif
 EXC(	STORE	t0, UNIT(0)(dst),	s_exc_p4u)
 EXC(	STORE	t1, UNIT(1)(dst),	s_exc_p3u)
@@ -407,6 +407,7 @@ l_exc_copy:
 	 * Assumes src < THREAD_BUADDR($28)
 	 */
 	LOAD	t0, TI_TASK($28)
+	 nop
 	LOAD	t0, THREAD_BUADDR(t0)
 1:
 EXC(	lb	t1, 0(src),	l_exc)
@@ -415,8 +416,9 @@ EXC(	lb	t1, 0(src),	l_exc)
 	bne	src, t0, 1b
 	 ADD	dst, dst, 1
 l_exc:
-	LOAD	t0, THREAD_BUADDR($28)	# t0 is just past last good address
-	LOAD	t0, THREAD_BUADDR(t0)
+	LOAD	t0, TI_TASK($28)
+	 nop
+	LOAD	t0, THREAD_BUADDR(t0)	# t0 is just past last good address
 	 nop
 	SUB	len, AT, t0		# len number of uncopied bytes
 	/*

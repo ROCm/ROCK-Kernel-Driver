@@ -461,9 +461,15 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 	if (params->xfer_align == 0 ||
 	    params->xfer_align % runtime->min_align != 0)
 		return -EINVAL;
-	if ((params->silence_threshold != 0 || params->silence_size < runtime->boundary) &&
-	    (params->silence_threshold + params->silence_size > runtime->buffer_size))
-		return -EINVAL;
+	if (params->silence_size >= runtime->boundary) {
+		if (params->silence_threshold != 0)
+			return -EINVAL;
+	} else {
+		if (params->silence_size > params->silence_threshold)
+			return -EINVAL;
+		if (params->silence_threshold > runtime->buffer_size)
+			return -EINVAL;
+	}
 	snd_pcm_stream_lock_irq(substream);
 	runtime->tstamp_mode = params->tstamp_mode;
 	runtime->sleep_min = params->sleep_min;

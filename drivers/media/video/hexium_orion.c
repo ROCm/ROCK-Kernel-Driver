@@ -25,7 +25,7 @@
 
 #include <media/saa7146_vv.h>
 
-static int debug = 255;
+static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "debug verbosity");
 

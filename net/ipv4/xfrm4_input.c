@@ -9,15 +9,22 @@
  * 	
  */
 
-#include <linux/slab.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
-
-static kmem_cache_t *secpath_cachep;
 
 int xfrm4_rcv(struct sk_buff *skb)
 {
 	return xfrm4_rcv_encap(skb, 0);
+}
+
+static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff *skb)
+{
+	struct iphdr *inner_iph = skb->nh.iph;
+
+	if (INET_ECN_is_ce(outer_iph->tos) &&
+	    INET_ECN_is_not_ce(inner_iph->tos))
+		IP_ECN_set_ce(inner_iph);
 }
 
 int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
@@ -75,6 +82,8 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 			if (iph->protocol != IPPROTO_IPIP)
 				goto drop;
 			skb->nh.raw = skb->data;
+			if (!(x->props.flags & XFRM_STATE_NOECN))
+				ipip_ecn_decapsulate(iph, skb);
 			iph = skb->nh.iph;
 			memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 			decaps = 1;
@@ -88,19 +97,12 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 	/* Allocate new secpath or COW existing one. */
 
 	if (!skb->sp || atomic_read(&skb->sp->refcnt) != 1) {
-		kmem_cache_t *pool = skb->sp ? skb->sp->pool : secpath_cachep;
 		struct sec_path *sp;
-		sp = kmem_cache_alloc(pool, SLAB_ATOMIC);
+		sp = secpath_dup(skb->sp);
 		if (!sp)
 			goto drop;
-		if (skb->sp) {
-			memcpy(sp, skb->sp, sizeof(struct sec_path));
+		if (skb->sp)
 			secpath_put(skb->sp);
-		} else {
-			sp->pool = pool;
-			sp->len = 0;
-		}
-		atomic_set(&sp->refcnt, 1);
 		skb->sp = sp;
 	}
 	if (xfrm_nr + skb->sp->len > XFRM_MAX_DEPTH)
@@ -130,16 +132,3 @@ drop:
 	kfree_skb(skb);
 	return 0;
 }
-
-
-void __init xfrm4_input_init(void)
-{
-	secpath_cachep = kmem_cache_create("secpath4_cache",
-					   sizeof(struct sec_path),
-					   0, SLAB_HWCACHE_ALIGN,
-					   NULL, NULL);
-
-	if (!secpath_cachep)
-		panic("IP: failed to allocate secpath4_cache\n");
-}
-

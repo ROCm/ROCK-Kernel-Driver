@@ -71,8 +71,8 @@ static int check_ci(struct atm_vcc *vcc,short vpi,int vci)
 
 int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 {
-	static short p = 0; /* poor man's per-device cache */
-	static int c = 0;
+	static short p;        /* poor man's per-device cache */
+	static int c;
 	short old_p;
 	int old_c;
 	int err;

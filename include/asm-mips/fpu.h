@@ -21,9 +21,13 @@
 #include <asm/current.h>
 
 struct sigcontext;
+struct sigcontext32;
 
 extern asmlinkage int (*save_fp_context)(struct sigcontext *sc);
 extern asmlinkage int (*restore_fp_context)(struct sigcontext *sc);
+
+extern asmlinkage int (*save_fp_context32)(struct sigcontext32 *sc);
+extern asmlinkage int (*restore_fp_context32)(struct sigcontext32 *sc);
 
 extern void fpu_emulator_init_fpu(void);
 extern void _init_fpu(void);
@@ -89,7 +93,7 @@ static inline void own_fpu(void)
 	}
 }
 
-static inline void loose_fpu(void)
+static inline void lose_fpu(void)
 {
 	if (cpu_has_fpu) {
 		KSTK_STATUS(current) &= ~ST0_CU1;
@@ -119,15 +123,15 @@ static inline void restore_fp(struct task_struct *tsk)
 		_restore_fp(tsk);
 }
 
-static inline unsigned long long *get_fpu_regs(struct task_struct *tsk)
+static inline fpureg_t *get_fpu_regs(struct task_struct *tsk)
 {
 	if (cpu_has_fpu) {
 		if ((tsk == current) && is_fpu_owner()) 
 			_save_fp(current);
-		return (unsigned long long *)&tsk->thread.fpu.hard.fp_regs[0];
-	} else {
-		return (unsigned long long *)tsk->thread.fpu.soft.regs;
+		return tsk->thread.fpu.hard.fpr;
 	}
+
+	return tsk->thread.fpu.soft.fpr;
 }
 
 #endif /* _ASM_FPU_H */

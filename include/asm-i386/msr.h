@@ -8,14 +8,29 @@
  */
 
 #define rdmsr(msr,val1,val2) \
-     __asm__ __volatile__("rdmsr" \
+	__asm__ __volatile__("rdmsr" \
 			  : "=a" (val1), "=d" (val2) \
 			  : "c" (msr))
 
 #define wrmsr(msr,val1,val2) \
-     __asm__ __volatile__("wrmsr" \
+	__asm__ __volatile__("wrmsr" \
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
+
+#define rdmsrl(msr,val) do { \
+	unsigned long l__,h__; \
+	rdmsr (msr, l__, h__);  \
+	val = l__;  \
+	val |= ((u64)h__<<32);  \
+} while(0)
+
+static inline void wrmsrl (unsigned long msr, unsigned long long val)
+{
+	unsigned long lo, hi;
+	lo = (unsigned long) val;
+	hi = val >> 32;
+	wrmsr (msr, lo, hi);
+}
 
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))
@@ -200,7 +215,7 @@
 #define MSR_K7_HWCR			0xC0010015
 #define MSR_K7_CLK_CTL			0xC001001b
 #define MSR_K7_FID_VID_CTL		0xC0010041
-#define MSR_K7_VID_STATUS		0xC0010042
+#define MSR_K7_FID_VID_STATUS		0xC0010042
 
 /* Centaur-Hauls/IDT defined MSRs. */
 #define MSR_IDT_FCR1			0x107

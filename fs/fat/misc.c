@@ -150,7 +150,7 @@ int fat_add_cluster(struct inode *inode)
 		mark_inode_dirty(inode);
 	}
 	if (new_fclus != (inode->i_blocks >> (cluster_bits - 9))) {
-		fat_fs_panic(sb, "clusters badly computed (%d != %ld)",
+		fat_fs_panic(sb, "clusters badly computed (%d != %lu)",
 			new_fclus, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
@@ -307,56 +307,4 @@ next:
 	*i_pos = ((loff_t)phys << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
 
 	return 0;
-}
-
-static int fat_get_short_entry(struct inode *dir, loff_t *pos,
-			       struct buffer_head **bh,
-			       struct msdos_dir_entry **de, loff_t *i_pos)
-{
-	while (fat_get_entry(dir, pos, bh, de, i_pos) >= 0) {
-		/* free entry or long name entry or volume label */
-		if (!IS_FREE((*de)->name) && !((*de)->attr & ATTR_VOLUME))
-			return 0;
-	}
-	return -ENOENT;
-}
-
-/*
- * fat_subdirs counts the number of sub-directories of dir. It can be run
- * on directories being created.
- */
-int fat_subdirs(struct inode *dir)
-{
-	struct buffer_head *bh;
-	struct msdos_dir_entry *de;
-	loff_t cpos, i_pos;
-	int count = 0;
-
-	bh = NULL;
-	cpos = 0;
-	while (fat_get_short_entry(dir, &cpos, &bh, &de, &i_pos) >= 0) {
-		if (de->attr & ATTR_DIR)
-			count++;
-	}
-	brelse(bh);
-	return count;
-}
-
-/*
- * Scans a directory for a given file (name points to its formatted name).
- * Returns an error code or zero.
- */
-int fat_scan(struct inode *dir, const unsigned char *name,
-	     struct buffer_head **bh, struct msdos_dir_entry **de,
-	     loff_t *i_pos)
-{
-	loff_t cpos;
-
-	*bh = NULL;
-	cpos = 0;
-	while (fat_get_short_entry(dir, &cpos, bh, de, i_pos) >= 0) {
-		if (!strncmp((*de)->name, name, MSDOS_NAME))
-			return 0;
-	}
-	return -ENOENT;
 }

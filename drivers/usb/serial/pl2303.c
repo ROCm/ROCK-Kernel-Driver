@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.9"
+#define DRIVER_VERSION "v0.10"
 #define DRIVER_DESC "Prolific PL2303 USB to serial adaptor driver"
 
 
@@ -550,7 +550,9 @@ static int pl2303_tiocmget (struct usb_serial_port *port, struct file *file)
 	result = ((mcr & CONTROL_DTR)		? TIOCM_DTR : 0)
 		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0)
 		  | ((status & UART_CTS)	? TIOCM_CTS : 0)
-		  | ((status & UART_DSR)	? TIOCM_DSR : 0);
+		  | ((status & UART_DSR)	? TIOCM_DSR : 0)
+		  | ((status & UART_RING)	? TIOCM_RI  : 0)
+		  | ((status & UART_DCD)	? TIOCM_CD  : 0);
 
 	dbg("%s - result = %x", __FUNCTION__, result);
 
@@ -637,7 +639,7 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 
-	if (urb->actual_length > UART_STATE)
+	if (urb->actual_length < UART_STATE)
 		goto exit;
 
 	/* Save off the uart status for others to look at */

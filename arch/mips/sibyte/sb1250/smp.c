@@ -23,7 +23,7 @@
 #include <linux/kernel_stat.h>
 
 #include <asm/mmu_context.h>
-#include <asm/sibyte/64bit.h>
+#include <asm/io.h>
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_int.h>
@@ -59,7 +59,7 @@ static u64 mailbox_regs[] = {
  */
 void core_send_ipi(int cpu, unsigned int action)
 {
-	out64((((u64)action)<< 48), mailbox_set_regs[cpu]);
+	__raw_writeq((((u64)action)<< 48), mailbox_set_regs[cpu]);
 }
 
 
@@ -76,12 +76,12 @@ void sb1250_mailbox_interrupt(struct pt_regs *regs)
 	int cpu = smp_processor_id();
 	unsigned int action;
 
-	kstat_cpu(cpu).irqs[K_INT_MBOX_0]++;
+	kstat_this_cpu.irqs[K_INT_MBOX_0]++;
 	/* Load the mailbox register to figure out what we're supposed to do */
-	action = (in64(mailbox_regs[cpu]) >> 48) & 0xffff;
+	action = (__raw_readq(mailbox_regs[cpu]) >> 48) & 0xffff;
 
 	/* Clear the mailbox to clear the interrupt */
-	out64(((u64)action)<<48, mailbox_clear_regs[cpu]);
+	__raw_writeq(((u64)action)<<48, mailbox_clear_regs[cpu]);
 
 	/*
 	 * Nothing to do for SMP_RESCHEDULE_YOURSELF; returning from the
@@ -141,7 +141,7 @@ void __init smp_boot_cpus(void)
 			/* Iterate until we find a CPU that comes up */
 			cur_cpu++;
 			retval = prom_boot_secondary(cur_cpu,
-					    (unsigned long)idle + KERNEL_STACK_SIZE - 32,
+					    (unsigned long)idle + THREAD_SIZE - 32,
 					    (unsigned long)idle);
 		} while (!retval && (cur_cpu < NR_CPUS));
 		if (retval) {

@@ -118,7 +118,7 @@ static void return_i2c_dev(struct i2c_dev *i2c_dev)
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
 	struct i2c_dev *i2c_dev = to_i2c_dev(class_dev);
-	return sprintf(buf, "%04x\n", MKDEV(I2C_MAJOR, i2c_dev->minor));
+	return print_dev_t(buf, MKDEV(I2C_MAJOR, i2c_dev->minor));
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 

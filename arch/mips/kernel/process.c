@@ -3,8 +3,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994 - 2000 by Ralf Baechle and others.
- * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 1994 - 1999, 2000 by Ralf Baechle and others.
+ * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -12,9 +12,10 @@
 #include <linux/mm.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
-#include <linux/personality.h>
+#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/mman.h>
+#include <linux/personality.h>
 #include <linux/sys.h>
 #include <linux/user.h>
 #include <linux/a.out.h>
@@ -28,7 +29,6 @@
 #include <asm/system.h>
 #include <asm/mipsregs.h>
 #include <asm/processor.h>
-#include <asm/ptrace.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/elf.h>
@@ -51,7 +51,6 @@ void default_idle (void)
 ATTRIB_NORET void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
-
 	while (1) {
 		while (!need_resched())
 			if (cpu_wait)
@@ -64,10 +63,18 @@ asmlinkage void ret_from_fork(void);
 
 void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 {
-	regs->cp0_status &= ~(ST0_CU0|ST0_KSU|ST0_CU1);
-       	regs->cp0_status |= KU_USER;
+	unsigned long status;
+
+	/* New thread loses kernel privileges. */
+	status = regs->cp0_status & ~(ST0_CU0|ST0_CU1|KU_MASK);
+#ifdef CONFIG_MIPS64
+	status &= ~ST0_FR;
+	status |= (current->thread.mflags & MF_32BIT_REGS) ? 0 : ST0_FR;
+#endif
+	status |= KU_USER;
+	regs->cp0_status = status;
 	current->used_math = 0;
-	loose_fpu();
+	lose_fpu();
 	regs->cp0_epc = pc;
 	regs->regs[29] = sp;
 	current_thread_info()->addr_limit = USER_DS;
@@ -82,14 +89,13 @@ void flush_thread(void)
 }
 
 int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
-		 unsigned long unused,
-                 struct task_struct * p, struct pt_regs * regs)
+	unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
 	struct thread_info *ti = p->thread_info;
-	struct pt_regs * childregs;
+	struct pt_regs *childregs;
 	long childksp;
 
-	childksp = (unsigned long)ti + KERNEL_STACK_SIZE - 32;
+	childksp = (unsigned long)ti + THREAD_SIZE - 32;
 
 	if (is_fpu_owner()) {
 		save_fp(p);
@@ -99,16 +105,21 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childregs = (struct pt_regs *) childksp - 1;
 	*childregs = *regs;
 	childregs->regs[7] = 0;	/* Clear error flag */
-	if(current->personality == PER_LINUX) {
-		childregs->regs[2] = 0;	/* Child gets zero as return value */
-		regs->regs[2] = p->pid;
-	} else {
+
+#ifdef CONFIG_BINFMT_IRIX
+	if (current->personality != PER_LINUX) {
 		/* Under IRIX things are a little different. */
 		childregs->regs[2] = 0;
 		childregs->regs[3] = 1;
 		regs->regs[2] = p->pid;
 		regs->regs[3] = 0;
+	} else
+#endif
+	{
+		childregs->regs[2] = 0;	/* Child gets zero as return value */
+		regs->regs[2] = p->pid;
 	}
+
 	if (childregs->cp0_status & ST0_CU0) {
 		childregs->regs[28] = (unsigned long) ti;
 		childregs->regs[29] = childksp;
@@ -124,9 +135,9 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * New tasks lose permission to use the fpu. This accelerates context
 	 * switching for most programs since they don't use the fpu.
 	 */
-	p->thread.cp0_status = read_c0_status() &
-                            ~(ST0_CU2|ST0_CU1|KU_MASK);
+	p->thread.cp0_status = read_c0_status() & ~(ST0_CU2|ST0_CU1);
 	childregs->cp0_status &= ~(ST0_CU2|ST0_CU1);
+	clear_tsk_thread_flag(p, TIF_USEDFPU);
 	p->set_child_tid = p->clear_child_tid = NULL;
 
 	return 0;
@@ -142,26 +153,28 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *r)
 /*
  * Create a kernel thread
  */
-int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
+long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
 	long retval;
 
 	__asm__ __volatile__(
-		"	.set	noreorder	\n"
-		"	move    $6, $sp		\n"
-		"	move    $4, %5		\n"
-		"	li      $2, %1		\n"
+		"	move	$6, $sp		\n"
+		"	move	$4, %5		\n"
+		"	li	$2, %1		\n"
 		"	syscall			\n"
-		"	beq     $6, $sp, 1f	\n"
-		"	 subu    $sp, 32	\n"
-		"	jalr    %4		\n"
-		"	 move    $4, %3		\n"
-		"	move    $4, $2		\n"
-		"	li      $2, %2		\n"
+		"	beq	$6, $sp, 1f	\n"
+#ifdef CONFIG_MIPS32	/* On o32 the caller has to create the stackframe */
+		"	subu	$sp, 32		\n"
+#endif
+		"	move	$4, %3		\n"
+		"	jalr	%4		\n"
+		"	move	$4, $2		\n"
+		"	li	$2, %2		\n"
 		"	syscall			\n"
-		"1:	addiu   $sp, 32		\n"
-		"	move    %0, $2		\n"
-		"	.set	reorder"
+#ifdef CONFIG_MIPS32	/* On o32 the caller has to deallocate the stackframe */
+		"	addiu	$sp, 32		\n"
+#endif
+		"1:	move	%0, $2"
 		: "=r" (retval)
 		: "i" (__NR_clone), "i" (__NR_exit), "r" (arg), "r" (fn),
 		  "r" (flags | CLONE_VM | CLONE_UNTRACED)
@@ -170,7 +183,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 		  * at, result, argument or temporary registers ...
 		  */
 		: "$2", "$3", "$4", "$5", "$6", "$7", "$8",
-		  "$9","$10","$11","$12","$13","$14","$15","$24","$25", "$31");
+		  "$9","$10","$11","$12","$13","$14","$15","$24","$25","$31");
 
 	return retval;
 }
@@ -198,16 +211,24 @@ static int __init get_frame_info(struct mips_frame_info *info, void *func)
 		     (ip->r_format.func == jalr_op ||
 		      ip->r_format.func == jr_op)))
 			break;
-		if (ip->i_format.opcode == sw_op &&
-		    ip->i_format.rs == 29) {
-			/* sw $ra, offset($sp) */
+
+		if (
+#ifdef CONFIG_MIPS32
+		    ip->i_format.opcode == sw_op &&
+#endif
+#ifdef CONFIG_MIPS64
+		    ip->i_format.opcode == sd_op &&
+#endif
+		    ip->i_format.rs == 29)
+		{
+			/* sw / sd $ra, offset($sp) */
 			if (ip->i_format.rt == 31) {
 				if (info->pc_offset != -1)
 					break;
 				info->pc_offset =
 					ip->i_format.simmediate / sizeof(long);
 			}
-			/* sw $s8, offset($sp) */
+			/* sw / sd $s8, offset($sp) */
 			if (ip->i_format.rt == 30) {
 				if (info->frame_offset != -1)
 					break;
@@ -235,13 +256,17 @@ void __init frame_info_init(void)
 		!get_frame_info(&wait_for_completion_frame, wait_for_completion);
 }
 
-unsigned long thread_saved_pc(struct thread_struct *t)
+/*
+ * Return saved PC of a blocked thread.
+ */
+unsigned long thread_saved_pc(struct task_struct *tsk)
 {
 	extern void ret_from_fork(void);
+	struct thread_struct *t = &tsk->thread;
 
 	/* New born processes are a special case */
 	if (t->reg31 == (unsigned long) ret_from_fork)
-	return t->reg31;
+		return t->reg31;
 
 	if (schedule_frame.pc_offset < 0)
 		return 0;
@@ -266,10 +291,9 @@ unsigned long get_wchan(struct task_struct *p)
 
 	if (!mips_frame_info_initialized)
 		return 0;
-	pc = thread_saved_pc(&p->thread);
-	if (pc < first_sched || pc >= last_sched) {
-		return pc;
-	}
+	pc = thread_saved_pc(p);
+	if (pc < first_sched || pc >= last_sched)
+		goto out;
 
 	if (pc >= (unsigned long) sleep_on_timeout)
 		goto schedule_timeout_caller;
@@ -289,7 +313,7 @@ schedule_caller:
 		pc = ((unsigned long *)frame)[sleep_on_frame.pc_offset];
 	else
 		pc = ((unsigned long *)frame)[wait_for_completion_frame.pc_offset];
-	return pc;
+	goto out;
 
 schedule_timeout_caller:
 	/*
@@ -307,6 +331,13 @@ schedule_timeout_caller:
 		frame = ((unsigned long *)frame)[schedule_timeout_frame.frame_offset];
 		pc    = ((unsigned long *)frame)[sleep_on_timeout_frame.pc_offset];
 	}
+
+out:
+
+#ifdef CONFIG_MIPS64
+	if (current->thread.mflags & MF_32BIT_REGS) /* Kludge for 32-bit ps  */
+		pc &= 0xffffffffUL;
+#endif
 
 	return pc;
 }

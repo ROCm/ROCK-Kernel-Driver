@@ -225,7 +225,6 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	 */
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
-	init_waitqueue_head(&q->queue_wait);
 	INIT_LIST_HEAD(&q->plug_list);
 }
 
@@ -1027,10 +1026,10 @@ int blk_remove_plug(request_queue_t *q)
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-	if (!blk_remove_plug(q))
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
 
-	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+	if (!blk_remove_plug(q))
 		return;
 
 	del_timer(&q->unplug_timer);

@@ -30,6 +30,7 @@
 #include <linux/skbuff.h>
 #include <linux/arcdevice.h>
 
+MODULE_LICENSE("GPL");
 #define VERSION "arcnet: RFC1201 \"standard\" (`a') encapsulation support loaded.\n"
 
 

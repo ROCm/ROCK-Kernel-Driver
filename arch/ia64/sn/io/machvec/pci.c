@@ -104,7 +104,7 @@ pci_fixup_ioc3(struct pci_dev *d)
 	 *       currently we hack this with special code in 
 	 *	 sgi_pci_intr_support()
 	 */
-        DBG("pci_fixup_ioc3: Fixing base addresses for ioc3 device %s\n", d->slot_name);
+        DBG("pci_fixup_ioc3: Fixing base addresses for ioc3 device %s\n", pci_name(d));
 
 	/* I happen to know from the spec that the ioc3 needs only 0xfffff 
 	 * The standard pci trick of writing ~0 to the baddr and seeing

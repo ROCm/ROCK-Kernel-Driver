@@ -501,7 +501,7 @@ static char *driver_version = "$Revision: 4.12 $";
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
 
-static struct pci_device_id synclinkmp_pci_tbl[] __devinitdata = {
+static struct pci_device_id synclinkmp_pci_tbl[] = {
 	{ PCI_VENDOR_ID_MICROGATE, PCI_DEVICE_ID_MICROGATE_SCA, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }, /* terminate list */
 };
@@ -729,7 +729,7 @@ static int open(struct tty_struct *tty, struct file *filp)
 
 	line = tty->index;
 	if ((line < 0) || (line >= synclinkmp_device_count)) {
-		printk("%s(%d): open with illegal line #%d.\n",
+		printk("%s(%d): open with invalid line #%d.\n",
 			__FILE__,__LINE__,line);
 		return -ENODEV;
 	}

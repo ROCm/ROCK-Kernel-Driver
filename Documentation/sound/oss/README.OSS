@@ -722,8 +722,8 @@ To configure the driver, run "make config" in the kernel source directory
 (after the questions about mouse, CD-ROM, ftape, etc. support).  Questions
 about options for sound will then be asked.
 
-After configuring the kernel and sound driver, run "make dep" and compile
-the kernel following instructions in the kernel README.
+After configuring the kernel and sound driver and compile the kernel 
+following instructions in the kernel README.
 
 The sound driver configuration dialog
 -------------------------------------

@@ -20,9 +20,7 @@ config I2C
 	  interfaces", below.
 
 	  If you want I2C support, you should say Y here and also to the
-	  specific driver for your bus adapter(s) below.  If you say Y to
-	  "/proc file system" below, you will then get a /proc interface which
-	  is documented in <file:Documentation/i2c/proc-interface>.
+	  specific driver for your bus adapter(s) below.
 
 	  This I2C support is also available as a module.  If you want to
 	  compile it as a module, say M here and read
@@ -79,7 +77,7 @@ config I2C_PHILIPSPAR
 
 config I2C_ELV
 	tristate "ELV adapter"
-	depends on I2C_ALGOBIT
+	depends on I2C_ALGOBIT && ISA
 	help
 	  This supports parallel-port I2C adapters called ELV.  Say Y if you
 	  own such an adapter.
@@ -91,7 +89,7 @@ config I2C_ELV
 
 config I2C_VELLEMAN
 	tristate "Velleman K9000 adapter"
-	depends on I2C_ALGOBIT
+	depends on I2C_ALGOBIT && ISA
 	help
 	  This supports the Velleman K9000 parallel-port I2C adapter.  Say Y
 	  if you own such an adapter.

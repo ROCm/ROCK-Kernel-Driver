@@ -173,6 +173,7 @@ struct hc_driver {
 #define	HCD_USB2	0x0020		/* USB 2.0 */
 
 	/* called to init HCD and root hub */
+	int	(*reset) (struct usb_hcd *hcd);
 	int	(*start) (struct usb_hcd *hcd);
 
 	/* called after all devices were suspended */
@@ -246,12 +247,11 @@ extern void usb_hc_died (struct usb_hcd *hcd);
 
 /* Enumeration is only for the hub driver, or HCD virtual root hubs */
 extern int usb_new_device(struct usb_device *dev, struct device *parent);
-extern void usb_connect(struct usb_device *dev);
+extern void usb_choose_address(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
 
 /* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
-extern void usb_set_maxpacket(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
 extern int usb_set_address(struct usb_device *dev);
 

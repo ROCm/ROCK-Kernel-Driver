@@ -362,7 +362,7 @@ pcibios_enable_resources (struct pci_dev *dev, int mask)
 		if (!r->start && r->end) {
 			printk(KERN_ERR
 			       "PCI: Device %s not available because of resource collisions\n",
-			       dev->slot_name);
+			       pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -373,7 +373,7 @@ pcibios_enable_resources (struct pci_dev *dev, int mask)
 	if (dev->resource[PCI_ROM_RESOURCE].start)
 		cmd |= PCI_COMMAND_MEMORY;
 	if (cmd != old_cmd) {
-		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
+		printk("PCI: Enabling device %s (%04x -> %04x)\n", pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;
@@ -388,7 +388,7 @@ pcibios_enable_device (struct pci_dev *dev, int mask)
 	if (ret < 0)
 		return ret;
 
-	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
+	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, pci_name(dev));
 	return acpi_pci_irq_enable(dev);
 }
 
@@ -503,7 +503,7 @@ pcibios_prep_mwi (struct pci_dev *dev)
 	current_linesize = 4 * pci_linesize;
 	if (desired_linesize != current_linesize) {
 		printk(KERN_WARNING "PCI: slot %s has incorrect PCI cache line size of %lu bytes,",
-		       dev->slot_name, current_linesize);
+		       pci_name(dev), current_linesize);
 		if (current_linesize > desired_linesize) {
 			printk(" expected %lu bytes instead\n", desired_linesize);
 			rc = -EINVAL;

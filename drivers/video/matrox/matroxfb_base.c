@@ -1070,7 +1070,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				memset(&r, 0, sizeof(r));
 				strcpy(r.driver, "matroxfb");
 				strcpy(r.card, "Matrox");
-				sprintf(r.bus_info, "PCI:%s", ACCESS_FBINFO(pcidev)->slot_name);
+				sprintf(r.bus_info, "PCI:%s", pci_name(ACCESS_FBINFO(pcidev)));
 				r.version = KERNEL_VERSION(1,0,0);
 				r.capabilities = V4L2_CAP_VIDEO_OUTPUT;
 				if (copy_to_user((void*)arg, &r, sizeof(r)))
@@ -2012,7 +2012,7 @@ static void pci_remove_matrox(struct pci_dev* pdev) {
 	matroxfb_remove(PMINFO 1);
 }
 
-static struct pci_device_id matroxfb_devices[] __devinitdata = {
+static struct pci_device_id matroxfb_devices[] = {
 #ifdef CONFIG_FB_MATROX_MILLENIUM
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},

@@ -54,11 +54,11 @@ extern int xfs_bdstrat_cb(struct page_buf_s *);
 
 extern int xfs_zero_eof(struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);
-extern ssize_t xfs_read(struct bhv_desc *, struct file *,
-				const struct iovec *, unsigned long,
+extern ssize_t xfs_read(struct bhv_desc *, struct kiocb *,
+				const struct iovec *, unsigned int,
 				loff_t *, struct cred *);
-extern ssize_t xfs_write(struct bhv_desc *, struct file *,
-				const struct iovec *, unsigned long,
+extern ssize_t xfs_write(struct bhv_desc *, struct kiocb *,
+				const struct iovec *, unsigned int,
 				loff_t *, struct cred *);
 extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
 				loff_t *, size_t, read_actor_t,

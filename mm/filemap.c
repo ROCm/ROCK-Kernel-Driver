@@ -724,7 +724,7 @@ success:
  * This is the "read()" routine for all filesystems
  * that can use the page cache directly.
  */
-static ssize_t
+ssize_t
 __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t *ppos)
 {
@@ -809,6 +809,7 @@ generic_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t
 	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
 EXPORT_SYMBOL(generic_file_aio_read);
+EXPORT_SYMBOL(__generic_file_aio_read);
 
 ssize_t
 generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
@@ -870,7 +871,8 @@ do_readahead(struct address_space *mapping, struct file *filp,
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
-	do_page_cache_readahead(mapping, filp, index, max_sane_readahead(nr));
+	force_page_cache_readahead(mapping, filp, index,
+					max_sane_readahead(nr));
 	return 0;
 }
 
@@ -996,7 +998,8 @@ retry_find:
 			goto no_cached_page;
 
 		did_readaround = 1;
-		do_page_cache_readahead(mapping, file, pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
+		do_page_cache_readahead(mapping, file,
+				pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
 		goto retry_find;
 	}
 
@@ -1230,7 +1233,7 @@ static int filemap_populate(struct vm_area_struct *vma,
 	int err;
 
 	if (!nonblock)
-		do_page_cache_readahead(mapping, vma->vm_file,
+		force_page_cache_readahead(mapping, vma->vm_file,
 					pgoff, len >> PAGE_CACHE_SHIFT);
 
 repeat:
@@ -1769,10 +1772,8 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		if (unlikely(copied != bytes))
 			if (status >= 0)
 				status = -EFAULT;
-
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
 		unlock_page(page);
+		mark_page_accessed(page);
 		page_cache_release(page);
 		if (status < 0)
 			break;

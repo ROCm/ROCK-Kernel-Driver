@@ -215,8 +215,6 @@ Building the driver into kernel
    on "SiS 900/7016 PCI Fast Ethernet Adapter support" when configuring
    the kernel. Build the kernel image in the usual way
    
-make dep
-
 make clean
 
 make bzlilo

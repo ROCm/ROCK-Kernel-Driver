@@ -35,7 +35,7 @@
 #include <linux/delay.h>
 
 
-void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
+irqreturn_t DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
 {
 	drm_device_t	 *dev = (drm_device_t *)device;
       	drm_i830_private_t *dev_priv = (drm_i830_private_t *)dev->dev_private;
@@ -44,15 +44,15 @@ void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
       	temp = I830_READ16(I830REG_INT_IDENTITY_R);
 	DRM_DEBUG("%x\n", temp);
 
-   	if (temp == 0) 
-		return;
+   	if ( !( temp & 2 ) ) 
+		return IRQ_NONE;
 
 	I830_WRITE16(I830REG_INT_IDENTITY_R, temp); 
 
-	if (temp & 2) {
-		atomic_inc(&dev_priv->irq_received);
-		wake_up_interruptible(&dev_priv->irq_queue); 
-	}
+	atomic_inc(&dev_priv->irq_received);
+	wake_up_interruptible(&dev_priv->irq_queue); 
+
+	return IRQ_HANDLED;
 }
 
 

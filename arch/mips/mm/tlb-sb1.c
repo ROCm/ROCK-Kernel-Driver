@@ -22,7 +22,8 @@
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
 
-extern char except_vec0_sb1[];
+extern void except_vec0_sb1(void);
+extern void except_vec1_sb1(void);
 
 /* Dump the current entry* and pagemask registers */
 static inline void dump_cur_tlb_regs(void)
@@ -35,6 +36,7 @@ static inline void dump_cur_tlb_regs(void)
 		".set noreorder        \n"
 		".set mips64           \n"
 		".set noat             \n"
+		"     tlbr             \n"
 		"     dmfc0  $1, $10   \n"
 		"     dsrl32 %0, $1, 0 \n"
 		"     sll    %1, $1, 0 \n"
@@ -76,7 +78,6 @@ void sb1_dump_tlb(void)
 	for (entry = 0; entry < current_cpu_data.tlbsize; entry++) {
 		write_c0_index(entry);
 		printk("\n%02i ", entry);
-		tlb_read();
 		dump_cur_tlb_regs();
 	}
 	printk("\n");
@@ -136,7 +137,7 @@ void sb1_sanitize_tlb(void)
 }
 
 void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
-                      unsigned long end)
+	unsigned long end)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
@@ -321,11 +322,7 @@ void __update_tlb(struct vm_area_struct *vma, unsigned long address, pte_t pte)
  */
 void sb1_tlb_init(void)
 {
-	u32 config1;
-
 	write_c0_pagemask(PM_4K);
-	config1 = read_c0_config1();
-	current_cpu_data.tlbsize = ((config1 >> 25) & 0x3f) + 1;
 
 	/*
 	 * We don't know what state the firmware left the TLB's in, so this is
@@ -334,6 +331,12 @@ void sb1_tlb_init(void)
 	 */
 	sb1_sanitize_tlb();
 
+#ifdef CONFIG_MIPS32
 	memcpy((void *)KSEG0, except_vec0_sb1, 0x80);
 	flush_icache_range(KSEG0, KSEG0 + 0x80);
+#endif
+#ifdef CONFIG_MIPS64
+	memcpy((void *)KSEG0 + 0x80, except_vec1_sb1, 0x80);
+	flush_icache_range(KSEG0 + 0x80, KSEG0 + 0x100);
+#endif
 }

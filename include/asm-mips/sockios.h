@@ -7,8 +7,8 @@
  *
  * Copyright (C) 1995 by Ralf Baechle
  */
-#ifndef __ASM_MIPS_SOCKIOS_H
-#define __ASM_MIPS_SOCKIOS_H
+#ifndef _ASM_SOCKIOS_H
+#define _ASM_SOCKIOS_H
 
 #include <asm/ioctl.h>
 
@@ -22,4 +22,4 @@
 
 #define SIOCGSTAMP	0x8906			/* Get stamp - linux-specific */
 
-#endif /* __ASM_MIPS_SOCKIOS_H */
+#endif /* _ASM_SOCKIOS_H */

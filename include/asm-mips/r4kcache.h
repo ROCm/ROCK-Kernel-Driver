@@ -140,7 +140,7 @@ static inline void invalidate_tcache_page(unsigned long addr)
 static inline void blast_dcache16(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + dcache_way_size;
+	unsigned long end = start + current_cpu_data.dcache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.dcache.waybit;
 	unsigned long ws_end = current_cpu_data.dcache.ways << 
 	                       current_cpu_data.dcache.waybit;
@@ -179,7 +179,7 @@ static inline void blast_dcache16_page_indexed(unsigned long page)
 static inline void blast_icache16(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + icache_way_size;
+	unsigned long end = start + current_cpu_data.icache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.icache.waybit;
 	unsigned long ws_end = current_cpu_data.icache.ways <<
 	                       current_cpu_data.icache.waybit;
@@ -218,7 +218,7 @@ static inline void blast_icache16_page_indexed(unsigned long page)
 static inline void blast_scache16(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + scache_way_size;
+	unsigned long end = start + current_cpu_data.scache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.scache.waybit;
 	unsigned long ws_end = current_cpu_data.scache.ways << 
 	                       current_cpu_data.scache.waybit;
@@ -283,7 +283,7 @@ static inline void blast_scache16_page_indexed(unsigned long page)
 static inline void blast_dcache32(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + dcache_way_size;
+	unsigned long end = start + current_cpu_data.dcache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.dcache.waybit;
 	unsigned long ws_end = current_cpu_data.dcache.ways <<
 	                       current_cpu_data.dcache.waybit;
@@ -322,7 +322,7 @@ static inline void blast_dcache32_page_indexed(unsigned long page)
 static inline void blast_icache32(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + icache_way_size;
+	unsigned long end = start + current_cpu_data.icache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.icache.waybit;
 	unsigned long ws_end = current_cpu_data.icache.ways <<
 	                       current_cpu_data.icache.waybit;
@@ -361,7 +361,7 @@ static inline void blast_icache32_page_indexed(unsigned long page)
 static inline void blast_scache32(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + scache_way_size;
+	unsigned long end = start + current_cpu_data.scache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.scache.waybit;
 	unsigned long ws_end = current_cpu_data.scache.ways << 
 	                       current_cpu_data.scache.waybit;
@@ -426,7 +426,7 @@ static inline void blast_scache32_page_indexed(unsigned long page)
 static inline void blast_icache64(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + icache_way_size;
+	unsigned long end = start + current_cpu_data.icache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.icache.waybit;
 	unsigned long ws_end = current_cpu_data.icache.ways <<
 	                       current_cpu_data.icache.waybit;
@@ -465,7 +465,7 @@ static inline void blast_icache64_page_indexed(unsigned long page)
 static inline void blast_scache64(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + scache_way_size;
+	unsigned long end = start + current_cpu_data.scache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.scache.waybit;
 	unsigned long ws_end = current_cpu_data.scache.ways << 
 	                       current_cpu_data.scache.waybit;
@@ -530,7 +530,7 @@ static inline void blast_scache64_page_indexed(unsigned long page)
 static inline void blast_scache128(void)
 {
 	unsigned long start = KSEG0;
-	unsigned long end = start + scache_way_size;
+	unsigned long end = start + current_cpu_data.scache.waysize;
 	unsigned long ws_inc = 1UL << current_cpu_data.scache.waybit;
 	unsigned long ws_end = current_cpu_data.scache.ways << 
 	                       current_cpu_data.scache.waybit;

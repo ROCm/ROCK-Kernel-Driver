@@ -1060,7 +1060,7 @@ static void __devexit btaudio_remove(struct pci_dev *pci_dev)
 
 /* -------------------------------------------------------------- */
 
-static struct pci_device_id btaudio_pci_tbl[] __devinitdata = {
+static struct pci_device_id btaudio_pci_tbl[] = {
         {
 		.vendor		= PCI_VENDOR_ID_BROOKTREE,
 		.device		= 0x0878,

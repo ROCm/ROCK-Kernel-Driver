@@ -872,7 +872,7 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 }
 
 
-static struct pci_device_id alim15x3_pci_tbl[] __devinitdata = {
+static struct pci_device_id alim15x3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, },
 };

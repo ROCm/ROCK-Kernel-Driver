@@ -36,7 +36,9 @@
 #include <asm/irq.h>
 #include <asm/lasat/lasat.h>
 
+#include <linux/tty.h>
 #include <linux/serial.h>
+#include <linux/serial_core.h>
 #include <asm/serial.h>
 #include <asm/lasat/serial.h>
 
@@ -150,28 +152,28 @@ asmlinkage void lasat_timer_interrupt(struct pt_regs *regs)
 	ll_timer_interrupt(MIPS_CPU_TIMER_IRQ, regs);
 }
 
-//#define DYNAMIC_SERIAL_INIT
+#define DYNAMIC_SERIAL_INIT
 #ifdef DYNAMIC_SERIAL_INIT
 void __init serial_init(void)
 {
-#ifdef CONFIG_SERIAL
-	struct serial_struct s;
+#ifdef CONFIG_SERIAL_8250
+	struct uart_port s;
 
 	memset(&s, 0, sizeof(s));
 
-	s.flags = STD_COM_FLAGS;
-	s.io_type = SERIAL_IO_MEM;
+	s.flags = STD_COM_FLAGS|UPF_RESOURCES;
+	s.iotype = SERIAL_IO_MEM;
 
 	if (mips_machtype == MACH_LASAT_100) {
-		s.baud_base = LASAT_BASE_BAUD_100;
+		s.uartclk = LASAT_BASE_BAUD_100 * 16;
 		s.irq = LASATINT_UART_100;
-		s.iomem_reg_shift = LASAT_UART_REGS_SHIFT_100;
-		s.iomem_base = (u8 *)KSEG1ADDR(LASAT_UART_REGS_BASE_100);
+		s.regshift = LASAT_UART_REGS_SHIFT_100;
+		s.membase = (char *)KSEG1ADDR(LASAT_UART_REGS_BASE_100);
 	} else {
-		s.baud_base = LASAT_BASE_BAUD_200;
+		s.uartclk = LASAT_BASE_BAUD_200 * 16;
 		s.irq = LASATINT_UART_200;
-		s.iomem_reg_shift = LASAT_UART_REGS_SHIFT_200;
-		s.iomem_base = (u8 *)KSEG1ADDR(LASAT_UART_REGS_BASE_200);
+		s.regshift = LASAT_UART_REGS_SHIFT_200;
+		s.membase = (char *)KSEG1ADDR(LASAT_UART_REGS_BASE_200);
 	}
 
 	if (early_serial_setup(&s) != 0)

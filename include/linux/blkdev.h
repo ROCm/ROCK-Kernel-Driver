@@ -337,8 +337,6 @@ struct request_queue
 	unsigned long		seg_boundary_mask;
 	unsigned int		dma_alignment;
 
-	wait_queue_head_t	queue_wait;
-
 	struct blk_queue_tag	*queue_tags;
 
 	/*

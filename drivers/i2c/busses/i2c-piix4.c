@@ -99,7 +99,6 @@ MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the PIIX4 at the given address. "
 		 "EXTREMELY DANGEROUS!");
 
-static void piix4_do_pause(unsigned int amount);
 static int piix4_transaction(void);
 
 
@@ -208,13 +207,6 @@ END:
 	return error_return;
 }
 
-/* Internally used pause function */
-static void piix4_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 /* Another internally used function */
 static int piix4_transaction(void)
 {
@@ -245,7 +237,7 @@ static int piix4_transaction(void)
 
 	/* We will always wait for a fraction of a second! (See PIIX4 docs errata) */
 	do {
-		piix4_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -402,7 +394,7 @@ static struct i2c_adapter piix4_adapter = {
 	},
 };
 
-static struct pci_device_id piix4_ids[] __devinitdata = {
+static struct pci_device_id piix4_ids[] = {
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
 		.device =	PCI_DEVICE_ID_INTEL_82371AB_3,

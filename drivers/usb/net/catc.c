@@ -989,9 +989,10 @@ static struct usb_driver catc_driver = {
 
 static int __init catc_init(void)
 {
-	info(DRIVER_VERSION " " DRIVER_DESC);
-	usb_register(&catc_driver);
-	return 0;
+	int result = usb_register(&catc_driver);
+	if (result == 0)
+		info(DRIVER_VERSION " " DRIVER_DESC);
+	return result;
 }
 
 static void __exit catc_exit(void)

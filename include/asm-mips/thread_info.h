@@ -1,4 +1,4 @@
-/* thread_info.h: i386 low-level thread information
+/* thread_info.h: MIPS low-level thread information
  *
  * Copyright (C) 2002  David Howells (dhowells@redhat.com)
  * - Incorporating suggestions made by Linus Torvalds and Dave Miller
@@ -8,6 +8,8 @@
 #define _ASM_THREAD_INFO_H
 
 #ifdef __KERNEL__
+
+#include <linux/config.h>
 
 #ifndef __ASSEMBLY__
 
@@ -62,11 +64,17 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #define current_thread_info()  __current_thread_info
 
 /* thread information allocation */
+#ifdef CONFIG_MIPS32
 #define THREAD_SIZE_ORDER (1)
+#endif
+#ifdef CONFIG_MIPS64
+#define THREAD_SIZE_ORDER (1)
+#endif
 #define THREAD_SIZE (PAGE_SIZE << THREAD_SIZE_ORDER)
-#define alloc_thread_info(tsk) ((struct thread_info *) \
-	__get_free_pages(GFP_KERNEL,THREAD_SIZE_ORDER))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), THREAD_SIZE_ORDER)
+#define THREAD_MASK (THREAD_SIZE - 1UL)
+#define alloc_thread_info(task) \
+	((struct thread_info *)kmalloc(THREAD_SIZE, GFP_KERNEL))
+#define free_thread_info(info) kfree(info)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 

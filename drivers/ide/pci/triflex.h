@@ -41,7 +41,7 @@ static ide_pci_host_proc_t triflex_proc __initdata = {
 };
 #endif
 
-static struct pci_device_id triflex_pci_tbl[] __devinitdata = {
+static struct pci_device_id triflex_pci_tbl[] = {
 	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_TRIFLEX_IDE, PCI_ANY_ID, 
 		PCI_ANY_ID, 0, 0, 0 },
 	{ 0, },

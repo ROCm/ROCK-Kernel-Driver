@@ -16,24 +16,30 @@
 
 #include <asm/io.h>
 
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-			   dma_addr_t * dma_handle)
+#ifndef UNCAC_BASE	/* Hack ... */
+#define UNCAC_BASE	0x9000000000000000UL
+#endif
+
+void *dma_alloc_coherent(struct device *dev, size_t size,
+			 dma_addr_t * dma_handle, int gfp)
 {
 	void *ret;
-	int gfp = GFP_ATOMIC;
-	struct pci_bus *bus = NULL;
+	/* ignore region specifiers */
+	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
-#ifdef CONFIG_ISA
-	if (hwdev == NULL || hwdev->dma_mask != 0xffffffff)
+	if (dev == NULL || (*dev->dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
-#endif
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret != NULL) {
 		memset(ret, 0, size);
+#if 0	/* Broken support for some platforms ...  */
 		if (hwdev)
 			bus = hwdev->bus;
 		*dma_handle = bus_to_baddr(bus, __pa(ret));
+#else
+		*dma_handle = virt_to_phys(ret);
+#endif
 #ifdef CONFIG_NONCOHERENT_IO
 		dma_cache_wback_inv((unsigned long) ret, size);
 		ret = UNCAC_ADDR(ret);
@@ -43,8 +49,8 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	return ret;
 }
 
-void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-			 void *vaddr, dma_addr_t dma_handle)
+void dma_free_coherent(struct device *dev, size_t size,
+                       void *vaddr, dma_addr_t dma_handle)
 {
 	unsigned long addr = (unsigned long) vaddr;
 

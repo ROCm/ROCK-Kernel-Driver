@@ -122,10 +122,9 @@ clean_1:
 		base = (void *) resource;
 	}
 
-	// driver->start(), later on, will transfer device from
+	// driver->reset(), later on, will transfer device from
 	// control by SMM/BIOS to control by Linux (if needed)
 
-	pci_set_master (dev);
 	hcd = driver->hcd_alloc ();
 	if (hcd == NULL){
 		dbg ("hcd alloc fail");
@@ -140,6 +139,9 @@ clean_2:
 			return retval;
 		}
 	}
+	hcd->regs = base;
+	hcd->region = region;
+
 	pci_set_drvdata (dev, hcd);
 	hcd->driver = driver;
 	hcd->description = driver->description;
@@ -157,22 +159,27 @@ clean_3:
 
 	dev_info (hcd->controller, "%s\n", hcd->product_desc);
 
+	/* till now HC has been in an indeterminate state ... */
+	if (driver->reset && (retval = driver->reset (hcd)) < 0) {
+		dev_err (hcd->controller, "can't reset\n");
+		goto clean_3;
+	}
+
+	pci_set_master (dev);
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
 #else
 	bufp = __irq_itoa(dev->irq);
 #endif
-	if (request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ, hcd->description, hcd)
-			!= 0) {
+	retval = request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ,
+				hcd->description, hcd);
+	if (retval != 0) {
 		dev_err (hcd->controller,
 				"request interrupt %s failed\n", bufp);
-		retval = -EBUSY;
 		goto clean_3;
 	}
 	hcd->irq = dev->irq;
 
-	hcd->regs = base;
-	hcd->region = region;
 	dev_info (hcd->controller, "irq %s, %s %p\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		base);

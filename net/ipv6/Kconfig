@@ -63,4 +63,3 @@ config IPV6_TUNNEL
 
 	  If unsure, say N.
 
-source "net/ipv6/netfilter/Kconfig"

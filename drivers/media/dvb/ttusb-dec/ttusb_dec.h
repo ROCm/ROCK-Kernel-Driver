@@ -22,7 +22,10 @@
 #ifndef _TTUSB_DEC_H
 #define _TTUSB_DEC_H
 
-#include "asm/semaphore.h"
+#include <asm/semaphore.h>
+#include <linux/interrupt.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
 #include "dmxdev.h"
 #include "dvb_demux.h"
 #include "dvb_filter.h"
@@ -77,11 +80,20 @@ struct ttusb_dec {
 
 	struct dvb_filter_pes2ts	a_pes2ts;
 	struct dvb_filter_pes2ts	v_pes2ts;
-	struct semaphore		pes2ts_sem;
 
 	u8			v_pes[16 + MAX_AV_PES_LENGTH];
 	int			v_pes_length;
 	int			v_pes_postbytes;
+
+	struct list_head	urb_frame_list;
+	struct tasklet_struct	urb_tasklet;
+	spinlock_t		urb_frame_list_lock;
+};
+
+struct urb_frame {
+	u8			data[ISO_FRAME_SIZE];
+	int			length;
+	struct list_head	urb_frame_list;
 };
 
 #endif

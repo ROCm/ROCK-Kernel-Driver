@@ -97,7 +97,8 @@ shaper.txt
 sis900.txt
 	- SiS 900/7016 Fast Ethernet device driver info.
 sk98lin.txt
-	- SysKonnect SK-NET (SK-98xx) Gigabit Ethernet driver info.
+	- Marvell Yukon Chipset / SysKonnect SK-98xx compliant Gigabit
+	  Ethernet Adapter family driver info
 skfp.txt
 	- SysKonnect FDDI (SK-5xxx, Compaq Netelligent) driver info.
 smc9.txt

@@ -12,9 +12,6 @@
 #include <linux/errno.h>
 #include <linux/thread_info.h>
 
-#define STR(x)  __STR(x)
-#define __STR(x)  #x
-
 /*
  * The fs value determines whether argument validity checking should be
  * performed or not.  If get_fs() == USER_DS, checking is performed, with
@@ -22,15 +19,51 @@
  *
  * For historical reasons, these macros are grossly misnamed.
  */
+#ifdef CONFIG_MIPS32
+#define __UA_ADDR	".word"
+#define __UA_LA		"la"
+#define __UA_ADDU	"addu"
+
 #define KERNEL_DS	((mm_segment_t) { (unsigned long) 0L })
 #define USER_DS		((mm_segment_t) { (unsigned long) -1L })
 
 #define VERIFY_READ    0
 #define VERIFY_WRITE   1
 
+#define __access_ok(addr, size, mask)					\
+	(((signed long)((mask)&(addr | ((addr) + (size)) | __ua_size(size)))) >= 0)
+ 
+#define __access_mask ((long)(get_fs().seg))
+ 
+#define access_ok(type, addr, size)					\
+	__access_ok(((unsigned long)(addr)),(size),__access_mask)
+
+#endif /* CONFIG_MIPS32 */
+
+#ifdef CONFIG_MIPS64
+#define __UA_ADDR	".dword"
+#define __UA_LA		"dla"
+#define __UA_ADDU	"daddu"
+
+#define KERNEL_DS	((mm_segment_t) { 0UL })
+#define USER_DS		((mm_segment_t) { -TASK_SIZE })
+
+#define VERIFY_READ    0
+#define VERIFY_WRITE   1
+
+#define __access_ok(addr, size, mask)					\
+	(((signed long)((mask) & ((addr) | ((addr) + (size)) | __ua_size(size)))) == 0)
+
+#define __access_mask get_fs().seg
+
+#define access_ok(type, addr, size)					\
+	__access_ok((unsigned long)(addr), (size), __access_mask)
+
+#endif /* CONFIG_MIPS64 */
+
 #define get_ds()	(KERNEL_DS)
-#define get_fs()        (current_thread_info()->addr_limit)
-#define set_fs(x)       (current_thread_info()->addr_limit = (x))
+#define get_fs()	(current_thread_info()->addr_limit)
+#define set_fs(x)	(current_thread_info()->addr_limit = (x))
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
@@ -44,21 +77,16 @@
  *  - AND "size" doesn't have any high-bits set
  *  - AND "addr+size" doesn't have any high-bits set
  *  - OR we are in kernel mode.
+ *
+ * __ua_size() is a trick to avoid runtime checking of positive constant
+ * sizes; for those we already know at compile time that the size is ok.
  */
 #define __ua_size(size)							\
-	(__builtin_constant_p(size) && (signed long) (size) > 0 ? 0 : (size))
-
-#define __access_ok(addr,size,mask)                                     \
-	(((signed long)((mask)&(addr | (addr + size) | __ua_size(size)))) >= 0)
-
-#define __access_mask ((long)(get_fs().seg))
-
-#define access_ok(type,addr,size) \
-__access_ok(((unsigned long)(addr)),(size),__access_mask)
+	((__builtin_constant_p(size) && (signed long) (size) > 0) ? 0 : (size))
 
 static inline int verify_area(int type, const void * addr, unsigned long size)
 {
-	return access_ok(type,addr,size) ? 0 : -EFAULT;
+	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
 
 /*
@@ -101,76 +129,83 @@ struct __large_struct { unsigned long buf[100]; };
 #define __GET_USER_DW __get_user_asm_ll32
 #endif
 
-#define __get_user_nocheck(x,ptr,size) ({ \
-long __gu_err; \
-__typeof(*(ptr)) __gu_val; \
-long __gu_addr; \
-__asm__("":"=r" (__gu_val)); \
-__gu_addr = (long) (ptr); \
-__asm__("":"=r" (__gu_err)); \
-switch (size) { \
-case 1: __get_user_asm("lb"); break; \
-case 2: __get_user_asm("lh"); break; \
-case 4: __get_user_asm("lw"); break; \
-case 8: __GET_USER_DW; break; \
-default: __get_user_unknown(); break; \
-} x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+#define __get_user_nocheck(x,ptr,size)				\
+({								\
+	long __gu_err;						\
+	__typeof(*(ptr)) __gu_val;				\
+	long __gu_addr;						\
+	__asm__("":"=r" (__gu_val));				\
+	__gu_addr = (long) (ptr);				\
+	__asm__("":"=r" (__gu_err));				\
+	switch (size) {						\
+	case 1: __get_user_asm("lb"); break;			\
+	case 2: __get_user_asm("lh"); break;			\
+	case 4: __get_user_asm("lw"); break;			\
+	case 8: __GET_USER_DW; break;				\
+	default: __get_user_unknown(); break;			\
+	} x = (__typeof__(*(ptr))) __gu_val; __gu_err;		\
+})
 
-#define __get_user_check(x,ptr,size) ({ \
-long __gu_err; \
-__typeof__(*(ptr)) __gu_val; \
-long __gu_addr; \
-__asm__("":"=r" (__gu_val)); \
-__gu_addr = (long) (ptr); \
-__asm__("":"=r" (__gu_err)); \
-if (__access_ok(__gu_addr,size,__access_mask)) { \
-switch (size) { \
-case 1: __get_user_asm("lb"); break; \
-case 2: __get_user_asm("lh"); break; \
-case 4: __get_user_asm("lw"); break; \
-case 8: __GET_USER_DW; break; \
-default: __get_user_unknown(); break; \
-} } x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+#define __get_user_check(x,ptr,size)				\
+({								\
+	long __gu_err;						\
+	__typeof__(*(ptr)) __gu_val;				\
+	long __gu_addr;						\
+	__asm__("":"=r" (__gu_val));				\
+	__gu_addr = (long) (ptr);				\
+	__asm__("":"=r" (__gu_err));				\
+	if (__access_ok(__gu_addr,size,__access_mask)) {	\
+		switch (size) {					\
+		case 1: __get_user_asm("lb"); break;		\
+		case 2: __get_user_asm("lh"); break;		\
+		case 4: __get_user_asm("lw"); break;		\
+		case 8: __GET_USER_DW; break;			\
+		default: __get_user_unknown(); break;		\
+		}						\
+	} x = (__typeof__(*(ptr))) __gu_val; __gu_err;		\
+})
 
-#define __get_user_asm(insn) \
-({ \
-__asm__ __volatile__( \
-	"1:\t" insn "\t%1,%2\n\t" \
-	"move\t%0,$0\n" \
-	"2:\n\t" \
-	".section\t.fixup,\"ax\"\n" \
-	"3:\tli\t%0,%3\n\t" \
-	"move\t%1,$0\n\t" \
-	"j\t2b\n\t" \
-	".previous\n\t" \
-	".section\t__ex_table,\"a\"\n\t" \
-	".word\t1b,3b\n\t" \
-	".previous" \
-	:"=r" (__gu_err), "=r" (__gu_val) \
-	:"o" (__m(__gu_addr)), "i" (-EFAULT)); })
+#define __get_user_asm(insn)					\
+({								\
+	__asm__ __volatile__(					\
+	"1:\t" insn "\t%1,%2\n\t"				\
+	"move\t%0,$0\n"						\
+	"2:\n\t"						\
+	".section\t.fixup,\"ax\"\n"				\
+	"3:\tli\t%0,%3\n\t"					\
+	"move\t%1,$0\n\t"					\
+	"j\t2b\n\t"						\
+	".previous\n\t"						\
+	".section\t__ex_table,\"a\"\n\t"			\
+	__UA_ADDR "\t1b,3b\n\t"					\
+	".previous"						\
+	:"=r" (__gu_err), "=r" (__gu_val)			\
+	:"o" (__m(__gu_addr)), "i" (-EFAULT));			\
+})
 
 /*
  * Get a long long 64 using 32 bit registers.
  */
-#define __get_user_asm_ll32 \
-({ \
-__asm__ __volatile__( \
-	"1:\tlw\t%1,%2\n" \
-	"2:\tlw\t%D1,%3\n\t" \
-	"move\t%0,$0\n" \
-	"3:\t.section\t.fixup,\"ax\"\n" \
-	"4:\tli\t%0,%4\n\t" \
-	"move\t%1,$0\n\t" \
-	"move\t%D1,$0\n\t" \
-	"j\t3b\n\t" \
-	".previous\n\t" \
-	".section\t__ex_table,\"a\"\n\t" \
-	".word\t1b,4b\n\t" \
-	".word\t2b,4b\n\t" \
-	".previous" \
-	:"=r" (__gu_err), "=&r" (__gu_val) \
-	:"o" (__m(__gu_addr)), "o" (__m(__gu_addr + 4)), \
-	 "i" (-EFAULT)); })
+#define __get_user_asm_ll32					\
+({								\
+	__asm__ __volatile__(					\
+	"1:\tlw\t%1,%2\n"					\
+	"2:\tlw\t%D1,%3\n\t"					\
+	"move\t%0,$0\n"						\
+	"3:\t.section\t.fixup,\"ax\"\n"				\
+	"4:\tli\t%0,%4\n\t"					\
+	"move\t%1,$0\n\t"					\
+	"move\t%D1,$0\n\t"					\
+	"j\t3b\n\t"						\
+	".previous\n\t"						\
+	".section\t__ex_table,\"a\"\n\t"			\
+	__UA_ADDR "\t1b,4b\n\t"					\
+	__UA_ADDR "\t2b,4b\n\t"					\
+	".previous"						\
+	:"=r" (__gu_err), "=&r" (__gu_val)			\
+	:"o" (__m(__gu_addr)), "o" (__m(__gu_addr + 4)),	\
+	 "i" (-EFAULT));					\
+})
 
 extern void __get_user_unknown(void);
 
@@ -184,71 +219,80 @@ extern void __get_user_unknown(void);
 #define __PUT_USER_DW __put_user_asm_ll32
 #endif
 
-#define __put_user_nocheck(x,ptr,size) ({ \
-long __pu_err; \
-__typeof__(*(ptr)) __pu_val; \
-long __pu_addr; \
-__pu_val = (x); \
-__pu_addr = (long) (ptr); \
-__asm__("":"=r" (__pu_err)); \
-switch (size) { \
-case 1: __put_user_asm("sb"); break; \
-case 2: __put_user_asm("sh"); break; \
-case 4: __put_user_asm("sw"); break; \
-case 8: __PUT_USER_DW; break; \
-default: __put_user_unknown(); break; \
-} __pu_err; })
+#define __put_user_nocheck(x,ptr,size)				\
+({								\
+	long __pu_err;						\
+	__typeof__(*(ptr)) __pu_val;				\
+	long __pu_addr;						\
+	__pu_val = (x);						\
+	__pu_addr = (long) (ptr);				\
+	__asm__("":"=r" (__pu_err));				\
+	switch (size) {						\
+	case 1: __put_user_asm("sb"); break;			\
+	case 2: __put_user_asm("sh"); break;			\
+	case 4: __put_user_asm("sw"); break;			\
+	case 8: __PUT_USER_DW; break;				\
+	default: __put_user_unknown(); break;			\
+	}							\
+	__pu_err;						\
+})
 
-#define __put_user_check(x,ptr,size) ({ \
-long __pu_err; \
-__typeof__(*(ptr)) __pu_val; \
-long __pu_addr; \
-__pu_val = (x); \
-__pu_addr = (long) (ptr); \
-__asm__("":"=r" (__pu_err)); \
-if (__access_ok(__pu_addr,size,__access_mask)) { \
-switch (size) { \
-case 1: __put_user_asm("sb"); break; \
-case 2: __put_user_asm("sh"); break; \
-case 4: __put_user_asm("sw"); break; \
-case 8: __PUT_USER_DW; break; \
-default: __put_user_unknown(); break; \
-} } __pu_err; })
+#define __put_user_check(x,ptr,size)				\
+({								\
+	long __pu_err;						\
+	__typeof__(*(ptr)) __pu_val;				\
+	long __pu_addr;						\
+	__pu_val = (x);						\
+	__pu_addr = (long) (ptr);				\
+	__asm__("":"=r" (__pu_err));				\
+	if (__access_ok(__pu_addr,size,__access_mask)) {	\
+		switch (size) {					\
+		case 1: __put_user_asm("sb"); break;		\
+		case 2: __put_user_asm("sh"); break;		\
+		case 4: __put_user_asm("sw"); break;		\
+		case 8: __PUT_USER_DW; break;			\
+		default: __put_user_unknown(); break;		\
+		}						\
+	}							\
+	__pu_err;						\
+})
 
-#define __put_user_asm(insn) \
-({ \
-__asm__ __volatile__( \
-	"1:\t" insn "\t%z1, %2\t\t\t# __put_user_asm\n\t" \
-	"move\t%0, $0\n" \
-	"2:\n\t" \
-	".section\t.fixup,\"ax\"\n" \
-	"3:\tli\t%0,%3\n\t" \
-	"j\t2b\n\t" \
-	".previous\n\t" \
-	".section\t__ex_table,\"a\"\n\t" \
-	".word\t1b,3b\n\t" \
-	".previous" \
-	:"=r" (__pu_err) \
-	:"Jr" (__pu_val), "o" (__m(__pu_addr)), "i" (-EFAULT)); })
+#define __put_user_asm(insn)					\
+({								\
+	__asm__ __volatile__(					\
+	"1:\t" insn "\t%z1, %2\t\t\t# __put_user_asm\n\t"	\
+	"move\t%0, $0\n"					\
+	"2:\n\t"						\
+	".section\t.fixup,\"ax\"\n"				\
+	"3:\tli\t%0,%3\n\t"					\
+	"j\t2b\n\t"						\
+	".previous\n\t"						\
+	".section\t__ex_table,\"a\"\n\t"			\
+	__UA_ADDR "\t1b,3b\n\t"					\
+	".previous"						\
+	:"=r" (__pu_err)					\
+	:"Jr" (__pu_val), "o" (__m(__pu_addr)), "i" (-EFAULT));	\
+})
 
-#define __put_user_asm_ll32 \
-({ \
-__asm__ __volatile__( \
-	"1:\tsw\t%1, %2\t\t\t# __put_user_asm_ll32\n\t" \
-	"2:\tsw\t%D1, %3\n" \
-	"move\t%0, $0\n" \
-	"3:\n\t" \
-	".section\t.fixup,\"ax\"\n" \
-	"4:\tli\t%0,%4\n\t" \
-	"j\t3b\n\t" \
-	".previous\n\t" \
-	".section\t__ex_table,\"a\"\n\t" \
-	".word\t1b,4b\n\t" \
-	".word\t2b,4b\n\t" \
-	".previous" \
-	:"=r" (__pu_err) \
-	:"r" (__pu_val), "o" (__m(__pu_addr)), "o" (__m(__pu_addr + 4)), \
-	 "i" (-EFAULT)); })
+#define __put_user_asm_ll32						\
+({									\
+	__asm__ __volatile__(						\
+	"1:\tsw\t%1, %2\t\t\t# __put_user_asm_ll32\n\t"			\
+	"2:\tsw\t%D1, %3\n"						\
+	"move\t%0, $0\n"						\
+	"3:\n\t"							\
+	".section\t.fixup,\"ax\"\n"					\
+	"4:\tli\t%0,%4\n\t"						\
+	"j\t3b\n\t"							\
+	".previous\n\t"							\
+	".section\t__ex_table,\"a\"\n\t"				\
+	__UA_ADDR "\t1b,4b\n\t"						\
+	__UA_ADDR "\t2b,4b\n\t"						\
+	".previous"							\
+	:"=r" (__pu_err)						\
+	:"r" (__pu_val), "o" (__m(__pu_addr)),				\
+	 "o" (__m(__pu_addr + 4)), "i" (-EFAULT));			\
+})
 
 extern void __put_user_unknown(void);
 
@@ -257,19 +301,20 @@ extern void __put_user_unknown(void);
  * jump instructions
  */
 #ifdef MODULE
-#define __MODULE_JAL(destination) \
-	".set\tnoat\n\t" \
-	"la\t$1, " #destination "\n\t" \
-	"jalr\t$1\n\t" \
+#define __MODULE_JAL(destination)					\
+	".set\tnoat\n\t"						\
+	__UA_LA "\t$1, " #destination "\n\t" 				\
+	"jalr\t$1\n\t"							\
 	".set\tat\n\t"
 #else
-#define __MODULE_JAL(destination) \
+#define __MODULE_JAL(destination)					\
 	"jal\t" #destination "\n\t"
 #endif
 
 extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 
-#define __invoke_copy_to_user(to,from,n) ({				\
+#define __invoke_copy_to_user(to,from,n)				\
+({									\
 	register void *__cu_to_r __asm__ ("$4");			\
 	register const void *__cu_from_r __asm__ ("$5");		\
 	register long __cu_len_r __asm__ ("$6");			\
@@ -278,7 +323,7 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_from_r = (from);						\
 	__cu_len_r = (n);						\
 	__asm__ __volatile__(						\
-		__MODULE_JAL(__copy_user)				\
+	__MODULE_JAL(__copy_user)					\
 	: "+r" (__cu_to_r), "+r" (__cu_from_r), "+r" (__cu_len_r)	\
 	:								\
 	: "$8", "$9", "$10", "$11", "$12", "$15", "$24", "$31",		\
@@ -286,7 +331,8 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len_r;							\
 })
 
-#define __copy_to_user(to,from,n) ({					\
+#define __copy_to_user(to,from,n)					\
+({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
@@ -298,7 +344,8 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
-#define copy_to_user(to,from,n) ({					\
+#define copy_to_user(to,from,n)						\
+({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
@@ -312,7 +359,8 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
-#define __invoke_copy_from_user(to,from,n) ({				\
+#define __invoke_copy_from_user(to,from,n)				\
+({									\
 	register void *__cu_to_r __asm__ ("$4");			\
 	register const void *__cu_from_r __asm__ ("$5");		\
 	register long __cu_len_r __asm__ ("$6");			\
@@ -321,12 +369,13 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_from_r = (from);						\
 	__cu_len_r = (n);						\
 	__asm__ __volatile__(						\
-		".set\tnoreorder\n\t"					\
-		__MODULE_JAL(__copy_user)				\
-		".set\tnoat\n\t"					\
-		"addu\t$1, %1, %2\n\t"					\
-		".set\tat\n\t"						\
-		".set\treorder\n\t"					\
+	".set\tnoreorder\n\t"						\
+	__MODULE_JAL(__copy_user)					\
+	".set\tnoat\n\t"						\
+	__UA_ADDU "\t$1, %1, %2\n\t"					\
+	".set\tat\n\t"							\
+	".set\treorder\n\t"						\
+	"move\t%0, $6"		/* XXX */				\
 	: "+r" (__cu_to_r), "+r" (__cu_from_r), "+r" (__cu_len_r)	\
 	:								\
 	: "$8", "$9", "$10", "$11", "$12", "$15", "$24", "$31",		\
@@ -334,7 +383,8 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len_r;							\
 })
 
-#define __copy_from_user(to,from,n) ({					\
+#define __copy_from_user(to,from,n)					\
+({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
@@ -347,7 +397,8 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
-#define copy_from_user(to,from,n) ({					\
+#define copy_from_user(to,from,n)					\
+({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
@@ -379,12 +430,15 @@ __clear_user(void *addr, __kernel_size_t size)
 	return res;
 }
 
-#define clear_user(addr,n) ({ \
-void * __cl_addr = (addr); \
-unsigned long __cl_size = (n); \
-if (__cl_size && access_ok(VERIFY_WRITE, ((unsigned long)(__cl_addr)), __cl_size)) \
-__cl_size = __clear_user(__cl_addr, __cl_size); \
-__cl_size; })
+#define clear_user(addr,n)					\
+({								\
+	void * __cl_addr = (addr);				\
+	unsigned long __cl_size = (n);				\
+	if (__cl_size && access_ok(VERIFY_WRITE,		\
+		((unsigned long)(__cl_addr)), __cl_size))	\
+		__cl_size = __clear_user(__cl_addr, __cl_size);	\
+	__cl_size;						\
+})
 
 /*
  * Returns: -EFAULT if exception before terminator, N if the entire

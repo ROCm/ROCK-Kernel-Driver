@@ -2187,7 +2187,7 @@ static void __devinit it8172_remove(struct pci_dev *dev)
 
 
 
-static struct pci_device_id id_table[] __devinitdata = {
+static struct pci_device_id id_table[] = {
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G_AUDIO, PCI_ANY_ID,
 	  PCI_ANY_ID, 0, 0 },
 	{ 0, }

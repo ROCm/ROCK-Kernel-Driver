@@ -26,7 +26,7 @@ static int __devinit pci_eisa_init (struct pci_dev *pdev,
 
 	if ((rc = pci_enable_device (pdev))) {
 		printk (KERN_ERR "pci_eisa : Could not enable device %s\n",
-			pdev->slot_name);
+			pci_name(pdev));
 		return rc;
 	}
 

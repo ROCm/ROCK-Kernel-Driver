@@ -43,11 +43,6 @@
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
-#define page_buffers(page)	((page)->buffers)
-#define page_has_buffers(page)	((page)->buffers)
-#endif
-
 #ifdef PAGEBUF_LOCK_TRACKING
 #define PB_SET_OWNER(pb)	(pb->pb_last_holder = current->pid)
 #define PB_CLEAR_OWNER(pb)	(pb->pb_last_holder = -1)

@@ -140,7 +140,7 @@ static int link_status(struct xircom_private *card);
 
 
 
-static struct pci_device_id xircom_pci_table[] __devinitdata = {
+static struct pci_device_id xircom_pci_table[] = {
 	{0x115D, 0x0003, PCI_ANY_ID, PCI_ANY_ID,},
 	{0,},
 };

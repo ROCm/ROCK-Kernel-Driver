@@ -138,7 +138,7 @@ static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
 		br_become_root_bridge(br);
 }
 
-static unsigned char br_mac_zero[6] = {0,0,0,0,0,0};
+static unsigned char br_mac_zero[6];
 
 /* called under bridge lock */
 void br_stp_recalculate_bridge_id(struct net_bridge *br)

@@ -190,7 +190,6 @@ struct usb_bluetooth {
 	int			bulk_in_buffer_size;
 
 	int			bulk_out_buffer_size;
-	struct urb *		write_urb_pool[NUM_BULK_URBS];
 	__u8			bulk_out_endpointAddress;
 
 	wait_queue_head_t	write_wait;
@@ -408,7 +407,6 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)tty->driver_data, __FUNCTION__);
-	int i;
 
 	if (!bluetooth) {
 		return;
@@ -427,9 +425,7 @@ static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 	if (bluetooth->open_count <= 0) {
 		bluetooth->open_count = 0;
 
-		/* shutdown any bulk reads and writes that might be going on */
-		for (i = 0; i < NUM_BULK_URBS; ++i)
-			usb_unlink_urb (bluetooth->write_urb_pool[i]);
+		/* shutdown any in-flight urbs that we know about */
 		usb_unlink_urb (bluetooth->read_urb);
 		usb_unlink_urb (bluetooth->interrupt_in_urb);
 	}
@@ -443,9 +439,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 	struct urb *urb = NULL;
 	unsigned char *temp_buffer = NULL;
 	const unsigned char *current_buffer;
-	const unsigned char *current_position;
-	int bytes_sent;
-	int buffer_size;
+	unsigned char *urb_buffer;
 	int i;
 	int retval = 0;
 
@@ -506,54 +500,46 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 			break;
 
 		case ACL_PKT:
-			current_position = current_buffer;
-			++current_position;
+			++current_buffer;
 			--count;
-			bytes_sent = 0;
 
-			while (count > 0) {
-				urb = NULL;
-
-				/* try to find a free urb in our list */
-				for (i = 0; i < NUM_BULK_URBS; ++i) {
-					if (bluetooth->write_urb_pool[i]->status != -EINPROGRESS) {
-						urb = bluetooth->write_urb_pool[i];
-						break;
-					}
-				}
-				if (urb == NULL) {
-					dbg ("%s - no free urbs", __FUNCTION__);
-					retval = bytes_sent;
-					goto exit;
-				}
-				
-
-				buffer_size = min (count, bluetooth->bulk_out_buffer_size);
-				memcpy (urb->transfer_buffer, current_position, buffer_size);
-
-				/* build up our urb */
-				usb_fill_bulk_urb (urb, bluetooth->dev, usb_sndbulkpipe(bluetooth->dev, bluetooth->bulk_out_endpointAddress),
-						urb->transfer_buffer, buffer_size, bluetooth_write_bulk_callback, bluetooth);
-
-				/* send it down the pipe */
-				retval = usb_submit_urb(urb, GFP_KERNEL);
-				if (retval) {
-					dbg("%s - usb_submit_urb(write bulk) failed with error = %d", __FUNCTION__, retval);
-					goto exit;
-				}
-#ifdef BTBUGGYHARDWARE
-				/* A workaround for the stalled data bug */
-				/* May or may not be needed...*/
-				if (count != 0) {
-					udelay(500);
-				}
-#endif
-				current_position += buffer_size;
-				bytes_sent += buffer_size;
-				count -= buffer_size;
+			urb_buffer = kmalloc (count, GFP_ATOMIC);
+			if (!urb_buffer) {
+				dev_err(&bluetooth->dev->dev, "out of memory\n");
+				retval = -ENOMEM;
+				goto exit;
 			}
 
-			retval = bytes_sent + 1;
+			urb = usb_alloc_urb(0, GFP_ATOMIC);
+			if (!urb) {
+				dev_err(&bluetooth->dev->dev, "no more free urbs\n");
+				kfree(urb_buffer);
+				retval = -ENOMEM;
+				goto exit;
+			}
+			memcpy (urb_buffer, current_buffer, count);
+
+			/* build up our urb */
+			usb_fill_bulk_urb(urb, bluetooth->dev, 
+					  usb_sndbulkpipe(bluetooth->dev,
+						  	  bluetooth->bulk_out_endpointAddress),
+					  urb_buffer,
+					  count,
+					  bluetooth_write_bulk_callback,
+					  bluetooth);
+
+
+			/* send it down the pipe */
+			retval = usb_submit_urb(urb, GFP_KERNEL);
+			if (retval) {
+				dbg("%s - usb_submit_urb(write bulk) failed with error = %d", __FUNCTION__, retval);
+				goto exit;
+			}
+
+			/* we are done with this urb, so let the host driver
+			 * really free it when it is finished with it */
+			usb_free_urb (urb);
+			retval = count + 1;
 			break;
 		
 		default :
@@ -563,8 +549,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 	}
 
 exit:
-	if (temp_buffer != NULL)
-		kfree (temp_buffer);
+	kfree (temp_buffer);
 
 	return retval;
 } 
@@ -572,55 +557,28 @@ exit:
 
 static int bluetooth_write_room (struct tty_struct *tty) 
 {
-	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)tty->driver_data, __FUNCTION__);
-	int room = 0;
-	int i;
-
-	if (!bluetooth) {
-		return -ENODEV;
-	}
-
 	dbg("%s", __FUNCTION__);
 
-	if (!bluetooth->open_count) {
-		dbg ("%s - device not open", __FUNCTION__);
-		return -EINVAL;
-	}
-
-	for (i = 0; i < NUM_BULK_URBS; ++i) {
-		if (bluetooth->write_urb_pool[i]->status != -EINPROGRESS) {
-			room += bluetooth->bulk_out_buffer_size;
-		}
-	}
-
-	dbg("%s - returns %d", __FUNCTION__, room);
-	return room;
+	/*
+	 * We really can take anything the user throws at us
+	 * but let's pick a nice big number to tell the tty
+	 * layer that we have lots of free space
+	 */
+	return 2048;
 }
 
 
 static int bluetooth_chars_in_buffer (struct tty_struct *tty) 
 {
-	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)tty->driver_data, __FUNCTION__);
-	int chars = 0;
-	int i;
+	dbg("%s", __FUNCTION__);
 
-	if (!bluetooth) {
-		return -ENODEV;
-	}
-
-	if (!bluetooth->open_count) {
-		dbg ("%s - device not open", __FUNCTION__);
-		return -EINVAL;
-	}
-
-	for (i = 0; i < NUM_BULK_URBS; ++i) {
-		if (bluetooth->write_urb_pool[i]->status == -EINPROGRESS) {
-			chars += bluetooth->write_urb_pool[i]->transfer_buffer_length;
-		}
-	}
-
-	dbg ("%s - returns %d", __FUNCTION__, chars);
-	return chars;
+	/* 
+	 * We can't really account for how much data we
+	 * have sent out, but hasn't made it through to the
+	 * device, so just tell the tty layer that everything
+	 * is flushed.
+	 */
+	return 0;
 }
 
 
@@ -1009,6 +967,9 @@ static void bluetooth_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 
 	dbg("%s", __FUNCTION__);
 
+	/* free up the transfer buffer, as usb_free_urb() does not do this */
+	kfree(urb->transfer_buffer);
+
 	if (!bluetooth) {
 		dbg("%s - bad bluetooth pointer, exiting", __FUNCTION__);
 		return;
@@ -1161,21 +1122,6 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 	bluetooth->bulk_out_endpointAddress = endpoint->bEndpointAddress;
 	bluetooth->bulk_out_buffer_size = endpoint->wMaxPacketSize * 2;
 
-	/* create our write urb pool */ 
-	for (i = 0; i < NUM_BULK_URBS; ++i) {
-		struct urb  *urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (urb == NULL) {
-			err("No free urbs available");
-			goto probe_error;
-		}
-		urb->transfer_buffer = kmalloc (bluetooth->bulk_out_buffer_size, GFP_KERNEL);
-		if (urb->transfer_buffer == NULL) {
-			err("out of memory");
-			goto probe_error;
-		}
-		bluetooth->write_urb_pool[i] = urb;
-	}
-
 	endpoint = interrupt_in_endpoint[0];
 	bluetooth->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!bluetooth->interrupt_in_urb) {
@@ -1213,12 +1159,6 @@ probe_error:
 		usb_free_urb (bluetooth->interrupt_in_urb);
 	if (bluetooth->interrupt_in_buffer)
 		kfree (bluetooth->interrupt_in_buffer);
-	for (i = 0; i < NUM_BULK_URBS; ++i)
-		if (bluetooth->write_urb_pool[i]) {
-			if (bluetooth->write_urb_pool[i]->transfer_buffer)
-				kfree (bluetooth->write_urb_pool[i]->transfer_buffer);
-			usb_free_urb (bluetooth->write_urb_pool[i]);
-		}
 	for (i = 0; i < NUM_CONTROL_URBS; ++i) 
 		if (bluetooth->control_urb_pool[i]) {
 			if (bluetooth->control_urb_pool[i]->transfer_buffer)
@@ -1262,14 +1202,6 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 
 		tty_unregister_device (bluetooth_tty_driver, bluetooth->minor);
 
-		for (i = 0; i < NUM_BULK_URBS; ++i) {
-			if (bluetooth->write_urb_pool[i]) {
-				usb_unlink_urb (bluetooth->write_urb_pool[i]);
-				if (bluetooth->write_urb_pool[i]->transfer_buffer)
-					kfree (bluetooth->write_urb_pool[i]->transfer_buffer);
-				usb_free_urb (bluetooth->write_urb_pool[i]);
-			}
-		}
 		for (i = 0; i < NUM_CONTROL_URBS; ++i) {
 			if (bluetooth->control_urb_pool[i]) {
 				usb_unlink_urb (bluetooth->control_urb_pool[i]);

@@ -43,7 +43,7 @@ static DECLARE_MUTEX(read_mutex);
 static struct inode *get_cramfs_inode(struct super_block *sb, struct cramfs_inode * cramfs_inode)
 {
 	struct inode * inode = new_inode(sb);
-	static struct timespec zerotime = { 0, 0 };
+	static struct timespec zerotime;
 
 	if (inode) {
 		inode->i_mode = cramfs_inode->mode;

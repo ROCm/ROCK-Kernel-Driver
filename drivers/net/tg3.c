@@ -1,7 +1,7 @@
 /*
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
- * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2001, 2002, 2003 David S. Miller (davem@redhat.com)
  * Copyright (C) 2001, 2002 Jeff Garzik (jgarzik@pobox.com)
  */
 
@@ -57,8 +57,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.7"
-#define DRV_MODULE_RELDATE	"July 23, 2003"
+#define DRV_MODULE_VERSION	"1.8"
+#define DRV_MODULE_RELDATE	"August 1, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -127,7 +127,7 @@ MODULE_PARM_DESC(tg3_debug, "Tigon3 bitmapped debugging message enable value");
 
 static int tg3_debug = -1;	/* -1 == use TG3_DEF_MSG_ENABLE as value */
 
-static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
+static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5700,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5701,
@@ -258,6 +258,7 @@ static inline void __netif_rx_complete(struct net_device *dev)
 {
 	if (!test_bit(__LINK_STATE_RX_SCHED, &dev->state)) BUG();
 	list_del(&dev->poll_list);
+	smp_mb__before_clear_bit();
 	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
 }
 
@@ -3102,18 +3103,20 @@ static void tg3_chip_reset(struct tg3 *tp)
 	u32 val;
 	u32 flags_save;
 
-	/* Force NVRAM to settle.
-	 * This deals with a chip bug which can result in EEPROM
-	 * corruption.
-	 */
-	if (tp->tg3_flags & TG3_FLAG_NVRAM) {
-		int i;
+	if (!(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
+		/* Force NVRAM to settle.
+		 * This deals with a chip bug which can result in EEPROM
+		 * corruption.
+		 */
+		if (tp->tg3_flags & TG3_FLAG_NVRAM) {
+			int i;
 
-		tw32(NVRAM_SWARB, SWARB_REQ_SET1);
-		for (i = 0; i < 100000; i++) {
-			if (tr32(NVRAM_SWARB) & SWARB_GNT1)
-				break;
-			udelay(10);
+			tw32(NVRAM_SWARB, SWARB_REQ_SET1);
+			for (i = 0; i < 100000; i++) {
+				if (tr32(NVRAM_SWARB) & SWARB_GNT1)
+					break;
+				udelay(10);
+			}
 		}
 	}
 
@@ -3206,7 +3209,8 @@ static int tg3_halt(struct tg3 *tp)
 		udelay(10);
 	}
 
-	if (i >= 100000) {
+	if (i >= 100000 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
 		printk(KERN_ERR PFX "tg3_halt timed out for %s, "
 		       "firmware will not restart magic=%08x\n",
 		       tp->dev->name, val);
@@ -3950,7 +3954,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 			break;
 		udelay(10);
 	}
-	if (i >= 100000) {
+	if (i >= 100000 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
 		printk(KERN_ERR PFX "tg3_reset_hw timed out for %s, "
 		       "firmware will not restart magic=%08x\n",
 		       tp->dev->name, val);
@@ -5126,7 +5131,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		strcpy (info.driver, DRV_MODULE_NAME);
 		strcpy (info.version, DRV_MODULE_VERSION);
 		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		strcpy (info.bus_info, pci_dev->slot_name);
+		strcpy (info.bus_info, pci_name(pci_dev));
 		info.eedump_len = 0;
 		info.regdump_len = TG3_REGDUMP_LEN;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
@@ -5568,6 +5573,9 @@ static void __devinit tg3_nvram_init(struct tg3 *tp)
 {
 	int j;
 
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704)
+		return;
+
 	tw32(GRC_EEPROM_ADDR,
 	     (EEPROM_ADDR_FSM_RESET |
 	      (EEPROM_DEFAULT_CLOCK_PERIOD <<
@@ -5639,6 +5647,11 @@ static int __devinit tg3_nvram_read(struct tg3 *tp,
 				    u32 offset, u32 *val)
 {
 	int i, saw_done_clear;
+
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704) {
+		printk(KERN_ERR PFX "Attempt to do nvram_read on Sun 5704\n");
+		return -EINVAL;
+	}
 
 	if (!(tp->tg3_flags & TG3_FLAG_NVRAM))
 		return tg3_nvram_read_using_eeprom(tp, offset, val);
@@ -5908,6 +5921,14 @@ static void __devinit tg3_read_partno(struct tg3 *tp)
 	unsigned char vpd_data[256];
 	int i;
 
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704) {
+		/* Sun decided not to put the necessary bits in the
+		 * NVRAM of their onboard tg3 parts :(
+		 */
+		strcpy(tp->board_part_number, "Sun 5704");
+		return;
+	}
+
 	for (i = 0; i < 256; i += 4) {
 		u32 tmp;
 
@@ -5964,6 +5985,34 @@ out_not_found:
 	strcpy(tp->board_part_number, "none");
 }
 
+#ifdef CONFIG_SPARC64
+static int __devinit tg3_is_sun_5704(struct tg3 *tp)
+{
+	struct pci_dev *pdev = tp->pdev;
+	struct pcidev_cookie *pcp = pdev->sysdata;
+
+	if (pcp != NULL) {
+		int node = pcp->prom_node;
+		u32 venid, devid;
+		int err;
+
+		err = prom_getproperty(node, "subsystem-vendor-id",
+				       (char *) &venid, sizeof(venid));
+		if (err == 0 || err == -1)
+			return 0;
+		err = prom_getproperty(node, "subsystem-id",
+				       (char *) &devid, sizeof(devid));
+		if (err == 0 || err == -1)
+			return 0;
+
+		if (venid == PCI_VENDOR_ID_SUN &&
+		    devid == PCI_DEVICE_ID_TIGON3_5704)
+			return 1;
+	}
+	return 0;
+}
+#endif
+
 static int __devinit tg3_get_invariants(struct tg3 *tp)
 {
 	u32 misc_ctrl_reg;
@@ -5971,6 +6020,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	u32 pci_state_reg, grc_misc_cfg;
 	u16 pci_cmd;
 	int err;
+
+#ifdef CONFIG_SPARC64
+	if (tg3_is_sun_5704(tp))
+		tp->tg3_flags2 |= TG3_FLG2_SUN_5704;
+#endif
 
 	/* If we have an AMD 762 or Intel ICH/ICH0 chipset, write
 	 * reordering to the mailbox registers done by the host
@@ -6095,7 +6149,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	err = tg3_set_power_state(tp, 0);
 	if (err) {
 		printk(KERN_ERR PFX "(%s) transition to D0 failed\n",
-		       tp->pdev->slot_name);
+		       pci_name(tp->pdev));
 		return err;
 	}
 
@@ -6206,7 +6260,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	err = tg3_phy_probe(tp);
 	if (err) {
 		printk(KERN_ERR PFX "(%s) phy probe failed, err %d\n",
-		       tp->pdev->slot_name, err);
+		       pci_name(tp->pdev), err);
 		/* ... but do not return immediately ... */
 	}
 
@@ -6336,7 +6390,8 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		dev->dev_addr[5] = (lo >>  0) & 0xff;
 	}
 	/* Next, try NVRAM. */
-	else if (!tg3_nvram_read(tp, mac_offset + 0, &hi) &&
+	else if (!(tp->tg3_flags & TG3_FLG2_SUN_5704) &&
+		 !tg3_nvram_read(tp, mac_offset + 0, &hi) &&
 		 !tg3_nvram_read(tp, mac_offset + 4, &lo)) {
 		dev->dev_addr[0] = ((hi >> 16) & 0xff);
 		dev->dev_addr[1] = ((hi >> 24) & 0xff);

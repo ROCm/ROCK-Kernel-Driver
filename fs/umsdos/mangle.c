@@ -178,7 +178,7 @@ int umsdos_parse (
 		 * So it serves both as a flag and as a translator.
 		 */
 		static char lkp[256];
-		static char is_init = 0;
+		static char is_init;
 
 		if (!is_init) {
 			/*

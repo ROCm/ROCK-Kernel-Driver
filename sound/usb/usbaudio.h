@@ -28,6 +28,7 @@
 #define USB_SUBCLASS_AUDIO_CONTROL	0x01
 #define USB_SUBCLASS_AUDIO_STREAMING	0x02
 #define USB_SUBCLASS_MIDI_STREAMING	0x03
+#define USB_SUBCLASS_VENDOR_SPEC	0xff
 
 #define USB_DT_CS_DEVICE                0x21
 #define USB_DT_CS_CONFIG                0x22
@@ -154,7 +155,8 @@ struct snd_usb_audio {
 #define QUIRK_MIDI_MIDIMAN		2
 #define QUIRK_COMPOSITE			3
 #define QUIRK_AUDIO_FIXED_ENDPOINT	4
-#define QUIRK_STANDARD_INTERFACE	5
+#define QUIRK_AUDIO_STANDARD_INTERFACE	5
+#define QUIRK_MIDI_STANDARD_INTERFACE	6
 
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
@@ -184,7 +186,7 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_AUDIO_FIXED_ENDPOINT, data points to an audioformat structure */
 
-/* for QUIRK_STANDARD_INTERFACE, data is NULL */
+/* for QUIRK_AUDIO/MIDI_STANDARD_INTERFACE, data is NULL */
 
 /*
  */
@@ -201,7 +203,7 @@ void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsub
 int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif);
 
 int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *iface, const snd_usb_audio_quirk_t *quirk);
-void snd_usbmidi_disconnect(struct list_head *p);
+void snd_usbmidi_disconnect(struct list_head *p, struct usb_driver *driver);
 
 /*
  * retrieve usb_interface descriptor from the host interface

@@ -526,8 +526,12 @@ __SYSCALL(__NR_exit_group, sys_exit_group)
 __SYSCALL(__NR_epoll_wait, sys_epoll_wait)
 #define __NR_epoll_ctl		233
 __SYSCALL(__NR_epoll_ctl, sys_epoll_ctl)
+#define __NR_tgkill		234
+__SYSCALL(__NR_tgkill, sys_tgkill)
+#define __NR_utimes		235
+__SYSCALL(__NR_utimes, sys_utimes)
 
-#define __NR_syscall_max __NR_epoll_ctl
+#define __NR_syscall_max __NR_utimes
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

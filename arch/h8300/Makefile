@@ -12,32 +12,39 @@ ifndef include-config
 endif
 
 platform-$(CONFIG_CPU_H8300H)	:= h8300h
+platform-$(CONFIG_CPU_H8S)	:= h8s
 PLATFORM := $(platform-y)
 
 board-$(CONFIG_H8300H_GENERIC)		:= generic
-board-$(CONFIG_H8300H_AKI3068NET)	:= ucsimm
-board-$(CONFIG_H8300H_H8MAX)		:= ucdimm
+board-$(CONFIG_H8300H_AKI3068NET)	:= aki3068net
+board-$(CONFIG_H8300H_H8MAX)		:= h8max
 board-$(CONFIG_H8300H_SIM)		:= generic
+board-$(CONFIG_H8S_GENERIC)		:= generic
+board-$(CONFIG_H8S_EDOSK2674)		:= edosk2674
+board-$(CONFIG_H8S_SIM)			:= generic
 BOARD := $(board-y)
 
 model-$(CONFIG_RAMKERNEL)	:= ram
 model-$(CONFIG_ROMKERNEL)	:= rom
 MODEL := $(model-y)
 
-cflags-$(CONFIG_CPU_H8300H)		:= -mh
+cflags-$(CONFIG_CPU_H8300H)	:= -mh
 ldflags-$(CONFIG_CPU_H8300H)	:= -mh8300helf
+cflags-$(CONFIG_CPU_H8S)	:= -ms
+ldflags-$(CONFIG_CPU_H8S)	:= -mh8300self
 
 CFLAGS += $(cflags-y)
-CFLAGS += -mint32 -fno-builtin
-CFLAGS += -O2 -g
+CFLAGS += -mint32 -fno-builtin -Os
+CFLAGS += -g
 CFLAGS += -D__linux__
 CFLAGS += -DUTS_SYSNAME=\"uClinux\" -DTARGET=$(BOARD)
 AFLAGS += -DPLATFORM=$(PLATFORM) -DTARGET=$(BOARD) -DMODEL=$(MODEL) $(cflags-y)
 LDFLAGS += $(ldflags-y)
 
 CROSS_COMPILE = h8300-elf-
-#HEAD := arch/$(ARCH)/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 LIBGCC := $(shell $(CROSS-COMPILE)$(CC) $(CFLAGS) -print-libgcc-file-name)
+
+head-y := arch/$(ARCH)/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
 core-y	+= arch/$(ARCH)/kernel/ \
 	   arch/$(ARCH)/mm/ \
@@ -58,3 +65,16 @@ prepare: include/asm-$(ARCH)/asm-offsets.h
 include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
 				   include/asm include/linux/version.h
 	$(call filechk,gen-asm-offsets)
+
+vmlinux.bin: vmlinux
+	$(OBJCOPY) -Obinary $< $@
+
+vmlinux.srec: vmlinux
+	$(OBJCOPY) -Osrec $< $@
+
+define archhelp
+  echo  'vmlinux.bin  - Create raw binary'
+  echo  'vmlinux.srec - Create srec binary'
+endef
+
+CLEAN_FILES += arch/$(ARCH)/vmlinux.bin arch/$(ARCH)/vmlinux.srec

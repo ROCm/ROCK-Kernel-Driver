@@ -790,6 +790,12 @@ ip_vs_add_dest(struct ip_vs_service *svc, struct ip_vs_dest_user *udest)
 		return -ERANGE;
 	}
 
+	if (udest->l_threshold > udest->u_threshold) {
+		IP_VS_ERR("ip_vs_add_dest(): lower threshold is higher than "
+			  "upper threshold\n");
+		return -ERANGE;
+	}
+
 	/*
 	 * Check if the dest already exists in the list
 	 */
@@ -885,7 +891,13 @@ ip_vs_edit_dest(struct ip_vs_service *svc, struct ip_vs_dest_user *udest)
 	EnterFunction(2);
 
 	if (udest->weight < 0) {
-		IP_VS_ERR("ip_vs_add_dest(): server weight less than zero\n");
+		IP_VS_ERR("ip_vs_edit_dest(): server weight less than zero\n");
+		return -ERANGE;
+	}
+
+	if (udest->l_threshold > udest->u_threshold) {
+		IP_VS_ERR("ip_vs_edit_dest(): lower threshold is higher than "
+			  "upper threshold\n");
 		return -ERANGE;
 	}
 

@@ -50,10 +50,11 @@ struct xfs_mount;
  * Macros, structures, prototypes for internal log manager use.
  */
 
-#define XLOG_NUM_ICLOGS		2
+#define XLOG_MIN_ICLOGS		2
+#define XLOG_MED_ICLOGS		4
 #define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
-#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
+#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Invalid cycle number */
 #define XLOG_VERSION_1		1
 #define XLOG_VERSION_2		2		/* Large IClogs, Log sunit */
 #define XLOG_VERSION_OKBITS	(XLOG_VERSION_1 | XLOG_VERSION_2)
@@ -484,59 +485,65 @@ typedef struct xlog_in_core {
  * that round off problems won't occur when releasing partial reservations.
  */
 typedef struct log {
-    /* The following block of fields are changed while holding icloglock */
-    sema_t		l_flushsema;    /* iclog flushing semaphore */
-    int			l_flushcnt;	/* # of procs waiting on this sema */
-    int			l_ticket_cnt;	/* free ticket count */
-    int			l_ticket_tcnt;	/* total ticket count */
-    int			l_covered_state;/* state of "covering disk log entries" */
-    xlog_ticket_t	*l_freelist;    /* free list of tickets */
-    xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
-    xlog_ticket_t	*l_tail;        /* free list of tickets */
-    xlog_in_core_t	*l_iclog;       /* head log queue	*/
-    lock_t		l_icloglock;    /* grab to change iclog state */
-    xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
-    xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
-    struct xfs_mount	*l_mp;	        /* mount point */
-    struct xfs_buf	*l_xbuf;        /* extra buffer for log wrapping */
-    dev_t		l_dev;	        /* dev_t of log */
-    xfs_daddr_t		l_logBBstart;   /* start block of log */
-    int			l_logsize;      /* size of log in bytes */
-    int			l_logBBsize;    /* size of log in 512 byte chunks */
-    int			l_roundoff;	/* round off error of all iclogs */
-    int			l_curr_cycle;   /* Cycle number of log writes */
-    int			l_prev_cycle;   /* Cycle # b4 last block increment */
-    int			l_curr_block;   /* current logical block of log */
-    int			l_prev_block;   /* previous logical block of log */
-    int			l_iclog_size;	 /* size of log in bytes */
-    int			l_iclog_size_log;/* log power size of log */
-    int			l_iclog_bufs;	 /* number of iclog buffers */
+	/* The following block of fields are changed while holding icloglock */
+	sema_t			l_flushsema;    /* iclog flushing semaphore */
+	int			l_flushcnt;	/* # of procs waiting on this
+						 * sema */
+	int			l_ticket_cnt;	/* free ticket count */
+	int			l_ticket_tcnt;	/* total ticket count */
+	int			l_covered_state;/* state of "covering disk
+						 * log entries" */
+	xlog_ticket_t		*l_freelist;    /* free list of tickets */
+	xlog_ticket_t		*l_unmount_free;/* kmem_free these addresses */
+	xlog_ticket_t		*l_tail;        /* free list of tickets */
+	xlog_in_core_t		*l_iclog;       /* head log queue	*/
+	lock_t			l_icloglock;    /* grab to change iclog state */
+	xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR with unflushed
+						 * buffers */
+	xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
+	struct xfs_mount	*l_mp;	        /* mount point */
+	struct xfs_buf		*l_xbuf;        /* extra buffer for log
+						 * wrapping */
+	dev_t			l_dev;	        /* dev_t of log */
+	xfs_daddr_t		l_logBBstart;   /* start block of log */
+	int			l_logsize;      /* size of log in bytes */
+	int			l_logBBsize;    /* size of log in BB chunks */
+	int			l_roundoff;	/* round off error of iclogs */
+	int			l_curr_cycle;   /* Cycle number of log writes */
+	int			l_prev_cycle;   /* Cycle number before last
+						 * block increment */
+	int			l_curr_block;   /* current logical log block */
+	int			l_prev_block;   /* previous logical log block */
+	int			l_iclog_size;	/* size of log in bytes */
+	int			l_iclog_size_log; /* log power size of log */
+	int			l_iclog_bufs;	/* number of iclog buffers */
 
-    /* The following field are used for debugging; need to hold icloglock */
-    char		*l_iclog_bak[XLOG_MAX_ICLOGS];
+	/* The following field are used for debugging; need to hold icloglock */
+	char			*l_iclog_bak[XLOG_MAX_ICLOGS];
 
-    /* The following block of fields are changed while holding grant_lock */
-    lock_t		l_grant_lock;		/* protects below fields */
-    xlog_ticket_t	*l_reserve_headq;	/* */
-    xlog_ticket_t	*l_write_headq;		/* */
-    int			l_grant_reserve_cycle;	/* */
-    int			l_grant_reserve_bytes;	/* */
-    int			l_grant_write_cycle;	/* */
-    int			l_grant_write_bytes;	/* */
+	/* The following block of fields are changed while holding grant_lock */
+	lock_t			l_grant_lock;
+	xlog_ticket_t		*l_reserve_headq;
+	xlog_ticket_t		*l_write_headq;
+	int			l_grant_reserve_cycle;
+	int			l_grant_reserve_bytes;
+	int			l_grant_write_cycle;
+	int			l_grant_write_bytes;
 
-    /* The following fields don't need locking */
+	/* The following fields don't need locking */
 #ifdef DEBUG
-    struct ktrace	*l_trace;
-    struct ktrace	*l_grant_trace;
+	struct ktrace		*l_trace;
+	struct ktrace		*l_grant_trace;
 #endif
-    uint		l_flags;
-    uint		l_quotaoffs_flag;/* XFS_DQ_*, if QUOTAOFFs found */
-    struct xfs_buf_cancel **l_buf_cancel_table;
-    int			l_stripemask;	/* log stripe mask */
-    int			l_iclog_hsize;  /* size of iclog header */
-    int			l_iclog_heads;  /* number of iclog header sectors */
-    uint		l_sectbb_log;   /* log2 of sector size in bbs */
-    uint		l_sectbb_mask;  /* sector size in bbs alignment mask */
+	uint			l_flags;
+	uint			l_quotaoffs_flag; /* XFS_DQ_*, for QUOTAOFFs */
+	struct xfs_buf_cancel	**l_buf_cancel_table;
+	int			l_stripemask;	/* log stripe mask */
+	int			l_iclog_hsize;  /* size of iclog header */
+	int			l_iclog_heads;  /* # of iclog header sectors */
+	uint			l_sectbb_log;   /* log2 of sector size in BBs */
+	uint			l_sectbb_mask;  /* sector size (in BBs)
+						 * alignment mask */
 } xlog_t;
 
 

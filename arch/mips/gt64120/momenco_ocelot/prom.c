@@ -15,29 +15,35 @@
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
 
-#define PLD_BASE	0xbc000000
+struct callvectors {
+	int	(*open) (char*, int, int);
+	int	(*close) (int);
+	int	(*read) (int, void*, int);
+	int	(*write) (int, void*, int);
+	off_t	(*lseek) (int, off_t, int);
+	int	(*printf) (const char*, ...);
+	void	(*cacheflush) (void);
+	char*	(*gets) (char*);
+};
 
-#define REV             0x0     /* Board Assembly Revision */
-#define PLD1ID          0x1     /* PLD 1 ID */
-#define PLD2ID          0x2     /* PLD 2 ID */
-#define RESET_STAT      0x3     /* Reset Status Register */
-#define BOARD_STAT      0x4     /* Board Status Register */
-#define CPCI_ID         0x5     /* Compact PCI ID Register */
-#define CONTROL         0x8     /* Control Register */
-#define CPU_EEPROM      0x9     /* CPU Configuration EEPROM Register */
-#define INTMASK         0xA     /* Interrupt Mask Register */
-#define INTSTAT         0xB     /* Interrupt Status Register */
-#define INTSET          0xC     /* Interrupt Set Register */
-#define INTCLR          0xD     /* Interrupt Clear Register */
+struct callvectors* debug_vectors;
+char arcs_cmdline[CL_SIZE];
 
-#define PLD_REG(x)	((uint8_t*)(PLD_BASE+(x)))
+extern unsigned long gt64120_base;
 
-char arcs_cmdline[COMMAND_LINE_SIZE];
+const char *get_system_type(void)
+{
+	return "Momentum Ocelot";
+}
 
 /* [jsun@junsun.net] PMON passes arguments in C main() style */
-void __init prom_init(int argc, const char **arg)
+void __init prom_init(int argc, char **arg, char** env, struct callvectors *cv)
 {
 	int i;
+	uint32_t tmp;
+
+	/* save the PROM vectors for debugging use */
+	debug_vectors = cv;
 
 	/* arg[0] is "g", the rest is boot parameters */
 	arcs_cmdline[0] = '\0';
@@ -52,9 +58,16 @@ void __init prom_init(int argc, const char **arg)
 	mips_machgroup = MACH_GROUP_MOMENCO;
 	mips_machtype = MACH_MOMENCO_OCELOT;
 
-	/* turn off the Bit Error LED, which comes on automatically
-	 * at power-up reset */
-	*PLD_REG(INTCLR) = 0x80;
+	while (*env) {
+		if (strncmp("gtbase", *env, 6) == 0) {
+			gt64120_base = simple_strtol(*env + strlen("gtbase="),
+							NULL, 16);
+			break;
+		}
+		*env++;
+	}
+
+	debug_vectors->printf("Booting Linux kernel...\n");
 
 	/* All the boards have at least 64MiB. If there's more, we
 	   detect and register it later */

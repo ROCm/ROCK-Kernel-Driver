@@ -241,7 +241,7 @@ static void __devexit tpam_remove(struct pci_dev *pcidev) {
 	kfree(card);
 }
 
-static struct pci_device_id tpam_pci_tbl[] __devinitdata = {
+static struct pci_device_id tpam_pci_tbl[] = {
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_TURBOPAM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ }

@@ -2,8 +2,8 @@
 # Automatically generated make config: don't edit
 #
 CONFIG_MIPS=y
-CONFIG_MIPS32=y
 # CONFIG_MIPS64 is not set
+CONFIG_MIPS32=y
 
 #
 # Code maturity level options
@@ -19,8 +19,11 @@ CONFIG_SYSVIPC=y
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_EMBEDDED is not set
+CONFIG_KALLSYMS=y
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
+CONFIG_IOSCHED_AS=y
+CONFIG_IOSCHED_DEADLINE=y
 
 #
 # Loadable module support
@@ -103,7 +106,6 @@ CONFIG_CPU_HAS_LLSC=y
 CONFIG_CPU_HAS_WB=y
 CONFIG_CPU_HAS_SYNC=y
 # CONFIG_PREEMPT is not set
-CONFIG_KALLSYMS=y
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 
 #
@@ -128,6 +130,7 @@ CONFIG_PCMCIA=m
 CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
+CONFIG_TRAD_SIGNALS=y
 
 #
 # Memory Technology Devices (MTD)
@@ -168,7 +171,6 @@ CONFIG_MTD_CFI_AMDSTD=y
 #
 # CONFIG_MTD_COMPLEX_MAPPINGS is not set
 # CONFIG_MTD_PHYSMAP is not set
-# CONFIG_MTD_UCLINUX is not set
 
 #
 # Self-contained MTD device drivers
@@ -212,6 +214,7 @@ CONFIG_MTD_CFI_AMDSTD=y
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_RAM is not set
 # CONFIG_BLK_DEV_INITRD is not set
+# CONFIG_LBD is not set
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -404,7 +407,6 @@ CONFIG_IRDA_FAST_RR=y
 #
 # Dongle support
 #
-# CONFIG_DONGLE is not set
 
 #
 # Old SIR device drivers
@@ -415,18 +417,12 @@ CONFIG_IRDA_FAST_RR=y
 #
 # Old Serial dongle support
 #
-# CONFIG_DONGLE_OLD is not set
 
 #
 # FIR device drivers
 #
-# CONFIG_NSC_FIR is not set
-# CONFIG_WINBOND_FIR is not set
 # CONFIG_TOSHIBA_OLD is not set
 # CONFIG_TOSHIBA_FIR is not set
-# CONFIG_SMC_IRCC_OLD is not set
-# CONFIG_SMC_IRCC_FIR is not set
-# CONFIG_ALI_FIR is not set
 # CONFIG_VLSI_FIR is not set
 
 #

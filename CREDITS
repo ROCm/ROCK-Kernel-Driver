@@ -1185,8 +1185,8 @@ D: via-rhine net driver hacking
 
 N: Danny ter Haar
 E: dth@cistron.nl
-D: /proc/procinfo, reboot on panic , kernel pre-patch tester ;)
-S: Cistron Internet Services
+D: /proc/cpuinfo, reboot on panic , kernel pre-patch tester ;)
+S: Cistron
 S: PO-Box 297
 S: 2400 AG, Alphen aan den Rijn
 S: The Netherlands
@@ -1522,17 +1522,12 @@ S: USA
 
 N: Dave Jones
 E: davej@codemonkey.org.uk
-E: davej@suse.de
 W: http://www.codemonkey.org.uk
 D: x86 errata/setup maintenance.
 D: AGPGART driver.
+D: CPUFREQ maintenance.
 D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
-S: c/o SuSE Linux UK Ltd
-S: Appleton House
-S: 139 King Street
-S: Hammersmith
-S: W6 9JG
 S: United Kingdom
 
 N: Ani Joshi
@@ -2626,15 +2621,15 @@ S: 75019 Paris
 S: France
 
 N: Rik van Riel
-E: riel@conectiva.com.br
+E: riel@redhat.com
 W: http://www.surriel.com/
 D: Linux-MM site, Documentation/sysctl/*, swap/mm readaround
-D: clustering contributor, kswapd fixes, random kernel hacker,
+D: kswapd fixes, random kernel hacker, rmap VM,
 D: nl.linux.org administrator, minor scheduler additions
-S: Conectiva S.A.
-S: R. Tocantins, 89 - Cristo Rei
-S: 80050-430 - Curitiba - Paraná
-S: Brazil
+S: Red Hat Boston
+S: 3 Lan Drive
+S: Westford, MA 01886
+S: USA
 
 N: Pekka Riikonen
 E: priikone@poseidon.pspt.fi
@@ -2980,6 +2975,14 @@ D: LanMedia Corp. Device WAN card device driver
 S: #102, 686 W. Maude Ave
 S: Sunyvale, CA 94086
 S: USA
+
+N: Michael Still
+E: mikal@stillhq.com
+W: http://www.stillhq.com
+D: Various janitorial patches
+D: mandocs and mandocs_install build targets
+S: (Email me and ask)
+S: Australia
 
 N: Henrik Storner
 E: storner@image.dk

@@ -65,9 +65,6 @@ void jfs_read_inode(struct inode *inode)
 	}
 }
 
-/* This define is from fs/open.c */
-#define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))
-
 /*
  * Workhorse of both fsync & write_inode
  */
@@ -105,7 +102,7 @@ int jfs_commit_inode(struct inode *inode, int wait)
 	rc = txCommit(tid, 1, &inode, wait ? COMMIT_SYNC : 0);
 	txEnd(tid);
 	up(&JFS_IP(inode)->commit_sem);
-	return -rc;
+	return rc;
 }
 
 void jfs_write_inode(struct inode *inode, int wait)
@@ -308,7 +305,7 @@ static int jfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
 	return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-				offset, nr_segs, jfs_get_blocks);
+				offset, nr_segs, jfs_get_blocks, NULL);
 }
 
 struct address_space_operations jfs_aops = {

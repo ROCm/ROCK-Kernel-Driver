@@ -6,6 +6,7 @@
  * Copyright (C) 1994 - 2003 by Ralf Baechle
  */
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 
@@ -58,3 +59,5 @@ void __update_cache(struct vm_area_struct *vma, unsigned long address,
 		ClearPageDcacheDirty(page);
 	}
 }
+
+EXPORT_SYMBOL(flush_dcache_page);

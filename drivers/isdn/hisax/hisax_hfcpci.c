@@ -47,7 +47,7 @@ MODULE_DESCRIPTION("HFC PCI ISDN driver");
           .class_mask  = 0,                      \
 	  .driver_data = (unsigned long) name }
 
-static struct pci_device_id hfcpci_ids[] __devinitdata = {
+static struct pci_device_id hfcpci_ids[] = {
 	ID(CCD,     CCD_2BD0,         "CCD/Billion/Asuscom 2BD0"),
 	ID(CCD,     CCD_B000,         "Billion B000"),
 	ID(CCD,     CCD_B006,         "Billion B006"),
@@ -1567,7 +1567,7 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
 	hfcpci_hw_init(adapter);
 
 	printk(KERN_INFO "hisax_hfcpci: found adapter %s at %s\n",
-	       (char *) ent->driver_data, pdev->slot_name);
+	       (char *) ent->driver_data, pci_name(pdev));
 
 	return 0;
 

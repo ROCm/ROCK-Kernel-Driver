@@ -657,7 +657,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 		if (request_resource(root, res) == 0)
 			return;
 		printk(KERN_INFO "yenta %s: Preassigned resource %d busy, reconfiguring...\n",
-				socket->dev->slot_name, nr);
+				pci_name(socket->dev), nr);
 		res->start = res->end = 0;
 	}
 
@@ -697,7 +697,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 		align = size;
 	} while (size >= min);
 	printk(KERN_INFO "yenta %s: no resource of type %x available, trying to continue...\n",
-			socket->dev->slot_name, type);
+			pci_name(socket->dev), type);
 	res->start = res->end = 0;
 }
 
@@ -901,7 +901,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 
 static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev, state, 0);
+	return pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
 }
 
 
@@ -911,7 +911,7 @@ static int yenta_dev_resume (struct pci_dev *dev)
 }
 
 
-static struct pci_device_id yenta_table [] __devinitdata = { {
+static struct pci_device_id yenta_table [] = { {
 	.class		= PCI_CLASS_BRIDGE_CARDBUS << 8,
 	.class_mask	= ~0,
 

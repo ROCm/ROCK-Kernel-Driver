@@ -538,7 +538,6 @@ static int hc_start (struct ohci_hcd *ohci)
 		return -ENOMEM;
 	}
 
-	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
 	if (hcd_register_root (&ohci->hcd) != 0) {
 		usb_put_dev (udev);

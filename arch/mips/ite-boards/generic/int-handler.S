@@ -26,15 +26,17 @@ NESTED(it8172_IRQ, PT_SIZE, sp)
 
         andi    a0, t0, CAUSEF_IP7
         beq     a0, zero, 1f
-        move    a0, sp
-        jal     mips_timer_interrupt
+
+        li	a0, 127			# MIPS_CPU_TIMER_IRQ = (NR_IRQS-1)
+        move    a1, sp
+        jal     ll_timer_interrupt
 	j	ret_from_irq
         nop
-        
+
 1:
         andi    a0, t0, CAUSEF_IP2      # the only int we expect at this time
-        beq     a0, zero, 3f           
-	move	a0,sp  
+        beq     a0, zero, 3f
+	move	a0,sp
 	jal	it8172_hw0_irqdispatch
 
 	mfc0	t0,CP0_STATUS		# disable interrupts
@@ -44,12 +46,12 @@ NESTED(it8172_IRQ, PT_SIZE, sp)
         nop
         nop
         nop
-	
+
 	la      a1, ret_from_irq
 	jr	a1
         nop
-	
-3:	
+
+3:
 	move a0, sp
 	jal	mips_spurious_interrupt
         nop

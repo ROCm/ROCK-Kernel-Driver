@@ -1186,7 +1186,7 @@ static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy(info.driver, "ns83820");
 			strcpy(info.version, VERSION);
-			strcpy(info.bus_info, dev->pci_dev->slot_name);
+			strcpy(info.bus_info, pci_name(dev->pci_dev));
 			if (copy_to_user(useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;
@@ -2061,7 +2061,7 @@ static void __devexit ns83820_remove_one(struct pci_dev *pci_dev)
 	pci_set_drvdata(pci_dev, NULL);
 }
 
-static struct pci_device_id ns83820_pci_tbl[] __devinitdata = {
+static struct pci_device_id ns83820_pci_tbl[] = {
 	{ 0x100b, 0x0022, PCI_ANY_ID, PCI_ANY_ID, 0, .driver_data = 0, },
 	{ 0, },
 };

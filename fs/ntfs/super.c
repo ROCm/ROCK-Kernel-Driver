@@ -33,7 +33,7 @@
 #include "sysctl.h"
 
 /* Number of mounted file systems which have compression enabled. */
-static unsigned long ntfs_nr_compression_users = 0;
+static unsigned long ntfs_nr_compression_users;
 
 /* Error constants/strings used in inode.c::ntfs_show_options(). */
 typedef enum {
@@ -1670,10 +1670,10 @@ static struct file_system_type ntfs_fs_type = {
 };
 
 /* Stable names for the slab caches. */
-static const char *ntfs_attr_ctx_cache_name = "ntfs_attr_ctx_cache";
-static const char *ntfs_name_cache_name = "ntfs_name_cache";
-static const char *ntfs_inode_cache_name = "ntfs_inode_cache";
-static const char *ntfs_big_inode_cache_name = "ntfs_big_inode_cache";
+static const char ntfs_attr_ctx_cache_name[] = "ntfs_attr_ctx_cache";
+static const char ntfs_name_cache_name[] = "ntfs_name_cache";
+static const char ntfs_inode_cache_name[] = "ntfs_inode_cache";
+static const char ntfs_big_inode_cache_name[] = "ntfs_big_inode_cache";
 
 static int __init init_ntfs_fs(void)
 {

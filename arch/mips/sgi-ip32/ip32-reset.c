@@ -14,6 +14,7 @@
 #include <linux/notifier.h>
 #include <linux/delay.h>
 #include <linux/ds17287rtc.h>
+#include <linux/interrupt.h>
 
 #include <asm/irq.h>
 #include <asm/reboot.h>
@@ -141,7 +142,7 @@ static inline void ip32_power_button(void)
 	add_timer(&power_timer);
 }
 
-static void ip32_rtc_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ip32_rtc_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	volatile unsigned char reg_c;
 
@@ -159,6 +160,7 @@ static void ip32_rtc_int(int irq, void *dev_id, struct pt_regs *regs)
 
 	printk(KERN_DEBUG "Power button pressed\n");
 	ip32_power_button();
+	return IRQ_HANDLED;
 }
 
 static int panic_event(struct notifier_block *this, unsigned long event,

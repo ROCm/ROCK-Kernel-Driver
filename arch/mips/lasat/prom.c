@@ -76,7 +76,7 @@ static void setup_prom_vectors(void)
 {
 	u32 version = *(u32 *)(RESET_VECTOR + 0x90);
 
-	if (version == 306) {
+	if (version >= 307) {
 		prom_display = (void *)PROM_DISPLAY_ADDR;
 		prom_putc = (void *)PROM_PUTC_ADDR;
 		prom_printf = real_prom_printf;

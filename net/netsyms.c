@@ -322,6 +322,7 @@ EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
 EXPORT_SYMBOL(xfrm_check_output);
 EXPORT_SYMBOL(__secpath_destroy);
+EXPORT_SYMBOL(secpath_dup);
 EXPORT_SYMBOL(xfrm_get_acqseq);
 EXPORT_SYMBOL(xfrm_parse_spi);
 EXPORT_SYMBOL(xfrm4_rcv);
@@ -513,20 +514,11 @@ EXPORT_SYMBOL(netlink_post);
 #endif
 
 EXPORT_SYMBOL(rtattr_parse);
-EXPORT_SYMBOL(rtnetlink_links);
 EXPORT_SYMBOL(__rta_fill);
-EXPORT_SYMBOL(rtnetlink_dump_ifinfo);
-EXPORT_SYMBOL(rtnetlink_put_metrics);
-EXPORT_SYMBOL(rtnl);
 EXPORT_SYMBOL(neigh_delete);
 EXPORT_SYMBOL(neigh_add);
 EXPORT_SYMBOL(neigh_dump_info);
 
-EXPORT_SYMBOL(dev_set_allmulti);
-EXPORT_SYMBOL(dev_set_promiscuity);
-EXPORT_SYMBOL(rtnl_sem);
-EXPORT_SYMBOL(rtnl_lock);
-EXPORT_SYMBOL(rtnl_unlock);
 
 /* ABI emulation layers need this */
 EXPORT_SYMBOL(move_addr_to_kernel);
@@ -534,7 +526,6 @@ EXPORT_SYMBOL(move_addr_to_user);
                   
 /* Used by at least ipip.c.  */
 EXPORT_SYMBOL(ipv4_config);
-EXPORT_SYMBOL(dev_open);
 
 /* Used by other modules */
 EXPORT_SYMBOL(xrlim_allow);
@@ -610,11 +601,22 @@ EXPORT_SYMBOL(netdev_fc_xoff);
 #endif
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
+EXPORT_SYMBOL(dev_open);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_mc_add);
 EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
+EXPORT_SYMBOL(dev_set_allmulti);
+EXPORT_SYMBOL(dev_set_promiscuity);
 EXPORT_SYMBOL(__kill_fasync);
+
+EXPORT_SYMBOL(rtnl);
+EXPORT_SYMBOL(rtnetlink_links);
+EXPORT_SYMBOL(rtnetlink_dump_ifinfo);
+EXPORT_SYMBOL(rtnetlink_put_metrics);
+EXPORT_SYMBOL(rtnl_sem);
+EXPORT_SYMBOL(rtnl_lock);
+EXPORT_SYMBOL(rtnl_unlock);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);

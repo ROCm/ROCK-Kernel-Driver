@@ -1,0 +1,161 @@
+#!/bin/bash
+#
+# This script creates the proper /dev/ entries for ALSA devices.
+# See ../Documentation/sound/alsa/ALSA-Configuration.txt for more
+# information.
+
+MAJOR=116
+OSSMAJOR=14
+MAX_CARDS=4
+PERM=666
+OWNER=root.root
+
+if [ "`grep -w -E "^audio" /etc/group`x" != x ]; then
+  PERM=660
+  OWNER=root.audio
+fi
+
+function create_odevice () {
+  rm -f $1
+  echo -n "Creating $1..."
+  mknod -m $PERM $1 c $OSSMAJOR $2
+  chown $OWNER $1
+  echo " done"
+}
+
+function create_odevices () {
+  tmp=0
+  tmp1=0
+  rm -f $1 $1?
+  echo -n "Creating $1?..."
+  while [ $tmp1 -lt $MAX_CARDS ]; do
+    minor=$[ $2 + $tmp ]
+    mknod -m $PERM $1$tmp1 c $OSSMAJOR $minor
+    chown $OWNER $1$tmp1
+    tmp=$[ $tmp + 16 ]
+    tmp1=$[ $tmp1 + 1 ]
+  done
+  echo " done"
+}
+
+function create_device1 () {
+  rm -f $1
+  minor=$2
+  echo -n "Creating $1..."
+  mknod -m $PERM $1 c $MAJOR $minor
+  chown $OWNER $1
+  echo " done"
+}
+
+function create_devices () {
+  tmp=0
+  rm -f $1 $1?
+  echo -n "Creating $1?..."
+  while [ $tmp -lt $MAX_CARDS ]; do
+    minor=$[ $tmp * 32 ]
+    minor=$[ $2 + $minor ]
+    mknod -m $PERM "${1}C${tmp}" c $MAJOR $minor
+    chown $OWNER "${1}C${tmp}"
+    tmp=$[ $tmp + 1 ]
+  done
+  echo " done"
+}
+
+function create_devices2 () {
+  tmp=0
+  rm -f $1 $1?
+  echo -n "Creating $1??..."
+  while [ $tmp -lt $MAX_CARDS ]; do
+    tmp1=0
+    while [ $tmp1 -lt $3 ]; do
+      minor=$[ $tmp * 32 ]
+      minor=$[ $2 + $minor + $tmp1 ]
+      mknod -m $PERM "${1}C${tmp}D${tmp1}" c $MAJOR $minor
+      chown $OWNER "${1}C${tmp}D${tmp1}"
+      tmp1=$[ $tmp1 + 1 ]
+    done
+    tmp=$[ $tmp + 1 ]
+  done
+  echo " done"
+}
+
+function create_devices3 () {
+  tmp=0
+  rm -f $1 $1?
+  echo -n "Creating $1??$4..."
+  while [ $tmp -lt $MAX_CARDS ]; do
+    tmp1=0
+    while [ $tmp1 -lt $3 ]; do
+      minor=$[ $tmp * 32 ]
+      minor=$[ $2 + $minor + $tmp1 ]
+      mknod -m $PERM "${1}C${tmp}D${tmp1}${4}" c $MAJOR $minor
+      chown $OWNER "${1}C${tmp}D${tmp1}${4}"
+      tmp1=$[ $tmp1 + 1 ]
+    done
+    tmp=$[ $tmp + 1 ]
+  done
+  echo " done"
+}
+
+if test "$1" = "-?" || test "$1" = "-h" || test "$1" = "--help"; then
+  echo "Usage: snddevices [max]"
+  exit
+fi
+
+if test "$1" = "max"; then
+  DSP_MINOR=19
+fi
+
+# OSS (Lite) compatible devices...
+
+if test $OSSMAJOR -eq 14; then
+  create_odevices /dev/mixer		0
+  create_odevice /dev/sequencer		1
+  create_odevices /dev/midi		2
+  create_odevices /dev/dsp		3
+  create_odevices /dev/audio		4
+  create_odevice /dev/sndstat		6
+  create_odevice /dev/music		8
+  create_odevices /dev/dmmidi		9
+  create_odevices /dev/dmfm		10
+  create_odevices /dev/amixer		11	# alternate mixer
+  create_odevices /dev/adsp		12	# alternate dsp
+  create_odevices /dev/amidi		13	# alternate midi
+  create_odevices /dev/admmidi		14	# alternate direct midi
+  # create symlinks
+  ln -svf /dev/mixer0 /dev/mixer
+  ln -svf /dev/midi0 /dev/midi
+  ln -svf /dev/dsp0 /dev/dsp
+  ln -svf /dev/audio0 /dev/audio
+  ln -svf /dev/music /dev/sequencer2
+  ln -svf /dev/adsp0 /dev/adsp
+  ln -svf /dev/amidi0 /dev/amidi
+fi
+
+# Remove old devices
+
+mv -f /dev/sndstat /dev/1sndstat
+rm -f /dev/snd*
+mv -f /dev/1sndstat /dev/sndstat
+if [ -d /dev/snd ]; then
+  rm -f /dev/snd/*
+  rmdir /dev/snd
+fi
+
+# Create new ones
+
+mkdir -p /dev/snd
+create_devices  /dev/snd/control	0
+create_device1  /dev/snd/seq		1
+create_device1  /dev/snd/timer		33
+create_devices2 /dev/snd/hw		4	4
+create_devices2 /dev/snd/midi		8	8
+create_devices3 /dev/snd/pcm		16	8	p
+create_devices3 /dev/snd/pcm		24	8	c
+
+# Loader devices
+
+echo "ALSA loader devices"
+rm -f /dev/aload*
+create_devices  /dev/aload		0
+create_device1  /dev/aloadSEQ		1
