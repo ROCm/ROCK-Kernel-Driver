@@ -183,7 +183,9 @@ acpi_dispose_crs (struct acpi_buffer *buf)
 #define ACPI_MAX_PLATFORM_INTERRUPTS	256
 
 /* Array to record platform interrupt vectors for generic interrupt routing. */
-int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = { [0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1 };
+int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
+	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
+};
 
 enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
 
@@ -528,7 +530,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 }
 
 void __init
-acpi_numa_arch_fixup(void)
+acpi_numa_arch_fixup (void)
 {
 	int i, j, node_from, node_to;
 
@@ -575,7 +577,7 @@ acpi_numa_arch_fixup(void)
 			if (!pxm_bit_test(j))
 				continue;
 			node_to = pxm_to_nid_map[j];
-			node_distance(node_from, node_to) = 
+			node_distance(node_from, node_to) =
 				slit_table->entry[i*slit_table->localities + j];
 		}
 	}
@@ -761,21 +763,20 @@ acpi_boot_init (void)
 	smp_boot_data.cpu_count = total_cpus;
 
 	smp_build_cpu_map();
-#ifdef CONFIG_NUMA
+# ifdef CONFIG_NUMA
 	build_cpu_to_node_map();
-#endif
+# endif
 #endif
 	/* Make boot-up look pretty */
 	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
 }
 
+/*
+ * PCI Interrupt Routing
+ */
 
-/* --------------------------------------------------------------------------
-                             PCI Interrupt Routing
-   -------------------------------------------------------------------------- */
 #ifdef CONFIG_PCI
-
 int __init
 acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 {
@@ -816,7 +817,8 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*count = acpi_prt.count;
 	return 0;
 }
-#endif
+#endif /* CONFIG_PCI */
+
 /* Assume IA64 always use I/O SAPIC */
 
 int __init
