@@ -72,7 +72,7 @@ static int __init ftape_init(void)
 KERN_INFO "(c) 1993-1996 Bas Laarhoven (bas@vimec.nl)\n"
 KERN_INFO "(c) 1995-1996 Kai Harrekilde-Petersen (khp@dolphinics.no)\n"
 KERN_INFO "(c) 1996-1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)\n"
-KERN_INFO "QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives\n"
+KERN_INFO "QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives\n");
         }
 #else /* !MODULE */
 	/* print a short no-nonsense boot message */
