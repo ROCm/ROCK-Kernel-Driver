@@ -413,17 +413,16 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	 * If not and the current association PMTU is higher than the new
 	 * peer's PMTU, reset the association PMTU to the new peer's PMTU.
 	 */
-	if (asoc->pmtu) {
+	if (asoc->pmtu)
 		asoc->pmtu = min_t(int, peer->pmtu, asoc->pmtu);
-	} else {
+	else
 		asoc->pmtu = peer->pmtu;
-	}
 
 	SCTP_DEBUG_PRINTK("sctp_assoc_add_peer:association %p PMTU set to "
 			  "%d\n", asoc, asoc->pmtu);
 
-	asoc->frag_point = asoc->pmtu -
-		(SCTP_IP_OVERHEAD + sizeof(sctp_data_chunk_t));
+	asoc->frag_point = asoc->pmtu;
+	asoc->frag_point -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
 
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.

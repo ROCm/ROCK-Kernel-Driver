@@ -1153,7 +1153,7 @@ int sctp_datachunks_from_user(sctp_association_t *asoc,
 	first_len = max;
 
 	/* Encourage Cookie-ECHO bundling. */
-	if (asoc->state < SCTP_STATE_ESTABLISHED) {
+	if (asoc->state < SCTP_STATE_COOKIE_ECHOED) {
 		whole = msg_len / (max - SCTP_ARBITRARY_COOKIE_ECHO_LEN);
 
 		/* Account for the DATA to be bundled with the COOKIE-ECHO. */
