@@ -4130,7 +4130,7 @@ static void __init attach_mixer(void)
 	}
 }
 
-static void __exit unload_mixer(void)
+static void unload_mixer(void)
 {
 	if (my_mixerdev >= 0)
 		sound_unload_mixerdev(my_mixerdev);
@@ -4968,7 +4968,7 @@ static void __init attach_midiemu(void)
 		midi_devs[my_mididev] = &awe_midi_operations;
 }
 
-static void __exit unload_midiemu(void)
+static void unload_midiemu(void)
 {
 	if (my_mididev >= 0)
 		sound_unload_mididev(my_mididev);
