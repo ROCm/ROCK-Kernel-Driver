@@ -507,7 +507,7 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 	u32 tmp;
 	u32 agp3;
 
-	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
+	for_each_pci_dev(device) {
 		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!cap_ptr)
 			continue;
@@ -551,7 +551,7 @@ void agp_device_command(u32 command, int agp_v3)
 	if (agp_v3)
 		mode *= 4;
 
-	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
+	for_each_pci_dev(device) {
 		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!agp)
 			continue;
