@@ -87,7 +87,8 @@ static inline int cpu_to_logical_apicid(int cpu)
        return (int)cpu_2_logical_apicid[cpu];
  }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m,
+			struct mpc_config_translation *translation_record)
 {
 	printk("Processor #%d %ld:%ld APIC version %d\n",
 	        m->mpc_apicid,
