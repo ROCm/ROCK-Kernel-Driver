@@ -270,7 +270,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				atkbd->set, code, serio->phys);
 			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
 				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
-					"hardware directly.\n");
+					" hardware directly.\n");
 			else
 				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
 			break;
