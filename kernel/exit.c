@@ -567,7 +567,6 @@ static void exit_notify(void)
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
 
-zap_again:
 	while (!list_empty(&current->children))
 		zap_thread(list_entry(current->children.next,struct task_struct,sibling), current, 0);
 	while (!list_empty(&current->ptrace_children))
