@@ -42,6 +42,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ioctl32.h>
+#include <linux/compat.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -646,8 +647,10 @@ static int i2o_cfg_passthru32(unsigned fd, unsigned cmnd, unsigned long arg,
 
 	cmd = (struct i2o_cmd_passthru32 __user *)arg;
 
-	if (get_user(iop, &cmd->iop) || get_user(user_msg, &cmd->msg))
+	if (get_user(iop, &cmd->iop) || get_user(i, &cmd->msg))
 		return -EFAULT;
+
+	user_msg = compat_ptr(i);
 
 	c = i2o_find_iop(iop);
 	if (!c) {
