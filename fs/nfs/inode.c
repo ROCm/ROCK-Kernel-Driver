@@ -245,7 +245,7 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	struct rpc_xprt		*xprt = NULL;
 	struct rpc_clnt		*clnt = NULL;
 	struct inode		*root_inode = NULL;
-	unsigned int		authflavor;
+	rpc_authflavor_t	authflavor;
 	struct rpc_timeout	timeparms;
 	struct nfs_fsinfo	fsinfo;
 	int			tcp, version, maxlen;

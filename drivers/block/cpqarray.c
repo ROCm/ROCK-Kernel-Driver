@@ -911,11 +911,13 @@ static inline void complete_buffers(struct bio *bio, int ok)
 {
 	struct bio *xbh;
 	while(bio) {
+		int nr_sectors = bio_sectors(bio);
+
 		xbh = bio->bi_next;
 		bio->bi_next = NULL;
 		
-		blk_finished_io(bio_sectors(bio));
-		bio_endio(bio, ok);
+		blk_finished_io(nr_sectors);
+		bio_endio(bio, nr_sectors << 9, ok ? 0 : -EIO);
 
 		bio = xbh;
 	}

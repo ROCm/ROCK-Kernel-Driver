@@ -1,7 +1,7 @@
 /*
- * linux/include/linux/auth.h
+ * linux/include/linux/sunrpc/auth.h
  *
- * Declarations for the RPC authentication machinery.
+ * Declarations for the RPC client authentication machinery.
  *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
@@ -67,7 +67,7 @@ struct rpc_auth {
  * Client authentication ops
  */
 struct rpc_authops {
-	unsigned int		au_flavor;	/* flavor (RPC_AUTH_*) */
+	rpc_authflavor_t	au_flavor;	/* flavor (RPC_AUTH_*) */
 #ifdef RPC_DEBUG
 	char *			au_name;
 #endif
@@ -94,7 +94,7 @@ extern struct rpc_authops	authdes_ops;
 
 int			rpcauth_register(struct rpc_authops *);
 int			rpcauth_unregister(struct rpc_authops *);
-struct rpc_auth *	rpcauth_create(unsigned int, struct rpc_clnt *);
+struct rpc_auth *	rpcauth_create(rpc_authflavor_t, struct rpc_clnt *);
 void			rpcauth_destroy(struct rpc_auth *);
 struct rpc_cred *	rpcauth_lookupcred(struct rpc_auth *, int);
 struct rpc_cred *	rpcauth_bindcred(struct rpc_task *);

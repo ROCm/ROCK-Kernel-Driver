@@ -144,7 +144,7 @@ static mddev_t *mddev_map[MAX_MD_DEVS];
 
 static int md_fail_request (request_queue_t *q, struct bio *bio)
 {
-	bio_io_error(bio);
+	bio_io_error(bio, bio->bi_size);
 	return 0;
 }
 
@@ -361,9 +361,13 @@ static void free_disk_sb(mdk_rdev_t * rdev)
 }
 
 
-static void bi_complete(struct bio *bio)
+static int bi_complete(struct bio *bio, unsigned int bytes_done, int error)
 {
+	if (bio->bi_size)
+		return 1;
+
 	complete((struct completion*)bio->bi_private);
+	return 0;
 }
 
 static int sync_page_io(struct block_device *bdev, sector_t sector, int size,

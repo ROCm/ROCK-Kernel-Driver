@@ -144,7 +144,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		if (!hash->dev1) {
 			printk ("linear_make_request : hash->dev1==NULL for block %ld\n",
 						block);
-			bio_io_error(bio);
+			bio_io_error(bio, bio->bi_size);
 			return 0;
 		}
 		tmp_dev = hash->dev1;
@@ -154,7 +154,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 	if (block >= (tmp_dev->size + tmp_dev->offset)
 				|| block < tmp_dev->offset) {
 		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, bdevname(tmp_dev->rdev->bdev), tmp_dev->size, tmp_dev->offset);
-		bio_io_error(bio);
+		bio_io_error(bio, bio->bi_size);
 		return 0;
 	}
 	bio->bi_bdev = tmp_dev->rdev->bdev;

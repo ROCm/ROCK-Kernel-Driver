@@ -1,5 +1,5 @@
 /*
- * linux/net/sunrpc/rpcauth_unix.c
+ * linux/net/sunrpc/auth_unix.c
  *
  * UNIX-style authentication; no AUTH_SHORT support
  *
@@ -216,18 +216,24 @@ unx_refresh(struct rpc_task *task)
 static u32 *
 unx_validate(struct rpc_task *task, u32 *p)
 {
-	u32		n = ntohl(*p++);
+	rpc_authflavor_t	flavor;
+	u32			size;
 
-	if (n != RPC_AUTH_NULL && n != RPC_AUTH_UNIX && n != RPC_AUTH_SHORT) {
-		printk("RPC: bad verf flavor: %ld\n", (unsigned long) n);
+	flavor = ntohl(*p++);
+	if (flavor != RPC_AUTH_NULL &&
+	    flavor != RPC_AUTH_UNIX &&
+	    flavor != RPC_AUTH_SHORT) {
+		printk("RPC: bad verf flavor: %u\n", flavor);
 		return NULL;
 	}
-	if ((n = ntohl(*p++)) > 400) {
-		printk("RPC: giant verf size: %ld\n", (unsigned long) n);
+
+	size = ntohl(*p++);
+	if (size > 400) {
+		printk("RPC: giant verf size: %u\n", size);
 		return NULL;
 	}
-	task->tk_auth->au_rslack = (n >> 2) + 2;
-	p += (n >> 2);
+	task->tk_auth->au_rslack = (size >> 2) + 2;
+	p += (size >> 2);
 
 	return p;
 }

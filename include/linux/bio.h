@@ -37,8 +37,9 @@
 #define BIO_BUG_ON
 #endif
 
-#define BIO_MAX_SECTORS	128
-#define BIO_MAX_SIZE	(BIO_MAX_SECTORS << 9)
+#define BIO_MAX_PAGES		(256)
+#define BIO_MAX_SIZE		(BIO_MAX_PAGES << PAGE_CACHE_SHIFT)
+#define BIO_MAX_SECTORS		(BIO_MAX_SIZE >> 9)
 
 /*
  * was unsigned short, but we might as well be ready for > 64kB I/O pages
@@ -50,7 +51,7 @@ struct bio_vec {
 };
 
 struct bio;
-typedef void (bio_end_io_t) (struct bio *);
+typedef int (bio_end_io_t) (struct bio *, unsigned int, int);
 typedef void (bio_destructor_t) (struct bio *);
 
 /*
@@ -101,6 +102,7 @@ struct bio {
 #define BIO_EOF		2	/* out-out-bounds error */
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
+#define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
  * bio bi_rw flags
@@ -123,7 +125,7 @@ struct bio {
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
 #define bio_sectors(bio)	((bio)->bi_size >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
-#define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_BARRIER))
+#define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 
 /*
  * will die
@@ -159,7 +161,7 @@ struct bio {
 #define BIO_SEG_BOUNDARY(q, b1, b2) \
 	BIOVEC_SEG_BOUNDARY((q), __BVEC_END((b1)), __BVEC_START((b2)))
 
-#define bio_io_error(bio) bio_endio((bio), 0)
+#define bio_io_error(bio, bytes) bio_endio((bio), (bytes), -EIO)
 
 /*
  * drivers should not use the __ version unless they _really_ want to
@@ -192,7 +194,7 @@ struct bio {
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
-extern void bio_endio(struct bio *, int);
+extern int bio_endio(struct bio *, unsigned int, int);
 struct request_queue;
 extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);
@@ -202,6 +204,8 @@ extern struct bio *bio_clone(struct bio *, int);
 extern struct bio *bio_copy(struct bio *, int, int);
 
 extern inline void bio_init(struct bio *);
+
+extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
 
 #ifdef CONFIG_HIGHMEM
 /*

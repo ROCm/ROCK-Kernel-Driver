@@ -594,6 +594,90 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 }
 
 /*
+ * Function:    scsi_mlqueue_insert()
+ *
+ * Purpose:     Insert a command in the midlevel queue.
+ *
+ * Arguments:   cmd    - command that we are adding to queue.
+ *              reason - why we are inserting command to queue.
+ *
+ * Lock status: Assumed that lock is not held upon entry.
+ *
+ * Returns:     Nothing.
+ *
+ * Notes:       We do this for one of two cases.  Either the host is busy
+ *              and it cannot accept any more commands for the time being,
+ *              or the device returned QUEUE_FULL and can accept no more
+ *              commands.
+ * Notes:       This could be called either from an interrupt context or a
+ *              normal process context.
+ */
+static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
+{
+	struct Scsi_Host *host = cmd->host;
+	unsigned long flags;
+
+	SCSI_LOG_MLQUEUE(1,
+		 printk("Inserting command %p into mlqueue\n", cmd));
+
+	/*
+	 * We are inserting the command into the ml queue.  First, we
+	 * cancel the timer, so it doesn't time out.
+	 */
+	scsi_delete_timer(cmd);
+
+	/*
+	 * Next, set the appropriate busy bit for the device/host.
+	 *
+	 * If the host/device isn't busy, assume that something actually
+	 * completed, and that we should be able to queue a command now.
+	 *
+	 * Note that there is an implicit assumption that every host can
+	 * always queue at least one command.  If a host is inactive and
+	 * cannot queue any commands, I don't see how things could
+	 * possibly work anyways.
+	 */
+	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
+		if (host->host_busy == 0) {
+			if (scsi_retry_command(cmd) == 0) {
+				return 0;
+			}
+		}
+		host->host_blocked = TRUE;
+	} else {
+		if (cmd->device->device_busy == 0) {
+			if (scsi_retry_command(cmd) == 0) {
+				return 0;
+			}
+		}
+		cmd->device->device_blocked = TRUE;
+	}
+
+	/*
+	 * Register the fact that we own the thing for now.
+	 */
+	cmd->state = SCSI_STATE_MLQUEUE;
+	cmd->owner = SCSI_OWNER_MIDLEVEL;
+	cmd->bh_next = NULL;
+
+	/*
+	 * Decrement the counters, since these commands are no longer
+	 * active on the host/device.
+	 */
+	spin_lock_irqsave(cmd->host->host_lock, flags);
+	cmd->host->host_busy--;
+	cmd->device->device_busy--;
+	spin_unlock_irqrestore(cmd->host->host_lock, flags);
+
+	/*
+	 * Insert this command at the head of the queue for it's device.
+	 * It will go before all other commands that are already in the queue.
+	 */
+	scsi_insert_special_cmd(cmd, 1);
+	return 0;
+}
+
+/*
  * Function:    scsi_release_command
  *
  * Purpose:     Release a command block.

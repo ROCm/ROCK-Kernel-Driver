@@ -204,6 +204,11 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
  **/
 void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
 {
+	if ((max_sectors << 9) < PAGE_CACHE_SIZE) {
+		max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_sectors);
+	}
+
 	q->max_sectors = max_sectors;
 }
 
@@ -219,6 +224,11 @@ void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
  **/
 void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_phys_segments = max_segments;
 }
 
@@ -235,6 +245,11 @@ void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments
  **/
 void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_hw_segments = max_segments;
 }
 
@@ -249,6 +264,11 @@ void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
  **/
 void blk_queue_max_segment_size(request_queue_t *q, unsigned int max_size)
 {
+	if (max_size < PAGE_CACHE_SIZE) {
+		max_size = PAGE_CACHE_SIZE;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_size);
+	}
+
 	q->max_segment_size = max_size;
 }
 
@@ -275,6 +295,11 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
  **/
 void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 {
+	if (mask < PAGE_CACHE_SIZE - 1) {
+		mask = PAGE_CACHE_SIZE - 1;
+		printk("%s: set to minimum %lx\n", __FUNCTION__, mask);
+	}
+
 	q->seg_boundary_mask = mask;
 }
 
@@ -1551,10 +1576,8 @@ get_rq:
 		/*
 		 * READA bit set
 		 */
-		if (bio->bi_rw & (1 << BIO_RW_AHEAD)) {
-			set_bit(BIO_RW_BLOCK, &bio->bi_flags);
+		if (bio_flagged(bio, BIO_RW_AHEAD))
 			goto end_io;
-		}
 
 		freereq = get_request_wait(q, rw);
 		spin_lock_irq(q->queue_lock);
@@ -1591,7 +1614,7 @@ out:
 	return 0;
 
 end_io:
-	bio->bi_end_io(bio);
+	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
 
@@ -1680,7 +1703,7 @@ void generic_make_request(struct bio *bio)
 			       bdevname(bio->bi_bdev),
 			       (long long) bio->bi_sector);
 end_io:
-			bio->bi_end_io(bio);
+			bio_endio(bio, 0, -EIO);
 			break;
 		}
 
@@ -1800,6 +1823,7 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	total_nsect = 0;
 	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
+		total_nsect += nsect;
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
@@ -1809,38 +1833,31 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		if (unlikely(nsect > nr_sectors)) {
 			int partial = nr_sectors << 9;
 
-			bio->bi_size -= partial;
 			bio_iovec(bio)->bv_offset += partial;
 			bio_iovec(bio)->bv_len -= partial;
-			blk_recalc_rq_sectors(req, nr_sectors);
+			blk_recalc_rq_sectors(req, total_nsect);
 			blk_recalc_rq_segments(req);
+			bio_endio(bio, partial, !uptodate ? -EIO : 0);
 			return 1;
 		}
 
 		/*
-		 * account transfer
+		 * if bio->bi_end_io returns 0, this bio is done. move on
 		 */
-		bio->bi_size -= bio_iovec(bio)->bv_len;
-		bio->bi_idx++;
-
-		nr_sectors -= nsect;
-		total_nsect += nsect;
-
-		if (!bio->bi_size) {
-			req->bio = bio->bi_next;
-
-			bio_endio(bio, uptodate);
-
-			total_nsect = 0;
+		req->bio = bio->bi_next;
+		if (bio_endio(bio, nsect << 9, !uptodate ? -EIO : 0)) {
+			bio->bi_idx++;
+			req->bio = bio;
 		}
 
-		if ((bio = req->bio)) {
-			blk_recalc_rq_sectors(req, nsect);
+		nr_sectors -= nsect;
 
+		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
 			if (unlikely(nr_sectors <= 0)) {
+				blk_recalc_rq_sectors(req, total_nsect);
 				blk_recalc_rq_segments(req);
 				return 1;
 			}
