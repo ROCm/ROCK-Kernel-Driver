@@ -47,7 +47,11 @@ do {						\
 #define MSR_DS		MSR_DR	/* Data Space */
 
 /* Default MSR for kernel mode. */
+#if defined (CONFIG_40x)
 #define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_IR|MSR_DR|MSR_CE|MSR_DE)
+#elif defined(CONFIG_BOOKE)
+#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_CE|MSR_DE)
+#endif
 
 /* Special Purpose Registers (SPRNs)*/
 #define SPRN_DECAR	0x036	/* Decrementer Auto Reload Register */
