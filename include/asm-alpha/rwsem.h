@@ -93,14 +93,16 @@ static inline void __down_read(struct rw_semaphore *sem)
  */
 static inline int __down_read_trylock(struct rw_semaphore *sem)
 {
-	long res, tmp;
+	long old, new, res;
 
 	res = sem->count;
 	do {
-		tmp = res + RWSEM_ACTIVE_READ_BIAS;
-		if (tmp <= 0)
+		new = res + RWSEM_ACTIVE_READ_BIAS;
+		if (new <= 0)
 			break;
-	} while (cmpxchg(&sem->count, res, tmp) != res);
+		old = res;
+		res = cmpxchg(&sem->count, old, new);
+	} while (res != old);
 	return res >= 0 ? 1 : 0;
 }
 
