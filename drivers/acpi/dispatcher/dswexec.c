@@ -399,16 +399,24 @@ acpi_ds_exec_end_op (
 			goto cleanup;
 		}
 
-		/* Resolve all operands */
+		/*
+		 * All opcodes require operand resolution, with the only exceptions
+		 * being the object_type and size_of operators.
+		 */
+		if (!(walk_state->op_info->flags & AML_NO_OPERAND_RESOLVE)) {
+			/* Resolve all operands */
 
-		status = acpi_ex_resolve_operands (walk_state->opcode,
-				  &(walk_state->operands [walk_state->num_operands -1]),
-				  walk_state);
+			status = acpi_ex_resolve_operands (walk_state->opcode,
+					  &(walk_state->operands [walk_state->num_operands -1]),
+					  walk_state);
+			if (ACPI_SUCCESS (status)) {
+				ACPI_DUMP_OPERANDS (ACPI_WALK_OPERANDS, ACPI_IMODE_EXECUTE,
+						  acpi_ps_get_opcode_name (walk_state->opcode),
+						  walk_state->num_operands, "after ex_resolve_operands");
+			}
+		}
+
 		if (ACPI_SUCCESS (status)) {
-			ACPI_DUMP_OPERANDS (ACPI_WALK_OPERANDS, ACPI_IMODE_EXECUTE,
-					  acpi_ps_get_opcode_name (walk_state->opcode),
-					  walk_state->num_operands, "after ex_resolve_operands");
-
 			/*
 			 * Dispatch the request to the appropriate interpreter handler
 			 * routine.  There is one routine per opcode "type" based upon the

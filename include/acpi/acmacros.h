@@ -55,6 +55,7 @@
 
 #define ACPI_SET_BIT(target,bit)        ((target) |= (bit))
 #define ACPI_CLEAR_BIT(target,bit)      ((target) &= ~(bit))
+#define ACPI_MIN(a,b)                   (((a)<(b))?(a):(b))
 
 
 #if ACPI_MACHINE_WIDTH == 16
