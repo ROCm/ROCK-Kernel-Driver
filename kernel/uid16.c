@@ -107,7 +107,7 @@ asmlinkage long sys_setfsgid16(old_gid_t gid)
 	return sys_setfsgid((gid_t)gid);
 }
 
-asmlinkage long sys_getgroups16(int gidsetsize, old_gid_t *grouplist)
+asmlinkage long sys_getgroups16(int gidsetsize, old_gid_t __user *grouplist)
 {
 	old_gid_t groups[NGROUPS];
 	int i,j;
@@ -126,7 +126,7 @@ asmlinkage long sys_getgroups16(int gidsetsize, old_gid_t *grouplist)
 	return i;
 }
 
-asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t *grouplist)
+asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
 {
 	old_gid_t groups[NGROUPS];
 	gid_t new_groups[NGROUPS];
