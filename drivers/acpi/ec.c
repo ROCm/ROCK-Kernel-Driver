@@ -1,6 +1,7 @@
 /*
  *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 38 $)
  *
+ *  Copyright (C) 2004 Luming Yu <luming.yu@intel.com>
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
@@ -441,8 +442,14 @@ acpi_ec_space_handler (
 
 	ACPI_FUNCTION_TRACE("acpi_ec_space_handler");
 
-	if ((address > 0xFF) || (bit_width != 8) || !value || !handler_context)
+	if ((address > 0xFF) || !value || !handler_context)
 		return_VALUE(AE_BAD_PARAMETER);
+
+	if(bit_width != 8) {
+		printk(KERN_WARNING PREFIX "acpi_ec_space_handler: bit_width should be 8\n");
+		if (acpi_strict)
+			return_VALUE(AE_BAD_PARAMETER);
+	}
 
 	ec = (struct acpi_ec *) handler_context;
 
