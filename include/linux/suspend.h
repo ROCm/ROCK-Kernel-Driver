@@ -7,6 +7,7 @@
 #include <linux/swap.h>
 #include <linux/notifier.h>
 #include <linux/config.h>
+#include <linux/init.h>
 
 extern unsigned char software_suspend_enabled;
 
