@@ -277,7 +277,9 @@ SECTIONS {
 		__con_initcall_start = .;
 		*(.con_initcall.init)
 		__con_initcall_end = .;
-		SECURITY_INIT
+		__security_initcall_start = .;
+		*(.security_initcall.init)
+		__security_initcall_end = .;
 		. = ALIGN(4);
 		__initramfs_start = .;
 		*(.init.ramfs)
