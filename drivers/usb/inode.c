@@ -540,9 +540,6 @@ static struct file_system_type usb_fs_type = {
 	get_sb:		usb_get_sb,
 };
 
-static DECLARE_FSTYPE(usbdevice_fs_type, "usbdevfs", usbfs_read_super, FS_SINGLE);
-static DECLARE_FSTYPE(usb_fs_type,       "usbfs",    usbfs_read_super, FS_SINGLE);
-
 /* --------------------------------------------------------------------- */
 static int get_mount (void)
 {
