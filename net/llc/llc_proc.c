@@ -13,10 +13,11 @@
  */
 
 #include <linux/config.h>
+#include <linux/init.h>
+#ifdef CONFIG_PROC_FS
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
-#include <linux/init.h>
 #include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/llc_c_ac.h>
@@ -27,14 +28,13 @@
 #include <net/llc_main.h>
 #include <net/llc_sap.h>
 
-#ifdef CONFIG_PROC_FS
 static void llc_ui_format_mac(struct seq_file *seq, unsigned char *mac)
 {
 	seq_printf(seq, "%02X:%02X:%02X:%02X:%02X:%02X",
 		   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
-static __inline__ struct sock *llc_get_sk_idx(loff_t pos)
+static struct sock *llc_get_sk_idx(loff_t pos)
 {
 	struct list_head *sap_entry;
 	struct llc_sap *sap;
@@ -44,15 +44,15 @@ static __inline__ struct sock *llc_get_sk_idx(loff_t pos)
 		sap = list_entry(sap_entry, struct llc_sap, node);
 
 		read_lock_bh(&sap->sk_list.lock);
-		for (sk = sap->sk_list.list; pos && sk; sk = sk->next)
-			--pos;
-		if (!pos) {
-			if (!sk)
-				read_unlock_bh(&sap->sk_list.lock);
-			break;
-		}
+		for (sk = sap->sk_list.list; sk; sk = sk->next)
+			if (!pos--) {
+				if (!sk)
+					read_unlock_bh(&sap->sk_list.lock);
+				goto out;
+			}
 		read_unlock_bh(&sap->sk_list.lock);
 	}
+out:
 	return sk;
 }
 
@@ -72,15 +72,7 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 	if (v == (void *)1) {
-		if (list_empty(&llc_main_station.sap_list.list)) {
-			sk = NULL;
-			goto out;
-		}
-		sap = list_entry(llc_main_station.sap_list.list.next,
-				 struct llc_sap, node);
-
-		read_lock_bh(&sap->sk_list.lock);
-		sk = sap->sk_list.list;
+		sk = llc_get_sk_idx(0);
 		goto out;
 	}
 	sk = v;
@@ -109,6 +101,13 @@ out:
 
 static void llc_seq_stop(struct seq_file *seq, void *v)
 {
+	if (v) {
+		struct sock *sk = v;
+		struct llc_opt *llc = llc_sk(sk);
+		struct llc_sap *sap = llc->sap;
+
+		read_unlock_bh(&sap->sk_list.lock);
+	}
 	read_unlock_bh(&llc_main_station.sap_list.lock);
 }
 

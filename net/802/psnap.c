@@ -91,12 +91,15 @@ static int snap_request(struct datalink_proto *dl,
 EXPORT_SYMBOL(register_snap_client);
 EXPORT_SYMBOL(unregister_snap_client);
 
+static char snap_err_msg[] __initdata =
+	KERN_CRIT "SNAP - unable to register with 802.2\n";
+
 static int __init snap_init(void)
 {
 	snap_sap = llc_sap_open(0xAA, snap_rcv);
 
 	if (!snap_sap)
-		printk(KERN_CRIT "SNAP - unable to register with 802.2\n");
+		printk(snap_err_msg);
 
 	return 0;
 }
