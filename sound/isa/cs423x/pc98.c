@@ -327,10 +327,6 @@ static int __init snd_card_pc98_probe(int dev)
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
-	if (mpu_port[dev] < 0 || mpu_irq[dev] < 0)
-		mpu_port[dev] = SNDRV_AUTO_PORT;
-	if (fm_port[dev] < 0)
-		fm_port[dev] = SNDRV_AUTO_PORT;
 
 	if ((err = pc98_cs4231_chip_init(dev)) < 0) {
 		snd_card_free(card);
@@ -363,7 +359,7 @@ static int __init snd_card_pc98_probe(int dev)
 		return err;
 	}
 
-	if (fm_port[dev] != SNDRV_AUTO_PORT) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		/* ??? */
 		outb(0x00, fm_port[dev] + 6);
 		inb(fm_port[dev] + 7);
@@ -381,7 +377,7 @@ static int __init snd_card_pc98_probe(int dev)
 		}
 	}
 
-	if (mpu_port[dev] != SNDRV_AUTO_PORT) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
 		err = pc98_mpu401_init(mpu_irq[dev]);
 		if (! err) {
 			err = snd_mpu401_uart_new(card, 0,

@@ -103,8 +103,6 @@ static int __init snd_card_cs4231_probe(int dev)
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_cs4231 *)card->private_data;
-	if (mpu_port[dev] < 0)
-		mpu_port[dev] = SNDRV_AUTO_PORT;
 	if ((err = snd_cs4231_create(card, port[dev], -1,
 				     irq[dev],
 				     dma1[dev],
@@ -128,10 +126,13 @@ static int __init snd_card_cs4231_probe(int dev)
 		return err;
 	}
 
-	if (mpu_irq[dev] >= 0 && mpu_irq[dev] != SNDRV_AUTO_IRQ) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
+		if (mpu_irq[dev] == SNDRV_AUTO_IRQ)
+			mpu_irq[dev] = -1;
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_CS4232,
 					mpu_port[dev], 0,
-					mpu_irq[dev], SA_INTERRUPT,
+					mpu_irq[dev],
+					mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0,
 					NULL) < 0)
 			printk(KERN_ERR "cs4231: MPU401 not detected\n");
 	}

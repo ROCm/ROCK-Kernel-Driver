@@ -283,7 +283,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		return error;
 	}
 
-	if (mpu_port[dev] > 0) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_AZT2320,
 				mpu_port[dev], 0,
 				mpu_irq[dev], SA_INTERRUPT,
@@ -291,7 +291,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 			snd_printk(KERN_ERR PFX "no MPU-401 device at 0x%lx\n", mpu_port[dev]);
 	}
 
-	if (fm_port[dev] > 0) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card,
 				    fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {

@@ -604,6 +604,7 @@ __skip_base:
 __skip_resources:
 	if (chip->hardware > OPTi9XX_HW_82C928) {
 		switch (chip->mpu_port) {
+		case 0:
 		case -1:
 			break;
 		case 0x300:
@@ -644,7 +645,7 @@ __skip_resources:
 		}
 
 		snd_opti9xx_write_mask(chip, OPTi9XX_MC_REG(6),
-			(chip->mpu_port == -1) ? 0x00 :
+			(chip->mpu_port <= 0) ? 0x00 :
 				0x80 | mpu_port_bits << 5 | mpu_irq_bits << 3,
 			0xf8);
 	}
@@ -2093,7 +2094,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	}
 #endif
 
-	if (chip->mpu_port <= 0)
+	if (chip->mpu_port <= 0 || chip->mpu_port == SNDRV_AUTO_PORT)
 		rmidi = NULL;
 	else
 		if ((error = snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
@@ -2101,7 +2102,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 				&rmidi)))
 			snd_printk("no MPU-401 device at 0x%lx?\n", chip->mpu_port);
 
-	if (chip->fm_port > 0) {
+	if (chip->fm_port > 0 && chip->fm_port != SNDRV_AUTO_PORT) {
 		opl3_t *opl3 = NULL;
 #ifndef OPTi93X
 		if (chip->hardware == OPTi9XX_HW_82C928 ||

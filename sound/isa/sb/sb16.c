@@ -465,7 +465,7 @@ static int __init snd_sb16_probe(int dev,
 		return -ENXIO;
 	}
 
-	if (chip->mpu_port) {
+	if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_SB,
 					       chip->mpu_port, 0,
 					       xirq, 0, &chip->rmidi)) < 0) {
@@ -475,7 +475,12 @@ static int __init snd_sb16_probe(int dev,
 		chip->rmidi_callback = snd_mpu401_uart_interrupt;
 	}
 
-	if (fm_port[dev] > 0) {
+#ifdef SNDRV_SBAWE_EMU8000
+	if (awe_port[dev] == SNDRV_AUTO_PORT)
+		awe_port[dev] = 0; /* disable */
+#endif
+
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card, fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3,
 				    fm_port[dev] == port[dev] || fm_port[dev] == 0x388,
