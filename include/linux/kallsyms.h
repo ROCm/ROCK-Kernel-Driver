@@ -28,12 +28,6 @@ static inline const char *kallsyms_lookup(unsigned long addr,
 	return NULL;
 }
 
-unsigned long kallsyms_get_addr(char * symname, unsigned long symsize)
-{
-	symsize=0;
-	return 0;
-}
-
 /* Stupid that this does nothing, but I didn't create this mess. */
 #define __print_symbol(fmt, addr)
 #endif /*CONFIG_KALLSYMS*/
