@@ -471,9 +471,16 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr, int addr_len
 			return err;
 	}
 
-	nlk->groups = nladdr->nl_groups;
-	if (nladdr->nl_groups)
+	if (!nladdr->nl_groups && !nlk->groups)
+		return 0;
+
+	netlink_table_grab();
+	if (nlk->groups && !nladdr->nl_groups)
+		__sk_del_bind_node(sk);
+	else if (!nlk->groups && nladdr->nl_groups)
 		sk_add_bind_node(sk, &nl_table[sk->sk_protocol].mc_list);
+	nlk->groups = nladdr->nl_groups;
+	netlink_table_ungrab();
 
 	return 0;
 }

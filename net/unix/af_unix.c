@@ -1535,9 +1535,11 @@ static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	msg->msg_namelen = 0;
 
+	down(&u->readsem);
+
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
-		goto out;
+		goto out_unlock;
 
 	wake_up_interruptible(&u->peer_wait);
 
@@ -1587,6 +1589,8 @@ static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 out_free:
 	skb_free_datagram(sk,skb);
+out_unlock:
+	up(&u->readsem);
 out:
 	return err;
 }

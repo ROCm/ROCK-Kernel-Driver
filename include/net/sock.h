@@ -1270,19 +1270,7 @@ static inline void sk_eat_skb(struct sock *sk, struct sk_buff *skb)
 	__kfree_skb(skb);
 }
 
-extern atomic_t netstamp_needed;
 extern void sock_enable_timestamp(struct sock *sk);
-
-static inline void net_timestamp(struct timeval *stamp) 
-{ 
-	if (atomic_read(&netstamp_needed)) 
-		do_gettimeofday(stamp);
-	else {
-		stamp->tv_sec = 0;
-		stamp->tv_usec = 0;
-	}		
-} 
-
 extern int sock_get_timestamp(struct sock *, struct timeval __user *);
 
 /* 
