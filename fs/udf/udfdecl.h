@@ -21,7 +21,7 @@
 #define UDF_EXTENT_FLAG_MASK	0xC0000000
 
 #define UDF_NAME_PAD		4
-#define UDF_NAME_LEN		255
+#define UDF_NAME_LEN		256
 #define UDF_PATH_LEN		1023
 
 #define udf_file_entry_alloc_offset(inode)\
@@ -59,13 +59,6 @@ struct udf_fileident_bh
 	int eoffset;
 };
 
-struct udf_directory_record
-{
-	uint32_t	d_parent;
-	uint32_t	d_inode;
-	uint32_t	d_name[255];
-};
-
 struct udf_vds_record
 {
 	uint32_t block;
@@ -81,7 +74,7 @@ struct generic_desc
 struct ustr
 {
 	uint8_t u_cmpID;
-	uint8_t u_name[UDF_NAME_LEN];
+	uint8_t u_name[UDF_NAME_LEN-2];
 	uint8_t u_len;
 };
 
@@ -116,19 +109,16 @@ extern int8_t udf_insert_aext(struct inode *, lb_addr, int, lb_addr, uint32_t, s
 extern int8_t udf_delete_aext(struct inode *, lb_addr, int, lb_addr, uint32_t, struct buffer_head *);
 extern int8_t udf_next_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_t *, struct buffer_head **, int);
 extern int8_t udf_current_aext(struct inode *, lb_addr *, int *, lb_addr *, uint32_t *, struct buffer_head **, int);
-extern void udf_discard_prealloc(struct inode *);
 
 /* misc.c */
 extern int udf_read_tagged_data(char *, int size, int fd, int block, int partref);
 extern struct buffer_head *udf_tgetblk(struct super_block *, int);
 extern struct buffer_head *udf_tread(struct super_block *, int);
-extern struct genericFormat *udf_add_extendedattr(struct inode *, uint32_t, uint32_t, uint8_t, struct buffer_head **);
-extern struct genericFormat *udf_get_extendedattr(struct inode *, uint32_t, uint8_t, struct buffer_head **);
+extern struct genericFormat *udf_add_extendedattr(struct inode *, uint32_t, uint32_t, uint8_t);
+extern struct genericFormat *udf_get_extendedattr(struct inode *, uint32_t, uint8_t);
 extern struct buffer_head *udf_read_tagged(struct super_block *, uint32_t, uint32_t, uint16_t *);
 extern struct buffer_head *udf_read_ptagged(struct super_block *, lb_addr, uint32_t, uint16_t *);
 extern void udf_release_data(struct buffer_head *);
-extern uint32_t udf64_low32(uint64_t);
-extern uint32_t udf64_high32(uint64_t);
 extern void udf_update_tag(char *, int);
 extern void udf_new_tag(char *, uint16_t, uint16_t, uint16_t, uint32_t, int);
 
@@ -154,6 +144,7 @@ extern void udf_free_inode(struct inode *);
 extern struct inode * udf_new_inode (struct inode *, int, int *);
 
 /* truncate.c */
+extern void udf_discard_prealloc(struct inode *);
 extern void udf_truncate_extents(struct inode *);
 
 /* balloc.c */
