@@ -255,7 +255,7 @@ ia32_sys_call_table:
 	.quad sys_umount			/* new_umount */
 	.quad ni_syscall			/* old lock syscall holder */
 	.quad sys32_ioctl
-	.quad sys32_fcntl64		/* 55 */
+	.quad compat_sys_fcntl64		/* 55 */
 	.quad ni_syscall			/* old mpx syscall holder */
 	.quad sys_setpgid
 	.quad ni_syscall			/* old ulimit syscall holder */
@@ -421,7 +421,7 @@ ia32_sys_call_table:
 	.quad sys_mincore
 	.quad sys_madvise
 	.quad sys_getdents64	/* 220 getdents64 */ 
-	.quad sys32_fcntl64	
+	.quad compat_sys_fcntl64	
 	.quad sys_ni_syscall	/* tux */
 	.quad sys_ni_syscall    /* security */
 	.quad sys_gettid	
