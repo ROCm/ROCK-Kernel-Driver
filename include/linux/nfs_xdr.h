@@ -740,6 +740,7 @@ struct nfs_rpc_ops {
 #ifdef CONFIG_NFS_ACL
 	struct posix_acl * (*getacl)(struct inode *, int);
 	int	(*setacl)(struct inode *, int, struct posix_acl *);
+	int	(*setacls)(struct inode *, struct posix_acl *, struct posix_acl *);
 	int	(*checkacls)(struct inode *inode);
 #endif  /* CONFIG_NFS_ACL */
 };

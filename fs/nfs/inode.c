@@ -661,6 +661,7 @@ nfs_init_locked(struct inode *inode, void *opaque)
 
 #ifdef CONFIG_NFS_ACL
 static struct inode_operations nfs_special_inode_operations = {
+	.permission =	nfs_permission,
 	.getattr =	nfs_getattr,
 	.setattr =	nfs_setattr,
 	.listxattr =	nfs_listxattr,
@@ -771,6 +772,16 @@ out_no_inode:
 	goto out;
 }
 
+void
+nfs_invalidate_access_cache(struct inode *inode)
+{
+	struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
+	if (*cred) {
+		put_rpccred(*cred);
+		*cred = NULL;
+	}
+}
+
 #define NFS_VALID_ATTRS (ATTR_MODE|ATTR_UID|ATTR_GID|ATTR_SIZE|ATTR_ATIME|ATTR_ATIME_SET|ATTR_MTIME|ATTR_MTIME_SET)
 
 int
@@ -816,13 +827,8 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 			vmtruncate(inode, attr->ia_size);
 		}
 	}
-	if ((attr->ia_valid & (ATTR_MODE|ATTR_UID|ATTR_GID)) != 0) {
-		struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
-		if (*cred) {
-			put_rpccred(*cred);
-			*cred = NULL;
-		}
-	}
+	if ((attr->ia_valid & (ATTR_MODE|ATTR_UID|ATTR_GID)) != 0)
+		nfs_invalidate_access_cache(inode);
 	nfs_end_data_update(inode);
 	unlock_kernel();
 	return error;
@@ -1491,6 +1497,8 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
+	/* The nfs client applies the umask itself when needed. */
+	s->s_flags |= MS_POSIXACL;
 	return s;
 }
 

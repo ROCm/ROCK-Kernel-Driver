@@ -31,6 +31,7 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
+#include <linux/posix_acl.h>
 
 #include "delegation.h"
 
@@ -1035,6 +1036,7 @@ out_err:
 static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		struct nameidata *nd)
 {
+	struct posix_acl *acl = NULL;
 	struct iattr attr;
 	struct inode *inode;
 	int error;
@@ -1043,7 +1045,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	dfprintk(VFS, "NFS: create(%s/%ld, %s\n", dir->i_sb->s_id, 
 		dir->i_ino, dentry->d_name.name);
 
-	attr.ia_mode = mode;
+	attr.ia_mode = mode & ~current->fs->umask;
 	attr.ia_valid = ATTR_MODE;
 
 	if (nd && (nd->flags & LOOKUP_CREATE))
@@ -1056,18 +1058,41 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	 * does not pass the create flags.
 	 */
 	lock_kernel();
+#ifdef CONFIG_NFS_ACL
+	acl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
+	if (IS_ERR(acl)) {
+		error = PTR_ERR(acl);
+		acl = NULL;
+		if (error != -EOPNOTSUPP)
+			goto out;
+	}
+	if (acl) {
+		mode_t xmode = mode;
+
+		error = posix_acl_create_masq(acl, &xmode);
+		if (error >= 0) 
+			attr.ia_mode = xmode;
+	}
+#endif
 	nfs_begin_data_update(dir);
 	inode = NFS_PROTO(dir)->create(dir, &dentry->d_name, &attr, open_flags);
 	nfs_end_data_update(dir);
-	if (!IS_ERR(inode)) {
-		d_instantiate(dentry, inode);
-		nfs_renew_times(dentry);
-		nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
-		error = 0;
-	} else {
+	if (IS_ERR(inode)) {
 		error = PTR_ERR(inode);
 		d_drop(dentry);
+		goto out;
 	}
+	d_instantiate(dentry, inode);
+	nfs_renew_times(dentry);
+	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
+	error = 0;
+#ifdef CONFIG_NFS_ACL
+	if (acl)
+		error = NFS_PROTO(dir)->setacls(inode, acl, NULL);
+#endif
+
+out:
+	posix_acl_release(acl);
 	unlock_kernel();
 	return error;
 }
@@ -1078,6 +1103,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 static int
 nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
+	struct posix_acl *acl = NULL;
 	struct iattr attr;
 	struct nfs_fattr fattr;
 	struct nfs_fh fhandle;
@@ -1089,18 +1115,45 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
-	attr.ia_mode = mode;
+	attr.ia_mode = mode & ~current->fs->umask;
 	attr.ia_valid = ATTR_MODE;
 
 	lock_kernel();
+#ifdef CONFIG_NFS_ACL
+	acl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
+	if (IS_ERR(acl)) {
+		error = PTR_ERR(acl);
+		acl = NULL;
+		if (error != -EOPNOTSUPP)
+			goto out;
+	}
+	if (acl) {
+		mode_t xmode = mode;
+
+		error = posix_acl_create_masq(acl, &xmode);
+		if (error >= 0)
+			attr.ia_mode = xmode;
+	}
+#endif
+
 	nfs_begin_data_update(dir);
 	error = NFS_PROTO(dir)->mknod(dir, &dentry->d_name, &attr, rdev,
 					&fhandle, &fattr);
 	nfs_end_data_update(dir);
-	if (!error)
-		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	else
+	if (error) {
 		d_drop(dentry);
+		goto out;
+	}
+	error = nfs_instantiate(dentry, &fhandle, &fattr);
+	if (error)
+		goto out;
+#ifdef CONFIG_NFS_ACL
+	if (acl)
+		error = NFS_PROTO(dir)->setacls(dentry->d_inode, acl, NULL);
+#endif
+
+out:
+	posix_acl_release(acl);
 	unlock_kernel();
 	return error;
 }
@@ -1110,6 +1163,7 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
  */
 static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
+	struct posix_acl *dfacl = NULL, *acl = NULL;
 	struct iattr attr;
 	struct nfs_fattr fattr;
 	struct nfs_fh fhandle;
@@ -1119,7 +1173,7 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		dir->i_ino, dentry->d_name.name);
 
 	attr.ia_valid = ATTR_MODE;
-	attr.ia_mode = mode | S_IFDIR;
+	attr.ia_mode = (mode & ~current->fs->umask) | S_IFDIR;
 
 	lock_kernel();
 #if 0
@@ -1131,14 +1185,46 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	 */
 	d_drop(dentry);
 #endif
+#ifdef CONFIG_NFS_ACL
+	dfacl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
+	if (IS_ERR(dfacl)) {
+		error = PTR_ERR(dfacl);
+		dfacl = NULL;
+		if (error != -EOPNOTSUPP)
+			goto out;
+	}
+	if (dfacl) {
+		mode_t xmode = mode;
+
+		acl = posix_acl_clone(dfacl, GFP_KERNEL);
+		error = -ENOMEM;
+		if (acl == NULL)
+			goto out;
+
+		error = posix_acl_create_masq(acl, &xmode);
+		if (error >= 0)
+			attr.ia_mode = xmode | S_IFDIR;
+	}
+#endif
 	nfs_begin_data_update(dir);
 	error = NFS_PROTO(dir)->mkdir(dir, &dentry->d_name, &attr, &fhandle,
 					&fattr);
 	nfs_end_data_update(dir);
-	if (!error)
-		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	else
+	if (error) {
 		d_drop(dentry);
+		goto out;
+	}
+	error = nfs_instantiate(dentry, &fhandle, &fattr);
+	if (error)
+		goto out;
+#ifdef CONFIG_NFS_ACL
+	if (acl)
+		error = NFS_PROTO(dir)->setacls(dentry->d_inode, acl, dfacl);
+#endif
+
+out:
+	posix_acl_release(acl);
+	posix_acl_release(dfacl);
 	unlock_kernel();
 	return error;
 }

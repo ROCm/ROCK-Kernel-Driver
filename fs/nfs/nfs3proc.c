@@ -862,7 +862,8 @@ getout:
 
 #ifdef CONFIG_NFS_ACL
 static int
-nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
+nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
+		  struct posix_acl *dfacl)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs_fattr fattr;
@@ -879,53 +880,15 @@ nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
 	   return -ENOMEM. */
 	if (acl && acl->a_count > NFS3_ACL_MAX_ENTRIES)
 		return -ENOSPC;
+	if (dfacl && dfacl->a_count > NFS3_ACL_MAX_ENTRIES)
+		return -ENOSPC;
 	args.inode = inode;
-	args.mask = NFS3_ACL|NFS3_DFACL;
+	args.mask = NFS3_ACL;
+	args.acl_access = acl;
 	if (S_ISDIR(inode->i_mode)) {
-		switch(type) {
-			case ACL_TYPE_ACCESS:
-				args.acl_access = acl;
-				args.acl_default = NFS_PROTO(inode)->getacl(
-					inode, ACL_TYPE_DEFAULT);
-				status = PTR_ERR(args.acl_default);
-				if (IS_ERR(args.acl_default)) {
-					args.acl_default = NULL;
-					goto cleanup;
-				}
-				break;
-
-			case ACL_TYPE_DEFAULT:
-				args.acl_access = NFS_PROTO(inode)->getacl(
-					inode, ACL_TYPE_ACCESS);
-				status = PTR_ERR(args.acl_access);
-				if (IS_ERR(args.acl_access)) {
-					args.acl_access = NULL;
-					goto cleanup;
-				}
-				args.acl_default = acl;
-				break;
-
-			default:
-				status = -EINVAL;
-				goto cleanup;
-		}
-	} else {
-		status = -EINVAL;
-		if (type != ACL_TYPE_ACCESS)
-			goto cleanup;
-		args.mask = NFS3_ACL;
-		args.acl_access = acl;
+		args.mask |= NFS3_DFACL;
+		args.acl_default = dfacl;
 	}
-	if (args.acl_access == NULL) {
-		args.acl_access = posix_acl_from_mode(inode->i_mode,
-						      GFP_KERNEL);
-		status = PTR_ERR(args.acl_access);
-		if (IS_ERR(args.acl_access)) {
-			args.acl_access = NULL;
-			goto cleanup;
-		}
-	}
-	args.mask = NFS3_ACL | (args.acl_default ? NFS3_DFACL : 0);
 
 	dprintk("NFS call setacl\n");
 	status = rpc_call(server->client_acl, NFS3PROC_SETACL,
@@ -945,6 +908,7 @@ nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
 		} else if (status == -ENOTSUPP)
 			status = -EOPNOTSUPP;
 	} else {
+		nfs_invalidate_access_cache(inode);
 		/* Force an attribute cache update if the file mode
 		 * has changed. */
 		if (inode->i_mode != fattr.mode)
@@ -952,11 +916,56 @@ nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
 		status = nfs_refresh_inode(inode, &fattr);
 	}
 
+	return status;
+}
+
+static int
+nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
+{
+	struct posix_acl *dfacl = NULL;
+	int status;
+
+	if (S_ISDIR(inode->i_mode)) {
+		switch(type) {
+			case ACL_TYPE_ACCESS:
+				acl = posix_acl_dup(acl);
+				dfacl = NFS_PROTO(inode)->
+					getacl(inode, ACL_TYPE_DEFAULT);
+				if (IS_ERR(dfacl)) {
+					status = PTR_ERR(dfacl);
+					dfacl = NULL;
+					goto cleanup;
+				}
+				break;
+
+			case ACL_TYPE_DEFAULT:
+				dfacl = posix_acl_dup(acl);
+				acl = NFS_PROTO(inode)->
+					getacl(inode, ACL_TYPE_ACCESS);
+				if (IS_ERR(acl)) {
+					status = PTR_ERR(acl);
+					acl = NULL;
+					goto cleanup;
+				}
+				break;
+
+			default:
+				return -EINVAL;
+		}
+	} else if (type != ACL_TYPE_ACCESS)
+			return -EINVAL;
+
+	if (acl == NULL) {
+		acl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
+		status = PTR_ERR(acl);
+		if (IS_ERR(acl))
+			goto cleanup;
+	}
+	status = nfs3_proc_setacls(inode, acl, dfacl);
+
 cleanup:
-	if (args.acl_access != acl)
-		posix_acl_release(args.acl_access);
-	if (args.acl_default != acl)
-		posix_acl_release(args.acl_default);
+	posix_acl_release(acl);
+	posix_acl_release(dfacl);
 	return status;
 }
 #endif  /* CONFIG_NFS_ACL */
@@ -1118,6 +1127,7 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 #ifdef CONFIG_NFS_ACL
 	.getacl		= nfs3_proc_getacl,
 	.setacl		= nfs3_proc_setacl,
+	.setacls	= nfs3_proc_setacls,
 	.checkacls	= nfs3_proc_checkacls,
 #endif  /* CONFIG_NFS_ACL */
 };
