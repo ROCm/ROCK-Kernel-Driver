@@ -217,6 +217,11 @@ static struct miscdevice scx200_wdt_miscdev = {
 static int __init scx200_wdt_init(void)
 {
 	int r;
+	static struct pci_device_id ns_sc[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_BRIDGE) },
+		{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SC1100_BRIDGE) },
+		{ },
+	};
 
 	printk(KERN_DEBUG NAME ": NatSemi SCx200 Watchdog Driver\n");
 
@@ -224,12 +229,7 @@ static int __init scx200_wdt_init(void)
 	 * First check that this really is a NatSemi SCx200 CPU or a Geode
 	 * SC1100 processor
 	 */
-	if ((pci_find_device(PCI_VENDOR_ID_NS,
-			     PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			     NULL)) == NULL
-	    && (pci_find_device(PCI_VENDOR_ID_NS,
-				PCI_DEVICE_ID_NS_SC1100_BRIDGE,
-				NULL)) == NULL)
+	if (!pci_dev_present(ns_sc))
 		return -ENODEV;
 
 	/* More sanity checks, verify that the configuration block is there */

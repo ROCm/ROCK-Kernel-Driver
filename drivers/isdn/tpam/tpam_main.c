@@ -88,10 +88,10 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	tpam_card *card, *c;
 	int i, err;
 
-	if (pci_enable_device(dev)) {
+	if ((err = pci_enable_device(dev))) {
 		printk(KERN_ERR "TurboPAM: can't enable PCI device at %s\n",
 			pci_name(dev));
-		return -ENODEV;
+		return err;
 	}
 
 	/* allocate memory for the board structure */

@@ -931,6 +931,10 @@ running once the system is up.
 					enabled.
 		noacpi			[IA-32] Do not use ACPI for IRQ routing
 					or for PCI scanning.
+		routeirq		Do IRQ routing for all PCI devices.
+					This is normally done in pci_enable_device(),
+					so this option is a temporary workaround
+					for broken drivers that don't call it.
 
 		firmware		[ARM] Do not re-enumerate the bus but
 					instead just use the configuration

@@ -145,14 +145,11 @@ static struct { const char name[8]; uint mode; uint bpp; } palette2fmt[] = {
 static
 void __init handle_chipset(void)
 {
-	struct pci_dev *dev = NULL;
-
 	/* Just in case some nut set this to something dangerous */
 	if (triton1)
 		triton1 = ZORAN_VDC_TRICOM;
 
-	while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437, dev)))
-	{
+	if (pci_pci_problems & PCIPCI_TRITON) {
 		printk(KERN_INFO "zoran: Host bridge 82437FX Triton PIIX\n");
 		triton1 = ZORAN_VDC_TRICOM;
 	}

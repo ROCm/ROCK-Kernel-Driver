@@ -575,7 +575,7 @@ static unsigned long	sandpoint_idedma_regbase;
 static void
 sandpoint_ide_probe(void)
 {
-	struct pci_dev *pdev = pci_find_device(PCI_VENDOR_ID_WINBOND,
+	struct pci_dev *pdev = pci_get_device(PCI_VENDOR_ID_WINBOND,
 			PCI_DEVICE_ID_WINBOND_82C105, NULL);
 
 	if (pdev) {
@@ -584,6 +584,7 @@ sandpoint_ide_probe(void)
 		sandpoint_ide_ctl_regbase[0]=pdev->resource[1].start;
 		sandpoint_ide_ctl_regbase[1]=pdev->resource[3].start;
 		sandpoint_idedma_regbase=pdev->resource[4].start;
+		pci_dev_put(dev);
 	}
 
 	sandpoint_ide_ports_known = 1;
