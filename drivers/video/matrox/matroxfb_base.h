@@ -93,29 +93,6 @@
 
 #endif /* MATROXFB_DEBUG */
 
-#if !defined(__i386__) && !defined(__x86_64__)
-#ifndef ioremap_nocache
-#define ioremap_nocache(X,Y) ioremap(X,Y)
-#endif
-#endif
-
-#if defined(__alpha__) || defined(__mc68000__) || defined(__i386__) || defined(__x86_64__)
-#define READx_WORKS
-#define MEMCPYTOIO_WORKS
-#else
-/* ppc/ppc64 must use __raw_{read,write}[bwl] as we drive adapter 
-   in big-endian mode for compatibility with XFree mga driver, and
-   so we do not want little-endian {read,write}[bwl] */
-#define READx_FAILS
-#define MEMCPYTOIO_WRITEL
-#endif
-
-#if defined(__mc68000__)
-#define MAP_BUSTOVIRT
-#else
-#define MAP_IOREMAP
-#endif
-
 #ifdef DEBUG
 #define dprintk(X...)	printk(X)
 #else
@@ -155,20 +132,11 @@
 #endif
 
 typedef struct {
-	u_int8_t __iomem*	vaddr;
+	void __iomem*	vaddr;
 } vaddr_t;
 
-#ifdef READx_WORKS
 static inline unsigned int mga_readb(vaddr_t va, unsigned int offs) {
 	return readb(va.vaddr + offs);
-}
-
-static inline unsigned int mga_readw(vaddr_t va, unsigned int offs) {
-	return readw(va.vaddr + offs);
-}
-
-static inline u_int32_t mga_readl(vaddr_t va, unsigned int offs) {
-	return readl(va.vaddr + offs);
 }
 
 static inline void mga_writeb(vaddr_t va, unsigned int offs, u_int8_t value) {
@@ -179,62 +147,42 @@ static inline void mga_writew(vaddr_t va, unsigned int offs, u_int16_t value) {
 	writew(value, va.vaddr + offs);
 }
 
+static inline u_int32_t mga_readl(vaddr_t va, unsigned int offs) {
+	return readl(va.vaddr + offs);
+}
+
 static inline void mga_writel(vaddr_t va, unsigned int offs, u_int32_t value) {
 	writel(value, va.vaddr + offs);
 }
+
+static inline void mga_memcpy_toio(vaddr_t va, const void* src, int len) {
+#if defined(__alpha__) || defined(__i386__) || defined(__x86_64__)
+	/*
+	 * memcpy_toio works for us if:
+	 *  (1) Copies data as 32bit quantities, not byte after byte,
+	 *  (2) Performs LE ordered stores, and
+	 *  (3) It copes with unaligned source (destination is guaranteed to be page
+	 *      aligned and length is guaranteed to be multiple of 4).
+	 */
+	memcpy_toio(va.vaddr, src, len);
 #else
-static inline unsigned int mga_readb(vaddr_t va, unsigned int offs) {
-	return __raw_readb(va.vaddr + offs);
-}
+        u_int32_t __iomem* addr = va.vaddr;
 
-static inline unsigned int mga_readw(vaddr_t va, unsigned int offs) {
-	return __raw_readw(va.vaddr + offs);
-}
-
-static inline u_int32_t mga_readl(vaddr_t va, unsigned int offs) {
-	return __raw_readl(va.vaddr + offs);
-}
-
-static inline void mga_writeb(vaddr_t va, unsigned int offs, u_int8_t value) {
-	__raw_writeb(value, va.vaddr + offs);
-}
-
-static inline void mga_writew(vaddr_t va, unsigned int offs, u_int16_t value) {
-	__raw_writew(value, va.vaddr + offs);
-}
-
-static inline void mga_writel(vaddr_t va, unsigned int offs, u_int32_t value) {
-	__raw_writel(value, va.vaddr + offs);
-}
-#endif
-
-static inline void mga_memcpy_toio(vaddr_t va, unsigned int offs, const void* src, int len) {
-#ifdef MEMCPYTOIO_WORKS
-	memcpy_toio(va.vaddr + offs, src, len);
-#elif defined(MEMCPYTOIO_WRITEL)
-	if (offs & 3) {
+	if ((unsigned long)src & 3) {
 		while (len >= 4) {
-			mga_writel(va, offs, get_unaligned((u32 *)src));
-			offs += 4;
+			writel(get_unaligned((u32 *)src), addr);
+			addr++;
 			len -= 4;
 			src += 4;
 		}
 	} else {
 		while (len >= 4) {
-			mga_writel(va, offs, *(u32 *)src);
-			offs += 4;
+			writel(*(u32 *)src, addr);
+			addr++;
 			len -= 4;
 			src += 4;
 		}
 	}
-	if (len) {
-		u_int32_t tmp;
-
-		memcpy(&tmp, src, len);
-		mga_writel(va, offs, tmp);
-	}
-#else
-#error "Sorry, do not know how to write block of data to device"
 #endif
 }
 
@@ -252,25 +200,15 @@ static inline void __iomem* vaddr_va(vaddr_t va) {
 #define MGA_IOREMAP_FB		MGA_IOREMAP_NOCACHE
 #define MGA_IOREMAP_MMIO	MGA_IOREMAP_NOCACHE
 static inline int mga_ioremap(unsigned long phys, unsigned long size, int flags, vaddr_t* virt) {
-#ifdef MAP_IOREMAP
 	if (flags & MGA_IOREMAP_NOCACHE)
 		virt->vaddr = ioremap_nocache(phys, size);
 	else
 		virt->vaddr = ioremap(phys, size);
-#else
-#ifdef MAP_BUSTOVIRT
-	virt->vaddr = bus_to_virt(phys);
-#else
-#error "Your architecture does not have neither ioremap nor bus_to_virt... Giving up"
-#endif
-#endif
 	return (virt->vaddr == 0); /* 0, !0... 0, error_code in future */
 }
 
 static inline void mga_iounmap(vaddr_t va) {
-#ifdef MAP_IOREMAP
 	iounmap(va.vaddr);
-#endif
 }
 
 struct my_timming {
@@ -774,11 +712,11 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 #define DAC_XGENIOCTRL		0x2A
 #define DAC_XGENIODATA		0x2B
 
-#define M_C2CTL		0x3E10
+#define M_C2CTL		0x3C10
+
+#define MX_OPTION_BSWAP         0x00000000
 
 #ifdef __LITTLE_ENDIAN
-#define MX_OPTION_BSWAP		0x00000000
-
 #define M_OPMODE_4BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE | M_OPMODE_DMA_BLIT)
 #define M_OPMODE_8BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE | M_OPMODE_DMA_BLIT)
 #define M_OPMODE_16BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE | M_OPMODE_DMA_BLIT)
@@ -786,29 +724,23 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 #define M_OPMODE_32BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE | M_OPMODE_DMA_BLIT)
 #else
 #ifdef __BIG_ENDIAN
-#define MX_OPTION_BSWAP		0x80000000
-
-#define M_OPMODE_4BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE | M_OPMODE_DMA_BLIT)	/* TODO */
-#define M_OPMODE_8BPP	(M_OPMODE_DMA_BE_8BPP  | M_OPMODE_DIR_BE_8BPP  | M_OPMODE_DMA_BLIT)
-#define M_OPMODE_16BPP	(M_OPMODE_DMA_BE_16BPP | M_OPMODE_DIR_BE_16BPP | M_OPMODE_DMA_BLIT)
-#define M_OPMODE_24BPP	(M_OPMODE_DMA_BE_8BPP | M_OPMODE_DIR_BE_8BPP | M_OPMODE_DMA_BLIT)	/* TODO, ?32 */
-#define M_OPMODE_32BPP	(M_OPMODE_DMA_BE_32BPP | M_OPMODE_DIR_BE_32BPP | M_OPMODE_DMA_BLIT)
+#define M_OPMODE_4BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_LE       | M_OPMODE_DMA_BLIT)	/* TODO */
+#define M_OPMODE_8BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_BE_8BPP  | M_OPMODE_DMA_BLIT)
+#define M_OPMODE_16BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_BE_16BPP | M_OPMODE_DMA_BLIT)
+#define M_OPMODE_24BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_BE_8BPP  | M_OPMODE_DMA_BLIT)	/* TODO, ?32 */
+#define M_OPMODE_32BPP	(M_OPMODE_DMA_LE | M_OPMODE_DIR_BE_32BPP | M_OPMODE_DMA_BLIT)
 #else
 #error "Byte ordering have to be defined. Cannot continue."
 #endif
 #endif
 
-#define mga_inb(addr)	mga_readb(ACCESS_FBINFO(mmio.vbase), (addr))
-#define mga_inl(addr)	mga_readl(ACCESS_FBINFO(mmio.vbase), (addr))
-#define mga_outb(addr,val) mga_writeb(ACCESS_FBINFO(mmio.vbase), (addr), (val))
-#define mga_outw(addr,val) mga_writew(ACCESS_FBINFO(mmio.vbase), (addr), (val))
-#define mga_outl(addr,val) mga_writel(ACCESS_FBINFO(mmio.vbase), (addr), (val))
-#define mga_readr(port,idx) (mga_outb((port),(idx)), mga_inb((port)+1))
-#ifdef __LITTLE_ENDIAN
-#define mga_setr(addr,port,val) mga_outw(addr, ((val)<<8) | (port))
-#else
-#define mga_setr(addr,port,val) do { mga_outb(addr, port); mga_outb((addr)+1, val); } while (0)
-#endif
+#define mga_inb(addr)		mga_readb(ACCESS_FBINFO(mmio.vbase), (addr))
+#define mga_inl(addr)		mga_readl(ACCESS_FBINFO(mmio.vbase), (addr))
+#define mga_outb(addr,val)	mga_writeb(ACCESS_FBINFO(mmio.vbase), (addr), (val))
+#define mga_outw(addr,val)	mga_writew(ACCESS_FBINFO(mmio.vbase), (addr), (val))
+#define mga_outl(addr,val)	mga_writel(ACCESS_FBINFO(mmio.vbase), (addr), (val))
+#define mga_readr(port,idx)	(mga_outb((port),(idx)), mga_inb((port)+1))
+#define mga_setr(addr,port,val)	mga_outw(addr, ((val)<<8) | (port))
 
 #define mga_fifo(n)	do {} while ((mga_inl(M_FIFOSTATUS) & 0xFF) < (n))
 
