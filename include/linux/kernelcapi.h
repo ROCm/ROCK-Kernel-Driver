@@ -55,10 +55,10 @@ typedef struct kcapi_carddef {
 struct capi20_appl {
 	u16 applid;
 	capi_register_params rparam;
+	void *private;
 
 	/* internal to kernelcapi.o */
-	void *param;
-	void (*signal) (u16 applid, void *param);
+	void (*signal) (struct capi20_appl *ap);
 	struct sk_buff_head recv_queue;
 	int nncci;
 	struct capi_ncci *nccilist;
@@ -80,8 +80,7 @@ u16 capi20_release(struct capi20_appl *ap);
 u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb);
 u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp);
 u16 capi20_set_signal(struct capi20_appl *ap,
-		      void (*signal) (u16 applid, void *param),
-		      void *param);
+		      void (*signal) (struct capi20_appl *ap));
 u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN]);
 u16 capi20_get_version(u32 contr, struct capi_version *verp);
 u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN]);

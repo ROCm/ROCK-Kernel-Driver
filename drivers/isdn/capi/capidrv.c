@@ -1372,15 +1372,15 @@ static void handle_data(_cmsg * cmsg, struct sk_buff *skb)
 
 static _cmsg s_cmsg;
 
-static void capidrv_signal(u16 applid, void *dummy)
+static void capidrv_signal(struct capi20_appl *ap)
 {
 	struct sk_buff *skb = 0;
 
-	while (capi20_get_message(&global.ap, &skb) == CAPI_NOERROR) {
+	while (capi20_get_message(ap, &skb) == CAPI_NOERROR) {
 		capi_message2cmsg(&s_cmsg, skb->data);
 		if (debugmode > 2)
 			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
-					applid, capi_cmsg2str(&s_cmsg));
+			       ap->applid, capi_cmsg2str(&s_cmsg));
 
 		if (s_cmsg.Command == CAPI_DATA_B3
 		    && s_cmsg.Subcommand == CAPI_IND) {
@@ -2328,7 +2328,7 @@ static int __init capidrv_init(void)
 		return -EIO;
 	}
 
-	capi20_set_signal(&global.ap, capidrv_signal, 0);
+	capi20_set_signal(&global.ap, capidrv_signal);
 
 	ncontr = profile.ncontroller;
 	for (contr = 1; contr <= ncontr; contr++) {

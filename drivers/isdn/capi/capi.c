@@ -566,9 +566,9 @@ static int handle_minor_send(struct capiminor *mp)
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 /* -------- function called by lower level -------------------------- */
 
-static void capi_signal(u16 applid, void *param)
+static void capi_signal(struct capi20_appl *ap)
 {
-	struct capidev *cdev = (struct capidev *)param;
+	struct capidev *cdev = ap->private;
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	struct capiminor *mp;
 	u16 datahandle;
@@ -794,12 +794,13 @@ capi_ioctl(struct inode *inode, struct file *file,
 					   sizeof(struct capi_register_params)))
 				return -EFAULT;
 			
+			cdev->ap.private = cdev;
 			cdev->errcode = capi20_register(ap);
 			if (cdev->errcode) {
 				ap->applid = 0;
 				return -EIO;
 			}
-			capi20_set_signal(ap, capi_signal, cdev);
+			capi20_set_signal(ap, capi_signal);
 		}
 		return (int)ap->applid;
 

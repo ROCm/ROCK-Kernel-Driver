@@ -579,7 +579,7 @@ static void recv_handler(void *dummy)
 			ap->nrecvctlpkt++;
 		}
 		skb_queue_tail(&ap->recv_queue, skb);
-		(ap->signal) (ap->applid, ap->param);
+		(ap->signal) (ap);
 	}
 }
 
@@ -870,7 +870,6 @@ u16 capi20_register(struct capi20_appl *ap)
 	ap->applid = applid;
 	applications[applid - 1] = ap;
 
-	ap->param = NULL;
 	ap->signal = NULL;
 	skb_queue_head_init(&ap->recv_queue);
 	ap->nncci = 0;
@@ -984,13 +983,11 @@ u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp)
 EXPORT_SYMBOL(capi20_get_message);
 
 u16 capi20_set_signal(struct capi20_appl *ap,
-		      void (*signal) (u16 applid, void *param),
-		      void *param)
+		      void (*signal) (struct capi20_appl *appl))
 {
 	if (ap->applid == 0)
 		return CAPI_ILLAPPNR;
 	ap->signal = signal;
-	ap->param = param;
 	return CAPI_NOERROR;
 }
 
