@@ -56,7 +56,7 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 
 	sd = sysfs_new_dirent(parent_sd, element);
 	if (!sd)
-		return -ENOMEM;
+		return 0;
 
 	sd->s_mode = mode;
 	sd->s_type = type;
@@ -201,7 +201,7 @@ static int sysfs_attach_link(struct sysfs_dirent * sd, struct dentry * dentry)
 	return err;
 }
 
-struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
+static struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
 				struct nameidata *nd)
 {
 	struct sysfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
@@ -277,7 +277,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	down(&dentry->d_inode->i_sem);
 	list_for_each_entry_safe(sd, tmp, &parent_sd->s_children, s_sibling) {
-		if (!sd->s_element)
+		if (!sd->s_element || !(sd->s_type & SYSFS_NOT_PINNED))
 			continue;
 		list_del_init(&sd->s_sibling);
 		sysfs_drop_dentry(sd, dentry);

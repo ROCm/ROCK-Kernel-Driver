@@ -6,6 +6,14 @@
  * 
  * This file is licenced under the GPL.
  */
+
+/*
+ * __hc32 and __hc16 are "Host Controller" types, they may be equivalent to
+ * __leXX (normally) or __beXX (given OHCI_BIG_ENDIAN), depending on the
+ * host controller implementation.
+ */
+typedef __u32 __bitwise __hc32;
+typedef __u16 __bitwise __hc16;
  
 /*
  * OHCI Endpoint Descriptor (ED) ... holds TD queue
@@ -15,21 +23,21 @@
  * both EHCI and UHCI call similar structures a "QH".
  */
 struct ed {
-	/* first fields are hardware-specified, le32 */
-	__le32			hwINFO;       	/* endpoint config bitmap */
+	/* first fields are hardware-specified */
+	__hc32			hwINFO;       	/* endpoint config bitmap */
 	/* info bits defined by hcd */
-#define ED_DEQUEUE	__constant_cpu_to_le32(1 << 27)
+#define ED_DEQUEUE	(1 << 27)
 	/* info bits defined by the hardware */
-#define ED_ISO		__constant_cpu_to_le32(1 << 15)
-#define ED_SKIP		__constant_cpu_to_le32(1 << 14)
-#define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
-#define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
-#define ED_IN		__constant_cpu_to_le32(0x02 << 11)
-	__le32			hwTailP;	/* tail of TD list */
-	__le32			hwHeadP;	/* head of TD list (hc r/w) */
-#define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
-#define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
-	__le32			hwNextED;	/* next ED in list */
+#define ED_ISO		(1 << 15)
+#define ED_SKIP		(1 << 14)
+#define ED_LOWSPEED	(1 << 13)
+#define ED_OUT		(0x01 << 11)
+#define ED_IN		(0x02 << 11)
+	__hc32			hwTailP;	/* tail of TD list */
+	__hc32			hwHeadP;	/* head of TD list (hc r/w) */
+#define ED_C		(0x02)			/* toggle carry */
+#define ED_H		(0x01)			/* halted */
+	__hc32			hwNextED;	/* next ED in list */
 
 	/* rest are purely for the driver's use */
 	dma_addr_t		dma;		/* addr of ED */
@@ -69,8 +77,8 @@ struct ed {
  * and 4.3.2 (iso)
  */
 struct td {
-	/* first fields are hardware-specified, le32 */
-	__le32		hwINFO;		/* transfer info bitmask */
+	/* first fields are hardware-specified */
+	__hc32		hwINFO;		/* transfer info bitmask */
 
 	/* hwINFO bits for both general and iso tds: */
 #define TD_CC       0xf0000000			/* condition code */
@@ -99,13 +107,13 @@ struct td {
 
 	/* (no hwINFO #defines yet for iso tds) */
 
-  	__le32		hwCBP;		/* Current Buffer Pointer (or 0) */
-  	__le32		hwNextTD;	/* Next TD Pointer */
-  	__le32		hwBE;		/* Memory Buffer End Pointer */
+  	__hc32		hwCBP;		/* Current Buffer Pointer (or 0) */
+  	__hc32		hwNextTD;	/* Next TD Pointer */
+  	__hc32		hwBE;		/* Memory Buffer End Pointer */
 
 	/* PSW is only for ISO */
 #define MAXPSW 1		/* hardware allows 8 */
-  	__le16		hwPSW [MAXPSW];
+  	__hc16		hwPSW [MAXPSW];
 
 	/* rest are purely for the driver's use */
   	__u8		index;
@@ -170,20 +178,20 @@ static const int cc_to_error [16] = {
  */
 struct ohci_hcca {
 #define NUM_INTS 32
-	__le32	int_table [NUM_INTS];	/* periodic schedule */
+	__hc32	int_table [NUM_INTS];	/* periodic schedule */
 
 	/* 
 	 * OHCI defines u16 frame_no, followed by u16 zero pad.
 	 * Since some processors can't do 16 bit bus accesses,
 	 * portable access must be a 32 bit byteswapped access.
 	 */
-	__le32	frame_no;		/* current frame number */
-#define OHCI_FRAME_NO(hccap) ((u16)le32_to_cpup(&(hccap)->frame_no))
-	__le32	done_head;		/* info returned for an interrupt */
+	__hc32	frame_no;		/* current frame number */
+	__hc32	done_head;		/* info returned for an interrupt */
 	u8	reserved_for_hc [116];
 	u8	what [4];		/* spec only identifies 252 bytes :) */
 } __attribute__ ((aligned(256)));
 
+#define ohci_frame_no(ohci) ((u16)hc32_to_cpup(ohci,&(ohci)->hcca->frame_no))
   
 /*
  * This is the structure of the OHCI controller's memory mapped I/O region.
@@ -192,36 +200,36 @@ struct ohci_hcca {
  */
 struct ohci_regs {
 	/* control and status registers (section 7.1) */
-	__u32	revision;
-	__u32	control;
-	__u32	cmdstatus;
-	__u32	intrstatus;
-	__u32	intrenable;
-	__u32	intrdisable;
+	__hc32	revision;
+	__hc32	control;
+	__hc32	cmdstatus;
+	__hc32	intrstatus;
+	__hc32	intrenable;
+	__hc32	intrdisable;
 
 	/* memory pointers (section 7.2) */
-	__u32	hcca;
-	__u32	ed_periodcurrent;
-	__u32	ed_controlhead;
-	__u32	ed_controlcurrent;
-	__u32	ed_bulkhead;
-	__u32	ed_bulkcurrent;
-	__u32	donehead;
+	__hc32	hcca;
+	__hc32	ed_periodcurrent;
+	__hc32	ed_controlhead;
+	__hc32	ed_controlcurrent;
+	__hc32	ed_bulkhead;
+	__hc32	ed_bulkcurrent;
+	__hc32	donehead;
 
 	/* frame counters (section 7.3) */
-	__u32	fminterval;
-	__u32	fmremaining;
-	__u32	fmnumber;
-	__u32	periodicstart;
-	__u32	lsthresh;
+	__hc32	fminterval;
+	__hc32	fmremaining;
+	__hc32	fmnumber;
+	__hc32	periodicstart;
+	__hc32	lsthresh;
 
 	/* Root hub ports (section 7.4) */
 	struct	ohci_roothub_regs {
-		__u32	a;
-		__u32	b;
-		__u32	status;
+		__hc32	a;
+		__hc32	b;
+		__hc32	status;
 #define MAX_ROOT_PORTS	15	/* maximum OHCI root hub ports (RH_A_NDP) */
-		__u32	portstatus [MAX_ROOT_PORTS];
+		__hc32	portstatus [MAX_ROOT_PORTS];
 	} roothub;
 
 	/* and optional "legacy support" registers (appendix B) at 0x0100 */
@@ -337,6 +345,11 @@ typedef struct urb_priv {
  */
 
 struct ohci_hcd {
+	/*
+	 * framework state
+	 */
+	struct usb_hcd		hcd;		/* must come first! */
+
 	spinlock_t		lock;
 
 	/*
@@ -387,33 +400,12 @@ struct ohci_hcd {
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
 #define	OHCI_QUIRK_SUPERIO	0x02			/* natsemi */
 #define	OHCI_QUIRK_INITRESET	0x04			/* SiS, OPTi, ... */
+#define	OHCI_BIG_ENDIAN		0x08			/* big endian HC */
 	// there are also chip quirks/bugs in init logic
 
-	/*
-	 * framework state
-	 */
-	struct usb_hcd		hcd;
 };
 
 #define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
-
-/*-------------------------------------------------------------------------*/
-
-static inline void disable (struct ohci_hcd *ohci)
-{
-	ohci->hcd.state = USB_STATE_HALT;
-}
-
-#define	FI			0x2edf		/* 12000 bits per frame (-1) */
-#define	FSMP(fi) 		(0x7fff & ((6 * ((fi) - 210)) / 7))
-#define LSTHRESH		0x628		/* lowspeed bit threshold */
-
-static inline void periodic_reinit (struct ohci_hcd *ohci)
-{
-	u32	fi = ohci->fminterval & 0x0ffff;
-
-	writel (((9 * fi) / 10) & 0x3fff, &ohci->regs->periodicstart);
-}
 
 /*-------------------------------------------------------------------------*/
 
@@ -438,44 +430,162 @@ static inline void periodic_reinit (struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
+/*
+ * While most USB host controllers implement their registers and
+ * in-memory communication descriptors in little-endian format,
+ * a minority (notably the IBM STB04XXX and the Motorola MPC5200
+ * processors) implement them in big endian format.
+ *
+ * This attempts to support either format at compile time without a
+ * runtime penalty, or both formats with the additional overhead
+ * of checking a flag bit.
+ */
+
+#ifdef CONFIG_USB_OHCI_BIG_ENDIAN
+
+#ifdef CONFIG_USB_OHCI_LITTLE_ENDIAN
+#define big_endian(ohci)	(ohci->flags & OHCI_BIG_ENDIAN) /* either */
+#else
+#define big_endian(ohci)	1		/* only big endian */
+#endif
+
+/*
+ * Big-endian read/write functions are arch-specific.
+ * Other arches can be added if/when they're needed.
+ */
+#if defined(CONFIG_PPC)
+#define readl_be(addr)		in_be32((__force unsigned *)addr)
+#define writel_be(val, addr)	out_be32((__force unsigned *)addr, val)
+#endif
+
+static inline unsigned int ohci_readl (const struct ohci_hcd *ohci,
+							__hc32 __iomem * regs)
+{
+	return big_endian(ohci) ? readl_be (regs) : readl ((__force u32 *)regs);
+}
+
+static inline void ohci_writel (const struct ohci_hcd *ohci,
+				const unsigned int val, __hc32 __iomem *regs)
+{
+	big_endian(ohci) ? writel_be (val, regs) :
+			   writel (val, (__force u32 *)regs);
+}
+
+#else	/* !CONFIG_USB_OHCI_BIG_ENDIAN */
+
+#define big_endian(ohci)	0		/* only little endian */
+
 #ifdef CONFIG_ARCH_LH7A404
 	/* Marc Singer: at the time this code was written, the LH7A404
 	 * had a problem reading the USB host registers.  This
 	 * implementation of the ohci_readl function performs the read
 	 * twice as a work-around.
 	 */
-static inline unsigned int ohci_readl (void* regs)
+static inline unsigned int
+ohci_readl (const struct ohci_hcd *ohci, const __hc32 *regs)
 {
-	*(volatile unsigned int*) regs;
-	return *(volatile unsigned int*) regs;
+	*(volatile __force unsigned int*) regs;
+	return *(volatile __force unsigned int*) regs;
 }
 #else
 	/* Standard version of ohci_readl uses standard, platform
 	 * specific implementation. */
-static inline unsigned int ohci_readl (void __iomem * regs)
+static inline unsigned int
+ohci_readl (const struct ohci_hcd *ohci, __hc32 __iomem * regs)
 {
-	return readl (regs);
+	return readl ((__force u32 *)regs);
 }
 #endif
+
+static inline void ohci_writel (const struct ohci_hcd *ohci,
+				const unsigned int val, __hc32 __iomem *regs)
+{
+	writel (val, (__force u32 *)regs);
+}
+
+#endif	/* !CONFIG_USB_OHCI_BIG_ENDIAN */
+
+/*-------------------------------------------------------------------------*/
+
+/* cpu to ohci */
+static inline __hc16 cpu_to_hc16 (const struct ohci_hcd *ohci, const u16 x)
+{
+	return big_endian(ohci) ? cpu_to_be16(x) : cpu_to_le16(x);
+}
+
+static inline __hc16 cpu_to_hc16p (const struct ohci_hcd *ohci, const u16 *x)
+{
+	return big_endian(ohci) ? cpu_to_be16p(x) : cpu_to_le16p(x);
+}
+
+static inline __hc32 cpu_to_hc32 (const struct ohci_hcd *ohci, const u32 x)
+{
+	return big_endian(ohci) ? cpu_to_be32(x) : cpu_to_le32(x);
+}
+
+static inline __hc32 cpu_to_hc32p (const struct ohci_hcd *ohci, const u32 *x)
+{
+	return big_endian(ohci) ? cpu_to_be32p(x) : cpu_to_le32p(x);
+}
+
+/* ohci to cpu */
+static inline u16 hc16_to_cpu (const struct ohci_hcd *ohci, const __hc16 x)
+{
+	return big_endian(ohci) ? be16_to_cpu(x) : le16_to_cpu(x);
+}
+
+static inline u16 hc16_to_cpup (const struct ohci_hcd *ohci, const __hc16 *x)
+{
+	return big_endian(ohci) ? be16_to_cpup(x) : le16_to_cpup(x);
+}
+
+static inline u32 hc32_to_cpu (const struct ohci_hcd *ohci, const __hc32 x)
+{
+	return big_endian(ohci) ? be32_to_cpu(x) : le32_to_cpu(x);
+}
+
+static inline u32 hc32_to_cpup (const struct ohci_hcd *ohci, const __hc32 *x)
+{
+	return big_endian(ohci) ? be32_to_cpup(x) : le32_to_cpup(x);
+}
+
+/*-------------------------------------------------------------------------*/
+
+static inline void disable (struct ohci_hcd *ohci)
+{
+	ohci->hcd.state = USB_STATE_HALT;
+}
+
+#define	FI			0x2edf		/* 12000 bits per frame (-1) */
+#define	FSMP(fi) 		(0x7fff & ((6 * ((fi) - 210)) / 7))
+#define LSTHRESH		0x628		/* lowspeed bit threshold */
+
+static inline void periodic_reinit (struct ohci_hcd *ohci)
+{
+	u32	fi = ohci->fminterval & 0x0ffff;
+
+	ohci_writel (ohci, ((9 * fi) / 10) & 0x3fff,
+						&ohci->regs->periodicstart);
+}
 
 /* AMD-756 (D2 rev) reports corrupt register contents in some cases.
  * The erratum (#4) description is incorrect.  AMD's workaround waits
  * till some bits (mostly reserved) are clear; ok for all revs.
  */
 #define read_roothub(hc, register, mask) ({ \
-	u32 temp = ohci_readl (&hc->regs->roothub.register); \
+	u32 temp = ohci_readl (hc, &hc->regs->roothub.register); \
 	if (temp == -1) \
 		disable (hc); \
 	else if (hc->flags & OHCI_QUIRK_AMD756) \
 		while (temp & mask) \
-			temp = ohci_readl (&hc->regs->roothub.register); \
+			temp = ohci_readl (hc, &hc->regs->roothub.register); \
 	temp; })
 
 static u32 roothub_a (struct ohci_hcd *hc)
 	{ return read_roothub (hc, a, 0xfc0fe000); }
 static inline u32 roothub_b (struct ohci_hcd *hc)
-	{ return ohci_readl (&hc->regs->roothub.b); }
+	{ return ohci_readl (hc, &hc->regs->roothub.b); }
 static inline u32 roothub_status (struct ohci_hcd *hc)
-	{ return ohci_readl (&hc->regs->roothub.status); }
+	{ return ohci_readl (hc, &hc->regs->roothub.status); }
 static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
 	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }

@@ -9,12 +9,6 @@
 
 #include "sysfs.h"
 
-struct inode_operations sysfs_symlink_inode_operations = {
-	.readlink = generic_readlink,
-	.follow_link = sysfs_follow_link,
-	.put_link = sysfs_put_link,
-};
-
 static int object_depth(struct kobject * kobj)
 {
 	struct kobject * p = kobj;
@@ -157,7 +151,7 @@ static int sysfs_getlink(struct dentry *dentry, char * path)
 
 }
 
-int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
+static int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int error = -ENOMEM;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
@@ -167,12 +161,19 @@ int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return 0;
 }
 
-void sysfs_put_link(struct dentry *dentry, struct nameidata *nd)
+static void sysfs_put_link(struct dentry *dentry, struct nameidata *nd)
 {
 	char *page = nd_get_link(nd);
 	if (!IS_ERR(page))
 		free_page((unsigned long)page);
 }
+
+struct inode_operations sysfs_symlink_inode_operations = {
+	.readlink = generic_readlink,
+	.follow_link = sysfs_follow_link,
+	.put_link = sysfs_put_link,
+};
+
 
 EXPORT_SYMBOL_GPL(sysfs_create_link);
 EXPORT_SYMBOL_GPL(sysfs_remove_link);

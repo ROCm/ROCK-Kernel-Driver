@@ -135,6 +135,52 @@ static struct kobj_type ktype_bus = {
 
 decl_subsys(bus, &ktype_bus, NULL);
 
+static int __bus_for_each_dev(struct bus_type *bus, struct device *start,
+			      void *data, int (*fn)(struct device *, void *))
+{
+	struct list_head *head;
+	struct device *dev;
+	int error = 0;
+
+	if (!(bus = get_bus(bus)))
+		return -EINVAL;
+
+	head = &bus->devices.list;
+	dev = list_prepare_entry(start, head, bus_list);
+	list_for_each_entry_continue(dev, head, bus_list) {
+		get_device(dev);
+		error = fn(dev, data);
+		put_device(dev);
+		if (error)
+			break;
+	}
+	put_bus(bus);
+	return error;
+}
+
+static int __bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
+			      void * data, int (*fn)(struct device_driver *, void *))
+{
+	struct list_head *head;
+	struct device_driver *drv;
+	int error = 0;
+
+	if (!(bus = get_bus(bus)))
+		return -EINVAL;
+
+	head = &bus->drivers.list;
+	drv = list_prepare_entry(start, head, kobj.entry);
+	list_for_each_entry_continue(drv, head, kobj.entry) {
+		get_driver(drv);
+		error = fn(drv, data);
+		put_driver(drv);
+		if (error)
+			break;
+	}
+	put_bus(bus);
+	return error;
+}
+
 /**
  *	bus_for_each_dev - device iterator.
  *	@bus:	bus type.
@@ -154,30 +200,16 @@ decl_subsys(bus, &ktype_bus, NULL);
  *	to retain this data, it should do, and increment the reference
  *	count in the supplied callback.
  */
+
 int bus_for_each_dev(struct bus_type * bus, struct device * start,
 		     void * data, int (*fn)(struct device *, void *))
 {
-	struct device *dev;
-	struct list_head * head;
-	int error = 0;
-
-	if (!(bus = get_bus(bus)))
-		return -EINVAL;
-
-	head = &bus->devices.list;
-	dev = list_prepare_entry(start, head, bus_list);
+	int ret;
 
 	down_read(&bus->subsys.rwsem);
-	list_for_each_entry_continue(dev, head, bus_list) {
-		get_device(dev);
-		error = fn(dev, data);
-		put_device(dev);
-		if (error)
-			break;
-	}
+	ret = __bus_for_each_dev(bus, start, data, fn);
 	up_read(&bus->subsys.rwsem);
-	put_bus(bus);
-	return error;
+	return ret;
 }
 
 /**
@@ -203,27 +235,12 @@ int bus_for_each_dev(struct bus_type * bus, struct device * start,
 int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 		     void * data, int (*fn)(struct device_driver *, void *))
 {
-	struct list_head * head;
-	struct device_driver *drv;
-	int error = 0;
-
-	if(!(bus = get_bus(bus)))
-		return -EINVAL;
-
-	head = &bus->drivers.list;
-	drv = list_prepare_entry(start, head, kobj.entry);
+	int ret;
 
 	down_read(&bus->subsys.rwsem);
-	list_for_each_entry_continue(drv, head, kobj.entry) {
-		get_driver(drv);
-		error = fn(drv, data);
-		put_driver(drv);
-		if(error)
-			break;
-	}
+	ret = __bus_for_each_drv(bus, start, data, fn);
 	up_read(&bus->subsys.rwsem);
-	put_bus(bus);
-	return error;
+	return ret;
 }
 
 /**
@@ -325,10 +342,10 @@ int device_attach(struct device * dev)
  *	driver_attach - try to bind driver to devices.
  *	@drv:	driver.
  *
- *	Walk the list of devices that the bus has on it and try to match
- *	the driver with each one.
- *	If bus_match() returns 0 and the @dev->driver is set, we've found
- *	a compatible pair.
+ *	Walk the list of devices that the bus has on it and try to
+ *	match the driver with each one.  If driver_probe_device()
+ *	returns 0 and the @dev->driver is set, we've found a
+ *	compatible pair.
  *
  *	Note that we ignore the -ENODEV error from driver_probe_device(),
  *	since it's perfectly valid for a driver not to bind to any devices.
@@ -590,7 +607,9 @@ int bus_rescan_devices(struct bus_type * bus)
 {
 	int count = 0;
 
-	bus_for_each_dev(bus, NULL, &count, bus_rescan_devices_helper);
+	down_write(&bus->subsys.rwsem);
+	__bus_for_each_dev(bus, NULL, &count, bus_rescan_devices_helper);
+	up_write(&bus->subsys.rwsem);
 
 	return count;
 }

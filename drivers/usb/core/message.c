@@ -34,10 +34,6 @@ static void timeout_kill(unsigned long data)
 {
 	struct urb	*urb = (struct urb *) data;
 
-	dev_warn(&urb->dev->dev, "%s timeout on ep%d%s\n",
-		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
-		usb_pipeendpoint(urb->pipe),
-		usb_pipein(urb->pipe) ? "in" : "out");
 	usb_unlink_urb(urb);
 }
 
@@ -68,8 +64,14 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 		wait_for_completion(&done);
 		status = urb->status;
 		/* note:  HCDs return ETIMEDOUT for other reasons too */
-		if (status == -ECONNRESET)
+		if (status == -ECONNRESET) {
+			dev_warn(&urb->dev->dev,
+				"%s timed out on ep%d%s\n",
+				current->comm,
+				usb_pipeendpoint(urb->pipe),
+				usb_pipein(urb->pipe) ? "in" : "out");
 			status = -ETIMEDOUT;
+		}
 		if (timeout > 0)
 			del_timer_sync(&timer);
 	}
@@ -549,8 +551,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
  *
  * Gets a USB descriptor.  Convenience functions exist to simplify
  * getting some types of descriptors.  Use
- * usb_get_device_descriptor() for USB_DT_DEVICE (not exported),
- * and usb_get_string() or usb_string() for USB_DT_STRING.
+ * usb_get_string() or usb_string() for USB_DT_STRING.
  * Device (USB_DT_DEVICE) and configuration descriptors (USB_DT_CONFIG)
  * are part of the device structure.
  * In addition to a number of USB-standard descriptors, some
@@ -703,6 +704,8 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	int err;
 	unsigned int u, idx;
 
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 	if (size <= 0 || !buf || !index)
 		return -EINVAL;
 	buf[0] = 0;
@@ -755,8 +758,8 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	return err;
 }
 
-/**
- * usb_get_device_descriptor - (re)reads the device descriptor
+/*
+ * usb_get_device_descriptor - (re)reads the device descriptor (usbcore)
  * @dev: the device whose device descriptor is being updated
  * @size: how much of the descriptor to read
  * Context: !in_interrupt ()

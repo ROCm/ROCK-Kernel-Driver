@@ -35,7 +35,6 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	struct usb_device	*root = hcd_to_bus (&ehci->hcd)->root_hub;
 	int			port;
-	int			status = 0;
 
 	if (root->dev.power.power_state != 0)
 		return 0;
@@ -45,10 +44,23 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	port = HCS_N_PORTS (ehci->hcs_params);
 	spin_lock_irq (&ehci->lock);
 
+	/* for hcd->state HCD_STATE_SUSPENDED, also stop the non-USB side */
+	root->dev.power.power_state = 3;
+	root->state = USB_STATE_SUSPENDED;
+
+	/* stop schedules, clean any completed work */
+	if (HCD_IS_RUNNING(hcd->state))
+		ehci_quiesce (ehci);
+	ehci->command = readl (&ehci->regs->command);
+	if (ehci->reclaim)
+		ehci->reclaim_ready = 1;
+	ehci_work(ehci, NULL);
+
 	/* suspend any active/unsuspended ports, maybe allow wakeup */
 	while (port--) {
-		u32	t1 = readl (&ehci->regs->port_status [port]);
-		u32	t2 = t1;
+		u32 __iomem	*reg = &ehci->regs->port_status [port];
+		u32		t1 = readl (reg);
+		u32		t2 = t1;
 
 		if ((t1 & PORT_PE) && !(t1 & PORT_OWNER))
 			t2 |= PORT_SUSPEND;
@@ -60,24 +72,16 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 		if (t1 != t2) {
 			ehci_vdbg (ehci, "port %d, %08x -> %08x\n",
 				port + 1, t1, t2);
-			writel (t2, &ehci->regs->port_status [port]);
+			writel (t2, reg);
 		}
 	}
 
-	/* stop schedules, then turn off HC and clean any completed work */
-	if (hcd->state == USB_STATE_RUNNING)
-		ehci_ready (ehci);
-	ehci->command = readl (&ehci->regs->command);
-	writel (ehci->command & ~CMD_RUN, &ehci->regs->command);
-	if (ehci->reclaim)
-		ehci->reclaim_ready = 1;
-	ehci_work(ehci, NULL);
-	(void) handshake (&ehci->regs->status, STS_HALT, STS_HALT, 2000);
+	/* turn off now-idle HC */
+	ehci_halt (ehci);
 
-	root->dev.power.power_state = 3;
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irq (&ehci->lock);
-	return status;
+	return 0;
 }
 
 
@@ -96,12 +100,16 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 
 	/* re-init operational registers in case we lost power */
 	if (readl (&ehci->regs->intr_enable) == 0) {
+		temp = 1;
 		writel (INTR_MASK, &ehci->regs->intr_enable);
 		writel (0, &ehci->regs->segment);
 		writel (ehci->periodic_dma, &ehci->regs->frame_list);
 		writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
-		/* FIXME will this work even (pci) vAUX was lost? */
-	}
+		/* FIXME will this work even if (pci) vAUX was lost? */
+	} else
+		temp = 0;
+	ehci_dbg(ehci, "resume root hub%s\n",
+			temp ? " after power loss" : "");
 
 	/* restore CMD_RUN, framelist size, and irq threshold */
 	writel (ehci->command, &ehci->regs->command);
@@ -135,8 +143,10 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		temp |= CMD_ASE;
 	if (ehci->periodic_sched)
 		temp |= CMD_PSE;
-	if (temp)
-		writel (ehci->command | temp, &ehci->regs->command);
+	if (temp) {
+		ehci->command |= temp;
+		writel (ehci->command, &ehci->regs->command);
+	}
 
 	root->dev.power.power_state = 0;
 	ehci->next_statechange = jiffies + msecs_to_jiffies(5);

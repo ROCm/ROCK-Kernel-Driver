@@ -31,6 +31,7 @@
  *	- GeneSys GL620USB-A
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
+ *	- KC Technology KC2190
  *
  *   + Smart USB devices can support such links directly, using Internet
  *     standard protocols instead of proprietary host-to-device links.
@@ -106,6 +107,7 @@
  * 22-aug-2003	AX8817X support (Dave Hollis).
  * 14-jun-2004  Trivial patch for AX8817X based Buffalo LUA-U2-KTX in Japan
  *		(Neil Bortnak)
+ * 03-nov-2004	Trivial patch for KC2190 (KC-190) chip. (Jonathan McDowell)
  *
  *-------------------------------------------------------------------------*/
 
@@ -134,7 +136,7 @@
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 
-#define DRIVER_VERSION		"25-Aug-2003"
+#define DRIVER_VERSION		"03-Nov-2004"
 
 
 /*-------------------------------------------------------------------------*/
@@ -2159,6 +2161,13 @@ static const struct driver_info	prolific_info = {
 
 #endif /* CONFIG_USB_PL2301 */
 
+
+#ifdef CONFIG_USB_KC2190
+#define HAVE_HARDWARE
+static const struct driver_info kc2190_info = {
+	.description =  "KC Technology KC-190",
+};
+#endif /* CONFIG_USB_KC2190 */
 
 
 #ifdef	CONFIG_USB_ARMLINUX
@@ -3293,6 +3302,13 @@ static const struct usb_device_id	products [] = {
 }, {
 	USB_DEVICE (0x067b, 0x0001),	// PL-2302
 	.driver_info =	(unsigned long) &prolific_info,
+},
+#endif
+
+#ifdef CONFIG_USB_KC2190
+{
+	USB_DEVICE (0x050f, 0x0190),	// KC-190
+	.driver_info =	(unsigned long) &kc2190_info,
 },
 #endif
 
