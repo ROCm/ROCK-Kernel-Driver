@@ -1182,24 +1182,6 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
 	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
-/*
- * Get space for the valid bitmap.
- */
-static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
-		unsigned long *zones_size)
-{
-	unsigned long size = 0;
-	int i;
-
-	for (i = 0; i < MAX_NR_ZONES; i++)
-		size += zones_size[i];
-	size = LONG_ALIGN((size + 7) >> 3);
-	if (size) {
-		pgdat->valid_addr_bitmap = 
-			(unsigned long *)alloc_bootmem_node(pgdat, size);
-		memset(pgdat->valid_addr_bitmap, 0, size);
-	}
-}
 
 /*
  * Initially all pages are reserved - free ones are freed
@@ -1393,8 +1375,6 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
 	memblk_set_online(node_to_memblk(nid));
-
-	calculate_zone_bitmap(pgdat, zones_size);
 }
 
 #ifndef CONFIG_DISCONTIGMEM
