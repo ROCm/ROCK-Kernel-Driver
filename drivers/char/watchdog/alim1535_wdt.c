@@ -385,8 +385,6 @@ static struct miscdevice ali_miscdev = {
 
 static struct notifier_block ali_notifier = {
 	.notifier_call =	ali_notify_sys,
-	.next =			NULL,
-	.priority =		0,
 };
 
 /*

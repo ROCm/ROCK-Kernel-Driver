@@ -225,10 +225,12 @@ static int full_duplex[MAX_UNITS];
  * v1.27b  Sep 30 2002 Kent Yoder <yoder1@us.ibm.com>
  * 	   Added timer for cable connection state changes.
  * v1.28   20 Feb 2004 Don Fry <brazilnut@us.ibm.com>
- *	   Jon Lewis <jonmason@us.ibm.com>, Chinmay Albal <albal@in.ibm.com>
+ *	   Jon Mason <jonmason@us.ibm.com>, Chinmay Albal <albal@in.ibm.com>
  *	   Now uses ethtool_ops, netif_msg_* and generic_mii_ioctl.
  *	   Fixes bogus 'Bus master arbitration failure', pci_[un]map_single
  *	   length errors, and transmit hangs.  Cleans up after errors in open.
+ *	   Jim Lewis <jklewis@us.ibm.com> added ethernet loopback test.
+ *	   Thomas Munck Steenholdt <tmus@tmus.dk> non-mii ioctl corrections.
  */
 
 
@@ -1745,13 +1747,17 @@ pcnet32_rx(struct net_device *dev)
 		if (!rx_in_place) {
 		    skb_reserve(skb,2); /* 16 byte align */
 		    skb_put(skb,pkt_len);	/* Make room */
-		    pci_dma_sync_single(lp->pci_dev,
-		                        lp->rx_dma_addr[entry],
-		                        PKT_BUF_SZ-2,
-		                        PCI_DMA_FROMDEVICE);
+		    pci_dma_sync_single_for_cpu(lp->pci_dev,
+						lp->rx_dma_addr[entry],
+						PKT_BUF_SZ-2,
+						PCI_DMA_FROMDEVICE);
 		    eth_copy_and_sum(skb,
 			    (unsigned char *)(lp->rx_skbuff[entry]->tail),
 			    pkt_len,0);
+		    pci_dma_sync_single_for_device(lp->pci_dev,
+						   lp->rx_dma_addr[entry],
+						   PKT_BUF_SZ-2,
+						   PCI_DMA_FROMDEVICE);
 		}
 		lp->stats.rx_bytes += skb->len;
 		skb->protocol=eth_type_trans(skb,dev);

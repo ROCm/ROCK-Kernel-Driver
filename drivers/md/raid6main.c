@@ -1571,7 +1571,8 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 		/* make sure we don't swamp the stripe cache if someone else
 		 * is trying to get access
 		 */
-		yield();
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
 	}
 	spin_lock(&sh->lock);
 	set_bit(STRIPE_SYNCING, &sh->state);

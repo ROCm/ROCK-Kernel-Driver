@@ -12,6 +12,10 @@ enum dma_data_direction {
 
 #include <asm/dma-mapping.h>
 
+/* Backwards compat, remove in 2.7.x */
+#define dma_sync_single		dma_sync_single_for_cpu
+#define dma_sync_sg		dma_sync_sg_for_cpu
+
 #endif
 
 

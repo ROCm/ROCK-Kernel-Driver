@@ -15,8 +15,10 @@ struct hppa_dma_ops {
 	void (*unmap_single)(struct device *dev, dma_addr_t iova, size_t size, enum dma_data_direction direction);
 	int  (*map_sg)(struct device *dev, struct scatterlist *sg, int nents, enum dma_data_direction direction);
 	void (*unmap_sg)(struct device *dev, struct scatterlist *sg, int nhwents, enum dma_data_direction direction);
-	void (*dma_sync_single)(struct device *dev, dma_addr_t iova, unsigned long offset, size_t size, enum dma_data_direction direction);
-	void (*dma_sync_sg)(struct device *dev, struct scatterlist *sg, int nelems, enum dma_data_direction direction);
+	void (*dma_sync_single_for_cpu)(struct device *dev, dma_addr_t iova, unsigned long offset, size_t size, enum dma_data_direction direction);
+	void (*dma_sync_single_for_device)(struct device *dev, dma_addr_t iova, unsigned long offset, size_t size, enum dma_data_direction direction);
+	void (*dma_sync_sg_for_cpu)(struct device *dev, struct scatterlist *sg, int nelems, enum dma_data_direction direction);
+	void (*dma_sync_sg_for_device)(struct device *dev, struct scatterlist *sg, int nelems, enum dma_data_direction direction);
 };
 
 /*
@@ -116,28 +118,53 @@ dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 
 
 static inline void
-dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
 		enum dma_data_direction direction)
 {
-	if(hppa_dma_ops->dma_sync_single)
-		hppa_dma_ops->dma_sync_single(dev, dma_handle, 0, size, direction);
+	if(hppa_dma_ops->dma_sync_single_for_cpu)
+		hppa_dma_ops->dma_sync_single_for_cpu(dev, dma_handle, 0, size, direction);
 }
 
 static inline void
-dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+		enum dma_data_direction direction)
+{
+	if(hppa_dma_ops->dma_sync_single_for_device)
+		hppa_dma_ops->dma_sync_single_for_device(dev, dma_handle, 0, size, direction);
+}
+
+static inline void
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
 		      unsigned long offset, size_t size,
 		      enum dma_data_direction direction)
 {
-	if(hppa_dma_ops->dma_sync_single)
-		hppa_dma_ops->dma_sync_single(dev, dma_handle, offset, size, direction);
+	if(hppa_dma_ops->dma_sync_single_for_cpu)
+		hppa_dma_ops->dma_sync_single_for_cpu(dev, dma_handle, offset, size, direction);
 }
 
 static inline void
-dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+		      unsigned long offset, size_t size,
+		      enum dma_data_direction direction)
+{
+	if(hppa_dma_ops->dma_sync_single_for_device)
+		hppa_dma_ops->dma_sync_single_for_device(dev, dma_handle, offset, size, direction);
+}
+
+static inline void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 		 enum dma_data_direction direction)
 {
-	if(hppa_dma_ops->dma_sync_sg)
-		hppa_dma_ops->dma_sync_sg(dev, sg, nelems, direction);
+	if(hppa_dma_ops->dma_sync_sg_for_cpu)
+		hppa_dma_ops->dma_sync_sg_for_cpu(dev, sg, nelems, direction);
+}
+
+static inline void
+dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+		 enum dma_data_direction direction)
+{
+	if(hppa_dma_ops->dma_sync_sg_for_device)
+		hppa_dma_ops->dma_sync_sg_for_device(dev, sg, nelems, direction);
 }
 
 static inline int
@@ -166,14 +193,14 @@ dma_get_cache_alignment(void)
 static inline int
 dma_is_consistent(dma_addr_t dma_addr)
 {
-	return (hppa_dma_ops->dma_sync_single == NULL);
+	return (hppa_dma_ops->dma_sync_single_for_cpu == NULL);
 }
 
 static inline void
 dma_cache_sync(void *vaddr, size_t size,
 	       enum dma_data_direction direction)
 {
-	if(hppa_dma_ops->dma_sync_single)
+	if(hppa_dma_ops->dma_sync_single_for_cpu)
 		flush_kernel_dcache_range((unsigned long)vaddr, size);
 }
 

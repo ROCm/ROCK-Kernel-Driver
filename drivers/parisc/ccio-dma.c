@@ -1149,8 +1149,10 @@ static struct hppa_dma_ops ccio_ops = {
 	.unmap_single =		ccio_unmap_single,
 	.map_sg = 		ccio_map_sg,
 	.unmap_sg = 		ccio_unmap_sg,
-	.dma_sync_single =	NULL,	/* NOP for U2/Uturn */
-	.dma_sync_sg =		NULL,	/* ditto */
+	.dma_sync_single_for_cpu =	NULL,	/* NOP for U2/Uturn */
+	.dma_sync_single_for_device =	NULL,	/* NOP for U2/Uturn */
+	.dma_sync_sg_for_cpu =		NULL,	/* ditto */
+	.dma_sync_sg_for_device =		NULL,	/* ditto */
 };
 
 #ifdef CONFIG_PROC_FS

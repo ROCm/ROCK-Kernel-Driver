@@ -667,6 +667,10 @@ static void b44_recycle_rx(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 	dest_desc->ctrl = ctrl;
 	dest_desc->addr = src_desc->addr;
 	src_map->skb = NULL;
+
+	pci_dma_sync_single_for_device(bp->pdev, src_desc->addr,
+				       RX_PKT_BUF_SZ,
+				       PCI_DMA_FROMDEVICE);
 }
 
 static int b44_rx(struct b44 *bp, int budget)
@@ -686,9 +690,9 @@ static int b44_rx(struct b44 *bp, int budget)
 		struct rx_header *rh;
 		u16 len;
 
-		pci_dma_sync_single(bp->pdev, map,
-				    RX_PKT_BUF_SZ,
-				    PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single_for_cpu(bp->pdev, map,
+					    RX_PKT_BUF_SZ,
+					    PCI_DMA_FROMDEVICE);
 		rh = (struct rx_header *) skb->data;
 		len = cpu_to_le16(rh->len);
 		if ((len > (RX_PKT_BUF_SZ - bp->rx_offset)) ||

@@ -136,7 +136,7 @@ void __devinit tulip_parse_eeprom(struct net_device *dev)
 	static struct mediatable *last_mediatable;
 	static unsigned char *last_ee_data;
 	static int controller_index;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	unsigned char *ee_data = tp->eeprom;
 	int i;
 

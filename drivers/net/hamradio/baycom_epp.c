@@ -646,7 +646,7 @@ static int transmit(struct baycom_state *bc, int cnt, unsigned char stat)
 
 static void do_rxpacket(struct net_device *dev)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	struct sk_buff *skb;
 	unsigned char *cp;
 	unsigned pktlen;
@@ -705,7 +705,7 @@ static void do_rxpacket(struct net_device *dev)
         
 static int receive(struct net_device *dev, int cnt)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	struct parport *pp = bc->pdev->port;
         unsigned int bitbuf, notbitstream, bitstream, numbits, state;
 	unsigned char tmp[128];
@@ -790,7 +790,7 @@ static void epp_bh(struct net_device *dev)
 	int cnt, cnt2;
 	
 	baycom_paranoia_check_void(dev, "epp_bh");
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	if (!bc->work_running)
 		return;
 	baycom_int_freq(bc);
@@ -908,7 +908,7 @@ static int baycom_send_packet(struct sk_buff *skb, struct net_device *dev)
 	struct baycom_state *bc;
 
 	baycom_paranoia_check(dev, "baycom_send_packet", 0);
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	if (skb->data[0] != 0) {
 		do_kiss_params(bc, skb->data, skb->len);
 		dev_kfree_skb(skb);
@@ -944,7 +944,7 @@ static struct net_device_stats *baycom_get_stats(struct net_device *dev)
 	struct baycom_state *bc;
 
 	baycom_paranoia_check(dev, "baycom_get_stats", NULL);
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	/* 
 	 * Get the current statistics.  This may be called with the
 	 * card open or closed. 
@@ -960,7 +960,7 @@ static void epp_wakeup(void *handle)
         struct baycom_state *bc;
 
 	baycom_paranoia_check_void(dev, "epp_wakeup");
-        bc = (struct baycom_state *)dev->priv;
+        bc = netdev_priv(dev);
         printk(KERN_DEBUG "baycom_epp: %s: why am I being woken up?\n", dev->name);
         if (!parport_claim(bc->pdev))
                 printk(KERN_DEBUG "baycom_epp: %s: I'm broken.\n", dev->name);
@@ -987,7 +987,7 @@ static int epp_open(struct net_device *dev)
 	unsigned long tstart;
 	
 	baycom_paranoia_check(dev, "epp_open", -ENXIO);
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
         pp = parport_find_base(dev->base_addr);
         if (!pp) {
                 printk(KERN_ERR "%s: parport at 0x%lx unknown\n", bc_drvname, dev->base_addr);
@@ -1102,7 +1102,7 @@ static int epp_close(struct net_device *dev)
 	unsigned char tmp[1];
 
 	baycom_paranoia_check(dev, "epp_close", -EINVAL);
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	pp = bc->pdev->port;
 	bc->work_running = 0;
 	flush_scheduled_work();
@@ -1163,7 +1163,7 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct hdlcdrv_ioctl hi;
 
 	baycom_paranoia_check(dev, "baycom_ioctl", -EINVAL);
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	if (cmd != SIOCDEVPRIVATE)
 		return -ENOIOCTLCMD;
 	if (get_user(cmd, (int *)ifr->ifr_data))
@@ -1290,7 +1290,7 @@ static void baycom_probe(struct net_device *dev)
 	/*
 	 * not a real probe! only initialize data structures
 	 */
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 	/*
 	 * initialize the baycom_state struct
 	 */
@@ -1351,7 +1351,7 @@ MODULE_LICENSE("GPL");
 
 static void __init baycom_epp_dev_setup(struct net_device *dev)
 {
-	struct baycom_state *bc = dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 
 	/*
 	 * initialize part of the baycom_state struct
@@ -1415,7 +1415,7 @@ static void __exit cleanup_baycomepp(void)
 		struct net_device *dev = baycom_device[i];
 
 		if (dev) {
-			struct baycom_state *bc = dev->priv;
+			struct baycom_state *bc = netdev_priv(dev);
 			if (bc->magic == BAYCOM_MAGIC) {
 				unregister_netdev(dev);
 				free_netdev(dev);

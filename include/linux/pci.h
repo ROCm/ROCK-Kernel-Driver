@@ -724,6 +724,10 @@ extern int msi_free_vectors(struct pci_dev* dev, int *vector, int nvec);
 
 #include <asm/pci.h>
 
+/* Backwards compat, remove in 2.7.x */
+#define pci_dma_sync_single	pci_dma_sync_single_for_cpu
+#define pci_dma_sync_sg		pci_dma_sync_sg_for_cpu
+
 /*
  *  If the system does not have PCI, clearly these return errors.  Define
  *  these as simple inline functions to avoid hair in drivers.

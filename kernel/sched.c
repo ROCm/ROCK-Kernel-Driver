@@ -201,8 +201,9 @@ struct prio_array {
  */
 struct runqueue {
 	spinlock_t lock;
-	unsigned long nr_running, nr_switches, expired_timestamp,
-		      nr_uninterruptible, timestamp_last_tick;
+	unsigned long long nr_switches;
+	unsigned long nr_running, expired_timestamp, nr_uninterruptible,
+		timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
@@ -950,9 +951,9 @@ unsigned long nr_uninterruptible(void)
 	return sum;
 }
 
-unsigned long nr_context_switches(void)
+unsigned long long nr_context_switches(void)
 {
-	unsigned long i, sum = 0;
+	unsigned long long i, sum = 0;
 
 	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_switches;

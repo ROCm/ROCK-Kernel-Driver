@@ -1016,14 +1016,20 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 			int pkt_size;
 
 			pkt_size = (int) (desc->PSize & 0x0000FFFF) - 4;
-			pci_dma_sync_single(tp->pci_dev, desc->buf_addr,
-				RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 			skb = dev_alloc_skb(pkt_size + 2);
 			if (skb != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	// 16 byte align the IP fields. //
+				pci_dma_sync_single_for_cpu(tp->pci_dev,
+							    desc->buf_addr,
+							    RX_BUF_SIZE,
+							    PCI_DMA_FROMDEVICE);
 				eth_copy_and_sum(skb, tp->RxBufferRing[cur_rx],
 						 pkt_size, 0);
+				pci_dma_sync_single_for_device(tp->pci_dev,
+							    desc->buf_addr,
+							    RX_BUF_SIZE,
+							    PCI_DMA_FROMDEVICE);
 				skb_put(skb, pkt_size);
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);

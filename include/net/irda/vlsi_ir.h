@@ -41,19 +41,6 @@
 #define PCI_CLASS_SUBCLASS_MASK		0xffff
 #endif
 
-/* missing pci-dma api call to give streaming dma buffer back to hw
- * patch was floating on lkml around 2.5.2x and might be present later.
- * Defining it this way is ok, since the vlsi-ir is only
- * used on two oldish x86-based notebooks which are cache-coherent
- * (and flush_write_buffers also handles PPro errata and C3 OOstore)
- */
-#ifdef CONFIG_X86
-#include <asm-i386/io.h>
-#define pci_dma_prep_single(dev, addr, size, direction)	flush_write_buffers()
-#else
-#error missing pci dma api call
-#endif
-
 /* in recent 2.5 interrupt handlers have non-void return value */
 #ifndef IRQ_RETVAL
 typedef void irqreturn_t;

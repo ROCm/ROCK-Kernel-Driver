@@ -1963,7 +1963,7 @@ static void sg_update_list(struct ScsiReqBlk *srb, u32 left)
 			psge->length -= xferred;
 			psge->address += xferred;
 			srb->sg_index = idx;
-			pci_dma_sync_single(srb->dcb->
+			pci_dma_sync_single_for_device(srb->dcb->
 					    acb->dev,
 					    srb->sg_bus_addr,
 					    SEGMENTX_LEN,
@@ -3448,11 +3448,11 @@ static void srb_done(struct AdapterCtlBlk *acb, struct DeviceCtlBlk *dcb,
 
 	if (dir != PCI_DMA_NONE) {
 		if (cmd->use_sg)
-			pci_dma_sync_sg(acb->dev,
+			pci_dma_sync_sg_for_cpu(acb->dev,
 					(struct scatterlist *)cmd->
 					request_buffer, cmd->use_sg, dir);
 		else if (cmd->request_buffer)
-			pci_dma_sync_single(acb->dev,
+			pci_dma_sync_single_for_cpu(acb->dev,
 					    srb->segment_x[0].address,
 					    cmd->request_bufflen, dir);
 	}

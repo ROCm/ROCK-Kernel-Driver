@@ -154,7 +154,7 @@ static int __devinit abyss_attach(struct pci_dev *pdev, const struct pci_device_
 		printk(":%2.2x", dev->dev_addr[i]);
 	printk("\n");
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	tp->setnselout = abyss_setnselout_pins;
 	tp->sifreadb = abyss_sifreadb;
 	tp->sifreadw = abyss_sifreadw;
@@ -188,7 +188,7 @@ err_out_trdev:
 static unsigned short abyss_setnselout_pins(struct net_device *dev)
 {
 	unsigned short val = 0;
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	
 	if(tp->DataRate == SPEED_4)
 		val |= 0x01;  /* Set 4Mbps */
@@ -398,7 +398,7 @@ static void abyss_read_eeprom(struct net_device *dev)
 	unsigned short val;
 	int i;
 	
-	tp = (struct net_local *)dev->priv;
+	tp = netdev_priv(dev);
 	ioaddr = dev->base_addr;
 	
 	/* Must enable glue chip first */

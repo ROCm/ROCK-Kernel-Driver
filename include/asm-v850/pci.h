@@ -27,7 +27,7 @@ extern void pcibios_set_master (struct pci_dev *dev);
 
 /* `Grant' to PDEV the memory block at CPU_ADDR, for doing DMA.  The
    32-bit PCI bus mastering address to use is returned.  the device owns
-   this memory until either pci_unmap_single or pci_dma_sync_single is
+   this memory until either pci_unmap_single or pci_dma_sync_single_for_cpu is
    performed.  */
 extern dma_addr_t
 pci_map_single (struct pci_dev *pdev, void *cpu_addr, size_t size, int dir);
@@ -44,10 +44,15 @@ pci_unmap_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
    If you perform a pci_map_single() but wish to interrogate the
    buffer using the cpu, yet do not wish to teardown the PCI dma
    mapping, you must call this function before doing so.  At the next
-   point you give the PCI dma address back to the card, the device
-   again owns the buffer.  */
+   point you give the PCI dma address back to the card, you must first
+   perform a pci_dma_sync_for_device, and then the device again owns
+   the buffer.  */
 extern void
-pci_dma_sync_single (struct pci_dev *dev, dma_addr_t dma_addr, size_t size,
+pci_dma_sync_single_for_cpu (struct pci_dev *dev, dma_addr_t dma_addr, size_t size,
+		     int dir);
+
+extern void
+pci_dma_sync_single_for_device (struct pci_dev *dev, dma_addr_t dma_addr, size_t size,
 		     int dir);
 
 

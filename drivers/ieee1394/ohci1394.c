@@ -1732,7 +1732,7 @@ static void ohci_iso_recv_bufferfill_task(struct hpsb_iso *iso, struct ohci_iso_
 		/* OK, the block is finished... */
 		
 		/* sync our view of the block */
-		dma_region_sync(&iso->data_buf, recv->block_dma*recv->buf_stride, recv->buf_stride);
+		dma_region_sync_for_cpu(&iso->data_buf, recv->block_dma*recv->buf_stride, recv->buf_stride);
 		
 		/* reset the DMA descriptor */
 		im->status = recv->buf_stride;
@@ -1789,7 +1789,7 @@ static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_is
 		}
 
 		/* sync our view of the buffer */
-		dma_region_sync(&iso->data_buf, iso->pkt_dma * recv->buf_stride, recv->buf_stride);
+		dma_region_sync_for_cpu(&iso->data_buf, iso->pkt_dma * recv->buf_stride, recv->buf_stride);
 			
 		/* record the per-packet info */
 		{
@@ -2016,7 +2016,7 @@ static int ohci_iso_xmit_queue(struct hpsb_iso *iso, struct hpsb_iso_packet_info
 	sy = info->sy;
 
 	/* sync up the card's view of the buffer */
-	dma_region_sync(&iso->data_buf, offset, len);
+	dma_region_sync_for_device(&iso->data_buf, offset, len);
 
 	/* append first_packet to the DMA chain */
 	/* by linking the previous descriptor to it */

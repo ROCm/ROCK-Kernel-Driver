@@ -32,9 +32,6 @@
 #include <asm/sbus.h>
 #include <asm/sbi.h>
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 #define IRQ_CROSS_CALL		15
 
 extern ctxd_t *srmmu_ctx_table_phys;

@@ -1297,6 +1297,13 @@ struct urb *usb_buffer_map (struct urb *urb)
 	return urb;
 }
 
+/* XXX DISABLED, no users currently.  If you wish to re-enable this
+ * XXX please determine whether the sync is to transfer ownership of
+ * XXX the buffer from device to cpu or vice verse, and thusly use the
+ * XXX appropriate _for_{cpu,device}() method.  -DaveM
+ */
+#if 0
+
 /**
  * usb_buffer_dmasync - synchronize DMA and CPU view of buffer(s)
  * @urb: urb whose transfer_buffer/setup_packet will be synchronized
@@ -1325,6 +1332,7 @@ void usb_buffer_dmasync (struct urb *urb)
 					DMA_TO_DEVICE);
 	}
 }
+#endif
 
 /**
  * usb_buffer_unmap - free DMA mapping(s) for an urb
@@ -1403,6 +1411,13 @@ int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
+/* XXX DISABLED, no users currently.  If you wish to re-enable this
+ * XXX please determine whether the sync is to transfer ownership of
+ * XXX the buffer from device to cpu or vice verse, and thusly use the
+ * XXX appropriate _for_{cpu,device}() method.  -DaveM
+ */
+#if 0
+
 /**
  * usb_buffer_dmasync_sg - synchronize DMA and CPU view of scatterlist buffer(s)
  * @dev: device to which the scatterlist will be mapped
@@ -1428,6 +1443,7 @@ void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
 	dma_sync_sg (controller, sg, n_hw_ents,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
+#endif
 
 /**
  * usb_buffer_unmap_sg - free DMA mapping(s) for a scatterlist
@@ -1595,11 +1611,15 @@ EXPORT_SYMBOL (usb_buffer_alloc);
 EXPORT_SYMBOL (usb_buffer_free);
 
 EXPORT_SYMBOL (usb_buffer_map);
+#if 0
 EXPORT_SYMBOL (usb_buffer_dmasync);
+#endif
 EXPORT_SYMBOL (usb_buffer_unmap);
 
 EXPORT_SYMBOL (usb_buffer_map_sg);
+#if 0
 EXPORT_SYMBOL (usb_buffer_dmasync_sg);
+#endif
 EXPORT_SYMBOL (usb_buffer_unmap_sg);
 
 MODULE_LICENSE("GPL");

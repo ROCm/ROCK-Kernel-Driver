@@ -652,7 +652,6 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 		goto refill;
 	}
 	pkt_len = TO_SIZE(rx_fd->state2);
-	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
 	pci_unmap_single(pdev, rx_fd->data, RX_MAX(HDLC_MAX_MRU), PCI_DMA_FROMDEVICE);
 	if ((skb->data[--pkt_len] & FrameOk) == FrameOk) {
 		stats->rx_packets++;

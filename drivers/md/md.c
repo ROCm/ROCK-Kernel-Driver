@@ -57,7 +57,7 @@
 
 
 #ifndef MODULE
-static void autostart_arrays (void);
+static void autostart_arrays (int part);
 #endif
 
 static mdk_personality_t *pers[MAX_PERSONALITY];
@@ -1447,7 +1447,7 @@ abort:
 	return 1;
 }
 
-static int mdp_major = 0;
+int mdp_major = 0;
 
 static struct kobject *md_probe(dev_t dev, int *part, void *data)
 {
@@ -1792,7 +1792,7 @@ static void autorun_array(mddev_t *mddev)
  *
  * If "unit" is allocated, then bump its reference count
  */
-static void autorun_devices(void)
+static void autorun_devices(int part)
 {
 	struct list_head candidates;
 	struct list_head *tmp;
@@ -1825,7 +1825,12 @@ static void autorun_devices(void)
 			       bdevname(rdev0->bdev, b), rdev0->preferred_minor);
 			break;
 		}
-		dev = MKDEV(MD_MAJOR, rdev0->preferred_minor);
+		if (part)
+			dev = MKDEV(mdp_major,
+				    rdev0->preferred_minor << MdpMinorShift);
+		else
+			dev = MKDEV(MD_MAJOR, rdev0->preferred_minor);
+
 		md_probe(dev, NULL, NULL);
 		mddev = mddev_find(dev);
 		if (!mddev) {
@@ -1922,7 +1927,7 @@ static int autostart_array(dev_t startdev)
 	/*
 	 * possibly return codes
 	 */
-	autorun_devices();
+	autorun_devices(0);
 	return 0;
 
 }
@@ -2407,7 +2412,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 #ifndef MODULE
 		case RAID_AUTORUN:
 			err = 0;
-			autostart_arrays();
+			autostart_arrays(arg);
 			goto done;
 #endif
 		default:;
@@ -3577,7 +3582,7 @@ void md_autodetect_dev(dev_t dev)
 }
 
 
-static void autostart_arrays(void)
+static void autostart_arrays(int part)
 {
 	char b[BDEVNAME_SIZE];
 	mdk_rdev_t *rdev;
@@ -3602,7 +3607,7 @@ static void autostart_arrays(void)
 	}
 	dev_cnt = 0;
 
-	autorun_devices();
+	autorun_devices(part);
 }
 
 #endif

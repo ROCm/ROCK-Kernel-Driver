@@ -399,7 +399,7 @@ get_eeprom_cksum(int off, int len, int *buffer)
 static int __init
 cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	static unsigned version_printed;
 	int i;
 	unsigned rev_type = 0;
@@ -735,7 +735,7 @@ out1:
 static void
 get_dma_channel(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (lp->dma) {
 		dev->dma = lp->dma;
@@ -757,7 +757,7 @@ get_dma_channel(struct net_device *dev)
 static void
 write_dma(struct net_device *dev, int chip_type, int dma)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	if ((lp->isa_config & ANY_ISA_DMA) == 0)
 		return;
 	if (chip_type == CS8900) {
@@ -770,7 +770,7 @@ write_dma(struct net_device *dev, int chip_type, int dma)
 static void
 set_dma_cfg(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (lp->use_dma) {
 		if ((lp->isa_config & ANY_ISA_DMA) == 0) {
@@ -793,7 +793,7 @@ set_dma_cfg(struct net_device *dev)
 static int
 dma_bufcfg(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	if (lp->use_dma)
 		return (lp->isa_config & ANY_ISA_DMA)? RX_DMA_ENBL : 0;
 	else
@@ -804,7 +804,7 @@ static int
 dma_busctl(struct net_device *dev)
 {
 	int retval = 0;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	if (lp->use_dma) {
 		if (lp->isa_config & ANY_ISA_DMA)
 			retval |= RESET_RX_DMA; /* Reset the DMA pointer */
@@ -820,7 +820,7 @@ dma_busctl(struct net_device *dev)
 static void
 dma_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	struct sk_buff *skb;
 	int status, length;
 	unsigned char *bp = lp->rx_dma_ptr;
@@ -882,7 +882,7 @@ skip_this_frame:
 
 void  __init reset_chip(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int reset_start_time;
 
@@ -912,7 +912,7 @@ void  __init reset_chip(struct net_device *dev)
 static void
 control_dc_dc(struct net_device *dev, int on_not_off)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned int selfcontrol;
 	int timenow = jiffies;
 	/* control the DC to DC convertor in the SelfControl register.  
@@ -940,7 +940,7 @@ control_dc_dc(struct net_device *dev, int on_not_off)
 static int
 detect_tp(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int timenow = jiffies;
 	int fdx;
 
@@ -1055,7 +1055,7 @@ send_test_pkt(struct net_device *dev)
 static int
 detect_aui(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (net_debug > 1) printk("%s: Attempting AUI\n", dev->name);
 	control_dc_dc(dev, 0);
@@ -1071,7 +1071,7 @@ detect_aui(struct net_device *dev)
 static int
 detect_bnc(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (net_debug > 1) printk("%s: Attempting BNC\n", dev->name);
 	control_dc_dc(dev, 1);
@@ -1117,7 +1117,7 @@ write_irq(struct net_device *dev, int chip_type, int irq)
 static int
 net_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int result = 0;
 	int i;
 	int ret;
@@ -1358,7 +1358,7 @@ static void net_timeout(struct net_device *dev)
 
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (net_debug > 3) {
 		printk("%s: sent %d byte packet of type %x\n",
@@ -1419,7 +1419,7 @@ static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
  	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	/* we MUST read all the events out of the ISQ, otherwise we'll never
            get interrupted again.  As a consequence, we can't have any limit
@@ -1517,7 +1517,7 @@ count_rx_errors(int status, struct net_local *lp)
 static void
 net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	struct sk_buff *skb;
 	int status, length;
 
@@ -1573,7 +1573,7 @@ static void release_dma_buff(struct net_local *lp)
 static int
 net_close(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 	
@@ -1600,7 +1600,7 @@ net_close(struct net_device *dev)
 static struct net_device_stats *
 net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&lp->lock, flags);
@@ -1614,7 +1614,7 @@ net_get_stats(struct net_device *dev)
 
 static void set_multicast_list(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&lp->lock, flags);
@@ -1758,7 +1758,7 @@ init_module(void)
 
 	dev->irq = irq;
 	dev->base_addr = io;
-	lp = dev->priv;
+	lp = netdev_priv(dev);
 
 #if ALLOW_DMA
 	if (use_dma) {

@@ -954,6 +954,7 @@ out_error:
 	fd = error;
 	goto out;
 }
+EXPORT_SYMBOL_GPL(sys_open);
 
 #ifndef __alpha__
 

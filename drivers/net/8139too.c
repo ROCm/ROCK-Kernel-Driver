@@ -968,12 +968,11 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	if (i < 0)
 		return i;
 
-	tp = dev->priv;
-	ioaddr = tp->mmio_addr;
-
-	assert (ioaddr != NULL);
 	assert (dev != NULL);
+	tp = dev->priv;
 	assert (tp != NULL);
+	ioaddr = tp->mmio_addr;
+	assert (ioaddr != NULL);
 
 	addr_len = read_eeprom (ioaddr, 0, 8) == 0x8129 ? 8 : 6;
 	for (i = 0; i < 3; i++)

@@ -703,7 +703,8 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 #define __unmap_scsi_data(dev, cmd)	do {; } while (0)
 #define __map_scsi_single_data(dev, cmd) (__vtobus(dev,(cmd)->request_buffer))
 #define __map_scsi_sg_data(dev, cmd)	((cmd)->use_sg)
-#define __sync_scsi_data(dev, cmd)	do {; } while (0)
+#define __sync_scsi_data_for_cpu(dev, cmd)	do {; } while (0)
+#define __sync_scsi_data_for_device(dev, cmd)	do {; } while (0)
 
 #define scsi_sg_dma_address(sc)		vtobus((sc)->address)
 #define scsi_sg_dma_len(sc)		((sc)->length)
@@ -767,18 +768,34 @@ static int __map_scsi_sg_data(struct device *dev, Scsi_Cmnd *cmd)
 	return use_sg;
 }
 
-static void __sync_scsi_data(struct device *dev, Scsi_Cmnd *cmd)
+static void __sync_scsi_data_for_cpu(struct device *dev, Scsi_Cmnd *cmd)
 {
 	enum dma_data_direction dma_dir = 
 		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
 	switch(cmd->__data_mapped) {
 	case 2:
-		dma_sync_sg(dev, cmd->buffer, cmd->use_sg, dma_dir);
+		dma_sync_sg_for_cpu(dev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		dma_sync_single(dev, cmd->__data_mapping,
-				cmd->request_bufflen, dma_dir);
+		dma_sync_single_for_cpu(dev, cmd->__data_mapping,
+					cmd->request_bufflen, dma_dir);
+		break;
+	}
+}
+
+static void __sync_scsi_data_for_device(struct device *dev, Scsi_Cmnd *cmd)
+{
+	enum dma_data_direction dma_dir =
+		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
+
+	switch(cmd->__data_mapped) {
+	case 2:
+		dma_sync_sg_for_device(dev, cmd->buffer, cmd->use_sg, dma_dir);
+		break;
+	case 1:
+		dma_sync_single_for_device(dev, cmd->__data_mapping,
+					   cmd->request_bufflen, dma_dir);
 		break;
 	}
 }
@@ -791,7 +808,8 @@ static void __sync_scsi_data(struct device *dev, Scsi_Cmnd *cmd)
 #define unmap_scsi_data(np, cmd)	__unmap_scsi_data(np->dev, cmd)
 #define map_scsi_single_data(np, cmd)	__map_scsi_single_data(np->dev, cmd)
 #define map_scsi_sg_data(np, cmd)	__map_scsi_sg_data(np->dev, cmd)
-#define sync_scsi_data(np, cmd)		__sync_scsi_data(np->dev, cmd)
+#define sync_scsi_data_for_cpu(np, cmd)	__sync_scsi_data_for_cpu(np->dev, cmd)
+#define sync_scsi_data_for_device(np, cmd) __sync_scsi_data_for_device(np->dev, cmd)
 
 /*==========================================================
 **

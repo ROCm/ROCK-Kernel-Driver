@@ -11,6 +11,7 @@
  * countries.
  *
  * Copyright (C) 2003 Manfred Spraul
+ * Copyright (C) 2004 Andrew de Quincey (wol support)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +29,7 @@
  *
  * Changelog:
  * 	0.01: 05 Oct 2003: First release that compiles without warnings.
- * 	0.02: 05 Oct 2003: Fix bug for drain_tx: do not try to free NULL skbs.
+ * 	0.02: 05 Oct 2003: Fix bug for nv_drain_tx: do not try to free NULL skbs.
  * 			   Check all PCI BARs for the register window.
  * 			   udelay added to mii_rw.
  * 	0.03: 06 Oct 2003: Initialize dev->irq.
@@ -37,7 +38,7 @@
  * 	0.06: 10 Oct 2003: MAC Address read updated, pff flag generation updated,
  * 			   irq mask updated
  * 	0.07: 14 Oct 2003: Further irq mask updates.
- * 	0.08: 20 Oct 2003: rx_desc.Length initialization added, alloc_rx refill
+ * 	0.08: 20 Oct 2003: rx_desc.Length initialization added, nv_alloc_rx refill
  * 			   added into irq handler, NULL check for drain_ring.
  * 	0.09: 20 Oct 2003: Basic link speed irq implementation. Only handle the
  * 			   requested interrupt sources.
@@ -47,7 +48,7 @@
  * 	0.12: 23 Oct 2003: Cleanups for release.
  * 	0.13: 25 Oct 2003: Limit for concurrent tx packets increased to 10.
  * 			   Set link speed correctly. start rx before starting
- * 			   tx (start_rx sets the link speed).
+ * 			   tx (nv_start_rx sets the link speed).
  * 	0.14: 25 Oct 2003: Nic dependant irq mask.
  * 	0.15: 08 Nov 2003: fix smp deadlock with set_multicast_list during
  * 			   open.
@@ -58,7 +59,7 @@
  * 	0.18: 17 Nov 2003: fix oops due to late initialization of dev_stats
  * 	0.19: 29 Nov 2003: Handle RxNoBuf, detect & handle invalid mac
  * 			   addresses, really stop rx if already running
- * 			   in start_rx, clean up a bit.
+ * 			   in nv_start_rx, clean up a bit.
  * 				(C) Carl-Daniel Hailfinger
  * 	0.20: 07 Dec 2003: alloc fixes
  * 	0.21: 12 Jan 2004: additional alloc fix, nic polling fix.
@@ -66,6 +67,8 @@
  * 			   on close.
  * 				(C) Carl-Daniel Hailfinger, Manfred Spraul
  *	0.23: 26 Jan 2004: various small cleanups
+ *	0.24: 27 Feb 2004: make driver even less anonymous in backtraces
+ *	0.25: 09 Mar 2004: wol support
  *
  * Known bugs:
  * We suspect that on some hardware no TX done interrupts are generated.
@@ -77,7 +80,7 @@
  * DEV_NEED_TIMERIRQ will not harm you on sane hardware, only generating a few
  * superfluous timer interrupts from the nic.
  */
-#define FORCEDETH_VERSION		"0.23"
+#define FORCEDETH_VERSION		"0.25"
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -232,6 +235,7 @@ enum {
 #define NVREG_WAKEUPFLAGS_ACCEPT_MAGPAT		0x01
 #define NVREG_WAKEUPFLAGS_ACCEPT_WAKEUPPAT	0x02
 #define NVREG_WAKEUPFLAGS_ACCEPT_LINKCHANGE	0x04
+#define NVREG_WAKEUPFLAGS_ENABLE	0x1111
 
 	NvRegPatternCRC = 0x204,
 	NvRegPatternMask = 0x208,
@@ -340,6 +344,7 @@ struct fe_priv {
 	u32 linkspeed;
 	int duplex;
 	int phyaddr;
+	int wolenabled;
 
 	/* General data: RO fields */
 	dma_addr_t ring_addr;
@@ -468,12 +473,12 @@ static int mii_rw(struct net_device *dev, int addr, int miireg, int value)
 	return retval;
 }
 
-static void start_rx(struct net_device *dev)
+static void nv_start_rx(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	u8 *base = get_hwbase(dev);
 
-	dprintk(KERN_DEBUG "%s: start_rx\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_start_rx\n", dev->name);
 	/* Already running? Stop it. */
 	if (readl(base + NvRegReceiverControl) & NVREG_RCVCTL_START) {
 		writel(0, base + NvRegReceiverControl);
@@ -485,48 +490,48 @@ static void start_rx(struct net_device *dev)
 	pci_push(base);
 }
 
-static void stop_rx(struct net_device *dev)
+static void nv_stop_rx(struct net_device *dev)
 {
 	u8 *base = get_hwbase(dev);
 
-	dprintk(KERN_DEBUG "%s: stop_rx\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_stop_rx\n", dev->name);
 	writel(0, base + NvRegReceiverControl);
 	reg_delay(dev, NvRegReceiverStatus, NVREG_RCVSTAT_BUSY, 0,
 		       NV_RXSTOP_DELAY1, NV_RXSTOP_DELAY1MAX,
-		       KERN_INFO "stop_rx: ReceiverStatus remained busy");
+		       KERN_INFO "nv_stop_rx: ReceiverStatus remained busy");
 
 	udelay(NV_RXSTOP_DELAY2);
 	writel(0, base + NvRegLinkSpeed);
 }
 
-static void start_tx(struct net_device *dev)
+static void nv_start_tx(struct net_device *dev)
 {
 	u8 *base = get_hwbase(dev);
 
-	dprintk(KERN_DEBUG "%s: start_tx\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_start_tx\n", dev->name);
 	writel(NVREG_XMITCTL_START, base + NvRegTransmitterControl);
 	pci_push(base);
 }
 
-static void stop_tx(struct net_device *dev)
+static void nv_stop_tx(struct net_device *dev)
 {
 	u8 *base = get_hwbase(dev);
 
-	dprintk(KERN_DEBUG "%s: stop_tx\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_stop_tx\n", dev->name);
 	writel(0, base + NvRegTransmitterControl);
 	reg_delay(dev, NvRegTransmitterStatus, NVREG_XMITSTAT_BUSY, 0,
 		       NV_TXSTOP_DELAY1, NV_TXSTOP_DELAY1MAX,
-		       KERN_INFO "stop_tx: TransmitterStatus remained busy");
+		       KERN_INFO "nv_stop_tx: TransmitterStatus remained busy");
 
 	udelay(NV_TXSTOP_DELAY2);
 	writel(0, base + NvRegUnknownTransmitterReg);
 }
 
-static void txrx_reset(struct net_device *dev)
+static void nv_txrx_reset(struct net_device *dev)
 {
 	u8 *base = get_hwbase(dev);
 
-	dprintk(KERN_DEBUG "%s: txrx_reset\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_txrx_reset\n", dev->name);
 	writel(NVREG_TXRXCTL_BIT2 | NVREG_TXRXCTL_RESET, base + NvRegTxRxControl);
 	pci_push(base);
 	udelay(NV_TXRX_RESET_DELAY);
@@ -551,9 +556,10 @@ static struct net_device_stats *nv_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-static int nv_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int nv_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
 	struct fe_priv *np = get_nvpriv(dev);
+	u8 *base = get_hwbase(dev);
 	u32 ethcmd;
 
 	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
@@ -580,6 +586,39 @@ static int nv_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return -EFAULT;
 		return 0;
 	}
+	case ETHTOOL_GWOL:
+	{
+		struct ethtool_wolinfo wolinfo;
+		memset(&wolinfo, 0, sizeof(wolinfo));
+		wolinfo.supported = WAKE_MAGIC;
+
+		spin_lock_irq(&np->lock);
+		if (np->wolenabled)
+			wolinfo.wolopts = WAKE_MAGIC;
+		spin_unlock_irq(&np->lock);
+
+		if (copy_to_user(useraddr, &wolinfo, sizeof(wolinfo)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SWOL:
+	{
+		struct ethtool_wolinfo wolinfo;
+		if (copy_from_user(&wolinfo, useraddr, sizeof(wolinfo)))
+			return -EFAULT;
+
+		spin_lock_irq(&np->lock);
+		if (wolinfo.wolopts == 0) {
+			writel(0, base + NvRegWakeUpFlags);
+			np->wolenabled = 0;
+		}
+		if (wolinfo.wolopts & WAKE_MAGIC) {
+			writel(NVREG_WAKEUPFLAGS_ENABLE, base + NvRegWakeUpFlags);
+			np->wolenabled = 1;
+		}
+		spin_unlock_irq(&np->lock);
+		return 0;
+	}
 
 	default:
 		break;
@@ -603,11 +642,11 @@ static int nv_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 /*
- * alloc_rx: fill rx ring entries.
+ * nv_alloc_rx: fill rx ring entries.
  * Return 1 if the allocations for the skbs failed and the
  * rx engine is without Available descriptors
  */
-static int alloc_rx(struct net_device *dev)
+static int nv_alloc_rx(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	unsigned int refill_rx = np->refill_rx;
@@ -633,7 +672,7 @@ static int alloc_rx(struct net_device *dev)
 		np->rx_ring[nr].Length = cpu_to_le16(RX_NIC_BUFSIZE);
 		wmb();
 		np->rx_ring[nr].Flags = cpu_to_le16(NV_RX_AVAIL);
-		dprintk(KERN_DEBUG "%s: alloc_rx: Packet  %d marked as Available\n",
+		dprintk(KERN_DEBUG "%s: nv_alloc_rx: Packet  %d marked as Available\n",
 					dev->name, refill_rx);
 		refill_rx++;
 	}
@@ -643,13 +682,13 @@ static int alloc_rx(struct net_device *dev)
 	return 0;
 }
 
-static void do_rx_refill(unsigned long data)
+static void nv_do_rx_refill(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct fe_priv *np = get_nvpriv(dev);
 
 	disable_irq(dev->irq);
-	if (alloc_rx(dev)) {
+	if (nv_alloc_rx(dev)) {
 		spin_lock(&np->lock);
 		if (!np->in_shutdown)
 			mod_timer(&np->oom_kick, jiffies + OOM_REFILL);
@@ -658,7 +697,7 @@ static void do_rx_refill(unsigned long data)
 	enable_irq(dev->irq);
 }
 
-static int init_ring(struct net_device *dev)
+static int nv_init_ring(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	int i;
@@ -673,10 +712,10 @@ static int init_ring(struct net_device *dev)
 	for (i = 0; i < RX_RING; i++) {
 		np->rx_ring[i].Flags = 0;
 	}
-	return alloc_rx(dev);
+	return nv_alloc_rx(dev);
 }
 
-static void drain_tx(struct net_device *dev)
+static void nv_drain_tx(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	int i;
@@ -693,7 +732,7 @@ static void drain_tx(struct net_device *dev)
 	}
 }
 
-static void drain_rx(struct net_device *dev)
+static void nv_drain_rx(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	int i;
@@ -712,8 +751,8 @@ static void drain_rx(struct net_device *dev)
 
 static void drain_ring(struct net_device *dev)
 {
-	drain_tx(dev);
-	drain_rx(dev);
+	nv_drain_tx(dev);
+	nv_drain_rx(dev);
 }
 
 /*
@@ -759,11 +798,11 @@ static int nv_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /*
- * tx_done: check for completed packets, release the skbs.
+ * nv_tx_done: check for completed packets, release the skbs.
  *
  * Caller must own np->lock.
  */
-static void tx_done(struct net_device *dev)
+static void nv_tx_done(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 
@@ -773,7 +812,7 @@ static void tx_done(struct net_device *dev)
 
 		prd = &np->tx_ring[i];
 
-		dprintk(KERN_DEBUG "%s: tx_done: looking at packet %d, Flags 0x%x.\n",
+		dprintk(KERN_DEBUG "%s: nv_tx_done: looking at packet %d, Flags 0x%x.\n",
 					dev->name, np->nic_tx, prd->Flags);
 		if (prd->Flags & cpu_to_le16(NV_TX_VALID))
 			break;
@@ -814,26 +853,26 @@ static void nv_tx_timeout(struct net_device *dev)
 	spin_lock_irq(&np->lock);
 
 	/* 1) stop tx engine */
-	stop_tx(dev);
+	nv_stop_tx(dev);
 
 	/* 2) check that the packets were not sent already: */
-	tx_done(dev);
+	nv_tx_done(dev);
 
 	/* 3) if there are dead entries: clear everything */
 	if (np->next_tx != np->nic_tx) {
 		printk(KERN_DEBUG "%s: tx_timeout: dead entries!\n", dev->name);
-		drain_tx(dev);
+		nv_drain_tx(dev);
 		np->next_tx = np->nic_tx = 0;
 		writel((u32) (np->ring_addr + RX_RING*sizeof(struct ring_desc)), base + NvRegTxRingPhysAddr);
 		netif_wake_queue(dev);
 	}
 
 	/* 4) restart tx engine */
-	start_tx(dev);
+	nv_start_tx(dev);
 	spin_unlock_irq(&np->lock);
 }
 
-static void rx_process(struct net_device *dev)
+static void nv_rx_process(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 
@@ -847,7 +886,7 @@ static void rx_process(struct net_device *dev)
 
 		i = np->cur_rx % RX_RING;
 		prd = &np->rx_ring[i];
-		dprintk(KERN_DEBUG "%s: rx_process: looking at packet %d, Flags 0x%x.\n",
+		dprintk(KERN_DEBUG "%s: nv_rx_process: looking at packet %d, Flags 0x%x.\n",
 					dev->name, np->cur_rx, prd->Flags);
 
 		if (prd->Flags & cpu_to_le16(NV_RX_AVAIL))
@@ -915,7 +954,7 @@ static void rx_process(struct net_device *dev)
 
 		skb_put(skb, len);
 		skb->protocol = eth_type_trans(skb, dev);
-		dprintk(KERN_DEBUG "%s: rx_process: packet %d with %d bytes, proto %d accepted.\n",
+		dprintk(KERN_DEBUG "%s: nv_rx_process: packet %d with %d bytes, proto %d accepted.\n",
 					dev->name, np->cur_rx, len, skb->protocol);
 		netif_rx(skb);
 		dev->last_rx = jiffies;
@@ -990,24 +1029,24 @@ static void nv_set_multicast(struct net_device *dev)
 	addr[0] |= NVREG_MCASTADDRA_FORCE;
 	pff |= NVREG_PFF_ALWAYS;
 	spin_lock_irq(&np->lock);
-	stop_rx(dev);
+	nv_stop_rx(dev);
 	writel(addr[0], base + NvRegMulticastAddrA);
 	writel(addr[1], base + NvRegMulticastAddrB);
 	writel(mask[0], base + NvRegMulticastMaskA);
 	writel(mask[1], base + NvRegMulticastMaskB);
 	writel(pff, base + NvRegPacketFilterFlags);
-	start_rx(dev);
+	nv_start_rx(dev);
 	spin_unlock_irq(&np->lock);
 }
 
-static int update_linkspeed(struct net_device *dev)
+static int nv_update_linkspeed(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	int adv, lpa, newls, newdup;
 
 	adv = mii_rw(dev, np->phyaddr, MII_ADVERTISE, MII_READ);
 	lpa = mii_rw(dev, np->phyaddr, MII_LPA, MII_READ);
-	dprintk(KERN_DEBUG "%s: update_linkspeed: PHY advertises 0x%04x, lpa 0x%04x.\n",
+	dprintk(KERN_DEBUG "%s: nv_update_linkspeed: PHY advertises 0x%04x, lpa 0x%04x.\n",
 				dev->name, adv, lpa);
 
 	/* FIXME: handle parallel detection properly, handle gigabit ethernet */
@@ -1037,7 +1076,7 @@ static int update_linkspeed(struct net_device *dev)
 	return 0;
 }
 
-static void link_irq(struct net_device *dev)
+static void nv_link_irq(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	u8 *base = get_hwbase(dev);
@@ -1050,29 +1089,29 @@ static void link_irq(struct net_device *dev)
 
 	miival = mii_rw(dev, np->phyaddr, MII_BMSR, MII_READ);
 	if (miival & BMSR_ANEGCOMPLETE) {
-		update_linkspeed(dev);
+		nv_update_linkspeed(dev);
 
 		if (netif_carrier_ok(dev)) {
-			stop_rx(dev);
+			nv_stop_rx(dev);
 		} else {
 			netif_carrier_on(dev);
 			printk(KERN_INFO "%s: link up.\n", dev->name);
 		}
 		writel(NVREG_MISC1_FORCE | ( np->duplex ? 0 : NVREG_MISC1_HD),
 					base + NvRegMisc1);
-		start_rx(dev);
+		nv_start_rx(dev);
 	} else {
 		if (netif_carrier_ok(dev)) {
 			netif_carrier_off(dev);
 			printk(KERN_INFO "%s: link down.\n", dev->name);
-			stop_rx(dev);
+			nv_stop_rx(dev);
 		}
 		writel(np->linkspeed, base + NvRegLinkSpeed);
 		pci_push(base);
 	}
 }
 
-static irqreturn_t nic_irq(int foo, void *data, struct pt_regs *regs)
+static irqreturn_t nv_nic_irq(int foo, void *data, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct fe_priv *np = get_nvpriv(dev);
@@ -1080,7 +1119,7 @@ static irqreturn_t nic_irq(int foo, void *data, struct pt_regs *regs)
 	u32 events;
 	int i;
 
-	dprintk(KERN_DEBUG "%s: nic_irq\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_nic_irq\n", dev->name);
 
 	for (i=0; ; i++) {
 		events = readl(base + NvRegIrqStatus) & NVREG_IRQSTAT_MASK;
@@ -1092,13 +1131,13 @@ static irqreturn_t nic_irq(int foo, void *data, struct pt_regs *regs)
 
 		if (events & (NVREG_IRQ_TX1|NVREG_IRQ_TX2|NVREG_IRQ_TX_ERR)) {
 			spin_lock(&np->lock);
-			tx_done(dev);
+			nv_tx_done(dev);
 			spin_unlock(&np->lock);
 		}
 
 		if (events & (NVREG_IRQ_RX|NVREG_IRQ_RX_NOBUF)) {
-			rx_process(dev);
-			if (alloc_rx(dev)) {
+			nv_rx_process(dev);
+			if (nv_alloc_rx(dev)) {
 				spin_lock(&np->lock);
 				if (!np->in_shutdown)
 					mod_timer(&np->oom_kick, jiffies + OOM_REFILL);
@@ -1108,7 +1147,7 @@ static irqreturn_t nic_irq(int foo, void *data, struct pt_regs *regs)
 
 		if (events & NVREG_IRQ_LINK) {
 			spin_lock(&np->lock);
-			link_irq(dev);
+			nv_link_irq(dev);
 			spin_unlock(&np->lock);
 		}
 		if (events & (NVREG_IRQ_TX_ERR)) {
@@ -1127,31 +1166,32 @@ static irqreturn_t nic_irq(int foo, void *data, struct pt_regs *regs)
 
 			if (!np->in_shutdown)
 				mod_timer(&np->nic_poll, jiffies + POLL_WAIT);
-			printk(KERN_DEBUG "%s: too many iterations (%d) in nic_irq.\n", dev->name, i);
+			printk(KERN_DEBUG "%s: too many iterations (%d) in nv_nic_irq.\n", dev->name, i);
 			spin_unlock(&np->lock);
 			break;
 		}
 
 	}
-	dprintk(KERN_DEBUG "%s: nic_irq completed\n", dev->name);
+	dprintk(KERN_DEBUG "%s: nv_nic_irq completed\n", dev->name);
 
 	return IRQ_RETVAL(i);
 }
 
-static void do_nic_poll(unsigned long data)
+static void nv_do_nic_poll(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct fe_priv *np = get_nvpriv(dev);
 	u8 *base = get_hwbase(dev);
 
 	disable_irq(dev->irq);
+	/* FIXME: Do we need synchronize_irq(dev->irq) here? */
 	/*
 	 * reenable interrupts on the nic, we have to do this before calling
-	 * nic_irq because that may decide to do otherwise
+	 * nv_nic_irq because that may decide to do otherwise
 	 */
 	writel(np->irqmask, base + NvRegIrqMask);
 	pci_push(base);
-	nic_irq((int) 0, (void *) data, (struct pt_regs *) NULL);
+	nv_nic_irq((int) 0, (void *) data, (struct pt_regs *) NULL);
 	enable_irq(dev->irq);
 }
 
@@ -1173,12 +1213,12 @@ static int nv_open(struct net_device *dev)
 	writel(0, base + NvRegAdapterControl);
 	writel(0, base + NvRegLinkSpeed);
 	writel(0, base + NvRegUnknownTransmitterReg);
-	txrx_reset(dev);
+	nv_txrx_reset(dev);
 	writel(0, base + NvRegUnknownSetupReg6);
 
 	/* 2) initialize descriptor rings */
 	np->in_shutdown = 0;
-	oom = init_ring(dev);
+	oom = nv_init_ring(dev);
 
 	/* 3) set mac address */
 	{
@@ -1224,7 +1264,7 @@ static int nv_open(struct net_device *dev)
 		np->phyaddr = i;
 
 		spin_lock_irq(&np->lock);
-		update_linkspeed(dev);
+		nv_update_linkspeed(dev);
 		spin_unlock_irq(&np->lock);
 
 		break;
@@ -1279,7 +1319,7 @@ static int nv_open(struct net_device *dev)
 	writel(NVREG_IRQSTAT_MASK, base + NvRegIrqStatus);
 	pci_push(base);
 
-	ret = request_irq(dev->irq, &nic_irq, SA_SHIRQ, dev->name, dev);
+	ret = request_irq(dev->irq, &nv_nic_irq, SA_SHIRQ, dev->name, dev);
 	if (ret)
 		goto out_drain;
 
@@ -1291,8 +1331,8 @@ static int nv_open(struct net_device *dev)
 	writel(0, base + NvRegMulticastMaskA);
 	writel(0, base + NvRegMulticastMaskB);
 	writel(NVREG_PFF_ALWAYS|NVREG_PFF_MYADDR, base + NvRegPacketFilterFlags);
-	start_rx(dev);
-	start_tx(dev);
+	nv_start_rx(dev);
+	nv_start_tx(dev);
 	netif_start_queue(dev);
 	if (oom)
 		mod_timer(&np->oom_kick, jiffies + OOM_REFILL);
@@ -1326,8 +1366,8 @@ static int nv_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 	spin_lock_irq(&np->lock);
-	stop_tx(dev);
-	stop_rx(dev);
+	nv_stop_tx(dev);
+	nv_stop_rx(dev);
 	base = get_hwbase(dev);
 
 	/* disable interrupts on the nic or we will lock up */
@@ -1340,6 +1380,9 @@ static int nv_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	drain_ring(dev);
+
+	if (np->wolenabled)
+		nv_start_rx(dev);
 
 	/* FIXME: power down nic */
 
@@ -1367,10 +1410,10 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 
 	init_timer(&np->oom_kick);
 	np->oom_kick.data = (unsigned long) dev;
-	np->oom_kick.function = &do_rx_refill;	/* timer handler */
+	np->oom_kick.function = &nv_do_rx_refill;	/* timer handler */
 	init_timer(&np->nic_poll);
 	np->nic_poll.data = (unsigned long) dev;
-	np->nic_poll.function = &do_nic_poll;	/* timer handler */
+	np->nic_poll.function = &nv_do_nic_poll;	/* timer handler */
 
 	err = pci_enable_device(pci_dev);
 	if (err) {
@@ -1458,6 +1501,10 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	dprintk(KERN_DEBUG "%s: MAC Address %02x:%02x:%02x:%02x:%02x:%02x\n", pci_name(pci_dev),
 			dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 			dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
+
+	/* disable WOL */
+	writel(0, base + NvRegWakeUpFlags);
+	np->wolenabled = 0;
 
 	np->tx_flags = cpu_to_le16(NV_TX_LASTPACKET|NV_TX_LASTPACKET1|NV_TX_VALID);
 	if (id->driver_data & DEV_NEED_LASTPACKET1)

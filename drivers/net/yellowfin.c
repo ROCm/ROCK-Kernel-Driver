@@ -1124,7 +1124,7 @@ static int yellowfin_rx(struct net_device *dev)
 
 		if(!desc->result_status)
 			break;
-		pci_dma_sync_single(yp->pci_dev, desc->addr, 
+		pci_dma_sync_single_for_cpu(yp->pci_dev, desc->addr,
 			yp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 		desc_status = le32_to_cpu(desc->result_status) >> 16;
 		buf_addr = rx_skb->tail;
@@ -1208,6 +1208,9 @@ static int yellowfin_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), 
 					rx_skb->tail, pkt_len);
 #endif
+				pci_dma_sync_single_for_device(yp->pci_dev, desc->addr,
+											   yp->rx_buf_sz,
+											   PCI_DMA_FROMDEVICE);
 			}
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);

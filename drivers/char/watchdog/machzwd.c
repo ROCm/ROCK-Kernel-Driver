@@ -447,8 +447,6 @@ static struct miscdevice zf_miscdev = {
  */
 static struct notifier_block zf_notifier = {
 	.notifier_call = zf_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static void __init zf_show_action(int act)
