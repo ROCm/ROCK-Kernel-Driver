@@ -905,6 +905,12 @@ need_resched:
 }
 #endif /* CONFIG_PREEMPT */
 
+int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
+{
+	task_t *p = curr->task;
+	return ((p->state & mode) && try_to_wake_up(p, sync));
+}
+
 /*
  * The core wakeup function.  Non-exclusive wakeups (nr_exclusive == 0) just
  * wake everything up.  If it's an exclusive wakeup (nr_exclusive == small +ve
@@ -916,18 +922,17 @@ need_resched:
  */
 static inline void __wake_up_common(wait_queue_head_t *q, unsigned int mode, int nr_exclusive, int sync)
 {
-	struct list_head *tmp;
-	unsigned int state;
-	wait_queue_t *curr;
-	task_t *p;
+	struct list_head *tmp, *next;
 
-	list_for_each(tmp, &q->task_list) {
+	list_for_each_safe(tmp, next, &q->task_list) {
+		wait_queue_t *curr;
+		unsigned flags;
 		curr = list_entry(tmp, wait_queue_t, task_list);
-		p = curr->task;
-		state = p->state;
-		if ((state & mode) && try_to_wake_up(p, sync) &&
-			((curr->flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive))
-				break;
+		flags = curr->flags;
+		if (curr->func(curr, mode, sync) &&
+		    (flags & WQ_FLAG_EXCLUSIVE) &&
+		    !--nr_exclusive)
+			break;
 	}
 }
 
