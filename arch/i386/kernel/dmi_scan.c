@@ -783,6 +783,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ exploding_pnp_bios, "ASUS P4P800", {	/* PnPBIOS GPF on boot */
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer Inc."),
 			MATCH(DMI_BOARD_NAME, "P4P800"),
+			NO_MATCH, NO_MATCH
 			} },
 
 	/* Machines which have problems handling enabled local APICs */

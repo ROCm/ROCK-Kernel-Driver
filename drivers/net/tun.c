@@ -129,8 +129,8 @@ static void tun_net_init(struct net_device *dev)
 		dev->addr_len = 0;
 		dev->mtu = 1500;
 
-		/* Type PPP seems most suitable */
-		dev->type = ARPHRD_PPP; 
+		/* Zero header length */
+		dev->type = ARPHRD_NONE; 
 		dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 		dev->tx_queue_len = 10;
 		break;

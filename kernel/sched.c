@@ -762,6 +762,13 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	load = source_load(cpu);
 	this_load = target_load(this_cpu);
 
+	/*
+	 * If sync wakeup then subtract the (maximum possible) effect of
+	 * the currently running task from the load of the current CPU:
+	 */
+	if (sync)
+		this_load -= SCHED_LOAD_SCALE;
+
 	/* Don't pull the task off an idle CPU to a busy one */
 	if (load < SCHED_LOAD_SCALE && load + this_load > SCHED_LOAD_SCALE
 			&& this_load > load)
