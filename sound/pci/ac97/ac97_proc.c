@@ -37,15 +37,12 @@
 static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, int subidx)
 {
 	char name[64];
-	unsigned int id;
 	unsigned short val, tmp, ext, mext;
 	static const char *spdif_slots[4] = { " SPDIF=3/4", " SPDIF=7/8", " SPDIF=6/9", " SPDIF=res" };
 	static const char *spdif_rates[4] = { " Rate=44.1kHz", " Rate=res", " Rate=48kHz", " Rate=32kHz" };
 	static const char *spdif_rates_cs4205[4] = { " Rate=48kHz", " Rate=44.1kHz", " Rate=res", " Rate=res" };
 
-	id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
-	id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
-	snd_ac97_get_name(NULL, id, name, 0);
+	snd_ac97_get_name(NULL, ac97->id, name, 0);
 	snd_iprintf(buffer, "%d-%d/%d: %s\n\n", ac97->addr, ac97->num, subidx, name);
 	if ((ac97->scaps & AC97_SCAP_AUDIO) == 0)
 		goto __modem;
