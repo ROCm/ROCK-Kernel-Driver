@@ -50,7 +50,4 @@ extern void smp_flush_cache_all(void);
 
 extern void flush_dcache_page(struct page *page);
 
-/* This is unnecessary on the SpitFire since D-CACHE is write-through. */
-#define flush_page_to_ram(page)			do { } while (0)
-
 #endif /* _SPARC64_CACHEFLUSH_H */

@@ -238,11 +238,12 @@ static void reschedule_retry(r1bio_t *r1_bio)
  * operation and are ready to return a success/failure code to the buffer
  * cache layer.
  */
-static void raid_end_bio_io(r1bio_t *r1_bio, int uptodate)
+static void raid_end_bio_io(r1bio_t *r1_bio)
 {
 	struct bio *bio = r1_bio->master_bio;
 
-	bio_endio(bio, bio->bi_size, uptodate ? 0 : -EIO);
+	bio_endio(bio, bio->bi_size,
+		test_bit(R1BIO_Uptodate, &r1_bio->state) ? 0 : -EIO);
 	free_r1bio(r1_bio);
 }
 
@@ -299,7 +300,7 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 * we have only one bio on the read side
 		 */
 		if (uptodate)
-			raid_end_bio_io(r1_bio, uptodate);
+			raid_end_bio_io(r1_bio);
 		else {
 			/*
 			 * oops, read error:
@@ -320,7 +321,7 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 */
 		if (atomic_dec_and_test(&r1_bio->remaining)) {
 			md_write_end(r1_bio->mddev);
-			raid_end_bio_io(r1_bio, uptodate);
+			raid_end_bio_io(r1_bio);
 		}	
 	}
 	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
@@ -542,10 +543,10 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		 * then return an IO error:
 		 */
 		md_write_end(mddev);
-		raid_end_bio_io(r1_bio, 0);
+		raid_end_bio_io(r1_bio);
 		return 0;
 	}
-	atomic_set(&r1_bio->remaining, sum_bios);
+	atomic_set(&r1_bio->remaining, sum_bios+1);
 
 	/*
 	 * We have to be a bit careful about the semaphore above, thats
@@ -567,6 +568,12 @@ static int make_request(request_queue_t *q, struct bio * bio)
 
 		generic_make_request(mbio);
 	}
+
+	if (atomic_dec_and_test(&r1_bio->remaining)) {
+		md_write_end(mddev);
+		raid_end_bio_io(r1_bio);
+	}
+
 	return 0;
 }
 
@@ -917,7 +924,7 @@ static void raid1d(mddev_t *mddev)
 				" read error for block %llu\n",
 				bdev_partition_name(bio->bi_bdev), 
 				(unsigned long long)r1_bio->sector);
-				raid_end_bio_io(r1_bio, 0);
+				raid_end_bio_io(r1_bio);
 				break;
 			}
 			printk(KERN_ERR "raid1: %s: redirecting sector %llu to"

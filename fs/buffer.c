@@ -1754,7 +1754,6 @@ recover:
 	 * exposing stale data.
 	 * The page is currently locked and not marked for writeback
 	 */
-	ClearPageUptodate(page);
 	bh = head;
 	/* Recovery: lock and submit the mapped buffers */
 	do {

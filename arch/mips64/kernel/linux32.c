@@ -195,7 +195,7 @@ int copy_strings32(int argc, u32 * argv, struct linux_binprm *bprm)
 			}
 			err = copy_from_user(kaddr + offset, (char *)A(str),
 			                     bytes_to_copy);
-			flush_page_to_ram(page);
+			flush_dcache_page(page);
 			kunmap(page);
 
 			if (err)

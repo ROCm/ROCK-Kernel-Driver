@@ -179,9 +179,9 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	int retval, i, off;
 	long __timeout = *timeout;
 
- 	read_lock(&current->files->file_lock);
+ 	spin_lock(&current->files->file_lock);
 	retval = max_select_fd(n, fds);
-	read_unlock(&current->files->file_lock);
+	spin_unlock(&current->files->file_lock);
 
 	if (retval < 0)
 		return retval;

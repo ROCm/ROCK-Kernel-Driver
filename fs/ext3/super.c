@@ -566,6 +566,8 @@ static void ext3_clear_inode(struct inode *inode)
 # define ext3_clear_inode NULL
 #endif
 
+static struct dquot_operations ext3_qops;
+
 static struct super_operations ext3_sops = {
 	.alloc_inode	= ext3_alloc_inode,
 	.destroy_inode	= ext3_destroy_inode,
@@ -1337,6 +1339,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext3_sops;
 	sb->s_export_op = &ext3_export_ops;
+	sb->dq_op = &ext3_qops;
 	INIT_LIST_HEAD(&sbi->s_orphan); /* unlinked but open files */
 
 	sb->s_root = 0;
@@ -1977,6 +1980,56 @@ int ext3_statfs (struct super_block * sb, struct statfs * buf)
 	return 0;
 }
 
+/* Helper function for writing quotas on sync - we need to start transaction before quota file
+ * is locked for write. Otherwise the are possible deadlocks:
+ * Process 1                         Process 2
+ * ext3_create()                     quota_sync()
+ *   journal_start()                   write_dquot()
+ *   DQUOT_INIT()                        down(dqio_sem)
+ *     down(dqio_sem)                    journal_start()
+ *
+ */
+
+#ifdef CONFIG_QUOTA
+
+#define EXT3_OLD_QFMT_BLOCKS 2
+#define EXT3_V0_QFMT_BLOCKS 6
+
+static int (*old_sync_dquot)(struct dquot *dquot);
+
+static int ext3_sync_dquot(struct dquot *dquot)
+{
+	int nblocks, ret;
+	handle_t *handle;
+	struct quota_info *dqops = sb_dqopt(dquot->dq_sb);
+	struct inode *qinode;
+
+	switch (dqops->info[dquot->dq_type].dqi_format->qf_fmt_id) {
+		case QFMT_VFS_OLD:
+			nblocks = EXT3_OLD_QFMT_BLOCKS;
+			break;
+		case QFMT_VFS_V0:
+			nblocks = EXT3_V0_QFMT_BLOCKS;
+			break;
+		default:
+			nblocks = EXT3_MAX_TRANS_DATA;
+	}
+	lock_kernel();
+	qinode = dqops->files[dquot->dq_type]->f_dentry->d_inode;
+	handle = ext3_journal_start(qinode, nblocks);
+	if (IS_ERR(handle)) {
+		unlock_kernel();
+		return PTR_ERR(handle);
+	}
+	unlock_kernel();
+	ret = old_sync_dquot(dquot);
+	lock_kernel();
+	ret = ext3_journal_stop(handle);
+	unlock_kernel();
+	return ret;
+}
+#endif
+
 static struct super_block *ext3_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
@@ -1999,6 +2052,11 @@ static int __init init_ext3_fs(void)
 	err = init_inodecache();
 	if (err)
 		goto out1;
+#ifdef CONFIG_QUOTA
+	init_dquot_operations(&ext3_qops);
+	old_sync_dquot = ext3_qops.sync_dquot;
+	ext3_qops.sync_dquot = ext3_sync_dquot;
+#endif
         err = register_filesystem(&ext3_fs_type);
 	if (err)
 		goto out;

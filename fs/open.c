@@ -702,7 +702,7 @@ int get_unused_fd(void)
 	int fd, error;
 
   	error = -EMFILE;
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 
 repeat:
  	fd = find_next_zero_bit(files->open_fds->fds_bits, 
@@ -751,7 +751,7 @@ repeat:
 	error = fd;
 
 out:
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	return error;
 }
 
@@ -765,9 +765,9 @@ static inline void __put_unused_fd(struct files_struct *files, unsigned int fd)
 void put_unused_fd(unsigned int fd)
 {
 	struct files_struct *files = current->files;
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	__put_unused_fd(files, fd);
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 }
 
 /*
@@ -786,11 +786,11 @@ void put_unused_fd(unsigned int fd)
 void fd_install(unsigned int fd, struct file * file)
 {
 	struct files_struct *files = current->files;
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (unlikely(files->fd[fd] != NULL))
 		BUG();
 	files->fd[fd] = file;
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 }
 
 asmlinkage long sys_open(const char __user * filename, int flags, int mode)
@@ -870,7 +870,7 @@ asmlinkage long sys_close(unsigned int fd)
 	struct file * filp;
 	struct files_struct *files = current->files;
 
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (fd >= files->max_fds)
 		goto out_unlock;
 	filp = files->fd[fd];
@@ -879,11 +879,11 @@ asmlinkage long sys_close(unsigned int fd)
 	files->fd[fd] = NULL;
 	FD_CLR(fd, files->close_on_exec);
 	__put_unused_fd(files, fd);
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	return filp_close(filp, files);
 
 out_unlock:
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	return -EBADF;
 }
 

@@ -98,13 +98,13 @@ static void kset_hotplug(const char *action, struct kset *kset,
 			 struct kobject *kobj)
 {
 	char *argv [3];
-	char **envp;
-	char *buffer;
+	char **envp = NULL;
+	char *buffer = NULL;
 	char *scratch;
 	int i = 0;
 	int retval;
 	int kobj_path_length;
-	char *kobj_path;
+	char *kobj_path = NULL;
 	char *name = NULL;
 
 	/* If the kset has a filter operation, call it. If it returns
@@ -119,16 +119,14 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	if (!hotplug_path[0])
 		return;
 
-	envp = (char **)kmalloc(NUM_ENVP * sizeof (char *), GFP_KERNEL);
+	envp = kmalloc(NUM_ENVP * sizeof (char *), GFP_KERNEL);
 	if (!envp)
 		return;
 	memset (envp, 0x00, NUM_ENVP * sizeof (char *));
 
 	buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
-	if (!buffer) {
-		kfree(envp);
-		return;
-	}
+	if (!buffer)
+		goto exit;
 
 	if (kset->hotplug_ops->name)
 		name = kset->hotplug_ops->name(kset, kobj);
@@ -150,11 +148,8 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 	kobj_path_length = get_kobj_path_length (kset, kobj);
 	kobj_path = kmalloc (kobj_path_length, GFP_KERNEL);
-	if (!kobj_path) {
-		kfree (buffer);
-		kfree (envp);
-		return;
-	}
+	if (!kobj_path)
+		goto exit;
 	memset (kobj_path, 0x00, kobj_path_length);
 	fill_kobj_path (kset, kobj, kobj_path, kobj_path_length);
 
@@ -181,15 +176,16 @@ static void kset_hotplug(const char *action, struct kset *kset,
 			  __FUNCTION__, retval);
 
 exit:
-	kfree (kobj_path);
-	kfree (buffer);
+	kfree(kobj_path);
+	kfree(buffer);
+	kfree(envp);
 	return;
 }
 #else
 static void kset_hotplug(const char *action, struct kset *kset,
 			 struct kobject *kobj)
 {
-	return 0;
+	return;
 }
 #endif	/* CONFIG_HOTPLUG */
 

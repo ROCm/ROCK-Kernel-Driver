@@ -78,7 +78,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	flush = zap_pte(mm, vma, addr, pte);
 
 	mm->rss++;
-	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
 	set_pte(pte, mk_pte(page, prot));
 	pte_chain = page_add_rmap(page, pte, pte_chain);

@@ -91,6 +91,13 @@ struct nfsctl_arg {
 		struct nfsctl_export	u_export;
 		struct nfsctl_fdparm	u_getfd;
 		struct nfsctl_fsparm	u_getfs;
+		/*
+		 * The following dummy member is needed to preserve binary compatibility
+		 * on platforms where alignof(void*)>alignof(int).  It's needed because
+		 * this union used to contain a member (u_umap) which contained a
+		 * pointer.
+		 */
+		void *u_ptr;
 	} u;
 #define ca_svc		u.u_svc
 #define ca_client	u.u_client

@@ -251,7 +251,6 @@ put_gate_page (struct page *page, unsigned long address)
 			pte_unmap(pte);
 			goto out;
 		}
-		flush_page_to_ram(page);
 		set_pte(pte, mk_pte(page, PAGE_GATE));
 		pte_unmap(pte);
 	}

@@ -117,16 +117,16 @@ static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsm
 		atomic_inc(&files->count);
 	task_unlock(task);
 	if (files) {
-		read_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 		file = fcheck_files(files, fd);
 		if (file) {
 			*mnt = mntget(file->f_vfsmnt);
 			*dentry = dget(file->f_dentry);
-			read_unlock(&files->file_lock);
+			spin_unlock(&files->file_lock);
 			put_files_struct(files);
 			return 0;
 		}
-		read_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		put_files_struct(files);
 	}
 	return -ENOENT;
@@ -655,7 +655,7 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 			task_unlock(p);
 			if (!files)
 				goto out;
-			read_lock(&files->file_lock);
+			spin_lock(&files->file_lock);
 			for (fd = filp->f_pos-2;
 			     fd < files->max_fds;
 			     fd++, filp->f_pos++) {
@@ -663,7 +663,7 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 
 				if (!fcheck_files(files, fd))
 					continue;
-				read_unlock(&files->file_lock);
+				spin_unlock(&files->file_lock);
 
 				j = NUMBUF;
 				i = fd;
@@ -675,12 +675,12 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 
 				ino = fake_ino(pid, PROC_PID_FD_DIR + fd);
 				if (filldir(dirent, buf+j, NUMBUF-j, fd+2, ino, DT_LNK) < 0) {
-					read_lock(&files->file_lock);
+					spin_lock(&files->file_lock);
 					break;
 				}
-				read_lock(&files->file_lock);
+				spin_lock(&files->file_lock);
 			}
-			read_unlock(&files->file_lock);
+			spin_unlock(&files->file_lock);
 			put_files_struct(files);
 	}
 out:
@@ -824,13 +824,13 @@ static int pid_fd_revalidate(struct dentry * dentry, int flags)
 		atomic_inc(&files->count);
 	task_unlock(task);
 	if (files) {
-		read_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 		if (fcheck_files(files, fd)) {
-			read_unlock(&files->file_lock);
+			spin_unlock(&files->file_lock);
 			put_files_struct(files);
 			return 1;
 		}
-		read_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		put_files_struct(files);
 	}
 	d_drop(dentry);
@@ -920,7 +920,7 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 	if (!files)
 		goto out_unlock;
 	inode->i_mode = S_IFLNK;
-	read_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	file = fcheck_files(files, fd);
 	if (!file)
 		goto out_unlock2;
@@ -928,7 +928,7 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 		inode->i_mode |= S_IRUSR | S_IXUSR;
 	if (file->f_mode & 2)
 		inode->i_mode |= S_IWUSR | S_IXUSR;
-	read_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	put_files_struct(files);
 	inode->i_op = &proc_pid_link_inode_operations;
 	inode->i_size = 64;
@@ -940,7 +940,7 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 	return NULL;
 
 out_unlock2:
-	read_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	put_files_struct(files);
 out_unlock:
 	iput(inode);

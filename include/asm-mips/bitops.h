@@ -824,6 +824,24 @@ extern __inline__ int ext2_clear_bit(int nr, void * addr)
 	return retval;
 }
 
+#define ext2_set_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_set_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
+#define ext2_clear_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_clear_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
 extern __inline__ int ext2_test_bit(int nr, const void * addr)
 {
 	int			mask;
@@ -890,7 +908,9 @@ found_middle:
 
 /* Native ext2 byte ordering, just collapse using defines. */
 #define ext2_set_bit(nr, addr) test_and_set_bit((nr), (addr))
+#define ext2_set_bit_atomic(lock, nr, addr) test_and_set_bit((nr), (addr))
 #define ext2_clear_bit(nr, addr) test_and_clear_bit((nr), (addr))
+#define ext2_clear_bit_atomic(lock, nr, addr) test_and_clear_bit((nr), (addr))
 #define ext2_test_bit(nr, addr) test_bit((nr), (addr))
 #define ext2_find_first_zero_bit(addr, size) find_first_zero_bit((addr), (size))
 #define ext2_find_next_zero_bit(addr, size, offset) \

@@ -6,7 +6,7 @@
 #define INIT_FILES \
 { 							\
 	.count		= ATOMIC_INIT(1), 		\
-	.file_lock	= RW_LOCK_UNLOCKED, 		\
+	.file_lock	= SPIN_LOCK_UNLOCKED, 		\
 	.max_fds	= NR_OPEN_DEFAULT, 		\
 	.max_fdset	= __FD_SETSIZE, 		\
 	.next_fd	= 0, 				\

@@ -94,12 +94,19 @@ error_out:
 	return bh;
 }
 
-static inline int reserve_blocks(struct super_block *sb, int count)
+/*
+ * Set sb->s_dirt here because the superblock was "logically" altered.  We
+ * need to recalculate its free blocks count and flush it out.
+ */
+static int reserve_blocks(struct super_block *sb, int count)
 {
-	struct ext2_sb_info * sbi = EXT2_SB(sb);
-	struct ext2_super_block * es = sbi->s_es;
-	unsigned free_blocks = le32_to_cpu(es->s_free_blocks_count);
-	unsigned root_blocks = le32_to_cpu(es->s_r_blocks_count);
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
+	struct ext2_super_block *es = sbi->s_es;
+	unsigned free_blocks;
+	unsigned root_blocks;
+
+	free_blocks = percpu_counter_read_positive(&sbi->s_freeblocks_counter);
+	root_blocks = le32_to_cpu(es->s_r_blocks_count);
 
 	if (free_blocks < count)
 		count = free_blocks;
@@ -117,46 +124,51 @@ static inline int reserve_blocks(struct super_block *sb, int count)
 			return 0;
 	}
 
-	es->s_free_blocks_count = cpu_to_le32(free_blocks - count);
-	mark_buffer_dirty(sbi->s_sbh);
+	percpu_counter_mod(&sbi->s_freeblocks_counter, -count);
 	sb->s_dirt = 1;
 	return count;
 }
 
-static inline void release_blocks(struct super_block *sb, int count)
+static void release_blocks(struct super_block *sb, int count)
 {
 	if (count) {
-		struct ext2_sb_info * sbi = EXT2_SB(sb);
-		struct ext2_super_block * es = sbi->s_es;
-		unsigned free_blocks = le32_to_cpu(es->s_free_blocks_count);
-		es->s_free_blocks_count = cpu_to_le32(free_blocks + count);
-		mark_buffer_dirty(sbi->s_sbh);
+		struct ext2_sb_info *sbi = EXT2_SB(sb);
+
+		percpu_counter_mod(&sbi->s_freeblocks_counter, count);
 		sb->s_dirt = 1;
 	}
 }
 
-static inline int group_reserve_blocks(struct ext2_group_desc *desc,
-				    struct buffer_head *bh, int count)
+static int group_reserve_blocks(struct ext2_sb_info *sbi, int group_no,
+	struct ext2_group_desc *desc, struct buffer_head *bh, int count)
 {
 	unsigned free_blocks;
 
 	if (!desc->bg_free_blocks_count)
 		return 0;
 
+	spin_lock(sb_bgl_lock(sbi, group_no));
 	free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
 	if (free_blocks < count)
 		count = free_blocks;
 	desc->bg_free_blocks_count = cpu_to_le16(free_blocks - count);
+	spin_unlock(sb_bgl_lock(sbi, group_no));
 	mark_buffer_dirty(bh);
 	return count;
 }
 
-static inline void group_release_blocks(struct ext2_group_desc *desc,
-				    struct buffer_head *bh, int count)
+static void group_release_blocks(struct super_block *sb, int group_no,
+	struct ext2_group_desc *desc, struct buffer_head *bh, int count)
 {
 	if (count) {
-		unsigned free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
+		struct ext2_sb_info *sbi = EXT2_SB(sb);
+		unsigned free_blocks;
+
+		spin_lock(sb_bgl_lock(sbi, group_no));
+		free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
 		desc->bg_free_blocks_count = cpu_to_le16(free_blocks + count);
+		spin_unlock(sb_bgl_lock(sbi, group_no));
+		sb->s_dirt = 1;
 		mark_buffer_dirty(bh);
 	}
 }
@@ -172,12 +184,11 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	unsigned long i;
 	unsigned long overflow;
 	struct super_block * sb = inode->i_sb;
+	struct ext2_sb_info * sbi = EXT2_SB(sb);
 	struct ext2_group_desc * desc;
-	struct ext2_super_block * es;
+	struct ext2_super_block * es = sbi->s_es;
 	unsigned freed = 0, group_freed;
 
-	lock_super (sb);
-	es = EXT2_SB(sb)->s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) ||
 	    block + count < block ||
 	    block + count > le32_to_cpu(es->s_blocks_count)) {
@@ -215,16 +226,17 @@ do_more:
 	if (in_range (le32_to_cpu(desc->bg_block_bitmap), block, count) ||
 	    in_range (le32_to_cpu(desc->bg_inode_bitmap), block, count) ||
 	    in_range (block, le32_to_cpu(desc->bg_inode_table),
-		      EXT2_SB(sb)->s_itb_per_group) ||
+		      sbi->s_itb_per_group) ||
 	    in_range (block + count - 1, le32_to_cpu(desc->bg_inode_table),
-		      EXT2_SB(sb)->s_itb_per_group))
+		      sbi->s_itb_per_group))
 		ext2_error (sb, "ext2_free_blocks",
 			    "Freeing blocks in system zones - "
 			    "Block = %lu, count = %lu",
 			    block, count);
 
 	for (i = 0, group_freed = 0; i < count; i++) {
-		if (!ext2_clear_bit(bit + i, bitmap_bh->b_data))
+		if (!ext2_clear_bit_atomic(sb_bgl_lock(sbi, block_group),
+					bit + i, (void *) bitmap_bh->b_data))
 			ext2_error (sb, "ext2_free_blocks",
 				      "bit already cleared for block %lu",
 				      block + i);
@@ -236,7 +248,7 @@ do_more:
 	if (sb->s_flags & MS_SYNCHRONOUS)
 		sync_dirty_buffer(bitmap_bh);
 
-	group_release_blocks(desc, bh2, group_freed);
+	group_release_blocks(sb, block_group, desc, bh2, group_freed);
 	freed += group_freed;
 
 	if (overflow) {
@@ -247,17 +259,18 @@ do_more:
 error_return:
 	brelse(bitmap_bh);
 	release_blocks(sb, freed);
-	unlock_super (sb);
 	DQUOT_FREE_BLOCK(inode, freed);
 }
 
-static int grab_block(char *map, unsigned size, int goal)
+static int grab_block(spinlock_t *lock, char *map, unsigned size, int goal)
 {
 	int k;
 	char *p, *r;
 
 	if (!ext2_test_bit(goal, map))
 		goto got_it;
+
+repeat:
 	if (goal) {
 		/*
 		 * The goal was occupied; search forward for a free 
@@ -297,7 +310,8 @@ static int grab_block(char *map, unsigned size, int goal)
 	}
 	return -1;
 got_it:
-	ext2_set_bit(goal, map);
+	if (ext2_set_bit_atomic(lock, goal, (void *) map)) 
+		goto repeat;	
 	return goal;
 }
 
@@ -309,15 +323,15 @@ got_it:
  * bitmap, and then for any free bit if that fails.
  * This function also updates quota and i_blocks field.
  */
-int ext2_new_block (struct inode * inode, unsigned long goal,
-    u32 * prealloc_count, u32 * prealloc_block, int * err)
+int ext2_new_block(struct inode *inode, unsigned long goal,
+			u32 *prealloc_count, u32 *prealloc_block, int *err)
 {
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *gdp_bh;	/* bh2 */
 	struct ext2_group_desc *desc;
 	int group_no;			/* i */
 	int ret_block;			/* j */
-	int bit;		/* k */
+	int bit;			/* k */
 	int target_block;		/* tmp */
 	int block = 0;
 	struct super_block *sb = inode->i_sb;
@@ -341,13 +355,10 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 		prealloc_goal--;
 
 	dq_alloc = prealloc_goal + 1;
-
-	lock_super (sb);
-
 	es_alloc = reserve_blocks(sb, dq_alloc);
 	if (!es_alloc) {
 		*err = -ENOSPC;
-		goto out_unlock;
+		goto out_dquot;
 	}
 
 	ext2_debug ("goal=%lu.\n", goal);
@@ -357,10 +368,16 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 		goal = le32_to_cpu(es->s_first_data_block);
 	group_no = (goal - le32_to_cpu(es->s_first_data_block)) / group_size;
 	desc = ext2_get_group_desc (sb, group_no, &gdp_bh);
-	if (!desc)
+	if (!desc) {
+		/*
+		 * gdp_bh may still be uninitialised.  But group_release_blocks
+		 * will not touch it because group_alloc is zero.
+		 */
 		goto io_error;
+	}
 
-	group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
+	group_alloc = group_reserve_blocks(sbi, group_no, desc,
+					gdp_bh, es_alloc);
 	if (group_alloc) {
 		ret_block = ((goal - le32_to_cpu(es->s_first_data_block)) %
 					group_size);
@@ -371,11 +388,11 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 		
 		ext2_debug("goal is at %d:%d.\n", group_no, ret_block);
 
-		ret_block = grab_block(bitmap_bh->b_data,
-				group_size, ret_block);
+		ret_block = grab_block(sb_bgl_lock(sbi, group_no),
+				bitmap_bh->b_data, group_size, ret_block);
 		if (ret_block >= 0)
 			goto got_block;
-		group_release_blocks(desc, gdp_bh, group_alloc);
+		group_release_blocks(sb, group_no, desc, gdp_bh, group_alloc);
 		group_alloc = 0;
 	}
 
@@ -393,7 +410,8 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 		desc = ext2_get_group_desc(sb, group_no, &gdp_bh);
 		if (!desc)
 			goto io_error;
-		group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
+		group_alloc = group_reserve_blocks(sbi, group_no, desc,
+						gdp_bh, es_alloc);
 	}
 	if (!group_alloc) {
 		*err = -ENOSPC;
@@ -404,7 +422,8 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 	if (!bitmap_bh)
 		goto io_error;
 
-	ret_block = grab_block(bitmap_bh->b_data, group_size, 0);
+	ret_block = grab_block(sb_bgl_lock(sbi, group_no), bitmap_bh->b_data,
+				group_size, 0);
 	if (ret_block < 0) {
 		ext2_error (sb, "ext2_new_block",
 			"Free blocks count corrupted for block group %d",
@@ -452,7 +471,9 @@ got_block:
 		unsigned n;
 
 		for (n = 0; n < group_alloc && ++ret_block < group_size; n++) {
-			if (ext2_set_bit(ret_block, bitmap_bh->b_data))
+			if (ext2_set_bit_atomic(sb_bgl_lock(sbi, group_no),
+						ret_block,
+						(void*) bitmap_bh->b_data))
  				break;
 		}
 		*prealloc_block = block + 1;
@@ -471,10 +492,9 @@ got_block:
 
 	*err = 0;
 out_release:
-	group_release_blocks(desc, gdp_bh, group_alloc);
+	group_release_blocks(sb, group_no, desc, gdp_bh, group_alloc);
 	release_blocks(sb, es_alloc);
-out_unlock:
-	unlock_super (sb);
+out_dquot:
 	DQUOT_FREE_BLOCK(inode, dq_alloc);
 out:
 	brelse(bitmap_bh);
@@ -487,11 +507,11 @@ io_error:
 
 unsigned long ext2_count_free_blocks (struct super_block * sb)
 {
-#ifdef EXT2FS_DEBUG
-	struct ext2_super_block * es;
-	unsigned long desc_count, bitmap_count, x;
 	struct ext2_group_desc * desc;
+	unsigned long desc_count = 0;
 	int i;
+#ifdef EXT2FS_DEBUG
+	unsigned long bitmap_count, x;
 	
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
@@ -519,13 +539,18 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	unlock_super (sb);
 	return bitmap_count;
 #else
-	return le32_to_cpu(EXT2_SB(sb)->s_es->s_free_blocks_count);
+        for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
+                desc = ext2_get_group_desc (sb, i, NULL);
+                if (!desc)
+                        continue;
+                desc_count += le16_to_cpu(desc->bg_free_blocks_count);
+	}
+	return desc_count;
 #endif
 }
 
-static inline int block_in_use (unsigned long block,
-				struct super_block * sb,
-				unsigned char * map)
+static inline int
+block_in_use(unsigned long block, struct super_block *sb, unsigned char *map)
 {
 	return ext2_test_bit ((block - le32_to_cpu(EXT2_SB(sb)->s_es->s_first_data_block)) %
 			 EXT2_BLOCKS_PER_GROUP(sb), map);
