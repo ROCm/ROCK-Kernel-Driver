@@ -70,25 +70,17 @@ config IA64_GENERIC
 	  will run on any supported IA-64 system.  However, if you configure
 	  a kernel for your specific system, it will be faster and smaller.
 
-	  To find out what type of IA-64 system you have, you may want to
-	  check the IA-64 Linux web site at <http://www.linux-ia64.org/>.
-	  As of the time of this writing, most hardware is DIG compliant,
-	  so the "DIG-compliant" option is usually the right choice.
-
-	  HP-simulator   For the HP simulator
-	  (<http://software.hp.com/ia64linux/>).
-	  HP-zx1         For HP zx1-based systems.
-	  SGI-SN2	 For SGI Altix systems
 	  DIG-compliant  For DIG ("Developer's Interface Guide") compliant
-	  systems.
+	  systems
+	  HP-zx1         For HP systems
+	  SGI-SN2	 For SGI Altix systems
+	  Ski-simulator  For the HP simulator
+	  (<http://www.hpl.hp.com/research/linux/ski/>)
 
 	  If you don't know what to do, choose "generic".
 
 config IA64_DIG
 	bool "DIG-compliant"
-
-config IA64_HP_SIM
-	bool "HP-simulator"
 
 config IA64_HP_ZX1
 	bool "HP-zx1"
@@ -99,6 +91,9 @@ config IA64_HP_ZX1
 
 config IA64_SGI_SN2
 	bool "SGI-SN2"
+
+config IA64_HP_SIM
+	bool "Ski-simulator"
 
 endchoice
 
