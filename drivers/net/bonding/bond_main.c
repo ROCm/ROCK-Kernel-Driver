@@ -2913,22 +2913,18 @@ static int bond_xmit_broadcast(struct sk_buff *skb, struct net_device *bond_dev)
 	struct net_device *tx_dev = NULL;
 	int i;
 
-	if (!IS_UP(bond_dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
 	read_lock(&bond->lock);
 
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
+	}
+	
 	read_lock(&bond->curr_slave_lock);
 	start_at = bond->curr_active_slave;
 	read_unlock(&bond->curr_slave_lock);
 
-	if (!start_at) { /* we're at the root, get the first slave */
-		/* no suitable interface, frame not sent */
-		read_unlock(&bond->lock);
-		dev_kfree_skb(skb);
-		return 0;
+	if (!start_at) {
+		goto free_out;
 	}
 
 	bond_for_each_slave_from(bond, slave, i, start_at) {
@@ -2957,12 +2953,18 @@ static int bond_xmit_broadcast(struct sk_buff *skb, struct net_device *bond_dev)
 		skb->priority = 1;
 		dev_queue_xmit(skb);
 	} else {
-		dev_kfree_skb(skb);
+		goto free_out;
 	}
 
+out:
 	/* frame sent to all suitable interfaces */
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	/* no suitable interface, frame not sent */
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev)
@@ -2971,22 +2973,18 @@ static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev
 	struct slave *slave, *start_at;
 	int i;
 
-	if (!IS_UP(bond_dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
 	read_lock(&bond->lock);
 
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
+	}
+	
 	read_lock(&bond->curr_slave_lock);
 	slave = start_at = bond->curr_active_slave;
 	read_unlock(&bond->curr_slave_lock);
 
-	if (!slave) { /* we're at the root, get the first slave */
-		/* no suitable interface, frame not sent */
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+	if (!slave) {
+		goto free_out;
 	}
 
 	bond_for_each_slave_from(bond, slave, i, start_at) {
@@ -3002,15 +3000,18 @@ static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev
 			bond->curr_active_slave = slave->next;
 			write_unlock(&bond->curr_slave_lock);
 
-			read_unlock(&bond->lock);
-			return 0;
+			goto out;
 		}
 	}
 
-	/* no suitable interface, frame not sent */
-	dev_kfree_skb(skb);
+out:
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	/* no suitable interface, frame not sent */
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 /* 
@@ -3026,18 +3027,10 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 	int slave_no;
 	int i;
 
-	if (!IS_UP(bond_dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
 	read_lock(&bond->lock);
 
-	if (bond->slave_cnt == 0) {
-		/* no suitable interface, frame not sent */
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
 	}
 
 	slave_no = (data->h_dest[5]^bond_dev->dev_addr[5]) % bond->slave_cnt;
@@ -3060,15 +3053,18 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 			skb->priority = 1;
 			dev_queue_xmit(skb);
 
-			read_unlock(&bond->lock);
-			return 0;
+			goto out;
 		}
 	}
 
-	/* no suitable interface, frame not sent */
-	dev_kfree_skb(skb);
+out:
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	/* no suitable interface, frame not sent */
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 /* 
@@ -3078,11 +3074,6 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_dev)
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
-
-	if (!IS_UP(bond_dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
 
 	/* if we are sending arp packets, try to at least 
 	   identify our own ip address */
@@ -3096,24 +3087,29 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_d
 	}
 
 	read_lock(&bond->lock);
-
 	read_lock(&bond->curr_slave_lock);
+
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
+	}
+	
 	if (bond->curr_active_slave) { /* one usable interface */
 		skb->dev = bond->curr_active_slave->dev;
-		read_unlock(&bond->curr_slave_lock);
 		skb->priority = 1;
 		dev_queue_xmit(skb);
-		read_unlock(&bond->lock);
-		return 0;
+		goto out;
 	} else {
-		read_unlock(&bond->curr_slave_lock);
+		goto free_out;
 	}
-
-	/* no suitable interface, frame not sent */
-	dprintk("There was no suitable interface, so we don't transmit\n");
-	dev_kfree_skb(skb);
+out:
+	read_unlock(&bond->curr_slave_lock);
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	/* no suitable interface, frame not sent */
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 static struct net_device_stats *bond_get_stats(struct net_device *bond_dev)

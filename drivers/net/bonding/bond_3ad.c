@@ -2360,32 +2360,18 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	int i;
 	struct ad_info ad_info;
 
-	if (!IS_UP(dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
-	if (bond == NULL) {
-		printk(KERN_ERR DRV_NAME ": Error: bond is NULL on device %s\n", dev->name);
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
+	/* make sure that the slaves list will
+	 * not change during tx
+	 */
 	read_lock(&bond->lock);
 
-	/* check if bond is empty */
-	if (bond->slave_cnt == 0) {
-		printk(KERN_DEBUG DRV_NAME ": Error: bond is empty\n");
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
 	}
 
 	if (bond_3ad_get_active_agg_info(bond, &ad_info)) {
 		printk(KERN_DEBUG "ERROR: bond_3ad_get_active_agg_info failed\n");
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+		goto free_out;
 	}
 
 	slaves_in_agg = ad_info.ports;
@@ -2394,9 +2380,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	if (slaves_in_agg == 0) {
 		/*the aggregator is empty*/
 		printk(KERN_DEBUG "ERROR: active aggregator is empty\n");
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+		goto free_out;
 	}
 
 	slave_agg_no = (data->h_dest[5]^bond->dev->dev_addr[5]) % slaves_in_agg;
@@ -2414,9 +2398,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 
 	if (slave_agg_no >= 0) {
 		printk(KERN_ERR DRV_NAME ": Error: Couldn't find a slave to tx on for aggregator ID %d\n", agg_id);
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
+		goto free_out;
 	}
 
 	start_at = slave;
@@ -2434,15 +2416,17 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 			skb->dev = slave->dev;			
 			skb->priority = 1;
 			dev_queue_xmit(skb);
-			read_unlock(&bond->lock);
-			return 0;
 		}
 	}
 
-	/* no suitable interface, frame not sent */
-	dev_kfree_skb(skb);
+out:
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	/* no suitable interface, frame not sent */
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 int bond_3ad_lacpdu_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type* ptype)

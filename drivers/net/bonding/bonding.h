@@ -45,18 +45,27 @@
 #define dprintk(fmt, args...)
 #endif /* BONDING_DEBUG */
 
-#define IS_UP(dev)  ((((dev)->flags & (IFF_UP)) == (IFF_UP)) && \
-		     (netif_running(dev) && netif_carrier_ok(dev)))
+#define IS_UP(dev)					   \
+	      ((((dev)->flags & IFF_UP) == IFF_UP)	&& \
+	       netif_running(dev)			&& \
+	       netif_carrier_ok(dev))
 
-/* Checks whether the dev is ready for transmit. We do not check netif_running
- * since a device can be stopped by the driver for short periods of time for
- * maintainance. dev_queue_xmit() handles this by queing the packet until the
- * the dev is running again. Keeping packets ordering requires sticking the
- * same dev as much as possible
+/*
+ * Checks whether bond is ready for transmit.
+ * 
+ * Caller must hold bond->lock
  */
-#define SLAVE_IS_OK(slave) \
-		     ((((slave)->dev->flags & (IFF_UP)) == (IFF_UP)) && \
-		     netif_carrier_ok((slave)->dev) && \
+#define BOND_IS_OK(bond)			     \
+		   (((bond)->dev->flags & IFF_UP) && \
+		    netif_running((bond)->dev)	  && \
+		    ((bond)->slave_cnt > 0))
+
+/*
+ * Checks whether slave is ready for transmit.
+ */
+#define SLAVE_IS_OK(slave)			        \
+		    (((slave)->dev->flags & IFF_UP)  && \
+		     netif_running((slave)->dev)     && \
 		     ((slave)->link == BOND_LINK_UP) && \
 		     ((slave)->state == BOND_STATE_ACTIVE))
 

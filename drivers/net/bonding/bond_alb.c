@@ -1158,24 +1158,15 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	u32 hash_index = 0;
 	u8 *hash_start = NULL;
 
-	if (!IS_UP(bond_dev)) { /* bond down */
-		dev_kfree_skb(skb);
-		return 0;
-	}
-
 	/* make sure that the curr_active_slave and the slaves list do
 	 * not change during tx
 	 */
 	read_lock(&bond->lock);
-
-	if (bond->slave_cnt == 0) {
-		/* no suitable interface, frame not sent */
-		dev_kfree_skb(skb);
-		read_unlock(&bond->lock);
-		return 0;
-	}
-
 	read_lock(&bond->curr_slave_lock);
+
+	if (!BOND_IS_OK(bond)) {
+		goto free_out;
+	}
 
 	switch (ntohs(skb->protocol)) {
 	case ETH_P_IP:
@@ -1256,12 +1247,17 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 		if (tx_slave) {
 			tlb_clear_slave(bond, tx_slave, 0);
 		}
-		dev_kfree_skb(skb);
+		goto free_out;
 	}
 
+out:
 	read_unlock(&bond->curr_slave_lock);
 	read_unlock(&bond->lock);
 	return 0;
+
+free_out:
+	dev_kfree_skb(skb);
+	goto out;
 }
 
 void bond_alb_monitor(struct bonding *bond)
