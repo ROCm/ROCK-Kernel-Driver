@@ -162,8 +162,8 @@ static int FAN_TO_REG(int reg, int div)
 	(AUTO_TEMP_MIN_FROM_REG(reg) - 5000)
 
 #define AUTO_TEMP_MAX_FROM_REG(reg)		\
-	AUTO_TEMP_RANGE_FROM_REG(reg) +		\
-	AUTO_TEMP_MIN_FROM_REG(reg)
+	(AUTO_TEMP_RANGE_FROM_REG(reg) +	\
+	AUTO_TEMP_MIN_FROM_REG(reg))
 
 static int AUTO_TEMP_MAX_TO_REG(int val, int reg, int pwm)
 {
