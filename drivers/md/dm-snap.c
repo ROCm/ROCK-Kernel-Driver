@@ -318,12 +318,9 @@ int dm_add_exception(struct dm_snapshot *s, chunk_t old, chunk_t new)
  */
 static int calc_max_buckets(void)
 {
-	unsigned long mem;
-
-	mem = num_physpages << PAGE_SHIFT;
-	mem /= 50;
+	/* use a fixed size of 2MB */
+	unsigned long mem = 2 * 1024 * 1024;
 	mem /= sizeof(struct list_head);
-
 	return mem;
 }
 
