@@ -893,7 +893,9 @@ pmac_pcibios_fixup(void)
 		request_region(0x0UL, 0x2e0UL, "reserved legacy io");
 		request_region(0x300UL, 0xe0UL, "reserved legacy io");
 		request_region(0x400UL, 0x10000UL-0x400UL, "reserved legacy io");
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
 		do_not_try_pc_legacy_8250_console = 1;
+#endif
 	} else
 		request_region(0x0UL, 0x10000UL, "reserved legacy io");
 }
