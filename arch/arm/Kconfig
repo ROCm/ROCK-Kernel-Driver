@@ -488,6 +488,11 @@ config ICST525
 	depends on ARCH_INTEGRATOR
 	default y
 
+config ARM_AMBA
+	bool
+	depends on ARCH_INTEGRATOR
+	default y
+
 config ISA
 	bool
 	depends on FOOTBRIDGE_HOST || ARCH_SHARK || ARCH_CLPS7500 || ARCH_EBSA110 || ARCH_CDB89712 || ARCH_EDB7211 || ARCH_SA1100
