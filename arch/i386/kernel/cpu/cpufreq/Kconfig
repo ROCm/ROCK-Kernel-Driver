@@ -99,7 +99,7 @@ config X86_GX_SUSPMOD
 
 	 If in doubt, say N.
 
-config X86_SPEEDSTEP
+config X86_SPEEDSTEP_ICH
 	tristate "Intel Speedstep"
 	depends on CPU_FREQ_TABLE
 	help
