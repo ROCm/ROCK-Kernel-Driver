@@ -473,7 +473,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	/* set proper values in socket->dev */
 	socket->dev.class_data = socket;
 	socket->dev.class = &pcmcia_socket_class;
-	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u\n", socket->sock);
+	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u", socket->sock);
 
 	/* register with the device core */
 	if (class_device_register(&socket->dev)) {
