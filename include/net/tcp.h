@@ -1876,14 +1876,6 @@ static __inline__ void tcp_openreq_init(struct open_request *req,
 
 #define TCP_MEM_QUANTUM	((int)PAGE_SIZE)
 
-static inline void tcp_free_skb(struct sock *sk, struct sk_buff *skb)
-{
-	tcp_sk(sk)->queue_shrunk = 1;
-	sk->sk_wmem_queued -= skb->truesize;
-	sk->sk_forward_alloc += skb->truesize;
-	__kfree_skb(skb);
-}
-
 extern void __tcp_mem_reclaim(struct sock *sk);
 extern int tcp_mem_schedule(struct sock *sk, int size, int kind);
 
@@ -1951,7 +1943,7 @@ static inline void tcp_writequeue_purge(struct sock *sk)
 	struct sk_buff *skb;
 
 	while ((skb = __skb_dequeue(&sk->sk_write_queue)) != NULL)
-		tcp_free_skb(sk, skb);
+		sk_stream_free_skb(sk, skb);
 	tcp_mem_reclaim(sk);
 }
 

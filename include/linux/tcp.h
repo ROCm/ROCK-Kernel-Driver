@@ -262,8 +262,8 @@ struct tcp_opt {
 	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
 
 	__u8	unused_pad;
-	__u8	queue_shrunk;	/* Write queue has been shrunk recently.*/
 	__u8	defer_accept;	/* User waits for some data after accept() */
+	/* one byte hole, try to pack */
 
 /* RTT measurement */
 	__u8	backoff;	/* backoff				*/

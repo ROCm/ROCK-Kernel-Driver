@@ -763,7 +763,7 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		 */
 		if (tp->fackets_out)
 			tp->fackets_out--;
-		tcp_free_skb(sk, next_skb);
+		sk_stream_free_skb(sk, next_skb);
 		tp->packets_out--;
 	}
 }
@@ -1104,7 +1104,7 @@ int tcp_send_synack(struct sock *sk)
 				return -ENOMEM;
 			__skb_unlink(skb, &sk->sk_write_queue);
 			__skb_queue_head(&sk->sk_write_queue, nskb);
-			tcp_free_skb(sk, skb);
+			sk_stream_free_skb(sk, skb);
 			sk_charge_skb(sk, nskb);
 			skb = nskb;
 		}

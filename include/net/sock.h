@@ -168,6 +168,7 @@ struct sock_common {
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
   *	@sk_write_pending - a write to stream socket waits to start
+  *	@sk_queue_shrunk - write queue has been shrunk recently
   *	@sk_state_change - callback to indicate change in the state of the sock
   *	@sk_data_ready - callback to indicate there is data to be processed
   *	@sk_write_space - callback to indicate there is bf sending space available
@@ -250,6 +251,8 @@ struct sock {
 	struct module		*sk_owner;
 	int			sk_write_pending;
 	void			*sk_security;
+	__u8			sk_queue_shrunk;
+	/* three bytes hole, try to pack */
 	void			(*sk_state_change)(struct sock *sk);
 	void			(*sk_data_ready)(struct sock *sk, int bytes);
 	void			(*sk_write_space)(struct sock *sk);
@@ -444,6 +447,14 @@ static inline void sk_stream_set_owner_r(struct sk_buff *skb, struct sock *sk)
 	skb->destructor = sk_stream_rfree;
 	atomic_add(skb->truesize, &sk->sk_rmem_alloc);
 	sk->sk_forward_alloc -= skb->truesize;
+}
+
+static inline void sk_stream_free_skb(struct sock *sk, struct sk_buff *skb)
+{
+	sk->sk_queue_shrunk   = 1;
+	sk->sk_wmem_queued   -= skb->truesize;
+	sk->sk_forward_alloc += skb->truesize;
+	__kfree_skb(skb);
 }
 
 /* The per-socket spinlock must be held here. */

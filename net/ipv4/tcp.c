@@ -1038,7 +1038,7 @@ do_fault:
 		if (tp->send_head == skb)
 			tp->send_head = NULL;
 		__skb_unlink(skb, skb->list);
-		tcp_free_skb(sk, skb);
+		sk_stream_free_skb(sk, skb);
 	}
 
 do_error:

@@ -2368,7 +2368,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 			tp->fackets_out--;
 		tp->packets_out--;
 		__skb_unlink(skb, skb->list);
-		tcp_free_skb(sk, skb);
+		sk_stream_free_skb(sk, skb);
 	}
 
 	if (acked&FLAG_ACKED) {
@@ -3829,7 +3829,7 @@ void tcp_cwnd_application_limited(struct sock *sk)
 
 
 /* When incoming ACK allowed to free some skb from write_queue,
- * we remember this event in flag tp->queue_shrunk and wake up socket
+ * we remember this event in flag sk->sk_queue_shrunk and wake up socket
  * on the exit from tcp input handler.
  *
  * PROBLEM: sndbuf expansion does not work well with largesend.
@@ -3857,10 +3857,8 @@ static void tcp_new_space(struct sock *sk)
 
 static inline void tcp_check_space(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
-
-	if (tp->queue_shrunk) {
-		tp->queue_shrunk = 0;
+	if (sk->sk_queue_shrunk) {
+		sk->sk_queue_shrunk = 0;
 		if (sk->sk_socket &&
 		    test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
 			tcp_new_space(sk);
