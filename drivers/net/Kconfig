@@ -492,12 +492,12 @@ config MIPS_GT96100ETH
 	help
 	  Say Y here to support the Ethernet subsystem on your GT96100 card.
 
-config MIPS_AU1000_ENET
+config MIPS_AU1X00_ENET
 	bool "MIPS AU1000 Ethernet support"
-	depends on NET_ETHERNET && MIPS_AU1000
+	depends on NET_ETHERNET && SOC_AU1X00
 	help
-	  If you have an Alchemy Semi AU1000 ethernet controller
-	  on an SGI MIPS system, say Y.  Otherwise, say N.
+	  If you have an Alchemy Semi AU1X00 based system
+	  say Y.  Otherwise, say N.
 
 config NET_SB1250_MAC
 	tristate "SB1250 Ethernet support"
