@@ -1217,7 +1217,7 @@ struct tty_driver *usb_serial_tty_driver;
 static int __init usb_serial_init(void)
 {
 	int i;
-	int result = 0;
+	int result;
 
 	usb_serial_tty_driver = alloc_tty_driver(SERIAL_TTY_MINORS);
 	if (!usb_serial_tty_driver)
@@ -1228,13 +1228,17 @@ static int __init usb_serial_init(void)
 		serial_table[i] = NULL;
 	}
 
-	bus_register(&usb_serial_bus_type);
+	result = bus_register(&usb_serial_bus_type);
+	if (result) {
+		err("%s - registering bus driver failed", __FUNCTION__);
+		goto exit_bus;
+	}
 
 	/* register the generic driver, if we should */
 	result = usb_serial_generic_register(debug);
 	if (result < 0) {
 		err("%s - registering generic driver failed", __FUNCTION__);
-		goto exit;
+		goto exit_generic;
 	}
 
 	usb_serial_tty_driver->owner = THIS_MODULE;
@@ -1252,7 +1256,7 @@ static int __init usb_serial_init(void)
 	result = tty_register_driver(usb_serial_tty_driver);
 	if (result) {
 		err("%s - tty_register_driver failed", __FUNCTION__);
-		goto exit_generic;
+		goto exit_reg_driver;
 	}
 
 	/* register the USB driver */
@@ -1269,10 +1273,13 @@ static int __init usb_serial_init(void)
 exit_tty:
 	tty_unregister_driver(usb_serial_tty_driver);
 
-exit_generic:
+exit_reg_driver:
 	usb_serial_generic_deregister();
 
-exit:
+exit_generic:
+	bus_unregister(&usb_serial_bus_type);
+
+exit_bus:
 	err ("%s - returning with error %d", __FUNCTION__, result);
 	put_tty_driver(usb_serial_tty_driver);
 	return result;
