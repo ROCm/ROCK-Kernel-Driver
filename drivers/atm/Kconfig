@@ -15,6 +15,11 @@ config ATM_TCP
 config ATM_LANAI
 	tristate "Efficient Networks Speedstream 3010"
 	depends on PCI
+	help
+	  Supports ATM cards based on the Efficient Networks "Lanai"
+	  chipset such as the Speedstream 3010 and the ENI-25p.  The
+	  Speedstream 3060 is currently not supported since we don't
+	  have the code to drive the on-board Alcatel DSL chipset (yet).
 
 config ATM_ENI
 	tristate "Efficient Networks ENI155P"
