@@ -59,7 +59,7 @@ extern void polaris_machine_check(u64, u64, struct pt_regs *);
 extern struct pci_ops t2_pci_ops;
 extern void t2_init_arch(void);
 extern void t2_machine_check(u64, u64, struct pt_regs *);
-#define t2_pci_tbi ((void *)0)
+extern void t2_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_titan.c */
 extern struct pci_ops titan_pci_ops;

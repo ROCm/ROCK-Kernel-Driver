@@ -1082,16 +1082,6 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 	if (ext3_should_journal_data(inode)) {
 		ret = walk_page_buffers(handle, page_buffers(page),
 				from, to, NULL, do_journal_get_write_access);
-		if (ret) {
-			/*
-			 * We're going to fail this prepare_write(),
-			 * so commit_write() will not be called.
-			 * We need to undo block_prepare_write()'s kmap().
-			 * AKPM: Do we need to clear PageUptodate?  I don't
-			 * think so.
-			 */
-			kunmap(page);
-		}
 	}
 prepare_write_failed:
 	if (ret)
@@ -1151,7 +1141,6 @@ static int ext3_commit_write(struct file *file, struct page *page,
 			from, to, &partial, commit_write_fn);
 		if (!partial)
 			SetPageUptodate(page);
-		kunmap(page);
 		if (pos > inode->i_size)
 			inode->i_size = pos;
 		EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
@@ -1162,17 +1151,8 @@ static int ext3_commit_write(struct file *file, struct page *page,
 		}
 		/* Be careful here if generic_commit_write becomes a
 		 * required invocation after block_prepare_write. */
-		if (ret == 0) {
+		if (ret == 0)
 			ret = generic_commit_write(file, page, from, to);
-		} else {
-			/*
-			 * block_prepare_write() was called, but we're not
-			 * going to call generic_commit_write().  So we
-			 * need to perform generic_commit_write()'s kunmap
-			 * by hand.
-			 */
-			kunmap(page);
-		}
 	}
 	if (inode->i_size > EXT3_I(inode)->i_disksize) {
 		EXT3_I(inode)->i_disksize = inode->i_size;
@@ -1535,6 +1515,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 	struct page *page;
 	struct buffer_head *bh;
 	int err;
+	void *kaddr;
 
 	blocksize = inode->i_sb->s_blocksize;
 	length = offset & (blocksize - 1);
@@ -1590,10 +1571,11 @@ static int ext3_block_truncate_page(handle_t *handle,
 		if (err)
 			goto unlock;
 	}
-	
-	memset(kmap(page) + offset, 0, length);
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr + offset, 0, length);
 	flush_dcache_page(page);
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 
 	BUFFER_TRACE(bh, "zeroed end of block");
 

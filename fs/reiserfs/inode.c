@@ -7,6 +7,7 @@
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
+#include <linux/highmem.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 #include <linux/buffer_head.h>
@@ -1692,8 +1693,6 @@ static int grab_tail_page(struct inode *p_s_inode,
     if (error)
 	goto unlock ;
 
-    kunmap(page) ; /* mapped by block_prepare_write */
-
     head = page_buffers(page) ;      
     bh = head;
     do {
@@ -1788,10 +1787,13 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
         length = offset & (blocksize - 1) ;
 	/* if we are not on a block boundary */
 	if (length) {
+	    char *kaddr;
+
 	    length = blocksize - length ;
-	    memset((char *)kmap(page) + offset, 0, length) ;   
+	    kaddr = kmap_atomic(page, KM_USER0) ;
+	    memset(kaddr + offset, 0, length) ;   
 	    flush_dcache_page(page) ;
-	    kunmap(page) ;
+	    kunmap_atomic(kaddr, KM_USER0) ;
 	    if (buffer_mapped(bh) && bh->b_blocknr != 0) {
 	        mark_buffer_dirty(bh) ;
 	    }
@@ -1941,23 +1943,25 @@ static int reiserfs_write_full_page(struct page *page) {
     struct buffer_head *arr[PAGE_CACHE_SIZE/512] ;
     int nr = 0 ;
 
-    if (!page_has_buffers(page)) {
+    if (!page_has_buffers(page))
         block_prepare_write(page, 0, 0, NULL) ;
-	kunmap(page) ;
-    }
+
     /* last page in the file, zero out any contents past the
     ** last byte in the file
     */
     if (page->index >= end_index) {
+	char *kaddr;
+
         last_offset = inode->i_size & (PAGE_CACHE_SIZE - 1) ;
 	/* no file contents in this page */
 	if (page->index >= end_index + 1 || !last_offset) {
 	    error =  -EIO ;
 	    goto fail ;
 	}
-	memset((char *)kmap(page)+last_offset, 0, PAGE_CACHE_SIZE-last_offset) ;
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr + last_offset, 0, PAGE_CACHE_SIZE-last_offset) ;
 	flush_dcache_page(page) ;
-	kunmap(page) ;
+	kunmap_atomic(kaddr, KM_USER0) ;
     }
     head = page_buffers(page) ;
     bh = head ;

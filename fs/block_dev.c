@@ -503,21 +503,16 @@ int check_disk_change(struct block_device *bdev)
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *disk;
-	struct hd_struct *part;
 
 	if (bdops->check_media_change == NULL)
 		return 0;
 	if (!bdops->check_media_change(dev))
 		return 0;
 
-	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
-		bdevname(bdev));
-
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
 	disk = get_gendisk(dev);
-	part = disk->part + minor(dev) - disk->first_minor;
 	if (bdops->revalidate)
 		bdops->revalidate(dev);
 	if (disk && disk->minor_shift)
@@ -527,17 +522,13 @@ int check_disk_change(struct block_device *bdev)
 
 int full_check_disk_change(struct block_device *bdev)
 {
-	int res;
+	int res = 0;
+	if (bdev->bd_contains != bdev)
+		BUG();
 	down(&bdev->bd_sem);
-	res = check_disk_change(bdev);
-	if (bdev->bd_invalidated && !bdev->bd_part_count) {
-		struct gendisk *g = get_gendisk(to_kdev_t(bdev->bd_dev));
-		struct hd_struct *part;
-		part = g->part + MINOR(bdev->bd_dev) - g->first_minor;
-		bdev->bd_invalidated = 0;
-		wipe_partitions(to_kdev_t(bdev->bd_dev));
-		if (part[0].nr_sects)
-			check_partition(g, bdev);
+	if (check_disk_change(bdev)) {
+		rescan_partitions(get_gendisk(to_kdev_t(bdev->bd_dev)), bdev);
+		res = 1;
 	}
 	up(&bdev->bd_sem);
 	return res;
@@ -602,8 +593,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		struct gendisk *g = get_gendisk(dev);
 		bdev->bd_contains = bdev;
 		if (g) {
-			int shift = g->minor_shift;
-			unsigned minor0 = (minor >> shift) << shift;
+			unsigned minor0 = g->first_minor;
 			if (minor != minor0) {
 				struct block_device *disk;
 				disk = bdget(MKDEV(major(dev), minor0));
@@ -637,11 +627,9 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			sector_t sect = 0;
 
 			bdev->bd_offset = 0;
-			if (g) {
-				struct hd_struct *p;
-				p = g->part + minor(dev) - g->first_minor;
-				sect = p->nr_sects;
-			} else if (blk_size[major(dev)])
+			if (g)
+				sect = get_capacity(g);
+			else if (blk_size[major(dev)])
 				sect = blk_size[major(dev)][minor(dev)] << 1;
 			bd_set_size(bdev, (loff_t)sect << 9);
 			bdi = blk_get_backing_dev_info(bdev);
@@ -650,21 +638,15 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			inode->i_data.backing_dev_info = bdi;
 			bdev->bd_inode->i_data.backing_dev_info = bdi;
 		}
-		if (bdev->bd_invalidated && !bdev->bd_part_count) {
-			struct hd_struct *part;
-			part = g->part + minor(dev) - g->first_minor;
-			bdev->bd_invalidated = 0;
-			wipe_partitions(dev);
-			if (part[0].nr_sects)
-				check_partition(g, bdev);
-		}
+		if (bdev->bd_invalidated)
+			rescan_partitions(g, bdev);
 	} else {
 		down(&bdev->bd_contains->bd_sem);
 		bdev->bd_contains->bd_part_count++;
 		if (!bdev->bd_openers) {
 			struct gendisk *g = get_gendisk(dev);
 			struct hd_struct *p;
-			p = g->part + minor(dev) - g->first_minor;
+			p = g->part + minor(dev) - g->first_minor - 1;
 			inode->i_data.backing_dev_info =
 			   bdev->bd_inode->i_data.backing_dev_info =
 			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;
@@ -792,27 +774,15 @@ static int blkdev_reread_part(struct block_device *bdev)
 {
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *disk = get_gendisk(dev);
-	struct hd_struct *part;
-	int res;
+	int res = 0;
 
-	if (!disk || !disk->minor_shift)
+	if (!disk || !disk->minor_shift || bdev != bdev->bd_contains)
 		return -EINVAL;
-	part = disk->part + minor(dev) - disk->first_minor;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 	if (down_trylock(&bdev->bd_sem))
 		return -EBUSY;
-	if (bdev->bd_part_count) {
-		up(&bdev->bd_sem);
-		return -EBUSY;
-	}
-	res = wipe_partitions(dev);
-	if (!res) {
-		if (bdev->bd_op->revalidate)
-			bdev->bd_op->revalidate(dev);
-		if (part[0].nr_sects)
-			check_partition(disk, bdev);
-	}
+	res = rescan_partitions(disk, bdev);
 	up(&bdev->bd_sem);
 	return res;
 }

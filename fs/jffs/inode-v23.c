@@ -47,6 +47,7 @@
 #include <linux/stat.h>
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
+#include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
@@ -751,7 +752,6 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 
 	get_page(page);
 	/* Don't SetPageLocked(page), should be locked already */
-	buf = page_address(page);
 	ClearPageUptodate(page);
 	ClearPageError(page);
 
@@ -760,8 +760,10 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 
 	read_len = 0;
 	result = 0;
-
 	offset = page->index << PAGE_CACHE_SHIFT;
+
+	kmap(page);
+	buf = page_address(page);
 	if (offset < inode->i_size) {
 		read_len = min_t(long, inode->i_size - offset, PAGE_SIZE);
 		r = jffs_read_data(f, buf, offset, read_len);
@@ -779,6 +781,8 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 	/* This handles the case of partial or no read in above */
 	if(read_len < PAGE_SIZE)
 	        memset(buf + read_len, 0, PAGE_SIZE - read_len);
+	flush_dcache_page(page);
+	kunmap(page);
 
 	D3(printk (KERN_NOTICE "readpage(): up biglock\n"));
 	up(&c->fmc->biglock);
@@ -788,9 +792,8 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 	}else {
 	        SetPageUptodate(page);	        
 	}
-	flush_dcache_page(page);
 
-	put_page(page);
+	page_cache_release(page);
 
 	D3(printk("jffs_readpage(): Leaving...\n"));
 

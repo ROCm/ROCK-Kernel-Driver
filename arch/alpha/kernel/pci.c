@@ -97,15 +97,22 @@ quirk_cypress(struct pci_dev *dev)
 	   way to turn this off.  The bridge also supports several extended
 	   BIOS ranges (disabled after power-up), and some consoles do turn
 	   them on.  So if we use a large direct-map window, or a large SG
-	   window, we must avoid entire 0xfff00000-0xffffffff region.  */
+	   window, we must avoid the entire 0xfff00000-0xffffffff region.  */
 	else if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
-		if (__direct_map_base + __direct_map_size >= 0xfff00000)
-			__direct_map_size = 0xfff00000 - __direct_map_base;
-		else {
+#define DMAPSZ (max_low_pfn << PAGE_SHIFT) /* memory size, not window size */
+		if ((__direct_map_base + DMAPSZ - 1) >= 0xfff00000UL) {
+			__direct_map_size = 0xfff00000UL - __direct_map_base;
+			printk("%s: adjusting direct map size to 0x%x\n",
+			       __FUNCTION__, __direct_map_size);
+		} else {
 			struct pci_controller *hose = dev->sysdata;
 			struct pci_iommu_arena *pci = hose->sg_pci;
-			if (pci && pci->dma_base + pci->size >= 0xfff00000)
-				pci->size = 0xfff00000 - pci->dma_base;
+			if (pci &&
+			    (pci->dma_base + pci->size - 1) >= 0xfff00000UL) {
+				pci->size = 0xfff00000UL - pci->dma_base;
+ 				printk("%s: adjusting PCI S/G size to 0x%x\n",
+				       __FUNCTION__, pci->size);
+			}
 		}
 	}
 }

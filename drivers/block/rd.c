@@ -109,9 +109,11 @@ int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
 static int ramdisk_readpage(struct file *file, struct page * page)
 {
 	if (!PageUptodate(page)) {
-		memset(kmap(page), 0, PAGE_CACHE_SIZE);
-		kunmap(page);
+		void *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
 	unlock_page(page);
@@ -121,9 +123,11 @@ static int ramdisk_readpage(struct file *file, struct page * page)
 static int ramdisk_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	if (!PageUptodate(page)) {
-		void *addr = page_address(page);
-		memset(addr, 0, PAGE_CACHE_SIZE);
+		void *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
 	SetPageDirty(page);
@@ -178,8 +182,11 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 			err = 0;
 
 			if (!PageUptodate(page)) {
-				memset(kmap(page), 0, PAGE_CACHE_SIZE);
-				kunmap(page);
+				void *kaddr = kmap_atomic(page, KM_USER0);
+
+				memset(kaddr, 0, PAGE_CACHE_SIZE);
+				flush_dcache_page(page);
+				kunmap_atomic(kaddr, KM_USER0);
 				SetPageUptodate(page);
 			}
 

@@ -83,6 +83,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 	unsigned long idx;
 	unsigned long vaddr;
 
+	inc_preempt_count();
 	if (page < highmem_start_page)
 		return page_address(page);
 
@@ -116,8 +117,10 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	unsigned long vaddr = (unsigned long) kvaddr;
 	unsigned long idx = type + KM_TYPE_NR*smp_processor_id();
 
-	if (vaddr < FIX_KMAP_BEGIN) // FIXME
+	if (vaddr < FIX_KMAP_BEGIN) { // FIXME
+		dec_preempt_count();
 		return;
+	}
 
 	if (vaddr != FIX_KMAP_BEGIN + idx * PAGE_SIZE)
 		BUG();
@@ -142,6 +145,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	flush_tlb_all();
 #endif
 #endif
+	dec_preempt_count();
 }
 
 #endif /* __KERNEL__ */

@@ -261,11 +261,13 @@ alpha_clone(unsigned long clone_flags, unsigned long usp,
 	    struct switch_stack * swstack)
 {
 	struct task_struct *p;
+	struct pt_regs *u_regs = (struct pt_regs *) (swstack+1);
+	int *user_tid = (int *)u_regs->r19;
+
 	if (!usp)
 		usp = rdusp();
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK,
-		    usp, (struct pt_regs *) (swstack+1), 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, u_regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -274,7 +276,7 @@ alpha_vfork(struct switch_stack * swstack)
 {
 	struct task_struct *p;
 	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(),
-		    (struct pt_regs *) (swstack+1), 0);
+		    (struct pt_regs *) (swstack+1), 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
