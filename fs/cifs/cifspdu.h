@@ -1046,6 +1046,8 @@ typedef union smb_com_transaction2 {
 
 /* PathInfo/FileInfo infolevels */
 #define SMB_INFO_STANDARD                   1
+#define SMB_SET_FILE_EA                     2
+#define SMB_QUERY_FILE_EA_SIZE              2
 #define SMB_INFO_QUERY_EAS_FROM_LIST        3
 #define SMB_INFO_QUERY_ALL_EAS              4
 #define SMB_INFO_IS_NAME_VALID              6
@@ -1620,6 +1622,19 @@ typedef struct {
 	char LinkDest[1];
 } FILE_UNIX_LINK_INFO;		/* level 513 QPathInfo */
 
+typedef struct {
+	__u16 CreationDate;
+	__u16 CreationTime;
+	__u16 LastAccessDate;
+	__u16 LastAccessTime;
+	__u16 LastWriteDate;
+	__u16 LastWriteTime;
+	__u32 DataSize; /* File Size (EOF) */
+	__u32 AllocationSize;
+	__u16 Attributes; /* verify not u32 */
+	__u32 EASize;
+} FILE_INFO_STANDARD;  /* level 1 SetPath/FileInfo */
+
 /* defines for enumerating possible values of the Unix type field below */
 #define UNIX_FILE      0
 #define UNIX_DIR       1
@@ -1680,12 +1695,12 @@ typedef struct {
 } FILE_DIRECTORY_INFO;   /* level 257 FF response data area */
 
 struct gea {
-	unsigned char cbName;
-	char szName[1];
+	unsigned char name_len;
+	char name[1];
 };
 
 struct gealist {
-	unsigned long cbList;
+	unsigned long list_len;
 	struct gea list[1];
 };
 
@@ -1693,7 +1708,7 @@ struct fea {
 	unsigned char EA_flags;
 	__u8 name_len;
 	__u16 value_len;
-	char szName[1];
+	char name[1];
 	/* optionally followed by value */
 };
 /* flags for _FEA.fEA */
