@@ -667,7 +667,7 @@ acpi_bus_generate_event (
 	if (!event_is_open)
 		return_VALUE(0);
 
-	event = kmalloc(sizeof(struct acpi_bus_event), GFP_KERNEL);
+	event = kmalloc(sizeof(struct acpi_bus_event), GFP_ATOMIC);
 	if (!event)
 		return_VALUE(-ENOMEM);
 
