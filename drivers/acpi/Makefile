@@ -29,9 +29,9 @@ obj-$(CONFIG_ACPI_INTERPRETER)	+= osl.o utils.o \
 #
 # ACPI Bus and Device Drivers
 #
-processor_tmp-objs	+= processor.o
+processor_tmp-objs	+= processor.o processor_throttling.o processor_idle.o
 ifdef CONFIG_CPU_FREQ
-processor_tmp-objs	+= processor_perflib.o processor_throttling.o
+processor_tmp-objs	+= processor_perflib.o			
 endif
 
 obj-$(CONFIG_ACPI_BUS)		+= sleep/

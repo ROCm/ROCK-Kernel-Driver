@@ -160,6 +160,7 @@ int acpi_processor_notify_smm(struct module *calling_module);
 /* for communication between multiple parts of the processor kernel module */
 extern struct acpi_processor	*processors[NR_CPUS];
 extern struct acpi_processor_errata errata;
+extern void (*pm_idle_save)(void);
 
 /* in processor_perflib.c */
 #ifdef CONFIG_CPU_FREQ
@@ -190,5 +191,12 @@ ssize_t acpi_processor_write_throttling (
         size_t			count,
         loff_t			*data);
 extern struct file_operations acpi_processor_throttling_fops;
+
+/* in processor_idle.c */
+struct dmi_system_id;
+void acpi_processor_idle (void);
+int acpi_processor_get_power_info (struct acpi_processor *pr);
+extern struct file_operations acpi_processor_power_fops;
+int no_c2c3(struct dmi_system_id *id);
 
 #endif
