@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "acdispat.h"
+#include <acpi/acpi.h>
+#include <acpi/acdispat.h>
 
 
 #define _COMPONENT          ACPI_DISPATCHER

@@ -23,12 +23,12 @@
  */
 
 
-#include "acpi.h"
-#include "acparser.h"
-#include "amlcode.h"
-#include "acdispat.h"
-#include "acnamesp.h"
-#include "acinterp.h"
+#include <acpi/acpi.h>
+#include <acpi/acparser.h>
+#include <acpi/amlcode.h>
+#include <acpi/acdispat.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acinterp.h>
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dsobject")

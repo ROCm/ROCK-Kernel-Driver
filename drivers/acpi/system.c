@@ -27,7 +27,7 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 
-#include "acpi_drivers.h"
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT

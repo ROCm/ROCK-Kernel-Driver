@@ -226,8 +226,6 @@
 #include <asm/uaccess.h>
 #include <asm/desc.h>
 
-#include <linux/sysrq.h>
-
 extern spinlock_t i8253_lock;
 extern unsigned long get_cmos_time(void);
 extern void machine_real_restart(unsigned char *, int);
@@ -971,30 +969,6 @@ static void apm_power_off(void)
 	else
 		(void) set_system_power_state(APM_STATE_OFF);
 }
-
-/**
- * handle_poweroff	-	sysrq callback for power down
- * @key: key pressed (unused)
- * @pt_regs: register state (unused)
- * @kbd: keyboard state (unused)
- * @tty: tty involved (unused)
- *
- * When the user hits Sys-Rq o to power down the machine this is the
- * callback we use.
- */
-
-static void handle_poweroff (int key, struct pt_regs *pt_regs,
-			     struct tty_struct *tty)
-{
-        apm_power_off();
-}
-
-static struct sysrq_key_op	sysrq_poweroff_op = {
-	.handler        = handle_poweroff,
-	.help_msg       = "Off",
-	.action_msg     = "Power Off\n"
-};
-
 
 #ifdef CONFIG_APM_DO_ENABLE
 
@@ -1848,7 +1822,6 @@ static int apm(void *unused)
 	/* Install our power off handler.. */
 	if (power_off)
 		pm_power_off = apm_power_off;
-	register_sysrq_key('o', &sysrq_poweroff_op);
 
 	if (num_online_cpus() == 1 || smp) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
@@ -2096,7 +2069,6 @@ static void __exit apm_exit(void)
 	}
 	misc_deregister(&apm_device);
 	remove_proc_entry("apm", NULL);
-	unregister_sysrq_key('o',&sysrq_poweroff_op);
 	if (power_off)
 		pm_power_off = NULL;
 	exit_kapmd = 1;

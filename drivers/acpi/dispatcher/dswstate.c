@@ -23,10 +23,10 @@
  */
 
 
-#include "acpi.h"
-#include "acparser.h"
-#include "acdispat.h"
-#include "acnamesp.h"
+#include <acpi/acpi.h>
+#include <acpi/acparser.h>
+#include <acpi/acdispat.h>
+#include <acpi/acnamesp.h>
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dswstate")

@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
 
 
 #define _COMPONENT          ACPI_NAMESPACE

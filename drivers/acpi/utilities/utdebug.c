@@ -23,7 +23,7 @@
  */
 
 
-#include "acpi.h"
+#include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utdebug")

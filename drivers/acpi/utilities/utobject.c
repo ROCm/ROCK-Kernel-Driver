@@ -23,9 +23,9 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
-#include "amlcode.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_UTILITIES
