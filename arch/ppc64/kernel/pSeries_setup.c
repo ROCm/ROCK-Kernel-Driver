@@ -59,6 +59,7 @@
 #include <asm/naca.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
+#include <asm/plpar_wrappers.h>
 
 #include "i8259.h"
 #include <asm/xics.h>

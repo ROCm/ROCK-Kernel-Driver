@@ -242,7 +242,7 @@ static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
  */
 static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 {
-	unsigned long vsid, va, vpn, flags;
+	unsigned long vsid, va, vpn, flags = 0;
 	long slot;
 	HPTE *hptep;
 	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);

@@ -504,7 +504,7 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 				   int local)
 {
 	int i;
-	unsigned long flags;
+	unsigned long flags = 0;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
