@@ -219,12 +219,10 @@ ixgb_identify_phy(struct ixgb_hw *hw)
 			phy_type = ixgb_phy_type_g6005;
 		}
 		break;
-		case IXGB_DEVICE_ID_82597EX_LR:
-			DEBUGOUT("Identified G6104 optics\n");
-			phy_type = ixgb_phy_type_g6104;
-			break;
-
-
+	case IXGB_DEVICE_ID_82597EX_LR:
+		DEBUGOUT("Identified G6104 optics\n");
+		phy_type = ixgb_phy_type_g6104;
+		break;
 	default:
 		DEBUGOUT("Unknown physical layer module\n");
 		phy_type = ixgb_phy_type_unknown;
