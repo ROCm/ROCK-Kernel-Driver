@@ -236,20 +236,24 @@ static void change_speed (unsigned int index)
 
 	if (have_a0 == 1)	/* A0 errata 5 */
 		__asm__("\tcli\n");
-	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
-	fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
 
-	fidvidctl.bits.FID = fid;
-	fidvidctl.bits.FIDC = 1;
-
-	/* Set the voltage lazily. Ie, only do voltage transition
-	   if its changed since last time (Some speeds have the same voltage) */
-	if (fidvidctl.bits.VID != vid) {
-		fidvidctl.bits.VID = vid;
-		fidvidctl.bits.VIDC = 1;
+	/* First change the frequency. */
+	if (fidvidctl.bits.FID != fid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
+		fidvidctl.bits.FID = fid;
+		fidvidctl.bits.FIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	}
 
-	wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	/* Now change voltage. */
+	if (fidvidctl.bits.VID != vid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.VID = vid;
+		fidvidctl.bits.VIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	}
+
 	if (have_a0 == 1)
 		__asm__("\tsti\n");
 
