@@ -410,6 +410,17 @@ static inline void dscc4_rx_update(struct dscc4_dev_priv *dpriv,
 	writel(dpriv->lrda, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
 }
 
+static inline unsigned int dscc4_tx_done(struct dscc4_dev_priv *dpriv)
+{
+	return (dpriv->tx_current + 1) == dpriv->tx_dirty;
+}
+
+static inline unsigned int dscc4_tx_quiescent(struct dscc4_dev_priv *dpriv,
+					      struct net_device *dev)
+{
+	return readl(dev->base_addr + CH0FTDA + dpriv->dev_id*4) == dpriv->ltda;
+}
+
 int state_check(u32 state, struct dscc4_dev_priv *dpriv, struct net_device *dev,
 		const char *msg)
 {
@@ -561,6 +572,37 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
+static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
+{
+	/* Cf errata DS5 p.6 */
+	writel(0x00000000, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
+	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	readl(dev->base_addr + CH0LRDA + dpriv->dev_id*4);
+	writel(MTFi|Rdr, dev->base_addr + dpriv->dev_id*0x0c + CH0CFG);
+	writel(Action, dev->base_addr + GCMDR);
+}
+
+static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
+{
+	u16 i = 0;
+
+	/* Cf errata DS5 p.7 */
+	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	scc_writel(0x00050000, dpriv, dev, CCR2);
+	/*
+	 * Must be longer than the time required to fill the fifo.
+	 */
+	while (!dscc4_tx_quiescent(dpriv, dev) && ++i) {
+		udelay(1);
+		wmb();
+	}
+
+	writel(MTFi|Rdt, dev->base_addr + dpriv->dev_id*0x0c + CH0CFG);
+	if (dscc4_do_action(dev, "Rdt") < 0)
+		printk(KERN_ERR "%s: Tx reset failed\n", dev->name);
+}
+
+/* TODO: (ab)use this function to refill a completely depleted RX ring. */
 static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 				struct net_device *dev)
 {
@@ -957,7 +999,7 @@ static int dscc4_open(struct net_device *dev)
 	/* Posted write is flushed in the busy-waiting loop */
 	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
 
-	if (dscc4_wait_ack_cec(dpriv, dev, "Cec"))
+	if (dscc4_wait_ack_cec(dpriv, dev, "Cec") < 0)
 		goto err_free_ring;
 
 	/* 
