@@ -39,6 +39,7 @@ F02 Oct/28/02: Add SB device ID for 3147 and 3177.
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -383,7 +384,8 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 
 	/* Allocate memory if needed */
 	self->rx_buff.head =
-	    (__u8 *) kmalloc(self->rx_buff.truesize, GFP_KERNEL | GFP_DMA);
+		dma_alloc_coherent(NULL, self->rx_buff.truesize,
+				   &self->rx_buff_dma, GFP_KERNEL);
 	if (self->rx_buff.head == NULL) {
 		err = -ENOMEM;
 		goto err_out2;
@@ -391,7 +393,8 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
 
 	self->tx_buff.head =
-	    (__u8 *) kmalloc(self->tx_buff.truesize, GFP_KERNEL | GFP_DMA);
+		dma_alloc_coherent(NULL, self->tx_buff.truesize,
+				   &self->tx_buff_dma, GFP_KERNEL);
 	if (self->tx_buff.head == NULL) {
 		err = -ENOMEM;
 		goto err_out3;
@@ -432,9 +435,11 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 
 	return 0;
  err_out4:
-	kfree(self->tx_buff.head);
+	dma_free_coherent(NULL, self->tx_buff.truesize,
+			  self->tx_buff.head, self->tx_buff_dma);
  err_out3:
-	kfree(self->rx_buff.head);
+	dma_free_coherent(NULL, self->rx_buff.truesize,
+			  self->rx_buff.head, self->rx_buff_dma);
  err_out2:
 	release_region(self->io.fir_base, self->io.fir_ext);
  err_out1:
@@ -468,9 +473,11 @@ static int __exit via_ircc_close(struct via_ircc_cb *self)
 		   __FUNCTION__, self->io.fir_base);
 	release_region(self->io.fir_base, self->io.fir_ext);
 	if (self->tx_buff.head)
-		kfree(self->tx_buff.head);
+		dma_free_coherent(NULL, self->tx_buff.truesize,
+				  self->tx_buff.head, self->tx_buff_dma);
 	if (self->rx_buff.head)
-		kfree(self->rx_buff.head);
+		dma_free_coherent(NULL, self->rx_buff.truesize,
+				  self->rx_buff.head, self->rx_buff_dma);
 	dev_self[self->index] = NULL;
 
 	free_netdev(self->netdev);
@@ -816,7 +823,7 @@ static int via_ircc_hard_xmit_sir(struct sk_buff *skb,
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
 
-	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len,
+	irda_setup_dma(self->io.dma, self->tx_buff_dma, self->tx_buff.len,
 		       DMA_TX_MODE);
 
 	SetSendByte(iobase, self->tx_buff.len);
@@ -897,7 +904,8 @@ static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase)
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
 	irda_setup_dma(self->io.dma,
-		       self->tx_fifo.queue[self->tx_fifo.ptr].start,
+		       ((u8 *)self->tx_fifo.queue[self->tx_fifo.ptr].start -
+			self->tx_buff.head) + self->tx_buff_dma,
 		       self->tx_fifo.queue[self->tx_fifo.ptr].len, DMA_TX_MODE);
 #ifdef	DBGMSG
 	DBG(printk
@@ -1022,8 +1030,8 @@ static int via_ircc_dma_receive(struct via_ircc_cb *self)
 	EnAllInt(iobase, ON);
 	EnTXDMA(iobase, OFF);
 	EnRXDMA(iobase, ON);
-	irda_setup_dma(self->io.dma2, self->rx_buff.data,
-		       self->rx_buff.truesize, DMA_RX_MODE);
+	irda_setup_dma(self->io.dma2, self->rx_buff_dma,
+		  self->rx_buff.truesize, DMA_RX_MODE);
 	TXStart(iobase, OFF);
 	RXStart(iobase, ON);
 
