@@ -2346,7 +2346,7 @@ mega_build_sglist(adapter_t *adapter, scb_t *scb, u32 *buf, u32 *len)
 	*len = (u32)cmd->request_bufflen;
 
 	if( scb->dma_direction == PCI_DMA_TODEVICE ) {
-		pci_dma_sync_sg(adapter->dev, sgl, cmd->use_sg,
+		pci_dma_sync_sg(adapter->dev, cmd->request_buffer, cmd->use_sg,
 				PCI_DMA_TODEVICE);
 	}
 
