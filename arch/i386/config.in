@@ -166,23 +166,18 @@ tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
 choice 'High Memory Support' \
 	"off           CONFIG_NOHIGHMEM \
 	 4GB           CONFIG_HIGHMEM4G \
-	 4GB-highpte   CONFIG_HIGHMEM4G_HIGHPTE \
-	 64GB          CONFIG_HIGHMEM64G \
-	 64GB-highpte  CONFIG_HIGHMEM64G_HIGHPTE" off
+	 64GB          CONFIG_HIGHMEM64G" off
+
+if [ "$CONFIG_HIGHMEM4G" = "y" -o "$CONFIG_HIGHMEM64G" = "y" ]; then
+   bool 'Use high memory pte support' CONFIG_HIGHPTE
+fi
+
 if [ "$CONFIG_HIGHMEM4G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
 fi
-if [ "$CONFIG_HIGHMEM4G_HIGHPTE" = "y" ]; then
-   define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_HIGHPTE y
-fi
+
 if [ "$CONFIG_HIGHMEM64G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_X86_PAE y
-fi
-if [ "$CONFIG_HIGHMEM64G_HIGHPTE" = "y" ]; then
-   define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_HIGHPTE y
    define_bool CONFIG_X86_PAE y
 fi
 

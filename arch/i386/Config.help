@@ -128,6 +128,12 @@ CONFIG_NOHIGHMEM
 
   If unsure, say "off".
 
+CONFIG_HIGHPTE
+  The VM uses one page table entry for each page of physical memory.
+  For systems with a lot of RAM, this can be wasteful of precious
+  low memory.  Setting this option will put user-space page table
+  entries in high memory.
+
 CONFIG_HIGHMEM4G
   Select this if you have a 32-bit processor and between 1 and 4
   gigabytes of physical RAM.
