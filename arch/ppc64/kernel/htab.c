@@ -195,7 +195,7 @@ static inline unsigned long computeHptePP(unsigned long pte)
  * to be valid via Linux page tables, return 1. If handled return 0
  */
 int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep)
+		pte_t *ptep, unsigned long trap)
 {
 	unsigned long va, vpn;
 	unsigned long newpp, prpn;
@@ -243,6 +243,24 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 		pte_val(new_pte) |= _PAGE_ACCESSED;
 
 	newpp = computeHptePP(pte_val(new_pte));
+
+#define PPC64_HWNOEXEC (1 << 2)
+
+	/* We do lazy icache flushing on POWER4 */
+	if (__is_processor(PV_POWER4) && pfn_valid(pte_pfn(new_pte))) {
+		struct page *page = pte_page(new_pte);
+
+		/* page is dirty */
+		if (!PageReserved(page) &&
+		    !test_bit(PG_arch_1, &page->flags)) {
+			if (trap == 0x400) {
+				__flush_dcache_icache(page_address(page));
+				set_bit(PG_arch_1, &page->flags);
+			} else {
+				newpp |= PPC64_HWNOEXEC;
+			}
+		}
+	}
 
 	/* Check if pte already has an hpte (case 2) */
 	if (pte_val(old_pte) & _PAGE_HASHPTE) {
@@ -317,7 +335,7 @@ repeat:
 	return 0;
 }
 
-int hash_page(unsigned long ea, unsigned long access)
+int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 {
 	void *pgdir;
 	unsigned long vsid;
@@ -376,7 +394,7 @@ int hash_page(unsigned long ea, unsigned long access)
 	 */
 	spin_lock(&mm->page_table_lock);
 	ptep = find_linux_pte(pgdir, ea);
-	ret = __hash_page(ea, access, vsid, ptep);
+	ret = __hash_page(ea, access, vsid, ptep, trap);
 	spin_unlock(&mm->page_table_lock);
 
 	return ret;

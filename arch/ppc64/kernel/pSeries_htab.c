@@ -215,7 +215,7 @@ static inline void set_pp_bit(unsigned long pp, HPTE *addr)
 
 	__asm__ __volatile__(
 	"1:	ldarx	%0,0,%3\n\
-		rldimi	%0,%2,0,62\n\
+		rldimi	%0,%2,0,61\n\
 		stdcx.	%0,0,%3\n\
 		bne	1b"
 	: "=&r" (old), "=m" (*p)
@@ -265,8 +265,6 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	Hpte_dword0 dw0;
 	unsigned long vpn, avpn;
 	unsigned long flags;
-
-	udbg_printf("updatepp\n");
 
 	if (large)
 		vpn = va >> LARGE_PAGE_SHIFT;

@@ -113,13 +113,10 @@ void show_mem(void)
 			reserved++;
 		else if (PageSwapCache(mem_map+i))
 			cached++;
-		else if (!atomic_read(&mem_map[i].count))
-			free++;
-		else
-			shared += atomic_read(&mem_map[i].count) - 1;
+		else if (page_count(mem_map+i))
+			shared += page_count(mem_map+i) - 1;
 	}
 	printk("%d pages of RAM\n",total);
-	printk("%d free pages\n",free);
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
@@ -575,6 +572,12 @@ void flush_dcache_page(struct page *page)
 
 void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 {
+	if (__is_processor(PV_POWER4))
+		return;
+
+	if ((vma->vm_flags & VM_EXEC) == 0)
+		return;
+
 	if (page->mapping && !PageReserved(page)
 	    && !test_bit(PG_arch_1, &page->flags)) {
 		__flush_dcache_icache(page_address(page));
@@ -585,13 +588,32 @@ void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
+
+	/* XXX we shouldnt have to do this, but glibc requires it */
+	if (__is_processor(PV_POWER4))
+		clear_bit(PG_arch_1, &pg->flags);
+	else
+		__flush_dcache_icache(page);
 }
 
 void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		    struct page *pg)
 {
 	copy_page(vto, vfrom);
-	__flush_dcache_icache(vto);
+
+	/*
+	 * Unfortunately we havent always marked our GOT and PLT sections
+	 * as executable, so we need to flush all file regions - Anton
+	 */
+#if 0
+	if (!vma->vm_file && ((vma->vm_flags & VM_EXEC) == 0))
+		return;
+#endif
+
+	if (__is_processor(PV_POWER4))
+		clear_bit(PG_arch_1, &pg->flags);
+	else
+		__flush_dcache_icache(vto);
 }
 
 void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
@@ -605,7 +627,7 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 
 extern pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea);
 int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep);
+		pte_t *ptep, unsigned long trap);
 
 /*
  * This is called at the end of handling a user page fault, when the
@@ -633,5 +655,6 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	ptep = find_linux_pte(pgdir, ea);
 	vsid = get_vsid(vma->vm_mm->context, ea);
 
-	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep);
+	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
+		    0x300);
 }

@@ -647,10 +647,8 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 {
 	unsigned long lpar_rc;
 	unsigned long flags;
-	flags = (newpp & 3) | H_AVPN;
+	flags = (newpp & 7) | H_AVPN;
 	unsigned long vpn = va >> PAGE_SHIFT;
-
-	udbg_printf("updatepp\n");
 
 	lpar_rc = plpar_pte_protect(flags, slot, (vpn >> 4) & ~0x7fUL);
 
