@@ -400,7 +400,7 @@ static int upgrade_mode(struct dm_dev *dd, int new_mode)
 	struct dm_dev dd_copy;
 	dev_t dev = dd->bdev->bd_dev;
 
-	memcpy(&dd_copy, dd, sizeof(dd_copy));
+	dd_copy = *dd;
 
 	dd->mode |= new_mode;
 	dd->bdev = NULL;
@@ -408,7 +408,7 @@ static int upgrade_mode(struct dm_dev *dd, int new_mode)
 	if (!r)
 		close_dev(&dd_copy);
 	else
-		memcpy(dd, &dd_copy, sizeof(dd_copy));
+		*dd = dd_copy;
 
 	return r;
 }

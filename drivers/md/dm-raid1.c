@@ -850,9 +850,9 @@ static void do_mirror(struct mirror_set *ms)
 	struct bio_list reads, writes;
 
 	spin_lock(&ms->lock);
-	memcpy(&reads, &ms->reads, sizeof(reads));
+	reads = ms->reads;
+	writes = ms->writes;
 	bio_list_init(&ms->reads);
-	memcpy(&writes, &ms->writes, sizeof(writes));
 	bio_list_init(&ms->writes);
 	spin_unlock(&ms->lock);
 

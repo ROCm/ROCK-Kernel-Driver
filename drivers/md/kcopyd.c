@@ -476,7 +476,7 @@ static void segment_complete(int read_err,
 		int i;
 		struct kcopyd_job *sub_job = mempool_alloc(_job_pool, GFP_NOIO);
 
-		memcpy(sub_job, job, sizeof(*job));
+		*sub_job = *job;
 		sub_job->source.sector += progress;
 		sub_job->source.count = count;
 
@@ -536,7 +536,7 @@ int kcopyd_copy(struct kcopyd_client *kc, struct io_region *from,
 	job->write_err = 0;
 	job->rw = READ;
 
-	memcpy(&job->source, from, sizeof(*from));
+	job->source = *from;
 
 	job->num_dests = num_dests;
 	memcpy(&job->dests, dests, sizeof(*dests) * num_dests);
