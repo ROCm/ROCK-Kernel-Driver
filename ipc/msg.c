@@ -24,7 +24,6 @@
 #include <linux/list.h>
 #include <linux/security.h>
 #include <linux/sched.h>
-#include <linux/audit.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include "util.h"
@@ -306,8 +305,6 @@ asmlinkage long sys_msgget (key_t key, int msgflg)
 {
 	int id, ret = -EPERM;
 	struct msg_queue *msq;
-
-	audit_intercept(AUDIT_msgget, key, msgflg);
 	
 	down(&msg_ids.sem);
 	if (key == IPC_PRIVATE) 
@@ -334,7 +331,7 @@ asmlinkage long sys_msgget (key_t key, int msgflg)
 		msg_unlock(msq);
 	}
 	up(&msg_ids.sem);
-	return audit_result(ret);
+	return ret;
 }
 
 static inline unsigned long copy_msqid_to_user(void *buf, struct msqid64_ds *in, int version)
@@ -434,11 +431,9 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 	struct msg_queue *msq;
 	struct msq_setbuf setbuf;
 	struct kern_ipc_perm *ipcp;
-
-	audit_intercept(AUDIT_msgctl, msqid, cmd, buf);
-
+	
 	if (msqid < 0 || cmd < 0)
-		return audit_result(-EINVAL);
+		return -EINVAL;
 
 	version = ipc_parse_version(&cmd);
 
@@ -449,15 +444,16 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		struct msginfo msginfo;
 		int max_id;
 		if (!buf)
-			return audit_result(-EFAULT);
-		err = security_msg_queue_msgctl(NULL, cmd);
-		if (err)
-			return audit_result(err);
-
+			return -EFAULT;
 		/* We must not return kernel stack data.
 		 * due to padding, it's not enough
 		 * to set all member fields.
 		 */
+
+		err = security_msg_queue_msgctl(NULL, cmd);
+		if (err)
+			return err;
+
 		memset(&msginfo,0,sizeof(msginfo));	
 		msginfo.msgmni = msg_ctlmni;
 		msginfo.msgmax = msg_ctlmax;
@@ -477,8 +473,8 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		max_id = msg_ids.max_id;
 		up(&msg_ids.sem);
 		if (copy_to_user (buf, &msginfo, sizeof(struct msginfo)))
-			return audit_result(-EFAULT);
-		return audit_result((max_id < 0) ? 0: max_id);
+			return -EFAULT;
+		return (max_id < 0) ? 0: max_id;
 	}
 	case MSG_STAT:
 	case IPC_STAT:
@@ -486,15 +482,15 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		struct msqid64_ds tbuf;
 		int success_return;
 		if (!buf)
-			return audit_result(-EFAULT);
+			return -EFAULT;
 		if(cmd == MSG_STAT && msqid >= msg_ids.size)
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 		memset(&tbuf,0,sizeof(tbuf));
 
 		msq = msg_lock(msqid);
 		if (msq == NULL)
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 		if(cmd == MSG_STAT) {
 			success_return = msg_buildid(msqid, msq->q_perm.seq);
@@ -523,17 +519,19 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		tbuf.msg_lrpid  = msq->q_lrpid;
 		msg_unlock(msq);
 		if (copy_msqid_to_user(buf, &tbuf, version))
-			return audit_result(-EFAULT);
-		return audit_result(success_return);
+			return -EFAULT;
+		return success_return;
 	}
 	case IPC_SET:
-		if (!buf || copy_msqid_from_user (&setbuf, buf, version))
-			return audit_result(-EFAULT);
+		if (!buf)
+			return -EFAULT;
+		if (copy_msqid_from_user (&setbuf, buf, version))
+			return -EFAULT;
 		break;
 	case IPC_RMID:
 		break;
 	default:
-		return audit_result(-EINVAL);
+		return  -EINVAL;
 	}
 
 	down(&msg_ids.sem);
@@ -588,13 +586,13 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 	err = 0;
 out_up:
 	up(&msg_ids.sem);
-	return audit_result(err);
+	return err;
 out_unlock_up:
 	msg_unlock(msq);
 	goto out_up;
 out_unlock:
 	msg_unlock(msq);
-	return audit_result(err);
+	return err;
 }
 
 static int testmsg(struct msg_msg* msg,long type,int mode)
@@ -654,20 +652,18 @@ asmlinkage long sys_msgsnd (int msqid, struct msgbuf *msgp, size_t msgsz, int ms
 	int err;
 	
 	if (msgsz > msg_ctlmax || (long) msgsz < 0 || msqid < 0)
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EINVAL);
+		return -EINVAL;
 	if (get_user(mtype, &msgp->mtype))
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EFAULT);
+		return -EFAULT; 
 	if (mtype < 1)
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EINVAL);
+		return -EINVAL;
 
 	msg = load_msg(msgp->mtext, msgsz);
 	if(IS_ERR(msg))
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(PTR_ERR(msg));
+		return PTR_ERR(msg);
 
 	msg->m_type = mtype;
 	msg->m_ts = msgsz;
-
-	audit_intercept(AUDIT_msgsnd, msqid, msg, msgsz, msgflg);
 
 	msq = msg_lock(msqid);
 	err=-EINVAL;
@@ -730,7 +726,6 @@ retry:
 out_unlock_free:
 	msg_unlock(msq);
 out_free:
-	(void)audit_result(err);
 	if(msg!=NULL)
 		free_msg(msg);
 	return err;
@@ -765,15 +760,13 @@ asmlinkage long sys_msgrcv (int msqid, struct msgbuf *msgp, size_t msgsz,
 	int err;
 	int mode;
 
-	audit_intercept(AUDIT_msgrcv, msqid, msgp, msgsz, msgtyp, msgflg);
-
 	if (msqid < 0 || (long) msgsz < 0)
-		return audit_result(-EINVAL);
+		return -EINVAL;
 	mode = convert_mode(&msgtyp,msgflg);
 
 	msq = msg_lock(msqid);
 	if(msq==NULL)
-		return audit_result(-EINVAL);
+		return -EINVAL;
 retry:
 	err = -EIDRM;
 	if (msg_checkid(msq,msqid))
@@ -822,7 +815,7 @@ out_success:
 			    msgsz = -EFAULT;
 		}
 		free_msg(msg);
-		return audit_result(msgsz);
+		return msgsz;
 	} else
 	{
 		/* no message waiting. Prepare for pipelined
@@ -884,7 +877,7 @@ out_success:
 out_unlock:
 	if(msq)
 		msg_unlock(msq);
-	return audit_result(err);
+	return err;
 }
 
 #ifdef CONFIG_PROC_FS

@@ -16,7 +16,6 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -184,8 +183,6 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 	struct task_struct *child;
 	long i, ret;
 	unsigned ui;
-
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
 
 	/* This lock_kernel fixes a subtle race with suid exec */
 	lock_kernel();
@@ -486,7 +483,7 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return audit_result(ret);
+	return ret;
 }
 
 asmlinkage void syscall_trace(struct pt_regs *regs)

@@ -824,7 +824,7 @@ int lento_link(const char * oldname, const char * newname,
                 struct dentry *new_dentry;
                 struct nameidata nd, old_nd;
 
-                error = __user_walk(oldname, 0, &old_nd, 0);
+                error = __user_walk(oldname, 0, &old_nd);
                 if (error)
                         goto exit;
                 error = path_lookup(to, LOOKUP_PARENT, &nd);

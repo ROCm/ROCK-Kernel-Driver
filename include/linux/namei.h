@@ -48,11 +48,11 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 #define LOOKUP_CREATE		(0x0200)
 #define LOOKUP_ACCESS		(0x0400)
 
-extern int FASTCALL(__user_walk(const char __user *, unsigned, struct nameidata *, const char **));
+extern int FASTCALL(__user_walk(const char __user *, unsigned, struct nameidata *));
 #define user_path_walk(name,nd) \
-	__user_walk(name, LOOKUP_FOLLOW, nd, 0)
+	__user_walk(name, LOOKUP_FOLLOW, nd)
 #define user_path_walk_link(name,nd) \
-	__user_walk(name, 0, nd, 0)
+	__user_walk(name, 0, nd)
 extern int FASTCALL(path_lookup(const char *, unsigned, struct nameidata *));
 extern int FASTCALL(path_walk(const char *, struct nameidata *));
 extern int FASTCALL(link_path_walk(const char *, struct nameidata *));

@@ -43,12 +43,10 @@
 #include <linux/proc_fs.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
-#include <linux/fshooks.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/objrmap.h>
 #include <linux/ckrm.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -126,23 +124,17 @@ asmlinkage long sys_uselib(const char __user * library)
 	int error;
 
 	nd.intent.open.flags = FMODE_READ;
-
-	FSHOOK_BEGIN_USER_WALK(open,
-		error,
-		library,
-		LOOKUP_FOLLOW|LOOKUP_OPEN,
-		nd,
-		filename,
-		.flags = O_RDONLY)
-
-	if (!S_ISREG(nd.dentry->d_inode->i_mode))
-		error = -EINVAL;
-	else
-		error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
-	if (error) {
-		path_release(&nd);
+	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
+	if (error)
 		goto out;
-	}
+
+	error = -EINVAL;
+	if (!S_ISREG(nd.dentry->d_inode->i_mode))
+		goto exit;
+
+	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
+	if (error)
+		goto exit;
 
 	file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
 	error = PTR_ERR(file);
@@ -170,10 +162,10 @@ asmlinkage long sys_uselib(const char __user * library)
 	}
 	fput(file);
 out:
-
-	FSHOOK_END_USER_WALK(open, error, filename)
-
   	return error;
+exit:
+	path_release(&nd);
+	goto out;
 }
 
 /*
@@ -493,8 +485,6 @@ struct file *open_exec(const char *name)
 	int err;
 	struct file *file;
 
-	FSHOOK_BEGIN(open, err, .filename = name, .flags = O_RDONLY)
-
 	nd.intent.open.flags = FMODE_READ;
 	err = path_lookup(name, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	file = ERR_PTR(err);
@@ -517,16 +507,13 @@ struct file *open_exec(const char *name)
 						file = ERR_PTR(err);
 					}
 				}
-				goto out;
+out:
+				return file;
 			}
 		}
 		path_release(&nd);
 	}
-out:
-
-	FSHOOK_END(open, err, file = ERR_PTR(err))
-
-	return file;
+	goto out;
 }
 
 EXPORT_SYMBOL(open_exec);
@@ -1119,12 +1106,9 @@ int do_execve(char * filename,
 
 	file = open_exec(filename);
 
-	/* don't do this prior to open_exec, as that will invoke an FS hook */
-	audit_intercept(AUDIT_execve, filename, argv, envp);
-
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return audit_result(retval);
+		return retval;
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
@@ -1182,7 +1166,7 @@ int do_execve(char * filename,
 
 		/* execve success */
 		security_bprm_free(&bprm);
-		return audit_result(retval);
+		return retval;
 	}
 
 out:
@@ -1205,7 +1189,7 @@ out_file:
 		allow_write_access(bprm.file);
 		fput(bprm.file);
 	}
-	return audit_result(retval);
+	return retval;
 }
 
 EXPORT_SYMBOL(do_execve);

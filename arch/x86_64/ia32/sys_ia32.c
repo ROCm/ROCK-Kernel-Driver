@@ -24,7 +24,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fs.h> 
-#include <linux/fshooks.h>
 #include <linux/file.h> 
 #include <linux/signal.h>
 #include <linux/syscalls.h>
@@ -62,7 +61,6 @@
 #include <linux/ptrace.h>
 #include <linux/highuid.h>
 #include <linux/vmalloc.h>
-#include <linux/audit.h>
 #include <asm/mman.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -1746,32 +1744,25 @@ asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
 	return ret;
 } 
 
-asmlinkage long sys32_open(const char __user * filename, int flags, int mode)
+asmlinkage long sys32_open(const char * filename, int flags, int mode)
 {
 	char * tmp;
-	int fd;
+	int fd, error;
 
 	/* don't force O_LARGEFILE */
 	tmp = getname(filename);
 	fd = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
-
-		FSHOOK_BEGIN(open, fd, .filename = tmp, .flags = flags, .mode = mode)
-
 		fd = get_unused_fd();
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
-
-			if (!IS_ERR(f))
+			error = PTR_ERR(f);
+			if (unlikely(IS_ERR(f))) {
+				put_unused_fd(fd); 
+				fd = error;
+			} else
 				fd_install(fd, f);
-			else {
-				put_unused_fd(fd);
-				fd = PTR_ERR(f);
-			}
 		}
-
-		FSHOOK_END(open, fd)
-
 		putname(tmp);
 	}
 	return fd;
@@ -1837,19 +1828,16 @@ long sys32_vm86_warning(void)
 	return -ENOSYS;
 } 
 
-long sys32_quotactl(unsigned int cmd, const char *special, qid_t id, caddr_t addr)
+long sys32_quotactl(void)
 { 
 	struct task_struct *me = current;
 	static char lastcomm[8];
-
-	audit_intercept(AUDIT_quotactl, cmd, NULL, id, addr);
-
 	if (strcmp(lastcomm, me->comm)) {
 		printk(KERN_INFO "%s: 32bit quotactl not supported on 64 bit kernel\n",
 		       me->comm);
 		strcpy(lastcomm, me->comm); 
 	} 
-	return audit_result(-ENOSYS);
+	return -ENOSYS;
 } 
 
 cond_syscall(sys32_ipc)

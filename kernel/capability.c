@@ -10,7 +10,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 #include <asm/uaccess.h>
 
 unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
@@ -151,14 +150,12 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
 	     return -EFAULT; 
 
      if (pid && !capable(CAP_SETPCAP))
-             return audit_intercept(AUDIT_capset, version, pid, NULL, NULL, NULL), audit_result(-EPERM);
+             return -EPERM;
 
      if (copy_from_user(&effective, &data->effective, sizeof(effective)) ||
 	 copy_from_user(&inheritable, &data->inheritable, sizeof(inheritable)) ||
 	 copy_from_user(&permitted, &data->permitted, sizeof(permitted)))
 	     return -EFAULT; 
-
-     audit_intercept(AUDIT_capset, version, pid, &effective, &inheritable, &permitted);
 
      spin_lock(&task_capability_lock);
      read_lock(&tasklist_lock);
@@ -208,5 +205,5 @@ out:
      read_unlock(&tasklist_lock);
      spin_unlock(&task_capability_lock);
 
-     return audit_result(ret);
+     return ret;
 }

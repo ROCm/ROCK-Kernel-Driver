@@ -26,7 +26,6 @@
 #include <linux/proc_fs.h>
 #include <linux/shmem_fs.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 #include <asm/uaccess.h>
 
 #include "util.h"
@@ -242,8 +241,6 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	struct shmid_kernel *shp;
 	int err, id = 0;
 
-	audit_intercept(AUDIT_shmget, key, size, shmflg);
-
 	down(&shm_ids.sem);
 	if (key == IPC_PRIVATE) {
 		err = newseg(key, shmflg, size);
@@ -272,7 +269,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	}
 	up(&shm_ids.sem);
 
-	return audit_result(err);
+	return err;
 }
 
 static inline unsigned long copy_shmid_to_user(void __user *buf, struct shmid64_ds *in, int version)
@@ -402,8 +399,6 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 	struct shmid_kernel *shp;
 	int err, version;
 
-	audit_intercept(AUDIT_shmctl, shmid, cmd, buf);
-
 	if (cmd < 0 || shmid < 0) {
 		err = -EINVAL;
 		goto out;
@@ -418,7 +413,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		err = security_shm_shmctl(NULL, cmd);
 		if (err)
-			return audit_result(err);
+			return err;
 
 		memset(&shminfo,0,sizeof(shminfo));
 		shminfo.shmmni = shminfo.shmseg = shm_ctlmni;
@@ -427,7 +422,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		shminfo.shmmin = SHMMIN;
 		if(copy_shminfo_to_user (buf, &shminfo, version))
-			return audit_result(-EFAULT);
+			return -EFAULT;
 		/* reading a integer is always atomic */
 		err= shm_ids.max_id;
 		if(err<0)
@@ -440,7 +435,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		err = security_shm_shmctl(NULL, cmd);
 		if (err)
-			return audit_result(err);
+			return err;
 
 		memset(&shm_info,0,sizeof(shm_info));
 		down(&shm_ids.sem);
@@ -589,7 +584,6 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 			err = -EFAULT;
 			goto out;
 		}
-
 		down(&shm_ids.sem);
 		shp = shm_lock(shmid);
 		err=-EINVAL;
@@ -631,7 +625,7 @@ out_up:
 out_unlock:
 	shm_unlock(shp);
 out:
-	return audit_result(err);
+	return err;
 }
 
 /*
@@ -654,25 +648,23 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	int acc_mode;
 	void *user_addr;
 
-	audit_intercept(AUDIT_shmat, shmid, shmaddr, shmflg);
-
 	if (shmid < 0) {
 		err = -EINVAL;
 		goto out;
 	} else if ((addr = (ulong)shmaddr)) {
 		if (addr & (SHMLBA-1)) {
- 			if (shmflg & SHM_RND)
+			if (shmflg & SHM_RND)
 				addr &= ~(SHMLBA-1);	   /* round down */
 			else
 #ifndef __ARCH_FORCE_SHMLBA
 				if (addr & ~PAGE_MASK)
 #endif
-					return audit_result(-EINVAL);
+					return -EINVAL;
 		}
 		flags = MAP_SHARED | MAP_FIXED;
 	} else {
 		if ((shmflg & SHM_REMAP))
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 		flags = MAP_SHARED;
 	}
@@ -710,7 +702,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	err = security_shm_shmat(shp, shmaddr, shmflg);
 	if (err) {
 		shm_unlock(shp);
-		return audit_result(err);
+		return err;
 	}
 		
 	file = shp->shm_file;
@@ -753,7 +745,7 @@ invalid:
 	if (IS_ERR(user_addr))
 		err = PTR_ERR(user_addr);
 out:
-	return audit_result(err);
+	return err;
 }
 
 /*
@@ -767,8 +759,6 @@ asmlinkage long sys_shmdt(char __user *shmaddr)
 	unsigned long addr = (unsigned long)shmaddr;
 	loff_t size = 0;
 	int retval = -EINVAL;
-
-	audit_intercept(AUDIT_shmdt, shmaddr);
 
 	down_write(&mm->mmap_sem);
 
@@ -838,7 +828,7 @@ asmlinkage long sys_shmdt(char __user *shmaddr)
 	}
 
 	up_write(&mm->mmap_sem);
-	return audit_result(retval);
+	return retval;
 }
 
 #ifdef CONFIG_PROC_FS

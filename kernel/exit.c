@@ -26,7 +26,6 @@
 #include <linux/kdb.h>
 #endif
 #include <linux/ckrm.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -780,11 +779,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	}
 
 	acct_process(code);
-#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-	if (AUDITING(tsk))
-		audit_exit(tsk, code);
-	audit_free(tsk->audit);
-#endif
 	__exit_mm(tsk);
 
 	exit_sem(tsk);

@@ -34,7 +34,6 @@
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
-#include <linux/audit.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -548,16 +547,14 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	int ret, forced = 0;
 
 	if (!capable(CAP_SYS_MODULE))
-		return audit_intercept(AUDIT_delete_module, NULL, flags), audit_result(-EPERM);
+		return -EPERM;
 
 	if (strncpy_from_user(name, name_user, MODULE_NAME_LEN-1) < 0)
 		return -EFAULT;
 	name[MODULE_NAME_LEN-1] = '\0';
 
-	audit_intercept(AUDIT_delete_module, name, flags);
-
 	if (down_interruptible(&module_mutex) != 0)
-		return audit_result(-EINTR);
+		return -EINTR;
 
 	mod = find_module(name);
 	if (!mod) {
@@ -606,7 +603,7 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 
  out:
 	up(&module_mutex);
-	return audit_result(ret);
+	return ret;
 }
 
 static void print_unload_info(struct seq_file *m, struct module *mod)
@@ -687,8 +684,7 @@ static inline void module_unload_init(struct module *mod)
 asmlinkage long
 sys_delete_module(const char *name_user, unsigned int flags)
 {
-	audit_intercept(AUDIT_delete_module, NULL, flags);
-	return audit_result(-ENOSYS);
+	return -ENOSYS;
 }
 
 #endif /* CONFIG_MODULE_UNLOAD */
@@ -1593,21 +1589,19 @@ sys_init_module(void __user *umod,
 	struct module *mod;
 	int ret;
 
-	audit_intercept(AUDIT_init_module, umod, len, uargs);
-
 	/* Must have permission */
 	if (!capable(CAP_SYS_MODULE))
-		return audit_result(-EPERM);
+		return -EPERM;
 
 	/* Only one module load at a time, please */
 	if (down_interruptible(&module_mutex) != 0)
-		return audit_result(-EINTR);
+		return -EINTR;
 
 	/* Do all the hard work */
 	mod = load_module(umod, len, uargs);
 	if (IS_ERR(mod)) {
 		up(&module_mutex);
-		return audit_result(PTR_ERR(mod));
+		return PTR_ERR(mod);
 	}
 
 	/* Flush the instruction cache, since we've played with text */
@@ -1647,7 +1641,7 @@ sys_init_module(void __user *umod,
 			free_module(mod);
 			up(&module_mutex);
 		}
-		return audit_result(ret);
+		return ret;
 	}
 
 	/* Now it's a first class citizen! */
@@ -1661,7 +1655,7 @@ sys_init_module(void __user *umod,
 	mod->init_text_size = 0;
 	up(&module_mutex);
 
-	return audit_result(0);
+	return 0;
 }
 
 static inline int within(unsigned long addr, void *start, unsigned long size)

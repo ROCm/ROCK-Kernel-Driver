@@ -14,7 +14,6 @@
 #include <linux/highuid.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 
@@ -157,23 +156,20 @@ asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
 	int retval;
 
 	if (!capable(CAP_SETGID))
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EPERM);
+		return -EPERM;
 	if ((unsigned)gidsetsize > NGROUPS_MAX)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EINVAL);
+		return -EINVAL;
 
 	group_info = groups_alloc(gidsetsize);
 	if (!group_info)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-ENOMEM);
+		return -ENOMEM;
 	retval = groups16_from_user(group_info, grouplist);
 	if (retval) {
 		put_group_info(group_info);
-		audit_intercept(AUDIT_setgroups, NULL);
-		return audit_result(retval);
+		return retval;
 	}
 
-	audit_intercept(AUDIT_setgroups, group_info);
-
-	(void)audit_result(retval = set_current_groups(group_info));
+	retval = set_current_groups(group_info);
 	put_group_info(group_info);
 
 	return retval;

@@ -28,7 +28,6 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-#include <linux/audit.h>
 #include <asm/uaccess.h>
 
 /* 
@@ -75,14 +74,13 @@ asmlinkage long sys_stime(time_t *tptr)
 	struct timespec tv;
 
 	if (!capable(CAP_SYS_TIME))
-		return audit_intercept(AUDIT_settimeofday, NULL, NULL), audit_result(-EPERM);
+		return -EPERM;
 	if (get_user(tv.tv_sec, tptr))
 		return -EFAULT;
 
 	tv.tv_nsec = 0;
-	audit_intercept(AUDIT_settimeofday, &tv, NULL);
 	do_settimeofday(&tv);
-	return audit_result(0);
+	return 0;
 }
 
 #endif
@@ -143,10 +141,8 @@ int do_sys_settimeofday(struct timespec *tv, struct timezone *tz)
 {
 	static int firsttime = 1;
 
-	audit_intercept(AUDIT_settimeofday, tv, tz);
-
 	if (!capable(CAP_SYS_TIME))
-		return audit_result(-EPERM);
+		return -EPERM;
 		
 	if (tz) {
 		/* SMP safe, global irq locking makes it work. */
@@ -162,9 +158,9 @@ int do_sys_settimeofday(struct timespec *tv, struct timezone *tz)
 		/* SMP safe, again the code in arch/foo/time.c should
 		 * globally block out interrupts when it runs.
 		 */
-		return audit_result(do_settimeofday(tv));
+		return do_settimeofday(tv);
 	}
-	return audit_result(0);
+	return 0;
 }
 
 asmlinkage long sys_settimeofday(struct timeval __user *tv,
@@ -214,29 +210,27 @@ int do_adjtimex(struct timex *txc)
         long ltemp, mtemp, save_adjust;
 	int result;
 
-	audit_intercept(AUDIT_adjtimex, txc);
-
 	/* In order to modify anything, you gotta be super-user! */
 	if (txc->modes && !capable(CAP_SYS_TIME))
-		return audit_result(-EPERM);
+		return -EPERM;
 		
 	/* Now we validate the data before disabling interrupts */
 
 	if ((txc->modes & ADJ_OFFSET_SINGLESHOT) == ADJ_OFFSET_SINGLESHOT)
 	  /* singleshot must not be used with any other mode bits */
 		if (txc->modes != ADJ_OFFSET_SINGLESHOT)
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 	if (txc->modes != ADJ_OFFSET_SINGLESHOT && (txc->modes & ADJ_OFFSET))
 	  /* adjustment Offset limited to +- .512 seconds */
 		if (txc->offset <= - MAXPHASE || txc->offset >= MAXPHASE )
-			return audit_result(-EINVAL);	
+			return -EINVAL;	
 
 	/* if the quartz is off by more than 10% something is VERY wrong ! */
 	if (txc->modes & ADJ_TICK)
 		if (txc->tick <  900000/USER_HZ ||
 		    txc->tick > 1100000/USER_HZ)
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 	write_seqlock_irq(&xtime_lock);
 	result = time_state;	/* mostly `TIME_OK' */
@@ -391,7 +385,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->stbcnt	   = pps_stbcnt;
 	write_sequnlock_irq(&xtime_lock);
 	do_gettimeofday(&txc->time);
-	return audit_result(result);
+	return(result);
 }
 
 asmlinkage long sys_adjtimex(struct timex __user *txc_p)

@@ -19,7 +19,6 @@
 #include <linux/sysctl.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/file.h>
 #include <linux/signal.h>
 #include <linux/resource.h>
@@ -49,7 +48,6 @@
 #include <linux/ipc.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
-#include <linux/audit.h>
 
 #include <asm/intrinsics.h>
 #include <asm/semaphore.h>
@@ -1445,20 +1443,11 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	unsigned int value, tmp;
 	long i, ret;
 
-	switch (request) {
-	      case PTRACE_TRACEME:
-	      case PTRACE_ATTACH:
-	      case PTRACE_SYSCALL:
-	      case PTRACE_CONT:
-	      case PTRACE_KILL:
-	      case PTRACE_SINGLESTEP:
-	      case PTRACE_DETACH:
-		return sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
-	}
-
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
-
 	lock_kernel();
+	if (request == PTRACE_TRACEME) {
+		ret = sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
+		goto out;
+	}
 
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
@@ -1471,6 +1460,11 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	ret = -EPERM;
 	if (pid == 1)		/* no messing around with init! */
 		goto out_tsk;
+
+	if (request == PTRACE_ATTACH) {
+		ret = sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
+		goto out_tsk;
+	}
 
 	ret = ptrace_check_attach(child, request == PTRACE_KILL);
 	if (ret < 0)
@@ -1551,6 +1545,14 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		ret = restore_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
+	      case PTRACE_SYSCALL:	/* continue, stop after next syscall */
+	      case PTRACE_CONT:		/* restart after signal. */
+	      case PTRACE_KILL:
+	      case PTRACE_SINGLESTEP:	/* execute chile for one instruction */
+	      case PTRACE_DETACH:	/* detach a process */
+		ret = sys_ptrace(request, pid, addr, data, arg4, arg5, arg6, arg7, stack);
+		break;
+
 	      default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
@@ -1560,7 +1562,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	put_task_struct(child);
   out:
 	unlock_kernel();
-	return audit_result(ret);
+	return ret;
 }
 
 /*
@@ -1578,25 +1580,23 @@ sys32_iopl (int level)
 	unsigned long addr;
 	mm_segment_t old_fs = get_fs ();
 
-	audit_intercept(AUDIT_iopl, level);
-
 	if (level != 3)
-		return audit_result(-EINVAL);
+		return(-EINVAL);
 	/* Trying to gain more privileges? */
 	old = ia64_getreg(_IA64_REG_AR_EFLAG);
 	if ((unsigned int) level > ((old >> 12) & 3)) {
 		if (!capable(CAP_SYS_RAWIO))
-			return audit_result(-EPERM);
+			return -EPERM;
 	}
 	set_fs(KERNEL_DS);
 	fd = sys_open("/dev/mem", O_SYNC | O_RDWR, 0);
 	set_fs(old_fs);
 	if (fd < 0)
-		return audit_result(fd);
+		return fd;
 	file = fget(fd);
 	if (file == NULL) {
 		sys_close(fd);
-		return audit_result(-EFAULT);
+		return(-EFAULT);
 	}
 
 	down_write(&current->mm->mmap_sem);
@@ -1612,7 +1612,7 @@ sys32_iopl (int level)
 
 	fput(file);
 	sys_close(fd);
-	return audit_result(0);
+	return 0;
 }
 
 asmlinkage long
@@ -1865,23 +1865,20 @@ sys32_setgroups16 (int gidsetsize, short *grouplist)
 	int retval;
 
 	if (!capable(CAP_SETGID))
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EPERM);
+		return -EPERM;
 	if ((unsigned)gidsetsize > NGROUPS_MAX)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EINVAL);
+		return -EINVAL;
 
 	group_info = groups_alloc(gidsetsize);
 	if (!group_info)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-ENOMEM);
+		return -ENOMEM;
 	retval = groups16_from_user(group_info, grouplist);
 	if (retval) {
 		put_group_info(group_info);
-		audit_intercept(AUDIT_setgroups, NULL);
-		return audit_result(retval);
+		return retval;
 	}
 
-	audit_intercept(AUDIT_setgroups, group_info);
-
-	(void)audit_result(retval = set_current_groups(group_info));
+	retval = set_current_groups(group_info);
 	put_group_info(group_info);
 
 	return retval;
@@ -2109,34 +2106,31 @@ sys32_brk (unsigned int brk)
  * Exactly like fs/open.c:sys_open(), except that it doesn't set the O_LARGEFILE flag.
  */
 asmlinkage long
-sys32_open(const char __user * filename, int flags, int mode)
+sys32_open (const char * filename, int flags, int mode)
 {
 	char * tmp;
-	int fd;
+	int fd, error;
 
 	tmp = getname(filename);
 	fd = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
-
-		FSHOOK_BEGIN(open, fd, .filename = tmp, .flags = flags, .mode = mode)
-
 		fd = get_unused_fd();
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
-
-			if (!IS_ERR(f))
-				fd_install(fd, f);
-			else {
-				put_unused_fd(fd);
-				fd = PTR_ERR(f);
-			}
+			error = PTR_ERR(f);
+			if (IS_ERR(f))
+				goto out_error;
+			fd_install(fd, f);
 		}
-
-		FSHOOK_END(open, fd)
-
+out:
 		putname(tmp);
 	}
 	return fd;
+
+out_error:
+	put_unused_fd(fd);
+	fd = error;
+	goto out;
 }
 
 /* Structure for ia32 emulation on ia64 */

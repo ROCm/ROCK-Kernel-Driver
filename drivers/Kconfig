@@ -52,6 +52,4 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
-source "drivers/audit/Kconfig"
-
 endmenu

@@ -24,7 +24,6 @@
 #include <linux/objrmap.h>
 #include <linux/security.h>
 #include <linux/backing-dev.h>
-#include <linux/audit.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -1081,13 +1080,12 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	int err;
 	
 	if (!capable(CAP_SYS_ADMIN))
-		return audit_intercept(AUDIT_swapoff, NULL), audit_result(-EPERM);
+		return -EPERM;
 
 	pathname = getname(specialfile);
+	err = PTR_ERR(pathname);
 	if (IS_ERR(pathname))
-		return PTR_ERR(pathname);
-
-	audit_intercept(AUDIT_swapoff, pathname);
+		goto out;
 
 	victim = filp_open(pathname, O_RDWR, 0);
 	putname(pathname);
@@ -1179,7 +1177,6 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 out_dput:
 	filp_close(victim, NULL);
 out:
-	(void)audit_result(err);
 	return err;
 }
 
@@ -1302,7 +1299,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	int did_down = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
-		return audit_intercept(AUDIT_swapon, NULL, swap_flags), audit_result(-EPERM);
+		return -EPERM;
 	swap_list_lock();
 	p = swap_info;
 	for (type = 0 ; type < nr_swapfiles ; type++,p++)
@@ -1323,7 +1320,6 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	 */
 	if (type > swp_type(pte_to_swp_entry(swp_entry_to_pte(swp_entry(~0UL,0))))) {
 		swap_list_unlock();
-		audit_intercept(AUDIT_swapon, NULL, swap_flags);
 		goto out;
 	}
 	if (type >= nr_swapfiles)
@@ -1349,11 +1345,10 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	swap_list_unlock();
 	name = getname(specialfile);
 	error = PTR_ERR(name);
-	if (IS_ERR(name))
+	if (IS_ERR(name)) {
 		name = NULL;
-	audit_intercept(AUDIT_swapon, name, swap_flags);
-	if (!name)
 		goto bad_swap_2;
+	}
 	swap_file = filp_open(name, O_RDWR, 0);
 	error = PTR_ERR(swap_file);
 	if (IS_ERR(swap_file)) {
@@ -1556,14 +1551,13 @@ bad_swap_2:
 	destroy_swap_extents(p);
 	if (swap_map)
 		vfree(swap_map);
-	if (swap_file)
+	if (swap_file && !IS_ERR(swap_file))
 		filp_close(swap_file, NULL);
 out:
 	if (page && !IS_ERR(page)) {
 		kunmap(page);
 		page_cache_release(page);
 	}
-	(void)audit_result(error);
 	if (name)
 		putname(name);
 	if (error && did_down)

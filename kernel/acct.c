@@ -53,7 +53,6 @@
 #include <linux/vfs.h>
 #include <linux/jiffies.h>
 #include <linux/times.h>
-#include <linux/audit.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <linux/blkdev.h> /* sector_div */
@@ -207,54 +206,47 @@ void acct_file_reopen(struct file *file)
  */
 asmlinkage long sys_acct(const char *name)
 {
-	struct file *file;
+	struct file *file = NULL;
 	char *tmp;
-	int error = 0;
+	int error;
 
 	if (!capable(CAP_SYS_PACCT))
-		return audit_intercept(AUDIT_acct, NULL), audit_result(-EPERM);
+		return -EPERM;
 
 	if (name) {
 		tmp = getname(name);
 		if (IS_ERR(tmp)) {
 			return (PTR_ERR(tmp));
 		}
-
-		audit_intercept(AUDIT_acct, tmp);
-
 		/* Difference from BSD - they don't do O_APPEND */
 		file = filp_open(tmp, O_WRONLY|O_APPEND, 0);
-		if (IS_ERR(file)) {
-			error = PTR_ERR(file);
-			file = NULL;
-		}
-		else if (!S_ISREG(file->f_dentry->d_inode->i_mode))
-			error = -EACCES;
-		else if (!file->f_op->write)
-			error = -EIO;
-	}
-	else {
-		tmp = NULL;
-		file = NULL;
-		audit_intercept(AUDIT_acct, NULL);
-	}
-
-	if (!error)
-		error = security_acct(file);
-	if (error && file)
-		filp_close(file, NULL);
-
-	(void)audit_result(error);
-	if (tmp)
 		putname(tmp);
+		if (IS_ERR(file)) {
+			return (PTR_ERR(file));
+		}
+		if (!S_ISREG(file->f_dentry->d_inode->i_mode)) {
+			filp_close(file, NULL);
+			return (-EACCES);
+		}
 
-	if (!error) {
-		spin_lock(&acct_globals.lock);
-		acct_file_reopen(file);
-		spin_unlock(&acct_globals.lock);
+		if (!file->f_op->write) {
+			filp_close(file, NULL);
+			return (-EIO);
+		}
 	}
 
-	return error;
+	error = security_acct(file);
+	if (error) {
+		if (file)
+			filp_close(file, NULL);
+		return error;
+	}
+
+	spin_lock(&acct_globals.lock);
+	acct_file_reopen(file);
+	spin_unlock(&acct_globals.lock);
+
+	return (0);
 }
 
 /*

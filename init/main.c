@@ -89,11 +89,6 @@ extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 extern void buffer_init(void);
-#ifdef CONFIG_FSHOOKS
-extern void fshooks_init(void);
-#else
-#define fshooks_init ((void)0)
-#endif
 extern void pidhash_init(void);
 extern void pidmap_init(void);
 extern void anon_vma_init(void);
@@ -522,7 +517,6 @@ asmlinkage void __init start_kernel(void)
 	fork_init(num_physpages);
 	proc_caches_init();
 	buffer_init();
-	fshooks_init();
 	unnamed_dev_init();
 	security_scaffolding_startup();
 	vfs_caches_init(num_physpages);

@@ -30,7 +30,6 @@
 #include <linux/smp.h>
 #include <linux/security.h>
 #include <linux/bootmem.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 
@@ -257,11 +256,9 @@ int do_syslog(int type, char __user * buf, int len)
 	char c;
 	int error = 0;
 
-	audit_intercept(AUDIT_syslog, type, buf, len);
-
 	error = security_syslog(type);
 	if (error)
-		return audit_result(error);
+		return error;
 
 	switch (type) {
 	case 0:		/* Close log */
@@ -386,7 +383,7 @@ int do_syslog(int type, char __user * buf, int len)
 		break;
 	}
 out:
-	return audit_result(error);
+	return error;
 }
 
 #ifdef	CONFIG_KDB

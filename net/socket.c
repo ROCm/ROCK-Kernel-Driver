@@ -81,7 +81,6 @@
 #include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <linux/kmod.h>
-#include <linux/audit.h>
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
@@ -1093,8 +1092,6 @@ asmlinkage long sys_socket(int family, int type, int protocol)
 	int retval;
 	struct socket *sock;
 
-	audit_intercept(AUDIT_socket, family, type, protocol);
-
 	retval = sock_create(family, type, protocol, &sock);
 	if (retval < 0)
 		goto out;
@@ -1105,11 +1102,11 @@ asmlinkage long sys_socket(int family, int type, int protocol)
 
 out:
 	/* It may be already another descriptor 8) Not kernel problem. */
-	return audit_result(retval);
+	return retval;
 
 out_release:
 	sock_release(sock);
-	return audit_result(retval);
+	return retval;
 }
 
 /*
@@ -1195,21 +1192,16 @@ asmlinkage long sys_bind(int fd, struct sockaddr __user *umyaddr, int addrlen)
 	if((sock = sockfd_lookup(fd,&err))!=NULL)
 	{
 		if((err=move_addr_to_kernel(umyaddr,addrlen,address))>=0) {
-			audit_intercept(AUDIT_bind, fd, address, addrlen);
 			err = security_socket_bind(sock, (struct sockaddr *)address, addrlen);
 			if (err) {
 				sockfd_put(sock);
-				return audit_result(err);
+				return err;
 			}
 			err = sock->ops->bind(sock, (struct sockaddr *)address, addrlen);
 		}
-		else
-			audit_intercept(AUDIT_bind, fd, NULL, addrlen);
 		sockfd_put(sock);
-	}
-	else
-		audit_intercept(AUDIT_bind, fd, NULL, 0);
-	return audit_result(err);
+	}			
+	return err;
 }
 
 

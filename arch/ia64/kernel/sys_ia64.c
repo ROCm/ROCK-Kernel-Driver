@@ -18,7 +18,6 @@
 #include <linux/syscalls.h>
 #include <linux/highuid.h>
 #include <linux/hugetlb.h>
-#include <linux/audit.h>
 
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
@@ -118,8 +117,6 @@ ia64_brk (unsigned long brk)
 	 * check and the clearing of r8.  However, we can't call sys_brk() because we need
 	 * to acquire the mmap_sem before we can do the test...
 	 */
-	audit_intercept(AUDIT_brk, brk);
-
 	down_write(&mm->mmap_sem);
 
 	if (brk < mm->end_code)
@@ -158,7 +155,7 @@ out:
 	retval = mm->brk;
 	up_write(&mm->mmap_sem);
 	force_successful_syscall_return();
-	return audit_lresult(retval);
+	return retval;
 }
 
 /*

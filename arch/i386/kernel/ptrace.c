@@ -14,7 +14,6 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -240,8 +239,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	struct task_struct *child;
 	struct user * dummy = NULL;
 	int i, ret;
-
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
 
 	lock_kernel();
 	ret = -EPERM;
@@ -572,7 +569,7 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return audit_result(ret);
+	return ret;
 }
 
 /* notification of system call entry/exit

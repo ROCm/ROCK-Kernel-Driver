@@ -21,7 +21,6 @@
 #include <linux/binfmts.h>
 #include <linux/security.h>
 #include <linux/ptrace.h>
-#include <linux/audit.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
@@ -2146,15 +2145,13 @@ sys_kill(int pid, int sig)
 {
 	struct siginfo info;
 
-	audit_intercept(AUDIT_kill, pid, sig);
-
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_code = SI_USER;
 	info.si_pid = current->tgid;
 	info.si_uid = current->uid;
 
-	return audit_lresult(kill_something_info(sig, &info, pid));
+	return kill_something_info(sig, &info, pid);
 }
 
 /**
@@ -2173,11 +2170,9 @@ asmlinkage long sys_tgkill(int tgid, int pid, int sig)
 	int error;
 	struct task_struct *p;
 
-	audit_intercept(AUDIT_tgkill, tgid, pid, sig);
-
 	/* This is only valid for single tasks */
 	if (pid <= 0 || tgid <= 0)
-		return audit_lresult(-EINVAL);
+		return -EINVAL;
 
 	info.si_signo = sig;
 	info.si_errno = 0;
@@ -2202,7 +2197,7 @@ asmlinkage long sys_tgkill(int tgid, int pid, int sig)
 		}
 	}
 	read_unlock(&tasklist_lock);
-	return audit_lresult(error);
+	return error;
 }
 
 /*
@@ -2215,11 +2210,9 @@ sys_tkill(int pid, int sig)
 	int error;
 	struct task_struct *p;
 
-	audit_intercept(AUDIT_tkill, pid, sig);
-
 	/* This is only valid for single tasks */
 	if (pid <= 0)
-		return audit_lresult(-EINVAL);
+		return -EINVAL;
 
 	info.si_signo = sig;
 	info.si_errno = 0;
@@ -2244,7 +2237,7 @@ sys_tkill(int pid, int sig)
 		}
 	}
 	read_unlock(&tasklist_lock);
-	return audit_lresult(error);
+	return error;
 }
 
 asmlinkage long

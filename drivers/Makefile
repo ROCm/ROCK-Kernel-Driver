@@ -52,6 +52,3 @@ obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
 obj-y				+= firmware/
 obj-$(CONFIG_CRASH_DUMP)	+= dump/
-ifneq (,$(findstring $(CONFIG_AUDIT),y m))
-obj-y				+= audit/
-endif

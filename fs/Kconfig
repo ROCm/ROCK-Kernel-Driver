@@ -1820,9 +1820,3 @@ source "fs/nls/Kconfig"
 
 endmenu
 
-
-config FSHOOKS
-	bool "File system hooks"
-	default y
-	help
-	  Provide capability to monitor file system activity

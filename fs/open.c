@@ -21,7 +21,6 @@
 #include <linux/vfs.h>
 #include <asm/uaccess.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/pagemap.h>
 
 int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
@@ -118,16 +117,14 @@ asmlinkage long sys_statfs(const char __user * path, struct statfs __user * buf)
 	struct nameidata nd;
 	int error;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(statfs, error, path, nd, path)
-
+	error = user_path_walk(path, &nd);
+	if (!error) {
 		struct statfs tmp;
 		error = vfs_statfs_native(nd.dentry->d_inode->i_sb, &tmp);
 		if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
 			error = -EFAULT;
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(statfs, error, path)
-
+	}
 	return error;
 }
 
@@ -139,17 +136,14 @@ asmlinkage long sys_statfs64(const char __user *path, size_t sz, struct statfs64
 
 	if (sz != sizeof(*buf))
 		return -EINVAL;
-
-	FSHOOK_BEGIN_USER_PATH_WALK(statfs, error, path, nd, path)
-
+	error = user_path_walk(path, &nd);
+	if (!error) {
 		struct statfs64 tmp;
 		error = vfs_statfs64(nd.dentry->d_inode->i_sb, &tmp);
 		if (!error && copy_to_user(buf, &tmp, sizeof(tmp)))
 			error = -EFAULT;
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(statfs, error, path)
-
+	}
 	return error;
 }
 
@@ -160,8 +154,6 @@ asmlinkage long sys_fstatfs(unsigned int fd, struct statfs __user * buf)
 	struct statfs tmp;
 	int error;
 
-	FSHOOK_BEGIN(fstatfs, error, .fd = fd)
-
 	error = -EBADF;
 	file = fget(fd);
 	if (!file)
@@ -171,9 +163,6 @@ asmlinkage long sys_fstatfs(unsigned int fd, struct statfs __user * buf)
 		error = -EFAULT;
 	fput(file);
 out:
-
-	FSHOOK_END(fstatfs, error)
-
 	return error;
 }
 
@@ -182,8 +171,6 @@ asmlinkage long sys_fstatfs64(unsigned int fd, size_t sz, struct statfs64 __user
 	struct file * file;
 	struct statfs64 tmp;
 	int error;
-
-	FSHOOK_BEGIN(fstatfs, error, .fd = fd)
 
 	if (sz != sizeof(*buf))
 		return -EINVAL;
@@ -197,9 +184,6 @@ asmlinkage long sys_fstatfs64(unsigned int fd, size_t sz, struct statfs64 __user
 		error = -EFAULT;
 	fput(file);
 out:
-
-	FSHOOK_END(fstatfs, error)
-
 	return error;
 }
 
@@ -232,8 +216,9 @@ static inline long do_sys_truncate(const char __user * path, loff_t length)
 	if (length < 0)	/* sorry, but loff_t says... */
 		goto out;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(truncate, error, path, nd, filename, .length = length)
-
+	error = user_path_walk(path, &nd);
+	if (error)
+		goto out;
 	inode = nd.dentry->d_inode;
 
 	/* For directories it's -EISDIR, for other non-regulars - -EINVAL */
@@ -277,9 +262,6 @@ static inline long do_sys_truncate(const char __user * path, loff_t length)
 
 dput_and_out:
 	path_release(&nd);
-
-	FSHOOK_END_USER_WALK(truncate, error, filename)
-
 out:
 	return error;
 }
@@ -296,8 +278,6 @@ static inline long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 	struct dentry *dentry;
 	struct file * file;
 	int error;
-
-	FSHOOK_BEGIN(ftruncate, error, .fd = fd, .length = length)
 
 	error = -EINVAL;
 	if (length < 0)
@@ -332,9 +312,6 @@ static inline long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 out_putf:
 	fput(file);
 out:
-
-	FSHOOK_END(ftruncate, error);
-
 	return error;
 }
 
@@ -356,6 +333,71 @@ asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length)
 }
 #endif
 
+#if !(defined(__alpha__) || defined(__ia64__))
+
+/*
+ * sys_utime() can be implemented in user-level using sys_utimes().
+ * Is this for backwards compatibility?  If so, why not move it
+ * into the appropriate arch directory (for those architectures that
+ * need it).
+ */
+
+/* If times==NULL, set access and modification to current time,
+ * must be owner or have write permission.
+ * Else, update from *times, must be owner or super user.
+ */
+asmlinkage long sys_utime(char __user * filename, struct utimbuf __user * times)
+{
+	int error;
+	struct nameidata nd;
+	struct inode * inode;
+	struct iattr newattrs;
+
+	error = user_path_walk(filename, &nd);
+	if (error)
+		goto out;
+	inode = nd.dentry->d_inode;
+
+	error = -EROFS;
+	if (IS_RDONLY(inode))
+		goto dput_and_out;
+
+	/* Don't worry, the checks are done in inode_change_ok() */
+	newattrs.ia_valid = ATTR_CTIME | ATTR_MTIME | ATTR_ATIME;
+	if (times) {
+		error = -EPERM;
+		if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
+			goto dput_and_out;
+
+		error = get_user(newattrs.ia_atime.tv_sec, &times->actime);
+		newattrs.ia_atime.tv_nsec = 0;
+		if (!error) 
+			error = get_user(newattrs.ia_mtime.tv_sec, &times->modtime);
+		newattrs.ia_mtime.tv_nsec = 0;
+		if (error)
+			goto dput_and_out;
+
+		newattrs.ia_valid |= ATTR_ATIME_SET | ATTR_MTIME_SET;
+	} else {
+                error = -EACCES;
+                if (IS_IMMUTABLE(inode))
+                        goto dput_and_out;
+
+		if (current->fsuid != inode->i_uid &&
+		    (error = permission(inode,MAY_WRITE,&nd)) != 0)
+			goto dput_and_out;
+	}
+	down(&inode->i_sem);
+	error = notify_change(nd.dentry, &newattrs);
+	up(&inode->i_sem);
+dput_and_out:
+	path_release(&nd);
+out:
+	return error;
+}
+
+#endif
+
 /* If times==NULL, set access and modification to current time,
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
@@ -367,14 +409,10 @@ long do_utimes(char __user * filename, struct timeval * times)
 	struct inode * inode;
 	struct iattr newattrs;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(utimes,
-		error,
-		filename,
-		nd,
-		path,
-		.atime = times,
-		.mtime = times + !!times)
+	error = user_path_walk(filename, &nd);
 
+	if (error)
+		goto out;
 	inode = nd.dentry->d_inode;
 
 	error = -EROFS;
@@ -407,43 +445,9 @@ long do_utimes(char __user * filename, struct timeval * times)
 	up(&inode->i_sem);
 dput_and_out:
 	path_release(&nd);
-
-	FSHOOK_END_USER_WALK(utimes, error, path)
-
+out:
 	return error;
 }
-
-#if !(defined(__alpha__) || defined(__ia64__))
-
-/*
- * sys_utime() can be implemented in user-level using sys_utimes().
- * Is this for backwards compatibility?  If so, why not move it
- * into the appropriate arch directory (for those architectures that
- * need it).
- */
-
-/* If times==NULL, set access and modification to current time,
- * must be owner or have write permission.
- * Else, update from *times, must be owner or super user.
- */
-asmlinkage long sys_utime(char __user * filename, struct utimbuf __user * utime)
-{
-	struct timeval times[2];
-
-	if (utime) {
-		struct utimbuf ktime;
-
-		if (copy_from_user(&ktime, utime, sizeof(ktime)))
-			return -EFAULT;
-		times[0].tv_sec = ktime.actime;
-		times[0].tv_usec = 0;
-		times[1].tv_sec = ktime.modtime;
-		times[1].tv_usec = 0;
-	}
-	return do_utimes(filename, utime ? times : NULL);
-}
-
-#endif
 
 asmlinkage long sys_utimes(char __user * filename, struct timeval __user * utimes)
 {
@@ -490,22 +494,15 @@ asmlinkage long sys_access(const char __user * filename, int mode)
 	else
 		current->cap_effective = current->cap_permitted;
 
-	FSHOOK_BEGIN_USER_WALK(access,
-		res,
-		filename,
-		LOOKUP_FOLLOW|LOOKUP_ACCESS,
-		nd,
-		path,
-		.mode = mode)
-
+	res = __user_walk(filename, LOOKUP_FOLLOW|LOOKUP_ACCESS, &nd);
+	if (!res) {
 		res = permission(nd.dentry->d_inode, mode, &nd);
 		/* SuS v2 requires we report a read only fs too */
 		if(!res && (mode & S_IWOTH) && IS_RDONLY(nd.dentry->d_inode)
 		   && !special_file(nd.dentry->d_inode->i_mode))
 			res = -EROFS;
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(access, res, path)
+	}
 
 	current->fsuid = old_fsuid;
 	current->fsgid = old_fsgid;
@@ -519,12 +516,9 @@ asmlinkage long sys_chdir(const char __user * filename)
 	struct nameidata nd;
 	int error;
 
-	FSHOOK_BEGIN_USER_WALK(chdir,
-		error,
-		filename,
-		LOOKUP_FOLLOW|LOOKUP_DIRECTORY,
-		nd,
-		dirname)
+	error = __user_walk(filename, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &nd);
+	if (error)
+		goto out;
 
 	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
@@ -534,9 +528,7 @@ asmlinkage long sys_chdir(const char __user * filename)
 
 dput_and_out:
 	path_release(&nd);
-
-	FSHOOK_END_USER_WALK(chdir, error, dirname)
-
+out:
 	return error;
 }
 
@@ -547,8 +539,6 @@ asmlinkage long sys_fchdir(unsigned int fd)
 	struct inode *inode;
 	struct vfsmount *mnt;
 	int error;
-
-	FSHOOK_BEGIN(fchdir, error, .fd = fd)
 
 	error = -EBADF;
 	file = fget(fd);
@@ -569,9 +559,6 @@ asmlinkage long sys_fchdir(unsigned int fd)
 out_putf:
 	fput(file);
 out:
-
-	FSHOOK_END(fchdir, error)
-
 	return error;
 }
 
@@ -580,12 +567,9 @@ asmlinkage long sys_chroot(const char __user * filename)
 	struct nameidata nd;
 	int error;
 
-	FSHOOK_BEGIN_USER_WALK(chroot,
-		error,
-		filename,
-		LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT,
-		nd,
-		path)
+	error = __user_walk(filename, LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
+	if (error)
+		goto out;
 
 	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
@@ -600,9 +584,7 @@ asmlinkage long sys_chroot(const char __user * filename)
 	error = 0;
 dput_and_out:
 	path_release(&nd);
-
-	FSHOOK_END_USER_WALK(chroot, error, path)
-
+out:
 	return error;
 }
 
@@ -611,12 +593,9 @@ asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
 	struct inode * inode;
 	struct dentry * dentry;
 	struct file * file;
-	int err;
+	int err = -EBADF;
 	struct iattr newattrs;
 
-	FSHOOK_BEGIN(fchmod, err, .fd = fd, .mode = mode)
-
-	err = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -641,9 +620,6 @@ asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
 out_putf:
 	fput(file);
 out:
-
-	FSHOOK_END(fchmod, err)
-
 	return err;
 }
 
@@ -654,14 +630,9 @@ asmlinkage long sys_chmod(const char __user * filename, mode_t mode)
 	int error;
 	struct iattr newattrs;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(chmod,
-		error,
-		filename,
-		nd,
-		path,
-		.mode = mode,
-		.link = false)
-
+	error = user_path_walk(filename, &nd);
+	if (error)
+		goto out;
 	inode = nd.dentry->d_inode;
 
 	error = -EROFS;
@@ -682,9 +653,7 @@ asmlinkage long sys_chmod(const char __user * filename, mode_t mode)
 
 dput_and_out:
 	path_release(&nd);
-
-	FSHOOK_END_USER_WALK(chmod, error, path)
-
+out:
 	return error;
 }
 
@@ -728,20 +697,11 @@ asmlinkage long sys_chown(const char __user * filename, uid_t user, gid_t group)
 	struct nameidata nd;
 	int error;
 
-	FSHOOK_BEGIN_USER_PATH_WALK(chown,
-		error,
-		filename,
-		nd,
-		path,
-		.uid = user,
-		.gid = group,
-		.link = false)
-
+	error = user_path_walk(filename, &nd);
+	if (!error) {
 		error = chown_common(nd.dentry, user, group);
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(chown, error, path)
-
+	}
 	return error;
 }
 
@@ -750,20 +710,11 @@ asmlinkage long sys_lchown(const char __user * filename, uid_t user, gid_t group
 	struct nameidata nd;
 	int error;
 
-	FSHOOK_BEGIN_USER_PATH_WALK_LINK(chown,
-		error,
-		filename,
-		nd,
-		path,
-		.uid = user,
-		.gid = group,
-		.link = true)
-
+	error = user_path_walk_link(filename, &nd);
+	if (!error) {
 		error = chown_common(nd.dentry, user, group);
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(chown, error, path)
-
+	}
 	return error;
 }
 
@@ -771,19 +722,13 @@ asmlinkage long sys_lchown(const char __user * filename, uid_t user, gid_t group
 asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group)
 {
 	struct file * file;
-	int error;
+	int error = -EBADF;
 
-	FSHOOK_BEGIN(fchown, error, .fd = fd, .uid = user, .gid = group)
-
-	error = -EBADF;
 	file = fget(fd);
 	if (file) {
 		error = chown_common(file->f_dentry, user, group);
 		fput(file);
 	}
-
-	FSHOOK_END(fchown, error)
-
 	return error;
 }
 
@@ -992,7 +937,7 @@ EXPORT_SYMBOL(fd_install);
 asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 {
 	char * tmp;
-	int fd;
+	int fd, error;
 
 #if BITS_PER_LONG != 32
 	flags |= O_LARGEFILE;
@@ -1000,26 +945,23 @@ asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 	tmp = getname(filename);
 	fd = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
-
-		FSHOOK_BEGIN(open, fd, .filename = tmp, .flags = flags, .mode = mode)
-
 		fd = get_unused_fd();
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
-
-			if (!IS_ERR(f))
-				fd_install(fd, f);
-			else {
-				put_unused_fd(fd);
-				fd = PTR_ERR(f);
-			}
+			error = PTR_ERR(f);
+			if (IS_ERR(f))
+				goto out_error;
+			fd_install(fd, f);
 		}
-
-		FSHOOK_END(open, fd)
-
+out:
 		putname(tmp);
 	}
 	return fd;
+
+out_error:
+	put_unused_fd(fd);
+	fd = error;
+	goto out;
 }
 EXPORT_SYMBOL_GPL(sys_open);
 
@@ -1075,30 +1017,24 @@ EXPORT_SYMBOL(filp_close);
  */
 asmlinkage long sys_close(unsigned int fd)
 {
-	struct file * filp = NULL;
+	struct file * filp;
 	struct files_struct *files = current->files;
-	int error;
 
-	FSHOOK_BEGIN(close, error, .fd = fd)
-
-	error = -EBADF;
 	spin_lock(&files->file_lock);
-	if (fd < files->max_fds) {
-		filp = files->fd[fd];
-		if (filp) {
-			files->fd[fd] = NULL;
-			FD_CLR(fd, files->close_on_exec);
-			__put_unused_fd(files, fd);
-			error = 0;
-		}
-	}
+	if (fd >= files->max_fds)
+		goto out_unlock;
+	filp = files->fd[fd];
+	if (!filp)
+		goto out_unlock;
+	files->fd[fd] = NULL;
+	FD_CLR(fd, files->close_on_exec);
+	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
-	if (!error)
-		error = filp_close(filp, files);
+	return filp_close(filp, files);
 
-	FSHOOK_END(close, error)
-
-	return error;
+out_unlock:
+	spin_unlock(&files->file_lock);
+	return -EBADF;
 }
 
 EXPORT_SYMBOL(sys_close);

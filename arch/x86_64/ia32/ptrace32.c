@@ -17,7 +17,6 @@
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/mm.h>
-#include <linux/audit.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 #include <asm/user32.h>
@@ -253,11 +252,9 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		
 	} 
 
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
-
 	child = find_target(request, pid, &ret);
 	if (!child)
-		return audit_result(ret);
+		return ret;
 
 	childregs = (struct pt_regs *)(child->thread.rsp0 - sizeof(struct pt_regs)); 
 
@@ -371,6 +368,6 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	}
 
 	put_task_struct(child);
-	return audit_result(ret);
+	return ret;
 }
 

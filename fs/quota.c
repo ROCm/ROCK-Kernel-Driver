@@ -13,7 +13,6 @@
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 
 /* Check validity of quotactl */
 static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
@@ -269,8 +268,8 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 	uint cmds, type;
 	struct super_block *sb = NULL;
 	struct block_device *bdev;
-	char *tmp = NULL;
-	int ret = 0;
+	char *tmp;
+	int ret;
 
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
@@ -280,29 +279,20 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 		if (IS_ERR(tmp))
 			return PTR_ERR(tmp);
 		bdev = lookup_bdev(tmp);
+		putname(tmp);
 		if (IS_ERR(bdev))
-			ret = PTR_ERR(bdev);
-		else {
-			sb = get_super(bdev);
-			bdput(bdev);
-			if (!sb)
-				ret = -ENODEV;
-		}
+			return PTR_ERR(bdev);
+		sb = get_super(bdev);
+		bdput(bdev);
+		if (!sb)
+			return -ENODEV;
 	}
 
-	audit_intercept(AUDIT_quotactl, cmd, tmp, id, addr);
-
-	if (!ret) {
-		ret = check_quotactl_valid(sb, type, cmds, id);
-		if (ret >= 0)
-			ret = do_quotactl(sb, type, cmds, id, addr);
-	}
+	ret = check_quotactl_valid(sb, type, cmds, id);
+	if (ret >= 0)
+		ret = do_quotactl(sb, type, cmds, id, addr);
 	if (sb)
 		drop_super(sb);
 
-	(void)audit_result(ret);
-
-	if (tmp)
-		putname(tmp);
 	return ret;
 }
