@@ -317,7 +317,7 @@ static int ct_cpu_seq_show(struct seq_file *seq, void *v)
 		   st->insert_failed,
 		   st->drop,
 		   st->early_drop,
-		   st->icmp_error,
+		   st->error,
 
 		   st->expect_new,
 		   st->expect_create,

@@ -305,12 +305,13 @@ struct ip_conntrack_stat
 	unsigned int insert_failed;
 	unsigned int drop;
 	unsigned int early_drop;
-	unsigned int icmp_error;
+	unsigned int error;
 	unsigned int expect_new;
 	unsigned int expect_create;
 	unsigned int expect_delete;
 };
 
+#define CONNTRACK_STAT_INC(count) (__get_cpu_var(ip_conntrack_stat).count++)
 
 /* eg. PROVIDES_CONNTRACK(ftp); */
 #define PROVIDES_CONNTRACK(name)                        \

@@ -151,7 +151,7 @@ destroy_expect(struct ip_conntrack_expect *exp)
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
 
 	kmem_cache_free(ip_conntrack_expect_cachep, exp);
-	__get_cpu_var(ip_conntrack_stat).expect_delete++;
+	CONNTRACK_STAT_INC(expect_delete);
 }
 
 inline void ip_conntrack_expect_put(struct ip_conntrack_expect *exp)
@@ -320,14 +320,14 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	DEBUGP("destroy_conntrack: returning ct=%p to slab\n", ct);
 	kmem_cache_free(ip_conntrack_cachep, ct);
 	atomic_dec(&ip_conntrack_count);
-	__get_cpu_var(ip_conntrack_stat).delete++;
+	CONNTRACK_STAT_INC(delete);
 }
 
 static void death_by_timeout(unsigned long ul_conntrack)
 {
 	struct ip_conntrack *ct = (void *)ul_conntrack;
 
-	__get_cpu_var(ip_conntrack_stat).delete_list++;
+	CONNTRACK_STAT_INC(delete_list);
 
 	WRITE_LOCK(&ip_conntrack_lock);
 	clean_from_lists(ct);
@@ -436,12 +436,12 @@ __ip_conntrack_confirm(struct sk_buff *skb)
 		atomic_inc(&ct->ct_general.use);
 		set_bit(IPS_CONFIRMED_BIT, &ct->status);
 		WRITE_UNLOCK(&ip_conntrack_lock);
-	 	__get_cpu_var(ip_conntrack_stat).insert++;
+		CONNTRACK_STAT_INC(insert);
 		return NF_ACCEPT;
 	}
 
 	WRITE_UNLOCK(&ip_conntrack_lock);
-	__get_cpu_var(ip_conntrack_stat).insert_failed++;
+	CONNTRACK_STAT_INC(insert_failed);
 	return NF_DROP;
 }
 
@@ -485,7 +485,7 @@ static int early_drop(struct list_head *chain)
 	if (del_timer(&h->ctrack->timeout)) {
 		death_by_timeout((unsigned long)h->ctrack);
 		dropped = 1;
-		__get_cpu_var(ip_conntrack_stat).early_drop++;
+		CONNTRACK_STAT_INC(early_drop);
 	}
 	ip_conntrack_put(h->ctrack);
 	return dropped;
@@ -605,13 +605,13 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		if (expected->expectfn)
 			expected->expectfn(conntrack);
 	
-		__get_cpu_var(ip_conntrack_stat).expect_new++;
+		CONNTRACK_STAT_INC(expect_new);
 
 		goto ret;
 	} else  {
 		conntrack->helper = ip_ct_find_helper(&repl_tuple);
 
-		__get_cpu_var(ip_conntrack_stat).new++;
+		CONNTRACK_STAT_INC(new);
 	}
 
 end:	atomic_inc(&ip_conntrack_count);
@@ -716,7 +716,7 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 
 	/* Previously seen (loopback or untracked)?  Ignore. */
 	if ((*pskb)->nfct) {
-		__get_cpu_var(ip_conntrack_stat).ignore++;
+		CONNTRACK_STAT_INC(ignore);
 		return NF_ACCEPT;
 	}
 
@@ -727,19 +727,20 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	 * core what to do with the packet. */
 	if (proto->error != NULL 
 	    && (ret = proto->error(*pskb, &ctinfo, hooknum)) <= 0) {
-		__get_cpu_var(ip_conntrack_stat).icmp_error++;
+		CONNTRACK_STAT_INC(error);
+		CONNTRACK_STAT_INC(invalid);
 		return -ret;
 	}
 
 	if (!(ct = resolve_normal_ct(*pskb, proto,&set_reply,hooknum,&ctinfo))) {
 		/* Not valid part of a connection */
-		__get_cpu_var(ip_conntrack_stat).invalid++;
+		CONNTRACK_STAT_INC(invalid);
 		return NF_ACCEPT;
 	}
 
 	if (IS_ERR(ct)) {
 		/* Too stressed to deal. */
-		__get_cpu_var(ip_conntrack_stat).drop++;
+		CONNTRACK_STAT_INC(drop);
 		return NF_DROP;
 	}
 
@@ -751,7 +752,7 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 		 * the netfilter core what to do*/
 		nf_conntrack_put((*pskb)->nfct);
 		(*pskb)->nfct = NULL;
-		__get_cpu_var(ip_conntrack_stat).invalid++;
+		CONNTRACK_STAT_INC(invalid);
 		return -ret;
 	}
 
@@ -759,7 +760,7 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 		ret = ct->helper->help(*pskb, ct, ctinfo);
 		if (ret == -1) {
 			/* Invalid */
-			__get_cpu_var(ip_conntrack_stat).invalid++;
+			CONNTRACK_STAT_INC(invalid);
 			nf_conntrack_put((*pskb)->nfct);
 			(*pskb)->nfct = NULL;
 			return NF_ACCEPT;
@@ -963,7 +964,7 @@ out:	ip_conntrack_expect_insert(expect, related_to);
 
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
-	__get_cpu_var(ip_conntrack_stat).expect_create++;
+	CONNTRACK_STAT_INC(expect_create);
 
 	return ret;
 }
