@@ -43,6 +43,7 @@
 #endif /* CONFIG_NFSD_V3 */
 #include <linux/nfsd/nfsfh.h>
 #include <linux/quotaops.h>
+#include <linux/dnotify.h>
 
 #include <asm/uaccess.h>
 
@@ -680,6 +681,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		nfsdstats.io_read += err;
 		*count = err;
 		err = 0;
+		dnotify_parent(file.f_dentry, DN_ACCESS);
 	} else 
 		err = nfserrno(err);
 out_close:
@@ -745,9 +747,11 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	/* Write the data. */
 	oldfs = get_fs(); set_fs(KERNEL_DS);
 	err = vfs_writev(&file, vec, vlen, &offset);
-	if (err >= 0)
-		nfsdstats.io_write += cnt;
 	set_fs(oldfs);
+	if (err >= 0) {
+		nfsdstats.io_write += cnt;
+		dnotify_parent(file.f_dentry, DN_MODIFY);
+	}
 
 	/* clear setuid/setgid flag after write */
 	if (err >= 0 && (inode->i_mode & (S_ISUID | S_ISGID))) {
