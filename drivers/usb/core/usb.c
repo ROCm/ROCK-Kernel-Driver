@@ -63,8 +63,7 @@ const char *usbcore_name = "usbcore";
 int nousb;		/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
 
-DECLARE_RWSEM(usb_all_devices_rwsem);
-EXPORT_SYMBOL(usb_all_devices_rwsem);
+static DECLARE_RWSEM(usb_all_devices_rwsem);
 
 
 static int generic_probe (struct device *dev)

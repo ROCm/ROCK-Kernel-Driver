@@ -1618,7 +1618,6 @@ int __usb_suspend_device (struct usb_device *udev, int port1, u32 state)
 		udev->dev.power.power_state = state;
 	return status;
 }
-EXPORT_SYMBOL(__usb_suspend_device);
 
 /**
  * usb_suspend_device - suspend a usb device
