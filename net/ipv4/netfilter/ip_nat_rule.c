@@ -267,7 +267,7 @@ int ip_nat_rule_find(struct sk_buff **pskb,
 	ret = ipt_do_table(pskb, hooknum, in, out, &nat_table, NULL);
 
 	if (ret == NF_ACCEPT) {
-		if (!(info->initialized & (1 << HOOK2MANIP(hooknum))))
+		if (!ip_nat_initialized(ct, HOOK2MANIP(hooknum)))
 			/* NUL mapping */
 			ret = alloc_null_binding(ct, info, hooknum);
 	}

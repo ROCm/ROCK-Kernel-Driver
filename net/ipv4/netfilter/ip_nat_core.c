@@ -62,13 +62,11 @@ hash_by_src(const struct ip_conntrack_tuple *tuple)
 /* Noone using conntrack by the time this called. */
 static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 {
-	struct ip_nat_info *info = &conn->nat.info;
-
-	if (!info->initialized)
+	if (!(conn->status & IPS_NAT_DONE_MASK))
 		return;
 
 	WRITE_LOCK(&ip_nat_lock);
-	list_del(&info->bysource);
+	list_del(&conn->nat.info.bysource);
 	WRITE_UNLOCK(&ip_nat_lock);
 }
 
@@ -261,14 +259,14 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 {
 	struct ip_conntrack_tuple curr_tuple, new_tuple;
 	struct ip_nat_info *info = &conntrack->nat.info;
-	int have_to_hash = !info->initialized;
+	int have_to_hash = !(conntrack->status & IPS_NAT_DONE_MASK);
 	enum ip_nat_manip_type maniptype = HOOK2MANIP(hooknum);
 
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_POST_ROUTING
 		     || hooknum == NF_IP_LOCAL_IN
 		     || hooknum == NF_IP_LOCAL_OUT);
-	IP_NF_ASSERT(!(info->initialized & (1 << maniptype)));
+	BUG_ON(ip_nat_initialized(conntrack, maniptype));
 
 	/* What we've got will look like inverse of reply. Normally
 	   this is what is in the conntrack, except for prior
@@ -305,7 +303,11 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	}
 
 	/* It's done. */
-	info->initialized |= (1 << maniptype);
+	if (maniptype == IP_NAT_MANIP_DST)
+		set_bit(IPS_DST_NAT_DONE_BIT, &conntrack->status);
+	else
+		set_bit(IPS_SRC_NAT_DONE_BIT, &conntrack->status);
+
 	return NF_ACCEPT;
 }
 
@@ -420,10 +422,11 @@ int icmp_reply_translation(struct sk_buff **pskb,
            start talking to each other without our translation, and be
            confused... --RR */
 	if (inside->icmp.type == ICMP_REDIRECT) {
-		/* Don't care about races here. */
-		if (ct->nat.info.initialized
-		    != ((1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST))
-		    || (ct->status & IPS_NAT_MASK))
+		/* If NAT isn't finished, assume it and drop. */
+		if ((ct->status & IPS_NAT_DONE_MASK) != IPS_NAT_DONE_MASK)
+			return 0;
+
+		if (ct->status & IPS_NAT_MASK)
 			return 0;
 	}
 
@@ -503,11 +506,9 @@ int __init ip_nat_init(void)
 	/* FIXME: Man, this is a hack.  <SIGH> */
 	IP_NF_ASSERT(ip_conntrack_destroyed == NULL);
 	ip_conntrack_destroyed = &ip_nat_cleanup_conntrack;
-	
-	/* Initialize fake conntrack so that NAT will skip it */
-	ip_conntrack_untracked.nat.info.initialized |= 
-		(1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST);
 
+	/* Initialize fake conntrack so that NAT will skip it */
+	ip_conntrack_untracked.status |= IPS_NAT_DONE_MASK;
 	return 0;
 }
 

@@ -411,7 +411,7 @@ void ip_nat_follow_master(struct ip_conntrack *ct,
 	struct ip_nat_range range;
 
 	/* This must be a fresh one. */
-	BUG_ON(ct->nat.info.initialized);
+	BUG_ON(ct->status & IPS_NAT_DONE_MASK);
 
 	/* Change src to where master sends to */
 	range.flags = IP_NAT_RANGE_MAP_IPS;

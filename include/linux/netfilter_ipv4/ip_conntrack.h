@@ -55,6 +55,16 @@ enum ip_conntrack_status {
 	/* Connection needs TCP sequence adjusted. */
 	IPS_SEQ_ADJUST_BIT = 6,
 	IPS_SEQ_ADJUST = (1 << IPS_SEQ_ADJUST_BIT),
+
+	/* NAT initialization bits. */
+	IPS_SRC_NAT_DONE_BIT = 7,
+	IPS_SRC_NAT_DONE = (1 << IPS_SRC_NAT_DONE_BIT),
+
+	IPS_DST_NAT_DONE_BIT = 8,
+	IPS_DST_NAT_DONE = (1 << IPS_DST_NAT_DONE_BIT),
+
+	/* Both together */
+	IPS_NAT_DONE_MASK = (IPS_DST_NAT_DONE | IPS_SRC_NAT_DONE),
 };
 
 #ifdef __KERNEL__
@@ -291,5 +301,12 @@ struct ip_conntrack_stat
 
 #define CONNTRACK_STAT_INC(count) (__get_cpu_var(ip_conntrack_stat).count++)
 
+static inline int ip_nat_initialized(struct ip_conntrack *conntrack,
+				     enum ip_nat_manip_type manip)
+{
+	if (manip == IP_NAT_MANIP_SRC)
+		return test_bit(IPS_SRC_NAT_DONE_BIT, &conntrack->status);
+	return test_bit(IPS_DST_NAT_DONE_BIT, &conntrack->status);
+}
 #endif /* __KERNEL__ */
 #endif /* _IP_CONNTRACK_H */

@@ -118,7 +118,7 @@ ip_nat_fn(unsigned int hooknum,
 
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
-		if (!(info->initialized & (1 << maniptype))) {
+		if (!ip_nat_initialized(ct, maniptype)) {
 			unsigned int ret;
 
 			/* LOCAL_IN hook doesn't have a chain!  */

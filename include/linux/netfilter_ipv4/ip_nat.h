@@ -55,9 +55,6 @@ struct ip_nat_multi_range_compat
 /* The structure embedded in the conntrack structure. */
 struct ip_nat_info
 {
-	/* Set to zero when conntrack created: bitmask of maniptypes */
-	u_int16_t initialized;
-
 	struct list_head bysource;
 
 	/* Helper (NULL if none). */
