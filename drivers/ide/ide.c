@@ -1526,7 +1526,19 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 #endif
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
+
+	/*
+	 * Aiee. This is ugly, but it gets called before "drive->disk"
+	 * has been initialized. Al will fix it, I'm sure.
+	 */
+	if (drive->disk)
+		rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
+	else {
+		printk("IDE init is ugly:");
+		dump_stack();
+		rq->rq_dev = mk_kdev(HWIF(drive)->major, (drive->select.b.unit) << PARTN_BITS);
+	}
+
 	rq->rq_disk = drive->disk;
 	if (action == ide_wait)
 		rq->waiting = &wait;
