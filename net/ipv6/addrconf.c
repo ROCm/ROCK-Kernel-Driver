@@ -964,17 +964,17 @@ int ipv6_dev_get_saddr(struct net_device *daddr_dev,
 
 	if (candidate.ifp) {
 		ipv6_addr_copy(saddr, &candidate.ifp->addr);
-
-		/* The home address is always used as source address in
-		 * MIPL mobile IPv6
-		 */
-		addrconf_get_mipv6_home_address(candidate.ifp, saddr);
-
 		in6_ifa_put(candidate.ifp);
 		err = 0;
 	} else {
 		err = -EADDRNOTAVAIL;
 	}
+
+	/* The home address is always used as source address in
+	 * MIPL mobile IPv6
+	 */
+	addrconf_get_mipv6_home_address(NULL, saddr);
+
 	return err;
 }
 
@@ -1802,6 +1802,7 @@ static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
 	return -EADDRNOTAVAIL;
 }
 
+
 int addrconf_add_ifaddr(void *arg)
 {
 	struct in6_ifreq ireq;
@@ -2056,6 +2057,9 @@ static void addrconf_ip6_tnl_config(struct net_device *dev)
 	struct inet6_dev *idev;
 
 	ASSERT_RTNL();
+
+	if (!dev->generate_eui64) 
+		dev->generate_eui64 = ipv6_generate_eui64;
 
 	if ((idev = addrconf_add_dev(dev)) == NULL) {
 		printk(KERN_DEBUG "init ip6-ip6: add_dev failed\n");

@@ -224,7 +224,10 @@ mipv6_modify_txoptions(struct sock *sk, struct sk_buff *skb,
 	struct ipv6_opt_hdr *old_hopopt = NULL;
 	struct ipv6_opt_hdr *old_dst1opt = NULL;
 	struct ipv6_rt_hdr *old_srcrt = NULL;
+	struct ipv6_opt_hdr *old_dst0opt = NULL;
+	/* XXX: What about auth opt ? */
 
+	int optlen;
 	int srcrtlen = 0, dst1len = 0;
 	int tot_len, use_hao = 0;
 	struct ipv6_txoptions *opt;
@@ -262,6 +265,7 @@ mipv6_modify_txoptions(struct sock *sk, struct sk_buff *skb,
 		old_hopopt = old_opt->hopopt;
 		old_dst1opt = old_opt->dst1opt;
 		old_srcrt = old_opt->srcrt;
+		old_dst0opt = old_opt->dst0opt;
 	} 
 
 	if (mip6_fn.mn_use_hao != NULL)
@@ -277,22 +281,33 @@ mipv6_modify_txoptions(struct sock *sk, struct sk_buff *skb,
 	if (mipv6_bcache_get(daddr, saddr, &bc_entry) == 0)
 		srcrtlen = sizeof(struct rt2_hdr);
 
-	if ((tot_len = srcrtlen + dst1len) == 0) { 
+	if (old_opt) {
+		tot_len = old_opt->tot_len;
+		if (use_hao && old_dst1opt) {
+			/* already accounted for old_dst1opt in check above */
+			tot_len -= ipv6_optlen(old_dst1opt);
+		}
+	} else
+		tot_len = sizeof(*opt);
+
+	if ((tot_len += (srcrtlen + dst1len)) == 0) { 
 		return old_opt;
 	}
 
-	tot_len += sizeof(*opt);
+	/* tot_len += sizeof(*opt); XXX : Already included in old_opt->len */
 
 	if (!(opt = kmalloc(tot_len, GFP_ATOMIC))) {
-		return NULL;
+		return old_opt;
 	}
 	memset(opt, 0, tot_len);
 	opt->tot_len = tot_len;
 	opt_ptr = (__u8 *) (opt + 1);
 	
 	if (old_srcrt) {
-		opt->srcrt = old_srcrt;
+		opt->srcrt = (struct ipv6_rt_hdr *) opt_ptr;
+		opt_ptr += ipv6_optlen(old_srcrt);
 		opt->opt_nflen += ipv6_optlen(old_srcrt);
+		memcpy(opt->srcrt, old_srcrt, ipv6_optlen(old_srcrt));
 	}
 
 	if (srcrtlen) {
@@ -337,19 +352,31 @@ mipv6_modify_txoptions(struct sock *sk, struct sk_buff *skb,
 	/* Only home address option is inserted to first dst opt header */
 	if (dst1len) {
 		opt->dst1opt = (struct ipv6_opt_hdr *) opt_ptr;
-		opt->opt_flen += dst1len;
 		opt_ptr += dst1len;
-		mipv6_append_dst1opts(opt->dst1opt, saddr, 
-				      old_dst1opt, dst1len);
+		opt->opt_flen += dst1len;
+		mipv6_append_dst1opts(opt->dst1opt, saddr, old_dst1opt,
+					dst1len);
 		opt->mipv6_flags = MIPV6_SND_HAO;
 	} else if (old_dst1opt) {
-		opt->dst1opt = old_dst1opt;
-		opt->opt_flen += ipv6_optlen(old_dst1opt);
+		optlen = ipv6_optlen(old_dst1opt);
+		opt->dst1opt = (struct ipv6_opt_hdr *) opt_ptr;
+		opt_ptr += optlen;
+		opt->opt_flen += optlen;
+		memcpy(opt->dst1opt, old_dst1opt, optlen);
 	}
 	if (old_hopopt) {
-		opt->hopopt = old_hopopt;
-		opt->opt_nflen += ipv6_optlen(old_hopopt);
+		optlen = ipv6_optlen(old_hopopt);
+		opt->hopopt = (struct ipv6_opt_hdr *) opt_ptr;
+		opt_ptr += optlen;
+		opt->opt_nflen += optlen;
+		memcpy(opt_ptr, old_hopopt, optlen);
 	}	
-	
+	if (old_dst0opt) {
+		optlen = ipv6_optlen(old_dst0opt);
+		opt->dst0opt = (struct ipv6_opt_hdr *) opt_ptr;
+		opt_ptr += optlen;
+		opt->opt_nflen += optlen;
+		memcpy(opt_ptr, old_dst0opt, optlen);
+	}	
 	return opt;
 }

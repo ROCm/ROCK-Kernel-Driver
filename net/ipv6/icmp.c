@@ -395,18 +395,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 
 	idev = in6_dev_get(skb->dev);
 
-	if (0) {
-		plen = msg.offset;
-		if (plen < 0)
-			__skb_push(skb, -plen);
-		else
-			__skb_pull(skb, plen);
-		// icmpv6_handle_mipv6_homeaddr(skb);
-		if (plen < 0)
-			__skb_pull(skb, -plen);
-		else
-			__skb_push(skb, plen);
-	}
+	icmpv6_handle_mipv6_homeaddr(skb);
 
 	err = ip6_append_data(sk, icmpv6_getfrag, &msg,
 			      len + sizeof(struct icmp6hdr),

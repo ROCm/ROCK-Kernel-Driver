@@ -800,7 +800,7 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 #endif
 			goto out_err_release;
 		}
-		// KK : saddr changed so should *dst.
+		/* XXX : saddr changed so should *dst */
 		dst_release(*dst);
 		*dst = ip6_route_output(sk, fl);
 		if ((err = (*dst)->error))
@@ -1223,6 +1223,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	int offset = 0;
 	int csummode = CHECKSUM_NONE;
 	struct ipv6_txoptions *orig_opt = opt;
+	int changed_opt_ptr = 0;
+	struct ipv6_txoptions *old_np_cork_opt = NULL;
 
 	opt = ip6_add_mipv6_txoptions(sk, NULL, orig_opt, fl, NULL);
 	if (orig_opt && !opt)
@@ -1237,13 +1239,9 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		 * setup for corking
 		 */
 		if (opt) {
-			if (np->cork.opt == NULL) {
-				np->cork.opt = kmalloc(opt->tot_len,
-						       sk->sk_allocation);
-				if (unlikely(np->cork.opt == NULL))
-					return -ENOBUFS;
-			}
-			memcpy(np->cork.opt, opt, opt->tot_len);
+			changed_opt_ptr = 1;
+			old_np_cork_opt = np->cork.opt;
+			np->cork.opt = opt;
 			inet->cork.flags |= IPCORK_OPT;
 			/* need source address above miyazawa*/
 		}
@@ -1275,6 +1273,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
 			ipv6_local_error(sk, EMSGSIZE, fl, mtu-exthdrlen);
+			if (changed_opt_ptr)
+				np->cork.opt = old_np_cork_opt;
 			ip6_free_mipv6_txoptions(opt, orig_opt);
 			return -EMSGSIZE;
 		}
@@ -1437,10 +1437,14 @@ alloc_new_skb:
 		offset += copy;
 		length -= copy;
 	}
-	ip6_free_mipv6_txoptions(opt, orig_opt);
+	if (old_np_cork_opt)
+		kfree(old_np_cork_opt);
+	/* ip6_free_mipv6_txoptions(opt, orig_opt); XXX : done in push_pend. */
 	return 0;
 error:
 	inet->cork.length -= length;
+	if (changed_opt_ptr)
+		np->cork.opt = old_np_cork_opt;
 	ip6_free_mipv6_txoptions(opt, orig_opt);
 	IP6_INC_STATS(Ip6OutDiscards);
 	return err;
@@ -1502,9 +1506,6 @@ int ip6_push_pending_frames(struct sock *sk)
 	ipv6_addr_copy(&hdr->daddr, final_dst);
 
 	skb->dst = dst_clone(&rt->u.dst);
-
-	// KK : Extra here, needed ?
-	ip6_mark_mipv6_packet(opt, skb);
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, skb->dst->dev, dst_output);
 	if (err) {
 		if (err > 0)
