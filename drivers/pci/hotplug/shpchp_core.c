@@ -84,10 +84,10 @@ static struct hotplug_slot_ops shpchp_hotplug_slot_ops = {
 	.disable_slot =		disable_slot,
 	.get_power_status =	get_power_status,
 	.get_attention_status =	get_attention_status,
-	.get_latch_status =		get_latch_status,
+	.get_latch_status =	get_latch_status,
 	.get_adapter_status =	get_adapter_status,
-  	.get_max_bus_speed =	get_max_bus_speed,
-  	.get_cur_bus_speed =	get_cur_bus_speed,
+	.get_max_bus_speed =	get_max_bus_speed,
+	.get_cur_bus_speed =	get_cur_bus_speed,
 };
 
 /**
@@ -218,7 +218,7 @@ static int get_ctlr_slot_config(struct controller *ctrl)
 	rc = shpc_get_ctlr_slot_config(ctrl, &num_ctlr_slots, &first_device_num, &physical_slot_num, &updown, &flags);
 	if (rc) {
 		err("%s: get_ctlr_slot_config fail for b:d (%x:%x)\n", __FUNCTION__, ctrl->bus, ctrl->device);
-		return (-1);
+		return -1;
 	}
 
 	ctrl->num_slots = num_ctlr_slots;
@@ -229,7 +229,7 @@ static int get_ctlr_slot_config(struct controller *ctrl)
 	dbg("%s: num_slot(0x%x) 1st_dev(0x%x) psn(0x%x) updown(%d) for b:d (%x:%x)\n",
 		__FUNCTION__, num_ctlr_slots, first_device_num, physical_slot_num, updown, ctrl->bus, ctrl->device);
 
-	return (0);
+	return 0;
 }
 
 
