@@ -52,7 +52,6 @@ cflags-$(CONFIG_PA7300LC)	+= -march=1.1 -mschedule=7300
 cflags-$(CONFIG_PA8X00)		+= -march=2.0 -mschedule=8000
 
 head-y			:= arch/parisc/kernel/head.o 
-head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
 
