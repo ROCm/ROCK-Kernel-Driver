@@ -1153,6 +1153,17 @@ err_no_interrupt:
 	return IRQ_RETVAL(handled);
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void amd8111e_poll(struct net_device *dev)
+{ 
+	unsigned long flags;
+	local_save_flags(flags); 
+	local_irq_disable();
+	amd8111e_interrupt(0, dev, NULL);
+	local_irq_restore(flags); 
+} 
+#endif
+
 /*
 This function closes the network interface and updates the statistics so that most recent statistics will be available after the interface is down.
 */
@@ -1884,6 +1895,9 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	dev->irq =pdev->irq;
 	dev->tx_timeout = amd8111e_tx_timeout; 
 	dev->watchdog_timeo = AMD8111E_TX_TIMEOUT; 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = amd8111e_poll; 
+#endif
 
 #if AMD8111E_VLAN_TAG_USED
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
