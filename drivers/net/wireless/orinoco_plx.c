@@ -128,7 +128,6 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
-#include <linux/wireless.h>
 #include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/fcntl.h>
