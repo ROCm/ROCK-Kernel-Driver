@@ -4047,23 +4047,19 @@ static void tg3_set_bdinfo(struct tg3 *tp, u32 bdinfo_addr,
 			   u32 nic_addr)
 {
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_HOST_ADDR +
-		       TG3_64BIT_REG_HIGH),
+		      (bdinfo_addr + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH),
 		      ((u64) mapping >> 32));
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_HOST_ADDR +
-		       TG3_64BIT_REG_LOW),
+		      (bdinfo_addr + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW),
 		      ((u64) mapping & 0xffffffff));
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_MAXLEN_FLAGS),
+		      (bdinfo_addr + TG3_BDINFO_MAXLEN_FLAGS),
 		       maxlen_flags);
-	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_NIC_ADDR),
-		      nic_addr);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tg3_write_mem(tp,
+			      (bdinfo_addr + TG3_BDINFO_NIC_ADDR),
+			      nic_addr);
 }
 
 static void __tg3_set_rx_mode(struct net_device *);
