@@ -167,9 +167,11 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		if (gdp) {
 			gdp->bg_free_inodes_count = cpu_to_le16(
 				le16_to_cpu(gdp->bg_free_inodes_count) + 1);
-			if (is_directory)
+			if (is_directory) {
 				gdp->bg_used_dirs_count = cpu_to_le16(
 				  le16_to_cpu(gdp->bg_used_dirs_count) - 1);
+				EXT3_SB(sb)->s_dir_count--;
+			}
 		}
 		BUFFER_TRACE(bh2, "call ext3_journal_dirty_metadata");
 		err = ext3_journal_dirty_metadata(handle, bh2);

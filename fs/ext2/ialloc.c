@@ -134,9 +134,11 @@ void ext2_free_inode (struct inode * inode)
 		if (desc) {
 			desc->bg_free_inodes_count =
 				cpu_to_le16(le16_to_cpu(desc->bg_free_inodes_count) + 1);
-			if (is_directory)
+			if (is_directory) {
 				desc->bg_used_dirs_count =
 					cpu_to_le16(le16_to_cpu(desc->bg_used_dirs_count) - 1);
+				EXT2_SB(sb)->s_dir_count--;
+			}
 		}
 		mark_buffer_dirty(bh2);
 		es->s_free_inodes_count =
