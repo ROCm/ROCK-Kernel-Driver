@@ -25,12 +25,9 @@
 /* Active configuration fields */
 #define usb_actconfig_attr(field, format_string)			\
 static ssize_t								\
-show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
+show_##field (struct device *dev, char *buf)				\
 {									\
 	struct usb_device *udev;					\
-									\
-	if (off)							\
-		return 0;						\
 									\
 	udev = to_usb_device (dev);					\
 	return sprintf (buf, format_string, udev->actconfig->desc.field); \
@@ -43,13 +40,11 @@ usb_actconfig_attr (bmAttributes, "%2x\n")
 usb_actconfig_attr (bMaxPower, "%3dmA\n")
 
 /* String fields */
-static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
+static ssize_t show_product (struct device *dev, char *buf)
 {
 	struct usb_device *udev;
 	int len;
 
-	if (off)
-		return 0;
 	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
@@ -62,13 +57,11 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
 
 static ssize_t
-show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
+show_manufacturer (struct device *dev, char *buf)
 {
 	struct usb_device *udev;
 	int len;
 
-	if (off)
-		return 0;
 	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
@@ -81,13 +74,11 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
 
 static ssize_t
-show_serial (struct device *dev, char *buf, size_t count, loff_t off)
+show_serial (struct device *dev, char *buf)
 {
 	struct usb_device *udev;
 	int len;
 
-	if (off)
-		return 0;
 	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
@@ -100,13 +91,11 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
 
 static ssize_t
-show_speed (struct device *dev, char *buf, size_t count, loff_t off)
+show_speed (struct device *dev, char *buf)
 {
 	struct usb_device *udev;
 	char *speed;
 
-	if (off)
-		return 0;
 	udev = to_usb_device (dev);
 
 	switch (udev->speed) {
@@ -130,12 +119,9 @@ static DEVICE_ATTR(speed, S_IRUGO, show_speed, NULL);
 /* Descriptor fields */
 #define usb_descriptor_attr(field, format_string)			\
 static ssize_t								\
-show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
+show_##field (struct device *dev, char *buf)				\
 {									\
 	struct usb_device *udev;					\
-									\
-	if (off)							\
-		return 0;						\
 									\
 	udev = to_usb_device (dev);					\
 	return sprintf (buf, format_string, udev->descriptor.field);	\
@@ -185,13 +171,10 @@ void usb_create_driverfs_dev_files (struct usb_device *udev)
 /* Interface fields */
 #define usb_intf_attr(field, format_string)				\
 static ssize_t								\
-show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
+show_##field (struct device *dev, char *buf)				\
 {									\
 	struct usb_interface *intf;					\
 	int alt;							\
-									\
-	if (off)							\
-		return 0;						\
 									\
 	intf = to_usb_interface (dev);					\
 	alt = intf->act_altsetting;					\
