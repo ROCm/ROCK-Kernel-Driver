@@ -34,22 +34,14 @@
 #include <asm/io.h>
 
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 /* Address is autodetected, there is no default value */
 static unsigned int normal_isa[] = { 0x0000, I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 static struct i2c_force_data forces[] = {{NULL}};
 
 enum chips { any_chip, smsc47m1 };
 static struct i2c_address_data addr_data = {
 	.normal_i2c		= normal_i2c,
-	.normal_i2c_range	= normal_i2c_range,
 	.normal_isa		= normal_isa,
-	.normal_isa_range	= normal_isa_range,
-	.probe			= normal_i2c,		/* cheat */
-	.probe_range		= normal_i2c_range,	/* cheat */
-	.ignore			= normal_i2c,		/* cheat */
-	.ignore_range		= normal_i2c_range,	/* cheat */
 	.forces			= forces,
 };
 
