@@ -477,12 +477,11 @@ void free_pages(unsigned long addr, unsigned int order)
  */
 unsigned int nr_free_pages(void)
 {
-	unsigned int i, sum = 0;
-	pg_data_t *pgdat;
+	unsigned int sum = 0;
+	zone_t *zone;
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
-		for (i = 0; i < MAX_NR_ZONES; ++i)
-			sum += pgdat->node_zones[i].free_pages;
+	for_each_zone(zone)
+		sum += zone->free_pages;
 
 	return sum;
 }
