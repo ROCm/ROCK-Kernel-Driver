@@ -1096,15 +1096,13 @@ static void time_out_leases(struct inode *inode)
 */
 void remove_lease(struct file_lock *fl)
 {
-	if (!IS_LEASE(fl))
-		return;
-
 	lock_kernel();
-
+	if (!fl || !IS_LEASE(fl))
+		goto out;
 	fl->fl_type = F_UNLCK | F_INPROGRESS;
 	fl->fl_break_time = jiffies - 10;
 	time_out_leases(fl->fl_file->f_dentry->d_inode);
-
+out:
 	unlock_kernel();
 }
 
