@@ -2905,6 +2905,10 @@ int sync_dirty_buffer(struct buffer_head *bh)
 		bh->b_end_io = end_buffer_write_sync;
 		ret = submit_bh(WRITE, bh);
 		wait_on_buffer(bh);
+		if (buffer_eopnotsupp(bh)) {
+			clear_buffer_eopnotsupp(bh);
+			ret = -EOPNOTSUPP;
+		}
 		if (!ret && !buffer_uptodate(bh))
 			ret = -EIO;
 	} else {

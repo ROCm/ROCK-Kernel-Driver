@@ -641,6 +641,17 @@ static int submit_barrier_buffer(struct buffer_head *bh) {
     return submit_bh(WRITE_BARRIER, bh) ;
 }
 
+static void check_barrier_completion(struct super_block *s, 
+                                     struct buffer_head *bh) {
+    if (buffer_eopnotsupp(bh)) {
+	clear_buffer_eopnotsupp(bh);
+	disable_barrier(s);
+	set_buffer_uptodate(bh);
+	set_buffer_dirty(bh);
+	sync_dirty_buffer(bh);
+    }
+}
+
 #define CHUNK_SIZE 32
 struct buffer_chunk {
     struct buffer_head *bh[CHUNK_SIZE];
@@ -1033,6 +1044,8 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   } else
       wait_on_buffer(jl->j_commit_bh);
 
+  check_barrier_completion(s, jl->j_commit_bh);
+
   /* If there was a write error in the journal - we can't commit this
    * transaction - it will be invalid and, if successful, will just end
    * up propogating the write error out to the filesystem. */
@@ -1164,6 +1177,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
 	    goto sync;
 	}
 	wait_on_buffer(journal->j_header_bh);
+	check_barrier_completion(p_s_sb, journal->j_header_bh);
     } else {
 sync:
 	set_buffer_dirty(journal->j_header_bh) ;
