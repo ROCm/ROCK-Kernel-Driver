@@ -162,6 +162,7 @@ static struct platform_device sa11x0udc_device = {
 	.id		= 0,
 	.dev		= {
 		.dma_mask = &sa11x0udc_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(sa11x0udc_resources),
 	.resource	= sa11x0udc_resources,
@@ -212,6 +213,7 @@ static struct platform_device sa11x0mcp_device = {
 	.id		= 0,
 	.dev = {
 		.dma_mask = &sa11x0mcp_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(sa11x0mcp_resources),
 	.resource	= sa11x0mcp_resources,
@@ -232,6 +234,7 @@ static struct platform_device sa11x0ssp_device = {
 	.id		= 0,
 	.dev = {
 		.dma_mask = &sa11x0ssp_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(sa11x0ssp_resources),
 	.resource	= sa11x0ssp_resources,
@@ -253,6 +256,9 @@ static struct resource sa11x0fb_resources[] = {
 static struct platform_device sa11x0fb_device = {
 	.name		= "sa11x0-fb",
 	.id		= 0,
+	.dev = {
+		.coherent_dma_mask = 0xffffffff,
+	},
 	.num_resources	= ARRAY_SIZE(sa11x0fb_resources),
 	.resource	= sa11x0fb_resources,
 };

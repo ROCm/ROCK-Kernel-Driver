@@ -774,6 +774,7 @@ acpi_ex_dump_object_descriptor (
 
 
 	case ACPI_TYPE_LOCAL_ALIAS:
+	case ACPI_TYPE_LOCAL_METHOD_ALIAS:
 	case ACPI_TYPE_LOCAL_EXTRA:
 	case ACPI_TYPE_LOCAL_DATA:
 	default:

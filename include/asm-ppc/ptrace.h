@@ -49,7 +49,10 @@ struct pt_regs {
 #define instruction_pointer(regs) ((regs)->nip)
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
 
-#define force_successful_syscall_return()   set_thread_flag(TIF_FORCE_NOERROR)
+#define force_successful_syscall_return()   \
+	do { \
+		current_thread_info()->local_flags |= _TIFL_FORCE_NOERROR; \
+	} while(0)
 
 /*
  * We use the least-significant bit of the trap field to indicate

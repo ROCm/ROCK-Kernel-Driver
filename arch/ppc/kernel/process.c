@@ -163,6 +163,7 @@ dump_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
 void
 enable_kernel_altivec(void)
 {
+	preempt_disable();
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_VEC))
 		giveup_altivec(current);
@@ -171,12 +172,14 @@ enable_kernel_altivec(void)
 #else
 	giveup_altivec(last_task_used_altivec);
 #endif /* __SMP __ */
+	preempt_enable();
 }
 #endif /* CONFIG_ALTIVEC */
 
 void
 enable_kernel_fp(void)
 {
+	preempt_disable();
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_FP))
 		giveup_fpu(current);
@@ -185,13 +188,16 @@ enable_kernel_fp(void)
 #else
 	giveup_fpu(last_task_used_math);
 #endif /* CONFIG_SMP */
+	preempt_enable();
 }
 
 int
 dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
-	if (tsk->thread.regs && tsk->thread.regs->msr & MSR_FP)
+	preempt_disable();
+	if (tsk->thread.regs && (tsk->thread.regs->msr & MSR_FP))
 		giveup_fpu(tsk);
+	preempt_enable();
 	memcpy(fpregs, &tsk->thread.fpr[0], sizeof(*fpregs));
 	return 1;
 }
@@ -329,12 +335,14 @@ void prepare_to_copy(struct task_struct *tsk)
 
 	if (regs == NULL)
 		return;
+	preempt_disable();
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 #ifdef CONFIG_ALTIVEC
 	if (regs->msr & MSR_VEC)
 		giveup_altivec(current);
 #endif /* CONFIG_ALTIVEC */
+	preempt_enable();
 }
 
 /*
@@ -479,12 +487,14 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
+	preempt_disable();
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 #ifdef CONFIG_ALTIVEC
 	if (regs->msr & MSR_VEC)
 		giveup_altivec(current);
 #endif /* CONFIG_ALTIVEC */
+	preempt_enable();
 	error = do_execve(filename, (char __user *__user *) a1,
 			  (char __user *__user *) a2, regs);
 	if (error == 0)

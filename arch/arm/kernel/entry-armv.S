@@ -530,33 +530,6 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
-#elif defined(CONFIG_ARCH_ANAKIN)
-
-		.macro	disable_fiq
-		.endm
-
-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-		mov	\base, #IO_BASE
-		mov	\irqstat, #INTERRUPT_CONTROLLER
-		ldr	\tmp, =anakin_irq_mask
-		ldr	\irqstat, [\base, \irqstat]
-		ldr	\tmp, [\tmp]
-		ands	\irqstat, \irqstat, \tmp
-		ldrne	\tmp, =anakin_active_irqs
-		strne	\irqstat, [\tmp]
-		movne	\irqnr, #IRQ_ANAKIN
-		.endm
-
-		.macro	irq_prio_table
-		.ltorg
-		.bss
-ENTRY(anakin_irq_mask)
-		.word	0
-ENTRY(anakin_active_irqs)
-		.space	4
-		.text
-		.endm
-
 #elif defined(CONFIG_ARCH_IOP310) || defined(CONFIG_ARCH_ADIFCC)
 
 		.macro	disable_fiq

@@ -35,7 +35,6 @@ CONFIG_ARCH_INTEGRATOR=y
 # CONFIG_ARCH_RPC is not set
 # CONFIG_ARCH_SA1100 is not set
 # CONFIG_ARCH_CLPS711X is not set
-# CONFIG_ARCH_ANAKIN is not set
 
 #
 # Archimedes/A5000 Implementations
@@ -620,7 +619,6 @@ CONFIG_DUMMY_CONSOLE=y
 # CONFIG_FB_CLPS711X is not set
 # CONFIG_FB_CYBER2000 is not set
 # CONFIG_FB_SA1100 is not set
-# CONFIG_FB_ANAKIN is not set
 # CONFIG_FB_E1355 is not set
 # CONFIG_FB_MATROX is not set
 # CONFIG_FB_ATY is not set

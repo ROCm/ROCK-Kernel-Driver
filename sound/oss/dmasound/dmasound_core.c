@@ -1004,6 +1004,7 @@ static void sq_reset(void)
 static int sq_fsync(struct file *filp, struct dentry *dentry)
 {
 	int rc = 0;
+	int timeout = 5;
 
 	write_sq.syncing |= 1;
 	sq_play();	/* there may be an incomplete frame waiting */
@@ -1016,6 +1017,12 @@ static int sq_fsync(struct file *filp, struct dentry *dentry)
 			 * and clear the queue. */
 			sq_reset_output();
 			rc = -EINTR;
+			break;
+		}
+		if (!--timeout) {
+			printk(KERN_WARNING "dmasound: Timeout draining output\n");
+			sq_reset_output();
+			rc = -EIO;
 			break;
 		}
 	}

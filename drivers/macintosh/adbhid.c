@@ -107,7 +107,6 @@ static struct adbhid *adbhid[16] = { 0 };
 static void adbhid_probe(void);
 
 static void adbhid_input_keycode(int, int, int, struct pt_regs *);
-static void leds_done(struct adb_request *);
 
 static void init_trackpad(int id);
 static void init_trackball(int id);
@@ -446,24 +445,54 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 
 static struct adb_request led_request;
 static int leds_pending[16];
+static int leds_req_pending;
 static int pending_devs[16];
 static int pending_led_start=0;
 static int pending_led_end=0;
+static spinlock_t leds_lock  = SPIN_LOCK_UNLOCKED;
+
+static void leds_done(struct adb_request *req)
+{
+	int leds, device;
+	unsigned long flags;
+
+	spin_lock_irqsave(&leds_lock, flags);
+
+	if (pending_led_start != pending_led_end) {
+		device = pending_devs[pending_led_start];
+		leds = leds_pending[device] & 0xff;
+		leds_pending[device] = 0;
+		pending_led_start++;
+		pending_led_start = (pending_led_start < 16) ? pending_led_start : 0;
+	} else
+		leds_req_pending = 0;
+
+	spin_unlock_irqrestore(&leds_lock, flags);
+	if (leds_req_pending)
+		adb_request(&led_request, leds_done, 0, 3,
+			    ADB_WRITEREG(device, KEYB_LEDREG), 0xff, ~leds);
+}
 
 static void real_leds(unsigned char leds, int device)
 {
-    if (led_request.complete) {
-	adb_request(&led_request, leds_done, 0, 3,
-		    ADB_WRITEREG(device, KEYB_LEDREG), 0xff,
-		    ~leds);
-    } else {
-	if (!(leds_pending[device] & 0x100)) {
-	    pending_devs[pending_led_end] = device;
-	    pending_led_end++;
-	    pending_led_end = (pending_led_end < 16) ? pending_led_end : 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&leds_lock, flags);
+	if (!leds_req_pending) {
+		leds_req_pending = 1;
+		spin_unlock_irqrestore(&leds_lock, flags);	       
+		adb_request(&led_request, leds_done, 0, 3,
+			    ADB_WRITEREG(device, KEYB_LEDREG), 0xff, ~leds);
+		return;
+	} else {
+		if (!(leds_pending[device] & 0x100)) {
+			pending_devs[pending_led_end] = device;
+			pending_led_end++;
+			pending_led_end = (pending_led_end < 16) ? pending_led_end : 0;
+		}
+		leds_pending[device] = leds | 0x100;
 	}
-	leds_pending[device] = leds | 0x100;
-    }
+	spin_unlock_irqrestore(&leds_lock, flags);	       
 }
 
 /*
@@ -487,21 +516,6 @@ static int adbhid_kbd_event(struct input_dev *dev, unsigned int type, unsigned i
 	return -1;
 }
 
-static void leds_done(struct adb_request *req)
-{
-    int leds,device;
-
-    if (pending_led_start != pending_led_end) {
-	device = pending_devs[pending_led_start];
-	leds = leds_pending[device] & 0xff;
-	leds_pending[device] = 0;
-	pending_led_start++;
-	pending_led_start = (pending_led_start < 16) ? pending_led_start : 0;
-	real_leds(leds,device);
-    }
-
-}
-
 static int
 adb_message_handler(struct notifier_block *this, unsigned long code, void *x)
 {
@@ -518,7 +532,7 @@ adb_message_handler(struct notifier_block *this, unsigned long code, void *x)
 		}
 
 		/* Stop pending led requests */
-		while(!led_request.complete)
+		while(leds_req_pending)
 			adb_poll();
 		break;
 

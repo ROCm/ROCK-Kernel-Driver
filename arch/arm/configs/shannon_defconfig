@@ -27,7 +27,6 @@ CONFIG_MODULES=y
 #
 # System Type
 #
-# CONFIG_ARCH_ANAKIN is not set
 # CONFIG_ARCH_ARCA5K is not set
 # CONFIG_ARCH_CLPS7500 is not set
 # CONFIG_ARCH_CLPS711X is not set

@@ -233,7 +233,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	bust_spinlocks(1);
 
 	if (address < PAGE_SIZE)
-		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
+		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference (address %016lx)\n", address);
 	else
 		printk(KERN_ALERT "Unable to handle kernel paging request at "
 		       "virtual address %016lx\n", address);

@@ -1104,7 +1104,7 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset, i
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
 	put_user(d_type, (char *) dirent + reclen - 1);
-	((char *) dirent) += reclen;
+	dirent = (void *) dirent + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
@@ -1781,9 +1781,12 @@ asmlinkage int sys32_sigaction (int sig, struct old_sigaction32 *act, struct old
 
         if (act) {
 		compat_old_sigset_t mask;
+		u32 u_handler, u_restorer;
 		
-		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
-		ret |= __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer);
+		ret = get_user(u_handler, &act->sa_handler);
+		new_ka.sa.sa_handler = (void *) (long) u_handler;
+		ret |= __get_user(u_restorer, &act->sa_restorer);
+		new_ka.sa.sa_restorer = (void *) (long) u_restorer;
 		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
 		ret |= __get_user(mask, &act->sa_mask);
 		if (ret)
@@ -1822,8 +1825,11 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 	set_thread_flag(TIF_NEWSIGNALS);
 
         if (act) {
+		u32 u_handler, u_restorer;
+
 		new_ka.ka_restorer = restorer;
-		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
+		ret = get_user(u_handler, &act->sa_handler);
+		new_ka.sa.sa_handler = (void *) (long) u_handler;
 		ret |= __copy_from_user(&set32, &act->sa_mask, sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6] | (((long)set32.sig[7]) << 32);
@@ -1832,7 +1838,8 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 		case 1: new_ka.sa.sa_mask.sig[0] = set32.sig[0] | (((long)set32.sig[1]) << 32);
 		}
 		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
-		ret |= __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer);
+		ret |= __get_user(u_restorer, &act->sa_restorer);
+		new_ka.sa.sa_restorer = (void *) (long) u_restorer;
                 if (ret)
                 	return -EFAULT;
 	}

@@ -108,10 +108,11 @@ acpi_ex_resolve_node_to_value (
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p source_desc=%p [%s]\n",
 		 node, source_desc, acpi_ut_get_type_name (entry_type)));
 
-	if (entry_type == ACPI_TYPE_LOCAL_ALIAS) {
+	if ((entry_type == ACPI_TYPE_LOCAL_ALIAS) ||
+		(entry_type == ACPI_TYPE_LOCAL_METHOD_ALIAS)) {
 		/* There is always exactly one level of indirection */
 
-		node       = (struct acpi_namespace_node *) node->object;
+		node       = ACPI_CAST_PTR (struct acpi_namespace_node, node->object);
 		source_desc = acpi_ns_get_attached_object (node);
 		entry_type = acpi_ns_get_type ((acpi_handle) node);
 		*object_ptr = node;

@@ -277,7 +277,7 @@ acpi_parse_ioapic (
  * Parse Interrupt Source Override for the ACPI SCI
  */
 static void
-acpi_parse_sci_int_src_ovr(u8 bus_irq, u16 polarity, u16 trigger, u32 global_irq)
+acpi_sci_ioapic_setup(u32 gsi, u16 polarity, u16 trigger)
 {
 	if (trigger == 0)	/* compatible SCI trigger is level */
 		trigger = 3;
@@ -292,13 +292,18 @@ acpi_parse_sci_int_src_ovr(u8 bus_irq, u16 polarity, u16 trigger, u32 global_irq
 	if (acpi_sci_flags.polarity)
 		polarity = acpi_sci_flags.polarity;
 
-	mp_override_legacy_irq(bus_irq, polarity, trigger, global_irq);
+	/*
+ 	 * mp_config_acpi_legacy_irqs() already setup IRQs < 16
+	 * If GSI is < 16, this will update its flags,
+	 * else it will create a new mp_irqs[] entry.
+	 */
+	mp_override_legacy_irq(gsi, polarity, trigger, gsi);
 
 	/*
 	 * stash over-ride to indicate we've been here
 	 * and for later update of acpi_fadt
 	 */
-	acpi_sci_override_gsi = global_irq;
+	acpi_sci_override_gsi = gsi;
 	return;
 }
 
@@ -315,9 +320,8 @@ acpi_parse_int_src_ovr (
 	acpi_table_print_madt_entry(header);
 
 	if (intsrc->bus_irq == acpi_fadt.sci_int) {
-		acpi_parse_sci_int_src_ovr(intsrc->bus_irq,
-			intsrc->flags.polarity, intsrc->flags.trigger,
-			intsrc->global_irq);
+		acpi_sci_ioapic_setup(intsrc->global_irq,
+			intsrc->flags.polarity, intsrc->flags.trigger);
 		return 0;
 	}
 
@@ -660,7 +664,7 @@ acpi_parse_madt_ioapic_entries(void)
 	 * pretend we got one so we can set the SCI flags.
 	 */
 	if (!acpi_sci_override_gsi)
-		acpi_parse_sci_int_src_ovr(acpi_fadt.sci_int, 0, 0, acpi_fadt.sci_int);
+		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
 
 	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (count < 0) {

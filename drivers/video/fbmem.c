@@ -55,7 +55,6 @@ extern int acornfb_init(void);
 extern int acornfb_setup(char*);
 extern int amifb_init(void);
 extern int amifb_setup(char*);
-extern int anakinfb_init(void);
 extern int atafb_init(void);
 extern int atafb_setup(char*);
 extern int macfb_init(void);
@@ -179,9 +178,6 @@ static struct {
 #endif
 #ifdef CONFIG_FB_AMIGA
 	{ "amifb", amifb_init, amifb_setup },
-#endif
-#ifdef CONFIG_FB_ANAKIN
-	{ "anakinfb", anakinfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_CLPS711X
 	{ "clps711xfb", clps711xfb_init, NULL },
