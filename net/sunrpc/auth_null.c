@@ -1,5 +1,5 @@
 /*
- * linux/net/sunrpc/rpcauth_null.c
+ * linux/net/sunrpc/auth_null.c
  *
  * AUTH_NULL authentication. Really :-)
  *
@@ -106,14 +106,18 @@ nul_refresh(struct rpc_task *task)
 static u32 *
 nul_validate(struct rpc_task *task, u32 *p)
 {
-	u32		n = ntohl(*p++);
+	rpc_authflavor_t	flavor;
+	u32			size;
 
-	if (n != RPC_AUTH_NULL) {
-		printk("RPC: bad verf flavor: %ld\n", (unsigned long) n);
+	flavor = ntohl(*p++);
+	if (flavor != RPC_AUTH_NULL) {
+		printk("RPC: bad verf flavor: %u\n", flavor);
 		return NULL;
 	}
-	if ((n = ntohl(*p++)) != 0) {
-		printk("RPC: bad verf size: %ld\n", (unsigned long) n);
+
+	size = ntohl(*p++);
+	if (size != 0) {
+		printk("RPC: bad verf size: %u\n", size);
 		return NULL;
 	}
 
