@@ -10,8 +10,15 @@
  * [ (C) Copyright 1999 Gregory P. Smith]
  * 
  * 
+ * OHCI is the main "non-Intel/VIA" standard for USB 1.1 host controller
+ * interfaces (though some non-x86 Intel chips use it).  It supports
+ * smarter hardware than UHCI.  A download link for the spec available
+ * through the http://www.usb.org website.
+ *
  * History:
  * 
+ * 2002/07/19 fixes to management of ED and schedule state.
+ * 2002/06/09 SA-1111 support (Christopher Hoover)
  * 2002/06/01 remember frame when HC won't see EDs any more; use that info
  *	to fix urb unlink races caused by interrupt latency assumptions;
  *	minor ED field and function naming updates
@@ -95,12 +102,12 @@
 /*
  * TO DO:
  *
- *	- "disabled" should be the hcd state
+ *	- "disabled" and "sleeping" should be in hcd->state
  *	- bandwidth alloc to generic code
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Jun-15"
+#define DRIVER_VERSION "2002-Jul-19"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -140,6 +147,7 @@ static int ohci_urb_enqueue (
 	int		i, size = 0;
 	unsigned long	flags;
 	int		bustime = 0;
+	int		retval = 0;
 	
 #ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "SUB", usb_pipein (pipe));
@@ -191,19 +199,25 @@ static int ohci_urb_enqueue (
 		return -ENOMEM;
 	memset (urb_priv, 0, sizeof (urb_priv_t) + size * sizeof (struct td *));
 	
+	spin_lock_irqsave (&ohci->lock, flags);
+
+	/* don't submit to a dead HC */
+	if (ohci->disabled || ohci->sleeping) {
+		retval = -ENODEV;
+		goto fail;
+	}
+
 	/* fill the private part of the URB */
 	urb_priv->length = size;
 	urb_priv->ed = ed;	
 
 	/* allocate the TDs (updating hash chains) */
-	spin_lock_irqsave (&ohci->lock, flags);
 	for (i = 0; i < size; i++) {
 		urb_priv->td [i] = td_alloc (ohci, SLAB_ATOMIC);
 		if (!urb_priv->td [i]) {
 			urb_priv->length = i;
-			urb_free_priv (ohci, urb_priv);
-			spin_unlock_irqrestore (&ohci->lock, flags);
-			return -ENOMEM;
+			retval = -ENOMEM;
+			goto fail;
 		}
 	}	
 
@@ -217,11 +231,11 @@ static int ohci_urb_enqueue (
 	switch (usb_pipetype (pipe)) {
 		case PIPE_ISOCHRONOUS:
 			if (urb->transfer_flags & USB_ISO_ASAP) { 
-				urb->start_frame = ( (ed->state == ED_OPER)
+				urb->start_frame = ((ed->state != ED_IDLE)
 					? (ed->intriso.last_iso + 1)
 					: (le16_to_cpu (ohci->hcca->frame_no)
 						+ 10)) & 0xffff;
-			}	
+			}
 			/* FALLTHROUGH */
 		case PIPE_INTERRUPT:
 			if (urb->bandwidth == 0) {
@@ -238,18 +252,20 @@ static int ohci_urb_enqueue (
 
 	urb->hcpriv = urb_priv;
 
-	/* link the ed into a chain if is not already */
-	if (ed->state != ED_OPER)
-		ep_link (ohci, ed);
+	/* schedule the ed if needed */
+	if (ed->state == ED_IDLE)
+		ed_schedule (ohci, ed);
 
 	/* fill the TDs and link them to the ed; and
 	 * enable that part of the schedule, if needed
 	 */
 	td_submit_urb (urb);
 
+fail:
+	if (retval)
+		urb_free_priv (ohci, urb_priv);
 	spin_unlock_irqrestore (&ohci->lock, flags);
-
-	return 0;
+	return retval;
 }
 
 /*
@@ -270,19 +286,17 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	if (!ohci->disabled) {
 		urb_priv_t  *urb_priv;
 
-		/* flag the urb's data for deletion in some upcoming
-		 * SF interrupt's delete list processing
+		/* Unless an IRQ completed the unlink while it was being
+		 * handed to us, flag it for unlink and giveback, and force
+		 * some upcoming INTR_SF to call finish_unlinks()
 		 */
 		spin_lock_irqsave (&ohci->lock, flags);
 		urb_priv = urb->hcpriv;
-
-		if (!urb_priv || (urb_priv->state == URB_DEL)) {
-			spin_unlock_irqrestore (&ohci->lock, flags);
-			return 0;
+		if (urb_priv) {
+			urb_priv->state = URB_DEL; 
+			if (urb_priv->ed->state == ED_OPER)
+				start_urb_unlink (ohci, urb_priv->ed);
 		}
-			
-		urb_priv->state = URB_DEL; 
-		start_urb_unlink (ohci, urb_priv->ed);
 		spin_unlock_irqrestore (&ohci->lock, flags);
 	} else {
 		/*
@@ -290,11 +304,15 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 * any more ... just clean up every urb's memory.
 		 */
 		finish_urb (ohci, urb);
-	}	
+	}
 	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
+
+/* frees config/altsetting state for endpoints,
+ * including ED memory, dummy TD, and bulk/intr data toggle
+ */
 
 static void
 ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
@@ -303,7 +321,11 @@ ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
 	int			i;
 	unsigned long		flags;
+#ifdef DEBUG
+	int			rescans = 0;
+#endif
 
+rescan:
 	/* free any eds, and dummy tds, still hanging around */
 	spin_lock_irqsave (&ohci->lock, flags);
 	for (i = 0; i < 32; i++) {
@@ -312,27 +334,47 @@ ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 		if (!ed)
 			continue;
 
-		ed->state &= ~ED_URB_DEL;
-		if (ohci->disabled && ed->state == ED_OPER)
-			ed->state = ED_UNLINK;
+		if (ohci->disabled && ed->state != ED_IDLE)
+			ed->state = ED_IDLE;
 		switch (ed->state) {
-		case ED_NEW:
-			break;
-		case ED_UNLINK:
+		case ED_UNLINK:		/* wait a frame? */
+			goto do_rescan;
+		case ED_IDLE:		/* fully unlinked */
 			td_free (ohci, ed->dummy);
 			break;
-
-		case ED_OPER:
 		default:
+#ifdef DEBUG
 			err ("illegal ED %d state in free_config, %d",
 				i, ed->state);
-#ifdef DEBUG
-			BUG ();
 #endif
+			/* ED_OPER: some driver disconnect() is broken,
+			 * it didn't even start its unlinks much less wait
+			 * for their completions.
+			 * OTHERWISE:  hcd bug, ed is garbage
+			 */
+			BUG ();
 		}
 		ed_free (ohci, ed);
 	}
 	spin_unlock_irqrestore (&ohci->lock, flags);
+	return;
+
+do_rescan:
+#ifdef DEBUG
+	/* a driver->disconnect() returned before its unlinks completed? */
+	if (in_interrupt ()) {
+		dbg ("WARNING: spin in interrupt; driver->disconnect() bug");
+		dbg ("dev usb-%s-%s ep 0x%x", 
+			ohci->hcd.self.bus_name, udev->devpath, i);
+	}
+	BUG_ON (!(readl (&ohci->regs->intrenable) & OHCI_INTR_SF));
+	BUG_ON (rescans >= 2);	/* HWBUG */
+	rescans++;
+#endif
+
+	spin_unlock_irqrestore (&ohci->lock, flags);
+	wait_ms (1);
+	goto rescan;
 }
 
 static int ohci_get_frame (struct usb_hcd *hcd)
