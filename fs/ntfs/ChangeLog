@@ -25,7 +25,7 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.12 - WIP.
+2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
 	- Add a new address space operations struct, ntfs_mst_aops, for mst
 	  protected attributes.  This is because the default ntfs_aops do not
@@ -36,6 +36,10 @@ ToDo:
 	  includes an adapted ntfs_commit_inode() and an implementation of
 	  ntfs_write_inode() which for now just cleans dirty inodes without
 	  writing them (it does emit a warning that this is happening).
+	- Undo the second decompression engine fix (see 2.1.9 release ChangeLog
+	  entry) as it was only fixing a theoretical bug but at the same time
+	  it badly broke the handling of sparse and uncompressed compression
+	  blocks.
 
 2.1.11 - Driver internal cleanups.
 

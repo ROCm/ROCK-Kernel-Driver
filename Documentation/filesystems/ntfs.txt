@@ -273,6 +273,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.12:
+	- Fix the second fix to the decompression engine from the 2.1.9 release
+	  and some further internals cleanups.
 2.1.11:
 	- Driver internal cleanups.
 2.1.10:

@@ -1142,7 +1142,7 @@ get_ctx_vol_failed:
 #ifdef NTFS_RW
 	/* Make sure that no unsupported volume flags are set. */
 	if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
-		static const char *es1 = "Volume has unsupported flags set ";
+		static const char *es1 = "Volume has unsupported flags set";
 		static const char *es2 = ".  Run chkdsk and mount in Windows.";
 
 		/* If a read-write mount, convert it to a read-only mount. */
