@@ -277,12 +277,12 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         return 0;
 }
 
-asmlinkage int sys_fork(struct pt_regs regs)
+asmlinkage long sys_fork(struct pt_regs regs)
 {
 	return do_fork(SIGCHLD, regs.gprs[15], &regs, 0, NULL, NULL);
 }
 
-asmlinkage int sys_clone(struct pt_regs regs)
+asmlinkage long sys_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
@@ -308,7 +308,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
  * do not have enough call-clobbered registers to hold all
  * the information you need.
  */
-asmlinkage int sys_vfork(struct pt_regs regs)
+asmlinkage long sys_vfork(struct pt_regs regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
 		       regs.gprs[15], &regs, 0, NULL, NULL);
@@ -317,7 +317,7 @@ asmlinkage int sys_vfork(struct pt_regs regs)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage int sys_execve(struct pt_regs regs)
+asmlinkage long sys_execve(struct pt_regs regs)
 {
         int error;
         char * filename;

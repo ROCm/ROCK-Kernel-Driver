@@ -298,7 +298,7 @@ static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
  *
  * This is really horribly ugly.
  */
-asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr)
+asmlinkage long sys32_ipc(u32 call, int first, int second, int third, u32 ptr)
 {
 	if(call >> 16) /* hack for backward compatibility */
 		return -EINVAL;
@@ -360,7 +360,7 @@ asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr)
 	return -EINVAL;
 }
 
-asmlinkage int sys32_truncate64(const char * path, unsigned long high, unsigned long low)
+asmlinkage long sys32_truncate64(const char * path, unsigned long high, unsigned long low)
 {
 	if ((int)high < 0)
 		return -EINVAL;
@@ -368,7 +368,7 @@ asmlinkage int sys32_truncate64(const char * path, unsigned long high, unsigned 
 		return sys_truncate(path, (high << 32) | low);
 }
 
-asmlinkage int sys32_ftruncate64(unsigned int fd, unsigned long high, unsigned long low)
+asmlinkage long sys32_ftruncate64(unsigned int fd, unsigned long high, unsigned long low)
 {
 	if ((int)high < 0)
 		return -EINVAL;
@@ -479,7 +479,7 @@ out:
 	return retval;
 }
 
-asmlinkage long sys32_readv(int fd, struct compat_iovec *vector, u32 count)
+asmlinkage long sys32_readv(int fd, struct compat_iovec *vector, unsigned long count)
 {
 	struct file *file;
 	long ret = -EBADF;
@@ -497,7 +497,7 @@ bad_file:
 	return ret;
 }
 
-asmlinkage long sys32_writev(int fd, struct compat_iovec *vector, u32 count)
+asmlinkage long sys32_writev(int fd, struct compat_iovec *vector, unsigned long count)
 {
 	struct file *file;
 	int ret = -EBADF;
@@ -549,7 +549,7 @@ static int fillonedir(void * __buf, const char * name, int namlen,
 	return 0;
 }
 
-asmlinkage int old32_readdir(unsigned int fd, struct old_linux_dirent32 *dirent, unsigned int count)
+asmlinkage long old32_readdir(unsigned int fd, struct old_linux_dirent32 *dirent, unsigned int count)
 {
 	int error = -EBADF;
 	struct file * file;
@@ -611,7 +611,7 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset, i
 	return 0;
 }
 
-asmlinkage int sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, unsigned int count)
+asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, unsigned int count)
 {
 	struct file * file;
 	struct linux_dirent32 * lastdirent;
@@ -706,10 +706,10 @@ set_fd_set32(unsigned long n, u32 *ufdset, unsigned long *fdset)
 #define MAX_SELECT_SECONDS \
 	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
 
-asmlinkage int sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
+asmlinkage long sys32_select(int n, u32 *inp, u32 *outp, u32 *exp,
+				struct compat_timeval *tvp)
 {
 	fd_set_bits fds;
-	struct compat_timeval *tvp = (struct compat_timeval *)AA(tvp_x);
 	char *bits;
 	unsigned long nn;
 	long timeout;
@@ -914,7 +914,7 @@ static int copy_mount_stuff_to_kernel(const void *user, unsigned long *kernel)
 #define SMBFS_NAME	"smbfs"
 #define NCPFS_NAME	"ncpfs"
 
-asmlinkage int sys32_mount(char *dev_name, char *dir_name, char *type, unsigned long new_flags, u32 data)
+asmlinkage long sys32_mount(char *dev_name, char *dir_name, char *type, unsigned long new_flags, void *data)
 {
 	unsigned long type_page = 0;
 	unsigned long data_page = 0;
@@ -936,7 +936,7 @@ asmlinkage int sys32_mount(char *dev_name, char *dir_name, char *type, unsigned 
 	is_smb = !strcmp((char *)type_page, SMBFS_NAME);
 	is_ncp = !strcmp((char *)type_page, NCPFS_NAME);
 
-	err = copy_mount_stuff_to_kernel((const void *)AA(data), &data_page);
+	err = copy_mount_stuff_to_kernel(data, &data_page);
 	if (err)
 		goto type_out;
 
@@ -996,7 +996,7 @@ struct sysinfo32 {
         char _f[8];
 };
 
-asmlinkage int sys32_sysinfo(struct sysinfo32 __user *info)
+asmlinkage long sys32_sysinfo(struct sysinfo32 __user *info)
 {
 	struct sysinfo s;
 	int ret, err;
@@ -1024,7 +1024,7 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 __user *info)
 	return ret;
 }
 
-asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
+asmlinkage long sys32_sched_rr_get_interval(compat_pid_t pid,
 				struct compat_timespec __user *interval)
 {
 	struct timespec t;
@@ -1039,8 +1039,8 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
 	return ret;
 }
 
-asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
-			compat_sigset_t __user *oset, compat_size_t sigsetsize)
+asmlinkage long sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
+			compat_sigset_t __user *oset, size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -1074,8 +1074,8 @@ asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
 	return 0;
 }
 
-asmlinkage int sys32_rt_sigpending(compat_sigset_t __user *set,
-				compat_size_t sigsetsize)
+asmlinkage long sys32_rt_sigpending(compat_sigset_t __user *set,
+				size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -1101,9 +1101,9 @@ asmlinkage int sys32_rt_sigpending(compat_sigset_t __user *set,
 extern int
 copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from);
 
-asmlinkage int
+asmlinkage long
 sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
-		      struct compat_timespec *uts, compat_size_t sigsetsize)
+		      struct compat_timespec *uts, size_t sigsetsize)
 {
 	int ret, sig;
 	sigset_t these;
@@ -1182,7 +1182,7 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	return ret;
 }
 
-asmlinkage int
+asmlinkage long
 sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 __user *uinfo)
 {
 	siginfo_t info;
@@ -1384,7 +1384,7 @@ out_file:
  * sys32_execve() executes a new program after the asm stub has set
  * things up for us.  This should basically do what I want it to.
  */
-asmlinkage int
+asmlinkage long
 sys32_execve(struct pt_regs regs)
 {
         int error;
@@ -1412,14 +1412,14 @@ out:
 
 #ifdef CONFIG_MODULES
 
-asmlinkage int
+asmlinkage long
 sys32_init_module(void __user *umod, unsigned long len,
 		const char __user *uargs)
 {
 	return sys_init_module(umod, len, uargs);
 }
 
-asmlinkage int
+asmlinkage long
 sys32_delete_module(const char __user *name_user, unsigned int flags)
 {
 	return sys_delete_module(name_user, flags);
@@ -1427,14 +1427,14 @@ sys32_delete_module(const char __user *name_user, unsigned int flags)
 
 #else /* CONFIG_MODULES */
 
-asmlinkage int
+asmlinkage long
 sys32_init_module(void __user *umod, unsigned long len,
 		const char __user *uargs)
 {
 	return -ENOSYS;
 }
 
-asmlinkage int
+asmlinkage long
 sys32_delete_module(const char __user *name_user, unsigned int flags)
 {
 	return -ENOSYS;
@@ -1599,7 +1599,7 @@ static int nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res
 	return copy_to_user(res32, kres, sizeof(*res32)) ? -EFAULT : 0;
 }
 
-int asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)
+long asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)
 {
 	struct nfsctl_arg *karg = NULL;
 	union nfsctl_res *kres = NULL;
@@ -1667,7 +1667,7 @@ done:
 
 extern struct timezone sys_tz;
 
-asmlinkage int sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
+asmlinkage long sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -1696,7 +1696,7 @@ static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 	return 0;
 }
 
-asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
+asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
 	struct timespec kts;
 	struct timezone ktz;
@@ -1714,23 +1714,23 @@ asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz
 }
 
 /* These are here just in case some old sparc32 binary calls it. */
-asmlinkage int sys32_pause(void)
+asmlinkage long sys32_pause(void)
 {
 	current->state = TASK_INTERRUPTIBLE;
 	schedule();
 	return -ERESTARTNOHAND;
 }
 
-asmlinkage compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf,
-				 compat_size_t count, u32 poshi, u32 poslo)
+asmlinkage long sys32_pread64(unsigned int fd, char *ubuf,
+				size_t count, u32 poshi, u32 poslo)
 {
 	if ((compat_ssize_t) count < 0)
 		return -EINVAL;
 	return sys_pread64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
-asmlinkage compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf,
-				  compat_size_t count, u32 poshi, u32 poslo)
+asmlinkage long sys32_pwrite64(unsigned int fd, const char *ubuf,
+				size_t count, u32 poshi, u32 poslo)
 {
 	if ((compat_ssize_t) count < 0)
 		return -EINVAL;
@@ -1742,7 +1742,7 @@ asmlinkage compat_ssize_t sys32_readahead(int fd, u32 offhi, u32 offlo, s32 coun
 	return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
 }
 
-asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
+asmlinkage long sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, size_t count)
 {
 	mm_segment_t old_fs = get_fs();
 	int ret;
@@ -1761,7 +1761,7 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 c
 	return ret;
 }
 
-asmlinkage int sys32_sendfile64(int out_fd, int in_fd, 
+asmlinkage long sys32_sendfile64(int out_fd, int in_fd,
 				compat_loff_t *offset, s32 count)
 {
 	mm_segment_t old_fs = get_fs();
@@ -1798,7 +1798,7 @@ struct timex32 {
 
 extern int do_adjtimex(struct timex *);
 
-asmlinkage int sys32_adjtimex(struct timex32 *utp)
+asmlinkage long sys32_adjtimex(struct timex32 *utp)
 {
 	struct timex txc;
 	int ret;
@@ -1951,7 +1951,7 @@ static int cp_stat64(struct stat64_emu31 *ubuf, struct kstat *stat)
 	return copy_to_user(ubuf,&tmp,sizeof(tmp)) ? -EFAULT : 0; 
 }
 
-asmlinkage long sys32_stat64(char * filename, struct stat64_emu31 * statbuf, long flags)
+asmlinkage long sys32_stat64(char * filename, struct stat64_emu31 * statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_stat(filename, &stat);
@@ -1960,7 +1960,7 @@ asmlinkage long sys32_stat64(char * filename, struct stat64_emu31 * statbuf, lon
 	return ret;
 }
 
-asmlinkage long sys32_lstat64(char * filename, struct stat64_emu31 * statbuf, long flags)
+asmlinkage long sys32_lstat64(char * filename, struct stat64_emu31 * statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_lstat(filename, &stat);
@@ -1969,7 +1969,7 @@ asmlinkage long sys32_lstat64(char * filename, struct stat64_emu31 * statbuf, lo
 	return ret;
 }
 
-asmlinkage long sys32_fstat64(unsigned long fd, struct stat64_emu31 * statbuf, long flags)
+asmlinkage long sys32_fstat64(unsigned long fd, struct stat64_emu31 * statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_fstat(fd, &stat);
@@ -2056,7 +2056,7 @@ out:
 	return error;
 }
 
-asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
+asmlinkage long sys32_read(unsigned int fd, char * buf, size_t count)
 {
 	if ((compat_ssize_t) count < 0)
 		return -EINVAL; 
@@ -2064,7 +2064,7 @@ asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
 	return sys_read(fd, buf, count);
 }
 
-asmlinkage compat_ssize_t sys32_write(unsigned int fd, char * buf, size_t count)
+asmlinkage long sys32_write(unsigned int fd, char * buf, size_t count)
 {
 	if ((compat_ssize_t) count < 0)
 		return -EINVAL; 
@@ -2072,7 +2072,7 @@ asmlinkage compat_ssize_t sys32_write(unsigned int fd, char * buf, size_t count)
 	return sys_write(fd, buf, count);
 }
 
-asmlinkage int sys32_clone(struct pt_regs regs)
+asmlinkage long sys32_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;

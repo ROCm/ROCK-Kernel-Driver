@@ -161,7 +161,7 @@ sys32_rt_sigsuspend(struct pt_regs * regs,compat_sigset_t *unewset, size_t sigse
         }
 }                                                         
 
-asmlinkage int
+asmlinkage long
 sys32_sigaction(int sig, const struct old_sigaction32 *act,
 		 struct old_sigaction32 *oact)
 {
@@ -254,7 +254,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 	return ret;
 }
 
-asmlinkage int
+asmlinkage long
 sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 {
 	stack_t kss, koss;

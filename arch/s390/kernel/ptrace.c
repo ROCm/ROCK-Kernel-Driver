@@ -616,7 +616,7 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 	return -EIO;
 }
 
-asmlinkage int
+asmlinkage long
 sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
