@@ -159,13 +159,39 @@ static int is_python(struct device_node *dev)
 	return 0;
 }
 
-static void python_countermeasures(unsigned long addr)
+static int get_phb_reg_prop(struct device_node *dev,
+			    unsigned int addr_size_words,
+			    struct reg_property64 *reg)
 {
+	unsigned int *ui_ptr = NULL, len;
+
+	/* Found a PHB, now figure out where his registers are mapped. */
+	ui_ptr = (unsigned int *)get_property(dev, "reg", &len);
+	if (ui_ptr == NULL)
+		return 1;
+
+	if (addr_size_words == 1) {
+		reg->address = ((struct reg_property32 *)ui_ptr)->address;
+		reg->size    = ((struct reg_property32 *)ui_ptr)->size;
+	} else {
+		*reg = *((struct reg_property64 *)ui_ptr);
+	}
+
+	return 0;
+}
+
+static void python_countermeasures(struct device_node *dev,
+				   unsigned int addr_size_words)
+{
+	struct reg_property64 reg_struct;
 	void __iomem *chip_regs;
 	volatile u32 val;
 
+	if (get_phb_reg_prop(dev, addr_size_words, &reg_struct))
+		return;
+
 	/* Python's register file is 1 MB in size. */
-	chip_regs = ioremap(addr & ~(0xfffffUL), 0x100000); 
+	chip_regs = ioremap(reg_struct.address & ~(0xfffffUL), 0x100000);
 
 	/* 
 	 * Firmware doesn't always clear this bit which is critical
@@ -228,27 +254,6 @@ unsigned long __devinit get_phb_buid (struct device_node *phb)
 	return buid;
 }
 
-static int get_phb_reg_prop(struct device_node *dev,
-			    unsigned int addr_size_words,
-			    struct reg_property64 *reg)
-{
-	unsigned int *ui_ptr = NULL, len;
-
-	/* Found a PHB, now figure out where his registers are mapped. */
-	ui_ptr = (unsigned int *) get_property(dev, "reg", &len);
-	if (ui_ptr == NULL)
-		return 1;
-
-	if (addr_size_words == 1) {
-		reg->address = ((struct reg_property32 *)ui_ptr)->address;
-		reg->size    = ((struct reg_property32 *)ui_ptr)->size;
-	} else {
-		*reg = *((struct reg_property64 *)ui_ptr);
-	}
-
-	return 0;
-}
-
 static int phb_set_bus_ranges(struct device_node *dev,
 			      struct pci_controller *phb)
 {
@@ -270,15 +275,10 @@ static int __devinit setup_phb(struct device_node *dev,
 			       struct pci_controller *phb,
 			       unsigned int addr_size_words)
 {
-	struct reg_property64 reg_struct;
-
-	if (get_phb_reg_prop(dev, addr_size_words, &reg_struct))
-		return 1;
-
 	pci_setup_pci_controller(phb);
 
 	if (is_python(dev))
-		python_countermeasures(reg_struct.address);
+		python_countermeasures(dev, addr_size_words);
 
 	if (phb_set_bus_ranges(dev, phb))
 		return 1;
