@@ -1514,6 +1514,8 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 	ide_hwifs[ix].ide_dma_timeout = &__ide_dma_timeout;
 	ide_hwifs[ix].ide_dma_retune = &__ide_dma_retune;
 	ide_hwifs[ix].ide_dma_lostirq = &pmac_ide_dma_lostirq;
+	ide_hwifs[ix].ide_dma_queued_on = &__ide_dma_queued_on;
+	ide_hwifs[ix].ide_dma_queued_off = &__ide_dma_queued_off;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)

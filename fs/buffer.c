@@ -319,6 +319,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 0);
 	if (!ret)
@@ -326,6 +327,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:
@@ -354,6 +356,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 		goto out_putf;
 
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 1);
 	if (!ret)
@@ -361,6 +364,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:

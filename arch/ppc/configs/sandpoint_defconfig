@@ -55,7 +55,6 @@ CONFIG_PPC_STD_MMU=y
 # CONFIG_POWERPMC250 is not set
 # CONFIG_EV64260 is not set
 # CONFIG_SPRUCE is not set
-# CONFIG_MENF1 is not set
 # CONFIG_LOPEC is not set
 # CONFIG_MCPN765 is not set
 # CONFIG_MVME5100 is not set
@@ -67,8 +66,7 @@ CONFIG_SANDPOINT=y
 # CONFIG_K2 is not set
 # CONFIG_PAL4 is not set
 # CONFIG_GEMINI is not set
-# CONFIG_ZX4500 is not set
-CONFIG_SANDPOINT_X3=y
+CONFIG_PPC_GEN550=y
 CONFIG_EPIC_SERIAL_MODE=y
 # CONFIG_MPC10X_STORE_GATHERING is not set
 # CONFIG_SMP is not set
@@ -84,8 +82,8 @@ CONFIG_ALTIVEC=y
 CONFIG_PCI=y
 CONFIG_PCI_DOMAINS=y
 CONFIG_KCORE_ELF=y
-CONFIG_BINFMT_ELF=y
 CONFIG_KERNEL_ELF=y
+CONFIG_BINFMT_ELF=y
 CONFIG_BINFMT_MISC=m
 # CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
@@ -118,6 +116,11 @@ CONFIG_TASK_SIZE=0x80000000
 CONFIG_BOOT_LOAD=0x00800000
 
 #
+# Generic Driver Options
+#
+# CONFIG_FW_LOADER is not set
+
+#
 # Memory Technology Devices (MTD)
 #
 # CONFIG_MTD is not set
@@ -147,7 +150,7 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_MD is not set
 
 #
-# ATA/IDE/MFM/RLL support
+# ATA/ATAPI/MFM/RLL support
 #
 CONFIG_IDE=y
 
@@ -166,6 +169,7 @@ CONFIG_BLK_DEV_IDEDISK=y
 CONFIG_BLK_DEV_IDECD=y
 # CONFIG_BLK_DEV_IDEFLOPPY is not set
 # CONFIG_IDE_TASK_IOCTL is not set
+CONFIG_IDE_TASKFILE_IO=y
 
 #
 # IDE chipset support/bugfixes
@@ -173,7 +177,7 @@ CONFIG_BLK_DEV_IDECD=y
 # CONFIG_BLK_DEV_IDEPCI is not set
 
 #
-# SCSI support
+# SCSI device support
 #
 # CONFIG_SCSI is not set
 
@@ -292,6 +296,7 @@ CONFIG_NET_PCI=y
 # CONFIG_AMD8111_ETH is not set
 # CONFIG_ADAPTEC_STARFIRE is not set
 # CONFIG_B44 is not set
+# CONFIG_TC35815 is not set
 # CONFIG_DGRS is not set
 # CONFIG_EEPRO100 is not set
 CONFIG_E100=y
@@ -413,11 +418,6 @@ CONFIG_FONT_8x16=y
 # CONFIG_LOGO is not set
 
 #
-# Old CD-ROM drivers (not SCSI, not IDE)
-#
-# CONFIG_CD_NO_IDESCSI is not set
-
-#
 # Input device support
 #
 CONFIG_INPUT=y
@@ -443,6 +443,7 @@ CONFIG_SERIO=y
 CONFIG_SERIO_I8042=y
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_PCIPS2 is not set
 
 #
 # Input Device Drivers
@@ -731,6 +732,7 @@ CONFIG_USB_SE401=m
 #
 # USB Network adaptors
 #
+# CONFIG_USB_AX8817X is not set
 # CONFIG_USB_CATC is not set
 # CONFIG_USB_KAWETH is not set
 # CONFIG_USB_PEGASUS is not set

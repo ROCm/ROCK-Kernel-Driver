@@ -361,17 +361,31 @@ void elv_put_request(request_queue_t *q, struct request *rq)
 		e->elevator_put_req_fn(q, rq);
 }
 
-int elv_register_queue(struct gendisk *disk)
+int elv_may_queue(request_queue_t *q, int rw)
 {
-	request_queue_t *q = disk->queue;
-	elevator_t *e;
+	elevator_t *e = &q->elevator;
 
-	if (!q)
-		return -ENXIO;
+	if (e->elevator_may_queue_fn)
+		return e->elevator_may_queue_fn(q, rw);
+
+	return 0;
+}
+
+void elv_completed_request(request_queue_t *q, struct request *rq)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_completed_req_fn)
+		e->elevator_completed_req_fn(q, rq);
+}
+
+int elv_register_queue(struct request_queue *q)
+{
+	elevator_t *e;
 
 	e = &q->elevator;
 
-	e->kobj.parent = kobject_get(&disk->kobj);
+	e->kobj.parent = kobject_get(&q->kobj);
 	if (!e->kobj.parent)
 		return -EBUSY;
 
@@ -381,14 +395,12 @@ int elv_register_queue(struct gendisk *disk)
 	return kobject_register(&e->kobj);
 }
 
-void elv_unregister_queue(struct gendisk *disk)
+void elv_unregister_queue(struct request_queue *q)
 {
-	request_queue_t *q = disk->queue;
-
 	if (q) {
 		elevator_t * e = &q->elevator;
 		kobject_unregister(&e->kobj);
-		kobject_put(&disk->kobj);
+		kobject_put(&q->kobj);
 	}
 }
 
@@ -408,5 +420,6 @@ EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
 EXPORT_SYMBOL(elv_queue_empty);
+EXPORT_SYMBOL(elv_completed_request);
 EXPORT_SYMBOL(elevator_exit);
 EXPORT_SYMBOL(elevator_init);
