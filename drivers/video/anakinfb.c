@@ -137,7 +137,7 @@ anakinfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)
-		return fb_set_cmap(cmap, kspc, anakinfb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -172,6 +172,7 @@ static struct fb_ops anakinfb_ops = {
 	fb_set_var:	anakinfb_set_var,
 	fb_get_cmap:	anakinfb_get_cmap,
 	fb_set_cmap:	anakinfb_set_cmap,
+	fb_setcolreg:	anakinfb_setcolreg,
 };
 
 int __init

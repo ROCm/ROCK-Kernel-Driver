@@ -793,10 +793,10 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, macfb_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(fb_default_cmap(video_cmap_len), 1,
-			    macfb_setcolreg, info);
+			    info);
 }
 
 static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -823,7 +823,7 @@ static int macfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, macfb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -836,6 +836,7 @@ static struct fb_ops macfb_ops = {
 	fb_set_var:	macfb_set_var,
 	fb_get_cmap:	macfb_get_cmap,
 	fb_set_cmap:	macfb_set_cmap,
+	fb_setcolreg:	macfb_setcolreg,
 };
 
 void __init macfb_setup(char *options, int *ints)

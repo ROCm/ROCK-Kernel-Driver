@@ -86,9 +86,9 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static void do_install_cmap(struct matroxfb_dh_fb_info* m2info, struct display* p) {
 	if (p->cmap.len)
-		fb_set_cmap(&p->cmap, 1, matroxfb_dh_setcolreg, &m2info->fbcon);
+		fb_set_cmap(&p->cmap, 1, &m2info->fbcon);
 	else
-		fb_set_cmap(fb_default_cmap(16), 1, matroxfb_dh_setcolreg, &m2info->fbcon);
+		fb_set_cmap(fb_default_cmap(16), 1, &m2info->fbcon);
 }
 
 static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
@@ -488,7 +488,7 @@ static int matroxfb_dh_set_cmap(struct fb_cmap* cmap, int kspc, int con,
 			return err;
 	}
 	if (con == m2info->fbcon.currcon)
-		return fb_set_cmap(cmap, kspc, matroxfb_dh_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &dsp->cmap, kspc ? 0 : 1);
 	return 0;
@@ -621,6 +621,7 @@ static struct fb_ops matroxfb_dh_ops = {
 	fb_set_var:	matroxfb_dh_set_var,
 	fb_get_cmap:	matroxfb_dh_get_cmap,
 	fb_set_cmap:	matroxfb_dh_set_cmap,
+	fb_setcolreg:	matroxfb_dh_setcolreg,
 	fb_pan_display:	matroxfb_dh_pan_display,
 	fb_blank:	matroxfb_dh_blank,
 	fb_ioctl:	matroxfb_dh_ioctl,

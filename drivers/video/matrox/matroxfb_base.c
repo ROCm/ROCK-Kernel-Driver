@@ -572,16 +572,16 @@ static int matroxfb_decode_var(CPMINFO struct display* p, struct fb_var_screenin
 	return 0;
 }
 
-static int matrox_setcolreg(unsigned regno, unsigned red, unsigned green,
-			    unsigned blue, unsigned transp,
-			    struct fb_info *fb_info)
+static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp,
+			      struct fb_info *fb_info)
 {
 	struct display* p;
 #ifdef CONFIG_FB_MATROX_MULTIHEAD
 	struct matrox_fb_info* minfo = (struct matrox_fb_info*)fb_info;
 #endif
 
-	DBG("matrox_setcolreg")
+	DBG("matroxfb_setcolreg")
 
 	/*
 	 *  Set a single color register. The values supplied are
@@ -661,10 +661,10 @@ static void do_install_cmap(WPMINFO struct display* dsp)
 	DBG("do_install_cmap")
 
 	if (dsp->cmap.len)
-		fb_set_cmap(&dsp->cmap, 1, matrox_setcolreg, &ACCESS_FBINFO(fbcon));
+		fb_set_cmap(&dsp->cmap, 1, &ACCESS_FBINFO(fbcon));
 	else
 		fb_set_cmap(fb_default_cmap(ACCESS_FBINFO(curr.cmap_len)),
-			    1, matrox_setcolreg, &ACCESS_FBINFO(fbcon));
+			    1, &ACCESS_FBINFO(fbcon));
 }
 
 static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
@@ -976,7 +976,7 @@ static int matroxfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == ACCESS_FBINFO(fbcon.currcon)) {			/* current console? */
-		return fb_set_cmap(cmap, kspc, matrox_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	} else
 		fb_copy_cmap(cmap, &dsp->cmap, kspc ? 0 : 1);
 	return 0;
@@ -1206,6 +1206,7 @@ static struct fb_ops matroxfb_ops = {
 	fb_set_var:	matroxfb_set_var,
 	fb_get_cmap:	matroxfb_get_cmap,
 	fb_set_cmap:	matroxfb_set_cmap,
+	fb_setcolreg:	matroxfb_setcolreg,
 	fb_pan_display:	matroxfb_pan_display,
 	fb_blank:	matroxfb_blank,
 	fb_ioctl:	matroxfb_ioctl,

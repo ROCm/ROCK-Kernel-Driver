@@ -376,6 +376,14 @@ static int tdfxfb_get_var(struct fb_var_screeninfo* var,
 static int tdfxfb_set_var(struct fb_var_screeninfo* var,
 			  int con,
 			  struct fb_info* fb);
+static int  tdfxfb_setcolreg(u_int regno, 
+			     u_int red, 
+			     u_int green, 
+			     u_int blue,
+			     u_int transp, 
+			     struct fb_info* fb);
+static void  tdfxfb_install_cmap(struct display *d, 
+				 struct fb_info *info);
 static int tdfxfb_pan_display(struct fb_var_screeninfo* var, 
 			      int con,
 			      struct fb_info* fb);
@@ -423,12 +431,6 @@ static int  tdfxfb_getcolreg(u_int regno,
 			     u_int* blue,
 			     u_int* transp, 
 			     struct fb_info* fb);
-static int  tdfxfb_setcolreg(u_int regno, 
-			     u_int red, 
-			     u_int green, 
-			     u_int blue,
-			     u_int transp, 
-			     struct fb_info* fb);
 static void  tdfxfb_install_cmap(struct display *d, 
 				 struct fb_info *info);
 
@@ -473,6 +475,7 @@ static struct fb_ops tdfxfb_ops = {
 	fb_set_var:	tdfxfb_set_var,
 	fb_get_cmap:	tdfxfb_get_cmap,
 	fb_set_cmap:	tdfxfb_set_cmap,
+	fb_setcolreg:	tdfxfb_setcolreg,
 	fb_pan_display:	tdfxfb_pan_display,
 	fb_blank:	tdfxfb_blank,
 };
@@ -1880,7 +1883,7 @@ static int tdfxfb_set_cmap(struct fb_cmap *cmap,
    }
    if(con == fb->currcon) {
       /* current console? */
-      return fb_set_cmap(cmap, kspc, tdfxfb_setcolreg, fb);
+      return fb_set_cmap(cmap, kspc, fb);
    } else {
       fb_copy_cmap(cmap, &d->cmap, kspc ? 0 : 1);
    }
@@ -2290,10 +2293,10 @@ static void tdfxfb_install_cmap(struct display *d,struct fb_info *info)
    struct fb_info_tdfx* i = (struct fb_info_tdfx*)info;
 
    if(d->cmap.len) {
-      fb_set_cmap(&(d->cmap), 1, tdfxfb_setcolreg, info);
+      fb_set_cmap(&(d->cmap), 1, info);
    } else {
       fb_set_cmap(fb_default_cmap(i->current_par.cmap_len), 1, 
-		  tdfxfb_setcolreg, info);
+		  info);
    }
 }
 

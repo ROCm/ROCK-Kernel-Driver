@@ -361,9 +361,9 @@ static int e1355_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 	return 0;
 }
 
-static int e1355_setcolreg(unsigned regno, unsigned red, unsigned green,
-			   unsigned blue, unsigned transp,
-			   struct fb_info *info)
+static int e1355fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			     unsigned blue, unsigned transp,
+			     struct fb_info *info)
 {
 	u8 r = (red >> 8) & 0xf0;
 	u8 g = (green>>8) & 0xf0;
@@ -467,7 +467,6 @@ struct fbgen_hwswitch e1355_switch = {
 	get_par:	e1355_get_par,
 	set_par:	e1355_set_par,
 	getcolreg:	e1355_getcolreg,
-	setcolreg:	e1355_setcolreg,
 	pan_display:	e1355_pan_display,
 	blank:		e1355_blank,
 	set_disp:	e1355_set_disp,
@@ -484,6 +483,7 @@ static struct fb_ops e1355fb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
+	fb_setcolreg:	e1355fb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
 	fb_blank:	fbgen_blank,
 };

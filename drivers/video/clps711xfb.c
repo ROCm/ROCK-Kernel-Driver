@@ -103,7 +103,7 @@ clps7111fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		err = fb_alloc_cmap(dcmap, CMAP_SIZE, 0);
 
 	if (!err && con == info->currcon) {
-		err = fb_set_cmap(cmap, kspc, clps7111fb_setcolreg, info);
+		err = fb_set_cmap(cmap, kspc, info);
 		dcmap = &info->cmap;
 	}
 
@@ -129,19 +129,19 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
 		return -EINVAL;
 
-	if (cfb->fb.var.xres != var->xres)
+	if (info->var.xres != var->xres)
 		chgvar = 1;
-	if (cfb->fb.var.yres != var->yres)
+	if (info->var.yres != var->yres)
 		chgvar = 1;
-	if (cfb->fb.var.xres_virtual != var->xres_virtual)
+	if (info->var.xres_virtual != var->xres_virtual)
 		chgvar = 1;
-	if (cfb->fb.var.yres_virtual != var->yres_virtual)
+	if (info->var.yres_virtual != var->yres_virtual)
 		chgvar = 1;
-	if (cfb->fb.var.bits_per_pixel != var->bits_per_pixel)
+	if (info->var.bits_per_pixel != var->bits_per_pixel)
 		chgvar = 1;
 
 	if (con < 0) {
-		display = cfb->fb.disp;
+		display = info->disp;
 		chgvar = 0;
 	} else {
 		display = fb_display + con;
@@ -159,21 +159,21 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	switch (var->bits_per_pixel) {
 #ifdef FBCON_HAS_MFB
 	case 1:
-		cfb->fb.fix.visual	= FB_VISUAL_MONO01;
+		info->fix.visual	= FB_VISUAL_MONO01;
 		display->dispsw		= &fbcon_mfb;
 		display->dispsw_data	= NULL;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB2
 	case 2:
-		cfb->fb.fix.visual	= FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
 		display->dispsw		= &fbcon_cfb2;
 		display->dispsw_data	= NULL;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB4
 	case 4:
-		cfb->fb.fix.visual	= FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
 		display->dispsw		= &fbcon_cfb4;
 		display->dispsw_data	= NULL;
 		break;
@@ -184,37 +184,37 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	display->next_line	= var->xres_virtual * var->bits_per_pixel / 8;
 
-	cfb->fb.fix.line_length = display->next_line;
+	info->fix.line_length = display->next_line;
 
-	display->screen_base	= cfb->fb.screen_base;
-	display->line_length	= cfb->fb.fix.line_length;
-	display->visual		= cfb->fb.fix.visual;
-	display->type		= cfb->fb.fix.type;
-	display->type_aux	= cfb->fb.fix.type_aux;
-	display->ypanstep	= cfb->fb.fix.ypanstep;
-	display->ywrapstep	= cfb->fb.fix.ywrapstep;
+	display->screen_base	= info->screen_base;
+	display->line_length	= info->fix.line_length;
+	display->visual		= info->fix.visual;
+	display->type		= info->fix.type;
+	display->type_aux	= info->fix.type_aux;
+	display->ypanstep	= info->fix.ypanstep;
+	display->ywrapstep	= info->fix.ywrapstep;
 	display->can_soft_blank = 1;
 	display->inverse	= 0;
 
-	cfb->fb.var		= *var;
-	cfb->fb.var.activate	&= ~FB_ACTIVATE_ALL;
+	info->var		= *var;
+	info->var.activate	&= ~FB_ACTIVATE_ALL;
 
 	/*
 	 * Update the old var.  The fbcon drivers still use this.
-	 * Once they are using cfb->fb.var, this can be dropped.
+	 * Once they are using cfb->var, this can be dropped.
 	 *                                      --rmk
 	 */
-	display->var		= cfb->fb.var;
+	display->var		= info->var;
 
 	/*
 	 * If we are setting all the virtual consoles, also set the
 	 * defaults used to create new consoles.
 	 */
 	if (var->activate & FB_ACTIVATE_ALL)
-		cfb->fb.disp->var = cfb->fb.var;
+		info->disp->var = info->var;
 
-	if (chgvar && info && cfb->fb.changevar)
-		cfb->fb.changevar(con);
+	if (chgvar && info && info->changevar)
+		info->changevar(con);
 
 	/*
 	 * LCDCON must only be changed while the LCD is disabled
@@ -231,7 +231,7 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	clps_writel(lcdcon, LCDCON);
 	clps_writel(syscon | SYSCON1_LCDEN, SYSCON1);
 
-	fb_set_cmap(&cfb->fb.cmap, 1, clps7111fb_setcolreg, &cfb->fb);
+	fb_set_cmap(&info->cmap, 1, info);
 
 	return 0;
 }
@@ -243,6 +243,7 @@ static struct fb_ops clps7111fb_ops = {
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,
+	fb_setcolreg:	clps7111fb_setcolreg,
 	fb_blank:	clps7111fb_blank,
 };
 

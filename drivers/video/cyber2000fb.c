@@ -306,8 +306,8 @@ static struct display_switch fbcon_cyber_accel = {
  *    Set a single color register. Return != 0 for invalid regno.
  */
 static int
-cyber2000_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-		    u_int transp, struct fb_info *info)
+cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+		      u_int transp, struct fb_info *info)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
 	struct fb_var_screeninfo *var = &cfb->display->var;
@@ -561,7 +561,7 @@ cyber2000fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	 * "improved" --rmk
 	 */
 	if (!err && display == cfb->display) {
-		err = fb_set_cmap(cmap, kspc, cyber2000_setcolreg, &cfb->fb);
+		err = fb_set_cmap(cmap, kspc, &cfb->fb);
 		dcmap = &cfb->fb.cmap;
 	}
 
@@ -982,7 +982,7 @@ cyber2000fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	cyber2000fb_update_start(cfb, var);
 	cyber2000fb_set_timing(cfb, &hw);
-	fb_set_cmap(&cfb->fb.cmap, 1, cyber2000_setcolreg, &cfb->fb);
+	fb_set_cmap(&cfb->fb.cmap, 1, &cfb->fb);
 
 	return 0;
 }
@@ -1144,6 +1144,7 @@ static struct fb_ops cyber2000fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	cyber2000fb_set_var,
 	fb_set_cmap:	cyber2000fb_set_cmap,
+	fb_setcolreg:	cyber2000fb_setcolreg,
 	fb_pan_display:	cyber2000fb_pan_display,
 	fb_blank:	cyber2000fb_blank,
 	fb_get_fix:	gen_get_fix,

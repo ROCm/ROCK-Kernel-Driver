@@ -566,6 +566,8 @@ static int radeonfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
                               struct fb_info *info);
 static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
                               struct fb_info *info);
+static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+                               unsigned blue, unsigned transp, struct fb_info *info);
 static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
                                  struct fb_info *info);
 static int radeonfb_blank (int blank, struct fb_info *info);
@@ -577,8 +579,6 @@ static int radeon_get_cmap_len (const struct fb_var_screeninfo *var);
 static int radeon_getcolreg (unsigned regno, unsigned *red, unsigned *green,
                              unsigned *blue, unsigned *transp,
                              struct fb_info *info);
-static int radeon_setcolreg (unsigned regno, unsigned red, unsigned green,
-                             unsigned blue, unsigned transp, struct fb_info *info);
 static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp);
 static void radeon_save_state (struct radeonfb_info *rinfo,
                                struct radeon_regs *save);
@@ -609,6 +609,7 @@ static struct fb_ops radeon_fb_ops = {
 	fb_set_var:		radeonfb_set_var,
 	fb_get_cmap:		radeonfb_get_cmap,
 	fb_set_cmap:		radeonfb_set_cmap,
+	fb_setcolreg:		radeonfb_setcolreg,
 	fb_pan_display:		radeonfb_pan_display,
 	fb_blank:		radeonfb_blank,
 	fb_ioctl:		radeonfb_ioctl,
@@ -1439,10 +1440,10 @@ static void do_install_cmap(int con, struct fb_info *info)
                 return;
                 
         if (fb_display[con].cmap.len)
-                fb_set_cmap(&fb_display[con].cmap, 1, radeon_setcolreg, info);
+                fb_set_cmap(&fb_display[con].cmap, 1, info);
         else {
                 int size = fb_display[con].var.bits_per_pixel == 8 ? 256 : 32;
-                fb_set_cmap(fb_default_cmap(size), 1, radeon_setcolreg, info);
+                fb_set_cmap(fb_default_cmap(size), 1, info);
         }
 }
 
@@ -1740,7 +1741,7 @@ static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
         }
  
         if (con == info->currcon) {
-                int rc = fb_set_cmap (cmap, kspc, radeon_setcolreg, info);
+                int rc = fb_set_cmap (cmap, kspc, info);
                 return rc;
         } else
                 fb_copy_cmap (cmap, &disp->cmap, kspc ? 0 : 1);
@@ -1896,8 +1897,8 @@ static int radeon_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 
 
 
-static int radeon_setcolreg (unsigned regno, unsigned red, unsigned green,
-                             unsigned blue, unsigned transp, struct fb_info *info)
+static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+                               unsigned blue, unsigned transp, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
 	u32 pindex;

@@ -38,6 +38,9 @@ static int q40fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
 static int q40fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
+static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info);
 
 static int q40con_switch(int con, struct fb_info *info);
 static int q40con_updatevar(int con, struct fb_info *info);
@@ -53,6 +56,7 @@ static struct fb_ops q40fb_ops = {
 	fb_set_var:	q40fb_set_var,
 	fb_get_cmap:	q40fb_get_cmap,
 	fb_set_cmap:	q40fb_set_cmap,
+	fb_setcolreg:	q40fb_setcolreg,
 };
 
 static char q40fb_name[]="Q40";
@@ -178,9 +182,9 @@ static int q40_getcolreg(unsigned regno, unsigned *red, unsigned *green,
     return 0;
 }
 
-static int q40_setcolreg(unsigned regno, unsigned red, unsigned green,
-			 unsigned blue, unsigned transp,
-			 const struct fb_info *info)
+static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info)
 {
     /*
      *  Set a single color register. The values supplied have a 16 bit
@@ -232,7 +236,7 @@ static int q40fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, q40_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;

@@ -225,6 +225,8 @@ static int sstfb_get_cmap(struct fb_cmap *cmap, int kspc,
                           int con, struct fb_info *info);
 static int sstfb_set_cmap(struct fb_cmap *cmap, int kspc,
                           int con, struct fb_info *info);
+static int sstfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                           u_int transp, struct fb_info *info);
 static int sstfb_pan_display(struct fb_var_screeninfo *var,
                              int con, struct fb_info *info);
 static int sstfb_ioctl(struct inode *inode, struct file *file,
@@ -239,8 +241,6 @@ static int sstfbcon_updatevar(int con, struct fb_info *info);
 static void sstfb_install_cmap(int con, struct fb_info *info);
 static int sstfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                            u_int *transp, struct fb_info *info);
-static int sstfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                           u_int transp, struct fb_info *info);
 
 static int sstfb_set_par(const struct sstfb_par *par,
                           struct sstfb_info *sst_info);
@@ -283,6 +283,7 @@ static struct fb_ops sstfb_ops = {
 	fb_set_var:	sstfb_set_var,
 	fb_get_cmap:	sstfb_get_cmap,
 	fb_set_cmap:	sstfb_set_cmap,
+	fb_setcolreg:	sstfb_setcolreg,
 	fb_pan_display:	sstfb_pan_display,
 	fb_ioctl:	sstfb_ioctl,
 };
@@ -511,11 +512,11 @@ static void sstfb_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, sstfb_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(
 			fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			1, sstfb_setcolreg, info);
+			1, info);
 }
 
 static int sstfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
@@ -894,7 +895,7 @@ static int sstfb_set_cmap(struct fb_cmap *cmap, int kspc,
 		if (err) return err;
 	}
 	if (con == info->currcon) {
-		return fb_set_cmap(cmap, kspc, sstfb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	} else {
 		fb_copy_cmap(cmap, &d->cmap, kspc ? 0 : 1);
 	}

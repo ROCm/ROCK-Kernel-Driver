@@ -135,8 +135,6 @@ static struct fb_hwswitch {
    int (*encode_var)(struct fb_var_screeninfo *var, struct virgefb_par *par);
    int (*getcolreg)(u_int regno, u_int *red, u_int *green, u_int *blue,
                     u_int *transp, struct fb_info *info);
-   int (*setcolreg)(u_int regno, u_int red, u_int green, u_int blue,
-                    u_int transp, struct fb_info *info);
    void (*blank)(int blank);
 } *fbhw;
 
@@ -305,8 +303,9 @@ static int virgefb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int virgefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                         u_int transp, struct fb_info *info);
 static int virgefb_blank(int blank, struct fb_info *info);
-
 
 /*
  *    Interface to the low level console driver
@@ -341,8 +340,6 @@ static int Cyber_encode_var(struct fb_var_screeninfo *var,
                           struct virgefb_par *par);
 static int Cyber_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
-static int Cyber_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info);
 static void Cyber_blank(int blank);
 
 
@@ -571,8 +568,8 @@ static int Cyber_encode_var(struct fb_var_screeninfo *var,
  *    entries in the var structure). Return != 0 for invalid regno.
  */
 
-static int Cyber_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			   u_int transp, struct fb_info *info)
+static int virgefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			     u_int transp, struct fb_info *info)
 {
 	if (((current_par.bpp==8) && (regno>255)) ||
 		((current_par.bpp!=8) && (regno>15)))
@@ -815,7 +812,7 @@ static void Cyber_MoveCursor (u_short x, u_short y)
 
 static struct fb_hwswitch Cyber_switch = {
 	Cyber_init, Cyber_encode_fix, Cyber_decode_var, Cyber_encode_var,
-	Cyber_getcolreg, Cyber_setcolreg, Cyber_blank
+	Cyber_getcolreg, Cyber_blank
 };
 
 
@@ -882,10 +879,10 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, fbhw->setcolreg, info);
+			    1, info);
 }
 
 /*
@@ -1057,7 +1054,7 @@ static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return(err);
 	}
 	if (con == info->currcon)		 /* current console? */
-		return(fb_set_cmap(cmap, kspc, fbhw->setcolreg, info));
+		return(fb_set_cmap(cmap, kspc, info));
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return(0);
@@ -1080,6 +1077,7 @@ static struct fb_ops virgefb_ops = {
 	fb_set_var:	virgefb_set_var,
 	fb_get_cmap:	virgefb_get_cmap,
 	fb_set_cmap:	virgefb_set_cmap,
+	fb_setcolreg:	virgefb_setcolreg,
 	fb_blank:	virgefb_blank,
 };
 

@@ -328,9 +328,9 @@ static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned bl
 
 #endif
 
-static int vesa_setcolreg(unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *fb_info)
+static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *fb_info)
 {
 	/*
 	 *  Set a single color register. The values supplied are
@@ -401,10 +401,9 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, vesa_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
-		fb_set_cmap(fb_default_cmap(video_cmap_len), 1, vesa_setcolreg,
-			    info);
+		fb_set_cmap(fb_default_cmap(video_cmap_len), 1, info); 
 }
 
 static int vesafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -431,7 +430,7 @@ static int vesafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, vesa_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -444,6 +443,7 @@ static struct fb_ops vesafb_ops = {
 	fb_set_var:	vesafb_set_var,
 	fb_get_cmap:	vesafb_get_cmap,
 	fb_set_cmap:	vesafb_set_cmap,
+	fb_setcolreg:	vesafb_setcolreg,
 	fb_pan_display:	vesafb_pan_display,
 };
 

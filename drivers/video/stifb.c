@@ -108,13 +108,6 @@ sti_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 	return 0;
 }
 
-static int
-sti_setcolreg(unsigned regno, unsigned red, unsigned green,
-	      unsigned blue, unsigned transp, struct fb_info *info)
-{
-	return 0;
-}
-
 static void
 sti_set_disp(const void *par, struct display *disp,
 	     struct fb_info_gen *info)
@@ -139,7 +132,6 @@ struct fbgen_hwswitch sti_switch = {
 	get_par:	sti_get_par,
 	set_par:	sti_set_par,
 	getcolreg:	sti_getcolreg,
-	setcolreg:	sti_setcolreg,
 	set_disp:	sti_set_disp
 };
 

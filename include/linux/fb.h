@@ -410,8 +410,6 @@ struct fbgen_hwswitch {
     void (*set_par)(const void *par, struct fb_info_gen *info);
     int (*getcolreg)(unsigned regno, unsigned *red, unsigned *green,
 		     unsigned *blue, unsigned *transp, struct fb_info *info);
-    int (*setcolreg)(unsigned regno, unsigned red, unsigned green,
-		     unsigned blue, unsigned transp, struct fb_info *info);
     int (*pan_display)(const struct fb_var_screeninfo *var,
 		       struct fb_info_gen *info);
     int (*blank)(int blank_mode, struct fb_info_gen *info);
@@ -496,10 +494,7 @@ extern int fb_get_cmap(struct fb_cmap *cmap, int kspc,
 		       int (*getcolreg)(u_int, u_int *, u_int *, u_int *,
 					u_int *, struct fb_info *),
 		       struct fb_info *fb_info);
-extern int fb_set_cmap(struct fb_cmap *cmap, int kspc,
-		       int (*setcolreg)(u_int, u_int, u_int, u_int, u_int,
-					struct fb_info *),
-		       struct fb_info *fb_info);
+extern int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *fb_info);
 extern struct fb_cmap *fb_default_cmap(int len);
 extern void fb_invert_cmaps(void);
 

@@ -213,6 +213,8 @@ static int pvr2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
                              struct fb_info *info);
 static int pvr2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
                              struct fb_info *info);
+static int pvr2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                            u_int transp, struct fb_info *info);
 static int pvr2fb_blank(int blank, struct fb_info *info);
 
 	/*
@@ -231,8 +233,6 @@ static u_long get_line_length(int xres_virtual, int bpp);
 static void set_color_bitfields(struct fb_var_screeninfo *var);
 static int pvr2_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                             u_int *transp, struct fb_info *info);
-static int pvr2_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                            u_int transp, struct fb_info *info);
 
 static int pvr2_encode_fix(struct fb_fix_screeninfo *fix,
                              struct pvr2fb_par *par);
@@ -259,6 +259,7 @@ static struct fb_ops pvr2fb_ops = {
 	fb_set_var:	pvr2fb_set_var,
 	fb_get_cmap:	pvr2fb_get_cmap,
 	fb_set_cmap:	pvr2fb_set_cmap,
+	fb_setcolreg:	pvr2fb_setcolreg,
 	fb_pan_display: pvr2fb_pan_display,
 	fb_blank:	pvr2fb_blank,
 };
@@ -489,7 +490,7 @@ static int pvr2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 return err;
 	}
 	if (con == info->currcon)                     /* current console? */
-		return fb_set_cmap(cmap, kspc, pvr2_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 
@@ -527,10 +528,10 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, pvr2_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-                            1, pvr2_setcolreg, info);
+                            1, info);
 }
 
 static inline u_long get_line_length(int xres_virtual, int bpp)
@@ -575,7 +576,7 @@ static int pvr2_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 	return 0;
 }
 	
-static int pvr2_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+static int pvr2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
                             u_int transp, struct fb_info *info)
 {
 	if (regno > 255)

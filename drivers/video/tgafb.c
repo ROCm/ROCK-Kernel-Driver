@@ -747,7 +747,7 @@ static int tgafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
     if (con == info->currcon) {		/* current console? */
-	err = fb_set_cmap(cmap, kspc, tgafb_setcolreg, info);
+	err = fb_set_cmap(cmap, kspc, info);
 #if 1
 	if (fb_info.tga_type != TGA_TYPE_8PLANE)
 		tgafb_update_palette();
@@ -853,7 +853,7 @@ static void tgafb_set_disp(const void *fb_par, struct display *disp,
 
 struct fbgen_hwswitch tgafb_hwswitch = {
     tgafb_detect, tgafb_encode_fix, tgafb_decode_var, tgafb_encode_var, tgafb_get_par,
-    tgafb_set_par, tgafb_getcolreg, tgafb_setcolreg, NULL, tgafb_blank, 
+    tgafb_set_par, tgafb_getcolreg, NULL, tgafb_blank, 
     tgafb_set_disp
 };
 
@@ -874,6 +874,7 @@ static struct fb_ops tgafb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	tgafb_set_cmap,
+	fb_setcolreg:	tgafb_setcolreg,
 	fb_blank:	fbgen_blank,
 };
 

@@ -147,6 +147,8 @@ static int atyfb_get_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *fb);
 static int atyfb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *fb);
+static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			 u_int transp, struct fb_info *fb);
 static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *fb);
 static int atyfb_blank(int blank, struct fb_info *fb);
@@ -204,8 +206,6 @@ static void atyfb_set_dispsw(struct display *disp, struct fb_info_aty *info,
 			     int bpp, int accel);
 static int atyfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			 u_int *transp, struct fb_info *fb);
-static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			 u_int transp, struct fb_info *fb);
 static void do_install_cmap(int con, struct fb_info *info);
 #ifdef CONFIG_PPC
 static int read_aty_sense(const struct fb_info_aty *info);
@@ -230,6 +230,7 @@ static struct fb_ops atyfb_ops = {
 	fb_set_var:	atyfb_set_var,
 	fb_get_cmap:	atyfb_get_cmap,
 	fb_set_cmap:	atyfb_set_cmap,
+	fb_setcolreg:	atyfb_setcolreg,
 	fb_pan_display:	atyfb_pan_display,
 	fb_blank:	atyfb_blank,
 	fb_ioctl:	atyfb_ioctl,
@@ -1209,7 +1210,7 @@ static int atyfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
     if (!info->display_fg || con == info->display_fg->vc_num)			/* current console? */
-	return fb_set_cmap(cmap, kspc, atyfb_setcolreg, info);
+	return fb_set_cmap(cmap, kspc, info);
     else
 	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
     return 0;
@@ -2773,10 +2774,10 @@ static void do_install_cmap(int con, struct fb_info *info)
     if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, atyfb_setcolreg, info);
+	fb_set_cmap(&fb_display[con].cmap, 1, info);
     else {
 	int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-	fb_set_cmap(fb_default_cmap(size), 1, atyfb_setcolreg, info);
+	fb_set_cmap(fb_default_cmap(size), 1, info);
     }
 }
 

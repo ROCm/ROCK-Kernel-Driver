@@ -725,7 +725,7 @@ static void riva_set_dispsw(struct rivafb_info *rinfo, struct display *disp)
  * Sets color register @regnum.
  *
  * CALLED FROM:
- * riva_setcolreg()
+ * rivafb_setcolreg()
  */
 static void riva_wclut(RIVA_HW_INST *chip,
 		       unsigned char regnum, unsigned char red,
@@ -1092,7 +1092,7 @@ static int rivafb_do_maximize(struct rivafb_info *rinfo,
  *
  * CALLED FROM:
  * riva_getcolreg()
- * riva_setcolreg()
+ * rivafb_setcolreg()
  * rivafb_get_cmap()
  * rivafb_set_cmap()
  */
@@ -1170,7 +1170,7 @@ static int riva_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 }
 
 /**
- * riva_setcolreg
+ * rivafb_setcolreg
  * @regno: register index
  * @red: red component
  * @green: green component
@@ -1195,9 +1195,9 @@ static int riva_getcolreg(unsigned regno, unsigned *red, unsigned *green,
  *		fbgen.c:fbgen_blank()
  *	fbgen.c:fbgen_blank()
  */
-static int riva_setcolreg(unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *info)
+static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *info)
 {
 	struct rivafb_info *rivainfo = (struct rivafb_info *)info;
 	RIVA_HW_INST *chip = &rivainfo->riva;
@@ -1557,7 +1557,7 @@ static int rivafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		}
 	}
 	if (con == info->currcon) {	/* current console? */
-		int rc = fb_set_cmap(cmap, kspc, riva_setcolreg, info);
+		int rc = fb_set_cmap(cmap, kspc, info);
 		DPRINTK("EXIT - returning %d\n", rc);
 		return rc;
 	} else
@@ -1751,6 +1751,7 @@ static struct fb_ops riva_fb_ops = {
 	fb_set_var:	rivafb_set_var,
 	fb_get_cmap:	rivafb_get_cmap,
 	fb_set_cmap:	rivafb_set_cmap,
+	fb_setcolreg:	rivafb_setcolreg,
 	fb_pan_display:	rivafb_pan_display,
 	fb_blank:	rivafb_blank,
 	fb_ioctl:	rivafb_ioctl,

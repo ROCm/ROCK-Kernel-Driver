@@ -1040,7 +1040,7 @@ sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 	fbi->palette_cpu = (u16 *)(fbi->map_cpu + PAGE_SIZE - palette_mem_size);
 	fbi->palette_dma = fbi->map_dma + PAGE_SIZE - palette_mem_size;
 
-	fb_set_cmap(&fbi->fb.cmap, 1, sa1100fb_setcolreg, &fbi->fb);
+	fb_set_cmap(&fbi->fb.cmap, 1, &fbi->fb);
 
 	/* Set board control register to handle new color depth */
 	sa1100fb_set_truecolor(var->bits_per_pixel >= 16);
@@ -1211,7 +1211,7 @@ __do_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		err = fb_alloc_cmap(&fb_display[con].cmap, fbi->palette_size, 0);
 
 	if (!err && con == info->currcon)
-		err = fb_set_cmap(cmap, kspc, sa1100fb_setcolreg, info);
+		err = fb_set_cmap(cmap, kspc, info);
 
 	if (!err)
 		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
@@ -1266,6 +1266,7 @@ static struct fb_ops sa1100fb_ops = {
 	fb_set_var:	sa1100fb_set_var,
 	fb_get_cmap:	sa1100fb_get_cmap,
 	fb_set_cmap:	sa1100fb_set_cmap,
+	fb_setcolreg:	sa1100fb_setcolreg,
 	fb_blank:	sa1100fb_blank,
 };
 
@@ -1382,7 +1383,7 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 			sa1100fb_blank_helper(blank);
 		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			fb_set_cmap(&fbi->fb.cmap, 1, sa1100fb_setcolreg, info);
+			fb_set_cmap(&fbi->fb.cmap, 1, info);
 		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
 	return 0;

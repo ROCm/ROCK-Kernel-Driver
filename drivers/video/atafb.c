@@ -283,13 +283,6 @@ extern unsigned char fontdata_8x16[];
  * void (*set_par)( struct atafb_par *par )
  *   Set the hardware according to 'par'.
  *   
- * int (*setcolreg)( unsigned regno, unsigned red,
- *                   unsigned green, unsigned blue,
- *                   unsigned transp, struct fb_info *info )
- *   Set a single color register. The values supplied are already
- *   rounded down to the hardware's capabilities (according to the
- *   entries in the var structure). Return != 0 for invalid regno.
- *
  * int (*getcolreg)( unsigned regno, unsigned *red,
  *                   unsigned *green, unsigned *blue,
  *                   unsigned *transp, struct fb_info *info )
@@ -322,9 +315,6 @@ static struct fb_hwswitch {
 	int  (*getcolreg)( unsigned regno, unsigned *red,
 					   unsigned *green, unsigned *blue,
 					   unsigned *transp, struct fb_info *info );
-	int  (*setcolreg)( unsigned regno, unsigned red,
-					   unsigned green, unsigned blue,
-					   unsigned transp, struct fb_info *info );
 	void (*set_screen_base)(void *s_base);
 	int  (*blank)( int blank_mode );
 	int  (*pan_display)( struct fb_var_screeninfo *var,
@@ -2324,7 +2314,7 @@ static int pan_display( struct fb_var_screeninfo *var,
 #ifdef ATAFB_TT
 static struct fb_hwswitch tt_switch = {
 	tt_detect, tt_encode_fix, tt_decode_var, tt_encode_var,
-	tt_get_par, tt_set_par, tt_getcolreg, tt_setcolreg,
+	tt_get_par, tt_set_par, tt_getcolreg, 
 	set_screen_base, NULL, pan_display
 };
 #endif
@@ -2333,14 +2323,14 @@ static struct fb_hwswitch tt_switch = {
 static struct fb_hwswitch falcon_switch = {
 	falcon_detect, falcon_encode_fix, falcon_decode_var, falcon_encode_var,
 	falcon_get_par, falcon_set_par, falcon_getcolreg,
-	falcon_setcolreg, set_screen_base, falcon_blank, falcon_pan_display
+	set_screen_base, falcon_blank, falcon_pan_display
 };
 #endif
 
 #ifdef ATAFB_STE
 static struct fb_hwswitch st_switch = {
 	stste_detect, stste_encode_fix, stste_decode_var, stste_encode_var,
-	stste_get_par, stste_set_par, stste_getcolreg, stste_setcolreg,
+	stste_get_par, stste_set_par, stste_getcolreg,
 	stste_set_screen_base, NULL, pan_display
 };
 #endif
@@ -2348,7 +2338,7 @@ static struct fb_hwswitch st_switch = {
 #ifdef ATAFB_EXT
 static struct fb_hwswitch ext_switch = {
 	ext_detect, ext_encode_fix, ext_decode_var, ext_encode_var,
-	ext_get_par, ext_set_par, ext_getcolreg, ext_setcolreg, NULL, NULL, NULL
+	ext_get_par, ext_set_par, ext_getcolreg, NULL, NULL, NULL
 };
 #endif
 
@@ -2416,10 +2406,10 @@ do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, fbhw->setcolreg, info);		
+					    1, info);		
 }
 
 static int
@@ -2580,7 +2570,7 @@ atafb_set_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 		return err;
 	}
 	if (con == info->currcon) /* current console ? */
-		return fb_set_cmap(cmap, kspc, fbhw->setcolreg, info);
+		return fb_set_cmap(cmap, kspc,  info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -2723,7 +2713,7 @@ atafb_blank(int blank, struct fb_info *info)
 		cmap.transp=NULL;
 		cmap.start=0;
 		cmap.len=16;
-		fb_set_cmap(&cmap, 1, fbhw->setcolreg, info);
+		fb_set_cmap(&cmap, 1, info);
 	}
 	else
 		do_install_cmap(info->currcon, info);
@@ -2743,18 +2733,21 @@ int __init atafb_init(void)
 #ifdef ATAFB_EXT
 		if (external_addr) {
 			fbhw = &ext_switch;
+			fb_info.fb_setcolreg = &ext_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_TT
 		if (ATARIHW_PRESENT(TT_SHIFTER)) {
 			fbhw = &tt_switch;
+			fb_info.fb_setcolreg = &tt_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_FALCON
 		if (ATARIHW_PRESENT(VIDEL_SHIFTER)) {
 			fbhw = &falcon_switch;
+			fb_info.fb_setcolreg = &falcon_setcolreg;
 			request_irq(IRQ_AUTO_4, falcon_vbl_switcher, IRQ_TYPE_PRIO,
 			            "framebuffer/modeswitch", falcon_vbl_switcher);
 			break;
@@ -2764,9 +2757,11 @@ int __init atafb_init(void)
 		if (ATARIHW_PRESENT(STND_SHIFTER) ||
 		    ATARIHW_PRESENT(EXTD_SHIFTER)) {
 			fbhw = &st_switch;
+			fb_info.fb_setcolreg = &stste_setcolreg;
 			break;
 		}
 		fbhw = &st_switch;
+		fb_info.fb_setcolreg = &stste_setcolreg;
 		printk("Cannot determine video hardware; defaulting to ST(e)\n");
 #else /* ATAFB_STE */
 		/* no default driver included */

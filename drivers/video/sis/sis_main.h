@@ -600,6 +600,9 @@ static int sisfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
 static int sisfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
+static int sisfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *fb_info);
 static int sisfb_ioctl (struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg, int con,
 			struct fb_info *info);
@@ -628,9 +631,6 @@ static void sisfb_validate_mode (void);
 static u8 sisfb_search_refresh_rate (unsigned int rate);
 static int sis_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 			  unsigned *blue, unsigned *transp,
-			  struct fb_info *fb_info);
-static int sis_setcolreg (unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
 			  struct fb_info *fb_info);
 static int sisfb_do_set_var (struct fb_var_screeninfo *var, int isactive,
 			     struct fb_info *info);

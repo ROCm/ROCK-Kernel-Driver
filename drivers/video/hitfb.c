@@ -323,7 +323,6 @@ struct fbgen_hwswitch hitfb_switch = {
     hitfb_get_par,
     hitfb_set_par,
     hitfb_getcolreg,
-    hitfb_setcolreg,
     hitfb_pan_display,
     hitfb_blank,
     hitfb_set_disp
@@ -337,6 +336,7 @@ static struct fb_ops hitfb_ops = {
     fb_set_var:		fbgen_set_var,
     fb_get_cmap:	fbgen_get_cmap,
     fb_set_cmap:	fbgen_set_cmap,
+    fb_setcolreg:	hitfb_setcolreg,	
     fb_pan_display:	fbgen_pan_display,
     fb_blank:		fbgen_blank,	
 };

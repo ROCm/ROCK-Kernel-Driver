@@ -330,9 +330,9 @@ static int iga_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 	return 0;
 }
 
-static int iga_setcolreg(unsigned regno, unsigned red, unsigned green,
-                          unsigned blue, unsigned transp,
-                          struct fb_info *fb_info)
+static int igafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+                           unsigned blue, unsigned transp,
+                           struct fb_info *fb_info)
 {
         /*
          *  Set a single color register. The values supplied are
@@ -390,10 +390,10 @@ static void do_install_cmap(int con, struct fb_info *fb_info)
                 return;
         if (fb_display[con].cmap.len)
                 fb_set_cmap(&fb_display[con].cmap, 1,
-                            iga_setcolreg, &info->fb_info);
+                            &info->fb_info);
         else
                 fb_set_cmap(fb_default_cmap(info->video_cmap_len), 1, 
-			    iga_setcolreg, &info->fb_info);
+			    &info->fb_info);
 }
 
 static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -424,7 +424,7 @@ static int igafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
                         return err;
         }
         if (con == info->currcon)                     /* current console? */
-                return fb_set_cmap(cmap, kspc, iga_setcolreg, info);
+                return fb_set_cmap(cmap, kspc, info);
         else
                 fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
         return 0;
@@ -440,6 +440,7 @@ static struct fb_ops igafb_ops = {
 	fb_set_var:	igafb_set_var,
 	fb_get_cmap:	igafb_get_cmap,
 	fb_set_cmap:	igafb_set_cmap,
+	fb_setcolreg:	igafb_setcolreg,
 #ifdef __sparc__
 	fb_mmap:	igafb_mmap,
 #endif

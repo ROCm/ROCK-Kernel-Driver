@@ -399,8 +399,8 @@ static int sis_getcolreg (unsigned regno, unsigned *red, unsigned *green, unsign
 	return 0;
 }
 
-static int sis_setcolreg (unsigned regno, unsigned red, unsigned green, unsigned blue,
-	       unsigned transp, struct fb_info *fb_info)
+static int sisfb_setcolreg (unsigned regno, unsigned red, unsigned green, unsigned blue,
+	      		    unsigned transp, struct fb_info *fb_info)
 {
 
 	if (regno >= video_cmap_len)
@@ -635,10 +635,9 @@ static void sisfb_do_install_cmap (int con, struct fb_info *info)
 		return;
 
 	if (fb_display[con].cmap.len)
-		fb_set_cmap (&fb_display[con].cmap, 1, sis_setcolreg, info);
+		fb_set_cmap (&fb_display[con].cmap, 1, info);
 	else
-		fb_set_cmap (fb_default_cmap (video_cmap_len), 1,
-			     sis_setcolreg, info);
+		fb_set_cmap (fb_default_cmap (video_cmap_len), 1, info);
 }
 
 /* --------------- Chip-dependent Routines --------------------------- */
@@ -2082,7 +2081,7 @@ static int sisfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_in
 			return err;
 	}
 	if (con == info->currcon)
-		return fb_set_cmap (cmap, kspc, sis_setcolreg, info);
+		return fb_set_cmap (cmap, kspc, info);
 	else
 		fb_copy_cmap (cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -2188,6 +2187,7 @@ static struct fb_ops sisfb_ops = {
 	fb_set_var:	sisfb_set_var,
 	fb_get_cmap:	sisfb_get_cmap,
 	fb_set_cmap:	sisfb_set_cmap,
+	fb_setcolreg:	sisfb_setcolreg,
 	fb_blank:	sisfb_blank,
 	fb_ioctl:	sisfb_ioctl,
 	fb_mmap:	sisfb_mmap,

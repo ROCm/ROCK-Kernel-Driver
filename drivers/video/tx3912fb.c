@@ -49,6 +49,8 @@ static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 				struct fb_info *info);
 static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 				struct fb_info *info);
+static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			u_int transp, struct fb_info *info);
 static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 				u_long arg, int con, struct fb_info *info);
 
@@ -70,8 +72,6 @@ static int tx3912fbcon_updatevar(int con, struct fb_info *info);
  */
 static int tx3912fb_getcolreg(u_int regno, u_int *red, u_int *green,
 			u_int *blue, u_int *transp, struct fb_info *info);
-static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			u_int transp, struct fb_info *info);
 static void tx3912fb_install_cmap(int con, struct fb_info *info);
 
 
@@ -85,6 +85,7 @@ static struct fb_ops tx3912fb_ops = {
 	fb_set_var: tx3912fb_set_var,
 	fb_get_cmap: tx3912fb_get_cmap,
 	fb_set_cmap: tx3912fb_set_cmap,
+	fb_setcolreg:	tx3912fb_setcolreg,
 	fb_ioctl: tx3912fb_ioctl,
 };
 
@@ -320,7 +321,7 @@ static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 
 	if (con == info->currcon)
-		return fb_set_cmap(cmap, kspc, tx3912fb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 
@@ -509,9 +510,9 @@ static void tx3912fb_install_cmap(int con, struct fb_info *info)
 		return;
 
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, tx3912fb_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
-		fb_set_cmap(fb_default_cmap(1 << fb_display[con].var.bits_per_pixel), 1, tx3912fb_setcolreg, info);
+		fb_set_cmap(fb_default_cmap(1 << fb_display[con].var.bits_per_pixel), 1, info);
 }
 
 MODULE_LICENSE("GPL");

@@ -375,7 +375,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 static struct fbgen_hwswitch pm2fb_hwswitch={
 	pm2fb_detect, pm2fb_encode_fix, pm2fb_decode_var,
 	pm2fb_encode_var, pm2fb_get_par, pm2fb_set_par,
-	pm2fb_getcolreg, pm2fb_setcolreg, pm2fb_pan_display,
+	pm2fb_getcolreg, pm2fb_pan_display,
 	pm2fb_blank, pm2fb_set_disp
 };
 
@@ -386,6 +386,7 @@ static struct fb_ops pm2fb_ops={
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
+	fb_setcolreg:	pm2fb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
 	fb_blank:	fbgen_blank,
 };

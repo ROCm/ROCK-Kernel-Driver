@@ -197,8 +197,6 @@ int gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 int fbgen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		   struct fb_info *info)
 {
-    struct fb_info_gen *info2 = (struct fb_info_gen *)info;
-    struct fbgen_hwswitch *fbhw = info2->fbhw;
     int err;
 
     if (!fb_display[con].cmap.len) {	/* no colormap allocated ? */
@@ -207,7 +205,7 @@ int fbgen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
     if (con == info->currcon)			/* current console ? */
-	return fb_set_cmap(cmap, kspc, fbhw->setcolreg, info);
+	return fb_set_cmap(cmap, kspc, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
     return 0;
@@ -355,14 +353,13 @@ void fbgen_set_disp(int con, struct fb_info_gen *info)
 
 void fbgen_install_cmap(int con, struct fb_info_gen *info)
 {
-    struct fbgen_hwswitch *fbhw = info->fbhw;
     if (con != info->info.currcon)
 	return;
     if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, &info->info);
+	fb_set_cmap(&fb_display[con].cmap, 1, &info->info);
     else {
 	int size = fb_display[con].var.bits_per_pixel == 16 ? 64 : 256;
-	fb_set_cmap(fb_default_cmap(size), 1, fbhw->setcolreg, &info->info);
+	fb_set_cmap(fb_default_cmap(size), 1, &info->info);
     }
 }
 
@@ -448,7 +445,7 @@ int fbgen_blank(int blank, struct fb_info *info)
 	cmap.transp = NULL;
 	cmap.start = 0;
 	cmap.len = 16;
-	fb_set_cmap(&cmap, 1, fbhw->setcolreg, info);
+	fb_set_cmap(&cmap, 1, info);
     } else
 	fbgen_install_cmap(info->currcon, info2);
     return 0;	

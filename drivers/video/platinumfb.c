@@ -108,6 +108,8 @@ static int platinum_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
 static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
+static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			      u_int transp, struct fb_info *fb);
 static int platinum_blank(int blank, struct fb_info *fb);
 
 
@@ -141,8 +143,6 @@ static void platinum_set_dispsw(struct display *disp,
 				int accel);
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			      u_int *transp, struct fb_info *fb);
-static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			      u_int transp, struct fb_info *fb);
 static void do_install_cmap(int con, struct fb_info *info);
 
 
@@ -160,6 +160,7 @@ static struct fb_ops platinumfb_ops = {
 	fb_set_var:	platinum_set_var,
 	fb_get_cmap:	platinum_get_cmap,
 	fb_set_cmap:	platinum_set_cmap,
+	fb_setcolreg:	platinum_setcolreg,
 	fb_blank:	platinum_blank,
 };
 
@@ -319,7 +320,7 @@ static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 	if (!info->display_fg ||
 	    info->display_fg->vc_num == con)	/* current console? */
-		return fb_set_cmap(cmap, kspc, platinum_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
 	return 0;
@@ -432,12 +433,10 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, platinum_setcolreg,
-			    info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info); 
 	else {
 		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, platinum_setcolreg,
-			    info);
+		fb_set_cmap(fb_default_cmap(size), 1, info); 
 	}
 }
 

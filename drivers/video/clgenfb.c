@@ -492,6 +492,10 @@ int clgenfb_setup (char *options);
 static int clgenfb_open (struct fb_info *info, int user);
 static int clgenfb_release (struct fb_info *info, int user);
 
+static int clgenfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp,
+			      struct fb_info *info);
+
 /* function table of the above functions */
 static struct fb_ops clgenfb_ops = {
 	owner:		THIS_MODULE,
@@ -502,6 +506,7 @@ static struct fb_ops clgenfb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
+	fb_setcolreg:	clgenfb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
 	fb_blank:	fbgen_blank,
 };
@@ -518,9 +523,6 @@ static void clgen_get_par (void *par, struct fb_info_gen *info);
 static void clgen_set_par (const void *par, struct fb_info_gen *info);
 static int clgen_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 			    unsigned *blue, unsigned *transp,
-			    struct fb_info *info);
-static int clgen_setcolreg (unsigned regno, unsigned red, unsigned green,
-			    unsigned blue, unsigned transp,
 			    struct fb_info *info);
 static int clgen_pan_display (const struct fb_var_screeninfo *var,
 			      struct fb_info_gen *info);
@@ -539,7 +541,6 @@ static struct fbgen_hwswitch clgen_hwswitch =
 	clgen_get_par,
 	clgen_set_par,
 	clgen_getcolreg,
-	clgen_setcolreg,
 	clgen_pan_display,
 	clgen_blank,
 	clgen_set_disp
@@ -1675,9 +1676,9 @@ static int clgen_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 }
 
 
-static int clgen_setcolreg (unsigned regno, unsigned red, unsigned green,
-			    unsigned blue, unsigned transp,
-			    struct fb_info *info)
+static int clgenfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp,
+			      struct fb_info *info)
 {
 	struct clgenfb_info *fb_info = (struct clgenfb_info *) info;
 

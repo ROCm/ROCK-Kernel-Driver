@@ -274,6 +274,9 @@ static int retz3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int retz3fb_setcolreg(unsigned int regno, unsigned int red,
+			     unsigned int green, unsigned int blue,
+			     unsigned int transp, struct fb_info *info);
 static int retz3fb_blank(int blank, struct fb_info *info);
 
 
@@ -319,9 +322,6 @@ static int retz3_encode_var(struct fb_var_screeninfo *var,
 static int retz3_getcolreg(unsigned int regno, unsigned int *red,
 			   unsigned int *green, unsigned int *blue,
 			   unsigned int *transp, struct fb_info *info);
-static int retz3_setcolreg(unsigned int regno, unsigned int red,
-			   unsigned int green, unsigned int blue,
-			   unsigned int transp, struct fb_info *info);
 
 /*
  *    Internal routines
@@ -895,9 +895,9 @@ static int retz3_encode_var(struct fb_var_screeninfo *var,
  *    Set a single color register. Return != 0 for invalid regno.
  */
 
-static int retz3_setcolreg(unsigned int regno, unsigned int red,
-			   unsigned int green, unsigned int blue,
-			   unsigned int transp, struct fb_info *info)
+static int retz3fb_setcolreg(unsigned int regno, unsigned int red,
+			     unsigned int green, unsigned int blue,
+			     unsigned int transp, struct fb_info *info)
 {
 	struct retz3_fb_info *zinfo = retz3info(info);
 	volatile unsigned char *regs = zinfo->regs;
@@ -1104,10 +1104,10 @@ static void do_install_cmap(int con, struct fb_info *info)
 	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, retz3_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else
 		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, retz3_setcolreg, info);
+					    1, info);
 }
 
 /*
@@ -1321,7 +1321,7 @@ static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)              /* current console? */
-		return(fb_set_cmap(cmap, kspc, retz3_setcolreg, info));
+		return(fb_set_cmap(cmap, kspc, info));
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -1361,6 +1361,7 @@ static struct fb_ops retz3fb_ops = {
 	fb_set_var:	retz3fb_set_var,
 	fb_get_cmap:	retz3fb_get_cmap,
 	fb_set_cmap:	retz3fb_set_cmap,
+	fb_setcolreg:	retz3fb_setcolreg,
 	fb_blank:	retz3fb_blank,
 };
 
@@ -1440,8 +1441,8 @@ int __init retz3fb_init(void)
 		/* Disable hardware cursor */
 		seq_w(regs, SEQ_CURSOR_Y_INDEX, 0x00);
 
-		retz3_setcolreg (255, 56<<8, 100<<8, 160<<8, 0, fb_info);
-		retz3_setcolreg (254, 0, 0, 0, 0, fb_info);
+		retz3fb_setcolreg (255, 56<<8, 100<<8, 160<<8, 0, fb_info);
+		retz3fb_setcolreg (254, 0, 0, 0, 0, fb_info);
 
 		strcpy(fb_info->modename, retz3fb_name);
 		fb_info->changevar = NULL;

@@ -510,7 +510,7 @@ int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 	
 /**
- *	hga_setcolreg - set color registers
+ *	hgafb_setcolreg - set color registers
  *	@regno:register index to set
  *	@red:red value, unused
  *	@green:green value, unused
@@ -523,8 +523,8 @@ int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
  *	A zero is returned on success and 1 for failure.
  */
 
-static int hga_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			 u_int transp, struct fb_info *info)
+static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			   u_int transp, struct fb_info *info)
 {
 	if (regno > 1)
 		return 1;
@@ -539,7 +539,7 @@ static int hga_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  *	@info:pointer to fb_info object containing info for current hga board
  *
  *	This wrapper function passes it's input parameters to fb_set_cmap().
- *	Callback function hga_setcolreg() is used to set the color registers.
+ *	Callback function hgafb_setcolreg() is used to set the color registers.
  */
 
 int hga_set_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -547,7 +547,7 @@ int hga_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	CHKINFO(-EINVAL);
 	DPRINTK("hga_set_cmap: con:%d\n", con);
-	return fb_set_cmap(cmap, kspc, hga_setcolreg, info);
+	return fb_set_cmap(cmap, kspc, info);
 }
 
 /**
@@ -620,6 +620,7 @@ static struct fb_ops hgafb_ops = {
 	fb_set_var:	hga_set_var,
 	fb_get_cmap:	hga_get_cmap,
 	fb_set_cmap:	hga_set_cmap,
+	fb_setcolreg:	hgafb_setcolreg,
 	fb_pan_display:	hga_pan_display,
 	fb_blank:	hgafb_blank,
 };
@@ -663,7 +664,7 @@ static int hgafbcon_switch(int con, struct fb_info *info)
 	 */
 #if 0
 	fb_copy_cmap(&fb_display[con].cmap, &info->cmap, 0);
-	fb_set_cmap(&info->cmap, 1, hga_setcolreg, info);
+	fb_set_cmap(&info->cmap, 1, info);
 #endif
 
 	memcpy(&info->var, &fb_display[con].var,

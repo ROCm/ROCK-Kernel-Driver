@@ -100,6 +100,8 @@ static int g364fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
 static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
+static int g364fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			    u_int transp, struct fb_info *info);
 static int g364fb_blank(int blank, struct fb_info *info);
 
 
@@ -115,8 +117,6 @@ static int g364fbcon_updatevar(int con, struct fb_info *info);
  */
 static int g364fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
-static int g364fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			    u_int transp, struct fb_info *info);
 static void do_install_cmap(int con, struct fb_info *info);
 
 
@@ -127,6 +127,7 @@ static struct fb_ops g364fb_ops = {
 	fb_set_var:	g364fb_set_var,
 	fb_get_cmap:	g364fb_get_cmap,
 	fb_set_cmap:	g364fb_set_cmap,
+	fb_setcolreg:	g364fb_setcolreg,
 	fb_pan_display:	g364fb_pan_display,
 	fb_blank:	g364fb_blank,
 };
@@ -264,7 +265,7 @@ static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
     if (con == info->currcon) {		/* current console? */
-	return fb_set_cmap(cmap, kspc, g364fb_setcolreg, info);
+	return fb_set_cmap(cmap, kspc, info);
     } else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
     return 0;
@@ -482,10 +483,10 @@ static void do_install_cmap(int con, struct fb_info *info)
     if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, g364fb_setcolreg, info);
+	fb_set_cmap(&fb_display[con].cmap, 1, info);
     else
 	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
-		    g364fb_setcolreg, info);
+		    info);
 }
 
 MODULE_LICENSE("GPL");

@@ -85,6 +85,8 @@ static int s3trio_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
 static int s3trio_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
+static int s3trio_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                         u_int transp, struct fb_info *info);
 static int s3trio_pan_display(struct fb_var_screeninfo *var, int con,
 			      struct fb_info *info);
 static void s3triofb_blank(int blank, struct fb_info *info);
@@ -96,9 +98,6 @@ static void s3triofb_blank(int blank, struct fb_info *info);
 int s3triofb_init(void);
 static int s3triofbcon_switch(int con, struct fb_info *info);
 static int s3triofbcon_updatevar(int con, struct fb_info *info);
-#if 0
-static int s3triofbcon_setcmap(struct fb_cmap *cmap, int con);
-#endif
 
     /*
      *  Text console acceleration
@@ -128,8 +127,6 @@ static void Trio_MoveCursor(u_short x, u_short y);
 
 static int s3trio_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
-static int s3trio_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info);
 static void do_install_cmap(int con, struct fb_info *info);
 
 
@@ -140,6 +137,7 @@ static struct fb_ops s3trio_ops = {
 	fb_set_var:	s3trio_set_var,
 	fb_get_cmap:	s3trio_get_cmap,
 	fb_set_cmap:	s3trio_set_cmap,
+	fb_setcolreg:	s3trio_setcolreg,
 	fb_pan_display:	s3trio_pan_display,
 	fb_blank:	s3triofb_blank,
 };
@@ -252,7 +250,7 @@ static int s3trio_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
     if (con == info->currcon)			/* current console? */
-	return fb_set_cmap(cmap, kspc, s3trio_setcolreg, info);
+	return fb_set_cmap(cmap, kspc, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
     return 0;
@@ -691,10 +689,10 @@ static void do_install_cmap(int con, struct fb_info *info)
     if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, s3trio_setcolreg, &fb_info);
+	fb_set_cmap(&fb_display[con].cmap, 1, &fb_info);
     else
 	fb_set_cmap(fb_default_cmap(fb_display[con].var.bits_per_pixel), 1,
-		    s3trio_setcolreg, &fb_info);
+		    &fb_info);
 }
 
 static void Trio_WaitQueue(u_short fifo) {

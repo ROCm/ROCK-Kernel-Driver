@@ -151,6 +151,8 @@ static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	struct fb_info *info);
 static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	struct fb_info *info);
+static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+	u_int transp, struct fb_info *info);
 static int controlfb_blank(int blank_mode, struct fb_info *info);
 static int control_mmap(struct fb_info *info, struct file *file,
 	struct vm_area_struct *vma);
@@ -166,8 +168,6 @@ static int controlfb_updatevar(int con, struct fb_info *info);
  */
 static int controlfb_getcolreg(u_int regno, u_int *red, u_int *green,
 	u_int *blue, u_int *transp, struct fb_info *info);
-static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-	u_int transp, struct fb_info *info);
 
 /*
  * inititialization
@@ -228,6 +228,7 @@ static struct fb_ops controlfb_ops = {
 	fb_set_var:	control_set_var,
 	fb_get_cmap:	control_get_cmap,
 	fb_set_cmap:	control_set_cmap,
+	fb_setcolreg:	control_setcolreg,
 	fb_pan_display:	control_pan_display,
 	fb_blank:	controlfb_blank,
 	fb_mmap:	control_mmap,
@@ -400,7 +401,7 @@ static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 	}
 	if (con == info->currcon)
-		return fb_set_cmap(cmap, kspc, controlfb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
 	return 0;
 }

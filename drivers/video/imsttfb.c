@@ -1292,10 +1292,10 @@ static void
 do_install_cmap (int con, struct fb_info *info)
 {
 	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, imsttfb_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	else {
 		u_int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, imsttfb_setcolreg, info);
+		fb_set_cmap(fb_default_cmap(size), 1, info);
 	}
 }
 
@@ -1560,7 +1560,7 @@ imsttfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 			return err;
 	}
 	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, imsttfb_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 
@@ -1706,6 +1706,7 @@ static struct fb_ops imsttfb_ops = {
 	fb_set_var:	imsttfb_set_var,
 	fb_get_cmap:	imsttfb_get_cmap,
 	fb_set_cmap:	imsttfb_set_cmap,
+	fb_setcolreg:	imsttfb_setcolreg,
 	fb_pan_display:	imsttfb_pan_display,
 	fb_blank:	imsttfb_blank,
 	fb_ioctl:	imsttfb_ioctl,

@@ -248,6 +248,8 @@ static int cyberfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int cyberfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int cyberfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			     u_int transp, struct fb_info *info);
 static int cyberfb_blank(int blank, struct fb_info *info);
 
 /*
@@ -294,8 +296,6 @@ static int Cyber_encode_var(struct fb_var_screeninfo *var,
 			    struct cyberfb_par *par);
 static int Cyber_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			   u_int *transp, struct fb_info *info);
-static int Cyber_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			   u_int transp, struct fb_info *info);
 
 /*
  *    Internal routines
@@ -378,8 +378,8 @@ static int Cyber_init(void)
 		*(CursorBase+3+(i*4)) = 0xffff0000;
 	}
 
-	Cyber_setcolreg (255, 56<<8, 100<<8, 160<<8, 0, NULL /* unused */);
-	Cyber_setcolreg (254, 0, 0, 0, 0, NULL /* unused */);
+	cyberfb_setcolreg (255, 56<<8, 100<<8, 160<<8, 0, NULL /* unused */);
+	cyberfb_setcolreg (254, 0, 0, 0, 0, NULL /* unused */);
 
 	DPRINTK("EXIT\n");
 	return 0;
@@ -516,7 +516,7 @@ static int Cyber_encode_var(struct fb_var_screeninfo *var,
  *    Set a single color register. Return != 0 for invalid regno.
  */
 
-static int Cyber_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+static int cyberfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			   u_int transp, struct fb_info *info)
 {
 	volatile unsigned char *regs = CyberRegs;
@@ -808,11 +808,11 @@ static void do_install_cmap(int con, struct fb_info *info)
 	}
 	if (fb_display[con].cmap.len) {
 		DPRINTK("Use console cmap\n");
-		fb_set_cmap(&fb_display[con].cmap, 1, Cyber_setcolreg, info);
+		fb_set_cmap(&fb_display[con].cmap, 1, info);
 	} else {
 		DPRINTK("Use default cmap\n");
 		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, Cyber_setcolreg, info);
+			    1, info);
 	}
 	DPRINTK("EXIT\n");
 }
@@ -990,7 +990,7 @@ static int cyberfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	}
 	if (con == info->currcon) {		 /* current console? */
 		DPRINTK("EXIT - Current console\n");
-		return(fb_set_cmap(cmap, kspc, Cyber_setcolreg, info));
+		return(fb_set_cmap(cmap, kspc, info));
 	} else {
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	}
@@ -1006,6 +1006,7 @@ static struct fb_ops cyberfb_ops = {
 	fb_set_var:	cyberfb_set_var,
 	fb_get_cmap:	cyberfb_get_cmap,
 	fb_set_cmap:	cyberfb_set_cmap,
+	fb_setcolreg:	cyberfb_setcolreg,
 	fb_blank:	cyberfb_blank,
 };
 

@@ -175,9 +175,9 @@ static int xxx_getcolreg(unsigned regno, unsigned *red, unsigned *green,
     return 0;
 }
 
-static int xxx_setcolreg(unsigned regno, unsigned red, unsigned green,
-			 unsigned blue, unsigned transp,
-			 const struct fb_info *info)
+static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info)
 {
     /*
      *  Set a single color register. The values supplied have a 16 bit
@@ -286,7 +286,7 @@ static void xxx_set_disp(const void *par, struct display *disp,
 
 struct fbgen_hwswitch xxx_switch = {
     xxx_detect, xxx_encode_fix, xxx_decode_var, xxx_encode_var, xxx_get_par,
-    xxx_set_par, xxx_getcolreg, xxx_setcolreg, xxx_pan_display, xxx_blank,
+    xxx_set_par, xxx_getcolreg, xxx_pan_display, xxx_blank,
     xxx_set_disp
 };
 
@@ -388,6 +388,7 @@ static struct fb_ops xxxfb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
+	fb_setcolreg:	xxxfb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
 	fb_blank:	fbgen_blank,
 	fb_ioctl:	xxxfb_ioctl,   /* optional */
