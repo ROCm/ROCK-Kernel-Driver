@@ -153,7 +153,7 @@ alloc_resource (char *name, struct resource *root, unsigned long start, unsigned
 	res->end = end;
 	res->flags = flags;
 
-	if (request_resource(root, res))
+	if (insert_resource(root, res))
 		return -EBUSY;
 
 	return 0;
