@@ -1160,7 +1160,6 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	cs->tx_skb = NULL;
 	cs->tx_cnt = 0;
 	cs->event = 0;
-	cs->tqueue.data = cs;
 
 	skb_queue_head_init(&cs->rq);
 	skb_queue_head_init(&cs->sq);
@@ -1738,7 +1737,7 @@ static void hisax_b_l2l1(struct PStack *st, int pr, void *arg);
 static int hisax_cardmsg(struct IsdnCardState *cs, int mt, void *arg);
 static int hisax_bc_setstack(struct PStack *st, struct BCState *bcs);
 static void hisax_bc_close(struct BCState *bcs);
-static void hisax_bh(struct IsdnCardState *cs);
+static void hisax_bh(void *data);
 static void EChannel_proc_rcv(struct hisax_d_if *d_if);
 
 int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
@@ -1770,7 +1769,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
-	INIT_WORK(&cs->tqueue, (void *) (void *) hisax_bh, NULL);
+	INIT_WORK(&cs->work, hisax_bh, cs);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	for (i = 0; i < 2; i++) {
 		cs->bcs[i].BC_SetStack = hisax_bc_setstack;
@@ -1799,11 +1798,12 @@ void hisax_unregister(struct hisax_d_if *hisax_d_if)
 static void hisax_sched_event(struct IsdnCardState *cs, int event)
 {
 	cs->event |= 1 << event;
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
-static void hisax_bh(struct IsdnCardState *cs)
+static void hisax_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 	struct PStack *st;
 	int pr;
 
@@ -1825,7 +1825,7 @@ static void hisax_bh(struct IsdnCardState *cs)
 static void hisax_b_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 }
 
 static inline void D_L2L1(struct hisax_d_if *d_if, int pr, void *arg)

@@ -146,7 +146,7 @@ static void change_speed(struct IsdnCardState *cs, int baud)
 
 static int mstartup(struct IsdnCardState *cs)
 {
-	unsigned unsigned long flags;
+	unsigned long flags;
 	int	retval=0;
 
 

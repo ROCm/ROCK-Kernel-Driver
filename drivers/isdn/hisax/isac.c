@@ -82,8 +82,9 @@ isac_new_ph(struct IsdnCardState *cs)
 }
 
 static void
-isac_bh(struct IsdnCardState *cs)
+isac_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 	struct PStack *stptr;
 	
 	if (!cs)
@@ -194,7 +195,7 @@ void
 isac_sched_event(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 void
@@ -624,7 +625,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 void __devinit
 initisac(struct IsdnCardState *cs)
 {
-	INIT_WORK(&cs->tqueue, (void *) (void *) isac_bh, NULL);
+	INIT_WORK(&cs->work, isac_bh, cs);
 	cs->setstack_d = setstack_isac;
 	cs->DC_Close = DC_Close_isac;
 	cs->dc.isac.mon_tx = NULL;

@@ -38,7 +38,7 @@ static inline void cic_int(struct IsdnCardState *cs);
 static void dch_l2l1(struct PStack *st, int pr, void *arg);
 static void dbusy_timer_handler(struct IsdnCardState *cs);
 static void ipacx_new_ph(struct IsdnCardState *cs);
-static void dch_bh(struct IsdnCardState *cs);
+static void dch_bh(void *data);
 static void dch_sched_event(struct IsdnCardState *cs, int event);
 static void dch_empty_fifo(struct IsdnCardState *cs, int count);
 static void dch_fill_fifo(struct IsdnCardState *cs);
@@ -272,8 +272,9 @@ ipacx_new_ph(struct IsdnCardState *cs)
 // bottom half handler for D channel
 //----------------------------------------------------------
 static void
-dch_bh(struct IsdnCardState *cs)
+dch_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 	struct PStack *st;
 	
 	if (!cs) return;
@@ -305,7 +306,7 @@ static void
 dch_sched_event(struct IsdnCardState *cs, int event)
 {
 	set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 //----------------------------------------------------------
@@ -507,7 +508,7 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	INIT_WORK(&cs->tqueue, (void *)(void *) dch_bh, cs);
+	INIT_WORK(&cs->work, dch_bh, cs);
 	cs->setstack_d      = dch_setstack;
   
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
@@ -589,7 +590,7 @@ static void
 bch_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 }
 
 //----------------------------------------------------------
