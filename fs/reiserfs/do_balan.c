@@ -319,8 +319,6 @@ static int balance_leaf (struct tree_balance * tb,
 		    int new_item_len;
 		    int version;
 
-		    RFALSE (!is_direct_le_ih (ih),
-			    "PAP-12075: only direct inserted item can be broken. %h", ih);
 		    ret_val = leaf_shift_left (tb, tb->lnum[0]-1, -1);
 
 		    /* Calculate item length to insert to S[0] */
@@ -343,7 +341,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    version = ih_version (ih);
 
 		    /* Calculate key component, item length and body to insert into S[0] */
-                    set_le_ih_k_offset( ih, le_ih_k_offset( ih ) + tb->lbytes );
+                    set_le_ih_k_offset( ih, le_ih_k_offset( ih ) + (tb->lbytes << (is_indirect_le_ih(ih)?tb->tb_sb->s_blocksize_bits - UNFM_P_SHIFT:0)) );
 
 		    put_ih_item_len( ih, new_item_len );
 		    if ( tb->lbytes >  zeros_num ) {
@@ -452,23 +450,28 @@ static int balance_leaf (struct tree_balance * tb,
 				ih_item_len( B_N_PITEM_HEAD(tb->L[0],n+item_pos-ret_val)),
 				l_n,body, zeros_num > l_n ? l_n : zeros_num
 				);
-
-			    RFALSE( l_n && 
-				    is_indirect_le_ih(B_N_PITEM_HEAD
-						      (tb->L[0],
-						       n + item_pos - ret_val)),
-				    "PAP-12110: pasting more than 1 unformatted node pointer into indirect item");
-
 			    /* 0-th item in S0 can be only of DIRECT type when l_n != 0*/
 			    {
-			      int version;
-
-			      version = ih_version (B_N_PITEM_HEAD (tbS0, 0));
-			      set_le_key_k_offset (version, B_N_PKEY (tbS0, 0), 
-						   le_key_k_offset (version, B_N_PKEY (tbS0, 0)) + l_n);
-			      version = ih_version (B_N_PITEM_HEAD(tb->CFL[0],tb->lkey[0]));
-			      set_le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFL[0],tb->lkey[0]),
-						   le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFL[0],tb->lkey[0])) + l_n);
+				int version;
+				int temp_l = l_n;
+				
+				RFALSE (ih_item_len (B_N_PITEM_HEAD (tbS0, 0)),
+					"PAP-12106: item length must be 0");
+				RFALSE (comp_short_le_keys (B_N_PKEY (tbS0, 0),
+							    B_N_PKEY (tb->L[0],
+									    n + item_pos - ret_val)),
+					"PAP-12107: items must be of the same file");
+				if (is_indirect_le_ih(B_N_PITEM_HEAD (tb->L[0],
+								      n + item_pos - ret_val)))	{
+				    temp_l = l_n << (tb->tb_sb->s_blocksize_bits - UNFM_P_SHIFT);
+				}
+				/* update key of first item in S0 */
+				version = ih_version (B_N_PITEM_HEAD (tbS0, 0));
+				set_le_key_k_offset (version, B_N_PKEY (tbS0, 0), 
+						     le_key_k_offset (version, B_N_PKEY (tbS0, 0)) + temp_l);
+				/* update left delimiting key */
+				set_le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFL[0],tb->lkey[0]),
+						     le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFL[0],tb->lkey[0])) + temp_l);
 			    }
 
 			    /* Calculate new body, position in item and insert_size[0] */
@@ -537,7 +540,7 @@ static int balance_leaf (struct tree_balance * tb,
 			    );
 		    /* if appended item is indirect item, put unformatted node into un list */
 		    if (is_indirect_le_ih (pasted))
-			set_ih_free_space (pasted, ((struct unfm_nodeinfo*)body)->unfm_freespace);
+			set_ih_free_space (pasted, 0);
 		    tb->insert_size[0] = 0;
 		    zeros_num = 0;
 		}
@@ -565,14 +568,10 @@ static int balance_leaf (struct tree_balance * tb,
 	    { /* new item or its part falls to R[0] */
 		if ( item_pos == n - tb->rnum[0] + 1 && tb->rbytes != -1 )
 		{ /* part of new item falls into R[0] */
-		    int old_key_comp, old_len, r_zeros_number;
+		    loff_t old_key_comp, old_len, r_zeros_number;
 		    const char * r_body;
 		    int version;
 		    loff_t offset;
-
-		    RFALSE( !is_direct_le_ih (ih),
-			    "PAP-12135: only direct item can be split. (%h)", 
-			    ih);
 
 		    leaf_shift_right(tb,tb->rnum[0]-1,-1);
 
@@ -582,7 +581,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    old_len = ih_item_len(ih);
 
 		    /* Calculate key component and item length to insert into R[0] */
-                    offset = le_ih_k_offset( ih ) + (old_len - tb->rbytes );
+                    offset = le_ih_k_offset( ih ) + ((old_len - tb->rbytes )<<(is_indirect_le_ih(ih)?tb->tb_sb->s_blocksize_bits - UNFM_P_SHIFT:0));
                     set_le_ih_k_offset( ih, offset );
 		    put_ih_item_len( ih, tb->rbytes);
 		    /* Insert part of the item into R[0] */
@@ -590,13 +589,13 @@ static int balance_leaf (struct tree_balance * tb,
 		    bi.bi_bh = tb->R[0];
 		    bi.bi_parent = tb->FR[0];
 		    bi.bi_position = get_right_neighbor_position (tb, 0);
-		    if ( offset - old_key_comp > zeros_num ) {
+		    if ( (old_len - tb->rbytes) > zeros_num ) {
 			r_zeros_number = 0;
-			r_body = body + offset - old_key_comp - zeros_num;
+			r_body = body + (old_len - tb->rbytes) - zeros_num;
 		    }
 		    else {
 			r_body = body;
-			r_zeros_number = zeros_num - (offset - old_key_comp);
+			r_zeros_number = zeros_num - (old_len - tb->rbytes);
 			zeros_num -= r_zeros_number;
 		    }
 
@@ -707,12 +706,17 @@ static int balance_leaf (struct tree_balance * tb,
 			
 			{
 			  int version;
+			  unsigned long temp_rem = n_rem;
 			  
 			  version = ih_version (B_N_PITEM_HEAD (tb->R[0],0));
+			  if (is_indirect_le_key(version,B_N_PKEY(tb->R[0],0))){
+			      temp_rem = n_rem << (tb->tb_sb->s_blocksize_bits -
+					 UNFM_P_SHIFT);
+			  }
 			  set_le_key_k_offset (version, B_N_PKEY(tb->R[0],0), 
-					       le_key_k_offset (version, B_N_PKEY(tb->R[0],0)) + n_rem);
+					       le_key_k_offset (version, B_N_PKEY(tb->R[0],0)) + temp_rem);
 			  set_le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFR[0],tb->rkey[0]), 
-					       le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFR[0],tb->rkey[0])) + n_rem);
+					       le_key_k_offset (version, B_N_PDELIM_KEY(tb->CFR[0],tb->rkey[0])) + temp_rem);
 			}
 /*		  k_offset (B_N_PKEY(tb->R[0],0)) += n_rem;
 		  k_offset (B_N_PDELIM_KEY(tb->CFR[0],tb->rkey[0])) += n_rem;*/
@@ -736,13 +740,12 @@ static int balance_leaf (struct tree_balance * tb,
 			leaf_paste_in_buffer(&bi, 0, n_shift, tb->insert_size[0] - n_rem, r_body, r_zeros_number);
 
 			if (is_indirect_le_ih (B_N_PITEM_HEAD(tb->R[0],0))) {
-
+#if 0
 			    RFALSE( n_rem,
 				    "PAP-12160: paste more than one unformatted node pointer");
-
-			    set_ih_free_space (B_N_PITEM_HEAD(tb->R[0],0), ((struct unfm_nodeinfo*)body)->unfm_freespace);
+#endif
+			    set_ih_free_space (B_N_PITEM_HEAD(tb->R[0],0), 0);
 			}
-
 			tb->insert_size[0] = n_rem;
 			if ( ! n_rem )
 			    pos_in_item ++;
@@ -781,7 +784,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    }
 
 		    if (is_indirect_le_ih (pasted))
-			set_ih_free_space (pasted, ((struct unfm_nodeinfo*)body)->unfm_freespace);
+			set_ih_free_space (pasted, 0);
 		    zeros_num = tb->insert_size[0] = 0;
 		}
 	    }
@@ -858,12 +861,6 @@ static int balance_leaf (struct tree_balance * tb,
 		    const char * r_body;
 		    int version;
 
-		    RFALSE( !is_direct_le_ih(ih),
-			/* The items which can be inserted are:
-			   Stat_data item, direct item, indirect item and directory item which consist of only two entries "." and "..".
-			   These items must not be broken except for a direct one. */
-			    "PAP-12205: non-direct item can not be broken when inserting");
-
 		    /* Move snum[i]-1 items from S[0] to S_new[i] */
 		    leaf_move_items (LEAF_FROM_S_TO_SNEW, tb, snum[i] - 1, -1, S_new[i]);
 		    /* Remember key component and item length */
@@ -873,7 +870,7 @@ static int balance_leaf (struct tree_balance * tb,
 
 		    /* Calculate key component and item length to insert into S_new[i] */
                     set_le_ih_k_offset( ih,
-                                le_ih_k_offset(ih) + (old_len - sbytes[i] ) );
+                                le_ih_k_offset(ih) + ((old_len - sbytes[i] )<<(is_indirect_le_ih(ih)?tb->tb_sb->s_blocksize_bits - UNFM_P_SHIFT:0)) );
 
 		    put_ih_item_len( ih, sbytes[i] );
 
@@ -883,13 +880,13 @@ static int balance_leaf (struct tree_balance * tb,
 		    bi.bi_parent = 0;
 		    bi.bi_position = 0;
 
-		    if ( le_ih_k_offset (ih) - old_key_comp > zeros_num ) {
+		    if ( (old_len - sbytes[i]) > zeros_num ) {
 			r_zeros_number = 0;
-			r_body = body + (le_ih_k_offset(ih) - old_key_comp) - zeros_num;
+			r_body = body + (old_len - sbytes[i]) - zeros_num;
 		    }
 		    else {
 			r_body = body;
-			r_zeros_number = zeros_num - (le_ih_k_offset (ih) - old_key_comp);
+			r_zeros_number = zeros_num - (old_len - sbytes[i]);
 			zeros_num -= r_zeros_number;
 		    }
 
@@ -1010,11 +1007,13 @@ static int balance_leaf (struct tree_balance * tb,
 
 			    tmp = B_N_PITEM_HEAD(S_new[i],0);
 			    if (is_indirect_le_ih (tmp)) {
-				if (n_rem)
-				    reiserfs_panic (tb->tb_sb, "PAP-12230: balance_leaf: invalid action with indirect item");
-				set_ih_free_space (tmp, ((struct unfm_nodeinfo*)body)->unfm_freespace);
+				set_ih_free_space (tmp, 0);
+				set_le_ih_k_offset( tmp, le_ih_k_offset(tmp) + 
+					            (n_rem << (tb->tb_sb->s_blocksize_bits - UNFM_P_SHIFT)));
+			    } else {
+				set_le_ih_k_offset( tmp, le_ih_k_offset(tmp) + 
+				                    n_rem );
 			    }
-                            set_le_ih_k_offset( tmp, le_ih_k_offset(tmp) + n_rem );
 			}
 
 			tb->insert_size[0] = n_rem;
@@ -1060,7 +1059,7 @@ static int balance_leaf (struct tree_balance * tb,
 
 		    /* if we paste to indirect item update ih_free_space */
 		    if (is_indirect_le_ih (pasted))
-			set_ih_free_space (pasted, ((struct unfm_nodeinfo*)body)->unfm_freespace);
+			set_ih_free_space (pasted, 0);
 		    zeros_num = tb->insert_size[0] = 0;
 		}
 	    }
@@ -1152,11 +1151,12 @@ static int balance_leaf (struct tree_balance * tb,
 		    leaf_paste_in_buffer (&bi, item_pos, pos_in_item, tb->insert_size[0], body, zeros_num);
 
 		    if (is_indirect_le_ih (pasted)) {
-
+#if 0
 			RFALSE( tb->insert_size[0] != UNFM_P_SIZE,
 				"PAP-12280: insert_size for indirect item must be %d, not %d",
 				UNFM_P_SIZE, tb->insert_size[0]);
-			set_ih_free_space (pasted, ((struct unfm_nodeinfo*)body)->unfm_freespace);
+#endif
+			set_ih_free_space (pasted, 0);
 		    }
 		    tb->insert_size[0] = 0;
 		}
