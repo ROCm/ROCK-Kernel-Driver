@@ -268,7 +268,7 @@ e1000_up(struct e1000_adapter *adapter)
 	e1000_configure_rx(adapter);
 	e1000_alloc_rx_buffers(adapter);
 
-	if((err = request_irq(netdev->irq, &e1000_intr,
+	if((err = request_irq(adapter->pdev->irq, &e1000_intr,
 		              SA_SHIRQ | SA_SAMPLE_RANDOM,
 		              netdev->name, netdev)))
 		return err;
@@ -285,7 +285,7 @@ e1000_down(struct e1000_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 
 	e1000_irq_disable(adapter);
-	free_irq(netdev->irq, netdev);
+	free_irq(adapter->pdev->irq, netdev);
 	del_timer_sync(&adapter->tx_fifo_stall_timer);
 	del_timer_sync(&adapter->watchdog_timer);
 	del_timer_sync(&adapter->phy_info_timer);
@@ -435,7 +435,6 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
 
-	netdev->irq = pdev->irq;
 	netdev->mem_start = mmio_start;
 	netdev->mem_end = mmio_start + mmio_len;
 	netdev->base_addr = adapter->hw.io_base;
@@ -2064,7 +2063,7 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 	atomic_inc(&adapter->irq_sem);
 	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
 	E1000_WRITE_FLUSH(&adapter->hw);
-	synchronize_irq(adapter->netdev->irq);
+	synchronize_irq(adapter->pdev->irq);
 }
 
 /**

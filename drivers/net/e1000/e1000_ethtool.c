@@ -648,8 +648,8 @@ e1000_intr_test(struct e1000_adapter *adapter, uint64_t *data)
 	*data = 0;
 
 	/* Hook up test interrupt handler just for this test */
-	if(request_irq
-	   (netdev->irq, &e1000_test_intr, SA_SHIRQ, netdev->name, netdev)) {
+	if(request_irq(adapter->pdev->irq, &e1000_test_intr, SA_SHIRQ,
+	   netdev->name, netdev)) {
 		*data = 1;
 		return -1;
 	}
@@ -733,7 +733,7 @@ e1000_intr_test(struct e1000_adapter *adapter, uint64_t *data)
 	msec_delay(10);
 
 	/* Unhook test interrupt handler */
-	free_irq(netdev->irq, netdev);
+	free_irq(adapter->pdev->irq, netdev);
 
 	return *data;
 }
