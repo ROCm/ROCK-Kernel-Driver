@@ -86,7 +86,7 @@ cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
 	int	len;
-	int	flags;
+	unsigned long flags;
 	va_list	ap;
 
 	level &= XFS_ERR_MASK;
