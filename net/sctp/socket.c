@@ -81,13 +81,13 @@
 
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
-static inline int sctp_wspace(sctp_association_t *asoc);
+static inline int sctp_wspace(struct sctp_association *asoc);
 static inline void sctp_set_owner_w(sctp_chunk_t *chunk);
 static void sctp_wfree(struct sk_buff *skb);
-static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
+static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
-static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p);
+static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
@@ -158,7 +158,7 @@ static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
 /* Bind a local address either to an endpoint or to an association.  */
 SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
@@ -454,7 +454,7 @@ err_bindx_add:
  */
 int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	int cnt;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
@@ -662,6 +662,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 
 	/* Clean up any skbs sitting on the receive queue.  */
 	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sctp_sk(sk)->pd_lobby);
 
 	/* This will run the backlog queue.  */
 	sctp_release_sock(sk);
@@ -714,7 +715,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			     struct msghdr *msg, int msg_len)
 {
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *new_asoc=NULL, *asoc=NULL;
 	struct sctp_transport *transport;
@@ -939,6 +940,19 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	/* ASSERT: we have a valid association at this point.  */
 	SCTP_DEBUG_PRINTK("We have a valid association.\n");
 
+	if (!sinfo) {
+		/* If the user didn't specify SNDRCVINFO, make up one with
+		 * some defaults.
+		 */
+		default_sinfo.sinfo_stream = asoc->defaults.stream;
+		default_sinfo.sinfo_flags = asoc->defaults.flags;
+		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
+		default_sinfo.sinfo_context = asoc->defaults.context;
+		default_sinfo.sinfo_timetolive = asoc->defaults.timetolive;
+		default_sinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
+		sinfo = &default_sinfo;
+	}
+
 	/* API 7.1.7, the sndbuf size per association bounds the
 	 * maximum size of data that can be sent in a single send call.
 	 */
@@ -963,13 +977,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			err = -EINVAL;
 			goto out_free;
 		}
-	} else {
-		/* If the user didn't specify SNDRCVINFO, make up one with
-		 * some defaults.
-		 */
-		default_sinfo.sinfo_stream = asoc->defaults.stream;
-		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
-		sinfo = &default_sinfo;
 	}
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
@@ -978,21 +985,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		if (err)
 			goto out_free;
 	}
-
-#if 0
-	/* FIXME: This looks wrong so I'll comment out.
-	 * We should be able to use this same technique for
-	 * primary address override!  --jgrimm
-	 */
-	/* If the user gave us an address, copy it in.  */
-	if (msg->msg_name) {
-		chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
-		if (!chunk->transport) {
-			err = -EINVAL;
-			goto out_free;
-		}
-	}
-#endif /* 0 */
 
 	/* Break the message into multiple chunks of maximum size. */
 	skb_queue_head_init(&chunks);
@@ -1013,6 +1005,23 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
+
+		/* This flag, in the UDP model, requests the SCTP stack to
+		 * override the primary destination address with the 
+		 * address found with the sendto/sendmsg call.
+		 */
+		if (sinfo_flags & MSG_ADDR_OVER) {
+			if (!msg->msg_name) {
+				err = -EINVAL;
+				goto out_free;
+			}
+			chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
+			if (!chunk->transport) {
+				err = -EINVAL;
+				goto out_free;
+			}
+		}
+
 		/* Send it to the lower layers.  */
 		sctp_primitive_SEND(asoc, chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
@@ -1110,8 +1119,8 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			     int len, int noblock, int flags, int *addr_len)
 {
-	sctp_ulpevent_t *event = NULL;
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_ulpevent *event = NULL;
+	struct sctp_opt *sp = sctp_sk(sk);
 	struct sk_buff *skb;
 	int copied;
 	int err = 0;
@@ -1143,7 +1152,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
-	event = (sctp_ulpevent_t *) skb->cb;
+	event = sctp_skb2event(skb);
 
 	if (err)
 		goto out_free;
@@ -1170,7 +1179,6 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	/* If skb's length exceeds the user's buffer, update the skb and
 	 * push it back to the receive_queue so that the next call to
 	 * recvmsg() will return the remaining data. Don't set MSG_EOR.
-	 * Otherwise, set MSG_EOR indicating the end of a message.
 	 */
 	if (skb_len > copied) {
 		msg->msg_flags &= ~MSG_EOR;
@@ -1178,6 +1186,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 			goto out_free;
 		sctp_skb_pull(skb, copied);
 		skb_queue_head(&sk->receive_queue, skb);
+
 		/* When only partial message is copied to the user, increase
 		 * rwnd by that amount. If all the data in the skb is read,
 		 * rwnd is updated when the skb's destructor is called via
@@ -1185,9 +1194,11 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 		 */
 		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
-	} else {
-		 msg->msg_flags |= MSG_EOR;
-	}
+	} else if ((event->msg_flags & MSG_NOTIFICATION) ||
+		   (event->msg_flags & MSG_EOR))
+		msg->msg_flags |= MSG_EOR;
+	else
+		msg->msg_flags &= ~MSG_EOR;
 
 out_free:
 	sctp_ulpevent_free(event); /* Free the skb. */
@@ -1225,7 +1236,7 @@ static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval,
 static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	/* Applicable to UDP-style socket only */
 	if (SCTP_SOCKET_TCP == sp->type)
@@ -1307,6 +1318,44 @@ static inline int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
 		return -EINVAL;
 	if (copy_from_user(&sctp_sk(sk)->initmsg, optval, optlen))
 		return -EFAULT;
+	return 0;
+}
+
+/*
+ *
+ * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ *
+ *   Applications that wish to use the sendto() system call may wish to
+ *   specify a default set of parameters that would normally be supplied
+ *   through the inclusion of ancillary data.  This socket option allows
+ *   such an application to set the default sctp_sndrcvinfo structure.
+ *   The application that wishes to use this socket option simply passes
+ *   in to this call the sctp_sndrcvinfo structure defined in Section
+ *   5.2.2) The input parameters accepted by this call include
+ *   sinfo_stream, sinfo_flags, sinfo_ppid, sinfo_context,
+ *   sinfo_timetolive.  The user must provide the sinfo_assoc_id field in
+ *   to this call if the caller is using the UDP model.
+ */
+static inline int sctp_setsockopt_set_default_send_param(struct sock *sk,
+						char *optval, int optlen)
+{
+	struct sctp_sndrcvinfo info;
+	sctp_association_t *asoc;
+
+	if (optlen != sizeof(struct sctp_sndrcvinfo))
+		return -EINVAL;
+	if (copy_from_user(&info, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	asoc->defaults.stream = info.sinfo_stream;
+	asoc->defaults.flags = info.sinfo_flags;
+	asoc->defaults.ppid = info.sinfo_ppid;
+	asoc->defaults.context = info.sinfo_context;
+	asoc->defaults.timetolive = info.sinfo_timetolive;
 	return 0;
 }
 
@@ -1401,6 +1450,11 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
 		break;
 
+	case SCTP_SET_DEFAULT_SEND_PARAM:
+		retval = sctp_setsockopt_set_default_send_param(sk,
+							optval, optlen);
+		break;
+
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -1432,7 +1486,7 @@ out_nounlock:
 SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 			     int addr_len)
 {
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
 	struct sctp_transport *transport;
@@ -1554,7 +1608,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 	sctp_protocol_t *proto;
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 
 	SCTP_DEBUG_PRINTK("sctp_init_sock(sk: %p)\n", sk);
 
@@ -1583,7 +1637,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
-	 * FIXME: This are not used yet.
+	 * FIXME: These are not used yet.
 	 */
 	sp->rtoinfo.srto_initial = proto->rto_initial;
 	sp->rtoinfo.srto_max     = proto->rto_max;
@@ -1620,6 +1674,11 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 */
 	sp->autoclose         = 0;
 	sp->pf = sctp_get_pf_specific(sk->family);
+
+	/* Control variables for partial data delivery. */
+	sp->pd_mode           = 0;
+	skb_queue_head_init(&sp->pd_lobby);
+
 	/* Create a per socket endpoint structure.  Even if we
 	 * change the data structure relationships, this may still
 	 * be useful for storing pre-connect address information.
@@ -1774,10 +1833,10 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	struct sock *newsk;
 	struct socket *tmpsock;
 	sctp_endpoint_t *newep;
-	sctp_opt_t *oldsp = sctp_sk(oldsk);
-	sctp_opt_t *newsp;
+	struct sctp_opt *oldsp = sctp_sk(oldsk);
+	struct sctp_opt *newsp;
 	struct sk_buff *skb, *tmp;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
@@ -1811,11 +1870,48 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	 * peeled off association to the new socket's receive queue.
 	 */
 	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
-		event = (sctp_ulpevent_t *)skb->cb;
+		event = sctp_skb2event(skb);
 		if (event->asoc == assoc) {
 			__skb_unlink(skb, skb->list);
 			__skb_queue_tail(&newsk->receive_queue, skb);
 		}
+	}
+
+	/* Clean up an messages pending delivery due to partial
+	 * delivery.   Three cases:
+	 * 1) No partial deliver;  no work.
+	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
+	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
+	 */
+	skb_queue_head_init(&newsp->pd_lobby);
+	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;;
+
+	if (sctp_sk(oldsk)->pd_mode) {
+		struct sk_buff_head *queue;
+
+		/* Decide which queue to move pd_lobby skbs to. */
+		if (assoc->ulpq.pd_mode) {
+			queue = &newsp->pd_lobby;
+		} else
+			queue = &newsk->receive_queue;
+
+		/* Walk through the pd_lobby, looking for skbs that
+		 * need moved to the new socket.
+		 */
+		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
+			event = sctp_skb2event(skb);
+			if (event->asoc == assoc) {
+				__skb_unlink(skb, skb->list);
+				__skb_queue_tail(queue, skb);
+			}
+		}
+
+		/* Clear up any skbs waiting for the partial
+		 * delivery to finish.
+		 */
+		if (assoc->ulpq.pd_mode)
+			sctp_clear_pd(oldsk);
+
 	}
 
 	/* Set the type of socket to indicate that it is peeled off from the
@@ -2087,6 +2183,50 @@ static inline int sctp_getsockopt_get_local_addrs(struct sock *sk, int len,
 	return 0;
 }
 
+/*
+ *
+ * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ *
+ *   Applications that wish to use the sendto() system call may wish to
+ *   specify a default set of parameters that would normally be supplied
+ *   through the inclusion of ancillary data.  This socket option allows
+ *   such an application to set the default sctp_sndrcvinfo structure.
+ *   The application that wishes to use this socket option simply passes
+ *   in to this call the sctp_sndrcvinfo structure defined in Section
+ *   5.2.2) The input parameters accepted by this call include
+ *   sinfo_stream, sinfo_flags, sinfo_ppid, sinfo_context,
+ *   sinfo_timetolive.  The user must provide the sinfo_assoc_id field in
+ *   to this call if the caller is using the UDP model.
+ *
+ *   For getsockopt, it get the default sctp_sndrcvinfo structure.
+ */
+static inline int sctp_getsockopt_set_default_send_param(struct sock *sk,
+					int len, char *optval, int *optlen)
+{
+	struct sctp_sndrcvinfo info;
+	sctp_association_t *asoc;
+
+	if (len != sizeof(struct sctp_sndrcvinfo))
+		return -EINVAL;
+	if (copy_from_user(&info, optval, sizeof(struct sctp_sndrcvinfo)))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	info.sinfo_stream = asoc->defaults.stream;
+	info.sinfo_flags = asoc->defaults.flags;
+	info.sinfo_ppid = asoc->defaults.ppid;
+	info.sinfo_context = asoc->defaults.context;
+	info.sinfo_timetolive = asoc->defaults.timetolive;
+
+	if (copy_to_user(optval, &info, sizeof(struct sctp_sndrcvinfo)))
+		return -EFAULT;
+
+	return 0;
+}
+
 SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 				char *optval, int *optlen)
 {
@@ -2162,6 +2302,11 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_GET_LOCAL_ADDRS:
 		retval = sctp_getsockopt_get_local_addrs(sk, len, optval,
 							      optlen);
+		break;
+
+	case SCTP_SET_DEFAULT_SEND_PARAM:
+		retval = sctp_getsockopt_set_default_send_param(sk, len,
+							optval, optlen);
 		break;
 
 	default:
@@ -2389,7 +2534,7 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
  */
 SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 
 	/* Only UDP style sockets that are not peeled off are allowed to

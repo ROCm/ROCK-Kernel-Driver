@@ -68,7 +68,6 @@ typedef enum {
 	SCTP_CMD_INIT_RESTART,  /* High level, do init timer work. */
 	SCTP_CMD_INIT_FAILED,   /* High level, do init failure work. */
 	SCTP_CMD_REPORT_DUP,	/* Report a duplicate TSN.  */
-	SCTP_CMD_REPORT_BIGGAP, /* Narc on a TSN (it was too high).  */
 	SCTP_CMD_STRIKE,	/* Mark a strike against a transport.  */
 	SCTP_CMD_TRANSMIT,      /* Transmit the outqueue. */
 	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers. */
@@ -86,7 +85,8 @@ typedef enum {
 	SCTP_CMD_PURGE_OUTQUEUE, /* Purge all data waiting to be sent. */
 	SCTP_CMD_SETUP_T2,       /* Hi-level, setup T2-shutdown parms.  */
 	SCTP_CMD_RTO_PENDING,	 /* Set transport's rto_pending. */
-
+	SCTP_CMD_PART_DELIVER,	 /* Partial data delivery considerations. */
+	SCTP_CMD_RENEGE,         /* Renege data on an association. */
 	SCTP_CMD_LAST
 } sctp_verb_t;
 
@@ -115,7 +115,7 @@ typedef union {
 	struct sctp_transport *transport;
 	sctp_bind_addr_t  *bp;
 	sctp_init_chunk_t *init;
-	sctp_ulpevent_t *ulpevent;
+	struct sctp_ulpevent *ulpevent;
 	sctp_packet_t *packet;
 	sctp_sackhdr_t *sackh;
 } sctp_arg_t;
@@ -163,7 +163,7 @@ SCTP_ARG_CONSTRUCTOR(ASOC,	sctp_association_t *, asoc)
 SCTP_ARG_CONSTRUCTOR(TRANSPORT,	struct sctp_transport *, transport)
 SCTP_ARG_CONSTRUCTOR(BA,	sctp_bind_addr_t *, bp)
 SCTP_ARG_CONSTRUCTOR(PEER_INIT,	sctp_init_chunk_t *, init)
-SCTP_ARG_CONSTRUCTOR(ULPEVENT,  sctp_ulpevent_t *, ulpevent)
+SCTP_ARG_CONSTRUCTOR(ULPEVENT,  struct sctp_ulpevent *, ulpevent)
 SCTP_ARG_CONSTRUCTOR(PACKET,	sctp_packet_t *, packet)
 SCTP_ARG_CONSTRUCTOR(SACKH,	sctp_sackhdr_t *, sackh)
 

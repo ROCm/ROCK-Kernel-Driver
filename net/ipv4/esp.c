@@ -360,7 +360,7 @@ int esp_output(struct sk_buff *skb)
 	esp = x->data;
 	alen = esp->auth.icv_trunc_len;
 	tfm = esp->conf.tfm;
-	blksize = crypto_tfm_alg_blocksize(tfm);
+	blksize = (crypto_tfm_alg_blocksize(tfm) + 3) & ~3;
 	clen = (clen + 2 + blksize-1)&~(blksize-1);
 	if (esp->conf.padlen)
 		clen = (clen + esp->conf.padlen-1)&~(esp->conf.padlen-1);

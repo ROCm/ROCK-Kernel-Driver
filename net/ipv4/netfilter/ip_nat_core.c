@@ -913,7 +913,7 @@ icmp_reply_translation(struct sk_buff *skb,
 		   packet, except it was never src/dst reversed, so
 		   where we would normally apply a dst manip, we apply
 		   a src, and vice versa. */
-		if (info->manips[i].hooknum == opposite_hook[hooknum]) {
+		if (info->manips[i].hooknum == hooknum) {
 			DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
 			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
 			       ? "DST" : "SRC",
@@ -924,9 +924,9 @@ icmp_reply_translation(struct sk_buff *skb,
 				  &info->manips[i].manip,
 				  !info->manips[i].maniptype,
 				  &skb->nfcache);
-		/* Outer packet needs to have IP header NATed like
-                   it's a reply. */
-		} else if (info->manips[i].hooknum == hooknum) {
+			/* Outer packet needs to have IP header NATed like
+	                   it's a reply. */
+
 			/* Use mapping to map outer packet: 0 give no
                            per-proto mapping */
 			DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",

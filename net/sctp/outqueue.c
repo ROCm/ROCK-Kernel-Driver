@@ -193,11 +193,17 @@ int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 			  : "Illegal Chunk");
 
 			skb_queue_tail(&q->out, (struct sk_buff *) chunk);
+			if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
+				SCTP_INC_STATS(SctpOutUnorderChunks);
+			else
+				SCTP_INC_STATS(SctpOutOrderChunks);
 			q->empty = 0;
 			break;
 		};
-	} else
+	} else {
 		skb_queue_tail(&q->control, (struct sk_buff *) chunk);
+		SCTP_INC_STATS(SctpOutCtrlChunks);
+	}
 
 	if (error < 0)
 		return error;
@@ -315,6 +321,11 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 	switch(reason) {
 	case SCTP_RETRANSMIT_T3_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_T3_RTX);
+		/* Update the retran path if the T3-rtx timer has expired for
+		 * the current retran path.
+		 */
+		if (transport == transport->asoc->peer.retran_path)
+			sctp_assoc_update_retran_path(transport->asoc);
 		break;
 	case SCTP_RETRANSMIT_FAST_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);

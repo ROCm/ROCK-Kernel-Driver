@@ -223,7 +223,8 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
         struct lecdatahdr_8023 *lec_h;
         struct atm_vcc *send_vcc;
 	struct lec_arp_table *entry;
-        unsigned char *nb, *dst;
+        unsigned char *dst;
+	int min_frame_size;
 #ifdef CONFIG_TR
         unsigned char rdesc[ETH_ALEN]; /* Token Ring route descriptor */
 #endif
@@ -294,26 +295,24 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
 #endif /* DUMP_PACKETS > 0 */
 
         /* Minimum ethernet-frame size */
-        if (skb->len <62) {
-                if (skb->truesize < 62) {
-                        printk("%s:data packet %d / %d\n",
-                               dev->name,
-                               skb->len,skb->truesize);
-                        nb=(unsigned char*)kmalloc(64, GFP_ATOMIC);
-                        if (nb == NULL) {
+#ifdef CONFIG_TR
+        if (priv->is_trdev)
+                min_frame_size = LEC_MINIMUM_8025_SIZE;
+	else
+#endif
+        min_frame_size = LEC_MINIMUM_8023_SIZE;
+        if (skb->len < min_frame_size) {
+                if (skb->truesize < min_frame_size) {
+                        skb2 = skb_copy_expand(skb, 0,
+                            min_frame_size - skb->truesize, GFP_ATOMIC);
                                 dev_kfree_skb(skb);
+                        if (skb2 == NULL) {
+                                priv->stats.tx_dropped++;
                                 return 0;
                         }
-                        memcpy(nb,skb->data,skb->len);
-                        kfree(skb->head);
-                        skb->head = skb->data = nb;
-                        skb->tail = nb+62;
-                        skb->end = nb+64;
-                        skb->len=62;
-                        skb->truesize = 64;
-                } else {
-                        skb->len = 62;
+                        skb = skb2;
                 }
+		skb_put(skb, min_frame_size - skb->len);
         }
         
         /* Send to right vcc */
@@ -618,6 +617,14 @@ static int lec_change_mtu(struct net_device *dev, int new_mtu)
         return 0;
 }
 
+static void lec_set_multicast_list(struct net_device *dev)
+{
+	/* by default, all multicast frames arrive over the bus.
+         * eventually support selective multicast service
+         */
+        return;
+}
+
 static void 
 lec_init(struct net_device *dev)
 {
@@ -627,7 +634,7 @@ lec_init(struct net_device *dev)
         dev->hard_start_xmit = lec_send_packet;
 
         dev->get_stats = lec_get_stats;
-        dev->set_multicast_list = NULL;
+        dev->set_multicast_list = lec_set_multicast_list;
         dev->do_ioctl  = NULL;
         printk("%s: Initialized!\n",dev->name);
         return;
@@ -706,7 +713,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                         lec_arp_check_empties(priv, vcc, skb);
                 }
                 skb->dev = dev;
-                skb->data += 2; /* skip lec_id */
+                skb_pull(skb, 2); /* skip lec_id */
 #ifdef CONFIG_TR
                 if (priv->is_trdev) skb->protocol = tr_type_trans(skb, dev);
                 else

@@ -3,40 +3,40 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * These functions manipulate sctp tsn mapping array.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Karl Knutson          <karl@athena.chicago.il.us>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -45,21 +45,21 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
-static void _sctp_tsnmap_update(sctp_tsnmap_t *map);
-static void _sctp_tsnmap_update_pending_data(sctp_tsnmap_t *map);
-static void _sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
-				      __u16 len, __u16 base,
-				      int *started, __u16 *start,
-				      int *ended, __u16 *end);
+static void sctp_tsnmap_update(struct sctp_tsnmap *map);
+static void sctp_tsnmap_update_pending_data(struct sctp_tsnmap *map);
+static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
+				     __u16 len, __u16 base,
+				     int *started, __u16 *start,
+				     int *ended, __u16 *end);
 
 /* Create a new sctp_tsnmap.
  * Allocate room to store at least 'len' contiguous TSNs.
  */
-sctp_tsnmap_t *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int priority)
+struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int priority)
 {
-	sctp_tsnmap_t *retval;
+	struct sctp_tsnmap *retval;
 
-	retval = kmalloc(sizeof(sctp_tsnmap_t) +
+	retval = kmalloc(sizeof(struct sctp_tsnmap) +
 			 sctp_tsnmap_storage_size(len),
 			 priority);
 	if (!retval)
@@ -72,13 +72,13 @@ sctp_tsnmap_t *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int priority)
 
 fail_map:
 	kfree(retval);
-
 fail:
 	return NULL;
 }
 
 /* Initialize a block of memory as a tsnmap.  */
-sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, __u16 len, __u32 initial_tsn)
+struct sctp_tsnmap *sctp_tsnmap_init(struct sctp_tsnmap *map, __u16 len,
+				     __u32 initial_tsn)
 {
 	map->tsn_map = map->raw_map;
 	map->overflow_map = map->tsn_map + len;
@@ -94,6 +94,7 @@ sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, __u16 len, __u32 initial_tsn
 	map->max_tsn_seen = map->cumulative_tsn_ack_point;
 	map->malloced = 0;
 	map->pending_data = 0;
+	map->num_dup_tsns = 0;
 
 	return map;
 }
@@ -104,7 +105,7 @@ sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, __u16 len, __u32 initial_tsn
  *  >0 if the TSN has been seen (duplicate)
  *  <0 if the TSN is invalid (too large to track)
  */
-int sctp_tsnmap_check(const sctp_tsnmap_t *map, __u32 tsn)
+int sctp_tsnmap_check(const struct sctp_tsnmap *map, __u32 tsn)
 {
 	__s32 gap;
 	int dup;
@@ -136,7 +137,7 @@ out:
 }
 
 /* Is there a gap in the TSN map?  */
-int sctp_tsnmap_has_gap(const sctp_tsnmap_t *map)
+int sctp_tsnmap_has_gap(const struct sctp_tsnmap *map)
 {
 	int has_gap;
 
@@ -145,7 +146,7 @@ int sctp_tsnmap_has_gap(const sctp_tsnmap_t *map)
 }
 
 /* Mark this TSN as seen.  */
-void sctp_tsnmap_mark(sctp_tsnmap_t *map, __u32 tsn)
+void sctp_tsnmap_mark(struct sctp_tsnmap *map, __u32 tsn)
 {
 	__s32 gap;
 
@@ -173,40 +174,45 @@ void sctp_tsnmap_mark(sctp_tsnmap_t *map, __u32 tsn)
 	/* Go fixup any internal TSN mapping variables including
 	 * cumulative_tsn_ack_point.
 	 */
-	_sctp_tsnmap_update(map);
+	sctp_tsnmap_update(map);
+}
+
+void sctp_tsnmap_report_dup(struct sctp_tsnmap *map, __u32 tsn)
+{
 }
 
 /* Retrieve the Cumulative TSN Ack Point. */
-__u32 sctp_tsnmap_get_ctsn(const sctp_tsnmap_t *map)
+__u32 sctp_tsnmap_get_ctsn(const struct sctp_tsnmap *map)
 {
 	return map->cumulative_tsn_ack_point;
 }
 
 /* Retrieve the highest TSN we've seen.  */
-__u32 sctp_tsnmap_get_max_tsn_seen(const sctp_tsnmap_t *map)
+__u32 sctp_tsnmap_get_max_tsn_seen(const struct sctp_tsnmap *map)
 {
 	return map->max_tsn_seen;
 }
 
 /* Dispose of a tsnmap.  */
-void sctp_tsnmap_free(sctp_tsnmap_t *map)
+void sctp_tsnmap_free(struct sctp_tsnmap *map)
 {
 	if (map->malloced)
 		kfree(map);
 }
 
 /* Initialize a Gap Ack Block iterator from memory being provided.  */
-void sctp_tsnmap_iter_init(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter)
+void sctp_tsnmap_iter_init(const struct sctp_tsnmap *map,
+			   struct sctp_tsnmap_iter *iter)
 {
 	/* Only start looking one past the Cumulative TSN Ack Point.  */
 	iter->start = map->cumulative_tsn_ack_point + 1;
 }
 
-/* Get the next Gap Ack Blocks. Returns 0 if there was not
- * another block to get.
+/* Get the next Gap Ack Blocks. Returns 0 if there was not another block
+ * to get.
  */
-int sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
-			     __u16 *start, __u16 *end)
+int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
+	struct sctp_tsnmap_iter *iter, __u16 *start, __u16 *end)
 {
 	int started, ended;
 	__u16 _start, _end, offset;
@@ -216,12 +222,10 @@ int sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
 
 	/* Search the first mapping array.  */
 	if (iter->start - map->base_tsn < map->len) {
+
 		offset = iter->start - map->base_tsn;
-		_sctp_tsnmap_find_gap_ack(map->tsn_map,
-					  offset,
-					  map->len, 0,
-					  &started, &_start,
-					  &ended, &_end);
+		sctp_tsnmap_find_gap_ack(map->tsn_map, offset, map->len, 0,
+					 &started, &_start, &ended, &_end);
 	}
 
 	/* Do we need to check the overflow map? */
@@ -235,12 +239,12 @@ int sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
 			offset = iter->start - map->base_tsn - map->len;
 
 		/* Search the overflow map.  */
-		_sctp_tsnmap_find_gap_ack(map->overflow_map,
-					  offset,
-					  map->len,
-					  map->len,
-					  &started, &_start,
-					  &ended, &_end);
+		sctp_tsnmap_find_gap_ack(map->overflow_map,
+					 offset,
+					 map->len,
+					 map->len,
+					 &started, &_start,
+					 &ended, &_end);
 	}
 
 	/* The Gap Ack Block happens to end at the end of the
@@ -278,7 +282,7 @@ int sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
 /* This private helper function updates the tsnmap buffers and
  * the Cumulative TSN Ack Point.
  */
-static void _sctp_tsnmap_update(sctp_tsnmap_t *map)
+static void sctp_tsnmap_update(struct sctp_tsnmap *map)
 {
 	__u32 ctsn;
 
@@ -301,10 +305,10 @@ static void _sctp_tsnmap_update(sctp_tsnmap_t *map)
 	} while (map->tsn_map[ctsn - map->base_tsn]);
 
 	map->cumulative_tsn_ack_point = ctsn - 1; /* Back up one. */
-	_sctp_tsnmap_update_pending_data(map);
+	sctp_tsnmap_update_pending_data(map);
 }
 
-static void _sctp_tsnmap_update_pending_data(sctp_tsnmap_t *map)
+static void sctp_tsnmap_update_pending_data(struct sctp_tsnmap *map)
 {
 	__u32 cum_tsn = map->cumulative_tsn_ack_point;
 	__u32 max_tsn = map->max_tsn_seen;
@@ -324,7 +328,7 @@ static void _sctp_tsnmap_update_pending_data(sctp_tsnmap_t *map)
 	for (i = start; i < end; i++) {
 		if (map->tsn_map[i])
 			pending_data--;
-	} 
+	}
 
 	if (gap >= map->len) {
 		start = 0;
@@ -345,14 +349,14 @@ out:
  * The flags "started" and "ended" tell is if we found the beginning
  * or (respectively) the end of a Gap Ack Block.
  */
-static void _sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
-				      __u16 len, __u16 base,
-				      int *started, __u16 *start,
-				      int *ended, __u16 *end)
+static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
+				     __u16 len, __u16 base,
+				     int *started, __u16 *start,
+				     int *ended, __u16 *end)
 {
 	int i = off;
 
-	/* Let's look through the entire array, but break out
+	/* Look through the entire array, but break out
 	 * early if we have found the end of the Gap Ack Block.
 	 */
 
@@ -380,4 +384,24 @@ static void _sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 			}
 		}
 	}
+}
+
+/* Renege that we have seen a TSN.  */
+void sctp_tsnmap_renege(struct sctp_tsnmap *map, __u32 tsn)
+{
+	__s32 gap;
+
+	if (TSN_lt(tsn, map->base_tsn))
+		return;
+	if (!TSN_lt(tsn, map->base_tsn + map->len + map->len))
+		return;
+	
+	/* Assert: TSN is in range.  */
+	gap = tsn - map->base_tsn;
+
+	/* Pretend we never saw the TSN.  */
+	if (gap < map->len)
+		map->tsn_map[gap] = 0;
+	else
+		map->overflow_map[gap - map->len] = 0;
 }
