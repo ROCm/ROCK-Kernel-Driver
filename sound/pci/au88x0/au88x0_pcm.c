@@ -1,10 +1,24 @@
 /*
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Library General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ */
+ 
+/*
  * Vortex PCM ALSA driver.
  *
- * Supports ADB and WT DMA. Unfortunately, WT routing is still a
- * mistery. To discover that, we need to disassemble the windoze
- * driver too.
- *
+ * Supports ADB and WT DMA. Unfortunately, WT channels do not run yet.
+ * It remains stuck,and DMA transfers do not happen.
  *
  */
 
@@ -488,14 +502,18 @@ static int __devinit snd_vortex_new_pcm(vortex_t * chip, int idx, int nr)
 	if (idx == VORTEX_PCM_ADB)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
 				&snd_vortex_playback_ops);
-	/* pre-allocation of linear buffers */
-	//snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
-	//				      snd_dma_pci_data(chip->pci_dev), 0x10000, 0x10000);
-	/* pre-allocation of Scatter-Gather buffers */
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
-					      snd_dma_pci_data(chip->pci_dev),
-					      0x10000, 0x10000);
 
+	/* pre-allocation of Scatter-Gather buffers */
+	
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+										  snd_dma_pci_data(chip->pci_dev),
+										  0x10000, 0x10000);
+	
+	// The above should be used, as soon as ALSA gets updated.
+	/*
+	snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci_dev, pcm,
+						 0x10000, 0x10000);
+	*/
 	if (VORTEX_PCM_TYPE(pcm) == VORTEX_PCM_SPDIF) {
 		snd_kcontrol_t *kcontrol;
 
