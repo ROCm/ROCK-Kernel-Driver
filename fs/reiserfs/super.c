@@ -517,7 +517,7 @@ typedef struct {
 
 /* possible values for "-o block-allocator=" and bits which are to be set in
    s_mount_opt of reiserfs specific part of in-core super block */
-const arg_desc_t balloc[] = {
+static const arg_desc_t balloc[] = {
     {"noborder", REISERFS_NO_BORDER},
     {"no_unhashed_relocation", REISERFS_NO_UNHASHED_RELOCATION},
     {"hashed_relocation", REISERFS_HASHED_RELOCATION},
@@ -525,7 +525,7 @@ const arg_desc_t balloc[] = {
     {NULL, -1}
 };
 
-const arg_desc_t tails[] = {
+static const arg_desc_t tails[] = {
     {"on", REISERFS_LARGETAIL},
     {"off", -1},
     {"small", REISERFS_SMALLTAIL},
