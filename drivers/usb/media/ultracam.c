@@ -103,7 +103,7 @@ MODULE_PARM_DESC(hue_correction, "YUV colorspace regulation: 0-255 (default=128)
  * 02-Nov-2000 First (mostly dummy) version.
  * 06-Nov-2000 Rewrote to dump all data into frame.
  */
-void ultracam_ProcessIsocData(uvd_t *uvd, usbvideo_frame_t *frame)
+void ultracam_ProcessIsocData(struct uvd *uvd, usbvideo_frame_t *frame)
 {
 	int n;
 
@@ -140,7 +140,7 @@ void ultracam_ProcessIsocData(uvd_t *uvd, usbvideo_frame_t *frame)
  * 1/27/00  Added check for dev == NULL; this happens if camera is unplugged.
  */
 static int ultracam_veio(
-	uvd_t *uvd,
+	struct uvd *uvd,
 	unsigned char req,
 	unsigned short value,
 	unsigned short index,
@@ -193,7 +193,7 @@ static int ultracam_veio(
 /*
  * ultracam_calculate_fps()
  */
-static int ultracam_calculate_fps(uvd_t *uvd)
+static int ultracam_calculate_fps(struct uvd *uvd)
 {
 	return 3 + framerate*4 + framerate/2;
 }
@@ -201,14 +201,14 @@ static int ultracam_calculate_fps(uvd_t *uvd)
 /*
  * ultracam_adjust_contrast()
  */
-static void ultracam_adjust_contrast(uvd_t *uvd)
+static void ultracam_adjust_contrast(struct uvd *uvd)
 {
 }
 
 /*
  * ultracam_change_lighting_conditions()
  */
-static void ultracam_change_lighting_conditions(uvd_t *uvd)
+static void ultracam_change_lighting_conditions(struct uvd *uvd)
 {
 }
 
@@ -219,7 +219,7 @@ static void ultracam_change_lighting_conditions(uvd_t *uvd)
  * range [0..6], where 0 is most smooth and 6 is most sharp (raw image, I guess).
  * Recommended value is 4. Cameras model 2 do not have this feature at all.
  */
-static void ultracam_set_sharpness(uvd_t *uvd)
+static void ultracam_set_sharpness(struct uvd *uvd)
 {
 }
 
@@ -228,11 +228,11 @@ static void ultracam_set_sharpness(uvd_t *uvd)
  *
  * This procedure changes brightness of the picture.
  */
-static void ultracam_set_brightness(uvd_t *uvd)
+static void ultracam_set_brightness(struct uvd *uvd)
 {
 }
 
-static void ultracam_set_hue(uvd_t *uvd)
+static void ultracam_set_hue(struct uvd *uvd)
 {
 }
 
@@ -242,7 +242,7 @@ static void ultracam_set_hue(uvd_t *uvd)
  * This procedure gets called from V4L interface to update picture settings.
  * Here we change brightness and contrast.
  */
-static void ultracam_adjust_picture(uvd_t *uvd)
+static void ultracam_adjust_picture(struct uvd *uvd)
 {
 	ultracam_adjust_contrast(uvd);
 	ultracam_set_brightness(uvd);
@@ -255,7 +255,7 @@ static void ultracam_adjust_picture(uvd_t *uvd)
  * This code tells camera to stop streaming. The interface remains
  * configured and bandwidth - claimed.
  */
-static void ultracam_video_stop(uvd_t *uvd)
+static void ultracam_video_stop(struct uvd *uvd)
 {
 }
 
@@ -266,24 +266,24 @@ static void ultracam_video_stop(uvd_t *uvd)
  * resets the video pipe. This sequence was observed to reinit the
  * camera or, at least, to initiate ISO data stream.
  */
-static void ultracam_reinit_iso(uvd_t *uvd, int do_stop)
+static void ultracam_reinit_iso(struct uvd *uvd, int do_stop)
 {
 }
 
-static void ultracam_video_start(uvd_t *uvd)
+static void ultracam_video_start(struct uvd *uvd)
 {
 	ultracam_change_lighting_conditions(uvd);
 	ultracam_set_sharpness(uvd);
 	ultracam_reinit_iso(uvd, 0);
 }
 
-static int ultracam_resetPipe(uvd_t *uvd)
+static int ultracam_resetPipe(struct uvd *uvd)
 {
 	usb_clear_halt(uvd->dev, uvd->video_endp);
 	return 0;
 }
 
-static int ultracam_alternateSetting(uvd_t *uvd, int setting)
+static int ultracam_alternateSetting(struct uvd *uvd, int setting)
 {
 	static const char proc[] = "ultracam_alternateSetting";
 	int i;
@@ -299,7 +299,7 @@ static int ultracam_alternateSetting(uvd_t *uvd, int setting)
 /*
  * Return negative code on failure, 0 on success.
  */
-static int ultracam_setup_on_open(uvd_t *uvd)
+static int ultracam_setup_on_open(struct uvd *uvd)
 {
 	int setup_ok = 0; /* Success by default */
 	/* Send init sequence only once, it's large! */
@@ -487,7 +487,7 @@ static int ultracam_setup_on_open(uvd_t *uvd)
 	return setup_ok;
 }
 
-static void ultracam_configure_video(uvd_t *uvd)
+static void ultracam_configure_video(struct uvd *uvd)
 {
 	if (uvd == NULL)
 		return;
@@ -539,7 +539,7 @@ static void ultracam_configure_video(uvd_t *uvd)
  */
 static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const struct usb_device_id *devid)
 {
-	uvd_t *uvd = NULL;
+	struct uvd *uvd = NULL;
 	int i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
@@ -628,7 +628,7 @@ static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const st
 	MOD_INC_USE_COUNT;
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
-		/* Here uvd is a fully allocated uvd_t object */
+		/* Here uvd is a fully allocated uvd object */
 		uvd->flags = flags;
 		uvd->debug = debug;
 		uvd->dev = dev;

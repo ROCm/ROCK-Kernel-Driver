@@ -129,7 +129,7 @@ struct konicawc {
 #define konicawc_set_value(uvd, value, index)			konicawc_ctrl_msg(uvd, USB_DIR_OUT, 2, value, index, NULL, 0)
 
 
-static int konicawc_ctrl_msg(uvd_t *uvd, u8 dir, u8 request, u16 value, u16 index, void *buf, int len)
+static int konicawc_ctrl_msg(struct uvd *uvd, u8 dir, u8 request, u16 value, u16 index, void *buf, int len)
 {
         int retval = usb_control_msg(uvd->dev,
 		dir ? usb_rcvctrlpipe(uvd->dev, 0) : usb_sndctrlpipe(uvd->dev, 0),
@@ -138,21 +138,21 @@ static int konicawc_ctrl_msg(uvd_t *uvd, u8 dir, u8 request, u16 value, u16 inde
 }
 
 
-static inline void konicawc_camera_on(uvd_t *uvd)
+static inline void konicawc_camera_on(struct uvd *uvd)
 {
         DEBUG(0, "camera on");
         konicawc_set_misc(uvd, 0x2, 1, 0x0b);
 }
 
 
-static inline void konicawc_camera_off(uvd_t *uvd)
+static inline void konicawc_camera_off(struct uvd *uvd)
 {
         DEBUG(0, "camera off");
         konicawc_set_misc(uvd, 0x2, 0, 0x0b);
 }
 
 
-static void konicawc_set_camera_size(uvd_t *uvd)
+static void konicawc_set_camera_size(struct uvd *uvd)
 {
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
@@ -166,7 +166,7 @@ static void konicawc_set_camera_size(uvd_t *uvd)
 }
 
 
-static int konicawc_setup_on_open(uvd_t *uvd)
+static int konicawc_setup_on_open(struct uvd *uvd)
 {
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
@@ -192,7 +192,7 @@ static int konicawc_setup_on_open(uvd_t *uvd)
 }
 
 
-static void konicawc_adjust_picture(uvd_t *uvd)
+static void konicawc_adjust_picture(struct uvd *uvd)
 {
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
@@ -218,7 +218,7 @@ static void konicawc_adjust_picture(uvd_t *uvd)
 }
 
 
-static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *stsurb)
+static int konicawc_compress_iso(struct uvd *uvd, struct urb *dataurb, struct urb *stsurb)
 {
 	char *cdata;
 	int i, totlen = 0;
@@ -316,7 +316,7 @@ static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *st
 }
 
 
-static void resubmit_urb(uvd_t *uvd, struct urb *urb)
+static void resubmit_urb(struct uvd *uvd, struct urb *urb)
 {
         int i, ret;
         for (i = 0; i < FRAMES_PER_DESC; i++) {
@@ -334,7 +334,7 @@ static void resubmit_urb(uvd_t *uvd, struct urb *urb)
 
 static void konicawc_isoc_irq(struct urb *urb)
 {
-	uvd_t *uvd = urb->context;
+	struct uvd *uvd = urb->context;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
 	/* We don't want to do anything if we are about to be removed! */
@@ -375,7 +375,7 @@ static void konicawc_isoc_irq(struct urb *urb)
 }
 
 
-static int konicawc_start_data(uvd_t *uvd)
+static int konicawc_start_data(struct uvd *uvd)
 {
 	struct usb_device *dev = uvd->dev;
 	int i, errFlag;
@@ -453,7 +453,7 @@ static int konicawc_start_data(uvd_t *uvd)
 }
 
 
-static void konicawc_stop_data(uvd_t *uvd)
+static void konicawc_stop_data(struct uvd *uvd)
 {
 	int i, j;
 	struct konicawc *cam;
@@ -488,7 +488,7 @@ static void konicawc_stop_data(uvd_t *uvd)
 }
 
 
-static void konicawc_process_isoc(uvd_t *uvd, usbvideo_frame_t *frame)
+static void konicawc_process_isoc(struct uvd *uvd, usbvideo_frame_t *frame)
 {	
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	int maxline = cam->maxline;
@@ -587,7 +587,7 @@ static int konicawc_find_fps(int size, int fps)
 }
 
 
-static int konicawc_set_video_mode(uvd_t *uvd, struct video_window *vw)
+static int konicawc_set_video_mode(struct uvd *uvd, struct video_window *vw)
 {
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	int newspeed = cam->speed;
@@ -653,14 +653,14 @@ static int konicawc_set_video_mode(uvd_t *uvd, struct video_window *vw)
 }
 
 
-static int konicawc_calculate_fps(uvd_t *uvd)
+static int konicawc_calculate_fps(struct uvd *uvd)
 {
 	struct konicawc *cam = uvd->user_data;
 	return spd_to_fps[cam->size][cam->speed]/3;
 }
 
 
-static void konicawc_configure_video(uvd_t *uvd)
+static void konicawc_configure_video(struct uvd *uvd)
 {
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	u8 buf[2];
@@ -719,7 +719,7 @@ static void konicawc_configure_video(uvd_t *uvd)
 
 static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *devid)
 {
-	uvd_t *uvd = NULL;
+	struct uvd *uvd = NULL;
 	int i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
@@ -795,7 +795,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
 		struct konicawc *cam = (struct konicawc *)(uvd->user_data);
-		/* Here uvd is a fully allocated uvd_t object */
+		/* Here uvd is a fully allocated uvd object */
 		for(i = 0; i < USBVIDEO_NUMSBUF; i++) {
 			cam->sts_urb[i] = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 			if(cam->sts_urb[i] == NULL) {
@@ -858,7 +858,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const st
 }
 
 
-static void konicawc_free_uvd(uvd_t *uvd)
+static void konicawc_free_uvd(struct uvd *uvd)
 {
 	int i;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
