@@ -28,7 +28,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"
-#define DRV_VERSION	"1.01"
+#define DRV_VERSION	"1.02"
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
@@ -43,6 +43,9 @@ enum {
 	 */
 	PIIX_COMB_PATA_P0	= (1 << 1),
 	PIIX_COMB		= (1 << 2), /* combined mode enabled? */
+
+	PIIX_PORT_PRESENT	= (1 << 0),
+	PIIX_PORT_ENABLED	= (1 << 4),
 
 	PIIX_80C_PRI		= (1 << 5) | (1 << 4),
 	PIIX_80C_SEC		= (1 << 7) | (1 << 6),
@@ -262,32 +265,48 @@ static void piix_pata_phy_reset(struct ata_port *ap)
 }
 
 /**
- *	piix_pcs_probe - Probe SATA port configuration and status register
- *	@ap: Port to probe
- *	@have_port: (output) Non-zero if SATA port is enabled
- *	@have_device: (output) Non-zero if SATA phy indicates device present
+ *	piix_sata_probe - Probe PCI device for present SATA devices
+ *	@pdev: PCI device to probe
  *
  *	Reads SATA PCI device's PCI config register Port Configuration
  *	and Status (PCS) to determine port and device availability.
  *
  *	LOCKING:
  *	None (inherited from caller).
+ *
+ *	RETURNS:
+ *	Non-zero if device detected, zero otherwise.
  */
-static void piix_pcs_probe (struct ata_port *ap, unsigned int *have_port,
-			    unsigned int *have_device)
+static int piix_sata_probe (struct ata_port *ap)
 {
 	struct pci_dev *pdev = ap->host_set->pdev;
-	u16 pcs;
+	int combined = (ap->flags & ATA_FLAG_SLAVE_POSS);
+	int orig_mask, mask, i;
+	u8 pcs;
 
-	pci_read_config_word(pdev, ICH5_PCS, &pcs);
+	mask = (PIIX_PORT_PRESENT << ap->port_no) |
+	       (PIIX_PORT_ENABLED << ap->port_no);
 
-	/* is SATA port enabled? */
-	if (pcs & (1 << ap->port_no)) {
-		*have_port = 1;
+	pci_read_config_byte(pdev, ICH5_PCS, &pcs);
+	orig_mask = (int) pcs & 0xff;
 
-		if (pcs & (1 << (ap->port_no + 4)))
-			*have_device = 1;
+	/* TODO: this is vaguely wrong for ICH6 combined mode,
+	 * where only two of the four SATA ports are mapped
+	 * onto a single ATA channel.  It is also vaguely inaccurate
+	 * for ICH5, which has only two ports.  However, this is ok,
+	 * as further device presence detection code will handle
+	 * any false positives produced here.
+	 */
+
+	for (i = 0; i < 4; i++) {
+		mask = (PIIX_PORT_PRESENT << i) | (PIIX_PORT_ENABLED << i);
+
+		if ((orig_mask & mask) == mask)
+			if (combined || (i == ap->port_no))
+				return 1;
 	}
+
+	return 0;
 }
 
 /**
@@ -302,9 +321,6 @@ static void piix_pcs_probe (struct ata_port *ap, unsigned int *have_port,
 
 static void piix_sata_phy_reset(struct ata_port *ap)
 {
-	const char *msg;
-	unsigned int have_port = 0, have_dev = 0;
-
 	if (!pci_test_config_bits(ap->host_set->pdev,
 				  &piix_enable_bits[ap->port_no])) {
 		ata_port_disable(ap);
@@ -312,18 +328,9 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 		return;
 	}
 
-	piix_pcs_probe(ap, &have_port, &have_dev);
-
-	if (!have_port)
-		msg = KERN_INFO "ata%u: SATA port disabled.\n";
-	else if (!have_dev)
-		msg = KERN_INFO "ata%u: SATA port has no device.\n";
-	else
-		msg = NULL;
-
-	if (msg) {
+	if (!piix_sata_probe(ap)) {
 		ata_port_disable(ap);
-		printk(msg, ap->id);
+		printk(KERN_INFO "ata%u: SATA port has no device.\n", ap->id);
 		return;
 	}
 
