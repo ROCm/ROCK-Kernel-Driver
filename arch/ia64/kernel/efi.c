@@ -711,6 +711,32 @@ efi_mem_attributes (unsigned long phys_addr)
 	return 0;
 }
 
+int
+valid_phys_addr_range (unsigned long phys_addr, unsigned long *size)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+
+		if (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT)) {
+			if (!(md->attribute & EFI_MEMORY_WB))
+				return 0;
+
+			if (*size > md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - phys_addr)
+				*size = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - phys_addr;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void __exit
 efivars_exit (void)
 {
