@@ -15,13 +15,12 @@
 
 LD=$(CROSS_COMPILE)ld -m elf_s390
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LDFLAGS=-e start
 ifeq ($(CONFIG_SHARED_KERNEL),y)
   LINKSCRIPT := arch/s390/vmlinux-shared.lds
 else
   LINKSCRIPT := arch/s390/vmlinux.lds
 endif
-LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) $(LDFLAGS)
+LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) -e start
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce

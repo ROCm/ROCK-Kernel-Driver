@@ -16,13 +16,12 @@
 LD=$(CROSS_COMPILE)ld -m elf64_s390
 CPP=$(CC) -E
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LDFLAGS=-e start
 ifeq ($(CONFIG_SHARED_KERNEL),y)
   LINKSCRIPT := arch/s390x/vmlinux-shared.lds
 else
   LINKSCRIPT := arch/s390x/vmlinux.lds
 endif
-LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) $(LDFLAGS)
+LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) -e start
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe

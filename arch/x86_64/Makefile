@@ -35,8 +35,7 @@ export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP
 
 LD=$(CROSS_COMPILE)ld -m elf_x86_64
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LDFLAGS=-e stext
-LINKFLAGS =-T $(TOPDIR)/arch/x86_64/vmlinux.lds $(LDFLAGS)
+LINKFLAGS =-T $(TOPDIR)/arch/x86_64/vmlinux.lds -e stext
 
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
