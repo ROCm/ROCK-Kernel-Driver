@@ -29,16 +29,38 @@ config CRYPTO_MD5
 	  MD5 message digest algorithm (RFC1321).
 
 config CRYPTO_SHA1
-	tristate "SHA-1 digest algorithm"
+	tristate "SHA1 digest algorithm"
 	depends on CRYPTO
 	help
-	  SHA-1 secure hash standard (FIPS 180-1).
+	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2).
+
+config CRYPTO_SHA256
+	tristate "SHA256 digest algorithm"
+	depends on CRYPTO
+	help
+	  SHA256 secure hash standard (DFIPS 180-2).
+	  
+	  This version of SHA implements a 256 bit hash with 128 bits of
+	  security against collision attacks.
 
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO
 	help
 	  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
+
+config CRYPTO_BLOWFISH
+	tristate "Blowfish cipher algorithm"
+	depends on CRYPTO
+	help
+	  Blowfish cipher algorithm, by Bruce Schneier.
+	  
+	  This is a variable key length cipher which can use keys from 32
+	  bits to 448 bits in length.  It's fast, simple and specifically
+	  designed for use on "large microprocessors".
+	  
+	  See also:
+	  http://www.counterpane.com/blowfish.html
 
 config CRYPTO_TEST
 	tristate "Testing module"

@@ -1032,11 +1032,6 @@ static int setkey(u32 *expkey, const u8 *key, unsigned int keylen, u32 *flags)
 	u32 n, w;
 	u8 bits0[56], bits1[56];
 
-	if (keylen != DES_KEY_SIZE) {
-		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
-		return -EINVAL;
-	}
-
 	n  = parity[key[0]]; n <<= 4;
 	n |= parity[key[1]]; n <<= 4;
 	n |= parity[key[2]]; n <<= 4;
@@ -1208,11 +1203,6 @@ static int des3_ede_setkey(void *ctx, const u8 *key,
 	unsigned int i, off;
 	struct des3_ede_ctx *dctx = ctx;
 
-	if (keylen != DES3_EDE_KEY_SIZE) {
-		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
-		return -EINVAL;
-	}
-
 	if (!(memcmp(key, &key[DES_KEY_SIZE], DES_KEY_SIZE) && 
 	    memcmp(&key[DES_KEY_SIZE], &key[DES_KEY_SIZE * 2],
 	    					DES_KEY_SIZE))) {
@@ -1249,33 +1239,35 @@ static void des3_ede_decrypt(void *ctx, u8 *dst, const u8 *src)
 }
 
 static struct crypto_alg des_alg = {
-	.cra_name	=	"des",
-	.cra_flags	=	CRYPTO_ALG_TYPE_CIPHER,
-	.cra_blocksize	=	DES_BLOCK_SIZE,
-	.cra_ctxsize	=	sizeof(struct des_ctx),
-	.cra_module	=	THIS_MODULE,
-	.cra_list	=	LIST_HEAD_INIT(des_alg.cra_list),
-	.cra_u		=	{ .cipher = {
-	.cia_keysize	=	DES_KEY_SIZE,
-	.cia_ivsize	=	DES_BLOCK_SIZE,
-	.cia_setkey   	= 	des_setkey,
-	.cia_encrypt 	=	des_encrypt,
-	.cia_decrypt  	=	des_decrypt } }
+	.cra_name		=	"des",
+	.cra_flags		=	CRYPTO_ALG_TYPE_CIPHER,
+	.cra_blocksize		=	DES_BLOCK_SIZE,
+	.cra_ctxsize		=	sizeof(struct des_ctx),
+	.cra_module		=	THIS_MODULE,
+	.cra_list		=	LIST_HEAD_INIT(des_alg.cra_list),
+	.cra_u			=	{ .cipher = {
+	.cia_min_keysize	=	DES_KEY_SIZE,
+	.cia_max_keysize	=	DES_KEY_SIZE,
+	.cia_ivsize		=	DES_BLOCK_SIZE,
+	.cia_setkey		= 	des_setkey,
+	.cia_encrypt		=	des_encrypt,
+	.cia_decrypt		=	des_decrypt } }
 };
 
 static struct crypto_alg des3_ede_alg = {
-	.cra_name	=	"des3_ede",
-	.cra_flags	=	CRYPTO_ALG_TYPE_CIPHER,
-	.cra_blocksize	=	DES3_EDE_BLOCK_SIZE,
-	.cra_ctxsize	=	sizeof(struct des3_ede_ctx),
-	.cra_module	=	THIS_MODULE,
-	.cra_list	=	LIST_HEAD_INIT(des3_ede_alg.cra_list),
-	.cra_u		=	{ .cipher = {
-	.cia_keysize	=	DES3_EDE_KEY_SIZE,
-	.cia_ivsize	=	DES3_EDE_BLOCK_SIZE,
-	.cia_setkey   	= 	des3_ede_setkey,
-	.cia_encrypt 	=	des3_ede_encrypt,
-	.cia_decrypt  	=	des3_ede_decrypt } }
+	.cra_name		=	"des3_ede",
+	.cra_flags		=	CRYPTO_ALG_TYPE_CIPHER,
+	.cra_blocksize		=	DES3_EDE_BLOCK_SIZE,
+	.cra_ctxsize		=	sizeof(struct des3_ede_ctx),
+	.cra_module		=	THIS_MODULE,
+	.cra_list		=	LIST_HEAD_INIT(des3_ede_alg.cra_list),
+	.cra_u			=	{ .cipher = {
+	.cia_min_keysize	=	DES3_EDE_KEY_SIZE,
+	.cia_max_keysize	=	DES3_EDE_KEY_SIZE,
+	.cia_ivsize		=	DES3_EDE_BLOCK_SIZE,
+	.cia_setkey	   	= 	des3_ede_setkey,
+	.cia_encrypt	 	=	des3_ede_encrypt,
+	.cia_decrypt	  	=	des3_ede_decrypt } }
 };
 
 static int __init init(void)
