@@ -744,469 +744,60 @@ void agp_enable(u32 mode)
 
 /* End - Generic Agp routines */
 
-
-/* per-chipset initialization data.
- * note -- all chipsets for a single vendor MUST be grouped together
- */
+/* per-chipset initialization data. */
 static struct {
-	unsigned short device_id; /* first, to make table easier to read */
-	unsigned short vendor_id;
-	enum chipset_type chipset;
-	const char *vendor_name;
-	const char *chipset_name;
-	int (*chipset_setup) (struct pci_dev *pdev);
-} agp_bridge_info[] __initdata = {
+	struct agp_bridge_info *ptr;
+} agp_bridge_list[] __initdata = {
 
 #ifdef CONFIG_AGP_ALI
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1541,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1541,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1541",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1621,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1621,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1621",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1631,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1631,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1631",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1632,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1632,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1632",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1641,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1641,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1641",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1644,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1644,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1644",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1647,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1647,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1647",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1651,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1651,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1651",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AL_M1671,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_M1671,
-		.vendor_name	= "Ali",
-		.chipset_name	= "M1671",
-		.chipset_setup	= ali_generic_setup,
-	},
-	{
-		.device_id	= 0,
-		.vendor_id	= PCI_VENDOR_ID_AL,
-		.chipset	= ALI_GENERIC,
-		.vendor_name	= "Ali",
-		.chipset_name	= "Generic",
-		.chipset_setup	= ali_generic_setup,
-	},
-#endif /* CONFIG_AGP_ALI */
-
-#ifdef CONFIG_AGP_AMD_8151
-	{ 
-		.device_id	= PCI_DEVICE_ID_AMD_8151_0,
-		.vendor_id  = PCI_VENDOR_ID_AMD,
-		.chipset    = AMD_8151,
-		.vendor_name = "AMD",
-		.chipset_name = "8151",
-		.chipset_setup = amd_8151_setup 
-	},
-#endif /* CONFIG_AGP_AMD */
-
-#ifdef CONFIG_AGP_AMD
-	{
-		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
-		.vendor_id	= PCI_VENDOR_ID_AMD,
-		.chipset	= AMD_IRONGATE,
-		.vendor_name	= "AMD",
-		.chipset_name	= "Irongate",
-		.chipset_setup	= amd_irongate_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700E,
-		.vendor_id	= PCI_VENDOR_ID_AMD,
-		.chipset	= AMD_761,
-		.vendor_name	= "AMD",
-		.chipset_name	= "761",
-		.chipset_setup	= amd_irongate_setup,
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700C,
-		.vendor_id	= PCI_VENDOR_ID_AMD,
-		.chipset	= AMD_762,
-		.vendor_name	= "AMD",
-		.chipset_name	= "760MP",
-		.chipset_setup	= amd_irongate_setup,
-	},
-	{
-		.device_id	= 0,
-		.vendor_id	= PCI_VENDOR_ID_AMD,
-		.chipset	= AMD_GENERIC,
-		.vendor_name	= "AMD",
-		.chipset_name	= "Generic",
-		.chipset_setup	= amd_irongate_setup,
-	},
-#endif /* CONFIG_AGP_AMD */
-#ifdef CONFIG_AGP_INTEL
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82443LX_0,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_LX,
-		.vendor_name	= "Intel",
-		.chipset_name	= "440LX",
-		.chipset_setup	= intel_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82443BX_0,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_BX,
-		.vendor_name	= "Intel",
-		.chipset_name	= "440BX",
-		.chipset_setup	= intel_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82443GX_0,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_GX,
-		.vendor_name	= "Intel",
-		.chipset_name	= "440GX",
-		.chipset_setup	= intel_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82815_MC,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I815,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i815",
-		.chipset_setup	= intel_815_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82820_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I820,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i820",
-		.chipset_setup	= intel_820_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82820_UP_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I820,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i820",
-		.chipset_setup	= intel_820_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82830_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I830_M,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i830M",
-		.chipset_setup	= intel_830mp_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82845G_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I845_G,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i845G",
-		.chipset_setup	= intel_830mp_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82840_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I840,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i840",
-		.chipset_setup	= intel_840_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82845_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I845,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i845",
-		.chipset_setup	= intel_845_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82850_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I850,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i850",
-		.chipset_setup	= intel_850_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_INTEL_82860_HB,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_I860,
-		.vendor_name	= "Intel",
-		.chipset_name	= "i860",
-		.chipset_setup	= intel_860_setup
-	},
-	{
-		.device_id	= 0,
-		.vendor_id	= PCI_VENDOR_ID_INTEL,
-		.chipset	= INTEL_GENERIC,
-		.vendor_name	= "Intel",
-		.chipset_name	= "Generic",
-		.chipset_setup	= intel_generic_setup
-	},
-
-#endif /* CONFIG_AGP_INTEL */
-
-#ifdef CONFIG_AGP_SIS
-	{
-		.device_id	= PCI_DEVICE_ID_SI_740,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "740",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_650,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "650",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_645,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "645",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_735,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "735",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_745,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "745",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_730,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "730",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_630,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "630",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_540,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "540",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_620,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "620",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_530,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "530",
-		.chipset_setup	= sis_generic_setup
-	},
-        {
-		.device_id	= PCI_DEVICE_ID_SI_550,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "550",
-		.chipset_setup	= sis_generic_setup
-	},
-	{
-		.device_id	= 0,
-		.vendor_id	= PCI_VENDOR_ID_SI,
-		.chipset	= SIS_GENERIC,
-		.vendor_name	= "SiS",
-		.chipset_name	= "Generic",
-		.chipset_setup	= sis_generic_setup
-	},
-#endif /* CONFIG_AGP_SIS */
-
-#ifdef CONFIG_AGP_VIA
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8501_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_MVP4,
-		.vendor_name	= "Via",
-		.chipset_name	= "MVP4",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_82C597_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_VP3,
-		.vendor_name	= "Via",
-		.chipset_name	= "VP3",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_82C598_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_MVP3,
-		.vendor_name	= "Via",
-		.chipset_name	= "MVP3",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_82C691,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_PRO,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8371_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_KX133,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro KX133",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8363_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_KT133,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro KT133",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8367_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_KT133,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro KT266",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_KT400,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro KT400",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_APOLLO_PRO,
-		.vendor_name	= "Via",
-		.chipset_name	= "Apollo Pro266T",
-		.chipset_setup	= via_generic_setup
-	},
-	{
-		.device_id	= 0,
-		.vendor_id	= PCI_VENDOR_ID_VIA,
-		.chipset	= VIA_GENERIC,
-		.vendor_name	= "Via",
-		.chipset_name	= "Generic",
-		.chipset_setup	= via_generic_setup
-	},
-#endif /* CONFIG_AGP_VIA */
-
-#ifdef CONFIG_AGP_HP_ZX1
-	{
-		.device_id	= PCI_DEVICE_ID_HP_ZX1_LBA,
-		.vendor_id	= PCI_VENDOR_ID_HP,
-		.chipset	= HP_ZX1,
-		.vendor_name	= "HP",
-		.chipset_name	= "ZX1",
-		.chipset_setup	= hp_zx1_setup
-	},
+	{ .ptr = &ali_agp_bridge_info },
 #endif
-
-	{ }, /* dummy final entry, always present */
+#ifdef CONFIG_AGP_AMD_8151
+	{.ptr = &amd_k8_agp_bridge_info },
+#endif
+#ifdef CONFIG_AGP_AMD
+	{.ptr = &amd_agp_bridge_info },
+#endif
+#ifdef CONFIG_AGP_INTEL
+	{.ptr = &intel_agp_bridge_info },
+#endif
+#ifdef CONFIG_AGP_SIS
+	{.ptr = &sis_agp_bridge_info },
+#endif
+#ifdef CONFIG_AGP_VIA
+	{.ptr = &via_agp_bridge_info },
+#endif
+#ifdef CONFIG_AGP_HP_ZX1
+	{.ptr = &hp_agp_bridge_info },
+#endif
+	{NULL},
 };
 
 
 /* scan table above for supported devices */
 static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 {
-	int i;
+	int i=0, j=0;
+	struct agp_bridge_info *bridge=NULL;
+	struct agp_device_ids *devs;
 	
-	for (i = 0; i < ARRAY_SIZE (agp_bridge_info); i++)
-		if (pdev->vendor == agp_bridge_info[i].vendor_id)
+	while (agp_bridge_list[i].ptr != NULL) {
+		bridge = agp_bridge_list[i].ptr;
+		if (pdev->vendor == bridge->vendor_id)
 			break;
+		i++;
+	}
 
-	if (i >= ARRAY_SIZE (agp_bridge_info)) {
+	/* Vendor not found! */
+	if (bridge == NULL) {
 		printk (KERN_DEBUG PFX "unsupported bridge\n");
 		return -ENODEV;
 	}
 
-	while ((i < ARRAY_SIZE (agp_bridge_info)) &&
-	       (agp_bridge_info[i].vendor_id == pdev->vendor)) {
-		if (pdev->device == agp_bridge_info[i].device_id) {
+	devs = bridge->ids;
+
+	while (devs[j].chipset_name != NULL) {
+		if (pdev->device == devs[j].device_id) {
 #ifdef CONFIG_AGP_ALI
 			if (pdev->device == PCI_DEVICE_ID_AL_M1621) {
 				u8 hidden_1621_id;
@@ -1214,21 +805,21 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 				pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
 				switch (hidden_1621_id) {
 				case 0x31:
-					agp_bridge_info[i].chipset_name="M1631";
+					devs[j].chipset_name="M1631";
 					break;
 				case 0x32:
-					agp_bridge_info[i].chipset_name="M1632";
+					devs[j].chipset_name="M1632";
 					break;
 				case 0x41:
-					agp_bridge_info[i].chipset_name="M1641";
+					devs[j].chipset_name="M1641";
 					break;
 				case 0x43:
 					break;
 				case 0x47:
-					agp_bridge_info[i].chipset_name="M1647";
+					devs[j].chipset_name="M1647";
 					break;
 				case 0x51:
-					agp_bridge_info[i].chipset_name="M1651";
+					devs[j].chipset_name="M1651";
 					break;
 				default:
 					break;
@@ -1237,30 +828,32 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 #endif
 
 			printk (KERN_INFO PFX "Detected %s %s chipset\n",
-				agp_bridge_info[i].vendor_name,
-				agp_bridge_info[i].chipset_name);
-			agp_bridge.type = agp_bridge_info[i].chipset;
-			return agp_bridge_info[i].chipset_setup (pdev);
+				bridge->vendor_name, devs[j].chipset_name);
+			agp_bridge.type = devs[j].chipset;
+
+			if (devs[j].chipset_setup != NULL)
+				return devs[j].chipset_setup(pdev);
+			else
+				return bridge->chipset_setup(pdev);
 		}
-		
-		i++;
+		j++;
 	}
 
-	i--; /* point to vendor generic entry (device_id == 0) */
+	j--; /* point to vendor generic entry (device_id == 0) */
 
 	/* try init anyway, if user requests it AND
 	 * there is a 'generic' bridge entry for this vendor */
-	if (agp_try_unsupported && agp_bridge_info[i].device_id == 0) {
+	if (agp_try_unsupported && devs[i].device_id == 0) {
 		printk(KERN_WARNING PFX "Trying generic %s routines"
 		       " for device id: %04x\n",
-		       agp_bridge_info[i].vendor_name, pdev->device);
-		agp_bridge.type = agp_bridge_info[i].chipset;
-		return agp_bridge_info[i].chipset_setup (pdev);
+		       bridge->vendor_name, pdev->device);
+		agp_bridge.type = devs[i].chipset;
+		return bridge->chipset_setup(pdev);
 	}
 
 	printk(KERN_ERR PFX "Unsupported %s chipset (device id: %04x),"
-	       " you might want to try agp_try_unsupported=1.\n",
-	       agp_bridge_info[i].vendor_name, pdev->device);
+		" you might want to try agp_try_unsupported=1.\n",
+		bridge->vendor_name, pdev->device);
 	return -ENODEV;
 }
 

@@ -31,7 +31,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-
+#include "i8x0.h"
 
 static int intel_fetch_size(void)
 {
