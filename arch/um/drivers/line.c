@@ -415,8 +415,7 @@ struct tty_driver *line_register_devfs(struct lines *set,
 			 struct tty_operations *ops, struct line *lines,
 			 int nlines)
 {
-	int err, i;
-	char *from, *to;
+	int i;
 	struct tty_driver *driver = alloc_tty_driver(nlines);
 
 	if (!driver)
@@ -435,12 +434,6 @@ struct tty_driver *line_register_devfs(struct lines *set,
 
 	if (tty_register_driver(driver))
 		panic("line_register_devfs : Couldn't register driver\n");
-
-	from = line_driver->symlink_from;
-	to = line_driver->symlink_to;
-	err = devfs_mk_symlink(from, to);
-	if(err) printk("Symlink creation from /dev/%s to /dev/%s "
-		       "returned %d\n", from, to, err);
 
 	for(i = 0; i < nlines; i++){
 		if(!lines[i].valid) 
