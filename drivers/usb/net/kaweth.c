@@ -57,10 +57,10 @@
 #include <linux/types.h>
 #include <linux/ethtool.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
-#include <asm/dma-mapping.h>
 
 #define DEBUG
 

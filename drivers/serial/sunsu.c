@@ -46,8 +46,7 @@
 #include <asm/isa.h>
 #endif
 
-/* #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ) */
-#if defined(CONFIG_MAGIC_SYSRQ)
+#if defined(CONFIG_SERIAL_SUNSU_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
@@ -1347,6 +1346,8 @@ static int __init sunsu_kbd_ms_init(void)
  * ------------------------------------------------------------
  */
 
+#ifdef CONFIG_SERIAL_SUNSU_CONSOLE
+
 #define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
 
 /*
@@ -1465,6 +1466,7 @@ static struct console sunsu_cons = {
 	.index	=	-1,
 	.data	=	&sunsu_reg,
 };
+#define SUNSU_CONSOLE	(&sunsu_cons)
 
 /*
  *	Register console.
@@ -1492,6 +1494,10 @@ static int __init sunsu_serial_console_init(void)
 	register_console(&sunsu_cons);
 	return 0;
 }
+#else
+#define SUNSU_CONSOLE			(NULL)
+#define sunsu_serial_console_init()	do { } while (0)
+#endif
 
 static int __init sunsu_serial_init(void)
 {
@@ -1522,7 +1528,7 @@ static int __init sunsu_serial_init(void)
 	sunserial_current_minor += instance;
 
 	sunsu_reg.nr = instance;
-	sunsu_reg.cons = &sunsu_cons;
+	sunsu_reg.cons = SUNSU_CONSOLE;
 
 	ret = uart_register_driver(&sunsu_reg);
 	if (ret < 0)
