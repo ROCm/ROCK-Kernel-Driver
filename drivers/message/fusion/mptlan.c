@@ -154,7 +154,7 @@ static int  mpt_lan_open(struct net_device *dev);
 static int  mpt_lan_reset(struct net_device *dev);
 static int  mpt_lan_close(struct net_device *dev);
 static void mpt_lan_post_receive_buckets(void *dev_id);
-static void mpt_lan_wake_post_buckets_task(struct net_device *dev, 
+static void mpt_lan_wake_post_buckets_task(struct net_device *dev,
 					   int priority);
 static int  mpt_lan_receive_post_turbo(struct net_device *dev, u32 tmsg);
 static int  mpt_lan_receive_post_reply(struct net_device *dev,
@@ -868,7 +868,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static inline void
 mpt_lan_wake_post_buckets_task(struct net_device *dev, int priority)
-/* 
+/*
  * @priority: 0 = put it on the timer queue, 1 = put it on the immediate queue
  */
 {
@@ -878,8 +878,6 @@ mpt_lan_wake_post_buckets_task(struct net_device *dev, int priority)
 		if (priority) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 			schedule_work(&priv->post_buckets_task);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,40)
-			schedule_task(&priv->post_buckets_task);
 #else
 			queue_task(&priv->post_buckets_task, &tq_immediate);
 			mark_bh(IMMEDIATE_BH);
@@ -887,8 +885,6 @@ mpt_lan_wake_post_buckets_task(struct net_device *dev, int priority)
 		} else {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 			schedule_delayed_work(&priv->post_buckets_task, 1);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,40)
-			schedule_task(&priv->post_buckets_task);
 #else
 			queue_task(&priv->post_buckets_task, &tq_timer);
 #endif
@@ -1191,7 +1187,7 @@ mpt_lan_receive_post_reply(struct net_device *dev,
 			remaining, atomic_read(&priv->buckets_out));
 	
 	if ((remaining < priv->bucketthresh) &&
-	    ((atomic_read(&priv->buckets_out) - remaining) > 
+	    ((atomic_read(&priv->buckets_out) - remaining) >
 	     MPT_LAN_BUCKETS_REMAIN_MISMATCH_THRESH)) {
 		
 		printk (KERN_WARNING MYNAM " Mismatch between driver's "
@@ -1525,7 +1521,7 @@ mpt_lan_init (void)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-void __init mpt_lan_exit(void)
+static void mpt_lan_exit(void)
 {
 	int i;
 
@@ -1534,10 +1530,11 @@ void __init mpt_lan_exit(void)
 	for (i = 0; mpt_landev[i] != NULL; i++) {
 		struct net_device *dev = mpt_landev[i];
 
-		printk (KERN_INFO MYNAM ": %s/%s: Fusion MPT LAN device unregistered\n",
+		printk (KERN_INFO ": %s/%s: Fusion MPT LAN device unregistered\n",
 			       IOC_AND_NETDEV_NAMES_s_s(dev));
 		unregister_fcdev(dev);
-		mpt_landev[i] = (struct net_device *) 0xdeadbeef; /* Debug */
+		//mpt_landev[i] = (struct net_device *) 0xdeadbeef; /* Debug */
+		mpt_landev[i] = NULL;
 	}
 
 	if (LanCtx >= 0) {
@@ -1550,9 +1547,10 @@ void __init mpt_lan_exit(void)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,59)
 MODULE_PARM(tx_max_out_p, "i");
 MODULE_PARM(max_buckets_out, "i"); // Debug stuff. FIXME!
+#endif
 
 module_init(mpt_lan_init);
 module_exit(mpt_lan_exit);

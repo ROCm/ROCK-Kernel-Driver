@@ -186,69 +186,12 @@ static inline void l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk, stru
 	write_unlock(&l->lock);
 }
 
-int l2cap_connect(struct sock *sk)
-{
-	bdaddr_t *src = &bt_sk(sk)->src;
-	bdaddr_t *dst = &bt_sk(sk)->dst;
-	struct l2cap_conn *conn;
-	struct hci_conn   *hcon;
-	struct hci_dev    *hdev;
-	int err = 0;
-
-	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
-
-	if (!(hdev = hci_get_route(dst, src)))
-		return -EHOSTUNREACH;
-
-	hci_dev_lock_bh(hdev);
-
-	err = -ENOMEM;
-
-	hcon = hci_connect(hdev, ACL_LINK, dst);
-	if (!hcon)
-		goto done;
-
-	conn = l2cap_conn_add(hcon, 0);
-	if (!conn) {
-		hci_conn_put(hcon);
-		goto done;
-	}
-
-	err = 0;
-
-	/* Update source addr of the socket */
-	bacpy(src, conn->src);
-
-	l2cap_chan_add(conn, sk, NULL);
-
-	sk->state = BT_CONNECT;
-	l2cap_sock_set_timer(sk, sk->sndtimeo);
-
-	if (hcon->state == BT_CONNECTED) {
-		if (sk->type == SOCK_SEQPACKET) {
-			struct l2cap_conn_req req;
-			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
-			req.psm  = l2cap_pi(sk)->psm;
-			l2cap_send_req(conn, L2CAP_CONN_REQ, sizeof(req), &req);
-		} else {
-			l2cap_sock_clear_timer(sk);
-			sk->state = BT_CONNECTED;
-		}
-	}
-
-done:
-	hci_dev_unlock_bh(hdev);
-	hci_dev_put(hdev);
-	return err;
-}
-
 /* ---- Socket interface ---- */
 static struct sock *__l2cap_get_sock_by_addr(u16 psm, bdaddr_t *src)
 {
 	struct sock *sk;
 	for (sk = l2cap_sk_list.head; sk; sk = sk->next) {
-		if (l2cap_pi(sk)->psm == psm &&
-				!bacmp(&bt_sk(sk)->src, src))
+		if (l2cap_pi(sk)->sport == psm && !bacmp(&bt_sk(sk)->src, src))
 			break;
 	}
 	return sk;
@@ -437,7 +380,10 @@ static int l2cap_sock_create(struct socket *sock, int protocol)
 
 	if (sock->type != SOCK_SEQPACKET && sock->type != SOCK_DGRAM && sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
-
+	
+	if (sock->type == SOCK_RAW && !capable(CAP_NET_RAW))
+		return -EPERM;
+	
 	sock->ops = &l2cap_sock_ops;
 
 	sk = l2cap_sock_alloc(sock, protocol, GFP_KERNEL);
@@ -472,13 +418,70 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
 	} else {
 		/* Save source address */
 		bacpy(&bt_sk(sk)->src, &la->l2_bdaddr);
-		l2cap_pi(sk)->psm = la->l2_psm;
+		l2cap_pi(sk)->psm   = la->l2_psm;
+		l2cap_pi(sk)->sport = la->l2_psm;
 		sk->state = BT_BOUND;
 	}
 	write_unlock_bh(&l2cap_sk_list.lock);
 
 done:
 	release_sock(sk);
+	return err;
+}
+
+static int l2cap_do_connect(struct sock *sk)
+{
+	bdaddr_t *src = &bt_sk(sk)->src;
+	bdaddr_t *dst = &bt_sk(sk)->dst;
+	struct l2cap_conn *conn;
+	struct hci_conn   *hcon;
+	struct hci_dev    *hdev;
+	int err = 0;
+
+	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
+
+	if (!(hdev = hci_get_route(dst, src)))
+		return -EHOSTUNREACH;
+
+	hci_dev_lock_bh(hdev);
+
+	err = -ENOMEM;
+
+	hcon = hci_connect(hdev, ACL_LINK, dst);
+	if (!hcon)
+		goto done;
+
+	conn = l2cap_conn_add(hcon, 0);
+	if (!conn) {
+		hci_conn_put(hcon);
+		goto done;
+	}
+
+	err = 0;
+
+	/* Update source addr of the socket */
+	bacpy(src, conn->src);
+
+	l2cap_chan_add(conn, sk, NULL);
+
+	sk->state = BT_CONNECT;
+	l2cap_sock_set_timer(sk, sk->sndtimeo);
+
+	if (hcon->state == BT_CONNECTED) {
+		if (sk->type == SOCK_SEQPACKET) {
+			struct l2cap_conn_req req;
+			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
+			req.psm  = l2cap_pi(sk)->psm;
+			l2cap_send_req(conn, L2CAP_CONN_REQ, sizeof(req), &req);
+		} else {
+			l2cap_sock_clear_timer(sk);
+			sk->state = BT_CONNECTED;
+		}
+	}
+
+done:
+	hci_dev_unlock_bh(hdev);
+	hci_dev_put(hdev);
 	return err;
 }
 
@@ -527,7 +530,7 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 	bacpy(&bt_sk(sk)->dst, &la->l2_bdaddr);
 	l2cap_pi(sk)->psm = la->l2_psm;
 
-	if ((err = l2cap_connect(sk)))
+	if ((err = l2cap_do_connect(sk)))
 		goto done;
 
 wait:
@@ -2051,30 +2054,31 @@ static struct file_operations l2cap_seq_fops = {
 	.release = seq_release,
 };
 
-static int __init l2cap_proc_init(void)
+static int  __init l2cap_proc_init(void)
 {
         struct proc_dir_entry *p = create_proc_entry("l2cap", S_IRUGO, proc_bt);
         if (!p)
                 return -ENOMEM;
+	p->owner     = THIS_MODULE;
         p->proc_fops = &l2cap_seq_fops;
         return 0;
 }
 
-static void __init l2cap_proc_cleanup(void)
+static void __exit l2cap_proc_cleanup(void)
 {
         remove_proc_entry("l2cap", proc_bt);
 }
 
 #else /* CONFIG_PROC_FS */
 
-static int __init l2cap_proc_init(void)
+static int  __init l2cap_proc_init(void)
 {
         return 0;
 }
 
-static void __init l2cap_proc_cleanup(void)
+static void __exit l2cap_proc_cleanup(void)
 {
-        return 0;
+        return;
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -2136,7 +2140,7 @@ int __init l2cap_init(void)
 	return 0;
 }
 
-void l2cap_cleanup(void)
+void __exit l2cap_cleanup(void)
 {
 	l2cap_proc_cleanup();
 

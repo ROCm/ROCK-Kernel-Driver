@@ -84,6 +84,7 @@ struct rpc_auth {
  * Client authentication ops
  */
 struct rpc_authops {
+	struct module		*owner;
 	rpc_authflavor_t	au_flavor;	/* flavor (RPC_AUTH_*) */
 #ifdef RPC_DEBUG
 	char *			au_name;

@@ -1,6 +1,6 @@
 Sony Programmable I/O Control Device Driver Readme
 --------------------------------------------------
-	Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+	Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
 	Copyright (C) 2001-2002 Alcôve <www.alcove.com>
 	Copyright (C) 2001 Michael Ashley <m.ashley@unsw.edu.au>
 	Copyright (C) 2001 Junichi Morita <jun1m@mars.dti.ne.jp>
@@ -44,7 +44,7 @@ Several options can be passed to the sonypi driver, either by adding them
 to /etc/modules.conf file, when the driver is compiled as a module or by
 adding the following to the kernel command line (in your bootloader):
 
-	sonypi=minor[,verbose[,fnkeyinit[,camera[,compat[,mask]]]]]
+	sonypi=minor[,verbose[,fnkeyinit[,camera[,compat[,mask[,useinput]]]]]]
 
 where:
 
@@ -96,6 +96,11 @@ where:
 				SONYPI_THUMBPHRASE_MASK 	0x0200
 				SONYPI_MEYE_MASK		0x0400
 				SONYPI_MEMORYSTICK_MASK		0x0800
+
+	useinput:	if set (which is the default) jogdial events are
+			forwarded to the input subsystem as mouse wheel
+			events.
+			
 
 Module use:
 -----------

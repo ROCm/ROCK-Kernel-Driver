@@ -52,16 +52,6 @@ static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = {
 };
 #undef BV
 
-static void *slab_pool_alloc(int gfp_mask, void *data)
-{
-	return kmem_cache_alloc(data, gfp_mask);
-}
-
-static void slab_pool_free(void *ptr, void *data)
-{
-	kmem_cache_free(data, ptr);
-}
-
 static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, unsigned long *idx)
 {
 	struct biovec_pool *bp;
@@ -749,8 +739,8 @@ static void __init biovec_init_pools(void)
 		if (i >= scale)
 			pool_entries >>= 1;
 
-		bp->pool = mempool_create(pool_entries, slab_pool_alloc,
-					slab_pool_free, bp->slab);
+		bp->pool = mempool_create(pool_entries, mempool_alloc_slab,
+					mempool_free_slab, bp->slab);
 		if (!bp->pool)
 			panic("biovec: can't init mempool\n");
 
@@ -766,7 +756,7 @@ static int __init init_bio(void)
 					SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!bio_slab)
 		panic("bio: can't create slab cache\n");
-	bio_pool = mempool_create(BIO_POOL_SIZE, slab_pool_alloc, slab_pool_free, bio_slab);
+	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab, mempool_free_slab, bio_slab);
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
 

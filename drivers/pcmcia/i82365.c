@@ -1018,11 +1018,6 @@ static int pcic_register_callback(unsigned int sock, void (*handler)(void *, uns
 {
     socket[sock].handler = handler;
     socket[sock].info = info;
-    if (handler == NULL) {
-	MOD_DEC_USE_COUNT;
-    } else {
-	MOD_INC_USE_COUNT;
-    }
     return 0;
 } /* pcic_register_callback */
 
@@ -1568,18 +1563,19 @@ static int pcic_suspend(unsigned int sock)
 }
 
 static struct pccard_operations pcic_operations = {
-	pcic_init,
-	pcic_suspend,
-	pcic_register_callback,
-	pcic_inquire_socket,
-	pcic_get_status,
-	pcic_get_socket,
-	pcic_set_socket,
-	pcic_get_io_map,
-	pcic_set_io_map,
-	pcic_get_mem_map,
-	pcic_set_mem_map,
-	pcic_proc_setup
+	.owner			= THIS_MODULE,
+	.init			= pcic_init,
+	.suspend		= pcic_suspend,
+	.register_callback	= pcic_register_callback,
+	.inquire_socket		= pcic_inquire_socket,
+	.get_status		= pcic_get_status,
+	.get_socket		= pcic_get_socket,
+	.set_socket		= pcic_set_socket,
+	.get_io_map		= pcic_get_io_map,
+	.set_io_map		= pcic_set_io_map,
+	.get_mem_map		= pcic_get_mem_map,
+	.set_mem_map		= pcic_set_mem_map,
+	.proc_setup		= pcic_proc_setup,
 };
 
 /*====================================================================*/

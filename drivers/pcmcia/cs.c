@@ -244,7 +244,14 @@ static const lookup_t service_table[] = {
 
 static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned int), void * info)
 {
-	return s->ss_entry->register_callback(s->sock, handler, info);
+	int error;
+
+	if (handler && !try_module_get(s->ss_entry->owner))
+		return -ENODEV;
+	error = s->ss_entry->register_callback(s->sock, handler, info);
+	if (!handler)
+		module_put(s->ss_entry->owner);
+	return error;
 }
 
 static int get_socket_status(socket_info_t *s, int *val)

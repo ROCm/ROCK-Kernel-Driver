@@ -173,44 +173,6 @@ int pci_visit_dev (struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
 EXPORT_SYMBOL(pci_visit_dev);
 
 /**
- * pci_is_dev_in_use - query devices' usage
- * @dev: PCI device to query
- *
- * Queries whether a given PCI device is in use by a driver or not.
- * Returns 1 if the device is in use, 0 if it is not.
- */
-int pci_is_dev_in_use(struct pci_dev *dev)
-{
-	/* 
-	 * dev->driver will be set if the device is in use by a new-style 
-	 * driver -- otherwise, check the device's regions to see if any
-	 * driver has claimed them.
-	 */
-
-	int i;
-	int inuse = 0;
-
-	if (dev->driver) {
-		/* Assume driver feels responsible */
-		return 1;
-	}
-
-	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
-		if (!pci_resource_start(dev, i))
-			continue;
-		if (pci_resource_flags(dev, i) & IORESOURCE_IO) {
-			inuse = check_region(pci_resource_start(dev, i),
-					     pci_resource_len(dev, i));
-		} else if (pci_resource_flags(dev, i) & IORESOURCE_MEM) {
-			inuse = check_mem_region(pci_resource_start(dev, i),
-						 pci_resource_len(dev, i));
-		}
-	}
-	return inuse;
-}
-EXPORT_SYMBOL(pci_is_dev_in_use);
-
-/**
  * pci_remove_device_safe - remove an unused hotplug device
  * @dev: the device to remove
  *
@@ -221,9 +183,8 @@ EXPORT_SYMBOL(pci_is_dev_in_use);
  */
 int pci_remove_device_safe(struct pci_dev *dev)
 {
-	if (pci_is_dev_in_use(dev)) {
+	if (pci_dev_driver(dev))
 		return -EBUSY;
-	}
 	pci_remove_device(dev);
 	return 0;
 }
