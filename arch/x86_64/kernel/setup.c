@@ -65,6 +65,7 @@ unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 int acpi_disabled = 0;
+int acpi_ht = 0;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
@@ -204,9 +205,24 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			acpi_disabled = 0;
 		}
 
-		if (!memcmp(from, "disableapic", 11))
+		/* acpi=ht just means: do ACPI MADT parsing 
+		   at bootup, but don't enable the full ACPI interpreter */
+		if (!memcmp(from, "acpi=ht", 7)) { 
+			acpi_ht = 1; 
+		}
+
+		if (!memcmp(from, "nolapic", 7) ||
+		    !memcmp(from, "disableapic", 11))
 			disable_apic = 1;
 
+		if (!memcmp(from, "noapic", 6)) 
+			skip_ioapic_setup = 1;
+
+		if (!memcmp(from, "apic", 6)) { 
+			skip_ioapic_setup = 0;
+			ioapic_force = 1;
+		}
+			
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
@@ -417,6 +433,13 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	paging_init();
+
+#ifndef CONFIG_SMP
+	/* Temporary hack: disable the IO-APIC for UP Nvidia and 
+	   This is until we sort out the ACPI problems. */
+	if (!acpi_disabled) 
+		check_ioapic();
+#endif
 #ifdef CONFIG_ACPI_BOOT
        /*
         * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
