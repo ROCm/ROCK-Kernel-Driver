@@ -31,6 +31,9 @@ if [ "$CONFIG_X86" = "y" ]; then
       tristate     '  Fan'		CONFIG_ACPI_FAN
       tristate     '  Processor'	CONFIG_ACPI_PROCESSOR
       dep_tristate '  Thermal Zone' 	CONFIG_ACPI_THERMAL $CONFIG_ACPI_PROCESSOR
+      if [ "$CONFIG_NUMA" = "y" ]; then
+        bool       '  NUMA support'     CONFIG_ACPI_NUMA $CONFIG_NUMA
+      fi
       tristate     '  Toshiba Laptop Extras'	CONFIG_ACPI_TOSHIBA
       bool         '  Debug Statements'	CONFIG_ACPI_DEBUG
     fi
@@ -58,6 +61,7 @@ if [ "$CONFIG_IA64" = "y" ]; then
     define_bool CONFIG_ACPI_FAN		n
     define_bool CONFIG_ACPI_PROCESSOR	n
     define_bool CONFIG_ACPI_THERMAL	n
+    define_bool CONFIG_ACPI_NUMA	y
     endmenu
   fi
 
@@ -77,7 +81,10 @@ if [ "$CONFIG_IA64" = "y" ]; then
     tristate     '  Button'		CONFIG_ACPI_BUTTON
     tristate     '  Fan'		CONFIG_ACPI_FAN
     tristate     '  Processor'		CONFIG_ACPI_PROCESSOR
-    dep_tristate '  Thermal Zone' CONFIG_ACPI_THERMAL $CONFIG_ACPI_PROCESSOR
+    dep_tristate '  Thermal Zone'       CONFIG_ACPI_THERMAL $CONFIG_ACPI_PROCESSOR
+    if [ "$CONFIG_NUMA" = "y" ]; then
+      bool       '  NUMA support'       CONFIG_ACPI_NUMA $CONFIG_NUMA
+    fi
     bool         '  Debug Statements' 	CONFIG_ACPI_DEBUG
     endmenu
   fi
