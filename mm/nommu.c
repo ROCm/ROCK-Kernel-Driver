@@ -33,9 +33,10 @@ unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS; /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
-
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+
 EXPORT_SYMBOL(sysctl_max_map_count);
+EXPORT_SYMBOL(mem_map);
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -74,6 +75,8 @@ out_sig:
 out:
 	return -EFBIG;
 }
+
+EXPORT_SYMBOL(vmtruncate);
 
 /*
  * Return the total memory allocated for this pointer, not
@@ -431,6 +434,7 @@ unsigned long do_mmap_pgoff(
 
 	tblock->next = current->mm->context.tblock.next;
 	current->mm->context.tblock.next = tblock;
+	current->mm->total_vm += len >> PAGE_SHIFT;
 
 #ifdef DEBUG
 	printk("do_mmap:\n");
@@ -484,6 +488,7 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 	realalloc -= kobjsize(tblock);
 	askedalloc -= sizeof(struct mm_tblock_struct);
 	kfree(tblock);
+	mm->total_vm -= len >> PAGE_SHIFT;
 
 #ifdef DEBUG
 	show_process_blocks();
@@ -496,6 +501,7 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 void exit_mmap(struct mm_struct * mm)
 {
 	struct mm_tblock_struct *tmp;
+	mm->total_vm = 0;
 
 	if (!mm)
 		return;
@@ -575,3 +581,14 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr,
 void swap_unplug_io_fn(struct backing_dev_info *bdi, struct page *page)
 {
 }
+
+unsigned long arch_get_unmapped_area(struct file *file, unsigned long addr,
+	unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	return -ENOMEM;
+}
+
+void arch_unmap_area(struct vm_area_struct *area)
+{
+}
+

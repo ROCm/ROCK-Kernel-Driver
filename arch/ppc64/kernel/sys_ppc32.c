@@ -1328,3 +1328,21 @@ long ppc32_timer_create(clockid_t clock,
 
 	return err;
 }
+
+asmlinkage long sys32_add_key(const char __user *_type,
+			      const char __user *_description,
+			      const void __user *_payload,
+			      u32 plen,
+			      u32 ringid)
+{
+	return sys_add_key(_type, _description, _payload, plen, ringid);
+}
+
+asmlinkage long sys32_request_key(const char __user *_type,
+				  const char __user *_description,
+				  const char __user *_callout_info,
+				  u32 destringid)
+{
+	return sys_request_key(_type, _description, _callout_info, destringid);
+}
+

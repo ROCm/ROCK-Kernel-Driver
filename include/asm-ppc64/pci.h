@@ -13,12 +13,15 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
+#include <asm/machdep.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
+
+struct pci_dev;
 
 #ifdef CONFIG_PPC_ISERIES
 #define pcibios_scan_all_fns(a, b)	0
@@ -36,7 +39,13 @@ static inline void pcibios_penalize_isa_irq(int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
-struct pci_dev;
+#define HAVE_ARCH_PCI_GET_LEGACY_IDE_IRQ
+static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+{
+	if (ppc_md.pci_get_legacy_ide_irq)
+		return ppc_md.pci_get_legacy_ide_irq(dev, channel);
+	return channel ? 15 : 14;
+}
 
 #define HAVE_ARCH_PCI_MWI 1
 static inline int pcibios_prep_mwi(struct pci_dev *dev)

@@ -200,6 +200,9 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		}
 		brq.mrq.stop = brq.data.blocks > 1 ? &brq.stop : NULL;
 
+		brq.data.sg = mq->sg;
+		brq.data.sg_len = blk_rq_map_sg(req->q, req, brq.data.sg);
+
 		mmc_wait_for_req(card->host, &brq.mrq);
 		if (brq.cmd.error) {
 			printk(KERN_ERR "%s: error %d sending read/write command\n",

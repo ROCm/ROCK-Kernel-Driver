@@ -29,7 +29,7 @@
 #define S3C2410_LCDCON5	    S3C2410_LCDREG(0x10)
 
 #define S3C2410_LCDCON1_CLKVAL(x)  ((x) << 8)
-#define S3C2410_LCDCON1_MMODE	   (1<<6)
+#define S3C2410_LCDCON1_MMODE	   (1<<7)
 #define S3C2410_LCDCON1_DSCAN4	   (0<<5)
 #define S3C2410_LCDCON1_STN4	   (1<<5)
 #define S3C2410_LCDCON1_STN8	   (2<<5)
@@ -48,15 +48,15 @@
 #define S3C2410_LCDCON1_TFT16BPP   (12<<1)
 #define S3C2410_LCDCON1_TFT24BPP   (13<<1)
 
-#define S3C2410_LCDCON1_ENVDI	   (1)
+#define S3C2410_LCDCON1_ENVID	   (1)
 
 #define S3C2410_LCDCON2_VBPD(x)	    ((x) << 24)
 #define S3C2410_LCDCON2_LINEVAL(x)  ((x) << 14)
 #define S3C2410_LCDCON2_VFPD(x)	    ((x) << 6)
 #define S3C2410_LCDCON2_VSPW(x)	    ((x) << 0)
 
-#define S3C2410_LCDCON3_HBPD(x)	    ((x) << 25)
-#define S3C2410_LCDCON3_WDLY(x)	    ((x) << 25)
+#define S3C2410_LCDCON3_HBPD(x)	    ((x) << 19)
+#define S3C2410_LCDCON3_WDLY(x)	    ((x) << 19)
 #define S3C2410_LCDCON3_HOZVAL(x)   ((x) << 8)
 #define S3C2410_LCDCON3_HFPD(x)	    ((x) << 0)
 #define S3C2410_LCDCON3_LINEBLANK(x)((x) << 0)
@@ -83,6 +83,12 @@
 #define S3C2410_LCDSADDR1   S3C2410_LCDREG(0x14)
 #define S3C2410_LCDSADDR2   S3C2410_LCDREG(0x18)
 #define S3C2410_LCDSADDR3   S3C2410_LCDREG(0x1C)
+
+#define S3C2410_LCDBANK(x)	((x) << 21)
+#define S3C2410_LCDBASEU(x)	(x)
+
+#define S3C2410_OFFSIZE(x)	((x) << 11)
+#define S3C2410_PAGEWIDTH(x)	(x)
 
 /* colour lookup and miscellaneous controls */
 

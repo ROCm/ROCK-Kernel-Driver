@@ -1302,9 +1302,6 @@ extern void try_to_flush_leftover_data(ide_drive_t *);
  */
 extern int ide_wait_cmd(ide_drive_t *, u8, u8, u8, u8, u8 *);
 
-/* (ide_drive_t *drive, u8 *buf) */
-extern int ide_wait_cmd_task(ide_drive_t *, u8 *);
-
 typedef struct ide_task_s {
 /*
  *	struct hd_drive_task_hdr	tf;
@@ -1349,8 +1346,6 @@ extern void ata_input_data(ide_drive_t *, void *, u32);
 extern void ata_output_data(ide_drive_t *, void *, u32);
 extern void atapi_input_bytes(ide_drive_t *, void *, u32);
 extern void atapi_output_bytes(ide_drive_t *, void *, u32);
-extern void taskfile_input_data(ide_drive_t *, void *, u32);
-extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
@@ -1491,6 +1486,7 @@ void ide_init_sg_cmd(ide_drive_t *, struct request *);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 int __ide_dma_bad_drive(ide_drive_t *);
 int __ide_dma_good_drive(ide_drive_t *);
+int ide_use_dma(ide_drive_t *);
 int __ide_dma_off(ide_drive_t *);
 void ide_dma_verbose(ide_drive_t *);
 
@@ -1516,6 +1512,7 @@ extern int __ide_dma_timeout(ide_drive_t *);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 #else
+static inline int ide_use_dma(ide_drive_t *drive) { return 0; }
 static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
 static inline void ide_dma_verbose(ide_drive_t *drive) { ; }
 #endif /* CONFIG_BLK_DEV_IDEDMA */

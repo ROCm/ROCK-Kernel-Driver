@@ -2887,7 +2887,7 @@ static void vortex_get_drvinfo(struct net_device *dev,
 }
 
 static struct ethtool_ops vortex_ethtool_ops = {
-	.get_drvinfo =		vortex_get_drvinfo,
+	.get_drvinfo		= vortex_get_drvinfo,
 };
 
 #ifdef CONFIG_PCI

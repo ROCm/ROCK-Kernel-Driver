@@ -154,8 +154,8 @@ struct pci_ops rtas_pci_ops = {
 
 static void python_countermeasures(unsigned long addr)
 {
-	void *chip_regs;
-	volatile u32 *tmp, i;
+	void __iomem *chip_regs;
+	volatile u32 val;
 
 	/* Python's register file is 1 MB in size. */
 	chip_regs = ioremap(addr & ~(0xfffffUL), 0x100000); 
@@ -167,17 +167,17 @@ static void python_countermeasures(unsigned long addr)
 
 #define PRG_CL_RESET_VALID 0x00010000
 
-	tmp = (u32 *)((unsigned long)chip_regs + 0xf6030);
-
-	if (*tmp & PRG_CL_RESET_VALID) {
+	val = in_be32(chip_regs + 0xf6030);
+	if (val & PRG_CL_RESET_VALID) {
 		printk(KERN_INFO "Python workaround: ");
-		*tmp &= ~PRG_CL_RESET_VALID;
+		val &= ~PRG_CL_RESET_VALID;
+		out_be32(chip_regs + 0xf6030, val);
 		/*
 		 * We must read it back for changes to
 		 * take effect
 		 */
-		i = *tmp;
-		printk("reg0: %x\n", i);
+		val = in_be32(chip_regs + 0xf6030);
+		printk("reg0: %x\n", val);
 	}
 
 	iounmap(chip_regs);

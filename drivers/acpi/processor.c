@@ -429,8 +429,15 @@ acpi_processor_idle (void)
 	switch (pr->power.state) {
 
 	case ACPI_STATE_C1:
-		/* Invoke C1. */
-		safe_halt();
+		/*
+		 * Invoke C1.
+		 * Use the appropriate idle routine, the one that would
+		 * be used without acpi C-states.
+		 */
+		if (pm_idle_save)
+			pm_idle_save();
+		else
+			safe_halt();
 		/*
                  * TBD: Can't get time duration while in C1, as resumes
 		 *      go to an ISR rather than here.  Need to instrument
@@ -2461,6 +2468,72 @@ end:
 
 
 
+static int
+acpi_processor_start(
+	struct acpi_device	*device)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	u32			i = 0;
+	struct acpi_processor	*pr;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_start");
+
+	pr = acpi_driver_data(device);
+
+	result = acpi_processor_get_info(pr);
+	if (result) {
+		/* Processor is physically not present */
+		return_VALUE(0);
+	}
+
+	BUG_ON((pr->id >= NR_CPUS) || (pr->id < 0));
+
+	processors[pr->id] = pr;
+
+	result = acpi_processor_add_fs(device);
+	if (result)
+		goto end;
+
+	status = acpi_install_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
+		acpi_processor_notify, pr);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Error installing device notify handler\n"));
+	}
+
+	/*
+	 * Install the idle handler if processor power management is supported.
+	 * Note that we use previously set idle handler will be used on 
+	 * platforms that only support C1.
+	 */
+	if ((pr->flags.power) && (!boot_option_idle_override)) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		for (i = 1; i < ACPI_C_STATE_COUNT; i++)
+			if (pr->power.states[i].valid)
+				printk(" C%d", i);
+		printk(")\n");
+		if (pr->id == 0) {
+			pm_idle_save = pm_idle;
+			pm_idle = acpi_processor_idle;
+		}
+	}
+	
+	if (pr->flags.throttling) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		printk(" %d throttling states", pr->throttling.state_count);
+		printk(")\n");
+	}
+
+end:
+
+	return_VALUE(result);
+}
+
+
+
 static void
 acpi_processor_notify (
 	acpi_handle		handle,
@@ -2518,8 +2591,6 @@ acpi_processor_add (
 	strcpy(acpi_device_name(device), ACPI_PROCESSOR_DEVICE_NAME);
 	strcpy(acpi_device_class(device), ACPI_PROCESSOR_CLASS);
 	acpi_driver_data(device) = pr;
-
-	return_VALUE(0);
 }
 
 

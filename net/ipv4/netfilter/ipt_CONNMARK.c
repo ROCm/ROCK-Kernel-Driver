@@ -60,7 +60,7 @@ target(struct sk_buff **pskb,
 		break;
 	    case IPT_CONNMARK_RESTORE:
 		nfmark = (*pskb)->nfmark;
-		diff = (ct->mark ^ nfmark & markinfo->mask);
+		diff = (ct->mark ^ nfmark) & markinfo->mask;
 		if (diff != 0) {
 		    (*pskb)->nfmark = nfmark ^ diff;
 		    (*pskb)->nfcache |= NFC_ALTERED;

@@ -17,6 +17,7 @@
 #include <asm/smp.h>
 #include <asm/io_apic.h>
 #include <asm/hw_irq.h>
+#include <linux/acpi.h>
 
 #include "pci.h"
 
@@ -1002,13 +1003,24 @@ static int __init pcibios_irq_init(void)
 subsys_initcall(pcibios_irq_init);
 
 
-void pcibios_penalize_isa_irq(int irq)
+static void pirq_penalize_isa_irq(int irq)
 {
 	/*
 	 *  If any ISAPnP device reports an IRQ in its list of possible
 	 *  IRQ's, we try to avoid assigning it to PCI devices.
 	 */
-	pirq_penalty[irq] += 100;
+	if (irq < 16)
+		pirq_penalty[irq] += 100;
+}
+
+void pcibios_penalize_isa_irq(int irq)
+{
+#ifdef CONFIG_ACPI_PCI
+	if (!acpi_noirq)
+		acpi_penalize_isa_irq(irq);
+	else
+#endif
+		pirq_penalize_isa_irq(irq);
 }
 
 int pirq_enable_irq(struct pci_dev *dev)

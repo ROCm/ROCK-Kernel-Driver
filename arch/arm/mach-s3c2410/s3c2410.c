@@ -189,13 +189,12 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 	printk("S3C2410: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
 	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
 	       print_mhz(s3c24xx_pclk));
-}
 
-static struct s3c2410_board *board;
+	/* initialise the clocks here, to allow other things like the
+	 * console to use them
+	 */
 
-void s3c2410_set_board(struct s3c2410_board *b)
-{
-	board = b;
+	s3c2410_init_clocks();
 }
 
 int __init s3c2410_init(void)
@@ -205,22 +204,5 @@ int __init s3c2410_init(void)
 	printk("S3C2410: Initialising architecture\n");
 
 	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
-	if (ret)
-		return ret;
-
-	if (board != NULL) {
-		if (board->devices != NULL) {
-			ret = platform_add_devices(board->devices,
-						   board->devices_count);
-
-			if (ret) {
-				printk(KERN_ERR "s3c2410: failed to add board devices (%d)\n", ret);
-			}
-		}
-
-		/* not adding board devices may not be fatal */
-		ret = 0;
-	}
-
 	return ret;
 }

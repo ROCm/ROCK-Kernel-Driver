@@ -221,7 +221,7 @@ acpi_bus_get_power_flags (
 	return 0;
 }
 
-static int
+int
 acpi_match_ids (
 	struct acpi_device	*device,
 	char			*ids)
@@ -476,12 +476,9 @@ acpi_bus_match (
 	struct acpi_device	*device,
 	struct acpi_driver	*driver)
 {
-	int error = 0;
-
-	error = driver->ops.match ? driver->ops.match(device, driver) : 
-			acpi_match_ids(device, driver->ids) ;
-
-	return error;
+	if (driver && driver->ops.match)
+		return driver->ops.match(device, driver);
+	return acpi_match_ids(device, driver->ids);
 }
 
 
@@ -661,9 +658,6 @@ acpi_bus_find_driver (
 	struct list_head	* node, *next;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_find_driver");
-
-	if (!device->flags.hardware_id && !device->flags.compatible_ids)
-		goto Done;
 
 	spin_lock(&acpi_device_lock);
 	list_for_each_safe(node,next,&acpi_bus_drivers) {

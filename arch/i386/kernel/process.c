@@ -57,6 +57,9 @@ asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int hlt_counter;
 
+unsigned long boot_option_idle_override = 0;
+EXPORT_SYMBOL(boot_option_idle_override);
+
 /*
  * Return saved PC of a blocked thread.
  */
@@ -214,6 +217,7 @@ static int __init idle_setup (char *str)
 		pm_idle = default_idle;
 	}
 
+	boot_option_idle_override = 1;
 	return 1;
 }
 

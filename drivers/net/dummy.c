@@ -77,7 +77,7 @@ static void __init dummy_setup(struct net_device *dev)
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = dev->priv;
+	struct net_device_stats *stats = netdev_priv(dev);
 
 	stats->tx_packets++;
 	stats->tx_bytes+=skb->len;
@@ -88,7 +88,7 @@ static int dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *dummy_get_stats(struct net_device *dev)
 {
-	return dev->priv;
+	return netdev_priv(dev);
 }
 
 static struct net_device **dummies;

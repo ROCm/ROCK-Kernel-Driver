@@ -1413,65 +1413,16 @@ config E100
 	depends on NET_PCI && PCI
 	select MII
 	---help---
-	  This driver supports Intel(R) PRO/100 family of adapters, which 
-	  includes:
-
-	  Controller  Adapter Name                       Board IDs
-	  ----------  ------------                       ---------
-
-	  82558       PRO/100+ PCI Adapter               668081-xxx, 
-	  689661-xxx
-	  82558       PRO/100+ Management Adapter        691334-xxx, 
-	  701738-xxx,
-	  721383-xxx
-	  82558       PRO/100+ Dual Port Server Adapter  714303-xxx, 
-	  711269-xxx, 
-	  A28276-xxx
-	  82558       PRO/100+ PCI Server Adapter        710550-xxx
-	  82550       PRO/100 S Server Adapter           752438-xxx
-	  82559                                          A56831-xxx, 
-	  A10563-xxx,
-	  A12171-xxx, 
-	  A12321-xxx, 
-	  A12320-xxx, 
-	  A12170-xxx
-	  748568-xxx
-	  748565-xxx
-	  82550       PRO/100 S Desktop Adapter          751767-xxx
-	  82559                                          748592-xxx, 
-	  A12167-xxx, 
-	  A12318-xxx, 
-	  A12317-xxx, 
-	  A12165-xxx,
-	  748569-xxx 
-	  82559       PRO/100+ Server Adapter            729757-xxx
-	  82559       PRO/100 S Management Adapter       748566-xxx, 
-	  748564-xxx
-	  82550       PRO/100 S Dual Port Server Adapter A56831-xxx
-	  82551       PRO/100 M Desktop Adapter          A80897-xxx
-	  PRO/100 S Advanced Management Adapter 
-	  747842-xxx, 
-	  745171-xxx
-	  CNR         PRO/100 VE Desktop Adapter         A10386-xxx, 
-	  A10725-xxx, 
-	  A23801-xxx, 
-	  A19716-xxx
-	  PRO/100 VM Desktop Adapter         A14323-xxx, 
-	  A19725-xxx, 
-	  A23801-xxx, 
-	  A22220-xxx, 
-	  A23796-xxx
-
-
+	  This driver supports Intel(R) PRO/100 family of adapters.
 	  To verify that your adapter is supported, find the board ID number 
 	  on the adapter. Look for a label that has a barcode and a number 
-	  in the format 123456-001 (six digits hyphen three digits). Match 
-	  this to the list of numbers above.
+	  in the format 123456-001 (six digits hyphen three digits). 
 
-	  For more information on how to identify your adapter, go to the 
-	  Adapter & Driver ID Guide at:
+	  Use the above information and the Adapter & Driver ID Guide at:
 
 	  http://support.intel.com/support/network/adapter/pro100/21397.htm
+
+          to identify the adapter.
 
 	  For the latest Intel PRO/100 network driver for Linux, see:
 
@@ -1730,7 +1681,7 @@ config VIA_RHINE
 	  (e.g. VT8235).
 
 	  To compile this driver as a module, choose M here. The module
-	  will be called via-rhine.
+	  will be called via-velocity.
 
 config VIA_RHINE_MMIO
 	bool "Use MMIO instead of PIO"
@@ -1741,18 +1692,6 @@ config VIA_RHINE_MMIO
 	  processing time in parts of the driver.
 
 	  If unsure, say Y.
-
-config VIA_VELOCITY
-	tristate "VIA Velocity support"
-	depends on NET_PCI && PCI
-	select CRC32
-	select CRC_CCITT
-	select MII
-	help
-	  If you have a VIA "Velocity" based network card say Y here.
-
-	  To compile this driver as a module, choose M here. The module
-	  will be called via-velocity.
 
 config LAN_SAA9730
 	bool "Philips SAA9730 Ethernet support (EXPERIMENTAL)"
@@ -1933,29 +1872,8 @@ config E1000
 	depends on PCI
 	---help---
 	  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
-	  adapters, which includes:
-
-	  Controller  Adapter Name                         Board IDs
-	  ----------  ------------                         ---------
-	  82542       PRO/1000 Gigabit Server Adapter      700262-xxx,
-	  717037-xxx
-	  82543       PRO/1000 F Server Adapter            738640-xxx,
-	  A38888-xxx
-	  82543       PRO/1000 T Server Adapter            A19845-xxx,
-	  A33948-xxx
-	  82544       PRO/1000 XT Server Adapter           A51580-xxx
-	  82544       PRO/1000 XF Server Adapter           A50484-xxx
-	  82544       PRO/1000 T Desktop Adapter           A62947-xxx
-	  82540       PRO/1000 MT Desktop Adapter          A78408-xxx
-	  82541       PRO/1000 MT Desktop Adapter          C91016-xxx
-	  82545       PRO/1000 MT Server Adapter           A92165-xxx
-	  82546       PRO/1000 MT Dual Port Server Adapter A92111-xxx
-	  82545       PRO/1000 MF Server Adapter           A91622-xxx
-	  82545       PRO/1000 MF Server Adapter(LX)       A91624-xxx
-	  82546       PRO/1000 MF Dual Port Server Adapter A91620-xxx 
-
-	  For more information on how to identify your adapter, go to the
-	  Adapter & Driver ID Guide at:
+	  adapters.  For more information on how to identify your adapter, go 
+	  to the Adapter & Driver ID Guide at:
 
 	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 
@@ -2140,6 +2058,18 @@ config SK98LIN
 	  say M here and read Documentation/kbuild/modules.txt. The module will
 	  be called sk98lin. This is recommended.
 
+config VIA_VELOCITY
+	tristate "VIA Velocity support"
+	depends on NET_PCI && PCI
+	select CRC32
+	select CRC_CCITT
+	select MII
+	help
+	  If you have a VIA "Velocity" based network card say Y here.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called via-velocity.
+
 config TIGON3
 	tristate "Broadcom Tigon3 support"
 	depends on PCI
@@ -2202,14 +2132,8 @@ config IXGB
 	depends on PCI
 	---help---
 	  This driver supports Intel(R) PRO/10GbE family of
-	  adapters, which includes:
-
-	  Controller  Adapter Name                           Board IDs
-	  ----------  ------------                           ---------
-	  82597EX     Intel(R) PRO/10GbE LR Server Adapter   A82505-xxx
-
-	  For more information on how to identify your adapter, go to the
-	  Adapter & Driver ID Guide at:
+	  adapters.  For more information on how to identify your adapter, go
+	  to the Adapter & Driver ID Guide at:
 
 	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 

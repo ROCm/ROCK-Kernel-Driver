@@ -96,7 +96,7 @@ void write_bugboot_header(int32_t out_fd, uint32_t boot_size)
   uint8_t header_block[HEADER_SIZE];
   bug_boot_header_t *bbh = (bug_boot_header_t *)&header_block[0];
 
-  bzero(header_block, HEADER_SIZE);
+  memset(header_block, 0, HEADER_SIZE);
 
   /* Fill in the PPCBUG ROM boot header */
   strncpy(bbh->magic_word, "BOOT", 4);		/* PPCBUG magic word */

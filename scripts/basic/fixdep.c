@@ -217,12 +217,12 @@ void use_config(char *m, int slen)
 	printf("    $(wildcard include/config/%s.h) \\\n", s);
 }
 
-void parse_config_file(char *map, size_t len)
+void parse_config_file(signed char *map, size_t len)
 {
 	int *end = (int *) (map + len);
 	/* start at +1, so that p can never be < map */
 	int *m   = (int *) map + 1;
-	char *p, *q;
+	signed char *p, *q;
 
 	for (; m < end; m++) {
 		if (*m == INT_CONF) { p = (char *) m  ; goto conf; }
@@ -291,9 +291,9 @@ void do_config_file(char *filename)
 
 void parse_dep_file(void *map, size_t len)
 {
-	char *m = map;
-	char *end = m + len;
-	char *p;
+	signed char *m = map;
+	signed char *end = m + len;
+	signed char *p;
 	char s[PATH_MAX];
 
 	p = strchr(m, ':');

@@ -105,7 +105,8 @@ typedef int (*acpi_op_resume)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_scan)	(struct acpi_device *device);
 typedef int (*acpi_op_bind)	(struct acpi_device *device);
 typedef int (*acpi_op_unbind)	(struct acpi_device *device);
-typedef int (*acpi_op_match)	(struct acpi_device *device, struct acpi_driver *driver);
+typedef int (*acpi_op_match)	(struct acpi_device *device,
+				 struct acpi_driver *driver);
 
 struct acpi_device_ops {
 	acpi_op_add		add;
@@ -332,6 +333,7 @@ int acpi_bus_add (struct acpi_device **child, struct acpi_device *parent,
 		acpi_handle handle, int type);
 
 
+int acpi_match_ids (struct acpi_device	*device, char	*ids);
 int acpi_create_dir(struct acpi_device *);
 void acpi_remove_dir(struct acpi_device *);
 

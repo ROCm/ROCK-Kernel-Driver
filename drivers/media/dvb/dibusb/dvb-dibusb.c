@@ -20,9 +20,7 @@
  *  Amaury Demol (ademol@dibcom.fr) from DiBcom for providing specs and driver
  *  sources, on which this driver (and the dib3000mb frontend) are based.
  *
- *  TODO
- *   - probing for i2c addresses, it is possible, that they have been changed
- *     by the vendor
+ * 
  *
  * see Documentation/dvb/README.dibusb for more information
  */
@@ -57,7 +55,7 @@
 
 static int debug;
 module_param(debug, int, 0x644);
-MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore (|-able)).");
+MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=ts,16=err (|-able)).");
 #else
 #define dprintk_new(args...)
 #define debug_dump(b,l)
@@ -66,30 +64,13 @@ MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore (|-able))
 #define deb_info(args...) dprintk_new(0x01,args)
 #define deb_xfer(args...) dprintk_new(0x02,args)
 #define deb_alot(args...) dprintk_new(0x04,args)
+#define deb_ts(args...)   dprintk_new(0x08,args)
+#define deb_err(args...)   dprintk_new(0x10,args)
 
 /* Version information */
 #define DRIVER_VERSION "0.0"
-#define DRIVER_DESC "DiBcom based USB Budget DVB-T device"
+#define DRIVER_DESC "Driver for DiBcom based USB Budget DVB-T device"
 #define DRIVER_AUTHOR "Patrick Boettcher, patrick.boettcher@desy.de"
-
-/* USB Driver stuff */
-
-/* table of devices that work with this driver */
-static struct usb_device_id dibusb_table [] = {
-	{ USB_DEVICE(USB_TWINHAN_VENDOR_ID, USB_VP7041_PRODUCT_PREFW_ID) },
-	{ USB_DEVICE(USB_TWINHAN_VENDOR_ID, USB_VP7041_PRODUCT_ID) },
-	{ USB_DEVICE(USB_IMC_NETWORKS_VENDOR_ID, USB_VP7041_PRODUCT_PREFW_ID) },
-	{ USB_DEVICE(USB_IMC_NETWORKS_VENDOR_ID, USB_VP7041_PRODUCT_ID) },
-	{ USB_DEVICE(USB_KWORLD_VENDOR_ID, USB_VSTREAM_PRODUCT_PREFW_ID) },
-	{ USB_DEVICE(USB_KWORLD_VENDOR_ID, USB_VSTREAM_PRODUCT_ID) },
-	{ USB_DEVICE(USB_DIBCOM_VENDOR_ID, USB_DIBCOM_PRODUCT_PREFW_ID) },
-	{ USB_DEVICE(USB_DIBCOM_VENDOR_ID, USB_DIBCOM_PRODUCT_ID) },
-	{ USB_DEVICE(USB_ULTIMA_ELECTRONIC_ID, USB_ULTIMA_ELEC_PROD_PREFW_ID) },
-	{ USB_DEVICE(USB_ULTIMA_ELECTRONIC_ID, USB_ULTIMA_ELEC_PROD_ID) },
-	{ }					/* Terminating entry */
-};
-
-MODULE_DEVICE_TABLE (usb, dibusb_table);
 
 static int dibusb_readwrite_usb(struct usb_dibusb *dib,
 		u8 *wbuf, u16 wlen, u8 *rbuf, u16 rlen)
@@ -99,12 +80,14 @@ static int dibusb_readwrite_usb(struct usb_dibusb *dib,
 	if (wbuf == NULL || wlen == 0)
 		return -EINVAL;
 
-/*	if (dib->disconnecting)
-		return -EINVAL;*/
-
 	if ((ret = down_interruptible(&dib->usb_sem)))
 		return ret;
 
+	if (dib->streaming && wbuf[0] == DIBUSB_REQ_I2C_WRITE)
+		deb_err("BUG: writing to i2c, while TS-streaming destroys the stream. What"
+			" did you do ? Please enable debugging and send the syslog to the author. (%x reg: %x %x)",
+			wbuf[0],wbuf[2],wbuf[3]);
+			
 	debug_dump(wbuf,wlen);
 
 	ret = usb_bulk_msg(dib->udev,COMMAND_PIPE,
@@ -189,6 +172,8 @@ static int dibusb_start_xfer(struct usb_dibusb *dib)
 		(DIB3000MB_FIFO_ACTIVATE >> 8) & 0xff,
 		(DIB3000MB_FIFO_ACTIVATE) & 0xff
 	};
+	dib->streaming = 1;
+	deb_ts("start streaming\n");
 	return dibusb_i2c_msg(dib,DIBUSB_DEMOD_I2C_ADDR_DEFAULT,b,4,NULL,0);
 }
 
@@ -200,11 +185,14 @@ static int dibusb_stop_xfer(struct usb_dibusb *dib)
 		(DIB3000MB_FIFO_INHIBIT >> 8) & 0xff,
 		(DIB3000MB_FIFO_INHIBIT) & 0xff
 	};
+	dib->streaming = 0;
+	deb_ts("stop streaming\n");
 	return dibusb_i2c_msg(dib,DIBUSB_DEMOD_I2C_ADDR_DEFAULT,b,4,NULL,0);
 }
 
 static int dibusb_set_pid(struct dibusb_pid *dpid)
 {
+	struct usb_dibusb *dib = dpid->dib;
 	u16 pid = dpid->pid | (dpid->active ? DIB3000MB_ACTIVATE_FILTERING : 0);
 	u8 b[4] = {
 		(dpid->reg >> 8) & 0xff,
@@ -212,25 +200,50 @@ static int dibusb_set_pid(struct dibusb_pid *dpid)
 		(pid >> 8) & 0xff,
 		(pid) & 0xff
 	};
+	int ret;
+	
+	/* firmware bug, i2c write during mpeg transfer */
+	if (dib->feedcount) {
+		deb_info("stop streaming\n");
+		ret = dibusb_stop_xfer(dib);
+	}
+	
+	if (dpid->active) 
+		dib->feedcount++;
+	else
+		dib->feedcount--;
 
-	return dibusb_i2c_msg(dpid->dib,DIBUSB_DEMOD_I2C_ADDR_DEFAULT,b,4,NULL,0);
+	ret = dibusb_i2c_msg(dib,DIBUSB_DEMOD_I2C_ADDR_DEFAULT,b,4,NULL,0);
+
+	if (ret == 0 && dib->feedcount) {
+		deb_info("start streaming\n");
+		ret = dibusb_start_xfer(dib);
+	}
+	return ret;
 }
 
 static void dibusb_urb_complete(struct urb *urb, struct pt_regs *ptregs)
 {
 	struct usb_dibusb *dib = urb->context;
 
-	if (!dib->streaming)
-		return;
+	deb_xfer("urb complete feedcount: %d, status: %d\n",dib->feedcount,urb->status);
 
-	if (urb->status == 0) {
-		deb_info("URB return len: %d\n",urb->actual_length);
+	if (dib->feedcount > 0 && urb->status == 0) {
+		deb_xfer("URB return len: %d\n",urb->actual_length);
 		if (urb->actual_length % 188)
-			deb_info("TS Packets: %d, %d\n", urb->actual_length/188,urb->actual_length % 188);
-		dvb_dmx_swfilter_packets(&dib->demux, (u8*) urb->transfer_buffer,urb->actual_length/188);
-	}
+			deb_xfer("TS Packets: %d, %d\n", urb->actual_length/188,urb->actual_length % 188);
 
-	if (dib->streaming)
+		/* Francois recommends to drop not full-filled packets, even if they may 
+		 * contain valid TS packets
+		 */
+		if (urb->actual_length == DIBUSB_TS_DEFAULT_SIZE && dib->dvb_is_ready)
+		dvb_dmx_swfilter_packets(&dib->demux, (u8*) urb->transfer_buffer,urb->actual_length/188);
+		else
+			deb_ts("URB dropped because of the " 
+					"actual_length or !dvb_is_ready (%d).\n",dib->dvb_is_ready);
+	} else 
+		deb_ts("URB dropped because of feedcount or status.\n");
+
 		usb_submit_urb(urb,GFP_KERNEL);
 }
 
@@ -240,9 +253,8 @@ static int dibusb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 //	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
 	struct usb_dibusb *dib = dvbdmxfeed->demux->priv;
 	struct dibusb_pid *dpid;
-	int ret = 0;
 
-	deb_info("pid: 0x%04x, feedtype: %d\n", dvbdmxfeed->pid,dvbdmxfeed->type);
+	deb_ts("pid: 0x%04x, feedtype: %d\n", dvbdmxfeed->pid,dvbdmxfeed->type);
 
 	if ((dpid = dibusb_get_free_pid(dib)) == NULL) {
 		err("no free pid in list.");
@@ -253,32 +265,14 @@ static int dibusb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 	dibusb_set_pid(dpid);
 
-	if (0 == dib->feed_count++) {
-		usb_fill_bulk_urb( dib->buf_urb, dib->udev, DATA_PIPE,
-			dib->buffer, 8192, dibusb_urb_complete, dib);
-		dib->buf_urb->transfer_flags = 0;
-
-
-		if ((ret = usb_submit_urb(dib->buf_urb,GFP_KERNEL))) {
-			dibusb_stop_xfer(dib);
-			err("could not submit buffer urb.");
-			return ret;
-		}
-
-		if ((ret = dibusb_start_xfer(dib)))
-			return ret;
-
-		dib->streaming = 1;
-	}
 	return 0;
 }
 
 static int dibusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
-	struct usb_dibusb *dib = dvbdmxfeed->demux->priv;
 	struct dibusb_pid *dpid = (struct dibusb_pid *) dvbdmxfeed->priv;
 
-	deb_info("stopfeed pid: 0x%04x, feedtype: %d",dvbdmxfeed->pid, dvbdmxfeed->type);
+	deb_ts("stopfeed pid: 0x%04x, feedtype: %d\n",dvbdmxfeed->pid, dvbdmxfeed->type);
 
 	if (dpid == NULL)
 		err("channel in dmxfeed->priv was NULL");
@@ -288,11 +282,6 @@ static int dibusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 		dibusb_set_pid(dpid);
 	}
 
-	if (--dib->feed_count == 0) {
-		dib->streaming = 0;
-		usb_unlink_urb(dib->buf_urb);
-		dibusb_stop_xfer(dib);
-	}
 	return 0;
 }
 
@@ -302,7 +291,7 @@ static int dibusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 /*
  * do not use this, just a workaround for a bug,
- * which will never occur :).
+ * which will hopefully never occur :).
  */
 static int dibusb_interrupt_read_loop(struct usb_dibusb *dib)
 {
@@ -312,7 +301,8 @@ static int dibusb_interrupt_read_loop(struct usb_dibusb *dib)
 
 /*
  * TODO: a tasklet should run with a delay of 1/10 second
- * and fill an appropriate event device ?
+ * and feed an appropriate event device ?
+ * NEC protocol is used for remote controlls
  */
 static int dibusb_read_remote_control(struct usb_dibusb *dib)
 {
@@ -321,6 +311,18 @@ static int dibusb_read_remote_control(struct usb_dibusb *dib)
 	if ((ret = dibusb_readwrite_usb(dib,b,1,rb,5)))
 		return ret;
 
+
+	
+	switch (rb[0]) {
+		case DIBUSB_RC_NEC_KEY_PRESSED:
+
+			break;
+		case DIBUSB_RC_NEC_EMPTY:
+		case DIBUSB_RC_NEC_KEY_REPEATED:
+		default:
+			break;
+	}
+	
 	return 0;
 }
 
@@ -474,11 +476,13 @@ err_i2c:
 err:
 	return ret;
 success:
+	dib->dvb_is_ready = 1;
 	return 0;
 }
 
 static int dibusb_dvb_exit(struct usb_dibusb *dib)
 {
+	dib->dvb_is_ready = 0;
 	deb_info("unregistering DVB part\n");
 	dvb_net_release(&dib->dvb_net);
 	dib->demux.dmx.close(&dib->demux.dmx);
@@ -492,8 +496,16 @@ static int dibusb_dvb_exit(struct usb_dibusb *dib)
 
 static int dibusb_exit(struct usb_dibusb *dib)
 {
-	usb_free_urb(dib->buf_urb);
-	pci_free_consistent(NULL,8192,dib->buffer,dib->dma_handle);
+	int i;
+	for (i = 0; i < DIBUSB_TS_NUM_URBS; i++) 
+		if (dib->buf_urb[i] != NULL) {
+			deb_info("killing URB no. %d.\n",i);
+			usb_kill_urb(dib->buf_urb[i]); // TODO kernel version ifdef for unlink_urb
+			
+			deb_info("freeing URB no. %d.\n",i);
+			usb_free_urb(dib->buf_urb[i]);
+		}
+	pci_free_consistent(NULL,DIBUSB_TS_BUFFER_SIZE,dib->buffer,dib->dma_handle);
 	return 0;
 }
 
@@ -513,11 +525,27 @@ static int dibusb_init(struct usb_dibusb *dib)
 
 	/* dibusb_reset_cpu(dib); */
 
-	dib->buffer = pci_alloc_consistent(NULL,8192, &dib->dma_handle);
-	memset(dib->buffer,0,8192);
-	if (!(dib->buf_urb = usb_alloc_urb(0,GFP_KERNEL))) {
+	if ((dib->buffer = pci_alloc_consistent(NULL,DIBUSB_TS_BUFFER_SIZE, &dib->dma_handle)) == NULL) {
+		return -ENOMEM;
+	}
+	memset(dib->buffer,0,DIBUSB_TS_BUFFER_SIZE);
+	for (i = 0; i < DIBUSB_TS_NUM_URBS; i++) {
+		if (!(dib->buf_urb[i] = usb_alloc_urb(0,GFP_KERNEL))) {
 		dibusb_exit(dib);
 		return -ENOMEM;
+	}
+		deb_info("submitting URB no. %d\n",i);
+
+		usb_fill_bulk_urb( dib->buf_urb[i], dib->udev, DATA_PIPE,
+				&dib->buffer[i*DIBUSB_TS_URB_BUFFER_SIZE], DIBUSB_TS_URB_BUFFER_SIZE, 
+				dibusb_urb_complete, dib);
+		dib->buf_urb[i]->transfer_flags = 0;
+
+		if ((ret = usb_submit_urb(dib->buf_urb[i],GFP_KERNEL))) {
+			err("could not submit buffer urb no. %d\n",i);
+			dibusb_exit(dib);
+			return ret;
+		}
 	}
 
 	for (i=0; i < DIBUSB_MAX_PIDS; i++) {
@@ -527,8 +555,9 @@ static int dibusb_init(struct usb_dibusb *dib)
 		dib->pid_list[i].dib = dib;
 	}
 
+	dib->feedcount = 0;
 	dib->streaming = 0;
-	dib->feed_count = 0;
+	dib->dvb_is_ready = 0;
 
 	if ((ret = dibusb_dvb_init(dib))) {
 		dibusb_exit(dib);
@@ -591,19 +620,23 @@ static int dibusb_loadfirmware(struct usb_device *udev,
 			if (ret != b[0]) {
 				err("error while transferring firmware "
 					"(transferred size: %d, block size: %d)",
-					ret,b[1]);
+					ret,b[0]);
 				ret = -EINVAL;
 				break;
 			}
 			i += 5 + b[0];
 		}
+		/* length in ret */
+		if (ret > 0)
+			ret = 0;
 		/* restart the CPU */
 		reset = 0;
-		if ((ret = dibusb_writemem(udev,DIBUSB_CPU_CSREG,&reset,1)) != 1)
+		if (ret || dibusb_writemem(udev,DIBUSB_CPU_CSREG,&reset,1) != 1) {
 			err("could not restart the USB controller CPU.");
+			ret = -EINVAL;
+		}
 
 		kfree(p);
-		ret = 0;
 	} else {
 		ret = -ENOMEM;
 	}

@@ -681,6 +681,38 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
+int ide_use_dma(ide_drive_t *drive)
+{
+	struct hd_driveid *id = drive->id;
+	ide_hwif_t *hwif = drive->hwif;
+
+	/* consult the list of known "bad" drives */
+	if (__ide_dma_bad_drive(drive))
+		return 0;
+
+	/* capable of UltraDMA modes */
+	if (id->field_valid & 4) {
+		if (hwif->ultra_mask & id->dma_ultra)
+			return 1;
+	}
+
+	/* capable of regular DMA modes */
+	if (id->field_valid & 2) {
+		if (hwif->mwdma_mask & id->dma_mword)
+			return 1;
+		if (hwif->swdma_mask & id->dma_1word)
+			return 1;
+	}
+
+	/* consult the list of known "good" drives */
+	if (__ide_dma_good_drive(drive) && id->eide_dma_time < 150)
+		return 1;
+
+	return 0;
+}
+
+EXPORT_SYMBOL_GPL(ide_use_dma);
+
 void ide_dma_verbose(ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;

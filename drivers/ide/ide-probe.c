@@ -730,6 +730,8 @@ static void probe_hwif(ide_hwif_t *hwif)
 			    /* And beware of confused Maxtor drives that go "M0000000000"
 			      "The SN# is garbage in the ID block..." [Eric] */
 			    strncmp(drive->id->serial_no, "M0000000000000000000", 20) &&
+			    /* Same goes for another set of Maxtor drives that say "D3000000" */
+			    strncmp(drive->id->serial_no, "D3000000", 8) &&
 			    strncmp(hwif->drives[0].id->serial_no, drive->id->serial_no, 20) == 0) {
 				printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
 				drive->present = 0;

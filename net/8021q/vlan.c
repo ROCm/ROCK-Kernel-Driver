@@ -35,6 +35,8 @@
 #include "vlan.h"
 #include "vlanproc.h"
 
+#define DRV_VERSION "1.8"
+
 /* Global VLAN variables */
 
 /* Our listing of VLAN group(s) */
@@ -42,8 +44,7 @@ struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
 #define vlan_grp_hashfn(IDX)	((((IDX) >> VLAN_GRP_HASH_SHIFT) ^ (IDX)) & VLAN_GRP_HASH_MASK)
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
-static unsigned int vlan_version = 1;
-static unsigned int vlan_release = 8;
+static char vlan_version[] = DRV_VERSION;
 static char vlan_copyright[] = "Ben Greear <greearb@candelatech.com>";
 static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 
@@ -84,8 +85,8 @@ static int __init vlan_proto_init(void)
 {
 	int err;
 
-	printk(VLAN_INF "%s v%u.%u %s\n",
-	       vlan_fullname, vlan_version, vlan_release, vlan_copyright);
+	printk(VLAN_INF "%s v%s %s\n",
+	       vlan_fullname, vlan_version, vlan_copyright);
 	printk(VLAN_INF "All bugs added by %s\n",
 	       vlan_buggyright);
 
@@ -735,3 +736,4 @@ static int vlan_ioctl_handler(void __user *arg)
 }
 
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);

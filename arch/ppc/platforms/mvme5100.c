@@ -204,6 +204,17 @@ mvme5100_init2(void)
 	return;
 }
 
+static int __init
+mvme5100_request_cascade(void)
+{
+#ifdef CONFIG_MVME5100_IPMC761_PRESENT
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			&i8259_irq);
+#endif
+	return 0;
+}
+arch_initcall(mvme5100_request_cascade);
+
 /*
  * Interrupt setup and service.
  * Have MPIC on HAWK and cascaded 8259s on Winbond cascaded to MPIC.
@@ -221,14 +232,12 @@ mvme5100_init_IRQ(void)
 	openpic_set_sources(0, 16, OpenPIC_Addr + 0x10000);
 #ifdef CONFIG_MVME5100_IPMC761_PRESENT
 	openpic_init(NUM_8259_INTERRUPTS);
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-			&i8259_irq);
 
 	/* Map i8259 interrupts. */
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
-	i8259_init(NULL);
+	i8259_init((long)NULL);
 #else
 	openpic_init(0);
 #endif

@@ -7,13 +7,12 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#include <asm/types.h>
-#include <asm/page.h>
-#include <stddef.h>
 #include <linux/config.h>
+#include <linux/types.h>
 #include <linux/threads.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
+#include <asm/page.h>
 
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>

@@ -786,6 +786,11 @@ static int __init acpi_irq_penalty_update(char *str, int used)
 	return 1;
 }
 
+void acpi_penalize_isa_irq(int irq)
+{
+	acpi_irq_penalty[irq] += PIRQ_PENALTY_ISA_USED;
+}
+
 /*
  * Over-ride default table to reserve additional IRQs for use by ISA
  * e.g. acpi_irq_isa=5

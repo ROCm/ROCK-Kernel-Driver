@@ -389,6 +389,7 @@
 #define PLATFORM_ISERIES_LPAR 0x0201
 #define PLATFORM_LPAR         0x0001
 #define PLATFORM_POWERMAC     0x0400
+#define PLATFORM_MAPLE        0x0500
 
 /* Compatibility with drivers coming from PPC32 world */
 #define _machine	(systemcfg->platform)

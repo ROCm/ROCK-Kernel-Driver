@@ -49,6 +49,12 @@
 				set_current_state(TASK_UNINTERRUPTIBLE); \
 				schedule_timeout((x * HZ)/1000 + 2); \
 			} } while(0)
+/* Some workarounds require millisecond delays and are run during interrupt
+ * context.  Most notably, when establishing link, the phy may need tweaking
+ * but cannot process phy register reads/writes faster than millisecond
+ * intervals...and we establish link due to a "link status change" interrupt.
+ */
+#define msec_delay_irq(x) mdelay(x)
 #endif
 
 #define PCI_COMMAND_REGISTER   PCI_COMMAND

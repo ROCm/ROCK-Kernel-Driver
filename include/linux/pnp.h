@@ -200,6 +200,7 @@ struct pnp_dev {
 	unsigned short	regs;		/* ISAPnP: supported registers */
 	int 		flags;		/* used by protocols */
 	struct proc_dir_entry *procent;	/* device entry in /proc/bus/isapnp */
+	void *data;
 };
 
 #define global_to_pnp_dev(n) list_entry(n, struct pnp_dev, global_list)

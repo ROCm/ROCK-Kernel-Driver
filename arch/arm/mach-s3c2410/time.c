@@ -1,7 +1,7 @@
-/* linux/include/asm-arm/arch-s3c2410/time.h
+/* linux/arch/arm/mach-s3c2410/time.c
  *
- *  Copyright (C) 2003 Simtec Electronics <linux@simtec.co.uk>
- *    Ben Dooks, <ben@simtec.co.uk>
+ * Copyright (C) 2003,2004 Simtec Electronics
+ *	Ben Dooks, <ben@simtec.co.uk>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,10 +38,6 @@
 
 static unsigned long timer_startval;
 static unsigned long timer_ticks_usec;
-
-/* with an 12MHz clock, we get 12 ticks per-usec
- */
-
 
 /***
  * Returns microsecond  since last clock interrupt.  Note that interrupts
@@ -106,7 +102,7 @@ static struct irqaction s3c2410_timer_irq = {
  * Currently we only use timer4, as it is the only timer which has no
  * other function that can be exploited externally
  */
-static void __init s3c2410_timer_init (void)
+static void s3c2410_timer_setup (void)
 {
 	unsigned long tcon;
 	unsigned long tcnt;
@@ -126,6 +122,9 @@ static void __init s3c2410_timer_init (void)
 	if (machine_is_bast() || machine_is_vr1000()) {
 		timer_ticks_usec = 12;	      /* timer is at 12MHz */
 		tcnt = (timer_ticks_usec * (1000*1000)) / HZ;
+
+		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
+		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
 	}
 
 	/* for the h1940, we use the pclk from the core to generate
@@ -138,7 +137,8 @@ static void __init s3c2410_timer_init (void)
 	 *   of 11.25MHz, and a tcnt of 56250.
 	 */
 
-	if (machine_is_h1940() || machine_is_smdk2410() ) {
+	if (machine_is_h1940() || machine_is_smdk2410() ||
+	    machine_is_rx3715()) {
 		timer_ticks_usec = s3c24xx_pclk / (1000*1000);
 		timer_ticks_usec /= 6;
 
@@ -150,7 +150,6 @@ static void __init s3c2410_timer_init (void)
 
 		tcnt = (s3c24xx_pclk / 6) / HZ;
 	}
-
 
 	printk("setup_timer tcon=%08lx, tcnt %04lx, tcfg %08lx,%08lx\n",
 	       tcon, tcnt, tcfg0, tcfg1);
@@ -177,15 +176,20 @@ static void __init s3c2410_timer_init (void)
 	__raw_writel(tcnt, S3C2410_TCNTB(4));
 	__raw_writel(tcnt, S3C2410_TCMPB(4));
 
-	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
-
 	/* start the timer running */
 	tcon |= S3C2410_TCON_T4START;
 	tcon &= ~S3C2410_TCON_T4MANUALUPD;
 	__raw_writel(tcon, S3C2410_TCON);
 }
 
+static void __init s3c2410_timer_init (void)
+{
+	s3c2410_timer_setup();
+	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
+}
+
 struct sys_timer s3c2410_timer = {
 	.init		= s3c2410_timer_init,
 	.offset		= s3c2410_gettimeoffset,
+	.resume		= s3c2410_timer_setup
 };

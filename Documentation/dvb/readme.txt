@@ -41,9 +41,9 @@ contains detailed installation instructions for the
 various bt8xx based "budget" DVB cards
 (Nebula, Pinnacle PCTV, Twinhan DST)
 
-"vp7041.txt"
-contains detailed informations about the
-Visionplus VisionDTV USB-Ter DVB-T adapter.
+"README.dibusb"
+contains detailed information about adapters
+based on DiBcom reference design.
 
 "udev.txt"
 how to get DVB and udev up and running.
