@@ -363,7 +363,6 @@ static unsigned long eeh_token_to_phys(unsigned long token)
 
 	return pa | (vaddr & (PAGE_SIZE-1));
 }
-EXPORT_SYMBOL(eeh_register_disable_func);
 
 /**
  * eeh_panic - call panic() for an eeh event that cannot be handled
@@ -397,6 +396,7 @@ void eeh_register_disable_func(int (*func)(struct pci_dev *))
 {
 	eeh_disable_slot = func;
 }
+EXPORT_SYMBOL(eeh_register_disable_func);
 
 /**
  * eeh_event_handler - handle any eeh events to see if we can disable
