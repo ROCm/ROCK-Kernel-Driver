@@ -560,41 +560,28 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 
 	/* get a minor number for the dev */
 	r = persistent ? specific_minor(minor) : next_free_minor(&minor);
-	if (r < 0) {
-		kfree(md);
-		return NULL;
-	}
+	if (r < 0)
+		goto bad1;
 
 	memset(md, 0, sizeof(*md));
 	init_rwsem(&md->lock);
 	atomic_set(&md->holders, 1);
 
 	md->queue = blk_alloc_queue(GFP_KERNEL);
-	if (!md->queue) {
-		kfree(md);
-		return NULL;
-	}
+	if (!md->queue)
+		goto bad1;
 
 	md->queue->queuedata = md;
 	blk_queue_make_request(md->queue, dm_request);
 
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
-	if (!md->io_pool) {
-		free_minor(minor);
-		blk_put_queue(md->queue);
-		kfree(md);
-		return NULL;
-	}
+ 	if (!md->io_pool)
+ 		goto bad2;
 
 	md->disk = alloc_disk(1);
-	if (!md->disk) {
-		mempool_destroy(md->io_pool);
-		free_minor(minor);
-		blk_put_queue(md->queue);
-		kfree(md);
-		return NULL;
-	}
+	if (!md->disk)
+		goto bad3;
 
 	md->disk->major = _major;
 	md->disk->first_minor = minor;
@@ -609,6 +596,16 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	init_waitqueue_head(&md->eventq);
 
 	return md;
+
+
+ bad3:
+	mempool_destroy(md->io_pool);
+ bad2:
+	blk_put_queue(md->queue);
+	free_minor(minor);
+ bad1:
+	kfree(md);
+	return NULL;
 }
 
 static void free_dev(struct mapped_device *md)
