@@ -350,7 +350,7 @@ acpi_tb_init_table_descriptor (
 void
 acpi_tb_delete_all_tables (void)
 {
-	acpi_table_type                     type;
+	acpi_table_type                 type;
 
 
 	/*
@@ -378,7 +378,7 @@ acpi_tb_delete_all_tables (void)
 
 void
 acpi_tb_delete_tables_by_type (
-	acpi_table_type                     type)
+	acpi_table_type                 type)
 {
 	struct acpi_table_desc          *table_desc;
 	u32                             count;
@@ -425,15 +425,16 @@ acpi_tb_delete_tables_by_type (
 		break;
 	}
 
-	/* Free the table */
-	/* Get the head of the list */
-
+	/*
+	 * Free the table
+	 * 1) Get the head of the list
+	 */
 	table_desc = acpi_gbl_table_lists[type].next;
 	count     = acpi_gbl_table_lists[type].count;
 
 	/*
-	 * Walk the entire list, deleting both the allocated tables
-	 * and the table descriptors
+	 * 2) Walk the entire list, deleting both the allocated tables
+	 *    and the table descriptors
 	 */
 	for (i = 0; i < count; i++) {
 		table_desc = acpi_tb_uninstall_table (table_desc);

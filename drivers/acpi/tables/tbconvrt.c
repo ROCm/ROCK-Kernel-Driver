@@ -131,7 +131,7 @@ acpi_tb_convert_to_xsdt (
 	/* Copy the header and set the length */
 
 	ACPI_MEMCPY (new_table, table_info->pointer, sizeof (struct acpi_table_header));
-	new_table->header.length = (u32) table_size;
+	new_table->length = (u32) table_size;
 
 	/* Copy the table pointers */
 
@@ -430,17 +430,17 @@ acpi_tb_convert_table_fadt (void)
 	 * FADT length and version validation.  The table must be at least as
 	 * long as the version 1.0 FADT
 	 */
-	if (acpi_gbl_FADT->header.length < sizeof (struct fadt_descriptor_rev1)) {
-		ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", acpi_gbl_FADT->header.length));
+	if (acpi_gbl_FADT->length < sizeof (struct fadt_descriptor_rev1)) {
+		ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", acpi_gbl_FADT->length));
 		return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
 	}
 
-	if (acpi_gbl_FADT->header.revision >= FADT2_REVISION_ID) {
-		if (acpi_gbl_FADT->header.length < sizeof (struct fadt_descriptor_rev2)) {
+	if (acpi_gbl_FADT->revision >= FADT2_REVISION_ID) {
+		if (acpi_gbl_FADT->length < sizeof (struct fadt_descriptor_rev2)) {
 			/* Length is too short to be a V2.0 table */
 
 			ACPI_REPORT_WARNING (("Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table\n",
-					 acpi_gbl_FADT->header.length, acpi_gbl_FADT->header.revision));
+					 acpi_gbl_FADT->length, acpi_gbl_FADT->revision));
 
 			acpi_tb_convert_fadt1 (local_fadt, (void *) acpi_gbl_FADT);
 		}
@@ -460,7 +460,7 @@ acpi_tb_convert_table_fadt (void)
 	 * Global FADT pointer will point to the new common V2.0 FADT
 	 */
 	acpi_gbl_FADT = local_fadt;
-	acpi_gbl_FADT->header.length = sizeof (FADT_DESCRIPTOR);
+	acpi_gbl_FADT->length = sizeof (FADT_DESCRIPTOR);
 
 	/* Free the original table */
 
@@ -477,8 +477,8 @@ acpi_tb_convert_table_fadt (void)
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
 		"Hex dump of common internal FADT, size %d (%X)\n",
-		acpi_gbl_FADT->header.length, acpi_gbl_FADT->header.length));
-	ACPI_DUMP_BUFFER ((u8 *) (acpi_gbl_FADT), acpi_gbl_FADT->header.length);
+		acpi_gbl_FADT->length, acpi_gbl_FADT->length));
+	ACPI_DUMP_BUFFER ((u8 *) (acpi_gbl_FADT), acpi_gbl_FADT->length);
 
 	return_ACPI_STATUS (AE_OK);
 }

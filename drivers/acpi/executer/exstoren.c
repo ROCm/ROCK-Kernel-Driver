@@ -46,6 +46,7 @@
 
 #include <acpi/acpi.h>
 #include <acpi/acinterp.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -114,9 +115,10 @@ acpi_ex_resolve_object (
 		/*
 		 * Must have a Integer, Buffer, or String
 		 */
-		if ((ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_INTEGER)    &&
-			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_BUFFER)     &&
-			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_STRING)) {
+		if ((ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_INTEGER)   &&
+			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_BUFFER)    &&
+			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_STRING)    &&
+			!((ACPI_GET_OBJECT_TYPE (source_desc) == ACPI_TYPE_LOCAL_REFERENCE) && (source_desc->reference.opcode == AML_LOAD_OP))) {
 			/*
 			 * Conversion successful but still not a valid type
 			 */

@@ -319,6 +319,12 @@ acpi_rs_extended_irq_resource (
 	buffer += 1;
 	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
+	/* Validate minimum descriptor length */
+
+	if (temp16 < 6) {
+		return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
+	}
+
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_EXT_IRQ;
 
@@ -357,6 +363,12 @@ acpi_rs_extended_irq_resource (
 	buffer += 1;
 	temp8 = *buffer;
 
+	/* Must have at least one IRQ */
+
+	if (temp8 < 1) {
+		return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
+	}
+
 	output_struct->data.extended_irq.number_of_interrupts = temp8;
 
 	/*
@@ -388,9 +400,12 @@ acpi_rs_extended_irq_resource (
 	 * pointer to where the null terminated string goes:
 	 * Each Interrupt takes 32-bits + the 5 bytes of the
 	 * stream that are default.
+	 *
+	 * Note: Some resource descriptors will have an additional null, so
+	 * we add 1 to the length.
 	 */
 	if (*bytes_consumed >
-		((acpi_size) output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
+		((acpi_size) output_struct->data.extended_irq.number_of_interrupts * 4) + (5 + 1)) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
