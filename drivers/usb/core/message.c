@@ -969,7 +969,6 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	usb_disable_interface(dev, iface);
 
 	iface->cur_altsetting = alt;
-	iface->act_altsetting = alt - iface->altsetting;
 
 	/* If the interface only has one altsetting and the device didn't
 	 * accept the request, we attempt to carry out the equivalent action
@@ -1068,7 +1067,6 @@ int usb_reset_configuration(struct usb_device *dev)
 			alt = &intf->altsetting[0];
 
 		intf->cur_altsetting = alt;
-		intf->act_altsetting = alt - intf->altsetting;
 		usb_enable_interface(dev, intf);
 	}
 	return 0;
@@ -1170,7 +1168,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 				alt = &intf->altsetting[0];
 
 			intf->cur_altsetting = alt;
-			intf->act_altsetting = alt - intf->altsetting;
 			usb_enable_interface(dev, intf);
 			intf->dev.parent = &dev->dev;
 			intf->dev.driver = NULL;

@@ -77,10 +77,6 @@ struct usb_host_interface {
  * 	endpoint configurations.  They will be in no particular order.
  * @num_altsetting: number of altsettings defined.
  * @cur_altsetting: the current altsetting.
- * @act_altsetting: index of current altsetting.  This number is always
- *	less than num_altsetting.  After the device is configured, each
- *	interface uses its default setting of zero.
- *	NOTE: act_altsetting is deprecated.  Use cur_altsetting instead.
  * @driver: the USB driver that is bound to this interface.
  * @minor: the minor number assigned to this interface, if this
  *	interface is bound to a driver that uses the USB major number.
@@ -125,7 +121,6 @@ struct usb_interface {
 
 	struct usb_host_interface *cur_altsetting;	/* the currently
 					 * active alternate setting */
-	unsigned act_altsetting;	/* index of active alternate setting: DEPRECATED */
 	unsigned num_altsetting;	/* number of alternate settings */
 
 	struct usb_driver *driver;	/* driver */
