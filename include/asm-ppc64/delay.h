@@ -33,6 +33,7 @@ static inline void __delay(unsigned long loops)
 
 	while((__get_tb()-start) < loops)
 		__HMT_low();
+	__HMT_medium();
 }
 
 static inline void udelay(unsigned long usecs)
@@ -40,7 +41,6 @@ static inline void udelay(unsigned long usecs)
 	unsigned long loops = tb_ticks_per_usec * usecs;
 
 	__delay(loops);
-	__HMT_medium();
 }
 
 #endif /* _PPC64_DELAY_H */
