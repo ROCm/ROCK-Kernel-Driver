@@ -142,8 +142,6 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 	spin_unlock(&mm->page_table_lock);
 }
 
-extern void __flush_tlb_mm(unsigned long, unsigned long);
-
 #define deactivate_mm(tsk,mm)	do { } while (0)
 
 /* Activate a new MM instance for the current task. */
