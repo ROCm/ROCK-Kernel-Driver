@@ -184,9 +184,9 @@ static void lbmWrite(struct jfs_log * log, struct lbuf * bp, int flag, int cant_
 static void lbmDirectWrite(struct jfs_log * log, struct lbuf * bp, int flag);
 static int lbmIOWait(struct lbuf * bp, int flag);
 static bio_end_io_t lbmIODone;
+static void lbmStartIO(struct lbuf * bp);
+static void lmGCwrite(struct jfs_log * log, int cant_block);
 
-void lbmStartIO(struct lbuf * bp);
-void lmGCwrite(struct jfs_log * log, int cant_block);
 
 
 /*
@@ -744,7 +744,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
  *	LOGGC_LOCK must be held by caller.
  *	N.B. LOG_LOCK is NOT held during lmGroupCommit().
  */
-void lmGCwrite(struct jfs_log * log, int cant_write)
+static void lmGCwrite(struct jfs_log * log, int cant_write)
 {
 	struct lbuf *bp;
 	struct logpage *lp;
@@ -893,8 +893,7 @@ void lmPostGC(struct lbuf * bp)
 	 */
 	if ((tblk = log->cqueue.head) &&
 	    ((log->gcrtc > 0) || (tblk->bp->l_wqnext != NULL) ||
-	     test_bit(log_SYNCBARRIER, &log->flag) ||
-	     test_bit(log_QUIESCE, &log->flag)))
+	     test_bit(log_FLUSH, &log->flag)))
 		/*
 		 * Call lmGCwrite with new group leader
 		 */
@@ -902,11 +901,13 @@ void lmPostGC(struct lbuf * bp)
 
 	/* no transaction are ready yet (transactions are only just
 	 * queued (GC_QUEUE) and not entered for group commit yet).
-	 * let the first transaction entering group commit
-	 * will elect hetself as new group leader.
+	 * the first transaction entering group commit
+	 * will elect herself as new group leader.
 	 */
-	else
+	else {
 		log->cflag &= ~logGC_PAGEOUT;
+		clear_bit(log_FLUSH, &log->flag);
+	}
 
 	//LOGGC_UNLOCK(log);
 	spin_unlock_irqrestore(&log->gclock, flags);
@@ -1049,17 +1050,11 @@ int lmLogSync(struct jfs_log * log, int nosyncwait)
 		set_bit(log_SYNCBARRIER, &log->flag);
 		jFYI(1, ("log barrier on: lsn=0x%x syncpt=0x%x\n", lsn,
 			 log->syncpt));
+		/*
+		 * We may have to initiate group commit
+		 */
+		jfs_flush_journal(log, 0);
 	}
-
-	/*
-	 * We may have to initiate group commit
-	 */
-	LOGGC_LOCK(log);
-	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
-		log->cflag |= logGC_PAGEOUT;
-		lmGCwrite(log, 0);
-	}
-	LOGGC_UNLOCK(log);
 
 	return lsn;
 }
@@ -1416,21 +1411,22 @@ int lmLogClose(struct super_block *sb, struct jfs_log * log)
 
 
 /*
- * NAME:	lmLogWait()
+ * NAME:	jfs_flush_journal()
  *
- * FUNCTION:	wait for all outstanding log records to be written to disk
+ * FUNCTION:	initiate write of any outstanding transactions to the journal
+ *		and optionally wait until they are all written to disk
  */
-void lmLogWait(struct jfs_log *log)
+void jfs_flush_journal(struct jfs_log *log, int wait)
 {
 	int i;
 
-	jFYI(1, ("lmLogWait: log:0x%p\n", log));
+	jFYI(1, ("jfs_flush_journal: log:0x%p wait=%d\n", log, wait));
 
 	/*
 	 * This ensures that we will keep writing to the journal as long
 	 * as there are unwritten commit records
 	 */
-	set_bit(log_QUIESCE, &log->flag);
+	set_bit(log_FLUSH, &log->flag);
 
 	/*
 	 * Initiate I/O on outstanding transactions
@@ -1441,6 +1437,9 @@ void lmLogWait(struct jfs_log *log)
 		lmGCwrite(log, 0);
 	}
 	LOGGC_UNLOCK(log);
+
+	if (!wait)
+		return;
 
 	if (log->cqueue.head || !list_empty(&log->synclist)) {
 		/*
@@ -1459,7 +1458,7 @@ void lmLogWait(struct jfs_log *log)
 	assert(log->cqueue.head == NULL);
 	assert(list_empty(&log->synclist));
 
-	clear_bit(log_QUIESCE, &log->flag);	/* Probably not needed */
+	clear_bit(log_FLUSH, &log->flag);
 }
 
 /*
@@ -1488,7 +1487,7 @@ int lmLogShutdown(struct jfs_log * log)
 
 	jFYI(1, ("lmLogShutdown: log:0x%p\n", log));
 
-	lmLogWait(log);
+	jfs_flush_journal(log, 1);
 
 	/*
 	 * We need to make sure all of the "written" metapages
@@ -1946,7 +1945,7 @@ static void lbmDirectWrite(struct jfs_log * log, struct lbuf * bp, int flag)
  *
  * serialization: LCACHE_LOCK() is NOT held during log i/o;
  */
-void lbmStartIO(struct lbuf * bp)
+static void lbmStartIO(struct lbuf * bp)
 {
 	struct bio *bio;
 	struct jfs_log *log = bp->l_log;
