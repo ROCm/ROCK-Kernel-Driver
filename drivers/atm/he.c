@@ -669,16 +669,20 @@ he_init_cs_block(struct he_dev *he_dev)
 
 }
 
-static void __init
+static int __init
 he_init_cs_block_rcm(struct he_dev *he_dev)
 {
-	unsigned rategrid[16][16];
+	unsigned (*rategrid)[16][16];
 	unsigned rate, delta;
 	int i, j, reg;
 
 	unsigned rate_atmf, exp, man;
 	unsigned long long rate_cps;
         int mult, buf, buf_limit = 4;
+
+	rategrid = kmalloc( sizeof(unsigned) * 16 * 16, GFP_KERNEL);
+	if (!rategrid)
+		return -ENOMEM;
 
 	/* initialize rate grid group table */
 
@@ -709,16 +713,16 @@ he_init_cs_block_rcm(struct he_dev *he_dev)
 	 */
 
 	for (j = 0; j < 16; j++) {
-		rategrid[0][j] = rate;
+		(*rategrid)[0][j] = rate;
 		rate -= delta;
 	}
 
 	for (i = 1; i < 16; i++)
 		for (j = 0; j < 16; j++)
 			if (i > 14)
-				rategrid[i][j] = rategrid[i - 1][j] / 4;
+				(*rategrid)[i][j] = (*rategrid)[i - 1][j] / 4;
 			else
-				rategrid[i][j] = rategrid[i - 1][j] / 2;
+				(*rategrid)[i][j] = (*rategrid)[i - 1][j] / 2;
 
 	/*
 	 * 2.4 transmit internal function
@@ -743,7 +747,7 @@ he_init_cs_block_rcm(struct he_dev *he_dev)
 			rate_cps = 10;	/* 2.2.1 minimum payload rate is 10 cps */
 
 		for (i = 255; i > 0; i--)
-			if (rategrid[i/16][i%16] >= rate_cps)
+			if ((*rategrid)[i/16][i%16] >= rate_cps)
 				break;	 /* pick nearest rate instead? */
 
 		/*
@@ -780,6 +784,9 @@ he_init_cs_block_rcm(struct he_dev *he_dev)
 
 		++rate_atmf;
 	}
+
+	kfree(rategrid);
+	return 0;
 }
 
 static int __init
@@ -1477,7 +1484,8 @@ he_start(struct atm_dev *dev)
 
 	/* 5.1.8 cs block connection memory initialization */
 	
-	he_init_cs_block_rcm(he_dev);
+	if (he_init_cs_block_rcm(he_dev) < 0)
+		return -ENOMEM;
 
 	/* 5.1.10 initialize host structures */
 
