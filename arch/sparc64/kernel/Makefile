@@ -21,6 +21,7 @@ obj-$(CONFIG_SPARC32_COMPAT) += sys32.o sys_sparc32.o signal32.o ioctl32.o
 obj-$(CONFIG_BINFMT_ELF32) += binfmt_elf32.o
 obj-$(CONFIG_BINFMT_AOUT32) += binfmt_aout32.o
 obj-$(CONFIG_MODULES) += module.o
+obj-$(CONFIG_US3_FREQ) += us3_cpufreq.o
 
 ifdef CONFIG_SUNOS_EMUL
   obj-y += sys_sunos32.o sunos_ioctl32.o
