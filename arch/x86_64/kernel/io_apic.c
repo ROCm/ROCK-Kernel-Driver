@@ -264,12 +264,15 @@ void __init check_ioapic(void)
 #endif
 					return;
 				case PCI_VENDOR_ID_NVIDIA:
+					printk(KERN_INFO "NVidia chipset found. Disabling timer override\n");
+					acpi_skip_timer_override = 1;
 #ifndef CONFIG_SMP
 					printk(KERN_INFO 
      "PCI bridge %02x:%02x from %x found. Setting \"noapic\". Overwrite with \"apic\"\n",
 					       num,slot,vendor); 
 					skip_ioapic_setup = 1;
 #endif
+
 					return;
 				} 
 

@@ -184,8 +184,10 @@ unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 
+#if 0
 	if (in_lock_functions(pc))
 		return *(unsigned long *)regs->rbp;
+#endif
 	return pc;
 }
 EXPORT_SYMBOL(profile_pc);
