@@ -35,7 +35,6 @@ static s64 extRoundDown(s64 nb);
 /*
  * external references
  */
-extern int dbExtend(struct inode *, s64, s64, s64);
 extern int jfs_commit_inode(struct inode *, int);
 
 
