@@ -2,7 +2,7 @@
 # Makefile for the netfilter modules on top of IPv4.
 #
 
-export-objs  := ip_conntrack_standalone.o ip_fw_compat.o ip_nat_standalone.o \
+export-objs  := ip_conntrack_standalone.o ip_nat_standalone.o \
 		ip_tables.o arp_tables.o
 
 # objects for the conntrack and NAT core (used by standalone and backw. compat)
