@@ -610,30 +610,27 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds,
 static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *asoc,
 			       sctp_state_t state)
 {
-
 	struct sock *sk = asoc->base.sk;
-	struct sctp_opt *sp = sctp_sk(sk);
 
 	asoc->state = state;
 	asoc->state_timestamp = jiffies;
 
-	if (SCTP_SOCKET_TCP == sp->type) {
+	if (sctp_style(sk, TCP)) {
 		/* Change the sk->state of a TCP-style socket that has 
 		 * sucessfully completed a connect() call.
 		 */
-		if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
-		    (SCTP_SS_CLOSED == sk->state))
+		if (sctp_state(asoc, ESTABLISHED) && sctp_sstate(sk, CLOSED))
 			sk->state = SCTP_SS_ESTABLISHED;
 
 		/* Set the RCV_SHUTDOWN flag when a SHUTDOWN is received. */
-		if (SCTP_STATE_SHUTDOWN_RECEIVED == asoc->state)
+		if (sctp_state(asoc, SHUTDOWN_RECEIVED) &&
+		    sctp_sstate(sk, ESTABLISHED))
 			sk->shutdown |= RCV_SHUTDOWN;
-
 	}
 
-	if ((SCTP_STATE_ESTABLISHED == asoc->state) ||
-	    (SCTP_STATE_CLOSED == asoc->state) ||
-	    (SCTP_STATE_SHUTDOWN_RECEIVED == asoc->state)) {
+	if (sctp_state(asoc, ESTABLISHED) ||
+	    sctp_state(asoc, CLOSED) ||
+	    sctp_state(asoc, SHUTDOWN_RECEIVED)) {
 		/* Wake up any processes waiting in the asoc's wait queue in
 		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf().
 	 	 */
@@ -646,7 +643,7 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 		 * For a UDP-style socket, the waiters are woken up by the
 		 * notifications.
 		 */
-		if (SCTP_SOCKET_UDP != sp->type)
+		if (!sctp_style(sk, UDP))
 			sk->state_change(sk);
 	}
 }
@@ -661,8 +658,7 @@ static void sctp_cmd_delete_tcb(sctp_cmd_seq_t *cmds,
 	 * listening socket, do not free it so that accept() can pick it
 	 * up later.
 	 */ 
-	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-	    (SCTP_SS_LISTENING == sk->state) && (!asoc->temp))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING) && (!asoc->temp))
 		return;
 
 	sctp_unhash_established(asoc);

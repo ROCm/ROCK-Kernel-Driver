@@ -794,7 +794,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 	SCTP_DEBUG_PRINTK("Using endpoint: %s.\n", ep->debug_name);
 
-	if (sctp_style(sk, TCP) && (SCTP_SS_ESTABLISHED != sk->state)) {
+	/* We cannot send a message over a TCP-style listening socket. */
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING)) {
 		err = -EPIPE;
 		goto out_nounlock;
 	}
@@ -843,6 +844,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
+	/* MSG_EOF or MSG_ABORT cannot be set on a TCP-style socket. */
+	if (sctp_style(sk, TCP) && (sinfo_flags & (MSG_EOF | MSG_ABORT))) {
+		err = -EINVAL;
+		goto out_nounlock;
+	}
+
 	/* If MSG_EOF is set, no data can be sent. Disallow sending zero
 	 * length messages when MSG_EOF|MSG_ABORT is not set.
 	 * If MSG_ABORT is set, the message length could be non zero with
@@ -874,10 +881,13 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
 		if (!asoc) {
 			/* If we could not find a matching association on the
-			 * endpoint, make sure that there is no peeled-off
-			 * association on another socket.
+			 * endpoint, make sure that it is not a TCP-style
+			 * socket that already has an association or there is
+			 * no peeled-off association on another socket.
 			 */
-			if (sctp_endpoint_is_peeled_off(ep, &to)) {
+			if ((sctp_style(sk, TCP) &&
+			     sctp_sstate(sk, ESTABLISHED)) ||
+			    sctp_endpoint_is_peeled_off(ep, &to)) {
 				err = -EADDRNOTAVAIL;
 				goto out_unlock;
 			}
@@ -885,7 +895,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	} else {
 		asoc = sctp_id2assoc(sk, associd);
 		if (!asoc) {
-			err = -EINVAL;
+			err = -EPIPE;
 			goto out_unlock;
 		}
 	}
@@ -1049,11 +1059,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			goto out_free;
 	}
 
-	/* This flag, in the UDP model, requests the SCTP stack to
-	 * override the primary destination address with the
-	 * address found with the sendto/sendmsg call.
+	/* If an address is passed with the sendto/sendmsg call, it is used
+	 * to override the primary destination address in the TCP model, or
+	 * when MSG_ADDR_OVER flag is set in the UDP model.
 	 */
-	if (sinfo_flags & MSG_ADDR_OVER) {
+	if ((sctp_style(sk, TCP) && msg_name) ||
+	    (sinfo_flags & MSG_ADDR_OVER)) {
 		chunk_tp = sctp_assoc_lookup_paddr(asoc, &to);
 		if (!chunk_tp) {
 			err = -EINVAL;
@@ -1063,7 +1074,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		chunk_tp = NULL;
 
 	/* Auto-connect, if we aren't connected already. */
-	if (SCTP_STATE_CLOSED == asoc->state) {
+	if (sctp_state(asoc, CLOSED)) {
 		err = sctp_primitive_ASSOCIATE(asoc, NULL);
 		if (err < 0)
 			goto out_free;
@@ -1193,7 +1204,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 
 	sctp_lock_sock(sk);
 
-	if (sctp_style(sk, TCP) && (SCTP_SS_ESTABLISHED != sk->state)) {
+	if (sctp_style(sk, TCP) && !sctp_sstate(sk, ESTABLISHED)) {
 		err = -ENOTCONN;
 		goto out;
 	}
@@ -2095,7 +2106,7 @@ static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, in
 static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
 	/* Applicable to UDP-style socket only */
-	if (SCTP_SOCKET_TCP == sctp_sk(sk)->type)
+	if (sctp_style(sk, TCP))
 		return -EOPNOTSUPP;
 	if (len != sizeof(int))
 		return -EINVAL;
@@ -2115,7 +2126,7 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 	/* An association cannot be branched off from an already peeled-off
 	 * socket, nor is this supported for tcp style sockets.
 	 */
-	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type)
+	if (!sctp_style(sk, UDP))
 		return -EINVAL;
 
 	/* Create a new socket.  */
@@ -2861,10 +2872,10 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 	/* Only UDP style sockets that are not peeled off are allowed to
 	 * listen().
 	 */
-	if (SCTP_SOCKET_UDP != sp->type)
+	if (!sctp_style(sk, UDP))
 		return -EINVAL;
 
-	if (sk->state == SCTP_SS_LISTENING)
+	if (sctp_sstate(sk, LISTENING))
 		return 0;
 
 	/*
@@ -2897,7 +2908,7 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 
-	if (sk->state == SCTP_SS_LISTENING)
+	if (sctp_sstate(sk, LISTENING))
 		return 0;
 
 	/*
@@ -2994,7 +3005,7 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	/* A TCP-style listening socket becomes readable when the accept queue
 	 * is not empty.
 	 */
-	if ((SCTP_SOCKET_TCP == sp->type) && (SCTP_SS_LISTENING == sk->state))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
 		return (!list_empty(&sp->ep->asocs)) ?
 		       	(POLLIN | POLLRDNORM) : 0;
 
@@ -3011,11 +3022,9 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	    (sk->shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
-	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type) {
-		/* The association is either gone or not ready.  */
-		if (SCTP_SS_CLOSED == sk->state)
-			return mask;
-	}
+	/* The association is either gone or not ready.  */
+	if (!sctp_style(sk, UDP) && sctp_sstate(sk, CLOSED))
+		return mask;
 
 	/* Is it writable?  */
 	if (sctp_writeable(sk)) {
@@ -3255,8 +3264,7 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	error = -ENOTCONN;
 
 	/* Is there a good reason to think that we may receive some data?  */
-	if ((list_empty(&sctp_sk(sk)->ep->asocs)) &&
-	    (sk->state != SCTP_SS_LISTENING))
+	if (list_empty(&sctp_sk(sk)->ep->asocs) && !sctp_sstate(sk, LISTENING))
 		goto out;
 
 	/* Handle signals.  */
@@ -3578,7 +3586,7 @@ static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 		if (signal_pending(current))
 			goto do_interrupted;
 
-		if (asoc->state == SCTP_STATE_ESTABLISHED)
+		if (sctp_state(asoc, ESTABLISHED))
 			break;
 
 		/* Let another process have a go.  Since we are going
@@ -3633,7 +3641,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 		}
 
 		err = -EINVAL;
-		if (sk->state != SCTP_SS_LISTENING)
+		if (!sctp_sstate(sk, LISTENING))
 			break;
 
 		err = 0;
@@ -3737,6 +3745,12 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 
 	/* Migrate the association to the new socket. */
 	sctp_assoc_migrate(assoc, newsk);
+
+	/* If the association on the newsk is already closed before accept()
+	 * is called, set RCV_SHUTDOWN flag.
+	 */ 
+	if (sctp_state(assoc, CLOSED) && sctp_style(newsk, TCP))
+		newsk->shutdown |= RCV_SHUTDOWN;
 
 	newsk->state = SCTP_SS_ESTABLISHED;
 }

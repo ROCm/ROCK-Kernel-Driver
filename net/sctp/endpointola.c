@@ -177,8 +177,7 @@ void sctp_endpoint_add_asoc(struct sctp_endpoint *ep,
 	list_add_tail(&asoc->asocs, &ep->asocs);
 
 	/* Increment the backlog value for a TCP-style listening socket. */
-	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-	    (SCTP_SS_LISTENING == sk->state))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
 		sk->ack_backlog++;
 }
 
