@@ -237,7 +237,7 @@ acpi_get_object_info (
 {
 	acpi_status                     status;
 	struct acpi_namespace_node      *node;
-	struct acpi_device_info         info;
+	struct acpi_device_info         *info;
 	struct acpi_device_info         *return_info;
 	struct acpi_compatible_id_list *cid_list = NULL;
 	acpi_size                       size;
@@ -254,55 +254,59 @@ acpi_get_object_info (
 		return (status);
 	}
 
+	info = ACPI_MEM_CALLOCATE (sizeof (struct acpi_device_info));
+	if (!info) {
+		return (AE_NO_MEMORY);
+	}
+
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		goto cleanup;
 	}
 
 	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
 		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-		return (AE_BAD_PARAMETER);
+		goto cleanup;
 	}
 
 	/* Init return structure */
 
 	size = sizeof (struct acpi_device_info);
-	ACPI_MEMSET (&info, 0, size);
 
-	info.type  = node->type;
-	info.name  = node->name.integer;
-	info.valid = 0;
+	info->type  = node->type;
+	info->name  = node->name.integer;
+	info->valid = 0;
 
 	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		goto cleanup;
 	}
 
 	/* If not a device, we are all done */
 
-	if (info.type == ACPI_TYPE_DEVICE) {
+	if (info->type == ACPI_TYPE_DEVICE) {
 		/*
 		 * Get extra info for ACPI Devices objects only:
 		 * Run the Device _HID, _UID, _CID, _STA, _ADR and _sx_d methods.
 		 *
 		 * Note: none of these methods are required, so they may or may
-		 * not be present for this device.  The Info.Valid bitfield is used
+		 * not be present for this device.  The Info->Valid bitfield is used
 		 * to indicate which methods were found and ran successfully.
 		 */
 
 		/* Execute the Device._HID method */
 
-		status = acpi_ut_execute_HID (node, &info.hardware_id);
+		status = acpi_ut_execute_HID (node, &info->hardware_id);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_HID;
+			info->valid |= ACPI_VALID_HID;
 		}
 
 		/* Execute the Device._UID method */
 
-		status = acpi_ut_execute_UID (node, &info.unique_id);
+		status = acpi_ut_execute_UID (node, &info->unique_id);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_UID;
+			info->valid |= ACPI_VALID_UID;
 		}
 
 		/* Execute the Device._CID method */
@@ -311,32 +315,30 @@ acpi_get_object_info (
 		if (ACPI_SUCCESS (status)) {
 			size += ((acpi_size) cid_list->count - 1) *
 					 sizeof (struct acpi_compatible_id);
-			info.valid |= ACPI_VALID_CID;
+			info->valid |= ACPI_VALID_CID;
 		}
 
 		/* Execute the Device._STA method */
 
-		status = acpi_ut_execute_STA (node, &info.current_status);
+		status = acpi_ut_execute_STA (node, &info->current_status);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_STA;
+			info->valid |= ACPI_VALID_STA;
 		}
 
 		/* Execute the Device._ADR method */
 
 		status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR, node,
-				  &info.address);
+				  &info->address);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_ADR;
+			info->valid |= ACPI_VALID_ADR;
 		}
 
 		/* Execute the Device._sx_d methods */
 
-		status = acpi_ut_execute_sxds (node, info.highest_dstates);
+		status = acpi_ut_execute_sxds (node, info->highest_dstates);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_SXDS;
+			info->valid |= ACPI_VALID_SXDS;
 		}
-
-		status = AE_OK;
 	}
 
 	/* Validate/Allocate/Clear caller buffer */
@@ -349,7 +351,7 @@ acpi_get_object_info (
 	/* Populate the return buffer */
 
 	return_info = buffer->pointer;
-	ACPI_MEMCPY (return_info, &info, sizeof (struct acpi_device_info));
+	ACPI_MEMCPY (return_info, info, sizeof (struct acpi_device_info));
 
 	if (cid_list) {
 		ACPI_MEMCPY (&return_info->compatibility_id, cid_list, cid_list->size);
@@ -357,6 +359,7 @@ acpi_get_object_info (
 
 
 cleanup:
+	ACPI_MEM_FREE (info);
 	if (cid_list) {
 		ACPI_MEM_FREE (cid_list);
 	}
