@@ -47,9 +47,6 @@
  * Adam J Richter <adam@yggdrasil.com>
  *  . Use of pci_class to find device
  *
- * Andreas Tobler <toa@pop.agri.ch>
- *  . Updated proc_fs calls
- *
  * Emilie Chung	<emilie.chung@axis.com>
  *  . Tip on Async Request Filter
  *
@@ -74,7 +71,6 @@
  * Ben Collins <bcollins@debian.org>
  *  . Working big-endian support
  *  . Updated to 2.4.x module scheme (PCI aswell)
- *  . Removed procfs support since it trashes random mem
  *  . Config ROM generation
  *
  * Manfred Weihs <weihs@ict.tuwien.ac.at>
@@ -98,6 +94,7 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/irq.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -164,7 +161,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 986 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1011 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -502,6 +499,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci);
 /* Global initialization */
 static void ohci_initialize(struct ti_ohci *ohci)
 {
+	char irq_buf[16];
 	quadlet_t buf;
 
 	spin_lock_init(&ohci->phy_reg_lock);
@@ -601,10 +599,15 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_linkEnable);
 
 	buf = reg_read(ohci, OHCI1394_Version);
-	PRINT(KERN_INFO, ohci->id, "OHCI-1394 %d.%d (PCI): IRQ=[%d]  "
+#ifndef __sparc__
+	sprintf (irq_buf, "%d", ohci->dev->irq);
+#else
+	sprintf (irq_buf, "%s", __irq_itoa(ohci->dev->irq));
+#endif
+	PRINT(KERN_INFO, ohci->id, "OHCI-1394 %d.%d (PCI): IRQ=[%s]  "
 	      "MMIO=[%lx-%lx]  Max Packet=[%d]",
 	      ((((buf) >> 16) & 0xf) + (((buf) >> 20) & 0xf) * 10),
-	      ((((buf) >> 4) & 0xf) + ((buf) & 0xf) * 10), ohci->dev->irq,
+	      ((((buf) >> 4) & 0xf) + ((buf) & 0xf) * 10), irq_buf,
 	      pci_resource_start(ohci->dev, 0),
 	      pci_resource_start(ohci->dev, 0) + OHCI1394_REGISTER_SIZE - 1,
 	      ohci->max_packet_size);
@@ -625,7 +628,7 @@ static void insert_packet(struct ti_ohci *ohci,
 
 	DBGMSG(ohci->id, "Inserting packet for node " NODE_BUS_FMT
 	       ", tlabel=%d, tcode=0x%x, speed=%d",
-	       NODE_BUS_ARGS(packet->node_id), packet->tlabel,
+	       NODE_BUS_ARGS(ohci->host, packet->node_id), packet->tlabel,
 	       packet->tcode, packet->speed_code);
 
 	d->prg_cpu[idx]->begin.address = 0;
@@ -650,8 +653,8 @@ static void insert_packet(struct ti_ohci *ohci,
 
                 if (packet->type == hpsb_raw) {
 			d->prg_cpu[idx]->data[0] = cpu_to_le32(OHCI1394_TCODE_PHY<<4);
-                        d->prg_cpu[idx]->data[1] = packet->header[0];
-                        d->prg_cpu[idx]->data[2] = packet->header[1];
+                        d->prg_cpu[idx]->data[1] = cpu_to_le32(packet->header[0]);
+                        d->prg_cpu[idx]->data[2] = cpu_to_le32(packet->header[1]);
                 } else {
                         d->prg_cpu[idx]->data[0] = packet->speed_code<<16 |
                                 (packet->header[0] & 0xFFFF);
@@ -1146,8 +1149,7 @@ struct ohci_iso_recv {
 	u32 ContextMatch;
 };
 
-static void ohci_iso_recv_bufferfill_task(unsigned long data);
-static void ohci_iso_recv_packetperbuf_task(unsigned long data);
+static void ohci_iso_recv_task(unsigned long data);
 static void ohci_iso_recv_stop(struct hpsb_iso *iso);
 static void ohci_iso_recv_shutdown(struct hpsb_iso *iso);
 static int  ohci_iso_recv_start(struct hpsb_iso *iso, int cycle, int tag_mask, int sync);
@@ -1237,10 +1239,7 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 	ohci1394_init_iso_tasklet(&recv->task,
 				  iso->channel == -1 ? OHCI_ISO_MULTICHANNEL_RECEIVE :
 				                       OHCI_ISO_RECEIVE,
-				  recv->dma_mode == BUFFER_FILL_MODE ?
-				  ohci_iso_recv_bufferfill_task :
-				  ohci_iso_recv_packetperbuf_task,
-				  (unsigned long) iso);
+				  ohci_iso_recv_task, (unsigned long) iso);
 
 	if (ohci1394_register_iso_tasklet(recv->ohci, &recv->task) < 0)
 		goto err;
@@ -1665,18 +1664,14 @@ static void ohci_iso_recv_bufferfill_parse(struct hpsb_iso *iso, struct ohci_iso
 		hpsb_iso_wake(iso);
 }
 
-static void ohci_iso_recv_bufferfill_task(unsigned long data)
+static void ohci_iso_recv_bufferfill_task(struct hpsb_iso *iso, struct ohci_iso_recv *recv)
 {
-	struct hpsb_iso *iso = (struct hpsb_iso*) data;
-	struct ohci_iso_recv *recv = iso->hostdata;
-
 	int loop;
 
 	/* loop over all blocks */
 	for (loop = 0; loop < recv->nblocks; loop++) {
 		
 		/* check block_dma to see if it's done */
-		
 		struct dma_cmd *im = &recv->block[recv->block_dma];
 		
 		/* check the DMA descriptor for new writes to xferStatus */
@@ -1726,10 +1721,8 @@ static void ohci_iso_recv_bufferfill_task(unsigned long data)
 	ohci_iso_recv_bufferfill_parse(iso, recv);
 }
 
-static void ohci_iso_recv_packetperbuf_task(unsigned long data)
+static void ohci_iso_recv_packetperbuf_task(struct hpsb_iso *iso, struct ohci_iso_recv *recv)
 {
-	struct hpsb_iso *iso = (struct hpsb_iso*) data;
-	struct ohci_iso_recv *recv = iso->hostdata;
 	int count;
 	int wake = 0;
 	
@@ -1803,6 +1796,16 @@ out:
 		hpsb_iso_wake(iso);
 }
 
+static void ohci_iso_recv_task(unsigned long data)
+{
+	struct hpsb_iso *iso = (struct hpsb_iso*) data;
+	struct ohci_iso_recv *recv = iso->hostdata;
+
+	if (recv->dma_mode == BUFFER_FILL_MODE)
+		ohci_iso_recv_bufferfill_task(iso, recv);
+	else
+		ohci_iso_recv_packetperbuf_task(iso, recv);
+}
 
 /***********************************
  * rawiso ISO transmission         *
@@ -2124,6 +2127,9 @@ static int ohci_isoctl(struct hpsb_iso *iso, enum isoctl_cmd cmd, unsigned long 
 		return 0;
 	case RECV_RELEASE:
 		ohci_iso_recv_release(iso, (struct hpsb_iso_packet_info*) arg);
+		return 0;
+	case RECV_FLUSH:
+		ohci_iso_recv_task((unsigned long) iso);
 		return 0;
 	case RECV_SHUTDOWN:
 		ohci_iso_recv_shutdown(iso);
@@ -3465,7 +3471,31 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 	case OHCI_INIT_DONE:
 		hpsb_remove_host(ohci->host);
 
+		/* Clear out BUS Options */
+		reg_write(ohci, OHCI1394_ConfigROMhdr, 0);
+		reg_write(ohci, OHCI1394_BusOptions,
+			  (reg_read(ohci, OHCI1394_BusOptions) & 0x0000f007) |
+			  0x00ff0000);
+		memset(ohci->csr_config_rom_cpu, 0, OHCI_CONFIG_ROM_LEN);
+
 	case OHCI_INIT_HAVE_IRQ:
+		/* Clear interrupt registers */
+		reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IsoXmitIntMaskClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IsoXmitIntEventClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IsoRecvIntMaskClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IsoRecvIntEventClear, 0xffffffff);
+
+		/* Disable IRM Contender */
+		set_phy_reg(ohci, 4, ~0xc0 & get_phy_reg(ohci, 4));
+		
+		/* Clear link control register */
+		reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
+
+		/* Let all other nodes know to ignore us */
+		ohci_devctl(ohci->host, RESET_BUS, LONG_RESET_NO_FORCE_ROOT);
+
 		/* Soft reset before we start - this disables
 		 * interrupts and clears linkEnable and LPS. */
 		ohci_soft_reset(ohci);

@@ -1,7 +1,7 @@
 /*
  * dv1394.h - DV input/output over IEEE 1394 on OHCI chips
  *   Copyright (C)2001 Daniel Maas <dmaas@dcine.com>
- *     receive, proc_fs by Dan Dennedy <dan@dennedy.org>
+ *     receive by Dan Dennedy <dan@dennedy.org>
  *
  * based on:
  *   video1394.h - driver for OHCI 1394 boards

@@ -142,7 +142,7 @@
 #define  MDIO_OP_READ		2
 #define  MDIO_DATA_SB_MASK	0xc0000000 /* Start Bits */
 #define  MDIO_DATA_SB_SHIFT	30
-#define  MDIO_DATA_SB_START	0x10000000 /* Start Of Frame */
+#define  MDIO_DATA_SB_START	0x40000000 /* Start Of Frame */
 #define B44_EMAC_IMASK	0x0418UL /* EMAC Interrupt Mask */
 #define B44_EMAC_ISTAT	0x041CUL /* EMAC Interrupt Status */
 #define  EMAC_INT_MII		0x00000001 /* MII MDIO Interrupt */

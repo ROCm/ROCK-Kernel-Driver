@@ -42,6 +42,9 @@
 #define LMI_ANSI		2 /* ANSI Annex D */
 #define LMI_CCITT		3 /* ITU-T Annex A */
 
+#define HDLC_MAX_MTU 1500	/* Ethernet 1500 bytes */
+#define HDLC_MAX_MRU (HDLC_MAX_MTU + 10 + 14 + 4) /* for ETH+VLAN over FR */
+
 
 #ifdef __KERNEL__
 
@@ -49,78 +52,6 @@
 #include <linux/netdevice.h>
 #include <net/syncppp.h>
 #include <linux/hdlc/ioctl.h>
-
-#define HDLC_MAX_MTU 1500	/* Ethernet 1500 bytes */
-#define HDLC_MAX_MRU (HDLC_MAX_MTU + 10 + 14 + 4) /* for ETH+VLAN over FR */
-
-#define MAXLEN_LMISTAT  20	/* max size of status enquiry frame */
-
-#define PVC_STATE_NEW       0x01
-#define PVC_STATE_ACTIVE    0x02
-#define PVC_STATE_FECN	    0x08 /* FECN condition */
-#define PVC_STATE_BECN      0x10 /* BECN condition */
-
-
-#define FR_UI              0x03
-#define FR_PAD             0x00
-
-#define NLPID_IP           0xCC
-#define NLPID_IPV6         0x8E
-#define NLPID_SNAP         0x80
-#define NLPID_PAD          0x00
-#define NLPID_Q933         0x08
-
-
-#define LMI_DLCI                   0 /* LMI DLCI */
-#define LMI_PROTO               0x08
-#define LMI_CALLREF             0x00 /* Call Reference */
-#define LMI_ANSI_LOCKSHIFT      0x95 /* ANSI lockshift */
-#define LMI_REPTYPE                1 /* report type */
-#define LMI_CCITT_REPTYPE       0x51
-#define LMI_ALIVE                  3 /* keep alive */
-#define LMI_CCITT_ALIVE         0x53
-#define LMI_PVCSTAT                7 /* pvc status */
-#define LMI_CCITT_PVCSTAT       0x57
-#define LMI_FULLREP                0 /* full report  */
-#define LMI_INTEGRITY              1 /* link integrity report */
-#define LMI_SINGLE                 2 /* single pvc report */
-#define LMI_STATUS_ENQUIRY      0x75
-#define LMI_STATUS              0x7D /* reply */
-
-#define LMI_REPT_LEN               1 /* report type element length */
-#define LMI_INTEG_LEN              2 /* link integrity element length */
-
-#define LMI_LENGTH                13 /* standard LMI frame length */
-#define LMI_ANSI_LENGTH           14
-
-
-
-typedef struct {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-	unsigned ea1  : 1;
-	unsigned cr   : 1;
-	unsigned dlcih: 6;
-  
-	unsigned ea2  : 1;
-	unsigned de   : 1;
-	unsigned becn : 1;
-	unsigned fecn : 1;
-	unsigned dlcil: 4;
-#elif defined (__BIG_ENDIAN_BITFIELD)
-	unsigned dlcih: 6;
-	unsigned cr   : 1;
-	unsigned ea1  : 1;
-  
-	unsigned dlcil: 4;
-	unsigned fecn : 1;
-	unsigned becn : 1;
-	unsigned de   : 1;
-	unsigned ea2  : 1;
-#else
-#error  "Please fix <asm/byteorder.h>"
-#endif
-}__attribute__ ((packed)) fr_hdr;
-
 
 
 typedef struct {		/* Used in Cisco and PPP mode */
@@ -177,14 +108,25 @@ typedef struct hdlc_device_struct {
 
 
 	/* Things below are for HDLC layer internal use only */
-	int (*ioctl)(struct net_device *dev, struct ifreq *ifr, int cmd);
-	int (*open)(struct hdlc_device_struct *hdlc);
-	void (*stop)(struct hdlc_device_struct *hdlc);
-	void (*proto_detach)(struct hdlc_device_struct *hdlc);
-	void (*netif_rx)(struct sk_buff *skb);
-	unsigned short (*type_trans)(struct sk_buff *skb,
-				     struct net_device *dev);
-	int proto;		/* IF_PROTO_HDLC/CISCO/FR/etc. */
+	struct {
+		int (*open)(struct hdlc_device_struct *hdlc);
+		void (*close)(struct hdlc_device_struct *hdlc);
+
+		/* if open & DCD */
+		void (*start)(struct hdlc_device_struct *hdlc);
+		/* if open & !DCD */
+		void (*stop)(struct hdlc_device_struct *hdlc);
+
+		void (*detach)(struct hdlc_device_struct *hdlc);
+		void (*netif_rx)(struct sk_buff *skb);
+		unsigned short (*type_trans)(struct sk_buff *skb,
+					     struct net_device *dev);
+		int id;		/* IF_PROTO_HDLC/CISCO/FR/etc. */
+	}proto;
+
+	int carrier;
+	int open;
+	spinlock_t state_lock;
 
 	union {
 		struct {
@@ -271,26 +213,11 @@ static __inline__ const char *hdlc_to_name(hdlc_device *hdlc)
 }
 
 
-static __inline__ u16 q922_to_dlci(u8 *hdr)
-{
-	return ((hdr[0] & 0xFC) << 2) | ((hdr[1] & 0xF0) >> 4);
-}
-
-
-
-static __inline__ void dlci_to_q922(u8 *hdr, u16 dlci)
-{
-	hdr[0] = (dlci >> 2) & 0xFC;
-	hdr[1] = ((dlci << 4) & 0xF0) | 0x01;
-}
-
-
-
 static __inline__ void debug_frame(const struct sk_buff *skb)
 {
 	int i;
 
-	for (i=0; i<skb->len; i++) {
+	for (i=0; i < skb->len; i++) {
 		if (i == 100) {
 			printk("...\n");
 			return;
@@ -301,33 +228,19 @@ static __inline__ void debug_frame(const struct sk_buff *skb)
 }
 
 
-
 /* Must be called by hardware driver when HDLC device is being opened */
-static __inline__ int hdlc_open(hdlc_device *hdlc)
-{
-	if (hdlc->proto == -1)
-		return -ENOSYS;		/* no protocol attached */
-
-	if (hdlc->open)
-		return hdlc->open(hdlc);
-	return 0;
-}
-
-
+int hdlc_open(hdlc_device *hdlc);
 /* Must be called by hardware driver when HDLC device is being closed */
-static __inline__ void hdlc_close(hdlc_device *hdlc)
-{
-	if (hdlc->stop)
-		hdlc->stop(hdlc);
-}
-
+void hdlc_close(hdlc_device *hdlc);
+/* Called by hardware driver when DCD line level changes */
+void hdlc_set_carrier(int on, hdlc_device *hdlc);
 
 /* May be used by hardware driver to gain control over HDLC device */
 static __inline__ void hdlc_proto_detach(hdlc_device *hdlc)
 {
-	if (hdlc->proto_detach)
-		hdlc->proto_detach(hdlc);
-	hdlc->proto_detach = NULL;
+	if (hdlc->proto.detach)
+		hdlc->proto.detach(hdlc);
+	hdlc->proto.detach = NULL;
 }
 
 
@@ -335,8 +248,8 @@ static __inline__ unsigned short hdlc_type_trans(struct sk_buff *skb,
 						 struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
-	if (hdlc->type_trans)
-		return hdlc->type_trans(skb, dev);
+	if (hdlc->proto.type_trans)
+		return hdlc->proto.type_trans(skb, dev);
 	else
 		return __constant_htons(ETH_P_HDLC);
 }

@@ -165,6 +165,10 @@ int hpsb_iso_xmit_sync(struct hpsb_iso *iso);
 /* N packets have been read out of the buffer, re-use the buffer space */
 int  hpsb_iso_recv_release_packets(struct hpsb_iso *recv, unsigned int n_packets);
 
+/* check for arrival of new packets immediately (even if irq_interval
+   has not yet been reached) */
+int hpsb_iso_recv_flush(struct hpsb_iso *iso);
+
 /* returns # of packets ready to send or receive */
 int hpsb_iso_n_ready(struct hpsb_iso *iso);
 

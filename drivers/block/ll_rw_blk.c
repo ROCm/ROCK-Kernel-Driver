@@ -689,7 +689,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 
 static char *rq_flags[] = {
 	"REQ_RW",
-	"REQ_RW_AHEAD",
+	"REQ_FAILFAST",
 	"REQ_SOFTBARRIER",
 	"REQ_HARDBARRIER",
 	"REQ_CMD",
@@ -706,6 +706,10 @@ static char *rq_flags[] = {
 	"REQ_DRIVE_CMD",
 	"REQ_DRIVE_TASK",
 	"REQ_DRIVE_TASKFILE",
+	"REQ_PREEMPT",
+	"REQ_PM_SUSPEND",
+	"REQ_PM_RESUME",
+	"REQ_PM_SHUTDOWN",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
@@ -1793,7 +1797,7 @@ void __blk_attempt_remerge(request_queue_t *q, struct request *rq)
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, ra;
 	struct list_head *insert_here;
 	sector_t sector;
 
@@ -1813,6 +1817,8 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	spin_lock_prefetch(q->queue_lock);
 
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
+
+	ra = bio_flagged(bio, BIO_RW_AHEAD) || current->flags & PF_READAHEAD;
 
 again:
 	insert_here = NULL;
@@ -1901,7 +1907,7 @@ get_rq:
 			/*
 			 * READA bit set
 			 */
-			if (bio_flagged(bio, BIO_RW_AHEAD))
+			if (ra)
 				goto end_io;
 	
 			freereq = get_request_wait(q, rw);
@@ -1920,6 +1926,12 @@ get_rq:
 	 */
 	if (barrier)
 		req->flags |= (REQ_HARDBARRIER | REQ_NOMERGE);
+
+	/*
+	 * don't stack up retries for read ahead
+	 */
+	if (ra)
+		req->flags |= REQ_FAILFAST;
 
 	req->errors = 0;
 	req->hard_sector = req->sector = sector;

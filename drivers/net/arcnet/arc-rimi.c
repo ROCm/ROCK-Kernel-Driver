@@ -47,7 +47,6 @@ static void arcrimi_command(struct net_device *dev, int command);
 static int arcrimi_status(struct net_device *dev);
 static void arcrimi_setmask(struct net_device *dev, int mask);
 static int arcrimi_reset(struct net_device *dev, int really_reset);
-static void arcrimi_openclose(struct net_device *dev, bool open);
 static void arcrimi_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count);
 static void arcrimi_copy_from_card(struct net_device *dev, int bufnum, int offset,
@@ -179,7 +178,7 @@ static int __init arcrimi_found(struct net_device *dev)
 	lp->hw.status = arcrimi_status;
 	lp->hw.intmask = arcrimi_setmask;
 	lp->hw.reset = arcrimi_reset;
-	lp->hw.open_close = arcrimi_openclose;
+	lp->hw.owner = THIS_MODULE;
 	lp->hw.copy_to_card = arcrimi_copy_to_card;
 	lp->hw.copy_from_card = arcrimi_copy_from_card;
 	lp->mem_start = ioremap(dev->mem_start, dev->mem_end - dev->mem_start + 1);
@@ -252,15 +251,6 @@ static int arcrimi_reset(struct net_device *dev, int really_reset)
 
 	/* done!  return success. */
 	return 0;
-}
-
-
-static void arcrimi_openclose(struct net_device *dev, int open)
-{
-	if (open)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
 }
 
 static void arcrimi_setmask(struct net_device *dev, int mask)

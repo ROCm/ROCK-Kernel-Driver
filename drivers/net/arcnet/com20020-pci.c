@@ -60,14 +60,6 @@ MODULE_PARM(clockp, "i");
 MODULE_PARM(clockm, "i");
 MODULE_LICENSE("GPL");
 
-static void com20020pci_open_close(struct net_device *dev, bool open)
-{
-	if (open)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
 static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct net_device *dev;
@@ -111,7 +103,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	lp->clockp = clockp & 7;
 	lp->clockm = clockm & 3;
 	lp->timeout = timeout;
-	lp->hw.open_close_ll = com20020pci_open_close;
+	lp->hw.owner = THIS_MODULE;
 
 	if (check_region(ioaddr, ARCNET_TOTAL_SIZE)) {
 		BUGMSG(D_INIT, "IO region %xh-%xh already allocated.\n",

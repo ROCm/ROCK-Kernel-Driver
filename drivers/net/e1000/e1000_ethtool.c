@@ -1475,6 +1475,107 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+	case ETHTOOL_GRXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
+
+		edata.data = adapter->rx_csum;
+		if (copy_to_user(addr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SRXCSUM: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, addr, sizeof(edata)))
+			return -EFAULT;
+		adapter->rx_csum = edata.data;
+		if(netif_running(netdev)) {
+			e1000_down(adapter);
+			e1000_up(adapter);
+		} else
+			e1000_reset(adapter);
+		return 0;
+	}
+	case ETHTOOL_GTXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
+
+		edata.data =
+			(netdev->features & NETIF_F_HW_CSUM) != 0;
+		if (copy_to_user(addr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_STXCSUM: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, addr, sizeof(edata)))
+			return -EFAULT;
+
+		if(adapter->hw.mac_type < e1000_82543) {
+			if (edata.data != 0)
+				return -EINVAL;
+			return 0;
+		}
+
+		if (edata.data)
+			netdev->features |= NETIF_F_HW_CSUM;
+		else
+			netdev->features &= ~NETIF_F_HW_CSUM;
+
+		return 0;
+	}
+	case ETHTOOL_GSG: {
+		struct ethtool_value edata = { ETHTOOL_GSG };
+
+		edata.data =
+			(netdev->features & NETIF_F_SG) != 0;
+		if (copy_to_user(addr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SSG: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, addr, sizeof(edata)))
+			return -EFAULT;
+
+		if (edata.data)
+			netdev->features |= NETIF_F_SG;
+		else
+			netdev->features &= ~NETIF_F_SG;
+
+		return 0;
+	}
+#ifdef NETIF_F_TSO
+	case ETHTOOL_GTSO: {
+		struct ethtool_value edata = { ETHTOOL_GTSO };
+
+		edata.data = (netdev->features & NETIF_F_TSO) != 0;
+		if (copy_to_user(addr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_STSO: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, addr, sizeof(edata)))
+			return -EFAULT;
+
+		if ((adapter->hw.mac_type < e1000_82544) ||
+		    (adapter->hw.mac_type == e1000_82547)) {
+			if (edata.data != 0)
+				return -EINVAL;
+			return 0;
+		}
+
+		if (edata.data)
+			netdev->features |= NETIF_F_TSO;
+		else
+			netdev->features &= ~NETIF_F_TSO;
+
+		return 0;
+	}
+#endif
 	default:
 		return -EOPNOTSUPP;
 	}

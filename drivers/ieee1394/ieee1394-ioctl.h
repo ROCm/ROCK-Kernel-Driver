@@ -100,6 +100,8 @@
 	_IOW ('#', 0x27, struct raw1394_iso_packets)
 #define RAW1394_IOC_ISO_XMIT_SYNC		\
 	_IO  ('#', 0x28)
+#define RAW1394_IOC_ISO_RECV_FLUSH              \
+	_IO  ('#', 0x29)
 
 
 #endif /* __IEEE1394_IOCTL_H */

@@ -767,6 +767,9 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 	} else if (blk_fs_request(rq)) {
 		/* Handle errors from READ and WRITE requests. */
 
+		if (blk_noretry_request(rq))
+			cdrom_end_request(drive, 0);
+
 		if (sense_key == NOT_READY) {
 			/* Tray open. */
 			cdrom_saw_media_change (drive);

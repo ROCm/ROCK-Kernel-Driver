@@ -442,8 +442,6 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 	int ret = 0;
 	void *buffer = 0;
 
-	MOD_INC_USE_COUNT;
-
 	do_gettimeofday(&start_time);
 	init_waitqueue_head(&msgwaitq);
 
@@ -479,7 +477,6 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 	       (diva_dbg_mem == 0) ? "internal" : "external");
 
       out:
-	MOD_DEC_USE_COUNT;
 	return (ret);
 }
 

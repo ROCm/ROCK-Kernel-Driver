@@ -420,8 +420,8 @@ L:	linux-computone@lazuli.wittsend.com
 S:	Supported
 
 COMX/MULTIGATE SYNC SERIAL DRIVERS
-P:	Gergely Madarasz
-M:	Gergely Madarasz <gorgo@itc.hu>
+P:	Pasztor Szilard
+M:	Pasztor Szilard <don@itc.hu>
 S:	Supported
 
 COSA/SRP SYNC SERIAL DRIVER
@@ -1620,8 +1620,8 @@ W:	http://www.torque.net/sg
 S:	Maintained
 
 SCSI SUBSYSTEM
-P:	Jens Axboe
-M:	axboe@suse.de
+P:	James E.J. Bottomley
+M:	James.Bottomley@HansenPartnership.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
