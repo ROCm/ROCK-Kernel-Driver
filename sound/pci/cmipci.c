@@ -2791,12 +2791,12 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 			int i;
 			for (i = 0; ports[i]; i++) {
 				joystick_port[dev] = ports[i];
-				cm->res_joystick = request_region(ports[i], 8, "CMIPCI gameport");
+				cm->res_joystick = request_region(ports[i], 1, "CMIPCI gameport");
 				if (cm->res_joystick)
 					break;
 			}
 		} else {
-			cm->res_joystick = request_region(joystick_port[dev], 8, "CMIPCI gameport");
+			cm->res_joystick = request_region(joystick_port[dev], 1, "CMIPCI gameport");
 		}
 	}
 	if (cm->res_joystick) {
