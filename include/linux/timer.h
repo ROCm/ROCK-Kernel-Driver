@@ -22,6 +22,15 @@ struct timer_list {
 
 #define TIMER_MAGIC	0x4b87ad6e
 
+#define TIMER_INITIALIZER(_function, _expires, _data) {		\
+		.function = (_function),			\
+		.expires = (_expires),				\
+		.data = (_data),				\
+		.base = NULL,					\
+		.magic = TIMER_MAGIC,				\
+		.lock = SPIN_LOCK_UNLOCKED,			\
+	}
+
 /***
  * init_timer - initialize a timer.
  * @timer: the timer to be initialized
