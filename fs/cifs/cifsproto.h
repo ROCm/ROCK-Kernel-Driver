@@ -184,6 +184,11 @@ extern int CIFSSMBUnixQuerySymLink(const int xid,
 			const unsigned char *searchName,
 			char *syminfo, const int buflen,
 			const struct nls_table *nls_codepage);
+extern int CIFSSMBQueryReparseLinkInfo(const int xid, 
+			const struct cifsTconInfo *tcon,
+			const unsigned char *searchName,
+			char *symlinkinfo, const int buflen, __u16 fid,
+			const struct nls_table *nls_codepage);
 
 extern int CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 			const char *fileName, const int disposition,

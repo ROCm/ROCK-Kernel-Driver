@@ -178,6 +178,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	struct block_device *bdev = NULL;
 	struct buffer_head bh;
 	int length;
+	int fully_mapped = 1;
 
 	if (page_has_buffers(page))
 		goto confused;
@@ -194,6 +195,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		}
 
 		if (!buffer_mapped(&bh)) {
+			fully_mapped = 0;
 			if (first_hole == blocks_per_page)
 				first_hole = page_block;
 			continue;
@@ -220,6 +222,8 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 			unlock_page(page);
 			goto out;
 		}
+	} else if (fully_mapped) {
+		SetPageMappedToDisk(page);
 	}
 
 	/*
@@ -614,12 +618,6 @@ mpage_writepages(struct address_space *mapping,
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);
 			}
-			if ((current->flags & PF_MEMALLOC) &&
-					!PageActive(page) && PageLRU(page)) {
-				if (!pagevec_add(&pvec, page))
-					pagevec_deactivate_inactive(&pvec);
-				page = NULL;
-			}
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
 			if (wbc->nonblocking && bdi_write_congested(bdi)) {
@@ -630,16 +628,13 @@ mpage_writepages(struct address_space *mapping,
 		} else {
 			unlock_page(page);
 		}
-
-		if (page)
-			page_cache_release(page);
+		page_cache_release(page);
 		write_lock(&mapping->page_lock);
 	}
 	/*
 	 * Leave any remaining dirty pages on ->io_pages
 	 */
 	write_unlock(&mapping->page_lock);
-	pagevec_deactivate_inactive(&pvec);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;

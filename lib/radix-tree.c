@@ -334,6 +334,9 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		radix_tree_node_free(pathp[1].node);
 	}
 
+	if (root->rnode == NULL)
+		root->height = 0;  /* Empty tree, we can reset the height */
+
 	return 0;
 }
 EXPORT_SYMBOL(radix_tree_delete);

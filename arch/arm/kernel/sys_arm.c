@@ -239,7 +239,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 asmlinkage int sys_fork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs->ARM_sp, regs, 0, NULL);
+	p = do_fork(SIGCHLD, regs->ARM_sp, regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -253,13 +253,13 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp, struct 
 	/*
 	 * We don't support SETTID / CLEARTID
 	 */
-	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID))
+	if (clone_flags & (CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID))
 		return -EINVAL;
 
 	if (!newsp)
 		newsp = regs->ARM_sp;
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
 
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -267,7 +267,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp, struct 
 asmlinkage int sys_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->ARM_sp, regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->ARM_sp, regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

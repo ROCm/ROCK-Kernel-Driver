@@ -72,6 +72,17 @@ static void bad_page(const char *function, struct page *page)
 	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
 		page->flags, page->mapping,
 		page_mapped(page), page_count(page));
+	printk("Backtrace:\n");
+	dump_stack();
+	printk("Trying to fix it up, but a reboot is needed\n");
+	page->flags &= ~(1 << PG_private	|
+			1 << PG_locked	|
+			1 << PG_lru	|
+			1 << PG_active	|
+			1 << PG_dirty	|
+			1 << PG_writeback);
+	set_page_count(page, 0);
+	page->mapping = NULL;
 }
 
 /*
@@ -156,6 +167,12 @@ static inline void free_pages_check(const char *function, struct page *page)
  * Frees a list of pages. 
  * Assumes all pages on list are in same zone, and of same order.
  * count is the number of pages to free, or 0 for all on the list.
+ *
+ * If the zone was previously in an "all pages pinned" state then look to
+ * see if this freeing clears that state.
+ *
+ * And clear the zone's pages_scanned counter, to hold off the "all pages are
+ * pinned" detection logic.
  */
 static int
 free_pages_bulk(struct zone *zone, int count,
@@ -170,6 +187,8 @@ free_pages_bulk(struct zone *zone, int count,
 	base = zone->zone_mem_map;
 	area = zone->free_area + order;
 	spin_lock_irqsave(&zone->lock, flags);
+	zone->all_unreclaimable = 0;
+	zone->pages_scanned = 0;
 	while (!list_empty(list) && count--) {
 		page = list_entry(list->prev, struct page, list);
 		/* have to delete it as __free_pages_bulk list manipulates */
@@ -246,7 +265,7 @@ static void prep_new_page(struct page *page, int order)
 
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 			1 << PG_referenced | 1 << PG_arch_1 |
-			1 << PG_checked);
+			1 << PG_checked | 1 << PG_mappedtodisk);
 	set_page_refs(page, order);
 }
 
@@ -400,12 +419,25 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 }
 
 /*
- * This is the 'heart' of the zoned buddy allocator:
+ * This is the 'heart' of the zoned buddy allocator.
+ *
+ * Herein lies the mysterious "incremental min".  That's the
+ *
+ *	min += z->pages_low;
+ *
+ * thing.  The intent here is to provide additional protection to low zones for
+ * allocation requests which _could_ use higher zones.  So a GFP_HIGHMEM
+ * request is not allowed to dip as deeply into the normal zone as a GFP_KERNEL
+ * request.  This preserves additional space in those lower zones for requests
+ * which really do need memory from those zones.  It means that on a decent
+ * sized machine, GFP_HIGHMEM and GFP_KERNEL requests basically leave the DMA
+ * zone untouched.
  */
 struct page *
 __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		struct zonelist *zonelist)
 {
+	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page *page;
@@ -413,7 +445,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int i;
 	int cold;
 
-	if (gfp_mask & __GFP_WAIT)
+	if (wait)
 		might_sleep();
 
 	cold = 0;
@@ -430,9 +462,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
 
-		/* the incremental min is allegedly to discourage fallback */
 		min += z->pages_low;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
@@ -440,12 +472,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	}
 
 	/* we're somewhat low on memory, failed to find what we needed */
-	for (i = 0; zones[i] != NULL; i++) {
-		struct zone *z = zones[i];
-		if (z->free_pages <= z->pages_low &&
-		    waitqueue_active(&z->zone_pgdat->kswapd_wait))
-			wake_up_interruptible(&z->zone_pgdat->kswapd_wait);
-	}
+	for (i = 0; zones[i] != NULL; i++)
+		wakeup_kswapd(zones[i]);
 
 	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
@@ -457,7 +485,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
@@ -479,7 +508,7 @@ rebalance:
 	}
 
 	/* Atomic allocations - we can't balance anything */
-	if (!(gfp_mask & __GFP_WAIT))
+	if (!wait)
 		goto nopage;
 
 	inc_page_state(allocstall);
@@ -494,7 +523,8 @@ rebalance:
 		struct zone *z = zones[i];
 
 		min += z->pages_min;
-		if (z->free_pages > min || z->free_pages >= z->pages_high) {
+		if (z->free_pages > min ||
+				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				return page;
@@ -1181,7 +1211,8 @@ struct pglist_data contig_page_data = { .bdata = &contig_bootmem_data };
 
 void __init free_area_init(unsigned long *zones_size)
 {
-	free_area_init_node(0, &contig_page_data, NULL, zones_size, 0, NULL);
+	free_area_init_node(0, &contig_page_data, NULL, zones_size,
+			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
 	mem_map = contig_page_data.node_mem_map;
 }
 #endif

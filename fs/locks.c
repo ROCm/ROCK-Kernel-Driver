@@ -297,11 +297,20 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		return -EINVAL;
 	}
 
-	if (((start += l->l_start) < 0) || (l->l_len < 0))
-		return -EINVAL;
+	/* POSIX-1996 leaves the case l->l_len < 0 undefined;
+	   POSIX-2001 defines it. */
+	start += l->l_start;
 	end = start + l->l_len - 1;
+	if (l->l_len < 0) {
+		end = start - 1;
+		start += l->l_len;
+	}
+
+	if (start < 0)
+		return -EINVAL;
 	if (l->l_len > 0 && end < 0)
 		return -EOVERFLOW;
+
 	fl->fl_start = start;	/* we record the absolute position */
 	fl->fl_end = end;
 	if (l->l_len == 0)

@@ -235,24 +235,25 @@ release_thread(struct task_struct *dead_task)
  * with parameters (SIGCHLD, 0).
  */
 int
-alpha_clone(unsigned long clone_flags, unsigned long usp, int *user_tid,
-	    struct pt_regs *regs)
+alpha_clone(unsigned long clone_flags, unsigned long usp, int *parent_tid,
+	    int *child_tid, unsigned long tls_value, struct pt_regs *regs)
 {
 	struct task_struct *p;
 
 	if (!usp)
 		usp = rdusp();
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
+		    parent_tid, child_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int
-alpha_vfork(struct switch_stack * swstack)
+alpha_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
 	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(),
-		    (struct pt_regs *) (swstack+1), 0, NULL);
+		    regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -306,7 +307,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	   required for proper operation in the case of a threaded
 	   application calling fork.  */
 	if (clone_flags & CLONE_SETTLS)
-		childti->pcb.unique = regs->r19;
+		childti->pcb.unique = regs->r20;
 
 	return 0;
 }

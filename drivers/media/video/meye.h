@@ -1,7 +1,9 @@
 /* 
  * Motion Eye video4linux driver for Sony Vaio PictureBook
  *
- * Copyright (C) 2001 Stelian Pop <stelian.pop@fr.alcove.com>, Alcôve
+ * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ *
+ * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2000 Andrew Tridgell <tridge@valinux.com>
  *
@@ -29,7 +31,7 @@
 #define _MEYE_PRIV_H_
 
 #define MEYE_DRIVER_MAJORVERSION	1
-#define MEYE_DRIVER_MINORVERSION	4
+#define MEYE_DRIVER_MINORVERSION	5
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */

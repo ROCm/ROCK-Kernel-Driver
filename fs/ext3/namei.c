@@ -1018,7 +1018,8 @@ dx_move_dirents(char *from, char *to, struct dx_map_entry *map, int count)
 		struct ext3_dir_entry_2 *de = (struct ext3_dir_entry_2 *) (from + map->offs);
 		rec_len = EXT3_DIR_REC_LEN(de->name_len);
 		memcpy (to, de, rec_len);
-		((struct ext3_dir_entry_2 *) to)->rec_len = rec_len;
+		((struct ext3_dir_entry_2 *) to)->rec_len =
+				cpu_to_le16(rec_len);
 		de->inode = 0;
 		map++;
 		to += rec_len;
@@ -1039,7 +1040,7 @@ static struct ext3_dir_entry_2* dx_pack_dirents(char *base, int size)
 			rec_len = EXT3_DIR_REC_LEN(de->name_len);
 			if (de > to)
 				memmove(to, de, rec_len);
-			to->rec_len = rec_len;
+			to->rec_len = cpu_to_le16(rec_len);
 			prev = to;
 			to = (struct ext3_dir_entry_2 *) (((char *) to) + rec_len);
 		}

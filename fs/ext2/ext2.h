@@ -120,6 +120,7 @@ extern struct file_operations ext2_file_operations;
 
 /* inode.c */
 extern struct address_space_operations ext2_aops;
+extern struct address_space_operations ext2_nobh_aops;
 
 /* namei.c */
 extern struct inode_operations ext2_dir_inode_operations;

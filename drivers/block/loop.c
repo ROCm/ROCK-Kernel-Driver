@@ -238,7 +238,7 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	up(&mapping->host->i_sem);
 out:
 	kunmap(bvec->bv_page);
-	balance_dirty_pages(mapping);
+	balance_dirty_pages_ratelimited(mapping);
 	return ret;
 
 unlock:

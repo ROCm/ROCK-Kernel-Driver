@@ -481,7 +481,8 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	*p++ = nfssvc_boot.tv_usec;
 
 	return nfsd_write(rqstp, current_fh, write->wr_offset,
-			  write->wr_buf, write->wr_buflen, &write->wr_how_written);
+			  write->wr_vec, write->wr_vlen, write->wr_buflen,
+			  &write->wr_how_written);
 }
 
 /* This routine never returns NFS_OK!  If there are no other errors, it
@@ -565,11 +566,14 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	fh_init(&current_fh, NFS4_FHSIZE);
 	fh_init(&save_fh, NFS4_FHSIZE);
 
-	resp->p = rqstp->rq_resbuf.buf + 3 + XDR_QUADLEN(args->taglen);
-	resp->end = rqstp->rq_resbuf.base + rqstp->rq_resbuf.buflen;
+	resp->xbuf = &rqstp->rq_res;
+	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
+	resp->p += 3 + XDR_QUADLEN(args->taglen);
+	resp->end = rqstp->rq_res.head[0].iov_base + PAGE_SIZE;
 	resp->taglen = args->taglen;
 	resp->tag = args->tag;
 	resp->opcnt = 0;
+	resp->rqstp = rqstp;
 
 	/*
 	 * According to RFC3010, this takes precedence over all other errors.
@@ -595,6 +599,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		 * failed response to the next operation.  If we don't
 		 * have enough room, fail with ERR_RESOURCE.
 		 */
+/* FIXME - is slack_space *really* words, or bytes??? - neilb */
 		slack_space = (char *)resp->end - (char *)resp->p;
 		if (slack_space < COMPOUND_SLACK_SPACE + COMPOUND_ERR_SLACK_SPACE) {
 			BUG_ON(slack_space < COMPOUND_ERR_SLACK_SPACE);
@@ -699,6 +704,16 @@ out:
 	if (args->ops != args->iops) {
 		kfree(args->ops);
 		args->ops = args->iops;
+	}
+	if (args->tmpp) {
+		kfree(args->tmpp);
+		args->tmpp = NULL;
+	}
+	while (args->to_free) {
+		struct tmpbuf *tb = args->to_free;
+		args->to_free = tb->next;
+		kfree(tb->buf);
+		kfree(tb);
 	}
 	fh_put(&current_fh);
 	fh_put(&save_fh);

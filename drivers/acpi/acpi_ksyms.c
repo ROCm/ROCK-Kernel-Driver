@@ -24,6 +24,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/acpi.h>
 #include "include/acpi.h"
 #include "acpi_bus.h"
 
@@ -141,3 +142,11 @@ EXPORT_SYMBOL(acpi_pci_irq_enable);
 extern int acpi_pci_irq_lookup (int segment, int bus, int device, int pin);
 EXPORT_SYMBOL(acpi_pci_irq_lookup);
 #endif /*CONFIG_ACPI_PCI */
+
+#ifdef CONFIG_ACPI_EC
+/* ACPI EC driver (ec.c) */
+
+EXPORT_SYMBOL(ec_read);
+EXPORT_SYMBOL(ec_write);
+#endif
+

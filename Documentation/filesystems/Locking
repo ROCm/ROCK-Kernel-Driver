@@ -135,7 +135,6 @@ prototypes:
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
 	int (*writepages)(struct address_space *, int *nr_to_write);
-	int (*vm_writeback)(struct page *, int *nr_to_write);
 	int (*set_page_dirty)(struct page *page);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
@@ -153,7 +152,6 @@ readpage:		no	yes, unlocks
 readpages:		no
 sync_page:		no	maybe
 writepages:		no
-vm_writeback:		no	yes
 set_page_dirty		no	no
 prepare_write:		no	yes
 commit_write:		no	yes
@@ -189,14 +187,6 @@ sync operations.  The address_space should start I/O against at least
 written.  The address_space implementation may write more (or less) pages
 than *nr_to_write asks for, but it should try to be reasonably close.  If
 nr_to_write is NULL, all dirty pages must be written.
-
-	->vm_writeback() is called from the VM.  The address_space should
-start I/O against at least *nr_to_write pages, including the passed page. As
-each page is written its PG_launder flag must be set (inside the page lock).
-
-	The vm_writeback() function is provided so that filesytems can perform
-clustered writeback around the page which the VM is trying to clean.
-If a_ops.vm_writeback is NULL the VM will fall back to single-page writepage().
 
 	->set_page_dirty() is called from various places in the kernel
 when the target page is marked as needing writeback.  It may be called

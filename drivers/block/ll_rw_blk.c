@@ -56,6 +56,7 @@ int blk_nohighio = 0;
 static struct congestion_state {
 	wait_queue_head_t wqh;
 	atomic_t nr_congested_queues;
+	atomic_t nr_active_queues;
 } congestion_states[2];
 
 /*
@@ -86,6 +87,11 @@ static inline int queue_congestion_off_threshold(void)
 	return ret;
 }
 
+/*
+ * A queue has just exitted congestion.  Note this in the global counter of
+ * congested queues, and wake up anyone who was waiting for requests to be
+ * put back.
+ */
 static void clear_queue_congested(request_queue_t *q, int rw)
 {
 	enum bdi_state bit;
@@ -99,6 +105,10 @@ static void clear_queue_congested(request_queue_t *q, int rw)
 		wake_up(&cs->wqh);
 }
 
+/*
+ * A queue has just entered congestion.  Flag that in the queue's VM-visible
+ * state flags and increment the global gounter of congested queues.
+ */
 static void set_queue_congested(request_queue_t *q, int rw)
 {
 	enum bdi_state bit;
@@ -107,6 +117,34 @@ static void set_queue_congested(request_queue_t *q, int rw)
 
 	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
 		atomic_inc(&congestion_states[rw].nr_congested_queues);
+}
+
+/*
+ * A queue has just put back its last read or write request and has fallen
+ * idle.
+ */
+static void clear_queue_active(request_queue_t *q, int rw)
+{
+	enum bdi_state bit;
+
+	bit = (rw == WRITE) ? BDI_write_active : BDI_read_active;
+
+	if (test_and_clear_bit(bit, &q->backing_dev_info.state))
+		atomic_dec(&congestion_states[rw].nr_active_queues);
+}
+
+/*
+ * A queue has just taken its first read or write request and has become
+ * active.
+ */
+static void set_queue_active(request_queue_t *q, int rw)
+{
+	enum bdi_state bit;
+
+	bit = (rw == WRITE) ? BDI_write_active : BDI_read_active;
+
+	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
+		atomic_inc(&congestion_states[rw].nr_active_queues);
 }
 
 /**
@@ -1252,6 +1290,8 @@ static struct request *get_request(request_queue_t *q, int rw)
 		rq = blkdev_free_rq(&rl->free);
 		list_del_init(&rq->queuelist);
 		rq->ref_count = 1;
+		if (rl->count == queue_nr_requests)
+			set_queue_active(q, rw);
 		rl->count--;
 		if (rl->count < queue_congestion_on_threshold())
 			set_queue_congested(q, rw);
@@ -1484,6 +1524,8 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		rl->count++;
 		if (rl->count >= queue_congestion_off_threshold())
 			clear_queue_congested(q, rw);
+		if (rl->count == queue_nr_requests)
+			clear_queue_active(q, rw);
 		if (rl->count >= batch_requests && waitqueue_active(&rl->wait))
 			wake_up(&rl->wait);
 	}
@@ -1512,19 +1554,20 @@ void blk_put_request(struct request *req)
  * @timeout: timeout in jiffies
  *
  * Waits for up to @timeout jiffies for a queue (any queue) to exit congestion.
- * If no queues are congested then just return, in the hope that the caller
- * will submit some more IO.
+ * If no queues are congested then just wait for the next request to be
+ * returned.
  */
 void blk_congestion_wait(int rw, long timeout)
 {
 	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
-	if (atomic_read(&cs->nr_congested_queues) == 0)
+	if (!atomic_read(&cs->nr_active_queues))
 		return;
+
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&cs->nr_congested_queues) != 0)
+	if (atomic_read(&cs->nr_active_queues))
 		io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
@@ -2157,6 +2200,7 @@ int __init blk_dev_init(void)
 	for (i = 0; i < ARRAY_SIZE(congestion_states); i++) {
 		init_waitqueue_head(&congestion_states[i].wqh);
 		atomic_set(&congestion_states[i].nr_congested_queues, 0);
+		atomic_set(&congestion_states[i].nr_active_queues, 0);
 	}
 	return 0;
 };

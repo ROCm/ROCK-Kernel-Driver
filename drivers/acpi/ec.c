@@ -92,6 +92,9 @@ struct acpi_ec {
 /* If we find an EC via the ECDT, we need to keep a ptr to its context */
 static struct acpi_ec	*ec_ecdt;
 
+/* External interfaces use first EC only, so remember */
+static struct acpi_device *first_ec;
+
 /* --------------------------------------------------------------------------
                              Transaction Management
    -------------------------------------------------------------------------- */
@@ -234,6 +237,47 @@ end:
 		acpi_release_global_lock(glk);
 
 	return_VALUE(result);
+}
+
+/*
+ * Externally callable EC access functions. For now, assume 1 EC only
+ */
+int
+ec_read(u8 addr, u8 *val)
+{
+	struct acpi_ec *ec;
+	int err;
+	u32 temp_data;
+
+	if (!first_ec)
+		return -ENODEV;
+
+	ec = acpi_driver_data(first_ec);
+
+	err = acpi_ec_read(ec, addr, &temp_data);
+
+	if (!err) {
+		*val = temp_data;
+		return 0;
+	}
+	else
+		return err;
+}
+
+int
+ec_write(u8 addr, u8 val)
+{
+	struct acpi_ec *ec;
+	int err;
+
+	if (!first_ec)
+		return -ENODEV;
+
+	ec = acpi_driver_data(first_ec);
+
+	err = acpi_ec_write(ec, addr, val);
+
+	return err;
 }
 
 
@@ -540,11 +584,15 @@ acpi_ec_add (
 	acpi_evaluate_integer(ec->handle, "_GLK", NULL, &ec->global_lock);
 
 	/* If our UID matches the UID for the ECDT-enumerated EC,
-	   we already found this EC, so abort. */
+	   we now have the *real* EC info, so kill the makeshift one.*/
 	acpi_evaluate_integer(ec->handle, "_UID", NULL, &uid);
 	if (ec_ecdt && ec_ecdt->uid == uid) {
-		result = -ENODEV;
-		goto end;
+		acpi_remove_address_space_handler(ACPI_ROOT_OBJECT,
+			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler);
+	
+		acpi_remove_gpe_handler(ec_ecdt->gpe_bit, &acpi_ec_gpe_handler);
+
+		kfree(ec_ecdt);
 	}
 
 	/* Get GPE bit assignment (EC events). */
@@ -563,6 +611,9 @@ acpi_ec_add (
 	printk(KERN_INFO PREFIX "%s [%s] (gpe %d)\n",
 		acpi_device_name(device), acpi_device_bid(device),
 		(u32) ec->gpe_bit);
+
+	if (!first_ec)
+		first_ec = device;
 
 end:
 	if (result)
@@ -584,7 +635,7 @@ acpi_ec_remove (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	ec = (struct acpi_ec *) acpi_driver_data(device);
+	ec = acpi_driver_data(device);
 
 	acpi_ec_remove_fs(device);
 
@@ -609,7 +660,7 @@ acpi_ec_start (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	ec = (struct acpi_ec *) acpi_driver_data(device);
+	ec = acpi_driver_data(device);
 
 	if (!ec)
 		return_VALUE(-EINVAL);
@@ -688,7 +739,7 @@ acpi_ec_stop (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	ec = (struct acpi_ec *) acpi_driver_data(device);
+	ec = acpi_driver_data(device);
 
 	status = acpi_remove_address_space_handler(ec->handle,
 		ACPI_ADR_SPACE_EC, &acpi_ec_space_handler);
@@ -711,50 +762,50 @@ acpi_ec_ecdt_probe (void)
 
 	status = acpi_get_firmware_table("ECDT", 1, ACPI_LOGICAL_ADDRESSING, 
 		(acpi_table_header **) &ecdt_ptr);
-	if (ACPI_SUCCESS(status)) {
-		printk(KERN_INFO PREFIX "Found ECDT\n");
+	if (ACPI_FAILURE(status))
+		return 0;
 
-		/*
-		 * TODO: When the new driver model allows it, simply tell the
-		 * EC driver it has a new device via that, instead if this.
-		 */
-		ec_ecdt = kmalloc(sizeof(struct acpi_ec), GFP_KERNEL);
-		if (!ec_ecdt)
-			return -ENOMEM;
-		memset(ec_ecdt, 0, sizeof(struct acpi_ec));
-		
-		ec_ecdt->command_addr = ecdt_ptr->ec_control;
-		ec_ecdt->status_addr = ecdt_ptr->ec_control;
-		ec_ecdt->data_addr = ecdt_ptr->ec_data;
-		ec_ecdt->gpe_bit = ecdt_ptr->gpe_bit;
-		ec_ecdt->lock = SPIN_LOCK_UNLOCKED;
-		/* use the GL just to be safe */
-		ec_ecdt->global_lock = TRUE;
-		ec_ecdt->uid = ecdt_ptr->uid;
+	printk(KERN_INFO PREFIX "Found ECDT\n");
 
-		status = acpi_get_handle(NULL, ecdt_ptr->ec_id, &ec_ecdt->handle);
-		if (ACPI_FAILURE(status)) {
-			goto error;
-		}
+	 /*
+	 * Generate a temporary ec context to use until the namespace is scanned
+	 */
+	ec_ecdt = kmalloc(sizeof(struct acpi_ec), GFP_KERNEL);
+	if (!ec_ecdt)
+		return -ENOMEM;
+	memset(ec_ecdt, 0, sizeof(struct acpi_ec));
 
-		/*
-		 * Install GPE handler
-		 */
-		status = acpi_install_gpe_handler(ec_ecdt->gpe_bit,
-			ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler,
-			ec_ecdt);
-		if (ACPI_FAILURE(status)) {
-			goto error;
-		}
+	ec_ecdt->command_addr = ecdt_ptr->ec_control;
+	ec_ecdt->status_addr = ecdt_ptr->ec_control;
+	ec_ecdt->data_addr = ecdt_ptr->ec_data;
+	ec_ecdt->gpe_bit = ecdt_ptr->gpe_bit;
+	ec_ecdt->lock = SPIN_LOCK_UNLOCKED;
+	/* use the GL just to be safe */
+	ec_ecdt->global_lock = TRUE;
+	ec_ecdt->uid = ecdt_ptr->uid;
 
-		status = acpi_install_address_space_handler (ACPI_ROOT_OBJECT,
-				ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
-				&acpi_ec_space_setup, ec_ecdt);
-		if (ACPI_FAILURE(status)) {
-			acpi_remove_gpe_handler(ec_ecdt->gpe_bit,
-				&acpi_ec_gpe_handler);
-			goto error;
-		}
+	status = acpi_get_handle(NULL, ecdt_ptr->ec_id, &ec_ecdt->handle);
+	if (ACPI_FAILURE(status)) {
+		goto error;
+	}
+
+	/*
+	 * Install GPE handler
+	 */
+	status = acpi_install_gpe_handler(ec_ecdt->gpe_bit,
+		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler,
+		ec_ecdt);
+	if (ACPI_FAILURE(status)) {
+		goto error;
+	}
+
+	status = acpi_install_address_space_handler (ACPI_ROOT_OBJECT,
+			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
+			&acpi_ec_space_setup, ec_ecdt);
+	if (ACPI_FAILURE(status)) {
+		acpi_remove_gpe_handler(ec_ecdt->gpe_bit,
+			&acpi_ec_gpe_handler);
+		goto error;
 	}
 
 	return 0;
@@ -796,20 +847,6 @@ subsys_initcall(acpi_ec_init);
 /* EC driver currently not unloadable */
 #if 0
 static void __exit
-acpi_ec_ecdt_exit (void)
-{
-	if (!ec_ecdt)
-		return;
-
-	acpi_remove_address_space_handler(ACPI_ROOT_OBJECT,
-		ACPI_ADR_SPACE_EC, &acpi_ec_space_handler);
-	
-	acpi_remove_gpe_handler(ec_ecdt->gpe_bit, &acpi_ec_gpe_handler);
-
-	kfree(ec_ecdt);
-}
-
-static void __exit
 acpi_ec_exit (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_ec_exit");
@@ -817,8 +854,6 @@ acpi_ec_exit (void)
 	acpi_bus_unregister_driver(&acpi_ec_driver);
 
 	remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
-
-	acpi_ec_ecdt_exit();
 
 	return_VOID;
 }
