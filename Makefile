@@ -78,12 +78,7 @@ all:	do-it-all
 
 ifeq (.config,$(wildcard .config))
 include .config
-ifeq (.hdepend,$(wildcard .hdepend))
 do-it-all:	vmlinux
-else
-CONFIGURATION = depend
-do-it-all:	depend
-endif
 else
 CONFIGURATION = config
 do-it-all:	config
@@ -191,10 +186,12 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 $(SUBDIRS): prepare
 	@$(MAKE) -C $@
 
-#	Things we need done before we even start the actual build
+#	Things we need done before we even start the actual build.
+#	The dependency on .hdepend will in turn take care of
+#	include/asm, include/linux/version etc.
 
 .PHONY: prepare
-prepare: symlinks include/linux/version.h include/config/MARKER .hdepend
+prepare: .hdepend include/config/MARKER
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -213,61 +210,77 @@ prepare: symlinks include/linux/version.h include/config/MARKER .hdepend
 # Configuration
 # ---------------------------------------------------------------------------
 
-oldconfig: symlinks
+PHONY: oldconfig xconfig menuconfig config
+
+oldconfig:
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
 
-xconfig: symlinks
+xconfig:
 	@$(MAKE) -C scripts kconfig.tk
 	wish -f scripts/kconfig.tk
 
-menuconfig: include/linux/version.h symlinks
+menuconfig:
 	@$(MAKE) -C scripts/lxdialog all
 	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
 
-config: symlinks
+config:
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
 
-# make asm->asm-$(ARCH) symlink
+# 	FIXME: The asm symlink changes when $(ARCH) changes. That's
+#	hard to detect, but I suppose "make mrproper" is a good idea
+#	before switching between archs anyway.
 
-symlinks:
-	rm -f include/asm
-	( cd include ; ln -sf asm-$(ARCH) asm)
-	@if [ ! -d include/linux/modules ]; then \
-		mkdir include/linux/modules; \
-	fi
+include/asm:
+	@echo 'Making asm->asm-$(ARCH) symlink'
+	@ln -s asm-$(ARCH) $@
+	@echo 'Making directory include/linux/modules'
+	@mkdir include/linux/modules
 
-# split autoconf.h into include/linux/config/*
+# 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
 
 # Generate some files
+# ---------------------------------------------------------------------------
 
-$(TOPDIR)/include/linux/version.h: include/linux/version.h
+#	version.h changes when $(KERNELRELEASE) etc change, as defined in
+#	this Makefile
 
-include/linux/version.h: ./Makefile
+include/linux/version.h: Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
-# helpers built in scripts/
+# Helpers built in scripts/
+# ---------------------------------------------------------------------------
 
 scripts/mkdep scripts/split-include : FORCE
 	@$(MAKE) -C scripts
 
-# ---------------------------------------------------------------------------
 # Generate dependencies
+# ---------------------------------------------------------------------------
 
-depend dep: dep-files
+.PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
 
-dep-files: scripts/mkdep archdep include/linux/version.h
-	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
+depend dep: .hdepend
+
+#	.hdepend is missing prerequisites - in fact dependencies need
+#	to be redone basically each time anything changed - since
+#	that's too expensive, we traditionally rely on the user to
+#	run "make dep" manually whenever necessary. In this case,
+#	we make "FORCE" a prequisite, to force redoing the
+#	dependencies. Yeah, that's ugly, and it'll go away soon.
+
+.hdepend: scripts/mkdep include/linux/version.h include/asm \
+	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
-	$(MAKE) update-modverfile
+	@$(MAKE) update-modverfile
 endif
+	@$(MAKE) archdep
 
-.PHONY: $(patsubst %,_sfdep_%,$(SUBDIRS))
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
 
