@@ -417,7 +417,6 @@ ENTRY(simd_coprocessor_error)
 ENTRY(device_not_available)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	GET_THREAD_INFO(%ebx)
 	movl %cr0, %eax
 	testl $0x4, %eax		# EM (math emulation bit)
 	jne device_not_available_emulate

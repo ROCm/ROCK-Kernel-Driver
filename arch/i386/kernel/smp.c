@@ -646,7 +646,10 @@ asmlinkage void smp_call_function_interrupt(void)
 	/*
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
+	irq_enter();
 	(*func)(info);
+	irq_exit();
+
 	if (wait) {
 		mb();
 		atomic_inc(&call_data->finished);
