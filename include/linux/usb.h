@@ -290,7 +290,7 @@ extern struct usb_device *usb_find_device(u16 vendor_id, u16 product_id);
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 
 /* used these for multi-interface device registration */
-extern void usb_driver_claim_interface(struct usb_driver *driver,
+extern int usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
 extern int usb_interface_claimed(struct usb_interface *iface);
 extern void usb_driver_release_interface(struct usb_driver *driver,

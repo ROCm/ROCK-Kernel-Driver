@@ -261,24 +261,27 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
  *
  * Few drivers should need to use this routine, since the most natural
  * way to bind to an interface is to return the private data from
- * the driver's probe() method.  Any driver that does use this must
- * first be sure that no other driver has claimed the interface, by
- * checking with usb_interface_claimed().
+ * the driver's probe() method.
  */
-void usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
+int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
 {
 	if (!iface || !driver)
-		return;
+		return -EINVAL;
 
-	// FIXME change API to report an error in this case
-	if (iface->driver)
-	    err ("%s driver booted %s off interface %p",
-	    	driver->name, iface->driver->name, iface);
-	else
+	lock_kernel();
+	if (iface->driver) {
+		unlock_kernel();
+		err ("%s driver booted %s off interface %p",
+			driver->name, iface->driver->name, iface);
+		return -EBUSY;
+	} else {
 	    dbg("%s driver claimed interface %p", driver->name, iface);
+	}
 
 	iface->driver = driver;
 	usb_set_intfdata(iface, priv);
+	unlock_kernel();
+	return 0;
 }
 
 /**
@@ -324,11 +327,11 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 	if (iface->driver && iface->driver != driver)
 		return;
 
-	iface->driver = NULL;
-	usb_set_intfdata(iface, NULL);
 	usb_set_interface(interface_to_usbdev(iface),
 			iface->altsetting[0].desc.bInterfaceNumber,
 			0);
+	usb_set_intfdata(iface, NULL);
+	iface->driver = NULL;
 }
 
 /**
