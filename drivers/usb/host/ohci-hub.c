@@ -190,7 +190,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		break;
 	case OHCI_USB_RESUME:
 		/* HCFS changes sometime after INTR_RD */
-		ohci_info (ohci, "remote wakeup\n");
+		ohci_info (ohci, "wakeup\n");
 		break;
 	case OHCI_USB_OPER:
 		ohci_dbg (ohci, "odd resume\n");
@@ -515,7 +515,7 @@ static int ohci_hub_control (
 #ifndef	OHCI_VERBOSE_DEBUG
 	if (*(u16*)(buf+2))	/* only if wPortChange is interesting */
 #endif
-		dbg_port (ohci, "GetStatus", wIndex + 1, temp);
+		dbg_port (ohci, "GetStatus", wIndex, temp);
 		break;
 	case SetHubFeature:
 		switch (wValue) {
