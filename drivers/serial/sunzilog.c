@@ -103,10 +103,6 @@ struct uart_sunzilog_port {
 
 	unsigned int cflag;
 
-	/* L1-A keyboard break state.  */
-	int				kbd_id;
-	int				l1_down;
-
 	unsigned char			parity_mask;
 	unsigned char			prev_status;
 
@@ -292,22 +288,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 					 struct pt_regs *regs)
 {
 	if (ZS_IS_KEYB(up)) {
-		/* if (!serial_console)	XXX Keith's case #1 - two brks work */
-		if (ch == SUNKBD_RESET) {
-			up->kbd_id = 1;
-			up->l1_down = 0;
-		} else if (up->kbd_id) {
-			up->kbd_id = 0;
-		} else if (ch == SUNKBD_L1) {
-			up->l1_down = 1;
-		} else if (ch == (SUNKBD_L1 | SUNKBD_UP)) {
-			up->l1_down = 0;
-		} else if (ch == SUNKBD_A && up->l1_down) {
-			sun_do_break();
-			up->l1_down = 0;
-			up->kbd_id = 0;
-			return;
-		}
+		/* Stop-A is handled by drivers/char/keyboard.c now. */
 #ifdef CONFIG_SERIO
 		if (up->serio_open)
 			serio_interrupt(&up->serio, ch, 0, regs);
