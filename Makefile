@@ -209,7 +209,7 @@ init-y		:= init/
 drivers-y	:= drivers/ sound/
 net-y		:= net/
 libs-y		:= lib/
-core-y		:=
+core-y		:= usr/
 SUBDIRS		:=
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
