@@ -204,165 +204,179 @@ pte_t fastcall * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned lon
 out:
 	return pte_offset_kernel(pmd, address);
 }
-#define PTE_TABLE_MASK	((PTRS_PER_PTE-1) * sizeof(pte_t))
-#define PMD_TABLE_MASK	((PTRS_PER_PMD-1) * sizeof(pmd_t))
 
 /*
  * copy one vm_area from one task to the other. Assumes the page tables
  * already present in the new task to be cleared in the whole range
  * covered by this vma.
  *
- * 08Jan98 Merged into one routine from several inline routines to reduce
- *         variable count and make things faster. -jj
- *
  * dst->page_table_lock is held on entry and exit,
- * but may be dropped within pmd_alloc() and pte_alloc_map().
+ * but may be dropped within p[mg]d_alloc() and pte_alloc_map().
  */
-int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
-			struct vm_area_struct *vma)
+
+static inline void
+copy_swap_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm, pte_t pte)
 {
-	pgd_t * src_pgd, * dst_pgd;
-	unsigned long address = vma->vm_start;
-	unsigned long end = vma->vm_end;
-	unsigned long cow;
+	if (pte_file(pte))
+		return;
+	swap_duplicate(pte_to_swp_entry(pte));
+	if (list_empty(&dst_mm->mmlist)) {
+		spin_lock(&mmlist_lock);
+		list_add(&dst_mm->mmlist, &src_mm->mmlist);
+		spin_unlock(&mmlist_lock);
+	}
+}
+
+static inline void
+copy_one_pte(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
+		pte_t *dst_pte, pte_t *src_pte, unsigned long vm_flags,
+		unsigned long addr)
+{
+	pte_t pte = *src_pte;
+	struct page *page;
+	unsigned long pfn;
+
+	/* pte contains position in swap, so copy. */
+	if (!pte_present(pte)) {
+		copy_swap_pte(dst_mm, src_mm, pte);
+		set_pte(dst_pte, pte);
+		return;
+	}
+	pfn = pte_pfn(pte);
+	/* the pte points outside of valid memory, the
+	 * mapping is assumed to be good, meaningful
+	 * and not mapped via rmap - duplicate the
+	 * mapping as is.
+	 */
+	page = NULL;
+	if (pfn_valid(pfn))
+		page = pfn_to_page(pfn);
+
+	if (!page || PageReserved(page)) {
+		set_pte(dst_pte, pte);
+		return;
+	}
+
+	/*
+	 * If it's a COW mapping, write protect it both
+	 * in the parent and the child
+	 */
+	if ((vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE) {
+		ptep_set_wrprotect(src_pte);
+		pte = *src_pte;
+	}
+
+	/*
+	 * If it's a shared mapping, mark it clean in
+	 * the child
+	 */
+	if (vm_flags & VM_SHARED)
+		pte = pte_mkclean(pte);
+	pte = pte_mkold(pte);
+	get_page(page);
+	dst_mm->rss++;
+	if (PageAnon(page))
+		dst_mm->anon_rss++;
+	set_pte(dst_pte, pte);
+	page_dup_rmap(page);
+}
+
+static int copy_pte_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
+		pmd_t *dst_pmd, pmd_t *src_pmd, struct vm_area_struct *vma,
+		unsigned long addr, unsigned long end)
+{
+	pte_t *src_pte, *dst_pte;
+	pte_t *s, *d;
+	unsigned long vm_flags = vma->vm_flags;
+
+	d = dst_pte = pte_alloc_map(dst_mm, dst_pmd, addr);
+	if (!dst_pte)
+		return -ENOMEM;
+
+	spin_lock(&src_mm->page_table_lock);
+	s = src_pte = pte_offset_map_nested(src_pmd, addr);
+	for (; addr < end; addr += PAGE_SIZE, s++, d++) {
+		if (pte_none(*s))
+			continue;
+		copy_one_pte(dst_mm, src_mm, d, s, vm_flags, addr);
+	}
+	pte_unmap_nested(src_pte);
+	pte_unmap(dst_pte);
+	spin_unlock(&src_mm->page_table_lock);
+	cond_resched_lock(&dst_mm->page_table_lock);
+	return 0;
+}
+
+static int copy_pmd_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
+		pgd_t *dst_pgd, pgd_t *src_pgd, struct vm_area_struct *vma,
+		unsigned long addr, unsigned long end)
+{
+	pmd_t *src_pmd, *dst_pmd;
+	int err = 0;
+	unsigned long next;
+
+	src_pmd = pmd_offset(src_pgd, addr);
+	dst_pmd = pmd_alloc(dst_mm, dst_pgd, addr);
+	if (!dst_pmd)
+		return -ENOMEM;
+
+	for (; addr < end; addr = next, src_pmd++, dst_pmd++) {
+		next = (addr + PMD_SIZE) & PMD_MASK;
+		if (next > end)
+			next = end;
+		if (pmd_none(*src_pmd))
+			continue;
+		if (pmd_bad(*src_pmd)) {
+			pmd_ERROR(*src_pmd);
+			pmd_clear(src_pmd);
+			continue;
+		}
+		err = copy_pte_range(dst_mm, src_mm, dst_pmd, src_pmd,
+							vma, addr, next);
+		if (err)
+			break;
+	}
+	return err;
+}
+
+int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
+		struct vm_area_struct *vma)
+{
+	pgd_t *src_pgd, *dst_pgd;
+	unsigned long addr, start, end, next;
+	int err = 0;
 
 	if (is_vm_hugetlb_page(vma))
 		return copy_hugetlb_page_range(dst, src, vma);
 
-	cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
-	src_pgd = pgd_offset(src, address)-1;
-	dst_pgd = pgd_offset(dst, address)-1;
+	start = vma->vm_start;
+	src_pgd = pgd_offset(src, start);
+	dst_pgd = pgd_offset(dst, start);
 
-	for (;;) {
-		pmd_t * src_pmd, * dst_pmd;
-
-		src_pgd++; dst_pgd++;
-		
-		/* copy_pmd_range */
-		
+	end = vma->vm_end;
+	addr = start;
+	while (addr && (addr < end-1)) {
+		next = (addr + PGDIR_SIZE) & PGDIR_MASK;
+		if (next > end || next <= addr)
+			next = end;
 		if (pgd_none(*src_pgd))
-			goto skip_copy_pmd_range;
-		if (unlikely(pgd_bad(*src_pgd))) {
+			continue;
+		if (pgd_bad(*src_pgd)) {
 			pgd_ERROR(*src_pgd);
 			pgd_clear(src_pgd);
-skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
-			if (!address || (address >= end))
-				goto out;
 			continue;
 		}
+		err = copy_pmd_range(dst, src, dst_pgd, src_pgd,
+							vma, addr, next);
+		if (err)
+			break;
 
-		src_pmd = pmd_offset(src_pgd, address);
-		dst_pmd = pmd_alloc(dst, dst_pgd, address);
-		if (!dst_pmd)
-			goto nomem;
-
-		do {
-			pte_t * src_pte, * dst_pte;
-		
-			/* copy_pte_range */
-		
-			if (pmd_none(*src_pmd))
-				goto skip_copy_pte_range;
-			if (unlikely(pmd_bad(*src_pmd))) {
-				pmd_ERROR(*src_pmd);
-				pmd_clear(src_pmd);
-skip_copy_pte_range:
-				address = (address + PMD_SIZE) & PMD_MASK;
-				if (address >= end)
-					goto out;
-				goto cont_copy_pmd_range;
-			}
-
-			dst_pte = pte_alloc_map(dst, dst_pmd, address);
-			if (!dst_pte)
-				goto nomem;
-			spin_lock(&src->page_table_lock);	
-			src_pte = pte_offset_map_nested(src_pmd, address);
-			do {
-				pte_t pte = *src_pte;
-				struct page *page;
-				unsigned long pfn;
-
-				/* copy_one_pte */
-
-				if (pte_none(pte))
-					goto cont_copy_pte_range_noset;
-				/* pte contains position in swap, so copy. */
-				if (!pte_present(pte)) {
-					if (!pte_file(pte)) {
-						swap_duplicate(pte_to_swp_entry(pte));
-						if (list_empty(&dst->mmlist)) {
-							spin_lock(&mmlist_lock);
-							list_add(&dst->mmlist,
-								 &src->mmlist);
-							spin_unlock(&mmlist_lock);
-						}
-					}
-					set_pte(dst_pte, pte);
-					goto cont_copy_pte_range_noset;
-				}
-				pfn = pte_pfn(pte);
-				/* the pte points outside of valid memory, the
-				 * mapping is assumed to be good, meaningful
-				 * and not mapped via rmap - duplicate the
-				 * mapping as is.
-				 */
-				page = NULL;
-				if (pfn_valid(pfn)) 
-					page = pfn_to_page(pfn); 
-
-				if (!page || PageReserved(page)) {
-					set_pte(dst_pte, pte);
-					goto cont_copy_pte_range_noset;
-				}
-
-				/*
-				 * If it's a COW mapping, write protect it both
-				 * in the parent and the child
-				 */
-				if (cow) {
-					ptep_set_wrprotect(src_pte);
-					pte = *src_pte;
-				}
-
-				/*
-				 * If it's a shared mapping, mark it clean in
-				 * the child
-				 */
-				if (vma->vm_flags & VM_SHARED)
-					pte = pte_mkclean(pte);
-				pte = pte_mkold(pte);
-				get_page(page);
-				dst->rss++;
-				if (PageAnon(page))
-					dst->anon_rss++;
-				set_pte(dst_pte, pte);
-				page_dup_rmap(page);
-cont_copy_pte_range_noset:
-				address += PAGE_SIZE;
-				if (address >= end) {
-					pte_unmap_nested(src_pte);
-					pte_unmap(dst_pte);
-					goto out_unlock;
-				}
-				src_pte++;
-				dst_pte++;
-			} while ((unsigned long)src_pte & PTE_TABLE_MASK);
-			pte_unmap_nested(src_pte-1);
-			pte_unmap(dst_pte-1);
-			spin_unlock(&src->page_table_lock);
-			cond_resched_lock(&dst->page_table_lock);
-cont_copy_pmd_range:
-			src_pmd++;
-			dst_pmd++;
-		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
+		src_pgd++;
+		dst_pgd++;
+		addr = next;
 	}
-out_unlock:
-	spin_unlock(&src->page_table_lock);
-out:
-	return 0;
-nomem:
-	return -ENOMEM;
+
+	return err;
 }
 
 static void zap_pte_range(struct mmu_gather *tlb,
