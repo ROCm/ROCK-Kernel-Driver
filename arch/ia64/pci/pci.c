@@ -551,6 +551,23 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 }
 
 /**
+ * ia64_pci_get_legacy_mem - generic legacy mem routine
+ * @bus: bus to get legacy memory base address for
+ *
+ * Find the base of legacy memory for @bus.  This is typically the first
+ * megabyte of bus address space for @bus or is simply 0 on platforms whose
+ * chipsets support legacy I/O and memory routing.  Returns the base address
+ * or an error pointer if an error occurred.
+ *
+ * This is the ia64 generic version of this routine.  Other platforms
+ * are free to override it with a machine vector.
+ */
+char *ia64_pci_get_legacy_mem(struct pci_bus *bus)
+{
+	return (char *)__IA64_UNCACHED_OFFSET;
+}
+
+/**
  * pci_mmap_legacy_page_range - map legacy memory space to userland
  * @bus: bus whose legacy space we're mapping
  * @vma: vma passed in by mmap
@@ -576,23 +593,6 @@ pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 		return -EAGAIN;
 
 	return 0;
-}
-
-/**
- * ia64_pci_get_legacy_mem - generic legacy mem routine
- * @bus: bus to get legacy memory base address for
- *
- * Find the base of legacy memory for @bus.  This is typically the first
- * megabyte of bus address space for @bus or is simply 0 on platforms whose
- * chipsets support legacy I/O and memory routing.  Returns the base address
- * or an error pointer if an error occurred.
- *
- * This is the ia64 generic version of this routine.  Other platforms
- * are free to override it with a machine vector.
- */
-char *ia64_pci_get_legacy_mem(struct pci_bus *bus)
-{
-	return (char *)__IA64_UNCACHED_OFFSET;
 }
 
 /**
