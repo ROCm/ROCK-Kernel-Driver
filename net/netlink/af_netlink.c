@@ -365,6 +365,7 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 	struct sockaddr_nl *nladdr=(struct sockaddr_nl*)addr;
 
 	if (addr->sa_family == AF_UNSPEC) {
+		sk->sk_state	= NETLINK_UNCONNECTED;
 		nlk->dst_pid	= 0;
 		nlk->dst_groups = 0;
 		return 0;
@@ -380,6 +381,7 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 		err = netlink_autobind(sock);
 
 	if (err == 0) {
+		sk->sk_state	= NETLINK_CONNECTED;
 		nlk->dst_pid 	= nladdr->nl_pid;
 		nlk->dst_groups = nladdr->nl_groups;
 	}
@@ -427,7 +429,9 @@ struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
 
 	/* Don't bother queuing skb if kernel socket has no input function */
 	nlk = nlk_sk(sock);
-	if (nlk->pid == 0 && !nlk->data_ready) {
+	if ((nlk->pid == 0 && !nlk->data_ready) ||
+	    (sock->sk_state == NETLINK_CONNECTED &&
+	     nlk->dst_pid != nlk_sk(ssk)->pid)) {
 		sock_put(sock);
 		return ERR_PTR(-ECONNREFUSED);
 	}

@@ -91,6 +91,11 @@ struct nlmsgerr
 
 #define NET_MAJOR 36		/* Major 36 is reserved for networking 						*/
 
+enum {
+	NETLINK_UNCONNECTED = 0,
+	NETLINK_CONNECTED,
+};
+
 #ifdef __KERNEL__
 
 #include <linux/capability.h>
