@@ -140,7 +140,7 @@ static __inline__ int _raw_write_trylock(rwlock_t *rw)
 	unsigned int tmp;
 
 	__asm__ __volatile__(
-"2:	lwarx	%0,0,%1\n\	# write_trylock\n\
+"2:	lwarx	%0,0,%1		# write_trylock\n\
 	cmpwi	0,%0,0\n\
 	bne-	1f\n"
 	PPC405_ERR77(0,%1)
