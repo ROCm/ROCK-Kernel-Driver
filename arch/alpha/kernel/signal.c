@@ -63,7 +63,7 @@ osf_sigprocmask(int how, unsigned long newmask, long a2, long a3,
 		unsigned long block, unblock;
 
 		newmask &= _BLOCKABLE;
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		oldmask = current->blocked.sig[0];
 
 		unblock = oldmask & ~newmask;
@@ -76,7 +76,7 @@ osf_sigprocmask(int how, unsigned long newmask, long a2, long a3,
 			sigemptyset(&current->blocked);
 		current->blocked.sig[0] = newmask;
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 
 		(&regs)->r0 = 0;		/* special no error return */
 	}
@@ -150,11 +150,11 @@ do_sigsuspend(old_sigset_t mask, struct pt_regs *reg, struct switch_stack *sw)
 	sigset_t oldset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	oldset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -177,11 +177,11 @@ do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
 		return -EFAULT;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	oldset = current->blocked;
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -284,10 +284,10 @@ do_sigreturn(struct sigframe *frame, struct pt_regs *regs,
 		goto give_sigsegv;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigcontext(&frame->sc, regs, sw))
 		goto give_sigsegv;
@@ -315,10 +315,10 @@ do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
 		goto give_sigsegv;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigcontext(&frame->uc.uc_mcontext, regs, sw))
 		goto give_sigsegv;
@@ -546,11 +546,11 @@ handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 }
 

@@ -443,7 +443,7 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 	 * We really want to use invalidate_inode_pages2() for
 	 * that, but not until that's cleaned up.
 	 */
-	invalidate_inode_pages(bdev->bd_inode);
+	invalidate_inode_pages(bdev->bd_inode->i_mapping);
 }
 
 void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)

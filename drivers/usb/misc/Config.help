@@ -112,6 +112,12 @@ CONFIG_USB_SPEEDTCH
   For more information, see Johan Verrept's webpages at
   <http://linux-usb.sourceforge.net/SpeedTouch/>.
 
+CONFIG_USB_TEST
+
+  This driver is for testing host controller software.  It is used
+  with specialized device firmware for regression and stress testing,
+  to help prevent problems from cropping up with 'real" drivers.
+
 CONFIG_USB_LCD
   Say Y here if you want to connect an USBLCD to your computer's
   USB port. The USBLCD is a small USB interface board for

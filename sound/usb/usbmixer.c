@@ -60,7 +60,7 @@ struct usb_mixer_build {
 	unsigned char *buffer;
 	unsigned int buflen;
 	unsigned int ctrlif;
-	unsigned long unitbitmap[32/sizeof(unsigned long)];
+	DECLARE_BITMAP(unitbitmap, 32*32);
 	usb_audio_term_t oterm;
 };
 
@@ -1252,7 +1252,7 @@ static int parse_audio_unit(mixer_build_t *state, int unitid)
 {
 	unsigned char *p1;
 
-	if (test_and_set_bit(unitid, &state->unitbitmap))
+	if (test_and_set_bit(unitid, state->unitbitmap))
 		return 0; /* the unit already visited */
 
 	p1 = find_audio_control_unit(state, unitid);
@@ -1302,7 +1302,7 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffe
 	while ((desc = snd_usb_find_csint_desc(buffer, buflen, desc, OUTPUT_TERMINAL, ctrlif, -1)) != NULL) {
 		if (desc[0] < 9)
 			continue; /* invalid descriptor? */
-		set_bit(desc[3], &state.unitbitmap);  /* mark terminal ID as visited */
+		set_bit(desc[3], state.unitbitmap);  /* mark terminal ID as visited */
 		state.oterm.id = desc[3];
 		state.oterm.type = combine_word(&desc[4]);
 		state.oterm.name = desc[8];

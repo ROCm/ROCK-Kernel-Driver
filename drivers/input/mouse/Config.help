@@ -52,7 +52,7 @@ CONFIG_MOUSE_LOGIBM
 
 CONFIG_MOUSE_PC110PAD
   Say Y if you have the IBM PC-110 micro-notebook and want its
-  touchscreen supported.
+  touchpad supported.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).

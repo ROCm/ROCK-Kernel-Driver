@@ -221,14 +221,7 @@ static struct cdrom_device_info mcd_info = {
 	.name		= "mcd",
 };
 
-static struct gendisk mcd_gendisk = {
-	.major		= MAJOR_NR,
-	.first_minor	= 0,
-	.minor_shift	= 0,
-	.disk_name	= "mcd",
-	.fops		= &mcd_bdops,
-	.flags		= GENHD_FL_CD,
-};
+static struct gendisk *mcd_gendisk;
 
 #ifndef MODULE
 static int __init mcd_setup(char *str)
@@ -1038,18 +1031,23 @@ static void mcd_release(struct cdrom_device_info *cdi)
 
 int __init mcd_init(void)
 {
-	struct gendisk *disk = &mcd_gendisk;
+	struct gendisk *disk = alloc_disk();
 	int count;
 	unsigned char result[3];
 	char msg[80];
 
+	if (!disk) {
+		printk(KERN_INFO "mcd: can't allocated disk.\n");
+		return -ENOMEM;
+	}
 	if (mcd_port <= 0 || mcd_irq <= 0) {
 		printk(KERN_INFO "mcd: not probing.\n");
+		put_disk(disk);
 		return -EIO;
 	}
-
 	if (register_blkdev(MAJOR_NR, "mcd", &mcd_bdops) != 0) {
 		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
+		put_disk(disk);
 		return -EIO;
 	}
 	if (!request_region(mcd_port, 4, "mcd")) {
@@ -1124,6 +1122,13 @@ int __init mcd_init(void)
 	mcd_invalidate_buffers();
 	mcdPresent = 1;
 
+	disk->major = MAJOR_NR;
+	disk->first_minor = 0;
+	disk->minor_shift = 0;
+	sprintf(disk->disk_name, "mcd");
+	disk->fops = &mcd_bdops;
+	disk->flags = GENHD_FL_CD;
+	mcd_gendisk = disk;
 	mcd_info.dev = mk_kdev(MAJOR_NR, 0);
 
 	if (register_cdrom(&mcd_info) != 0) {
@@ -1141,6 +1146,7 @@ out_probe:
 out_region:
 	unregister_blkdev(MAJOR_NR, "mcd");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	put_disk(disk);
 	return -EIO;
 }
 
@@ -1506,7 +1512,8 @@ static int GetToc(void)
 
 void __exit mcd_exit(void)
 {
-	del_gendisk(&mcd_gendisk);
+	del_gendisk(mcd_gendisk);
+	put_disk(mcd_gendisk);
 	if (unregister_cdrom(&mcd_info)) {
 		printk(KERN_WARNING "Can't unregister cdrom mcd\n");
 		return;

@@ -624,7 +624,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 #else
 
 static int usb_hotplug (struct device *dev, char **envp,
-			char *buffer, int buffer_size)
+			int num_envp, char *buffer, int buffer_size)
 {
 	return -ENODEV;
 }

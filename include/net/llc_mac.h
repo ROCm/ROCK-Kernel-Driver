@@ -13,8 +13,6 @@
  */
 extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
-extern struct net_device *mac_dev_peer(struct net_device *current_dev,
-				       int type, u8 *mac);
 extern u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da);
 extern int llc_conn_rcv(struct sock *sk, struct sk_buff *skb);
 

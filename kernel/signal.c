@@ -405,14 +405,8 @@ found_another:
 	return 0;
 }
 
-/*
- * Dequeue a signal and return the element to the caller, which is 
- * expected to free it.
- *
- * All callers have to hold the siglock.
- */
-
-int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info)
+static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
+			siginfo_t *info)
 {
 	int sig = 0;
 
@@ -436,6 +430,27 @@ int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info)
 	recalc_sigpending();
 
 	return sig;
+}
+
+/*
+ * Dequeue a signal and return the element to the caller, which is 
+ * expected to free it.
+ *
+ * All callers have to hold the siglock.
+ */
+int dequeue_signal(sigset_t *mask, siginfo_t *info)
+{
+	/*
+	 * Here we handle shared pending signals. To implement the full
+	 * semantics we need to unqueue and resend them. It will likely
+	 * get into our own pending queue.
+	 */
+	if (current->sig->shared_pending.head) {
+		int signr = __dequeue_signal(&current->sig->shared_pending, mask, info);
+		if (signr)
+			__send_sig_info(signr, info, current);
+	}
+	return __dequeue_signal(&current->pending, mask, info);
 }
 
 static int rm_from_queue(int sig, struct sigpending *s)
@@ -843,8 +858,7 @@ struct task_struct * find_unblocked_thread(struct task_struct *p, int signr)
 	struct pid *pid;
 
 	for_each_task_pid(p->tgid, PIDTYPE_TGID, tmp, l, pid)
-		if (!sigismember(&tmp->blocked, signr) &&
-					!sigismember(&tmp->real_blocked, signr))
+		if (!sigismember(&tmp->blocked, signr))
 			return tmp;
 	return NULL;
 }
@@ -885,6 +899,10 @@ __send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	t = find_unblocked_thread(p, sig);
 	if (!t) {
 		ret = specific_send_sig_info(sig, info, p, 1);
+		goto out_unlock;
+	}
+	if (sigismember(&t->real_blocked,sig)) {
+		ret = specific_send_sig_info(sig, info, t, 0);
 		goto out_unlock;
 	}
 	if (sig_kernel_broadcast(sig) || sig_kernel_coredump(sig)) {
@@ -1169,10 +1187,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 		struct k_sigaction *ka;
 
 		spin_lock_irq(&current->sig->siglock);
-		if (current->sig->shared_pending.head)
-			signr = dequeue_signal(&current->sig->shared_pending, mask, info);
-		if (!signr)
-			signr = dequeue_signal(&current->pending, mask, info);
+		signr = dequeue_signal(mask, info);
 		spin_unlock_irq(&current->sig->siglock);
 
 		if (!signr)
@@ -1268,7 +1283,7 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 #endif
 
 EXPORT_SYMBOL(recalc_sigpending);
-EXPORT_SYMBOL(dequeue_signal);
+EXPORT_SYMBOL_GPL(dequeue_signal);
 EXPORT_SYMBOL(flush_signals);
 EXPORT_SYMBOL(force_sig);
 EXPORT_SYMBOL(force_sig_info);
@@ -1469,9 +1484,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 	}
 
 	spin_lock_irq(&current->sig->siglock);
-	sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
-	if (!sig)
-		sig = dequeue_signal(&current->pending, &these, &info);
+	sig = dequeue_signal(&these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1491,9 +1504,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			timeout = schedule_timeout(timeout);
 
 			spin_lock_irq(&current->sig->siglock);
-			sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
-			if (!sig)
-				sig = dequeue_signal(&current->pending, &these, &info);
+			sig = dequeue_signal(&these, &info);
 			current->blocked = current->real_blocked;
 			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();

@@ -412,6 +412,15 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 	if (get_user(len, optlen))
 		return -EFAULT;
 	switch (optname) {
+	case IPV6_ADDRFORM:
+		if (sk->protocol != IPPROTO_UDP &&
+		    sk->protocol != IPPROTO_TCP)
+			return -EINVAL;
+		if (sk->state != TCP_ESTABLISHED)
+			return -ENOTCONN;
+		val = sk->family;
+		break;
+
 	case IPV6_PKTOPTIONS:
 	{
 		struct msghdr msg;

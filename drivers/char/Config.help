@@ -648,6 +648,21 @@ CONFIG_INTEL_RNG
 
   If unsure, say N.
 
+CONFIG_AMD_RNG
+  This driver provides kernel-side support for the Random Number
+  Generator hardware found on AMD 76x based motherboards.
+
+  Both a character driver, used to read() entropy data, and a timer
+  function which automatically adds entropy directly into the
+  kernel pool, are exported by this driver.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  i810_rng.o.
+
+  If unsure, say N.
+
 CONFIG_WATCHDOG
   If you say Y here (and to one of the following options) and create a
   character special file /dev/watchdog with major number 10 and minor

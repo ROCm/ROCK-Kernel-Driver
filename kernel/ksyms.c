@@ -65,8 +65,6 @@
 
 extern void set_device_ro(kdev_t dev,int flag);
 
-extern void *sys_call_table;
-
 extern struct timezone sys_tz;
 
 #ifdef CONFIG_MODVERSIONS
@@ -517,9 +515,6 @@ EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(simple_strtol);
 EXPORT_SYMBOL(system_utsname);	/* UTS data */
 EXPORT_SYMBOL(uts_sem);		/* UTS semaphore */
-#ifndef __mips__
-EXPORT_SYMBOL(sys_call_table);
-#endif
 EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);

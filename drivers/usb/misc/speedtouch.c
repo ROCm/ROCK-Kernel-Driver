@@ -163,11 +163,11 @@ int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page);
 void udsl_atm_processqueue (struct udsl_instance_data *instance);
 
 static struct atmdev_ops udsl_atm_devops = {
-	open:udsl_atm_open,
-	close:udsl_atm_close,
-	ioctl:udsl_atm_ioctl,
-	send:udsl_atm_send,
-	proc_read:udsl_atm_proc_read,
+	.open =		udsl_atm_open,
+	.close =	udsl_atm_close,
+	.ioctl =	udsl_atm_ioctl,
+	.send =		udsl_atm_send,
+	.proc_read =	udsl_atm_proc_read,
 };
 
 struct udsl_atm_dev_data {
@@ -182,7 +182,7 @@ static int udsl_usb_probe (struct usb_interface *intf,
 static void udsl_usb_disconnect (struct usb_interface *intf);
 int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
 			struct sk_buff *skb);
-static int udsl_usb_ioctl (struct usb_device *hub, unsigned int code, void *user_data);
+static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data);
 static int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc);
 
 static struct usb_driver udsl_usb_driver = {
@@ -886,8 +886,9 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 #define hex2int(c) ( (c >= '0')&&(c <= '9') ?  (c - '0') : ((c & 0xf)+9) )
 
 
-static int udsl_usb_ioctl (struct usb_device *dev, unsigned int code, void *user_data)
+static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct udsl_instance_data *instance;
 	int i;
 

@@ -1426,14 +1426,10 @@ int cs46xx_src_link(cs46xx_t *chip,dsp_scb_descriptor_t * src)
 	src->parent_scb_ptr = parent_scb;
 
 	/* update entry in DSP RAM */
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_cs46xx_poke(chip,
 			(parent_scb->address + SCBsubListPtr) << 2,
 			(parent_scb->sub_list_ptr->address << 0x10) |
 			(parent_scb->next_scb_ptr->address));
-  
-
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
   
 	return 0;
 }

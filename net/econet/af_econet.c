@@ -643,51 +643,19 @@ static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void *arg)
 static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	int pid;
 
-	switch(cmd) 
-	{
-		case FIOSETOWN:
-		case SIOCSPGRP:
-			if (get_user(pid, (int *) arg))
-				return -EFAULT; 
-			return f_setown(sock->file, pid, 1);
-		case FIOGETOWN:
-		case SIOCGPGRP:
-			return put_user(sock->file->f_owner.pid, (int *)arg);
+	switch(cmd) {
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;
 			return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
-		case SIOCGIFFLAGS:
-		case SIOCSIFFLAGS:
-		case SIOCGIFCONF:
-		case SIOCGIFMETRIC:
-		case SIOCSIFMETRIC:
-		case SIOCGIFMEM:
-		case SIOCSIFMEM:
-		case SIOCGIFMTU:
-		case SIOCSIFMTU:
-		case SIOCSIFLINK:
-		case SIOCGIFHWADDR:
-		case SIOCSIFHWADDR:
-		case SIOCSIFMAP:
-		case SIOCGIFMAP:
-		case SIOCSIFSLAVE:
-		case SIOCGIFSLAVE:
-		case SIOCGIFINDEX:
-		case SIOCGIFNAME:
-		case SIOCGIFCOUNT:
-		case SIOCSIFHWBROADCAST:
-			return(dev_ioctl(cmd,(void *) arg));
-
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:
 			return ec_dev_ioctl(sock, cmd, (void *)arg);
 			break;
 
 		default:
-			return(dev_ioctl(cmd,(void *) arg));
+			return dev_ioctl(cmd,(void *) arg);
 	}
 	/*NOTREACHED*/
 	return 0;

@@ -141,14 +141,14 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 
 	write_lock_bh(&ipv6_sk_mc_lock);
 	for (lnk = &np->ipv6_mc_list; (mc_lst = *lnk) !=NULL ; lnk = &mc_lst->next) {
-		if (mc_lst->ifindex == ifindex &&
+		if ((ifindex == 0 || mc_lst->ifindex == ifindex) &&
 		    ipv6_addr_cmp(&mc_lst->addr, addr) == 0) {
 			struct net_device *dev;
 
 			*lnk = mc_lst->next;
 			write_unlock_bh(&ipv6_sk_mc_lock);
 
-			if ((dev = dev_get_by_index(ifindex)) != NULL) {
+			if ((dev = dev_get_by_index(mc_lst->ifindex)) != NULL) {
 				ipv6_dev_mc_dec(dev, &mc_lst->addr);
 				dev_put(dev);
 			}

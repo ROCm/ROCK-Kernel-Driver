@@ -2,6 +2,7 @@
 # Makefile for alpha-specific library files..
 #
 
+EXTRA_AFLAGS := $(CFLAGS)
 L_TARGET := lib.a
 
 # Many of these routines have implementations tuned for ev6.

@@ -642,63 +642,6 @@ static int __init rd_load_disk(int n)
 	return rd_load_image("/dev/root");
 }
 
-#ifdef CONFIG_DEVFS_FS
-
-static void __init convert_name(char *prefix, char *name, char *p, int part)
-{
-	int host, bus, target, lun;
-	char dest[64];
-	char src[64];
-	char *base = p - 1;
-
-	/*  Decode "c#b#t#u#"  */
-	if (*p++ != 'c')
-		return;
-	host = simple_strtol(p, &p, 10);
-	if (*p++ != 'b')
-		return;
-	bus = simple_strtol(p, &p, 10);
-	if (*p++ != 't')
-		return;
-	target = simple_strtol(p, &p, 10);
-	if (*p++ != 'u')
-		return;
-	lun = simple_strtol(p, &p, 10);
-	if (!part)
-		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d",
-				prefix, host, bus, target, lun);
-	else if (*p++ == 'p')
-		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d/part%s",
-				prefix, host, bus, target, lun, p);
-	else
-		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d/disc",
-				prefix, host, bus, target, lun);
-	*base = '\0';
-	sprintf(src, "/dev/%s", name);
-	sys_mkdir(src, 0755);
-	*base = '/';
-	sprintf(src, "/dev/%s", name);
-	sys_symlink(dest, src);
-}
-
-static void __init devfs_make_root(char *name)
-{
-
-	if (!strncmp(name, "sd/", 3))
-		convert_name("../scsi", name, name+3, 1);
-	else if (!strncmp(name, "sr/", 3))
-		convert_name("../scsi", name, name+3, 0);
-	else if (!strncmp(name, "ide/hd/", 7))
-		convert_name("..", name, name + 7, 1);
-	else if (!strncmp(name, "ide/cd/", 7))
-		convert_name("..", name, name + 7, 0);
-}
-#else
-static void __init devfs_make_root(char *name)
-{
-}
-#endif
-
 static void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
@@ -713,7 +656,6 @@ static void __init mount_root(void)
 		ROOT_DEV = Root_FD0;
 	}
 #endif
-	devfs_make_root(root_device_name);
 	create_dev("/dev/root", ROOT_DEV, root_device_name);
 #ifdef CONFIG_BLK_DEV_FD
 	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {

@@ -1690,13 +1690,7 @@ static int aztcd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static struct gendisk azt_disk = {
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &azt_fops,
-	.disk_name = "aztcd"
-};
+static struct gendisk *azt_disk;
 
 /*
  * Test for presence of drive and initialize it.  Called at boot time.
@@ -1844,6 +1838,7 @@ static int __init aztcd_init(void)
 				for (count = 0; count < AZT_TIMEOUT;
 				     count++)
 					barrier();	/* Stop gcc 2.96 being smart */
+				/* use udelay(), damnit -- AV */
 
 				if ((st = getAztStatus()) == -1) {
 					printk(KERN_WARNING "aztcd: Drive Status"
@@ -1913,21 +1908,33 @@ static int __init aztcd_init(void)
 	}
 	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &azt_fops, NULL);
+	azt_disk = alloc_disk();
+	if (!azt_disk)
+		goto err_out2;
 	if (register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
 		printk(KERN_WARNING "aztcd: Unable to get major %d for Aztech"
 		       " CD-ROM\n", MAJOR_NR);
 		ret = -EIO;
-		goto err_out;
+		goto err_out3;
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_aztcd_request, &aztSpin);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	add_disk(&azt_disk);
+	azt_disk->major = MAJOR_NR;
+	azt_disk->first_minor = 0;
+	azt_disk->minor_shift = 0;
+	azt_disk->fops = &azt_fops;
+	sprintf(azt_disk->disk_name, "aztcd");
+	add_disk(azt_disk);
 
 	azt_invalidate_buffers();
 	aztPresent = 1;
 	aztCloseDoor();
 	return (0);
- err_out:
+err_out3:
+	put_disk(azt_disk);
+err_out2:
+	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+err_out:
 	if ((azt_port == 0x1f0) || (azt_port == 0x170)) {
 		SWITCH_IDE_MASTER;
 		release_region(azt_port, 8);	/*IDE-interface */
@@ -1940,7 +1947,8 @@ static int __init aztcd_init(void)
 static void __exit aztcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	del_gendisk(&azt_disk);
+	del_gendisk(azt_disk);
+	put_disk(azt_disk);
 	if ((unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {
 		printk("What's that: can't unregister aztcd\n");
 		return;

@@ -813,24 +813,9 @@ void __setup_APIC_LVTT(unsigned int clocks)
 
 static void setup_APIC_timer(unsigned int clocks)
 {
-	unsigned int slice, t0, t1;
 	unsigned long flags;
-	int delta;
 
-	local_save_flags(flags);
-	local_irq_enable();
-	/*
-	 * ok, Intel has some smart code in their APIC that knows
-	 * if a CPU was in 'hlt' lowpower mode, and this increases
-	 * its APIC arbitration priority. To avoid the external timer
-	 * IRQ APIC event being in synchron with the APIC clock we
-	 * introduce an interrupt skew to spread out timer events.
-	 *
-	 * The number of slices within a 'big' timeslice is NR_CPUS+1
-	 */
-
-	slice = clocks / (NR_CPUS+1);
-	printk("cpu: %d, clocks: %d, slice: %d\n", smp_processor_id(), clocks, slice);
+	local_irq_save(flags);
 
 	/*
 	 * Wait for IRQ0's slice:
@@ -838,22 +823,6 @@ static void setup_APIC_timer(unsigned int clocks)
 	wait_8254_wraparound();
 
 	__setup_APIC_LVTT(clocks);
-
-	t0 = apic_read(APIC_TMICT)*APIC_DIVISOR;
-	/* Wait till TMCCT gets reloaded from TMICT... */
-	do {
-		t1 = apic_read(APIC_TMCCT)*APIC_DIVISOR;
-		delta = (int)(t0 - t1 - slice*(smp_processor_id()+1));
-	} while (delta >= 0);
-	/* Now wait for our slice for real. */
-	do {
-		t1 = apic_read(APIC_TMCCT)*APIC_DIVISOR;
-		delta = (int)(t0 - t1 - slice*(smp_processor_id()+1));
-	} while (delta < 0);
-
-	__setup_APIC_LVTT(clocks);
-
-	printk("CPU%d<T0:%d,T1:%d,D:%d,S:%d,C:%d>\n", smp_processor_id(), t0, t1, delta, slice, clocks);
 
 	local_irq_restore(flags);
 }

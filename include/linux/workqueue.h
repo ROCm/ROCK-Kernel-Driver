@@ -6,6 +6,7 @@
 #define _LINUX_WORKQUEUE_H
 
 #include <linux/timer.h>
+#include <linux/linkage.h>
 
 struct workqueue_struct;
 
@@ -15,7 +16,7 @@ struct work_struct {
 	void (*func)(void *);
 	void *data;
 	void *wq_data;
-	timer_t timer;
+	struct timer_list timer;
 };
 
 #define __WORK_INITIALIZER(n, f, d) {				\
