@@ -18,7 +18,7 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       # XXX Why don't we do "source drivers/char/Config.in" somewhere?
       if [ "$CONFIG_PCI" = "y" ]; then
 	 define_bool CONFIG_APM_RTC_IS_GMT y		# no shit
-	 bool 'PC-style RTC' CONFIG_RTC
+         tristate 'PC-style Real Time Clock Support' CONFIG_RTC
       fi
    fi
 fi

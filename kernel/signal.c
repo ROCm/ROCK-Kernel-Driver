@@ -71,6 +71,14 @@ int max_queued_signals = 1024;
 |  SIGPWR            |  load-balance    |  kill-all      |
 |  SIGRTMIN-SIGRTMAX |  load-balance    |  kill-all      |
 ----------------------------------------------------------
+
+    non-POSIX signal thread group behavior:
+
+----------------------------------------------------------
+|                    |  userspace       |  kernel        |
+----------------------------------------------------------
+|  SIGEMT            |  specific        |  kill-all+core |
+----------------------------------------------------------
 */
 
 /* Some systems do not have a SIGSTKFLT and the kernel never
@@ -82,12 +90,19 @@ int max_queued_signals = 1024;
 #define M_SIGSTKFLT	0
 #endif
 
+#ifdef SIGEMT
+#define M_SIGEMT	M(SIGEMT)
+#else
+#define M_SIGEMT	0
+#endif
+
 #define M(sig) (1UL << (sig))
 
 #define SIG_USER_SPECIFIC_MASK (\
 	M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    | \
 	M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGPIPE)   |  M(SIGXFSZ)   | \
-	M(SIGPROF)   |  M(SIGSYS)    |  M_SIGSTKFLT |  M(SIGCONT)   )
+	M(SIGPROF)   |  M(SIGSYS)    |  M_SIGSTKFLT  |  M(SIGCONT)   | \
+        M_SIGEMT )
 
 #define SIG_USER_LOAD_BALANCE_MASK (\
         M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGUSR1)   | \
@@ -105,7 +120,8 @@ int max_queued_signals = 1024;
 	M(SIGPIPE)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGXCPU)   | \
 	M(SIGXFSZ)   |  M(SIGVTALRM) |  M(SIGPROF)   |  M(SIGPOLL)   | \
 	M(SIGSYS)    |  M_SIGSTKFLT  |  M(SIGPWR)    |  M(SIGCONT)   | \
-        M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
+        M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   | \
+        M_SIGEMT )
 
 #define SIG_KERNEL_ONLY_MASK (\
 	M(SIGKILL)   |  M(SIGSTOP)                                   )
@@ -113,7 +129,7 @@ int max_queued_signals = 1024;
 #define SIG_KERNEL_COREDUMP_MASK (\
         M(SIGQUIT)   |  M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   | \
         M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGBUS)    |  M(SIGSYS)    | \
-        M(SIGXCPU)   |  M(SIGXFSZ)                                   )
+        M(SIGXCPU)   |  M(SIGXFSZ)   |  M_SIGEMT                     )
 
 #define T(sig, mask) \
 	((1UL << (sig)) & mask)
