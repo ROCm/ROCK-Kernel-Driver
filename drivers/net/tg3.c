@@ -7740,7 +7740,7 @@ err_out_iounmap:
 	iounmap((void *) tp->regs);
 
 err_out_free_dev:
-	kfree(dev);
+	free_netdev(dev);
 
 err_out_free_res:
 	pci_release_regions(pdev);

@@ -1543,7 +1543,7 @@ lan_init_chip(struct parisc_device *dev)
 	retval = register_netdev(netdevice);
 	if (retval) {
 		printk(KERN_WARNING __FILE__ ": register_netdevice ret'd %d\n", retval);
-		kfree(netdevice);
+		free_netdev(netdevice);
 		return -ENODEV;
 	};
 	if (dev->id.sversion == 0x72) {

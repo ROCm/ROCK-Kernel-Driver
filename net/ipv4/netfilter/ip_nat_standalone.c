@@ -271,7 +271,7 @@ int ip_nat_protocol_register(struct ip_nat_protocol *proto)
 	struct list_head *i;
 
 	WRITE_LOCK(&ip_nat_lock);
-	for (i = protos.next; i != &protos; i = i->next) {
+	list_for_each(i, &protos) {
 		if (((struct ip_nat_protocol *)i)->protonum
 		    == proto->protonum) {
 			ret = -EBUSY;
