@@ -1559,7 +1559,7 @@ int snd_pcm_hw_param_set(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 		if (err < 0)
 			return err;
 	}
-	return snd_pcm_hw_param_value(params, var, 0);
+	return snd_pcm_hw_param_value(params, var, NULL);
 }
 
 int _snd_pcm_hw_param_mask(snd_pcm_hw_params_t *params,
@@ -1735,28 +1735,28 @@ int snd_pcm_hw_params_choose(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
 	int err;
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_ACCESS, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_ACCESS, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_FORMAT, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_FORMAT, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_SUBFORMAT, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_SUBFORMAT, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_CHANNELS, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_CHANNELS, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_RATE, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_RATE, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_PERIOD_TIME, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_PERIOD_TIME, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_last(pcm, params, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0);
+	err = snd_pcm_hw_param_last(pcm, params, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, NULL);
 	assert(err >= 0);
 
-	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_TICK_TIME, 0);
+	err = snd_pcm_hw_param_first(pcm, params, SNDRV_PCM_HW_PARAM_TICK_TIME, NULL);
 	assert(err >= 0);
 
 	return 0;
