@@ -1036,7 +1036,7 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 		break;
 
 	default:
-		printk(KERN_DEBUG "bug: unknown timer value\n");
+		printk(timer_bug_msg);
 	};
 }
 
