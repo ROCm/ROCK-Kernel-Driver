@@ -346,10 +346,11 @@ ProgramCheckException(struct pt_regs *regs)
 	}
 }
 
- void
+void
 KernelFPUnavailableException(struct pt_regs *regs)
 {
-	printk("Illegal floating point used in kernel (task=0x%016lx, pc=0x%016lx, trap=0x%08x)\n",
+	printk("Illegal floating point used in kernel "
+			"(task=0x%p, pc=0x%016lx, trap=0x%08lx)\n",
 		current, regs->nip, regs->trap);
 	panic("Unrecoverable FP Unavailable Exception in Kernel");
 }
