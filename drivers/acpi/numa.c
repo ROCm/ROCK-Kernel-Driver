@@ -31,7 +31,7 @@
 #include <linux/acpi.h>
 #include <acpi/acpi_bus.h>
 
-extern int __init acpi_table_parse_madt_family (enum acpi_table_id id, unsigned long madt_size, int entry_id, acpi_madt_entry_handler handler);
+extern int __init acpi_table_parse_madt_family (enum acpi_table_id id, unsigned long madt_size, int entry_id, acpi_madt_entry_handler handler, unsigned int max_entries);
 
 void __init
 acpi_table_print_srat_entry (
@@ -149,10 +149,11 @@ acpi_parse_srat (unsigned long phys_addr, unsigned long size)
 int __init
 acpi_table_parse_srat (
 	enum acpi_srat_entry_id	id,
-	acpi_madt_entry_handler	handler)
+	acpi_madt_entry_handler	handler,
+	unsigned int max_entries)
 {
 	return acpi_table_parse_madt_family(ACPI_SRAT, sizeof(struct acpi_table_srat),
-					    id, handler);
+					    id, handler, max_entries);
 }
 
 
@@ -166,9 +167,11 @@ acpi_numa_init()
 
 	if (result > 0) {
 		result = acpi_table_parse_srat(ACPI_SRAT_PROCESSOR_AFFINITY,
-					       acpi_parse_processor_affinity);
+					       acpi_parse_processor_affinity,
+					       NR_CPUS);
 		result = acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY,
-					       acpi_parse_memory_affinity);
+					       acpi_parse_memory_affinity,
+					       NR_MEMBLKS);
 	} else {
 		/* FIXME */
 		printk("Warning: acpi_table_parse(ACPI_SRAT) returned %d!\n",result);

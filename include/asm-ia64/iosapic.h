@@ -52,6 +52,9 @@
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_IOSAPIC
+
+#define NR_IOSAPICS			256
+
 extern void __init iosapic_system_init (int pcat_compat);
 extern void __init iosapic_init (unsigned long address,
 				    unsigned int gsi_base);
