@@ -103,6 +103,14 @@
 #define SCTP_PROTOSW_FLAG INET_PROTOSW_PERMANENT
 #endif
 
+
+/* Certain internal static functions need to be exported when 
+ * compiled into the test frame.
+ */
+#ifndef SCTP_STATIC
+#define SCTP_STATIC static
+#endif
+
 /* 
  * Function declarations. 
  */

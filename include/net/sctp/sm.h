@@ -215,7 +215,8 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *,
 			     int priority);
 sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *,
 				 const sctp_chunk_t *,
-				 const int priority);
+				 const int priority,
+				 const int unkparam_len);
 sctp_chunk_t *sctp_make_cookie_echo(const sctp_association_t *,
 				    const sctp_chunk_t *);
 sctp_chunk_t *sctp_make_cookie_ack(const sctp_association_t *,
@@ -304,6 +305,14 @@ void sctp_generate_t3_rtx_event(unsigned long peer);
 void sctp_generate_heartbeat_event(unsigned long peer);
 
 sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *);
+sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
+				  const sctp_association_t *asoc,
+				  sctp_chunk_t *chunk,
+				  const void *payload,
+				  size_t paylen);
+sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
+				 const sctp_chunk_t *chunk);
+void sctp_ootb_pkt_free(sctp_packet_t *packet);
 
 sctp_cookie_param_t *
 sctp_pack_cookie(const sctp_endpoint_t *, const sctp_association_t *,
