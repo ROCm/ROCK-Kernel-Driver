@@ -139,10 +139,10 @@ struct irda_usb_cb {
 
 	wait_queue_head_t wait_q;	/* for timeouts */
 
-	struct urb rx_urb[IU_MAX_RX_URBS];	/* URBs used to receive data frames */
+	struct urb *rx_urb[IU_MAX_RX_URBS];	/* URBs used to receive data frames */
 	struct urb *idle_rx_urb;	/* Pointer to idle URB in Rx path */
-	struct urb tx_urb;		/* URB used to send data frames */
-	struct urb speed_urb;		/* URB used to send speed commands */
+	struct urb *tx_urb;		/* URB used to send data frames */
+	struct urb *speed_urb;		/* URB used to send speed commands */
 	
 	struct net_device *netdev;	/* Yes! we are some kind of netdev. */
 	struct net_device_stats stats;
