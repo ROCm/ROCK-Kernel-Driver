@@ -1802,14 +1802,18 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 		get_bh(bh);
 		if (!buffer_mapped(bh))
 			continue;
-		if (wbc->sync_mode != WB_SYNC_NONE) {
+		/*
+		 * If it's a fully non-blocking write attempt and we cannot
+		 * lock the buffer then redirty the page.  Note that this can
+		 * potentially cause a busy-wait loop from pdflush and kswapd
+		 * activity, but those code paths have their own higher-level
+		 * throttling.
+		 */
+		if (wbc->sync_mode != WB_SYNC_NONE || !wbc->nonblocking) {
 			lock_buffer(bh);
-		} else {
-			if (test_set_buffer_locked(bh)) {
-				if (buffer_dirty(bh))
-					__set_page_dirty_nobuffers(page);
-				continue;
-			}
+		} else if (test_set_buffer_locked(bh)) {
+			__set_page_dirty_nobuffers(page);
+			continue;
 		}
 		if (test_clear_buffer_dirty(bh)) {
 			if (!buffer_uptodate(bh))
@@ -1857,6 +1861,7 @@ done:
 		if (uptodate)
 			SetPageUptodate(page);
 		end_page_writeback(page);
+		wbc->pages_skipped++;	/* We didn't write this page */
 	}
 	return err;
 

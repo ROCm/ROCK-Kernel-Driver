@@ -261,13 +261,13 @@ static void background_writeout(unsigned long _min_pages)
 			break;
 		wbc.encountered_congestion = 0;
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		wbc.pages_skipped = 0;
 		writeback_inodes(&wbc);
 		min_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
-		if (wbc.nr_to_write > 0) {
+		if (wbc.nr_to_write > 0 || wbc.pages_skipped > 0) {
 			/* Wrote less than expected */
-			if (wbc.encountered_congestion)
-				blk_congestion_wait(WRITE, HZ/10);
-			else
+			blk_congestion_wait(WRITE, HZ/10);
+			if (!wbc.encountered_congestion)
 				break;
 		}
 	}

@@ -39,6 +39,7 @@ struct writeback_control {
 					   older than this */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	long pages_skipped;		/* Pages which were not written */
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
 	int for_kupdate;		/* A kupdate writeback */
