@@ -306,6 +306,7 @@ qla2x00_pci_config(scsi_qla_host_t *ha)
 
 			/* Select FPM registers. */
 			WRT_REG_WORD(&ha->iobase->ctrl_status, 0x20);
+			RD_REG_WORD(&ha->iobase->ctrl_status);
 
 			/* Get the fb rev level */
 			ha->fb_rev = RD_FB_CMD_REG(ha, ha->iobase);
@@ -315,6 +316,7 @@ qla2x00_pci_config(scsi_qla_host_t *ha)
 
 			/* Deselect FPM registers. */
 			WRT_REG_WORD(&ha->iobase->ctrl_status, 0x0);
+			RD_REG_WORD(&ha->iobase->ctrl_status);
 
 			/* Release RISC module. */
 			WRT_REG_WORD(&ha->iobase->hccr, HCCR_RELEASE_RISC);
@@ -408,25 +410,32 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 				udelay(100);
 			}
 		} else {
+			RD_REG_WORD(&reg->hccr);	/* PCI Posting. */
 			udelay(10);
 		}
 
 		/* Select FPM registers. */
 		WRT_REG_WORD(&reg->ctrl_status, 0x20);
+		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 
 		/* FPM Soft Reset. */
 		WRT_REG_WORD(&reg->fpm_diag_config, 0x100);
+		RD_REG_WORD(&reg->fpm_diag_config);	/* PCI Posting. */
 
 		/* Toggle Fpm Reset. */
-		if (!IS_QLA2200(ha))
+		if (!IS_QLA2200(ha)) {
 			WRT_REG_WORD(&reg->fpm_diag_config, 0x0);
+			RD_REG_WORD(&reg->fpm_diag_config); /* PCI Posting. */
+		}
 
 		/* Select frame buffer registers. */
 		WRT_REG_WORD(&reg->ctrl_status, 0x10);
+		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 
 		/* Reset frame buffer FIFOs. */
 		if (IS_QLA2200(ha)) {
 			WRT_FB_CMD_REG(ha, reg, 0xa000);
+			RD_FB_CMD_REG(ha, reg);		/* PCI Posting. */
 		} else {
 			WRT_FB_CMD_REG(ha, reg, 0x00fc);
 
@@ -440,19 +449,25 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 
 		/* Select RISC module registers. */
 		WRT_REG_WORD(&reg->ctrl_status, 0);
+		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 
 		/* Reset RISC processor. */
 		WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+		RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
 
 		/* Release RISC processor. */
 		WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
+		RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
 	}
 
 	WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 	WRT_REG_WORD(&reg->hccr, HCCR_CLR_HOST_INT);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 
 	/* Reset ISP chip. */
 	WRT_REG_WORD(&reg->ctrl_status, CSR_ISP_SOFT_RESET);
+	RD_REG_WORD(&reg->ctrl_status);			/* PCI Posting. */
 
 	/* Wait for RISC to recover from reset. */
 	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
@@ -473,12 +488,13 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 
 	/* Reset RISC processor. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 
 	WRT_REG_WORD(&reg->semaphore, 0);
 
 	/* Release RISC processor. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
-	RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 
 	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
 		for (cnt = 0; cnt < 30000; cnt++) {
@@ -507,8 +523,10 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 	pci_write_config_word(ha->pdev, PCI_COMMAND, cmd);
 
 	/* Disable RISC pause on FPM parity error. */
-	if (!IS_QLA2100(ha))
+	if (!IS_QLA2100(ha)) {
 		WRT_REG_WORD(&reg->hccr, HCCR_DISABLE_PARITY_PAUSE);
+		RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
+	}
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
@@ -539,6 +557,8 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 
 	/* Reset ISP chip. */
 	WRT_REG_WORD(&reg->ctrl_status, CSR_ISP_SOFT_RESET);
+	RD_REG_WORD(&reg->ctrl_status);			/* PCI Posting. */
+
 	/*
 	 * We need to have a delay here since the card will not respond while
 	 * in reset causing an MCA on some architectures.
@@ -559,7 +579,9 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 
 	/* Reset RISC processor. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 
 	/* Workaround for QLA2312 PCI parity error */
 	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
@@ -863,7 +885,7 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
  	WRT_REG_WORD(ISP_REQ_Q_OUT(ha, reg), 0);
  	WRT_REG_WORD(ISP_RSP_Q_IN(ha, reg), 0);
  	WRT_REG_WORD(ISP_RSP_Q_OUT(ha, reg), 0);
-	RD_REG_WORD(ISP_RSP_Q_OUT(ha, reg));
+	RD_REG_WORD(ISP_RSP_Q_OUT(ha, reg));		/* PCI Posting. */
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -4258,9 +4280,13 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 			}
 
 			reg = ha->iobase;
+
 			spin_lock_irqsave(&ha->hardware_lock, flags);
+
 			/* Disable SRAM, Instruction RAM and GP RAM parity. */
 			WRT_REG_WORD(&reg->hccr, (HCCR_ENABLE_PARITY + 0x0));
+			RD_REG_WORD(&reg->hccr);	/* PCI Posting. */
+
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	
 			status = qla2x00_setup_chip(ha);
@@ -4276,6 +4302,7 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
  				/* SRAM, Instruction RAM and GP RAM parity */
  				WRT_REG_WORD(&reg->hccr,
  				    (HCCR_ENABLE_PARITY + 0x7));
+			RD_REG_WORD(&reg->hccr);	/* PCI Posting. */
 
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		}
@@ -4328,9 +4355,12 @@ qla2x00_reset_adapter(scsi_qla_host_t *ha)
 
 	ha->flags.online = 0;
 	qla2x00_disable_intrs(ha);
+
 	/* Reset RISC processor. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
+	RD_REG_WORD(&reg->hccr);			/* PCI Posting. */
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
