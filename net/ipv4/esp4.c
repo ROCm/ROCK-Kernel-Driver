@@ -518,6 +518,8 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	esp->conf.padlen = 0;
 	if (esp->conf.ivlen) {
 		esp->conf.ivec = kmalloc(esp->conf.ivlen, GFP_KERNEL);
+		if (unlikely(esp->conf.ivec == NULL))
+			goto error;
 		get_random_bytes(esp->conf.ivec, esp->conf.ivlen);
 	}
 	crypto_cipher_setkey(esp->conf.tfm, esp->conf.key, esp->conf.key_len);

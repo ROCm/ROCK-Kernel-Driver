@@ -71,7 +71,7 @@ static int bad_range(struct zone *zone, struct page *page)
 
 static void bad_page(const char *function, struct page *page)
 {
-	printk("Bad page state at %s\n", function);
+	printk("Bad page state at %s (in process '%s', page %p)\n", function, current->comm, page);
 	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
 		page->flags, page->mapping,
 		page_mapped(page), page_count(page));
@@ -390,6 +390,27 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	return allocated;
 }
 
+#if defined(CONFIG_PM) || defined(CONFIG_HOTPLUG_CPU)
+static void __drain_pages(unsigned int cpu)
+{
+	struct zone *zone;
+	int i;
+
+	for_each_zone(zone) {
+		struct per_cpu_pageset *pset;
+
+		pset = &zone->pageset[cpu];
+		for (i = 0; i < ARRAY_SIZE(pset->pcp); i++) {
+			struct per_cpu_pages *pcp;
+
+			pcp = &pset->pcp[i];
+			pcp->count -= free_pages_bulk(zone, pcp->count,
+						&pcp->list, 0);
+		}
+	}
+}
+#endif /* CONFIG_PM || CONFIG_HOTPLUG_CPU */
+
 #ifdef CONFIG_PM
 int is_head_of_free_region(struct page *page)
 {
@@ -419,22 +440,9 @@ int is_head_of_free_region(struct page *page)
 void drain_local_pages(void)
 {
 	unsigned long flags;
-	struct zone *zone;
-	int i;
 
 	local_irq_save(flags);	
-	for_each_zone(zone) {
-		struct per_cpu_pageset *pset;
-
-		pset = &zone->pageset[smp_processor_id()];
-		for (i = 0; i < ARRAY_SIZE(pset->pcp); i++) {
-			struct per_cpu_pages *pcp;
-
-			pcp = &pset->pcp[i];
-			pcp->count -= free_pages_bulk(zone, pcp->count,
-						&pcp->list, 0);
-		}
-	}
+	__drain_pages(smp_processor_id());
 	local_irq_restore(flags);	
 }
 #endif /* CONFIG_PM */
