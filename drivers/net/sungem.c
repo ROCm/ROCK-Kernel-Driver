@@ -651,7 +651,7 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 		}
 
 		gp->net_stats.tx_packets++;
-		dev_kfree_skb(skb);
+		dev_kfree_skb_any(skb);
 	}
 	gp->tx_old = entry;
 
