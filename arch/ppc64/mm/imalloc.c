@@ -13,6 +13,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/pgtable.h>
 
 rwlock_t imlist_lock = RW_LOCK_UNLOCKED;
 struct vm_struct * imlist = NULL;
