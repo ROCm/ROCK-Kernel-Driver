@@ -405,7 +405,6 @@ xprt_close(struct rpc_xprt *xprt)
 	sk->sk_write_space  = xprt->old_write_space;
 	write_unlock_bh(&sk->sk_callback_lock);
 
-	xprt_disconnect(xprt);
 	sk->sk_no_check	 = 0;
 
 	sock_release(sock);
@@ -416,6 +415,7 @@ xprt_socket_autoclose(void *args)
 {
 	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
 
+	xprt_disconnect(xprt);
 	xprt_close(xprt);
 	xprt_release_write(xprt, NULL);
 }
@@ -511,7 +511,8 @@ out_err:
 	if (xprt->snd_task) {
 		xprt->snd_task->tk_status = status;
 		rpc_wake_up_task(xprt->snd_task);
-	}
+	} else
+		rpc_wake_up_status(&xprt->pending, -ENOTCONN);
 	spin_unlock_bh(&xprt->sock_lock);
 }
 
@@ -1642,6 +1643,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 {
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
+	xprt_disconnect(xprt);
 	xprt_close(xprt);
 	kfree(xprt->slot);
 	kfree(xprt);
