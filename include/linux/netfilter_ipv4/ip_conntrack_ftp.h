@@ -34,7 +34,6 @@ struct ip_conntrack_expect;
 /* For NAT to hook in when we find a packet which describes what other
  * connection we should expect. */
 extern unsigned int (*ip_nat_ftp_hook)(struct sk_buff **pskb,
-				       struct ip_conntrack *ct,
 				       enum ip_conntrack_info ctinfo,
 				       enum ip_ct_ftp_type type,
 				       unsigned int matchoff,

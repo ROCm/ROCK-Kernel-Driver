@@ -39,15 +39,14 @@ MODULE_DESCRIPTION("tftp NAT helper");
 MODULE_LICENSE("GPL");
 
 static unsigned int help(struct sk_buff **pskb,
-			 struct ip_conntrack *ct,
 			 enum ip_conntrack_info ctinfo,
 			 struct ip_conntrack_expect *exp)
 {
 	exp->saved_proto.udp.port = exp->tuple.dst.u.tcp.port;
 	exp->dir = IP_CT_DIR_REPLY;
 	exp->expectfn = ip_nat_follow_master;
-	if (ip_conntrack_expect_related(exp, ct) != 0) {
-		ip_conntrack_expect_put(exp);
+	if (ip_conntrack_expect_related(exp) != 0) {
+		ip_conntrack_expect_free(exp);
 		return NF_DROP;
 	}
 	return NF_ACCEPT;

@@ -32,7 +32,6 @@ MODULE_DESCRIPTION("Amanda NAT helper");
 MODULE_LICENSE("GPL");
 
 static unsigned int help(struct sk_buff **pskb,
-			 struct ip_conntrack *ct,
 			 enum ip_conntrack_info ctinfo,
 			 unsigned int matchoff,
 			 unsigned int matchlen,
@@ -52,22 +51,18 @@ static unsigned int help(struct sk_buff **pskb,
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int err;
 		exp->tuple.dst.u.tcp.port = htons(port);
-		atomic_inc(&exp->use);
-		err = ip_conntrack_expect_related(exp, ct);
-		/* Success, or retransmit. */
-		if (!err || err == -EEXIST)
+		if (ip_conntrack_expect_related(exp) == 0)
 			break;
 	}
 
 	if (port == 0) {
-		ip_conntrack_expect_put(exp);
+		ip_conntrack_expect_free(exp);
 		return NF_DROP;
 	}
 
 	sprintf(buffer, "%u", port);
-	ret = ip_nat_mangle_udp_packet(pskb, ct, ctinfo,
+	ret = ip_nat_mangle_udp_packet(pskb, exp->master, ctinfo,
 				       matchoff, matchlen,
 				       buffer, strlen(buffer));
 	if (ret != NF_ACCEPT)

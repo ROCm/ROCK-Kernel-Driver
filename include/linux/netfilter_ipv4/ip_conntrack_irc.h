@@ -20,7 +20,6 @@ struct ip_ct_irc_master {
 
 #ifdef __KERNEL__
 extern unsigned int (*ip_nat_irc_hook)(struct sk_buff **pskb,
-				       struct ip_conntrack *ct,
 				       enum ip_conntrack_info ctinfo,
 				       unsigned int matchoff,
 				       unsigned int matchlen,

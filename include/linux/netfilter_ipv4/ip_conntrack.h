@@ -102,32 +102,18 @@ struct ip_conntrack_expect
 	/* Internal linked list (global expectation list) */
 	struct list_head list;
 
-	/* reference count */
-	atomic_t use;
-
-	/* expectation list for this master */
-	struct list_head expected_list;
+	/* We expect this tuple, with the following mask */
+	struct ip_conntrack_tuple tuple, mask;
+ 
+	/* Function to call after setup and insertion */
+	void (*expectfn)(struct ip_conntrack *new,
+			 struct ip_conntrack_expect *this);
 
 	/* The conntrack of the master connection */
-	struct ip_conntrack *expectant;
-
-	/* The conntrack of the sibling connection, set after
-	 * expectation arrived */
-	struct ip_conntrack *sibling;
-
-	/* Tuple saved for conntrack */
-	struct ip_conntrack_tuple ct_tuple;
+	struct ip_conntrack *master;
 
 	/* Timer function; deletes the expectation. */
 	struct timer_list timeout;
-
-	/* Data filled out by the conntrack helpers follow: */
-
-	/* We expect this tuple, with the following mask */
-	struct ip_conntrack_tuple tuple, mask;
-
-	/* Function to call after setup and insertion */
-	void (*expectfn)(struct ip_conntrack *new);
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED
 	/* This is the original per-proto part, used to map the
@@ -136,8 +122,6 @@ struct ip_conntrack_expect
 	/* Direction relative to the master connection. */
 	enum ip_conntrack_dir dir;
 #endif
-
-	union ip_conntrack_expect_proto proto;
 };
 
 struct ip_conntrack_counter
@@ -164,16 +148,11 @@ struct ip_conntrack
 	/* Accounting Information (same cache line as other written members) */
 	struct ip_conntrack_counter counters[IP_CT_DIR_MAX];
 #endif
+	/* If we were expected by an expectation, this will be it */
+	struct ip_conntrack *master;
 
-	/* If we're expecting another related connection, this will be
-           in expected linked list */
-	struct list_head sibling_list;
-	
 	/* Current number of expected connections */
 	unsigned int expecting;
-
-	/* If we were expected by an expectation, this will be it */
-	struct ip_conntrack_expect *master;
 
 	/* Helper, if any. */
 	struct ip_conntrack_helper *helper;
@@ -203,7 +182,7 @@ struct ip_conntrack
 };
 
 /* get master conntrack via master expectation */
-#define master_ct(conntr) (conntr->master ? conntr->master->expectant : NULL)
+#define master_ct(conntr) (conntr->master)
 
 /* Alter reply tuple (maybe alter helper). */
 extern void
@@ -226,13 +205,6 @@ ip_conntrack_get(const struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
 
 /* decrement reference count on a conntrack */
 extern inline void ip_conntrack_put(struct ip_conntrack *ct);
-
-/* find unconfirmed expectation based on tuple */
-struct ip_conntrack_expect *
-ip_conntrack_expect_find_get(const struct ip_conntrack_tuple *tuple);
-
-/* decrement reference count on an expectation */
-void ip_conntrack_expect_put(struct ip_conntrack_expect *exp);
 
 /* call to create an explicit dependency on ip_conntrack. */
 extern void need_ip_conntrack(void);

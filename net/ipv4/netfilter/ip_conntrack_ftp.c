@@ -40,7 +40,6 @@ static int loose;
 module_param(loose, int, 0600);
 
 unsigned int (*ip_nat_ftp_hook)(struct sk_buff **pskb,
-				struct ip_conntrack *ct,
 				enum ip_conntrack_info ctinfo,
 				enum ip_ct_ftp_type type,
 				unsigned int matchoff,
@@ -407,7 +406,7 @@ static int help(struct sk_buff **pskb,
 		   networks, or the packet filter itself). */
 		if (!loose) {
 			ret = NF_ACCEPT;
-			ip_conntrack_expect_put(exp);
+			ip_conntrack_expect_free(exp);
 			goto out_update_nl;
 		}
 		exp->tuple.dst.ip = htonl((array[0] << 24) | (array[1] << 16)
@@ -423,17 +422,19 @@ static int help(struct sk_buff **pskb,
 		  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 
 	exp->expectfn = NULL;
+	exp->master = ct;
 
 	/* Now, NAT might want to mangle the packet, and register the
 	 * (possibly changed) expectation itself. */
 	if (ip_nat_ftp_hook)
-		ret = ip_nat_ftp_hook(pskb, ct, ctinfo, search[i].ftptype,
+		ret = ip_nat_ftp_hook(pskb, ctinfo, search[i].ftptype,
 				      matchoff, matchlen, exp, &seq);
 	else {
 		/* Can't expect this?  Best to drop packet now. */
-		if (ip_conntrack_expect_related(exp, ct) != 0)
+		if (ip_conntrack_expect_related(exp) != 0) {
+			ip_conntrack_expect_free(exp);
 			ret = NF_DROP;
-		else
+		} else
 			ret = NF_ACCEPT;
 	}
 
@@ -476,7 +477,6 @@ static int __init init(void)
 		ftp[i].mask.dst.protonum = 0xFFFF;
 		ftp[i].max_expected = 1;
 		ftp[i].timeout = 0;
-		ftp[i].flags = IP_CT_HELPER_F_REUSE_EXPECT;
 		ftp[i].me = ip_conntrack_ftp;
 		ftp[i].help = help;
 

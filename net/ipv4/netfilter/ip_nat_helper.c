@@ -438,12 +438,13 @@ static void ip_nat_copy_manip(struct ip_nat_info *master,
 
 /* Setup NAT on this expected conntrack so it follows master. */
 /* If we fail to get a free NAT slot, we'll get dropped on confirm */
-void ip_nat_follow_master(struct ip_conntrack *ct)
+void ip_nat_follow_master(struct ip_conntrack *ct,
+			  struct ip_conntrack_expect *this)
 {
-	struct ip_nat_info *master = &ct->master->expectant->nat.info;
+	struct ip_nat_info *master = &ct->master->nat.info;
 
 	/* This must be a fresh one. */
 	BUG_ON(ct->nat.info.initialized);
 
-	ip_nat_copy_manip(master, ct->master, ct);
+	ip_nat_copy_manip(master, this, ct);
 }

@@ -39,7 +39,6 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #endif
 
 unsigned int (*ip_nat_tftp_hook)(struct sk_buff **pskb,
-				 struct ip_conntrack *ct,
 				 enum ip_conntrack_info ctinfo,
 				 struct ip_conntrack_expect *exp);
 EXPORT_SYMBOL_GPL(ip_nat_tftp_hook);
@@ -76,14 +75,17 @@ static int tftp_help(struct sk_buff **pskb,
 		exp->mask.dst.u.udp.port = 0xffff;
 		exp->mask.dst.protonum = 0xffff;
 		exp->expectfn = NULL;
+		exp->master = ct;
 
 		DEBUGP("expect: ");
 		DUMP_TUPLE(&exp->tuple);
 		DUMP_TUPLE(&exp->mask);
 		if (ip_nat_tftp_hook)
-			ret = ip_nat_tftp_hook(pskb, ct, ctinfo, exp);
-		else if (ip_conntrack_expect_related(exp, ct) != 0)
+			ret = ip_nat_tftp_hook(pskb, ctinfo, exp);
+		else if (ip_conntrack_expect_related(exp) != 0) {
+			ip_conntrack_expect_free(exp);
 			ret = NF_DROP;
+		}
 		break;
 	case TFTP_OPCODE_DATA:
 	case TFTP_OPCODE_ACK:

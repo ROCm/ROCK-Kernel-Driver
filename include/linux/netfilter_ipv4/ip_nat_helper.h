@@ -28,5 +28,6 @@ extern int ip_nat_seq_adjust(struct sk_buff **pskb,
 
 /* Setup NAT on this expected conntrack so it follows master, but goes
  * to port ct->master->saved_proto. */
-extern void ip_nat_follow_master(struct ip_conntrack *ct);
+extern void ip_nat_follow_master(struct ip_conntrack *ct,
+				 struct ip_conntrack_expect *this);
 #endif

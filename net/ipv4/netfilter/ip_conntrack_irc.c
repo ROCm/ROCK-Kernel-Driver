@@ -44,7 +44,6 @@ static char irc_buffer[65536];
 static DECLARE_LOCK(irc_buffer_lock);
 
 unsigned int (*ip_nat_irc_hook)(struct sk_buff **pskb,
-				struct ip_conntrack *ct,
 				enum ip_conntrack_info ctinfo,
 				unsigned int matchoff,
 				unsigned int matchlen,
@@ -220,13 +219,16 @@ static int help(struct sk_buff **pskb,
 				{ { 0, { 0 } },
 				  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 			exp->expectfn = NULL;
+			exp->master = ct;
 			if (ip_nat_irc_hook)
-				ret = ip_nat_irc_hook(pskb, ct, ctinfo, 
+				ret = ip_nat_irc_hook(pskb, ctinfo, 
 						      addr_beg_p - ib_ptr,
 						      addr_end_p - addr_beg_p,
 						      exp);
-			else if (ip_conntrack_expect_related(exp, ct) != 0)
+			else if (ip_conntrack_expect_related(exp) != 0) {
+				ip_conntrack_expect_free(exp);
 				ret = NF_DROP;
+			}
 			goto out;
 		} /* for .. NUM_DCCPROTO */
 	} /* while data < ... */

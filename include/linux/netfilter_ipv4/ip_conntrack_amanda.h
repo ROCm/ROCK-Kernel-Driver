@@ -4,7 +4,6 @@
 
 struct ip_conntrack_expect;
 extern unsigned int (*ip_nat_amanda_hook)(struct sk_buff **pskb,
-					  struct ip_conntrack *ct,
 					  enum ip_conntrack_info ctinfo,
 					  unsigned int matchoff,
 					  unsigned int matchlen,

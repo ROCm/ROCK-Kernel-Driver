@@ -113,7 +113,6 @@ static int (*mangle[])(struct sk_buff **, u_int32_t, u_int16_t,
 /* So, this packet has hit the connection tracking matching code.
    Mangle it, and change the expectation to match the new version. */
 static unsigned int ip_nat_ftp(struct sk_buff **pskb,
-			       struct ip_conntrack *ct,
 			       enum ip_conntrack_info ctinfo,
 			       enum ip_ct_ftp_type type,
 			       unsigned int matchoff,
@@ -124,6 +123,7 @@ static unsigned int ip_nat_ftp(struct sk_buff **pskb,
 	u_int32_t newip;
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
+	struct ip_conntrack *ct = exp->master;
 
 	DEBUGP("FTP_NAT: type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -138,17 +138,13 @@ static unsigned int ip_nat_ftp(struct sk_buff **pskb,
 
 	/* Try to get same port: if not, try to change it. */
 	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int err;
 		exp->tuple.dst.u.tcp.port = htons(port);
-		atomic_inc(&exp->use);
-		err = ip_conntrack_expect_related(exp, ct);
-		/* Success, or retransmit. */
-		if (!err || err == -EEXIST)
+		if (ip_conntrack_expect_related(exp) == 0)
 			break;
 	}
 
 	if (port == 0) {
-		ip_conntrack_expect_put(exp);
+		ip_conntrack_expect_free(exp);
 		return NF_DROP;
 	}
 

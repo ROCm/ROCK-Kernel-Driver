@@ -45,7 +45,6 @@ static char amanda_buffer[65536];
 static DECLARE_LOCK(amanda_buffer_lock);
 
 unsigned int (*ip_nat_amanda_hook)(struct sk_buff **pskb,
-				   struct ip_conntrack *ct,
 				   enum ip_conntrack_info ctinfo,
 				   unsigned int matchoff,
 				   unsigned int matchlen,
@@ -110,6 +109,7 @@ static int help(struct sk_buff **pskb,
 		}
 
 		exp->expectfn = NULL;
+		exp->master = ct;
 
 		exp->tuple.src.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
 		exp->tuple.src.u.tcp.port = 0;
@@ -124,11 +124,13 @@ static int help(struct sk_buff **pskb,
 		exp->mask.dst.u.tcp.port = 0xFFFF;
 
 		if (ip_nat_amanda_hook)
-			ret = ip_nat_amanda_hook(pskb, ct, ctinfo,
+			ret = ip_nat_amanda_hook(pskb, ctinfo,
 						 tmp - amanda_buffer,
 						 len, exp);
-		else if (ip_conntrack_expect_related(exp, ct) != 0)
+		else if (ip_conntrack_expect_related(exp) != 0) {
+			ip_conntrack_expect_free(exp);
 			ret = NF_DROP;
+		}
 	}
 
 out:
