@@ -1136,16 +1136,20 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 static int
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+ips_biosparam(Disk *disk, kdev_t dev, int geom[]) {
+   ips_ha_t         *ha = (ips_ha_t *) disk->device->host->hostdata;
+   unsigned long     capacity = disk->capacity;
+#else
 ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]) {
-   ips_ha_t         *ha;
+   ips_ha_t         *ha = (ips_ha_t *) sdev->host->hostdata;
+#endif
    int               heads;
    int               sectors;
    int               cylinders;
 
    METHOD_TRACE("ips_biosparam", 1);
-
-   ha = (ips_ha_t *) sdev->host->hostdata;
 
    if (!ha)
       /* ?!?! host adater info invalid */
@@ -1178,7 +1182,7 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 
    return (0);
 }
-
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_select_queue_depth                                     */
@@ -1188,7 +1192,7 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 /*   Select queue depths for the devices on the contoller                   */
 /*                                                                          */
 /****************************************************************************/
-/*static void
+static void
 ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
    Scsi_Device *device;
    ips_ha_t    *ha;
@@ -1221,8 +1225,8 @@ ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
       }
    }
 }
-*/
 
+#else
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_slave_configure                                        */
@@ -1247,6 +1251,7 @@ ips_slave_configure(Scsi_Device *SDptr)
    }
    return 0;
 }
+#endif
 
 /****************************************************************************/
 /*                                                                          */
