@@ -397,10 +397,12 @@ static int __init sc1200wdt_init(void)
 		goto out_clean;
 	}
 
+#if defined CONFIG_PNP
 	/* now that the user has specified an IO port and we haven't detected
 	 * any devices, disable pnp support */
 	isapnp = 0;
 	pnp_unregister_driver(&scl200wdt_pnp_driver);
+#endif
 
 	if (!request_region(io, io_len, SC1200_MODULE_NAME)) {
 		printk(KERN_ERR PFX "Unable to register IO port %#x\n", io);
