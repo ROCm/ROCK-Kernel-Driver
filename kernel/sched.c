@@ -81,21 +81,15 @@
  * These are the 'tuning knobs' of the scheduler:
  *
  * Minimum timeslice is 5 msecs (or 1 jiffy, whichever is larger),
- * default timeslice is 150 msecs, maximum timeslice is 800 msecs.
+ * default timeslice is 105 msecs, maximum timeslice is 805 msecs.
  * Timeslices get refilled after they expire.
+ * Those values are choosen accurately to make sure each nice level
+ * step does make a difference with HZ = 1000.
  */
-#if HZ >= 200
-#define __MIN_TIMESLICE		(5 * HZ / 1000)
-#else
-#define __MIN_TIMESLICE		1
-#endif
-#define __DEF_TIMESLICE		(150 * HZ / 1000)
-#if HZ >= 500
-#define __MIN_TIMESLICE_DESKTOP	(2 * HZ / 1000)
-#else
-#define __MIN_TIMESLICE_DESKTOP	1
-#endif
-#define __DEF_TIMESLICE_DESKTOP	(60 * HZ / 1000)
+#define __MIN_TIMESLICE		5000 /* usec userspace */
+#define __DEF_TIMESLICE		105000 /* usec userspace */
+#define __MIN_TIMESLICE_DESKTOP	1000 /* usec userspace */
+#define __DEF_TIMESLICE_DESKTOP	21000 /* usec userspace */
 int def_timeslice = __DEF_TIMESLICE, min_timeslice = __MIN_TIMESLICE;
 #define MIN_TIMESLICE ((min_timeslice * HZ + 999999) / 1000000)
 #define DEF_TIMESLICE ((def_timeslice * HZ + 999999) / 1000000)
