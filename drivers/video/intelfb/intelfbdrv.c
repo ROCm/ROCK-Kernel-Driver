@@ -87,9 +87,12 @@
  *    09/2004 - Version 0.9.0 - by Sylvain Meyer
  *              Port to linux 2.6 kernel fbdev
  *              Fix HW accel and HW cursor on i845G
- *              Add TV-Out functionality (tested with a ch7011 tv encoder)
  *              Use of agpgart for fb memory reservation
  *              Add mtrr support
+ *
+ *    10/2004 - Version 0.9.1
+ *              Use module_param instead of old MODULE_PARM
+ *              Some cleanup
  *
  * TODO:
  *
@@ -129,10 +132,6 @@
 #include "intelfb.h"
 #include "intelfbdrv.h"
 #include "intelfbhw.h"
-
-#include "builtinmodes.c"
-
-#define FB_ACCEL_I830 42
 
 /*
  * Limiting the class to PCI_CLASS_DISPLAY_VGA prevents function 1 of the
@@ -187,18 +186,38 @@ MODULE_DESCRIPTION(
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DEVICE_TABLE(pci, intelfb_pci_table);
 
-INTELFB_INT_PARAM(accel, 1, "Enable console acceleration");
-INTELFB_INT_PARAM(hwcursor, 1, "Enable HW cursor");
-INTELFB_INT_PARAM(mtrr, 1, "Enable MTRR support");
-INTELFB_INT_PARAM(fixed, 0, "Disable mode switching");
-INTELFB_INT_PARAM(noinit, 0, "Don't initialise graphics mode when loading");
-INTELFB_INT_PARAM(noregister, 0, "Don't register, just probe and exit (debug)");
-INTELFB_INT_PARAM(probeonly, 0, "Do a minimal probe (debug)");
-INTELFB_INT_PARAM(idonly, 0,
-		  "Just identify without doing anything else (debug)");
-INTELFB_INT_PARAM(bailearly, 0, "Bail out early, depending on value (debug)");
-INTELFB_STR_PARAM(mode, 0,
-		  "Initial video mode \"<xres>x<yres>[-<depth>][@<refresh>]\"");
+static int accel        = 1;
+static int hwcursor     = 1;
+static int mtrr         = 1;
+static int fixed        = 0;
+static int noinit       = 0;
+static int noregister   = 0;
+static int probeonly    = 0;
+static int idonly       = 0;
+static int bailearly    = 0;
+static char *mode       = NULL;
+
+module_param(accel, bool, S_IRUGO);
+MODULE_PARM_DESC(accel, "Enable console acceleration");
+module_param(hwcursor, bool, S_IRUGO);
+MODULE_PARM_DESC(hwcursor, "Enable HW cursor");
+module_param(mtrr, bool, S_IRUGO);
+MODULE_PARM_DESC(mtrr, "Enable MTRR support");
+module_param(fixed, bool, S_IRUGO);
+MODULE_PARM_DESC(fixed, "Disable mode switching");
+module_param(noinit, bool, 0);
+MODULE_PARM_DESC(noinit, "Don't initialise graphics mode when loading");
+module_param(noregister, bool, 0);
+MODULE_PARM_DESC(noregister, "Don't register, just probe and exit (debug)");
+module_param(probeonly, bool, 0);
+MODULE_PARM_DESC(probeonly, "Do a minimal probe (debug)");
+module_param(idonly, bool, 0);
+MODULE_PARM_DESC(idonly, "Just identify without doing anything else (debug)");
+module_param(bailearly, bool, 0);
+MODULE_PARM_DESC(bailearly, "Bail out early, depending on value (debug)");
+module_param(mode, charp, S_IRUGO);
+MODULE_PARM_DESC(mode,
+		 "Initial video mode \"<xres>x<yres>[-<depth>][@<refresh>]\"");
 /***************************************************************
  *                     modules entry points                    *
  ***************************************************************/
@@ -224,7 +243,6 @@ intelfb_init(void)
 	if (fb_get_options("intelfb", &option))
 		return -ENODEV;
 	intelfb_setup(option);
-
 #endif
 
 	return pci_module_init(&intelfb_driver);
@@ -239,7 +257,6 @@ intelfb_exit(void)
 
 #ifndef MODULE
 #define OPT_EQUAL(opt, name) (!strncmp(opt, name, strlen(name)))
-#define OPT_INTVAL(opt, name) simple_strtoul(opt + strlen(name), NULL, 0)
 #define OPT_STRVAL(opt, name) (opt + strlen(name))
 
 static __inline__ char *
@@ -279,19 +296,6 @@ get_opt_bool(const char *this_opt, const char *name, int *ret)
 		else
 			return 0;
 	}
-	return 1;
-}
-
-static __inline__ int
-get_opt_int(const char *this_opt, const char *name, int *ret)
-{
-	if (!ret)
-		return 0;
-
-	if (!OPT_EQUAL(this_opt, name))
-		return 0;
-
-	*ret = OPT_INTVAL(this_opt, name);
 	return 1;
 }
 
@@ -510,7 +514,7 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* Map the fb and MMIO regions */
-	dinfo->aperture.virtual = (u32 __iomem *)ioremap_nocache
+	dinfo->aperture.virtual = (u8 __iomem *)ioremap_nocache
 		(dinfo->aperture.physical, dinfo->aperture.size);
 	if (!dinfo->aperture.virtual) {
 		ERR_MSG("Cannot remap FB region.\n");
@@ -518,7 +522,7 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENODEV;
 	}
 	dinfo->mmio_base =
-		(u32 __iomem *)ioremap_nocache(dinfo->mmio_base_phys,
+		(u8 __iomem *)ioremap_nocache(dinfo->mmio_base_phys,
 					       INTEL_REG_SIZE);
 	if (!dinfo->mmio_base) {
 		ERR_MSG("Cannot remap MMIO region.\n");
@@ -759,27 +763,6 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (bailearly == 18)
 		bailout(dinfo);
 
-#if TEST_MODE_TO_HW
-	{
-		struct intelfb_hwstate hw;
-		struct fb_var_screeninfo var;
-		int i;
-
-		for (i = 0; i < num_modes; i++) {
-			mode_to_var(&modedb[i], &var, 8);
-			intelfbhw_read_hw_state(dinfo, &hw, 0);
-			if (intelfbhw_mode_to_hw(dinfo, &hw, &var)) {
-				DBG_MSG("Failed to set hw for mode %dx%d\n",
-					var.xres, var.yres);
-			} else {
-				DBG_MSG("HW state for mode %dx%d\n",
-					var.xres, var.yres);
-				intelfbhw_print_hw_state(dinfo, &hw);
-			}
-		}
-	}
-#endif
-
 	/* Cursor initialisation */
 	if (dinfo->hwcursor) {
 		intelfbhw_cursor_init(dinfo);
@@ -835,79 +818,7 @@ intelfb_pci_unregister(struct pci_dev *pdev)
  *                       helper functions                      *
  ***************************************************************/
 
-/*
- * A simplified version of fb_find_mode.  The latter doesn't seem to work
- * too well -- haven't figured out why yet.
- */
-static int
-intelfb_find_mode(struct fb_var_screeninfo *var,
-		  struct fb_info *info, const char *mode_option,
-		  const struct fb_videomode *db, unsigned int dbsize,
-		  const struct fb_videomode *default_mode,
-		  unsigned int default_bpp)
-{
-	int i;
-	char mname[20] = "", tmp[20] = "", *p, *q;
-	unsigned int bpp = 0;
-
-	DBG_MSG("intelfb_find_mode\n");
-
-	/* Set up defaults */
-	if (!db) {
-		db = modedb;
-		dbsize = sizeof(modedb) / sizeof(*modedb);
-	}
-
-	if (!default_bpp)
-		default_bpp = 16;
-
-	var->activate = FB_ACTIVATE_TEST;
-	if (mode_option && *mode_option) {
-		if (strlen(mode_option) < sizeof(tmp) - 1) {
-			strcat(tmp, mode_option);
-			q = tmp;
-			p = strsep(&q, "-");
-			strcat(mname, p);
-			if (q) {
-				p = strsep(&q, "@");
-				bpp = simple_strtoul(p, NULL, 10);
-				if (q) {
-					strcat(mname, "@");
-					strcat(mname, q);
-				}
-			}
-		}
-		if (!bpp)
-			bpp = default_bpp;
-		DBG_MSG("Mode is %s, bpp %d\n", mname, bpp);
-	}
-	if (*mname) {
-		for (i = 0; i < dbsize; i++) {
-			if (!strncmp(db[i].name, mname, strlen(mname))) {
-				mode_to_var(&db[i], var, bpp);
-				if (!intelfb_check_var(var, info))
-					return 1;
-			}
-		}
-	}
-
-	if (!default_mode)
-		return 0;
-
-	mode_to_var(default_mode, var, default_bpp);
-	if (!intelfb_check_var(var, info))
-		return 3;
-
-	for (i = 0; i < dbsize; i++) {
-		mode_to_var(&db[i], var, default_bpp);
-		if (!intelfb_check_var(var, info))
-			return 4;
-	}
-
-	return 0;
-}
-
-int
+int __inline__
 intelfb_var_to_depth(const struct fb_var_screeninfo *var)
 {
 	DBG_MSG("intelfb_var_to_depth: bpp: %d, green.length is %d\n",
@@ -923,7 +834,23 @@ intelfb_var_to_depth(const struct fb_var_screeninfo *var)
 	}
 }
 
-static void
+
+static __inline__ int
+var_to_refresh(const struct fb_var_screeninfo *var)
+{
+	int xtot = var->xres + var->left_margin + var->right_margin +
+		   var->hsync_len;
+	int ytot = var->yres + var->upper_margin + var->lower_margin +
+		   var->vsync_len;
+
+	return (1000000000 / var->pixclock * 1000 + 500) / xtot / ytot;
+}
+
+/***************************************************************
+ *                Various intialisation functions              *
+ ***************************************************************/
+
+static void __devinit
 get_initial_mode(struct intelfb_info *dinfo)
 {
 	struct fb_var_screeninfo *var;
@@ -940,16 +867,6 @@ get_initial_mode(struct intelfb_info *dinfo)
 	memset(var, 0, sizeof(*var));
 	var->xres = screen_info.lfb_width;
 	var->yres = screen_info.lfb_height;
-	var->xres_virtual = var->xres;
-#if ALLOCATE_FOR_PANNING
-	/* Allow use of half of the video ram for panning */
-	var->yres_virtual =
-		dinfo->initial_video_ram / 2 / dinfo->initial_pitch;
-	if (var->yres_virtual < var->yres)
-		var->yres_virtual = var->yres;
-#else
-	var->yres_virtual = var->yres;
-#endif
 	var->bits_per_pixel = screen_info.lfb_depth;
 	switch (screen_info.lfb_depth) {
 	case 15:
@@ -1001,84 +918,29 @@ get_initial_mode(struct intelfb_info *dinfo)
 	}
 }
 
-/* Convert a mode to a var, also making the bpp a supported value. */
-static void
-mode_to_var(const struct fb_videomode *mode, struct fb_var_screeninfo *var,
-	    u32 bpp)
-{
-	if (!mode || !var)
-		return;
-
-	var->xres = mode->xres;
-	var->yres = mode->yres;
-	var->xres_virtual = mode->xres;
-	var->yres_virtual = mode->yres;
-	var->xoffset = 0;
-	var->yoffset = 0;
-	if (bpp <= 8)
-		var->bits_per_pixel = 8;
-	else if (bpp <= 16) {
-		if (bpp == 16)
-			var->green.length = 6;
-		var->bits_per_pixel = 16;
-	} else if (bpp <= 32)
-		var->bits_per_pixel = 32;
-	else {
-		WRN_MSG("var_to_mode: bad bpp: %d\n", bpp);
-		var->bits_per_pixel = bpp;
-	}
-	var->pixclock = mode->pixclock;
-	var->left_margin = mode->left_margin;
-	var->right_margin = mode->right_margin;
-	var->upper_margin = mode->upper_margin;
-	var->lower_margin = mode->lower_margin;
-	var->hsync_len = mode->hsync_len;
-	var->vsync_len = mode->vsync_len;
-	var->sync = mode->sync;
-	var->vmode = mode->vmode;
-	var->width = -1;
-	var->height = -1;
-}
-
-static __inline__ int
-var_to_refresh(const struct fb_var_screeninfo *var)
-{
-	int xtot = var->xres + var->left_margin + var->right_margin +
-		   var->hsync_len;
-	int ytot = var->yres + var->upper_margin + var->lower_margin +
-		   var->vsync_len;
-
-	return (1000000000 / var->pixclock * 1000 + 500) / xtot / ytot;
-}
-
-/***************************************************************
- *                Various intialisation functions              *
- ***************************************************************/
-
 static int __devinit
 intelfb_init_var(struct intelfb_info *dinfo)
 {
+	struct fb_var_screeninfo *var;
 	int msrc = 0;
 
-	DBG_MSG("intelfb_init_disp_var\n");
+	DBG_MSG("intelfb_init_var\n");
 
-	if (dinfo->fixed_mode) {
-	        memcpy(&dinfo->info->var, &dinfo->initial_var,
+	var = &dinfo->info->var;
+	if (FIXED_MODE(dinfo)) {
+	        memcpy(var, &dinfo->initial_var,
 		       sizeof(struct fb_var_screeninfo));
 		msrc = 5;
 	} else {
 		if (mode) {
-			msrc = intelfb_find_mode(&dinfo->info->var,
-						 dinfo->info, mode,
-						 modedb, num_modes, NULL, 0);
+			msrc = fb_find_mode(var, dinfo->info, mode,
+					    NULL, 0, NULL, 0);
 			if (msrc)
 				msrc |= 8;
 		}
 		if (!msrc) {
-			msrc = intelfb_find_mode(&dinfo->info->var,
-						 dinfo->info, PREFERRED_MODE,
-						 modedb, num_modes,
-						 &modedb[DFLT_MODE], 0);
+			msrc = fb_find_mode(var, dinfo->info, PREFERRED_MODE,
+					    NULL, 0, NULL, 0);
 		}
 	}
 
@@ -1087,16 +949,26 @@ intelfb_init_var(struct intelfb_info *dinfo)
 		return 1;
 	}
 
-	INF_MSG("Initial video mode is %dx%d-%d@%d.\n", dinfo->info->var.xres,
-		dinfo->info->var.yres, intelfb_var_to_depth(&dinfo->info->var),
-		var_to_refresh(&dinfo->info->var));
+	INF_MSG("Initial video mode is %dx%d-%d@%d.\n", var->xres, var->yres,
+		var->bits_per_pixel, var_to_refresh(var));
 
 	DBG_MSG("Initial video mode is from %d.\n", msrc);
 
+#if ALLOCATE_FOR_PANNING
+	/* Allow use of half of the video ram for panning */
+	var->xres_virtual = var->xres;
+	var->yres_virtual =
+		dinfo->fb.size / 2 / (var->bits_per_pixel * var->xres);
+	if (var->yres_virtual < var->yres)
+		var->yres_virtual = var->yres;
+#else
+	var->yres_virtual = var->yres;
+#endif
+
 	if (dinfo->accel)
-		dinfo->info->var.accel_flags |= FB_ACCELF_TEXT;
+		var->accel_flags |= FB_ACCELF_TEXT;
 	else
-		dinfo->info->var.accel_flags &= ~FB_ACCELF_TEXT;
+		var->accel_flags &= ~FB_ACCELF_TEXT;
 
 	return 0;
 }
@@ -1211,7 +1083,7 @@ intelfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	if (intelfbhw_validate_mode(dinfo, var) != 0)
 		return -EINVAL;
 
-	memcpy(&v, var, sizeof(v));
+	v = *var;
 
 	/* Check for a supported bpp. */
 	if (v.bits_per_pixel <= 8) {
@@ -1299,7 +1171,7 @@ intelfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	v.red.msb_right = v.green.msb_right = v.blue.msb_right =
 			  v.transp.msb_right = 0;
 
-        memcpy(var, &v, sizeof(v));
+        *var = v;
 
 	return 0;
 }
@@ -1317,16 +1189,14 @@ intelfb_set_par(struct fb_info *info)
 	}
 
 	DBG_MSG("intelfb_set_par (%dx%d-%d)\n", info->var.xres,
-		info->var.yres, intelfb_var_to_depth(&info->var));
+		info->var.yres, info->var.bits_per_pixel);
 
 	intelfb_blank(1, info);
 
 	if (dinfo->accel)
 		intelfbhw_2d_stop(dinfo);
 
-	mdelay(100);
-
-	memcpy(&hw, &dinfo->save_state, sizeof(hw));
+	hw = dinfo->save_state;
 	if (intelfbhw_mode_to_hw(dinfo, &hw, &info->var))
 		return -EINVAL;
 	if (intelfbhw_program_mode(dinfo, &hw, 0))
@@ -1339,15 +1209,20 @@ intelfb_set_par(struct fb_info *info)
 
 	update_dinfo(dinfo, &info->var);
 
-	mdelay(100);
-
 	if (dinfo->accel)
 		intelfbhw_2d_start(dinfo);
 
-	intelfbhw_pan_display(&info->var, info);
+	intelfb_pan_display(&info->var, info);
 
 	intelfb_blank(0, info);
 
+	if (ACCEL(dinfo, info)) {
+		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN |
+		FBINFO_HWACCEL_COPYAREA | FBINFO_HWACCEL_FILLRECT |
+		FBINFO_HWACCEL_IMAGEBLIT;
+	} else {
+		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
+	}
 	return 0;
 }
 
@@ -1432,7 +1307,7 @@ intelfb_fillrect (struct fb_info *info, const struct fb_fillrect *rect)
 	DBG_MSG("intelfb_fillrect\n");
 #endif
 
-	if (!dinfo->accel || dinfo->ring_lockup || dinfo->depth == 4)
+	if (!ACCEL(dinfo, info) || dinfo->depth == 4)
 		return cfb_fillrect(info, rect);
 
 	if (rect->rop == ROP_COPY)
@@ -1460,7 +1335,7 @@ intelfb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 	DBG_MSG("intelfb_copyarea\n");
 #endif
 
-	if (!dinfo->accel || dinfo->ring_lockup || dinfo->depth == 4)
+	if (!ACCEL(dinfo, info) || dinfo->depth == 4)
 		return cfb_copyarea(info, region);
 
 	intelfbhw_do_bitblt(dinfo, region->sx, region->sy, region->dx,
@@ -1478,7 +1353,7 @@ intelfb_imageblit(struct fb_info *info, const struct fb_image *image)
 	DBG_MSG("intelfb_imageblit\n");
 #endif
 
-	if (!dinfo->accel || dinfo->ring_lockup || dinfo->depth == 4
+	if (!ACCEL(dinfo, info) || dinfo->depth == 4
 	    || image->depth != 1)
 		return cfb_imageblit(info, image);
 
@@ -1512,7 +1387,7 @@ intelfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	intelfbhw_cursor_hide(dinfo);
 
 	/* If XFree killed the cursor - restore it */
-	if (INREG(CURSOR_A_BASEADDR) != dinfo->cursor.physical) {
+	if (INREG(CURSOR_A_BASEADDR) != dinfo->cursor.offset << 12) {
 		u32 fg, bg;
 
 		DBG_MSG("the cursor was killed - restore it !!\n");
@@ -1572,7 +1447,7 @@ intelfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		intelfbhw_cursor_setcolor(dinfo, bg, fg);
 	}
 
-	if (cursor->set & (FB_CUR_SETSHAPE & FB_CUR_SETIMAGE)) {
+	if (cursor->set & (FB_CUR_SETSHAPE | FB_CUR_SETIMAGE)) {
 		u32 s_pitch = (ROUND_UP_TO(cursor->image.width, 8) / 8);
 		u32 size = s_pitch * cursor->image.height;
 		u8 *dat = (u8 *) cursor->image.data;

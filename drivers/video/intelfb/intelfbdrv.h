@@ -29,19 +29,11 @@
 */
 
 int __init intelfb_setup(char *options);
-static void get_initial_mode(struct intelfb_info *dinfo);
+static void __devinit get_initial_mode(struct intelfb_info *dinfo);
 static void update_dinfo(struct intelfb_info *dinfo,
 			 struct fb_var_screeninfo *var);
 static int intelfb_get_fix(struct fb_fix_screeninfo *fix,
 			   struct fb_info *info);
-static void mode_to_var(const struct fb_videomode *mode,
-			struct fb_var_screeninfo *var, u32 bpp);
-static int
-intelfb_find_mode(struct fb_var_screeninfo *var,
-		  struct fb_info *info, const char *mode_option,
-		  const struct fb_videomode *db, unsigned int dbsize,
-		  const struct fb_videomode *default_mode,
-		  unsigned int default_bpp);
 
 static int intelfb_check_var(struct fb_var_screeninfo *var,
 			     struct fb_info *info);
@@ -69,8 +61,8 @@ static int intelfb_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg,
 			 struct fb_info *info);
 
-static int intelfb_pci_register(struct pci_dev *pdev,
-				const struct pci_device_id *ent);
+static int __devinit intelfb_pci_register(struct pci_dev *pdev,
+					  const struct pci_device_id *ent);
 static void __devexit intelfb_pci_unregister(struct pci_dev *pdev);
 static int __devinit intelfb_set_fbinfo(struct intelfb_info *dinfo);
 
