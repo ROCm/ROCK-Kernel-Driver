@@ -1359,6 +1359,8 @@ extern int ide_do_drive_cmd(ide_drive_t *, struct request *, ide_action_t);
  */
 extern void ide_end_drive_cmd(ide_drive_t *, u8, u8);
 
+extern void try_to_flush_leftover_data(ide_drive_t *);
+
 /*
  * Issue ATA command and wait for completion.
  * Use for implementing commands in kernel

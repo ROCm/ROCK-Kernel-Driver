@@ -811,7 +811,6 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 	ide_hwif_t *hwif;
 	struct request *rq;
 	u8 err;
-	int i = (drive->mult_count ? drive->mult_count : 1) * SECTOR_WORDS;
 
 	err = idedisk_dump_status(drive, msg, stat);
 
@@ -851,22 +850,8 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 			rq->errors |= ERROR_RECAL;
 		}
 	}
-	if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ) {
-		/*
-		 * try_to_flush_leftover_data() is invoked in response to
-		 * a drive unexpectedly having its DRQ_STAT bit set.  As
-		 * an alternative to resetting the drive, this routine
-		 * tries to clear the condition by read a sector's worth
-		 * of data from the drive.  Of course, this may not help
-		 * if the drive is *waiting* for data from *us*.
-		 */
-		while (i > 0) {
-			u32 buffer[16];
-			unsigned int wcount = (i > 16) ? 16 : i;
-			i -= wcount;
-			taskfile_input_data(drive, buffer, wcount);
-		}
-	}
+	if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ)
+		try_to_flush_leftover_data(drive);
 	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT)) {
 		/* force an abort */
 		hwif->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
