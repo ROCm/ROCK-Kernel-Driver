@@ -833,10 +833,8 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 	if (unit<0 || unit>=MAX_LINKS)
 		return NULL;
 
-	if (!(sock = sock_alloc())) 
+	if (sock_create_lite(PF_NETLINK, SOCK_DGRAM, unit, &sock))
 		return NULL;
-
-	sock->type = SOCK_RAW;
 
 	if (netlink_create(sock, unit) < 0) {
 		sock_release(sock);
