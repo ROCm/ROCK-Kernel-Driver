@@ -63,8 +63,8 @@ enum wl3501_signals {
 };
 
 enum wl3501_net_type {
-	WL3501_NET_TYPE_INFRASTRUCTURE,
-	WL3501_NET_TYPE_INDEPENDENT,
+	WL3501_NET_TYPE_INFRA,
+	WL3501_NET_TYPE_ADHOC,
 	WL3501_NET_TYPE_ANY_BSS,
 };
 
@@ -82,12 +82,6 @@ enum wl3501_tx_result {
 enum wl3501_sys_type {
 	WL3501_SYS_TYPE_OPEN,
 	WL3501_SYS_TYPE_SHARE_KEY,
-};
-
-enum wl3501_pkt_type {
-	WL3501_PKT_TYPE_ETHERII,
-	WL3501_PKT_TYPE_ETHER802_3E,
-	WL3501_PKT_TYPE_ETHER802_3F,
 };
 
 enum wl3501_status {
@@ -429,10 +423,10 @@ struct wl3501_card {
 	u16				esbq_confirm;
 	struct wl3501_mac_addr		bssid;
 	u8				llc_type;
-	enum wl3501_net_type		net_type;
+	int				net_type;
 	u8				essid[34];
 	u8				keep_essid[34];
-	u8				ether_type;
+	int				ether_type;
 	u8				chan;
 	u8				def_chan;
 	u16				start_seg;
@@ -447,6 +441,7 @@ struct wl3501_card {
 	u8				version[2];
 	struct net_device_stats 	stats;
 	struct iw_statistics		wstats;
+	struct iw_spy_data		spy_data;
 	struct dev_node_t		node;
 };
 
@@ -476,7 +471,7 @@ struct wl3501_ioctl_parm {
 };
 
 enum wl3501_ioctl_cmd {
-	WL3501_IOCTL_CMD_GET_PARAMETER,
+	WL3501_IOCTL_CMD_GET_PARAMETER = SIOCIWFIRSTPRIV,
 	WL3501_IOCTL_CMD_SET_PARAMETER,
 	WL3501_IOCTL_CMD_WRITE_FLASH,
 	WL3501_IOCTL_CMD_SET_RESET,

@@ -301,6 +301,8 @@ config PCMCIA_WL3501
       depends on NET_RADIO && EXPERIMENTAL && PCMCIA
        ---help---
          A driver for WL3501 PCMCIA 802.11 wireless cards made by Planet.
+	 It has basic support for Linux wireless extensions and initial
+	 micro support for ethtool.
 
 # yes, this works even when no drivers are selected
 config NET_WIRELESS
