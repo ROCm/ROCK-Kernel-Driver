@@ -56,7 +56,7 @@
 #include <net/xfrm.h>
 #include <net/checksum.h>
 
-static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**));
+static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *));
 
 static __inline__ void ipv6_select_ident(struct sk_buff *skb, struct frag_hdr *fhdr)
 {
@@ -108,9 +108,8 @@ static int ip6_dev_loopback_xmit(struct sk_buff *newskb)
 }
 
 
-static int ip6_output2(struct sk_buff **pskb)
+static int ip6_output2(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct net_device *dev = dst->dev;
 
@@ -146,14 +145,12 @@ static int ip6_output2(struct sk_buff **pskb)
 	return NF_HOOK(PF_INET6, NF_IP6_POST_ROUTING, skb,NULL, skb->dev,ip6_output_finish);
 }
 
-int ip6_output(struct sk_buff **pskb)
+int ip6_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
-
 	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list))
-		return ip6_fragment(pskb, ip6_output2);
+		return ip6_fragment(skb, ip6_output2);
 	else
-		return ip6_output2(pskb);
+		return ip6_output2(skb);
 }
 
 #ifdef CONFIG_NETFILTER
@@ -518,10 +515,10 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 	return offset;
 }
 
-static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
+static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *))
 {
 	struct net_device *dev;
-	struct sk_buff *frag, *skb = *pskb;
+	struct sk_buff *frag;
 	struct rt6_info *rt = (struct rt6_info*)skb->dst;
 	struct ipv6hdr *tmp_hdr;
 	struct frag_hdr *fh;
@@ -610,7 +607,7 @@ static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
 				ip6_copy_metadata(frag, skb);
 			}
 			
-			err = output(&skb);
+			err = output(skb);
 			if (err || !frag)
 				break;
 
@@ -726,7 +723,7 @@ slow_path:
 
 		IP6_INC_STATS(IPSTATS_MIB_FRAGCREATES);
 
-		err = output(&frag);
+		err = output(frag);
 		if (err)
 			goto fail;
 	}

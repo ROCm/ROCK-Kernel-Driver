@@ -55,7 +55,7 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 
-typedef void * sctp_assoc_t;
+typedef __s32 sctp_assoc_t;
 
 /* The following symbols come from the Sockets API Extensions for
  * SCTP <draft-ietf-tsvwg-sctpsocket-07.txt>.

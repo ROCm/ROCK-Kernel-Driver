@@ -1165,8 +1165,6 @@ EXPORT_SYMBOL(inet_stream_connect);
 EXPORT_SYMBOL(inet_stream_ops);
 EXPORT_SYMBOL(inet_unregister_protosw);
 EXPORT_SYMBOL(net_statistics);
-EXPORT_SYMBOL(tcp_protocol);
-EXPORT_SYMBOL(udp_protocol);
 
 #ifdef INET_REFCNT_DEBUG
 EXPORT_SYMBOL(inet_sock_nr);

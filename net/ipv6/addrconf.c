@@ -404,6 +404,7 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev)
 	return idev;
 }
 
+#ifdef CONFIG_SYSCTL
 static void dev_forward_change(struct inet6_dev *idev)
 {
 	struct net_device *dev;
@@ -449,7 +450,7 @@ static void addrconf_forward_change(void)
 	}
 	read_unlock(&dev_base_lock);
 }
-
+#endif
 
 /* Nobody refers to this ifaddr, destroy it */
 
@@ -760,7 +761,7 @@ static int inline ipv6_saddr_pref(const struct inet6_ifaddr *ifp, u8 invpref)
 #endif
 
 int ipv6_dev_get_saddr(struct net_device *dev,
-		   struct in6_addr *daddr, struct in6_addr *saddr, int onlink)
+		       struct in6_addr *daddr, struct in6_addr *saddr)
 {
 	struct inet6_ifaddr *ifp = NULL;
 	struct inet6_ifaddr *match = NULL;
@@ -769,10 +770,7 @@ int ipv6_dev_get_saddr(struct net_device *dev,
 	int err;
 	int hiscore = -1, score;
 
-	if (!onlink)
-		scope = ipv6_addr_scope(daddr);
-	else
-		scope = IFA_LINK;
+	scope = ipv6_addr_scope(daddr);
 
 	/*
 	 *	known dev
@@ -877,17 +875,7 @@ out:
 int ipv6_get_saddr(struct dst_entry *dst,
 		   struct in6_addr *daddr, struct in6_addr *saddr)
 {
-	struct rt6_info *rt;
-	struct net_device *dev = NULL;
-	int onlink;
-
-	rt = (struct rt6_info *) dst;
-	if (rt)
-		dev = rt->rt6i_dev;
-
-	onlink = (rt && (rt->rt6i_flags & RTF_ALLONLINK));
-
-	return ipv6_dev_get_saddr(dev, daddr, saddr, onlink);
+	return ipv6_dev_get_saddr(dst ? dst->dev : NULL, daddr, saddr);
 }
 
 
@@ -3042,7 +3030,7 @@ int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 			addrconf_forward_change();
 		}
 		if (*valp)
-			rt6_purge_dflt_routers(0);
+			rt6_purge_dflt_routers();
 	}
 
         return ret;
@@ -3096,7 +3084,7 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 		}
 
 		if (*valp)
-			rt6_purge_dflt_routers(0);
+			rt6_purge_dflt_routers();
 	} else
 		*valp = new;
 

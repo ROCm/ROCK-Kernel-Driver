@@ -706,10 +706,19 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		if (!new_transport) {
 			new_transport = asoc->peer.active_path;
 		} else if (!new_transport->active) {
-			/* If the chunk is Heartbeat, send it to
-			 * chunk->transport, even it's inactive.
+			/* If the chunk is Heartbeat or Heartbeat Ack, 
+			 * send it to chunk->transport, even if it's 
+			 * inactive.
+			 *
+			 * 3.3.6 Heartbeat Acknowledgement:
+			 * ...  
+			 * A HEARTBEAT ACK is always sent to the source IP
+			 * address of the IP datagram containing the
+			 * HEARTBEAT chunk to which this ack is responding.
+			 * ...  
 			 */
-			if (chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT)
+			if (chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT &&
+			    chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT_ACK)
 				new_transport = asoc->peer.active_path;
 		}
 

@@ -163,6 +163,8 @@ void fib_release_info(struct fib_info *fi)
 		if (fi->fib_prefsrc)
 			hlist_del(&fi->fib_lhash);
 		change_nexthops(fi) {
+			if (!nh->nh_dev)
+				continue;
 			hlist_del(&nh->nh_hash);
 		} endfor_nexthops(fi)
 		fi->fib_dead = 1;

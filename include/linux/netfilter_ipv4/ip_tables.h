@@ -407,11 +407,6 @@ struct ipt_target
 	struct module *me;
 };
 
-extern struct ipt_target *
-ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-extern struct arpt_target *
-arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-
 extern int ipt_register_target(struct ipt_target *target);
 extern void ipt_unregister_target(struct ipt_target *target);
 

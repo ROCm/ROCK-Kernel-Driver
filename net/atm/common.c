@@ -57,7 +57,7 @@ void vcc_insert_socket(struct sock *sk)
 	write_unlock_irq(&vcc_sklist_lock);
 }
 
-void vcc_remove_socket(struct sock *sk)
+static void vcc_remove_socket(struct sock *sk)
 {
 	write_lock_irq(&vcc_sklist_lock);
 	sk_del_node_init(sk);
@@ -86,7 +86,6 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 EXPORT_SYMBOL(vcc_hash);
 EXPORT_SYMBOL(vcc_sklist_lock);
 EXPORT_SYMBOL(vcc_insert_socket);
-EXPORT_SYMBOL(vcc_remove_socket);
 
 static void vcc_sock_destruct(struct sock *sk)
 {

@@ -91,16 +91,14 @@ out:
 	return ret;
 }
 
-int xfrm4_output(struct sk_buff **pskb)
+int xfrm4_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	int err;
 	
 	if (skb->ip_summed == CHECKSUM_HW) {
-		err = skb_checksum_help(pskb, 0);
-		skb = *pskb;
+		err = skb_checksum_help(skb, 0);
 		if (err)
 			goto error_nolock;
 	}
