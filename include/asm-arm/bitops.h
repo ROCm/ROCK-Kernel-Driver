@@ -212,6 +212,8 @@ extern int _test_and_clear_bit_le(int nr, volatile unsigned long * p);
 extern int _test_and_change_bit_le(int nr, volatile unsigned long * p);
 extern int _find_first_zero_bit_le(void * p, unsigned size);
 extern int _find_next_zero_bit_le(void * p, int size, int offset);
+extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
 
 /*
  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
@@ -224,7 +226,8 @@ extern int _test_and_clear_bit_be(int nr, volatile unsigned long * p);
 extern int _test_and_change_bit_be(int nr, volatile unsigned long * p);
 extern int _find_first_zero_bit_be(void * p, unsigned size);
 extern int _find_next_zero_bit_be(void * p, int size, int offset);
-
+extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+extern int _find_next_bit_be(unsigned long *p, int size, int offset);
 
 /*
  * The __* form of bitops are non-atomic and may be reordered.
@@ -255,6 +258,8 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #define test_bit(nr,p)			__test_bit(nr,p)
 #define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
 #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_le(p,sz,off)
+#define find_first_bit(p,sz)		_find_first_bit_le(p,sz)
+#define find_next_bit(p,sz,off)		_find_next_bit_le(p,sz,off)
 
 #define WORD_BITOFF_TO_LE(x)		((x))
 
@@ -272,6 +277,8 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #define test_bit(nr,p)			__test_bit(nr,p)
 #define find_first_zero_bit(p,sz)	_find_first_zero_bit_be(p,sz)
 #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_be(p,sz,off)
+#define find_first_bit(p,sz)		_find_first_bit_be(p,sz)
+#define find_next_bit(p,sz,off)		_find_next_bit_be(p,sz,off)
 
 #define WORD_BITOFF_TO_LE(x)		((x) ^ 0x18)
 
