@@ -114,22 +114,10 @@ void __init mach_get_physical_ram (unsigned long *ram_start,
 
 void __init mach_reserve_bootmem ()
 {
-	extern char _root_fs_image_start, _root_fs_image_end;
-	u32 root_fs_image_start = (u32)&_root_fs_image_start;
-	u32 root_fs_image_end = (u32)&_root_fs_image_end;
-
 	if (SDRAM_ADDR < RAM_END && SDRAM_ADDR > RAM_START)
 		/* We can't use the space between SRAM and SDRAM, so
 		   prevent the kernel from trying.  */
 		reserve_bootmem (SRAM_END, SDRAM_ADDR - SRAM_END);
-
-	/* Reserve the memory used by the root filesystem image if it's
-	   in RAM.  */
-	if (root_fs_image_end > root_fs_image_start
-	    && root_fs_image_start >= RAM_START
-	    && root_fs_image_start < RAM_END)
-		reserve_bootmem (root_fs_image_start,
-				 root_fs_image_end - root_fs_image_start);
 }
 
 void mach_gettimeofday (struct timespec *tv)

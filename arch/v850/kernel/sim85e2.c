@@ -150,21 +150,6 @@ void mach_get_physical_ram (unsigned long *ram_start, unsigned long *ram_len)
 	*ram_len = RAM_END - RAM_START;
 }
 
-void __init mach_reserve_bootmem ()
-{
-	extern char _root_fs_image_start, _root_fs_image_end;
-	u32 root_fs_image_start = (u32)&_root_fs_image_start;
-	u32 root_fs_image_end = (u32)&_root_fs_image_end;
-
-	/* Reserve the memory used by the root filesystem image if it's
-	   in RAM.  */
-	if (root_fs_image_end > root_fs_image_start
-	    && root_fs_image_start >= RAM_START
-	    && root_fs_image_start < RAM_END)
-		reserve_bootmem (root_fs_image_start,
-				 root_fs_image_end - root_fs_image_start);
-}
-
 void __init mach_sched_init (struct irqaction *timer_action)
 {
 	/* The simulator actually cycles through all interrupts

@@ -54,21 +54,6 @@ void __init mach_get_physical_ram (unsigned long *ram_start,
 	*ram_len = SDRAM_SIZE;
 }
 
-void __init mach_reserve_bootmem ()
-{
-	extern char _root_fs_image_start, _root_fs_image_end;
-	u32 root_fs_image_start = (u32)&_root_fs_image_start;
-	u32 root_fs_image_end = (u32)&_root_fs_image_end;
-
-	/* Reserve the memory used by the root filesystem image if it's
-	   in SDRAM.  */
-	if (root_fs_image_end > root_fs_image_start
-	    && root_fs_image_start >= SDRAM_ADDR
-	    && root_fs_image_start < (SDRAM_ADDR + SDRAM_SIZE))
-		reserve_bootmem (root_fs_image_start,
-				 root_fs_image_end - root_fs_image_start);
-}
-
 void mach_gettimeofday (struct timespec *tv)
 {
 	tv->tv_sec = 0;
