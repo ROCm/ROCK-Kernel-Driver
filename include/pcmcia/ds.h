@@ -30,9 +30,9 @@
 #ifndef _LINUX_DS_H
 #define _LINUX_DS_H
 
-#include <pcmcia/driver_ops.h>
 #include <pcmcia/bulkmem.h>
 #include <linux/device.h>
+#include <pcmcia/cs_types.h>
 
 typedef struct tuple_parse_t {
     tuple_t		tuple;
@@ -107,6 +107,12 @@ typedef union ds_ioctl_arg_t {
 #define DS_BIND_MTD			_IOWR('d', 64, mtd_info_t)
 
 #ifdef __KERNEL__
+
+typedef struct dev_node_t {
+    char		dev_name[DEV_NAME_LEN];
+    u_short		major, minor;
+    struct dev_node_t	*next;
+} dev_node_t;
 
 typedef struct dev_link_t {
     dev_node_t		*dev;
