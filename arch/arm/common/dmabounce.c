@@ -121,9 +121,9 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
 	DO_STATS ( device_info->total_allocs++ );
 
 	buf = kmalloc(sizeof(struct safe_buffer), GFP_ATOMIC);
-	if (buf == 0) {
+	if (buf == NULL) {
 		dev_warn(dev, "%s: kmalloc failed\n", __func__);
-		return 0;
+		return NULL;
 	}
 
 	if (size <= device_info->small_buffer_size) {
@@ -137,16 +137,16 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
 
 		DO_STATS ( device_info->lbp_allocs++ );
 	} else {
-		pool = 0;
+		pool = NULL;
 		safe = dma_alloc_coherent(dev, size, &safe_dma_addr, GFP_ATOMIC);
 	}
 
-	if (safe == 0) {
+	if (safe == NULL) {
 		dev_warn(device_info->dev,
 			"%s: could not alloc dma memory (size=%d)\n",
 		       __func__, size);
 		kfree(buf);
-		return 0;
+		return NULL;
 	}
 
 #ifdef STATS
