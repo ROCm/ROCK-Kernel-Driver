@@ -1396,6 +1396,9 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	if (sig == -1)
 		BUG();
 
+	BUG_ON(tsk->group_leader != tsk && tsk->group_leader->state != TASK_ZOMBIE && !tsk->ptrace);
+	BUG_ON(tsk->group_leader == tsk && !thread_group_empty(tsk) && !tsk->ptrace);
+
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_pid = tsk->pid;

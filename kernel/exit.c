@@ -495,7 +495,8 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 		/* If we'd notified the old parent about this child's death,
 		 * also notify the new parent.
 		 */
-		if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
+		if (p->state == TASK_ZOMBIE && p->exit_signal != -1 &&
+		    thread_group_empty(p))
 			do_notify_parent(p, p->exit_signal);
 	}
 
@@ -546,7 +547,8 @@ static inline void forget_original_parent(struct task_struct * father)
 			reparent_thread(p, father, 0);
 		} else {
 			ptrace_unlink (p);
-			if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
+			if (p->state == TASK_ZOMBIE && p->exit_signal != -1 &&
+			    thread_group_empty(p))
 				do_notify_parent(p, p->exit_signal);
 		}
 	}
@@ -649,7 +651,7 @@ static void exit_notify(struct task_struct *tsk)
 	 * send it a SIGCHLD instead of honoring exit_signal.  exit_signal
 	 * only has special meaning to our real parent.
 	 */
-	if (tsk->exit_signal != -1) {
+	if (tsk->exit_signal != -1 && thread_group_empty(tsk)) {
 		int signal = tsk->parent == tsk->real_parent ? tsk->exit_signal : SIGCHLD;
 		do_notify_parent(tsk, signal);
 	} else if (tsk->ptrace) {
