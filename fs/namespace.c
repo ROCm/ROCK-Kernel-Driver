@@ -1209,8 +1209,6 @@ void set_fs_root(struct fs_struct *fs, struct vfsmount *mnt,
 	}
 }
 
-EXPORT_SYMBOL(set_fs_root);
-
 /*
  * Replace the fs->{pwdmnt,pwd} with {mnt,dentry}. Put the old values.
  * It can block. Requires the big lock held.
@@ -1233,8 +1231,6 @@ void set_fs_pwd(struct fs_struct *fs, struct vfsmount *mnt,
 		mntput(old_pwdmnt);
 	}
 }
-
-EXPORT_SYMBOL(set_fs_pwd);
 
 static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
 {
