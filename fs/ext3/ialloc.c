@@ -127,7 +127,7 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	clear_inode (inode);
 
 	lock_super (sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	if (ino < EXT3_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
 		ext3_error (sb, "ext3_free_inode",
 			    "reserved or nonexistent inode %lu", ino);
@@ -155,8 +155,8 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		fatal = ext3_journal_get_write_access(handle, bh2);
 		if (fatal) goto error_return;
 
-		BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "get write access");
-		fatal = ext3_journal_get_write_access(handle, sb->u.ext3_sb.s_sbh);
+		BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get write access");
+		fatal = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 		if (fatal) goto error_return;
 
 		if (gdp) {
@@ -171,9 +171,9 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		if (!fatal) fatal = err;
 		es->s_free_inodes_count =
 			cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) + 1);
-		BUFFER_TRACE(sb->u.ext3_sb.s_sbh,
+		BUFFER_TRACE(EXT3_SB(sb)->s_sbh,
 					"call ext3_journal_dirty_metadata");
-		err = ext3_journal_dirty_metadata(handle, sb->u.ext3_sb.s_sbh);
+		err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 		if (!fatal) fatal = err;
 	}
 	BUFFER_TRACE(bitmap_bh, "call ext3_journal_dirty_metadata");
@@ -222,16 +222,16 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 	ei = EXT3_I(inode);
 
 	lock_super (sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 repeat:
 	gdp = NULL;
 	i = 0;
 
 	if (S_ISDIR(mode)) {
 		avefreei = le32_to_cpu(es->s_free_inodes_count) /
-			sb->u.ext3_sb.s_groups_count;
+			EXT3_SB(sb)->s_groups_count;
 		if (!gdp) {
-			for (j = 0; j < sb->u.ext3_sb.s_groups_count; j++) {
+			for (j = 0; j < EXT3_SB(sb)->s_groups_count; j++) {
 				struct buffer_head *temp_buffer;
 				tmp = ext3_get_group_desc (sb, j, &temp_buffer);
 				if (tmp &&
@@ -261,10 +261,10 @@ repeat:
 			 * Use a quadratic hash to find a group with a
 			 * free inode
 			 */
-			for (j = 1; j < sb->u.ext3_sb.s_groups_count; j <<= 1) {
+			for (j = 1; j < EXT3_SB(sb)->s_groups_count; j <<= 1) {
 				i += j;
-				if (i >= sb->u.ext3_sb.s_groups_count)
-					i -= sb->u.ext3_sb.s_groups_count;
+				if (i >= EXT3_SB(sb)->s_groups_count)
+					i -= EXT3_SB(sb)->s_groups_count;
 				tmp = ext3_get_group_desc (sb, i, &bh2);
 				if (tmp &&
 				    le16_to_cpu(tmp->bg_free_inodes_count)) {
@@ -278,8 +278,8 @@ repeat:
 			 * That failed: try linear search for a free inode
 			 */
 			i = EXT3_I(dir)->i_block_group + 1;
-			for (j = 2; j < sb->u.ext3_sb.s_groups_count; j++) {
-				if (++i >= sb->u.ext3_sb.s_groups_count)
+			for (j = 2; j < EXT3_SB(sb)->s_groups_count; j++) {
+				if (++i >= EXT3_SB(sb)->s_groups_count)
 					i = 0;
 				tmp = ext3_get_group_desc (sb, i, &bh2);
 				if (tmp &&
@@ -357,13 +357,13 @@ repeat:
 	err = ext3_journal_dirty_metadata(handle, bh2);
 	if (err) goto fail;
 	
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "get_write_access");
-	err = ext3_journal_get_write_access(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get_write_access");
+	err = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 	if (err) goto fail;
 	es->s_free_inodes_count =
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "call ext3_journal_dirty_metadata");
-	err = ext3_journal_dirty_metadata(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "call ext3_journal_dirty_metadata");
+	err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 	sb->s_dirt = 1;
 	if (err) goto fail;
 
@@ -417,7 +417,7 @@ repeat:
 	if (IS_DIRSYNC(inode))
 		handle->h_sync = 1;
 	insert_inode_hash(inode);
-	inode->i_generation = sb->u.ext3_sb.s_next_generation++;
+	inode->i_generation = EXT3_SB(sb)->s_next_generation++;
 
 	ei->i_state = EXT3_STATE_NEW;
 	err = ext3_mark_inode_dirty(handle, inode);
@@ -512,11 +512,11 @@ unsigned long ext3_count_free_inodes (struct super_block * sb)
 	int i;
 
 	lock_super (sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	gdp = NULL;
-	for (i = 0; i < sb->u.ext3_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
 		gdp = ext3_get_group_desc (sb, i, NULL);
 		if (!gdp)
 			continue;
@@ -537,7 +537,7 @@ unsigned long ext3_count_free_inodes (struct super_block * sb)
 	unlock_super(sb);
 	return desc_count;
 #else
-	return le32_to_cpu(sb->u.ext3_sb.s_es->s_free_inodes_count);
+	return le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count);
 #endif
 }
 
@@ -551,11 +551,11 @@ void ext3_check_inodes_bitmap (struct super_block * sb)
 	struct ext3_group_desc * gdp;
 	int i;
 
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	gdp = NULL;
-	for (i = 0; i < sb->u.ext3_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
 		gdp = ext3_get_group_desc (sb, i, NULL);
 		if (!gdp)
 			continue;

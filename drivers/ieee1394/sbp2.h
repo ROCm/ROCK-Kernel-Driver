@@ -357,6 +357,10 @@ struct sbp2_command_info {
 
 };
 
+/* A list of flags for detected oddities and brokeness. */
+#define SBP2_BREAKAGE_128K_MAX_TRANSFER		0x1
+#define SBP2_BREAKAGE_INQUIRY_HACK		0x2
+
 /*
  * Information needed on a per scsi id basis (one for each sbp2 device)
  */
@@ -412,6 +416,9 @@ struct scsi_id_instance_data {
 
 	/* Node entry, as retrieved from NodeMgr entries */
 	struct node_entry *ne;
+
+	/* Device specific workarounds/brokeness */
+	u32 workarounds;
 };
 
 /*
@@ -542,7 +549,11 @@ static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id
 static int sbp2scsi_detect (Scsi_Host_Template *tpnt);
 static const char *sbp2scsi_info (struct Scsi_Host *host);
 void sbp2scsi_setup(char *str, int *ints);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,28)
+static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]);
+#else
 static int sbp2scsi_biosparam (Scsi_Disk *disk, struct block_device *dev, int geom[]);
+#endif
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt); 
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt); 
 static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));

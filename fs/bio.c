@@ -33,7 +33,7 @@ static kmem_cache_t *bio_slab;
 #define BIOVEC_NR_POOLS 6
 
 struct biovec_pool {
-	int size;
+	int nr_vecs;
 	char *name; 
 	kmem_cache_t *slab;
 	mempool_t *pool;
@@ -88,7 +88,7 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 
 	bvl = mempool_alloc(bp->pool, gfp_mask);
 	if (bvl)
-		memset(bvl, 0, bp->size);
+		memset(bvl, 0, bp->nr_vecs * sizeof(struct bio_vec));
 	return bvl;
 }
 
@@ -457,27 +457,55 @@ void bio_endio(struct bio *bio, int uptodate)
 		bio->bi_end_io(bio);
 }
 
-static void __init biovec_init_pool(void)
+static void __init biovec_init_pools(void)
 {
-	int i, size;
+	int i, size, megabytes, pool_entries = BIO_POOL_SIZE;
+	int scale = BIOVEC_NR_POOLS;
+
+	megabytes = nr_free_pages() >> (20 - PAGE_SHIFT);
+
+	/*
+	 * find out where to start scaling
+	 */
+	if (megabytes <= 16)
+		scale = 0;
+	else if (megabytes <= 32)
+		scale = 1;
+	else if (megabytes <= 64)
+		scale = 2;
+	else if (megabytes <= 96)
+		scale = 3;
+	else if (megabytes <= 128)
+		scale = 4;
+
+	/*
+	 * scale number of entries
+	 */
+	pool_entries = megabytes * 2;
+	if (pool_entries > 256)
+		pool_entries = 256;
 
 	for (i = 0; i < BIOVEC_NR_POOLS; i++) {
 		struct biovec_pool *bp = bvec_array + i;
 
-		size = bp->size * sizeof(struct bio_vec);
-
-		printk("biovec: init pool %d, %d entries, %d bytes\n", i,
-						bp->size, size);
+		size = bp->nr_vecs * sizeof(struct bio_vec);
 
 		bp->slab = kmem_cache_create(bp->name, size, 0,
 						SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!bp->slab)
 			panic("biovec: can't init slab cache\n");
-		bp->pool = mempool_create(BIO_POOL_SIZE, slab_pool_alloc,
+
+		if (i >= scale)
+			pool_entries >>= 1;
+
+		bp->pool = mempool_create(pool_entries, slab_pool_alloc,
 					slab_pool_free, bp->slab);
 		if (!bp->pool)
 			panic("biovec: can't init mempool\n");
-		bp->size = size;	
+
+		printk("biovec pool[%d]: %3d bvecs: %3d entries (%d bytes)\n",
+						i, bp->nr_vecs, pool_entries,
+						size);
 	}
 }
 
@@ -493,7 +521,7 @@ static int __init init_bio(void)
 
 	printk("BIO: pool of %d setup, %ZuKb (%Zd bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
 
-	biovec_init_pool();
+	biovec_init_pools();
 
 	return 0;
 }

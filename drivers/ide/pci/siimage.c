@@ -1,11 +1,12 @@
 /*
- * linux/drivers/ide/siimage.c		Version 1.00	May 9, 2002
+ * linux/drivers/ide/siimage.c		Version 1.01	Sept 11, 2002
  *
  * Copyright (C) 2001-2002	Andre Hedrick <andre@linux-ide.org>
  */
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
@@ -836,26 +837,57 @@ static void __init init_dma_siimage (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_siimage (struct pci_dev *dev, ide_pci_device_t *d)
+
+static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &siimage_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init siimage_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_CMD)
-		return 0;
-
-	for (d = siimage_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	siimage_remove_one	-	called when an SI IDE is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an IDE device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void siimage_remove_one(struct pci_dev *dev)
+{
+	panic("SiImage IDE removal not yet supported");
+}
+
+static struct pci_device_id siimage_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_SII_680,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_SII_3112, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"SiI IDE",
+	id_table:	siimage_pci_tbl,
+	probe:		siimage_init_one,
+	remove:		__devexit_p(siimage_remove_one),
+};
+
+static int siimage_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void siimage_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(siimage_ide_init);
+module_exit(siimage_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for SiI IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

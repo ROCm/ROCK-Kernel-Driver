@@ -252,6 +252,27 @@ static __inline__ int __get_order(unsigned long size)
         #define MPT_SCSI_USE_NEW_EH
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
+#define mptscsih_save_flags(flags) \
+({	local_save_flags(flags); \
+	local_irq_disable(); \
+})
+#else
+#define mptscsih_save_flags(flags) \
+({	save_flags(flags); \
+	cli(); \
+})
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
+#define mptscsih_restore_flags(flags) \
+({	local_irq_enable(); \
+	local_irq_restore(flags); \
+})
+#else
+#define mptscsih_restore_flags(flags)  restore_flags(flags);
+#endif
+
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* _LINUX_COMPAT_H */
 

@@ -55,6 +55,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -664,29 +665,79 @@ static void __init init_setup_piix (struct pci_dev *dev, ide_pci_device_t *d)
 }
 
 /**
- *	piix_scan_pcidev	-	Check for and initialize PIIX IDE
- *	@dev: PCI device to check
+ *	piix_init_one	-	called when a PIIX is found
+ *	@dev: the piix device
+ *	@id: the matching pci id
  *
- *	Checks if the passed device is an Intel PIIX device. If so the
- *	hardware is initialized and we return 1 to claim the device. If not
- *	we return 0.
+ *	Called when the PCI registration layer (or the IDE initialization)
+ *	finds a device matching our IDE device tables.
  */
  
-int __init piix_scan_pcidev (struct pci_dev *dev)
+static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
+	ide_pci_device_t *d = &piix_pci_info[id->driver_data];
 
-	if (dev->vendor != PCI_VENDOR_ID_INTEL)
-		return 0;
-
-	for (d = piix_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	if (dev->device != d->device)
+		BUG();
+	d->init_setup(dev, d);
 	return 0;
 }
 
+/**
+ *	piix_remove_one	-	called with a PIIX is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a PIIX device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void piix_remove_one(struct pci_dev *dev)
+{
+	panic("PIIX removal not yet supported");
+}
+
+static struct pci_device_id piix_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371MX,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 6},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 7},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82372FB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 8},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82451NX,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 9},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_9, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 10},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_8, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 11},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_10,PCI_ANY_ID, PCI_ANY_ID, 0, 0, 12},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_11,PCI_ANY_ID, PCI_ANY_ID, 0, 0, 13},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_11,PCI_ANY_ID, PCI_ANY_ID, 0, 0, 14},
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_11, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 15},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"PIIX IDE",
+	id_table:	piix_pci_tbl,
+	probe:		piix_init_one,
+	remove:		__devexit_p(piix_remove_one),
+};
+
+static int piix_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void piix_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(piix_ide_init);
+module_exit(piix_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick, Andrzej Krzysztofowicz");
+MODULE_DESCRIPTION("PCI driver module for Intel PIIX IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

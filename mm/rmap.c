@@ -214,6 +214,7 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
 		SetPageDirect(page);
+		inc_page_state(nr_mapped);
 		goto out;
 	}
 
@@ -336,6 +337,8 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 
 out:
 	pte_chain_unlock(page);
+	if (!page_mapped(page))
+		dec_page_state(nr_mapped);
 	return;
 }
 
@@ -447,6 +450,7 @@ int try_to_unmap(struct page * page)
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
 			page->pte.direct = 0;
+			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 		}
 		goto out;
@@ -500,6 +504,8 @@ int try_to_unmap(struct page * page)
 		}
 	}
 out:
+	if (!page_mapped(page))
+		dec_page_state(nr_mapped);
 	return ret;
 }
 

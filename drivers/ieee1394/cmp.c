@@ -299,14 +299,14 @@ static int pcr_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
 
 
 static struct hpsb_highlevel_ops cmp_highlevel_ops = {
-	add_host:	cmp_add_host,
-	remove_host:	cmp_remove_host,
-        host_reset:	cmp_host_reset,
+	.add_host =	cmp_add_host,
+	.remove_host =	cmp_remove_host,
+        .host_reset =	cmp_host_reset,
 };
 
 static struct hpsb_address_ops pcr_ops = {
-        read: pcr_read,
-        lock: pcr_lock,
+	.read =	pcr_read,
+        .lock =	pcr_lock,
 };
 
 /* Module interface */

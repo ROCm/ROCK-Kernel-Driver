@@ -55,10 +55,8 @@ void release_task(struct task_struct * p)
 
 	if (p->state != TASK_ZOMBIE)
 		BUG();
-#ifdef CONFIG_SMP
 	if (p != current)
 		wait_task_inactive(p);
-#endif
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);

@@ -712,6 +712,8 @@ void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d)
 		probe_hwif_init(&ide_hwifs[index_list.b.high]);
 }
 
+EXPORT_SYMBOL_GPL(ide_setup_pci_device);
+
 void ide_setup_pci_devices (struct pci_dev *dev, struct pci_dev *dev2, ide_pci_device_t *d)
 {
 	ata_index_t index_list  = do_ide_setup_pci_device(dev, d, 1);
@@ -727,152 +729,10 @@ void ide_setup_pci_devices (struct pci_dev *dev, struct pci_dev *dev2, ide_pci_d
 		probe_hwif_init(&ide_hwifs[index_list2.b.high]);
 }
 
-/*
- * ide_scan_pcibus() gets invoked at boot time from ide.c.
- * It finds all PCI IDE controllers and calls ide_setup_pci_device for them.
- */
-void __init ide_scan_pcidev (struct pci_dev *dev)
-{
-#if 0
-	printk(" PCI slot %s, VID=%04x, DID=%04x\n",
-		dev->slot_name, dev->vendor, dev->device);
-#endif
-
-	if ((dev->vendor == PCI_VENDOR_ID_CMD) &&
-	    (dev->device == PCI_DEVICE_ID_CMD_640)) {
-		return;
-#ifdef CONFIG_BLK_DEV_ALI15X3
-	}{
-		extern int ali15x3_scan_pcidev(struct pci_dev *dev);
-		if (ali15x3_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD74XX
-	}{
-		extern int amd74xx_scan_pcidev(struct pci_dev *dev);
-		if (amd74xx_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_AMD74XX */
-#ifdef CONFIG_BLK_DEV_CS5530
-	}{
-		extern int cs5530_scan_pcidev(struct pci_dev *dev);
-		if (cs5530_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_CS5530 */
-#ifdef CONFIG_BLK_DEV_CY82C693
-	}{
-		extern int cy82c693_scan_pcidev(struct pci_dev *dev);
-		if (cy82c693_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_CY82C693 */
-#ifdef CONFIG_BLK_DEV_IT8172
-	}{
-		extern int it8172_scan_pcidev(struct pci_dev *dev);
-		if (it8172_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_IT8172 */
-#ifdef CONFIG_BLK_DEV_NFORCE
-	}{
-		extern int nforce_scan_pcidev(struct pci_dev *dev);
-		if (nforce_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_NFORCE */
-#ifdef CONFIG_BLK_DEV_NS87415
-	}{
-		extern int ns87415_scan_pcidev(struct pci_dev *dev);
-		if (ns87415_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_NS87415 */
-#ifdef CONFIG_BLK_DEV_OPTI621
-	}{
-		extern int opti621_scan_pcidev(struct pci_dev *dev);
-		if (opti621_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_OPTI621 */
-#ifdef CONFIG_BLK_DEV_PIIX
-	}{
-		extern int piix_scan_pcidev(struct pci_dev *dev);
-		if (piix_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_PIIX */
-#ifdef CONFIG_BLK_DEV_RZ1000
-	}{
-		extern int rz1000_scan_pcidev(struct pci_dev *dev);
-		if (rz1000_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_RZ1000 */
-#ifdef CONFIG_BLK_DEV_SVWKS
-	}{
-		extern int serverworks_scan_pcidev(struct pci_dev *dev);
-		if (serverworks_scan_pcidev(dev))	return;
-#endif /* CONFIG_BLK_DEV_SVWKS */
-#ifdef CONFIG_BLK_DEV_SIS5513
-	}{
-		extern int sis5513_scan_pcidev(struct pci_dev *dev);
-		if (sis5513_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_SIS5513 */
-#ifdef CONFIG_BLK_DEV_SLC90E66
-	}{
-		extern int slc90e66_scan_pcidev(struct pci_dev *dev);
-		if (slc90e66_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_SLC90E66 */
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-	}{
-		extern int via82cxxx_scan_pcidev(struct pci_dev *dev);
-		if (via82cxxx_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_VIA82CXXX */
-
-#ifdef CONFIG_BLK_DEV_AEC62XX
-	}{
-		extern int aec62xx_scan_pcidev(struct pci_dev *dev);
-		if (aec62xx_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_AEC62XX */
-#ifdef CONFIG_BLK_DEV_CMD64X
-	}{
-		extern int cmd64x_scan_pcidev(struct pci_dev *dev);
-		if (cmd64x_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_CMD64X */
-#ifdef CONFIG_BLK_DEV_HPT34X
-	}{
-		extern int hpt34x_scan_pcidev(struct pci_dev *dev);
-		if (hpt34x_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_HPT34X */
-#ifdef CONFIG_BLK_DEV_HPT366
-	}{
-		extern int hpt366_scan_pcidev(struct pci_dev *dev);
-		if (hpt366_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_PDC202XX_OLD
-	}{
-		extern int pdc202xx_scan_pcidev(struct pci_dev *dev);
-		if (pdc202xx_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_PDC202XX_OLD */
-#ifdef CONFIG_BLK_DEV_PDC202XX_NEW
-	}{
-		extern int pdcnew_scan_pcidev(struct pci_dev *dev);
-		if (pdcnew_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_PDC202XX_NEW */
-#ifdef CONFIG_BLK_DEV_PDC_ADMA
-	}{
-		extern int pdcadma_scan_pcidev(struct pci_dev *dev);
-		if (pdcadma_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_PDC_ADMA */
-#ifdef CONFIG_BLK_DEV_SIIMAGE
-	}{
-		extern int siimage_scan_pcidev(struct pci_dev *dev);
-		if (siimage_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_SIIMAGE */
-#ifdef CONFIG_BLK_DEV_SL82C105
-	}{
-		extern int sl82c105_scan_pcidev(struct pci_dev *dev);
-		if (sl82c105_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_SL82C105 */
-#ifdef CONFIG_BLK_DEV_TRM290
-	}{
-		extern int trm290_scan_pcidev(struct pci_dev *dev);
-		if (trm290_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_TRM290 */
-#ifdef CONFIG_BLK_DEV_GENERIC
-	}{
-		extern int generic_scan_pcidev(struct pci_dev *dev);
-		if (generic_scan_pcidev(dev))		return;
-#endif /* CONFIG_BLK_DEV_GENERIC */
-	}
-}
-
+EXPORT_SYMBOL_GPL(ide_setup_pci_devices);
 
 /*
- *	Module interfaces - not yet functional.
+ *	Module interfaces
  */
  
 static int pre_init = 1;		/* Before first ordered IDE scan */
@@ -893,15 +753,15 @@ static LIST_HEAD(ide_pci_drivers);
  *	Returns are the same as for pci_register_driver
  */
 
-int ide_register_pci_driver(struct pci_driver *driver)
+int ide_pci_register_driver(struct pci_driver *driver)
 {
 	if(!pre_init)
-		return pci_register_driver(driver);
+		return pci_module_init(driver);
 	list_add_tail(&driver->node, &ide_pci_drivers);
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_register_pci_driver);
+EXPORT_SYMBOL_GPL(ide_pci_register_driver);
 
 /**
  *	ide_unregister_pci_driver	-	unregister an IDE driver
@@ -911,7 +771,7 @@ EXPORT_SYMBOL(ide_register_pci_driver);
  *	as for pci_unregister_driver
  */
  
-void ide_unregister_pci_driver(struct pci_driver *driver)
+void ide_pci_unregister_driver(struct pci_driver *driver)
 {
 	if(!pre_init)
 		pci_unregister_driver(driver);
@@ -919,7 +779,40 @@ void ide_unregister_pci_driver(struct pci_driver *driver)
 		list_del(&driver->node);
 }
 
-EXPORT_SYMBOL(ide_unregister_pci_driver);
+EXPORT_SYMBOL_GPL(ide_pci_unregister_driver);
+
+/**
+ *	ide_scan_pcidev		-	find an IDE driver for a device
+ *	@dev: PCI device to check
+ *
+ *	Look for an IDE driver to handle the device we are considering.
+ *	This is only used during boot up to get the ordering correct. After
+ *	boot up the pci layer takes over the job.
+ */
+ 
+static int __init ide_scan_pcidev(struct pci_dev *dev)
+{
+	struct list_head *l;
+	struct pci_driver *d;
+	
+	list_for_each(l, &ide_pci_drivers)
+	{
+		d = list_entry(l, struct pci_driver, node);
+		if(d->id_table)
+		{
+			const struct pci_device_id *id = pci_match_device(d->id_table, dev);
+			if(id != NULL)
+			{
+				if(d->probe(dev, id) >= 0)
+				{
+					dev->driver = d;
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
 
 /**
  *	ide_scan_pcibus		-	perform the initial IDE driver scan
@@ -933,6 +826,8 @@ EXPORT_SYMBOL(ide_unregister_pci_driver);
 void __init ide_scan_pcibus (int scan_direction)
 {
 	struct pci_dev *dev;
+	struct pci_driver *d;
+	struct list_head *l, *n;
 
 	pre_init = 0;
 	if (!scan_direction) {
@@ -944,5 +839,16 @@ void __init ide_scan_pcibus (int scan_direction)
 			ide_scan_pcidev(dev);
 		}
 	}
-	/* FIXME: now add the drivers list to the real pci probe list */
+	
+	/*
+	 *	Hand the drivers over to the PCI layer now we
+	 *	are post init.
+	 */
+
+	list_for_each_safe(l, n, &ide_pci_drivers)
+	{
+		list_del(l);
+		d = list_entry(l, struct pci_driver, node);
+		pci_register_driver(d);
+	}
 }

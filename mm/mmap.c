@@ -245,7 +245,7 @@ static inline unsigned long calc_vm_flags(unsigned long prot, unsigned long flag
 }
 
 #ifdef DEBUG_MM_RB
-static int browse_rb(rb_node_t * rb_node) {
+static int browse_rb(struct rb_node * rb_node) {
 	int i = 0;
 	if (rb_node) {
 		i++;
@@ -277,10 +277,11 @@ static void validate_mm(struct mm_struct * mm) {
 
 static struct vm_area_struct * find_vma_prepare(struct mm_struct * mm, unsigned long addr,
 						struct vm_area_struct ** pprev,
-						rb_node_t *** rb_link, rb_node_t ** rb_parent)
+						struct rb_node *** rb_link,
+						struct rb_node ** rb_parent)
 {
 	struct vm_area_struct * vma;
-	rb_node_t ** __rb_link, * __rb_parent, * rb_prev;
+	struct rb_node ** __rb_link, * __rb_parent, * rb_prev;
 
 	__rb_link = &mm->mm_rb.rb_node;
 	rb_prev = __rb_parent = NULL;
@@ -311,8 +312,8 @@ static struct vm_area_struct * find_vma_prepare(struct mm_struct * mm, unsigned 
 	return vma;
 }
 
-static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
-				   rb_node_t * rb_parent)
+static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct * vma,
+				   struct vm_area_struct * prev, struct rb_node * rb_parent)
 {
 	if (prev) {
 		vma->vm_next = prev->vm_next;
@@ -327,7 +328,7 @@ static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct 
 }
 
 static inline void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
-				 rb_node_t ** rb_link, rb_node_t * rb_parent)
+				 struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
 	rb_insert_color(&vma->vm_rb, &mm->mm_rb);
@@ -353,7 +354,7 @@ static inline void __vma_link_file(struct vm_area_struct * vma)
 }
 
 static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  struct vm_area_struct * prev,
-		       rb_node_t ** rb_link, rb_node_t * rb_parent)
+		       struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
 	__vma_link_list(mm, vma, prev, rb_parent);
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
@@ -361,7 +362,7 @@ static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  stru
 }
 
 static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
-			    rb_node_t ** rb_link, rb_node_t * rb_parent)
+			    struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
 	spin_lock(&mm->page_table_lock);
 	lock_vma_mappings(vma);
@@ -374,7 +375,8 @@ static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, 
 }
 
 static int vma_merge(struct mm_struct * mm, struct vm_area_struct * prev,
-		     rb_node_t * rb_parent, unsigned long addr, unsigned long end, unsigned long vm_flags)
+		     struct rb_node * rb_parent, unsigned long addr, 
+		     unsigned long end, unsigned long vm_flags)
 {
 	spinlock_t * lock = &mm->page_table_lock;
 	if (!prev) {
@@ -426,7 +428,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	unsigned int vm_flags;
 	int correct_wcount = 0;
 	int error;
-	rb_node_t ** rb_link, * rb_parent;
+	struct rb_node ** rb_link, * rb_parent;
 	unsigned long charged = 0;
 
 	if (file && (!file->f_op || !file->f_op->mmap))
@@ -698,7 +700,7 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 		/* (Cache hit rate is typically around 35%.) */
 		vma = mm->mmap_cache;
 		if (!(vma && vma->vm_end > addr && vma->vm_start <= addr)) {
-			rb_node_t * rb_node;
+			struct rb_node * rb_node;
 
 			rb_node = mm->mm_rb.rb_node;
 			vma = NULL;
@@ -728,7 +730,7 @@ struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 				      struct vm_area_struct **pprev)
 {
 	struct vm_area_struct *vma = NULL, *prev = NULL;
-	rb_node_t * rb_node;
+	struct rb_node * rb_node;
 	if (!mm)
 		goto out;
 
@@ -1031,10 +1033,14 @@ static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
 	touched = NULL;
 	do {
 		struct vm_area_struct *next = mpnt->vm_next;
-		mpnt->vm_next = touched;
-		touched = mpnt;
-		mm->map_count--;
-		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		if (!(is_vm_hugetlb_page(mpnt))) {
+			mpnt->vm_next = touched;
+			touched = mpnt;
+			rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+			mm->map_count--;
+		}
+		else
+			free_hugepages(mpnt);
 		mpnt = next;
 	} while (mpnt && mpnt->vm_start < end);
 	*npp = mpnt;
@@ -1158,7 +1164,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
 	unsigned long flags;
-	rb_node_t ** rb_link, * rb_parent;
+	struct rb_node ** rb_link, * rb_parent;
 
 	len = PAGE_ALIGN(len);
 	if (!len)
@@ -1236,7 +1242,7 @@ out:
 void build_mmap_rb(struct mm_struct * mm)
 {
 	struct vm_area_struct * vma;
-	rb_node_t ** rb_link, * rb_parent;
+	struct rb_node ** rb_link, * rb_parent;
 
 	mm->mm_rb = RB_ROOT;
 	rb_link = &mm->mm_rb.rb_node;
@@ -1273,7 +1279,10 @@ void exit_mmap(struct mm_struct * mm)
 			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
-		unmap_page_range(tlb, mpnt, start, end);
+		if (!(is_vm_hugetlb_page(mpnt)))
+			unmap_page_range(tlb, mpnt, start, end);
+		else
+			mpnt->vm_ops->close(mpnt);
 		mpnt = mpnt->vm_next;
 	}
 
@@ -1319,7 +1328,7 @@ void exit_mmap(struct mm_struct * mm)
 void __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {
 	struct vm_area_struct * __vma, * prev;
-	rb_node_t ** rb_link, * rb_parent;
+	struct rb_node ** rb_link, * rb_parent;
 
 	__vma = find_vma_prepare(mm, vma->vm_start, &prev, &rb_link, &rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)
@@ -1332,7 +1341,7 @@ void __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {
 	struct vm_area_struct * __vma, * prev;
-	rb_node_t ** rb_link, * rb_parent;
+	struct rb_node ** rb_link, * rb_parent;
 
 	__vma = find_vma_prepare(mm, vma->vm_start, &prev, &rb_link, &rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)

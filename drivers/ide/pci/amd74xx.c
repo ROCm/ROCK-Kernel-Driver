@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -392,26 +393,60 @@ static void __init init_dma_amd74xx (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_amd74xx (struct pci_dev *dev, ide_pci_device_t *d)
+
+static int __devinit amd74xx_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &amd74xx_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init amd74xx_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_AMD)
-		return 0;
-
-	for (d = amd74xx_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	amd74xx_remove_one	-	called with an AMD IDE is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an AMD IDE device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void amd74xx_remove_one(struct pci_dev *dev)
+{
+	panic("AMD IDE removal not yet supported");
+}
+
+static struct pci_device_id amd74xx_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7409,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7411,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7441,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_IDE, 	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"AMD IDE",
+	id_table:	amd74xx_pci_tbl,
+	probe:		amd74xx_init_one,
+	remove:		__devexit_p(amd74xx_remove_one),
+};
+
+static int amd74xx_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void amd74xx_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(amd74xx_ide_init);
+module_exit(amd74xx_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for AMD IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

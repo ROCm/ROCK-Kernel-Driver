@@ -157,24 +157,6 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 //	return r;
 }
 
-static void amd_identify(struct cpuinfo_x86 * c)
-{
-	u32 xlvl;
-
-	if (have_cpuid_p()) {
-		generic_identify(c);
-
-		/* AMD-defined flags: level 0x80000001 */
-		xlvl = cpuid_eax(0x80000000);
-		if ( (xlvl & 0xffff0000) == 0x80000000 ) {
-			if ( xlvl >= 0x80000001 )
-				c->x86_capability[1] = cpuid_edx(0x80000001);
-			if ( xlvl >= 0x80000004 )
-				get_model_name(c); /* Default name */
-		}
-	}
-}
-
 static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 {
 	/* AMD errata T13 (order #21922) */
@@ -204,7 +186,7 @@ static struct cpu_dev amd_cpu_dev __initdata = {
 		},
 	},
 	.c_init		= init_amd,
-	.c_identify	= amd_identify,
+	.c_identify	= generic_identify,
 	.c_size_cache	= amd_size_cache,
 };
 

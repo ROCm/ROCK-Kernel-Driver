@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/pagevec.h>
+#include <linux/blkdev.h>
 
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -561,6 +562,7 @@ void get_page_state(struct page_state *ret)
 		ret->nr_pagecache += ps->nr_pagecache;
 		ret->nr_page_table_pages += ps->nr_page_table_pages;
 		ret->nr_reverse_maps += ps->nr_reverse_maps;
+		ret->nr_mapped += ps->nr_mapped;
 	}
 }
 
@@ -589,7 +591,7 @@ void si_meminfo(struct sysinfo *val)
 	val->totalram = totalram_pages;
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
-	val->bufferram = get_page_cache_size();
+	val->bufferram = nr_blockdev_pages();
 #ifdef CONFIG_HIGHMEM
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();

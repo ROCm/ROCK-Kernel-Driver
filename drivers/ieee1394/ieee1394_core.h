@@ -16,7 +16,7 @@ struct hpsb_packet {
         struct list_head list;
 
         /* This can be used for host driver internal linking. */
-        struct hpsb_packet *xnext;
+	struct list_head driver_list;
 
         nodeid_t node_id;
 
@@ -77,6 +77,10 @@ struct hpsb_packet {
         quadlet_t embedded_header[5];
 };
 
+static inline struct hpsb_packet *driver_packet(struct list_head *l)
+{
+	return list_entry(l, struct hpsb_packet, driver_list);
+}
 
 void abort_timedouts(struct hpsb_host *host);
 void abort_requests(struct hpsb_host *host);

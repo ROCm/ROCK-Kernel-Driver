@@ -45,18 +45,21 @@
  * a way that's easy to parse by the protocol interface.
  */
 
-static LIST_HEAD(node_list);
-static rwlock_t node_lock = RW_LOCK_UNLOCKED;
-
-static LIST_HEAD(driver_list);
-static rwlock_t driver_lock = RW_LOCK_UNLOCKED;
-
-/* The rwlock unit_directory_lock is always held when manipulating the
- * global unit_directory_list, but this also protects access to the
- * lists of unit directories stored in the protocol drivers.
+/* The nodemgr maintains a number of data structures: the node list,
+ * the driver list, unit directory list and the host info list.  The
+ * first three lists are accessed from process context only: /proc
+ * readers, insmod and rmmod, and the nodemgr thread.  Access to these
+ * lists are serialized by means of the nodemgr_serialize mutex, which
+ * must be taken before accessing the structures and released
+ * afterwards.  The host info list is only accessed during insmod,
+ * rmmod and from interrupt and allways only for a short period of
+ * time, so a spinlock is used to protect this list.
  */
+
+static DECLARE_MUTEX(nodemgr_serialize);
+static LIST_HEAD(node_list);
+static LIST_HEAD(driver_list);
 static LIST_HEAD(unit_directory_list);
-static rwlock_t unit_directory_lock = RW_LOCK_UNLOCKED;
 
 static LIST_HEAD(host_info_list);
 static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
@@ -83,6 +86,9 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 	struct node_entry *ne;
 	int len;
 	char *out = page;
+
+	if (down_interruptible(&nodemgr_serialize))
+		return -EINTR;
 
 	list_for_each(lh, &node_list) {
 		struct list_head *l;
@@ -127,16 +133,24 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 		/* Now the unit directories */
 		list_for_each (l, &ne->unit_directories) {
 			struct unit_directory *ud = list_entry (l, struct unit_directory, node_list);
+			int printed = 0; // small hack
+
 			PUTF("  Unit Directory %d:\n", ud_count++);
-			if (ud->flags & UNIT_DIRECTORY_VENDOR_ID)
+			if (ud->flags & UNIT_DIRECTORY_VENDOR_ID) {
 				PUTF("    Vendor/Model ID: %s [%06x]",
 				     ud->vendor_name ?: "Unknown", ud->vendor_id);
-			else if (ud->flags & UNIT_DIRECTORY_MODEL_ID) /* Have to put something */
-				PUTF("    Vendor/Model ID: %s [%06x]",
-				      ne->vendor_name ?: "Unknown", ne->vendor_id);
-			if (ud->flags & UNIT_DIRECTORY_MODEL_ID)
+				printed = 1;
+			}
+			if (ud->flags & UNIT_DIRECTORY_MODEL_ID) {
+				if (!printed)
+					PUTF("    Vendor/Model ID: %s [%06x]",
+					     ne->vendor_name ?: "Unknown", ne->vendor_id);
 				PUTF(" / %s [%06x]", ud->model_name ?: "Unknown", ud->model_id);
-			PUTF("\n");
+				printed = 1;
+			}
+			if (printed)
+				PUTF("\n");
+
 			if (ud->flags & UNIT_DIRECTORY_SPECIFIER_ID)
 				PUTF("    Software Specifier ID: %06x\n", ud->specifier_id);
 			if (ud->flags & UNIT_DIRECTORY_VERSION)
@@ -147,6 +161,8 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 		}
 
 	}
+
+	up(&nodemgr_serialize);
 
 	len = out - page;
 	len -= off;
@@ -306,7 +322,6 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 					      nodeid_t nodeid, unsigned int generation)
 {
         struct node_entry *ne;
-        unsigned long flags;
 
 	ne = nodemgr_scan_root_directory (host, nodeid, generation);
         if (!ne) return NULL;
@@ -318,9 +333,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
         ne->guid = guid;
 	ne->generation = generation;
 
-        write_lock_irqsave(&node_lock, flags);
         list_add_tail(&ne->list, &node_list);
-        write_unlock_irqrestore(&node_lock, flags);
 
 	nodemgr_process_config_rom (ne, busoptions);
 
@@ -758,11 +771,9 @@ static void nodemgr_release_unit_directory(struct unit_directory *ud)
 
 void hpsb_release_unit_directory(struct unit_directory *ud)
 {
-	unsigned long flags;
-
-	write_lock_irqsave(&unit_directory_lock, flags);
+	down(&nodemgr_serialize);
 	nodemgr_release_unit_directory(ud);
-	write_unlock_irqrestore(&unit_directory_lock, flags);
+	up(&nodemgr_serialize);
 }
 
 static void nodemgr_free_unit_directories(struct node_entry *ne)
@@ -852,13 +863,12 @@ int hpsb_register_protocol(struct hpsb_protocol_driver *driver)
 {
 	struct unit_directory *ud;
 	struct list_head *lh;
-	unsigned long flags;
 
-        write_lock_irqsave(&driver_lock, flags);
+	if (down_interruptible(&nodemgr_serialize))
+		return -EINTR;
+
 	list_add_tail(&driver->list, &driver_list);
-	write_unlock_irqrestore(&driver_lock, flags);
 
-	write_lock_irqsave(&unit_directory_lock, flags);
 	INIT_LIST_HEAD(&driver->unit_directories);
 	lh = unit_directory_list.next;
 	while (lh != &unit_directory_list) {
@@ -867,7 +877,8 @@ int hpsb_register_protocol(struct hpsb_protocol_driver *driver)
 		if (nodemgr_match_driver(driver, ud) && driver->probe(ud) == 0)
 			nodemgr_claim_unit_directory(ud, driver);
 	}
-	write_unlock_irqrestore(&unit_directory_lock, flags);
+
+	up(&nodemgr_serialize);
 
 	/*
 	 * Right now registration always succeeds, but maybe we should
@@ -881,13 +892,10 @@ void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver)
 {
 	struct list_head *lh;
 	struct unit_directory *ud;
-	unsigned long flags;
 
-        write_lock_irqsave(&driver_lock, flags);
+	down(&nodemgr_serialize);
+
 	list_del(&driver->list);
-	write_unlock_irqrestore(&driver_lock, flags);
-
-	write_lock_irqsave(&unit_directory_lock, flags);
 	lh = driver->unit_directories.next;
 	while (lh != &driver->unit_directories) {
 		ud = list_entry(lh, struct unit_directory, driver_list);
@@ -896,14 +904,13 @@ void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver)
 			ud->driver->disconnect(ud);
 		nodemgr_release_unit_directory(ud);
 	}
-	write_unlock_irqrestore(&unit_directory_lock, flags);
+
+	up(&nodemgr_serialize);
 }
 
 static void nodemgr_process_config_rom(struct node_entry *ne, 
 				       quadlet_t busoptions)
 {
-	unsigned long flags;
-
 	ne->busopt.irmc		= (busoptions >> 31) & 1;
 	ne->busopt.cmc		= (busoptions >> 30) & 1;
 	ne->busopt.isc		= (busoptions >> 29) & 1;
@@ -929,11 +936,9 @@ static void nodemgr_process_config_rom(struct node_entry *ne,
 	 * thing.  If this was a new device, the call to
 	 * nodemgr_disconnect_drivers is a no-op and all is well.
 	 */
-	write_lock_irqsave(&unit_directory_lock, flags);
 	nodemgr_free_unit_directories(ne);
 	nodemgr_process_root_directory(ne);
 	nodemgr_bind_drivers(ne);
-	write_unlock_irqrestore(&unit_directory_lock, flags);
 }
 
 /*
@@ -1032,16 +1037,12 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 
 static void nodemgr_remove_node(struct node_entry *ne)
 {
-	unsigned long flags;
-
 	HPSB_DEBUG("%s removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
 		   (ne->host->node_id == ne->nodeid) ? "Host" : "Device",
 		   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid,
 		   ne->vendor_name ?: "Unknown");
 
-	write_lock_irqsave(&unit_directory_lock, flags);
 	nodemgr_free_unit_directories(ne);
-	write_unlock_irqrestore(&unit_directory_lock, flags);
 	list_del(&ne->list);
 	kfree(ne);
 
@@ -1077,7 +1078,7 @@ static void nodemgr_node_probe_one(struct hpsb_host *host,
 	}
 
 	guid = ((u64)buffer[3] << 32) | buffer[4];
-	ne = hpsb_guid_get_entry(guid);
+	ne = find_entry_by_guid(guid);
 
 	if (!ne)
 		nodemgr_create_node(guid, buffer[2], host, nodeid, generation);
@@ -1089,13 +1090,11 @@ static void nodemgr_node_probe_one(struct hpsb_host *host,
 
 static void nodemgr_node_probe_cleanup(struct hpsb_host *host, unsigned int generation)
 {
-	unsigned long flags;
 	struct list_head *lh, *next;
 	struct node_entry *ne;
 
 	/* Now check to see if we have any nodes that aren't referenced
 	 * any longer.  */
-	write_lock_irqsave(&node_lock, flags);
 	list_for_each_safe(lh, next, &node_list) {
 		ne = list_entry(lh, struct node_entry, list);
 
@@ -1110,7 +1109,6 @@ static void nodemgr_node_probe_cleanup(struct hpsb_host *host, unsigned int gene
 		if (ne->generation != generation)
 			nodemgr_remove_node(ne);
 	}
-	write_unlock_irqrestore(&node_lock, flags);
 
 	return;
 }
@@ -1169,12 +1167,14 @@ static int nodemgr_host_thread(void *__hi)
 	daemonize();
 
 	strcpy(current->comm, "knodemgrd");
-
+	
 	/* Sit and wait for a signal to probe the nodes on the bus. This
 	 * happens when we get a bus reset. */
-	while (!down_interruptible(&hi->reset_sem))
+	while (!down_interruptible(&hi->reset_sem) &&
+	       !down_interruptible(&nodemgr_serialize)) {
 		nodemgr_node_probe(hi->host);
-
+		up(&nodemgr_serialize);
+	}
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 	HPSB_DEBUG ("NodeMgr: Exiting thread for %s", hi->host->driver->name);
 #endif
@@ -1184,24 +1184,22 @@ static int nodemgr_host_thread(void *__hi)
 
 struct node_entry *hpsb_guid_get_entry(u64 guid)
 {
-        unsigned long flags;
         struct node_entry *ne;
 
-        read_lock_irqsave(&node_lock, flags);
+	down(&nodemgr_serialize);
         ne = find_entry_by_guid(guid);
-        read_unlock_irqrestore(&node_lock, flags);
+	up(&nodemgr_serialize);
 
         return ne;
 }
 
 struct node_entry *hpsb_nodeid_get_entry(nodeid_t nodeid)
 {
-	unsigned long flags;
 	struct node_entry *ne;
 
-	read_lock_irqsave(&node_lock, flags);
+	down(&nodemgr_serialize);
 	ne = find_entry_by_nodeid(nodeid);
-	read_unlock_irqrestore(&node_lock, flags);
+	up(&nodemgr_serialize);
 
 	return ne;
 }
@@ -1309,17 +1307,14 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 		}
 	}
 
-	if (hi == NULL) {
-		HPSB_ERR ("NodeMgr: could not process reset of non-existent host");
-		goto done_reset_host;
-	}
-
+	if (hi != NULL) {
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_DEBUG ("NodeMgr: Processing host reset for %s", host->driver->name);
+		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", host->driver->name);
 #endif
-	up(&hi->reset_sem);
+		up(&hi->reset_sem);
+	} else
+		HPSB_ERR ("NodeMgr: could not process reset of non-existent host");
 
-done_reset_host:
 	spin_unlock_irqrestore (&host_info_lock, flags);
 
 	return;
@@ -1341,22 +1336,7 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 			break;
 		}
 	}
-
-	if (!hi)
-		HPSB_ERR ("NodeMgr: host %s does not exist, cannot remove",
-			  host->driver->name);
 	spin_unlock_irqrestore (&host_info_lock, flags);
-
-	/* Even if we fail the host_info part, remove all the node
-	 * entries.  */
-	write_lock_irqsave(&node_lock, flags);
-	list_for_each_safe(lh, next, &node_list) {
-		ne = list_entry(lh, struct node_entry, list);
-
-		if (ne->host == host)
-			nodemgr_remove_node(ne);
-	}
-	write_unlock_irqrestore(&node_lock, flags);
 
 	if (hi) {
 		if (hi->pid >= 0) {
@@ -1365,14 +1345,30 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 		}
 		kfree(hi);
 	}
+	else
+		HPSB_ERR("NodeMgr: host %s does not exist, cannot remove",
+			 host->driver->name);
+
+	down(&nodemgr_serialize);
+
+	/* Even if we fail the host_info part, remove all the node
+	 * entries.  */
+	list_for_each_safe(lh, next, &node_list) {
+		ne = list_entry(lh, struct node_entry, list);
+
+		if (ne->host == host)
+			nodemgr_remove_node(ne);
+	}
+
+	up(&nodemgr_serialize);
 
 	return;
 }
 
 static struct hpsb_highlevel_ops nodemgr_ops = {
-	add_host:	nodemgr_add_host,
-	host_reset:	nodemgr_host_reset,
-	remove_host:	nodemgr_remove_host,
+	.add_host =	nodemgr_add_host,
+	.host_reset =	nodemgr_host_reset,
+	.remove_host =	nodemgr_remove_host,
 };
 
 static struct hpsb_highlevel *hl;

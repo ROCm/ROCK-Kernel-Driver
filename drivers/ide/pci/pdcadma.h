@@ -31,7 +31,7 @@ static void init_hwif_pdcadma(ide_hwif_t *);
 static void init_dma_pdcadma(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t pdcadma_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_PDC,
 		device:		PCI_DEVICE_ID_PDC_1841,
 		name:		"PDCADMA",

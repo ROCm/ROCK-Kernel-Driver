@@ -1912,6 +1912,14 @@ M:	eis@baty.hanse.de
 L:	linux-x25@vger.kernel.org
 S:	Maintained
 
+XFS FILESYSTEM
+P:	Silicon Graphics Inc
+M:	owner-xfs@oss.sgi.com
+M:	lord@sgi.com
+L:	linux-xfs@oss.sgi.com
+W:	http://oss.sgi.com/projects/xfs
+S:	Supported
+
 X86 3-LEVEL PAGING (PAE) SUPPORT
 P:	Ingo Molnar
 M:	mingo@redhat.com

@@ -126,6 +126,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>
@@ -191,7 +192,7 @@ static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 	return 1;
 #endif
-	if (!(count = ide_build_dmatable(drive, rq))) {
+	if (!(count = ide_build_dmatable(drive, rq, PCI_DMA_TODEVICE))) {
 		/* try PIO instead of DMA */
 		trm290_prepare_drive(drive, 0); /* select PIO xfer */
 		return 1;
@@ -235,7 +236,7 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 	task_ioreg_t command	= WIN_NOP;
 	unsigned int count, reading = 2, writing = 0;
 
-	if (!(count = ide_build_dmatable(drive, rq))) {
+	if (!(count = ide_build_dmatable(drive, rq, PCI_DMA_FROMDEVICE))) {
 		/* try PIO instead of DMA */
 		trm290_prepare_drive(drive, 0); /* select PIO xfer */
 		return 1;
@@ -396,26 +397,55 @@ void __init init_hwif_trm290 (ide_hwif_t *hwif)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-void __init init_setup_trm290 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit trm290_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &trm290_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init trm290_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_TEKRAM)
-		return 0;
-
-	for (d = trm290_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	trm290_remove_one	-	called when an trm290 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a trm290 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void trm290_remove_one(struct pci_dev *dev)
+{
+	panic("trm290 removal not yet supported");
+}
+
+static struct pci_device_id trm290_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_TEKRAM, PCI_DEVICE_ID_TEKRAM_DC290, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"TRM290 IDE",
+	id_table:	trm290_pci_tbl,
+	probe:		trm290_init_one,
+	remove:		__devexit_p(trm290_remove_one),
+};
+
+static int trm290_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void trm290_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(trm290_ide_init);
+module_exit(trm290_ide_exit);
+
+MODULE_AUTHOR("Mark Lord");
+MODULE_DESCRIPTION("PCI driver module for Tekram TRM290 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;
