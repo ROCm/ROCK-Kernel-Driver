@@ -46,11 +46,16 @@ static void __init longrun_get_policy(struct cpufreq_policy *policy)
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 	msr_lo &= 0x0000007F;
 	msr_hi &= 0x0000007F;
-
-	policy->min = longrun_low_freq + msr_lo * 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	policy->max = longrun_low_freq + msr_hi * 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		policy->min = policy->max = longrun_high_freq;
+	} else {
+		policy->min = longrun_low_freq + msr_lo * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		policy->max = longrun_low_freq + msr_hi * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 	policy->cpu = 0;
 }
 
@@ -70,10 +75,15 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 	if (!policy)
 		return -EINVAL;
 
-	pctg_lo = (policy->min - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	pctg_hi = (policy->max - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		pctg_lo = pctg_hi = 100;
+	} else {
+		pctg_lo = (policy->min - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		pctg_hi = (policy->max - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 
 	if (pctg_hi > 100)
 		pctg_hi = 100;
