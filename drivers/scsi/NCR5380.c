@@ -706,7 +706,7 @@ static int __init NCR5380_probe_irq(struct Scsi_Host *instance, int possible)
 			trying_irqs |= mask;
 
 	timeout = jiffies + (250 * HZ / 1000);
-	probe_irq = IRQ_NONE;
+	probe_irq = SCSI_IRQ_NONE;
 
 	/*
 	 * A interrupt is triggered whenever BSY = false, SEL = true
@@ -723,7 +723,7 @@ static int __init NCR5380_probe_irq(struct Scsi_Host *instance, int possible)
 	NCR5380_write(OUTPUT_DATA_REG, hostdata->id_mask);
 	NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE | ICR_ASSERT_DATA | ICR_ASSERT_SEL);
 
-	while (probe_irq == IRQ_NONE && time_before(jiffies, timeout))
+	while (probe_irq == SCSI_IRQ_NONE && time_before(jiffies, timeout))
 	{
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
@@ -892,7 +892,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset, int length, int 
 
 	SPRINTF("\nBase Addr: 0x%05lX    ", (long) instance->base);
 	SPRINTF("io_port: %04x      ", (int) instance->io_port);
-	if (instance->irq == IRQ_NONE)
+	if (instance->irq == SCSI_IRQ_NONE)
 		SPRINTF("IRQ: None.\n");
 	else
 		SPRINTF("IRQ: %d.\n", instance->irq);
@@ -1207,7 +1207,7 @@ static void NCR5380_main(void *p)
 
 	instance = hostdata->host;
 
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_lock_irqsave(instance->host_lock, flags);
 
 	do {
@@ -1308,7 +1308,7 @@ static void NCR5380_main(void *p)
 			break;
 	} while (!done);
 	
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_unlock_irqrestore(instance->host_lock, flags);
 }
 
@@ -1481,7 +1481,7 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag)
 	NCR5380_setup(instance);
 
 	if (hostdata->selecting) {
-		if(instance->irq != IRQ_NONE)
+		if(instance->irq != SCSI_IRQ_NONE)
 			spin_unlock_irq(instance->host_lock);
 		goto part2;	/* RvC: sorry prof. Dijkstra, but it keeps the
 				   rest of the code nearly the same */
@@ -1506,14 +1506,14 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag)
 	NCR5380_write(OUTPUT_DATA_REG, hostdata->id_mask);
 	NCR5380_write(MODE_REG, MR_ARBITRATE);
 
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_unlock_irq(instance->host_lock);
 
 	/* We can be relaxed here, interrupts are on, we are
 	   in workqueue context, the birds are singing in the trees */
 
 	err = NCR5380_poll_politely(instance, INITIATOR_COMMAND_REG, ICR_ARBITRATION_PROGRESS, ICR_ARBITRATION_PROGRESS, 5*HZ);
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_lock_irq(instance->host_lock);
 
 	if (err < 0) {
@@ -1649,7 +1649,7 @@ part2:
 					   waiting period */
 	if ((NCR5380_read(STATUS_REG) & (SR_SEL | SR_IO)) == (SR_SEL | SR_IO)) {
 		NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
-		if(instance->irq != IRQ_NONE)
+		if(instance->irq != SCSI_IRQ_NONE)
 			spin_lock_irq(instance->host_lock);
 		NCR5380_reselect(instance);
 		printk("scsi%d : reselection after won arbitration?\n", instance->host_no);
@@ -1676,7 +1676,7 @@ part2:
 			NCR5380_write(SELECT_ENABLE_REG, hostdata->id_mask);
 			return -1;
 		}
-		if(instance->irq != IRQ_NONE)
+		if(instance->irq != SCSI_IRQ_NONE)
 			spin_lock_irq(instance->host_lock);
 		cmd->result = DID_BAD_TARGET << 16;
 		collect_stats(hostdata, cmd);
@@ -1714,9 +1714,9 @@ part2:
 	}
 
 	dprintk(NDEBUG_SELECTION, ("scsi%d : target %d selected, going into MESSAGE OUT phase.\n", instance->host_no, cmd->device->id));
-	tmp[0] = IDENTIFY(((instance->irq == IRQ_NONE) ? 0 : 1), cmd->device->lun);
+	tmp[0] = IDENTIFY(((instance->irq == SCSI_IRQ_NONE) ? 0 : 1), cmd->device->lun);
 
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_lock_irq(instance->host_lock);
 		
 	len = 1;
@@ -1738,7 +1738,7 @@ part2:
 
 	/* Selection failed */
 failed:
-	if(instance->irq != IRQ_NONE)
+	if(instance->irq != SCSI_IRQ_NONE)
 		spin_lock_irq(instance->host_lock);
 	return -1;
 

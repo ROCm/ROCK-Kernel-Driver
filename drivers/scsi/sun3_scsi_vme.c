@@ -235,7 +235,7 @@ static int sun3scsi_detect(Scsi_Host_Template * tpnt)
 #ifndef REAL_DMA
 		printk("scsi%d: IRQ%d not free, interrupts disabled\n",
 		       instance->host_no, instance->irq);
-		instance->irq = IRQ_NONE;
+		instance->irq = SCSI_IRQ_NONE;
 #else
 		printk("scsi%d: IRQ%d not free, bailing out\n",
 		       instance->host_no, instance->irq);
@@ -244,7 +244,7 @@ static int sun3scsi_detect(Scsi_Host_Template * tpnt)
 	}
 
 	printk("scsi%d: Sun3 5380 VME at port %lX irq", instance->host_no, instance->io_port);
-	if (instance->irq == IRQ_NONE)
+	if (instance->irq == SCSI_IRQ_NONE)
 		printk ("s disabled");
 	else
 		printk (" %d", instance->irq);
@@ -280,7 +280,7 @@ static int sun3scsi_detect(Scsi_Host_Template * tpnt)
 #ifdef MODULE
 int sun3scsi_release (struct Scsi_Host *shpnt)
 {
-	if (shpnt->irq != IRQ_NONE)
+	if (shpnt->irq != SCSI_IRQ_NONE)
 		free_irq (shpnt->irq, NULL);
 
 	iounmap(sun3_scsi_regp);
