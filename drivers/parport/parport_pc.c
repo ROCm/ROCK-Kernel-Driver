@@ -2136,8 +2136,6 @@ static int __devinit parport_irq_probe(struct parport *pb)
 {
 	struct parport_pc_private *priv = pb->private_data;
 
-	priv->ctr_writable |= 0x10;
-
 	if (priv->ecr) {
 		pb->irq = programmable_irq_support(pb);
 
@@ -2161,9 +2159,6 @@ static int __devinit parport_irq_probe(struct parport *pb)
 
 	if (pb->irq == PARPORT_IRQ_NONE)
 		pb->irq = get_superio_irq(pb);
-
-	if (pb->irq == PARPORT_IRQ_NONE)
-		priv->ctr_writable &= ~0x10;
 
 	return pb->irq;
 }
@@ -2293,6 +2288,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	}
 	if (p->irq != PARPORT_IRQ_NONE) {
 		printk(", irq %d", p->irq);
+		priv->ctr_writable |= 0x10;
 
 		if (p->dma == PARPORT_DMA_AUTO) {
 			p->dma = PARPORT_DMA_NONE;
