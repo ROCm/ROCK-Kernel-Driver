@@ -1351,6 +1351,7 @@ static int do_swap_page(struct mm_struct * mm,
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
 		inc_page_state(pgmajfault);
+		grab_swap_token();
 	}
 
 	mark_page_accessed(page);

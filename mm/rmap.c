@@ -230,6 +230,9 @@ static int page_referenced_one(struct page *page,
 	if (ptep_clear_flush_young(vma, address, pte))
 		referenced++;
 
+	if (mm != current->mm && has_swap_token(mm))
+		referenced++;
+
 	(*mapcount)--;
 
 out_unmap:

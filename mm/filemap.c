@@ -1195,6 +1195,7 @@ no_cached_page:
 	 * effect.
 	 */
 	error = page_cache_read(file, pgoff);
+	grab_swap_token();
 
 	/*
 	 * The page we want has now been added to the page cache.

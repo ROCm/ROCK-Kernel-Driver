@@ -29,6 +29,7 @@
 #include <linux/fs.h>
 #include <linux/cpu.h>
 #include <linux/security.h>
+#include <linux/swap.h>
 #include <linux/syscalls.h>
 #include <linux/jiffies.h>
 #include <linux/futex.h>
@@ -461,6 +462,7 @@ void mmput(struct mm_struct *mm)
 		spin_unlock(&mmlist_lock);
 		exit_aio(mm);
 		exit_mmap(mm);
+		put_swap_token(mm);
 		mmdrop(mm);
 	}
 }

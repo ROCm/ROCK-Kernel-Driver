@@ -220,6 +220,10 @@ struct mm_struct {
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
+	/* Token based thrashing protection. */
+	unsigned long swap_token_time;
+	char recent_pagein;
+
 	/* coredumping support */
 	int core_waiters;
 	struct completion *core_startup_done, core_done;
