@@ -32,6 +32,7 @@ static char *actions[] = {
 	"remove",	/* 0x01 */
 	"change",	/* 0x02 */
 	"mount",	/* 0x03 */
+	"umount",	/* 0x04 */
 };
 
 static char *action_to_string(enum kobject_action action)

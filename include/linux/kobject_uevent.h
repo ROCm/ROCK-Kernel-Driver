@@ -21,6 +21,7 @@ enum kobject_action {
 	KOBJ_REMOVE	= 0x01,	/* remove event, for hotplug */
 	KOBJ_CHANGE	= 0x02,	/* a sysfs attribute file has changed */
 	KOBJ_MOUNT	= 0x03,	/* mount event for block devices */
+	KOBJ_UMOUNT	= 0x04,	/* umount event for block devices */
 	KOBJ_MAX_ACTION,	/* must be last action listed */
 };
 
