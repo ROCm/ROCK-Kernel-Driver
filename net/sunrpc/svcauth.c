@@ -97,25 +97,6 @@ svc_auth_unregister(rpc_authflavor_t flavor)
  * it will complain.
  */
 
-int hash_mem(char *buf, int len, int bits)
-{
-	int hash = 0;
-	unsigned long l;
-	while (len >= BITS_PER_LONG/8) {
-		l = *(unsigned long *)buf;
-		buf += BITS_PER_LONG/8;
-		len -= BITS_PER_LONG/8;
-		hash ^= hash_long(l, bits);
-	}
-	if (len) {
-		l=0;
-		memcpy((char*)&l, buf, len);
-		hash ^= hash_long(l, bits);
-	}
-	return hash;
-}
-
-
 /*
  * Auth auth_domain cache is somewhat different to other caches,
  * largely because the entries are possibly of different types:

@@ -14,7 +14,7 @@
 #include <linux/string.h>
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/sunrpc/cache.h>
-#include <linux/string.h>
+#include <linux/hash.h>
 
 struct svc_cred {
 	uid_t			cr_uid;
@@ -113,10 +113,41 @@ extern struct auth_domain *auth_unix_lookup(struct in_addr addr);
 extern int auth_unix_forget_old(struct auth_domain *dom);
 extern void svcauth_unix_purge(void);
 
-extern int hash_mem(char *buf, int len, int bits);
-static inline int hash_str(char *name, int bits)
+static inline unsigned long hash_str(char *name, int bits)
 {
-	return hash_mem(name, strlen(name), bits);
+	unsigned long hash = 0;
+	unsigned long l = 0;
+	int len = 0;
+	unsigned char c;
+	do {
+		if (unlikely(!(c = *name++))) {
+			c = (char)len; len = -1;
+		}
+		l = (l << 8) | c;
+		len++;
+		if ((len & (BITS_PER_LONG/8-1))==0)
+			hash = hash_long(hash^l, BITS_PER_LONG);
+	} while (len);
+	return hash >> (BITS_PER_LONG - bits);
+}
+
+static inline unsigned long hash_mem(char *buf, int length, int bits)
+{
+	unsigned long hash = 0;
+	unsigned long l = 0;
+	int len = 0;
+	unsigned char c;
+	do {
+		if (len == length) {
+			c = (char)len; len = -1;
+		} else
+			c = *buf++;
+		l = (l << 8) | c;
+		len++;
+		if ((len & (BITS_PER_LONG/8-1))==0)
+			hash = hash_long(hash^l, BITS_PER_LONG);
+	} while (len);
+	return hash >> (BITS_PER_LONG - bits);
 }
 
 extern struct cache_detail auth_domain_cache, ip_map_cache;
