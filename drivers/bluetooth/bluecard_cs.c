@@ -226,7 +226,7 @@ static int bluecard_write(unsigned int iobase, unsigned int offset, __u8 *buf, i
 static void bluecard_write_wakeup(bluecard_info_t *info)
 {
 	if (!info) {
-		printk(KERN_WARNING "bluecard_cs: Call of write_wakeup for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -379,7 +379,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 	int i, len;
 
 	if (!info) {
-		printk(KERN_WARNING "bluecard_cs: Call of receive for unknown device.\n");
+		BT_ERR("Unknown device");
 		return;
 	}
 
@@ -397,7 +397,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 			info->rx_state = RECV_WAIT_PACKET_TYPE;
 			info->rx_count = 0;
 			if (!(info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
-				printk(KERN_WARNING "bluecard_cs: Can't allocate mem for new packet.\n");
+				BT_ERR("Can't allocate mem for new packet");
 				return;
 			}
 		}
@@ -439,7 +439,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 
 			default:
 				/* unknown packet */
-				printk(KERN_WARNING "bluecard_cs: Unknown HCI packet with type 0x%02x received.\n", info->rx_skb->pkt_type);
+				BT_ERR("Unknown HCI packet with type 0x%02x received", info->rx_skb->pkt_type);
 				info->hdev->stat.err_rx++;
 
 				kfree_skb(info->rx_skb);
@@ -506,7 +506,7 @@ static irqreturn_t bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *r
 	unsigned char reg;
 
 	if (!info) {
-		printk(KERN_WARNING "bluecard_cs: Call of irq %d for unknown device.\n", irq);
+		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
 
@@ -574,7 +574,7 @@ static int bluecard_hci_set_baud_rate(struct hci_dev *hdev, int baud)
 	unsigned char cmd[] = { HCI_COMMAND_PKT, 0x09, 0xfc, 0x01, 0x03 };
 
 	if (!(skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
-		printk(KERN_WARNING "bluecard_cs: Can't allocate mem for new packet.\n");
+		BT_ERR("Can't allocate mem for new packet");
 		return -1;
 	}
 
@@ -664,7 +664,7 @@ static int bluecard_hci_send_frame(struct sk_buff *skb)
 	struct hci_dev *hdev = (struct hci_dev *)(skb->dev);
 
 	if (!hdev) {
-		printk(KERN_WARNING "bluecard_cs: Frame for unknown HCI device (hdev=NULL).");
+		BT_ERR("Frame for unknown HCI device (hdev=NULL)");
 		return -ENODEV;
 	}
 
@@ -780,7 +780,7 @@ int bluecard_open(bluecard_info_t *info)
 	/* Initialize and register HCI device */
 	hdev = hci_alloc_dev();
 	if (!hdev) {
-		printk(KERN_WARNING "bluecard_cs: Can't allocate HCI device.\n");
+		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;
 	}
 
@@ -799,7 +799,7 @@ int bluecard_open(bluecard_info_t *info)
 	hdev->owner = THIS_MODULE;
 	
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "bluecard_cs: Can't register HCI device.\n");
+		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -825,7 +825,7 @@ int bluecard_close(bluecard_info_t *info)
 	outb(0x80, iobase + 0x30);
 
 	if (hci_unregister_dev(hdev) < 0)
-		printk(KERN_WARNING "bluecard_cs: Can't unregister HCI device %s.\n", hdev->name);
+		BT_ERR("Can't unregister HCI device %s", hdev->name);
 
 	hci_free_dev(hdev);
 
