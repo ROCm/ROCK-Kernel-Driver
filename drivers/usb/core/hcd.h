@@ -275,10 +275,6 @@ extern int usb_set_address(struct usb_device *dev);
 #define EndpointOutRequest \
 	((USB_DIR_OUT|USB_TYPE_STANDARD|USB_RECIP_INTERFACE)<<8)
 
-/* table 9.6 standard features */
-#define DEVICE_REMOTE_WAKEUP	1
-#define ENDPOINT_HALT		0
-
 /* class requests from the USB 2.0 hub spec, table 11-15 */
 /* GetBusState and SetHubDescriptor are optional, omitted */
 #define ClearHubFeature		(0x2000 | USB_REQ_CLEAR_FEATURE)
