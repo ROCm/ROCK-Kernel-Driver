@@ -123,6 +123,7 @@
 #define _PAGE_G		0x0000000000000001	/* Global                             */
 
 /* Here are the SpitFire software bits we use in the TTE's. */
+#define _PAGE_FILE	0x0000000000001000	/* Pagecache page                     */
 #define _PAGE_MODIFIED	0x0000000000000800	/* Modified Page (ie. dirty)          */
 #define _PAGE_ACCESSED	0x0000000000000400	/* Accessed Page (ie. referenced)     */
 #define _PAGE_READ	0x0000000000000200	/* Readable SW Bit                    */
@@ -310,6 +311,12 @@ static inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 	  } )
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
+
+/* File offset in PTE support. */
+#define pte_file(pte)		(pte_val(pte) & _PAGE_FILE)
+#define pte_to_pgoff(pte)	(pte_val(pte) >> PAGE_SHIFT)
+#define pgoff_to_pte(off)	(__pte(((off) << PAGE_SHIFT) | _PAGE_FILE))
+#define PTE_FILE_MAX_BITS	(64UL - PAGE_SHIFT - 1UL)
 
 extern unsigned long prom_virt_to_phys(unsigned long, int *);
 
