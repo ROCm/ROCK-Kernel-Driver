@@ -357,7 +357,7 @@ repeat:
  */
 void kick_if_running(task_t * p)
 {
-	if ((task_running(task_rq(p), p)) && (p->thread_info->cpu != smp_processor_id()))
+	if ((task_running(task_rq(p), p)) && (task_cpu(p) != smp_processor_id()))
 		resched_task(p);
 }
 
