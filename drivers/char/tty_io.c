@@ -2126,7 +2126,7 @@ static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
 	struct tty_dev *tty_dev = to_tty_dev(class_dev);
-	return sprintf(buf, "%04x\n", tty_dev->dev);
+	return sprintf(buf, "%04lx\n", (unsigned long)tty_dev->dev);
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 
