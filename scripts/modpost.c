@@ -392,6 +392,31 @@ is_vmlinux(const char *modname)
 	return strcmp(myname, "vmlinux") == 0;
 }
 
+static struct {
+	void *file;
+	unsigned long size;
+} supp;
+
+int
+supported(struct module *mod)
+{
+	unsigned long pos = 0;
+	char *line, *basename;
+
+	/* In a first shot, do a simple linear scan. */
+	while ((line = get_next_line(&pos, supp.file,
+				     supp.size))) {
+		basename = strrchr(mod->name, '/');
+		if (!basename)
+			basename = line;
+		else
+			basename++;
+		if (!strcmp(basename, line))
+			return 1;
+	}
+	return 0;
+}
+
 void
 read_symbols(char *modname)
 {
@@ -494,6 +519,13 @@ add_header(struct buffer *b)
 	buf_printf(b, " .exit = cleanup_module,\n");
 	buf_printf(b, "#endif\n");
 	buf_printf(b, "};\n");
+}
+
+void
+add_supported_flag(struct buffer *b, struct module *mod)
+{
+	if (supported(mod))
+		buf_printf(b, "\nMODULE_INFO(supported, \"yes\");\n");
 }
 
 /* Record CRCs for unresolved symbols */
@@ -617,6 +649,14 @@ write_if_changed(struct buffer *b, const char *fname)
 }
 
 void
+read_supported(const char *fname)
+{
+	supp.file = grab_file(fname, &supp.size);
+	if (!supp.file)
+		; /* ignore error */
+}
+
+void
 read_dump(const char *fname)
 {
 	unsigned long size, pos = 0;
@@ -691,9 +731,10 @@ main(int argc, char **argv)
 	struct buffer buf = { };
 	char fname[SZ];
 	char *dump_read = NULL, *dump_write = NULL;
+	char *supp = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:o:s:")) != -1) {
 		switch(opt) {
 			case 'i':
 				dump_read = optarg;
@@ -701,10 +742,16 @@ main(int argc, char **argv)
 			case 'o':
 				dump_write = optarg;
 				break;
+			case 's':
+				supp = optarg;
+				break;
 			default:
 				exit(1);
 		}
 	}
+
+	if (supp)
+		read_supported(supp);
 
 	if (dump_read)
 		read_dump(dump_read);
@@ -720,6 +767,7 @@ main(int argc, char **argv)
 		buf.pos = 0;
 
 		add_header(&buf);
+		add_supported_flag(&buf, mod);
 		add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);

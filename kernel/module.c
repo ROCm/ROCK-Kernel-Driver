@@ -1269,7 +1269,7 @@ static struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args, *modmagic, *strtab = NULL;
+	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
 		crcindex, gplcrcindex, versindex, pcpuindex;
@@ -1382,6 +1382,13 @@ static struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
+	}
+
+	supported = get_modinfo(sechdrs, infoindex, "supported");
+	if (!supported || strcmp(supported, "yes")) {
+		tainted |= TAINT_FORCED_MODULE;
+		printk(KERN_WARNING "%s: unsupported module, tainting "
+		       "kernel.\n", mod->name);
 	}
 
 	/* Now copy in args */

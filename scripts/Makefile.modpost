@@ -52,6 +52,7 @@ _modpost: $(modules)
 quiet_cmd_modpost = MODPOST
       cmd_modpost = scripts/modpost \
 	$(if $(KBUILD_EXTMOD),-i,-o) $(symverfile) \
+	-s $(objtree)/Module.supported \
 	$(filter-out FORCE,$^)
 
 .PHONY: __modpost
