@@ -312,13 +312,16 @@ nfs_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr *
 	return 0;
 }
 
-static void
-nfs_proc_unlink_done(struct dentry *dir, struct rpc_message *msg)
+static int
+nfs_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
 {
+	struct rpc_message *msg = &task->tk_msg;
+	
 	if (msg->rpc_argp) {
 		NFS_CACHEINV(dir->d_inode);
 		kfree(msg->rpc_argp);
 	}
+	return 0;
 }
 
 static int
@@ -512,6 +515,58 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
+static void
+nfs_write_done(struct rpc_task *task)
+{
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+	nfs_writeback_done(task, data->u.v3.args.stable,
+			   data->u.v3.args.count, data->u.v3.res.count);
+}
+
+static void
+nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
+{
+	struct rpc_task		*task = &data->task;
+	struct inode		*inode = data->inode;
+	struct nfs_page		*req;
+	int			flags;
+	struct rpc_message	msg;
+
+	/* Note: NFSv2 ignores @stable and always uses NFS_FILE_SYNC */
+	
+	req = nfs_list_entry(data->pages.next);
+	data->u.v3.args.fh     = NFS_FH(inode);
+	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
+	data->u.v3.args.pgbase = req->wb_offset;
+	data->u.v3.args.count  = count;
+	data->u.v3.args.stable = NFS_FILE_SYNC;
+	data->u.v3.args.pages  = data->pagevec;
+	data->u.v3.res.fattr   = &data->fattr;
+	data->u.v3.res.count   = count;
+	data->u.v3.res.verf    = &data->verf;
+
+	/* Set the initial flags for the task.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+
+	/* Finalize the task. */
+	rpc_init_task(task, NFS_CLIENT(inode), nfs_write_done, flags);
+	task->tk_calldata = data;
+	/* Release requests */
+	task->tk_release = nfs_writedata_release;
+
+	msg.rpc_proc = NFSPROC_WRITE;
+	msg.rpc_argp = &data->u.v3.args;
+	msg.rpc_resp = &data->u.v3.res;
+	msg.rpc_cred = data->cred;
+	rpc_call_setup(&data->task, &msg, 0);
+}
+
+static void
+nfs_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
+{
+	BUG();
+}
+
 struct nfs_rpc_ops	nfs_v2_clientops = {
 	.version	= 2,		       /* protocol version */
 	.getroot	= nfs_proc_get_root,
@@ -537,4 +592,6 @@ struct nfs_rpc_ops	nfs_v2_clientops = {
 	.statfs		= nfs_proc_statfs,
 	.decode_dirent	= nfs_decode_dirent,
 	.read_setup	= nfs_proc_read_setup,
+	.write_setup	= nfs_proc_write_setup,
+	.commit_setup	= nfs_proc_commit_setup,
 };
