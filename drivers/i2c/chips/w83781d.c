@@ -1039,7 +1039,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		struct i2c_client *new_client)
 {
 	int i, val1 = 0, id;
-	int err = 0;
+	int err;
 	const char *client_name;
 	struct w83781d_data *data = i2c_get_clientdata(new_client);
 
@@ -1058,7 +1058,8 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 			    force_subclients[i] > 0x4f) {
 				dev_err(&new_client->dev, "Invalid subclient "
 					"address %d; must be 0x48-0x4f\n",
-			       force_subclients[i]);
+					force_subclients[i]);
+				err = -EINVAL;
 				goto ERROR_SC_1;
 			}
 		}
@@ -1082,6 +1083,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 			dev_err(&new_client->dev,
 			       "Duplicate addresses 0x%x for subclients.\n",
 			       data->lm75[0].addr);
+			err = -EBUSY;
 			goto ERROR_SC_1;
 		}
 	}
@@ -1119,7 +1121,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 			break;
 	}
 
-	return err;
+	return 0;
 
 /* Undo inits in case of errors */
 ERROR_SC_2:
@@ -1136,18 +1138,22 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	int i = 0, val1 = 0, val2;
 	struct i2c_client *new_client;
 	struct w83781d_data *data;
-	int err = 0;
+	int err;
 	const char *client_name = "";
 	int is_isa = i2c_is_isa_adapter(adapter);
 	enum vendor { winbond, asus } vendid;
 
 	if (!is_isa
-	    && !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+	    && !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+		err = -EINVAL;
 		goto ERROR0;
+	}
 
 	if (is_isa)
-		if (!request_region(address, W83781D_EXTENT, "w83781d"))
+		if (!request_region(address, W83781D_EXTENT, "w83781d")) {
+			err = -EBUSY;
 			goto ERROR0;
+		}
 
 	/* Probe whether there is anything available on this address. Already
 	   done for SMBus clients */
@@ -1155,15 +1161,21 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		if (is_isa) {
 
 #define REALLY_SLOW_IO
-			/* We need the timeouts for at least some LM78-like chips. But only
-			   if we read 'undefined' registers. */
+			/* We need the timeouts for at least some LM78-like
+			   chips. But only if we read 'undefined' registers. */
 			i = inb_p(address + 1);
-			if (inb_p(address + 2) != i)
+			if (inb_p(address + 2) != i) {
+				err = -ENODEV;
 				goto ERROR1;
-			if (inb_p(address + 3) != i)
+			}
+			if (inb_p(address + 3) != i) {
+				err = -ENODEV;
 				goto ERROR1;
-			if (inb_p(address + 7) != i)
+			}
+			if (inb_p(address + 7) != i) {
+				err = -ENODEV;
 				goto ERROR1;
+			}
 #undef REALLY_SLOW_IO
 
 			/* Let's just hope nothing breaks here */
@@ -1171,7 +1183,8 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			outb_p(~i & 0x7f, address + 5);
 			if ((inb_p(address + 5) & 0x7f) != (~i & 0x7f)) {
 				outb_p(i, address + 5);
-				return 0;
+				err = -ENODEV;
+				goto ERROR1;
 			}
 		}
 	}
@@ -1204,8 +1217,10 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	   force_*=... parameter, and the Winbond will be reset to the right
 	   bank. */
 	if (kind < 0) {
-		if (w83781d_read_value(new_client, W83781D_REG_CONFIG) & 0x80)
+		if (w83781d_read_value(new_client, W83781D_REG_CONFIG) & 0x80){
+			err = -ENODEV;
 			goto ERROR2;
+		}
 		val1 = w83781d_read_value(new_client, W83781D_REG_BANK);
 		val2 = w83781d_read_value(new_client, W83781D_REG_CHIPMAN);
 		/* Check for Winbond or Asus ID if in bank 0 */
@@ -1213,14 +1228,19 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		    (((!(val1 & 0x80)) && (val2 != 0xa3) && (val2 != 0xc3)
 		      && (val2 != 0x94))
 		     || ((val1 & 0x80) && (val2 != 0x5c) && (val2 != 0x12)
-			 && (val2 != 0x06))))
+			 && (val2 != 0x06)))) {
+			err = -ENODEV;
 			goto ERROR2;
-		/* If Winbond SMBus, check address at 0x48. Asus doesn't support */
+		}
+		/* If Winbond SMBus, check address at 0x48.
+		   Asus doesn't support */
 		if ((!is_isa) && (((!(val1 & 0x80)) && (val2 == 0xa3)) ||
 				  ((val1 & 0x80) && (val2 == 0x5c)))) {
 			if (w83781d_read_value
-			    (new_client, W83781D_REG_I2C_ADDR) != address)
+			    (new_client, W83781D_REG_I2C_ADDR) != address) {
+				err = -ENODEV;
 				goto ERROR2;
+			}
 		}
 	}
 
@@ -1239,8 +1259,11 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			vendid = winbond;
 		else if ((val2 == 0x12) || (val2 == 0x06))
 			vendid = asus;
-		else
+		else {
+			err = -ENODEV;
 			goto ERROR2;
+		}
+
 		/* mask off lower bit, not reliable */
 		val1 =
 		    w83781d_read_value(new_client, W83781D_REG_WCHIPID) & 0xfe;
@@ -1262,6 +1285,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 				       "Ignoring 'force' parameter for unknown chip at"
 				       "adapter %d, address 0x%02x\n",
 				       i2c_adapter_id(adapter), address);
+			err = -EINVAL;
 			goto ERROR2;
 		}
 	}
@@ -1279,7 +1303,9 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	} else if (kind == w83697hf) {
 		client_name = "W83697HF chip";
 	} else {
-		dev_err(&new_client->dev, "Internal error: unknown kind (%d)?!?", kind);
+		dev_err(&new_client->dev, "Internal error: unknown "
+						"kind (%d)?!?", kind);
+		err = -ENODEV;
 		goto ERROR2;
 	}
 
