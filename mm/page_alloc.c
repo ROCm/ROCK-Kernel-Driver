@@ -1398,6 +1398,52 @@ void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
 	}
 }
 
+/*
+ * Page buddy system uses "index >> (i+1)", where "index" is
+ * at most "size-1".
+ *
+ * The extra "+3" is to round down to byte size (8 bits per byte
+ * assumption). Thus we get "(size-1) >> (i+4)" as the last byte
+ * we can access.
+ *
+ * The "+1" is because we want to round the byte allocation up
+ * rather than down. So we should have had a "+7" before we shifted
+ * down by three. Also, we have to add one as we actually _use_ the
+ * last bit (it's [0,n] inclusive, not [0,n[).
+ *
+ * So we actually had +7+1 before we shift down by 3. But
+ * (n+8) >> 3 == (n >> 3) + 1 (modulo overflows, which we do not have).
+ *
+ * Finally, we LONG_ALIGN because all bitmap operations are on longs.
+ */
+unsigned long pages_to_bitmap_size(unsigned long order, unsigned long nr_pages)
+{
+	unsigned long bitmap_size;
+
+	bitmap_size = (nr_pages-1) >> (order+4);
+	bitmap_size = LONG_ALIGN(bitmap_size+1);
+
+	return bitmap_size;
+}
+
+void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone, unsigned long size)
+{
+	int order;
+	for (order = 0; ; order++) {
+		unsigned long bitmap_size;
+
+		INIT_LIST_HEAD(&zone->free_area[order].free_list);
+		if (order == MAX_ORDER-1) {
+			zone->free_area[order].map = NULL;
+			break;
+		}
+
+		bitmap_size = pages_to_bitmap_size(order, size);
+		zone->free_area[order].map =
+		  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
+	}
+}
+
 #ifndef __HAVE_ARCH_MEMMAP_INIT
 #define memmap_init(start, size, nid, zone, start_pfn) \
 	memmap_init_zone((start), (size), (nid), (zone), (start_pfn))
@@ -1514,43 +1560,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		zone_start_pfn += size;
 		lmem_map += size;
 
-		for (i = 0; ; i++) {
-			unsigned long bitmap_size;
-
-			INIT_LIST_HEAD(&zone->free_area[i].free_list);
-			if (i == MAX_ORDER-1) {
-				zone->free_area[i].map = NULL;
-				break;
-			}
-
-			/*
-			 * Page buddy system uses "index >> (i+1)",
-			 * where "index" is at most "size-1".
-			 *
-			 * The extra "+3" is to round down to byte
-			 * size (8 bits per byte assumption). Thus
-			 * we get "(size-1) >> (i+4)" as the last byte
-			 * we can access.
-			 *
-			 * The "+1" is because we want to round the
-			 * byte allocation up rather than down. So
-			 * we should have had a "+7" before we shifted
-			 * down by three. Also, we have to add one as
-			 * we actually _use_ the last bit (it's [0,n]
-			 * inclusive, not [0,n[).
-			 *
-			 * So we actually had +7+1 before we shift
-			 * down by 3. But (n+8) >> 3 == (n >> 3) + 1
-			 * (modulo overflows, which we do not have).
-			 *
-			 * Finally, we LONG_ALIGN because all bitmap
-			 * operations are on longs.
-			 */
-			bitmap_size = (size-1) >> (i+4);
-			bitmap_size = LONG_ALIGN(bitmap_size+1);
-			zone->free_area[i].map = 
-			  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
-		}
+		zone_init_free_lists(pgdat, zone, zone->spanned_pages);
 	}
 }
 
