@@ -394,7 +394,6 @@ static pte_t *srmmu_pte_alloc_one_fast(struct mm_struct *mm, unsigned long addre
 
 static pte_t *srmmu_pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	BUG();
 	return NULL;
 }
 
