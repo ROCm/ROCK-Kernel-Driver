@@ -1107,13 +1107,25 @@ static struct snd_ac97_build_ops patch_ad1981a_build_ops = {
 #endif
 };
 
+static void check_ad1981_hp_jack_sense(ac97_t *ac97)
+{
+	u32 subid = ((u32)ac97->subsystem_vendor << 16) | ac97->subsystem_device;
+	switch (subid) {
+	case 0x103c0890: /* HP nc6000 */
+	case 0x103c006d: /* HP nx9105 */
+		/* enable headphone jack sense */
+		snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11);
+		break;
+	}
+}
+
 int patch_ad1981a(ac97_t *ac97)
 {
 	patch_ad1881(ac97);
 	ac97->build_ops = &patch_ad1981a_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
-	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
+	check_ad1981_hp_jack_sense(ac97);
 	return 0;
 }
 
@@ -1144,7 +1156,7 @@ int patch_ad1981b(ac97_t *ac97)
 	ac97->build_ops = &patch_ad1981b_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
-	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
+	check_ad1981_hp_jack_sense(ac97);
 	return 0;
 }
 
