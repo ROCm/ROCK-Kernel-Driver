@@ -2656,7 +2656,7 @@ asmlinkage long sys32_waitid(int which, compat_pid_t pid,
 	info.si_signo = 0;
 	set_fs (KERNEL_DS);
 	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
-			 uru ? &ru : NULL);
+			 uru ? (struct rusage __user *) &ru : NULL);
 	set_fs (old_fs);
 
 	if (ret < 0 || info.si_signo == 0)
