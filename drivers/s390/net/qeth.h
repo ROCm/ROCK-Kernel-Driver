@@ -24,7 +24,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.129 $"
+#define VERSION_QETH_H 		"$Revision: 1.132 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -754,6 +754,8 @@ struct qeth_card {
 	struct qeth_perf_stats perf_stats;
 #endif /* CONFIG_QETH_PERF_STATS */
 	int use_hard_stop;
+	int (*orig_hard_header)(struct sk_buff *,struct net_device *,
+				unsigned short,void *,void *,unsigned);
 };
 
 struct qeth_card_list_struct {
@@ -828,6 +830,17 @@ qeth_get_netdev_flags(struct qeth_card *card)
 #endif
 	}
 }
+static inline struct sk_buff *
+qeth_pskb_unshare(struct sk_buff *skb, int pri)
+{
+        struct sk_buff *nskb;
+        if (!skb_cloned(skb))
+                return skb;
+        nskb = skb_copy(skb, pri);
+        kfree_skb(skb); /* free our shared copy */
+        return nskb;
+}
+
 
 inline static int
 qeth_get_initial_mtu_for_card(struct qeth_card * card)
@@ -1071,8 +1084,4 @@ qeth_schedule_recovery(struct qeth_card *);
 extern int
 qeth_realloc_buffer_pool(struct qeth_card *, int);
 
-extern int
-qeth_fake_header(struct sk_buff *skb, struct net_device *dev,
-                 unsigned short type, void *daddr, void *saddr,
-		 unsigned len);
 #endif /* __QETH_H__ */
