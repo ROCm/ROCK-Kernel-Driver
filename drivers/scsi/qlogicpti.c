@@ -35,7 +35,6 @@
 #include <asm/ptrace.h>
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
-#include <asm/vaddrs.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 

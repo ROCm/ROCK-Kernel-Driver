@@ -1,4 +1,4 @@
-/* $Id: console.c,v 1.24 2001/04/27 07:02:42 davem Exp $
+/* $Id: console.c,v 1.25 2001/10/30 04:54:22 davem Exp $
  * console.c: Routines that deal with sending and receiving IO
  *            to/from the current console device using the PROM.
  *
@@ -207,6 +207,7 @@ prom_query_output_device()
 		}
 		break;
 	default:
-	}
+		;
+	};
 	return PROMDEV_O_UNK;
 }

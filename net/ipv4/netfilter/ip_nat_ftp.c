@@ -52,7 +52,7 @@ ftp_nat_expected(struct sk_buff **pskb,
 	ftpinfo = &master->help.ct_ftp_info;
 
 	LOCK_BH(&ip_ftp_lock);
-	if (!ftpinfo->is_ftp) {
+	if (ftpinfo->is_ftp != 21) {
 		UNLOCK_BH(&ip_ftp_lock);
 		DEBUGP("nat_expected: master not ftp\n");
 		return 0;

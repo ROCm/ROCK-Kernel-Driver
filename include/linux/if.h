@@ -22,7 +22,7 @@
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
 
-/* Standard interface flags. */
+/* Standard interface flags (netdevice->flags). */
 #define	IFF_UP		0x1		/* interface is up		*/
 #define	IFF_BROADCAST	0x2		/* broadcast address valid	*/
 #define	IFF_DEBUG	0x4		/* turn on debugging		*/
@@ -44,6 +44,9 @@
 #define IFF_PORTSEL	0x2000          /* can set media type		*/
 #define IFF_AUTOMEDIA	0x4000		/* auto media select active	*/
 #define IFF_DYNAMIC	0x8000		/* dialup device with changing addresses*/
+
+/* Private (from user) interface flags (netdevice->priv_flags). */
+#define IFF_802_1Q_VLAN 0x1             /* 802.1Q VLAN device.          */
 
 /*
  *	Device mapping structure. I'd just gone off and designed a 

@@ -335,7 +335,7 @@ static int help(const struct iphdr *iph, size_t len,
 	LOCK_BH(&ip_ftp_lock);
 	if (htonl((array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3])
 	    == ct->tuplehash[dir].tuple.src.ip) {
-		info->is_ftp = 1;
+		info->is_ftp = 21;
 		info->seq = ntohl(tcph->seq) + matchoff;
 		info->len = matchlen;
 		info->ftptype = search[i].ftptype;

@@ -62,7 +62,7 @@
 #include <linux/smp_lock.h>
 
 /* Does the buffer contain a disk block which is in the tree. */
-inline int B_IS_IN_TREE (struct buffer_head * p_s_bh)
+inline int B_IS_IN_TREE (const struct buffer_head * p_s_bh)
 {
 
   RFALSE( B_LEVEL (p_s_bh) > MAX_HEIGHT,
@@ -74,7 +74,7 @@ inline int B_IS_IN_TREE (struct buffer_head * p_s_bh)
 
 
 
-inline void copy_short_key (void * to, void * from)
+inline void copy_short_key (void * to, const void * from)
 {
     memcpy (to, from, SHORT_KEY_SIZE);
 }
@@ -82,7 +82,8 @@ inline void copy_short_key (void * to, void * from)
 //
 // to gets item head in le form
 //
-inline void copy_item_head(void * p_v_to, void * p_v_from)
+inline void copy_item_head(struct item_head * p_v_to, 
+			   const struct item_head * p_v_from)
 {
   memcpy (p_v_to, p_v_from, IH_SIZE);
 }
@@ -94,7 +95,8 @@ inline void copy_item_head(void * p_v_to, void * p_v_from)
    Returns: -1 if key1 < key2 
    0 if key1 == key2
    1 if key1 > key2 */
-inline int  comp_short_keys (struct key * le_key, struct cpu_key * cpu_key)
+inline int  comp_short_keys (const struct key * le_key, 
+			     const struct cpu_key * cpu_key)
 {
   __u32 * p_s_le_u32, * p_s_cpu_u32;
   int n_key_length = REISERFS_SHORT_KEY_LEN;
@@ -117,7 +119,7 @@ inline int  comp_short_keys (struct key * le_key, struct cpu_key * cpu_key)
    Compare keys using all 4 key fields.
    Returns: -1 if key1 < key2 0
    if key1 = key2 1 if key1 > key2 */
-inline int  comp_keys (struct key * le_key, struct cpu_key * cpu_key)
+inline int  comp_keys (const struct key * le_key, const struct cpu_key * cpu_key)
 {
   int retval;
 
@@ -146,7 +148,8 @@ inline int  comp_keys (struct key * le_key, struct cpu_key * cpu_key)
 //
 // FIXME: not used yet
 //
-inline int comp_cpu_keys (struct cpu_key * key1, struct cpu_key * key2)
+inline int comp_cpu_keys (const struct cpu_key * key1, 
+			  const struct cpu_key * key2)
 {
     if (key1->on_disk_key.k_dir_id < key2->on_disk_key.k_dir_id)
 	return -1;
@@ -173,7 +176,7 @@ inline int comp_cpu_keys (struct cpu_key * key1, struct cpu_key * key2)
     return 0;
 }
 
-inline int comp_short_le_keys (struct key * key1, struct key * key2)
+inline int comp_short_le_keys (const struct key * key1, const struct key * key2)
 {
   __u32 * p_s_1_u32, * p_s_2_u32;
   int n_key_length = REISERFS_SHORT_KEY_LEN;
@@ -189,8 +192,8 @@ inline int comp_short_le_keys (struct key * key1, struct key * key2)
   return 0;
 }
 
-inline int comp_short_cpu_keys (struct cpu_key * key1, 
-				struct cpu_key * key2)
+inline int comp_short_cpu_keys (const struct cpu_key * key1, 
+				const struct cpu_key * key2)
 {
   __u32 * p_s_1_u32, * p_s_2_u32;
   int n_key_length = REISERFS_SHORT_KEY_LEN;
@@ -209,13 +212,13 @@ inline int comp_short_cpu_keys (struct cpu_key * key1,
 
 
 
-inline void cpu_key2cpu_key (struct cpu_key * to, struct cpu_key * from)
+inline void cpu_key2cpu_key (struct cpu_key * to, const struct cpu_key * from)
 {
     memcpy (to, from, sizeof (struct cpu_key));
 }
 
 
-inline void le_key2cpu_key (struct cpu_key * to, struct key * from)
+inline void le_key2cpu_key (struct cpu_key * to, const struct key * from)
 {
     to->on_disk_key.k_dir_id = le32_to_cpu (from->k_dir_id);
     to->on_disk_key.k_objectid = le32_to_cpu (from->k_objectid);
@@ -235,7 +238,7 @@ inline void le_key2cpu_key (struct cpu_key * to, struct key * from)
 
 // this does not say which one is bigger, it only returns 1 if keys
 // are not equal, 0 otherwise
-inline int comp_le_keys (struct key * k1, struct key * k2)
+inline int comp_le_keys (const struct key * k1, const struct key * k2)
 {
     return memcmp (k1, k2, sizeof (struct key));
 }
@@ -255,8 +258,8 @@ inline int comp_le_keys (struct key * k1, struct key * k2)
  cut the number of possible items it could be by one more than half rounded down,
  or we find it. */
 inline	int bin_search (
-              void    * p_v_key,    /* Key to search for.                   */
-	      void    * p_v_base,   /* First item in the array.             */
+              const void * p_v_key, /* Key to search for.                   */
+	      const void * p_v_base,/* First item in the array.             */
 	      int       p_n_num,    /* Number of items in the array.        */
 	      int       p_n_width,  /* Item size in the array.
 				       searched. Lest the reader be
@@ -290,19 +293,19 @@ extern struct tree_balance * cur_tb;
 
 
 /* Minimal possible key. It is never in the tree. */
-struct key  MIN_KEY = {0, 0, {{0, 0},}};
+const struct key  MIN_KEY = {0, 0, {{0, 0},}};
 
 /* Maximal possible key. It is never in the tree. */
-struct key  MAX_KEY = {0xffffffff, 0xffffffff, {{0xffffffff, 0xffffffff},}};
+const struct key  MAX_KEY = {0xffffffff, 0xffffffff, {{0xffffffff, 0xffffffff},}};
 
 
 /* Get delimiting key of the buffer by looking for it in the buffers in the path, starting from the bottom
    of the path, and going upwards.  We must check the path's validity at each step.  If the key is not in
    the path, there is no delimiting key in the tree (buffer is first or last buffer in tree), and in this
    case we return a special key, either MIN_KEY or MAX_KEY. */
-inline	struct  key * get_lkey  (
-	                struct path         * p_s_chk_path,
-                        struct super_block  * p_s_sb
+inline	const struct  key * get_lkey  (
+	                const struct path         * p_s_chk_path,
+                        const struct super_block  * p_s_sb
                       ) {
   int                   n_position, n_path_offset = p_s_chk_path->path_length;
   struct buffer_head  * p_s_parent;
@@ -339,9 +342,9 @@ inline	struct  key * get_lkey  (
 
 
 /* Get delimiting key of the buffer at the path and its right neighbor. */
-inline	struct  key * get_rkey  (
-	                struct path         * p_s_chk_path,
-                        struct super_block  * p_s_sb
+inline	const struct  key * get_rkey  (
+	                const struct path         * p_s_chk_path,
+                        const struct super_block  * p_s_sb
                       ) {
   int                   n_position,
     			n_path_offset = p_s_chk_path->path_length;
@@ -384,7 +387,7 @@ inline	struct  key * get_rkey  (
    this case get_lkey and get_rkey return a special key which is MIN_KEY or MAX_KEY. */
 static  inline  int key_in_buffer (
                       struct path         * p_s_chk_path, /* Path which should be checked.  */
-                      struct cpu_key      * p_s_key,      /* Key which should be checked.   */
+                      const struct cpu_key      * p_s_key,      /* Key which should be checked.   */
                       struct super_block  * p_s_sb        /* Super block pointer.           */
 		      ) {
 
@@ -635,7 +638,7 @@ static void search_by_key_reada (struct super_block * s, int blocknr)
    correctness of the bottom of the path */
 /* The function is NOT SCHEDULE-SAFE! */
 int search_by_key (struct super_block * p_s_sb,
-		   struct cpu_key * p_s_key, /* Key to search. */
+		   const struct cpu_key * p_s_key, /* Key to search. */
 		   struct path * p_s_search_path, /* This structure was
 						     allocated and initialized
 						     by the calling
@@ -729,7 +732,8 @@ int search_by_key (struct super_block * p_s_sb,
 	// certain level
 	if (!is_tree_node (p_s_bh, expected_level)) {
 	    reiserfs_warning ("vs-5150: search_by_key: "
-			      "invalid format found in block %d. Fsck?\n", p_s_bh->b_blocknr);
+			      "invalid format found in block %ld. Fsck?\n", 
+			      p_s_bh->b_blocknr);
 	    pathrelse (p_s_search_path);
 	    return IO_ERROR;
 	}
@@ -738,7 +742,7 @@ int search_by_key (struct super_block * p_s_sb,
 	n_node_level = B_LEVEL (p_s_bh);
 
 	RFALSE( n_node_level < n_stop_level,
-		"vs-5152: tree level is less than stop level (%d)",
+		"vs-5152: tree level (%d) is less than stop level (%d)",
 		n_node_level, n_stop_level);
 
 	n_retval = bin_search( p_s_key, B_N_PITEM_HEAD(p_s_bh, 0),
@@ -789,7 +793,7 @@ int search_by_key (struct super_block * p_s_sb,
 
 /* The function is NOT SCHEDULE-SAFE! */
 int search_for_position_by_key (struct super_block  * p_s_sb,         /* Pointer to the super block.          */
-				struct cpu_key      * p_cpu_key,      /* Key to search (cpu variable)         */
+				const struct cpu_key  * p_cpu_key,      /* Key to search (cpu variable)         */
 				struct path         * p_s_search_path /* Filled up by this function.          */
     ) {
     struct item_head    * p_le_ih; /* pointer to on-disk structure */
@@ -857,7 +861,7 @@ int search_for_position_by_key (struct super_block  * p_s_sb,         /* Pointer
 
 
 /* Compare given item and item pointed to by the path. */
-int comp_items (struct item_head * stored_ih, struct path * p_s_path)
+int comp_items (const struct item_head * stored_ih, const struct path * p_s_path)
 {
     struct buffer_head  * p_s_bh;
     struct item_head    * ih;
@@ -873,23 +877,6 @@ int comp_items (struct item_head * stored_ih, struct path * p_s_path)
     /* we need only to know, whether it is the same item */
     ih = get_ih (p_s_path);
     return memcmp (stored_ih, ih, IH_SIZE);
-
-#if 0
-    /* Get item at the path. */
-    p_s_path_item = PATH_PITEM_HEAD(p_s_path);
-    /* Compare keys. */
-    if ( COMP_KEYS(&(p_s_path_item->ih_key), &(p_cpu_ih->ih_key)) )
-	return 1;
-
-    /* Compare other items fields. */
-    if( ih_entry_count(p_s_path_item) != ih_entry_count(p_cpu_ih) ||
-	ih_item_len(p_s_path_item) != ih_item_len(p_cpu_ih) ||
-	ih_location(p_s_path_item) != ih_location(p_cpu_ih) )
-	return 1;
-
-    /* Items are equal. */
-    return 0;
-#endif
 }
 
 
@@ -985,7 +972,7 @@ static char  prepare_for_delete_or_cut(
 				       struct reiserfs_transaction_handle *th, 
 				       struct inode * inode,
 				       struct path         * p_s_path,
-				       struct cpu_key      * p_s_item_key,
+				       const struct cpu_key      * p_s_item_key,
 				       int                 * p_n_removed,      /* Number of unformatted nodes which were removed
 										  from end of the file. */
 				       int                 * p_n_cut_size,
@@ -1279,7 +1266,7 @@ void padd_item (char * item, int total_length, int length)
 /* Delete object item. */
 int reiserfs_delete_item (struct reiserfs_transaction_handle *th, 
 			  struct path * p_s_path, /* Path to the deleted item. */
-			  struct cpu_key * p_s_item_key, /* Key to search for the deleted item.  */
+			  const struct cpu_key * p_s_item_key, /* Key to search for the deleted item.  */
 			  struct inode * p_s_inode,/* inode is here just to update i_blocks */
 			  struct buffer_head  * p_s_un_bh)    /* NULL or unformatted node pointer.    */
 {
@@ -1477,7 +1464,7 @@ static int maybe_indirect_to_direct (struct reiserfs_transaction_handle *th,
 			      struct inode * p_s_inode,
 			      struct page *page, 
 			      struct path         * p_s_path,
-			      struct cpu_key      * p_s_item_key,
+			      const struct cpu_key      * p_s_item_key,
 			      loff_t         n_new_file_size,
 			      char                * p_c_mode
 			      ) {
@@ -1637,7 +1624,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	    indirect_to_direct_roll_back (th, p_s_inode, p_s_path);
 	}
 	if (n_ret_value == NO_DISK_SPACE)
-	    reiserfs_warning ("");
+	    reiserfs_warning ("NO_DISK_SPACE");
 	unfix_nodes (&s_cut_balance);
 	return -EIO;
     }
@@ -1676,7 +1663,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
 	if (c_mode == M_DELETE && ih_item_len(le_ih) != UNFM_P_SIZE)
 	    reiserfs_panic (p_s_sb, "vs-5653: reiserfs_cut_from_item: "
-			    "completing indirect2direct conversion indirect item %h"
+			    "completing indirect2direct conversion indirect item %h "
 			    "being deleted must be of 4 byte long", le_ih);
 
 	if (c_mode == M_CUT && s_cut_balance.insert_size[0] != -UNFM_P_SIZE) {
@@ -1848,7 +1835,8 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 
 #ifdef CONFIG_REISERFS_CHECK
 // this makes sure, that we __append__, not overwrite or add holes
-static void check_research_for_paste (struct path * path, struct cpu_key * p_s_key)
+static void check_research_for_paste (struct path * path, 
+				      const struct cpu_key * p_s_key)
 {
     struct item_head * found_ih = get_ih (path);
     
@@ -1875,7 +1863,7 @@ static void check_research_for_paste (struct path * path, struct cpu_key * p_s_k
 /* Paste bytes to the existing item. Returns bytes number pasted into the item. */
 int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th, 
 			      struct path         * p_s_search_path,	/* Path to the pasted item.          */
-			      struct cpu_key      * p_s_key,        	/* Key to search for the needed item.*/
+			      const struct cpu_key      * p_s_key,        	/* Key to search for the needed item.*/
 			      const char          * p_c_body,       	/* Pointer to the bytes to paste.    */
 			      int                   n_pasted_size)  	/* Size of pasted bytes.             */
 {
@@ -1919,7 +1907,7 @@ error_out:
 /* Insert new item into the buffer at the path. */
 int reiserfs_insert_item(struct reiserfs_transaction_handle *th, 
 			 struct path         * 	p_s_path,         /* Path to the inserteded item.         */
-			 struct cpu_key      * key,
+			 const struct cpu_key      * key,
 			 struct item_head    * 	p_s_ih,           /* Pointer to the item header to insert.*/
 			 const char          * 	p_c_body)         /* Pointer to the bytes to insert.      */
 {

@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.213 2001/10/10 23:54:50 davem Exp $
+ * Version:	$Id: tcp.c,v 1.214 2001/10/20 00:00:11 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2391,10 +2391,8 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 			info.tcpi_snd_wscale = 0;
 			info.tcpi_rcv_wscale = 0;
 		}
-#ifdef CONFIG_INET_ECN
 		if (tp->ecn_flags&TCP_ECN_OK)
 			info.tcpi_options |= TCPI_OPT_ECN;
-#endif
 
 		info.tcpi_rto = (1000000*tp->rto)/HZ;
 		info.tcpi_ato = (1000000*tp->ack.ato)/HZ;

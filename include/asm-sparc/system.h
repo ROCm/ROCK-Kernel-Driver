@@ -1,4 +1,4 @@
-/* $Id: system.h,v 1.84 2000/09/23 02:11:22 davem Exp $ */
+/* $Id: system.h,v 1.86 2001/10/30 04:57:10 davem Exp $ */
 #include <linux/config.h>
 
 #ifndef __SPARC_SYSTEM_H
@@ -149,17 +149,17 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	: "g1", "g2", "g3", "g4", "g5", "g7", "l0", "l1",				\
 	"l4", "l5", "l6", "l7", "i0", "i1", "i2", "i3", "i4", "i5", "o0", "o1", "o2",	\
 	"o3");										\
-here:  } while(0)
+here:;  } while(0)
 
 /*
  * Changing the IRQ level on the Sparc.
  */
 extern __inline__ void setipl(unsigned long __orig_psr)
 {
-	__asm__ __volatile__("
-		wr	%0, 0x0, %%psr
-		nop; nop; nop
-"		: /* no outputs */
+	__asm__ __volatile__(
+		"wr	%0, 0x0, %%psr\n\t"
+		"nop; nop; nop\n"
+		: /* no outputs */
 		: "r" (__orig_psr)
 		: "memory", "cc");
 }
@@ -168,13 +168,13 @@ extern __inline__ void __cli(void)
 {
 	unsigned long tmp;
 
-	__asm__ __volatile__("
-		rd	%%psr, %0
-		nop; nop; nop;		/* Sun4m + Cypress + SMP bug */
-		or	%0, %1, %0
-		wr	%0, 0x0, %%psr
-		nop; nop; nop
-"		: "=r" (tmp)
+	__asm__ __volatile__(
+		"rd	%%psr, %0\n\t"
+		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
+		"or	%0, %1, %0\n\t"
+		"wr	%0, 0x0, %%psr\n\t"
+		"nop; nop; nop\n"
+		: "=r" (tmp)
 		: "i" (PSR_PIL)
 		: "memory");
 }
@@ -183,13 +183,13 @@ extern __inline__ void __sti(void)
 {
 	unsigned long tmp;
 
-	__asm__ __volatile__("
-		rd	%%psr, %0	
-		nop; nop; nop;		/* Sun4m + Cypress + SMP bug */
-		andn	%0, %1, %0
-		wr	%0, 0x0, %%psr
-		nop; nop; nop
-"		: "=r" (tmp)
+	__asm__ __volatile__(
+		"rd	%%psr, %0\n\t"
+		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
+		"andn	%0, %1, %0\n\t"
+		"wr	%0, 0x0, %%psr\n\t"
+		"nop; nop; nop\n"
+		: "=r" (tmp)
 		: "i" (PSR_PIL)
 		: "memory");
 }
@@ -206,18 +206,18 @@ extern __inline__ unsigned long swap_pil(unsigned long __new_psr)
 {
 	unsigned long retval;
 
-	__asm__ __volatile__("
-		rd	%%psr, %0
-		nop; nop; nop;		/* Sun4m + Cypress + SMP bug */
-		and	%0, %2, %%g1
-		and	%1, %2, %%g2
-		xorcc	%%g1, %%g2, %%g0
-		be	1f
-		 nop
-		wr	%0, %2, %%psr
-		nop; nop; nop;
-1:
-"		: "=r" (retval)
+	__asm__ __volatile__(
+		"rd	%%psr, %0\n\t"
+		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
+		"and	%0, %2, %%g1\n\t"
+		"and	%1, %2, %%g2\n\t"
+		"xorcc	%%g1, %%g2, %%g0\n\t"
+		"be	1f\n\t"
+		" nop\n\t"
+		"wr	%0, %2, %%psr\n\t"
+		"nop; nop; nop;\n"
+		"1:\n"
+		: "=r" (retval)
 		: "r" (__new_psr), "i" (PSR_PIL)
 		: "g1", "g2", "memory", "cc");
 
@@ -228,13 +228,13 @@ extern __inline__ unsigned long read_psr_and_cli(void)
 {
 	unsigned long retval;
 
-	__asm__ __volatile__("
-		rd	%%psr, %0
-		nop; nop; nop;		/* Sun4m + Cypress + SMP bug */
-		or	%0, %1, %%g1
-		wr	%%g1, 0x0, %%psr
-		nop; nop; nop
-"		: "=r" (retval)
+	__asm__ __volatile__(
+		"rd	%%psr, %0\n\t"
+		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
+		"or	%0, %1, %%g1\n\t"
+		"wr	%%g1, 0x0, %%psr\n\t"
+		"nop; nop; nop\n\t"
+		: "=r" (retval)
 		: "i" (PSR_PIL)
 		: "g1", "memory");
 
@@ -307,11 +307,11 @@ extern __inline__ unsigned long xchg_u32(__volatile__ unsigned long *m, unsigned
 
 	/* Note: this is magic and the nop there is
 	   really needed. */
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___f____xchg32
-	 nop
-"	: "=&r" (ret)
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___f____xchg32\n\t"
+	" nop\n\t"
+	: "=&r" (ret)
 	: "0" (ret), "r" (ptr)
 	: "g3", "g4", "g7", "memory", "cc");
 

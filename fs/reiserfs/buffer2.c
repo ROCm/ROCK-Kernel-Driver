@@ -33,7 +33,7 @@
    hold we did free all buffers in tree balance structure
    (get_empty_nodes and get_nodes_for_preserving) or in path structure
    only (get_new_buffer) just before calling this */
-void wait_buffer_until_released (struct buffer_head * bh)
+void wait_buffer_until_released (const struct buffer_head * bh)
 {
   int repeat_counter = 0;
 

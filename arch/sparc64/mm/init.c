@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.194 2001/10/17 18:26:58 davem Exp $
+/*  $Id: init.c,v 1.199 2001/10/25 18:48:03 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -132,21 +132,69 @@ __inline__ void flush_dcache_page_impl(struct page *page)
 #endif
 }
 
+#define PG_dcache_dirty		PG_arch_1
+
+#define dcache_dirty_cpu(page) \
+	(((page)->flags >> 24) & (NR_CPUS - 1UL))
+
+static __inline__ void set_dcache_dirty(struct page *page)
+{
+	unsigned long mask = smp_processor_id();
+	unsigned long non_cpu_bits = (1UL << 24UL) - 1UL;
+	mask = (mask << 24) | (1UL << PG_dcache_dirty);
+	__asm__ __volatile__("1:\n\t"
+			     "ldx	[%2], %%g7\n\t"
+			     "and	%%g7, %1, %%g5\n\t"
+			     "or	%%g5, %0, %%g5\n\t"
+			     "casx	[%2], %%g7, %%g5\n\t"
+			     "cmp	%%g7, %%g5\n\t"
+			     "bne,pn	%%xcc, 1b\n\t"
+			     " nop"
+			     : /* no outputs */
+			     : "r" (mask), "r" (non_cpu_bits), "r" (&page->flags)
+			     : "g5", "g7");
+}
+
+static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long cpu)
+{
+	unsigned long mask = (1UL << PG_dcache_dirty);
+
+	__asm__ __volatile__("! test_and_clear_dcache_dirty\n"
+			     "1:\n\t"
+			     "ldx	[%2], %%g7\n\t"
+			     "srlx	%%g7, 24, %%g5\n\t"
+			     "cmp	%%g5, %0\n\t"
+			     "bne,pn	%%icc, 2f\n\t"
+			     " andn	%%g7, %1, %%g5\n\t"
+			     "casx	[%2], %%g7, %%g5\n\t"
+			     "cmp	%%g7, %%g5\n\t"
+			     "bne,pn	%%xcc, 1b\n\t"
+			     " nop\n"
+			     "2:"
+			     : /* no outputs */
+			     : "r" (cpu), "r" (mask), "r" (&page->flags)
+			     : "g5", "g7");
+}
+
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
 	struct page *page = pte_page(pte);
+	unsigned long pg_flags;
 
-	if (VALID_PAGE(page) && page->mapping &&
-	    test_bit(PG_dcache_dirty, &page->flags)) {
+	if (VALID_PAGE(page) &&
+	    page->mapping &&
+	    ((pg_flags = page->flags) & (1UL << PG_dcache_dirty))) {
+		int cpu = (pg_flags >> 24);
+
 		/* This is just to optimize away some function calls
 		 * in the SMP case.
 		 */
-		if (dcache_dirty_cpu(page) == smp_processor_id())
+		if (cpu == smp_processor_id())
 			flush_dcache_page_impl(page);
 		else
-			smp_flush_dcache_page_impl(page);
+			smp_flush_dcache_page_impl(page, cpu);
 
-		clear_dcache_dirty(page);
+		clear_dcache_dirty_cpu(page, cpu);
 	}
 	__update_mmu_cache(vma, address, pte);
 }
@@ -162,7 +210,7 @@ void flush_dcache_page(struct page *page)
 		if (dirty) {
 			if (dirty_cpu == smp_processor_id())
 				return;
-			smp_flush_dcache_page_impl(page);
+			smp_flush_dcache_page_impl(page, dirty_cpu);
 		}
 		set_dcache_dirty(page);
 	} else {
@@ -244,12 +292,44 @@ void __init early_pgtable_allocfail(char *type)
 	prom_halt();
 }
 
+#define BASE_PAGE_SIZE 8192
+static pmd_t *prompmd;
+
+/*
+ * Translate PROM's mapping we capture at boot time into physical address.
+ * The second parameter is only set from prom_callback() invocations.
+ */
+unsigned long prom_virt_to_phys(unsigned long promva, int *error)
+{
+	pmd_t *pmdp = prompmd + ((promva >> 23) & 0x7ff);
+	pte_t *ptep;
+	unsigned long base;
+
+	if (pmd_none(*pmdp)) {
+		if (error)
+			*error = 1;
+		return(0);
+	}
+	ptep = (pte_t *)pmd_page(*pmdp) + ((promva >> 13) & 0x3ff);
+	if (!pte_present(*ptep)) {
+		if (error)
+			*error = 1;
+		return(0);
+	}
+	if (error) {
+		*error = 0;
+		return(pte_val(*ptep));
+	}
+	base = pte_val(*ptep) & _PAGE_PADDR;
+	return(base + (promva & (BASE_PAGE_SIZE - 1)));
+}
+
 static void inherit_prom_mappings(void)
 {
 	struct linux_prom_translation *trans;
 	unsigned long phys_page, tte_vaddr, tte_data;
 	void (*remap_func)(unsigned long, unsigned long, int);
-	pmd_t *pmdp, *pmd;
+	pmd_t *pmdp;
 	pte_t *ptep;
 	int node, n, i, tsz;
 	extern unsigned int obp_iaddr_patch[2], obp_daddr_patch[2];
@@ -283,21 +363,21 @@ static void inherit_prom_mappings(void)
 	 * in inherit_locked_prom_mappings()).
 	 */
 #define OBP_PMD_SIZE 2048
-#define BASE_PAGE_SIZE 8192
-	pmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, 0UL);
-	if (pmd == NULL)
+	prompmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, 0UL);
+	if (prompmd == NULL)
 		early_pgtable_allocfail("pmd");
-	memset(pmd, 0, OBP_PMD_SIZE);
+	memset(prompmd, 0, OBP_PMD_SIZE);
 	for (i = 0; i < n; i++) {
 		unsigned long vaddr;
 
-		if (trans[i].virt >= 0xf0000000 && trans[i].virt < 0x100000000) {
+		if (trans[i].virt >= LOW_OBP_ADDRESS && trans[i].virt < HI_OBP_ADDRESS) {
 			for (vaddr = trans[i].virt;
-			     vaddr < trans[i].virt + trans[i].size;
+			     ((vaddr < trans[i].virt + trans[i].size) && 
+			     (vaddr < HI_OBP_ADDRESS));
 			     vaddr += BASE_PAGE_SIZE) {
 				unsigned long val;
 
-				pmdp = pmd + ((vaddr >> 23) & 0x7ff);
+				pmdp = prompmd + ((vaddr >> 23) & 0x7ff);
 				if (pmd_none(*pmdp)) {
 					ptep = __alloc_bootmem(BASE_PAGE_SIZE,
 							       BASE_PAGE_SIZE,
@@ -321,7 +401,7 @@ static void inherit_prom_mappings(void)
 			}
 		}
 	}
-	phys_page = __pa(pmd);
+	phys_page = __pa(prompmd);
 	obp_iaddr_patch[0] |= (phys_page >> 10);
 	obp_iaddr_patch[1] |= (phys_page & 0x3ff);
 	flushi((long)&obp_iaddr_patch[0]);

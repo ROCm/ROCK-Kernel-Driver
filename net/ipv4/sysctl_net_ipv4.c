@@ -1,7 +1,7 @@
 /*
  * sysctl_net_ipv4.c: sysctl interface to net IPV4 subsystem.
  *
- * $Id: sysctl_net_ipv4.c,v 1.49 2001/08/22 20:38:41 davem Exp $
+ * $Id: sysctl_net_ipv4.c,v 1.50 2001/10/20 00:00:11 davem Exp $
  *
  * Begun April 1, 1996, Mike Shaver.
  * Added /proc/sys/net/ipv4 directory entry (empty =) ). [MS]
@@ -201,10 +201,8 @@ ctl_table ipv4_table[] = {
 	 &sysctl_tcp_fack, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_TCP_REORDERING, "tcp_reordering",
 	 &sysctl_tcp_reordering, sizeof(int), 0644, NULL, &proc_dointvec},
-#ifdef CONFIG_INET_ECN
 	{NET_TCP_ECN, "tcp_ecn",
 	 &sysctl_tcp_ecn, sizeof(int), 0644, NULL, &proc_dointvec},
-#endif
 	{NET_TCP_DSACK, "tcp_dsack",
 	 &sysctl_tcp_dsack, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_TCP_MEM, "tcp_mem",

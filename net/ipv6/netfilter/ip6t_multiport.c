@@ -51,7 +51,7 @@ match(const struct sk_buff *skb,
 	if (offset == 0 && datalen < sizeof(struct udphdr)) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
-			duprintf("ipt_multiport:"
+			duprintf("ip6t_multiport:"
 				 " Dropping evil offset=0 tinygram.\n");
 			*hotdrop = 1;
 			return 0;

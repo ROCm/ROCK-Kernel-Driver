@@ -354,7 +354,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 	/* here we're in the low on memory slow path */
 
 rebalance:
-	if (current->flags & PF_MEMALLOC) {
+	if (current->flags & (PF_MEMALLOC | PF_MEMDIE)) {
 		zone = zonelist->zones;
 		for (;;) {
 			zone_t *z = *(zone++);
@@ -426,7 +426,7 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 	return 0;
 }
 
-void free_lru_page(struct page *page)
+void page_cache_release(struct page *page)
 {
 	if (!PageReserved(page) && put_page_testzero(page)) {
 		if (PageActive(page) || PageInactive(page))

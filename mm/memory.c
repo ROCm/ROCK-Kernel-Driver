@@ -1238,7 +1238,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		return do_anonymous_page(mm, vma, page_table, write_access, address);
 	spin_unlock(&mm->page_table_lock);
 
-	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK);
+	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
 
 	if (new_page == NULL)	/* no page was available -- SIGBUS */
 		return 0;

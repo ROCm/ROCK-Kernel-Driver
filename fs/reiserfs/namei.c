@@ -125,7 +125,7 @@ entry position in the item
 */
 
 /* The function is NOT SCHEDULE-SAFE! */
-int search_by_entry_key (struct super_block * sb, struct cpu_key * key,
+int search_by_entry_key (struct super_block * sb, const struct cpu_key * key,
 			 struct path * path, struct reiserfs_dir_entry * de)
 {
     int retval;

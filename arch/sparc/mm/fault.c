@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.120 2001/07/18 13:40:05 anton Exp $
+/* $Id: fault.c,v 1.121 2001/10/30 04:54:22 davem Exp $
  * fault.c:  Page fault handlers for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -177,11 +177,11 @@ asmlinkage int lookup_fault(unsigned long pc, unsigned long ret_pc,
 	memset (&regs, 0, sizeof (regs));
 	regs.pc = pc;
 	regs.npc = pc + 4;
-	__asm__ __volatile__ ("
-		rd %%psr, %0
-		nop
-		nop
-		nop" : "=r" (regs.psr));
+	__asm__ __volatile__ (
+		"rd %%psr, %0\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n" : "=r" (regs.psr));
 	unhandled_fault (address, current, &regs);
 	/* Not reached */
 	return 0;

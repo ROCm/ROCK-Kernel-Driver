@@ -47,6 +47,10 @@
  *	1.08	11 Dec 2000, Richard Schaal <richard.schaal@intel.com> and
  *			     Tigran Aivazian <tigran@veritas.com>
  *		Intel Pentium 4 processor support and bugfixes.
+ *	1.09	30 Oct 2001, Tigran Aivazian <tigran@veritas.com>
+ *		Bugfix for HT (Hyper-Threading) enabled processors
+ *		whereby processor resources are shared by all logical processors
+ *		in a single CPU package.
  */
 
 #include <linux/init.h>
@@ -61,7 +65,7 @@
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 
-#define MICROCODE_VERSION 	"1.08"
+#define MICROCODE_VERSION 	"1.09"
 
 MODULE_DESCRIPTION("Intel CPU (IA-32) microcode update driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
@@ -240,10 +244,6 @@ static void do_update_one(void *unused)
 				printk(KERN_ERR 
 					"microcode: CPU%d not 'upgrading' to earlier revision"
 					" %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
-			} else if (microcode[i].rev == rev) {
-				printk(KERN_ERR
-					"microcode: CPU%d already up-to-date (revision %d)\n",
-						cpu_num, rev);
 			} else {
 				int sum = 0;
 				struct microcode *m = &microcode[i];

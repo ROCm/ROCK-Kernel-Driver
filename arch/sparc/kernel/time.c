@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.58 2001/01/11 15:07:09 davem Exp $
+/* $Id: time.c,v 1.59 2001/10/30 04:54:21 davem Exp $
  * linux/arch/sparc/kernel/time.c
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -475,36 +475,39 @@ void do_gettimeofday(struct timeval *tv)
 	 * is guarenteed to be atomic, this is why we can run this
 	 * with interrupts on full blast.  Don't touch this... -DaveM
 	 */
-	__asm__ __volatile__("
-	sethi	%hi(master_l10_counter), %o1
-	ld	[%o1 + %lo(master_l10_counter)], %g3
-	sethi	%hi(xtime), %g2
-1:	ldd	[%g2 + %lo(xtime)], %o4
-	ld	[%g3], %o1
-	ldd	[%g2 + %lo(xtime)], %o2
-	xor	%o4, %o2, %o2
-	xor	%o5, %o3, %o3
-	orcc	%o2, %o3, %g0
-	bne	1b
-	 cmp	%o1, 0
-	bge	1f
-	 srl	%o1, 0xa, %o1
-	sethi	%hi(tick), %o3
-	ld	[%o3 + %lo(tick)], %o3
-	sethi	%hi(0x1fffff), %o2
-	or	%o2, %lo(0x1fffff), %o2
-	add	%o5, %o3, %o5
-	and	%o1, %o2, %o1
-1:	add	%o5, %o1, %o5
-	sethi	%hi(1000000), %o2
-	or	%o2, %lo(1000000), %o2
-	cmp	%o5, %o2
-	bl,a	1f
-	 st	%o4, [%o0 + 0x0]
-	add	%o4, 0x1, %o4
-	sub	%o5, %o2, %o5
-	st	%o4, [%o0 + 0x0]
-1:	st	%o5, [%o0 + 0x4]");
+	__asm__ __volatile__(
+	"sethi	%hi(master_l10_counter), %o1\n\t"
+	"ld	[%o1 + %lo(master_l10_counter)], %g3\n\t"
+	"sethi	%hi(xtime), %g2\n"
+	"1:\n\t"
+	"ldd	[%g2 + %lo(xtime)], %o4\n\t"
+	"ld	[%g3], %o1\n\t"
+	"ldd	[%g2 + %lo(xtime)], %o2\n\t"
+	"xor	%o4, %o2, %o2\n\t"
+	"xor	%o5, %o3, %o3\n\t"
+	"orcc	%o2, %o3, %g0\n\t"
+	"bne	1b\n\t"
+	" cmp	%o1, 0\n\t"
+	"bge	1f\n\t"
+	" srl	%o1, 0xa, %o1\n\t"
+	"sethi	%hi(tick), %o3\n\t"
+	"ld	[%o3 + %lo(tick)], %o3\n\t"
+	"sethi	%hi(0x1fffff), %o2\n\t"
+	"or	%o2, %lo(0x1fffff), %o2\n\t"
+	"add	%o5, %o3, %o5\n\t"
+	"and	%o1, %o2, %o1\n"
+	"1:\n\t"
+	"add	%o5, %o1, %o5\n\t"
+	"sethi	%hi(1000000), %o2\n\t"
+	"or	%o2, %lo(1000000), %o2\n\t"
+	"cmp	%o5, %o2\n\t"
+	"bl,a	1f\n\t"
+	" st	%o4, [%o0 + 0x0]\n\t"
+	"add	%o4, 0x1, %o4\n\t"
+	"sub	%o5, %o2, %o5\n\t"
+	"st	%o4, [%o0 + 0x0]\n"
+	"1:\n\t"
+	"st	%o5, [%o0 + 0x4]\n");
 }
 
 void do_settimeofday(struct timeval *tv)

@@ -1,4 +1,4 @@
-/* $Id: sun4c.c,v 1.207 2001/07/17 16:17:33 anton Exp $
+/* $Id: sun4c.c,v 1.208 2001/10/30 04:54:22 davem Exp $
  * sun4c.c: Doing in software what should be done in hardware.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -135,25 +135,26 @@ static void sun4c_flush_context_sw(void)
 	unsigned long nbytes = SUN4C_VAC_SIZE;
 	unsigned long lsize = sun4c_vacinfo.linesize;
 
-	__asm__ __volatile__("
-	add	%2, %2, %%g1
-	add	%2, %%g1, %%g2
-	add	%2, %%g2, %%g3
-	add	%2, %%g3, %%g4
-	add	%2, %%g4, %%g5
-	add	%2, %%g5, %%o4
-	add	%2, %%o4, %%o5
-1:	subcc	%0, %%o5, %0
-	sta	%%g0, [%0] %3
-	sta	%%g0, [%0 + %2] %3
-	sta	%%g0, [%0 + %%g1] %3
-	sta	%%g0, [%0 + %%g2] %3
-	sta	%%g0, [%0 + %%g3] %3
-	sta	%%g0, [%0 + %%g4] %3
-	sta	%%g0, [%0 + %%g5] %3
-	bg	1b
-	 sta	%%g0, [%1 + %%o4] %3
-"	: "=&r" (nbytes)
+	__asm__ __volatile__(
+	"add	%2, %2, %%g1\n\t"
+	"add	%2, %%g1, %%g2\n\t"
+	"add	%2, %%g2, %%g3\n\t"
+	"add	%2, %%g3, %%g4\n\t"
+	"add	%2, %%g4, %%g5\n\t"
+	"add	%2, %%g5, %%o4\n\t"
+	"add	%2, %%o4, %%o5\n"
+	"1:\n\t"
+	"subcc	%0, %%o5, %0\n\t"
+	"sta	%%g0, [%0] %3\n\t"
+	"sta	%%g0, [%0 + %2] %3\n\t"
+	"sta	%%g0, [%0 + %%g1] %3\n\t"
+	"sta	%%g0, [%0 + %%g2] %3\n\t"
+	"sta	%%g0, [%0 + %%g3] %3\n\t"
+	"sta	%%g0, [%0 + %%g4] %3\n\t"
+	"sta	%%g0, [%0 + %%g5] %3\n\t"
+	"bg	1b\n\t"
+	" sta	%%g0, [%1 + %%o4] %3\n"
+	: "=&r" (nbytes)
 	: "0" (nbytes), "r" (lsize), "i" (ASI_FLUSHCTX)
 	: "g1", "g2", "g3", "g4", "g5", "o4", "o5", "cc");
 }
@@ -165,26 +166,27 @@ static void sun4c_flush_segment_sw(unsigned long addr)
 		unsigned long nbytes = SUN4C_VAC_SIZE;
 		unsigned long lsize = sun4c_vacinfo.linesize;
 
-		__asm__ __volatile__("
-		add	%2, %2, %%g1
-		add	%2, %%g1, %%g2
-		add	%2, %%g2, %%g3
-		add	%2, %%g3, %%g4
-		add	%2, %%g4, %%g5
-		add	%2, %%g5, %%o4
-		add	%2, %%o4, %%o5
-1:		subcc	%1, %%o5, %1
-		sta	%%g0, [%0] %6
-		sta	%%g0, [%0 + %2] %6
-		sta	%%g0, [%0 + %%g1] %6
-		sta	%%g0, [%0 + %%g2] %6
-		sta	%%g0, [%0 + %%g3] %6
-		sta	%%g0, [%0 + %%g4] %6
-		sta	%%g0, [%0 + %%g5] %6
-		sta	%%g0, [%0 + %%o4] %6
-		bg	1b
-		 add	%0, %%o5, %0
-"		: "=&r" (addr), "=&r" (nbytes), "=&r" (lsize)
+		__asm__ __volatile__(
+		"add	%2, %2, %%g1\n\t"
+		"add	%2, %%g1, %%g2\n\t"
+		"add	%2, %%g2, %%g3\n\t"
+		"add	%2, %%g3, %%g4\n\t"
+		"add	%2, %%g4, %%g5\n\t"
+		"add	%2, %%g5, %%o4\n\t"
+		"add	%2, %%o4, %%o5\n"
+		"1:\n\t"
+		"subcc	%1, %%o5, %1\n\t"
+		"sta	%%g0, [%0] %6\n\t"
+		"sta	%%g0, [%0 + %2] %6\n\t"
+		"sta	%%g0, [%0 + %%g1] %6\n\t"
+		"sta	%%g0, [%0 + %%g2] %6\n\t"
+		"sta	%%g0, [%0 + %%g3] %6\n\t"
+		"sta	%%g0, [%0 + %%g4] %6\n\t"
+		"sta	%%g0, [%0 + %%g5] %6\n\t"
+		"sta	%%g0, [%0 + %%o4] %6\n\t"
+		"bg	1b\n\t"
+		" add	%0, %%o5, %0\n"
+		: "=&r" (addr), "=&r" (nbytes), "=&r" (lsize)
 		: "0" (addr), "1" (nbytes), "2" (lsize),
 		  "i" (ASI_FLUSHSEG)
 		: "g1", "g2", "g3", "g4", "g5", "o4", "o5", "cc");
@@ -242,26 +244,27 @@ static void sun4c_flush_page_sw(unsigned long addr)
 		unsigned long left = PAGE_SIZE;
 		unsigned long lsize = sun4c_vacinfo.linesize;
 
-		__asm__ __volatile__("
-		add	%2, %2, %%g1
-		add	%2, %%g1, %%g2
-		add	%2, %%g2, %%g3
-		add	%2, %%g3, %%g4
-		add	%2, %%g4, %%g5
-		add	%2, %%g5, %%o4
-		add	%2, %%o4, %%o5
-1:		subcc	%1, %%o5, %1
-		sta	%%g0, [%0] %6
-		sta	%%g0, [%0 + %2] %6
-		sta	%%g0, [%0 + %%g1] %6
-		sta	%%g0, [%0 + %%g2] %6
-		sta	%%g0, [%0 + %%g3] %6
-		sta	%%g0, [%0 + %%g4] %6
-		sta	%%g0, [%0 + %%g5] %6
-		sta	%%g0, [%0 + %%o4] %6
-		bg	1b
-		 add	%0, %%o5, %0
-"		: "=&r" (addr), "=&r" (left), "=&r" (lsize)
+		__asm__ __volatile__(
+		"add	%2, %2, %%g1\n\t"
+		"add	%2, %%g1, %%g2\n\t"
+		"add	%2, %%g2, %%g3\n\t"
+		"add	%2, %%g3, %%g4\n\t"
+		"add	%2, %%g4, %%g5\n\t"
+		"add	%2, %%g5, %%o4\n\t"
+		"add	%2, %%o4, %%o5\n"
+		"1:\n\t"
+		"subcc	%1, %%o5, %1\n\t"
+		"sta	%%g0, [%0] %6\n\t"
+		"sta	%%g0, [%0 + %2] %6\n\t"
+		"sta	%%g0, [%0 + %%g1] %6\n\t"
+		"sta	%%g0, [%0 + %%g2] %6\n\t"
+		"sta	%%g0, [%0 + %%g3] %6\n\t"
+		"sta	%%g0, [%0 + %%g4] %6\n\t"
+		"sta	%%g0, [%0 + %%g5] %6\n\t"
+		"sta	%%g0, [%0 + %%o4] %6\n\t"
+		"bg	1b\n\t"
+		" add	%0, %%o5, %0\n"
+		: "=&r" (addr), "=&r" (left), "=&r" (lsize)
 		: "0" (addr), "1" (left), "2" (lsize),
 		  "i" (ASI_FLUSHPG)
 		: "g1", "g2", "g3", "g4", "g5", "o4", "o5", "cc");
@@ -1402,46 +1405,46 @@ static void sun4c_flush_cache_all(void)
 
 	if (sun4c_vacinfo.linesize == 32) {
 		while (begin < end) {
-			__asm__ __volatile__("
-			ld	[%0 + 0x00], %%g0
-			ld	[%0 + 0x20], %%g0
-			ld	[%0 + 0x40], %%g0
-			ld	[%0 + 0x60], %%g0
-			ld	[%0 + 0x80], %%g0
-			ld	[%0 + 0xa0], %%g0
-			ld	[%0 + 0xc0], %%g0
-			ld	[%0 + 0xe0], %%g0
-			ld	[%0 + 0x100], %%g0
-			ld	[%0 + 0x120], %%g0
-			ld	[%0 + 0x140], %%g0
-			ld	[%0 + 0x160], %%g0
-			ld	[%0 + 0x180], %%g0
-			ld	[%0 + 0x1a0], %%g0
-			ld	[%0 + 0x1c0], %%g0
-			ld	[%0 + 0x1e0], %%g0
-			" : : "r" (begin));
+			__asm__ __volatile__(
+			"ld	[%0 + 0x00], %%g0\n\t"
+			"ld	[%0 + 0x20], %%g0\n\t"
+			"ld	[%0 + 0x40], %%g0\n\t"
+			"ld	[%0 + 0x60], %%g0\n\t"
+			"ld	[%0 + 0x80], %%g0\n\t"
+			"ld	[%0 + 0xa0], %%g0\n\t"
+			"ld	[%0 + 0xc0], %%g0\n\t"
+			"ld	[%0 + 0xe0], %%g0\n\t"
+			"ld	[%0 + 0x100], %%g0\n\t"
+			"ld	[%0 + 0x120], %%g0\n\t"
+			"ld	[%0 + 0x140], %%g0\n\t"
+			"ld	[%0 + 0x160], %%g0\n\t"
+			"ld	[%0 + 0x180], %%g0\n\t"
+			"ld	[%0 + 0x1a0], %%g0\n\t"
+			"ld	[%0 + 0x1c0], %%g0\n\t"
+			"ld	[%0 + 0x1e0], %%g0\n"
+			: : "r" (begin));
 			begin += 512;
 		}
 	} else {
 		while (begin < end) {
-			__asm__ __volatile__("
-			ld	[%0 + 0x00], %%g0
-			ld	[%0 + 0x10], %%g0
-			ld	[%0 + 0x20], %%g0
-			ld	[%0 + 0x30], %%g0
-			ld	[%0 + 0x40], %%g0
-			ld	[%0 + 0x50], %%g0
-			ld	[%0 + 0x60], %%g0
-			ld	[%0 + 0x70], %%g0
-			ld	[%0 + 0x80], %%g0
-			ld	[%0 + 0x90], %%g0
-			ld	[%0 + 0xa0], %%g0
-			ld	[%0 + 0xb0], %%g0
-			ld	[%0 + 0xc0], %%g0
-			ld	[%0 + 0xd0], %%g0
-			ld	[%0 + 0xe0], %%g0
-			ld	[%0 + 0xf0], %%g0
-			" : : "r" (begin));
+			__asm__ __volatile__(
+			"ld	[%0 + 0x00], %%g0\n\t"
+			"ld	[%0 + 0x10], %%g0\n\t"
+			"ld	[%0 + 0x20], %%g0\n\t"
+			"ld	[%0 + 0x30], %%g0\n\t"
+			"ld	[%0 + 0x40], %%g0\n\t"
+			"ld	[%0 + 0x50], %%g0\n\t"
+			"ld	[%0 + 0x60], %%g0\n\t"
+			"ld	[%0 + 0x70], %%g0\n\t"
+			"ld	[%0 + 0x80], %%g0\n\t"
+			"ld	[%0 + 0x90], %%g0\n\t"
+			"ld	[%0 + 0xa0], %%g0\n\t"
+			"ld	[%0 + 0xb0], %%g0\n\t"
+			"ld	[%0 + 0xc0], %%g0\n\t"
+			"ld	[%0 + 0xd0], %%g0\n\t"
+			"ld	[%0 + 0xe0], %%g0\n\t"
+			"ld	[%0 + 0xf0], %%g0\n"
+			: : "r" (begin));
 			begin += 256;
 		}
 	}

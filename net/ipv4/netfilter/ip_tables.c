@@ -1059,6 +1059,10 @@ do_replace(void *user, unsigned int len)
 	if (len != sizeof(tmp) + tmp.size)
 		return -ENOPROTOOPT;
 
+	/* Pedantry: prevent them from hitting BUG() in vmalloc.c --RR */
+	if ((SMP_ALIGN(tmp.size) >> PAGE_SHIFT) + 2 > num_physpages)
+		return -ENOMEM;
+
 	newinfo = vmalloc(sizeof(struct ipt_table_info)
 			  + SMP_ALIGN(tmp.size) * smp_num_cpus);
 	if (!newinfo)

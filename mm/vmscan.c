@@ -515,20 +515,6 @@ page_mapped:
 	}
 	spin_unlock(&pagemap_lru_lock);
 
-	if (nr_pages <= 0)
-		return 0;
-
-	/*
-	 * If swapping out isn't appropriate, and 
-	 * we still fail, try the other (usually smaller)
-	 * caches instead.
-	 */
-	shrink_dcache_memory(priority, gfp_mask);
-	shrink_icache_memory(priority, gfp_mask);
-#ifdef CONFIG_QUOTA
-	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
-#endif
-
 	return nr_pages;
 }
 
@@ -577,12 +563,21 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 	ratio = (unsigned long) nr_pages * nr_active_pages / ((nr_inactive_pages + 1) * 2);
 	refill_inactive(ratio);
 
-	return shrink_cache(nr_pages, classzone, gfp_mask, priority);
+	nr_pages = shrink_cache(nr_pages, classzone, gfp_mask, priority);
+	if (nr_pages <= 0)
+		return 0;
+
+	shrink_dcache_memory(priority, gfp_mask);
+	shrink_icache_memory(priority, gfp_mask);
+#ifdef CONFIG_QUOTA
+	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
+#endif
+
+	return nr_pages;
 }
 
 int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int order)
 {
-	int ret = 0;
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
 
@@ -592,7 +587,14 @@ int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int ord
 			return 1;
 	} while (--priority);
 
-	return ret;
+	/*
+	 * Hmm.. Cache shrink failed - time to kill something?
+	 * Mhwahahhaha! This is the part I really like. Giggle.
+	 */
+	if (out_of_memory())
+		oom_kill();
+
+	return 0;
 }
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
@@ -647,9 +649,6 @@ static void kswapd_balance(void)
 		do
 			need_more_balance |= kswapd_balance_pgdat(pgdat);
 		while ((pgdat = pgdat->node_next));
-		if (need_more_balance && out_of_memory()) {
-			oom_kill();	
-		}
 	} while (need_more_balance);
 }
 

@@ -548,16 +548,12 @@ static inline void ipgre_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
 static inline u8
 ipgre_ecn_encapsulate(u8 tos, struct iphdr *old_iph, struct sk_buff *skb)
 {
-#ifdef CONFIG_INET_ECN
 	u8 inner = 0;
 	if (skb->protocol == __constant_htons(ETH_P_IP))
 		inner = old_iph->tos;
 	else if (skb->protocol == __constant_htons(ETH_P_IPV6))
 		inner = ip6_get_dsfield((struct ipv6hdr*)old_iph);
 	return INET_ECN_encapsulate(tos, inner);
-#else
-	return tos;
-#endif
 }
 
 int ipgre_rcv(struct sk_buff *skb)

@@ -621,7 +621,7 @@ failed:
 	return error;
 }
 
-struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address)
+struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused)
 {
 	struct page * page;
 	unsigned int idx;

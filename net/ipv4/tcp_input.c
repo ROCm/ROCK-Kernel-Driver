@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_input.c,v 1.237 2001/09/21 21:27:34 davem Exp $
+ * Version:	$Id: tcp_input.c,v 1.238 2001/10/20 00:00:11 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -69,10 +69,6 @@
 #include <net/inet_common.h>
 #include <linux/ipsec.h>
 
-
-/* These are on by default so the code paths get tested.
- * For the final 2.2 this may be undone at our discretion. -DaveM
- */
 int sysctl_tcp_timestamps = 1;
 int sysctl_tcp_window_scaling = 1;
 int sysctl_tcp_sack = 1;

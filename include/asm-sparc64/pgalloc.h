@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.26 2001/10/18 09:06:37 davem Exp $ */
+/* $Id: pgalloc.h,v 1.29 2001/10/20 12:38:51 davem Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -34,9 +34,9 @@ extern void __flush_dcache_page(void *addr, int flush_icache);
 extern void __flush_icache_page(unsigned long);
 extern void flush_dcache_page_impl(struct page *page);
 #ifdef CONFIG_SMP
-extern void smp_flush_dcache_page_impl(struct page *page);
+extern void smp_flush_dcache_page_impl(struct page *page, int cpu);
 #else
-#define smp_flush_dcache_page_impl flush_dcache_page_impl
+#define smp_flush_dcache_page_impl(page,cpu) flush_dcache_page_impl(page)
 #endif
 
 extern void flush_dcache_page(struct page *page);

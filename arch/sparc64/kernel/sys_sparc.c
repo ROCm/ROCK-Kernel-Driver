@@ -1,4 +1,4 @@
-/* $Id: sys_sparc.c,v 1.52 2001/04/14 01:12:02 davem Exp $
+/* $Id: sys_sparc.c,v 1.54 2001/10/28 20:49:13 davem Exp $
  * linux/arch/sparc64/kernel/sys_sparc.c
  *
  * This file contains various random system calls that
@@ -255,13 +255,27 @@ extern asmlinkage long sys_personality(unsigned long);
 
 asmlinkage int sparc64_personality(unsigned long personality)
 {
-	int ret;
-	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
-		personality = PER_LINUX32;
-	ret = sys_personality(personality);
-	if (ret == PER_LINUX32)
+	unsigned long ret, trying, orig_ret;
+
+	trying = ret = personality;
+
+	if (current->personality == PER_LINUX32 &&
+	    trying == PER_LINUX)
+		trying = ret = PER_LINUX32;
+
+	/* For PER_LINUX32 we want to retain &default_exec_domain.  */
+	if (trying == PER_LINUX32)
 		ret = PER_LINUX;
-	return ret;
+
+	orig_ret = ret;
+	ret = sys_personality(ret);
+
+	if (orig_ret == PER_LINUX && trying == PER_LINUX32) {
+		current->personality = PER_LINUX32;
+		ret = PER_LINUX;
+	}
+
+	return (int) ret;
 }
 
 /* Linux version of mmap */

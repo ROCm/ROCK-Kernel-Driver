@@ -1245,8 +1245,9 @@ static inline void xfer_secondary_pool(struct entropy_store *r,
 
 	if (r->entropy_count < nbytes * 8 &&
 	    r->entropy_count < r->poolinfo.POOLBITS) {
-		int nwords = min(r->poolinfo.poolwords - r->entropy_count/32,
-				 sizeof(tmp) / 4);
+		int nwords = min_t(int,
+				   r->poolinfo.poolwords - r->entropy_count/32,
+				   sizeof(tmp) / 4);
 
 		DEBUG_ENT("xfer %d from primary to %s (have %d, need %d)\n",
 			  nwords * 32,

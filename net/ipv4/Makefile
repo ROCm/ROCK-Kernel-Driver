@@ -27,6 +27,3 @@ obj-$(CONFIG_SYN_COOKIES) += syncookies.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 
 include $(TOPDIR)/Rules.make
-
-tar:
-		tar -cvf /dev/f1 .

@@ -3233,6 +3233,7 @@ static ST_buffer *
 				break;
 			}
 		}
+		tb->sg[0].page = NULL;
 		if (tb->sg[segs].address == NULL) {
 			kfree(tb);
 			tb = NULL;
@@ -3264,6 +3265,7 @@ static ST_buffer *
 					tb = NULL;
 					break;
 				}
+				tb->sg[segs].page = NULL;
 				tb->sg[segs].length = b_size;
 				got += b_size;
 				segs++;
@@ -3337,6 +3339,7 @@ static int enlarge_buffer(ST_buffer * STbuffer, int new_size, int need_dma)
 			normalize_buffer(STbuffer);
 			return FALSE;
 		}
+		STbuffer->sg[segs].page = NULL;
 		STbuffer->sg[segs].length = b_size;
 		STbuffer->sg_segs += 1;
 		got += b_size;

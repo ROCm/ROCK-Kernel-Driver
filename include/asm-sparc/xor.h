@@ -26,28 +26,27 @@ sparc_2(unsigned long bytes, unsigned long *p1, unsigned long *p2)
 	int lines = bytes / (sizeof (long)) / 8;
 
 	do {
-		__asm__ __volatile__("
-		  ldd [%0 + 0x00], %%g2
-		  ldd [%0 + 0x08], %%g4
-		  ldd [%0 + 0x10], %%o0
-		  ldd [%0 + 0x18], %%o2
-		  ldd [%1 + 0x00], %%o4
-		  ldd [%1 + 0x08], %%l0
-		  ldd [%1 + 0x10], %%l2
-		  ldd [%1 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  std %%g2, [%0 + 0x00]
-		  std %%g4, [%0 + 0x08]
-		  std %%o0, [%0 + 0x10]
-		  std %%o2, [%0 + 0x18]
-		  "
+		__asm__ __volatile__(
+		  "ldd [%0 + 0x00], %%g2\n\t"
+		  "ldd [%0 + 0x08], %%g4\n\t"
+		  "ldd [%0 + 0x10], %%o0\n\t"
+		  "ldd [%0 + 0x18], %%o2\n\t"
+		  "ldd [%1 + 0x00], %%o4\n\t"
+		  "ldd [%1 + 0x08], %%l0\n\t"
+		  "ldd [%1 + 0x10], %%l2\n\t"
+		  "ldd [%1 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "std %%g2, [%0 + 0x00]\n\t"
+		  "std %%g4, [%0 + 0x08]\n\t"
+		  "std %%o0, [%0 + 0x10]\n\t"
+		  "std %%o2, [%0 + 0x18]\n"
 		:
 		: "r" (p1), "r" (p2)
 		: "g2", "g3", "g4", "g5",
@@ -65,40 +64,39 @@ sparc_3(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	int lines = bytes / (sizeof (long)) / 8;
 
 	do {
-		__asm__ __volatile__("
-		  ldd [%0 + 0x00], %%g2
-		  ldd [%0 + 0x08], %%g4
-		  ldd [%0 + 0x10], %%o0
-		  ldd [%0 + 0x18], %%o2
-		  ldd [%1 + 0x00], %%o4
-		  ldd [%1 + 0x08], %%l0
-		  ldd [%1 + 0x10], %%l2
-		  ldd [%1 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%2 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%2 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%2 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%2 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  std %%g2, [%0 + 0x00]
-		  std %%g4, [%0 + 0x08]
-		  std %%o0, [%0 + 0x10]
-		  std %%o2, [%0 + 0x18]
-		  "
+		__asm__ __volatile__(
+		  "ldd [%0 + 0x00], %%g2\n\t"
+		  "ldd [%0 + 0x08], %%g4\n\t"
+		  "ldd [%0 + 0x10], %%o0\n\t"
+		  "ldd [%0 + 0x18], %%o2\n\t"
+		  "ldd [%1 + 0x00], %%o4\n\t"
+		  "ldd [%1 + 0x08], %%l0\n\t"
+		  "ldd [%1 + 0x10], %%l2\n\t"
+		  "ldd [%1 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%2 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%2 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%2 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%2 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "std %%g2, [%0 + 0x00]\n\t"
+		  "std %%g4, [%0 + 0x08]\n\t"
+		  "std %%o0, [%0 + 0x10]\n\t"
+		  "std %%o2, [%0 + 0x18]\n"
 		:
 		: "r" (p1), "r" (p2), "r" (p3)
 		: "g2", "g3", "g4", "g5",
@@ -117,52 +115,51 @@ sparc_4(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	int lines = bytes / (sizeof (long)) / 8;
 
 	do {
-		__asm__ __volatile__("
-		  ldd [%0 + 0x00], %%g2
-		  ldd [%0 + 0x08], %%g4
-		  ldd [%0 + 0x10], %%o0
-		  ldd [%0 + 0x18], %%o2
-		  ldd [%1 + 0x00], %%o4
-		  ldd [%1 + 0x08], %%l0
-		  ldd [%1 + 0x10], %%l2
-		  ldd [%1 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%2 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%2 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%2 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%2 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%3 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%3 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%3 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%3 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  std %%g2, [%0 + 0x00]
-		  std %%g4, [%0 + 0x08]
-		  std %%o0, [%0 + 0x10]
-		  std %%o2, [%0 + 0x18]
-		  "
+		__asm__ __volatile__(
+		  "ldd [%0 + 0x00], %%g2\n\t"
+		  "ldd [%0 + 0x08], %%g4\n\t"
+		  "ldd [%0 + 0x10], %%o0\n\t"
+		  "ldd [%0 + 0x18], %%o2\n\t"
+		  "ldd [%1 + 0x00], %%o4\n\t"
+		  "ldd [%1 + 0x08], %%l0\n\t"
+		  "ldd [%1 + 0x10], %%l2\n\t"
+		  "ldd [%1 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%2 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%2 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%2 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%2 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%3 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%3 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%3 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%3 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "std %%g2, [%0 + 0x00]\n\t"
+		  "std %%g4, [%0 + 0x08]\n\t"
+		  "std %%o0, [%0 + 0x10]\n\t"
+		  "std %%o2, [%0 + 0x18]\n"
 		:
 		: "r" (p1), "r" (p2), "r" (p3), "r" (p4)
 		: "g2", "g3", "g4", "g5",
@@ -182,64 +179,63 @@ sparc_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 	int lines = bytes / (sizeof (long)) / 8;
 
 	do {
-		__asm__ __volatile__("
-		  ldd [%0 + 0x00], %%g2
-		  ldd [%0 + 0x08], %%g4
-		  ldd [%0 + 0x10], %%o0
-		  ldd [%0 + 0x18], %%o2
-		  ldd [%1 + 0x00], %%o4
-		  ldd [%1 + 0x08], %%l0
-		  ldd [%1 + 0x10], %%l2
-		  ldd [%1 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%2 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%2 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%2 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%2 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%3 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%3 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%3 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%3 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  ldd [%4 + 0x00], %%o4
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  ldd [%4 + 0x08], %%l0
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  ldd [%4 + 0x10], %%l2
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  ldd [%4 + 0x18], %%l4
-		  xor %%g2, %%o4, %%g2
-		  xor %%g3, %%o5, %%g3
-		  xor %%g4, %%l0, %%g4
-		  xor %%g5, %%l1, %%g5
-		  xor %%o0, %%l2, %%o0
-		  xor %%o1, %%l3, %%o1
-		  xor %%o2, %%l4, %%o2
-		  xor %%o3, %%l5, %%o3
-		  std %%g2, [%0 + 0x00]
-		  std %%g4, [%0 + 0x08]
-		  std %%o0, [%0 + 0x10]
-		  std %%o2, [%0 + 0x18]
-		  "
+		__asm__ __volatile__(
+		  "ldd [%0 + 0x00], %%g2\n\t"
+		  "ldd [%0 + 0x08], %%g4\n\t"
+		  "ldd [%0 + 0x10], %%o0\n\t"
+		  "ldd [%0 + 0x18], %%o2\n\t"
+		  "ldd [%1 + 0x00], %%o4\n\t"
+		  "ldd [%1 + 0x08], %%l0\n\t"
+		  "ldd [%1 + 0x10], %%l2\n\t"
+		  "ldd [%1 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%2 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%2 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%2 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%2 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%3 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%3 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%3 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%3 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "ldd [%4 + 0x00], %%o4\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "ldd [%4 + 0x08], %%l0\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "ldd [%4 + 0x10], %%l2\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "ldd [%4 + 0x18], %%l4\n\t"
+		  "xor %%g2, %%o4, %%g2\n\t"
+		  "xor %%g3, %%o5, %%g3\n\t"
+		  "xor %%g4, %%l0, %%g4\n\t"
+		  "xor %%g5, %%l1, %%g5\n\t"
+		  "xor %%o0, %%l2, %%o0\n\t"
+		  "xor %%o1, %%l3, %%o1\n\t"
+		  "xor %%o2, %%l4, %%o2\n\t"
+		  "xor %%o3, %%l5, %%o3\n\t"
+		  "std %%g2, [%0 + 0x00]\n\t"
+		  "std %%g4, [%0 + 0x08]\n\t"
+		  "std %%o0, [%0 + 0x10]\n\t"
+		  "std %%o2, [%0 + 0x18]\n"
 		:
 		: "r" (p1), "r" (p2), "r" (p3), "r" (p4), "r" (p5)
 		: "g2", "g3", "g4", "g5",

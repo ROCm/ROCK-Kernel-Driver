@@ -189,7 +189,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 		     struct inode * p_s_inode,
 		     struct page *page, 
 		     struct path * p_s_path, /* path to the indirect item. */
-		     struct cpu_key * p_s_item_key, /* Key to look for unformatted node pointer to be cut. */
+		     const struct cpu_key * p_s_item_key, /* Key to look for unformatted node pointer to be cut. */
 		     loff_t n_new_file_size, /* New file size. */
 		     char * p_c_mode)
 {

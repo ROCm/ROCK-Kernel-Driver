@@ -369,9 +369,9 @@ static int clear_prepared_bits(struct buffer_head *bh) {
 }
 
 /* buffer is in current transaction */
-inline int buffer_journaled(struct buffer_head *bh) {
+inline int buffer_journaled(const struct buffer_head *bh) {
   if (bh)
-    return test_bit(BH_JDirty, &bh->b_state) ;
+    return test_bit(BH_JDirty, ( struct buffer_head * ) &bh->b_state) ;
   else
     return 0 ;
 }
@@ -379,9 +379,9 @@ inline int buffer_journaled(struct buffer_head *bh) {
 /* disk block was taken off free list before being in a finished transation, or written to disk
 ** journal_new blocks can be reused immediately, for any purpose
 */ 
-inline int buffer_journal_new(struct buffer_head *bh) {
+inline int buffer_journal_new(const struct buffer_head *bh) {
   if (bh) 
-    return test_bit(BH_JNew, &bh->b_state) ;
+    return test_bit(BH_JNew, ( struct buffer_head * )&bh->b_state) ;
   else
     return 0 ;
 }
@@ -725,8 +725,8 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
       retry_count++ ;
       goto retry;
     }
-    reiserfs_panic(s, "journal-563: flush_commit_list: BAD, j_commit_left is %lu, should be 1\n", 
-                       atomic_read(&(jl->j_commit_left)));
+    reiserfs_panic(s, "journal-563: flush_commit_list: BAD, j_commit_left is %u, should be 1\n", 
+		   atomic_read(&(jl->j_commit_left)));
   }
 
   mark_buffer_dirty(jl->j_commit_bh) ;
@@ -866,7 +866,7 @@ static int flush_older_journal_lists(struct super_block *p_s_sb, struct reiserfs
 
 static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
     if (buffer_journaled(bh)) {
-        reiserfs_warning("clm-2084: pinned buffer %u:%s sent to disk\n",
+        reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
 	                 bh->b_blocknr, kdevname(bh->b_dev)) ;
     }
     mark_buffer_uptodate(bh, uptodate) ;
@@ -2108,7 +2108,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   }
 
   if (th->t_trans_id != SB_JOURNAL(p_s_sb)->j_trans_id) {
-    reiserfs_panic(th->t_super, "journal-1577: handle trans id %d != current trans id %d\n", 
+    reiserfs_panic(th->t_super, "journal-1577: handle trans id %ld != current trans id %ld\n", 
                    th->t_trans_id, SB_JOURNAL(p_s_sb)->j_trans_id);
   }
   p_s_sb->s_dirt = 1 ;
@@ -2445,7 +2445,7 @@ static int check_journal_end(struct reiserfs_transaction_handle *th, struct supe
   int wait_on_commit = flags & WAIT ;
 
   if (th->t_trans_id != SB_JOURNAL(p_s_sb)->j_trans_id) {
-    reiserfs_panic(th->t_super, "journal-1577: handle trans id %d != current trans id %d\n", 
+    reiserfs_panic(th->t_super, "journal-1577: handle trans id %ld != current trans id %ld\n", 
                    th->t_trans_id, SB_JOURNAL(p_s_sb)->j_trans_id);
   }
 
@@ -2516,7 +2516,7 @@ static int check_journal_end(struct reiserfs_transaction_handle *th, struct supe
   }
 
   if (SB_JOURNAL(p_s_sb)->j_start > JOURNAL_BLOCK_COUNT) {
-    reiserfs_panic(p_s_sb, "journal-003: journal_end: j_start (%d) is too high\n", SB_JOURNAL(p_s_sb)->j_start) ;
+    reiserfs_panic(p_s_sb, "journal-003: journal_end: j_start (%ld) is too high\n", SB_JOURNAL(p_s_sb)->j_start) ;
   }
   return 1 ;
 }

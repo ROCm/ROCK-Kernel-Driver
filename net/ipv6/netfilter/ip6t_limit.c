@@ -13,7 +13,7 @@
 #include <linux/interrupt.h>
 
 #include <linux/netfilter_ipv6/ip6_tables.h>
-#include <linux/netfilter_ipv4/ipt_limit.h>
+#include <linux/netfilter_ipv6/ip6t_limit.h>
 
 /* The algorithm used is the Simple Token Bucket Filter (TBF)
  * see net/sched/sch_tbf.c in the linux source tree
@@ -42,7 +42,7 @@ static spinlock_t limit_lock = SPIN_LOCK_UNLOCKED;
 #define CREDITS_PER_JIFFY 128
 
 static int
-ipt_limit_match(const struct sk_buff *skb,
+ip6t_limit_match(const struct sk_buff *skb,
 		const struct net_device *in,
 		const struct net_device *out,
 		const void *matchinfo,
@@ -51,7 +51,7 @@ ipt_limit_match(const struct sk_buff *skb,
 		u_int16_t datalen,
 		int *hotdrop)
 {
-	struct ipt_rateinfo *r = ((struct ipt_rateinfo *)matchinfo)->master;
+	struct ip6t_rateinfo *r = ((struct ip6t_rateinfo *)matchinfo)->master;
 	unsigned long now = jiffies;
 
 	spin_lock_bh(&limit_lock);
@@ -77,32 +77,32 @@ user2credits(u_int32_t user)
 	/* If multiplying would overflow... */
 	if (user > 0xFFFFFFFF / (HZ*CREDITS_PER_JIFFY))
 		/* Divide first. */
-		return (user / IPT_LIMIT_SCALE) * HZ * CREDITS_PER_JIFFY;
+		return (user / IP6T_LIMIT_SCALE) * HZ * CREDITS_PER_JIFFY;
 
-	return (user * HZ * CREDITS_PER_JIFFY) / IPT_LIMIT_SCALE;
+	return (user * HZ * CREDITS_PER_JIFFY) / IP6T_LIMIT_SCALE;
 }
 
 static int
-ipt_limit_checkentry(const char *tablename,
+ip6t_limit_checkentry(const char *tablename,
 		     const struct ip6t_ip6 *ip,
 		     void *matchinfo,
 		     unsigned int matchsize,
 		     unsigned int hook_mask)
 {
-	struct ipt_rateinfo *r = matchinfo;
+	struct ip6t_rateinfo *r = matchinfo;
 
-	if (matchsize != IP6T_ALIGN(sizeof(struct ipt_rateinfo)))
+	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_rateinfo)))
 		return 0;
 
 	/* Check for overflow. */
 	if (r->burst == 0
 	    || user2credits(r->avg * r->burst) < user2credits(r->avg)) {
-		printk("Call rusty: overflow in ipt_limit: %u/%u\n",
+		printk("Call rusty: overflow in ip6t_limit: %u/%u\n",
 		       r->avg, r->burst);
 		return 0;
 	}
 
-	/* User avg in seconds * IPT_LIMIT_SCALE: convert to jiffies *
+	/* User avg in seconds * IP6T_LIMIT_SCALE: convert to jiffies *
 	   128. */
 	r->prev = jiffies;
 	r->credit = user2credits(r->avg * r->burst);	 /* Credits full. */
@@ -115,20 +115,20 @@ ipt_limit_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ip6t_match ipt_limit_reg
-= { { NULL, NULL }, "limit", ipt_limit_match, ipt_limit_checkentry, NULL,
+static struct ip6t_match ip6t_limit_reg
+= { { NULL, NULL }, "limit", ip6t_limit_match, ip6t_limit_checkentry, NULL,
     THIS_MODULE };
 
 static int __init init(void)
 {
-	if (ip6t_register_match(&ipt_limit_reg))
+	if (ip6t_register_match(&ip6t_limit_reg))
 		return -EINVAL;
 	return 0;
 }
 
 static void __exit fini(void)
 {
-	ip6t_unregister_match(&ipt_limit_reg);
+	ip6t_unregister_match(&ip6t_limit_reg);
 }
 
 module_init(init);

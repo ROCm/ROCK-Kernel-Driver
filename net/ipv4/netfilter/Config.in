@@ -7,6 +7,7 @@ comment '  IP: Netfilter Configuration'
 tristate 'Connection tracking (required for masq/NAT)' CONFIG_IP_NF_CONNTRACK
 if [ "$CONFIG_IP_NF_CONNTRACK" != "n" ]; then
   dep_tristate '  FTP protocol support' CONFIG_IP_NF_FTP $CONFIG_IP_NF_CONNTRACK
+  dep_tristate '  IRC protocol support' CONFIG_IP_NF_IRC $CONFIG_IP_NF_CONNTRACK
 fi
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_NETLINK" = "y" ]; then
@@ -20,6 +21,8 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
   dep_tristate '  netfilter MARK match support' CONFIG_IP_NF_MATCH_MARK $CONFIG_IP_NF_IPTABLES
   dep_tristate '  Multiple port match support' CONFIG_IP_NF_MATCH_MULTIPORT $CONFIG_IP_NF_IPTABLES
   dep_tristate '  TOS match support' CONFIG_IP_NF_MATCH_TOS $CONFIG_IP_NF_IPTABLES
+  dep_tristate '  LENGTH match support' CONFIG_IP_NF_MATCH_LENGTH $CONFIG_IP_NF_IPTABLES
+  dep_tristate '  TTL match support' CONFIG_IP_NF_MATCH_TTL $CONFIG_IP_NF_IPTABLES
   dep_tristate '  tcpmss match support' CONFIG_IP_NF_MATCH_TCPMSS $CONFIG_IP_NF_IPTABLES
   if [ "$CONFIG_IP_NF_CONNTRACK" != "n" ]; then
     dep_tristate '  Connection state match support' CONFIG_IP_NF_MATCH_STATE $CONFIG_IP_NF_CONNTRACK $CONFIG_IP_NF_IPTABLES 
@@ -43,6 +46,16 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
       define_bool CONFIG_IP_NF_NAT_NEEDED y
       dep_tristate '    MASQUERADE target support' CONFIG_IP_NF_TARGET_MASQUERADE $CONFIG_IP_NF_NAT
       dep_tristate '    REDIRECT target support' CONFIG_IP_NF_TARGET_REDIRECT $CONFIG_IP_NF_NAT
+      if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+        dep_tristate '    Basic SNMP-ALG support (EXPERIMENTAL)' CONFIG_IP_NF_NAT_SNMP_BASIC $CONFIG_IP_NF_NAT
+      fi
+      if [ "$CONFIG_IP_NF_IRC" = "m" ]; then
+        define_tristate CONFIG_IP_NF_NAT_IRC m
+      else
+        if [ "$CONFIG_IP_NF_IRC" = "y" ]; then
+          define_tristate CONFIG_IP_NF_NAT_IRC $CONFIG_IP_NF_NAT
+        fi
+      fi
       # If they want FTP, set to $CONFIG_IP_NF_NAT (m or y), 
       # or $CONFIG_IP_NF_FTP (m or y), whichever is weaker.  Argh.
       if [ "$CONFIG_IP_NF_FTP" = "m" ]; then

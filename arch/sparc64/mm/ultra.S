@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.63 2001/10/17 19:30:21 davem Exp $
+/* $Id: ultra.S,v 1.67 2001/10/23 14:28:20 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -505,7 +505,7 @@ xcall_report_regs:
 
 	.align		32
 	.globl		xcall_flush_dcache_page_cheetah
-xcall_flush_dcache_page_cheetah:
+xcall_flush_dcache_page_cheetah: /* %g1 == physical page address */
 	sethi		%hi(PAGE_SIZE), %g3
 1:	subcc		%g3, (1 << 5), %g3
 	stxa		%g0, [%g1 + %g3] ASI_DCACHE_INVALIDATE
@@ -516,18 +516,39 @@ xcall_flush_dcache_page_cheetah:
 	nop
 
 	.globl		xcall_flush_dcache_page_spitfire
-xcall_flush_dcache_page_spitfire:
-	rdpr		%pstate, %g2
-	wrpr		%g2, PSTATE_IG | PSTATE_AG, %pstate
-	rdpr		%pil, %g2
-	wrpr		%g0, 15, %pil
-	sethi		%hi(109f), %g7
-	b,pt		%xcc, etrap_irq
-109:	 or		%g7, %lo(109b), %g7
-	call		smp_flush_dcache_page_client
+xcall_flush_dcache_page_spitfire: /* %g1 == physical page address
+				     %g7 == kernel page virtual address
+				     %g5 == (page->mapping != NULL)  */
+#if (L1DCACHE_SIZE > PAGE_SIZE)
+	srlx		%g1, (13 - 2), %g1	! Form tag comparitor
+	sethi		%hi(L1DCACHE_SIZE), %g3	! D$ size == 16K
+	sub		%g3, (1 << 5), %g3	! D$ linesize == 32
+1:	ldxa		[%g3] ASI_DCACHE_TAG, %g2
+	andcc		%g2, 0x3, %g0
+	be,pn		%xcc, 2f
+	 andn		%g2, 0x3, %g2
+	cmp		%g2, %g1
+
+	bne,pt		%xcc, 2f
 	 nop
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	stxa		%g0, [%g3] ASI_DCACHE_TAG
+	membar		#Sync
+2:	cmp		%g3, 0
+	bne,pt		%xcc, 1b
+	 sub		%g3, (1 << 5), %g3
+
+	brz,pn		%g5, 2f
+#endif /* L1DCACHE_SIZE > PAGE_SIZE */
+	 sethi		%hi(PAGE_SIZE), %g3
+
+1:	flush		%g7
+	subcc		%g3, (1 << 5), %g3
+	bne,pt		%icc, 1b
+	 add		%g7, (1 << 5), %g7
+
+2:	retry
+	nop
+	nop
 
 	.globl		xcall_capture
 xcall_capture:

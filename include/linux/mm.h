@@ -125,7 +125,7 @@ extern pgprot_t protection_map[16];
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
 	void (*close)(struct vm_area_struct * area);
-	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address);
+	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
 };
 
 /*
@@ -399,7 +399,6 @@ extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
 /*
  * There is only one 'core' page-freeing function.
  */
-extern void FASTCALL(free_lru_page(struct page *));
 extern void FASTCALL(__free_pages(struct page *page, unsigned int order));
 extern void FASTCALL(free_pages(unsigned long addr, unsigned int order));
 
@@ -412,7 +411,7 @@ extern void show_free_areas_node(pg_data_t *pgdat);
 extern void clear_page_tables(struct mm_struct *, unsigned long, int);
 
 extern int fail_writepage(struct page *);
-struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address);
+struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
 struct file *shmem_file_setup(char * name, loff_t size);
 extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
@@ -525,7 +524,7 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 
 /* generic vm_area_ops exported for stackable file systems */
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
-extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long);
+extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /*
  * GFP bitmasks..

@@ -1,10 +1,6 @@
 #ifndef _INET_ECN_H_
 #define _INET_ECN_H_
 
-#include <linux/config.h>
-
-#ifdef CONFIG_INET_ECN
-
 static inline int INET_ECN_is_ce(__u8 dsfield)
 {
 	return (dsfield&3) == 3;
@@ -39,18 +35,6 @@ static inline __u8 INET_ECN_encapsulate(__u8 outer, __u8 inner)
 	if (INET_ECN_is_capable((sk)->protinfo.af_inet.tos))	\
 		(label) |= __constant_htons(2 << 4);		\
     } while (0)
-
-
-#else
-#define INET_ECN_is_ce(x...)		(0)
-#define INET_ECN_is_not_ce(x...)	(0)
-#define INET_ECN_is_capable(x...)	(0)
-#define INET_ECN_encapsulate(x, y)	(x)
-#define IP6_ECN_flow_init(x...)		do { } while (0)
-#define	IP6_ECN_flow_xmit(x...)		do { } while (0)
-#define	INET_ECN_xmit(x...)		do { } while (0)
-#define	INET_ECN_dontxmit(x...)		do { } while (0)
-#endif
 
 static inline void IP_ECN_set_ce(struct iphdr *iph)
 {

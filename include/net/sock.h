@@ -416,6 +416,8 @@ struct tcp_opt {
 	unsigned int		keepalive_time;	  /* time before keep alive takes place */
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 	int			linger2;
+
+	unsigned long last_synq_overflow; 
 };
 
  	

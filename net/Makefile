@@ -45,6 +45,7 @@ subdir-$(CONFIG_SUNRPC)		+= sunrpc
 subdir-$(CONFIG_ATM)		+= atm
 subdir-$(CONFIG_DECNET)		+= decnet
 subdir-$(CONFIG_ECONET)		+= econet
+subdir-$(CONFIG_VLAN_8021Q)           += 8021q
 
 
 obj-y	:= socket.o $(join $(subdir-y), $(patsubst %,/%.o,$(notdir $(subdir-y))))

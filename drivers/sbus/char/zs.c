@@ -1,4 +1,4 @@
-/* $Id: zs.c,v 1.67 2001/10/13 08:27:50 davem Exp $
+/* $Id: zs.c,v 1.68 2001/10/25 18:48:03 davem Exp $
  * zs.c: Zilog serial port driver for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -1933,7 +1933,7 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	char *revision = "$Revision: 1.67 $";
+	char *revision = "$Revision: 1.68 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2058,16 +2058,7 @@ static struct sun_zslayout * __init get_zs(int chip)
 	if (mapped_addr != 0) {
 		return (struct sun_zslayout *) mapped_addr;
 	} else {
-		pgd_t *pgd = pgd_offset_k((unsigned long)vaddr[0]);
-		pmd_t *pmd = pmd_offset(pgd, (unsigned long)vaddr[0]);
-		pte_t *pte = pte_offset(pmd, (unsigned long)vaddr[0]);
-		unsigned long base = pte_val(*pte) & _PAGE_PADDR;
-
-		/* Translate PROM's mapping we captured at boot
-		 * time into physical address.
-		 */
-		base += ((unsigned long)vaddr[0] & ~PAGE_MASK);
-		return (struct sun_zslayout *) base;
+		return (struct sun_zslayout *) prom_virt_to_phys((unsigned long)vaddr[0], 0);
 	}
 }
 #else /* !(__sparc_v9__) */

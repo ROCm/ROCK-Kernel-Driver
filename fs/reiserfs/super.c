@@ -23,7 +23,8 @@
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
 
-
+char reiserfs_super_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
+char reiser2fs_super_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
 
 //
 // a portion of this function, particularly the VFS interface portion,

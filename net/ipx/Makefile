@@ -23,6 +23,3 @@ obj-$(CONFIG_SYSCTL) += sysctl_net_ipx.o
 obj-$(CONFIG_SPX) += af_spx.o
 
 include $(TOPDIR)/Rules.make
-
-tar:
-		tar -cvf /dev/f1 .

@@ -1682,7 +1682,7 @@ static void nopage_sequential_readahead(struct vm_area_struct * vma,
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
-struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address)
+struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
 	int error;
 	struct file *file = area->vm_file;

@@ -1,5 +1,5 @@
 /*
- *  $Id: ipconfig.c,v 1.39 2001/10/13 01:47:31 davem Exp $
+ *  $Id: ipconfig.c,v 1.40 2001/10/30 03:08:02 davem Exp $
  *
  *  Automatic Configuration of IP -- use DHCP, BOOTP, RARP, or
  *  user-supplied information to configure own IP address and routes.
@@ -861,6 +861,13 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 				printk(" by server %u.%u.%u.%u\n",
 				       NIPQUAD(ic_servaddr));
 #endif
+				/* The DHCP indicated server address takes
+				 * precedence over the bootp header one if
+				 * they are different.
+				 */
+				if ((server_id != INADDR_NONE) &&
+				    (b->server_ip != server_id))
+					b->server_ip = ic_servaddr;
 				break;
 
 			case DHCPACK:

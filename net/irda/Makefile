@@ -41,10 +41,3 @@ obj-y += ircomm/ircomm_and_tty.o
 endif
 
 include $(TOPDIR)/Rules.make
-
-tar:
-		tar -cvf /dev/f1 .
-
-
-
-

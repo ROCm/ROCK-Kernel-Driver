@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.113 2001/10/17 18:26:58 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.116 2001/10/26 15:49:21 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -126,7 +126,9 @@ EXPORT_SYMBOL(kernel_flag);
 
 /* Hard IRQ locking */
 EXPORT_SYMBOL(global_irq_holder);
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
+#endif
 EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
@@ -136,7 +138,9 @@ EXPORT_SYMBOL(__global_restore_flags);
 EXPORT_SYMBOL(cpu_data);
 
 /* Misc SMP information */
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(smp_num_cpus);
+#endif
 EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(__cpu_logical_map);
 
@@ -151,7 +155,9 @@ EXPORT_SYMBOL(_do_write_lock);
 EXPORT_SYMBOL(_do_write_unlock);
 #endif
 
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(smp_call_function);
+#endif
 
 #endif
 
@@ -307,8 +313,6 @@ EXPORT_SYMBOL(prom_cpu_nodes);
 EXPORT_SYMBOL(sys_ioctl);
 EXPORT_SYMBOL(sys32_ioctl);
 EXPORT_SYMBOL(sparc32_open);
-EXPORT_SYMBOL(move_addr_to_kernel);
-EXPORT_SYMBOL(move_addr_to_user);
 #endif
 
 /* Special internal versions of library functions. */

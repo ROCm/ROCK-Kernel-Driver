@@ -1,10 +1,6 @@
 #ifndef _NET_TCP_ECN_H_
 #define _NET_TCP_ECN_H_ 1
 
-#include <linux/config.h>
-
-#ifdef CONFIG_INET_ECN
-
 #include <net/inet_ecn.h>
 
 #define TCP_HP_BITS (~(TCP_RESERVED_BITS|TCP_FLAG_PSH)|TCP_FLAG_ECE|TCP_FLAG_CWR)
@@ -132,31 +128,5 @@ TCP_ECN_create_request(struct open_request *req, struct tcphdr *th)
 	if (sysctl_tcp_ecn && th->ece && th->cwr)
 		req->ecn_ok = 1;
 }
-
-
-
-#else
-
-#define TCP_HP_BITS (~(TCP_RESERVED_BITS|TCP_FLAG_PSH))
-
-
-#define TCP_ECN_send_syn(x...)		do { } while (0)
-#define TCP_ECN_send_synack(x...)	do { } while (0)
-#define TCP_ECN_make_synack(x...)	do { } while (0)
-#define TCP_ECN_send(x...)		do { } while (0)
-
-#define TCP_ECN_queue_cwr(x...)		do { } while (0)
-
-#define TCP_ECN_accept_cwr(x...)	do { } while (0)
-#define TCP_ECN_check_ce(x...)		do { } while (0)
-#define TCP_ECN_rcv_synack(x...)	do { } while (0)
-#define TCP_ECN_rcv_syn(x...)		do { } while (0)
-#define TCP_ECN_rcv_ecn_echo(x...)	(0)
-#define TCP_ECN_openreq_child(x...)	do { } while (0)
-#define TCP_ECN_create_request(x...)	do { } while (0)
-#define TCP_ECN_withdraw_cwr(x...)	do { } while (0)
-
-
-#endif
 
 #endif

@@ -83,6 +83,10 @@ struct ip_conntrack_expect
 
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
 
+#if defined(CONFIG_IP_NF_IRC) || defined(CONFIG_IP_NF_IRC_MODULE)
+#include <linux/netfilter_ipv4/ip_conntrack_irc.h>
+#endif
+
 struct ip_conntrack
 {
 	/* Usage count in here is 1 for hash table/destruct timer, 1 per skb,
@@ -121,6 +125,9 @@ struct ip_conntrack
 
 	union {
 		struct ip_ct_ftp ct_ftp_info;
+#if defined(CONFIG_IP_NF_IRC) || defined(CONFIG_IP_NF_IRC_MODULE)
+		struct ip_ct_irc ct_irc_info;
+#endif
 	} help;
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED

@@ -5,7 +5,7 @@
  *
  *		PACKET - implements raw packet sockets.
  *
- * Version:	$Id: af_packet.c,v 1.56 2001/08/06 13:21:16 davem Exp $
+ * Version:	$Id: af_packet.c,v 1.57 2001/10/30 03:38:37 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -623,6 +623,18 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 
 	h->tp_status = status;
 	mb();
+
+	{
+		struct page *p_start, *p_end;
+		u8 *h_end = (u8 *)h + macoff + snaplen - 1;
+
+		p_start = virt_to_page(h);
+		p_end = virt_to_page(h_end);
+		while (p_start <= p_end) {
+			flush_dcache_page(p_start);
+			p_start++;
+		}
+	}
 
 	sk->data_ready(sk, 0);
 

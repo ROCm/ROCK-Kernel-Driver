@@ -26,6 +26,3 @@ endif
 obj-$(CONFIG_NET)	:= $(OBJS) $(OBJ2)
 
 include $(TOPDIR)/Rules.make
-
-tar:
-	tar -cvf /dev/f1 .

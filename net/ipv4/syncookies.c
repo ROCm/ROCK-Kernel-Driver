@@ -9,7 +9,7 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  * 
- *  $Id: syncookies.c,v 1.15 2001/10/15 12:34:50 davem Exp $
+ *  $Id: syncookies.c,v 1.17 2001/10/26 14:55:41 davem Exp $
  *
  *  Missing: IPv6 support. 
  */
@@ -22,8 +22,6 @@
 #include <net/tcp.h>
 
 extern int sysctl_tcp_syncookies;
-
-static unsigned long tcp_lastsynq_overflow;
 
 /* 
  * This table has to be sorted and terminated with (__u16)-1.
@@ -53,7 +51,9 @@ __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
 	int mssind;
 	const __u16 mss = *mssp;
 
-	tcp_lastsynq_overflow = jiffies;
+	
+	sk->tp_pinfo.af_tcp.last_synq_overflow = jiffies;
+
 	/* XXX sort msstab[] by probability?  Binary search? */
 	for (mssind = 0; mss > msstab[mssind + 1]; mssind++)
 		;
@@ -78,13 +78,10 @@ __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
  * Check if a ack sequence number is a valid syncookie. 
  * Return the decoded mss if it is, or 0 if not.
  */
-static inline int cookie_check(struct sk_buff *skb, __u32 cookie) 
+static inline int cookie_check(struct sk_buff *skb, __u32 cookie)
 {
 	__u32 seq; 
 	__u32 mssind;
-
-  	if ((jiffies - tcp_lastsynq_overflow) > TCP_TIMEOUT_INIT)
-		return 0; 
 
 	seq = ntohl(skb->h.th->seq)-1; 
 	mssind = check_tcp_syn_cookie(cookie,
@@ -126,8 +123,8 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	if (!sysctl_tcp_syncookies || !skb->h.th->ack)
 		goto out;
 
-	mss = cookie_check(skb, cookie);
-	if (!mss) {
+  	if (time_after(jiffies, sk->tp_pinfo.af_tcp.last_synq_overflow + TCP_TIMEOUT_INIT) ||
+	    (mss = cookie_check(skb, cookie)) == 0) {
 	 	NET_INC_STATS_BH(SyncookiesFailed);
 		goto out;
 	}

@@ -1,4 +1,4 @@
-/* $Id: uaccess.h,v 1.23 2001/09/24 03:51:39 davem Exp $
+/* $Id: uaccess.h,v 1.24 2001/10/30 04:32:24 davem Exp $
  * uaccess.h: User space memore access functions.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -322,16 +322,17 @@ __copy_res; })
 extern __inline__ __kernel_size_t __clear_user(void *addr, __kernel_size_t size)
 {
   __kernel_size_t ret;
-  __asm__ __volatile__ ("
-	.section __ex_table,#alloc
-	.align 4
-	.word 1f,3
-	.previous
-	mov %2, %%o1
-1:	call __bzero
-	 mov %1, %%o0
-	mov %%o0, %0 
-	" : "=r" (ret) : "r" (addr), "r" (size) :
+  __asm__ __volatile__ (
+	".section __ex_table,#alloc\n\t"
+	".align 4\n\t"
+	".word 1f,3\n\t"
+	".previous\n\t"
+	"mov %2, %%o1\n"
+	"1:\n\t"
+	"call __bzero\n\t"
+	" mov %1, %%o0\n\t"
+	"mov %%o0, %0\n"
+	: "=r" (ret) : "r" (addr), "r" (size) :
 	"o0", "o1", "o2", "o3", "o4", "o5", "o7",
 	"g1", "g2", "g3", "g4", "g5", "g7", "cc");
   return ret;

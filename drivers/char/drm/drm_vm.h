@@ -58,11 +58,13 @@ struct vm_operations_struct   DRM(vm_sg_ops) = {
 
 #if LINUX_VERSION_CODE < 0x020317
 unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
-			     unsigned long address)
+			     unsigned long address,
+			     int unused)
 #else
 				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
-			    unsigned long address)
+			    unsigned long address,
+			    int unused)
 #endif
 {
 #if __REALLY_HAVE_AGP
@@ -134,11 +136,13 @@ vm_nopage_error:
 
 #if LINUX_VERSION_CODE < 0x020317
 unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				 unsigned long address)
+				 unsigned long address,
+				 int unused)
 #else
 				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				unsigned long address)
+				unsigned long address,
+				int unused)
 #endif
 {
 #if LINUX_VERSION_CODE >= 0x020300
@@ -268,11 +272,13 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 
 #if LINUX_VERSION_CODE < 0x020317
 unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				 unsigned long address)
+				 unsigned long address,
+				 int unused)
 #else
 				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				unsigned long address)
+				unsigned long address,
+				int unused)
 #endif
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
@@ -303,11 +309,13 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 
 #if LINUX_VERSION_CODE < 0x020317
 unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				unsigned long address)
+				unsigned long address,
+				int unused)
 #else
 				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-			       unsigned long address)
+			       unsigned long address,
+			       int unused)
 #endif
 {
 #if LINUX_VERSION_CODE >= 0x020300

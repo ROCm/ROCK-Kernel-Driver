@@ -1,4 +1,4 @@
-/* $Id: ioport.c,v 1.44 2001/02/13 04:07:38 davem Exp $
+/* $Id: ioport.c,v 1.45 2001/10/30 04:54:21 davem Exp $
  * ioport.c:  Simple io mapping allocator.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -703,7 +703,7 @@ void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, i
 		}
 	}
 }
-#endif CONFIG_PCI
+#endif /* CONFIG_PCI */
 
 #ifdef CONFIG_PROC_FS
 
@@ -725,7 +725,7 @@ _sparc_io_get_info(char *buf, char **start, off_t fpos, int length, int *eof,
 	return p-buf;
 }
 
-#endif CONFIG_PROC_FS
+#endif /* CONFIG_PROC_FS */
 
 /*
  * This is a version of find_resource and it belongs to kernel/resource.c.

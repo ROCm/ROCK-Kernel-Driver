@@ -1060,7 +1060,10 @@ mount_it:
 	vfsmnt->mnt_root = dget(sb->s_root);
 	bdput(bdev); /* sb holds a reference */
 
+
+#ifdef CONFIG_ROOT_NFS
 attach_it:
+#endif
 	root_nd.mnt = root_vfsmnt;
 	root_nd.dentry = root_vfsmnt->mnt_sb->s_root;
 	graft_tree(vfsmnt, &root_nd);

@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.100 2001/10/15 12:34:50 davem Exp $
+ * Version:	$Id: route.c,v 1.101 2001/10/20 00:00:11 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -150,11 +150,7 @@ struct dst_ops ipv4_dst_ops = {
 	entry_size:		sizeof(struct rtable),
 };
 
-#ifdef CONFIG_INET_ECN
 #define ECN_OR_COST(class)	TC_PRIO_##class
-#else
-#define ECN_OR_COST(class)	TC_PRIO_FILLER
-#endif
 
 __u8 ip_tos2prio[16] = {
 	TC_PRIO_BESTEFFORT,

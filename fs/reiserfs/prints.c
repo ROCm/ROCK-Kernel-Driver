@@ -332,26 +332,8 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
   do_reiserfs_warning(fmt);
   printk ( KERN_EMERG "%s", error_buf);
   BUG ();
-  // console_print (error_buf);
-  // for (;;);
 
-  /* comment before release */
-  //for (;;);
-
-#if 0 /* this is not needed, the state is ignored */
-  if (sb && !(sb->s_flags & MS_RDONLY)) {
-    sb->u.reiserfs_sb.s_mount_state |= REISERFS_ERROR_FS;
-    sb->u.reiserfs_sb.s_rs->s_state = REISERFS_ERROR_FS;
-    
-    mark_buffer_dirty(sb->u.reiserfs_sb.s_sbh) ;
-    sb->s_dirt = 1;
-  }
-#endif
-
-  /* this is to prevent panic from syncing this filesystem */
-  if (sb)
-    sb->s_flags |= MS_RDONLY;
-
+  /* this is not actually called, but makes reiserfs_panic() "noreturn" */
   panic ("REISERFS: panic (device %s): %s\n",
 	 sb ? kdevname(sb->s_dev) : "sb == 0", error_buf);
 }

@@ -183,7 +183,10 @@ struct hh_cache
 {
 	struct hh_cache *hh_next;	/* Next entry			     */
 	atomic_t	hh_refcnt;	/* number of users                   */
-	unsigned short  hh_type;	/* protocol identifier, f.e ETH_P_IP */
+	unsigned short  hh_type;	/* protocol identifier, f.e ETH_P_IP
+                                         *  NOTE:  For VLANs, this will be the
+                                         *  encapuslated type. --BLG
+                                         */
 	int		hh_len;		/* length of header */
 	int		(*hh_output)(struct sk_buff *skb);
 	rwlock_t	hh_lock;
@@ -287,6 +290,11 @@ struct net_device
 
 	unsigned short		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		gflags;
+        unsigned short          priv_flags; /* Like 'flags' but invisible to userspace. */
+        unsigned short          unused_alignment_fixer; /* Because we need priv_flags,
+                                                         * and we want to be 32-bit aligned.
+                                                         */
+
 	unsigned		mtu;	/* interface MTU value		*/
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned short		hard_header_len;	/* hardware hdr length	*/

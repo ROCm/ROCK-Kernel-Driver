@@ -30,6 +30,7 @@
 #include <net/pkt_sched.h>
 #include <net/scm.h>
 #include <linux/if_bridge.h>
+#include <linux/if_vlan.h>
 #include <linux/random.h>
 #ifdef CONFIG_NET_DIVERT
 #include <linux/divert.h>
@@ -213,6 +214,12 @@ EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
+/* for 801q VLAN support */
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+EXPORT_SYMBOL(dev_change_flags);
+EXPORT_SYMBOL(vlan_ioctl_hook);
+#endif
+
 EXPORT_SYMBOL(sklist_destroy_socket);
 EXPORT_SYMBOL(sklist_insert_socket);
 
@@ -354,7 +361,6 @@ EXPORT_SYMBOL(tcp_inherit_port);
 EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
 EXPORT_SYMBOL(tcp_v4_do_rcv);
 EXPORT_SYMBOL(tcp_v4_connect);
-EXPORT_SYMBOL(tcp_v4_hash_connecting);
 EXPORT_SYMBOL(tcp_unhash);
 EXPORT_SYMBOL(udp_prot);
 EXPORT_SYMBOL(tcp_prot);
@@ -362,7 +368,8 @@ EXPORT_SYMBOL(tcp_openreq_cachep);
 EXPORT_SYMBOL(ipv4_specific);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_transmit_skb);
-EXPORT_SYMBOL(tcp_connect);
+EXPORT_SYMBOL(tcp_connect_init);
+EXPORT_SYMBOL(tcp_connect_send);
 EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_tw_deschedule);
 EXPORT_SYMBOL(tcp_delete_keepalive_timer);
@@ -432,6 +439,9 @@ EXPORT_SYMBOL(rtnl_sem);
 EXPORT_SYMBOL(rtnl_lock);
 EXPORT_SYMBOL(rtnl_unlock);
 
+/* ABI emulation layers need this */
+EXPORT_SYMBOL(move_addr_to_kernel);
+EXPORT_SYMBOL(move_addr_to_user);
                   
 /* Used by at least ipip.c.  */
 EXPORT_SYMBOL(ipv4_config);

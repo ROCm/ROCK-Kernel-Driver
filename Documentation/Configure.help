@@ -1940,6 +1940,20 @@ CONFIG_IP_NF_CONNTRACK
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
 
+IRC Send/Chat support
+CONFIG_IP_NF_IRC
+  There is a commonly-used extension to IRC called
+  Direct Client-to-Client Protocol (DCC).  This enables users to send
+  files to each other, and also chat to each other without the need
+  of a server.  DCC Sending is used anywhere you send files over IRC,
+  and DCC Chat is most commonly used by Eggdrop bots.  If you are
+  using NAT, this extension will enable you to send files and initiate
+  chats.  Note that you do NOT need this extension to get files or
+  have others initiate chats, or everything else in IRC.
+
+  If you want to compile it as a module, say 'M' here and read
+  Documentation/modules.txt.  If unsure, say 'N'.
+
 FTP protocol support
 CONFIG_IP_NF_FTP
   Tracking FTP connections is problematic: special helpers are
@@ -1966,6 +1980,40 @@ CONFIG_IP_NF_IPTABLES
 
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
+CONFIG_IP6_NF_MATCH_LIMIT
+  limit matching allows you to control the rate at which a rule can be
+  matched: mainly useful in combination with the LOG target ("LOG
+  target support", below) and to avoid some Denial of Service attacks.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+MAC address match support
+CONFIG_IP6_NF_MATCH_MAC
+  mac matching allows you to match packets based on the source
+  ethernet address of the packet.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Multiple port match support
+CONFIG_IP6_NF_MATCH_MULTIPORT
+  Multiport matching allows you to match TCP or UDP packets based on
+  a series of source or destination ports: normally a rule can only
+  match a single range of ports.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Owner match support (EXPERIMENTAL)
+CONFIG_IP6_NF_MATCH_OWNER
+  Packet owner matching allows you to match locally-generated packets
+  based on who created them: the user, group, process or session.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+
 
 limit match support
 CONFIG_IP_NF_MATCH_LIMIT
@@ -1998,6 +2046,22 @@ CONFIG_IP_NF_MATCH_MULTIPORT
   Multiport matching allows you to match TCP or UDP packets based on
   a series of source or destination ports: normally a rule can only
   match a single range of ports.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+TTL match support
+CONFIG_IP_NF_MATCH_TTL
+  This adds CONFIG_IP_NF_MATCH_TTL option, which enabled the user
+  to match packets by their TTL value.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+length match support
+CONFIG_IP_NF_MATCH_LENGTH
+  This option allows you to match the length of a packet against a
+  specific value or range of values.
 
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
@@ -2078,6 +2142,20 @@ CONFIG_IP_NF_TARGET_MASQUERADE
   only useful for dialup accounts with dynamic IP address (ie. your IP
   address will be different on next dialup).
 
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Basic SNMP-ALG support
+CONFIG_IP_NF_NAT_SNMP_BASIC
+
+  This module implements an Application Layer Gateway (ALG) for 
+  SNMP payloads.  In conjunction with NAT, it allows a network 
+  management system to access multiple private networks with 
+  conflicting addresses.  It works by modifying IP addresses 
+  inside SNMP payloads to match IP-layer NAT mapping.
+  
+  This is the "basic" form of SNMP-ALG, as described in RFC 2962
+  
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
 
@@ -2217,6 +2295,14 @@ CONFIG_IP6_NF_MATCH_MARK
   Netfilter mark matching allows you to match packets based on the
   `nfmark' value in the packet.  This can be set by the MARK target
   (see below).
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+LOG target support
+CONFIG_IP6_NF_TARGET_LOG
+  This option adds a `LOG' target, which allows you to create rules in
+  any ip6tables table which records the packet header to the syslog.
 
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.

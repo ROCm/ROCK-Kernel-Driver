@@ -56,7 +56,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     INITIALIZE_PATH (path_to_entry);
     struct buffer_head * bh;
     int item_num, entry_num;
-    struct key * rkey;
+    const struct key * rkey;
     struct item_head * ih, tmp_ih;
     int search_res;
     char * local_buf;

@@ -568,9 +568,7 @@ struct tcp_func {
 							 struct sk_buff *skb,
 							 struct open_request *req,
 							 struct dst_entry *dst);
-	
-	int			(*hash_connecting)	(struct sock *sk);
-
+    
 	int			(*remember_stamp)	(struct sock *sk);
 
 	__u16			net_header_len;
@@ -772,8 +770,9 @@ extern int			tcp_v4_connect(struct sock *sk,
 					       struct sockaddr *uaddr,
 					       int addr_len);
 
-extern int			tcp_connect(struct sock *sk,
-					    struct sk_buff *skb);
+extern void			tcp_connect_init(struct sock *sk);
+
+extern void			tcp_connect_send(struct sock *sk, struct sk_buff *skb);
 
 extern struct sk_buff *		tcp_make_synack(struct sock *sk,
 						struct dst_entry *dst,

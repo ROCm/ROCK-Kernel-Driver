@@ -106,7 +106,7 @@ static int balance_leaf_when_delete (struct tree_balance * tb, int flag)
 
 	RFALSE( ih_item_len(ih) + IH_SIZE != -tb->insert_size[0],
 	        "vs-12013: mode Delete, insert size %d, ih to be deleted %h",
-                ih);
+ 		 -tb->insert_size [0], ih);
 
 	bi.tb = tb;
 	bi.bi_bh = tbS0;

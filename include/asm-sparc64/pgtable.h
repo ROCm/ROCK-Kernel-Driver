@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.147 2001/10/17 18:26:58 davem Exp $
+/* $Id: pgtable.h,v 1.151 2001/10/25 18:48:03 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -46,31 +46,6 @@
 
 #ifndef __ASSEMBLY__
 
-#define PG_dcache_dirty		PG_arch_1
-
-#define dcache_dirty_cpu(page) \
-	(((page)->flags >> 24) & (NR_CPUS - 1UL))
-
-#define set_dcache_dirty(PAGE) \
-do {	unsigned long mask = smp_processor_id(); \
-	unsigned long non_cpu_bits = (1UL << 24UL) - 1UL; \
-	mask = (mask << 24) | (1UL << PG_dcache_dirty); \
-	__asm__ __volatile__("1:\n\t" \
-			     "ldx	[%2], %%g7\n\t" \
-			     "and	%%g7, %1, %%g5\n\t" \
-			     "or	%%g5, %0, %%g5\n\t" \
-			     "casx	[%2], %%g7, %%g5\n\t" \
-			     "cmp	%%g7, %%g5\n\t" \
-			     "bne,pn	%%xcc, 1b\n\t" \
-			     " nop" \
-			     : /* no outputs */ \
-			     : "r" (mask), "r" (non_cpu_bits), "r" (&(PAGE)->flags) \
-			     : "g5", "g7"); \
-} while (0)
-
-#define clear_dcache_dirty(PAGE) \
-	clear_bit(PG_dcache_dirty, &(PAGE)->flags)
-
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following
  * hook is made available.
@@ -106,6 +81,8 @@ do {	unsigned long mask = smp_processor_id(); \
 #define VMALLOC_START		0x0000000140000000UL
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
 #define VMALLOC_END		0x0000000200000000UL
+#define LOW_OBP_ADDRESS		0xf0000000UL
+#define HI_OBP_ADDRESS		0x100000000UL
 
 #define pte_ERROR(e)	__builtin_trap()
 #define pmd_ERROR(e)	__builtin_trap()
@@ -312,6 +289,10 @@ extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 #define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define swp_entry_to_pte(x)		((pte_t) { (x).val })
 
+extern unsigned long prom_virt_to_phys(unsigned long, int *);
+#define LOW_OBP_ADDRESS		0xf0000000UL
+#define HI_OBP_ADDRESS		0x100000000UL
+
 extern __inline__ unsigned long
 sun4u_get_pte (unsigned long addr)
 {
@@ -321,6 +302,8 @@ sun4u_get_pte (unsigned long addr)
 
 	if (addr >= PAGE_OFFSET)
 		return addr & _PAGE_PADDR;
+	if ((addr >= LOW_OBP_ADDRESS) && (addr < HI_OBP_ADDRESS))
+		return prom_virt_to_phys(addr, 0);
 	pgdp = pgd_offset_k (addr);
 	pmdp = pmd_offset (pgdp, addr);
 	ptep = pte_offset (pmdp, addr);

@@ -58,6 +58,3 @@ include $(TOPDIR)/Rules.make
 
 cl2llc.c: cl2llc.pre
 	sed -f ./pseudo/opcd2num.sed cl2llc.pre >cl2llc.c
-
-tar:
-		tar -cvf /dev/f1 .

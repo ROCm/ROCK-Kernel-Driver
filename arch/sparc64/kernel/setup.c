@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.69 2001/10/18 09:40:00 davem Exp $
+/*  $Id: setup.c,v 1.70 2001/10/25 18:48:03 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -195,7 +195,14 @@ int prom_callback(long *args)
 			pgd_t *pgdp;
 			pmd_t *pmdp;
 			pte_t *ptep;
+			int error;
 
+			if ((va >= LOW_OBP_ADDRESS) && (va < HI_OBP_ADDRESS)) {
+				tte = prom_virt_to_phys(va, &error);
+				if (!error)
+					res = PROM_TRUE;
+				goto done;
+			}
 			pgdp = pgd_offset_k(va);
 			if (pgd_none(*pgdp))
 				goto done;

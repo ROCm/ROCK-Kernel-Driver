@@ -1363,6 +1363,7 @@ static int quota_on(struct super_block *sb, short type, char *path)
 	inode->i_flags |= S_NOQUOTA;
 
 	dqopt->files[type] = f;
+	sb->dq_op = &dquot_operations;
 	set_enable_flags(dqopt, type);
 
 	dquot = dqget(sb, 0, type);
@@ -1370,7 +1371,6 @@ static int quota_on(struct super_block *sb, short type, char *path)
 	dqopt->block_expire[type] = (dquot != NODQUOT) ? dquot->dq_btime : MAX_DQ_TIME;
 	dqput(dquot);
 
-	sb->dq_op = &dquot_operations;
 	add_dquot_ref(sb, type);
 
 	up(&dqopt->dqoff_sem);

@@ -75,24 +75,25 @@ static inline void down(struct semaphore * sem)
 	ptr = &(sem->count.counter);
 	increment = 1;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_sub
-	 add	%%o7, 8, %%o7
-	tst	%%g2
-	bl	2f
-	 nop
-1:
-	.subsection 2
-2:	save	%%sp, -64, %%sp
-	mov	%%g1, %%l1
-	mov	%%g5, %%l5
-	call	%3
-	 mov	%%g1, %%o0
-	mov	%%l1, %%g1
-	ba	1b
-	 restore %%l5, %%g0, %%g5
-	.previous\n"
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_sub\n\t"
+	" add	%%o7, 8, %%o7\n\t"
+	"tst	%%g2\n\t"
+	"bl	2f\n\t"
+	" nop\n"
+	"1:\n\t"
+	".subsection 2\n"
+	"2:\n\t"
+	"save	%%sp, -64, %%sp\n\t"
+	"mov	%%g1, %%l1\n\t"
+	"mov	%%g5, %%l5\n\t"
+	"call	%3\n\t"
+	" mov	%%g1, %%o0\n\t"
+	"mov	%%l1, %%g1\n\t"
+	"ba	1b\n\t"
+	" restore %%l5, %%g0, %%g5\n\t"
+	".previous\n"
 	: "=&r" (increment)
 	: "0" (increment), "r" (ptr), "i" (__down)
 	: "g3", "g4", "g7", "memory", "cc");
@@ -110,25 +111,26 @@ static inline int down_interruptible(struct semaphore * sem)
 	ptr = &(sem->count.counter);
 	increment = 1;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_sub
-	 add	%%o7, 8, %%o7
-	tst	%%g2
-	bl	2f
-	 clr	%%g2
-1:
-	.subsection 2
-2:	save	%%sp, -64, %%sp
-	mov	%%g1, %%l1
-	mov	%%g5, %%l5
-	call	%3
-	 mov	%%g1, %%o0
-	mov	%%l1, %%g1
-	mov	%%l5, %%g5
-	ba	1b
-	 restore %%o0, %%g0, %%g2
-	.previous\n"
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_sub\n\t"
+	" add	%%o7, 8, %%o7\n\t"
+	"tst	%%g2\n\t"
+	"bl	2f\n\t"
+	" clr	%%g2\n"
+	"1:\n\t"
+	".subsection 2\n"
+	"2:\n\t"
+	"save	%%sp, -64, %%sp\n\t"
+	"mov	%%g1, %%l1\n\t"
+	"mov	%%g5, %%l5\n\t"
+	"call	%3\n\t"
+	" mov	%%g1, %%o0\n\t"
+	"mov	%%l1, %%g1\n\t"
+	"mov	%%l5, %%g5\n\t"
+	"ba	1b\n\t"
+	" restore %%o0, %%g0, %%g2\n\t"
+	".previous\n"
 	: "=&r" (increment)
 	: "0" (increment), "r" (ptr), "i" (__down_interruptible)
 	: "g3", "g4", "g7", "memory", "cc");
@@ -148,25 +150,26 @@ static inline int down_trylock(struct semaphore * sem)
 	ptr = &(sem->count.counter);
 	increment = 1;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_sub
-	 add	%%o7, 8, %%o7
-	tst	%%g2
-	bl	2f
-	 clr	%%g2
-1:
-	.subsection 2
-2:	save	%%sp, -64, %%sp
-	mov	%%g1, %%l1
-	mov	%%g5, %%l5
-	call	%3
-	 mov	%%g1, %%o0
-	mov	%%l1, %%g1
-	mov	%%l5, %%g5
-	ba	1b
-	 restore %%o0, %%g0, %%g2
-	.previous\n"
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_sub\n\t"
+	" add	%%o7, 8, %%o7\n\t"
+	"tst	%%g2\n\t"
+	"bl	2f\n\t"
+	" clr	%%g2\n"
+	"1:\n\t"
+	".subsection 2\n"
+	"2:\n\t"
+	"save	%%sp, -64, %%sp\n\t"
+	"mov	%%g1, %%l1\n\t"
+	"mov	%%g5, %%l5\n\t"
+	"call	%3\n\t"
+	" mov	%%g1, %%o0\n\t"
+	"mov	%%l1, %%g1\n\t"
+	"mov	%%l5, %%g5\n\t"
+	"ba	1b\n\t"
+	" restore %%o0, %%g0, %%g2\n\t"
+	".previous\n"
 	: "=&r" (increment)
 	: "0" (increment), "r" (ptr), "i" (__down_trylock)
 	: "g3", "g4", "g7", "memory", "cc");
@@ -186,24 +189,25 @@ static inline void up(struct semaphore * sem)
 	ptr = &(sem->count.counter);
 	increment = 1;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_add
-	 add	%%o7, 8, %%o7
-	tst	%%g2
-	ble	2f
-	 nop
-1:
-	.subsection 2
-2:	save	%%sp, -64, %%sp
-	mov	%%g1, %%l1
-	mov	%%g5, %%l5
-	call	%3
-	 mov	%%g1, %%o0
-	mov	%%l1, %%g1
-	ba	1b
-	 restore %%l5, %%g0, %%g5
-	.previous\n"
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_add\n\t"
+	" add	%%o7, 8, %%o7\n\t"
+	"tst	%%g2\n\t"
+	"ble	2f\n\t"
+	" nop\n"
+	"1:\n\t"
+	".subsection 2\n"
+	"2:\n\t"
+	"save	%%sp, -64, %%sp\n\t"
+	"mov	%%g1, %%l1\n\t"
+	"mov	%%g5, %%l5\n\t"
+	"call	%3\n\t"
+	" mov	%%g1, %%o0\n\t"
+	"mov	%%l1, %%g1\n\t"
+	"ba	1b\n\t"
+	" restore %%l5, %%g0, %%g5\n\t"
+	".previous\n"
 	: "=&r" (increment)
 	: "0" (increment), "r" (ptr), "i" (__up)
 	: "g3", "g4", "g7", "memory", "cc");

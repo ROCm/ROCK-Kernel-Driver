@@ -102,6 +102,9 @@
 #define SIOCADDDLCI	0x8980		/* Create new DLCI device	*/
 #define SIOCDELDLCI	0x8981		/* Delete DLCI device		*/
 
+#define SIOCGIFVLAN	0x8982		/* 802.1Q VLAN support		*/
+#define SIOCSIFVLAN	0x8983		/* Set 802.1Q VLAN options 	*/
+
 /* Device private ioctl calls */
 
 /*

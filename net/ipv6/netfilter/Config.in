@@ -16,6 +16,11 @@ tristate 'IP6 tables support (required for filtering/masq/NAT)' CONFIG_IP6_NF_IP
 if [ "$CONFIG_IP6_NF_IPTABLES" != "n" ]; then
 # The simple matches.
   dep_tristate '  limit match support' CONFIG_IP6_NF_MATCH_LIMIT $CONFIG_IP6_NF_IPTABLES
+  dep_tristate '  MAC address match support' CONFIG_IP6_NF_MATCH_MAC $CONFIG_IP6_NF_IPTABLES
+  dep_tristate '  Multiple port match support' CONFIG_IP6_NF_MATCH_MULTIPORT $CONFIG_IP6_NF_IPTABLES
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+    dep_tristate '  Owner match support (EXPERIMENTAL)' CONFIG_IP6_NF_MATCH_OWNER $CONFIG_IP6_NF_IPTABLES
+  fi
 #  dep_tristate '  MAC address match support' CONFIG_IP6_NF_MATCH_MAC $CONFIG_IP6_NF_IPTABLES
   dep_tristate '  netfilter MARK match support' CONFIG_IP6_NF_MATCH_MARK $CONFIG_IP6_NF_IPTABLES
 #  dep_tristate '  Multiple port match support' CONFIG_IP6_NF_MATCH_MULTIPORT $CONFIG_IP6_NF_IPTABLES
@@ -30,6 +35,9 @@ if [ "$CONFIG_IP6_NF_IPTABLES" != "n" ]; then
 
 # The targets
   dep_tristate '  Packet filtering' CONFIG_IP6_NF_FILTER $CONFIG_IP6_NF_IPTABLES 
+  if [ "$CONFIG_IP6_NF_FILTER" != "n" ]; then
+    dep_tristate '    LOG target support' CONFIG_IP6_NF_TARGET_LOG $CONFIG_IP6_NF_FILTER
+  fi
 
 #  if [ "$CONFIG_IP6_NF_FILTER" != "n" ]; then
 #    dep_tristate '    REJECT target support' CONFIG_IP6_NF_TARGET_REJECT $CONFIG_IP6_NF_FILTER

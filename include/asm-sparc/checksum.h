@@ -1,4 +1,4 @@
-/* $Id: checksum.h,v 1.31 2000/01/31 01:26:52 davem Exp $ */
+/* $Id: checksum.h,v 1.32 2001/10/30 04:32:24 davem Exp $ */
 #ifndef __SPARC_CHECKSUM_H
 #define __SPARC_CHECKSUM_H
 
@@ -55,10 +55,10 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len,
 	register char *d asm("o1") = dst;
 	register int l asm("g1") = len;
 	
-	__asm__ __volatile__ ("
-		call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "
-		 mov %4, %%g7
-	" : "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (sum) :
+	__asm__ __volatile__ (
+		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		" mov %4, %%g7\n"
+	: "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (sum) :
 	"o1", "o2", "o3", "o4", "o5", "o7", "g1", "g2", "g3", "g4", "g5", "g7");
 	return ret;
 }
@@ -77,15 +77,15 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
 		register int l asm("g1") = len;
 		register unsigned int s asm("g7") = sum;
 
-		__asm__ __volatile__ ("
-		.section __ex_table,#alloc
-		.align 4
-		.word 1f,2
-		.previous
-1:
-		call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "
-		 st %5, [%%sp + 64]
-		" : "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (s), "r" (err) :
+		__asm__ __volatile__ (
+		".section __ex_table,#alloc\n\t"
+		".align 4\n\t"
+		".word 1f,2\n\t"
+		".previous\n"
+		"1:\n\t"
+		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		" st %5, [%%sp + 64]\n"
+		: "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (s), "r" (err) :
 		"o1", "o2", "o3", "o4", "o5", "o7", "g1", "g2", "g3", "g4", "g5", "g7");
 		return ret;
 	}
@@ -104,15 +104,15 @@ csum_partial_copy_to_user(const char *src, char *dst, int len,
 		register int l asm("g1") = len;
 		register unsigned int s asm("g7") = sum;
 
-		__asm__ __volatile__ ("
-		.section __ex_table,#alloc
-		.align 4
-		.word 1f,1
-		.previous
-1:
-		call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "
-		 st %5, [%%sp + 64]
-		" : "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (s), "r" (err) :
+		__asm__ __volatile__ (
+		".section __ex_table,#alloc\n\t"
+		".align 4\n\t"
+		".word 1f,1\n\t"
+		".previous\n"
+		"1:\n\t"
+		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		" st %5, [%%sp + 64]\n"
+		: "=r" (ret) : "0" (ret), "r" (d), "r" (l), "r" (s), "r" (err) :
 		"o1", "o2", "o3", "o4", "o5", "o7", "g1", "g2", "g3", "g4", "g5", "g7");
 		return ret;
 	}
@@ -214,27 +214,26 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 						     unsigned short proto,
 						     unsigned int sum) 
 {
-	__asm__ __volatile__ ("
-		addcc	%3, %4, %%g4
-		addxcc	%5, %%g4, %%g4
-		ld	[%2 + 0x0c], %%g2
-		ld	[%2 + 0x08], %%g3
-		addxcc	%%g2, %%g4, %%g4
-		ld	[%2 + 0x04], %%g2
-		addxcc	%%g3, %%g4, %%g4
-		ld	[%2 + 0x00], %%g3
-		addxcc	%%g2, %%g4, %%g4
-		ld	[%1 + 0x0c], %%g2
-		addxcc	%%g3, %%g4, %%g4
-		ld	[%1 + 0x08], %%g3
-		addxcc	%%g2, %%g4, %%g4
-		ld	[%1 + 0x04], %%g2
-		addxcc	%%g3, %%g4, %%g4
-		ld	[%1 + 0x00], %%g3
-		addxcc	%%g2, %%g4, %%g4
-		addxcc	%%g3, %%g4, %0
-		addx	0, %0, %0
-		"
+	__asm__ __volatile__ (
+		"addcc	%3, %4, %%g4\n\t"
+		"addxcc	%5, %%g4, %%g4\n\t"
+		"ld	[%2 + 0x0c], %%g2\n\t"
+		"ld	[%2 + 0x08], %%g3\n\t"
+		"addxcc	%%g2, %%g4, %%g4\n\t"
+		"ld	[%2 + 0x04], %%g2\n\t"
+		"addxcc	%%g3, %%g4, %%g4\n\t"
+		"ld	[%2 + 0x00], %%g3\n\t"
+		"addxcc	%%g2, %%g4, %%g4\n\t"
+		"ld	[%1 + 0x0c], %%g2\n\t"
+		"addxcc	%%g3, %%g4, %%g4\n\t"
+		"ld	[%1 + 0x08], %%g3\n\t"
+		"addxcc	%%g2, %%g4, %%g4\n\t"
+		"ld	[%1 + 0x04], %%g2\n\t"
+		"addxcc	%%g3, %%g4, %%g4\n\t"
+		"ld	[%1 + 0x00], %%g3\n\t"
+		"addxcc	%%g2, %%g4, %%g4\n\t"
+		"addxcc	%%g3, %%g4, %0\n\t"
+		"addx	0, %0, %0\n"
 		: "=&r" (sum)
 		: "r" (saddr), "r" (daddr), 
 		  "r"(htonl(len)), "r"(htonl(proto)), "r"(sum)

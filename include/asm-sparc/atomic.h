@@ -56,11 +56,11 @@ static __inline__ int __atomic_add(int i, atomic_t *v)
 	ptr = &v->counter;
 	increment = i;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_add
-	 add	%%o7, 8, %%o7
-"	: "=&r" (increment)
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_add\n\t"
+	" add	%%o7, 8, %%o7\n"
+	: "=&r" (increment)
 	: "0" (increment), "r" (ptr)
 	: "g3", "g4", "g7", "memory", "cc");
 
@@ -75,11 +75,11 @@ static __inline__ int __atomic_sub(int i, atomic_t *v)
 	ptr = &v->counter;
 	increment = i;
 
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_sub
-	 add	%%o7, 8, %%o7
-"	: "=&r" (increment)
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___atomic_sub\n\t"
+	" add	%%o7, 8, %%o7\n"
+	: "=&r" (increment)
 	: "0" (increment), "r" (ptr)
 	: "g3", "g4", "g7", "memory", "cc");
 

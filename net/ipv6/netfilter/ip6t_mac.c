@@ -27,7 +27,7 @@ match(const struct sk_buff *skb,
 }
 
 static int
-ipt_mac_checkentry(const char *tablename,
+ip6t_mac_checkentry(const char *tablename,
 		   const struct ip6t_ip6 *ip,
 		   void *matchinfo,
 		   unsigned int matchsize,
@@ -35,7 +35,7 @@ ipt_mac_checkentry(const char *tablename,
 {
 	if (hook_mask
 	    & ~((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_IN))) {
-		printk("ipt_mac: only valid for PRE_ROUTING or LOCAL_IN.\n");
+		printk("ip6t_mac: only valid for PRE_ROUTING or LOCAL_IN.\n");
 		return 0;
 	}
 
@@ -46,7 +46,7 @@ ipt_mac_checkentry(const char *tablename,
 }
 
 static struct ip6t_match mac_match
-= { { NULL, NULL }, "mac", &match, &ipt_mac_checkentry, NULL, THIS_MODULE };
+= { { NULL, NULL }, "mac", &match, &ip6t_mac_checkentry, NULL, THIS_MODULE };
 
 static int __init init(void)
 {

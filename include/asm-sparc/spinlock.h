@@ -99,18 +99,20 @@ do { \
 
 extern __inline__ void spin_lock(spinlock_t *lock)
 {
-	__asm__ __volatile__("
-1:	ldstub	[%0], %%g2
-	orcc	%%g2, 0x0, %%g0
-	bne,a	2f
-	 ldub	[%0], %%g2
-	.subsection	2
-2:	orcc	%%g2, 0x0, %%g0
-	bne,a	2b
-	 ldub	[%0], %%g2
-	b,a	1b
-	.previous
-"	: /* no outputs */
+	__asm__ __volatile__(
+	"\n1:\n\t"
+	"ldstub	[%0], %%g2\n\t"
+	"orcc	%%g2, 0x0, %%g0\n\t"
+	"bne,a	2f\n\t"
+	" ldub	[%0], %%g2\n\t"
+	".subsection	2\n"
+	"2:\n\t"
+	"orcc	%%g2, 0x0, %%g0\n\t"
+	"bne,a	2b\n\t"
+	" ldub	[%0], %%g2\n\t"
+	"b,a	1b\n\t"
+	".previous\n"
+	: /* no outputs */
 	: "r" (lock)
 	: "g2", "memory", "cc");
 }
@@ -167,11 +169,11 @@ extern __inline__ void _read_lock(rwlock_t *rw)
 {
 	register rwlock_t *lp asm("g1");
 	lp = rw;
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___rw_read_enter
-	 ldstub	[%%g1 + 3], %%g2
-"	: /* no outputs */
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___rw_read_enter\n\t"
+	" ldstub	[%%g1 + 3], %%g2\n"
+	: /* no outputs */
 	: "r" (lp)
 	: "g2", "g4", "memory", "cc");
 }
@@ -187,11 +189,11 @@ extern __inline__ void _read_unlock(rwlock_t *rw)
 {
 	register rwlock_t *lp asm("g1");
 	lp = rw;
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___rw_read_exit
-	 ldstub	[%%g1 + 3], %%g2
-"	: /* no outputs */
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___rw_read_exit\n\t"
+	" ldstub	[%%g1 + 3], %%g2\n"
+	: /* no outputs */
 	: "r" (lp)
 	: "g2", "g4", "memory", "cc");
 }
@@ -207,11 +209,11 @@ extern __inline__ void write_lock(rwlock_t *rw)
 {
 	register rwlock_t *lp asm("g1");
 	lp = rw;
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___rw_write_enter
-	 ldstub	[%%g1 + 3], %%g2
-"	: /* no outputs */
+	__asm__ __volatile__(
+	"mov	%%o7, %%g4\n\t"
+	"call	___rw_write_enter\n\t"
+	" ldstub	[%%g1 + 3], %%g2\n"
+	: /* no outputs */
 	: "r" (lp)
 	: "g2", "g4", "memory", "cc");
 }

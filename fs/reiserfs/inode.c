@@ -81,8 +81,10 @@ void make_cpu_key (struct cpu_key * key, const struct inode * inode, loff_t offs
 //
 // when key is 0, do not set version and short key
 //
-inline void make_le_item_head (struct item_head * ih, struct cpu_key * key, int version,
-			       loff_t offset, int type, int length, int entry_count/*or ih_free_space*/)
+inline void make_le_item_head (struct item_head * ih, const struct cpu_key * key,
+			       int version,
+			       loff_t offset, int type, int length, 
+			       int entry_count/*or ih_free_space*/)
 {
     if (key) {
 	ih->ih_key.k_dir_id = cpu_to_le32 (key->on_disk_key.k_dir_id);
@@ -1141,7 +1143,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 }
 
 
-struct inode * reiserfs_iget (struct super_block * s, struct cpu_key * key)
+struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key)
 {
     struct inode * inode;
     struct reiserfs_iget4_args args ;
@@ -1949,7 +1951,8 @@ static int reiserfs_writepage (struct page * page)
 //
 // from ext2_prepare_write, but modified
 //
-int reiserfs_prepare_write(struct file *f, struct page *page, unsigned from, unsigned to) {
+int reiserfs_prepare_write(struct file *f, struct page *page, 
+			   unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
     reiserfs_wait_on_write_block(inode->i_sb) ;
     fix_tail_page_for_writing(page) ;

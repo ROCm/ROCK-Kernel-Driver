@@ -1102,6 +1102,10 @@ do_replace(void *user, unsigned int len)
 	if (copy_from_user(&tmp, user, sizeof(tmp)) != 0)
 		return -EFAULT;
 
+	/* Pedantry: prevent them from hitting BUG() in vmalloc.c --RR */
+	if ((SMP_ALIGN(tmp.size) >> PAGE_SHIFT) + 2 > num_physpages)
+		return -ENOMEM;
+
 	newinfo = vmalloc(sizeof(struct ip6t_table_info)
 			  + SMP_ALIGN(tmp.size) * smp_num_cpus);
 	if (!newinfo)

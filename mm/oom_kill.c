@@ -150,7 +150,7 @@ void oom_kill_task(struct task_struct *p)
 	 * exit() and clear out its resources quickly...
 	 */
 	p->counter = 5 * HZ;
-	p->flags |= PF_MEMALLOC;
+	p->flags |= PF_MEMALLOC | PF_MEMDIE;
 
 	/* This process has hardware access, be more careful. */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {
@@ -193,35 +193,6 @@ void oom_kill(void)
 	return;
 }
 
-static inline int node_zones_low(pg_data_t *pgdat)
-{
-	zone_t * zone;
-	int i;
-
-	for (i = pgdat->nr_zones-1; i >= 0; i--) {
-		zone = pgdat->node_zones + i;
-
-		if (zone->free_pages > (zone->pages_low))
-			return 0;
-
-	}
-	return 1;
-}
-
-static int all_zones_low(void)
-{
-	pg_data_t * pgdat = pgdat_list;
-
-	pgdat = pgdat_list;
-	do {
-		if (node_zones_low(pgdat))
-			continue;
-		return 0;
-	} while ((pgdat = pgdat->node_next));
-
-	return 1;
-}
-
 /**
  * out_of_memory - is the system out of memory?
  *
@@ -230,29 +201,51 @@ static int all_zones_low(void)
  */
 int out_of_memory(void)
 {
-	long cache_mem, limit;
+	static unsigned long first, last, count;
+	unsigned long now = jiffies;
+	unsigned long since = now - last;
 
-	/* Enough free memory?  Not OOM. */
-	if (!all_zones_low())
+	/*
+	 * If there's been more than a second since last query,
+	 * we're not oom.
+	 */
+	last = now;
+	if (since > HZ) {
+		first = now;
+		count = 0;
+		return 0;
+	}
+
+	/*
+	 * If we have gotten less than 100 failures,
+	 * we're not really oom. 
+	 */
+	if (++count < 100)
 		return 0;
 
-	/* Enough swap space left?  Not OOM. */
+	/*
+	 * If we haven't tried for at least one second,
+	 * we're not really oom.
+	 */
+	since = now - first;
+	if (since < HZ)
+		return 0;
+
+	/*
+	 * Enough swap space left?  Not OOM.
+	 */
 	if (nr_swap_pages > 0)
 		return 0;
 
 	/*
-	 * If the buffer and page cache (including swap cache) are over
-	 * their (/proc tunable) minimum, we're still not OOM.  We test
-	 * this to make sure we don't return OOM when the system simply
-	 * has a hard time with the cache.
+	 * Ok, really out of memory.
+	 *
+	 * Reset test logic, let the poor sucker
+	 * we selected die in peace (this will
+	 * delay the next oom kill for at least
+	 * another second and another X failures).
 	 */
-	cache_mem = atomic_read(&page_cache_size);
-	limit = 2;
-	limit *= num_physpages / 100;
-
-	if (cache_mem > limit)
-		return 0;
-
-	/* Else... */
+	first = now;
+	count = 0;
 	return 1;
 }
