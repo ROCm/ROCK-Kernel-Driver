@@ -34,10 +34,15 @@
  * the project's page is at http://www.linuxtv.org/dvb/
  */
 
+#include <linux/moduleparam.h>
+
 #include "budget.h"
 #include "ttpci-eeprom.h"
 
-int budget_debug = 0;
+int budget_debug;
+
+module_param_named(debug, budget_debug, int, 0644);
+MODULE_PARM_DESC(budget_debug, "Turn on/off budget debugging (default:off).");
 
 /****************************************************************************
  * TT budget / WinTV Nova
@@ -258,13 +263,26 @@ static void budget_unregister(struct budget *budget)
         dvb_dmx_release(&budget->demux);
 }
 
-
-static int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
+/* fixme: can this be unified among all saa7146 based dvb cards? */
+static int client_register(struct i2c_client *client)
 {
-	struct saa7146_dev *dev = i2c->data;
-	return saa7146_i2c_transfer(dev, msgs, num, 6);
+	struct saa7146_dev *dev = (struct saa7146_dev*)i2c_get_adapdata(client->adapter);
+	struct budget *budget = (struct budget*)dev->ext_priv;
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_REGISTER, budget->dvb_adapter);
+	return 0;
 }
 
+static int client_unregister(struct i2c_client *client)
+{
+	struct saa7146_dev *dev = (struct saa7146_dev*)i2c_get_adapdata(client->adapter);
+	struct budget *budget = (struct budget*)dev->ext_priv;
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_UNREGISTER, budget->dvb_adapter);
+	return 0;
+}
 
 int ttpci_budget_init (struct budget *budget,
 		       struct saa7146_dev* dev,
@@ -301,17 +319,27 @@ int ttpci_budget_init (struct budget *budget,
 	if (bi->type != BUDGET_FS_ACTIVY)
 		saa7146_write(dev, GPIO_CTRL, 0x500000); /* GPIO 3 = 1 */
 	
-	saa7146_i2c_adapter_prepare(dev, NULL, 0, SAA7146_I2C_BUS_BIT_RATE_120);
+	budget->i2c_adap = (struct i2c_adapter) {
+		.client_register = client_register,
+		.client_unregister = client_unregister,
+#ifdef I2C_ADAP_CLASS_TV_DIGITAL
+		.class = I2C_ADAP_CLASS_TV_DIGITAL,
+#else
+		.class = I2C_CLASS_TV_DIGITAL,
+#endif
+	};
 
-	budget->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
-						budget->dvb_adapter, 0);
+	strlcpy(budget->i2c_adap.name, budget->card->name, sizeof(budget->i2c_adap.name));
 
-	if (!budget->i2c_bus) {
+	saa7146_i2c_adapter_prepare(dev, &budget->i2c_adap, SAA7146_I2C_BUS_BIT_RATE_120);
+	strcpy(budget->i2c_adap.name, budget->card->name);
+
+	if (i2c_add_adapter(&budget->i2c_adap) < 0) {
 		dvb_unregister_adapter (budget->dvb_adapter);
 		return -ENOMEM;
 	}
 
-	ttpci_eeprom_parse_mac(budget->i2c_bus);
+	ttpci_eeprom_parse_mac(&budget->i2c_adap, budget->dvb_adapter->proposed_mac);
 
 	if( NULL == (budget->grabbing = saa7146_vmalloc_build_pgtable(dev->pci,length,&budget->pt))) {
 		ret = -ENOMEM;
@@ -334,11 +362,10 @@ int ttpci_budget_init (struct budget *budget,
 		return 0;
 	}
 err:
+	i2c_del_adapter(&budget->i2c_adap);
+
 	if (budget->grabbing)
 		vfree(budget->grabbing);
-
-	dvb_unregister_i2c_bus (master_xfer,budget->i2c_bus->adapter,
-				budget->i2c_bus->id);
 
 	dvb_unregister_adapter (budget->dvb_adapter);
 
@@ -354,8 +381,7 @@ int ttpci_budget_deinit (struct budget *budget)
 
 	budget_unregister (budget);
 
-	dvb_unregister_i2c_bus (master_xfer, budget->i2c_bus->adapter,
-				budget->i2c_bus->id);
+	i2c_del_adapter(&budget->i2c_adap);
 
 	dvb_unregister_adapter (budget->dvb_adapter);
 
@@ -402,7 +428,5 @@ EXPORT_SYMBOL_GPL(ttpci_budget_irq10_handler);
 EXPORT_SYMBOL_GPL(ttpci_budget_set_video_port);
 EXPORT_SYMBOL_GPL(budget_debug);
 
-MODULE_PARM(budget_debug,"i");
 MODULE_LICENSE("GPL");
-
 

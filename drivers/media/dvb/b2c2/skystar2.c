@@ -2236,7 +2236,7 @@ static int flexcop_diseqc_ioctl(struct dvb_frontend *fe, unsigned int cmd, void 
 }
 
 
-int client_register(struct i2c_client *client)
+static int client_register(struct i2c_client *client)
 {
 	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
 
@@ -2247,7 +2247,7 @@ int client_register(struct i2c_client *client)
 	return 0;
 }
 
-int client_unregister(struct i2c_client *client)
+static int client_unregister(struct i2c_client *client)
 {
 	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
 

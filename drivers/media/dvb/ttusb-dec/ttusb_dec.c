@@ -22,10 +22,12 @@
 #include <asm/semaphore.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/usb.h>
+#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
 #if defined(CONFIG_CRC32) || defined(CONFIG_CRC32_MODULE)
@@ -37,13 +39,17 @@
 
 #include "dmxdev.h"
 #include "dvb_demux.h"
-#include "dvb_i2c.h"
 #include "dvb_filter.h"
 #include "dvb_frontend.h"
 #include "dvb_net.h"
 
-static int debug = 0;
-static int output_pva = 0;
+static int debug;
+static int output_pva;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
+module_param(output_pva, int, 0444);
+MODULE_PARM_DESC(output_pva, "Output PVA from dvr device (default:off)");
 
 #define dprintk	if (debug) printk
 
@@ -95,7 +101,6 @@ struct ttusb_dec {
 	struct dmxdev			dmxdev;
 	struct dvb_demux		demux;
 	struct dmx_frontend		frontend;
-	struct dvb_i2c_bus		i2c_bus;
 	struct dvb_net			dvb_net;
 	struct dvb_frontend_info	*frontend_info;
 	int (*frontend_ioctl) (struct dvb_frontend *, unsigned int, void *);
@@ -1100,7 +1105,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 				 	       &dec->iso_dma_handle);
 
 	memset(dec->iso_buffer, 0,
-	       sizeof(ISO_FRAME_SIZE * (FRAMES_PER_ISO_BUF * ISO_BUF_COUNT)));
+	       ISO_FRAME_SIZE * (FRAMES_PER_ISO_BUF * ISO_BUF_COUNT));
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
 		struct urb *urb;
@@ -1600,7 +1605,7 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 				p->u.qam.symbol_rate);
 			dprintk("            inversion->%d\n", p->inversion);
 
-		freq = htonl(p->frequency * 1000 +
+		freq = htonl(p->frequency +
 		       (dec->hi_band ? LOF_HI : LOF_LO));
 			memcpy(&b[4], &freq, sizeof(u32));
 			sym_rate = htonl(p->u.qam.symbol_rate);
@@ -1628,9 +1633,18 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 		dprintk("%s: FE_INIT\n", __FUNCTION__);
 		break;
 
-	case FE_DISEQC_SEND_MASTER_CMD:
+	case FE_DISEQC_SEND_MASTER_CMD: {
+		u8 b[] = { 0x00, 0xff, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00 };
+		struct dvb_diseqc_master_cmd *cmd = arg;
+		memcpy(&b[4], cmd->msg, cmd->msg_len);
 		dprintk("%s: FE_DISEQC_SEND_MASTER_CMD\n", __FUNCTION__);
+		ttusb_dec_send_command(dec, 0x72,
+				       sizeof(b) - (6 - cmd->msg_len), b,
+				       NULL, NULL);
 		break;
+	}
 
 	case FE_DISEQC_SEND_BURST:
 		dprintk("%s: FE_DISEQC_SEND_BURST\n", __FUNCTION__);
@@ -1669,15 +1683,13 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 
 static void ttusb_dec_init_frontend(struct ttusb_dec *dec)
 {
-	dec->i2c_bus.adapter = dec->adapter;
-
-	dvb_register_frontend(dec->frontend_ioctl, &dec->i2c_bus, (void *)dec,
-			      dec->frontend_info);
+	int ret;
+	ret = dvb_register_frontend(dec->frontend_ioctl, dec->adapter, dec, dec->frontend_info, THIS_MODULE);
 }
 
 static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
 {
-	dvb_unregister_frontend(dec->frontend_ioctl, &dec->i2c_bus);
+	dvb_unregister_frontend_new(dec->frontend_ioctl, dec->adapter);
 }
 
 static void ttusb_dec_init_filters(struct ttusb_dec *dec)
@@ -1840,7 +1852,3 @@ MODULE_DESCRIPTION(DRIVER_NAME);
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(usb, ttusb_dec_table);
 
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug level");
-MODULE_PARM(output_pva, "i");
-MODULE_PARM_DESC(output_pva, "Output PVA from dvr device");
