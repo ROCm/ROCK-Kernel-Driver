@@ -294,6 +294,19 @@ tcp_low_latency - BOOLEAN
 	changed would be a Beowulf compute cluster.
 	Default: 0
 
+tcp_westwood - BOOLEAN
+        Enable TCP Westwood+ congestion control algorithm.
+	TCP Westwood+ is a sender-side only modification of the TCP Reno 
+	protocol stack that optimizes the performance of TCP congestion 
+	control. It is based on end-to-end bandwidth estimation to set 
+	congestion window and slow start threshold after a congestion 
+	episode. Using this estimation, TCP Westwood+ adaptively sets a 
+	slow start threshold and a congestion window which takes into 
+	account the bandwidth used  at the time congestion is experienced. 
+	TCP Westwood+ significantly increases fairness wrt TCP Reno in 
+	wired networks and throughput over wireless links.   
+        Default: 0
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 

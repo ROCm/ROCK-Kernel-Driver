@@ -1,7 +1,12 @@
 /* Same.  Just like SNAT, only try to make the connections
  * 	  between client A and server B always have the same source ip.
  *
- * (C) 2000 Rusty Russell.  GPL.
+ * (C) 2000 Paul `Rusty' Russell
+ * (C) 2001 Martin Josefsson
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * 010320 Martin Josefsson <gandalf@wlug.westbo.se>
  * 	* copied ipt_BALANCE.c to ipt_SAME.c and changed a few things.
