@@ -341,6 +341,8 @@ static ssize_t mem_read(struct file * file, char * buf,
 	if (mm)
 		atomic_inc(&mm->mm_users);
 	task_unlock(task);
+	if (!mm)
+		return 0;
 
 	if (file->private_data != (void*)((long)current->self_exec_id) ) {
 		mmput(mm);

@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
  *
- * $Id: spia.c,v 1.9 2001/06/02 14:47:16 dwmw2 Exp $
+ * $Id: spia.c,v 1.11 2001/07/03 17:50:56 sjhill Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,12 +28,43 @@
 static struct mtd_info *spia_mtd = NULL;
 
 /*
+ * Values specific to the SPIA board (used with EP7212 processor)
+ */
+#define SPIA_IO_ADDR	= 0xd0000000	/* Start of EP7212 IO address space */
+#define SPIA_FIO_ADDR	= 0xf0000000	/* Address where flash is mapped */
+#define SPIA_PEDR	= 0x0080	/*
+					 * IO offset to Port E data register
+					 * where the CLE, ALE and NCE pins
+					 * are wired to.
+					 */
+#define SPIA_PEDDR	= 0x00c0	/*
+					 * IO offset to Port E data direction
+					 * register so we can control the IO
+					 * lines.
+					 */
+
+/*
  * Module stuff
  */
 #if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
   #define spia_init init_module
   #define spia_cleanup cleanup_module
 #endif
+
+static int spia_io_base = SPIA_IO_BASE;
+static int spia_fio_base = SPIA_FIO_BASE;
+static int spia_pedr = SPIA_PEDR;
+static int spia_peddr = SPIA_PEDDR;
+
+MODULE_PARM(spia_io_base, "i");
+MODULE_PARM(spia_fio_base, "i");
+MODULE_PARM(spia_pedr, "i");
+MODULE_PARM(spia_peddr, "i");
+
+__setup("spia_io_base=",spia_io_base);
+__setup("spia_fio_base=",spia_fio_base);
+__setup("spia_pedr=",spia_pedr);
+__setup("spia_peddr=",spia_peddr);
 
 /*
  * Define partitions for flash device
@@ -77,11 +108,11 @@ int __init spia_init (void)
 	 * Set GPIO Port E control register so that the pins are configured
 	 * to be outputs for controlling the NAND flash.
 	 */
-	(*(volatile unsigned char *) (IO_BASE + PEDDR)) = 0x07;
+	(*(volatile unsigned char *) (spia_io_base + spia_peddr)) = 0x07;
 
 	/* Set address of NAND IO lines */
-	this->IO_ADDR = FIO_BASE;
-	this->CTRL_ADDR = IO_BASE + PEDR;
+	this->IO_ADDR = spia_fio_base;
+	this->CTRL_ADDR = spia_io_base + spia_pedr;
 	this->CLE = 0x01;
 	this->ALE = 0x02;
 	this->NCE = 0x04;

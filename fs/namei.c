@@ -1126,10 +1126,10 @@ do_link:
 		putname(nd->last.name);
 		goto exit;
 	}
+	error = -ELOOP;
 	if (count++==32) {
-		dentry = nd->dentry;
 		putname(nd->last.name);
-		goto ok;
+		goto exit;
 	}
 	dir = nd->dentry;
 	down(&dir->d_inode->i_sem);

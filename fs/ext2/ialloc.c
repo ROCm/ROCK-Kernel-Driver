@@ -194,6 +194,7 @@ void ext2_free_inode (struct inode * inode)
 	 * Note: we must free any quota before locking the superblock,
 	 * as writing the quota to disk may need the lock as well.
 	 */
+	DQUOT_INIT(inode);
 	DQUOT_FREE_INODE(sb, inode);
 	DQUOT_DROP(inode);
 
@@ -417,7 +418,6 @@ repeat:
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
 	mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
 	sb->s_dirt = 1;
-	inode->i_mode = mode;
 	inode->i_uid = current->fsuid;
 	if (test_opt (sb, GRPID))
 		inode->i_gid = dir->i_gid;
@@ -427,6 +427,7 @@ repeat:
 			mode |= S_ISGID;
 	} else
 		inode->i_gid = current->fsgid;
+	inode->i_mode = mode;
 
 	inode->i_ino = j;
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */

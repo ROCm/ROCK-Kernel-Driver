@@ -793,6 +793,7 @@ static struct cardbus_override_struct {
 	{ PD(TI,1251A),	&ti_ops },
 	{ PD(TI,1211),	&ti_ops },
 	{ PD(TI,1251B),	&ti_ops },
+	{ PD(TI,1410),	&ti_ops },
 	{ PD(TI,1420),	&ti_ops },
 
 	{ PD(RICOH,RL5C465), &ricoh_ops },

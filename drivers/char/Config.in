@@ -186,7 +186,7 @@ if [ "$CONFIG_AGP" != "n" ]; then
    bool '  AMD Irongate support' CONFIG_AGP_AMD
    bool '  Generic SiS support' CONFIG_AGP_SIS
    bool '  ALI chipset support' CONFIG_AGP_ALI
-   bool '  Severworks LE/HE support' CONFIG_AGP_SWORKS
+   bool '  Serverworks LE/HE support' CONFIG_AGP_SWORKS
 fi
 
 source drivers/char/drm/Config.in

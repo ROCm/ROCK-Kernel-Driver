@@ -1446,7 +1446,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if (dmabuf->enable & ADC_RUNNING) {
 			stop_adc(state);
 		}
-		return ret;
+		return put_user(ret, (int *)arg);
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {

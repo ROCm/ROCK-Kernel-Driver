@@ -519,6 +519,7 @@
 #define PCI_DEVICE_ID_TI_1220		0xac17
 #define PCI_DEVICE_ID_TI_1221		0xac19
 #define PCI_DEVICE_ID_TI_1210		0xac1a
+#define PCI_DEVICE_ID_TI_1410		0xac50
 #define PCI_DEVICE_ID_TI_1450		0xac1b
 #define PCI_DEVICE_ID_TI_1225		0xac1c
 #define PCI_DEVICE_ID_TI_1251A		0xac1d
