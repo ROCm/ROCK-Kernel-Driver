@@ -1340,13 +1340,14 @@ static int sd_probe(struct device *dev)
 
 	strcpy(gd->devfs_name, sdp->devfs_name);
 
+	gd->private_data = &sdkp->driver;
+
 	sd_revalidate_disk(gd);
 
 	gd->driverfs_dev = &sdp->sdev_driverfs_dev;
 	gd->flags = GENHD_FL_DRIVERFS;
 	if (sdp->removable)
 		gd->flags |= GENHD_FL_REMOVABLE;
-	gd->private_data = &sdkp->driver;
 	gd->queue = sdkp->device->request_queue;
 
 	dev_set_drvdata(dev, sdkp);
