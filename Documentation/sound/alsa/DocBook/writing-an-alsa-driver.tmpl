@@ -5016,13 +5016,14 @@ struct _snd_pcm_runtime {
       <informalexample>
         <programlisting>
 <![CDATA[
-  snd_info_set_text_ops(entry, chip, my_proc_read);
+  snd_info_set_text_ops(entry, chip, read_size, my_proc_read);
 ]]>
         </programlisting>
       </informalexample>
     
     where the second argument (<parameter>chip</parameter>) is the
-    private data to be used in the callbacks and the third
+    private data to be used in the callbacks. The third parameter
+    specifies the read buffer size and the fourth
     (<parameter>my_proc_read</parameter>) is the callback function, which
     is defined like
 
