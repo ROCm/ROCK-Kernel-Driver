@@ -107,12 +107,6 @@ enum {
 	ATA_FLAG_MMIO		= (1 << 6), /* use MMIO, not PIO */
 	ATA_FLAG_SATA_RESET	= (1 << 7), /* use COMRESET */
 
-	/* struct ata_taskfile flags */
-	ATA_TFLAG_LBA48		= (1 << 0), /* enable 48-bit LBA and "HOB" */
-	ATA_TFLAG_ISADDR	= (1 << 1), /* enable r/w to nsect/lba regs */
-	ATA_TFLAG_DEVICE	= (1 << 2), /* enable r/w to device reg */
-	ATA_TFLAG_WRITE		= (1 << 3), /* data dir: host->dev==1 (write) */
-
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
 	ATA_QCFLAG_ATAPI	= (1 << 3), /* is ATAPI packet command? */
@@ -221,29 +215,6 @@ struct ata_host_set {
 	unsigned int		n_ports;
 	void			*private_data;
 	struct ata_port *	ports[0];
-};
-
-struct ata_taskfile {
-	unsigned long		flags;		/* ATA_TFLAG_xxx */
-	u8			protocol;	/* ATA_PROT_xxx */
-
-	u8			ctl;		/* control reg */
-
-	u8			hob_feature;	/* additional data */
-	u8			hob_nsect;	/* to support LBA48 */
-	u8			hob_lbal;
-	u8			hob_lbam;
-	u8			hob_lbah;
-
-	u8			feature;
-	u8			nsect;
-	u8			lbal;
-	u8			lbam;
-	u8			lbah;
-
-	u8			device;
-
-	u8			command;	/* IO operation */
 };
 
 struct ata_queued_cmd {
