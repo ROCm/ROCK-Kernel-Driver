@@ -1237,24 +1237,6 @@ pciio_device_info_unregister(vertex_hdl_t connectpt,
     hwgraph_vertex_destroy(pconn);
     
 }
-/* Add the pci card inventory information to the hwgraph
- */
-static void
-pciio_device_inventory_add(vertex_hdl_t pconn_vhdl)
-{
-    pciio_info_t	pciio_info = pciio_info_get(pconn_vhdl);
-
-    ASSERT(pciio_info);
-    ASSERT(pciio_info->c_vertex == pconn_vhdl);
-
-    /* Donot add inventory  for non-existent devices */
-    if ((pciio_info->c_vendor == PCIIO_VENDOR_ID_NONE)	||
-	(pciio_info->c_device == PCIIO_DEVICE_ID_NONE))
-	return;
-    device_inventory_add(pconn_vhdl,INV_IOBD,INV_PCIADAP,
-			 pciio_info->c_vendor,pciio_info->c_device,
-			 pciio_info->c_slot);
-}
 
 /*ARGSUSED */
 int
@@ -1266,7 +1248,6 @@ pciio_device_attach(vertex_hdl_t pconn,
     pciio_device_id_t       device_id;
 
 
-    pciio_device_inventory_add(pconn);
     pciio_info = pciio_info_get(pconn);
 
     vendor_id = pciio_info->c_vendor;

@@ -329,28 +329,6 @@ early_probe_for_widget(vertex_hdl_t hubv, xwidget_hwid_t hwid)
 	}
 }
 
-/* Add inventory information to the widget vertex 
- * Right now (module,slot,revision) is being
- * added as inventory information.
- */
-static void
-xwidget_inventory_add(vertex_hdl_t 		widgetv,
-		      lboard_t 			*board,
-		      struct xwidget_hwid_s 	hwid)
-{
-	if (!board)
-		return;
-	/* Donot add inventory information for the baseio
-	 * on a speedo with an xbox. It has already been
-	 * taken care of in SN00_vmc.
-	 * Speedo with xbox's baseio comes in at slot io1 (widget 9)
-	 */
-	device_inventory_add(widgetv,INV_IOBD,board->brd_type,
-			     geo_module(board->brd_geoid),
-			     SLOTNUM_GETSLOT(board->brd_slot),
-			     hwid.rev_num);
-}
-
 /*
  * io_xswitch_widget_init
  *	
@@ -494,10 +472,6 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		hwid.part_num = XWIDGET_PART_NUM(widget_id);
 		hwid.rev_num = XWIDGET_REV_NUM(widget_id);
 		hwid.mfg_num = XWIDGET_MFG_NUM(widget_id);
-		/* Store some inventory information about
-		 * the xwidget in the hardware graph.
-		 */
-		xwidget_inventory_add(widgetv,board,hwid);
 
 		(void)xwidget_register(&hwid, widgetv, widgetnum,
 				       hubv, hub_widgetid);
