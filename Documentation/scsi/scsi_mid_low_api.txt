@@ -27,8 +27,7 @@ refers to this file. With the appropriate DocBook toolset, this permits
 users to generate html, ps and pdf renderings of information within this
 file (e.g. the interface functions).
 
-This version of the document was written in the period when lk 2.5.47
-was current.
+This version of the document roughly matches lk 2.5.50 .
 
 Driver structure
 ================
@@ -43,9 +42,9 @@ under the drivers/scsi directory.
 
 When a new LLD is being added to Linux, the following files (found in the
 drivers/scsi directory) will need some attention: Makefile, Config.help and
-Config.in . SCSI documentation is in the process of being moved to the 
-Documentation/scsi directory in the kernel source tree. It is probably best
-to study how existing LLDs are organized.
+Config.in . SCSI documentation is found in the Documentation/scsi directory
+of the kernel source tree. It is probably best to study how existing LLDs 
+are organized.
 
 As the 2.5 series development kernels evolve, changes are being
 introduced into this interface. An example of this is driver
@@ -75,11 +74,10 @@ Those functions in group b) are listed in a section entitled "Interface
 functions" below. The function pointers are placed in the members of
 "struct SHT", an instance of which is passed to scsi_register() [or
 scsi_register_host() in the passive initialization model]. Those interface
-functions that are not mandatory and that the LLD does
-not wish to supply should have NULL placed in the corresponding member
-of struct SHT. [Defining an instance of struct SHT at file scope will
-cause NULL to be placed in function pointer members not explicitly
-initialized.]
+functions that are not mandatory and that the LLD does not wish to supply
+should have NULL placed in the corresponding member of struct SHT.
+[Defining an instance of struct SHT at file scope will cause NULL to be 
+placed in function pointer members not explicitly initialized.]
 
 Those instances in group c) are slowly being removed as they tend to be
 "racy" especially in a hotplug environment.
@@ -87,42 +85,53 @@ Those instances in group c) are slowly being removed as they tend to be
 
 Hotplug initialization model
 ============================
-In this model a LLD controls when SCSI hosts are introduced
-and removed from the SCSI subsystem. Hosts can be introduced as early as
-driver initialization and removed as late as driver shutdown. Typically
-a driver will respond to a sysfs probe() callback that indicates a
-HBA is present (e.g. a PCI device). After confirming it is a device that
-it wants to control, it will initialize the HBA and then register a new 
-host with the SCSI mid level.
+In this model a LLD controls when SCSI hosts are introduced and removed
+from the SCSI subsystem. Hosts can be introduced as early as driver
+initialization and removed as late as driver shutdown. Typically a driver
+will respond to a sysfs probe() callback that indicates a HBA is present
+(e.g. a PCI device). After confirming it is a device that it wants to
+control, it will initialize the HBA and then register a new host with the
+SCSI mid level.
 
 Hot unplugging a HBA that controls a disk which is processing SCSI
 commands on a mounted file system is an ugly situation. Issues with
-this scenario are still being worked through. The primary concern in
+this scenario are still being worked through. The primary concern is
 the stability of the kernel (specifically the block and SCSI subsystems)
 since the effected disk can be "cleaned up" the next time it is seen.
 
-During LLD initialization the driver should register
-itself with the appropriate IO bus that it expects to find HBA(s)
-(e.g. the PCI bus). This can probably be done via sysfs (formerly known
-as driverfs). Any driver parameters (especially those that are writeable
-after the driver is loaded) could also be registered with sysfs at
-this point. At the end of driver initialization the SCSI mid level is
-typically not aware of its presence.
+During LLD initialization the driver should register itself with the
+appropriate IO bus that it expects to find HBA(s) (e.g. the PCI bus). This
+can probably be done via sysfs (formerly known as driverfs). Any driver
+parameters (especially those that are writeable after the driver is
+loaded) could also be registered with sysfs at this point. At the end of
+driver initialization the SCSI mid level is typically not aware of its
+presence.
 
 At some later time, the LLD becomes aware of a HBA and what follows
-is a typical sequence of calls (for 3 discovered SCSI devices)
-between the LLD and the mid level.
+is a typical sequence of calls between the LLD and the mid level.
+This example shows 3 devices being found and 1 device not being found:
 
 LLD                   mid level                    LLD
 ---                   ---------                    ---
 scsi_register()  -->
 scsi_add_host()  --------+
                          |
-                    slave_attach()  -->  scsi_adjust_queue_depth()
-                    slave_attach()  -->  scsi_adjust_queue_depth()
-                    slave_attach()  -->  scsi_adjust_queue_depth()
+		    slave_alloc()
+                    slave_configure() -->  scsi_adjust_queue_depth()
+			 |
+		    slave_alloc()
+                    slave_configure() -->  scsi_adjust_queue_depth()
+			 |
+		    slave_alloc()
+                    slave_configure() -->  scsi_adjust_queue_depth()
+			 |
+		    slave_alloc()   **
+                    slave_destroy() **
 
-The invocation of scsi_adjust_queue_depth() by the LLD is optional.
+The invocation of scsi_adjust_queue_depth() by the LLD is required
+if slave_configure() is supplied.
+** For scsi devices that the mid level tries to scan but do not
+   respond, a slave_alloc(), slave_destroy() pair is called.
 
 Here is the corresponding sequence when a host (HBA) is being
 removed:
@@ -131,29 +140,29 @@ LLD                   mid level
 ---                   ---------
 scsi_remove_host()  -----+
                          |
-                    slave_detach() 
-                    slave_detach()
-                    slave_detach()
+                    slave_destroy() 
+                    slave_destroy()
+                    slave_destroy()
 scsi_unregister()  -->
 
 It is practical for a LLD to keep track of struct Scsi_Host instances
 (a pointer is returned by scsi_register() ) and struct scsi_device
-instances (a pointer is passed as the parameter to slave_attach() ).
-Both classes of instances are "owned" by the mid-level. struct scsi_devices 
-instances are freed after slave_detach(). struct Scsi_Host instances
-are freed after scsi_unregister().
+instances (a pointer is passed as the parameter to slave_alloc() and
+slave_configure() ). Both classes of instances are "owned" by the 
+mid-level. struct scsi_devices instances are freed after slave_destroy().
+struct Scsi_Host instances are freed after scsi_unregister().
 
 
 Passive initialization model
 ============================
-LLD initialization (both built-in and module) and shutdown and "wired
+LLD initialization (both built-in and module) and shutdown are "wired
 up" by passing function pointers to the module_init() and module_exit()
 macros respectively. In this model the function identified by "module_init"
 must call scsi_register_host() and the function identified by "module_exit"
 must call scsi_unregister_host().
 Most LLDs inherited from the lk 2.4 series include a file called
 "scsi_module.c" [yes the ".c" is a little surprising] in their
-source code. For it to work a declaration like this is needed before
+source code. For that file to work a declaration like this is needed before
 it is included:
     static struct SHT driver_template = DRIVER_TEMPLATE;
     #include "scsi_module.c"
@@ -164,7 +173,7 @@ pointers to supported interface functions and other values.
 
 Here is an example of an initialization sequence when two hosts are
 detected (so detect() returns 2) and the SCSI bus scan on each host
-finds 3 SCSI devices.
+finds 1 SCSI device (and a second device does not respond).
 
 LLD                      mid level                 LLD
 ---                      ---------                 ---
@@ -175,17 +184,21 @@ scsi_register_host() -------+
                             |                scsi_register()
                             |                scsi_register()
                             |
-                      slave_attach()  -->  scsi_adjust_queue_depth()
-                      slave_attach()  -->  scsi_adjust_queue_depth()
-                      slave_attach()  -->  scsi_adjust_queue_depth()
+		      slave_alloc()
+                      slave_configure()  -->  scsi_adjust_queue_depth()
+		      slave_alloc()   **
+		      slave_destroy() **
                             |
-                      slave_attach()  -->  scsi_adjust_queue_depth()
-                      slave_attach()  -->  scsi_adjust_queue_depth()
-                      slave_attach()  -->  scsi_adjust_queue_depth()
+		      slave_alloc()
+                      slave_configure()  -->  scsi_adjust_queue_depth()
+		      slave_alloc()   **
+		      slave_destroy() **
 
-If the LLD does not supply a slave_attach() then the mid level invokes
+If the LLD does not supply a slave_configure() then the mid level invokes
 scsi_adjust_queue_depth() itself with tagged queuing off and "cmd_per_lun"
-for that host as the third parameter.
+for that host as the queue length.
+** For scsi devices that the mid level tries to scan but do not
+   respond, a slave_alloc(), slave_destroy() pair is called.
 
 Here is a LLD shutdown sequence:
 
@@ -193,17 +206,13 @@ LLD                      mid level                 LLD
 ---                      ---------                 ---
 scsi_unregister_host() -----+
                             |
-                     slave_detach()
-                     slave_detach()
-                     slave_detach()
+                     slave_destroy()
                         release()   -->   scsi_unregister()
                             |
-                     slave_detach()
-                     slave_detach()
-                     slave_detach()
+                     slave_destroy()
                         release()   -->   scsi_unregister()
 
-Both slave_detach() and release() are optional. If they are not supplied
+Both slave_destroy() and release() are optional. If they are not supplied
 the mid level supplies default actions.
 
 The shortcoming of the "passive initialization model" is that host
@@ -215,8 +224,7 @@ driver shutdown and re-initialization.
 
 Conventions
 ===========
-First there is Linus's thoughts on C coding found in file 
-Documentation/CodingStyle . 
+First Linus's thoughts on C coding found in file Documentation/CodingStyle . 
 
 Next there is a movement to "outlaw" typedefs introducing synonyms for 
 struct tags. Both can be still found in the SCSI subsystem, for example: 
@@ -264,9 +272,10 @@ int scsi_add_host(struct Scsi_Host *shost)
  *	Returns nothing
  *
  * 	Notes: Can be invoked any time on a SCSI device controlled by this
- *	LLD. [Specifically after slave_attach() and prior to slave_detach().]
- *	Can safely be invoked from interrupt code. Actual queue depth change
- *	may be delayed until the next command is being processed.
+ *	LLD. [Specifically during and after slave_configure() and prior to
+ *	slave_destroy().] Can safely be invoked from interrupt code. Actual
+ *	queue depth change may be delayed until the next command is being
+ *	processed.
  *	Defined in drivers/scsi/scsi.c [see source code for more notes]
  *
  **/
@@ -471,11 +480,11 @@ Interface functions are supplied (defined) by LLDs and
 their function pointers are placed in an instance of struct SHT which
 is passed to scsi_register() [or scsi_register_host()]. Some
 are mandatory. Interface functions should be declared static. The 
-accepted convention is that driver "xyz" will declare its slave_attach() 
+accepted convention is that driver "xyz" will declare its slave_configure() 
 function as:
-    static int xyz_slave_attach(struct scsi_device * sdev);
+    static int xyz_slave_configure(struct scsi_device * sdev);
 
-A pointer to this function should be placed in the 'slave_attach' member
+A pointer to this function should be placed in the 'slave_configure' member
 of a "struct SHT" instance. A pointer to such an instance should
 passed to the mid level's scsi_register() [or scsi_register_host()].
 
@@ -787,13 +796,37 @@ int proc_info(char * buffer, char ** start, off_t offset,
 
 
 /**
- *      slave_attach - driver fine tuning for give device just after it
- *		       has been first scan (i.e. it responded to an
+ *      slave_alloc -	prior to any commands being sent to a new device 
+ *			(i.e. just prior to scan) this call is made
+ *      @sdp: pointer to new device (about to be scanned)
+ *
+ *      Returns 0 if ok. Any other return is assumed to be an error and
+ *	the device is ignored.
+ *
+ *      Required: no
+ *
+ *      Locks: none
+ *
+ *      Notes: Allows the driver to allocate any resources for a device
+ *	prior to its initial scan. The corresponding scsi device may not
+ *	exist but the mid level is just about to scan for it (i.e. send
+ *	and INQUIRY command plus ...). If a device is found then
+ *	slave_configure() will be called while if a device is not found
+ *	slave_destroy() is called.
+ *      For more details see the hosts.h file.
+ **/
+    int slave_alloc(struct scsi_device *sdp);
+
+
+/**
+ *      slave_configure - driver fine tuning for give device just after it
+ *		       has been first scanned (i.e. it responded to an
  *		       INQUIRY)
  *      @sdp: device that has just been attached
  *
  *      Returns 0 if ok. Any other return is assumed to be an error and
- *	the device is taken offline.
+ *	the device is taken offline. [offline devices will _not_ have
+ *	slave_destroy() called on them so clean up resources.]
  *
  *      Required: no
  *
@@ -805,16 +838,16 @@ int proc_info(char * buffer, char ** start, off_t offset,
  *	If this function is not supplied, the mid level will call
  *	scsi_adjust_queue_depth() with the struct Scsi_Host::cmd_per_lun
  *	value on behalf of the given device. If this function is
- *	supplied then its implementation is expected to call
+ *	supplied then its implementation must call
  *	scsi_adjust_queue_depth(). 	
  **/
-    int slave_attach(struct scsi_device *sdp);
+    int slave_configure(struct scsi_device *sdp);
 
 
 /**
- *      slave_detach - given device is about to be shut down. No further
- *		       commands will be sent.
- *      @sdp: device that is about to be detached
+ *      slave_destroy - given device is about to be shut down. All
+ *			activity has ceased on this device.
+ *      @sdp: device that is about to be shut down
  *
  *      Returns nothing
  *
@@ -827,10 +860,10 @@ int proc_info(char * buffer, char ** start, off_t offset,
  *	by this driver for given device should be freed now. No further
  *	commands will be sent for this sdp instance. [However the device
  *	could be re-attached in the future in which case a new instance
- *	of struct scsi_device would be supplied by a future slave_attach()
- *	call.]
+ *	of struct scsi_device would be supplied by future slave_alloc()
+ *	and slave_configure() calls.]
  **/
-    void slave_detach(struct scsi_device *sdp);
+    void slave_destroy(struct scsi_device *sdp);
 
 
 
@@ -958,7 +991,7 @@ subsystems in the Documentation/Configure.help file. In the 2.5 series,
 the SCSI subsystem now has its own (much smaller) drivers/scsi/Config.help
 file.
 
-Addition of slave_attach() and slave_detach().
+Addition of slave_alloc(), slave_configure() and slave_destroy().
 
 Addition of the "hotplug initialization model".
 
@@ -970,8 +1003,9 @@ The following people have contributed to this document:
         James Bottomley <James.Bottomley@steeleye.com> 
         Patrick Mansfield <patmans@us.ibm.com> 
 	Christoph Hellwig <hch@infradead.org>
+	Doug Ledford <dledford@redhat.com>
 
 
 Douglas Gilbert
 dgilbert@interlog.com
-17th November 2002
+29th November 2002
