@@ -378,7 +378,6 @@ enum {
 #define CURSOR_BLINK_RATE	20
 #define CURSOR_DRAW_DELAY	2
 
-static int currcon = 0;
 static int inverse = 0;
 static char fontname[40] __initdata = { 0 };
 static char curblink __initdata = 1;
@@ -1241,7 +1240,7 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 		   u_int transp, struct fb_info *info)
 {
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	u_int bpp = fb_display[currcon].var.bits_per_pixel;
+	u_int bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 	if (regno > 255)
 		return 1;
@@ -1269,7 +1268,7 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 		switch (bpp) {
 #ifdef FBCON_HAS_CFB16
 			case 16:
-				p->fbcon_cmap.cfb16[regno] = (regno << (fb_display[currcon].var.green.length == 5 ? 10 : 11)) | (regno << 5) | regno;
+				p->fbcon_cmap.cfb16[regno] = (regno << (fb_display[info->currcon].var.green.length == 5 ? 10 : 11)) | (regno << 5) | regno;
 				break;
 #endif
 #ifdef FBCON_HAS_CFB24
@@ -1493,7 +1492,7 @@ imsttfb_set_var (struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	if (info->changevar)
 		(*info->changevar)(con);
 
-	if (con == currcon) {
+	if (con == info->currcon) {
 		if (oldgreenlen != disp->var.green.length) {
 			if (disp->var.green.length == 6)
 				set_565(p);
@@ -1529,7 +1528,7 @@ imsttfb_pan_display (struct fb_var_screeninfo *var, int con, struct fb_info *inf
 
 	disp->var.xoffset = var->xoffset;
 	disp->var.yoffset = var->yoffset;
-	if (con == currcon)
+	if (con == info->currcon)
 		set_offset(disp, p);
 
 	return 0;
@@ -1538,7 +1537,7 @@ imsttfb_pan_display (struct fb_var_screeninfo *var, int con, struct fb_info *inf
 static int
 imsttfb_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 {
-	if (con == currcon)	/* current console? */
+	if (con == info->currcon)	/* current console? */
 		return fb_get_cmap(cmap, kspc, imsttfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1560,7 +1559,7 @@ imsttfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 		if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, imsttfb_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -1661,7 +1660,7 @@ static int
 imsttfbcon_switch (int con, struct fb_info *info)
 {
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	struct display *old = &fb_display[currcon], *new = &fb_display[con];
+	struct display *old = &fb_display[info->currcon], *new = &fb_display[con];
 
 	if (old->cmap.len)
 		fb_get_cmap(&old->cmap, 1, imsttfb_getcolreg, info);
@@ -1669,7 +1668,7 @@ imsttfbcon_switch (int con, struct fb_info *info)
 	if (old->conp && old->conp->vc_sw && old->conp->vc_sw->con_cursor)
 		old->conp->vc_sw->con_cursor(old->conp, CM_ERASE);
 
-	currcon = con;
+	info->currcon = con;
 
 	if (old->var.xres != new->var.xres
 	    || old->var.yres != new->var.yres
@@ -1702,7 +1701,7 @@ imsttfbcon_updatevar (int con, struct fb_info *info)
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
 	struct display *disp = &fb_display[con];
 
-	if (con != currcon)
+	if (con != info->currcon)
 		goto out;
 
 	if (p->ramdac == IBM)
@@ -1869,6 +1868,7 @@ init_imstt(struct fb_info_imstt *p)
 	p->info.node = NODEV;
 	p->info.fbops = &imsttfb_ops;
 	p->info.disp = &p->disp;
+	p->info.currcon = -1;
 	p->info.changevar = 0;
 	p->info.switch_con = &imsttfbcon_switch;
 	p->info.updatevar = &imsttfbcon_updatevar;

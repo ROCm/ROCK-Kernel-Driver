@@ -175,9 +175,9 @@
 #define BIT(x) (1UL << (x))
 
 /* COMMAND_2D reg. values */
-#define ROP_COPY	0xcc     // src
-#define ROP_INVERT      0x55     // NOT dst
-#define ROP_XOR         0x66     // src XOR dst
+#define TDFX_ROP_COPY	     0xcc     // src
+#define TDFX_ROP_INVERT      0x55     // NOT dst
+#define TDFX_ROP_XOR         0x66     // src XOR dst
 
 #define AUTOINC_DSTX                    BIT(10)
 #define AUTOINC_DSTY                    BIT(11)
@@ -466,8 +466,6 @@ void tdfxfb_setup(char *options,
 static int tdfxfb_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void tdfxfb_remove(struct pci_dev *pdev);
 
-static int currcon = 0;
-
 static struct fb_ops tdfxfb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	tdfxfb_get_fix,
@@ -715,7 +713,7 @@ static void do_bitblt(u32 curx,
 			   u32 stride,
 			   u32 bpp) {
 
-   u32 blitcmd = COMMAND_2D_S2S_BITBLT | (ROP_COPY << 24);
+   u32 blitcmd = COMMAND_2D_S2S_BITBLT | (TDFX_ROP_COPY << 24);
    u32 fmt= stride | ((bpp+((bpp==8) ? 0 : 8)) << 13); 
    
    if (curx <= dstx) {
@@ -761,7 +759,7 @@ static void do_putc(u32 fgx, u32 bgx,
    tdfx_outl(COLORBACK, bgx);
    tdfx_outl(SRCXY,     0);
    tdfx_outl(DSTXY,     xx | (yy << 16));
-   tdfx_outl(COMMAND_2D, COMMAND_2D_H2S_BITBLT | (ROP_COPY << 24));
+   tdfx_outl(COMMAND_2D, COMMAND_2D_H2S_BITBLT | (TDFX_ROP_COPY << 24));
    tdfx_outl(SRCFORMAT, 0x400000);
    tdfx_outl(DSTFORMAT, fmt);
    tdfx_outl(DSTSIZE,   fontwidth(p) | (fontheight(p) << 16));
@@ -824,7 +822,7 @@ static void do_putcs(u32 fgx, u32 bgx,
    tdfx_outl(DSTFORMAT, fmt);
    tdfx_outl(DSTSIZE, w | (h << 16));
    tdfx_outl(SRCXY,     0);
-   tdfx_outl(COMMAND_2D, COMMAND_2D_H2S_BITBLT | (ROP_COPY << 24));
+   tdfx_outl(COMMAND_2D, COMMAND_2D_H2S_BITBLT | (TDFX_ROP_COPY << 24));
    
    while (count--) {
       u8 *chardata=p->fontdata+(scr_readw(s++) & p->charmask)*h*fw;
@@ -1029,14 +1027,14 @@ static void tdfx_cfbX_clear_margins(struct vc_data* conp, struct display* p,
       do_fillrect( p->var.xoffset+rs, 0, 
 		  rw, p->var.yres_virtual, 0, 
 		  fb_info.current_par.lpitch,
-		  fb_info.current_par.bpp, ROP_COPY);
+		  fb_info.current_par.bpp, TDFX_ROP_COPY);
    }
    
    if (bh) { 
       do_fillrect( p->var.xoffset, p->var.yoffset+bs, 
 		  rs, bh, 0, 
 		  fb_info.current_par.lpitch,
-		  fb_info.current_par.bpp, ROP_COPY);
+		  fb_info.current_par.bpp, TDFX_ROP_COPY);
    }
 }
 static void tdfx_cfbX_bmove(struct display* p, 
@@ -1127,7 +1125,7 @@ static void tdfx_cfb8_clear(struct vc_data* conp,
 		   fontheight(p)*height,
 		   bg, 
 		   fb_info.current_par.lpitch, 
-		   fb_info.current_par.bpp,ROP_COPY);
+		   fb_info.current_par.bpp, TDFX_ROP_COPY);
 }
 
 static void tdfx_cfb16_clear(struct vc_data* conp, 
@@ -1145,7 +1143,7 @@ static void tdfx_cfb16_clear(struct vc_data* conp,
 		   fontheight(p)*height,
 		   bg, 
 		   fb_info.current_par.lpitch, 
-		   fb_info.current_par.bpp,ROP_COPY);
+		   fb_info.current_par.bpp, TDFX_ROP_COPY);
 }
 
 static void tdfx_cfb32_clear(struct vc_data* conp, 
@@ -1163,7 +1161,7 @@ static void tdfx_cfb32_clear(struct vc_data* conp,
 		   fontheight(p)*height,
 		   bg, 
 		   fb_info.current_par.lpitch, 
-		   fb_info.current_par.bpp,ROP_COPY);
+		   fb_info.current_par.bpp, TDFX_ROP_COPY);
 }
 static void tdfx_cfbX_revc(struct display *p, int xx, int yy)
 {
@@ -1172,7 +1170,7 @@ static void tdfx_cfbX_revc(struct display *p, int xx, int yy)
    do_fillrect( xx * fontwidth(p), yy * fontheight(p), 
 	        fontwidth(p), fontheight(p), 
 	        (bpp==8) ? 0x0f : 0xffffffff, 
-	        fb_info.current_par.lpitch, bpp, ROP_XOR);
+	        fb_info.current_par.lpitch, bpp, TDFX_ROP_XOR);
    
 }
 static void tdfx_cfbX_cursor(struct display *p, int mode, int x, int y) 
@@ -1838,7 +1836,7 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo* var,
   if(nowrap && 
      (var->yoffset + var->yres > var->yres_virtual)) return -EINVAL;
  
-  if (con==currcon)
+  if (con == fb->currcon)
     do_pan_var(var,i);
    
   fb_display[con].var.xoffset=var->xoffset;
@@ -1854,7 +1852,7 @@ static int tdfxfb_get_cmap(struct fb_cmap *cmap,
    struct fb_info_tdfx* i = (struct fb_info_tdfx*)fb;
    struct display *d=(con<0) ? fb->disp : fb_display + con;
    
-   if(con == currcon) {
+   if(con == fb->currcon) {
       /* current console? */
       return fb_get_cmap(cmap, kspc, tdfxfb_getcolreg, fb);
    } else if(d->cmap.len) {
@@ -1879,7 +1877,7 @@ static int tdfxfb_set_cmap(struct fb_cmap *cmap,
       if((err = fb_alloc_cmap(&d->cmap, cmap_len, 0)))
 	return err;
    }
-   if(con == currcon) {
+   if(con == fb->currcon) {
       /* current console? */
       return fb_set_cmap(cmap, kspc, tdfxfb_setcolreg, fb);
    } else {
@@ -1961,7 +1959,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 
 	/* clear framebuffer memory */
 	memset_io(fb_info.bufbase_virt, 0, fb_info.bufbase_size);
-	currcon = -1;
+	fb_info.fb_info.currcon = -1;
 
 	if (!nohwcursor)
 		tdfxfb_hwcursor_init();
@@ -1978,6 +1976,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	fb_info.fb_info.node       = NODEV;
 	fb_info.fb_info.fbops      = &tdfxfb_ops;
 	fb_info.fb_info.disp       = &fb_info.disp;
+	fb_info.fb_info.currcon	   = -1;
 	strcpy(fb_info.fb_info.fontname, fontname);
 	fb_info.fb_info.switch_con = &tdfxfb_switch_con;
 	fb_info.fb_info.updatevar  = &tdfxfb_updatevar;
@@ -2117,16 +2116,16 @@ static int tdfxfb_switch_con(int con,
 			     struct fb_info *fb) {
    struct fb_info_tdfx *info = (struct fb_info_tdfx*)fb;
    struct tdfxfb_par par;
-   int old_con = currcon;
+   int old_con = fb->currcon;
    int set_par = 1;
 
    /* Do we have to save the colormap? */
-   if (currcon>=0)
-     if(fb_display[currcon].cmap.len)
-       fb_get_cmap(&fb_display[currcon].cmap, 1, tdfxfb_getcolreg, fb);
+   if (fb->currcon>=0)
+     if(fb_display[fb->currcon].cmap.len)
+       fb_get_cmap(&fb_display[fb->currcon].cmap, 1, tdfxfb_getcolreg, fb);
    
-   currcon = con;
-   fb_display[currcon].var.activate = FB_ACTIVATE_NOW; 
+   fb->currcon = con;
+   fb_display[fb->currcon].var.activate = FB_ACTIVATE_NOW; 
    tdfxfb_decode_var(&fb_display[con].var, &par, info);
    if (old_con>=0 && vt_cons[old_con]->vc_mode!=KD_GRAPHICS) {
      /* check if we have to change video registers */
@@ -2207,7 +2206,7 @@ static int  tdfxfb_updatevar(int con,
 			     struct fb_info* fb) {
 
    struct fb_info_tdfx* i = (struct fb_info_tdfx*)fb;
-   if ((con==currcon) && (!nopan)) 
+   if ((con==fb->currcon) && (!nopan)) 
      do_pan_var(&fb_display[con].var,i);
    return 0;
 }

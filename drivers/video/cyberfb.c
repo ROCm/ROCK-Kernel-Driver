@@ -123,7 +123,6 @@ struct cyberfb_par {
 static struct cyberfb_par current_par;
 
 static int current_par_valid = 0;
-static int currcon = 0;
 
 static struct display disp;
 static struct fb_info fb_info;
@@ -804,7 +803,7 @@ static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 static void do_install_cmap(int con, struct fb_info *info)
 {
 	DPRINTK("ENTER\n");
-	if (con != currcon) {
+	if (con != info->currcon) {
 		DPRINTK("EXIT - Not current console\n");
 		return;
 	}
@@ -919,7 +918,7 @@ static int cyberfb_set_var(struct fb_var_screeninfo *var, int con,
 	int err, oldxres, oldyres, oldvxres, oldvyres, oldbpp, oldaccel;
 
 	DPRINTK("ENTER\n");
-	if ((err = do_fb_set_var(var, con == currcon))) {
+	if ((err = do_fb_set_var(var, con == info->currcon))) {
 		DPRINTK("EXIT - do_fb_set_var failed\n");
 		return(err);
 	}
@@ -956,7 +955,7 @@ static int cyberfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info)
 {
 	DPRINTK("ENTER\n");
-	if (con == currcon) { /* current console? */
+	if (con == info->currcon) { /* current console? */
 		DPRINTK("EXIT - console is current console\n");
 		return(fb_get_cmap(cmap, kspc, Cyber_getcolreg, info));
 	} else if (fb_display[con].cmap.len) { /* non default colormap? */
@@ -990,7 +989,7 @@ static int cyberfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return(err);
 		}
 	}
-	if (con == currcon) {		 /* current console? */
+	if (con == info->currcon) {		 /* current console? */
 		DPRINTK("EXIT - Current console\n");
 		return(fb_set_cmap(cmap, kspc, Cyber_setcolreg, info));
 	} else {
@@ -1088,6 +1087,7 @@ int __init cyberfb_init(void)
 	    fb_info.node = NODEV;
 	    fb_info.fbops = &cyberfb_ops;
 	    fb_info.disp = &disp;
+	    fb_info.currcon = -1;
 	    fb_info.switch_con = &Cyberfb_switch;
 	    fb_info.updatevar = &Cyberfb_updatevar;
 	    fb_info.blank = &Cyberfb_blank;
@@ -1129,13 +1129,13 @@ static int Cyberfb_switch(int con, struct fb_info *info)
 {
         DPRINTK("ENTER\n");
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len) {
-		fb_get_cmap(&fb_display[currcon].cmap, 1, Cyber_getcolreg,
+	if (fb_display[info->currcon].cmap.len) {
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, Cyber_getcolreg,
 			    info);
 	}
 
 	do_fb_set_var(&fb_display[con].var, 1);
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	DPRINTK("EXIT\n");

@@ -214,7 +214,6 @@ static void control_cleanup(void);
 
 /************************** Internal variables *******************************/
 
-static int currcon;
 static struct fb_info_control *control_fb;
 
 static char fontname[40] __initdata = { 0 };
@@ -324,7 +323,7 @@ static int control_set_var(struct fb_var_screeninfo *var, int con,
 	} else
 		disp->var = *var;
 
-	if(con == currcon) {
+	if (con == info->currcon) {
 		control_set_hardware(p, &par);
 		if(depthchange) {
 			if((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
@@ -377,7 +376,7 @@ static int control_pan_display(struct fb_var_screeninfo *var, int con,
 static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)		/* current console? */
+	if (con == info->currcon)		/* current console? */
 		return fb_get_cmap(cmap, kspc, controlfb_getcolreg, info);
 	if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0: 2);
@@ -399,7 +398,7 @@ static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if (err)
 			return err;
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_set_cmap(cmap, kspc, controlfb_setcolreg, info);
 	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
 	return 0;
@@ -463,10 +462,10 @@ static int controlfb_switch(int con, struct fb_info *info)
 	struct fb_info_control	*p = (struct fb_info_control *)info;
 	struct fb_par_control	par;
 
-	if (currcon >= 0 && fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, controlfb_getcolreg,
+	if (info->currcon >= 0 && fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, controlfb_getcolreg,
 			    info);
-	currcon = con;
+	info->currcon = con;
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 	control_var_to_par(&fb_display[con].var, &par, info);
@@ -668,7 +667,7 @@ try_again:
 		var.yres_virtual = vyres;
 
 	control_init_info(&p->info, p);
-	currcon = -1;
+	p->info.currcon = -1;
 	var.activate = FB_ACTIVATE_NOW;
 
 	if (control_set_var(&var, -1, &p->info) < 0) {

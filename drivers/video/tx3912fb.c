@@ -35,7 +35,6 @@
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
 static struct display global_disp;
-static int currcon = 0;
 
 /*
  * Interface used by the world
@@ -298,7 +297,7 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap(cmap, kspc, tx3912fb_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -321,7 +320,7 @@ static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 				1<<fb_display[con].var.bits_per_pixel, 0)))
 			return err;
 
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_set_cmap(cmap, kspc, tx3912fb_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -400,6 +399,7 @@ int __init tx3912fb_init(void)
 	fb_info.node = NODEV;
 	fb_info.fbops = &tx3912fb_ops;
 	fb_info.disp = &global_disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &tx3912fbcon_switch;
 	fb_info.updatevar = &tx3912fbcon_updatevar;
 	fb_info.blank = &tx3912fbcon_blank;
@@ -422,16 +422,15 @@ int __init tx3912fb_init(void)
 static int tx3912fbcon_switch(int con, struct fb_info *info)
 {
 	/* Save off the color map if needed */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1,
 			tx3912fb_getcolreg, info);
 
 	/* Make the switch */
-	currcon = con;
+	info->currcon = con;
 
 	/* Install new colormap */
 	tx3912fb_install_cmap(con, info);
-
 	return 0;
 }
 
@@ -517,7 +516,7 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  */
 static void tx3912fb_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 
 	if (fb_display[con].cmap.len)

@@ -83,7 +83,6 @@ struct fb_info_iga {
     struct pci_mmap_map *mmap_map;
     struct { u_short blue, green, red, pad; } palette[256];
     int video_cmap_len;
-    int currcon;
     struct display disp;
     struct display_switch dispsw; 
     union {
@@ -387,7 +386,7 @@ static void do_install_cmap(int con, struct fb_info *fb_info)
 {
 	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
 
-        if (con != info->currcon)
+        if (con != fb_info->currcon)
                 return;
         if (fb_display[con].cmap.len)
                 fb_set_cmap(&fb_display[con].cmap, 1,
@@ -402,7 +401,7 @@ static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
 	
-        if (con == info->currcon) /* current console? */
+        if (con == fb_info->currcon) /* current console? */
                 return fb_get_cmap(cmap, kspc, iga_getcolreg, &info->fb_info);
         else if (fb_display[con].cmap.len) /* non default colormap? */
                 fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -424,7 +423,7 @@ static int igafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
                 if (err)
                         return err;
         }
-        if (con == fb->currcon)                     /* current console? */
+        if (con == info->currcon)                     /* current console? */
                 return fb_set_cmap(cmap, kspc, iga_setcolreg, info);
         else
                 fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -514,11 +513,11 @@ static int igafb_switch(int con, struct fb_info *fb_info)
 	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
 
         /* Do we have to save the colormap? */
-        if (fb_display[info->currcon].cmap.len)
-                fb_get_cmap(&fb_display[info->currcon].cmap, 1,
+        if (fb_display[fb_info->currcon].cmap.len)
+                fb_get_cmap(&fb_display[fb_info->currcon].cmap, 1,
                             iga_getcolreg, fb_info);
 
-	info->currcon = con;
+	fb_info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, fb_info);
 	igafb_update_var(con, fb_info);
@@ -571,6 +570,7 @@ static int __init iga_init(struct fb_info_iga *info)
 	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &igafb_ops;
 	info->fb_info.disp = &info->disp;
+	info->fb_info.currcon = -1;
 	strcpy(info->fb_info.fontname, fontname);
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &igafb_switch;

@@ -304,7 +304,6 @@ struct fb_info_aty128 {
 #ifdef CONFIG_MTRR
     struct { int vram; int vram_valid; } mtrr;
 #endif
-    int currcon;
     int blitter_may_be_busy;
     int fifo_slots;                 /* free slots in FIFO (64 max) */
 };
@@ -1555,7 +1554,7 @@ aty128fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 #else
     struct fb_info_aty128 fb = (struct fb_info_aty128 *)info;
 
-    if (con == fb->currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, aty128_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1576,9 +1575,8 @@ static int
 aty128fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-    int err;
-    struct fb_info_aty128 *fb = (struct fb_info_aty128 *)info;
     struct display *disp;  
+    int err;
 
     if (con >= 0)
 	disp = &fb_display[con];
@@ -1591,7 +1589,7 @@ aty128fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	    return err;
     }
 
-    if (con == fb->currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_set_cmap(cmap, kspc, aty128_setcolreg, info);
     else
 	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
@@ -1871,7 +1869,7 @@ aty128_pci_register(struct pci_dev *pdev,
 	/* Copy PCI device info into info->pdev */
 	info->pdev = pdev;
 
-	info->currcon = -1;
+	info->fb_info.currcon = -1;
 
 	/* Virtualize mmio region */
 	info->regbase_phys = reg_addr;
@@ -2120,12 +2118,12 @@ aty128fbcon_switch(int con, struct fb_info *fb)
     struct aty128fb_par par;
 
     /* Do we have to save the colormap? */
-    if (fb_display[info->currcon].cmap.len)
-    	fb_get_cmap(&fb_display[info->currcon].cmap, 1,
+    if (fb_display[fb->currcon].cmap.len)
+    	fb_get_cmap(&fb_display[fb->currcon].cmap, 1,
 			aty128_getcolreg, fb);
 
     /* set the current console */
-    info->currcon = con;
+    fb->currcon = con;
 
     aty128_decode_var(&fb_display[con].var, &par, info);
     aty128_set_par(&par, info);
@@ -2291,9 +2289,7 @@ aty128_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static void
 do_install_cmap(int con, struct fb_info *info)
 {
-    struct fb_info_aty128 *fb = (struct fb_info_aty128 *)info;
-
-    if (con != fb->currcon)
+    if (con != info->currcon)
 	return;
 
     if (fb_display[con].cmap.len)

@@ -204,9 +204,9 @@ BOOLEAN sisfb_query_north_bridge_space (PSIS_HW_DEVICE_INFO psishw_ext,
 
 /* -------------------- Export functions ----------------------------- */
 
-static void sis_get_glyph (SIS_GLYINFO * gly)
+static void sis_get_glyph (struct fb_info *info, SIS_GLYINFO * gly)
 {
-	struct display *p = &fb_display[currcon];
+	struct display *p = &fb_display[info->currcon];
 	u16 c;
 	u8 *cdat;
 	int widthb;
@@ -631,7 +631,7 @@ static void sisfb_set_disp (int con, struct fb_var_screeninfo *var)
 
 static void sisfb_do_install_cmap (int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 
 	if (fb_display[con].cmap.len)
@@ -2034,7 +2034,7 @@ static int sisfb_set_var (struct fb_var_screeninfo *var, int con, struct fb_info
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 
-	if (sisfb_do_set_var (var, con == currcon, info)) {
+	if (sisfb_do_set_var (var, con == info->currcon, info)) {
 		sisfb_crtc_to_var (var);
 		return -EINVAL;
 	}
@@ -2061,7 +2061,7 @@ static int sisfb_set_var (struct fb_var_screeninfo *var, int con, struct fb_info
 
 static int sisfb_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 {
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap (cmap, kspc, sis_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap (&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -2081,7 +2081,7 @@ static int sisfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_in
 		if (err)
 			return err;
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_set_cmap (cmap, kspc, sis_setcolreg, info);
 	else
 		fb_copy_cmap (cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -2103,7 +2103,7 @@ static int sisfb_ioctl (struct inode *inode, struct file *file,
 		sis_free (*(unsigned long *) arg);
 		break;
 	case FBIOGET_GLYPH:
-		sis_get_glyph ((SIS_GLYINFO *) arg);
+		sis_get_glyph (info, (SIS_GLYINFO *) arg);
 		break;
 	case FBIOGET_HWCINFO:
 		{
@@ -2158,7 +2158,7 @@ static int sisfb_mmap (struct fb_info *info, struct file *file, struct vm_area_s
 
 	if (off >= len) {
 		off -= len;
-		sisfb_get_var (&var, currcon, info);
+		sisfb_get_var (&var, info->currcon, info);
 		if (var.accel_flags)
 			return -EINVAL;
 		start = (unsigned long) ivideo.mmio_base;
@@ -2203,17 +2203,17 @@ static int sisfb_switch (int con, struct fb_info *info)
 {
 	int cols, rows;
 
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap (&fb_display[currcon].cmap, 1, sis_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap (&fb_display[info->currcon].cmap, 1, sis_getcolreg, info);
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 
-	if (!memcmp(&fb_display[con].var, &fb_display[currcon].var, sizeof (struct fb_var_screeninfo))) {
-		currcon = con;
+	if (!memcmp(&fb_display[con].var, &fb_display[info->currcon].var, sizeof (struct fb_var_screeninfo))) {
+		info->currcon = con;
 		return 1;
 	}
 
-	currcon = con;
+	info->currcon = con;
 
 	sisfb_do_set_var (&fb_display[con].var, 1, info);
 
@@ -2257,8 +2257,7 @@ int sisfb_setup (char *options)
 	if (!options || !*options)
 		return 0;
 
-	for (this_opt = strtok (options, ","); this_opt;
-	     this_opt = strtok (NULL, ",")) {
+	while ((this_opt = strsep (&options, ",")) != NULL) {
 		if (!*this_opt)
 			continue;
 
@@ -2769,6 +2768,7 @@ sishw_ext.usExternalChip = 0;
 	fb_info.node = NODEV;
 	fb_info.fbops = &sisfb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &sisfb_switch;
 	fb_info.updatevar = &sisfb_update_var;
 	fb_info.blank = &sisfb_blank;

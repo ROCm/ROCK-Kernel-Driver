@@ -205,7 +205,6 @@ static union {
 
 static int             inverse   = 0;
 static int             vidtest   = 0;
-static int             currcon   = 0;
 
 static int macfb_update_var(int con, struct fb_info *info)
 {
@@ -791,7 +790,7 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, macfb_setcolreg, info);
@@ -803,7 +802,7 @@ static void do_install_cmap(int con, struct fb_info *info)
 static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, macfb_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -823,7 +822,7 @@ static int macfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if (err)
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, macfb_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -864,11 +863,11 @@ void __init macfb_setup(char *options, int *ints)
 static int macfb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, macfb_getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, macfb_getcolreg,
 			    info);
 	
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	macfb_update_var(con, info);

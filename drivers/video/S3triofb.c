@@ -60,7 +60,6 @@
 
 #define IO_OUT16VAL(v, r)       (((v) << 8) | (r))
 
-static int currcon = 0;
 static struct display disp;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
@@ -227,7 +226,7 @@ static int s3trio_pan_display(struct fb_var_screeninfo *var, int con,
 static int s3trio_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, s3trio_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -252,7 +251,7 @@ static int s3trio_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 				 1<<fb_display[con].var.bits_per_pixel, 0)))
 	    return err;
     }
-    if (con == currcon)			/* current console? */
+    if (con == info->currcon)			/* current console? */
 	return fb_set_cmap(cmap, kspc, s3trio_setcolreg, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -555,6 +554,7 @@ static void __init s3triofb_of_init(struct device_node *dp)
     strcpy(fb_info.modename, "Trio64 ");
     strncat(fb_info.modename, dp->full_name, sizeof(fb_info.modename));
     fb_info.node = NODEV;
+    fb_info.currcon = -1;
     fb_info.fbops = &s3trio_ops;
 #if 0
     fb_info.fbvar_num = 1;
@@ -598,10 +598,10 @@ static void __init s3triofb_of_init(struct device_node *dp)
 static int s3triofbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, s3trio_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, s3trio_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con,info);
     return 0;
@@ -688,7 +688,7 @@ static int s3trio_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-    if (con != currcon)
+    if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
 	fb_set_cmap(&fb_display[con].cmap, 1, s3trio_setcolreg, &fb_info);

@@ -70,7 +70,6 @@ static struct display disp;
 
 static struct fb_var_screeninfo default_var;
 
-static int currcon = 0;
 static int inverse = 0;
 
 int xxxfb_init(void);
@@ -309,6 +308,7 @@ int __init xxxfb_init(void)
     fb_info.gen.info.node = NODEV;
     fb_info.gen.info.fbops = &xxxfb_ops;
     fb_info.gen.info.disp = &disp;
+    fb_info.gen.info.currcon = -1;
     fb_info.gen.info.switch_con = &xxxfb_switch;
     fb_info.gen.info.updatevar = &xxxfb_update_var;
     fb_info.gen.info.blank = &xxxfb_blank;

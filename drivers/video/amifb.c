@@ -739,8 +739,6 @@ static struct amifb_par {
 	u_short fmode;		/* vmode */
 } currentpar;
 
-static int currcon = 0;
-
 static struct display disp;
 
 static struct fb_info fb_info;
@@ -1372,7 +1370,7 @@ static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 				return err;
 			do_install_cmap(con, info);
 		}
-		if (con == currcon)
+		if (con == info->currcon)
 			ami_set_var(&display->var);
 	}
 	return 0;
@@ -1399,7 +1397,7 @@ static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 		    var->yoffset+fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 			return -EINVAL;
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		ami_pan_var(var);
 	fb_display[con].var.xoffset = var->xoffset;
 	fb_display[con].var.yoffset = var->yoffset;
@@ -1417,7 +1415,7 @@ static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 static int amifb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, ami_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1442,7 +1440,7 @@ static int amifb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 					 0)))
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, ami_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -1732,6 +1730,7 @@ default_chipset:
 	fb_info.node = NODEV;
 	fb_info.fbops = &amifb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = 1;
 	fb_info.switch_con = &amifbcon_switch;
 	fb_info.updatevar = &amifbcon_updatevar;
 	fb_info.blank = &amifbcon_blank;
@@ -1819,10 +1818,10 @@ static void amifb_deinit(void)
 static int amifbcon_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, ami_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, ami_getcolreg, info);
 
-	currcon = con;
+	info->currcon = con;
 	ami_set_var(&fb_display[con].var);
 	/* Install new colormap */
 	do_install_cmap(con, info);
@@ -1854,7 +1853,7 @@ static void amifbcon_blank(int blank, struct fb_info *info)
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, ami_setcolreg, info);

@@ -108,7 +108,6 @@ struct virgefb_par {
 static struct virgefb_par current_par;
 
 static int current_par_valid = 0;
-static int currcon = 0;
 
 static struct display disp;
 static struct fb_info fb_info;
@@ -881,7 +880,7 @@ static int do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, info);
@@ -1000,7 +999,7 @@ static int virgefb_set_var(struct fb_var_screeninfo *var, int con,
 {
 	int err, oldxres, oldyres, oldvxres, oldvyres, oldbpp, oldaccel;
 
-	if ((err = do_fb_set_var(var, con == currcon)))
+	if ((err = do_fb_set_var(var, con == info->currcon)))
 		return(err);
 	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 		oldxres = fb_display[con].var.xres;
@@ -1033,7 +1032,7 @@ static int virgefb_set_var(struct fb_var_screeninfo *var, int con,
 static int virgefb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return(fb_get_cmap(cmap, kspc, fbhw->getcolreg, info));
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1058,7 +1057,7 @@ static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 				1<<fb_display[con].var.bits_per_pixel, 0)))
 			return(err);
 	}
-	if (con == currcon)		 /* current console? */
+	if (con == info->currcon)		 /* current console? */
 		return(fb_set_cmap(cmap, kspc, fbhw->setcolreg, info));
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -1171,6 +1170,7 @@ int __init virgefb_init(void)
 	    fb_info.node = NODEV;
 	    fb_info.fbops = &virgefb_ops;
 	    fb_info.disp = &disp;
+	    fb_info.currcon = -1;	
 	    fb_info.switch_con = &Cyberfb_switch;
 	    fb_info.updatevar = &Cyberfb_updatevar;
 	    fb_info.blank = &Cyberfb_blank;
@@ -1205,12 +1205,12 @@ int __init virgefb_init(void)
 static int Cyberfb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, fbhw->getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, fbhw->getcolreg,
 			    info);
 
 	do_fb_set_var(&fb_display[con].var, 1);
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return(0);

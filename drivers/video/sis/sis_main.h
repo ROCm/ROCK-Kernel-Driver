@@ -242,7 +242,6 @@ static int sisfb_off = 0;
 static int sisfb_crt1off = 0;
 static int sisfb_inverse = 0;
 static int sisvga_enabled = 0;
-static int currcon = 0;
 /*karl*/
 static int sisfb_tvmode = 0;
 static int sisfb_mem = 0;
@@ -668,7 +667,7 @@ static void sisfb_post_setmode (void);
 static void sisfb_crtc_to_var (struct fb_var_screeninfo *var);
 
 /* Export functions  */
-static void sis_get_glyph (SIS_GLYINFO * gly);
+static void sis_get_glyph (struct fb_info *info, SIS_GLYINFO * gly);
 void sis_dispinfo (struct ap_data *rec);
 void sis_malloc (struct sis_memreq *req);
 void sis_free (unsigned long base);

@@ -75,7 +75,6 @@ static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
 static char fontname[40] __initdata = { 0 };
 
-static int currcon = 0;
 static int switching = 0;
 
 struct fb_par_valkyrie {
@@ -224,7 +223,7 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 		/* Don't want to do this if just switching consoles. */
 		(*info->changevar)(con);
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		valkyrie_set_par(&par, p);
 	if (depthchange)
 		if ((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
@@ -237,7 +236,7 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)	{
+	if (con == info->currcon)	{
 		/* current console? */
 		return fb_get_cmap(cmap, kspc, valkyriefb_getcolreg, info);
 	}
@@ -265,7 +264,7 @@ static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		}
 	}
 
-	if (con == currcon) {
+	if (con == info->currcon) {
 		return fb_set_cmap(cmap, kspc, valkyriefb_setcolreg, info);
 	}
 	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
@@ -277,10 +276,10 @@ static int valkyriefb_switch(int con, struct fb_info *fb)
 	struct fb_info_valkyrie *info = (struct fb_info_valkyrie *) fb;
 	struct fb_par_valkyrie par;
 
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, valkyriefb_getcolreg,
+	if (fb_display[fb->currcon].cmap.len)
+		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, valkyriefb_getcolreg,
 			    fb);
-	currcon = con;
+	fb->currcon = con;
 #if 1
 	valkyrie_var_to_par(&fb_display[currcon].var, &par, fb);
 	valkyrie_set_par(&par, info);
@@ -393,7 +392,7 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len) {
 		fb_set_cmap(&fb_display[con].cmap, 1, valkyriefb_setcolreg,
@@ -782,6 +781,7 @@ static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valky
 	info->node = NODEV;
 	info->fbops = &valkyriefb_ops;
 	info->disp = &p->disp;
+	info->currcon = -1;
 	strcpy(info->fontname, fontname);
 	info->changevar = NULL;
 	info->switch_con = &valkyriefb_switch;

@@ -42,9 +42,6 @@
 #include <video/fbcon-cfb32.h>
 #include <video/macmodes.h>
 
-
-static int currcon = 0;
-
 /* Supported palette hacks */
 enum {
 	cmap_unknown,
@@ -210,7 +207,7 @@ static int offb_set_var(struct fb_var_screeninfo *var, int con,
 static int offb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, offb_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -240,7 +237,7 @@ static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
 	    return err;
     }
-    if (con == currcon)			/* current console? */
+    if (con == info->currcon)			/* current console? */
 	return fb_set_cmap(cmap, kspc, offb_setcolreg, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -569,6 +566,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     info->info.node = NODEV;
     info->info.fbops = &offb_ops;
     info->info.disp = disp;
+    info->info.currcon = -1;	
     info->info.fontname[0] = '\0';
     info->info.changevar = NULL;
     info->info.switch_con = &offbcon_switch;
@@ -621,10 +619,10 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 static int offbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, offb_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, offb_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     return 0;
@@ -687,7 +685,7 @@ static void offbcon_blank(int blank, struct fb_info *info)
 	    }
 	}
     else
-	do_install_cmap(currcon, info);
+	do_install_cmap(info->currcon, info);
 }
 
     /*
@@ -794,7 +792,7 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-    if (con != currcon)
+    if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
 	fb_set_cmap(&fb_display[con].cmap, 1, offb_setcolreg, info);

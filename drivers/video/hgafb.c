@@ -156,7 +156,6 @@ static struct fb_info fb_info;
 static struct display disp;
 
 /* Don't assume that tty1 will be the initial current console. */
-static int currcon = -1; 
 static int release_io_port = 0;
 static int release_io_ports = 0;
 
@@ -625,15 +624,15 @@ static struct fb_ops hgafb_ops = {
 static int hgafbcon_switch(int con, struct fb_info *info)
 {
 	CHKINFO(-EINVAL);
-	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", currcon, con, (unsigned)info, (unsigned)&fb_info);
+	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", info->currcon, con, (unsigned)info, (unsigned)&fb_info);
 
 	/* Save the colormap and video mode */
 #if 0	/* Not necessary in hgafb, we use fixed colormap */
-	fb_copy_cmap(&info->cmap, &fb_display[currcon].cmap, 0);
+	fb_copy_cmap(&info->cmap, &fb_display[info->currcon].cmap, 0);
 #endif
 
-	if (currcon != -1) /* this check is absolute necessary! */
-		memcpy(&fb_display[currcon].var, &info->var,
+	if (info->currcon != -1) /* this check is absolute necessary! */
+		memcpy(&fb_display[info->currcon].var, &info->var,
 				sizeof(struct fb_var_screeninfo));
 
 	/* Install a new colormap and change the video mode. By default fbcon
@@ -648,7 +647,7 @@ static int hgafbcon_switch(int con, struct fb_info *info)
 	memcpy(&info->var, &fb_display[con].var,
 			sizeof(struct fb_var_screeninfo));
 	/* hga_set_var(&info->var, con, &fb_info); is it necessary? */
-	currcon = con;
+	info->currcon = con;
 
 	/* Hack to work correctly with XF86_Mono */
 	hga_gfx_mode();
@@ -721,7 +720,6 @@ int __init hgafb_init(void)
 	hga_fix.smem_len = hga_vram_len;
 
 	disp.var = hga_default_var;
-/*	disp.cmap = ???; */
 	disp.screen_base = (char*)hga_fix.smem_start;
 	disp.visual = hga_fix.visual;
 	disp.type = hga_fix.type;
@@ -744,7 +742,6 @@ int __init hgafb_init(void)
 	strcpy (fb_info.modename, hga_fix.id);
 	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
-/*	fb_info.open = ??? */
 	fb_info.var = hga_default_var;
 	fb_info.fix = hga_fix;
 	fb_info.monspecs.hfmin = 0;
@@ -755,8 +752,7 @@ int __init hgafb_init(void)
 	fb_info.fbops = &hgafb_ops;
 	fb_info.screen_base = (char *)hga_fix.smem_start;
 	fb_info.disp = &disp;
-/*	fb_info.display_fg = ??? */
-/*	fb_info.fontname initialized later */
+	fb_info.currcon = 1;
 	fb_info.changevar = NULL;
 	fb_info.switch_con = hgafbcon_switch;
 	fb_info.updatevar = hgafbcon_updatevar;

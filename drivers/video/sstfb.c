@@ -176,7 +176,6 @@ Notes
 
 /********/
 
-int currcon; /* =0 */
 int num_sst; /* =0*/		/* number of initialized boards */
 
 /* initialized by setup */
@@ -509,8 +508,8 @@ static inline void dac_i_write(u8 reg,u8 val)
 static void sstfb_install_cmap(int con, struct fb_info *info)
 {
 	f_dprintk("sstfb_install_cmap(con: %d)\n",con);
-	f_ddprintk("currcon: %d\n", currcon);
-	if (con != currcon)
+	f_ddprintk("currcon: %d\n", info->currcon);
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, sstfb_setcolreg, info);
@@ -864,7 +863,7 @@ static int sstfb_set_var(struct fb_var_screeninfo *var,
 		}
 	}
 
-	if ((con <0) || (con==currcon)) {
+	if ((con <0) || (con==info->currcon)) {
 		sstfb_set_par (&par, sst_info);
 	}
 	print_var(var, "var");
@@ -888,14 +887,14 @@ static int sstfb_set_cmap(struct fb_cmap *cmap, int kspc,
 
 	f_dprintk("sstfb_set_cmap\n");
 	f_ddprintk("con: %d, currcon: %d, d->cmap.len %d\n",
-		 con, currcon, d->cmap.len);
+		 con, info->currcon, d->cmap.len);
 
 	if (d->cmap.len != 16 ) {	/* or test if cmap.len == 0 ? */
 		int err;
 		err = fb_alloc_cmap(&d->cmap, 16, 0); /* cmap size=16 */
 		if (err) return err;
 	}
-	if (con == currcon) {
+	if (con == info->currcon) {
 		return fb_set_cmap(cmap, kspc, sstfb_setcolreg, info);
 	} else {
 		fb_copy_cmap(cmap, &d->cmap, kspc ? 0 : 1);
@@ -908,10 +907,10 @@ static int sstfb_get_cmap(struct fb_cmap *cmap, int kspc,
 {
 	f_dprintk("sstfb_get_cmap\n");
 	f_ddprintk("con %d, curcon %d, cmap.len %d\n",
-		 con, currcon, fb_display[con].cmap.len);
+		 con, info->currcon, fb_display[con].cmap.len);
 
 	/* FIXME: check if con = -1 ? cf sstfb_set_cmap...  */
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap(cmap, kspc, sstfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -982,9 +981,9 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 	case _IO('F', 0xde):		/* 0x46de */
 		f_dprintk("test color display\n");
 		f_ddprintk("currcon: %d, bpp %d\n",
-			  currcon, fb_display[currcon].var.bits_per_pixel);
+			  info->currcon, fb_display[currcon].var.bits_per_pixel);
 		memset_io(sst_info->video.vbase, 0, sst_info->video.len);
-	switch (fb_display[currcon].var.bits_per_pixel) {
+	switch (fb_display[info->currcon].var.bits_per_pixel) {
 /* FIXME broken : if we call this ioctl from a tty not bound to the fb, we use its depth and not the current one ... */
 	       	case 16:
 			sstfb_test16(sst_info);
@@ -997,7 +996,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 #  endif
 		default:
 			dprintk("bug line %d: bad depth '%u'\n", __LINE__,
-			        fb_display[currcon].var.bits_per_pixel);
+			        fb_display[info->currcon].var.bits_per_pixel);
 			}
 		return 0;
 	}
@@ -1801,6 +1800,7 @@ int __init sstfb_init(void)
 		fb_info.info.flags      = FBINFO_FLAG_DEFAULT;
 		fb_info.info.fbops      = &sstfb_ops;
 		fb_info.info.disp       = &disp;
+		fb_info.info.currcon	= -1;
 		fb_info.info.changevar  = NULL;
 		fb_info.info.switch_con = &sstfbcon_switch;
 		fb_info.info.updatevar  = &sstfbcon_updatevar;
@@ -1849,15 +1849,15 @@ static int sstfbcon_switch(int con, struct fb_info *info)
 	struct sstfb_par par;
 
 	f_dprintk("sstfbcon_switch(con: %d)\n",con);
-	f_ddprintk("currcon: %d\n", currcon);
-	v_dprintk("currcon: %d\n", currcon);
+	f_ddprintk("currcon: %d\n", info->currcon);
+	v_dprintk("currcon: %d\n", info->currcon);
 
-	if (currcon >=  0) {
-		if (fb_display[currcon].cmap.len)
-			fb_get_cmap(&fb_display[currcon].cmap, 1,
+	if (info->currcon >=  0) {
+		if (fb_display[info->currcon].cmap.len)
+			fb_get_cmap(&fb_display[info->currcon].cmap, 1,
 			            sstfb_getcolreg, info);
 	}
-	currcon = con;
+	info->currcon = con;
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 
 	print_var(&fb_display[con].var, "&fb_display[con: %d].var",con);

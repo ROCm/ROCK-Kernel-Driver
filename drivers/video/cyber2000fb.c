@@ -1139,36 +1139,6 @@ static void cyber2000fb_blank(int blank, struct fb_info *info)
 	}
 }
 
-/*
- * Get the currently displayed virtual consoles colormap.
- */
-static int
-gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	fb_copy_cmap(&info->cmap, cmap, kspc ? 0 : 2);
-	return 0;
-}
-
-/*
- * Get the currently displayed virtual consoles fixed part of the display.
- */
-static int
-gen_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	*fix = info->fix;
-	return 0;
-}
-
-/*
- * Get the current user defined part of the display.
- */
-static int
-gen_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = info->var;
-	return 0;
-}
-
 static struct fb_ops cyber2000fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	cyber2000fb_set_var,

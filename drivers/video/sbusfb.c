@@ -56,7 +56,6 @@
 int sbusfb_init(void);
 int sbusfb_setup(char*);
 
-static int currcon;
 static int defx_margin = -1, defy_margin = -1;
 static char fontname[40] __initdata = { 0 };
 static int curblink __initdata = 1;
@@ -523,7 +522,7 @@ static int sbusfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if ((err = fb_alloc_cmap(&disp->cmap, 1<<disp->var.bits_per_pixel, 0)))
 			return err;
 	}
-	if (con == currcon) {			/* current console? */
+	if (con == info->currcon) {			/* current console? */
 		err = fb_set_cmap(cmap, kspc, sbusfb_setcolreg, info);
 		if (!err) {
 			struct fb_info_sbusfb *fb = sbusfbinfo(info);
@@ -762,8 +761,8 @@ static int sbusfbcon_switch(int con, struct fb_info *info)
 	int lastconsole;
     
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, sbusfb_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, sbusfb_getcolreg, info);
 
 	if (info->display_fg) {
 		lastconsole = info->display_fg->vc_num;
@@ -780,7 +779,7 @@ static int sbusfbcon_switch(int con, struct fb_info *info)
 		fb->x_margin = x_margin; fb->y_margin = y_margin;
 		sbusfb_clear_margin(&fb_display[con], 0);
 	}
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;
@@ -857,7 +856,7 @@ static void do_install_cmap(int con, struct fb_info *info)
 {
 	struct fb_info_sbusfb *fb = sbusfbinfo(info);
 	
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, sbusfb_setcolreg, info);
@@ -1022,6 +1021,7 @@ sizechange:
 	fb->info.node = NODEV;
 	fb->info.fbops = &sbusfb_ops;
 	fb->info.disp = disp;
+	fb->info.currcon = -1;
 	strcpy(fb->info.fontname, fontname);
 	fb->info.changevar = NULL;
 	fb->info.switch_con = &sbusfbcon_switch;

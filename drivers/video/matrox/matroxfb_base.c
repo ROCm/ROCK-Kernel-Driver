@@ -257,7 +257,7 @@ static int matroxfb_pan_display(struct fb_var_screeninfo *var, int con,
 		    var->yoffset+fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 			return -EINVAL;
 	}
-	if (con == ACCESS_FBINFO(currcon))
+	if (con == ACCESS_FBINFO(fbcon.currcon))
 		matrox_pan_var(PMINFO var);
 	fb_display[con].var.xoffset = var->xoffset;
 	fb_display[con].var.yoffset = var->yoffset;
@@ -782,7 +782,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 	/* fgshift, bgshift, charmask */
 	if (chgvar && info && info->changevar)
 		info->changevar(con);
-	if (con == ACCESS_FBINFO(currcon)) {
+	if (con == ACCESS_FBINFO(fbcon.currcon)) {
 		unsigned int pos;
 
 		ACCESS_FBINFO(curr.cmap_len) = cmap_len;
@@ -943,7 +943,7 @@ static int matroxfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		return -ENXIO;
 	}
 
-	if (con == ACCESS_FBINFO(currcon)) /* current console? */
+	if (con == ACCESS_FBINFO(fbcon.currcon)) /* current console? */
 		return fb_get_cmap(cmap, kspc, matrox_getcolreg, info);
 	else if (dsp->cmap.len) /* non default colormap? */
 		fb_copy_cmap(&dsp->cmap, cmap, kspc ? 0 : 2);
@@ -975,7 +975,7 @@ static int matroxfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if (err)
 			return err;
 	}
-	if (con == ACCESS_FBINFO(currcon)) {			/* current console? */
+	if (con == ACCESS_FBINFO(fbcon.currcon)) {			/* current console? */
 		return fb_set_cmap(cmap, kspc, matrox_setcolreg, info);
 	} else
 		fb_copy_cmap(cmap, &dsp->cmap, kspc ? 0 : 1);
@@ -1054,7 +1054,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 						if (val != 1)
 							return val;
 						if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY)
-							matroxfb_switch(ACCESS_FBINFO(currcon), info);
+							matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), info);
 						if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 							struct matroxfb_dh_fb_info* crtc2;
 
@@ -1130,7 +1130,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				if (tmp == ACCESS_FBINFO(output.ph))
 					return 0;
 				ACCESS_FBINFO(output.ph) = tmp;
-				matroxfb_switch(ACCESS_FBINFO(currcon), info);
+				matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), info);
 				return 0;
 			}
 		case MATROXFB_GET_OUTPUT_CONNECTION:
@@ -1184,10 +1184,10 @@ int matroxfb_switch(int con, struct fb_info *info)
 
 	DBG("matroxfb_switch");
 
-	if (ACCESS_FBINFO(currcon) >= 0) {
+	if (ACCESS_FBINFO(fbcon.currcon) >= 0) {
 		/* Do we have to save the colormap? */
 		cmap = &(ACCESS_FBINFO(currcon_display)->cmap);
-		dprintk(KERN_DEBUG "switch1: con = %d, cmap.len = %d\n", ACCESS_FBINFO(currcon), cmap->len);
+		dprintk(KERN_DEBUG "switch1: con = %d, cmap.len = %d\n", ACCESS_FBINFO(fbcon.currcon), cmap->len);
 
 		if (cmap->len) {
 			dprintk(KERN_DEBUG "switch1a: %p %p %p %p\n", cmap->red, cmap->green, cmap->blue, cmap->transp);
@@ -1199,7 +1199,7 @@ int matroxfb_switch(int con, struct fb_info *info)
 #endif
 		}
 	}
-	ACCESS_FBINFO(currcon) = con;
+	ACCESS_FBINFO(fbcon.currcon) = con;
 	if (con < 0)
 		p = ACCESS_FBINFO(fbcon.disp);
 	else
@@ -1731,7 +1731,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 	ACCESS_FBINFO(devflags.ydstorg) = 0;
 
-	ACCESS_FBINFO(currcon) = -1;
+	ACCESS_FBINFO(fbcon.currcon) = -1;
 	ACCESS_FBINFO(currcon_display) = d;
 	ACCESS_FBINFO(video.base) = video_base_phys;
 	ACCESS_FBINFO(video.len_usable) = ACCESS_FBINFO(video.len);
@@ -1898,7 +1898,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 	printk("fb%d: %s frame buffer device\n",
 	       GET_FB_IDX(ACCESS_FBINFO(fbcon.node)), ACCESS_FBINFO(fbcon.modename));
-	if (ACCESS_FBINFO(currcon) < 0) {
+	if (ACCESS_FBINFO(fbcon.currcon) < 0) {
 		/* there is no console on this fb... but we have to initialize hardware
 		 * until someone tells me what is proper thing to do */
 		printk(KERN_INFO "fb%d: initializing hardware\n",

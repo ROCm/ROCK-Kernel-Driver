@@ -142,8 +142,6 @@ static struct fb_ops dn_fb_ops = {
 	fb_set_cmap:	dn_fb_set_cmap,
 };
 
-static int currcon=0;
-
 #define NUM_TOTAL_MODES 1
 struct fb_var_screeninfo dn_fb_predefined[] = {
 
@@ -309,6 +307,7 @@ unsigned long __init dnfb_init(unsigned long mem_start) {
 	fb_info.blank=&dnfbcon_blank;	
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
+	fb_info.currcon = -1;
 	
         dn_fb_get_var(&disp[0].var,0, &fb_info);
 
@@ -338,10 +337,8 @@ unsigned long __init dnfb_init(unsigned long mem_start) {
 	
 static int dnfbcon_switch(int con,  struct fb_info *info) { 
 
-	currcon=con;
-	
+	info->currcon = con;
 	return 0;
-
 }
 
 static int dnfbcon_updatevar(int con,  struct fb_info *info) {

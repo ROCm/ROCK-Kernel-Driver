@@ -737,7 +737,7 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		  u_int trans, struct fb_info *info)
 {
 	union palette pal;
-	int bpp = fb_display[current_par.currcon].var.bits_per_pixel;
+	int bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 	if (regno >= current_par.palette_size)
 		return 1;
@@ -780,7 +780,7 @@ acornfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	int err = 0;
 
-	if (con == current_par.currcon)
+	if (con == info->currcon)
 		err = fb_get_cmap(cmap, kspc, acornfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -800,7 +800,7 @@ acornfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		err = fb_alloc_cmap(&fb_display[con].cmap,
 				    current_par.palette_size, 0);
 	if (!err) {
-		if (con == current_par.currcon)
+		if (con == info->currcon)
 			err = fb_set_cmap(cmap, kspc, acornfb_setcolreg,
 					  info);
 		else
@@ -1050,7 +1050,7 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	if (chgvar && info && info->changevar)
 		info->changevar(con);
 
-	if (con == current_par.currcon) {
+	if (con == info->currcon) {
 		struct fb_cmap *cmap;
 		unsigned long start, size;
 		int control;
@@ -1173,7 +1173,7 @@ static struct fb_ops acornfb_ops = {
 static int
 acornfb_updatevar(int con, struct fb_info *info)
 {
-	if (con == current_par.currcon)
+	if (con == info->currcon)
 		acornfb_update_dma(&fb_display[con].var);
 
 	return 0;
@@ -1184,14 +1184,14 @@ acornfb_switch(int con, struct fb_info *info)
 {
 	struct fb_cmap *cmap;
 
-	if (current_par.currcon >= 0) {
-		cmap = &fb_display[current_par.currcon].cmap;
+	if (info->currcon >= 0) {
+		cmap = &fb_display[info->currcon].cmap;
 
 		if (cmap->len)
 			fb_get_cmap(cmap, 1, acornfb_getcolreg, info);
 	}
 
-	current_par.currcon = con;
+	info->currcon = con;
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 
@@ -1204,7 +1204,7 @@ static void
 acornfb_blank(int blank, struct fb_info *info)
 {
 	union palette p;
-	int i, bpp = fb_display[current_par.currcon].var.bits_per_pixel;
+	int i, bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 #ifdef FBCON_HAS_CFB16
 	if (bpp == 16) {
@@ -1635,7 +1635,7 @@ acornfb_init(void)
 		}
 	}
 
-	current_par.currcon	   = -1;
+	fb_info.currcon	   = -1;
 	current_par.screen_base	   = SCREEN_BASE;
 	current_par.screen_base_p  = SCREEN_START;
 	current_par.using_vram     = 0;

@@ -222,8 +222,6 @@ int atyfb_init(void);
 int atyfb_setup(char*);
 #endif
 
-static int currcon = 0;
-
 static struct fb_ops atyfb_ops = {
 	owner:		THIS_MODULE,
 	fb_open:	atyfb_open,
@@ -1988,6 +1986,7 @@ found:
     info->fb_info.node = NODEV;
     info->fb_info.fbops = &atyfb_ops;
     info->fb_info.disp = disp;
+    info->fb_info.currcon = -1;  	
     strcpy(info->fb_info.fontname, fontname);
     info->fb_info.changevar = NULL;
     info->fb_info.switch_con = &atyfbcon_switch;
@@ -2623,17 +2622,17 @@ static int atyfbcon_switch(int con, struct fb_info *fb)
     struct atyfb_par par;
 
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, atyfb_getcolreg, fb);
+    if (fb_display[fb->currcon].cmap.len)
+	fb_get_cmap(&fb_display[fb->currcon].cmap, 1, atyfb_getcolreg, fb);
 
 #ifdef CONFIG_FB_ATY_CT
     /* Erase HW Cursor */
     if (info->cursor)
-	atyfb_cursor(&fb_display[currcon], CM_ERASE,
+	atyfb_cursor(&fb_display[fb->currcon], CM_ERASE,
 		     info->cursor->pos.x, info->cursor->pos.y);
 #endif /* CONFIG_FB_ATY_CT */
 
-    currcon = con;
+    fb->currcon = con;
 
     atyfb_decode_var(&fb_display[con].var, &par, info);
     atyfb_set_par(&par, info);
@@ -2771,7 +2770,7 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-    if (con != currcon)
+    if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
 	fb_set_cmap(&fb_display[con].cmap, 1, atyfb_setcolreg, info);

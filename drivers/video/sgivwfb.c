@@ -62,7 +62,6 @@ static int            ypan       = 0;
 static int            ywrap      = 0;
 
 /* console related variables */
-static int currcon = 0;
 static struct display disp;
 
 static union {
@@ -558,7 +557,7 @@ static int sgivwfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-    if (con != currcon)
+    if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
 	fb_set_cmap(&fb_display[con].cmap, 1, sgivwfb_setcolreg, info);
@@ -805,7 +804,7 @@ static int sgivwfb_set_var(struct fb_var_screeninfo *var, int con,
 static int sgivwfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info)
 {
-  if (con == currcon) /* current console? */
+  if (con == info->currcon) /* current console? */
     return fb_get_cmap(cmap, kspc, sgivwfb_getcolreg, info);
   else if (fb_display[con].cmap.len) /* non default colormap? */
     fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -828,7 +827,7 @@ static int sgivwfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
     if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
       return err;
   }
-  if (con == currcon)			/* current console? */
+  if (con == info->currcon)			/* current console? */
     return fb_set_cmap(cmap, kspc, sgivwfb_setcolreg, info);
   else
     fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -893,6 +892,7 @@ int __init sgivwfb_init(void)
   fb_info.node = NODEV;
   fb_info.fbops = &sgivwfb_ops;
   fb_info.disp = &disp;
+  fb_info.currcon = -1;	
   fb_info.switch_con = &sgivwfbcon_switch;
   fb_info.updatevar = &sgivwfbcon_updatevar;
   fb_info.blank = &sgivwfbcon_blank;
@@ -928,10 +928,10 @@ int __init sgivwfb_init(void)
 static int sgivwfbcon_switch(int con, struct fb_info *info)
 {
   /* Do we have to save the colormap? */
-  if (fb_display[currcon].cmap.len)
-    fb_get_cmap(&fb_display[currcon].cmap, 1, sgivwfb_getcolreg, info);
+  if (fb_display[info->currcon].cmap.len)
+    fb_get_cmap(&fb_display[info->currcon].cmap, 1, sgivwfb_getcolreg, info);
 
-  currcon = con;
+  info->currcon = con;
   /* Install new colormap */
   do_install_cmap(con, info);
   return 0;

@@ -173,8 +173,6 @@ static int screen_len;
 
 static int current_par_valid=0; 
 
-static int currcon=0;
-
 static int mono_moni=0;
 
 static struct display disp;
@@ -1597,7 +1595,7 @@ static int falcon_pan_display( struct fb_var_screeninfo *var,
 							   struct atafb_par *par )
 {
 	int xoffset;
-	int bpp = fb_display[currcon].var.bits_per_pixel;
+	int bpp = fb_display[fb_info.currcon].var.bits_per_pixel;
 
 	if (bpp == 1)
 		var->xoffset = up(var->xoffset, 32);
@@ -1608,13 +1606,13 @@ static int falcon_pan_display( struct fb_var_screeninfo *var,
 		var->xoffset = up(var->xoffset, 2);
 	}
 	par->hw.falcon.line_offset = bpp *
-	       	(fb_display[currcon].var.xres_virtual - fb_display[currcon].var.xres) / 16;
+	       	(fb_display[fb_info.currcon].var.xres_virtual - fb_display[currcon].var.xres) / 16;
 	if (par->hw.falcon.xoffset)
 		par->hw.falcon.line_offset -= bpp;
 	xoffset = var->xoffset - par->hw.falcon.xoffset;
 
 	par->screen_base = screen_base +
-	        (var->yoffset * fb_display[currcon].var.xres_virtual + xoffset) * bpp / 8;
+	        (var->yoffset * fb_display[fb_info.currcon].var.xres_virtual + xoffset) * bpp / 8;
 	if (fbhw->set_screen_base)
 		fbhw->set_screen_base (par->screen_base);
 	else
@@ -2313,8 +2311,8 @@ static int pan_display( struct fb_var_screeninfo *var,
 		return -EINVAL;
 	var->xoffset = up(var->xoffset, 16);
 	par->screen_base = screen_base +
-	        (var->yoffset * fb_display[currcon].var.xres_virtual + var->xoffset)
-	        * fb_display[currcon].var.bits_per_pixel / 8;
+	        (var->yoffset * fb_display[fb_info.currcon].var.xres_virtual + var->xoffset)
+	        * fb_display[fb_info.currcon].var.bits_per_pixel / 8;
 	fbhw->set_screen_base (par->screen_base);
 	return 0;
 }
@@ -2415,7 +2413,7 @@ do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 static void
 do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, info);
@@ -2530,7 +2528,7 @@ atafb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 {
 	int err,oldxres,oldyres,oldbpp,oldxres_virtual,
 	    oldyres_virtual,oldyoffset;
-	if ((err=do_fb_set_var(var, con==currcon)))
+	if ((err=do_fb_set_var(var, con==info->currcon)))
 		return err;
 	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 		oldxres=fb_display[con].var.xres;
@@ -2560,7 +2558,7 @@ atafb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 static int
 atafb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 {
-	if (con == currcon) /* current console ? */
+	if (con == info->currcon) /* current console ? */
 		return fb_get_cmap(cmap, kspc, fbhw->getcolreg, info);
 	else
 		if (fb_display[con].cmap.len) /* non default colormap ? */
@@ -2581,7 +2579,7 @@ atafb_set_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 					 0)))
 		return err;
 	}
-	if (con == currcon) /* current console ? */
+	if (con == info->currcon) /* current console ? */
 		return fb_set_cmap(cmap, kspc, fbhw->setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -2599,7 +2597,7 @@ atafb_pan_display(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	    || yoffset < 0 || yoffset + fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 		return -EINVAL;
 
-	if (con == currcon) {
+	if (con == info->currcon) {
 		if (fbhw->pan_display) {
 			if ((err = fbhw->pan_display(var, &current_par)))
 				return err;
@@ -2692,11 +2690,11 @@ static int
 atafb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap ? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, fbhw->getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, fbhw->getcolreg,
 			    info);
 	do_fb_set_var(&fb_display[con].var,1);
-	currcon=con;
+	info->currcon=con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;
@@ -2727,7 +2725,7 @@ atafb_blank(int blank, struct fb_info *info)
 		fb_set_cmap(&cmap, 1, fbhw->setcolreg, info);
 	}
 	else
-		do_install_cmap(currcon, info);
+		do_install_cmap(info->currcon, info);
 }
 
 int __init atafb_init(void)
@@ -2831,6 +2829,7 @@ int __init atafb_init(void)
 	fb_info.node = NODEV;
 	fb_info.fbops = &atafb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &atafb_switch;
 	fb_info.updatevar = &fb_update_var;
 	fb_info.blank = &atafb_blank;

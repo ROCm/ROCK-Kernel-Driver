@@ -239,7 +239,6 @@ struct radeonfb_info {
 	struct pci_dev *pdev;
 
 	struct display disp;
-	int currcon;
 	struct display *currcon_display;
 
 	struct { u8 red, green, blue, pad; } palette[256];
@@ -1309,6 +1308,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeon_fb_ops;
         info->display_fg = NULL;
+	info->currcon = -1;
         strncpy (info->fontname, fontname, sizeof (info->fontname));
         info->fontname[sizeof (info->fontname) - 1] = 0;
         info->changevar = NULL;
@@ -1435,9 +1435,7 @@ static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
-                
-        if (con != rinfo->currcon)
+        if (con != info->currcon)
                 return;
                 
         if (fb_display[con].cmap.len)
@@ -1711,7 +1709,7 @@ static int radeonfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
                 
         disp = (con < 0) ? rinfo->info.disp : &fb_display[con];
         
-        if (con == rinfo->currcon) {
+        if (con == info->currcon) {
                 int rc = fb_get_cmap (cmap, kspc, radeon_getcolreg, info);
                 return rc;
         } else if (disp->cmap.len)
@@ -1741,7 +1739,7 @@ static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
                         return err;
         }
  
-        if (con == rinfo->currcon) {
+        if (con == info->currcon) {
                 int rc = fb_set_cmap (cmap, kspc, radeon_setcolreg, info);
                 return rc;
         } else
@@ -1789,7 +1787,7 @@ static int radeonfb_switch (int con, struct fb_info *info)
         
         disp = (con < 0) ? rinfo->info.disp : &fb_display[con];
                 
-        if (rinfo->currcon >= 0) {
+        if (info->currcon >= 0) {
                 cmap = &(rinfo->currcon_display->cmap);
                 if (cmap->len)
                         fb_get_cmap (cmap, 1, radeon_getcolreg, info);
@@ -1802,7 +1800,7 @@ static int radeonfb_switch (int con, struct fb_info *info)
                 switchcon = 1;
         
         if (switchcon) {
-                rinfo->currcon = con;
+                info->currcon = con;
                 rinfo->currcon_display = disp;
                 disp->var.activate = FB_ACTIVATE_NOW;
         

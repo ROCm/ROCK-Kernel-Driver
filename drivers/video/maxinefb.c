@@ -78,7 +78,6 @@ static struct fb_var_screeninfo maxinefb_defined = {
 struct maxinefb_par {
 };
 
-static int currcon = 0;
 struct maxinefb_par current_par;
 
 /* Reference to machine type set in arch/mips/dec/prom/identify.c, KM */
@@ -275,7 +274,7 @@ static int maxinefb_get_fix(struct fb_fix_screeninfo *fix, int con,
 static int maxinefb_switch(int con, struct fb_info *info)
 {
 	maxinefb_do_fb_set_var(&fb_display[con].var, 1);
-	currcon = con;
+	info->currcon = con;
 	return 0;
 }
 
@@ -361,6 +360,7 @@ int __init maxinefb_init(void)
 	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &maxinefb_switch;
 	fb_info.updatevar = &maxinefb_fb_update_var;
 	fb_info.blank = NULL;

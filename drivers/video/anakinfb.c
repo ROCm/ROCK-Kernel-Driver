@@ -24,7 +24,6 @@
 #include <video/fbcon-cfb16.h>
 
 static u16 colreg[16];
-static int currcon = 0;
 static struct fb_info fb_info;
 static struct display display;
 
@@ -118,7 +117,7 @@ static int
 anakinfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap(cmap, kspc, anakinfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -137,7 +136,7 @@ anakinfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if ((err = fb_alloc_cmap(&fb_display[con].cmap, 16, 0)))
 			return err;
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_set_cmap(cmap, kspc, anakinfb_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -147,7 +146,7 @@ anakinfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 static int
 anakinfb_switch_con(int con, struct fb_info *info)
 { 
-	currcon = con;
+	info->currcon = con;
 	return 0;
 
 }
@@ -180,9 +179,10 @@ anakinfb_init(void)
 {
 	memset(&fb_info, 0, sizeof(struct fb_info));
 	strcpy(fb_info.modename, "AnakinFB");
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
+	fb_info.currcon = -1;
 	fb_info.disp = &display;
 	strcpy(fb_info.fontname, "VGA8x16");
 	fb_info.changevar = NULL;

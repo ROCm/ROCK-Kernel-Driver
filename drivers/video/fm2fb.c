@@ -144,7 +144,6 @@ static void *fm2fb_mem;
 static unsigned long fm2fb_reg_phys;
 static volatile unsigned char *fm2fb_reg;
 
-static int currcon = 0;
 static struct display disp;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[16];
@@ -291,7 +290,7 @@ static int fm2fb_set_var(struct fb_var_screeninfo *var, int con,
 static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, fm2fb_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -313,7 +312,7 @@ static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, 256, 0)))
 	    return err;
     }
-    if (con == currcon) {		/* current console? */
+    if (con == info->currcon) {		/* current console? */
 	err = fb_set_cmap(cmap, kspc, fm2fb_setcolreg, info);
 	return err;
     } else
@@ -403,6 +402,7 @@ int __init fm2fb_init(void)
 	strcpy(fb_info.modename, fb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fbops = &fm2fb_ops;
+	fb_info.currcon = -1;
 	fb_info.disp = &disp;
 	fb_info.fontname[0] = '\0';
 	fb_info.changevar = NULL;
@@ -443,10 +443,10 @@ int __init fm2fb_setup(char *options)
 static int fm2fbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, fm2fb_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, fm2fb_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     return 0;
@@ -520,7 +520,7 @@ static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-    if (con != currcon)
+    if (con != info->currcon)
 	return;
     if (fb_display[con].cmap.len)
 	fb_set_cmap(&fb_display[con].cmap, 1, fm2fb_setcolreg, info);

@@ -64,8 +64,6 @@ static char default_fontname[40] __initdata = { 0 };
 static struct fb_var_screeninfo default_var;
 static int default_var_valid = 0;
 
-static int currcon = 0;
-
 static struct { u_char red, green, blue, pad; } palette[256];
 #ifdef FBCON_HAS_CFB32
 static u32 fbcon_cfb32_cmap[16];
@@ -748,7 +746,7 @@ static int tgafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, 256, 0)))
 	    return err;
     }
-    if (con == currcon) {		/* current console? */
+    if (con == info->currcon) {		/* current console? */
 	err = fb_set_cmap(cmap, kspc, tgafb_setcolreg, info);
 #if 1
 	if (fb_info.tga_type != TGA_TYPE_8PLANE)
@@ -941,6 +939,7 @@ int __init tgafb_init(void)
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &tgafb_ops;
     fb_info.gen.info.disp = &disp;
+    fb_info.gen.info.currcon = -1;	
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;

@@ -105,7 +105,6 @@ struct retz3_fb_info {
 	volatile unsigned char *regs;
 	unsigned long physfbmem;
 	unsigned long physregs;
-	int currcon;
 	int current_par_valid; /* set to 0 by memset */
 	int blitbusy;
 	struct display disp;
@@ -1102,9 +1101,7 @@ static int do_fb_set_var(struct fb_info *info,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	struct retz3_fb_info *zinfo = retz3info(info);
-
-	if (con != zinfo->currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, retz3_setcolreg, info);
@@ -1218,7 +1215,7 @@ static int retz3fb_set_var(struct fb_var_screeninfo *var, int con,
 	else
 		display = &zinfo->disp;	/* used during initialization */
 
-	if ((err = do_fb_set_var(info, var, con == zinfo->currcon)))
+	if ((err = do_fb_set_var(info, var, con == info->currcon)))
 		return err;
 	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 		oldxres = display->var.xres;
@@ -1296,7 +1293,7 @@ static int retz3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	struct retz3_fb_info *zinfo = retz3info(info);
 
-	if (con == zinfo->currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return(fb_get_cmap(cmap, kspc, retz3_getcolreg, info));
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1323,7 +1320,7 @@ static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 					 0)))
 			return err;
 	}
-	if (con == zinfo->currcon)              /* current console? */
+	if (con == info->currcon)              /* current console? */
 		return(fb_set_cmap(cmap, kspc, retz3_setcolreg, info));
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -1425,6 +1422,7 @@ int __init retz3fb_init(void)
 		fb_info->node = NODEV;
 		fb_info->fbops = &retz3fb_ops;
 		fb_info->disp = &zinfo->disp;
+		fb_info->currcon = -1;
 		fb_info->switch_con = &z3fb_switch;
 		fb_info->updatevar = &z3fb_updatevar;
 		fb_info->blank = &z3fb_blank;
@@ -1465,12 +1463,12 @@ static int z3fb_switch(int con, struct fb_info *info)
 	struct retz3_fb_info *zinfo = retz3info(info);
 
 	/* Do we have to save the colormap? */
-	if (fb_display[zinfo->currcon].cmap.len)
-		fb_get_cmap(&fb_display[zinfo->currcon].cmap, 1,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1,
 			    retz3_getcolreg, info);
 
 	do_fb_set_var(info, &fb_display[con].var, 1);
-	zinfo->currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;

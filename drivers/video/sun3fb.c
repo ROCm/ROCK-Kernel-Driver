@@ -66,7 +66,6 @@
 int sun3fb_init(void);
 int sun3fb_setup(char *options);
 
-static int currcon;
 static char fontname[40] __initdata = { 0 };
 static int curblink __initdata = 1;
 
@@ -294,7 +293,7 @@ static void sun3fb_cursor(struct display *p, int mode, int x, int y)
 static int sun3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, sun3fb_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -316,7 +315,7 @@ static int sun3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if ((err = fb_alloc_cmap(&fb_display[con].cmap, 1<<fb_display[con].var.bits_per_pixel, 0)))
 			return err;
 	}
-	if (con == currcon) {			/* current console? */
+	if (con == info->currcon) {			/* current console? */
 		err = fb_set_cmap(cmap, kspc, sun3fb_setcolreg, info);
 		if (!err) {
 			struct fb_info_sbusfb *fb = sbusfbinfo(info);
@@ -364,8 +363,8 @@ static int sun3fbcon_switch(int con, struct fb_info *info)
 	int lastconsole;
     
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, sun3fb_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, sun3fb_getcolreg, info);
 
 	if (info->display_fg) {
 		lastconsole = info->display_fg->vc_num;
@@ -382,7 +381,7 @@ static int sun3fbcon_switch(int con, struct fb_info *info)
 		fb->x_margin = x_margin; fb->y_margin = y_margin;
 		sun3fb_clear_margin(&fb_display[con], 0);
 	}
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;
@@ -459,7 +458,7 @@ static void do_install_cmap(int con, struct fb_info *info)
 {
 	struct fb_info_sbusfb *fb = sbusfbinfo(info);
 	
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, sun3fb_setcolreg, info);
@@ -576,6 +575,7 @@ sizechange:
 	fb->info.node = NODEV;
 	fb->info.fbops = &sun3fb_ops;
 	fb->info.disp = disp;
+	fb->info.currcon = -1;
 	strcpy(fb->info.fontname, fontname);
 	fb->info.changevar = NULL;
 	fb->info.switch_con = &sun3fbcon_switch;

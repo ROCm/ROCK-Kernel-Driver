@@ -48,8 +48,6 @@
 #include <video/fbcon-cfb16.h>
 #include <video/macmodes.h>
 
-static int currcon = 0;
-
 struct fb_info_chips {
 	struct fb_info info;
 	struct fb_fix_screeninfo fix;
@@ -188,7 +186,7 @@ static int chips_set_var(struct fb_var_screeninfo *var, int con,
 static int chips_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)		/* current console? */
+	if (con == info->currcon)		/* current console? */
 		return fb_get_cmap(cmap, kspc, chipsfb_getcolreg, info);
 	if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -209,7 +207,7 @@ static int chips_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, chipsfb_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -222,12 +220,12 @@ static int chipsfbcon_switch(int con, struct fb_info *info)
 	int new_bpp, old_bpp;
 
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, chipsfb_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, chipsfb_getcolreg, info);
 
 	new_bpp = fb_display[con].var.bits_per_pixel;
-	old_bpp = fb_display[currcon].var.bits_per_pixel;
-	currcon = con;
+	old_bpp = fb_display[info->currcon].var.bits_per_pixel;
+	info->currcon = con;
 
 	if (new_bpp != old_bpp)
 		chips_set_bitdepth(p, &fb_display[con], con, new_bpp);
@@ -325,7 +323,7 @@ static int chipsfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, chipsfb_setcolreg, info);
@@ -342,7 +340,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 	struct fb_var_screeninfo* var = &p->var;
 	
 	if (bpp == 16) {
-		if (con == currcon) {
+		if (con == info->currcon) {
 			write_cr(0x13, 200);		// Set line length (doublewords)
 			write_xr(0x81, 0x14);		// 15 bit (555) color mode
 			write_xr(0x82, 0x00);		// Disable palettes
@@ -364,7 +362,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 		disp->dispsw = &fbcon_dummy;
 #endif
 	} else if (bpp == 8) {
-		if (con == currcon) {
+		if (con == info->currcon) {
 			write_cr(0x13, 100);		// Set line length (doublewords)
 			write_xr(0x81, 0x12);		// 8 bit color mode
 			write_xr(0x82, 0x08);		// Graphics gamma enable
@@ -581,6 +579,7 @@ static void __init init_chips(struct fb_info_chips *p)
 	p->info.node = NODEV;
 	p->info.fbops = &chipsfb_ops;
 	p->info.disp = &p->disp;
+	p->info.currcon = -1;
 	p->info.fontname[0] = 0;
 	p->info.changevar = NULL;
 	p->info.switch_con = &chipsfbcon_switch;

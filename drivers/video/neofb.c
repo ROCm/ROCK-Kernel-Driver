@@ -858,7 +858,7 @@ static int neofb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
    * we should be able to remove this test once fbcon has been
    * "improved" --rmk
    */
-  if (!err && con == info->currcon)
+  if (!err && con == info->fb.currcon)
     {
       err = fb_set_cmap (cmap, kspc, neo_setcolreg, fb);
       dcmap = &fb->cmap;
@@ -1565,7 +1565,7 @@ static int neofb_set_var (struct fb_var_screeninfo *var, int con,
   if (chgvar && fb && fb->changevar)
     fb->changevar (con);
 
-  if (con == info->currcon)
+  if (con == info->fb.currcon)
     {
       if (chgvar || con < 0)
         neofb_set_par (info, &par);
@@ -1634,9 +1634,9 @@ static int neofb_switch (int con, struct fb_info *fb)
   struct display *disp;
   struct fb_cmap *cmap;
 
-  if (info->currcon >= 0)
+  if (info->fb.currcon >= 0)
     {
-      disp = fb_display + info->currcon;
+      disp = fb_display + info->fb.currcon;
 
       /*
        * Save the old colormap and video mode.
@@ -1646,7 +1646,7 @@ static int neofb_switch (int con, struct fb_info *fb)
 	fb_copy_cmap(&fb->cmap, &disp->cmap, 0);
     }
 
-  info->currcon = con;
+  info->fb.currcon = con;
   disp = fb_display + con;
 
   /*
@@ -2099,7 +2099,7 @@ static struct neofb_info * __devinit neo_alloc_fb_info (struct pci_dev *dev,
 
   memset (info, 0, sizeof(struct neofb_info) + sizeof(struct display));
 
-  info->currcon = -1;
+  info->fb.currcon = -1;
   info->pcidev  = dev;
   info->accel   = id->driver_data;
 

@@ -102,8 +102,6 @@ static struct fb_var_screeninfo vga16fb_defined = {
 static struct display disp;
 static struct { u_short blue, green, red, pad; } palette[256];
 
-static int             currcon   = 0;
-
 /* --------------------------------------------------------------------- */
 
 static void vga16fb_pan_var(struct fb_info *info, struct fb_var_screeninfo *var)
@@ -535,7 +533,7 @@ static int vga16fb_set_var(struct fb_var_screeninfo *var, int con,
 			if (info->fb_info.changevar)
 				info->fb_info.changevar(con);
 		}
-		if (con == currcon)
+		if (con == info->fb_info.currcon)
 			vga16fb_set_par(&par, info);
 	}
 
@@ -602,10 +600,10 @@ static int vga16_setcolreg(unsigned regno, unsigned red, unsigned green,
 	palette[regno].green = green;
 	palette[regno].blue  = blue;
 	
-	if (currcon < 0)
+	if (fb_info->currcon < 0)
 		gray = disp.var.grayscale;
 	else
-		gray = fb_display[currcon].var.grayscale;
+		gray = fb_display[fb_info->currcon].var.grayscale;
 	if (gray) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
@@ -620,7 +618,7 @@ static int vga16_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, vga16_setcolreg, info);
@@ -632,7 +630,7 @@ static void do_install_cmap(int con, struct fb_info *info)
 static int vga16fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, vga16_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -652,7 +650,7 @@ static int vga16fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if (err)
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, vga16_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -665,7 +663,7 @@ static int vga16fb_pan_display(struct fb_var_screeninfo *var, int con,
 	if (var->xoffset + fb_display[con].var.xres > fb_display[con].var.xres_virtual ||
 	    var->yoffset + fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 		return -EINVAL;
-	if (con == currcon)
+	if (con == info->currcon)
 		vga16fb_pan_var(info, var);
 	fb_display[con].var.xoffset = var->xoffset;
 	fb_display[con].var.yoffset = var->yoffset;
@@ -707,11 +705,11 @@ static int vga16fb_switch(int con, struct fb_info *fb)
 	struct vga16fb_info *info = (struct vga16fb_info*)fb;
 
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, vga16_getcolreg,
+	if (fb_display[fb->currcon].cmap.len)
+		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, vga16_getcolreg,
 			    fb);
 	
-	currcon = con;
+	fb->currcon = con;
 	vga16fb_decode_var(&fb_display[con].var, &par, info);
 	vga16fb_set_par(&par, info);
 	vga16fb_set_disp(con, info);
@@ -873,7 +871,7 @@ static void vga16fb_blank(int blank, struct fb_info *fb_info)
 			info->vesa_blanked = 0;
 		}
 		if (info->palette_blanked) {
-			do_install_cmap(currcon, fb_info);
+			do_install_cmap(fb_info->currcon, fb_info);
 			info->palette_blanked = 0;
 		}
 		break;
@@ -929,6 +927,7 @@ int __init vga16fb_init(void)
 	vga16fb.fb_info.node = NODEV;
 	vga16fb.fb_info.fbops = &vga16fb_ops;
 	vga16fb.fb_info.disp=&disp;
+	vga16fb.fb_info.currcon = -1;
 	vga16fb.fb_info.switch_con=&vga16fb_switch;
 	vga16fb.fb_info.updatevar=&vga16fb_update_var;
 	vga16fb.fb_info.blank=&vga16fb_blank;

@@ -2781,6 +2781,7 @@ int __init clgenfb_init(void)
 	fb_info->gen.info.node = NODEV;
 	fb_info->gen.info.fbops = &clgenfb_ops;
 	fb_info->gen.info.disp = &disp;
+	fb_info->gen.info.currcon = -1;
 	fb_info->gen.info.changevar = NULL;
 	fb_info->gen.info.switch_con = &fbgen_switch;
 	fb_info->gen.info.updatevar = &fbgen_update_var;
@@ -2860,8 +2861,7 @@ int __init clgenfb_setup(char *options) {
 	if (!options || !*options)
 		return 0;
 
-	for (this_opt = strtok (options, ","); this_opt != NULL;
-	     this_opt = strtok (NULL, ",")) {
+	while ((this_opt = strsep (&options, ",")) != NULL) {	
 		if (!*this_opt) continue;
 
 		DPRINTK("clgenfb_setup: option '%s'\n", this_opt);

@@ -1518,7 +1518,7 @@ static int rivafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 	dsp = (con < 0) ? rivainfo->info.disp : &fb_display[con];
 
-	if (con == rivainfo->currcon) {	/* current console? */
+	if (con == info->currcon) {	/* current console? */
 		int rc = fb_get_cmap(cmap, kspc, riva_getcolreg, info);
 		DPRINTK("EXIT - returning %d\n", rc);
 		return rc;
@@ -1556,7 +1556,7 @@ static int rivafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 		}
 	}
-	if (con == rivainfo->currcon) {	/* current console? */
+	if (con == info->currcon) {	/* current console? */
 		int rc = fb_set_cmap(cmap, kspc, riva_setcolreg, info);
 		DPRINTK("EXIT - returning %d\n", rc);
 		return rc;
@@ -1611,7 +1611,7 @@ static int rivafb_pan_display(struct fb_var_screeninfo *var, int con,
 
 	base = var->yoffset * dsp->line_length + var->xoffset;
 
-	if (con == rivainfo->currcon) {
+	if (con == info->currcon) {
 		rivainfo->riva.SetStartAddress(&rivainfo->riva, base);
 	}
 
@@ -1665,11 +1665,11 @@ static int rivafb_switch(int con, struct fb_info *info)
 
 	dsp = (con < 0) ? rivainfo->info.disp : &fb_display[con];
 
-	if (rivainfo->currcon >= 0) {
+	if (info->currcon >= 0) {
 		/* Do we have to save the colormap? */
 		cmap = &(rivainfo->currcon_display->cmap);
 		DPRINTK("switch1: con = %d, cmap.len = %d\n",
-			 rivainfo->currcon, cmap->len);
+			 info->currcon, cmap->len);
 
 		if (cmap->len) {
 			DPRINTK("switch1a: %p %p %p %p\n", cmap->red,
@@ -1677,7 +1677,7 @@ static int rivafb_switch(int con, struct fb_info *info)
 			fb_get_cmap(cmap, 1, riva_getcolreg, info);
 		}
 	}
-	rivainfo->currcon = con;
+	info->currcon = con;
 	rivainfo->currcon_display = dsp;
 
 	rivafb_set_var(&dsp->var, con, info);
@@ -1818,6 +1818,7 @@ static int __devinit riva_set_fbinfo(struct rivafb_info *rinfo)
 	/* FIXME: set monspecs to what??? */
 
 	info->display_fg = NULL;
+	info->currcon = -1;
 	strncpy(info->fontname, fontname, sizeof(info->fontname));
 	info->fontname[sizeof(info->fontname) - 1] = 0;
 

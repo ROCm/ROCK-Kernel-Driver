@@ -60,8 +60,6 @@ static struct fb_ops q40fb_ops = {
 	fb_ioctl:	q40fb_ioctl,
 };
 
-static int currcon=0;
-
 static char q40fb_name[]="Q40";
 
 static int q40fb_get_fix(struct fb_fix_screeninfo *fix, int con,
@@ -211,7 +209,7 @@ static int q40fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
 #if 1
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, q40_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -238,7 +236,7 @@ static int q40fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 					 0)))
 			return err;
 	}
-	if (con == currcon)			/* current console? */
+	if (con == info->currcon)			/* current console? */
 		return fb_set_cmap(cmap, kspc, q40_setcolreg, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
@@ -328,6 +326,7 @@ int __init q40fb_init(void)
 	strcpy(&fb_info.modename[0],q40fb_name);
 	fb_info.fontname[0]=0;
 	fb_info.disp=disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con=&q40con_switch;
 	fb_info.updatevar=&q40con_updatevar;
 	fb_info.blank=&q40con_blank;	
@@ -353,10 +352,8 @@ int __init q40fb_init(void)
 	
 static int q40con_switch(int con, struct fb_info *info)
 { 
-	currcon=con;
-	
+	info->currcon=con;
 	return 0;
-
 }
 
 static int q40con_updatevar(int con, struct fb_info *info)

@@ -93,7 +93,6 @@ static struct fb_var_screeninfo pmagbbfb_defined = {
 struct pmagbbfb_par {
 };
 
-static int currcon = 0;
 struct pmagbbfb_par current_par;
 
 static void pmagbbfb_encode_var(struct fb_var_screeninfo *var,
@@ -284,8 +283,7 @@ static int pmagbbfb_ioctl(struct inode *inode, struct file *file,
 static int pmagbbfb_switch(int con, struct fb_info *info)
 {
 	pmagbb_do_fb_set_var(&fb_display[con].var, 1);
-	currcon = con;
-
+	info->currcon = con;
 	return 0;
 }
 
@@ -392,6 +390,7 @@ int __init pmagbbfb_init_one(int slot)
 	ip->info.node = NODEV;
 	ip->info.fbops = &pmagbbfb_ops;
 	ip->info.disp = &disp;
+	ip->info.currcon = -1;
 	ip->info.switch_con = &pmagbbfb_switch;
 	ip->info.updatevar = &pmagbb_fb_update_var;
 	ip->info.blank = &pmagbbfb_blank;

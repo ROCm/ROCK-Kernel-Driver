@@ -50,8 +50,6 @@
 
 static char fontname[40] __initdata = { 0 };
 
-static int currcon = 0;
-
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
 
@@ -332,10 +330,10 @@ static int platinum_switch(int con, struct fb_info *fb)
 	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
 	struct fb_par_platinum par;
 
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, platinum_getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, platinum_getcolreg,
 			    fb);
-	currcon = con;
+	info->currcon = con;
 
 	platinum_var_to_par(&fb_display[con].var, &par, info);
 	platinum_set_par(&par, info);
@@ -431,7 +429,7 @@ static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 static void do_install_cmap(int con, struct fb_info *info)
 {
-	if (con != currcon)
+	if (con != info->currcon)
 		return;
 	if (fb_display[con].cmap.len)
 		fb_set_cmap(&fb_display[con].cmap, 1, platinum_setcolreg,
@@ -594,6 +592,7 @@ static int __init init_platinum(struct fb_info_platinum *info)
 	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &platinumfb_ops;
 	info->fb_info.disp = disp;
+	info->fb_info.currcon = -1;
 	strcpy(info->fb_info.fontname, fontname);
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &platinum_switch;

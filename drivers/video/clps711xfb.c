@@ -36,10 +36,7 @@
 #include <asm/hardware/clps7111.h>
 #include <asm/arch/syspld.h>
 
-static struct clps7111fb_info {
-	struct fb_info		fb;
-	int			currcon;
-} *cfb;
+struct fb_info	*cfb;
 
 #define CMAP_SIZE	16
 
@@ -98,7 +95,6 @@ static int
 clps7111fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		    struct fb_info *info)
 {
-	struct clps7111fb_info *cfb = (struct clps7111fb_info *)info;
 	struct fb_cmap *dcmap = &fb_display[con].cmap;
 	int err = 0;
 
@@ -106,14 +102,13 @@ clps7111fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if (!dcmap->len)
 		err = fb_alloc_cmap(dcmap, CMAP_SIZE, 0);
 
-	if (!err && con == cfb->currcon) {
-		err = fb_set_cmap(cmap, kspc, clps7111fb_setcolreg, &cfb->fb);
-		dcmap = &cfb->fb.cmap;
+	if (!err && con == info->currcon) {
+		err = fb_set_cmap(cmap, kspc, clps7111fb_setcolreg, info);
+		dcmap = &info->cmap;
 	}
 
 	if (!err)
 		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
-
 	return err;
 }
 
@@ -282,22 +277,21 @@ static struct fb_ops clps7111fb_ops = {
 
 static int clps7111fb_switch(int con, struct fb_info *info)
 {
-	struct clps7111fb_info *cfb = (struct clps7111fb_info *)info;
 	struct display *disp;
 	struct fb_cmap *cmap;
 
-	if (cfb->currcon >= 0) {
-		disp = fb_display + cfb->currcon;
+	if (info->currcon >= 0) {
+		disp = fb_display + info->currcon;
 
 		/*
 		 * Save the old colormap and video mode.
 		 */
-		disp->var = cfb->fb.var;
+		disp->var = info->var;
 		if (disp->cmap.len)
-			fb_copy_cmap(&cfb->fb.cmap, &disp->cmap, 0);
+			fb_copy_cmap(&info->cmap, &disp->cmap, 0);
 	}
 
-	cfb->currcon = con;
+	info->currcon = con;
 	disp = fb_display + con;
 
 	/*
@@ -310,12 +304,12 @@ static int clps7111fb_switch(int con, struct fb_info *info)
 	else
 		cmap = fb_default_cmap(CMAP_SIZE);
 
-	fb_copy_cmap(cmap, &cfb->fb.cmap, 0);
+	fb_copy_cmap(cmap, &info->cmap, 0);
 
-	cfb->fb.var = disp->var;
-	cfb->fb.var.activate = FB_ACTIVATE_NOW;
+	info->var = disp->var;
+	info->var.activate = FB_ACTIVATE_NOW;
 
-	clps7111fb_set_var(&cfb->fb.var, con, &cfb->fb);
+	clps7111fb_set_var(&info->var, con, info);
 
 	return 0;
 }
@@ -435,31 +429,31 @@ int __init clps711xfb_init(void)
 
 	cfb->currcon		= -1;
 
-	strcpy(cfb->fb.fix.id, "clps7111");
-	cfb->fb.screen_base	= (void *)PAGE_OFFSET;
-	cfb->fb.fix.smem_start	= PAGE_OFFSET;
-	cfb->fb.fix.smem_len	= 0x14000;
-	cfb->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
+	strcpy(cfb->fix.id, "clps7111");
+	cfb->screen_base	= (void *)PAGE_OFFSET;
+	cfb->fix.smem_start	= PAGE_OFFSET;
+	cfb->fix.smem_len	= 0x14000;
+	cfb->fix.type	= FB_TYPE_PACKED_PIXELS;
 
-	cfb->fb.var.xres	 = 640;
-	cfb->fb.var.xres_virtual = 640;
-	cfb->fb.var.yres	 = 240;
-	cfb->fb.var.yres_virtual = 240;
-	cfb->fb.var.bits_per_pixel = 4;
-	cfb->fb.var.grayscale   = 1;
-	cfb->fb.var.activate	= FB_ACTIVATE_NOW;
-	cfb->fb.var.height	= -1;
-	cfb->fb.var.width	= -1;
+	cfb->var.xres	 = 640;
+	cfb->var.xres_virtual = 640;
+	cfb->var.yres	 = 240;
+	cfb->var.yres_virtual = 240;
+	cfb->var.bits_per_pixel = 4;
+	cfb->var.grayscale   = 1;
+	cfb->var.activate	= FB_ACTIVATE_NOW;
+	cfb->var.height	= -1;
+	cfb->var.width	= -1;
 
-	cfb->fb.fbops		= &clps7111fb_ops;
-	cfb->fb.changevar	= NULL;
-	cfb->fb.switch_con	= clps7111fb_switch;
-	cfb->fb.updatevar	= clps7111fb_updatevar;
-	cfb->fb.blank		= clps7111fb_blank;
-	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
-	cfb->fb.disp		= (struct display *)(cfb + 1);
+	cfb->fbops		= &clps7111fb_ops;
+	cfb->changevar	= NULL;
+	cfb->switch_con	= clps7111fb_switch;
+	cfb->updatevar	= clps7111fb_updatevar;
+	cfb->blank		= clps7111fb_blank;
+	cfb->flags		= FBINFO_FLAG_DEFAULT;
+	cfb->disp		= (struct display *)(cfb + 1);
 
-	fb_alloc_cmap(&cfb->fb.cmap, CMAP_SIZE, 0);
+	fb_alloc_cmap(&cfb->cmap, CMAP_SIZE, 0);
 
 	/* Register the /proc entries. */
 	clps7111fb_backlight_proc_entry = create_proc_entry("backlight", 0444,
@@ -498,15 +492,15 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 	}
 
-	clps7111fb_set_var(&cfb->fb.var, -1, &cfb->fb);
-	err = register_framebuffer(&cfb->fb);
+	clps7111fb_set_var(&cfb->var, -1, cfb);
+	err = register_framebuffer(cfb);
 
 out:	return err;
 }
 
 static void __exit clps711xfb_exit(void)
 {
-	unregister_framebuffer(&cfb->fb);
+	unregister_framebuffer(cfb);
 	kfree(cfb);
 
 	/*

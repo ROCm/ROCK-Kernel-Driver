@@ -348,6 +348,7 @@ int __init hitfb_init(void)
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &hitfb_ops;
     fb_info.gen.info.disp = &fb_info.disp;
+    fb_info.gen.info.currcon = 1;	
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;

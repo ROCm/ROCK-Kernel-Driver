@@ -63,8 +63,6 @@ struct sa1100fb_lcd_reg {
 
 struct sa1100fb_info {
 	struct fb_info		fb;
-	signed int		currcon;
-
 	struct sa1100fb_rgb	*rgb[NR_RGB];
 
 	u_int			max_bpp;
