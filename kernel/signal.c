@@ -1588,7 +1588,9 @@ static void ptrace_stop(int exit_code, int nostop_code, siginfo_t *info)
 	read_lock(&tasklist_lock);
 	if (likely(current->ptrace & PT_PTRACED) &&
 	    likely(current->parent != current->real_parent ||
-		   !(current->ptrace & PT_ATTACHED))) {
+		   !(current->ptrace & PT_ATTACHED)) &&
+	    (likely(current->parent->signal != current->signal) ||
+	     !unlikely(current->signal->flags & SIGNAL_GROUP_EXIT))) {
 		do_notify_parent_cldstop(current, current->parent,
 					 CLD_TRAPPED);
 		read_unlock(&tasklist_lock);

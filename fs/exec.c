@@ -685,6 +685,14 @@ static inline int de_thread(struct task_struct *tsk)
 		 */
 		ptrace = leader->ptrace;
 		parent = leader->parent;
+		if (unlikely(ptrace) && unlikely(parent == current)) {
+			/*
+			 * Joker was ptracing his own group leader,
+			 * and now he wants to be his own parent!
+			 * We can't have that.
+			 */
+			ptrace = 0;
+		}
 
 		ptrace_unlink(current);
 		ptrace_unlink(leader);
