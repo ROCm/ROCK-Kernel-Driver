@@ -588,14 +588,10 @@ int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
         if (outp->coda_ioctl.len > data->vi.out_size) {
 		error = -EINVAL;
         } else {
-		error = verify_area(VERIFY_WRITE, data->vi.out, 
-                                    data->vi.out_size);
-		if ( error ) goto exit;
-
 		if (copy_to_user(data->vi.out, 
 				 (char *)outp + (long)outp->coda_ioctl.data, 
 				 data->vi.out_size)) {
-			error = -EINVAL;
+			error = -EFAULT;
 			goto exit;
 		}
         }
