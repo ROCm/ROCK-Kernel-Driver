@@ -2749,15 +2749,7 @@ scsi_reset_provider(Scsi_Device *dev, int flag)
 	 */
 	SCpnt->pid			= 0;
 
-	if (dev->host->hostt->use_new_eh_code) {
-		rtn = scsi_new_reset(SCpnt, flag);
-	} else {
-		unsigned long flags;
-
-		spin_lock_irqsave(&io_request_lock, flags);
-		rtn = scsi_old_reset(SCpnt, flag);
-		spin_unlock_irqrestore(&io_request_lock, flags);
-	}
+        rtn = scsi_new_reset(SCpnt, flag);
 
 	scsi_delete_timer(SCpnt);
 	return rtn;
