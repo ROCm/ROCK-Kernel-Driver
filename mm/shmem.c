@@ -488,16 +488,6 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
-	if (inode->i_mapping->nrpages) {
-		/*
-		 * Call truncate_inode_pages again: racing shmem_unuse_inode
-		 * may have swizzled a page in from swap since vmtruncate or
-		 * generic_delete_inode did it, before we lowered next_index.
-		 */
-		spin_unlock(&info->lock);
-		truncate_inode_pages(inode->i_mapping, inode->i_size);
-		spin_lock(&info->lock);
-	}
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -579,6 +569,7 @@ static inline int shmem_find_swp(swp_entry_t entry, swp_entry_t *dir, swp_entry_
 
 static int shmem_unuse_inode(struct shmem_inode_info *info, swp_entry_t entry, struct page *page)
 {
+	struct inode *inode;
 	unsigned long idx;
 	unsigned long size;
 	unsigned long limit;
@@ -643,8 +634,15 @@ lost2:
 	spin_unlock(&info->lock);
 	return 0;
 found:
-	if (move_from_swap_cache(page, idx + offset,
-			info->vfs_inode.i_mapping) == 0)
+	idx += offset;
+	inode = &info->vfs_inode;
+
+	/* Racing against delete or truncate? Must leave out of page cache */
+	limit = (inode->i_state & I_FREEING)? 0:
+		(inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+
+	if (idx >= limit ||
+	    move_from_swap_cache(page, idx, inode->i_mapping) == 0)
 		shmem_swp_set(info, ptr + offset, 0);
 	shmem_swp_unmap(ptr);
 	spin_unlock(&info->lock);
@@ -653,7 +651,7 @@ found:
 	 * try_to_unuse will skip over mms, then reincrement count.
 	 */
 	swap_free(entry);
-	return 1;
+	return idx < limit;
 }
 
 /*
