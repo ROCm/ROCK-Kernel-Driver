@@ -518,7 +518,7 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	capi20_put_message(global.ap.applid, skb);
+	capi20_put_message(&global.ap, skb);
 	global.nsentctlpkt++;
 }
 
@@ -1376,7 +1376,7 @@ static void capidrv_signal(u16 applid, void *dummy)
 {
 	struct sk_buff *skb = 0;
 
-	while (capi20_get_message(global.ap.applid, &skb) == CAPI_NOERROR) {
+	while (capi20_get_message(&global.ap, &skb) == CAPI_NOERROR) {
 		capi_message2cmsg(&s_cmsg, skb->data);
 		if (debugmode > 2)
 			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
@@ -1912,7 +1912,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		printk(KERN_DEBUG "capidrv-%d: only %d bytes headroom, need %d\n",
 		       card->contrnr, skb_headroom(skb), msglen);
 		memcpy(skb_push(nskb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(global.ap.applid, nskb);
+		errcode = capi20_put_message(&global.ap, nskb);
 		if (errcode == CAPI_NOERROR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
@@ -1924,7 +1924,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
 	} else {
 		memcpy(skb_push(skb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(global.ap.applid, skb);
+		errcode = capi20_put_message(&global.ap, skb);
 		if (errcode == CAPI_NOERROR) {
 			nccip->datahandle++;
 			global.nsentdatapkt++;
@@ -2319,7 +2319,7 @@ static int __init capidrv_init(void)
 		return -EIO;
 	}
 
-	capi20_set_callback(global.ap.applid, lower_callback);
+	capi20_set_callback(&global.ap, lower_callback);
 
 	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
@@ -2328,7 +2328,7 @@ static int __init capidrv_init(void)
 		return -EIO;
 	}
 
-	capi20_set_signal(global.ap.applid, capidrv_signal, 0);
+	capi20_set_signal(&global.ap, capidrv_signal, 0);
 
 	ncontr = profile.ncontroller;
 	for (contr = 1; contr <= ncontr; contr++) {

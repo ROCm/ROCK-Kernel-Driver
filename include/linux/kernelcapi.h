@@ -77,9 +77,9 @@ struct capi20_appl {
 u16 capi20_isinstalled(void);
 u16 capi20_register(struct capi20_appl *ap);
 u16 capi20_release(struct capi20_appl *ap);
-u16 capi20_put_message(u16 applid, struct sk_buff *skb);
-u16 capi20_get_message(u16 applid, struct sk_buff **msgp);
-u16 capi20_set_signal(u16 applid,
+u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb);
+u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp);
+u16 capi20_set_signal(struct capi20_appl *ap,
 		      void (*signal) (u16 applid, void *param),
 		      void *param);
 u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN]);
@@ -89,7 +89,8 @@ u16 capi20_get_profile(u32 contr, struct capi_profile *profp);
 int capi20_manufacturer(unsigned int cmd, void *data);
 
 /* temporary hack XXX */
-void capi20_set_callback(u16 applid, void (*callback) (unsigned int cmd, __u32 contr, void *data));
+void capi20_set_callback(struct capi20_appl *ap, 
+			 void (*callback) (unsigned int cmd, __u32 contr, void *data));
 
 
 

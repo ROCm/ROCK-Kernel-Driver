@@ -912,19 +912,17 @@ u16 capi20_release(struct capi20_appl *ap)
 
 EXPORT_SYMBOL(capi20_release);
 
-u16 capi20_put_message(u16 applid, struct sk_buff *skb)
+u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb)
 {
 	struct capi_ctr *card;
-	struct capi20_appl *ap;
 	int showctl = 0;
 	u8 cmd, subcmd;
 
-	DBG("applid %#x", applid);
+	DBG("applid %#x", ap->applid);
  
 	if (ncards == 0)
 		return CAPI_REGNOTINSTALLED;
-	ap = get_capi_appl_by_nr(applid);
-	if (!ap)
+	if (ap->applid == 0)
 		return CAPI_ILLAPPNR;
 	if (skb->len < 12
 	    || !capi_cmd_valid(CAPIMSG_COMMAND(skb->data))
@@ -971,12 +969,11 @@ u16 capi20_put_message(u16 applid, struct sk_buff *skb)
 
 EXPORT_SYMBOL(capi20_put_message);
 
-u16 capi20_get_message(u16 applid, struct sk_buff **msgp)
+u16 capi20_get_message(struct capi20_appl *ap, struct sk_buff **msgp)
 {
-	struct capi20_appl *ap = get_capi_appl_by_nr(applid);
 	struct sk_buff *skb;
 
-	if (!ap)
+	if (ap->applid == 0)
 		return CAPI_ILLAPPNR;
 	if ((skb = skb_dequeue(&ap->recv_queue)) == 0)
 		return CAPI_RECEIVEQUEUEEMPTY;
@@ -986,13 +983,11 @@ u16 capi20_get_message(u16 applid, struct sk_buff **msgp)
 
 EXPORT_SYMBOL(capi20_get_message);
 
-u16 capi20_set_signal(u16 applid,
-		    void (*signal) (u16 applid, void *param),
-		    void *param)
+u16 capi20_set_signal(struct capi20_appl *ap,
+		      void (*signal) (u16 applid, void *param),
+		      void *param)
 {
-	struct capi20_appl *ap = get_capi_appl_by_nr(applid);
-
-	if (!ap)
+	if (ap->applid == 0)
 		return CAPI_ILLAPPNR;
 	ap->signal = signal;
 	ap->param = param;
@@ -1258,10 +1253,9 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 EXPORT_SYMBOL(capi20_manufacturer);
 
 /* temporary hack */
-void capi20_set_callback(u16 applid, void (*callback) (unsigned int cmd, __u32 contr, void *data))
+void capi20_set_callback(struct capi20_appl *ap,
+			 void (*callback) (unsigned int cmd, __u32 contr, void *data))
 {
-	struct capi20_appl *ap = get_capi_appl_by_nr(applid);
-
 	ap->callback = callback;
 }
 

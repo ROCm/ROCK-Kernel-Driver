@@ -84,7 +84,7 @@ struct capiminor {
 	struct capincci  *nccip;
 	unsigned int      minor;
 
-	u16  		 applid;
+	struct capi20_appl *ap;
 	u32		 ncci;
 	u16		 datahandle;
 	u16		 msgid;
@@ -207,7 +207,7 @@ static void capiminor_del_all_ack(struct capiminor *mp)
 
 /* -------- struct capiminor ---------------------------------------- */
 
-static struct capiminor *capiminor_alloc(u16 applid, u32 ncci)
+static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 {
 	struct capiminor *mp, *p;
 	struct list_head *l;
@@ -225,7 +225,7 @@ static struct capiminor *capiminor_alloc(u16 applid, u32 ncci)
 	printk(KERN_DEBUG "capiminor_alloc %d\n", GET_USE_COUNT(THIS_MODULE));
 #endif
 	memset(mp, 0, sizeof(struct capiminor));
-	mp->applid = applid;
+	mp->ap = ap;
 	mp->ncci = ncci;
 	mp->msgid = 0;
 	atomic_set(&mp->ttyopencount,0);
@@ -309,7 +309,7 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	mp = 0;
 	if (cdev->userflags & CAPIFLAG_HIGHJACKING)
-		mp = np->minorp = capiminor_alloc(cdev->ap.applid, ncci);
+		mp = np->minorp = capiminor_alloc(&cdev->ap, ncci);
 	if (mp) {
 		mp->nccip = np;
 #ifdef _DEBUG_REFCOUNT
@@ -423,7 +423,7 @@ gen_data_b3_resp_for(struct capiminor *mp, struct sk_buff *skb)
 		u16 datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4+4+2);
 		unsigned char *s = skb_put(nskb, CAPI_DATA_B3_RESP_LEN);
 		capimsg_setu16(s, 0, CAPI_DATA_B3_RESP_LEN);
-		capimsg_setu16(s, 2, mp->applid);
+		capimsg_setu16(s, 2, mp->ap->applid);
 		capimsg_setu8 (s, 4, CAPI_DATA_B3);
 		capimsg_setu8 (s, 5, CAPI_RESP);
 		capimsg_setu16(s, 6, mp->msgid++);
@@ -463,7 +463,7 @@ static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 			return -1;
 		}
 		datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4);
-		errcode = capi20_put_message(mp->applid, nskb);
+		errcode = capi20_put_message(mp->ap, nskb);
 		if (errcode != CAPI_NOERROR) {
 			printk(KERN_ERR "capi: send DATA_B3_RESP failed=%x\n",
 					errcode);
@@ -521,7 +521,7 @@ static int handle_minor_send(struct capiminor *mp)
 		skb_push(skb, CAPI_DATA_B3_REQ_LEN);
 		memset(skb->data, 0, CAPI_DATA_B3_REQ_LEN);
 		capimsg_setu16(skb->data, 0, CAPI_DATA_B3_REQ_LEN);
-		capimsg_setu16(skb->data, 2, mp->applid);
+		capimsg_setu16(skb->data, 2, mp->ap->applid);
 		capimsg_setu8 (skb->data, 4, CAPI_DATA_B3);
 		capimsg_setu8 (skb->data, 5, CAPI_REQ);
 		capimsg_setu16(skb->data, 6, mp->msgid++);
@@ -536,7 +536,7 @@ static int handle_minor_send(struct capiminor *mp)
 			skb_queue_head(&mp->outqueue, skb);
 			return count;
 		}
-		errcode = capi20_put_message(mp->applid, skb);
+		errcode = capi20_put_message(mp->ap, skb);
 		if (errcode == CAPI_NOERROR) {
 			mp->datahandle++;
 			count++;
@@ -577,14 +577,12 @@ static void capi_signal(u16 applid, void *param)
 	struct sk_buff *skb = 0;
 	u32 ncci;
 
-	capi20_get_message(applid, &skb);
+	capi20_get_message(&cdev->ap, &skb);
 	if (!skb) {
 		printk(KERN_ERR "BUG: capi_signal: no skb\n");
 		return;
 	}
 
-	BUG_ON(cdev->ap.applid != applid);
-		
 	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
 		if (info == 0)
@@ -747,7 +745,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			
 	}
 
-	cdev->errcode = capi20_put_message(cdev->ap.applid, skb);
+	cdev->errcode = capi20_put_message(&cdev->ap, skb);
 
 	if (cdev->errcode) {
 		kfree_skb(skb);
@@ -781,28 +779,29 @@ static int
 capi_ioctl(struct inode *inode, struct file *file,
 	   unsigned int cmd, unsigned long arg)
 {
-	struct capidev *cdev = (struct capidev *)file->private_data;
+	struct capidev *cdev = file->private_data;
+	struct capi20_appl *ap = &cdev->ap;
 	capi_ioctl_struct data;
 	int retval = -EINVAL;
 
 	switch (cmd) {
 	case CAPI_REGISTER:
 		{
-			if (cdev->ap.applid)
+			if (ap->applid)
 				return -EEXIST;
 
 			if (copy_from_user(&cdev->ap.rparam, (void *) arg,
 					   sizeof(struct capi_register_params)))
 				return -EFAULT;
 			
-			cdev->errcode = capi20_register(&cdev->ap);
+			cdev->errcode = capi20_register(ap);
 			if (cdev->errcode) {
-				cdev->ap.applid = 0;
+				ap->applid = 0;
 				return -EIO;
 			}
-			capi20_set_signal(cdev->ap.applid, capi_signal, cdev);
+			capi20_set_signal(ap, capi_signal, cdev);
 		}
-		return (int)cdev->ap.applid;
+		return (int)ap->applid;
 
 	case CAPI_GET_VERSION:
 		{
