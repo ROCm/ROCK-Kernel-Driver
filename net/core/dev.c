@@ -708,9 +708,6 @@ void netdev_state_change(struct net_device *dev)
 	}
 }
 
-
-#ifdef CONFIG_KMOD
-
 /**
  *	dev_load 	- load a network module
  *	@name: name of interface
@@ -725,12 +722,6 @@ void dev_load(const char *name)
 	if (!dev_get(name) && capable(CAP_SYS_MODULE))
 		request_module("%s", name);
 }
-
-#else
-
-static inline void dev_load(const char *unused){;}
-
-#endif
 
 static int default_rebuild_header(struct sk_buff *skb)
 {
