@@ -1449,8 +1449,6 @@ static void nfs_kill_super(struct super_block *s)
 
 	kill_anon_super(s);
 
-	nfs4_renewd_prepare_shutdown(server);
-
 	if (server->client != NULL && !IS_ERR(server->client))
 		rpc_shutdown_client(server->client);
 	if (server->client_sys != NULL && !IS_ERR(server->client_sys))
@@ -1460,8 +1458,6 @@ static void nfs_kill_super(struct super_block *s)
 		lockd_down();	/* release rpc.lockd */
 
 	rpciod_down();		/* release rpciod */
-
-	destroy_nfsv4_state(server);
 
 	if (server->hostname != NULL)
 		kfree(server->hostname);
@@ -1542,9 +1538,6 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (data->wsize != 0)
 		server->wsize = nfs_block_size(data->wsize, NULL);
 	server->flags = data->flags & NFS_MOUNT_FLAGMASK;
-
-	/* NFSv4 doesn't use NLM locking */
-	server->flags |= NFS_MOUNT_NONLM;
 
 	server->acregmin = data->acregmin*HZ;
 	server->acregmax = data->acregmax*HZ;
@@ -1790,8 +1783,22 @@ out_free:
 
 static void nfs4_kill_super(struct super_block *sb)
 {
+	struct nfs_server *server = NFS_SB(sb);
+
 	nfs_return_all_delegations(sb);
-	nfs_kill_super(sb);
+	kill_anon_super(sb);
+
+	nfs4_renewd_prepare_shutdown(server);
+
+	if (server->client != NULL && !IS_ERR(server->client))
+		rpc_shutdown_client(server->client);
+	rpciod_down();		/* release rpciod */
+
+	destroy_nfsv4_state(server);
+
+	if (server->hostname != NULL)
+		kfree(server->hostname);
+	kfree(server);
 }
 
 static struct file_system_type nfs4_fs_type = {
