@@ -62,7 +62,7 @@ void sctp_ulpq_free(struct sctp_ulpq *);
 /* Add a new DATA chunk for processing. */
 int sctp_ulpq_tail_data(struct sctp_ulpq *, sctp_chunk_t *chunk, int priority);
 
-/* Add a new event for propogation to the ULP. */
+/* Add a new event for propagation to the ULP. */
 int sctp_ulpq_tail_event(struct sctp_ulpq *, struct sctp_ulpevent *ev);
 
 /* Is the ulpqueue empty. */
