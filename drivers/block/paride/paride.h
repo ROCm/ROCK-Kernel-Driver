@@ -45,7 +45,7 @@ struct pi_adapter  {
 	int	saved_r0;	     /* saved port state */
 	int	saved_r2;	     /* saved port state */
 	int	reserved;	     /* number of ports reserved */
-	int	private;	     /* for protocol module */
+	unsigned long	private;     /* for protocol module */
 
 	wait_queue_head_t parq;     /* semaphore for parport sharing */
 	void	*pardev;	     /* pointer to pardevice */
