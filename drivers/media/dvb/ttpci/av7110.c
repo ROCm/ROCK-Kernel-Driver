@@ -4510,8 +4510,6 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 {
 #ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE
 	const struct firmware *fw;
-#else
-	struct firmware *fw;
 #endif
 	struct av7110 *av7110 = NULL;
 	int ret = 0;
@@ -4527,20 +4525,12 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		printk("dvb-ttpci: cannot request firmware!\n");
 		return -EINVAL;
 	}
-#else
-	fw = vmalloc(sizeof(struct firmware));
-	if (NULL == fw) {
-		printk("dvb-ttpci: not enough memory\n");
-		return -ENOMEM;
-	}
-	fw->size = sizeof(dvb_ttpci_fw);
-	fw->data = dvb_ttpci_fw;
-#endif
 
 	if (fw->size <= 200000) {
 		printk("dvb-ttpci: this firmware is way too small.\n");
 		return -EINVAL;
 	}
+#endif
 
 	/* prepare the av7110 device struct */
 	if (!(av7110 = kmalloc (sizeof (struct av7110), GFP_KERNEL))) {
@@ -4549,6 +4539,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	}
 	memset(av7110, 0, sizeof(struct av7110));
 	
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
 	/* check if the firmware is available */
 	av7110->bin_fw = (unsigned char*)vmalloc(fw->size);
 	if (NULL == av7110->bin_fw) {
@@ -4558,6 +4549,10 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	}
 	memcpy(av7110->bin_fw, fw->data, fw->size);
 	av7110->size_fw = fw->size;
+#else
+	av7110->bin_fw = dvb_ttpci_fw;
+	av7110->size_fw = sizeof dvb_ttpci_fw;
+#endif
 
 	/* check for firmware magic */
 	ptr = av7110->bin_fw;
@@ -4602,9 +4597,6 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	av7110->bin_root = ptr;
 	av7110->size_root = len;
 	
-#ifdef CONFIG_DVB_AV7110_FIRMWARE_FILE
-	vfree(fw);
-#endif	
 	/* go on with regular device initialization */
 	av7110->card_name = (char*)pci_ext->ext_priv;
 	av7110->dev=(struct saa7146_dev *)dev;
@@ -4875,7 +4867,9 @@ err:
 
 	return ret;
 fw_error:
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
 	vfree(av7110->bin_fw);
+#endif
 	kfree(av7110);
 	return -EINVAL;
 }
@@ -4919,9 +4913,11 @@ static int av7110_detach (struct saa7146_dev* saa)
 	dvb_unregister_adapter (av7110->dvb_adapter);
 
 	av7110_num--;
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
 	if (NULL != av7110->bin_fw ) {
 		vfree(av7110->bin_fw);
 	}
+#endif
 	kfree (av7110);
 	saa->ext_priv = NULL;
 
