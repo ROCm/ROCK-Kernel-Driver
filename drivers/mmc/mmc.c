@@ -715,8 +715,6 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	if (host) {
 		memset(host, 0, sizeof(struct mmc_host) + extra);
 
-		host->priv = host + 1;
-
 		spin_lock_init(&host->lock);
 		init_waitqueue_head(&host->wq);
 		INIT_LIST_HEAD(&host->cards);

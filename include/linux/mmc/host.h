@@ -64,7 +64,6 @@ struct device;
 struct mmc_host {
 	struct device		*dev;
 	struct mmc_host_ops	*ops;
-	void			*priv;
 	unsigned int		f_min;
 	unsigned int		f_max;
 	u32			ocr_avail;
