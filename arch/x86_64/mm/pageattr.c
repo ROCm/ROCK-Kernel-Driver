@@ -179,7 +179,6 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 		if (0 && page_to_phys(page) < KERNEL_TEXT_SIZE) {		
 			unsigned long addr2;
 			addr2 = __START_KERNEL_map + page_to_phys(page);
-			__pgprot(prot) &= ~_PAGE_NX;
 			err = __change_page_attr(addr2, page, prot, 
 						 PAGE_KERNEL_EXECUTABLE);
 		} 
