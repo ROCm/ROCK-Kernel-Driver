@@ -40,6 +40,15 @@ static int check_reset_complete (
 
 	/* if reset finished and it's still not enabled -- handoff */
 	if (!(port_status & PORT_PE)) {
+
+		/* with integrated TT, there's nobody to hand it to! */
+		if (ehci_is_ARC(ehci)) {
+			ehci_dbg (ehci,
+				"Failed to enable port %d on root hub TT\n",
+				index+1);
+			return port_status;
+		}
+
 		ehci_dbg (ehci, "port %d full speed --> companion\n",
 			index + 1);
 
@@ -257,7 +266,8 @@ static int ehci_hub_control (
 		if (!(temp & PORT_OWNER)) {
 			if (temp & PORT_CONNECT) {
 				status |= 1 << USB_PORT_FEAT_CONNECTION;
-				status |= 1 << USB_PORT_FEAT_HIGHSPEED;
+				// status may be from integrated TT
+				status |= ehci_port_speed(ehci, temp);
 			}
 			if (temp & PORT_PE)
 				status |= 1 << USB_PORT_FEAT_ENABLE;
@@ -307,8 +317,12 @@ static int ehci_hub_control (
 					&ehci->regs->port_status [wIndex]);
 			break;
 		case USB_PORT_FEAT_RESET:
-			/* line status bits may report this as low speed */
+			/* line status bits may report this as low speed,
+			 * which can be fine if this root hub has a
+			 * transaction translator built in.
+			 */
 			if ((temp & (PORT_PE|PORT_CONNECT)) == PORT_CONNECT
+					&& !ehci_is_ARC(ehci)
 					&& PORT_USB11 (temp)) {
 				ehci_dbg (ehci,
 					"port %d low speed --> companion\n",
