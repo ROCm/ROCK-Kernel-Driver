@@ -27,6 +27,18 @@
 #ifndef __CS46XX_DSP_SCB_TYPES_H__
 #define __CS46XX_DSP_SCB_TYPES_H__
 
+#include <asm/byteorder.h>
+
+#ifndef ___DSP_DUAL_16BIT_ALLOC
+#if   defined(__LITTLE_ENDIAN)
+#define ___DSP_DUAL_16BIT_ALLOC(a,b) u16 a; u16 b;
+#elif defined(__BIG_ENDIAN)
+#define ___DSP_DUAL_16BIT_ALLOC(a,b) u16 b; u16 a;
+#else
+#error Not __LITTLE_ENDIAN and not __BIG_ENDIAN, then what ???
+#endif
+#endif
+
 /* This structs are used internally by the SP */
 
 typedef struct _basic_dma_req_t {
@@ -60,11 +72,14 @@ typedef struct _scatter_gather_ext_t {
 } scatter_gather_ext_t;
 
 typedef struct _volume_control_t {
-	u16 rightTarg;     /* Target volume for left & right channels */
-	u16 leftTarg;
-
-	u16 rightVol;       /* Current left & right channel volumes */
-	u16 leftVol;
+	___DSP_DUAL_16BIT_ALLOC(
+	   rightTarg,  /* Target volume for left & right channels */
+	   leftTarg
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	   rightVol,   /* Current left & right channel volumes */
+	   leftVol
+	)
 } volume_control_t;
 
 /* Generic stream control block (SCB) structure definition */
@@ -95,15 +110,17 @@ typedef struct _generic_scb_t {
 	/* Sublist pointer & next stream control block (SCB) link.
 	   Initialized & modified by the host R/O for the DSP task
 	*/
-	u16 next_scb;     /* REQUIRED */
-	u16 sub_list_ptr; /* REQUIRED */
-
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,     /* REQUIRED */
+	    sub_list_ptr  /* REQUIRED */
+	)
   
 	/* Pointer to this tasks parameter block & stream function pointer 
 	   Initialized by the host  R/O for the DSP task */
-	u16 entry_point;  /* REQUIRED */
-	u16 this_spb;     /* REQUIRED */
-
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,  /* REQUIRED */
+	    this_spb      /* REQUIRED */
+	)
 
 	/* rsConfig register for stream buffer (rsDMA reg. 
 	   is loaded from basicReq.daw for incoming streams, or 
@@ -176,59 +193,78 @@ typedef struct _spos_control_block_t {
 		    This rule does not apply to one off boot time initialisation prior to starting the SP
 	*/
 
- 
+
+	___DSP_DUAL_16BIT_ALLOC( 
 	/* First element on the Hyper forground task tree */
-	u16 hfg_tree_root_ptr;   /* HOST */			    
+	    hfg_tree_root_ptr,  /* HOST */			    
 	/* First 3 dwords are written by the host and read-only on the DSP */
-	u16 hfg_stack_base;     /* HOST */
+	    hfg_stack_base      /* HOST */
+	)
 
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Point to this data structure to enable easy access */
-	u16 spos_cb_ptr;		   /* SP */
-	u16 prev_task_tree_ptr;  /* SP && HOST */
+	    spos_cb_ptr,	 /* SP */
+	    prev_task_tree_ptr   /* SP && HOST */
+	)
 
-
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Currently Unused */
-	u16 xxinterval_timer_period;   
+	    xxinterval_timer_period,
 	/* Enable extension of SPOS data structure */
-	u16 HFGSPB_ptr;
+	    HFGSPB_ptr
+	)
 
 
-	u16 xxnum_HFG_ticks_thisInterval; 
+	___DSP_DUAL_16BIT_ALLOC(
+	    xxnum_HFG_ticks_thisInterval,
 	/* Modified by the DSP */
-	u16 xxnum_tntervals;
+	    xxnum_tntervals
+	)
 
 
 	/* Set by DSP upon encountering a trap (breakpoint) or a spurious
 	   interrupt.  The host must clear this dword after reading it
 	   upon receiving spInt1. */
-	u16 spurious_int_flag;	 /* (Host & SP) Nature of the spurious interrupt */
-	u16 trap_flag;             /* (Host & SP) Nature of detected Trap */
+	___DSP_DUAL_16BIT_ALLOC(
+	    spurious_int_flag,	 /* (Host & SP) Nature of the spurious interrupt */
+	    trap_flag            /* (Host & SP) Nature of detected Trap */
+	)
 
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused2,					
+	    invalid_IP_flag        /* (Host & SP ) Indicate detection of invalid instruction pointer */
+	)
 
-	u16 unused2;					
-	u16 invalid_IP_flag;       /* (Host & SP ) Indicate detection of invalid instruction pointer */
-
-
+	___DSP_DUAL_16BIT_ALLOC(
 	/* pointer to forground task tree header for use in next task search */
-	u16 fg_task_tree_hdr_ptr;	  /* HOST */		
+	    fg_task_tree_hdr_ptr,	  /* HOST */		
 	/* Data structure for controlling synchronous link update */
-	u16  hfg_sync_update_ptr;   /* HOST */
+	    hfg_sync_update_ptr           /* HOST */
+	)
   
-	u16  begin_foreground_FCNT;  /* SP */
+	___DSP_DUAL_16BIT_ALLOC(
+	     begin_foreground_FCNT,  /* SP */
 	/* Place holder for holding sleep timing */
-	u16  last_FCNT_before_sleep; /* SP */
+	     last_FCNT_before_sleep  /* SP */
+	)
 
-	u16 unused7;           /* SP */
-	u16 next_task_treePtr; /* SP */
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused7,           /* SP */
+	    next_task_treePtr  /* SP */
+	)
 
-	u32  nused5;        
+	u32 unused5;        
 
-	u16 active_flags;	   /* SP */
+	___DSP_DUAL_16BIT_ALLOC(
+	    active_flags,   /* SP */
 	/* State flags, used to assist control of execution of Hyper Forground */
-	u16 HFG_flags;       /* SP */
+	    HFG_flags       /* SP */
+	)
 
-	u16 unused9;
-	u16 unused8;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused9,
+	    unused8
+	)
                               
 	/* Space for saving enough context so that we can set up enough 
 	   to save some more context.
@@ -261,16 +297,21 @@ typedef struct _timing_master_scb_t {
 	/* First 12 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;     /* REQUIRED */
-	u16 sub_list_ptr; /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,     /* REQUIRED */
+	    sub_list_ptr  /* REQUIRED */
+	)
 
-	u16 entry_point;  /* REQUIRED */
-	u16 this_spb;     /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,  /* REQUIRED */
+	    this_spb      /* REQUIRED */
+	)
 
-
+	___DSP_DUAL_16BIT_ALLOC(
 	/* Initial values are 0000:xxxx */
-	u16 reserved;  
-	u16 extra_sample_accum;
+ 	    reserved,
+	    extra_sample_accum
+	)
 
   
 	/* Initial values are xxxx:0000
@@ -281,9 +322,10 @@ typedef struct _timing_master_scb_t {
 	       resynchronize the FIFO pointer
 	       upon start/restart) 
 	*/
-	u16 codec_FIFO_syncd; 
-	u16 codec_FIFO_ptr;
-
+	___DSP_DUAL_16BIT_ALLOC(
+	    codec_FIFO_syncd, 
+	    codec_FIFO_ptr
+	)
   
 	/* Init. 8000:0005 for 44.1k
                  8000:0001 for 48k
@@ -292,8 +334,10 @@ typedef struct _timing_master_scb_t {
 	       processed in the current group of
 	       frames
 	*/
-	u16 frac_samp_accum_qm1;
-	u16 TM_frms_left_in_group; 
+	___DSP_DUAL_16BIT_ALLOC(
+	    frac_samp_accum_qm1,
+	    TM_frms_left_in_group
+	) 
 
 	/* Init. 0001:0005 for 44.1k
                  0000:0001 for 48k
@@ -303,8 +347,10 @@ typedef struct _timing_master_scb_t {
 	       nsamp_per_frm_q15
 	   lo: Number of frames in the group
 	*/
-	u16 frac_samp_correction_qm1;
-	u16 TM_frm_group_length; 
+	___DSP_DUAL_16BIT_ALLOC(
+	    frac_samp_correction_qm1,
+	    TM_frm_group_length  
+	)
 
 	/* Init. 44.1k*65536/8k = 0x00058333 for 44.1k
                  48k*65536/8k = 0x00060000 for 48k
@@ -319,13 +365,18 @@ typedef struct _codec_output_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_rs_config; /* REQUIRED */
+
 	u32 strm_buf_ptr;   /* REQUIRED */
 
 	/* NOTE: The CODEC output task reads samples from the first task on its
@@ -347,8 +398,10 @@ typedef struct _codec_output_scb_t {
 	       to which the right-channel samples
 	       are to be written.
 	*/
-	u16 left_chan_base_IO_addr;
-	u16 right_chan_IO_disp; 
+	___DSP_DUAL_16BIT_ALLOC(
+	    left_chan_base_IO_addr,
+	    right_chan_IO_disp
+	)
 
 
 	/* Init: 0x0080:0004 for non-AC-97
@@ -359,12 +412,16 @@ typedef struct _codec_output_scb_t {
 	       16-bit input sample to obtain the
 	       32-bit output word
 	*/
-	u16 CO_scale_shift_count; 
-	u16 CO_exp_vol_change_rate;
+	___DSP_DUAL_16BIT_ALLOC(
+	    CO_scale_shift_count, 
+	    CO_exp_vol_change_rate
+	)
 
 	/* Pointer to SCB at end of input chain */
-	u16 reserved;
-	u16 last_sub_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    reserved,
+	    last_sub_ptr
+	)
 } codec_output_scb_t;
 
 /* SCB for CODEC input algorithm */
@@ -372,11 +429,15 @@ typedef struct _codec_input_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_rs_config; /* REQUIRED */
 	u32 strm_buf_ptr;   /* REQUIRED */
@@ -402,17 +463,20 @@ typedef struct _codec_input_scb_t {
 	       to which the right-channel samples
 	       are to be written.
 	*/
-	u16 rightChanINdisp; 
-	u16 left_chan_base_IN_addr;
-
+	___DSP_DUAL_16BIT_ALLOC(
+	    rightChanINdisp, 
+	    left_chan_base_IN_addr
+	)
 	/* Init. ?:fffc
 	   lo: Negative shift count to shift the
 	       32-bit input dword to obtain the
 	       16-bit sample msb-aligned (count
 	       is negative to shift left)
 	*/
-	u16 scaleShiftCount; 
-	u16 reserver1;
+	___DSP_DUAL_16BIT_ALLOC(
+	    scaleShiftCount, 
+	    reserver1
+	)
 
 	u32  reserved2;
 } codec_input_scb_t;
@@ -422,11 +486,15 @@ typedef struct _pcm_serial_input_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_buf_ptr;   /* REQUIRED */
 	u32 strm_rs_config; /* REQUIRED */
@@ -438,8 +506,10 @@ typedef struct _pcm_serial_input_scb_t {
 	   lo: Flag indicating the link to the CODEC
 	       input task is to be initialized
 	*/
-	u16 init_codec_input_link; 
-	u16 codec_input_buf_scb;
+	___DSP_DUAL_16BIT_ALLOC(
+	    init_codec_input_link,
+	    codec_input_buf_scb
+	)
 
 	/* Initialized by the host (host updates target volumes) */
 	volume_control_t psi_vol_ctrl;   
@@ -447,36 +517,54 @@ typedef struct _pcm_serial_input_scb_t {
 } pcm_serial_input_scb_t;
 
 typedef struct _src_task_scb_t {
-	u16 frames_left_in_gof;
-	u16 gofs_left_in_sec;
+	___DSP_DUAL_16BIT_ALLOC(
+	    frames_left_in_gof,
+	    gofs_left_in_sec
+	)
 
-	u16 const2_thirds;
-	u16 num_extra_tnput_samples;
+	___DSP_DUAL_16BIT_ALLOC(
+	    const2_thirds,
+	    num_extra_tnput_samples
+	)
 
-	u16 cor_per_gof;
-	u16 correction_per_sec;
+	___DSP_DUAL_16BIT_ALLOC(
+	    cor_per_gof,
+	    correction_per_sec 
+	)
 
-	u16 output_buf_producer_ptr;  
-	u16 junk_DMA_MID;
+	___DSP_DUAL_16BIT_ALLOC(
+	    output_buf_producer_ptr,  
+	    junk_DMA_MID
+	)
 
-	u16 gof_length;  
-	u16 gofs_per_sec;
-  
+	___DSP_DUAL_16BIT_ALLOC(
+	    gof_length,  
+	    gofs_per_sec
+	)
+
 	u32 input_buf_strm_config;
 
-	u16 reserved_for_SRC_use;
-	u16 input_buf_consumer_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    reserved_for_SRC_use,
+	    input_buf_consumer_ptr
+	)
 
 	u32 accum_phi;
 
-	u16 exp_src_vol_change_rate;
-	u16 input_buf_producer_ptr;
-  
-	u16 src_next_scb;
-	u16 src_sub_list_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    exp_src_vol_change_rate,
+	    input_buf_producer_ptr
+	)
 
-	u16 src_entry_point;
-	u16 src_this_sbp;
+	___DSP_DUAL_16BIT_ALLOC(
+	    src_next_scb,
+	    src_sub_list_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    src_entry_point,
+	    src_this_sbp
+	)
 
 	u32  src_strm_rs_config;
 	u32  src_strm_buf_ptr;
@@ -490,26 +578,34 @@ typedef struct _decimate_by_pow2_scb_t {
 	/* decimationFactor = 2, 4, or 8 (larger factors waste too much memory
 	                                  when compared to cascading decimators)
 	*/
-	u16 dec2_coef_base_ptr;
-	u16 dec2_coef_increment;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_coef_base_ptr,
+	    dec2_coef_increment
+	)
+
 	/* coefIncrement = 128 / decimationFactor (for our ROM filter)
 	   coefBasePtr = 0x8000 (for our ROM filter)
 	*/
-
-	u16 dec2_in_samples_per_out_triplet;
-	u16 dec2_extra_in_samples;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_in_samples_per_out_triplet,
+	    dec2_extra_in_samples
+	)
 	/* extraInSamples: # of accumulated, unused input samples (init. to 0)
 	   inSamplesPerOutTriplet = 3 * decimationFactor
 	*/
 
-	u16 dec2_const2_thirds;
-	u16 dec2_half_num_taps_mp5;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_const2_thirds,
+	    dec2_half_num_taps_mp5
+	)
 	/* halfNumTapsM5: (1/2 number of taps in decimation filter) minus 5
 	   const2thirds: constant 2/3 in 16Q0 format (sign.15)
 	*/
 
-	u16 dec2_output_buf_producer_ptr;
-	u16 dec2_junkdma_mid;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_output_buf_producer_ptr,
+	    dec2_junkdma_mid
+	)
 
 	u32  dec2_reserved2;
 
@@ -518,26 +614,34 @@ typedef struct _decimate_by_pow2_scb_t {
 	   (buffer size = decimationFactor * 32 dwords)
 	*/
 
-	u16 dec2_phi_incr;
-	u16 dec2_input_buf_consumer_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_phi_incr,
+	    dec2_input_buf_consumer_ptr
+	)
 	/* inputBufConsumerPtr: Input buffer read pointer (into SRC filter)
 	   phiIncr = decimationFactor * 4
 	*/
 
 	u32 dec2_reserved3;
 
-	u16 dec2_exp_vol_change_rate;
-	u16 dec2_input_buf_producer_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_exp_vol_change_rate,
+	    dec2_input_buf_producer_ptr
+	)
 	/* inputBufProducerPtr: Input buffer write pointer
 	   expVolChangeRate: Exponential volume change rate for possible
 	                     future mixer on input streams
 	*/
 
-	u16 dec2_next_scb;
-	u16 dec2_sub_list_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_next_scb,
+	    dec2_sub_list_ptr
+	)
 
-	u16 dec2_entry_point;
-	u16 dec2_this_spb;
+	___DSP_DUAL_16BIT_ALLOC(
+	    dec2_entry_point,
+	    dec2_this_spb
+	)
 
 	u32  dec2_strm_rs_config;
 	u32  dec2_strm_buf_ptr;
@@ -548,23 +652,32 @@ typedef struct _decimate_by_pow2_scb_t {
 } decimate_by_pow2_scb_t;
 
 typedef struct _vari_decimate_scb_t {
-	u16 vdec_frames_left_in_gof;
-	u16 vdec_gofs_left_in_sec;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_frames_left_in_gof,
+	    vdec_gofs_left_in_sec
+	)
 
-	u16 vdec_const2_thirds;
-	u16 vdec_extra_in_samples;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_const2_thirds,
+	    vdec_extra_in_samples
+	)
 	/* extraInSamples: # of accumulated, unused input samples (init. to 0)
 	   const2thirds: constant 2/3 in 16Q0 format (sign.15) */
 
-	u16 vdec_cor_per_gof;
-	u16 vdec_correction_per_sec;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_cor_per_gof,
+	    vdec_correction_per_sec
+	)
 
-	u16 vdec_output_buf_producer_ptr;
-	u16 vdec_input_buf_consumer_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_output_buf_producer_ptr,
+	    vdec_input_buf_consumer_ptr
+	)
 	/* inputBufConsumerPtr: Input buffer read pointer (into SRC filter) */
-
-	u16 vdec_gof_length;
-	u16 vdec_gofs_per_sec;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_gof_length,
+	    vdec_gofs_per_sec
+	)
 
 	u32  vdec_input_buf_strm_config;
 	/* inputBufStrmConfig: rsConfig for the input buffer to the decimator
@@ -575,17 +688,23 @@ typedef struct _vari_decimate_scb_t {
 	u32  vdec_accumphi;
 	/* accumPhi: accumulated fractional phase increment (6.26) */
 
-	u16 vdec_exp_vol_change_rate;
-	u16 vdec_input_buf_producer_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+ 	    vdec_exp_vol_change_rate,
+	    vdec_input_buf_producer_ptr
+	)
 	/* inputBufProducerPtr: Input buffer write pointer
 	   expVolChangeRate: Exponential volume change rate for possible
 	   future mixer on input streams */
 
-	u16 vdec_next_scb;
-	u16 vdec_sub_list_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_next_scb,
+	    vdec_sub_list_ptr
+	)
 
-	u16 vdec_entry_point;
-	u16 vdec_this_spb;
+	___DSP_DUAL_16BIT_ALLOC(
+	    vdec_entry_point,
+	    vdec_this_spb
+	)
 
 	u32 vdec_strm_rs_config;
 	u32 vdec_strm_buf_ptr;
@@ -601,11 +720,15 @@ typedef struct _mix2_ostream_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_rs_config; /* REQUIRED */
 	u32 strm_buf_ptr;   /* REQUIRED */
@@ -617,18 +740,24 @@ typedef struct _mix2_ostream_scb_t {
 	       processed in the current group of
 	       frames
 	*/
-	u16 frames_left_in_group;
-	u16 accum_input_triplets;
+	___DSP_DUAL_16BIT_ALLOC(
+	    frames_left_in_group,
+	    accum_input_triplets
+	)
 
 	/* hi: Exponential volume change rate
 	       for mixer on input streams
 	   lo: Number of frames in the group
 	*/
-	u16 frame_group_length;
-	u16 exp_vol_change_rate;
+	___DSP_DUAL_16BIT_ALLOC(
+	    frame_group_length,
+	    exp_vol_change_rate
+	)
   
-	u16 const_FFFF;
-	u16 const_zero;
+	___DSP_DUAL_16BIT_ALLOC(
+	    const_FFFF,
+	    const_zero
+	)
 } mix2_ostream_scb_t;
 
 
@@ -637,11 +766,15 @@ typedef struct _mix_only_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_rs_config; /* REQUIRED */
 	u32 strm_buf_ptr;   /* REQUIRED */
@@ -668,30 +801,40 @@ typedef struct _async_codec_input_scb_t {
 	u32  ostrm_rs_config;
 	u32  ostrm_buf_ptr;
   
-	u16 io_sclks_per_lr_clk;
-	u16 io_io_enable;
+	___DSP_DUAL_16BIT_ALLOC(
+	    io_sclks_per_lr_clk,
+	    io_io_enable
+	)
 
 	u32  io_free4;
-  
-	u16 io_next_scb;
-	u16 io_sub_list_ptr;
 
-	u16 io_entry_point;
-	u16 io_this_spb;
+	___DSP_DUAL_16BIT_ALLOC(  
+	    io_next_scb,
+	    io_sub_list_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    io_entry_point,
+	    io_this_spb
+	)
 
 	u32 istrm_rs_config;
 	u32 istrm_buf_ptr;
 
 	/* Init. 0000:8042: for ASER1
                  0000:8044: for ASER2  */
-	u16 io_stat_reg_addr;
-	u16 iofifo_pointer;
+	___DSP_DUAL_16BIT_ALLOC(
+	    io_stat_reg_addr,
+	    iofifo_pointer
+	)
 
 	/* Init 1 stero:100 ASER1
 	   Init 0 mono:110 ASER2 
 	*/
-	u16 ififo_base_addr;            
-	u16 ist_mo_format;
+	___DSP_DUAL_16BIT_ALLOC(
+	    ififo_base_addr,            
+	    ist_mo_format
+	)
 
 	u32 i_free;
 } async_codec_input_scb_t;
@@ -699,43 +842,59 @@ typedef struct _async_codec_input_scb_t {
 
 /* SCB for the SP/DIF CODEC input and output */
 typedef struct _spdifiscb_t {
-	u16 status_ptr;     
-	u16 status_start_ptr;
-  
+	___DSP_DUAL_16BIT_ALLOC(
+	    status_ptr,     
+	    status_start_ptr
+	)
+
 	u32 current_total;
 	u32 previous_total;
 
-	u16 count;
-	u16 count_limit;
-  
+	___DSP_DUAL_16BIT_ALLOC(
+	    count,
+	    count_limit
+	)
+
 	u32 status_data;
-  
-	u16 status;
-	u16 free4;
+
+	___DSP_DUAL_16BIT_ALLOC(  
+	    status,
+	    free4
+	)
 
 	u32 free3;
-  
-	u16 free2;
-	u16 bit_count;
+
+	___DSP_DUAL_16BIT_ALLOC(  
+	    free2,
+	    bit_count
+	)
 
 	u32  temp_status;
   
-	u16 next_SCB;
-	u16 sub_list_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_SCB,
+	    sub_list_ptr
+	)
 
-	u16 entry_point;
-	u16 this_spb;
-  
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,
+	    this_spb
+	)
+
 	u32  strm_rs_config;
 	u32  strm_buf_ptr;
   
-	u16 stat_reg_addr; 
-	u16 fifo_pointer;
-  
-	u16 fifo_base_addr; 
-	u16 st_mo_format;
-  
-	u32  Free1;
+	___DSP_DUAL_16BIT_ALLOC(
+	    stat_reg_addr, 
+	    fifo_pointer
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    fifo_base_addr, 
+	    st_mo_format
+	)
+
+	u32  free1;
 } spdifiscb_t;
 
 
@@ -751,93 +910,132 @@ typedef struct _spdifoscb_t {
 	u32 strm_rs_config;
                                
 	u32 strm_buf_ptr;
-  
-	u16 status;
-	u16 free5;
+
+	___DSP_DUAL_16BIT_ALLOC(  
+	    status,
+	    free5
+	)
 
 	u32 free4;
-  
-	u16 next_scb;
-	u16 sub_list_ptr;
 
-	u16 entry_point;
-	u16 this_spb;
-  
+	___DSP_DUAL_16BIT_ALLOC(  
+	    next_scb,
+	    sub_list_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,
+	    this_spb
+	)
+
 	u32 free6[2];
   
-	u16 stat_reg_addr; 
-	u16 fifo_pointer;
-  
-	u16 fifo_base_addr;
-	u16 st_mo_format;
-  
+	___DSP_DUAL_16BIT_ALLOC(
+	    stat_reg_addr, 
+	    fifo_pointer
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    fifo_base_addr,
+	    st_mo_format
+	)
+
 	u32  free1;                                         
 } spdifoscb_t;
 
 
 
 typedef struct _asynch_fg_rx_scb_t {
+	___DSP_DUAL_16BIT_ALLOC(
+	    bot_buf_mask,
+	    buf_Mask
+	)
 
-	u16 bot_buf_mask;
-	u16 buf_Mask;
+	___DSP_DUAL_16BIT_ALLOC(
+	    max,
+	    min
+	)
 
-	u16 max;
-	u16 min;
-  
-	u16 old_producer_pointer;
-	u16 hfg_scb_ptr;
-	
-	u16 delta;
-	u16 adjust_count;
-     
+	___DSP_DUAL_16BIT_ALLOC(
+	    old_producer_pointer,
+	    hfg_scb_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    delta,
+	    adjust_count
+	)
+
 	u32 unused2[5];  
-  
-	u16 sibling_ptr;  
-	u16 child_ptr;
-  
-	u16 code_ptr;
-	u16 this_ptr;
-  
+
+	___DSP_DUAL_16BIT_ALLOC(  
+	    sibling_ptr,  
+	    child_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	    code_ptr,
+	    this_ptr
+	)
+
 	u32 strm_rs_config; 
 
 	u32 strm_buf_ptr;
   
 	u32 unused_phi_incr;
   
-	u16 righttarg;   
-	u16 left_targ;
+	___DSP_DUAL_16BIT_ALLOC(
+	    right_targ,   
+	    left_targ
+	)
 
-	u16 rightVol;
-	u16 leftVol;
+	___DSP_DUAL_16BIT_ALLOC(
+	    right_vol,
+	    left_vol
+	)
 } asynch_fg_rx_scb_t;
 
 
 
 typedef struct _asynch_fg_tx_scb_t {
-	u16 not_buf_mask;
-	u16 buf_mask;
+	___DSP_DUAL_16BIT_ALLOC(
+	    not_buf_mask,
+	    buf_mask
+	)
 
-	u16 Max;                   
-	u16 min;
+	___DSP_DUAL_16BIT_ALLOC(
+	    max,
+	    min
+	)
 
-	u16 unused1;
-	u16 hfg_scb_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused1,
+	    hfg_scb_ptr
+	)
 
-	u16 delta;
-	u16 adjust_count;
+	___DSP_DUAL_16BIT_ALLOC(
+	    delta,
+	    adjust_count
+	)
 
 	u32 accum_phi;
 
-	u16 unused2;
-	u16 const_one_third;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused2,
+	    const_one_third
+	)
 
 	u32 unused3[3];
 
-	u16 sibling_ptr;
-	u16 child_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    sibling_ptr,
+	    child_ptr
+	)
 
-	u16 codePtr;
-	u16 this_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    codePtr,
+	    this_ptr
+	)
 
 	u32 strm_rs_config;
 
@@ -845,11 +1043,15 @@ typedef struct _asynch_fg_tx_scb_t {
 
 	u32 phi_incr;
 
-	u16 unused_right_targ;
-	u16 unused_left_targ;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused_right_targ,
+	    unused_left_targ
+	)
 
-	u16 unused_right_vol;
-	u16 unused_left_vol;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused_right_vol,
+	    unused_left_vol
+	)
 } asynch_fg_tx_scb_t;
 
 
@@ -857,49 +1059,67 @@ typedef struct _output_snoop_scb_t {
 	/* First 13 dwords from generic_scb_t */
 	basic_dma_req_t  basic_req;  /* Optional */
 	scatter_gather_ext_t sg_ext;  /* Optional */
-	u16 next_scb;       /* REQUIRED */
-	u16 sub_list_ptr;   /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,       /* REQUIRED */
+	    sub_list_ptr    /* REQUIRED */
+	)
 
-	u16 entry_point;    /* REQUIRED */
-	u16 this_spb;       /* REQUIRED */
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,    /* REQUIRED */
+	    this_spb        /* REQUIRED */
+	)
 
 	u32 strm_rs_config; /* REQUIRED */
 	u32 strm_buf_ptr;   /* REQUIRED */
 
-	u16 init_snoop_input_link;
-	u16 snoop_child_input_scb;
+	___DSP_DUAL_16BIT_ALLOC(
+	    init_snoop_input_link,
+	    snoop_child_input_scb
+	)
 
 	u32 snoop_input_buf_ptr;
 
-	u16 reserved;
-	u16 input_scb;
+	___DSP_DUAL_16BIT_ALLOC(
+	    reserved,
+	    input_scb
+	)
 } output_snoop_scb_t;
 
 typedef struct _spio_write_scb_t {
-	u16 address1;
-	u16 address2;
+	___DSP_DUAL_16BIT_ALLOC(
+	    address1,
+	    address2
+	)
 
 	u32 data1;
 
 	u32 data2;
 
-	u16 address3;
-	u16 address4;
+	___DSP_DUAL_16BIT_ALLOC(
+	    address3,
+	    address4
+	)
 
 	u32 data3;
 
 	u32 data4;
 
-	u16 unused1;
-	u16 data_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    unused1,
+	    data_ptr
+	)
 
 	u32 unused2[2];
 
-	u16 sibling_ptr;
-	u16 child_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    sibling_ptr,
+	    child_ptr
+	)
 
-	u16 entry_point;
-	u16 this_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,
+	    this_ptr
+	)
 
 	u32 unused3[5];
 } spio_write_scb_t;
@@ -920,11 +1140,15 @@ typedef struct _magic_snoop_task_t {
 
 	u32 i7;
 
-	u16 next_scb;
-	u16 sub_list_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    next_scb,
+	    sub_list_ptr
+	)
 
-	u16 entry_point;
-	u16 this_ptr;
+	___DSP_DUAL_16BIT_ALLOC(
+	    entry_point,
+	    this_ptr
+	)
 
 	u32 strm_buf_config;
 	u32 strm_buf_ptr2;
@@ -933,4 +1157,60 @@ typedef struct _magic_snoop_task_t {
 
 	volume_control_t vdec_vol_ctrl;
 } magic_snoop_task_t;
+
+
+typedef struct _filter_scb_t {
+	___DSP_DUAL_16BIT_ALLOC(
+	      a0_right,          /* 0x00 */
+	      a0_left
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	      a1_right,          /* 0x01 */
+	      a1_left
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	      a2_right,          /* 0x02 */
+	      a2_left
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+	      output_buf_ptr,    /* 0x03 */
+	      init
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	      filter_unused3,    /* 0x04 */
+	      filter_unused2
+	)
+
+	u32 prev_sample_output1; /* 0x05 */
+	u32 prev_sample_output2; /* 0x06 */
+	u32 prev_sample_input1;  /* 0x07 */
+	u32 prev_sample_input2;  /* 0x08 */
+
+	___DSP_DUAL_16BIT_ALLOC(
+	      next_scb_ptr,      /* 0x09 */
+	      sub_list_ptr
+	)
+
+	___DSP_DUAL_16BIT_ALLOC(
+	      entry_point,       /* 0x0A */
+	      spb_ptr
+	)
+
+	u32  strm_rs_config;     /* 0x0B */
+	u32  strm_buf_ptr;       /* 0x0C */
+
+	___DSP_DUAL_16BIT_ALLOC(
+              b0_right,          /* 0x0D */
+	      b0_left
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+              b1_right,          /* 0x0E */
+	      b1_left
+	)
+	___DSP_DUAL_16BIT_ALLOC(
+              b2_right,          /* 0x0F */
+	      b2_left
+	)
+} filter_scb_t;
 #endif /* __DSP_SCB_TYPES_H__ */

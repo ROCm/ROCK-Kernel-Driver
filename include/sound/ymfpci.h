@@ -174,6 +174,28 @@
 #define YDSXG_CAPTURE_VOICES		2
 #define YDSXG_EFFECT_VOICES		5
 
+#define YMFPCI_LEGACY_SBEN	(1 << 0)	/* soundblaster enable */
+#define YMFPCI_LEGACY_FMEN	(1 << 1)	/* OPL3 enable */
+#define YMFPCI_LEGACY_JPEN	(1 << 2)	/* joystick enable */
+#define YMFPCI_LEGACY_MEN	(1 << 3)	/* MPU401 enable */
+#define YMFPCI_LEGACY_MIEN	(1 << 4)	/* MPU RX irq enable */
+#define YMFPCI_LEGACY_IOBITS	(1 << 5)	/* i/o bits range, 0 = 16bit, 1 =10bit */
+#define YMFPCI_LEGACY_SDMA	(3 << 6)	/* SB DMA select */
+#define YMFPCI_LEGACY_SBIRQ	(7 << 8)	/* SB IRQ select */
+#define YMFPCI_LEGACY_MPUIRQ	(7 << 11)	/* MPU IRQ select */
+#define YMFPCI_LEGACY_SIEN	(1 << 14)	/* serialized IRQ */
+#define YMFPCI_LEGACY_LAD	(1 << 15)	/* legacy audio disable */
+
+#define YMFPCI_LEGACY2_FMIO	(3 << 0)	/* OPL3 i/o address (724/740) */
+#define YMFPCI_LEGACY2_SBIO	(3 << 2)	/* SB i/o address (724/740) */
+#define YMFPCI_LEGACY2_MPUIO	(3 << 4)	/* MPU401 i/o address (724/740) */
+#define YMFPCI_LEGACY2_JSIO	(3 << 6)	/* joystick i/o address (724/740) */
+#define YMFPCI_LEGACY2_MAIM	(1 << 8)	/* MPU401 ack intr mask */
+#define YMFPCI_LEGACY2_SMOD	(3 << 11)	/* SB DMA mode */
+#define YMFPCI_LEGACY2_SBVER	(3 << 13)	/* SB version select */
+#define YMFPCI_LEGACY2_IMOD	(1 << 15)	/* legacy IRQ mode */
+/* SIEN:IMOD 0:0 = legacy irq, 0:1 = INTA, 1:0 = serialized IRQ */
+
 /*
  *
  */
@@ -283,6 +305,8 @@ struct _snd_ymfpci {
 	unsigned long reg_area_phys;
 	unsigned long reg_area_virt;
 	struct resource *res_reg_area;
+	struct resource *fm_res;
+	struct resource *mpu_res;
 
 	unsigned short old_legacy_ctrl;
 	unsigned int joystick_port;

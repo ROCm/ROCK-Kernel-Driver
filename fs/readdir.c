@@ -58,7 +58,7 @@ struct old_linux_dirent {
 };
 
 struct readdir_callback {
-	struct old_linux_dirent * dirent;
+	struct old_linux_dirent __user * dirent;
 	int count;
 };
 
@@ -66,7 +66,7 @@ static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset
 		      ino_t ino, unsigned int d_type)
 {
 	struct readdir_callback * buf = (struct readdir_callback *) __buf;
-	struct old_linux_dirent * dirent;
+	struct old_linux_dirent __user * dirent;
 
 	if (buf->count)
 		return -EINVAL;
@@ -85,7 +85,7 @@ static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset
 	return 0;
 }
 
-asmlinkage long old_readdir(unsigned int fd, void * dirent, unsigned int count)
+asmlinkage long old_readdir(unsigned int fd, struct old_linux_dirent __user * dirent, unsigned int count)
 {
 	int error;
 	struct file * file;
@@ -122,8 +122,8 @@ struct linux_dirent {
 };
 
 struct getdents_callback {
-	struct linux_dirent * current_dir;
-	struct linux_dirent * previous;
+	struct linux_dirent __user * current_dir;
+	struct linux_dirent __user * previous;
 	int count;
 	int error;
 };
@@ -131,7 +131,7 @@ struct getdents_callback {
 static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 		   ino_t ino, unsigned int d_type)
 {
-	struct linux_dirent * dirent;
+	struct linux_dirent __user * dirent;
 	struct getdents_callback * buf = (struct getdents_callback *) __buf;
 	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
 
@@ -161,10 +161,10 @@ efault:
 	return -EFAULT;
 }
 
-asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count)
+asmlinkage long sys_getdents(unsigned int fd, struct linux_dirent __user * dirent, unsigned int count)
 {
 	struct file * file;
-	struct linux_dirent * lastdirent;
+	struct linux_dirent __user * lastdirent;
 	struct getdents_callback buf;
 	int error;
 
@@ -177,7 +177,7 @@ asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count)
 	if (!file)
 		goto out;
 
-	buf.current_dir = (struct linux_dirent *) dirent;
+	buf.current_dir = dirent;
 	buf.previous = NULL;
 	buf.count = count;
 	buf.error = 0;
@@ -203,8 +203,8 @@ out:
 #define ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
 
 struct getdents_callback64 {
-	struct linux_dirent64 * current_dir;
-	struct linux_dirent64 * previous;
+	struct linux_dirent64 __user * current_dir;
+	struct linux_dirent64 __user * previous;
 	int count;
 	int error;
 };
@@ -212,7 +212,7 @@ struct getdents_callback64 {
 static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 		     ino_t ino, unsigned int d_type)
 {
-	struct linux_dirent64 *dirent;
+	struct linux_dirent64 __user *dirent;
 	struct getdents_callback64 * buf = (struct getdents_callback64 *) __buf;
 	int reclen = ROUND_UP64(NAME_OFFSET(dirent) + namlen + 1);
 
@@ -246,10 +246,10 @@ efault:
 	return -EFAULT;
 }
 
-asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int count)
+asmlinkage long sys_getdents64(unsigned int fd, struct linux_dirent64 __user * dirent, unsigned int count)
 {
 	struct file * file;
-	struct linux_dirent64 * lastdirent;
+	struct linux_dirent64 __user * lastdirent;
 	struct getdents_callback64 buf;
 	int error;
 
@@ -262,7 +262,7 @@ asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int coun
 	if (!file)
 		goto out;
 
-	buf.current_dir = (struct linux_dirent64 *) dirent;
+	buf.current_dir = dirent;
 	buf.previous = NULL;
 	buf.count = count;
 	buf.error = 0;
@@ -273,9 +273,8 @@ asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int coun
 	error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
-		struct linux_dirent64 d;
-		d.d_off = file->f_pos;
-		__put_user(d.d_off, &lastdirent->d_off);
+		typeof(lastdirent->d_off) d_off = file->f_pos;
+		__put_user(d_off, &lastdirent->d_off);
 		error = count - buf.count;
 	}
 

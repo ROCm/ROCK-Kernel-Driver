@@ -70,8 +70,6 @@ int snd_opl3_synth_setup(opl3_t * opl3)
 	opl3->use_time = 0;
 	opl3->connection_reg = 0x00;
 	if (opl3->hardware >= OPL3_HW_OPL3) {
-		/* Enter OPL3 mode */
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, OPL3_OPL3_ENABLE);
 		/* Clear 4-op connections */
 		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_CONNECTION_SELECT,
 				 opl3->connection_reg);
@@ -197,7 +195,7 @@ static int snd_opl3_synth_create_port(opl3_t * opl3)
 	callbacks.private_data = opl3;
 
 	opl_ver = (opl3->hardware & OPL3_HW_MASK) >> 8;
-	sprintf(name, "OPL%i Port", opl_ver);
+	sprintf(name, "OPL%i FM Port", opl_ver);
 
 	opl3->chset->client = opl3->seq_client;
 	opl3->chset->port = snd_seq_event_port_attach(opl3->seq_client, &callbacks,

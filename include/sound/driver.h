@@ -27,7 +27,6 @@
 #endif
 
 #include <linux/config.h>
-#include <linux/version.h>
 
 #define SNDRV_CARDS		8	/* number of supported soundcards - don't change - minor numbers */
 

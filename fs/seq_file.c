@@ -43,7 +43,7 @@ int seq_open(struct file *file, struct seq_operations *op)
  *
  *	Ready-made ->f_op->read()
  */
-ssize_t seq_read(struct file *file, char *buf, size_t size, loff_t *ppos)
+ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 {
 	struct seq_file *m = (struct seq_file *)file->private_data;
 	size_t copied = 0;

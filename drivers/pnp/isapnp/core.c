@@ -106,8 +106,6 @@ static int isapnp_detected;
 
 /* some prototypes */
 
-extern struct pnp_protocol isapnp_protocol;
-
 static inline void write_data(unsigned char x)
 {
 	outb(x, _PNPWRP);

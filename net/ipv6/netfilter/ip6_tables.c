@@ -343,6 +343,10 @@ ip6t_do_table(struct sk_buff **pskb,
 	void *table_base;
 	struct ip6t_entry *e, *back;
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* Initialization */
 	ipv6 = (*pskb)->nh.ipv6h;
 	protohdr = (u_int32_t *)((char *)ipv6 + IPV6_HDR_LEN);

@@ -561,7 +561,7 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 
 		} else if (buf[5] == 0x00 && buf[6] == 0x04) {
 			/* master volume */
-			parsed = SNDRV_MIDI_SYSEX_GS_REVERB_MODE;
+			parsed = SNDRV_MIDI_SYSEX_GS_MASTER_VOLUME;
 			chset->gs_master_volume = buf[7];
 
 		}

@@ -154,6 +154,10 @@ ip6t_local_hook(unsigned int hook,
 	}
 #endif
 
+	/* FIXME: Push down to extensions --RR */
+	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+		return NF_DROP;
+
 	/* save source/dest address, nfmark, hoplimit, flowlabel, priority,  */
 	memcpy(&saddr, &(*pskb)->nh.ipv6h->saddr, sizeof(saddr));
 	memcpy(&daddr, &(*pskb)->nh.ipv6h->daddr, sizeof(daddr));

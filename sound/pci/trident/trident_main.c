@@ -1881,7 +1881,7 @@ static int snd_trident_spdif_open(snd_pcm_substream_t * substream)
 		runtime->hw = snd_trident_spdif_7018;
 	}
 
-	trident->spdif_pcm_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	trident->spdif_pcm_ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(trident->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &trident->spdif_pcm_ctl->id);
 
@@ -1920,7 +1920,7 @@ static int snd_trident_spdif_close(snd_pcm_substream_t * substream)
 		outl(temp, TRID_REG(trident, SI_SERIAL_INTF_CTRL));
 	}
 	spin_unlock_irq(&trident->reg_lock);
-	trident->spdif_pcm_ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	trident->spdif_pcm_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(trident->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &trident->spdif_pcm_ctl->id);
 	return 0;
@@ -2677,7 +2677,7 @@ static int snd_trident_pcm_vol_control_get(snd_kcontrol_t * kcontrol,
 					   snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 
 	if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
 		ucontrol->value.integer.value[0] = 1023 - mix->vol;
@@ -2692,7 +2692,7 @@ static int snd_trident_pcm_vol_control_put(snd_kcontrol_t * kcontrol,
 {
 	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned int val;
 	int change = 0;
 
@@ -2715,6 +2715,7 @@ static snd_kcontrol_new_t snd_trident_pcm_vol_control __devinitdata =
 	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name =         "PCM Front Playback Volume",
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.count =	32,
 	.info =		snd_trident_pcm_vol_control_info,
 	.get =		snd_trident_pcm_vol_control_get,
 	.put =		snd_trident_pcm_vol_control_put,
@@ -2738,7 +2739,8 @@ static int snd_trident_pcm_pan_control_info(snd_kcontrol_t *kcontrol, snd_ctl_el
 static int snd_trident_pcm_pan_control_get(snd_kcontrol_t * kcontrol,
 					   snd_ctl_elem_value_t * ucontrol)
 {
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	trident_t *trident = snd_kcontrol_chip(kcontrol);
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 
 	ucontrol->value.integer.value[0] = mix->pan;
 	if (ucontrol->value.integer.value[0] & 0x40) {
@@ -2754,7 +2756,7 @@ static int snd_trident_pcm_pan_control_put(snd_kcontrol_t * kcontrol,
 {
 	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned char val;
 	int change = 0;
 
@@ -2776,6 +2778,7 @@ static snd_kcontrol_new_t snd_trident_pcm_pan_control __devinitdata =
 	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name =         "PCM Pan Playback Control",
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.count =	32,
 	.info =		snd_trident_pcm_pan_control_info,
 	.get =		snd_trident_pcm_pan_control_get,
 	.put =		snd_trident_pcm_pan_control_put,
@@ -2799,7 +2802,8 @@ static int snd_trident_pcm_rvol_control_info(snd_kcontrol_t *kcontrol, snd_ctl_e
 static int snd_trident_pcm_rvol_control_get(snd_kcontrol_t * kcontrol,
 					    snd_ctl_elem_value_t * ucontrol)
 {
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	trident_t *trident = snd_kcontrol_chip(kcontrol);
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 
 	ucontrol->value.integer.value[0] = 127 - mix->rvol;
 	return 0;
@@ -2810,7 +2814,7 @@ static int snd_trident_pcm_rvol_control_put(snd_kcontrol_t * kcontrol,
 {
 	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned short val;
 	int change = 0;
 
@@ -2829,6 +2833,7 @@ static snd_kcontrol_new_t snd_trident_pcm_rvol_control __devinitdata =
 	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name =         "PCM Reverb Playback Volume",
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.count = 	32,
 	.info =		snd_trident_pcm_rvol_control_info,
 	.get =		snd_trident_pcm_rvol_control_get,
 	.put =		snd_trident_pcm_rvol_control_put,
@@ -2852,7 +2857,8 @@ static int snd_trident_pcm_cvol_control_info(snd_kcontrol_t *kcontrol, snd_ctl_e
 static int snd_trident_pcm_cvol_control_get(snd_kcontrol_t * kcontrol,
 					    snd_ctl_elem_value_t * ucontrol)
 {
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	trident_t *trident = snd_kcontrol_chip(kcontrol);
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 
 	ucontrol->value.integer.value[0] = 127 - mix->cvol;
 	return 0;
@@ -2863,7 +2869,7 @@ static int snd_trident_pcm_cvol_control_put(snd_kcontrol_t * kcontrol,
 {
 	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	snd_trident_pcm_mixer_t *mix = (snd_trident_pcm_mixer_t *)kcontrol->private_value;
+	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned short val;
 	int change = 0;
 
@@ -2882,28 +2888,32 @@ static snd_kcontrol_new_t snd_trident_pcm_cvol_control __devinitdata =
 	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name =         "PCM Chorus Playback Volume",
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.count =	32,
 	.info =		snd_trident_pcm_cvol_control_info,
 	.get =		snd_trident_pcm_cvol_control_get,
 	.put =		snd_trident_pcm_cvol_control_put,
 };
 
-static void snd_trident_notify_pcm_change1(snd_card_t * card, snd_kcontrol_t *kctl, int activate)
+static void snd_trident_notify_pcm_change1(snd_card_t * card, snd_kcontrol_t *kctl, int num, int activate)
 {
+	snd_ctl_elem_id_t id;
+
 	snd_runtime_check(kctl != NULL, return);
 	if (activate)
-		kctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+		kctl->vd[num].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	else
-		kctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+		kctl->vd[num].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE |
-		       SNDRV_CTL_EVENT_MASK_INFO, &kctl->id);
+		       SNDRV_CTL_EVENT_MASK_INFO,
+		       snd_ctl_build_ioff(&id, kctl, num));
 }
 
-static void snd_trident_notify_pcm_change(snd_card_t * card, snd_trident_pcm_mixer_t * tmix, int activate)
+static void snd_trident_notify_pcm_change(trident_t *trident, snd_trident_pcm_mixer_t *tmix, int num, int activate)
 {
-	snd_trident_notify_pcm_change1(card, tmix->ctl_vol, activate);
-	snd_trident_notify_pcm_change1(card, tmix->ctl_pan, activate);
-	snd_trident_notify_pcm_change1(card, tmix->ctl_rvol, activate);
-	snd_trident_notify_pcm_change1(card, tmix->ctl_cvol, activate);
+	snd_trident_notify_pcm_change1(trident->card, trident->ctl_vol, num, activate);
+	snd_trident_notify_pcm_change1(trident->card, trident->ctl_pan, num, activate);
+	snd_trident_notify_pcm_change1(trident->card, trident->ctl_rvol, num, activate);
+	snd_trident_notify_pcm_change1(trident->card, trident->ctl_cvol, num, activate);
 }
 
 static int snd_trident_pcm_mixer_build(trident_t *trident, snd_trident_voice_t *voice, snd_pcm_substream_t *substream)
@@ -2917,7 +2927,7 @@ static int snd_trident_pcm_mixer_build(trident_t *trident, snd_trident_voice_t *
 	tmix->pan = T4D_DEFAULT_PCM_PAN;
 	tmix->rvol = T4D_DEFAULT_PCM_RVOL;
 	tmix->cvol = T4D_DEFAULT_PCM_CVOL;
-	snd_trident_notify_pcm_change(trident->card, tmix, 1);
+	snd_trident_notify_pcm_change(trident, tmix, substream->number, 1);
 	return 0;
 }
 
@@ -2928,7 +2938,7 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 	snd_assert(trident != NULL && substream != NULL, return -EINVAL);
 	tmix = &trident->pcm_mixer[substream->number];
 	tmix->voice = NULL;
-	snd_trident_notify_pcm_change(trident->card, tmix, 0);
+	snd_trident_notify_pcm_change(trident, tmix, substream->number, 0);
 	return 0;
 }
 
@@ -3007,34 +3017,26 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 		
 		tmix = &trident->pcm_mixer[idx];
 		tmix->voice = NULL;
-		if ((kctl = tmix->ctl_vol = snd_ctl_new1(&snd_trident_pcm_vol_control, trident)) == NULL)
-			return -ENOMEM;
-		kctl->private_value = (long)tmix;
-		kctl->id.index = idx;
-		if ((err = snd_ctl_add(card, kctl)))
-			return err;
-		
-		if ((kctl = tmix->ctl_pan = snd_ctl_new1(&snd_trident_pcm_pan_control, trident)) == NULL)
-			return -ENOMEM;
-		kctl->private_value = (long)tmix;
-		kctl->id.index = idx;
-		if ((err = snd_ctl_add(card, kctl)))
-			return err;
-
-		if ((kctl = tmix->ctl_rvol = snd_ctl_new1(&snd_trident_pcm_rvol_control, trident)) == NULL)
-			return -ENOMEM;
-		kctl->private_value = (long)tmix;
-		kctl->id.index = idx;
-		if ((err = snd_ctl_add(card, kctl)))
-			return err;
-
-		if ((kctl = tmix->ctl_cvol = snd_ctl_new1(&snd_trident_pcm_cvol_control, trident)) == NULL)
-			return -ENOMEM;
-		kctl->private_value = (long)tmix;
-		kctl->id.index = idx;
-		if ((err = snd_ctl_add(card, kctl)))
-			return err;
 	}
+	if ((trident->ctl_vol = snd_ctl_new1(&snd_trident_pcm_vol_control, trident)) == NULL)
+		return -ENOMEM;
+	if ((err = snd_ctl_add(card, trident->ctl_vol)))
+		return err;
+		
+	if ((trident->ctl_pan = snd_ctl_new1(&snd_trident_pcm_pan_control, trident)) == NULL)
+		return -ENOMEM;
+	if ((err = snd_ctl_add(card, trident->ctl_pan)))
+		return err;
+
+	if ((trident->ctl_rvol = snd_ctl_new1(&snd_trident_pcm_rvol_control, trident)) == NULL)
+		return -ENOMEM;
+	if ((err = snd_ctl_add(card, trident->ctl_rvol)))
+		return err;
+
+	if ((trident->ctl_cvol = snd_ctl_new1(&snd_trident_pcm_cvol_control, trident)) == NULL)
+		return -ENOMEM;
+	if ((err = snd_ctl_add(card, trident->ctl_cvol)))
+		return err;
 
 	if (trident->device == TRIDENT_DEVICE_ID_NX) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_ac97_rear_control, trident))) < 0)
@@ -3187,7 +3189,7 @@ inline static void do_delay(trident_t *chip)
 
 static int snd_trident_sis_reset(trident_t *trident)
 {
-	signed long end_time;
+	unsigned long end_time;
 	unsigned int i;
 	int r;
 
@@ -3364,7 +3366,7 @@ static void snd_trident_stop_all_voices(trident_t *trident)
 static int snd_trident_4d_dx_init(trident_t *trident)
 {
 	struct pci_dev *pci = trident->pci;
-	signed long end_time;
+	unsigned long end_time;
 
 	/* reset the legacy configuration and whole audio/wavetable block */
 	pci_write_config_dword(pci, 0x40, 0);	/* DDMA */
@@ -3404,7 +3406,7 @@ static int snd_trident_4d_dx_init(trident_t *trident)
 static int snd_trident_4d_nx_init(trident_t *trident)
 {
 	struct pci_dev *pci = trident->pci;
-	signed long end_time;
+	unsigned long end_time;
 
 	/* reset the legacy configuration and whole audio/wavetable block */
 	pci_write_config_dword(pci, 0x40, 0);	/* DDMA */

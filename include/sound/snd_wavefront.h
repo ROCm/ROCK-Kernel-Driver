@@ -98,12 +98,12 @@ struct _snd_wavefront {
 
 struct _snd_wavefront_card {
 	snd_wavefront_t wavefront;
-#ifdef __ISAPNP__
-	struct isapnp_dev *wss;
-	struct isapnp_dev *ctrl;
-	struct isapnp_dev *mpu;
-	struct isapnp_dev *synth;
-#endif /* CONFIG_ISAPNP */
+#ifdef CONFIG_PNP
+	struct pnp_dev *wss;
+	struct pnp_dev *ctrl;
+	struct pnp_dev *mpu;
+	struct pnp_dev *synth;
+#endif /* CONFIG_PNP */
 };
 
 extern void snd_wavefront_internal_interrupt (snd_wavefront_card_t *card);
