@@ -115,6 +115,7 @@ static void cacheflush(void);
 static void cpu_cmd(void);
 #endif /* CONFIG_SMP */
 static void csum(void);
+static void bootcmds(void);
 static void mem_translate(void);
 static void mem_check(void);
 static void mem_find_real(void);
@@ -135,6 +136,14 @@ extern unsigned long _ASR;
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
 #define GETWORD(v)	(((v)[0] << 24) + ((v)[1] << 16) + ((v)[2] << 8) + (v)[3])
+
+#define isxdigit(c)	(('0' <= (c) && (c) <= '9') \
+			 || ('a' <= (c) && (c) <= 'f') \
+			 || ('A' <= (c) && (c) <= 'F'))
+#define isalnum(c)	(('0' <= (c) && (c) <= '9') \
+			 || ('a' <= (c) && (c) <= 'z') \
+			 || ('A' <= (c) && (c) <= 'Z'))
+#define isspace(c)	(c == ' ' || c == '\t' || c == 10 || c == 13 || c == 0)
 
 static char *help_string = "\
 Commands:\n\
@@ -165,13 +174,13 @@ Commands:\n\
   t	print backtrace\n\
   T	Enable/Disable PPCDBG flags\n\
   x	exit monitor\n\
-  z	reboot\n\
-  Z	halt\n\
 ";
 
 static int xmon_trace[NR_CPUS];
 #define SSTEP	1		/* stepping because of 's' command */
 #define BRSTEP	2		/* stepping over breakpoint */
+
+static struct pt_regs *xmon_regs[NR_CPUS];
 
 /*
  * Stuff for reading and writing memory safely
@@ -307,6 +316,7 @@ xmon(struct pt_regs *excp)
 
 	msr = get_msr();
 	set_msrd(msr & ~MSR_EE);	/* disable interrupts */
+	xmon_regs[smp_processor_id()] = excp;
 	excprint(excp);
 #ifdef CONFIG_SMP
 	if (test_and_set_bit(smp_processor_id(), &cpus_in_xmon))
@@ -335,91 +345,13 @@ xmon(struct pt_regs *excp)
 		xmon_trace[smp_processor_id()] = 0;
 		insert_bpts();
 	}
+	xmon_regs[smp_processor_id()] = 0;
 #ifdef CONFIG_SMP
 	clear_bit(0, &got_xmon);
 	clear_bit(smp_processor_id(), &cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
 }
-
-/* Code can call this to get a backtrace and continue. */
-void
-xmon_backtrace(const char *fmt, ...)
-{
-	va_list ap;
-	struct pt_regs regs;
-
-
-	/* Ok, grab regs as they are now.
-	 This won't do a particularily good job because the
-	 prologue has already been executed.
-	 ToDo: We could reach back into the callers save
-	 area to do a better job of representing the
-	 caller's state.
-	 */
-	asm volatile ("std	0,0(%0)\n\
-	    std	1,8(%0)\n\
-	    std	2,16(%0)\n\
-	    std	3,24(%0)\n\
-	    std	4,32(%0)\n\
-	    std	5,40(%0)\n\
-	    std	6,48(%0)\n\
-	    std	7,56(%0)\n\
-	    std	8,64(%0)\n\
-	    std	9,72(%0)\n\
-	    std	10,80(%0)\n\
-	    std	11,88(%0)\n\
-	    std	12,96(%0)\n\
-	    std	13,104(%0)\n\
-	    std	14,112(%0)\n\
-	    std	15,120(%0)\n\
-	    std	16,128(%0)\n\
-	    std	17,136(%0)\n\
-	    std	18,144(%0)\n\
-	    std	19,152(%0)\n\
-	    std	20,160(%0)\n\
-	    std	21,168(%0)\n\
-	    std	22,176(%0)\n\
-	    std	23,184(%0)\n\
-	    std	24,192(%0)\n\
-	    std	25,200(%0)\n\
-	    std	26,208(%0)\n\
-	    std	27,216(%0)\n\
-	    std	28,224(%0)\n\
-	    std	29,232(%0)\n\
-	    std	30,240(%0)\n\
-	    std	31,248(%0)" : : "b" (&regs));
-	/* Fetch the link reg for this stack frame.
-	 NOTE: the prev printf fills in the lr. */
-	regs.nip = regs.link = ((unsigned long *)(regs.gpr[1]))[2];
-	regs.msr = get_msr();
-	regs.ctr = get_ctr();
-	regs.xer = get_xer();
-	regs.ccr = get_cr();
-	regs.trap = 0;
-
-	va_start(ap, fmt);
-	xmon_vfprintf(stdout, fmt, ap);
-	xmon_putc('\n', stdout);
-	va_end(ap);
-	take_input("\n");
-	backtrace(&regs);
-}
-
-/* Call this to poll for ^C during busy operations.
- * Returns true if the user has hit ^C.
- */
-int
-xmon_interrupted(void)
-{
-	int ret = xmon_read_poll();
-	if (ret == 3) {
-		printf("\n^C interrupted.\n");
-		return 1;
-	}
-	return 0;
-}
-
 
 void
 xmon_irq(int irq, void *d, struct pt_regs *regs)
@@ -599,14 +531,6 @@ cmds(struct pt_regs *excp)
 			cmd = inchar();
 		}
 		switch (cmd) {
-		case 'z':
-			printf("Rebooting machine now...");
-			machine_restart(NULL);
-			break;
-		case 'Z':
-			printf("Halting machine now...");
-			machine_halt();
-			break;
 		case 'm':
 			cmd = inchar();
 			switch (cmd) {
@@ -690,6 +614,8 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
+		case 'z':
+			bootcmds();
 		case 'T':
 			debug_trace();
 			break;
@@ -706,6 +632,19 @@ cmds(struct pt_regs *excp)
 			break;
 		}
 	}
+}
+
+static void bootcmds(void)
+{
+	int cmd;
+
+	cmd = inchar();
+	if (cmd == 'r')
+		ppc_md.restart(NULL);
+	else if (cmd == 'h')
+		ppc_md.halt();
+	else if (cmd == 'p')
+		ppc_md.power_off();
 }
 
 #ifdef CONFIG_SMP
@@ -1288,34 +1227,6 @@ super_regs()
 	}
 	scannl();
 }
-
-#if 0
-static void
-openforth()
-{
-	int c;
-	char *p;
-	char cmd[1024];
-	int args[5];
-	extern int (*prom_entry)(int *);
-
-	p = cmd;
-	c = skipbl();
-	while (c != '\n') {
-		*p++ = c;
-		c = inchar();
-	}
-	*p = 0;
-	args[0] = (int) "interpret";
-	args[1] = 1;
-	args[2] = 1;
-	args[3] = (int) cmd;
-	(*prom_entry)(args);
-	printf("\n");
-	if (args[4] != 0)
-		printf("error %x\n", args[4]);
-}
-#endif
 
 #ifndef CONFIG_PPC64BRIDGE
 static void
@@ -2015,6 +1926,16 @@ skipbl()
 	return c;
 }
 
+#define N_PTREGS	44
+static char *regnames[N_PTREGS] = {
+	"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+	"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
+	"r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23",
+	"r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31",
+	"pc", "msr", "or3", "ctr", "lr", "xer", "ccr", "mq",
+	"trap", "dar", "dsisr", "res"
+};
+
 int
 scanhex(vp)
 unsigned long *vp;
@@ -2023,6 +1944,36 @@ unsigned long *vp;
 	unsigned long v;
 
 	c = skipbl();
+	if (c == '%') {
+		/* parse register name */
+		char regname[8];
+		int i;
+
+		for (i = 0; i < sizeof(regname) - 1; ++i) {
+			c = inchar();
+			if (!isalnum(c)) {
+				termch = c;
+				break;
+			}
+			regname[i] = c;
+		}
+		regname[i] = 0;
+		for (i = 0; i < N_PTREGS; ++i) {
+			if (strcmp(regnames[i], regname) == 0) {
+				unsigned long *rp = (unsigned long *)
+					xmon_regs[smp_processor_id()];
+				if (rp == NULL) {
+					printf("regs not available\n");
+					return 0;
+				}
+				*vp = rp[i];
+				return 1;
+			}
+		}
+		printf("invalid register name '%%%s'\n", regname);
+		return 0;
+	}
+
 	d = hexdigit(c);
 	if( d == EOF ){
 		termch = c;
