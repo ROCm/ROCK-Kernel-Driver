@@ -37,7 +37,7 @@
 #include <asm/acpi.h>
 
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_BOOT
 
 enum acpi_irq_model_id {
 	ACPI_IRQ_MODEL_PIC = 0,
@@ -369,11 +369,11 @@ void acpi_numa_arch_fixup(void);
 
 extern int acpi_mp_config;
 
-#else
+#else	/*!CONFIG_ACPI_BOOT*/
 
 #define acpi_mp_config	0
 
-#endif
+#endif 	/*!CONFIG_ACPI_BOOT*/
 
 
 #ifdef CONFIG_ACPI_PCI
