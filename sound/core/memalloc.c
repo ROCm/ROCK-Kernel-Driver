@@ -207,8 +207,9 @@ int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,
 		dmab->addr = 0;
 		return -ENXIO;
 	}
-	if (dmab->area)
-		dmab->bytes = size;
+	if (! dmab->area)
+		return -ENOMEM;
+	dmab->bytes = size;
 	return 0;
 }
 
@@ -342,6 +343,8 @@ int snd_dma_set_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer
 	down(&list_mutex);
 	mem = mem_list_find(dev, 0);
 	if (mem) {
+		if (mem->used)
+			printk(KERN_WARNING "snd-page-alloc: releasing the used block (type=%d, id=0x%x\n", mem->dev.type, mem->dev.id);
 		snd_dma_free_pages(dev, &mem->buffer);
 		if (! dmab || ! dmab->bytes) {
 			/* remove the entry */
@@ -361,7 +364,7 @@ int snd_dma_set_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer
 			return -ENOMEM;
 		}
 		mem->dev = *dev;
-		list_add(&mem->list, &mem_list_head);
+		list_add_tail(&mem->list, &mem_list_head);
 	}
 	/* store the entry */
 	mem->used = 1;
@@ -824,33 +827,40 @@ static void __init preallocate_cards(void)
 
 	while ((pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci)) != NULL) {
 		struct prealloc_dev *dev;
+		unsigned int i;
 		if (card >= SNDRV_CARDS)
 			break;
 		for (dev = prealloc_devices; dev->vendor; dev++) {
-			unsigned int i;
-			if (dev->vendor != pci->vendor || dev->device != pci->device)
-				continue;
-			if (! enable[card++])
-				continue;
+			if (dev->vendor == pci->vendor && dev->device == pci->device)
+				break;
+		}
+		if (! dev->vendor)
+			continue;
+		if (! enable[card++]) {
+			printk(KERN_DEBUG "snd-page-alloc: skipping card %d, device %04x:%04x\n", card, pci->vendor, pci->device);
+			continue;
+		}
 			
-			if (pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
-				printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
-				continue;
+		if (pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
+			printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
+			continue;
+		}
+		for (i = 0; i < dev->buffers; i++) {
+			struct snd_mem_list *mem;
+			mem = kmalloc(sizeof(*mem), GFP_KERNEL);
+			if (! mem) {
+				printk(KERN_WARNING "snd-page-alloc: can't malloc memlist\n");
+				break;
 			}
-
-			for (i = 0; i < dev->buffers; i++) {
-				struct snd_dma_device dma;
-				struct snd_dma_buffer buf;
-				snd_dma_device_pci(&dma, pci, SNDRV_DMA_DEVICE_UNUSED);
-				memset(&buf, 0, sizeof(buf));
-				snd_dma_alloc_pages(&dma, dev->size, &buf);
-				if (buf.bytes) {
-					if (snd_dma_set_reserved(&dma, &buf) < 0) {
-						printk(KERN_WARNING "snd-page-alloc: cannot reserve buffer\n");
-						snd_dma_free_pages(&dma, &buf);
-					}
-				} else
-					printk(KERN_WARNING "snd-page-alloc: cannot allocate buffer pages (size = %d)\n", dev->size);
+			memset(mem, 0, sizeof(*mem));
+			snd_dma_device_pci(&mem->dev, pci, SNDRV_DMA_DEVICE_UNUSED);
+			if (snd_dma_alloc_pages(&mem->dev, dev->size, &mem->buffer) < 0) {
+				printk(KERN_WARNING "snd-page-alloc: cannot allocate buffer pages (size = %d)\n", dev->size);
+				kfree(mem);
+			} else {
+				down(&list_mutex);
+				list_add_tail(&mem->list, &mem_list_head);
+				up(&list_mutex);
 			}
 		}
 	}
@@ -894,7 +904,8 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 		case SNDRV_DMA_TYPE_PCI:
 		case SNDRV_DMA_TYPE_PCI_SG:
 			if (mem->dev.dev.pci) {
-				len += sprintf(page + len, "PCI [%04x:%04x]",
+				len += sprintf(page + len, "%s [%04x:%04x]",
+					       mem->dev.type == SNDRV_DMA_TYPE_PCI ? "PCI" : "PCI-SG",
 					       mem->dev.dev.pci->vendor,
 					       mem->dev.dev.pci->device);
 			}
