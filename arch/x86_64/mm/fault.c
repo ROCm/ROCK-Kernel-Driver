@@ -211,7 +211,8 @@ static int is_errata93(struct pt_regs *regs, unsigned long address)
 int unhandled_signal(struct task_struct *tsk, int sig)
 {
 	/* Warn for strace, but not for gdb */
-	if ((tsk->ptrace & (PT_PTRACED|PT_TRACESYSGOOD)) == PT_PTRACED)
+	if (!test_ti_thread_flag(tsk->thread_info, TIF_SYSCALL_TRACE) && 
+	    (tsk->ptrace & PT_PTRACED))
 		return 0;
 	return (tsk->sighand->action[sig-1].sa.sa_handler == SIG_IGN) ||
 		(tsk->sighand->action[sig-1].sa.sa_handler == SIG_DFL);

@@ -155,16 +155,6 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if (!bank[i])
 			continue;
 		
-		/* Did this bank cause the exception? */ 
-		/* Assume that the bank with fatal errors did it,
-		   and that there is only a single one. */
-		if ((m.status & MCI_STATUS_PCC)) { 
-			panicm = m; 
-		} else {
-			m.rip = 0;
-			m.cs = 0;
-		}
-
 		m.misc = 0; 
 		m.addr = 0;
 
@@ -175,6 +165,16 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		   check it anyways */
 		if ((m.status & MCI_STATUS_EN) == 0)
 			continue;
+
+		/* Did this bank cause the exception? */ 
+		/* Assume that the bank with uncorrectable errors did it,
+		   and that there is only a single one. */
+		if (m.status & MCI_STATUS_UC) { 
+			panicm = m; 
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
 
 		/* In theory _OVER could be a nowayout too, but 
 		   assume any overflowed errors were no fatal. */
