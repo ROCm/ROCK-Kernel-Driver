@@ -393,19 +393,19 @@ MODULE_DESCRIPTION("Policing actions");
 MODULE_LICENSE("GPL");
 
 
-struct tc_action_ops act_police_ops = {
-	NULL,
-	"police",
-	TCA_ID_POLICE, 
-	TCA_CAP_NONE, 
-	THIS_MODULE,
-	tcf_act_police,
-	tcf_act_police_stats,
-	tcf_act_police_dump,
-	tcf_act_police_cleanup,
-	tcf_hash_search,
-	tcf_act_police_locate,
-	tcf_generic_walker
+static struct tc_action_ops act_police_ops = {
+	.next		=	NULL,
+	.kind		=	"police",
+	.type		=	TCA_ID_POLICE, 
+	.capab		=	TCA_CAP_NONE, 
+	.owner		=	THIS_MODULE,
+	.act		=	tcf_act_police,
+	.get_stats	=	tcf_act_police_stats,
+	.dump		=	tcf_act_police_dump,
+	.cleanup	=	tcf_act_police_cleanup,
+	.lookup		=	tcf_hash_search,
+	.init		=	tcf_act_police_locate,
+	.walk		=	tcf_generic_walker
 };
 
 static int __init
