@@ -814,12 +814,12 @@ static int atkbd_reconnect(struct serio *serio)
 		param[0] = (test_bit(LED_SCROLLL, atkbd->dev.led) ? 1 : 0)
 		         | (test_bit(LED_NUML,    atkbd->dev.led) ? 2 : 0)
  		         | (test_bit(LED_CAPSL,   atkbd->dev.led) ? 4 : 0);
-		
+
 		if (atkbd_probe(atkbd))
 			return -1;
 		if (atkbd->set != atkbd_set_3(atkbd))
 			return -1;
-		
+
 		atkbd_enable(atkbd);
 
 		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
