@@ -22,7 +22,7 @@
 #include <asm/naca.h>
 #include <asm/rtas.h>
 #include "i8259.h"
-#include "xics.h"
+#include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 
@@ -430,15 +430,6 @@ nextnode:
 	ppc64_boot_msg(0x21, "XICS Done");
 }
 
-void xics_isa_init(void)
-{
-	return;
-	if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET, no_action,
-			0, "8259 cascade", 0))
-		printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
-	i8259_init();
-}
-
 void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 {
         irq_desc_t *desc = irq_desc + virq;
@@ -446,7 +437,7 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	unsigned long flags;
 	long status;
 	unsigned long xics_status[2];
-	u32 newmask;
+	unsigned long newmask;
 
 	virq -= XICS_IRQ_OFFSET;
 	irq = virt_irq_to_real(virq);
@@ -464,12 +455,12 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpumask == 0xffffffff) {
+	if (cpumask == -1UL) {
 		newmask = default_distrib_server;
 	} else {
 		if (!(cpumask & cpu_online_map))
 			goto out;
-		newmask = find_first_bit(&cpumask, 32);
+		newmask = find_first_bit(&cpumask, 8*sizeof(unsigned long));
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,
