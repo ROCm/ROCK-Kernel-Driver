@@ -163,7 +163,7 @@ map_buffer_at_offset(
 	delta -= mp->pbm_offset;
 	delta >>= block_bits;
 
-	sector_shift = block_bits - 9;
+	sector_shift = block_bits - BBSHIFT;
 	bn = mp->pbm_bn >> sector_shift;
 	bn += delta;
 	ASSERT((bn << sector_shift) >= mp->pbm_bn);
@@ -285,7 +285,7 @@ probe_unmapped_cluster(
 		total += bh->b_size;
 	} while ((bh = bh->b_this_page) != head);
 
-	/* if we reached the end of the page, sum forwards in
+	/* If we reached the end of the page, sum forwards in
 	 * following pages.
 	 */
 	if (bh == head) {
@@ -735,8 +735,8 @@ page_state_convert(
 					page_dirty = 0;
 				}
 			} else if (startio) {
-				if (buffer_uptodate(bh)) {
-					lock_buffer(bh);
+				if (buffer_uptodate(bh) &&
+				    !test_and_set_bit(BH_Lock, &bh->b_state)) {
 					bh_arr[cnt++] = bh;
 					page_dirty = 0;
 				}
@@ -759,8 +759,7 @@ next_bh:
 	}
 
 	if (mp) {
-		cluster_write(inode, page->index + 1, mp,
-				startio, unmapped);
+		cluster_write(inode, page->index + 1, mp, startio, unmapped);
 	}
 
 	return page_dirty;
@@ -769,7 +768,7 @@ error:
 	for (i = 0; i < cnt; i++) {
 		unlock_buffer(bh_arr[i]);
 	}
-	
+
 	/*
 	 * If it's delalloc and we have nowhere to put it,
 	 * throw it away, unless the lower layers told
@@ -812,8 +811,7 @@ linvfs_get_block_core(
 		size = 1 << inode->i_blkbits;
 
 	VOP_BMAP(vp, offset, size,
-		create ? flags : PBF_READ,
-		(struct page_buf_bmap_s *)&pbmap, &retpbbm, error);
+		create ? flags : PBF_READ, &pbmap, &retpbbm, error);
 	if (error)
 		return -error;
 
@@ -831,7 +829,7 @@ linvfs_get_block_core(
 			delta = offset - pbmap.pbm_offset;
 			delta >>= inode->i_blkbits;
 
-			bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
+			bn = pbmap.pbm_bn >> (inode->i_blkbits - BBSHIFT);
 			bn += delta;
 
 			bh_result->b_blocknr = bn;

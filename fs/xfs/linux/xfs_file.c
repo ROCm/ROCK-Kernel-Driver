@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -136,6 +136,7 @@ linvfs_aio_write(
 	return linvfs_writev(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
 }
 
+
 STATIC ssize_t
 linvfs_sendfile(
 	struct file		*filp,
@@ -199,9 +200,7 @@ linvfs_fsync(
 		flags |= FSYNC_DATA;
 
 	ASSERT(vp);
-
 	VOP_FSYNC(vp, flags, NULL, (xfs_off_t)0, (xfs_off_t)-1, error);
-
 	return -error;
 }
 
@@ -287,6 +286,7 @@ done:
 	kfree(read_buf);
 	return -error;
 }
+
 
 STATIC int
 linvfs_file_mmap(

@@ -186,7 +186,7 @@ typedef enum {
 
 extern struct bhv_vfsops xfs_dmops;
 
-extern void xfs_dm_init(void);
-extern void xfs_dm_exit(void);
+extern int dmapi_init(void);
+extern void dmapi_uninit(void);
 
 #endif	/* __XFS_DMAPI_H__ */
