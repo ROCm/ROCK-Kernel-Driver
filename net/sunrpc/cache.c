@@ -183,7 +183,7 @@ void cache_register(struct cache_detail *cd)
 	cd->nextcheck = 0;
 	cd->entries = 0;
 	atomic_set(&cd->readers, 0);
-	cd->last_close = get_seconds();
+	cd->last_close = 0;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 }
