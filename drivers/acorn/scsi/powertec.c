@@ -41,6 +41,7 @@
 #include "../../scsi/sd.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
+#include "scsi.h"
 
 #include <scsi/scsicam.h>
 
@@ -180,15 +181,9 @@ powertecscsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 
 	if (dmach != NO_DMA &&
 	    (min_type == fasdma_real_all || SCp->this_residual >= 512)) {
-		int bufs = SCp->buffers_residual;
-		int pci_dir, dma_dir;
+		int bufs, pci_dir, dma_dir;
 
-		if (bufs)
-			memcpy(info->sg + 1, SCp->buffer + 1,
-				sizeof(struct scatterlist) * bufs);
-		info->sg[0].address = SCp->ptr;
-		info->sg[0].page    = NULL;
-		info->sg[0].length  = SCp->this_residual;
+		bufs = copy_SCp_to_sg(&info->sg[0], SCp, NR_SG);
 
 		if (direction == DMA_OUT)
 			pci_dir = PCI_DMA_TODEVICE,

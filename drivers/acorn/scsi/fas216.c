@@ -59,6 +59,7 @@
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
+#include "scsi.h"
 
 #define VER_MAJOR	0
 #define VER_MINOR	0
@@ -588,38 +589,32 @@ fas216_handlewide(FAS216_Info *info, char *msg)
 static void
 fas216_updateptrs(FAS216_Info *info, int bytes_transferred)
 {
-	unsigned char *ptr;
-	unsigned int residual;
+	Scsi_Pointer *SCp = &info->scsi.SCp;
 
 	fas216_checkmagic(info);
 
-	ptr = info->scsi.SCp.ptr;
-	residual = info->scsi.SCp.this_residual;
-
 	info->SCpnt->request_bufflen -= bytes_transferred;
 
-	while (residual <= bytes_transferred && bytes_transferred) {
-		/* We have used up this buffer */
-		bytes_transferred -= residual;
-		if (info->scsi.SCp.buffers_residual) {
-			info->scsi.SCp.buffer++;
-			info->scsi.SCp.buffers_residual--;
-			ptr = (unsigned char *)info->scsi.SCp.buffer->address;
-			residual = info->scsi.SCp.buffer->length;
-		} else {
-			ptr = NULL;
-			residual = 0;
+	while (bytes_transferred != 0) {
+		if (SCp->this_residual > bytes_transferred)
+			break;
+		/*
+		 * We have used up this buffer.  Move on to the
+		 * next buffer.
+		 */
+		bytes_transferred -= SCp->this_residual;
+		if (!next_SCp(&info->scsi.SCp)) {
+			printk(KERN_WARNING "scsi%d.%c: out of buffers\n",
+				info->host->host_no, '0' + info->SCpnt->target);
+			return;
 		}
 	}
 
-	residual -= bytes_transferred;
-	ptr += bytes_transferred;
-
-	if (residual == 0)
-		ptr = NULL;
-
-	info->scsi.SCp.ptr = ptr;
-	info->scsi.SCp.this_residual = residual;
+	SCp->this_residual -= bytes_transferred;
+	if (SCp->this_residual)
+		SCp->ptr += bytes_transferred;
+	else
+		SCp->ptr = NULL;
 }
 
 /* Function: void fas216_pio(FAS216_Info *info, fasdmadir_t direction)
@@ -631,35 +626,12 @@ fas216_updateptrs(FAS216_Info *info, int bytes_transferred)
 static void
 fas216_pio(FAS216_Info *info, fasdmadir_t direction)
 {
-	unsigned int residual;
-	char *ptr;
-
 	fas216_checkmagic(info);
 
-	residual = info->scsi.SCp.this_residual;
-	ptr = info->scsi.SCp.ptr;
-
 	if (direction == DMA_OUT)
-		outb(*ptr++, REG_FF(info));
+		outb(get_next_SCp_byte(&info->scsi.SCp), REG_FF(info));
 	else
-		*ptr++ = inb(REG_FF(info));
-
-	residual -= 1;
-
-	if (residual == 0) {
-		if (info->scsi.SCp.buffers_residual) {
-			info->scsi.SCp.buffer++;
-			info->scsi.SCp.buffers_residual--;
-			ptr = (unsigned char *)info->scsi.SCp.buffer->address;
-			residual = info->scsi.SCp.buffer->length;
-		} else {
-			ptr = NULL;
-			residual = 0;
-		}
-	}
-
-	info->scsi.SCp.ptr = ptr;
-	info->scsi.SCp.this_residual = residual;
+		put_next_SCp_byte(&info->scsi.SCp, inb(REG_FF(info)));
 }
 
 /* Function: void fas216_starttransfer(FAS216_Info *info,
@@ -2034,48 +2006,8 @@ int fas216_queue_command(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	SCpnt->scsi_done = done;
 	SCpnt->host_scribble = (void *)fas216_std_done;
 	SCpnt->result = 0;
-	SCpnt->SCp.Message = 0;
-	SCpnt->SCp.Status = 0;
 
-	if (SCpnt->use_sg) {
-		unsigned long len = 0;
-		int buf;
-
-		SCpnt->SCp.buffer = (struct scatterlist *) SCpnt->buffer;
-		SCpnt->SCp.buffers_residual = SCpnt->use_sg - 1;
-		SCpnt->SCp.ptr = (char *) SCpnt->SCp.buffer->address;
-		SCpnt->SCp.this_residual = SCpnt->SCp.buffer->length;
-		/*
-		 * Calculate correct buffer length.  Some commands
-		 * come in with the wrong request_bufflen.
-		 */
-		for (buf = 0; buf <= SCpnt->SCp.buffers_residual; buf++)
-			len += SCpnt->SCp.buffer[buf].length;
-
-		if (SCpnt->request_bufflen != len)
-			printk(KERN_WARNING "scsi%d.%c: bad request buffer "
-			       "length %d, should be %ld\n", info->host->host_no,
-			       '0' + SCpnt->target, SCpnt->request_bufflen, len);
-		SCpnt->request_bufflen = len;
-	} else {
-		SCpnt->SCp.buffer = NULL;
-		SCpnt->SCp.buffers_residual = 0;
-		SCpnt->SCp.ptr = (unsigned char *)SCpnt->request_buffer;
-		SCpnt->SCp.this_residual = SCpnt->request_bufflen;
-	}
-
-	/*
-	 * If the upper SCSI layers pass a buffer, but zero length,
-	 * we aren't interested in the buffer pointer.
-	 */
-	if (SCpnt->SCp.this_residual == 0 && SCpnt->SCp.ptr) {
-#if 0
-		printk(KERN_WARNING "scsi%d.%c: zero length buffer passed for "
-		       "command ", info->host->host_no, '0' + SCpnt->target);
-		print_command(SCpnt->cmnd);
-#endif
-		SCpnt->SCp.ptr = NULL;
-	}
+	init_SCp(SCpnt);
 
 	info->stats.queues += 1;
 	SCpnt->tag = 0;
