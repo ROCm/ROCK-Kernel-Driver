@@ -15,6 +15,9 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -26,13 +29,13 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
+#include <asm/cpudata.h>
 
 #define IRQ_RESCHEDULE		13
 #define IRQ_STOP_CPU		14
 #define IRQ_CROSS_CALL		15
 
 extern ctxd_t *srmmu_ctx_table_phys;
-extern int linux_num_cpus;
 
 extern void calibrate_delay(void);
 
@@ -40,10 +43,7 @@ extern volatile int smp_processors_ready;
 extern unsigned long cpu_present_map;
 extern int smp_num_cpus;
 extern int smp_threads_ready;
-extern unsigned char mid_xlate[NR_CPUS];
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
-extern unsigned long smp_proc_in_lock[NR_CPUS];
-extern struct cpuinfo_sparc cpu_data[NR_CPUS];
 extern unsigned long cpu_offset[NR_CPUS];
 extern unsigned char boot_cpu_id;
 extern int smp_activated;
@@ -80,7 +80,7 @@ void __init smp4m_callin(void)
 	local_flush_cache_all();
 	local_flush_tlb_all();
 
-	set_irq_udt(mid_xlate[boot_cpu_id]);
+	set_irq_udt(boot_cpu_id);
 
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer();
@@ -134,7 +134,6 @@ extern int start_secondary(void *unused);
  *	Cycle through the processors asking the PROM to start each one.
  */
  
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
 extern struct linux_prom_registers smp_penguin_ctable;
 extern unsigned long trapbase_cpu1[];
 extern unsigned long trapbase_cpu2[];
@@ -143,33 +142,32 @@ extern unsigned long trapbase_cpu3[];
 void __init smp4m_boot_cpus(void)
 {
 	int cpucount = 0;
-	int i = 0;
-	int first, prev;
+	int i, mid;
 
 	printk("Entering SMP Mode...\n");
 
 	local_irq_enable();
 	cpu_present_map = 0;
 
-	for(i=0; i < linux_num_cpus; i++)
-		cpu_present_map |= (1<<i);
+	for (i = 0; !cpu_find_by_instance(i, NULL, &mid); i++)
+		cpu_present_map |= (1<<mid);
 
+	/* XXX cpu_offset is broken -Keith */
 	for(i=0; i < NR_CPUS; i++) {
-		cpu_offset[i] = (char *)&cpu_data[i] - (char *)&cpu_data;
+		cpu_offset[i] = (char *)&(cpu_data(i)) - (char *)&(cpu_data(0));
 		__cpu_number_map[i] = -1;
 		__cpu_logical_map[i] = -1;
 	}
 
-	mid_xlate[boot_cpu_id] = (linux_cpus[boot_cpu_id].mid & ~8);
 	__cpu_number_map[boot_cpu_id] = 0;
 	__cpu_logical_map[0] = boot_cpu_id;
-	current->cpu = boot_cpu_id;
+	current_thread_info()->cpu = boot_cpu_id;
 
 	smp_store_cpu_info(boot_cpu_id);
-	set_irq_udt(mid_xlate[boot_cpu_id]);
+	set_irq_udt(boot_cpu_id);
 	smp_setup_percpu_timer();
 	local_flush_cache_all();
-	if(linux_num_cpus == 1)
+	if(cpu_find_by_instance(1, NULL, NULL))
 		return;  /* Not an MP box. */
 	for(i = 0; i < NR_CPUS; i++) {
 		if(i == boot_cpu_id)
@@ -188,9 +186,9 @@ void __init smp4m_boot_cpus(void)
 
 			p = prev_task(&init_task);
 
-			p->cpu = i;
+			init_idle(p, i);
 
-			current_set[i] = p;
+			current_set[i] = p->thread_info;
 
 			unhash_process(p);
 
@@ -208,9 +206,8 @@ void __init smp4m_boot_cpus(void)
 
 			/* whirrr, whirrr, whirrrrrrrrr... */
 			printk("Starting CPU %d at %p\n", i, entry);
-			mid_xlate[i] = (linux_cpus[i].mid & ~8);
 			local_flush_cache_all();
-			prom_startcpu(linux_cpus[i].prom_node,
+			prom_startcpu(cpu_data(i).prom_node,
 				      &smp_penguin_ctable, 0, (char *)entry);
 
 			/* wheee... it's going... */
@@ -241,7 +238,7 @@ void __init smp4m_boot_cpus(void)
 		unsigned long bogosum = 0;
 		for(i = 0; i < NR_CPUS; i++) {
 			if(cpu_present_map & (1 << i))
-				bogosum += cpu_data[i].udelay_val;
+				bogosum += cpu_data(i).udelay_val;
 		}
 		printk("Total of %d Processors activated (%lu.%02lu BogoMIPS).\n",
 		       cpucount + 1,
@@ -251,20 +248,6 @@ void __init smp4m_boot_cpus(void)
 		smp_num_cpus = cpucount + 1;
 	}
 
-	/* Setup CPU list for IRQ distribution scheme. */
-	first = prev = -1;
-	for(i = 0; i < NR_CPUS; i++) {
-		if(cpu_present_map & (1 << i)) {
-			if(first == -1)
-				first = i;
-			if(prev != -1)
-				cpu_data[prev].next = i;
-			cpu_data[i].mid = mid_xlate[i];
-			prev = i;
-		}
-	}
-	cpu_data[prev].next = first;
-	
 	/* Free unneeded trap tables */
 	if (!(cpu_present_map & (1 << 1))) {
 		ClearPageReserved(virt_to_page(trapbase_cpu1));
@@ -295,11 +278,11 @@ void __init smp4m_boot_cpus(void)
 /* At each hardware IRQ, we get this called to forward IRQ reception
  * to the next processor.  The caller must disable the IRQ level being
  * serviced globally so that there are no double interrupts received.
+ *
+ * XXX See sparc64 irq.c.
  */
 void smp4m_irq_rotate(int cpu)
 {
-	if(smp_processors_ready)
-		set_irq_udt(cpu_data[cpu_data[cpu].next].mid);
 }
 
 /* Cross calls, in order to work efficiently and atomically do all
@@ -331,10 +314,10 @@ void smp4m_message_pass(int target, int msg, unsigned long data, int wait)
 			mask &= ~(1 << me);
 		for(i = 0; i < 4; i++) {
 			if(mask & (1 << i))
-				set_cpu_int(mid_xlate[i], irq);
+				set_cpu_int(i, irq);
 		}
 	} else {
-		set_cpu_int(mid_xlate[target], irq);
+		set_cpu_int(target, irq);
 	}
 	smp_cpu_in_msg[me]--;
 
@@ -385,7 +368,7 @@ void smp4m_cross_call(smpfunc_t func, unsigned long arg1, unsigned long arg2,
 				if(mask & (1 << i)) {
 					ccall_info.processors_in[i] = 0;
 					ccall_info.processors_out[i] = 0;
-					set_cpu_int(mid_xlate[i], IRQ_CROSS_CALL);
+					set_cpu_int(i, IRQ_CROSS_CALL);
 				} else {
 					ccall_info.processors_in[i] = 1;
 					ccall_info.processors_out[i] = 1;
@@ -424,28 +407,28 @@ void smp4m_cross_call_irq(void)
 	ccall_info.processors_out[i] = 1;
 }
 
-extern unsigned int prof_multiplier[NR_CPUS];
-extern unsigned int prof_counter[NR_CPUS];
-
 extern void sparc_do_profile(unsigned long pc, unsigned long o7);
+
+#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
+#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
-	clear_profile_irq(mid_xlate[cpu]);
+	clear_profile_irq(cpu);
 
 	if(!user_mode(regs))
 		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
 
-	if(!--prof_counter[cpu]) {
+	if(!--prof_counter(cpu)) {
 		int user = user_mode(regs);
 
 		irq_enter();
 		update_process_times(user);
 		irq_exit();
 
-		prof_counter[cpu] = prof_multiplier[cpu];
+		prof_counter(cpu) = prof_multiplier(cpu);
 	}
 }
 
@@ -455,8 +438,8 @@ static void __init smp_setup_percpu_timer(void)
 {
 	int cpu = smp_processor_id();
 
-	prof_counter[cpu] = prof_multiplier[cpu] = 1;
-	load_profile_irq(mid_xlate[cpu], lvl14_resolution);
+	prof_counter(cpu) = prof_multiplier(cpu) = 1;
+	load_profile_irq(cpu, lvl14_resolution);
 
 	if(cpu == boot_cpu_id)
 		enable_pil_irq(14);
