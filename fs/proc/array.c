@@ -315,6 +315,7 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 	unsigned long cmin_flt = 0, cmaj_flt = 0, cutime = 0, cstime = 0;
 	unsigned long  min_flt = 0,  maj_flt = 0,  utime = 0,  stime = 0;
 	unsigned long rsslim = 0;
+	struct task_struct *t;
 	char tcomm[sizeof(task->comm)];
 
 	state = *get_task_state(task);
@@ -335,6 +336,19 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 		spin_lock_irq(&task->sighand->siglock);
 		num_threads = atomic_read(&task->signal->count);
 		collect_sigign_sigcatch(task, &sigign, &sigcatch);
+
+		/* add up live thread stats at the group level */
+		if (whole) {
+			t = task;
+			do {
+				min_flt += t->min_flt;
+				maj_flt += t->maj_flt;
+				utime += t->utime;
+				stime += t->stime;
+				t = next_thread(t);
+			} while (t != task);
+		}
+
 		spin_unlock_irq(&task->sighand->siglock);
 	}
 	if (task->signal) {
@@ -350,10 +364,10 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 		cstime = task->signal->cstime;
 		rsslim = task->signal->rlim[RLIMIT_RSS].rlim_cur;
 		if (whole) {
-			min_flt = task->signal->min_flt;
-			maj_flt = task->signal->maj_flt;
-			utime = task->signal->utime;
-			stime = task->signal->stime;
+			min_flt += task->signal->min_flt;
+			maj_flt += task->signal->maj_flt;
+			utime += task->signal->utime;
+			stime += task->signal->stime;
 		}
 	}
 	ppid = task->pid ? task->real_parent->pid : 0;
