@@ -595,13 +595,9 @@ void __init smp_boot_cpus(void)
 	}
 
 	/*
-	 * XXX very rough. On POWER4 we optimise tlb flushes for
-	 * tasks that only run on one cpu so we increase decay ticks.
+	 * XXX very rough. 
 	 */
-	if (__is_processor(PV_POWER4))
-		cache_decay_ticks = HZ/50;
-	else
-		cache_decay_ticks = HZ/100;
+	cache_decay_ticks = HZ/100;
 
 	/* Probe arch for CPUs */
 	cpu_nr = ppc_md.smp_probe();

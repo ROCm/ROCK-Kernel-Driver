@@ -59,15 +59,14 @@ unsigned long eeh_token(unsigned long phb, unsigned long bus, unsigned long devf
 	return ((IO_UNMAPPED_REGION_ID << 60) | (phb << 48UL) | ((bus & 0xff) << 40UL) | (devfn << 32UL) | (offset & 0xffffffff));
 }
 
-
-
-int eeh_get_state(unsigned long ea) {
+int eeh_get_state(unsigned long ea)
+{
 	return 0;
 }
 
-
 /* Check for an eeh failure at the given token address.
- * The given value has been read and it should be 1's (0xff, 0xffff or 0xffffffff).
+ * The given value has been read and it should be 1's (0xff, 0xffff or
+ * 0xffffffff).
  *
  * Probe to determine if an error actually occurred.  If not return val.
  * Otherwise panic.
@@ -113,7 +112,8 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	return val;	/* good case */
 }
 
-void eeh_init(void) {
+void eeh_init(void)
+{
 	extern char cmd_line[];	/* Very early cmd line parse.  Cheap, but works. */
 	char *eeh_force_off = strstr(cmd_line, "eeh-force-off");
 	char *eeh_force_on = strstr(cmd_line, "eeh-force-on");
@@ -121,7 +121,7 @@ void eeh_init(void) {
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
 	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
-	if (ibm_set_eeh_option != RTAS_UNKNOWN_SERVICE && naca->platform == PLATFORM_PSERIES_LPAR)
+	if (ibm_set_eeh_option != RTAS_UNKNOWN_SERVICE)
 		eeh_implemented = 1;
 
 	if (eeh_force_off > eeh_force_on) {
@@ -334,6 +334,7 @@ static int __init eehoff_parm(char *str)
 {
 	return eeh_parm(str, 0);
 }
+
 static int __init eehon_parm(char *str)
 {
 	return eeh_parm(str, 1);
