@@ -1,6 +1,6 @@
 /*  devfs (Device FileSystem) utilities.
 
-    Copyright (C) 1999-2001  Richard Gooch
+    Copyright (C) 1999-2002  Richard Gooch
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -48,6 +48,12 @@
     20010818   Richard Gooch <rgooch@atnf.csiro.au>
                Updated major masks up to Linus' "no new majors" proclamation.
 	       Block: were 126 now 122 free, char: were 26 now 19 free.
+    20020324   Richard Gooch <rgooch@atnf.csiro.au>
+               Fixed bug in <devfs_alloc_unique_number>: was clearing beyond
+	       bitfield.
+    20020326   Richard Gooch <rgooch@atnf.csiro.au>
+               Fixed bitfield data type for <devfs_*alloc_devnum>.
+               Made major bitfield type and initialiser 64 bit safe.
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -125,8 +131,13 @@ EXPORT_SYMBOL(devfs_register_series);
 struct major_list
 {
     spinlock_t lock;
-    __u32 bits[8];
+    unsigned long bits[256 / BITS_PER_LONG];
 };
+#if BITS_PER_LONG == 32
+#  define INITIALISER64(low,high) (low), (high)
+#else
+#  define INITIALISER64(low,high) ( (high) << 32 | (low) )
+#endif
 
 /*  Block majors already assigned:
     0-3, 7-9, 11-63, 65-99, 101-113, 120-127, 199, 201, 240-255
@@ -134,14 +145,11 @@ struct major_list
 */
 static struct major_list block_major_list =
 {SPIN_LOCK_UNLOCKED,
-    {0xfffffb8f,  /*  Majors 0   to 31   */
-     0xffffffff,  /*  Majors 32  to 63   */
-     0xfffffffe,  /*  Majors 64  to 95   */
-     0xff03ffef,  /*  Majors 96  to 127  */
-     0x00000000,  /*  Majors 128 to 159  */
-     0x00000000,  /*  Majors 160 to 191  */
-     0x00000280,  /*  Majors 192 to 223  */
-     0xffff0000}  /*  Majors 224 to 255  */
+    {INITIALISER64 (0xfffffb8f, 0xffffffff),  /*  Majors 0-31,    32-63    */
+     INITIALISER64 (0xfffffffe, 0xff03ffef),  /*  Majors 64-95,   96-127   */
+     INITIALISER64 (0x00000000, 0x00000000),  /*  Majors 128-159, 160-191  */
+     INITIALISER64 (0x00000280, 0xffff0000),  /*  Majors 192-223, 224-255  */
+    }
 };
 
 /*  Char majors already assigned:
@@ -150,14 +158,11 @@ static struct major_list block_major_list =
 */
 static struct major_list char_major_list =
 {SPIN_LOCK_UNLOCKED,
-    {0xfffffeff,  /*  Majors 0   to 31   */
-     0xffffffff,  /*  Majors 32  to 63   */
-     0xffffffff,  /*  Majors 64  to 95   */
-     0xffffffff,  /*  Majors 96  to 127  */
-     0x7cffffff,  /*  Majors 128 to 159  */
-     0xffffffff,  /*  Majors 160 to 191  */
-     0x3f0fffff,  /*  Majors 192 to 223  */
-     0xffff007f}  /*  Majors 224 to 255  */
+    {INITIALISER64 (0xfffffeff, 0xffffffff),  /*  Majors 0-31,    32-63    */
+     INITIALISER64 (0xffffffff, 0xffffffff),  /*  Majors 64-95,   96-127   */
+     INITIALISER64 (0x7cffffff, 0xffffffff),  /*  Majors 128-159, 160-191  */
+     INITIALISER64 (0x3f0fffff, 0xffff007f),  /*  Majors 192-223, 224-255  */
+    }
 };
 
 
@@ -212,7 +217,7 @@ EXPORT_SYMBOL(devfs_dealloc_major);
 struct minor_list
 {
     int major;
-    __u32 bits[8];
+    unsigned long bits[256 / BITS_PER_LONG];
     struct minor_list *next;
 };
 
@@ -267,7 +272,7 @@ kdev_t devfs_alloc_devnum (char type)
 	if (minor >= 256) continue;
 	__set_bit (minor, entry->bits);
 	up (semaphore);
-	return mk_kdev(entry->major, minor);
+	return mk_kdev (entry->major, minor);
     }
     /*  Need to allocate a new major  */
     if ( ( entry = kmalloc (sizeof *entry, GFP_KERNEL) ) == NULL )
@@ -289,7 +294,7 @@ kdev_t devfs_alloc_devnum (char type)
     else list->last->next = entry;
     list->last = entry;
     up (semaphore);
-    return mk_kdev(entry->major, 0);
+    return mk_kdev (entry->major, 0);
 }   /*  End Function devfs_alloc_devnum  */
 EXPORT_SYMBOL(devfs_alloc_devnum);
 
@@ -309,7 +314,7 @@ void devfs_dealloc_devnum (char type, kdev_t devnum)
     struct device_list *list;
     struct minor_list *entry;
 
-    if (kdev_none(devnum)) return;
+    if ( kdev_none (devnum) ) return;
     if (type == DEVFS_SPECIAL_CHR)
     {
 	semaphore = &char_semaphore;
@@ -355,7 +360,6 @@ int devfs_alloc_unique_number (struct unique_numspace *space)
 {
     int number;
     unsigned int length;
-    __u32 *bits;
 
     /*  Get around stupid lack of semaphore initialiser  */
     spin_lock (&space->init_lock);
@@ -368,6 +372,8 @@ int devfs_alloc_unique_number (struct unique_numspace *space)
     down (&space->semaphore);
     if (space->num_free < 1)
     {
+	void *bits;
+
 	if (space->length < 16) length = 16;
 	else length = space->length << 1;
 	if ( ( bits = vmalloc (length) ) == NULL )

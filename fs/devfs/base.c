@@ -612,6 +612,14 @@
 	       Added KERN_* to remaining messages.
 	       Cleaned up declaration of <stat_read>.
   v1.11
+    20020219   Richard Gooch <rgooch@atnf.csiro.au>
+	       Changed <devfs_rmdir> to allow later additions if not yet empty.
+  v1.12
+    20020406   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed silently introduced calls to lock_kernel() and
+	       unlock_kernel() due to recent VFS locking changes. BKL isn't
+	       required in devfs.
+  v1.13
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -644,7 +652,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.11 (20020129)"
+#define DEVFS_VERSION            "1.13 (20020406)"
 
 #define DEVFS_NAME "devfs"
 
@@ -2667,7 +2675,7 @@ static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
       case 0:
 	scan_dir_for_removable (parent);
 	err = (*filldir) (dirent, "..", 2, file->f_pos,
-			  parent_ino(file->f_dentry), DT_DIR);
+			  parent_ino (file->f_dentry), DT_DIR);
 	if (err == -EINVAL) break;
 	if (err < 0) return err;
 	file->f_pos++;
@@ -2933,14 +2941,10 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
 	up on any error  */
     dentry->d_op = &devfs_dops;
     /*  First try to get the devfs entry for this directory  */
-    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
     DPRINTK (DEBUG_I_LOOKUP, "(%s): dentry: %p parent: %p by: \"%s\"\n",
 	     dentry->d_name.name, dentry, parent, current->comm);
-    if (parent == NULL) {
-	unlock_kernel();
-	return ERR_PTR (-ENOENT);
-    }
+    if (parent == NULL) return ERR_PTR (-ENOENT);
     read_lock (&parent->u.dir.lock);
     de = _devfs_search_dir (parent, dentry->d_name.name, dentry->d_name.len);
     read_unlock (&parent->u.dir.lock);
@@ -2965,7 +2969,6 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
 	if (try_modload (parent, fs_info,
 			 dentry->d_name.name, dentry->d_name.len, &tmp) < 0)
 	{   /*  Lookup event was not queued to devfsd  */
-	    unlock_kernel();
 	    d_add (dentry, NULL);
 	    return NULL;
 	}
@@ -3008,7 +3011,6 @@ out:
     wake_up (&lookup_info.wait_queue);
     write_unlock (&parent->u.dir.lock);
     devfs_put (de);
-    unlock_kernel();
     return retval;
 }   /*  End Function devfs_lookup  */
 
@@ -3019,30 +3021,19 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     struct inode *inode = dentry->d_inode;
     struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
 
-    lock_kernel();
     de = get_devfs_entry_from_vfs_inode (inode);
     DPRINTK (DEBUG_I_UNLINK, "(%s): de: %p\n", dentry->d_name.name, de);
-    if (de == NULL) {
-	unlock_kernel();
-	return -ENOENT;
-    }
-    if (!de->vfs_deletable) {
-	unlock_kernel();
-	return -EPERM;
-    }
+    if (de == NULL) return -ENOENT;
+    if (!de->vfs_deletable) return -EPERM;
     write_lock (&de->parent->u.dir.lock);
     unhooked = _devfs_unhook (de);
     write_unlock (&de->parent->u.dir.lock);
-    if (!unhooked) {
-	unlock_kernel();
-	return -ENOENT;
-    }
+    if (!unhooked) return -ENOENT;
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_DELETE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
     free_dentry (de);
     devfs_put (de);
-    unlock_kernel();
     return 0;
 }   /*  End Function devfs_unlink  */
 
@@ -3055,37 +3046,27 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
     struct inode *inode;
 
     /*  First try to get the devfs entry for this directory  */
-    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
-    if (parent == NULL) {
-	unlock_kernel();
-	return -ENOENT;
-    }
+    if (parent == NULL) return -ENOENT;
     err = devfs_do_symlink (parent, dentry->d_name.name, DEVFS_FL_NONE,
 			    symname, &de, NULL);
     DPRINTK (DEBUG_DISABLED, "(%s): errcode from <devfs_do_symlink>: %d\n",
 	     dentry->d_name.name, err);
-    if (err < 0) {
-	unlock_kernel();
-	return err;
-    }
+    if (err < 0) return err;
     de->vfs_deletable = TRUE;
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
     de->inode.mtime = CURRENT_TIME;
     de->inode.ctime = CURRENT_TIME;
-    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL ) {
-	unlock_kernel();
+    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL )
 	return -ENOMEM;
-    }
     DPRINTK (DEBUG_DISABLED, "(%s): new VFS inode(%u): %p  dentry: %p\n",
 	     dentry->d_name.name, de->inode.ino, inode, dentry);
     d_instantiate (dentry, inode);
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CREATE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
-    unlock_kernel();
     return 0;
 }   /*  End Function devfs_symlink  */
 
@@ -3097,38 +3078,26 @@ static int devfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
     struct inode *inode;
 
     mode = (mode & ~S_IFMT) | S_IFDIR;  /*  VFS doesn't pass S_IFMT part  */
-    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
-    if (parent == NULL) {
-	unlock_kernel();
-	return -ENOENT;
-    }
+    if (parent == NULL) return -ENOENT;
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
-    if (!de) {
-	unlock_kernel();
-	return -ENOMEM;
-    }
+    if (!de) return -ENOMEM;
     de->vfs_deletable = TRUE;
-    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 ) {
-	unlock_kernel();
+    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 )
 	return err;
-    }
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
     de->inode.mtime = CURRENT_TIME;
     de->inode.ctime = CURRENT_TIME;
-    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL ) {
-	unlock_kernel();
+    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL )
 	return -ENOMEM;
-    }
     DPRINTK (DEBUG_DISABLED, "(%s): new VFS inode(%u): %p  dentry: %p\n",
 	     dentry->d_name.name, de->inode.ino, inode, dentry);
     d_instantiate (dentry, inode);
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CREATE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
-    unlock_kernel();
     return 0;
 }   /*  End Function devfs_mkdir  */
 
@@ -3139,45 +3108,27 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
     struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
     struct inode *inode = dentry->d_inode;
 
-    /* WTF??? */
     if (dir->i_sb->u.generic_sbp != inode->i_sb->u.generic_sbp) return -EINVAL;
-    lock_kernel();
     de = get_devfs_entry_from_vfs_inode (inode);
-    if (de == NULL) {
-	unlock_kernel();
-	return -ENOENT;
-    }
-    if ( !S_ISDIR (de->mode) ) {
-	unlock_kernel();
-	return -ENOTDIR;
-    }
-    if (!de->vfs_deletable) {
-	unlock_kernel();
-	return -EPERM;
-    }
-    /*  First ensure the directory is empty and will stay thay way  */
+    if (de == NULL) return -ENOENT;
+    if ( !S_ISDIR (de->mode) ) return -ENOTDIR;
+    if (!de->vfs_deletable) return -EPERM;
+    /*  First ensure the directory is empty and will stay that way  */
     write_lock (&de->u.dir.lock);
-    de->u.dir.no_more_additions = TRUE;
     if (de->u.dir.first) err = -ENOTEMPTY;
+    else de->u.dir.no_more_additions = TRUE;
     write_unlock (&de->u.dir.lock);
-    if (err) {
-	unlock_kernel();
-	return err;
-    }
+    if (err) return err;
     /*  Now unhook the directory from it's parent  */
     write_lock (&de->parent->u.dir.lock);
     if ( !_devfs_unhook (de) ) err = -ENOENT;
     write_unlock (&de->parent->u.dir.lock);
-    if (err) {
-	unlock_kernel();
-	return err;
-    }
+    if (err) return err;
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_DELETE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
     free_dentry (de);
     devfs_put (de);
-    unlock_kernel();
     return 0;
 }   /*  End Function devfs_rmdir  */
 
@@ -3191,43 +3142,31 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 
     DPRINTK (DEBUG_I_MKNOD, "(%s): mode: 0%o  dev: %d\n",
 	     dentry->d_name.name, mode, rdev);
-    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
-    if (parent == NULL) {
-	unlock_kernel();
-	return -ENOENT;
-    }
+    if (parent == NULL) return -ENOENT;
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
-    if (!de) {
-	unlock_kernel();
-	return -ENOMEM;
-    }
+    if (!de) return -ENOMEM;
     de->vfs_deletable = TRUE;
     if ( S_ISBLK (mode) || S_ISCHR (mode) )
     {
 	de->u.fcb.u.device.major = MAJOR (rdev);
 	de->u.fcb.u.device.minor = MINOR (rdev);
     }
-    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 ) {
-	unlock_kernel();
+    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 )
 	return err;
-    }
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
     de->inode.mtime = CURRENT_TIME;
     de->inode.ctime = CURRENT_TIME;
-    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL ) {
-	unlock_kernel();
+    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL )
 	return -ENOMEM;
-    }
     DPRINTK (DEBUG_I_MKNOD, ":   new VFS inode(%u): %p  dentry: %p\n",
 	     de->inode.ino, inode, dentry);
     d_instantiate (dentry, inode);
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CREATE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
-    unlock_kernel();
     return 0;
 }   /*  End Function devfs_mknod  */
 
@@ -3301,18 +3240,19 @@ out_no_root:
     PRINTK ("(): get root inode failed\n");
     if (root_inode) iput (root_inode);
     return -EINVAL;
-}   /*  End Function devfs_read_super  */
+}   /*  End Function devfs_fill_super  */
 
-static struct super_block *devfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+static struct super_block *devfs_get_sb (struct file_system_type *fs_type,
+					 int flags, char *dev_name, void *data)
 {
-	return get_sb_single(fs_type, flags, data, devfs_fill_super);
+    return get_sb_single (fs_type, flags, data, devfs_fill_super);
 }
 
-static struct file_system_type devfs_fs_type = {
-	name:		DEVFS_NAME,
-	get_sb:		devfs_get_sb,
-	kill_sb:	kill_anon_super,
+static struct file_system_type devfs_fs_type =
+{
+    name:	DEVFS_NAME,
+    get_sb:	devfs_get_sb,
+    kill_sb:	kill_anon_super,
 };
 
 /*  File operations for devfsd follow  */
