@@ -100,7 +100,6 @@
 #endif
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
-extern cpumask_t	__cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
@@ -333,21 +332,6 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 #endif
-}
-
-static inline void move_irq(int irq)
-{
-	/* note - we hold desc->lock */
-	cpumask_t tmp;
-	irq_desc_t *desc = irq_descp(irq);
-
-	if (!cpus_empty(pending_irq_cpumask[irq])) {
-		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
-		if (unlikely(!cpus_empty(tmp))) {
-			desc->handler->set_affinity(irq, pending_irq_cpumask[irq]);
-		}
-		cpus_clear(pending_irq_cpumask[irq]);
-	}
 }
 
 /*
