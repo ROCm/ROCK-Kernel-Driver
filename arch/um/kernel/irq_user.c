@@ -377,6 +377,8 @@ int deactivate_all_fds(void)
 		if(err)
 			return(err);
 	}
+	/* If there is a signal already queued, after unblocking ignore it */
+	set_handler(SIGIO, SIG_IGN, 0, -1);
 
 	return(0);
 }

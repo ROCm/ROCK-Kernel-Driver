@@ -155,17 +155,19 @@ int main(int argc, char **argv, char **envp)
 		int err;
 
 		printf("\n");
-
-		/* Let any pending signals fire, then disable them.  This
-		 * ensures that they won't be delivered after the exec, when
-		 * they are definitely not expected.
-		 */
-		unblock_signals();
+		/* stop timers and set SIG*ALRM to be ignored */
 		disable_timer();
+		/* disable SIGIO for the fds and set SIGIO to be ignored */
 		err = deactivate_all_fds();
 		if(err)
 			printf("deactivate_all_fds failed, errno = %d\n",
 			       -err);
+
+		/* Let any pending signals fire now.  This ensures
+		 * that they won't be delivered after the exec, when
+		 * they are definitely not expected.
+		 */
+		unblock_signals();
 
 		execvp(new_argv[0], new_argv);
 		perror("Failed to exec kernel");
