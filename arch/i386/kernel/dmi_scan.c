@@ -510,12 +510,12 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 }
 
 /*
- * HP Proliant DL 760 G2 needs to tweak the IRQ delivery mode for timer IRQ
+ * HP Proliants DL740/760 need to tweak the IRQ delivery mode for timer IRQ
  */
 
 static __init int enable_timer_irq_tweak(struct dmi_blacklist *d)
 {
-	printk(KERN_WARNING "Enable tweak for timer IRQ delivery mode.\n");
+	printk(KERN_WARNING "Enable tweak for timer IRQ delivery/dest mode.\n");
 	need_timer_irq_tweak = 1;
 	return 0;
 }
@@ -1013,11 +1013,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_VERSION, "DL760"),
 			NO_MATCH }},
 
-	{ enable_timer_irq_tweak, "HP ProLiant DL760 G2", {
-			MATCH(DMI_BIOS_VENDOR, "HP"),
-			MATCH(DMI_BIOS_VERSION, "P44-"),
-			NO_MATCH, NO_MATCH }},
-
 #ifdef	CONFIG_ACPI_BOOT
 	/*
 	 * If your system is blacklisted here, but you find that acpi=force
@@ -1097,6 +1092,21 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "eserver xSeries 440"),
 			NO_MATCH, NO_MATCH }},
 #endif	// CONFIG_ACPI_BOOT
+
+	/*
+	 * Boxes that need to set delivery and dest mode of timer 
+	 * IRQ to 0 to not recieve timer IRQs multiple times.
+	 */
+
+	{ enable_timer_irq_tweak, "HP ProLiant DL740", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P47-"),
+			NO_MATCH, NO_MATCH }},
+
+	{ enable_timer_irq_tweak, "HP ProLiant DL760 G2", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P44-"),
+			NO_MATCH, NO_MATCH }},
 
 #ifdef	CONFIG_ACPI_PCI
 
