@@ -43,7 +43,7 @@
 #include <linux/config.h>
 #include <linux/timer.h>
 #include <linux/cache.h>
-
+#include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>	/* struct sk_buff */
 #include <linux/security.h>
@@ -197,6 +197,7 @@ struct sock {
 	void			*user_data;
   
 	/* Callbacks */
+	struct module		*owner;
 	void			(*state_change)(struct sock *sk);
 	void			(*data_ready)(struct sock *sk,int bytes);
 	void			(*write_space)(struct sock *sk);
@@ -269,6 +270,23 @@ struct proto {
 		u8  __pad[SMP_CACHE_BYTES - sizeof(int)];
 	} stats[NR_CPUS];
 };
+
+static __inline__ void sk_set_owner(struct sock *sk, struct module *owner)
+{
+	/*
+	 * One should use sk_set_owner just once, after struct sock creation,
+	 * be it shortly after sk_alloc or after a function that returns a new
+	 * struct sock (and that down the call chain called sk_alloc), e.g. the
+	 * IPv4 and IPv6 modules share tcp_create_openreq_child, so if
+	 * tcp_create_openreq_child called sk_set_owner IPv6 would have to
+	 * change the ownership of this struct sock, with one not needed
+	 * transient sk_set_owner call.
+	 */
+	if (unlikely(sk->owner != NULL))
+		BUG();
+	sk->owner = owner;
+	__module_get(owner);
+}
 
 /* Called with local bh disabled */
 static __inline__ void sock_prot_inc_use(struct proto *prot)
