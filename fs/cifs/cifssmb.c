@@ -366,9 +366,12 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
-
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	
+	if(ses->server) {
+		if(ses->server->secMode & 
+		   (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+			pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	}
 
 	if (rc) {
 		up(&ses->sesSem);
@@ -2174,6 +2177,10 @@ getDFSRetry:
 			/* BB add check for name_len bigger than bcc */
 			*targetUNCs = 
 				kmalloc(name_len+1+ (*number_of_UNC_in_array),GFP_KERNEL);
+			if(*targetUNCs == NULL) {
+				rc = -ENOMEM;
+				goto GetDFSRefExit;
+			}
 			/* copy the ref strings */
 			referrals =  
 			    (struct dfs_referral_level_3 *) 
@@ -2197,6 +2204,7 @@ getDFSRetry:
 		}
 
 	}
+GetDFSRefExit:
 	if (pSMB)
 		cifs_buf_release(pSMB);
 

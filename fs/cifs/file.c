@@ -148,7 +148,7 @@ cifs_open(struct inode *inode, struct file *file)
 	and the first handle has writebehind data, we might be 
 	able to simply do a filemap_fdatawrite/filemap_fdatawait first */
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
-	if(buf==0) {
+	if(buf== NULL) {
 		if (full_path)
 			kfree(full_path);
 		FreeXid(xid);
@@ -1687,8 +1687,12 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	}
 	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
-
+	if(data == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	if(file->f_dentry == NULL) {
+		kfree(data);
 		FreeXid(xid);
 		return -EIO;
 	}
@@ -1696,7 +1700,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
 	up(&file->f_dentry->d_sb->s_vfs_rename_sem);
 
-
+	if(full_path == NULL) {
+		kfree(data);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	cFYI(1, ("Full path: %s start at: %lld ", full_path, file->f_pos));
 
 	switch ((int) file->f_pos) {
@@ -1784,6 +1792,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cFYI(1,("Last file: %s with name %d bytes long",
 					lastFindData->FileName,
 					cifsFile->resume_name_length));
+				if(cifsFile->search_resume_name == NULL) {
+					rc = -ENOMEM;
+					break;
+				}
 				memcpy(cifsFile->search_resume_name,
 					lastFindData->FileName, 
 					cifsFile->resume_name_length);
@@ -1813,6 +1825,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cFYI(1,("Last file: %s with name %d bytes long",
 					pfindDataUnix->FileName,
 					cifsFile->resume_name_length));
+				if(cifsFile->search_resume_name == NULL) {
+					rc = -ENOMEM;
+					break;
+				}
 				memcpy(cifsFile->search_resume_name,
 					pfindDataUnix->FileName, 
 					cifsFile->resume_name_length);
@@ -1966,6 +1982,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					cFYI(1,("Last file: %s with name %d bytes long",
 						lastFindData->FileName,
 						cifsFile->resume_name_length));
+					if(cifsFile->search_resume_name == NULL) {
+						rc = -ENOMEM;
+						break;
+					}
+					
 					memcpy(cifsFile->search_resume_name,
 						lastFindData->FileName, 
 						cifsFile->resume_name_length);
@@ -2001,6 +2022,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					cFYI(1,("fnext last file: %s with name %d bytes long",
 						pfindDataUnix->FileName,
 						cifsFile->resume_name_length));
+					if(cifsFile->search_resume_name == NULL) {
+						rc = -ENOMEM;
+						break;
+					}
 					memcpy(cifsFile->search_resume_name,
 						pfindDataUnix->FileName, 
 						cifsFile->resume_name_length);
