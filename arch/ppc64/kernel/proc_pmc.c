@@ -100,9 +100,6 @@ void proc_ppc64_init(void)
 	if (!proc_ppc64_root) return;
 	spin_unlock(&proc_ppc64_lock);
 
-#ifdef CONFIG_PPC_EEH
-	eeh_init_proc(proc_ppc64_root);
-#endif
 
 	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64_root);
 
