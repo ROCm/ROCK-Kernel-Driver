@@ -99,6 +99,7 @@ dump_block_map(struct dump_blockdev *dev, void *buf, int len)
 	if (dump_block_map_valid(dev, page, len)) {
 		/* already mapped and usable rightaway */
 		bio->bi_size = len; /* reset size to the whole bio */
+		bio->bi_vcnt = len / PAGE_SIZE; /* Set the proper vector cnt */
 	} else {
 		/* need to map the bio */
 		bio->bi_size = 0;
