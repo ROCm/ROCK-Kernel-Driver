@@ -1,7 +1,7 @@
 /*
  * ASIX AX8817x USB 2.0 10/100/HomePNA Ethernet controller driver
  *
- * $Id: ax8817x.c,v 1.11 2003/06/15 19:00:02 dhollis Exp $
+ * $Id: ax8817x.c,v 1.17 2003/07/23 20:46:13 dhollis Exp $
  *
  * Copyright (c) 2002-2003 TiVo Inc.
  *
@@ -10,6 +10,12 @@
  *
  * History 
  *
+ *	2003-07-22 - Dave Hollis <dhollis@davehollis.com>  2.0.1
+ *		* Add Intellinet USB ids
+ *		* Fix mii/ethtool support - link check works!
+ *		* Add msglevel support
+ *		* Shamelessly 'borrowed' devdbg/err/info macros from usbnet
+ *		* Change strlcpy to strncpy
  *	2003-06-15 - Dave Hollis <dhollis@davehollis.com>  2.0.0
  *		* Remove crc32 inline function, use core kernel instead
  *		* Set sane defaults for rx_buffers
@@ -50,7 +56,7 @@
  * Known Issues
  *
  * Todo
- *	Fix mii/ethtool output
+ *	Fix receive performance on OHCI
 */
 
 #include <linux/slab.h>
@@ -69,7 +75,7 @@
 #include <linux/version.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v2.0.0"
+#define DRIVER_VERSION "v2.0.1"
 #define DRIVER_AUTHOR "TiVo, Inc."
 #define DRIVER_DESC "ASIX AX8817x USB Ethernet driver"
 #define DRIVER_NAME "ax8817x"
@@ -95,6 +101,7 @@ MODULE_LICENSE("GPL");
 #define AX_RX_MAX                   ETH_FRAME_LEN
 #define AX_TIMEOUT_CMD              ( HZ / 10 )
 #define AX_TIMEOUT_TX               ( HZ * 2 )
+#define AX_MCAST_FILTER_SIZE        8
 #define AX_MAX_MCAST                64
 
 #define AX_DRV_STATE_INITIALIZING   0x00
@@ -155,6 +162,7 @@ struct ax8817x_info {
 	u8 phy_id;
 	u8 phy_state;
 	u8 drv_state;
+	int msg_level;
 };
 
 
@@ -167,12 +175,27 @@ const struct usb_device_id ax8817x_id_table[] = {
       {USB_DEVICE(0x0846, 0x1040), driver_info:0x00130103},
 	/* D-Link DUB-E100 */
       {USB_DEVICE(0x2001, 0x1a00), driver_info:0x009f9d9f},
-
+        /* Intellinet USB Ethernet */
+      {USB_DEVICE(0x0b95, 0x1720), driver_info:0x00130103},
 	{}
 };
 
 MODULE_DEVICE_TABLE(usb, ax8817x_id_table);
 
+#ifdef DEBUG
+#define devdbg(ax_info, fmt, arg...) \
+	printk(KERN_DEBUG "%s: " fmt "\n" , (ax_info)->net->name, ## arg)
+#else
+#define devdbg(ax_info, fmt, arg...) do {} while(0)
+#endif
+
+#define deverr(ax_info, fmt, arg...) \
+	printk(KERN_ERR "%s: " fmt "\n", (ax_info)->net->name, ## arg)
+	
+#define devinfo(ax_info, fmt, arg...) \
+	do { if ((ax_info)->msg_level >= 1) \
+		printk(KERN_INFO "%s: " fmt "\n", (ax_info)->net->name, ## arg); \
+	} while (0)
 
 static void ax_run_ctl_queue(struct ax8817x_info *, struct ax_cmd_req *,
 			     int);
@@ -880,14 +903,14 @@ static void ax8817x_set_multicast(struct net_device *net)
 		u32 crc_bits;
 		int i;
 
-		multi_filter = kmalloc(8, GFP_ATOMIC);
+		multi_filter = kmalloc(AX_MCAST_FILTER_SIZE, GFP_ATOMIC);
 		if (multi_filter == NULL) {
 			/* Oops, couldn't allocate a DMA buffer for setting the multicast
 			   filter. Try all multi mode, although the ax_write_cmd_async
 			   will almost certainly fail, too... (but it will printk). */
 			rx_ctl |= 0x02;
 		} else {
-			memset(multi_filter, 0, 8);
+			memset(multi_filter, 0, AX_MCAST_FILTER_SIZE);
 
 			/* Build the multicast hash filter. */
 			for (i = 0; i < net->mc_count; i++) {
@@ -901,7 +924,7 @@ static void ax8817x_set_multicast(struct net_device *net)
 
 			ax_write_cmd_async(ax_info,
 					   AX_CMD_WRITE_MULTI_FILTER, 0, 0,
-					   8, multi_filter);
+					   AX_MCAST_FILTER_SIZE, multi_filter);
 
 			rx_ctl |= 0x10;
 		}
@@ -915,19 +938,24 @@ static int read_mii_word(struct ax8817x_info *ax_info, __u8 phy, __u8 indx,
 			 __u16 * regd)
 {
 	int ret;
+	u8 buf[4];
 
-	ax_write_cmd(ax_info, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
-	ret =
-	    ax_read_cmd(ax_info, AX_CMD_READ_MII_REG, phy, indx, 2, regd);
-	ax_write_cmd(ax_info, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
-
-	return 0;
+	devdbg(ax_info,"read_mii_word: phy=%02x, indx=%02x, regd=%04x", phy, indx, *regd);
+	
+	ax_write_cmd(ax_info, AX_CMD_SET_SW_MII, 0, 0, 0, &buf);
+	
+	ret = ax_read_cmd(ax_info, AX_CMD_READ_MII_REG, ax_info->phy_id, (__u16)indx, 2, regd);
+	devdbg(ax_info,"read_mii_word: AX_CMD_READ_MII_REG ret=%02x, regd=%04x", ret, *regd);
+	
+	ax_write_cmd(ax_info, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
+	
+	return ret;
 }
 
 static int write_mii_word(struct ax8817x_info *ax_info, __u8 phy,
 			  __u8 indx, __u16 regd)
 {
-	warn("write_mii_word - not implemented!");
+	deverr(ax_info, "write_mii_word - not implemented!");
 	return 0;
 }
 
@@ -936,6 +964,8 @@ static int mdio_read(struct net_device *dev, int phy_id, int loc)
 	struct ax8817x_info *ax_info = dev->priv;
 	int res;
 
+	devdbg(ax_info, "mdio_read: phy_id=%02x, loc=%02x", phy_id, loc);
+	
 	read_mii_word(ax_info, phy_id, loc, (u16 *) & res);
 	return res & 0xffff;
 }
@@ -945,6 +975,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int loc,
 {
 	struct ax8817x_info *ax_info = dev->priv;
 
+	devdbg(ax_info, "mdio_write: phy_id=%02x, loc=%02x", phy_id, loc);
 	write_mii_word(ax_info, phy_id, loc, val);
 }
 
@@ -961,10 +992,10 @@ static int ax8817x_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 	case ETHTOOL_GDRVINFO:{
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 
-			strlcpy(info.driver, DRIVER_NAME,
-				ETHTOOL_BUSINFO_LEN);
-			strlcpy(info.version, DRIVER_VERSION,
-				ETHTOOL_BUSINFO_LEN);
+			strncpy(info.driver, DRIVER_NAME,
+				sizeof(info.driver) - 1);
+			strncpy(info.version, DRIVER_VERSION,
+				sizeof(info.version) - 1);
 			usb_make_path(ax_info->usb, info.bus_info,sizeof info.bus_info);
 			if (copy_to_user(uaddr, &info, sizeof(info)))
 				return -EFAULT;
@@ -993,15 +1024,14 @@ static int ax8817x_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 	case ETHTOOL_GLINK:{
 			struct ethtool_value edata = { ETHTOOL_GLINK };
 
-			edata.data =
-			    ax_info->phy_state == AX_PHY_STATE_LINK;
+			edata.data = mii_link_ok(&ax_info->mii);
 			if (copy_to_user(uaddr, &edata, sizeof(edata)))
 				return -EFAULT;
 			return 0;
 		}
 	case ETHTOOL_GMSGLVL:{
 			struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-			/* edata.data = ax_info->msg_enable; FIXME */
+			edata.data = ax_info->msg_level;
 			if (copy_to_user(uaddr, &edata, sizeof(edata)))
 				return -EFAULT;
 			return 0;
@@ -1011,62 +1041,24 @@ static int ax8817x_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 
 			if (copy_from_user(&edata, uaddr, sizeof(edata)))
 				return -EFAULT;
-			/* sp->msg_enable = edata.data;  FIXME */
+			ax_info->msg_level = edata.data;
 			return 0;
 		}
 	}
 	return -EOPNOTSUPP;
 }
 
-static int ax8817x_mii_ioctl(struct net_device *net, struct ifreq *ifr,
-			     int cmd)
-{
-	struct ax8817x_info *ax_info;
-	struct mii_ioctl_data *data_ptr =
-	    (struct mii_ioctl_data *) &(ifr->ifr_data);
-
-	ax_info = net->priv;
-
-	switch (cmd) {
-	case SIOCGMIIPHY:
-		data_ptr->phy_id = ax_info->phy_id;
-		break;
-	case SIOCGMIIREG:
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
-		ax_read_cmd(ax_info, AX_CMD_READ_MII_REG, 0,
-			    data_ptr->reg_num & 0x1f, 2,
-			    &(data_ptr->val_out));
-		break;
-	default:
-		return -EOPNOTSUPP;
-	}
-	return 0;
-}
-
 static int ax8817x_ioctl(struct net_device *net, struct ifreq *ifr,
 			 int cmd)
 {
 	struct ax8817x_info *ax_info;
-	int res;
 
 	ax_info = net->priv;
-	res = 0;
 
-	switch (cmd) {
-	case SIOCETHTOOL:
-		res = ax8817x_ethtool_ioctl(net, (void __user *)ifr->ifr_data);
-		break;
-	case SIOCGMIIPHY:	/* Get address of PHY in use */
-	case SIOCGMIIREG:	/* Read from MII PHY register */
-	case SIOCSMIIREG:	/* Write to MII PHY register */
-		return ax8817x_mii_ioctl(net, ifr, cmd);
-	default:
-		res = -EOPNOTSUPP;
-	}
-
-	return res;
+	if (cmd == SIOCETHTOOL)
+		return ax8817x_ethtool_ioctl(net, (void __user *) ifr->ifr_data);
+	
+	return generic_mii_ioctl(&ax_info->mii, (struct mii_ioctl_data *) &ifr->ifr_data, cmd, NULL);
 }
 
 static int ax8817x_net_init(struct net_device *net)
@@ -1219,7 +1211,8 @@ static int ax8817x_bind(struct usb_interface *intf,
 	ax_info->mii.dev = net;
 	ax_info->mii.mdio_read = mdio_read;
 	ax_info->mii.mdio_write = mdio_write;
-	ax_info->mii.phy_id_mask = 0x1f;
+	ax_info->mii.phy_id = ax_info->phy_id;
+	ax_info->mii.phy_id_mask = 0x3f;
 	ax_info->mii.reg_num_mask = 0x1f;
 
 	/* Set up the interrupt URB, and start PHY state monitoring */
