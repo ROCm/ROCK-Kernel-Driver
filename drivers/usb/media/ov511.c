@@ -6067,10 +6067,11 @@ error:
  *
  ***************************************************************************/
 
-static void *
-ov51x_probe(struct usb_device *dev, unsigned int ifnum,
+static int
+ov51x_probe(struct usb_interface *intf, 
 	    const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_ov511 *ov;
 	int i;
@@ -6080,15 +6081,15 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
-	interface = &dev->actconfig->interface[ifnum].altsetting[0];
+	interface = &intf->altsetting[0];
 
 	/* Checking vendor/product should be enough, but what the hell */
 	if (interface->bInterfaceClass != 0xFF)
-		return NULL;
+		return -ENODEV;
 	if (interface->bInterfaceSubClass != 0x00)
-		return NULL;
+		return -ENODEV;
 
 	if ((ov = kmalloc(sizeof(*ov), GFP_KERNEL)) == NULL) {
 		err("couldn't kmalloc ov struct");
@@ -6217,7 +6218,8 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 	create_proc_ov511_cam(ov);
 #endif
 
-     	return ov;
+	dev_set_drvdata (&intf->dev, ov);
+     	return 0;
 
 error:
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
@@ -6240,16 +6242,20 @@ error_dealloc:
 
 error_out:
 	err("Camera initialization failed");
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
-ov51x_disconnect(struct usb_device *dev, void *ptr)
+ov51x_disconnect(struct usb_interface *intf)
 {
-	struct usb_ov511 *ov = (struct usb_ov511 *) ptr;
+	struct usb_ov511 *ov = dev_get_drvdata (&intf->dev);
 	int n;
 
 	PDEBUG(3, "");
+
+	dev_set_drvdata (&intf->dev, NULL);
+	if (!ov)
+		return;
 
 	video_unregister_device(&ov->vdev);
 	if (ov->user)
