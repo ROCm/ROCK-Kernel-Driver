@@ -2429,7 +2429,7 @@ EXPORT_SYMBOL(generic_make_request);
  * interfaces, @bio must be presetup and ready for I/O.
  *
  */
-int submit_bio(int rw, struct bio *bio)
+void submit_bio(int rw, struct bio *bio)
 {
 	int count = bio_sectors(bio);
 
@@ -2451,7 +2451,6 @@ int submit_bio(int rw, struct bio *bio)
 	}
 
 	generic_make_request(bio);
-	return 1;
 }
 
 EXPORT_SYMBOL(submit_bio);
@@ -2733,7 +2732,7 @@ void end_that_request_last(struct request *req)
 	struct gendisk *disk = req->rq_disk;
 	struct completion *waiting = req->waiting;
 
-	if (unlikely(laptop_mode))
+	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
 
 	if (disk && blk_fs_request(req)) {

@@ -1200,17 +1200,11 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	}
 
 	case SIOCGSTAMP:
-		if (sk != NULL) {
-			if (!sk->sk_stamp.tv_sec) {
-				release_sock(sk);
-				return -ENOENT;
-			}
-			ret = copy_to_user((void *)arg, &sk->sk_stamp, sizeof(struct timeval)) ? -EFAULT : 0;
-			release_sock(sk);
-			return ret;
-		}
+		ret = -EINVAL;
+		if (sk != NULL)
+			ret = sock_get_timestamp(sk, (struct timeval *)arg);
 		release_sock(sk);
-		return -EINVAL;
+		return ret;
 
 	case SIOCGIFADDR:
 	case SIOCSIFADDR:

@@ -1694,12 +1694,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			if (!sk->sk_stamp.tv_sec) {
-				res = -ENOENT;
-				break;
-			}
-			res = copy_to_user((void *)arg, &sk->sk_stamp,
-					  sizeof(struct timeval)) ? -EFAULT : 0;
+			res = sock_get_timestamp(sk, (struct timeval *)arg);
 			break;
 	 	}
 		res = -EINVAL;

@@ -10,22 +10,14 @@
  */
 #include <linux/config.h>
 #include <linux/compiler.h>
-#include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/types.h>
 #include <linux/ptrace.h>
-#include <linux/mman.h>
-#include <linux/mm.h>
 #include <linux/proc_fs.h>
-#include <linux/bitops.h>
 #include <linux/init.h>
 
-#include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
-#include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
 #include "fault.h"

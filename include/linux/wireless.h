@@ -438,7 +438,7 @@ struct	iw_param
  */
 struct	iw_point
 {
-  caddr_t	pointer;	/* Pointer to the data  (in user space) */
+  void __user	*pointer;	/* Pointer to the data  (in user space) */
   __u16		length;		/* number of fields or size in bytes */
   __u16		flags;		/* Optional params */
 };

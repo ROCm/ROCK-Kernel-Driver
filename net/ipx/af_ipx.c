@@ -1797,7 +1797,8 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 				     copied);
 	if (rc)
 		goto out_free;
-	sk->sk_stamp = skb->stamp;
+	if (skb->stamp.tv_sec)
+		sk->sk_stamp = skb->stamp;
 
 	msg->msg_namelen = sizeof(*sipx);
 
@@ -1870,15 +1871,8 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 	case SIOCGSTAMP:
 		rc = -EINVAL;
-		if (sk) {
-			rc = -ENOENT;
-			if (!sk->sk_stamp.tv_sec)
-				break;
-			rc = -EFAULT;
-			if (!copy_to_user((void *)arg, &sk->sk_stamp,
-					  sizeof(struct timeval)))
-				rc = 0;
-		}
+		if (sk) 
+			rc = sock_get_timestamp(sk, (struct timeval *)arg);
 		break;
 	case SIOCGIFDSTADDR:
 	case SIOCSIFDSTADDR:

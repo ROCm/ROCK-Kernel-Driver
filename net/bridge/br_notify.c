@@ -14,7 +14,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/if_bridge.h>
+
 #include "br_private.h"
 
 static int br_device_event(struct notifier_block *unused, unsigned long event, void *ptr);

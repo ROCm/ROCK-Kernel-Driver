@@ -274,6 +274,7 @@ static int lance_rx (struct net_device *dev)
 	struct sk_buff *skb = 0;	/* XXX shut up gcc warnings */
 
 #ifdef TEST_HITS
+	int i;
 	printk ("[");
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		if (i == lp->rx_new)

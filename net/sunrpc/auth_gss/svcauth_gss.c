@@ -895,6 +895,7 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 		svc_putu32(resv, rpc_success);
 		goto complete;
 	case RPC_GSS_PROC_DATA:
+		*authp = rpc_autherr_badcred;
 		rqstp->rq_client =
 			find_gss_auth_domain(rsci->mechctx, gc->gc_svc);
 		if (rqstp->rq_client == NULL)

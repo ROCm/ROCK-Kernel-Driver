@@ -635,7 +635,7 @@ asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t __user *offset, siz
 		return ret;
 	}
 
-	return do_sendfile(out_fd, in_fd, NULL, count, MAX_NON_LFS);
+	return do_sendfile(out_fd, in_fd, NULL, count, 0);
 }
 
 asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t __user *offset, size_t count)

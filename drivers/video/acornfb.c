@@ -20,12 +20,9 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
-#include <linux/mm.h>
-#include <linux/tty.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/fb.h>
@@ -36,7 +33,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
-#include <asm/uaccess.h>
+#include <asm/pgtable.h>
 
 #include "acornfb.h"
 

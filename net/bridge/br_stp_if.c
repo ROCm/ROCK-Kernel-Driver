@@ -14,21 +14,26 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/if_bridge.h>
 #include <linux/smp_lock.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 #include "br_private_stp.h"
 
-static inline __u16 br_make_port_id(const struct net_bridge_port *p)
+
+/* Port id is composed of priority and port number.
+ * NB: least significant bits of priority are dropped to
+ *     make room for more ports.
+ */
+static inline port_id br_make_port_id(__u8 priority, __u16 port_no)
 {
-	return (p->priority << 8) | p->port_no;
+	return ((u16)priority << BR_PORT_BITS) 
+		| (port_no & ((1<<BR_PORT_BITS)-1));
 }
 
 /* called under bridge lock */
 void br_init_port(struct net_bridge_port *p)
 {
-	p->port_id = br_make_port_id(p);
+	p->port_id = br_make_port_id(p->priority, p->port_no);
 	br_become_designated_port(p);
 	p->state = BR_STATE_BLOCKING;
 	p->topology_change_ack = 0;
@@ -111,7 +116,8 @@ void br_stp_disable_port(struct net_bridge_port *p)
 }
 
 /* called under bridge lock */
-static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
+static void br_stp_change_bridge_id(struct net_bridge *br, 
+				    const unsigned char *addr)
 {
 	unsigned char oldaddr[6];
 	struct net_bridge_port *p;
@@ -138,15 +144,13 @@ static void br_stp_change_bridge_id(struct net_bridge *br, unsigned char *addr)
 		br_become_root_bridge(br);
 }
 
-static unsigned char br_mac_zero[6];
+static const unsigned char br_mac_zero[6];
 
 /* called under bridge lock */
 void br_stp_recalculate_bridge_id(struct net_bridge *br)
 {
-	unsigned char *addr;
+	const unsigned char *addr = br_mac_zero;
 	struct net_bridge_port *p;
-
-	addr = br_mac_zero;
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (addr == br_mac_zero ||
@@ -160,7 +164,7 @@ void br_stp_recalculate_bridge_id(struct net_bridge *br)
 }
 
 /* called under bridge lock */
-void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
+void br_stp_set_bridge_priority(struct net_bridge *br, u16 newprio)
 {
 	struct net_bridge_port *p;
 	int wasroot;
@@ -185,17 +189,15 @@ void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
 }
 
 /* called under bridge lock */
-void br_stp_set_port_priority(struct net_bridge_port *p, int newprio)
+void br_stp_set_port_priority(struct net_bridge_port *p, u8 newprio)
 {
-	__u16 new_port_id;
-
-	p->priority = newprio & 0xFF;
-	new_port_id = br_make_port_id(p);
+	port_id new_port_id = br_make_port_id(newprio, p->port_no);
 
 	if (br_is_designated_port(p))
 		p->designated_port = new_port_id;
 
 	p->port_id = new_port_id;
+	p->priority = newprio;
 	if (!memcmp(&p->br->bridge_id, &p->designated_bridge, 8) &&
 	    p->port_id < p->designated_port) {
 		br_become_designated_port(p);
@@ -204,7 +206,7 @@ void br_stp_set_port_priority(struct net_bridge_port *p, int newprio)
 }
 
 /* called under bridge lock */
-void br_stp_set_path_cost(struct net_bridge_port *p, int path_cost)
+void br_stp_set_path_cost(struct net_bridge_port *p, u32 path_cost)
 {
 	p->path_cost = path_cost;
 	br_configuration_update(p->br);

@@ -562,7 +562,9 @@ int set_anon_super(struct super_block *s, void *data)
 	spin_unlock(&unnamed_dev_lock);
 
 	if ((dev & MAX_ID_MASK) == (1 << MINORBITS)) {
+		spin_lock(&unnamed_dev_lock);
 		idr_remove(&unnamed_dev_idr, dev);
+		spin_unlock(&unnamed_dev_lock);
 		return -EMFILE;
 	}
 	s->s_dev = MKDEV(0, dev & MINORMASK);

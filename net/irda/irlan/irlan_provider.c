@@ -358,7 +358,7 @@ void irlan_provider_send_reply(struct irlan_cb *self, int command,
 					 12);
 		break;
 	case CMD_FILTER_OPERATION:
-		handle_filter_request(self, skb);
+		irlan_filter_request(self, skb);
 		break;
 	default:
 		IRDA_DEBUG(2, "%s(), Unknown command!\n", __FUNCTION__ );

@@ -634,8 +634,8 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		/* RFC 2460 section 8.1 says that we SHOULD log
 		   this error. Well, it is reasonable.
 		 */
-		if (net_ratelimit())
-			printk(KERN_INFO "IPv6: udp checksum is 0\n");
+		LIMIT_NETDEBUG(
+			printk(KERN_INFO "IPv6: udp checksum is 0\n"));
 		goto discard;
 	}
 
@@ -650,7 +650,7 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	if (skb->ip_summed==CHECKSUM_HW) {
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		if (csum_ipv6_magic(saddr, daddr, ulen, IPPROTO_UDP, skb->csum)) {
-			NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp v6 hw csum failure.\n"));
+			LIMIT_NETDEBUG(printk(KERN_DEBUG "udp v6 hw csum failure.\n"));
 			skb->ip_summed = CHECKSUM_NONE;
 		}
 	}
@@ -913,6 +913,7 @@ do_udp_sendmsg:
 	if (msg->msg_controllen) {
 		opt = &opt_space;
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
+		opt->tot_len = sizeof(*opt);
 
 		err = datagram_send_ctl(msg, fl, opt, &hlimit);
 		if (err < 0) {
@@ -970,7 +971,7 @@ back_from_confirm:
 		/* ... which is an evident application bug. --ANK */
 		release_sock(sk);
 
-		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 2\n"));
+		LIMIT_NETDEBUG(printk(KERN_DEBUG "udp cork app bug 2\n"));
 		err = -EINVAL;
 		goto out;
 	}

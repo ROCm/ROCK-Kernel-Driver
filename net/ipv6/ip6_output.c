@@ -170,8 +170,8 @@ int ip6_route_me_harder(struct sk_buff *skb)
 
 	if (dst->error) {
 		IP6_INC_STATS(Ip6OutNoRoutes);
-		if (net_ratelimit())
-			printk(KERN_DEBUG "ip6_route_me_harder: No more route.\n");
+		LIMIT_NETDEBUG(
+			printk(KERN_DEBUG "ip6_route_me_harder: No more route.\n"));
 		dst_release(dst);
 		return -EINVAL;
 	}

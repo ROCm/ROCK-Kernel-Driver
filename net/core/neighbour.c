@@ -1094,7 +1094,7 @@ void pneigh_enqueue(struct neigh_table *tbl, struct neigh_parms *p,
 		kfree_skb(skb);
 		return;
 	}
-	skb->stamp.tv_sec  = 0;
+	skb->stamp.tv_sec  = LOCALLY_ENQUEUED;
 	skb->stamp.tv_usec = now + sched_next;
 
 	spin_lock(&tbl->proxy_queue.lock);

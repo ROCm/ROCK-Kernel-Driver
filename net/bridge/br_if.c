@@ -14,31 +14,65 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/netdevice.h>
+#include <linux/ethtool.h>
 #include <linux/if_arp.h>
-#include <linux/if_bridge.h>
-#include <linux/inetdevice.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <net/sock.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 
-/* Limited to 256 ports because of STP protocol pdu */
-#define  BR_MAX_PORTS	256
-
+/*
+ * Determine initial path cost based on speed.
+ * using recommendations from 802.1d standard
+ *
+ * Need to simulate user ioctl because not all device's that support
+ * ethtool, use ethtool_ops.  Also, since driver might sleep need to
+ * not be holding any locks.
+ */
 static int br_initial_port_cost(struct net_device *dev)
 {
+
+	struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+	struct ifreq ifr;
+	mm_segment_t old_fs;
+	int err;
+
+	strncpy(ifr.ifr_name, dev->name, IFNAMSIZ);
+	ifr.ifr_data = (void *) &ecmd;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = dev_ethtool(&ifr);
+	set_fs(old_fs);
+	
+	if (!err) {
+		switch(ecmd.speed) {
+		case SPEED_100:
+			return 19;
+		case SPEED_1000:
+			return 4;
+		case SPEED_10000:
+			return 2;
+		case SPEED_10:
+			return 100;
+		default:
+			pr_info("bridge: can't decode speed from %s: %d\n",
+				dev->name, ecmd.speed);
+			return 100;
+		}
+	}
+
+	/* Old silly heuristics based on name */
 	if (!strncmp(dev->name, "lec", 3))
 		return 7;
-
-	if (!strncmp(dev->name, "eth", 3))
-		return 100;			/* FIXME handle 100Mbps */
 
 	if (!strncmp(dev->name, "plip", 4))
 		return 2500;
 
-	return 100;
+	return 100;	/* assume old 10Mbps */
 }
 
 static void destroy_nbp(void *arg)
@@ -129,32 +163,38 @@ static struct net_bridge *new_nb(const char *name)
 	return br;
 }
 
-static int free_port(struct net_bridge *br)
+/* find an available port number */
+static int find_portno(struct net_bridge *br)
 {
 	int index;
 	struct net_bridge_port *p;
-	long inuse[BR_MAX_PORTS/(sizeof(long)*8)];
+	unsigned long *inuse;
 
-	/* find free port number */
-	memset(inuse, 0, sizeof(inuse));
+	inuse = kmalloc(BITS_TO_LONGS(BR_MAX_PORTS)*sizeof(unsigned long),
+			GFP_ATOMIC);
+	if (!inuse)
+		return -ENOMEM;
+
+	memset(inuse, 0, BITS_TO_LONGS(BR_MAX_PORTS)*sizeof(unsigned long));
+	set_bit(0, inuse);	/* zero is reserved */
 	list_for_each_entry(p, &br->port_list, list) {
 		set_bit(p->port_no, inuse);
 	}
-
 	index = find_first_zero_bit(inuse, BR_MAX_PORTS);
-	if (index >= BR_MAX_PORTS)
-		return -EXFULL;
+	kfree(inuse);
 
-	return index;
+	return (index >= BR_MAX_PORTS) ? -EXFULL : index;
 }
 
 /* called under bridge lock */
-static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device *dev)
+static struct net_bridge_port *new_nbp(struct net_bridge *br, 
+				       struct net_device *dev,
+				       unsigned long cost)
 {
 	int index;
 	struct net_bridge_port *p;
 	
-	index = free_port(br);
+	index = find_portno(br);
 	if (index < 0)
 		return ERR_PTR(index);
 
@@ -164,15 +204,14 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 
 	memset(p, 0, sizeof(*p));
 	p->br = br;
+	dev_hold(dev);
 	p->dev = dev;
-	p->path_cost = br_initial_port_cost(dev);
-	p->priority = 0x80;
+	p->path_cost = cost;
+ 	p->priority = 0x8000 >> BR_PORT_BITS;
 	dev->br_port = p;
 	p->port_no = index;
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
-
-	list_add_rcu(&p->list, &br->port_list);
 
 	return p;
 }
@@ -218,13 +257,11 @@ int br_del_bridge(const char *name)
 	return ret;
 }
 
-/* called under bridge lock */
 int br_add_if(struct net_bridge *br, struct net_device *dev)
 {
 	struct net_bridge_port *p;
-
-	if (dev->br_port != NULL)
-		return -EBUSY;
+	unsigned long cost;
+	int err = 0;
 
 	if (dev->flags & IFF_LOOPBACK || dev->type != ARPHRD_ETHER)
 		return -EINVAL;
@@ -232,34 +269,48 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (dev->hard_start_xmit == br_dev_xmit)
 		return -ELOOP;
 
-	dev_hold(dev);
-	p = new_nbp(br, dev);
-	if (IS_ERR(p)) {
-		dev_put(dev);
-		return PTR_ERR(p);
+	cost = br_initial_port_cost(dev);
+
+	spin_lock_bh(&br->lock);
+	if (dev->br_port != NULL)
+		err = -EBUSY;
+
+	else if (IS_ERR(p = new_nbp(br, dev, cost)))
+		err = PTR_ERR(p);
+
+ 	else if ((err = br_fdb_insert(br, p, dev->dev_addr, 1)))
+ 		 destroy_nbp(p);
+ 
+	else {
+		dev_set_promiscuity(dev, 1);
+
+		list_add_rcu(&p->list, &br->port_list);
+
+		br_stp_recalculate_bridge_id(br);
+		if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
+			br_stp_enable_port(p);
+
 	}
-
-	dev_set_promiscuity(dev, 1);
-
-	br_stp_recalculate_bridge_id(br);
-	br_fdb_insert(br, p, dev->dev_addr, 1);
-	if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
-		br_stp_enable_port(p);
-
-	return 0;
+	spin_unlock_bh(&br->lock);
+	return err;
 }
 
-/* called under bridge lock */
 int br_del_if(struct net_bridge *br, struct net_device *dev)
 {
 	struct net_bridge_port *p;
+	int err = 0;
 
-	if ((p = dev->br_port) == NULL || p->br != br)
-		return -EINVAL;
+	spin_lock_bh(&br->lock);
+	p = dev->br_port;
+	if (!p || p->br != br) 
+		err = -EINVAL;
+	else {
+		del_nbp(p);
+		br_stp_recalculate_bridge_id(br);
+	}
+	spin_unlock_bh(&br->lock);
 
-	del_nbp(p);
-	br_stp_recalculate_bridge_id(br);
-	return 0;
+	return err;
 }
 
 int br_get_bridge_ifindices(int *indices, int num)

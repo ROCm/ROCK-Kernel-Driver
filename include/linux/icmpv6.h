@@ -95,8 +95,7 @@ struct icmp6hdr {
 #define MLD2_ALLOW_NEW_SOURCES	5
 #define MLD2_BLOCK_OLD_SOURCES	6
 
-/* this must be an IANA-assigned value; 206 for testing only */
-#define ICMPV6_MLD2_REPORT		206
+#define ICMPV6_MLD2_REPORT		143
 #define MLD2_ALL_MCR_INIT { { { 0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x16 } } }
 
 /*

@@ -28,7 +28,6 @@
 #include <asm/elf.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pgalloc.h>
 #include <asm/proc-fns.h>
 #include <asm/processor.h>
 #include <asm/semaphore.h>

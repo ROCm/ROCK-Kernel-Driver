@@ -328,6 +328,8 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 
 		case SO_TIMESTAMP:
 			sk->sk_rcvtstamp = valbool;
+			if (valbool) 
+				sock_enable_timestamp(sk);
 			break;
 
 		case SO_RCVLOWAT:
@@ -641,6 +643,8 @@ void sk_free(struct sock *sk)
 		sk_filter_release(sk, filter);
 		sk->sk_filter = NULL;
 	}
+
+	sock_disable_timestamp(sk);
 
 	if (atomic_read(&sk->sk_omem_alloc))
 		printk(KERN_DEBUG "%s: optmem leakage (%d bytes) detected.\n",
@@ -1135,6 +1139,9 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
 	sk->sk_owner		=	NULL;
 
+	sk->sk_stamp.tv_sec     = -1L;
+	sk->sk_stamp.tv_usec    = -1L;
+
 	atomic_set(&sk->sk_refcnt, 1);
 }
 
@@ -1160,8 +1167,41 @@ void fastcall release_sock(struct sock *sk)
 		wake_up(&(sk->sk_lock.wq));
 	spin_unlock_bh(&(sk->sk_lock.slock));
 }
-
 EXPORT_SYMBOL(release_sock);
+
+/* When > 0 there are consumers of rx skb time stamps */
+atomic_t netstamp_needed = ATOMIC_INIT(0); 
+
+int sock_get_timestamp(struct sock *sk, struct timeval *userstamp)
+{ 
+	if (!sock_flag(sk, SOCK_TIMESTAMP))
+		sock_enable_timestamp(sk);
+	if (sk->sk_stamp.tv_sec == -1) 
+		return -ENOENT;
+	if (sk->sk_stamp.tv_sec == 0)
+		do_gettimeofday(&sk->sk_stamp);
+	return copy_to_user(userstamp, &sk->sk_stamp, sizeof(struct timeval)) ?
+		-EFAULT : 0; 
+} 
+EXPORT_SYMBOL(sock_get_timestamp);
+
+void sock_enable_timestamp(struct sock *sk)
+{	
+	if (!sock_flag(sk, SOCK_TIMESTAMP)) { 
+		sock_set_flag(sk, SOCK_TIMESTAMP);
+		atomic_inc(&netstamp_needed);
+	}
+}
+EXPORT_SYMBOL(sock_enable_timestamp); 
+
+void sock_disable_timestamp(struct sock *sk)
+{	
+	if (sock_flag(sk, SOCK_TIMESTAMP)) { 
+		sock_reset_flag(sk, SOCK_TIMESTAMP);
+		atomic_dec(&netstamp_needed);
+	}
+}
+EXPORT_SYMBOL(sock_disable_timestamp);
 
 EXPORT_SYMBOL(__lock_sock);
 EXPORT_SYMBOL(__release_sock);

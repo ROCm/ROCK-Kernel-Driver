@@ -860,7 +860,7 @@ int arp_process(struct sk_buff *skb)
 				if (n)
 					neigh_release(n);
 
-				if (skb->stamp.tv_sec == 0 ||
+				if (skb->stamp.tv_sec == LOCALLY_ENQUEUED || 
 				    skb->pkt_type == PACKET_HOST ||
 				    in_dev->arp_parms->proxy_delay == 0) {
 					arp_send(ARPOP_REPLY,ETH_P_ARP,sip,dev,tip,sha,dev->dev_addr,sha);

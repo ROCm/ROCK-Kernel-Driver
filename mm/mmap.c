@@ -728,7 +728,7 @@ unmap_and_free_vma:
 	fput(file);
 
 	/* Undo any partial mapping done by a device driver. */
-	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
+	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start, NULL);
 free_vma:
 	kmem_cache_free(vm_area_cachep, vma);
 unacct_error:
@@ -1160,7 +1160,7 @@ static void unmap_region(struct mm_struct *mm,
 
 	lru_add_drain();
 	tlb = tlb_gather_mmu(mm, 0);
-	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted);
+	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 
 	if (is_hugepage_only_range(start, end - start))
@@ -1446,7 +1446,7 @@ void exit_mmap(struct mm_struct *mm)
 	flush_cache_mm(mm);
 	/* Use ~0UL here to ensure all VMAs in the mm are unmapped */
 	mm->map_count -= unmap_vmas(&tlb, mm, mm->mmap, 0,
-					~0UL, &nr_accounted);
+					~0UL, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
@@ -1498,9 +1498,11 @@ void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
  * Copy the vma structure to a new location in the same mm,
  * prior to moving page table entries, to effect an mremap move.
  */
-struct vm_area_struct *copy_vma(struct vm_area_struct *vma,
+struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 	unsigned long addr, unsigned long len, unsigned long pgoff)
 {
+	struct vm_area_struct *vma = *vmap;
+	unsigned long vma_start = vma->vm_start;
 	struct mm_struct *mm = vma->vm_mm;
 	struct vm_area_struct *new_vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
@@ -1508,7 +1510,14 @@ struct vm_area_struct *copy_vma(struct vm_area_struct *vma,
 	find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	new_vma = vma_merge(mm, prev, rb_parent, addr, addr + len,
 			vma->vm_flags, vma->vm_file, pgoff);
-	if (!new_vma) {
+	if (new_vma) {
+		/*
+		 * Source vma may have been merged into new_vma
+		 */
+		if (vma_start >= new_vma->vm_start &&
+		    vma_start < new_vma->vm_end)
+			*vmap = new_vma;
+	} else {
 		new_vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (new_vma) {
 			*new_vma = *vma;
@@ -1524,25 +1533,4 @@ struct vm_area_struct *copy_vma(struct vm_area_struct *vma,
 		}
 	}
 	return new_vma;
-}
-
-/*
- * Position vma after prev in shared file list:
- * for mremap move error recovery racing against vmtruncate.
- */
-void vma_relink_file(struct vm_area_struct *vma, struct vm_area_struct *prev)
-{
-	struct mm_struct *mm = vma->vm_mm;
-	struct address_space *mapping;
-
-	if (vma->vm_file) {
-		mapping = vma->vm_file->f_mapping;
-		if (mapping) {
-			down(&mapping->i_shared_sem);
-			spin_lock(&mm->page_table_lock);
-			list_move(&vma->shared, &prev->shared);
-			spin_unlock(&mm->page_table_lock);
-			up(&mapping->i_shared_sem);
-		}
-	}
 }

@@ -359,16 +359,12 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		set_pte(ptep, swp_entry_to_pte(entry));
 		BUG_ON(pte_file(*ptep));
 	} else {
-		unsigned long pgidx;
 		/*
 		 * If a nonlinear mapping then store the file page offset
 		 * in the pte.
 		 */
 		BUG_ON(!page->mapping);
-		pgidx = (address - vma->vm_start) >> PAGE_SHIFT;
-		pgidx += vma->vm_pgoff;
-		pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
-		if (page->index != pgidx) {
+		if (page->index != linear_page_index(vma, address)) {
 			set_pte(ptep, pgoff_to_pte(page->index));
 			BUG_ON(!pte_file(*ptep));
 		}

@@ -175,6 +175,12 @@ int sctp_rcv(struct sk_buff *skb)
 	rcvr = asoc ? &asoc->base : &ep->base;
 	sk = rcvr->sk;
 
+	/* SCTP seems to always need a timestamp right now (FIXME) */
+	if (skb->stamp.tv_sec == 0) {
+		do_gettimeofday(&skb->stamp);
+		sock_enable_timestamp(sk); 
+	}
+
 	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb, family))
 		goto discard_release;
 

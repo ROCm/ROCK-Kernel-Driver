@@ -1003,6 +1003,8 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			/* We compiled with -fno-common.  These are not
 			   supposed to happen.  */
 			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
+			printk("%s: please compile with -fno-common\n",
+			       mod->name);
 			ret = -ENOEXEC;
 			break;
 

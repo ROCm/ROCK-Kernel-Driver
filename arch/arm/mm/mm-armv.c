@@ -16,7 +16,6 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 
-#include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/page.h>
 #include <asm/rmap.h>

@@ -485,8 +485,7 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 			break;
 		block_in_file++;
 	}
-	if (page_block == 0)
-		buffer_error();
+	BUG_ON(page_block == 0);
 
 	first_unmapped = page_block;
 

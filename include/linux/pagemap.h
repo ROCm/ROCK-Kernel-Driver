@@ -139,14 +139,12 @@ static inline unsigned long get_page_cache_size(void)
         return atomic_read(&nr_pagecache);
 }
 
-static inline void ___add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long index)
+static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
+					unsigned long address)
 {
-	page->mapping = mapping;
-	page->index = index;
-
-	mapping->nrpages++;
-	pagecache_acct(1);
+	pgoff_t pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
+	pgoff += vma->vm_pgoff;
+	return pgoff >> (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 }
 
 extern void FASTCALL(__lock_page(struct page *page));

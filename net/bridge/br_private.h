@@ -24,6 +24,9 @@
 
 #define BR_HOLD_TIME (1*HZ)
 
+#define BR_PORT_BITS	10
+#define BR_MAX_PORTS	(1<<BR_PORT_BITS)
+
 typedef struct bridge_id bridge_id;
 typedef struct mac_addr mac_addr;
 typedef __u16 port_id;
@@ -37,7 +40,6 @@ struct bridge_id
 struct mac_addr
 {
 	unsigned char	addr[6];
-	unsigned char	pad[2];
 };
 
 struct net_bridge_fdb_entry
@@ -48,8 +50,8 @@ struct net_bridge_fdb_entry
 	atomic_t			use_count;
 	unsigned long			ageing_timer;
 	mac_addr			addr;
-	unsigned			is_local:1;
-	unsigned			is_static:1;
+	unsigned char			is_local;
+	unsigned char			is_static;
 };
 
 struct net_bridge_port
@@ -57,19 +59,19 @@ struct net_bridge_port
 	struct net_bridge		*br;
 	struct net_device		*dev;
 	struct list_head		list;
-	__u8				port_no;
-	__u8				priority;
 
 	/* STP */
+	u8				priority;
+	u8				state;
+	u16				port_no;
+	unsigned char			topology_change_ack;
+	unsigned char			config_pending;
 	port_id				port_id;
-	int				state;
-	int				path_cost;
-	bridge_id			designated_root;
-	int				designated_cost;
-	bridge_id			designated_bridge;
 	port_id				designated_port;
-	unsigned			topology_change_ack:1;
-	unsigned			config_pending:1;
+	bridge_id			designated_root;
+	bridge_id			designated_bridge;
+	u32				path_cost;
+	u32				designated_cost;
 
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
@@ -89,29 +91,29 @@ struct net_bridge
 
 	/* STP */
 	bridge_id			designated_root;
-	int				root_path_cost;
-	int				root_port;
-	int				max_age;
-	int				hello_time;
-	int				forward_delay;
 	bridge_id			bridge_id;
-	int				bridge_max_age;
-	int				bridge_hello_time;
-	int				bridge_forward_delay;
-	unsigned			stp_enabled:1;
-	unsigned			topology_change:1;
-	unsigned			topology_change_detected:1;
+	u32				root_path_cost;
+	unsigned long			max_age;
+	unsigned long			hello_time;
+	unsigned long			forward_delay;
+	unsigned long			bridge_max_age;
+	unsigned long			ageing_time;
+	unsigned long			bridge_hello_time;
+	unsigned long			bridge_forward_delay;
+
+	u16				root_port;
+	unsigned char			stp_enabled;
+	unsigned char			topology_change;
+	unsigned char			topology_change_detected;
 
 	struct timer_list		hello_timer;
 	struct timer_list		tcn_timer;
 	struct timer_list		topology_change_timer;
 	struct timer_list		gc_timer;
-
-	int				ageing_time;
 };
 
 extern struct notifier_block br_device_notifier;
-extern unsigned char bridge_ula[6];
+extern const unsigned char bridge_ula[6];
 
 /* called under bridge lock */
 static inline int br_is_root_bridge(const struct net_bridge *br)
@@ -125,6 +127,8 @@ extern void br_dev_setup(struct net_device *dev);
 extern int br_dev_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* br_fdb.c */
+extern void br_fdb_init(void);
+extern void br_fdb_fini(void);
 extern void br_fdb_changeaddr(struct net_bridge_port *p,
 			      const unsigned char *newaddr);
 extern void br_fdb_cleanup(unsigned long arg);
@@ -137,10 +141,10 @@ extern int  br_fdb_get_entries(struct net_bridge *br,
 			unsigned char *_buf,
 			int maxnum,
 			int offset);
-extern void br_fdb_insert(struct net_bridge *br,
-			  struct net_bridge_port *source,
-			  const unsigned char *addr,
-			  int is_local);
+extern int br_fdb_insert(struct net_bridge *br,
+			 struct net_bridge_port *source,
+			 const unsigned char *addr,
+			 int is_local);
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -188,7 +192,7 @@ extern void br_netfilter_fini(void);
 /* br_stp.c */
 extern void br_log_state(const struct net_bridge_port *p);
 extern struct net_bridge_port *br_get_port(struct net_bridge *br,
-				    int port_no);
+				    	   u16 port_no);
 extern void br_init_port(struct net_bridge_port *p);
 extern void br_become_designated_port(struct net_bridge_port *p);
 
@@ -199,11 +203,11 @@ extern void br_stp_enable_port(struct net_bridge_port *p);
 extern void br_stp_disable_port(struct net_bridge_port *p);
 extern void br_stp_recalculate_bridge_id(struct net_bridge *br);
 extern void br_stp_set_bridge_priority(struct net_bridge *br,
-				int newprio);
+				       u16 newprio);
 extern void br_stp_set_port_priority(struct net_bridge_port *p,
-			      int newprio);
+				     u8 newprio);
 extern void br_stp_set_path_cost(struct net_bridge_port *p,
-			  int path_cost);
+				 u32 path_cost);
 
 /* br_stp_bpdu.c */
 extern int br_stp_handle_bpdu(struct sk_buff *skb);

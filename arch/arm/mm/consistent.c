@@ -12,17 +12,14 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 
+#include <asm/cacheflush.h>
 #include <asm/io.h>
-#include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 #define CONSISTENT_BASE	(0xffc00000)
