@@ -206,7 +206,7 @@ struct mptscsih_driver_setup
 #define x_scsi_dev_reset	mptscsih_dev_reset
 #define x_scsi_host_reset	mptscsih_host_reset
 #define x_scsi_bios_param	mptscsih_bios_param
-#define x_scsi_select_queue_depths	mptscsih_select_queue_depths
+#define x_scsi_slave_attach	mptscsih_slave_attach
 
 #define x_scsi_taskmgmt_bh	mptscsih_taskmgmt_bh
 #define x_scsi_old_abort	mptscsih_old_abort
@@ -234,7 +234,7 @@ extern	int		 x_scsi_bios_param(Disk *, struct block_device *, int *);
 #else
 extern	int		 x_scsi_bios_param(Disk *, kdev_t, int *);
 #endif
-extern	void		 x_scsi_select_queue_depths(struct Scsi_Host *, Scsi_Device *);
+extern	int		 x_scsi_slave_attach(Scsi_Device *);
 extern	void		 x_scsi_taskmgmt_bh(void *);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
@@ -262,6 +262,7 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 	eh_bus_reset_handler:		x_scsi_bus_reset,	\
 	eh_host_reset_handler:		x_scsi_host_reset,	\
 	bios_param:			x_scsi_bios_param,	\
+	slave_attach:			x_scsi_slave_attach,	\
 	can_queue:			MPT_SCSI_CAN_QUEUE,	\
 	this_id:			-1,			\
 	sg_tablesize:			MPT_SCSI_SG_DEPTH,	\
