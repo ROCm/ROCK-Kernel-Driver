@@ -67,16 +67,17 @@ static int hvc_open(struct tty_struct *tty, struct file * filp)
 {
 	int line = minor(tty->device) - tty->driver.minor_start;
 	struct hvc_struct *hp;
+	unsigned long flags;
 
 	if (line < 0 || line >= MAX_NR_HVC_CONSOLES)
 		return -ENODEV;
 	hp = &hvc_struct[line];
 
 	tty->driver_data = hp;
-	spin_lock(&hp->lock);
+	spin_lock_irqsave(&hp->lock, flags);
 	hp->tty = tty;
 	hp->count++;
-	spin_unlock(&hp->lock);
+	spin_unlock_irqrestore(&hp->lock, flags);
 
 	return 0;
 }
@@ -84,16 +85,17 @@ static int hvc_open(struct tty_struct *tty, struct file * filp)
 static void hvc_close(struct tty_struct *tty, struct file * filp)
 {
 	struct hvc_struct *hp = tty->driver_data;
+	unsigned long flags;
 
 	if (tty_hung_up_p(filp))
 		return;
-	spin_lock(&hp->lock);
+	spin_lock_irqsave(&hp->lock, flags);
 	if (--hp->count == 0)
 		hp->tty = NULL;
 	else if (hp->count < 0)
 		printk(KERN_ERR "hvc_close %lu: oops, count is %d\n",
 		       hp - hvc_struct, hp->count);
-	spin_unlock(&hp->lock);
+	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
 /* called with hp->lock held */
@@ -122,8 +124,9 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 	struct hvc_struct *hp = tty->driver_data;
 	char *p;
 	int todo, written = 0;
+	unsigned long flags;
 
-	spin_lock(&hp->lock);
+	spin_lock_irqsave(&hp->lock, flags);
 	while (count > 0 && (todo = N_OUTBUF - hp->n_outbuf) > 0) {
 		if (todo > count)
 			todo = count;
@@ -143,7 +146,7 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 		written += todo;
 		hvc_push(hp);
 	}
-	spin_unlock(&hp->lock);
+	spin_unlock_irqrestore(&hp->lock, flags);
 
 	return written;
 }
@@ -168,8 +171,9 @@ static void hvc_poll(int index)
 	struct tty_struct *tty;
 	int i, n;
 	char buf[16] __ALIGNED__;
+	unsigned long flags;
 
-	spin_lock(&hp->lock);
+	spin_lock_irqsave(&hp->lock, flags);
 
 	if (hp->n_outbuf > 0)
 		hvc_push(hp);
@@ -197,7 +201,7 @@ static void hvc_poll(int index)
 		}
 	}
 
-	spin_unlock(&hp->lock);
+	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
 int khvcd(void *unused)
