@@ -89,7 +89,7 @@ sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
 
 /* Initialize the packet structure. */
 sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
-				sctp_transport_t *transport,
+				struct sctp_transport *transport,
 				__u16 sport,
 				__u16 dport)
 {
@@ -233,7 +233,7 @@ finish:
  */
 int sctp_packet_transmit(sctp_packet_t *packet)
 {
-	sctp_transport_t *transport = packet->transport;
+	struct sctp_transport *transport = packet->transport;
 	sctp_association_t *asoc = transport->asoc;
 	struct sctphdr *sh;
 	__u32 crc32;
@@ -473,7 +473,7 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	size_t datasize, rwnd, inflight;
-	sctp_transport_t *transport = packet->transport;
+	struct sctp_transport *transport = packet->transport;
 	__u32 max_burst_bytes;
 
 	/* RFC 2960 6.1  Transmission of DATA Chunks

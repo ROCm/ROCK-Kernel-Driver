@@ -256,7 +256,7 @@ sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *,
 				   const sctp_chunk_t *,
 				   const struct msghdr *);
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
-				  const sctp_transport_t *,
+				  const struct sctp_transport *,
 				  const void *payload,
 				  const size_t paylen);
 sctp_chunk_t *sctp_make_heartbeat_ack(const sctp_association_t *,

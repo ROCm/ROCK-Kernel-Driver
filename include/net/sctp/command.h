@@ -1,34 +1,34 @@
 /* SCTP kernel reference Implementation Copyright (C) 1999-2001
  * Cisco, Motorola, and IBM
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * These are the definitions needed for the command object.
- * 
- * The SCTP reference implementation  is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation  is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * the SCTP reference implementation  is distributed in the hope that it 
+ *
+ * the SCTP reference implementation  is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to one of the
  * following email addresses:
- * 
+ *
  * La Monte H.P. Yarroll <piggy@acm.org>
  * Karl Knutson <karl@athena.chicago.il.us>
  * Ardelle Fan <ardelle.fan@intel.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -72,8 +72,9 @@ typedef enum {
 	SCTP_CMD_SET_BIND_ADDR, /* Set the association bind_addr.  */
 	SCTP_CMD_STRIKE,	/* Mark a strike against a transport.  */
 	SCTP_CMD_TRANSMIT,      /* Transmit the outqueue. */
-	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers.  */
-	SCTP_CMD_HB_TIMERS_UPDATE,   /* Update the heartbeat timers.  */
+	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers. */
+	SCTP_CMD_HB_TIMER_UPDATE,    /* Update a heartbeat timers.  */
+	SCTP_CMD_HB_TIMERS_STOP,     /* Stop the heartbeat timers.  */
 	SCTP_CMD_TRANSPORT_RESET,    /* Reset the status of a transport. */
 	SCTP_CMD_TRANSPORT_ON,       /* Mark the transport as active. */
 	SCTP_CMD_REPORT_ERROR,   /* Pass this error back out of the sm. */
@@ -112,7 +113,7 @@ typedef union {
 	void *ptr;
 	sctp_chunk_t *chunk;
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_bind_addr_t  *bp;
 	sctp_init_chunk_t *init;
 	sctp_ulpevent_t *ulpevent;
@@ -160,7 +161,7 @@ SCTP_ARG_CONSTRUCTOR(TO,	sctp_event_timeout_t, to)
 SCTP_ARG_CONSTRUCTOR(PTR,	void *, ptr)
 SCTP_ARG_CONSTRUCTOR(CHUNK,	sctp_chunk_t *, chunk)
 SCTP_ARG_CONSTRUCTOR(ASOC,	sctp_association_t *, asoc)
-SCTP_ARG_CONSTRUCTOR(TRANSPORT,	sctp_transport_t *, transport)
+SCTP_ARG_CONSTRUCTOR(TRANSPORT,	struct sctp_transport *, transport)
 SCTP_ARG_CONSTRUCTOR(BA,	sctp_bind_addr_t *, bp)
 SCTP_ARG_CONSTRUCTOR(PEER_INIT,	sctp_init_chunk_t *, init)
 SCTP_ARG_CONSTRUCTOR(ULPEVENT,  sctp_ulpevent_t *, ulpevent)

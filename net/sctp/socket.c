@@ -717,7 +717,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *new_asoc=NULL, *asoc=NULL;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_chunk_t *chunk = NULL;
 	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
@@ -1253,7 +1253,7 @@ static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
 	struct sctp_paddrparams params;
 	sctp_association_t *asoc;
 	union sctp_addr *addr;
-	sctp_transport_t *trans;
+	struct sctp_transport *trans;
 	int error;
 
 	if (optlen != sizeof(struct sctp_paddrparams))
@@ -1442,7 +1442,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	union sctp_addr to;
 	sctp_scope_t scope;
 	long timeo;
@@ -1659,7 +1659,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	struct sctp_status status;
 	sctp_endpoint_t *ep;
 	sctp_association_t *assoc = NULL;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_assoc_t associd;
 	int retval = 0;
 
@@ -1878,7 +1878,7 @@ static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
 	struct sctp_paddrparams params;
 	sctp_association_t *asoc;
 	union sctp_addr *addr;
-	sctp_transport_t *trans;
+	struct sctp_transport *trans;
 
 	if (len != sizeof(struct sctp_paddrparams))
 		return -EINVAL;
@@ -1962,7 +1962,7 @@ static inline int sctp_getsockopt_get_peer_addrs(struct sock *sk, int len,
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
-	sctp_transport_t *from;
+	struct sctp_transport *from;
 	struct sockaddr_storage *to;
 
 	if (len != sizeof(struct sctp_getaddrs))
@@ -1981,7 +1981,7 @@ static inline int sctp_getsockopt_get_peer_addrs(struct sock *sk, int len,
 
 	to = getaddrs.addrs;
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		from = list_entry(pos, sctp_transport_t, transports);
+		from = list_entry(pos, struct sctp_transport, transports);
 		if (copy_to_user(to, &from->ipaddr, sizeof(from->ipaddr)))
 			return -EFAULT;
 		to ++;

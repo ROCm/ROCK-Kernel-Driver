@@ -678,7 +678,7 @@ sctp_disposition_t sctp_sf_heartbeat(const sctp_endpoint_t *ep,
 				     void *arg,
 				     sctp_cmd_seq_t *commands)
 {
-	sctp_transport_t *transport = (sctp_transport_t *) arg;
+	struct sctp_transport *transport = (struct sctp_transport *) arg;
 	sctp_chunk_t *reply;
 	sctp_sender_hb_info_t hbinfo;
 	size_t paylen = 0;
@@ -711,7 +711,7 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
-	sctp_transport_t *transport = (sctp_transport_t *) arg;
+	struct sctp_transport *transport = (struct sctp_transport *) arg;
 
 	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
@@ -737,7 +737,7 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_TRANSPORT_RESET,
 				SCTP_TRANSPORT(transport));
 	}
-	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_UPDATE,
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMER_UPDATE,
 			SCTP_TRANSPORT(transport));
 
         return SCTP_DISPOSITION_CONSUME;
@@ -842,7 +842,7 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 {
 	sctp_chunk_t *chunk = arg;
 	union sctp_addr from_addr;
-	sctp_transport_t *link;
+	struct sctp_transport *link;
 	sctp_sender_hb_info_t *hbinfo;
 	unsigned long max_interval;
 
@@ -944,7 +944,7 @@ static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 				       sctp_chunk_t *init,
 				       sctp_cmd_seq_t *commands)
 {
-	sctp_transport_t *new_addr, *addr;
+	struct sctp_transport *new_addr, *addr;
 	struct list_head *pos, *pos2;
 	int found;
 
@@ -963,10 +963,11 @@ static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 	found = 0;
 
 	list_for_each(pos, &new_asoc->peer.transport_addr_list) {
-		new_addr = list_entry(pos, sctp_transport_t, transports);
+		new_addr = list_entry(pos, struct sctp_transport, transports);
 		found = 0;
 		list_for_each(pos2, &asoc->peer.transport_addr_list) {
-			addr = list_entry(pos2, sctp_transport_t, transports);
+			addr = list_entry(pos2, struct sctp_transport, 
+					  transports);
 			if (sctp_cmp_addr_exact(&new_addr->ipaddr,
 						&addr->ipaddr)) {
 				found = 1;
@@ -1629,7 +1630,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 					      new_asoc);
 		break;
 
-	case 'C': /* Collisioun case C. */
+	case 'C': /* Collision case C. */
 		retval = sctp_sf_do_dupcook_c(ep, asoc, chunk, commands,
 					      new_asoc);
 		break;
@@ -1799,7 +1800,7 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const sctp_endpoint_t *ep,
 	sctp_cookie_preserve_param_t bht;
 	sctp_errhdr_t *err;
 	struct list_head *pos;
-	sctp_transport_t *t;
+	struct sctp_transport *t;
 	sctp_chunk_t *reply;
 	sctp_bind_addr_t *bp;
 	int attempts;
@@ -1848,9 +1849,11 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const sctp_endpoint_t *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_INC,
 			SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
 
-	/* If we've sent any data bundled with COOKIE-ECHO we need to resend. */
+	/* If we've sent any data bundled with COOKIE-ECHO we need to 
+	 * resend. 
+	 */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		t = list_entry(pos, sctp_transport_t, transports);
+		t = list_entry(pos, struct sctp_transport, transports);
 		sctp_add_cmd_sf(commands, SCTP_CMD_RETRAN, SCTP_TRANSPORT(t));
 	}
 
@@ -3767,7 +3770,7 @@ sctp_disposition_t sctp_sf_do_prm_requestheartbeat(
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
-	return sctp_sf_heartbeat(ep, asoc, type, (sctp_transport_t *)arg,
+	return sctp_sf_heartbeat(ep, asoc, type, (struct sctp_transport *)arg,
 				 commands);
 }
 
@@ -3837,6 +3840,13 @@ sctp_disposition_t sctp_sf_do_9_2_start_shutdown(const sctp_endpoint_t *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_SHUTDOWN_SENT));
 
+	/* sctp-implguide 2.10 Issues with Heartbeating and failover
+	 *
+	 * HEARTBEAT ... is discontinued after sending either SHUTDOWN
+         * or SHUTDOWN-ACK.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_STOP, SCTP_NULL());
+
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 
 	return SCTP_DISPOSITION_CONSUME;
@@ -3889,6 +3899,14 @@ sctp_disposition_t sctp_sf_do_9_2_shutdown_ack(const sctp_endpoint_t *ep,
 	/* Enter the SHUTDOWN-ACK-SENT state.  */
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_SHUTDOWN_ACK_SENT));
+
+	/* sctp-implguide 2.10 Issues with Heartbeating and failover
+	 *
+	 * HEARTBEAT ... is discontinued after sending either SHUTDOWN
+         * or SHUTDOWN-ACK.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_STOP, SCTP_NULL());
+
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 
 	return SCTP_DISPOSITION_CONSUME;
@@ -3933,7 +3951,7 @@ sctp_disposition_t sctp_sf_do_6_3_3_rtx(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
-	sctp_transport_t *transport = arg;
+	struct sctp_transport *transport = arg;
 
 	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
@@ -4333,7 +4351,7 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 				 const sctp_chunk_t *chunk)
 {
 	sctp_packet_t *packet;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	__u16 sport;
 	__u16 dport;
 	__u32 vtag;
