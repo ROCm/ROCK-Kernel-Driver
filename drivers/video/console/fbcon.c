@@ -212,7 +212,7 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 	int depth = fb_get_color_depth(info);
 	int color = 0;
 
-	if (!info->fbops->fb_blank && console_blanked) {
+	if (console_blanked) {
 		unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 
 		c = vc->vc_video_erase_char & charmask;
@@ -229,7 +229,7 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 		int fg = (info->fix.visual != FB_VISUAL_MONO01) ? 1 : 0;
 		int bg = (info->fix.visual != FB_VISUAL_MONO01) ? 0 : 1;
 
-		if (!info->fbops->fb_blank && console_blanked)
+		if (console_blanked)
 			fg = bg;
 
 		color = (is_fg) ? fg : bg;
@@ -1993,17 +1993,52 @@ static int fbcon_switch(struct vc_data *vc)
 	return 1;
 }
 
+static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
+				int blank)
+{
+	if (blank) {
+		if (info->fix.visual == FB_VISUAL_DIRECTCOLOR ||
+		    info->fix.visual == FB_VISUAL_PSEUDOCOLOR) {
+			struct fb_cmap cmap;
+			u16 *black;
+
+			black = kmalloc(sizeof(u16) * info->cmap.len,
+					GFP_KERNEL);
+			if (black) {
+				memset(black, 0, info->cmap.len * sizeof(u16));
+				cmap.red = cmap.green = cmap.blue = black;
+				cmap.transp = info->cmap.transp ? black : NULL;
+				cmap.start = info->cmap.start;
+				cmap.len = info->cmap.len;
+				fb_set_cmap(&cmap, info);
+			}
+
+			kfree(black);
+		} else {
+			unsigned short charmask = vc->vc_hi_font_mask ?
+				0x1ff : 0xff;
+			unsigned short oldc;
+
+			oldc = vc->vc_video_erase_char;
+			vc->vc_video_erase_char &= charmask;
+			fbcon_clear(vc, 0, 0, vc->vc_rows, vc->vc_cols);
+			vc->vc_video_erase_char = oldc;
+		}
+	} else {
+		if (info->fix.visual == FB_VISUAL_DIRECTCOLOR ||
+		    info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+			fb_set_cmap(&info->cmap, info);
+	}
+}
+
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 {
-	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = info->fbcon_par;
-	struct display *p = &fb_display[vc->vc_num];
-	int retval = 0;
+	int active = !fbcon_is_inactive(vc, info);
 
 	if (mode_switch) {
 		struct fb_var_screeninfo var = info->var;
-
 /*
  * HACK ALERT: Some hardware will require reinitializion at this stage,
  *             others will require it to be done as late as possible.
@@ -2020,36 +2055,25 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 			var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
 			fb_set_var(info, &var);
 		}
-
-		return 0;
 	}
 
-	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
-	ops->cursor_flash = (!blank);
+ 	if (active) {
+ 		int ret = -1;
 
-	if (!info->fbops->fb_blank) {
-		if (blank) {
-			unsigned short oldc;
-			u_int height;
-			u_int y_break;
+ 		fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
+ 		ops->cursor_flash = (!blank);
 
-			oldc = vc->vc_video_erase_char;
-			vc->vc_video_erase_char &= charmask;
-			height = vc->vc_rows;
-			y_break = p->vrows - p->yscroll;
-			if (height > y_break) {
-				fbcon_clear(vc, 0, 0, y_break, vc->vc_cols);
-				fbcon_clear(vc, y_break, 0, height - y_break,
-					    vc->vc_cols);
-			} else
-				fbcon_clear(vc, 0, 0, height, vc->vc_cols);
-			vc->vc_video_erase_char = oldc;
- 		} else if (!fbcon_is_inactive(vc, info))
-			update_screen(vc->vc_num);
-	} else if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
- 		retval = info->fbops->fb_blank(blank, info);
+ 		if (info->fbops->fb_blank)
+ 			ret = info->fbops->fb_blank(blank, info);
 
-	return retval;
+ 		if (ret)
+ 			fbcon_generic_blank(vc, info, blank);
+
+ 		if (!blank)
+  			update_screen(vc->vc_num);
+ 	}
+
+ 	return 0;
 }
 
 static void fbcon_free_font(struct display *p)
@@ -2786,7 +2810,6 @@ module_exit(fb_console_exit);
  *  Visible symbols for modules
  */
 
-EXPORT_SYMBOL(fb_display);
 EXPORT_SYMBOL(fb_con);
 
 MODULE_LICENSE("GPL");

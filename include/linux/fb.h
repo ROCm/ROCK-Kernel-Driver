@@ -258,6 +258,24 @@ struct fb_con2fbmap {
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
 
+
+enum {
+	/* screen: unblanked, hsync: on,  vsync: on */
+	FB_BLANK_UNBLANK       = VESA_NO_BLANKING,
+
+	/* screen: blanked,   hsync: on,  vsync: on */
+	FB_BLANK_NORMAL        = VESA_NO_BLANKING + 1,
+
+	/* screen: blanked,   hsync: on,  vsync: off */
+	FB_BLANK_VSYNC_SUSPEND = VESA_VSYNC_SUSPEND + 1,
+
+	/* screen: blanked,   hsync: off, vsync: on */
+	FB_BLANK_HSYNC_SUSPEND = VESA_HSYNC_SUSPEND + 1,
+
+	/* screen: blanked,   hsync: off, vsync: off */
+	FB_BLANK_POWERDOWN     = VESA_POWERDOWN + 1
+};
+
 #define FB_VBLANK_VBLANKING	0x001	/* currently in a vertical blank */
 #define FB_VBLANK_HBLANKING	0x002	/* currently in a horizontal blank */
 #define FB_VBLANK_HAVE_VBLANK	0x004	/* vertical blanks can be detected */
