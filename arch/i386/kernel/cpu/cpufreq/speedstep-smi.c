@@ -139,7 +139,7 @@ static int speedstep_get_state (void)
 		: "a" (command), "b" (function), "c" (0), "d" (smi_port), "S" (0)
 	);
 
-	return state;
+	return (state & 1);
 }
 
 /**
