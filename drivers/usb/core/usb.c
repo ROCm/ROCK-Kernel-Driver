@@ -42,6 +42,7 @@
 #include <linux/usb.h>
 
 #include "hcd.h"
+#include "usb.h"
 
 extern int  usb_hub_init(void);
 extern void usb_hub_cleanup(void);
@@ -629,98 +630,6 @@ static int usb_hotplug (struct device *dev, char **envp,
 
 #endif	/* CONFIG_HOTPLUG */
 
-/* driverfs files */
-
-/* devices have one current configuration, with one
- * or more interfaces that are used concurrently 
- */
-static ssize_t
-show_config (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device	*udev;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
-}
-
-static DEVICE_ATTR(configuration,S_IRUGO,show_config,NULL);
-
-/* interfaces have one current setting; alternates
- * can have different endpoints and class info.
- */
-static ssize_t
-show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_interface	*interface;
-
-	if (off)
-		return 0;
-	interface = to_usb_interface (dev);
-	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
-}
-static DEVICE_ATTR(altsetting,S_IRUGO,show_altsetting,NULL);
-
-/* product driverfs file */
-static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
-
-/* manufacturer driverfs file */
-static ssize_t
-show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
-
-/* serial number driverfs file */
-static ssize_t
-show_serial (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
-
 /**
  * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
  * @parent: hub to which device is connected
@@ -1133,13 +1042,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		return err;
 
 	/* add the USB device specific driverfs files */
-	device_create_file (&dev->dev, &dev_attr_configuration);
-	if (dev->descriptor.iManufacturer)
-		device_create_file (&dev->dev, &dev_attr_manufacturer);
-	if (dev->descriptor.iProduct)
-		device_create_file (&dev->dev, &dev_attr_product);
-	if (dev->descriptor.iSerialNumber)
-		device_create_file (&dev->dev, &dev_attr_serial);
+	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
 	 * Remember, interfaces get bound to drivers, not devices. */
@@ -1169,7 +1072,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		}
 		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
 		device_register (&interface->dev);
-		device_create_file (&interface->dev, &dev_attr_altsetting);
+		usb_create_driverfs_intf_files (interface);
 	}
 
 	/* add a /proc/bus/usb entry */
