@@ -590,17 +590,19 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, struct pcmcia_socket *s)
+		    int low, char *name, struct pcmcia_socket *s)
 {
     u_long try;
     resource_map_t *m;
     int ret = -1;
 
+    low = low || !(s->features & SS_CAP_PAGE_REGS);
+
     down(&rsrc_sem);
     while (1) {
 	for (m = mem_db.next; m != &mem_db; m = m->next) {
 	    /* first pass >1MB, second pass <1MB */
-	    if ((force_low != 0) ^ (m->base < 0x100000))
+	    if ((low != 0) ^ (m->base < 0x100000))
 		continue;
 
 	    try = (m->base & ~(align-1)) + *base;
@@ -616,9 +618,9 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 		    break;
 	    }
 	}
-	if (force_low)
+	if (low)
 	    break;
-	force_low++;
+	low++;
     }
  out:
     up(&rsrc_sem);
