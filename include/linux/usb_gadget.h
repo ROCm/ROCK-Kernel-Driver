@@ -10,11 +10,6 @@
  * All Rights Reserved.
  *
  * This software is licensed under the GNU GPL version 2.
- *
- * ALTERNATIVELY, the kernel API documentation which is included in this
- * software may also be licenced under the "GNU Free Documentation
- * License" (version 1.2 or, at your choice, any later version), when
- * used as part of the "USB Gadget API for Linux" documentation.
  */
 
 #ifndef __LINUX_USB_GADGET_H
