@@ -457,14 +457,14 @@ include/asm:
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	@echo '  SPLIT  include/linux/autoconf.h -> include/config/*'
+	@echo '  SPLIT   include/linux/autoconf.h -> include/config/*'
 	@scripts/split-include include/linux/autoconf.h include/config
 	@touch $@
 
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
 
-include/linux/autoconf.h: .config
+include/linux/autoconf.h: .config scripts
 	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
