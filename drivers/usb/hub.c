@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/sched.h>
