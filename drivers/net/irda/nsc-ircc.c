@@ -921,8 +921,8 @@ static void nsc_ircc_change_dongle_speed(int iobase, int speed, int dongle_id)
 		break;
 	case 0x0A: /* same as */
 	case 0x0B: /* Reserved */
-		IRDA_DEBUG(0, __FUNCTION__ "(), %s not defined by irda yet\n",
-			   dongle_types[dongle_id]); 
+		IRDA_DEBUG(0, "%s(), %s not defined by irda yet\n",
+			   __FUNCTION__, dongle_types[dongle_id]); 
 		break;
 	case 0x0C: /* same as */
 	case 0x0D: /* HP HSDL-1100/HSDL-2100 */
@@ -930,14 +930,14 @@ static void nsc_ircc_change_dongle_speed(int iobase, int speed, int dongle_id)
 	case 0x0E: /* Supports SIR Mode only */
 		break;
 	case 0x0F: /* No dongle connected */
-		IRDA_DEBUG(0, __FUNCTION__ "(), %s is not for IrDA mode\n",
-			   dongle_types[dongle_id]);
+		IRDA_DEBUG(0, "%s(), %s is not for IrDA mode\n",
+			   __FUNCTION__, dongle_types[dongle_id]);
 
 		switch_bank(iobase, BANK0); 
 		outb(0x62, iobase+MCR);
 		break;
 	default: 
-		IRDA_DEBUG(0, __FUNCTION__ "(), invalid data_rate\n");
+		IRDA_DEBUG(0, "%s(), invalid data_rate\n", __FUNCTION__);
 	}
 	/* Restore bank register */
 	outb(bank, iobase+BSR);
@@ -958,7 +958,7 @@ static __u8 nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 speed)
 	__u8 bank;
 	__u8 ier;                  /* Interrupt enable register */
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), speed=%d\n", speed);
+	IRDA_DEBUG(2, "%s(), speed=%d\n", __FUNCTION__, speed);
 
 	ASSERT(self != NULL, return 0;);
 
@@ -991,20 +991,20 @@ static __u8 nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 speed)
 		outb(inb(iobase+4) | 0x04, iobase+4);
 	       
 		mcr = MCR_MIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 576000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 576000\n", __FUNCTION__);
 		break;
 	case 1152000:
 		mcr = MCR_MIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 1152000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 1152000\n", __FUNCTION__);
 		break;
 	case 4000000:
 		mcr = MCR_FIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 4000000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 4000000\n", __FUNCTION__);
 		break;
 	default:
 		mcr = MCR_FIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), unknown baud rate of %d\n", 
-			   speed);
+		IRDA_DEBUG(0, "%s(), unknown baud rate of %d\n", 
+			   __FUNCTION__, speed);
 		break;
 	}
 
@@ -1305,15 +1305,15 @@ static int nsc_ircc_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
 	int actual = 0;
 	__u8 bank;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	/* Save current bank */
 	bank = inb(iobase+BSR);
 
 	switch_bank(iobase, BANK0);
 	if (!(inb_p(iobase+LSR) & LSR_TXEMP)) {
-		IRDA_DEBUG(4, __FUNCTION__ 
-			   "(), warning, FIFO not empty yet!\n");
+		IRDA_DEBUG(4, "%s(), warning, FIFO not empty yet!\n",
+			   __FUNCTION__);
 
 		/* FIFO may still be filled to the Tx interrupt threshold */
 		fifo_size -= 17;
@@ -1325,8 +1325,8 @@ static int nsc_ircc_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
 		outb(buf[actual++], iobase+TXD);
 	}
         
-	IRDA_DEBUG(4, __FUNCTION__ "(), fifo_size %d ; %d sent of %d\n", 
-		   fifo_size, actual, len);
+	IRDA_DEBUG(4, "%s(), fifo_size %d ; %d sent of %d\n", 
+		   __FUNCTION__, fifo_size, actual, len);
 	
 	/* Restore bank */
 	outb(bank, iobase+BSR);
@@ -1347,7 +1347,7 @@ static int nsc_ircc_dma_xmit_complete(struct nsc_ircc_cb *self)
 	__u8 bank;
 	int ret = TRUE;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	iobase = self->io.fir_base;
 
@@ -1478,7 +1478,7 @@ static int nsc_ircc_dma_receive_complete(struct nsc_ircc_cb *self, int iobase)
 		len = inb(iobase+RFLFL) | ((inb(iobase+RFLFH) & 0x1f) << 8);
 
 		if (st_fifo->tail >= MAX_RX_WINDOW) {
-			IRDA_DEBUG(0, __FUNCTION__ "(), window is full!\n");
+			IRDA_DEBUG(0, "%s(), window is full!\n", __FUNCTION__);
 			continue;
 		}
 			
@@ -1671,7 +1671,7 @@ static void nsc_ircc_sir_interrupt(struct nsc_ircc_cb *self, int eir)
 		 * Need to be after self->io.direction to avoid race with
 		 * nsc_ircc_hard_xmit_sir() - Jean II */
 		if (self->new_speed) {
-			IRDA_DEBUG(2, __FUNCTION__ "(), Changing speed!\n");
+			IRDA_DEBUG(2, "%s(), Changing speed!\n", __FUNCTION__);
 			self->ier = nsc_ircc_change_speed(self,
 							  self->new_speed);
 			self->new_speed = 0;
@@ -1755,8 +1755,9 @@ static void nsc_ircc_fir_interrupt(struct nsc_ircc_cb *self, int iobase,
 					nsc_ircc_dma_receive(self);
 					self->ier = IER_SFIF_IE;
 				} else
-					WARNING(__FUNCTION__ "(), potential "
-						"Tx queue lockup !\n");
+					WARNING("%s(), potential "
+						"Tx queue lockup !\n",
+						__FUNCTION__);
 			}
 		} else {
 			/*  Not finished yet, so interrupt on DMA again */
@@ -1863,7 +1864,7 @@ static int nsc_ircc_is_receiving(struct nsc_ircc_cb *self)
  */
 static int nsc_ircc_net_init(struct net_device *dev)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	/* Setup to be a normal IrDA network device driver */
 	irda_device_setup(dev);
@@ -1886,7 +1887,7 @@ static int nsc_ircc_net_open(struct net_device *dev)
 	char hwname[32];
 	__u8 bank;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 	
 	ASSERT(dev != NULL, return -1;);
 	self = (struct nsc_ircc_cb *) dev->priv;
@@ -1950,7 +1951,7 @@ static int nsc_ircc_net_close(struct net_device *dev)
 	int iobase;
 	__u8 bank;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 	
 	ASSERT(dev != NULL, return -1;);
 
@@ -2006,7 +2007,7 @@ static int nsc_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
+	IRDA_DEBUG(2, "%s(), %s, (cmd=0x%X)\n", __FUNCTION__, dev->name, cmd);
 	
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
