@@ -1407,7 +1407,6 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	skb_queue_head_init(bp->queue);
 
 	init_timer(&bp->tx_timeout);
-	/*     bp->timeout_active = 0; */
 
 	ret = request_irq(dev->irq, bmac_misc_intr, 0, "BMAC-misc", dev);
 	if (ret) {
