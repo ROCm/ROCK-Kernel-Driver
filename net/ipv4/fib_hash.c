@@ -747,46 +747,31 @@ static int fn_hash_flush(struct fib_table *tb)
 
 #ifdef CONFIG_PROC_FS
 
-static int fn_hash_get_info(struct fib_table *tb, char *buffer, int first, int count)
+static int fn_hash_seq_show(struct fib_table *tb, struct seq_file *seq)
 {
-	struct fn_hash *table = (struct fn_hash*)tb->tb_data;
+	struct fn_hash *table = (struct fn_hash *)tb->tb_data;
 	struct fn_zone *fz;
-	int pos = 0;
-	int n = 0;
 
 	read_lock(&fib_hash_lock);
-	for (fz=table->fn_zone_list; fz; fz = fz->fz_next) {
+	for (fz = table->fn_zone_list; fz; fz = fz->fz_next) {
 		int i;
 		struct fib_node *f;
 		int maxslot = fz->fz_divisor;
 		struct fib_node **fp = fz->fz_hash;
 
-		if (fz->fz_nent == 0)
+		if (!fz->fz_nent)
 			continue;
 
-		if (pos + fz->fz_nent <= first) {
-			pos += fz->fz_nent;
-			continue;
-		}
-
-		for (i=0; i < maxslot; i++, fp++) {
-			for (f = *fp; f; f = f->fn_next) {
-				if (++pos <= first)
-					continue;
-				fib_node_get_info(f->fn_type,
-						  f->fn_state&FN_S_ZOMBIE,
+		for (i = 0; i < maxslot; i++, fp++)
+			for (f = *fp; f; f = f->fn_next)
+				fib_node_seq_show(seq, f->fn_type,
+						  f->fn_state & FN_S_ZOMBIE,
 						  FIB_INFO(f),
 						  fz_prefix(f->fn_key, fz),
-						  FZ_MASK(fz), buffer);
-				buffer += 128;
-				if (++n >= count)
-					goto out;
-			}
-		}
+						  FZ_MASK(fz));
 	}
-out:
 	read_unlock(&fib_hash_lock);
-  	return n;
+  	return 0;
 }
 #endif
 
@@ -913,7 +898,7 @@ struct fib_table * __init fib_hash_init(int id)
 	tb->tb_select_default = fn_hash_select_default;
 	tb->tb_dump = fn_hash_dump;
 #ifdef CONFIG_PROC_FS
-	tb->tb_get_info = fn_hash_get_info;
+	tb->tb_seq_show = fn_hash_seq_show;
 #endif
 	memset(tb->tb_data, 0, sizeof(struct fn_hash));
 	return tb;

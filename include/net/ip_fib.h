@@ -18,6 +18,7 @@
 
 #include <linux/config.h>
 #include <net/flow.h>
+#include <linux/seq_file.h>
 
 struct kern_rta
 {
@@ -128,8 +129,7 @@ struct fib_table
 	int		(*tb_dump)(struct fib_table *table, struct sk_buff *skb,
 				     struct netlink_callback *cb);
 	int		(*tb_flush)(struct fib_table *table);
-	int		(*tb_get_info)(struct fib_table *table, char *buf,
-				       int first, int count);
+	int		(*tb_seq_show)(struct fib_table *table, struct seq_file *seq);
 	void		(*tb_select_default)(struct fib_table *table,
 					     const struct flowi *flp, struct fib_result *res);
 
@@ -138,14 +138,14 @@ struct fib_table
 
 #ifndef CONFIG_IP_MULTIPLE_TABLES
 
-extern struct fib_table *local_table;
-extern struct fib_table *main_table;
+extern struct fib_table *ip_fib_local_table;
+extern struct fib_table *ip_fib_main_table;
 
 static inline struct fib_table *fib_get_table(int id)
 {
 	if (id != RT_TABLE_LOCAL)
-		return main_table;
-	return local_table;
+		return ip_fib_main_table;
+	return ip_fib_local_table;
 }
 
 static inline struct fib_table *fib_new_table(int id)
@@ -155,8 +155,8 @@ static inline struct fib_table *fib_new_table(int id)
 
 static inline int fib_lookup(const struct flowi *flp, struct fib_result *res)
 {
-	if (local_table->tb_lookup(local_table, flp, res) &&
-	    main_table->tb_lookup(main_table, flp, res))
+	if (ip_fib_local_table->tb_lookup(ip_fib_local_table, flp, res) &&
+	    ip_fib_main_table->tb_lookup(ip_fib_main_table, flp, res))
 		return -ENETUNREACH;
 	return 0;
 }
@@ -164,12 +164,12 @@ static inline int fib_lookup(const struct flowi *flp, struct fib_result *res)
 static inline void fib_select_default(const struct flowi *flp, struct fib_result *res)
 {
 	if (FIB_RES_GW(*res) && FIB_RES_NH(*res).nh_scope == RT_SCOPE_LINK)
-		main_table->tb_select_default(main_table, flp, res);
+		ip_fib_main_table->tb_select_default(ip_fib_main_table, flp, res);
 }
 
 #else /* CONFIG_IP_MULTIPLE_TABLES */
-#define local_table (fib_tables[RT_TABLE_LOCAL])
-#define main_table (fib_tables[RT_TABLE_MAIN])
+#define ip_fib_local_table (fib_tables[RT_TABLE_LOCAL])
+#define ip_fib_main_table (fib_tables[RT_TABLE_MAIN])
 
 extern struct fib_table * fib_tables[RT_TABLE_MAX+1];
 extern int fib_lookup(const struct flowi *flp, struct fib_result *res);
@@ -222,7 +222,8 @@ extern int fib_sync_down(u32 local, struct net_device *dev, int force);
 extern int fib_sync_up(struct net_device *dev);
 extern int fib_convert_rtentry(int cmd, struct nlmsghdr *nl, struct rtmsg *rtm,
 			       struct kern_rta *rta, struct rtentry *r);
-extern void fib_node_get_info(int type, int dead, struct fib_info *fi, u32 prefix, u32 mask, char *buffer);
+extern void fib_node_seq_show(struct seq_file *seq, int type, int dead,
+			      struct fib_info *fi, u32 prefix, u32 mask);
 extern u32  __fib_res_prefsrc(struct fib_result *res);
 
 /* Exported by fib_hash.c */

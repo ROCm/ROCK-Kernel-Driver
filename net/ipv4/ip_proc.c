@@ -18,6 +18,9 @@
 #include <linux/netdevice.h>
 #include <net/neighbour.h>
 #include <net/arp.h>
+#include <linux/rtnetlink.h>
+#include <linux/route.h>
+#include <net/ip_fib.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 
@@ -30,6 +33,8 @@ extern int udp_get_info(char *, char **, off_t, int);
 
 #ifdef CONFIG_PROC_FS
 #ifdef CONFIG_AX25
+
+/* ------------------------------------------------------------------------ */
 /*
  *	ax25 -> ASCII conversion
  */
@@ -159,6 +164,40 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+/* ------------------------------------------------------------------------ */
+
+static void *fib_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return *pos ? NULL : (void *)1;
+}
+
+static void *fib_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	return NULL;
+}
+
+static void fib_seq_stop(struct seq_file *seq, void *v)
+{
+}
+/* 
+ *	This outputs /proc/net/route.
+ *
+ *	It always works in backward compatibility mode.
+ *	The format of the file is not supposed to be changed.
+ */
+static int fib_seq_show(struct seq_file *seq, void *v)
+{
+	seq_printf(seq, "%-127s\n", "Iface\tDestination\tGateway "
+			"\tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU"
+			"\tWindow\tIRTT");
+	if (ip_fib_main_table)
+		ip_fib_main_table->tb_seq_show(ip_fib_main_table, seq);
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
 struct seq_operations arp_seq_ops = {
 	.start  = arp_seq_start,
 	.next   = arp_seq_next,
@@ -166,9 +205,21 @@ struct seq_operations arp_seq_ops = {
 	.show   = arp_seq_show,
 };
 
+struct seq_operations fib_seq_ops = {
+	.start  = fib_seq_start,
+	.next   = fib_seq_next,
+	.stop   = fib_seq_stop,
+	.show   = fib_seq_show,
+};
+
 static int arp_seq_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &arp_seq_ops);
+}
+
+static int fib_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &fib_seq_ops);
 }
 
 static struct file_operations arp_seq_fops = {
@@ -177,6 +228,15 @@ static struct file_operations arp_seq_fops = {
 	.llseek         = seq_lseek,
 	.release	= seq_release,
 };
+
+static struct file_operations fib_seq_fops = {
+	.open           = fib_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release,
+};
+
+/* ------------------------------------------------------------------------ */
 
 int __init ipv4_proc_init(void)
 {
@@ -205,8 +265,15 @@ int __init ipv4_proc_init(void)
 	if (!p)
 		goto out_arp;
 	p->proc_fops = &arp_seq_fops;
+
+	p = create_proc_entry("route", S_IRUGO, proc_net);
+	if (!p)
+		goto out_route;
+	p->proc_fops = &fib_seq_fops;
 out:
 	return rc;
+out_route:
+	remove_proc_entry("route", proc_net);
 out_arp:
 	proc_net_remove("udp");
 out_udp:
