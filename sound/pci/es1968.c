@@ -522,9 +522,7 @@ enum {
 
 /* DMA Hack! */
 struct snd_esm_memory {
-	char *buf;
-	unsigned long addr;
-	int size;
+	struct snd_dma_buffer buf;
 	int empty;	/* status */
 	struct list_head list;
 };
@@ -1078,10 +1076,10 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 	for (channel = 0; channel <= high_apu; channel++) {
 		apu = es->apu[channel];
 
-		snd_es1968_program_wavecache(chip, es, channel, es->memory->addr, 0);
+		snd_es1968_program_wavecache(chip, es, channel, es->memory->buf.addr, 0);
 
 		/* Offset to PCMBAR */
-		pa = es->memory->addr;
+		pa = es->memory->buf.addr;
 		pa -= chip->dma.addr;
 		pa >>= 1;	/* words */
 
@@ -1230,20 +1228,20 @@ static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 	/* input mixer (left/mono) */
 	/* parallel in crap, see maestro reg 0xC [8-11] */
 	init_capture_apu(chip, es, 2,
-			 es->mixbuf->addr, ESM_MIXBUF_SIZE/4, /* in words */
+			 es->mixbuf->buf.addr, ESM_MIXBUF_SIZE/4, /* in words */
 			 ESM_APU_INPUTMIXER, 0x14);
 	/* SRC (left/mono); get input from inputing apu */
-	init_capture_apu(chip, es, 0, es->memory->addr, size,
+	init_capture_apu(chip, es, 0, es->memory->buf.addr, size,
 			 ESM_APU_SRCONVERTOR, es->apu[2]);
 	if (es->fmt & ESS_FMT_STEREO) {
 		/* input mixer (right) */
 		init_capture_apu(chip, es, 3,
-				 es->mixbuf->addr + ESM_MIXBUF_SIZE/2,
+				 es->mixbuf->buf.addr + ESM_MIXBUF_SIZE/2,
 				 ESM_MIXBUF_SIZE/4, /* in words */
 				 ESM_APU_INPUTMIXER, 0x15);
 		/* SRC (right) */
 		init_capture_apu(chip, es, 1,
-				 es->memory->addr + size*2, size,
+				 es->memory->buf.addr + size*2, size,
 				 ESM_APU_SRCONVERTOR, es->apu[3]);
 	}
 
@@ -1408,8 +1406,8 @@ static int calc_available_memory_size(es1968_t *chip)
 	down(&chip->memory_mutex);
 	list_for_each(p, &chip->buf_list) {
 		esm_memory_t *buf = list_entry(p, esm_memory_t, list);
-		if (buf->empty && buf->size > max_size)
-			max_size = buf->size;
+		if (buf->empty && buf->buf.bytes > max_size)
+			max_size = buf->buf.bytes;
 	}
 	up(&chip->memory_mutex);
 	if (max_size >= 128*1024)
@@ -1427,24 +1425,25 @@ static esm_memory_t *snd_es1968_new_memory(es1968_t *chip, int size)
 	down(&chip->memory_mutex);
 	list_for_each(p, &chip->buf_list) {
 		buf = list_entry(p, esm_memory_t, list);
-		if (buf->empty && buf->size >= size)
+		if (buf->empty && buf->buf.bytes >= size)
 			goto __found;
 	}
 	up(&chip->memory_mutex);
 	return NULL;
 
 __found:
-	if (buf->size > size) {
+	if (buf->buf.bytes > size) {
 		esm_memory_t *chunk = kmalloc(sizeof(*chunk), GFP_KERNEL);
 		if (chunk == NULL) {
 			up(&chip->memory_mutex);
 			return NULL;
 		}
-		chunk->size = buf->size - size;
-		chunk->buf = buf->buf + size;
-		chunk->addr = buf->addr + size;
+		chunk->buf = buf->buf;
+		chunk->buf.bytes -= size;
+		chunk->buf.area += size;
+		chunk->buf.addr += size;
 		chunk->empty = 1;
-		buf->size = size;
+		buf->buf.bytes = size;
 		list_add(&chunk->list, &buf->list);
 	}
 	buf->empty = 0;
@@ -1462,7 +1461,7 @@ static void snd_es1968_free_memory(es1968_t *chip, esm_memory_t *buf)
 	if (buf->list.prev != &chip->buf_list) {
 		chunk = list_entry(buf->list.prev, esm_memory_t, list);
 		if (chunk->empty) {
-			chunk->size += buf->size;
+			chunk->buf.bytes += buf->buf.bytes;
 			list_del(&buf->list);
 			kfree(buf);
 			buf = chunk;
@@ -1471,7 +1470,7 @@ static void snd_es1968_free_memory(es1968_t *chip, esm_memory_t *buf)
 	if (buf->list.next != &chip->buf_list) {
 		chunk = list_entry(buf->list.next, esm_memory_t, list);
 		if (chunk->empty) {
-			buf->size += chunk->size;
+			buf->buf.bytes += chunk->buf.bytes;
 			list_del(&chunk->list);
 			kfree(chunk);
 		}
@@ -1525,9 +1524,10 @@ snd_es1968_init_dmabuf(es1968_t *chip)
 		return -ENOMEM;
 	}
 	memset(chip->dma.area, 0, ESM_MEM_ALIGN);
-	chunk->buf = chip->dma.area + ESM_MEM_ALIGN;
-	chunk->addr = chip->dma.addr + ESM_MEM_ALIGN;
-	chunk->size = chip->dma.bytes - ESM_MEM_ALIGN;
+	chunk->buf = chip->dma;
+	chunk->buf.area += ESM_MEM_ALIGN;
+	chunk->buf.addr += ESM_MEM_ALIGN;
+	chunk->buf.bytes -= ESM_MEM_ALIGN;
 	chunk->empty = 1;
 	list_add(&chunk->list, &chip->buf_list);
 
@@ -1545,7 +1545,7 @@ static int snd_es1968_hw_params(snd_pcm_substream_t *substream,
 	int size = params_buffer_bytes(hw_params);
 
 	if (chan->memory) {
-		if (chan->memory->size >= size) {
+		if (chan->memory->buf.bytes >= size) {
 			runtime->dma_bytes = size;
 			return 0;
 		}
@@ -1556,9 +1556,7 @@ static int snd_es1968_hw_params(snd_pcm_substream_t *substream,
 		// snd_printd("cannot allocate dma buffer: size = %d\n", size);
 		return -ENOMEM;
 	}
-	runtime->dma_bytes = size;
-	runtime->dma_area = chan->memory->buf;
-	runtime->dma_addr = chan->memory->addr;
+	snd_pcm_set_runtime_buffer(substream, &chan->memory->buf);
 	return 1; /* area was changed */
 }
 
@@ -1637,6 +1635,8 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	es->substream = substream;
 	es->mode = ESM_MODE_PLAY;
 
+	substream->dma_device = chip->dma_dev; /* for mmap */
+
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_playback;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
@@ -1695,7 +1695,9 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 		snd_magic_kfree(es);
                 return -ENOMEM;
         }
-	memset(es->mixbuf->buf, 0, ESM_MIXBUF_SIZE);
+	memset(es->mixbuf->buf.area, 0, ESM_MIXBUF_SIZE);
+
+	substream->dma_device = chip->dma_dev; /* for mmap */
 
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_capture;
@@ -1800,11 +1802,11 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 		return;
 	}
 
-	memset(memory->buf, 0, CLOCK_MEASURE_BUFSIZE);
+	memset(memory->buf.area, 0, CLOCK_MEASURE_BUFSIZE);
 
-	wave_set_register(chip, apu << 3, (memory->addr - 0x10) & 0xfff8);
+	wave_set_register(chip, apu << 3, (memory->buf.addr - 0x10) & 0xfff8);
 
-	pa = (unsigned int)((memory->addr - chip->dma.addr) >> 1);
+	pa = (unsigned int)((memory->buf.addr - chip->dma.addr) >> 1);
 	pa |= 0x00400000;	/* System RAM (Bit 22) */
 
 	/* initialize apu */
@@ -2470,6 +2472,8 @@ static int snd_es1968_free(es1968_t *chip)
 		outw(0, chip->io_port + ESM_PORT_HOST_IRQ); /* disable IRQ */
 	}
 
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void *)chip);
 #ifdef SUPPORT_JOYSTICK
 	if (chip->res_joystick) {
 		gameport_unregister_port(&chip->gameport);
@@ -2484,8 +2488,6 @@ static int snd_es1968_free(es1968_t *chip)
 		release_resource(chip->res_io_port);
 		kfree_nocheck(chip->res_io_port);
 	}
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void *)chip);
 	snd_magic_kfree(chip);
 	return 0;
 }

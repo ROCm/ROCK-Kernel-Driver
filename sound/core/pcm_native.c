@@ -304,13 +304,25 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_refine_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_refine(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_refine(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
@@ -408,13 +420,25 @@ static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_params_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_params(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_params(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
@@ -3009,6 +3033,12 @@ static struct vm_operations_struct snd_pcm_vm_ops_data =
 	.nopage =	snd_pcm_mmap_data_nopage,
 };
 
+static struct vm_operations_struct snd_pcm_vm_ops_data_mmio =
+{
+	.open =		snd_pcm_mmap_data_open,
+	.close =	snd_pcm_mmap_data_close,
+};
+
 int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 		      struct vm_area_struct *area)
 {
@@ -3044,6 +3074,14 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	area->vm_ops = &snd_pcm_vm_ops_data;
 	area->vm_private_data = substream;
 	area->vm_flags |= VM_RESERVED;
+	if (runtime->hw.info & SNDRV_PCM_INFO_MMAP_IOMEM) {
+		area->vm_ops = &snd_pcm_vm_ops_data_mmio;
+		area->vm_flags |= VM_IO;
+		if (io_remap_page_range(area, area->vm_start,
+					runtime->dma_addr + offset,
+					size, area->vm_page_prot))
+			return -EAGAIN;
+	}
 	atomic_inc(&runtime->mmap_count);
 	return 0;
 }
@@ -3133,31 +3171,68 @@ static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old *opa
 
 static int snd_pcm_hw_refine_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old __user * _oparams)
 {
-	snd_pcm_hw_params_t params;
-	struct sndrv_pcm_hw_params_old oparams;
+	snd_pcm_hw_params_t *params;
+	struct sndrv_pcm_hw_params_old *oparams = NULL;
 	int err;
-	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
-		return -EFAULT;
-	snd_pcm_hw_convert_from_old_params(&params, &oparams);
-	err = snd_pcm_hw_refine(substream, &params);
-	snd_pcm_hw_convert_to_old_params(&oparams, &params);
-	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	oparams = kmalloc(sizeof(*oparams), GFP_KERNEL);
+	if (!oparams) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	if (copy_from_user(oparams, _oparams, sizeof(*oparams))) {
+		err = -EFAULT;
+		goto out;
+	}
+	snd_pcm_hw_convert_from_old_params(params, oparams);
+	err = snd_pcm_hw_refine(substream, params);
+	snd_pcm_hw_convert_to_old_params(oparams, params);
+	if (copy_to_user(_oparams, oparams, sizeof(*oparams))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
+	kfree(oparams);
 	return err;
 }
 
 static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old __user * _oparams)
 {
-	snd_pcm_hw_params_t params;
-	struct sndrv_pcm_hw_params_old oparams;
+	snd_pcm_hw_params_t *params;
+	struct sndrv_pcm_hw_params_old *oparams = NULL;
 	int err;
-	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
-		return -EFAULT;
-	snd_pcm_hw_convert_from_old_params(&params, &oparams);
-	err = snd_pcm_hw_params(substream, &params);
-	snd_pcm_hw_convert_to_old_params(&oparams, &params);
-	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	oparams = kmalloc(sizeof(*oparams), GFP_KERNEL);
+	if (!oparams) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(oparams, _oparams, sizeof(*oparams))) {
+		err = -EFAULT;
+		goto out;
+	}
+	snd_pcm_hw_convert_from_old_params(params, oparams);
+	err = snd_pcm_hw_params(substream, params);
+	snd_pcm_hw_convert_to_old_params(oparams, params);
+	if (copy_to_user(_oparams, oparams, sizeof(*oparams))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
+	kfree(oparams);
 	return err;
 }
 

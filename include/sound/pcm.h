@@ -351,7 +351,8 @@ struct _snd_pcm_runtime {
 	unsigned char *dma_area;	/* DMA area */
 	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
 	size_t dma_bytes;		/* size of DMA area */
-	void *dma_private;		/* private DMA data for the memory allocator */
+
+	struct snd_dma_buffer *dma_buffer_p;	/* allocated buffer */
 
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	/* -- OSS things -- */
@@ -851,7 +852,7 @@ int snd_pcm_format_little_endian(snd_pcm_format_t format);
 int snd_pcm_format_big_endian(snd_pcm_format_t format);
 int snd_pcm_format_width(snd_pcm_format_t format);			/* in bits */
 int snd_pcm_format_physical_width(snd_pcm_format_t format);		/* in bits */
-u_int64_t snd_pcm_format_silence_64(snd_pcm_format_t format);
+const unsigned char *snd_pcm_format_silence_64(snd_pcm_format_t format);
 int snd_pcm_format_set_silence(snd_pcm_format_t format, void *buf, unsigned int frames);
 snd_pcm_format_t snd_pcm_build_linear_format(int width, int unsignd, int big_endian);
 ssize_t snd_pcm_format_size(snd_pcm_format_t format, size_t samples);
@@ -892,6 +893,22 @@ snd_pcm_sframes_t snd_pcm_lib_readv(snd_pcm_substream_t *substream,
 
 int snd_pcm_limit_hw_rates(snd_pcm_runtime_t *runtime);
 
+static inline void snd_pcm_set_runtime_buffer(snd_pcm_substream_t *substream,
+					      struct snd_dma_buffer *bufp)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (bufp) {
+		runtime->dma_buffer_p = bufp;
+		runtime->dma_area = bufp->area;
+		runtime->dma_addr = bufp->addr;
+		runtime->dma_bytes = bufp->bytes;
+	} else {
+		runtime->dma_buffer_p = NULL;
+		runtime->dma_area = NULL;
+		runtime->dma_addr = 0;
+		runtime->dma_bytes = 0;
+	}
+}
 
 /*
  *  Timer interface
@@ -916,7 +933,7 @@ int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
 int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size);
 int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream);
 
-#define snd_pcm_substream_sgbuf(substream) ((substream)->runtime->dma_private)
+#define snd_pcm_substream_sgbuf(substream) ((substream)->runtime->dma_buffer_p->private_data)
 #define snd_pcm_sgbuf_pages(size) snd_sgbuf_aligned_pages(size)
 #define snd_pcm_sgbuf_get_addr(sgbuf,ofs) snd_sgbuf_get_addr(sgbuf,ofs)
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);

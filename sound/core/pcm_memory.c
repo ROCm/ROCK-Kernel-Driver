@@ -314,31 +314,35 @@ struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned lon
 int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 {
 	snd_pcm_runtime_t *runtime;
-	struct snd_dma_buffer dmab;
+	struct snd_dma_buffer *dmab = NULL;
 
 	snd_assert(substream->dma_device.type != SNDRV_DMA_TYPE_UNKNOWN, return -EINVAL);
 	snd_assert(substream != NULL, return -EINVAL);
 	runtime = substream->runtime;
-	snd_assert(runtime != NULL, return -EINVAL);	
+	snd_assert(runtime != NULL, return -EINVAL);
 
-	if (runtime->dma_area != NULL) {
+	if (runtime->dma_buffer_p) {
 		/* perphaps, we might free the large DMA memory region
 		   to save some space here, but the actual solution
 		   costs us less time */
-		if (runtime->dma_bytes >= size)
+		if (runtime->dma_buffer_p->bytes >= size) {
+			runtime->dma_bytes = size;
 			return 0;	/* ok, do not change */
+		}
 		snd_pcm_lib_free_pages(substream);
 	}
 	if (substream->dma_buffer.area != NULL && substream->dma_buffer.bytes >= size) {
-		dmab = substream->dma_buffer; /* use the pre-allocated buffer */
+		dmab = &substream->dma_buffer; /* use the pre-allocated buffer */
 	} else {
-		memset(&dmab, 0, sizeof(dmab)); /* allocate a new buffer */
-		if (snd_dma_alloc_pages(&substream->dma_device, size, &dmab) < 0)
+		dmab = snd_kcalloc(sizeof(*dmab), GFP_KERNEL);
+		if (! dmab)
 			return -ENOMEM;
+		if (snd_dma_alloc_pages(&substream->dma_device, size, dmab) < 0) {
+			kfree(dmab);
+			return -ENOMEM;
+		}
 	}
-	runtime->dma_area = dmab.area;
-	runtime->dma_addr = dmab.addr;
-	runtime->dma_private = dmab.private_data;
+	snd_pcm_set_runtime_buffer(substream, dmab);
 	runtime->dma_bytes = size;
 	return 1;			/* area was changed */
 }
@@ -360,34 +364,11 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 	snd_assert(runtime != NULL, return -EINVAL);
 	if (runtime->dma_area == NULL)
 		return 0;
-	if (runtime->dma_area != substream->dma_buffer.area) {
+	if (runtime->dma_buffer_p != &substream->dma_buffer) {
 		/* it's a newly allocated buffer.  release it now. */
-		struct snd_dma_buffer dmab;
-		memset(&dmab, 0, sizeof(dmab));
-		dmab.area = runtime->dma_area;
-		dmab.addr = runtime->dma_addr;
-		dmab.bytes = runtime->dma_bytes;
-		dmab.private_data = runtime->dma_private;
-		snd_dma_free_pages(&substream->dma_device, &dmab);
+		snd_dma_free_pages(&substream->dma_device, runtime->dma_buffer_p);
+		kfree(runtime->dma_buffer_p);
 	}
-	runtime->dma_area = NULL;
-	runtime->dma_addr = 0UL;
-	runtime->dma_bytes = 0;
-	runtime->dma_private = NULL;
+	snd_pcm_set_runtime_buffer(substream, NULL);
 	return 0;
 }
-
-#ifndef MODULE
-
-/* format is: snd-pcm=preallocate_dma,maximum_substreams */
-
-static int __init alsa_pcm_setup(char *str)
-{
-	(void)(get_option(&str,&preallocate_dma) == 2 &&
-	       get_option(&str,&maximum_substreams) == 2);
-	return 1;
-}
-
-__setup("snd-pcm=", alsa_pcm_setup);
-
-#endif /* ifndef MODULE */

@@ -133,6 +133,7 @@ EXPORT_SYMBOL(snd_seq_kernel_client_enqueue_blocking);
 EXPORT_SYMBOL(snd_seq_kernel_client_dispatch);
 EXPORT_SYMBOL(snd_seq_kernel_client_ctl);
 EXPORT_SYMBOL(snd_seq_kernel_client_write_poll);
+EXPORT_SYMBOL(snd_seq_set_queue_tempo);
   /* seq_memory.c */
 EXPORT_SYMBOL(snd_seq_expand_var_event);
 EXPORT_SYMBOL(snd_seq_dump_var_event);

@@ -1072,30 +1072,36 @@ static snd_kcontrol_new_t snd_cmipci_spdif_stream __devinitdata =
  */
 
 /* save mixer setting and mute for AC3 playback */
-static void save_mixer_state(cmipci_t *cm)
+static int save_mixer_state(cmipci_t *cm)
 {
 	if (! cm->mixer_insensitive) {
+		snd_ctl_elem_value_t *val;
 		unsigned int i;
+
+		val = kmalloc(sizeof(*val), GFP_ATOMIC);
+		if (!val)
+			return -ENOMEM;
 		for (i = 0; i < CM_SAVED_MIXERS; i++) {
 			snd_kcontrol_t *ctl = cm->mixer_res_ctl[i];
 			if (ctl) {
-				snd_ctl_elem_value_t val;
 				int event;
-				memset(&val, 0, sizeof(val));
-				ctl->get(ctl, &val);
-				cm->mixer_res_status[i] = val.value.integer.value[0];
-				val.value.integer.value[0] = cm_saved_mixer[i].toggle_on;
+				memset(val, 0, sizeof(*val));
+				ctl->get(ctl, val);
+				cm->mixer_res_status[i] = val->value.integer.value[0];
+				val->value.integer.value[0] = cm_saved_mixer[i].toggle_on;
 				event = SNDRV_CTL_EVENT_MASK_INFO;
-				if (cm->mixer_res_status[i] != val.value.integer.value[0]) {
-					ctl->put(ctl, &val); /* toggle */
+				if (cm->mixer_res_status[i] != val->value.integer.value[0]) {
+					ctl->put(ctl, val); /* toggle */
 					event |= SNDRV_CTL_EVENT_MASK_VALUE;
 				}
 				ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 				snd_ctl_notify(cm->card, event, &ctl->id);
 			}
 		}
+		kfree(val);
 		cm->mixer_insensitive = 1;
 	}
+	return 0;
 }
 
 
@@ -1103,27 +1109,32 @@ static void save_mixer_state(cmipci_t *cm)
 static void restore_mixer_state(cmipci_t *cm)
 {
 	if (cm->mixer_insensitive) {
+		snd_ctl_elem_value_t *val;
 		unsigned int i;
+
+		val = kmalloc(sizeof(*val), GFP_KERNEL);
+		if (!val)
+			return;
 		cm->mixer_insensitive = 0; /* at first clear this;
 					      otherwise the changes will be ignored */
 		for (i = 0; i < CM_SAVED_MIXERS; i++) {
 			snd_kcontrol_t *ctl = cm->mixer_res_ctl[i];
 			if (ctl) {
-				snd_ctl_elem_value_t val;
 				int event;
 
-				memset(&val, 0, sizeof(val));
+				memset(val, 0, sizeof(*val));
 				ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
-				ctl->get(ctl, &val);
+				ctl->get(ctl, val);
 				event = SNDRV_CTL_EVENT_MASK_INFO;
-				if (val.value.integer.value[0] != cm->mixer_res_status[i]) {
-					val.value.integer.value[0] = cm->mixer_res_status[i];
-					ctl->put(ctl, &val);
+				if (val->value.integer.value[0] != cm->mixer_res_status[i]) {
+					val->value.integer.value[0] = cm->mixer_res_status[i];
+					ctl->put(ctl, val);
 					event |= SNDRV_CTL_EVENT_MASK_VALUE;
 				}
 				snd_ctl_notify(cm->card, event, &ctl->id);
 			}
 		}
+		kfree(val);
 	}
 }
 
@@ -1175,15 +1186,16 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 	}
 }
 
-static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up, int do_ac3)
+static int setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up, int do_ac3)
 {
-	int rate;
+	int rate, err;
 	unsigned long flags;
 
 	rate = subs->runtime->rate;
 
 	if (up && do_ac3)
-		save_mixer_state(cm);
+		if ((err = save_mixer_state(cm)) < 0)
+			return err;
 
 	spin_lock_irqsave(&cm->reg_lock, flags);
 	cm->spdif_playback_avail = up;
@@ -1208,6 +1220,7 @@ static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up
 		setup_ac3(cm, subs, 0, 0);
 	}
 	spin_unlock_irqrestore(&cm->reg_lock, flags);
+	return 0;
 }
 
 
@@ -1220,13 +1233,15 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
 	int rate = substream->runtime->rate;
-	int do_spdif, do_ac3 = 0;
+	int err, do_spdif, do_ac3 = 0;
+
 	do_spdif = ((rate == 44100 || rate == 48000) &&
 		    substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE &&
 		    substream->runtime->channels == 2);
 	if (do_spdif && cm->can_ac3_hw) 
 		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
-	setup_spdif_playback(cm, substream, do_spdif, do_ac3);
+	if ((err = setup_spdif_playback(cm, substream, do_spdif, do_ac3)) < 0)
+		return err;
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
 
@@ -1234,12 +1249,14 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 static int snd_cmipci_playback_spdif_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
-	int do_ac3;
+	int err, do_ac3;
+
 	if (cm->can_ac3_hw) 
 		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
 	else
 		do_ac3 = 1; /* doesn't matter */
-	setup_spdif_playback(cm, substream, 1, do_ac3);
+	if ((err = setup_spdif_playback(cm, substream, 1, do_ac3)) < 0)
+		return err;
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
 

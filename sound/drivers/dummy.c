@@ -180,20 +180,6 @@ typedef struct snd_card_dummy_pcm {
 static snd_card_t *snd_dummy_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 
-static int snd_card_dummy_playback_ioctl(snd_pcm_substream_t * substream,
-				         unsigned int cmd,
-				         void *arg)
-{
-	return snd_pcm_lib_ioctl(substream, cmd, arg);
-}
-
-static int snd_card_dummy_capture_ioctl(snd_pcm_substream_t * substream,
-					unsigned int cmd,
-					void *arg)
-{
-	return snd_pcm_lib_ioctl(substream, cmd, arg);
-}
-
 static void snd_card_dummy_pcm_timer_start(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -342,6 +328,17 @@ static void snd_card_dummy_runtime_free(snd_pcm_runtime_t *runtime)
 	snd_magic_kfree(dpcm);
 }
 
+static int snd_card_dummy_hw_params(snd_pcm_substream_t * substream,
+				    snd_pcm_hw_params_t * hw_params)
+{
+	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+}
+
+static int snd_card_dummy_hw_free(snd_pcm_substream_t * substream)
+{
+	return snd_pcm_lib_free_pages(substream);
+}
+
 static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -351,10 +348,6 @@ static int snd_card_dummy_playback_open(snd_pcm_substream_t * substream)
 	dpcm = snd_magic_kcalloc(snd_card_dummy_pcm_t, 0, GFP_KERNEL);
 	if (dpcm == NULL)
 		return -ENOMEM;
-	if ((runtime->dma_area = snd_malloc_pages_fallback(MAX_BUFFER_SIZE, GFP_KERNEL, &runtime->dma_bytes)) == NULL) {
-		snd_magic_kfree(dpcm);
-		return -ENOMEM;
-	}
 	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
@@ -386,11 +379,6 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 	dpcm = snd_magic_kcalloc(snd_card_dummy_pcm_t, 0, GFP_KERNEL);
 	if (dpcm == NULL)
 		return -ENOMEM;
-	if ((runtime->dma_area = snd_malloc_pages_fallback(MAX_BUFFER_SIZE, GFP_KERNEL, &runtime->dma_bytes)) == NULL) {
-		snd_magic_kfree(dpcm);
-		return -ENOMEM;
-	}
-	memset(runtime->dma_area, 0, runtime->dma_bytes);
 	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
@@ -415,24 +403,20 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 
 static int snd_card_dummy_playback_close(snd_pcm_substream_t * substream)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-
-	snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 	return 0;
 }
 
 static int snd_card_dummy_capture_close(snd_pcm_substream_t * substream)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-
-	snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 	return 0;
 }
 
 static snd_pcm_ops_t snd_card_dummy_playback_ops = {
 	.open =			snd_card_dummy_playback_open,
 	.close =		snd_card_dummy_playback_close,
-	.ioctl =		snd_card_dummy_playback_ioctl,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_card_dummy_hw_params,
+	.hw_free =		snd_card_dummy_hw_free,
 	.prepare =		snd_card_dummy_playback_prepare,
 	.trigger =		snd_card_dummy_playback_trigger,
 	.pointer =		snd_card_dummy_playback_pointer,
@@ -441,7 +425,9 @@ static snd_pcm_ops_t snd_card_dummy_playback_ops = {
 static snd_pcm_ops_t snd_card_dummy_capture_ops = {
 	.open =			snd_card_dummy_capture_open,
 	.close =		snd_card_dummy_capture_close,
-	.ioctl =		snd_card_dummy_capture_ioctl,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_card_dummy_hw_params,
+	.hw_free =		snd_card_dummy_hw_free,
 	.prepare =		snd_card_dummy_capture_prepare,
 	.trigger =		snd_card_dummy_capture_trigger,
 	.pointer =		snd_card_dummy_capture_pointer,
@@ -459,6 +445,9 @@ static int __init snd_card_dummy_pcm(snd_card_dummy_t *dummy, int device, int su
 	pcm->private_data = dummy;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "Dummy PCM");
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
+					      snd_dma_continuous_data(GFP_KERNEL),
+					      0, 64*1024);
 	return 0;
 }
 

@@ -1177,10 +1177,11 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 	snd_pcm_substream_t *substream;
 	int err;
 	int direct;
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	unsigned int formats = 0;
 	snd_mask_t format_mask;
 	int fmt;
+
 	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
 		return err;
 	if (atomic_read(&substream->runtime->mmap_count)) {
@@ -1194,10 +1195,14 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 		       AFMT_S16_LE | AFMT_S16_BE |
 		       AFMT_S8 | AFMT_U16_LE |
 		       AFMT_U16_BE;
-	_snd_pcm_hw_params_any(&params);
-	err = snd_pcm_hw_refine(substream, &params);
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params)
+		return -ENOMEM;
+	_snd_pcm_hw_params_any(params);
+	err = snd_pcm_hw_refine(substream, params);
+	format_mask = *hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT); 
+	kfree(params);
 	snd_assert(err >= 0, return err);
-	format_mask = *hw_param_mask(&params, SNDRV_PCM_HW_PARAM_FORMAT); 
 	for (fmt = 0; fmt < 32; ++fmt) {
 		if (snd_mask_test(&format_mask, fmt)) {
 			int f = snd_pcm_oss_format_to(fmt);
@@ -2280,7 +2285,7 @@ static void snd_pcm_oss_proc_write(snd_info_entry_t *entry,
 				   snd_info_buffer_t * buffer)
 {
 	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
-	char line[512], str[32], task_name[32], *ptr;
+	char line[256], str[32], task_name[32], *ptr;
 	int idx1;
 	snd_pcm_oss_setup_t *setup, *setup1, template;
 

@@ -45,10 +45,14 @@ MODULE_LICENSE("GPL");
 #ifndef SNDRV_CARDS
 #define SNDRV_CARDS	8
 #endif
+
+/* FIXME: so far only some PCI devices have the preallocation table */
+#ifdef CONFIG_PCI
 static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int boot_devs;
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
+#endif
 
 /*
  */

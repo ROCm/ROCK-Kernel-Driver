@@ -77,11 +77,15 @@ config SND_ES18XX
 	help
 	  Say 'Y' or 'M' to include support for ESS AudioDrive ES18xx chips.
 
+config SND_GUS_SYNTH
+	tristate
+
 config SND_GUSCLASSIC
 	tristate "Gravis UltraSound Classic"
 	depends on SND
 	select SND_RAWMIDI
 	select SND_PCM
+	select SND_GUS_SYNTH
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound Classic soundcard.
 
@@ -91,6 +95,7 @@ config SND_GUSEXTREME
 	select SND_HWDEP
 	select SND_MPU401_UART
 	select SND_PCM
+	select SND_GUS_SYNTH
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound Extreme soundcard.
 
@@ -99,6 +104,7 @@ config SND_GUSMAX
 	depends on SND
 	select SND_RAWMIDI
 	select SND_PCM
+	select SND_GUS_SYNTH
 	help
 	  Say 'Y' or 'M' to include support for Gravis UltraSound MAX soundcard.
 
@@ -107,6 +113,7 @@ config SND_INTERWAVE
 	depends on SND
 	select SND_RAWMIDI
 	select SND_PCM
+	select SND_GUS_SYNTH
 	help
 	  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
 	  (Gravis UltraSound Plug & Play, STB SoundRage32, MED3210, Dynasonic Pro,
@@ -117,6 +124,7 @@ config SND_INTERWAVE_STB
 	depends on SND
 	select SND_RAWMIDI
 	select SND_PCM
+	select SND_GUS_SYNTH
 	help
 	  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
 	  with TEA6330T bass and treble regulator (UltraSound 32-Pro).

@@ -44,6 +44,7 @@
 #include "amp.h"
 #include "revo.h"
 #include "aureon.h"
+#include "vt1720_mobo.h"
 
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -54,6 +55,7 @@ MODULE_DEVICES("{"
 	       REVO_DEVICE_DESC
 	       AMP_AUDIO2000_DEVICE_DESC
 	       AUREON_DEVICE_DESC
+	       VT1720_MOBO_DEVICE_DESC
 		"{VIA,VT1720},"
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
@@ -419,7 +421,7 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 	ice->cur_rate = rate;
 
 	/* check MT02 */
-	if (ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) {
+	if (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S) {
 		val = old = inb(ICEMT1724(ice, I2S_FORMAT));
 		if (rate > 96000)
 			val |= VT1724_MT_I2S_MCLK_128X; /* 128x MCLK */
@@ -445,15 +447,6 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 	for (i = 0; i < ice->akm_codecs; i++) {
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
-	}
-
-	/* set up AC97 registers if needed */
-	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) && ice->ac97) {
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_FRONT_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_SURR_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_LFE_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_SPDIF, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_LR_ADC_RATE, rate);
 	}
 }
 
@@ -698,7 +691,7 @@ static snd_pcm_hardware_t snd_vt1724_2ch_stereo =
 static int set_rate_constraints(ice1712_t *ice, snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) {
+	if (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S) {
 		/* I2S */
 		if (ice->eeprom.data[ICE_EEP2_I2S] & 0x08)
 			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
@@ -714,15 +707,9 @@ static int set_rate_constraints(ice1712_t *ice, snd_pcm_substream_t *substream)
 			ratec = AC97_RATES_FRONT_DAC;
 		else
 			ratec = AC97_RATES_ADC;
-		runtime->hw.rates = ice->ac97->rates[ratec];
 		runtime->hw.rate_max = 48000;
-		if (runtime->hw.rates == SNDRV_PCM_RATE_48000) {
-			runtime->hw.rate_min = 48000;
-			return 0;
-		} else {
-			runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000;
-			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_48);
-		}
+		runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000;
+		return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_48);
 	}
 	return 0;
 }
@@ -864,8 +851,45 @@ const static struct vt1724_pcm_reg vt1724_capture_spdif_reg = {
 	.pause = VT1724_RDMA1_PAUSE,
 };
 
+/* update spdif control bits; call with reg_lock */
+static void update_spdif_bits(ice1712_t *ice, unsigned int val)
+{
+	unsigned char cbit, disabled;
+
+	cbit = inb(ICEREG1724(ice, SPDIF_CFG));
+	disabled = cbit & ~VT1724_CFG_SPDIF_OUT_EN;
+	if (cbit != disabled)
+		outb(disabled, ICEREG1724(ice, SPDIF_CFG));
+	outw(val, ICEMT1724(ice, SPDIF_CTRL));
+	if (cbit != disabled)
+		outb(cbit, ICEREG1724(ice, SPDIF_CFG));
+	outw(val, ICEMT1724(ice, SPDIF_CTRL));
+}
+
+/* update SPDIF control bits according to the given rate */
+static void update_spdif_rate(ice1712_t *ice, unsigned int rate)
+{
+	unsigned int val, nval;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ice->reg_lock, flags);
+	nval = val = inw(ICEMT1724(ice, SPDIF_CTRL));
+	nval &= ~(7 << 12);
+	switch (rate) {
+	case 44100: break;
+	case 48000: nval |= 2 << 12; break;
+	case 32000: nval |= 3 << 12; break;
+	}
+	if (val != nval)
+		update_spdif_bits(ice, nval);
+	spin_unlock_irqrestore(&ice->reg_lock, flags);
+}
+
 static int snd_vt1724_playback_spdif_prepare(snd_pcm_substream_t * substream)
 {
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	if (! ice->force_pdma4)
+		update_spdif_rate(ice, substream->runtime->rate);
 	return snd_vt1724_pcm_prepare(substream, &vt1724_playback_spdif_reg);
 }
 
@@ -1274,7 +1298,7 @@ static unsigned int encode_spdif_bits(snd_aes_iec958_t *diga)
 		}
 	} else {
 		/* consumer */
-		val |= diga->status[0] & 0x04; /* copyright */
+		val |= diga->status[1] & 0x04; /* copyright */
 		if ((diga->status[0] & IEC958_AES0_CON_EMPHASIS)== IEC958_AES0_CON_EMPHASIS_5015)
 			val |= 1U << 3;
 		val |= (unsigned int)(diga->status[1] & 0x3f) << 4; /* category */
@@ -1331,16 +1355,8 @@ static int snd_vt1724_spdif_default_put(snd_kcontrol_t * kcontrol,
 	val = encode_spdif_bits(&ucontrol->value.iec958);
 	spin_lock_irqsave(&ice->reg_lock, flags);
 	old = inw(ICEMT1724(ice, SPDIF_CTRL));
-	if (val != old) {
-		unsigned char cbit, disabled;
-		cbit = inb(ICEREG1724(ice, SPDIF_CFG));
-		disabled = cbit & ~VT1724_CFG_SPDIF_OUT_EN;
-		if (cbit != disabled)
-			outb(disabled, ICEREG1724(ice, SPDIF_CFG));
-		outw(val, ICEMT1724(ice, SPDIF_CTRL));
-		if (cbit != disabled)
-			outb(cbit, ICEREG1724(ice, SPDIF_CFG));
-	}
+	if (val != old)
+		update_spdif_bits(ice, val);
 	spin_unlock_irqrestore(&ice->reg_lock, flags);
 	return (val != old);
 }
@@ -1815,6 +1831,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_revo_cards,
 	snd_vt1724_amp_cards, 
 	snd_vt1724_aureon_cards,
+	snd_vt1720_mobo_cards,
 	0,
 };
 
@@ -1929,9 +1946,6 @@ static int __devinit snd_vt1724_chip_init(ice1712_t *ice)
 	snd_vt1724_set_gpio_data(ice, ice->eeprom.gpiostate);
 
 	outb(0, ICEREG1724(ice, POWERDOWN));
-
-	/* read back to check the availability of SPDIF out */
-	ice->eeprom.data[ICE_EEP2_SPDIF] = inb(ICEREG1724(ice, SPDIF_CFG));
 
 	return 0;
 }
