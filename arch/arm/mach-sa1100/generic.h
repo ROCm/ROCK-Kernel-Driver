@@ -6,6 +6,7 @@
 
 extern void __init sa1100_map_io(void);
 extern void __init sa1100_init_irq(void);
+extern void __init sa1100_init_time(void);
 
 #define SET_BANK(__nr,__start,__size) \
 	mi->bank[__nr].start = (__start), \

@@ -1,4 +1,5 @@
-/* include/asm-arm/arch-lh7a40x/time.h
+/* 
+ *  arch/arm/mach-lh7a40x/time.c
  *
  *  Copyright (C) 2004 Logic Product Development
  *
@@ -7,6 +8,18 @@
  *  version 2 as published by the Free Software Foundation.
  *
  */
+#include <linux/config.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/interrupt.h>
+#include <linux/time.h>
+
+#include <asm/hardware.h>
+#include <asm/io.h>
+#include <asm/irq.h>
+#include <asm/leds.h>
+
+#include <asm/mach/time.h>
 
 #if HZ < 100
 # define TIMER_CONTROL	TIMER_CONTROL1
@@ -28,24 +41,25 @@ static irqreturn_t
 lh7a40x_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	TIMER_EOI = 0;
-	do_profile (regs);
-	do_leds();
-	do_set_rtc();
-	do_timer (regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }
 
-void __init time_init(void)
+static struct irqaction lh7a40x_timer_irq = {
+	.name		= "LHA740x Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= lh7a40x_timer_interrupt
+};
+
+void __init lh7a40x_init_time(void)
 {
 				/* Stop/disable all timers */
 	TIMER_CONTROL1 = 0;
 	TIMER_CONTROL2 = 0;
 	TIMER_CONTROL3 = 0;
 
-	timer_irq.handler = lh7a40x_timer_interrupt;
-	timer_irq.flags |= SA_INTERRUPT;
-	setup_irq (TIMER_IRQ, &timer_irq);
+	setup_irq (TIMER_IRQ, &lh7a40x_timer_irq);
 
 	TIMER_LOAD = TIMER_CONSTANT;
 	TIMER_CONTROL = TIMER_MODE;

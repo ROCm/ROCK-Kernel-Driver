@@ -91,10 +91,16 @@ void __init ipaq_init_irq(void)
 
 }
 
+void __init ipaq_init_time(void)
+{
+	s3c2410_init_time();
+}
+
 MACHINE_START(H1940, "IPAQ-H1940")
      MAINTAINER("Ben Dooks <ben@fluff.org>")
      BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(ipaq_map_io)
      INITIRQ(ipaq_init_irq)
+     INITTIME(ipaq_init_time)
 MACHINE_END

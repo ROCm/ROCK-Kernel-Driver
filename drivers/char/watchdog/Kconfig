@@ -96,12 +96,13 @@ config IXP4XX_WATCHDOG
 	  Say N if you are unsure.
 
 config SA1100_WATCHDOG
-	tristate "SA1100 watchdog"
-	depends on WATCHDOG && ARCH_SA1100
+	tristate "SA1100/PXA2xx watchdog"
+	depends on WATCHDOG && ( ARCH_SA1100 || ARCH_PXA )
 	help
-	  Watchdog timer embedded into SA11x0 chips. This will reboot your
-	  system when timeout is reached.
-	  NOTE, that once enabled, this timer cannot be disabled.
+	  Watchdog timer embedded into SA11x0 and PXA2xx chips. This will
+	  reboot your system when timeout is reached.
+
+	  NOTE: once enabled, this timer cannot be disabled.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sa1100_wdt.
