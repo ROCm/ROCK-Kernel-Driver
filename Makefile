@@ -727,7 +727,7 @@ define filechk_version.h
 	)
 endef
 
-include/linux/version.h: Makefile
+include/linux/version.h: Makefile .config
 	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
