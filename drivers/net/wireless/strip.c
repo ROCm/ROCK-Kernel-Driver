@@ -82,6 +82,7 @@ static const char StripVersion[] = "1.3A-STUART.CHESHIRE";
 /* Header files								*/
 
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <asm/system.h>
@@ -454,10 +455,7 @@ static spinlock_t strip_lock = SPIN_LOCK_UNLOCKED;
 
 #define READDEC(X) ((X)>='0' && (X)<='9' ? (X)-'0' : 0)
 
-#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
-#define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
-#define ELEMENTS_OF(X) (sizeof(X) / sizeof((X)[0]))
-#define ARRAY_END(X) (&((X)[ELEMENTS_OF(X)]))
+#define ARRAY_END(X) (&((X)[ARRAY_SIZE(X)]))
 
 #define JIFFIE_TO_SEC(X) ((X) / HZ)
 
@@ -847,7 +845,7 @@ static __u8 *radio_address_to_string(const MetricomAddress * addr,
 static int allocate_buffers(struct strip *strip_info, int mtu)
 {
 	struct net_device *dev = strip_info->dev;
-	int sx_size = MAX(STRIP_ENCAP_SIZE(MAX_RECV_MTU), 4096);
+	int sx_size = max_t(int, STRIP_ENCAP_SIZE(MAX_RECV_MTU), 4096);
 	int tx_size = STRIP_ENCAP_SIZE(mtu) + MaxCommandStringLength;
 	__u8 *r = kmalloc(MAX_RECV_MTU, GFP_ATOMIC);
 	__u8 *s = kmalloc(sx_size, GFP_ATOMIC);
@@ -953,6 +951,7 @@ static void strip_unlock(struct strip *strip_info)
  * ascii representation of the number plus 9 charactes for the " seconds"
  * and the null character.
  */
+#ifdef CONFIG_PROC_FS
 static char *time_delta(char buffer[], long time)
 {
 	time -= jiffies;
@@ -1173,6 +1172,7 @@ static struct file_operations strip_seq_fops = {
 	.llseek  = seq_lseek,
 	.release = seq_release,
 };
+#endif
 
 
 
@@ -1465,7 +1465,7 @@ static void strip_send(struct strip *strip_info, struct sk_buff *skb)
 		/* Cycle to next periodic command? */
 		if (strip_info->firmware_level >= StructuredMessages)
 			if (++strip_info->next_command >=
-			    ELEMENTS_OF(CommandString))
+			    ARRAY_SIZE(CommandString))
 				strip_info->next_command = 0;
 #ifdef EXT_COUNTERS
 		strip_info->tx_ebytes += ts.length;
@@ -1709,7 +1709,7 @@ static void get_radio_version(struct strip *strip_info, __u8 * ptr, __u8 * end)
 	p++;
 
 	len = value_end - value_begin;
-	len = MIN(len, sizeof(FirmwareVersion) - 1);
+	len = min_t(int, len, sizeof(FirmwareVersion) - 1);
 	if (strip_info->firmware_version.c[0] == 0)
 		printk(KERN_INFO "%s: Radio Firmware: %.*s\n",
 		       strip_info->dev->name, len, value_begin);
