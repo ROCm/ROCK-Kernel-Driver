@@ -113,12 +113,13 @@ static inline unsigned int tdb_hash(const char *name)
  * the list of unresolved symbols per module */
 
 struct symbol *
-alloc_symbol(const char *name)
+alloc_symbol(const char *name, struct symbol *next)
 {
 	struct symbol *s = NOFAIL(malloc(sizeof(*s) + strlen(name) + 1));
 
 	memset(s, 0, sizeof(*s));
 	strcpy(s->name, name);
+	s->next = next;
 	return s;
 }
 
@@ -128,17 +129,15 @@ void
 new_symbol(const char *name, struct module *module, unsigned int *crc)
 {
 	unsigned int hash;
-	struct symbol *new = alloc_symbol(name);
+	struct symbol *new;
 
+	hash = tdb_hash(name) % SYMBOL_HASH_SIZE;
+	new = symbolhash[hash] = alloc_symbol(name, symbolhash[hash]);
 	new->module = module;
 	if (crc) {
 		new->crc = *crc;
 		new->crc_valid = 1;
 	}
-
-	hash = tdb_hash(name) % SYMBOL_HASH_SIZE;
-	new->next = symbolhash[hash];
-	symbolhash[hash] = new;
 }
 
 struct symbol *
@@ -165,7 +164,7 @@ add_exported_symbol(const char *name, struct module *module, unsigned int *crc)
 	struct symbol *s = find_symbol(name);
 
 	if (!s) {
-		new_symbol(name, modules, crc);
+		new_symbol(name, module, crc);
 		return;
 	}
 	if (crc) {
@@ -319,7 +318,6 @@ void
 handle_modversions(struct module *mod, struct elf_info *info,
 		   Elf_Sym *sym, const char *symname)
 {
-	struct symbol *s;
 	unsigned int crc;
 
 	switch (sym->st_shndx) {
@@ -356,13 +354,10 @@ handle_modversions(struct module *mod, struct elf_info *info,
 #endif
 		
 		if (memcmp(symname, MODULE_SYMBOL_PREFIX,
-			   strlen(MODULE_SYMBOL_PREFIX)) == 0) {
-			s = alloc_symbol(symname + 
-					 strlen(MODULE_SYMBOL_PREFIX));
-			/* add to list */
-			s->next = mod->unres;
-			mod->unres = s;
-		}
+			   strlen(MODULE_SYMBOL_PREFIX)) == 0)
+			mod->unres = alloc_symbol(symname +
+						  strlen(MODULE_SYMBOL_PREFIX),
+						  mod->unres);
 		break;
 	default:
 		/* All exported symbols */
@@ -393,7 +388,6 @@ read_symbols(char *modname)
 	const char *symname;
 	struct module *mod;
 	struct elf_info info = { };
-	struct symbol *s;
 	Elf_Sym *sym;
 
 	/* When there's no vmlinux, don't print warnings about
@@ -419,10 +413,12 @@ read_symbols(char *modname)
 	 * the automatic versioning doesn't pick it up, but it's really
 	 * important anyhow */
 	if (modversions) {
-		s = alloc_symbol("struct_module");
-		/* add to list */
-		s->next = mod->unres;
-		mod->unres = s;
+		mod->unres = alloc_symbol("struct_module", mod->unres);
+
+		/* Always version init_module and cleanup_module, in
+		 * case module doesn't have its own. */
+		mod->unres = alloc_symbol("init_module", mod->unres);
+		mod->unres = alloc_symbol("cleanup_module", mod->unres);
 	}
 }
 
