@@ -30,10 +30,15 @@ read(struct file * file, char * userbuf, size_t count, loff_t * off)
 	loff_t offs = *off;
 	int ret;
 
-	if (offs > size)
-		return 0;
-	if (offs + count > size)
-		count = size - offs;
+	if (count > PAGE_SIZE)
+		count = PAGE_SIZE;
+
+	if (size) {
+		if (offs > size)
+			return 0;
+		if (offs + count > size)
+			count = size - offs;
+	}
 
 	ret = fill_read(dentry, buffer, offs, count);
 	if (ret < 0) 
@@ -41,7 +46,7 @@ read(struct file * file, char * userbuf, size_t count, loff_t * off)
 	count = ret;
 
 	ret = -EFAULT;
-	if (copy_to_user(userbuf, buffer + offs, count) != 0)
+	if (copy_to_user(userbuf, buffer, count) != 0)
 		goto Done;
 
 	*off = offs + count;
@@ -69,19 +74,23 @@ static ssize_t write(struct file * file, const char * userbuf,
 	loff_t offs = *off;
 	int ret;
 
-	if (offs > size)
-		return 0;
-	if (offs + count > size)
-		count = size - offs;
+	if (count > PAGE_SIZE)
+		count = PAGE_SIZE;
+	if (size) {
+		if (offs > size)
+			return 0;
+		if (offs + count > size)
+			count = size - offs;
+	}
 
 	ret = -EFAULT;
-	if (copy_from_user(buffer + offs, userbuf, count))
+	if (copy_from_user(buffer, userbuf, count))
 		goto Done;
 
 	count = flush_write(dentry, buffer, offs, count);
 	if (count > 0)
 		*off = offs + count;
-	ret = 0;
+	ret = count;
  Done:
 	return ret;
 }
@@ -102,7 +111,7 @@ static int open(struct inode * inode, struct file * file)
 		goto Done;
 
 	error = -ENOMEM;
-	file->private_data = kmalloc(attr->size, GFP_KERNEL);
+	file->private_data = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!file->private_data)
 		goto Done;
 
