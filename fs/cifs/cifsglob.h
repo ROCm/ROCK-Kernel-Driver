@@ -199,17 +199,18 @@ struct cifsLockInfo {
 struct cifsFileInfo {
 	struct list_head tlist;	/* pointer to next fid owned by tcon */
 	struct list_head flist;	/* next fid (file instance) for this inode */
-	unsigned int uid;	/* allows you to find which FileInfo structure */
+	unsigned int uid;	/* allows finding which FileInfo structure */
 	__u32 pid;		/* process id who opened file */
 	__u16 netfid;		/* file id from remote */
 	/* BB add lock scope info here if needed */ ;
 	/* lock scope id (0 if none) */
-    struct file * pfile; /* needed for writepage */
+    	struct file * pfile; /* needed for writepage */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
-    char * search_resume_name;
-    unsigned int resume_name_length;
-    __u32 resume_key;
+	int emptyDir:1;
+	char * search_resume_name;
+	unsigned int resume_name_length;
+	__u32 resume_key;
 };
 
 /*

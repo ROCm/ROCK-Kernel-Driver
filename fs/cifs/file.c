@@ -1109,8 +1109,16 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		/* fallthrough */
 	case 2:
 		if (file->private_data != NULL) {
-			cFYI(1,("Search rewinding on %s",full_path));
-			CIFSFindClose(xid, pTcon, cifsFile->netfid);
+			cifsFile =
+				(struct cifsFileInfo *) file->private_data;
+			if (cifsFile->endOfSearch) {
+				if(cifsFile->emptyDir) {
+					cFYI(1, ("End of search, empty dir"));
+					rc = 0;
+					break;
+				}
+			} else
+				CIFSFindClose(xid, pTcon, cifsFile->netfid);
 			if(cifsFile->search_resume_name) {
 				kfree(cifsFile->search_resume_name);
 				cifsFile->search_resume_name = NULL;
@@ -1261,10 +1269,12 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					(FILE_DIRECTORY_INFO *) ((char *) pfindData
 						 + le32_to_cpu(pfindData->NextEntryOffset));
 				/* BB also should check to make sure that pointer is not beyond the end of the SMB */
-				/* if(pfindData > lastFindData) rc = -EIOl; break; */
+				/* if(pfindData > lastFindData) rc = -EIO; break; */
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
 				cifsFile->endOfSearch = TRUE;
+				if(findParms.SearchCount == 2)
+					cifsFile->emptyDir = TRUE;
 			}
 		} else {
 			if (cifsFile)
