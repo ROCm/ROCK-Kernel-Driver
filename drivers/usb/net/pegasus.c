@@ -1045,20 +1045,21 @@ static inline void setup_pegasus_II(pegasus_t * pegasus)
 		set_register(pegasus, Reg81, 2);
 }
 
-static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
-			   const struct usb_device_id *id)
+static int pegasus_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct net_device *net;
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
 
 	if (usb_set_configuration(dev, dev->config[0].bConfigurationValue)) {
 		err("usb_set_configuration() failed");
-		return NULL;
+		return -ENODEV;
 	}
 	if (!(pegasus = kmalloc(sizeof(struct pegasus), GFP_KERNEL))) {
 		err("out of memory allocating device structure");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	usb_get_dev(dev);
@@ -1068,14 +1069,14 @@ static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (!alloc_urbs(pegasus)) {
 		kfree(pegasus);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	net = init_etherdev(NULL, 0);
 	if (!net) {
 		free_all_urbs(pegasus);
 		kfree(pegasus);
-		return NULL;
+		return -ENODEV;
 	}
 
 	init_MUTEX(&pegasus->sem);
@@ -1122,13 +1123,18 @@ static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 exit:
 	up(&pegasus->sem);
-	return pegasus;
+	if (pegasus) {
+		dev_set_drvdata (&intf->dev, pegasus);
+		return 0;
+	}
+	return -EIO;
 }
 
-static void pegasus_disconnect(struct usb_device *dev, void *ptr)
+static void pegasus_disconnect(struct usb_interface *intf)
 {
-	struct pegasus *pegasus = ptr;
+	struct pegasus *pegasus = dev_get_drvdata (&intf->dev);
 
+	dev_set_drvdata (&intf->dev, NULL);
 	if (!pegasus) {
 		warn("unregistering non-existant device");
 		return;
@@ -1136,7 +1142,7 @@ static void pegasus_disconnect(struct usb_device *dev, void *ptr)
 
 	pegasus->flags |= PEGASUS_UNPLUG;
 	unregister_netdev(pegasus->net);
-	usb_put_dev(dev);
+	usb_put_dev(interface_to_usbdev(intf));
 	unlink_all_urbs(pegasus);
 	free_all_urbs(pegasus);
 	free_skb_pool(pegasus);
