@@ -494,13 +494,13 @@ xfs_alloc_trace_modagf(
 		(void *)(__psunsigned_t)INT_GET(agf->agf_seqno, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_length, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_BNO],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_CNT],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_BNO],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_CNT],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_flfirst, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_fllast, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_flcount, ARCH_CONVERT),
