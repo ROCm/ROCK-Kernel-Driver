@@ -48,6 +48,12 @@ int security_scaffolding_startup (void)
 	printk (KERN_INFO "Security Scaffold v" SECURITY_SCAFFOLD_VERSION
 		" initialized\n");
 
+	if (verify (&dummy_security_ops)) {
+		printk (KERN_ERR "%s could not verify "
+			"dummy_security_ops structure.\n", __FUNCTION__);
+		return -EIO;
+	}
+
 	security_ops = &dummy_security_ops;
 
 	return 0;
