@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
+#include <linux/suspend.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -561,6 +562,8 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 	/* I hope that every freeze operations from the upper levels have
 	 * already been done...
 	 */
+
+	BUG_ON(in_interrupt());
 
 	if (level != SUSPEND_SAVE_STATE)
 		return 0;

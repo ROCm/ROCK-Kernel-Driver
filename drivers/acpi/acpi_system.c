@@ -33,6 +33,7 @@
 #include <linux/delay.h>
 #include <linux/sysrq.h>
 #include <linux/pm.h>
+#include <linux/device.h>
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
 #include "acpi_bus.h"
@@ -128,6 +129,12 @@ acpi_system_restore_state (
 	/* restore device context */
 	device_resume(RESUME_RESTORE_STATE);
 #endif
+
+	if (dmi_broken & BROKEN_INIT_AFTER_S1) {
+		printk("Broken toshiba laptop -> kicking interrupts\n");
+		init_8259A(0);
+	}
+
 	return AE_OK;
 }
 
@@ -254,23 +261,21 @@ acpi_system_suspend(
 	switch (state)
 	{
 	case ACPI_STATE_S1:
-		/* do nothing */
+		barrier();
+		status = acpi_enter_sleep_state(state);
 		break;
 
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
-		acpi_save_register_state((unsigned long)&&acpi_sleep_done);
+		do_suspend_magic(0);
 		break;
 	}
 
-	barrier();
-	status = acpi_enter_sleep_state(state);
-
-acpi_sleep_done:
-
+	printk("acpi_restore_register_state...");
 	acpi_restore_register_state();
 	restore_flags(flags);
 
+	printk("acpi returning...");
 	return status;
 }
 
@@ -289,6 +294,8 @@ acpi_suspend (
 	/* get out if state is invalid */
 	if (state < ACPI_STATE_S1 || state > ACPI_STATE_S5)
 		return AE_ERROR;
+
+	freeze_processes();
 
 	/* do we have a wakeup address for S2 and S3? */
 	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3) {
@@ -315,13 +322,17 @@ acpi_suspend (
 	 * no matter what.
 	 */
 	acpi_system_restore_state(state);
+	printk("acpi_leave_sleep_state...");
 	acpi_leave_sleep_state(state);
+	printk("ook\n");
 
 	/* make sure interrupts are enabled */
 	ACPI_ENABLE_IRQS();
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) 0);
+
+	thaw_processes();
 
 	return status;
 }
@@ -700,8 +711,17 @@ acpi_system_write_sleep (
 	
 	if (!system->states[state])
 		return_VALUE(-ENODEV);
+
 	
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	if (state == 4) {
+		/* We are working from process context, that's why we may call it directly. */ 
+		do_software_suspend();
+		return_VALUE(count);
+	}
+#endif
 	status = acpi_suspend(state);
+
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 	
@@ -1180,6 +1200,10 @@ acpi_system_add (
 		}
 	}
 	printk(")\n");
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	printk(KERN_INFO "Software suspend => we can do S4.");
+	system->states[4] = 1;
+#endif
 
 #ifdef CONFIG_PM
 	/* Install the soft-off (S5) handler. */

@@ -14,6 +14,7 @@
 #include <linux/gfp.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/suspend.h>
 
 
 /*
@@ -96,7 +97,7 @@ static int __pdflush(struct pdflush_work *my_work)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
-	current->flags |= PF_FLUSHER;
+	current->flags |= PF_FLUSHER | PF_KERNTHREAD;
 	my_work->fn = NULL;
 	my_work->who = current;
 
@@ -107,15 +108,21 @@ static int __pdflush(struct pdflush_work *my_work)
 	for ( ; ; ) {
 		struct pdflush_work *pdf;
 
+#ifdef CONFIG_SOFTWARE_SUSPEND
+		run_task_queue(&tq_bdflush);
+#endif
 		list_add(&my_work->list, &pdflush_list);
 		my_work->when_i_went_to_sleep = jiffies;
 		set_current_state(TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&pdflush_lock);
 
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 		schedule();
 
 		preempt_enable();
-		(*my_work->fn)(my_work->arg0);
+		if (my_work->fn)
+			(*my_work->fn)(my_work->arg0);
 		preempt_disable();
 
 		/*
@@ -146,6 +153,7 @@ static int __pdflush(struct pdflush_work *my_work)
 			pdf->when_i_went_to_sleep = jiffies;	/* Limit exit rate */
 			break;					/* exeunt */
 		}
+		my_work->fn = NULL;
 	}
 	nr_pdflush_threads--;
 //	printk("pdflush %d [%d] ends\n", nr_pdflush_threads, current->pid);

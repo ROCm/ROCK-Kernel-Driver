@@ -1418,7 +1418,9 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	if (bio->bi_bdev)
+		req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	else	req->rq_dev = NODEV;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)

@@ -366,6 +366,7 @@ static int ksoftirqd(void * __bind_cpu)
 
 	daemonize();
 	set_user_nice(current, 19);
+	current->flags |= PF_IOTHREAD;
 	sigfillset(&current->blocked);
 
 	/* Migrate to the right CPU */

@@ -71,10 +71,10 @@
 #include <linux/smp_lock.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
+#include <linux/loop.h>
+#include <linux/suspend.h>
 
 #include <asm/uaccess.h>
-
-#include <linux/loop.h>		
 
 #define MAJOR_NR LOOP_MAJOR
 
@@ -534,6 +534,7 @@ static int loop_thread(void *data)
 	daemonize();
 
 	sprintf(current->comm, "loop%d", lo->lo_number);
+	current->flags |= PF_IOTHREAD;
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);

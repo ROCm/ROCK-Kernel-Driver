@@ -32,6 +32,7 @@
 #include <linux/writeback.h>
 #include <linux/mempool.h>
 #include <linux/hash.h>
+#include <linux/suspend.h>
 #include <asm/bitops.h>
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
@@ -119,6 +120,8 @@ void unlock_buffer(struct buffer_head *bh)
 	smp_mb__after_clear_bit();
 	wake_up_buffer(bh);
 }
+
+DECLARE_TASK_QUEUE(tq_bdflush);
 
 /*
  * Block until a buffer comes unlocked.  This doesn't stop it
