@@ -16,7 +16,6 @@ Default values and initialization routines for most of these
 files can be found in mm/swap.c.
 
 Currently, these files are in /proc/sys/vm:
-- kswapd
 - overcommit_memory
 - page-cluster
 - dirty_async_ratio
@@ -31,39 +30,6 @@ dirty_async_ratio, dirty_background_ratio, dirty_expire_centisecs,
 dirty_sync_ratio dirty_writeback_centisecs:
 
 See Documentation/filesystems/proc.txt
-
-==============================================================
-
-kswapd:
-
-Kswapd is the kernel swapout daemon. That is, kswapd is that
-piece of the kernel that frees memory when it gets fragmented
-or full. Since every system is different, you'll probably want
-some control over this piece of the system.
-
-The numbers in this page correspond to the numbers in the
-struct pager_daemon {tries_base, tries_min, swap_cluster
-}; The tries_base and swap_cluster probably have the
-largest influence on system performance.
-
-tries_base	The maximum number of pages kswapd tries to
-		free in one round is calculated from this
-		number. Usually this number will be divided
-		by 4 or 8 (see mm/vmscan.c), so it isn't as
-		big as it looks.
-		When you need to increase the bandwidth to/from
-		swap, you'll want to increase this number.
-tries_min	This is the minimum number of times kswapd
-		tries to free a page each time it is called.
-		Basically it's just there to make sure that
-		kswapd frees some pages even when it's being
-		called with minimum priority.
-swap_cluster	This is the number of pages kswapd writes in
-		one turn. You want this large so that kswapd
-		does it's I/O in large chunks and the disk
-		doesn't have to seek often, but you don't want
-		it to be too large since that would flood the
-		request queue.
 
 ==============================================================
 

@@ -15,7 +15,6 @@
 #include <linux/slab.h>
 #include <linux/blk.h>
 #include <linux/swap.h>
-#include <linux/swapctl.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>

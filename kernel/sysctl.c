@@ -22,7 +22,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/sysctl.h>
-#include <linux/swapctl.h>
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
 #include <linux/utsname.h>
@@ -272,8 +271,6 @@ static ctl_table vm_table[] = {
 	{VM_OVERCOMMIT_RATIO, "overcommit_ratio",
 	 &sysctl_overcommit_ratio, sizeof(sysctl_overcommit_ratio), 0644,
 	 NULL, &proc_dointvec},
-	{VM_PAGERDAEMON, "kswapd",
-	 &pager_daemon, sizeof(pager_daemon_t), 0644, NULL, &proc_dointvec},
 	{VM_PAGE_CLUSTER, "page-cluster", 
 	 &page_cluster, sizeof(int), 0644, NULL, &proc_dointvec},
 	{VM_DIRTY_BACKGROUND, "dirty_background_ratio",
