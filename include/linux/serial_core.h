@@ -211,6 +211,8 @@ struct uart_state {
 	struct uart_info	*info;
 	struct uart_port	*port;
 
+	struct semaphore	sem;
+
 #ifdef CONFIG_PM
 	struct pm_dev		*pm;
 #endif
@@ -235,7 +237,6 @@ struct uart_info {
  */
 #define UIF_CHECK_CD		(1 << 25)
 #define UIF_CTS_FLOW		(1 << 26)
-#define UIF_CLOSING		(1 << 27)
 #define UIF_NORMAL_ACTIVE	(1 << 29)
 #define UIF_INITIALIZED		(1 << 31)
 

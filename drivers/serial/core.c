@@ -21,9 +21,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *  $Id: core.c,v 1.100 2002/07/28 10:03:28 rmk Exp $
- *
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -57,6 +54,8 @@
 static DECLARE_MUTEX(port_sem);
 
 #define HIGH_BITS_OFFSET	((sizeof(long)-sizeof(int))*8)
+
+#define uart_users(state)	((state)->count + ((state)->info ? (state)->info->blocked_open : 0))
 
 static void uart_change_speed(struct uart_state *state, struct termios *old_termios);
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
@@ -138,7 +137,7 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
 
 /*
  * Startup the port.  This will be called once per open.  All calls
- * will be serialised by the global port semaphore.
+ * will be serialised by the per-port semaphore.
  */
 static int uart_startup(struct uart_state *state, int init_hw)
 {
@@ -196,8 +195,7 @@ static int uart_startup(struct uart_state *state, int init_hw)
 
 		info->flags |= UIF_INITIALIZED;
 
-		if (info->tty)
-			clear_bit(TTY_IO_ERROR, &info->tty->flags);
+		clear_bit(TTY_IO_ERROR, &info->tty->flags);
 	}
 
 	if (retval && capable(CAP_SYS_ADMIN))
@@ -209,7 +207,7 @@ static int uart_startup(struct uart_state *state, int init_hw)
 /*
  * This routine will shutdown a serial port; interrupts are disabled, and
  * DTR is dropped if the hangup on close termio flag is on.  Calls to
- * uart_shutdown are serialised by port_sem.
+ * uart_shutdown are serialised by the per-port semaphore.
  */
 static void uart_shutdown(struct uart_state *state)
 {
@@ -694,7 +692,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	 * module insertion/removal doesn't change anything
 	 * under us.
 	 */
-	down(&port_sem);
+	down(&state->sem);
 
 	change_irq  = new_serial.irq != port->irq;
 
@@ -747,14 +745,14 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 		/*
 		 * Make sure that we are the sole user of this port.
 		 */
-		if (state->count > 1 || state->info->blocked_open != 0)
+		if (uart_users(state) > 1)
 			goto exit;
 
 		/*
 		 * We need to shutdown the serial port at the old
 		 * port/type/irq combination.
 		 */
-		uart_shutdown(state->info);
+		uart_shutdown(state);
 	}
 
 	if (change_port) {
@@ -820,7 +818,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
 	port->fifosize         = new_serial.xmit_fifo_size;
-	if (state->info && state->info->tty)
+	if (state->info->tty)
 		state->info->tty->low_latency =
 			(port->flags & UPF_LOW_LATENCY) ? 1 : 0;
 
@@ -828,7 +826,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	retval = 0;
 	if (port->type == PORT_UNKNOWN)
 		goto exit;
-	if (state->info && state->info->flags & UIF_INITIALIZED) {
+	if (state->info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
 		    old_custom_divisor != port->custom_divisor) {
 			/* If they're setting up a custom divisor or speed,
@@ -844,13 +842,14 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	} else
 		retval = uart_startup(state, 1);
  exit:
-	up(&port_sem);
+	up(&state->sem);
 	return retval;
 }
 
 
 /*
- * uart_get_lsr_info - get line status register info
+ * uart_get_lsr_info - get line status register info.
+ * Note: uart_ioctl protects us against hangups.
  */
 static int uart_get_lsr_info(struct uart_state *state, unsigned int *value)
 {
@@ -933,16 +932,16 @@ static int uart_do_autoconfig(struct uart_state *state)
 		return -EPERM;
 
 	/*
-	 * Take the 'count' lock.  This prevents count
-	 * from incrementing, and hence any extra opens
-	 * of the port while we're auto-configging.
+	 * Take the per-port semaphore.  This prevents count from
+	 * changing, and hence any extra opens of the port while
+	 * we're auto-configuring.
 	 */
-	if (down_interruptible(&port_sem))
+	if (down_interruptible(&state->sem))
 		return -ERESTARTSYS;
 
 	ret = -EBUSY;
-	if (state->count == 1 && state->info->blocked_open == 0) {
-		uart_shutdown(state->info);
+	if (uart_users(state) == 1) {
+		uart_shutdown(state);
 
 		/*
 		 * If we already have a port type configured,
@@ -963,10 +962,16 @@ static int uart_do_autoconfig(struct uart_state *state)
 
 		ret = uart_startup(state, 1);
 	}
-	up(&port_sem);
+	up(&state->sem);
 	return ret;
 }
 
+/*
+ * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
+ * - mask passed in arg for lines of interest
+ *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
+ * Caller should use TIOCGICOUNT to see which one it was
+ */
 static int
 uart_wait_modem_status(struct uart_state *state, unsigned long arg)
 {
@@ -1021,105 +1026,132 @@ uart_wait_modem_status(struct uart_state *state, unsigned long arg)
 }
 
 /*
+ * Get counter of input serial line interrupts (DCD,RI,DSR,CTS)
+ * Return: write counters to the user passed counter struct
+ * NB: both 1->0 and 0->1 transitions are counted except for
+ *     RI where only 0->1 is counted.
+ */
+static int
+uart_get_count(struct uart_state *state, struct serial_icounter_struct *icnt)
+{
+	struct serial_icounter_struct icount;
+	struct uart_icount cnow;
+	struct uart_port *port = state->port;
+
+	spin_lock_irq(&port->lock);
+	memcpy(&cnow, &port->icount, sizeof(struct uart_icount));
+	spin_unlock_irq(&port->lock);
+
+	icount.cts         = cnow.cts;
+	icount.dsr         = cnow.dsr;
+	icount.rng         = cnow.rng;
+	icount.dcd         = cnow.dcd;
+	icount.rx          = cnow.rx;
+	icount.tx          = cnow.tx;
+	icount.frame       = cnow.frame;
+	icount.overrun     = cnow.overrun;
+	icount.parity      = cnow.parity;
+	icount.brk         = cnow.brk;
+	icount.buf_overrun = cnow.buf_overrun;
+
+	return copy_to_user(icnt, &icount, sizeof(icount)) ? -EFAULT : 0;
+}
+
+/*
  * Called via sys_ioctl under the BKL.  We can use spin_lock_irq() here.
  */
 static int
-uart_ioctl(struct tty_struct *tty, struct file *file, unsigned int cmd,
+uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	   unsigned long arg)
 {
 	struct uart_state *state = tty->driver_data;
-	struct serial_icounter_struct icount;
-	struct uart_icount cnow;
 	int ret = -ENOIOCTLCMD;
 
 	BUG_ON(!kernel_locked());
 
-	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
-	    (cmd != TIOCSERCONFIG) && (cmd != TIOCSERGSTRUCT) &&
-	    (cmd != TIOCMIWAIT) && (cmd != TIOCGICOUNT)) {
-		if (tty->flags & (1 << TTY_IO_ERROR))
-			return -EIO;
-	}
-
+	/*
+	 * These ioctls don't rely on the hardware to be present.
+	 */
 	switch (cmd) {
-		case TIOCMGET:
-			ret = uart_get_modem_info(state->port,
-						  (unsigned int *)arg);
-			break;
+	case TIOCGSERIAL:
+		ret = uart_get_info(state, (struct serial_struct *)arg);
+		break;
 
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			ret = uart_set_modem_info(state->port, cmd,
-						  (unsigned int *)arg);
-			break;
+	case TIOCSSERIAL:
+		ret = uart_set_info(state, (struct serial_struct *)arg);
+		break;
 
-		case TIOCGSERIAL:
-			ret = uart_get_info(state, (struct serial_struct *)arg);
-			break;
+	case TIOCSERCONFIG:
+		ret = uart_do_autoconfig(state);
+		break;
 
-		case TIOCSSERIAL:
-			ret = uart_set_info(state, (struct serial_struct *)arg);
-			break;
-
-		case TIOCSERCONFIG:
-			ret = uart_do_autoconfig(state);
-			break;
-
-		case TIOCSERGETLSR: /* Get line status register */
-			ret = uart_get_lsr_info(state, (unsigned int *)arg);
-			break;
-
-		/*
-		 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
-		 * - mask passed in arg for lines of interest
-		 *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
-		 * Caller should use TIOCGICOUNT to see which one it was
-		 */
-		case TIOCMIWAIT:
-			ret = uart_wait_modem_status(state, arg);
-			break;
-
-		/*
-		 * Get counter of input serial line interrupts (DCD,RI,DSR,CTS)
-		 * Return: write counters to the user passed counter struct
-		 * NB: both 1->0 and 0->1 transitions are counted except for
-		 *     RI where only 0->1 is counted.
-		 */
-		case TIOCGICOUNT:
-			spin_lock_irq(&state->port->lock);
-			memcpy(&cnow, &state->port->icount,
-			       sizeof(struct uart_icount));
-			spin_unlock_irq(&state->port->lock);
-
-			icount.cts         = cnow.cts;
-			icount.dsr         = cnow.dsr;
-			icount.rng         = cnow.rng;
-			icount.dcd         = cnow.dcd;
-			icount.rx          = cnow.rx;
-			icount.tx          = cnow.tx;
-			icount.frame       = cnow.frame;
-			icount.overrun     = cnow.overrun;
-			icount.parity      = cnow.parity;
-			icount.brk         = cnow.brk;
-			icount.buf_overrun = cnow.buf_overrun;
-
-			ret = copy_to_user((void *)arg, &icount, sizeof(icount))
-					? -EFAULT : 0;
-			break;
-
-		case TIOCSERGWILD: /* obsolete */
-		case TIOCSERSWILD: /* obsolete */
-			ret = 0;
-			break;
-
-		default: {
-			struct uart_port *port = state->port;
-			if (port->ops->ioctl)
-				ret = port->ops->ioctl(port, cmd, arg);
-			break;
-		}
+	case TIOCSERGWILD: /* obsolete */
+	case TIOCSERSWILD: /* obsolete */
+		ret = 0;
+		break;
 	}
+
+	if (ret != -ENOIOCTLCMD)
+		goto out;
+
+	if (tty->flags & (1 << TTY_IO_ERROR)) {
+		ret = -EIO;
+		goto out;
+	}
+
+	/*
+	 * The following should only be used when hardware is present.
+	 */
+	switch (cmd) {
+	case TIOCMIWAIT:
+		ret = uart_wait_modem_status(state, arg);
+		break;
+
+	case TIOCGICOUNT:
+		ret = uart_get_count(state, (struct serial_icounter_struct *)arg);
+		break;
+	}
+
+	if (ret != -ENOIOCTLCMD)
+		goto out;
+
+	down(&state->sem);
+
+	if (tty_hung_up_p(filp)) {
+		ret = -EIO;
+		goto out_up;
+	}
+
+	/*
+	 * All these rely on hardware being present and need to be
+	 * protected against the tty being hung up.
+	 */
+	switch (cmd) {
+	case TIOCMGET:
+		ret = uart_get_modem_info(state->port, (unsigned int *)arg);
+		break;
+
+	case TIOCMBIS:
+	case TIOCMBIC:
+	case TIOCMSET:
+		ret = uart_set_modem_info(state->port, cmd,
+					  (unsigned int *)arg);
+		break;
+
+	case TIOCSERGETLSR: /* Get line status register */
+		ret = uart_get_lsr_info(state, (unsigned int *)arg);
+		break;
+
+	default: {
+		struct uart_port *port = state->port;
+		if (port->ops->ioctl)
+			ret = port->ops->ioctl(port, cmd, arg);
+		break;
+	}
+	}
+ out_up:
+	up(&state->sem);
+ out:
 	return ret;
 }
 
@@ -1186,23 +1218,15 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->port;
-	unsigned long flags;
 
 	BUG_ON(!kernel_locked());
+	DPRINTK("uart_close(%d) called\n", port->line);
 
-	if (!state->info)
-		return;
+	down(&state->sem);
 
-	DPRINTK("uart_close() called\n");
-
-	/*
-	 * This is safe, as long as the BKL exists in
-	 * do_tty_hangup(), and we're protected by the BKL.
-	 */
 	if (tty_hung_up_p(filp))
 		goto done;
 
-	spin_lock_irqsave(&state->port->lock, flags);
 	if ((tty->count == 1) && (state->count != 1)) {
 		/*
 		 * Uh, oh.  tty->count is 1, which means that the tty
@@ -1220,23 +1244,16 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		       tty->driver.name, port->line, state->count);
 		state->count = 0;
 	}
-	if (state->count) {
-		spin_unlock_irqrestore(&state->port->lock, flags);
+	if (state->count)
 		goto done;
-	}
-
-	/*
-	 * The UIF_CLOSING flag protects us against further opens
-	 * of this port.
-	 */
-	state->info->flags |= UIF_CLOSING;
-	spin_unlock_irqrestore(&state->port->lock, flags);
 
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
-	 * the line discipline to only process XON/XOFF characters.
+	 * the line discipline to only process XON/XOFF characters by
+	 * setting tty->closing.
 	 */
 	tty->closing = 1;
+
 	if (state->closing_wait != USF_CLOSING_WAIT_NONE)
 		tty_wait_until_sent(tty, state->closing_wait);
 
@@ -1245,6 +1262,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	 * disable the receive line status interrupts.
 	 */
 	if (state->info->flags & UIF_INITIALIZED) {
+		unsigned long flags;
 		spin_lock_irqsave(&port->lock, flags);
 		port->ops->stop_rx(port);
 		spin_unlock_irqrestore(&port->lock, flags);
@@ -1255,14 +1273,14 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		 */
 		uart_wait_until_sent(tty, port->timeout);
 	}
-	down(&port_sem);
-	uart_shutdown(state->info);
-	up(&port_sem);
+
+	uart_shutdown(state);
 	uart_flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
 	state->info->tty = NULL;
+
 	if (state->info->blocked_open) {
 		if (state->close_delay) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -1270,25 +1288,18 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 			set_current_state(TASK_RUNNING);
 		}
 	} else {
-#ifdef CONFIG_PM
-		/*
-		 * Put device into D3 state.
-		 */
-		pm_send(state->pm, PM_SUSPEND, (void *)3);
-#else
 		if (port->ops->pm)
 			port->ops->pm(port, 3, 0);
-#endif
 	}
 
 	/*
 	 * Wake up anyone trying to open this port.
 	 */
-	state->info->flags &= ~(UIF_NORMAL_ACTIVE|UIF_CLOSING);
+	state->info->flags &= ~UIF_NORMAL_ACTIVE;
 	wake_up_interruptible(&state->info->open_wait);
 
  done:
-	;
+	up(&state->sem);
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1361,19 +1372,18 @@ static void uart_hangup(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 
 	BUG_ON(!kernel_locked());
+	DPRINTK("uart_hangup(%d)\n", state->port->line);
 
-	uart_flush_buffer(tty);
-	down(&port_sem);
-	if (state->info->flags & UIF_CLOSING) {
-		up(&port_sem);
-		return;
+	down(&state->sem);
+	if (state->info && state->info->flags & UIF_NORMAL_ACTIVE) {
+		uart_flush_buffer(tty);
+		uart_shutdown(state);
+		state->count = 0;
+		state->info->flags &= ~UIF_NORMAL_ACTIVE;
+		state->info->tty = NULL;
+		wake_up_interruptible(&state->info->open_wait);
 	}
-	uart_shutdown(state->info);
-	state->count = 0;
-	state->info->flags &= ~UIF_NORMAL_ACTIVE;
-	state->info->tty = NULL;
-	up(&port_sem);
-	wake_up_interruptible(&state->info->open_wait);
+	up(&state->sem);
 }
 
 /*
@@ -1414,6 +1424,10 @@ static void uart_update_termios(struct uart_state *state)
 	}
 }
 
+/*
+ * Block the open until the port is ready.  We must be called with
+ * the per-port semaphore held.
+ */
 static int
 uart_block_til_ready(struct file *filp, struct uart_state *state)
 {
@@ -1431,16 +1445,8 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 		/*
 		 * If we have been hung up, tell userspace/restart open.
 		 */
-		if (tty_hung_up_p(filp))
+		if (tty_hung_up_p(filp) || info->tty == NULL)
 			break;
-
-		/*
-		 * If the device is in the middle of being closed, block
-		 * until it's done.  We will need to re-initialise the
-		 * port.  Hmm, is it legal to block a non-blocking open?
-		 */
-		if (info->flags & UIF_CLOSING)
-			goto wait;
 
 		/*
 		 * If the port has been closed, tell userspace/restart open.
@@ -1478,8 +1484,9 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 		if (port->ops->get_mctrl(port) & TIOCM_CAR)
 			break;
 
-	 wait:
+		up(&state->sem);
 		schedule();
+		down(&state->sem);
 
 		if (signal_pending(current))
 			break;
@@ -1493,10 +1500,7 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 	if (signal_pending(current))
 		return -ERESTARTSYS;
 
-	if (info->tty->flags & (1 << TTY_IO_ERROR))
-		return 0;
-
-	if (tty_hung_up_p(filp) || !(info->flags & UIF_INITIALIZED))
+	if (!info->tty || tty_hung_up_p(filp))
 		return (port->flags & UPF_HUP_NOTIFY) ?
 			-EAGAIN : -ERESTARTSYS;
 
@@ -1509,11 +1513,17 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
 
 	down(&port_sem);
 	state = drv->state + line;
+	if (down_interruptible(&state->sem)) {
+		state = ERR_PTR(-ERESTARTSYS);
+		goto out;
+	}
+
 	state->count++;
 	if (!state->port) {
-		up(&port_sem);
 		state->count--;
-		return ERR_PTR(-ENXIO);
+		up(&state->sem);
+		state = ERR_PTR(-ENXIO);
+		goto out;
 	}
 
 	if (!state->info) {
@@ -1530,14 +1540,15 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
 
 			tasklet_init(&state->info->tlet, uart_tasklet_action,
 				     (unsigned long)state);
-			up(&port_sem);
 		} else {
 			state->count--;
-			up(&port_sem);
-			return ERR_PTR(-ENOMEM);
+			up(&state->sem);
+			state = ERR_PTR(-ENOMEM);
 		}
 	}
 
+ out:
+	up(&port_sem);
 	return state;
 }
 
@@ -1558,7 +1569,6 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	int retval, line = minor(tty->device) - tty->driver.minor_start;
 
 	BUG_ON(!kernel_locked());
-
 	DPRINTK("uart_open(%d) called\n", line);
 
 	/*
@@ -1571,8 +1581,11 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 		goto fail;
 
 	/*
-	 * FIXME: This one isn't fun.  We can't guarantee that the tty isn't
-	 * already in open, nor can we guarantee the state of tty->driver_data
+	 * We take the semaphore inside uart_get to guarantee that we won't
+	 * be re-entered while allocating the info structure, or while we
+	 * request any IRQs that the driver may need.  This also has the nice
+	 * side-effect that it delays the action of uart_hangup, so we can
+	 * guarantee that info->tty will always contain something reasonable.
 	 */
 	state = uart_get(drv, line);
 	if (IS_ERR(state)) {
@@ -1593,11 +1606,11 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	/*
 	 * If the port is in the middle of closing, bail out now.
 	 */
-	if (tty_hung_up_p(filp) || (state->info->flags & UIF_CLOSING)) {
-	    	wait_event_interruptible(state->info->open_wait,
-					 !(state->info->flags & UIF_CLOSING));
+	if (tty_hung_up_p(filp)) {
 		retval = (state->port->flags & UPF_HUP_NOTIFY) ?
 			-EAGAIN : -ERESTARTSYS;
+		state->count--;
+		up(&state->sem);
 		goto fail;
 	}
 
@@ -1605,30 +1618,22 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * Make sure the device is in D0 state.
 	 */
 	if (state->count == 1) {
-#ifdef CONFIG_PM
-		pm_send(state->pm, PM_RESUME, (void *)0);
-#else
 		struct uart_port *port = state->port;
 		if (port->ops->pm)
 			port->ops->pm(port, 0, 3);
-#endif
 	}
 
 	/*
-	 * Start up the serial port.  We have this semaphore here to
-	 * prevent uart_startup or uart_shutdown being re-entered if
-	 * we sleep while requesting an IRQ.
+	 * Start up the serial port.
 	 */
-	down(&port_sem);
 	retval = uart_startup(state, 0);
-	up(&port_sem);
-	if (retval)
-		goto fail;
 
 	/*
-	 * Wait until the port is ready.
+	 * If we succeeded, wait until the port is ready.
 	 */
-	retval = uart_block_til_ready(filp, state);
+	if (retval == 0)
+		retval = uart_block_til_ready(filp, state);
+	up(&state->sem);
 
 	/*
 	 * If this is the first open to succeed, adjust things to suit.
@@ -1900,8 +1905,8 @@ static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstat
 	port = state->port;
 	ops = port->ops;
 
-	DPRINTK("pm: %08x: %d -> %d, %srunning\n",
-		port->iobase, dev->state, pm_state, running ? "" : "not ");
+	DPRINTK("pm: %08x: %ld -> %d, %srunning\n",
+		port->iobase, state->pm->state, pm_state, running ? "" : "not ");
 
 	if (pm_state == 0) {
 		if (ops->pm)
@@ -2051,42 +2056,33 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 		port->ops->set_mctrl(port, 0);
 		spin_unlock_irqrestore(&port->lock, flags);
 
-#ifdef CONFIG_PM
+#if 0 //def CONFIG_PM
 		/*
 		 * Power down all ports by default, except the
 		 * console if we have one.  We need to drop the
 		 * port semaphore here.
 		 */
 		if (state->pm && (!drv->cons || port->line != drv->cons->index)) {
-			up(&port_sem);
 			pm_send(state->pm, PM_SUSPEND, (void *)3);
-			down(&port_sem);
 		}
 #endif
 	}
 }
 
 /*
- *	Hangup the port.  This must be done outside the port_sem
- *	since uart_hangup() grabs this same semaphore.  Grr.
- */
-static void
-__uart_hangup_port(struct uart_driver *drv, struct uart_state *state)
-{
-	struct uart_info *info = state->info;
-
-	if (info && info->tty)
-		tty_vhangup(info->tty);
-}
-
-/*
- * This reverses the affects of __uart_register_port.
+ * This reverses the affects of __uart_register_port, hanging up the
+ * port before removal.
  */
 static void
 __uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
 {
 	struct uart_port *port = state->port;
 	struct uart_info *info = state->info;
+
+	if (info && info->tty)
+		tty_vhangup(info->tty);
+
+	down(&state->sem);
 
 	state->info = NULL;
 
@@ -2113,6 +2109,8 @@ __uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
 		tasklet_kill(&info->tlet);
 		kfree(info);
 	}
+
+	up(&state->sem);
 }
 
 /**
@@ -2214,6 +2212,9 @@ int uart_register_driver(struct uart_driver *drv)
 
 		state->close_delay     = 5 * HZ / 10;
 		state->closing_wait    = 30 * HZ;
+
+		init_MUTEX(&state->sem);
+
 #ifdef CONFIG_PM
 		state->pm = pm_register(PM_SYS_DEV, PM_SYS_COM, uart_pm);
 		if (state->pm)
@@ -2304,8 +2305,6 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
 	if (state->port != port)
 		printk(KERN_ALERT "Removing wrong port: %p != %p\n",
 			state->port, port);
-
-	__uart_hangup_port(drv, state);
 
 	down(&port_sem);
 	__uart_unregister_port(drv, state);
@@ -2408,8 +2407,7 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 		 * alter it underneath itself - the port may be open and
 		 * trying to do useful work.
 		 */
-		if (state->count != 0 ||
-		    (state->info && state->info->blocked_open != 0)) {
+		if (uart_users(state) != 0) {
 			ret = -EBUSY;
 			goto out;
 		}
@@ -2460,8 +2458,6 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	}
 
 	state = drv->state + line;
-
-	__uart_hangup_port(drv, state);
 
 	down(&port_sem);
 	__uart_unregister_port(drv, state);
