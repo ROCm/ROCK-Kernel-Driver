@@ -821,11 +821,7 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFDIVERT:
 		case SIOCSIFDIVERT:
 		/* Convert this to call through a hook */
-#ifdef CONFIG_NET_DIVERT
 			err = divert_ioctl(cmd, (struct divert_cf *)arg);
-#else
-			err = -ENOPKG;
-#endif	/* CONFIG_NET_DIVERT */
 			break;
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:

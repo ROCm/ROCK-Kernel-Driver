@@ -1465,15 +1465,6 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 
 #endif
 
-static inline void handle_diverter(struct sk_buff *skb)
-{
-#ifdef CONFIG_NET_DIVERT
-	/* if diversion is supported on device, then divert */
-	if (skb->dev->divert && skb->dev->divert->divert)
-		divert_frame(skb);
-#endif
-}
-
 static inline int __handle_bridge(struct sk_buff *skb,
 			struct packet_type **pt_prev, int *ret)
 {
@@ -2568,11 +2559,9 @@ int register_netdevice(struct net_device *dev)
 	dev->fastpath_lock = RW_LOCK_UNLOCKED;
 #endif
 
-#ifdef CONFIG_NET_DIVERT
 	ret = alloc_divert_blk(dev);
 	if (ret)
 		goto out;
-#endif /* CONFIG_NET_DIVERT */
 
 	dev->iflink = -1;
 
@@ -2638,9 +2627,7 @@ int register_netdevice(struct net_device *dev)
 out:
 	return ret;
 out_err:
-#ifdef CONFIG_NET_DIVERT
 	free_divert_blk(dev);
-#endif
 	goto out;
 }
 
@@ -2845,9 +2832,7 @@ int unregister_netdevice(struct net_device *dev)
 	/* Notifier chain MUST detach us from master device. */
 	BUG_TRAP(!dev->master);
 
-#ifdef CONFIG_NET_DIVERT
 	free_divert_blk(dev);
-#endif
 
 	kobject_unregister(&dev->kobj);
 
