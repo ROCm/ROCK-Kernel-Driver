@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003 Christophe Saout <christophe@saout.de>
+ * Copyright (C) 2004 Clemens Fruhwirth <clemens@endorphin.org>
  *
  * This file is released under the GPL.
  */
@@ -15,6 +16,7 @@
 #include <linux/workqueue.h>
 #include <asm/atomic.h>
 #include <asm/scatterlist.h>
+#include <asm/page.h>
 
 #include "dm.h"
 
@@ -110,6 +112,13 @@ static void mempool_free_page(void *page, void *data)
  *
  * plain: the initial vector is the 32-bit low-endian version of the sector
  *        number, padded with zeros if neccessary.
+ *
+ * ess_iv: "encrypted sector|salt initial vector", the sector number is
+ *         encrypted with the bulk cipher using a salt as key. The salt
+ *         should be derived from the bulk cipher's key via hashing.
+ *
+ * plumb: unimplemented, see:
+ * http://article.gmane.org/gmane.linux.kernel.device-mapper.dm-crypt/454
  */
 
 static int crypt_iv_plain_gen(struct crypt_config *cc, u8 *iv, sector_t sector)
@@ -120,8 +129,105 @@ static int crypt_iv_plain_gen(struct crypt_config *cc, u8 *iv, sector_t sector)
 	return 0;
 }
 
+static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
+	                      const char *opts)
+{
+	struct crypto_tfm *essiv_tfm;
+	struct crypto_tfm *hash_tfm;
+	struct scatterlist sg;
+	unsigned int saltsize;
+	u8 *salt;
+
+	if (opts == NULL) {
+		ti->error = PFX "Digest algorithm missing for ESSIV mode";
+		return -EINVAL;
+	}
+
+	/* Hash the cipher key with the given hash algorithm */
+	hash_tfm = crypto_alloc_tfm(opts, 0);
+	if (hash_tfm == NULL) {
+		ti->error = PFX "Error initializing ESSIV hash";
+		return -EINVAL;
+	}
+
+	if (crypto_tfm_alg_type(hash_tfm) != CRYPTO_ALG_TYPE_DIGEST) {
+		ti->error = PFX "Expected digest algorithm for ESSIV hash";
+		crypto_free_tfm(hash_tfm);
+		return -EINVAL;
+	}
+
+	saltsize = crypto_tfm_alg_digestsize(hash_tfm);
+	salt = kmalloc(saltsize, GFP_KERNEL);
+	if (salt == NULL) {
+		ti->error = PFX "Error kmallocing salt storage in ESSIV";
+		crypto_free_tfm(hash_tfm);
+		return -ENOMEM;
+	}
+
+	sg.page = virt_to_page(cc->key);
+	sg.offset = offset_in_page(cc->key);
+	sg.length = cc->key_size;
+	crypto_digest_digest(hash_tfm, &sg, 1, salt);
+	crypto_free_tfm(hash_tfm);
+
+	/* Setup the essiv_tfm with the given salt */
+	essiv_tfm = crypto_alloc_tfm(crypto_tfm_alg_name(cc->tfm),
+	                             CRYPTO_TFM_MODE_ECB);
+	if (essiv_tfm == NULL) {
+		ti->error = PFX "Error allocating crypto tfm for ESSIV";
+		kfree(salt);
+		return -EINVAL;
+	}
+	if (crypto_tfm_alg_blocksize(essiv_tfm)
+	    != crypto_tfm_alg_ivsize(cc->tfm)) {
+		ti->error = PFX "Block size of ESSIV cipher does "
+			        "not match IV size of block cipher";
+		crypto_free_tfm(essiv_tfm);
+		kfree(salt);
+		return -EINVAL;
+	}
+	if (crypto_cipher_setkey(essiv_tfm, salt, saltsize) < 0) {
+		ti->error = PFX "Failed to set key for ESSIV cipher";
+		crypto_free_tfm(essiv_tfm);
+		kfree(salt);
+		return -EINVAL;
+	}
+	kfree(salt);
+
+	cc->iv_gen_private = (void *)essiv_tfm;
+	return 0;
+}
+
+static void crypt_iv_essiv_dtr(struct crypt_config *cc)
+{
+	crypto_free_tfm((struct crypto_tfm *)cc->iv_gen_private);
+	cc->iv_gen_private = NULL;
+}
+
+static int crypt_iv_essiv_gen(struct crypt_config *cc, u8 *iv, sector_t sector)
+{
+	struct scatterlist sg = { NULL, };
+
+	memset(iv, 0, cc->iv_size);
+	*(u64 *)iv = cpu_to_le64(sector);
+
+	sg.page = virt_to_page(iv);
+	sg.offset = offset_in_page(iv);
+	sg.length = cc->iv_size;
+	crypto_cipher_encrypt((struct crypto_tfm *)cc->iv_gen_private,
+	                      &sg, &sg, cc->iv_size);
+
+	return 0;
+}
+
 static struct crypt_iv_operations crypt_iv_plain_ops = {
 	.generator = crypt_iv_plain_gen
+};
+
+static struct crypt_iv_operations crypt_iv_essiv_ops = {
+	.ctr       = crypt_iv_essiv_ctr,
+	.dtr       = crypt_iv_essiv_dtr,
+	.generator = crypt_iv_essiv_gen
 };
 
 
@@ -503,7 +609,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	cc->tfm = tfm;
 
 	/*
-	 * Choose ivmode. Valid modes: "plain"
+	 * Choose ivmode. Valid modes: "plain", "essiv:<esshash>".
 	 * See comments at iv code
 	 */
 
@@ -511,6 +617,8 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		cc->iv_gen_ops = NULL;
 	else if (strcmp(ivmode, "plain") == 0)
 		cc->iv_gen_ops = &crypt_iv_plain_ops;
+	else if (strcmp(ivmode, "essiv") == 0)
+		cc->iv_gen_ops = &crypt_iv_essiv_ops;
 	else {
 		ti->error = PFX "Invalid IV mode";
 		goto bad2;
@@ -521,9 +629,9 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad2;
 
 	if (tfm->crt_cipher.cit_decrypt_iv && tfm->crt_cipher.cit_encrypt_iv)
-		/* at least a 32 bit sector number should fit in our buffer */
+		/* at least a 64 bit sector number should fit in our buffer */
 		cc->iv_size = max(crypto_tfm_alg_ivsize(tfm),
-		                  (unsigned int)(sizeof(u32) / sizeof(u8)));
+		                  (unsigned int)(sizeof(u64) / sizeof(u8)));
 	else {
 		cc->iv_size = 0;
 		if (cc->iv_gen_ops) {
