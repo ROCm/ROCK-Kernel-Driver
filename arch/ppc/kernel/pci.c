@@ -412,7 +412,7 @@ probe_resource(struct pci_bus *parent, struct resource *pr,
 			r = &dev->resource[i];
 			if (!r->flags || (r->flags & IORESOURCE_UNSET))
 				continue;
-			if (pci_find_parent_resource(bus->self, r) != pr)
+			if (pci_find_parent_resource(dev, r) != pr)
 				continue;
 			if (r->end >= res->start && res->end >= r->start) {
 				*conflict = r;
