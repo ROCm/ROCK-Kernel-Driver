@@ -1088,10 +1088,9 @@ int ip6ip6_fb_tnl_dev_init(struct net_device *dev)
 	return 0;
 }
 
-static struct inet6_protocol ip6ip6_protocol = {
+static struct xfrm6_tunnel ip6ip6_handler = {
 	.handler = ip6ip6_rcv,
 	.err_handler = ip6ip6_err,
-	.flags = INET6_PROTO_FINAL
 };
 
 /**
@@ -1104,9 +1103,9 @@ int __init ip6_tunnel_init(void)
 {
 	int  err;
 
-	if ((err = inet6_add_protocol(&ip6ip6_protocol, IPPROTO_IPV6)) < 0) {
-		printk(KERN_ERR "Failed to register IPv6 protocol\n");
-		return err;
+	if (xfrm6_tunnel_register(&ip6ip6_handler) < 0) {
+		printk(KERN_ERR "ip6ip6 init: can't register tunnel\n");
+		return -EAGAIN;
 	}
 	ip6ip6_fb_tnl_dev = alloc_netdev(sizeof(struct ip6_tnl), "ip6tnl0",
 					 ip6ip6_tnl_dev_setup);
@@ -1123,7 +1122,7 @@ int __init ip6_tunnel_init(void)
 	}
 	return 0;
 fail:
-	inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6);
+	xfrm6_tunnel_deregister(&ip6ip6_handler);
 	return err;
 }
 
@@ -1133,8 +1132,10 @@ fail:
 
 void ip6_tunnel_cleanup(void)
 {
+	if (xfrm6_tunnel_deregister(&ip6ip6_handler) < 0)
+		printk(KERN_INFO "ip6ip6 close: can't deregister tunnel\n");
+
 	unregister_netdev(ip6ip6_fb_tnl_dev);
-	inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6);
 }
 
 #ifdef MODULE
