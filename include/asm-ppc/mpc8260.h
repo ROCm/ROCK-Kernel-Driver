@@ -36,7 +36,7 @@
 #include <platforms/tqm8260.h>
 #endif
 
-#ifdef CONFIG_PQ2ADS
+#if defined(CONFIG_PQ2ADS) || defined (CONFIG_PQ2FADS)
 #include <platforms/pq2ads.h>
 #endif
 
