@@ -995,12 +995,12 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 		/*
 		 * If dentry is moved, fail the lookup
 		 */ 
-		if (unlikely(move_count != dentry->d_move_count)) 
-			break;
-		if (!d_unhashed(dentry)) {
-			atomic_inc(&dentry->d_count);
-			dentry->d_vfs_flags |= DCACHE_REFERENCED;
-			found = dentry;
+		if (likely(move_count == dentry->d_move_count)) {
+			if (!d_unhashed(dentry)) {
+				atomic_inc(&dentry->d_count);
+				dentry->d_vfs_flags |= DCACHE_REFERENCED;
+				found = dentry;
+			}
 		}
 		spin_unlock(&dentry->d_lock);
 		break;
