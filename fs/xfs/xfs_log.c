@@ -122,9 +122,7 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-#ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
-#endif
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -339,13 +337,11 @@ xfs_log_force(xfs_mount_t *mp,
 
 }	/* xfs_log_force */
 
-
 /*
- * This function will take a log sequence number and check to see if that
- * lsn has been flushed to disk.  If it has, then the callback function is
- * called with the callback argument.  If the relevant in-core log has not
- * been synced to disk, we add the callback to the callback list of the
- * in-core log.
+ * Attaches a new iclog I/O completion callback routine during
+ * transaction commit.  If the log is in error state, a non-zero
+ * return code is handed back and the caller is responsible for
+ * executing the callback at an appropriate time.
  */
 int
 xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
@@ -371,10 +367,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 		iclog->ic_callback_tail = &(cb->cb_next);
 	}
 	LOG_UNLOCK(log, spl);
-	if (abortflg) {
-		cb->cb_func(cb->cb_arg, abortflg);
-	}
-	return 0;
+	return abortflg;
 }	/* xfs_log_notify */
 
 int
@@ -497,7 +490,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 		if (readonly)
 			vfsp->vfs_flag |= VFS_RDONLY;
 		if (error) {
-			cmn_err(CE_WARN, "XFS: log mount/recovery failed");
+			cmn_err(CE_WARN, "XFS: log mount/recovery failed: error %d", error);
 			xlog_unalloc_log(mp->m_log);
 			return error;
 		}
@@ -1664,7 +1657,6 @@ xlog_write(xfs_mount_t *	mp,
     int		     copy_len;	     /* # bytes actually memcpy'ing */
     int		     copy_off;	     /* # bytes from entry start */
     int		     contwr;	     /* continued write of in-core log? */
-    int		     firstwr = 0;    /* first write of transaction */
     int		     error;
     int		     record_cnt = 0, data_cnt = 0;
 
@@ -1729,7 +1721,6 @@ xlog_write(xfs_mount_t *	mp,
 		logop_head->oh_flags    = XLOG_START_TRANS;
 		INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
 		ticket->t_flags		&= ~XLOG_TIC_INITED;	/* clear bit */
-		firstwr = 1;			  /* increment log ops below */
 		record_cnt++;
 
 		start_rec_copy = sizeof(xlog_op_header_t);
@@ -1800,7 +1791,6 @@ xlog_write(xfs_mount_t *	mp,
 	    copy_len += start_rec_copy + sizeof(xlog_op_header_t);
 	    record_cnt++;
 	    data_cnt += contwr ? copy_len : 0;
-	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		    /* already marked WANT_SYNC by xlog_state_get_iclog_space */
 		    xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);
@@ -3253,7 +3243,7 @@ xlog_verify_dest_ptr(xlog_t     *log,
 }	/* xlog_verify_dest_ptr */
 
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /* check split LR write */
 STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,

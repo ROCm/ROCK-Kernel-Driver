@@ -357,12 +357,15 @@ struct uhci_hcd {
 
 	/* List of QH's that are done, but waiting to be unlinked (race) */
 	struct list_head qh_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int qh_remove_age;		/* Age in frames */
 
 	/* List of TD's that are done, but waiting to be freed (race) */
 	struct list_head td_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int td_remove_age;		/* Age in frames */
 
 	/* List of asynchronously unlinked URB's */
 	struct list_head urb_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int urb_remove_age;		/* Age in frames */
 
 	/* List of URB's awaiting completion callback */
 	struct list_head complete_list;		/* P: uhci->schedule_lock */

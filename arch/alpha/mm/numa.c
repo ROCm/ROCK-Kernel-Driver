@@ -384,7 +384,7 @@ show_mem(void)
 			else if (!page_count(lmem_map+i))
 				free++;
 			else
-				shared += atomic_read(&lmem_map[i].count) - 1;
+				shared += page_count(lmem_map + i) - 1;
 		}
 	}
 	printk("%ld pages of RAM\n",total);

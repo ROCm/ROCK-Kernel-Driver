@@ -95,6 +95,7 @@ config USB_PXA2XX
 config USB_PXA2XX_SMALL
 	depends on USB_GADGET_PXA2XX
 	bool
+	default n if USB_ETH_RNDIS
 	default y if USB_ZERO
 	default y if USB_ETH
 	default y if USB_G_SERIAL

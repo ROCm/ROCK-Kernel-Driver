@@ -541,7 +541,7 @@ char * ppc_rtas_process_error(int error)
 		case SENSOR_BUSY:
 			return "(busy)";
 		case SENSOR_NOT_EXIST:
-			return "(non existant)";
+			return "(non existent)";
 		case SENSOR_DR_ENTITY:
 			return "(dr entity removed)";
 		default:
@@ -698,7 +698,7 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 			}
 			break;
 		default:
-			n += sprintf(buf+n,  "Unkown sensor (type %d), ignoring it\n",
+			n += sprintf(buf+n,  "Unknown sensor (type %d), ignoring it\n",
 					s.token);
 			unknown = 1;
 			have_strings = 1;

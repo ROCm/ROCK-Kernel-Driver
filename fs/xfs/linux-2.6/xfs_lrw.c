@@ -922,7 +922,7 @@ retry:
 				xfs_trans_ihold(tp, xip);
 				xfs_trans_log_inode(tp, xip, XFS_ILOG_CORE);
 				xfs_trans_set_sync(tp);
-				error = xfs_trans_commit(tp, 0, (xfs_lsn_t)0);
+				error = xfs_trans_commit(tp, 0, NULL);
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
 			}
 		}

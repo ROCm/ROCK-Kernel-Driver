@@ -470,7 +470,6 @@ e1000_init_hw(struct e1000_hw *hw)
     uint16_t pcix_stat_hi_word;
     uint16_t cmd_mmrbc;
     uint16_t stat_mmrbc;
-
     DEBUGFUNC("e1000_init_hw");
 
     /* Initialize Identification LED */
@@ -909,6 +908,12 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     ret_val = e1000_set_phy_mode(hw);
     if(ret_val)
         return ret_val;
+
+    if(hw->mac_type == e1000_82545_rev_3) {
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+        phy_data |= 0x00000008;
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
+    }
 
     if(hw->mac_type <= e1000_82543 ||
        hw->mac_type == e1000_82541 || hw->mac_type == e1000_82547 ||
@@ -1961,7 +1966,7 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
 int32_t
 e1000_check_for_link(struct e1000_hw *hw)
 {
-    uint32_t rxcw;
+    uint32_t rxcw = 0;
     uint32_t ctrl;
     uint32_t status;
     uint32_t rctl;
@@ -1971,16 +1976,23 @@ e1000_check_for_link(struct e1000_hw *hw)
 
     DEBUGFUNC("e1000_check_for_link");
 
+    ctrl = E1000_READ_REG(hw, CTRL);
+    status = E1000_READ_REG(hw, STATUS);
+
     /* On adapters with a MAC newer than 82544, SW Defineable pin 1 will be
      * set when the optics detect a signal. On older adapters, it will be
      * cleared when there is a signal.  This applies to fiber media only.
      */
-    if(hw->media_type == e1000_media_type_fiber)
-        signal = (hw->mac_type > e1000_82544) ? E1000_CTRL_SWDPIN1 : 0;
+    if((hw->media_type == e1000_media_type_fiber) ||
+       (hw->media_type == e1000_media_type_internal_serdes)) {
+        rxcw = E1000_READ_REG(hw, RXCW);
 
-    ctrl = E1000_READ_REG(hw, CTRL);
-    status = E1000_READ_REG(hw, STATUS);
-    rxcw = E1000_READ_REG(hw, RXCW);
+        if(hw->media_type == e1000_media_type_fiber) {
+            signal = (hw->mac_type > e1000_82544) ? E1000_CTRL_SWDPIN1 : 0;
+            if(status & E1000_STATUS_LU)
+                hw->get_link_status = FALSE;
+        }
+    }
 
     /* If we have a copper PHY then we only want to go out to the PHY
      * registers to see if Auto-Neg has completed and/or if our link
@@ -2093,8 +2105,8 @@ e1000_check_for_link(struct e1000_hw *hw)
      * in. The autoneg_failed flag does this.
      */
     else if((((hw->media_type == e1000_media_type_fiber) &&
-            ((ctrl & E1000_CTRL_SWDPIN1) == signal)) ||
-            (hw->media_type == e1000_media_type_internal_serdes)) &&
+              ((ctrl & E1000_CTRL_SWDPIN1) == signal)) ||
+             (hw->media_type == e1000_media_type_internal_serdes)) &&
             (!(status & E1000_STATUS_LU)) &&
             (!(rxcw & E1000_RXCW_C))) {
         if(hw->autoneg_failed == 0) {
@@ -2125,8 +2137,7 @@ e1000_check_for_link(struct e1000_hw *hw)
      */
     else if(((hw->media_type == e1000_media_type_fiber) ||
              (hw->media_type == e1000_media_type_internal_serdes)) &&
-              (ctrl & E1000_CTRL_SLU) &&
-              (rxcw & E1000_RXCW_C)) {
+            (ctrl & E1000_CTRL_SLU) && (rxcw & E1000_RXCW_C)) {
         DEBUGOUT("RXing /C/, enable AutoNeg and stop forcing link.\r\n");
         E1000_WRITE_REG(hw, TXCW, hw->txcw);
         E1000_WRITE_REG(hw, CTRL, (ctrl & ~E1000_CTRL_SLU));

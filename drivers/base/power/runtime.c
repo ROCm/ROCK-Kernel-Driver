@@ -12,9 +12,11 @@
 
 static void runtime_resume(struct device * dev)
 {
+	dev_dbg(dev, "resuming\n");
 	if (!dev->power.power_state)
 		return;
-	resume_device(dev);
+	if (!resume_device(dev))
+		dev->power.power_state = 0;
 }
 
 

@@ -96,7 +96,8 @@ ep_matches (
 				/* for now, avoid PXA "interrupt-in";
 				 * it's documented as never using DATA1.
 				 */
-				if (gadget_is_pxa (gadget))
+				if (gadget_is_pxa (gadget)
+						&& 'i' == tmp [1])
 					return 0;
 				break;
 			case USB_ENDPOINT_XFER_BULK:

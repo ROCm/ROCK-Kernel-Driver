@@ -577,25 +577,70 @@ retry:
 	 */
 	if (!(ioflag & BMAPI_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		xfs_off_t	aligned_offset;
+		xfs_filblks_t   count_fsb;
 		unsigned int	iosize;
 		xfs_fileoff_t	ioalign;
+		int		n;
+		xfs_fileoff_t   start_fsb;
 
+		/*
+		 * If there are any real blocks past eof, then don't
+		 * do any speculative allocation.
+		 */
+		start_fsb = XFS_B_TO_FSBT(mp,
+					((xfs_ufsize_t)(offset + count - 1)));
+		count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAXIOFFSET(mp));
+		while (count_fsb > 0) {
+			nimaps = XFS_WRITE_IMAPS;
+			error = XFS_BMAPI(mp, NULL, io, start_fsb, count_fsb,
+					0, &firstblock, 0, imap, &nimaps, NULL);
+			if (error) {
+				return error;
+			}
+			for (n = 0; n < nimaps; n++) {
+				if ((imap[n].br_startblock != HOLESTARTBLOCK) &&
+				    (imap[n].br_startblock != DELAYSTARTBLOCK)) {
+					goto write_map;
+				}
+				start_fsb += imap[n].br_blockcount;
+				count_fsb -= imap[n].br_blockcount;
+			}
+		}
 		iosize = mp->m_writeio_blocks;
 		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		last_fsb = ioalign + iosize;
 		aeof = 1;
 	}
-
+write_map:
 	nimaps = XFS_WRITE_IMAPS;
 	firstblock = NULLFSBLOCK;
 
+	/*
+	 * If mounted with the "-o swalloc" option, roundup the allocation
+	 * request to a stripe width boundary if the file size is >=
+	 * stripe width and we are allocating past the allocation eof.
+	 */
+	if (mp->m_swidth && (mp->m_flags & XFS_MOUNT_SWALLOC)
+	    && (isize >= XFS_FSB_TO_B(mp, mp->m_swidth)) && aeof) {
+		int eof;
+		xfs_fileoff_t new_last_fsb;
+
+		new_last_fsb = roundup_64(last_fsb, mp->m_swidth);
+		error = xfs_bmap_eof(ip, new_last_fsb, XFS_DATA_FORK, &eof);
+		if (error) {
+			return error;
+		}
+		if (eof) {
+			last_fsb = new_last_fsb;
+		}
 	/*
 	 * Roundup the allocation request to a stripe unit (m_dalign) boundary
 	 * if the file size is >= stripe unit size, and we are allocating past
 	 * the allocation eof.
 	 */
-	if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign)) && aeof) {
+	} else if (mp->m_dalign && (isize >= XFS_FSB_TO_B(mp, mp->m_dalign))
+		   && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);

@@ -78,6 +78,8 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 			     : "memory");
 }
 
+extern void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags);
+
 #else /* !(CONFIG_DEBUG_SPINLOCK) */
 
 typedef struct {
@@ -103,10 +105,9 @@ extern int _spin_trylock (spinlock_t *lock);
 #define _raw_spin_trylock(lp)	_spin_trylock(lp)
 #define _raw_spin_lock(lock)	_do_spin_lock(lock, "spin_lock")
 #define _raw_spin_unlock(lock)	_do_spin_unlock(lock)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
-
-#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 /* Multi-reader locks, these are much saner than the 32-bit Sparc ones... */
 
@@ -144,6 +145,7 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
+extern int _do_write_trylock(rwlock_t *rw, char *str);
 
 #define _raw_read_lock(lock) \
 do {	unsigned long flags; \
@@ -172,6 +174,15 @@ do {	unsigned long flags; \
 	_do_write_unlock(lock); \
 	local_irq_restore(flags); \
 } while(0)
+
+#define _raw_write_trylock(lock) \
+({	unsigned long flags; \
+	int val; \
+	local_irq_save(flags); \
+	val = _do_write_trylock(lock, "write_trylock"); \
+	local_irq_restore(flags); \
+	val; \
+})
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 

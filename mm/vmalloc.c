@@ -284,6 +284,7 @@ void __vunmap(void *addr, int deallocate_pages)
 
 	if ((PAGE_SIZE-1) & (unsigned long)addr) {
 		printk(KERN_ERR "Trying to vfree() bad address (%p)\n", addr);
+		WARN_ON(1);
 		return;
 	}
 
@@ -291,6 +292,7 @@ void __vunmap(void *addr, int deallocate_pages)
 	if (unlikely(!area)) {
 		printk(KERN_ERR "Trying to vfree() nonexistent vm area (%p)\n",
 				addr);
+		WARN_ON(1);
 		return;
 	}
 	

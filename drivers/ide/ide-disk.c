@@ -358,13 +358,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 
 	nsectors.all		= (u16) rq->nr_sectors;
 
-	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
-		if (!ata_pending_commands(drive))
-			BUG();
-
-		return ide_started;
-	}
-
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
 
@@ -482,7 +475,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			   ((lba48) ? WIN_READ_EXT : WIN_READ));
 		ide_execute_command(drive, command, &read_intr, WAIT_CMD, NULL);
 		return ide_started;
-	} else if (rq_data_dir(rq) == WRITE) {
+	} else {
 		ide_startstop_t startstop;
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 		if (blk_rq_tagged(rq))
@@ -520,9 +513,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		}
 		return ide_started;
 	}
-	blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
-	ide_end_request(drive, 0, 0);
-	return ide_stopped;
 }
 EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
@@ -539,26 +529,11 @@ static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned 
  */
 ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
-	BUG_ON(drive->blocked);
-	if (!blk_fs_request(rq)) {
-		blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
-		ide_end_request(drive, 0, 0);
-		return ide_stopped;
-	}
-
 	/*
 	 * 268435455  == 137439 MB or 28bit limit
 	 *
 	 * need to add split taskfile operations based on 28bit threshold.
 	 */
-
-	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
-		if (!ata_pending_commands(drive))
-			BUG();
-
-		return ide_started;
-	}
-
 	if (drive->addressing == 1)		/* 48-bit LBA */
 		return lba_48_rw_disk(drive, rq, (unsigned long long) block);
 	if (drive->select.b.lba)		/* 28-bit LBA */
@@ -733,6 +708,21 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_hwif_t *hwif = HWIF(drive);
+
+	BUG_ON(drive->blocked);
+
+	if (!blk_fs_request(rq)) {
+		blk_dump_rq_flags(rq, "ide_do_rw_disk - bad command");
+		ide_end_request(drive, 0, 0);
+		return ide_stopped;
+	}
+
+	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
+		if (!ata_pending_commands(drive))
+			BUG();
+
+		return ide_started;
+	}
 
 	if (hwif->rw_disk)
 		return hwif->rw_disk(drive, rq, block);
