@@ -30,6 +30,7 @@
 #include <linux/utsname.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/rpc_pipe_fs.h>
 
 #include <linux/nfs.h>
 
@@ -108,8 +109,19 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 
 	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
 
-	if (!rpcauth_create(flavor, clnt))
+	snprintf(clnt->cl_pathname, sizeof(clnt->cl_pathname),
+			"/%s/clnt%p", clnt->cl_protname, clnt);
+	clnt->cl_dentry = rpc_mkdir(clnt->cl_pathname, clnt);
+	if (IS_ERR(clnt->cl_dentry)) {
+		printk(KERN_INFO "RPC: Couldn't create pipefs entry %s\n",
+				clnt->cl_pathname);
+		goto out_no_path;
+	}
+	if (!rpcauth_create(flavor, clnt)) {
+		printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
+				flavor);
 		goto out_no_auth;
+	}
 
 	/* save the nodename */
 	clnt->cl_nodelen = strlen(system_utsname.nodename);
@@ -123,8 +135,8 @@ out_no_clnt:
 	printk(KERN_INFO "RPC: out of memory in rpc_create_client\n");
 	goto out;
 out_no_auth:
-	printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
-		flavor);
+	rpc_rmdir(clnt->cl_pathname);
+out_no_path:
 	kfree(clnt);
 	clnt = NULL;
 	goto out;
@@ -176,6 +188,7 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		rpcauth_destroy(clnt->cl_auth);
 		clnt->cl_auth = NULL;
 	}
+	rpc_rmdir(clnt->cl_pathname);
 	if (clnt->cl_xprt) {
 		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
@@ -801,13 +814,23 @@ call_refresh(struct rpc_task *task)
 static void
 call_refreshresult(struct rpc_task *task)
 {
+	int status = task->tk_status;
 	dprintk("RPC: %4d call_refreshresult (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
-	if (task->tk_status < 0)
-		rpc_exit(task, -EACCES);
-	else
-		task->tk_action = call_reserve;
+	task->tk_status = 0;
+	task->tk_action = call_reserve;
+	if (status >= 0)
+		return;
+	switch (status) {
+		case -EPIPE:
+			rpc_delay(task, 3*HZ);
+		case -ETIMEDOUT:
+			task->tk_action = call_refresh;
+			break;
+		default:
+			rpc_exit(task, -EACCES);
+	}
 }
 
 /*
