@@ -167,9 +167,8 @@ int os_set_owner(int fd, int pid)
 	if(fcntl(fd, F_SETOWN, pid) < 0){
 		int save_errno = errno;
 
-		if(fcntl(fd, F_GETOWN, 0) != pid){
+		if(fcntl(fd, F_GETOWN, 0) != pid)
 			return(-save_errno);
-		}
 	}
 
 	return(0);
@@ -268,9 +267,9 @@ int os_open_file(char *file, struct openflags flags, int mode)
 	if(flags.e) f |= O_EXCL;
 
 	fd = open64(file, f, mode);
-	if(fd < 0) 
+	if(fd < 0)
 		return(-errno);
-	
+
 	if(flags.cl && fcntl(fd, F_SETFD, 1)){
 		os_close_file(fd);
 		return(-errno);
@@ -650,7 +649,7 @@ int os_lock_file(int fd, int excl)
 		err = -errno;
 		goto out;
 	}
-	
+
 	printk("F_SETLK failed, file already locked by pid %d\n", lock.l_pid);
 	err = save;
  out:

@@ -93,7 +93,7 @@ static ssize_t write_proc_mm(struct file *file, const char *buffer,
 			break;
 		}
 
-		mm_init_new_context(from, mm);
+		mm_copy_segments(from, mm);
 		break;
 	}
 	default:

@@ -141,7 +141,7 @@ int mconsole_reply(struct mc_request *req, char *str, int err, int more)
 		memcpy(reply.data, str, len);
 		reply.data[len] = '\0';
 		total -= len;
- 		str += len;
+		str += len;
 		reply.len = len + 1;
 
 		len = sizeof(reply) + reply.len - sizeof(reply.data);

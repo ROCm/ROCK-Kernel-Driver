@@ -133,7 +133,7 @@ int os_unmap_memory(void *addr, int len)
         int err;
 
         err = munmap(addr, len);
-	if(err < 0) 
+	if(err < 0)
 		return(-errno);
         return(0);
 }

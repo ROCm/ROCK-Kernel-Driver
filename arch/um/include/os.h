@@ -27,7 +27,7 @@
 /*
  * types taken from stat_file() in hostfs_user.c
  * (if they are wrong here, they are wrong there...).
-`*/
+ */
 struct uml_stat {
 	int                ust_dev;        /* device */
 	unsigned long long ust_ino;        /* inode */
@@ -110,7 +110,7 @@ static inline struct openflags of_excl(struct openflags flags)
 	flags.e = 1; 
 	return(flags); 
 }
- 
+
 static inline struct openflags of_cloexec(struct openflags flags)
 { 
 	flags.cl = 1; 

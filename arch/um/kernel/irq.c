@@ -90,17 +90,19 @@ struct hw_interrupt_type no_irq_type = {
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
+	int i = *(loff_t *) v, j;
 	struct irqaction * action;
 	unsigned long flags;
 
-	seq_printf(p, "           ");
-	for (j=0; j<NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "CPU%d       ",j);
-	seq_putc(p, '\n');
+	if (i == 0) {
+		seq_printf(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ",j);
+		seq_putc(p, '\n');
+	}
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
@@ -122,12 +124,13 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+	} else if (i == NR_IRQS) {
+		seq_printf(p, "NMI: ");
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", nmi_count(j));
+		seq_putc(p, '\n');
 	}
-	seq_printf(p, "NMI: ");
-	for (j = 0; j < NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "%10u ", nmi_count(j));
-	seq_putc(p, '\n');
 
 	return 0;
 }
@@ -581,14 +584,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
-	cpumask_t new_value, tmp;
+	cpumask_t new_value;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
 	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
+	if(err)
+		return(err);
 
 #ifdef CONFIG_SMP
 	/*
@@ -611,6 +614,7 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
 	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");

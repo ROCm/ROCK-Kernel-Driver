@@ -360,7 +360,7 @@ int start_io_thread(unsigned long sp, int *fd_out)
 	os_close_file(fds[1]);
 	kernel_fd = -1;
 	*fd_out = -1;
-out:
+ out:
 	return(err);
 }
 

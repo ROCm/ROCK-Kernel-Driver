@@ -105,7 +105,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	return retval;
 }
 
-int mm_init_new_context(struct mm_struct *old_mm, struct mm_struct *mm)
+int mm_copy_segments(struct mm_struct *old_mm, struct mm_struct *mm)
 {
 	int retval = 0;
 

@@ -81,10 +81,10 @@ static int cow_ioctl(struct inode * inode, struct file * file,
 static int cow_revalidate(kdev_t rdev);
 
 static struct block_device_operations cow_blops = {
-       .open		= cow_open,
-       .release	= cow_release,
-       .ioctl		= cow_ioctl,
-       .revalidate	= cow_revalidate,
+	.open		= cow_open,
+	.release	= cow_release,
+	.ioctl		= cow_ioctl,
+	.revalidate	= cow_revalidate,
 };
 
 /* Initialized in an initcall, and unchanged thereafter */
@@ -132,13 +132,13 @@ static int cow_add(int n)
 
 	return(0);
 
-out:
+ out:
 	return(err);
 }
 
 /*
-* Add buffer_head to back of pending list
-*/
+ * Add buffer_head to back of pending list
+ */
 static void cow_add_bh(struct cow *cow, struct buffer_head *bh)
 {
 	unsigned long flags;
@@ -253,7 +253,7 @@ static int cow_thread(void *data)
 		start = bh->b_blocknr * bh->b_size / dev->sectorsize;
 		len = bh->b_size / dev->sectorsize;
 		for(i = 0; i < len ; i++){
-			if(ubd_test_bit(start +ni, 
+			if(ubd_test_bit(start + i, 
 					(unsigned char *) dev->bitmap))
 				continue;
 
@@ -339,7 +339,7 @@ int cow_init(void)
 	INIT_ELV(cow_queue, &cow_queue->elevator);
 	blk_queue_make_request(cow_queue, cow_make_request);
 
-       add_gendisk(&cow_gendisk);
+	add_gendisk(&cow_gendisk);
 
 	for(i=0;i<MAX_DEV;i++) 
 		cow_add(i);
@@ -497,7 +497,7 @@ static int cow_open(struct inode *inode, struct file *filp)
 		down(&dev->sem);
 	}
 	dev->count++;
-out:
+ out:
 	spin_unlock(&cow_lock);
 	return(err);
 }
@@ -531,7 +531,7 @@ static int cow_release(struct inode * inode, struct file * file)
 	bdput(dev->backing_bdev);
 	dev->backing_bdev = 0;
 
-out:
+ out:
 	spin_unlock(&cow_lock);
 	return(0);
 }

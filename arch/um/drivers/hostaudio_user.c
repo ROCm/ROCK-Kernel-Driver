@@ -27,15 +27,11 @@ ssize_t hostaudio_read_user(struct hostaudio_state *state, char *buffer,
 ssize_t hostaudio_write_user(struct hostaudio_state *state, const char *buffer,
 			     size_t count, loff_t *ppos)
 {
-	ssize_t ret;
-
 #ifdef DEBUG
         printk("hostaudio: write_user called, count = %d\n", count);
 #endif
 
 	return(os_write_file(state->fd, buffer, count));
-
-        return(ret);
 }
 
 int hostaudio_ioctl_user(struct hostaudio_state *state, unsigned int cmd, 
@@ -54,10 +50,10 @@ int hostaudio_open_user(struct hostaudio_state *state, int r, int w, char *dsp)
         printk("hostaudio: open_user called\n");
 #endif
 
-        state->fd = os_open_file(dsp, of_set_rw(OPENFLAGS(), r, w), 0);
+	state->fd = os_open_file(dsp, of_set_rw(OPENFLAGS(), r, w), 0);
 
 	if(state->fd < 0) {
-	        printk("hostaudio_open_user failed to open '%s', err = %d\n",
+		printk("hostaudio_open_user failed to open '%s', err = %d\n",
 		       dsp, -state->fd);
 		return(state->fd); 
 	}
@@ -70,10 +66,10 @@ int hostaudio_release_user(struct hostaudio_state *state)
 #ifdef DEBUG
         printk("hostaudio: release called\n");
 #endif
-        if(state->fd >= 0){
+	if(state->fd >= 0){
 		os_close_file(state->fd);
 		state->fd = -1;
-        }
+	}
 
         return(0);
 }

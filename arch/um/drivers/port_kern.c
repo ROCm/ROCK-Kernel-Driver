@@ -40,7 +40,7 @@ struct port_dev {
 struct connection {
 	struct list_head list;
 	int fd;
- 	int helper_pid;
+	int helper_pid;
 	int socket[2];
 	int telnetd_pid;
 	struct port_list *port;
@@ -51,7 +51,7 @@ static irqreturn_t pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
- 	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
+	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
 		if(fd == -EAGAIN)
 			return(IRQ_NONE);
@@ -105,8 +105,7 @@ static int port_accept(struct port_list *port)
 	}
 
 	list_add(&conn->list, &port->pending);
-	ret = 1;
-	goto out;
+	return(1);
 
  out_free:
 	kfree(conn);

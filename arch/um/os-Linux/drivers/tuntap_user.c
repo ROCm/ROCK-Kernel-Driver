@@ -141,7 +141,7 @@ static int tuntap_open(void *data)
 			printk("Failed to open /dev/net/tun, err = %d\n",
 			       -pri->fd);
 			return(pri->fd);
-		} 
+		}
 		memset(&ifr, 0, sizeof(ifr));
 		ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 		strlcpy(ifr.ifr_name, pri->dev_name, sizeof(ifr.ifr_name));
