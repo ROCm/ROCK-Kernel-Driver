@@ -11,6 +11,7 @@
 #include <linux/threads.h>
 #include <linux/brlock.h>
 #include <linux/spinlock.h>
+#include <linux/cache.h>
 
 /* entry.S is sensitive to the offsets of these fields */ /* XXX P3 Is it? */
 typedef struct {
