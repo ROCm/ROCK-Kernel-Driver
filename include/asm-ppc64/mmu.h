@@ -107,8 +107,6 @@ typedef struct {
 
 extern HTAB htab_data;
 
-#define LARGE_PAGE_SHIFT 24
-
 static inline unsigned long hpt_hash(unsigned long vpn, int large)
 {
 	unsigned long vsid;

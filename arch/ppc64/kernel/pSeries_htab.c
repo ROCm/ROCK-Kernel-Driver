@@ -329,7 +329,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 		va = (vsid << 28) | (batch->addr[i] & 0x0fffffff);
 		batch->vaddr[j] = va;
 		if (large)
-			vpn = va >> LARGE_PAGE_SHIFT;
+			vpn = va >> HPAGE_SHIFT;
 		else
 			vpn = va >> PAGE_SHIFT;
 		hash = hpt_hash(vpn, large);
