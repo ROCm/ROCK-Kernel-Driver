@@ -107,7 +107,7 @@ static int ircomm_state_idle(struct ircomm_cb *self, IRCOMM_EVENT event,
 		ircomm_connect_indication(self, skb, info);
 		break;
 	default:
-		IRDA_DEBUG(4, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(4, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
 		if (skb)
 			dev_kfree_skb(skb);
@@ -139,7 +139,7 @@ static int ircomm_state_waiti(struct ircomm_cb *self, IRCOMM_EVENT event,
 		ircomm_disconnect_indication(self, skb, info);
 		break;
 	default:
-		IRDA_DEBUG(0, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(0, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
 		if (skb)
 			dev_kfree_skb(skb);
@@ -174,7 +174,7 @@ static int ircomm_state_waitr(struct ircomm_cb *self, IRCOMM_EVENT event,
 		ircomm_disconnect_indication(self, skb, info);
 		break;
 	default:
-		IRDA_DEBUG(0, __FUNCTION__ "(), unknown event = %s\n",
+		IRDA_DEBUG(0, "%s(), unknown event = %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
 		if (skb)
 			dev_kfree_skb(skb);
@@ -218,7 +218,7 @@ static int ircomm_state_conn(struct ircomm_cb *self, IRCOMM_EVENT event,
 		ret = self->issue.disconnect_request(self, skb, info);
 		break;
 	default:
-		IRDA_DEBUG(0, __FUNCTION__ "(), unknown event = %s\n",
+		IRDA_DEBUG(0, "%s(), unknown event = %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
 		if (skb)
 			dev_kfree_skb(skb);
@@ -236,7 +236,7 @@ static int ircomm_state_conn(struct ircomm_cb *self, IRCOMM_EVENT event,
 int ircomm_do_event(struct ircomm_cb *self, IRCOMM_EVENT event,
 		    struct sk_buff *skb, struct ircomm_info *info) 
 {
-	IRDA_DEBUG(4, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(4, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_state[self->state], ircomm_event[event]);
 
 	return (*state[self->state])(self, event, skb, info);
@@ -252,6 +252,6 @@ void ircomm_next_state(struct ircomm_cb *self, IRCOMM_STATE state)
 {
 	self->state = state;
 	
-	IRDA_DEBUG(4, __FUNCTION__": next state=%s, service type=%d\n", 
+	IRDA_DEBUG(4, "%s: next state=%s, service type=%d\n", __FUNCTION__ , 
 		   ircomm_state[self->state], self->service_type);
 }

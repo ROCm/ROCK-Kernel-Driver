@@ -79,12 +79,13 @@ struct ias_object *irias_new_object( char *name, int id)
 {
         struct ias_object *obj;
 
-	IRDA_DEBUG( 4, __FUNCTION__ "()\n");
+	IRDA_DEBUG( 4, "%s()\n", __FUNCTION__);
 
 	obj = (struct ias_object *) kmalloc(sizeof(struct ias_object),
 					    GFP_ATOMIC);
 	if (obj == NULL) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), Unable to allocate object!\n");
+		IRDA_DEBUG(0, "%s(), Unable to allocate object!\n",
+			   __FUNCTION__);
 		return NULL;
 	}
 	memset(obj, 0, sizeof( struct ias_object));
@@ -295,8 +296,8 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 	}
 
 	if ( attrib->value->type != new_value->type) {
-		IRDA_DEBUG( 0, __FUNCTION__
-		       "(), changing value type not allowed!\n");
+		IRDA_DEBUG( 0, "%s(), changing value type not allowed!\n",
+			    __FUNCTION__);
 		spin_unlock_irqrestore(&obj->attribs->hb_spinlock, flags);
 		return -1;
 	}
@@ -521,7 +522,7 @@ struct ias_value *irias_new_missing_value(void)
  */
 void irias_delete_value(struct ias_value *value)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	ASSERT(value != NULL, return;);
 
@@ -541,7 +542,7 @@ void irias_delete_value(struct ias_value *value)
 			 kfree(value->t.oct_seq);
 		 break;
 	default:
-		IRDA_DEBUG(0, __FUNCTION__ "(), Unknown value type!\n");
+		IRDA_DEBUG(0, "%s(), Unknown value type!\n", __FUNCTION__);
 		break;
 	}
 	kfree(value);

@@ -85,7 +85,7 @@ static int irda_data_indication(void *instance, void *sap, struct sk_buff *skb)
 	struct sock *sk;
 	int err;
 
-	IRDA_DEBUG(3, __FUNCTION__ "()\n");
+	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
 	self = (struct irda_sock *) instance;
 	ASSERT(self != NULL, return -1;);
@@ -95,7 +95,7 @@ static int irda_data_indication(void *instance, void *sap, struct sk_buff *skb)
 
 	err = sock_queue_rcv_skb(sk, skb);
 	if (err) {
-		IRDA_DEBUG(1, __FUNCTION__ "(), error: no more mem!\n");
+		IRDA_DEBUG(1, "%s(), error: no more mem!\n", __FUNCTION__);
 		self->rx_flow = FLOW_STOP;
 
 		/* When we return error, TTP will need to requeue the skb */
@@ -119,7 +119,7 @@ static void irda_disconnect_indication(void *instance, void *sap,
 
 	self = (struct irda_sock *) instance;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	/* Don't care about it, but let's not leak it */
 	if(skb)
@@ -127,7 +127,8 @@ static void irda_disconnect_indication(void *instance, void *sap,
 
 	sk = self->sk;
 	if (sk == NULL) {
-		IRDA_DEBUG(0, __FUNCTION__ "(%p) : BUG : sk is NULL\n", self);
+		IRDA_DEBUG(0, "%s(%p) : BUG : sk is NULL\n",
+			   __FUNCTION__, self);
 		return;
 	}
 
@@ -183,7 +184,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 
 	self = (struct irda_sock *) instance;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	sk = self->sk;
 	if (sk == NULL)
@@ -215,7 +216,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 		self->max_data_size = irttp_get_max_seg_size(self->tsap);
 	};
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), max_data_size=%d\n",
+	IRDA_DEBUG(2, "%s(), max_data_size=%d\n", __FUNCTION__,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
@@ -242,7 +243,7 @@ static void irda_connect_indication(void *instance, void *sap,
 
 	self = (struct irda_sock *) instance;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	sk = self->sk;
 	if (sk == NULL)
@@ -274,7 +275,7 @@ static void irda_connect_indication(void *instance, void *sap,
 		self->max_data_size = irttp_get_max_seg_size(self->tsap);
 	};
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), max_data_size=%d\n",
+	IRDA_DEBUG(2, "%s(), max_data_size=%d\n", __FUNCTION__,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
@@ -293,13 +294,14 @@ void irda_connect_response(struct irda_sock *self)
 {
 	struct sk_buff *skb;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	ASSERT(self != NULL, return;);
 
 	skb = dev_alloc_skb(64);
 	if (skb == NULL) {
-		IRDA_DEBUG(0, __FUNCTION__ "() Unable to allocate sk_buff!\n");
+		IRDA_DEBUG(0, "%s() Unable to allocate sk_buff!\n",
+			   __FUNCTION__);
 		return;
 	}
 
@@ -320,7 +322,7 @@ static void irda_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 	struct irda_sock *self;
 	struct sock *sk;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	self = (struct irda_sock *) instance;
 	ASSERT(self != NULL, return;);
@@ -330,17 +332,18 @@ static void irda_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 
 	switch (flow) {
 	case FLOW_STOP:
-		IRDA_DEBUG(1, __FUNCTION__ "(), IrTTP wants us to slow down\n");
+		IRDA_DEBUG(1, "%s(), IrTTP wants us to slow down\n",
+			   __FUNCTION__);
 		self->tx_flow = flow;
 		break;
 	case FLOW_START:
 		self->tx_flow = flow;
-		IRDA_DEBUG(1, __FUNCTION__
-			   "(), IrTTP wants us to start again\n");
+		IRDA_DEBUG(1, "%s(), IrTTP wants us to start again\n",
+			   __FUNCTION__);
 		wake_up_interruptible(sk->sleep);
 		break;
 	default:
-		IRDA_DEBUG( 0, __FUNCTION__ "(), Unknown flow command!\n");
+		IRDA_DEBUG(0, "%s(), Unknown flow command!\n", __FUNCTION__);
 		/* Unknown flow command, better stop */
 		self->tx_flow = flow;
 		break;
@@ -366,7 +369,7 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
 		return;
 	}
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	/* We probably don't need to make any more queries */
 	iriap_close(self->iriap);
@@ -374,7 +377,7 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
 
 	/* Check if request succeeded */
 	if (result != IAS_SUCCESS) {
-		IRDA_DEBUG(1, __FUNCTION__ "(), IAS query failed! (%d)\n",
+		IRDA_DEBUG(1, "%s(), IAS query failed! (%d)\n", __FUNCTION__,
 			   result);
 
 		self->errno = result;	/* We really need it later */
@@ -408,7 +411,7 @@ static void irda_selective_discovery_indication(discovery_t *discovery,
 {
 	struct irda_sock *self;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	self = (struct irda_sock *) priv;
 	if (!self) {
@@ -445,7 +448,7 @@ static void irda_discovery_timeout(u_long priv)
 {
 	struct irda_sock *self;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	self = (struct irda_sock *) priv;
 	ASSERT(self != NULL, return;);
@@ -488,7 +491,8 @@ static int irda_open_tsap(struct irda_sock *self, __u8 tsap_sel, char *name)
 	self->tsap = irttp_open_tsap(tsap_sel, DEFAULT_INITIAL_CREDIT,
 				     &notify);
 	if (self->tsap == NULL) {
-		IRDA_DEBUG( 0, __FUNCTION__ "(), Unable to allocate TSAP!\n");
+		IRDA_DEBUG(0, "%s(), Unable to allocate TSAP!\n",
+			   __FUNCTION__);
 		return -ENOMEM;
 	}
 	/* Remember which TSAP selector we actually got */
@@ -1066,7 +1070,7 @@ static int irda_create(struct socket *sock, int protocol)
 	struct sock *sk;
 	struct irda_sock *self;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	/* Check for valid socket type */
 	switch (sock->type) {
@@ -1090,7 +1094,7 @@ static int irda_create(struct socket *sock, int protocol)
 	}
 	memset(self, 0, sizeof(struct irda_sock));
 
-	IRDA_DEBUG(2, __FUNCTION__ "() : self is %p\n", self);
+	IRDA_DEBUG(2, "%s() : self is %p\n", __FUNCTION__, self);
 
 	init_waitqueue_head(&self->query_wait);
 
@@ -1152,7 +1156,7 @@ static int irda_create(struct socket *sock, int protocol)
  */
 void irda_destroy_socket(struct irda_sock *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	ASSERT(self != NULL, return;);
 
@@ -1195,7 +1199,7 @@ static int irda_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
         if (sk == NULL)
 		return 0;
@@ -1264,7 +1268,7 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), len=%d\n", len);
+	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	/* Note : socket.c set MSG_EOR on SEQPACKET sockets */
 	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_EOR))
@@ -1293,9 +1297,8 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 
 	/* Check that we don't send out to big frames */
 	if (len > self->max_data_size) {
-		IRDA_DEBUG(2, __FUNCTION__
-			   "(), Chopping frame from %d to %d bytes!\n", len,
-			   self->max_data_size);
+		IRDA_DEBUG(2, "%s(), Chopping frame from %d to %d bytes!\n",
+			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}
 
@@ -1315,7 +1318,7 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	 */
 	err = irttp_data_request(self->tsap, skb);
 	if (err) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), err=%d\n", err);
+		IRDA_DEBUG(0, "%s(), err=%d\n", __FUNCTION__, err);
 		return err;
 	}
 	/* Tell client how much data we actually sent */
@@ -1336,7 +1339,7 @@ static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
 	struct sk_buff *skb;
 	int copied, err;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	ASSERT(self != NULL, return -1;);
 
@@ -1349,9 +1352,8 @@ static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
 	copied     = skb->len;
 
 	if (copied > size) {
-		IRDA_DEBUG(2, __FUNCTION__
-			   "(), Received truncated frame (%d < %d)!\n",
-			   copied, size);
+		IRDA_DEBUG(2, "%s(), Received truncated frame (%d < %d)!\n",
+			   __FUNCTION__, copied, size);
 		copied = size;
 		msg->msg_flags |= MSG_TRUNC;
 	}
@@ -1367,7 +1369,7 @@ static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
 	 */
 	if (self->rx_flow == FLOW_STOP) {
 		if ((atomic_read(&sk->rmem_alloc) << 2) <= sk->rcvbuf) {
-			IRDA_DEBUG(2, __FUNCTION__ "(), Starting IrTTP\n");
+			IRDA_DEBUG(2, "%s(), Starting IrTTP\n", __FUNCTION__);
 			self->rx_flow = FLOW_START;
 			irttp_flow_request(self->tsap, FLOW_START);
 		}
@@ -1389,7 +1391,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 	int target = 1;
 	DECLARE_WAITQUEUE(waitq, current);
 
-	IRDA_DEBUG(3, __FUNCTION__ "()\n");
+	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
 	ASSERT(self != NULL, return -1;);
 
@@ -1466,14 +1468,15 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 
 			/* put the skb back if we didn't use it up.. */
 			if (skb->len) {
-				IRDA_DEBUG(1, __FUNCTION__ "(), back on q!\n");
+				IRDA_DEBUG(1, "%s(), back on q!\n",
+					   __FUNCTION__);
 				skb_queue_head(&sk->receive_queue, skb);
 				break;
 			}
 
 			kfree_skb(skb);
 		} else {
-			IRDA_DEBUG(0, __FUNCTION__ "() questionable!?\n");
+			IRDA_DEBUG(0, "%s() questionable!?\n", __FUNCTION__);
 
 			/* put message back and return */
 			skb_queue_head(&sk->receive_queue, skb);
@@ -1489,7 +1492,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 	 */
 	if (self->rx_flow == FLOW_STOP) {
 		if ((atomic_read(&sk->rmem_alloc) << 2) <= sk->rcvbuf) {
-			IRDA_DEBUG(2, __FUNCTION__ "(), Starting IrTTP\n");
+			IRDA_DEBUG(2, "%s(), Starting IrTTP\n", __FUNCTION__);
 			self->rx_flow = FLOW_START;
 			irttp_flow_request(self->tsap, FLOW_START);
 		}
@@ -1514,7 +1517,7 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), len=%d\n", len);
+	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	if (msg->msg_flags & ~MSG_DONTWAIT)
 		return -EINVAL;
@@ -1535,9 +1538,9 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 	 * service, so we have no fragmentation and no coalescence
 	 */
 	if (len > self->max_data_size) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), Warning to much data! "
-			   "Chopping frame from %d to %d bytes!\n", len,
-			   self->max_data_size);
+		IRDA_DEBUG(0, "%s(), Warning to much data! "
+			   "Chopping frame from %d to %d bytes!\n",
+			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}
 
@@ -1548,7 +1551,7 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 
 	skb_reserve(skb, self->max_header_size);
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), appending user data\n");
+	IRDA_DEBUG(4, "%s(), appending user data\n", __FUNCTION__);
 	asmptr = skb->h.raw = skb_put(skb, len);
 	memcpy_fromiovec(asmptr, msg->msg_iov, len);
 
@@ -1558,7 +1561,7 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
 	 */
 	err = irttp_udata_request(self->tsap, skb);
 	if (err) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), err=%d\n", err);
+		IRDA_DEBUG(0, "%s(), err=%d\n", __FUNCTION__, err);
 		return err;
 	}
 	return len;
@@ -1580,7 +1583,7 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), len=%d\n", len);
+	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	if (msg->msg_flags & ~MSG_DONTWAIT)
 		return -EINVAL;
@@ -1598,9 +1601,9 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 	 * service, so we have no fragmentation and no coalescence
 	 */
 	if (len > self->max_data_size) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), Warning to much data! "
-			   "Chopping frame from %d to %d bytes!\n", len,
-			   self->max_data_size);
+		IRDA_DEBUG(0, "%s(), Warning to much data! "
+			   "Chopping frame from %d to %d bytes!\n",
+			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}
 
@@ -1611,13 +1614,13 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 
 	skb_reserve(skb, self->max_header_size);
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), appending user data\n");
+	IRDA_DEBUG(4, "%s(), appending user data\n", __FUNCTION__);
 	asmptr = skb->h.raw = skb_put(skb, len);
 	memcpy_fromiovec(asmptr, msg->msg_iov, len);
 
 	err = irlmp_connless_data_request(self->lsap, skb);
 	if (err) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), err=%d\n", err);
+		IRDA_DEBUG(0, "%s(), err=%d\n", __FUNCTION__, err);
 		return err;
 	}
 	return len;
@@ -1634,7 +1637,7 @@ static int irda_shutdown(struct socket *sock, int how)
 
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(1, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(1, "%s(%p)\n", __FUNCTION__, self);
 
 	sk->state       = TCP_CLOSE;
 	sk->shutdown   |= SEND_SHUTDOWN;
@@ -1669,7 +1672,7 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 	struct irda_sock *self = irda_sk(sk);
 	unsigned int mask;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	poll_wait(file, sk->sleep, wait);
 	mask = 0;
@@ -1678,7 +1681,7 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 	if (sk->err)
 		mask |= POLLERR;
 	if (sk->shutdown & RCV_SHUTDOWN) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), POLLHUP\n");
+		IRDA_DEBUG(0, "%s(), POLLHUP\n", __FUNCTION__);
 		mask |= POLLHUP;
 	}
 
@@ -1692,7 +1695,7 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 	switch (sk->type) {
 	case SOCK_STREAM:
 		if (sk->state == TCP_CLOSE) {
-			IRDA_DEBUG(0, __FUNCTION__ "(), POLLHUP\n");
+			IRDA_DEBUG(0, "%s(), POLLHUP\n", __FUNCTION__);
 			mask |= POLLHUP;
 		}
 
@@ -1728,7 +1731,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), cmd=%#x\n", cmd);
+	IRDA_DEBUG(4, "%s(), cmd=%#x\n", __FUNCTION__, cmd);
 
 	switch (cmd) {
 	case TIOCOUTQ: {
@@ -1775,7 +1778,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCSIFMETRIC:
 		return -EINVAL;
 	default:
-		IRDA_DEBUG(1, __FUNCTION__ "(), doing device ioctl!\n");
+		IRDA_DEBUG(1, "%s(), doing device ioctl!\n", __FUNCTION__);
 		return dev_ioctl(cmd, (void *) arg);
 	}
 
@@ -1801,7 +1804,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	if (level != SOL_IRLMP)
 		return -ENOPROTOOPT;
@@ -1963,8 +1966,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 
 		/* Check is the user space own the object */
 		if(ias_attr->value->owner != IAS_USER_ATTR) {
-			IRDA_DEBUG(1, __FUNCTION__
-				   "(), attempting to delete a kernel attribute\n");
+			IRDA_DEBUG(1, "%s(), attempting to delete a kernel attribute\n", __FUNCTION__);
 			kfree(ias_opt);
 			return -EPERM;
 		}
@@ -1982,8 +1984,8 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 
 		/* Only possible for a seqpacket service (TTP with SAR) */
 		if (sk->type != SOCK_SEQPACKET) {
-			IRDA_DEBUG(2, __FUNCTION__
-				   "(), setting max_sdu_size = %d\n", opt);
+			IRDA_DEBUG(2, "%s(), setting max_sdu_size = %d\n",
+				   __FUNCTION__, opt);
 			self->max_sdu_size_rx = opt;
 		} else {
 			WARNING("%s: not allowed to set MAXSDUSIZE for this socket type!\n",
@@ -2099,7 +2101,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	int err;
 	int offset, total;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	if (level != SOL_IRLMP)
 		return -ENOPROTOOPT;
@@ -2356,8 +2358,7 @@ bed:
 		if (!self->cachediscovery) {
 			int ret = 0;
 
-			IRDA_DEBUG(1, __FUNCTION__
-				   "(), nothing discovered yet, going to sleep...\n");
+			IRDA_DEBUG(1, "%s(), nothing discovered yet, going to sleep...\n", __FUNCTION__);
 
 			/* Set watchdog timer to expire in <val> ms. */
 			self->errno = 0;
@@ -2375,15 +2376,14 @@ bed:
 			if(timer_pending(&(self->watchdog)))
 				del_timer(&(self->watchdog));
 
-			IRDA_DEBUG(1, __FUNCTION__
-				   "(), ...waking up !\n");
+			IRDA_DEBUG(1, "%s(), ...waking up !\n", __FUNCTION__);
 
 			if (ret != 0)
 				return ret;
 		}
 		else
-			IRDA_DEBUG(1, __FUNCTION__
-				   "(), found immediately !\n");
+			IRDA_DEBUG(1, "%s(), found immediately !\n",
+				   __FUNCTION__);
 
 		/* Tell IrLMP that we have been notified */
 		irlmp_update_client(self->ckey, self->mask, NULL, NULL, NULL);
