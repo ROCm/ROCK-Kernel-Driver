@@ -196,7 +196,7 @@ sb1000_probe(struct net_device *dev)
 		/* check I/O base and IRQ */
 		if (dev->base_addr != 0 && dev->base_addr != ioaddr[0])
 			continue;
-		if (dev->rmem_end != 0 && dev->rmem_end != ioaddr[1])
+		if (dev->mem_start != 0 && dev->mem_start != ioaddr[1])
 			continue;
 		if (dev->irq != 0 && dev->irq != irq)
 			continue;
@@ -212,14 +212,14 @@ sb1000_probe(struct net_device *dev)
 		}
 		 
 		dev->base_addr = ioaddr[0];
-		/* rmem_end holds the second I/O address - fv */
-		dev->rmem_end = ioaddr[1];
+		/* mem_start holds the second I/O address */
+		dev->mem_start = ioaddr[1];
 		dev->irq = irq;
 
 		if (sb1000_debug > 0)
 			printk(KERN_NOTICE "%s: sb1000 at (%#3.3lx,%#3.3lx), "
 				"S/N %#8.8x, IRQ %d.\n", dev->name, dev->base_addr,
-				dev->rmem_end, serial_number, dev->irq);
+				dev->mem_start, serial_number, dev->irq);
 
 		dev = init_etherdev(dev, 0);
 		if (!dev)
@@ -935,8 +935,8 @@ sb1000_error_dpc(struct net_device *dev)
 	const int ErrorDpcCounterInitialize = 200;
 
 	ioaddr[0] = dev->base_addr;
-	/* rmem_end holds the second I/O address - fv */
-	ioaddr[1] = dev->rmem_end;
+	/* mem_start holds the second I/O address */
+	ioaddr[1] = dev->mem_start;
 	name = dev->name;
 
 	sb1000_wait_for_ready_clear(ioaddr, name);
@@ -961,8 +961,8 @@ sb1000_open(struct net_device *dev)
 	const unsigned short FirmwareVersion[] = {0x01, 0x01};
 
 	ioaddr[0] = dev->base_addr;
-	/* rmem_end holds the second I/O address - fv */
-	ioaddr[1] = dev->rmem_end;
+	/* mem_start holds the second I/O address */
+	ioaddr[1] = dev->mem_start;
 	name = dev->name;
 
 	/* initialize sb1000 */
@@ -1029,8 +1029,8 @@ static int sb1000_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -ENODEV;
 
 	ioaddr[0] = dev->base_addr;
-	/* rmem_end holds the second I/O address - fv */
-	ioaddr[1] = dev->rmem_end;
+	/* mem_start holds the second I/O address */
+	ioaddr[1] = dev->mem_start;
 	name = dev->name;
 
 	switch (cmd) {
@@ -1130,8 +1130,8 @@ static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	ioaddr[0] = dev->base_addr;
-	/* rmem_end holds the second I/O address - fv */
-	ioaddr[1] = dev->rmem_end;
+	/* mem_start holds the second I/O address */
+	ioaddr[1] = dev->mem_start;
 	name = dev->name;
 
 	/* is it a good interrupt? */
@@ -1189,8 +1189,8 @@ static int sb1000_close(struct net_device *dev)
 	netif_stop_queue(dev);
 	
 	ioaddr[0] = dev->base_addr;
-	/* rmem_end holds the second I/O address - fv */
-	ioaddr[1] = dev->rmem_end;
+	/* mem_start holds the second I/O address */
+	ioaddr[1] = dev->mem_start;
 
 	free_irq(dev->irq, dev);
 	/* If we don't do this, we can't re-insmod it later. */
@@ -1234,8 +1234,8 @@ init_module(void)
 	}
 	dev_sb1000.init = sb1000_probe;
 	dev_sb1000.base_addr = io[0];
-	/* rmem_end holds the second I/O address - fv */
-	dev_sb1000.rmem_end = io[1];
+	/* mem_start holds the second I/O address */
+	dev_sb1000.mem_start = io[1];
 	dev_sb1000.irq = irq;
 	if (register_netdev(&dev_sb1000) != 0) {
 		printk(KERN_ERR "sb1000: failed to register device (io: %03x,%03x   "
@@ -1249,7 +1249,7 @@ void cleanup_module(void)
 {
 	unregister_netdev(&dev_sb1000);
 	release_region(dev_sb1000.base_addr, 16);
-	release_region(dev_sb1000.rmem_end, 16);
+	release_region(dev_sb1000.mem_start, 16);
 	kfree(dev_sb1000.priv);
 	dev_sb1000.priv = NULL;
 }
