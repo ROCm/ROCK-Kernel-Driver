@@ -661,10 +661,15 @@ allmodconfig:
 defconfig:
 	yes '' | $(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
 
-# Cleaning up
-# ---------------------------------------------------------------------------
+###
+# Cleaning is done on three levels.
+# make clean     Delete all automatically generated files, including
+#                tools and firmware.
+# make mrproper  Delete the current configuration, and related files
+#                Any core files spread around is deleted as well
+# make distclean Remove editor backup files, patch leftover files and the like
 
-#	files removed with 'make clean'
+# Files removed with 'make clean'
 CLEAN_FILES += \
 	include/linux/compile.h \
 	vmlinux System.map \
@@ -690,7 +695,7 @@ CLEAN_FILES += \
 	net/khttpd/make_times_h net/khttpd/times.h \
 	submenu*
 
-# 	files removed with 'make mrproper'
+# Files removed with 'make mrproper'
 MRPROPER_FILES += \
 	include/linux/autoconf.h include/linux/version.h \
 	drivers/net/hamradio/soundmodem/sm_tbl_{afsk1200,afsk2666,fsk9600}.h \
@@ -712,33 +717,43 @@ MRPROPER_FILES += \
 	tags TAGS kernel.spec \
 	.tmp*
 
-# 	directories removed with 'make mrproper'
+# Directories removed with 'make mrproper'
 MRPROPER_DIRS += \
 	.tmp_export-objs \
 	include/config \
 	include/linux/modules
 
-clean:	archclean
-	@echo 'Cleaning up'
-	@find . $(RCS_FIND_IGNORE) \
-		\( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
-		-name .\*.tmp -o -name .\*.d \) -type f -print \
-		| grep -v lxdialog/ | xargs rm -f
-	@rm -f $(CLEAN_FILES)
-	+@$(call descend,Documentation/DocBook,clean)
+# clean - Delete all intermidiate files
+#
+clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook
+cleanprint:
+	@echo '  Cleaning the srctree'
 
+$(addprefix _clean_,$(clean-dirs)): cleanprint
+	+@$(call descend,$(patsubst _clean_%,%,$@), subdirclean)
+
+quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
+cmd_rmclean	  = rm -f $(CLEAN_FILES)
+clean: archclean $(addprefix _clean_,$(clean-dirs))
+	$(call cmd,rmclean)
+
+# mrproper - delete configuration + modules + core files
+#
+quiet_cmd_mrproper = RM  $$(MRPROPER_DIRS) + $$(MRPROPER_FILES)
+cmd_mrproper = rm -rf $(MRPROPER_DIRS) && rm -f $(MRPROPER_FILES)
 mrproper: clean archmrproper
-	@echo 'Making mrproper'
+	@echo '  Making mrproper in the srctree'
 	@find . $(RCS_FIND_IGNORE) \
-		\( -name .depend -o -name .\*.cmd \) \
+		\( -name .depend -o -name .\*.cmd -o -name core \) \
 		-type f -print | xargs rm -f
-	@rm -rf $(MRPROPER_DIRS)
-	@rm -f $(MRPROPER_FILES)
+	$(call cmd,mrproper)
 	+@$(call descend,scripts,mrproper)
 	+@$(call descend,Documentation/DocBook,mrproper)
 
+# distclean - remove all temporaries left behind by patch, vi, emacs etc.
+#
 distclean: mrproper
-	@echo 'Making distclean'
+	@echo '  Making distclean in the srctree'
 	@find . $(RCS_FIND_IGNORE) \
 		\( -not -type d \) -and \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \

@@ -87,6 +87,7 @@ obj-m		:= $(filter-out %/, $(obj-m))
 # Subdirectories we need to descend into
 
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
+subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # export.o is never a composite object, since $(export-objs) has a
 # fixed meaning (== objects which EXPORT_SYMBOL())
@@ -113,6 +114,10 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Only build module versions for files which are selected to be built
 export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
+host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
+host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
+host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+
 # Add subdir path
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
@@ -127,12 +132,19 @@ multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
 multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
 multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
+subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
+clean-files	:= $(addprefix $(obj)/,$(clean-files))
+host-progs	:= $(addprefix $(obj)/,$(host-progs))
+host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
+host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
+host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
-# We're called for one of three purposes:
+# We're called for one of four purposes:
+# o subdirclean: Delete intermidiate files in the current directory
 # o fastdep: build module version files (.ver) for $(export-objs) in
 #   the current directory
 # o modules_install: install the modules in the current directory
@@ -142,6 +154,13 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 #   When targets are given directly (like foo.o), we just build these
 #   targets (That happens when someone does make some/dir/foo.[ois])
 
+ifeq ($(MAKECMDGOALS),subdirclean)
+subdirclean: $(subdir-ymn)
+	@/bin/true
+	@rm -f $(EXTRA_TARGETS) $(host-progs) $(clean-files) \
+        $(addprefix $(obj)/,*.[oas] .*.cmd .*.tmp .*.d)
+	@$(clean-rule)
+else
 ifeq ($(MAKECMDGOALS),fastdep)
 
 # ===========================================================================
@@ -399,14 +418,6 @@ targets += $(multi-used-y) $(multi-used-m)
 # Compile programs on the host
 # ===========================================================================
 
-host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
-host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
-host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
-host-progs	      := $(addprefix $(obj)/,$(host-progs))
-host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
-host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
-host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
-
 quiet_cmd_host_cc__c  = HOSTCC  $(echo_target)
 cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,$(depfile) \
 			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
@@ -431,6 +442,7 @@ $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
 
 targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
 
+endif # ! subdirclean
 endif # ! modules_install
 endif # ! fastdep
 
@@ -480,9 +492,9 @@ cmd_gzip = gzip -f -9 < $< > $@
 # Descending
 # ---------------------------------------------------------------------------
 
-.PHONY: $(subdir-ym)
+.PHONY: $(subdir-ymn)
 
-$(subdir-ym):
+$(subdir-ymn):
 	+@$(call descend,$@,$(MAKECMDGOALS))
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
