@@ -677,7 +677,6 @@ static void update_wall_time(unsigned long ticks)
 	if (xtime.tv_nsec >= 1000000000) {
 	    xtime.tv_nsec -= 1000000000;
 	    xtime.tv_sec++;
-	    time_interpolator_update(NSEC_PER_SEC);
 	    second_overflow();
 	}
 }
