@@ -25,6 +25,21 @@ struct linger {
 };
 
 /*
+ * Desired design of maximum size and alignment (see RFC2553)
+ */
+#define _SS_MAXSIZE	128	/* Implementation specific max size */
+#define _SS_ALIGNSIZE	(__alignof__ (struct sockaddr *))
+				/* Implementation specific desired alignment */
+
+struct sockaddr_storage {
+	sa_family_t	ss_family;		/* address family */
+	/* Following field(s) are implementation specific */
+	char		__data[_SS_MAXSIZE - sizeof(sa_family_t)];
+				/* space to achieve desired size, */
+				/* _SS_MAXSIZE value minus size of ss_family */
+} __attribute__ ((aligned(_SS_ALIGNSIZE)));	/* force desired alignment */
+
+/*
  *	As we do 4.4BSD message passing we use a 4.4BSD message passing
  *	system, not 4.3. Thus msg_accrights(len) are now missing. They
  *	belong in an obscure libc emulation or the bin.
