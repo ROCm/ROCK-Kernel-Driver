@@ -11,7 +11,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 
-#include <asm/page.h> /* for BUG() */
+#include <asm/bug.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
