@@ -11,7 +11,6 @@
 #include <linux/netfilter_ipv6/ip6_tables.h>
 #include <linux/netfilter_ipv6/ip6t_rt.h>
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("IPv6 RT match");
 MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");

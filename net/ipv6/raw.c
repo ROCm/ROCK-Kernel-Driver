@@ -45,6 +45,7 @@
 #include <net/inet_common.h>
 
 #include <net/rawv6.h>
+#include <net/xfrm.h>
 
 struct sock *raw_v6_htable[RAWV6_HTABLE_SIZE];
 rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
@@ -303,6 +304,11 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct raw6_opt *raw_opt = raw6_sk(sk);
+
+        if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb)) {
+                kfree_skb(skb);
+                return NET_RX_DROP;
+        }
 
 	if (!raw_opt->checksum)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;

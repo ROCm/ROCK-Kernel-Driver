@@ -145,11 +145,12 @@ END(fsys_fallback_syscall)
 	 */
 
 #define SIGTRAMP_SAVES										\
-	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)	\
-	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF						\
-	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF						\
-	.savesp pr, PR_OFF+SIGCONTEXT_OFF							\
-	.savesp rp, RP_OFF+SIGCONTEXT_OFF							\
+	.unwabi @svr4, 's';	/* mark this as a sigtramp handler (saves scratch regs) */	\
+	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF;						\
+	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF;						\
+	.savesp pr, PR_OFF+SIGCONTEXT_OFF;     							\
+	.savesp rp, RP_OFF+SIGCONTEXT_OFF;							\
+	.savesp ar.pfs, CFM_OFF+SIGCONTEXT_OFF;							\
 	.vframesp SP_OFF+SIGCONTEXT_OFF
 
 GLOBAL_ENTRY(ia64_sigtramp)
@@ -173,9 +174,7 @@ GLOBAL_ENTRY(ia64_sigtramp)
 	.spillsp.p p8, ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 (p8)	br.cond.spnt setup_rbs		// yup -> (clobbers r14, r15, and r16)
 back_from_setup_rbs:
-
-	.spillreg ar.pfs, r8
-	alloc r8=ar.pfs,0,0,3,0		// get CFM0, EC0, and CPL0 into r8
+	alloc r8=ar.pfs,0,0,3,0
 	ld8 out0=[base0],16		// load arg0 (signum)
 	adds base1=(ARG1_OFF-(RBS_BASE_OFF+SIGCONTEXT_OFF)),base1
 	;;
@@ -184,17 +183,12 @@ back_from_setup_rbs:
 	;;
 	ld8 out2=[base0]		// load arg2 (sigcontextp)
 	ld8 gp=[r17]			// get signal handler's global pointer
-
 	adds base0=(BSP_OFF+SIGCONTEXT_OFF),sp
 	;;
 	.spillsp ar.bsp, BSP_OFF+SIGCONTEXT_OFF
-	st8 [base0]=r9,(CFM_OFF-BSP_OFF)	// save sc_ar_bsp
-	dep r8=0,r8,38,26			// clear EC0, CPL0 and reserved bits
-	adds base1=(FR6_OFF+16+SIGCONTEXT_OFF),sp
-	;;
-	.spillsp ar.pfs, CFM_OFF+SIGCONTEXT_OFF
-	st8 [base0]=r8				// save CFM0
+	st8 [base0]=r9			// save sc_ar_bsp
 	adds base0=(FR6_OFF+SIGCONTEXT_OFF),sp
+	adds base1=(FR6_OFF+16+SIGCONTEXT_OFF),sp
 	;;
 	stf.spill [base0]=f6,32
 	stf.spill [base1]=f7,32
@@ -217,7 +211,6 @@ back_from_setup_rbs:
 	ld8 r15=[base0],(CFM_OFF-BSP_OFF)	// fetch sc_ar_bsp and advance to CFM_OFF
 	mov r14=ar.bsp
 	;;
-	ld8 r8=[base0]				// restore (perhaps modified) CFM0, EC0, and CPL0
 	cmp.ne p8,p0=r14,r15			// do we need to restore the rbs?
 (p8)	br.cond.spnt restore_rbs		// yup -> (clobbers r14-r18, f6 & f7)
 	;;

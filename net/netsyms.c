@@ -54,6 +54,12 @@ extern __u32 sysctl_rmem_max;
 #include <linux/mroute.h>
 #include <linux/igmp.h>
 #include <net/xfrm.h>
+#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
+#include <net/ah.h>
+#endif
+#if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
+#include <net/esp.h>
+#endif
 
 extern struct net_proto_family inet_family_ops;
 
@@ -296,11 +302,11 @@ EXPORT_SYMBOL(__xfrm_policy_check);
 EXPORT_SYMBOL(__xfrm_route_forward);
 EXPORT_SYMBOL(xfrm_state_alloc);
 EXPORT_SYMBOL(__xfrm_state_destroy);
-EXPORT_SYMBOL(xfrm_state_find);
+EXPORT_SYMBOL(xfrm4_state_find);
 EXPORT_SYMBOL(xfrm_state_insert);
 EXPORT_SYMBOL(xfrm_state_check_expire);
 EXPORT_SYMBOL(xfrm_state_check_space);
-EXPORT_SYMBOL(xfrm_state_lookup);
+EXPORT_SYMBOL(xfrm4_state_lookup);
 EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
@@ -324,13 +330,17 @@ EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
 EXPORT_SYMBOL(xfrm_policy_byid);
 EXPORT_SYMBOL(xfrm_policy_list);
+EXPORT_SYMBOL(xfrm_dst_lookup_register);
+EXPORT_SYMBOL(xfrm_dst_lookup_unregister);
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+EXPORT_SYMBOL(xfrm6_state_find);
+EXPORT_SYMBOL(xfrm6_rcv);
 EXPORT_SYMBOL(xfrm6_state_lookup);
 EXPORT_SYMBOL(xfrm6_find_acq);
-EXPORT_SYMBOL(xfrm6_alloc_spi);
 EXPORT_SYMBOL(xfrm6_register_type);
 EXPORT_SYMBOL(xfrm6_unregister_type);
 EXPORT_SYMBOL(xfrm6_get_type);
+EXPORT_SYMBOL(xfrm6_clear_mutable_options);
 #endif
 
 EXPORT_SYMBOL_GPL(xfrm_probe_algs);
@@ -342,6 +352,15 @@ EXPORT_SYMBOL_GPL(xfrm_aalg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_aalg_get_byname);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byname);
+#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
+EXPORT_SYMBOL_GPL(skb_ah_walk);
+#endif
+#if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
+EXPORT_SYMBOL_GPL(skb_cow_data);
+EXPORT_SYMBOL_GPL(pskb_put);
+EXPORT_SYMBOL_GPL(skb_icv_walk);
+EXPORT_SYMBOL_GPL(skb_to_sgvec);
+#endif
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */

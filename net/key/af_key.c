@@ -51,7 +51,7 @@ static void pfkey_sock_destruct(struct sock *sk)
 {
 	skb_queue_purge(&sk->receive_queue);
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		printk("Attempt to release alive pfkey socket: %p\n", sk);
 		return;
 	}
@@ -550,8 +550,8 @@ static struct  xfrm_state *pfkey_xfrm_state_lookup(struct sadb_msg *hdr, void **
 
 	switch (((struct sockaddr *)(addr + 1))->sa_family) {
 	case AF_INET:
-		x = xfrm_state_lookup(((struct sockaddr_in *)(addr + 1))->sin_addr.s_addr,
-				      sa->sadb_sa_spi, proto);
+		x = xfrm4_state_lookup(((struct sockaddr_in *)(addr + 1))->sin_addr.s_addr,
+				       sa->sadb_sa_spi, proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -1097,18 +1097,7 @@ static int pfkey_getspi(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 			min_spi = htonl(0x100);
 			max_spi = htonl(0x0fffffff);
 		}
-		switch (x->props.family) {
-		case AF_INET:
-			xfrm_alloc_spi(x, min_spi, max_spi);
-			break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			xfrm6_alloc_spi(x, min_spi, max_spi);
-			break;
-#endif
-		default:
-			break;
-		}
+		xfrm_alloc_spi(x, min_spi, max_spi);
 		if (x->id.spi)
 			resp_skb = pfkey_xfrm_state2msg(x, 0, 3);
 	}
@@ -2420,7 +2409,8 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	return pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
 }
 
-static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int *dir)
+static struct xfrm_policy *pfkey_compile_policy(u16 family, int opt,
+                                                u8 *data, int len, int *dir)
 {
 	struct xfrm_policy *xp;
 	struct sadb_x_policy *pol = (struct sadb_x_policy*)data;
@@ -2451,6 +2441,7 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 	xp->lft.hard_byte_limit = XFRM_INF;
 	xp->lft.soft_packet_limit = XFRM_INF;
 	xp->lft.hard_packet_limit = XFRM_INF;
+	xp->family = family;
 
 	xp->xfrm_nr = 0;
 	if (pol->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&

@@ -92,10 +92,8 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
  *
  * Notes:
  *    This should be turned into an inline function.  Each scsi command
- *    has it's own timer, and as it is added to the queue, we set up the
- *    timer.  When the command completes, we cancel the timer.  Pretty
- *    simple, really, especially compared to the old way of handling this
- *    crap.
+ *    has its own timer, and as it is added to the queue, we set up the
+ *    timer.  When the command completes, we cancel the timer.
  **/
 void scsi_add_timer(struct scsi_cmnd *scmd, int timeout,
 		    void (*complete)(struct scsi_cmnd *))
@@ -249,6 +247,7 @@ static int scsi_check_sense(struct scsi_cmnd *scmd)
 {
 	if (!SCSI_SENSE_VALID(scmd))
 		return FAILED;
+
 	if (scmd->sense_buffer[2] & 0xe0)
 		return SUCCESS;
 
@@ -1193,12 +1192,12 @@ void scsi_sleep(int timeout)
  * Notes:
  *    This is *only* called when we are examining the status after sending
  *    out the actual data command.  any commands that are queued for error
- *    recovery (i.e. test_unit_ready) do *not* come through here.
+ *    recovery (e.g. test_unit_ready) do *not* come through here.
  *
  *    When this routine returns failed, it means the error handler thread
- *    is woken.  in cases where the error code indicates an error that
+ *    is woken.  In cases where the error code indicates an error that
  *    doesn't require the error handler read (i.e. we don't need to
- *    abort/reset), then this function should return SUCCESS.
+ *    abort/reset), this function should return SUCCESS.
  **/
 int scsi_decide_disposition(struct scsi_cmnd *scmd)
 {
@@ -1214,11 +1213,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 						  __FUNCTION__));
 		return SUCCESS;
 	}
+
 	/*
 	 * first check the host byte, to see if there is anything in there
 	 * that would indicate what we need to do.
 	 */
-
 	switch (host_byte(scmd->result)) {
 	case DID_PASSTHROUGH:
 		/*
@@ -1296,11 +1295,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 	/*
 	 * next, check the message byte.
 	 */
-	if (msg_byte(scmd->result) != COMMAND_COMPLETE) {
+	if (msg_byte(scmd->result) != COMMAND_COMPLETE)
 		return FAILED;
-	}
+
 	/*
-	 * now, check the status byte to see if this indicates anything special.
+	 * check the status byte to see if this indicates anything special.
 	 */
 	switch (status_byte(scmd->result)) {
 	case QUEUE_FULL:
@@ -1321,10 +1320,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		return SUCCESS;
 	case CHECK_CONDITION:
 		rtn = scsi_check_sense(scmd);
-		if (rtn == NEEDS_RETRY) {
+		if (rtn == NEEDS_RETRY)
 			goto maybe_retry;
-		}
-		return rtn;
+		/* if rtn == FAILED, we have no sense information */
+		/* was: return rtn; */
+		return SUCCESS;
 	case CONDITION_GOOD:
 	case INTERMEDIATE_GOOD:
 	case INTERMEDIATE_C_GOOD:
@@ -1490,9 +1490,9 @@ static void scsi_eh_ready_devs(struct Scsi_Host *shost,
 			       struct list_head *work_q,
 			       struct list_head *done_q)
 {
-	if (scsi_eh_bus_device_reset(shost, work_q, done_q))
-		if (scsi_eh_bus_reset(shost, work_q, done_q))
-			if (scsi_eh_host_reset(work_q, done_q))
+	if (!scsi_eh_bus_device_reset(shost, work_q, done_q))
+		if (!scsi_eh_bus_reset(shost, work_q, done_q))
+			if (!scsi_eh_host_reset(work_q, done_q))
 				scsi_eh_offline_sdevs(work_q, done_q);
 }
 

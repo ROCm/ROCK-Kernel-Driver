@@ -14,7 +14,7 @@
 
 #define VER_MAJOR                 1
 #define VER_MINOR                 6
-#define VER_LEVEL                 0
+#define VER_LEVEL                 1
 
 #include "sis.h"
 
@@ -890,11 +890,15 @@ static int      sisfb_blank(int blank,
                             struct fb_info *info);			
 static int 	sisfb_mmap(struct fb_info *info, struct file *file,
 		           struct vm_area_struct *vma);			    
-extern void     sisfb_fillrect(struct fb_info *info, 
-				const struct fb_fillrect *rect);
-extern void     sisfb_copyarea(struct fb_info *info, 
+extern void     fbcon_sis_fillrect(struct fb_info *info, 
+                                   const struct fb_fillrect *rect);
+extern void     fbcon_sis_copyarea(struct fb_info *info, 
                                    const struct fb_copyarea *area);
-extern int      sisfb_sync(struct fb_info *info);
+#if 0				   
+extern void     cfb_imageblit(struct fb_info *info, 
+                              const struct fb_image *image);
+#endif			      
+extern int      fbcon_sis_sync(struct fb_info *info);
 static int      sisfb_ioctl(struct inode *inode, 
 	 		    struct file *file,
 		       	    unsigned int cmd, 

@@ -27,7 +27,6 @@ void oprofile_reset_stats(void)
 
 		cpu_buf = &cpu_buffer[i]; 
 		cpu_buf->sample_received = 0;
-		cpu_buf->sample_lost_locked = 0;
 		cpu_buf->sample_lost_overflow = 0;
 		cpu_buf->sample_lost_task_exit = 0;
 	}
@@ -63,8 +62,6 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 		 */
 		oprofilefs_create_ro_ulong(sb, cpudir, "sample_received",
 			&cpu_buf->sample_received);
-		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_locked",
-			&cpu_buf->sample_lost_locked);
 		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_overflow",
 			&cpu_buf->sample_lost_overflow);
 		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_task_exit",

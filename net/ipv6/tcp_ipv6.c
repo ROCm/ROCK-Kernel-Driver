@@ -50,6 +50,7 @@
 #include <net/ip6_route.h>
 #include <net/inet_ecn.h>
 #include <net/protocol.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 
@@ -677,6 +678,9 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		fl.nl_u.ip6_u.daddr = rt0->addr;
 	}
 
+	if (!fl.fl6_src)
+		fl.fl6_src = &np->saddr;
+
 	dst = ip6_route_output(sk, &fl);
 
 	if ((err = dst->error) != 0) {
@@ -800,7 +804,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 			dst = ip6_route_output(sk, &fl);
 		} else
-			dst_clone(dst);
+			dst_hold(dst);
 
 		if (dst->error) {
 			sk->err_soft = -dst->error;
@@ -1637,6 +1641,9 @@ process:
 	if (sk_filter(sk, skb, 0))
 		goto discard_and_relse;
 
+	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
+		goto discard_it;
+
 	skb->dev = NULL;
 
 	bh_lock_sock(sk);
@@ -1652,6 +1659,9 @@ process:
 	return ret;
 
 no_tcp_socket:
+	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
+		goto discard_and_relse;
+
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 bad_packet:
 		TCP_INC_STATS_BH(TcpInErrs);
@@ -1671,8 +1681,11 @@ discard_it:
 discard_and_relse:
 	sock_put(sk);
 	goto discard_it;
-                
+
 do_time_wait:
+	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
+		goto discard_and_relse;
+
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
 		sock_put(sk);

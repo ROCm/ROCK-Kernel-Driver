@@ -502,8 +502,8 @@ void fbcon_sis_clear32(struct vc_data *conp, struct display *p, int srcy,
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)
 extern int sisfb_accel;
-void sisfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
-void sisfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
+void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
+void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 #endif
 
 #endif

@@ -746,7 +746,7 @@ dup_task_struct(struct task_struct *orig)
 
 	memcpy(tsk, orig, sizeof(struct task_struct) + sizeof(struct thread_info));
 	tsk->thread_info = (struct thread_info *) ((char *) tsk + IA64_TASK_SIZE);
-	atomic_set(&tsk->usage, 1);
+	atomic_set(&tsk->usage, 2);
 	return tsk;
 }
 

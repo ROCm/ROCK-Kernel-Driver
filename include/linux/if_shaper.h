@@ -21,7 +21,7 @@ struct shaper
 	__u32 bitspersec;
 	__u32 shapelatency;
 	__u32 shapeclock;
-	__u32 recovery;		/* Time we can next clock a packet out on
+	unsigned long recovery;	/* Time we can next clock a packet out on
 				   an empty queue */
         unsigned long locked;
         struct net_device_stats stats;

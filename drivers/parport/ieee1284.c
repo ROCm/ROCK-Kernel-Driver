@@ -170,7 +170,7 @@ int parport_wait_peripheral(struct parport *port,
 {
 	int ret;
 	int usec;
-	long deadline;
+	unsigned long deadline;
 	unsigned char status;
 
 	usec = port->physport->spintime; /* usecs of fast polling */

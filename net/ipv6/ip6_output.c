@@ -192,6 +192,11 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	int seg_len = skb->len;
 	int hlimit;
 	u32 mtu;
+	int err = 0;
+
+	if ((err = xfrm_lookup(&skb->dst, fl, sk, 0)) < 0) {
+		return err;
+	}
 
 	if (opt) {
 		int head_room;
@@ -550,7 +555,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		    || (fl->oif && fl->oif != dst->dev->ifindex)) {
 			dst = NULL;
 		} else
-			dst_clone(dst);
+			dst_hold(dst);
 	}
 
 	if (dst == NULL)
@@ -575,6 +580,13 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		fl->fl6_src = &saddr;
 	}
 	pktlength = length;
+
+        if (dst) {
+		if ((err = xfrm_lookup(&dst, fl, sk, 0)) < 0) {
+			dst_release(dst);	
+			return -ENETUNREACH;
+		}
+        }
 
 	if (hlimit < 0) {
 		if (ipv6_addr_is_multicast(fl->fl6_dst))
@@ -630,10 +642,8 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		err = 0;
 		if (flags&MSG_PROBE)
 			goto out;
-
-		skb = sock_alloc_send_skb(sk, pktlength + 15 +
-					  dev->hard_header_len,
-					  flags & MSG_DONTWAIT, &err);
+		/* alloc skb with mtu as we do in the IPv4 stack for IPsec */
+		skb = sock_alloc_send_skb(sk, mtu, flags & MSG_DONTWAIT, &err);
 
 		if (skb == NULL) {
 			IP6_INC_STATS(Ip6OutDiscards);
@@ -663,6 +673,8 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		err = getfrag(data, &hdr->saddr,
 			      ((char *) hdr) + (pktlength - length),
 			      0, length);
+		if (!opt || !opt->dst1opt)
+			skb->h.raw = ((char *) hdr) + (pktlength - length);
 
 		if (!err) {
 			IP6_INC_STATS(Ip6OutRequests);

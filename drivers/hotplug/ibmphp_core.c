@@ -845,12 +845,9 @@ static u8 bus_structure_fixup (u8 busno)
 static int ibm_configure_device (struct pci_func *func)
 {
 	unsigned char bus;
-	struct pci_dev dev0;
 	struct pci_bus *child;
 	int rc = 0;
 	int flag = 0;	/* this is to make sure we don't double scan the bus, for bridged devices primarily */
-
-	memset (&dev0, 0, sizeof (struct pci_dev));
 
 	if (!(bus_structure_fixup (func->busno)))
 		flag = 1;
@@ -858,13 +855,12 @@ static int ibm_configure_device (struct pci_func *func)
 		func->dev = pci_find_slot (func->busno, (func->device << 3) | (func->function & 0x7));
 
 	if (func->dev == NULL) {
-		dev0.bus = ibmphp_find_bus (func->busno);
-		if (!dev0.bus)
+		struct pci_bus *bus = ibmphp_find_bus (func->busno);
+		if (!bus)
 			return 0;
-		dev0.devfn = ((func->device << 3) + (func->function & 0x7));
-		dev0.sysdata = dev0.bus->sysdata;
 
-		func->dev = pci_scan_slot (&dev0);
+		func->dev = pci_scan_slot(bus,
+				 (func->device << 3) + (func->function & 0x7));
 
 		if (func->dev == NULL) {
 			err ("ERROR... : pci_dev still NULL \n");

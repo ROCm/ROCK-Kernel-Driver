@@ -848,7 +848,7 @@ ENTRY(dispatch_to_ia32_handler)
 	alloc r15=ar.pfs,0,0,6,0	// must first in an insn group
 	;;
 	ld4 r8=[r14],8		// r8 == eax (syscall number)
-	mov r15=230		// number of entries in ia32 system call table
+	mov r15=250		// number of entries in ia32 system call table
 	;;
 	cmp.ltu.unc p6,p7=r8,r15
 	ld4 out1=[r14],8	// r9 == ecx

@@ -76,14 +76,7 @@
 	#define DBG_PRINTK(format, a...)
 #endif      
 
-#if defined(LINUX_2_1)
- #define dev_put(a)
- #define __sock_put(a)
- #define sock_hold(a)
- #define DECLARE_WAITQUEUE(a,b) \
-		struct wait_queue a = { b, NULL }
-#endif
-		
+
 /* SECURE SOCKET IMPLEMENTATION 
  * 
  *   TRANSMIT:
@@ -599,17 +592,8 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
   		return -EMSGSIZE;
 	}
 
-      #ifndef LINUX_2_4
-	dev_lock_list();
-      #endif
-      
-      #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
 	skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
 				msg->msg_flags & MSG_DONTWAIT, &err);
-      #else
-	skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 0, 
-				msg->msg_flags & MSG_DONTWAIT, &err);
-      #endif
 
 	if (skb==NULL){
 		goto out_unlock;
@@ -642,10 +626,6 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (!(dev->flags & IFF_UP))
 		goto out_free;
 
-      #ifndef LINUX_2_4
-	dev_unlock_list();
-      #endif
-	
 	if (atomic_read(&sk->wmem_alloc) + skb->truesize > (unsigned int)sk->sndbuf){
 		kfree_skb(skb);
 		return -ENOBUFS;
@@ -665,9 +645,6 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 out_free:
 	kfree_skb(skb);
 out_unlock:
-#ifndef LINUX_2_4
-	dev_unlock_list();
-#endif
 	return err;
 }
 
@@ -862,16 +839,12 @@ static void wanpipe_destroy_timer(unsigned long data)
 		kfree(wp);
 		wp_sk(sk) = NULL;
 		
-              #ifdef LINUX_2_4
 		if (atomic_read(&sk->refcnt) != 1){
 			atomic_set(&sk->refcnt,1);
 			DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :delay.\n",
 					atomic_read(&sk->refcnt));
 		}
 		sock_put(sk);
-              #else
-		sk_free(sk);
-              #endif
 		atomic_dec(&wanpipe_socks_nr);
 		MOD_DEC_USE_COUNT;
 		return;
@@ -970,16 +943,8 @@ static void release_device (netdevice_t *dev)
  *      protocol entry in the device list.
  *===========================================================*/
 
-#ifdef LINUX_2_4
 static int wanpipe_release(struct socket *sock)
-#else
-static int wanpipe_release(struct socket *sock, struct socket *peersock)
-#endif
 {
-	
-#ifndef LINUX_2_4
-	struct sk_buff	*skb;
-#endif
 	wanpipe_opt *wp;
 	struct sock *sk = sock->sk;
 	struct sock **skp;
@@ -1039,25 +1004,13 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 
 	sock->sk = NULL;
 	sk->socket = NULL;
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 
 	/* Purge queues */
-#ifdef LINUX_2_4
 	skb_queue_purge(&sk->receive_queue);
 	skb_queue_purge(&sk->write_queue);
 	skb_queue_purge(&sk->error_queue);
-#else	
 
-	while ((skb=skb_dequeue(&sk->receive_queue))!=NULL){
-		kfree_skb(skb);
-	}
-	while ((skb=skb_dequeue(&sk->error_queue))!=NULL){
-		kfree_skb(skb);
-	}
-	while ((skb=skb_dequeue(&sk->write_queue))!=NULL){
-		kfree_skb(skb);
-	}
-#endif	
 	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
 		del_timer(&sk->timer);
 		printk(KERN_INFO "wansock: Killing in Timer R %i , W %i\n",
@@ -1072,16 +1025,12 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 	kfree(wp);
 	wp_sk(sk) = NULL;
 
-      #ifdef LINUX_2_4
 	if (atomic_read(&sk->refcnt) != 1){
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i !:release.\n",
 					atomic_read(&sk->refcnt));
 		atomic_set(&sk->refcnt,1);
 	}
 	sock_put(sk);
-      #else	
-	sk_free(sk);
-      #endif
 	atomic_dec(&wanpipe_socks_nr);
 	MOD_DEC_USE_COUNT;
 	return 0;
@@ -1128,7 +1077,7 @@ static void release_driver(struct sock *sk)
 		while ((skb=skb_dequeue(&sk->receive_queue))!=NULL){
 			if ((deadsk = get_newsk_from_skb(skb))){
 				DBG_PRINTK (KERN_INFO "wansock: RELEASE: FOUND DEAD SOCK\n");
-				deadsk->dead=1;
+				__set_bit(SOCK_DEAD, &deadsk->flags);
 				start_cleanup_timer(deadsk);
 			}
 			kfree_skb(skb);
@@ -1181,10 +1130,6 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 {
 
 	struct sock *sk = (struct sock *)data;
-#ifndef LINUX_2_4
-	struct sk_buff *skb;
-#endif
-
 	struct sock **skp;
 
 	if (!sk)
@@ -1226,21 +1171,9 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	sk->socket = NULL;
 
 	/* Purge queues */
-#ifdef LINUX_2_4
 	skb_queue_purge(&sk->receive_queue);
 	skb_queue_purge(&sk->write_queue);
 	skb_queue_purge(&sk->error_queue);
-#else	
-	while ((skb=skb_dequeue(&sk->receive_queue)) != NULL){
-		kfree_skb(skb);
-	}
-	while ((skb=skb_dequeue(&sk->write_queue)) != NULL) {
-		kfree_skb(skb);
-	}
-	while ((skb=skb_dequeue(&sk->error_queue)) != NULL){
-		kfree_skb(skb);
-	}
-#endif
 	
 	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
 		del_timer(&sk->timer);
@@ -1257,16 +1190,12 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 		wp_sk(sk) = NULL;
 	}
 
-      #ifdef LINUX_2_4
 	if (atomic_read(&sk->refcnt) != 1){
 		atomic_set(&sk->refcnt,1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :timer.\n",
 					atomic_read(&sk->refcnt));
 	}
 	sock_put(sk);
-      #else
-	sk_free(sk);
-      #endif
 	atomic_dec(&wanpipe_socks_nr);
 	MOD_DEC_USE_COUNT;
 	return;
@@ -1301,16 +1230,12 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 		wp_sk(sk) = NULL;
 	}
 
-      #ifdef LINUX_2_4
 	if (atomic_read(&sk->refcnt) != 1){
 		atomic_set(&sk->refcnt,1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :timer.\n",
 					atomic_read(&sk->refcnt));
 	}
 	sock_put(sk);
-      #else
-	sk_free(sk);
-      #endif
 	atomic_dec(&wanpipe_socks_nr);
 	MOD_DEC_USE_COUNT;
 	return;
@@ -1330,16 +1255,12 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
 		wp_sk(sk) = NULL;
 	}
 
-      #ifdef LINUX_2_4
 	if (atomic_read(&sk->refcnt) != 1){
 		atomic_set(&sk->refcnt,1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i !:listen.\n",
 					atomic_read(&sk->refcnt));
 	}
 	sock_put(sk);
-      #else
-	sk_free(sk);
-      #endif
 	atomic_dec(&wanpipe_socks_nr);
 	MOD_DEC_USE_COUNT;
 	return;
@@ -1494,11 +1415,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
                  */
 		strncpy(name,sll->sll_device,14);
 		name[14]=0;
-#ifdef LINUX_2_4
 		dev = dev_get_by_name(name);
-#else
-		dev = dev_get(name);
-#endif
 		if (dev == NULL){
 			printk(KERN_INFO "wansock: Failed to get Dev from name: %s,\n",
 					name);
@@ -1706,11 +1623,7 @@ static int wanpipe_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (err)
 		goto out_free;
 	
-#ifdef LINUX_2_1
-	sk->stamp=skb->stamp;
-#else
 	sock_recv_timestamp(msg, sk, skb);
-#endif
 	
 	if (msg->msg_name)
 		memcpy(msg->msg_name, skb->cb, msg->msg_namelen);
@@ -2212,11 +2125,7 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
 	if (sock_writeable(sk)){
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	}else{
-	      #ifdef LINUX_2_4
 		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
-	      #else
- 		sk->socket->flags |= SO_NOSPACE;
-	      #endif
 	}
 		
 	return mask;
@@ -2649,7 +2558,6 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 	return 0;
 }
 
-#ifdef LINUX_2_4
 struct proto_ops wanpipe_ops = {
 	.family = 	PF_WANPIPE,
 
@@ -2668,29 +2576,6 @@ struct proto_ops wanpipe_ops = {
 	.sendmsg = 	wanpipe_sendmsg,
 	.recvmsg = 	wanpipe_recvmsg
 };
-#else
-struct proto_ops wanpipe_ops = {
-	PF_WANPIPE,
-
-	sock_no_dup,
-	wanpipe_release,
-	wanpipe_bind,
-	wanpipe_connect,
-	sock_no_socketpair,
-	wanpipe_accept,
-	wanpipe_getname, 
-	wanpipe_poll,
-	wanpipe_ioctl,
-	wanpipe_listen, 
-	sock_no_shutdown,
-	sock_no_setsockopt,
-	sock_no_getsockopt,
-	sock_no_fcntl,
-	wanpipe_sendmsg,
-	wanpipe_recvmsg
-};
-#endif
-
 
 static struct net_proto_family wanpipe_family_ops = {
 	.family =PF_WANPIPE,

@@ -862,7 +862,7 @@ con3215_unblank(void)
 	spin_unlock_irqrestore(raw->lock, flags);
 }
 
-static int __init
+static int __init 
 con3215_consetup(struct console *co, char *options)
 {
 	return 0;
@@ -884,7 +884,7 @@ static struct console con3215 = {
  * 3215 console initialization code called from console_init().
  * NOTE: This is called before kmalloc is available.
  */
-void __init
+static void __init
 con3215_init(void)
 {
 	struct ccw_device *cdev;
@@ -1122,6 +1122,7 @@ tty3215_unthrottle(struct tty_struct * tty)
 		spin_unlock_irqrestore(raw->lock, flags);
 	}
 }
+console_initcall(con3215_init);
 
 /*
  * Disable writing to a 3215 tty

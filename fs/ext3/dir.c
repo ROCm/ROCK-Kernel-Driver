@@ -105,8 +105,10 @@ static int ext3_readdir(struct file * filp,
 
 	if (is_dx(inode)) {
 		err = ext3_dx_readdir(filp, dirent, filldir);
-		if (err != ERR_BAD_DX_DIR)
+		if (err != ERR_BAD_DX_DIR) {
+			unlock_kernel();
 			return err;
+		}
 		/*
 		 * We don't set the inode dirty flag since it's not
 		 * critical that it get flushed back to the disk.

@@ -59,11 +59,11 @@ static void ide_unplugged_insl (unsigned long port, void *addr, u32 count)
 {
 }
 
-static void ide_unplugged_outb (u8 addr, unsigned long port)
+static void ide_unplugged_outb (u8 val, unsigned long port)
 {
 }
 
-static void ide_unplugged_outw (u16 addr, unsigned long port)
+static void ide_unplugged_outw (u16 val, unsigned long port)
 {
 }
 
@@ -71,7 +71,7 @@ static void ide_unplugged_outsw (unsigned long port, void *addr, u32 count)
 {
 }
 
-static void ide_unplugged_outl (u32 addr, unsigned long port)
+static void ide_unplugged_outl (u32 val, unsigned long port)
 {
 }
 
@@ -125,14 +125,14 @@ static void ide_insl (unsigned long port, void *addr, u32 count)
 	insl(port, addr, count);
 }
 
-static void ide_outb (u8 addr, unsigned long port)
+static void ide_outb (u8 val, unsigned long port)
 {
-	outb(addr, port);
+	outb(val, port);
 }
 
-static void ide_outw (u16 addr, unsigned long port)
+static void ide_outw (u16 val, unsigned long port)
 {
-	outw(addr, port);
+	outw(val, port);
 }
 
 static void ide_outsw (unsigned long port, void *addr, u32 count)
@@ -140,9 +140,9 @@ static void ide_outsw (unsigned long port, void *addr, u32 count)
 	outsw(port, addr, count);
 }
 
-static void ide_outl (u32 addr, unsigned long port)
+static void ide_outl (u32 val, unsigned long port)
 {
-	outl(addr, port);
+	outl(val, port);
 }
 
 static void ide_outsl (unsigned long port, void *addr, u32 count)

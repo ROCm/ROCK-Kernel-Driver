@@ -221,46 +221,63 @@ static struct pci_bus * __devinit pci_alloc_bus(void)
 	b = kmalloc(sizeof(*b), GFP_KERNEL);
 	if (b) {
 		memset(b, 0, sizeof(*b));
+		INIT_LIST_HEAD(&b->node);
 		INIT_LIST_HEAD(&b->children);
 		INIT_LIST_HEAD(&b->devices);
 	}
 	return b;
 }
 
-struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr)
+static struct pci_bus * __devinit
+pci_alloc_child_bus(struct pci_bus *parent, struct pci_dev *bridge, int busnr)
 {
 	struct pci_bus *child;
-	int i;
 
 	/*
 	 * Allocate a new bus, and inherit stuff from the parent..
 	 */
 	child = pci_alloc_bus();
 
-	list_add_tail(&child->node, &parent->children);
-	child->self = dev;
-	dev->subordinate = child;
-	child->parent = parent;
-	child->ops = parent->ops;
-	child->sysdata = parent->sysdata;
-	child->dev = &dev->dev;
+	if (child) {
+		int i;
 
-	/*
-	 * Set up the primary, secondary and subordinate
-	 * bus numbers.
-	 */
-	child->number = child->secondary = busnr;
-	child->primary = parent->secondary;
-	child->subordinate = 0xff;
+		child->self = bridge;
+		child->parent = parent;
+		child->ops = parent->ops;
+		child->sysdata = parent->sysdata;
+		child->dev = &bridge->dev;
 
-	/* Set up default resource pointers and names.. */
-	for (i = 0; i < 4; i++) {
-		child->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
-		child->resource[i]->name = child->name;
+		/*
+		 * Set up the primary, secondary and subordinate
+		 * bus numbers.
+		 */
+		child->number = child->secondary = busnr;
+		child->primary = parent->secondary;
+		child->subordinate = 0xff;
+
+		/* Set up default resource pointers and names.. */
+		for (i = 0; i < 4; i++) {
+			child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
+			child->resource[i]->name = child->name;
+		}
+
+		bridge->subordinate = child;
 	}
 
 	return child;
 }
+
+struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr)
+{
+	struct pci_bus *child;
+
+	child = pci_alloc_child_bus(parent, dev, busnr);
+	if (child)
+		list_add_tail(&child->node, &parent->children);
+	return child;
+}
+
+static unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus);
 
 /*
  * If it's a bridge, configure it and scan the bus behind it.
@@ -288,12 +305,12 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		 */
 		if (pass)
 			return max;
-		child = pci_add_new_bus(bus, dev, 0);
+		child = pci_alloc_child_bus(bus, dev, 0);
 		child->primary = buses & 0xFF;
 		child->secondary = (buses >> 8) & 0xFF;
 		child->subordinate = (buses >> 16) & 0xFF;
 		child->number = child->secondary;
-		cmax = pci_do_scan_bus(child);
+		cmax = pci_scan_child_bus(child);
 		if (cmax > max) max = cmax;
 	} else {
 		/*
@@ -306,18 +323,27 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		/* Clear errors */
 		pci_write_config_word(dev, PCI_STATUS, 0xffff);
 
-		child = pci_add_new_bus(bus, dev, ++max);
+		child = pci_alloc_child_bus(bus, dev, ++max);
 		buses = (buses & 0xff000000)
 		      | ((unsigned int)(child->primary)     <<  0)
 		      | ((unsigned int)(child->secondary)   <<  8)
 		      | ((unsigned int)(child->subordinate) << 16);
+
+		/*
+		 * yenta.c forces a secondary latency timer of 176.
+		 * Copy that behaviour here.
+		 */
+		if (is_cardbus)
+			buses = (buses & 0x00ffffff) | (176 << 24);
+			
 		/*
 		 * We need to blast all three values with a single write.
 		 */
 		pci_write_config_dword(dev, PCI_PRIMARY_BUS, buses);
+
 		if (!is_cardbus) {
 			/* Now we can scan all subordinate buses... */
-			max = pci_do_scan_bus(child);
+			max = pci_scan_child_bus(child);
 		} else {
 			/*
 			 * For CardBus bridges, we leave 4 bus numbers
@@ -374,7 +400,8 @@ int pci_setup_device(struct pci_dev * dev)
 	dev->class = class;
 	class >>= 8;
 
-	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn, dev->vendor, dev->device, class, dev->hdr_type);
+	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn,
+		dev->vendor, dev->device, class, dev->hdr_type);
 
 	/* "Unknown power state" */
 	dev->current_state = 4;
@@ -427,23 +454,35 @@ int pci_setup_device(struct pci_dev * dev)
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
  */
-struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
+static struct pci_dev * __devinit
+pci_scan_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
 	u32 l;
+	u8 hdr_type;
 
-	if (pci_read_config_dword(temp, PCI_VENDOR_ID, &l))
+	if (pci_bus_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type))
+		return NULL;
+
+	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
 		return NULL;
 
 	/* some broken boards return 0 or ~0 if a slot is empty: */
 	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 
-	memcpy(dev, temp, sizeof(*dev));
+	memset(dev, 0, sizeof(struct pci_dev));
+	dev->bus = bus;
+	dev->sysdata = bus->sysdata;
+	dev->dev.parent = bus->dev;
+	dev->dev.bus = &pci_bus_type;
+	dev->devfn = devfn;
+	dev->hdr_type = hdr_type & 0x7f;
+	dev->multifunction = !!(hdr_type & 0x80);
 	dev->vendor = l & 0xffff;
 	dev->device = (l >> 16) & 0xffff;
 
@@ -461,74 +500,63 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	strcpy(dev->dev.bus_id,dev->slot_name);
 	dev->dev.dma_mask = &dev->dma_mask;
 
-	device_register(&dev->dev);
 	return dev;
 }
 
-struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
+/**
+ * pci_scan_slot - scan a PCI slot on a bus for devices.
+ * @bus: PCI bus to scan
+ * @devfn: slot number to scan (must have zero function.)
+ *
+ * Scan a PCI slot on the specified PCI bus for devices, adding
+ * discovered devices to the @bus->devices list.  New devices
+ * will have an empty dev->global_list head.
+ */
+int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 {
-	struct pci_bus *bus = temp->bus;
-	struct pci_dev *dev;
-	struct pci_dev *first_dev = NULL;
-	int func = 0;
-	int is_multi = 0;
-	u8 hdr_type;
+	int func, nr = 0;
 
-	for (func = 0; func < 8; func++, temp->devfn++) {
-		if (func && !is_multi)		/* not a multi-function device */
-			continue;
-		if (pci_read_config_byte(temp, PCI_HEADER_TYPE, &hdr_type))
-			continue;
-		temp->hdr_type = hdr_type & 0x7f;
+	for (func = 0; func < 8; func++, devfn++) {
+		struct pci_dev *dev;
 
-		dev = pci_scan_device(temp);
+		dev = pci_scan_device(bus, devfn);
 		if (!dev)
 			continue;
-		if (!func) {
-			is_multi = hdr_type & 0x80;
-			first_dev = dev;
-		}
 
-		/*
-		 * Link the device to both the global PCI device chain and
-		 * the per-bus list of devices and add the /proc entry.
-		 */
-		pci_insert_device (dev, bus);
+		if (func != 0)
+			dev->multifunction = 1;
 
 		/* Fix up broken headers */
 		pci_fixup_device(PCI_FIXUP_HEADER, dev);
+
+		/*
+		 * Add the device to our list of discovered devices
+		 * and the bus list for fixup functions, etc.
+		 */
+		INIT_LIST_HEAD(&dev->global_list);
+		list_add_tail(&dev->bus_list, &bus->devices);
+		nr++;
+
+		/*
+		 * If this is a single function device,
+		 * don't scan past the first function.
+		 */
+		if (!dev->multifunction)
+			break;
 	}
-	return first_dev;
+	return nr;
 }
 
-unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
+static unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 {
-	unsigned int devfn, max, pass;
-	struct list_head *ln;
+	unsigned int devfn, pass, max = bus->secondary;
 	struct pci_dev *dev;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		printk(KERN_ERR "Out of memory in %s\n", __FUNCTION__);
-		return 0;
-	}
-
 	DBG("Scanning bus %02x\n", bus->number);
-	max = bus->secondary;
-
-	/* Create a device template */
-	memset(dev, 0, sizeof(*dev));
-	dev->bus = bus;
-	dev->sysdata = bus->sysdata;
-	dev->dev.parent = bus->dev;
-	dev->dev.bus = &pci_bus_type;
 
 	/* Go find them, Rover! */
-	for (devfn = 0; devfn < 0x100; devfn += 8) {
-		dev->devfn = devfn;
-		pci_scan_slot(dev);
-	}
-	kfree(dev);
+	for (devfn = 0; devfn < 0x100; devfn += 8)
+		pci_scan_slot(bus, devfn);
 
 	/*
 	 * After performing arch-dependent fixup of the bus, look behind
@@ -537,9 +565,9 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	DBG("Fixups for bus %02x\n", bus->number);
 	pcibios_fixup_bus(bus);
 	for (pass=0; pass < 2; pass++)
-		for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-			dev = pci_dev_b(ln);
-			if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE || dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
+		list_for_each_entry(dev, &bus->devices, bus_list) {
+			if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||
+			    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
 				max = pci_scan_bridge(bus, dev, max, pass);
 		}
 
@@ -551,6 +579,20 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	 * Return how far we've got finding sub-buses.
 	 */
 	DBG("Bus scan for %02x returning with max=%02x\n", bus->number, max);
+	return max;
+}
+
+unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
+{
+	unsigned int max;
+
+	max = pci_scan_child_bus(bus);
+
+	/*
+	 * Make the discovered devices available.
+	 */
+	pci_bus_add_devices(bus);
+
 	return max;
 }
 

@@ -876,6 +876,7 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		}
 
 		hub->children[port] = dev;
+		dev->state = USB_STATE_POWERED;
 
 		/* Reset the device, and detect its speed */
 		if (usb_hub_port_reset(hub, port, dev, delay)) {

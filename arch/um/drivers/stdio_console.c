@@ -214,12 +214,13 @@ static struct console stdiocons = INIT_CONSOLE("tty", console_write,
 					       console_device, console_setup,
 					       CON_PRINTBUFFER);
 
-void stdio_console_init(void)
+static void __init stdio_console_init(void)
 {
 	INIT_LIST_HEAD(&vts[0].chan_list);
 	list_add(&init_console_chan.list, &vts[0].chan_list);
 	register_console(&stdiocons);
 }
+console_initcall(stdio_console_init);
 
 static int console_chan_setup(char *str)
 {

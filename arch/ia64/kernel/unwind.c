@@ -51,18 +51,24 @@
 #define UNW_LOG_HASH_SIZE	(UNW_LOG_CACHE_SIZE + 1)
 #define UNW_HASH_SIZE		(1 << UNW_LOG_HASH_SIZE)
 
-#define UNW_DEBUG	0
 #define UNW_STATS	0	/* WARNING: this disabled interrupts for long time-spans!! */
 
-#if UNW_DEBUG
-  static long unw_debug_level = 255;
-# define debug(level,format...)	if (unw_debug_level > level) printk(format)
-# define dprintk(format...)	printk(format)
-# define inline
-#else
-# define debug(level,format...)
-# define dprintk(format...)
-#endif
+#ifdef UNW_DEBUG
+  static unsigned int unw_debug_level = UNW_DEBUG;
+#  ifdef CONFIG_KDB
+#    include <linux/kdb.h>
+#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
+#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
+#  else	/* !CONFIG_KDB */
+#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
+     /* Do not code a printk level, not all debug lines end in newline */
+#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
+#  endif /* CONFIG_KDB */
+#  define inline
+#else /* !UNW_DEBUG */
+#  define UNW_DEBUG_ON(n)  0
+#  define UNW_DPRINT(n, ...)
+#endif /* UNW_DEBUG */
 
 #if UNW_STATS
 # define STAT(x...)	x
@@ -111,7 +117,7 @@ static struct {
 	/* script cache: */
 	struct unw_script cache[UNW_CACHE_SIZE];
 
-# if UNW_DEBUG
+# ifdef UNW_DEBUG
 	const char *preg_name[UNW_NUM_REGS];
 # endif
 # if UNW_STATS
@@ -190,7 +196,7 @@ static struct {
 		struct_offset(struct unw_frame_info, fr_loc[31 - 16])/8,
 	},
 	.hash = { [0 ... UNW_HASH_SIZE - 1] = -1 },
-#if UNW_DEBUG
+#ifdef UNW_DEBUG
 	.preg_name = {
 		"pri_unat_gr", "pri_unat_mem", "bsp", "bspstore", "ar.pfs", "ar.rnat", "psp", "rp",
 		"r4", "r5", "r6", "r7",
@@ -223,8 +229,20 @@ pt_regs_off (unsigned long reg)
 	else if (reg <= 31)
 		off = struct_offset(struct pt_regs, r16) + 8*(reg - 16);
 	else
-		dprintk("unwind: bad scratch reg r%lu\n", reg);
+		UNW_DPRINT(0, "unwind.%s: bad scratch reg r%lu\n", __FUNCTION__, reg);
 	return off;
+}
+
+static inline struct pt_regs *
+get_scratch_regs (struct unw_frame_info *info)
+{
+	if (!info->pt) {
+		/* This should not happen with valid unwind info.  */
+		UNW_DPRINT(0, "unwind.%s: bad unwind info: resetting info->pt\n", __FUNCTION__);
+		info->pt = info->sp - 16;
+	}
+	UNW_DPRINT(3, "unwind.%s: sp 0x%lx pt 0x%lx\n", __FUNCTION__, info->sp, info->pt);
+	return (struct pt_regs *) info->pt;
 }
 
 int
@@ -235,7 +253,8 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 	struct pt_regs *pt;
 
 	if ((unsigned) regnum - 1 >= 127) {
-		dprintk("unwind: trying to access non-existent r%u\n", regnum);
+		UNW_DPRINT(0, "unwind.%s: trying to access non-existent r%u\n",
+			   __FUNCTION__, regnum);
 		return -1;
 	}
 
@@ -280,8 +299,9 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 					if ((unsigned long) addr < info->regstk.limit
 					    || (unsigned long) addr >= info->regstk.top)
 					{
-						dprintk("unwind: %p outside of regstk "
-							"[0x%lx-0x%lx)\n", (void *) addr,
+						UNW_DPRINT(0, "unwind.%s: %p outside of regstk "
+							"[0x%lx-0x%lx)\n",
+							__FUNCTION__, (void *) addr,
 							info->regstk.limit,
 							info->regstk.top);
 						return -1;
@@ -298,11 +318,13 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 			}
 		} else {
 			/* access a scratch register */
-			if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-				pt = (struct pt_regs *) info->psp - 1;
-			else
-				pt = (struct pt_regs *) info->sp - 1;
-			addr = (unsigned long *) ((long) pt + pt_regs_off(regnum));
+			if (!info->pt) {
+				UNW_DPRINT(0, "unwind.%s: no pt-regs; cannot access r%d\n",
+					   __FUNCTION__, regnum);
+				return -1;
+			}
+			pt = get_scratch_regs(info);
+			addr = (unsigned long *) (pt + pt_regs_off(regnum));
 			if (info->pri_unat_loc)
 				nat_addr = info->pri_unat_loc;
 			else
@@ -316,7 +338,8 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 		if ((unsigned long) addr < info->regstk.limit
 		    || (unsigned long) addr >= info->regstk.top)
 		{
-			dprintk("unwind: ignoring attempt to access register outside of rbs\n");
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to access register outside "
+				   "of rbs\n",  __FUNCTION__);
 			return -1;
 		}
 		if ((unsigned long) nat_addr >= info->regstk.top)
@@ -348,10 +371,7 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
+	pt = get_scratch_regs(info);
 	switch (regnum) {
 		/* scratch: */
 	      case 0: addr = &pt->b0; break;
@@ -366,7 +386,8 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		break;
 
 	      default:
-		dprintk("unwind: trying to access non-existent b%u\n", regnum);
+		UNW_DPRINT(0, "unwind.%s: trying to access non-existent b%u\n",
+			   __FUNCTION__, regnum);
 		return -1;
 	}
 	if (write)
@@ -383,14 +404,12 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 	struct pt_regs *pt;
 
 	if ((unsigned) (regnum - 2) >= 126) {
-		dprintk("unwind: trying to access non-existent f%u\n", regnum);
+		UNW_DPRINT(0, "unwind.%s: trying to access non-existent f%u\n",
+			   __FUNCTION__, regnum);
 		return -1;
 	}
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
+	pt = get_scratch_regs(info);
 
 	if (regnum <= 5) {
 		addr = *(&info->f2_loc + (regnum - 2));
@@ -428,11 +447,7 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
-
+	pt = get_scratch_regs(info);
 	switch (regnum) {
 	      case UNW_AR_BSP:
 		addr = info->bsp_loc;
@@ -495,7 +510,8 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		break;
 
 	      default:
-		dprintk("unwind: trying to access non-existent ar%u\n", regnum);
+		UNW_DPRINT(0, "unwind.%s: trying to access non-existent ar%u\n",
+			   __FUNCTION__, regnum);
 		return -1;
 	}
 
@@ -612,7 +628,7 @@ decode_abreg (unsigned char abreg, int memory)
 	      default:
 		break;
 	}
-	dprintk("unwind: bad abreg=0x%x\n", abreg);
+	UNW_DPRINT(0, "unwind.%s: bad abreg=0x%x\n", __FUNCTION__, abreg);
 	return UNW_REG_LC;
 }
 
@@ -652,7 +668,7 @@ spill_next_when (struct unw_reg_info **regp, struct unw_reg_info *lim, unw_word 
 			return;
 		}
 	}
-	dprintk("unwind: excess spill!\n");
+	UNW_DPRINT(0, "unwind.%s: excess spill!\n",  __FUNCTION__);
 }
 
 static inline void
@@ -720,7 +736,7 @@ static void
 desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave,
 	       struct unw_state_record *sr)
 {
-	int i;
+	int i, region_start;
 
 	if (!(sr->in_body || sr->first_region))
 		finish_prologue(sr);
@@ -732,19 +748,20 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 		return;
 	}
 
+	region_start = sr->region_start + sr->region_len;
+
 	for (i = 0; i < sr->epilogue_count; ++i)
 		pop(sr);
 	sr->epilogue_count = 0;
 	sr->epilogue_start = UNW_WHEN_NEVER;
 
-	if (!body)
-		push(sr);
-
-	sr->region_start += sr->region_len;
+	sr->region_start = region_start;
 	sr->region_len = rlen;
 	sr->in_body = body;
 
 	if (!body) {
+		push(sr);
+
 		for (i = 0; i < 4; ++i) {
 			if (mask & 0x8)
 				set_reg(sr->curr.reg + unw.save_order[i], UNW_WHERE_GR,
@@ -765,10 +782,13 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 static inline void
 desc_abi (unsigned char abi, unsigned char context, struct unw_state_record *sr)
 {
-	if (abi == 0 && context == 'i')
+	if (abi == 0 && context == 'i') {
 		sr->flags |= UNW_FLAG_INTERRUPT_FRAME;
+		UNW_DPRINT(3, "unwind.%s: interrupt frame\n",  __FUNCTION__);
+	}
 	else
-		dprintk("unwind: ignoring unwabi(abi=0x%x,context=0x%x)\n", abi, context);
+		UNW_DPRINT(0, "unwind%s: ignoring unwabi(abi=0x%x,context=0x%x)\n",
+				__FUNCTION__, abi, context);
 }
 
 static inline void
@@ -1136,6 +1156,9 @@ script_lookup (struct unw_frame_info *info)
 	unsigned short index;
 	unsigned long ip, pr;
 
+	if (UNW_DEBUG_ON(0))
+		return 0;	/* Always regenerate scripts in debug mode */
+
 	STAT(++unw.stat.cache.lookups);
 
 	ip = info->ip;
@@ -1260,8 +1283,8 @@ static inline void
 script_emit (struct unw_script *script, struct unw_insn insn)
 {
 	if (script->count >= UNW_MAX_SCRIPT_LEN) {
-		dprintk("unwind: script exceeds maximum size of %u instructions!\n",
-			UNW_MAX_SCRIPT_LEN);
+		UNW_DPRINT(0, "unwind.%s: script exceeds maximum size of %u instructions!\n",
+			__FUNCTION__, UNW_MAX_SCRIPT_LEN);
 		return;
 	}
 	script->insn[script->count++] = insn;
@@ -1302,7 +1325,8 @@ emit_nat_info (struct unw_state_record *sr, int i, struct unw_script *script)
 		break;
 
 	      default:
-		dprintk("unwind: don't know how to emit nat info for where = %u\n", r->where);
+		UNW_DPRINT(0, "unwind.%s: don't know how to emit nat info for where = %u\n",
+			   __FUNCTION__, r->where);
 		return;
 	}
 	insn.opc = opc;
@@ -1339,8 +1363,9 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 			}
 			val = unw.preg_index[UNW_REG_R4 + (rval - 4)];
 		} else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs) + pt_regs_off(rval);
+			/* register got spilled to a scratch register */
+			opc = UNW_INSN_MOVE_SCRATCH;
+			val = pt_regs_off(rval);
 		}
 		break;
 
@@ -1350,12 +1375,12 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		else if (rval >= 16 && rval <= 31)
 			val = unw.preg_index[UNW_REG_F16 + (rval - 16)];
 		else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs);
+			opc = UNW_INSN_MOVE_SCRATCH;
 			if (rval <= 9)
-				val += struct_offset(struct pt_regs, f6) + 16*(rval - 6);
+				val = struct_offset(struct pt_regs, f6) + 16*(rval - 6);
 			else
-				dprintk("unwind: kernel may not touch f%lu\n", rval);
+				UNW_DPRINT(0, "unwind.%s: kernel may not touch f%lu\n",
+					   __FUNCTION__, rval);
 		}
 		break;
 
@@ -1363,14 +1388,13 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		if (rval >= 1 && rval <= 5)
 			val = unw.preg_index[UNW_REG_B1 + (rval - 1)];
 		else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs);
+			opc = UNW_INSN_MOVE_SCRATCH;
 			if (rval == 0)
-				val += struct_offset(struct pt_regs, b0);
+				val = struct_offset(struct pt_regs, b0);
 			else if (rval == 6)
-				val += struct_offset(struct pt_regs, b6);
+				val = struct_offset(struct pt_regs, b6);
 			else
-				val += struct_offset(struct pt_regs, b7);
+				val = struct_offset(struct pt_regs, b7);
 		}
 		break;
 
@@ -1383,7 +1407,8 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		break;
 
 	      default:
-		dprintk("unwind: register %u has unexpected `where' value of %u\n", i, r->where);
+		UNW_DPRINT(0, "unwind%s: register %u has unexpected `where' value of %u\n",
+			   __FUNCTION__, i, r->where);
 		break;
 	}
 	insn.opc = opc;
@@ -1456,9 +1481,10 @@ build_script (struct unw_frame_info *info)
 		r->when = UNW_WHEN_NEVER;
 	sr.pr_val = info->pr;
 
+	UNW_DPRINT(3, "unwind.%s: ip 0x%lx\n", __FUNCTION__, ip);
 	script = script_new(ip);
 	if (!script) {
-		dprintk("unwind: failed to create unwind script\n");
+		UNW_DPRINT(0, "unwind.%s: failed to create unwind script\n",  __FUNCTION__);
 		STAT(unw.stat.script.build_time += ia64_get_itc() - start);
 		return 0;
 	}
@@ -1476,8 +1502,8 @@ build_script (struct unw_frame_info *info)
 	}
 	if (!e) {
 		/* no info, return default unwinder (leaf proc, no mem stack, no saved regs)  */
-		dprintk("unwind: no unwind info for ip=0x%lx (prev ip=0x%lx)\n", ip,
-			unw.cache[info->prev_script].ip);
+		UNW_DPRINT(1, "unwind.%s: no unwind info for ip=0x%lx (prev ip=0x%lx)\n",
+			__FUNCTION__, ip, unw.cache[info->prev_script].ip);
 		sr.curr.reg[UNW_REG_RP].where = UNW_WHERE_BR;
 		sr.curr.reg[UNW_REG_RP].when = -1;
 		sr.curr.reg[UNW_REG_RP].val = 0;
@@ -1525,26 +1551,32 @@ build_script (struct unw_frame_info *info)
 		sr.curr.reg[UNW_REG_RP].where = UNW_WHERE_BR;
 		sr.curr.reg[UNW_REG_RP].when = -1;
 		sr.curr.reg[UNW_REG_RP].val = sr.return_link_reg;
+		UNW_DPRINT(1, "unwind.%s: using default for rp at ip=0x%lx where=%d val=0x%lx\n",
+			   __FUNCTION__, ip, sr.curr.reg[UNW_REG_RP].where,
+			   sr.curr.reg[UNW_REG_RP].val);
 	}
 
-#if UNW_DEBUG
-	printk("unwind: state record for func 0x%lx, t=%u:\n",
-	       table->segment_base + e->start_offset, sr.when_target);
+#ifdef UNW_DEBUG
+	UNW_DPRINT(1, "unwind.%s: state record for func 0x%lx, t=%u:\n",
+		__FUNCTION__, table->segment_base + e->start_offset, sr.when_target);
 	for (r = sr.curr.reg; r < sr.curr.reg + UNW_NUM_REGS; ++r) {
 		if (r->where != UNW_WHERE_NONE || r->when != UNW_WHEN_NEVER) {
-			printk("  %s <- ", unw.preg_name[r - sr.curr.reg]);
+			UNW_DPRINT(1, "  %s <- ", unw.preg_name[r - sr.curr.reg]);
 			switch (r->where) {
-			      case UNW_WHERE_GR:     printk("r%lu", r->val); break;
-			      case UNW_WHERE_FR:     printk("f%lu", r->val); break;
-			      case UNW_WHERE_BR:     printk("b%lu", r->val); break;
-			      case UNW_WHERE_SPREL:  printk("[sp+0x%lx]", r->val); break;
-			      case UNW_WHERE_PSPREL: printk("[psp+0x%lx]", r->val); break;
+			      case UNW_WHERE_GR:     UNW_DPRINT(1, "r%lu", r->val); break;
+			      case UNW_WHERE_FR:     UNW_DPRINT(1, "f%lu", r->val); break;
+			      case UNW_WHERE_BR:     UNW_DPRINT(1, "b%lu", r->val); break;
+			      case UNW_WHERE_SPREL:  UNW_DPRINT(1, "[sp+0x%lx]", r->val); break;
+			      case UNW_WHERE_PSPREL: UNW_DPRINT(1, "[psp+0x%lx]", r->val); break;
 			      case UNW_WHERE_NONE:
-				printk("%s+0x%lx", unw.preg_name[r - sr.curr.reg], r->val);
+				UNW_DPRINT(1, "%s+0x%lx", unw.preg_name[r - sr.curr.reg], r->val);
 				break;
-			      default:		     printk("BADWHERE(%d)", r->where); break;
+
+			      default:
+				UNW_DPRINT(1, "BADWHERE(%d)", r->where);
+				break;
 			}
-			printk("\t\t%d\n", r->when);
+			UNW_DPRINT(1, "\t\t%d\n", r->when);
 		}
 	}
 #endif
@@ -1642,6 +1674,16 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 			s[dst] = s[val];
 			break;
 
+		      case UNW_INSN_MOVE_SCRATCH:
+			if (state->pt) {
+				s[dst] = (unsigned long) get_scratch_regs(state) + val;
+			} else {
+				s[dst] = 0;
+				UNW_DPRINT(0, "unwind.%s: no state->pt, dst=%ld, val=%ld\n",
+					   __FUNCTION__, dst, val);
+			}
+			break;
+
 		      case UNW_INSN_MOVE_STACKED:
 			s[dst] = (unsigned long) ia64_rse_skip_regs((unsigned long *)state->bsp,
 								    val);
@@ -1667,11 +1709,12 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 			break;
 
 		      case UNW_INSN_LOAD:
-#if UNW_DEBUG
+#ifdef UNW_DEBUG
 			if ((s[val] & (local_cpu_data->unimpl_va_mask | 0x7)) != 0
 			    || s[val] < TASK_SIZE)
 			{
-				debug(1, "unwind: rejecting bad psp=0x%lx\n", s[val]);
+				UNW_DPRINT(0, "unwind.%s: rejecting bad psp=0x%lx\n",
+					   __FUNCTION__, s[val]);
 				break;
 			}
 #endif
@@ -1704,7 +1747,8 @@ find_save_locs (struct unw_frame_info *info)
 
 	if ((info->ip & (local_cpu_data->unimpl_va_mask | 0xf)) || info->ip < TASK_SIZE) {
 		/* don't let obviously bad addresses pollute the cache */
-		debug(1, "unwind: rejecting bad ip=0x%lx\n", info->ip);
+		/* FIXME: should really be level 0 but it occurs too often. KAO */
+		UNW_DPRINT(1, "unwind.%s: rejecting bad ip=0x%lx\n", __FUNCTION__, info->ip);
 		info->rp_loc = 0;
 		return -1;
 	}
@@ -1713,8 +1757,9 @@ find_save_locs (struct unw_frame_info *info)
 	if (!scr) {
 		scr = build_script(info);
 		if (!scr) {
-			dprintk("unwind: failed to locate/build unwind script for ip %lx\n",
-				info->ip);
+			UNW_DPRINT(0,
+				   "unwind.%s: failed to locate/build unwind script for ip %lx\n",
+				   __FUNCTION__, info->ip);
 			return -1;
 		}
 		have_write_lock = 1;
@@ -1747,7 +1792,9 @@ unw_unwind (struct unw_frame_info *info)
 
 	/* restore the ip */
 	if (!info->rp_loc) {
-		debug(1, "unwind: failed to locate return link (ip=0x%lx)!\n", info->ip);
+		/* FIXME: should really be level 0 but it occurs too often. KAO */
+		UNW_DPRINT(1, "unwind.%s: failed to locate return link (ip=0x%lx)!\n",
+			   __FUNCTION__, info->ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
@@ -1757,14 +1804,14 @@ unw_unwind (struct unw_frame_info *info)
 		 * We don't have unwind info for the gate page, so we consider that part
 		 * of user-space for the purpose of unwinding.
 		 */
-		debug(1, "unwind: reached user-space (ip=0x%lx)\n", ip);
+		UNW_DPRINT(2, "unwind.%s: reached user-space (ip=0x%lx)\n", __FUNCTION__, ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
 
 	/* restore the cfm: */
 	if (!info->pfs_loc) {
-		dprintk("unwind: failed to locate ar.pfs!\n");
+		UNW_DPRINT(0, "unwind.%s: failed to locate ar.pfs!\n", __FUNCTION__);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
@@ -1774,16 +1821,18 @@ unw_unwind (struct unw_frame_info *info)
 	pr = info->pr;
 	num_regs = 0;
 	if ((info->flags & UNW_FLAG_INTERRUPT_FRAME)) {
+		info->pt = info->sp + 16;
 		if ((pr & (1UL << pNonSys)) != 0)
 			num_regs = *info->cfm_loc & 0x7f;		/* size of frame */
 		info->pfs_loc =
-			(unsigned long *) (info->sp + 16 + struct_offset(struct pt_regs, ar_pfs));
+			(unsigned long *) (info->pt + struct_offset(struct pt_regs, ar_pfs));
+		UNW_DPRINT(3, "unwind.%s: interrupt_frame pt 0x%lx\n", __FUNCTION__, info->pt);
 	} else
 		num_regs = (*info->cfm_loc >> 7) & 0x7f;	/* size of locals */
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->bsp, -num_regs);
 	if (info->bsp < info->regstk.limit || info->bsp > info->regstk.top) {
-		dprintk("unwind: bsp (0x%lx) out of range [0x%lx-0x%lx]\n",
-			info->bsp, info->regstk.limit, info->regstk.top);
+		UNW_DPRINT(0, "unwind.%s: bsp (0x%lx) out of range [0x%lx-0x%lx]\n",
+			__FUNCTION__, info->bsp, info->regstk.limit, info->regstk.top);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
@@ -1791,14 +1840,15 @@ unw_unwind (struct unw_frame_info *info)
 	/* restore the sp: */
 	info->sp = info->psp;
 	if (info->sp < info->memstk.top || info->sp > info->memstk.limit) {
-		dprintk("unwind: sp (0x%lx) out of range [0x%lx-0x%lx]\n",
-			info->sp, info->memstk.top, info->memstk.limit);
+		UNW_DPRINT(0, "unwind.%s: sp (0x%lx) out of range [0x%lx-0x%lx]\n",
+			__FUNCTION__, info->sp, info->memstk.top, info->memstk.limit);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
 
 	if (info->ip == prev_ip && info->sp == prev_sp && info->bsp == prev_bsp) {
-		dprintk("unwind: ip, sp, bsp remain unchanged; stopping here (ip=0x%lx)\n", ip);
+		UNW_DPRINT(0, "unwind.%s: ip, sp, bsp unchanged; stopping here (ip=0x%lx)\n",
+			   __FUNCTION__, ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
 	}
@@ -1822,7 +1872,8 @@ unw_unwind_to_user (struct unw_frame_info *info)
 	while (unw_unwind(info) >= 0) {
 		if (unw_get_rp(info, &ip) < 0) {
 			unw_get_ip(info, &ip);
-			dprintk("unwind: failed to read return pointer (ip=0x%lx)\n", ip);
+			UNW_DPRINT(0, "unwind.%s: failed to read return pointer (ip=0x%lx)\n",
+				   __FUNCTION__, ip);
 			return -1;
 		}
 		/*
@@ -1833,7 +1884,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 			return 0;
 	}
 	unw_get_ip(info, &ip);
-	dprintk("unwind: failed to unwind to user-level (ip=0x%lx)\n", ip);
+	UNW_DPRINT(0, "unwind.%s: failed to unwind to user-level (ip=0x%lx)\n", __FUNCTION__, ip);
 	return -1;
 }
 
@@ -1874,11 +1925,30 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	info->task = t;
 	info->sw  = sw;
 	info->sp = info->psp = (unsigned long) (sw + 1) - 16;
+	info->pt = 0;
 	info->cfm_loc = &sw->ar_pfs;
 	sol = (*info->cfm_loc >> 7) & 0x7f;
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sol);
 	info->ip = sw->b0;
 	info->pr = sw->pr;
+	UNW_DPRINT(3,
+			"unwind.%s\n"
+			"  rbslimit 0x%lx\n"
+			"  rbstop   0x%lx\n"
+			"  stklimit 0x%lx\n"
+			"  stktop   0x%lx\n"
+			"  task     0x%lx\n"
+			"  sw       0x%lx\n",
+			__FUNCTION__, rbslimit, rbstop, stklimit, stktop,
+			(unsigned long)(info->task),
+			(unsigned long)(info->sw));
+	UNW_DPRINT(3,
+			"  sp/psp   0x%lx\n"
+			"  sol      0x%lx\n"
+			"  bsp      0x%lx\n"
+			"  ip       0x%lx\n"
+			"  pr       0x%lx\n",
+			info->sp, sol, info->bsp, info->ip, info->pr);
 
 	find_save_locs(info);
 	STAT(unw.stat.api.init_time += ia64_get_itc() - start; local_irq_restore(flags));
@@ -1889,6 +1959,7 @@ unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 {
 	struct switch_stack *sw = (struct switch_stack *) (t->thread.ksp + 16);
 
+	UNW_DPRINT(1, "unwind.%s\n", __FUNCTION__);
 	unw_init_frame_info(info, t, sw);
 }
 
@@ -1916,7 +1987,8 @@ unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned lon
 	unsigned long flags;
 
 	if (end - start <= 0) {
-		dprintk("unwind: ignoring attempt to insert empty unwind table\n");
+		UNW_DPRINT(0, "unwind.%s: ignoring attempt to insert empty unwind table\n",
+			   __FUNCTION__);
 		return 0;
 	}
 
@@ -1946,13 +2018,15 @@ unw_remove_unwind_table (void *handle)
 	long index;
 
 	if (!handle) {
-		dprintk("unwind: ignoring attempt to remove non-existent unwind table\n");
+		UNW_DPRINT(0, "unwind.%s: ignoring attempt to remove non-existent unwind table\n",
+			   __FUNCTION__);
 		return;
 	}
 
 	table = handle;
 	if (table == &unw.kernel_table) {
-		dprintk("unwind: sorry, freeing the kernel's unwind table is a no-can-do!\n");
+		UNW_DPRINT(0, "unwind.%s: sorry, freeing the kernel's unwind table is a "
+			   "no-can-do!\n", __FUNCTION__);
 		return;
 	}
 
@@ -1964,7 +2038,8 @@ unw_remove_unwind_table (void *handle)
 			if (prev->next == table)
 				break;
 		if (!prev) {
-			dprintk("unwind: failed to find unwind table %p\n", (void *) table);
+			UNW_DPRINT(0, "unwind.%s: failed to find unwind table %p\n",
+				   __FUNCTION__, (void *) table);
 			spin_unlock_irqrestore(&unw.lock, flags);
 			return;
 		}

@@ -81,9 +81,13 @@ wrap_mmu_context (struct mm_struct *mm)
 	}
 	read_unlock(&tasklist_lock);
 	/* can't call flush_tlb_all() here because of race condition with O(1) scheduler [EF] */
-	for (i = 0; i < NR_CPUS; ++i)
-		if (i != smp_processor_id())
-			per_cpu(ia64_need_tlb_flush, i) = 1;
+	{
+		int cpu = get_cpu(); /* prevent preemption/migration */
+		for (i = 0; i < NR_CPUS; ++i)
+			if (i != cpu)
+				per_cpu(ia64_need_tlb_flush, i) = 1;
+		put_cpu();
+	}
 	local_flush_tlb_all();
 }
 

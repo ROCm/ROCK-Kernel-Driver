@@ -196,10 +196,10 @@ extern inline pmd_t *pmd_offset (pgd_t *pgd, unsigned long address)
 }
 
 /* Find an entry in the third-level pagetable. */
-#define __pte_offset(address) ((address >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
-#define pte_offset_kernel(pmd, address) ((pte_t *) __pmd_page(*pmd) + __pte_offset(address))
+#define pte_index(address) ((address >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
+#define pte_offset_kernel(pmd, address) ((pte_t *) __pmd_page(*pmd) + pte_index(address))
 /* FIXME: should we bother with kmap() here? */
-#define pte_offset_map(pmd, address) ((pte_t *)kmap(pmd_page(*pmd)) + __pte_offset(address))
+#define pte_offset_map(pmd, address) ((pte_t *)kmap(pmd_page(*pmd)) + pte_index(address))
 #define pte_offset_map_nested(pmd, address) pte_offset_map(pmd, address)
 #define pte_unmap(pte) kunmap(pte)
 #define pte_unmap_nested(pte) kunmap(pte)

@@ -90,7 +90,7 @@ stop_this_cpu (void)
 void
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 {
-	int this_cpu = smp_processor_id();
+	int this_cpu = get_cpu();
 	unsigned long *pending_ipis = &__get_cpu_var(ipi_operation);
 	unsigned long ops;
 
@@ -146,8 +146,12 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 		} while (ops);
 		mb();	/* Order data access and bit testing. */
 	}
+	put_cpu();
 }
 
+/*
+ * Called with preeemption disabled 
+ */
 static inline void
 send_IPI_single (int dest_cpu, int op)
 {
@@ -155,6 +159,9 @@ send_IPI_single (int dest_cpu, int op)
 	platform_send_ipi(dest_cpu, IA64_IPI_VECTOR, IA64_IPI_DM_INT, 0);
 }
 
+/*
+ * Called with preeemption disabled 
+ */
 static inline void
 send_IPI_allbutself (int op)
 {
@@ -166,6 +173,9 @@ send_IPI_allbutself (int op)
 	}
 }
 
+/*
+ * Called with preeemption disabled 
+ */
 static inline void
 send_IPI_all (int op)
 {
@@ -176,12 +186,18 @@ send_IPI_all (int op)
 			send_IPI_single(i, op);
 }
 
+/*
+ * Called with preeemption disabled 
+ */
 static inline void
 send_IPI_self (int op)
 {
 	send_IPI_single(smp_processor_id(), op);
 }
 
+/*
+ * Called with preeemption disabled 
+ */
 void
 smp_send_reschedule (int cpu)
 {
@@ -197,11 +213,14 @@ void
 smp_send_reschedule_all (void)
 {
 	int i;
+	int cpu = get_cpu(); /* disable preemption */
 
 	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i) && i != smp_processor_id())
+		if (cpu_online(i) && i != cpu)
 			smp_send_reschedule(i);
+	put_cpu();
 }
+
 
 void
 smp_flush_tlb_all (void)
@@ -247,9 +266,11 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 {
 	struct call_data_struct data;
 	int cpus = 1;
+	int me = get_cpu(); /* prevent preemption and reschedule on another processor */
 
-	if (cpuid == smp_processor_id()) {
+	if (cpuid == me) {
 		printk("%s: trying to call self\n", __FUNCTION__);
+		put_cpu();
 		return -EBUSY;
 	}
 
@@ -276,6 +297,7 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 	call_data = NULL;
 
 	spin_unlock_bh(&call_lock);
+	put_cpu();
 	return 0;
 }
 

@@ -453,8 +453,13 @@ static void prune_icache(int nr_to_scan)
 }
 
 /*
- * This is called from kswapd when we think we need some
- * more memory. 
+ * shrink_icache_memory() will attempt to reclaim some unused inodes.  Here,
+ * "unused" means that no dentries are referring to the inodes: the files are
+ * not open and the dcache references to those inodes have already been
+ * reclaimed.
+ *
+ * This function is passed the number of inodes to scan, and it returns the
+ * total number of remaining possibly-reclaimable inodes.
  */
 static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 {
@@ -467,7 +472,7 @@ static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_icache(nr);
 	}
-	return inodes_stat.nr_inodes;
+	return inodes_stat.nr_unused;
 }
 
 /*

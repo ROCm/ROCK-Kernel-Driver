@@ -50,6 +50,10 @@ read(struct file * file, char * userbuf, size_t count, loff_t * off)
 		ret = count;
 	}
  Done:
+	if (buffer && buffer->data) {
+		kfree(buffer->data);
+		buffer->data = NULL;
+	}
 	return ret;
 }
 
@@ -66,7 +70,7 @@ int alloc_buf_data(struct sysfs_bin_buffer * buffer)
 static int fill_write(struct file * file, const char * userbuf, 
 		      struct sysfs_bin_buffer * buffer)
 {
-	return copy_from_user(buffer,userbuf,buffer->count) ?
+	return copy_from_user(buffer->data,userbuf,buffer->count) ?
 		-EFAULT : 0;
 }
 

@@ -70,12 +70,6 @@
 #ifndef NULL
 #define NULL     0		/* zero          */
 #endif
-#ifndef TRUE
-#define TRUE     (1)		/* boolean true  */
-#endif
-#ifndef FALSE
-#define FALSE    (0)		/* boolean false */
-#endif
 #ifndef FAILURE
 #define FAILURE  (-1)
 #endif
@@ -597,11 +591,9 @@ typedef struct Ha_Ctrl_Struc {
 	TCS HCS_Tcs[MAX_TARGETS];	/* 78 */
 	ULONG pSRB_head;	/* SRB save queue header     */
 	ULONG pSRB_tail;	/* SRB save queue tail       */
-#if LINUX_VERSION_CODE >= CVT_LINUX_VERSION(2,1,95)
 	spinlock_t HCS_AvailLock;
 	spinlock_t HCS_SemaphLock;
 	spinlock_t pSRB_lock;	/* SRB queue lock            */
-#endif
 } HCS;
 
 /* Bit Definition for HCB_Config */

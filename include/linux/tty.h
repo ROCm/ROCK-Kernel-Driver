@@ -294,7 +294,7 @@ struct tty_struct {
 	unsigned char lnext:1, erasing:1, raw:1, real_raw:1, icanon:1;
 	unsigned char closing:1;
 	unsigned short minimum_to_wake;
-	unsigned overrun_time;
+	unsigned long overrun_time;
 	int num_overrun;
 	unsigned long process_char_map[256/(8*sizeof(unsigned long))];
 	char *read_buf;
@@ -348,7 +348,6 @@ extern int fg_console, last_console, want_console;
 
 extern int kmsg_redirect;
 
-extern void con_init(void);
 extern void console_init(void);
 
 extern int lp_init(void);

@@ -582,20 +582,26 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		unsigned short old_sg;
 		unsigned old_request_bufflen;
 		unsigned char old_sc_data_direction;
+		unsigned char old_cmd_len;
 		unsigned char old_cmnd[MAX_COMMAND_SIZE];
 
 		US_DEBUGP("Issuing auto-REQUEST_SENSE\n");
 
 		/* save the old command */
 		memcpy(old_cmnd, srb->cmnd, MAX_COMMAND_SIZE);
+		old_cmd_len = srb->cmd_len;
 
 		/* set the command and the LUN */
+		memset(srb->cmnd, 0, MAX_COMMAND_SIZE);
 		srb->cmnd[0] = REQUEST_SENSE;
 		srb->cmnd[1] = old_cmnd[1] & 0xE0;
-		srb->cmnd[2] = 0;
-		srb->cmnd[3] = 0;
 		srb->cmnd[4] = 18;
-		srb->cmnd[5] = 0;
+
+		/* FIXME: we must do the protocol translation here */
+		if (us->subclass == US_SC_RBC || us->subclass == US_SC_SCSI)
+			srb->cmd_len = 6;
+		else
+			srb->cmd_len = 12;
 
 		/* set the transfer direction */
 		old_sc_data_direction = srb->sc_data_direction;
@@ -621,6 +627,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->request_bufflen = old_request_bufflen;
 		srb->use_sg = old_sg;
 		srb->sc_data_direction = old_sc_data_direction;
+		srb->cmd_len = old_cmd_len;
 		memcpy(srb->cmnd, old_cmnd, MAX_COMMAND_SIZE);
 
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {

@@ -108,16 +108,8 @@
 #define _OUTB(port, byte)	(outb((byte),(port)))
 #define	SYSTEM_TICK		jiffies
 
+#include <linux/init.h>
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4) 
- #include <linux/init.h>
-#else
- #include <linux/bios32.h>/* BIOS32, PCI BIOS functions and definitions */
- #define ioremap vremap
- #define iounmap vfree
- extern void * vremap (unsigned long offset, unsigned long size);
- extern void vfree (void *addr);
-#endif
 
 #elif	defined(_SCO_UNIX_)	/****** SCO Unix ****************************/
 
@@ -381,9 +373,7 @@ void cleanup_module (void)
  *		< 0	error
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4) 
 EXPORT_SYMBOL(sdla_setup);
-#endif
 
 int sdla_setup (sdlahw_t* hw, void* sfm, unsigned len)
 {
@@ -528,9 +518,7 @@ int sdla_setup (sdlahw_t* hw, void* sfm, unsigned len)
  * Shut down SDLA: disable shared memory access and interrupts, stop CPU, etc.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_down);
-#endif
 
 int sdla_down (sdlahw_t* hw)
 {
@@ -572,7 +560,6 @@ int sdla_down (sdlahw_t* hw)
                 *(char *)hw->vector = S514_CPU_HALT;
         	CPU_no = hw->S514_cpu_no[0];
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		/* disable the PCI IRQ and disable memory access */
                 pci_read_config_dword(hw->pci_dev, PCI_INT_CONFIG, &int_config);
 	        int_config &= (CPU_no == S514_CPU_A) ? ~PCI_DISABLE_IRQ_CPU_A :	~PCI_DISABLE_IRQ_CPU_B;
@@ -585,22 +572,6 @@ int sdla_down (sdlahw_t* hw)
 		else
                         pci_write_config_dword(hw->pci_dev, PCI_MAP1_DWORD,
 				PCI_CPU_B_MEM_DISABLE);
-#else
-                /* disable the PCI IRQ and disable memory access */
-             	pcibios_read_config_dword(hw->pci_bus, hw->pci_dev_func,
-			PCI_INT_CONFIG, &int_config);
-	        int_config &= (CPU_no == S514_CPU_A) ? ~PCI_DISABLE_IRQ_CPU_A :	~PCI_DISABLE_IRQ_CPU_B;
-        	pcibios_write_config_dword(hw->pci_bus, hw->pci_dev_func,
-			PCI_INT_CONFIG, int_config);
-                read_S514_int_stat(hw, &int_status);
-                S514_intack(hw, int_status);
-     		// disable PCI memory access
-		if(CPU_no == S514_CPU_A)
-	     		pcibios_write_config_dword(hw->pci_bus,hw->pci_dev_func,
-				PCI_MAP0_DWORD, PCI_CPU_A_MEM_DISABLE);
-		else
-                        pcibios_write_config_dword(hw->pci_bus,hw->pci_dev_func,							PCI_MAP1_DWORD, PCI_CPU_B_MEM_DISABLE);
-#endif
 
 		/* free up the allocated virtual memory */
  		iounmap((void *)hw->dpmbase);
@@ -618,9 +589,7 @@ int sdla_down (sdlahw_t* hw)
  * Map shared memory window into SDLA address space.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_mapmem);
-#endif
 
 int sdla_mapmem (sdlahw_t* hw, unsigned long addr)
 {
@@ -681,9 +650,7 @@ int sdla_mapmem (sdlahw_t* hw, unsigned long addr)
  * Enable interrupt generation.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_inten);
-#endif
 
 int sdla_inten (sdlahw_t* hw)
 {
@@ -739,9 +706,7 @@ int sdla_inten (sdlahw_t* hw)
  * Disable interrupt generation.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_intde);
-#endif
 
 int sdla_intde (sdlahw_t* hw)
 {
@@ -796,9 +761,7 @@ int sdla_intde (sdlahw_t* hw)
  * Acknowledge SDLA hardware interrupt.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_intack);
-#endif
 
 int sdla_intack (sdlahw_t* hw)
 {
@@ -848,18 +811,11 @@ int sdla_intack (sdlahw_t* hw)
  * Acknowledge S514 hardware interrupt.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(S514_intack);
-#endif
 
 void S514_intack (sdlahw_t* hw, u32 int_status)
 {
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
         pci_write_config_dword(hw->pci_dev, PCI_INT_STATUS, int_status);
-#else
-	pcibios_write_config_dword(hw->pci_bus, hw->pci_dev_func,
-                PCI_INT_STATUS, int_status);
-#endif
 }
 
 
@@ -867,18 +823,11 @@ void S514_intack (sdlahw_t* hw, u32 int_status)
  * Read the S514 hardware interrupt status.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(read_S514_int_stat);
-#endif
 
 void read_S514_int_stat (sdlahw_t* hw, u32* int_status)
 {
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	pci_read_config_dword(hw->pci_dev, PCI_INT_STATUS, int_status);
-#else
-        pcibios_read_config_dword(hw->pci_bus, hw->pci_dev_func, PCI_INT_STATUS,
-		int_status);
-#endif
 }
 
 
@@ -886,9 +835,7 @@ void read_S514_int_stat (sdlahw_t* hw, u32* int_status)
  * Generate an interrupt to adapter's CPU.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_intr);
-#endif
 
 int sdla_intr (sdlahw_t* hw)
 {
@@ -932,9 +879,7 @@ int sdla_intr (sdlahw_t* hw)
  * o Return number of loops made, or 0 if command timed out.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_exec);
-#endif
 
 int sdla_exec (void* opflag)
 {
@@ -970,9 +915,7 @@ int sdla_exec (void* opflag)
  * interrupt routines are accessing adapter shared memory.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_peek);
-#endif
 
 int sdla_peek (sdlahw_t* hw, unsigned long addr, void* buf, unsigned len)
 {
@@ -1054,9 +997,7 @@ static void peek_by_4 (unsigned long src, void* buf, unsigned len)
  * interrupt routines are accessing adapter shared memory.
  */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(sdla_poke);
-#endif
  
 int sdla_poke (sdlahw_t* hw, unsigned long addr, void* buf, unsigned len)
 {
@@ -1961,20 +1902,11 @@ static int detect_s514 (sdlahw_t* hw)
 	int number_S514_cards = 0;
 	u32 S514_mem_base_addr = 0;
 	u32 ut_u32;
-
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct pci_dev *pci_dev;
-#else
-	u8 ut_u8;
-#endif
 
 
 #ifdef CONFIG_PCI
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
         if(!pci_present())
-#else
-	if(!pcibios_present())
-#endif
         {
                 printk(KERN_INFO "%s: PCI BIOS not present!\n", modname);
                 return 0;
@@ -2029,26 +1961,12 @@ static int detect_s514 (sdlahw_t* hw)
 		}
 	}
 
-      #if defined(LINUX_2_4)
 	pci_dev = hw->pci_dev;
 	/* read the physical memory base address */
 	S514_mem_base_addr = (CPU_no == S514_CPU_A) ? 
 		(pci_dev->resource[1].start) :
 		(pci_dev->resource[2].start);
 	
-      #elif defined (LINUX_2_1)
-	pci_dev = hw->pci_dev;
-	/* read the physical memory base address */
-	S514_mem_base_addr = (CPU_no == S514_CPU_A) ? 
-		(pci_dev->base_address[1] & PCI_BASE_ADDRESS_MEM_MASK) :
-		(pci_dev->base_address[2] & PCI_BASE_ADDRESS_MEM_MASK);
-	
-      #else
-	pcibios_read_config_dword(hw->pci_bus, hw->pci_dev_func,
-		(CPU_no == S514_CPU_A) ? PCI_MEM_BASE0_DWORD :
-		PCI_MEM_BASE1_DWORD, &S514_mem_base_addr);
-      #endif
-
 	printk(KERN_INFO "%s: S514 PCI memory at 0x%X\n",
 		modname, S514_mem_base_addr);
 	if(!S514_mem_base_addr) {
@@ -2060,24 +1978,14 @@ static int detect_s514 (sdlahw_t* hw)
 	}
 
 	/* enable the PCI memory */
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	pci_read_config_dword(pci_dev, 
 		(CPU_no == S514_CPU_A) ? PCI_MAP0_DWORD : PCI_MAP1_DWORD,
 		&ut_u32);
 	pci_write_config_dword(pci_dev,
 		(CPU_no == S514_CPU_A) ? PCI_MAP0_DWORD : PCI_MAP1_DWORD,
 		(ut_u32 | PCI_MEMORY_ENABLE));
-#else
-        pcibios_read_config_dword(hw->pci_bus, hw->pci_dev_func,
-		(CPU_no == S514_CPU_A) ? PCI_MAP0_DWORD : PCI_MAP1_DWORD,
-		&ut_u32); 
-        pcibios_write_config_dword(hw->pci_bus, hw->pci_dev_func,
-		(CPU_no == S514_CPU_A) ? PCI_MAP0_DWORD : PCI_MAP1_DWORD,
-		(ut_u32 | PCI_MEMORY_ENABLE));
-#endif
 
 	/* check the IRQ allocated and enable IRQ usage */
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	if(!(hw->irq = pci_dev->irq)) {
 		printk(KERN_INFO "%s: IRQ not allocated to S514 adapter\n",
 			modname);
@@ -2099,29 +2007,6 @@ static int detect_s514 (sdlahw_t* hw)
         ut_u32 |= (CPU_no == S514_CPU_A) ?
                 PCI_ENABLE_IRQ_CPU_A : PCI_ENABLE_IRQ_CPU_B;
         pci_write_config_dword(pci_dev, PCI_INT_CONFIG, ut_u32);
-#else
-	/* the INTPIN must not be 0 - if it is, then the S514 adapter is not */
-	/* configured for IRQ usage */
-	pcibios_read_config_byte(hw->pci_bus, hw->pci_dev_func,
-		PCI_INT_PIN_BYTE, &ut_u8);
-        if(!ut_u8) {
-                printk(KERN_INFO "%s: invalid setting for INTPIN on S514 card\n", modname);
-                printk(KERN_INFO "Please contact your Sangoma representative\n");
-                return 0;
-        }
-        pcibios_read_config_byte(hw->pci_bus, hw->pci_dev_func,
-		PCI_INT_LINE_BYTE, (unsigned char *)&hw->irq);
-        if(hw->irq == PCI_IRQ_NOT_ALLOCATED) {
-                printk(KERN_INFO "%s: IRQ not allocated to S514 adapter\n",
-			modname);
-                return 0;
-        }
-	pcibios_read_config_dword(hw->pci_bus, hw->pci_dev_func, PCI_INT_CONFIG, &ut_u32);
-	ut_u32 |= (CPU_no == S514_CPU_A) ?
-		PCI_ENABLE_IRQ_CPU_A : PCI_ENABLE_IRQ_CPU_B;
-        pcibios_write_config_dword(hw->pci_bus, hw->pci_dev_func, 
-		PCI_INT_CONFIG, ut_u32);
-#endif
 
 	printk(KERN_INFO "%s: IRQ %d allocated to the S514 card\n",
 		modname, hw->irq);
@@ -2157,15 +2042,10 @@ static int find_s514_adapter(sdlahw_t* hw, char find_first_S514_card)
 	char S514_found_in_slot = 0;
         u16 PCI_subsys_vendor;
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
         struct pci_dev *pci_dev = NULL;
-#else
-        int pci_index;
-#endif
  
        slot_no = hw->S514_slot_no;
   
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	while ((pci_dev = pci_find_device(V3_VENDOR_ID, V3_DEVICE_ID, pci_dev))
         	!= NULL) {
                 
@@ -2196,40 +2076,6 @@ static int find_s514_adapter(sdlahw_t* hw, char find_first_S514_card)
                         break;
                 }
         }
-
-#else
-	//LINUX VERSION 2.0.X 
-        for (pci_index = 0; pci_index < MAX_S514_CARDS; pci_index ++) {
-                if (pcibios_find_device(V3_VENDOR_ID, V3_DEVICE_ID, pci_index,
-                        &hw->pci_bus, &hw->pci_dev_func)!=PCIBIOS_SUCCESSFUL) {
-                                break;
-                }
-                
-		pcibios_read_config_word(hw->pci_bus, hw->pci_dev_func,
-                        PCI_SUBSYS_VENDOR_WORD, &PCI_subsys_vendor);
-                
-		if (PCI_subsys_vendor != SANGOMA_SUBSYS_VENDOR)
-                        continue;
-                
-		if (find_first_S514_card)
-                        return(1);
-           	
-		number_S514_cards ++;
-		
-                printk(KERN_INFO "%s: S514 card found, bus #%d, slot #%d\n",
-                        modname, hw->pci_bus,
-                        ((hw->pci_dev_func >> 3) & PCI_DEV_SLOT_MASK));
-
-		if (hw->auto_pci_cfg){
-			hw->S514_slot_no = ((hw->pci_dev_func >> 3) & PCI_DEV_SLOT_MASK)
-			slot_no = hw->S514_slot_no;
-				
-		}else if (((hw->pci_dev_func >> 3) & PCI_DEV_SLOT_MASK) == slot_no) {
-                        S514_found_in_slot = 1;
-                        break;
-                }
-        }
-#endif
 
 	/* if no S514 adapter has been found, then exit */
         if (!number_S514_cards) {
@@ -2408,17 +2254,11 @@ static int pci_probe(sdlahw_t *hw)
         u16 PCI_subsys_vendor;
 	u16 PCI_card_type;
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
         struct pci_dev *pci_dev = NULL;
 	struct pci_bus *bus = NULL;
-#else
-        int pci_index;
-	u8 irq;
-#endif
  
        slot_no = 0;
   
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	while ((pci_dev = pci_find_device(V3_VENDOR_ID, V3_DEVICE_ID, pci_dev))
         	!= NULL) {
 		
@@ -2453,52 +2293,13 @@ static int pci_probe(sdlahw_t *hw)
 		}
         }
 
-#else
-        for (pci_index = 0; pci_index < MAX_S514_CARDS; pci_index ++) {
-		
-                if(pcibios_find_device(V3_VENDOR_ID, V3_DEVICE_ID, pci_index,
-                        &hw->pci_bus, &hw->pci_dev_func)!=PCIBIOS_SUCCESSFUL) {
-                                break;
-                }
-                pcibios_read_config_word(hw->pci_bus, hw->pci_dev_func,
-                        PCI_SUBSYS_VENDOR_WORD, &PCI_subsys_vendor);
-                if(PCI_subsys_vendor != SANGOMA_SUBSYS_VENDOR)
-                        continue;
-		
-		pcibios_read_config_word(hw->pci_bus,hw->pci_dev_func,PCI_CARD_TYPE,
-                        &PCI_card_type);
-
-		pcibios_read_config_byte(hw->pci_bus, hw->pci_dev_func,
-				PCI_INT_LINE_BYTE, &irq);
-
-		/* A dual cpu card can support up to 4 physical connections,
-		 * where a single cpu card can support up to 2 physical
-		 * connections.  The FT1 card can only support a single 
-		 * connection, however we cannot distinguish between a Single
-		 * CPU card and an FT1 card. */
-		if (PCI_card_type == S514_DUAL_CPU){
-                	number_S514_cards += 4;
-			 printk(KERN_INFO "%s: S514-PCI card found, cpu(s) 2, bus #%d, slot #%d, irq #%d\n",
-                        	modname, hw->pci_bus,
-                        	((hw->pci_dev_func >> 3) & PCI_DEV_SLOT_MASK),irq);
-		}else{
-			printk(KERN_INFO "%s: S514-PCI card found, cpu(s) 1, bus #%d, slot #%d, irq #%d\n",
-                        	modname, hw->pci_bus,
-                        	((hw->pci_dev_func >> 3) & PCI_DEV_SLOT_MASK),irq);
-			number_S514_cards += 2;
-		}
-        }
-#endif
-
 	return number_S514_cards;
 
 }
 
 
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 EXPORT_SYMBOL(wanpipe_hw_probe);
-#endif
 
 unsigned wanpipe_hw_probe(void)
 {

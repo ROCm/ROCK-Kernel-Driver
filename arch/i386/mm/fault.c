@@ -394,14 +394,14 @@ vmalloc_fault:
 		 * Do _not_ use "tsk" here. We might be inside
 		 * an interrupt in the middle of a task switch..
 		 */
-		int offset = __pgd_offset(address);
+		int index = pgd_index(address);
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
 		asm("movl %%cr3,%0":"=r" (pgd));
-		pgd = offset + (pgd_t *)__va(pgd);
-		pgd_k = init_mm.pgd + offset;
+		pgd = index + (pgd_t *)__va(pgd);
+		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))
 			goto no_context;

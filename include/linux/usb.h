@@ -213,7 +213,7 @@ struct usb_tt;
 struct usb_device {
 	int		devnum;		/* Address on USB bus */
 	char		devpath [16];	/* Use in messages: /port/port/... */
-
+	enum usb_device_state	state;	/* configured, not attached, etc */
 	enum usb_device_speed	speed;	/* high/full/low (or error) */
 
 	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
@@ -240,7 +240,6 @@ struct usb_device {
 
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
-	int present;			/* if device is present or not */
 
 	void *hcpriv;			/* Host Controller private data */
 	

@@ -634,6 +634,7 @@ static void serial_throttle (struct tty_struct * tty)
 		serial->type->throttle(port);
 
 exit:
+	;
 }
 
 static void serial_unthrottle (struct tty_struct * tty)
@@ -656,6 +657,7 @@ static void serial_unthrottle (struct tty_struct * tty)
 		serial->type->unthrottle(port);
 
 exit:
+	;
 }
 
 static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg)
@@ -704,6 +706,7 @@ static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 		serial->type->set_termios(port, old);
 
 exit:
+	;
 }
 
 static void serial_break (struct tty_struct *tty, int break_state)
@@ -726,6 +729,7 @@ static void serial_break (struct tty_struct *tty, int break_state)
 		serial->type->break_ctl(port, break_state);
 
 exit:
+	;
 }
 
 static void serial_shutdown (struct usb_serial *serial)

@@ -30,14 +30,13 @@ struct op_sample {
 };
  
 struct oprofile_cpu_buffer {
-	spinlock_t int_lock;
-	/* protected by int_lock */
-	unsigned long pos;
+	volatile unsigned long head_pos;
+	volatile unsigned long tail_pos;
+	unsigned long buffer_size;
 	struct task_struct * last_task;
 	int last_is_kernel;
 	struct op_sample * buffer;
 	unsigned long sample_received;
-	unsigned long sample_lost_locked;
 	unsigned long sample_lost_overflow;
 	unsigned long sample_lost_task_exit;
 } ____cacheline_aligned;

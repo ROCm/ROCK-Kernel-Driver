@@ -174,6 +174,7 @@ int imm_detect(Scsi_Host_Template * host)
 	    parport_unregister_device(imm_hosts[i].dev);
 	    continue;
 	}
+
 	/* now the glue ... */
 	switch (imm_hosts[i].mode) {
 	case IMM_NIBBLE:
@@ -218,7 +219,7 @@ int imm_detect(Scsi_Host_Template * host)
 
 /* This is to give the imm driver a way to modify the timings (and other
  * parameters) by writing to the /proc/scsi/imm/0 file.
- * Very simple method really... (To simple, no error checking :( )
+ * Very simple method really... (Too simple, no error checking :( )
  * Reason: Kernel hackers HATE having to unload and reload modules for
  * testing...
  * Also gives a method to use a script to obtain optimum timings (TODO)
@@ -948,7 +949,7 @@ static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
     unsigned char l = 0, h = 0;
     int retv, x;
 
-    /* First check for any errors that may of occurred
+    /* First check for any errors that may have occurred
      * Here we check for internal errors
      */
     if (tmp->failed)

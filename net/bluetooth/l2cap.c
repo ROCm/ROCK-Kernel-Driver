@@ -272,7 +272,7 @@ static void l2cap_sock_kill(struct sock *sk)
 
 	/* Kill poor orphan */
 	bt_sock_unlink(&l2cap_sk_list, sk);
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 	sock_put(sk);
 }
 

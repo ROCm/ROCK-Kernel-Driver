@@ -36,10 +36,8 @@
 extern ia64_mv_setup_t sn1_setup;
 extern ia64_mv_cpu_init_t sn_cpu_init;
 extern ia64_mv_irq_init_t sn1_irq_init;
-extern ia64_mv_map_nr_t sn1_map_nr;
 extern ia64_mv_send_ipi_t sn1_send_IPI;
 extern ia64_mv_global_tlb_purge_t sn1_global_tlb_purge;
-extern ia64_mv_pci_fixup_t sn1_pci_fixup;
 extern ia64_mv_inb_t sn1_inb;
 extern ia64_mv_inw_t sn1_inw;
 extern ia64_mv_inl_t sn1_inl;

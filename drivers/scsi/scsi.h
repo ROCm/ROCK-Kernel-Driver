@@ -280,26 +280,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_SET_IOCTL_LOGGING(LEVEL)  \
         SCSI_SET_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL);
 
-/*
- *  the return of the status word will be in the following format :
- *  The low byte is the status returned by the SCSI command, 
- *  with vendor specific bits masked.
- *  
- *  The next byte is the message which followed the SCSI status.
- *  This allows a stos to be used, since the Intel is a little
- *  endian machine.
- *  
- *  The final byte is a host return code, which is one of the following.
- *  
- *  IE 
- *  lsb     msb
- *  status  msg host code   
- *  
- *  Our errors returned by OUR driver, NOT SCSI message.  Or'd with
- *  SCSI message passed back to driver <IF any>.
- */
-
-
+/* host byte codes */
 #define DID_OK          0x00	/* NO error                                */
 #define DID_NO_CONNECT  0x01	/* Couldn't connect before timeout period  */
 #define DID_BUS_BUSY    0x02	/* BUS stayed busy through time out period */

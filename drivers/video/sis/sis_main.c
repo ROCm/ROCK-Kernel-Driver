@@ -11,13 +11,13 @@
  *			- SiS Xabre (330) support
  *			- many fixes and enhancements for all chipset series,
  *			- extended bridge handling, TV output for Chrontel 7005
- *                      - 650/LVDS support (for LCD panels up to 1400x1050)
- *                      - 650/Chrontel 7019 support
+ *                      - 650/LVDS support (for LCD panels up to 1600x1200)
+ *                      - 650/740/Chrontel 7019 support
  *                      - 30xB/30xLV LCD, TV and VGA2 support
  *			- memory queue handling enhancements,
  *                      - 2D acceleration and y-panning,
- *                      - portation to 2.5 API (yet incomplete)
- *			- everything marked with "TW" and more
+ *                      - portation to 2.5 API
+ *			- etc.
  *			(see http://www.winischhofer.net/
  *			for more information and updates)
  */
@@ -298,34 +298,28 @@ static int sisfb_validate_mode(int myindex)
    switch (ivideo.disp_state & DISPTYPE_DISP2) {
      case DISPTYPE_LCD:
 	switch (sishw_ext.ulCRT2LCDType) {
-	case LCD_1024x768:
-	 	xres = 1024; yres =  768;  break;
-	case LCD_1280x1024:
-		xres = 1280; yres = 1024;  break;
-	case LCD_1280x960:
-	        xres = 1280; yres =  960;  break;
-	case LCD_2048x1536:
-		xres = 2048; yres = 1536;  break;
-	case LCD_1920x1440:
-		xres = 1920; yres = 1440;  break;
-	case LCD_1600x1200:
-		xres = 1600; yres = 1200;  break;
-	case LCD_800x600:
-		xres =  800; yres =  600;  break;
 	case LCD_640x480:
 		xres =  640; yres =  480;  break;
-	case LCD_320x480:				/* TW: FSTN */
-		xres =  320; yres =  480;  break;
+	case LCD_800x600:
+		xres =  800; yres =  600;  break;
         case LCD_1024x600:
-		xres = 1024; yres =  600;  break;
-	case LCD_1152x864:
-		xres = 1152; yres =  864;  break;
+		xres = 1024; yres =  600;  break;		
+	case LCD_1024x768:
+	 	xres = 1024; yres =  768;  break;
 	case LCD_1152x768:
-		xres = 1152; yres =  768;  break;
+		xres = 1152; yres =  768;  break;		
+	case LCD_1280x960:
+	        xres = 1280; yres =  960;  break;		
 	case LCD_1280x768:
 		xres = 1280; yres =  768;  break;
+	case LCD_1280x1024:
+		xres = 1280; yres = 1024;  break;
 	case LCD_1400x1050:
-		xres = 1400; yres = 1050;  break;
+		xres = 1400; yres = 1050;  break;		
+	case LCD_1600x1200:
+		xres = 1600; yres = 1200;  break;
+	case LCD_320x480:				/* TW: FSTN */
+		xres =  320; yres =  480;  break;
 	default:
 	        xres =    0; yres =    0;  break;
 	}
@@ -335,8 +329,85 @@ static int sisfb_validate_mode(int myindex)
         if(sisbios_mode[myindex].yres > yres) {
 	        return(-1);
 	}
-	if (sisbios_mode[myindex].xres == 720) {
-		return(-1);
+	if((sishw_ext.usExternalChip == 0x01) ||   /* LVDS */
+           (sishw_ext.usExternalChip == 0x05) ||   /* LVDS+Chrontel */
+	   (sishw_ext.Is301BDH)) {		   /* 301B-DH */
+	   switch (sisbios_mode[myindex].xres) {
+	   	case 512:
+	       		if(sisbios_mode[myindex].yres != 512) return -1;
+			if(sishw_ext.ulCRT2LCDType == LCD_1024x600) return -1;
+	       		break;
+	   	case 640:
+		       	if((sisbios_mode[myindex].yres != 400) &&
+	           	   (sisbios_mode[myindex].yres != 480))
+		          	return -1;
+	       		break;
+	   	case 800:
+		       	if(sisbios_mode[myindex].yres != 600) return -1;
+	       		break;
+	   	case 1024:
+		       	if((sisbios_mode[myindex].yres != 600) &&
+	           	   (sisbios_mode[myindex].yres != 768))
+		          	return -1;
+			if((sisbios_mode[myindex].yres == 600) &&
+			   (sishw_ext.ulCRT2LCDType != LCD_1024x600))
+			   	return -1;
+			break;
+		case 1152:
+			if((sisbios_mode[myindex].yres) != 768) return -1;
+			if(sishw_ext.ulCRT2LCDType != LCD_1152x768) return -1;
+			break;
+	   	case 1280:
+		   	if((sisbios_mode[myindex].yres != 768) &&
+	           	   (sisbios_mode[myindex].yres != 1024))
+		          	return -1;
+			if((sisbios_mode[myindex].yres == 768) &&
+			   (sishw_ext.ulCRT2LCDType != LCD_1280x768))
+			   	return -1;				
+			break;
+	   	case 1400:
+		   	if(sisbios_mode[myindex].yres != 1050) return -1;
+			break;
+	   	case 1600:
+		   	if(sisbios_mode[myindex].yres != 1200) return -1;
+			break;
+	   	default:
+		        return -1;		
+	   }
+	} else {
+	   switch (sisbios_mode[myindex].xres) {
+	   	case 512:
+	       		if(sisbios_mode[myindex].yres != 512) return -1;
+	       		break;
+	   	case 640:
+		       	if((sisbios_mode[myindex].yres != 400) &&
+	           	   (sisbios_mode[myindex].yres != 480))
+		          	return -1;
+	       		break;
+	   	case 800:
+		       	if(sisbios_mode[myindex].yres != 600) return -1;
+	       		break;
+	   	case 1024:
+		       	if(sisbios_mode[myindex].yres != 768) return -1;
+			break;
+	   	case 1280:
+		   	if((sisbios_mode[myindex].yres != 960) &&
+	           	   (sisbios_mode[myindex].yres != 1024))
+		          	return -1;
+			if(sisbios_mode[myindex].yres == 960) {
+			    if(sishw_ext.ulCRT2LCDType == LCD_1400x1050) 
+			   	return -1;
+			}
+			break;
+	   	case 1400:
+		   	if(sisbios_mode[myindex].yres != 1050) return -1;
+			break;
+	   	case 1600:
+		   	if(sisbios_mode[myindex].yres != 1200) return -1;
+			break;
+	   	default:
+		        return -1;		
+	   }
 	}
 	break;
      case DISPTYPE_TV:
@@ -379,6 +450,9 @@ static int sisfb_validate_mode(int myindex)
 		return(-1);
 	}
 	break;
+     case DISPTYPE_CRT2:	
+        if(sisbios_mode[myindex].xres > 1280) return -1;
+	break;	
      }
      return(myindex);
 }
@@ -561,11 +635,13 @@ static int sisfb_do_set_var(struct fb_var_screeninfo *var, int isactive,
 
 	TWDEBUG("Inside do_set_var");
 	
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)	
 	inSISIDXREG(SISCR,0x34,reg);
 	if(reg & 0x80) {
 	   printk(KERN_INFO "sisfb: Cannot change display mode, X server is active\n");
 	   return -EBUSY;
 	}
+#endif	
 
 	if((var->vmode & FB_VMODE_MASK) == FB_VMODE_NONINTERLACED) {
 		vtotal = var->upper_margin + var->yres + var->lower_margin +
@@ -1614,39 +1690,42 @@ static int sisfb_check_var(struct fb_var_screeninfo *var,
 		if( (sisbios_mode[search_idx].xres == var->xres) &&
 		    (sisbios_mode[search_idx].yres == var->yres) &&
 		    (sisbios_mode[search_idx].bpp == var->bits_per_pixel)) {
-			found_mode = 1;
-			break;
+		        if(sisfb_validate_mode(search_idx) > 0) {
+			   found_mode = 1;
+			   break;
+			}
 		}
 		search_idx++;
 	}
 
-	if(found_mode)
-		search_idx = sisfb_validate_mode(search_idx);
-	else {
+	if(!found_mode) {
+	
 		printk(KERN_ERR "sisfb: %dx%dx%d is no valid mode\n", 
 			var->xres, var->yres, var->bits_per_pixel);
+			
                 search_idx = 0;
-		while( (sisbios_mode[search_idx].mode_no != 0) &&
-	       	       (sisbios_mode[search_idx].xres <= (var->xres + 16)) ) {
-		   if( ((sisbios_mode[search_idx].xres >= var->xres) &&
-		        (sisbios_mode[search_idx].xres <= (var->xres + 16)))   && 
-		       ((sisbios_mode[search_idx].yres >= var->yres) &&
-		        (sisbios_mode[search_idx].yres <= (var->yres + 16))) && 
-		       (sisbios_mode[search_idx].bpp == var->bits_per_pixel) ) {
-			  found_mode = 1;
-			  break;
+		while(sisbios_mode[search_idx].mode_no != 0) {
+		       
+		   if( (var->xres <= sisbios_mode[search_idx].xres) &&
+		       (var->yres <= sisbios_mode[search_idx].yres) && 
+		       (var->bits_per_pixel == sisbios_mode[search_idx].bpp) ) {
+		          if(sisfb_validate_mode(search_idx) > 0) {
+			     found_mode = 1;
+			     break;
+			  }
 		   }
 		   search_idx++;
 	        }			
 		if(found_mode) {
-		   var->xres = sisbios_mode[search_idx].xres;
-		   var->yres = sisbios_mode[search_idx].yres;
-		   printk(KERN_DEBUG "sisfb: Adapted to mode %dx%dx%d\n",
-		   	var->xres, var->yres, var->bits_per_pixel);
+			var->xres = sisbios_mode[search_idx].xres;
+		      	var->yres = sisbios_mode[search_idx].yres;
+		      	printk(KERN_DEBUG "sisfb: Adapted to mode %dx%dx%d\n",
+		   		var->xres, var->yres, var->bits_per_pixel);
+		   
 		} else {
-		   printk(KERN_ERR "sisfb: Failed to find similar mode to %dx%dx%d", 
-			var->xres, var->yres, var->bits_per_pixel);
-		   return -EINVAL;
+		   	printk(KERN_ERR "sisfb: Failed to find similar mode to %dx%dx%d\n", 
+				var->xres, var->yres, var->bits_per_pixel);
+		   	return -EINVAL;
 		}
 	}
 
@@ -1993,11 +2072,11 @@ static struct fb_ops sisfb_ops = {
         .fb_pan_display = sisfb_pan_display,
 #endif	
         .fb_blank     = sisfb_blank,
-	.fb_fillrect  = sisfb_fillrect,
-	.fb_copyarea  = sisfb_copyarea,
+	.fb_fillrect  = fbcon_sis_fillrect,
+	.fb_copyarea  = fbcon_sis_copyarea,
 	.fb_imageblit = cfb_imageblit,
 	.fb_cursor    = soft_cursor,	
-	.fb_sync      = sisfb_sync,
+	.fb_sync      = fbcon_sis_sync,
 	.fb_ioctl     =	sisfb_ioctl,
 	.fb_mmap      =	sisfb_mmap,
 };
@@ -2112,12 +2191,12 @@ static void sisfb_detect_VB_connect_300()
 		if (sisfb_crt2type != -1)
 			/* TW: override detected CRT2 type */
 			ivideo.disp_state = sisfb_crt2type;
+                else if (sr17 & 0x04)
+			ivideo.disp_state = DISPTYPE_TV;			
+		else if (sr17 & 0x02)
+			ivideo.disp_state = DISPTYPE_LCD;			
 		else if (sr17 & 0x08 )
 			ivideo.disp_state = DISPTYPE_CRT2;
-		else if (sr17 & 0x02)
-			ivideo.disp_state = DISPTYPE_LCD;
-		else if (sr17 & 0x04)
-			ivideo.disp_state = DISPTYPE_TV;
 		else
 			ivideo.disp_state = 0;
 
@@ -2149,12 +2228,12 @@ static void sisfb_detect_VB_connect_300()
 		if (sisfb_crt2type != -1)
 			/* TW: override detected CRT2 type */
 			ivideo.disp_state = sisfb_crt2type;
-		else if (cr32 & SIS_VB_CRT2)
-			ivideo.disp_state = DISPTYPE_CRT2;
-		else if (cr32 & SIS_VB_LCD)
-			ivideo.disp_state = DISPTYPE_LCD;
 		else if (cr32 & SIS_VB_TV)
 			ivideo.disp_state = DISPTYPE_TV;
+		else if (cr32 & SIS_VB_LCD)
+			ivideo.disp_state = DISPTYPE_LCD;
+		else if (cr32 & SIS_VB_CRT2)
+			ivideo.disp_state = DISPTYPE_CRT2;
 		else
 			ivideo.disp_state = 0;
 
@@ -2458,12 +2537,12 @@ static void sisfb_detect_VB_connect_315(void)
 	if (sisfb_crt2type != -1)
 		/* TW: Override with option */
 		ivideo.disp_state = sisfb_crt2type;
+	else if (cr32 & SIS_VB_TV)
+		ivideo.disp_state = DISPTYPE_TV;		
+	else if (cr32 & SIS_VB_LCD)
+		ivideo.disp_state = DISPTYPE_LCD;		
 	else if (cr32 & SIS_VB_CRT2)
 		ivideo.disp_state = DISPTYPE_CRT2;
-	else if (cr32 & SIS_VB_LCD)
-		ivideo.disp_state = DISPTYPE_LCD;
-	else if (cr32 & SIS_VB_TV)
-		ivideo.disp_state = DISPTYPE_TV;
 	else
 		ivideo.disp_state = 0;
 
@@ -3865,7 +3944,8 @@ int __init sisfb_init(void)
 #endif
 
         outSISIDXREG(SISSR, IND_SIS_PASSWORD, SIS_PASSWORD);
-	
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)		
 #ifdef MODULE	
 	inSISIDXREG(SISCR,0x34,reg);
 	if(reg & 0x80) {
@@ -3875,6 +3955,7 @@ int __init sisfb_init(void)
 	   }
 	}
 #endif	
+#endif
 
 #ifdef LINUXBIOS  /* -------------------------------- */
 
@@ -4512,7 +4593,9 @@ static char         *queuemode = NULL;
 static int          pdc = 0;
 static int          noaccel = -1;
 static int          noypan  = -1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static int          inverse = 0;
+#endif
 static int          userom = 1;
 static int          useoem = -1;
 static char         *tvstandard = NULL;
@@ -4657,7 +4740,7 @@ int init_module(void)
 		/* For 2.4, set mode=none if no mode is given  */
 		sisfb_mode_idx = MODE_INDEX_NONE;
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		/* For 2.5, we don't need this "mode=none" stuff anymore */	
 		sisfb_mode_idx = DEFAULT_MODE;
 #endif
@@ -4689,8 +4772,10 @@ int init_module(void)
 
 	/* TW: Panning only with acceleration */
 	if(sisfb_accel == 0)  sisfb_ypan = 0;
-
+	
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	if(inverse)           sisfb_inverse = 1;
+#endif
 
 	if(mem)		      sisfb_mem = mem;
 

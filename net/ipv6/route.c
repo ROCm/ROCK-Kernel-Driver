@@ -49,6 +49,8 @@
 #include <net/addrconf.h>
 #include <net/tcp.h>
 #include <linux/rtnetlink.h>
+#include <net/dst.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 
@@ -127,6 +129,12 @@ struct fib6_node ip6_routing_table = {
 
 rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
 
+
+/*	Dummy rt for ndisc */
+struct rt6_info *ndisc_get_dummy_rt()
+{
+	return dst_alloc(&ip6_dst_ops);
+}
 
 /*
  *	Route lookup. Any rt6_lock is implied.
@@ -356,7 +364,7 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 
 		rt->rt6i_nexthop = ndisc_get_neigh(rt->rt6i_dev, &rt->rt6i_gateway);
 
-		dst_clone(&rt->u.dst);
+		dst_hold(&rt->u.dst);
 
 		err = rt6_ins(rt);
 		if (err == 0)
@@ -366,7 +374,7 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 
 		return rt;
 	}
-	dst_clone(&ip6_null_entry.u.dst);
+	dst_hold(&ip6_null_entry.u.dst);
 	return &ip6_null_entry;
 }
 
@@ -374,7 +382,7 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 if (rt == &ip6_null_entry && strict) { \
        while ((fn = fn->parent) != NULL) { \
 		if (fn->fn_flags & RTN_ROOT) { \
-			dst_clone(&rt->u.dst); \
+			dst_hold(&rt->u.dst); \
 			goto out; \
 		} \
 		if (fn->fn_flags & RTN_RTINFO) \
@@ -404,7 +412,7 @@ restart:
 	if ((rt->rt6i_flags & RTF_CACHE)) {
 		rt = rt6_device_match(rt, skb->dev->ifindex, strict);
 		BACKTRACK();
-		dst_clone(&rt->u.dst);
+		dst_hold(&rt->u.dst);
 		goto out;
 	}
 
@@ -424,7 +432,7 @@ restart:
 		*/
 		goto relookup;
 	}
-	dst_clone(&rt->u.dst);
+	dst_hold(&rt->u.dst);
 
 out:
 	read_unlock_bh(&rt6_lock);
@@ -455,7 +463,7 @@ restart:
 	if ((rt->rt6i_flags & RTF_CACHE)) {
 		rt = rt6_device_match(rt, fl->oif, strict);
 		BACKTRACK();
-		dst_clone(&rt->u.dst);
+		dst_hold(&rt->u.dst);
 		goto out;
 	}
 	if (rt->rt6i_flags & RTF_DEFAULT) {
@@ -480,7 +488,7 @@ restart:
 		*/
 		goto relookup;
 	}
-	dst_clone(&rt->u.dst);
+	dst_hold(&rt->u.dst);
 
 out:
 	read_unlock_bh(&rt6_lock);
@@ -815,7 +823,7 @@ static int ip6_route_del(struct in6_rtmsg *rtmsg)
 			if (rtmsg->rtmsg_metric &&
 			    rtmsg->rtmsg_metric != rt->rt6i_metric)
 				continue;
-			dst_clone(&rt->u.dst);
+			dst_hold(&rt->u.dst);
 			read_unlock_bh(&rt6_lock);
 
 			return ip6_del_rt(rt);
@@ -878,7 +886,7 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 			read_lock(&rt6_lock);
 			for (rt1 = ip6_routing_table.leaf; rt1; rt1 = rt1->u.next) {
 				if (!ipv6_addr_cmp(saddr, &rt1->rt6i_gateway)) {
-					dst_clone(&rt1->u.dst);
+					dst_hold(&rt1->u.dst);
 					dst_release(&rt->u.dst);
 					read_unlock(&rt6_lock);
 					rt = rt1;
@@ -1065,7 +1073,7 @@ struct rt6_info *rt6_get_dflt_router(struct in6_addr *addr, struct net_device *d
 			break;
 	}
 	if (rt)
-		dst_clone(&rt->u.dst);
+		dst_hold(&rt->u.dst);
 	write_unlock_bh(&rt6_lock);
 	return rt;
 }
@@ -1859,6 +1867,14 @@ ctl_table ipv6_route_table[] = {
 
 #endif
 
+int xfrm6_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
+{
+	int err = 0;
+	*dst = (struct xfrm_dst*)ip6_route_output(NULL, fl);
+	if (!*dst)
+		err = -ENETUNREACH;
+	return err;
+}
 
 void __init ip6_route_init(void)
 {
@@ -1867,6 +1883,7 @@ void __init ip6_route_init(void)
 						     0, SLAB_HWCACHE_ALIGN,
 						     NULL, NULL);
 	fib6_init();
+	xfrm_dst_lookup_register(xfrm6_dst_lookup, AF_INET6);
 #ifdef 	CONFIG_PROC_FS
 	proc_net_create("ipv6_route", 0, rt6_proc_info);
 	proc_net_create("rt6_stats", 0, rt6_proc_stats);
@@ -1880,7 +1897,7 @@ void ip6_route_cleanup(void)
 	proc_net_remove("ipv6_route");
 	proc_net_remove("rt6_stats");
 #endif
-
+	xfrm_dst_lookup_unregister(AF_INET6);
 	rt6_ifdown(NULL);
 	fib6_gc_cleanup();
 }

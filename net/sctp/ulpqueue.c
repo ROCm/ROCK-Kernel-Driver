@@ -189,7 +189,7 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	/* If the socket is just going to throw this away, do not
 	 * even try to deliver it.
 	 */
-	if (sk->dead || (sk->shutdown & RCV_SHUTDOWN))
+	if (test_bit(SOCK_DEAD, &sk->flags) || (sk->shutdown & RCV_SHUTDOWN))
 		goto out_free;
 
 	/* Check if the user wishes to receive this event.  */

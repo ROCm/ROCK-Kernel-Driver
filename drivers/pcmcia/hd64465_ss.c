@@ -1070,8 +1070,8 @@ static int __init init_hs(void)
 	}
 
 /*	hd64465_io_debug = 0; */
-	platform_device_register(&hd64465_device);
 	hd64465_device.dev.class_data = &hd64465_data;
+	platform_device_register(&hd64465_device);
 
 	return 0;
 }

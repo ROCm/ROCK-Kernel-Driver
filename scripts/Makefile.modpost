@@ -37,7 +37,7 @@ targets += $(modules)
 quiet_cmd_cc_o_c = CC      $@
       cmd_cc_o_c = $(CC) $(CFLAGS) $(CFLAGS_MODULE) -c -o $@ $<
 
-$(modules:.ko=.mod.o): %.mod.o: %.mod.c
+$(modules:.ko=.mod.o): %.mod.o: %.mod.c FORCE
 	$(call if_changed,cc_o_c)
 
 targets += $(modules:.ko=.mod.o)
@@ -51,9 +51,9 @@ $(modules:.ko=.mod.c): __modpost ;
 # Extract all checksums for all exported symbols
 
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost $^
+      cmd_modpost = scripts/modpost $(filter-out FORCE,$^)
 
-__modpost: $(wildcard vmlinux) $(modules:.ko=.o)
+__modpost: $(wildcard vmlinux) $(modules:.ko=.o) FORCE
 	$(call if_changed,modpost)
 
 targets += __modpost

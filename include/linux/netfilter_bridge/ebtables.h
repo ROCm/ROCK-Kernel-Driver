@@ -2,7 +2,7 @@
  *  ebtables
  *
  *	Authors:
- *	Bart De Schuymer		<bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer		<bdschuym@pandora.be>
  *
  *  ebtables.c,v 2.0, April, 2002
  *
@@ -20,7 +20,7 @@
 #define EBT_CHAIN_MAXNAMELEN EBT_TABLE_MAXNAMELEN
 #define EBT_FUNCTION_MAXNAMELEN EBT_TABLE_MAXNAMELEN
 
-// verdicts >0 are "branches"
+/* verdicts >0 are "branches" */
 #define EBT_ACCEPT   -1
 #define EBT_DROP     -2
 #define EBT_CONTINUE -3
@@ -34,33 +34,34 @@ struct ebt_counter
 };
 
 struct ebt_entries {
-	// this field is always set to zero
-	// See EBT_ENTRY_OR_ENTRIES.
-	// Must be same size as ebt_entry.bitmask
+	/* this field is always set to zero
+	 * See EBT_ENTRY_OR_ENTRIES.
+	 * Must be same size as ebt_entry.bitmask */
 	unsigned int distinguisher;
-	// the chain name
+	/* the chain name */
 	char name[EBT_CHAIN_MAXNAMELEN];
-	// counter offset for this chain
+	/* counter offset for this chain */
 	unsigned int counter_offset;
-	// one standard (accept, drop, return) per hook
+	/* one standard (accept, drop, return) per hook */
 	int policy;
-	// nr. of entries
+	/* nr. of entries */
 	unsigned int nentries;
-	// entry list
+	/* entry list */
 	char data[0];
 };
 
-// used for the bitmask of struct ebt_entry
+/* used for the bitmask of struct ebt_entry */
 
-// This is a hack to make a difference between an ebt_entry struct and an
-// ebt_entries struct when traversing the entries from start to end.
-// Using this simplifies the code alot, while still being able to use
-// ebt_entries.
-// Contrary, iptables doesn't use something like ebt_entries and therefore uses
-// different techniques for naming the policy and such. So, iptables doesn't
-// need a hack like this.
+/* This is a hack to make a difference between an ebt_entry struct and an
+ * ebt_entries struct when traversing the entries from start to end.
+ * Using this simplifies the code alot, while still being able to use
+ * ebt_entries.
+ * Contrary, iptables doesn't use something like ebt_entries and therefore uses
+ * different techniques for naming the policy and such. So, iptables doesn't
+ * need a hack like this.
+ */
 #define EBT_ENTRY_OR_ENTRIES 0x01
-// these are the normal masks
+/* these are the normal masks */
 #define EBT_NOPROTO 0x02
 #define EBT_802_3 0x04
 #define EBT_SOURCEMAC 0x08
@@ -84,7 +85,7 @@ struct ebt_entry_match
 		char name[EBT_FUNCTION_MAXNAMELEN];
 		struct ebt_match *match;
 	} u;
-	// size of data
+	/* size of data */
 	unsigned int match_size;
 	unsigned char data[0];
 };
@@ -95,7 +96,7 @@ struct ebt_entry_watcher
 		char name[EBT_FUNCTION_MAXNAMELEN];
 		struct ebt_watcher *watcher;
 	} u;
-	// size of data
+	/* size of data */
 	unsigned int watcher_size;
 	unsigned char data[0];
 };
@@ -106,7 +107,7 @@ struct ebt_entry_target
 		char name[EBT_FUNCTION_MAXNAMELEN];
 		struct ebt_target *target;
 	} u;
-	// size of data
+	/* size of data */
 	unsigned int target_size;
 	unsigned char data[0];
 };
@@ -118,29 +119,29 @@ struct ebt_standard_target
 	int verdict;
 };
 
-// one entry
+/* one entry */
 struct ebt_entry {
-	// this needs to be the first field
+	/* this needs to be the first field */
 	unsigned int bitmask;
 	unsigned int invflags;
 	uint16_t ethproto;
-	// the physical in-dev
+	/* the physical in-dev */
 	char in[IFNAMSIZ];
-	// the logical in-dev
+	/* the logical in-dev */
 	char logical_in[IFNAMSIZ];
-	// the physical out-dev
+	/* the physical out-dev */
 	char out[IFNAMSIZ];
-	// the logical out-dev
+	/* the logical out-dev */
 	char logical_out[IFNAMSIZ];
 	unsigned char sourcemac[ETH_ALEN];
 	unsigned char sourcemsk[ETH_ALEN];
 	unsigned char destmac[ETH_ALEN];
 	unsigned char destmsk[ETH_ALEN];
-	// sizeof ebt_entry + matches
+	/* sizeof ebt_entry + matches */
 	unsigned int watchers_offset;
-	// sizeof ebt_entry + matches + watchers
+	/* sizeof ebt_entry + matches + watchers */
 	unsigned int target_offset;
-	// sizeof ebt_entry + matches + watchers + target
+	/* sizeof ebt_entry + matches + watchers + target */
 	unsigned int next_offset;
 	unsigned char elems[0];
 };
@@ -149,20 +150,20 @@ struct ebt_replace
 {
 	char name[EBT_TABLE_MAXNAMELEN];
 	unsigned int valid_hooks;
-	// nr of rules in the table
+	/* nr of rules in the table */
 	unsigned int nentries;
-	// total size of the entries
+	/* total size of the entries */
 	unsigned int entries_size;
-	// start of the chains
+	/* start of the chains */
 	struct ebt_entries *hook_entry[NF_BR_NUMHOOKS];
-	// nr of counters userspace expects back
+	/* nr of counters userspace expects back */
 	unsigned int num_counters;
-	// where the kernel will put the old counters
+	/* where the kernel will put the old counters */
 	struct ebt_counter *counters;
 	char *entries;
 };
 
-// [gs]etsockopt numbers
+/* {g,s}etsockopt numbers */
 #define EBT_BASE_CTL            128
 
 #define EBT_SO_SET_ENTRIES      (EBT_BASE_CTL)
@@ -177,7 +178,7 @@ struct ebt_replace
 
 #ifdef __KERNEL__
 
-// return values for match() functions
+/* return values for match() functions */
 #define EBT_MATCH 0
 #define EBT_NOMATCH 1
 
@@ -185,11 +186,11 @@ struct ebt_match
 {
 	struct list_head list;
 	const char name[EBT_FUNCTION_MAXNAMELEN];
-	// 0 == it matches
+	/* 0 == it matches */
 	int (*match)(const struct sk_buff *skb, const struct net_device *in,
 	   const struct net_device *out, const void *matchdata,
 	   unsigned int datalen);
-	// 0 == let it in
+	/* 0 == let it in */
 	int (*check)(const char *tablename, unsigned int hookmask,
 	   const struct ebt_entry *e, void *matchdata, unsigned int datalen);
 	void (*destroy)(void *matchdata, unsigned int datalen);
@@ -203,7 +204,7 @@ struct ebt_watcher
 	void (*watcher)(const struct sk_buff *skb, const struct net_device *in,
 	   const struct net_device *out, const void *watcherdata,
 	   unsigned int datalen);
-	// 0 == let it in
+	/* 0 == let it in */
 	int (*check)(const char *tablename, unsigned int hookmask,
 	   const struct ebt_entry *e, void *watcherdata, unsigned int datalen);
 	void (*destroy)(void *watcherdata, unsigned int datalen);
@@ -214,33 +215,33 @@ struct ebt_target
 {
 	struct list_head list;
 	const char name[EBT_FUNCTION_MAXNAMELEN];
-	// returns one of the standard verdicts
+	/* returns one of the standard verdicts */
 	int (*target)(struct sk_buff **pskb, unsigned int hooknr,
 	   const struct net_device *in, const struct net_device *out,
 	   const void *targetdata, unsigned int datalen);
-	// 0 == let it in
+	/* 0 == let it in */
 	int (*check)(const char *tablename, unsigned int hookmask,
 	   const struct ebt_entry *e, void *targetdata, unsigned int datalen);
 	void (*destroy)(void *targetdata, unsigned int datalen);
 	struct module *me;
 };
 
-// used for jumping from and into user defined chains (udc)
+/* used for jumping from and into user defined chains (udc) */
 struct ebt_chainstack
 {
-	struct ebt_entries *chaininfo; // pointer to chain data
-	struct ebt_entry *e; // pointer to entry data
-	unsigned int n; // n'th entry
+	struct ebt_entries *chaininfo; /* pointer to chain data */
+	struct ebt_entry *e; /* pointer to entry data */
+	unsigned int n; /* n'th entry */
 };
 
 struct ebt_table_info
 {
-	// total size of the entries
+	/* total size of the entries */
 	unsigned int entries_size;
 	unsigned int nentries;
-	// pointers to the start of the chains
+	/* pointers to the start of the chains */
 	struct ebt_entries *hook_entry[NF_BR_NUMHOOKS];
-	// room to maintain the stack used for jumping from and into udc
+	/* room to maintain the stack used for jumping from and into udc */
 	struct ebt_chainstack **chainstack;
 	char *entries;
 	struct ebt_counter counters[0] ____cacheline_aligned;
@@ -253,11 +254,11 @@ struct ebt_table
 	struct ebt_replace *table;
 	unsigned int valid_hooks;
 	rwlock_t lock;
-	// e.g. could be the table explicitly only allows certain
-	// matches, targets, ... 0 == let it in
+	/* e.g. could be the table explicitly only allows certain
+	 * matches, targets, ... 0 == let it in */
 	int (*check)(const struct ebt_table_info *info,
 	   unsigned int valid_hooks);
-	// the data used by the kernel
+	/* the data used by the kernel */
 	struct ebt_table_info *private;
 };
 
@@ -273,20 +274,20 @@ extern unsigned int ebt_do_table(unsigned int hook, struct sk_buff **pskb,
    const struct net_device *in, const struct net_device *out,
    struct ebt_table *table);
 
-   // Used in the kernel match() functions
+/* Used in the kernel match() functions */
 #define FWINV(bool,invflg) ((bool) ^ !!(info->invflags & invflg))
-// True if the hook mask denotes that the rule is in a base chain,
-// used in the check() functions
+/* True if the hook mask denotes that the rule is in a base chain,
+ * used in the check() functions */
 #define BASE_CHAIN (hookmask & (1 << NF_BR_NUMHOOKS))
-// Clear the bit in the hook mask that tells if the rule is on a base chain
+/* Clear the bit in the hook mask that tells if the rule is on a base chain */
 #define CLEAR_BASE_CHAIN_BIT (hookmask &= ~(1 << NF_BR_NUMHOOKS))
-// True if the target is not a standard target
+/* True if the target is not a standard target */
 #define INVALID_TARGET (info->target < -NUM_STANDARD_TARGETS || info->target >= 0)
 
 #endif /* __KERNEL__ */
 
-// blatently stolen from ip_tables.h
-// fn returns 0 to continue iteration
+/* blatently stolen from ip_tables.h
+ * fn returns 0 to continue iteration */
 #define EBT_MATCH_ITERATE(e, fn, args...)                   \
 ({                                                          \
 	unsigned int __i;                                   \

@@ -95,6 +95,7 @@ struct ctlr_info
 #define SA5_REPLY_INTR_MASK_OFFSET	0x34
 #define SA5_REPLY_PORT_OFFSET		0x44
 #define SA5_INTR_STATUS		0x30
+#define SA5_SCRATCHPAD_OFFSET	0xB0
 
 #define SA5_CTCFG_OFFSET	0xB4
 #define SA5_CTMEM_OFFSET	0xB8
@@ -104,6 +105,7 @@ struct ctlr_info
 #define SA5_INTR_PENDING	0x08
 #define SA5B_INTR_PENDING	0x04
 #define FIFO_EMPTY		0xffffffff	
+#define CCISS_FIRMWARE_READY	0xffff0000 /* value in scratchpad register */
 
 #define  CISS_ERROR_BIT		0x02
 

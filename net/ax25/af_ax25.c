@@ -330,7 +330,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 				ax25_cb *sax25 = ax25_sk(skb->sk);
 
 				/* Queue the unaccepted socket for death */
-				skb->sk->dead = 1;
+				__set_bit(SOCK_DEAD, &skb->sk->flags);
 
 				ax25_start_heartbeat(sax25);
 				sax25->state = AX25_STATE_0;
@@ -984,8 +984,8 @@ static int ax25_release(struct socket *sock)
 			sk->state                = TCP_CLOSE;
 			sk->shutdown            |= SEND_SHUTDOWN;
 			sk->state_change(sk);
-			sk->dead                 = 1;
-			sk->destroy              = 1;
+			__set_bit(SOCK_DEAD, &sk->flags);
+			__set_bit(SOCK_DESTROY, &sk->flags);
 			break;
 
 		default:
@@ -995,7 +995,7 @@ static int ax25_release(struct socket *sock)
 		sk->state     = TCP_CLOSE;
 		sk->shutdown |= SEND_SHUTDOWN;
 		sk->state_change(sk);
-		sk->dead      = 1;
+		__set_bit(SOCK_DEAD, &sk->flags);
 		ax25_destroy_socket(ax25);
 	}
 

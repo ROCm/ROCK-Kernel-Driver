@@ -6,7 +6,7 @@
 	IN_PER_CPU=0
 }
 
-/__per_cpu$$/ && ! ( / __ksymtab_/ || / __kstrtab_/ || / __kcrctab_/ ) {
+/__per_cpu$$/ && ! ( / __ksymtab_/ || / __kstrtab_/ || / __kcrctab_/ || / __crc_/ ) {
 	if (!IN_PER_CPU) {
 		print $$3 " not in per-cpu section" > "/dev/stderr";
 		FOUND=1;

@@ -4,7 +4,7 @@
 struct ebt_nat_info
 {
 	unsigned char mac[ETH_ALEN];
-	// EBT_ACCEPT, EBT_DROP, EBT_CONTINUE or EBT_RETURN
+	/* EBT_ACCEPT, EBT_DROP, EBT_CONTINUE or EBT_RETURN */
 	int target;
 };
 #define EBT_SNAT_TARGET "snat"
