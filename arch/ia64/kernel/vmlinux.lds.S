@@ -42,6 +42,7 @@ SECTIONS
 	*(.text.ivt)
 	*(.text)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.gnu.linkonce.t*)
     }
   .text2 : AT(ADDR(.text2) - LOAD_OFFSET)

@@ -18,6 +18,7 @@ SECTIONS
   .text : { 
 	*(.text) 
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.fixup)
 	*(.gnu.warning)
   } :kernel
