@@ -326,6 +326,15 @@ config SA1100_STORK
 #	help
 #	  :: write me ::
 
+config SA1100_SSP
+	tristate "Generic PIO SSP"
+	depends on ARCH_SA1100
+	help
+	  Say Y here to enable support for the generic PIO SSP driver.
+	  This isn't for audio support, but for attached sensors and
+	  other devices, eg for BadgePAD 4 sensor support, or Jornada
+	  720 touchscreen support.
+
 config SA1100_USB
 	tristate "SA1100 USB function support"
 	depends on ARCH_SA1100
