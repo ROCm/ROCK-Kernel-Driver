@@ -69,8 +69,8 @@ MODULE_DESCRIPTION(ACPI_BUTTON_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
 
-int acpi_button_add (struct acpi_device *device);
-int acpi_button_remove (struct acpi_device *device, int type);
+static int acpi_button_add (struct acpi_device *device);
+static int acpi_button_remove (struct acpi_device *device, int type);
 static int acpi_button_info_open_fs(struct inode *inode, struct file *file);
 static int acpi_button_state_open_fs(struct inode *inode, struct file *file);
 
@@ -285,7 +285,7 @@ acpi_button_notify_fixed (
 }
 
 
-int
+static int
 acpi_button_add (
 	struct acpi_device	*device)
 {
@@ -435,7 +435,7 @@ end:
 }
 
 
-int
+static int
 acpi_button_remove (struct acpi_device *device, int type)
 {
 	acpi_status		status = 0;
