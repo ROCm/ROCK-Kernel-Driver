@@ -66,12 +66,7 @@ void release_task(struct task_struct * p)
  
 	BUG_ON(p->state < TASK_ZOMBIE);
  
-	if (p != current)
-		wait_task_inactive(p);
-
 	atomic_dec(&p->user->processes);
-	security_task_free(p);
-	free_uid(p->user);
 	write_lock_irq(&tasklist_lock);
 	if (unlikely(p->ptrace))
 		__ptrace_unlink(p);
