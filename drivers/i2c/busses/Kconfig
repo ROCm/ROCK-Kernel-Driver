@@ -310,6 +310,7 @@ config I2C_VIAPRO
 	  8233
 	  8233A
 	  8235
+	  8237
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-viapro.
