@@ -366,9 +366,9 @@ static void scsi_dump_status(int level)
 				       i++,
 
 				       SCpnt->host->host_no,
-				       SCpnt->channel,
-                                       SCpnt->target,
-                                       SCpnt->lun,
+				       SCpnt->device->channel,
+                                       SCpnt->device->id,
+                                       SCpnt->device->lun,
 
                                        SCpnt->request->rq_disk ?
                                        SCpnt->request->rq_disk->disk_name : "?",

@@ -929,7 +929,7 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset, int length, int 
 
 static char *lprint_Scsi_Cmnd(Scsi_Cmnd * cmd, char *pos, char *buffer, int length)
 {
-	SPRINTF("scsi%d : destination target %d, lun %d\n", cmd->host->host_no, cmd->target, cmd->lun);
+	SPRINTF("scsi%d : destination target %d, lun %d\n", cmd->host->host_no, cmd->device->id, cmd->device->lun);
 	SPRINTF("        command = ");
 	pos = lprint_command(cmd->cmnd, pos, buffer, length);
 	return (pos);
@@ -1126,15 +1126,15 @@ static int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 		case WRITE:
 		case WRITE_6:
 		case WRITE_10:
-			hostdata->time_write[cmd->target] -= (jiffies - hostdata->timebase);
-			hostdata->bytes_write[cmd->target] += cmd->request_bufflen;
+			hostdata->time_write[cmd->device->id] -= (jiffies - hostdata->timebase);
+			hostdata->bytes_write[cmd->device->id] += cmd->request_bufflen;
 			hostdata->pendingw++;
 			break;
 		case READ:
 		case READ_6:
 		case READ_10:
-			hostdata->time_read[cmd->target] -= (jiffies - hostdata->timebase);
-			hostdata->bytes_read[cmd->target] += cmd->request_bufflen;
+			hostdata->time_read[cmd->device->id] -= (jiffies - hostdata->timebase);
+			hostdata->bytes_read[cmd->device->id] += cmd->request_bufflen;
 			hostdata->pendingr++;
 			break;
 	}
@@ -1224,7 +1224,7 @@ static void NCR5380_main(void *p)
 				if (prev != tmp)
 					dprintk(NDEBUG_LISTS, ("MAIN tmp=%p   target=%d   busy=%d lun=%d\n", tmp, tmp->target, hostdata->busy[tmp->target], tmp->lun));
 				/*  When we find one, remove it from the issue queue. */
-				if (!(hostdata->busy[tmp->target] & (1 << tmp->lun))) {
+				if (!(hostdata->busy[tmp->device->id] & (1 << tmp->device->lun))) {
 					if (prev) {
 						REMOVE(prev, prev->host_scribble, tmp, tmp->host_scribble);
 						prev->host_scribble = tmp->host_scribble;
@@ -1286,7 +1286,7 @@ static void NCR5380_main(void *p)
 				   this is needed for Mustek scanners, that
 				   do not respond to commands immediately
 				   after a scan */
-				printk(KERN_DEBUG "scsi%d: device %d did not respond in time\n", instance->host_no, tmp->target);
+				printk(KERN_DEBUG "scsi%d: device %d did not respond in time\n", instance->host_no, tmp->device->id);
 				LIST(tmp, hostdata->issue_queue);
 				tmp->host_scribble = (unsigned char *) hostdata->issue_queue;
 				hostdata->issue_queue = tmp;
@@ -1421,13 +1421,13 @@ static void collect_stats(struct NCR5380_hostdata *hostdata, Scsi_Cmnd * cmd)
 	case WRITE:
 	case WRITE_6:
 	case WRITE_10:
-		hostdata->time_write[cmd->target] += (jiffies - hostdata->timebase);
+		hostdata->time_write[cmd->device->id] += (jiffies - hostdata->timebase);
 		hostdata->pendingw--;
 		break;
 	case READ:
 	case READ_6:
 	case READ_10:
-		hostdata->time_read[cmd->target] += (jiffies - hostdata->timebase);
+		hostdata->time_read[cmd->device->id] += (jiffies - hostdata->timebase);
 		hostdata->pendingr--;
 		break;
 	}
@@ -1567,7 +1567,7 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag)
 	 * the host and target ID's on the SCSI bus.
 	 */
 
-	NCR5380_write(OUTPUT_DATA_REG, (hostdata->id_mask | (1 << cmd->target)));
+	NCR5380_write(OUTPUT_DATA_REG, (hostdata->id_mask | (1 << cmd->device->id)));
 
 	/* 
 	 * Raise ATN while SEL is true before BSY goes false from arbitration,
@@ -1612,7 +1612,7 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag)
 
 	udelay(1);
 
-	dprintk(NDEBUG_SELECTION, ("scsi%d : selecting target %d\n", instance->host_no, cmd->target));
+	dprintk(NDEBUG_SELECTION, ("scsi%d : selecting target %d\n", instance->host_no, cmd->device->id));
 
 	/* 
 	 * The SCSI specification calls for a 250 ms timeout for the actual 
@@ -1668,7 +1668,7 @@ part2:
 
 	if (!(NCR5380_read(STATUS_REG) & SR_BSY)) {
 		NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
-		if (hostdata->targets_present & (1 << cmd->target)) {
+		if (hostdata->targets_present & (1 << cmd->device->id)) {
 			printk(KERN_DEBUG "scsi%d : weirdness\n", instance->host_no);
 			if (hostdata->restart_select)
 				printk(KERN_DEBUG "\trestart select\n");
@@ -1686,7 +1686,7 @@ part2:
 		NCR5380_write(SELECT_ENABLE_REG, hostdata->id_mask);
 		return 0;
 	}
-	hostdata->targets_present |= (1 << cmd->target);
+	hostdata->targets_present |= (1 << cmd->device->id);
 
 	/*
 	 * Since we followed the SCSI spec, and raised ATN while SEL 
@@ -1713,8 +1713,8 @@ part2:
 		goto failed;
 	}
 
-	dprintk(NDEBUG_SELECTION, ("scsi%d : target %d selected, going into MESSAGE OUT phase.\n", instance->host_no, cmd->target));
-	tmp[0] = IDENTIFY(((instance->irq == IRQ_NONE) ? 0 : 1), cmd->lun);
+	dprintk(NDEBUG_SELECTION, ("scsi%d : target %d selected, going into MESSAGE OUT phase.\n", instance->host_no, cmd->device->id));
+	tmp[0] = IDENTIFY(((instance->irq == IRQ_NONE) ? 0 : 1), cmd->device->lun);
 
 	if(instance->irq != IRQ_NONE)
 		spin_lock_irq(instance->host_lock);
@@ -1729,7 +1729,7 @@ part2:
 	dprintk(NDEBUG_SELECTION, ("scsi%d : nexus established.\n", instance->host_no));
 	/* XXX need to handle errors here */
 	hostdata->connected = cmd;
-	hostdata->busy[cmd->target] |= (1 << cmd->lun);
+	hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 
 	initialize_SCp(cmd);
 
@@ -2380,7 +2380,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 						 * If the watchdog timer fires, all future accesses to this
 						 * device will use the polled-IO.
 						 */
-						printk("scsi%d : switching target %d lun %d to slow handshake\n", instance->host_no, cmd->target, cmd->lun);
+						printk("scsi%d : switching target %d lun %d to slow handshake\n", instance->host_no, cmd->device->id, cmd->device->lun);
 						cmd->device->borken = 1;
 						NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE | ICR_ASSERT_ATN);
 						sink = 1;
@@ -2417,14 +2417,14 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 				case LINKED_FLG_CMD_COMPLETE:
 					/* Accept message by clearing ACK */
 					NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
-					dprintk(NDEBUG_LINKED, ("scsi%d : target %d lun %d linked command complete.\n", instance->host_no, cmd->target, cmd->lun));
+					dprintk(NDEBUG_LINKED, ("scsi%d : target %d lun %d linked command complete.\n", instance->host_no, cmd->device->id, cmd->device->lun));
 					/* 
 					 * Sanity check : A linked command should only terminate with
 					 * one of these messages if there are more linked commands
 					 * available.
 					 */
 					if (!cmd->next_link) {
-						printk("scsi%d : target %d lun %d linked command complete, no next_link\n" instance->host_no, cmd->target, cmd->lun);
+						printk("scsi%d : target %d lun %d linked command complete, no next_link\n" instance->host_no, cmd->device->id, cmd->device->lun);
 						sink = 1;
 						do_abort(instance);
 						return;
@@ -2433,7 +2433,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 					/* The next command is still part of this process */
 					cmd->next_link->tag = cmd->tag;
 					cmd->result = cmd->SCp.Status | (cmd->SCp.Message << 8);
-					dprintk(NDEBUG_LINKED, ("scsi%d : target %d lun %d linked request done, calling scsi_done().\n", instance->host_no, cmd->target, cmd->lun));
+					dprintk(NDEBUG_LINKED, ("scsi%d : target %d lun %d linked request done, calling scsi_done().\n", instance->host_no, cmd->device->id, cmd->device->lun));
 					collect_stats(hostdata, cmd);
 					cmd->scsi_done(cmd);
 					cmd = hostdata->connected;
@@ -2445,8 +2445,8 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 					sink = 1;
 					NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
 					hostdata->connected = NULL;
-					dprintk(NDEBUG_QUEUES, ("scsi%d : command for target %d, lun %d completed\n", instance->host_no, cmd->target, cmd->lun));
-					hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+					dprintk(NDEBUG_QUEUES, ("scsi%d : command for target %d, lun %d completed\n", instance->host_no, cmd->device->id, cmd->device->lun));
+					hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 
 					/* 
 					 * I'm not sure what the correct thing to do here is : 
@@ -2514,7 +2514,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 					case ORDERED_QUEUE_TAG:
 					case SIMPLE_QUEUE_TAG:
 						cmd->device->tagged_queue = 0;
-						hostdata->busy[cmd->target] |= (1 << cmd->lun);
+						hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 						break;
 					default:
 						break;
@@ -2528,7 +2528,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 						    hostdata->disconnected_queue;
 						hostdata->connected = NULL;
 						hostdata->disconnected_queue = cmd;
-						dprintk(NDEBUG_QUEUES, ("scsi%d : command for target %d lun %d was moved from connected to" "  the disconnected_queue\n", instance->host_no, cmd->target, cmd->lun));
+						dprintk(NDEBUG_QUEUES, ("scsi%d : command for target %d lun %d was moved from connected to" "  the disconnected_queue\n", instance->host_no, cmd->device->id, cmd->device->lun));
 						/* 
 						 * Restore phase bits to 0 so an interrupted selection, 
 						 * arbitration can resume.
@@ -2619,9 +2619,9 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 						print_msg(extended_msg);
 						printk("\n");
 					} else if (tmp != EXTENDED_MESSAGE)
-						printk("scsi%d: rejecting unknown message %02x from target %d, lun %d\n", instance->host_no, tmp, cmd->target, cmd->lun);
+						printk("scsi%d: rejecting unknown message %02x from target %d, lun %d\n", instance->host_no, tmp, cmd->device->id, cmd->device->lun);
 					else
-						printk("scsi%d: rejecting unknown extended message code %02x, length %d from target %d, lun %d\n", instance->host_no, extended_msg[1], extended_msg[0], cmd->target, cmd->lun);
+						printk("scsi%d: rejecting unknown extended message code %02x, length %d from target %d, lun %d\n", instance->host_no, extended_msg[1], extended_msg[0], cmd->device->id, cmd->device->lun);
 
 					msgout = MESSAGE_REJECT;
 					NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE | ICR_ASSERT_ATN);
@@ -2634,7 +2634,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 				hostdata->last_message = msgout;
 				NCR5380_transfer_pio(instance, &phase, &len, &data);
 				if (msgout == ABORT) {
-					hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+					hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 					hostdata->connected = NULL;
 					cmd->result = DID_ERROR << 16;
 					collect_stats(hostdata, cmd);
@@ -2772,7 +2772,7 @@ static void NCR5380_reselect(struct Scsi_Host *instance) {
 
 
 		for (tmp = (Scsi_Cmnd *) hostdata->disconnected_queue, prev = NULL; tmp; prev = tmp, tmp = (Scsi_Cmnd *) tmp->host_scribble)
-			if ((target_mask == (1 << tmp->target)) && (lun == tmp->lun)
+			if ((target_mask == (1 << tmp->device->id)) && (lun == tmp->device->lun)
 			    ) {
 				if (prev) {
 					REMOVE(prev, prev->host_scribble, tmp, tmp->host_scribble);

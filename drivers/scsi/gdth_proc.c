@@ -447,8 +447,8 @@ static int gdth_set_bin_info(char *buffer,int length,int hanum,Scsi_Cmnd scp)
         piord->size = sizeof(gdth_iord_str);
         memcpy(cmnd, piowr->iu.scsi.cmd, 12);
 #if LINUX_VERSION_CODE >= 0x020322
-        scp->target = piowr->iu.scsi.target;
-        scp->channel = virt_ctr ? 0 : piowr->iu.scsi.bus;
+        scp->device->id = piowr->iu.scsi.target;
+        scp->device->channel = virt_ctr ? 0 : piowr->iu.scsi.bus;
         scp->cmd_len = piowr->iu.scsi.cmd_len;
         gdth_do_cmd(scp, pcmd, cmnd, piowr->timeout);
         piord->status = (scp->SCp.Message<<16)|scp->SCp.Status;
@@ -467,7 +467,7 @@ static int gdth_set_bin_info(char *buffer,int length,int hanum,Scsi_Cmnd scp)
         piord = (gdth_iord_str *)ha->pscratch;
         piord->size = sizeof(gdth_iord_str);
 #if LINUX_VERSION_CODE >= 0x020322
-        scp->channel = virt_ctr ? 0 : piowr->iu.scsi.bus;
+        scp->device->channel = virt_ctr ? 0 : piowr->iu.scsi.bus;
         piord->status = (ulong32)gdth_eh_bus_reset( scp );
         if (piord->status == SUCCESS)
             piord->status = S_OK;
@@ -1383,8 +1383,8 @@ static void gdth_wait_completion(int hanum, int busnum, int id)
 
     for (i = 0; i < GDTH_MAXCMDS; ++i) {
         scp = ha->cmd_tab[i].cmnd;
-        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
-        if (!SPECIAL_SCP(scp) && scp->target == (unchar)id && 
+        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+        if (!SPECIAL_SCP(scp) && scp->device->id == (unchar)id && 
             b == (unchar)busnum) {
             scp->SCp.have_data_in = 0;
             GDTH_UNLOCK_HA(ha, flags);
@@ -1410,8 +1410,8 @@ static void gdth_stop_timeout(int hanum, int busnum, int id)
     GDTH_LOCK_HA(ha, flags);
 
     for (scp = ha->req_first; scp; scp = (Scsi_Cmnd *)scp->SCp.ptr) {
-        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
-        if (scp->target == (unchar)id && b == (unchar)busnum) {
+        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+        if (scp->device->id == (unchar)id && b == (unchar)busnum) {
             TRACE2(("gdth_stop_timeout(): update_timeout()\n"));
             scp->SCp.buffers_residual = gdth_update_timeout(hanum, scp, 0);
         }
@@ -1430,8 +1430,8 @@ static void gdth_start_timeout(int hanum, int busnum, int id)
     GDTH_LOCK_HA(ha, flags);
 
     for (scp = ha->req_first; scp; scp = (Scsi_Cmnd *)scp->SCp.ptr) {
-        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
-        if (scp->target == (unchar)id && b == (unchar)busnum) {
+        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->device->channel;
+        if (scp->device->id == (unchar)id && b == (unchar)busnum) {
             TRACE2(("gdth_start_timeout(): update_timeout()\n"));
             gdth_update_timeout(hanum, scp, scp->SCp.buffers_residual);
         }

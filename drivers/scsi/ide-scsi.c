@@ -800,13 +800,13 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 
 int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 	idescsi_scsi_t *scsi;
 	struct request *rq = NULL;
 	idescsi_pc_t *pc = NULL;
 
 	if (!drive) {
-		printk (KERN_ERR "ide-scsi: drive id %d not present\n", cmd->target);
+		printk (KERN_ERR "ide-scsi: drive id %d not present\n", cmd->device->id);
 		goto abort;
 	}
 	scsi = drive->driver_data;
@@ -867,7 +867,7 @@ int idescsi_abort (Scsi_Cmnd *cmd)
 {
 	int countdown = 8;
 	unsigned long flags;
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 	idescsi_scsi_t *scsi;
 
 	printk (KERN_ERR "ide-scsi: abort called for %lu\n", cmd->serial_number);
@@ -898,7 +898,7 @@ int idescsi_reset (Scsi_Cmnd *cmd)
 {
 	unsigned long flags;
 	struct request *req;
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 
 	printk (KERN_ERR "ide-scsi: reset called for %lu\n", cmd->serial_number);
 	/* first null the handler for the drive and let any process

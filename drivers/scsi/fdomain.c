@@ -1262,7 +1262,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       outb( 0x40 | FIFO_COUNT, Interrupt_Cntl_port );
 
       outb( 0x82, SCSI_Cntl_port ); /* Bus Enable + Select */
-      outb( adapter_mask | (1 << current_SC->target), SCSI_Data_NoACK_port );
+      outb( adapter_mask | (1 << current_SC->device->id), SCSI_Data_NoACK_port );
       
       /* Stop arbitration and enable parity */
       outb( 0x10 | PARITY_MASK, TMC_Cntl_port );
@@ -1274,7 +1274,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       status = inb( SCSI_Status_port );
       if (!(status & 0x01)) {
 	 /* Try again, for slow devices */
-	 if (fdomain_select( current_SC->target )) {
+	 if (fdomain_select( current_SC->device->id )) {
 #if EVERY_ACCESS
 	    printk( " SFAIL " );
 #endif
@@ -1337,7 +1337,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 	     && current_SC->SCp.Status != 2
 	     && current_SC->SCp.Status != 8) {
 	    printk( "scsi: <fdomain> target = %d, command = %x, status = %x\n",
-		    current_SC->target,
+		    current_SC->device->id,
 		    current_SC->cmnd[0],
 		    current_SC->SCp.Status );
 	 }
@@ -1596,7 +1596,7 @@ static void print_info(Scsi_Cmnd *SCpnt)
 
    printk( " (%d), target = %d cmnd = 0x%02x pieces = %d size = %u\n",
 	   SCpnt->SCp.phase,
-	   SCpnt->target,
+	   SCpnt->device->id,
 	   *(unsigned char *)SCpnt->cmnd,
 	   SCpnt->use_sg,
 	   SCpnt->request_bufflen );

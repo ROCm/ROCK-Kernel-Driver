@@ -1591,15 +1591,15 @@ ckc_e:
 	       //dc390_Going_remove (pDCB, pSRB);
 	       dc390_remove_dev (pACB, pDCB); DCB_removed = 1;
 	       
-	       if( (pcmd->target == pACB->pScsiHost->max_id - 1) &&
-		  ((pcmd->lun == 0) || (pcmd->lun == pACB->pScsiHost->max_lun - 1)) )
+	       if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) &&
+		  ((pcmd->device->lun == 0) || (pcmd->device->lun == pACB->pScsiHost->max_lun - 1)) )
 		 pACB->scan_devices = 0;
 	    }
 	    else
 	    {
 	        /* device present: add */
-		if( (pcmd->target == pACB->pScsiHost->max_id - 1) && 
-		    (pcmd->lun == pACB->pScsiHost->max_lun - 1) )
+		if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) && 
+		    (pcmd->device->lun == pACB->pScsiHost->max_lun - 1) )
 		    pACB->scan_devices = END_SCAN ;
 	        /* pACB->DeviceCnt++; */ /* Dev is added on INQUIRY */
 	    }
@@ -1624,8 +1624,8 @@ ckc_e:
 	     dc390_add_dev (pACB, pDCB, ptr);
 	     if (pACB->scan_devices) pACB->DeviceCnt++;
 	  }
-	if( (pcmd->target == pACB->pScsiHost->max_id - 1) &&
-	    (pcmd->lun == pACB->pScsiHost->max_lun - 1) )
+	if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) &&
+	    (pcmd->device->lun == pACB->pScsiHost->max_lun - 1) )
 	  pACB->scan_devices = 0;
      };
 

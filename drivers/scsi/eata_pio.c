@@ -310,7 +310,7 @@ static int eata_pio_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
 	cp->status = USED;	/* claim free slot */
 
-	DBG(DBG_QUEUE, printk(KERN_DEBUG "eata_pio_queue pid %ld, target: %x, lun:" " %x, y %d\n", cmd->pid, cmd->target, cmd->lun, y));
+	DBG(DBG_QUEUE, printk(KERN_DEBUG "eata_pio_queue pid %ld, target: %x, lun:" " %x, y %d\n", cmd->pid, cmd->device->id, cmd->device->lun, y));
 
 	cmd->scsi_done = (void *) done;
 
@@ -319,14 +319,14 @@ static int eata_pio_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	else
 		cp->DataIn = TRUE;	/* Input mode  */
 
-	cp->Interpret = (cmd->target == hd->hostid);
+	cp->Interpret = (cmd->device->id == hd->hostid);
 	cp->cp_datalen = htonl((unsigned long) cmd->request_bufflen);
 	cp->Auto_Req_Sen = FALSE;
 	cp->cp_reqDMA = htonl(0);
 	cp->reqlen = 0;
 
-	cp->cp_id = cmd->target;
-	cp->cp_lun = cmd->lun;
+	cp->cp_id = cmd->device->id;
+	cp->cp_lun = cmd->device->lun;
 	cp->cp_dispri = FALSE;
 	cp->cp_identify = TRUE;
 	memcpy(cp->cp_cdb, cmd->cmnd, COMMAND_SIZE(*cmd->cmnd));
@@ -353,7 +353,7 @@ static int eata_pio_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
 	if (eata_pio_send_command(base, EATA_CMD_PIO_SEND_CP)) {
 		cmd->result = DID_BUS_BUSY << 16;
-		printk(KERN_NOTICE "eata_pio_queue target %d, pid %ld, HBA busy, " "returning DID_BUS_BUSY, done.\n", cmd->target, cmd->pid);
+		printk(KERN_NOTICE "eata_pio_queue target %d, pid %ld, HBA busy, " "returning DID_BUS_BUSY, done.\n", cmd->device->id, cmd->pid);
 		done(cmd);
 		cp->status = FREE;
 		return (0);
@@ -366,7 +366,7 @@ static int eata_pio_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	for (x = 0; x < hd->cppadlen; x++)
 		outw(0, base + HA_RDATA);
 
-	DBG(DBG_QUEUE, printk(KERN_DEBUG "Queued base %#.4lx pid: %ld target: %x " "lun: %x slot %d irq %d\n", (long) sh->base, cmd->pid, cmd->target, cmd->lun, y, sh->irq));
+	DBG(DBG_QUEUE, printk(KERN_DEBUG "Queued base %#.4lx pid: %ld target: %x " "lun: %x slot %d irq %d\n", (long) sh->base, cmd->pid, cmd->device->id, cmd->device->lun, y, sh->irq));
 
 	return (0);
 }
@@ -375,7 +375,7 @@ static int eata_pio_abort(Scsi_Cmnd * cmd)
 {
 	uint loop = HZ;
 
-	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_abort called pid: %ld " "target: %x lun: %x reason %x\n", cmd->pid, cmd->target, cmd->lun, cmd->abort_reason));
+	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_abort called pid: %ld " "target: %x lun: %x reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, cmd->abort_reason));
 
 
 	while (inb(cmd->host->base + HA_RAUXSTAT) & HA_ABUSY)
@@ -410,7 +410,7 @@ static int eata_pio_host_reset(Scsi_Cmnd * cmd)
 	Scsi_Cmnd *sp;
 	struct Scsi_Host *host = cmd->host;
 
-	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset called pid:%ld target:" " %x lun: %x reason %x\n", cmd->pid, cmd->target, cmd->lun, cmd->abort_reason));
+	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset called pid:%ld target:" " %x lun: %x reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, cmd->abort_reason));
 
 	if (HD(cmd)->state == RESET) {
 		printk(KERN_WARNING "eata_pio_reset: exit, already in reset.\n");

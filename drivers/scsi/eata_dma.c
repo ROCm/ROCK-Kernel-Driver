@@ -299,8 +299,8 @@ void eata_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 	    eata_stat = inb(base + HA_RSTATUS); 
 	    DBG(DBG_INTR, printk("IRQ %d received, base %#.4x, pid %ld, "
 				 "target: %x, lun: %x, ea_s: %#.2x, hba_s: "
-				 "%#.2x \n", irq, base, cmd->pid, cmd->target,
-				 cmd->lun, eata_stat, hba_stat));
+				 "%#.2x \n", irq, base, cmd->pid, cmd->device->id,
+				 cmd->device->lun, eata_stat, hba_stat));
 	    
 	    switch (hba_stat) {
 	    case HA_NO_ERROR:	/* NO Error */
@@ -337,7 +337,7 @@ void eata_int_handler(int irq, void *dev_id, struct pt_regs * regs)
  		break;
 	    case HA_CP_RESET_NA:
 	    case HA_CP_RESET:
-	        HD(cmd)->resetlevel[cmd->channel] = 0; 
+	        HD(cmd)->resetlevel[cmd->device->channel] = 0; 
 		result = DID_RESET << 16;
 		DBG(DBG_STATUS, printk(KERN_WARNING "scsi%d: reseted cmd "
 				       "pid %ldreturned\n", 
@@ -517,7 +517,7 @@ int eata_queue(Scsi_Cmnd * cmd, void (* done) (Scsi_Cmnd *))
     restore_flags(flags);
     
     DBG(DBG_QUEUE, printk("eata_queue pid %ld, target: %x, lun: %x, y %d\n",
-			  cmd->pid, cmd->target, cmd->lun, y));
+			  cmd->pid, cmd->device->id, cmd->device->lun, y));
     DBG(DBG_QUEUE && DBG_DELAY, DELAY(1));
     
     if(hd->do_latency == TRUE) 
@@ -547,7 +547,7 @@ int eata_queue(Scsi_Cmnd * cmd, void (* done) (Scsi_Cmnd *))
     /* FIXME: This will will have to be changed once the midlevel driver 
      *        allows different HBA IDs on every channel.
      */
-    if (cmd->target == sh->this_id) 
+    if (cmd->device->id == sh->this_id) 
 	ccb->Interpret = TRUE;	/* Interpret command */
 
     if (cmd->use_sg) {
@@ -586,9 +586,9 @@ int eata_queue(Scsi_Cmnd * cmd, void (* done) (Scsi_Cmnd *))
     ccb->cp_reqDMA = htonl(virt_to_bus(cmd->sense_buffer));
     ccb->reqlen = sizeof(cmd->sense_buffer);
     
-    ccb->cp_id = cmd->target;
-    ccb->cp_channel = cmd->channel;
-    ccb->cp_lun = cmd->lun;
+    ccb->cp_id = cmd->device->id;
+    ccb->cp_channel = cmd->device->channel;
+    ccb->cp_lun = cmd->device->lun;
     ccb->cp_dispri = TRUE;
     ccb->cp_identify = TRUE;
     memcpy(ccb->cp_cdb, cmd->cmnd, cmd->cmd_len);
@@ -604,14 +604,14 @@ int eata_queue(Scsi_Cmnd * cmd, void (* done) (Scsi_Cmnd *))
 	cmd->result = DID_BUS_BUSY << 16;
 	DBG(DBG_QUEUE && DBG_ABNORM, 
 	    printk("eata_queue target %d, pid %ld, HBA busy, "
-		   "returning DID_BUS_BUSY\n",cmd->target, cmd->pid));
+		   "returning DID_BUS_BUSY\n",cmd->device->id, cmd->pid));
 	ccb->status = FREE;    
 	done(cmd);
 	return(0);
     }
     DBG(DBG_QUEUE, printk("Queued base %#.4x pid: %ld target: %x lun: %x "
 			 "slot %d irq %d\n", (s32)sh->base, cmd->pid, 
-			 cmd->target, cmd->lun, y, sh->irq));
+			 cmd->device->id, cmd->device->lun, y, sh->irq));
     DBG(DBG_QUEUE && DBG_DELAY, DELAY(1));
 
     return(0);
@@ -629,7 +629,7 @@ int eata_abort(Scsi_Cmnd * cmd)
     cli();
 
     DBG(DBG_ABNORM, printk("eata_abort called pid: %ld target: %x lun: %x"
-			   " reason %x\n", cmd->pid, cmd->target, cmd->lun, 
+			   " reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, 
 			   cmd->abort_reason));
     DBG(DBG_ABNORM && DBG_DELAY, DELAY(1));
 
@@ -690,7 +690,7 @@ int eata_reset(Scsi_Cmnd * cmd, unsigned int resetflags)
     cli();
     
     DBG(DBG_ABNORM, printk("eata_reset called pid:%ld target: %x lun: %x"
-			   " reason %x\n", cmd->pid, cmd->target, cmd->lun, 
+			   " reason %x\n", cmd->pid, cmd->device->id, cmd->device->lun, 
 			   cmd->abort_reason));
 	
     for (x = 1, sh = first_HBA; x <= registered_HBAs; x++, sh = SD(sh)->next) {

@@ -467,7 +467,7 @@ void sym_print_addr (ccb_p cp)
 	Scsi_Cmnd *cmd = cp->cam_ccb;
 	if (cmd)
 		printf("%s:%d:%d:", sym_name(SYM_SOFTC_PTR(cmd)),
-		       cmd->target,cmd->lun);
+		       cmd->device->id,cmd->device->lun);
 }
 
 /*
@@ -603,13 +603,13 @@ void sym_sniff_inquiry(hcb_p np, Scsi_Cmnd *cmd, int resid)
 		return;
 
 	sync_scsi_data(np, cmd);
-	retv = __sym_sniff_inquiry(np, cmd->target, cmd->lun,
+	retv = __sym_sniff_inquiry(np, cmd->device->id, cmd->device->lun,
 				   (u_char *) cmd->request_buffer,
 				   cmd->request_bufflen - resid);
 	if (retv < 0)
 		return;
 	else if (retv)
-		sym_update_trans_settings(np, &np->target[cmd->target]);
+		sym_update_trans_settings(np, &np->target[cmd->device->id]);
 }
 
 /*
@@ -687,9 +687,9 @@ static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
 	 *  Minimal checkings, so that we will not 
 	 *  go outside our tables.
 	 */
-	if (ccb->target == np->myaddr ||
-	    ccb->target >= SYM_CONF_MAX_TARGET ||
-	    ccb->lun    >= SYM_CONF_MAX_LUN) {
+	if (ccb->device->id == np->myaddr ||
+	    ccb->device->id >= SYM_CONF_MAX_TARGET ||
+	    ccb->device->lun >= SYM_CONF_MAX_LUN) {
 		sym_xpt_done2(np, ccb, CAM_DEV_NOT_THERE);
 		return 0;
         }
@@ -697,7 +697,7 @@ static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
 	/*
 	 *  Retreive the target descriptor.
 	 */
-	tp = &np->target[ccb->target];
+	tp = &np->target[ccb->device->id];
 
 	/*
 	 *  Complete the 1st INQUIRY command with error 
@@ -714,7 +714,7 @@ static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
 	if (ccb->cmnd[0] == 0x12 || ccb->cmnd[0] == 0x0) {
 		if ((tp->usrflags & SYM_SCAN_BOOT_DISABLED) ||
 		    ((tp->usrflags & SYM_SCAN_LUNS_DISABLED) && 
-		     ccb->lun != 0)) {
+		     ccb->device->lun != 0)) {
 			tp->usrflags &= ~SYM_SCAN_BOOT_DISABLED;
 			sym_xpt_done2(np, ccb, CAM_DEV_NOT_THERE);
 			return 0;
@@ -724,13 +724,13 @@ static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
 	/*
 	 *  Select tagged/untagged.
 	 */
-	lp = sym_lp(np, tp, ccb->lun);
+	lp = sym_lp(np, tp, ccb->device->lun);
 	order = (lp && lp->s.reqtags) ? M_SIMPLE_TAG : 0;
 
 	/*
 	 *  Queue the SCSI IO.
 	 */
-	cp = sym_get_ccb(np, ccb->target, ccb->lun, order);
+	cp = sym_get_ccb(np, ccb->device->id, ccb->device->lun, order);
 	if (!cp)
 		return 1;	/* Means resource shortage */
 	(void) sym_queue_scsiio(np, ccb, cp);
@@ -1113,7 +1113,7 @@ static int sym_eh_handler(int op, char *opname, Scsi_Cmnd *cmd)
 	struct sym_eh_wait eh, *ep = &eh;
 	char devname[20];
 
-	sprintf(devname, "%s:%d:%d", sym_name(np), cmd->target, cmd->lun);
+	sprintf(devname, "%s:%d:%d", sym_name(np), cmd->device->id, cmd->device->lun);
 
 	printf_warning("%s: %s operation started.\n", devname, opname);
 
@@ -1167,7 +1167,7 @@ prepare:
 		sts = sym_abort_scsiio(np, cmd, 1);
 		break;
 	case SYM_EH_DEVICE_RESET:
-		sts = sym_reset_scsi_target(np, cmd->target);
+		sts = sym_reset_scsi_target(np, cmd->device->id);
 		break;
 	case SYM_EH_BUS_RESET:
 		sym_reset_scsi_bus(np, 1);

@@ -217,7 +217,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 	int block, upper_blk, num;
 	unsigned char *buff;
 	int errsts = 0;
-	int target = SCpnt->target;
+	int target = SCpnt->device->id;
 	int bufflen = SCpnt->request_bufflen;
 	unsigned long capac;
 	struct sdebug_dev_info * devip = NULL;
@@ -247,7 +247,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 		return schedule_resp(SCpnt, NULL, done, 0, 0);
         }
 
-	if (SCpnt->lun >= scsi_debug_max_luns)
+	if (SCpnt->device->lun >= scsi_debug_max_luns)
 		return schedule_resp(SCpnt, NULL, done, 
 				     DID_NO_CONNECT << 16, 0);
 	devip = devInfoReg(SCpnt);
@@ -868,18 +868,18 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_cmnd *scmd)
 		return devip;
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
-		if ((devip->channel == scmd->channel) &&
-		    (devip->target == scmd->target) &&
-		    (devip->lun == scmd->lun) &&
+		if ((devip->channel == scmd->device->channel) &&
+		    (devip->target == scmd->device->id) &&
+		    (devip->lun == scmd->device->lun) &&
 		    (devip->host == scmd->host))
 			return devip;
 	}
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
 		if (!devip->used) {
-			devip->channel = scmd->channel;
-			devip->target = scmd->target;
-			devip->lun = scmd->lun;
+			devip->channel = scmd->device->channel;
+			devip->target = scmd->device->id;
+			devip->lun = scmd->device->lun;
 			devip->host = scmd->host;
 			devip->reset = 1;
 			devip->used = 1;

@@ -4736,7 +4736,7 @@ static void PRINT_LUN(ncb_p np, int target, int lun)
 static void PRINT_ADDR(Scsi_Cmnd *cmd)
 {
 	struct host_data *host_data = (struct host_data *) cmd->host->hostdata;
-	PRINT_LUN(host_data->ncb, cmd->target, cmd->lun);
+	PRINT_LUN(host_data->ncb, cmd->device->id, cmd->device->lun);
 }
 
 /*==========================================================
@@ -6505,8 +6505,8 @@ static int ncr_prepare_nego(ncb_p np, ccb_p cp, u_char *msgptr)
 static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 {
 /*	Scsi_Device        *device    = cmd->device; */
-	tcb_p tp                      = &np->target[cmd->target];
-	lcb_p lp		      = ncr_lp(np, tp, cmd->lun);
+	tcb_p tp                      = &np->target[cmd->device->id];
+	lcb_p lp		      = ncr_lp(np, tp, cmd->device->lun);
 	ccb_p cp;
 
 	u_char	idmsg, *msgptr;
@@ -6520,9 +6520,9 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	**
 	**---------------------------------------------
 	*/
-	if ((cmd->target == np->myaddr	  ) ||
-		(cmd->target >= MAX_TARGET) ||
-		(cmd->lun    >= MAX_LUN   )) {
+	if ((cmd->device->id == np->myaddr	  ) ||
+		(cmd->device->id >= MAX_TARGET) ||
+		(cmd->device->lun    >= MAX_LUN   )) {
 		return(DID_BAD_TARGET);
         }
 
@@ -6562,7 +6562,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 			np->settle_time = tlimit;
 	}
 
-        if (np->settle_time || !(cp=ncr_get_ccb (np, cmd->target, cmd->lun))) {
+        if (np->settle_time || !(cp=ncr_get_ccb (np, cmd->device->id, cmd->device->lun))) {
 		insert_into_waiting_list(np, cmd);
 		return(DID_OK);
 	}

@@ -547,7 +547,7 @@ static void read_callback(void *context, struct fib * fibptr)
 	scsicmd = (Scsi_Cmnd *) context;
 
 	dev = (struct aac_dev *)scsicmd->host->hostdata;
-	cid =TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+	cid =TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 	lba = ((scsicmd->cmnd[1] & 0x1F) << 16) | (scsicmd->cmnd[2] << 8) | scsicmd->cmnd[3];
 	dprintk((KERN_DEBUG "read_callback[cpu %d]: lba = %d, t = %ld.\n", smp_processor_id(), lba, jiffies));
@@ -592,7 +592,7 @@ static void write_callback(void *context, struct fib * fibptr)
 
 	scsicmd = (Scsi_Cmnd *) context;
 	dev = (struct aac_dev *)scsicmd->host->hostdata;
-	cid = TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+	cid = TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 	lba = ((scsicmd->cmnd[1] & 0x1F) << 16) | (scsicmd->cmnd[2] << 8) | scsicmd->cmnd[3];
 	dprintk((KERN_DEBUG "write_callback[cpu %d]: lba = %d, t = %ld.\n", smp_processor_id(), lba, jiffies));
@@ -872,14 +872,14 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 	 *	Test does not apply to ID 16, the pseudo id for the controller
 	 *	itself.
 	 */
-	if (scsicmd->target != scsicmd->host->this_id) {
-		if ((scsicmd->channel == 0) ){
-			if( (scsicmd->target >= AAC_MAX_TARGET) || (scsicmd->lun != 0)){ 
+	if (scsicmd->device->id != scsicmd->host->this_id) {
+		if ((scsicmd->device->channel == 0) ){
+			if( (scsicmd->device->id >= AAC_MAX_TARGET) || (scsicmd->device->lun != 0)){ 
 				scsicmd->result = DID_NO_CONNECT << 16;
 				__aac_io_done(scsicmd);
 				return 0;
 			}
-			cid = TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+			cid = TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 			/*
 			 *	If the target container doesn't exist, it may have
@@ -944,7 +944,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 	{
 		struct inquiry_data *inq_data_ptr;
 
-		dprintk((KERN_DEBUG "INQUIRY command, ID: %d.\n", scsicmd->target));
+		dprintk((KERN_DEBUG "INQUIRY command, ID: %d.\n", scsicmd->device->id));
 		inq_data_ptr = (struct inquiry_data *)scsicmd->request_buffer;
 		memset(inq_data_ptr, 0, sizeof (struct inquiry_data));
 
@@ -959,7 +959,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 		 *	see: <vendor>.c i.e. aac.c
 		 */
 		setinqstr(cardtype, (void *) (inq_data_ptr->inqd_vid), fsa_dev_ptr->type[cid]);
-		if (scsicmd->target == scsicmd->host->this_id)
+		if (scsicmd->device->id == scsicmd->host->this_id)
 			inq_data_ptr->inqd_pdt = INQD_PDT_PROC;	/* Processor device */
 		else
 			inq_data_ptr->inqd_pdt = INQD_PDT_DA;	/* Direct/random access device */
@@ -1366,7 +1366,7 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 	u16 fibsize;
 	u32 flag;
 
-	if( scsicmd->target > 15 || scsicmd->lun > 7) {
+	if( scsicmd->device->id > 15 || scsicmd->device->lun > 7) {
 		scsicmd->result = DID_NO_CONNECT << 16;
 		__aac_io_done(scsicmd);
 		return 0;
@@ -1402,9 +1402,9 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 
 	srbcmd = (struct aac_srb*) fib_data(cmd_fibcontext);
 	srbcmd->function = cpu_to_le32(SRBF_ExecuteScsi);
-	srbcmd->channel  = cpu_to_le32(aac_logical_to_phys(scsicmd->channel));
-	srbcmd->target   = cpu_to_le32(scsicmd->target);
-	srbcmd->lun      = cpu_to_le32(scsicmd->lun);
+	srbcmd->channel  = cpu_to_le32(aac_logical_to_phys(scsicmd->device->channel));
+	srbcmd->target   = cpu_to_le32(scsicmd->device->id);
+	srbcmd->lun      = cpu_to_le32(scsicmd->device->lun);
 	srbcmd->flags    = cpu_to_le32(flag);
 	srbcmd->timeout  = cpu_to_le32(0);  // timeout not used
 	srbcmd->retry_limit =cpu_to_le32(0); // Obsolete parameter

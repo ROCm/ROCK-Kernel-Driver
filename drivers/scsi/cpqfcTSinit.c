@@ -729,9 +729,12 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
       case CPQFC_IOCTL_FC_TARGET_ADDRESS:
 	// can we find an FC device mapping to this SCSI target?
-	DumCmnd.channel = ScsiDev->channel;		// For searching
-	DumCmnd.target  = ScsiDev->id;
-	DumCmnd.lun     = ScsiDev->lun;
+/* 	DumCmnd.channel = ScsiDev->channel; */		// For searching
+/* 	DumCmnd.target  = ScsiDev->id; */
+/* 	DumCmnd.lun     = ScsiDev->lun; */
+
+        DumCmnd.device = ScsiDev;
+	
 	pLoggedInPort = fcFindLoggedInPort( fcChip,
 		&DumCmnd, // search Scsi Nexus
 		0,        // DON'T search linked list for FC port id
@@ -1352,9 +1355,9 @@ int cpqfcTS_queuecommand(Scsi_Cmnd *Cmnd, void (* done)(Scsi_Cmnd *))
 //    printk(" @Q bad targ cmnd %p@ ", Cmnd);
       QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
     }
-    else if (Cmnd->lun >= CPQFCTS_MAX_LUN)
+    else if (Cmnd->device->lun >= CPQFCTS_MAX_LUN)
     {
-      printk(KERN_WARNING "cpqfc: Invalid LUN: %d\n", Cmnd->lun);
+      printk(KERN_WARNING "cpqfc: Invalid LUN: %d\n", Cmnd->device->lun);
       QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
     } 
 

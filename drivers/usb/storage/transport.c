@@ -1196,7 +1196,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	bcb.Tag = srb->serial_number;
 	bcb.Lun = srb->cmnd[1] >> 5;
 	if (us->flags & US_FL_SCM_MULT_TARG)
-		bcb.Lun |= srb->target << 4;
+		bcb.Lun |= srb->device->id << 4;
 	bcb.Length = srb->cmd_len;
 
 	/* copy the command payload */

@@ -3641,7 +3641,7 @@ typedef struct {
 typedef Scsi_Cmnd            REQ, *REQP;
 #define REQPNEXT(reqp)       ((REQP) ((reqp)->host_scribble))
 #define REQPNEXTP(reqp)      ((REQP *) &((reqp)->host_scribble))
-#define REQPTID(reqp)        ((reqp)->target)
+#define REQPTID(reqp)        ((reqp)->device->id)
 #define REQPTIME(reqp)       ((reqp)->SCp.this_residual)
 #define REQTIMESTAMP()       (jiffies)
 
@@ -6463,7 +6463,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
         (ulong) scp, (ulong) scp->scsi_done);
 
     boardp = ASC_BOARDP(scp->host);
-    device = boardp->device[scp->target];
+    device = boardp->device[scp->device->id];
 
     if (ASC_NARROW_BOARD(boardp)) {
         /*
@@ -6498,7 +6498,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
              * Increment monotonically increasing per device successful
              * request counter. Wrapping doesn't matter.
              */
-            boardp->reqcnt[scp->target]++;
+            boardp->reqcnt[scp->device->id]++;
             asc_enqueue(&boardp->active, scp, ASC_BACK);
             ASC_DBG(1,
                 "asc_execute_scsi_cmnd: AscExeScsiQueue(), ASC_NOERROR\n");
@@ -6578,7 +6578,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
              * Increment monotonically increasing per device successful
              * request counter. Wrapping doesn't matter.
              */
-            boardp->reqcnt[scp->target]++;
+            boardp->reqcnt[scp->device->id]++;
             asc_enqueue(&boardp->active, scp, ASC_BACK);
             ASC_DBG(1,
                 "asc_execute_scsi_cmnd: AdvExeScsiQueue(), ASC_NOERROR\n");
@@ -6652,9 +6652,9 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
     }
     asc_scsi_q.cdbptr = &scp->cmnd[0];
     asc_scsi_q.q2.cdb_len = scp->cmd_len;
-    asc_scsi_q.q1.target_id = ASC_TID_TO_TARGET_ID(scp->target);
-    asc_scsi_q.q1.target_lun = scp->lun;
-    asc_scsi_q.q2.target_ix = ASC_TIDLUN_TO_IX(scp->target, scp->lun);
+    asc_scsi_q.q1.target_id = ASC_TID_TO_TARGET_ID(scp->device->id);
+    asc_scsi_q.q1.target_lun = scp->device->lun;
+    asc_scsi_q.q2.target_ix = ASC_TIDLUN_TO_IX(scp->device->id, scp->device->lun);
     asc_scsi_q.q1.sense_addr = cpu_to_le32(virt_to_bus(&scp->sense_buffer[0]));
     asc_scsi_q.q1.sense_len = sizeof(scp->sense_buffer);
 
@@ -6669,8 +6669,8 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
      * started request.
      *
      */
-    if ((boardp->dvc_var.asc_dvc_var.cur_dvc_qng[scp->target] > 0) &&
-        (boardp->reqcnt[scp->target] % 255) == 0) {
+    if ((boardp->dvc_var.asc_dvc_var.cur_dvc_qng[scp->device->id] > 0) &&
+        (boardp->reqcnt[scp->device->id] % 255) == 0) {
         asc_scsi_q.q2.tag_code = M2_QTAG_MSG_ORDERED;
     } else {
         asc_scsi_q.q2.tag_code = M2_QTAG_MSG_SIMPLE;
@@ -6823,8 +6823,8 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
         scsiqp->cdb16[i - 12] = scp->cmnd[i];
     }
 
-    scsiqp->target_id = scp->target;
-    scsiqp->target_lun = scp->lun;
+    scsiqp->target_id = scp->device->id;
+    scsiqp->target_lun = scp->device->lun;
 
     scsiqp->sense_addr = cpu_to_le32(virt_to_bus(&scp->sense_buffer[0]));
     scsiqp->sense_len = sizeof(scp->sense_buffer);
@@ -7085,10 +7085,10 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
          * If an INQUIRY command completed successfully, then call
          * the AscInquiryHandling() function to set-up the device.
          */
-        if (scp->cmnd[0] == SCSICMD_Inquiry && scp->lun == 0 &&
+        if (scp->cmnd[0] == SCSICMD_Inquiry && scp->device->lun == 0 &&
             (scp->request_bufflen - qdonep->remain_bytes) >= 8)
         {
-            AscInquiryHandling(asc_dvc_varp, scp->target & 0x7,
+            AscInquiryHandling(asc_dvc_varp, scp->device->id & 0x7,
                 (ASC_SCSI_INQUIRY *) scp->request_buffer);
         }
 
@@ -7160,10 +7160,10 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
      * current request finished normally, then set the bit for the target
      * to indicate that a device is present.
      */
-    if ((boardp->init_tidmask & ADV_TID_TO_TIDMASK(scp->target)) == 0 &&
+    if ((boardp->init_tidmask & ADV_TID_TO_TIDMASK(scp->device->id)) == 0 &&
         qdonep->d3.done_stat == QD_NO_ERROR &&
         qdonep->d3.host_stat == QHSTA_NO_ERROR) {
-        boardp->init_tidmask |= ADV_TID_TO_TIDMASK(scp->target);
+        boardp->init_tidmask |= ADV_TID_TO_TIDMASK(scp->device->id);
     }
 
     /*
@@ -7343,10 +7343,10 @@ adv_isr_callback(ADV_DVC_VAR *adv_dvc_varp, ADV_SCSI_REQ_Q *scsiqp)
      * current request finished normally, then set the bit for the target
      * to indicate that a device is present.
      */
-    if ((boardp->init_tidmask & ADV_TID_TO_TIDMASK(scp->target)) == 0 &&
+    if ((boardp->init_tidmask & ADV_TID_TO_TIDMASK(scp->device->id)) == 0 &&
         scsiqp->done_status == QD_NO_ERROR &&
         scsiqp->host_status == QHSTA_NO_ERROR) {
-        boardp->init_tidmask |= ADV_TID_TO_TIDMASK(scp->target);
+        boardp->init_tidmask |= ADV_TID_TO_TIDMASK(scp->device->id);
     }
 
     /*
@@ -7586,7 +7586,7 @@ asc_dequeue_list(asc_queue_t *ascq, REQP *lastpp, int tid)
         {
             REQP reqp;
             for (reqp = firstp; reqp; reqp = REQPNEXT(reqp)) {
-                REQTIMESTAT("asc_dequeue_list", ascq, reqp, reqp->target);
+                REQTIMESTAT("asc_dequeue_list", ascq, reqp, reqp->device->id);
             }
         }
 #endif /* ADVANSYS_STATS */

@@ -588,9 +588,9 @@ static int ql_debug_level = 0;
 #define ENTER_INTR(x)		dprintk(3, "qla1280 : Entering %s()\n", x);
 #define LEAVE_INTR(x)		dprintk(3, "qla1280 : Leaving %s()\n", x);
 
-#define SCSI_BUS_32(scp)	scp->channel
-#define SCSI_TCN_32(scp)	scp->target
-#define SCSI_LUN_32(scp)	scp->lun
+#define SCSI_BUS_32(scp)	scp->device->channel
+#define SCSI_TCN_32(scp)	scp->device->id
+#define SCSI_LUN_32(scp)	scp->device->lun
 
 /****************************************************************************/
 /*  LINUX -  Loadable Module Functions.                                     */

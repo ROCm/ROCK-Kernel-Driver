@@ -2042,7 +2042,7 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	{
 	UCHAR		   *cdb = (UCHAR *)SCpnt->cmnd;					// Pointer to SCSI CDB
 	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 	UCHAR			rc;											// command return code
 	int				z; 
 	PDEVICE_RAID1	pdr;
@@ -2073,9 +2073,9 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		{
 		UCHAR			zlo, zhi;
 
-		DEB (printk ("\nPCI2242I: ID %d, LUN %d opcode %X ", SCpnt->target, SCpnt->lun, *cdb));
+		DEB (printk ("\nPCI2242I: ID %d, LUN %d opcode %X ", SCpnt->device->id, SCpnt->device->lun, *cdb));
 		padapter->pdev = pdev;
-		if ( !pdev->byte6 || SCpnt->lun )
+		if ( !pdev->byte6 || SCpnt->device->lun )
 			{
 			OpDone (padapter, DID_BAD_TARGET << 16);
 			return 0;
@@ -2138,7 +2138,7 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		padapter->reconTimer.data = 0;
 		}
 		
-	if ( (SCpnt->target >= padapter->numberOfDrives) || SCpnt->lun )
+	if ( (SCpnt->device->id >= padapter->numberOfDrives) || SCpnt->device->lun )
 		{
 		OpDone (padapter, DID_BAD_TARGET << 16);
 		return 0;
@@ -2792,7 +2792,7 @@ unregister1:;
 int Pci2220i_Abort (Scsi_Cmnd *SCpnt)
 	{
 	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 
 	if ( !padapter->SCpnt )
 		return SCSI_ABORT_NOT_RUNNING;
@@ -2824,7 +2824,7 @@ int Pci2220i_Abort (Scsi_Cmnd *SCpnt)
 int Pci2220i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	{
 	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 
 	if ( padapter->atapi )
 		{

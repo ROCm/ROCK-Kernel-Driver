@@ -346,7 +346,7 @@ static int in2000_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	instance = cmd->host;
 	hostdata = (struct IN2000_hostdata *) instance->hostdata;
 
-	DB(DB_QUEUE_COMMAND, printk("Q-%d-%02x-%ld(", cmd->target, cmd->cmnd[0], cmd->pid))
+	DB(DB_QUEUE_COMMAND, printk("Q-%d-%02x-%ld(", cmd->device->id, cmd->cmnd[0], cmd->pid))
 
 /* Set up a few fields in the Scsi_Cmnd structure for our own use:
  *  - host_scribble is the pointer to the next cmd in the input queue
@@ -473,7 +473,7 @@ static void in2000_execute(struct Scsi_Host *instance)
 	cmd = (Scsi_Cmnd *) hostdata->input_Q;
 	prev = 0;
 	while (cmd) {
-		if (!(hostdata->busy[cmd->target] & (1 << cmd->lun)))
+		if (!(hostdata->busy[cmd->device->id] & (1 << cmd->device->lun)))
 			break;
 		prev = cmd;
 		cmd = (Scsi_Cmnd *) cmd->host_scribble;
@@ -496,7 +496,7 @@ static void in2000_execute(struct Scsi_Host *instance)
 		hostdata->input_Q = (Scsi_Cmnd *) cmd->host_scribble;
 
 #ifdef PROC_STATISTICS
-	hostdata->cmd_cnt[cmd->target]++;
+	hostdata->cmd_cnt[cmd->device->id]++;
 #endif
 
 /*
@@ -504,9 +504,9 @@ static void in2000_execute(struct Scsi_Host *instance)
  */
 
 	if (is_dir_out(cmd))
-		write_3393(hostdata, WD_DESTINATION_ID, cmd->target);
+		write_3393(hostdata, WD_DESTINATION_ID, cmd->device->id);
 	else
-		write_3393(hostdata, WD_DESTINATION_ID, cmd->target | DSTID_DPD);
+		write_3393(hostdata, WD_DESTINATION_ID, cmd->device->id | DSTID_DPD);
 
 /* Now we need to figure out whether or not this command is a good
  * candidate for disconnect/reselect. We guess to the best of our
@@ -543,7 +543,7 @@ static void in2000_execute(struct Scsi_Host *instance)
 	if (!(hostdata->input_Q))	/* input_Q empty? */
 		goto no;
 	for (prev = (Scsi_Cmnd *) hostdata->input_Q; prev; prev = (Scsi_Cmnd *) prev->host_scribble) {
-		if ((prev->target != cmd->target) || (prev->lun != cmd->lun)) {
+		if ((prev->device->id != cmd->device->id) || (prev->device->lun != cmd->device->lun)) {
 			for (prev = (Scsi_Cmnd *) hostdata->input_Q; prev; prev = (Scsi_Cmnd *) prev->host_scribble)
 				prev->SCp.phase = 1;
 			goto yes;
@@ -555,17 +555,17 @@ static void in2000_execute(struct Scsi_Host *instance)
 	cmd->SCp.phase = 1;
 
 #ifdef PROC_STATISTICS
-	hostdata->disc_allowed_cnt[cmd->target]++;
+	hostdata->disc_allowed_cnt[cmd->device->id]++;
 #endif
 
       no:
 	write_3393(hostdata, WD_SOURCE_ID, ((cmd->SCp.phase) ? SRCID_ER : 0));
 
-	write_3393(hostdata, WD_TARGET_LUN, cmd->lun);
-	write_3393(hostdata, WD_SYNCHRONOUS_TRANSFER, hostdata->sync_xfer[cmd->target]);
-	hostdata->busy[cmd->target] |= (1 << cmd->lun);
+	write_3393(hostdata, WD_TARGET_LUN, cmd->device->lun);
+	write_3393(hostdata, WD_SYNCHRONOUS_TRANSFER, hostdata->sync_xfer[cmd->device->id]);
+	hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 
-	if ((hostdata->level2 <= L2_NONE) || (hostdata->sync_stat[cmd->target] == SS_UNSET)) {
+	if ((hostdata->level2 <= L2_NONE) || (hostdata->sync_stat[cmd->device->id] == SS_UNSET)) {
 
 		/*
 		 * Do a 'Select-With-ATN' command. This will end with
@@ -587,11 +587,11 @@ static void in2000_execute(struct Scsi_Host *instance)
  * unless we don't want to even _try_ synchronous transfers: In this
  * case we set SS_SET to make the defaults final.
  */
-		if (hostdata->sync_stat[cmd->target] == SS_UNSET) {
-			if (hostdata->sync_off & (1 << cmd->target))
-				hostdata->sync_stat[cmd->target] = SS_SET;
+		if (hostdata->sync_stat[cmd->device->id] == SS_UNSET) {
+			if (hostdata->sync_off & (1 << cmd->device->id))
+				hostdata->sync_stat[cmd->device->id] = SS_SET;
 			else
-				hostdata->sync_stat[cmd->target] = SS_FIRST;
+				hostdata->sync_stat[cmd->device->id] = SS_FIRST;
 		}
 		hostdata->state = S_SELECTING;
 		write_3393_count(hostdata, 0);	/* this guarantees a DATA_PHASE interrupt */
@@ -772,7 +772,7 @@ static void transfer_bytes(Scsi_Cmnd * cmd, int data_in_dir)
 
 /* Set up hardware registers */
 
-	write_3393(hostdata, WD_SYNCHRONOUS_TRANSFER, hostdata->sync_xfer[cmd->target]);
+	write_3393(hostdata, WD_SYNCHRONOUS_TRANSFER, hostdata->sync_xfer[cmd->device->id]);
 	write_3393_count(hostdata, cmd->SCp.this_residual);
 	write_3393(hostdata, WD_CONTROL, CTRL_IDI | CTRL_EDI | CTRL_BUS);
 	write1_io(0, IO_FIFO_WRITE);	/* zero counter, assume write */
@@ -1077,7 +1077,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 		}
 
 		cmd->result = DID_NO_CONNECT << 16;
-		hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+		hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 		hostdata->state = S_UNCONNECTED;
 		cmd->scsi_done(cmd);
 
@@ -1099,16 +1099,16 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 		/* construct an IDENTIFY message with correct disconnect bit */
 
-		hostdata->outgoing_msg[0] = (0x80 | 0x00 | cmd->lun);
+		hostdata->outgoing_msg[0] = (0x80 | 0x00 | cmd->device->lun);
 		if (cmd->SCp.phase)
 			hostdata->outgoing_msg[0] |= 0x40;
 
-		if (hostdata->sync_stat[cmd->target] == SS_FIRST) {
+		if (hostdata->sync_stat[cmd->device->id] == SS_FIRST) {
 #ifdef SYNC_DEBUG
 			printk(" sending SDTR ");
 #endif
 
-			hostdata->sync_stat[cmd->target] = SS_WAITING;
+			hostdata->sync_stat[cmd->device->id] = SS_WAITING;
 
 			/* tack on a 2nd message to ask about synchronous transfers */
 
@@ -1227,8 +1227,8 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 #ifdef SYNC_DEBUG
 			    printk("-REJ-");
 #endif
-			if (hostdata->sync_stat[cmd->target] == SS_WAITING)
-				hostdata->sync_stat[cmd->target] = SS_SET;
+			if (hostdata->sync_stat[cmd->device->id] == SS_WAITING)
+				hostdata->sync_stat[cmd->device->id] = SS_SET;
 			write_3393_cmd(hostdata, WD_CMD_NEGATE_ACK);
 			hostdata->state = S_CONNECTED;
 			break;
@@ -1248,7 +1248,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 				switch (ucp[2]) {	/* what's the EXTENDED code? */
 				case EXTENDED_SDTR:
 					id = calc_sync_xfer(ucp[3], ucp[4]);
-					if (hostdata->sync_stat[cmd->target] != SS_WAITING) {
+					if (hostdata->sync_stat[cmd->device->id] != SS_WAITING) {
 
 /* A device has sent an unsolicited SDTR message; rather than go
  * through the effort of decoding it and then figuring out what
@@ -1266,14 +1266,14 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 						hostdata->outgoing_msg[3] = hostdata->default_sx_per / 4;
 						hostdata->outgoing_msg[4] = 0;
 						hostdata->outgoing_len = 5;
-						hostdata->sync_xfer[cmd->target] = calc_sync_xfer(hostdata->default_sx_per / 4, 0);
+						hostdata->sync_xfer[cmd->device->id] = calc_sync_xfer(hostdata->default_sx_per / 4, 0);
 					} else {
-						hostdata->sync_xfer[cmd->target] = id;
+						hostdata->sync_xfer[cmd->device->id] = id;
 					}
 #ifdef SYNC_DEBUG
-					printk("sync_xfer=%02x", hostdata->sync_xfer[cmd->target]);
+					printk("sync_xfer=%02x", hostdata->sync_xfer[cmd->device->id]);
 #endif
-					hostdata->sync_stat[cmd->target] = SS_SET;
+					hostdata->sync_stat[cmd->device->id] = SS_SET;
 					write_3393_cmd(hostdata, WD_CMD_NEGATE_ACK);
 					hostdata->state = S_CONNECTED;
 					break;
@@ -1335,7 +1335,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 			lun = read_3393(hostdata, WD_TARGET_LUN);
 			DB(DB_INTR, printk(":%d.%d", cmd->SCp.Status, lun))
 			    hostdata->connected = NULL;
-			hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+			hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 			hostdata->state = S_UNCONNECTED;
 			if (cmd->SCp.Status == ILLEGAL_STATUS_BYTE)
 				cmd->SCp.Status = lun;
@@ -1420,7 +1420,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 		}
 		DB(DB_INTR, printk("UNEXP_DISC-%ld", cmd->pid))
 		    hostdata->connected = NULL;
-		hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+		hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 		hostdata->state = S_UNCONNECTED;
 		if (cmd->cmnd[0] == REQUEST_SENSE && cmd->SCp.Status != GOOD)
 			cmd->result = (cmd->result & 0x00ffff) | (DID_ERROR << 16);
@@ -1451,7 +1451,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 		switch (hostdata->state) {
 		case S_PRE_CMP_DISC:
 			hostdata->connected = NULL;
-			hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+			hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 			hostdata->state = S_UNCONNECTED;
 			DB(DB_INTR, printk(":%d", cmd->SCp.Status))
 			    if (cmd->cmnd[0] == REQUEST_SENSE && cmd->SCp.Status != GOOD)
@@ -1468,7 +1468,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 			hostdata->state = S_UNCONNECTED;
 
 #ifdef PROC_STATISTICS
-			hostdata->disc_done_cnt[cmd->target]++;
+			hostdata->disc_done_cnt[cmd->device->id]++;
 #endif
 
 			break;
@@ -1496,7 +1496,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 			if (hostdata->selecting) {
 				cmd = (Scsi_Cmnd *) hostdata->selecting;
 				hostdata->selecting = NULL;
-				hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+				hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 				cmd->host_scribble = (uchar *) hostdata->input_Q;
 				hostdata->input_Q = cmd;
 			}
@@ -1506,7 +1506,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 			if (cmd) {
 				if (phs == 0x00) {
-					hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+					hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 					cmd->host_scribble = (uchar *) hostdata->input_Q;
 					hostdata->input_Q = cmd;
 				} else {
@@ -1538,7 +1538,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 		cmd = (Scsi_Cmnd *) hostdata->disconnected_Q;
 		patch = NULL;
 		while (cmd) {
-			if (id == cmd->target && lun == cmd->lun)
+			if (id == cmd->device->id && lun == cmd->device->lun)
 				break;
 			patch = cmd;
 			cmd = (Scsi_Cmnd *) cmd->host_scribble;
@@ -1565,9 +1565,9 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 		 */
 
 		if (is_dir_out(cmd))
-			write_3393(hostdata, WD_DESTINATION_ID, cmd->target);
+			write_3393(hostdata, WD_DESTINATION_ID, cmd->device->id);
 		else
-			write_3393(hostdata, WD_DESTINATION_ID, cmd->target | DSTID_DPD);
+			write_3393(hostdata, WD_DESTINATION_ID, cmd->device->id | DSTID_DPD);
 		if (hostdata->level2 >= L2_RESELECT) {
 			write_3393_count(hostdata, 0);	/* we want a DATA_PHASE interrupt */
 			write_3393(hostdata, WD_COMMAND_PHASE, 0x45);
@@ -1767,7 +1767,7 @@ static int in2000_abort(Scsi_Cmnd * cmd)
 		sr = read_3393(hostdata, WD_SCSI_STATUS);
 		printk("asr=%02x, sr=%02x.", asr, sr);
 
-		hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+		hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 		hostdata->connected = NULL;
 		hostdata->state = S_UNCONNECTED;
 		cmd->result = DID_ABORT << 16;
@@ -2263,7 +2263,7 @@ static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn,
 		strcat(bp, "\nconnected:     ");
 		if (hd->connected) {
 			cmd = (Scsi_Cmnd *) hd->connected;
-			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->target, cmd->lun, cmd->cmnd[0]);
+			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->device->id, cmd->device->lun, cmd->cmnd[0]);
 			strcat(bp, tbuf);
 		}
 	}
@@ -2271,7 +2271,7 @@ static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn,
 		strcat(bp, "\ninput_Q:       ");
 		cmd = (Scsi_Cmnd *) hd->input_Q;
 		while (cmd) {
-			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->target, cmd->lun, cmd->cmnd[0]);
+			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->device->id, cmd->device->lun, cmd->cmnd[0]);
 			strcat(bp, tbuf);
 			cmd = (Scsi_Cmnd *) cmd->host_scribble;
 		}
@@ -2280,7 +2280,7 @@ static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn,
 		strcat(bp, "\ndisconnected_Q:");
 		cmd = (Scsi_Cmnd *) hd->disconnected_Q;
 		while (cmd) {
-			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->target, cmd->lun, cmd->cmnd[0]);
+			sprintf(tbuf, " %ld-%d:%d(%02x)", cmd->pid, cmd->device->id, cmd->device->lun, cmd->cmnd[0]);
 			strcat(bp, tbuf);
 			cmd = (Scsi_Cmnd *) cmd->host_scribble;
 		}

@@ -228,7 +228,7 @@ static int scsi_check_device_busy(struct scsi_device *sdev)
 active:
 	printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, "
 			"pid=%ld, state=%d, owner=%d.\n",
-			scmd->request->rq_status, scmd->target,
+			scmd->request->rq_status, scmd->device->id,
 			scmd->pid, scmd->state, scmd->owner);
 
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {

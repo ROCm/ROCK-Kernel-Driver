@@ -853,8 +853,8 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 	cmd->hdr.entry_type = ENTRY_COMMAND;
 	cmd->hdr.entry_cnt = 1;
 
-	cmd->target_lun = Cmnd->lun;
-	cmd->target_id = Cmnd->target;
+	cmd->target_lun = Cmnd->device->lun;
+	cmd->target_id = Cmnd->device->id;
 	cmd->cdb_length = cpu_to_le16(Cmnd->cmd_len);
 	cmd->control_flags = cpu_to_le16(CFLAG_READ | CFLAG_WRITE);
 	cmd->time_out = cpu_to_le16(30);
@@ -1186,7 +1186,7 @@ int isp1020_abort(Scsi_Cmnd *Cmnd)
 	isp1020_disable_irqs(host);
 
 	param[0] = MBOX_ABORT;
-	param[1] = (((u_short) Cmnd->target) << 8) | Cmnd->lun;
+	param[1] = (((u_short) Cmnd->device->id) << 8) | Cmnd->device->lun;
 	param[2] = cmd_cookie >> 16;
 	param[3] = cmd_cookie & 0xffff;
 

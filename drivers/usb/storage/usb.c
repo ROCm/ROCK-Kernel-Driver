@@ -371,16 +371,16 @@ static int usb_stor_control_thread(void * __us)
 		/* reject if target != 0 or if LUN is higher than
 		 * the maximum known LUN
 		 */
-		else if (us->srb->target && 
+		else if (us->srb->device->id && 
 				!(us->flags & US_FL_SCM_MULT_TARG)) {
 			US_DEBUGP("Bad target number (%d/%d)\n",
-				  us->srb->target, us->srb->lun);
+				  us->srb->device->id, us->srb->device->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
 
-		else if (us->srb->lun > us->max_lun) {
+		else if (us->srb->device->lun > us->max_lun) {
 			US_DEBUGP("Bad LUN (%d/%d)\n",
-				  us->srb->target, us->srb->lun);
+				  us->srb->device->id, us->srb->device->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
 

@@ -775,7 +775,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			if (dlen >= SCSI_STD_INQUIRY_BYTES) {
 				mptscsih_initTarget(hd,
 						hd->port,
-						sc->target,
+						sc->device->id,
 						pScsiReq->LUN[1],
 						sc->buffer,
 						dlen);
@@ -845,7 +845,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 
 			/* GEM Workaround. */
 			if (hd->is_spi)
-				mptscsih_no_negotiate(hd, sc->target);
+				mptscsih_no_negotiate(hd, sc->device->id);
 			break;
 
 		case MPI_IOCSTATUS_SCSI_IOC_TERMINATED:		/* 0x004B */
@@ -857,7 +857,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 
 			/* GEM Workaround. */
 			if (hd->is_spi)
-				mptscsih_no_negotiate(hd, sc->target);
+				mptscsih_no_negotiate(hd, sc->device->id);
 			break;
 
 		case MPI_IOCSTATUS_SCSI_RESIDUAL_MISMATCH:	/* 0x0049 */
@@ -916,7 +916,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			   ) {
 				mptscsih_initTarget(hd,
 						hd->port,
-						sc->target,
+						sc->device->id,
 						pScsiReq->LUN[1],
 						sc->buffer,
 						xfer_cnt);
@@ -1000,7 +1000,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			   ) {
 				mptscsih_initTarget(hd,
 						hd->port,
-						sc->target,
+						sc->device->id,
 						pScsiReq->LUN[1],
 						sc->buffer,
 						xfer_cnt);
@@ -1597,7 +1597,7 @@ mptscsih_report_queue_full(Scsi_Cmnd *sc, SCSIIOReply_t *pScsiReply, SCSIIOReque
 		if (sc->host != NULL && sc->host->hostdata != NULL)
 			ioc_str = ((MPT_SCSI_HOST *)sc->host->hostdata)->ioc->name;
 		printk(MYIOC_s_WARN_FMT "Device (%d:%d:%d) reported QUEUE_FULL!\n",
-				ioc_str, 0, sc->target, sc->lun);
+				ioc_str, 0, sc->device->id, sc->device->lun);
 		last_queue_full = time;
 	}
 }
@@ -2577,8 +2577,8 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
 	did_errcode = 0;
 	hd = (MPT_SCSI_HOST *) SCpnt->host->hostdata;
-	target = SCpnt->target;
-	lun = SCpnt->lun;
+	target = SCpnt->device->id;
+	lun = SCpnt->device->lun;
 	SCpnt->scsi_done = done;
 
 	pTarget = hd->Targets[target];
@@ -3227,7 +3227,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 
 	hd->abortSCpnt = SCpnt;
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK,
-	                       SCpnt->target, SCpnt->lun, ctx2abort, NO_SLEEP)
+	                       SCpnt->device->id, SCpnt->device->lun, ctx2abort, NO_SLEEP)
 		< 0) {
 
 		/* The TM request failed and the subsequent FW-reload failed!
@@ -3292,7 +3292,7 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 	}
 
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET,
-	                       SCpnt->target, 0, 0, NO_SLEEP)
+	                       SCpnt->device->id, 0, 0, NO_SLEEP)
 		< 0){
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
@@ -4237,7 +4237,7 @@ copy_sense_data(Scsi_Cmnd *sc, MPT_SCSI_HOST *hd, MPT_FRAME_HDR *mf, SCSIIOReply
 					pReq->LUN[1],
 					target->dev_vol_name);
 		else
-			sprintf(devFoo, "%d:%d:%d", hd->ioc->id, sc->target, sc->lun);
+			sprintf(devFoo, "%d:%d:%d", hd->ioc->id, sc->device->id, sc->device->lun);
 		thisIo.DevIDStr = devFoo;
 /* fubar */
 		thisIo.dataPtr = NULL;

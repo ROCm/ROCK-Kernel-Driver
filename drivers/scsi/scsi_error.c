@@ -276,7 +276,7 @@ static void scsi_eh_get_failed(Scsi_Cmnd **sc_list, struct Scsi_Host *shost)
 							  " cmds still active"
 							  " (%p %x %d)\n",
 					       scmd, scmd->state,
-					       scmd->target));
+					       scmd->device->id));
 				}
 			}
 		}
@@ -503,7 +503,7 @@ static int scsi_send_eh_cmnd(Scsi_Cmnd *scmd, int timeout)
 
 	if (scmd->device->scsi_level <= SCSI_2)
 		scmd->cmnd[1] = (scmd->cmnd[1] & 0x1f) |
-			(scmd->lun << 5 & 0xe0);
+			(scmd->device->lun << 5 & 0xe0);
 
 	if (host->can_queue) {
 		DECLARE_MUTEX_LOCKED(sem);
@@ -745,7 +745,7 @@ static int scsi_eh_get_sense(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 
 		SCSI_LOG_ERROR_RECOVERY(2, printk("%s: requesting sense"
 						  " for tgt: %d\n",
-						  __FUNCTION__, scmd->target));
+						  __FUNCTION__, scmd->device->id));
 		rtn = scsi_request_sense(scmd);
 		if (rtn != SUCCESS)
 			continue;
@@ -1016,7 +1016,7 @@ static int scsi_try_bus_reset(Scsi_Cmnd *scmd)
 		 * Mark all affected devices to expect a unit attention.
 		 */
 		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
-			if (scmd->channel == sdev->channel) {
+			if (scmd->device->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
 			}
@@ -1052,7 +1052,7 @@ static int scsi_try_host_reset(Scsi_Cmnd *scmd)
 		 * Mark all affected devices to expect a unit attention.
 		 */
 		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
-			if (scmd->channel == sdev->channel) {
+			if (scmd->device->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
 			}
@@ -1091,7 +1091,7 @@ static int scsi_eh_bus_host_reset(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 		for (scmd = sc_todo; scmd; scmd = scmd->bh_next) {
 			if (!scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR))
 				continue;
-			if (channel == scmd->channel) {
+			if (channel == scmd->device->channel) {
 				chan_scmd = scmd;
 				break;
 				/*
@@ -1115,7 +1115,7 @@ static int scsi_eh_bus_host_reset(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 		if (rtn == SUCCESS) {
 			for (scmd = sc_todo; scmd; scmd = scmd->bh_next) {
 				if (!scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR)
-				    || channel != scmd->channel)
+				    || channel != scmd->device->channel)
 					continue;
 				if (!scsi_eh_tur(scmd)) {
 					rtn = scsi_eh_retry_cmd(scmd);
@@ -1348,7 +1348,7 @@ int scsi_decide_disposition(Scsi_Cmnd *scmd)
 
 	case RESERVATION_CONFLICT:
 		printk("scsi%d (%d,%d,%d) : reservation conflict\n",
-		       scmd->host->host_no, scmd->channel,
+		       scmd->host->host_no, scmd->device->channel,
 		       scmd->device->id, scmd->device->lun);
 		return SUCCESS; /* causes immediate i/o error */
 	default:
@@ -1766,9 +1766,6 @@ scsi_reset_provider(Scsi_Device *dev, int flag)
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
 	SCpnt->host                    	= dev->host;
 	SCpnt->device                  	= dev;
-	SCpnt->target                  	= dev->id;
-	SCpnt->lun                     	= dev->lun;
-	SCpnt->channel                 	= dev->channel;
 	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
 	SCpnt->request->waiting        	= NULL;
 	SCpnt->use_sg                  	= 0;
