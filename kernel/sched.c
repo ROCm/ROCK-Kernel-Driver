@@ -1175,6 +1175,7 @@ DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 void scheduler_tick(int user_ticks, int sys_ticks)
 {
 	int cpu = smp_processor_id();
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
@@ -1184,19 +1185,19 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			kstat_cpu(cpu).cpustat.system += sys_ticks;
+			cpustat->system += sys_ticks;
 		else if (atomic_read(&rq->nr_iowait) > 0)
-			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
+			cpustat->iowait += sys_ticks;
 		else
-			kstat_cpu(cpu).cpustat.idle += sys_ticks;
+			cpustat->idle += sys_ticks;
 		rebalance_tick(rq, 1);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
-		kstat_cpu(cpu).cpustat.nice += user_ticks;
+		cpustat->nice += user_ticks;
 	else
-		kstat_cpu(cpu).cpustat.user += user_ticks;
-	kstat_cpu(cpu).cpustat.system += sys_ticks;
+		cpustat->user += user_ticks;
+	cpustat->system += sys_ticks;
 
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
