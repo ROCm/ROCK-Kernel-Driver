@@ -3344,10 +3344,10 @@ readbuf_word(int pos)
 	/* read from user buffer */
 	if (readbuf_flags & AWE_SAMPLE_8BITS) {
 		unsigned char cc;
-		get_user(cc, (unsigned __user char*)(readbuf_addr + readbuf_offs + pos));
+		get_user(cc, (unsigned char __user *)(readbuf_addr + readbuf_offs + pos));
 		c = (unsigned short)cc << 8; /* convert 8bit -> 16bit */
 	} else {
-		get_user(c, (unsigned __user short*)(readbuf_addr + readbuf_offs + pos * 2));
+		get_user(c, (unsigned short __user *)(readbuf_addr + readbuf_offs + pos * 2));
 	}
 	if (readbuf_flags & AWE_SAMPLE_UNSIGNED)
 		c ^= 0x8000; /* unsigned -> signed */
