@@ -823,6 +823,14 @@ UNUSUAL_DEV( 0x0dd8, 0x1060, 0x0000, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Patch by Stephan Walter <stephan.walter@epfl.ch>
+ * I don't know why, but it works... */
+UNUSUAL_DEV( 0x0dda, 0x0001, 0x0012, 0x0012,
+		"WINWARD",
+		"Music Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
 UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		"USB",
