@@ -82,6 +82,11 @@ struct mapped_device {
 	 */
 	uint32_t event_nr;
 	wait_queue_head_t eventq;
+
+	/*
+	 * freeze/thaw support require holding onto a super block
+	 */
+	struct super_block *frozen_sb;
 };
 
 #define MIN_IOS 256
@@ -914,8 +919,12 @@ static int __lock_fs(struct mapped_device *md)
 		return -ENOMEM;
 	}
 
-	fsync_bdev_lockfs(bdev);
-	bdput(bdev);
+	WARN_ON(md->frozen_sb);
+	md->frozen_sb = freeze_bdev(bdev);
+	/* don't bdput right now, we don't want the bdev
+	 * to go away while it is locked.  We'll bdput
+	 * in __unlock_fs
+	 */
 	return 0;
 }
 
@@ -932,7 +941,9 @@ static int __unlock_fs(struct mapped_device *md)
 		return -ENOMEM;
 	}
 
-	unlockfs(bdev);
+	thaw_bdev(bdev, md->frozen_sb);
+	md->frozen_sb = NULL;
+	bdput(bdev);
 	bdput(bdev);
 	return 0;
 }

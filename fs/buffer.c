@@ -264,16 +264,72 @@ int fsync_bdev(struct block_device *bdev)
 	return sync_blockdev(bdev);
 }
 
-int fsync_bdev_lockfs(struct block_device *bdev)
+/*
+ * triggered by the device mapper code to lock a filesystem and force
+ * it into a consistent state.
+ *
+ * This takes the block device bd_mount_sem to make sure no new mounts
+ * happen on bdev until unlockfs is called.  If a super is found on this
+ * block device, we hould a read lock on the s->s_umount sem to make sure
+ * nobody unmounts until the snapshot creation is done
+ */
+struct super_block *freeze_bdev(struct block_device *bdev)
 {
-	int res;
-	res = fsync_bdev(bdev);
-	if (res)
-		return res;
-	sync_super_lockfs(bdev);
-	return sync_blockdev(bdev);
+	struct super_block *sb;
+
+	if (!bdev)
+		return NULL;
+	down(&bdev->bd_mount_sem);
+	sb = get_super(bdev);
+	if (sb && !(sb->s_flags & MS_RDONLY)) {
+		sb->s_frozen = SB_FREEZE_WRITE;
+		wmb();
+
+		sync_inodes_sb(sb, 0);
+		DQUOT_SYNC(sb);
+
+		sb->s_frozen = SB_FREEZE_TRANS;
+		wmb();
+		
+		lock_super(sb);
+		if (sb->s_dirt && sb->s_op->write_super)
+			sb->s_op->write_super(sb);
+		unlock_super(sb);
+
+		if (sb->s_op->sync_fs)
+			sb->s_op->sync_fs(sb, 1);
+	
+		sync_blockdev(sb->s_bdev);
+		sync_inodes_sb(sb, 1);
+		sync_blockdev(sb->s_bdev);
+
+		if (sb->s_op->write_super_lockfs)
+			sb->s_op->write_super_lockfs(sb);
+	}
+
+	sync_blockdev(bdev);
+	return sb;	/* thaw_bdev releases s->s_umount and bd_mount_sem */
 }
-EXPORT_SYMBOL(fsync_bdev_lockfs);
+EXPORT_SYMBOL(freeze_bdev);
+
+void thaw_bdev(struct block_device *bdev, struct super_block *sb)
+{
+	if (!bdev)
+		return;
+	if (sb) {
+		BUG_ON(sb->s_bdev != bdev);
+
+		if (sb->s_op->unlockfs)
+			sb->s_op->unlockfs(sb);
+		sb->s_frozen = SB_UNFROZEN;
+		wmb();
+		wake_up(&sb->s_wait_unfrozen);
+		drop_super(sb);
+	}
+
+	up(&bdev->bd_mount_sem);
+}
+EXPORT_SYMBOL(thaw_bdev);
 
 /*
  * sync everything.  Start out by waking pdflush, because that writes back

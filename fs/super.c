@@ -77,6 +77,7 @@ static struct super_block *alloc_super(void)
 		sema_init(&s->s_dquot.dqio_sem, 1);
 		sema_init(&s->s_dquot.dqonoff_sem, 1);
 		init_rwsem(&s->s_dquot.dqptr_sem);
+		init_waitqueue_head(&s->s_wait_unfrozen);
 		s->s_maxbytes = MAX_NON_LFS;
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
@@ -290,62 +291,6 @@ static inline void write_super(struct super_block *sb)
 			sb->s_op->write_super(sb);
 	unlock_super(sb);
 }
-
-/*
- * triggered by the device mapper code to lock a filesystem and force
- * it into a consistent state.
- *
- * This takes the block device bd_mount_sem to make sure no new mounts
- * happen on bdev until unlockfs is called.  If a super is found on this
- * block device, we hould a read lock on the s->s_umount sem to make sure
- * nobody unmounts until the snapshot creation is done
- */
-void sync_super_lockfs(struct block_device *bdev) 
-{
-	struct super_block *sb;
-	down(&bdev->bd_mount_sem);
-	sb = get_super(bdev);
-	if (sb) {
-		lock_super(sb);
-		if (sb->s_dirt && sb->s_op->write_super)
-			sb->s_op->write_super(sb);
-		if (sb->s_op->write_super_lockfs)
-			sb->s_op->write_super_lockfs(sb);
-		unlock_super(sb);
-	}
-	/* unlockfs releases s->s_umount and bd_mount_sem */
-}
-
-void unlockfs(struct block_device *bdev)
-{
-	struct list_head *p;
-	/*
-	 * copied from get_super, but we need to
-	 * do special things since lockfs left the
-	 * s_umount sem held
-	 */
-	spin_lock(&sb_lock);
-	list_for_each(p, &super_blocks) {
-		struct super_block *s = sb_entry(p);
-		/*
-		 * if there is a super for this block device
-		 * in the list, get_super must have found it
-		 * during sync_super_lockfs, so our drop_super
-		 * will drop the reference created there.
-		 */
-		if (s->s_bdev == bdev && s->s_root) {
-			spin_unlock(&sb_lock);
-			if (s->s_op->unlockfs)
-				s->s_op->unlockfs(s);
-			drop_super(s);
-			goto unlock;
-		}
-	}
-	spin_unlock(&sb_lock);
-unlock:
-	up(&bdev->bd_mount_sem);
-}
-EXPORT_SYMBOL(unlockfs);
 
 /*
  * Note: check the dirty flag before waiting, so we don't

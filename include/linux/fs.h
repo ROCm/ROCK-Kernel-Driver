@@ -725,6 +725,9 @@ struct super_block {
 	struct list_head	s_instances;
 	struct quota_info	s_dquot;	/* Diskquota specific options */
 
+	int			s_frozen;
+	wait_queue_head_t	s_wait_unfrozen;
+
 	char s_id[32];				/* Informational name */
 
 	struct kobject           kobj;          /* anchor for sysfs */
@@ -736,6 +739,18 @@ struct super_block {
 	 */
 	struct semaphore s_vfs_rename_sem;	/* Kludge */
 };
+
+/*
+ * Snapshotting support.
+ */
+enum {
+	SB_UNFROZEN = 0,
+	SB_FREEZE_WRITE	= 1,
+	SB_FREEZE_TRANS = 2,
+};
+
+#define vfs_check_frozen(sb, level) \
+	wait_event((sb)->s_wait_unfrozen, ((sb)->s_frozen < (level)))
 
 /*
  * Superblock locking.
@@ -1242,7 +1257,6 @@ extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern int filemap_write_and_wait(struct address_space *mapping);
 extern void sync_supers(void);
-extern void sync_super_lockfs(struct block_device *);
 extern void sync_filesystems(int wait);
 extern void emergency_sync(void);
 extern void emergency_remount(void);
