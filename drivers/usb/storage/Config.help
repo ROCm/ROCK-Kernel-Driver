@@ -1,6 +1,9 @@
 CONFIG_USB_STORAGE
   Say Y here if you want to connect USB mass storage devices to your
-  computer's USB port.
+  computer's USB port. This is the driver you need for USB floppy drives,
+  USB hard disks, USB tape drives and USB CD-ROMs, along with
+  similar devices. This driver may also be used for some cameras and
+  card readers.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -44,3 +47,11 @@ CONFIG_USB_STORAGE_SDDR09
 CONFIG_USB_STORAGE_SDDR55
   Say Y here to include additional code to support the Sandisk SDDR-55
   SmartMedia reader in the USB Mass Storage driver.
+
+CONFIG_USB_STORAGE_HP8200e
+  Say Y here to include additional code to support Hewlett-Packard
+  8200e/8210e/8230e CD-Writer Plus drives.
+
+CONFIG_USB_STORAGE_JUMPSHOT
+  Say Y here to include additional code to support the Lexar Jumpshot
+  USB CompactFlash reader.
