@@ -315,7 +315,6 @@ acpi_pci_irq_enable (
 {
 	int			irq = 0;
 	u8			pin = 0;
-	static u16		irq_mask = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_enable");
 
@@ -372,10 +371,13 @@ acpi_pci_irq_enable (
 	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
 	 */
 #ifdef CONFIG_X86
-	if ((dev->irq < 16) &&  !((1 << dev->irq) & irq_mask)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Setting IRQ %d as level-triggered\n", dev->irq));
-		irq_mask |= (1 << dev->irq);
-		eisa_set_level_irq(dev->irq);
+	{
+		static u16 irq_mask;
+		if ((dev->irq < 16) &&  !((1 << dev->irq) & irq_mask)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Setting IRQ %d as level-triggered\n", dev->irq));
+			irq_mask |= (1 << dev->irq);
+			eisa_set_level_irq(dev->irq);
+		}
 	}
 #endif
 #ifdef CONFIG_IOSAPIC
