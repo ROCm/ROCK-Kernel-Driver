@@ -296,7 +296,8 @@ static dev_link_t *tc574_attach(void)
 	lp = dev->priv;
 	link = &lp->link;
 	link->priv = dev;
-	
+
+	spin_lock_init(&lp->window_lock);
 	init_timer(&link->release);
 	link->release.function = &tc574_release;
 	link->release.data = (unsigned long)link;
