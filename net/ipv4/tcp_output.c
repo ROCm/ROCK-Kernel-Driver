@@ -991,7 +991,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		/* New SKB created, account for it. */
 		new_factor = TCP_SKB_CB(skb)->tso_factor;
 		tcp_dec_pcount_explicit(&tp->packets_out,
-					new_factor - old_factor);
+					old_factor - new_factor);
 		tcp_inc_pcount(&tp->packets_out, skb->next);
 	}
 
