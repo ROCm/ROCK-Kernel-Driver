@@ -105,7 +105,7 @@ default subdirectories:
 
 
 Drivers registered with the class get a symlink in the drivers/ directory 
-that points the driver's directory (under its bus directory):
+that points to the driver's directory (under its bus directory):
 
    class/
    `-- input

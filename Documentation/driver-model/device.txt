@@ -47,11 +47,13 @@ intf_list:     List of intf_data. There is one structure allocated for
 
 children:      List of child devices.
 
+parent:        *** FIXME ***
+
 name:	       ASCII description of device. 
 	       Example: " 3Com Corporation 3c905 100BaseTX [Boomerang]"
 
 bus_id:	       ASCII representation of device's bus position. This 
-	       field should a name unique across all devices on the
+	       field should be a name unique across all devices on the
 	       bus type the device belongs to. 
 
 	       Example: PCI bus_ids are in the form of
@@ -66,11 +68,11 @@ bus:	       Pointer to struct bus_type that device belongs to.
 
 dir:	       Device's sysfs directory.
 
+class_num:     Class-enumerated value of the device.
+
 driver:	       Pointer to struct device_driver that controls the device.
 
 driver_data:   Driver-specific data.
-
-class_num:     Class-enumerated value of the device.
 
 platform_data: Platform data specific to the device.
 
@@ -108,7 +110,7 @@ get_device() will return a pointer to the struct device passed to it
 if the reference is not already 0 (if it's in the process of being
 removed already).
 
-A driver can take use the lock in the device structure using: 
+A driver can access the lock in the device structure using: 
 
 void lock_device(struct device * dev);
 void unlock_device(struct device * dev);

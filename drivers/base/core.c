@@ -21,9 +21,6 @@
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
-DECLARE_MUTEX(device_sem);
-
-
 /*
  * sysfs bindings for devices.
  */
@@ -180,6 +177,7 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
 
 void device_initialize(struct device *dev)
 {
+	kobj_set_kset_s(dev,devices_subsys);
 	kobject_init(&dev->kobj);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
@@ -214,7 +212,6 @@ int device_add(struct device *dev)
 
 	/* first, register with generic layer. */
 	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
-	kobj_set_kset_s(dev,devices_subsys);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
@@ -222,11 +219,11 @@ int device_add(struct device *dev)
 		goto register_done;
 
 	/* now take care of our own registration */
-	if (parent) {
-		down(&device_sem);
+
+	down_write(&devices_subsys.rwsem);
+	if (parent)
 		list_add_tail(&dev->node,&parent->children);
-		up(&device_sem);
-	}
+	up_write(&devices_subsys.rwsem);
 
 	bus_add_device(dev);
 
@@ -304,11 +301,10 @@ void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
 
-	if (parent) {
-		down(&device_sem);
+	down_write(&devices_subsys.rwsem);
+	if (parent)
 		list_del_init(&dev->node);
-		up(&device_sem);
-	}
+	up_write(&devices_subsys.rwsem);
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
