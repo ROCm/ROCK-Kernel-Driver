@@ -706,7 +706,7 @@ MRPROPER_FILES += \
 	include/asm \
 	.hdepend $(TOPDIR)/include/linux/modversions.h \
 	tags TAGS kernel.spec \
-	.tmpversion
+	.tmp*
 
 # 	directories removed with 'make mrproper'
 MRPROPER_DIRS += \
@@ -732,8 +732,8 @@ mrproper: clean archmrproper
 	@find . $(RCS_FIND_IGNORE) \
 		\( -name .depend -o -name .\*.cmd \) \
 		-type f -print | xargs rm -f
-	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
+	@rm -f $(MRPROPER_FILES)
 	@$(MAKE) -C scripts mrproper
 	@$(MAKE) -f Documentation/DocBook/Makefile mrproper
 
