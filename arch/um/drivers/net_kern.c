@@ -285,14 +285,14 @@ static int eth_configure(int n, void *init, char *mac,
 	dev->priv = (void *) &dev[1];
 	device->dev = dev;
 
-	(*device->kern->init)(dev, init);
+	(*transport->kern->init)(dev, init);
 	rtnl_lock();
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if(err)
 		return(1);
 
-	dev->mtu = device->user->max_packet;
+	dev->mtu = transport->user->max_packet;
 	dev->open = uml_net_open;
 	dev->hard_start_xmit = uml_net_start_xmit;
 	dev->stop = uml_net_close;
