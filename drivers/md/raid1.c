@@ -586,7 +586,6 @@ static void mark_disk_bad(mddev_t *mddev, int failed)
 	sb->working_disks--;
 	sb->failed_disks++;
 	mddev->sb_dirty = 1;
-	md_wakeup_thread(conf->thread);
 	if (!mirror->write_only)
 		conf->working_disks--;
 	printk(DISK_FAILED, bdev_partition_name(mirror->bdev), conf->working_disks);
@@ -1061,10 +1060,6 @@ static void raid1d(void *data)
 
 		mddev = r1_bio->mddev;
 		conf = mddev_to_conf(mddev);
-		if (mddev->sb_dirty) {
-			printk(KERN_INFO "raid1: dirty sb detected, updating.\n");
-			md_update_sb(mddev);
-		}
 		bio = r1_bio->master_bio;
 		switch(r1_bio->cmd) {
 		case SPECIAL:

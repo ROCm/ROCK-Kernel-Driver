@@ -904,7 +904,7 @@ static int sync_sbs(mddev_t * mddev)
 	return 0;
 }
 
-void __md_update_sb(mddev_t * mddev)
+static void md_update_sb(mddev_t * mddev)
 {
 	int err, count = 100;
 	struct list_head *tmp;
@@ -961,16 +961,6 @@ repeat:
 		printk(KERN_ERR "md: excessive errors occurred during superblock update, exiting\n");
 	}
 }
-
-void md_update_sb(mddev_t *mddev)
-{
-	if (mddev_lock(mddev))
-		return;
-	if (mddev->sb_dirty)
-		__md_update_sb(mddev);
-	mddev_unlock(mddev);
-}
-
 
 /*
  * Import a device. If 'on_disk', then sanity check the superblock
@@ -1640,7 +1630,7 @@ static int do_md_run(mddev_t * mddev)
 	 */
 	if (mddev->pers->sync_request)
 		mddev->sb->state &= ~(1 << MD_SB_CLEAN);
-	__md_update_sb(mddev);
+	md_update_sb(mddev);
 
 	md_recover_arrays();
 	/*
@@ -1749,7 +1739,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 				printk(KERN_INFO "md: marking sb clean...\n");
 				mddev->sb->state |= 1 << MD_SB_CLEAN;
 			}
-			__md_update_sb(mddev);
+			md_update_sb(mddev);
 		}
 		if (ro)
 			set_device_ro(dev, 1);
@@ -2234,7 +2224,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 
 	remove_descriptor(disk, mddev->sb);
 	kick_rdev_from_array(rdev);
-	__md_update_sb(mddev);
+	md_update_sb(mddev);
 
 	return 0;
 busy:
@@ -2341,7 +2331,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	mddev->sb->spare_disks++;
 	mddev->sb->working_disks++;
 
-	__md_update_sb(mddev);
+	md_update_sb(mddev);
 
 	/*
 	 * Kick recovery, maybe this spare has to be added to the
@@ -3309,6 +3299,8 @@ void md_do_recovery(void *data)
 		sb = mddev->sb;
 		if (!sb || !mddev->pers || mddev->ro)
 			goto unlock;
+		if (mddev->sb_dirty)
+			md_update_sb(mddev);
 		if (mddev->recovery_running > 0)
 			/* resync/recovery still happening */
 			goto unlock;
@@ -3341,7 +3333,7 @@ void md_do_recovery(void *data)
 					mddev->spare = NULL;
 				}
 			}
-			__md_update_sb(mddev);
+			md_update_sb(mddev);
 			mddev->recovery_running = 0;
 			wake_up(&resync_wait);
 			goto unlock;
@@ -3849,7 +3841,6 @@ EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
 EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
-EXPORT_SYMBOL(md_update_sb);
 EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
 EXPORT_SYMBOL(find_rdev_nr);

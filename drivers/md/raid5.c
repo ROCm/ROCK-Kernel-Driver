@@ -462,7 +462,6 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			mddev->sb_dirty = 1;
 			conf->working_disks--;
 			conf->failed_disks++;
-			md_wakeup_thread(conf->thread);
 			printk (KERN_ALERT
 				"raid5: Disk failure on %s, disabling device."
 				" Operation continuing on %d devices\n",
@@ -494,7 +493,6 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			sb->failed_disks++;
 
 			mddev->sb_dirty = 1;
-			md_wakeup_thread(conf->thread);
 
 			return 0;
 		}
@@ -1339,9 +1337,6 @@ static void raid5d (void *data)
 	PRINTK("+++ raid5d active\n");
 
 	handled = 0;
-
-	if (mddev->sb_dirty)
-		md_update_sb(mddev);
 	spin_lock_irq(&conf->device_lock);
 	while (1) {
 		struct list_head *first;

@@ -226,7 +226,6 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 	sb->working_disks--;
 	sb->failed_disks++;
 	mddev->sb_dirty = 1;
-	md_wakeup_thread(conf->thread);
 	conf->working_disks--;
 	printk (DISK_FAILED, bdev_partition_name (multipath->bdev),
 				 conf->working_disks);
@@ -593,10 +592,6 @@ static void multipathd (void *data)
 		spin_unlock_irqrestore(&retry_list_lock, flags);
 
 		mddev = mp_bh->mddev;
-		if (mddev->sb_dirty) {
-			printk(KERN_INFO "dirty sb detected, updating.\n");
-			md_update_sb(mddev);
-		}
 		bio = &mp_bh->bio;
 		bio->bi_sector = mp_bh->master_bio->bi_sector;
 		bdev = bio->bi_bdev;
