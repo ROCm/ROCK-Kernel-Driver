@@ -110,6 +110,16 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	if ((err = snd_cs46xx_pcm_rear(chip,1, NULL)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+	if ((err = snd_cs46xx_pcm_iec958(chip,2,NULL)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+#endif
 	if ((err = snd_cs46xx_mixer(chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -118,6 +128,12 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+	if ((err = snd_cs46xx_start_dsp(chip)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+
+
 	snd_cs46xx_gameport(chip);
 
 	strcpy(card->driver, "CS46xx");
@@ -132,6 +148,7 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
 	pci_set_drvdata(pci, chip);
 	dev++;
 	return 0;
