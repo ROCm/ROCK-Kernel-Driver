@@ -228,16 +228,6 @@ static inline void outb_command(unsigned char val, unsigned int base_addr)
 	outb(val, base_addr + PORT_COMMAND);
 }
 
-static inline unsigned int inw_data(unsigned int base_addr)
-{
-	return inw(base_addr + PORT_DATA);
-}
-
-static inline void outw_data(unsigned int val, unsigned int base_addr)
-{
-	outw(val, base_addr + PORT_DATA);
-}
-
 static inline unsigned int backlog_next(unsigned int n)
 {
 	return (n + 1) % BACKLOG_SIZE;

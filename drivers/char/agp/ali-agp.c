@@ -277,6 +277,15 @@ static struct agp_device_ids ali_agp_device_ids[] __devinitdata =
 		.device_id	= PCI_DEVICE_ID_AL_M1671,
 		.chipset_name	= "M1671",
 	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1681,
+		.chipset_name	= "M1681",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1683,
+		.chipset_name	= "M1683",
+	},
+
 	{ }, /* dummy final entry, always present */
 };
 
@@ -387,6 +396,8 @@ static struct pci_driver agp_ali_pci_driver = {
 
 static int __init agp_ali_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_ali_pci_driver);
 }
 

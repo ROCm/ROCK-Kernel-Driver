@@ -155,10 +155,6 @@ static void join_net(u_long local);
 static void start_net(u_long local);
 /* void start_net(ray_dev_t *local); */
 
-/* Create symbol table for registering with kernel in init_module */
-EXPORT_SYMBOL(ray_dev_ioctl);
-EXPORT_SYMBOL(ray_rx);
-
 /*===========================================================================*/
 /* Parameters that can be set with 'insmod' */
 /* Bit map of interrupts to choose from */

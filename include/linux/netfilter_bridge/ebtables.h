@@ -201,9 +201,9 @@ struct ebt_watcher
 {
 	struct list_head list;
 	const char name[EBT_FUNCTION_MAXNAMELEN];
-	void (*watcher)(const struct sk_buff *skb, const struct net_device *in,
-	   const struct net_device *out, const void *watcherdata,
-	   unsigned int datalen);
+	void (*watcher)(const struct sk_buff *skb, unsigned int hooknr,
+	   const struct net_device *in, const struct net_device *out,
+	   const void *watcherdata, unsigned int datalen);
 	/* 0 == let it in */
 	int (*check)(const char *tablename, unsigned int hookmask,
 	   const struct ebt_entry *e, void *watcherdata, unsigned int datalen);

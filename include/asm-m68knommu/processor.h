@@ -55,11 +55,6 @@ extern inline void wrusp(unsigned long usp)
  */
 #define TASK_UNMAPPED_BASE	0
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-
 /* 
  * if you change this structure, you must change the code and offsets
  * in m68k/machasm.S

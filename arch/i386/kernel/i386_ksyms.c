@@ -61,7 +61,6 @@ extern unsigned long get_cmos_time(void);
 
 /* platform dependent support */
 EXPORT_SYMBOL(boot_cpu_data);
-EXPORT_SYMBOL(MCA_bus);
 #ifdef CONFIG_DISCONTIGMEM
 EXPORT_SYMBOL(node_data);
 EXPORT_SYMBOL(physnode_map);

@@ -85,7 +85,7 @@ static int qla2x00_send_login_iocb_cb(scsi_qla_host_t *, struct io_descriptor *,
 /** 
  * Mailbox IOCB callback array.
  **/
-int (*iocb_function_cb_list[LAST_IOCB_CB])
+static int (*iocb_function_cb_list[LAST_IOCB_CB])
 	(scsi_qla_host_t *, struct io_descriptor *, struct mbx_entry *) = {
 
 	qla2x00_send_abort_iocb_cb,

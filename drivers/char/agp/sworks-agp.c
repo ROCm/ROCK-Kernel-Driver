@@ -242,12 +242,12 @@ static int serverworks_fetch_size(void)
  */
 static void serverworks_tlbflush(struct agp_memory *temp)
 {
-	OUTREG8(serverworks_private.registers, SVWRKS_POSTFLUSH, 1);
-	while(INREG8(serverworks_private.registers, SVWRKS_POSTFLUSH) == 1)
+	writeb(1, serverworks_private.registers+SVWRKS_POSTFLUSH);
+	while (readb(serverworks_private.registers+SVWRKS_POSTFLUSH) == 1)
 		cpu_relax();
 
-	OUTREG32(serverworks_private.registers, SVWRKS_DIRFLUSH, 1);
-	while(INREG32(serverworks_private.registers, SVWRKS_DIRFLUSH) == 1)
+	writel(1, serverworks_private.registers+SVWRKS_DIRFLUSH);
+	while(readl(serverworks_private.registers+SVWRKS_DIRFLUSH) == 1)
 		cpu_relax();
 }
 
@@ -269,21 +269,21 @@ static int serverworks_configure(void)
 		return -ENOMEM;
 	}
 
-	OUTREG8(serverworks_private.registers, SVWRKS_GART_CACHE, 0x0a);
+	writeb(0xA, serverworks_private.registers+SVWRKS_GART_CACHE);
+	readb(serverworks_private.registers+SVWRKS_GART_CACHE);	/* PCI Posting. */
 
-	OUTREG32(serverworks_private.registers, SVWRKS_GATTBASE, 
-		 agp_bridge->gatt_bus_addr);
+	writel(agp_bridge->gatt_bus_addr, serverworks_private.registers+SVWRKS_GATTBASE);
+	readl(serverworks_private.registers+SVWRKS_GATTBASE);	/* PCI Posting. */
 
-	cap_reg = INREG16(serverworks_private.registers, SVWRKS_COMMAND);
+	cap_reg = readw(serverworks_private.registers+SVWRKS_COMMAND);
 	cap_reg &= ~0x0007;
 	cap_reg |= 0x4;
-	OUTREG16(serverworks_private.registers, SVWRKS_COMMAND, cap_reg);
+	writew(cap_reg, serverworks_private.registers+SVWRKS_COMMAND);
+	readw(serverworks_private.registers+SVWRKS_COMMAND);
 
-	pci_read_config_byte(serverworks_private.svrwrks_dev,
-			     SVWRKS_AGP_ENABLE, &enable_reg);
+	pci_read_config_byte(serverworks_private.svrwrks_dev,SVWRKS_AGP_ENABLE, &enable_reg);
 	enable_reg |= 0x1; /* Agp Enable bit */
-	pci_write_config_byte(serverworks_private.svrwrks_dev,
-			      SVWRKS_AGP_ENABLE, enable_reg);
+	pci_write_config_byte(serverworks_private.svrwrks_dev,SVWRKS_AGP_ENABLE, enable_reg);
 	serverworks_tlbflush(NULL);
 
 	agp_bridge->capndx = pci_find_capability(serverworks_private.svrwrks_dev, PCI_CAP_ID_AGP);
@@ -539,6 +539,8 @@ static struct pci_driver agp_serverworks_pci_driver = {
 
 static int __init agp_serverworks_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_serverworks_pci_driver);
 }
 

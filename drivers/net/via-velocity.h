@@ -291,10 +291,10 @@ struct velocity_td_info {
 	dma_addr_t buf_dma;
 };
 
-enum {
+enum  velocity_owner {
 	OWNED_BY_HOST = 0,
 	OWNED_BY_NIC = 1
-} velocity_owner;
+};
 
 
 /*

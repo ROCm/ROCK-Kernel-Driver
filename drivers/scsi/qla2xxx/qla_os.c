@@ -151,6 +151,8 @@ static void qla2x00_config_dma_addressing(scsi_qla_host_t *ha);
  * SCSI host template entry points 
  */
 static int qla2xxx_slave_configure(struct scsi_device * device);
+static int qla2x00_queuecommand(struct scsi_cmnd *cmd,
+		void (*fn)(struct scsi_cmnd *));
 static int qla2xxx_eh_abort(struct scsi_cmnd *);
 static int qla2xxx_eh_device_reset(struct scsi_cmnd *);
 static int qla2xxx_eh_bus_reset(struct scsi_cmnd *);
@@ -396,8 +398,9 @@ static void qla2x00_rst_aen(scsi_qla_host_t *);
 
 static uint8_t qla2x00_mem_alloc(scsi_qla_host_t *);
 static void qla2x00_mem_free(scsi_qla_host_t *ha);
-int qla2x00_allocate_sp_pool( scsi_qla_host_t *ha);
-void qla2x00_free_sp_pool(scsi_qla_host_t *ha);
+static int qla2x00_allocate_sp_pool( scsi_qla_host_t *ha);
+static void qla2x00_free_sp_pool(scsi_qla_host_t *ha);
+static srb_t *qla2x00_get_new_sp(scsi_qla_host_t *ha);
 
 static ssize_t qla2x00_sysfs_read_fw_dump(struct kobject *, char *, loff_t,
     size_t);
@@ -427,13 +430,6 @@ static struct bin_attribute sysfs_nvram_attr = {
 	.read = qla2x00_sysfs_read_nvram,
 	.write = qla2x00_sysfs_write_nvram,
 };
-
-
-int
-qla2x00_set_info(char *buffer, int length, struct Scsi_Host *shost)
-{
-	return (-ENOSYS);  /* Currently this is a no-op */
-}
 
 /* -------------------------------------------------------------------------- */
 
@@ -570,6 +566,7 @@ static ssize_t qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf,
 	/* Write NVRAM. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	qla2x00_lock_nvram_access(ha);
+	qla2x00_release_nvram_protection(ha);
  	witer = (uint16_t *)buf;
 	for (cnt = 0; cnt < count / 2; cnt++) {
 		qla2x00_write_nvram_word(ha, cnt+ha->nvram_base,
@@ -583,7 +580,7 @@ static ssize_t qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf,
 }
 
 /* -------------------------------------------------------------------------- */
-char *
+static char *
 qla2x00_get_pci_info_str(struct scsi_qla_host *ha, char *str)
 {
 	static char *pci_bus_modes[] = {
@@ -663,7 +660,7 @@ qla2x00_get_fw_version_str(struct scsi_qla_host *ha, char *str)
 * interrupt handler may call this routine as part of request-completion
 * handling).
 **************************************************************************/
-int
+static int
 qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 {
 	fc_port_t	*fcport;
@@ -754,7 +751,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	cmd->host_scribble = (unsigned char *)handle;
 
 	/* Bookkeeping information */
-	sp->r_start = jiffies;       /* time the request was received */
+	sp->r_start = jiffies;		/* Time the request was recieved. */
 	sp->u_start = 0;
 
 	/* Setup device queue pointers. */
@@ -793,7 +790,6 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		}
 	} else
 		sp->flags |= SRB_TAPE;
-
 
 	DEBUG5(printk("scsi(%ld:%2d:%2d): (queuecmd) queue sp = %p, "
 	    "flags=0x%x fo retry=%d, pid=%ld\n",
@@ -836,6 +832,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		spin_lock_irq(ha->host->host_lock);
 		return (0);
 	}
+
 	if (tq && test_bit(TQF_SUSPENDED, &tq->flags) &&
 	    (sp->flags & SRB_TAPE) == 0) {
 		/* If target suspended put incoming I/O in retry_q. */
@@ -956,7 +953,7 @@ qla2x00_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
  *    Success (Adapter is online) : 0
  *    Failed  (Adapter is offline/disabled) : 1
  */
-int 
+static int 
 qla2x00_wait_for_hba_online(scsi_qla_host_t *ha)
 {
 	int 	 return_status;
@@ -1290,7 +1287,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 *
 * Note:
 **************************************************************************/
-int
+static int
 qla2x00_eh_wait_for_pending_target_commands(scsi_qla_host_t *ha, unsigned int t)
 {
 	int	cnt;
@@ -1502,7 +1499,7 @@ eh_dev_reset_done:
 *
 * Note:
 **************************************************************************/
-int
+static int
 qla2x00_eh_wait_for_pending_commands(scsi_qla_host_t *ha)
 {
 	int	cnt;
@@ -2322,7 +2319,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 		    "%s: has data been written to the file. \n",
 		    __func__);)
 
-		return (qla2x00_set_info(buffer, length, shost));
+		return -ENOSYS;
 	}
 
 	if (start) {
@@ -2341,8 +2338,6 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->model_number, qla2x00_get_fw_version_str(ha, fw_info));
 
 	copy_info(&info, "Driver version %s\n", qla2x00_version_str);
-
-	copy_info(&info, "Entry address = %p\n", qla2x00_set_info);
 
 	tmp_sn = ((ha->serial0 & 0x1f) << 16) | (ha->serial2 << 8) | 
 	    ha->serial1;
@@ -3146,7 +3141,7 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
  * 
  * Note: Sets the ref_count for non Null sp to one.
  */
-int
+static int
 qla2x00_allocate_sp_pool(scsi_qla_host_t *ha) 
 {
 	int      rval;
@@ -3165,7 +3160,7 @@ qla2x00_allocate_sp_pool(scsi_qla_host_t *ha)
  *  This routine frees all adapter allocated memory.
  *  
  */
-void
+static void
 qla2x00_free_sp_pool( scsi_qla_host_t *ha) 
 {
 	if (ha->srb_mempool) {
@@ -3626,7 +3621,7 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
  * output:
  *        srb_t * or NULL
  */
-srb_t *
+static srb_t *
 qla2x00_get_new_sp(scsi_qla_host_t *ha)
 {
 	srb_t *sp;
@@ -3911,9 +3906,9 @@ qla2x00_cmd_timeout(srb_t *sp)
 	if (sp->state == SRB_PENDING_STATE) {
 		__del_from_pending_queue(vis_ha, sp);
 		DEBUG2(printk("scsi(%ld): Found in Pending queue pid %ld, "
-		    "State = %x., fcport state=%d jiffies=%lx\n",
+		    "State = %x., fcport state=%d sjiffs=%lx njiffs=%lx\n",
 		    vis_ha->host_no, cmd->serial_number, sp->state,
-		    atomic_read(&fcport->state), jiffies));
+		    atomic_read(&fcport->state), sp->r_start, jiffies));
 
 		/*
 		 * If FC_DEVICE is marked as dead return the cmd with
@@ -3980,8 +3975,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 
 	if (processed) {
 		qla2x00_done(dest_ha);
-
-		 return;
+		return;
 	}
 
 	spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
@@ -4146,13 +4140,13 @@ qla2x00_done(scsi_qla_host_t *old_ha)
 
 			default:
 				DEBUG2(printk("scsi(%ld:%d:%d) %s: did_error "
-				    "= %d, comp-scsi= 0x%x-0x%x.\n",
+				    "= %d, comp-scsi= 0x%x-0x%x pid=%ld.\n",
 				    vis_ha->host_no,
 				    cmd->device->id, cmd->device->lun,
 				    __func__,
 				    host_byte(cmd->result),
 				    CMD_COMPL_STATUS(cmd),
-				    CMD_SCSI_STATUS(cmd)));
+				    CMD_SCSI_STATUS(cmd), cmd->serial_number));
 				break;
 		}
 
@@ -4273,11 +4267,10 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 			test_bit(ABORT_ISP_ACTIVE, &dest_ha->dpc_flags) ||
 			atomic_read(&dest_ha->loop_state) != LOOP_READY)) {
 
-			DEBUG3(printk("scsi(%ld): port=(0x%x) retry_q(%d) "
-			    "loop state = %d, loop counter = 0x%x dpc flags "
-			    "= 0x%lx\n",
-			    dest_ha->host_no,
-			    fcport->loop_id,
+			DEBUG3(printk("scsi(%ld): pid=%ld port=0x%x state=%d "
+			    "loop state=%d, loop counter=0x%x "
+			    "dpc_flags=0x%lx\n", sp->cmd->serial_number,
+			    dest_ha->host_no, fcport->loop_id,
 			    atomic_read(&fcport->state),
 			    atomic_read(&dest_ha->loop_state),
 			    atomic_read(&dest_ha->loop_down_timer),
@@ -4325,105 +4318,6 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 		qla2x00_process_response_queue_in_zio_mode(vis_ha);
 
 	}
-}
-
-
-/**************************************************************************
-*   qla2x00_check_tgt_status
-*
-* Description:
-*     Checks to see if the target or loop is down.
-*
-* Input:
-*     cmd - pointer to Scsi cmd structure
-*
-* Returns:
-*   1 - if target is present
-*   0 - if target is not present
-*
-**************************************************************************/
-int
-qla2x00_check_tgt_status(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
-{
-	os_lun_t        *lq;
-	unsigned int	b, t, l;
-	fc_port_t	*fcport;
-
-	/* Generate LU queue on bus, target, LUN */
-	b = cmd->device->channel;
-	t = cmd->device->id;
-	l = cmd->device->lun;
-
-	if ((lq = GET_LU_Q(ha,t,l)) == NULL) {
-		return (QLA_FUNCTION_FAILED);
-	}
-
-	fcport = lq->fclun->fcport;
-
-	if (TGT_Q(ha, t) == NULL ||
-	    l >= ha->max_luns ||
-	    atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    atomic_read(&ha->loop_state) == LOOP_DEAD ||
-	    (!atomic_read(&ha->loop_down_timer) &&
-		atomic_read(&ha->loop_state) == LOOP_DOWN) ||
-	    test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags) ||
-	    test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
-	    atomic_read(&ha->loop_state) != LOOP_READY) {
-
-		DEBUG(printk(KERN_INFO
-		    "scsi(%ld:%2d:%2d:%2d): %s connection is down\n",
-		    ha->host_no,
-		    b, t, l,
-		    __func__));
-
-		cmd->result = DID_NO_CONNECT << 16;
-		return (QLA_FUNCTION_FAILED);
-	}
-	return (QLA_SUCCESS);
-}
-
-/**************************************************************************
-*   qla2x00_check_port_status
-*
-* Description:
-*     Checks to see if the port or loop is down.
-*
-* Input:
-*     fcport - pointer to fc_port_t structure.
-*
-* Returns:
-*   1 - if port is present
-*   0 - if port is not present
-*
-**************************************************************************/
-int
-qla2x00_check_port_status(scsi_qla_host_t *ha, fc_port_t *fcport)
-{
-	if (fcport == NULL) {
-		return (QLA_FUNCTION_FAILED);
-	}
-
-	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    atomic_read(&ha->loop_state) == LOOP_DEAD) {
-		return (QLA_FUNCTION_FAILED);
-	}
-
-	if ((atomic_read(&fcport->state) != FCS_ONLINE) || 
-	    (!atomic_read(&ha->loop_down_timer) &&
-		atomic_read(&ha->loop_state) == LOOP_DOWN) ||
-	    (test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags)) ||
-	    test_bit(CFG_ACTIVE, &ha->cfg_flags) ||
-	    test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
-	    atomic_read(&ha->loop_state) != LOOP_READY) {
-
-		DEBUG(printk(KERN_INFO
-		    "scsi(%ld): Connection is down. fcport=%p.\n",
-		    ha->host_no, fcport));
-
-		return (QLA_BUSY);
-	}
-
-	return (QLA_SUCCESS);
 }
 
 /* XXX(hch): crude hack to emulate a down_timeout() */
@@ -4530,9 +4424,7 @@ qla2x00_module_init(void)
 	if (!qla2xxx_transport_template)
 		return -ENODEV;
 
-	printk(KERN_INFO
-	    "QLogic Fibre Channel HBA Driver (%p)\n", qla2x00_set_info);
-
+	printk(KERN_INFO "QLogic Fibre Channel HBA Driver\n");
 	return 0;
 }
 

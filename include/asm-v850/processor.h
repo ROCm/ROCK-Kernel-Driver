@@ -48,13 +48,6 @@
  */
 #define current_text_addr()	({ __label__ _l; _l: &&_l;})
 
-
-/*
- * Bus types
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
 /* If you change this, you must change the associated assembly-languages
    constants defined below, THREAD_*.  */
 struct thread_struct {

@@ -26,12 +26,6 @@
 #define TASK_UNMAPPED_BASE \
   ((current->personality & ADDR_LIMIT_32BIT) ? 0x40000000 : TASK_SIZE / 2)
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
 typedef struct {
 	unsigned long seg;
 } mm_segment_t;

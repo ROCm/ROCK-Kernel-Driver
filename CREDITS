@@ -1893,7 +1893,7 @@ D: Early protocol filter for bridging code
 D: Bug fixes
 
 N: Paul Laufer
-E: pelaufer@csupomona.edu
+E: paul@laufernet.com
 D: Soundblaster driver fixes, ISAPnP quirk
 S: California, USA
 

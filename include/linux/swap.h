@@ -269,6 +269,7 @@ static inline void put_swap_token(struct mm_struct *mm)
 #define move_from_swap_cache(p, i, m)		1
 #define __delete_from_swap_cache(p)		/*NOTHING*/
 #define delete_from_swap_cache(p)		/*NOTHING*/
+#define swap_token_default_timeout		0
 
 static inline int remove_exclusive_swap_page(struct page *p)
 {

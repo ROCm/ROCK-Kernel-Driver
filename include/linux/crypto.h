@@ -56,6 +56,9 @@
 #define CRYPTO_UNSPEC			0
 #define CRYPTO_MAX_ALG_NAME		64
 
+#define CRYPTO_DIR_ENCRYPT		1
+#define CRYPTO_DIR_DECRYPT		0
+
 struct scatterlist;
 
 /*

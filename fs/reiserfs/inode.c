@@ -1449,12 +1449,14 @@ struct dentry *reiserfs_get_dentry(struct super_block *sb, void *vobjp)
     
     key.on_disk_key.k_objectid = data[0] ;
     key.on_disk_key.k_dir_id = data[1] ;
+    reiserfs_write_lock(sb);
     inode = reiserfs_iget(sb, &key) ;
     if (inode && !IS_ERR(inode) && data[2] != 0 &&
 	data[2] != inode->i_generation) {
 	    iput(inode) ;
 	    inode = NULL ;
     }
+    reiserfs_write_unlock(sb);
     if (!inode)
 	    inode = ERR_PTR(-ESTALE);
     if (IS_ERR(inode))

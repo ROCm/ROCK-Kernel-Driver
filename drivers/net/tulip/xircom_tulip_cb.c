@@ -93,6 +93,7 @@ static int csr0 = 0x00A00000 | 0x4800;
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
@@ -116,13 +117,16 @@ KERN_INFO " unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Xircom CBE-100 ethernet driver");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION(DRV_VERSION);
 
-MODULE_PARM(debug, "i");
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(csr0, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param(debug, int, 0);
+module_param(max_interrupt_work, int, 0);
+module_param(rx_copybreak, int, 0);
+module_param(csr0, int, 0);
+
+static int num_units;
+module_param_array(options, num_units, int, 0);
+module_param_array(full_duplex, num_units, int, 0);
 
 #define RUN_AT(x) (jiffies + (x))
 
