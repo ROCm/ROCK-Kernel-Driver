@@ -1538,15 +1538,15 @@ static void pmz_console_write(struct console *con, const char *s, unsigned int c
 	write_zsreg(up, R5, up->curregs[5] | TxENABLE | RTS | DTR);
 
 	for (i = 0; i < count; i++) {
-		/* Wait for the transmit buffer to empty. */
-		while ((read_zsreg(up, R0) & Tx_BUF_EMP) == 0)
-			udelay(5);
-		write_zsdata(up, s[i]);
 		if (s[i] == 10) {
 			while ((read_zsreg(up, R0) & Tx_BUF_EMP) == 0)
 				udelay(5);
 			write_zsdata(up, R13);
 		}
+		/* Wait for the transmit buffer to empty. */
+		while ((read_zsreg(up, R0) & Tx_BUF_EMP) == 0)
+			udelay(5);
+		write_zsdata(up, s[i]);
 	}
 
 	/* Restore the values in the registers. */

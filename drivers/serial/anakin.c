@@ -411,16 +411,10 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++, s++) {
-		while (!(anakin_in(port, 0x10) & TXEMPTY))
-			barrier();
-
 		/*
 		 *	Send the character out.
 		 *	If a LF, also do CR...
 		 */
-		anakin_out(port, 0x14, *s);
-		anakin_out(port, 0x18, anakin_in(port, 0x18) | SENDREQUEST);
-
 		if (*s == 10) {
 			while (!(anakin_in(port, 0x10) & TXEMPTY))
 				barrier();
@@ -428,6 +422,10 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 			anakin_out(port, 0x18, anakin_in(port, 0x18)
 					| SENDREQUEST);
 		}
+		while (!(anakin_in(port, 0x10) & TXEMPTY))
+			barrier();
+		anakin_out(port, 0x14, *s);
+		anakin_out(port, 0x18, anakin_in(port, 0x18) | SENDREQUEST);
 	}
 
 	/*
