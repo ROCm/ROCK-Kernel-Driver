@@ -58,6 +58,8 @@ void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
 
+int acpi_disabled __initdata;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
+
 const char *
 acpi_get_sysname (void)
 {
@@ -608,7 +610,7 @@ acpi_boot_init (char *cmdline)
 	 * gets interrupts such as power and sleep buttons.  If it's not
 	 * on a Legacy interrupt, it needs to be setup.
 	 */
-	if (acpi_table_parse(ACPI_FACP, acpi_parse_fadt) < 1)
+	if (acpi_table_parse(ACPI_FADT, acpi_parse_fadt) < 1)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
 #ifdef CONFIG_SERIAL_8250_ACPI
