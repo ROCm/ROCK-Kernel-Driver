@@ -158,7 +158,6 @@ int ata_scsi_error(struct Scsi_Host *host)
  *	ata_scsi_rw_xlat -
  *	@qc:
  *	@scsicmd:
- *	@cmd_size:
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
@@ -167,8 +166,7 @@ int ata_scsi_error(struct Scsi_Host *host)
  *
  */
 
-static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
-				   unsigned int cmd_size)
+static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
 	struct ata_taskfile *tf = &qc->tf;
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
@@ -191,7 +189,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 		VPRINTK("writing\n");
 	}
 
-	if (cmd_size == 10) {
+	if (scsicmd[0] == READ_10 || scsicmd[0] == WRITE_10) {
 		if (lba48) {
 			tf->hob_nsect = scsicmd[7];
 			tf->hob_lbal = scsicmd[2];
@@ -220,7 +218,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 		return 0;
 	}
 
-	if (cmd_size == 6) {
+	if (scsicmd[0] == READ_6 || scsicmd[0] == WRITE_6) {
 		qc->nsect = tf->nsect = scsicmd[4];
 		tf->lbal = scsicmd[3];
 		tf->lbam = scsicmd[2];
@@ -230,7 +228,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 		return 0;
 	}
 
-	if (cmd_size == 16) {
+	if (scsicmd[0] == READ_16 || scsicmd[0] == WRITE_16) {
 		/* rule out impossible LBAs and sector counts */
 		if (scsicmd[2] || scsicmd[3] || scsicmd[10] || scsicmd[11])
 			return 1;
@@ -275,15 +273,14 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
  *	@dev:
  *	@cmd:
  *	@done:
- *	@cmd_size:
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
-		      struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
-		      unsigned int cmd_size)
+static void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *))
 {
 	struct ata_queued_cmd *qc;
 	u8 *scsicmd = cmd->cmnd;
@@ -302,7 +299,7 @@ void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
 
 	qc->flags |= ATA_QCFLAG_SG;	/* data is present; dma-map it */
 
-	if (ata_scsi_rw_xlat(qc, scsicmd, cmd_size))
+	if (ata_scsi_rw_xlat(qc, scsicmd))
 		goto err_out;
 
 	/* select device, send command to hardware */
@@ -964,6 +961,22 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 	return dev;
 }
 
+static inline int ata_scsi_xlat_possible(u8 cmd)
+{
+	switch (cmd) {
+	case READ_6:
+	case READ_10:
+	case READ_16:
+
+	case WRITE_6:
+	case WRITE_10:
+	case WRITE_16:
+		return 1;
+	}
+
+	return 0;
+}
+
 /**
  *	ata_scsi_queuecmd - Issue SCSI cdb to libata-managed device
  *	@cmd: SCSI command to be sent
@@ -1008,26 +1021,12 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 
 	/* fast path */
 	if (dev->class == ATA_DEV_ATA) {
-		switch(scsicmd[0]) {
-		case READ_6:
-		case WRITE_6:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 6);
+		if (ata_scsi_xlat_possible(scsicmd[0])) {
+			ata_scsi_rw_queue(ap, dev, cmd, done);
 			goto out_unlock;
-
-		case READ_10:
-		case WRITE_10:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 10);
-			goto out_unlock;
-
-		case READ_16:
-		case WRITE_16:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 16);
-			goto out_unlock;
-
-		default:
-			/* do nothing */
-			break;
 		}
+
+		/* otherwise fall through to slow path */
 
 	} else {
 		assert (dev->class == ATA_DEV_ATAPI);

@@ -50,9 +50,6 @@ extern void ata_thread_wake(struct ata_port *ap, unsigned int thr_state);
 
 /* libata-scsi.c */
 extern void ata_to_sense_error(struct ata_queued_cmd *qc);
-extern void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
-		      struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
-		      unsigned int cmd_size);
 extern int ata_scsi_error(struct Scsi_Host *host);
 extern unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 			       unsigned int buflen);
