@@ -19,7 +19,7 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 		"VmStk:\t%8lu kB\n"
 		"VmExe:\t%8lu kB\n"
 		"VmLib:\t%8lu kB\n",
-		mm->total_vm << (PAGE_SHIFT-10),
+		(mm->total_vm - mm->reserved_vm) << (PAGE_SHIFT-10),
 		mm->locked_vm << (PAGE_SHIFT-10),
 		mm->rss << (PAGE_SHIFT-10),
 		data << (PAGE_SHIFT-10),

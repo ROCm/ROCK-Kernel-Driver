@@ -225,7 +225,7 @@ struct mm_struct {
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
 	unsigned long rss, total_vm, locked_vm, shared_vm;
-	unsigned long exec_vm, stack_vm, def_flags;
+	unsigned long exec_vm, stack_vm, reserved_vm, def_flags;
 
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 

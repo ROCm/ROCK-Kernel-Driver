@@ -750,6 +750,8 @@ void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
 		mm->stack_vm += pages;
 	if (flags & VM_EXEC)
 		mm->exec_vm += pages;
+	if (flags & (VM_RESERVED|VM_IO))
+		mm->reserved_vm += pages;
 }
 #endif /* CONFIG_PROC_FS */
 
