@@ -47,6 +47,10 @@ static int atkbd_softrepeat;
 module_param_named(softrepeat, atkbd_softrepeat, bool, 0);
 MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
 
+static int atkbd_softraw = 1;
+module_param_named(softraw, atkbd_softraw, bool, 0);
+MODULE_PARM_DESC(softraw, "Use software generated rawmode");
+
 static int atkbd_scroll;
 module_param_named(scroll, atkbd_scroll, bool, 0);
 MODULE_PARM_DESC(scroll, "Enable scroll-wheel on MS Office and similar keyboards");
@@ -335,6 +339,9 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 			goto out;
 		code |= (atkbd->set != 3) ? 0x80 : 0x100;
 	}
+
+	if (atkbd->keycode[code] != ATKBD_KEY_NULL)
+		input_event(&atkbd->dev, EV_MSC, MSC_SCAN, code);
 
 	switch (atkbd->keycode[code]) {
 		case ATKBD_KEY_NULL:
@@ -750,16 +757,21 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 			return;
 	}
 
+	if (!atkbd->write)
+		atkbd_softrepeat = 1;
+	if (atkbd_softrepeat)
+		atkbd_softraw = 1;
+
 	if (atkbd->write) {
 		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP) | BIT(EV_MSC);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
 	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP) | BIT(EV_MSC);
-	atkbd->dev.mscbit[0] = BIT(MSC_RAW);
+	atkbd->dev.mscbit[0] = atkbd_softraw ? BIT(MSC_SCAN) : BIT(MSC_RAW) | BIT(MSC_SCAN);
 
 	if (!atkbd_softrepeat) {
 		atkbd->dev.rep[REP_DELAY] = 250;
 		atkbd->dev.rep[REP_PERIOD] = 33;
-	}
+	} else atkbd_softraw = 1;
 
 	atkbd->serio = serio;
 
