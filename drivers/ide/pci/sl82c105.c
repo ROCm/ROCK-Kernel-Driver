@@ -284,7 +284,7 @@ extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
 static int __devinit sl82c105_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &slc82c105_chipsets[id->driver_data];
+	ide_pci_device_t *d = &sl82c105_chipsets[id->driver_data];
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
