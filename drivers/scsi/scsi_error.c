@@ -1740,6 +1740,8 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	scmd->sc_request		= NULL;
 	scmd->sc_magic			= SCSI_CMND_MAGIC;
 
+	init_timer(&scmd->eh_timeout);
+
 	/*
 	 * Sometimes the command can get back into the timer chain,
 	 * so use the pid as an identifier.
