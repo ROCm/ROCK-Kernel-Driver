@@ -60,6 +60,17 @@ struct async {
 	struct urb *urb;
 };
 
+static int usbfs_snoop = 0;
+module_param (usbfs_snoop, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC (usbfs_snoop, "true to log all usbfs traffic");
+
+#define snoop(dev, format, arg...)				\
+	do {							\
+		if (usbfs_snoop)				\
+			dev_info( dev , format , ## arg);	\
+	} while (0)
+
+
 static inline int connected (struct usb_device *dev)
 {
 	return dev->state != USB_STATE_NOTATTACHED;
@@ -398,7 +409,7 @@ static int checkintf(struct dev_state *ps, unsigned int ifnum)
 	if (test_bit(ifnum, &ps->ifclaimed))
 		return 0;
 	/* if not yet claimed, claim it for the driver */
-	printk(KERN_WARNING "usbfs: process %d (%s) did not claim interface %u before use\n",
+	dev_warn(&ps->dev->dev, "usbfs: process %d (%s) did not claim interface %u before use\n",
 	       current->pid, current->comm, ifnum);
 	return claimintf(ps, ifnum);
 }
@@ -521,7 +532,7 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 	struct usbdevfs_ctrltransfer ctrl;
 	unsigned int tmo;
 	unsigned char *tbuf;
-	int i, ret;
+	int i, j, ret;
 
 	if (copy_from_user(&ctrl, arg, sizeof(ctrl)))
 		return -EFAULT;
@@ -537,9 +548,18 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 			free_page((unsigned long)tbuf);
 			return -EINVAL;
 		}
+		snoop(&dev->dev, "control read: bRequest=%02x bRrequestType=%02x wValue=%04x wIndex=%04x\n", 
+			ctrl.bRequest, ctrl.bRequestType, ctrl.wValue, ctrl.wIndex);
+
 		i = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
 		if ((i > 0) && ctrl.wLength) {
+			if (usbfs_snoop) {
+				dev_info(&dev->dev, "control read: data ");
+				for (j = 0; j < ctrl.wLength; ++j)
+					printk ("%02x ", (unsigned char)((char *)ctrl.data)[j]);
+				printk("\n");
+			}
 			if (copy_to_user(ctrl.data, tbuf, ctrl.wLength)) {
 				free_page((unsigned long)tbuf);
 				return -EFAULT;
@@ -552,15 +572,23 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 				return -EFAULT;
 			}
 		}
+		snoop(&dev->dev, "control write: bRequest=%02x bRrequestType=%02x wValue=%04x wIndex=%04x\n", 
+			ctrl.bRequest, ctrl.bRequestType, ctrl.wValue, ctrl.wIndex);
+		if (usbfs_snoop) {
+			dev_info(&dev->dev, "control write: data: ");
+			for (j = 0; j < ctrl.wLength; ++j)
+				printk ("%02x ", (unsigned char)((char *)ctrl.data)[j]);
+			printk("\n");
+		}
 		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
-		printk(KERN_DEBUG "usbfs: USBDEVFS_CONTROL failed "
-			"cmd %s dev %d rqt %u rq %u len %u ret %d\n", 
-			current->comm,
-		       dev->devnum, ctrl.bRequestType, ctrl.bRequest, ctrl.wLength, i);
+		dev_printk(KERN_DEBUG, &dev->dev, "usbfs: USBDEVFS_CONTROL "
+			   "failed cmd %s rqt %u rq %u len %u ret %d\n",
+			   current->comm, ctrl.bRequestType, ctrl.bRequest,
+			   ctrl.wLength, i);
 	}
 	return i;
 }
@@ -613,8 +641,8 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 	}
 	kfree(tbuf);
 	if (i < 0) {
-		printk(KERN_WARNING "usbfs: USBDEVFS_BULK failed dev %d ep 0x%x len %u ret %d\n", 
-		       dev->devnum, bulk.ep, bulk.len, i);
+		dev_warn(&dev->dev, "usbfs: USBDEVFS_BULK failed "
+			 "ep 0x%x len %u ret %d\n", bulk.ep, bulk.len, i);
 		return i;
 	}
 	return len2;
@@ -917,7 +945,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 	}
         async_newpending(as);
         if ((ret = usb_submit_urb(as->urb, GFP_KERNEL))) {
-		printk(KERN_DEBUG "usbfs: usb_submit_urb returned %d\n", ret);
+		dev_printk(KERN_DEBUG, &ps->dev->dev, "usbfs: usb_submit_urb returned %d\n", ret);
                 async_removepending(as);
                 free_async(as);
                 return ret;
@@ -1154,82 +1182,100 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		up(&dev->serialize);
 		return -ENODEV;
 	}
+
 	switch (cmd) {
 	case USBDEVFS_CONTROL:
+		snoop(&dev->dev, "%s: CONTROL\n", __FUNCTION__);
 		ret = proc_control(ps, (void __user *)arg);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_BULK:
+		snoop(&dev->dev, "%s: BULK\n", __FUNCTION__);
 		ret = proc_bulk(ps, (void __user *)arg);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_RESETEP:
+		snoop(&dev->dev, "%s: RESETEP\n", __FUNCTION__);
 		ret = proc_resetep(ps, (void __user *)arg);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_RESET:
+		snoop(&dev->dev, "%s: RESET\n", __FUNCTION__);
 		ret = proc_resetdevice(ps);
 		break;
 
 	case USBDEVFS_CLEAR_HALT:
+		snoop(&dev->dev, "%s: CLEAR_HALT\n", __FUNCTION__);
 		ret = proc_clearhalt(ps, (void __user *)arg);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_GETDRIVER:
+		snoop(&dev->dev, "%s: GETDRIVER\n", __FUNCTION__);
 		ret = proc_getdriver(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_CONNECTINFO:
+		snoop(&dev->dev, "%s: CONNECTINFO\n", __FUNCTION__);
 		ret = proc_connectinfo(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_SETINTERFACE:
+		snoop(&dev->dev, "%s: SETINTERFACE\n", __FUNCTION__);
 		ret = proc_setintf(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_SETCONFIGURATION:
+		snoop(&dev->dev, "%s: SETCONFIGURATION\n", __FUNCTION__);
 		ret = proc_setconfig(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_SUBMITURB:
+		snoop(&dev->dev, "%s: SUBMITURB\n", __FUNCTION__);
 		ret = proc_submiturb(ps, (void __user *)arg);
 		if (ret >= 0)
 			inode->i_mtime = CURRENT_TIME;
 		break;
 
 	case USBDEVFS_DISCARDURB:
+		snoop(&dev->dev, "%s: DISCARDURB\n", __FUNCTION__);
 		ret = proc_unlinkurb(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_REAPURB:
+		snoop(&dev->dev, "%s: REAPURB\n", __FUNCTION__);
 		ret = proc_reapurb(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_REAPURBNDELAY:
+		snoop(&dev->dev, "%s: REAPURBDELAY\n", __FUNCTION__);
 		ret = proc_reapurbnonblock(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_DISCSIGNAL:
+		snoop(&dev->dev, "%s: DISCSIGNAL\n", __FUNCTION__);
 		ret = proc_disconnectsignal(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_CLAIMINTERFACE:
+		snoop(&dev->dev, "%s: CLAIMINTERFACE\n", __FUNCTION__);
 		ret = proc_claiminterface(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_RELEASEINTERFACE:
+		snoop(&dev->dev, "%s: RELEASEINTERFACE\n", __FUNCTION__);
 		ret = proc_releaseinterface(ps, (void __user *)arg);
 		break;
 
 	case USBDEVFS_IOCTL:
+		snoop(&dev->dev, "%s: IOCTL\n", __FUNCTION__);
 		ret = proc_ioctl(ps, (void __user *) arg);
 		break;
 	}
