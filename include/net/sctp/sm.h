@@ -140,6 +140,8 @@ sctp_state_fn_t sctp_sf_do_5_2_2_dupinit;
 sctp_state_fn_t sctp_sf_do_5_2_4_dupcook;
 sctp_state_fn_t sctp_sf_unk_chunk;
 sctp_state_fn_t sctp_sf_do_8_5_1_E_sa;
+sctp_state_fn_t sctp_sf_cookie_echoed_err;
+sctp_state_fn_t sctp_sf_do_5_2_6_stale;
 
 /* Prototypes for primitive event state functions.  */
 sctp_state_fn_t sctp_sf_do_prm_asoc;
@@ -175,7 +177,6 @@ sctp_state_fn_t sctp_sf_autoclose_timer_expire;
  */
 
 /* Prototypes for chunk state functions.  Not in use. */
-sctp_state_fn_t sctp_sf_do_5_2_6_stale;
 sctp_state_fn_t sctp_sf_do_9_2_reshutack;
 sctp_state_fn_t sctp_sf_do_9_2_reshut;
 sctp_state_fn_t sctp_sf_do_9_2_shutack;
@@ -211,7 +212,7 @@ void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 /* Prototypes for chunk-building functions.  */
 sctp_chunk_t *sctp_make_init(const sctp_association_t *,
 			     const sctp_bind_addr_t *,
-			     int priority);
+			     int priority, int vparam_len);
 sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *,
 				 const sctp_chunk_t *,
 				 const int priority,
@@ -322,9 +323,15 @@ sctp_pack_cookie(const sctp_endpoint_t *, const sctp_association_t *,
 		 const __u8 *, int addrs_len);
 sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *,
 				       const sctp_association_t *,
-				       sctp_chunk_t *, int priority, int *err);
+				       sctp_chunk_t *, int priority, int *err,
+				       sctp_chunk_t **err_chk_p);
 int sctp_addip_addr_config(sctp_association_t *, sctp_param_t,
 			   struct sockaddr_storage*, int);
+void sctp_send_stale_cookie_err(const sctp_endpoint_t *ep,
+				const sctp_association_t *asoc,
+				const sctp_chunk_t *chunk,
+				sctp_cmd_seq_t *commands,
+				sctp_chunk_t *err_chunk);
 
 /* 3rd level prototypes */
 __u32 sctp_generate_tag(const sctp_endpoint_t *);

@@ -207,7 +207,7 @@ void sctp_transport_route(sctp_transport_t *transport, union sctp_addr *saddr,
 			  struct sctp_opt *opt)
 {
 	sctp_association_t *asoc = transport->asoc;
-	struct sctp_func *af = transport->af_specific;
+	struct sctp_af *af = transport->af_specific;
 	union sctp_addr *daddr = &transport->ipaddr;
 	sctp_bind_addr_t *bp;
 	rwlock_t *addr_lock;
