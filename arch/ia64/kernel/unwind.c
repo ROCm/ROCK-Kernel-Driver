@@ -825,7 +825,7 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 static inline void
 desc_abi (unsigned char abi, unsigned char context, struct unw_state_record *sr)
 {
-	if (abi == 0 && context == 'i') {
+	if (abi == 3 && context == 'i') {
 		sr->flags |= UNW_FLAG_INTERRUPT_FRAME;
 		UNW_DPRINT(3, "unwind.%s: interrupt frame\n",  __FUNCTION__);
 	}

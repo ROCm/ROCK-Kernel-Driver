@@ -863,7 +863,8 @@ module_arch_cleanup (struct module *mod)
 }
 
 #ifdef CONFIG_SMP
-void percpu_modcopy(void *pcpudst, const void *src, unsigned long size)
+void
+percpu_modcopy (void  *pcpudst, const void *src, unsigned long size)
 {
 	unsigned int i;
 	for (i = 0; i < NR_CPUS; i++)

@@ -461,6 +461,13 @@ extern struct page *zero_page_memmap_ptr;
 
 typedef pte_t *pte_addr_t;
 
+/*
+ * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
+ * information.  However, we use this routine to take care of any (delayed) i-cache
+ * flushing that may be necessary.
+ */
+extern void update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte);
+
 #  ifdef CONFIG_VIRTUAL_MEM_MAP
   /* arch mem_map init routine is needed due to holes in a virtual mem_map */
 #   define __HAVE_ARCH_MEMMAP_INIT

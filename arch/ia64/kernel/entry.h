@@ -14,6 +14,7 @@
 #define SW(f)		(IA64_SWITCH_STACK_##f##_OFFSET)
 
 #define PT_REGS_SAVES(off)			\
+	.unwabi 3, 'i';				\
 	.unwabi @svr4, 'i';			\
 	.fframe IA64_PT_REGS_SIZE+16+(off);	\
 	.spillsp rp, PT(CR_IIP)+16+(off);	\

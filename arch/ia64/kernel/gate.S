@@ -171,7 +171,8 @@ END(__kernel_syscall_via_epc)
 	 */
 
 #define SIGTRAMP_SAVES										\
-	.unwabi @svr4, 's';	/* mark this as a sigtramp handler (saves scratch regs) */	\
+	.unwabi 3, 's';		/* mark this as a sigtramp handler (saves scratch regs) */	\
+	.unwabi @svr4, 's'; /* backwards compatibility with old unwinders (remove in v2.7) */	\
 	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF;						\
 	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF;						\
 	.savesp pr, PR_OFF+SIGCONTEXT_OFF;     							\

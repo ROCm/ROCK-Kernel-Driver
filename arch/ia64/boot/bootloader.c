@@ -55,6 +55,9 @@ struct disk_stat {
 
 #include "../kernel/fw-emu.c"
 
+/* This needs to be defined because lib/string.c:strlcat() calls it in case of error... */
+asm (".global printk; printk = 0");
+
 /*
  * Set a break point on this function so that symbols are available to set breakpoints in
  * the kernel being debugged.
