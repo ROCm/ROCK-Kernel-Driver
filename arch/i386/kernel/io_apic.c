@@ -1069,12 +1069,14 @@ static int pin_2_irq(int idx, int apic, int pin)
 			while (i < apic)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
+#ifdef CONFIG_ACPI_BOOT
 			/*
 			 * For MPS mode, so far only used by ES7000 platform
 			 */
 			if (platform_rename_gsi)
 				irq = platform_rename_gsi(apic, irq);
 			break;
+#endif
 		}
 		default:
 		{
