@@ -545,9 +545,9 @@ _pagebuf_lookup_pages(
 		size -= nbytes;
 
 		if (!PageUptodate(page)) {
-			if ((blocksize == PAGE_CACHE_SIZE) &&
-			    (flags & PBF_READ)) {
-				pb->pb_locked = 1;
+			if (blocksize == PAGE_CACHE_SIZE) {
+				if (flags & PBF_READ)
+					pb->pb_locked = 1;
 				good_pages--;
 			} else if (!PagePrivate(page)) {
 				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
