@@ -49,13 +49,14 @@
  */
 int jfs_umount(struct super_block *sb)
 {
-	int rc = 0;
-	log_t *log;
+	struct address_space *bdev_mapping = sb->s_bdev->bd_inode->i_mapping;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	struct inode *ipbmap = sbi->ipbmap;
 	struct inode *ipimap = sbi->ipimap;
 	struct inode *ipaimap = sbi->ipaimap;
 	struct inode *ipaimap2 = sbi->ipaimap2;
+	log_t *log;
+	int rc = 0;
 
 	jFYI(1, ("\n	UnMount JFS: sb:0x%p\n", sb));
 
@@ -109,6 +110,14 @@ int jfs_umount(struct super_block *sb)
 	sbi->ipimap = NULL;
 
 	/*
+	 * Make sure all metadata makes it to disk before we mark
+	 * the superblock as clean
+	 */
+	filemap_fdatawait(bdev_mapping);
+	filemap_fdatawrite(bdev_mapping);
+	filemap_fdatawait(bdev_mapping);
+
+	/*
 	 * ensure all file system file pages are propagated to their
 	 * home blocks on disk (and their in-memory buffer pages are 
 	 * invalidated) BEFORE updating file system superblock state
@@ -133,6 +142,7 @@ int jfs_umount(struct super_block *sb)
 
 int jfs_umount_rw(struct super_block *sb)
 {
+	struct address_space *bdev_mapping = sb->s_bdev->bd_inode->i_mapping;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	log_t *log = sbi->log;
 
@@ -151,6 +161,16 @@ int jfs_umount_rw(struct super_block *sb)
 	 */
 	dbSync(sbi->ipbmap);
 	diSync(sbi->ipimap);
+
+	/*
+	 * Note that we have to do this even if sync_blockdev() will
+	 * do exactly the same a few instructions later:  We can't
+	 * mark the superblock clean before everything is flushed to
+	 * disk.
+	 */
+	filemap_fdatawait(bdev_mapping);
+	filemap_fdatawrite(bdev_mapping);
+	filemap_fdatawait(bdev_mapping);
 
 	updateSuper(sb, FM_CLEAN);
 	sbi->log = NULL;
