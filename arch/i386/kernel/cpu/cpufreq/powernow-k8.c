@@ -509,9 +509,8 @@ static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 
 		printk(KERN_ERR PFX "lastfid invalid\n");
 		return -EINVAL;
 	}
-	if (lastfid > LO_FID_TABLE_TOP) {
+	if (lastfid > LO_FID_TABLE_TOP)
 		printk(KERN_INFO PFX  "first fid not from lo freq table\n");
-	}
 
 	return 0;
 }
@@ -590,10 +589,8 @@ static int fill_powernow_table(struct powernow_k8_data *data, struct pst_s *pst,
 /* Find and validate the PSB/PST table in BIOS. */
 static int find_psb_table(struct powernow_k8_data *data)
 {
-	struct cpufreq_frequency_table *powernow_table;
 	struct psb_s *psb;
-	struct pst_s *pst;
-	unsigned int i, j;
+	unsigned int i;
 	u32 mvs;
 	u8 maxvid;
 
@@ -629,12 +626,9 @@ static int find_psb_table(struct powernow_k8_data *data)
 		data->vidmvs = 1 << mvs;
 		data->batps = ((psb->flags2) >> 6) & 3;
 
-		printk(KERN_INFO PFX "voltage stable in %d usec", data->vstable * 20);
-		if (data->batps)
-			printk(", only %d lowest states on battery", data->batps);
-		printk(", ramp voltage offset: %d", data->rvo);
-		printk(", isochronous relief time: %d", data->irt);
-		printk(", maximum voltage step: %d\n", mvs);
+		dprintk(KERN_INFO PFX "ramp voltage offset: %d\n", data->rvo);
+		dprintk(KERN_INFO PFX "isochronous relief time: %d\n", data->irt);
+		dprintk(KERN_INFO PFX "maximum voltage step: %d - %x\n", mvs, data->vidmvs);
 
 		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
 		if (psb->numpst != 1) {
@@ -642,85 +636,28 @@ static int find_psb_table(struct powernow_k8_data *data)
 			return -ENODEV;
 		}
 
-		dprintk(KERN_DEBUG PFX "cpuid: 0x%x\n", psb->cpuid);
-
 		data->plllock = psb->plllocktime;
-		printk(KERN_INFO PFX "pll lock time: 0x%x, ", data->plllock);
-
+		dprintk(KERN_INFO PFX "plllocktime: %x (units 1us)\n", psb->plllocktime);
+		dprintk(KERN_INFO PFX "maxfid: %x\n", psb->maxfid);
+		dprintk(KERN_INFO PFX "maxvid: %x\n", psb->maxvid);
 		maxvid = psb->maxvid;
-		printk("maxfid 0x%x (%d MHz), maxvid 0x%x\n", 
-		       psb->maxfid, find_freq_from_fid(psb->maxfid), maxvid);
 
 		data->numps = psb->numpstates;
-		if (data->numps < 2) {
-			printk(KERN_ERR BFX "no p states to transition\n");
-			return -ENODEV;
-		}
-
-		if (data->batps == 0) {
-			data->batps = data->numps;
-		} else if (data->batps > data->numps) {
-			printk(KERN_ERR BFX "batterypstates > numpstates\n");
-			data->batps = data->numps;
-		} else {
-			printk(KERN_ERR PFX
-			       "Restricting operation to %d p-states\n", data->batps);
-			printk(KERN_ERR PFX
-			       "Check for an updated driver to access all "
-			       "%d p-states\n", data->numps);
-		}
-
-		if (data->numps <= 1) {
-			printk(KERN_ERR PFX "only 1 p-state to transition\n");
-			return -ENODEV;
-		}
-
-		pst = (struct pst_s *) (psb + 1);
-		if (check_pst_table(data, pst, maxvid))
-			return -EINVAL;
-
-		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (data->numps + 1)), GFP_KERNEL);
-		if (!powernow_table) {
-			printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
-			return -ENOMEM;
-		}
-
-		for (j = 0; j < psb->numpstates; j++) {
-			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
-			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
-		}
-
-		/* If you want to override your frequency tables, this
-		   is right place. */
-
-		for (j = 0; j < data->numps; j++) {
-			powernow_table[j].frequency = find_freq_from_fid(powernow_table[j].index & 0xff)*1000;
-			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
-			       powernow_table[j].index & 0xff,
-			       powernow_table[j].frequency/1000,
-			       powernow_table[j].index >> 8);
-		}
-
-		powernow_table[data->numps].frequency = CPUFREQ_TABLE_END;
-		powernow_table[data->numps].index = 0;
-
-		if (query_current_values_with_pending_wait(data)) {
-			kfree(powernow_table);
-			return -EIO;
-		}
-
-		printk(KERN_INFO PFX "currfid 0x%x (%d MHz), currvid 0x%x\n",
-		       data->currfid, find_freq_from_fid(data->currfid), data->currvid);
-
-		for (j = 0; j < data->numps; j++)
-			if ((pst[j].fid==data->currfid) && (pst[j].vid==data->currvid))
-				return 0;
-
-		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
-		return 0;
+		dprintk(KERN_INFO PFX "numpstates: %x\n", data->numps);
+		return fill_powernow_table(data, (struct pst_s *)(psb+1), maxvid);
 	}
-
-	printk(KERN_ERR BFX "no PSB\n");
+	/*
+	 * If you see this message, complain to BIOS manufacturer. If
+	 * he tells you "we do not support Linux" or some similar
+	 * nonsense, remember that Windows 2000 uses the same legacy
+	 * mechanism that the old Linux PSB driver uses. Tell them it
+	 * is broken with Windows 2000.
+	 *
+	 * The reference to the AMD documentation is chapter 9 in the
+	 * BIOS and Kernel Developer's Guide, which is available on
+	 * www.amd.com
+	 */
+	printk(KERN_ERR PFX "BIOS error - no PSB\n");
 	return -ENODEV;
 }
 
