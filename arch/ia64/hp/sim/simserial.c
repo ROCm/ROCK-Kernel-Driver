@@ -1025,6 +1025,9 @@ simrs_init (void)
 	int			i;
 	struct serial_state	*state;
 
+	if (!ia64_platform_is("hpsim"))
+		return -ENODEV;
+
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
