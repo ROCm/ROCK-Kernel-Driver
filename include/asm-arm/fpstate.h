@@ -11,7 +11,7 @@
 #ifndef __ASM_ARM_FPSTATE_H
 #define __ASM_ARM_FPSTATE_H
 
-#define FP_SIZE 35
+#include <linux/config.h>
 
 #ifndef __ASSEMBLY__
 
@@ -43,18 +43,31 @@ union vfp_state {
 extern void vfp_flush_thread(union vfp_state *);
 extern void vfp_release_thread(union vfp_state *);
 
+#define FP_HARD_SIZE 35
+
 struct fp_hard_struct {
-	unsigned int save[FP_SIZE];		/* as yet undefined */
+	unsigned int save[FP_HARD_SIZE];		/* as yet undefined */
 };
 
+#define FP_SOFT_SIZE 35
+
 struct fp_soft_struct {
-	unsigned int save[FP_SIZE];		/* undefined information */
+	unsigned int save[FP_SOFT_SIZE];		/* undefined information */
+};
+
+struct iwmmxt_struct {
+	unsigned int save[0x98/sizeof(int) + 1];
 };
 
 union fp_state {
 	struct fp_hard_struct	hard;
 	struct fp_soft_struct	soft;
+#ifdef CONFIG_IWMMXT
+	struct iwmmxt_struct	iwmmxt;
+#endif
 };
+
+#define FP_SIZE (sizeof(union fp_state) / sizeof(int))
 
 #endif
 

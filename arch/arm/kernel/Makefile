@@ -19,6 +19,9 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
 obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
 obj-$(CONFIG_PCI)		+= bios32.o
 
+obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+
 ifneq ($(CONFIG_ARCH_EBSA110),y)
   obj-y		+= io.o
 endif

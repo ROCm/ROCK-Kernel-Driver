@@ -1174,7 +1174,7 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
  *  r0  - instruction opcode.
  *  r10 - this threads thread_info structure.
  */
-call_fpe:	enable_irq r10				@ Enable interrupts
+call_fpe:
 		tst	r0, #0x08000000			@ only CDP/CPRT/LDC/STC have bit 27
 #if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
 		and	r8, r0, #0x0f000000		@ mask out op-code bits
@@ -1186,6 +1186,14 @@ call_fpe:	enable_irq r10				@ Enable interrupts
 		mov	r7, #1
 		add	r6, r10, #TI_USED_CP
 		strb	r7, [r6, r8, lsr #8]		@ set appropriate used_cp[]
+#ifdef CONFIG_IWMMXT
+		@ Test if we need to give access to iWMMXt coprocessors
+		ldr	r5, [r10, #TI_FLAGS]
+		rsbs	r7, r8, #(1 << 8)		@ CP 0 or 1 only
+		movcss	r7, r5, lsr #(TIF_USING_IWMMXT + 1)
+		bcs	iwmmxt_task_enable
+#endif
+		enable_irq r7
 		add	pc, pc, r8, lsr #6
 		mov	r0, r0
 
@@ -1264,7 +1272,11 @@ ENTRY(ret_from_exception)
 ENTRY(__switch_to)
 		add	ip, r1, #TI_CPU_SAVE
 		ldr	r3, [r2, #TI_CPU_DOMAIN]!
-		stmia	ip, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
+		stmia	ip!, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
+#if defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_IWMMXT)
+		mra	r4, r5, acc0
+		stmia   ip, {r4, r5}
+#endif
 		mcr	p15, 0, r3, c3, c0, 0		@ Set domain register
 #ifdef CONFIG_VFP
 		@ Always disable VFP so we can lazily save/restore the old
@@ -1272,6 +1284,13 @@ ENTRY(__switch_to)
 		VFPFMRX	r4, FPEXC
 		bic	r4, r4, #FPEXC_ENABLE
 		VFPFMXR	FPEXC, r4
+#endif
+#if defined(CONFIG_IWMMXT)
+		bl	iwmmxt_task_switch
+#elif defined(CONFIG_CPU_XSCALE)
+		add	r4, r2, #40			@ cpu_context_save->extra
+		ldmib	r4, {r4, r5}
+		mar	acc0, r4, r5
 #endif
 		ldmib	r2, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 

@@ -12,7 +12,7 @@ config ARCH_LUBBOCK
 config MACH_MAINSTONE
 	bool "Intel HCDDBBVA0 Development Platform"
 	select PXA27x
-	#select IWMMXT
+	select IWMMXT
 
 config ARCH_PXA_IDP
 	bool "Accelent Xscale IDP"
@@ -31,5 +31,10 @@ config PXA27x
 	bool
 	help
 	  Select code specific to PXA27x variants
+
+config IWMMXT
+	bool
+	help
+	  Enable support for iWMMXt
 
 endif
