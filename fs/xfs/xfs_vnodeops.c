@@ -1595,8 +1595,7 @@ xfs_inactive_symlink_local(
 STATIC int
 xfs_inactive_attrs(
 	xfs_inode_t	*ip,
-	xfs_trans_t	**tpp,
-	int		*commitflags)
+	xfs_trans_t	**tpp)
 {
 	xfs_trans_t	*tp;
 	int		error;
@@ -1606,9 +1605,8 @@ xfs_inactive_attrs(
 	tp = *tpp;
 	mp = ip->i_mount;
 	ASSERT(ip->i_d.di_forkoff != 0);
-	xfs_trans_commit(tp, *commitflags, NULL);
+	xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	*commitflags = 0;
 
 	error = xfs_attr_inactive(ip);
 	if (error) {
@@ -1620,8 +1618,8 @@ xfs_inactive_attrs(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 	error = xfs_trans_reserve(tp, 0,
 				  XFS_IFREE_LOG_RES(mp),
-				  0, 0,
-				  XFS_DEFAULT_LOG_COUNT);
+				  0, XFS_TRANS_PERM_LOG_RES,
+				  XFS_INACTIVE_LOG_COUNT);
 	if (error) {
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		xfs_trans_cancel(tp, 0);
@@ -1694,10 +1692,12 @@ xfs_inactive(
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
+	xfs_bmap_free_t	free_list; 
+	xfs_fsblock_t	first_block;
+	int		committed;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
-	int		commit_flags;
 	int		truncate;
 
 	vp = BHV_TO_VNODE(bdp);
@@ -1795,10 +1795,10 @@ xfs_inactive(
 		 */
 		error = xfs_itruncate_finish(&tp, ip, 0, XFS_DATA_FORK,
 				(!(mp->m_flags & XFS_MOUNT_WSYNC) ? 1 : 0));
-		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 		if (error) {
-			xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
+			xfs_trans_cancel(tp,
+				XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			return (VN_INACTIVE_CACHE);
 		}
@@ -1819,13 +1819,11 @@ xfs_inactive(
 
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
-		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
-
 	} else {
 		error = xfs_trans_reserve(tp, 0,
 					  XFS_IFREE_LOG_RES(mp),
-					  0, 0,
-					  XFS_DEFAULT_LOG_COUNT);
+					  0, XFS_TRANS_PERM_LOG_RES,
+					  XFS_INACTIVE_LOG_COUNT);
 		if (error) {
 			ASSERT(XFS_FORCED_SHUTDOWN(mp));
 			xfs_trans_cancel(tp, 0);
@@ -1835,7 +1833,6 @@ xfs_inactive(
 		xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
-		commit_flags = 0;
 	}
 
 	/*
@@ -1846,7 +1843,7 @@ xfs_inactive(
 	 * because we can't use it for xfs_attr_inactive().
 	 */
 	if (ip->i_d.di_anextents > 0) {
-		error = xfs_inactive_attrs(ip, &tp, &commit_flags);
+		error = xfs_inactive_attrs(ip, &tp);
 		/*
 		 * If we got an error, the transaction is already
 		 * cancelled, and the inode is unlocked. Just get out.
@@ -1860,7 +1857,8 @@ xfs_inactive(
 	/*
 	 * Free the inode.
 	 */
-	error = xfs_ifree(tp, ip);
+	XFS_BMAP_INIT(&free_list, &first_block);
+	error = xfs_ifree(tp, ip, &free_list);
 	if (error) {
 		/*
 		 * If we fail to free the inode, shut down.  The cancel
@@ -1873,7 +1871,7 @@ xfs_inactive(
 				error, mp->m_fsname);
 			xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 		}
-		xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
+		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	} else {
 		/*
 		 * Credit the quota account(s). The inode is gone.
@@ -1884,7 +1882,9 @@ xfs_inactive(
 		 * Just ignore errors at this point.  There is
 		 * nothing we can do except to try to keep going.
 		 */
-		(void) xfs_trans_commit(tp, commit_flags, NULL);
+		(void) xfs_bmap_finish(&tp,  &free_list, first_block,
+				       &committed);
+		(void) xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	}
 	/*
 	 * Release the dquots held by inode, if any.

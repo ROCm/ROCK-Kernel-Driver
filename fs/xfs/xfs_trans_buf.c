@@ -931,6 +931,35 @@ xfs_trans_inode_buf(
 	bip->bli_format.blf_flags |= XFS_BLI_INODE_BUF;
 }
 
+/*
+ * This call is used to indicate that the buffer is going to
+ * be staled and was an inode buffer. This means it gets
+ * special processing during unpin - where any inodes 
+ * associated with the buffer should be removed from ail.
+ * There is also special processing during recovery,
+ * any replay of the inodes in the buffer needs to be
+ * prevented as the buffer may have been reused.
+ */
+void
+xfs_trans_stale_inode_buf(
+	xfs_trans_t	*tp,
+	xfs_buf_t	*bp)
+{
+	xfs_buf_log_item_t	*bip;
+
+	ASSERT(XFS_BUF_ISBUSY(bp));
+	ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
+	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
+
+	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
+
+	bip->bli_flags |= XFS_BLI_STALE_INODE;
+	bip->bli_item.li_cb = (void(*)(xfs_buf_t*,xfs_log_item_t*))
+		xfs_buf_iodone;
+}
+
+
 
 /*
  * Mark the buffer as being one which contains newly allocated
@@ -954,7 +983,6 @@ xfs_trans_inode_alloc_buf(
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	ASSERT(atomic_read(&bip->bli_refcount) > 0);
-	ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 
 	bip->bli_flags |= XFS_BLI_INODE_ALLOC_BUF;
 }

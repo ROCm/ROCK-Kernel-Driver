@@ -57,6 +57,7 @@
 #include "xfs_bit.h"
 #include "xfs_rtalloc.h"
 #include "xfs_error.h"
+#include "xfs_bmap.h"
 
 /*
  * Log specified fields for the inode given by bp and off.
@@ -921,7 +922,10 @@ error0:
 int
 xfs_difree(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_ino_t	inode)		/* inode to be freed */
+	xfs_ino_t	inode,		/* inode to be freed */
+	xfs_bmap_free_t	*flist,		/* extents to free */
+	int		*delete,	/* set if inode cluster was deleted */
+	xfs_ino_t	*first_ino)	/* first inode in deleted cluster */
 {
 	/* REFERENCED */
 	xfs_agblock_t	agbno;	/* block number containing inode */
@@ -932,6 +936,7 @@ xfs_difree(
 	xfs_btree_cur_t	*cur;	/* inode btree cursor */
 	int		error;	/* error return value */
 	int		i;	/* result code */
+	int		ilen;	/* inodes in an inode cluster */
 	xfs_mount_t	*mp;	/* mount structure for filesystem */
 	int		off;	/* offset of inode in inode chunk */
 	xfs_inobt_rec_t	rec;	/* btree record */
@@ -995,10 +1000,11 @@ xfs_difree(
 			if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino,
 					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT)))
 				goto error0;
-			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += rec.ir_freecount;
-			if ((error = xfs_inobt_increment(cur, 0, &i)))
-				goto error0;
+			if (i) {
+				freecount += rec.ir_freecount;
+				if ((error = xfs_inobt_increment(cur, 0, &i)))
+					goto error0;
+			}
 		} while (i == 1);
 		ASSERT(freecount == INT_GET(agi->agi_freecount, ARCH_CONVERT) ||
 		       XFS_FORCED_SHUTDOWN(mp));
@@ -1033,20 +1039,60 @@ xfs_difree(
 	 */
 	XFS_INOBT_SET_FREE(&rec, off, ARCH_NOCONVERT);
 	rec.ir_freecount++;
-	if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))) {
-		cmn_err(CE_WARN,
-			"xfs_difree: xfs_inobt_update()  returned an error %d on %s.  Returning error.",
-			error, mp->m_fsname);
-		goto error0;
-	}
+
 	/*
-	 * Change the inode free counts and log the ag/sb changes.
+	 * When an inode cluster is free, it becomes elgible for removal
 	 */
-	INT_MOD(agi->agi_freecount, ARCH_CONVERT, 1);
-	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
-	down_read(&mp->m_peraglock);
-	mp->m_perag[agno].pagi_freecount++;
-	up_read(&mp->m_peraglock);
+	if ((mp->m_flags & XFS_MOUNT_IDELETE) &&
+	    (rec.ir_freecount == XFS_IALLOC_INODES(mp))) {
+
+		*delete = 1;
+		*first_ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino);
+
+		/*
+		 * Remove the inode cluster from the AGI B+Tree, adjust the
+		 * AGI and Superblock inode counts, and mark the disk space
+		 * to be freed when the transaction is committed.
+		 */
+		ilen = XFS_IALLOC_INODES(mp);
+		INT_MOD(agi->agi_count, ARCH_CONVERT, -ilen);
+		INT_MOD(agi->agi_freecount, ARCH_CONVERT, -(ilen - 1));
+		xfs_ialloc_log_agi(tp, agbp, XFS_AGI_COUNT | XFS_AGI_FREECOUNT);
+		down_read(&mp->m_peraglock);
+		mp->m_perag[agno].pagi_freecount -= ilen - 1;
+		up_read(&mp->m_peraglock);
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_ICOUNT, -ilen);
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -(ilen - 1));
+
+		if ((error = xfs_inobt_delete(cur, &i))) {
+			cmn_err(CE_WARN, "xfs_difree: xfs_inobt_delete returned an error %d on %s.\n",
+				error, mp->m_fsname);
+			goto error0;
+		}
+
+		xfs_bmap_add_free(XFS_AGB_TO_FSB(mp,
+				agno, XFS_INO_TO_AGBNO(mp,rec.ir_startino)),
+				XFS_IALLOC_BLOCKS(mp), flist, mp);
+	} else {
+		*delete = 0;
+
+		if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))) {
+			cmn_err(CE_WARN,
+				"xfs_difree: xfs_inobt_update()  returned an error %d on %s.  Returning error.",
+				error, mp->m_fsname);
+			goto error0;
+		}
+		/* 
+		 * Change the inode free counts and log the ag/sb changes.
+		 */
+		INT_MOD(agi->agi_freecount, ARCH_CONVERT, 1);
+		xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
+		down_read(&mp->m_peraglock);
+		mp->m_perag[agno].pagi_freecount++;
+		up_read(&mp->m_peraglock);
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
+	}
+
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
@@ -1054,20 +1100,23 @@ xfs_difree(
 		if ((error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i)))
 			goto error0;
 		do {
-			if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT)))
+			if ((error = xfs_inobt_get_rec(cur,
+					&rec.ir_startino,
+					&rec.ir_freecount,
+					&rec.ir_free, &i,
+					ARCH_NOCONVERT)))
 				goto error0;
-			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += rec.ir_freecount;
-			if ((error = xfs_inobt_increment(cur, 0, &i)))
-				goto error0;
+			if (i) {
+				freecount += rec.ir_freecount;
+				if ((error = xfs_inobt_increment(cur, 0, &i)))
+					goto error0;
+			}
 		} while (i == 1);
 		ASSERT(freecount == INT_GET(agi->agi_freecount, ARCH_CONVERT) ||
 		       XFS_FORCED_SHUTDOWN(mp));
 	}
 #endif
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 	return 0;
 
 error0:

@@ -189,6 +189,7 @@ int xfs_ilog_fext(int w);
 void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);
 void	xfs_inode_item_destroy(struct xfs_inode *);
 void	xfs_iflush_done(struct xfs_buf *, xfs_inode_log_item_t *);
+void	xfs_istale_done(struct xfs_buf *, xfs_inode_log_item_t *);
 void	xfs_iflush_abort(struct xfs_inode *);
 
 #endif	/* __KERNEL__ */

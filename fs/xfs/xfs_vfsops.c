@@ -298,6 +298,8 @@ xfs_start_flags(
 		mp->m_flags |= XFS_MOUNT_DFLT_IOSIZE;
 		mp->m_readio_log = mp->m_writeio_log = ap->iosizelog;
 	}
+	if (ap->flags & XFSMNT_IDELETE)
+		mp->m_flags |= XFS_MOUNT_IDELETE;
 
 	/*
 	 * no recovery flag requires a read-only mount
@@ -1597,6 +1599,7 @@ xfs_vget(
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_64BITINODE   "inode64"  /* inodes can be allocated anywhere */
+#define MNTOPT_IKEEP	"ikeep"		/* free empty inode clusters */
 
 
 int
@@ -1610,6 +1613,8 @@ xfs_parseargs(
 	char			*this_char, *value, *eov;
 	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
 	int			iosize;
+
+	args->flags |= XFSMNT_IDELETE; /* default to on */
 
 	if (!options)
 		return 0;
@@ -1715,6 +1720,8 @@ xfs_parseargs(
 			args->flags |= XFSMNT_NOUUID;
 		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {
 			args->flags |= XFSMNT_NOLOGFLUSH;
+		} else if (!strcmp(this_char, MNTOPT_IKEEP)) {
+			args->flags &= ~XFSMNT_IDELETE;
 		} else if (!strcmp(this_char, "osyncisdsync")) {
 			/* no-op, this is now the default */
 printk("XFS: osyncisdsync is now the default, option is deprecated.\n");

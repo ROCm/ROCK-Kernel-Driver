@@ -416,6 +416,7 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_32BITINOOPT	0x00008000	/* saved mount option state */
 #define XFS_MOUNT_NOUUID	0x00010000	/* ignore uuid during mount */
 #define XFS_MOUNT_NOLOGFLUSH	0x00020000
+#define XFS_MOUNT_IDELETE	0x00040000	/* delete empty inode clusters*/
 
 /*
  * Default minimum read and write sizes.
