@@ -85,10 +85,9 @@ acpi_ns_one_complete_parse (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-
 	/* Create and initialize a new walk state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+	walk_state = acpi_ds_create_walk_state (table_desc->table_id,
 			   NULL, NULL, NULL);
 	if (!walk_state) {
 		acpi_ps_free_op (parse_root);

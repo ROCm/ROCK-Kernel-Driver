@@ -407,7 +407,7 @@ typedef u32                                     acpi_table_type;
 #define ACPI_TABLE_SSDT                 (acpi_table_type) 5
 #define ACPI_TABLE_XSDT                 (acpi_table_type) 6
 #define ACPI_TABLE_MAX                  6
-#define NUM_ACPI_TABLES                 (ACPI_TABLE_MAX+1)
+#define NUM_ACPI_TABLE_TYPES            (ACPI_TABLE_MAX+1)
 
 
 /*
@@ -747,7 +747,7 @@ struct acpi_system_info
 	u32                                 debug_level;
 	u32                                 debug_layer;
 	u32                                 num_table_types;
-	struct acpi_table_info              table_info [NUM_ACPI_TABLES];
+	struct acpi_table_info              table_info [NUM_ACPI_TABLE_TYPES];
 };
 
 

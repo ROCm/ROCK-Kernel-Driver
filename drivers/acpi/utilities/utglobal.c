@@ -299,10 +299,10 @@ acpi_ut_hex_to_ascii_char (
  ******************************************************************************/
 
 
-struct acpi_table_desc              acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
+struct acpi_table_list              acpi_gbl_table_lists[NUM_ACPI_TABLE_TYPES];
 
 
-struct acpi_table_support           acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
+struct acpi_table_support           acpi_gbl_table_data[NUM_ACPI_TABLE_TYPES] =
 {
 	/***********    Name,   Signature, Global typed pointer     Signature size,      Type                  How many allowed?,    Contains valid AML? */
 
@@ -535,11 +535,9 @@ acpi_ut_get_object_type_name (
 
 
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
-
 /*
  * Strings and procedures used for debug only
  */
-
 
 /*****************************************************************************
  *
@@ -558,14 +556,13 @@ acpi_ut_get_mutex_name (
 	u32                             mutex_id)
 {
 
-	if (mutex_id > MAX_MTX)
+	if (mutex_id > MAX_MUTEX)
 	{
 		return ("Invalid Mutex ID");
 	}
 
 	return (acpi_gbl_mutex_names[mutex_id]);
 }
-
 
 #endif
 
@@ -630,9 +627,12 @@ acpi_ut_allocate_owner_id (
 		owner_id = acpi_gbl_next_table_owner_id;
 		acpi_gbl_next_table_owner_id++;
 
+		/* Check for wraparound */
+
 		if (acpi_gbl_next_table_owner_id == ACPI_FIRST_METHOD_ID)
 		{
 			acpi_gbl_next_table_owner_id = ACPI_FIRST_TABLE_ID;
+			ACPI_REPORT_WARNING (("Table owner ID wraparound\n"));
 		}
 		break;
 
@@ -644,6 +644,8 @@ acpi_ut_allocate_owner_id (
 
 		if (acpi_gbl_next_method_owner_id == ACPI_FIRST_TABLE_ID)
 		{
+			/* Check for wraparound */
+
 			acpi_gbl_next_method_owner_id = ACPI_FIRST_METHOD_ID;
 		}
 		break;
@@ -710,23 +712,19 @@ acpi_ut_init_globals (
 
 	/* ACPI table structure */
 
-	for (i = 0; i < NUM_ACPI_TABLES; i++)
+	for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++)
 	{
-		acpi_gbl_acpi_tables[i].prev        = &acpi_gbl_acpi_tables[i];
-		acpi_gbl_acpi_tables[i].next        = &acpi_gbl_acpi_tables[i];
-		acpi_gbl_acpi_tables[i].pointer     = NULL;
-		acpi_gbl_acpi_tables[i].length      = 0;
-		acpi_gbl_acpi_tables[i].allocation  = ACPI_MEM_NOT_ALLOCATED;
-		acpi_gbl_acpi_tables[i].count       = 0;
+		acpi_gbl_table_lists[i].next        = NULL;
+		acpi_gbl_table_lists[i].count       = 0;
 	}
 
 	/* Mutex locked flags */
 
-	for (i = 0; i < NUM_MTX; i++)
+	for (i = 0; i < NUM_MUTEX; i++)
 	{
-		acpi_gbl_acpi_mutex_info[i].mutex   = NULL;
-		acpi_gbl_acpi_mutex_info[i].owner_id = ACPI_MUTEX_NOT_ACQUIRED;
-		acpi_gbl_acpi_mutex_info[i].use_count = 0;
+		acpi_gbl_mutex_info[i].mutex        = NULL;
+		acpi_gbl_mutex_info[i].owner_id     = ACPI_MUTEX_NOT_ACQUIRED;
+		acpi_gbl_mutex_info[i].use_count    = 0;
 	}
 
 	/* GPE support */
@@ -737,8 +735,8 @@ acpi_ut_init_globals (
 
 	/* Global notify handlers */
 
-	acpi_gbl_sys_notify.handler         = NULL;
-	acpi_gbl_drv_notify.handler         = NULL;
+	acpi_gbl_system_notify.handler      = NULL;
+	acpi_gbl_device_notify.handler      = NULL;
 	acpi_gbl_init_handler               = NULL;
 
 	/* Global "typed" ACPI table pointers */

@@ -64,7 +64,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20030418
+#define ACPI_CA_VERSION                 0x20030509
 
 /* Maximum objects in the various object caches */
 
