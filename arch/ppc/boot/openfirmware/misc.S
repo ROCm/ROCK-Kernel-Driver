@@ -16,7 +16,7 @@
 setup_bats:
 	mfpvr	5
 	rlwinm	5,5,16,16,31		/* r3 = 1 for 601, 4 for 604 */
-	cmpi	0,5,1
+	cmpwi	0,5,1
 	li	0,0
 	bne	4f
 	mtibatl	3,0			/* invalidate BAT first */

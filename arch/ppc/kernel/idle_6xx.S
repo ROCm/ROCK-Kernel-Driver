@@ -79,12 +79,12 @@ BEGIN_FTR_SECTION
 	/* Now check if user or arch enabled NAP mode */
 	lis	r4,powersave_nap@ha
 	lwz	r4,powersave_nap@l(r4)
-	cmpi	0,r4,0
+	cmpwi	0,r4,0
 	beq	1f
 	lis	r3,HID0_NAP@h
 1:	
 END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
-	cmpi	0,r3,0
+	cmpwi	0,r3,0
 	beqlr
 
 	/* Clear MSR:EE */
@@ -133,7 +133,7 @@ BEGIN_FTR_SECTION
 	/* Go to low speed mode on some 750FX */
 	lis	r4,powersave_lowspeed@ha
 	lwz	r4,powersave_lowspeed@l(r4)
-	cmpi	0,r4,0
+	cmpwi	0,r4,0
 	beq	1f
 	mfspr	r4,SPRN_HID1
 	oris	r4,r4,0x0001

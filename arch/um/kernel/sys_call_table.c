@@ -47,7 +47,6 @@ extern syscall_handler_t sys_rt_sigaction;
 extern syscall_handler_t sys_sigaltstack;
 extern syscall_handler_t sys_vfork;
 extern syscall_handler_t sys_mmap2;
-extern syscall_handler_t sys_timer_create;
 extern syscall_handler_t old_mmap_i386;
 extern syscall_handler_t old_select;
 extern syscall_handler_t sys_modify_ldt;
