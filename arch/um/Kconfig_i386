@@ -18,3 +18,7 @@ config 3_LEVEL_PGTABLES
 config ARCH_HAS_SC_SIGNALS
 	bool
 	default y
+
+config ARCH_REUSE_HOST_VSYSCALL_AREA
+	bool
+	default y
