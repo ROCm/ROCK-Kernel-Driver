@@ -1363,7 +1363,7 @@ check_capabilities:
 	 * Executable DACs are overridable if at least one exec bit is set.
 	 */
 	if (!(mask & MAY_EXEC) ||
-		(inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
