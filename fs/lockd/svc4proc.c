@@ -527,15 +527,13 @@ nlm4svc_callback_exit(struct rpc_task *task)
 struct nlm_void			{ int dummy; };
 
 #define PROC(name, xargt, xrest, argt, rest, respsize)	\
- { (svc_procfunc) nlm4svc_proc_##name,	\
-   (kxdrproc_t) nlm4svc_decode_##xargt,	\
-   (kxdrproc_t) nlm4svc_encode_##xrest,	\
-   NULL,				\
-   sizeof(struct nlm_##argt),		\
-   sizeof(struct nlm_##rest),		\
-   0,					\
-   0,					\
-   respsize,				\
+ { .pc_func	= (svc_procfunc) nlm4svc_proc_##name,	\
+   .pc_decode	= (kxdrproc_t) nlm4svc_decode_##xargt,	\
+   .pc_encode	= (kxdrproc_t) nlm4svc_encode_##xrest,	\
+   .pc_release	= NULL,					\
+   .pc_argsize	= sizeof(struct nlm_##argt),		\
+   .pc_ressize	= sizeof(struct nlm_##rest),		\
+   .pc_xdrressize = respsize,				\
  }
 #define	Ck	(1+8)	/* cookie */
 #define	No	(1+1024/4)	/* netobj */

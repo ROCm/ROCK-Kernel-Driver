@@ -602,15 +602,15 @@ static struct rpc_procinfo	nlm_procedures[] = {
 };
 
 static struct rpc_version	nlm_version1 = {
-		number:		1,
-		nrprocs:	16,
-		procs:		nlm_procedures,
+		.number		= 1,
+		.nrprocs	= 16,
+		.procs		= nlm_procedures,
 };
 
 static struct rpc_version	nlm_version3 = {
-		number:		3,
-		nrprocs:	24,
-		procs:		nlm_procedures,
+		.number		= 3,
+		.nrprocs	= 24,
+		.procs		= nlm_procedures,
 };
 
 #ifdef 	CONFIG_LOCKD_V4
@@ -618,23 +618,21 @@ extern struct rpc_version nlm_version4;
 #endif
 
 static struct rpc_version *	nlm_versions[] = {
-	NULL,
-	&nlm_version1,
-	NULL,
-	&nlm_version3,
+	[1] = &nlm_version1,
+	[3] = &nlm_version3,
 #ifdef 	CONFIG_LOCKD_V4
-	&nlm_version4,
+	[4] = &nlm_version4,
 #endif
 };
 
 static struct rpc_stat		nlm_stats;
 
 struct rpc_program		nlm_program = {
-		name:		"lockd",
-		number:		NLM_PROGRAM,
-		nrvers:		sizeof(nlm_versions) / sizeof(nlm_versions[0]),
-		version:	nlm_versions,
-		stats:		&nlm_stats,
+		.name		= "lockd",
+		.number		= NLM_PROGRAM,
+		.nrvers		= sizeof(nlm_versions) / sizeof(nlm_versions[0]),
+		.version	= nlm_versions,
+		.stats		= &nlm_stats,
 };
 
 #ifdef LOCKD_DEBUG
