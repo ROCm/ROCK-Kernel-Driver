@@ -23,20 +23,21 @@
  * TLB handling.  This allows us to remove pages from the page
  * tables, and efficiently handle the TLB issues.
  */
-typedef struct free_pte_ctx {
+struct mmu_gather {
 	struct mm_struct	*mm;
 	unsigned int		freed;
 
 	unsigned int		flushes;
 	unsigned int		avoided_flushes;
-} mmu_gather_t;
+};
 
-extern mmu_gather_t mmu_gathers[NR_CPUS];
+extern struct mmu_gather mmu_gathers[NR_CPUS];
 
-static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
+static inline struct mmu_gather *
+tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
 {
 	int cpu = smp_processor_id();
-	mmu_gather_t *tlb = &mmu_gathers[cpu];
+	struct mmu_gather *tlb = &mmu_gathers[cpu];
 
 	tlb->mm = mm;
 	tlb->freed = 0;
@@ -44,7 +45,8 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int fu
 	return tlb;
 }
 
-static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
+static inline void
+tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm = tlb->mm;
 	unsigned long freed = tlb->freed;

@@ -563,6 +563,26 @@ int __set_page_dirty_nobuffers(struct page *page)
 EXPORT_SYMBOL(__set_page_dirty_nobuffers);
 
 /*
+ * set_page_dirty() is racy if the caller has no reference against
+ * page->mapping->host, and if the page is unlocked.  This is because another
+ * CPU could truncate the page off the mapping and then free the mapping.
+ *
+ * Usually, the page _is_ locked, or the caller is a user-space process which
+ * holds a reference on the inode by having an open file.
+ *
+ * In other cases, the page should be locked before running set_page_dirty().
+ */
+int set_page_dirty_lock(struct page *page)
+{
+	int ret;
+
+	lock_page(page);
+	ret = set_page_dirty(page);
+	unlock_page(page);
+	return ret;
+}
+
+/*
  * Clear a page's dirty flag, while caring for dirty memory accounting. 
  * Returns true if the page was previously dirty.
  */

@@ -1219,7 +1219,7 @@ static int __init init_blkmtd(void)
   INIT_LIST_HEAD(&mtd_rawdevice->as.dirty_pages);
   INIT_LIST_HEAD(&mtd_rawdevice->as.locked_pages);
   mtd_rawdevice->as.host = NULL;
-  spin_lock_init(&(mtd_rawdevice->as.i_shared_lock));
+  init_MUTEX(&(mtd_rawdevice->as.i_shared_sem));
 
   mtd_rawdevice->as.a_ops = &blkmtd_aops;
   INIT_LIST_HEAD(&mtd_rawdevice->as.i_mmap);

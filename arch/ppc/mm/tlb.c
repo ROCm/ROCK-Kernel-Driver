@@ -50,7 +50,7 @@ void flush_hash_entry(struct mm_struct *mm, pte_t *ptep, unsigned long addr)
  * Called at the end of a mmu_gather operation to make sure the
  * TLB flush is completely done.
  */
-void tlb_flush(mmu_gather_t *tlb)
+void tlb_flush(struct mmu_gather *tlb)
 {
 	if (Hash == 0) {
 		/*

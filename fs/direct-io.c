@@ -343,7 +343,7 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 			struct page *page = bvec[page_no].bv_page;
 
 			if (dio->rw == READ)
-				set_page_dirty(page);
+				set_page_dirty_lock(page);
 			page_cache_release(page);
 		}
 		bio_put(bio);

@@ -2278,3 +2278,50 @@ void __might_sleep(char *file, int line)
 #endif
 }
 #endif
+
+
+#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+/*
+ * This could be a long-held lock.  If another CPU holds it for a long time,
+ * and that CPU is not asked to reschedule then *this* CPU will spin on the
+ * lock for a long time, even if *this* CPU is asked to reschedule.
+ *
+ * So what we do here, in the slow (contended) path is to spin on the lock by
+ * hand while permitting preemption.
+ *
+ * Called inside preempt_disable().
+ */
+void __preempt_spin_lock(spinlock_t *lock)
+{
+	if (preempt_count() > 1) {
+		_raw_spin_lock(lock);
+		return;
+	}
+
+	while (!_raw_spin_trylock(lock)) {
+		if (need_resched()) {
+			preempt_enable_no_resched();
+			__cond_resched();
+			preempt_disable();
+		}
+		cpu_relax();
+	}
+}
+
+void __preempt_write_lock(rwlock_t *lock)
+{
+	if (preempt_count() > 1) {
+		_raw_write_lock(lock);
+		return;
+	}
+
+	while (!_raw_write_trylock(lock)) {
+		if (need_resched()) {
+			preempt_enable_no_resched();
+			__cond_resched();
+			preempt_disable();
+		}
+		cpu_relax();
+	}
+}
+#endif

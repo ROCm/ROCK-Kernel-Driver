@@ -85,31 +85,37 @@
  * regardless of whether CONFIG_SMP or CONFIG_PREEMPT are set. The various
  * methods are defined as nops in the case they are not required.
  */
+#define spin_trylock(lock)	({preempt_disable(); _raw_spin_trylock(lock) ? \
+				1 : ({preempt_enable(); 0;});})
+
+#define write_trylock(lock)	({preempt_disable();_raw_write_trylock(lock) ? \
+				1 : ({preempt_enable(); 0;});})
+
+/* Where's read_trylock? */
+
+#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+void __preempt_spin_lock(spinlock_t *lock);
+void __preempt_write_lock(rwlock_t *lock);
+
+#define spin_lock(lock) \
+do { \
+	preempt_disable(); \
+	if (unlikely(!_raw_spin_trylock(lock))) \
+		__preempt_spin_lock(lock); \
+} while (0)
+
+#define write_lock(lock) \
+do { \
+	preempt_disable(); \
+	if (unlikely(!_raw_write_trylock(lock))) \
+		__preempt_write_lock(lock); \
+} while (0)
+
+#else
 #define spin_lock(lock)	\
 do { \
 	preempt_disable(); \
 	_raw_spin_lock(lock); \
-} while(0)
-
-#define spin_trylock(lock)	({preempt_disable(); _raw_spin_trylock(lock) ? \
-				1 : ({preempt_enable(); 0;});})
-
-#define spin_unlock(lock) \
-do { \
-	_raw_spin_unlock(lock); \
-	preempt_enable(); \
-} while (0)
-
-#define read_lock(lock)	\
-do { \
-	preempt_disable(); \
-	_raw_read_lock(lock); \
-} while(0)
-
-#define read_unlock(lock) \
-do { \
-	_raw_read_unlock(lock); \
-	preempt_enable(); \
 } while(0)
 
 #define write_lock(lock) \
@@ -117,6 +123,19 @@ do { \
 	preempt_disable(); \
 	_raw_write_lock(lock); \
 } while(0)
+#endif
+
+#define read_lock(lock)	\
+do { \
+	preempt_disable(); \
+	_raw_read_lock(lock); \
+} while(0)
+
+#define spin_unlock(lock) \
+do { \
+	_raw_spin_unlock(lock); \
+	preempt_enable(); \
+} while (0)
 
 #define write_unlock(lock) \
 do { \
@@ -124,8 +143,11 @@ do { \
 	preempt_enable(); \
 } while(0)
 
-#define write_trylock(lock)	({preempt_disable();_raw_write_trylock(lock) ? \
-				1 : ({preempt_enable(); 0;});})
+#define read_unlock(lock) \
+do { \
+	_raw_read_unlock(lock); \
+	preempt_enable(); \
+} while(0)
 
 #define spin_lock_irqsave(lock, flags) \
 do { \

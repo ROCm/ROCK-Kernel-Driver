@@ -34,7 +34,7 @@ extern void tlb_flush(struct free_pte_ctx *tlb);
 extern void flush_hash_entry(struct mm_struct *mm, pte_t *ptep,
 			     unsigned long address);
 
-static inline void __tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
+static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 					unsigned long address)
 {
 	if (pte_val(*ptep) & _PAGE_HASHPTE)
