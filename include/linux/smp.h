@@ -101,9 +101,13 @@ static inline void smp_send_reschedule_all(void) { }
 #define this_cpu(var)				var
 
 /* Need to know about CPUs going up/down? */
-#define register_cpu_notifier(nb) 0
-#define unregister_cpu_notifier(nb) do { } while(0)
-
+static inline int register_cpu_notifier(struct notifier_block *nb)
+{
+	return 0;
+}
+static inline void unregister_cpu_notifier(struct notifier_block *nb)
+{
+}
 #endif /* !SMP */
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })
