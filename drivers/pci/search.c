@@ -29,15 +29,35 @@ pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 struct pci_bus *
 pci_find_bus(unsigned char busnr)
 {
-	struct pci_bus* bus;
+	struct pci_bus* bus = NULL;
 	struct pci_bus* tmp_bus;
 
-	pci_for_each_bus(bus) {
+	while ((bus = pci_find_next_bus(bus)) != NULL)  {
 		tmp_bus = pci_do_find_bus(bus, busnr);
 		if(tmp_bus)
 			return tmp_bus;
 	}
 	return NULL;
+}
+
+/**
+ * pci_find_next_bus - begin or continue searching for a PCI bus
+ * @from: Previous PCI bus found, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI busses.  A new search is
+ * initiated by passing %NULL to the @from argument.  Otherwise if
+ * @from is not %NULL, searches continue from next device on the
+ * global list.
+ */
+struct pci_bus * 
+pci_find_next_bus(const struct pci_bus *from)
+{
+	struct list_head *n = from ? from->node.next : pci_root_buses.next;
+	struct pci_bus *b = NULL;
+
+	if (n != &pci_root_buses)
+		b = pci_bus_b(n);
+	return b;
 }
 
 /**
@@ -96,7 +116,6 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
 	}
 	return NULL;
 }
-
 
 /**
  * pci_find_device - begin or continue searching for a PCI device by vendor/device id
