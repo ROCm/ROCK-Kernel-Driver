@@ -89,6 +89,8 @@ static inline struct page *kmap_atomic_to_page(void *ptr)
 	return pte_page(*pte);
 }
 
+#define flush_cache_kmaps()	flush_cache_all()
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_HIGHMEM_H */

@@ -101,7 +101,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 	if (! area)
 		goto out;
 
-	va = VMALLOC_VMADDR(area->addr);
+	va = (unsigned long) area->addr;
 
 	flags = _PAGE_KERNEL | _PAGE_NO_CACHE;
 	

@@ -129,7 +129,6 @@ extern unsigned long ioremap_bot, ioremap_base;
 #else
 #define VMALLOC_START ((((long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
 #endif
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END	ioremap_bot
 
 /*

@@ -391,7 +391,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 		cur_gatt = phys_to_virt(GET_GATT(baddr) & ~1);
 		pte = cur_gatt[GET_GATT_OFF(baddr)] & ~1;
 
-		if (__alpha_remap_area_pages(VMALLOC_VMADDR(vaddr), 
+		if (__alpha_remap_area_pages(vaddr,
 					     pte, PAGE_SIZE, 0)) {
 			printk("AGP ioremap: FAILED to map...\n");
 			vfree(area->addr);

@@ -24,6 +24,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/hash.h>
+#include <linux/highmem.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
@@ -62,7 +63,7 @@ static void flush_all_zero_pkmaps(void)
 {
 	int i;
 
-	flush_cache_all();
+	flush_cache_kmaps();
 
 	for (i = 0; i < LAST_PKMAP; i++) {
 		struct page *page;

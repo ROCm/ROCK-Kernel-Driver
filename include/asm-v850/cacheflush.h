@@ -27,6 +27,8 @@
 #define flush_cache_range(vma, start, end)	((void)0)
 #define flush_cache_page(vma, vmaddr)		((void)0)
 #define flush_dcache_page(page)			((void)0)
+#define flush_cache_vmap(start, end)		((void)0)
+#define flush_cache_vunmap(start, end)		((void)0)
 
 #ifdef CONFIG_NO_CACHE
 
@@ -55,5 +57,11 @@ extern void flush_cache_sigtramp (unsigned long addr);
 
 #endif /* CONFIG_NO_CACHE */
 
+#define copy_to_user_page(vma, page, vaddr, dst, src, len) \
+do { memcpy(dst, src, len); \
+     flush_icache_user_range(vma, page, vaddr, len); \
+} while (0)
+#define copy_from_user_page(vma, page, vaddr, dst, src, len) \
+	memcpy(dst, src, len)
 
 #endif /* __V850_CACHEFLUSH_H__ */

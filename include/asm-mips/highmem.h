@@ -54,6 +54,8 @@ extern void *kmap_atomic(struct page *page, enum km_type type);
 extern void kunmap_atomic(void *kvaddr, enum km_type type);
 extern struct page *kmap_atomic_to_page(void *ptr);
 
+#define flush_cache_kmaps()	flush_cache_all()
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_HIGHMEM_H */

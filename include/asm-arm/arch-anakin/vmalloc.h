@@ -19,8 +19,7 @@
  * linux/arch/arm/kernel/traps.c)
  */
 #define VMALLOC_ARCH_OFFSET	(8 * 1024 * 1024)
-#define VMALLOC_VMADDR(a)	((unsigned int) (a))
-#define VMALLOC_START		((VMALLOC_VMADDR(high_memory) + VMALLOC_ARCH_OFFSET) & ~(VMALLOC_ARCH_OFFSET - 1))
+#define VMALLOC_START		(((unsigned long) (high_memory) + VMALLOC_ARCH_OFFSET) & ~(VMALLOC_ARCH_OFFSET - 1))
 #define VMALLOC_END		(PAGE_OFFSET + 0x10000000)
 
 #define MODULE_START	(PAGE_OFFSET - 16*1048576)

@@ -207,6 +207,15 @@ extern void dmac_inv_range(unsigned long, unsigned long);
 extern void dmac_clean_range(unsigned long, unsigned long);
 extern void dmac_flush_range(unsigned long, unsigned long);
 
+#define flush_cache_vmap(start, end)		flush_cache_all()
+#define flush_cache_vunmap(start, end)		flush_cache_all()
+#define copy_to_user_page(vma, page, vaddr, dst, src, len) \
+do { memcpy(dst, src, len); \
+     flush_icache_user_range(vma, page, vaddr, len); \
+} while (0)
+#define copy_from_user_page(vma, page, vaddr, dst, src, len) \
+	memcpy(dst, src, len)
+
 #endif
 
 /*
