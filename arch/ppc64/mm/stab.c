@@ -5,7 +5,7 @@
  *    Copyright (c) 2001 Dave Engebretsen
  *
  * Copyright (C) 2002 Anton Blanchard <anton@au.ibm.com>, IBM
- * 
+ *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
@@ -41,7 +41,7 @@ void stab_initialize(unsigned long stab)
 		make_ste(stab, GET_ESID(KERNELBASE), vsid);
 
 		/* Order update */
-		asm volatile("sync":::"memory"); 
+		asm volatile("sync":::"memory");
 	}
 }
 
@@ -61,33 +61,32 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 {
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
-	STE *ste, *castout_ste;
-	unsigned long kernel_segment = (REGION_ID(esid << SID_SHIFT) != 
+	struct stab_entry *ste, *castout_ste;
+	unsigned long kernel_segment = (REGION_ID(esid << SID_SHIFT) !=
 					USER_REGION_ID);
+	unsigned long esid_data;
 
 	/* Search the primary group first. */
 	global_entry = (esid & 0x1f) << 3;
-	ste = (STE *)(stab | ((esid & 0x1f) << 7)); 
+	ste = (struct stab_entry *)(stab | ((esid & 0x1f) << 7));
 
 	/* Find an empty entry, if one exists. */
 	for (group = 0; group < 2; group++) {
 		for (entry = 0; entry < 8; entry++, ste++) {
-			if (!(ste->dw0.dw0.v)) {
-				ste->dw0.dword0 = 0;
-				ste->dw1.dword1 = 0;
-				ste->dw1.dw1.vsid = vsid;
-				ste->dw0.dw0.esid = esid;
-				ste->dw0.dw0.kp = 1;
-				if (!kernel_segment)
-					ste->dw0.dw0.ks = 1;
+			if (!(ste->esid_data & STE_ESID_V)) {
+				ste->vsid_data = vsid << STE_VSID_SHIFT;
 				asm volatile("eieio":::"memory");
-				ste->dw0.dw0.v = 1;
+				esid_data = esid << SID_SHIFT;
+				esid_data |= STE_ESID_KP | STE_ESID_V;
+				if (! kernel_segment)
+					esid_data |= STE_ESID_KS;
+				ste->esid_data = esid_data;
 				return (global_entry | entry);
 			}
 		}
 		/* Now search the secondary group. */
 		global_entry = ((~esid) & 0x1f) << 3;
-		ste = (STE *)(stab | (((~esid) & 0x1f) << 7)); 
+		ste = (struct stab_entry *)(stab | (((~esid) & 0x1f) << 7));
 	}
 
 	/*
@@ -98,16 +97,16 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	for (i = 0; i < 16; i++) {
 		if (castout_entry < 8) {
 			global_entry = (esid & 0x1f) << 3;
-			ste = (STE *)(stab | ((esid & 0x1f) << 7)); 
+			ste = (struct stab_entry *)(stab | ((esid & 0x1f) << 7));
 			castout_ste = ste + castout_entry;
 		} else {
 			global_entry = ((~esid) & 0x1f) << 3;
-			ste = (STE *)(stab | (((~esid) & 0x1f) << 7)); 
+			ste = (struct stab_entry *)(stab | (((~esid) & 0x1f) << 7));
 			castout_ste = ste + (castout_entry - 8);
 		}
 
 		/* Dont cast out the first kernel segment */
-		if (castout_ste->dw0.dw0.esid != GET_ESID(KERNELBASE))
+		if ((castout_ste->esid_data & ESID_MASK) != KERNELBASE)
 			break;
 
 		castout_entry = (castout_entry + 1) & 0xf;
@@ -120,20 +119,22 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	/* Force previous translations to complete. DRENG */
 	asm volatile("isync" : : : "memory");
 
-	castout_ste->dw0.dw0.v = 0;
+	old_esid = castout_ste->esid_data >> SID_SHIFT;
+	castout_ste->esid_data = 0;		/* Invalidate old entry */
+
 	asm volatile("sync" : : : "memory");    /* Order update */
 
-	castout_ste->dw0.dword0 = 0;
-	castout_ste->dw1.dword1 = 0;
-	castout_ste->dw1.dw1.vsid = vsid;
-	old_esid = castout_ste->dw0.dw0.esid;
-	castout_ste->dw0.dw0.esid = esid;
-	castout_ste->dw0.dw0.kp = 1;
-	if (!kernel_segment)
-		castout_ste->dw0.dw0.ks = 1;
+	castout_ste->vsid_data = vsid << STE_VSID_SHIFT;
+
 	asm volatile("eieio" : : : "memory");   /* Order update */
-	castout_ste->dw0.dw0.v  = 1;
-	asm volatile("slbie  %0" : : "r" (old_esid << SID_SHIFT)); 
+
+	esid_data = esid << SID_SHIFT;
+	esid_data |= STE_ESID_KP | STE_ESID_V;
+	if (!kernel_segment)
+		esid_data |= STE_ESID_KS;
+	castout_ste->esid_data = esid_data;
+
+	asm volatile("slbie  %0" : : "r" (old_esid << SID_SHIFT));
 	/* Ensure completion of slbie */
 	asm volatile("sync" : : : "memory");
 
@@ -240,8 +241,8 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 /* Flush all user entries from the segment table of the current processor. */
 void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
-	STE *stab = (STE *) get_paca()->stab_addr;
-	STE *ste;
+	struct stab_entry *stab = (struct stab_entry *) get_paca()->stab_addr;
+	struct stab_entry *ste;
 	unsigned long offset = __get_cpu_var(stab_cache_ptr);
 
 	/* Force previous translations to complete. DRENG */
@@ -252,7 +253,7 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 
 		for (i = 0; i < offset; i++) {
 			ste = stab + __get_cpu_var(stab_cache[i]);
-			ste->dw0.dw0.v = 0;
+			ste->esid_data = 0; /* invalidate entry */
 		}
 	} else {
 		unsigned long entry;
@@ -263,12 +264,12 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 		/* Never flush the first entry. */
 		ste += 1;
 		for (entry = 1;
-		     entry < (PAGE_SIZE / sizeof(STE));
+		     entry < (PAGE_SIZE / sizeof(struct stab_entry));
 		     entry++, ste++) {
 			unsigned long ea;
-			ea = ste->dw0.dw0.esid << SID_SHIFT;
+			ea = ste->esid_data & ESID_MASK;
 			if (ea < KERNELBASE) {
-				ste->dw0.dw0.v = 0;
+				ste->esid_data = 0;
 			}
 		}
 	}
