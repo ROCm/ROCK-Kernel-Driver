@@ -794,6 +794,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 {
 	struct usblp *usblp = 0;
 	int protocol;
+	int retval;
 	char name[6];
 
 	/* Malloc and start initializing usblp structure so we can use it
@@ -808,7 +809,12 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = ifnum;
 
-	if (usb_register_dev(&usblp_driver, 1, &usblp->minor)) {
+	retval = usb_register_dev(&usblp_driver, 1, &usblp->minor);
+	if (retval) {
+		if (retval != -ENODEV) {
+			err("Not able to get a minor for this device.");
+			goto abort;
+		}
 		/* Look for a free usblp_table entry on our own. */
 		while (usblp_table[usblp->minor]) {
 			usblp->minor++;

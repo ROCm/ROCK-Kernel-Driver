@@ -290,6 +290,7 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 {
 	struct brlvger_priv *priv = NULL;
 	int i;
+	int retval;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_interface_descriptor *actifsettings;
 	/* protects against reentrance: once we've found a free slot
@@ -315,7 +316,12 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 
 	down(&reserve_sem);
 
-	if (usb_register_dev(&brlvger_driver, 1, &i)) {
+	retval = usb_register_dev(&brlvger_driver, 1, &i);
+	if (retval) {
+		if (retval != -ENODEV) {
+			err("Not able to get a minor for this device.");
+			goto error;
+		}
 		for( i = 0; i < MAX_NR_BRLVGER_DEVS; i++ )
 			if( display_table[i] == NULL )
 				break;

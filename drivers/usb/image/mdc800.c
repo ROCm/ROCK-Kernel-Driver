@@ -411,6 +411,7 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 	int i,j;
 	struct usb_interface_descriptor	*intf_desc;
 	int irq_interval=0;
+	int retval;
 
 	dbg ("(mdc800_usb_probe) called.");
 
@@ -475,7 +476,11 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 
 	down (&mdc800->io_lock);
 
-	usb_register_dev (&mdc800_usb_driver, 1, &mdc800->minor);
+	retval = usb_register_dev (&mdc800_usb_driver, 1, &mdc800->minor);
+	if (retval && (retval != -ENODEV)) {
+		err ("Not able to get a minor for this device.");
+		return 0;
+	}
 
 	mdc800->dev=dev;
 	mdc800->open=0;

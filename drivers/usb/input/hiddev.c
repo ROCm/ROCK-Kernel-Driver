@@ -606,6 +606,7 @@ int hiddev_connect(struct hid_device *hid)
 {
 	struct hiddev *hiddev;
 	int minor, i;
+	int retval;
 	char devfs_name[16];
 
 	for (i = 0; i < hid->maxapplication; i++)
@@ -615,7 +616,12 @@ int hiddev_connect(struct hid_device *hid)
 	if (i == hid->maxapplication)
 		return -1;
 
-	if (usb_register_dev (&hiddev_driver, 1, &minor)) {
+	retval = usb_register_dev (&hiddev_driver, 1, &minor);
+	if (retval) {
+		if (retval != -ENODEV) {
+			err ("Not able to get a minor for this device.");
+			return -1;
+		}
 		for (minor = 0; minor < HIDDEV_MINORS && hiddev_table[minor]; minor++);
 		if (minor == HIDDEV_MINORS) {
 			printk(KERN_ERR "hiddev: no more free hiddev devices\n");
