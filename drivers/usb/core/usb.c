@@ -655,7 +655,7 @@ static void usb_release_dev(struct device *dev)
  * usb_alloc_dev - usb device constructor (usbcore-internal)
  * @parent: hub to which device is connected; null to allocate a root hub
  * @bus: bus used to access the device
- * @port: zero based index of port; ignored for root hubs
+ * @port1: one-based index of port; ignored for root hubs
  * Context: !in_interrupt ()
  *
  * Only hub drivers (including virtual root hub drivers for host
@@ -664,7 +664,7 @@ static void usb_release_dev(struct device *dev)
  * This call may not be used in a non-sleeping context.
  */
 struct usb_device *
-usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
+usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port1)
 {
 	struct usb_device *dev;
 
@@ -711,10 +711,10 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 		/* match any labeling on the hubs; it's one-based */
 		if (parent->devpath [0] == '0')
 			snprintf (dev->devpath, sizeof dev->devpath,
-				"%d", port + 1);
+				"%d", port1);
 		else
 			snprintf (dev->devpath, sizeof dev->devpath,
-				"%s.%d", parent->devpath, port + 1);
+				"%s.%d", parent->devpath, port1);
 
 		dev->dev.parent = &parent->dev;
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
