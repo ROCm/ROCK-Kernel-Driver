@@ -1380,10 +1380,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	if (pinfo->autoconf && in6_dev->cnf.autoconf) {
 		struct inet6_ifaddr * ifp;
 		struct in6_addr addr;
-		int plen;
 		int create = 0;
-
-		plen = pinfo->prefix_len >> 3;
 
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
