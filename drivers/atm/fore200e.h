@@ -556,7 +556,7 @@ typedef struct host_bsq_entry {
 
 typedef struct host_cmdq_entry {
     struct cp_cmdq_entry* cp_entry;    /* addr of cp resident cmd queue entry */
-    enum   status*        status;      /* addr of host resident status        */
+    enum status *status;	       /* addr of host resident status        */
 } host_cmdq_entry_t;
 
 
@@ -668,7 +668,7 @@ typedef struct bs_spec {
 
 typedef struct init_block {
     enum opcode  opcode;               /* initialize command             */
-    enum status  status;	       /* related status word            */
+    enum status	 status;	       /* related status word            */
     u32          receive_threshold;    /* not used                       */
     u32          num_connect;          /* ATM connections                */
     u32          cmd_queue_len;        /* length of command queue        */

@@ -141,7 +141,7 @@ static void idt77105_restart_timer_func(unsigned long dummy)
 }
 
 
-static int fetch_stats(struct atm_dev *dev,struct idt77105_stats *arg,int zero)
+static int fetch_stats(struct atm_dev *dev,struct idt77105_stats __user *arg,int zero)
 {
 	unsigned long flags;
 	struct idt77105_stats stats;
@@ -188,7 +188,7 @@ static int set_loopback(struct atm_dev *dev,int mode)
 }
 
 
-static int idt77105_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int idt77105_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
         printk(KERN_NOTICE "%s(%d) idt77105_ioctl() called\n",dev->type,dev->number);
 	switch (cmd) {
@@ -196,16 +196,15 @@ static int idt77105_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 			if (!capable(CAP_NET_ADMIN)) return -EPERM;
 			/* fall through */
 		case IDT77105_GETSTAT:
-			return fetch_stats(dev,(struct idt77105_stats *) arg,
-			    cmd == IDT77105_GETSTATZ);
+			return fetch_stats(dev, arg, cmd == IDT77105_GETSTATZ);
 		case ATM_SETLOOP:
 			return set_loopback(dev,(int) (long) arg);
 		case ATM_GETLOOP:
-			return put_user(PRIV(dev)->loop_mode,(int *) arg) ?
+			return put_user(PRIV(dev)->loop_mode,(int __user *)arg) ?
 			    -EFAULT : 0;
 		case ATM_QUERYLOOP:
 			return put_user(ATM_LM_LOC_ATM | ATM_LM_RMT_ATM,
-			    (int *) arg) ? -EFAULT : 0;
+			    (int __user *) arg) ? -EFAULT : 0;
 		default:
 			return -ENOIOCTLCMD;
 	}

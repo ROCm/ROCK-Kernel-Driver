@@ -1968,7 +1968,7 @@ static int eni_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flgs)
 }
 
 
-static int eni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int eni_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
 	struct eni_dev *eni_dev = ENI_DEV(dev);
 
@@ -1983,7 +1983,7 @@ static int eni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 		struct eni_multipliers mult;
 
 		if (!capable(CAP_NET_ADMIN)) return -EPERM;
-		if (copy_from_user(&mult,(void *) arg,
+		if (copy_from_user(&mult, arg,
 		    sizeof(struct eni_multipliers)))
 			return -EFAULT;
 		if ((mult.tx && mult.tx <= 100) || (mult.rx &&mult.rx <= 100) ||
@@ -1996,7 +1996,7 @@ static int eni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	if (cmd == ATM_SETCIRANGE) {
 		struct atm_cirange ci;
 
-		if (copy_from_user(&ci,(void *) arg,sizeof(struct atm_cirange)))
+		if (copy_from_user(&ci, arg,sizeof(struct atm_cirange)))
 			return -EFAULT;
 		if ((ci.vpi_bits == 0 || ci.vpi_bits == ATM_CI_MAX) &&
 		    (ci.vci_bits == NR_VCI_LD || ci.vpi_bits == ATM_CI_MAX))
@@ -2009,14 +2009,14 @@ static int eni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 
 
 static int eni_getsockopt(struct atm_vcc *vcc,int level,int optname,
-    void *optval,int optlen)
+    void __user *optval,int optlen)
 {
 	return -EINVAL;
 }
 
 
 static int eni_setsockopt(struct atm_vcc *vcc,int level,int optname,
-    void *optval,int optlen)
+    void __user *optval,int optlen)
 {
 	return -EINVAL;
 }

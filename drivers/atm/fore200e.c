@@ -1911,7 +1911,7 @@ fore200e_getstats(struct fore200e* fore200e)
 
 
 static int
-fore200e_getsockopt(struct atm_vcc* vcc, int level, int optname, void* optval, int optlen)
+fore200e_getsockopt(struct atm_vcc* vcc, int level, int optname, void __user *optval, int optlen)
 {
     /* struct fore200e* fore200e = FORE200E_DEV(vcc->dev); */
 
@@ -1923,7 +1923,7 @@ fore200e_getsockopt(struct atm_vcc* vcc, int level, int optname, void* optval, i
 
 
 static int
-fore200e_setsockopt(struct atm_vcc* vcc, int level, int optname, void* optval, int optlen)
+fore200e_setsockopt(struct atm_vcc* vcc, int level, int optname, void __user *optval, int optlen)
 {
     /* struct fore200e* fore200e = FORE200E_DEV(vcc->dev); */
     
@@ -2059,7 +2059,7 @@ fore200e_swap(unsigned int in)
 
 
 static int
-fore200e_fetch_stats(struct fore200e* fore200e, struct sonet_stats* arg)
+fore200e_fetch_stats(struct fore200e* fore200e, struct sonet_stats __user *arg)
 {
     struct sonet_stats tmp;
 
@@ -2088,7 +2088,7 @@ fore200e_fetch_stats(struct fore200e* fore200e, struct sonet_stats* arg)
 
 
 static int
-fore200e_ioctl(struct atm_dev* dev, unsigned int cmd, void* arg)
+fore200e_ioctl(struct atm_dev* dev, unsigned int cmd, void __user * arg)
 {
     struct fore200e* fore200e = FORE200E_DEV(dev);
     
@@ -2097,19 +2097,19 @@ fore200e_ioctl(struct atm_dev* dev, unsigned int cmd, void* arg)
     switch (cmd) {
 
     case SONET_GETSTAT:
-	return fore200e_fetch_stats(fore200e, (struct sonet_stats*)arg);
+	return fore200e_fetch_stats(fore200e, (struct sonet_stats __user *)arg);
 
     case SONET_GETDIAG:
-	return put_user(0, (int*)arg) ? -EFAULT : 0;
+	return put_user(0, (int __user *)arg) ? -EFAULT : 0;
 
     case ATM_SETLOOP:
 	return fore200e_setloop(fore200e, (int)(unsigned long)arg);
 
     case ATM_GETLOOP:
-	return put_user(fore200e->loop_mode, (int*)arg) ? -EFAULT : 0;
+	return put_user(fore200e->loop_mode, (int __user *)arg) ? -EFAULT : 0;
 
     case ATM_QUERYLOOP:
-	return put_user(ATM_LM_LOC_PHY | ATM_LM_RMT_PHY, (int*)arg) ? -EFAULT : 0;
+	return put_user(ATM_LM_LOC_PHY | ATM_LM_RMT_PHY, (int __user *)arg) ? -EFAULT : 0;
     }
 
     return -ENOSYS; /* not implemented */
