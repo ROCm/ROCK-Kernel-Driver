@@ -9,6 +9,7 @@
 #include "asm/unistd.h"
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"
+#include "asm/stat.h"
 #include "sysdep/syscalls.h"
 #include "kern_util.h"
 
