@@ -47,6 +47,9 @@
 #define NEIGH_PRINTK2 NEIGH_PRINTK
 #endif
 
+#define NEIGH_HASHMASK		0x1F
+#define PNEIGH_HASHMASK		0xF
+
 static void neigh_timer_handler(unsigned long arg);
 #ifdef CONFIG_ARPD
 static void neigh_app_notify(struct neighbour *n);
@@ -1205,6 +1208,7 @@ void neigh_parms_destroy(struct neigh_parms *parms)
 void neigh_table_init(struct neigh_table *tbl)
 {
 	unsigned long now = jiffies;
+	unsigned long hsize, phsize;
 
 	atomic_set(&tbl->parms.refcnt, 1);
 	INIT_RCU_HEAD(&tbl->parms.rcu_head);
@@ -1219,6 +1223,18 @@ void neigh_table_init(struct neigh_table *tbl)
 
 	if (!tbl->kmem_cachep)
 		panic("cannot create neighbour cache");
+
+	hsize = (NEIGH_HASHMASK + 1) * sizeof(struct neighbour *);
+	tbl->hash_buckets = kmalloc(hsize, GFP_KERNEL);
+
+	phsize = (PNEIGH_HASHMASK + 1) * sizeof(struct pneigh_entry *);
+	tbl->phash_buckets = kmalloc(phsize, GFP_KERNEL);
+
+	if (!tbl->hash_buckets || !tbl->phash_buckets)
+		panic("cannot allocate neighbour cache hashes");
+
+	memset(tbl->hash_buckets, 0, hsize);
+	memset(tbl->phash_buckets, 0, phsize);
 
 	tbl->lock	       = RW_LOCK_UNLOCKED;
 	init_timer(&tbl->gc_timer);
@@ -1260,6 +1276,13 @@ int neigh_table_clear(struct neigh_table *tbl)
 		}
 	}
 	write_unlock(&neigh_tbl_lock);
+
+	kfree(tbl->hash_buckets);
+	tbl->hash_buckets = NULL;
+
+	kfree(tbl->phash_buckets);
+	tbl->phash_buckets = NULL;
+
 	return 0;
 }
 

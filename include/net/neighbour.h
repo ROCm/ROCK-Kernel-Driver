@@ -140,9 +140,6 @@ struct pneigh_entry
 	u8			key[0];
 };
 
-#define NEIGH_HASHMASK		0x1F
-#define PNEIGH_HASHMASK		0xF
-
 /*
  *	neighbour table manipulation
  */
@@ -176,8 +173,8 @@ struct neigh_table
 	struct neigh_parms	*parms_list;
 	kmem_cache_t		*kmem_cachep;
 	struct neigh_statistics	stats;
-	struct neighbour	*hash_buckets[NEIGH_HASHMASK+1];
-	struct pneigh_entry	*phash_buckets[PNEIGH_HASHMASK+1];
+	struct neighbour	**hash_buckets;
+	struct pneigh_entry	**phash_buckets;
 };
 
 /* flags for neigh_update() */
