@@ -156,7 +156,7 @@ simscsi_readwrite (Scsi_Cmnd *sc, int mode, unsigned long offset, unsigned long 
 	if (sc->request_bufflen < req.len)
 		return;
 
-	stat.fd = desc[sc->target];
+	stat.fd = desc[sc->device->id];
 	if (DBG)
 		printk("simscsi_%s @ %lx (off %lx)\n",
 		       mode == SSC_READ ? "read":"write", req.addr, offset);
@@ -178,7 +178,7 @@ simscsi_sg_readwrite (Scsi_Cmnd *sc, int mode, unsigned long offset)
 	struct disk_stat stat;
 	struct disk_req req;
 
-	stat.fd = desc[sc->target];
+	stat.fd = desc[sc->device->id];
 
 	while (list_len) {
 		req.addr = __pa(page_address(sl->page) + sl->offset);
@@ -259,6 +259,7 @@ simscsi_readwrite10 (Scsi_Cmnd *sc, int mode)
 int
 simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 {
+	unsigned int target_id = sc->device->id;
 	char fname[MAX_ROOT_LEN+16];
 	size_t disk_size;
 	char *buf;
@@ -267,21 +268,21 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 
 	if (DBG)
 		printk("simscsi_queuecommand: target=%d,cmnd=%u,sc=%lu,sp=%lx,done=%p\n",
-		       sc->target, sc->cmnd[0], sc->serial_number, sp, done);
+		       target_id, sc->cmnd[0], sc->serial_number, sp, done);
 #endif
 
 	sc->result = DID_BAD_TARGET << 16;
 	sc->scsi_done = done;
-	if (sc->target <= 15 && sc->lun == 0) {
+	if (target_id <= 15 && sc->device->lun == 0) {
 		switch (sc->cmnd[0]) {
 		      case INQUIRY:
 			if (sc->request_bufflen < 35) {
 				break;
 			}
-			sprintf (fname, "%s%c", simscsi_root, 'a' + sc->target);
-			desc[sc->target] = ia64_ssc(__pa(fname), SSC_READ_ACCESS|SSC_WRITE_ACCESS,
-						    0, 0, SSC_OPEN);
-			if (desc[sc->target] < 0) {
+			sprintf (fname, "%s%c", simscsi_root, 'a' + target_id);
+			desc[target_id] = ia64_ssc(__pa(fname), SSC_READ_ACCESS|SSC_WRITE_ACCESS,
+						   0, 0, SSC_OPEN);
+			if (desc[target_id] < 0) {
 				/* disk doesn't exist... */
 				break;
 			}
@@ -303,37 +304,37 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			break;
 
 		      case READ_6:
-			if (desc[sc->target] < 0 )
+			if (desc[target_id] < 0 )
 				break;
 			simscsi_readwrite6(sc, SSC_READ);
 			break;
 
 		      case READ_10:
-			if (desc[sc->target] < 0 )
+			if (desc[target_id] < 0 )
 				break;
 			simscsi_readwrite10(sc, SSC_READ);
 			break;
 
 		      case WRITE_6:
-			if (desc[sc->target] < 0)
+			if (desc[target_id] < 0)
 				break;
 			simscsi_readwrite6(sc, SSC_WRITE);
 			break;
 
 		      case WRITE_10:
-			if (desc[sc->target] < 0)
+			if (desc[target_id] < 0)
 				break;
 			simscsi_readwrite10(sc, SSC_WRITE);
 			break;
 
 
 		      case READ_CAPACITY:
-			if (desc[sc->target] < 0 || sc->request_bufflen < 8) {
+			if (desc[target_id] < 0 || sc->request_bufflen < 8) {
 				break;
 			}
 			buf = sc->request_buffer;
 
-			disk_size = simscsi_get_disk_size(desc[sc->target]);
+			disk_size = simscsi_get_disk_size(desc[target_id]);
 
 			/* pretend to be a 1GB disk (partition table contains real stuff): */
 			buf[0] = (disk_size >> 24) & 0xff;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 2001-2003 Hewlett-Packard Co
  *               Stephane Eranian <eranian@hpl.hp.com>
  */
 

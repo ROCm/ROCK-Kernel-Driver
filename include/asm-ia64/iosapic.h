@@ -51,26 +51,23 @@
 
 #ifndef __ASSEMBLY__
 
-extern void __devinit iosapic_init (unsigned long address,
-				    unsigned int gsi_base,
-				    int pcat_compat);
+extern void __init iosapic_system_init (int pcat_compat);
+extern void __init iosapic_init (unsigned long address,
+				    unsigned int gsi_base);
 extern int gsi_to_vector (unsigned int gsi);
 extern int gsi_to_irq (unsigned int gsi);
-extern void iosapic_parse_prt (void);
+extern void __init iosapic_parse_prt (void);
 extern int iosapic_register_intr (unsigned int gsi, unsigned long polarity,
-				  unsigned long edge_triggered,
-				  u32 gsi_base, char *iosapic_address);
-extern void iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
+				  unsigned long trigger);
+extern void __init iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 				      unsigned long polarity,
-				      unsigned long edge_triggered);
-extern int iosapic_register_platform_intr (u32 int_type,
+				      unsigned long trigger);
+extern int __init iosapic_register_platform_intr (u32 int_type,
 					   unsigned int gsi,
 					   int pmi_vector,
 					   u16 eid, u16 id,
 					   unsigned long polarity,
-					   unsigned long edge_triggered,
-					   unsigned int gsi_base,
-					   char *iosapic_address);
+					   unsigned long trigger);
 extern unsigned int iosapic_version (char *addr);
 
 extern void iosapic_pci_fixup (int);

@@ -1194,7 +1194,9 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
  	LIST_HEAD(thread_list);
  	struct list_head *t;
 	elf_fpregset_t *fpu = NULL;
+#ifdef ELF_CORE_COPY_XFPREGS
 	elf_fpxregset_t *xfpu = NULL;
+#endif
 	int thread_status_size = 0;
 
 	/*
@@ -1400,7 +1402,9 @@ cleanup:
 	kfree(psinfo);
 	kfree(notes);
 	kfree(fpu);
+#ifdef ELF_CORE_COPY_XFPREGS
 	kfree(xfpu);
+#endif
 	return has_dumped;
 #undef NUM_NOTES
 }

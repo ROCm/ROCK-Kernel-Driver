@@ -67,6 +67,7 @@
 #define INTERACTIVE_DELTA	2
 #define MAX_SLEEP_AVG		(10*HZ)
 #define STARVATION_LIMIT	(10*HZ)
+#define NODE_THRESHOLD		125
 
 /*
  * If a task is 'interactive' then we reinsert it in the active
@@ -325,7 +326,7 @@ static inline int effective_prio(task_t *p)
 static inline void __activate_task(task_t *p, runqueue_t *rq)
 {
 	enqueue_task(p, rq->active);
-	rq->nr_running++;
+	nr_running_inc(rq);
 }
 
 static inline void activate_task(task_t *p, runqueue_t *rq)
@@ -545,7 +546,7 @@ void wake_up_forked_process(task_t * p)
 		list_add_tail(&p->run_list, &current->run_list);
 		p->array = current->array;
 		p->array->nr_active++;
-		rq->nr_running++;
+		nr_running_inc(rq);
 	}
 	task_rq_unlock(rq, &flags);
 }
