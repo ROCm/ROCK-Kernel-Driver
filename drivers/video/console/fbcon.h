@@ -33,6 +33,7 @@ struct display {
     u_short scrollmode;             /* Scroll Method */
     short yscroll;                  /* Hardware scrolling */
     int vrows;                      /* number of virtual rows */
+    int cursor_shape;
 };
 
 /* drivers/video/console/fbcon.c */

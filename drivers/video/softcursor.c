@@ -25,7 +25,8 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	u8 *dst, src[64];
 
 	info->cursor.enable = (cursor->set & FB_CUR_SETCUR) ? 1 : 0;
-
+	info->cursor.rop = cursor->rop;
+	
 	if (cursor->set & FB_CUR_SETSIZE) {
 		info->cursor.image.height = cursor->image.height;
 		info->cursor.image.width = cursor->image.width;
@@ -56,17 +57,25 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	size = d_pitch * info->cursor.image.height + buf_align;
 	size &= ~buf_align;
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
+
+	if (cursor->set & FB_CUR_SETSHAPE) {
+		if (!cursor->mask)	return -EINVAL;
+		if (info->cursor.mask)
+			kfree(info->cursor.mask);
+		info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
+		memcpy(info->cursor.mask, cursor->mask, dsize);			
+	}
 	
 	if (info->cursor.enable) {
-		switch (cursor->rop) {
+		switch (info->cursor.rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				src[i] = cursor->image.data[i] ^ cursor->mask[i]; 
+				src[i] = cursor->image.data[i] ^ info->cursor.mask[i]; 
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < size; i++)
-				src[i] = cursor->image.data[i] & cursor->mask[i];
+				src[i] = cursor->image.data[i] & info->cursor.mask[i];
 			break;
 		}
 	} else {
@@ -76,7 +85,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	move_buf_aligned(info, dst, src, d_pitch, s_pitch,info->cursor.image.height);
 	
 	info->cursor.image.data = dst;
-	info->cursor.rop = cursor->rop;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);
 	atomic_dec(&info->pixmap.count);
