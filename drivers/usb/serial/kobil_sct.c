@@ -21,7 +21,8 @@
  * Supported readers: USB TWIN, KAAN Standard Plus and SecOVID Reader Plus
  * (Adapter K), B1 Professional and KAAN Professional (Adapter B)
  * 
- * TODO: High baudrates
+ * (28/05/2003) tw
+ *      Add support for KAAN SIM
  *
  * (12/09/2002) tw
  *      Adapted to 2.5.
@@ -58,7 +59,7 @@
 #include "usb-serial.h"
 
 /* Version Information */
-#define DRIVER_VERSION "12/09/2002"
+#define DRIVER_VERSION "28/05/2003"
 #define DRIVER_AUTHOR "KOBIL Systems GmbH - http://www.kobil.com"
 #define DRIVER_DESC "KOBIL USB Smart Card Terminal Driver (experimental)"
 
@@ -66,6 +67,7 @@
 #define KOBIL_ADAPTER_B_PRODUCT_ID	0x2011
 #define KOBIL_ADAPTER_K_PRODUCT_ID	0x2012
 #define KOBIL_USBTWIN_PRODUCT_ID	0x0078
+#define KOBIL_KAAN_SIM_PRODUCT_ID       0x0081
 
 #define KOBIL_TIMEOUT		500
 #define KOBIL_BUF_LENGTH	300
@@ -92,11 +94,20 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(KOBIL_VENDOR_ID, KOBIL_ADAPTER_B_PRODUCT_ID) },
 	{ USB_DEVICE(KOBIL_VENDOR_ID, KOBIL_ADAPTER_K_PRODUCT_ID) },
 	{ USB_DEVICE(KOBIL_VENDOR_ID, KOBIL_USBTWIN_PRODUCT_ID) },
+	{ USB_DEVICE(KOBIL_VENDOR_ID, KOBIL_KAAN_SIM_PRODUCT_ID) },
 	{ }			/* Terminating entry */
 };
 
 
 MODULE_DEVICE_TABLE (usb, id_table);
+
+static struct usb_driver kobil_driver = {
+	.name =		"kobil",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 
 struct usb_serial_device_type kobil_device = {
 	.owner =		THIS_MODULE,
@@ -160,6 +171,9 @@ static int kobil_startup (struct usb_serial *serial)
 		break;
 	case KOBIL_USBTWIN_PRODUCT_ID:
 		printk(KERN_DEBUG "KOBIL USBTWIN detected\n");
+		break;
+	case KOBIL_KAAN_SIM_PRODUCT_ID:
+		printk(KERN_DEBUG "KOBIL KAAN SIM detected\n");
 		break;
 	}
 	usb_set_serial_port_data(serial->port, priv);
@@ -353,7 +367,7 @@ static void kobil_read_int_callback( struct urb *purb, struct pt_regs *regs)
 	struct usb_serial_port *port = (struct usb_serial_port *) purb->context;
 	struct tty_struct *tty;
 	unsigned char *data = purb->transfer_buffer;
-	char *dbg_data;
+//	char *dbg_data;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -366,16 +380,18 @@ static void kobil_read_int_callback( struct urb *purb, struct pt_regs *regs)
 	if (purb->actual_length) {
 		
 		// BEGIN DEBUG
-		dbg_data = (unsigned char *) kmalloc((3 *  purb->actual_length + 10) * sizeof(char), GFP_KERNEL);  
-		if (! dbg_data) {
-			return;
-		}
-		memset(dbg_data, 0, (3 *  purb->actual_length + 10));
-		for (i = 0; i < purb->actual_length; i++) { 
-			sprintf(dbg_data +3*i, "%02X ", data[i]); 
-		}
-		dbg(" <-- %s", dbg_data );
-		kfree(dbg_data);
+		/*
+		  dbg_data = (unsigned char *) kmalloc((3 *  purb->actual_length + 10) * sizeof(char), GFP_KERNEL);
+		  if (! dbg_data) {
+		  return;
+		  }
+		  memset(dbg_data, 0, (3 *  purb->actual_length + 10));
+		  for (i = 0; i < purb->actual_length; i++) { 
+		  sprintf(dbg_data +3*i, "%02X ", data[i]); 
+		  }
+		  dbg(" <-- %s", dbg_data );
+		  kfree(dbg_data);
+		*/
 		// END DEBUG
 
 		for (i = 0; i < purb->actual_length; ++i) {
@@ -438,7 +454,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	priv->filled = priv->filled + count;
 
 
-	// only send complete block. TWIN and adapter K use the same protocol.
+	// only send complete block. TWIN, KAAN SIM and adapter K use the same protocol.
 	if ( ((priv->device_type != KOBIL_ADAPTER_B_PRODUCT_ID) && (priv->filled > 2) && (priv->filled >= (priv->buf[1] + 3))) || 
 	     ((priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) && (priv->filled > 3) && (priv->filled >= (priv->buf[2] + 4))) ) {
 		
@@ -503,7 +519,7 @@ static int kobil_tiocmget(struct usb_serial_port *port, struct file *file)
 	int transfer_buffer_length = 8;
 
 	priv = usb_get_serial_port_data(port);
-	if (priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) {
+	if ((priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) || (priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID)) {
 		// This device doesn't support ioctl calls
 		return -EINVAL;
 	}
@@ -549,7 +565,7 @@ static int  kobil_tiocmset(struct usb_serial_port *port, struct file *file,
 	int transfer_buffer_length = 8;
 
 	priv = usb_get_serial_port_data(port);
-	if (priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) {
+	if ((priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) || (priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID)) {
 		// This device doesn't support ioctl calls
 		return -EINVAL;
 	}
@@ -616,7 +632,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 	char *settings;
 
 	priv = usb_get_serial_port_data(port);
-	if (priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) {
+	if ((priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) || (priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID)) {
 		// This device doesn't support ioctl calls
 		return 0;
 	}
@@ -727,6 +743,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 static int __init kobil_init (void)
 {
 	usb_serial_register (&kobil_device);
+	usb_register (&kobil_driver);
 
 	info(DRIVER_VERSION " " DRIVER_AUTHOR);
 	info(DRIVER_DESC);
@@ -737,6 +754,7 @@ static int __init kobil_init (void)
 
 static void __exit kobil_exit (void)
 {
+	usb_deregister (&kobil_driver);
 	usb_serial_deregister (&kobil_device);
 }
 
