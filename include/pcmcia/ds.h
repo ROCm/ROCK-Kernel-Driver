@@ -128,6 +128,7 @@ typedef struct dev_link_t {
 
 
 struct pcmcia_socket;
+struct client_t;
 
 extern struct bus_type pcmcia_bus_type;
 
@@ -158,6 +159,7 @@ struct pcmcia_device {
 	/* deprecated, a cleaned up version will be moved into this
 	   struct soon */
 	dev_link_t		*instance;
+	struct client_t		*client;
 
 	struct device		dev;
 };

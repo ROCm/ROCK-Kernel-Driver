@@ -704,6 +704,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	p_dev->socket = s->parent;
 	p_dev->device_no = (s->device_count++);
 	p_dev->func   = bind_info->function;
+	p_dev->client = client;
 
 	p_dev->dev.bus = &pcmcia_bus_type;
 	p_dev->dev.parent = s->parent->dev.dev;
