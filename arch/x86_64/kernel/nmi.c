@@ -42,7 +42,7 @@
 static int nmi_active;
 static int panic_on_timeout;
 
-unsigned int nmi_watchdog = NMI_IO_APIC;
+unsigned int nmi_watchdog = NMI_LOCAL_APIC;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 int nmi_watchdog_disabled;
