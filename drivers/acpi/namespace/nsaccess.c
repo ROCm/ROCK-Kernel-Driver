@@ -100,6 +100,16 @@ acpi_ns_root_initialize (void)
 		 * initial value, create the initial value.
 		 */
 		if (init_val->val) {
+			acpi_string val;
+
+			status = acpi_os_predefined_override(init_val, &val);
+			if (ACPI_FAILURE (status)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Could not override predefined %s\n", init_val->name));
+			}
+			if (val == NULL)
+				val = init_val->val;
+
 			/*
 			 * Entry requests an initial value, allocate a
 			 * descriptor for it.
@@ -118,7 +128,7 @@ acpi_ns_root_initialize (void)
 			switch (init_val->type) {
 			case ACPI_TYPE_METHOD:
 				obj_desc->method.param_count =
-						(u8) ACPI_STRTOUL (init_val->val, NULL, 10);
+						(u8) ACPI_STRTOUL (val, NULL, 10);
 				obj_desc->common.flags |= AOPOBJ_DATA_VALID;
 
 #if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
@@ -132,7 +142,7 @@ acpi_ns_root_initialize (void)
 			case ACPI_TYPE_INTEGER:
 
 				obj_desc->integer.value =
-						(acpi_integer) ACPI_STRTOUL (init_val->val, NULL, 10);
+						(acpi_integer) ACPI_STRTOUL (val, NULL, 10);
 				break;
 
 
@@ -141,8 +151,8 @@ acpi_ns_root_initialize (void)
 				/*
 				 * Build an object around the static string
 				 */
-				obj_desc->string.length = (u32) ACPI_STRLEN (init_val->val);
-				obj_desc->string.pointer = init_val->val;
+				obj_desc->string.length = (u32) ACPI_STRLEN (val);
+				obj_desc->string.pointer = val;
 				obj_desc->common.flags |= AOPOBJ_STATIC_POINTER;
 				break;
 
@@ -151,7 +161,7 @@ acpi_ns_root_initialize (void)
 
 				obj_desc->mutex.node = new_node;
 				obj_desc->mutex.sync_level =
-						 (u16) ACPI_STRTOUL (init_val->val, NULL, 10);
+						 (u16) ACPI_STRTOUL (val, NULL, 10);
 
 				if (ACPI_STRCMP (init_val->name, "_GL_") == 0) {
 					/*

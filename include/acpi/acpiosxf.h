@@ -29,8 +29,8 @@
 #ifndef __ACPIOSXF_H__
 #define __ACPIOSXF_H__
 
-#include <acpi/platform/acenv.h>
-#include <acpi/actypes.h>
+#include "platform/acenv.h"
+#include "actypes.h"
 
 
 /* Priorities for acpi_os_queue_for_execution */
@@ -91,6 +91,11 @@ acpi_status
 acpi_os_get_root_pointer (
 	u32                             flags,
 	struct acpi_pointer             *address);
+
+acpi_status
+acpi_os_predefined_override (
+	const struct acpi_predefined_names *init_val,
+	acpi_string                     *new_val);
 
 acpi_status
 acpi_os_table_override (

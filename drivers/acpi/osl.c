@@ -203,6 +203,22 @@ acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 	return AE_OK;
 }
 
+static char acpi_os_name[200] = ACPI_OS_NAME;
+
+acpi_status
+acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
+		             acpi_string *new_val)
+{
+	if (!init_val || !new_val)
+		return AE_BAD_PARAMETER;
+
+	*new_val = NULL;
+	if (!memcmp (init_val->name, "_OS_", 4))
+		*new_val = acpi_os_name;
+
+	return AE_OK;
+}
+
 acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
@@ -854,3 +870,28 @@ acpi_os_signal (
 
 	return AE_OK;
 }
+
+int __init
+acpi_os_name_setup(char *str)
+{
+	char *p = acpi_os_name;
+	int count = 199;
+
+	if (!str || !*str)
+		return 0;
+
+	for (; count-- && str && *str; str++) {
+		if (isalnum(*str) || *str == ' ')
+			*p++ = *str;
+		else if (*str == '\'' || *str == '"')
+			continue;
+		else
+			break;
+	}
+	*p = 0;
+
+	return 1;
+		
+}
+
+__setup("acpi_os_name=", acpi_os_name_setup);
