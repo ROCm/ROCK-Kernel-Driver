@@ -105,21 +105,27 @@ static int init_slots(struct controller *ctrl)
 	slot_number = ctrl->first_slot;
 
 	while (number_of_slots) {
-		new_slot = (struct slot *) kmalloc(sizeof(struct slot), GFP_KERNEL);
+		new_slot = kmalloc(sizeof(*new_slot), GFP_KERNEL);
 		if (!new_slot)
 			goto error;
 
 		memset(new_slot, 0, sizeof(struct slot));
-		new_slot->hotplug_slot = kmalloc (sizeof (struct hotplug_slot), GFP_KERNEL);
+		new_slot->hotplug_slot =
+				kmalloc(sizeof(*(new_slot->hotplug_slot)),
+						GFP_KERNEL);
 		if (!new_slot->hotplug_slot)
 			goto error_slot;
-		memset(new_slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
+		memset(new_slot->hotplug_slot, 0, sizeof(struct hotplug_slot));
 
-		new_slot->hotplug_slot->info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
+		new_slot->hotplug_slot->info =
+			kmalloc(sizeof(*(new_slot->hotplug_slot->info)),
+						GFP_KERNEL);
 		if (!new_slot->hotplug_slot->info)
 			goto error_hpslot;
-		memset(new_slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
-		new_slot->hotplug_slot->name = kmalloc (SLOT_NAME_SIZE, GFP_KERNEL);
+		memset(new_slot->hotplug_slot->info, 0,
+					sizeof(struct hotplug_slot_info));
+		new_slot->hotplug_slot->name = kmalloc(SLOT_NAME_SIZE,
+						GFP_KERNEL);
 		if (!new_slot->hotplug_slot->name)
 			goto error_info;
 
@@ -349,7 +355,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	int num_ctlr_slots;		/* number of slots supported by this HPC */
 	u8 value;
 
-	ctrl = (struct controller *) kmalloc(sizeof(struct controller), GFP_KERNEL);
+	ctrl = kmalloc(sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl) {
 		err("%s : out of memory\n", __FUNCTION__);
 		goto err_out_none;
@@ -372,7 +378,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_drvdata(pdev, ctrl);
 
-	ctrl->pci_bus = kmalloc (sizeof (*ctrl->pci_bus), GFP_KERNEL);
+	ctrl->pci_bus = kmalloc(sizeof(*ctrl->pci_bus), GFP_KERNEL);
 	if (!ctrl->pci_bus) {
 		err("%s: out of memory\n", __FUNCTION__);
 		rc = -ENOMEM;
