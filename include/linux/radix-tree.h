@@ -21,8 +21,6 @@
 
 struct radix_tree_node;
 
-#define RADIX_TREE_SLOT_RESERVED ((void *)~0UL)
-
 struct radix_tree_root {
 	unsigned int		height;
 	int			gfp_mask;
@@ -41,7 +39,6 @@ do {					\
 	(root)->rnode = NULL;		\
 } while (0)
 
-extern int radix_tree_reserve(struct radix_tree_root *, unsigned long, void ***);
 extern int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 extern void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
 extern int radix_tree_delete(struct radix_tree_root *, unsigned long);
