@@ -15,6 +15,30 @@
 
 #include "generic.h"
 
+static void omnimeter_backlight_power(int on)
+{
+	if (on)
+		LEDBacklightOn();
+	else
+		LEDBacklightOff();
+}
+
+static void omnimeter_lcd_power(int on)
+{
+	if (on)
+		LCDPowerOn();
+}
+
+static int __init omnimeter_init(void)
+{
+	if (machine_is_omnimeter()) {
+		sa1100fb_backlight_power = omnimeter_backlight_power;
+		sa1100fb_lcd_power = omnimeter_lcd_power;
+	}
+	return 0;
+}
+
+__initcall(omnimeter_init);
 
 static void __init
 fixup_omnimeter(struct machine_desc *desc, struct param_struct *params,

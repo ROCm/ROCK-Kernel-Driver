@@ -487,7 +487,7 @@ static int raid5_error (mddev_t *mddev, kdev_t dev)
 	PRINTK("raid5_error called\n");
 
 	for (i = 0, disk = conf->disks; i < conf->raid_disks; i++, disk++) {
-		if (disk->dev == dev) {
+		if (kdev_same(disk->dev, dev)) {
 			if (disk->operational) {
 				disk->operational = 0;
 				mark_disk_faulty(sb->disks+disk->number);
@@ -513,7 +513,7 @@ static int raid5_error (mddev_t *mddev, kdev_t dev)
 	 */
 	if (conf->spare) {
 		disk = conf->spare;
-		if (disk->dev == dev) {
+		if (kdev_same(disk->dev, dev)) {
 			printk (KERN_ALERT
 				"raid5: Disk failure on spare %s\n",
 				partition_name (dev));
@@ -1460,7 +1460,7 @@ static int raid5_run (mddev_t *mddev)
 
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
-			disk->dev = MKDEV(0,0);
+			disk->dev = NODEV;
 
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1919,7 +1919,7 @@ static int raid5_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		*d = failed_desc;
 
-		if (sdisk->dev == MKDEV(0,0))
+		if (kdev_none(sdisk->dev))
 			sdisk->used_slot = 0;
 
 		/*
@@ -1947,7 +1947,7 @@ static int raid5_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 			err = 1;
 			goto abort;
 		}
-		rdisk->dev = MKDEV(0,0);
+		rdisk->dev = NODEV;
 		rdisk->used_slot = 0;
 
 		break;
@@ -1964,7 +1964,7 @@ static int raid5_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		adisk->number = added_desc->number;
 		adisk->raid_disk = added_desc->raid_disk;
-		adisk->dev = MKDEV(added_desc->major,added_desc->minor);
+		adisk->dev = mk_kdev(added_desc->major,added_desc->minor);
 
 		adisk->operational = 0;
 		adisk->write_only = 0;

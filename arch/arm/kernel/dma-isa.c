@@ -95,7 +95,7 @@ static void isa_enable_dma(dmach_t channel, dma_t *dma)
 			 * coherence.
 			 */
 			dma->buf.dma_address = pci_map_single(NULL,
-				dma->buf.address, dma->buf.length,
+				dma->buf.__address, dma->buf.length,
 				direction);
 		}
 

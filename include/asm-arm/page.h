@@ -3,8 +3,8 @@
 
 #include <asm/proc/page.h>
 
-#define PAGE_SIZE       (1UL << PAGE_SHIFT)
-#define PAGE_MASK       (~(PAGE_SIZE-1))
+#define PAGE_SIZE	(1UL << PAGE_SHIFT)
+#define PAGE_MASK	(~(PAGE_SIZE-1))
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
@@ -14,8 +14,8 @@
 #define clear_page(page)	memzero((void *)(page), PAGE_SIZE)
 extern void copy_page(void *to, void *from);
 
-#define clear_user_page(page, vaddr)	clear_page(page)
-#define copy_user_page(to, from, vaddr)	copy_page(to, from)
+#define clear_user_page(page, vaddr)	cpu_clear_user_page(page,vaddr)
+#define copy_user_page(to, from, vaddr)	cpu_copy_user_page(to,from,vaddr)
 
 #ifdef STRICT_MM_TYPECHECKS
 /*
@@ -63,10 +63,20 @@ typedef unsigned long pgprot_t;
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_DEBUG_BUGVERBOSE
 extern void __bug(const char *file, int line, void *data);
 
+/* give file/line information */
 #define BUG()		__bug(__FILE__, __LINE__, NULL)
 #define PAGE_BUG(page)	__bug(__FILE__, __LINE__, page)
+
+#else
+
+/* these just cause an oops */
+#define BUG()		(*(int *)0 = 0)
+#define PAGE_BUG(page)	(*(int *)0 = 0)
+
+#endif
 
 /* Pure 2^n version of get_order */
 static inline int get_order(unsigned long size)

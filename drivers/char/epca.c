@@ -1384,7 +1384,7 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 		return (0) ;
 	}
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if (line < 0 || line >= nbdevs) 
 	{
 		printk(KERN_ERR "<Error> - pc_open : line out of range in pc_open\n");
@@ -2895,7 +2895,7 @@ static void receive_data(struct channel *ch)
 	if (bc->orun) 
 	{
 		bc->orun = 0;
-		printk(KERN_WARNING "overrun! DigiBoard device minor = %d\n",MINOR(tty->device));
+		printk(KERN_WARNING "overrun! DigiBoard device minor = %d\n",minor(tty->device));
 	}
 
 	rxwinon(ch);

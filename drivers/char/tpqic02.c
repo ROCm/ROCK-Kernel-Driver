@@ -1830,7 +1830,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count,
 		/* can't print a ``long long'' (for filp->f_pos), so chop it */
 		printk(TPQIC02_NAME
 		       ": request READ, minor=%x, buf=%p, count=%lx"
-		       ", pos=%lx, flags=%x\n", MINOR(dev), buf,
+		       ", pos=%lx, flags=%x\n", minor(dev), buf,
 		       (long) count, (unsigned long) filp->f_pos, flags);
 
 	if (count % TAPE_BLKSIZE) {	/* Only allow mod 512 bytes at a time. */
@@ -2027,7 +2027,7 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf,
 		/* can't print a ``long long'' (for filp->f_pos), so chop it */
 		printk(TPQIC02_NAME ": request WRITE, minor=%x, buf=%p"
 		       ", count=%lx, pos=%lx, flags=%x\n",
-		       MINOR(dev), buf,
+		       minor(dev), buf,
 		       (long) count, (unsigned long) filp->f_pos, flags);
 	}
 
@@ -2203,7 +2203,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 		       kdevname(dev), flags);
 	}
 
-	if (MINOR(dev) == 255) {	/* special case for resetting */
+	if (minor(dev) == 255) {	/* special case for resetting */
 		if (capable(CAP_SYS_ADMIN)) {
 			return (tape_reset(1) == TE_OK) ? -EAGAIN : -ENXIO;
 		} else {
@@ -2383,7 +2383,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	}
 	if (s != 0) {
 		status_dead = YES;	/* force reset */
-		current_tape_dev = 0;	/* earlier 0xff80 */
+		current_tape_dev = NODEV;/* earlier 0xff80 */
 		return -EIO;
 	}
 
@@ -2522,7 +2522,7 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp,
 			    unsigned int iocmd, unsigned long ioarg)
 {
 	int error;
-	int dev_maj = MAJOR(inode->i_rdev);
+	int dev_maj = major(inode->i_rdev);
 	int c;
 	struct mtop operation;
 	unsigned char blk_addr[6];
@@ -2828,7 +2828,7 @@ int __init qic02_tape_init(void)
 		return -ENODEV;
 	}
 
-	current_tape_dev = MKDEV(QIC02_TAPE_MAJOR, 0);
+	current_tape_dev = mk_kdev(QIC02_TAPE_MAJOR, 0);
 
 #ifndef CONFIG_QIC02_DYNCONF
 	printk(TPQIC02_NAME ": IRQ %d, DMA %d, IO 0x%x, IFC %s, %s, %s\n",

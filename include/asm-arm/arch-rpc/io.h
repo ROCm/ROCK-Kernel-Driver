@@ -241,4 +241,10 @@ DECLARE_IO(int,l,"")
 /* the following macro is depreciated */
 #define ioaddr(port)			__ioaddr((port))
 
+#define insb(p,d,l)	__raw_readsb(__ioaddr(p),d,l)
+#define insw(p,d,l)	__raw_readsw(__ioaddr(p),d,l)
+
+#define outsb(p,d,l)	__raw_writesb(__ioaddr(p),d,l)
+#define outsw(p,d,l)	__raw_writesw(__ioaddr(p),d,l)
+
 #endif

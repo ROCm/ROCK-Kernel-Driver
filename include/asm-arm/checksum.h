@@ -55,25 +55,24 @@ ip_fast_csum(unsigned char * iph, unsigned int ihl)
 	unsigned int sum, tmp1;
 
 	__asm__ __volatile__(
-	"ldr	%0, [%1], #4		@ ip_fast_csum
-	ldr	%3, [%1], #4
-	sub	%2, %2, #5
-	adds	%0, %0, %3
-	ldr	%3, [%1], #4
-	adcs	%0, %0, %3
-	ldr	%3, [%1], #4
-	adcs	%0, %0, %3
-1:	ldr	%3, [%1], #4
-	adcs	%0, %0, %3
-	tst	%2, #15
-	subne	%2, %2, #1
-	bne	1b
-	adc	%0, %0, #0
-	adds	%0, %0, %0, lsl #16
-	addcs	%0, %0, #0x10000
-	mvn	%0, %0
-	mov	%0, %0, lsr #16
-	"
+	"ldr	%0, [%1], #4		@ ip_fast_csum		\n\
+	ldr	%3, [%1], #4					\n\
+	sub	%2, %2, #5					\n\
+	adds	%0, %0, %3					\n\
+	ldr	%3, [%1], #4					\n\
+	adcs	%0, %0, %3					\n\
+	ldr	%3, [%1], #4					\n\
+1:	adcs	%0, %0, %3					\n\
+	ldr	%3, [%1], #4					\n\
+	tst	%2, #15			@ do this carefully	\n\
+	subne	%2, %2, #1		@ without destroying	\n\
+	bne	1b			@ the carry flag	\n\
+	adcs	%0, %0, %3					\n\
+	adc	%0, %0, #0					\n\
+	adds	%0, %0, %0, lsl #16				\n\
+	addcs	%0, %0, #0x10000				\n\
+	mvn	%0, %0						\n\
+	mov	%0, %0, lsr #16"
 	: "=r" (sum), "=r" (iph), "=r" (ihl), "=r" (tmp1)
 	: "1" (iph), "2" (ihl)
 	: "cc");
@@ -87,7 +86,7 @@ static inline unsigned int
 csum_fold(unsigned int sum)
 {
 	__asm__(
-	"adds	%0, %1, %1, lsl #16	@ csum_fold
+	"adds	%0, %1, %1, lsl #16	@ csum_fold		\n\
 	addcs	%0, %0, #0x10000"
 	: "=r" (sum)
 	: "r" (sum)
@@ -100,10 +99,10 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
 		   unsigned int proto, unsigned int sum)
 {
 	__asm__(
-	"adds	%0, %1, %2		@ csum_tcpudp_nofold
-	adcs	%0, %0, %3
-	adcs	%0, %0, %4
-	adcs	%0, %0, %5
+	"adds	%0, %1, %2		@ csum_tcpudp_nofold	\n\
+	adcs	%0, %0, %3					\n\
+	adcs	%0, %0, %4					\n\
+	adcs	%0, %0, %5					\n\
 	adc	%0, %0, #0"
 	: "=&r"(sum)
 	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len) << 16), "Ir" (proto << 8)
@@ -119,13 +118,13 @@ csum_tcpudp_magic(unsigned long saddr, unsigned long daddr, unsigned short len,
 		  unsigned int proto, unsigned int sum)
 {
 	__asm__(
-	"adds	%0, %1, %2		@ csum_tcpudp_magic
-	adcs	%0, %0, %3
-	adcs	%0, %0, %4
-	adcs	%0, %0, %5
-	adc	%0, %0, #0
-	adds	%0, %0, %0, lsl #16
-	addcs	%0, %0, #0x10000
+	"adds	%0, %1, %2		@ csum_tcpudp_magic	\n\
+	adcs	%0, %0, %3					\n\
+	adcs	%0, %0, %4					\n\
+	adcs	%0, %0, %5					\n\
+	adc	%0, %0, #0					\n\
+	adds	%0, %0, %0, lsl #16				\n\
+	addcs	%0, %0, #0x10000				\n\
 	mvn	%0, %0"
 	: "=&r"(sum)
 	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (proto << 8)

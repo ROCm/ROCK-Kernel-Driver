@@ -29,16 +29,9 @@ fixup_sherman(struct machine_desc *desc, struct param_struct *params,
 //	setup_initrd( 0xc0400000, 8*1024*1024 );
 }
 
-static struct map_desc sherman_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash*/
-  LAST_DESC
-};
-
 static void __init sherman_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(sherman_io_desc);
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

@@ -27,8 +27,10 @@
 
 #ifndef __ASSEMBLY__
 #define clps_readb(off)		__raw_readb(CLPS7111_BASE + (off))
+#define clps_readw(off)		__raw_readw(CLPS7111_BASE + (off))
 #define clps_readl(off)		__raw_readl(CLPS7111_BASE + (off))
 #define clps_writeb(val,off)	__raw_writeb(val, CLPS7111_BASE + (off))
+#define clps_writew(val,off)	__raw_writew(val, CLPS7111_BASE + (off))
 #define clps_writel(val,off)	__raw_writel(val, CLPS7111_BASE + (off))
 #endif
 
@@ -48,6 +50,7 @@
 #define INTSR1		(0x0240)
 #define INTMR1		(0x0280)
 #define LCDCON		(0x02c0)
+#define TC1D            (0x0300)
 #define TC2D		(0x0340)
 #define RTCDR		(0x0380)
 #define RTCMR		(0x03c0)

@@ -105,231 +105,6 @@ ENTRY(cpu_arm720_tlb_invalidate_page)
 		mov	pc, lr
 
 /*
- * Function: arm720_data_abort ()
- *
- * Params  : r0 = address of aborted instruction
- *         : r3 = saved SPSR
- *
- * Purpose : obtain information about current aborted instruction
- *
- * Returns : r0 = address of abort
- *	   : r1 != 0 if writing
- *	   : r3 = FSR
- *	   : sp = pointer to registers
- */
-
-Ldata_ldmstm:	tst	r4, #1 << 21			@ check writeback bit
-		beq	Ldata_simple
-		mov	r7, #0x11
-		orr	r7, r7, r7, lsl #8
-		and	r0, r4, r7
-		and	r2, r4, r7, lsl #1
-		add	r0, r0, r2, lsr #1
-		and	r2, r4, r7, lsl #2
-		add	r0, r0, r2, lsr #2
-		and	r2, r4, r7, lsl #3
-		add	r0, r0, r2, lsr #3
-		add	r0, r0, r0, lsr #8
-		add	r0, r0, r0, lsr #4
-		and	r7, r0, #15			@ r7 = no. of registers to transfer.
-		and	r5, r4, #15 << 16		@ Get Rn
-		ldr	r0, [sp, r5, lsr #14]		@ Get register
-		tst	r4, #1 << 23			@ U bit
-		subne	r7, r0, r7, lsl #2
-		addeq	r7, r0, r7, lsl #2		@ Do correction (signed)
-Ldata_saver7:	str	r7, [sp, r5, lsr #14]		@ Put register
-Ldata_simple:	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-		mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-		and	r3, r3, #255
-		mov	pc, lr
-
-ENTRY(cpu_arm720_data_abort)
-		tst	r3, #T_BIT
-		bne	.data_thumb_abort
-		ldr	r4, [r0]			@ read instruction causing problem
-		tst	r4, r4, lsr #21			@ C = bit 20
-		sbc	r1, r1, r1			@ r1 = C - 1
-		and	r2, r4, #15 << 24
-		add	pc, pc, r2, lsr #22		@ Now branch to the relevent processing routine
-		movs	pc, lr
-
-		b	Ldata_lateldrhpost		@ ldrh	rd, [rn], #m/rm
-		b	Ldata_lateldrhpre		@ ldrh	rd, [rn, #m/rm]
-		b	Ldata_unknown
-		b	Ldata_unknown
-		b	Ldata_lateldrpostconst		@ ldr	rd, [rn], #m
-		b	Ldata_lateldrpreconst		@ ldr	rd, [rn, #m] 
-		b	Ldata_lateldrpostreg		@ ldr	rd, [rn], rm
-		b	Ldata_lateldrprereg		@ ldr	rd, [rn, rm]
-		b	Ldata_ldmstm			@ ldm*a	rn, <rlist>
-		b	Ldata_ldmstm			@ ldm*b	rn, <rlist>
-		b	Ldata_unknown
-		b	Ldata_unknown
-		b	Ldata_simple			@ ldc	rd, [rn], #m	@ Same as ldr	rd, [rn], #m
-		b	Ldata_simple			@ ldc	rd, [rn, #m]
-		b	Ldata_unknown
-
-Ldata_unknown:	@ Part of jumptable
-		mov	r0, r2
-		mov	r1, r4
-		mov	r2, sp
-		bl	baddataabort
-		b	ret_from_exception
-
-Ldata_lateldrhpre:
-		tst	r4, #1 << 21			@ check writeback bit
-		beq	Ldata_simple
-Ldata_lateldrhpost:
-		and	r5, r4, #0x00f			@ get Rm / low nibble of immediate value
-		tst	r4, #1 << 22			@ if (immediate offset)
-		andne	r2, r4, #0xf00			@ { immediate high nibble
-		orrne	r2, r5, r2, lsr #4		@   combine nibbles } else
-		ldreq	r2, [sp, r5, lsl #2]		@ { load Rm value }
-		and	r5, r4, #15 << 16		@ get Rn
-		ldr	r0, [sp, r5, lsr #14]		@ load Rn value
-		tst	r4, #1 << 23			@ U bit
-		subne	r7, r0, r2
-		addeq	r7, r0, r2
-		b	Ldata_saver7
-
-Ldata_lateldrpreconst:
-		tst	r4, #1 << 21			@ check writeback bit
-		beq	Ldata_simple
-Ldata_lateldrpostconst:
-		movs	r2, r4, lsl #20			@ Get offset
-		beq	Ldata_simple
-		and	r5, r4, #15 << 16		@ Get Rn
-		ldr	r0, [sp, r5, lsr #14]
-		tst	r4, #1 << 23			@ U bit
-		subne	r7, r0, r2, lsr #20
-		addeq	r7, r0, r2, lsr #20
-		b	Ldata_saver7
-
-Ldata_lateldrprereg:
-		tst	r4, #1 << 21			@ check writeback bit
-		beq	Ldata_simple
-Ldata_lateldrpostreg:
-		and	r5, r4, #15
-		ldr	r2, [sp, r5, lsl #2]		@ Get Rm
-		mov	r3, r4, lsr #7
-		ands	r3, r3, #31
-		and	r6, r4, #0x70
-		orreq	r6, r6, #8
-		add	pc, pc, r6
-		mov	r0, r0
-
-		mov	r2, r2, lsl r3			@ 0: LSL #!0
-		b	1f
-		b	1f				@ 1: LSL #0
-		mov	r0, r0
-		b	1f				@ 2: MUL?
-		mov	r0, r0
-		b	1f				@ 3: MUL?
-		mov	r0, r0
-		mov	r2, r2, lsr r3			@ 4: LSR #!0
-		b	1f
-		mov	r2, r2, lsr #32			@ 5: LSR #32
-		b	1f
-		b	1f				@ 6: MUL?
-		mov	r0, r0
-		b	1f				@ 7: MUL?
-		mov	r0, r0
-		mov	r2, r2, asr r3			@ 8: ASR #!0
-		b	1f
-		mov	r2, r2, asr #32			@ 9: ASR #32
-		b	1f
-		b	1f				@ A: MUL?
-		mov	r0, r0
-		b	1f				@ B: MUL?
-		mov	r0, r0
-		mov	r2, r2, ror r3			@ C: ROR #!0
-		b	1f
-		mov	r2, r2, rrx			@ D: RRX
-		b	1f
-		mov	r0, r0				@ E: MUL?
-		mov	r0, r0
-		mov	r0, r0				@ F: MUL?
-
-
-1:		and	r5, r4, #15 << 16		@ Get Rn
-		ldr	r0, [sp, r5, lsr #14]
-		tst	r4, #1 << 23			@ U bit
-		subne	r7, r0, r2
-		addeq	r7, r0, r2
-		b	Ldata_saver7
-
-.data_thumb_abort:
-		ldrh	r4, [r0]			@ read instruction
-		tst	r4, r4, lsr #12			@ C = bit 11
-		sbc	r1, r1, r1			@ r1 = C - 1
-		and	r2, r4, #15 << 12
-		add	pc, pc, r2, lsr #10		@ lookup in table
-		nop
-
-/* 0 */		b	Ldata_unknown
-/* 1 */		b	Ldata_unknown
-/* 2 */		b	Ldata_unknown
-/* 3 */		b	Ldata_unknown
-/* 4 */		b	Ldata_unknown
-/* 5 */		b	.data_thumb_reg
-/* 6 */		b	Ldata_simple
-/* 7 */		b	Ldata_simple
-/* 8 */		b	Ldata_simple
-/* 9 */		b	Ldata_simple
-/* A */		b	Ldata_unknown
-/* B */		b	.data_thumb_pushpop
-/* C */		b	.data_thumb_ldmstm
-/* D */		b	Ldata_unknown
-/* E */		b	Ldata_unknown
-/* F */		b	Ldata_unknown
-
-.data_thumb_reg:
-		tst	r4, #1 << 9
-		beq	Ldata_simple
-		tst	r4, #1 << 10		@ If 'S' (signed) bit is set
-		movne	r1, #0			@ it must be a load instr
-		b	Ldata_simple
-
-.data_thumb_pushpop:
-		tst	r4, #1 << 10
-		beq	Ldata_unknown
-		mov	r7, #0x11
-		and	r0, r4, r7
-		and	r2, r4, r7, lsl #1
-		add	r0, r0, r2, lsr #1
-		and	r2, r4, r7, lsl #2
-		add	r0, r0, r2, lsr #2
-		and	r2, r4, r7, lsl #3
-		add	r0, r0, r2, lsr #3
-		add	r0, r0, r0, lsr #4
-		and	r2, r4, #0x0100			@ catch 'R' bit for push/pop
-		add	r0, r0, r2, lsr #8
-		and	r0, r0, #15			@ number of regs to transfer
-		ldr	r7, [sp, #13 << 2]
-		tst	r4, #1 << 11
-		addne	r7, r7, r0, lsl #2		@ increment SP if PUSH
-		subeq	r7, r7, r0, lsr #2		@ decrement SP if POP
-		str	r7, [sp, #13 << 2]
-		b	Ldata_simple
-
-.data_thumb_ldmstm:
-		mov	r7, #0x11
-		and	r0, r4, r7
-		and	r2, r4, r7, lsl #1
-		add	r0, r0, r2, lsr #1
-		and	r2, r4, r7, lsl #2
-		add	r0, r0, r2, lsr #2
-		and	r2, r4, r7, lsl #3
-		add	r0, r0, r2, lsr #3
-		add	r0, r0, r0, lsr #4
-		and	r0, r0, #15			@ number of regs to transfer
-		and	r5, r4, #7 << 8
-		ldr	r7, [sp, r5, lsr #6]
-		sub	r7, r7, r0, lsr #2		@ always decrement
-		str	r7, [sp, r5, lsr #6]
-		b	Ldata_simple
-
-/*
  * Function: arm720_check_bugs (void)
  *	   : arm720_proc_init (void)
  *	   : arm720_proc_fin (void)
@@ -338,7 +113,7 @@ Ldata_lateldrpostreg:
  */
 ENTRY(cpu_arm720_check_bugs)
 		mrs	ip, cpsr
-		bic	ip, ip, #F_BIT
+		bic	ip, ip, #PSR_F_BIT
 		msr	cpsr, ip
 		mov	pc, lr
 
@@ -347,7 +122,7 @@ ENTRY(cpu_arm720_proc_init)
 
 ENTRY(cpu_arm720_proc_fin)
 		stmfd	sp!, {lr}
-		mov	ip, #F_BIT | I_BIT | SVC_MODE
+		mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 		msr	cpsr_c, ip
 		mrc	p15, 0, r0, c1, c0, 0
 		bic	r0, r0, #0x1000			@ ...i............
@@ -462,7 +237,7 @@ __arm720_setup:	mov	r0, #0
  */
 		.type	arm720_processor_functions, #object
 ENTRY(arm720_processor_functions)
-		.word	cpu_arm720_data_abort
+		.word	armv4t_late_abort
 		.word	cpu_arm720_check_bugs
 		.word	cpu_arm720_proc_init
 		.word	cpu_arm720_proc_fin
@@ -493,6 +268,11 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_set_pgd
 		.word	cpu_arm720_set_pmd
 		.word	cpu_arm720_set_pte
+
+		/* misc */
+		.word	armv4_clear_user_page
+		.word	armv4_copy_user_page
+
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
 		.type	cpu_arm720_info, #object

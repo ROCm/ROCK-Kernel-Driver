@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/errno.h>
+#include <linux/ioport.h>
 
 #include <asm/hardware.h>
 #include <asm/setup.h>
@@ -34,7 +35,7 @@ static int __init pfs168_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe();
+	ret = sa1111_probe(0x40000000);
 	if (ret < 0)
 		return ret;
 
@@ -65,8 +66,7 @@ static int __init pfs168_init(void)
 	 */
 	sa1110_mb_enable();
 
-	set_GPIO_IRQ_edge(GPIO_GPIO(25), GPIO_RISING_EDGE);
-	sa1111_init_irq(SA1100_GPIO_TO_IRQ(25));	/* SA1111 IRQ on GPIO 25 */
+	sa1111_init_irq(IRQ_GPIO25);	/* SA1111 IRQ on GPIO 25 */
 
 	return 0;
 }
@@ -84,6 +84,8 @@ static void __init pfs168_init_irq(void)
 	 */
 	set_GPIO_IRQ_edge(GPIO_GPIO(19), GPIO_RISING_EDGE);
 	set_GPIO_IRQ_edge(GPIO_GPIO(20), GPIO_RISING_EDGE);
+	set_GPIO_IRQ_edge(GPIO_GPIO(25), GPIO_RISING_EDGE);
+	set_GPIO_IRQ_edge(GPIO_UCB1300_IRQ, GPIO_RISING_EDGE);
 }
 
 

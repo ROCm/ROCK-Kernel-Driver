@@ -10,21 +10,21 @@
 #ifndef __ASM_PROC_PTRACE_H
 #define __ASM_PROC_PTRACE_H
 
-#define USR26_MODE	0x00
-#define FIQ26_MODE	0x01
-#define IRQ26_MODE	0x02
-#define SVC26_MODE	0x03
+#define USR26_MODE	0x00000000
+#define FIQ26_MODE	0x00000001
+#define IRQ26_MODE	0x00000002
+#define SVC26_MODE	0x00000003
 #define USR_MODE	USR26_MODE
 #define FIQ_MODE	FIQ26_MODE
 #define IRQ_MODE	IRQ26_MODE
 #define SVC_MODE	SVC26_MODE
-#define MODE_MASK	0x03
-#define F_BIT		(1 << 26)
-#define I_BIT		(1 << 27)
-#define CC_V_BIT	(1 << 28)
-#define CC_C_BIT	(1 << 29)
-#define CC_Z_BIT	(1 << 30)
-#define CC_N_BIT	(1 << 31)
+#define MODE_MASK	0x00000003
+#define PSR_F_BIT	0x04000000
+#define PSR_I_BIT	0x08000000
+#define PSR_V_BIT	0x10000000
+#define PSR_C_BIT	0x20000000
+#define PSR_Z_BIT	0x40000000
+#define PSR_N_BIT	0x80000000
 #define PCMASK		0xfc000003
 
 #ifndef __ASSEMBLY__
@@ -65,13 +65,13 @@ struct pt_regs {
 #define thumb_mode(regs) (0)
 
 #define interrupts_enabled(regs) \
-	(!((regs)->ARM_pc & I_BIT))
+	(!((regs)->ARM_pc & PSR_I_BIT))
 
 #define fast_interrupts_enabled(regs) \
-	(!((regs)->ARM_pc & F_BIT))
+	(!((regs)->ARM_pc & PSR_F_BIT))
 
 #define condition_codes(regs) \
-	((regs)->ARM_pc & (CC_V_BIT|CC_C_BIT|CC_Z_BIT|CC_N_BIT))
+	((regs)->ARM_pc & (PSR_V_BIT|PSR_C_BIT|PSR_Z_BIT|PSR_N_BIT))
 
 /* Are the current registers suitable for user mode?
  * (used to maintain security in signal handlers)
@@ -79,13 +79,13 @@ struct pt_regs {
 static inline int valid_user_regs(struct pt_regs *regs)
 {
 	if (user_mode(regs) &&
-	    (regs->ARM_pc & (F_BIT | I_BIT)) == 0)
+	    (regs->ARM_pc & (PSR_F_BIT | PSR_I_BIT)) == 0)
 		return 1;
 
 	/*
 	 * force it to be something sensible
 	 */
-	regs->ARM_pc &= ~(MODE_MASK | F_BIT | I_BIT);
+	regs->ARM_pc &= ~(MODE_MASK | PSR_F_BIT | PSR_I_BIT);
 
 	return 0;
 }

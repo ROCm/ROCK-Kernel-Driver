@@ -11,7 +11,7 @@ extern void sa1110_mb_disable(void);
 /*
  * Probe for a SA1111 chip.
  */
-extern int sa1111_probe(void);
+extern int sa1111_probe(unsigned long phys);
 
 /*
  * Wake up a SA1111 chip.
@@ -30,5 +30,5 @@ extern void sa1111_configure_smc(int sdram, unsigned int drac, unsigned int cas_
 
 
 extern void sa1111_init_irq(int irq_nr);
-extern void sa1111_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs );
+extern void sa1111_IRQ_demux(int irq, void *dev_id, struct pt_regs *regs);
 

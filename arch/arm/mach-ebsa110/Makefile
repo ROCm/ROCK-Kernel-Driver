@@ -11,7 +11,7 @@ O_TARGET		:= ebsa110.o
 
 # Object file lists.
 
-obj-y			:= arch.o io.o irq.o mm.o time.o
+obj-y			:= core.o io.o time.o
 obj-m			:=
 obj-n			:=
 obj-			:=

@@ -205,10 +205,10 @@ static char *_rio_h_sccs_ = "@(#)rio.h	1.3";
 #define	RIO_MODEMOFFSET		0x200	/* doesn't mean anything */
 #define	RIO_MODEM_MASK		0x1FF
 #define	RIO_MODEM_BIT		0x200
-#define	RIO_UNMODEM(DEV)	(minor(DEV) & RIO_MODEM_MASK)
-#define	RIO_ISMODEM(DEV)	(minor(DEV) & RIO_MODEM_BIT)
-#define RIO_PORT(DEV,FIRST_MAJ)	( (major(DEV) - FIRST_MAJ) * PORTS_PER_HOST) \
-					+ minor(DEV)
+#define	RIO_UNMODEM(DEV)	(MINOR(DEV) & RIO_MODEM_MASK)
+#define	RIO_ISMODEM(DEV)	(MINOR(DEV) & RIO_MODEM_BIT)
+#define RIO_PORT(DEV,FIRST_MAJ)	( (MAJOR(DEV) - FIRST_MAJ) * PORTS_PER_HOST) \
+					+ MINOR(DEV)
 
 #define	splrio	spltty
 

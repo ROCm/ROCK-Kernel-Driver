@@ -169,7 +169,7 @@ vector_undefinstr:
 		bne	__und_svc
 		save_user_regs
 		zero_fp
-		teqp	pc, #I_BIT | MODE_SVC
+		teqp	pc, #PSR_I_BIT | MODE_SVC
 .Lbug_undef:
 		ldr	r4, .LC2
 		ldr	pc, [r4]			@ Call FP module USR entry point

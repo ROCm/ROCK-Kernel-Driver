@@ -39,24 +39,50 @@ extern int __bug_unaligned_x(void *ptr);
  * out of long long >> 32, or the low word from long long << 32
  */
 
-#define __get_unaligned_2(__p)					\
+#define __get_unaligned_2_le(__p)					\
 	(__p[0] | __p[1] << 8)
 
-#define __get_unaligned_4(__p)					\
+#define __get_unaligned_2_be(__p)					\
+	(__p[0] << 8 | __p[1])
+
+#define __get_unaligned_4_le(__p)					\
 	(__p[0] | __p[1] << 8 | __p[2] << 16 | __p[3] << 24)
 
-#define get_unaligned(ptr)					\
+#define __get_unaligned_4_be(__p)					\
+	(__p[0] << 24 | __p[1] << 16 | __p[2] << 8 | __p[3])
+
+#define __get_unaligned_le(ptr)					\
 	({							\
 		__typeof__(*(ptr)) __v;				\
 		__u8 *__p = (__u8 *)(ptr);			\
 		switch (sizeof(*(ptr))) {			\
 		case 1:	__v = *(ptr);			break;	\
-		case 2: __v = __get_unaligned_2(__p);	break;	\
-		case 4: __v = __get_unaligned_4(__p);	break;	\
+		case 2: __v = __get_unaligned_2_le(__p);	break;	\
+		case 4: __v = __get_unaligned_4_le(__p);	break;	\
 		case 8: {					\
 				unsigned int __v1, __v2;	\
-				__v2 = __get_unaligned_4((__p+4)); \
-				__v1 = __get_unaligned_4(__p);	\
+				__v2 = __get_unaligned_4_le((__p+4)); \
+				__v1 = __get_unaligned_4_le(__p);	\
+				__v = ((unsigned long long)__v2 << 32 | __v1);	\
+			}					\
+			break;					\
+		default: __v = __bug_unaligned_x(__p);	break;	\
+		}						\
+		__v;						\
+	})
+
+#define __get_unaligned_be(ptr)					\
+	({							\
+		__typeof__(*(ptr)) __v;				\
+		__u8 *__p = (__u8 *)(ptr);			\
+		switch (sizeof(*(ptr))) {			\
+		case 1:	__v = *(ptr);			break;	\
+		case 2: __v = __get_unaligned_2_be(__p);	break;	\
+		case 4: __v = __get_unaligned_4_be(__p);	break;	\
+		case 8: {					\
+				unsigned int __v1, __v2;	\
+				__v2 = __get_unaligned_4_be(__p); \
+				__v1 = __get_unaligned_4_be((__p+4));	\
 				__v = ((unsigned long long)__v2 << 32 | __v1);	\
 			}					\
 			break;					\
@@ -66,43 +92,66 @@ extern int __bug_unaligned_x(void *ptr);
 	})
 
 
-static inline void __put_unaligned_2(__u32 __v, register __u8 *__p)
+static inline void __put_unaligned_2_le(__u32 __v, register __u8 *__p)
 {
 	*__p++ = __v;
 	*__p++ = __v >> 8;
 }
 
-static inline void __put_unaligned_4(__u32 __v, register __u8 *__p)
+static inline void __put_unaligned_2_be(__u32 __v, register __u8 *__p)
 {
-	__put_unaligned_2(__v >> 16, __p + 2);
-	__put_unaligned_2(__v, __p);
+	*__p++ = __v >> 8;
+	*__p++ = __v;
 }
 
-static inline void __put_unaligned_8(const unsigned long long __v, register __u8 *__p)
+static inline void __put_unaligned_4_le(__u32 __v, register __u8 *__p)
+{
+	__put_unaligned_2_le(__v >> 16, __p + 2);
+	__put_unaligned_2_le(__v, __p);
+}
+
+static inline void __put_unaligned_4_be(__u32 __v, register __u8 *__p)
+{
+	__put_unaligned_2_be(__v >> 16, __p);
+	__put_unaligned_2_be(__v, __p + 2);
+}
+
+static inline void __put_unaligned_8_le(const unsigned long long __v, register __u8 *__p)
 {
 	/*
 	 * tradeoff: 8 bytes of stack for all unaligned puts (2
 	 * instructions), or an extra register in the long long
 	 * case - go for the extra register.
 	 */
-	__put_unaligned_4(__v >> 32, __p+4);
-	__put_unaligned_4(__v, __p);
+	__put_unaligned_4_le(__v >> 32, __p+4);
+	__put_unaligned_4_le(__v, __p);
+}
+
+static inline void __put_unaligned_8_be(const unsigned long long __v, register __u8 *__p)
+{
+	/*
+	 * tradeoff: 8 bytes of stack for all unaligned puts (2
+	 * instructions), or an extra register in the long long
+	 * case - go for the extra register.
+	 */
+	__put_unaligned_4_be(__v >> 32, __p);
+	__put_unaligned_4_be(__v, __p+4);
 }
 
 /*
  * Try to store an unaligned value as efficiently as possible.
  */
-#define put_unaligned(val,ptr)					\
+#define __put_unaligned_le(val,ptr)					\
 	({							\
 		switch (sizeof(*(ptr))) {			\
 		case 1:						\
 			*(ptr) = (val);				\
 			break;					\
-		case 2: __put_unaligned_2((val),(__u8 *)(ptr));	\
+		case 2: __put_unaligned_2_le((val),(__u8 *)(ptr));	\
 			break;					\
-		case 4:	__put_unaligned_4((val),(__u8 *)(ptr));	\
+		case 4:	__put_unaligned_4_le((val),(__u8 *)(ptr));	\
 			break;					\
-		case 8:	__put_unaligned_8((val),(__u8 *)(ptr)); \
+		case 8:	__put_unaligned_8_le((val),(__u8 *)(ptr)); \
 			break;					\
 		default: __bug_unaligned_x(ptr);		\
 			break;					\
@@ -110,5 +159,33 @@ static inline void __put_unaligned_8(const unsigned long long __v, register __u8
 		(void) 0;					\
 	})
 
+#define put_unaligned_be(val,ptr)					\
+	({							\
+		switch (sizeof(*(ptr))) {			\
+		case 1:						\
+			*(ptr) = (val);				\
+			break;					\
+		case 2: __put_unaligned_2_be((val),(__u8 *)(ptr));	\
+			break;					\
+		case 4:	__put_unaligned_4_be((val),(__u8 *)(ptr));	\
+			break;					\
+		case 8:	__put_unaligned_8_be((val),(__u8 *)(ptr)); \
+			break;					\
+		default: __bug_unaligned_x(ptr);		\
+			break;					\
+		}						\
+		(void) 0;					\
+	})
+
+/*
+ * Select endianness
+ */
+#ifndef __ARMEB__
+#define get_unaligned	__get_unaligned_le
+#define put_unaligned	__put_unaligned_le
+#else
+#define get_unaligned	__get_unaligned_be
+#define put_unaligned	__put_unaligned_be
+#endif
 
 #endif

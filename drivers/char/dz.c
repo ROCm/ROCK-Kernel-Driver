@@ -1273,7 +1273,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 	struct dz_serial *info;
 	int retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 
 	/*
 	 * The dz lines for the mouse/keyboard must be opened using their
@@ -1508,7 +1508,7 @@ static void dz_console_print (struct console *cons,
 
 static kdev_t dz_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 static int __init dz_console_setup(struct console *co, char *options)

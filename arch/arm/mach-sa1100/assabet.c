@@ -31,16 +31,70 @@
 
 #include "generic.h"
 
+#define ASSABET_BCR_DB1110 \
+	(ASSABET_BCR_SPK_OFF    | ASSABET_BCR_QMUTE     | \
+	 ASSABET_BCR_LED_GREEN  | ASSABET_BCR_LED_RED   | \
+	 ASSABET_BCR_RS232EN    | ASSABET_BCR_LCD_12RGB | \
+	 ASSABET_BCR_IRDA_MD0)
 
-unsigned long BCR_value = ASSABET_BCR_DB1110;
+#define ASSABET_BCR_DB1111 \
+	(ASSABET_BCR_SPK_OFF    | ASSABET_BCR_QMUTE     | \
+	 ASSABET_BCR_LED_GREEN  | ASSABET_BCR_LED_RED   | \
+	 ASSABET_BCR_RS232EN    | ASSABET_BCR_LCD_12RGB | \
+	 ASSABET_BCR_CF_BUS_OFF | ASSABET_BCR_STEREO_LB | \
+	 ASSABET_BCR_IRDA_MD0   | ASSABET_BCR_CF_RST)
+
 unsigned long SCR_value = ASSABET_SCR_INIT;
-EXPORT_SYMBOL(BCR_value);
 EXPORT_SYMBOL(SCR_value);
 
+static unsigned long BCR_value = ASSABET_BCR_DB1110;
+
+void ASSABET_BCR_frob(unsigned int mask, unsigned int val)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	BCR_value = (BCR_value & ~mask) | val;
+	ASSABET_BCR = BCR_value;
+	local_irq_restore(flags);
+}
+
+EXPORT_SYMBOL(ASSABET_BCR_frob);
+
+static void assabet_backlight_power(int on)
+{
+#ifndef ASSABET_PAL_VIDEO
+	if (on)
+		ASSABET_BCR_set(ASSABET_BCR_LIGHT_ON);
+	else
+#endif
+		ASSABET_BCR_clear(ASSABET_BCR_LIGHT_ON);
+}
+
+static void assabet_lcd_power(int on)
+{
+#ifndef ASSABET_PAL_VIDEO
+	if (on)
+		ASSABET_BCR_set(ASSABET_BCR_LCD_ON);
+	else
+#endif
+		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
+}
 
 static int __init assabet_init(void)
 {
-	if (machine_is_assabet() && machine_has_neponset()) {
+	if (!machine_is_assabet())
+		return -EINVAL;
+
+	/*
+	 * Set the IRQ edges
+	 */
+	set_GPIO_IRQ_edge(GPIO_GPIO23, GPIO_RISING_EDGE);	/* UCB1300 */
+
+	sa1100fb_lcd_power = assabet_lcd_power;
+	sa1100fb_backlight_power = assabet_backlight_power;
+
+	if (machine_has_neponset()) {
 		/*
 		 * Angel sets this, but other bootloaders may not.
 		 *
@@ -55,6 +109,7 @@ static int __init assabet_init(void)
 			"hasn't been configured in the kernel\n" );
 #endif
 	}
+
 	return 0;
 }
 
@@ -87,18 +142,18 @@ static void __init map_sa1100_gpio_regs( void )
  * repeat it here because the kernel may not be loaded as a zImage, and
  * also because it's a hassle to communicate the SCR value to the kernel
  * from the decompressor.
+ *
+ * Note that IRQs are guaranteed to be disabled.
  */
 static void __init get_assabet_scr(void)
 {
-	unsigned long flags, scr, i;
+	unsigned long scr, i;
 
-	local_irq_save(flags);
 	GPDR |= 0x3fc;			/* Configure GPIO 9:2 as outputs */
 	GPSR = 0x3fc;			/* Write 0xFF to GPIO 9:2 */
 	GPDR &= ~(0x3fc);		/* Configure GPIO 9:2 as inputs */
 	for(i = 100; i--; scr = GPLR);	/* Read GPIO 9:2 */
 	GPDR |= 0x3fc;			/*  restore correct pin direction */
-	local_irq_restore(flags);
 	scr &= 0x3fc;			/* save as system configuration byte. */
 	SCR_value = scr;
 }
@@ -174,7 +229,6 @@ fixup_assabet(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc assabet_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
   { 0xf1000000, 0x12000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Board Control Register */
   { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* MQ200 */
   /*  f3000000 - neponset system registers */
@@ -186,19 +240,18 @@ static void assabet_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 {
 	if (port->mapbase == _Ser1UTCR0) {
 		if (state)
-			ASSABET_BCR_clear(ASSABET_BCR_RS232EN);
+			ASSABET_BCR_clear(ASSABET_BCR_RS232EN |
+					  ASSABET_BCR_COM_RTS |
+					  ASSABET_BCR_COM_DTR);
 		else
-			ASSABET_BCR_set(ASSABET_BCR_RS232EN);
+			ASSABET_BCR_set(ASSABET_BCR_RS232EN |
+					ASSABET_BCR_COM_RTS |
+					ASSABET_BCR_COM_DTR);
 	}
 }
 
 /*
- * Note! this can be called from IRQ context.
- * FIXME: You _need_ to handle ASSABET_BCR carefully, which doesn't
- * happen at the moment.  Suggest putting interrupt save/restore
- * in ASSABET_BCR_set/clear.
- *
- * NB: Assabet uses COM_RTS and COM_DTR for both UART1 (com port)
+ * Assabet uses COM_RTS and COM_DTR for both UART1 (com port)
  * and UART3 (radio module).  We only handle them for UART1 here.
  */
 static void assabet_set_mctrl(struct uart_port *port, u_int mctrl)
@@ -207,21 +260,21 @@ static void assabet_set_mctrl(struct uart_port *port, u_int mctrl)
 		u_int set = 0, clear = 0;
 
 		if (mctrl & TIOCM_RTS)
-			set |= ASSABET_BCR_COM_RTS;
-		else
 			clear |= ASSABET_BCR_COM_RTS;
+		else
+			set |= ASSABET_BCR_COM_RTS;
 
 		if (mctrl & TIOCM_DTR)
-			set |= ASSABET_BCR_COM_DTR;
-		else
 			clear |= ASSABET_BCR_COM_DTR;
+		else
+			set |= ASSABET_BCR_COM_DTR;
 
 		ASSABET_BCR_clear(clear);
 		ASSABET_BCR_set(set);
 	}
 }
 
-static int assabet_get_mctrl(struct uart_port *port)
+static u_int assabet_get_mctrl(struct uart_port *port)
 {
 	u_int ret = 0;
 	u_int bsr = ASSABET_BSR;
@@ -312,11 +365,7 @@ static void __init assabet_map_io(void)
 	PWER = PWER_GPIO0;
 	PGSR = 0;
 	PCFR = 0;
-
-	/*
-	 * Clear all possible wakeup reasons.
-	 */
-	RCSR = RCSR_HWR | RCSR_SWR | RCSR_WDR | RCSR_SMR;
+	PSDR = 0;
 }
 
 

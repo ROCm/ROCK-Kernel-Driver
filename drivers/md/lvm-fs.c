@@ -172,9 +172,9 @@ devfs_handle_t lvm_fs_create_lv(vg_t *vg_ptr, lv_t *lv) {
 	struct proc_dir_entry *pde;
 	const char *name = _basename(lv->lv_name);
 
-	lv_devfs_handle[MINOR(lv->lv_dev)] = devfs_register(
+	lv_devfs_handle[minor(lv->lv_dev)] = devfs_register(
 		vg_devfs_handle[vg_ptr->vg_number], name,
-		DEVFS_FL_DEFAULT, LVM_BLK_MAJOR, MINOR(lv->lv_dev),
+		DEVFS_FL_DEFAULT, LVM_BLK_MAJOR, minor(lv->lv_dev),
 		S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		&lvm_blk_dops, NULL);
 
@@ -183,12 +183,12 @@ devfs_handle_t lvm_fs_create_lv(vg_t *vg_ptr, lv_t *lv) {
 		pde->read_proc = _proc_read_lv;
 		pde->data = lv;
 	}
-	return lv_devfs_handle[MINOR(lv->lv_dev)];
+	return lv_devfs_handle[minor(lv->lv_dev)];
 }
 
 void lvm_fs_remove_lv(vg_t *vg_ptr, lv_t *lv) {
-	devfs_unregister(lv_devfs_handle[MINOR(lv->lv_dev)]);
-	lv_devfs_handle[MINOR(lv->lv_dev)] = NULL;
+	devfs_unregister(lv_devfs_handle[minor(lv->lv_dev)]);
+	lv_devfs_handle[minor(lv->lv_dev)] = NULL;
 
 	if(vg_ptr->lv_subdir_pde) {
 		const char *name = _basename(lv->lv_name);
@@ -283,7 +283,7 @@ static int _proc_read_lv(char *page, char **start, off_t off,
                              lv->lv_stripesize);
        }
 	sz += sprintf(page + sz, "device:       %02u:%02u\n",
-		      MAJOR(lv->lv_dev), MINOR(lv->lv_dev));
+		      major(lv->lv_dev), minor(lv->lv_dev));
 
 	return sz;
 }
@@ -304,7 +304,7 @@ static int _proc_read_pv(char *page, char **start, off_t off,
 	sz += sprintf(page + sz, "PE total:     %u\n", pv->pe_total);
 	sz += sprintf(page + sz, "PE allocated: %u\n", pv->pe_allocated);
 	sz += sprintf(page + sz, "device:       %02u:%02u\n",
-                      MAJOR(pv->pv_dev), MINOR(pv->pv_dev));
+                      major(pv->pv_dev), minor(pv->pv_dev));
 
 	_show_uuid(pv->pv_uuid, uuid, uuid + sizeof(uuid));
 	sz += sprintf(page + sz, "uuid:         %s\n", uuid);

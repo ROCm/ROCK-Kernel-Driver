@@ -31,6 +31,7 @@ static void __init lart_map_io(void)
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 	sa1100_register_uart(2, 2);
+
 	GAFR |= (GPIO_UART_TXD | GPIO_UART_RXD);
 	GPDR |= GPIO_UART_TXD;
 	GPDR &= ~GPIO_UART_RXD;

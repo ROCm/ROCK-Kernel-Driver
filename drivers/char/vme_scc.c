@@ -833,7 +833,7 @@ static void scc_send_xchar(struct tty_struct *tty, char ch)
 
 static int scc_open (struct tty_struct * tty, struct file * filp)
 {
-	int line = MINOR(tty->device) - SCC_MINOR_BASE;
+	int line = minor(tty->device) - SCC_MINOR_BASE;
 	int retval;
 	struct scc_port *port = &scc_ports[line];
 	int i, channel = port->channel;
@@ -1067,7 +1067,7 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 
 static kdev_t scc_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, SCC_MINOR_BASE + c->index);
+	return mk_kdev(TTY_MAJOR, SCC_MINOR_BASE + c->index);
 }
 
 

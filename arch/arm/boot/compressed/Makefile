@@ -9,7 +9,7 @@
 
 HEAD		 = head.o
 OBJS		 = misc.o
-CFLAGS		 = $(CPPFLAGS) -O2 -DSTDC_HEADERS $(CFLAGS_PROC) -msoft-float
+CFLAGS		 = $(CPPFLAGS) -O2 -DSTDC_HEADERS $(CFLAGS_BOOT)
 FONTC		 = $(TOPDIR)/drivers/video/font_acorn_8x8.c
 ZLDFLAGS	 = -p -X -T vmlinux.lds
 
@@ -57,6 +57,10 @@ ifeq ($(CONFIG_SA1100_NANOENGINE),y)
 endif
 endif
 
+ifeq ($(CONFIG_CPU_XSCALE),y)
+OBJS		+= head-xscale.o
+endif
+
 SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;
 
 ifneq ($(ZBSSADDR),)
@@ -84,12 +88,12 @@ piggy.o:	$(SYSTEM)
 font.o:		$(FONTC)
 		$(CC) $(CFLAGS) -Dstatic= -c -o $@ $(FONTC)
 
-vmlinux.lds:	vmlinux.lds.in
+vmlinux.lds:	vmlinux.lds.in Makefile $(TOPDIR)/arch/$(ARCH)/boot/Makefile $(TOPDIR)/.config
 		@sed "$(SEDFLAGS)" < vmlinux.lds.in > $@
 
 clean:;		rm -f vmlinux core piggy* vmlinux.lds
 
-.PHONY:	vmlinux.lds clean
+.PHONY:	clean
 
 misc.o: misc.c $(TOPDIR)/include/asm/arch/uncompress.h $(TOPDIR)/lib/inflate.c
 

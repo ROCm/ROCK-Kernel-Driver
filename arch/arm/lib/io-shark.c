@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/lib/io-shark.c
  *
- *  by Alexander Schulz <aschulz@netwinder.org>
+ *  by Alexander Schulz
  *
  * derived from:
  * linux/arch/arm/lib/io-ebsa.S

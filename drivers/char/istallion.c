@@ -1034,7 +1034,7 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 		(int) filp, tty->device);
 #endif
 
-	minordev = MINOR(tty->device);
+	minordev = minor(tty->device);
 	brdnr = MINOR2BRD(minordev);
 	if (brdnr >= stli_nrbrds)
 		return(-ENODEV);
@@ -4859,7 +4859,7 @@ static ssize_t stli_memread(struct file *fp, char *buf, size_t count, loff_t *of
 			(int) fp, (int) buf, count, (int) offp);
 #endif
 
-	brdnr = MINOR(fp->f_dentry->d_inode->i_rdev);
+	brdnr = minor(fp->f_dentry->d_inode->i_rdev);
 	if (brdnr >= stli_nrbrds)
 		return(-ENODEV);
 	brdp = stli_brds[brdnr];
@@ -4910,7 +4910,7 @@ static ssize_t stli_memwrite(struct file *fp, const char *buf, size_t count, lof
 			(int) fp, (int) buf, count, (int) offp);
 #endif
 
-	brdnr = MINOR(fp->f_dentry->d_inode->i_rdev);
+	brdnr = minor(fp->f_dentry->d_inode->i_rdev);
 	if (brdnr >= stli_nrbrds)
 		return(-ENODEV);
 	brdp = stli_brds[brdnr];
@@ -5247,7 +5247,7 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
  *	Now handle the board specific ioctls. These all depend on the
  *	minor number of the device they were called from.
  */
-	brdnr = MINOR(ip->i_rdev);
+	brdnr = minor(ip->i_rdev);
 	if (brdnr >= STL_MAXBRDS)
 		return(-ENODEV);
 	brdp = stli_brds[brdnr];

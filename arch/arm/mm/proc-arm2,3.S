@@ -234,7 +234,7 @@ _arm2_proc_init:
  */
 _arm3_proc_fin:	mov	r0, #2
 		mcr	p15, 0, r0, c2, c0
-_arm2_proc_fin:	orrs	pc, lr, #I_BIT|F_BIT
+_arm2_proc_fin:	orrs	pc, lr, #PSR_I_BIT|PSR_F_BIT
 
 /*
  * Function: *_xchg_1 (int new, volatile void *ptr)
@@ -244,7 +244,7 @@ _arm2_proc_fin:	orrs	pc, lr, #I_BIT|F_BIT
  * Returns : Original byte data at 'ptr'
  */
 _arm2_xchg_1:	mov	r2, pc
-		orr	r2, r2, #I_BIT
+		orr	r2, r2, #PSR_I_BIT
 		teqp	r2, #0
 		ldrb	r2, [r1]
 		strb	r0, [r1]
@@ -262,7 +262,7 @@ _arm3_xchg_1:	swpb	r0, r0, [r1]
  * Returns : Original word data at 'ptr'
  */
 _arm2_xchg_4:	mov	r2, pc
-		orr	r2, r2, #I_BIT
+		orr	r2, r2, #PSR_I_BIT
 		teqp	r2, #0
 		ldr	r2, [r1]
 		str	r0, [r1]

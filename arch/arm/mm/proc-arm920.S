@@ -51,35 +51,12 @@
 #define PAGESIZE	4096
 
 	.text
-
-/*
- * cpu_arm920_data_abort()
- *
- * obtain information about current aborted instruction
- *
- * r0 = address of aborted instruction
- *
- * Returns:
- *  r0 = address of abort
- *  r1 != 0 if writing
- *  r3 = FSR
- */
-	.align	5
-ENTRY(cpu_arm920_data_abort)
-	ldr	r1, [r0]			@ read aborted instruction
-	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	tst	r1, r1, lsr #21			@ C = bit 20
-	mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-	sbc	r1, r1, r1			@ r1 = C - 1
-	and	r3, r3, #255
-	mov	pc, lr
-	
 /*
  * cpu_arm920_check_bugs()
  */
 ENTRY(cpu_arm920_check_bugs)
 	mrs	ip, cpsr
-	bic	ip, ip, #F_BIT
+	bic	ip, ip, #PSR_F_BIT
 	msr	cpsr, ip
 	mov	pc, lr
 
@@ -94,7 +71,7 @@ ENTRY(cpu_arm920_proc_init)
  */
 ENTRY(cpu_arm920_proc_fin)
 	stmfd	sp!, {lr}
-	mov	ip, #F_BIT | I_BIT | SVC_MODE
+	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 	msr	cpsr_c, ip
 	bl	cpu_arm920_cache_clean_invalidate_all
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
@@ -590,7 +567,7 @@ __arm920_setup:
  */
 	.type	arm920_processor_functions, #object
 arm920_processor_functions:
-	.word	cpu_arm920_data_abort
+	.word	armv4t_early_abort
 	.word	cpu_arm920_check_bugs
 	.word	cpu_arm920_proc_init
 	.word	cpu_arm920_proc_fin
@@ -621,6 +598,11 @@ arm920_processor_functions:
 	.word	cpu_arm920_set_pgd
 	.word	cpu_arm920_set_pmd
 	.word	cpu_arm920_set_pte
+
+	/* misc */
+	.word	armv4_clear_user_page
+	.word	armv4_copy_user_page
+
 	.size	arm920_processor_functions, . - arm920_processor_functions
 
 	.type	cpu_arm920_info, #object

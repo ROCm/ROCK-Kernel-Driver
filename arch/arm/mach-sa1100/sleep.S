@@ -176,7 +176,7 @@ sa1110_sdram_controller_fix:
 ENTRY(sa1100_cpu_resume)
 
 	@ set SVC, irqs off
-	mov	r0, #I_BIT | MODE_SVC
+	mov	r0, #PSR_F_BIT | PSR_I_BIT | MODE_SVC
 	msr	cpsr_c, r0
 
 	@ load physical address of sleep_save

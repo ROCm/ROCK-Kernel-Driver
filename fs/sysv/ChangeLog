@@ -1,3 +1,41 @@
+Fri Jan  4 2001  Alexander Viro  <viro@math.psu.edu>
+
+	* ialloc.c (sysv_free_inode): Use sb->s_id instead of bdevname().
+	* inode.c (sysv_read_inode): Likewise.
+	  (sysv_update_inode): Likewise.
+	  (sysv_sync_inode): Likewise.
+	* super.c (detect_sysv): Likewise.
+	  (complete_read_super): Likewise.
+	  (sysv_read_super): Likewise.
+	  (v7_read_super): Likewise.
+
+Sun Dec 30 2001  Manfred Spraul  <manfreds@colorfullife.com>
+
+	* dir.c (dir_commit_chunk): Do not set dir->i_version.
+	(sysv_readdir): Likewise.
+
+Thu Dec 27 2001  Alexander Viro  <viro@math.psu.edu>
+
+	* itree.c (get_block): Use map_bh() to fill out bh_result.
+
+Tue Dec 25 2001  Alexander Viro  <viro@math.psu.edu>
+
+	* super.c (sysv_read_super): Use sb_set_blocksize() to set blocksize.
+	  (v7_read_super): Likewise.
+
+Tue Nov 27 2001  Alexander Viro  <viro@math.psu.edu>
+
+	* itree.c (get_block): Change type for iblock argument to sector_t.
+	* super.c (sysv_read_super): Set s_blocksize early.
+	  (v7_read_super): Likewise.
+	* balloc.c (sysv_new_block): Use sb_bread(). instead of bread().
+	  (sysv_count_free_blocks): Likewise.
+	* ialloc.c (sysv_raw_inode): Likewise.
+	* itree.c (get_branch): Likewise.
+	  (free_branches): Likewise.
+	* super.c (sysv_read_super): Likewise.
+	  (v7_read_super): Likewise.
+
 Sat Dec 15 2001  Christoph Hellwig  <hch@caldera.de>
 
 	* inode.c (sysv_read_inode): Mark inode as bad in case of failure.

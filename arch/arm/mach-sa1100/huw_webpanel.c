@@ -22,11 +22,35 @@
 unsigned long BCR_value;
 EXPORT_SYMBOL(BCR_value);
 
+static void huw_lcd_power(int on)
+{
+	if (on)
+		BCR_clear(BCR_TFT_NPWR);
+	else
+		BCR_set(BCR_TFT_NPWR);
+}
 
-static void __init init_huw_cs3(void)
+static void huw_backlight_power(int on)
+{
+#error FIXME
+	if (on) {
+		BCR_set(BCR_CCFL_POW | BCR_PWM_BACKLIGHT);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_task(200 * HZ / 1000);
+		BCR_set(BCR_TFT_ENA);
+	}
+}
+
+static int __init init_huw_cs3(void)
 {
 	// here we can place some initcode
 	// BCR_value = 0x1045bf70; //*((volatile unsigned long*)0xf1fffff0);
+	if (machine_is_huw_webpanel()) {
+		sa1100fb_lcd_power = huw_lcd_power;
+		sa1100fb_backlight_power = huw_backlight_power;
+	}
+
+	return 0;
 }
 
 __initcall(init_huw_cs3);
@@ -55,7 +79,6 @@ fixup_huw_webpanel(struct machine_desc *desc, struct param_struct *params,
 **/
 static struct map_desc huw_webpanel_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0, neccessary for mtd */
   { 0xf0000000, 0xc1fb8000, 0x00048000, DOMAIN_IO, 1, 1, 0, 0 }, /* Parameter */
   { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Paules CS3, write only */
   LAST_DESC

@@ -42,12 +42,9 @@ static void excalibur_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-extern __inline__ void setup_timer(void)
+void __init time_init(void)
 {
-
-
 	timer_irq.handler = excalibur_timer_interrupt;
-
 
 	/* 
 	 * Make irqs happen for the system timer
@@ -55,7 +52,7 @@ extern __inline__ void setup_timer(void)
 	setup_arm_irq(IRQ_TIMER0, &timer_irq);
 
 	/* Start the timer */
-	*TIMER0_LIMIT(IO_ADDRESS(EXC_TIMER00_BASE))=(unsigned int)(EXC_AHB2_CLK_FREQUENCY/50);
+	*TIMER0_LIMIT(IO_ADDRESS(EXC_TIMER00_BASE))=(unsigned int)(EXC_AHB2_CLK_FREQUENCY/200);
 	*TIMER0_PRESCALE(IO_ADDRESS(EXC_TIMER00_BASE))=1;
 	*TIMER0_CR(IO_ADDRESS(EXC_TIMER00_BASE))=TIMER0_CR_IE_MSK | TIMER0_CR_S_MSK;
 }

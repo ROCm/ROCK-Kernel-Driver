@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/ioport.h>
 #include <linux/ptrace.h>
 
 #include <asm/hardware.h>
@@ -37,6 +38,9 @@ static int GPIO_IRQ_falling_edge;
 
 void set_GPIO_IRQ_edge( int gpio_mask, int edge )
 {
+	int flags;
+
+	local_irq_save(flags);
 	if (edge & GPIO_FALLING_EDGE)
 		GPIO_IRQ_falling_edge |= gpio_mask;
 	else
@@ -45,6 +49,9 @@ void set_GPIO_IRQ_edge( int gpio_mask, int edge )
 		GPIO_IRQ_rising_edge |= gpio_mask;
 	else
 		GPIO_IRQ_rising_edge &= ~gpio_mask;
+	GPDR &= ~gpio_mask;
+	GAFR &= ~gpio_mask;
+	restore_flags(flags);
 }
 
 EXPORT_SYMBOL(set_GPIO_IRQ_edge);
@@ -121,7 +128,7 @@ static void sa1100_GPIO11_27_demux(int irq, void *dev_id,
 
 		for (i = 11; i <= 27; ++i) {
 			if (irq & (1<<i)) {
-				do_IRQ (IRQ_GPIO_11_27(i), regs);
+				do_IRQ(IRQ_GPIO11 + i - 11, regs);
 			}
 		}
 	}
@@ -175,10 +182,17 @@ static void sa1100_unmask_GPIO11_27_irq(unsigned int irq)
 	GFER = (GFER & ~mask) | (GPIO_IRQ_falling_edge & mask);
 }
 
+static struct resource irq_resource = {
+	name:	"irqs",
+	start:	0x90050000,
+	end:	0x9005ffff,
+};
 
 void __init sa1100_init_irq(void)
 {
 	int irq;
+
+	request_resource(&iomem_resource, &irq_resource);
 
 	/* disable all IRQs */
 	ICMR = 0;

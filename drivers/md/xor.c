@@ -19,6 +19,7 @@
 #define BH_TRACE 0
 #include <linux/module.h>
 #include <linux/raid/md.h>
+#include <linux/raid/md_compatible.h>
 #include <linux/raid/xor.h>
 #include <asm/xor.h>
 

@@ -35,7 +35,7 @@ void flexanet_leds_event(led_event_t evt)
 	switch (evt) {
 	case led_start:
 		/* start using LEDs and enable its hardware */
-		hw_led_bcr = BCR_LED_GREEN;
+		hw_led_bcr = FHH_BCR_LED_GREEN;
 		hw_led_gpio = GPIO_LED_RED;
 		led_state = LED_STATE_ENABLED;
 		break;
@@ -71,13 +71,13 @@ void flexanet_leds_event(led_event_t evt)
 	case led_idle_start:
 		/* turn off CPU load LED */
 		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_bcr &= ~BCR_LED_GREEN;
+			hw_led_bcr &= ~FHH_BCR_LED_GREEN;
 		break;
 
 	case led_idle_end:
 		/* turn on CPU load LED */
 		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_bcr |= BCR_LED_GREEN;
+			hw_led_bcr |= FHH_BCR_LED_GREEN;
 		break;
 #endif
 
@@ -88,12 +88,12 @@ void flexanet_leds_event(led_event_t evt)
 	/* direct LED access (must be previously claimed) */
 	case led_green_on:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_bcr |= BCR_LED_GREEN;
+			hw_led_bcr |= FHH_BCR_LED_GREEN;
 		break;
 
 	case led_green_off:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_bcr &= ~BCR_LED_GREEN;
+			hw_led_bcr &= ~FHH_BCR_LED_GREEN;
 		break;
 
 	case led_amber_on:
@@ -119,7 +119,7 @@ void flexanet_leds_event(led_event_t evt)
 	if  (led_state & LED_STATE_ENABLED)
 	{
 		/* update LEDs */
-		BCR = BCR_value = (BCR_value & ~BCR_LED_GREEN) | hw_led_bcr;
+		FHH_BCR = flexanet_BCR = (flexanet_BCR & ~FHH_BCR_LED_GREEN) | hw_led_bcr;
 		GPSR = hw_led_gpio;
 		GPCR = hw_led_gpio ^ GPIO_LED_RED;
 	}

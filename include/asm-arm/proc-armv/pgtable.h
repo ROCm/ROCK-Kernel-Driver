@@ -15,9 +15,6 @@
 #ifndef __ASM_PROC_PGTABLE_H
 #define __ASM_PROC_PGTABLE_H
 
-#include <asm/proc/domain.h>
-#include <asm/arch/vmalloc.h>
-
 /*
  * entries per page directory level: they are two-level, so
  * we don't really have any PMD directory.
@@ -26,27 +23,91 @@
 #define PTRS_PER_PMD		1
 #define PTRS_PER_PGD		4096
 
-/****************
-* PMD functions *
-****************/
-
-/* PMD types (actually level 1 descriptor) */
-#define PMD_TYPE_MASK		0x0003
-#define PMD_TYPE_FAULT		0x0000
-#define PMD_TYPE_TABLE		0x0001
-#define PMD_TYPE_SECT		0x0002
-#define PMD_UPDATABLE		0x0010
-#define PMD_SECT_CACHEABLE	0x0008
-#define PMD_SECT_BUFFERABLE	0x0004
-#define PMD_SECT_AP_WRITE	0x0400
-#define PMD_SECT_AP_READ	0x0800
+/*
+ * Hardware page table definitions.
+ *
+ * + Level 1 descriptor (PMD)
+ *   - common
+ */
+#define PMD_TYPE_MASK		(3 << 0)
+#define PMD_TYPE_FAULT		(0 << 0)
+#define PMD_TYPE_TABLE		(1 << 0)
+#define PMD_TYPE_SECT		(2 << 0)
+#define PMD_UPDATABLE		(1 << 4)
 #define PMD_DOMAIN(x)		((x) << 5)
+#define PMD_PROTECTION		(1 << 9)	/* v5 */
+/*
+ *   - section
+ */
+#define PMD_SECT_BUFFERABLE	(1 << 2)
+#define PMD_SECT_CACHEABLE	(1 << 3)
+#define PMD_SECT_AP_WRITE	(1 << 10)
+#define PMD_SECT_AP_READ	(1 << 11)
+#define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
+/*
+ *   - coarse table (not used)
+ */
+
+/*
+ * + Level 2 descriptor (PTE)
+ *   - common
+ */
+#define PTE_TYPE_MASK		(3 << 0)
+#define PTE_TYPE_FAULT		(0 << 0)
+#define PTE_TYPE_LARGE		(1 << 0)
+#define PTE_TYPE_SMALL		(2 << 0)
+#define PTE_TYPE_EXT		(3 << 0)	/* v5 */
+#define PTE_BUFFERABLE		(1 << 2)
+#define PTE_CACHEABLE		(1 << 3)
+
+/*
+ *   - extended small page/tiny page
+ */
+#define PTE_EXT_AP_UNO_SRO	(0 << 4)
+#define PTE_EXT_AP_UNO_SRW	(1 << 4)
+#define PTE_EXT_AP_URO_SRW	(2 << 4)
+#define PTE_EXT_AP_URW_SRW	(3 << 4)
+#define PTE_EXT_TEX(x)		((x) << 6)	/* v5 */
+
+/*
+ *   - small page
+ */
+#define PTE_SMALL_AP_UNO_SRO	(0x00 << 4)
+#define PTE_SMALL_AP_UNO_SRW	(0x55 << 4)
+#define PTE_SMALL_AP_URO_SRW	(0xaa << 4)
+#define PTE_SMALL_AP_URW_SRW	(0xff << 4)
+#define PTE_AP_READ		PTE_SMALL_AP_URO_SRW
+#define PTE_AP_WRITE		PTE_SMALL_AP_UNO_SRW
+
+/*
+ * "Linux" PTE definitions.
+ *
+ * We keep two sets of PTEs - the hardware and the linux version.
+ * This allows greater flexibility in the way we map the Linux bits
+ * onto the hardware tables, and allows us to have YOUNG and DIRTY
+ * bits.
+ *
+ * The PTE table pointer refers to the hardware entries; the "Linux"
+ * entries are stored 1024 bytes below.
+ */
+#define L_PTE_PRESENT		(1 << 0)
+#define L_PTE_YOUNG		(1 << 1)
+#define L_PTE_BUFFERABLE	(1 << 2)	/* matches PTE */
+#define L_PTE_CACHEABLE		(1 << 3)	/* matches PTE */
+#define L_PTE_USER		(1 << 4)
+#define L_PTE_WRITE		(1 << 5)
+#define L_PTE_EXEC		(1 << 6)
+#define L_PTE_DIRTY		(1 << 7)
+
+#ifndef __ASSEMBLY__
+
+#include <asm/proc/domain.h>
 
 #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_DOMAIN(DOMAIN_USER))
 #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_DOMAIN(DOMAIN_KERNEL))
 
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
-#define set_pmd(pmdp,pmd)	cpu_set_pmd(pmdp,pmd)
+#define set_pmd(pmdp,pmd)	cpu_set_pmd(pmdp, pmd)
 
 static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 {
@@ -75,48 +136,7 @@ static inline unsigned long pmd_page(pmd_t pmd)
 	return __phys_to_virt(ptr);
 }
 
-/****************
-* PTE functions *
-****************/
-
-/* PTE types (actually level 2 descriptor) */
-#define PTE_TYPE_MASK		0x0003
-#define PTE_TYPE_FAULT		0x0000
-#define PTE_TYPE_LARGE		0x0001
-#define PTE_TYPE_SMALL		0x0002
-#define PTE_AP_READ		0x0aa0
-#define PTE_AP_WRITE		0x0550
-#define PTE_CACHEABLE		0x0008
-#define PTE_BUFFERABLE		0x0004
-
 #define set_pte(ptep, pte)	cpu_set_pte(ptep,pte)
-
-/* We now keep two sets of ptes - the physical and the linux version.
- * This gives us many advantages, and allows us greater flexibility.
- *
- * The Linux pte's contain:
- *  bit   meaning
- *   0    page present
- *   1    young
- *   2    bufferable	- matches physical pte
- *   3    cacheable	- matches physical pte
- *   4    user
- *   5    write
- *   6    execute
- *   7    dirty
- *  8-11  unused
- *  12-31 virtual page address
- *
- * These are stored at the pte pointer; the physical PTE is at -1024bytes
- */
-#define L_PTE_PRESENT		(1 << 0)
-#define L_PTE_YOUNG		(1 << 1)
-#define L_PTE_BUFFERABLE	(1 << 2)
-#define L_PTE_CACHEABLE		(1 << 3)
-#define L_PTE_USER		(1 << 4)
-#define L_PTE_WRITE		(1 << 5)
-#define L_PTE_EXEC		(1 << 6)
-#define L_PTE_DIRTY		(1 << 7)
 
 /*
  * The following macros handle the cache and bufferable bits...
@@ -162,5 +182,7 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
  * Mark the prot value as uncacheable and unbufferable.
  */
 #define pgprot_noncached(prot)	__pgprot(pgprot_val(prot) & ~(L_PTE_CACHEABLE | L_PTE_BUFFERABLE))
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_PROC_PGTABLE_H */

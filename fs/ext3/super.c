@@ -56,10 +56,10 @@ int journal_no_write[2];
 
 static void make_rdonly(kdev_t dev, int *no_write)
 {
-	if (dev) {
+	if (kdev_val(dev)) {
 		printk(KERN_WARNING "Turning device %s read-only\n", 
 		       bdevname(dev));
-		*no_write = 0xdead0000 + dev;
+		*no_write = 0xdead0000 + kdev_val(dev);
 	}
 }
 

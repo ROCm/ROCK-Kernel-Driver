@@ -1089,12 +1089,12 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	struct riscom_board * bp;
 	unsigned long flags;
 	
-	board = RC_BOARD(MINOR(tty->device));
+	board = RC_BOARD(minor(tty->device));
 	if (board > RC_NBOARD || !(rc_board[board].flags & RC_BOARD_PRESENT))
 		return -ENODEV;
 	
 	bp = &rc_board[board];
-	port = rc_port + board * RC_NPORT + RC_PORT(MINOR(tty->device));
+	port = rc_port + board * RC_NPORT + RC_PORT(minor(tty->device));
 	if (rc_paranoia_check(port, tty->device, "rc_open"))
 		return -ENODEV;
 	

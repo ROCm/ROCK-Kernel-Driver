@@ -62,5 +62,3 @@
 #endif
 
 #define	SA1111_BASE	(0x18000000)
-
-#include "SA-1111.h"

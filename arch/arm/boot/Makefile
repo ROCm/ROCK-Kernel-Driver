@@ -118,6 +118,22 @@ ifeq ($(CONFIG_ARCH_ANAKIN),y)
 ZTEXTADDR	 = 0x20008000
 endif
 
+ifeq ($(CONFIG_ARCH_IQ80310),y)
+ZRELADDR	 = 0xa0008000
+
+# for serial upload
+ZTEXTADDR	 = 0xa1008000
+
+# for direct flash execution
+# ZTEXTADDR	 = 0x00060000
+# ZBSSADDR	 = 0xa1008000
+endif
+
+ifeq ($(CONFIG_ARCH_ADIFCC),y)
+ZRELADDR	 = 0xc0008000
+ZTEXTADDR	 = 0xc1000000
+endif
+
 #
 # If you don't define ZRELADDR above,
 # then it defaults to ZTEXTADDR

@@ -683,7 +683,7 @@ static void lp_console_write (struct console *co, const char *s,
 
 static kdev_t lp_console_device (struct console *c)
 {
-	return MKDEV(LP_MAJOR, CONSOLE_LP);
+	return mk_kdev(LP_MAJOR, CONSOLE_LP);
 }
 
 static struct console lpcons = {

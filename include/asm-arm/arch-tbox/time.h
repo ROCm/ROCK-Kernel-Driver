@@ -29,15 +29,8 @@ static void timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 }
 
-static inline void setup_timer (void)
+void __init time_init(void)
 {
-	/*
-	 * Default the date to 1 Jan 1970 0:0:0
-	 * You will have to run a time daemon to set the
-	 * clock correctly at bootup
-	 */
-	xtime.tv_sec = mktime(1970, 1, 1, 0, 0, 0);
-
 	timer_irq.handler = timer_interrupt;
 	setup_arm_irq(IRQ_TIMER, &timer_irq);
 }

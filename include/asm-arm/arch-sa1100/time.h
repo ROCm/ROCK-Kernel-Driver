@@ -10,7 +10,7 @@
  */
 
 
-#define RTC_DEF_DIVIDER		32768 - 1
+#define RTC_DEF_DIVIDER		(32768 - 1)
 #define RTC_DEF_TRIM            0
 
 static unsigned long __init sa1100_get_rtc_time(void)
@@ -63,29 +63,34 @@ static unsigned long sa1100_gettimeoffset (void)
 	return usec;
 }
 
+/*
+ * We will be entered with IRQs enabled.
+ *
+ * Loop until we get ahead of the free running timer.
+ * This ensures an exact clock tick count and time acuracy.
+ * IRQs are disabled inside the loop to ensure coherence between
+ * lost_ticks (updated in do_timer()) and the match reg value, so we
+ * can use do_gettimeofday() from interrupt handlers.
+ */
 static void sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	long flags;
-	int next_match;
+	unsigned int next_match;
+	unsigned long flags;
 
-	/* Loop until we get ahead of the free running timer.
-	 * This ensures an exact clock tick count and time acuracy.
-	 * IRQs are disabled inside the loop to ensure coherence between
-	 * lost_ticks (updated in do_timer()) and the match reg value, so we
-	 * can use do_gettimeofday() from interrupt handlers.
-	 */
 	do {
 		do_leds();
-		do_set_rtc();
-		save_flags_cli( flags );
+		local_irq_save(flags);
 		do_timer(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
-		restore_flags( flags );
-	} while( (signed long)(next_match - OSCR) <= 0 );
+		local_irq_restore(flags);
+		do_set_rtc();
+	} while ((signed long)(next_match - OSCR) <= 0);
+
+	do_profile(regs);
 }
 
-static inline void setup_timer (void)
+void __init time_init(void)
 {
 	gettimeoffset = sa1100_gettimeoffset;
 	set_rtc = sa1100_set_rtc;

@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/boot/compressed/ofw-shark.c
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * This file is used to get some basic information
  * about the memory layout of the shark we are running

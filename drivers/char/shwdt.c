@@ -131,7 +131,7 @@ static void sh_wdt_ping(unsigned long data)
  */
 static int sh_wdt_open(struct inode *inode, struct file *file)
 {
-	switch (MINOR(inode->i_rdev)) {
+	switch (minor(inode->i_rdev)) {
 		case WATCHDOG_MINOR:
 			if (sh_is_open) {
 				return -EBUSY;
@@ -160,7 +160,7 @@ static int sh_wdt_close(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	
-	if (MINOR(inode->i_rdev) == WATCHDOG_MINOR) {
+	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		sh_wdt_stop();
 #endif

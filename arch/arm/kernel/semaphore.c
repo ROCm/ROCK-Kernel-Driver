@@ -177,8 +177,7 @@ int __down_trylock(struct semaphore * sem)
  * value in some cases..
  */
 #ifdef CONFIG_CPU_26
-asm("	.section	.text.lock, \"ax\"
-	.align	5
+asm("	.align	5
 	.globl	__down_failed
 __down_failed:
 	stmfd	sp!, {r0 - r3, lr}
@@ -211,14 +210,11 @@ __up_wakeup:
 	mov	r0, ip
 	bl	__up
 	ldmfd	sp!, {r0 - r3, pc}^
-
-	.previous
 	");
 
 #else
 /* 32 bit version */
-asm("	.section	.text.lock, \"ax\"
-	.align	5
+asm("	.align	5
 	.globl	__down_failed
 __down_failed:
 	stmfd	sp!, {r0 - r3, lr}
@@ -251,8 +247,6 @@ __up_wakeup:
 	mov	r0, ip
 	bl	__up
 	ldmfd	sp!, {r0 - r3, pc}
-
-	.previous
 	");
 
 #endif

@@ -7,6 +7,8 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
+#include <linux/tty.h>
+#include <linux/ioport.h>
 #include <linux/serial_core.h>
 
 #include <asm/hardware.h>
@@ -16,6 +18,7 @@
 #include <asm/arch/irq.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/assabet.h>
+#include <asm/hardware/sa1111.h>
 
 #include "sa1111.h"
 
@@ -40,10 +43,10 @@ static void neponset_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs )
 		if (!irr) break;
 
 		if( irr & IRR_ETHERNET )
-			do_IRQ(NEPONSET_ETHERNET_IRQ, regs);
+			do_IRQ(IRQ_NEPONSET_SMC9196, regs);
 
 		if( irr & IRR_USAR )
-			do_IRQ(NEPONSET_USAR_IRQ, regs);
+			do_IRQ(IRQ_NEPONSET_USAR, regs);
 
 		if( irr & IRR_SA1111 )
 			sa1111_IRQ_demux(irq, dev_id, regs);
@@ -58,19 +61,16 @@ static struct irqaction neponset_irq = {
 
 static void __init neponset_init_irq(void)
 {
-	int irq;
-
 	sa1111_init_irq(-1);	/* SA1111 IRQ not routed to a GPIO */
 
 	/* setup extra Neponset IRQs */
-	irq = NEPONSET_ETHERNET_IRQ;
-	irq_desc[irq].valid	= 1;
-	irq_desc[irq].probe_ok	= 1;
-	irq = NEPONSET_USAR_IRQ;
-	irq_desc[irq].valid	= 1;
-	irq_desc[irq].probe_ok	= 1;
-	set_GPIO_IRQ_edge(ASSABET_GPIO_NEP_IRQ, GPIO_RISING_EDGE);
-	setup_arm_irq(ASSABET_IRQ_GPIO_NEP_IRQ, &neponset_irq);
+	irq_desc[IRQ_NEPONSET_SMC9196].valid	= 1;
+	irq_desc[IRQ_NEPONSET_SMC9196].probe_ok	= 1;
+	irq_desc[IRQ_NEPONSET_USAR].valid	= 1;
+	irq_desc[IRQ_NEPONSET_USAR].probe_ok	= 1;
+
+	set_GPIO_IRQ_edge(GPIO_GPIO25, GPIO_RISING_EDGE);
+	setup_arm_irq(IRQ_GPIO25, &neponset_irq);
 }
 
 static int __init neponset_init(void)
@@ -102,6 +102,11 @@ static int __init neponset_init(void)
 	}
 
 	/*
+	 * Disable GPIO 0/1 drivers so the buttons work on the module.
+	 */
+	NCR_0 |= NCR_GP01_OFF;
+
+	/*
 	 * Neponset has SA1111 connected to CS4.  We know that after
 	 * reset the chip will be configured for variable latency IO.
 	 */
@@ -110,7 +115,7 @@ static int __init neponset_init(void)
 	/*
 	 * Probe for a SA1111.
 	 */
-	ret = sa1111_probe();
+	ret = sa1111_probe(0x40000000);
 	if (ret < 0)
 		return ret;
 
@@ -184,7 +189,7 @@ static void neponset_set_mctrl(struct uart_port *port, u_int mctrl)
 	MDM_CTL_0 = mdm_ctl0;
 }
 
-static int neponset_get_mctrl(struct uart_port *port)
+static u_int neponset_get_mctrl(struct uart_port *port)
 {
 	u_int ret = TIOCM_CD | TIOCM_CTS | TIOCM_DSR;
 	u_int mdm_ctl1 = MDM_CTL_1;

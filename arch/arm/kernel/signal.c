@@ -344,7 +344,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 	/*
 	 * This is the X/Open sanctioned signal stack switching.
 	 */
-	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags(sp))
+	if ((ka->sa.sa_flags & SA_ONSTACK) && !sas_ss_flags(sp))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
 	/*
@@ -378,9 +378,9 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 		thumb = handler & 1;
 
 		if (thumb)
-			cpsr |= T_BIT;
+			cpsr |= PSR_T_BIT;
 		else
-			cpsr &= ~T_BIT;
+			cpsr &= ~PSR_T_BIT;
 	}
 #endif
 #endif

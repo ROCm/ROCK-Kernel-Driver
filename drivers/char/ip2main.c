@@ -1589,9 +1589,9 @@ ip2_open( PTTY tty, struct file *pFile )
 	wait_queue_t wait;
 	int rc = 0;
 	int do_clocal = 0;
-	i2ChanStrPtr  pCh = DevTable[MINOR(tty->device)];
+	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
 
-	ip2trace (MINOR(tty->device), ITRC_OPEN, ITRC_ENTER, 0 );
+	ip2trace (minor(tty->device), ITRC_OPEN, ITRC_ENTER, 0 );
 
 	if ( pCh == NULL ) {
 		return -ENODEV;
@@ -1604,7 +1604,7 @@ ip2_open( PTTY tty, struct file *pFile )
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG \
 			"IP2:open(tty=%p,pFile=%p):dev=%x,maj=%d,min=%d,ch=%d,idx=%d\n",
-	       tty, pFile, tty->device, MAJOR(tty->device), MINOR(tty->device),
+	       tty, pFile, tty->device, major(tty->device), minor(tty->device),
 			 pCh->infl.hd.i2sChannel, pCh->port_index);
 	open_sanity_check ( pCh, pCh->pMyBord );
 #endif
@@ -1796,7 +1796,7 @@ ip2_close( PTTY tty, struct file *pFile )
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_ENTER, 0 );
 
 #ifdef IP2DEBUG_OPEN
-	printk(KERN_DEBUG "IP2:close ttyF%02X:\n",MINOR(tty->device));
+	printk(KERN_DEBUG "IP2:close ttyF%02X:\n",minor(tty->device));
 #endif
 
 	if ( tty_hung_up_p ( pFile ) ) {
@@ -2205,7 +2205,7 @@ ip2_unthrottle ( PTTY tty )
 static void
 ip2_start ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[MINOR(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 0, 1, CMD_RESUME);
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_UNSUSPEND);
@@ -2218,7 +2218,7 @@ ip2_start ( PTTY tty )
 static void
 ip2_stop ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[MINOR(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_SUSPEND);
 #ifdef IP2DEBUG_WRITE
@@ -2246,7 +2246,7 @@ static int
 ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 {
 	wait_queue_t wait;
-	i2ChanStrPtr pCh = DevTable[MINOR(tty->device)];
+	i2ChanStrPtr pCh = DevTable[minor(tty->device)];
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
 	int rc = 0;
@@ -3010,12 +3010,12 @@ static
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0)
 int
 ip2_ipl_read(struct inode *pInode, char *pData, size_t count, loff_t *off )
-	unsigned int minor = MINOR( pInode->i_rdev );
+	unsigned int minor = minor( pInode->i_rdev );
 #else
 ssize_t
 ip2_ipl_read(struct file *pFile, char *pData, size_t count, loff_t *off )
 {
-	unsigned int minor = MINOR( pFile->f_dentry->d_inode->i_rdev );
+	unsigned int minor = minor( pFile->f_dentry->d_inode->i_rdev );
 #endif
 	int rc = 0;
 
@@ -3146,7 +3146,7 @@ ip2_ipl_write(struct file *pFile, const char *pData, size_t count, loff_t *off)
 static int
 ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 {
-	unsigned int iplminor = MINOR(pInode->i_rdev);
+	unsigned int iplminor = minor(pInode->i_rdev);
 	int rc = 0;
 	ULONG *pIndex = (ULONG*)arg;
 	i2eBordStrPtr pB = i2BoardPtrTable[iplminor / 4];
@@ -3281,7 +3281,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 static int
 ip2_ipl_open( struct inode *pInode, struct file *pFile )
 {
-	unsigned int iplminor = MINOR(pInode->i_rdev);
+	unsigned int iplminor = minor(pInode->i_rdev);
 	i2eBordStrPtr pB;
 	i2ChanStrPtr  pCh;
 

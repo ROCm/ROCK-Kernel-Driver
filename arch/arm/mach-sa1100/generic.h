@@ -12,3 +12,6 @@ extern void __init sa1100_init_irq(void);
 	mi->bank[__nr].size = (__size), \
 	mi->bank[__nr].node = (((unsigned)(__start) - PHYS_OFFSET) >> 27)
 
+extern void (*sa1100fb_backlight_power)(int on);
+extern void (*sa1100fb_lcd_power)(int on);
+

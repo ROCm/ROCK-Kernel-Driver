@@ -2,7 +2,7 @@
  *  linux/arch/arm/kernel/time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
- *  Modifications for ARM (C) 1994, 1995, 1996,1997 Russell King
+ *  Modifications for ARM (C) 1994-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,13 +24,12 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/smp.h>
+#include <linux/timex.h>
 
-#include <asm/uaccess.h>
+#include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-
-#include <linux/timex.h>
-#include <asm/hardware.h>
+#include <asm/leds.h>
 
 extern int setup_arm_irq(int, struct irqaction *);
 extern rwlock_t xtime_lock;
@@ -122,17 +121,13 @@ static inline void do_set_rtc(void)
 
 #ifdef CONFIG_LEDS
 
-#include <asm/leds.h>
-
 static void dummy_leds_event(led_event_t evt)
 {
 }
 
 void (*leds_event)(led_event_t) = dummy_leds_event;
 
-#ifdef CONFIG_MODULES
 EXPORT_SYMBOL(leds_event);
-#endif
 #endif
 
 #ifdef CONFIG_LEDS_TIMER
@@ -152,16 +147,15 @@ static void do_leds(void)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
-	unsigned long usec, sec;
+	unsigned long usec, sec, lost;
 
 	read_lock_irqsave(&xtime_lock, flags);
 	usec = gettimeoffset();
-	{
-		unsigned long lost = jiffies - wall_jiffies;
 
-		if (lost)
-			usec += lost * USECS_PER_JIFFY;
-	}
+	lost = jiffies - wall_jiffies;
+	if (lost)
+		usec += lost * USECS_PER_JIFFY;
+
 	sec = xtime.tv_sec;
 	usec += xtime.tv_usec;
 	read_unlock_irqrestore(&xtime_lock, flags);
@@ -179,11 +173,11 @@ void do_gettimeofday(struct timeval *tv)
 void do_settimeofday(struct timeval *tv)
 {
 	write_lock_irq(&xtime_lock);
-	/* This is revolting. We need to set the xtime.tv_usec
-	 * correctly. However, the value in this location is
-	 * is value at the last tick.
-	 * Discover what correction gettimeofday
-	 * would have done, and then undo it!
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * done, and then undo it!
 	 */
 	tv->tv_usec -= gettimeoffset();
 	tv->tv_usec -= (jiffies - wall_jiffies) * USECS_PER_JIFFY;
@@ -209,17 +203,3 @@ static struct irqaction timer_irq = {
  * Include architecture specific code
  */
 #include <asm/arch/time.h>
-
-/*
- * This must cause the timer to start ticking.
- * It doesn't have to set the current time though
- * from an RTC - it can be done later once we have
- * some buses initialised.
- */
-void __init time_init(void)
-{
-	xtime.tv_usec = 0;
-	xtime.tv_sec  = 0;
-
-	setup_timer();
-}

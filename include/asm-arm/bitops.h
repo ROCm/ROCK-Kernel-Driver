@@ -258,7 +258,7 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #else
 
 /*
- * These are the little endian, atomic definitions.
+ * These are the big endian, atomic definitions.
  */
 #define set_bit(nr,p)			ATOMIC_BITOP_BE(set_bit,nr,p)
 #define clear_bit(nr,p)			ATOMIC_BITOP_BE(clear_bit,nr,p)
@@ -271,7 +271,7 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_be(p,sz,off)
 
 /*
- * These are the little endian, non-atomic definitions.
+ * These are the big endian, non-atomic definitions.
  */
 #define __set_bit(nr,p)			NONATOMIC_BITOP_BE(set_bit,nr,p)
 #define __clear_bit(nr,p)		NONATOMIC_BITOP_BE(clear_bit,nr,p)

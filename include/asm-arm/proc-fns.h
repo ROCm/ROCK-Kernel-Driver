@@ -26,6 +26,12 @@
 # define MULTI_CPU
 #endif
 
+/*
+ * CPU_NAME - the prefix for CPU related functions
+ * CPU_ABRT - the prefix for the CPU abort decoding function
+ * MMU_ARCH - the prefix for copy_user_page/clear_user_page
+ */
+
 #ifdef CONFIG_CPU_32
 # define CPU_INCLUDE_NAME "asm/cpu-multi32.h"
 # ifdef CONFIG_CPU_ARM610
@@ -33,7 +39,9 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME arm6
+#   define CPU_NAME cpu_arm6
+#   define CPU_ABRT cpu_arm6
+#   define MMU_ARCH armv3
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM710
@@ -41,7 +49,9 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME arm7
+#   define CPU_NAME cpu_arm7
+#   define CPU_ABRT cpu_arm7
+#   define MMU_ARCH armv3
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM720T
@@ -49,7 +59,9 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME arm720
+#   define CPU_NAME cpu_arm720
+#   define CPU_ABRT armv4t_late
+#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM920T
@@ -57,7 +69,19 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME arm920
+#   define CPU_NAME cpu_arm920
+#   define CPU_ABRT armv4t_early
+#   define MMU_ARCH armv4
+#  endif
+# endif
+# ifdef CONFIG_CPU_ARM922T
+#  ifdef CPU_NAME
+#   undef  MULTI_CPU
+#   define MULTI_CPU
+#  else
+#   define CPU_NAME cpu_arm922
+#   define CPU_ABRT armv4t_early
+#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_ARM926T
@@ -65,7 +89,9 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME arm926
+#   define CPU_NAME cpu_arm926
+#   define CPU_ABRT armv5ej_early
+#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_SA110
@@ -73,7 +99,9 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME sa110
+#   define CPU_NAME cpu_sa110
+#   define CPU_ABRT armv4_early
+#   define MMU_ARCH armv4
 #  endif
 # endif
 # ifdef CONFIG_CPU_SA1100
@@ -81,7 +109,29 @@
 #   undef  MULTI_CPU
 #   define MULTI_CPU
 #  else
-#   define CPU_NAME sa1100
+#   define CPU_NAME cpu_sa1100
+#   define CPU_ABRT armv4_early
+#   define MMU_ARCH armv4_mc
+#  endif
+# endif
+# ifdef CONFIG_CPU_ARM1020
+#  ifdef CPU_NAME
+#   undef  MULTI_CPU
+#   define MULTI_CPU
+#  else
+#   define CPU_NAME cpu_arm1020
+#   define CPU_ABRT armv4t_early
+#   define MMU_ARCH armv4
+#  endif
+# endif
+# ifdef CONFIG_CPU_XSCALE
+#  ifdef CPU_NAME
+#   undef  MULTI_CPU
+#   define MULTI_CPU
+#  else
+#   define CPU_NAME cpu_xscale
+#   define CPU_ABRT armv4t_early
+#   define MMU_ARCH armv5te
 #  endif
 # endif
 #endif

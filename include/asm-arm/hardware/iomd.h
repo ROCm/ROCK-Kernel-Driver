@@ -21,10 +21,10 @@
  * We use __raw_base variants here so that we give the compiler the
  * chance to keep IOC_BASE in a register.
  */
-#define iomd_readb(off)		__raw_base_readb(IOMD_BASE, (off))
-#define iomd_readl(off)		__raw_base_readl(IOMD_BASE, (off))
-#define iomd_writeb(val,off)	__raw_base_writeb(val, IOMD_BASE, (off))
-#define iomd_writel(val,off)	__raw_base_writel(val, IOMD_BASE, (off))
+#define iomd_readb(off)		__raw_readb(IOMD_BASE + (off))
+#define iomd_readl(off)		__raw_readl(IOMD_BASE + (off))
+#define iomd_writeb(val,off)	__raw_writeb(val, IOMD_BASE + (off))
+#define iomd_writel(val,off)	__raw_writel(val, IOMD_BASE + (off))
 
 #endif
 

@@ -20,13 +20,4 @@
 #define __mem_pci(a)		((unsigned long)(a))
 #define __mem_isa(a)		((unsigned long)(a))
 
-/*
- * Generic virtual read/write
- */
-#define __arch_getw(a)		(*(volatile unsigned short *)(a))
-#define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
-
-#define iomem_valid_addr(iomem,sz)	(1)
-#define iomem_to_phys(iomem)		(iomem)
-
 #endif

@@ -95,7 +95,7 @@ int get_card_from_id(int driver)
 		if(adapter[i]->driverId == driver)
 			return i;
 	}
-	return -NODEV;
+	return -ENODEV;
 }
 
 /* 

@@ -11,47 +11,42 @@
 
 #include <asm/irq.h>
 #include <asm/mach/pci.h>
-#include <asm/hardware/dec21285.h>
 
-/* netwinder host-specific stuff */
+/*
+ * We now use the slot ID instead of the device identifiers to select
+ * which interrupt is routed where.
+ */
 static int __init netwinder_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-#define DEV(v,d) ((v)<<16|(d))
-	switch (DEV(dev->vendor, dev->device)) {
-	case DEV(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21142):
-	case DEV(PCI_VENDOR_ID_NCR, PCI_DEVICE_ID_NCR_53C885):
-	case DEV(PCI_VENDOR_ID_NCR, PCI_DEVICE_ID_NCR_YELLOWFIN):
-		return IRQ_NETWINDER_ETHER100;
-
-	case DEV(PCI_VENDOR_ID_WINBOND2, 0x5a5a):
-		return IRQ_NETWINDER_ETHER10;
-
-	case DEV(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553):
+	switch (slot) {
+	case 0:  /* host bridge */
 		return 0;
 
-	case DEV(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105):
-		return IRQ_ISA_HARDDISK1;
-
-	case DEV(PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_2000):
-	case DEV(PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_2010):
-	case DEV(PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_5000):
+	case 9:  /* CyberPro */
 		return IRQ_NETWINDER_VGA;
 
-	case DEV(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285):
-		return 0;
+	case 10: /* DC21143 */
+		return IRQ_NETWINDER_ETHER100;
+
+	case 12: /* Winbond 553 */
+		return IRQ_ISA_HARDDISK1;
+
+	case 13: /* Winbond 89C940F */
+		return IRQ_NETWINDER_ETHER10;
 
 	default:
-		printk(KERN_ERR "PCI: %02X:%02X [%04X:%04X] unknown device\n",
-			dev->bus->number, dev->devfn,
-			dev->vendor, dev->device);
+		printk(KERN_ERR "PCI: unknown device in slot %s: %s\n",
+			dev->slot_name, dev->name);
 		return 0;
 	}
 }
 
 struct hw_pci netwinder_pci __initdata = {
-	setup_resources:	dc21285_setup_resources,
-	init:			dc21285_init,
-	mem_offset:		DC21285_PCI_MEM,
-	swizzle:		no_swizzle,
+	swizzle:		pci_std_swizzle,
 	map_irq:		netwinder_map_irq,
+	nr_controllers:		1,
+	setup:			dc21285_setup,
+	scan:			dc21285_scan_bus,
+	preinit:		dc21285_preinit,
+	postinit:		dc21285_postinit,
 };

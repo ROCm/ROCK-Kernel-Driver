@@ -83,7 +83,7 @@
 
 		.macro	restore_user_regs
 		ldr	r0, [sp, #S_PSR]		@ Get calling cpsr
-		mov	ip, #I_BIT | MODE_SVC
+		mov	ip, #PSR_I_BIT | MODE_SVC
 		msr	cpsr_c, ip			@ disable IRQs
 		msr	spsr, r0			@ save in spsr_svc
 		ldr	lr, [sp, #S_PC]			@ Get PC
@@ -94,7 +94,7 @@
 		.endm
 
 		.macro	fast_restore_user_regs
-		mov	ip, #I_BIT | MODE_SVC
+		mov	ip, #PSR_I_BIT | MODE_SVC
 		msr	cpsr_c, ip			@ disable IRQs
 		ldr	r1, [sp, #S_OFF + S_PSR]	@ get calling cpsr
 		ldr	lr, [sp, #S_OFF + S_PC]!	@ get pc
@@ -207,7 +207,7 @@ tsk	.req	r9				@ current task
  */
 	.macro	get_scno
 #ifdef CONFIG_ARM_THUMB
-	tst	r8, #T_BIT		@ this is SPSR from save_user_regs
+	tst	r8, #PSR_T_BIT		@ this is SPSR from save_user_regs
 	addne	scno, r7, #OS_NUMBER << 20 @ put OS number in
 	ldreq	scno, [lr, #-4]
 

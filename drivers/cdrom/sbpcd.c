@@ -2057,7 +2057,7 @@ static void switch_drive(int i);
 
 static int sbpcd_select_speed(struct cdrom_device_info *cdi, int speed)
 {
-  int i = MINOR(cdi->dev);
+  int i = minor(cdi->dev);
 
   if (i != d)
     switch_drive(i);
@@ -2095,7 +2095,7 @@ static int DriveReset(void)
 
 static int sbpcd_reset(struct cdrom_device_info *cdi)
 {
-  int i = MINOR(cdi->dev);
+  int i = minor(cdi->dev);
 
   if (i != d)
     switch_drive(i);
@@ -2376,7 +2376,7 @@ static int sbpcd_tray_move(struct cdrom_device_info *cdi, int position)
 {
 	int i;
 	int retval=0;
-	i = MINOR(cdi->dev);
+	i = minor(cdi->dev);
 	switch_drive(i);
 	/* DUH! --AJK */
 	if(D_S[d].CD_changed != 0xFF) {
@@ -4061,13 +4061,13 @@ static int sbpcd_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 	msg(DBG_000,"Drive Status: busy =%d.\n", st_busy);
 
 #if 0
-  if (!(D_S[MINOR(cdi->dev)].status_bits & p_door_closed)) return CDS_TRAY_OPEN;
-  if (D_S[MINOR(cdi->dev)].status_bits & p_disk_ok) return CDS_DISC_OK;
-  if (D_S[MINOR(cdi->dev)].status_bits & p_disk_in) return CDS_DRIVE_NOT_READY;
+  if (!(D_S[minor(cdi->dev)].status_bits & p_door_closed)) return CDS_TRAY_OPEN;
+  if (D_S[minor(cdi->dev)].status_bits & p_disk_ok) return CDS_DISC_OK;
+  if (D_S[minor(cdi->dev)].status_bits & p_disk_in) return CDS_DRIVE_NOT_READY;
 
   return CDS_NO_DISC;
 #else
-  if (D_S[MINOR(cdi->dev)].status_bits & p_spinning) return CDS_DISC_OK;
+  if (D_S[minor(cdi->dev)].status_bits & p_spinning) return CDS_DISC_OK;
 /*  return CDS_TRAY_OPEN; */
   return CDS_NO_DISC;
   
@@ -4203,8 +4203,8 @@ static int sbp_status(void)
 static int sbpcd_get_last_session(struct cdrom_device_info *cdi, struct cdrom_multisession *ms_infp)
 {
 	ms_infp->addr_format = CDROM_LBA;
-	ms_infp->addr.lba    = D_S[MINOR(cdi->dev)].lba_multi;
-	if (D_S[MINOR(cdi->dev)].f_multisession)
+	ms_infp->addr.lba    = D_S[minor(cdi->dev)].lba_multi;
+	if (D_S[minor(cdi->dev)].f_multisession)
 		ms_infp->xa_flag=1; /* valid redirection address */
 	else
 		ms_infp->xa_flag=0; /* invalid redirection address */
@@ -4223,8 +4223,8 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 	int i;
 	
 	msg(DBG_IO2,"ioctl(%d, 0x%08lX, 0x%08lX)\n",
-	    MINOR(cdi->dev), cmd, arg);
-	i=MINOR(cdi->dev);
+	    minor(cdi->dev), cmd, arg);
+	i=minor(cdi->dev);
 	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
 	{
 		msg(DBG_INF, "ioctl: bad device: %04X\n", cdi->dev);
@@ -4533,9 +4533,9 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case BLKRASET:
 		if(!capable(CAP_SYS_ADMIN)) RETURN_UP(-EACCES);
-		if(!(cdi->dev)) RETURN_UP(-EINVAL);
+		if(kdev_none(cdi->dev)) RETURN_UP(-EINVAL);
 		if(arg > 0xff) RETURN_UP(-EINVAL);
-		read_ahead[MAJOR(cdi->dev)] = arg;
+		read_ahead[major(cdi->dev)] = arg;
 		RETURN_UP(0);
 	default:
 		msg(DBG_IOC,"ioctl: unknown function request %04X\n", cmd);
@@ -4549,8 +4549,8 @@ static int sbpcd_audio_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 	int i, st, j;
 	
 	msg(DBG_IO2,"ioctl(%d, 0x%08lX, 0x%08p)\n",
-	    MINOR(cdi->dev), cmd, arg);
-	i=MINOR(cdi->dev);
+	    minor(cdi->dev), cmd, arg);
+	i=minor(cdi->dev);
 	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
 	{
 		msg(DBG_INF, "ioctl: bad device: %04X\n", cdi->dev);
@@ -4930,7 +4930,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 		sbpcd_end_request(req, 0);
 	if (req -> sector == -1)
 		sbpcd_end_request(req, 0);
-	spin_unlock_irq(&q->queue_lock);
+	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
 	if (req->cmd != READ)
@@ -4938,7 +4938,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 		msg(DBG_INF, "bad cmd %d\n", req->cmd);
 		goto err_done;
 	}
-	i = MINOR(req->rq_dev);
+	i = minor(req->rq_dev);
 	if ( (i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
 	{
 		msg(DBG_INF, "do_request: bad device: %s\n",
@@ -4970,7 +4970,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 			xnr, req, req->sector, req->nr_sectors, jiffies);
 #endif
 		up(&ioctl_read_sem);
-		spin_lock_irq(&q->queue_lock);
+		spin_lock_irq(q->queue_lock);
 		sbpcd_end_request(req, 1);
 		goto request_loop;
 	}
@@ -5011,7 +5011,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 				xnr, req, req->sector, req->nr_sectors, jiffies);
 #endif
 			up(&ioctl_read_sem);
-			spin_lock_irq(&q->queue_lock);
+			spin_lock_irq(q->queue_lock);
 			sbpcd_end_request(req, 1);
 			goto request_loop;
 		}
@@ -5027,7 +5027,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 #endif
 	up(&ioctl_read_sem);
 	sbp_sleep(0);    /* wait a bit, try again */
-	spin_lock_irq(&q->queue_lock);
+	spin_lock_irq(q->queue_lock);
 	sbpcd_end_request(req, 0);
 	goto request_loop;
 }
@@ -5435,7 +5435,7 @@ static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
 {
 	int i;
 
-	i = MINOR(cdi->dev);
+	i = minor(cdi->dev);
 
 	down(&ioctl_read_sem);
 	switch_drive(i);
@@ -5474,7 +5474,7 @@ static void sbpcd_release(struct cdrom_device_info * cdi)
 {
 	int i;
 	
-	i = MINOR(cdi->dev);
+	i = minor(cdi->dev);
 	if ((i<0) || (i>=NR_SBPCD) || (D_S[i].drv_id==-1))
 	{
 		msg(DBG_INF, "release: bad device: %04X\n", cdi->dev);
@@ -6003,8 +6003,8 @@ static int sbpcd_chk_disk_change(kdev_t full_dev)
 {
 	int i;
 	
-	msg(DBG_CHK,"media_check (%d) called\n", MINOR(full_dev));
-	i=MINOR(full_dev);
+	i=minor(full_dev);
+	msg(DBG_CHK,"media_check (%d) called\n", i);
 	
 	if (D_S[i].CD_changed==0xFF)
         {

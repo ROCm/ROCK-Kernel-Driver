@@ -89,10 +89,12 @@ static void __init build_tag_list(struct param_struct *params, void *taglist, in
 	}
 
 #ifdef CONFIG_FOOTBRIDGE
-	tag = tag_next(tag);
-	tag->hdr.tag = ATAG_MEMCLK;
-	tag->hdr.size = tag_size(tag_memclk);
-	tag->u.memclk.fmemclk = params->u1.s.mem_fclk_21285;
+	if (params->u1.s.mem_fclk_21285) {
+		tag = tag_next(tag);
+		tag->hdr.tag = ATAG_MEMCLK;
+		tag->hdr.size = tag_size(tag_memclk);
+		tag->u.memclk.fmemclk = params->u1.s.mem_fclk_21285;
+	}
 #endif
 
 #ifdef CONFIG_ARCH_ACORN

@@ -37,12 +37,6 @@ static inline unsigned long ___mem_isa(unsigned long a)
 #endif
 
 /*
- * Generic virtual read/write
- */
-#define __arch_getw(a)		(*(volatile unsigned short *)(a))
-#define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
-
-/*
  * ioremap support - validate a PCI memory address,
  * and convert a PCI memory address to a physical
  * address for the page tables.
@@ -50,5 +44,16 @@ static inline unsigned long ___mem_isa(unsigned long a)
 #define iomem_valid_addr(iomem,sz)	\
 	((iomem) < 0x80000000 && (iomem) + (sz) <= 0x80000000)
 #define iomem_to_phys(iomem)	((iomem) + PLX_MEM_START)
+
+#define __arch_ioremap(off,sz,nocache)				\
+ ({								\
+	unsigned long _off = (off), _size = (sz);		\
+	void *_ret = (void *)0;					\
+	if (iomem_valid_addr(_off, _size))			\
+		_ret = __ioremap(iomem_to_phys(_off),_size,0);	\
+	_ret;							\
+ })
+
+#define __arch_iounmap __iounmap
 
 #endif

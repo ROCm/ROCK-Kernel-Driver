@@ -9,20 +9,15 @@ USE_STANDARD_AS_RULE := true
 
 O_TARGET		:= sa1100.o
 
-obj-y :=
+# Common support (must be linked before board specific support)
+obj-y := generic.o irq.o dma.o
 obj-m :=
 obj-n :=
 obj-  :=
 
-export-objs :=	assabet.o dma-sa1100.o dma-sa1111.o freebird.o generic.o \
-		h3600.o huw_webpanel.o irq.o pcipool.o sa1111-pcibuf.o   \
-		yopy.o
-
-# These aren't present yet, and prevents a plain -ac kernel building.
-# hwtimer.o usb_ctl.o usb_recv.o usb_send.o
-
-# Common support (must be linked before board specific support)
-obj-y += generic.o irq.o dma-sa1100.o
+export-objs :=	assabet.o dma.o flexanet.o freebird.o generic.o h3600.o \
+		huw_webpanel.o irq.o pcipool.o sa1111.o sa1111-pcibuf.o \
+		yopy.o usb_ctl.o usb_recv.o usb_send.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
@@ -31,11 +26,12 @@ obj-y += generic.o irq.o dma-sa1100.o
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET) += cpu-sa1110.o
 obj-$(CONFIG_SA1100_CERF) += cpu-sa1110.o
+obj-$(CONFIG_SA1100_PT_SYSTEM3) += cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART) += cpu-sa1100.o
 endif
 
 # Next, the SA1111 stuff.
-obj-$(CONFIG_SA1111) += sa1111.o dma-sa1111.o
+obj-$(CONFIG_SA1111) += sa1111.o
 obj-$(CONFIG_USB_OHCI_SA1111) += sa1111-pcibuf.o pcipool.o
 
 # Specific board support
@@ -59,7 +55,9 @@ obj-$(CONFIG_SA1100_OMNIMETER) += omnimeter.o
 obj-$(CONFIG_SA1100_PANGOLIN) += pangolin.o
 obj-$(CONFIG_SA1100_PFS168) += pfs168.o
 obj-$(CONFIG_SA1100_PLEB) += pleb.o
+obj-$(CONFIG_SA1100_SHANNON) += shannon.o
 obj-$(CONFIG_SA1100_SHERMAN) += sherman.o
+obj-$(CONFIG_SA1100_PT_SYSTEM3) += system3.o
 obj-$(CONFIG_SA1100_SIMPAD) += simpad.o
 obj-$(CONFIG_SA1100_VICTOR) += victor.o
 obj-$(CONFIG_SA1100_XP860) += xp860.o
@@ -77,9 +75,21 @@ leds-$(CONFIG_SA1100_GRAPHICSMASTER) += leds-graphicsmaster.o
 leds-$(CONFIG_SA1100_LART) += leds-lart.o
 leds-$(CONFIG_SA1100_PFS168) += leds-pfs168.o
 leds-$(CONFIG_SA1100_SIMPAD) += leds-simpad.o  
+leds-$(CONFIG_SA1100_PT_SYSTEM3) += leds-system3.o
 obj-$(CONFIG_LEDS) += $(leds-y)
+
+# SA1110 USB client support
+list-multi += sa1100usb_core.o
+sa1100usb_core-objs := usb_ctl.o usb_ep0.o usb_recv.o usb_send.o
+obj-$(CONFIG_SA1100_USB) += sa1100usb_core.o
+obj-$(CONFIG_SA1100_USB_NETLINK) += usb-eth.o
+obj-$(CONFIG_SA1100_USB_CHAR) += usb-char.o
 
 # Miscelaneous functions
 obj-$(CONFIG_PM) += pm.o sleep.o
 
 include $(TOPDIR)/Rules.make
+
+sa1100usb_core.o: $(sa1100usb_core-objs)
+	$(LD) -r -o $@ $(sa1100usb_core-objs)
+

@@ -1455,17 +1455,17 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	struct specialix_board * bp;
 	unsigned long flags;
 	
-	board = SX_BOARD(MINOR(tty->device));
+	board = SX_BOARD(minor(tty->device));
 
 	if (board > SX_NBOARD || !(sx_board[board].flags & SX_BOARD_PRESENT))
 		return -ENODEV;
 	
 	bp = &sx_board[board];
-	port = sx_port + board * SX_NPORT + SX_PORT(MINOR(tty->device));
+	port = sx_port + board * SX_NPORT + SX_PORT(minor(tty->device));
 
 #ifdef DEBUG_SPECIALIX
 	printk (KERN_DEBUG "Board = %d, bp = %p, port = %p, portno = %d.\n", 
-	        board, bp, port, SX_PORT(MINOR(tty->device)));
+	        board, bp, port, SX_PORT(minor(tty->device)));
 #endif
 
 	if (sx_paranoia_check(port, tty->device, "sx_open"))

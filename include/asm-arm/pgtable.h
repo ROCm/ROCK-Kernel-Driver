@@ -12,6 +12,7 @@
 
 #include <linux/config.h>
 #include <asm/arch/memory.h>
+#include <asm/arch/vmalloc.h>
 #include <asm/proc-fns.h>
 
 /*
@@ -176,6 +177,13 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 #include <asm-generic/pgtable.h>
 
 extern void pgtable_cache_init(void);
+
+/*
+ * remap a physical address `phys' of size `size' with page protection `prot'
+ * into virtual address `from'
+ */
+#define io_remap_page_range(from,phys,size,prot) \
+		remap_page_range(from,phys,size,prot)
 
 #endif /* !__ASSEMBLY__ */
 

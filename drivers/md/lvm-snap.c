@@ -68,7 +68,7 @@ static int _pv_get_number(vg_t * vg, kdev_t rdev, uint *pvn) {
 		if(vg->pv[p] == NULL)
 			continue;
 
-		if(vg->pv[p]->pv_dev == rdev)
+		if(kdev_same(vg->pv[p]->pv_dev, rdev))
 			break;
 
 	}
@@ -77,7 +77,7 @@ static int _pv_get_number(vg_t * vg, kdev_t rdev, uint *pvn) {
 		/* bad news, the snapshot COW table is probably corrupt */
 		printk(KERN_ERR
 		       "%s -- _pv_get_number failed for rdev = %u\n",
-		       lvm_name, rdev);
+		       lvm_name, kdev_t_to_nr(rdev));
 		return -1;
 	}
 
@@ -105,7 +105,7 @@ lvm_find_exception_table(kdev_t org_dev, unsigned long org_start, lv_t * lv)
 
 		exception = list_entry(next, lv_block_exception_t, hash);
 		if (exception->rsector_org == org_start &&
-		    exception->rdev_org == org_dev)
+		    kdev_same(exception->rdev_org, org_dev))
 		{
 			if (i)
 			{
@@ -169,8 +169,10 @@ void lvm_drop_snapshot(vg_t *vg, lv_t *lv_snap, const char *reason)
        /* wipe the snapshot since it's inconsistent now */
        _disable_snapshot(vg, lv_snap);
 
-	for (i = last_dev = 0; i < lv_snap->lv_remap_ptr; i++) {
-		if ( lv_snap->lv_block_exception[i].rdev_new != last_dev) {
+	last_dev = NODEV;
+	for (i = 0; i < lv_snap->lv_remap_ptr; i++) {
+		if ( !kdev_same(lv_snap->lv_block_exception[i].rdev_new,
+				last_dev)) {
 			last_dev = lv_snap->lv_block_exception[i].rdev_new;
 			invalidate_buffers(last_dev);
 		}
@@ -213,7 +215,7 @@ static inline void invalidate_snap_cache(unsigned long start, unsigned long nr,
 	struct buffer_head * bh;
 	int sectors_per_block, i, blksize, minor;
 
-	minor = MINOR(dev);
+	minor = minor(dev);
 	blksize = lvm_blocksizes[minor];
 	sectors_per_block = blksize >> 9;
 	nr /= sectors_per_block;
@@ -299,7 +301,8 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 		     vg_t *vg, lv_t* lv_snap)
 {
 	const char * reason;
-	unsigned long org_start, snap_start, snap_phys_dev, virt_start, pe_off;
+	kdev_t snap_phys_dev;
+	unsigned long org_start, snap_start, virt_start, pe_off;
 	int idx = lv_snap->lv_remap_ptr, chunk_size = lv_snap->lv_chunk_size;
 	struct kiobuf * iobuf;
 	int blksize_snap, blksize_org, min_blksize, max_blksize;

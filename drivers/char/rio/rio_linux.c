@@ -375,16 +375,16 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
 
 int rio_minor (kdev_t device)
 {
-  return MINOR (device) + 
-    256 * ((MAJOR (device) == RIO_NORMAL_MAJOR1) ||
-	   (MAJOR (device) == RIO_CALLOUT_MAJOR1));
+  return minor (device) + 
+    256 * ((major (device) == RIO_NORMAL_MAJOR1) ||
+	   (major (device) == RIO_CALLOUT_MAJOR1));
 }
 
 
 int rio_ismodem (kdev_t device)
 {
-  return (MAJOR (device) == RIO_NORMAL_MAJOR0) ||
-         (MAJOR (device) == RIO_NORMAL_MAJOR1);
+  return (major (device) == RIO_NORMAL_MAJOR0) ||
+         (major (device) == RIO_NORMAL_MAJOR1);
 }
 
 
@@ -424,7 +424,7 @@ static int rio_set_real_termios (void *ptr)
 
   tty = ((struct Port *)ptr)->gs.tty;
 
-  modem = (MAJOR(tty->device) == RIO_NORMAL_MAJOR0) || (MAJOR(tty->device) == RIO_NORMAL_MAJOR1);
+  modem = (major(tty->device) == RIO_NORMAL_MAJOR0) || (major(tty->device) == RIO_NORMAL_MAJOR1);
 
   rv = RIOParam( (struct Port *) ptr, CONFIG, modem, 1);
 

@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
+#include <linux/ioport.h>
 #include <linux/serial_core.h>
 
 #include <asm/hardware.h>
@@ -53,7 +54,7 @@ static int __init adsbitsy_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe();
+	ret = sa1111_probe(0x18000000);
 	if (ret < 0)
 		return ret;
 
@@ -94,7 +95,7 @@ static int __init adsbitsy_init(void)
 	sa1110_mb_enable();
 
 	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_RISING_EDGE);
-	sa1111_init_irq(SA1100_GPIO_TO_IRQ(0));
+	sa1111_init_irq(IRQ_GPIO0);
 
 	return 0;
 }
@@ -126,7 +127,6 @@ fixup_adsbitsy(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc adsbitsy_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x08000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 1 */
   { 0xf4000000, 0x18000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA1111 */
   LAST_DESC
 };
@@ -135,24 +135,15 @@ static int adsbitsy_uart_open(struct uart_port *port, struct uart_info *info)
 {
 	if (port->mapbase == _Ser1UTCR0) {
 		Ser1SDCR0 |= SDCR0_UART;
-		// Set RTS Output and High (should be done in the set_mctrl fn)
-		GPDR |= GPIO_GPIO15;
-		GPCR |= GPIO_GPIO15;
-		// Set CTS Input
-		GPDR &= ~GPIO_GPIO14;
+#error Fixme	// Set RTS High (should be done in the set_mctrl fn)
+		GPCR = GPIO_GPIO15;
 	} else if (port->mapbase == _Ser2UTCR0) {
 		Ser2UTCR4 = Ser2HSCR0 = 0;
-		// Set RTS Output and High (should be done in the set_mctrl fn)
-		GPDR |= GPIO_GPIO17;
-		GPCR |= GPIO_GPIO17;
-		// Set CTS Input
-		GPDR &= ~GPIO_GPIO16;
+#error Fixme	// Set RTS High (should be done in the set_mctrl fn)
+		GPCR = GPIO_GPIO17;
 	} else if (port->mapbase == _Ser2UTCR0) {
-		// Set RTS Output and High (should be done in the set_mctrl fn)
-		GPDR |= GPIO_GPIO19;
-		GPCR |= GPIO_GPIO19;
-		// Set CTS Input
-		GPDR &= ~GPIO_GPIO18;
+#error Fixme	// Set RTS High (should be done in the set_mctrl fn)
+		GPCR = GPIO_GPIO19;
 	}
 	return 0;
 }
@@ -166,10 +157,12 @@ static void __init adsbitsy_map_io(void)
 	sa1100_map_io();
 	iotable_init(adsbitsy_io_desc);
 
-	sa1110_register_uart_fns(&adsbitsy_port_fns);
+	sa1100_register_uart_fns(&adsbitsy_port_fns);
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 	sa1100_register_uart(2, 2);
+	GPDR |= GPIO_GPIO15 | GPIO_GPIO17 | GPIO_GPIO19;
+	GPDR &= ~(GPIO_GPIO14 | GPIO_GPIO16 | GPIO_GPIO18);
 }
 
 MACHINE_START(ADSBITSY, "ADS Bitsy")

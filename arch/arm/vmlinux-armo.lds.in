@@ -48,7 +48,6 @@ SECTIONS
 			*(.text)
 			*(.fixup)
 			*(.gnu.warning)
-			*(.text.lock)	/* out-of-line lock text */
 			*(.rodata)
 			*(.rodata.*)
 			*(.glue_7)

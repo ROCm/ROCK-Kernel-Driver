@@ -23,8 +23,6 @@
 #ifndef __ASM_HARDWARE_EP7212_H
 #define __ASM_HARDWARE_EP7212_H
 
-#include <linux/config.h>
-
 /*
  * define EP7212_BASE to be the base address of the region
  * you want to access.
@@ -49,10 +47,6 @@
 #define INTSR3			0x2240
 #define INTMR3			0x2280
 #define LEDFLSH			0x22c0
-#if defined (CONFIG_ARCH_CDB89712)
-#define SDCONF			0x2300
-#define SDRFPR			0x2340
-#endif
 
 #define DAIR_DAIEN		(1 << 16)
 #define DAIR_ECS		(1 << 17)
@@ -85,20 +79,5 @@
 #define SYSCON3_ADCCKNSEN	(1 << 4)
 #define SYSCON3_FASTWAKE	(1 << 8)
 #define SYSCON3_DAIEN		(1 << 9)
-
-#if defined (CONFIG_ARCH_CDB89712)
-#define SDCONF_ACTIVE		(1 << 10)
-#define SDCONF_CLKCTL		(1 << 9)
-#define SDCONF_WIDTH_4		(0 << 7)
-#define SDCONF_WIDTH_8		(1 << 7)
-#define SDCONF_WIDTH_16		(2 << 7)
-#define SDCONF_WIDTH_32		(3 << 7)
-#define SDCONF_SIZE_16		(0 << 5)
-#define SDCONF_SIZE_64		(1 << 5)
-#define SDCONF_SIZE_128		(2 << 5)
-#define SDCONF_SIZE_256		(3 << 5)
-#define SDCONF_CASLAT_2		(2)
-#define SDCONF_CASLAT_3		(3)
-#endif
 
 #endif /* __ASM_HARDWARE_EP7212_H */

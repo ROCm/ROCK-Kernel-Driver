@@ -17,6 +17,7 @@
 #include <linux/console.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/tty.h>
 #include <linux/init.h>
 
 #include <asm/elf.h>
@@ -105,6 +106,109 @@ static struct resource io_res[] = {
 #define lp1 io_res[1]
 #define lp2 io_res[2]
 
+#ifdef CONFIG_CPU_32
+static const char *cache_types[16] = {
+	"write-through",
+	"write-back",
+	"write-back",
+	"undefined 3",
+	"undefined 4",
+	"undefined 5",
+	"write-back",
+	"write-back",
+	"undefined 8",
+	"undefined 9",
+	"undefined 10",
+	"undefined 11",
+	"undefined 12",
+	"undefined 13",
+	"undefined 14",
+	"undefined 15",
+};
+
+static const char *cache_clean[16] = {
+	"not required",
+	"read-block",
+	"cp15 c7 ops",
+	"undefined 3",
+	"undefined 4",
+	"undefined 5",
+	"cp15 c7 ops",
+	"cp15 c7 ops",
+	"undefined 8",
+	"undefined 9",
+	"undefined 10",
+	"undefined 11",
+	"undefined 12",
+	"undefined 13",
+	"undefined 14",
+	"undefined 15",
+};
+
+static const char *cache_lockdown[16] = {
+	"not supported",
+	"not supported",
+	"not supported",
+	"undefined 3",
+	"undefined 4",
+	"undefined 5",
+	"format A",
+	"format B",
+	"undefined 8",
+	"undefined 9",
+	"undefined 10",
+	"undefined 11",
+	"undefined 12",
+	"undefined 13",
+	"undefined 14",
+	"undefined 15",
+};
+
+#define CACHE_TYPE(x)	(((x) >> 25) & 15)
+#define CACHE_S(x)	((x) & (1 << 24))
+#define CACHE_DSIZE(x)	(((x) >> 12) & 4095)	/* only if S=1 */
+#define CACHE_ISIZE(x)	((x) & 4095)
+
+#define CACHE_SIZE(y)	(((y) >> 6) & 7)
+#define CACHE_ASSOC(y)	(((y) >> 3) & 7)
+#define CACHE_M(y)	((y) & (1 << 2))
+#define CACHE_LINE(y)	((y) & 3)
+
+static inline void dump_cache(const char *prefix, unsigned int cache)
+{
+	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+
+	printk("%s size %dK associativity %d line length %d sets %d\n",
+		prefix,
+		mult << (8 + CACHE_SIZE(cache)),
+		(mult << CACHE_ASSOC(cache)) >> 1,
+		8 << CACHE_LINE(cache),
+		1 << (6 + CACHE_SIZE(cache) - CACHE_ASSOC(cache) -
+			CACHE_LINE(cache)));
+}
+
+static inline void dump_cpu_cache_id(void)
+{
+	unsigned int cache_info;
+
+	asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (cache_info));
+
+	if (cache_info == processor_id)
+		return;
+
+	printk("CPU: D %s cache\n", cache_types[CACHE_TYPE(cache_info)]);
+	if (CACHE_S(cache_info)) {
+		dump_cache("CPU: I cache", CACHE_ISIZE(cache_info));
+		dump_cache("CPU: D cache", CACHE_DSIZE(cache_info));
+	} else {
+		dump_cache("CPU: cache", CACHE_ISIZE(cache_info));
+	}
+}
+
+#else
+#define dump_cpu_cache_id() do { } while (0)
+#endif
+
 static void __init setup_processor(void)
 {
 	extern struct proc_info_list __proc_info_begin, __proc_info_end;
@@ -139,6 +243,8 @@ static void __init setup_processor(void)
 	       proc_info.manufacturer, proc_info.cpu_name,
 	       (int)processor_id & 15);
 
+	dump_cpu_cache_id();
+
 	sprintf(system_utsname.machine, "%s%c", list->arch_name, ENDIANNESS);
 	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);
 	elf_hwcap = list->elf_hwcap;
@@ -146,7 +252,7 @@ static void __init setup_processor(void)
 	cpu_proc_init();
 }
 
-static struct machine_desc * __init setup_architecture(unsigned int nr)
+static struct machine_desc * __init setup_machine(unsigned int nr)
 {
 	extern struct machine_desc __arch_info_begin, __arch_info_end;
 	struct machine_desc *list;
@@ -168,7 +274,7 @@ static struct machine_desc * __init setup_architecture(unsigned int nr)
 		while (1);
 	}
 
-	printk("Architecture: %s\n", list->name);
+	printk("Machine: %s\n", list->name);
 	if (compat)
 		printk(KERN_WARNING "Using compatibility code "
 			"scheduled for removal in v%d.%d.%d\n",
@@ -231,7 +337,7 @@ void __init
 setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 {
 #ifdef CONFIG_BLK_DEV_RAM
-	extern int rd_size;
+	extern int rd_size, rd_image_start, rd_prompt, rd_doload;
 
 	rd_image_start = image_start;
 	rd_prompt = prompt;
@@ -458,10 +564,10 @@ void __init setup_arch(char **cmdline_p)
 	struct machine_desc *mdesc;
 	char *from = default_command_line;
 
-	ROOT_DEV = MKDEV(0, 255);
+	ROOT_DEV = mk_kdev(0, 255);
 
 	setup_processor();
-	mdesc = setup_architecture(machine_arch_type);
+	mdesc = setup_machine(machine_arch_type);
 	machine_name = mdesc->name;
 
 	if (mdesc->soft_reboot)
@@ -533,6 +639,41 @@ static const char *hwcap_str[] = {
 	NULL
 };
 
+static const char *proc_arch[16] = {
+	"undefined 0",
+	"4",
+	"4T",
+	"5",
+	"5T",
+	"5TE",
+	"undefined 6",
+	"undefined 7",
+	"undefined 8",
+	"undefined 9",
+	"undefined 10",
+	"undefined 11",
+	"undefined 12",
+	"undefined 13",
+	"undefined 14",
+	"undefined 15"
+};
+
+static void
+c_show_cache(struct seq_file *m, const char *type, unsigned int cache)
+{
+	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+
+	seq_printf(m, "%s size\t\t: %d\n"
+		      "%s assoc\t\t: %d\n"
+		      "%s line length\t: %d\n"
+		      "%s sets\t\t: %d\n",
+		type, mult << (8 + CACHE_SIZE(cache)),
+		type, (mult << CACHE_ASSOC(cache)) >> 1,
+		type, 8 << CACHE_LINE(cache),
+		type, 1 << (6 + CACHE_SIZE(cache) - CACHE_ASSOC(cache) -
+			    CACHE_LINE(cache)));
+}
+
 static int c_show(struct seq_file *m, void *v)
 {
 	int i;
@@ -552,7 +693,60 @@ static int c_show(struct seq_file *m, void *v)
 		if (elf_hwcap & (1 << i))
 			seq_printf(m, "%s ", hwcap_str[i]);
 
-	seq_puts(m, "\n\n");
+	seq_puts(m, "\n");
+
+	if ((processor_id & 0x0000f000) == 0x00000000) {
+		/* pre-ARM7 */
+		seq_printf(m, "CPU part\t\t: %07x\n", processor_id >> 4);
+	} else if ((processor_id & 0x0000f000) == 0x00007000) {
+		/* ARM7 */
+		seq_printf(m, "CPU implementor\t: 0x%02x\n"
+			      "CPU architecture: %s\n"
+			      "CPU variant\t: 0x%02x\n"
+			      "CPU part\t: 0x%03x\n",
+			   processor_id >> 24,
+			   processor_id & (1 << 23) ? "4T" : "3",
+			   (processor_id >> 16) & 127,
+			   (processor_id >> 4) & 0xfff);
+	} else {
+		/* post-ARM7 */
+		seq_printf(m, "CPU implementor\t: 0x%02x\n"
+			      "CPU architecture: %s\n"
+			      "CPU variant\t: 0x%x\n"
+			      "CPU part\t: 0x%03x\n",
+			   processor_id >> 24,
+			   proc_arch[(processor_id >> 16) & 15],
+			   (processor_id >> 20) & 15,
+			   (processor_id >> 4) & 0xfff);
+	}
+	seq_printf(m, "CPU revision\t: %d\n", processor_id & 15);
+
+#ifdef CONFIG_CPU_32
+	{
+		unsigned int cache_info;
+
+		asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (cache_info));
+		if (cache_info != processor_id) {
+			seq_printf(m, "Cache type\t: %s\n"
+				      "Cache clean\t: %s\n"
+				      "Cache lockdown\t: %s\n"
+				      "Cache unified\t: %s\n",
+				   cache_types[CACHE_TYPE(cache_info)],
+				   cache_clean[CACHE_TYPE(cache_info)],
+				   cache_lockdown[CACHE_TYPE(cache_info)],
+				   CACHE_S(cache_info) ? "separate I,D" : "unified");
+
+			if (CACHE_S(cache_info)) {
+				c_show_cache(m, "I", CACHE_ISIZE(cache_info));
+				c_show_cache(m, "D", CACHE_DSIZE(cache_info));
+			} else {
+				c_show_cache(m, "Cache", CACHE_ISIZE(cache_info));
+			}
+		}
+	}
+#endif
+
+	seq_puts(m, "\n");
 
 	seq_printf(m, "Hardware\t: %s\n", machine_name);
 	seq_printf(m, "Revision\t: %04x\n", system_rev);

@@ -139,7 +139,6 @@ unsigned int EmulateAll(unsigned int opcode)
 {
   unsigned int nRc = 1, code;
   unsigned long flags;
-  FPA11 *fpa11;
 
   save_flags(flags); sti();
 

@@ -6,6 +6,8 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/config.h>
+
 /*
  * Just any arbitrary offset to the start of the vmalloc VM area: the
  * current 8MB value just means that there will be a 8MB "hole" after the
@@ -17,4 +19,9 @@
 #define VMALLOC_OFFSET	  (8*1024*1024)
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
+
+#ifdef CONFIG_ARCH_FOOTBRIDGE
+#define VMALLOC_END       (PAGE_OFFSET + 0x30000000)
+#else
 #define VMALLOC_END       (PAGE_OFFSET + 0x20000000)
+#endif

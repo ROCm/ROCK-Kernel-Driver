@@ -389,7 +389,7 @@ irqProceed:;
 	OpDone (SCpnt, DID_OK << 16);
 
 irq_return:
-    spin_unlock_irqrestore(&shost->host_flag, flags);
+    spin_unlock_irqrestore(&shost->host_lock, flags);
 out:;
 }
 /****************************************************************

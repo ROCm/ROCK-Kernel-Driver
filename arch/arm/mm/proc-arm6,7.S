@@ -240,7 +240,7 @@ Ldata_lateldrpostreg:
 ENTRY(cpu_arm6_check_bugs)
 ENTRY(cpu_arm7_check_bugs)
 		mrs	ip, cpsr
-		bic	ip, ip, #F_BIT
+		bic	ip, ip, #PSR_F_BIT
 		msr	cpsr, ip
 		mov	pc, lr
 
@@ -250,7 +250,7 @@ ENTRY(cpu_arm7_proc_init)
 
 ENTRY(cpu_arm6_proc_fin)
 ENTRY(cpu_arm7_proc_fin)
-		mov	r0, #F_BIT | I_BIT | SVC_MODE
+		mov	r0, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 		msr	cpsr_c, r0
 		mov	r0, #0x31			@ ....S..DP...M
 		mcr	p15, 0, r0, c1, c0, 0		@ disable caches
@@ -418,6 +418,11 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_set_pgd
 		.word	cpu_arm6_set_pmd
 		.word	cpu_arm6_set_pte
+
+		/* other */
+		.word	armv3_clear_user_page
+		.word	armv3_copy_user_page
+
 		.size	arm6_processor_functions, . - arm6_processor_functions
 
 /*
@@ -457,6 +462,11 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_set_pgd
 		.word	cpu_arm7_set_pmd
 		.word	cpu_arm7_set_pte
+
+		/* other */
+		.word	armv3_clear_user_page
+		.word	armv3_copy_user_page
+
 		.size	arm7_processor_functions, . - arm7_processor_functions
 
 		.type	cpu_arm6_info, #object

@@ -114,7 +114,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	}
 
 #ifdef CONFIG_ARCH_ACORN
-	show_fiq_list(p);
+	show_fiq_list(p, v);
 #endif
 	seq_printf(p, "Err: %10lu\n", irq_err_count);
 	return 0;

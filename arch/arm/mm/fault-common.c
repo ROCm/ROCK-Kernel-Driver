@@ -39,8 +39,8 @@
  * of the 26-bit machines, and also means that we avoid the horrible
  * gcc code for "int val = !other_val;".
  */
-#define DO_COW(m)		(m)
-#define READ_FAULT(m)		(!(m))
+#define DO_COW(code)		((code) & (1 << 8))
+#define READ_FAULT(code)	(!DO_COW(code))
 #endif
 
 NORET_TYPE void die(const char *msg, struct pt_regs *regs, int err) ATTRIB_NORET;

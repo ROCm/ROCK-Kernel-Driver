@@ -122,6 +122,11 @@ extern struct processor {
 		 */
 		void (*set_pte)(pte_t *ptep, pte_t pte);
 	} pgtable;
+
+	struct {	/* other */
+		void (*clear_user_page)(void *page, unsigned long u_addr);
+		void (*copy_user_page)(void *to, void *from, unsigned long u_addr);
+	} misc;
 } processor;
 
 extern const struct processor arm6_processor_functions;
@@ -154,6 +159,9 @@ extern const struct processor sa110_processor_functions;
 #define cpu_set_pgd(pgd)			processor.pgtable.set_pgd(pgd)
 #define cpu_set_pmd(pmdp, pmd)			processor.pgtable.set_pmd(pmdp, pmd)
 #define cpu_set_pte(ptep, pte)			processor.pgtable.set_pte(ptep, pte)
+
+#define cpu_copy_user_page(to,from,uaddr)	processor.misc.copy_user_page(to,from,uaddr)
+#define cpu_clear_user_page(page,uaddr)		processor.misc.clear_user_page(page,uaddr)
 
 #define cpu_switch_mm(pgd,tsk)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))
 

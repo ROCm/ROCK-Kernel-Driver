@@ -249,4 +249,10 @@ DECLARE_IO(int,l,"")
 /* the following macro is depreciated */
 #define ioaddr(port)			__ioaddr((port))
 
+/*
+ * No ioremap support here.
+ */
+#define __arch_ioremap(c,s,f)	((void *)(c))
+#define __arch_iounmap(c)	do { }  while (0)
+
 #endif

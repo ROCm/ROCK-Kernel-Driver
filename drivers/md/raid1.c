@@ -611,7 +611,7 @@ static int error(mddev_t *mddev, kdev_t dev)
 	 * else mark the drive as failed
 	 */
 	for (i = 0; i < disks; i++)
-		if (mirrors[i].dev == dev && mirrors[i].operational)
+		if (kdev_same(mirrors[i].dev, dev) && mirrors[i].operational)
 			break;
 	if (i == disks)
 		return 0;
@@ -853,7 +853,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		*d = failed_desc;
 
-		if (sdisk->dev == MKDEV(0,0))
+		if (kdev_none(sdisk->dev))
 			sdisk->used_slot = 0;
 		/*
 		 * this really activates the spare.
@@ -879,7 +879,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 			err = 1;
 			goto abort;
 		}
-		rdisk->dev = MKDEV(0,0);
+		rdisk->dev = NODEV;
 		rdisk->used_slot = 0;
 		conf->nr_disks--;
 		break;
@@ -896,7 +896,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		adisk->number = added_desc->number;
 		adisk->raid_disk = added_desc->raid_disk;
-		adisk->dev = MKDEV(added_desc->major, added_desc->minor);
+		adisk->dev = mk_kdev(added_desc->major, added_desc->minor);
 
 		adisk->operational = 0;
 		adisk->write_only = 0;
@@ -1098,7 +1098,7 @@ static void raid1d(void *data)
 		case READA:
 			dev = bio->bi_dev;
 			map(mddev, &bio->bi_dev);
-			if (bio->bi_dev == dev) {
+			if (kdev_same(bio->bi_dev, dev)) {
 				printk(IO_ERROR, partition_name(bio->bi_dev), r1_bio->sector);
 				raid_end_bio_io(r1_bio, 0, 0);
 				break;
@@ -1428,7 +1428,7 @@ static int run(mddev_t *mddev)
 
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
-			disk->dev = MKDEV(0,0);
+			disk->dev = NODEV;
 
 			disk->operational = 0;
 			disk->write_only = 0;

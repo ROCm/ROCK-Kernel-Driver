@@ -327,7 +327,7 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_open() called (major=%u,minor=%u)\n",
 		__FILE__,__LINE__,
-		MAJOR(tty->device), MINOR(tty->device));
+		major(tty->device), minor(tty->device));
 		
 	/* There should not be an existing table for this slot. */
 	if (n_hdlc) {

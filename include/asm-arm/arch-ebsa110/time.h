@@ -33,7 +33,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * Set up timer interrupt.
  */
-static inline void setup_timer(void)
+void __init time_init(void)
 {
 	ebsa110_setup_timer();
 

@@ -54,6 +54,7 @@ static inline void set_fs (mm_segment_t fs)
 	: "=r" (err)						\
 	: "r" (x), "r" (addr), "i" (-EFAULT), "0" (err))
 
+#ifndef __ARMEB__
 #define __put_user_asm_half(x,addr,err)				\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
@@ -61,6 +62,15 @@ static inline void set_fs (mm_segment_t fs)
 	__put_user_asm_byte(__temp, __ptr, err);		\
 	__put_user_asm_byte(__temp >> 8, __ptr + 1, err);	\
 })
+#else
+#define __put_user_asm_half(x,addr,err)				\
+({								\
+	unsigned long __temp = (unsigned long)(x);		\
+	unsigned long __ptr  = (unsigned long)(addr);		\
+	__put_user_asm_byte(__temp >> 8, __ptr, err);		\
+	__put_user_asm_byte(__temp, __ptr + 1, err);	\
+})
+#endif
 
 #define __put_user_asm_word(x,addr,err)				\
 	__asm__ __volatile__(					\
@@ -95,6 +105,7 @@ static inline void set_fs (mm_segment_t fs)
 	: "=r" (err), "=&r" (x)					\
 	: "r" (addr), "i" (-EFAULT), "0" (err))
 
+#ifndef __ARMEB__
 #define __get_user_asm_half(x,addr,err)				\
 ({								\
 	unsigned long __b1, __b2, __ptr = (unsigned long)addr;	\
@@ -102,7 +113,15 @@ static inline void set_fs (mm_segment_t fs)
 	__get_user_asm_byte(__b2, __ptr + 1, err);		\
 	(x) = __b1 | (__b2 << 8);				\
 })
-
+#else
+#define __get_user_asm_half(x,addr,err)				\
+({								\
+	unsigned long __b1, __b2;				\
+	__get_user_asm_byte(__b1, addr, err);			\
+	__get_user_asm_byte(__b2, (int)(addr) + 1, err);	\
+	(x) = (__b1 << 8) | __b2;				\
+})
+#endif
 
 #define __get_user_asm_word(x,addr,err)				\
 	__asm__ __volatile__(					\

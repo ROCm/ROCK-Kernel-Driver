@@ -56,35 +56,39 @@
  * cpu_arm926_data_abort()
  *
  * obtain information about current aborted instruction
+ * Note: we read user space.  This means we might cause a data
+ * abort here if the I-TLB and D-TLB aren't seeing the same
+ * picture.  Unfortunately, this does happen.  We live with it.
  *
  * Inputs:
- *  r0 = address of abort 
- *  r1 = cpsr of abort 
+ *  r2 = address of abort 
+ *  r3 = cpsr of abort
  *
  * Returns:
  *  r0 = address of abort
  *  r1 != 0 if writing
  *  r3 = FSR
+ *  r4 = corrupted
  */
 	.align	5
 ENTRY(cpu_arm926_data_abort)
+	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
+	mrc	p15, 0, r4, c5, c0, 0		@ get FSR
+
 	tst	r1, #1<<24			@ Check for Jbit (NE -> found)
 	movne	r1, #-1 			@ Mark as writing
 	bne	2f
 
-	tst	r1, #1<<5			@ Check for Thumb-bit (NE -> found)
-	ldrneh	r1, [r0]			@ Read aborted Thumb instruction        
+	tst	r3, #1<<5			@ Check for Thumb-bit (NE -> found)
+	ldrneh	r1, [r2]			@ Read aborted Thumb instruction        
 	tstne	r1, r1, lsr #12 		@ C = bit 11
 
-	ldreq	r1, [r0]			@ Read aborted ARM instruction
+	ldreq	r1, [r2]			@ Read aborted ARM instruction
 	tsteq	r1, r1, lsr #21 		@ C = bit 20
 
 	sbc	r1, r1, r1			@ r1 = C - 1
 2:
-	mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-	and	r3, r3, #255
-	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-
+	and	r3, r4, #255
 	mov	pc, lr
 
 /*
@@ -92,7 +96,7 @@ ENTRY(cpu_arm926_data_abort)
  */
 ENTRY(cpu_arm926_check_bugs)
 	mrs	ip, cpsr
-	bic	ip, ip, #F_BIT
+	bic	ip, ip, #PSR_F_BIT
 	msr	cpsr, ip
 	mov	pc, lr
 
@@ -107,7 +111,7 @@ ENTRY(cpu_arm926_proc_init)
  */
 ENTRY(cpu_arm926_proc_fin)
 	stmfd	sp!, {lr}
-	mov	ip, #F_BIT | I_BIT | SVC_MODE
+	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 	msr	cpsr_c, ip
 	bl	cpu_arm926_cache_clean_invalidate_all
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
@@ -601,7 +605,7 @@ __arm926_setup:
  */
 	.type	arm926_processor_functions, #object
 arm926_processor_functions:
-	.word	cpu_arm926_data_abort
+	.word	armv5ej_early_abort
 	.word	cpu_arm926_check_bugs
 	.word	cpu_arm926_proc_init
 	.word	cpu_arm926_proc_fin
@@ -632,6 +636,11 @@ arm926_processor_functions:
 	.word	cpu_arm926_set_pgd
 	.word	cpu_arm926_set_pmd
 	.word	cpu_arm926_set_pte
+
+	/* misc */
+	.word	armv4_clear_user_page
+	.word	armv4_copy_user_page
+
 	.size	arm926_processor_functions, . - arm926_processor_functions
 
 	.type	cpu_arm926_info, #object

@@ -64,7 +64,7 @@
 		kphex	r7, 8		/* architecture id */
 		kputc	#':'
 		mrc	p15, 0, r0, c1, c0
-		kphex	r0, 8		/* control reg
+		kphex	r0, 8		/* control reg */
 		kputc	#'\n'
 		kphex	r5, 8		/* decompressed kernel start */
 		kputc	#'-'
@@ -218,7 +218,12 @@ cache_on:	ldr	r1, proc_sa110_type
 		ldr     r1, proc_sa1110_type
 		eor	r1, r1, r6
 		movs	r1, r1, lsr #4
-		movne	pc, lr
+		beq	1f
+		ldr	r1, proc_xscale_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #16
+@		movne	pc, lr
+		bne	cache_off
 1:
 		sub	r3, r4, #16384		@ Page directory size
 		bic	r3, r3, #0xff		@ Align the pointer
@@ -379,10 +384,14 @@ cache_clean_flush:
 		ldr	r1, proc_sa1110_type
 		eor	r1, r1, r6
 		movs	r1, r1, lsr #4
+		beq	1f
+		ldr	r1, proc_xscale_type
+		eor	r1, r1, r6
+		movs	r1, r1, lsr #16
 		movne	pc, lr
 1:
 		bic	r1, pc, #31
-		add	r2, r1, #32768
+		add	r2, r1, #65536		@ 2x the largest dcache size
 1:		ldr	r12, [r1], #32		@ s/w flush D cache
 		teq	r1, r2
 		bne	1b
@@ -390,6 +399,12 @@ cache_clean_flush:
 		mcr	p15, 0, r1, c7, c7, 0	@ flush I cache
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
 		mov	pc, lr
+
+		.type	proc_xscale_type,#object
+proc_xscale_type:
+		.word	0x69050000
+		.size	proc_xscale_type, . - proc_xscale_type
+
 
 /*
  * Various debugging routines for printing hex characters and

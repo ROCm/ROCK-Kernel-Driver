@@ -281,7 +281,7 @@ cdu535_check_media_change(kdev_t full_dev)
 {
 	int retval;
 
-	if (MINOR(full_dev) != 0) {
+	if (minor(full_dev) != 0) {
 		printk(CDU535_MESSAGE_NAME " request error: invalid device.\n");
 		return 0;
 	}
@@ -810,7 +810,7 @@ do_cdu535_request(request_queue_t * q)
 			return;
 		}
 		INIT_REQUEST;
-		dev = MINOR(CURRENT->rq_dev);
+		dev = minor(CURRENT->rq_dev);
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;
 		if (dev != 0) {
@@ -1089,7 +1089,7 @@ cdu_ioctl(struct inode *inode,
 	if (!inode) {
 		return -EINVAL;
 	}
-	dev = MINOR(inode->i_rdev) >> 6;
+	dev = minor(inode->i_rdev) >> 6;
 	if (dev != 0) {
 		return -EINVAL;
 	}
@@ -1644,7 +1644,7 @@ sony535_init(void)
 		return -EIO;
 	}
 	request_region(sony535_cd_base_io, 4, CDU535_HANDLE);
-	register_disk(NULL, MKDEV(MAJOR_NR,0), 1, &cdu_fops, 0);
+	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &cdu_fops, 0);
 	return 0;
 }
 

@@ -26,20 +26,4 @@
 #define __mem_pci(a)		((unsigned long)(a))
 #define __mem_isa(a)		(PCI_MEMORY_VADDR + (unsigned long)(a))
 
-/*
- * Generic virtual read/write
- */
-#define __arch_getw(a)		(*(volatile unsigned short *)(a))
-#define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
-
-/*
- * Validate the pci memory address for ioremap.
- */
-#define iomem_valid_addr(iomem,size)	(1)
-
-/*
- * Convert PCI memory space to a CPU physical address
- */
-#define iomem_to_phys(iomem)	(iomem)
-
 #endif

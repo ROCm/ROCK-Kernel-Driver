@@ -28,34 +28,16 @@
  */
 #define MAX_DMA_CHANNELS	0
 
-
 /*
  * The SA1100 has six internal DMA channels.
  */
-#define SA1100_DMA_CHANNELS     6
-
-
-/*
- * The SA-1111 SAC has two DMA channels.
- */
-#define SA1111_SAC_DMA_CHANNELS 2
-#define SA1111_SAC_XMT_CHANNEL  0
-#define SA1111_SAC_RCV_CHANNEL  1
-
+#define SA1100_DMA_CHANNELS	6
 
 /*
- * The SA-1111 SAC channels will reside in the same index space as
- * the built-in SA-1100 channels, and will take on the next available
- * identifiers after the 1100.
+ * Maximum physical DMA buffer size
  */
-#define SA1111_SAC_DMA_BASE     SA1100_DMA_CHANNELS
-
-#ifdef CONFIG_SA1111
-# define MAX_SA1100_DMA_CHANNELS (SA1100_DMA_CHANNELS + SA1111_SAC_DMA_CHANNELS)
-#else
-# define MAX_SA1100_DMA_CHANNELS SA1100_DMA_CHANNELS
-#endif
-
+#define MAX_DMA_SIZE		0x1fff
+#define CUT_DMA_SIZE		0x1000
 
 /*
  * All possible SA1100 devices a DMA channel can be attached to.
@@ -81,29 +63,72 @@ typedef enum {
 	DMA_Ser4SSPRd  = DDAR_Ser4SSPRd    /* Ser. port 4 SSP Read (16 bits) */
 } dma_device_t;
 
+typedef struct {
+	volatile u_long DDAR;
+	volatile u_long SetDCSR;
+	volatile u_long ClrDCSR;
+	volatile u_long RdDCSR;
+	volatile dma_addr_t DBSA;
+	volatile u_long DBTA;
+	volatile dma_addr_t DBSB;
+	volatile u_long DBTB;
+} dma_regs_t;
 
-typedef void (*dma_callback_t)( void *buf_id, int size );
+typedef void (*dma_callback_t)(void *data);
 
+/*
+ * DMA function prototypes
+ */
 
-/* SA1100 DMA API */
-extern int sa1100_request_dma( dmach_t *channel, const char *device_id,
-			       dma_device_t device );
-extern int sa1100_dma_set_callback( dmach_t channel, dma_callback_t cb );
-extern int sa1100_dma_set_spin( dmach_t channel, dma_addr_t addr, int size );
-extern int sa1100_dma_queue_buffer( dmach_t channel, void *buf_id,
-				    dma_addr_t data, int size );
-extern int sa1100_dma_get_current( dmach_t channel, void **buf_id, dma_addr_t *addr );
-extern int sa1100_dma_stop( dmach_t channel );
-extern int sa1100_dma_resume( dmach_t channel );
-extern int sa1100_dma_flush_all( dmach_t channel );
-extern void sa1100_free_dma( dmach_t channel );
-extern int sa1100_dma_sleep( dmach_t channel );
-extern int sa1100_dma_wakeup( dmach_t channel );
+extern int sa1100_request_dma( dma_device_t device, const char *device_id,
+			       dma_callback_t callback, void *data,
+			       dma_regs_t **regs );
+extern void sa1100_free_dma( dma_regs_t *regs );
+extern int sa1100_start_dma( dma_regs_t *regs, dma_addr_t dma_ptr, u_int size );
+extern dma_addr_t sa1100_get_dma_pos(dma_regs_t *regs);
+extern void sa1100_reset_dma(dma_regs_t *regs);
 
-/* Sa1111 DMA interface (all but registration uses the above) */
-extern int sa1111_sac_request_dma( dmach_t *channel, const char *device_id,
-				   unsigned int direction );
-extern int sa1111_check_dma_bug( dma_addr_t addr );
+/**
+ * 	sa1100_stop_dma - stop DMA in progress
+ * 	@regs: identifier for the channel to use
+ *
+ * 	This stops DMA without clearing buffer pointers. Unlike
+ * 	sa1100_clear_dma() this allows subsequent use of sa1100_resume_dma()
+ * 	or sa1100_get_dma_pos().
+ *
+ * 	The @regs identifier is provided by a successful call to
+ * 	sa1100_request_dma().
+ **/
+
+#define sa1100_stop_dma(regs)	((regs)->ClrDCSR = DCSR_IE|DCSR_RUN)
+
+/**
+ * 	sa1100_resume_dma - resume DMA on a stopped channel
+ * 	@regs: identifier for the channel to use
+ *
+ * 	This resumes DMA on a channel previously stopped with
+ * 	sa1100_stop_dma().
+ *
+ * 	The @regs identifier is provided by a successful call to
+ * 	sa1100_request_dma().
+ **/
+
+#define sa1100_resume_dma(regs)	((regs)->SetDCSR = DCSR_IE|DCSR_RUN)
+
+/**
+ * 	sa1100_clear_dma - clear DMA pointers
+ * 	@regs: identifier for the channel to use
+ *
+ * 	This clear any DMA state so the DMA engine is ready to restart
+ * 	with new buffers through sa1100_start_dma(). Any buffers in flight
+ * 	are discarded.
+ *
+ * 	The @regs identifier is provided by a successful call to
+ * 	sa1100_request_dma().
+ **/
+
+#define sa1100_clear_dma(regs)	((regs)->ClrDCSR = DCSR_IE|DCSR_RUN|DCSR_STRTA|DCSR_STRTB)
+
 
 #ifdef CONFIG_SA1111
 static inline void

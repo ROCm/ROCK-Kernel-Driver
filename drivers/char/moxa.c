@@ -189,7 +189,7 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 
 #define WAKEUP_CHARS		256
 
-#define PORTNO(x)		(MINOR((x)->device) - (x)->driver.minor_start)
+#define PORTNO(x)		(minor((x)->device) - (x)->driver.minor_start)
 
 static int verbose = 0;
 static int ttymajor = MOXAMAJOR;
@@ -648,7 +648,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	}
 	if (--ch->count < 0) {
 		printk("moxa_close: bad serial port count, minor=%d\n",
-		       MINOR(tty->device));
+		       minor(tty->device));
 		ch->count = 0;
 	}
 	if (ch->count) {

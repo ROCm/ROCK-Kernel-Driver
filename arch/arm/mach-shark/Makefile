@@ -11,7 +11,7 @@ O_TARGET		:= shark.o
 
 # Object file lists.
 
-obj-y			:= arch.o dma.o mm.o pci.o
+obj-y			:= core.o dma.o irq.o pci.o
 obj-m			:=
 obj-n			:=
 obj-			:=

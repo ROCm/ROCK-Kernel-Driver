@@ -139,7 +139,7 @@ void set_dma_addr (dmach_t channel, unsigned long physaddr)
 
 	dma->sg = &dma->buf;
 	dma->sgcount = 1;
-	dma->buf.address = bus_to_virt(physaddr);
+	dma->buf.__address = bus_to_virt(physaddr);
 	dma->using_sg = 0;
 	dma->invalid = 1;
 }
@@ -275,6 +275,8 @@ GLOBAL_ALIAS(init_dma, get_dma_residue);
 
 #endif
 
+EXPORT_SYMBOL(request_dma);
+EXPORT_SYMBOL(free_dma);
 EXPORT_SYMBOL(enable_dma);
 EXPORT_SYMBOL(disable_dma);
 EXPORT_SYMBOL(set_dma_addr);

@@ -60,6 +60,7 @@
    ( (((x)&0x00ffffff) | (((x)&(0x30000000>>VIO_SHIFT))<<VIO_SHIFT)) + PIO_START )
 
 #ifndef __ASSEMBLY__
+#include <asm/types.h>
 
 #if 0
 # define __REG(x)	(*((volatile u32 *)io_p2v(x)))
@@ -93,17 +94,12 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
  * This must be called *before* the corresponding IRQ is registered.
  * Use this instead of directly setting GRER/GFER.
  */
+#define GPIO_NO_EDGES		0
 #define GPIO_FALLING_EDGE       1
 #define GPIO_RISING_EDGE        2
 #define GPIO_BOTH_EDGES         3
 #ifndef __ASSEMBLY__
 extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
-
-/*
- * Return the current CPU clock frequency in units of 100kHz
- */
-extern unsigned short get_cclk_frequency(void);
-
 #endif
 
 
@@ -145,9 +141,7 @@ extern unsigned short get_cclk_frequency(void);
 #include "empeg.h"
 #endif
 
-#ifdef CONFIG_SA1100_H3600
 #include "h3600.h"
-#endif
 
 #ifdef CONFIG_SA1100_ITSY
 #include "itsy.h"
@@ -185,6 +179,8 @@ extern unsigned short get_cclk_frequency(void);
 #include "adsbitsy.h"
 #endif
 
+#include "system3.h"
+
 #ifdef CONFIG_SA1101
 
 /*
@@ -209,21 +205,6 @@ extern unsigned short get_cclk_frequency(void);
 
 #if defined(CONFIG_SA1100_FLEXANET)
 #include "flexanet.h"
-#endif
-
-#ifdef CONFIG_SA1111
-
-/*
- * The SA1111 is always located at virtual 0xf4000000.
- */
-
-#define SA1111_VBASE		0xf4000000
-
-#define SA1111_p2v( x )         ((x) - SA1111_BASE + SA1111_VBASE)
-#define SA1111_v2p( x )         ((x) - SA1111_VBASE + SA1111_BASE)
-
-#include "SA-1111.h"
-
 #endif
 
 #endif  /* _ASM_ARCH_HARDWARE_H */

@@ -19,20 +19,6 @@
 static int debug_pci;
 int have_isa_bridge;
 
-struct pci_sys_data {
-	/*
-	 * The hardware we are attached to
-	 */
-	struct hw_pci	*hw;
-
-	unsigned long	mem_offset;
-
-	/*
-	 * These are the resources for the root bus.
-	 */
-	struct resource *resource[3];
-};
-
 void pcibios_report_status(u_int status_mask, int warn)
 {
 	struct pci_dev *dev;
@@ -153,8 +139,7 @@ static void __init pci_fixup_dec21285(struct pci_dev *dev)
 }
 
 /*
- * PCI IDE controllers use non-standard I/O port
- * decoding, respect it.
+ * PCI IDE controllers use non-standard I/O port decoding, respect it.
  */
 static void __init pci_fixup_ide_bases(struct pci_dev *dev)
 {
@@ -181,8 +166,81 @@ static void __init pci_fixup_dec21142(struct pci_dev *dev)
 	pci_write_config_dword(dev, 0x40, 0x80000000);
 }
 
+/*
+ * The CY82C693 needs some rather major fixups to ensure that it does
+ * the right thing.  Idea from the Alpha people, with a few additions.
+ *
+ * We ensure that the IDE base registers are set to 1f0/3f4 for the
+ * primary bus, and 170/374 for the secondary bus.  Also, hide them
+ * from the PCI subsystem view as well so we won't try to perform
+ * our own auto-configuration on them.
+ *
+ * In addition, we ensure that the PCI IDE interrupts are routed to
+ * IRQ 14 and IRQ 15 respectively.
+ *
+ * The above gets us to a point where the IDE on this device is
+ * functional.  However, The CY82C693U _does not work_ in bus
+ * master mode without locking the PCI bus solid.
+ */
+static void __init pci_fixup_cy82c693(struct pci_dev *dev)
+{
+	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
+		u32 base0, base1;
+
+		if (dev->class & 0x80) {	/* primary */
+			base0 = 0x1f0;
+			base1 = 0x3f4;
+		} else {			/* secondary */
+			base0 = 0x170;
+			base1 = 0x374;
+		}
+
+		pci_write_config_dword(dev, PCI_BASE_ADDRESS_0,
+				       base0 | PCI_BASE_ADDRESS_SPACE_IO);
+		pci_write_config_dword(dev, PCI_BASE_ADDRESS_1,
+				       base1 | PCI_BASE_ADDRESS_SPACE_IO);
+
+		dev->resource[0].start = 0;
+		dev->resource[0].end   = 0;
+		dev->resource[0].flags = 0;
+
+		dev->resource[1].start = 0;
+		dev->resource[1].end   = 0;
+		dev->resource[1].flags = 0;
+	} else if (PCI_FUNC(dev->devfn) == 0) {
+		/*
+		 * Setup IDE IRQ routing.
+		 */
+		pci_write_config_byte(dev, 0x4b, 14);
+		pci_write_config_byte(dev, 0x4c, 15);
+
+		/*
+		 * Disable FREQACK handshake, enable USB.
+		 */
+		pci_write_config_byte(dev, 0x4d, 0x41);
+
+		/*
+		 * Enable PCI retry, and PCI post-write buffer.
+		 */
+		pci_write_config_byte(dev, 0x44, 0x17);
+
+		/*
+		 * Enable ISA master and DMA post write buffering.
+		 */
+		pci_write_config_byte(dev, 0x45, 0x03);
+	}
+}
+
 struct pci_fixup pcibios_fixups[] = {
 	{
+		PCI_FIXUP_HEADER,
+		PCI_VENDOR_ID_CONTAQ,	PCI_DEVICE_ID_CONTAQ_82C693,
+		pci_fixup_cy82c693
+	}, {
+		PCI_FIXUP_HEADER,
+		PCI_VENDOR_ID_DEC,	PCI_DEVICE_ID_DEC_21142,
+		pci_fixup_dec21142
+	}, {
 		PCI_FIXUP_HEADER,
 		PCI_VENDOR_ID_DEC,	PCI_DEVICE_ID_DEC_21285,
 		pci_fixup_dec21285
@@ -198,10 +256,6 @@ struct pci_fixup pcibios_fixups[] = {
 		PCI_FIXUP_HEADER,
 		PCI_ANY_ID,		PCI_ANY_ID,
 		pci_fixup_ide_bases
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_DEC,	PCI_DEVICE_ID_DEC_21142,
-		pci_fixup_dec21142
 	}, { 0 }
 };
 
@@ -232,6 +286,8 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	val = res->start;
 	if (res->flags & IORESOURCE_MEM)
 		val -= sys->mem_offset;
+	else
+		val -= sys->io_offset;
 	val |= res->flags & PCI_REGION_FLAG_MASK;
 
 	pci_write_config_dword(dev, reg, val);
@@ -268,15 +324,19 @@ static inline int pdev_bad_for_parity(struct pci_dev *dev)
 static void __init
 pdev_fixup_device_resources(struct pci_sys_data *root, struct pci_dev *dev)
 {
+	unsigned long offset;
 	int i;
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		if (dev->resource[i].start == 0)
 			continue;
-		if (dev->resource[i].flags & IORESOURCE_MEM) {
-			dev->resource[i].start += root->mem_offset;
-			dev->resource[i].end   += root->mem_offset;
-		}
+		if (dev->resource[i].flags & IORESOURCE_MEM)
+			offset = root->mem_offset;
+		else
+			offset = root->io_offset;
+
+		dev->resource[i].start += offset;
+		dev->resource[i].end   += offset;
 	}
 }
 
@@ -388,15 +448,116 @@ pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *rang
 {
 	struct pci_sys_data *root = bus->sysdata;
 
+	ranges->io_start -= root->io_offset;
+	ranges->io_end -= root->io_offset;
 	ranges->mem_start -= root->mem_offset;
 	ranges->mem_end -= root->mem_offset;
 	ranges->prefetch_start -= root->mem_offset;
 	ranges->prefetch_end -= root->mem_offset;
 }
 
-u8 __init no_swizzle(struct pci_dev *dev, u8 *pin)
+/*
+ * This is the standard PCI-PCI bridge swizzling algorithm:
+ *
+ *   Dev: 0  1  2  3
+ *    A   A  B  C  D
+ *    B   B  C  D  A
+ *    C   C  D  A  B
+ *    D   D  A  B  C
+ *        ^^^^^^^^^^ irq pin on bridge
+ */
+u8 __devinit pci_std_swizzle(struct pci_dev *dev, u8 *pinp)
 {
-	return 0;
+	int pin = *pinp;
+
+	if (pin != 0) {
+		pin -= 1;
+		while (dev->bus->self) {
+			pin = (pin + PCI_SLOT(dev->devfn)) & 3;
+			/*
+			 * move up the chain of bridges,
+			 * swizzling as we go.
+			 */
+			dev = dev->bus->self;
+		}
+		*pinp = pin + 1;
+	}
+
+	return PCI_SLOT(dev->devfn);
+}
+
+/*
+ * Swizzle the device pin each time we cross a bridge.
+ * This might update pin and returns the slot number.
+ */
+static u8 __devinit pcibios_swizzle(struct pci_dev *dev, u8 *pin)
+{
+	struct pci_sys_data *sys = dev->sysdata;
+	int slot = 0, oldpin = *pin;
+
+	if (sys->swizzle)
+		slot = sys->swizzle(dev, pin);
+
+	if (debug_pci)
+		printk("PCI: %s swizzling pin %d => pin %d slot %d\n",
+			dev->slot_name, oldpin, *pin, slot);
+
+	return slot;
+}
+
+/*
+ * Map a slot/pin to an IRQ.
+ */
+static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+{
+	struct pci_sys_data *sys = dev->sysdata;
+	int irq = -1;
+
+	if (sys->map_irq)
+		irq = sys->map_irq(dev, slot, pin);
+
+	if (debug_pci)
+		printk("PCI: %s mapping slot %d pin %d => irq %d\n",
+			dev->slot_name, slot, pin, irq);
+
+	return irq;
+}
+
+static void __init pcibios_init_hw(struct hw_pci *hw)
+{
+	struct pci_sys_data *sys = NULL;
+	int ret;
+	int nr, busnr;
+
+	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+		sys = kmalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+		if (!sys)
+			panic("PCI: unable to allocate sys data!");
+
+		memset(sys, 0, sizeof(struct pci_sys_data));
+
+		sys->hw      = hw;
+		sys->busnr   = busnr;
+		sys->swizzle = hw->swizzle;
+		sys->map_irq = hw->map_irq;
+		sys->resource[0] = &ioport_resource;
+		sys->resource[1] = &iomem_resource;
+
+		ret = hw->setup(nr, sys);
+
+		if (ret > 0) {
+			sys->bus = hw->scan(nr, sys);
+
+			if (!sys->bus)
+				panic("PCI: unable to scan bus!");
+
+			busnr = sys->bus->subordinate + 1;
+		} else if (ret < 0)
+			break;
+	}
+
+	kfree(sys);
+
 }
 
 extern struct hw_pci ebsa285_pci;
@@ -406,10 +567,10 @@ extern struct hw_pci personal_server_pci;
 extern struct hw_pci ftv_pci;
 extern struct hw_pci shark_pci;
 extern struct hw_pci integrator_pci;
+extern struct hw_pci iq80310_pci;
 
 void __init pcibios_init(void)
 {
-	struct pci_sys_data *root;
 	struct hw_pci *hw = NULL;
 
 	do {
@@ -455,44 +616,28 @@ void __init pcibios_init(void)
 			break;
 		}
 #endif
+#ifdef CONFIG_ARCH_IQ80310
+		if (machine_is_iq80310()) {
+			hw = &iq80310_pci;
+			break;
+		}
+#endif
 	} while (0);
 
 	if (hw == NULL)
 		return;
 
-	root = kmalloc(sizeof(*root), GFP_KERNEL);
-	if (!root)
-		panic("PCI: unable to allocate root data!");
-
-	root->hw = hw;
-	root->mem_offset = hw->mem_offset;
-
-	memset(root->resource, 0, sizeof(root->resource));
-
-	/*
-	 * Setup the resources for this bus.
-	 *   resource[0] - IO ports
-	 *   resource[1] - non-prefetchable memory
-	 *   resource[2] - prefetchable memory
-	 */
-	if (root->hw->setup_resources)
-		root->hw->setup_resources(root->resource);
-	else {
-		root->resource[0] = &ioport_resource;
-		root->resource[1] = &iomem_resource;
-		root->resource[2] = NULL;
-	}
-
-	/*
-	 * Set up the host bridge, and scan the bus.
-	 */
-	root->hw->init(root);
+	if (hw->preinit)
+		hw->preinit();
+	pcibios_init_hw(hw);
+	if (hw->postinit)
+		hw->postinit();
 
 	/*
 	 * Assign any unassigned resources.
 	 */
 	pci_assign_unassigned_resources();
-	pci_fixup_irqs(root->hw->swizzle, root->hw->map_irq);
+	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
 }
 
 char * __init pcibios_setup(char *str)

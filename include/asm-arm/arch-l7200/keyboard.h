@@ -17,6 +17,8 @@
 
 #include <asm/irq.h>
 
+#error This needs fixing --rmk
+
 /*
  * Layout of L7200 keyboard registers
  */

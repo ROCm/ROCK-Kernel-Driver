@@ -240,6 +240,10 @@
 #define __NR_mincore			(__NR_SYSCALL_BASE+219)
 #define __NR_madvise			(__NR_SYSCALL_BASE+220)
 #define __NR_fcntl64			(__NR_SYSCALL_BASE+221)
+					/* 222 for tux */
+#define __NR_security			(__NR_SYSCALL_BASE+223)
+#define __NR_gettid			(__NR_SYSCALL_BASE+224)
+#define __NR_readahead			(__NR_SYSCALL_BASE+225)
 
 /*
  * The following SWIs are ARM private.
@@ -356,6 +360,9 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5) {			\
 }
 
 #ifdef __KERNEL_SYSCALLS__
+
+struct rusage;
+asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru);
 
 static inline long idle(void)
 {

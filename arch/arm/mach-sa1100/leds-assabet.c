@@ -42,6 +42,8 @@ void assabet_leds_event(led_event_t evt)
 
 	case led_stop:
 		led_state &= ~LED_STATE_ENABLED;
+		hw_led_state = ASSABET_BCR_LED_RED | ASSABET_BCR_LED_GREEN;
+		ASSABET_BCR_frob(ASSABET_BCR_LED_MASK, hw_led_state);
 		break;
 
 	case led_claim:
@@ -107,8 +109,7 @@ void assabet_leds_event(led_event_t evt)
 	}
 
 	if  (led_state & LED_STATE_ENABLED)
-		ASSABET_BCR = BCR_value = (BCR_value & ~ASSABET_BCR_LED_MASK) |
-			hw_led_state;
+		ASSABET_BCR_frob(ASSABET_BCR_LED_MASK, hw_led_state);
 
 	local_irq_restore(flags);
 }

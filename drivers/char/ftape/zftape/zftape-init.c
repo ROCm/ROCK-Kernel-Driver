@@ -112,11 +112,11 @@ static int zft_open(struct inode *ino, struct file *filep)
 	int result;
 	TRACE_FUN(ft_t_flow);
 
-	TRACE(ft_t_flow, "called for minor %d", MINOR(ino->i_rdev));
+	TRACE(ft_t_flow, "called for minor %d", minor(ino->i_rdev));
 	if ( test_and_set_bit(0,&busy_flag) ) {
 		TRACE_ABORT(-EBUSY, ft_t_warn, "failed: already busy");
 	}
-	if ((MINOR(ino->i_rdev) & ~(ZFT_MINOR_OP_MASK | FTAPE_NO_REWIND))
+	if ((minor(ino->i_rdev) & ~(ZFT_MINOR_OP_MASK | FTAPE_NO_REWIND))
 	     > 
 	    FTAPE_SEL_D) {
 		clear_bit(0,&busy_flag);
@@ -124,7 +124,7 @@ static int zft_open(struct inode *ino, struct file *filep)
 	}
 	orig_sigmask = current->blocked;
 	sigfillset(&current->blocked);
-	result = _zft_open(MINOR(ino->i_rdev), filep->f_flags & O_ACCMODE);
+	result = _zft_open(minor(ino->i_rdev), filep->f_flags & O_ACCMODE);
 	if (result < 0) {
 		current->blocked = orig_sigmask; /* restore mask */
 		clear_bit(0,&busy_flag);
@@ -146,7 +146,7 @@ static int zft_close(struct inode *ino, struct file *filep)
 	int result;
 	TRACE_FUN(ft_t_flow);
 
-	if ( !test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit) {
+	if ( !test_bit(0,&busy_flag) || minor(ino->i_rdev) != zft_unit) {
 		TRACE(ft_t_err, "failed: not busy or wrong unit");
 		TRACE_EXIT 0;
 	}
@@ -169,7 +169,7 @@ static int zft_ioctl(struct inode *ino, struct file *filep,
 	sigset_t old_sigmask;
 	TRACE_FUN(ft_t_flow);
 
-	if ( !test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if ( !test_bit(0,&busy_flag) || minor(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}
@@ -190,7 +190,7 @@ static int  zft_mmap(struct file *filep, struct vm_area_struct *vma)
 	TRACE_FUN(ft_t_flow);
 
 	if ( !test_bit(0,&busy_flag) || 
-	    MINOR(filep->f_dentry->d_inode->i_rdev) != zft_unit || 
+	    minor(filep->f_dentry->d_inode->i_rdev) != zft_unit || 
 	    ft_failure)
 	{
 		TRACE_ABORT(-EIO, ft_t_err,
@@ -219,7 +219,7 @@ static ssize_t zft_read(struct file *fp, char *buff,
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_data_flow, "called with count: %ld", (unsigned long)req_len);
-	if (!test_bit(0,&busy_flag)  || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if (!test_bit(0,&busy_flag)  || minor(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}
@@ -242,7 +242,7 @@ static ssize_t zft_write(struct file *fp, const char *buff,
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_flow, "called with count: %ld", (unsigned long)req_len);
-	if (!test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if (!test_bit(0,&busy_flag) || minor(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}

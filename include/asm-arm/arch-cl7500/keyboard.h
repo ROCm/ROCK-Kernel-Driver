@@ -6,6 +6,7 @@
  *
  * Copyright (C) 1998-2001 Russell King
  */
+#include <asm/irq.h>
 #define NR_SCANCODES 128
 
 extern int ps2kbd_init_hw(void);

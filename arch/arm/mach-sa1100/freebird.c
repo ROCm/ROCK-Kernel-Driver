@@ -21,6 +21,35 @@
 unsigned long BCR_value = BCR_DB1110;
 EXPORT_SYMBOL(BCR_value);
 
+static void freebird_backlight_power(int on)
+{
+#error FIXME
+	if (on) {
+		BCR_set(BCR_FREEBIRD_LCD_PWR | BCR_FREEBIRD_LCD_DISP);
+		/* Turn on backlight, Chester */
+		BCR_set(BCR_FREEBIRD_LCD_BACKLIGHT);
+	} else {
+		BCR_clear(BCR_FREEBIRD_LCD_PWR | BCR_FREEBIRD_LCD_DISP
+			  /* | BCR_FREEBIRD_LCD_BACKLIGHT */);
+	}
+}
+
+static void freebird_lcd_power(int on)
+{
+}
+
+static int __init freebird_init(void)
+{
+	if (machine_is_freebird()) {
+		sa1100fb_backlight_power = freebird_backlight_power;
+		sa1100fb_lcd_power = freebird_lcd_power;
+
+		set_GPIO_IRQ_edge(GPIO_FREEBIRD_UCB1300, GPIO_RISING_EDGE);
+	}
+	return 0;
+}
+
+__initcall(freebird_init);
 
 static void __init
 fixup_freebird(struct machine_desc *desc, struct param_struct *params,
@@ -37,7 +66,6 @@ fixup_freebird(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc freebird_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
   { 0xf0000000, 0x12000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Board Control Register */
   { 0xf2000000, 0x19000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0},
    LAST_DESC

@@ -1018,7 +1018,7 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 		(int) filp, tty->device);
 #endif
 
-	minordev = MINOR(tty->device);
+	minordev = minor(tty->device);
 	brdnr = MINOR2BRD(minordev);
 	if (brdnr >= stl_nrbrds)
 		return(-ENODEV);
@@ -3133,7 +3133,7 @@ static int stl_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, uns
 		(int) fp, cmd, (int) arg);
 #endif
 
-	brdnr = MINOR(ip->i_rdev);
+	brdnr = minor(ip->i_rdev);
 	if (brdnr >= STL_MAXBRDS)
 		return(-ENODEV);
 	rc = 0;

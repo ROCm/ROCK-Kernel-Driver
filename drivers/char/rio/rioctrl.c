@@ -1737,15 +1737,15 @@ RIO_DEBUG_CTRL, 				if (su)
 
 					switch ( (uint)arg & RIO_DEV_MASK ) {
 						case RIO_DEV_DIRECT:
-							arg = (caddr_t)drv_makedev(major(dev), port);
+							arg = (caddr_t)drv_makedev(MAJOR(dev), port);
 							rio_dprintk (RIO_DEBUG_CTRL, "Makedev direct 0x%x is 0x%x\n",port, (int)arg);
 							return (int)arg;
 					 	case RIO_DEV_MODEM:
-							arg =  (caddr_t)drv_makedev(major(dev), (port|RIO_MODEM_BIT) );
+							arg =  (caddr_t)drv_makedev(MAJOR(dev), (port|RIO_MODEM_BIT) );
 							rio_dprintk (RIO_DEBUG_CTRL, "Makedev modem 0x%x is 0x%x\n",port, (int)arg);
 							return (int)arg;
 						case RIO_DEV_XPRINT:
-							arg = (caddr_t)drv_makedev(major(dev), port);
+							arg = (caddr_t)drv_makedev(MAJOR(dev), port);
 							rio_dprintk (RIO_DEBUG_CTRL, "Makedev printer 0x%x is 0x%x\n",port, (int)arg);
 							return (int)arg;
 					}

@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-rpc/vmalloc.h
+ * linux/include/asm-arm/arch-tbox/vmalloc.h
  */
 
 /*

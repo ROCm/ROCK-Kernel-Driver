@@ -114,9 +114,11 @@ extern void pci_v3_setup_resources(struct resource **res);
 extern void pci_v3_init(void *);
 
 struct hw_pci integrator_pci __initdata = {
-	setup_resources:	pci_v3_setup_resources,
-	init:			pci_v3_init,
 	mem_offset:		0x40000000,
 	swizzle:		integrator_swizzle,
 	map_irq:		integrator_map_irq,
+	setup:			pci_v3_setup,
+	scan:			pci_v3_scan_bus,
+	preinit:		pci_v3_preinit,
+	postinit:		pci_v3_postinit,
 };

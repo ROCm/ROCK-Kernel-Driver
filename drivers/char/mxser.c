@@ -91,7 +91,7 @@
 #define 	UART_MCR_AFE		0x20
 #define 	UART_LSR_SPECIAL	0x1E
 
-#define PORTNO(x)		(MINOR((x)->device) - (x)->driver.minor_start)
+#define PORTNO(x)		(minor((x)->device) - (x)->driver.minor_start)
 
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 

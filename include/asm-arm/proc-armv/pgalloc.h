@@ -46,13 +46,12 @@ static inline void pte_free_slow(pte_t *pte)
  * If 'mm' is the init tasks mm, then we are doing a vmalloc, and we
  * need to set stuff up correctly for it.
  */
-#define pmd_populate(mm,pmdp,pte)			\
-	do {						\
-		unsigned long __prot;			\
-		if (mm == &init_mm)			\
-			__prot = _PAGE_KERNEL_TABLE;	\
-		else					\
-			__prot = _PAGE_USER_TABLE;	\
-		set_pmd(pmdp, __mk_pmd(pte, __prot));	\
+#define pmd_populate(mm,pmdp,pte)				\
+	do {							\
+		unsigned long __prot;				\
+		if (mm == &init_mm)				\
+			__prot = _PAGE_KERNEL_TABLE;		\
+		else						\
+			__prot = _PAGE_USER_TABLE;		\
+		set_pmd(pmdp, __mk_pmd(pte, __prot));		\
 	} while (0)
-

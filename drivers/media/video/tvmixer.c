@@ -177,7 +177,7 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 static int tvmixer_open(struct inode *inode, struct file *file)
 {
-        int i, minor = MINOR(inode->i_rdev);
+        int i, minor = minor(inode->i_rdev);
         struct TVMIXER *mix = NULL;
 	struct i2c_client *client = NULL;
 

@@ -9,7 +9,7 @@
 
 LINKFLAGS	:=-p -X -T arch/arm/vmlinux.lds
 GZFLAGS		:=-9
-CFLAGS		+=-fno-common -pipe
+CFLAGS		+=-pipe
 
 ifneq ($(CONFIG_NO_FRAME_POINTER),y)
 CFLAGS		:=$(CFLAGS:-fomit-frame-pointer=)
@@ -22,9 +22,7 @@ endif
 # Select CPU dependent flags.  Note that order of declaration is important;
 # the options further down the list override previous items.
 #
-# Note!  For APCS-26 YOU MUST HAVE AN APCS-26 LIBGCC.A
-#
-apcs-y				:=-mapcs-32
+apcs-$(CONFIG_CPU_32)		:=-mapcs-32
 apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3 -Os
 
 # This selects which instruction set is used.
@@ -32,6 +30,7 @@ arch-y				:=
 arch-$(CONFIG_CPU_32v3)		:=-march=armv3
 arch-$(CONFIG_CPU_32v4)		:=-march=armv4
 arch-$(CONFIG_CPU_32v5)		:=-march=armv5
+arch-$(CONFIG_CPU_XSCALE)	:=-march=armv4 -Wa,-mxscale #-march=armv5te
 
 # This selects how we optimise for the processor.
 tune-y				:=
@@ -39,15 +38,19 @@ tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
 tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
 tune-$(CONFIG_CPU_ARM720T)	:=-mtune=arm7tdmi
 tune-$(CONFIG_CPU_ARM920T)	:=-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM922T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
+tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm #-mtune=xscale
 
+CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
 AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float
 
 ifeq ($(CONFIG_CPU_26),y)
-PROCESSOR	 = armo
+PROCESSOR	:= armo
+HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
   ifeq ($(CONFIG_ROM_KERNEL),y)
     DATAADDR	 = 0x02080000
     TEXTADDR	 = 0x03800000
@@ -60,6 +63,7 @@ endif
 
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	 = armv
+HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 TEXTADDR	 = 0xC0008000
 LDSCRIPT	 = arch/arm/vmlinux-armv.lds.in
 endif
@@ -134,51 +138,55 @@ ifeq ($(CONFIG_ARCH_ANAKIN),y)
 MACHINE		 = anakin
 endif
 
-export	MACHINE PROCESSOR TEXTADDR GZFLAGS
+ifeq ($(CONFIG_ARCH_IOP310),y)
+MACHINE		 = iop310
+endif
+
+ifeq ($(CONFIG_ARCH_ADIFCC),y)
+MACHINE		= adifcc
+endif
+
+export	MACHINE PROCESSOR TEXTADDR GZFLAGS CFLAGS_BOOT
 
 # Only set INCDIR if its not already defined above
 # Grr, ?= doesn't work as all the other assignment operators do.  Make bug?
 ifeq ($(origin INCDIR), undefined)
-INCDIR		:= $(MACHINE)
+INCDIR		:=$(MACHINE)
 endif
 
 ifeq ($(origin DATAADDR), undefined)
 DATAADDR	:= .
 endif
 
-# If we have a machine-specific directory, then include it in the build.
-MACHDIR		:= arch/arm/mach-$(MACHINE)
-ifeq ($(MACHDIR),$(wildcard $(MACHDIR)))
-SUBDIRS		+= $(MACHDIR)
-CORE_FILES	:= $(MACHDIR)/$(MACHINE).o $(CORE_FILES)
+# Do we have FASTFPE?
+FASTFPE		:=arch/arm/fastfpe
+ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
+SUBDIRS		+=$(FASTFPE)
+FASTFPE_OBJ	:=$(FASTFPE)/fast-math-emu.o
 endif
 
-HEAD		:= arch/arm/kernel/head-$(PROCESSOR).o \
-		   arch/arm/kernel/init_task.o
-SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe
-CORE_FILES	:= arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
-LIBS		:= arch/arm/lib/lib.a $(LIBS)
+# If we have a machine-specific directory, then include it in the build.
+SUBDIRS		+=arch/arm/mach-$(MACHINE) \
+		  arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe
+CORE_FILES	:=arch/arm/mach-$(MACHINE)/$(MACHINE).o \
+		  arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
+LIBS		:=arch/arm/lib/lib.a $(LIBS)
 
 ifeq ($(CONFIG_FPE_NWFPE),y)
-LIBS		:= arch/arm/nwfpe/math-emu.o $(LIBS)
+LIBS		:=arch/arm/nwfpe/math-emu.o $(LIBS)
 endif
 
-# Only include fastfpe if it is part of the kernel tree.
-FASTFPE		:= arch/arm/fastfpe
-ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
-SUBDIRS		+= $(FASTFPE)
 ifeq ($(CONFIG_FPE_FASTFPE),y)
-LIBS		:= arch/arm/fastfpe/fast-math-emu.o $(LIBS)
-endif
+LIBS		:=$(FASTFPE_OBJ) $(LIBS)
 endif
 
 ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
-SUBDIRS		+= drivers/acorn/char
-DRIVERS		+= drivers/acorn/char/acorn-char.o
+SUBDIRS		+=drivers/acorn/char
+DRIVERS		+=drivers/acorn/char/acorn-char.o
 endif
 
-MAKEBOOT	 = $(MAKE) -C arch/$(ARCH)/boot
-MAKETOOLS	 = $(MAKE) -C arch/$(ARCH)/tools
+MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
+MAKETOOLS	 =$(MAKE) -C arch/$(ARCH)/tools
 
 # The following is a hack to get 'constants.h' up
 # to date before starting compilation
@@ -254,7 +262,7 @@ bp:;	@$(MAKEBOOT) bootpImage
 	@( \
 	CFG=$(@:_config=); \
 	if [ -f arch/arm/def-configs/$$CFG ]; then \
-	  [ -f .config ] && $(MV) .config .config.old; \
+	  [ -f .config ] && mv -f .config .config.old; \
 	  cp arch/arm/def-configs/$$CFG .config; \
 	  echo "*** Default configuration for $$CFG installed"; \
 	  echo "*** Next, you may run 'make oldconfig'"; \

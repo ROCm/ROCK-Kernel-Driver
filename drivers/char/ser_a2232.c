@@ -460,7 +460,7 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 	int retval;
 	struct a2232_port *port;
 
-	line = MINOR(tty->device);
+	line = minor(tty->device);
 	port = &a2232_ports[line];
 	
 	tty->driver_data = port;

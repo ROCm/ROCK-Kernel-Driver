@@ -248,18 +248,18 @@ serial_paranoia_check(struct cyclades_port *info,
 	"Warning: cyclades_port out of range for (%d, %d) in %s\n";
 
     if (!info) {
-	printk(badinfo, MAJOR(device), MINOR(device), routine);
+	printk(badinfo, major(device), minor(device), routine);
 	return 1;
     }
 
     if( (long)info < (long)(&cy_port[0])
     || (long)(&cy_port[NR_PORTS]) < (long)info ){
-	printk(badrange, MAJOR(device), MINOR(device), routine);
+	printk(badrange, major(device), minor(device), routine);
 	return 1;
     }
 
     if (info->magic != CYCLADES_MAGIC) {
-	printk(badmagic, MAJOR(device), MINOR(device), routine);
+	printk(badmagic, major(device), minor(device), routine);
 	return 1;
     }
 #endif
@@ -2132,7 +2132,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
   int retval, line;
 
 /* CP('O'); */
-    line = MINOR(tty->device) - tty->driver.minor_start;
+    line = minor(tty->device) - tty->driver.minor_start;
     if ((line < 0) || (NR_PORTS <= line)){
         return -ENODEV;
     }
@@ -2807,7 +2807,7 @@ void serial167_console_write(struct console *co, const char *str, unsigned count
 
 static kdev_t serial167_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 

@@ -113,7 +113,6 @@ static void __init graphicsclient_init_irq(void)
 		irq_desc[irq].mask	= ADS_mask_irq1;
 		irq_desc[irq].unmask	= ADS_unmask_irq1;
 	}
-	GPDR &= ~GPIO_GPIO0;
 	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_FALLING_EDGE);
 	setup_arm_irq( IRQ_GPIO0, &ADS_ext_irq );
 }
@@ -138,7 +137,6 @@ fixup_graphicsclient(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc graphicsclient_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x08000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 1 */
   { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
   { 0xf1000000, 0x18000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CAN */
   LAST_DESC
@@ -193,11 +191,7 @@ graphicsclient_uart_open(struct uart_port *port, struct uart_info *info)
 	if (port->mapbase == _Ser1UTCR0) {
 		Ser1SDCR0 |= SDCR0_UART;
 		/* Set RTS Output */
-		GPDR |= GPIO_GC_UART0_RTS;
 		GPSR  = GPIO_GC_UART0_RTS;
-
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GC_UART0_CTS;
 
 		gc_uart_ctrl_data[0].cts_prev_state = 0;
 		gc_uart_ctrl_data[0].info = info;
@@ -210,11 +204,7 @@ graphicsclient_uart_open(struct uart_port *port, struct uart_info *info)
 	} else if (port->mapbase == _Ser2UTCR0) {
 		Ser2UTCR4 = Ser2HSCR0 = 0;
 		/* Set RTS Output */
-		GPDR |= GPIO_GC_UART1_RTS;
 		GPSR  = GPIO_GC_UART1_RTS;
-
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GC_UART1_RTS;
 
 		gc_uart_ctrl_data[1].cts_prev_state = 0;
 		gc_uart_ctrl_data[1].info = info;
@@ -226,11 +216,7 @@ graphicsclient_uart_open(struct uart_port *port, struct uart_info *info)
 							&gc_uart_ctrl_data[1]);
 	} else if (port->mapbase == _Ser3UTCR0) {
 		/* Set RTS Output */
-		GPDR |= GPIO_GC_UART2_RTS;
 		GPSR =	GPIO_GC_UART2_RTS;
-
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GC_UART2_RTS;
 
 		gc_uart_ctrl_data[2].cts_prev_state = 0;
 		gc_uart_ctrl_data[2].info = info;
@@ -258,9 +244,9 @@ graphicsclient_uart_close(struct uart_port *port, struct uart_info *info)
 	return 0;
 }
 
-static int graphicsclient_get_mctrl(struct uart_port *port)
+static u_int graphicsclient_get_mctrl(struct uart_port *port)
 {
-	int result = TIOCM_CD | TIOCM_DSR;
+	u_int result = TIOCM_CD | TIOCM_DSR;
 
 	if (port->mapbase == _Ser1UTCR0) {
 		if (!(GPLR & GPIO_GC_UART0_CTS))
@@ -326,6 +312,8 @@ static void __init graphicsclient_map_io(void)
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 	sa1100_register_uart(2, 2);
+	GPDR |= GPIO_GC_UART0_RTS | GPIO_GC_UART1_RTS | GPIO_GC_UART2_RTS;
+	GPDR &= ~(GPIO_GC_UART0_CTS | GPIO_GC_UART1_RTS | GPIO_GC_UART2_RTS);
 }
 
 MACHINE_START(GRAPHICSCLIENT, "ADS GraphicsClient")

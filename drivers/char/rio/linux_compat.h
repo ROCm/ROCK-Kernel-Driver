@@ -60,9 +60,6 @@ struct ttystatics {
 
 #define getpid()    (current->pid)
 
-#define major(dev) MAJOR(dev)
-#define minor(dev) MINOR(dev)
-
 #define QSIZE SERIAL_XMIT_SIZE
 
 #define pseterr(errno) return (- errno)

@@ -73,6 +73,4 @@ static inline void __arch_putw(unsigned int value, unsigned long a)
 #define outw(v,p)		outw_t(v,p)
 #define outl(v,p)		outl_t(v,p)
 
-#define __arch_ioremap		__ioremap
-
 #endif

@@ -548,7 +548,7 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 		return -EIO;
 	}
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	rs_dprintk (TX3912_UART_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p)\n", 
 	            (int) current->pid, line, tty, current->tty);
 
@@ -1007,7 +1007,7 @@ static void serial_console_write(struct console *co, const char *s,
 
 static kdev_t serial_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 static __init int serial_console_setup(struct console *co, char *options)

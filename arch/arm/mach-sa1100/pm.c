@@ -19,29 +19,26 @@
  * 			Cleaned up, pushed platform dependent stuff
  * 			in the platform specific files.
  */
-
-/*
- * Debug macros
- */
-#define DEBUG 1
-#ifdef DEBUG
-#  define DPRINTK(fmt, args...)	printk("%s: " fmt, __FUNCTION__ , ## args)
-#else
-#  define DPRINTK(fmt, args...)
-#endif
-
-
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/sysctl.h>
-#include <linux/acpi.h>
+#include <linux/errno.h>
 
 #include <asm/hardware.h>
 #include <asm/memory.h>
 #include <asm/system.h>
+#include <asm/leds.h>
 
 #include "sleep.h"
+
+/*
+ * Debug macros
+ */
+#undef DEBUG
 
 extern void sa1100_cpu_suspend(void);
 extern void sa1100_cpu_resume(void);
@@ -57,18 +54,15 @@ int pm_do_suspend(void)
 	int retval;
 
 	/* set up pointer to sleep parameters */
-	sleep_save = kmalloc (SLEEP_SAVE_SIZE*sizeof(long), GFP_ATOMIC);
+	sleep_save = kmalloc(SLEEP_SAVE_SIZE*sizeof(long), GFP_ATOMIC);
 	if (!sleep_save)
 		return -ENOMEM;
+
 	sleep_save_p = virt_to_phys(sleep_save);
 
-	retval = pm_send_all(PM_SUSPEND, (void *)2);
-	if (retval) {
-		kfree(sleep_save);
-		return retval;
-	}
-
 	cli();
+
+	leds_event(led_stop);
 
 	/* preserve current time */
 	RCNR = xtime.tv_sec;
@@ -112,7 +106,9 @@ int pm_do_suspend(void)
 	/* ensure not to come back here if it wasn't intended */
 	PSPR = 0;
 
-	DPRINTK("*** made it back from resume\n");
+#ifdef DEBUG
+	printk("*** made it back from resume\n");
+#endif
 
 	/* restore registers */
 	RESTORE(GPDR);
@@ -146,21 +142,61 @@ int pm_do_suspend(void)
 	/* restore current time */
 	xtime.tv_sec = RCNR;
 
+	leds_event(led_start);
+
 	sti();
 
 	kfree (sleep_save);
 
-	retval = pm_send_all(PM_RESUME, (void *)0);
-	if (retval)
-		return retval;
+	/*
+	 * Restore the CPU frequency settings.
+	 */
+#ifdef CONFIG_CPU_FREQ
+	cpufreq_restore();
+#endif
 
 	return 0;
+}
+
+#ifdef CONFIG_SYSCTL
+/*
+ * ARGH!  ACPI people defined CTL_ACPI in linux/acpi.h rather than
+ * linux/sysctl.h.
+ *
+ * This means our interface here won't survive long - it needs a new
+ * interface.  Quick hack to get this working - use sysctl id 9999.
+ */
+#warning ACPI broke the kernel, this interface needs to be fixed up.
+#define CTL_ACPI 9999
+#define ACPI_S1_SLP_TYP 19
+
+/*
+ * Send us to sleep.  We must not be called from IRQ context.
+ */
+static int sysctl_pm_do_suspend(void)
+{
+	int retval;
+
+	if (in_interrupt()) {
+		printk(KERN_CRIT "pm_do_suspend() called from IRQ\n");
+		return -EINVAL;
+	}
+
+	retval = pm_send_all(PM_SUSPEND, (void *)3);
+
+	if (retval == 0) {
+		retval = __pm_do_suspend();
+
+		pm_send_all(PM_RESUME, (void *)0);
+	}
+
+	return retval;
 }
 
 
 static struct ctl_table pm_table[] =
 {
-	{ACPI_S1_SLP_TYP, "suspend", NULL, 0, 0600, NULL, (proc_handler *)&pm_do_suspend},
+	{ACPI_S1_SLP_TYP, "suspend", NULL, 0, 0600, NULL, (proc_handler *)&sysctl_pm_do_suspend},
 	{0}
 };
 
@@ -181,3 +217,4 @@ static int __init pm_init(void)
 
 __initcall(pm_init);
 
+#endif

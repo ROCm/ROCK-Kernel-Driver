@@ -22,12 +22,10 @@
  * Our do_softirq out of line code.  See include/asm-arm/softirq.h for
  * the calling assembly.
  */
-	.section ".text.lock","ax"
 ENTRY(__do_softirq)
 	stmfd	sp!, {r0 - r3, ip, lr}
 	bl	do_softirq
 	ldmfd	sp!, {r0 - r3, ip, pc}
-	.previous
 
 	.align	5
 /*

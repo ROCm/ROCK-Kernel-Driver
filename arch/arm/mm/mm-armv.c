@@ -30,8 +30,8 @@
  */
 static int __init nocache_setup(char *__unused)
 {
-	cr_alignment &= ~4;
-	cr_no_alignment &= ~4;
+	cr_alignment &= ~CR1_C;
+	cr_no_alignment &= ~CR1_C;
 	flush_cache_all();
 	set_cr(cr_alignment);
 	return 1;
@@ -39,8 +39,8 @@ static int __init nocache_setup(char *__unused)
 
 static int __init nowrite_setup(char *__unused)
 {
-	cr_alignment &= ~(8|4);
-	cr_no_alignment &= ~(8|4);
+	cr_alignment &= ~(CR1_W|CR1_C);
+	cr_no_alignment &= ~(CR1_W|CR1_C);
 	flush_cache_all();
 	set_cr(cr_alignment);
 	return 1;
@@ -48,8 +48,8 @@ static int __init nowrite_setup(char *__unused)
 
 static int __init noalign_setup(char *__unused)
 {
-	cr_alignment &= ~2;
-	cr_no_alignment &= ~2;
+	cr_alignment &= ~CR1_A;
+	cr_no_alignment &= ~CR1_A;
 	set_cr(cr_alignment);
 	return 1;
 }

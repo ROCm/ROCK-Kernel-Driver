@@ -11,43 +11,40 @@
  * Single CPU
  */
 #ifdef __STDC__
-#define __cpu_fn(name,x)	cpu_##name##x
+#define __catify_fn(name,x)	name##x
 #else
-#define __cpu_fn(name,x)	cpu_/**/name/**/x
+#define __catify_fn(name,x)	name/**/x
 #endif
-#define cpu_fn(name,x)		__cpu_fn(name,x)
+#define __cpu_fn(name,x)	__catify_fn(name,x)
 
 /*
  * If we are supporting multiple CPUs, then we must use a table of
  * function pointers for this lot.  Otherwise, we can optimise the
  * table away.
  */
-#define cpu_data_abort			cpu_fn(CPU_NAME,_data_abort)
-#define cpu_check_bugs			cpu_fn(CPU_NAME,_check_bugs)
-#define cpu_proc_init			cpu_fn(CPU_NAME,_proc_init)
-#define cpu_proc_fin			cpu_fn(CPU_NAME,_proc_fin)
-#define cpu_reset			cpu_fn(CPU_NAME,_reset)
-#define cpu_do_idle			cpu_fn(CPU_NAME,_do_idle)
-
-#define cpu_cache_clean_invalidate_all	cpu_fn(CPU_NAME,_cache_clean_invalidate_all)
-#define cpu_cache_clean_invalidate_range cpu_fn(CPU_NAME,_cache_clean_invalidate_range)
-#define cpu_flush_ram_page		cpu_fn(CPU_NAME,_flush_ram_page)
-
-#define cpu_dcache_invalidate_range	cpu_fn(CPU_NAME,_dcache_invalidate_range)
-#define cpu_dcache_clean_range		cpu_fn(CPU_NAME,_dcache_clean_range)
-#define cpu_dcache_clean_page		cpu_fn(CPU_NAME,_dcache_clean_page)
-#define cpu_dcache_clean_entry		cpu_fn(CPU_NAME,_dcache_clean_entry)
-
-#define cpu_icache_invalidate_range	cpu_fn(CPU_NAME,_icache_invalidate_range)
-#define cpu_icache_invalidate_page	cpu_fn(CPU_NAME,_icache_invalidate_page)
-
-#define cpu_tlb_invalidate_all		cpu_fn(CPU_NAME,_tlb_invalidate_all)
-#define cpu_tlb_invalidate_range	cpu_fn(CPU_NAME,_tlb_invalidate_range)
-#define cpu_tlb_invalidate_page		cpu_fn(CPU_NAME,_tlb_invalidate_page)
-
-#define cpu_set_pgd			cpu_fn(CPU_NAME,_set_pgd)
-#define cpu_set_pmd			cpu_fn(CPU_NAME,_set_pmd)
-#define cpu_set_pte			cpu_fn(CPU_NAME,_set_pte)
+#define cpu_data_abort			__cpu_fn(CPU_ABRT,_abort)
+#define cpu_check_bugs			__cpu_fn(CPU_NAME,_check_bugs)
+#define cpu_proc_init			__cpu_fn(CPU_NAME,_proc_init)
+#define cpu_proc_fin			__cpu_fn(CPU_NAME,_proc_fin)
+#define cpu_reset			__cpu_fn(CPU_NAME,_reset)
+#define cpu_do_idle			__cpu_fn(CPU_NAME,_do_idle)
+#define cpu_cache_clean_invalidate_all	__cpu_fn(CPU_NAME,_cache_clean_invalidate_all)
+#define cpu_cache_clean_invalidate_range __cpu_fn(CPU_NAME,_cache_clean_invalidate_range)
+#define cpu_flush_ram_page		__cpu_fn(CPU_NAME,_flush_ram_page)
+#define cpu_dcache_invalidate_range	__cpu_fn(CPU_NAME,_dcache_invalidate_range)
+#define cpu_dcache_clean_range		__cpu_fn(CPU_NAME,_dcache_clean_range)
+#define cpu_dcache_clean_page		__cpu_fn(CPU_NAME,_dcache_clean_page)
+#define cpu_dcache_clean_entry		__cpu_fn(CPU_NAME,_dcache_clean_entry)
+#define cpu_icache_invalidate_range	__cpu_fn(CPU_NAME,_icache_invalidate_range)
+#define cpu_icache_invalidate_page	__cpu_fn(CPU_NAME,_icache_invalidate_page)
+#define cpu_tlb_invalidate_all		__cpu_fn(CPU_NAME,_tlb_invalidate_all)
+#define cpu_tlb_invalidate_range	__cpu_fn(CPU_NAME,_tlb_invalidate_range)
+#define cpu_tlb_invalidate_page		__cpu_fn(CPU_NAME,_tlb_invalidate_page)
+#define cpu_set_pgd			__cpu_fn(CPU_NAME,_set_pgd)
+#define cpu_set_pmd			__cpu_fn(CPU_NAME,_set_pmd)
+#define cpu_set_pte			__cpu_fn(CPU_NAME,_set_pte)
+#define cpu_copy_user_page		__cpu_fn(MMU_ARCH,_copy_user_page)
+#define cpu_clear_user_page		__cpu_fn(MMU_ARCH,_clear_user_page)
 
 #ifndef __ASSEMBLY__
 
@@ -83,6 +80,10 @@ extern void cpu_tlb_invalidate_page(unsigned long address, int flags);
 extern void cpu_set_pgd(unsigned long pgd_phys);
 extern void cpu_set_pmd(pmd_t *pmdp, pmd_t pmd);
 extern void cpu_set_pte(pte_t *ptep, pte_t pte);
+
+extern void cpu_copy_user_page(void *to, void *from, unsigned long u_addr);
+extern void cpu_clear_user_page(void *page, unsigned long u_addr);
+
 extern volatile void cpu_reset(unsigned long addr);
 
 #define cpu_switch_mm(pgd,tsk) cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))

@@ -7,6 +7,7 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/tty.h>
+#include <linux/ioport.h>
 
 #include <asm/hardware.h>
 #include <asm/setup.h>
@@ -21,6 +22,7 @@
 
 static void xp860_power_off(void)
 {
+	cli();
 	GPDR |= GPIO_GPIO20;
 	GPSR = GPIO_GPIO20;
 	mdelay(1000);
@@ -40,7 +42,7 @@ static int __init xp860_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe();
+	ret = sa1111_probe(0x40000000);
 	if (ret < 0)
 		return ret;
 

@@ -40,7 +40,7 @@
  */
 	.macro	save_and_disable_irqs, oldcpsr, temp
 	mrs	\oldcpsr, cpsr
-	mov	\temp, #I_BIT | MODE_SVC
+	mov	\temp, #PSR_I_BIT | MODE_SVC
 	msr	cpsr_c, \temp
 	.endm
 

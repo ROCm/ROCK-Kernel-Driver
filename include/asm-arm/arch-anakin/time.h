@@ -20,8 +20,7 @@ anakin_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 }
 
-static inline void
-setup_timer(void)
+void __init time_init(void)
 {
 	timer_irq.handler = anakin_timer_interrupt;
 	timer_irq.flags = SA_INTERRUPT;

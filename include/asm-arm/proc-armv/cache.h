@@ -44,13 +44,13 @@
 
 #define flush_cache_range(_mm,_start,_end)				\
 	do {								\
-		if ((_mm) == current->mm)				\
+		if ((_mm) == current->active_mm)			\
 			cpu_cache_clean_invalidate_range((_start), (_end), 1); \
 	} while (0)
 
 #define flush_cache_page(_vma,_vmaddr)					\
 	do {								\
-		if ((_vma)->vm_mm == current->mm) {			\
+		if ((_vma)->vm_mm == current->active_mm) {		\
 			cpu_cache_clean_invalidate_range((_vmaddr),	\
 				(_vmaddr) + PAGE_SIZE,			\
 				((_vma)->vm_flags & VM_EXEC));		\
@@ -62,36 +62,68 @@
  * in the cache for this page.  This does not invalidate either I or D caches.
  *
  * Called from:
- * 1. mm/filemap.c:filemap_nopage
- * 2. mm/filemap.c:filemap_nopage
- *    [via do_no_page - ok]
+ *  1. fs/exec.c:put_dirty_page				- ok
+ *     - page came from alloc_page(), so page->mapping = NULL.
+ *     - flush_dcache_page called immediately prior.
  *
- * 3. mm/memory.c:break_cow
- *    [copy_cow_page doesn't do anything to the cache; insufficient cache
- *     handling.  Need to add flush_dcache_page() here]
+ *  2. kernel/ptrace.c:access_one_page			- flush_icache_page
+ *     - flush_cache_page takes care of the user space side of the mapping.
+ *     - page is either a page cache page (with page->mapping set, and
+ *       hence page->mapping->i_mmap{,shared} also set) or an anonymous
+ *       page.  I think this is ok.
  *
- * 4. mm/memory.c:do_swap_page
- *    [read_swap_cache_async doesn't do anything to the cache: insufficient
- *     cache handling.  Need to add flush_dcache_page() here]
+ *  3. kernel/ptrace.c:access_one_page			- bad
+ *     - flush_cache_page takes care of the user space side of the mapping.
+ *     - no apparant cache protection, reading the kernel virtual alias
  *
- * 5. mm/memory.c:do_anonymous_page
- *    [zero page, never written by kernel - ok]
+ *  4. mm/filemap.c:filemap_no_page			- ok
+ *     - add_to_page_cache_* clears PG_arch_1.
+ *     - page->mapping != NULL.
+ *     - i_mmap or i_mmap_shared will be non-null if mmap'd
+ *     - called from (8).
  *
- * 6. mm/memory.c:do_no_page
- *    [we will be calling update_mmu_cache, which will catch on PG_dcache_dirty]
+ *  5. mm/memory.c:break_cow,do_wp_page			- {copy,clear}_user_page
+ *     - need to ensure that copy_cow_page has pushed all data from the dcache
+ *       to the page.
+ *       - calls
+ *         - clear_user_highpage -> clear_user_page
+ *         - copy_user_highpage -> copy_user_page
  *
- * 7. mm/shmem.c:shmem_nopage
- * 8. mm/shmem.c:shmem_nopage
- *    [via do_no_page - ok]
+ *  6. mm/memory.c:do_swap_page				- flush_icache_page
+ *     - flush_icache_page called afterwards - if flush_icache_page does the
+ *       same as flush_dcache_page, update_mmu_cache will do the work for us.
+ *     - update_mmu_cache called.
  *
- * 9. fs/exec.c:put_dirty_page
- *    [we call flush_dcache_page prior to this, which will flush out the
- *     kernel virtual addresses from the dcache - ok]
+ *  7. mm/memory.c:do_anonymous_page			- {copy,clear}_user_page
+ *     - calls clear_user_highpage.  See (5)
+ *
+ *  8. mm/memory.c:do_no_page				- flush_icache_page
+ *     - flush_icache_page called afterwards - if flush_icache_page does the
+ *       same as flush_dcache_page, update_mmu_cache will do the work for us.
+ *     - update_mmu_cache called.
+ *     - When we place a user mapping, we will call update_mmu_cache,
+ *       which will catch PG_arch_1 set.
+ *
+ *  9. mm/shmem.c:shmem_no_page				- ok
+ *     - shmem_get_page clears PG_arch_1, as does add_to_page_cache (duplicate)
+ *     - page->mapping != NULL.
+ *     - i_mmap or i_mmap_shared will be non-null if mmap'd
+ *     - called from (8).
+ *
+ * 10. mm/swapfile.c:try_to_unuse			- bad
+ *     - this looks really dodgy - we're putting pages from the swap cache
+ *       straight into processes, and the only cache handling appears to
+ *       be flush_page_to_ram.
  */
+#define flush_page_to_ram_ok
+#ifdef flush_page_to_ram_ok
+#define flush_page_to_ram(page)	do { } while (0)
+#else
 static __inline__ void flush_page_to_ram(struct page *page)
 {
 	cpu_flush_ram_page(page_address(page));
 }
+#endif
 
 /*
  * D cache only
@@ -100,6 +132,8 @@ static __inline__ void flush_page_to_ram(struct page *page)
 #define invalidate_dcache_range(_s,_e)	cpu_dcache_invalidate_range((_s),(_e))
 #define clean_dcache_range(_s,_e)	cpu_dcache_clean_range((_s),(_e))
 #define flush_dcache_range(_s,_e)	cpu_cache_clean_invalidate_range((_s),(_e),0)
+
+#define mapping_mapped(map)	((map)->i_mmap || (map)->i_mmap_shared)
 
 /*
  * flush_dcache_page is used when the kernel has written to the page
@@ -116,14 +150,37 @@ static __inline__ void flush_page_to_ram(struct page *page)
  */
 static inline void flush_dcache_page(struct page *page)
 {
-	if (page->mapping && !(page->mapping->i_mmap) &&
-	     !(page->mapping->i_mmap_shared))
+	if (page->mapping && !mapping_mapped(page->mapping))
 		set_bit(PG_dcache_dirty, &page->flags);
 	else {
 		unsigned long virt = (unsigned long)page_address(page);
 		cpu_cache_clean_invalidate_range(virt, virt + PAGE_SIZE, 0);
 	}
 }
+
+/*
+ * flush_icache_page makes the kernel page address consistent with the
+ * user space mappings.  The functionality is the same as flush_dcache_page,
+ * except we can do an optimisation and only clean the caches here if
+ * vma->vm_mm == current->active_mm.
+ *
+ * This function is misnamed IMHO.  There are three places where it
+ * is called, each of which is preceded immediately by a call to
+ * flush_page_to_ram:
+ */
+#ifdef flush_page_to_ram_ok
+static inline void flush_icache_page(struct vm_area_struct *vma, struct page *page)
+{
+	if (page->mapping && !mapping_mapped(page->mapping))
+		set_bit(PG_dcache_dirty, &page->flags);
+	else if (vma->vm_mm == current->active_mm) {
+		unsigned long virt = (unsigned long)page_address(page);
+		cpu_cache_clean_invalidate_range(virt, virt + PAGE_SIZE, 0);
+	}
+}
+#else
+#define flush_icache_page(vma,pg)	do { } while (0)
+#endif
 
 #define clean_dcache_entry(_s)		cpu_dcache_clean_entry((unsigned long)(_s))
 
@@ -141,32 +198,6 @@ static inline void flush_dcache_page(struct page *page)
 	do {								\
 		cpu_icache_invalidate_range((_s), (_e));		\
 	} while (0)
-
-/*
- * This function is misnamed IMHO.  There are three places where it
- * is called, each of which is preceded immediately by a call to
- * flush_page_to_ram:
- *
- *  1. kernel/ptrace.c:access_one_page
- *     called after we have written to the kernel view of a user page.
- *     The user page has been expundged from the cache by flush_cache_page.
- *     [we don't need to do anything here if we add a call to
- *      flush_dcache_page]
- *
- *  2. mm/memory.c:do_swap_page
- *     called after we have (possibly) written to the kernel view of a
- *     user page, which has previously been removed (ie, has been through
- *     the swap cache).
- *     [if the flush_page_to_ram() conditions are satisfied, then ok]
- *
- *  3. mm/memory.c:do_no_page
- *     [if the flush_page_to_ram() conditions are satisfied, then ok]
- *
- * Invalidating the icache at the kernels virtual page isn't really
- * going to do us much good, since we wouldn't have executed any
- * instructions there.
- */
-#define flush_icache_page(vma,pg)	do { } while (0)
 
 /*
  * Old ARM MEMC stuff.  This supports the reversed mapping handling that

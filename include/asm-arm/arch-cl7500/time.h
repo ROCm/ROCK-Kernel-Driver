@@ -9,6 +9,8 @@
  *  04-Dec-1997	RMK	Updated for new arch/arm/time.c
  */
 
+extern void ioctime_init(void);
+
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
@@ -29,9 +31,8 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * Set up timer interrupt.
  */
-static inline void setup_timer(void)
+void __init time_init(void)
 {
-	extern void ioctime_init(void);
 	ioctime_init();
 
 	timer_irq.handler = timer_interrupt;

@@ -18,10 +18,17 @@
  * Make sure that the compiler and target are compatible.
  */
 #if defined(__APCS_32__) && defined(CONFIG_CPU_26)
-#error Your compiler targets APCS-32 but this kernel requires APCS-26
+#error Sorry, your compiler targets APCS-32 but this kernel requires APCS-26
 #endif
 #if defined(__APCS_26__) && defined(CONFIG_CPU_32)
-#error Your compiler targets APCS-26 but this kernel requires APCS-32
+#error Sorry, your compiler targets APCS-26 but this kernel requires APCS-32
+#endif
+#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 95)
+#error Sorry, your compiler is known to miscompile kernels.  Only use gcc 2.95.3 and later.
+#endif
+#if __GNUC__ == 2 && __GNUC_MINOR__ == 95
+/* shame we can't detect the .1 or .2 releases */
+#warning GCC 2.95.2 and earlier miscompiles kernels.
 #endif
 
 #define OFF_TSK(n) (unsigned long)&(((struct task_struct *)0)->n)

@@ -22,6 +22,7 @@
 #include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
+#include <asm/proc/pgtable.h>
 
 /* This is the maximum size of an area which will be flushed.  If the area
  * is larger than this, then we flush the whole cache
@@ -41,6 +42,10 @@
 #define FLUSH_OFFSET	32768
 
 		.macro flush_110_dcache	rd, ra, re
+		ldr	\rd, =flush_base
+		ldr	\ra, [\rd]
+		eor	\ra, \ra, #FLUSH_OFFSET
+		str	\ra, [\rd]
 		add	\re, \ra, #16384		@ only necessary for 16k
 1001:		ldr	\rd, [\ra], #DCACHELINESIZE
 		teq	\re, \ra
@@ -48,6 +53,10 @@
 		.endm
 
 		.macro flush_1100_dcache	rd, ra, re
+		ldr	\rd, =flush_base
+		ldr	\ra, [\rd]
+		eor	\ra, \ra, #FLUSH_OFFSET
+		str	\ra, [\rd]
 		add	\re, \ra, #8192			@ only necessary for 8k
 1001:		ldr	\rd, [\ra], #DCACHELINESIZE
 		teq	\re, \ra
@@ -62,32 +71,8 @@
 		.endm
 
 		.data
-Lclean_switch:	.long	0
+flush_base:	.long	FLUSH_BASE
 		.text
-
-
-/*
- * cpu_sa110_data_abort()
- *
- * obtain information about current aborted instruction
- *
- * r0 = address of aborted instruction
- *
- * Returns:
- *  r0 = address of abort
- *  r1 != 0 if writing
- *  r3 = FSR
- */
-	.align	5
-ENTRY(cpu_sa110_data_abort)
-ENTRY(cpu_sa1100_data_abort)
-	ldr	r1, [r0]			@ read aborted instruction
-	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	tst	r1, r1, lsr #21			@ C = bit 20
-	mrc	p15, 0, r3, c5, c0, 0		@ get FSR
-	sbc	r1, r1, r1			@ r1 = C - 1
-	and	r3, r3, #255
-	mov	pc, lr
 
 /*
  * cpu_sa110_check_bugs()
@@ -95,7 +80,7 @@ ENTRY(cpu_sa1100_data_abort)
 ENTRY(cpu_sa110_check_bugs)
 ENTRY(cpu_sa1100_check_bugs)
 	mrs	ip, cpsr
-	bic	ip, ip, #F_BIT
+	bic	ip, ip, #PSR_F_BIT
 	msr	cpsr, ip
 	mov	pc, lr
 
@@ -113,7 +98,7 @@ ENTRY(cpu_sa1100_proc_init)
  */
 ENTRY(cpu_sa110_proc_fin)
 	stmfd	sp!, {lr}
-	mov	ip, #F_BIT | I_BIT | SVC_MODE
+	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 	msr	cpsr_c, ip
 	bl	cpu_sa110_cache_clean_invalidate_all	@ clean caches
 1:	mov	r0, #0
@@ -126,7 +111,7 @@ ENTRY(cpu_sa110_proc_fin)
 
 ENTRY(cpu_sa1100_proc_fin)
 	stmfd	sp!, {lr}
-	mov	ip, #F_BIT | I_BIT | SVC_MODE
+	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 	msr	cpsr_c, ip
 	bl	cpu_sa1100_cache_clean_invalidate_all	@ clean caches
 	b	1b
@@ -224,13 +209,6 @@ ENTRY(cpu_sa1100_do_idle)
 ENTRY(cpu_sa110_cache_clean_invalidate_all)
 	mov	r2, #1
 cpu_sa110_cache_clean_invalidate_all_r2:
-	ldr	r3, =Lclean_switch
-	ldr	ip, =FLUSH_BASE
-	ldr	r1, [r3]
-	ands	r1, r1, #1
-	eor	r1, r1, #1
-	str	r1, [r3]
-	addne	ip, ip, #FLUSH_OFFSET
 	flush_110_dcache	r3, ip, r1
 	mov	ip, #0
 	teq	r2, #0
@@ -242,13 +220,6 @@ cpu_sa110_cache_clean_invalidate_all_r2:
 ENTRY(cpu_sa1100_cache_clean_invalidate_all)
 	mov	r2, #1
 cpu_sa1100_cache_clean_invalidate_all_r2:
-	ldr	r3, =Lclean_switch
-	ldr	ip, =FLUSH_BASE
-	ldr	r1, [r3]
-	ands	r1, r1, #1
-	eor	r1, r1, #1
-	str	r1, [r3]
-	addne	ip, ip, #FLUSH_OFFSET
 	flush_1100_dcache	r3, ip, r1
 	mov	ip, #0
 	teq	r2, #0
@@ -501,13 +472,6 @@ ENTRY(cpu_sa1100_tlb_invalidate_page)
  */
 	.align	5
 ENTRY(cpu_sa110_set_pgd)
-	ldr	r3, =Lclean_switch
-	ldr	ip, =FLUSH_BASE
-	ldr	r2, [r3]
-	ands	r2, r2, #1
-	eor	r2, r2, #1
-	str	r2, [r3]
-	addne	ip, ip, #FLUSH_OFFSET
 	flush_110_dcache	r3, ip, r1
 	mov	r1, #0
 	mcr	p15, 0, r1, c7, c5, 0		@ invalidate I cache
@@ -525,13 +489,6 @@ ENTRY(cpu_sa110_set_pgd)
  */
 	.align	5
 ENTRY(cpu_sa1100_set_pgd)
-	ldr	r3, =Lclean_switch
-	ldr	ip, =FLUSH_BASE
-	ldr	r2, [r3]
-	ands	r2, r2, #1
-	eor	r2, r2, #1
-	str	r2, [r3]
-	addne	ip, ip, #FLUSH_OFFSET
 	flush_1100_dcache	r3, ip, r1
 	mov	ip, #0
 	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache
@@ -568,19 +525,19 @@ ENTRY(cpu_sa110_set_pte)
 ENTRY(cpu_sa1100_set_pte)
 	str	r1, [r0], #-1024		@ linux version
 
-	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
 	bic	r2, r1, #0xff0
 	bic	r2, r2, #3
-	orr	r2, r2, #HPTE_TYPE_SMALL
+	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #LPTE_USER | LPTE_EXEC	@ User or Exec?
-	orrne	r2, r2, #HPTE_AP_READ
+	tst	r1, #L_PTE_USER | L_PTE_EXEC	@ User or Exec?
+	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-	tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-	orreq	r2, r2, #HPTE_AP_WRITE
+	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-	tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young?
+	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
 	movne	r2, #0
 
 	str	r2, [r0]			@ hardware version
@@ -636,7 +593,7 @@ __setup_common:
 
 	.type	sa110_processor_functions, #object
 ENTRY(sa110_processor_functions)
-	.word	cpu_sa110_data_abort
+	.word	armv4_early_abort
 	.word	cpu_sa110_check_bugs
 	.word	cpu_sa110_proc_init
 	.word	cpu_sa110_proc_fin
@@ -667,6 +624,11 @@ ENTRY(sa110_processor_functions)
 	.word	cpu_sa110_set_pgd
 	.word	cpu_sa110_set_pmd
 	.word	cpu_sa110_set_pte
+
+	/* misc */
+	.word	armv4_clear_user_page
+	.word	armv4_copy_user_page
+
 	.size	sa110_processor_functions, . - sa110_processor_functions
 
 	.type	cpu_sa110_info, #object
@@ -681,7 +643,7 @@ cpu_sa110_info:
  */
 	.type	sa1100_processor_functions, #object
 ENTRY(sa1100_processor_functions)
-	.word	cpu_sa1100_data_abort
+	.word	armv4_early_abort
 	.word	cpu_sa1100_check_bugs
 	.word	cpu_sa1100_proc_init
 	.word	cpu_sa1100_proc_fin
@@ -712,6 +674,11 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_set_pgd
 	.word	cpu_sa1100_set_pmd
 	.word	cpu_sa1100_set_pte
+
+	/* misc */
+	.word	armv4_clear_user_page
+	.word	armv4_copy_user_page
+
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
 cpu_sa1100_info:

@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/sizes.h>
  
 #include <asm/mach/map.h>
 

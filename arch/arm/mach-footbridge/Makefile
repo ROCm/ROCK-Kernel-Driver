@@ -11,7 +11,7 @@ O_TARGET		:= footbridge.o
 
 # Object file lists.
 
-obj-y			:= arch.o irq.o mm.o #dma.o
+obj-y			:= arch.o dc21285.o dma.o irq.o mm.o
 obj-m			:=
 obj-n			:=
 obj-			:=

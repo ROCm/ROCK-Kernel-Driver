@@ -11,9 +11,6 @@
 #ifndef __ASM_ARM_ARCH_IO_H
 #define __ASM_ARM_ARCH_IO_H
 
-#define iomem_valid_addr(off,sz)	(1)
-#define iomem_to_phys(off)		(off)
-
 #define IO_SPACE_LIMIT 0xffffffff
 
 /*
@@ -181,9 +178,6 @@ DECLARE_IO(long,l,"")
 #define outb(v,p)	(__builtin_constant_p((p)) ? __outbc(v,p) : __outb(v,p))
 #define outw(v,p)	(__builtin_constant_p((p)) ? __outwc(v,p) : __outw(v,p))
 #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
-
-#define __arch_getw(addr)	(*(volatile unsigned short *)(addr))
-#define __arch_putw(b,addr)	(*(volatile unsigned short *)(addr) = (b))
 
 /*
  * Translated address IO functions

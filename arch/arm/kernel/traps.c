@@ -53,7 +53,7 @@ static const char *handler[]= { "prefetch abort", "data abort", "address excepti
  */
 static int verify_stack(unsigned long sp)
 {
-	if (sp < PAGE_OFFSET || sp > (unsigned long)high_memory)
+	if (sp < PAGE_OFFSET || (sp > (unsigned long)high_memory && high_memory != 0))
 		return -EFAULT;
 
 	return 0;
@@ -62,13 +62,16 @@ static int verify_stack(unsigned long sp)
 /*
  * Dump out the contents of some memory nicely...
  */
-void dump_mem(unsigned long bottom, unsigned long top)
+static void dump_mem(const char *str, unsigned long bottom, unsigned long top)
 {
 	unsigned long p = bottom & ~31;
 	int i;
 
+	printk("%s", str);
+	printk("(0x%08lx to 0x%08lx)\n", bottom, top);
+
 	for (p = bottom & ~31; p < top;) {
-		printk("%08lx: ", p);
+		printk("%04lx: ", p & 0xffff);
 
 		for (i = 0; i < 8; i++, p += 4) {
 			unsigned int val;
@@ -79,20 +82,10 @@ void dump_mem(unsigned long bottom, unsigned long top)
 				__get_user(val, (unsigned long *)p);
 				printk("%08x ", val);
 			}
-			if (i == 3)
-				printk(" ");
 		}
 		printk ("\n");
 	}
 }
-
-/*
- * These constants are for searching for possible module text
- * segments.  VMALLOC_OFFSET comes from mm/vmalloc.c; MODULE_RANGE is
- * a guess of how much space is likely to be vmalloced.
- */
-#define VMALLOC_OFFSET (8*1024*1024)
-#define MODULE_RANGE (8*1024*1024)
 
 static void dump_instr(struct pt_regs *regs)
 {
@@ -122,8 +115,7 @@ static void dump_instr(struct pt_regs *regs)
 
 static void dump_stack(struct task_struct *tsk, unsigned long sp)
 {
-	printk("Stack:\n");
-	dump_mem(sp - 16, 8192+(unsigned long)tsk);
+	dump_mem("Stack: ", sp - 16, 8192+(unsigned long)tsk);
 }
 
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
@@ -289,10 +281,9 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 		handler[reason], processor_modes[proc_mode]);
 
 	/*
-	 * We need to switch to kernel mode so that we can
-	 * use __get_user to safely read from kernel space.
-	 * Note that we now dump the code first, just in case
-	 * the backtrace kills us.
+	 * We need to switch to kernel mode so that we can use __get_user
+	 * to safely read from kernel space.  Note that we now dump the
+	 * code first, just in case the backtrace kills us.
 	 */
 	fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -301,10 +292,8 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 	 * Dump out the vectors and stub routines.  Maybe a better solution
 	 * would be to dump them out only if we detect that they are corrupted.
 	 */
-	printk(KERN_CRIT "Vectors:\n");
-	dump_mem(vectors, 0x40);
-	printk(KERN_CRIT "Stubs:\n");
-	dump_mem(vectors + 0x200, 0x4b8);
+	dump_mem(KERN_CRIT "Vectors: ", vectors, vectors + 0x40);
+	dump_mem(KERN_CRIT "Stubs: ", vectors + 0x200, vectors + 0x4b8);
 
 	set_fs(fs);
 
@@ -528,11 +517,6 @@ asmlinkage void __div0(void)
 
 void abort(void)
 {
-	void *lr = __builtin_return_address(0);
-
-	printk(KERN_CRIT "abort() called from %p!  (Please "
-	       "report to rmk@arm.linux.org.uk)\n", lr);
-
 	BUG();
 
 	/* if that doesn't kill us, halt */

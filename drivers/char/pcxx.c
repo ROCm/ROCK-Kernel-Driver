@@ -406,7 +406,7 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	int boardnum;
 	int retval;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 
 	if(line < 0 || line >= nbdevs) {
 		printk("line out of range in pcxe_open\n");
@@ -2080,7 +2080,7 @@ static void receive_data(struct channel *ch)
 
 	if(bc->orun) {
 		bc->orun = 0;
-		printk("overrun! DigiBoard device minor=%d\n",MINOR(tty->device));
+		printk("overrun! DigiBoard device minor=%d\n",minor(tty->device));
 	}
 
 	rxwinon(ch);

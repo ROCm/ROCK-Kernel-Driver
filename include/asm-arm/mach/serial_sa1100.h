@@ -18,9 +18,10 @@ struct uart_info;
  */
 struct sa1100_port_fns {
 	void	(*set_mctrl)(struct uart_port *, u_int);
-	int	(*get_mctrl)(struct uart_port *);
+	u_int	(*get_mctrl)(struct uart_port *);
 	void	(*enable_ms)(struct uart_port *);
 	void	(*pm)(struct uart_port *, u_int, u_int);
+	int	(*set_wake)(struct uart_port *, u_int);
 	int	(*open)(struct uart_port *, struct uart_info *);
 	void	(*close)(struct uart_port *, struct uart_info *);
 };

@@ -19,6 +19,7 @@
 #include <linux/in6.h>
 #include <linux/interrupt.h>
 #include <linux/pm.h>
+#include <linux/tty.h>
 #include <linux/vt_kern.h>
 
 #include <asm/byteorder.h>
@@ -77,7 +78,7 @@ extern void fp_enter(void);
 extern void __do_softirq(void);
 
 #define EXPORT_SYMBOL_ALIAS(sym,orig)		\
- const char __kstrtab_##sym##[]			\
+ const char __kstrtab_##sym[]			\
   __attribute__((section(".kstrtab"))) =	\
     __MODULE_STRING(sym);			\
  const struct module_symbol __ksymtab_##sym	\
@@ -115,7 +116,9 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(system_rev);
 EXPORT_SYMBOL(system_serial_low);
 EXPORT_SYMBOL(system_serial_high);
+#ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(__bug);
+#endif
 EXPORT_SYMBOL(__bad_xchg);
 EXPORT_SYMBOL(__readwrite_bug);
 EXPORT_SYMBOL(enable_irq);
@@ -231,14 +234,25 @@ EXPORT_SYMBOL_NOVERS(__udivsi3);
 EXPORT_SYMBOL_NOVERS(__umodsi3);
 
 	/* bitops */
-EXPORT_SYMBOL(set_bit);
-EXPORT_SYMBOL(test_and_set_bit);
-EXPORT_SYMBOL(clear_bit);
-EXPORT_SYMBOL(test_and_clear_bit);
-EXPORT_SYMBOL(change_bit);
-EXPORT_SYMBOL(test_and_change_bit);
-EXPORT_SYMBOL(find_first_zero_bit);
-EXPORT_SYMBOL(find_next_zero_bit);
+EXPORT_SYMBOL(_set_bit_le);
+EXPORT_SYMBOL(_test_and_set_bit_le);
+EXPORT_SYMBOL(_clear_bit_le);
+EXPORT_SYMBOL(_test_and_clear_bit_le);
+EXPORT_SYMBOL(_change_bit_le);
+EXPORT_SYMBOL(_test_and_change_bit_le);
+EXPORT_SYMBOL(_find_first_zero_bit_le);
+EXPORT_SYMBOL(_find_next_zero_bit_le);
+
+#ifdef __ARMEB__
+EXPORT_SYMBOL(_set_bit_be);
+EXPORT_SYMBOL(_test_and_set_bit_be);
+EXPORT_SYMBOL(_clear_bit_be);
+EXPORT_SYMBOL(_test_and_clear_bit_be);
+EXPORT_SYMBOL(_change_bit_be);
+EXPORT_SYMBOL(_test_and_change_bit_be);
+EXPORT_SYMBOL(_find_first_zero_bit_be);
+EXPORT_SYMBOL(_find_next_zero_bit_be);
+#endif
 
 	/* elf */
 EXPORT_SYMBOL(elf_platform);

@@ -12,6 +12,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
+#include <linux/ioport.h>
 
 #include <asm/hardware.h>
 #include <asm/setup.h>
@@ -43,7 +44,7 @@ static int __init graphicsmaster_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe();
+	ret = sa1111_probe(0x18000000);
 	if (ret < 0)
 		return ret;
 
@@ -174,7 +175,6 @@ static void __init graphicsmaster_init_irq(void)
 		irq_desc[irq].mask	= ADS_mask_irq1;
 		irq_desc[irq].unmask	= ADS_unmask_irq1;
 	}
-	GPDR &= ~GPIO_GPIO0;
 	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_FALLING_EDGE);
 	setup_arm_irq( IRQ_GPIO0, &ADS_ext_irq );
 }
@@ -200,7 +200,6 @@ fixup_graphicsmaster(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc graphicsmaster_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x08000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 1 */
   { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 1, 1, 0, 0 }, /* CPLD */
   { 0xf1000000, 0x40000000, 0x00400000, DOMAIN_IO, 1, 1, 0, 0 }, /* CAN */
   { 0xf4000000, 0x18000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
@@ -215,31 +214,22 @@ static int graphicsmaster_uart_open(struct uart_port *port, struct uart_info *in
 		Ser1SDCR0 |= SDCR0_UART;
 		/* Set RTS Output */
 		GPSR = GPIO_GPIO15;
-		GPDR |= GPIO_GPIO15;
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GPIO14;
 	}
 	else if (port->mapbase == _Ser2UTCR0) {
 		Ser2UTCR4 = Ser2HSCR0 = 0;
 		/* Set RTS Output */
 		GPSR = GPIO_GPIO17;
-		GPDR |= GPIO_GPIO17;
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GPIO16;
 	}
 	else if (port->mapbase == _Ser3UTCR0) {
 	        /* Set RTS Output */
 		GPSR = GPIO_GPIO19;
-		GPDR |= GPIO_GPIO19;
-		/* Set CTS Input */
-		GPDR &= ~GPIO_GPIO18;
 	}
 	return ret;
 }
 
-static int graphicsmaster_get_mctrl(struct uart_port *port)
+static u_int graphicsmaster_get_mctrl(struct uart_port *port)
 {
-	int result = TIOCM_CD | TIOCM_DSR;
+	u_int result = TIOCM_CD | TIOCM_DSR;
 
 	if (port->mapbase == _Ser1UTCR0) {
 		if (!(GPLR & GPIO_GPIO14))
@@ -304,6 +294,10 @@ static void __init graphicsmaster_map_io(void)
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 	sa1100_register_uart(2, 2);
+
+	/* set GPDR now */
+	GPDR |= GPIO_GPIO15 | GPIO_GPIO17 | GPIO_GPIO19;
+       	GPDR &= ~(GPIO_GPIO14 | GPIO_GPIO16 | GPIO_GPIO18);
 }
 
 MACHINE_START(GRAPHICSMASTER, "ADS GraphicsMaster")

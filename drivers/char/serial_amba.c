@@ -953,7 +953,7 @@ static void ambauart_flush_buffer(struct tty_struct *tty)
 
 #if DEBUG
 	printk("ambauart_flush_buffer(%d) called\n",
-	       MINOR(tty->device) - tty->driver.minor_start);
+	       minor(tty->device) - tty->driver.minor_start);
 #endif
 	save_flags(flags); cli();
 	info->xmit.head = info->xmit.tail = 0;
@@ -1515,7 +1515,7 @@ static void ambauart_wait_until_sent(struct tty_struct *tty, int timeout)
 	expire = jiffies + timeout;
 #if DEBUG
 	printk("ambauart_wait_until_sent(%d), jiff=%lu, expire=%lu...\n",
-	       MINOR(tty->device) - tty->driver.minor_start, jiffies,
+	       minor(tty->device) - tty->driver.minor_start, jiffies,
 	       expire);
 #endif
 	while (UART_GET_FR(info->port) & AMBA_UARTFR_BUSY) {
@@ -1690,7 +1690,7 @@ static struct amba_info *ambauart_get(int line)
 static int ambauart_open(struct tty_struct *tty, struct file *filp)
 {
 	struct amba_info *info;
-	int retval, line = MINOR(tty->device) - tty->driver.minor_start;
+	int retval, line = minor(tty->device) - tty->driver.minor_start;
 
 #if DEBUG
 	printk("ambauart_open(%d) called\n", line);
@@ -1923,7 +1923,7 @@ static void ambauart_console_write(struct console *co, const char *s, u_int coun
 
 static kdev_t ambauart_console_device(struct console *c)
 {
-	return MKDEV(SERIAL_AMBA_MAJOR, SERIAL_AMBA_MINOR + c->index);
+	return mk_kdev(SERIAL_AMBA_MAJOR, SERIAL_AMBA_MINOR + c->index);
 }
 
 static int __init ambauart_console_setup(struct console *co, char *options)

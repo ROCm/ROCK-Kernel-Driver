@@ -99,24 +99,24 @@ ENTRY(memmove)
 		cmp	r2, #12
 		blt	10f
 		sub	r2, r2, #12
-9:		mov	r3, r7, lsr #8
+9:		mov	r3, r7, pull #8
 		ldmia	r1!, {r4 - r7}
-		orr	r3, r3, r4, lsl #24
-		mov	r4, r4, lsr #8
-		orr	r4, r4, r5, lsl #24
-		mov	r5, r5, lsr #8
-		orr	r5, r5, r6, lsl #24
-		mov	r6, r6, lsr #8
-		orr	r6, r6, r7, lsl #24
+		orr	r3, r3, r4, push #24
+		mov	r4, r4, pull #8
+		orr	r4, r4, r5, push #24
+		mov	r5, r5, pull #8
+		orr	r5, r5, r6, push #24
+		mov	r6, r6, pull #8
+		orr	r6, r6, r7, push #24
 		stmia	r0!, {r3 - r6}
 		subs	r2, r2, #16
 		bge	9b
 		adds	r2, r2, #12
 		blt	100f
-10:		mov	r3, r7, lsr #8
+10:		mov	r3, r7, pull #8
 		ldr	r7, [r1], #4
 		subs	r2, r2, #4
-		orr	r3, r3, r7, lsl #24
+		orr	r3, r3, r7, push #24
 		str	r3, [r0], #4
 		bge	10b
 100:		sub	r1, r1, #3
@@ -125,24 +125,24 @@ ENTRY(memmove)
 11:		cmp	r2, #12
 		blt	13f		/* */
 		sub	r2, r2, #12
-12:		mov	r3, r7, lsr #16
+12:		mov	r3, r7, pull #16
 		ldmia	r1!, {r4 - r7}
-		orr	r3, r3, r4, lsl #16
-		mov	r4, r4, lsr #16
-		orr	r4, r4, r5, lsl #16
-		mov	r5, r5, lsr #16
-		orr	r5, r5, r6, lsl #16
-		mov	r6, r6, lsr #16
-		orr	r6, r6, r7,LSL#16
+		orr	r3, r3, r4, push #16
+		mov	r4, r4, pull #16
+		orr	r4, r4, r5, push #16
+		mov	r5, r5, pull #16
+		orr	r5, r5, r6, push #16
+		mov	r6, r6, pull #16
+		orr	r6, r6, r7, push #16
 		stmia	r0!, {r3 - r6}
 		subs	r2, r2, #16
 		bge	12b
 		adds	r2, r2, #12
 		blt	14f
-13:		mov	r3, r7, lsr #16
+13:		mov	r3, r7, pull #16
 		ldr	r7, [r1], #4
 		subs	r2, r2, #4
-		orr	r3, r3, r7, lsl #16
+		orr	r3, r3, r7, push #16
 		str	r3, [r0], #4
 		bge	13b
 14:		sub	r1, r1, #2
@@ -151,24 +151,24 @@ ENTRY(memmove)
 15:		cmp	r2, #12
 		blt	17f
 		sub	r2, r2, #12
-16:		mov	r3, r7, lsr #24
-		ldmia	r1!,{r4 - r7}
-		orr	r3, r3, r4, lsl #8
-		mov	r4, r4, lsr #24
-		orr	r4, r4, r5, lsl #8
-		mov	r5, r5, lsr #24
-		orr	r5, r5, r6, lsl #8
-		mov	r6, r6, lsr #24
-		orr	r6, r6, r7, lsl #8
+16:		mov	r3, r7, pull #24
+		ldmia	r1!, {r4 - r7}
+		orr	r3, r3, r4, push #8
+		mov	r4, r4, pull #24
+		orr	r4, r4, r5, push #8
+		mov	r5, r5, pull #24
+		orr	r5, r5, r6, push #8
+		mov	r6, r6, pull #24
+		orr	r6, r6, r7, push #8
 		stmia	r0!, {r3 - r6}
 		subs	r2, r2, #16
 		bge	16b
 		adds	r2, r2, #12
 		blt	18f
-17:		mov	r3, r7, lsr #24
+17:		mov	r3, r7, pull #24
 		ldr	r7, [r1], #4
 		subs	r2, r2, #4
-		orr	r3, r3, r7, lsl#8
+		orr	r3, r3, r7, push #8
 		str	r3, [r0], #4
 		bge	17b
 18:		sub	r1, r1, #1
@@ -240,24 +240,24 @@ ENTRY(memmove)
 		cmp	r2, #12
 		blt	28f
 		sub	r2, r2, #12
-27:		mov	r7, r3, lsl #8
+27:		mov	r7, r3, push #8
 		ldmdb	r1!, {r3, r4, r5, r6}
-		orr	r7, r7, r6, lsr #24
-		mov	r6, r6, lsl #8
-		orr	r6, r6, r5, lsr #24
-		mov	r5, r5, lsl #8
-		orr	r5, r5, r4, lsr #24
-		mov	r4, r4, lsl #8
-		orr	r4, r4, r3, lsr #24
+		orr	r7, r7, r6, pull #24
+		mov	r6, r6, push #8
+		orr	r6, r6, r5, pull #24
+		mov	r5, r5, push #8
+		orr	r5, r5, r4, pull #24
+		mov	r4, r4, push #8
+		orr	r4, r4, r3, pull #24
 		stmdb	r0!, {r4, r5, r6, r7}
 		subs	r2, r2, #16
 		bge	27b
 		adds	r2, r2, #12
 		blt	29f
-28:		mov	ip, r3, lsl #8
+28:		mov	ip, r3, push #8
 		ldr	r3, [r1, #-4]!
 		subs	r2, r2, #4
-		orr	ip, ip, r3, lsr #24
+		orr	ip, ip, r3, pull #24
 		str	ip, [r0, #-4]!
 		bge	28b
 29:		add	r1, r1, #3
@@ -266,24 +266,24 @@ ENTRY(memmove)
 30:		cmp	r2, #12
 		blt	32f
 		sub	r2, r2, #12
-31:		mov	r7, r3, lsl #16
+31:		mov	r7, r3, push #16
 		ldmdb	r1!, {r3, r4, r5, r6}
-		orr	r7, r7, r6, lsr #16
-		mov	r6, r6, lsl #16
-		orr	r6, r6, r5, lsr #16
-		mov	r5, r5, lsl #16
-		orr	r5, r5, r4, lsr #16
-		mov	r4, r4, lsl #16
-		orr	r4, r4, r3, lsr #16
+		orr	r7, r7, r6, pull #16
+		mov	r6, r6, push #16
+		orr	r6, r6, r5, pull #16
+		mov	r5, r5, push #16
+		orr	r5, r5, r4, pull #16
+		mov	r4, r4, push #16
+		orr	r4, r4, r3, pull #16
 		stmdb	r0!, {r4, r5, r6, r7}
 		subs	r2, r2, #16
 		bge	31b
 		adds	r2, r2, #12
 		blt	33f
-32:		mov	ip, r3, lsl #16
+32:		mov	ip, r3, push #16
 		ldr	r3, [r1, #-4]!
 		subs	r2, r2, #4
-		orr	ip, ip, r3, lsr #16
+		orr	ip, ip, r3, pull #16
 		str	ip, [r0, #-4]!
 		bge	32b
 33:		add	r1, r1, #2
@@ -292,24 +292,24 @@ ENTRY(memmove)
 34:		cmp	r2, #12
 		blt	36f
 		sub	r2, r2, #12
-35:		mov	r7, r3, lsl #24
+35:		mov	r7, r3, push #24
 		ldmdb	r1!, {r3, r4, r5, r6}
-		orr	r7, r7, r6, lsr #8
-		mov	r6, r6, lsl #24
-		orr	r6, r6, r5, lsr #8
-		mov	r5, r5, lsl #24
-		orr	r5, r5, r4, lsr #8
-		mov	r4, r4, lsl #24
-		orr	r4, r4, r3, lsr #8
+		orr	r7, r7, r6, pull #8
+		mov	r6, r6, push #24
+		orr	r6, r6, r5, pull #8
+		mov	r5, r5, push #24
+		orr	r5, r5, r4, pull #8
+		mov	r4, r4, push #24
+		orr	r4, r4, r3, pull #8
 		stmdb	r0!, {r4, r5, r6, r7}
 		subs	r2, r2, #16
 		bge	35b
 		adds	r2, r2, #12
 		blt	37f
-36:		mov	ip, r3, lsl #24
+36:		mov	ip, r3, push #24
 		ldr	r3, [r1, #-4]!
 		subs	r2, r2, #4
-		orr	ip, ip, r3, lsr #8
+		orr	ip, ip, r3, pull #8
 		str	ip, [r0, #-4]!
 		bge	36b
 37:		add	r1, r1, #1

@@ -29,25 +29,29 @@ ENTRY(udelay)
 		RETINSTR(moveq,pc,lr)
 
 /*
- * loops = (r0 * 0x10c6 * 100 * loops_per_jiffie) / 2^32
+ * loops = (r0 * 0x10c6 * 100 * loops_per_jiffy) / 2^32
+ *
+ * Oh, if only we had a cycle counter...
  */
 
 @ Delay routine
 ENTRY(__delay)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+#if 0
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		RETINSTR(movcc,pc,lr)
+		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
-		bcs	SYMBOL_NAME(__delay)
+#endif
+		bhi	SYMBOL_NAME(__delay)
 		RETINSTR(mov,pc,lr)

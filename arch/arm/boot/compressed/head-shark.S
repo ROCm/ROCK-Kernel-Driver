@@ -1,5 +1,5 @@
 /* The head-file for the Shark
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * Does the following:
  * - get the memory layout from firmware. This can only be done as long as the mmu

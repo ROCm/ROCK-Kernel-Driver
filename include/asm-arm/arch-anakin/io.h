@@ -17,12 +17,7 @@
 
 #define IO_SPACE_LIMIT		0xffffffff
 
-#define __io(a)			a
-#define __arch_getw(a)		(*(volatile unsigned short *) (a))
-#define __arch_putw(b, a)	(*(volatile unsigned short *) (a) = (b))
-
-#define iomem_valid_addr(i, s)	1
-#define iomem_to_phys(i)	i
+#define __io(a)			(a)
 
 /*
  * We don't support ins[lb]/outs[lb].  Make them fault.

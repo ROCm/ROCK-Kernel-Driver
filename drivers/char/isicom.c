@@ -1021,7 +1021,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "ISICOM: open start!!!.\n");
 #endif	
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	
 #ifdef ISICOM_DEBUG	
 	printk(KERN_DEBUG "line = %d.\n", line);

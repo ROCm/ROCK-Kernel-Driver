@@ -52,14 +52,16 @@ EXPORT_SYMBOL(yopy_gpio_set);
 
 static int __init yopy_hw_init(void)
 {
-	YOPY_EGPIO = yopy_egpio;
+	if (machine_is_yopy()) {
+		YOPY_EGPIO = yopy_egpio;
 
-	/* Enable Output */
-	PPDR |= PPC_L_BIAS;
-	PSDR &= ~PPC_L_BIAS;
-	PPSR |= PPC_L_BIAS;
+		/* Enable Output */
+		PPDR |= PPC_L_BIAS;
+		PSDR &= ~PPC_L_BIAS;
+		PPSR |= PPC_L_BIAS;
 
-	YOPY_EGPIO = yopy_egpio;
+		YOPY_EGPIO = yopy_egpio;
+	}
 
 	return 0;
 }
@@ -82,6 +84,8 @@ static void __init yopy_map_io(void)
 	iotable_init(yopy_io_desc);
 
 	sa1100_register_uart(0, 3);
+
+	set_GPIO_IRQ_edge(GPIO_UCB1200_IRQ, GPIO_RISING_EDGE);
 }
 
 

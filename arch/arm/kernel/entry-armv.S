@@ -548,6 +548,39 @@ ENTRY(anakin_active_irqs)
 		.text
 		.endm
 
+#elif defined(CONFIG_ARCH_IOP310) || defined(CONFIG_ARCH_ADIFCC)
+
+		.macro	disable_fiq
+		.endm
+
+        	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+        	mrc p13, 0, \irqstat, c4, c0, 0 @ get INTSRC
+        	mrc p13, 0, \base, c0, c0, 0    @ get INTCTL
+
+        	tst \irqstat, #(1<<29)      @ if INTSRC_BI
+        	tstne   \base, #(1<<3)          @ and INTCTL_BM
+        	movne   \irqnr, #IRQ_XS80200_BCU
+        	bne 1001f
+
+        	tst \irqstat, #(1<<28)      @ if INTSRC_PI
+        	tstne   \base, #(1<<2)          @ and INTCTL_PM
+        	movne   \irqnr, #IRQ_XS80200_PMU
+        	bne 1001f
+
+        	tst \irqstat, #(1<<31)      @ if INTSRC_FI
+        	tstne   \base, #(1<<0)          @ and INTCTL_FM
+        	movne   \irqnr, #IRQ_XS80200_EXTFIQ
+        	bne 1001f
+
+        	tst \irqstat, #(1<<30)      @ if INTSRC_II
+        	tstne   \base, #(1<<1)          @ and INTCTL_IM
+        	movne   \irqnr, #IRQ_XS80200_EXTIRQ
+
+1001:
+  		.endm
+
+  		.macro	irq_prio_table
+ 		.endm
 #else
 #error Unknown architecture
 #endif
@@ -641,23 +674,23 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r1, lr
 		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
 		mrs	r9, cpsr			@ Enable interrupts if they were
-		tst	r3, #I_BIT
-		biceq	r9, r9, #I_BIT			@ previously
-		mov	r0, r2
+		tst	r3, #PSR_I_BIT
+		biceq	r9, r9, #PSR_I_BIT		@ previously
+		mov	r0, r2				@ *** remove once everyones in sync
 /*
  * This routine must not corrupt r9
  */
 #ifdef MULTI_CPU
-		ldr	r2, .LCprocfns			@ pass r0, r3 to
+		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
-		ldr	pc, [r2]			@ call processor specific code
+		ldr	pc, [r4]			@ call processor specific code
 #else
 		bl	cpu_data_abort
 #endif
 		msr	cpsr_c, r9
 		mov	r2, sp
 		bl	SYMBOL_NAME(do_DataAbort)
-		mov	r0, #I_BIT | MODE_SVC
+		mov	r0, #PSR_I_BIT | MODE_SVC
 		msr	cpsr_c, r0
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
@@ -700,7 +733,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r1, sp				@ struct pt_regs *regs
 		bl	SYMBOL_NAME(do_undefinstr)
 
-1:		mov	r0, #I_BIT | MODE_SVC
+1:		mov	r0, #PSR_I_BIT | MODE_SVC
 		msr	cpsr_c, r0
 		ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
 		msr	spsr, lr
@@ -716,13 +749,13 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r1, lr
 		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
 		mrs	r9, cpsr			@ Enable interrupts if they were
-		tst	r3, #I_BIT
-		biceq	r9, r9, #I_BIT			@ previously
+		tst	r3, #PSR_I_BIT
+		biceq	r9, r9, #PSR_I_BIT		@ previously
 		msr	cpsr_c, r9
 		mov	r0, r2				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
-		mov	r0, #I_BIT | MODE_SVC
+		mov	r0, #PSR_I_BIT | MODE_SVC
 		msr	cpsr_c, r0
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
@@ -747,15 +780,16 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmia	sp, {r0 - r12}			@ save r0 - r12
 		ldr	r7, .LCabt
 		add	r5, sp, #S_PC
-		ldmia	r7, {r0, r3, r4}		@ Get USR pc, cpsr
-		stmia	r5, {r0, r3, r4}		@ Save USR pc, cpsr, old_r0
+		ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
+		stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
 		stmdb	r5, {sp, lr}^
 		alignment_trap r7, r7, __temp_abt
 		zero_fp
+		mov	r0, r2				@ remove once everyones in sync
 #ifdef MULTI_CPU
-		ldr	r2, .LCprocfns			@ pass r0, r3 to
+		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
-		ldr	pc, [r2]			@ call processor specific code
+		ldr	pc, [r4]			@ call processor specific code
 #else
 		bl	cpu_data_abort
 #endif
@@ -883,7 +917,7 @@ vector_IRQ:	@
 		@
 		@ now branch to the relevent MODE handling routine
 		@
-		mov	r13, #I_BIT | MODE_SVC
+		mov	r13, #PSR_I_BIT | MODE_SVC
 		msr	spsr_c, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
@@ -924,7 +958,7 @@ vector_data:	@
 		@
 		@ now branch to the relevent MODE handling routine
 		@
-		mov	r13, #I_BIT | MODE_SVC
+		mov	r13, #PSR_I_BIT | MODE_SVC
 		msr	spsr_c, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
@@ -966,7 +1000,7 @@ vector_prefetch:
 		@
 		@ now branch to the relevent MODE handling routine
 		@
-		mov	r13, #I_BIT | MODE_SVC
+		mov	r13, #PSR_I_BIT | MODE_SVC
 		msr	spsr_c, r13			@ switch to SVC_32 mode
 
 		ands	lr, lr, #15
@@ -1007,7 +1041,7 @@ vector_undefinstr:
 		@
 		@ now branch to the relevent MODE handling routine
 		@
-		mov	r13, #I_BIT | MODE_SVC
+		mov	r13, #PSR_I_BIT | MODE_SVC
 		msr	spsr_c, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15

@@ -13,38 +13,32 @@ O_TARGET	:= mm.o
 
 # Object file lists.
 
-obj-y		:= init.o
+obj-y		:= init.o extable.o fault-common.o
 obj-m		:=
 obj-n		:=
 obj-		:=
 export-objs	:= proc-syms.o discontig.o
 
-cpu32-y		:= consistent.o fault-armv.o ioremap.o mm-armv.o
-cpu32-$(CONFIG_MODULES) += proc-syms.o
+ifeq ($(CONFIG_CPU_32),y)
+obj-y		+= consistent.o fault-armv.o ioremap.o mm-armv.o
+obj-$(CONFIG_MODULES) += proc-syms.o
+endif
 
-obj-y		+= extable.o fault-common.o
-obj-$(CONFIG_CPU_26) += fault-armo.o mm-armo.o small_page.o
-obj-$(CONFIG_CPU_32) += $(cpu32-y)
-
+obj-$(CONFIG_ALIGNMENT_TRAP) += alignment.o
 obj-$(CONFIG_DISCONTIGMEM) += discontig.o
 
 # Select the processor-specific files
 p-$(CONFIG_CPU_26)	+= proc-arm2,3.o
 p-$(CONFIG_CPU_ARM610)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM710)	+= proc-arm6,7.o
-p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o
-p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o
-p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o
-p-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o
-p-$(CONFIG_CPU_SA110)	+= proc-sa110.o
-p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o
-
-# Integrator follows "new style"
-# Soon, others will do too, and we can get rid of this
-MMMACH		:= mm-$(MACHINE).c
-ifeq ($(MMMACH),$(wildcard $(MMMACH)))
-obj-$(CONFIG_CPU_32)	+= $(MMMACH:.c=.o)
-endif
+p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o armv4t-late-abort.o
+p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o armv4t-early-abort.o
+p-$(CONFIG_CPU_ARM922T)	+= proc-arm922.o armv4t-early-abort.o
+p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o armv5ej-early-abort.o
+p-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o armv4t-early-abort.o
+p-$(CONFIG_CPU_SA110)	+= proc-sa110.o armv4-early-abort.o
+p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o armv4-early-abort.o minicache.o
+p-$(CONFIG_CPU_XSCALE)	+= proc-xscale.o armv4t-early-abort.o minicache.o
 
 obj-y		+= $(sort $(p-y))
 

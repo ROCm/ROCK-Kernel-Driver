@@ -3,7 +3,14 @@
 
 #ifdef __KERNEL__
 
+#include <linux/mm.h> /* bah! */
+
 #include <asm/arch/hardware.h>
+#include <asm/scatterlist.h>
+#include <asm/page.h>
+#include <asm/io.h>
+
+struct pci_dev;
 
 static inline void pcibios_set_master(struct pci_dev *dev)
 {
@@ -15,10 +22,11 @@ static inline void pcibios_penalize_isa_irq(int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
-#include <asm/scatterlist.h>
-#include <asm/io.h>
-
-struct pci_dev;
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS     (0)
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,
@@ -108,8 +116,20 @@ pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int directi
 	int i;
 
 	for (i = 0; i < nents; i++, sg++) {
-		consistent_sync(sg->address, sg->length, direction);
-		sg->dma_address = virt_to_bus(sg->address);
+		char *virt;
+		if (sg->address && sg->page)
+			BUG();
+		else if (!sg->address && !sg->page)
+			BUG();
+
+		if (sg->address) {
+			sg->dma_address = virt_to_bus(sg->address);
+			virt = sg->address;
+		} else {
+			sg->dma_address = page_to_bus(sg->page) + sg->offset;
+			virt = page_address(sg->page) + sg->offset;
+		}
+		consistent_sync(virt, sg->length, direction);
 	}
 
 	return nents;
@@ -151,8 +171,15 @@ pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int d
 {
 	int i;
 
-	for (i = 0; i < nelems; i++, sg++)
-		consistent_sync(sg->address, sg->length, direction);
+	for (i = 0; i < nelems; i++, sg++) {
+		char *virt;
+
+		if (sg->address)
+			virt = sg->address;
+		else
+			virt = page_address(sg->page) + sg->offset;
+		consistent_sync(virt, sg->length, direction);
+	}
 }
 
 /* Return whether the given PCI device DMA address mask can

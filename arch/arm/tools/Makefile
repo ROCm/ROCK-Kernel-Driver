@@ -15,12 +15,16 @@ $(TOPDIR)/include/asm-arm/mach-types.h: mach-types gen-mach-types
 # what we want.  We do this in several stages so make picks up on
 # any errors that occur along the way.
 
-$(TOPDIR)/include/asm-arm/constants.h: constants-hdr getconstants.c
-	$(CC) $(CFLAGS) -S -o - getconstants.c > $@.tmp.1
+constants.h: constants-hdr getconstants.c
+	$(CC) $(CFLAGS) -S -o $@.tmp.1 getconstants.c
 	sed 's/^\(#define .* \)[#$$]\(.*\)/\1\2/;/^#define/!d' $@.tmp.1 > $@.tmp.2
-	cat constants-hdr $@.tmp.2 > $@.tmp
-	cmp $@.tmp $@ >/dev/null 2>&1 || mv $@.tmp $@
+	cat constants-hdr $@.tmp.2 > $@
 	$(RM) $@.tmp*
+
+# Only update include/asm-arm/constants.h when it has actually changed.
+
+$(TOPDIR)/include/asm-arm/constants.h: constants.h
+	cmp constants.h $@ >/dev/null 2>&1 || cp -p constants.h $@
 
 # Build our dependencies, and then generate the constants and
 # mach-types header files.  If we do it now, mkdep will pick
@@ -29,7 +33,7 @@ $(TOPDIR)/include/asm-arm/constants.h: constants-hdr getconstants.c
 
 dep:
 	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- getconstants.c |\
-	 sed s,getconstants.o,$(TOPDIR)/include/asm-arm/constants.h, > .depend
+	 sed s,getconstants.o,constants.h, > .depend
 	$(MAKE) all
 
 .PHONY:	all dep

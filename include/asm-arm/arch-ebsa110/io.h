@@ -15,12 +15,6 @@
 
 #define IO_SPACE_LIMIT 0xffff
 
-/*
- * Generic virtual read/write
- */
-#define __arch_getw(a)		(*(volatile unsigned short *)(a))
-#define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
-
 u8  __inb(int port);
 u16 __inw(int port);
 u32 __inl(int port);
@@ -53,7 +47,7 @@ void __writel(u32 val, void *addr);
 #define writew(v,b)		__writew(v,b)
 #define writel(v,b)		__writel(v,b)
 
-#define __arch_ioremap(off,sz,c)	((void *)(off))
-#define __arch_iounmap(virt)		do { } while (0)
+#define __arch_ioremap(cookie,sz,c)	((void *)(cookie))
+#define __arch_iounmap(cookie)		do { } while (0)
 
 #endif
