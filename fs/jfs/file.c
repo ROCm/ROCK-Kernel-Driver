@@ -24,9 +24,6 @@
 #include "jfs_debug.h"
 
 
-extern int generic_file_open(struct inode *, struct file *);
-extern loff_t generic_file_llseek(struct file *, loff_t, int origin);
-
 extern int jfs_commit_inode(struct inode *, int);
 
 int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
