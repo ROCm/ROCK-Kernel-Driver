@@ -41,6 +41,7 @@
 #include <net/llc_conn.h>
 #include <net/llc_mac.h>
 #include <net/llc_main.h>
+#include <net/llc_proc.h>
 #include <linux/llc.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
@@ -1027,94 +1028,6 @@ out:
 	return rc;
 }
 
-#ifdef CONFIG_PROC_FS
-#define MAC_FORMATTED_SIZE 17
-static void llc_ui_format_mac(char *bf, unsigned char *mac)
-{
-	sprintf(bf, "%02X:%02X:%02X:%02X:%02X:%02X",
-		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-}
-
-/**
- *	llc_ui_get_info - return info to procfs
- *	@buffer: where to put the formatted output
- *	@start: starting from
- *	@offset: offset into buffer.
- *	@length: size of the buffer
- *
- *	Get the output of the local llc ui socket list to the caller.
- *	Returns the length of data wrote to buffer.
- */
-static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	off_t pos = 0;
-	off_t begin = 0;
-	struct llc_sap *sap;
-	struct sock *sk;
-	struct list_head *sap_entry;
-	struct llc_station *station = llc_station_get();
-	int len = sprintf(buffer, "SKt Mc local_mac_sap        "
-				  "remote_mac_sap       tx_queue rx_queue st uid "
-				  "link\n");
-
-	/* Output the LLC socket data for the /proc filesystem */
-	read_lock_bh(&station->sap_list.lock);
-	list_for_each(sap_entry, &station->sap_list.list) {
-		sap = list_entry(sap_entry, struct llc_sap, node);
-
-		read_lock_bh(&sap->sk_list.lock);
-		for (sk = sap->sk_list.list; sk; sk = sk->next) {
-			struct llc_opt *llc = llc_sk(sk);
-
-			len += sprintf(buffer + len, "%2X  %2X ", sk->type,
-				       !llc_mac_null(llc->addr.sllc_mmac));
-			if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
-				llc_ui_format_mac(buffer + len,
-						  llc->dev->dev_addr);
-			else {
-				if (!llc_mac_null(llc->addr.sllc_mmac))
-					llc_ui_format_mac(buffer + len,
-							  llc->addr.sllc_mmac);
-				else
-					sprintf(buffer + len,
-						"00:00:00:00:00:00");
-			}
-			len += MAC_FORMATTED_SIZE;
-			len += sprintf(buffer + len, "@%02X ", sap->laddr.lsap);
-			llc_ui_format_mac(buffer + len, llc->addr.sllc_dmac);
-			len += MAC_FORMATTED_SIZE;
-			len += sprintf(buffer + len,
-					"@%02X %8d %8d %2d %3d ",
-					llc->addr.sllc_dsap,
-					atomic_read(&sk->wmem_alloc),
-					atomic_read(&sk->rmem_alloc),
-					sk->state,
-					sk->socket ?
-					  SOCK_INODE(sk->socket)->i_uid : -1);
-			len += sprintf(buffer + len, "%4d\n", llc->link);
-			/* Are we still dumping unwanted data then discard the record */
-			pos = begin + len;
-
-			if (pos < offset) {
-				len = 0; /* Keep dumping into the buffer start */
-				begin = pos;
-			}
-			if (pos > offset + length) /* We have dumped enough */
-				break;
-		}
-		read_unlock_bh(&sap->sk_list.lock);
-	}
-	read_unlock_bh(&station->sap_list.lock);
-
-	/* The data in question runs from begin to begin + len */
-	*start = buffer + offset - begin; /* Start of wanted data */
-	len -= offset - begin; /* Remove unwanted header data from length */
-	if (len > length)
-		len = length; /* Remove unwanted tail data from length */
-	return len;
-}
-#endif /* CONFIG_PROC_FS */
-
 static struct net_proto_family llc_ui_family_ops = {
 	.family = PF_LLC,
 	.create = llc_ui_create,
@@ -1145,15 +1058,20 @@ static char llc_ui_banner[] __initdata =
 
 int __init llc_ui_init(void)
 {
+	int rc = llc_proc_init();
+
+	if (rc)
+		goto out;
 	llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 	sock_register(&llc_ui_family_ops);
-	proc_net_create("llc", 0, llc_ui_get_info);
 	printk(llc_ui_banner);
-	return 0;
+	rc = 0;
+out:
+	return rc;
 }
 
 void __exit llc_ui_exit(void)
 {
-	proc_net_remove("llc");
 	sock_unregister(PF_LLC);
+	llc_proc_exit();
 }

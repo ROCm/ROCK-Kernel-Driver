@@ -50,7 +50,7 @@ static struct llc_station_state_trans *
 						    struct sk_buff *skb);
 static int llc_rtn_all_conns(struct llc_sap *sap);
 
-static struct llc_station llc_main_station;	/* only one of its kind */
+struct llc_station llc_main_station;	/* only one of its kind */
 
 #undef LLC_REFCNT_DEBUG
 #ifdef LLC_REFCNT_DEBUG
@@ -337,16 +337,6 @@ static int llc_rtn_all_conns(struct llc_sap *sap)
 
 	write_unlock_bh(&sap->sk_list.lock);
 	return rc;
-}
-
-/**
- *	llc_station_get - get addr of global station.
- *
- *	Returns address of a place to copy the global station to it.
- */
-struct llc_station *llc_station_get(void)
-{
-	return &llc_main_station;
 }
 
 /**
