@@ -31,7 +31,7 @@ extern unsigned long pci_memspace_mask;
 
 #define bus_dvma_to_mem(__vaddr) ((__vaddr) & pci_memspace_mask)
 
-static __inline__ u8 inb(unsigned long addr)
+static __inline__ u8 _inb(unsigned long addr)
 {
 	u8 ret;
 
@@ -42,7 +42,7 @@ static __inline__ u8 inb(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u16 inw(unsigned long addr)
+static __inline__ u16 _inw(unsigned long addr)
 {
 	u16 ret;
 
@@ -53,7 +53,7 @@ static __inline__ u16 inw(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u32 inl(unsigned long addr)
+static __inline__ u32 _inl(unsigned long addr)
 {
 	u32 ret;
 
@@ -64,33 +64,40 @@ static __inline__ u32 inl(unsigned long addr)
 	return ret;
 }
 
-static __inline__ void outb(u8 b, unsigned long addr)
+static __inline__ void _outb(u8 b, unsigned long addr)
 {
 	__asm__ __volatile__("stba\t%r0, [%1] %2\t/* pci_outb */"
 			     : /* no outputs */
 			     : "Jr" (b), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static __inline__ void outw(u16 w, unsigned long addr)
+static __inline__ void _outw(u16 w, unsigned long addr)
 {
 	__asm__ __volatile__("stha\t%r0, [%1] %2\t/* pci_outw */"
 			     : /* no outputs */
 			     : "Jr" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static __inline__ void outl(u32 l, unsigned long addr)
+static __inline__ void _outl(u32 l, unsigned long addr)
 {
 	__asm__ __volatile__("stwa\t%r0, [%1] %2\t/* pci_outl */"
 			     : /* no outputs */
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-#define inb_p inb
-#define outb_p outb
-#define inw_p inw
-#define outw_p outw
-#define inl_p inl
-#define outl_p outl
+#define inb(__addr)		(_inb((unsigned long)(__addr)))
+#define inw(__addr)		(_inw((unsigned long)(__addr)))
+#define inl(__addr)		(_inl((unsigned long)(__addr)))
+#define outb(__b, __addr)	(_outb((u8)(__b), (unsigned long)(__addr)))
+#define outw(__w, __addr)	(_outw((u16)(__w), (unsigned long)(__addr)))
+#define outl(__l, __addr)	(_outl((u32)(__l), (unsigned long)(__addr)))
+
+#define inb_p(__addr) 		inb(__addr)
+#define outb_p(__b, __addr)	outb(__b, __addr)
+#define inw_p(__addr)		inw(__addr)
+#define outw_p(__w, __addr)	outw(__w, __addr)
+#define inl_p(__addr)		inl(__addr)
+#define outl_p(__l, __addr)	outl(__l, __addr)
 
 extern void outsb(unsigned long addr, const void *src, unsigned long count);
 extern void outsw(unsigned long addr, const void *src, unsigned long count);
