@@ -356,13 +356,13 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
-	cb->cb_next = 0;
+	cb->cb_next = NULL;
 	spl = LOG_LOCK(log);
 	abortflg = (iclog->ic_state & XLOG_STATE_IOERROR);
 	if (!abortflg) {
 		ASSERT_ALWAYS((iclog->ic_state == XLOG_STATE_ACTIVE) ||
 			      (iclog->ic_state == XLOG_STATE_WANT_SYNC));
-		cb->cb_next = 0;
+		cb->cb_next = NULL;
 		*(iclog->ic_callback_tail) = cb;
 		iclog->ic_callback_tail = &(cb->cb_next);
 	}
@@ -564,7 +564,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	xlog_in_core_t	 *first_iclog;
 #endif
 	xfs_log_iovec_t  reg[1];
-	xfs_log_ticket_t tic = 0;
+	xfs_log_ticket_t tic = NULL;
 	xfs_lsn_t	 lsn;
 	int		 error;
 	SPLDECL(s);
@@ -1277,7 +1277,7 @@ xlog_commit_record(xfs_mount_t  *mp,
 	int		error;
 	xfs_log_iovec_t	reg[1];
 
-	reg[0].i_addr = 0;
+	reg[0].i_addr = NULL;
 	reg[0].i_len = 0;
 
 	ASSERT_ALWAYS(iclog);
@@ -1857,7 +1857,7 @@ xlog_state_clean_log(xlog_t *log)
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
-			iclog->ic_callback	= 0;   /* don't need to free */
+			iclog->ic_callback	= NULL;   /* don't need to free */
 			/*
 			 * If the number of ops in this iclog indicate it just
 			 * contains the dummy transaction, we can
@@ -2080,7 +2080,7 @@ xlog_state_do_callback(
 
 			while (cb != 0) {
 				iclog->ic_callback_tail = &(iclog->ic_callback);
-				iclog->ic_callback = 0;
+				iclog->ic_callback = NULL;
 				LOG_UNLOCK(log, s);
 
 				/* perform callbacks in the order given */
@@ -3098,7 +3098,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 		log->l_ticket_cnt++;
 		log->l_ticket_tcnt++;
 	}
-	t_list->t_next = 0;
+	t_list->t_next = NULL;
 	log->l_tail = t_list;
 	LOG_UNLOCK(log, s);
 }	/* xlog_state_ticket_alloc */
@@ -3126,7 +3126,7 @@ xlog_ticket_put(xlog_t		*log,
 	/* no need to clear fields */
 #else
 	/* When we debug, it is easier if tickets are cycled */
-	ticket->t_next     = 0;
+	ticket->t_next     = NULL;
 	if (log->l_tail != 0) {
 		log->l_tail->t_next = ticket;
 	} else {

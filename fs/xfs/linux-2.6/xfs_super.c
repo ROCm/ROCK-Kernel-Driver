@@ -573,7 +573,7 @@ linvfs_get_parent(
 
 	dotdot.d_name.name = "..";
 	dotdot.d_name.len = 2;
-	dotdot.d_inode = 0;
+	dotdot.d_inode = NULL;
 
 	cvp = NULL;
 	vp = LINVFS_GET_VP(child->d_inode);

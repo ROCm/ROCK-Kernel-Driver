@@ -3749,6 +3749,6 @@ xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)
 		     (void *)ra,		/* caller of ilock */
 		     (void *)(unsigned long)current_cpu(),
 		     (void *)(unsigned long)current_pid(),
-		     0,0,0,0,0,0,0,0,0,0);
+		     NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 #endif

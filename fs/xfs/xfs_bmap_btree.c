@@ -1953,7 +1953,7 @@ xfs_bmbt_get_block(
 		*bpp = cur->bc_bufs[level];
 		rval = XFS_BUF_TO_BMBT_BLOCK(*bpp);
 	} else {
-		*bpp = 0;
+		*bpp = NULL;
 		ifp = XFS_IFORK_PTR(cur->bc_private.b.ip,
 			cur->bc_private.b.whichfork);
 		rval = ifp->if_broot;

@@ -264,7 +264,7 @@ xfs_probe_unwritten_page(
 
 	page = find_trylock_page(mapping, index);
 	if (!page)
-		return 0;
+		return NULL;
 	if (PageWriteback(page))
 		goto out;
 
