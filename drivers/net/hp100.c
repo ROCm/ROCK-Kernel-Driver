@@ -306,7 +306,7 @@ static void wait(void)
  * Read board id and convert to string.
  * Effectively same code as decode_eisa_sig
  */
-static __init const char *hp100_read_id(int ioaddr)
+static __devinit const char *hp100_read_id(int ioaddr)
 {
 	int i;
 	static char str[HP100_SIG_LEN];
@@ -429,8 +429,8 @@ struct net_device * __init hp100_probe(int unit)
 }
 #endif
 
-static int __init hp100_probe1(struct net_device *dev, int ioaddr,
-			       u_char bus, struct pci_dev *pci_dev)
+static int __devinit hp100_probe1(struct net_device *dev, int ioaddr,
+				  u_char bus, struct pci_dev *pci_dev)
 {
 	int i;
 	int err = -ENODEV;

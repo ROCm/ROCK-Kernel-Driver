@@ -711,7 +711,7 @@ static void __init attach_opl3sa2_mixer(struct address_info *hw_config, int card
 }
 
 
-static void __init opl3sa2_clear_slots(struct address_info* hw_config)
+static void opl3sa2_clear_slots(struct address_info* hw_config)
 {
 	int i;
 
