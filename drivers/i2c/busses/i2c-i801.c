@@ -55,21 +55,6 @@ MODULE_LICENSE("GPL");
 #define HAVE_PEC
 #endif
 
-#ifndef PCI_DEVICE_ID_INTEL_82801CA_SMBUS
-#define PCI_DEVICE_ID_INTEL_82801CA_SMBUS	0x2483
-#endif
-
-#ifndef PCI_DEVICE_ID_INTEL_82801DB_SMBUS
-#define PCI_DEVICE_ID_INTEL_82801DB_SMBUS	0x24C3
-#endif
-
-static int supported[] = {PCI_DEVICE_ID_INTEL_82801AA_3,
-                          PCI_DEVICE_ID_INTEL_82801AB_3,
-                          PCI_DEVICE_ID_INTEL_82801BA_2,
-			  PCI_DEVICE_ID_INTEL_82801CA_SMBUS,
-			  PCI_DEVICE_ID_INTEL_82801DB_SMBUS,
-                          0 };
-
 /* I801 SMBus address offsets */
 #define SMBHSTSTS (0 + i801_smba)
 #define SMBHSTCNT (2 + i801_smba)
@@ -135,7 +120,6 @@ static int isich4;
 static int i801_setup(struct pci_dev *dev)
 {
 	int error_return = 0;
-	int *num = supported;
 	unsigned char temp;
 
 	/* Note: we keep on searching until we have found 'function 3' */
@@ -143,7 +127,10 @@ static int i801_setup(struct pci_dev *dev)
 		return -ENODEV;
 
 	I801_dev = dev;
-	isich4 = *num == PCI_DEVICE_ID_INTEL_82801DB_SMBUS;
+	if (dev->device == PCI_DEVICE_ID_INTEL_82801DB_3)
+		isich4 = 1;
+	else
+		isich4 = 0;
 
 /* Determine the address of the SMBus areas */
 	if (force_addr) {
@@ -290,7 +277,7 @@ int i801_block_transaction(union i2c_smbus_data *data, char read_write,
                                               hostc | SMBHSTCFG_I2C_EN);
                 } else {
                         dev_err(&I801_dev->dev,
-				"I2C_SMBUS_I2C_BLOCK_READ not supported!\n");
+				"I2C_SMBUS_I2C_BLOCK_READ not DB!\n");
                         return -1;
                 }
         }
@@ -607,13 +594,13 @@ static struct pci_device_id i801_ids[] __devinitdata = {
 	},
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
-		.device =	PCI_DEVICE_ID_INTEL_82801CA_SMBUS,
+		.device =	PCI_DEVICE_ID_INTEL_82801CA_3,
 		.subvendor =	PCI_ANY_ID,
 		.subdevice =	PCI_ANY_ID,
 	},
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
-		.device =	PCI_DEVICE_ID_INTEL_82801DB_SMBUS,
+		.device =	PCI_DEVICE_ID_INTEL_82801DB_3,
 		.subvendor =	PCI_ANY_ID,
 		.subdevice =	PCI_ANY_ID,
 	},
