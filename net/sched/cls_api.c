@@ -130,21 +130,29 @@ static __inline__ u32 tcf_auto_prio(struct tcf_proto *tp)
 
 static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 {
-	struct rtattr **tca = arg;
-	struct tcmsg *t = NLMSG_DATA(n);
-	u32 protocol = TC_H_MIN(t->tcm_info);
-	u32 prio = TC_H_MAJ(t->tcm_info);
-	u32 nprio = prio;
-	u32 parent = t->tcm_parent;
+	struct rtattr **tca;
+	struct tcmsg *t;
+	u32 protocol;
+	u32 prio;
+	u32 nprio;
+	u32 parent;
 	struct net_device *dev;
 	struct Qdisc  *q;
 	struct tcf_proto **back, **chain;
-	struct tcf_proto *tp = NULL;
+	struct tcf_proto *tp;
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
 	unsigned long cl = 0;
 	unsigned long fh;
 	int err;
+
+replay:
+	tca = arg;
+	t = NLMSG_DATA(n);
+	protocol = TC_H_MIN(t->tcm_info);
+	prio = TC_H_MAJ(t->tcm_info);
+	nprio = prio;
+	parent = t->tcm_parent;
 
 	if (prio == 0) {
 		/* If no priority is given, user wants we allocated it. */
@@ -294,6 +302,9 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 errout:
 	if (cl)
 		cops->put(q, cl);
+	if (err == -EAGAIN)
+		/* Replay the request. */
+		goto replay;
 	return err;
 }
 

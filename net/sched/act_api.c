@@ -291,16 +291,28 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 			goto err_out;
 	}
 
-	*err = -ENOENT;
 	a_o = tc_lookup_action_n(act_name);
-#ifdef CONFIG_KMOD
 	if (a_o == NULL) {
+#ifdef CONFIG_KMOD
+		rtnl_unlock();
 		request_module(act_name);
+		rtnl_lock();
+
 		a_o = tc_lookup_action_n(act_name);
-	}
+
+		/* We dropped the RTNL semaphore in order to
+		 * perform the module load.  So, even if we
+		 * succeeded in loading the module we have to
+		 * tell the caller to replay the request.  We
+		 * indicate this using -EAGAIN.
+		 */
+		if (a_o != NULL) {
+			*err = -EAGAIN;
+			goto err_mod;
+		}
 #endif
-	if (a_o == NULL)
 		goto err_out;
+	}
 
 	*err = -ENOMEM;
 	a = kmalloc(sizeof(*a), GFP_KERNEL);
@@ -740,7 +752,10 @@ static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		 */
 		if (n->nlmsg_flags&NLM_F_REPLACE)
 			ovr = 1;
+replay:
 		ret = tcf_action_add(tca[TCA_ACT_TAB-1], n, pid, ovr);
+		if (ret == -EAGAIN)
+			goto replay;
 		break;
 	case RTM_DELACTION:
 		ret = tca_action_gd(tca[TCA_ACT_TAB-1], n, pid, RTM_DELACTION);
