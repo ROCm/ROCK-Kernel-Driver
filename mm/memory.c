@@ -967,12 +967,13 @@ void swapin_readahead(swp_entry_t entry)
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Ok, do the async read-ahead now */
-		new_page = read_swap_cache_async(swp_entry(swp_type(entry), offset));
+		new_page = read_swap_cache_async(swp_entry(swp_type(entry),
+						offset));
 		if (!new_page)
 			break;
 		page_cache_release(new_page);
 	}
-	return;
+	lru_add_drain();	/* Push any new pages onto the LRU now */
 }
 
 /*
@@ -1007,7 +1008,7 @@ static int do_swap_page(struct mm_struct * mm,
 				ret = VM_FAULT_MINOR;
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
-			return ret;
+			goto out;
 		}
 
 		/* Had to read the page from swap area: Major fault */
@@ -1029,7 +1030,8 @@ static int do_swap_page(struct mm_struct * mm,
 		spin_unlock(&mm->page_table_lock);
 		unlock_page(page);
 		page_cache_release(page);
-		return VM_FAULT_MINOR;
+		ret = VM_FAULT_MINOR;
+		goto out;
 	}
 
 	/* The page isn't present yet, go ahead with the fault. */
@@ -1053,6 +1055,7 @@ static int do_swap_page(struct mm_struct * mm,
 	update_mmu_cache(vma, address, pte);
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
+out:
 	return ret;
 }
 
