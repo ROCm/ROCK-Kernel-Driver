@@ -235,6 +235,11 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	if (command == PSMOUSE_CMD_RESET_BAT)
                 timeout = 4000000; /* 4 sec */
 
+	/* initialize cmdbuf with preset values from param */
+	if (receive)
+	   for (i = 0; i < receive; i++)
+		psmouse->cmdbuf[(receive - 1) - i] = param[i];
+
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
 			return (psmouse->cmdcnt = 0) - 1;
@@ -245,8 +250,9 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 
 	while (psmouse->cmdcnt && timeout--) {
 	
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT)
-			timeout = 100000;
+		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
+				timeout > 100000) /* do not run in a endless loop */
+			timeout = 100000; /* 1 sec */
 
 		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_GETID &&
 		    psmouse->cmdbuf[1] != 0xab && psmouse->cmdbuf[1] != 0xac) {
@@ -414,7 +420,7 @@ static int psmouse_probe(struct psmouse *psmouse)
  * in case of an IntelliMouse in 4-byte mode or 0x04 for IM Explorer.
  */
 
-	param[0] = param[1] = 0xa5;
+	param[0] = 0xa5;
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETID))
 		return -1;
@@ -578,12 +584,14 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	serio->private = psmouse;
 	if (serio_open(serio, dev)) {
 		kfree(psmouse);
+		serio->private = NULL;
 		return;
 	}
 
 	if (psmouse_probe(psmouse) <= 0) {
 		serio_close(serio);
 		kfree(psmouse);
+		serio->private = NULL;
 		return;
 	}
 	
