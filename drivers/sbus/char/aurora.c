@@ -179,7 +179,7 @@ extern inline void aurora_long_delay(unsigned long delay)
 #ifdef AURORA_DEBUG
 	printk("aurora_long_delay: start\n");
 #endif
-	for (i = jiffies + delay; i > jiffies; ) ;
+	for (i = jiffies + delay; time_before(jiffies, i); ) ;
 #ifdef AURORA_DEBUG
 	printk("aurora_long_delay: end\n");
 #endif

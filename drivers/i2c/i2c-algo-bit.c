@@ -49,7 +49,7 @@
 /* respectively. This makes sure that the algorithm works. Some chips   */
 /* might not like this, as they have an internal timeout of some mils	*/
 /*
-#define SLO_IO      jif=jiffies;while(jiffies<=jif+i2c_table[minor].veryslow)\
+#define SLO_IO      jif=jiffies;while(time_before_eq(jiffies, jif+i2c_table[minor].veryslow))\
                         cond_resched();
 */
 
@@ -117,7 +117,7 @@ static inline int sclhi(struct i2c_algo_bit_data *adap)
  		 * while they are processing data internally. 
  		 */
 		setscl(adap,1);
-		if (start+adap->timeout <= jiffies) {
+		if (time_after_eq(jiffies, start+adap->timeout)) {
 			return -ETIMEDOUT;
 		}
 		cond_resched();

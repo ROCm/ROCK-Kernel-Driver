@@ -355,7 +355,7 @@ init_e100_ide (void)
 	printk("ide: waiting %d seconds for drives to regain consciousness\n", CONFIG_ETRAX_IDE_DELAY);
 
 	h = jiffies + (CONFIG_ETRAX_IDE_DELAY * HZ);
-	while(jiffies < h) ;
+	while(time_before(jiffies, h)) ;
 
   /* reset the dma channels we will use */
 
