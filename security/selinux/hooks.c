@@ -3179,8 +3179,9 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 		
 	/* Fixme: this lookup is inefficient */
 	iph = skb->nh.iph;
-	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr), &node_sid);
-	if (err)
+	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr),
+				&node_sid) ? NF_DROP : NF_ACCEPT;
+	if (err != NF_ACCEPT)
 		goto out;
 	
 	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE,
