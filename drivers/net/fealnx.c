@@ -1144,6 +1144,7 @@ static void getlinktype(struct net_device *dev)
 }
 
 
+/* Take lock before calling this */
 static void allocate_rx_buffers(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
@@ -1174,14 +1175,16 @@ static void netdev_timer(unsigned long data)
 	struct net_device *dev = (struct net_device *) data;
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int next_tick = 10 * HZ;
 	int old_crvalue = np->crvalue;
 	unsigned int old_linkok = np->linkok;
+	unsigned long flags;
 
 	if (debug)
 		printk(KERN_DEBUG "%s: Media selection timer tick, status %8.8x "
 		       "config %8.8x.\n", dev->name, readl(ioaddr + ISR),
 		       readl(ioaddr + TCRRCR));
+
+	spin_lock_irqsave(&np->lock, flags);
 
 	if (np->flags == HAS_MII_XCVR) {
 		getlinkstatus(dev);
@@ -1196,7 +1199,9 @@ static void netdev_timer(unsigned long data)
 
 	allocate_rx_buffers(dev);
 
-	np->timer.expires = RUN_AT(next_tick);
+	spin_unlock_irqrestore(&np->lock, flags);
+
+	np->timer.expires = RUN_AT(10 * HZ);
 	add_timer(&np->timer);
 }
 
@@ -1401,7 +1406,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-/* Stop rx before calling this */
+/* Take lock and stop rx before calling this */
 static void reset_rx_descriptors(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
