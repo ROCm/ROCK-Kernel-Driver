@@ -62,8 +62,12 @@
 #include <linux/nfs_page.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
+#include <linux/mempool.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
+
+#define MIN_POOL_WRITE		(32)
+#define MIN_POOL_COMMIT		(4)
 
 /*
  * Local function declarations
@@ -74,11 +78,13 @@ static struct nfs_page * nfs_update_request(struct file*, struct inode *,
 static void	nfs_strategy(struct inode *inode);
 
 static kmem_cache_t *nfs_wdata_cachep;
+static mempool_t *nfs_wdata_mempool;
+static mempool_t *nfs_commit_mempool;
 
 static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
 {
 	struct nfs_write_data	*p;
-	p = kmem_cache_alloc(nfs_wdata_cachep, SLAB_NOFS);
+	p = (struct nfs_write_data *)mempool_alloc(nfs_wdata_mempool, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);
@@ -88,13 +94,35 @@ static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
 
 static __inline__ void nfs_writedata_free(struct nfs_write_data *p)
 {
-	kmem_cache_free(nfs_wdata_cachep, p);
+	mempool_free(p, nfs_wdata_mempool);
 }
 
 void nfs_writedata_release(struct rpc_task *task)
 {
 	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
 	nfs_writedata_free(wdata);
+}
+
+static __inline__ struct nfs_write_data *nfs_commit_alloc(void)
+{
+	struct nfs_write_data	*p;
+	p = (struct nfs_write_data *)mempool_alloc(nfs_commit_mempool, SLAB_NOFS);
+	if (p) {
+		memset(p, 0, sizeof(*p));
+		INIT_LIST_HEAD(&p->pages);
+	}
+	return p;
+}
+
+static __inline__ void nfs_commit_free(struct nfs_write_data *p)
+{
+	mempool_free(p, nfs_commit_mempool);
+}
+
+void nfs_commit_release(struct rpc_task *task)
+{
+	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
+	nfs_commit_free(wdata);
 }
 
 /*
@@ -1093,7 +1121,7 @@ nfs_commit_list(struct list_head *head, int how)
 	struct nfs_page         *req;
 	sigset_t		oldset;
 
-	data = nfs_writedata_alloc();
+	data = nfs_commit_alloc();
 
 	if (!data)
 		goto out_bad;
@@ -1237,11 +1265,27 @@ int nfs_init_writepagecache(void)
 	if (nfs_wdata_cachep == NULL)
 		return -ENOMEM;
 
+	nfs_wdata_mempool = mempool_create(MIN_POOL_WRITE,
+					   mempool_alloc_slab,
+					   mempool_free_slab,
+					   nfs_wdata_cachep);
+	if (nfs_wdata_mempool == NULL)
+		return -ENOMEM;
+
+	nfs_commit_mempool = mempool_create(MIN_POOL_COMMIT,
+					   mempool_alloc_slab,
+					   mempool_free_slab,
+					   nfs_wdata_cachep);
+	if (nfs_commit_mempool == NULL)
+		return -ENOMEM;
+
 	return 0;
 }
 
 void nfs_destroy_writepagecache(void)
 {
+	mempool_destroy(nfs_commit_mempool);
+	mempool_destroy(nfs_wdata_mempool);
 	if (kmem_cache_destroy(nfs_wdata_cachep))
 		printk(KERN_INFO "nfs_write_data: not all structures were freed\n");
 }

@@ -811,7 +811,7 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	rpc_init_task(task, NFS_CLIENT(inode), nfs3_commit_done, flags);
 	task->tk_calldata = data;
 	/* Release requests */
-	task->tk_release = nfs_writedata_release;
+	task->tk_release = nfs_commit_release;
 	
 	msg.rpc_proc = NFS3PROC_COMMIT;
 	msg.rpc_argp = &data->u.v3.args;

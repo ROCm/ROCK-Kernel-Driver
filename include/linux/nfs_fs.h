@@ -327,6 +327,7 @@ extern void nfs_writeback_done(struct rpc_task *task, int stable,
 extern void nfs_writedata_release(struct rpc_task *task);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
+extern void nfs_commit_release(struct rpc_task *task);
 extern void nfs_commit_done(struct rpc_task *);
 #endif
 
