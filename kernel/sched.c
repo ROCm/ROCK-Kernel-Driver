@@ -1012,6 +1012,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	unsigned long flags;
 	cpumask_t old_mask, new_mask = cpumask_of_cpu(dest_cpu);
 
+	lock_cpu_hotplug();
 	rq = task_rq_lock(p, &flags);
 	old_mask = p->cpus_allowed;
 	if (!cpu_isset(dest_cpu, old_mask) || !cpu_online(dest_cpu))
@@ -1035,6 +1036,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	}
 out:
 	task_rq_unlock(rq, &flags);
+	unlock_cpu_hotplug();
 }
 
 /*
@@ -2309,11 +2311,13 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
 		return -EFAULT;
 
+	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
 
 	p = find_process_by_pid(pid);
 	if (!p) {
 		read_unlock(&tasklist_lock);
+		unlock_cpu_hotplug();
 		return -ESRCH;
 	}
 
@@ -2334,6 +2338,7 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 
 out_unlock:
 	put_task_struct(p);
+	unlock_cpu_hotplug();
 	return retval;
 }
 
