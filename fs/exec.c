@@ -497,6 +497,7 @@ int kernel_read(struct file *file, unsigned long offset,
 
 static int exec_mmap(struct mm_struct *mm)
 {
+	struct task_struct *tsk;
 	struct mm_struct * old_mm, *active_mm;
 
 	/* Add it to the list of mm's */
@@ -505,14 +506,17 @@ static int exec_mmap(struct mm_struct *mm)
 	mmlist_nr++;
 	spin_unlock(&mmlist_lock);
 
-	task_lock(current);
+	/* Notify parent that we're no longer interested in the old VM */
+	tsk = current;
 	old_mm = current->mm;
-	active_mm = current->active_mm;
-	current->mm = mm;
-	current->active_mm = mm;
+	mm_release(tsk, old_mm);
+
+	task_lock(tsk);
+	active_mm = tsk->active_mm;
+	tsk->mm = mm;
+	tsk->active_mm = mm;
 	activate_mm(active_mm, mm);
-	task_unlock(current);
-	mm_release();
+	task_unlock(tsk);
 	if (old_mm) {
 		if (active_mm != old_mm) BUG();
 		mmput(old_mm);

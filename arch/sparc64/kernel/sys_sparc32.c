@@ -1729,8 +1729,7 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_times
 	set_fs (KERNEL_DS);
 	ret = sys_sched_rr_get_interval(pid, &t);
 	set_fs (old_fs);
-	if (put_user (t.tv_sec, &interval->tv_sec) ||
-	    __put_user (t.tv_nsec, &interval->tv_nsec))
+	if (put_compat_timespec(&t, interval))
 		return -EFAULT;
 	return ret;
 }
@@ -1861,8 +1860,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 	signotset(&these);
 
 	if (uts) {
-		if (get_user (ts.tv_sec, &uts->tv_sec) ||
-		    get_user (ts.tv_nsec, &uts->tv_nsec))
+		if (get_compat_timespec(&ts, uts))
 			return -EINVAL;
 		if (ts.tv_nsec >= 1000000000L || ts.tv_nsec < 0
 		    || ts.tv_sec < 0)

@@ -78,7 +78,7 @@ struct exception_table_entry
 };
 
 /* Returns 0 if exception not found and fixup otherwise.  */
-extern unsigned long search_exception_table(unsigned long, unsigned long *);
+extern unsigned long search_extables_range(unsigned long addr, unsigned long *g2);
 
 extern void __ret_efault(void);
 
