@@ -281,8 +281,20 @@ void pg_init_units( void )
 	}
 } 
 
-#define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
-#define	RR(c,r)		(pi_read_regr(PI,c,r))
+static inline int status_reg(int unit)
+{
+	return pi_read_regr(PI, 1, 6);
+}
+
+static inline int read_reg(int unit, int reg)
+{
+	return pi_read_regr(PI, 0, reg);
+}
+
+static inline void write_reg(int unit, int reg, int val)
+{
+	pi_write_regr(PI, 0, reg, val);
+}
 
 #define DRIVE           (0xa0+0x10*PG.drive)
 
@@ -299,7 +311,7 @@ static int pg_wait(int unit, int go, int stop, unsigned long tmo, char *msg)
 	PG.status = 0;
 
 	j = 0;
-	while ((((r=RR(1,6))&go) || (stop&&(!(r&stop))))
+	while ((((r=status_reg(unit))&go) || (stop&&(!(r&stop))))
 	       && time_before(jiffies,tmo)) {
 		if (j++ < PG_SPIN)
 			udelay(PG_SPIN_DEL);
@@ -310,9 +322,9 @@ static int pg_wait(int unit, int go, int stop, unsigned long tmo, char *msg)
 	to = time_after_eq(jiffies, tmo);
 
 	if ((r&(STAT_ERR&stop)) || to) {
-		s = RR(0,7);
-		e = RR(0,1);
-		p = RR(0,2);
+		s = read_reg(unit, 7);
+		e = read_reg(unit, 1);
+		p = read_reg(unit, 2);
 		if (verbose > 1)
 			printk("%s: %s: stat=0x%x err=0x%x phase=%d%s\n",
 			       PG.name, msg, s, e, p, to ? " timeout" : "");
@@ -330,23 +342,23 @@ static int pg_command(int unit, char *cmd, int dlen, unsigned long tmo)
 
 	pi_connect(PI);
 
-	WR(0,6,DRIVE);
+	write_reg(unit, 6,DRIVE);
 
 	if (pg_wait(unit, STAT_BUSY|STAT_DRQ, 0, tmo, "before command")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
-	WR(0,4,dlen % 256);
-	WR(0,5,dlen / 256);
-	WR(0,7,0xa0);          /* ATAPI packet command */
+	write_reg(unit, 4,dlen % 256);
+	write_reg(unit, 5,dlen / 256);
+	write_reg(unit, 7,0xa0);          /* ATAPI packet command */
 
 	if (pg_wait(unit, STAT_BUSY, STAT_DRQ, tmo, "command DRQ")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
-	if (RR(0,2) != 1) {
+	if (read_reg(unit, 2) != 1) {
 		printk("%s: command phase error\n",PG.name);
 		pi_disconnect(PI);
 		return -1;
@@ -371,10 +383,10 @@ static int pg_completion(int unit, char *buf, unsigned long tmo)
 
 	PG.dlen = 0;
 
-	while (RR(0,7)&STAT_DRQ) {
-		d = (RR(0,4)+256*RR(0,5));
+	while (read_reg(unit, 7)&STAT_DRQ) {
+		d = (read_reg(unit, 4)+256*read_reg(unit, 5));
 		n = ((d+3)&0xfffc);
-		p = RR(0,2)&3;
+		p = read_reg(unit, 2)&3;
 		if (p == 0)
 			pi_write_block(PI,buf,n);
 		if (p == 2)
@@ -399,21 +411,21 @@ static int pg_reset( int unit )
 	int	expect[5] = {1,1,1,0x14,0xeb};
 
 	pi_connect(PI);
-	WR(0,6,DRIVE);
-	WR(0,7,8);
+	write_reg(unit, 6,DRIVE);
+	write_reg(unit, 7,8);
 
 	pg_sleep(20*HZ/1000);
 
 	k = 0;
-	while ((k++ < PG_RESET_TMO) && (RR(1,6)&STAT_BUSY))
+	while ((k++ < PG_RESET_TMO) && (status_reg(unit)&STAT_BUSY))
 		pg_sleep(1);
 
 	flg = 1;
-	for(i=0;i<5;i++) flg &= (RR(0,i+1) == expect[i]);
+	for(i=0;i<5;i++) flg &= (read_reg(unit, i+1) == expect[i]);
 
 	if (verbose) {
 		printk("%s: Reset (%d) signature = ",PG.name,k);
-		for (i=0;i<5;i++) printk("%3x",RR(0,i+1));
+		for (i=0;i<5;i++) printk("%3x",read_reg(unit, i+1));
 		if (!flg) printk(" (incorrect)");
 		printk("\n");
 	}
