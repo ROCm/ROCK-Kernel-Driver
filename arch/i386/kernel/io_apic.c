@@ -745,7 +745,7 @@ static int __init find_irq_entry(int apic, int pin, int type)
 /*
  * Find the pin to which IRQ[irq] (ISA) is connected
  */
-static int __init find_isa_irq_pin(int irq, int type)
+static int find_isa_irq_pin(int irq, int type)
 {
 	int i;
 
