@@ -1786,7 +1786,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 		dev->set_multicast_list = lcs_set_multicast_list;
 #endif
 	dev->get_stats = lcs_getstats;
-	dev->owner = THIS_MODULE;
+	SET_MODULE_OWNER(&tun->dev);
 	netif_stop_queue(dev);
 	lcs_stopcard(card);
 	return 0;
