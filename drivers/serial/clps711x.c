@@ -193,7 +193,7 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		clps711xuart_stop_tx(port);
+		clps711xuart_stop_tx(port, 0);
 		return;
 	}
 
@@ -210,7 +210,7 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
-		clps711xuart_stop_tx(port);
+		clps711xuart_stop_tx(port, 0);
 }
 
 static unsigned int clps711xuart_tx_empty(struct uart_port *port)
@@ -425,6 +425,7 @@ static struct uart_port clps711x_ports[UART_NR] = {
 		.uartclk	= 3686400,
 		.fifosize	= 16,
 		.ops		= &clps711x_pops,
+		.line		= 0,
 		.flags		= ASYNC_BOOT_AUTOCONF,
 	},
 	{
@@ -433,6 +434,7 @@ static struct uart_port clps711x_ports[UART_NR] = {
 		.uartclk	= 3686400,
 		.fifosize	= 16,
 		.ops		= &clps711x_pops,
+		.line		= 1,
 		.flags		= ASYNC_BOOT_AUTOCONF,
 	}
 };

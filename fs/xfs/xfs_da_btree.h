@@ -90,15 +90,6 @@ typedef struct xfs_da_intnode {
 typedef struct xfs_da_node_hdr xfs_da_node_hdr_t;
 typedef struct xfs_da_node_entry xfs_da_node_entry_t;
 
-#define XFS_DA_NODE_ENTSIZE_BYNAME	/* space a name uses */ \
-	(sizeof(xfs_da_node_entry_t))
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_NODE_ENTRIES)
-int xfs_da_node_entries(struct xfs_mount *mp);
-#define XFS_DA_NODE_ENTRIES(mp)		xfs_da_node_entries(mp)
-#else
-#define XFS_DA_NODE_ENTRIES(mp)		((mp)->m_da_node_ents)
-#endif
-
 #define XFS_DA_MAXHASH	((xfs_dahash_t)-1) /* largest valid hash value */
 
 /*
@@ -243,7 +234,7 @@ extern xfs_dabuf_t	*xfs_dabuf_global_list;
 typedef struct xfs_da_state_blk {
 	xfs_dabuf_t	*bp;		/* buffer containing block */
 	xfs_dablk_t	blkno;		/* filesystem blkno of buffer */
-	xfs_daddr_t		disk_blkno;	/* on-disk blkno (in BBs) of buffer */
+	xfs_daddr_t	disk_blkno;	/* on-disk blkno (in BBs) of buffer */
 	int		index;		/* relevant index into block */
 	xfs_dahash_t	hashval;	/* last hash value in block */
 	int		magic;		/* blk's magic number, ie: blk type */
@@ -257,12 +248,13 @@ typedef struct xfs_da_state_path {
 typedef struct xfs_da_state {
 	xfs_da_args_t		*args;		/* filename arguments */
 	struct xfs_mount	*mp;		/* filesystem mount point */
-	int			blocksize;	/* logical block size */
-	int			inleaf;		/* insert into 1->lf, 0->splf */
+	unsigned int		blocksize;	/* logical block size */
+	unsigned int		node_ents;	/* how many entries in danode */
 	xfs_da_state_path_t	path;		/* search/split paths */
 	xfs_da_state_path_t	altpath;	/* alternate path for join */
-	int			extravalid;	/* T/F: extrablk is in use */
-	int			extraafter;	/* T/F: extrablk is after new */
+	unsigned int		inleaf     : 1;	/* insert into 1->lf, 0->splf */
+	unsigned int		extravalid : 1;	/* T/F: extrablk is in use */
+	unsigned int		extraafter : 1;	/* T/F: extrablk is after new */
 	xfs_da_state_blk_t	extrablk;	/* for double-splits on leafs */
 						/* for dirv2 extrablk is data */
 } xfs_da_state_t;

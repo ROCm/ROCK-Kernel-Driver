@@ -187,7 +187,7 @@ struct sadb_x_policy {
 
 struct sadb_x_ipsecrequest {
 	uint16_t	sadb_x_ipsecrequest_len;
-	uint16_t	sadb_x_ipsecrequest_exttype;
+	uint16_t	sadb_x_ipsecrequest_proto;
 	uint8_t		sadb_x_ipsecrequest_mode;
 	uint8_t		sadb_x_ipsecrequest_level;
 	uint16_t	sadb_x_ipsecrequest_reqid;
@@ -249,8 +249,8 @@ struct sadb_x_ipsecrequest {
 
 /* Encryption algorithms */
 #define SADB_EALG_NONE		0
-#define SADB_EALG_DESCBC	2
-#define SADB_EALG_3DESCBC	3
+#define SADB_EALG_DESCBC	1
+#define SADB_EALG_3DESCBC	2
 #define SADB_EALG_NULL		11
 #define SADB_EALG_MAX		11
 

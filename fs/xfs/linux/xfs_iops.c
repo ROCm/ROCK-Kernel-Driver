@@ -52,17 +52,17 @@ validate_fields(
 	ip->i_blocks = va.va_nblocks;
 }
 
-#ifdef CONFIG_FS_POSIX_ACL
 /*
  * Determine whether a process has a valid fs_struct (kernel daemons
  * like knfsd don't have an fs_struct).
+ *
+ * XXX(hch):  nfsd is broken, better fix it instead.
  */
 STATIC int inline
 has_fs_struct(struct task_struct *task)
 {
 	return (task->fs != init_task.fs);
 }
-#endif
 
 STATIC int
 linvfs_mknod(
@@ -81,15 +81,8 @@ linvfs_mknod(
 	if (test_default_acl)
 		have_default_acl = test_default_acl(dvp);
 
-#ifdef CONFIG_FS_POSIX_ACL
-	/*
-	 * Conditionally compiled so that the ACL base kernel changes can be
-	 * split out into separate patches - remove this once MS_POSIXACL is
-	 * accepted, or some other way to implement this exists.
-	 */
 	if (IS_POSIXACL(dir) && !have_default_acl && has_fs_struct(current))
 		mode &= ~current->fs->umask;
-#endif
 
 	memset(&va, 0, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;

@@ -797,8 +797,7 @@ static struct file_operations	stli_fsiomem = {
  *	much cheaper on host cpu than using interrupts. It turns out to
  *	not increase character latency by much either...
  */
-static struct timer_list	stli_timerlist = {
-	function: stli_poll
+static struct timer_list stli_timerlist = TIMER_INITIALIZER(stli_poll, 0, 0);
 };
 
 static int	stli_timeron;

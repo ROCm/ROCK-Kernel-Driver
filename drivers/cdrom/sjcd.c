@@ -152,7 +152,7 @@ static struct sjcd_stat statistic;
 /*
  * Timer.
  */
-static struct timer_list sjcd_delay_timer;
+static struct timer_list sjcd_delay_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 #define SJCD_SET_TIMER( func, tmout )           \
     ( sjcd_delay_timer.expires = jiffies+tmout,         \

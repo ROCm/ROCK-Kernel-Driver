@@ -400,3 +400,4 @@ struct ohci_hcd {
 
 #define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
 
+struct ohci_hcd *dev_to_ohci(struct device *);

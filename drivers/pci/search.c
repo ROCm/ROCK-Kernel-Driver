@@ -1,6 +1,45 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 
+static struct pci_bus *
+pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
+{
+	struct pci_bus* child;
+	struct list_head *tmp;
+
+	if(bus->number == busnr)
+		return bus;
+
+	list_for_each(tmp, &bus->children) {
+		child = pci_do_find_bus(pci_bus_b(tmp), busnr);
+		if(child)
+			return child;
+	}
+	return NULL;
+}
+
+/**
+ * pci_find_bus - locate PCI bus from a given bus number
+ * @busnr: number of desired PCI bus
+ *
+ * Given a PCI bus number, the desired PCI bus is located in system
+ * global list of PCI buses.  If the bus is found, a pointer to its
+ * data structure is returned.  If no bus is found, %NULL is returned.
+ */
+struct pci_bus *
+pci_find_bus(unsigned char busnr)
+{
+	struct pci_bus* bus;
+	struct pci_bus* tmp_bus;
+
+	pci_for_each_bus(bus) {
+		tmp_bus = pci_do_find_bus(bus, busnr);
+		if(tmp_bus)
+			return tmp_bus;
+	}
+	return NULL;
+}
+
 /**
  * pci_find_slot - locate PCI device from a given PCI slot
  * @bus: number of PCI bus on which desired PCI device resides
@@ -104,6 +143,7 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	return NULL;
 }
 
+EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_slot);

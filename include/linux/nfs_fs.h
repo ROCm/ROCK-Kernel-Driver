@@ -163,13 +163,11 @@ struct nfs_inode {
 	/*
 	 * This is the list of dirty unwritten pages.
 	 */
-	struct list_head	read;
 	struct list_head	dirty;
 	struct list_head	commit;
 	struct list_head	writeback;
 
-	unsigned int		nread,
-				ndirty,
+	unsigned int		ndirty,
 				ncommit,
 				npages;
 
@@ -348,12 +346,6 @@ extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *)
 #endif
 
 static inline int
-nfs_have_read(struct inode *inode)
-{
-	return !list_empty(&NFS_I(inode)->read);
-}
-
-static inline int
 nfs_have_writebacks(struct inode *inode)
 {
 	return !list_empty(&NFS_I(inode)->writeback);
@@ -396,10 +388,9 @@ nfs_wb_file(struct inode *inode, struct file *file)
  * linux/fs/nfs/read.c
  */
 extern int  nfs_readpage(struct file *, struct page *);
-extern int  nfs_pagein_inode(struct inode *, unsigned long, unsigned int);
+extern int  nfs_readpages(struct file *, struct address_space *,
+		struct list_head *, unsigned);
 extern int  nfs_pagein_list(struct list_head *, int);
-extern int  nfs_scan_lru_read(struct nfs_server *, struct list_head *);
-extern int  nfs_scan_lru_read_timeout(struct nfs_server *, struct list_head *);
 extern void nfs_readpage_result(struct rpc_task *, unsigned int count, int eof);
 extern void nfs_readdata_release(struct rpc_task *);
 

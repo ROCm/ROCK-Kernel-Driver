@@ -1026,7 +1026,8 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 			 "%s\t%08X\t%08X\t%04X\t%d\t%u\t%d\t%08X\t%d\t%u\t%u",
 			 fi->fib_dev ? fi->fib_dev->name : "*", prefix,
 			 fi->fib_nh->nh_gw, flags, 0, 0, fi->fib_priority,
-			 mask, fi->fib_advmss + 40, fi->fib_window,
+			 mask, (fi->fib_advmss ? fi->fib_advmss + 40 : 0),
+			 fi->fib_window,
 			 fi->fib_rtt >> 3);
 	else
 		snprintf(bf, sizeof(bf),

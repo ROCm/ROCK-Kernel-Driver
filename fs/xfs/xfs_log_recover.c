@@ -145,7 +145,7 @@ xlog_header_check_dump(xfs_mount_t *mp, xlog_rec_header_t *head)
     printk("xlog_header_check_dump:\n	 SB : uuid = ");
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&mp->m_sb.sb_uuid)[b]);
     printk(", fmt = %d\n",XLOG_FMT);
-    printk("	log: uuid = ");
+    printk("    log: uuid = ");
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&head->h_fs_uuid)[b]);
     printk(", fmt = %d\n", INT_GET(head->h_fmt, ARCH_CONVERT));
 }
@@ -1802,7 +1802,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		 */
 		error = 0;
 		if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF|XFS_BLI_GDQUOT_BUF)) {
-			/* OK, if this returns nopkg() */
+			/* OK, if this returns ENOSYS */
 			error = xfs_qm_dqcheck((xfs_disk_dquot_t *)
 					       item->ri_buf[i].i_addr,
 					       -1, 0, XFS_QMOPT_DOWARN,
@@ -2315,7 +2315,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 * of looking at the SB quota bits.
 	 *
 	 * The other possibility, of course, is that the quota subsystem was
-	 * removed since the last mount - nopkg().
+	 * removed since the last mount - ENOSYS.
 	 */
 	dq_f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
 	ASSERT(dq_f);
@@ -2323,7 +2323,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			   dq_f->qlf_id,
 			   0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans (log copy)"))) {
-	  if ((error == nopkg()))
+	  if (error == ENOSYS)
 			return (0);
 		return XFS_ERROR(EIO);
 	}

@@ -1372,7 +1372,6 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 
-	srb->resid = 0;
 	info = (struct sddr09_card_info *)us->extra;
 	if (!info) {
 		nand_init_ecc();

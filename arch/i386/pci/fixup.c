@@ -138,7 +138,7 @@ static void __devinit pci_fixup_piix4_acpi(struct pci_dev *d)
 #define VIA_8363_KL133_REVISION_ID 0x81
 #define VIA_8363_KM133_REVISION_ID 0x84
 
-static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
+static void __devinit pci_fixup_via_northbridge_bug(struct pci_dev *d)
 {
 	u8 v;
 	u8 revision;
@@ -180,7 +180,7 @@ static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
  * system to PCI bus no matter what are their window settings, so they are
  * "transparent" (or subtractive decoding) from programmers point of view.
  */
-static void __init pci_fixup_transparent_bridge(struct pci_dev *dev)
+static void __devinit pci_fixup_transparent_bridge(struct pci_dev *dev)
 {
 	if ((dev->class >> 8) == PCI_CLASS_BRIDGE_PCI &&
 	    (dev->device & 0xff00) == 0x2400)

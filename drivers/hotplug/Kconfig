@@ -73,5 +73,48 @@ config HOTPLUG_PCI_ACPI
 
 	  When in doubt, say N.
 
+config HOTPLUG_PCI_CPCI
+	tristate "CompactPCI Hotplug driver"
+	depends on HOTPLUG_PCI
+	help
+	  Say Y here if you have a CompactPCI system card with CompactPCI
+	  hotswap support per the PICMG 2.1 specification.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called cpci_hotplug.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_CPCI_ZT5550
+	tristate "Ziatech ZT5550 CompactPCI Hotplug driver"
+	depends on HOTPLUG_PCI_CPCI && X86
+	help
+	  Say Y here if you have an Performance Technologies (formerly Intel,
+          formerly just Ziatech) Ziatech ZT5550 CompactPCI system card.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called cpcihp_zt5550.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
+config HOTPLUG_PCI_CPCI_GENERIC
+	tristate "Generic port I/O CompactPCI Hotplug driver"
+	depends on HOTPLUG_PCI_CPCI && X86
+	help
+	  Say Y here if you have a CompactPCI system card that exposes the #ENUM
+	  hotswap signal as a bit in a system register that can be read through
+	  standard port I/O.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called cpcihp_generic.o. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+	  When in doubt, say N.
+
 endmenu
 

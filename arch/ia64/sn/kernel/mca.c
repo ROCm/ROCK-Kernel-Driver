@@ -238,7 +238,7 @@ sn_cpei_handler(int irq, void *devid, struct pt_regs *regs) {
 #include <linux/timer.h>
 
 #define CPEI_INTERVAL   (HZ/100)
-struct timer_list sn_cpei_timer;
+struct timer_list sn_cpei_timer = TIMER_INITIALIZER(NULL, 0, 0);
 void sn_init_cpei_timer(void);
 
 void

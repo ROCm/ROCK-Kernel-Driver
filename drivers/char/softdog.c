@@ -67,9 +67,8 @@ MODULE_LICENSE("GPL");
  
 static void watchdog_fire(unsigned long);
 
-static struct timer_list watchdog_ticktock = {
-	function:	watchdog_fire,
-};
+static struct timer_list watchdog_ticktock =
+		TIMER_INITIALIZER(watchdog_fire, 0, 0);
 static int timer_alive;
 
 

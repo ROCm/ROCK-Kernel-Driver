@@ -27,6 +27,7 @@
 #include <linux/miscdevice.h>
 #include <linux/smp_lock.h>
 #include <linux/mm.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -243,8 +244,13 @@ static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
 		if (filp->f_flags & O_NONBLOCK)
 			return ret ? : -EAGAIN;
 
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(1);
+		if (need_resched())
+		{
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout(1);
+		}
+		else
+			udelay(200);
 
 		if (signal_pending (current))
 			return ret ? : -ERESTARTSYS;

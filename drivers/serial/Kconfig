@@ -325,15 +325,58 @@ config SERIAL_SUNSAB
 	  (PCI) UltraSPARC systems.  Say Y or M if you want to be able to these
 	  serial ports.
 
+config V850E_NB85E_UART
+	bool "NEC V850E on-chip UART support"
+	depends on V850E_NB85E || V850E2_ANNA
+	default y
+
+config V850E_NB85E_UART_CONSOLE
+	bool "Use NEC V850E on-chip UART for console"
+	depends on V850E_NB85E_UART
+
 config SERIAL_CORE
 	tristate
-	default m if SERIAL_AMBA!=y && SERIAL_CLPS711X!=y && SERIAL_21285!=y && !SERIAL_SA1100 && !SERIAL_ANAKIN && !SERIAL_UART00 && SERIAL_8250!=y && !SERIAL_ROCKETPORT && !SERIAL_SUNCORE && (SERIAL_AMBA=m || SERIAL_CLPS711X=m || SERIAL_21285=m || SERIAL_8250=m)
-	default y if SERIAL_AMBA=y || SERIAL_CLPS711X=y || SERIAL_21285=y || SERIAL_SA1100 || SERIAL_ANAKIN || SERIAL_UART00 || SERIAL_8250=y || SERIAL_ROCKETPORT || SERIAL_SUNCORE
+	default m if SERIAL_AMBA!=y && SERIAL_CLPS711X!=y && SERIAL_21285!=y && !SERIAL_SA1100 && !SERIAL_ANAKIN && !SERIAL_UART00 && SERIAL_8250!=y && !SERIAL_ROCKETPORT && !SERIAL_SUNCORE && !V850E_NB85E_UART && (SERIAL_AMBA=m || SERIAL_CLPS711X=m || SERIAL_21285=m || SERIAL_8250=m)
+	default y if SERIAL_AMBA=y || SERIAL_CLPS711X=y || SERIAL_21285=y || SERIAL_SA1100 || SERIAL_ANAKIN || SERIAL_UART00 || SERIAL_8250=y || SERIAL_ROCKETPORT || SERIAL_SUNCORE || V850E_NB85E_UART
 
 config SERIAL_CORE_CONSOLE
 	bool
-	depends on SERIAL_AMBA_CONSOLE || SERIAL_CLPS711X_CONSOLE || SERIAL_21285_CONSOLE || SERIAL_SA1100_CONSOLE || SERIAL_ANAKIN_CONSOLE || SERIAL_UART00_CONSOLE || SERIAL_8250_CONSOLE || SERIAL_SUNCORE
+	depends on SERIAL_AMBA_CONSOLE || SERIAL_CLPS711X_CONSOLE || SERIAL_21285_CONSOLE || SERIAL_SA1100_CONSOLE || SERIAL_ANAKIN_CONSOLE || SERIAL_UART00_CONSOLE || SERIAL_8250_CONSOLE || SERIAL_SUNCORE || V850E_NB85E_UART_CONSOLE
 	default y
+
+config SERIAL_68328
+	bool "68328 serial support"
+	depends on M68328 || M68EZ328 || M68VZ328
+	help
+	  This driver supports the built-in serial port of the Motorola 68328
+	  (standard, EZ and VZ varities).
+
+config SERIAL_68328_RTS_CTS
+	bool "Support RTS/CTS on 68328 serial port"
+	depends on SERIAL_68328
+
+config SERIAL_COLDFIRE
+	bool "ColdFire serial support"
+	depends on COLDFIRE
+	help
+	  This driver supports the built-in serial ports of the Motorola ColdFire
+	  family of CPUs.
+
+config SERIAL_68360_SMC
+	bool "68360 SMC uart support"
+	depends on M68360
+	help
+	  This driver supports the SMC serial ports of the Motorola 68360 CPU.
+
+config SERIAL_68360_SCC
+	bool "68360 SCC uart support"
+	depends on M68360
+	help
+	  This driver supports the SCC serial ports of the Motorola 68360 CPU.
+
+config 68360_SERIAL
+	bool
+	depends on SERIAL_68360_SMC || SERIAL_68630_SCC
 
 endmenu
 

@@ -28,15 +28,6 @@ static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_addres
 		__pollwait(filp, wait_address, p);
 }
 
-static inline void poll_initwait(poll_table* pt)
-{
-	pt->queue = 1;
-	pt->qproc = NULL;
-	pt->priv = NULL;
-	pt->error = 0;
-	pt->table = NULL;
-}
-
 static inline void poll_initwait_ex(poll_table* pt, int queue,
 				    void (*qproc)(void *, wait_queue_head_t *),
 				    void *priv)
@@ -46,6 +37,12 @@ static inline void poll_initwait_ex(poll_table* pt, int queue,
 	pt->priv = priv;
 	pt->error = 0;
 	pt->table = NULL;
+}
+
+static inline void poll_initwait(poll_table* pt)
+{
+
+	poll_initwait_ex(pt, 1, NULL, NULL);
 }
 
 extern void poll_freewait(poll_table* pt);

@@ -613,7 +613,7 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 #ifdef PCMCIA
 
 /*
- *	Allow PCMCIA code to preset the port */
+ *	Allow PCMCIA code to preset the port
  *	port should be 0 and irq to -1 respectively for autoprobing 
  */
 

@@ -352,33 +352,11 @@ int proc_info(char * buffer, char ** start, off_t offset,
  *      Locks: lock_kernel() active on entry and expected to be active
  *      on return.
  *
- *      Notes: Invoked from mid level's scsi_unregister_host(). When a
- *      host is being unregistered the mid level does not bother to
- *      call revoke() on the devices it controls.
+ *      Notes: Invoked from mid level's scsi_unregister_host().
  *      This function should call scsi_unregister(shp) [found in hosts.c]
  *      prior to returning.
  **/
     int release(struct Scsi_Host * shp);
-
-
-/**
- *      revoke - indicate disinterest in a scsi device
- *      @sdp: host template for this driver.
- *
- *      Return value ignored.
- *
- *      Required: no
- *
- *      Locks: none held
- *
- *      Notes: Called when "scsi remove-single-device <h> <b> <t> <l>"
- *      is written to /proc/scsi/scsi to indicate the device is no longer 
- *      required. It is called after the upper level drivers have detached 
- *      this device and before the device name  (e.g. /dev/sdc) is 
- *      unregistered and the resources associated with it are freed.
- **/
-    int revoke(Scsi_device * sdp);
-
 
 /**
  *      select_queue_depths - calculate allowable number of scsi commands

@@ -107,6 +107,7 @@ struct sock {
 	wait_queue_head_t	*sleep;		/* Sock wait queue			*/
 	struct dst_entry	*dst_cache;	/* Destination cache			*/
 	rwlock_t		dst_lock;
+	struct xfrm_policy	*policy[2];
 	atomic_t		rmem_alloc;	/* Receive queue bytes committed	*/
 	struct sk_buff_head	receive_queue;	/* Incoming packets			*/
 	atomic_t		wmem_alloc;	/* Transmit queue bytes committed	*/

@@ -2,7 +2,7 @@
 
     PCMCIA Card Information Structure parser
 
-    cistpl.c 1.97 2001/10/04 03:33:49
+    cistpl.c 1.99 2002/10/24 06:11:48
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -109,8 +109,8 @@ static void set_cis_map(socket_info_t *s, pccard_mem_map *mem)
     }
 }
 
-void read_cis_mem(socket_info_t *s, int attr, u_int addr,
-		  u_int len, void *ptr)
+int read_cis_mem(socket_info_t *s, int attr, u_int addr,
+		 u_int len, void *ptr)
 {
     pccard_mem_map *mem = &s->cis_mem;
     u_char *sys, *buf = ptr;
@@ -118,7 +118,7 @@ void read_cis_mem(socket_info_t *s, int attr, u_int addr,
     DEBUG(3, "cs: read_cis_mem(%d, %#x, %u)\n", attr, addr, len);
     if (setup_cis_mem(s) != 0) {
 	memset(ptr, 0xff, len);
-	return;
+	return -1;
     }
     mem->flags = MAP_ACTIVE | ((cis_width) ? MAP_16BIT : 0);
 
@@ -156,6 +156,7 @@ void read_cis_mem(socket_info_t *s, int attr, u_int addr,
     DEBUG(3, "cs:  %#2.2x %#2.2x %#2.2x %#2.2x ...\n",
 	  *(u_char *)(ptr+0), *(u_char *)(ptr+1),
 	  *(u_char *)(ptr+2), *(u_char *)(ptr+3));
+    return 0;
 }
 
 void write_cis_mem(socket_info_t *s, int attr, u_int addr,
@@ -270,7 +271,7 @@ static int setup_cis_mem(socket_info_t *s)
 	if (find_mem_region(&s->cis_mem.sys_start, s->cap.map_size,
 			    s->cap.map_size, low, "card services", s)) {
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
-	    return CS_OUT_OF_RESOURCE;
+	    return -1;
 	}
 	s->cis_mem.sys_stop = s->cis_mem.sys_start+s->cap.map_size-1;
 	s->cis_virt = bus_ioremap(s->cap.bus, s->cis_mem.sys_start,
@@ -303,7 +304,7 @@ void release_cis_mem(socket_info_t *s)
 static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 			   u_int len, void *ptr)
 {
-    int i;
+    int i, ret;
     char *caddr;
 
     if (s->fake_cis) {
@@ -326,12 +327,12 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
     }
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS)
-	read_cb_mem(s, 0, attr, addr, len, ptr);
+	ret = read_cb_mem(s, 0, attr, addr, len, ptr);
     else
 #endif
-	read_cis_mem(s, attr, addr, len, ptr);
+	ret = read_cis_mem(s, attr, addr, len, ptr);
     /* Copy data into the cache, if there is room */
-    if ((i < MAX_CIS_TABLE) &&
+    if ((ret == 0) && (i < MAX_CIS_TABLE) &&
 	(caddr+len < s->cis_cache+MAX_CIS_DATA)) {
 	s->cis_table[i].addr = addr;
 	s->cis_table[i].len = len;

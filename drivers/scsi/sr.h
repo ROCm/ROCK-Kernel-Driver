@@ -26,6 +26,7 @@
 
 typedef struct scsi_cd {
 	struct Scsi_Device_Template *driver;
+	struct list_head list;
 	unsigned capacity;	/* size in blocks                       */
 	Scsi_Device *device;
 	unsigned int vendor;	/* vendor code, see sr_vendor.c         */

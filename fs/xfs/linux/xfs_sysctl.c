@@ -40,42 +40,13 @@
 
 extern struct xfsstats xfsstats;
 
-STATIC ulong xfs_min[XFS_PARAM] = { \
-			    0,			    0, 0, 0, 0, 0 };
-STATIC ulong xfs_max[XFS_PARAM] = { \
-	XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX, 1, 1, 1, 1 };
+STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0 };
+STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1 };
 
-xfs_param_t xfs_params = { 128, 32, 0, 1, 0, 0 };
+xfs_param_t xfs_params = { 0, 1, 0, 0 };
 
 static struct ctl_table_header *xfs_table_header;
 
-
-/* Custom proc handlers */
-
-STATIC int
-xfs_refcache_resize_proc_handler(
-	ctl_table	*ctl,
-	int		write,
-	struct file	*filp,
-	void		*buffer,
-	size_t		*lenp)
-{
-	int		ret, *valp = ctl->data;
-	int		xfs_refcache_new_size;
-	int		xfs_refcache_old_size = *valp;
-
-	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
-	xfs_refcache_new_size = *valp;
-
-	if (!ret && write && xfs_refcache_new_size != xfs_refcache_old_size) {
-		xfs_refcache_resize(xfs_refcache_new_size);
-		/* Don't purge more than size of the cache */
-		if (xfs_refcache_new_size < xfs_params.refcache_purge)
-			xfs_params.refcache_purge = xfs_refcache_new_size;
-	}
-
-	return ret;
-}
 
 STATIC int
 xfs_stats_clear_proc_handler(
@@ -103,14 +74,6 @@ xfs_stats_clear_proc_handler(
 }
 
 STATIC ctl_table xfs_table[] = {
-	{XFS_REFCACHE_SIZE, "refcache_size", &xfs_params.refcache_size,
-	sizeof(ulong), 0644, NULL, &xfs_refcache_resize_proc_handler,
-	&sysctl_intvec, NULL, &xfs_min[0], &xfs_max[0]},
-
-	{XFS_REFCACHE_PURGE, "refcache_purge", &xfs_params.refcache_purge,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
-	&sysctl_intvec, NULL, &xfs_min[1], &xfs_params.refcache_size},
-
 	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.stats_clear,
 	sizeof(ulong), 0644, NULL, &xfs_stats_clear_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[2], &xfs_max[2]},

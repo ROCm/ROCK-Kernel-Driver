@@ -37,7 +37,7 @@ SECTIONS
 		__initcall_end = .;
 		. = ALIGN(32);
 		__initramfs_start = .;
-			*(.init.initramfs)
+			usr/built-in.o(.init.ramfs)
 		__initramfs_end = .;
 		. = ALIGN(4096);
 		__init_end = .;

@@ -29,6 +29,17 @@
 
 /*-------------------------------------------------------------------------*/
 
+struct ohci_hcd *dev_to_ohci(struct device *dev) {
+	struct pci_dev *pdev = 
+		container_of (dev, struct pci_dev, dev);
+	struct ohci_hcd	*ohci = 
+		container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
+
+	return ohci;
+}
+
+/*-------------------------------------------------------------------------*/
+
 static int __devinit
 ohci_pci_start (struct usb_hcd *hcd)
 {

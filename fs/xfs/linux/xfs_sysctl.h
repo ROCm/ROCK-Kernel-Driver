@@ -42,8 +42,6 @@
 #define XFS_PARAM	(sizeof(struct xfs_param) / sizeof(ulong))
 
 typedef struct xfs_param {
-	ulong	refcache_size;	/* Size of NFS reference cache.          */
-	ulong	refcache_purge;	/* # of entries to purge each time.      */
 	ulong	stats_clear;	/* Reset all XFS statistics to zero.     */
 	ulong	restrict_chown;	/* Root/non-root can give away files.    */
 	ulong	sgid_inherit;	/* Inherit ISGID bit if process' GID is  */
@@ -52,12 +50,10 @@ typedef struct xfs_param {
 } xfs_param_t;
 
 enum {
-	XFS_REFCACHE_SIZE = 1,
-	XFS_REFCACHE_PURGE = 2,
-	XFS_STATS_CLEAR = 3,
-	XFS_RESTRICT_CHOWN = 4,
-	XFS_SGID_INHERIT = 5,
-	XFS_SYMLINK_MODE = 6,
+	XFS_STATS_CLEAR = 1,
+	XFS_RESTRICT_CHOWN = 2,
+	XFS_SGID_INHERIT = 3,
+	XFS_SYMLINK_MODE = 4,
 };
 
 extern xfs_param_t	xfs_params;

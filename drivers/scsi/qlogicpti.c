@@ -807,7 +807,7 @@ static int __init qpti_map_queues(struct qlogicpti *qpti)
 }
 
 /* Detect all PTI Qlogic ISP's in the machine. */
-int __init qlogicpti_detect(Scsi_Host_Template *tpnt)
+static int __init qlogicpti_detect(Scsi_Host_Template *tpnt)
 {
 	struct qlogicpti *qpti;
 	struct Scsi_Host *qpti_host;
@@ -946,7 +946,7 @@ int __init qlogicpti_detect(Scsi_Host_Template *tpnt)
 	return nqptis;
 }
 
-int qlogicpti_release(struct Scsi_Host *host)
+static int qlogicpti_release(struct Scsi_Host *host)
 {
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
 
@@ -1164,7 +1164,10 @@ static void ourdone(Scsi_Cmnd *Cmnd)
 	done(Cmnd);
 }
 
-int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
+static int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *));
+
+static int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd,
+				       void (*done)(Scsi_Cmnd *))
 {
 	struct qlogicpti *qpti = (struct qlogicpti *) Cmnd->host->hostdata;
 	unsigned long flags;
@@ -1240,7 +1243,7 @@ int qlogicpti_queuecommand_slow(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
  *
  * "This code must fly." -davem
  */
-int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
+static int qlogicpti_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 {
 	struct Scsi_Host *host = Cmnd->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
@@ -1461,7 +1464,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 	local_irq_restore(flags);
 }
 
-int qlogicpti_abort(Scsi_Cmnd *Cmnd)
+static int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 {
 	u_short param[6];
 	struct Scsi_Host *host = Cmnd->host;
@@ -1503,7 +1506,7 @@ int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	return return_status;
 }
 
-int qlogicpti_reset(Scsi_Cmnd *Cmnd)
+static int qlogicpti_reset(Scsi_Cmnd *Cmnd)
 {
 	u_short param[6];
 	struct Scsi_Host *host = Cmnd->host;
@@ -1532,6 +1535,23 @@ int qlogicpti_reset(Scsi_Cmnd *Cmnd)
 	return return_status;
 }
 
-static Scsi_Host_Template driver_template = QLOGICPTI;
+static Scsi_Host_Template driver_template = {
+	.detect			= qlogicpti_detect,
+	.release		= qlogicpti_release,
+	.info			= qlogicpti_info,
+	.queuecommand		= qlogicpti_queuecommand_slow,
+	.eh_abort_handler	= qlogicpti_abort,
+	.eh_bus_reset_handler	= qlogicpti_reset,
+	.can_queue		= QLOGICPTI_REQ_QUEUE_LEN,
+	.this_id		= 7,
+	.sg_tablesize		= QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN),
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+/* Sparc32's iommu code cannot handle highmem pages yet. */
+#ifdef CONFIG_SPARC64
+	.highmem_io		= 1,
+#endif
+};
+
 
 #include "scsi_module.c"

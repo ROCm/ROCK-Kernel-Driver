@@ -63,7 +63,6 @@ xfs_init(void)
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t		xfs_dabuf_global_lock;
 #endif
-	extern int		xfs_refcache_size;
 
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
@@ -144,14 +143,6 @@ xfs_init(void)
 
 	xfs_init_procfs();
 	xfs_sysctl_register();
-
-	xfs_refcache_size = xfs_params.refcache_size;
-
-	/*
-	 * The inode hash table is created on a per mounted
-	 * file system bases.
-	 */
-
 	return 0;
 }
 
@@ -168,14 +159,9 @@ xfs_cleanup(void)
 	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_buf_item_zone;
 	extern kmem_zone_t	*xfs_chashlist_zone;
-	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
-	if (xfs_refcache) {
-		kmem_free(xfs_refcache,
-			XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
-	}
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
@@ -584,13 +570,6 @@ xfs_unmount(
 	}
 
 	/*
-	 * First blow any referenced inode from this file system
-	 * out of the reference cache, and delete the timer.
-	 */
-	xfs_refcache_purge_mp(mp);
-	del_timer_sync(&mp->m_sbdirty_timer);
-
-	/*
 	 * Make sure there are no active users.
 	 */
 	if (xfs_ibusy(mp)) {
@@ -607,13 +586,9 @@ xfs_unmount(
 	ASSERT(vn_count(rvp) == 1);
 
 	/*
-	 * Drop the reference count, and then
-	 * run the vnode through vn_remove.
+	 * Drop the reference count
 	 */
-	rvp->v_flag |= VPURGE;			/* OK for vn_purge */
 	VN_RELE(rvp);
-
-	vn_remove(rvp);
 
 	/*
 	 * If we're forcing a shutdown, typically because of a media error,
@@ -1433,7 +1408,7 @@ xfs_syncsub(
 		ASSERT(ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
 
-	} while (ip->i_mnext != mp->m_inodes);
+	} while (ip != mp->m_inodes);
 
 	XFS_MOUNT_IUNLOCK(mp);
 
@@ -1514,15 +1489,6 @@ xfs_syncsub(
 	}
 
 	/*
-	 * If this is the 30 second sync, then kick some entries out of
-	 * the reference cache.	 This ensures that idle entries are
-	 * eventually kicked out of the cache.
-	 */
-	if (flags & SYNC_BDFLUSH) {
-		xfs_refcache_purge_some(mp);
-	}
-
-	/*
 	 * Now check to see if the log needs a "dummy" transaction.
 	 */
 
@@ -1567,40 +1533,6 @@ xfs_syncsub(
 	return XFS_ERROR(last_error);
 }
 
-STATIC void
-xfs_initialize_vnode(
-	bhv_desc_t	*bdp,
-	vnode_t		*vp,
-	bhv_desc_t	*inode_bhv,
-	int		unlock)
-{
-	xfs_inode_t	*ip = XFS_BHVTOI(inode_bhv);
-	struct inode	*inode = LINVFS_GET_IP(vp);
-
-	if (vp->v_fbhv == NULL) {
-		vp->v_vfsp = bhvtovfs(bdp);
-		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
-		bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
-	}
-
-	vp->v_type = IFTOVT(ip->i_d.di_mode);
-	/* Have we been called during the new inode create process,
-	 * in which case we are too early to fill in the linux inode.
-	 */
-	if (vp->v_type == VNON)
-		return;
-
-	xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
-
-	/* For new inodes we need to set the ops vectors,
-	 * and unlock the inode.
-	 */
-	if (unlock && (inode->i_state & I_NEW)) {
-		linvfs_set_inode_ops(inode);
-		unlock_new_inode(inode);
-	}
-}
-
 /*
  * xfs_vget - called by DMAPI to get vnode from file handle
  */
@@ -1616,10 +1548,8 @@ xfs_vget(
 	xfs_ino_t	ino;
 	unsigned int	igen;
 	xfs_mount_t	*mp;
-	struct inode	*inode = NULL;
 
 	xfid  = (struct xfs_fid *)fidp;
-
 	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
 		ino  = xfid->xfs_fid_ino;
 		igen = xfid->xfs_fid_gen;
@@ -1649,9 +1579,7 @@ xfs_vget(
 	}
 
 	*vpp = XFS_ITOV(ip);
-	inode = LINVFS_GET_IP((*vpp));
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
 	return 0;
 }
 

@@ -22,7 +22,9 @@ struct work_struct {
 #define __WORK_INITIALIZER(n, f, d) {				\
         .entry	= { &(n).entry, &(n).entry },			\
 	.func = (f),						\
-	.data = (d) }
+	.data = (d),						\
+	.timer = TIMER_INITIALIZER(NULL, 0, 0),			\
+	}
 
 #define DECLARE_WORK(n, f, d)					\
 	struct work_struct n = __WORK_INITIALIZER(n, f, d)

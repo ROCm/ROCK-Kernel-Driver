@@ -31,6 +31,7 @@ RANLIB		= sparc64-linux-ranlib
 else
 AS		:= $(AS) -64
 LDFLAGS		:= -m elf64_sparc
+LDFLAGS_BLOB	:= --format binary --oformat elf64-sparc
 endif
 ELFTOAOUT	= elftoaout
 ifneq ($(UNDECLARED_REGS),y)

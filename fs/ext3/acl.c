@@ -547,17 +547,17 @@ ext3_xattr_set_acl_default(struct inode *inode, const char *name,
 }
 
 struct ext3_xattr_handler ext3_xattr_acl_access_handler = {
-	prefix:	XATTR_NAME_ACL_ACCESS,
-	list:	ext3_xattr_list_acl_access,
-	get:	ext3_xattr_get_acl_access,
-	set:	ext3_xattr_set_acl_access,
+	.prefix	= XATTR_NAME_ACL_ACCESS,
+	.list	= ext3_xattr_list_acl_access,
+	.get	= ext3_xattr_get_acl_access,
+	.set	= ext3_xattr_set_acl_access,
 };
 
 struct ext3_xattr_handler ext3_xattr_acl_default_handler = {
-	prefix:	XATTR_NAME_ACL_DEFAULT,
-	list:	ext3_xattr_list_acl_default,
-	get:	ext3_xattr_get_acl_default,
-	set:	ext3_xattr_set_acl_default,
+	.prefix	= XATTR_NAME_ACL_DEFAULT,
+	.list	= ext3_xattr_list_acl_default,
+	.get	= ext3_xattr_get_acl_default,
+	.set	= ext3_xattr_set_acl_default,
 };
 
 void

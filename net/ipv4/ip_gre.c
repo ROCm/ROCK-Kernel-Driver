@@ -523,11 +523,11 @@ out:
 
 	/* change mtu on this route */
 	if (type == ICMP_DEST_UNREACH && code == ICMP_FRAG_NEEDED) {
-		if (rel_info > skb2->dst->pmtu) {
+		if (rel_info > dst_pmtu(skb2->dst)) {
 			kfree_skb(skb2);
 			return;
 		}
-		skb2->dst->pmtu = rel_info;
+		skb2->dst->ops->update_pmtu(skb2->dst, rel_info);
 		rel_info = htonl(rel_info);
 	} else if (type == ICMP_TIME_EXCEEDED) {
 		struct ip_tunnel *t = (struct ip_tunnel*)skb2->dev->priv;

@@ -51,11 +51,12 @@ static struct input_dev rpcmouse_dev = {
 
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
+	struct input_dev *dev = dev_id;
 	short x, y, dx, dy, b;
 
 	x = (short) iomd_readl(IOMD_MOUSEX);
 	y = (short) iomd_readl(IOMD_MOUSEY);
-	b = (short) (__raw_readl(0xe0310000) >> 4) & 7;
+	b = (short) (__raw_readl(0xe0310000) ^ 0x70);
 
 	dx = x - rpcmouse_lastx;
 	dy = y - rpcmouse_lasty; 
@@ -63,14 +64,14 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	rpcmouse_lastx = x;
 	rpcmouse_lasty = y;
 
-	input_report_rel(&rpcmouse_dev, REL_X, dx);
-	input_report_rel(&rpcmouse_dev, REL_Y, dy);
+	input_report_rel(dev, REL_X, dx);
+	input_report_rel(dev, REL_Y, -dy);
 
-	input_report_key(&rpcmouse_dev, BTN_LEFT,   b & 0x10);
-	input_report_key(&rpcmouse_dev, BTN_MIDDLE, b & 0x20);
-	input_report_key(&rpcmouse_dev, BTN_RIGHT,  b & 0x40);
+	input_report_key(dev, BTN_LEFT,   b & 0x40);
+	input_report_key(dev, BTN_MIDDLE, b & 0x20);
+	input_report_key(dev, BTN_RIGHT,  b & 0x10);
 
-	input_sync(&rpcmouse_dev);
+	input_sync(dev);
 }
 
 static int __init rpcmouse_init(void)
@@ -80,7 +81,7 @@ static int __init rpcmouse_init(void)
 	rpcmouse_lastx = (short) iomd_readl(IOMD_MOUSEX);
 	rpcmouse_lasty = (short) iomd_readl(IOMD_MOUSEY);
 
-	if (request_irq(IRQ_VSYNCPULSE, rpcmouse_irq, SA_SHIRQ, "rpcmouse", NULL)) {
+	if (request_irq(IRQ_VSYNCPULSE, rpcmouse_irq, SA_SHIRQ, "rpcmouse", &rpcmouse_dev)) {
 		printk(KERN_ERR "rpcmouse: unable to allocate VSYNC interrupt\n");
 		return -1;
 	}
@@ -95,7 +96,7 @@ static int __init rpcmouse_init(void)
 static void __exit rpcmouse_exit(void)
 {
 	input_unregister_device(&rpcmouse_dev);
-	free_irq(IRQ_VSYNCPULSE, NULL);
+	free_irq(IRQ_VSYNCPULSE, &rpcmouse_dev);
 }
 
 module_init(rpcmouse_init);

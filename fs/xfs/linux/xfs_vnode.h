@@ -119,7 +119,6 @@ extern ushort		vttoif_tab[];
 #define VFRLOCKS	 0x8000000	/* vnode has FR locks applied	*/
 #define VENF_LOCKING	0x10000000	/* enf. mode FR locking in effect */
 #define VOPLOCK		0x20000000	/* oplock set on the vnode	*/
-#define VPURGE		0x40000000	/* In the linux 'put' thread	*/
 
 typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
 			  VRWLOCK_WRITE, VRWLOCK_WRITE_DIRECT,
