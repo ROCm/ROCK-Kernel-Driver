@@ -1652,6 +1652,22 @@ config CIFS_STATS
           Enabling this option will cause statistics for each server share
 	  mounted by the cifs client to be displayed in /proc/fs/cifs/Stats
 
+config CIFS_XATTR
+        bool "CIFS extended attributes (EXPERIMENTAL)"
+        depends on CIFS
+        help
+          Extended attributes are name:value pairs associated with inodes by
+          the kernel or by users (see the attr(5) manual page, or visit
+          <http://acl.bestbits.at/> for details).  CIFS maps the name of
+          extended attributes beginning with the user namespace prefix
+          to SMB/CIFS EAs. EAs are stored on Windows servers without the
+          user namespace prefix, but their names are seen by Linux cifs clients
+          prefaced by the user namespace prefix. The system namespace
+          (used by some filesystems to store ACLs) is not supported at
+          this time.
+                                                                                                    
+          If unsure, say N.
+
 config CIFS_POSIX
         bool "CIFS POSIX Extensions (EXPERIMENTAL)"
         depends on CIFS

@@ -28,6 +28,7 @@
 #include <linux/pagemap.h>
 #include <linux/ctype.h>
 #include <linux/utsname.h>
+#include <linux/mempool.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"
@@ -49,6 +50,8 @@ extern void SMBNTencrypt(unsigned char *passwd, unsigned char *c8,
 			 unsigned char *p24);
 extern int cifs_inet_pton(int, const char *, void *dst);
 
+extern mempool_t *cifs_req_poolp;
+
 struct smb_vol {
 	char *username;
 	char *password;
@@ -64,6 +67,8 @@ struct smb_vol {
 	int rw:1;
 	int retry:1;
 	int intr:1;
+	int setuids:1;
+	int noperm:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -202,6 +207,15 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	current->flags |= PF_MEMALLOC;
 	server->tsk = current;	/* save process info to wake at shutdown */
 	cFYI(1, ("Demultiplex PID: %d", current->pid));
+	write_lock(&GlobalSMBSeslock);
+	atomic_inc(&tcpSesAllocCount);
+	length = tcpSesAllocCount.counter;
+	write_unlock(&GlobalSMBSeslock);
+	if(length  > 1) {
+		mempool_resize(cifs_req_poolp,
+			length + CIFS_MIN_RCV_POOL,
+			GFP_KERNEL);
+	}
 
 	while (server->tcpStatus != CifsExiting) {
 		if (smb_buffer == NULL)
@@ -464,6 +478,16 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		coming home not much else we can do but free the memory */
 	}
 	kfree(server);
+
+	write_lock(&GlobalSMBSeslock);
+	atomic_dec(&tcpSesAllocCount);
+	length = tcpSesAllocCount.counter;
+	write_unlock(&GlobalSMBSeslock);
+	if(length  > 0) {
+		mempool_resize(cifs_req_poolp,
+			length + CIFS_MIN_RCV_POOL,
+			GFP_KERNEL);
+	}
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ/4);
@@ -740,6 +764,14 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->retry = 1;
 		} else if (strnicmp(data, "soft", 4) == 0) {
 			vol->retry = 0;
+		} else if (strnicmp(data, "perm", 4) == 0) {
+			vol->noperm = 0;
+		} else if (strnicmp(data, "noperm", 6) == 0) {
+			vol->noperm = 1;
+		} else if (strnicmp(data, "setuids", 7) == 0) {
+			vol->setuids = 1;
+		} else if (strnicmp(data, "nosetuids", 9) == 0) {
+			vol->setuids = 0;
 		} else if (strnicmp(data, "nohard", 6) == 0) {
 			vol->retry = 0;
 		} else if (strnicmp(data, "nosoft", 6) == 0) {
@@ -1314,6 +1346,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cifs_sb->mnt_file_mode = volume_info.file_mode;
 		cifs_sb->mnt_dir_mode = volume_info.dir_mode;
 		cFYI(1,("file mode: 0x%x  dir mode: 0x%x",cifs_sb->mnt_file_mode,cifs_sb->mnt_dir_mode));
+
+		if(volume_info.noperm)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_NO_PERM;
+		if(volume_info.setuids)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SET_UID;
+
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,
 			     volume_info.username);
