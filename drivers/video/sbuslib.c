@@ -108,6 +108,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		struct fbcmap __user *c = (struct fbcmap __user *) arg;
 		struct fb_cmap cmap;
 		u16 red, green, blue;
+		u8 red8, green8, blue8;
 		unsigned char __user *ured;
 		unsigned char __user *ugreen;
 		unsigned char __user *ublue;
@@ -128,10 +129,14 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		for (i = 0; i < count; i++) {
 			int err;
 
-			if (get_user(red, &ured[i]) ||
-			    get_user(green, &ugreen[i]) ||
-			    get_user(blue, &ublue[i]))
+			if (get_user(red8, &ured[i]) ||
+			    get_user(green8, &ugreen[i]) ||
+			    get_user(blue8, &ublue[i]))
 				return -EFAULT;
+
+			red = red8 << 8;
+			green = green8 << 8;
+			blue = blue8 << 8;
 
 			cmap.start = index + i;
 			err = fb_set_cmap(&cmap, info);
@@ -147,6 +152,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		unsigned char __user *ublue;
 		struct fb_cmap *cmap = &info->cmap;
 		int index, count, i;
+		u8 red, green, blue;
 
 		if (get_user(index, &c->index) ||
 		    __get_user(count, &c->count) ||
@@ -159,9 +165,12 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 			return -EINVAL;
 
 		for (i = 0; i < count; i++) {
-			if (put_user(cmap->red[index + i], &ured[i]) ||
-			    put_user(cmap->green[index + i], &ugreen[i]) ||
-			    put_user(cmap->blue[index + i], &ublue[i]))
+			red = cmap->red[index + i] >> 8;
+			green = cmap->green[index + i] >> 8;
+			blue = cmap->blue[index + i] >> 8;
+			if (put_user(red, &ured[i]) ||
+			    put_user(green, &ugreen[i]) ||
+			    put_user(blue, &ublue[i]))
 				return -EFAULT;
 		}
 		return 0;
