@@ -31,8 +31,8 @@
 #ifndef __RADEON_DRV_H__
 #define __RADEON_DRV_H__
 
-#define GET_RING_HEAD(ring)		readl( (volatile u32 *) (ring)->head )
-#define SET_RING_HEAD(ring,val)		writel( (val), (volatile u32 *) (ring)->head )
+#define GET_RING_HEAD(ring)		DRM_READ32(  (volatile u32 *) (ring)->head )
+#define SET_RING_HEAD(ring,val)		DRM_WRITE32( (volatile u32 *) (ring)->head , (val))
 
 typedef struct drm_radeon_freelist {
    	unsigned int age;
@@ -78,12 +78,25 @@ typedef struct drm_radeon_private {
 	volatile u32 *scratch;
 
 	int usec_timeout;
+
+	int is_r200;
+
 	int is_pci;
 	unsigned long phys_pci_gart;
 	dma_addr_t bus_pci_gart;
 
-	atomic_t idle_count;
+	struct {
+		u32 boxes;
+		int freelist_timeouts;
+		int freelist_loops;
+		int requested_bufs;
+		int last_frame_reads;
+		int last_clear_reads;
+		int clears;
+		int texture_uploads;
+	} stats;
 
+	int do_boxes;
 	int page_flipping;
 	int current_page;
 	u32 crtc_offset;
@@ -119,63 +132,44 @@ typedef struct drm_radeon_buf_priv {
 } drm_radeon_buf_priv_t;
 
 				/* radeon_cp.c */
-extern int radeon_cp_init( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_start( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_stop( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_reset( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_idle( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_engine_reset( struct inode *inode, struct file *filp,
-				unsigned int cmd, unsigned long arg );
-extern int radeon_fullscreen( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_buffers( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
+extern int radeon_cp_init( DRM_IOCTL_ARGS );
+extern int radeon_cp_start( DRM_IOCTL_ARGS );
+extern int radeon_cp_stop( DRM_IOCTL_ARGS );
+extern int radeon_cp_reset( DRM_IOCTL_ARGS );
+extern int radeon_cp_idle( DRM_IOCTL_ARGS );
+extern int radeon_engine_reset( DRM_IOCTL_ARGS );
+extern int radeon_fullscreen( DRM_IOCTL_ARGS );
+extern int radeon_cp_buffers( DRM_IOCTL_ARGS );
 
 extern void radeon_freelist_reset( drm_device_t *dev );
 extern drm_buf_t *radeon_freelist_get( drm_device_t *dev );
 
 extern int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n );
 
-static inline void
-radeon_update_ring_snapshot( drm_radeon_ring_buffer_t *ring )
-{
-	ring->space = (GET_RING_HEAD(ring) - ring->tail) * sizeof(u32);
-	if ( ring->space <= 0 )
-		ring->space += ring->size;
-}
-
 extern int radeon_do_cp_idle( drm_radeon_private_t *dev_priv );
 extern int radeon_do_cleanup_cp( drm_device_t *dev );
 extern int radeon_do_cleanup_pageflip( drm_device_t *dev );
 
 				/* radeon_state.c */
-extern int radeon_cp_clear( struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long arg );
-extern int radeon_cp_swap( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
-extern int radeon_cp_vertex( struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg );
-extern int radeon_cp_indices( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_texture( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_stipple( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
-			       unsigned int cmd, unsigned long arg );
-extern int radeon_cp_vertex2( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_cmdbuf( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_getparam( struct inode *inode, struct file *filp,
-			      unsigned int cmd, unsigned long arg );
-extern int radeon_cp_flip( struct inode *inode, struct file *filp,
-			   unsigned int cmd, unsigned long arg );
+extern int radeon_cp_clear( DRM_IOCTL_ARGS );
+extern int radeon_cp_swap( DRM_IOCTL_ARGS );
+extern int radeon_cp_vertex( DRM_IOCTL_ARGS );
+extern int radeon_cp_indices( DRM_IOCTL_ARGS );
+extern int radeon_cp_texture( DRM_IOCTL_ARGS );
+extern int radeon_cp_stipple( DRM_IOCTL_ARGS );
+extern int radeon_cp_indirect( DRM_IOCTL_ARGS );
+extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
+extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
+extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
+extern int radeon_cp_flip( DRM_IOCTL_ARGS );
+
+/* Flags for stats.boxes
+ */
+#define RADEON_BOX_DMA_IDLE      0x1
+#define RADEON_BOX_RING_FULL     0x2
+#define RADEON_BOX_FLIP          0x4
+#define RADEON_BOX_WAIT_IDLE     0x8
+#define RADEON_BOX_TEXTURE_LOAD  0x10
 
 
 
@@ -296,6 +290,7 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #	define RADEON_STENCIL_ENABLE		(1 << 7)
 #	define RADEON_Z_ENABLE			(1 << 8)
 #define RADEON_RB3D_DEPTHOFFSET		0x1c24
+#define RADEON_RB3D_DEPTHPITCH		0x1c28
 #define RADEON_RB3D_PLANEMASK		0x1d84
 #define RADEON_RB3D_STENCILREFMASK	0x1d7c
 #define RADEON_RB3D_ZCACHE_MODE		0x3250
@@ -527,6 +522,62 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #define RADEON_TXFORMAT_ARGB8888	6
 #define RADEON_TXFORMAT_RGBA8888	7
 
+#define R200_PP_TXCBLEND_0                0x2f00
+#define R200_PP_TXCBLEND_1                0x2f10
+#define R200_PP_TXCBLEND_2                0x2f20
+#define R200_PP_TXCBLEND_3                0x2f30
+#define R200_PP_TXCBLEND_4                0x2f40
+#define R200_PP_TXCBLEND_5                0x2f50
+#define R200_PP_TXCBLEND_6                0x2f60
+#define R200_PP_TXCBLEND_7                0x2f70
+#define R200_SE_TCL_LIGHT_MODEL_CTL_0     0x2268 
+#define R200_PP_TFACTOR_0                 0x2ee0
+#define R200_SE_VTX_FMT_0                 0x2088
+#define R200_SE_VAP_CNTL                  0x2080
+#define R200_SE_TCL_MATRIX_SEL_0          0x2230
+#define R200_SE_TCL_TEX_PROC_CTL_2        0x22a8 
+#define R200_SE_TCL_UCP_VERT_BLEND_CTL    0x22c0 
+#define R200_PP_TXFILTER_5                0x2ca0 
+#define R200_PP_TXFILTER_4                0x2c80 
+#define R200_PP_TXFILTER_3                0x2c60 
+#define R200_PP_TXFILTER_2                0x2c40 
+#define R200_PP_TXFILTER_1                0x2c20 
+#define R200_PP_TXFILTER_0                0x2c00 
+#define R200_PP_TXOFFSET_5                0x2d78
+#define R200_PP_TXOFFSET_4                0x2d60
+#define R200_PP_TXOFFSET_3                0x2d48
+#define R200_PP_TXOFFSET_2                0x2d30
+#define R200_PP_TXOFFSET_1                0x2d18
+#define R200_PP_TXOFFSET_0                0x2d00
+#define R200_RE_AUX_SCISSOR_CNTL          0x26f0
+#define R200_SE_VTE_CNTL                  0x20b0
+#define R200_SE_TCL_OUTPUT_VTX_COMP_SEL   0x2250
+#define R200_PP_TAM_DEBUG3                0x2d9c
+#define R200_PP_CNTL_X                    0x2cc4
+#define R200_SE_VAP_CNTL_STATUS           0x2140
+#define R200_RE_SCISSOR_TL_0              0x1cd8
+#define R200_RE_SCISSOR_TL_1              0x1ce0
+#define R200_RE_SCISSOR_TL_2              0x1ce8
+#define R200_RB3D_DEPTHXY_OFFSET          0x1d60 
+#define R200_RE_AUX_SCISSOR_CNTL          0x26f0
+#define R200_SE_VTX_STATE_CNTL            0x2180
+#define R200_RE_POINTSIZE                 0x2648
+#define R200_SE_TCL_INPUT_VTX_VECTOR_ADDR_0 0x2254
+
+
+#define SE_VAP_CNTL__TCL_ENA_MASK                          0x00000001
+#define SE_VAP_CNTL__FORCE_W_TO_ONE_MASK                   0x00010000
+#define SE_VAP_CNTL__VF_MAX_VTX_NUM__SHIFT                 0x00000012
+#define SE_VTE_CNTL__VTX_XY_FMT_MASK                       0x00000100
+#define SE_VTE_CNTL__VTX_Z_FMT_MASK                        0x00000200
+#define SE_VTX_FMT_0__VTX_Z0_PRESENT_MASK                  0x00000001
+#define SE_VTX_FMT_0__VTX_W0_PRESENT_MASK                  0x00000002
+#define SE_VTX_FMT_0__VTX_COLOR_0_FMT__SHIFT               0x0000000b
+#define R200_3D_DRAW_IMMD_2      0xC0003500
+#define R200_SE_VTX_FMT_1                 0x208c
+#define R200_RE_CNTL                      0x1c50 
+
+
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */
 
@@ -544,11 +595,11 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #define RADEON_BASE(reg)	((unsigned long)(dev_priv->mmio->handle))
 #define RADEON_ADDR(reg)	(RADEON_BASE( reg ) + reg)
 
-#define RADEON_READ(reg)	readl( (volatile u32 *) RADEON_ADDR(reg) )
-#define RADEON_WRITE(reg,val)	writel( (val), (volatile u32 *) RADEON_ADDR(reg) )
+#define RADEON_READ(reg)	DRM_READ32(  (volatile u32 *) RADEON_ADDR(reg) )
+#define RADEON_WRITE(reg,val)	DRM_WRITE32( (volatile u32 *) RADEON_ADDR(reg), (val) )
 
-#define RADEON_READ8(reg)	readb( (volatile u8 *) RADEON_ADDR(reg) )
-#define RADEON_WRITE8(reg,val)	writeb( (val), (volatile u8 *) RADEON_ADDR(reg) )
+#define RADEON_READ8(reg)	DRM_READ8(  (volatile u8 *) RADEON_ADDR(reg) )
+#define RADEON_WRITE8(reg,val)	DRM_WRITE8( (volatile u8 *) RADEON_ADDR(reg), (val) )
 
 #define RADEON_WRITE_PLL( addr, val )					\
 do {									\
@@ -628,36 +679,22 @@ extern int RADEON_READ_PLL( drm_device_t *dev, int addr );
 #define LOCK_TEST_WITH_RETURN( dev )					\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
-		DRM_ERROR( "%s called without lock held\n",		\
-			   __FUNCTION__ );				\
-		return -EINVAL;						\
+	     dev->lock.pid != DRM_CURRENTPID ) {			\
+		DRM_ERROR( "%s called without lock held\n", __func__ );	\
+		return DRM_ERR(EINVAL);				\
 	}								\
 } while (0)
 
+
+/* Perfbox functionality only.  
+ */
 #define RING_SPACE_TEST_WITH_RETURN( dev_priv )				\
 do {									\
-	drm_radeon_ring_buffer_t *ring = &dev_priv->ring; int i;	\
-	if ( ring->space < ring->high_mark ) {				\
-		for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {	\
-			radeon_update_ring_snapshot( ring );		\
-			if ( ring->space >= ring->high_mark )		\
-				goto __ring_space_done;			\
-			udelay( 1 );					\
-		}							\
-		DRM_ERROR( "ring space check from memory failed, reading register...\n" );	\
-		/* If ring space check fails from RAM, try reading the	\
-		   register directly */					\
-		ring->space = 4 * ( RADEON_READ( RADEON_CP_RB_RPTR ) - ring->tail );	\
-		if ( ring->space <= 0 )					\
-			ring->space += ring->size;			\
-		if ( ring->space >= ring->high_mark )			\
-			goto __ring_space_done;				\
-									\
-		DRM_ERROR( "ring space check failed!\n" );		\
-		return -EBUSY;						\
+	if (!(dev_priv->stats.boxes & RADEON_BOX_DMA_IDLE)) {		\
+		u32 head = GET_RING_HEAD(&dev_priv->ring);		\
+		if (head == dev_priv->ring.tail)			\
+			dev_priv->stats.boxes |= RADEON_BOX_DMA_IDLE;	\
 	}								\
- __ring_space_done:							\
 } while (0)
 
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
@@ -665,7 +702,7 @@ do {									\
 	drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;		\
 	if ( sarea_priv->last_dispatch >= RADEON_MAX_VB_AGE ) {		\
 		int __ret = radeon_do_cp_idle( dev_priv );		\
-		if ( __ret < 0 ) return __ret;				\
+		if ( __ret ) return __ret;				\
 		sarea_priv->last_dispatch = 0;				\
 		radeon_freelist_reset( dev );				\
 	}								\
@@ -694,18 +731,18 @@ do {									\
 #if defined(__powerpc__)
 #define radeon_flush_write_combine()	(void) GET_RING_HEAD( &dev_priv->ring )
 #else
-#define radeon_flush_write_combine()	mb()
+#define radeon_flush_write_combine()	DRM_WRITEMEMORYBARRIER()
 #endif
 
 
 #define RADEON_VERBOSE	0
 
-#define RING_LOCALS	int write, _nr; unsigned int mask; volatile u32 *ring;
+#define RING_LOCALS	int write, _nr; unsigned int mask; u32 *ring;
 
 #define BEGIN_RING( n ) do {						\
 	if ( RADEON_VERBOSE ) {						\
 		DRM_INFO( "BEGIN_RING( %d ) in %s\n",			\
-			   n, __FUNCTION__ );				\
+			   n, __func__ );				\
 	}								\
 	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {		\
                 COMMIT_RING();						\
@@ -724,16 +761,15 @@ do {									\
 	}								\
 	if (((dev_priv->ring.tail + _nr) & mask) != write) {		\
 		DRM_ERROR( 						\
-			"ADVANCE_RING(): mismatch: nr: %x write: %x\n",	\
+			"ADVANCE_RING(): mismatch: nr: %x write: %x line: %d\n",	\
 			((dev_priv->ring.tail + _nr) & mask),		\
-			write);						\
+			write, __LINE__);						\
 	} else								\
 		dev_priv->ring.tail = write;				\
 } while (0)
 
-#define COMMIT_RING() do {						\
-	radeon_flush_write_combine();					\
-	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		\
+#define COMMIT_RING() do {					    \
+	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		    \
 } while (0)
 
 #define OUT_RING( x ) do {						\
@@ -757,23 +793,21 @@ do {									\
 								\
 	if (write + _size > mask) {				\
 		int i = (mask+1) - write;			\
-		if (__copy_from_user( (int *)(ring+write),	\
+		if (DRM_COPY_FROM_USER_UNCHECKED( (int *)(ring+write),	\
 				      _tab, i*4 ))		\
-			return -EFAULT;				\
+			return DRM_ERR(EFAULT);		\
 		write = 0;					\
 		_size -= i;					\
 		_tab += i;					\
 	}							\
 								\
-	if (_size && __copy_from_user( (int *)(ring+write),	\
+	if (_size && DRM_COPY_FROM_USER_UNCHECKED( (int *)(ring+write),	\
 			               _tab, _size*4 ))		\
-		return -EFAULT;					\
+		return DRM_ERR(EFAULT);			\
 								\
 	write += _size;						\
 	write &= mask;						\
 } while (0)
 
-
-#define RADEON_PERFORMANCE_BOXES	0
 
 #endif /* __RADEON_DRV_H__ */

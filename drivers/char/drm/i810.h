@@ -41,6 +41,47 @@
 #define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
 
+#define DRIVER_AUTHOR		"VA Linux Systems Inc."
+
+#define DRIVER_NAME		"i810"
+#define DRIVER_DESC		"Intel i810"
+#define DRIVER_DATE		"20020211"
+
+/* Interface history
+ *
+ * 1.1   - XFree86 4.1
+ * 1.2   - XvMC interfaces
+ *       - XFree86 4.2
+ * 1.2.1 - Disable copying code (leave stub ioctls for backwards compatibility)
+ *       - Remove requirement for interrupt (leave stubs again)
+ */
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		2
+#define DRIVER_PATCHLEVEL	1
+
+#define DRIVER_IOCTLS							    \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_INIT)]   = { i810_dma_init,    1, 1 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_VERTEX)] = { i810_dma_vertex,  1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_CLEAR)]  = { i810_clear_bufs,  1, 0 }, \
+      	[DRM_IOCTL_NR(DRM_IOCTL_I810_FLUSH)]  = { i810_flush_ioctl, 1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_GETAGE)] = { i810_getage,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_GETBUF)] = { i810_getbuf,      1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_SWAP)]   = { i810_swap_bufs,   1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_COPY)]   = { i810_copybuf,     1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I810_DOCOPY)] = { i810_docopy,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_OV0INFO)] = { i810_ov0_info,   1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_FSTATUS)] = { i810_fstatus,    1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_OV0FLIP)] = { i810_ov0_flip,   1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_MC)]      = { i810_dma_mc,     1, 1 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_RSTATUS)] = { i810_rstatus,    1, 0 }
+
+
+#define __HAVE_COUNTERS         4
+#define __HAVE_COUNTER6         _DRM_STAT_IRQ
+#define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
+#define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
+#define __HAVE_COUNTER9         _DRM_STAT_DMA
+
 /* Driver customization:
  */
 #define __HAVE_RELEASE		1

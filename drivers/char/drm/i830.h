@@ -41,6 +41,33 @@
 #define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
 
+#define DRIVER_AUTHOR		"VA Linux Systems Inc."
+
+#define DRIVER_NAME		"i830"
+#define DRIVER_DESC		"Intel 830M"
+#define DRIVER_DATE		"20011004"
+
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		2
+#define DRIVER_PATCHLEVEL	0
+
+#define DRIVER_IOCTLS							    \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_INIT)]   = { i830_dma_init,    1, 1 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_VERTEX)] = { i830_dma_vertex,  1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_CLEAR)]  = { i830_clear_bufs,  1, 0 }, \
+      	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLUSH)]  = { i830_flush_ioctl, 1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETAGE)] = { i830_getage,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETBUF)] = { i830_getbuf,      1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_SWAP)]   = { i830_swap_bufs,   1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_COPY)]   = { i830_copybuf,     1, 0 }, \
+   	[DRM_IOCTL_NR(DRM_IOCTL_I830_DOCOPY)] = { i830_docopy,      1, 0 },
+
+#define __HAVE_COUNTERS         4
+#define __HAVE_COUNTER6         _DRM_STAT_IRQ
+#define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
+#define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
+#define __HAVE_COUNTER9         _DRM_STAT_DMA
+
 /* Driver customization:
  */
 #define __HAVE_RELEASE		1
