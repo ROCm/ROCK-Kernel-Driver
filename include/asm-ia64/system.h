@@ -409,7 +409,7 @@ extern void ia64_load_extra (struct task_struct *task);
 		{							\
 			ia64_psr(ia64_task_regs(next))->dfh = 0;	\
 			ia64_psr(ia64_task_regs(next))->mfh = 0;	\
-		} else						\
+		} else							\
 			ia64_psr(ia64_task_regs(next))->dfh = 1;	\
 	}								\
 	__switch_to(prev,next,last);					\

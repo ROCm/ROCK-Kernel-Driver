@@ -49,10 +49,15 @@ static fpswa_interface_t *fpswa_interface;
 void __init
 trap_init (void)
 {
-	printk("fpswa interface at %lx\n", ia64_boot_param->fpswa);
-	if (ia64_boot_param->fpswa)
+	int major = 0, minor = 0;
+
+	if (ia64_boot_param->fpswa) {
 		/* FPSWA fixup: make the interface pointer a kernel virtual address: */
 		fpswa_interface = __va(ia64_boot_param->fpswa);
+		major = fpswa_interface->revision & 0xffff;
+		minor = fpswa_interface->revision >> 16;
+	}
+	printk("fpswa interface at %lx (rev %d.%d)\n", ia64_boot_param->fpswa, major, minor);
 }
 
 /*
