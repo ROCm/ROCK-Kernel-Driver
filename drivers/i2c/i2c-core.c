@@ -79,11 +79,35 @@ static struct class i2c_adapter_class = {
 	.release =	&i2c_adapter_class_dev_release,
 };
 
+static ssize_t show_adapter_name(struct device *dev, char *buf)
+{
+	struct i2c_adapter *adap = dev_to_i2c_adapter(dev);
+	return sprintf(buf, "%s\n", adap->name);
+}
+static DEVICE_ATTR(name, S_IRUGO, show_adapter_name, NULL);
+
+
 static void i2c_client_release(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	complete(&client->released);
 }
+
+static ssize_t show_client_name(struct device *dev, char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	return sprintf(buf, "%s\n", client->name);
+}
+
+/* 
+ * We can't use the DEVICE_ATTR() macro here as we want the same filename for a
+ * different type of a device.  So beware if the DEVICE_ATTR() macro ever
+ * changes, this definition will also have to change.
+ */
+static struct device_attribute dev_attr_client_name = {
+	.attr	= {.name = "name", .mode = S_IRUGO, .owner = THIS_MODULE },
+	.show	= &show_client_name,
+};
 
 
 /* ---------------------------------------------------
@@ -120,6 +144,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	adap->dev.driver = &i2c_adapter_driver;
 	adap->dev.release = &i2c_adapter_dev_release;
 	device_register(&adap->dev);
+	device_create_file(&adap->dev, &dev_attr_name);
 
 	/* Add this adapter to the i2c_adapter class */
 	memset(&adap->class_dev, 0x00, sizeof(struct class_device));
@@ -184,6 +209,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	init_completion(&adap->dev_released);
 	init_completion(&adap->class_dev_released);
 	class_device_unregister(&adap->class_dev);
+	device_remove_file(&adap->dev, &dev_attr_name);
 	device_unregister(&adap->dev);
 	list_del(&adap->list);
 
@@ -361,6 +387,7 @@ int i2c_attach_client(struct i2c_client *client)
 		"%d-%04x", i2c_adapter_id(adapter), client->addr);
 	printk("registering %s\n", client->dev.bus_id);
 	device_register(&client->dev);
+	device_create_file(&client->dev, &dev_attr_client_name);
 	
 	return 0;
 }
@@ -387,6 +414,7 @@ int i2c_detach_client(struct i2c_client *client)
 	down(&adapter->clist_lock);
 	list_del(&client->list);
 	init_completion(&client->released);
+	device_remove_file(&client->dev, &dev_attr_client_name);
 	device_unregister(&client->dev);
 	up(&adapter->clist_lock);
 	wait_for_completion(&client->released);
