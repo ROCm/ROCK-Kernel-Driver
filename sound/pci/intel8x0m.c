@@ -30,13 +30,11 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
-#include <linux/gameport.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
-#include <sound/mpu401.h>
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -48,8 +46,13 @@ MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{Intel,82801CA-ICH3},"
 		"{Intel,82801DB-ICH4},"
 		"{Intel,ICH5},"
-	        "{Intel,MX440}}");
-
+	        "{Intel,MX440},"
+		"{SiS,7013},"
+		"{NVidia,NForce Modem},"
+		"{NVidia,NForce2 Modem},"
+		"{NVidia,NForce2s Modem},"
+		"{NVidia,NForce3 Modem},"
+		"{AMD,AMD768}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -1332,15 +1335,7 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 	if (card == NULL)
 		return -ENOMEM;
 
-	switch (pci_id->driver_data) {
-	case DEVICE_NFORCE:
-		strcpy(card->driver, "NFORCE-MODEM");
-		break;
-	default:
-		strcpy(card->driver, "ICH-MODEM");
-		break;
-	}
-
+	strcpy(card->driver, "ICH-MODEM");
 	strcpy(card->shortname, "Intel ICH");
 	for (name = shortnames; name->id; name++) {
 		if (pci->device == name->id) {
