@@ -1315,13 +1315,21 @@ static inline int ioc_batching(struct io_context *ioc)
 	if (!ioc)
 		return 0;
 
+	/*
+	 * Make sure the process is able to allocate at least 1 request
+	 * even if the batch times out, otherwise we could theoretically
+	 * lose wakeups.
+	 */
 	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
 		(ioc->nr_batch_requests > 0
 		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
 }
 
 /*
- * ioc_set_batching sets ioc to be a new "batcher" if it is not one
+ * ioc_set_batching sets ioc to be a new "batcher" if it is not one. This
+ * will cause the process to be a "batcher" on all queues in the system. This
+ * is the behaviour we want though - once it gets a wakeup it should be given
+ * a nice run.
  */
 void ioc_set_batching(struct io_context *ioc)
 {
@@ -1364,6 +1372,12 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
+		/*
+		 * The queue will fill after this allocation, so set it as
+		 * full, and mark this process as "batching". This process
+		 * will be allowed to complete a batch of requests, others
+		 * will be blocked.
+		 */
 		if (!blk_queue_full(q, rw)) {
 			ioc_set_batching(ioc);
 			blk_set_queue_full(q, rw);
@@ -1372,6 +1386,10 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	if (blk_queue_full(q, rw)
 			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
+		/*
+		 * The queue is full and the allocating process is not a
+		 * "batcher", and not exempted by the IO scheduler
+		 */
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
@@ -1383,6 +1401,13 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	rq = blk_alloc_request(q, gfp_mask);
 	if (!rq) {
+		/*
+		 * Allocation failed presumably due to memory. Undo anything
+		 * we might have messed up.
+		 *
+		 * Allocating task should really be put onto the front of the
+		 * wait queue, but this is pretty rare.
+		 */
 		spin_lock_irq(q->queue_lock);
 		freed_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
@@ -1439,6 +1464,13 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			struct io_context *ioc;
 
 			io_schedule();
+
+			/*
+			 * After sleeping, we become a "batching" process and
+			 * will be able to allocate at least one request, and
+			 * up to a big batch of them for a small period time.
+			 * See ioc_batching, ioc_set_batching
+			 */
 			ioc = get_io_context(GFP_NOIO);
 			ioc_set_batching(ioc);
 			put_io_context(ioc);
