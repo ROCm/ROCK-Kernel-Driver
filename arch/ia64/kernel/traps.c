@@ -359,6 +359,10 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			if (isr & 0x11) {
 				siginfo.si_code = FPE_FLTINV;
+			} else if (isr & 0x22) {
+				/* denormal operand gets the same si_code as underflow 
+				* see arch/i386/kernel/traps.c:math_error()  */
+				siginfo.si_code = FPE_FLTUND;
 			} else if (isr & 0x44) {
 				siginfo.si_code = FPE_FLTDIV;
 			}
