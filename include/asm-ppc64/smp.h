@@ -22,11 +22,11 @@
 #include <linux/cpumask.h>
 #include <linux/kernel.h>
 
-#ifdef CONFIG_SMP
-
 #ifndef __ASSEMBLY__
 
 #include <asm/paca.h>
+
+#ifdef CONFIG_SMP
 
 extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
 extern void smp_send_tlb_invalidate(int);
@@ -69,9 +69,11 @@ extern cpumask_t cpu_available_map;
 void smp_init_iSeries(void);
 void smp_init_pSeries(void);
 
-#endif /* __ASSEMBLY__ */
 #endif /* !(CONFIG_SMP) */
+#endif /* __ASSEMBLY__ */
+
 #define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
 #define set_hard_smp_processor_id(CPU, VAL) do { (paca[(CPU)].xHwProcNum = VAL); } while (0)
+
 #endif /* !(_PPC64_SMP_H) */
 #endif /* __KERNEL__ */
