@@ -222,7 +222,7 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 
 /*
  * i8042_open() is called when a port is open by the higher layer.
- * It allocates the interrupt and enables in in the chip.
+ * It allocates the interrupt and enables it in the chip.
  */
 
 static int i8042_open(struct serio *port)
