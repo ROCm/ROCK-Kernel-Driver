@@ -169,6 +169,7 @@ struct prom_t {
 };
 
 extern struct prom_t prom;
+extern char *of_stdout_device;
 
 extern int boot_cpuid;
 
