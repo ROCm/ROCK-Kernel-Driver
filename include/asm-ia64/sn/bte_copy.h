@@ -250,7 +250,7 @@ bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 			 * status register into the notification area.
 			 * This fakes the shub performing the copy.
 			 */
-			if (jiffies > bte->idealTransferTimeout) {
+			if (time_after(jiffies, bte->idealTransferTimeout)) {
 				bte->notify = HUB_L(bte->bte_base_addr);
 				bte->idealTransferTimeoutReached++;
 				bte->idealTransferTimeout = jiffies +
