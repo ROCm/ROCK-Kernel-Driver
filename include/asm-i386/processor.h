@@ -650,4 +650,6 @@ extern void select_idle_routine(const struct cpuinfo_x86 *c);
 #define ARCH_HAS_SCHED_WAKE_IDLE
 #endif
 
+extern unsigned long boot_option_idle_override;
+
 #endif /* __ASM_I386_PROCESSOR_H */

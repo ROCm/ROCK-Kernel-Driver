@@ -461,4 +461,6 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 #define ARCH_HAS_SCHED_WAKE_IDLE
 #endif
 
+extern unsigned long boot_option_idle_override;
+
 #endif /* __ASM_X86_64_PROCESSOR_H */
