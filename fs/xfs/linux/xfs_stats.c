@@ -80,6 +80,7 @@ xfs_read_xfsstats(
 			xfsstats.xs_xstrat_bytes,
 			xfsstats.xs_write_bytes,
 			xfsstats.xs_read_bytes);
+	len += sprintf(buffer + len, "debug %u\n", defined(XFSDEBUG));
 
 	if (offset >= len) {
 		*start = buffer;

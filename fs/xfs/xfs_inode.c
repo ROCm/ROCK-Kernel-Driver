@@ -1197,8 +1197,6 @@ xfs_ialloc(
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
 	ip->i_d.di_flags = 0;
-	if ((pip->i_d.di_flags & XFS_DIFLAG_NODUMP) && xfs_inherit_nodump)
-		ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
 	case IFIFO:
@@ -1212,8 +1210,18 @@ xfs_ialloc(
 		break;
 	case IFREG:
 	case IFDIR:
-		if ((pip->i_d.di_flags & XFS_DIFLAG_SYNC) && xfs_inherit_sync)
-			ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+		if (pip->i_d.di_flags &
+		    (XFS_DIFLAG_NOATIME|XFS_DIFLAG_NODUMP|XFS_DIFLAG_SYNC)) {
+			if ((pip->i_d.di_flags & XFS_DIFLAG_NOATIME) &&
+			    xfs_inherit_noatime)
+				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+			if ((pip->i_d.di_flags & XFS_DIFLAG_NODUMP) &&
+			    xfs_inherit_nodump)
+				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
+			if ((pip->i_d.di_flags & XFS_DIFLAG_SYNC) &&
+			    xfs_inherit_sync)
+				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+		}
 	case IFLNK:
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 		ip->i_df.if_flags = XFS_IFEXTENTS;
