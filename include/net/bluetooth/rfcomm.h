@@ -185,10 +185,11 @@ struct rfcomm_dlc {
 	atomic_t      refcnt;
 	u8            dlci;
 	u8            addr;
+	u8            priority;
+	u8            v24_sig;
+	u8            mscex;
 
 	uint          mtu;
-	u8            v24_sig;
-
 	uint          credits;
 	uint          rx_credits;
 	uint          tx_credits;
@@ -212,6 +213,11 @@ struct rfcomm_dlc {
 #define RFCOMM_SCHED_TX     2
 #define RFCOMM_SCHED_TIMEO  3
 #define RFCOMM_SCHED_WAKEUP 31
+
+/* MSC exchange flags */
+#define RFCOMM_MSCEX_TX     1
+#define RFCOMM_MSCEX_RX     2
+#define RFCOMM_MSCEX_OK     (RFCOMM_MSCEX_TX + RFCOMM_MSCEX_RX)
 
 extern struct task_struct *rfcomm_thread;
 extern unsigned long rfcomm_event;

@@ -535,6 +535,7 @@ int __init hci_uart_init(void)
 	hci_uart_ldisc.receive_room= hci_uart_tty_room;
 	hci_uart_ldisc.receive_buf = hci_uart_tty_receive;
 	hci_uart_ldisc.write_wakeup= hci_uart_tty_wakeup;
+	hci_uart_ldisc.owner       = THIS_MODULE;
 
 	if ((err = tty_register_ldisc(N_HCI, &hci_uart_ldisc))) {
 		BT_ERR("HCI line discipline registration failed. (%d)", err);

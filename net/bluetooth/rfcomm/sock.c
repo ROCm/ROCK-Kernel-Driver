@@ -182,8 +182,6 @@ static void rfcomm_sock_destruct(struct sock *sk)
 
 	if (sk->protinfo)
 		kfree(sk->protinfo);
-	
-	MOD_DEC_USE_COUNT;
 }
 
 static void rfcomm_sock_cleanup_listen(struct sock *parent)
@@ -265,6 +263,8 @@ static struct sock *rfcomm_sock_alloc(struct socket *sock, int proto, int prio)
 	if (!sk)
 		return NULL;
 
+	sk_set_owner(sk, THIS_MODULE);
+
 	d = rfcomm_dlc_alloc(prio);
 	if (!d) {
 		sk_free(sk);
@@ -288,8 +288,6 @@ static struct sock *rfcomm_sock_alloc(struct socket *sock, int proto, int prio)
 	bt_sock_link(&rfcomm_sk_list, sk);
 
 	BT_DBG("sk %p", sk);
-
-	MOD_INC_USE_COUNT;
 	return sk;
 }
 
