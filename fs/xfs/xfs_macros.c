@@ -115,35 +115,11 @@ xfs_ag_daddr(xfs_mount_t *mp, xfs_agnumber_t agno, xfs_daddr_t d)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_BEST_BLOCKS)
-xfs_extlen_t
-xfs_ag_best_blocks(int bl, xfs_drfsbno_t blks)
-{
-	return XFS_AG_BEST_BLOCKS(bl, blks);
-}
-#endif
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_MAX_BLOCKS)
-xfs_extlen_t
-xfs_ag_max_blocks(int bl)
-{
-	return XFS_AG_MAX_BLOCKS(bl);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_MAXLEVELS)
 int
 xfs_ag_maxlevels(xfs_mount_t *mp)
 {
 	return XFS_AG_MAXLEVELS(mp);
-}
-#endif
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_MIN_BLOCKS)
-xfs_extlen_t
-xfs_ag_min_blocks(int bl)
-{
-	return XFS_AG_MIN_BLOCKS(bl);
 }
 #endif
 
