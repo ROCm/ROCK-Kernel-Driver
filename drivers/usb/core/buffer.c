@@ -182,5 +182,47 @@ void hcd_buffer_unmap (
 				: PCI_DMA_TODEVICE);
 }
 
+int hcd_buffer_map_sg (
+	struct usb_bus		*bus,
+	struct scatterlist	*sg,
+	int			*n_hw_ents,
+	int			nents,
+	int			direction
+) {
+	struct usb_hcd *hcd = bus->hcpriv;
 
-// FIXME DMA-Mappings for struct scatterlist
+	// FIXME pci_map_sg() has no standard failure mode!
+	*n_hw_ents = pci_map_sg(hcd->pdev, sg, nents,
+				(direction == USB_DIR_IN)
+				? PCI_DMA_FROMDEVICE
+				: PCI_DMA_TODEVICE);
+	return 0;
+}
+
+void hcd_buffer_sync_sg (
+	struct usb_bus		*bus,
+	struct scatterlist	*sg,
+	int			n_hw_ents,
+	int			direction
+) {
+	struct usb_hcd *hcd = bus->hcpriv;
+
+	pci_dma_sync_sg(hcd->pdev, sg, n_hw_ents,
+			(direction == USB_DIR_IN)
+			? PCI_DMA_FROMDEVICE
+			: PCI_DMA_TODEVICE);
+}
+
+void hcd_buffer_unmap_sg (
+	struct usb_bus		*bus,
+	struct scatterlist	*sg,
+	int			n_hw_ents,
+	int			direction
+) {
+	struct usb_hcd *hcd = bus->hcpriv;
+
+	pci_unmap_sg(hcd->pdev, sg, n_hw_ents,
+		     (direction == USB_DIR_IN)
+		     ? PCI_DMA_FROMDEVICE
+		     : PCI_DMA_TODEVICE);
+}

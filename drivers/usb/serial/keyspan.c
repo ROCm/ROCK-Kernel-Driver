@@ -402,7 +402,7 @@ static void	usa26_indat_callback(struct urb *urb)
 	port = (struct usb_serial_port *) urb->context;
 	tty = port->tty;
 	if (urb->actual_length) {
-			/* 0x80 bit is error flag */
+		/* 0x80 bit is error flag */
 		if ((data[0] & 0x80) == 0) {
 			/* no error on any byte */
 			for (i = 1; i < urb->actual_length ; ++i) {
@@ -787,7 +787,7 @@ static void	usa49_indat_callback(struct urb *urb)
 	port = (struct usb_serial_port *) urb->context;
 	tty = port->tty;
 	if (urb->actual_length) {
-			/* 0x80 bit is error flag */
+		/* 0x80 bit is error flag */
 		if ((data[0] & 0x80) == 0) {
 			/* no error on any byte */
 			for (i = 1; i < urb->actual_length ; ++i) {
@@ -1104,25 +1104,25 @@ static struct callbacks {
 		/* msg_usa26 callbacks */
 		.instat_callback =	usa26_instat_callback,
 		.glocont_callback =	usa26_glocont_callback,
-		.indat_callback =		usa26_indat_callback,
+		.indat_callback =	usa26_indat_callback,
 		.outdat_callback =	usa2x_outdat_callback,
-		.inack_callback =		usa26_inack_callback,
+		.inack_callback =	usa26_inack_callback,
 		.outcont_callback =	usa26_outcont_callback,
 	}, {
 		/* msg_usa28 callbacks */
 		.instat_callback =	usa28_instat_callback,
 		.glocont_callback =	usa28_glocont_callback,
-		.indat_callback =		usa28_indat_callback,
+		.indat_callback =	usa28_indat_callback,
 		.outdat_callback =	usa2x_outdat_callback,
-		.inack_callback =		usa28_inack_callback,
+		.inack_callback =	usa28_inack_callback,
 		.outcont_callback =	usa28_outcont_callback,
 	}, {
 		/* msg_usa49 callbacks */
 		.instat_callback =	usa49_instat_callback,
 		.glocont_callback =	usa49_glocont_callback,
-		.indat_callback =		usa49_indat_callback,
+		.indat_callback =	usa49_indat_callback,
 		.outdat_callback =	usa2x_outdat_callback,
-		.inack_callback =		usa49_inack_callback,
+		.inack_callback =	usa49_inack_callback,
 		.outcont_callback =	usa49_outcont_callback,
 	}
 };
@@ -1362,8 +1362,6 @@ static int keyspan_usa28_calc_baud(u32 baud_rate, u32 baudclk, u8 *rate_hi,
 	dbg ("%s - %d OK.", __FUNCTION__, baud_rate);
 	return (KEYSPAN_BAUD_RATE_OK);
 }
-
-
 
 static int keyspan_usa26_send_setup(struct usb_serial *serial,
 				    struct usb_serial_port *port,

@@ -103,7 +103,7 @@ MODULE_PARM_DESC(hue_correction, "YUV colorspace regulation: 0-255 (default=128)
  * 02-Nov-2000 First (mostly dummy) version.
  * 06-Nov-2000 Rewrote to dump all data into frame.
  */
-void ultracam_ProcessIsocData(struct uvd *uvd, usbvideo_frame_t *frame)
+void ultracam_ProcessIsocData(struct uvd *uvd, struct usbvideo_frame *frame)
 {
 	int n;
 
@@ -672,7 +672,7 @@ static struct usb_device_id id_table[] = {
  */
 static int __init ultracam_init(void)
 {
-	usbvideo_cb_t cbTbl;
+	struct usbvideo_cb cbTbl;
 	memset(&cbTbl, 0, sizeof(cbTbl));
 	cbTbl.probe = ultracam_probe;
 	cbTbl.setupOnOpen = ultracam_setup_on_open;

@@ -659,7 +659,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	}
 
 	ip6_dst_store(sk, dst, NULL);
-	sk->route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
+	sk->route_caps = dst->dev->features&~(NETIF_F_IP_CSUM|NETIF_F_TSO);
 
 	if (saddr == NULL) {
 		err = ipv6_get_saddr(dst, &np->daddr, &saddr_buf);
@@ -1333,7 +1333,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	MOD_INC_USE_COUNT;
 
 	ip6_dst_store(newsk, dst, NULL);
-	sk->route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
+	sk->route_caps = dst->dev->features&~(NETIF_F_IP_CSUM|NETIF_F_TSO);
 
 	newtcp6sk = (struct tcp6_sock *)newsk;
 	newtcp6sk->pinet6 = &newtcp6sk->inet6;
@@ -1721,7 +1721,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 		}
 
 		ip6_dst_store(sk, dst, NULL);
-		sk->route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
+		sk->route_caps = dst->dev->features&~(NETIF_F_IP_CSUM|NETIF_F_TSO);
 	}
 
 	return 0;

@@ -905,16 +905,21 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 
 /* Compute the current effective MSS, taking SACKs and IP options,
  * and even PMTU discovery events into account.
+ *
+ * LARGESEND note: !urg_mode is overkill, only frames up to snd_up
+ * cannot be large. However, taking into account rare use of URG, this
+ * is not a big flaw.
  */
 
-static __inline__ unsigned int tcp_current_mss(struct sock *sk)
+static __inline__ unsigned int tcp_current_mss(struct sock *sk, int large)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
-	int mss_now = tp->mss_cache; 
+	int mss_now = large && (sk->route_caps&NETIF_F_TSO) && !tp->urg_mode ?
+		tp->mss_cache : tp->mss_cache_std;
 
 	if (dst && dst->pmtu != tp->pmtu_cookie)
-		mss_now = tcp_sync_mss(sk, dst->pmtu);
+ 		mss_now = tcp_sync_mss(sk, dst->pmtu);
 
 	if (tp->eff_sacks)
 		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
@@ -933,7 +938,7 @@ static __inline__ unsigned int tcp_current_mss(struct sock *sk)
 static inline void tcp_initialize_rcv_mss(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	unsigned int hint = min(tp->advmss, tp->mss_cache);
+	unsigned int hint = min(tp->advmss, tp->mss_cache_std);
 
 	hint = min(hint, tp->rcv_wnd/2);
 	hint = min(hint, TCP_MIN_RCVMSS);
@@ -1269,7 +1274,7 @@ static __inline__ void __tcp_push_pending_frames(struct sock *sk,
 static __inline__ void tcp_push_pending_frames(struct sock *sk,
 					       struct tcp_opt *tp)
 {
-	__tcp_push_pending_frames(sk, tp, tcp_current_mss(sk), tp->nonagle);
+	__tcp_push_pending_frames(sk, tp, tcp_current_mss(sk, 1), tp->nonagle);
 }
 
 static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
@@ -1277,7 +1282,7 @@ static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
 	struct sk_buff *skb = tp->send_head;
 
 	return (skb &&
-		tcp_snd_test(tp, skb, tcp_current_mss(sk),
+		tcp_snd_test(tp, skb, tcp_current_mss(sk, 1),
 			     tcp_skb_is_last(sk, skb) ? 1 : tp->nonagle));
 }
 
@@ -1837,6 +1842,15 @@ static inline int tcp_paws_check(struct tcp_opt *tp, int rst)
 	if (rst && xtime.tv_sec >= tp->ts_recent_stamp + TCP_PAWS_MSL)
 		return 0;
 	return 1;
+}
+
+static inline void tcp_v4_setup_caps(struct sock *sk, struct dst_entry *dst)
+{
+	sk->route_caps = dst->dev->features;
+	if (sk->route_caps & NETIF_F_TSO) {
+		if (sk->no_largesend)
+			sk->route_caps &= ~NETIF_F_TSO;
+	}
 }
 
 #define TCP_CHECK_TIMER(sk) do { } while (0)

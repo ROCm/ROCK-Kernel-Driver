@@ -72,6 +72,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(ATEN_VENDOR_ID, ATEN_PRODUCT_ID) },
 	{ USB_DEVICE(ELCOM_VENDOR_ID, ELCOM_PRODUCT_ID) },
 	{ USB_DEVICE(ITEGNO_VENDOR_ID, ITEGNO_PRODUCT_ID) },
+	{ USB_DEVICE(MA620_VENDOR_ID, MA620_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -167,7 +168,7 @@ static int set_control_lines (struct usb_device *dev, u8 value)
 	retval = usb_control_msg (dev, usb_sndctrlpipe (dev, 0),
 				  SET_CONTROL_REQUEST, SET_CONTROL_REQUEST_TYPE,
 				  value, 0, NULL, 0, 100);
-	dbg (__FUNCTION__" - value = %d, retval = %d", value, retval);
+	dbg("%s - value = %d, retval = %d", __FUNCTION__, value, retval);
 	return retval;
 }
 
@@ -175,10 +176,10 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 {
 	int result;
 
-	dbg (__FUNCTION__ " - port %d, %d bytes", port->number, count);
+	dbg("%s - port %d, %d bytes", __FUNCTION__, port->number, count);
 
 	if (port->write_urb->status == -EINPROGRESS) {
-		dbg (__FUNCTION__ " - already writing");
+		dbg("%s - already writing", __FUNCTION__);
 		return 0;
 	}
 
@@ -196,7 +197,7 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 	port->write_urb->dev = port->serial->dev;
 	result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 	if (result)
-		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 	else
 		result = count;
 
@@ -214,11 +215,11 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	int baud;
 	int i;
 
-	dbg (__FUNCTION__ " -  port %d, initialized = %d", port->number, 
+	dbg("%s -  port %d, initialized = %d", __FUNCTION__, port->number, 
 	     ((struct pl2303_private *) port->private)->termios_initialized);
 
 	if ((!port->tty) || (!port->tty->termios)) {
-		dbg(__FUNCTION__" - no tty structures");
+		dbg("%s - no tty structures", __FUNCTION__);
 		return;
 	}
 
@@ -232,14 +233,14 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	if (old_termios) {
 		if ((cflag == old_termios->c_cflag) &&
 		    (RELEVANT_IFLAG(port->tty->termios->c_iflag) == RELEVANT_IFLAG(old_termios->c_iflag))) {
-		    dbg(__FUNCTION__ " - nothing to change...");
+		    dbg("%s - nothing to change...", __FUNCTION__);
 		    return;
 		}
 	}
 
 	buf = kmalloc (7, GFP_KERNEL);
 	if (!buf) {
-		err(__FUNCTION__ " - out of memory.");
+		err("%s - out of memory.", __FUNCTION__);
 		return;
 	}
 	memset (buf, 0x00, 0x07);
@@ -265,7 +266,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 			default:
 			case CS8:	buf[6] = 8;	break;
 		}
-		dbg (__FUNCTION__ " - data bits = %d", buf[6]);
+		dbg("%s - data bits = %d", __FUNCTION__, buf[6]);
 	}
 
 	baud = 0;
@@ -290,7 +291,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 			err ("pl2303 driver does not support the baudrate requested (fix it)");
 			break;
 	}
-	dbg (__FUNCTION__ " - baud = %d", baud);
+	dbg("%s - baud = %d", __FUNCTION__, baud);
 	if (baud) {
 		buf[0] = baud & 0xff;
 		buf[1] = (baud >> 8) & 0xff;
@@ -303,10 +304,10 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	/* For reference buf[4]=2 is 2 stop bits */
 	if (cflag & CSTOPB) {
 		buf[4] = 2;
-		dbg(__FUNCTION__ " - stop bits = 2");
+		dbg("%s - stop bits = 2", __FUNCTION__);
 	} else {
 		buf[4] = 0;
-		dbg(__FUNCTION__ " - stop bits = 1");
+		dbg("%s - stop bits = 1", __FUNCTION__);
 	}
 
 	if (cflag & PARENB) {
@@ -317,14 +318,14 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 		/* For reference buf[5]=4 is space parity */
 		if (cflag & PARODD) {
 			buf[5] = 1;
-			dbg(__FUNCTION__ " - parity = odd");
+			dbg("%s - parity = odd", __FUNCTION__);
 		} else {
 			buf[5] = 2;
-			dbg(__FUNCTION__ " - parity = even");
+			dbg("%s - parity = even", __FUNCTION__);
 		}
 	} else {
 		buf[5] = 0;
-		dbg(__FUNCTION__ " - parity = none");
+		dbg("%s - parity = none", __FUNCTION__);
 	}
 
 	i = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
@@ -370,7 +371,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 		
-	dbg (__FUNCTION__ " -  port %d", port->number);
+	dbg("%s -  port %d", __FUNCTION__, port->number);
 
 #define FISH(a,b,c,d)								\
 	result=usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev,0),	\
@@ -401,20 +402,20 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 	//FIXME: need to assert RTS and DTR if CRTSCTS off
 
-	dbg (__FUNCTION__ " - submitting read urb");
+	dbg("%s - submitting read urb", __FUNCTION__);
 	port->read_urb->dev = serial->dev;
 	result = usb_submit_urb (port->read_urb, GFP_KERNEL);
 	if (result) {
-		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
 		pl2303_close (port, NULL);
 		return -EPROTO;
 	}
 
-	dbg (__FUNCTION__ " - submitting interrupt urb");
+	dbg("%s - submitting interrupt urb", __FUNCTION__);
 	port->interrupt_in_urb->dev = serial->dev;
 	result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
 	if (result) {
-		err(__FUNCTION__ " - failed submitting interrupt urb, error %d", result);
+		err("%s - failed submitting interrupt urb, error %d", __FUNCTION__, result);
 		pl2303_close (port, NULL);
 		return -EPROTO;
 	}
@@ -435,7 +436,7 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	if (!serial)
 		return;
 	
-	dbg (__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (serial->dev) {
 		if (port->tty) {
@@ -450,23 +451,23 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 		}
 
 		/* shutdown our urbs */
-		dbg (__FUNCTION__ " - shutting down urbs");
+		dbg("%s - shutting down urbs", __FUNCTION__);
 		result = usb_unlink_urb (port->write_urb);
 		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb "
-			     "(write_urb) failed with reason: %d",
+			dbg("%s - usb_unlink_urb (write_urb)"
+			    " failed with reason: %d", __FUNCTION__,
 			     result);
 
 		result = usb_unlink_urb (port->read_urb);
 		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb "
-			     "(read_urb) failed with reason: %d",
+			dbg("%s - usb_unlink_urb (read_urb) "
+			    "failed with reason: %d", __FUNCTION__,
 			     result);
 
 		result = usb_unlink_urb (port->interrupt_in_urb);
 		if (result)
-			dbg (__FUNCTION__ " - usb_unlink_urb "
-			     "(interrupt_in_urb) failed with reason: %d",
+			dbg("%s - usb_unlink_urb (interrupt_in_urb)"
+			    " failed with reason: %d", __FUNCTION__,
 			     result);
 	}
 }
@@ -515,7 +516,7 @@ static int get_modem_info (struct usb_serial_port *port, unsigned int *value)
 	result = ((mcr & CONTROL_DTR)		? TIOCM_DTR : 0)
 		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0);
 
-	dbg (__FUNCTION__ " - result = %x", result);
+	dbg("%s - result = %x", __FUNCTION__, result);
 
 	if (copy_to_user(value, &result, sizeof(int)))
 		return -EFAULT;
@@ -524,22 +525,22 @@ static int get_modem_info (struct usb_serial_port *port, unsigned int *value)
 
 static int pl2303_ioctl (struct usb_serial_port *port, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	dbg (__FUNCTION__" (%d) cmd = 0x%04x", port->number, cmd);
+	dbg("%s (%d) cmd = 0x%04x", __FUNCTION__, port->number, cmd);
 
 	switch (cmd) {
 		
 		case TIOCMGET:
-			dbg (__FUNCTION__" (%d) TIOCMGET", port->number);
+			dbg("%s (%d) TIOCMGET", __FUNCTION__, port->number);
 			return get_modem_info (port, (unsigned int *)arg);
 
 		case TIOCMBIS:
 		case TIOCMBIC:
 		case TIOCMSET:
-			dbg(__FUNCTION__" (%d) TIOCMSET/TIOCMBIC/TIOCMSET",  port->number);
+			dbg("%s (%d) TIOCMSET/TIOCMBIC/TIOCMSET", __FUNCTION__,  port->number);
 			return set_modem_info(port, cmd, (unsigned int *) arg);
 
 		default:
-			dbg (__FUNCTION__" not supported = 0x%04x", cmd);
+			dbg("%s not supported = 0x%04x", __FUNCTION__, cmd);
 			break;
 	}
 
@@ -553,19 +554,19 @@ static void pl2303_break_ctl (struct usb_serial_port *port, int break_state)
 	u16 state;
 	int result;
 
-	dbg (__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (break_state == 0)
 		state = BREAK_OFF;
 	else
 		state = BREAK_ON;
-	dbg (__FUNCTION__" - turning break %s", state==BREAK_OFF ? "off" : "on");
+	dbg("%s - turning break %s", state==BREAK_OFF ? "off" : "on", __FUNCTION__);
 
 	result = usb_control_msg (serial->dev, usb_rcvctrlpipe (serial->dev, 0),
 				  BREAK_REQUEST, BREAK_REQUEST_TYPE, state, 
 				  0, NULL, 0, 100);
 	if (result)
-		dbg (__FUNCTION__" - error sending break = %d", result);
+		dbg("%s - error sending break = %d", __FUNCTION__, result);
 }
 
 
@@ -573,7 +574,7 @@ static void pl2303_shutdown (struct usb_serial *serial)
 {
 	int i;
 
-	dbg (__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
 	for (i = 0; i < serial->num_ports; ++i)
 		kfree (serial->port[i].private);
@@ -619,30 +620,30 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!serial) {
-		dbg(__FUNCTION__ " - bad serial pointer, exiting");
+		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
 	}
 
 	if (urb->status) {
-		dbg (__FUNCTION__ " - urb->status = %d", urb->status);
+		dbg("%s - urb->status = %d", __FUNCTION__, urb->status);
 		if (!port->open_count) {
-			dbg (__FUNCTION__ " - port is closed, exiting.");
+			dbg("%s - port is closed, exiting.", __FUNCTION__);
 			return;
 		}
 		if (urb->status == -EPROTO) {
 			/* PL2303 mysteriously fails with -EPROTO reschedule the read */
-			dbg (__FUNCTION__ " - caught -EPROTO, resubmitting the urb");
+			dbg("%s - caught -EPROTO, resubmitting the urb", __FUNCTION__);
 			urb->status = 0;
 			urb->dev = serial->dev;
 			result = usb_submit_urb(urb, GFP_ATOMIC);
 			if (result)
-				err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+				err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 			return;
 		}
-		dbg (__FUNCTION__ " - unable to handle the error, exiting.");
+		dbg("%s - unable to handle the error, exiting.", __FUNCTION__);
 		return;
 	}
 
@@ -664,7 +665,7 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 		urb->dev = serial->dev;
 		result = usb_submit_urb(urb, GFP_ATOMIC);
 		if (result)
-			err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+			err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 	}
 
 	return;
@@ -680,20 +681,20 @@ static void pl2303_write_bulk_callback (struct urb *urb)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
 	
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
 		/* error in the urb, so we have to resubmit it */
 		if (serial_paranoia_check (port->serial, __FUNCTION__)) {
 			return;
 		}
-		dbg (__FUNCTION__ " - Overflow in write");
-		dbg (__FUNCTION__ " - nonzero write bulk status received: %d", urb->status);
+		dbg("%s - Overflow in write", __FUNCTION__);
+		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		port->write_urb->transfer_buffer_length = 1;
 		port->write_urb->dev = port->serial->dev;
 		result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 		if (result)
-			err(__FUNCTION__ " - failed resubmitting write urb, error %d", result);
+			err("%s - failed resubmitting write urb, error %d", __FUNCTION__, result);
 
 		return;
 	}

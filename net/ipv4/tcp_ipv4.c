@@ -780,7 +780,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	}
 
 	__sk_dst_set(sk, &rt->u.dst);
-	sk->route_caps = rt->u.dst.dev->features;
+	tcp_v4_setup_caps(sk, &rt->u.dst);
 
 	if (!inet->opt || !inet->opt->srr)
 		daddr = rt->rt_dst;
@@ -1559,7 +1559,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		goto exit;
 
 	newsk->dst_cache = dst;
-	newsk->route_caps = dst->dev->features;
+	tcp_v4_setup_caps(newsk, dst);
 
 	newtp		      = tcp_sk(newsk);
 	newinet		      = inet_sk(newsk);
@@ -1865,7 +1865,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 		return err;
 
 	__sk_dst_set(sk, &rt->u.dst);
-	sk->route_caps = rt->u.dst.dev->features;
+	tcp_v4_setup_caps(sk, &rt->u.dst);
 
 	new_saddr = rt->rt_src;
 
@@ -1913,7 +1913,7 @@ int tcp_v4_rebuild_header(struct sock *sk)
 			      RT_CONN_FLAGS(sk), sk->bound_dev_if);
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
-		sk->route_caps = rt->u.dst.dev->features;
+		tcp_v4_setup_caps(sk, &rt->u.dst);
 		return 0;
 	}
 

@@ -209,6 +209,8 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	atomic_set(&skb->users, 1);
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);
 	skb_shinfo(skb)->nr_frags  = 0;
+	skb_shinfo(skb)->tso_size = 0;
+	skb_shinfo(skb)->tso_segs = 0;
 	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
@@ -490,6 +492,7 @@ int skb_linearize(struct sk_buff *skb, int gfp_mask)
 	unsigned int size;
 	u8 *data;
 	long offset;
+	struct skb_shared_info *ninfo;
 	int headerlen = skb->data - skb->head;
 	int expand = (skb->tail + skb->data_len) - skb->end;
 
@@ -509,6 +512,14 @@ int skb_linearize(struct sk_buff *skb, int gfp_mask)
 	if (skb_copy_bits(skb, -headerlen, data, headerlen + skb->len))
 		BUG();
 
+	/* Set up shinfo */
+	ninfo = (struct skb_shared_info*)(data + size);
+	atomic_set(&ninfo->dataref, 1);
+	ninfo->tso_size = skb_shinfo(skb)->tso_size;
+	ninfo->tso_segs = skb_shinfo(skb)->tso_segs;
+	ninfo->nr_frags = 0;
+	ninfo->frag_list = NULL;
+
 	/* Offset between the two in bytes */
 	offset = data - skb->head;
 
@@ -524,11 +535,6 @@ int skb_linearize(struct sk_buff *skb, int gfp_mask)
 	skb->mac.raw += offset;
 	skb->tail    += offset;
 	skb->data    += offset;
-
-	/* Set up shinfo */
-	atomic_set(&(skb_shinfo(skb)->dataref), 1);
-	skb_shinfo(skb)->nr_frags  = 0;
-	skb_shinfo(skb)->frag_list = NULL;
 
 	/* We are no longer a clone, even if we were. */
 	skb->cloned    = 0;
@@ -583,6 +589,8 @@ struct sk_buff *pskb_copy(struct sk_buff *skb, int gfp_mask)
 		}
 		skb_shinfo(n)->nr_frags = i;
 	}
+	skb_shinfo(n)->tso_size = skb_shinfo(skb)->tso_size;
+	skb_shinfo(n)->tso_segs = skb_shinfo(skb)->tso_segs;
 
 	if (skb_shinfo(skb)->frag_list) {
 		skb_shinfo(n)->frag_list = skb_shinfo(skb)->frag_list;
@@ -694,6 +702,9 @@ struct sk_buff *skb_realloc_headroom(struct sk_buff *skb, unsigned int headroom)
  *
  *	You must pass %GFP_ATOMIC as the allocation priority if this function
  *	is called from an interrupt.
+ *
+ *	BUG ALERT: ip_summed is not copied. Why does this work? Is it used
+ *	only by netfilter in the cases when checksum is recalculated? --ANK
  */
 struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 				int newheadroom, int newtailroom, int gfp_mask)
@@ -716,6 +727,8 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 		BUG();
 
 	copy_skb_header(n, skb);
+	skb_shinfo(n)->tso_size = skb_shinfo(skb)->tso_size;
+	skb_shinfo(n)->tso_segs = skb_shinfo(skb)->tso_segs;
 
 	return n;
 }

@@ -26,8 +26,10 @@
 
 #ifdef	DEBUG
 
-/* check the values in the HCSPARAMS register - host controller structural parameters */
-/* see EHCI 0.95 Spec, Table 2-4 for each value */
+/* check the values in the HCSPARAMS register
+ * (host controller _Structural_ parameters)
+ * see EHCI spec, Table 2-4 for each value
+ */
 static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 {
 	u32	params = readl (&ehci->caps->hcs_params);
@@ -67,8 +69,10 @@ static inline void dbg_hcs_params (struct ehci_hcd *ehci, char *label) {}
 
 #ifdef	DEBUG
 
-/* check the values in the HCCPARAMS register - host controller capability parameters */
-/* see EHCI 0.95 Spec, Table 2-5 for each value */
+/* check the values in the HCCPARAMS register
+ * (host controller _Capability_ parameters)
+ * see EHCI Spec, Table 2-5 for each value
+ * */
 static void dbg_hcc_params (struct ehci_hcd *ehci, char *label)
 {
 	u32	params = readl (&ehci->caps->hcc_params);
@@ -79,13 +83,13 @@ static void dbg_hcc_params (struct ehci_hcd *ehci, char *label)
 			label, HCC_EXT_CAPS (params));
 	}
 	if (HCC_ISOC_CACHE (params)) {
-		dbg ("%s hcc_params 0x%04x caching frame %s%s%s",
+		dbg ("%s hcc_params %04x caching frame %s%s%s",
 		     label, params,
 		     HCC_PGM_FRAMELISTLEN (params) ? "256/512/1024" : "1024",
 		     HCC_CANPARK (params) ? " park" : "",
 		     HCC_64BIT_ADDR (params) ? " 64 bit addr" : "");
 	} else {
-		dbg ("%s hcc_params 0x%04x caching %d uframes %s%s%s",
+		dbg ("%s hcc_params %04x caching %d uframes %s%s%s",
 		     label,
 		     params,
 		     HCC_ISOC_THRES (params),
@@ -118,62 +122,131 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 	}
 }
 
+static int dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+{
+	return snprintf (buf, len,
+		"%s%sstatus %04x%s%s%s%s%s%s%s%s%s%s",
+		label, label [0] ? " " : "", status,
+		(status & STS_ASS) ? " Async" : "",
+		(status & STS_PSS) ? " Periodic" : "",
+		(status & STS_RECL) ? " Recl" : "",
+		(status & STS_HALT) ? " Halt" : "",
+		(status & STS_IAA) ? " IAA" : "",
+		(status & STS_FATAL) ? " FATAL" : "",
+		(status & STS_FLR) ? " FLR" : "",
+		(status & STS_PCD) ? " PCD" : "",
+		(status & STS_ERR) ? " ERR" : "",
+		(status & STS_INT) ? " INT" : ""
+		);
+}
+
+static int dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+{
+	return snprintf (buf, len,
+		"%s%sintrenable %02x%s%s%s%s%s%s",
+		label, label [0] ? " " : "", enable,
+		(enable & STS_IAA) ? " IAA" : "",
+		(enable & STS_FATAL) ? " FATAL" : "",
+		(enable & STS_FLR) ? " FLR" : "",
+		(enable & STS_PCD) ? " PCD" : "",
+		(enable & STS_ERR) ? " ERR" : "",
+		(enable & STS_INT) ? " INT" : ""
+		);
+}
+
 static const char *const fls_strings [] =
     { "1024", "512", "256", "??" };
 
+static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+{
+	return snprintf (buf, len,
+		"%s%scommand %06x %s=%d ithresh=%d%s%s%s%s period=%s%s %s",
+		label, label [0] ? " " : "", command,
+		(command & CMD_PARK) ? "park" : "(park)",
+		CMD_PARK_CNT (command),
+		(command >> 16) & 0x3f,
+		(command & CMD_LRESET) ? " LReset" : "",
+		(command & CMD_IAAD) ? " IAAD" : "",
+		(command & CMD_ASE) ? " Async" : "",
+		(command & CMD_PSE) ? " Periodic" : "",
+		fls_strings [(command >> 2) & 0x3],
+		(command & CMD_RESET) ? " Reset" : "",
+		(command & CMD_RUN) ? "RUN" : "HALT"
+		);
+}
+
+static int
+dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+{
+	char	*sig;
+
+	/* signaling state */
+	switch (status & (3 << 10)) {
+	case 0 << 10: sig = "se0"; break;
+	case 1 << 10: sig = "k"; break;		/* low speed */
+	case 2 << 10: sig = "j"; break;
+	default: sig = "?"; break;
+	}
+
+	return snprintf (buf, len,
+		"%s%sport %d status %06x%s%s sig=%s %s%s%s%s%s%s%s%s%s",
+		label, label [0] ? " " : "", port, status,
+		(status & PORT_POWER) ? " POWER" : "",
+		(status & PORT_OWNER) ? " OWNER" : "",
+		sig,
+		(status & PORT_RESET) ? " RESET" : "",
+		(status & PORT_SUSPEND) ? " SUSPEND" : "",
+		(status & PORT_RESUME) ? " RESUME" : "",
+		(status & PORT_OCC) ? " OCC" : "",
+		(status & PORT_OC) ? " OC" : "",
+		(status & PORT_PEC) ? " PEC" : "",
+		(status & PORT_PE) ? " PE" : "",
+		(status & PORT_CSC) ? " CSC" : "",
+		(status & PORT_CONNECT) ? " CONNECT" : ""
+	    );
+}
+
 #else
 static inline void __attribute__((__unused__))
-dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh) {}
+dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
+{}
+
+static inline int __attribute__((__unused__))
+dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+{}
+
+static inline int __attribute__((__unused__))
+dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+{}
+
+static inline int __attribute__((__unused__))
+dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+{}
+
+static inline int __attribute__((__unused__))
+dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+{}
+
 #endif	/* DEBUG */
 
 /* functions have the "wrong" filename when they're output... */
+#define dbg_status(ehci, label, status) { \
+	char _buf [80]; \
+	dbg_status_buf (_buf, sizeof _buf, label, status); \
+	dbg ("%s", _buf); \
+}
 
-#define dbg_status(ehci, label, status) \
-	dbg ("%s status 0x%x%s%s%s%s%s%s%s%s%s%s", \
-		label, status, \
-		(status & STS_ASS) ? " Async" : "", \
-		(status & STS_PSS) ? " Periodic" : "", \
-		(status & STS_RECL) ? " Recl" : "", \
-		(status & STS_HALT) ? " Halt" : "", \
-		(status & STS_IAA) ? " IAA" : "", \
-		(status & STS_FATAL) ? " FATAL" : "", \
-		(status & STS_FLR) ? " FLR" : "", \
-		(status & STS_PCD) ? " PCD" : "", \
-		(status & STS_ERR) ? " ERR" : "", \
-		(status & STS_INT) ? " INT" : "" \
-		)
+#define dbg_cmd(ehci, label, command) { \
+	char _buf [80]; \
+	dbg_command_buf (_buf, sizeof _buf, label, command); \
+	dbg ("%s", _buf); \
+}
 
-#define dbg_cmd(ehci, label, command) \
-	dbg ("%s %x cmd %s=%d ithresh=%d%s%s%s%s period=%s%s %s", \
-		label, command, \
-		(command & CMD_PARK) ? "park" : "(park)", \
-		CMD_PARK_CNT (command), \
-		(command >> 16) & 0x3f, \
-		(command & CMD_LRESET) ? " LReset" : "", \
-		(command & CMD_IAAD) ? " IAAD" : "", \
-		(command & CMD_ASE) ? " Async" : "", \
-		(command & CMD_PSE) ? " Periodic" : "", \
-		fls_strings [(command >> 2) & 0x3], \
-		(command & CMD_RESET) ? " Reset" : "", \
-		(command & CMD_RUN) ? "RUN" : "HALT" \
-		)
-
-#define dbg_port(hcd, label, port, status) \
-	dbg ("%s port %d status 0x%x%s%s speed=%d%s%s%s%s%s%s%s%s%s", \
-		label, port, status, \
-		(status & PORT_OWNER) ? " OWNER" : "", \
-		(status & PORT_POWER) ? " POWER" : "", \
-		(status >> 10) & 3, \
-		(status & PORT_RESET) ? " RESET" : "", \
-		(status & PORT_SUSPEND) ? " SUSPEND" : "", \
-		(status & PORT_RESUME) ? " RESUME" : "", \
-		(status & PORT_OCC) ? " OCC" : "", \
-		(status & PORT_OC) ? " OC" : "", \
-		(status & PORT_PEC) ? " PEC" : "", \
-		(status & PORT_PE) ? " PE" : "", \
-		(status & PORT_CSC) ? " CSC" : "", \
-		(status & PORT_CONNECT) ? " CONNECT" : "" \
-	    )
+#define dbg_port(hcd, label, port, status) { \
+	char _buf [80]; \
+	dbg_port_buf (_buf, sizeof _buf, label, port, status); \
+	dbg ("%s", _buf); \
+}
 
 #ifdef DEBUG
 
@@ -228,8 +301,9 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 						qtd_list);
 				scratch = cpu_to_le32p (&td->hw_token);
 				temp = snprintf (next, size,
-						", td %p len=%d %s",
+						", td %p len=%d tok %04x %s",
 						td, scratch >> 16,
+						scratch & 0xffff,
 						({ char *tmp;
 						 switch ((scratch>>8)&0x03) {
 						 case 0: tmp = "out"; break;
@@ -364,16 +438,104 @@ static DEVICE_ATTR (periodic, S_IRUSR, show_periodic, NULL);
 
 #undef DBG_SCHED_LIMIT
 
+static ssize_t
+show_registers (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct pci_dev		*pdev;
+	struct ehci_hcd		*ehci;
+	unsigned long		flags;
+	unsigned		temp, size, i;
+	char			*next, scratch [80];
+	static char		fmt [] = "%*s\n";
+	static char		label [] = "";
+
+	if (off != 0)
+		return 0;
+
+	pdev = container_of (dev, struct pci_dev, dev);
+	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
+
+	next = buf;
+	size = count;
+
+	spin_lock_irqsave (&ehci->lock, flags);
+
+	/* Capability Registers */
+	i = readw (&ehci->caps->hci_version);
+	temp = snprintf (next, size, "EHCI %x.%02x, hcd state %d\n",
+		i >> 8, i & 0x0ff, ehci->hcd.state);
+	size -= temp;
+	next += temp;
+
+	// FIXME interpret both types of params
+	i = readl (&ehci->caps->hcs_params);
+	temp = snprintf (next, size, "structural params 0x%08x\n", i);
+	size -= temp;
+	next += temp;
+
+	i = readl (&ehci->caps->hcc_params);
+	temp = snprintf (next, size, "capability params 0x%08x\n", i);
+	size -= temp;
+	next += temp;
+
+	/* Operational Registers */
+	temp = dbg_status_buf (scratch, sizeof scratch, label,
+			readl (&ehci->regs->status));
+	temp = snprintf (next, size, fmt, temp, scratch);
+	size -= temp;
+	next += temp;
+
+	temp = dbg_command_buf (scratch, sizeof scratch, label,
+			readl (&ehci->regs->command));
+	temp = snprintf (next, size, fmt, temp, scratch);
+	size -= temp;
+	next += temp;
+
+	temp = dbg_intr_buf (scratch, sizeof scratch, label,
+			readl (&ehci->regs->intr_enable));
+	temp = snprintf (next, size, fmt, temp, scratch);
+	size -= temp;
+	next += temp;
+
+	temp = snprintf (next, size, "uframe %04x\n",
+			readl (&ehci->regs->frame_index));
+	size -= temp;
+	next += temp;
+
+	for (i = 0; i < HCS_N_PORTS (ehci->hcs_params); i++) {
+		temp = dbg_port_buf (scratch, sizeof scratch, label, i,
+				readl (&ehci->regs->port_status [i]));
+		temp = snprintf (next, size, fmt, temp, scratch);
+		size -= temp;
+		next += temp;
+	}
+
+	if (ehci->reclaim) {
+		temp = snprintf (next, size, "reclaim qh %p%s\n",
+				ehci->reclaim,
+				ehci->reclaim_ready ? " ready" : "");
+		size -= temp;
+		next += temp;
+	}
+
+	spin_unlock_irqrestore (&ehci->lock, flags);
+
+	return count - size;
+}
+static DEVICE_ATTR (registers, S_IRUSR, show_registers, NULL);
+
 static inline void create_debug_files (struct ehci_hcd *bus)
 {
 	device_create_file (&bus->hcd.pdev->dev, &dev_attr_async);
 	device_create_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+	device_create_file (&bus->hcd.pdev->dev, &dev_attr_registers);
 }
 
 static inline void remove_debug_files (struct ehci_hcd *bus)
 {
 	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_async);
 	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
+	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_registers);
 }
 
 #else /* DEBUG */

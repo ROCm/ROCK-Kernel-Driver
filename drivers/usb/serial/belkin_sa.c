@@ -184,7 +184,7 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 {
 	int i;
 	
-	dbg (__FUNCTION__);
+	dbg ("%s", __FUNCTION__);
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
@@ -199,7 +199,7 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 {
 	int retval = 0;
 
-	dbg(__FUNCTION__" port %d", port->number);
+	dbg("%s port %d", __FUNCTION__, port->number);
 
 	/*Start reading from the device*/
 	/* TODO: Look at possibility of submitting mulitple URBs to device to
@@ -233,7 +233,7 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 	if (!serial)
 		return;
 
-	dbg(__FUNCTION__" port %d", port->number);
+	dbg("%s port %d", __FUNCTION__, port->number);
 
 	if (serial->dev) {
 		/* shutdown our bulk reads and writes */
