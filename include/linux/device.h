@@ -366,6 +366,7 @@ extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);
 
 extern struct bus_type platform_bus_type;
+extern struct device legacy_bus;
 
 /* drivers/base/power.c */
 extern int device_suspend(u32 state, u32 level);

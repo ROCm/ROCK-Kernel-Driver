@@ -13,7 +13,6 @@ struct multipath_private_data {
 	struct multipath_info	multipaths[MD_SB_DISKS];
 	int			raid_disks;
 	int			working_disks;
-	mdk_thread_t		*thread;
 	spinlock_t		device_lock;
 
 	mempool_t		*pool;

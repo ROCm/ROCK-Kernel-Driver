@@ -294,7 +294,9 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 	/* client */
 	len = qword_get(&mesg, buf, PAGE_SIZE);
-	if (len <= 0) return -EINVAL;
+	err = -EINVAL;
+	if (len <= 0) goto out;
+
 	err = -ENOENT;
 	dom = auth_domain_find(buf);
 	if (!dom)
@@ -473,8 +475,14 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
 
 	exp = svc_export_lookup(&key, 0);
 	if (exp != NULL) 
-		if (cache_check(&svc_export_cache, &exp->h, reqp))
+		switch (cache_check(&svc_export_cache, &exp->h, reqp)) {
+		case 0: break;
+		case -EAGAIN:
+			exp = ERR_PTR(-EAGAIN);
+			break;
+		default:
 			exp = NULL;
+		}
 
 	return exp;
 }
@@ -915,7 +923,8 @@ struct flags {
 	{ NFSEXP_UIDMAP, {"uidmap", ""}},
 	{ NFSEXP_KERBEROS, { "kerberos", ""}},
 	{ NFSEXP_SUNSECURE, { "sunsecure", ""}},
-	{ NFSEXP_CROSSMNT, {"nohide", ""}},
+	{ NFSEXP_NOHIDE, {"nohide", ""}},
+	{ NFSEXP_CROSSMNT, {"crossmnt", ""}},
 	{ NFSEXP_NOSUBTREECHECK, {"no_subtree_check", ""}},
 	{ NFSEXP_NOAUTHNLM, {"insecure_locks", ""}},
 #ifdef MSNFS
