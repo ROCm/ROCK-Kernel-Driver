@@ -52,6 +52,8 @@ static int v1_read_dqblk(struct dquot *dquot)
 
 	/* Now we are sure filp is valid */
 	offset = v1_dqoff(dquot->dq_id);
+	/* Set structure to 0s in case read fails/is after end of file */
+	memset(&dqblk, 0, sizeof(struct v1_disk_dqblk));
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 	filp->f_op->read(filp, (char *)&dqblk, sizeof(struct v1_disk_dqblk), &offset);
