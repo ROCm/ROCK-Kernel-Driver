@@ -337,19 +337,6 @@ static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	hpt34x_remove_one	-	called with an hpt34x is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an hpt34x device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void hpt34x_remove_one(struct pci_dev *dev)
-{
-	panic("hpt34x removal not yet supported");
-}
-
 static struct pci_device_id hpt34x_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT343, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -359,7 +346,6 @@ static struct pci_driver driver = {
 	name:		"HPT34x IDE",
 	id_table:	hpt34x_pci_tbl,
 	probe:		hpt34x_init_one,
-	remove:		__devexit_p(hpt34x_remove_one),
 };
 
 static int hpt34x_ide_init(void)

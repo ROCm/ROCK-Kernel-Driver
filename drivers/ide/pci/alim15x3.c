@@ -862,19 +862,6 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 }
 
 
-/**
- *	ali15x3_remove_one	-	called with an ALi is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an ALi device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void ali15x3_remove_one(struct pci_dev *dev)
-{
-	panic("ALi removal not yet supported");
-}
-
 static struct pci_device_id alim15x3_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, },
@@ -884,7 +871,6 @@ static struct pci_driver driver = {
 	name:		"ALI15x3 IDE",
 	id_table:	alim15x3_pci_tbl,
 	probe:		alim15x3_init_one,
-	remove:		__devexit_p(ali15x3_remove_one),
 };
 
 static int ali15x3_ide_init(void)

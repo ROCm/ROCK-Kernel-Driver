@@ -373,19 +373,6 @@ static int __devinit opti621_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	opti621_remove_one	-	called with an Opti621 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an Opti621 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void opti621_remove_one(struct pci_dev *dev)
-{
-	panic("Opti621 removal not yet supported");
-}
-
 static struct pci_device_id opti621_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C621, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C825, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -396,7 +383,6 @@ static struct pci_driver driver = {
 	name:		"Opti621 IDE",
 	id_table:	opti621_pci_tbl,
 	probe:		opti621_init_one,
-	remove:		__devexit_p(opti621_remove_one),
 };
 
 static int opti621_ide_init(void)

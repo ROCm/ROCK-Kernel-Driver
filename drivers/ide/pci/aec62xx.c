@@ -533,19 +533,6 @@ static int __devinit aec62xx_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	aec62xx_remove_one	-	called when an AEC is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an AEC device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void aec62xx_remove_one(struct pci_dev *dev)
-{
-	panic("AEC62xx removal not yet supported");
-}
-
 static struct pci_device_id aec62xx_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP850UF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP860,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },
@@ -559,7 +546,6 @@ static struct pci_driver driver = {
 	name:		"AEC62xx IDE",
 	id_table:	aec62xx_pci_tbl,
 	probe:		aec62xx_init_one,
-	remove:		__devexit_p(aec62xx_remove_one),
 };
 
 static int aec62xx_ide_init(void)

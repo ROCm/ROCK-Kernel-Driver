@@ -683,19 +683,6 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 	return 0;
 }
 
-/**
- *	piix_remove_one	-	called with a PIIX is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a PIIX device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void piix_remove_one(struct pci_dev *dev)
-{
-	panic("PIIX removal not yet supported");
-}
-
 static struct pci_device_id piix_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -720,7 +707,6 @@ static struct pci_driver driver = {
 	name:		"PIIX IDE",
 	id_table:	piix_pci_tbl,
 	probe:		piix_init_one,
-	remove:		__devexit_p(piix_remove_one),
 };
 
 static int piix_ide_init(void)

@@ -938,19 +938,6 @@ static int __devinit pdc202xx_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-/**
- *	pdc202xx_remove_one	-	called with the IDE to be unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an IDE device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void pdc202xx_remove_one(struct pci_dev *dev)
-{
-	panic("Promise IDE removal not yet supported");
-}
-
 static struct pci_device_id pdc202xx_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20246, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20262, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -964,7 +951,6 @@ static struct pci_driver driver = {
 	name:		"Promise Old IDE",
 	id_table:	pdc202xx_pci_tbl,
 	probe:		pdc202xx_init_one,
-	remove:		__devexit_p(pdc202xx_remove_one),
 };
 
 static int pdc202xx_ide_init(void)
