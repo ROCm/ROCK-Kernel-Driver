@@ -1143,7 +1143,7 @@ static struct usb_mididev *allocMidiDev(
 
 	memset(m, 0, sizeof(struct usb_mididev));
 
-	if ((m->dev_midi = register_sound_midi(&usb_midi_fops, -1, &s->usbdev->dev)) < 0) {
+	if ((m->dev_midi = register_sound_midi(&usb_midi_fops, -1)) < 0) {
 		printk(KERN_ERR "usbmidi: cannot register midi device\n");
 		kfree(m);
 		return NULL;
