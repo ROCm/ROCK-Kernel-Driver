@@ -58,9 +58,9 @@ void pppox_unbind_sock(struct sock *sk)
 {
 	/* Clear connection to ppp device, if attached. */
 
-	if (sk->state & (PPPOX_BOUND|PPPOX_ZOMBIE)) {
+	if (sk->sk_state & (PPPOX_BOUND | PPPOX_ZOMBIE)) {
 		ppp_unregister_channel(&pppox_sk(sk)->chan);
-		sk->state = PPPOX_DEAD;
+		sk->sk_state = PPPOX_DEAD;
 	}
 }
 
@@ -81,7 +81,7 @@ static int pppox_ioctl(struct socket* sock, unsigned int cmd,
 	case PPPIOCGCHAN: {
 		int index;
 		rc = -ENOTCONN;
-		if (!(sk->state & PPPOX_CONNECTED))
+		if (!(sk->sk_state & PPPOX_CONNECTED))
 			break;
 
 		rc = -EINVAL;
@@ -90,12 +90,13 @@ static int pppox_ioctl(struct socket* sock, unsigned int cmd,
 			break;
 
 		rc = 0;
-		sk->state |= PPPOX_BOUND;
+		sk->sk_state |= PPPOX_BOUND;
 		break;
 	}
 	default:
-		if (pppox_protos[sk->protocol]->ioctl)
-			rc = pppox_protos[sk->protocol]->ioctl(sock, cmd, arg);
+		if (pppox_protos[sk->sk_protocol]->ioctl)
+			rc = pppox_protos[sk->sk_protocol]->ioctl(sock, cmd,
+								  arg);
 
 		break;
 	};

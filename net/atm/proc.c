@@ -136,7 +136,7 @@ static void atmarp_info(struct net_device *dev,struct atmarp_entry *entry,
 	unsigned char *ip;
 	int svc,off,ip_len;
 
-	svc = !clip_vcc || clip_vcc->vcc->sk->family == AF_ATMSVC;
+	svc = !clip_vcc || clip_vcc->vcc->sk->sk_family == AF_ATMSVC;
 	off = sprintf(buf,"%-6s%-4s%-4s%5ld ",dev->name,svc ? "SVC" : "PVC",
 	    !clip_vcc || clip_vcc->encap ? "LLC" : "NULL",
 	    (jiffies-(clip_vcc ? clip_vcc->last_use : entry->neigh->used))/
@@ -213,7 +213,7 @@ static void vc_info(struct atm_vcc *vcc,char *buf)
 	if (!vcc->dev) here += sprintf(here,"Unassigned    ");
 	else here += sprintf(here,"%3d %3d %5d ",vcc->dev->number,vcc->vpi,
 		    vcc->vci);
-	switch (vcc->sk->family) {
+	switch (vcc->sk->sk_family) {
 		case AF_ATMPVC:
 			here += sprintf(here,"PVC");
 			break;
@@ -221,12 +221,12 @@ static void vc_info(struct atm_vcc *vcc,char *buf)
 			here += sprintf(here,"SVC");
 			break;
 		default:
-			here += sprintf(here,"%3d",vcc->sk->family);
+			here += sprintf(here, "%3d", vcc->sk->sk_family);
 	}
 	here += sprintf(here," %04lx  %5d %7d/%7d %7d/%7d\n",vcc->flags,
 	    vcc->reply,
-	    atomic_read(&vcc->sk->wmem_alloc),vcc->sk->sndbuf,
-	    atomic_read(&vcc->sk->rmem_alloc),vcc->sk->rcvbuf);
+	    atomic_read(&vcc->sk->sk_wmem_alloc), vcc->sk->sk_sndbuf,
+	    atomic_read(&vcc->sk->sk_rmem_alloc), vcc->sk->sk_rcvbuf);
 }
 
 
@@ -354,7 +354,8 @@ static int atm_pvc_info(loff_t pos,char *buf)
 		dev = list_entry(p, struct atm_dev, dev_list);
 		spin_lock_irqsave(&dev->lock, flags);
 		for (vcc = dev->vccs; vcc; vcc = vcc->next)
-			if (vcc->sk->family == PF_ATMPVC && vcc->dev && !left--) {
+			if (vcc->sk->sk_family == PF_ATMPVC &&
+			    vcc->dev && !left--) {
 				pvc_info(vcc,buf,clip_info);
 				spin_unlock_irqrestore(&dev->lock, flags);
 				spin_unlock(&atm_dev_lock);
@@ -423,7 +424,7 @@ static int atm_svc_info(loff_t pos,char *buf)
 		dev = list_entry(p, struct atm_dev, dev_list);
 		spin_lock_irqsave(&dev->lock, flags);
 		for (vcc = dev->vccs; vcc; vcc = vcc->next)
-			if (vcc->sk->family == PF_ATMSVC && !left--) {
+			if (vcc->sk->sk_family == PF_ATMSVC && !left--) {
 				svc_info(vcc,buf);
 				spin_unlock_irqrestore(&dev->lock, flags);
 				spin_unlock(&atm_dev_lock);

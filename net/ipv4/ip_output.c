@@ -148,7 +148,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	iph->ttl      = ip_select_ttl(inet, &rt->u.dst);
 	iph->daddr    = rt->rt_dst;
 	iph->saddr    = rt->rt_src;
-	iph->protocol = sk->protocol;
+	iph->protocol = sk->sk_protocol;
 	iph->tot_len  = htons(skb->len);
 	ip_select_ident(iph, &rt->u.dst, sk);
 	skb->nh.iph   = iph;
@@ -159,7 +159,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	}
 	ip_send_check(iph);
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 
 	/* Send it out. */
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
@@ -316,12 +316,12 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 			daddr = opt->faddr;
 
 		{
-			struct flowi fl = { .oif = sk->bound_dev_if,
+			struct flowi fl = { .oif = sk->sk_bound_dev_if,
 					    .nl_u = { .ip4_u =
 						      { .daddr = daddr,
 							.saddr = inet->saddr,
 							.tos = RT_CONN_FLAGS(sk) } },
-					    .proto = sk->protocol,
+					    .proto = sk->sk_protocol,
 					    .uli_u = { .ports =
 						       { .sport = inet->sport,
 							 .dport = inet->dport } } };
@@ -351,7 +351,7 @@ packet_routed:
 	else
 		iph->frag_off = 0;
 	iph->ttl      = ip_select_ttl(inet, &rt->u.dst);
-	iph->protocol = sk->protocol;
+	iph->protocol = sk->sk_protocol;
 	iph->saddr    = rt->rt_src;
 	iph->daddr    = rt->rt_dst;
 	skb->nh.iph   = iph;
@@ -363,7 +363,7 @@ packet_routed:
 	}
 
 	mtu = dst_pmtu(&rt->u.dst);
-	if (skb->len > mtu && (sk->route_caps&NETIF_F_TSO)) {
+	if (skb->len > mtu && (sk->sk_route_caps & NETIF_F_TSO)) {
 		unsigned int hlen;
 
 		/* Hack zone: all this must be done by TCP. */
@@ -379,7 +379,7 @@ packet_routed:
 	/* Add an IP checksum. */
 	ip_send_check(iph);
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		       dst_output);
@@ -739,14 +739,14 @@ int ip_append_data(struct sock *sk,
 	if (flags&MSG_PROBE)
 		return 0;
 
-	if (skb_queue_empty(&sk->write_queue)) {
+	if (skb_queue_empty(&sk->sk_write_queue)) {
 		/*
 		 * setup for corking.
 		 */
 		opt = ipc->opt;
 		if (opt) {
 			if (inet->cork.opt == NULL)
-				inet->cork.opt = kmalloc(sizeof(struct ip_options)+40, sk->allocation);
+				inet->cork.opt = kmalloc(sizeof(struct ip_options) + 40, sk->sk_allocation);
 			memcpy(inet->cork.opt, opt, sizeof(struct ip_options)+opt->optlen);
 			inet->cork.flags |= IPCORK_OPT;
 			inet->cork.addr = ipc->addr;
@@ -805,7 +805,7 @@ int ip_append_data(struct sock *sk,
 	 *    it is not necessary. Not a big bug, but needs a fix.
 	 */
 
-	if ((skb = skb_peek_tail(&sk->write_queue)) == NULL)
+	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		goto alloc_new_skb;
 
 	while (length > 0) {
@@ -842,10 +842,11 @@ alloc_new_skb:
 						(flags & MSG_DONTWAIT), &err);
 			} else {
 				skb = NULL;
-				if (atomic_read(&sk->wmem_alloc) <= 2*sk->sndbuf)
+				if (atomic_read(&sk->sk_wmem_alloc) <=
+				    2 * sk->sk_sndbuf)
 					skb = sock_wmalloc(sk, 
 							   alloclen + hh_len + 15, 1,
-							   sk->allocation);
+							   sk->sk_allocation);
 				if (unlikely(skb == NULL))
 					err = -ENOBUFS;
 			}
@@ -883,7 +884,7 @@ alloc_new_skb:
 			/*
 			 * Put the packet on the pending queue.
 			 */
-			__skb_queue_tail(&sk->write_queue, skb);
+			__skb_queue_tail(&sk->sk_write_queue, skb);
 			continue;
 		}
 
@@ -922,7 +923,7 @@ alloc_new_skb:
 			} else if (i < MAX_SKB_FRAGS) {
 				if (copy > PAGE_SIZE)
 					copy = PAGE_SIZE;
-				page = alloc_pages(sk->allocation, 0);
+				page = alloc_pages(sk->sk_allocation, 0);
 				if (page == NULL)  {
 					err = -ENOMEM;
 					goto error;
@@ -933,7 +934,7 @@ alloc_new_skb:
 				skb_fill_page_desc(skb, i, page, 0, 0);
 				frag = &skb_shinfo(skb)->frags[i];
 				skb->truesize += PAGE_SIZE;
-				atomic_add(PAGE_SIZE, &sk->wmem_alloc);
+				atomic_add(PAGE_SIZE, &sk->sk_wmem_alloc);
 			} else {
 				err = -EMSGSIZE;
 				goto error;
@@ -978,7 +979,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	if (flags&MSG_PROBE)
 		return 0;
 
-	if (skb_queue_empty(&sk->write_queue))
+	if (skb_queue_empty(&sk->sk_write_queue))
 		return -EINVAL;
 
 	rt = inet->cork.rt;
@@ -999,7 +1000,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 		return -EMSGSIZE;
 	}
 
-	if ((skb = skb_peek_tail(&sk->write_queue)) == NULL)
+	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		return -EINVAL;
 
 	inet->cork.length += size;
@@ -1012,7 +1013,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 			BUG_TRAP(len == 0);
 
 			skb = sock_wmalloc(sk, fragheaderlen + hh_len + 15, 1,
-					   sk->allocation);
+					   sk->sk_allocation);
 			if (unlikely(!skb)) {
 				err = -ENOBUFS;
 				goto error;
@@ -1036,7 +1037,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 			/*
 			 * Put the packet on the pending queue.
 			 */
-			__skb_queue_tail(&sk->write_queue, skb);
+			__skb_queue_tail(&sk->sk_write_queue, skb);
 			continue;
 		}
 
@@ -1088,14 +1089,14 @@ int ip_push_pending_frames(struct sock *sk)
 	__u8 ttl;
 	int err = 0;
 
-	if ((skb = __skb_dequeue(&sk->write_queue)) == NULL)
+	if ((skb = __skb_dequeue(&sk->sk_write_queue)) == NULL)
 		goto out;
 	tail_skb = &(skb_shinfo(skb)->frag_list);
 
 	/* move skb->data to ip header from ext header */
 	if (skb->data < skb->nh.raw)
 		__skb_pull(skb, skb->nh.raw - skb->data);
-	while ((tmp_skb = __skb_dequeue(&sk->write_queue)) != NULL) {
+	while ((tmp_skb = __skb_dequeue(&sk->sk_write_queue)) != NULL) {
 		__skb_pull(tmp_skb, skb->h.raw - skb->nh.raw);
 		*tail_skb = tmp_skb;
 		tail_skb = &(tmp_skb->next);
@@ -1147,12 +1148,12 @@ int ip_push_pending_frames(struct sock *sk)
 		iph->id = htons(inet->id++);
 	}
 	iph->ttl = ttl;
-	iph->protocol = sk->protocol;
+	iph->protocol = sk->sk_protocol;
 	iph->saddr = rt->rt_src;
 	iph->daddr = rt->rt_dst;
 	ip_send_check(iph);
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	skb->dst = dst_clone(&rt->u.dst);
 
 	/* Netfilter gets whole the not fragmented skb. */
@@ -1186,7 +1187,7 @@ void ip_flush_pending_frames(struct sock *sk)
 	struct inet_opt *inet = inet_sk(sk);
 	struct sk_buff *skb;
 
-	while ((skb = __skb_dequeue_tail(&sk->write_queue)) != NULL)
+	while ((skb = __skb_dequeue_tail(&sk->sk_write_queue)) != NULL)
 		kfree_skb(skb);
 
 	inet->cork.flags &= ~IPCORK_OPT;
@@ -1257,7 +1258,7 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 				    .uli_u = { .ports =
 					       { .sport = skb->h.th->dest,
 					         .dport = skb->h.th->source } },
-				    .proto = sk->protocol };
+				    .proto = sk->sk_protocol };
 		if (ip_route_output_key(&rt, &fl))
 			return;
 	}
@@ -1270,11 +1271,11 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 	 */
 	bh_lock_sock(sk);
 	inet->tos = skb->nh.iph->tos;
-	sk->priority = skb->priority;
-	sk->protocol = skb->nh.iph->protocol;
+	sk->sk_priority = skb->priority;
+	sk->sk_protocol = skb->nh.iph->protocol;
 	ip_append_data(sk, ip_reply_glue_bits, arg->iov->iov_base, len, 0,
 		       &ipc, rt, MSG_DONTWAIT);
-	if ((skb = skb_peek(&sk->write_queue)) != NULL) {
+	if ((skb = skb_peek(&sk->sk_write_queue)) != NULL) {
 		if (arg->csumoffset >= 0)
 			*((u16 *)skb->h.raw + arg->csumoffset) = csum_fold(csum_add(skb->csum, arg->csum));
 		skb->ip_summed = CHECKSUM_NONE;

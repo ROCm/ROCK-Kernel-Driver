@@ -126,15 +126,15 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 			return NULL;
 		}
 		memset(pi, 0, pi_size);
-		sk->protinfo = pi;
+		sk->sk_protinfo = pi;
 	}
 
 	sock_init_data(sock, sk);
 	INIT_LIST_HEAD(&bt_sk(sk)->accept_q);
 	
-	sk->zapped   = 0;
-	sk->protocol = proto;
-	sk->state    = BT_OPEN;
+	sk->sk_zapped   = 0;
+	sk->sk_protocol = proto;
+	sk->sk_state    = BT_OPEN;
 
 	return sk;
 }
@@ -142,7 +142,7 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 void bt_sock_link(struct bt_sock_list *l, struct sock *sk)
 {
 	write_lock_bh(&l->lock);
-	sk->next = l->head;
+	sk->sk_next = l->head;
 	l->head = sk;
 	sock_hold(sk);
 	write_unlock_bh(&l->lock);
@@ -153,9 +153,9 @@ void bt_sock_unlink(struct bt_sock_list *l, struct sock *sk)
 	struct sock **skp;
 
 	write_lock_bh(&l->lock);
-	for (skp = &l->head; *skp; skp = &((*skp)->next)) {
+	for (skp = &l->head; *skp; skp = &((*skp)->sk_next)) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
@@ -170,15 +170,15 @@ void bt_accept_enqueue(struct sock *parent, struct sock *sk)
 	sock_hold(sk);
 	list_add_tail(&bt_sk(sk)->accept_q, &bt_sk(parent)->accept_q);
 	bt_sk(sk)->parent = parent;
-	parent->ack_backlog++;
+	parent->sk_ack_backlog++;
 }
 
 static void bt_accept_unlink(struct sock *sk)
 {
-	BT_DBG("sk %p state %d", sk, sk->state);
+	BT_DBG("sk %p state %d", sk, sk->sk_state);
 
 	list_del_init(&bt_sk(sk)->accept_q);
-	bt_sk(sk)->parent->ack_backlog--;
+	bt_sk(sk)->parent->sk_ack_backlog--;
 	bt_sk(sk)->parent = NULL;
 	sock_put(sk);
 }
@@ -194,13 +194,13 @@ struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock)
 		sk = (struct sock *) list_entry(p, struct bt_sock, accept_q);
 		
 		lock_sock(sk);
-		if (sk->state == BT_CLOSED) {
+		if (sk->sk_state == BT_CLOSED) {
 			release_sock(sk);
 			bt_accept_unlink(sk);
 			continue;
 		}
 		
-		if (sk->state == BT_CONNECTED || !newsock) {
+		if (sk->sk_state == BT_CONNECTED || !newsock) {
 			bt_accept_unlink(sk);
 			if (newsock)
 				sock_graft(sk, newsock);
@@ -226,7 +226,7 @@ int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 		return -EOPNOTSUPP;
 
 	if (!(skb = skb_recv_datagram(sk, flags, noblock, &err))) {
-		if (sk->shutdown & RCV_SHUTDOWN)
+		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			return 0;
 		return err;
 	}
@@ -254,30 +254,30 @@ unsigned int bt_sock_poll(struct file * file, struct socket *sock, poll_table *w
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	poll_wait(file, sk->sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 	mask = 0;
 
-	if (sk->err || !skb_queue_empty(&sk->error_queue))
+	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
 		mask |= POLLERR;
 
-	if (sk->shutdown == SHUTDOWN_MASK)
+	if (sk->sk_shutdown == SHUTDOWN_MASK)
 		mask |= POLLHUP;
 
-	if (!skb_queue_empty(&sk->receive_queue) || 
+	if (!skb_queue_empty(&sk->sk_receive_queue) || 
 			!list_empty(&bt_sk(sk)->accept_q) ||
-			(sk->shutdown & RCV_SHUTDOWN))
+			(sk->sk_shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
-	if (sk->state == BT_CLOSED)
+	if (sk->sk_state == BT_CLOSED)
 		mask |= POLLHUP;
 
-	if (sk->state == BT_CONNECT || sk->state == BT_CONNECT2)
+	if (sk->sk_state == BT_CONNECT || sk->sk_state == BT_CONNECT2)
 		return mask;
 	
 	if (sock_writeable(sk))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	else
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 
 	return mask;
 }
@@ -290,8 +290,8 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 
 	BT_DBG("sk %p", sk);
 
-	add_wait_queue(sk->sleep, &wait);
-	while (sk->state != BT_CONNECTED) {
+	add_wait_queue(sk->sk_sleep, &wait);
+	while (sk->sk_state != BT_CONNECTED) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!timeo) {
 			err = -EAGAIN;
@@ -303,10 +303,10 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 		lock_sock(sk);
 
 		err = 0;
-		if (sk->state == BT_CONNECTED)
+		if (sk->sk_state == BT_CONNECTED)
 			break;
 
-		if (sk->err) {
+		if (sk->sk_err) {
 			err = sock_error(sk);
 			break;
 		}
@@ -317,7 +317,7 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 		}
 	}
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 	return err;
 }
 

@@ -267,13 +267,13 @@ static void sctp_v4_from_sk(union sctp_addr *addr, struct sock *sk)
 	addr->v4.sin_addr.s_addr = inet_sk(sk)->rcv_saddr;
 }
 
-/* Initialize sk->rcv_saddr from sctp_addr. */
+/* Initialize sk->sk_rcv_saddr from sctp_addr. */
 static void sctp_v4_to_sk_saddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet_sk(sk)->rcv_saddr = addr->v4.sin_addr.s_addr;
 }
 
-/* Initialize sk->daddr from sctp_addr. */
+/* Initialize sk->sk_daddr from sctp_addr. */
 static void sctp_v4_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet_sk(sk)->daddr = addr->v4.sin_addr.s_addr;
@@ -512,25 +512,25 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 	struct inet_opt *newinet;
 
 	newsk = sk_alloc(PF_INET, GFP_KERNEL, sizeof(struct sctp_sock),
-			 sk->slab);
+			 sk->sk_slab);
 	if (!newsk)
 		goto out;
 
 	sock_init_data(NULL, newsk);
 	sk_set_owner(newsk, THIS_MODULE);
 
-	newsk->type = SOCK_STREAM;
+	newsk->sk_type = SOCK_STREAM;
 
-	newsk->prot = sk->prot;
-	newsk->no_check = sk->no_check;
-	newsk->reuse = sk->reuse;
-	newsk->shutdown = sk->shutdown;
+	newsk->sk_prot = sk->sk_prot;
+	newsk->sk_no_check = sk->sk_no_check;
+	newsk->sk_reuse = sk->sk_reuse;
+	newsk->sk_shutdown = sk->sk_shutdown;
 
-	newsk->destruct = inet_sock_destruct;
-	newsk->zapped = 0;
-	newsk->family = PF_INET;
-	newsk->protocol = IPPROTO_SCTP;
-	newsk->backlog_rcv = sk->prot->backlog_rcv;
+	newsk->sk_destruct = inet_sock_destruct;
+	newsk->sk_zapped = 0;
+	newsk->sk_family = PF_INET;
+	newsk->sk_protocol = IPPROTO_SCTP;
+	newsk->sk_backlog_rcv = sk->sk_prot->backlog_rcv;
 
 	newinet = inet_sk(newsk);
 
@@ -555,7 +555,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 	atomic_inc(&inet_sock_nr);
 #endif
 
-	if (0 != newsk->prot->init(newsk)) {
+	if (newsk->sk_prot->init(newsk)) {
 		inet_sock_release(newsk);
 		newsk = NULL;
 	}
@@ -601,7 +601,7 @@ int sctp_ctl_sock_init(void)
 		       "SCTP: Failed to create the SCTP control socket.\n");
 		return err;
 	}
-	sctp_ctl_socket->sk->allocation = GFP_ATOMIC;
+	sctp_ctl_socket->sk->sk_allocation = GFP_ATOMIC;
 	inet_sk(sctp_ctl_socket->sk)->uc_ttl = -1;
 
 	return 0;

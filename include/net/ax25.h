@@ -201,7 +201,7 @@ typedef struct ax25_cb {
 	struct sock		*sk;		/* Backlink to socket */
 } ax25_cb;
 
-#define ax25_sk(__sk) ((ax25_cb *)(__sk)->protinfo)
+#define ax25_sk(__sk) ((ax25_cb *)(__sk)->sk_protinfo)
 
 /* af_ax25.c */
 extern ax25_cb *ax25_list;

@@ -538,14 +538,14 @@ ipq_rcv_sk(struct sock *sk, int len)
 		if (down_trylock(&ipqnl_sem))
 			return;
 			
-		while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			ipq_rcv_skb(skb);
 			kfree_skb(skb);
 		}
 		
 		up(&ipqnl_sem);
 
-	} while (ipqnl && ipqnl->receive_queue.qlen);
+	} while (ipqnl && ipqnl->sk_receive_queue.qlen);
 }
 
 static int

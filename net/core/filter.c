@@ -414,10 +414,10 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 	if (!err) {
 		struct sk_filter *old_fp;
 
-		spin_lock_bh(&sk->lock.slock);
-		old_fp = sk->filter;
-		sk->filter = fp;
-		spin_unlock_bh(&sk->lock.slock);
+		spin_lock_bh(&sk->sk_lock.slock);
+		old_fp = sk->sk_filter;
+		sk->sk_filter = fp;
+		spin_unlock_bh(&sk->sk_lock.slock);
 		fp = old_fp;
 	}
 

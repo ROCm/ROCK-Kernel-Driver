@@ -180,7 +180,7 @@ static int check_port(unsigned short port)
 		struct dn_scp *scp = DN_SK(sk);
 		if (scp->addrloc == port)
 			return -1;
-		sk = sk->next;
+		sk = sk->sk_next;
 	}
 	return 0;
 }
@@ -212,9 +212,9 @@ static int dn_hash_sock(struct sock *sk)
 	struct sock **skp;
 	int rv = -EUSERS;
 
-	if (sk->next)
+	if (sk->sk_next)
 		BUG();
-	if (sk->pprev)
+	if (sk->sk_pprev)
 		BUG();
 
 	write_lock_bh(&dn_hash_lock);
@@ -226,8 +226,8 @@ static int dn_hash_sock(struct sock *sk)
 	if ((skp = dn_find_list(sk)) == NULL)
 		goto out;
 
-	sk->next = *skp;
-	sk->pprev = skp;
+	sk->sk_next = *skp;
+	sk->sk_pprev = skp;
 	*skp = sk;
 	rv = 0;
 out:
@@ -237,36 +237,36 @@ out:
 
 static void dn_unhash_sock(struct sock *sk)
 {
-	struct sock **skp = sk->pprev;
+	struct sock **skp = sk->sk_pprev;
 
 	if (skp == NULL)
 		return;
 
 	write_lock(&dn_hash_lock);
 	while(*skp != sk)
-		skp = &((*skp)->next);
-	*skp = sk->next;
+		skp = &((*skp)->sk_next);
+	*skp = sk->sk_next;
 	write_unlock(&dn_hash_lock);
 
-	sk->next = NULL;
-	sk->pprev = NULL;
+	sk->sk_next = NULL;
+	sk->sk_pprev = NULL;
 }
 
 static void dn_unhash_sock_bh(struct sock *sk)
 {
-	struct sock **skp = sk->pprev;
+	struct sock **skp = sk->sk_pprev;
 
 	if (skp == NULL)
 		return;
 
 	write_lock_bh(&dn_hash_lock);
 	while(*skp != sk)
-		skp = &((*skp)->next);
-	*skp = sk->next;
+		skp = &((*skp)->sk_next);
+	*skp = sk->sk_next;
 	write_unlock_bh(&dn_hash_lock);
 
-	sk->next = NULL;
-	sk->pprev = NULL;
+	sk->sk_next = NULL;
+	sk->sk_pprev = NULL;
 }
 
 struct sock **listen_hash(struct sockaddr_dn *addr)
@@ -292,7 +292,7 @@ struct sock **listen_hash(struct sockaddr_dn *addr)
  */
 static void dn_rehash_sock(struct sock *sk)
 {
-	struct sock **skp = sk->pprev;
+	struct sock **skp = sk->sk_pprev;
 	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->addr.sdn_flags & SDF_WILD)
@@ -300,14 +300,14 @@ static void dn_rehash_sock(struct sock *sk)
 
 	write_lock_bh(&dn_hash_lock);
 	while(*skp != sk)
-		skp = &((*skp)->next);
-	*skp = sk->next;
+		skp = &((*skp)->sk_next);
+	*skp = sk->sk_next;
 
 	DN_SK(sk)->addrloc = 0;
 	skp = listen_hash(&DN_SK(sk)->addr);
 
-	sk->next = *skp;
-	sk->pprev = skp;
+	sk->sk_next = *skp;
+	sk->sk_pprev = skp;
 	*skp = sk;
 	write_unlock_bh(&dn_hash_lock);
 }
@@ -405,9 +405,9 @@ struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 	struct sock *sk;
 
 	read_lock(&dn_hash_lock);
-	for(sk = *skp; sk != NULL; sk = sk->next) {
+	for(sk = *skp; sk; sk = sk->sk_next) {
 		struct dn_scp *scp = DN_SK(sk);
-		if (sk->state != TCP_LISTEN)
+		if (sk->sk_state != TCP_LISTEN)
 			continue;
 		if (scp->addr.sdn_objnum) {
 			if (scp->addr.sdn_objnum != addr->sdn_objnum)
@@ -425,7 +425,7 @@ struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 		return sk;
 	}
 
-	if (dn_wild_sk && (dn_wild_sk->state == TCP_LISTEN))
+	if (dn_wild_sk && (dn_wild_sk->sk_state == TCP_LISTEN))
 		sock_hold((sk = dn_wild_sk));
 
 	read_unlock(&dn_hash_lock);
@@ -440,7 +440,7 @@ struct sock *dn_find_by_skb(struct sk_buff *skb)
 
 	read_lock(&dn_hash_lock);
 	sk = dn_sk_hash[cb->dst_port & DN_SK_HASH_MASK];
-	for (; sk != NULL; sk = sk->next) {
+	for (; sk; sk = sk->sk_next) {
 		scp = DN_SK(sk);
 		if (cb->src != dn_saddr2dn(&scp->peer))
 			continue;
@@ -469,7 +469,7 @@ static void dn_destruct(struct sock *sk)
 	skb_queue_purge(&scp->other_xmit_queue);
 	skb_queue_purge(&scp->other_receive_queue);
 
-	dst_release(xchg(&sk->dst_cache, NULL));
+	dst_release(xchg(&sk->sk_dst_cache, NULL));
 }
 
 struct sock *dn_alloc_sock(struct socket *sock, int gfp)
@@ -488,12 +488,12 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	sock_init_data(sock, sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	sk->backlog_rcv = dn_nsp_backlog_rcv;
-	sk->destruct    = dn_destruct;
-	sk->no_check    = 1;
-	sk->family      = PF_DECnet;
-	sk->protocol    = 0;
-	sk->allocation  = gfp;
+	sk->sk_backlog_rcv = dn_nsp_backlog_rcv;
+	sk->sk_destruct    = dn_destruct;
+	sk->sk_no_check    = 1;
+	sk->sk_family      = PF_DECnet;
+	sk->sk_protocol    = 0;
+	sk->sk_allocation  = gfp;
 
 	/* Initialization of DECnet Session Control Port		*/
 	scp->state	= DN_O;		/* Open			*/
@@ -600,7 +600,7 @@ int dn_destroy_timer(struct sock *sk)
 
 	scp->persist = (HZ * decnet_time_wait);
 
-	if (sk->socket)
+	if (sk->sk_socket)
 		return 0;
 
 	dn_stop_fast_timer(sk); /* unlikely, but possible that this is runninng */
@@ -619,16 +619,17 @@ static void dn_destroy_sock(struct sock *sk)
 
 	scp->nsp_rxtshift = 0; /* reset back off */
 
-	if (sk->socket) {
-		if (sk->socket->state != SS_UNCONNECTED)
-			sk->socket->state = SS_DISCONNECTING;
+	if (sk->sk_socket) {
+		if (sk->sk_socket->state != SS_UNCONNECTED)
+			sk->sk_socket->state = SS_DISCONNECTING;
 	}
 
-	sk->state = TCP_CLOSE;
+	sk->sk_state = TCP_CLOSE;
 
 	switch(scp->state) {
 		case DN_DN:
-			dn_nsp_send_disc(sk, NSP_DISCCONF, NSP_REASON_DC, sk->allocation);
+			dn_nsp_send_disc(sk, NSP_DISCCONF, NSP_REASON_DC,
+					 sk->sk_allocation);
 			scp->persist_fxn = dn_destroy_timer;
 			scp->persist = dn_nsp_persist(sk);
 			break;
@@ -640,7 +641,7 @@ static void dn_destroy_sock(struct sock *sk)
 		case DN_DI:
 		case DN_DR:
 disc_reject:
-			dn_nsp_send_disc(sk, NSP_DISCINIT, 0, sk->allocation);
+			dn_nsp_send_disc(sk, NSP_DISCINIT, 0, sk->sk_allocation);
 		case DN_NC:
 		case DN_NR:
 		case DN_RJ:
@@ -697,7 +698,7 @@ static int dn_create(struct socket *sock, int protocol)
 	if ((sk = dn_alloc_sock(sock, GFP_KERNEL)) == NULL) 
 		return -ENOBUFS;
 
-	sk->protocol = protocol;
+	sk->sk_protocol = protocol;
 
 	return 0;
 }
@@ -777,13 +778,13 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	rv = -EINVAL;
 	lock_sock(sk);
-	if (sk->zapped != 0) {
+	if (sk->sk_zapped) {
 		memcpy(&scp->addr, saddr, addr_len);
-		sk->zapped = 0;
+		sk->sk_zapped = 0;
 
 		rv = dn_hash_sock(sk);
 		if (rv) {
-			sk->zapped = 1;
+			sk->sk_zapped = 1;
 		}
 	}
 	release_sock(sk);
@@ -798,7 +799,7 @@ static int dn_auto_bind(struct socket *sock)
 	struct dn_scp *scp = DN_SK(sk);
 	int rv;
 
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 
 	scp->addr.sdn_flags  = 0;
 	scp->addr.sdn_objnum = 0;
@@ -823,7 +824,7 @@ static int dn_auto_bind(struct socket *sock)
 	if (rv == 0) {
 		rv = dn_hash_sock(sk);
 		if (rv) {
-			sk->zapped = 1;
+			sk->sk_zapped = 1;
 		}
 	}
 
@@ -843,7 +844,7 @@ static int dn_confirm_accept(struct sock *sk, long *timeo, int allocation)
 	scp->segsize_loc = dst_path_metric(__sk_dst_get(sk), RTAX_ADVMSS);
 	dn_send_conn_conf(sk, allocation);
 
-	prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
 		if (scp->state == DN_CC)
@@ -861,13 +862,13 @@ static int dn_confirm_accept(struct sock *sk, long *timeo, int allocation)
 		err = -EAGAIN;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 	if (err == 0) {
-		sk->socket->state = SS_CONNECTED;
+		sk->sk_socket->state = SS_CONNECTED;
 	} else if (scp->state != DN_CC) {
-		sk->socket->state = SS_UNCONNECTED;
+		sk->sk_socket->state = SS_UNCONNECTED;
 	}
 	return err;
 }
@@ -884,7 +885,7 @@ static int dn_wait_run(struct sock *sk, long *timeo)
 	if (!*timeo)
 		return -EALREADY;
 
-	prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
 		if (scp->state == DN_CI || scp->state == DN_CC)
@@ -902,21 +903,21 @@ static int dn_wait_run(struct sock *sk, long *timeo)
 		err = -ETIMEDOUT;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 out:
 	if (err == 0) {
-		sk->socket->state = SS_CONNECTED;
+		sk->sk_socket->state = SS_CONNECTED;
 	} else if (scp->state != DN_CI && scp->state != DN_CC) {
-		sk->socket->state = SS_UNCONNECTED;
+		sk->sk_socket->state = SS_UNCONNECTED;
 	}
 	return err;
 }
 
 static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, long *timeo, int flags)
 {
-	struct socket *sock = sk->socket;
+	struct socket *sock = sk->sk_socket;
 	struct dn_scp *scp = DN_SK(sk);
 	int err = -EISCONN;
 	struct flowi fl;
@@ -949,8 +950,8 @@ static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, 
 	if (addr->sdn_flags & SDF_WILD)
 		goto out;
 
-	if (sk->zapped) {
-		err = dn_auto_bind(sk->socket);
+	if (sk->sk_zapped) {
+		err = dn_auto_bind(sk->sk_socket);
 		if (err)
 			goto out;
 	}
@@ -959,17 +960,17 @@ static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, 
 
 	err = -EHOSTUNREACH;
 	memset(&fl, 0, sizeof(fl));
-	fl.oif = sk->bound_dev_if;
+	fl.oif = sk->sk_bound_dev_if;
 	fl.fld_dst = dn_saddr2dn(&scp->peer);
 	fl.fld_src = dn_saddr2dn(&scp->addr);
 	dn_sk_ports_copy(&fl, scp);
 	fl.proto = DNPROTO_NSP;
-	if (dn_route_output_sock(&sk->dst_cache, &fl, sk, flags) < 0)
+	if (dn_route_output_sock(&sk->sk_dst_cache, &fl, sk, flags) < 0)
 		goto out;
-	sk->route_caps = sk->dst_cache->dev->features;
+	sk->sk_route_caps = sk->sk_dst_cache->dev->features;
 	sock->state = SS_CONNECTING;
 	scp->state = DN_CI;
-	scp->segsize_loc = dst_path_metric(sk->dst_cache, RTAX_ADVMSS);
+	scp->segsize_loc = dst_path_metric(sk->sk_dst_cache, RTAX_ADVMSS);
 
 	dn_nsp_send_conninit(sk, NSP_CI);
 	err = -EINPROGRESS;
@@ -1002,7 +1003,7 @@ static inline int dn_check_state(struct sock *sk, struct sockaddr_dn *addr, int 
 		case DN_RUN:
 			return 0;
 		case DN_CR:
-			return dn_confirm_accept(sk, timeo, sk->allocation);
+			return dn_confirm_accept(sk, timeo, sk->sk_allocation);
 		case DN_CI:
 		case DN_CC:
 			return dn_wait_run(sk, timeo);
@@ -1050,19 +1051,19 @@ static struct sk_buff *dn_wait_for_connect(struct sock *sk, long *timeo)
 	struct sk_buff *skb = NULL;
 	int err = 0;
 
-	prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
-		skb = skb_dequeue(&sk->receive_queue);
+		skb = skb_dequeue(&sk->sk_receive_queue);
 		if (skb == NULL) {
 			*timeo = schedule_timeout(*timeo);
-			skb = skb_dequeue(&sk->receive_queue);
+			skb = skb_dequeue(&sk->sk_receive_queue);
 		}
 		lock_sock(sk);
 		if (skb != NULL)
 			break;
 		err = -EINVAL;
-		if (sk->state != TCP_LISTEN)
+		if (sk->sk_state != TCP_LISTEN)
 			break;
 		err = sock_intr_errno(*timeo);
 		if (signal_pending(current))
@@ -1070,9 +1071,9 @@ static struct sk_buff *dn_wait_for_connect(struct sock *sk, long *timeo)
 		err = -EAGAIN;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 
 	return skb == NULL ? ERR_PTR(err) : skb;
 }
@@ -1089,12 +1090,12 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	lock_sock(sk);
 
-        if (sk->state != TCP_LISTEN || DN_SK(sk)->state != DN_O) {
+        if (sk->sk_state != TCP_LISTEN || DN_SK(sk)->state != DN_O) {
 		release_sock(sk);
 		return -EINVAL;
 	}
 
-	skb = skb_dequeue(&sk->receive_queue);
+	skb = skb_dequeue(&sk->sk_receive_queue);
 	if (skb == NULL) {
 		skb = dn_wait_for_connect(sk, &timeo);
 		if (IS_ERR(skb)) {
@@ -1104,8 +1105,8 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	}
 
 	cb = DN_SKB_CB(skb);
-	sk->ack_backlog--;
-	newsk = dn_alloc_sock(newsock, sk->allocation);
+	sk->sk_ack_backlog--;
+	newsk = dn_alloc_sock(newsock, sk->sk_allocation);
 	if (newsk == NULL) {
 		release_sock(sk);
 		kfree_skb(skb);
@@ -1113,7 +1114,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	}
 	release_sock(sk);
 
-	dst_release(xchg(&newsk->dst_cache, skb->dst));
+	dst_release(xchg(&newsk->sk_dst_cache, skb->dst));
 	skb->dst = NULL;
 
         DN_SK(newsk)->state        = DN_CR;
@@ -1129,7 +1130,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	if ((DN_SK(newsk)->services_rem & NSP_FC_MASK) == NSP_FC_NONE)
 		DN_SK(newsk)->max_window = decnet_no_fc_max_cwnd;
 
-	newsk->state  = TCP_LISTEN;
+	newsk->sk_state  = TCP_LISTEN;
 	memcpy(&(DN_SK(newsk)->addr), &(DN_SK(sk)->addr), sizeof(struct sockaddr_dn));
 
 	/*
@@ -1168,15 +1169,16 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	lock_sock(newsk);
 	err = dn_hash_sock(newsk);
 	if (err == 0) {
-		newsk->zapped = 0;
+		newsk->sk_zapped = 0;
 		dn_send_conn_ack(newsk);
 
 		/*
-	 	 * Here we use sk->allocation since although the conn conf is
+	 	 * Here we use sk->sk_allocation since although the conn conf is
 	 	 * for the newsk, the context is the old socket.
 	 	 */
 		if (DN_SK(newsk)->accept_mode == ACC_IMMED)
-			err = dn_confirm_accept(newsk, &timeo, sk->allocation);
+			err = dn_confirm_accept(newsk, &timeo,
+						sk->sk_allocation);
 	}
 	release_sock(newsk);
         return err;
@@ -1246,7 +1248,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		return val;
 
 	case TIOCOUTQ:
-		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
 		err = put_user(amount, (int *)arg);
@@ -1257,9 +1259,10 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		if ((skb = skb_peek(&scp->other_receive_queue)) != NULL) {
 			amount = skb->len;
 		} else {
-			struct sk_buff *skb = sk->receive_queue.next;
+			struct sk_buff *skb = sk->sk_receive_queue.next;
 			for(;;) {
-				if (skb == (struct sk_buff *)&sk->receive_queue)
+				if (skb ==
+				    (struct sk_buff *)&sk->sk_receive_queue)
 					break;
 				amount += skb->len;
 				skb = skb->next;
@@ -1284,15 +1287,15 @@ static int dn_listen(struct socket *sock, int backlog)
 
 	lock_sock(sk);
 
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		goto out;
 
-	if ((DN_SK(sk)->state != DN_O) || (sk->state == TCP_LISTEN))
+	if ((DN_SK(sk)->state != DN_O) || (sk->sk_state == TCP_LISTEN))
 		goto out;
 
-	sk->max_ack_backlog = backlog;
-	sk->ack_backlog     = 0;
-	sk->state           = TCP_LISTEN;
+	sk->sk_max_ack_backlog = backlog;
+	sk->sk_ack_backlog     = 0;
+	sk->sk_state           = TCP_LISTEN;
 	err                 = 0;
 	dn_rehash_sock(sk);
 
@@ -1325,7 +1328,7 @@ static int dn_shutdown(struct socket *sock, int how)
 	if (how != SHUTDOWN_MASK)
 		goto out;
 
-	sk->shutdown = how;
+	sk->sk_shutdown = how;
 	dn_destroy_sock(sk);
 	err = 0;
 
@@ -1438,7 +1441,7 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 			if (scp->state != DN_CR)
 				return -EINVAL;
 			timeo = sock_rcvtimeo(sk, 0);
-			err = dn_confirm_accept(sk, &timeo, sk->allocation);
+			err = dn_confirm_accept(sk, &timeo, sk->sk_allocation);
 			return err;
 
 		case DSO_CONREJECT:
@@ -1447,8 +1450,8 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 				return -EINVAL;
 
 			scp->state = DN_DR;
-			sk->shutdown = SHUTDOWN_MASK;
-			dn_nsp_send_disc(sk, 0x38, 0, sk->allocation);
+			sk->sk_shutdown = SHUTDOWN_MASK;
+			dn_nsp_send_disc(sk, 0x38, 0, sk->sk_allocation);
 			break;
 
 		default:
@@ -1662,7 +1665,7 @@ static int dn_data_ready(struct sock *sk, struct sk_buff_head *q, int flags, int
 
 		if (cb->nsp_flags & 0x40) {
 			/* SOCK_SEQPACKET reads to EOM */
-			if (sk->type == SOCK_SEQPACKET)
+			if (sk->sk_type == SOCK_SEQPACKET)
 				return 1;
 			/* so does SOCK_STREAM unless WAITALL is specified */
 			if (!(flags & MSG_WAITALL))
@@ -1685,7 +1688,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
-	struct sk_buff_head *queue = &sk->receive_queue;
+	struct sk_buff_head *queue = &sk->sk_receive_queue;
 	int target = size > 1 ? 1 : 0;
 	int copied = 0;
 	int rv = 0;
@@ -1696,7 +1699,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	lock_sock(sk);
 
-	if (sk->zapped) {
+	if (sk->sk_zapped) {
 		rv = -EADDRNOTAVAIL;
 		goto out;
 	}
@@ -1705,7 +1708,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (rv)
 		goto out;
 
-	if (sk->shutdown & RCV_SHUTDOWN) {
+	if (sk->sk_shutdown & RCV_SHUTDOWN) {
 		if (!(flags & MSG_NOSIGNAL))
 			send_sig(SIGPIPE, current, 0);
 		rv = -EPIPE;
@@ -1728,7 +1731,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 * See if there is data ready to read, sleep if there isn't
 	 */
 	for(;;) {
-		if (sk->err)
+		if (sk->sk_err)
 			goto out;
 
 		if (skb_queue_len(&scp->other_receive_queue)) {
@@ -1800,7 +1803,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 		}
 
 		if (eor) { 
-			if (sk->type == SOCK_SEQPACKET)
+			if (sk->sk_type == SOCK_SEQPACKET)
 				break;
 			if (!(flags & MSG_WAITALL))
 				break;
@@ -1816,12 +1819,12 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 	rv = copied;
 
 
-	if (eor && (sk->type == SOCK_SEQPACKET))
+	if (eor && (sk->sk_type == SOCK_SEQPACKET))
 		msg->msg_flags |= MSG_EOR;
 
 out:
 	if (rv == 0)
-		rv = (flags & MSG_PEEK) ? -sk->err : sock_error(sk);
+		rv = (flags & MSG_PEEK) ? -sk->sk_err : sock_error(sk);
 
 	if ((rv >= 0) && msg->msg_name) {
 		memcpy(msg->msg_name, &scp->peer, sizeof(struct sockaddr_dn));
@@ -1950,13 +1953,13 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (err)
 		goto out_err;
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		err = -EPIPE;
 		goto out_err;
 	}
 
-	if ((flags & MSG_TRYHARD) && sk->dst_cache)
-		dst_negative_advice(&sk->dst_cache);
+	if ((flags & MSG_TRYHARD) && sk->sk_dst_cache)
+		dst_negative_advice(&sk->sk_dst_cache);
 
 	mss = scp->segsize_rem;
 	fctype = scp->services_rem & NSP_FC_MASK;
@@ -2053,7 +2056,7 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 		}
 
 		sent += len;
-		dn_nsp_queue_xmit(sk, skb, sk->allocation, flags & MSG_OOB);
+		dn_nsp_queue_xmit(sk, skb, sk->sk_allocation, flags & MSG_OOB);
 		skb = NULL;
 
 		scp->persist = dn_nsp_persist(sk);
@@ -2132,7 +2135,7 @@ static struct sock *dn_socket_get_next(struct seq_file *seq,
 {
 	struct dn_iter_state *state = seq->private;
 
-	n = n->next;
+	n = n->sk_next;
 try_again:
 	if (n)
 		goto out;

@@ -43,10 +43,9 @@ static inline int udp_lport_inuse(u16 num)
 {
 	struct sock *sk = udp_hash[num & (UDP_HTABLE_SIZE - 1)];
 
-	for(; sk != NULL; sk = sk->next) {
+	for (; sk; sk = sk->sk_next)
 		if (inet_sk(sk)->num == num)
 			return 1;
-	}
 	return 0;
 }
 
