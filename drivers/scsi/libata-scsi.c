@@ -38,15 +38,22 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 
 
 /**
- *	ata_std_bios_param - generic bios head/sector/cylinder calculator
- *	    used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
- *	    mapping. Some situations may arise where the disk is not 
- *	    bootable if this is not used.
+ *	ata_std_bios_param - generic bios head/sector/cylinder calculator used by sd.
+ *	@sdev: SCSI device for which BIOS geometry is to be determined
+ *	@bdev: block device associated with @sdev
+ *	@capacity: capacity of SCSI device
+ *	@geom: location to which geometry will be output
+ *
+ *	Generic bios head/sector/cylinder calculator
+ *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
+ *	mapping. Some situations may arise where the disk is not 
+ *	bootable if this is not used.
  *
  *	LOCKING:
+ *	Defined by the SCSI layer.  We don't really care.
  *
  *	RETURNS:
- *
+ *	Zero.
  */
 int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 		       sector_t capacity, int geom[]) 
@@ -60,6 +67,27 @@ int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 
+/**
+ *	ata_scsi_qc_new - acquire new ata_queued_cmd reference
+ *	@ap: ATA port to which the new command is attached
+ *	@dev: ATA device to which the new command is attached
+ *	@cmd: SCSI command that originated this ATA command
+ *	@done: SCSI command completion function
+ *
+ *	Obtain a reference to an unused ata_queued_cmd structure,
+ *	which is the basic libata structure representing a single
+ *	ATA command sent to the hardware.
+ *
+ *	If a command was available, fill in the SCSI-specific
+ *	portions of the structure with information on the
+ *	current command.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Command allocated, or %NULL if none available.
+ */
 struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 				       struct ata_device *dev,
 				       struct scsi_cmnd *cmd,
@@ -88,11 +116,18 @@ struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 }
 
 /**
- *	ata_to_sense_error -
- *	@qc:
- *	@cmd:
+ *	ata_to_sense_error - convert ATA error to SCSI error
+ *	@qc: Command that we are erroring out
+ *
+ *	Converts an ATA error into a SCSI error.
+ *
+ *	Right now, this routine is laughably primitive.  We
+ *	don't even examine what ATA told us, we just look at
+ *	the command data direction, and return a fatal SCSI
+ *	sense error based on that.
  *
  *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
  */
 
 void ata_to_sense_error(struct ata_queued_cmd *qc)
@@ -116,11 +151,15 @@ void ata_to_sense_error(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_scsi_slave_config -
- *	@sdev:
+ *	ata_scsi_slave_config - Set SCSI device attributes
+ *	@sdev: SCSI device to examine
+ *
+ *	This is called before we actually start reading
+ *	and writing to the device, to configure certain
+ *	SCSI mid-layer behaviors.
  *
  *	LOCKING:
- *
+ *	Defined by SCSI layer.  We don't really care.
  */
 
 int ata_scsi_slave_config(struct scsi_device *sdev)
@@ -159,15 +198,23 @@ int ata_scsi_error(struct Scsi_Host *host)
 }
 
 /**
- *	ata_scsi_rw_xlat -
- *	@qc:
- *	@scsicmd:
+ *	ata_scsi_rw_xlat - Translate SCSI r/w command into an ATA one
+ *	@qc: Storage for translated ATA taskfile
+ *	@scsicmd: SCSI command to translate
+ *
+ *	Converts any of six SCSI read/write commands into the
+ *	ATA counterpart, including starting sector (LBA),
+ *	sector count, and taking into account the device's LBA48
+ *	support.
+ *
+ *	Commands %READ_6, %READ_10, %READ_16, %WRITE_6, %WRITE_10, and
+ *	%WRITE_16 are currently supported.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  *
  *	RETURNS:
- *
+ *	Zero on success, non-zero on error.
  */
 
 static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
@@ -272,11 +319,18 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 }
 
 /**
- *	ata_scsi_translate -
- *	@ap:
- *	@dev:
- *	@cmd:
- *	@done:
+ *	ata_scsi_translate - Translate then issue SCSI command to ATA device
+ *	@ap: ATA port to which the command is addressed
+ *	@dev: ATA device to which the command is addressed
+ *	@cmd: SCSI command to execute
+ *	@done: SCSI command completion function
+ *
+ *	Our ->queuecommand() function has decided that the SCSI
+ *	command issued can be directly translated into an ATA
+ *	command, rather than handled internally.
+ *
+ *	This function sets up an ata_queued_cmd structure for the
+ *	SCSI command, and sends that ata_queued_cmd to the hardware.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
@@ -622,9 +676,9 @@ static void ata_msense_push(u8 **ptr_io, const u8 *last,
 
 /**
  *	ata_msense_caching - Simulate MODE SENSE caching info page
- *	@dev:
- *	@ptr_io:
- *	@last:
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
  *
  *	Generate a caching info page, which conditionally indicates
  *	write caching to the SCSI layer, depending on device
@@ -647,9 +701,9 @@ static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 
 /**
  *	ata_msense_ctl_mode - Simulate MODE SENSE control mode page
- *	@dev:
- *	@ptr_io:
- *	@last:
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
  *
  *	Generate a generic MODE SENSE control mode page.
  *
@@ -807,11 +861,15 @@ unsigned int ata_scsiop_report_luns(struct ata_scsi_args *args, u8 *rbuf,
 }
 
 /**
- *	ata_scsi_badcmd -
- *	@cmd:
- *	@done:
- *	@asc:
- *	@ascq:
+ *	ata_scsi_badcmd - End a SCSI request with an error
+ *	@cmd: SCSI request to be handled
+ *	@done: SCSI command completion function
+ *	@asc: SCSI-defined additional sense code
+ *	@ascq: SCSI-defined additional sense code qualifier
+ *
+ *	Helper function that completes a SCSI command with
+ *	%SAM_STAT_CHECK_CONDITION, with a sense key %ILLEGAL_REQUEST
+ *	and the specified additional sense codes.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
@@ -939,6 +997,23 @@ err_out:
 	DPRINTK("EXIT - badcmd\n");
 }
 
+/**
+ *	ata_scsi_find_dev - lookup ata_device from scsi_cmnd
+ *	@ap: ATA port to which the device is attached
+ *	@cmd: SCSI command to be sent to the device
+ *
+ *	Given various information provided in struct scsi_cmnd,
+ *	map that onto an ATA bus, and using that mapping
+ *	determine which ata_device is associated with the
+ *	SCSI command to be sent.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Associated ATA device, or %NULL if not found.
+ */
+
 static inline struct ata_device *
 ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 {
@@ -965,6 +1040,17 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 	return dev;
 }
 
+/**
+ *	ata_scsi_xlat_possible - check if SCSI to ATA translation is possible
+ *	@cmd: SCSI command opcode to consider
+ *
+ *	Look up the SCSI command given, and determine whether the
+ *	SCSI command is to be translated or simulated.
+ *
+ *	RETURNS:
+ *	Non-zero if possible, zero if not.
+ */
+
 static inline int ata_scsi_xlat_possible(u8 cmd)
 {
 	switch (cmd) {
@@ -980,6 +1066,14 @@ static inline int ata_scsi_xlat_possible(u8 cmd)
 
 	return 0;
 }
+
+/**
+ *	ata_scsi_dump_cdb - dump SCSI command contents to dmesg
+ *	@ap: ATA port to which the command was being sent
+ *	@cmd: SCSI command to dump
+ *
+ *	Prints the contents of a SCSI command via printk().
+ */
 
 static inline void ata_scsi_dump_cdb(struct ata_port *ap,
 				     struct scsi_cmnd *cmd)
