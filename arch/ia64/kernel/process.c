@@ -579,7 +579,8 @@ pid_t
 kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {
 	struct task_struct *parent = current;
-	int result, tid;
+	int result; 
+	pid_t tid;
 
 	tid = clone(flags | CLONE_VM | CLONE_UNTRACED, 0);
 	if (parent != current) {
