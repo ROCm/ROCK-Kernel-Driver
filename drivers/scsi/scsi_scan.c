@@ -541,8 +541,6 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 		printk(KERN_INFO "scsi: unknown device type %d\n", sdev->type);
 	}
 
-	sdev->random = (sdev->type == TYPE_TAPE) ? 0 : 1;
-
 	scsi_set_name(sdev, inq_result);
 
 	print_inquiry(inq_result);

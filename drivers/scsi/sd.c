@@ -1271,8 +1271,6 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 		
 	SRpnt->sr_device->use_10_for_rw = 1;
 	SRpnt->sr_device->use_10_for_ms = 0;
-	SRpnt->sr_device->remap = 1;
-
  leave:
 	scsi_release_request(SRpnt);
 

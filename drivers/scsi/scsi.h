@@ -355,14 +355,12 @@ struct scsi_device {
 	char * model;		/* ... after scan; point to static string */
 	char * rev;		/* ... "nullnullnullnull" before scan */
 	unsigned char current_tag;	/* current tag */
-//	unsigned char sync_min_period;	/* Not less than this period */
-//	unsigned char sync_max_offset;	/* Not greater than this offset */
 	struct scsi_target      *sdev_target;   /* used only for single_lun */
 
 	unsigned online:1;
+
 	unsigned writeable:1;
 	unsigned removable:1;
-	unsigned random:1;
 	unsigned changed:1;	/* Data invalid due to media change */
 	unsigned busy:1;	/* Used to prevent races */
 	unsigned lockable:1;	/* Able to prevent media removal */
@@ -388,9 +386,6 @@ struct scsi_device {
 				     * because we did a bus reset. */
 	unsigned use_10_for_rw:1; /* first try 10-byte read / write */
 	unsigned use_10_for_ms:1; /* first try 10-byte mode sense/select */
-	unsigned remap:1;	/* support remapping  */
-//	unsigned sync:1;	/* Sync transfer state, managed by host */
-//	unsigned wide:1;	/* WIDE transfer state, managed by host */
 	unsigned no_start_on_add:1;	/* do not issue start on add */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */

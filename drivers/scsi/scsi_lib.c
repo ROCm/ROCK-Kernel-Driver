@@ -730,17 +730,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 	 * can choose a block to remap, etc.
 	 */
 	if (driver_byte(result) != 0) {
-		if (suggestion(result) == SUGGEST_REMAP) {
-#ifdef REMAP
-			/*
-			 * Not yet implemented.  A read will fail after being remapped,
-			 * a write will call the strategy routine again.
-			 */
-			if (cmd->device->remap) {
-				result = 0;
-			}
-#endif
-		}
 		if ((cmd->sense_buffer[0] & 0x7f) == 0x70) {
 			/*
 			 * If the device is in the process of becoming ready,
