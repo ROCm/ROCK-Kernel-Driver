@@ -445,7 +445,7 @@ static int sctp_v6_cmp_addr(const union sctp_addr *addr1,
 	if (addr1->sa.sa_family != addr2->sa.sa_family) {
 		if (addr1->sa.sa_family == AF_INET &&
 		    addr2->sa.sa_family == AF_INET6 &&
-		    IPV6_ADDR_MAPPED == ipv6_addr_type(&addr2->v6.sin6_addr)) {
+		    IPV6_ADDR_MAPPED & ipv6_addr_type(&addr2->v6.sin6_addr)) {
 			if (addr2->v6.sin6_port == addr1->v4.sin_port &&
 			    addr2->v6.sin6_addr.s6_addr32[3] ==
 			    addr1->v4.sin_addr.s_addr)
@@ -453,7 +453,7 @@ static int sctp_v6_cmp_addr(const union sctp_addr *addr1,
 		}
 		if (addr2->sa.sa_family == AF_INET &&
 		    addr1->sa.sa_family == AF_INET6 &&
-		    IPV6_ADDR_MAPPED == ipv6_addr_type(&addr1->v6.sin6_addr)) {
+		    IPV6_ADDR_MAPPED & ipv6_addr_type(&addr1->v6.sin6_addr)) {
 			if (addr1->v6.sin6_port == addr2->v4.sin_port &&
 			    addr1->v6.sin6_addr.s6_addr32[3] ==
 			    addr2->v4.sin_addr.s_addr)
@@ -499,7 +499,7 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_opt *sp)
 	type = ipv6_addr_type(in6);
 	if (IPV6_ADDR_ANY == type)
 		return 1;
-	if (type == IPV6_ADDR_MAPPED) {
+	if (type & IPV6_ADDR_MAPPED) {
 		if (sp && !sp->v4mapped)
 			return 0;
 		if (sp && ipv6_only_sock(sctp_opt2sk(sp)))
@@ -525,7 +525,7 @@ static int sctp_v6_addr_valid(union sctp_addr *addr, struct sctp_opt *sp)
 	int ret = ipv6_addr_type(&addr->v6.sin6_addr);
 
 	/* Support v4-mapped-v6 address. */
-	if (ret == IPV6_ADDR_MAPPED) {
+	if (ret & IPV6_ADDR_MAPPED) {
 		/* Note: This routine is used in input, so v4-mapped-v6
 		 * are disallowed here when there is no sctp_opt.
 		 */
