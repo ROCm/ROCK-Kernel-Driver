@@ -458,6 +458,7 @@ static struct ethtool_ops netdev_ethtool_ops;
 static int netdev_close(struct net_device *dev);
 static void reset_rx_descriptors(struct net_device *dev);
 
+
 static void stop_nic_tx(long ioaddr, long crvalue)
 {
 	writel(crvalue & (~CR_W_TXEN), ioaddr + TCRRCR);
@@ -487,6 +488,17 @@ static void stop_nic_rx(long ioaddr, long crvalue)
 	}
 }
 
+
+static void stop_nic_rxtx(long ioaddr, long crvalue)
+{
+	int delay = 0x1000;
+	writel(crvalue & ~(CR_W_RXEN+CR_W_TXEN), ioaddr + TCRRCR);
+	while(--delay) {
+		if( (readl(ioaddr + TCRRCR) & (CR_R_RXSTOP+CR_R_TXSTOP))
+		                           == (CR_R_RXSTOP+CR_R_TXSTOP) )
+			break;
+	}
+}
 
 
 static int __devinit fealnx_init_one(struct pci_dev *pdev,
@@ -1175,8 +1187,7 @@ static void netdev_timer(unsigned long data)
 		if ((old_linkok == 0) && (np->linkok == 1)) {	/* we need to detect the media type again */
 			getlinktype(dev);
 			if (np->crvalue != old_crvalue) {
-				stop_nic_tx(ioaddr, np->crvalue);
-				stop_nic_rx(ioaddr, np->crvalue & (~CR_W_TXEN));
+				stop_nic_rxtx(ioaddr, np->crvalue);
 				writel(np->crvalue, ioaddr + TCRRCR);
 			}
 		}
@@ -1776,8 +1787,7 @@ static void set_rx_mode(struct net_device *dev)
 		rx_mode = CR_W_AB | CR_W_AM;
 	}
 
-	stop_nic_tx(ioaddr, np->crvalue);
-	stop_nic_rx(ioaddr, np->crvalue & (~CR_W_TXEN));
+	stop_nic_rxtx(ioaddr, np->crvalue);
 
 	writel(mc_filter[0], ioaddr + MAR0);
 	writel(mc_filter[1], ioaddr + MAR1);
@@ -1882,8 +1892,7 @@ static int netdev_close(struct net_device *dev)
 	writel(0x0000, ioaddr + IMR);
 
 	/* Stop the chip's Tx and Rx processes. */
-	stop_nic_tx(ioaddr, 0);
-	stop_nic_rx(ioaddr, 0);
+	stop_nic_rxtx(ioaddr, 0);
 
 	del_timer_sync(&np->timer);
 
