@@ -50,6 +50,7 @@
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
+#include <linux/percpu.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -598,3 +599,6 @@ EXPORT_SYMBOL(init_thread_union);
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(pidhash);
+#if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
+EXPORT_SYMBOL(__per_cpu_offset);
+#endif
