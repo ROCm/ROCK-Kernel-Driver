@@ -100,7 +100,6 @@ typedef struct {
 	unsigned char c_algo;			/* compression algorithm */
 	unsigned char pos_unknown;			/* after reset position unknown */
 	int tape_type;
-	int timeout;		/* timeout for normal commands */
 	int long_timeout;	/* timeout for commands known to take long time */
 
 	unsigned long max_pfn;	/* the maximum page number reachable by the HBA */

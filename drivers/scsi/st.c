@@ -486,7 +486,7 @@ static int cross_eof(Scsi_Tape * STp, int forward)
 		   tape_name(STp), forward ? "forward" : "backward"));
 
 	SRpnt = st_do_scsi(NULL, STp, cmd, 0, SCSI_DATA_NONE,
-			   STp->timeout, MAX_RETRIES, TRUE);
+			   STp->device->timeout, MAX_RETRIES, TRUE);
 	if (!SRpnt)
 		return (STp->buffer)->syscall_result;
 
@@ -544,7 +544,7 @@ static int flush_write_buffer(Scsi_Tape * STp)
 		cmd[4] = blks;
 
 		SRpnt = st_do_scsi(NULL, STp, cmd, transfer, SCSI_DATA_WRITE,
-				   STp->timeout, MAX_WRITE_RETRIES, TRUE);
+				   STp->device->timeout, MAX_WRITE_RETRIES, TRUE);
 		if (!SRpnt)
 			return (STp->buffer)->syscall_result;
 
@@ -867,7 +867,7 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 		memset((void *) &cmd[0], 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_BLOCK_LIMITS;
 
-		SRpnt = st_do_scsi(SRpnt, STp, cmd, 6, SCSI_DATA_READ, STp->timeout,
+		SRpnt = st_do_scsi(SRpnt, STp, cmd, 6, SCSI_DATA_READ, STp->device->timeout,
 				   MAX_READY_RETRIES, TRUE);
 		if (!SRpnt) {
 			retval = (STp->buffer)->syscall_result;
@@ -894,7 +894,7 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 	cmd[0] = MODE_SENSE;
 	cmd[4] = 12;
 
-	SRpnt = st_do_scsi(SRpnt, STp, cmd, 12, SCSI_DATA_READ, STp->timeout,
+	SRpnt = st_do_scsi(SRpnt, STp, cmd, 12, SCSI_DATA_READ, STp->device->timeout,
 			   MAX_READY_RETRIES, TRUE);
 	if (!SRpnt) {
 		retval = (STp->buffer)->syscall_result;
@@ -1116,7 +1116,7 @@ static int st_flush(struct file *filp)
 		cmd[4] = 1 + STp->two_fm;
 
 		SRpnt = st_do_scsi(NULL, STp, cmd, 0, SCSI_DATA_NONE,
-				   STp->timeout, MAX_WRITE_RETRIES, TRUE);
+				   STp->device->timeout, MAX_WRITE_RETRIES, TRUE);
 		if (!SRpnt) {
 			result = (STp->buffer)->syscall_result;
 			goto out;
@@ -1509,7 +1509,7 @@ static ssize_t
 		cmd[4] = blks;
 
 		SRpnt = st_do_scsi(SRpnt, STp, cmd, transfer, SCSI_DATA_WRITE,
-				   STp->timeout, MAX_WRITE_RETRIES, !async_write);
+				   STp->device->timeout, MAX_WRITE_RETRIES, !async_write);
 		if (!SRpnt) {
 			retval = STbp->syscall_result;
 			goto out;
@@ -1679,7 +1679,7 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 
 	SRpnt = *aSRpnt;
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, bytes, SCSI_DATA_READ,
-			   STp->timeout, MAX_RETRIES, TRUE);
+			   STp->device->timeout, MAX_RETRIES, TRUE);
 	release_buffering(STp);
 	*aSRpnt = SRpnt;
 	if (!SRpnt)
@@ -2081,7 +2081,7 @@ static int st_set_options(Scsi_Tape *STp, long options)
 			DEBC( printk(KERN_INFO "%s: Long timeout set to %d seconds.\n", name,
 			       (value & ~MT_ST_SET_LONG_TIMEOUT)));
 		} else {
-			STp->timeout = value * HZ;
+			STp->device->timeout = value * HZ;
 			DEBC( printk(KERN_INFO "%s: Normal timeout set to %d seconds.\n",
 				name, value) );
 		}
@@ -2189,7 +2189,7 @@ static int read_mode_page(Scsi_Tape *STp, int page, int omit_block_descs)
 	cmd[4] = 255;
 
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, cmd[4], SCSI_DATA_READ,
-			   STp->timeout, 0, TRUE);
+			   STp->device->timeout, 0, TRUE);
 	if (SRpnt == NULL)
 		return (STp->buffer)->syscall_result;
 
@@ -2220,7 +2220,7 @@ static int write_mode_page(Scsi_Tape *STp, int page, int slow)
 	(STp->buffer)->b_data[pgo + MP_OFF_PAGE_NBR] &= MP_MSK_PAGE_NBR;
 
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, cmd[4], SCSI_DATA_WRITE,
-			   (slow ? STp->long_timeout : STp->timeout), 0, TRUE);
+			   (slow ? STp->long_timeout : STp->device->timeout), 0, TRUE);
 	if (SRpnt == NULL)
 		return (STp->buffer)->syscall_result;
 
@@ -2332,7 +2332,7 @@ static int do_load_unload(Scsi_Tape *STp, struct file *filp, int load_code)
 	}
 	if (STp->immediate) {
 		cmd[1] = 1;	/* Don't wait for completion */
-		timeout = STp->timeout;
+		timeout = STp->device->timeout;
 	}
 	else
 		timeout = STp->long_timeout;
@@ -2512,7 +2512,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		cmd[2] = (arg >> 16);
 		cmd[3] = (arg >> 8);
 		cmd[4] = arg;
-		timeout = STp->timeout;
+		timeout = STp->device->timeout;
                 DEBC(
                      if (cmd_in == MTWEOF)
                                printk(ST_DEB_MSG "%s: Writing %d filemarks.\n", name,
@@ -2530,7 +2530,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		cmd[0] = REZERO_UNIT;
 		if (STp->immediate) {
 			cmd[1] = 1;	/* Don't wait for completion */
-			timeout = STp->timeout;
+			timeout = STp->device->timeout;
 		}
                 DEBC(printk(ST_DEB_MSG "%s: Rewinding tape.\n", name));
 		fileno = blkno = at_sm = 0;
@@ -2543,7 +2543,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		cmd[0] = START_STOP;
 		if (STp->immediate) {
 			cmd[1] = 1;	/* Don't wait for completion */
-			timeout = STp->timeout;
+			timeout = STp->device->timeout;
 		}
 		cmd[4] = 3;
                 DEBC(printk(ST_DEB_MSG "%s: Retensioning tape.\n", name));
@@ -2576,7 +2576,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		cmd[1] = (arg ? 1 : 0);	/* Long erase with non-zero argument */
 		if (STp->immediate) {
 			cmd[1] |= 2;	/* Don't wait for completion */
-			timeout = STp->timeout;
+			timeout = STp->device->timeout;
 		}
 		else
 			timeout = STp->long_timeout * 8;
@@ -2628,7 +2628,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		(STp->buffer)->b_data[9] = (ltmp >> 16);
 		(STp->buffer)->b_data[10] = (ltmp >> 8);
 		(STp->buffer)->b_data[11] = ltmp;
-		timeout = STp->timeout;
+		timeout = STp->device->timeout;
                 DEBC(
 			if (cmd_in == MTSETBLK || cmd_in == SET_DENS_AND_BLK)
 				printk(ST_DEB_MSG
@@ -2809,7 +2809,7 @@ static int get_location(Scsi_Tape *STp, unsigned int *block, int *partition,
 		if (!logical && !STp->scsi2_logical)
 			scmd[1] = 1;
 	}
-	SRpnt = st_do_scsi(NULL, STp, scmd, 20, SCSI_DATA_READ, STp->timeout,
+	SRpnt = st_do_scsi(NULL, STp, scmd, 20, SCSI_DATA_READ, STp->device->timeout,
 			   MAX_READY_RETRIES, TRUE);
 	if (!SRpnt)
 		return (STp->buffer)->syscall_result;
@@ -2911,7 +2911,7 @@ static int set_location(Scsi_Tape *STp, unsigned int block, int partition,
 	}
 	if (STp->immediate) {
 		scmd[1] |= 1;		/* Don't wait for completion */
-		timeout = STp->timeout;
+		timeout = STp->device->timeout;
 	}
 
 	SRpnt = st_do_scsi(NULL, STp, scmd, 0, SCSI_DATA_NONE,
@@ -3832,7 +3832,7 @@ static int st_probe(struct device *dev)
 	tpnt->partition = 0;
 	tpnt->new_partition = 0;
 	tpnt->nbr_partitions = 0;
-	tpnt->timeout = ST_TIMEOUT;
+	tpnt->device->timeout = ST_TIMEOUT;
 	tpnt->long_timeout = ST_LONG_TIMEOUT;
 	tpnt->try_dio = try_direct_io && !SDp->host->unchecked_isa_dma;
 
