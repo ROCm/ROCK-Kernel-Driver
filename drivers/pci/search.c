@@ -171,9 +171,20 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	return NULL;
 }
 
+/**
+ * pci_present - determine if there are any pci devices on this system
+ *
+ * Returns 0 if no pci devices are present, 1 if pci devices are present.
+ */
+int pci_present(void)
+{
+	return !list_empty(&pci_devices);
+}
+
 EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_device_reverse);
 EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
+EXPORT_SYMBOL(pci_present);
