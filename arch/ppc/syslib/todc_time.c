@@ -7,7 +7,7 @@
  * Author: Mark A. Greer
  *         mgreer@mvista.com
  *
- * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -31,15 +31,13 @@
  * 'nvram_data' to the base address of your nvram and leave 'nvram_as0' and
  * 'nvram_as1' NULL.  If your board uses address/data regs to access nvram,
  * set 'nvram_as0' to the address of the lower byte, set 'nvram_as1' to the
- * address of the upper byte (leave NULL if using mv146818), and set
+ * address of the upper byte (leave NULL if using mc146818), and set
  * 'nvram_data' to the address of the 8-bit data register.
  *
- * You also need to set 'ppc_md.nvram_read_val' and 'ppc_md.nvram_write_val' to
- * the proper routines.  There are standard ones defined further down in
- * this file that you can use.
- *
- * There is a built in assumption that the RTC and NVRAM are accessed by the
- * same mechanism (i.e., ppc_md.nvram_read_val, etc works for both).
+ * In order to break the assumption that the RTC and NVRAM are accessed by
+ * the same mechanism, you need to explicitly set 'ppc_md.rtc_read_val' and
+ * 'ppc_md.rtc_write_val', otherwise the values of 'ppc_md.rtc_read_val'
+ * and 'ppc_md.rtc_write_val' will be used.
  *
  * Note: Even though the documentation for the various RTC chips say that it
  * 	 take up to a second before it starts updating once the 'R' bit is
@@ -116,16 +114,15 @@ todc_m48txx_write_val(int addr, unsigned char val)
 u_char
 todc_mc146818_read_val(int addr)
 {
-	outb(addr, todc_info->nvram_as0);
-	return inb(todc_info->nvram_data);
+	outb_p(addr, todc_info->nvram_as0);
+	return inb_p(todc_info->nvram_data);
 }
 
 void
 todc_mc146818_write_val(int addr, unsigned char val)
 {
-	outb(addr, todc_info->nvram_as0);
-   	outb(val, todc_info->nvram_data);
-	return;
+	outb_p(addr, todc_info->nvram_as0);
+   	outb_p(val, todc_info->nvram_data);
 }
 
 
@@ -143,16 +140,16 @@ todc_read_val(int addr)
 
 	if (todc_info->sw_flags & TODC_FLAG_2_LEVEL_NVRAM) {
 		if (addr < todc_info->nvram_size) { /* NVRAM */
-			ppc_md.nvram_write_val(todc_info->nvram_addr_reg, addr);
-			val = ppc_md.nvram_read_val(todc_info->nvram_data_reg);
+			ppc_md.rtc_write_val(todc_info->nvram_addr_reg, addr);
+			val = ppc_md.rtc_read_val(todc_info->nvram_data_reg);
 		}
 		else { /* Clock Reg */
 			addr -= todc_info->nvram_size;
-			val = ppc_md.nvram_read_val(addr);
+			val = ppc_md.rtc_read_val(addr);
 		}
 	}
 	else {
-		val = ppc_md.nvram_read_val(addr);
+		val = ppc_md.rtc_read_val(addr);
 	}
 
 	return val;
@@ -163,16 +160,16 @@ todc_write_val(int addr, u_char val)
 {
 	if (todc_info->sw_flags & TODC_FLAG_2_LEVEL_NVRAM) {
 		if (addr < todc_info->nvram_size) { /* NVRAM */
-			ppc_md.nvram_write_val(todc_info->nvram_addr_reg, addr);
-			ppc_md.nvram_write_val(todc_info->nvram_data_reg, val);
+			ppc_md.rtc_write_val(todc_info->nvram_addr_reg, addr);
+			ppc_md.rtc_write_val(todc_info->nvram_data_reg, val);
 		}
 		else { /* Clock Reg */
 			addr -= todc_info->nvram_size;
-			ppc_md.nvram_write_val(addr, val);
+			ppc_md.rtc_write_val(addr, val);
 		}
 	}
 	else {
-		ppc_md.nvram_write_val(addr, val);
+		ppc_md.rtc_write_val(addr, val);
 	}
 }
 
@@ -192,85 +189,79 @@ todc_write_val(int addr, u_char val)
 long __init
 todc_time_init(void)
 {
-	static u_char	not_initialized = 1;
+	u_char	cntl_b;
 
-	/* Make sure clocks are running */
-	if (not_initialized) {
-		u_char	cntl_b;
+	if (!ppc_md.rtc_read_val)
+		ppc_md.rtc_read_val = ppc_md.nvram_read_val;
+	if (!ppc_md.rtc_write_val)
+		ppc_md.rtc_write_val = ppc_md.nvram_write_val;
+	
+	cntl_b = todc_read_val(todc_info->control_b);
 
-		cntl_b = todc_read_val(todc_info->control_b);
-
-		if (todc_info->rtc_type == TODC_TYPE_MC146818) {
-			if ((cntl_b & 0x70) != 0x20) {
-				printk(KERN_INFO "TODC %s %s\n",
-					"real-time-clock was stopped.",
-					"Now starting...");
-				cntl_b &= ~0x70;
-				cntl_b |= 0x20;
-			}
-
-			todc_write_val(todc_info->control_b, cntl_b);
+	if (todc_info->rtc_type == TODC_TYPE_MC146818) {
+		if ((cntl_b & 0x70) != 0x20) {
+			printk(KERN_INFO "TODC %s %s\n",
+				"real-time-clock was stopped.",
+				"Now starting...");
+			cntl_b &= ~0x70;
+			cntl_b |= 0x20;
 		}
-		else if (todc_info->rtc_type == TODC_TYPE_DS17285) {
-			u_char mode;
 
-			mode = todc_read_val(TODC_TYPE_DS17285_CNTL_A);
-			/* Make sure countdown clear is not set */
-			mode &= ~0x40;
-			/* Enable oscillator, extended register set */
-			mode |= 0x30;
-			todc_write_val(TODC_TYPE_DS17285_CNTL_A, mode);
+		todc_write_val(todc_info->control_b, cntl_b);
+	} else if (todc_info->rtc_type == TODC_TYPE_DS17285) {
+		u_char mode;
 
+		mode = todc_read_val(TODC_TYPE_DS17285_CNTL_A);
+		/* Make sure countdown clear is not set */
+		mode &= ~0x40;
+		/* Enable oscillator, extended register set */
+		mode |= 0x30;
+		todc_write_val(TODC_TYPE_DS17285_CNTL_A, mode);
+
+	} else if (todc_info->rtc_type == TODC_TYPE_DS1501) {
+		u_char	month;
+
+		todc_info->enable_read = TODC_DS1501_CNTL_B_TE;
+		todc_info->enable_write = TODC_DS1501_CNTL_B_TE;
+
+		month = todc_read_val(todc_info->month);
+
+		if ((month & 0x80) == 0x80) {
+			printk(KERN_INFO "TODC %s %s\n",
+				"real-time-clock was stopped.",
+				"Now starting...");
+			month &= ~0x80;
+			todc_write_val(todc_info->month, month);
 		}
-		else if (todc_info->rtc_type == TODC_TYPE_DS1501) {
-			u_char	month;
 
-			todc_info->enable_read = TODC_DS1501_CNTL_B_TE;
-			todc_info->enable_write = TODC_DS1501_CNTL_B_TE;
+		cntl_b &= ~TODC_DS1501_CNTL_B_TE;
+		todc_write_val(todc_info->control_b, cntl_b);
+	} else { /* must be a m48txx type */
+		u_char	cntl_a;
 
-			month = todc_read_val(todc_info->month);
+		todc_info->enable_read = TODC_MK48TXX_CNTL_A_R;
+		todc_info->enable_write = TODC_MK48TXX_CNTL_A_W;
 
-			if ((month & 0x80) == 0x80) {
-				printk(KERN_INFO "TODC %s %s\n",
-					"real-time-clock was stopped.",
-					"Now starting...");
-				month &= ~0x80;
-				todc_write_val(todc_info->month, month);
-			}
+		cntl_a = todc_read_val(todc_info->control_a);
 
-			cntl_b &= ~TODC_DS1501_CNTL_B_TE;
-			todc_write_val(todc_info->control_b, cntl_b);
-		}
-		else { /* must be a m48txx type */
-			u_char	cntl_a;
+		/* Check & clear STOP bit in control B register */
+		if (cntl_b & TODC_MK48TXX_DAY_CB) {
+			printk(KERN_INFO "TODC %s %s\n",
+				"real-time-clock was stopped.",
+				"Now starting...");
 
-			todc_info->enable_read = TODC_MK48TXX_CNTL_A_R;
-			todc_info->enable_write = TODC_MK48TXX_CNTL_A_W;
+			cntl_a |= todc_info->enable_write;
+			cntl_b &= ~TODC_MK48TXX_DAY_CB;/* Start Oscil */
 
-			cntl_a = todc_read_val(todc_info->control_a);
-
-			/* Check & clear STOP bit in control B register */
-			if (cntl_b & TODC_MK48TXX_DAY_CB) {
-				printk(KERN_INFO "TODC %s %s\n",
-					"real-time-clock was stopped.",
-					"Now starting...");
-
-				cntl_a |= todc_info->enable_write;
-				cntl_b &= ~TODC_MK48TXX_DAY_CB;/* Start Oscil */
-
-				todc_write_val(todc_info->control_a, cntl_a);
-				todc_write_val(todc_info->control_b, cntl_b);
-			}
-
-			/* Make sure READ & WRITE bits are cleared. */
-			cntl_a &= ~(todc_info->enable_write |
-				    todc_info->enable_read);
 			todc_write_val(todc_info->control_a, cntl_a);
+			todc_write_val(todc_info->control_b, cntl_b);
 		}
 
-		not_initialized = 0;
+		/* Make sure READ & WRITE bits are cleared. */
+		cntl_a &= ~(todc_info->enable_write |
+			    todc_info->enable_read);
+		todc_write_val(todc_info->control_a, cntl_a);
 	}
-
 
 	return 0;
 }
