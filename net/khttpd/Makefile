@@ -14,9 +14,9 @@ include $(TOPDIR)/Rules.make
 
 # Dependencies on generated files need to be listed explicitly
 
-rfc_time.o: times.h
+$(obj)/rfc_time.o: $(obj)/times.h
 
 # Generated files
 
-times.h: make_times_h
-	./$< >$@
+$(obj)/times.h: $(obj)/make_times_h
+	$< >$@

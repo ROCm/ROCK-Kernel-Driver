@@ -24,17 +24,20 @@ include $(TOPDIR)/Rules.make
 
 # Dependencies for generated files need to be listed explicitly
 
-aic7xxx_core.o: aic7xxx_seq.h
+$(obj)/aic7xxx_core.o: $(obj)/aic7xxx_seq.h
 
-$(aic7xxx-objs): aic7xxx_reg.h
+$(addprefix $(obj)/,$(aic7xxx-objs)): $(obj)/aic7xxx_reg.h
 
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
 
-aic7xxx_seq.h aic7xxx_reg.h: aic7xxx.seq aic7xxx.reg aicasm/aicasm
-	aicasm/aicasm -I. -r aic7xxx_reg.h -o aic7xxx_seq.h aic7xxx.seq
+$(obj)/aic7xxx_seq.h $(obj)/aic7xxx_reg.h: $(src)/aic7xxx.seq \
+					   $(src)/aic7xxx.reg \
+					   $(obj)/aicasm/aicasm
+	$(obj)/aicasm/aicasm -I. -r $(obj)/aic7xxx_reg.h \
+				 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
 
-aicasm/aicasm: aicasm/*.[chyl]
-	$(MAKE) -C aicasm
+$(obj)/aicasm/aicasm: $(src)/aicasm/*.[chyl]
+	$(MAKE) -C $(src)/aicasm
 
 endif
 

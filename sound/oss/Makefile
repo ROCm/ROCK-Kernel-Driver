@@ -108,127 +108,67 @@ include $(TOPDIR)/Rules.make
 
 # Turtle Beach Maui / Tropez
 
-maui.o: maui_boot.h
+$(obj)/maui.o: $(obj)/maui_boot.h
 
 ifeq ($(CONFIG_MAUI_HAVE_BOOT),y)
-    maui_boot.h: $(patsubst "%", %, $(CONFIG_MAUI_BOOT_FILE)) bin2hex
-	./bin2hex -i maui_os < $(CONFIG_MAUI_BOOT_FILE) > $@
+    $(obj)/maui_boot.h: $(patsubst "%", %, $(CONFIG_MAUI_BOOT_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex -i maui_os < $< > $@
 else
-    maui_boot.h:
+    $(obj)/maui_boot.h:
 	(							\
 	    echo 'static unsigned char * maui_os = NULL;';	\
 	    echo 'static int maui_osLen = 0;';			\
 	) > $@
 endif
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_MAUI_HAVE_BOOT) $(CONFIG_MAUI_BOOT_FILE)),$$(strip $$(CONFIG_MAUI_HAVE_BOOT) $$(CONFIG_MAUI_BOOT_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
-
-
 
 # Turtle Beach MultiSound
 
 ifeq ($(CONFIG_MSNDCLAS_HAVE_BOOT),y)
-    msnd_classic.o: msndperm.c msndinit.c
+    $(obj)/msnd_classic.o: $(obj)/msndperm.c $(obj)/msndinit.c
 
-    msndperm.c: $(patsubst "%", %, $(CONFIG_MSNDCLAS_PERM_FILE)) bin2hex
-	./bin2hex msndperm < $(CONFIG_MSNDCLAS_PERM_FILE) > $@
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_MSNDCLAS_HAVE_BOOT) $(CONFIG_MSNDCLAS_PERM_FILE)),$$(strip $$(CONFIG_MSNDCLAS_HAVE_BOOT) $$(CONFIG_MSNDCLAS_PERM_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
+    $(obj)/msndperm.c: $(patsubst "%", %, $(CONFIG_MSNDCLAS_PERM_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex msndperm < $< > $@
 
-    msndinit.c: $(patsubst "%", %, $(CONFIG_MSNDCLAS_INIT_FILE)) bin2hex
-	./bin2hex msndinit < $(CONFIG_MSNDCLAS_INIT_FILE) > $@
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_MSNDCLAS_HAVE_BOOT) $(CONFIG_MSNDCLAS_INIT_FILE)),$$(strip $$(CONFIG_MSNDCLAS_HAVE_BOOT) $$(CONFIG_MSNDCLAS_INIT_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
+    $(obj)/msndinit.c: $(patsubst "%", %, $(CONFIG_MSNDCLAS_INIT_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex msndinit < $< > $@
 endif
 
 ifeq ($(CONFIG_MSNDPIN_HAVE_BOOT),y)
-    msnd_pinnacle.o: pndsperm.c pndspini.c
+    $(obj)/msnd_pinnacle.o: $(obj)/pndsperm.c $(obj)/pndspini.c
 
-    pndsperm.c: $(patsubst "%", %, $(CONFIG_MSNDPIN_PERM_FILE)) bin2hex
-	./bin2hex pndsperm < $(CONFIG_MSNDPIN_PERM_FILE) > $@
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_MSNDPIN_HAVE_BOOT) $(CONFIG_MSNDPIN_PERM_FILE)),$$(strip $$(CONFIG_MSNDPIN_HAVE_BOOT) $$(CONFIG_MSNDPIN_PERM_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
+    $(obj)/pndsperm.c: $(patsubst "%", %, $(CONFIG_MSNDPIN_PERM_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex pndsperm < $< > $@
 
-    pndspini.c: $(patsubst "%", %, $(CONFIG_MSNDPIN_INIT_FILE)) bin2hex
-	./bin2hex pndspini < $(CONFIG_MSNDPIN_INIT_FILE) > $@
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_MSNDPIN_HAVE_BOOT) $(CONFIG_MSNDPIN_INIT_FILE)),$$(strip $$(CONFIG_MSNDPIN_HAVE_BOOT) $$(CONFIG_MSNDPIN_INIT_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
+    $(obj)/pndspini.c: $(patsubst "%", %, $(CONFIG_MSNDPIN_INIT_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex pndspini < $< > $@
 endif
-
-
 
 # PSS (ECHO-ADI2111)
 
-pss.o: pss_boot.h
+$(obj)/pss.o: $(obj)/pss_boot.h
 
 ifeq ($(CONFIG_PSS_HAVE_BOOT),y)
-    pss_boot.h: $(patsubst "%", %, $(CONFIG_PSS_BOOT_FILE)) bin2hex
-	./bin2hex pss_synth < $(CONFIG_PSS_BOOT_FILE) > $@
+    $(obj)/pss_boot.h: $(patsubst "%", %, $(CONFIG_PSS_BOOT_FILE)) $(obj)/bin2hex
+	$(obj)/bin2hex pss_synth < $< > $@
 else
-    pss_boot.h:
+    $(obj)/pss_boot.h:
 	(							\
 	    echo 'static unsigned char * pss_synth = NULL;';	\
 	    echo 'static int pss_synthLen = 0;';		\
 	) > $@
 endif
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_PSS_HAVE_BOOT) $(CONFIG_PSS_BOOT_FILE)),$$(strip $$(CONFIG_PSS_HAVE_BOOT) $$(CONFIG_PSS_BOOT_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
-
-
 
 # MediaTrix AudioTrix Pro
 
-trix.o: trix_boot.h
+$(obj)/trix.o: $(obj)/trix_boot.h
 
 ifeq ($(CONFIG_TRIX_HAVE_BOOT),y)
-    trix_boot.h: $(patsubst "%", %, $(CONFIG_TRIX_BOOT_FILE)) hex2hex
-	./hex2hex -i trix_boot < $(CONFIG_TRIX_BOOT_FILE) > $@
+    $(obj)/trix_boot.h: $(patsubst "%", %, $(CONFIG_TRIX_BOOT_FILE)) $(obj)/hex2hex
+	$(obj)/hex2hex -i trix_boot < $< > $@
 else
-    trix_boot.h:
+    $(obj)/trix_boot.h:
 	(							\
 	    echo 'static unsigned char * trix_boot = NULL;';	\
 	    echo 'static int trix_boot_len = 0;';		\
 	) > $@
-endif
-	@ ( \
-	    echo 'ifeq ($(strip $(CONFIG_TRIX_HAVE_BOOT) $(CONFIG_TRIX_BOOT_FILE)),$$(strip $$(CONFIG_TRIX_HAVE_BOOT) $$(CONFIG_TRIX_BOOT_FILE)))'; \
-	    echo 'FILES_BOOT_UP_TO_DATE += $@'; \
-	    echo 'endif' \
-	) > .$@.boot
-
-
-
-# Find boot files whose source file names have changed and force rebuild.
-
-FILES_BOOT_UP_TO_DATE :=
-
-FILES_BOOT_EXIST := $(wildcard .*.boot)
-ifneq ($(FILES_BOOT_EXIST),)
-include $(FILES_BOOT_EXIST)
-endif
-
-FILES_BOOT_CHANGED := $(strip \
-    $(filter-out $(FILES_BOOT_UP_TO_DATE), \
-	maui_boot.h pss_boot.h trix_boot.h))
-
-ifneq ($(FILES_BOOT_CHANGED),)
-$(FILES_BOOT_CHANGED): FORCE
 endif

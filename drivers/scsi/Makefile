@@ -131,32 +131,32 @@ cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 
 include $(TOPDIR)/Rules.make
 
-53c7,8xx.o: 53c8xx_d.h 53c8xx_u.h
-53c7xx.o:   53c7xx_d.h 53c7xx_u.h
-sim710.o:   sim710_d.h
-53c700.o $(MODVERDIR)/53c700.ver: 53c700_d.h
+$(obj)/53c7,8xx.o: $(obj)/53c8xx_d.h $(obj)/53c8xx_u.h
+$(obj)/53c7xx.o:   $(obj)/53c7xx_d.h $(obj)/53c7xx_u.h
+$(obj)/sim710.o:   $(obj)/sim710_d.h
+$(obj)/53c700.o $(MODVERDIR)/53c700.ver: $(obj)/53c700_d.h
 
 # If you want to play with the firmware, uncomment
 # GENERATE_FIRMWARE := 1
 
 ifdef GENERATE_FIRMWARE
 
-53c8xx_d.h: 53c7,8xx.scr script_asm.pl
-	$(CPP) -traditional -DCHIP=810 - < $< | grep -v '^#' | $(PERL) script_asm.pl $@ $(@:_d.h=_u.h)
+$(obj)/53c8xx_d.h: $(src)/53c7,8xx.scr $(src)/script_asm.pl
+	$(CPP) -traditional -DCHIP=810 - < $< | grep -v '^#' | $(PERL) $(src)/script_asm.pl $@ $(@:_d.h=_u.h)
 
-53c8xx_u.h: 53c8xx_d.h
+$(obj)/53c8xx_u.h: $(obj)/53c8xx_d.h
 
-53c7xx_d.h: 53c7xx.scr script_asm.pl
-	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
+$(obj)/53c7xx_d.h: $(src)/53c7xx.scr $(src)/script_asm.pl
+	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
 
-53c7xx_u.h: 53c7xx_d.h
+$(obj)/53c7xx_u.h: $(obj)/53c7xx_d.h
 
-sim710_d.h: sim710.scr script_asm.pl
-	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
+$(obj)/sim710_d.h: $(src)/sim710.scr $(src)/script_asm.pl
+	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
 
-sim710_u.h: sim710_d.h
+$(obj)/sim710_u.h: $(obj)/sim710_d.h
 
-53c700_d.h: 53c700.scr script_asm.pl
-	$(PERL) -s script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h) < $<
+$(obj)/53c700_d.h: $(src)/53c700.scr $(src)/script_asm.pl
+	$(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h) < $<
 
 endif

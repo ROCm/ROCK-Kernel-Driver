@@ -52,52 +52,26 @@ endif
 
 obj-$(CONFIG_ATM_FORE200E) += fore_200e.o
 
-EXTRA_CFLAGS=-g
-
 fore_200e-objs	:= fore200e.o $(FORE200E_FW_OBJS)
 
 host-progs := fore200e_mkfirm
 
+EXTRA_CFLAGS := -g
+
 include $(TOPDIR)/Rules.make
 
-
 # FORE Systems 200E-series firmware magic
-fore200e_pca_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_PCA_FW)) \
-	  fore200e_mkfirm
-	./fore200e_mkfirm -k -b _fore200e_pca_fw \
+$(obj)/fore200e_pca_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_PCA_FW)) \
+			  $(obj)/fore200e_mkfirm
+	$(obj)/fore200e_mkfirm -k -b _fore200e_pca_fw \
 	  -i $(CONFIG_ATM_FORE200E_PCA_FW) -o $@
-	@ ( \
-	  echo 'ifeq ($(strip $(CONFIG_ATM_FORE200E_PCA_FW)), $$(CONFIG_ATM_FORE200E_PCA_FW))'; \
-	  echo 'FORE200E_FW_UP_TO_DATE += $@'; \
-	  echo 'endif' \
-	) >.$@.fw
 
-fore200e_sba_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_SBA_FW)) \
-	  fore200e_mkfirm
-	./fore200e_mkfirm -k -b _fore200e_sba_fw \
+$(obj)/fore200e_sba_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_SBA_FW)) \
+			  $(obj)/fore200e_mkfirm
+	$(obj)/fore200e_mkfirm -k -b _fore200e_sba_fw \
 	  -i $(CONFIG_ATM_FORE200E_SBA_FW) -o $@
-	@ ( \
-	  echo 'ifeq ($(strip $(CONFIG_ATM_FORE200E_SBA_FW)), $$(CONFIG_ATM_FORE200E_SBA_FW))'; \
-	  echo 'FORE200E_FW_UP_TO_DATE += $@'; \
-	  echo 'endif' \
-	) >.$@.fw
 
 # deal with the various suffixes of the binary firmware images
-%.bin %.bin1 %.bin2: %.data
+$(obj)/%.bin $(obj)/%.bin1 $(obj)/%.bin2: $(obj)/%.data
 	objcopy -Iihex $< -Obinary $@.gz
 	gzip -df $@.gz
-
-# firmware dependency stuff taken from drivers/sound/Makefile
-FORE200E_FW_UP_TO_DATE :=
-
-FORE200E_FW_FILES := $(wildcard .fore200e_*.fw)
-ifneq ($(FORE200E_FW_FILES),)
-include $(FORE200E_FW_FILES)
-endif
-
-FORE200E_FW_CHANGED := $(filter-out $(FORE200E_FW_UP_TO_DATE), \
-                       fore200e_pca_fw.c fore200e_sba_fw.c)
-
-ifneq ($(FORE200E_FW_CHANGED),)
-$(FORE200E_FW_CHANGED): FORCE
-endif

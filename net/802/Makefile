@@ -20,19 +20,22 @@ include $(TOPDIR)/Rules.make
 
 # Dependencies on generated files need to be listed explicitly
 
-cl2llc.o: transit/pdutr.h transit/timertr.h pseudo/pseudocode.h
+$(obj)/cl2llc.o: $(obj)/transit/pdutr.h $(obj)/transit/timertr.h \
+		 $(obj)/pseudo/pseudocode.h
 
 # Generated files
 
-transit/pdutr.h: transit/pdutr.pre transit/compile.awk			
-	awk -f transit/compile.awk $< >$@
+$(obj)/transit/pdutr.h: $(src)/transit/pdutr.pre $(src)/transit/compile.awk
+	awk -f $(src)/transit/compile.awk $< >$@
 
-transit/timertr.h: transit/timertr.pre transit/compile.awk
-	awk -f transit/compile.awk $< >$@
+$(obj)/transit/timertr.h: $(src)/transit/timertr.pre $(src)/transit/compile.awk
+	awk -f $(src)/transit/compile.awk $< >$@
 
-pseudo/pseudocode.h: pseudo/pseudocode pseudo/opcd2num.sed \
-		     pseudo/compile.awk
-	sed -f pseudo/opcd2num.sed $< | awk -f pseudo/compile.awk >$@
+$(obj)/pseudo/pseudocode.h: $(src)/pseudo/pseudocode \
+			    $(src)/pseudo/opcd2num.sed \
+			    $(src)/pseudo/compile.awk
+	sed -f $(src)/pseudo/opcd2num.sed $< | \
+	awk -f $(src)/pseudo/compile.awk >$@
 
-cl2llc.c: cl2llc.pre pseudo/opcd2num.sed
-	sed -f pseudo/opcd2num.sed $< >$@
+$(obj)/cl2llc.c: $(src)/cl2llc.pre $(src)/pseudo/opcd2num.sed
+	sed -f $(src)/pseudo/opcd2num.sed $< >$@
