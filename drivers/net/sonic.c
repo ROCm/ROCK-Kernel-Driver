@@ -620,3 +620,5 @@ static int sonic_init(struct net_device *dev)
 
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

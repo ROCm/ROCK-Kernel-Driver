@@ -163,6 +163,7 @@ void __init arcnet_init(void)
 
 static int debug = ARCNET_DEBUG;
 MODULE_PARM(debug, "i");
+MODULE_LICENSE("GPL");
 
 int __init init_module(void)
 {

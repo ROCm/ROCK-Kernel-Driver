@@ -423,3 +423,5 @@ static void __exit ariadne2_cleanup(void)
 
 module_init(ariadne2_probe);
 module_exit(ariadne2_cleanup);
+
+MODULE_LICENSE("GPL");
