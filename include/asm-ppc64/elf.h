@@ -87,7 +87,7 @@ ppc64_elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)				\
 do {								\
-	unsigned long new_flags = 0				\
+	unsigned long new_flags = 0;				\
 	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)		\
 		new_flags = _TIF_32BIT;				\
 	if ((current_thread_info()->flags & _TIF_32BIT)		\
