@@ -2,7 +2,7 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2003 International Business Machines, Corp.
- * Copyright (c) 2001 Intel Corp.
+ * Copyright (c) 2001-2003 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -36,8 +36,9 @@
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
- *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Daisy Chang           <daisyc@us.ibm.com>
  *    Sridhar Samudrala     <sri@us.ibm.com>
+ *    Ardelle Fan           <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -420,6 +421,23 @@ static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 	}
 
 	return retval;
+}
+
+/* Generate a random jitter in the range of -50% ~ +50% of input RTO. */
+static inline __s32 sctp_jitter(__u32 rto)
+{
+	static __u32 sctp_rand;
+	__s32 ret;
+
+	sctp_rand += jiffies;
+	sctp_rand ^= (sctp_rand << 12);
+	sctp_rand ^= (sctp_rand >> 20);
+
+	/* Choose random number from 0 to rto, then move to -50% ~ +50% 
+	 * of rto. 
+	 */
+	ret = sctp_rand % rto - (rto >> 1);
+	return ret;
 }
 
 /* Walk through a list of TLV parameters.  Don't trust the

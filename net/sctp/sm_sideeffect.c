@@ -1134,8 +1134,8 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 	 */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, sctp_transport_t, transports);
-		if (!mod_timer(&t->hb_timer,
-			       t->hb_interval + t->rto + jiffies)) {
+		if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + 
+				sctp_jitter(t->rto) + jiffies)) {
 			sctp_transport_hold(t);
 		}
 	}
@@ -1147,7 +1147,8 @@ static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *cmds,
 				   sctp_transport_t *t)
 {
 	/* Update the heartbeat timer.  */
-	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
+	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + 
+			sctp_jitter(t->rto) + jiffies))
 		sctp_transport_hold(t);
 }
 
