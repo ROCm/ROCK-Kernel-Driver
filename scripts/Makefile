@@ -5,7 +5,7 @@
 # fix-dep: 	 Used to generate dependency information during build process
 # split-include: Divide all config symbols up in a number of files in
 #                include/config/...
-# docproc: 	 Preprocess .tmpl file in order to generate .sgml documentation
+# docproc: 	 Preprocess .tmpl file in order to generate .sgml docs
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
 host-progs    := fixdep split-include conmakehash docproc kallsyms modpost \
