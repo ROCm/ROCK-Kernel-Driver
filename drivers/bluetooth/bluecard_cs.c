@@ -92,14 +92,14 @@ typedef struct bluecard_info_t {
 } bluecard_info_t;
 
 
-void bluecard_config(dev_link_t *link);
-void bluecard_release(dev_link_t *link);
-int bluecard_event(event_t event, int priority, event_callback_args_t *args);
+static void bluecard_config(dev_link_t *link);
+static void bluecard_release(dev_link_t *link);
+static int bluecard_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "bluecard_cs";
 
-dev_link_t *bluecard_attach(void);
-void bluecard_detach(dev_link_t *);
+static dev_link_t *bluecard_attach(void);
+static void bluecard_detach(dev_link_t *);
 
 static dev_link_t *dev_list = NULL;
 
@@ -172,7 +172,7 @@ static dev_link_t *dev_list = NULL;
 /* ======================== LED handling routines ======================== */
 
 
-void bluecard_activity_led_timeout(u_long arg)
+static void bluecard_activity_led_timeout(u_long arg)
 {
 	bluecard_info_t *info = (bluecard_info_t *)arg;
 	unsigned int iobase = info->link.io.BasePort1;
@@ -721,7 +721,7 @@ static int bluecard_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned l
 /* ======================== Card services HCI interaction ======================== */
 
 
-int bluecard_open(bluecard_info_t *info)
+static int bluecard_open(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev;
@@ -839,7 +839,7 @@ int bluecard_open(bluecard_info_t *info)
 }
 
 
-int bluecard_close(bluecard_info_t *info)
+static int bluecard_close(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev = info->hdev;
@@ -866,7 +866,7 @@ int bluecard_close(bluecard_info_t *info)
 	return 0;
 }
 
-dev_link_t *bluecard_attach(void)
+static dev_link_t *bluecard_attach(void)
 {
 	bluecard_info_t *info;
 	client_reg_t client_reg;
@@ -924,7 +924,7 @@ dev_link_t *bluecard_attach(void)
 }
 
 
-void bluecard_detach(dev_link_t *link)
+static void bluecard_detach(dev_link_t *link)
 {
 	bluecard_info_t *info = link->priv;
 	dev_link_t **linkp;
@@ -969,7 +969,7 @@ static int first_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse
 	return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
-void bluecard_config(dev_link_t *link)
+static void bluecard_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
 	bluecard_info_t *info = link->priv;
@@ -1044,7 +1044,7 @@ failed:
 }
 
 
-void bluecard_release(dev_link_t *link)
+static void bluecard_release(dev_link_t *link)
 {
 	bluecard_info_t *info = link->priv;
 
@@ -1063,7 +1063,7 @@ void bluecard_release(dev_link_t *link)
 }
 
 
-int bluecard_event(event_t event, int priority, event_callback_args_t *args)
+static int bluecard_event(event_t event, int priority, event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
 	bluecard_info_t *info = link->priv;

@@ -92,14 +92,14 @@ typedef struct btuart_info_t {
 } btuart_info_t;
 
 
-void btuart_config(dev_link_t *link);
-void btuart_release(dev_link_t *link);
-int btuart_event(event_t event, int priority, event_callback_args_t *args);
+static void btuart_config(dev_link_t *link);
+static void btuart_release(dev_link_t *link);
+static int btuart_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "btuart_cs";
 
-dev_link_t *btuart_attach(void);
-void btuart_detach(dev_link_t *);
+static dev_link_t *btuart_attach(void);
+static void btuart_detach(dev_link_t *);
 
 static dev_link_t *dev_list = NULL;
 
@@ -492,7 +492,7 @@ static int btuart_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned lon
 /* ======================== Card services HCI interaction ======================== */
 
 
-int btuart_open(btuart_info_t *info)
+static int btuart_open(btuart_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
@@ -561,7 +561,7 @@ int btuart_open(btuart_info_t *info)
 }
 
 
-int btuart_close(btuart_info_t *info)
+static int btuart_close(btuart_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
@@ -590,7 +590,7 @@ int btuart_close(btuart_info_t *info)
 	return 0;
 }
 
-dev_link_t *btuart_attach(void)
+static dev_link_t *btuart_attach(void)
 {
 	btuart_info_t *info;
 	client_reg_t client_reg;
@@ -648,7 +648,7 @@ dev_link_t *btuart_attach(void)
 }
 
 
-void btuart_detach(dev_link_t *link)
+static void btuart_detach(dev_link_t *link)
 {
 	btuart_info_t *info = link->priv;
 	dev_link_t **linkp;
@@ -702,7 +702,7 @@ static int next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 	return get_tuple(handle, tuple, parse);
 }
 
-void btuart_config(dev_link_t *link)
+static void btuart_config(dev_link_t *link)
 {
 	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
 	client_handle_t handle = link->handle;
@@ -816,7 +816,7 @@ failed:
 }
 
 
-void btuart_release(dev_link_t *link)
+static void btuart_release(dev_link_t *link)
 {
 	btuart_info_t *info = link->priv;
 
@@ -833,7 +833,7 @@ void btuart_release(dev_link_t *link)
 }
 
 
-int btuart_event(event_t event, int priority, event_callback_args_t *args)
+static int btuart_event(event_t event, int priority, event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
 	btuart_info_t *info = link->priv;
