@@ -148,7 +148,7 @@ comment 'Watchdog Cards'
 bool 'Watchdog Timer Support'	CONFIG_WATCHDOG
 if [ "$CONFIG_WATCHDOG" != "n" ]; then
    bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT
-   tristate '  Software Watchdog' CONFIG_SOFT_WATCHDOG
+   tristate '  Software watchdog' CONFIG_SOFT_WATCHDOG
    tristate '  WDT Watchdog timer' CONFIG_WDT
    tristate '  WDT PCI Watchdog timer' CONFIG_WDTPCI
    if [ "$CONFIG_WDT" != "n" ]; then

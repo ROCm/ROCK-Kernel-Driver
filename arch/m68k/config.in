@@ -501,7 +501,7 @@ bool 'Support for user serial device modules' CONFIG_USERIAL
 bool 'Watchdog Timer Support'	CONFIG_WATCHDOG
 if [ "$CONFIG_WATCHDOG" != "n" ]; then
    bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT
-   bool '  Software Watchdog' CONFIG_SOFT_WATCHDOG
+   bool '  Software watchdog' CONFIG_SOFT_WATCHDOG
 fi
 if [ "$CONFIG_ATARI" = "y" ]; then
    bool 'Enhanced Real Time Clock Support' CONFIG_RTC
