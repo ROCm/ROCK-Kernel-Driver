@@ -6295,7 +6295,9 @@ static void tg3_set_rx_mode(struct net_device *dev)
 	struct tg3 *tp = netdev_priv(dev);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	__tg3_set_rx_mode(dev);
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 }
 
