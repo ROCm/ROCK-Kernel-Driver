@@ -579,6 +579,35 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	unlazy_fpu(tsk);
 	struct_cpy(&p->thread.i387, &tsk->thread.i387);
 
+	/*
+	 * Set a new TLS for the child thread?
+	 */
+	if (clone_flags & CLONE_SETTLS) {
+		struct desc_struct *desc;
+		struct user_desc info;
+		int idx;
+
+		if (copy_from_user(&info, (void *)childregs->esi, sizeof(info)))
+			return -EFAULT;
+		if (LDT_empty(&info))
+			return -EINVAL;
+
+		idx = info.entry_number;
+		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+			return -EINVAL;
+
+		desc = p->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+
+	/*
+	 * Notify the child of the TID?
+	 */
+	if (clone_flags & CLONE_SETTID)
+		if (put_user(p->pid, (pid_t *)childregs->edx))
+			return -EFAULT;
+
 	if (unlikely(NULL != tsk->thread.ts_io_bitmap)) {
 		p->thread.ts_io_bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!p->thread.ts_io_bitmap)
