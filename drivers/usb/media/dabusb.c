@@ -598,6 +598,7 @@ static int dabusb_open (struct inode *inode, struct file *file)
 		if (file->f_flags & O_NONBLOCK) {
 			return -EBUSY;
 		}
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout (HZ / 2);
 
 		if (signal_pending (current)) {
