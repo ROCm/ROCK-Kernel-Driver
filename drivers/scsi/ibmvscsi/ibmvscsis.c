@@ -232,8 +232,6 @@ struct server_adapter {
 	struct crq_queue queue;
 	struct tasklet_struct crq_tasklet;
 	struct tasklet_struct endio_tasklet;
-	atomic_t crq_task_count;	/* TODO: this is only for debugging. get rid of it */
-	atomic_t endio_task_count;	/* TODO: this is only for debugging. get rid of it */
 	struct iu_pool pool;
 	spinlock_t lock;
 	struct bio *bio_done;
@@ -1022,10 +1020,6 @@ static void endio_task(unsigned long data)
 	int bytes;
 	unsigned long flags;
 
-	if (atomic_inc_return(&adapter->endio_task_count) > 1) {
-		err("In endio_task twice!!!\n");
-	}
-
 	do {
 		spin_lock_irqsave(&adapter->lock, flags);
 		if ((bio = adapter->bio_done)) {
@@ -1075,9 +1069,11 @@ static void endio_task(unsigned long data)
 				}
 			}
 
+			spin_lock_irqsave(&adapter->lock, flags);
 			free_data_buffer(iue->req.data_buffer,
 					 iue->req.data_token, iue->req.data_len,
 					 adapter);
+			spin_unlock_irqrestore(&adapter->lock, flags);
 
 			free_iu(iue);
 
@@ -1085,7 +1081,6 @@ static void endio_task(unsigned long data)
 			atomic_dec(&adapter->bio_count);
 		}
 	} while (bio);
-	atomic_dec(&adapter->endio_task_count);
 }
 
 /* ==============================================================
@@ -1646,7 +1641,6 @@ u16 send_adapter_info(struct iu_entry *iue,
 		      dma_addr_t remote_buffer, u16 length)
 {
 	dma_addr_t data_token;
-	int bytes;
 	struct device_node *rootdn;
 	const char *partition_name = "";
 	unsigned int *p_number_ptr;
@@ -1659,6 +1653,7 @@ u16 send_adapter_info(struct iu_entry *iue,
 	dbg("in send_adapter_info\n ");
 	rootdn = find_path_device("/");
 	if ((info) && (!dma_mapping_error(data_token))) {
+		int rc;
 		memset(info, 0x00, sizeof(*info));
 
 		dbg("building adapter_info\n ");
@@ -1676,20 +1671,24 @@ u16 send_adapter_info(struct iu_entry *iue,
 		info->mad_version = 1;
 		info->os_type = 3;
 
-		bytes = send_cmd_data(data_token, sizeof(*info), iue);
+		rc = h_copy_rdma(sizeof(*info),
+				 iue->adapter->liobn,
+				 data_token,
+				 iue->adapter->riobn,
+				 remote_buffer);
 
 		dma_free_coherent(iue->adapter->dev,
 				  sizeof(*info), info, data_token);
+
+		if (rc != H_Success) {
+			err("Error sending adapter info rc %d\n",rc);
+			return 1;
+		}
 	} else {
 		dbg("bad dma_alloc_cohereint in adapter_info\n ");
-		bytes = -1;
-	}
-
-	if (bytes < 0) {
 		return 1;
-	} else {
-		return 0;
 	}
+	return 0;
 
 }
 
@@ -1801,6 +1800,7 @@ static void process_device_reset(struct iu_entry *iue)
 	}
 
 	spin_unlock_irqrestore(&iue->adapter->lock, flags);
+	send_rsp(iue, SENSE_SUCCESS);
 }
 
 static void process_abort(struct iu_entry *iue)
@@ -1830,15 +1830,16 @@ static void process_abort(struct iu_entry *iue)
 	info("unable to abort cmd\n");
 
 	spin_unlock_irqrestore(&iue->adapter->lock, flags);
+	send_rsp(iue, SENSE_INVALID_ID);
 }
 
 static void process_tsk_mgmt(struct iu_entry *iue)
 {
 	union VIOSRP_IU *iu = iue->iu;
 
-	if (iu->srp.tsk_mgmt.task_mgmt_flags != 0x01) {
+	if (iu->srp.tsk_mgmt.task_mgmt_flags == 0x01) {
 		process_abort(iue);
-	} else if (iu->srp.tsk_mgmt.task_mgmt_flags != 0x08) {
+	} else if (iu->srp.tsk_mgmt.task_mgmt_flags == 0x08) {
 		process_device_reset(iue);
 	} else {
 		send_rsp(iue, SENSE_INVALID_CMD);
@@ -2023,10 +2024,6 @@ static void crq_task(unsigned long data)
 	long rc;
 	int done = 0;
 
-	if (atomic_inc_return(&adapter->crq_task_count) > 1) {
-		err("In crq_task twice!!!\n");
-	}
-
 	while (!done) {
 
 		/* Loop through and process CRQs */
@@ -2051,7 +2048,6 @@ static void crq_task(unsigned long data)
 			done = 1;
 		}
 	}
-	atomic_dec(&adapter->crq_task_count);
 }
 
 /*
