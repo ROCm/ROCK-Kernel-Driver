@@ -320,7 +320,7 @@ static int pm_do_freq(ctl_table * ctl, int write, struct file *file,
 	unsigned long val, pll;
 #define TMPBUFLEN 64
 #define MAX_CPU_FREQ 396
-	char buf[8], *p;
+	char buf[TMPBUFLEN], *p;
 	unsigned long flags, intc0_mask, intc1_mask;
 	unsigned long old_baud_base, old_cpu_freq, baud_rate, old_clk,
 	    old_refresh;

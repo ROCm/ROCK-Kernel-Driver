@@ -114,11 +114,13 @@ FEXPORT(syscall_exit_work_partial)
 	SAVE_STATIC
 FEXPORT(syscall_exit_work)
 	LONG_L	t0, TI_FLAGS($28)
-	li	t1, _TIF_SYSCALL_TRACE
+	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
 	and	t0, t1
 	beqz	t0, work_pending	# trace bit is set
 	local_irq_enable		# could let do_syscall_trace()
 					# call schedule() instead
+	move	a0, sp
+	li	a1, 1
 	jal	do_syscall_trace
 	b	resume_userspace
 

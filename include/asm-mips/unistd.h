@@ -288,16 +288,25 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 265)
 #define __NR_tgkill			(__NR_Linux + 266)
 #define __NR_utimes			(__NR_Linux + 267)
+#define __NR_mbind			(__NR_Linux + 268)
+#define __NR_get_mempolicy		(__NR_Linux + 269)
+#define __NR_set_mempolicy		(__NR_Linux + 270)
+#define __NR_mq_open			(__NR_Linux + 271)
+#define __NR_mq_unlink			(__NR_Linux + 272)
+#define __NR_mq_timedsend		(__NR_Linux + 273)
+#define __NR_mq_timedreceive		(__NR_Linux + 274)
+#define __NR_mq_notify			(__NR_Linux + 275)
+#define __NR_mq_getsetattr		(__NR_Linux + 276)
 
 /*
  * Offset of the last Linux o32 flavoured syscall
  */
-#define __NR_Linux_syscalls		267
+#define __NR_Linux_syscalls		276
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
 #define __NR_O32_Linux			4000
-#define __NR_O32_Linux_syscalls		267
+#define __NR_O32_Linux_syscalls		276
 
 #if _MIPS_SIM == _MIPS_SIM_ABI64
 
@@ -532,16 +541,25 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 224)
 #define __NR_tgkill			(__NR_Linux + 225)
 #define __NR_utimes			(__NR_Linux + 226)
+#define __NR_mbind			(__NR_Linux + 227)
+#define __NR_get_mempolicy		(__NR_Linux + 228)
+#define __NR_set_mempolicy		(__NR_Linux + 229)
+#define __NR_mq_open			(__NR_Linux + 230)
+#define __NR_mq_unlink			(__NR_Linux + 231)
+#define __NR_mq_timedsend		(__NR_Linux + 232)
+#define __NR_mq_timedreceive		(__NR_Linux + 233)
+#define __NR_mq_notify			(__NR_Linux + 234)
+#define __NR_mq_getsetattr		(__NR_Linux + 235)
 
 /*
  * Offset of the last Linux flavoured syscall
  */
-#define __NR_Linux_syscalls		226
+#define __NR_Linux_syscalls		235
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
 
 #define __NR_64_Linux			5000
-#define __NR_64_Linux_syscalls		226
+#define __NR_64_Linux_syscalls		235
 
 #if _MIPS_SIM == _MIPS_SIM_NABI32
 
@@ -780,16 +798,25 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 228)
 #define __NR_tgkill			(__NR_Linux + 229)
 #define __NR_utimes			(__NR_Linux + 230)
+#define __NR_mbind			(__NR_Linux + 231)
+#define __NR_get_mempolicy		(__NR_Linux + 232)
+#define __NR_set_mempolicy		(__NR_Linux + 233)
+#define __NR_mq_open			(__NR_Linux + 234)
+#define __NR_mq_unlink			(__NR_Linux + 235)
+#define __NR_mq_timedsend		(__NR_Linux + 236)
+#define __NR_mq_timedreceive		(__NR_Linux + 237)
+#define __NR_mq_notify			(__NR_Linux + 238)
+#define __NR_mq_getsetattr		(__NR_Linux + 239)
 
 /*
  * Offset of the last N32 flavoured syscall
  */
-#define __NR_Linux_syscalls		230
+#define __NR_Linux_syscalls		239
 
 #endif /* _MIPS_SIM == _MIPS_SIM_NABI32 */
 
 #define __NR_N32_Linux			6000
-#define __NR_N32_Linux_syscalls		230
+#define __NR_N32_Linux_syscalls		239
 
 #ifndef __ASSEMBLY__
 

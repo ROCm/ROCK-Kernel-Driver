@@ -33,8 +33,8 @@ NESTED(handle_sys, PT_SIZE, sp)
 
 	sltiu	t0, v0, MAX_SYSCALL_NO + 1 # check syscall number
 	addiu	t1, 4			# skip to next instruction
-	beqz	t0, illegal_syscall
 	sw	t1, PT_EPC(sp)
+	beqz	t0, illegal_syscall
 
 	/* XXX Put both in one cacheline, should save a bit. */
 	sll	t0, v0, 2
@@ -49,7 +49,7 @@ NESTED(handle_sys, PT_SIZE, sp)
 stack_done:
 	sw	a3, PT_R26(sp)          # save for syscall restart
 	LONG_L	t0, TI_FLAGS($28)	# syscall tracing enabled?
-	li	t1, _TIF_SYSCALL_TRACE
+	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
 	and	t0, t1, t0
 	bnez	t0, syscall_trace_entry	# -> yes
 
@@ -84,6 +84,8 @@ o32_syscall_exit_work:
 syscall_trace_entry:
 	SAVE_STATIC
 	sw	t2, PT_R1(sp)
+	move	a0, sp
+	li	a1, 0
 	jal	do_syscall_trace
 	lw	t2, PT_R1(sp)
 
@@ -233,13 +235,15 @@ illegal_syscall:
 
 	/* Success, so skip usual error handling garbage.  */
 	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
-	li	t0, _TIF_SYSCALL_TRACE
+	li	t0, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
 	and	t0, a2, t0
 	bnez	t0, 1f
 
 	b	o32_syscall_exit
 
 1:	SAVE_STATIC
+	move	a0, sp
+	li	a1, 1
 	jal	do_syscall_trace
 	j	syscall_exit
 
@@ -614,6 +618,15 @@ out:	jr	ra
 	sys	sys_clock_nanosleep	4	/* 4265 */
 	sys	sys_tgkill		3
 	sys	sys_utimes		2
+	sys	sys_ni_syscall		0	/* sys_mbind */
+	sys	sys_ni_syscall		0	/* sys_get_mempolicy */
+	sys	sys_ni_syscall		0	/* 4270 sys_set_mempolicy */
+	sys	sys_mq_open		4
+	sys	sys_mq_unlink		1
+	sys	sys_mq_timedsend	5
+	sys	sys_mq_timedreceive	5
+	sys	sys_mq_notify		2	/* 4275 */
+	sys	sys_mq_getsetattr	3
 
 	.endm
 

@@ -7,7 +7,7 @@
 #
 
 obj-y += prom.o int-handler.o irq.o puts.o time.o reset.o \
-	au1xxx_irqmap.o clocks.o power.o setup.o sleeper.o
+	au1xxx_irqmap.o clocks.o power.o setup.o sleeper.o cputable.o
 
 obj-$(CONFIG_AU1X00_USB_DEVICE)	+= usbdev.o
 obj-$(CONFIG_KGDB)		+= dbg_io.o

@@ -27,21 +27,34 @@
 #ifndef __ASM_DB1X00_H
 #define __ASM_DB1X00_H
 
+#ifdef CONFIG_MIPS_DB1550
+#define BCSR_KSEG1_ADDR 0xAF000000
+#else
+#define BCSR_KSEG1_ADDR 0xAE000000
+#endif
 
 /*
  * Overlay data structure of the Db1x00 board registers.
- * Registers located at physical 1E0000xx, KSEG1 0xAE0000xx
+ * Registers located at physical 0E0000xx, KSEG1 0xAE0000xx
  */
 typedef volatile struct
 {
-	/*00*/	unsigned long whoami;
-	/*04*/	unsigned long status;
-	/*08*/	unsigned long switches;
-	/*0C*/	unsigned long resets;
-	/*10*/	unsigned long pcmcia;
-	/*14*/	unsigned long specific;
-	/*18*/	unsigned long leds;
-	/*1C*/	unsigned long swreset;
+	/*00*/	unsigned short whoami;
+	unsigned short reserved0;
+	/*04*/	unsigned short status;
+	unsigned short reserved1;
+	/*08*/	unsigned short switches;
+	unsigned short reserved2;
+	/*0C*/	unsigned short resets;
+	unsigned short reserved3;
+	/*10*/	unsigned short pcmcia;
+	unsigned short reserved4;
+	/*14*/	unsigned short specific;
+	unsigned short reserved5;
+	/*18*/	unsigned short leds;
+	unsigned short reserved6;
+	/*1C*/	unsigned short swreset;
+	unsigned short reserved7;
 
 } BCSR;
 

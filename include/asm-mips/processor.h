@@ -175,6 +175,8 @@ typedef struct {
 	unsigned long seg;
 } mm_segment_t;
 
+#define ARCH_MIN_TASKALIGN	8
+
 /*
  * If you change thread_struct remember to change the #defines below too!
  */

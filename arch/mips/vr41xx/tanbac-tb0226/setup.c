@@ -83,7 +83,10 @@ static int tanbac_tb0226_setup(void)
 	ioport_resource.start = IO_PORT_RESOURCE_START;
 	ioport_resource.end = IO_PORT_RESOURCE_END;
 
-	vr41xx_siu_init(SIU_RS232C, 0);
+#ifdef CONFIG_SERIAL_8250
+	vr41xx_select_siu_interface(SIU_RS232C, IRDA_NONE);
+	vr41xx_siu_init();
+#endif
 
 #ifdef CONFIG_PCI
 	vr41xx_pciu_init(&pci_address_map);

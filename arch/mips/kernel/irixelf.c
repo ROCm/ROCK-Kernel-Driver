@@ -1130,7 +1130,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	psinfo.pr_pid = prstatus.pr_pid = current->pid;
 	psinfo.pr_ppid = prstatus.pr_ppid = current->parent->pid;
 	psinfo.pr_pgrp = prstatus.pr_pgrp = process_group(current);
-	psinfo.pr_sid = prstatus.pr_sid = current->session;
+	psinfo.pr_sid = prstatus.pr_sid = current->signal->session;
 	prstatus.pr_utime.tv_sec = CT_TO_SECS(current->utime);
 	prstatus.pr_utime.tv_usec = CT_TO_USECS(current->utime);
 	prstatus.pr_stime.tv_sec = CT_TO_SECS(current->stime);

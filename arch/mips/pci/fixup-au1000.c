@@ -37,22 +37,72 @@
 /*
  * Shortcut
  */
-#define INTA	AU1000_PCI_INTA
-#define INTB	AU1000_PCI_INTB
-
-static char irq_tab_alchemy[][5] __initdata = {
- [11] = { -1, INTA, INTA, INTA, INTA },
- [12] = { -1, INTA, INTA, INTA, INTA },
-#if defined( CONFIG_SOC_AU1550 )
- [13] = { -1, INTB, INTB, INTB, INTB }
+#ifdef CONFIG_SOC_AU1500
+#define INTA AU1000_PCI_INTA
+#define INTB AU1000_PCI_INTB
+#define INTC AU1000_PCI_INTC
+#define INTD AU1000_PCI_INTD
 #endif
+
+#ifdef CONFIG_SOC_AU1550
+#define INTA AU1550_PCI_INTA
+#define INTB AU1550_PCI_INTB
+#define INTC AU1550_PCI_INTC
+#define INTD AU1550_PCI_INTD
+#endif
+
+#define INTX    0xFF /* not valid */
+
+#ifdef CONFIG_MIPS_DB1500
+static char irq_tab_alchemy[][5] __initdata = {
+ [12] =	{ -1, INTA, INTX, INTX, INTX},   /* IDSEL 12 - HPT371   */
+ [13] =	{ -1, INTA, INTB, INTC, INTD},   /* IDSEL 13 - PCI slot */
 };
+#endif
+
+#ifdef CONFIG_MIPS_BOSPORUS
+static char irq_tab_alchemy[][5] __initdata = {
+ [11] =	{ -1, INTA, INTB, INTX, INTX},   /* IDSEL 11 - miniPCI  */
+ [12] =	{ -1, INTA, INTX, INTX, INTX},   /* IDSEL 12 - SN1741   */
+ [13] =	{ -1, INTA, INTB, INTC, INTD},   /* IDSEL 13 - PCI slot */
+};
+#endif
+
+#ifdef CONFIG_MIPS_MIRAGE
+static char irq_tab_alchemy[][5] __initdata = {
+ [11] =	{ -1, INTD, INTX, INTX, INTX},   /* IDSEL 11 - SMI VGX */
+ [12] =	{ -1, INTX, INTX, INTC, INTX},   /* IDSEL 12 - PNX1300 */
+ [13] =	{ -1, INTA, INTB, INTX, INTX},   /* IDSEL 13 - miniPCI */
+};
+#endif
+
+#ifdef CONFIG_MIPS_DB1550
+static char irq_tab_alchemy[][5] __initdata = {
+ [11] =	{ -1, INTC, INTX, INTX, INTX},   /* IDSEL 11 - on-board HPT371    */
+ [12] =	{ -1, INTB, INTC, INTD, INTA},   /* IDSEL 12 - PCI slot 2 (left)  */
+ [13] =	{ -1, INTA, INTB, INTC, INTD},   /* IDSEL 13 - PCI slot 1 (right) */
+};
+#endif
+
+#ifdef CONFIG_MIPS_PB1500
+static char irq_tab_alchemy[][5] __initdata = {
+ [12] = { -1, INTA, INTX, INTX, INTX},   /* IDSEL 12 - HPT370   */
+ [13] = { -1, INTA, INTB, INTC, INTD},   /* IDSEL 13 - PCI slot */
+};
+#endif
+
+#ifdef CONFIG_MIPS_PB1550
+static char irq_tab_alchemy[][5] __initdata = {
+ [12] =	{ -1, INTB, INTC, INTD, INTA},   /* IDSEL 12 - PCI slot 2 (left)  */
+ [13] =	{ -1, INTA, INTB, INTC, INTD},   /* IDSEL 13 - PCI slot 1 (right) */
+};
+#endif
 
 int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	return irq_tab_alchemy[slot][pin];
+return irq_tab_alchemy[slot][pin];
 }
 
 struct pci_fixup pcibios_fixups[] __initdata = {
-	{ 0 }
+{ 0 }
 };
