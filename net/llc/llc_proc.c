@@ -61,9 +61,7 @@ static void *llc_seq_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&llc_main_station.sap_list.lock);
-	if (!l)
-		return (void *)1;
-	return llc_get_sk_idx(--l);
+	return l ? llc_get_sk_idx(--l) : (void *)1;
 }
 
 static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
