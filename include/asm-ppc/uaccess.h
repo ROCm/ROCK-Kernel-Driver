@@ -32,7 +32,7 @@
 #define __access_ok(addr,size) (__kernel_ok || __user_ok((addr),(size)))
 #define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+extern inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -225,45 +225,46 @@ do {								\
 
 /* more complex routines */
 
-extern int __copy_tofrom_user(void *to, const void *from, unsigned long size);
+extern int __copy_tofrom_user(void __user *to, const void __user *from,
+			      unsigned long size);
 
 extern inline unsigned long
-copy_from_user(void *to, const void *from, unsigned long n)
+copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	unsigned long over;
 
 	if (access_ok(VERIFY_READ, from, n))
-		return __copy_tofrom_user(to, from, n);
+		return __copy_tofrom_user((void __user *)to, from, n);
 	if ((unsigned long)from < TASK_SIZE) {
 		over = (unsigned long)from + n - TASK_SIZE;
-		return __copy_tofrom_user(to, from, n - over) + over;
+		return __copy_tofrom_user((void __user *)to, from, n - over) + over;
 	}
 	return n;
 }
 
 extern inline unsigned long
-copy_to_user(void *to, const void *from, unsigned long n)
+copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	unsigned long over;
 
 	if (access_ok(VERIFY_WRITE, to, n))
-		return __copy_tofrom_user(to, from, n);
+		return __copy_tofrom_user(to, (void __user *) from, n);
 	if ((unsigned long)to < TASK_SIZE) {
 		over = (unsigned long)to + n - TASK_SIZE;
-		return __copy_tofrom_user(to, from, n - over) + over;
+		return __copy_tofrom_user(to, (void __user *) from, n - over) + over;
 	}
 	return n;
 }
 
 #define __copy_from_user(to, from, size) \
-	__copy_tofrom_user((to), (from), (size))
+	__copy_tofrom_user((void __user *)(to), (from), (size))
 #define __copy_to_user(to, from, size) \
-	__copy_tofrom_user((to), (from), (size))
+	__copy_tofrom_user((to), (void __user *)(from), (size))
 
-extern unsigned long __clear_user(void *addr, unsigned long size);
+extern unsigned long __clear_user(void __user *addr, unsigned long size);
 
 extern inline unsigned long
-clear_user(void *addr, unsigned long size)
+clear_user(void __user *addr, unsigned long size)
 {
 	if (access_ok(VERIFY_WRITE, addr, size))
 		return __clear_user(addr, size);
@@ -274,10 +275,10 @@ clear_user(void *addr, unsigned long size)
 	return size;
 }
 
-extern int __strncpy_from_user(char *dst, const char *src, long count);
+extern int __strncpy_from_user(char *dst, const char __user *src, long count);
 
 extern inline long
-strncpy_from_user(char *dst, const char *src, long count)
+strncpy_from_user(char *dst, const char __user *src, long count)
 {
 	if (access_ok(VERIFY_READ, src, 1))
 		return __strncpy_from_user(dst, src, count);
@@ -290,7 +291,7 @@ strncpy_from_user(char *dst, const char *src, long count)
  * Return 0 for error
  */
 
-extern int __strnlen_user(const char *str, long len, unsigned long top);
+extern int __strnlen_user(const char __user *str, long len, unsigned long top);
 
 /*
  * Returns the length of the string at str (including the null byte),
@@ -300,7 +301,7 @@ extern int __strnlen_user(const char *str, long len, unsigned long top);
  * The `top' parameter to __strnlen_user is to make sure that
  * we can never overflow from the user area into kernel space.
  */
-extern __inline__ int strnlen_user(const char *str, long len)
+extern __inline__ int strnlen_user(const char __user *str, long len)
 {
 	unsigned long top = __kernel_ok? ~0UL: TASK_SIZE - 1;
 

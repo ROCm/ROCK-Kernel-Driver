@@ -281,7 +281,7 @@ emulate_instruction(struct pt_regs *regs)
 		return retval;
 	CHECK_FULL_REGS(regs);
 
-	if (get_user(instword, (uint *)(regs->nip)))
+	if (get_user(instword, (uint __user *)(regs->nip)))
 		return -EFAULT;
 
 	/* Emulate the mfspr rD, PVR.
