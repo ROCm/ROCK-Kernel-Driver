@@ -58,40 +58,60 @@ tcf_pedit_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 {
 	struct rtattr *tb[TCA_PEDIT_MAX];
 	struct tc_pedit *parm;
-	int size = 0;
 	int ret = 0;
 	struct tcf_pedit *p;
+	struct tc_pedit_key *keys = NULL;
+	int ksize;
 
-	if (rtattr_parse(tb, TCA_PEDIT_MAX, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0)
-		return -1;
-	if (tb[TCA_PEDIT_PARMS - 1] == NULL) {
-		printk("BUG: tcf_pedit_init called with NULL params\n");
-		return -1;
-	}
+	if (rta == NULL || rtattr_parse(tb, TCA_PEDIT_MAX, RTA_DATA(rta),
+	                                RTA_PAYLOAD(rta)) < 0)
+		return -EINVAL;
 
-	parm = RTA_DATA(tb[TCA_PEDIT_PARMS - 1]);
-	p = tcf_hash_check(parm, a, ovr, bind);
-	if (p == NULL) { /* new */
+	if (tb[TCA_PEDIT_PARMS - 1] == NULL ||
+	    RTA_PAYLOAD(tb[TCA_PEDIT_PARMS-1]) < sizeof(*parm))
+		return -EINVAL;
+	parm = RTA_DATA(tb[TCA_PEDIT_PARMS-1]);
+	ksize = parm->nkeys * sizeof(struct tc_pedit_key);
+	if (RTA_PAYLOAD(tb[TCA_PEDIT_PARMS-1]) < sizeof(*parm) + ksize)
+		return -EINVAL;
+
+	p = tcf_hash_check(parm->index, a, ovr, bind);
+	if (p == NULL) {
 		if (!parm->nkeys)
-			return -1;
-		size = sizeof(*p) + parm->nkeys * sizeof(struct tc_pedit_key);
-		p = tcf_hash_create(parm, est, a, size, ovr, bind);
+			return -EINVAL;
+		p = tcf_hash_create(parm->index, est, a, sizeof(*p), ovr, bind);
 		if (p == NULL)
-			return -1;
-		ret = 1;
-		goto override;
-	} 
-
-	if (ovr) {
-override:
-		p->flags = parm->flags;
-		p->nkeys = parm->nkeys;
-		p->action = parm->action;
-		memcpy(p->keys, parm->keys,
-		       parm->nkeys * sizeof(struct tc_pedit_key));
+			return -ENOMEM;
+		keys = kmalloc(ksize, GFP_KERNEL);
+		if (keys == NULL) {
+			kfree(p);
+			return -ENOMEM;
+		}
+		ret = ACT_P_CREATED;
+	} else {
+		if (!ovr) {
+			tcf_hash_release(p, bind);
+			return -EEXIST;
+		}
+		if (p->nkeys && p->nkeys != parm->nkeys) {
+			keys = kmalloc(ksize, GFP_KERNEL);
+			if (keys == NULL)
+				return -ENOMEM;
+		}
 	}
 
+	spin_lock_bh(&p->lock);
+	p->flags = parm->flags;
+	p->action = parm->action;
+	if (keys) {
+		kfree(p->keys);
+		p->keys = keys;
+		p->nkeys = parm->nkeys;
+	}
+	memcpy(p->keys, parm->keys, ksize);
+	spin_unlock_bh(&p->lock);
+	if (ret == ACT_P_CREATED)
+		tcf_hash_insert(p);
 	return ret;
 }
 
@@ -100,8 +120,13 @@ tcf_pedit_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_pedit *p = PRIV(a, pedit);
 
-	if (NULL != p)
-		return tcf_hash_release(p, bind);
+	if (p != NULL) {
+		struct tc_pedit_key *keys = p->keys;
+		if (tcf_hash_release(p, bind)) {
+			kfree(keys);
+			return 1;
+		}
+	}
 	return 0;
 }
 
