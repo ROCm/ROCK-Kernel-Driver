@@ -457,14 +457,8 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	/*
 	 * Right, time to make up the new buffer_head.
 	 */
-	do {
-		new_bh = alloc_buffer_head();
-		if (!new_bh) {
-			printk (KERN_NOTICE "%s: ENOMEM at alloc_buffer_head, "
-				"trying again.\n", __FUNCTION__);
-			yield();
-		}
-	} while (!new_bh);
+	new_bh = alloc_buffer_head(GFP_NOFS|__GFP_NOFAIL);
+
 	/* keep subsequent assertions sane */
 	new_bh->b_state = 0;
 	init_buffer(new_bh, NULL, NULL);
@@ -1613,28 +1607,7 @@ void shrink_journal_memory(void)
  */
 void * __jbd_kmalloc (const char *where, size_t size, int flags, int retry)
 {
-	void *p;
-	static unsigned long last_warning;
-	
-	while (1) {
-		p = kmalloc(size, flags);
-		if (p)
-			return p;
-		if (!retry)
-			return NULL;
-		/* Log every retry for debugging.  Also log them to the
-		 * syslog, but do rate-limiting on the non-debugging
-		 * messages. */
-		jbd_debug(1, "ENOMEM in %s, retrying.\n", where);
-
-		if (time_after(jiffies, last_warning + 5*HZ)) {
-			printk(KERN_NOTICE
-			       "ENOMEM in %s, retrying.\n", where);
-			last_warning = jiffies;
-		}
-		
-		yield();
-	}
+	return kmalloc(size, flags | (retry ? __GFP_NOFAIL : 0));	
 }
 
 /*

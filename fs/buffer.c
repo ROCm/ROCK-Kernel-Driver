@@ -995,7 +995,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		bh = alloc_buffer_head();
+		bh = alloc_buffer_head(GFP_NOFS);
 		if (!bh)
 			goto no_grow;
 
@@ -2346,7 +2346,7 @@ int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
 		if (buffer_uptodate(&map_bh))
 			continue;	/* reiserfs does this */
 		if (block_start < from || block_end > to) {
-			struct buffer_head *bh = alloc_buffer_head();
+			struct buffer_head *bh = alloc_buffer_head(GFP_NOFS);
 
 			if (!bh) {
 				ret = -ENOMEM;
@@ -2905,9 +2905,9 @@ static void recalc_bh_state(void)
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
 	
-struct buffer_head *alloc_buffer_head(void)
+struct buffer_head *alloc_buffer_head(int gfp_flags)
 {
-	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, GFP_NOFS);
+	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, gfp_flags);
 	if (ret) {
 		preempt_disable();
 		__get_cpu_var(bh_accounting).nr++;
