@@ -482,9 +482,10 @@ struct Scsi_Host
     unsigned int max_host_blocked;
 
     /* 
-     * Support for driverfs filesystem
+     * Support for sysfs
      */
-    struct device *host_gendev;
+    struct device host_gendev;
+    struct class_device class_dev;
 
     /*
      * We should ensure that this is aligned, both for better performance
@@ -495,8 +496,11 @@ struct Scsi_Host
         __attribute__ ((aligned (sizeof(unsigned long))));
 };
 
-#define	to_scsi_host(d)	d->driver_data	/* Major logical breakage, but we compile again... */
-	
+#define		dev_to_shost(d)		\
+	container_of(d, struct Scsi_Host, host_gendev)
+#define		class_to_shost(d)	\
+	container_of(d, struct Scsi_Host, class_dev)
+
 /*
  * These two functions are used to allocate and free a pseudo device
  * which will connect to the host adapter itself rather than any
@@ -519,12 +523,12 @@ static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 static inline void scsi_set_device(struct Scsi_Host *shost,
                                    struct device *dev)
 {
-        shost->host_gendev = dev;
+        shost->host_gendev.parent = dev;
 }
 
 static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
-        return shost->host_gendev;
+        return shost->host_gendev.parent;
 }
 
 struct Scsi_Device_Template
@@ -591,6 +595,10 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
  */
 extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
 extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
+extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
+extern void scsi_sysfs_remove_host(struct Scsi_Host *);
+
+extern void scsi_free_sdev(struct scsi_device *);
 
 extern struct class shost_class;
 

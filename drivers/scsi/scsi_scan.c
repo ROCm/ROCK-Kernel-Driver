@@ -480,7 +480,7 @@ out:
  *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
  *     the list, and freeing @sdev.
  **/
-static void scsi_free_sdev(struct scsi_device *sdev)
+void scsi_free_sdev(struct scsi_device *sdev)
 {
 	unsigned long flags;
 
@@ -1273,8 +1273,6 @@ int scsi_remove_device(struct scsi_device *sdev)
 		return -EINVAL;
 
 	scsi_device_unregister(sdev);
-
-	scsi_free_sdev(sdev);
 	return 0;
 }
 

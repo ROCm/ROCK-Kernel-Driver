@@ -193,16 +193,6 @@ static int scsi_host_legacy_release(struct Scsi_Host *shost)
 	return 0;
 }
 
-static int scsi_remove_legacy_host(struct Scsi_Host *shost)
-{
-	int error;
-
-	error = scsi_remove_host(shost);
-	if (!error)
-		(*shost->hostt->release)(shost);
-	return 0;
-}
-
 static int scsi_check_device_busy(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
@@ -268,11 +258,8 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	list_for_each_entry(sdev, &shost->my_devices, siblings)
 		sdev->online = FALSE;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
-		if (scsi_check_device_busy(sdev))
-			return 1;
-
 	scsi_forget_host(shost);
+	scsi_sysfs_remove_host(shost);
 	return 0;
 }
 
@@ -293,9 +280,9 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	if (dev) {
-		shost->host_gendev = dev;
-	}
+	error = scsi_sysfs_add_host(shost, dev);
+	if (error)
+		return error;
 
 	scsi_scan_host(shost);
 			
@@ -531,7 +518,7 @@ out_of_space:
  **/
 int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 {
-	scsi_tp_for_each_host(shost_tp, scsi_remove_legacy_host);
+	scsi_tp_for_each_host(shost_tp, scsi_remove_host);
 	return 0;
 
 }
