@@ -2024,6 +2024,7 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	spin_lock_init(&ha->mbx_reg_lock);
 	spin_lock_init(&ha->list_lock);
 
+	ha->dpc_pid = -1;
 	init_completion(&ha->dpc_inited);
 	init_completion(&ha->dpc_exited);
 
