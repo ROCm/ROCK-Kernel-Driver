@@ -50,6 +50,8 @@
  * 	 					--MAG
  */
 
+extern spinlock_t	rtc_lock;
+
 /*
  * 'todc_info' should be initialized in your *_setup.c file to
  * point to a fully initialized 'todc_info_t' structure.
@@ -126,6 +128,54 @@ todc_mc146818_write_val(int addr, unsigned char val)
 	return;
 }
 
+
+/*
+ * Routines to make RTC chips with NVRAM buried behind an addr/data pair
+ * have the NVRAM and clock regs appear at the same level.
+ * The NVRAM will appear to start at addr 0 and the clock regs will appear
+ * to start immediately after the NVRAM (actually, start at offset
+ * todc_info->nvram_size).
+ */
+static inline u_char
+todc_read_val(int addr)
+{
+	u_char	val;
+
+	if (todc_info->sw_flags & TODC_FLAG_2_LEVEL_NVRAM) {
+		if (addr < todc_info->nvram_size) { /* NVRAM */
+			ppc_md.nvram_write_val(todc_info->nvram_addr_reg, addr);
+			val = ppc_md.nvram_read_val(todc_info->nvram_data_reg);
+		}
+		else { /* Clock Reg */
+			addr -= todc_info->nvram_size;
+			val = ppc_md.nvram_read_val(addr);
+		}
+	}
+	else {
+		val = ppc_md.nvram_read_val(addr);
+	}
+
+	return val;
+}
+
+static inline void
+todc_write_val(int addr, u_char val)
+{
+	if (todc_info->sw_flags & TODC_FLAG_2_LEVEL_NVRAM) {
+		if (addr < todc_info->nvram_size) { /* NVRAM */
+			ppc_md.nvram_write_val(todc_info->nvram_addr_reg, addr);
+			ppc_md.nvram_write_val(todc_info->nvram_data_reg, val);
+		}
+		else { /* Clock Reg */
+			addr -= todc_info->nvram_size;
+			ppc_md.nvram_write_val(addr, val);
+		}
+	}
+	else {
+		ppc_md.nvram_write_val(addr, val);
+	}
+}
+
 /*
  * TODC routines
  *
@@ -148,7 +198,7 @@ todc_time_init(void)
 	if (not_initialized) {
 		u_char	cntl_b;
 
-		cntl_b = ppc_md.nvram_read_val(todc_info->control_b);
+		cntl_b = todc_read_val(todc_info->control_b);
 
 		if (todc_info->rtc_type == TODC_TYPE_MC146818) {
 			if ((cntl_b & 0x70) != 0x20) {
@@ -159,7 +209,18 @@ todc_time_init(void)
 				cntl_b |= 0x20;
 			}
 
-			ppc_md.nvram_write_val(todc_info->control_b, cntl_b);
+			todc_write_val(todc_info->control_b, cntl_b);
+		}
+		else if (todc_info->rtc_type == TODC_TYPE_DS17285) {
+			u_char mode;
+
+			mode = todc_read_val(TODC_TYPE_DS17285_CNTL_A);
+			/* Make sure countdown clear is not set */
+			mode &= ~0x40;
+			/* Enable oscillator, extended register set */
+			mode |= 0x30;
+			todc_write_val(TODC_TYPE_DS17285_CNTL_A, mode);
+
 		}
 		else if (todc_info->rtc_type == TODC_TYPE_DS1501) {
 			u_char	month;
@@ -167,18 +228,18 @@ todc_time_init(void)
 			todc_info->enable_read = TODC_DS1501_CNTL_B_TE;
 			todc_info->enable_write = TODC_DS1501_CNTL_B_TE;
 
-			month = ppc_md.nvram_read_val(todc_info->month);
+			month = todc_read_val(todc_info->month);
 
 			if ((month & 0x80) == 0x80) {
 				printk(KERN_INFO "TODC %s %s\n",
 					"real-time-clock was stopped.",
 					"Now starting...");
 				month &= ~0x80;
-				ppc_md.nvram_write_val(todc_info->month, month);
+				todc_write_val(todc_info->month, month);
 			}
 
 			cntl_b &= ~TODC_DS1501_CNTL_B_TE;
-			ppc_md.nvram_write_val(todc_info->control_b, cntl_b);
+			todc_write_val(todc_info->control_b, cntl_b);
 		}
 		else { /* must be a m48txx type */
 			u_char	cntl_a;
@@ -186,7 +247,7 @@ todc_time_init(void)
 			todc_info->enable_read = TODC_MK48TXX_CNTL_A_R;
 			todc_info->enable_write = TODC_MK48TXX_CNTL_A_W;
 
-			cntl_a = ppc_md.nvram_read_val(todc_info->control_a);
+			cntl_a = todc_read_val(todc_info->control_a);
 
 			/* Check & clear STOP bit in control B register */
 			if (cntl_b & TODC_MK48TXX_DAY_CB) {
@@ -197,16 +258,14 @@ todc_time_init(void)
 				cntl_a |= todc_info->enable_write;
 				cntl_b &= ~TODC_MK48TXX_DAY_CB;/* Start Oscil */
 
-				ppc_md.nvram_write_val(todc_info->control_a,
-						       cntl_a);
-				ppc_md.nvram_write_val(todc_info->control_b,
-						       cntl_b);
+				todc_write_val(todc_info->control_a, cntl_a);
+				todc_write_val(todc_info->control_b, cntl_b);
 			}
 
 			/* Make sure READ & WRITE bits are cleared. */
 			cntl_a &= ~(todc_info->enable_write |
 				    todc_info->enable_read);
-			ppc_md.nvram_write_val(todc_info->control_a, cntl_a);
+			todc_write_val(todc_info->control_a, cntl_a);
 		}
 
 		not_initialized = 0;
@@ -231,7 +290,8 @@ todc_get_rtc_time(void)
 	uint	limit, i;
 	u_char	save_control, uip;
 
-	save_control = ppc_md.nvram_read_val(todc_info->control_a);
+	spin_lock(&rtc_lock);
+	save_control = todc_read_val(todc_info->control_a);
 
 	if (todc_info->rtc_type != TODC_TYPE_MC146818) {
 		limit = 1;
@@ -241,9 +301,10 @@ todc_get_rtc_time(void)
 			case TODC_TYPE_DS1743:
 			case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 			case TODC_TYPE_DS1747:
+			case TODC_TYPE_DS17285:
 				break;
 			default:
-				ppc_md.nvram_write_val(todc_info->control_a,
+				todc_write_val(todc_info->control_a,
 				       (save_control | todc_info->enable_read));
 		}
 	}
@@ -253,19 +314,18 @@ todc_get_rtc_time(void)
 
 	for (i=0; i<limit; i++) {
 		if (todc_info->rtc_type == TODC_TYPE_MC146818) {
-			uip = ppc_md.nvram_read_val(todc_info->RTC_FREQ_SELECT);
+			uip = todc_read_val(todc_info->RTC_FREQ_SELECT);
 		}
 
-		sec = ppc_md.nvram_read_val(todc_info->seconds) & 0x7f;
-		min = ppc_md.nvram_read_val(todc_info->minutes) & 0x7f;
-		hour = ppc_md.nvram_read_val(todc_info->hours) & 0x3f;
-		day = ppc_md.nvram_read_val(todc_info->day_of_month) & 0x3f;
-		mon = ppc_md.nvram_read_val(todc_info->month) & 0x1f;
-		year = ppc_md.nvram_read_val(todc_info->year) & 0xff;
+		sec = todc_read_val(todc_info->seconds) & 0x7f;
+		min = todc_read_val(todc_info->minutes) & 0x7f;
+		hour = todc_read_val(todc_info->hours) & 0x3f;
+		day = todc_read_val(todc_info->day_of_month) & 0x3f;
+		mon = todc_read_val(todc_info->month) & 0x1f;
+		year = todc_read_val(todc_info->year) & 0xff;
 
 		if (todc_info->rtc_type == TODC_TYPE_MC146818) {
-			uip |= ppc_md.nvram_read_val(
-					todc_info->RTC_FREQ_SELECT);
+			uip |= todc_read_val(todc_info->RTC_FREQ_SELECT);
 			if ((uip & RTC_UIP) == 0) break;
 		}
 	}
@@ -276,13 +336,15 @@ todc_get_rtc_time(void)
 			case TODC_TYPE_DS1743:
 			case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 			case TODC_TYPE_DS1747:
+			case TODC_TYPE_DS17285:
 				break;
 			default:
 				save_control &= ~(todc_info->enable_read);
-				ppc_md.nvram_write_val(todc_info->control_a,
+				todc_write_val(todc_info->control_a,
 						       save_control);
 		}
 	}
+	spin_unlock(&rtc_lock);
 
 	if ((todc_info->rtc_type != TODC_TYPE_MC146818) ||
 	    ((save_control & RTC_DM_BINARY) == 0) ||
@@ -310,19 +372,19 @@ todc_set_rtc_time(unsigned long nowtime)
 	struct rtc_time	tm;
 	u_char		save_control, save_freq_select;
 
+	spin_lock(&rtc_lock);
 	to_tm(nowtime, &tm);
 
-	save_control = ppc_md.nvram_read_val(todc_info->control_a);
+	save_control = todc_read_val(todc_info->control_a);
 
 	/* Assuming MK48T59_RTC_CA_WRITE & RTC_SET are equal */
-	ppc_md.nvram_write_val(todc_info->control_a,
+	todc_write_val(todc_info->control_a,
 			       (save_control | todc_info->enable_write));
 	save_control &= ~(todc_info->enable_write); /* in case it was set */
 
 	if (todc_info->rtc_type == TODC_TYPE_MC146818) {
-		save_freq_select =
-			ppc_md.nvram_read_val(todc_info->RTC_FREQ_SELECT);
-		ppc_md.nvram_write_val(todc_info->RTC_FREQ_SELECT,
+		save_freq_select = todc_read_val(todc_info->RTC_FREQ_SELECT);
+		todc_write_val(todc_info->RTC_FREQ_SELECT,
 				       save_freq_select | RTC_DIV_RESET2);
 	}
 
@@ -341,19 +403,19 @@ todc_set_rtc_time(unsigned long nowtime)
 		BIN_TO_BCD(tm.tm_year);
 	}
 
-	ppc_md.nvram_write_val(todc_info->seconds,      tm.tm_sec);
-	ppc_md.nvram_write_val(todc_info->minutes,      tm.tm_min);
-	ppc_md.nvram_write_val(todc_info->hours,        tm.tm_hour);
-	ppc_md.nvram_write_val(todc_info->month,        tm.tm_mon);
-	ppc_md.nvram_write_val(todc_info->day_of_month, tm.tm_mday);
-	ppc_md.nvram_write_val(todc_info->year,         tm.tm_year);
+	todc_write_val(todc_info->seconds,      tm.tm_sec);
+	todc_write_val(todc_info->minutes,      tm.tm_min);
+	todc_write_val(todc_info->hours,        tm.tm_hour);
+	todc_write_val(todc_info->month,        tm.tm_mon);
+	todc_write_val(todc_info->day_of_month, tm.tm_mday);
+	todc_write_val(todc_info->year,         tm.tm_year);
 
-	ppc_md.nvram_write_val(todc_info->control_a, save_control);
+	todc_write_val(todc_info->control_a, save_control);
 
 	if (todc_info->rtc_type == TODC_TYPE_MC146818) {
-		ppc_md.nvram_write_val(todc_info->RTC_FREQ_SELECT,
-				       save_freq_select);
+		todc_write_val(todc_info->RTC_FREQ_SELECT, save_freq_select);
 	}
+	spin_unlock(&rtc_lock);
 
 	return 0;
 }
@@ -367,30 +429,28 @@ static unsigned char __init todc_read_timereg(int addr)
 
 	switch (todc_info->rtc_type) {
 		case TODC_TYPE_DS1557:
-		case TODC_TYPE_DS1743:
 		case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 		case TODC_TYPE_DS1747:
+		case TODC_TYPE_DS17285:
 		case TODC_TYPE_MC146818:
 			break;
 		default:
-			save_control =
-				ppc_md.nvram_read_val(todc_info->control_a);
-			ppc_md.nvram_write_val(todc_info->control_a,
+			save_control = todc_read_val(todc_info->control_a);
+			todc_write_val(todc_info->control_a,
 				       (save_control | todc_info->enable_read));
 	}
-	val = ppc_md.nvram_read_val(addr);
+	val = todc_read_val(addr);
 
 	switch (todc_info->rtc_type) {
 		case TODC_TYPE_DS1557:
-		case TODC_TYPE_DS1743:
 		case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 		case TODC_TYPE_DS1747:
+		case TODC_TYPE_DS17285:
 		case TODC_TYPE_MC146818:
 			break;
 		default:
 			save_control &= ~(todc_info->enable_read);
-			ppc_md.nvram_write_val(todc_info->control_a,
-					       save_control);
+			todc_write_val(todc_info->control_a, save_control);
 	}
 
 	return val;
@@ -412,7 +472,7 @@ todc_calibrate_decr(void)
 
 	/*
 	 * Actually this is bad for precision, we should have a loop in
-	 * which we only read the seconds counter. nvram_read_val writes
+	 * which we only read the seconds counter. todc_read_val writes
 	 * the address bytes on every call and this takes a lot of time.
 	 * Perhaps an nvram_wait_change method returning a time
 	 * stamp with a loop count as parameter would be the solution.
