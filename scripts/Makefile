@@ -14,6 +14,13 @@ always		:= $(host-progs) empty.o
 
 modpost-objs	:= modpost.o file2alias.o
 
+# CONFIG_KDB needed by kallsyms for kdb
+ifdef CONFIG_KALLSYMS
+ifdef CONFIG_KDB
+HOSTCFLAGS_kallsyms.o := -D CONFIG_KDB
+endif
+endif
+
 subdir-$(CONFIG_MODVERSIONS)	+= genksyms
 
 # Let clean descend into subdirs

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 1999-2002 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -30,9 +30,10 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-obj-$(CONFIG_KDB_MODULES) += kdbm_vm.o kdbm_pg.o
+obj-$(CONFIG_KDB_MODULES) += kdbm_vm.o kdbm_pg.o kdbm_task.o
+ifdef CONFIG_X86
+obj-$(CONFIG_KDB_MODULES) += kdbm_x86.o
+endif
 CFLAGS_kdbm_vm.o	+= -I $(TOPDIR)/drivers/scsi
 
 EXTRA_CFLAGS += -I $(TOPDIR)/arch/$(ARCH)/kdb
-
-#include $(TOPDIR)/Rules.make

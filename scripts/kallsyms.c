@@ -6,6 +6,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  * Usage: nm -n vmlinux | scripts/kallsyms > symbols.S
+ * If CONFIG_KDB is defined, generate all symbols for kdb.
  */
 
 #include <stdio.h>
@@ -21,7 +22,12 @@ struct sym_entry {
 
 static struct sym_entry *table;
 static int size, cnt;
-static unsigned long long _stext, _etext, _sinittext, _einittext;
+static unsigned long long _stext, _etext, _sinittext, _einittext, _end;
+#ifdef CONFIG_KDB
+#define kdb 1
+#else
+#define kdb 0
+#endif
 
 static void
 usage(void)
@@ -51,12 +57,18 @@ read_symbol(FILE *in, struct sym_entry *s)
 static int
 symbol_valid(struct sym_entry *s)
 {
-	if ((s->addr < _stext || s->addr > _etext)
+	if ((s->addr < _stext || (kdb && s->addr > _end) || (!kdb && s->addr > _etext))
 	    && (s->addr < _sinittext || s->addr > _einittext))
 		return 0;
 
 	if (strstr(s->sym, "_compiled."))
 		return 0;
+	if (kdb) {
+		if (strcmp(s->sym, "kallsyms_addresses") == 0 ||
+		    strcmp(s->sym, "kallsyms_num_syms") == 0 ||
+		    strcmp(s->sym, "kallsyms_names") == 0)
+		return 0;
+	}
 
 	return 1;
 }
@@ -87,6 +99,8 @@ read_map(FILE *in)
 			_sinittext = table[i].addr;
 		if (strcmp(table[i].sym, "_einittext") == 0)
 			_einittext = table[i].addr;
+		if (kdb && strcmp(table[i].sym, "_end") == 0)
+			_end = table[i].addr;
 	}
 }
 
@@ -115,7 +129,7 @@ write_src(void)
 		if (!symbol_valid(&table[i]))
 			continue;
 		
-		if (table[i].addr == last_addr)
+		if (table[i].addr == last_addr && !kdb)
 			continue;
 
 		printf("\tPTR\t%#llx\n", table[i].addr);
@@ -140,7 +154,7 @@ write_src(void)
 		if (!symbol_valid(&table[i]))
 			continue;
 		
-		if (table[i].addr == last_addr)
+		if (table[i].addr == last_addr && !kdb)
 			continue;
 
 		for (k = 0; table[i].sym[k] && table[i].sym[k] == prev[k]; ++k)

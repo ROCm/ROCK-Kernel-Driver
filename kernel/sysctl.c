@@ -39,14 +39,13 @@
 #include <linux/initrd.h>
 #include <linux/times.h>
 #include <asm/uaccess.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
 #endif
-
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif /* CONFIG_KDB */
 
 #if defined(CONFIG_SYSCTL)
 
@@ -503,6 +502,16 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+#ifdef	CONFIG_KDB
+	{
+		.ctl_name	= KERN_KDB,
+		.procname	= "kdb",
+		.data		= &kdb_on,
+		.maxlen		= sizeof(kdb_on),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif	/* CONFIG_KDB */
 	{
 		.ctl_name	= KERN_CADPID,
 		.procname	= "cad_pid",

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 1999-2002 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -30,7 +30,6 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-# export-objs	:= kdbmain.o kdb_io.o
 obj-y		:= kdb_bt.o kdb_bp.o kdb_id.o kdbsupport.o gen-kdb_cmds.o kdbmain.o kdb_io.o
 
 subdir-$(CONFIG_KDB_MODULES) := modules
@@ -42,13 +41,14 @@ override CFLAGS := $(CFLAGS:%-pg=% )
 
 EXTRA_CFLAGS += -I $(TOPDIR)/arch/$(ARCH)/kdb
 
-#include $(TOPDIR)/Rules.make
-
-$(obj)/gen-kdb_cmds.c:	$(src)/kdb_cmds $(src)/Makefile
-	$(AWK) 'BEGIN {print "#include <linux/init.h>"} \
-		/^ *#/{next} \
+quiet_cmd_gen-kdb = GENKDB  $@
+      cmd_gen-kdb = $(AWK) 'BEGIN {print "\#include <linux/init.h>"} \
+		/^ *\#/{next} \
 		/^[ \t]*$$/{next} \
 		{gsub(/"/, "\\\"", $$0); \
 		  print "static __initdata char kdb_cmd" cmds++ "[] = \"" $$0 "\\n\";"} \
 		END {print "char __initdata *kdb_cmds[] = {"; for (i = 0; i < cmds; ++i) {print "  kdb_cmd" i ","}; print("  0\n};");}' \
-		$(obj)/kdb_cmds > $(obj)/gen-kdb_cmds.c
+		$< > $@
+
+$(obj)/gen-kdb_cmds.c:	$(src)/kdb_cmds $(src)/Makefile
+	$(call cmd,gen-kdb)

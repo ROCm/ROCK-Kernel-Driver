@@ -14,13 +14,20 @@
 #include <linux/err.h>
 #include <linux/proc_fs.h>
 
+#ifdef CONFIG_KDB
+#define kdb 1
+#else
+#define kdb 0
+#endif
+
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
 extern unsigned long kallsyms_num_syms __attribute__((weak));
 extern char kallsyms_names[] __attribute__((weak));
 
 /* Defined by the linker script. */
-extern char _stext[], _etext[], _sinittext[], _einittext[];
+extern char _stext[], _etext[], _edata[], _sinittext[], _einittext[];
+extern char _end[];	/* for CONFIG_KDB */
 
 static inline int is_kernel_inittext(unsigned long addr)
 {
@@ -33,6 +40,19 @@ static inline int is_kernel_inittext(unsigned long addr)
 static inline int is_kernel_text(unsigned long addr)
 {
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext)
+		return 1;
+	return 0;
+}
+
+static inline int is_kernel(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr <=
+#ifdef	CONFIG_KDB
+			(unsigned long)_end
+#else
+			(unsigned long)_edata
+#endif
+		)
 		return 1;
 	return 0;
 }
@@ -50,8 +70,8 @@ const char *kallsyms_lookup(unsigned long addr,
 
 	namebuf[127] = 0;
 	namebuf[0] = 0;
-
-	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
+	if ((kdb && is_kernel(addr)) ||
+	    (!kdb && (is_kernel_text(addr) || is_kernel_inittext(addr)))) {
 		unsigned long symbol_end;
 		char *name = kallsyms_names;
 
@@ -75,8 +95,7 @@ const char *kallsyms_lookup(unsigned long addr,
 		else if (is_kernel_inittext(addr))
 			symbol_end = (unsigned long)_einittext;
 		else
-			symbol_end = (unsigned long)_etext;
-
+			symbol_end = kdb ? (unsigned long)_end : (unsigned long)_etext;
 		*symbolsize = symbol_end - kallsyms_addresses[best];
 		*modname = NULL;
 		*offset = addr - kallsyms_addresses[best];
@@ -84,33 +103,6 @@ const char *kallsyms_lookup(unsigned long addr,
 	}
 
 	return module_address_lookup(addr, symbolsize, offset, modname);
-}
-
-/* given a name, return the address and size of the symbol. */
-unsigned long kallsyms_get_addr(char * symname, unsigned long symsize)
-{
-	char namebuf[128];
-	int j;
-	char *name;
-	name = kallsyms_names;
-	for (j = 0; j <= kallsyms_num_syms; j++) {
-		namebuf[127]=0;
-		unsigned prefix = *name++;
-		strncpy(namebuf + prefix, name, 127 - prefix);
-		name += strlen(name) + 1;
-
-		if (strcmp(namebuf,symname)==0) {
-			if (j+1 < kallsyms_num_syms) {
-				symsize = kallsyms_addresses[j+1]-kallsyms_addresses[j];
-			} else {
-				symsize = 1;  /* should do something smarter here.. */
-			}
-			return kallsyms_addresses[j];
-		}
-	}
-	/* symbol not found... */
-	symsize=0;
-	return 0;
 }
 
 /* Replace "%s" in format with address, or returns -errno. */

@@ -888,6 +888,8 @@ GLOBAL_ENTRY(ia64_spinlock_contention_pre3_4)
 	cmp4.eq p14,p0=r30,r0
 (p14)	br.cond.sptk.few b6	// lock is now free, try to acquire
 	br.cond.sptk.few .wait
+	.global ia64_spinlock_contention_pre3_4_end	// for kernprof
+ia64_spinlock_contention_pre3_4_end:
 END(ia64_spinlock_contention_pre3_4)
 
 #else

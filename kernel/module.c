@@ -1997,3 +1997,7 @@ struct module *module_text_address(unsigned long addr)
 void struct_module(struct module *mod) { return; }
 EXPORT_SYMBOL(struct_module);
 #endif
+
+#ifdef	CONFIG_KDB
+struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
+#endif	/* CONFIG_KDB */

@@ -4,7 +4,7 @@
 /*
  * Kernel Debugger Architecture Independent Global Headers
  *
- * Copyright (C) 1999-2002 Silicon Graphics, Inc.  All Rights Reserved
+ * Copyright (C) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved
  * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -37,11 +37,13 @@
  */
 
 #include <linux/config.h>
+#include <linux/init.h>
+#include <linux/sched.h>
 #include <asm/kdb.h>
 
-#define KDB_MAJOR_VERSION	2
-#define KDB_MINOR_VERSION	4
-#define KDB_TEST_VERSION	" ppc64-03.11.2003"
+#define KDB_MAJOR_VERSION	4
+#define KDB_MINOR_VERSION	3
+#define KDB_TEST_VERSION	""
 
 	/*
 	 * kdb_initial_cpu is initialized to -1, and is set to the cpu
@@ -63,6 +65,13 @@ extern volatile int kdb_initial_cpu;
 	 */
 extern int kdb_on;
 
+	/* Global 'enter the debugger' variable tested by scheduler, spinlocks
+	 * etc., to handle problems when interrupts are not working or are not
+	 * safe.
+	 */
+extern volatile int kdb_enter_debugger;
+
+#if defined(CONFIG_SERIAL_8250_CONSOLE) || defined(CONFIG_SGI_L1_SERIAL_CONSOLE)
 	/*
 	 * kdb_serial.iobase is initialized to zero, and is set to the I/O
 	 * address of the serial port when the console is setup in
@@ -73,6 +82,7 @@ extern struct kdb_serial {
 	unsigned long iobase;
 	unsigned long ioreg_shift;
 } kdb_serial;
+#endif
 
 	/*
 	 * kdb_diemsg
@@ -82,12 +92,11 @@ extern struct kdb_serial {
 	 */
 extern const char *kdb_diemsg;
 
-	/*
-	 * KDB_FLAG_EARLYKDB is set when the 'kdb' option is specified
-	 * as a boot parameter (e.g. via lilo).   It indicates that the
-	 * kernel debugger should be entered as soon as practical.
-	 */
-#define KDB_FLAG_EARLYKDB	0x00000001
+#define KDB_FLAG_EARLYKDB	(1 << 0)	/* set from boot parameter kdb=early */
+#define KDB_FLAG_CATASTROPHIC	(1 << 1)	/* A catastrophic event has occurred */
+#define KDB_FLAG_CMD_INTERRUPT	(1 << 2)	/* Previous command was interrupted */
+#define KDB_FLAG_NOIPI		(1 << 3)	/* Do not send IPIs */
+#define KDB_FLAG_ONLY_DO_DUMP	(1 << 4)	/* Only do a dump, used when kdb is off */
 
 	/*
 	 * Internal debug flags
@@ -126,12 +135,12 @@ volatile extern int kdb_state[ /*NR_CPUS*/ ];
 #define KDB_STATE_REENTRY	0x00000100	/* Valid re-entry into kdb */
 #define KDB_STATE_SUPPRESS	0x00000200	/* Suppress error messages */
 #define KDB_STATE_LONGJMP	0x00000400	/* longjmp() data is available */
- /* Spare, was    NO_WATCHDOG	0x00000800 */
+#define KDB_STATE_GO_SWITCH	0x00000800	/* go is switching back to initial cpu */
 #define KDB_STATE_PRINTF_LOCK	0x00001000	/* Holds kdb_printf lock */
 #define KDB_STATE_WAIT_IPI	0x00002000	/* Waiting for kdb_ipi() NMI */
 #define KDB_STATE_RECURSE	0x00004000	/* Recursive entry to kdb */
 #define KDB_STATE_IP_ADJUSTED	0x00008000	/* Restart IP has been adjusted */
-#define KDB_STATE_NO_BP_DELAY	0x00010000	/* No need to delay breakpoints */
+#define KDB_STATE_GO1		0x00010000	/* go only releases one cpu */
 #define KDB_STATE_ARCH		0xff000000	/* Reserved for arch specific use */
 
 #define KDB_STATE_CPU(flag,cpu)		(kdb_state[cpu] & KDB_STATE_##flag)
@@ -161,7 +170,7 @@ typedef enum {
 	KDB_REASON_WATCHDOG,		/* Watchdog interrupt; regs valid */
 	KDB_REASON_RECURSE,		/* Recursive entry to kdb; regs probably valid */
 	KDB_REASON_SILENT,		/* Silent entry/exit to kdb; regs invalid */
-	KDB_REASON_RESET,		/* Reset vector, for all runner-up cpus; regs valid */
+	KDB_REASON_CALL_PRESET,		/* Same as KDB_REASON_CALL but kdb_process_running has been preset */
 } kdb_reason_t;
 
 typedef enum {
@@ -227,6 +236,8 @@ extern void	     kdb_init(void);
 extern void	     kdb_symbol_print(kdb_machreg_t, const kdb_symtab_t *, unsigned int);
 extern char	    *kdb_read(char *buffer, size_t bufsize);
 extern char	    *kdb_strdup(const char *str, int type);
+extern int kallsyms_symbol_next(char *prefix_name, int flag);
+extern int kallsyms_symbol_complete(char *prefix_name);
 
 #if defined(CONFIG_SMP)
 	/*
@@ -244,6 +255,22 @@ extern void	     smp_kdb_stop(void);
 	 * Check Architecture, for example.
 	 */
 extern void	     kdb_enablehwfault(void);
+
+	 /*
+	  * Let other code know that kdb is in control.  Routines registered
+	  * on this list are called from the initial cpu with 1 when kdb is
+	  * entered and 0 when kdb exits.
+	  *
+	  * WARNING: If a module registers itself on this list (or any notifier
+	  * list) then there is a race condition.  The module could be in the
+	  * middle of removal on one cpu when it is called via the notifier
+	  * chain on another cpu.  It is the responsibility of the module to
+	  * prevent this race.  The safest way is for the module to define a
+	  * 'can_unload' function which unregisters the module from all
+	  * notifier chains before allowing the module to be unloaded.
+	  */
+
+extern struct notifier_block *kdb_notifier_list;
 
 	 /*
 	  * Do we have a set of registers?
@@ -273,5 +300,27 @@ struct kdb_usb_exchange {
 };
 extern struct kdb_usb_exchange kdb_usb_infos; /* KDB common structure */
 #endif /* CONFIG_KDB_USB */
+
+#ifdef	MODULE
+#define kdb_module_init(fn) module_init(fn)
+#define kdb_module_exit(fn) module_exit(fn)
+#else	/* !MODULE */
+extern initcall_t __kdb_initcall_start, __kdb_initcall_end;
+#define kdb_module_init(fn) \
+	static initcall_t __kdb_initcall_##fn __attribute__ ((unused,__section__ (".kdb_initcall.init"))) = fn;
+#define kdb_module_exit(fn) \
+	static exitcall_t __kdb_exitcall_##fn __attribute__ ((unused,__section__ (".kdb_exitcall.exit"))) = fn;
+#endif	/* MODULE */
+
+static inline
+int kdb_process_cpu(const struct task_struct *p)
+{
+	return p->thread_info->cpu;
+}
+
+extern struct task_struct *kdb_current_task;
+extern struct page * kdb_follow_page(struct mm_struct *, unsigned long, int); /* from mm/memory.c */
+
+extern const char kdb_serial_str[];
 
 #endif	/* !_KDB_H */

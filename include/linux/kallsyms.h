@@ -17,7 +17,6 @@ const char *kallsyms_lookup(unsigned long addr,
 /* Replace "%s" in format with address, if found */
 extern void __print_symbol(const char *fmt, unsigned long address);
 
-unsigned long kallsyms_get_addr(char * symname, unsigned long symsize);
 #else /* !CONFIG_KALLSYMS */
 
 static inline const char *kallsyms_lookup(unsigned long addr,

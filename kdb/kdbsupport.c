@@ -1,7 +1,7 @@
 /*
  * Kernel Debugger Architecture Independent Support Functions
  *
- * Copyright (C) 1999-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License
@@ -30,6 +30,7 @@
  * For further information regarding this notice, see:
  *
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
+ * 03/02/13    added new 2.5 kallsyms <xavier.bru@bull.net>
  */
 
 #include <stdarg.h>
@@ -40,10 +41,23 @@
 #include <linux/kallsyms.h>
 #include <linux/stddef.h>
 #include <linux/vmalloc.h>
+#include <linux/ptrace.h>
+#include <linux/module.h>
+#include <linux/highmem.h>
+
 #include <asm/uaccess.h>
 
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
+
+#ifdef CONFIG_MODULES
+extern struct list_head *kdb_modules;
+#endif
+
+/* These will be re-linked against their real values during the second link stage */
+extern unsigned long kallsyms_addresses[] __attribute__((weak));;
+extern unsigned long kallsyms_num_syms __attribute__((weak));
+extern char kallsyms_names[] __attribute__((weak));
 
 /*
  * Symbol table functions.
@@ -69,19 +83,51 @@
 int
 kdbgetsymval(const char *symname, kdb_symtab_t *symtab)
 {
-	unsigned long symsize;
-	memset(symtab, 0, sizeof(*symtab));
+	int i;
+	char *name = kallsyms_names;
+	char namebuf[128];
 
-	symtab->sym_name = symname;
-	symtab->sym_start = kallsyms_get_addr((char *)symname,&symsize);
-	symtab->sym_end=symtab->sym_start+symsize;
-	if (symtab->sym_start) {
-		symtab->mod_name = "kernel";
-		return 1;
-	} else {
-		symtab->mod_name = "unknown";
-		return 0;
+	if (KDB_DEBUG(AR))
+		kdb_printf("kdbgetsymval: symname=%s, symtab=%p\n", symname, symtab);
+	memset(symtab, 0, sizeof(*symtab));
+	
+	namebuf[127] = 0;
+	namebuf[0] = 0;
+	for (i = 0; i < kallsyms_num_syms; i++) {
+		unsigned prefix = *name++;
+		strncpy(namebuf + prefix, name, 127 - prefix);
+		if (strcmp(namebuf, symname) == 0) {
+			/* found */
+			symtab->sym_start = kallsyms_addresses[i];
+			if (KDB_DEBUG(AR))
+				kdb_printf("kdbgetsymval: returns 1, symtab->sym_start=0x%lx\n", symtab->sym_start);
+			return(1);
+		}
+		name += strlen(name) + 1;	    
 	}
+#ifdef CONFIG_MODULES
+ {
+	struct module *mod;
+	/* look into modules */
+	list_for_each_entry(mod, kdb_modules, list) {
+		for (i = 1; i < mod->num_symtab; i++) {
+			if (mod->symtab[i].st_shndx == SHN_UNDEF)
+				continue;
+			name =  mod->strtab + mod->symtab[i].st_name;
+			if (strcmp(name, symname) == 0) {
+				/* found */
+				symtab->sym_start = mod->symtab[i].st_value;
+				if (KDB_DEBUG(AR))
+					kdb_printf("kdbgetsymval: returns 1, symtab->sym_start=0x%lx\n", symtab->sym_start);
+				return(1);
+			}
+		}
+	}
+ }
+#endif /* CONFIG_MODULES */
+	if (KDB_DEBUG(AR))
+		kdb_printf("kdbgetsymval: returns 0\n");
+	return(0);
 }
 
 /*
@@ -100,22 +146,176 @@ kdbgetsymval(const char *symname, kdb_symtab_t *symtab)
  * Locking:
  *	None.
  * Remarks:
+ *	2.6 kallsyms has a "feature" where it unpacks the name into a string.
+ *	If that string is reused before the caller expects it then the caller
+ *	sees its string change without warning.  To avoid cluttering up the
+ *	main kdb code with lots of kdb_strdup, tests and kfree calls, kdbnearsym
+ *	maintains an LRU list of the last few unique strings.  The list is sized
+ *	large enough to hold active strings, no kdb caller of kdbnearsym makes
+ *	more than ~20 later calls before using a saved value.
  */
 
 int
 kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 {
-	unsigned long symsize;
-	unsigned long symoffset;
-	char namebuf[128];
+	int ret;
+	unsigned long symbolsize;
+	unsigned long offset;
+	static char *knt[100];	/* kdb name table, arbitrary size */
+	char *knt1 = kmalloc(128, GFP_ATOMIC);
+
+	if (!knt1) {
+		kdb_printf("kdbnearsym: addr=0x%lx cannot kmalloc knt1\n", addr);
+		return 0;
+	}
+
+	if (KDB_DEBUG(AR))
+		kdb_printf("kdbnearsym: addr=0x%lx, symtab=%p\n", addr, symtab);
+
 	memset(symtab, 0, sizeof(*symtab));
-	symtab->sym_name = kallsyms_lookup(addr,&symsize,&symoffset,(char **) &symtab->mod_name,namebuf);
-	
-	symtab->sym_start=addr-symoffset;
-	symtab->sym_end=symtab->sym_start+symsize;
-	if (symtab->mod_name && *symtab->mod_name == '\0')
+	symtab->sym_name = kallsyms_lookup(addr, &symbolsize , &offset, (char **)(&symtab->mod_name), knt1);
+	symtab->sym_start = addr - offset;
+	symtab->sym_end = symtab->sym_start + symbolsize;
+	ret = (symtab->sym_name != 0);
+
+	if (symtab->sym_name) {
+		int i;
+		for (i = 0; i < ARRAY_SIZE(knt); ++i) {
+			if (knt[i] && strcmp(knt[i], knt1) == 0)
+				break;
+		}
+		if (i >= ARRAY_SIZE(knt)) {
+			memcpy(knt, knt+1, sizeof(knt[0])*(ARRAY_SIZE(knt)-1));
+			i = ARRAY_SIZE(knt)-1;
+		} else {
+			kfree(knt1);
+			knt1 = knt[i];
+			memcpy(knt+i, knt+i+1, sizeof(knt[0])*(ARRAY_SIZE(knt)-i-1));
+		}
+		knt[i] = knt1;
+		symtab->sym_name = knt[i];
+	}
+
+	if (symtab->mod_name == NULL)
 		symtab->mod_name = "kernel";
-	return 1;
+	if (KDB_DEBUG(AR))
+		kdb_printf("kdbnearsym: returns %d symtab->sym_start=0x%lx, symtab->mod_name=%p, symtab->sym_name=%p (%s)\n", ret, symtab->sym_start, symtab->mod_name, symtab->sym_name, symtab->sym_name);
+
+	return ret;
+}
+
+/* 
+ * kallsyms_symbol_complete
+ *
+ * Parameters:
+ *	prefix_name 	prefix of a symbol name to lookup
+ * Returns: 
+ *	Number of symbols which match the given prefix.
+ */
+
+int kallsyms_symbol_complete(char *prefix_name)
+{
+	char *name = kallsyms_names;
+	int i;
+	char namebuf[128];
+	int prefix_len = strlen(prefix_name);
+	int number = 0;
+
+	/* look into kernel symbols */
+
+	for (i=0; i < kallsyms_num_syms; i++) {
+		unsigned prefix = *name++;
+		strncpy(namebuf + prefix, name, 127 - prefix);
+		if (strncmp(namebuf, prefix_name, prefix_len) == 0) {
+			/* found */
+			++number;
+		}
+		name += strlen(name) + 1;	    
+	}
+#ifdef CONFIG_MODULES
+ {
+	struct module *mod;
+	/* look into modules symbols */
+	list_for_each_entry(mod, kdb_modules, list) {
+		for (i = 1; i < mod->num_symtab; i++) {
+			if (mod->symtab[i].st_shndx == SHN_UNDEF)
+				continue;
+			name =  mod->strtab + mod->symtab[i].st_name;
+			if (strncmp(name, prefix_name, prefix_len) == 0) {
+				/* found */
+				++number;
+			}
+		}
+	}
+ }
+#endif /* CONFIG_MODULES */
+	return number;
+}
+
+/* 
+ * kallsyms_symbol_next
+ *
+ * Parameters:
+ *	prefix_name 	prefix of a symbol name to lookup
+ * 	flag	0 means search from the head, 1 means continue search.
+ * Returns: 
+ *	1 if a symbol matches the given prefix.
+ *	0 if no string found
+ */
+
+int kallsyms_symbol_next(char *prefix_name, int flag)
+{
+	int prefix_len = strlen(prefix_name);
+	char namebuf[128];
+	static int i;
+	static char *name;
+	static struct module *mod;
+
+	if (flag) {
+		/* continue searching */
+		i++;
+		name += strlen(name) + 1;	    
+	} else {
+		/* new search */
+		i = 0;
+		name = kallsyms_names;
+		mod = (struct module *)NULL;
+	}
+
+	if (mod == (struct module *)NULL) {
+		/* look into kernel symbols */
+		for (; i < kallsyms_num_syms; i++) {
+			unsigned prefix = *name++;
+			strncpy(namebuf + prefix, name, 127 - prefix);
+			if (strncmp(namebuf, prefix_name, prefix_len) == 0) {
+				/* found */
+				strncpy(prefix_name, namebuf, strlen(namebuf)+1);
+				return(1);
+			}
+			name += strlen(name) + 1;	    
+		}
+#ifdef CONFIG_MODULES
+		/* not found */
+		i = 1;
+		mod = list_entry(kdb_modules->next, struct module, list);
+	}
+	/* look into modules */
+	for (; &mod->list != kdb_modules; mod = 
+		     list_entry(mod->list.next, struct module, list))
+		for (; i < mod->num_symtab; i++) {
+			if (mod->symtab[i].st_shndx == SHN_UNDEF)
+				continue;
+			name =  mod->strtab + mod->symtab[i].st_name;
+			if (strncmp(name, prefix_name, prefix_len) == 0) {
+				/* found */
+				strncpy(prefix_name, name, strlen(name)+1);
+				return(1);
+			}
+		}
+#else /* CONFIG_MODULES */
+	}
+#endif /* CONFIG_MODULES */
+	return(0);
 }
 
 #if defined(CONFIG_SMP)
@@ -313,7 +513,7 @@ kdb_get_next_ar(kdb_machreg_t arend, kdb_machreg_t func,
 
 	memset(ar, 0, sizeof(*ar));
 	if (!kdbnearsym(pc, symtab)) {
-		symtab->sym_name = "<unknown>";
+		symtab->sym_name = symtab->sec_name = "<unknown>";
 		symtab->mod_name = "kernel";
 		if (KDB_DEBUG(AR)) {
 			kdb_printf("kdb_get_next_ar: callee not in kernel\n");
@@ -426,28 +626,26 @@ kdb_symbol_print(kdb_machreg_t addr, const kdb_symtab_t *symtab_p, unsigned int 
 	if (punc & KDB_SP_VALUE) {
 		kdb_printf(kdb_machreg_fmt0, addr);
 	}
-	if (!symtab_p2->sym_name) {
-		return;
-	}
-	if (punc & KDB_SP_VALUE) {
-		kdb_printf(" ");
-	}
-	if (punc & KDB_SP_PAREN) {
-		kdb_printf("(");
-	}
-	if (symtab_p2->mod_name)
+	if (symtab_p2->sym_name) {
+		if (punc & KDB_SP_VALUE) {
+			kdb_printf(" ");
+		}
+		if (punc & KDB_SP_PAREN) {
+			kdb_printf("(");
+		}
 		if (strcmp(symtab_p2->mod_name, "kernel")) {
 			kdb_printf("[%s]", symtab_p2->mod_name);
 		}
-	kdb_printf("%s", symtab_p2->sym_name);
-	if (addr != symtab_p2->sym_start) {
-		kdb_printf("+0x%lx", addr - symtab_p2->sym_start);
-	}
-	if (punc & KDB_SP_SYMSIZE) {
-		kdb_printf("/0x%lx", symtab_p2->sym_end - symtab_p2->sym_start);
-	}
-	if (punc & KDB_SP_PAREN) {
-		kdb_printf(")");
+		kdb_printf("%s", symtab_p2->sym_name);
+		if (addr != symtab_p2->sym_start) {
+			kdb_printf("+0x%lx", addr - symtab_p2->sym_start);
+		}
+		if (punc & KDB_SP_SYMSIZE) {
+			kdb_printf("/0x%lx", symtab_p2->sym_end - symtab_p2->sym_start);
+		}
+		if (punc & KDB_SP_PAREN) {
+			kdb_printf(")");
+		}
 	}
 	if (punc & KDB_SP_SPACEA) {
 		kdb_printf(" ");
@@ -671,7 +869,6 @@ int kdb_putword(unsigned long addr, unsigned long word, size_t size)
 #define UNRUNNABLE	(1UL << (8*sizeof(unsigned long) - 1))	/* unrunnable is < 0 */
 #define RUNNING		(1UL << (8*sizeof(unsigned long) - 2))
 #define TRACED		(1UL << (8*sizeof(unsigned long) - 3))
-#define PT_PTRACED 0x00000001
 
 unsigned long
 kdb_task_state_string(int argc, const char **argv, const char **envp)
@@ -716,7 +913,148 @@ kdb_task_state_string(int argc, const char **argv, const char **envp)
 unsigned long
 kdb_task_state(const struct task_struct *p, unsigned long mask)
 {
+	if (!p)
+		return(0);
 	return ((mask & p->state) ||
 		(mask & RUNNING && p->state == 0) ||
 		(mask & TRACED && p->ptrace & PT_PTRACED));
+}
+
+struct kdb_running_process kdb_running_process[NR_CPUS];
+
+/*
+ * kdb_save_running
+ *
+ * 	Save the state of a running process.  This is invoked on the current
+ * 	process on each cpu (assuming the cpu is responding).
+ * Inputs:
+ *	regs	struct pt_regs for the process
+ * Outputs:
+ *	Updates kdb_running_process[] for this cpu.
+ * Returns:
+ *	none.
+ * Locking:
+ *	none.
+ */
+
+void
+kdb_save_running(struct pt_regs *regs)
+{
+	struct kdb_running_process *krp = kdb_running_process + smp_processor_id();
+	krp->p = current;
+	krp->regs = regs;
+	krp->seqno = kdb_seqno;
+	kdba_save_running(&(krp->arch), regs);
+}
+
+/*
+ * kdb_unsave_running
+ *
+ * 	Reverse the effect of kdb_save_running.
+ * Inputs:
+ *	regs	struct pt_regs for the process
+ * Outputs:
+ *	Updates kdb_running_process[] for this cpu.
+ * Returns:
+ *	none.
+ * Locking:
+ *	none.
+ */
+
+void
+kdb_unsave_running(struct pt_regs *regs)
+{
+	struct kdb_running_process *krp = kdb_running_process + smp_processor_id();
+	kdba_unsave_running(&(krp->arch), regs);
+	krp->seqno = 0;
+}
+
+
+/*
+ * kdb_print_nameval
+ *
+ * 	Print a name and its value, converting the value to a symbol lookup
+ * 	if possible.
+ * Inputs:
+ *	name	field name to print
+ *	val	value of field
+ * Outputs:
+ *	none.
+ * Returns:
+ *	none.
+ * Locking:
+ *	none.
+ */
+
+void
+kdb_print_nameval(const char *name, unsigned long val)
+{
+	kdb_symtab_t symtab;
+	kdb_printf("  %-11.11s ", name);
+	if (kdbnearsym(val, &symtab))
+		kdb_symbol_print(val, &symtab, KDB_SP_VALUE|KDB_SP_SYMSIZE|KDB_SP_NEWLINE);
+	else
+		kdb_printf("0x%lx\n", val);
+}
+
+static struct page * kdb_get_one_user_page(struct task_struct *tsk, unsigned long start,
+		int len, int write)
+{
+	struct mm_struct *mm = tsk->mm;
+	unsigned int flags;
+	struct vm_area_struct *	vma;
+
+	/* shouldn't cross a page boundary. temporary restriction. */
+	if ((start & PAGE_MASK) != ((start+len) & PAGE_MASK)) {
+		kdb_printf("%s: crosses page boundary: addr=%08lx, len=%d\n", 
+			__FUNCTION__, start, len);
+		return NULL;
+	}
+
+	/* we need to align start address to the current page boundy, PAGE_ALIGN
+	 * aligns to next page boundry. 
+	 * FIXME: What about hugetlb?
+	 */
+	start = start & PAGE_MASK;
+	flags = write ? (VM_WRITE | VM_MAYWRITE) : (VM_READ | VM_MAYREAD);
+
+	vma = find_extend_vma(mm, start);
+
+	/* may be we can allow access to VM_IO pages inside KDB? */
+	if (!vma || (vma->vm_flags & VM_IO) || !(flags & vma->vm_flags))
+		return NULL;
+
+	return kdb_follow_page(mm, start, write);
+}
+
+int kdb_getuserarea_size(void *to, unsigned long from, size_t size)
+{
+	struct page *page;
+	void * vaddr;
+
+	page = kdb_get_one_user_page(kdb_current_task, from, size, 0);
+	if (!page)
+		return size;
+
+	vaddr = kmap_atomic(page, KM_KDB);
+	memcpy(to, vaddr+ (from & (PAGE_SIZE - 1)), size);
+	kunmap_atomic(vaddr, KM_KDB);
+
+	return 0;
+}
+
+int kdb_putuserarea_size(unsigned long to, void *from, size_t size)
+{
+	struct page *page;
+	void * vaddr;
+
+	page = kdb_get_one_user_page(kdb_current_task, to, size, 1);
+	if (!page)
+		return size;
+
+	vaddr = kmap_atomic(page, KM_KDB);
+	memcpy(vaddr+ (to & (PAGE_SIZE - 1)), from, size);
+	kunmap_atomic(vaddr, KM_KDB);
+
+	return 0;
 }

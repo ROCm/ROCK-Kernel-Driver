@@ -1,12 +1,294 @@
+2004-02-21 Keith Owens  <kaos@sgi.com>
+
+	* Correct build of kdb_cmds when using a separate object directory and
+	  make it quiet.  j-nomura (NEC), Keith Owens.
+	* kdb v4.3-2.6.3-common-2.
+
+2004-02-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.3-common-1.
+
+2004-02-17 Keith Owens  <kaos@sgi.com>
+
+	* Remove WAR for incorrect console registration patch.
+	* kdb v4.3-2.6.3-rc4-common-1.
+
+2004-02-17 Keith Owens  <kaos@sgi.com>
+
+	* Convert longjmp buffers from static to dynamic allocation, for large
+	  cpu counts.
+	* Tweak kdbm_task for SMP/UP.
+	* Reconcile with kdb-v4.3 2.4.25-rc1-common-1.
+	* Simplify coexistence with NPTL patches.
+	* Support kill command on new scheduler.
+	* Do not refetch data when printing a value as characters.
+	* Document the pid command.
+	* Work around 2.6 kallsyms 'feature'.
+	* Upgrade to 2.6.3-rc3.
+	* WAR for incorrect console registration patch.
+	* kdb v4.3-2.6.3-rc3-common-1.
+
+2003-12-03 Keith Owens  <kaos@sgi.com>
+
+	* Reconcile 2.6-test versions from Xavier Bru (Bull), Greg Banks (SGI),
+	  Jim Houston (Concurrent Computer Corp).
+	* Reconcile with kdb v4.3-2.4.23-common-2.
+	* Clean up CONFIG_KDB changes to {scripts,kernel}/kallsyms.c.
+	* Correct handling of kdb command line arguments.
+	* Make hooks into module code less intrusive.
+	* Delete kdb_active_task, not required with O(1) scheduler.
+	* Port kdbm_task.c from 2.4.
+	* Disable debug check in exit.c::next_thread() when kdb is running.
+	* Remove "only bh_disable when interrupts are set".  BH must be disabled
+	  in kdb to prevent deadlock on breakpoints in interrupt handlers.
+	* Add kdb to drivers/char/sn_serial.c.
+	* kdb v4.3-2.6.0-test11-common-1.
+
+2003-11-11 Xavier Bru   <xavier.bru@bull.net>
+	* Merge to 2.6.0-test9
+2003-10-17 Xavier Bru   <xavier.bru@bull.net>
+	* fix NUll ptr in kdb_ps at early prompt.
+2003-10-14 Xavier Bru   <xavier.bru@bull.net>
+	* fix NUll ptr in kdb_ps when cpu not present.
+2003-10-06 Xavier Bru   <xavier.bru@bull.net>
+	* Merge to 2.6.0-test5
+	* fix compile error with CONFIG_MODULES not set.
+
+2003-09-08 Xavier Bru   <xavier.bru@bull.net>
+	* Merge to 2.6.0-test4
+
+2003-07-10 Xavier Bru   <xavier.bru@bull.net>
+
+	* Merge kdb v4.3 to 2.5.72 ia64
+	* don't call local_bh_enable() with interrupts masked.
+
+2003-04-07 Xavier Bru   <xavier.bru@bull.net>
+
+	* Merge kdb v4.1 to 2.5.64 ia64
+	* new kernel parameters support
+	* new module format
+	* new kallsyms support
+
+2003-12-02 Keith Owens  <kaos@sgi.com>
+
+	* Use correct page alignment in kdb_get_one_user_page().
+	  Prasanna S Panchamukhi, IBM.
+	* Split pte command into pte -m and pte -p.  Dean Roe, SGI.
+	* kdb v4.3-2.4.23-common-2.
+
+2003-12-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.23-common-1.
+
+2003-11-11 Keith Owens  <kaos@sgi.com>
+
+	* Make KDB for USB keyboards build.  Peter T. Breuer.
+	* Do not use USB keyboard if it has not been probed.
+	* kdb v4.3-2.4.23-rc1-common-1.
+
+2003-10-10 Keith Owens  <kaos@sgi.com>
+
+	* Sync with XFS 2.4.22 tree.
+	* kdb v4.3-2.4.22-common-2.
+
+2003-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.22-common-1.
+
+2003-07-27 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.22-pre8-common-8.
+
+2003-07-20 Keith Owens  <kaos@sgi.com>
+
+	* Make kdb_serial_str a common constant, the same for all consoles.
+	* Support SGI L1 console.
+	* kdb v4.3-2.4.21-common-8.
+
+2003-07-14 Keith Owens  <kaos@sgi.com>
+
+	* Correct ll command.
+	* kdb v4.3-2.4.21-common-7.
+
+2003-07-08 Keith Owens  <kaos@sgi.com>
+
+	* Export more kdb symbols.  Vamsi Krishna S., IBM.
+	* kdb v4.3-2.4.21-common-6.
+
+2003-07-07 Keith Owens  <kaos@sgi.com>
+
+	* Tweak 'waiting for cpus' message.
+	* kdb v4.3-2.4.21-common-5.
+
+2003-07-07 Keith Owens  <kaos@sgi.com>
+
+	* 2.4.21-ia64-030702 patches common code that affects kdb.  Workaround
+	  this nuisance.
+	* kdb v4.3-2.4.21-common-4.
+
+2003-06-24 Keith Owens  <kaos@sgi.com>
+
+	* Add task and sigset commands.  Mark Goodwin, SGI.
+	* kdb v4.3-2.4.21-common-3.
+
+2003-06-23 Keith Owens  <kaos@sgi.com>
+
+	* Sync with XFS 2.4.21 tree.
+	* kdb v4.3-2.4.21-common-2.
+
+2003-06-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.21-common-1.
+
+2003-06-20 Keith Owens  <kaos@sgi.com>
+
+	* More details on vm command, add vmp and pte commands.
+	  Dean Nelson, Dean Roe, SGI.
+	* YAO1SCF (Yet Another O(1) Scheduler Coexistence Fix).
+	* Changes to common code to build on sparc.  Tom Duffy.
+	* Move Tom Duffy's changes to drivers/sbus from the sparc64
+	  patch to the common patch to keep all the serial changes
+	  together.
+	* Changes to common code to build on Xscale.  Eddie Dong, Intel.
+	* Remove CROSS_COMPILE_INC.
+	* Remove obsolete boot parameter 'kdb', long since replaced by
+	  'kdb=on'.
+	* Remove obsolete kdb_eframe_t casts.
+	* Add CONFIG_KDB_CONTINUE_CATASTROPHIC.
+	* Wait a short interval for cpus to join kdb before proceeding.
+	* Automatically enable sysrq for sr command.
+	* Correct double free of kdb_printf lock, spotted by Richard Sanders.
+	* Add optional cpu parameter to btc command.
+	* kdb v4.3-2.4.20-common-1.
+
+2003-05-02 Keith Owens  <kaos@sgi.com>
+
+	* Some architectures have problems with the initial empty kallsyms
+	  section so revert to three kallsyms passes.
+	* Flush buffered input at startup and at 'more' prompt.
+	* Only print 'more' prompt when longjmp data is available.
+	* Print more data for buffers and inodes.
+	* Disable kill command when O(1) scheduler is installed, the code
+	  needs to be redone for O(1).
+	* The kernel has an undocumented assumption that enable_bh() is
+	  always called with interrupts enabled, make it so.
+	* Print trailing punctuation even for symbols that are not in kernel.
+	* Add read/write access to user pages.  Vamsi Krishna S., IBM
+	* Rename cpu_is_online to cpu_online, as in 2.5.
+	* O(1) scheduler removes init_task so kdb maintains its own list of
+	  active tasks.
+	* Delete btp 0 <cpuid> option, it needed init_tasks.
+	* Clean up USB keyboard support.  Steven Dake.
+	* Sync with XFS 2.4.20 tree.
+	* kdb v4.2-2.4.20-common-1.
+
+2003-04-04 Keith Owens  <kaos@sgi.com>
+
+	* Remove one kallsyms pass.
+	* Automatic detection of O(1) scheduler.
+	* Rename cpu_online to cpu_is_online.
+	* Workarounds for scheduler bugs.
+	* Tweak algorithm for detecting if cpu process data is available.
+	* Add 'kill' command.  Sonic Zhang, Keith Owens.
+	* kdb v4.1-2.4.20-common-1.
+
+2003-03-16 Keith Owens  <kaos@sgi.com>
+
+	* Each cpu saves its state as it enters kdb or before it enters code
+	  which cannot call kdb.
+	* Allow btp on process 0 for a specified cpu.
+	* Add btt command, backtrace given a struct task address.
+	* btc command no longer switches cpus, instead it uses the saved data.
+	* bta shows the idle task on each cpu as well as real tasks, the idle
+	  task could be handling an interrupt.
+	* ps command shows the idle task on each cpu.
+	* ps checks that the saved data for a cpu matches the process running on
+	  that cpu and warns about stale saved data or no saved data at all.
+	* Remove special cases for i386 backtrace from common code and simplify
+	  common bt code.
+	* Clean up kdb interaction with CONFIG_SERIAL_CONSOLE.
+	* Do not automatically repeat commands after the user typed 'q'.
+	* O(1) scheduler patch changes the process cpu field but does not set
+	  any indicator that O(1) is being used.  Adjust kdb_process_cpu() by
+	  hand after applying O(1).
+	* Add kdb_print_nameval() to common code.
+	* Convert tests of cpu_online_map to cpu_online() macro.
+	* module.h needs errno.h when compiling with CONFIG_MODULES=n.
+	* Correct duplicate breakpoint handling.
+	* Do not try to send IPI during a catastrophic error, send_ipi can hang
+	  and take kdb with it.
+	* kdb memmap command is i386 only, restrict it.
+	* Add large block device (LBD) support from XFS tree.  Eric Sandeen.
+	* kdb v4.0-2.4.20-common-1.
+
+2003-02-03 Keith Owens  <kaos@sgi.com>
+
+	* Register kdb commands early.
+	* Decode oops via kallsyms if it is available.
+	* Update copyright notices to 2003.
+	* Add defcmd/endefcmd to allow users to package their own macros.
+	* kdb commands that fail are ignored when prefixed with '-'.
+	* Add selection options to bta command.
+	* Add btc command (switch to each cpu and backtrace).
+	* Do real time detection of dead cpus.
+	* Clear ip adjusted flag when leaving kdb.
+	* Clean up ps command.
+	* Print ps output for each task when backtracing.
+	* Bump to version v3.0 to reduce confusion between kdb and kernel
+	  version numbers.
+	* Add kdba_local_arch_setup/kdba_local_arch_cleanup to correct
+	  keyboard freeze.  Ashish Kalra.
+	* Refuse multiple breakpoints at the same address.
+	* Add fl (file_lock) command, from XFS development tree.
+	* Correct inode_pages, from XFS development tree.
+	* Add command history and editing.  Sonic Zhang.
+	* Extend command history and editing to handle vt100 escape sequences.
+	* Allow tab completion at start of line.
+	* Touch nmi watchdog on long running bta and btc commands.
+	* Clean up ps output and standardize with bta codes.
+	* Correctly handle escaped characters in commands.
+	* Update man pages for btc and command history/editing.
+	* kdb v3.0-2.4.20-common-1.
+
+2002-11-29 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.20.
+	* Correct Documentation/kdb/kdb_sr.man.
+	* Remove leading zeroes from pids, they are decimal, not octal.
+	* kdb v2.5-2.4.20-common-1.
+
+2002-11-14 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.20-rc1.
+	* kdb v2.5-2.4.20-rc1-common-1.
+
+2002-11-14 Keith Owens  <kaos@sgi.com>
+
+	* Fix processing with O(1) scheduler.
+	* 'go' switches back to initial cpu first.
+	* 'go <address>' only allowed on initial cpu.
+	* 'go' installs the global breakpoints from the initial cpu before
+	   releasing the other cpus.
+	* If 'go' has to single step over a breakpoint then it single steps just
+	  the initial cpu, installs the global breakpoints then releases the
+	  other cpus.
+	* General clean up of handling for breakpoints and single stepping over
+	  software breakpoints.
+	* Add kdb_notifier_block so other code can tell when kdb is in control.
+	* kdb v2.5-2.4.19-common-1.
+
 2002-11-02 Keith Owens  <kaos@sgi.com>
 
-	* Upgrade to 2.5.45.
 	* Correct build without CONFIG_KDB.
-	* kdb v2.4-2.5.45-common-1.
+	* kdb v2.4-2.4.19-common-3.
 
 2002-11-01 Keith Owens  <kaos@sgi.com>
 
-	* Sync with kdb v2.4-2.4.19-common-2.
+	* Minimize differences from 2.5.44.
+	* kdb v2.4-2.4.19-common-2.
+
+2002-10-31 Keith Owens  <kaos@sgi.com>
+
 	* Add defcmd/endefcmd feature.
 	* Remove kdb_eframe_t.
 	* Clear bp data before using.
@@ -16,48 +298,33 @@
 	* Remove kdba_getcurrentframe().
 	* Coexist with O(1) scheduler.
 	* Add lines option to dmesg, speed up dmesg.
-	* Add selection critera to ps and bta commands.
-	* New man page, Documentation/kdb/kdb_sr.man.
-	* kdb v2.4-2.5.44-common-1.
-
-2002-10-25 Keith Owens  <kaos@sgi.com>
-
-	* Move -fomit-frame-pointer after .config has been read.
-	* Upgrade to 2.5.44.
-	* kdb v2.3-2.5.44-common-1.
+	* kdb v2.4-2.4.19-common-1.
 
 2002-10-17 Keith Owens  <kaos@sgi.com>
 
-	* Upgrade to 2.5.43.
-	* kdb v2.3-2.5.43-common-1.
+	* Add selection critera to ps and bta commands.
+	* kdb v2.3-2.4.19-common-4.
 
-2002-10-14 Keith Owens  <kaos@sgi.com>
+2002-10-07 Keith Owens  <kaos@sgi.com>
 
-	* Upgrade to 2.5.42.
-	* kdb v2.3-2.5.42-common-1.
-
-2002-10-09 Keith Owens  <kaos@sgi.com>
-
-	* Upgrade to 2.5.41.
-	* kdb v2.3-2.5.41-common-1.
+	* New man page, Documentation/kdb/kdb_sr.man.
 
 2002-10-04 Keith Owens  <kaos@sgi.com>
 
 	* Minimize differences between patches for 2.4 and 2.5 kernels.
+	* Add Configure.help for CONFIG_KDB_USB.
 	* Reduce stack usage.
-	* kdb v2.3-2.5.40-common-2.
+	* kdb v2.3-2.4.19-common-3.
 
-2002-10-03 Keith Owens  <kaos@sgi.com>
+2002-08-10 Keith Owens  <kaos@sgi.com>
 
-	* Upgrade to 2.5.40.
-	* kdb v2.3-2.5.40-common-1.
-
-2002-09-24 Keith Owens  <kaos@sgi.com>
-
-	* Sync with kdb v2.3-2.4.19-common-2.
-	* Sync with 2.5.x-xfs (2.5.38).
 	* Replace kdb_port with kdb_serial to support memory mapped I/O.
 	  David Mosberger.
+	* kdb v2.3-2.4.19-common-2.
+
+2002-08-07 Keith Owens <kaos@sgi.com>
+
+	* Upgrade to 2.4.19.
 	* Remove individual SGI copyrights, the general SGI copyright applies.
 	* Handle md0.  Reported by Hugh Dickins, different fix by Keith Owens.
 	* Use page_address() in kdbm_pg.c.  Hugh Dickins.
@@ -65,17 +332,34 @@
 	* Move breakpoint address verification into arch dependent code.
 	* Dynamically resize kdb command table as required.
 	* Common code to support USB keyboard.  Sebastien Lelarge.
-	  Note: broken in 2.5 until somebody who understands USB can fix it.
+	* kdb v2.3-2.4.19-common-1.
+
+2002-07-09 Keith Owens <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-rc1.
 	* Add dmesg command.
 	* Clean up copyrights, Eric Sandeen.
+	* kdb v2.2-2.4.19-rc1-common-1.
+
+2002-06-14 Keith Owens <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre10.
+	* Sync with XFS.
+	* kdb v2.1-2.4.19-pre10-common-1.
+
+2002-04-09 Keith Owens <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre6.
+	* kdb v2.1-2.4.19-pre6-common-1.
+
+2002-03-18 Keith Owens <kaos@sgi.com>
+
 	* Syntax check mdWcN commands.
 
-2002-02-27 Keith Owens <kaos@sgi.com>
+2002-03-01 Keith Owens <kaos@sgi.com>
 
-	* Tom Duffy's kdb for 2.5.5.
-	* Sync with kdb v2.1-2.4.18-common-1.
-	* Correct kdbm_pg.c for non-highmem machines.
-	* kdb v2.1-2.5.5-common-1.
+	* Sync with XFS 2.4.18.
+	* kdb v2.1-2.4.18-common-2.
 
 2002-02-26 Keith Owens <kaos@sgi.com>
 

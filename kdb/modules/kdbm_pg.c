@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License
@@ -36,8 +36,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>
-#include <linux/buffer_head.h>
 #include <linux/bio.h>
+#include <linux/buffer_head.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 #include <linux/blkdev.h>
@@ -49,17 +49,21 @@ MODULE_LICENSE("GPL");
 
 /* Standard Linux page stuff */
 
+#ifndef CONFIG_DISCONTIGMEM
 static char	*pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
-	"PG_dirty_dontuse", "PG_lru", "PG_active", "PG_slab",
+	"PG_dirty", "PG_lru", "PG_active", "PG_slab",
 	"PG_highmem", "PG_checked", "PG_arch_1", "PG_reserved",
-	"PG_private", "PG_writeback",
+	"PG_private", "PG_writeback", "PG_nosave", "PG_chainlock",
+	"PG_direct", "PG_mappedtodisk", "PG_reclaim", "PG_compound",
 	NULL };
+#endif
 
 static char	*bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
-	"Mapped", "New", "AsyncRead", "AsyncWrite",
-	"JBD", "Delay", "Private",
+	"Mapped", "New", "Async_read", "Async_write",
+	"Delay", "Boundary", "Write_EIO",
+	"Private",
 	NULL };
 
 static char *inode_flag_vals[] = {
@@ -92,11 +96,6 @@ static char	*map_flags(unsigned long flags, char *mapping[])
 	return (buffer);
 }
 
-static char	*page_flags(unsigned long flags)
-{
-	return(map_flags(flags, pg_flag_vals));
-}
-
 static int
 kdbm_buffers(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
@@ -116,15 +115,31 @@ kdbm_buffers(int argc, const char **argv, const char **envp,
 		return(diag);
 
 	kdb_printf("buffer_head at 0x%lx\n", addr);
-	kdb_printf("  bno %ld size %d dev 0x%x\n",
-		bh.b_blocknr, bh.b_size, bh.b_bdev->bd_dev);
+	kdb_printf("  bno %llu size %d dev 0x%x\n",
+		(unsigned long long)bh.b_blocknr,
+		bh.b_size,
+		bh.b_bdev->bd_dev);
 	kdb_printf("  count %d state 0x%lx [%s]\n",
 		bh.b_count.counter, bh.b_state,
 		map_flags(bh.b_state, bh_state_vals));
-	kdb_printf("  b_data 0x%p b_page 0x%p b_this_page 0x%p b_private 0x%p\n",
-		bh.b_data, bh.b_page, bh.b_this_page, bh.b_private);
+	kdb_printf("  b_data 0x%p\n",
+		bh.b_data);
+	kdb_printf("  b_page 0x%p b_this_page 0x%p b_private 0x%p\n",
+		bh.b_page, bh.b_this_page, bh.b_private);
+	kdb_printf("  b_end_io ");
+	if (bh.b_end_io)
+		kdb_symbol_print(kdba_funcptr_value(bh.b_end_io), NULL, KDB_SP_VALUE);
+	else
+		kdb_printf("(NULL)");
+	kdb_printf("\n");
 
 	return 0;
+}
+
+#ifndef CONFIG_DISCONTIGMEM
+static char	*page_flags(unsigned long flags)
+{
+	return(map_flags(flags, pg_flag_vals));
 }
 
 static int
@@ -163,6 +178,7 @@ kdbm_page(int argc, const char **argv, const char **envp,
 
 	return 0;
 }
+#endif /* CONFIG_DISCONTIGMEM */
 
 unsigned long
 print_request(unsigned long addr)
@@ -173,16 +189,17 @@ print_request(unsigned long addr)
 		return(0);
 
 	kdb_printf("struct request at 0x%lx\n", addr);
-	kdb_printf("  rq_dev 0x%x errors %d sector %ld nr_sectors %ld\n",
-			kdev_val(rq.rq_dev), rq.errors, rq.sector,
-			rq.nr_sectors);
+	kdb_printf("  errors %d sector %llu nr_sectors %lu waiting 0x%p\n",
+			rq.errors,
+			(unsigned long long)rq.sector, rq.nr_sectors,
+			rq.waiting);
 
-	kdb_printf("  hsect %ld hnrsect %ld nrhwseg %d currnrsect %d\n",
-			rq.hard_sector, rq.hard_nr_sectors,
-			rq.nr_hw_segments, rq.current_nr_sectors);
-	kdb_printf("  ");
+	kdb_printf("  hsect %llu hnrsect %lu nrseg %u nrhwseg %u currnrsect %u\n",
+			(unsigned long long)rq.hard_sector, rq.hard_nr_sectors,
+			rq.nr_phys_segments, rq.nr_hw_segments,
+			rq.current_nr_sectors);
 
-	return 1;
+	return (unsigned long) rq.queuelist.next;
 }
 
 static int
@@ -206,6 +223,43 @@ kdbm_request(int argc, const char **argv, const char **envp,
 	return 0;
 }
 
+
+static int
+kdbm_rqueue(int argc, const char **argv, const char **envp,
+	struct pt_regs *regs)
+{
+	struct request_queue	rq;
+	unsigned long addr, head_addr, next;
+	long	offset=0;
+	int nextarg;
+	int i, diag;
+	
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	nextarg = 1;
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(rq, addr)))
+		return(diag);
+
+	kdb_printf("struct request_queue at 0x%lx\n", addr);
+	i = 0;
+	next = (unsigned long)rq.queue_head.next;
+	head_addr = addr + offsetof(struct request_queue, queue_head);
+	kdb_printf(" request queue: %s\n", next == head_addr ?
+		"empty" : "");
+	while (next != head_addr) {
+		i++;
+		next = print_request(next);
+	}
+
+	if (i)
+		kdb_printf("%d requests found\n", i);
+
+	return 0;
+}
+
+
 static void
 do_buffer(unsigned long addr)
 {
@@ -214,7 +268,8 @@ do_buffer(unsigned long addr)
 	if (kdb_getarea(bh, addr))
 		return;
 
-	kdb_printf("bh 0x%lx bno %8ld [%s]\n", addr, bh.b_blocknr,
+	kdb_printf("bh 0x%lx bno %8llu [%s]\n", addr,
+		 (unsigned long long)bh.b_blocknr,
 		 map_flags(bh.b_state, bh_state_vals));
 }
 
@@ -269,21 +324,20 @@ kdbm_inode_pages(int argc, const char **argv, const char **envp,
  again:
 	if (which == 0){
 	  which=1;
-	  head = &ap->clean_pages;
+	  head = &inode->i_mapping->clean_pages;
 	  kdb_printf("CLEAN  page_struct   index  cnt  flags\n");
 	} else if (which == 1) {
 	  which=2;
-	  head = &ap->dirty_pages;
+	  head = &inode->i_mapping->dirty_pages;
 	  kdb_printf("DIRTY  page_struct   index  cnt  flags\n");
 	} else if (which == 2) {
 	  which=3;
-	  head = &ap->locked_pages;
+	  head = &inode->i_mapping->locked_pages;
 	  kdb_printf("LOCKED page_struct   index  cnt  flags\n");
 	} else {
 	  goto out;
 	}
 	
-	if(!head) goto again;
 	curr = head->next;
 	while (curr != head) {
 		struct page 	 page;
@@ -345,33 +399,37 @@ kdbm_inode(int argc, const char **argv, const char **envp,
 
 	kdb_printf("struct inode at  0x%lx\n", addr);
 
-	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
+	kdb_printf(" i_ino = %lu i_count = %u i_size %Ld\n",
 					inode->i_ino, atomic_read(&inode->i_count),
-					inode->i_dev, inode->i_size);
+					inode->i_size);
 
 	kdb_printf(" i_mode = 0%o  i_nlink = %d  i_rdev = 0x%x\n",
 					inode->i_mode, inode->i_nlink,
-					kdev_val(inode->i_rdev));
+					inode->i_rdev);
 
-	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
-					inode->i_hash.next, inode->i_hash.prev);
+	kdb_printf(" i_hash.nxt = 0x%p i_hash.pprev = 0x%p\n",
+		inode->i_hash.next,
+		inode->i_hash.pprev);
 
 	kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
-					inode->i_list.next, inode->i_list.prev);
+		list_entry(inode->i_list.next, struct inode, i_list),
+		list_entry(inode->i_list.prev, struct inode, i_list));
 
 	kdb_printf(" i_dentry.nxt = 0x%p i_dentry.prv = 0x%p\n",
-					inode->i_dentry.next,
-					inode->i_dentry.prev);
+		list_entry(inode->i_dentry.next, struct dentry, d_alias),
+		list_entry(inode->i_dentry.prev, struct dentry, d_alias));
 
 	kdb_printf(" i_sb = 0x%p i_op = 0x%p i_data = 0x%lx nrpages = %lu\n",
 					inode->i_sb, inode->i_op,
 					addr + offsetof(struct inode, i_data),
 					inode->i_data.nrpages);
-	kdb_printf(" i_mapping = 0x%p\n i_flags 0x%x i_state 0x%lx [%s]",
-			   inode->i_mapping, inode->i_flags,
-			   inode->i_state,
-			   map_flags(inode->i_state, inode_flag_vals));
+	kdb_printf(" i_fop= 0x%p i_flock = 0x%p i_mapping = 0x%p\n",
+			   inode->i_fop, inode->i_flock, inode->i_mapping);
 	
+	kdb_printf(" i_flags 0x%x i_state 0x%lx [%s]",
+			   inode->i_flags, inode->i_state,
+			   map_flags(inode->i_state, inode_flag_vals));
+
 	iaddr  = (char *)addr;
 	iaddr += offsetof(struct inode, u);
 
@@ -383,6 +441,46 @@ out:
 }
 
 static int
+kdbm_sb(int argc, const char **argv, const char **envp,
+	struct pt_regs *regs)
+{
+	struct super_block *sb = NULL;
+	unsigned long addr;
+	long	offset=0;
+	int nextarg;
+	int diag;
+	
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	nextarg = 1;
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+		goto out;
+	if (!(sb = kmalloc(sizeof(*sb), GFP_ATOMIC))) {
+		kdb_printf("kdbm_sb: cannot kmalloc sb\n");
+		goto out;
+	}
+	if ((diag = kdb_getarea(*sb, addr)))
+		goto out;
+
+	kdb_printf("struct super_block at  0x%lx\n", addr);
+	kdb_printf(" s_dev 0x%x blocksize 0x%lx\n", sb->s_dev, sb->s_blocksize);
+	kdb_printf(" s_flags 0x%lx s_root 0x%p\n", sb->s_flags, sb->s_root);
+	kdb_printf(" s_dirt %d s_dirty.next 0x%p s_dirty.prev 0x%p\n",
+		sb->s_dirt, sb->s_dirty.next, sb->s_dirty.prev);
+out:
+	if (sb)
+		kfree(sb);
+	return diag;
+}
+
+
+
+#ifdef	CONFIG_X86
+/* According to Steve Lord, this code is ix86 specific.  Patches to extend it to
+ * other architectures will be greatefully accepted.
+ */
+static int
 kdbm_memmap(int argc, const char **argv, const char **envp,
         struct pt_regs *regs)
 {
@@ -393,6 +491,9 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 	int		locked_count = 0;
 	int		page_counts[9];
 	int		buffered_count = 0;
+#ifdef buffer_delay
+	int		delay_count = 0;
+#endif
 	int		diag;
 	unsigned long addr;
 
@@ -415,8 +516,13 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 			page_counts[page.count.counter]++;
 		else
 			page_counts[8]++;
-		if (page_has_buffers(&page))
+		if (page_has_buffers(&page)) {
 			buffered_count++;
+#ifdef buffer_delay
+			if (buffer_delay(page.buffers))
+				delay_count++;
+#endif
+		}
 
 	}
 
@@ -425,6 +531,9 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 	kdb_printf("  Dirty pages:      %6d\n", dirty_count);
 	kdb_printf("  Locked pages:     %6d\n", locked_count);
 	kdb_printf("  Buffer pages:     %6d\n", buffered_count);
+#ifdef buffer_delay
+	kdb_printf("  Delalloc pages:   %6d\n", delay_count);
+#endif
 	for (i = 0; i < 8; i++) {
 		kdb_printf("  %d page count:     %6d\n",
 			i, page_counts[i]);
@@ -432,59 +541,22 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 	kdb_printf("  high page count:  %6d\n", page_counts[8]);
 	return 0;
 }
-
-static int
-kdbm_bio(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
-{
-	struct bio	bio;
-	struct bio_vec	vec;
-	unsigned long addr;
-	long    offset=0;
-	int nextarg;
-	int diag;
-	int i;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-
-	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag)
-		return diag;
-
-	if ((diag = kdb_getarea(bio, addr)))
-		return(diag);
-
-	kdb_printf("struct bio at 0x%lx\n", addr);
-	kdb_printf("  sector 0x%lx dev 0x%x size 0x%x flags 0x%lx rw 0x%lx\n",
-		bio.bi_sector, bio.bi_bdev->bd_dev, bio.bi_size, bio.bi_flags,
-		bio.bi_rw);
-	kdb_printf("  vcnt %d vec 0x%p idx %d max %d private 0x%p\n",
-		   bio.bi_vcnt, bio.bi_io_vec, bio.bi_idx, bio.bi_max_vecs,
-		   bio.bi_private);
-	addr = (unsigned long) bio.bi_io_vec;
-	for (i = 0; i < bio.bi_vcnt; i++) {
-		diag = kdb_getarea(vec, addr);
-		if (diag)
-			return diag;
-		addr += sizeof(struct bio_vec);
-		kdb_printf("    page 0x%p offset 0x%x len 0x%x\n",
-			vec.bv_page, vec.bv_offset, vec.bv_len);
-	}
-
-	return 0;
-}
+#endif	/* CONFIG_X86 */
 
 static int __init kdbm_pg_init(void)
 {
+#ifndef CONFIG_DISCONTIGMEM
 	kdb_register("page", kdbm_page, "<vaddr>", "Display page", 0);
+#endif
 	kdb_register("inode", kdbm_inode, "<vaddr>", "Display inode", 0);
+	kdb_register("sb", kdbm_sb, "<vaddr>", "Display super_block", 0);
 	kdb_register("bh", kdbm_buffers, "<buffer head address>", "Display buffer", 0);
-	kdb_register("bio", kdbm_bio, "<bio address>", "Display bio struct", 0);
 	kdb_register("inode_pages", kdbm_inode_pages, "<inode *>", "Display pages in an inode", 0);
 	kdb_register("req", kdbm_request, "<vaddr>", "dump request struct", 0);
+	kdb_register("rqueue", kdbm_rqueue, "<vaddr>", "dump request queue", 0);
+#ifdef	CONFIG_X86
 	kdb_register("memmap", kdbm_memmap, "", "page table summary", 0);
+#endif
 
 	return 0;
 }
@@ -492,12 +564,18 @@ static int __init kdbm_pg_init(void)
 
 static void __exit kdbm_pg_exit(void)
 {
+#ifndef CONFIG_DISCONTIGMEM
 	kdb_unregister("page");
+#endif
 	kdb_unregister("inode");
+	kdb_unregister("sb");
 	kdb_unregister("bh");
-	kdb_unregister("bio");
 	kdb_unregister("inode_pages");
+	kdb_unregister("req");
+	kdb_unregister("rqueue");
+#ifdef	CONFIG_X86
 	kdb_unregister("memmap");
+#endif
 }
 
 module_init(kdbm_pg_init)

@@ -57,9 +57,9 @@
 #include <asm/smp.h>
 #endif
 
-#ifdef CONFIG_KDB
+#ifdef	CONFIG_KDB
 #include <linux/kdb.h>
-#endif /* CONFIG_KDB */
+#endif	/* CONFIG_KDB */
 
 /*
  * Versions of gcc older than that listed below may actually compile
@@ -158,6 +158,24 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
 __setup("profile=", profile_setup);
+
+#ifdef	CONFIG_KDB
+static int __init kdb_setup(char *str)
+{
+	if (strcmp(str, "on") == 0) {
+		kdb_on = 1;
+	} else if (strcmp(str, "off") == 0) {
+		kdb_on = 0;
+	} else if (strcmp(str, "early") == 0) {
+		kdb_on = 1;
+		kdb_flags |= KDB_FLAG_EARLYKDB;
+	} else
+		printk("kdb flag %s not recognised\n", str);
+	return 0;
+}
+
+__setup("kdb=", kdb_setup);
+#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -475,15 +493,17 @@ asmlinkage void __init start_kernel(void)
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
-#ifdef CONFIG_KDB
-	kdb_init(); /* only call after kmem_cache_sizes_init */
-	if (KDB_FLAG(EARLYKDB)) {
-	    KDB_ENTER();
-	}
-#endif /* CONFIG_KDB */
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
+
+#ifdef	CONFIG_KDB
+	kdb_init();
+	if (KDB_FLAG(EARLYKDB)) {
+		KDB_ENTER();
+	}
+#endif	/* CONFIG_KDB */
+
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();

@@ -2934,3 +2934,10 @@ void __preempt_write_lock(rwlock_t *lock)
 
 EXPORT_SYMBOL(__preempt_write_lock);
 #endif /* defined(CONFIG_SMP) && defined(CONFIG_PREEMPT) */
+
+#ifdef	CONFIG_KDB
+task_t *kdb_cpu_curr(int cpu)
+{
+	return(cpu_curr(cpu));
+}
+#endif

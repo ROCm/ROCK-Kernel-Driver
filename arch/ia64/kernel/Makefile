@@ -45,3 +45,5 @@ $(obj)/gate-syms.o: $(src)/gate.lds.s $(obj)/gate.o FORCE
 # We must build gate.so before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/gate-data.o: $(obj)/gate.so
+
+CFLAGS_mca.o	+= -I $(TOPDIR)/arch/$(ARCH)/kdb

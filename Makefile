@@ -414,11 +414,7 @@ CFLAGS := $(CPPFLAGS) $(CFLAGS)
 AFLAGS := $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
-ifeq ($(CONFIG_KDB),y)
-  # Use ifeq for now because kdb subdirs are not in bk yet
-  # Otherwise make mrproper will die because it also cleans core-n
-  core-y			+= kdb/
-endif
+core-$(CONFIG_KDB) += kdb/
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \

@@ -4,7 +4,7 @@
 /*
  * Kernel Debugger Architecture Independent Private Headers
  *
- * Copyright (C) 1999-2002 Silicon Graphics, Inc.  All Rights Reserved
+ * Copyright (C) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License
@@ -160,7 +160,8 @@ extern void	     kdb_io_init(void);
 	/*
 	 * Architecture specific function to read a string.
 	 */
-extern char *	     kdba_read(char *, size_t);
+typedef int (*get_char_func)(void);
+extern get_char_func poll_funcs[];
 
 	/*
 	 * Data for a single activation record on stack.
@@ -194,8 +195,7 @@ extern int	     kdb_get_next_ar(kdb_machreg_t, kdb_machreg_t,
 
 struct task_struct;
 
-extern int	     kdba_bt_stack(struct pt_regs *, kdb_machreg_t *,
-				   int, struct task_struct *);
+extern int	     kdba_bt_address(kdb_machreg_t, int);
 extern int	     kdba_bt_process(struct task_struct *, int);
 extern int	     kdba_prologue(const kdb_symtab_t *, kdb_machreg_t,
 				   kdb_machreg_t, kdb_machreg_t, kdb_machreg_t,
@@ -310,6 +310,15 @@ extern void kdb_syslog_data(char *syslog_data[]);
 extern unsigned long kdb_task_state_string(int argc, const char **argv, const char **envp);
 extern unsigned long kdb_task_state(const struct task_struct *p, unsigned long mask);
 extern void kdb_ps1(struct task_struct *p);
+extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
+extern void kdb_print_nameval(const char *name, unsigned long val);
+extern void kdb_send_sig_info(struct task_struct *p, struct siginfo *info, int seqno);
+
+	/*
+	 * Architecture Dependant Local Processor setup & cleanup interfaces
+	 */
+extern void kdba_local_arch_setup(void);
+extern void kdba_local_arch_cleanup(void);
 
 	/*
 	 * Defines for kdb_symbol_print.
@@ -321,5 +330,31 @@ extern void kdb_ps1(struct task_struct *p);
 #define KDB_SP_SYMSIZE	0x0010		/* Print the size of the symbol */
 #define KDB_SP_NEWLINE	0x0020		/* Newline after string */
 #define KDB_SP_DEFAULT (KDB_SP_VALUE|KDB_SP_PAREN)
+
+/* Save data about running processes */
+
+struct kdb_running_process {
+	struct task_struct *p;
+	struct pt_regs *regs;
+	int seqno;				/* kdb sequence number */
+	struct kdba_running_process arch;	/* arch dependent save data */
+};
+
+extern struct kdb_running_process kdb_running_process[/* NR_CPUS */];
+
+extern void kdb_save_running(struct pt_regs *);
+extern void kdb_unsave_running(struct pt_regs *);
+
+/* 	Incremented each time the main kdb loop is entered on the initial cpu,
+ * 	it gives some indication of how old the saved data is.
+ */
+extern int kdb_seqno;
+
+#define kdb_task_has_cpu(p) (task_curr(p))
+extern task_t *kdb_cpu_curr(int cpu);
+
+/* Simplify coexistence with NPTL */
+#define	kdb_do_each_thread(g, p) do_each_thread(g, p)
+#define	kdb_while_each_thread(g, p) while_each_thread(g, p)
 
 #endif	/* !_KDBPRIVATE_H */

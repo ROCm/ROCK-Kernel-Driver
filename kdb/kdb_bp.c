@@ -1,7 +1,7 @@
 /*
  * Kernel Debugger Architecture Independent Breakpoint Handler
  *
- * Copyright 1999-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1999-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License
@@ -115,9 +115,6 @@ kdb_bp_install_local(struct pt_regs *regs)
 			kdb_printf("kdb_bp_install_local bp %d bp_enabled %d bp_global %d cpu %d bp_cpu %d\n",
 				i, kdb_breakpoints[i].bp_enabled, kdb_breakpoints[i].bp_global,
 				smp_processor_id(), kdb_breakpoints[i].bp_cpu);
-		}
-		if (KDB_STATE(NO_BP_DELAY)) {
-			kdb_breakpoints[i].bp_delay = 0;
 		}
 		if (kdb_breakpoints[i].bp_enabled
 		 && kdb_breakpoints[i].bp_cpu == smp_processor_id()
@@ -272,10 +269,10 @@ kdb_printbp(kdb_bp_t *bp, int i)
 int
 kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	int     i;
-	kdb_bp_t *bp;
+	int     i, bpno;
+	kdb_bp_t *bp, *bp_check;
 	int     diag;
-	int     free, same;
+	int     free;
 	kdb_machreg_t addr;
 	char   *symname = NULL;
 	long    offset = 0ul;
@@ -287,10 +284,10 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		/*
 		 * Display breakpoint table
 		 */
-		for(i=0,bp=kdb_breakpoints; i<KDB_MAXBPT; i++, bp++) {
+		for(bpno=0,bp=kdb_breakpoints; bpno<KDB_MAXBPT; bpno++, bp++) {
 			if (bp->bp_free) continue;
 
-			kdb_printbp(bp, i);
+			kdb_printbp(bp, bpno);
 		}
 
 		return 0;
@@ -305,23 +302,33 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, &symname, regs);
 	if (diag)
 		return diag;
+	if (!addr)
+		return KDB_BADINT;
 
 	/*
 	 * Allocate a new bp structure
 	 */
-	free = same = KDB_MAXBPT;
-	for(i=0,bp=kdb_breakpoints; i<KDB_MAXBPT; i++,bp++) {
+	free = KDB_MAXBPT;
+	for(bpno=0,bp=kdb_breakpoints; bpno<KDB_MAXBPT; bpno++,bp++) {
 		if (bp->bp_free) {
 			break;
 		}
 	}
 
-	if (i == KDB_MAXBPT)
+	if (bpno == KDB_MAXBPT)
 		return KDB_TOOMANYBPT;
 
 	memset(bp, 0, sizeof(*bp));
+	bp->bp_free = 1;
 	kdba_check_pc(&addr);
+	for(i=0,bp_check=kdb_breakpoints; i<KDB_MAXBPT; i++,bp_check++) {
+		if (!bp_check->bp_free && bp_check->bp_addr == addr) {
+			kdb_printf("You already have a breakpoint at " kdb_bfd_vma_fmt0 "\n", addr);
+			return KDB_DUPBPT;
+		}
+	}
 	bp->bp_addr = addr;
+	bp->bp_free = 0;
 
 	bp->bp_forcehw = hardware;
 	if (KDB_DEBUG(BP))
@@ -358,7 +365,7 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		bp->bp_hardtype = 1;
 	}
 
-	kdb_printbp(bp, i);
+	kdb_printbp(bp, bpno);
 
 	return 0;
 }
@@ -511,6 +518,10 @@ kdb_bc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 				i, bp->bp_addr);
 
 			break;
+		}
+		if (bp->bp_delay && (cmd == KDBCMD_BC || cmd == KDBCMD_BD)) {
+			bp->bp_delay = 0;
+			KDB_STATE_CLEAR(SSBPT);
 		}
 	}
 

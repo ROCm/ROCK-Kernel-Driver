@@ -22,6 +22,9 @@
 #include <linux/profile.h>
 #include <linux/mount.h>
 #include <linux/proc_fs.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -818,11 +821,18 @@ task_t *next_thread(task_t *p)
 	struct list_head *tmp, *head = &link->pidptr->task_list;
 
 #ifdef CONFIG_SMP
+#ifdef	CONFIG_KDB
+	/* kdb does not take locks */
+	if (!KDB_IS_RUNNING()) {
+#endif
 	if (!p->sighand)
 		BUG();
 	if (!spin_is_locked(&p->sighand->siglock) &&
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
+#ifdef	CONFIG_KDB
+	}
+#endif
 #endif
 	tmp = link->pid_chain.next;
 	if (tmp == head)

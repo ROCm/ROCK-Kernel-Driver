@@ -43,6 +43,9 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
@@ -419,6 +422,11 @@ void __init smp_callin(void)
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
+
+#ifdef	CONFIG_KDB
+	/* Activate any preset global breakpoints on this cpu */
+	kdb(KDB_REASON_SILENT, 0, 0);
+#endif	/* CONFIG_KDB */
 
 	/*
 	 *      Synchronize the TSC with the BP
