@@ -63,7 +63,19 @@ static void nfs_clear_inode(struct inode *);
 static void nfs_umount_begin(struct super_block *);
 static int  nfs_statfs(struct super_block *, struct kstatfs *);
 static int  nfs_show_options(struct seq_file *, struct vfsmount *);
+
+#ifdef CONFIG_NFS_ACL
 static void nfs_forget_cached_acls(struct inode *);
+static void __nfs_forget_cached_acls(struct nfs_inode *nfsi);
+#else
+static inline void nfs_forget_cached_acls(struct inode *inode)
+{
+}
+
+static inline void __nfs_forget_cached_acls(struct inode *inode)
+{
+}
+#endif
 
 static struct super_operations nfs_sops = { 
 	.alloc_inode	= nfs_alloc_inode,
@@ -1186,16 +1198,16 @@ static void __nfs_forget_cached_acls(struct nfs_inode *nfsi)
 }
 #endif  /* CONFIG_NFS_ACL */
 
+#ifdef CONFIG_NFS_ACL
 static void nfs_forget_cached_acls(struct inode *inode)
 {
-#ifdef CONFIG_NFS_ACL
 	dprintk("NFS: nfs_forget_cached_acls(%s/%ld)\n", inode->i_sb->s_id,
 		inode->i_ino);
 	spin_lock(&inode->i_lock);
 	__nfs_forget_cached_acls(NFS_I(inode));
 	spin_unlock(&inode->i_lock);
-#endif
 }
+#endif
 
 #ifdef CONFIG_NFS_ACL
 struct posix_acl *nfs_get_cached_acl(struct inode *inode, int type)
