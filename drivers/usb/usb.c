@@ -2322,7 +2322,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
-	int ret;
+	struct usb_interface_descriptor *iface_as;
+	int i, ret;
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
@@ -2344,8 +2345,30 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		return ret;
 
 	iface->act_altsetting = alternate;
-	dev->toggle[0] = 0;	/* 9.1.1.5 says to do this */
-	dev->toggle[1] = 0;
+
+	/* 9.1.1.5: reset toggles for all endpoints affected by this iface-as
+	 *
+	 * Note:
+	 * Despite EP0 is always present in all interfaces/AS, the list of
+	 * endpoints from the descriptor does not contain EP0. Due to its
+	 * omnipresence one might expect EP0 being considered "affected" by
+	 * any SetInterface request and hence assume toggles need to be reset.
+	 * However, EP0 toggles are re-synced for every individual transfer
+	 * during the SETUP stage - hence EP0 toggles are "don't care" here.
+	 */
+
+	iface_as = &iface->altsetting[alternate];
+	for (i = 0; i < iface_as->bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint[i].bEndpointAddress;
+
+		usb_settoggle(dev, ep&USB_ENDPOINT_NUMBER_MASK, usb_endpoint_out(ep), 0);
+	}
+
+	/* usb_set_maxpacket() sets the maxpacket size for all EP in all
+	 * interfaces but it shouldn't do any harm here: we have changed
+	 * the AS for the requested interface only, hence for unaffected
+	 * interfaces it's just re-application of still-valid values.
+	 */
 	usb_set_maxpacket(dev);
 	return 0;
 }
