@@ -276,9 +276,8 @@ static int __init agp_nvidia_probe(struct pci_dev *pdev,
 		pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
 	
 	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
-		printk(KERN_INFO PFX "agpgart: Detected an NVIDIA "
-			"nForce/nForce2 chipset, but could not find "
-			"the secondary devices.\n");
+		printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
+			"chipset, but could not find the secondary devices.\n");
 		return -ENODEV;
 	}
 

@@ -448,8 +448,8 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	bridge_dev = pci_find_slot((unsigned int)pdev->bus->number,
 			PCI_DEVFN(0, 1));
 	if (!bridge_dev) {
-		printk(KERN_INFO PFX "agpgart: Detected a Serverworks "
-		       "Chipset, but could not find the secondary device.\n");
+		printk(KERN_INFO PFX "Detected a Serverworks chipset "
+		       "but could not find the secondary device.\n");
 		return -ENODEV;
 	}
 
