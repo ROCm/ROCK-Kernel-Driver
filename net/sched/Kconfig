@@ -387,3 +387,15 @@ config NET_CLS_POLICE
 	  Say Y to support traffic policing (bandwidth limits).  Needed for
 	  ingress and egress rate limiting.
 
+config NET_ACT_GACT
+        tristate '      generic Actions'
+        depends on NET_CLS_ACT
+        ---help---
+        You must have new iproute2 to use this feature
+        This adds simple filtering actions like drop,accepet etc 
+                                                                                
+config GACT_PROB
+        bool '         generic Actions probability'
+        depends on NET_ACT_GACT
+        ---help---
+        Allows generic actions to be randomly  or deterministically used
