@@ -46,10 +46,6 @@
 extern int  xfs_init(void);
 extern void xfs_cleanup(void);
 
-#ifndef EVMS_MAJOR
-# define EVMS_MAJOR		117
-#endif
-
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
 # define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
@@ -541,13 +537,6 @@ xfs_alloc_buftarg(
 	btp->pbr_bdev = bdev;
 	btp->pbr_mapping = bdev->bd_inode->i_mapping;
 	xfs_size_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
-
-	switch (MAJOR(btp->pbr_dev)) {
-	case MD_MAJOR:
-	case EVMS_MAJOR:
-		btp->pbr_flags = PBR_ALIGNED_ONLY;
-		break;
-	}
 
 	return btp;
 }
