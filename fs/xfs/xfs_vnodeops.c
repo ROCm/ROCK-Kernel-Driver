@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1287,7 +1287,7 @@ xfs_inactive_free_eofblocks(
 	 * of the file.  If not, then there is nothing to do.
 	 */
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)ip->i_d.di_size));
-	last_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
+	last_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAXIOFFSET(mp));
 	map_len = last_fsb - end_fsb;
 	if (map_len <= 0)
 		return (0);
@@ -4282,24 +4282,18 @@ xfs_zero_remaining_bytes(
 	xfs_off_t		startoff,
 	xfs_off_t		endoff)
 {
-	xfs_buf_t		*bp;
-	int			error=0;
 	xfs_bmbt_irec_t		imap;
-	xfs_off_t		lastoffset;
-	xfs_mount_t		*mp;
-	int			nimap;
-	xfs_off_t		offset;
 	xfs_fileoff_t		offset_fsb;
+	xfs_off_t		lastoffset;
+	xfs_off_t		offset;
+	xfs_buf_t		*bp;
+	xfs_mount_t		*mp = ip->i_mount;
+	int			nimap;
+	int			error = 0;
 
-	mp = ip->i_mount;
-	bp = XFS_ngetrbuf(mp->m_sb.sb_blocksize,mp);
-	ASSERT(!XFS_BUF_GETERROR(bp));
-
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		XFS_BUF_SET_TARGET(bp, mp->m_rtdev_targp);
-	} else {
-		XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
-	}
+	bp = xfs_buf_get_noaddr(mp->m_sb.sb_blocksize,
+				ip->i_d.di_flags & XFS_DIFLAG_REALTIME ?
+				mp->m_rtdev_targp : mp->m_ddev_targp);
 
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -4341,7 +4335,7 @@ xfs_zero_remaining_bytes(
 			break;
 		}
 	}
-	XFS_nfreerbuf(bp);
+	xfs_buf_free(bp);
 	return error;
 }
 
@@ -4612,9 +4606,9 @@ xfs_change_file_space(
 	llen = bf->l_len > 0 ? bf->l_len - 1 : bf->l_len;
 
 	if (   (bf->l_start < 0)
-	    || (bf->l_start > XFS_MAX_FILE_OFFSET)
+	    || (bf->l_start > XFS_MAXIOFFSET(mp))
 	    || (bf->l_start + llen < 0)
-	    || (bf->l_start + llen > XFS_MAX_FILE_OFFSET))
+	    || (bf->l_start + llen > XFS_MAXIOFFSET(mp)))
 		return XFS_ERROR(EINVAL);
 
 	bf->l_whence = 0;

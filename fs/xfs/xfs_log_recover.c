@@ -99,14 +99,14 @@ xlog_get_bp(
 			num_bblks += XLOG_SECTOR_ROUNDUP_BBCOUNT(log, 1);
 		num_bblks = XLOG_SECTOR_ROUNDUP_BBCOUNT(log, num_bblks);
 	}
-	return XFS_ngetrbuf(BBTOB(num_bblks), log->l_mp);
+	return xfs_buf_get_noaddr(BBTOB(num_bblks), log->l_mp->m_logdev_targp);
 }
 
 void
 xlog_put_bp(
 	xfs_buf_t	*bp)
 {
-	XFS_nfreerbuf(bp);
+	xfs_buf_free(bp);
 }
 
 
