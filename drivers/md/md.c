@@ -1607,9 +1607,6 @@ static int do_md_run(mddev_t * mddev)
 	mddev->pers = pers[pnum];
 	spin_unlock(&pers_lock);
 
-	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
-	mddev->queue->queuedata = mddev;
-
 	err = mddev->pers->run(mddev);
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
@@ -1627,6 +1624,10 @@ static int do_md_run(mddev_t * mddev)
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
 	set_capacity(disk, mddev->array_size<<1);
+
+	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
+	mddev->queue->queuedata = mddev;
+
 	return 0;
 }
 
@@ -1698,12 +1699,8 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		} else {
 			if (mddev->ro)
 				set_disk_ro(disk, 0);
-			if (mddev->pers->stop(mddev)) {
-				err = -EBUSY;
-				if (mddev->ro)
-					set_disk_ro(disk, 1);
-				goto out;
-			}
+			blk_queue_make_request(mddev->queue, md_fail_request);
+			mddev->pers->stop(mddev);
 			module_put(mddev->pers->owner);
 			mddev->pers = NULL;
 			if (mddev->ro)
