@@ -20,6 +20,12 @@ LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
 		-mtraceback=full -mcpu=power4
 
+have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
+
+ifeq ($(have_zero_bss),y)
+CFLAGS		+= -fno-zero-initialized-in-bss
+endif
+
 head-y := arch/ppc64/kernel/head.o
 
 libs-y				+= arch/ppc64/lib/
