@@ -1554,7 +1554,6 @@ void __init sabre_init(int pnode, char *model_name)
 	struct linux_prom64_registers pr_regs[2];
 	struct pci_controller_info *p;
 	struct pci_iommu *iommu;
-	unsigned long flags;
 	int tsbsize, err;
 	u32 busrange[2];
 	u32 vdma[2];
