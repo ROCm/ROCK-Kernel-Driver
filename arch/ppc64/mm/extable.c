@@ -62,9 +62,9 @@ search_one_table(const struct exception_table_entry *first,
 
 		mid = (last - first) / 2 + first;
 		diff = mid->insn - value;
-		if (diff == 0) {
+		if (diff == 0)
 			return mid->fixup;
-		} else if (diff < 0)
+		else if (diff < 0)
 			first = mid+1;
 		else
 			last = mid-1;

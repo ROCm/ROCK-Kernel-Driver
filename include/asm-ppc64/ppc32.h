@@ -43,25 +43,24 @@ typedef __kernel_fsid_t __kernel_fsid_t32;
 })
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
-typedef unsigned int           __kernel_size_t32;
-typedef int                    __kernel_ssize_t32;
-typedef int                    __kernel_ptrdiff_t32;
-typedef int                    __kernel_time_t32;
-typedef int                    __kernel_clock_t32;
-typedef int                    __kernel_pid_t32;
-typedef unsigned short         __kernel_ipc_pid_t32;
-typedef unsigned int           __kernel_uid_t32;
-typedef unsigned int           __kernel_gid_t32;
-typedef unsigned int           __kernel_dev_t32;
-typedef unsigned int           __kernel_ino_t32;
-typedef unsigned int           __kernel_mode_t32;
-typedef unsigned int           __kernel_umode_t32;
-typedef short                  __kernel_nlink_t32;
-typedef int                    __kernel_daddr_t32;
-typedef int                    __kernel_off_t32;
-typedef unsigned int           __kernel_caddr_t32;
-typedef int 		       __kernel_loff_t32;
-/* typedef __kernel_fsid_t        __kernel_fsid_t32; */
+typedef unsigned int	__kernel_size_t32;
+typedef int		__kernel_ssize_t32;
+typedef int		__kernel_ptrdiff_t32;
+typedef int		__kernel_time_t32;
+typedef int		__kernel_clock_t32;
+typedef int		__kernel_pid_t32;
+typedef unsigned short	__kernel_ipc_pid_t32;
+typedef unsigned int	__kernel_uid_t32;
+typedef unsigned int	__kernel_gid_t32;
+typedef unsigned int	__kernel_dev_t32;
+typedef unsigned int	__kernel_ino_t32;
+typedef unsigned int	__kernel_mode_t32;
+typedef unsigned int	__kernel_umode_t32;
+typedef short		__kernel_nlink_t32;
+typedef int		__kernel_daddr_t32;
+typedef int		__kernel_off_t32;
+typedef unsigned int	__kernel_caddr_t32;
+typedef int		__kernel_loff_t32;
 
 struct statfs32 {
 	int f_type;
@@ -87,12 +86,12 @@ typedef struct siginfo32 {
 	int si_code;
 
 	union {
-		int _pad[SI_PAD_SIZE];
+		int _pad[SI_PAD_SIZE32];
 
 		/* kill() */
 		struct {
 			__kernel_pid_t32 _pid;		/* sender's pid */
-			unsigned int _uid;		/* sender's uid */
+			__kernel_uid_t32 _uid;		/* sender's uid */
 		} _kill;
 
 		/* POSIX.1b timers */
@@ -104,14 +103,14 @@ typedef struct siginfo32 {
 		/* POSIX.1b signals */
 		struct {
 			__kernel_pid_t32 _pid;		/* sender's pid */
-			unsigned int _uid;		/* sender's uid */
+			__kernel_uid_t32 _uid;		/* sender's uid */
 			sigval_t32 _sigval;
 		} _rt;
 
 		/* SIGCHLD */
 		struct {
 			__kernel_pid_t32 _pid;		/* which child */
-			unsigned int _uid;		/* sender's uid */
+			__kernel_uid_t32 _uid;		/* sender's uid */
 			int _status;			/* exit code */
 			__kernel_clock_t32 _utime;
 			__kernel_clock_t32 _stime;
@@ -119,7 +118,7 @@ typedef struct siginfo32 {
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
 		struct {
-			u32 _addr; /* faulting insn/memory ref. */
+			unsigned int _addr; /* faulting insn/memory ref. */
 			int _trapno;
 		} _sigfault;
 
@@ -153,8 +152,7 @@ typedef struct {
 } sigset32_t;
 
 struct sigaction32 {
-       unsigned int  sa_handler;	/* Really a pointer, but need to deal 
-					     with 32 bits */
+       unsigned int  sa_handler;	/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
        sigset32_t sa_mask;		/* A 32 bit mask */
@@ -228,5 +226,9 @@ struct ucontext32 {
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
+struct ipc_kludge_32 {
+	unsigned int msgp;
+	int msgtyp;
+};
 
 #endif  /* _PPC64_PPC32_H */

@@ -8,6 +8,9 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#define SI_PAD_SIZE    ((SI_MAX_SIZE/sizeof(int)) - 4)
+#define SI_PAD_SIZE32  ((SI_MAX_SIZE/sizeof(int)) - 3)
+
 #include <asm-generic/siginfo.h>
 
 #endif /* _PPC64_SIGINFO_H */

@@ -2408,14 +2408,14 @@ do_sys32_msgrcv(int first, int second, int msgtyp, int third,
 		return -EINVAL;
 
 	if (!version) {
-		struct ipc_kludge *uipck = (struct ipc_kludge *)uptr;
-		struct ipc_kludge ipck;
+		struct ipc_kludge_32 *uipck = (struct ipc_kludge_32 *)uptr;
+		struct ipc_kludge_32 ipck;
 
 		err = -EINVAL;
 		if (!uptr)
 			goto out;
 		err = -EFAULT;
-		if (copy_from_user(&ipck, uipck, sizeof(struct ipc_kludge)))
+		if (copy_from_user(&ipck, uipck, sizeof(struct ipc_kludge_32)))
 			goto out;
 		uptr = (void *)A(ipck.msgp);
 		msgtyp = ipck.msgtyp;
@@ -2559,7 +2559,7 @@ do_sys32_shmat(int first, int second, int third, int version, void *uptr)
 static int
 do_sys32_shmctl(int first, int second, void *uptr)
 {
-	int err = -EFAULT, err2;
+	int err = -EINVAL, err2;
 	mm_segment_t old_fs;
 
 	switch (second & (~IPC_64)) {
