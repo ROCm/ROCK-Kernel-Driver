@@ -318,6 +318,7 @@ struct file_operations cifs_file_ops = {
 struct file_operations cifs_dir_ops = {
 	.readdir = cifs_readdir,
 	.release = cifs_closedir,
+	.read    = generic_read_dir,
 };
 
 static void

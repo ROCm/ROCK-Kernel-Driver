@@ -1065,11 +1065,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 	xid = GetXid();
 
-	data = kmalloc(4096, GFP_KERNEL);
-	pfindData = (FILE_DIRECTORY_INFO *) data;
-
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
+	data = kmalloc(pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE,
+			GFP_KERNEL);
+	pfindData = (FILE_DIRECTORY_INFO *) data;
 
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
 

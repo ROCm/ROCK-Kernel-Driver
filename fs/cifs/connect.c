@@ -56,6 +56,7 @@ struct smb_vol {
 	mode_t file_mode;
 	mode_t dir_mode;
 	int rw;
+	unsigned short int port;
 };
 
 int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
@@ -343,11 +344,7 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 	char *value;
 	char *data;
 
-	vol->username = NULL;
-	vol->password = NULL;
-	vol->domainname = NULL;
-	vol->UNC = NULL;
-	vol->UNCip = NULL;
+	memset(vol,0,sizeof(struct smb_vol));
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
 	vol->rw = TRUE;
@@ -381,6 +378,15 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 				printk(KERN_WARNING "CIFS: password too long\n");
 				return 1;
 			}
+		} else if (strnicmp(data, "ip", 2) == 0) {
+			if (!value || !*value) {
+				vol->UNCip = NULL;
+			} else if (strnlen(value, 35) < 35) {
+				vol->UNCip = value;
+			} else {
+				printk(KERN_WARNING "CIFS: ip address too long\n");
+				return 1;
+			}
 		} else if ((strnicmp(data, "unc", 3) == 0)
 			   || (strnicmp(data, "target", 6) == 0)
 			   || (strnicmp(data, "path", 4) == 0)) {
@@ -399,7 +405,6 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 					       "CIFS: UNC Path does not begin with // or \\\\ \n");
 					return 1;
 				}
-				vol->UNCip = &vol->UNC[2];
 			} else {
 				printk(KERN_WARNING "CIFS: UNC name too long\n");
 				return 1;
@@ -420,22 +425,27 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 		} else if (strnicmp(data, "uid", 3) == 0) {
 			if (value && *value) {
 				vol->linux_uid =
-				    simple_strtoul(value, &value, 0);
+					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "gid", 3) == 0) {
 			if (value && *value) {
 				vol->linux_gid =
-				    simple_strtoul(value, &value, 0);
+					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "file_mode", 4) == 0) {
 			if (value && *value) {
 				vol->file_mode =
-				    simple_strtoul(value, &value, 0);
+					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "dir_mode", 3) == 0) {
 			if (value && *value) {
 				vol->dir_mode =
-				    simple_strtoul(value, &value, 0);
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "port", 4) == 0) {
+			if (value && *value) {
+				vol->port =
+					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
@@ -458,12 +468,14 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 				printk(KERN_WARNING "CIFS: UNC Path does not begin with // or \\\\ \n");
 				return 1;
 			}
-			vol->UNCip = &vol->UNC[2];
 		} else {
 			printk(KERN_WARNING "CIFS: UNC name too long\n");
 			return 1;
 		}
 	}
+	if(vol->UNCip == 0)
+		vol->UNCip = &vol->UNC[2];
+
 	return 0;
 }
 
@@ -553,20 +565,19 @@ connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 	unsigned char *referrals = NULL;
 
 	if (pSesInfo->ipc_tid == 0) {
-		temp_unc =
-		    kmalloc(2 +
-			    strnlen(pSesInfo->serverName,
-				    SERVER_NAME_LEN_WITH_NULL * 2) + 1 +
-			    4 /* IPC$ */  + 1, GFP_KERNEL);
+		temp_unc = kmalloc(2 /* for slashes */ +
+			strnlen(pSesInfo->serverName,SERVER_NAME_LEN_WITH_NULL * 2)
+				 + 1 + 4 /* slash IPC$ */  + 2,
+				GFP_KERNEL);
 		if (temp_unc == NULL)
 			return -ENOMEM;
 		temp_unc[0] = '\\';
 		temp_unc[1] = '\\';
 		strncpy(temp_unc + 2, pSesInfo->serverName,
 			SERVER_NAME_LEN_WITH_NULL * 2);
-		strncpy(temp_unc + 2 +
-			strnlen(pSesInfo->serverName,
-				SERVER_NAME_LEN_WITH_NULL * 2), "\\IPC$", 6);
+		strncpy(temp_unc + 2 + 
+			strnlen(pSesInfo->serverName,SERVER_NAME_LEN_WITH_NULL * 2), 
+			"\\IPC$", 5);
 		rc = CIFSTCon(xid, pSesInfo, temp_unc, NULL, nls_codepage);
 		cFYI(1,
 		     ("CIFS Tcon rc = %d ipc_tid = %d", rc,pSesInfo->ipc_tid));
@@ -670,11 +681,23 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	}
 
 	psin_server->sin_family = AF_INET;
-	psin_server->sin_port = htons(CIFS_PORT);
+	if(psin_server->sin_port) { /* user overrode default port */
+		rc = (*csocket)->ops->connect(*csocket,
+				(struct sockaddr *) psin_server,
+				sizeof (struct sockaddr_in),0);
+		if (rc >= 0) {
+			return rc;
+		}
+	}
 
-	rc = (*csocket)->ops->connect(*csocket,
+	/* do not retry on the same port we just failed on */
+	if(psin_server->sin_port != htons(CIFS_PORT)) {
+		psin_server->sin_port = htons(CIFS_PORT);
+
+		rc = (*csocket)->ops->connect(*csocket,
 					(struct sockaddr *) psin_server,
 					sizeof (struct sockaddr_in),0);
+	}
 	if (rc < 0) {
 		psin_server->sin_port = htons(RFC1001_PORT);
 		rc = (*csocket)->ops->connect(*csocket, (struct sockaddr *)
@@ -703,13 +726,24 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	}
 
 	psin_server->sin6_family = AF_INET6;
-	psin_server->sin6_port = htons(CIFS_PORT);
+	if(psin_server->sin6_port) { /* user overrode default port */
+		rc = (*csocket)->ops->connect(*csocket,
+				(struct sockaddr *) psin_server,
+				sizeof (struct sockaddr_in6),0);
+		if (rc >= 0) {
+			return rc;
+		}
+	}
 
-	rc = (*csocket)->ops->connect(*csocket,
-				      (struct sockaddr *) psin_server,
-				      sizeof (struct sockaddr_in6), 0
-/* BB fix the timeout to be shorter - and check flags */
-	    );
+	/* do not retry on the same port we just failed on */
+	if(psin_server->sin6_port != htons(CIFS_PORT)) {
+		psin_server->sin6_port = htons(CIFS_PORT);
+
+		rc = (*csocket)->ops->connect(*csocket,
+				(struct sockaddr *) psin_server,
+				sizeof (struct sockaddr_in6), 0);
+/* BB fix the timeout to be shorter above - and check flags */
+	}
 	if (rc < 0) {
 		psin_server->sin6_port = htons(RFC1001_PORT);
 		rc = (*csocket)->ops->connect(*csocket, (struct sockaddr *)
@@ -778,7 +812,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			     volume_info.username, &srvTcp);
 	if (srvTcp) {
 		cFYI(1, ("Existing tcp session with server found "));                
-	} else {		/* create socket */
+	} else {	/* create socket */
+		if(volume_info.port)
+			sin_server.sin_port = htons(volume_info.port);
 		rc = ipv4_connect(&sin_server, &csocket);
 		if (rc < 0) {
 			cERROR(1,
