@@ -10,8 +10,7 @@
 #ifndef __ASM_ARM_NUMNODES_H
 #define __ASM_ARM_NUMNODES_H
 
-#include <asm/memory.h>
-
-#define MAX_NUMNODES	NR_NODES
+/* Max 4 Nodes */
+#define NODES_SHIFT	2
 
 #endif

@@ -89,6 +89,9 @@ static inline void *phys_to_virt(unsigned long x)
  * This is more complex.  We have a set of mem_map arrays spread
  * around in memory.
  */
+#include <asm/numnodes.h>
+#define NUM_NODES	(1 << NODES_SHIFT)
+
 #define page_to_pfn(page)					\
 	(( (page) - page_zone(page)->zone_mem_map)		\
 	  + page_zone(page)->zone_start_pfn)
@@ -96,18 +99,20 @@ static inline void *phys_to_virt(unsigned long x)
 #define pfn_to_page(pfn)					\
 	(PFN_TO_MAPBASE(pfn) + LOCAL_MAP_NR((pfn) << PAGE_SHIFT))
 
-#define pfn_valid(pfn)		(PFN_TO_NID(pfn) < NR_NODES)
+#define pfn_valid(pfn)		(PFN_TO_NID(pfn) < NUM_NODES)
 
 #define virt_to_page(kaddr)					\
 	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
 
-#define virt_addr_valid(kaddr)	(KVADDR_TO_NID(kaddr) < NR_NODES)
+#define virt_addr_valid(kaddr)	(KVADDR_TO_NID(kaddr) < NUM_NODES)
 
 /*
  * Common discontigmem stuff.
  *  PHYS_TO_NID is used by the ARM kernel/setup.c
  */
 #define PHYS_TO_NID(addr)	PFN_TO_NID((addr) >> PAGE_SHIFT)
+
+#undef NUM_NODES
 
 #endif
 
