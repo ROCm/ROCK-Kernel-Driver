@@ -11,7 +11,9 @@
 
 static int new_loglevel = 10;
 static int orig_loglevel;
+#ifdef SUSPEND_CONSOLE
 static int orig_fgconsole, orig_kmsg;
+#endif
 
 int pm_prepare_console(void)
 {
@@ -50,6 +52,7 @@ void pm_restore_console(void)
 	acquire_console_sem();
 	set_console(orig_fgconsole);
 	release_console_sem();
+	kmsg_redirect = orig_kmsg;
 #endif
 	return;
 }
