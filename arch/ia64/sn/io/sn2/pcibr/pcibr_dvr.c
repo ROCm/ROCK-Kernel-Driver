@@ -629,6 +629,8 @@ pcibr_driver_reg_callback(vertex_hdl_t pconn_vhdl,
 
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
     pcibr_info->f_att_det_error = error;
+
+#ifdef CONFIG_HOTPLUG_PCI_SGI
     pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
 
     if (error) {
@@ -636,6 +638,7 @@ pcibr_driver_reg_callback(vertex_hdl_t pconn_vhdl,
     } else {
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_STARTUP_CMPLT;
     }
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
 }
 
 /*
@@ -668,6 +671,7 @@ pcibr_driver_unreg_callback(vertex_hdl_t pconn_vhdl,
 
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
     pcibr_info->f_att_det_error = error;
+#ifdef CONFIG_HOTPLUG_PCI_SGI
     pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
 
     if (error) {
@@ -675,6 +679,7 @@ pcibr_driver_unreg_callback(vertex_hdl_t pconn_vhdl,
     } else {
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_SHUTDOWN_CMPLT;
     }
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
 }
 
 /*
