@@ -205,7 +205,6 @@ static int skfp_init_one(struct pci_dev *pdev,
 {
 	struct net_device *dev;
 	struct s_smc *smc;	/* board pointer */
-	unsigned long port, len;
 	void __iomem *mem;
 	int err;
 
@@ -216,62 +215,43 @@ static int skfp_init_one(struct pci_dev *pdev,
 
 	err = pci_enable_device(pdev);
 	if (err)
-		goto err_out1;
+		return err;
 
-
-#ifdef MEM_MAPPED_IO
-	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
-		printk(KERN_ERR "skfp: region is not an MMIO resource\n");
-		err = -EIO;
-		goto err_out1;
-	}
-	port = pci_resource_start(pdev, 0);
-	len = pci_resource_len(pdev, 0);
-
-	if (len < 0x4000) {
-		printk(KERN_ERR "skfp: Invalid PCI region size: %lu\n", len);
-		err = -EIO;
-		goto err_out1;
-	}
-#else
-	if (!(pci_resource_flags(pdev, 1) & IO_RESOURCE_IO)) {
-		printk(KERN_ERR "skfp: region is not PIO resource\n");
-		err = -EIO;
-		goto err_out1;
-	}
-
-	port = pci_resource_start(pdev, 1);
-	len = pci_resource_len(pdev, 1);
-	if (len < FP_IO_LEN) {
-		printk(KERN_ERR "skfp: Invalid PCI region size: %d\n",
-		       io_len);
-		err = -EIO;
-		goto err_out1;
-	}
-#endif
 	err = pci_request_regions(pdev, "skfddi");
 	if (err)
 		goto err_out1;
 
 	pci_set_master(pdev);
 
-	dev = alloc_fddidev(sizeof(struct s_smc));
-	if (!dev) {
-		printk(KERN_ERR "skfp: Unable to allocate fddi device, "
-				"FDDI adapter will be disabled.\n");
-		err = -ENOMEM;
+#ifdef MEM_MAPPED_IO
+	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+		printk(KERN_ERR "skfp: region is not an MMIO resource\n");
+		err = -EIO;
 		goto err_out2;
 	}
 
-#ifdef MEM_MAPPED_IO
-	mem = ioremap(port, len);
+	mem = ioremap(pci_resource_start(pdev, 0), 0x4000);
 #else
-	mem =ioport_map(port, len);
+	if (!(pci_resource_flags(pdev, 1) & IO_RESOURCE_IO)) {
+		printk(KERN_ERR "skfp: region is not PIO resource\n");
+		err = -EIO;
+		goto err_out2;
+	}
+
+	mem = ioport_map(pci_resource_start(pdev, 1), FP_IO_LEN);
 #endif
 	if (!mem) {
 		printk(KERN_ERR "skfp:  Unable to map register, "
 				"FDDI adapter will be disabled.\n");
 		err = -EIO;
+		goto err_out2;
+	}
+
+	dev = alloc_fddidev(sizeof(struct s_smc));
+	if (!dev) {
+		printk(KERN_ERR "skfp: Unable to allocate fddi device, "
+				"FDDI adapter will be disabled.\n");
+		err = -ENOMEM;
 		goto err_out3;
 	}
 
@@ -331,16 +311,17 @@ err_out5:
 	pci_free_consistent(pdev, MAX_FRAME_SIZE,
 			    smc->os.LocalRxBuffer, smc->os.LocalRxBufferDMA);
 err_out4:
-#ifdef MEM_MAPPED_IO
-	iounmap(smc->hw.iop);
-#else
-	ioport_unmap(smc->hw.iop);
-#endif
-err_out3:
 	free_netdev(dev);
+err_out3:
+#ifdef MEM_MAPPED_IO
+	iounmap(mem);
+#else
+	ioport_unmap(mem);
+#endif
 err_out2:
 	pci_release_regions(pdev);
 err_out1:
+	pci_disable_device(pdev);
 	return err;
 }
 
@@ -376,6 +357,7 @@ static void __devexit skfp_remove_one(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	free_netdev(p);
 
+	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
 
