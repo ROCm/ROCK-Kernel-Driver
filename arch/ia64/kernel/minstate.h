@@ -1,5 +1,7 @@
 #include <linux/config.h>
 
+#include <asm/cache.h>
+
 #include "entry.h"
 
 /*
