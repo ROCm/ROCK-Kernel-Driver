@@ -110,6 +110,12 @@ static unsigned int get_number(FILE *fp)
     return val;
 }
 
+static unsigned int get_number255(FILE *fp, unsigned int maxval)
+{
+    unsigned int val = get_number(fp);
+    return (255*val+maxval/2)/maxval;
+}
+
 static void read_image(void)
 {
     FILE *fp;
@@ -137,8 +143,8 @@ static void read_image(void)
 	case '5':
 	case '6':
 	    /* Binary PBM/PGM/PPM */
-	    die("%s: Binary PNM is not supported.\n"
-		"Use pnmnoraw(1) to convert it to ASCII.\n", filename);
+	    die("%s: Binary PNM is not supported\n"
+		"Use pnmnoraw(1) to convert it to ASCII PNM\n", filename);
 
 	default:
 	    die("%s is not a PNM file\n", filename);
@@ -172,7 +178,7 @@ static void read_image(void)
 	    for (i = 0; i < logo_height; i++)
 		for (j = 0; j < logo_width; j++)
 		    logo_data[i][j].red = logo_data[i][j].green =
-			logo_data[i][j].blue = 255*get_number(fp)/maxval;
+			logo_data[i][j].blue = get_number255(fp, maxval);
 	    break;
 
 	case '3':
@@ -180,9 +186,9 @@ static void read_image(void)
 	    maxval = get_number(fp);
 	    for (i = 0; i < logo_height; i++)
 		for (j = 0; j < logo_width; j++) {
-		    logo_data[i][j].red = 255*get_number(fp)/maxval;
-		    logo_data[i][j].green = 255*get_number(fp)/maxval;
-		    logo_data[i][j].blue = 255*get_number(fp)/maxval;
+		    logo_data[i][j].red = get_number255(fp, maxval);
+		    logo_data[i][j].green = get_number255(fp, maxval);
+		    logo_data[i][j].blue = get_number255(fp, maxval);
 		}
 	    break;
     }
@@ -306,7 +312,9 @@ static void write_logo_vga16(void)
 		if (is_equal(logo_data[i][j], clut_vga16[k]))
 		    break;
 	    if (k == 16)
-		die("Image must use the 16 console colors only\n");
+		die("Image must use the 16 console colors only\n"
+		    "Use ppmquant(1) -map clut_vga16.ppm to reduce the number "
+		    "of colors\n");
 	}
 
     /* write file header */
@@ -344,7 +352,8 @@ static void write_logo_clut224(void)
 		    break;
 	    if (k == logo_clutsize) {
 		if (logo_clutsize == MAX_LINUX_LOGO_COLORS)
-		    die("Image has more than %d colors\n",
+		    die("Image has more than %d colors\n"
+			"Use ppmquant(1) to reduce the number of colors\n",
 			MAX_LINUX_LOGO_COLORS);
 		logo_clut[logo_clutsize++] = logo_data[i][j];
 	    }

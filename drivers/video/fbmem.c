@@ -363,13 +363,13 @@ int num_registered_fb;
 static int ofonly __initdata = 0;
 #endif
 
+#ifdef CONFIG_LOGO
+#include <linux/linux_logo.h>
+
 static inline unsigned safe_shift(unsigned d, int n)
 {
 	return n < 0 ? d >> -n : d << n;
 }
-
-#ifdef CONFIG_FB_LOGO
-#include <linux/linux_logo.h>
 
 static void __init fb_set_logocmap(struct fb_info *info,
 				   const struct linux_logo *logo)
@@ -661,7 +661,7 @@ int fb_show_logo(struct fb_info *info)
 #else
 int fb_prepare_logo(struct fb_info *info) { return 0; }
 int fb_show_logo(struct fb_info *info) { return 0; }
-#endif /* CONFIG_FB_LOGO */
+#endif /* CONFIG_LOGO */
 
 static int fbmem_read_proc(char *buf, char **start, off_t offset,
 			   int len, int *eof, void *private)

@@ -111,7 +111,6 @@ int q40fb_init(void)
 	fb_info.pseudo_palette = pseudo_palette;	
    	fb_info.screen_base = (char *) q40fb_fix.smem_start;
 
-	/* The below fields will go away !!!! */
 	fb_alloc_cmap(&fb_info.cmap, 16, 0);
 
 	master_outb(3, DISPLAY_CONTROL_REG);

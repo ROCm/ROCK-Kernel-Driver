@@ -332,16 +332,22 @@ void accel_clear(struct vc_data *vc, struct display *p, int sy,
 }	
 
 #define FB_PIXMAPSIZE 8192
+/*
+ * FIXME: Break up this function, it's becoming too long...
+ */        
 void accel_putcs(struct vc_data *vc, struct display *p,
 			const unsigned short *s, int count, int yy, int xx)
 {
-	struct fb_info *info = p->fb_info;
-	unsigned short charmask = p->charmask;
 	unsigned int width = ((vc->vc_font.width + 7)/8);
 	unsigned int cellsize = vc->vc_font.height * width;
-	struct fb_image image;
-	u16 c = scr_readw(s);
+	unsigned int maxcnt = FB_PIXMAPSIZE/cellsize;
+	unsigned short charmask = p->charmask;
+	struct fb_info *info = p->fb_info;
+	unsigned int pitch, cnt, i, j, k;
 	static u8 pixmap[FB_PIXMAPSIZE];
+	struct fb_image image;
+	u8 *src, *dst, *dst0;
+	u16 c = scr_readw(s);
 	
 	image.fg_color = attr_fgcol(p, c);
 	image.bg_color = attr_bgcol(p, c);
@@ -349,13 +355,9 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 	image.dy = yy * vc->vc_font.height;
 	image.height = vc->vc_font.height;
 	image.depth = 0;
+	image.data = pixmap;
 
 	if (!(vc->vc_font.width & 7)) {
-		unsigned int pitch, cnt, i, j, k;
-		unsigned int maxcnt = FB_PIXMAPSIZE/cellsize;
-		char *src, *dst, *dst0;
-
-		image.data = pixmap;
 		while (count) {
 			if (count > maxcnt) 
 				cnt = k = maxcnt;
@@ -381,14 +383,51 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 			image.dx += cnt * vc->vc_font.width;
 			count -= cnt;
 		}
+		
 	} else {
-		image.width = vc->vc_font.width;
-		while (count--) {
-			image.data = p->fontdata + 
-				(scr_readw(s++) & charmask) * cellsize;
+		unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
+		unsigned int shift_high = 8;
+		unsigned idx = vc->vc_font.width/8;
+		u8 mask;
+
+		while (count) {
+			if (count > maxcnt) 
+				cnt = k = maxcnt;
+			else
+				cnt = k = count;
+			
+			dst0 = pixmap;
+			image.width = vc->vc_font.width * cnt;
+			pitch = (image.width + 7)/8;
+			while (k--) {
+				src = p->fontdata + (scr_readw(s++)&charmask)*
+					cellsize;
+				dst = dst0;
+				mask = (u8) (0xfff << shift_high);
+				for (i = image.height; i--; ) {
+					for (j = 0; j < idx; j++) {
+						dst[j] &= mask;
+						dst[j] |= *src >> shift_low;
+						dst[j+1] = *src << shift_high;
+						src++;
+					}
+					dst[idx] &= mask;
+					dst[idx] |= *src >> shift_low;
+					if (shift_high < mod)
+						dst[idx+1] = *src << shift_high;
+					src++;
+					dst += pitch;
+				}
+				shift_low += mod;
+				dst0 += (shift_low >= 8) ? width : width - 1;
+				shift_low &= 7;
+				shift_high = 8 - shift_low;
+			}
+
 			info->fbops->fb_imageblit(info, &image);
-			image.dx += vc->vc_font.width;
-		}	
+			image.dx += cnt * vc->vc_font.width;
+			count -= cnt;
+		}
 	}
 }
 
