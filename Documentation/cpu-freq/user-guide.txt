@@ -21,6 +21,8 @@ Contents:
 1.1 ARM
 1.2 x86
 1.3 sparc64
+1.4 ppc
+1.5 SuperH
 
 2. "Policy" / "Governor"?
 2.1 Policy
@@ -76,6 +78,20 @@ cpufreq:
 
 UltraSPARC-III
 
+
+1.4 ppc
+-------
+
+Several "PowerBook" and "iBook2" notebooks are supported.
+
+
+1.5 SuperH
+----------
+
+The following SuperH processors are supported by cpufreq:
+
+SH-3
+SH-4
 
 
 2. "Policy" / "Governor" ?
