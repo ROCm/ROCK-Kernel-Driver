@@ -983,6 +983,9 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
+	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+		return;
+
 	if (!height || !width)
 		return;
 
@@ -1007,6 +1010,7 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
+
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
@@ -1041,6 +1045,9 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	struct display *p = &fb_display[vc->vc_num];
 	int y = real_y(p, vc->vc_y);
  	int c = scr_readw((u16 *) vc->vc_pos);
+
+	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+		return;
 
 	ops->cursor_flash = 1;
 	if (mode & CM_SOFTBACK) {
@@ -1690,6 +1697,9 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
 
+	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
+		return;
+
 	if (!width || !height)
 		return;
 
@@ -1952,6 +1962,7 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = (struct fbcon_ops *) info->fbcon_par;
 	struct display *p = &fb_display[vc->vc_num];
+	int retval = 0;
 
 	if (mode_switch) {
 		struct fb_var_screeninfo var = info->var;
@@ -1968,19 +1979,16 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 		if (info->flags & FBINFO_MISC_MODESWITCHLATE)
 			info->flags |= FBINFO_MISC_MODESWITCH;
 
-		if (blank) {
-			fbcon_cursor(vc, CM_ERASE);
-			return 0;
-		}
-
-		if (!(info->flags & FBINFO_MISC_MODESWITCHLATE)) {
+		if (!blank && !(info->flags & FBINFO_MISC_MODESWITCHLATE)) {
 			var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
 			fb_set_var(info, &var);
 		}
+
+		return 0;
 	}
 
-	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 	ops->cursor_flash = (!blank);
+	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 
 	if (!info->fbops->fb_blank) {
 		if (blank) {
@@ -2001,9 +2009,10 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 			vc->vc_video_erase_char = oldc;
 		} else
 			update_screen(vc->vc_num);
-		return 0;
-	} else
-		return fb_blank(info, blank);
+	} else if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
+		retval = fb_blank(info, blank);
+
+	return retval;
 }
 
 static void fbcon_free_font(struct display *p)
