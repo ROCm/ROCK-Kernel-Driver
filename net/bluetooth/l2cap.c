@@ -1039,7 +1039,7 @@ static void l2cap_chan_ready(struct sock *sk)
 		sk->state = BT_CONNECTED;
 		sk->state_change(sk);
 	} else {
-		/* Incomming channel.
+		/* Incoming channel.
 		 * Wake up socket sleeping on accept.
 		 */
 		parent->data_ready(parent, 0);

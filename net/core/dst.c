@@ -252,9 +252,7 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 }
 
 struct notifier_block dst_dev_notifier = {
-	dst_dev_event,
-	NULL,
-	0
+	.notifier_call	= dst_dev_event,
 };
 
 void __init dst_init(void)

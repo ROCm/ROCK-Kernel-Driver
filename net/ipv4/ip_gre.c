@@ -159,7 +159,7 @@ static struct ip_tunnel *tunnels[4][HASH_SIZE];
 
 static rwlock_t ipgre_lock = RW_LOCK_UNLOCKED;
 
-/* Given src, dst and key, find approriate for input tunnel. */
+/* Given src, dst and key, find appropriate for input tunnel. */
 
 static struct ip_tunnel * ipgre_tunnel_lookup(u32 remote, u32 local, u32 key)
 {

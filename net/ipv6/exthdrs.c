@@ -19,7 +19,7 @@
  *	yoshfuji		: ensure not to overrun while parsing 
  *				  tlv options.
  *	Mitsuru KANDA @USAGI and: Remove ipv6_parse_exthdrs().
- *	YOSHIFUJI Hideaki @USAGI  Register inbound extention header
+ *	YOSHIFUJI Hideaki @USAGI  Register inbound extension header
  *				  handlers as inet6_protocol{}.
  */
 
@@ -344,7 +344,7 @@ void __init ipv6_rthdr_init(void)
    this stupid requirement making rthdr idea useless)
 
    Actually, it creates severe problems  for us.
-   Embrionic requests has no associated sockets,
+   Embryonic requests has no associated sockets,
    so that user have no control over it and
    cannot not only to set reply options, but
    even to know, that someone wants to connect

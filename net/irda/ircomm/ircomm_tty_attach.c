@@ -518,12 +518,12 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 	del_timer(&self->watchdog_timer);
 
 	/* Remove LM-IAS object now so it is not reused.
-	 * IrCOMM deals very poorly with multiple incomming connections.
+	 * IrCOMM deals very poorly with multiple incoming connections.
 	 * It should looks a lot more like IrNET, and "dup" a server TSAP
 	 * to the application TSAP (based on various rules).
 	 * This is a cheap workaround allowing multiple clients to
 	 * connect to us. It will not always work.
-	 * Each IrCOMM socket has an IAS entry. Incomming connection will
+	 * Each IrCOMM socket has an IAS entry. Incoming connection will
 	 * pick the first one found. So, when we are fully connected,
 	 * we remove our IAS entries so that the next IAS entry is used.
 	 * We do that for *both* client and server, because a server

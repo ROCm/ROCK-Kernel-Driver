@@ -263,7 +263,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
  *	To avoid extra problems ND packets are send through this
  *	routine. It's code duplication but I really want to avoid
  *	extra checks since ipv6_build_header is used by TCP (which
- *	is for us performace critical)
+ *	is for us performance critical)
  */
 
 int ip6_nd_hdr(struct sock *sk, struct sk_buff *skb, struct net_device *dev,

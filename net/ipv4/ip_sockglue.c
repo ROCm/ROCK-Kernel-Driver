@@ -177,7 +177,7 @@ int ip_cmsg_send(struct msghdr *msg, struct ipcm_cookie *ipc)
 }
 
 
-/* Special input handler for packets catched by router alert option.
+/* Special input handler for packets caught by router alert option.
    They are selected only by protocol field, and then processed likely
    local ones; but only if someone wants them! Otherwise, router
    not running rsvpd will kill RSVP.

@@ -771,7 +771,7 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 		/* This is full of good intentions, but doesn't work in
 		 * practice.
 		 * After sending the first UA response, we switch the
-		 * dongle to the negociated speed, which is usually
+		 * dongle to the negotiated speed, which is usually
 		 * different than 9600 kb/s.
 		 * From there, there is two solutions :
 		 * 1) The other end has received the first UA response :
@@ -779,7 +779,7 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 		 * and will ignore and drop the second UA response.
 		 * Actually, it's even worse : the other side will almost
 		 * immediately send a RR that will likely collide with the
-		 * UA response (depending on negociated turnaround).
+		 * UA response (depending on negotiated turnaround).
 		 * 2) The other end has not received the first UA response,
 		 * will stay at 9600 and will never see the second UA response.
 		 * Jean II */

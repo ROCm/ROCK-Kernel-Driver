@@ -838,7 +838,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	/* Socket identity is still unknown (sport may be zero).
 	 * However we set state to SYN-SENT and not releasing socket
 	 * lock select source port, enter ourselves into the hash tables and
-	 * complete initalization after this.
+	 * complete initialization after this.
 	 */
 	tcp_set_state(sk, TCP_SYN_SENT);
 	err = tcp_v4_hash_connect(sk);

@@ -78,7 +78,7 @@ fail:
 	return NULL;
 }
 
-/* Intialize a new transport from provided memory.  */
+/* Initialize a new transport from provided memory.  */
 struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 					   const union sctp_addr *addr,
 					   int priority)
@@ -171,7 +171,7 @@ void sctp_transport_destroy(struct sctp_transport *transport)
 }
 
 /* Start T3_rtx timer if it is not already running and update the heartbeat
- * timer.  This routine is called everytime a DATA chunk is sent.
+ * timer.  This routine is called every time a DATA chunk is sent.
  */
 void sctp_transport_reset_timers(struct sctp_transport *transport)
 {

@@ -19,7 +19,6 @@
 #include <linux/interrupt.h>
 #include <linux/if.h>
 #include <linux/netdevice.h>
-#include <linux/brlock.h>
 #include <linux/inetdevice.h>
 #include <net/sock.h>
 #include <net/route.h>
@@ -40,12 +39,13 @@
 #endif
 
 /* Sockopts only registered and called from user context, so
-   BR_NETPROTO_LOCK would be overkill.  Also, [gs]etsockopt calls may
+   net locking would be overkill.  Also, [gs]etsockopt calls may
    sleep. */
 static DECLARE_MUTEX(nf_sockopt_mutex);
 
 struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
 static LIST_HEAD(nf_sockopts);
+static spinlock_t nf_hook_lock = SPIN_LOCK_UNLOCKED;
 
 /* 
  * A queue handler may be registered for each protocol.  Each is protected by
@@ -56,28 +56,31 @@ static struct nf_queue_handler_t {
 	nf_queue_outfn_t outfn;
 	void *data;
 } queue_handler[NPROTO];
+static rwlock_t queue_handler_lock = RW_LOCK_UNLOCKED;
 
 int nf_register_hook(struct nf_hook_ops *reg)
 {
 	struct list_head *i;
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	for (i = nf_hooks[reg->pf][reg->hooknum].next; 
-	     i != &nf_hooks[reg->pf][reg->hooknum]; 
-	     i = i->next) {
+	spin_lock_bh(&nf_hook_lock);
+	list_for_each(i, &nf_hooks[reg->pf][reg->hooknum]) {
 		if (reg->priority < ((struct nf_hook_ops *)i)->priority)
 			break;
 	}
-	list_add(&reg->list, i->prev);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	list_add_rcu(&reg->list, i->prev);
+	spin_unlock_bh(&nf_hook_lock);
+
+	synchronize_net();
 	return 0;
 }
 
 void nf_unregister_hook(struct nf_hook_ops *reg)
 {
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	list_del(&reg->list);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&nf_hook_lock);
+	list_del_rcu(&reg->list);
+	spin_unlock_bh(&nf_hook_lock);
+
+	synchronize_net();
 }
 
 /* Do exclusive ranges overlap? */
@@ -344,7 +347,11 @@ static unsigned int nf_iterate(struct list_head *head,
 			       int (*okfn)(struct sk_buff *),
 			       int hook_thresh)
 {
-	for (*i = (*i)->next; *i != head; *i = (*i)->next) {
+	/*
+	 * The caller must not block between calls to this
+	 * function because of risk of continuing from deleted element.
+	 */
+	list_for_each_continue_rcu(*i, head) {
 		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
 
 		if (hook_thresh > elem->priority)
@@ -383,7 +390,7 @@ int nf_register_queue_handler(int pf, nf_queue_outfn_t outfn, void *data)
 {      
 	int ret;
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	write_lock_bh(&queue_handler_lock);
 	if (queue_handler[pf].outfn)
 		ret = -EBUSY;
 	else {
@@ -391,7 +398,7 @@ int nf_register_queue_handler(int pf, nf_queue_outfn_t outfn, void *data)
 		queue_handler[pf].data = data;
 		ret = 0;
 	}
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	write_unlock_bh(&queue_handler_lock);
 
 	return ret;
 }
@@ -399,10 +406,11 @@ int nf_register_queue_handler(int pf, nf_queue_outfn_t outfn, void *data)
 /* The caller must flush their queue before this */
 int nf_unregister_queue_handler(int pf)
 {
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	write_lock_bh(&queue_handler_lock);
 	queue_handler[pf].outfn = NULL;
 	queue_handler[pf].data = NULL;
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	write_unlock_bh(&queue_handler_lock);
+	
 	return 0;
 }
 
@@ -425,7 +433,9 @@ static int nf_queue(struct sk_buff *skb,
 #endif
 
 	/* QUEUE == DROP if noone is waiting, to be safe. */
+	read_lock(&queue_handler_lock);
 	if (!queue_handler[pf].outfn) {
+		read_unlock(&queue_handler_lock);
 		kfree_skb(skb);
 		return 1;
 	}
@@ -435,6 +445,7 @@ static int nf_queue(struct sk_buff *skb,
 		if (net_ratelimit())
 			printk(KERN_ERR "OOM queueing packet %p\n",
 			       skb);
+		read_unlock(&queue_handler_lock);
 		kfree_skb(skb);
 		return 1;
 	}
@@ -443,8 +454,11 @@ static int nf_queue(struct sk_buff *skb,
 		(struct nf_hook_ops *)elem, pf, hook, indev, outdev, okfn };
 
 	/* If it's going away, ignore hook. */
-	if (!try_module_get(info->elem->owner))
+	if (!try_module_get(info->elem->owner)) {
+		read_unlock(&queue_handler_lock);
+		kfree(info);
 		return 0;
+	}
 
 	/* Bump dev refs so they don't vanish while packet is out */
 	if (indev) dev_hold(indev);
@@ -460,6 +474,8 @@ static int nf_queue(struct sk_buff *skb,
 #endif
 
 	status = queue_handler[pf].outfn(skb, info, queue_handler[pf].data);
+	read_unlock(&queue_handler_lock);
+
 	if (status < 0) {
 		/* James M doesn't say fuck enough. */
 		if (indev) dev_put(indev);
@@ -495,7 +511,7 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 	}
 
 	/* We may already have this, but read-locks nest anyway */
-	br_read_lock_bh(BR_NETPROTO_LOCK);
+	rcu_read_lock();
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	if (skb->nf_debug & (1 << hook)) {
@@ -526,7 +542,7 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		break;
 	}
 
-	br_read_unlock_bh(BR_NETPROTO_LOCK);
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -535,11 +551,22 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 {
 	struct list_head *elem = &info->elem->list;
 
-	/* We don't have BR_NETPROTO_LOCK here */
-	br_read_lock_bh(BR_NETPROTO_LOCK);
+	rcu_read_lock();
 
 	/* Drop reference to owner of hook which queued us. */
 	module_put(info->elem->owner);
+
+	list_for_each_rcu(i, &nf_hooks[info->pf][info->hook]) {
+		if (i == elem) 
+  			break;
+  	}
+  
+	if (elem == &nf_hooks[info->pf][info->hook]) {
+		/* The module which sent it to userspace is gone. */
+		NFDEBUG("%s: module disappeared, dropping packet.\n",
+			__FUNCTION__);
+		verdict = NF_DROP;
+	}
 
 	/* Continue traversal iff userspace said ok... */
 	if (verdict == NF_REPEAT) {
@@ -570,7 +597,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		kfree_skb(skb);
 		break;
 	}
-	br_read_unlock_bh(BR_NETPROTO_LOCK);
+	rcu_read_unlock();
 
 	/* Release those devices we held, or Alexey will kill me. */
 	if (info->indev) dev_put(info->indev);

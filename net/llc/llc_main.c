@@ -162,7 +162,7 @@ out_kfree_skb:
 
 /**
  *     llc_sk_init - Initializes a socket with default llc values.
- *     @sk: socket to intiailize.
+ *     @sk: socket to initialize.
  *
  *     Initializes a socket with default llc values.
  */

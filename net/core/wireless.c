@@ -66,7 +66,7 @@
 #define WE_STRICT_WRITE		/* Check write buffer size */
 /* I'll probably drop both the define and kernel message in the next version */
 
-/* Debuging stuff */
+/* Debugging stuff */
 #undef WE_IOCTL_DEBUG		/* Debug IOCTL API */
 #undef WE_EVENT_DEBUG		/* Debug Event dispatcher */
 
@@ -1005,7 +1005,7 @@ static inline void rtmsg_iwinfo(struct net_device *	dev,
 /* ---------------------------------------------------------------- */
 /*
  * Main event dispatcher. Called from other parts and drivers.
- * Send the event on the apropriate channels.
+ * Send the event on the appropriate channels.
  * May be called from interrupt context.
  */
 void wireless_send_event(struct net_device *	dev,

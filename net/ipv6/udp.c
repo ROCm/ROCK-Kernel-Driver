@@ -378,7 +378,7 @@ ipv4_connected:
 
 	ip6_dst_store(sk, dst, fl.fl6_dst);
 
-	/* get the source adddress used in the apropriate device */
+	/* get the source address used in the appropriate device */
 
 	err = ipv6_get_saddr(dst, daddr, &saddr);
 

@@ -2104,7 +2104,7 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 
 		for (imc=idev->mc_list; imc; imc=imc->next) {
 			struct ip6_sf_list *psf;
-			unsigned long icount, xcount, i;
+			unsigned long i;
 
 			spin_lock_bh(&imc->mca_lock);
 			for (psf=imc->mca_sources; psf; psf=psf->sf_next) {

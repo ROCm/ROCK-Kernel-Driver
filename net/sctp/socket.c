@@ -2854,7 +2854,7 @@ static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsi
 	return pp;
 }
 
-/* FIXME: Commments! */
+/* FIXME: Comments! */
 static __inline__ void __sctp_put_port(struct sock *sk)
 {
 	struct sctp_protocol *sctp_proto = sctp_get_protocol();

@@ -602,7 +602,7 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 			break;
 
 		/* 
-		 * error of unkown type. 
+		 * error of unknown type. 
 		 * must pass to upper level 
 		 */
 
