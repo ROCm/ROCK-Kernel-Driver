@@ -32,7 +32,9 @@
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/proc_fs.h>
+#ifdef CONFIG_X86
 #include <asm/mpspec.h>
+#endif
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 #include "include/acinterp.h"	/* for acpi_ex_eisa_id_to_string() */
@@ -1967,11 +1969,13 @@ acpi_bus_init (void)
 		goto error1;
 	}
 
+#ifdef CONFIG_X86
 	/* Ensure the SCI is set to level-triggered, active-low */
 	if (acpi_ioapic)
 		mp_override_legacy_irq(acpi_fadt.sci_int, 3, 3, acpi_fadt.sci_int);
 	else
 		eisa_set_level_irq(acpi_fadt.sci_int);
+#endif
 
 	status = acpi_enable_subsystem(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
