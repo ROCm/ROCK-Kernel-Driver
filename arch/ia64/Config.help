@@ -557,3 +557,8 @@ CONFIG_DEBUG_SPINLOCK
   best used in conjunction with the NMI watchdog so that spinlock
   deadlocks are also debuggable.
 
+CONFIG_IA64_GRANULE_16MB
+  IA64 identity-mapped regions use a large page size called "granules".
+
+  Select "16MB" for a small granule size.
+  Select "64MB" for a large granule size.  This is the current default.
