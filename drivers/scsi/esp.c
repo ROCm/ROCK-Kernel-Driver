@@ -1041,6 +1041,8 @@ static void __init esp_init_swstate(struct esp *esp)
 	esp->resetting_bus = 0;
 	esp->snip = 0;
 
+	init_waitqueue_head(&esp->reset_queue);
+
 	/* Debugging... */
 	for(i = 0; i < 32; i++)
 		esp->espcmdlog[i] = 0;
@@ -2045,6 +2047,7 @@ static int esp_finish_reset(struct esp *esp)
 
 	/* SCSI bus reset is complete. */
 	esp->resetting_bus = 0;
+	wake_up(&esp->reset_queue);
 
 	/* Ok, now it is safe to get commands going once more. */
 	if (esp->issue_SC)
@@ -2065,7 +2068,7 @@ static int esp_do_resetbus(struct esp *esp)
 /* Reset ESP chip, reset hanging bus, then kill active and
  * disconnected commands for targets without soft reset.
  */
-int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
+int esp_reset(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
 	unsigned long flags;
@@ -2074,7 +2077,9 @@ int esp_reset(Scsi_Cmnd *SCptr, unsigned int how)
 	(void) esp_do_resetbus(esp);
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 
-	return SCSI_RESET_PENDING;
+	wait_event(esp->reset_queue, (esp->resetting_bus == 0));
+
+	return SUCCESS;
 }
 
 /* Internal ESP done function. */
