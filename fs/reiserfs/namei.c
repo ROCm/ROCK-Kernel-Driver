@@ -643,7 +643,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
 
 out_failed:
     if (locked)
-        reiserfs_write_unlock (dir->i_sb);
+        reiserfs_write_unlock_xattrs (dir->i_sb);
     reiserfs_write_unlock(dir->i_sb);
     return retval;
 }
@@ -715,7 +715,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
 
 out_failed:
     if (locked)
-        reiserfs_write_unlock (dir->i_sb);
+        reiserfs_write_unlock_xattrs (dir->i_sb);
     reiserfs_write_unlock(dir->i_sb);
     return retval;
 }
