@@ -555,6 +555,10 @@ struct proto {
 	int			*sysctl_rmem;
 	int			max_header;
 
+	kmem_cache_t		*slab;
+	int			slab_obj_size;
+	void			*af_specific;
+
 	char			name[32];
 
 	struct {
@@ -562,6 +566,14 @@ struct proto {
 		u8  __pad[SMP_CACHE_BYTES - sizeof(int)];
 	} stats[NR_CPUS];
 };
+
+extern int sk_alloc_slab(struct proto *prot, char *name);
+extern void sk_free_slab(struct proto *prot);
+
+static inline void sk_alloc_slab_error(struct proto *proto)
+{
+	printk(KERN_CRIT "%s: Can't create sock SLAB cache!\n", proto->name);
+}
 
 static __inline__ void sk_set_owner(struct sock *sk, struct module *owner)
 {

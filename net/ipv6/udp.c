@@ -1031,6 +1031,10 @@ void udp6_proc_exit(void) {
 
 /* ------------------------------------------------------------------------ */
 
+struct ipv6_sk_offset udp_sock_offset = {
+	.offset = offsetof(struct udp6_sock, inet6),
+};
+
 struct proto udpv6_prot = {
 	.name =		"UDP",
 	.close =	udpv6_close,
@@ -1046,6 +1050,8 @@ struct proto udpv6_prot = {
 	.hash =		udp_v6_hash,
 	.unhash =	udp_v6_unhash,
 	.get_port =	udp_v6_get_port,
+	.slab_obj_size = sizeof(struct udp6_sock),
+	.af_specific =	&udp_sock_offset,
 };
 
 extern struct proto_ops inet6_dgram_ops;

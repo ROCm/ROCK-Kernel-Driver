@@ -1343,6 +1343,27 @@ void sk_common_release(struct sock *sk)
 
 EXPORT_SYMBOL(sk_common_release);
 
+int sk_alloc_slab(struct proto *prot, char *name)
+{
+	prot->slab = kmem_cache_create(name,
+				       prot->slab_obj_size, 0,
+				       SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+	return prot->slab != NULL ? 0 : -ENOBUFS;
+}
+
+EXPORT_SYMBOL(sk_alloc_slab);
+
+void sk_free_slab(struct proto *prot)
+{
+	if (prot->slab != NULL) {
+		kmem_cache_destroy(prot->slab);
+		prot->slab = NULL;
+	}
+}
+
+EXPORT_SYMBOL(sk_free_slab);
+
 EXPORT_SYMBOL(__lock_sock);
 EXPORT_SYMBOL(__release_sock);
 EXPORT_SYMBOL(sk_alloc);
