@@ -104,7 +104,7 @@ void check_pgt_cache(void)
                                 if (page2)
                                         page2->lru.next = page->lru.next;
                                 else
-                                        (struct page *)pgd_quicklist = page->lru.next;
+                                        pgd_quicklist = (void *) page->lru.next;
                                 pgd_cache_size -= 2;
                                 __free_page(page);
                                 if (page2)
