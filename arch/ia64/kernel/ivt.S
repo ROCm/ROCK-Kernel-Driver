@@ -127,12 +127,9 @@ ENTRY(vhpt_miss)
 	shr.u r18=r22,PGDIR_SHIFT		// get bits 33-63 of the faulting address
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
-	.global ia64_ivt_patch1
-ia64_ivt_patch1:
-{	.mlx // we patch this bundle to include physical address of swapper_pg_dir
-	srlz.d					// ensure "rsm psr.dt" has taken effect
-(p6)	movl r19=swapper_pg_dir			// region 5 is rooted at swapper_pg_dir
-}
+
+	LOAD_PHYSICAL(srlz.d, p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+
 	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3
@@ -425,12 +422,9 @@ ENTRY(nested_dtlb_miss)
 	shr.u r18=r16,PGDIR_SHIFT		// get bits 33-63 of faulting address
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
-	.global ia64_ivt_patch2
-ia64_ivt_patch2:
-{	.mlx // we patch this bundle to include physical address of swapper_pg_dir
-	srlz.d					// ensure "rsm psr.dt" has taken effect
-(p6)	movl r19=swapper_pg_dir			// region 5 is rooted at swapper_pg_dir
-}
+
+	LOAD_PHYSICAL(srlz.d, p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+
 	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
 (p7)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT-3

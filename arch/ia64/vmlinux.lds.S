@@ -55,6 +55,13 @@ SECTIONS
 	  __stop___ex_table = .;
 	}
 
+  __vtop_patchlist : AT(ADDR(__vtop_patchlist) - LOAD_OFFSET)
+	{
+	  __start___vtop_patchlist = .;
+	  *(__vtop_patchlist)
+	  __end____vtop_patchlist = .;
+	}
+
   __mckinley_e9_bundles : AT(ADDR(__mckinley_e9_bundles) - LOAD_OFFSET)
 	{
 	  __start___mckinley_e9_bundles = .;

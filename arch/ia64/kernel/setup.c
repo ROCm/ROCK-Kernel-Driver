@@ -349,43 +349,51 @@ find_memory (void)
 }
 
 /*
- * There are two places in the performance critical path of
- * the exception handling code where we need to know the physical
- * address of the swapper_pg_dir structure.  This routine
- * patches the "movl" instructions to load the value needed.
+ * We need sometimes to load the physical address of a kernel
+ * object.  Often we can convert the virtual address to physical
+ * at execution time, but sometimes (either for performance reasons
+ * or during error recovery) we cannot to this.  Patch the marked
+ * bundles to load the physical address.
+ * The 64-bit value in a "movl reg=value" is scattered between the
+ * two words of the bundle like this:
+ *
+ * 6  6         5         4         3         2         1
+ * 3210987654321098765432109876543210987654321098765432109876543210
+ * ABBBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCDEEEEEFFFFFFFFFGGGGGGG
+ *
+ * CCCCCCCCCCCCCCCCCCxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ * xxxxAFFFFFFFFFEEEEEDxGGGGGGGxxxxxxxxxxxxxBBBBBBBBBBBBBBBBBBBBBBB
  */
 static void __init
-patch_ivt_with_phys_swapper_pg_dir(void)
+patch_physical (void)
 {
-	extern char ia64_ivt_patch1[], ia64_ivt_patch2[];
-	unsigned long spd = ia64_tpa((__u64)swapper_pg_dir);
-	unsigned long *p;
+	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
+	unsigned long **e, *p, paddr, vaddr;
 
-	p = (unsigned long *)ia64_imva(ia64_ivt_patch1);
+	for (e = __start___vtop_patchlist; e < __end____vtop_patchlist; e++) {
+		p = *e;
 
-	*p = (*p & 0x3fffffffffffUL) |
-		((spd & 0x000000ffffc00000UL)<<24);
-	p++;
-	*p = (*p & 0xf000080fff800000UL) |
-		((spd & 0x8000000000000000UL) >> 4)  |
-		((spd & 0x7fffff0000000000UL) >> 40) |
-		((spd & 0x00000000001f0000UL) << 29) |
-		((spd & 0x0000000000200000UL) << 23) |
-		((spd & 0x000000000000ff80UL) << 43) |
-		((spd & 0x000000000000007fUL) << 36);
+		vaddr = ((p[1] & 0x0800000000000000UL) << 4)  | /*A*/
+			((p[1] & 0x00000000007fffffUL) << 40) | /*B*/
+			((p[0] & 0xffffc00000000000UL) >> 24) | /*C*/
+			((p[1] & 0x0000100000000000UL) >> 23) | /*D*/
+			((p[1] & 0x0003e00000000000UL) >> 29) | /*E*/
+			((p[1] & 0x07fc000000000000UL) >> 43) | /*F*/
+			((p[1] & 0x000007f000000000UL) >> 36);  /*G*/
 
-	p = (unsigned long *)ia64_imva(ia64_ivt_patch2);
+		paddr = ia64_tpa(vaddr);
 
-	*p = (*p & 0x3fffffffffffUL) |
-		((spd & 0x000000ffffc00000UL)<<24);
-	p++;
-	*p = (*p & 0xf000080fff800000UL) |
-		((spd & 0x8000000000000000UL) >> 4)  |
-		((spd & 0x7fffff0000000000UL) >> 40) |
-		((spd & 0x00000000001f0000UL) << 29) |
-		((spd & 0x0000000000200000UL) << 23) |
-		((spd & 0x000000000000ff80UL) << 43) |
-		((spd & 0x000000000000007fUL) << 36);
+		*p = (*p & 0x3fffffffffffUL) |
+			((paddr & 0x000000ffffc00000UL)<<24);	/*C*/
+		p++;
+		*p = (*p & 0xf000080fff800000UL) |
+			((paddr & 0x8000000000000000UL) >> 4)  | /*A*/
+			((paddr & 0x7fffff0000000000UL) >> 40) | /*B*/
+			((paddr & 0x0000000000200000UL) << 23) | /*D*/
+			((paddr & 0x00000000001f0000UL) << 29) | /*E*/
+			((paddr & 0x000000000000ff80UL) << 43) | /*F*/
+			((paddr & 0x000000000000007fUL) << 36);  /*G*/
+	}
 }
 
 
@@ -397,7 +405,7 @@ setup_arch (char **cmdline_p)
 
 	unw_init();
 
-	patch_ivt_with_phys_swapper_pg_dir();
+	patch_physical();
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 	strncpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));

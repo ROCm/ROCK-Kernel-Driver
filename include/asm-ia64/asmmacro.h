@@ -51,6 +51,22 @@ name:
   [99:]	x
 
 /*
+ * Mark instructions that need a load of a virtual address patched to be
+ * a load of a physical address.  We use this either in critical performance
+ * path (ivt.S - TLB miss processing) or in places where it might not be
+ * safe to use a "tpa" instruction (mca_asm.S - error recovery).
+ */
+	.section "__vtop_patchlist", "a"	// declare section & section attributes
+	.previous
+
+#define	LOAD_PHYSICAL(op, preg, reg, obj)	\
+1: {	.mlx;					\
+	op;					\
+(preg)	movl reg = obj;				\
+   };						\
+	.xdata8 "__vtop_patchlist", 1b
+
+/*
  * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
  * we'll patch out the work-around bundles with NOPs, so their impact is minimal.
  */
