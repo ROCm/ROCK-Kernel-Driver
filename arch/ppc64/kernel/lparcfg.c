@@ -5,6 +5,8 @@
  *    Copyright (c) 2003 Dave Engebretsen
  * Will Schmidt willschm@us.ibm.com
  *    SPLPAR updates, Copyright (c) 2003 Will Schmidt IBM Corporation.
+ * Nathan Lynch nathanl@austin.ibm.com
+ *    Added lparcfg_write, Copyright (C) 2004 Nathan Lynch IBM Corporation.
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -33,6 +35,9 @@ static struct proc_dir_entry *proc_ppc64_lparcfg;
 #define LPARCFG_BUFF_SIZE 4096
 
 #ifdef CONFIG_PPC_ISERIES
+
+#define lparcfg_write NULL
+
 static unsigned char e2a(unsigned char x)
 {
         switch (x) {
@@ -383,6 +388,99 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	}
 	return 0;
 }
+
+/*
+ * Interface for changing system parameters (variable capacity weight
+ * and entitled capacity).  Format of input is "param_name=value";
+ * anything after value is ignored.  Valid parameters at this time are
+ * "partition_entitled_capacity" and "capacity_weight".  We use
+ * H_SET_PPP to alter parameters.
+ *
+ * This function should be invoked only on systems with
+ * FW_FEATURE_SPLPAR.
+ */
+static ssize_t lparcfg_write(struct file *file, const char __user *buf, size_t count, loff_t *off)
+{
+	char *kbuf;
+	char *tmp;
+	u64 new_entitled, *new_entitled_ptr = &new_entitled;
+	u8 new_weight, *new_weight_ptr = &new_weight;
+
+	unsigned long current_entitled;    /* parameters for h_get_ppp */
+	unsigned long dummy;
+	unsigned long resource;
+	u8 current_weight;
+
+	ssize_t retval = -ENOMEM;
+
+	kbuf = kmalloc(count, GFP_KERNEL);
+	if (!kbuf)
+		goto out;
+
+	retval = -EFAULT;
+	if (copy_from_user(kbuf, buf, count))
+		goto out;
+
+	retval = -EINVAL;
+	kbuf[count - 1] = '\0';
+	tmp = strchr(kbuf, '=');
+	if (!tmp)
+		goto out;
+
+	*tmp++ = '\0';
+
+	if (!strcmp(kbuf, "partition_entitled_capacity")) {
+		char *endp;
+		*new_entitled_ptr = (u64)simple_strtoul(tmp, &endp, 10);
+		if (endp == tmp)
+			goto out;
+		new_weight_ptr = &current_weight;
+	} else if (!strcmp(kbuf, "capacity_weight")) {
+		char *endp;
+		*new_weight_ptr = (u8)simple_strtoul(tmp, &endp, 10);
+		if (endp == tmp)
+			goto out;
+		new_entitled_ptr = &current_entitled;
+	} else
+		goto out;
+
+	/* Get our current parameters */
+	retval = h_get_ppp(&current_entitled, &dummy, &dummy, &resource);
+	if (retval) {
+		retval = -EIO;
+		goto out;
+	}
+
+	current_weight = (resource>>5*8)&0xFF;
+
+	pr_debug("%s: current_entitled = %lu, current_weight = %lu\n",
+		 __FUNCTION__, current_entitled, current_weight);
+
+	pr_debug("%s: new_entitled = %lu, new_weight = %lu\n",
+		 __FUNCTION__, *new_entitled_ptr, *new_weight_ptr);
+
+	retval = plpar_hcall_norets(H_SET_PPP, *new_entitled_ptr,
+				    *new_weight_ptr);
+
+	if (retval == H_Success || retval == H_Constrained) {
+		retval = count;
+	} else if (retval == H_Busy) {
+		retval = -EBUSY;
+	} else if (retval == H_Hardware) {
+		retval = -EIO;
+	} else if (retval == H_Parameter) {
+		retval = -EINVAL;
+	} else {
+		printk(KERN_WARNING "%s: received unknown hv return code %ld",
+		       __FUNCTION__, retval);
+		retval = -EIO;
+	}
+
+out:
+	kfree(kbuf);
+	return retval;
+}
+
 #endif /* CONFIG_PPC_PSERIES */
 
 
@@ -442,8 +540,15 @@ struct file_operations lparcfg_fops = {
 int __init lparcfg_init(void)
 {
 	struct proc_dir_entry *ent;
+	mode_t mode = S_IRUSR;
 
-	ent = create_proc_entry("ppc64/lparcfg", S_IRUSR, NULL);
+	/* Allow writing if we have FW_FEATURE_SPLPAR */
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		lparcfg_fops.write = lparcfg_write;
+		mode |= S_IWUSR;
+	}
+
+	ent = create_proc_entry("ppc64/lparcfg", mode, NULL);
 	if (ent) {
 		ent->proc_fops = &lparcfg_fops;
 		ent->data = kmalloc(LPARCFG_BUFF_SIZE, GFP_KERNEL);

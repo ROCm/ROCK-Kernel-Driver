@@ -405,8 +405,8 @@ static void internal_register_disk(int diskno)
 	registered[diskno] = 1;
 
 	printk(VIOD_KERN_INFO
-	       "Disk %2.2d size %dM, sectors %d, heads %d, cylinders %d, sectsize %d\n",
-               diskno, (int)viodasd_devices[diskno].size >> 20,
+	       "Disk %2.2d size %luM, sectors %d, heads %d, cylinders %d, sectsize %d\n",
+               diskno, (unsigned long)viodasd_devices[diskno].size >> 20,
 	       (int)viodasd_devices[diskno].sectors,
 	       (int)viodasd_devices[diskno].tracks,
 	       (int)viodasd_devices[diskno].cylinders,
