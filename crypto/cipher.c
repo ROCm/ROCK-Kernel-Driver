@@ -34,6 +34,13 @@ struct scatter_walk {
 	unsigned int		offset;
 };
 
+enum km_type crypto_km_types[] = {
+	KM_USER0,
+	KM_USER1,
+	KM_SOFTIRQ0,
+	KM_SOFTIRQ1,
+};
+
 static inline void xor_64(u8 *a, const u8 *b)
 {
 	((u32 *)a)[0] ^= ((u32 *)b)[0];
