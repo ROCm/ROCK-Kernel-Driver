@@ -234,7 +234,7 @@ static int __init powernow_k6_init(void)
 
 	/* initialization of main "cpufreq" code*/
 	driver = kmalloc(sizeof(struct cpufreq_driver) +
-			 NR_CPUS * sizeof(struct cpufreq_freqs), GFP_KERNEL);
+			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!driver) {
 		release_region (POWERNOW_IOPORT, 16);
 		return -ENOMEM;
