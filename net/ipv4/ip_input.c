@@ -223,7 +223,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		int protocol = skb->nh.iph->protocol;
 		int hash;
 		struct sock *raw_sk;
-		struct inet_protocol *ipprot;
+		struct net_protocol *ipprot;
 
 	resubmit:
 		hash = protocol & (MAX_INET_PROTOS - 1);
