@@ -86,7 +86,10 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 		       errno);
 		return(-errno);
 	}
-	else if(n != 0)	pid = -err;
+	else if(n != 0){
+		waitpid(pid, NULL, 0);
+		pid = -err;
+	}
 
 	if(stack_out == NULL) free_stack(stack, 0);
         else *stack_out = stack;
