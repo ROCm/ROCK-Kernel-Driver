@@ -673,48 +673,6 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 		and	r2, r6, #31			@ int mode
 		b	bad_mode
 
-#if 1 /* defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE */
-		/* The FPE is always present */
-		.equ	fpe_not_present, fpundefinstr
-#else
-wfs_mask_data:	.word	0x0e200110			@ WFS/RFS
-		.word	0x0fef0fff
-		.word	0x0d000100			@ LDF [sp]/STF [sp]
-		.word	0x0d000100			@ LDF [fp]/STF [fp]
-		.word	0x0f000f00
-
-/* We get here if an undefined instruction happens and the floating
- * point emulator is not present.  If the offending instruction was
- * a WFS, we just perform a normal return as if we had emulated the
- * operation.  This is a hack to allow some basic userland binaries
- * to run so that the emulator module proper can be loaded. --philb
- */
-fpe_not_present:
-		adr	r10, wfs_mask_data
-		ldmia	r10, {r4, r5, r6, r7, r8}
-		ldr	r10, [sp, #S_PC]		@ Load PC
-		sub	r10, r10, #4
-		mask_pc	r10, r10
-		ldrt	r10, [r10]			@ get instruction
-		and	r5, r10, r5
-		teq	r5, r4				@ Is it WFS?
-		moveq	pc, r9
-		and	r5, r10, r8
-		teq	r5, r6				@ Is it LDF/STF on sp or fp?
-		teqne	r5, r7
-		movne	pc, lr
-		tst	r10, #0x00200000		@ Does it have WB
-		moveq	pc, r9
-		and	r4, r10, #255			@ get offset
-		and	r6, r10, #0x000f0000
-		tst	r10, #0x00800000		@ +/-
-		ldr	r5, [sp, r6, lsr #14]		@ Load reg
-		rsbeq	r4, r4, #0
-		add	r5, r5, r4, lsl #2
-		str	r5, [sp, r6, lsr #14]		@ Save reg
-		mov	pc, r9
-#endif
-
 /*
  * SVC mode handlers
  */
@@ -1014,7 +972,7 @@ do_fpe:		ldr	r4, .LCfp
 
 		.data
 ENTRY(fp_enter)
-		.word	fpe_not_present
+		.word	fpundefinstr
 		.text
 
 fpundefinstr:	mov	r0, sp
