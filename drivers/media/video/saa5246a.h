@@ -23,7 +23,7 @@
 #define __SAA5246A_H__
 
 #define MAJOR_VERSION 1		/* driver major version number */
-#define MINOR_VERSION 7		/* driver minor version number */
+#define MINOR_VERSION 8		/* driver minor version number */
 
 #define IF_NAME "SAA5246A"
 
