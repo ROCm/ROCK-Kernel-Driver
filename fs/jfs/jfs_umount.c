@@ -64,15 +64,11 @@ int jfs_umount(struct super_block *sb)
 	 *
 	 * if mounted read-write and log based recovery was enabled
 	 */
-	if ((log = sbi->log)) {
+	if ((log = sbi->log))
 		/*
-		 * close log: 
-		 *
-		 * remove file system from log active file system list.
+		 * Wait for outstanding transactions to be written to log: 
 		 */
-		log = sbi->log;
-		rc = lmLogClose(sb, log);
-	}
+		lmLogWait(log);
 
 	/*
 	 * close fileset inode allocation map (aka fileset inode)
@@ -113,6 +109,14 @@ int jfs_umount(struct super_block *sb)
 	sbi->ipimap = NULL;
 
 	/*
+	 * Make sure all metadata makes it to disk before we mark
+	 * the superblock as clean
+	 */
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+	filemap_fdatawrite(sbi->direct_inode->i_mapping);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+
+	/*
 	 * ensure all file system file pages are propagated to their
 	 * home blocks on disk (and their in-memory buffer pages are 
 	 * invalidated) BEFORE updating file system superblock state
@@ -120,10 +124,16 @@ int jfs_umount(struct super_block *sb)
 	 * consistent state) and log superblock active file system 
 	 * list (to signify skip logredo()).
 	 */
-	if (log)		/* log = NULL if read-only mount */
+	if (log) {		/* log = NULL if read-only mount */
 		rc = updateSuper(sb, FM_CLEAN);
 
-
+		/*
+		 * close log: 
+		 *
+		 * remove file system from log active file system list.
+		 */
+		rc = lmLogClose(sb, log);
+	}
 	jFYI(0, ("	UnMount JFS Complete: %d\n", rc));
 	return rc;
 }
@@ -132,8 +142,9 @@ int jfs_umount(struct super_block *sb)
 int jfs_umount_rw(struct super_block *sb)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
+	log_t *log = sbi->log;
 
-	if (!sbi->log)
+	if (!log)
 		return 0;
 
 	/*
@@ -141,13 +152,19 @@ int jfs_umount_rw(struct super_block *sb)
 	 *
 	 * remove file system from log active file system list.
 	 */
-	lmLogClose(sb, sbi->log);
+	lmLogWait(log);
 
+	/*
+	 * Make sure all metadata makes it to disk
+	 */
 	dbSync(sbi->ipbmap);
 	diSync(sbi->ipimap);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+	filemap_fdatawrite(sbi->direct_inode->i_mapping);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
 
-	sbi->log = 0;
+	updateSuper(sb, FM_CLEAN);
+	sbi->log = NULL;
 
-	return updateSuper(sb, FM_CLEAN);
-       
+	return lmLogClose(sb, log);
 }
