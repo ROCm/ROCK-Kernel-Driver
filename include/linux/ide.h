@@ -794,6 +794,7 @@ typedef struct ide_drive_s {
 	int		lun;		/* logical unit */
 	int		crc_count;	/* crc counter to reduce drive speed */
 	struct list_head list;
+	struct device	gendev;
 	struct gendisk *disk;
 } ide_drive_t;
 
