@@ -654,7 +654,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 			mdio_write(dev, np->phys[0], MII_ADVERTISE, ADVERTISE_FULL);
 		else
 			writel(ADVERTISE_FULL, dev->base_addr + ANARANLPAR);
-		np->mii.duplex_lock = 1;
+		np->mii.force_media = 1;
 	}
 
 	/* The chip-specific entries in the device structure. */
@@ -956,7 +956,7 @@ static int netdev_open(struct net_device *dev)
 // 89/9/1 modify,
 //   np->crvalue = 0x00e40001;    /* tx store and forward, tx/rx enable */
 	np->crvalue |= 0x00e40001;	/* tx store and forward, tx/rx enable */
-	np->mii.full_duplex = np->mii.duplex_lock;
+	np->mii.full_duplex = np->mii.force_media;
 	getlinkstatus(dev);
 	if (np->linkok)
 		getlinktype(dev);

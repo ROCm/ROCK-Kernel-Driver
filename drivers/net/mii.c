@@ -122,7 +122,7 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		bmcr |= (BMCR_ANENABLE | BMCR_ANRESTART);
 		mii->mdio_write(dev, mii->phy_id, MII_BMCR, bmcr);
 
-		mii->duplex_lock = 0;
+		mii->force_media = 0;
 	} else {
 		u32 bmcr, tmp;
 
@@ -139,7 +139,7 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		if (bmcr != tmp)
 			mii->mdio_write(dev, mii->phy_id, MII_BMCR, tmp);
 
-		mii->duplex_lock = 1;
+		mii->force_media = 1;
 	}
 	return 0;
 }
@@ -186,7 +186,7 @@ unsigned int mii_check_media (struct mii_if_info *mii,
 	int advertise, lpa, media, duplex;
 
 	/* if forced media, go no further */
-	if (mii->duplex_lock)
+	if (mii->force_media)
 		return 0; /* duplex did not change */
 
 	/* check current and old link status */

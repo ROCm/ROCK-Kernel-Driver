@@ -1049,7 +1049,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 		printk(KERN_INFO "%s: Media type forced to Full Duplex.\n", dev->name);
 		/* Changing the MII-advertised media because might prevent
 		   re-connection. */
-		tp->mii.duplex_lock = 1;
+		tp->mii.force_media = 1;
 	}
 	if (tp->default_port) {
 		printk(KERN_INFO "  Forcing %dMbps %s-duplex operation.\n",
@@ -1306,7 +1306,7 @@ static int rtl8139_open (struct net_device *dev)
 
 	}
 
-	tp->mii.full_duplex = tp->mii.duplex_lock;
+	tp->mii.full_duplex = tp->mii.force_media;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
 	tp->twistie = (tp->chipset == CH_8139_K) ? 1 : 0;
 	tp->time_to_die = 0;
@@ -1537,7 +1537,7 @@ static inline void rtl8139_thread_iter (struct net_device *dev,
 
 	mii_lpa = mdio_read (dev, tp->phys[0], MII_LPA);
 
-	if (!tp->mii.duplex_lock && mii_lpa != 0xffff) {
+	if (!tp->mii.force_media && mii_lpa != 0xffff) {
 		int duplex = (mii_lpa & LPA_100FULL)
 		    || (mii_lpa & 0x01C0) == 0x0040;
 		if (tp->mii.full_duplex != duplex) {
@@ -1995,7 +1995,7 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 		/* Really link-change on new chips. */
 		int lpar = RTL_R16 (NWayLPAR);
 		int duplex = (lpar & LPA_100FULL) || (lpar & 0x01C0) == 0x0040
-				|| tp->mii.duplex_lock;
+				|| tp->mii.force_media;
 		if (tp->mii.full_duplex != duplex) {
 			tp->mii.full_duplex = duplex;
 #if 0

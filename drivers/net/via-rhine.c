@@ -731,7 +731,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	if (np->mii_if.full_duplex) {
 		printk(KERN_INFO "%s: Set to forced full duplex, autonegotiation"
 			   " disabled.\n", dev->name);
-		np->mii_if.duplex_lock = 1;
+		np->mii_if.force_media = 1;
 	}
 
 	/* The chip-specific entries in the device structure. */
@@ -1001,7 +1001,7 @@ static void init_registers(struct net_device *dev)
 		   ioaddr + IntrEnable);
 
 	np->chip_cmd = CmdStart|CmdTxOn|CmdRxOn|CmdNoTxPoll;
-	if (np->mii_if.duplex_lock)
+	if (np->mii_if.force_media)
 		np->chip_cmd |= CmdFDuplex;
 	writew(np->chip_cmd, ioaddr + ChipCmd);
 
@@ -1043,7 +1043,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 		switch (regnum) {
 		case MII_BMCR:					/* Is user forcing speed/duplex? */
 			if (value & 0x9000)			/* Autonegotiation. */
-				np->mii_if.duplex_lock = 0;
+				np->mii_if.force_media = 0;
 			else
 				np->mii_if.full_duplex = (value & 0x0100) ? 1 : 0;
 			break;
@@ -1114,7 +1114,7 @@ static void via_rhine_check_duplex(struct net_device *dev)
 	int negotiated = mii_lpa & np->mii_if.advertising;
 	int duplex;
 
-	if (np->mii_if.duplex_lock  ||  mii_lpa == 0xffff)
+	if (np->mii_if.force_media  ||  mii_lpa == 0xffff)
 		return;
 	duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
 	if (np->mii_if.full_duplex != duplex) {

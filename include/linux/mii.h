@@ -108,8 +108,8 @@ struct mii_if_info {
 	int phy_id;
 	int advertising;
 
-	unsigned int full_duplex : 1;
-	unsigned int duplex_lock : 1;
+	unsigned int full_duplex : 1;	/* is full duplex? */
+	unsigned int force_media : 1;	/* is autoneg. disabled? */
 
 	struct net_device *dev;
 	int (*mdio_read) (struct net_device *dev, int phy_id, int location);
