@@ -576,6 +576,28 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	return retval;
 }
 
+static void __serial_close(struct usb_serial_port *port, struct file *filp)
+{
+	if (!port->open_count) {
+		dbg (__FUNCTION__ " - port not opened");
+		return;
+	}
+
+	--port->open_count;
+	if (port->open_count <= 0) {
+		/* only call the device specific close if this 
+		 * port is being closed by the last owner */
+		if (port->serial->type->close)
+			port->serial->type->close(port, filp);
+		else
+			generic_close(port, filp);
+		port->open_count = 0;
+	}
+
+	if (port->serial->type->owner)
+		__MOD_DEC_USE_COUNT(port->serial->type->owner);
+}
+
 static void serial_close(struct tty_struct *tty, struct file * filp)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
@@ -588,31 +610,11 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	if (tty->driver_data == NULL) {
-		/* disconnect beat us to the punch here, so handle it gracefully */
-		goto exit;
-	}
-	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not opened");
-		goto exit_no_mod_dec;
+	/* if disconnect beat us to the punch here, there's nothing to do */
+	if (tty->driver_data) {
+		__serial_close(port, filp);
 	}
 
-	--port->open_count;
-	if (port->open_count <= 0) {
-		/* only call the device specific close if this 
-		 * port is being closed by the last owner */
-		if (serial->type->close)
-			serial->type->close(port, filp);
-		else
-			generic_close(port, filp);
-		port->open_count = 0;
-	}
-
-exit:
-	if (serial->type->owner)
-		__MOD_DEC_USE_COUNT(serial->type->owner);
-
-exit_no_mod_dec:
 	up (&port->sem);
 }
 
@@ -1400,10 +1402,15 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 	if (serial) {
 		/* fail all future close/read/write/ioctl/etc calls */
 		for (i = 0; i < serial->num_ports; ++i) {
-			down (&serial->port[i].sem);
-			if (serial->port[i].tty != NULL)
-				serial->port[i].tty->driver_data = NULL;
-			up (&serial->port[i].sem);
+			port = &serial->port[i];
+			down (&port->sem);
+			if (port->tty != NULL) {
+				while (port->open_count > 0) {
+					__serial_close(port, NULL);
+				}
+				port->tty->driver_data = NULL;
+			}
+			up (&port->sem);
 		}
 
 		serial->dev = NULL;
