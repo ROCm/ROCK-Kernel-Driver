@@ -437,6 +437,34 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI_PCI
+unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
+{
+	static u16 irq_mask;
+	unsigned int irq;
+	extern void eisa_set_level_irq(unsigned int irq);
+
+	/*
+	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
+	 */
+	if (acpi_irq_model == ACPI_IRQ_MODEL_PIC) {
+		if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
+			Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
+			irq_mask |= (1 << gsi);
+			eisa_set_level_irq(gsi);
+		}
+	}
+
+#ifdef CONFIG_X86_IO_APIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC) {
+		mp_register_gsi(gsi, edge_level, active_high_low);
+	}
+#endif
+	acpi_gsi_to_irq(gsi, &irq);
+	return irq;
+}
+#endif	/* CONFIG_ACPI_PCI */
+
 static unsigned long __init
 acpi_scan_rsdp (
 	unsigned long		start,

@@ -57,28 +57,18 @@ static acpi_status acpi_serial_port(struct serial_struct *req,
 static acpi_status acpi_serial_ext_irq(struct serial_struct *req,
 				       struct acpi_resource_ext_irq *ext_irq)
 {
-	if (ext_irq->number_of_interrupts > 0) {
-#ifdef CONFIG_IA64
-		req->irq = acpi_register_irq(ext_irq->interrupts[0],
-	                  ext_irq->active_high_low, ext_irq->edge_level);
-#else
-		req->irq = ext_irq->interrupts[0];
-#endif
-	}
+	if (ext_irq->number_of_interrupts > 0)
+		req->irq = acpi_register_gsi(ext_irq->interrupts[0],
+	                  ext_irq->edge_level, ext_irq->active_high_low);
 	return AE_OK;
 }
 
 static acpi_status acpi_serial_irq(struct serial_struct *req,
 				   struct acpi_resource_irq *irq)
 {
-	if (irq->number_of_interrupts > 0) {
-#ifdef CONFIG_IA64
-		req->irq = acpi_register_irq(irq->interrupts[0],
-	                  irq->active_high_low, irq->edge_level);
-#else
-		req->irq = irq->interrupts[0];
-#endif
-	}
+	if (irq->number_of_interrupts > 0)
+		req->irq = acpi_register_gsi(irq->interrupts[0],
+	                  irq->edge_level, irq->active_high_low);
 	return AE_OK;
 }
 

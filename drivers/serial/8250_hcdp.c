@@ -183,16 +183,12 @@ setup_serial_hcdp(void *tablep)
 		}
 
 		if (HCDP_IRQ_SUPPORTED(hcdp_dev)) {
-#ifdef CONFIG_IA64
 			if (HCDP_PCI_UART(hcdp_dev))
-				port.irq = acpi_register_irq(gsi,
-					ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+				port.irq = acpi_register_gsi(gsi,
+					ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
 			else
-				port.irq = acpi_register_irq(gsi,
-					ACPI_ACTIVE_HIGH, ACPI_EDGE_SENSITIVE);
-#else
-			port.irq = gsi;
-#endif
+				port.irq = acpi_register_gsi(gsi,
+					ACPI_EDGE_SENSITIVE, ACPI_ACTIVE_HIGH);
 			port.flags |= UPF_AUTO_IRQ;
 
 			if (HCDP_PCI_UART(hcdp_dev))
