@@ -121,6 +121,7 @@
 /*
  * These are the definitions for the Modem Control Register
  */
+#define UART_MCR_AFE	0x20	/* Enable auto-RTS/CTS (TI16C750) */
 #define UART_MCR_LOOP	0x10	/* Enable loopback test mode */
 #define UART_MCR_OUT2	0x08	/* Out2 complement */
 #define UART_MCR_OUT1	0x04	/* Out1 complement */
