@@ -47,7 +47,7 @@
 #include <asm/errno.h>
 #include <asm/segment.h>
 #include <asm/smp.h>
-#include <asm/irq_vectors.h>
+#include "irq_vectors.h"
 
 EBX		= 0x00
 ECX		= 0x04
@@ -344,34 +344,8 @@ ENTRY(name)				\
 	call smp_/**/name;	\
 	jmp ret_from_intr;
 
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-#ifdef CONFIG_SMP
-BUILD_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
-BUILD_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-#endif
-
-/*
- * every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-#ifdef CONFIG_X86_LOCAL_APIC
-BUILD_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-BUILD_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-BUILD_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-
-#ifdef CONFIG_X86_MCE_P4THERMAL
-BUILD_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
-#endif
-
-#endif
+/* The include is where all of the SMP etc. interrupts come from */
+#include "entry_arch.h"
 
 ENTRY(divide_error)
 	pushl $0			# no error code
