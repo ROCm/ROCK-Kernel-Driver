@@ -326,6 +326,10 @@ static struct mem_types mem_types[] __initdata = {
 	[MT_MEMORY] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
+	},
+	[MT_ROM] = {
+		.prot_sect = PMD_TYPE_SECT,
+		.domain    = DOMAIN_KERNEL,
 	}
 };
 
@@ -359,6 +363,7 @@ static void __init build_mem_type_table(void)
 		mem_types[MT_MINICLEAN].prot_sect  |= PMD_BIT4;
 		mem_types[MT_VECTORS].prot_l1      |= PMD_BIT4;
 		mem_types[MT_MEMORY].prot_sect     |= PMD_BIT4;
+		mem_types[MT_ROM].prot_sect        |= PMD_BIT4;
 	}
 
 	/*
@@ -370,6 +375,7 @@ static void __init build_mem_type_table(void)
 		 * kernel memory mapping.
 		 */
 		mem_types[MT_MEMORY].prot_sect &= ~PMD_BIT4;
+		mem_types[MT_ROM].prot_sect &= ~PMD_BIT4;
 		/*
 		 * Mark cache clean areas read only from SVC mode
 		 * and no access from userspace.
@@ -389,6 +395,7 @@ static void __init build_mem_type_table(void)
 
 	mem_types[MT_VECTORS].prot_l1 |= ecc_mask;
 	mem_types[MT_MEMORY].prot_sect |= ecc_mask | cp->pmd;
+	mem_types[MT_ROM].prot_sect |= cp->pmd;
 
 	for (i = 0; i < 16; i++) {
 		unsigned long v = pgprot_val(protection_map[i]);
@@ -433,7 +440,7 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-	if (md->type == MT_DEVICE &&
+	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
 		printk(KERN_WARNING "BUG: mapping for 0x%08lx at 0x%08lx "
 		       "overlaps vmalloc space\n",
@@ -508,6 +515,8 @@ void setup_mm_for_reboot(char mode)
 	}
 }
 
+extern void _stext, _etext;
+
 /*
  * Setup initial mappings.  We use the page we allocated for zero page to hold
  * the mappings, which will get overwritten by the vectors in traps_init().
@@ -533,6 +542,14 @@ void __init memtable_init(struct meminfo *mi)
 		p->type       = MT_MEMORY;
 		p ++;
 	}
+
+#ifdef CONFIG_XIP_KERNEL
+	p->physical   = CONFIG_XIP_PHYS_ADDR & PMD_MASK;
+	p->virtual    = (unsigned long)&_stext & PMD_MASK;
+	p->length     = ((unsigned long)&_etext - p->virtual + ~PMD_MASK) & PMD_MASK;
+	p->type       = MT_ROM;
+	p ++;
+#endif
 
 #ifdef FLUSH_BASE
 	p->physical   = FLUSH_BASE_PHYS;

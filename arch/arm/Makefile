@@ -65,8 +65,6 @@ AFLAGS		+=$(CFLAGS_ABI) $(arch-y) $(tune-y) -msoft-float
 CHECKFLAGS	+= -D__arm__
 
 #Default value
-DATAADDR	:= .
-
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 textaddr-y	:= 0xC0008000
 
@@ -110,6 +108,15 @@ export CFLAGS_3c589_cs.o
 endif
 
 TEXTADDR := $(textaddr-y)
+ifeq ($(CONFIG_XIP_KERNEL),y)
+  DATAADDR := $(TEXTADDR)
+  # Replace phys addr with virt addr while keeping offset from base.
+  xipaddr-y ?= 0xe8000000
+  TEXTADDR := $(shell echo $(CONFIG_XIP_PHYS_ADDR) $(xipaddr-y) | \
+                      awk --non-decimal-data '/[:xdigit:]/ \
+                          { printf("0x%x\n", and($$1, 0x000fffff) + $$2) }' )
+endif
+
 ifeq ($(incdir-y),)
 incdir-y := $(machine-y)
 endif
@@ -120,7 +127,7 @@ else
 MACHINE  :=
 endif
   
-export	TEXTADDR GZFLAGS
+export	TEXTADDR DATAADDR GZFLAGS
 
 # Do we have FASTFPE?
 FASTFPE		:=arch/arm/fastfpe
@@ -142,7 +149,11 @@ drivers-$(CONFIG_ARCH_L7200)	+= drivers/acorn/char/
 libs-y				+= arch/arm/lib/
 
 # Default target when executing plain make
+ifeq ($(CONFIG_XIP_KERNEL),y)
+all: xipImage
+else
 all: zImage
+endif
 
 boot := arch/arm/boot
 
@@ -169,7 +180,7 @@ maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 # Convert bzImage to zImage
 bzImage: zImage
 
-zImage Image bootpImage uImage: vmlinux
+zImage Image xipImage bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 zinstall install: vmlinux
@@ -195,6 +206,7 @@ include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
   echo  '                  (supply initrd image via make variable INITRD=<path>)'
   echo  '  install       - Install uncompressed kernel'

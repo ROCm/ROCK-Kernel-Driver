@@ -59,7 +59,7 @@ extern void convert_to_tag_list(struct tag *tags);
 extern void squash_mem_tags(struct tag *tag);
 extern void reboot_setup(char *str);
 extern int root_mountflags;
-extern int _stext, _text, _etext, _edata, _end;
+extern void _stext, _text, _etext, __data_start, _edata, _end;
 
 unsigned int processor_id;
 unsigned int __machine_arch_type;
@@ -113,7 +113,7 @@ static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '
  */
 static struct resource mem_res[] = {
 	{ "Video RAM",   0,     0,     IORESOURCE_MEM			},
-	{ "Kernel code", 0,     0,     IORESOURCE_MEM			},
+	{ "Kernel text", 0,     0,     IORESOURCE_MEM			},
 	{ "Kernel data", 0,     0,     IORESOURCE_MEM			}
 };
 
@@ -447,10 +447,10 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 	struct resource *res;
 	int i;
 
-	kernel_code.start  = __virt_to_phys(init_mm.start_code);
-	kernel_code.end    = __virt_to_phys(init_mm.end_code - 1);
-	kernel_data.start  = __virt_to_phys(init_mm.end_code);
-	kernel_data.end    = __virt_to_phys(init_mm.brk - 1);
+	kernel_code.start   = virt_to_phys(&_text);
+	kernel_code.end     = virt_to_phys(&_etext - 1);
+	kernel_data.start   = virt_to_phys(&__data_start);
+	kernel_data.end     = virt_to_phys(&_end - 1);
 
 	for (i = 0; i < mi->nr_banks; i++) {
 		unsigned long virt_start, virt_end;
