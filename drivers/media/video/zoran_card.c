@@ -47,6 +47,8 @@
 #include <linux/video_decoder.h>
 #include <linux/video_encoder.h>
 
+#include <asm/io.h>
+
 #include "videocodec.h"
 #include "zoran.h"
 #include "zoran_card.h"
