@@ -799,7 +799,6 @@ typedef struct ide_dma_ops_s {
 	int (*ide_dma_good_drive)(ide_drive_t *drive);
 	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
 	/* dma queued operations */
@@ -945,7 +944,6 @@ typedef struct hwif_s {
 	int (*ide_dma_good_drive)(ide_drive_t *drive);
 	int (*ide_dma_count)(ide_drive_t *drive);
 	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
 
@@ -1637,7 +1635,6 @@ extern int __ide_dma_bad_drive(ide_drive_t *);
 extern int __ide_dma_good_drive(ide_drive_t *);
 extern int __ide_dma_count(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);
-extern int __ide_dma_retune(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
 

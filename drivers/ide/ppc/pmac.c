@@ -2029,7 +2029,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
 	hwif->ide_dma_verbose = &__ide_dma_verbose;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
-	hwif->ide_dma_retune = &__ide_dma_retune;
 	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;
 	hwif->ide_dma_queued_on = &__ide_dma_queued_on;
 	hwif->ide_dma_queued_off = &__ide_dma_queued_off;

@@ -846,7 +846,6 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_good_drive	= old_hwif.ide_dma_good_drive;
 	hwif->ide_dma_count		= old_hwif.ide_dma_count;
 	hwif->ide_dma_verbose		= old_hwif.ide_dma_verbose;
-	hwif->ide_dma_retune		= old_hwif.ide_dma_retune;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
 	hwif->ide_dma_queued_on		= old_hwif.ide_dma_queued_on;
