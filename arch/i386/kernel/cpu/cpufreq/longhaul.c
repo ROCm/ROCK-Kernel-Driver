@@ -268,7 +268,7 @@ static int __init longhaul_get_ranges (void)
 		if (ratio > maxmult || ratio < minmult)
 			continue;
 		longhaul_table[k].frequency = calc_speed (ratio, fsb);
-		longhaul_table[k].index	= (j << 8);
+		longhaul_table[k].index	= j;
 		k++;
 	}
 
