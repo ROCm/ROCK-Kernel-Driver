@@ -34,8 +34,10 @@
 #include <linux/miscdevice.h>
 #include <linux/agp_backend.h>
 #include <linux/agpgart.h>
+#include <linux/slab.h>
+#include <linux/mm.h>
 #include <asm/uaccess.h>
-
+#include <asm/pgtable.h>
 #include "agp.h"
 
 static struct agp_front_data agp_fe;
