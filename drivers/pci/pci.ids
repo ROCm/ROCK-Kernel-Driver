@@ -3247,7 +3247,8 @@
 		1148 5061  SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 		1148 5071  SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
 		1148 9521  SK-9521 10/100/1000Base-T Adapter
-	4400  Gigabit Ethernet
+	4400 SK-9Dxx Gigabit Ethernet Adapter
+	4500 SK-9Mxx Gigabit Ethernet Adapter
 1149  Win System Corporation
 114a  VMIC
 	5579  VMIPCI-5579 (Reflective Memory Card)
@@ -5882,6 +5883,8 @@
 	03e8  AC1000 Gigabit Ethernet
 	03e9  AC1001 Gigabit Ethernet
 	03ea  AC9100 Gigabit Ethernet
+		173b 0001  AC1002
+	03eb  AC1003 Gigabit Ethernet
 1743  Peppercon AG
 	8139  ROL/F-100 Fast Ethernet Adapter with ROL
 174b  PC Partner Limited
