@@ -223,8 +223,8 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 {
 	struct net_device *dev;
 	struct streamer_private *streamer_priv;
-	__u32 pio_start, pio_end, pio_flags, pio_len;
-	__u32 mmio_start, mmio_end, mmio_flags, mmio_len;
+	unsigned long pio_start, pio_end, pio_flags, pio_len;
+	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
 	int rc = 0;
 	static int card_no=-1;
 	u16 pcr;
@@ -287,14 +287,14 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 #endif
 
 	if (!request_region(pio_start, pio_len, "lanstreamer")) {
-		printk(KERN_ERR "lanstreamer: unable to get pci io addr %x\n",
+		printk(KERN_ERR "lanstreamer: unable to get pci io addr %lx\n",
 			pio_start);
 		rc= -EBUSY;
 		goto err_out;
 	}
 
 	if (!request_mem_region(mmio_start, mmio_len, "lanstreamer")) {
-		printk(KERN_ERR "lanstreamer: unable to get pci mmio addr %x\n",
+		printk(KERN_ERR "lanstreamer: unable to get pci mmio addr %lx\n",
 			mmio_start);
 		rc= -EBUSY;
 		goto err_out_free_pio;
@@ -302,7 +302,7 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 
 	streamer_priv->streamer_mmio=ioremap(mmio_start, mmio_len);
 	if (streamer_priv->streamer_mmio == NULL) {
-		printk(KERN_ERR "lanstreamer: unable to remap MMIO %x\n",
+		printk(KERN_ERR "lanstreamer: unable to remap MMIO %lx\n",
 			mmio_start);
 		rc= -EIO;
 		goto err_out_free_mmio;
@@ -377,7 +377,7 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 		goto err_out_unmap;
 	return 0;
 
-err_out_unmap;
+err_out_unmap:
 	iounmap(streamer_priv->streamer_mmio);
 err_out_free_mmio:
 	release_mem_region(mmio_start, mmio_len);
@@ -394,7 +394,6 @@ err_out:
 static void __devexit streamer_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev=pci_get_drvdata(pdev);
-	struct streamer_private **p = &dev_streamer, **next;
 	struct streamer_private *streamer_priv;
 
 #if STREAMER_DEBUG
@@ -414,15 +413,19 @@ static void __devexit streamer_remove_one(struct pci_dev *pdev)
 
 #if STREAMER_NETWORK_MONITOR
 #ifdef CONFIG_PROC_FS
-	for (p = &dev_streamer; *p; p = next) {
-		next = &(*p)->next;
-		if (*p == streamer_priv) {
-			*p = *next;
-			break;
+	{
+		struct streamer_private **p, **next;
+
+		for (p = &dev_streamer; *p; p = next) {
+			next = &(*p)->next;
+			if (*p == streamer_priv) {
+				*p = *next;
+				break;
+			}
 		}
+		if (!dev_streamer)
+			remove_proc_entry("net/streamer_tr", NULL);
 	}
-	if (!dev_streamer)
-		remove_proc_entry("net/streamer_tr", NULL);
 #endif
 #endif
 
