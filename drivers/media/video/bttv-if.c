@@ -233,6 +233,7 @@ static struct i2c_adapter bttv_i2c_adap_template = {
 	.owner             = THIS_MODULE,
 	I2C_DEVNAME("bt848"),
 	.id                = I2C_HW_B_BT848,
+	.class             = I2C_ADAP_CLASS_TV_ANALOG,
 	.client_register   = attach_inform,
 };
 

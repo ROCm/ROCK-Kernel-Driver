@@ -336,6 +336,7 @@ static struct i2c_adapter saa7134_adap_template = {
 	.owner         = THIS_MODULE,
 	I2C_DEVNAME("saa7134"),
 	.id            = I2C_ALGO_SAA7134,
+	.class         = I2C_ADAP_CLASS_TV_ANALOG,
 	.algo          = &saa7134_algo,
 	.client_register = attach_inform,
 };

@@ -273,7 +273,7 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int tda9875_probe(struct i2c_adapter *adap)
 {
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, tda9875_attach);
 	return 0;
 }

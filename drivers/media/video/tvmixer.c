@@ -254,12 +254,7 @@ static int tvmixer_clients(struct i2c_client *client)
 	int i,minor;
 
 	/* TV card ??? */
-	switch (client->adapter->id) {
-	case I2C_ALGO_BIT | I2C_HW_B_BT848:
-	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
-		/* ok, have a look ... */
-		break;
-	default:
+	if (!(client->adapter->class & I2C_ADAP_CLASS_TV_ANALOG)) {
 		/* ignore that one */
 		if (debug)
 			printk("tvmixer: %s is not a tv card\n",

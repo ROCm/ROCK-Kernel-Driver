@@ -225,6 +225,7 @@ struct i2c_adapter {
 	struct module *owner;
 	unsigned int id;/* == is algo->id | hwdep.struct->id, 		*/
 			/* for registered values see below		*/
+	unsigned int class;
 	struct i2c_algorithm *algo;/* the algorithm to access the bus	*/
 	void *algo_data;
 
@@ -277,6 +278,12 @@ static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
 #define I2C_CLIENT_PEC  0x04			/* Use Packet Error Checking */
 #define I2C_CLIENT_TEN	0x10			/* we have a ten bit chip address	*/
 						/* Must equal I2C_M_TEN below */
+
+/* i2c adapter classes (bitmask) */
+#define I2C_ADAP_CLASS_SMBUS      (1<<0)        /* lm_sensors, ... */
+#define I2C_ADAP_CLASS_TV_ANALOG  (1<<1)        /* bttv + friends */
+#define I2C_ADAP_CLASS_TV_DIGINAL (1<<2)        /* dbv cards */
+#define I2C_ADAP_CLASS_DDC        (1<<3)        /* i2c-matroxfb ? */
 
 /* i2c_client_address_data is the struct for holding default client
  * addresses for a driver and for the parameters supplied on the
