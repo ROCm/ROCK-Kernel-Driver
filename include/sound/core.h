@@ -211,8 +211,8 @@ struct _snd_minor {
 	int number;			/* minor number */
 	int device;			/* device number */
 	const char *comment;		/* for /proc/asound/devices */
-	snd_info_entry_t *dev;		/* for /proc/asound/dev */
 	struct file_operations *f_ops;	/* file operations */
+	char name[0];			/* device name (keep at the end of structure) */
 };
 
 typedef struct _snd_minor snd_minor_t;
@@ -240,12 +240,13 @@ int snd_minor_info_done(void);
 /* sound_oss.c */
 
 #ifdef CONFIG_SND_OSSEMUL
-
 int snd_minor_info_oss_init(void);
 int snd_minor_info_oss_done(void);
-
 int snd_oss_init_module(void);
-
+#else
+#define snd_minor_info_oss_init() /*NOP*/
+#define snd_minor_info_oss_done() /*NOP*/
+#define snd_oss_init_module() /*NOP*/
 #endif
 
 /* memory.c */
@@ -268,6 +269,10 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) snd_wrapper_kfree(obj)
 #define vfree_nocheck(obj) snd_wrapper_vfree(obj)
 #else
+#define snd_memory_init() /*NOP*/
+#define snd_memory_done() /*NOP*/
+#define snd_memory_info_init() /*NOP*/
+#define snd_memory_info_done() /*NOP*/
 #define kmalloc_nocheck(size, flags) kmalloc(size, flags)
 #define vmalloc_nocheck(size) vmalloc(size)
 #define kfree_nocheck(obj) kfree(obj)

@@ -1438,7 +1438,7 @@ static struct _ac97_rate_regs nforce_ac97_rate_regs[] __devinitdata = {
 	{ NVD_PCMOUT, { AC97_PCM_FRONT_DAC_RATE, AC97_PCM_SURR_DAC_RATE, AC97_PCM_LFE_DAC_RATE }, AC97_RATES_FRONT_DAC },
 	{ NVD_PCMIN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
 	{ NVD_MIC, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ NVD_SPBAR, { AC97_SPDIF, 0, 0 }, AC97_RATES_SPDIF },
+	{ NVD_SPBAR, { AC97_SPDIF, AC97_PCM_FRONT_DAC_RATE, 0 }, AC97_RATES_SPDIF },
 };
 
 static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
@@ -1452,9 +1452,11 @@ static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{ 0x1028, 0x0126, "Dell Optiplex GX260", AC97_TUNE_HP_ONLY },
-	{ 0x1734, 0x0088, "Fujisu-Siemens D1522", AC97_TUNE_HP_ONLY },
+	{ 0x1734, 0x0088, "Fujitsu-Siemens D1522", AC97_TUNE_HP_ONLY },
+	{ 0x10f1, 0x2665, "Fujitsu-Siemens Celcius", AC97_TUNE_HP_ONLY },
 	{ 0x8086, 0x4d44, "Intel D850EMV2", AC97_TUNE_HP_ONLY },
 	{ 0x4144, 0x5360, "AMD64 Motherboard", AC97_TUNE_HP_ONLY },
+	{ 0x1043, 0x80b0, "ASUS P4PE Mobo", AC97_TUNE_SWAP_SURROUND },
 	{ } /* terminator */
 };
 
@@ -1796,6 +1798,13 @@ static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 		/* unmute the output on SIS7012 */
 		iputword(chip, 0x4c, igetword(chip, 0x4c) | 1);
 	}
+	if (chip->device_type == DEVICE_NFORCE) {
+		/* enable SPDIF interrupt */
+		unsigned int val;
+		pci_read_config_dword(chip->pci, 0x4c, &val);
+		val |= 0x1000000;
+		pci_write_config_dword(chip->pci, 0x4c, val);
+	}
       	return 0;
 }
 
@@ -1871,6 +1880,13 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* reset channels */
 	for (i = 0; i < chip->bdbars_count; i++)
 		iputbyte(chip, ICH_REG_OFF_CR + chip->ichd[i].reg_offset, ICH_RESETREGS);
+	if (chip->device_type == DEVICE_NFORCE) {
+		/* stop the spdif interrupt */
+		unsigned int val;
+		pci_read_config_dword(chip->pci, 0x4c, &val);
+		val &= ~0x1000000;
+		pci_write_config_dword(chip->pci, 0x4c, val);
+	}
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
@@ -2349,7 +2365,15 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	if (card == NULL)
 		return -ENOMEM;
 
-	strcpy(card->driver, "ICH");
+	switch (pci_id->driver_data) {
+	case DEVICE_NFORCE:
+		strcpy(card->driver, "NFORCE");
+		break;
+	default:
+		strcpy(card->driver, "ICH");
+		break;
+	}
+
 	strcpy(card->shortname, "Intel ICH");
 	for (name = shortnames; name->id; name++) {
 		if (pci->device == name->id) {

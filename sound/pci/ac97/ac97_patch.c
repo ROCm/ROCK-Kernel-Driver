@@ -367,11 +367,25 @@ int patch_ad1980(ac97_t * ac97)
 
 int patch_alc650(ac97_t * ac97)
 {
-	unsigned short val;
+	unsigned short val, nval;
+	int spdif = 0;
+
+	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
+	snd_ac97_write(ac97, AC97_ALC650_MULTICH, val ^ 0x80);
+	nval = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
+	ac97->spec.dev_flags = 0;
+	if (val != nval) {
+		ac97->spec.dev_flags = 1; /* rev.E or later */
+		snd_ac97_write(ac97, AC97_ALC650_MULTICH, val); /* push back */
+	}
 
 	/* check spdif */
-	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-	if (val & AC97_EA_SPCV) {
+	if (ac97->spec.dev_flags) {
+		val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+		if (val & AC97_EA_SPCV)
+			spdif = 1;
+	}
+	if (spdif) {
 		/* enable spdif in */
 		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
 				     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
@@ -381,6 +395,25 @@ int patch_alc650(ac97_t * ac97)
 	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
 	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
 	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
+
+	if (! ac97->spec.dev_flags) {
+		/* set GPIO */
+		int mic_off;
+		mic_off = snd_ac97_read(ac97, AC97_ALC650_MULTICH) & (1 << 10);
+		/* GPIO0 direction */
+		val = snd_ac97_read(ac97, 0x76);
+		if (mic_off)
+			val &= ~0x01;
+		else
+			val |= 0x01;
+		snd_ac97_write_cache(ac97, 0x76, val);
+		val = snd_ac97_read(ac97, 0x78);
+		if (mic_off)
+			val &= ~0x100;
+		else
+			val = val | 0x100;
+		snd_ac97_write_cache(ac97, 0x78, val);
+	}
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);

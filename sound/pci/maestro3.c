@@ -947,8 +947,14 @@ static struct m3_quirk m3_quirk_list[] = {
 		.amp_gpio = -1,
 		.irda_workaround = 1,
 	},
-	/* FIXME: Inspiron 8100 id should probably be here, too
-	 * (8200 irrelevant: has intel8x0 with CS4205) */
+	/* Dell Inspiron 8100 */
+	{
+		.name = "Dell Inspiron 8100",
+		.vendor = 0x1028,
+		.device = 0x00e6,
+		.amp_gpio = -1,
+		.irda_workaround = 1,
+	},
 	/* NEC LM800J/7 */
 	{
 		.name = "NEC LM800J/7",

@@ -40,10 +40,11 @@ enum sb_hw_type {
 	SB_HW_DT019X,		/* Diamond Tech. DT-019X / Avance Logic ALS-007 */
 };
 
-#define SB_OPEN_PCM		0x01
-#define SB_OPEN_MIDI_INPUT	0x02
-#define SB_OPEN_MIDI_OUTPUT	0x04
-#define SB_OPEN_MIDI_TRIGGER	0x08
+#define SB_OPEN_PCM			0x01
+#define SB_OPEN_MIDI_INPUT		0x02
+#define SB_OPEN_MIDI_OUTPUT		0x04
+#define SB_OPEN_MIDI_INPUT_TRIGGER	0x08
+#define SB_OPEN_MIDI_OUTPUT_TRIGGER	0x10
 
 #define SB_MODE_HALT		0x00
 #define SB_MODE_PLAYBACK_8	0x01
@@ -157,6 +158,7 @@ typedef struct _snd_sb sb_t;
 #define SB_DSP_STEREO_16BIT	0xac
 
 #define SB_DSP_MIDI_INPUT_IRQ	0x31
+#define SB_DSP_MIDI_UART_IRQ	0x35
 #define SB_DSP_MIDI_OUTPUT	0x38
 
 #define SB_DSP4_OUT8_AI		0xc6

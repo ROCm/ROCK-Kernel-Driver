@@ -65,6 +65,7 @@ obj-$(call sequencer,$(CONFIG_SND_SB16)) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
 obj-$(call sequencer,$(CONFIG_SND_SBAWE)) += $(RAWMIDI_OBJS) $(OPL3_OBJS) snd-seq-virmidi.o
 obj-$(call sequencer,$(CONFIG_SND_ES968)) += $(RAWMIDI_OBJS)
 obj-$(call sequencer,$(CONFIG_SND_WAVEFRONT)) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
+obj-$(call sequencer,$(CONFIG_SND_SSCAPE)) += $(RAWMIDI_OBJS)
 obj-$(call sequencer,$(CONFIG_SND_ALS4000)) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
 obj-$(call sequencer,$(CONFIG_SND_CMIPCI)) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
 obj-$(call sequencer,$(CONFIG_SND_CS4281)) += $(RAWMIDI_OBJS) $(OPL3_OBJS)

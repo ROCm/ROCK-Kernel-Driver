@@ -179,6 +179,7 @@ snd_wavefront_pnp (int dev, snd_wavefront_card_t *acard, struct pnp_card_link *c
 	*/
 
 	if (cs4232_pcm_port[dev] != SNDRV_AUTO_PORT)
+		pnp_resource_change(&cfg->port_resource[0], cs4232_pcm_port[dev], 4);
 	if (fm_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[1], fm_port[dev], 4);
 	if (dma1[dev] != SNDRV_AUTO_DMA)

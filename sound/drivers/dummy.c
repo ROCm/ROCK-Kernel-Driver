@@ -247,8 +247,8 @@ static void snd_card_dummy_pcm_timer_function(unsigned long data)
 	dpcm->pcm_irq_pos += dpcm->pcm_jiffie;
 	dpcm->pcm_buf_pos += dpcm->pcm_jiffie;
 	dpcm->pcm_buf_pos %= dpcm->pcm_size;
-	while (dpcm->pcm_irq_pos >= dpcm->pcm_count) {
-		dpcm->pcm_irq_pos -= dpcm->pcm_count;
+	if (dpcm->pcm_irq_pos >= dpcm->pcm_count) {
+		dpcm->pcm_irq_pos %= dpcm->pcm_count;
 		snd_pcm_period_elapsed(dpcm->substream);
 	}
 	spin_unlock_irq(&dpcm->lock);	

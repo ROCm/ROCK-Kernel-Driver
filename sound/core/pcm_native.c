@@ -648,7 +648,7 @@ static int snd_pcm_action_group(struct action_ops *ops,
 		snd_pcm_group_for_each(pos, substream) {
 			s1 = snd_pcm_group_substream_entry(pos);
 			if (s1 != substream)
-				spin_unlock(&s->self_group.lock);
+				spin_unlock(&s1->self_group.lock);
 			if (s1 == s)	/* end */
 				break;
 		}
@@ -1018,14 +1018,15 @@ static int snd_pcm_xrun(snd_pcm_substream_t *substream)
 		break;
 	case SNDRV_PCM_STATE_SUSPENDED:
 		snd_pcm_stream_unlock_irq(substream);
-		if ((result = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) < 0)
-			goto _end_nospin;
-		goto _xrun_recovery;
+		result = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
+		snd_pcm_stream_lock_irq(substream);
+		if (result >= 0)
+			goto _xrun_recovery;
+		break;
 	default:
 		result = -EBADFD;
 	}
 	snd_pcm_stream_unlock_irq(substream);
-       _end_nospin:
 	snd_power_unlock(card);
 	return result;
 }
@@ -1053,8 +1054,8 @@ static int snd_pcm_do_reset(snd_pcm_substream_t * substream, int state)
 	// snd_assert(runtime->status->hw_ptr < runtime->buffer_size, );
 	runtime->hw_ptr_base = 0;
 	runtime->hw_ptr_interrupt = runtime->status->hw_ptr - runtime->status->hw_ptr % runtime->period_size;
-	runtime->silenced_start = runtime->status->hw_ptr;
-	runtime->silenced_size = 0;
+	runtime->silence_start = runtime->status->hw_ptr;
+	runtime->silence_filled = 0;
 	return 0;
 }
 
@@ -1193,11 +1194,11 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 		break;
 	case SNDRV_PCM_STATE_SUSPENDED:
 		snd_pcm_stream_unlock_irq(substream);
-		if ((result = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) < 0) {
-			snd_pcm_stream_lock_irq(substream);
-			goto _end;
-		}
-		goto _xrun_recovery;
+		result = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
+		snd_pcm_stream_lock_irq(substream);
+		if (result >= 0)
+			snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
+		goto _end;
 	case SNDRV_PCM_STATE_OPEN:
 		result = -EBADFD;
 		goto _end;
@@ -1212,7 +1213,6 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 		}
 		/* Fall through */
 	case SNDRV_PCM_STATE_XRUN:
-	       _xrun_recovery:
 		snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
 		/* Fall through */
 	case SNDRV_PCM_STATE_SETUP:
@@ -1237,18 +1237,19 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&runtime->sleep, &wait);
 	while (1) {
+		long tout;
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (signal_pending(current)) {
 			state = SIGNALED;
 			break;
 		}
 		snd_pcm_stream_unlock_irq(substream);
-		if (schedule_timeout(10 * HZ) == 0) {
-			snd_pcm_stream_lock_irq(substream);
+		tout = schedule_timeout(10 * HZ);
+		snd_pcm_stream_lock_irq(substream);
+		if (tout == 0) {
 			state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
 			break;
 		}
-		snd_pcm_stream_lock_irq(substream);
 		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING) {
 			state = READY;
 			break;
@@ -1308,20 +1309,20 @@ static int snd_pcm_playback_drop(snd_pcm_substream_t *substream)
 		/* Fall through */
 	case SNDRV_PCM_STATE_PREPARED:
 	case SNDRV_PCM_STATE_XRUN:
-	       _xrun_recovery:
 		snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
 		break;
 	case SNDRV_PCM_STATE_SUSPENDED:
 		snd_pcm_stream_unlock_irq(substream);
-		if ((res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) < 0)
-			goto _end_nospin;
-		goto _xrun_recovery;
+		res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
+		snd_pcm_stream_lock_irq(substream);
+		if (res >= 0)
+			snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
+		break;
 	default:
 		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
 	snd_pcm_stream_unlock_irq(substream);
-       _end_nospin:
 	snd_power_unlock(card);
 	return res;
 }
@@ -1363,14 +1364,15 @@ static int snd_pcm_capture_drain(snd_pcm_substream_t * substream)
 		break;
 	case SNDRV_PCM_STATE_SUSPENDED:
 		snd_pcm_stream_unlock_irq(substream);
-		if ((res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) < 0)
-			goto _end_nospin;
-		goto _xrun_recovery;
+		res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
+		snd_pcm_stream_lock_irq(substream);
+		if (res >= 0)
+			goto _xrun_recovery;
+		break;
 	default: 
 		break; 
 	}
 	snd_pcm_stream_unlock_irq(substream);
-       _end_nospin:
 	snd_power_unlock(card);
 	return res;
 }
@@ -1397,8 +1399,10 @@ static int snd_pcm_capture_drop(snd_pcm_substream_t * substream)
 		break;
 	case SNDRV_PCM_STATE_SUSPENDED:
 		snd_pcm_stream_unlock_irq(substream);
-		if ((res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) < 0)
-			goto _end_nospin;
+		res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
+		snd_pcm_stream_lock_irq(substream);
+		if (res < 0)
+			goto _end;
 		/* Fall through */
 	case SNDRV_PCM_STATE_PREPARED:
 	case SNDRV_PCM_STATE_DRAINING:
@@ -1409,13 +1413,14 @@ static int snd_pcm_capture_drop(snd_pcm_substream_t * substream)
 		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
+       _end:
 	snd_pcm_stream_unlock_irq(substream);
-       _end_nospin:
 	snd_power_unlock(card);
 	return res;
 }
 
 /* WARNING: Don't forget to fput back the file */
+extern int snd_major;
 static struct file *snd_pcm_file_fd(int fd)
 {
 	struct file *file;
@@ -1426,7 +1431,7 @@ static struct file *snd_pcm_file_fd(int fd)
 		return 0;
 	inode = file->f_dentry->d_inode;
 	if (!S_ISCHR(inode->i_mode) ||
-	    major(inode->i_rdev) != CONFIG_SND_MAJOR) {
+	    major(inode->i_rdev) != snd_major) {
 		fput(file);
 		return 0;
 	}
@@ -1566,7 +1571,8 @@ static int snd_pcm_hw_rule_format(snd_pcm_hw_params_t *params,
 		if (! snd_mask_test(mask, k))
 			continue;
 		bits = snd_pcm_format_physical_width(k);
-		snd_assert(bits > 0, continue);
+		if (bits <= 0)
+			continue; /* ignore invalid formats */
 		if ((unsigned)bits < i->min || (unsigned)bits > i->max)
 			snd_mask_reset(&m, k);
 	}
@@ -1587,7 +1593,8 @@ static int snd_pcm_hw_rule_sample_bits(snd_pcm_hw_params_t *params,
 		if (! snd_mask_test(hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT), k))
 			continue;
 		bits = snd_pcm_format_physical_width(k);
-		snd_assert(bits > 0, continue);
+		if (bits <= 0)
+			continue; /* ignore invalid formats */
 		if (t.min > (unsigned)bits)
 			t.min = bits;
 		if (t.max < (unsigned)bits)

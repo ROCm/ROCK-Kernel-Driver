@@ -645,6 +645,7 @@ static int __init snd_opl3sa2_pnp(int dev, opl3sa2_t *chip,
 	pnp_init_resource_table(cfg);
 	if (sb_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[0], sb_port[dev], 16);
+	if (wss_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[1], wss_port[dev], 8);
 	if (fm_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[2], fm_port[dev], 4);
@@ -664,7 +665,7 @@ static int __init snd_opl3sa2_pnp(int dev, opl3sa2_t *chip,
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
 		kfree(cfg);
-		snd_printk(KERN_ERR "PnP configure failure (out of resources?)\n");
+		snd_printk(KERN_ERR "PnP configure failure (out of resources?) err = %d\n", err);
 		return -EBUSY;
 	}
 	sb_port[dev] = pnp_port_start(pdev, 0);

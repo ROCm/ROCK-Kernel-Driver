@@ -118,12 +118,6 @@ static int PRO_RATE_RESET = 1;
 static unsigned int PRO_RATE_DEFAULT = 44100;
 
 /*
- *  AK4xxx stuff
- */
-
-#include "ak4xxx.c"
-
-/*
  *  Basic I/O
  */
  
@@ -2161,7 +2155,7 @@ static unsigned char __devinit snd_ice1712_read_i2c(ice1712_t *ice,
 static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice)
 {
 	int dev = 0xa0;		/* EEPROM device address */
-	unsigned int i;
+	unsigned int i, size;
 
 	if ((inb(ICEREG(ice, I2C_CTRL)) & ICE1712_I2C_EEPROM) == 0) {
 		snd_printk("ICE1712 has not detected EEPROM\n");
@@ -2172,7 +2166,9 @@ static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice)
 				(snd_ice1712_read_i2c(ice, dev, 0x02) << 16) | 
 				(snd_ice1712_read_i2c(ice, dev, 0x03) << 24);
 	ice->eeprom.size = snd_ice1712_read_i2c(ice, dev, 0x04);
-	if (ice->eeprom.size > 32) {
+	if (ice->eeprom.size < 6)
+		ice->eeprom.size = 32; /* FIXME: any cards without the correct size? */
+	else if (ice->eeprom.size > 32) {
 		snd_printk("invalid EEPROM (size = %i)\n", ice->eeprom.size);
 		return -EIO;
 	}
@@ -2181,7 +2177,8 @@ static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice)
 		snd_printk("invalid EEPROM version %i\n", ice->eeprom.version);
 		/* return -EIO; */
 	}
-	for (i = 0; i < ice->eeprom.size; i++)
+	size = ice->eeprom.size - 6;
+	for (i = 0; i < size; i++)
 		ice->eeprom.data[i] = snd_ice1712_read_i2c(ice, dev, i + 6);
 
 	ice->eeprom.gpiomask = ice->eeprom.data[ICE_EEP1_GPIO_MASK];

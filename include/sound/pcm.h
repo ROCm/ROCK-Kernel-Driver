@@ -317,8 +317,8 @@ struct _snd_pcm_runtime {
 	snd_pcm_uframes_t silence_size;	/* Silence filling size */
 	snd_pcm_uframes_t boundary;	/* pointers wrap point */
 
-	snd_pcm_uframes_t silenced_start;
-	snd_pcm_uframes_t silenced_size;
+	snd_pcm_uframes_t silence_start; /* starting pointer to silence area */
+	snd_pcm_uframes_t silence_filled; /* size filled with silence */
 
 	snd_pcm_sync_id_t sync;		/* hardware synchronization ID */
 

@@ -53,14 +53,9 @@ Module parameters
 		  for soundcards which are not installed in your system
     device_mode
 		- specifies permission mask for dynamic sound device filesystem
+		  (available only when DEVFS is enabled)
 		- default value = 0666
 		- for example 'device_mode=0660'
-    device_gid
-		- specifies GID number for dynamic sound device filesystem
-		- default value = 0 (root)
-    device_uid
-		- specifies UID number for dynamic sound device filesystem
-		- default value = 0 (root)
 
   
   Module snd-pcm-oss
@@ -144,6 +139,7 @@ Module parameters
     Module for ALi M5451 PCI chip.
 
     pcm_channels    - Number of hardware channels assigned for PCM
+    spdif           - Support SPDIF I/O (disabled by default)
 
     Module supports autoprobe and multiple chips (max 8).
 
@@ -845,6 +841,20 @@ Module parameters
     dma1	- DMA #
 
     Module supports up to 8 cards.
+
+  Module snd-sscape
+  -----------------
+
+    Module for ENSONIQ SoundScape PnP cards.
+
+    port	- Port # (PnP setup)
+    irq		- IRQ # (PnP setup)
+    mpu_irq	- MPU-401 IRQ # (PnP setup)
+    dma		- DMA # (PnP setup)
+
+    Module supports up to 8 cards.  ISA PnP must be enabled.
+    You need sscape_ctl tool in alsa-tools package for loading
+    the microcode.
 
   Module snd-sun-amd7930 (on sparc only)
   --------------------------------------

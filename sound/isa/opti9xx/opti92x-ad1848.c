@@ -279,13 +279,6 @@ static snd_card_t *snd_opti9xx_legacy = SNDRV_DEFAULT_PTR1;
 
 #ifdef CONFIG_PNP
 
-#define ISAPNP_OPTI9XX(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
-	{ \
-		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		.devs = { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
-			ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
-	}
-
 static struct pnp_card_device_id snd_opti9xx_pnpids[] = {
 #ifndef OPTi93X
 	/* OPTi 82C924 */
@@ -2202,7 +2195,11 @@ static int __init alsa_card_opti9xx_init(void)
 {
 	int cards, error;
 
+#ifdef CONFIG_PNP
 	cards = pnp_register_card_driver(&opti9xx_pnpc_driver);
+#else
+	cards = 0;
+#endif
 	if (cards == 0 && (error = snd_card_opti9xx_probe(NULL, NULL)) < 0) {
 #ifdef CONFIG_PNP
 		pnp_unregister_card_driver(&opti9xx_pnpc_driver);

@@ -121,6 +121,7 @@ static int __devinit snd_card_es968_pnp(int dev, struct snd_card_es968 *acard,
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
 		snd_printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		kfree(cfg);
 		return err;
 	}
 	port[dev] = pnp_port_start(pdev, 0);

@@ -104,6 +104,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445363, 0xffffffff, "AD1886A",		patch_ad1881,	NULL },
 { 0x41445370, 0xffffffff, "AD1980",		patch_ad1980,	NULL },
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1881,	NULL },
+{ 0x41445375, 0xffffffff, "AD1985",		patch_ad1980,	NULL },
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL,		NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL,		NULL },
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL,		NULL },
@@ -1080,7 +1081,6 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	/* 7: Independent Master Volume Left */
 	/* 8: reserved */
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
-	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
 	AC97_SINGLE("Swap Surround Slot", AC97_ALC650_MULTICH, 14, 1, 0),
 #if 0 /* always set in patch_alc650 */
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
@@ -1090,6 +1090,43 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Center/LFE DAC Switch", AC97_ALC650_LFE_DAC_VOL, 15, 1, 1),
 	AC97_DOUBLE("Center/LFE DAC Volume", AC97_ALC650_LFE_DAC_VOL, 8, 0, 31, 1),
 #endif
+};
+
+static const snd_kcontrol_new_t snd_ac97_control_alc650_mic =
+AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0);
+
+
+static int snd_ac97_alc650_mic_gpio_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.integer.value[0] = (ac97->regs[AC97_ALC650_MULTICH] >> 10) & 1;
+	return 0;
+}
+
+static int snd_ac97_alc650_mic_gpio_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int change;
+	change = snd_ac97_update_bits(ac97, AC97_ALC650_MULTICH, 1 << 10,
+				      ucontrol->value.integer.value[0] ? (1 << 10) : 0);
+	if (change) {
+		/* GPIO0 write for mic */
+		snd_ac97_update_bits(ac97, 0x76, 0x01,
+				     ucontrol->value.integer.value[0] ? 0 : 0x01);
+		/* GPIO0 high for mic */
+		snd_ac97_update_bits(ac97, 0x78, 0x100,
+				     ucontrol->value.integer.value[0] ? 0 : 0x100);
+	}
+	return change;
+}
+
+static const snd_kcontrol_new_t snd_ac97_control_alc650_mic_gpio = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Mic As Center/LFE",
+	.info = snd_ac97_info_single,
+	.get = snd_ac97_alc650_mic_gpio_get,
+	.put = snd_ac97_alc650_mic_gpio_put,
+	.private_value = (1 << 16), /* for info */
 };
 
 static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc650[] = {
@@ -1831,9 +1868,14 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 				return err;
 		break;
 	case AC97_ID_ALC650:
+		/* detect ALC650 rev.E of later */
 		for (idx = 0; idx < ARRAY_SIZE(snd_ac97_controls_alc650); idx++)
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_alc650[idx], ac97))) < 0)
 				return err;
+		if ((err = snd_ctl_add(card, snd_ac97_cnew(ac97->spec.dev_flags ?
+							   &snd_ac97_control_alc650_mic :
+							   &snd_ac97_control_alc650_mic_gpio, ac97))) < 0)
+			return err;
 		if (ac97->ext_id & AC97_EI_SPDIF) {
 			for (idx = 0; idx < ARRAY_SIZE(snd_ac97_spdif_controls_alc650); idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_spdif_controls_alc650[idx], ac97))) < 0)
@@ -2864,16 +2906,36 @@ static int remove_ctl(ac97_t *ac97, const char *name)
 	return snd_ctl_remove_id(ac97->card, &id);
 }
 
+static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name)
+{
+	snd_ctl_elem_id_t sid;
+	memset(&sid, 0, sizeof(sid));
+	strcpy(sid.name, name);
+	sid.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+	return snd_ctl_find_id(ac97->card, &sid);
+}
+
 static int rename_ctl(ac97_t *ac97, const char *src, const char *dst)
 {
-	snd_ctl_elem_id_t sid, did;
-	memset(&sid, 0, sizeof(sid));
-	strcpy(sid.name, src);
-	sid.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	memset(&did, 0, sizeof(did));
-	strcpy(did.name, dst);
-	did.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	return snd_ctl_rename_id(ac97->card, &sid, &did);
+	snd_kcontrol_t *kctl = ctl_find(ac97, src);
+	if (kctl) {
+		strcpy(kctl->id.name, dst);
+		return 0;
+	}
+	return -ENOENT;
+}
+
+static int swap_ctl(ac97_t *ac97, const char *s1, const char *s2)
+{
+	snd_kcontrol_t *kctl1, *kctl2;
+	kctl1 = ctl_find(ac97, s1);
+	kctl2 = ctl_find(ac97, s2);
+	if (kctl1 && kctl2) {
+		strcpy(kctl1->id.name, s2);
+		strcpy(kctl2->id.name, s1);
+		return 0;
+	}
+	return -ENOENT;
 }
 
 static int swap_headphone(ac97_t *ac97, int remove_master)
@@ -2888,6 +2950,14 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 	}
 	rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
 	rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
+	return 0;
+}
+
+static int swap_surround(ac97_t *ac97)
+{
+	/* FIXME: error checks.. */
+	swap_ctl(ac97, "Master Playback Switch", "Surround Playback Switch");
+	swap_ctl(ac97, "Master Playback Volume", "Surround Playback Volume");
 	return 0;
 }
 
@@ -2916,6 +2986,8 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
 				return swap_headphone(ac97, 1);
 			case AC97_TUNE_SWAP_HP:
 				return swap_headphone(ac97, 0);
+			case AC97_TUNE_SWAP_SURROUND:
+				return swap_surround(ac97);
 			}
 			snd_printk(KERN_ERR "invalid quirk type %d for %s\n", quirk->type, quirk->name);
 			return -EINVAL;

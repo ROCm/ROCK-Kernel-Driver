@@ -191,5 +191,11 @@ config SND_SGALAXY
 	help
 	  Say 'Y' or 'M' to include support for Aztech Sound Galaxy.
 
-endmenu
+config SND_SSCAPE
+	tristate "Ensoniq SoundScape PnP driver"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Ensoniq SoundScape PnP
+	  soundcard.
 
+endmenu
