@@ -34,6 +34,7 @@
 #include "init.h"
 #include "irq_user.h"
 #include "mem_user.h"
+#include "time_user.h"
 #include "tlb.h"
 #include "frame_kern.h"
 #include "sigcontext.h"
