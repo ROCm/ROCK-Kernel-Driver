@@ -207,7 +207,7 @@ struct mddev_s
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	mdk_rdev_t			*spare;
+	int				spares;
 
 	int				degraded;	/* whether md should consider
 							 * adding a spare
@@ -231,8 +231,6 @@ struct mdk_personality_s
 	int (*error_handler)(mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_add_disk) (mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
-	int (*spare_write) (mddev_t *mddev);
-	int (*spare_inactive) (mddev_t *mddev);
 	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
@@ -276,9 +274,6 @@ extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
  */
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
 	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
-
-#define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
-				x = y; y = __tmp; } while (0)
 
 typedef struct mdk_thread_s {
 	void			(*run) (void *data);

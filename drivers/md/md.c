@@ -233,7 +233,7 @@ mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr)
 	struct list_head *tmp;
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->raid_disk == nr)
+		if (rdev->desc_nr == nr)
 			return rdev;
 	}
 	return NULL;
@@ -804,6 +804,7 @@ static void sync_sbs(mddev_t * mddev)
 	mdk_rdev_t *rdev;
 	mdp_super_t *sb;
 	struct list_head *tmp;
+	int next_spare = mddev->raid_disks;
 
 	/* make all rdev->sb match mddev data..
 	 * we setup the data in the first rdev and copy it
@@ -856,12 +857,20 @@ static void sync_sbs(mddev_t * mddev)
 
 	sb->disks[0].state = (1<<MD_DISK_REMOVED);
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		mdp_disk_t *d = &sb->disks[rdev->desc_nr];
+		mdp_disk_t *d;
+		if (rdev->raid_disk >= 0)
+			rdev->desc_nr = rdev->raid_disk;
+		else
+			rdev->desc_nr = next_spare++;
+		d = &sb->disks[rdev->desc_nr];
 		nr_disks++;
 		d->number = rdev->desc_nr;
 		d->major = MAJOR(rdev->bdev->bd_dev);
 		d->minor = MINOR(rdev->bdev->bd_dev);
-		d->raid_disk = rdev->raid_disk;
+		if (rdev->raid_disk >= 0)
+			d->raid_disk = rdev->raid_disk;
+		else
+			d->raid_disk = rdev->desc_nr; /* compatability */
 		if (rdev->faulty) {
 			d->state = (1<<MD_DISK_FAULTY);
 			failed++;
@@ -1195,15 +1204,17 @@ static int analyze_sbs(mddev_t * mddev)
 			mdp_disk_t *desc;
 			rdev->desc_nr = rdev->sb->this_disk.number;
 			desc = sb->disks + rdev->desc_nr;
-			rdev->raid_disk = desc->raid_disk;
+			rdev->raid_disk = -1;
 			rdev->in_sync = rdev->faulty = 0;
 
 			if (desc->state & (1<<MD_DISK_FAULTY)) {
 				rdev->faulty = 1;
 				kick_rdev_from_array(rdev);
 			} else if (desc->state & (1<<MD_DISK_SYNC) &&
-				 rdev->raid_disk < mddev->raid_disks)
+				   desc->raid_disk < mddev->raid_disks) {
 				rdev->in_sync = 1;
+				rdev->raid_disk = desc->raid_disk;
+			}
 		}
 	}
 
@@ -1551,10 +1562,6 @@ static int do_md_stop(mddev_t * mddev, int ro)
 				mddev->recovery_running = -EINTR;
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
-			if (mddev->spare) {
-				mddev->pers->spare_inactive(mddev);
-				mddev->spare = NULL;
-			}
 		}
 
 		invalidate_device(dev, 1);
@@ -1925,7 +1932,7 @@ static int get_disk_info(mddev_t * mddev, void * arg)
 		}
 	} else {
 		info.major = info.minor = 0;
-		info.raid_disk = 0;
+		info.raid_disk = -1;
 		info.state = (1<<MD_DISK_REMOVED);
 	}
 
@@ -1975,7 +1982,11 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 			return PTR_ERR(rdev);
 		}
 		rdev->desc_nr = info->number;
-		rdev->raid_disk = info->raid_disk;
+		if (info->raid_disk < mddev->raid_disks)
+			rdev->raid_disk = info->raid_disk;
+		else
+			rdev->raid_disk = -1;
+
 		rdev->faulty = 0;
 		if (rdev->raid_disk < mddev->raid_disks)
 			rdev->in_sync = (info->state & (1<<MD_DISK_SYNC));
@@ -2034,7 +2045,6 @@ static int hot_generate_error(mddev_t * mddev, dev_t dev)
 
 static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 {
-	int err;
 	mdk_rdev_t *rdev;
 
 	if (!mddev->pers)
@@ -2043,28 +2053,12 @@ static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 	printk(KERN_INFO "md: trying to remove %s from md%d ... \n",
 		partition_name(to_kdev_t(dev)), mdidx(mddev));
 
-	if (!mddev->pers->hot_remove_disk) {
-		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
-		       mdidx(mddev));
-		return -EINVAL;
-	}
-
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
 		return -ENXIO;
 
-	if (rdev->in_sync && ! rdev->faulty)
+	if (rdev->raid_disk >= 0)
 		goto busy;
-
-	err = mddev->pers->hot_remove_disk(mddev, rdev->raid_disk);
-	if (err == -EBUSY) {
-		MD_BUG();
-		goto busy;
-	}
-	if (err) {
-		MD_BUG();
-		return -EINVAL;
-	}
 
 	kick_rdev_from_array(rdev);
 	md_update_sb(mddev);
@@ -2137,13 +2131,7 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 	}
 
 	rdev->desc_nr = i;
-	rdev->raid_disk = i;
-
-	if (mddev->pers->hot_add_disk(mddev, rdev)) {
-		MD_BUG();
-		err = -EINVAL;
-		goto abort_unbind_export;
-	}
+	rdev->raid_disk = -1;
 
 	md_update_sb(mddev);
 
@@ -2697,7 +2685,7 @@ static int status_resync(char * page, mddev_t * mddev)
 		sz += sprintf(page + sz, "] ");
 	}
 	sz += sprintf(page + sz, " %s =%3lu.%lu%% (%lu/%lu)",
-		      (mddev->spare ? "recovery" : "resync"),
+		      (mddev->spares ? "recovery" : "resync"),
 		      res/10, res % 10, resync, max_blocks);
 
 	/*
@@ -2813,22 +2801,6 @@ int unregister_md_personality(int pnum)
 	printk(KERN_INFO "md: %s personality unregistered\n", pers[pnum]->name);
 	pers[pnum] = NULL;
 	return 0;
-}
-
-static mdk_rdev_t *get_spare(mddev_t *mddev)
-{
-	mdk_rdev_t *rdev;
-	struct list_head *tmp;
-
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->faulty)
-			continue;
-		if (rdev->in_sync)
-			continue;
-
-		return rdev;
-	}
-	return NULL;
 }
 
 static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
@@ -3048,19 +3020,30 @@ static void md_do_sync(void *data)
 
 
 /*
- * This is the kernel thread that watches all md arrays for re-sync action
- * that might be needed.
+ * This is the kernel thread that watches all md arrays for re-sync and other
+ * action that might be needed.
  * It does not do any resync itself, but rather "forks" off other threads
  * to do that as needed.
  * When it is determined that resync is needed, we set "->recovery_running" and
  * create a thread at ->sync_thread.
- * When the thread finishes is clears recovery_running (or set and error)
+ * When the thread finishes it clears recovery_running (or sets an error)
  * and wakeup up this thread which will reap the thread and finish up.
+ * This thread also removes any faulty devices (with nr_pending == 0).
+ *
+ * The overall approach is:
+ *  1/ if the superblock needs updating, update it.
+ *  2/ If a recovery thread is running, don't do anything else.
+ *  3/ If recovery has finished, clean up, possibly marking spares active.
+ *  4/ If there are any faulty devices, remove them.
+ *  5/ If array is degraded, try to add spares devices
+ *  6/ If array has spares or is not in-sync, start a resync thread.
  */
 void md_do_recovery(void *data)
 {
 	mddev_t *mddev;
-	struct list_head *tmp;
+	mdk_rdev_t *rdev;
+	struct list_head *tmp, *rtmp;
+
 
 	dprintk(KERN_INFO "md: recovery thread got woken up ...\n");
 
@@ -3076,26 +3059,11 @@ void md_do_recovery(void *data)
 			/* resync has finished, collect result */
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
-			if (mddev->recovery_running < 0) {
-				/* some sort of failure.
-				 * If we were doing a reconstruction,
-				 * we need to retrieve the spare
-				 */
-				if (!mddev->pers->spare_inactive)
-					goto unlock;
-				if (mddev->spare) {
-					mddev->pers->spare_inactive(mddev);
-					mddev->spare = NULL;
-				}
-			} else {
-				if (!mddev->pers->spare_active)
-					goto unlock;
+			if (mddev->recovery_running == 0) {
 				/* success...*/
-				if (mddev->spare) {
-					mddev->pers->spare_active(mddev);
-					mddev->spare->in_sync = 1;
-					mddev->spare = NULL;
-				}
+				/* activate any spares */
+				mddev->pers->spare_active(mddev);
+				mddev->spares = 0;
 			}
 			md_update_sb(mddev);
 			mddev->recovery_running = 0;
@@ -3108,16 +3076,33 @@ void md_do_recovery(void *data)
 			wake_up(&resync_wait);
 		}
 
-		if (mddev->degraded) {
-			mddev->spare = get_spare(mddev);
-			if (!mddev->spare)
-				printk(KERN_ERR "md%d: no spare disk to reconstruct array! "
-				       "-- continuing in degraded mode\n", mdidx(mddev));
-			else
-				printk(KERN_INFO "md%d: resyncing spare disk %s to replace failed disk\n",
-				       mdidx(mddev), bdev_partition_name(mddev->spare->bdev));
+		/* no recovery is running.
+		 * remove any failed drives, then
+		 * add spares if possible
+		 */
+		mddev->spares = 0;
+		ITERATE_RDEV(mddev,rdev,rtmp) {
+			if (rdev->raid_disk >= 0 &&
+			    rdev->faulty &&
+			    atomic_read(&rdev->nr_pending)==0) {
+				mddev->pers->hot_remove_disk(mddev, rdev->raid_disk);
+				rdev->raid_disk = -1;
+			}
+			if (!rdev->faulty && rdev->raid_disk >= 0 && !rdev->in_sync)
+				mddev->spares++;
 		}
-		if (!mddev->spare && mddev->in_sync) {
+		if (mddev->degraded) {
+			ITERATE_RDEV(mddev,rdev,rtmp)
+				if (rdev->raid_disk < 0
+				    && !rdev->faulty) {
+					if (mddev->pers->hot_add_disk(mddev,rdev))
+						mddev->spares++;
+					else
+						break;
+				}
+		}
+
+		if (!mddev->spares && mddev->in_sync) {
 			/* nothing we can do ... */
 			goto unlock;
 		}
@@ -3127,13 +3112,9 @@ void md_do_recovery(void *data)
 								"md_resync");
 			if (!mddev->sync_thread) {
 				printk(KERN_ERR "md%d: could not start resync thread...\n", mdidx(mddev));
-				if (mddev->spare)
-					mddev->pers->spare_inactive(mddev);
-				mddev->spare = NULL;
+				/* leave the spares where they are, it shouldn't hurt */
 				mddev->recovery_running = 0;
 			} else {
-				if (mddev->spare)
-					mddev->pers->spare_write(mddev);
 				mddev->recovery_running = 1;
 				md_wakeup_thread(mddev->sync_thread);
 			}
@@ -3595,6 +3576,5 @@ EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
-EXPORT_SYMBOL(find_rdev_nr);
 EXPORT_SYMBOL(md_interrupt_thread);
 MODULE_LICENSE("GPL");

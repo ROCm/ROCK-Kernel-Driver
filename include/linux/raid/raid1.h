@@ -14,7 +14,6 @@ struct mirror_info {
 	 */
 	int		operational;
 	int		write_only;
-	int		spare;
 };
 
 typedef struct r1bio_s r1bio_t;
@@ -27,7 +26,6 @@ struct r1_private_data_s {
 	int			last_used;
 	sector_t		next_seq_sect;
 	mdk_thread_t		*thread;
-	mirror_info_t		*spare;
 	spinlock_t		device_lock;
 
 	/* for use when syncing mirrors: */

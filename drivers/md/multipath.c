@@ -299,23 +299,24 @@ static void print_multipath_conf (multipath_conf_t *conf)
 static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	multipath_conf_t *conf = mddev->private;
-	int err = 1;
-	struct multipath_info *p = conf->multipaths + rdev->raid_disk;
+	int found = 0;
+	int path;
+	struct multipath_info *p;
 
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (!p->rdev) {
-		p->rdev = rdev;
-		p->operational = 1;
-		conf->working_disks++;
-		err = 0;
-	}
-	if (err)
-		MD_BUG();
+	for (path=0; path<mddev->raid_disks; path++) 
+		if ((p=conf->multipaths+path)->rdev == NULL) {
+			p->rdev = rdev;
+			p->operational = 1;
+			conf->working_disks++;
+			rdev->raid_disk = path;
+			found = 1;
+		}
 	spin_unlock_irq(&conf->device_lock);
 
 	print_multipath_conf(conf);
-	return err;
+	return found;
 }
 
 static int multipath_remove_disk(mddev_t *mddev, int number)
@@ -443,7 +444,6 @@ static int multipath_run (mddev_t *mddev)
 	struct multipath_info *disk;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
-	int num_rdevs = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -465,39 +465,30 @@ static int multipath_run (mddev_t *mddev)
 	}
 	memset(conf, 0, sizeof(*conf));
 
+	conf->working_disks = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->faulty) {
-			/* this is a "should never happen" case and if it */
-			/* ever does happen, a continue; won't help */
-			printk(ERRORS, bdev_partition_name(rdev->bdev));
-			continue;
-		} else {
-			/* this is a "should never happen" case and if it */
-			/* ever does happen, a continue; won't help */
-			if (!rdev->sb) {
-				MD_BUG();
-				continue;
-			}
-		}
-		if (rdev->desc_nr == -1) {
-			MD_BUG();
-			continue;
-		}
-
 		disk_idx = rdev->raid_disk;
-		disk = conf->multipaths + disk_idx;
+		if (disk_idx < 0 ||
+		    disk_idx >= mddev->raid_disks)
+			continue;
 
-		/*
-		 * Mark all disks as active to start with, there are no
-		 * spares.  multipath_read_balance deals with choose
-		 * the "best" operational device.
-		 */
+		disk = conf->multipaths + disk_idx;
 		disk->rdev = rdev;
-		disk->operational = 1;
-		num_rdevs++;
+		if (rdev->faulty) 
+			disk->operational = 0;
+		else {
+
+			/*
+			 * Mark all disks as active to start with, there are no
+			 * spares.  multipath_read_balance deals with choose
+			 * the "best" operational device.
+			 */
+			disk->operational = 1;
+			conf->working_disks++;
+		}
 	}
 
-	conf->raid_disks = mddev->raid_disks = num_rdevs;
+	conf->raid_disks = mddev->raid_disks;
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
@@ -506,6 +497,7 @@ static int multipath_run (mddev_t *mddev)
 		printk(NONE_OPERATIONAL, mdidx(mddev));
 		goto out_free_conf;
 	}
+	mddev->degraded = conf->raid_disks = conf->working_disks;
 
 	conf->pool = mempool_create(NR_RESERVED_BUFS,
 				    mp_pool_alloc, mp_pool_free,

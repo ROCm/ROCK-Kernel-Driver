@@ -195,7 +195,6 @@ struct disk_info {
 	mdk_rdev_t	*rdev;
 	int		operational;
 	int		write_only;
-	int		spare;
 };
 
 struct raid5_private_data {
