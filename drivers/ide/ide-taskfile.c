@@ -512,6 +512,26 @@ EXPORT_SYMBOL(task_mulout_intr);
 
 #else /* !CONFIG_IDE_TASKFILE_IO */
 
+static inline void task_multi_sectors(ide_drive_t *drive,
+				      struct request *rq, int rw)
+{
+	unsigned int nsect, msect = drive->mult_count;
+
+	rq->errors = 0;
+	do {
+		nsect = rq->current_nr_sectors;
+		if (nsect > msect)
+			nsect = msect;
+
+		task_sectors(drive, rq, nsect, rw);
+
+		if (!rq->nr_sectors)
+			msect = 0;
+		else
+			msect -= nsect;
+	} while (msect);
+}
+
 static u8 wait_drive_not_busy(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -585,8 +605,6 @@ EXPORT_SYMBOL(task_in_intr);
 ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int msect = drive->mult_count;
-	unsigned int nsect;
 	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
@@ -610,19 +628,7 @@ finish_rq:
 		return ide_stopped;
 	}
 
-	rq->errors = 0;
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_sectors(drive, rq, nsect, IDE_PIO_IN);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
+	task_multi_sectors(drive, rq, IDE_PIO_IN);
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
@@ -712,8 +718,6 @@ EXPORT_SYMBOL(pre_task_out_intr);
 ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int msect = drive->mult_count;
-	unsigned int nsect;
 	u8 stat;
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
@@ -748,20 +752,7 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 
 	/* Still data left to transfer. */
 	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-
-	rq->errors = 0;
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_sectors(drive, rq, nsect, IDE_PIO_OUT);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
+	task_multi_sectors(drive, rq, IDE_PIO_OUT);
 
 	return ide_started;
 }
