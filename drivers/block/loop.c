@@ -916,11 +916,7 @@ static int lo_open(struct inode *inode, struct file *file)
 
 static int lo_release(struct inode *inode, struct file *file)
 {
-	struct block_device *bdev = inode->i_bdev;
-	struct loop_device *lo = bdev->bd_disk->private_data;
-
-	if (!(lo->lo_flags & LO_FLAGS_READ_ONLY))
-		fsync_bdev(bdev);
+	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
 
 	down(&lo->lo_ctl_mutex);
 	--lo->lo_refcnt;
