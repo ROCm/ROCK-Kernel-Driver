@@ -569,7 +569,7 @@ int netpoll_setup(struct netpoll *np)
 		if (time_before(jiffies, atleast)) {
 			printk(KERN_NOTICE "%s: carrier detect appears flaky,"
 			       " waiting 10 seconds\n",
-			       np->name, np->dev_name);
+			       np->name);
 			while (time_before(jiffies, atmost))
 				cond_resched();
 		}
