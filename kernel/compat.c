@@ -441,6 +441,9 @@ long compat_timer_settime(timer_t timer_id, int flags,
 	long err;
 	mm_segment_t oldfs;
 	struct itimerspec newts, oldts;
+
+	if (!new)
+		return -EINVAL;
 	if (get_compat_itimerspec(&newts, new))
 		return -EFAULT;	
 	oldfs = get_fs();
