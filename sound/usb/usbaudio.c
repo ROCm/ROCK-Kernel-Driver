@@ -1937,11 +1937,11 @@ static int snd_usb_roland_ua100_hack(snd_usb_audio_t *chip)
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = &ep_quirk
 	};
-	struct usb_config_descriptor *cfg = chip->dev->actconfig;
+	struct usb_host_config *cfg = chip->dev->actconfig;
 	struct usb_interface *iface;
 	int err;
 
-	if (cfg->bNumInterfaces != 3) {
+	if (cfg->desc.bNumInterfaces != 3) {
 		snd_printdd(KERN_ERR "invalid UA-100 descriptor\n");
 		return -ENXIO;
 	}
@@ -2134,18 +2134,18 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 				 struct usb_interface *intf,
 				 const struct usb_device_id *usb_id)
 {
-	struct usb_config_descriptor *config = dev->actconfig;	
+	struct usb_host_config *config = dev->actconfig;	
 	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)usb_id->driver_info;
 	int i;
 	snd_card_t *card;
 	snd_usb_audio_t *chip;
-	int ifnum = intf->altsetting->bInterfaceNumber;
+	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 
 	if (quirk && quirk->ifnum != QUIRK_ANY_INTERFACE && ifnum != quirk->ifnum)
 		goto __err_val;
 
-	if (usb_set_configuration(dev, config->bConfigurationValue) < 0) {
-		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", config->bConfigurationValue);
+	if (usb_set_configuration(dev, config->desc.bConfigurationValue) < 0) {
+		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", config->desc.bConfigurationValue);
 		goto __err_val;
 	}
 

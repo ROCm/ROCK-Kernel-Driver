@@ -517,7 +517,7 @@ static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 static struct usb_endpoint_descriptor* snd_usbmidi_get_int_epd(snd_usb_midi_t* umidi)
 {
 	struct usb_interface* intf;
-	struct usb_interface_descriptor* intfd;
+	struct usb_host_interface* intfd;
 
 	if (umidi->chip->dev->descriptor.idVendor != 0x0582)
 		return NULL;
@@ -545,7 +545,7 @@ static struct usb_endpoint_descriptor* snd_usbmidi_get_int_epd(snd_usb_midi_t* u
 static struct usb_endpoint_descriptor* snd_usbmidi_get_midiman_int_epd(snd_usb_midi_t* umidi)
 {
 	struct usb_interface* intf = umidi->iface;
-	if (!intf || intf->altsetting[0].bNumEndpoints < 1)
+	if (!intf || intf->altsetting[0].desc.bNumEndpoints < 1)
 		return NULL;
 	return &intf->altsetting[0].endpoint[0].desc;
 }
@@ -774,9 +774,9 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 			   	   snd_usb_midi_endpoint_info_t* endpoints)
 {
 	struct usb_interface* intf;
-	struct usb_interface_descriptor* intfd;
+	struct usb_host_interface* intfd;
 	struct usb_ms_header_descriptor* ms_header;
-	struct usb_endpoint_descriptor* ep;
+	struct usb_host_endpoint* ep;
 	struct usb_ms_endpoint_descriptor* ms_ep;
 	int i, epidx;
 
@@ -795,9 +795,9 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 		printk(KERN_WARNING "snd-usb-midi: MIDIStreaming interface descriptor not found\n");
 
 	epidx = 0;
-	for (i = 0; i < intfd->bNumEndpoints; ++i) {
+	for (i = 0; i < intfd->desc.bNumEndpoints; ++i) {
 		ep = &intfd->endpoint[i];
-		if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK)
+		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK)
 			continue;
 		ms_ep = (struct usb_ms_endpoint_descriptor*)ep->extra;
 		if (ep->extralen < 4 ||
@@ -806,22 +806,22 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 		    ms_ep->bDescriptorSubtype != MS_GENERAL)
 			continue;
 		if (endpoints[epidx].epnum != 0 &&
-		    endpoints[epidx].epnum != (ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK)) {
+		    endpoints[epidx].epnum != (ep->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK)) {
 			++epidx;
 			if (epidx >= MIDI_MAX_ENDPOINTS) {
 				printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
 				break;
 			}
 		}
-		endpoints[epidx].epnum = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-		if (ep->bEndpointAddress & USB_DIR_IN) {
+		endpoints[epidx].epnum = ep->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		if (ep->desc.bEndpointAddress & USB_DIR_IN) {
 			endpoints[epidx].in_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
 		} else {
 			endpoints[epidx].out_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
 		}
 		printk(KERN_INFO "snd-usb-midi: detected %d %s jack(s) on endpoint %d\n",
 		       ms_ep->bNumEmbMIDIJack,
-		       ep->bEndpointAddress & USB_DIR_IN ? "input" : "output",
+		       ep->desc.bEndpointAddress & USB_DIR_IN ? "input" : "output",
 		       endpoints[epidx].epnum);
 	}
 	return 0;
@@ -835,7 +835,7 @@ static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 			       	       snd_usb_midi_endpoint_info_t* endpoint)
 {
 	struct usb_interface* intf;
-	struct usb_interface_descriptor* intfd;
+	struct usb_host_interface* intfd;
 	struct usb_endpoint_descriptor* epd;
 
 	if (endpoint->epnum == -1) {
@@ -858,14 +858,14 @@ static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi,
 				     snd_usb_midi_endpoint_info_t* endpoint)
 {
 	struct usb_interface* intf;
-	struct usb_interface_descriptor* intfd;
+	struct usb_host_interface* intfd;
 	uint8_t* cs_desc;
 
 	intf = umidi->iface;
 	if (!intf)
 		return -ENOENT;
 	intfd = intf->altsetting;
-	if (intfd->bNumEndpoints < 1)
+	if (intfd->desc.bNumEndpoints < 1)
 		return -ENOENT;
 
 	for (cs_desc = intfd->extra;
@@ -892,7 +892,7 @@ static int snd_usbmidi_create_endpoints_midiman(snd_usb_midi_t* umidi, int ports
 {
 	snd_usb_midi_endpoint_info_t ep_info;
 	struct usb_interface* intf;
-	struct usb_interface_descriptor* intfd;
+	struct usb_host_interface* intfd;
 	struct usb_endpoint_descriptor* epd;
 	int cable, err;
 
