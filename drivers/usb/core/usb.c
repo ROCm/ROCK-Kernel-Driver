@@ -1532,6 +1532,116 @@ void usb_buffer_unmap (struct urb *urb)
 				: USB_DIR_OUT);
 }
 
+/**
+ * usb_buffer_map_sg - create scatterlist DMA mapping(s) for an endpoint
+ * @dev: device to which the scatterlist will be mapped
+ * @pipe: endpoint defining the mapping direction
+ * @sg: the scatterlist to map
+ * @nents: the number of entries in the scatterlist
+ *
+ * Return value is either < 0 (indicating no buffers could be mapped), or
+ * the number of DMA mapping array entries in the scatterlist.
+ *
+ * The caller is responsible for placing the resulting DMA addresses from
+ * the scatterlist into URB transfer buffer pointers, and for setting the
+ * URB_NO_DMA_MAP transfer flag in each of those URBs.
+ *
+ * Top I/O rates come from queuing URBs, instead of waiting for each one
+ * to complete before starting the next I/O.   This is particularly easy
+ * to do with scatterlists.  Just allocate and submit one URB for each DMA
+ * mapping entry returned, stopping on the first error or when all succeed.
+ *
+ * This call would normally be used when translating scatterlist requests,
+ * rather than usb_buffer_map(), since on some hardware (with IOMMUs) it
+ * may be able to coalesce mappings for improved I/O efficiency.
+ *
+ * Reverse the effect of this call with usb_buffer_unmap_sg().
+ */
+int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int nents)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+	int n_hw_ents;
+
+	if (!dev
+			|| usb_pipecontrol (pipe)
+			|| !(bus = dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_map_sg)
+		return -1;
+
+	if (op->buffer_map_sg (bus,
+			       sg,
+			       &n_hw_ents,
+			       nents,
+			       usb_pipein (pipe)
+				       ? USB_DIR_IN
+				       : USB_DIR_OUT))
+		return -1;
+
+	return n_hw_ents;
+}
+
+/**
+ * usb_buffer_dmasync_sg - synchronize DMA and CPU view of scatterlist buffer(s)
+ * @dev: device to which the scatterlist will be mapped
+ * @pipe: endpoint defining the mapping direction
+ * @sg: the scatterlist to synchronize
+ * @n_hw_ents: the positive return value from usb_buffer_map_sg
+ *
+ * Use this when you are re-using a scatterlist's data buffers for
+ * another USB request.
+ */
+void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int n_hw_ents)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!dev
+			|| !(bus = dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_dmasync_sg)
+		return;
+
+	op->buffer_dmasync_sg (bus,
+			       sg,
+			       n_hw_ents,
+			       usb_pipein (pipe)
+				       ? USB_DIR_IN
+				       : USB_DIR_OUT);
+}
+
+/**
+ * usb_buffer_unmap_sg - free DMA mapping(s) for a scatterlist
+ * @dev: device to which the scatterlist will be mapped
+ * @pipe: endpoint defining the mapping direction
+ * @sg: the scatterlist to unmap
+ * @n_hw_ents: the positive return value from usb_buffer_map_sg
+ *
+ * Reverses the effect of usb_buffer_map_sg().
+ */
+void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int n_hw_ents)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!dev
+			|| !(bus = dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_unmap_sg)
+		return;
+
+	op->buffer_unmap_sg (bus,
+			     sg,
+			     n_hw_ents,
+			     usb_pipein (pipe)
+				     ? USB_DIR_IN
+				     : USB_DIR_OUT);
+}
+
 #ifdef CONFIG_PROC_FS
 struct list_head *usb_driver_get_list(void)
 {
@@ -1611,5 +1721,9 @@ EXPORT_SYMBOL (usb_buffer_free);
 EXPORT_SYMBOL (usb_buffer_map);
 EXPORT_SYMBOL (usb_buffer_dmasync);
 EXPORT_SYMBOL (usb_buffer_unmap);
+
+EXPORT_SYMBOL (usb_buffer_map_sg);
+EXPORT_SYMBOL (usb_buffer_dmasync_sg);
+EXPORT_SYMBOL (usb_buffer_unmap_sg);
 
 MODULE_LICENSE("GPL");
