@@ -64,7 +64,7 @@ extern struct net_device *elmc_probe(int unit);
 extern struct net_device *skmca_probe(int unit);
 extern struct net_device *elplus_probe(int unit);
 extern int ac3200_probe(struct net_device *);
-extern int es_probe(struct net_device *);
+extern struct net_device *es_probe(int unit);
 extern struct net_device *lne390_probe(int unit);
 extern struct net_device *e2100_probe(int unit);
 extern struct net_device *ni5010_probe(int unit);
@@ -167,13 +167,13 @@ static struct devprobe eisa_probes[] __initdata = {
 #ifdef CONFIG_AC3200	
 	{ac3200_probe, 0},
 #endif
-#ifdef CONFIG_ES3210
-	{es_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 eisa_probes2[] __initdata = {
+#ifdef CONFIG_ES3210
+	{es_probe, 0},
+#endif
 #ifdef CONFIG_LNE390
 	{lne390_probe, 0},
 #endif
