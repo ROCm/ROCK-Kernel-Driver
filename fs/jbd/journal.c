@@ -507,6 +507,7 @@ int journal_next_log_block(journal_t *journal, unsigned long *retp)
 {
 	unsigned long blocknr;
 
+	spin_lock(&journal->j_state_lock);
 	J_ASSERT(journal->j_free > 1);
 
 	blocknr = journal->j_head;
@@ -514,6 +515,7 @@ int journal_next_log_block(journal_t *journal, unsigned long *retp)
 	journal->j_free--;
 	if (journal->j_head == journal->j_last)
 		journal->j_head = journal->j_first;
+	spin_unlock(&journal->j_state_lock);
 	return journal_bmap(journal, blocknr, retp);
 }
 
@@ -733,7 +735,7 @@ static void journal_fail_superblock (journal_t *journal)
  * subsequent use.
  */
 
-static int journal_reset (journal_t *journal)
+static int journal_reset(journal_t *journal)
 {
 	journal_superblock_t *sb = journal->j_superblock;
 	unsigned int first, last;
