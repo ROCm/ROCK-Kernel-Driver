@@ -57,7 +57,6 @@ obj-$(CONFIG_SUNGEM) += sungem.o
 
 obj-$(CONFIG_MACE) += mace.o
 obj-$(CONFIG_BMAC) += bmac.o
-obj-$(CONFIG_GMAC) += gmac.o
 
 obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
 
