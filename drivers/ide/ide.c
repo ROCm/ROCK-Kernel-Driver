@@ -818,6 +818,7 @@ abort:
 
 EXPORT_SYMBOL(ide_unregister);
 
+
 /**
  *	ide_setup_ports 	-	set up IDE interface ports
  *	@hw: register descriptions
@@ -2145,12 +2146,12 @@ static void __init probe_for_hwifs (void)
 		buddha_init();
 	}
 #endif /* CONFIG_BLK_DEV_BUDDHA */
-#if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP)
+#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP)
 	{
 		extern void pnpide_init(int enable);
 		pnpide_init(1);
 	}
-#endif /* CONFIG_BLK_DEV_ISAPNP */
+#endif /* CONFIG_BLK_DEV_IDEPNP */
 }
 
 void __init ide_init_builtin_drivers (void)
@@ -2321,9 +2322,9 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
-#if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP) && defined(MODULE)
+#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
 	pnpide_init(0);
-#endif /* CONFIG_BLK_DEV_ISAPNP */
+#endif /* CONFIG_BLK_DEV_IDEPNP */
 #ifdef CONFIG_PROC_FS
 	ide_remove_proc_entries(drive->proc, DRIVER(drive)->proc);
 	ide_remove_proc_entries(drive->proc, generic_subdriver_entries);
