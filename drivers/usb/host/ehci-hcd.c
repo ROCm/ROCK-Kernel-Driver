@@ -97,7 +97,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "26 Oct 2004"
+#define DRIVER_VERSION "10 Dec 2004"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -991,12 +991,18 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		qh = (struct ehci_qh *) urb->hcpriv;
 		if (!qh)
 			break;
-		if (qh->qh_state == QH_STATE_LINKED) {
-			/* messy, can spin or block a microframe ... */
-			intr_deschedule (ehci, qh, 1);
-			/* qh_state == IDLE */
+		switch (qh->qh_state) {
+		case QH_STATE_LINKED:
+			intr_deschedule (ehci, qh);
+			/* FALL THROUGH */
+		case QH_STATE_IDLE:
+			qh_completions (ehci, qh, NULL);
+			break;
+		default:
+			ehci_dbg (ehci, "bogus qh %p state %d\n",
+					qh, qh->qh_state);
+			goto done;
 		}
-		qh_completions (ehci, qh, NULL);
 
 		/* reschedule QH iff another request is queued */
 		if (!list_empty (&qh->qtd_list)
@@ -1023,6 +1029,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		// completion irqs can wait up to 1024 msec,
 		break;
 	}
+done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	return 0;
 }

@@ -268,8 +268,7 @@ __acquires(ehci->lock)
 
 static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
-static void intr_deschedule (struct ehci_hcd *ehci,
-				struct ehci_qh *qh, int wait);
+static void intr_deschedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 /*
@@ -428,7 +427,7 @@ halt:
 			 * except maybe high bandwidth ...
 			 */
 			if (qh->period) {
-				intr_deschedule (ehci, qh, 1);
+				intr_deschedule (ehci, qh);
 				(void) qh_schedule (ehci, qh);
 			} else
 				start_unlink_async (ehci, qh);
@@ -664,9 +663,12 @@ qh_make (
 			qh->c_usecs = 0;
 			qh->gap_uf = 0;
 
-			/* FIXME handle HS periods of less than 1 frame. */
 			qh->period = urb->interval >> 3;
-			if (qh->period < 1) {
+			if (qh->period == 0 && urb->interval != 1) {
+				/* NOTE interval 2 or 4 uframes could work.
+				 * But interval 1 scheduling is simpler, and
+				 * includes high bandwidth.
+				 */
 				dbg ("intr period %d uframes, NYET!",
 						urb->interval);
 				goto done;
