@@ -1611,6 +1611,7 @@ int sigprocmask(int how, sigset_t *set, sigset_t *oldset)
 		break;
 	case SIG_SETMASK:
 		current->blocked = *set;
+		break;
 	default:
 		error = -EINVAL;
 	}
