@@ -87,11 +87,11 @@ typedef struct {
 } ibmcam_t;
 #define	IBMCAM_T(uvd)	((ibmcam_t *)((uvd)->user_data))
 
-struct usbvideo *cams = NULL;
+static struct usbvideo *cams;
 
-static int debug = 0;
+static int debug;
 
-static int flags = 0; /* FLAGS_DISPLAY_HINTS | FLAGS_OVERLAY_STATS; */
+static int flags; /* = FLAGS_DISPLAY_HINTS | FLAGS_OVERLAY_STATS; */
 
 static const int min_canvasWidth  = 8;
 static const int min_canvasHeight = 4;
