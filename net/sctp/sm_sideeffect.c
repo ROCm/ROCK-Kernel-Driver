@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  *
@@ -677,8 +677,8 @@ static void sctp_cmd_delete_tcb(sctp_cmd_seq_t *cmds,
 /*
  * ADDIP Section 4.1 ASCONF Chunk Procedures
  * A4) Start a T-4 RTO timer, using the RTO value of the selected
- * destination address (normally the primary path; see RFC2960
- * section 6.4 for details).
+ * destination address (we use active path instead of primary path just
+ * because primary path may be inactive. 
  */
 static void sctp_cmd_setup_t4(sctp_cmd_seq_t *cmds,
 				struct sctp_association *asoc,
@@ -686,7 +686,7 @@ static void sctp_cmd_setup_t4(sctp_cmd_seq_t *cmds,
 {
 	struct sctp_transport *t;
 
-	t = asoc->peer.primary_path;
+	t = asoc->peer.active_path;
 	asoc->timeouts[SCTP_EVENT_TIMEOUT_T4_RTO] = t->rto;
 	chunk->transport = t;
 }

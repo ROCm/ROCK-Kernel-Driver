@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2003 Intel Corp.
@@ -477,10 +477,6 @@ static int sctp_send_asconf_add_ip(struct sock		*sk,
 		}
 
 		retval = sctp_send_asconf(asoc, chunk);
-		if (retval) {
-			sctp_chunk_free(chunk);
-			goto out;
-		}
 
 		/* FIXME: After sending the add address ASCONF chunk, we
 		 * cannot append the address to the association's binding
@@ -672,10 +668,6 @@ static int sctp_send_asconf_del_ip(struct sock		*sk,
 		}
 
 		retval = sctp_send_asconf(asoc, chunk);
-		if (retval) {
-			sctp_chunk_free(chunk);
-			goto out;
-		}
 
 		/* FIXME: After sending the delete address ASCONF chunk, we
 		 * cannot remove the addresses from the association's bind
@@ -2001,14 +1993,10 @@ static int sctp_setsockopt_peer_primary_addr(struct sock *sk, char *optval,
 		return -ENOMEM;
 
 	err = sctp_send_asconf(asoc, chunk);
-	if (err) {
-		sctp_chunk_free(chunk);
-		return err;
-	}
 
 	SCTP_DEBUG_PRINTK("We set peer primary addr primitively.\n");
 
-	return 0;
+	return err;
 }
 
 

@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 Intel Corp.
@@ -3165,6 +3165,8 @@ sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
 		/* We are going to ABORT, so we might as well stop
 		 * processing the rest of the chunks in the packet.
 		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_ASCONF_ACK));
@@ -3174,6 +3176,9 @@ sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
 	}
 
 	if ((rcvd_serial == sent_serial) && asoc->addip_last_asconf) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+
 		if (!sctp_process_asconf_ack((struct sctp_association *)asoc,
 					     asconf_ack))
 			return SCTP_DISPOSITION_CONSUME;
@@ -4372,7 +4377,7 @@ nomem:
 
 /*
  * ADDIP Section 4.1 ASCONF CHunk Procedures
- * If the T-4 RTO timer expires the endpoint should do B1 to B5
+ * If the T4 RTO timer expires the endpoint should do B1 to B5
  */
 sctp_disposition_t sctp_sf_t4_timer_expire(
 	const struct sctp_endpoint *ep,
@@ -4381,7 +4386,55 @@ sctp_disposition_t sctp_sf_t4_timer_expire(
 	void *arg,
 	sctp_cmd_seq_t *commands)
 {
-	// FIXME: need to handle t4 expire
+	struct sctp_chunk *chunk = asoc->addip_last_asconf;
+	struct sctp_transport *transport = chunk->transport;
+
+	/* ADDIP 4.1 B1) Increment the error counters and perform path failure
+	 * detection on the appropriate destination address as defined in
+	 * RFC2960 [5] section 8.1 and 8.2.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_STRIKE, SCTP_TRANSPORT(transport));
+
+	/* Reconfig T4 timer and transport. */
+	sctp_add_cmd_sf(commands, SCTP_CMD_SETUP_T4, SCTP_CHUNK(chunk));
+
+	/* ADDIP 4.1 B2) Increment the association error counters and perform
+	 * endpoint failure detection on the association as defined in
+	 * RFC2960 [5] section 8.1 and 8.2.
+	 * association error counter is incremented in SCTP_CMD_STRIKE.
+	 */
+	if (asoc->overall_error_count >= asoc->max_retrans) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
+				SCTP_U32(SCTP_ERROR_NO_ERROR));
+		SCTP_INC_STATS(SctpAborteds);
+		SCTP_INC_STATS(SctpCurrEstab);
+		return SCTP_DISPOSITION_ABORT;
+	}
+
+	/* ADDIP 4.1 B3) Back-off the destination address RTO value to which
+	 * the ASCONF chunk was sent by doubling the RTO timer value.
+	 * This is done in SCTP_CMD_STRIKE.
+	 */
+
+	/* ADDIP 4.1 B4) Re-transmit the ASCONF Chunk last sent and if possible
+	 * choose an alternate destination address (please refer to RFC2960
+	 * [5] section 6.4.1). An endpoint MUST NOT add new parameters to this
+	 * chunk, it MUST be the same (including its serial number) as the last 
+	 * ASCONF sent.
+	 */
+	sctp_chunk_hold(asoc->addip_last_asconf);
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+			SCTP_CHUNK(asoc->addip_last_asconf));
+
+	/* ADDIP 4.1 B5) Restart the T-4 RTO timer. Note that if a different
+	 * destination is selected, then the RTO used will be that of the new
+	 * destination address.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+
 	return SCTP_DISPOSITION_CONSUME;
 }
 
