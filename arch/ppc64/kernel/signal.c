@@ -105,7 +105,7 @@ long sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	       struct pt_regs *regs)
 {
 	sigset_t saveset;
-  
+
 	mask &= _BLOCKABLE;
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
@@ -135,7 +135,7 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int
 {
 	sigset_t saveset, newset;
 
-  /* XXX: Don't preclude handling different sized sigset_t's.  */
+	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (sigsetsize != sizeof(sigset_t))
 		return -EINVAL;
 
@@ -162,8 +162,8 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int
 
 long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 {
-  struct pt_regs *regs = (struct pt_regs *) &uss;
-  return do_sigaltstack(uss, uoss, regs->gpr[1]);
+	struct pt_regs *regs = (struct pt_regs *) &uss;
+	return do_sigaltstack(uss, uoss, regs->gpr[1]);
 }
 
 long sys_sigaction(int sig, const struct old_sigaction *act,
@@ -217,8 +217,6 @@ struct sigregs {
 	   decrementing it. */
 	int		abigap[72];
 };
-
-
 
 struct rt_sigframe
 {
@@ -395,7 +393,7 @@ long sys_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	sigset_t set;
 	unsigned long prevsp;
 
-        sc = (struct sigcontext_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
+	sc = (struct sigcontext_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
 
@@ -455,7 +453,7 @@ badframe:
  */
 static void
 setup_frame(struct pt_regs *regs, struct sigregs *frame,
-            unsigned long newsp)
+	    unsigned long newsp)
 {
 
 	/* Handler is *really* a pointer to the function descriptor for
@@ -503,7 +501,7 @@ setup_frame(struct pt_regs *regs, struct sigregs *frame,
 
 	return;
 
- badframe:
+badframe:
 #if DEBUG_SIG
 	printk("badframe in setup_frame, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
@@ -520,7 +518,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	      unsigned long *newspp, unsigned long frame)
 {
 	struct sigcontext_struct *sc;
-        struct rt_sigframe *rt_sf;
+	struct rt_sigframe *rt_sf;
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -528,14 +526,13 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 		 !(ka->sa.sa_flags & SA_RESTART))))
 		regs->result = -EINTR;
 
-        /* Set up Signal Frame */
+	/* Set up Signal Frame */
 	if (ka->sa.sa_flags & SA_SIGINFO) {
 		/* Put a Real Time Context onto stack */
 		*newspp -= sizeof(*rt_sf);
 		rt_sf = (struct rt_sigframe *) *newspp;
 		if (verify_area(VERIFY_WRITE, rt_sf, sizeof(*rt_sf)))
 			goto badframe;
-                
 
 		if (__put_user((unsigned long) ka->sa.sa_handler, &rt_sf->uc.uc_mcontext.handler)
 		    || __put_user(&rt_sf->info, &rt_sf->pinfo)
@@ -555,20 +552,20 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 		    || __put_user(sig, &rt_sf->uc.uc_mcontext.signal))
 			goto badframe;
 	} else {
-	        /* Put another sigcontext on the stack */
-                *newspp -= sizeof(*sc);
-        	sc = (struct sigcontext_struct *) *newspp;
-        	if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
-	        	goto badframe;
-
-        	if (__put_user((unsigned long) ka->sa.sa_handler, &sc->handler)
-	           || __put_user(oldset->sig[0], &sc->oldmask)
+		/* Put another sigcontext on the stack */
+		*newspp -= sizeof(*sc);
+		sc = (struct sigcontext_struct *) *newspp;
+		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
+			goto badframe;
+		
+		if (__put_user((unsigned long) ka->sa.sa_handler, &sc->handler)
+		    || __put_user(oldset->sig[0], &sc->oldmask)
 #if _NSIG_WORDS > 1
-	           || __put_user(oldset->sig[1], &sc->_unused[3])
+		    || __put_user(oldset->sig[1], &sc->_unused[3])
 #endif
-	           || __put_user((struct pt_regs *)frame, &sc->regs)
-	           || __put_user(sig, &sc->signal))
-	        	goto badframe;
+		    || __put_user((struct pt_regs *)frame, &sc->regs)
+		    || __put_user(sig, &sc->signal))
+			goto badframe;
 	}
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
@@ -714,7 +711,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(signr, ka, &info, oldset, regs, &newsp, frame);
-                break;
+		break;
 	}
 
 	if (regs->trap == 0x0C00 /* System Call! */ &&
@@ -727,11 +724,11 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	}
 
 	if (newsp == frame)
-             return 0;		/* no signals delivered */
+		return 0;		/* no signals delivered */
 
-        if (ka->sa.sa_flags & SA_SIGINFO)
-             setup_rt_frame(regs, (struct sigregs *) frame, newsp);
-        else        
-	    setup_frame(regs, (struct sigregs *) frame, newsp);
+	if (ka->sa.sa_flags & SA_SIGINFO)
+		setup_rt_frame(regs, (struct sigregs *) frame, newsp);
+	else
+		setup_frame(regs, (struct sigregs *) frame, newsp);
 	return 1;
 }
