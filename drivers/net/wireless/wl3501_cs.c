@@ -241,7 +241,7 @@ void wl3501_get_from_wla(struct wl3501_card *this, u16 src, void *dest,
  *  |    PLCP      |    MAC Header   |  DST  SRC         Data ...       |
  *  |  (24 bytes)  |    (30 bytes)   |  (6)  (6)  (Ethernet Row Data)   |
  *  *--------------*-----------------*----------------------------------*
- *  \               \- IEEE 802.11 -/ \------------ uDataLen -----------/
+ *  \               \- IEEE 802.11 -/ \-------------- len --------------/
  *   \-struct wl3501_80211_tx_hdr--/   \-------- Ethernet Frame -------/
  *
  * Return = Postion in Card

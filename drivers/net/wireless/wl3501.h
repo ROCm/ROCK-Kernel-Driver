@@ -2,6 +2,7 @@
 #define __WL3501_H__
 
 #include <linux/spinlock.h>
+#include "ieee802_11.h"
 
 /* define for WLA 2.0 */
 #define WL3501_BLKSZ 256
@@ -476,22 +477,9 @@ struct wl3501_80211_tx_plcp_hdr {
 	u16	crc16;
 } __attribute__ ((packed));
 
-/*
- * Data Frame MAC Header (IEEE 802.11)
- */
-struct wl3501_80211_data_mac_hdr {
-	u16			frame_ctrl;
-	u16			duration_id;
-	struct wl3501_mac_addr	addr1;
-	struct wl3501_mac_addr	addr2;
-	struct wl3501_mac_addr	addr3;
-	u16			seq_ctrl;
-	struct wl3501_mac_addr	addr4;
-} __attribute__ ((packed));
-
 struct wl3501_80211_tx_hdr {
-	struct wl3501_80211_tx_plcp_hdr	 pclp_hdr;
-	struct wl3501_80211_data_mac_hdr mac_hdr;
+	struct wl3501_80211_tx_plcp_hdr	pclp_hdr;
+	struct ieee802_11_hdr		mac_hdr;
 } __attribute__ ((packed));
 
 /*
