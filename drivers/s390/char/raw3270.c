@@ -381,6 +381,8 @@ raw3270_irq (struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 			return;	/* Sucessfully restarted. */
 		break;
 	case RAW3270_IO_STOP:
+		if (!rq)
+			break;
 		raw3270_halt_io_nolock(rp, rq);
 		rq->rc = -EIO;
 		break;
@@ -881,7 +883,7 @@ raw3270_activate_view(struct raw3270_view *view)
 		if (rc) {
 			/* Didn't work. Try to reactivate the old view. */
 			rp->view = oldview;
-			if (oldview->fn->activate(oldview) != 0) {
+			if (!oldview || oldview->fn->activate(oldview) != 0) {
 				/* Didn't work as well. Try any other view. */
 				list_for_each_entry(nv, &rp->view_list, list)
 					if (nv != view && nv != oldview) {

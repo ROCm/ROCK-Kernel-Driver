@@ -186,7 +186,8 @@ __switch_to_noper:
  */
 	.global do_call_softirq
 do_call_softirq:
-	stmg	%r12,%r15,48(%r15)
+	stnsm	48(%r15),0xfc
+	stmg	%r12,%r15,56(%r15)
 	lgr	%r12,%r15
 	lg	%r0,__LC_ASYNC_STACK
 	slgr    %r0,%r15
@@ -196,7 +197,8 @@ do_call_softirq:
 0:	aghi	%r15,-STACK_FRAME_OVERHEAD
 	stg	%r12,0(%r15)		# store back chain
 	brasl	%r14,do_softirq
-	lmg	%r12,%r15,48(%r12)
+	lmg	%r12,%r15,56(%r12)
+	ssm	48(%r15)
 	br	%r14
 
 __critical_start:
