@@ -112,6 +112,8 @@ void exit_thread_tt(void)
 	close(current->thread.mode.tt.switch_pipe[1]);
 }
 
+void schedule_tail(task_t *prev);
+
 static void new_thread_handler(int sig)
 {
 	int (*fn)(void *);
@@ -125,7 +127,7 @@ static void new_thread_handler(int sig)
 	block_signals();
 	init_new_thread_signals(1);
 #ifdef CONFIG_SMP
-	schedule_tail(NULL);
+	schedule_tail(current->thread.prev_sched);
 #endif
 	enable_timer();
 	free_page(current->thread.temp_stack);
@@ -167,7 +169,7 @@ void finish_fork_handler(int sig)
 #endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
- 	sti();
+	local_irq_disable();
 	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
@@ -187,7 +189,7 @@ int fork_tramp(void *stack)
 {
 	int sig = sigusr1;
 
-	cli();
+	local_irq_enable();
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	kill(os_getpid(), sig);
