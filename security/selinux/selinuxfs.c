@@ -71,6 +71,7 @@ enum sel_inos {
 	SEL_MLS,	/* return if MLS policy is enabled */
 	SEL_DISABLE,	/* disable SELinux until next reboot */
 	SEL_AVC,	/* AVC management directory */
+	SEL_MEMBER,	/* compute polyinstantiation membership decision */
 };
 
 #define TMPBUFLEN	12
@@ -307,12 +308,14 @@ static ssize_t sel_write_access(struct file * file, char *buf, size_t size);
 static ssize_t sel_write_create(struct file * file, char *buf, size_t size);
 static ssize_t sel_write_relabel(struct file * file, char *buf, size_t size);
 static ssize_t sel_write_user(struct file * file, char *buf, size_t size);
+static ssize_t sel_write_member(struct file * file, char *buf, size_t size);
 
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[SEL_ACCESS] = sel_write_access,
 	[SEL_CREATE] = sel_write_create,
 	[SEL_RELABEL] = sel_write_relabel,
 	[SEL_USER] = sel_write_user,
+	[SEL_MEMBER] = sel_write_member,
 };
 
 static ssize_t selinux_transaction_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
@@ -579,6 +582,67 @@ out2:
 	kfree(user);
 out:
 	kfree(con);
+	return length;
+}
+
+static ssize_t sel_write_member(struct file * file, char *buf, size_t size)
+{
+	char *scon, *tcon;
+	u32 ssid, tsid, newsid;
+	u16 tclass;
+	ssize_t length;
+	char *newcon;
+	u32 len;
+
+	length = task_has_security(current, SECURITY__COMPUTE_MEMBER);
+	if (length)
+		return length;
+
+	length = -ENOMEM;
+	scon = kmalloc(size+1, GFP_KERNEL);
+	if (!scon)
+		return length;
+	memset(scon, 0, size+1);
+
+	tcon = kmalloc(size+1, GFP_KERNEL);
+	if (!tcon)
+		goto out;
+	memset(tcon, 0, size+1);
+
+	length = -EINVAL;
+	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
+		goto out2;
+
+	length = security_context_to_sid(scon, strlen(scon)+1, &ssid);
+	if (length < 0)
+		goto out2;
+	length = security_context_to_sid(tcon, strlen(tcon)+1, &tsid);
+	if (length < 0)
+		goto out2;
+
+	length = security_member_sid(ssid, tsid, tclass, &newsid);
+	if (length < 0)
+		goto out2;
+
+	length = security_sid_to_context(newsid, &newcon, &len);
+	if (length < 0)
+		goto out2;
+
+	if (len > SIMPLE_TRANSACTION_LIMIT) {
+		printk(KERN_ERR "%s:  context size (%u) exceeds payload "
+		       "max\n", __FUNCTION__, len);
+		length = -ERANGE;
+		goto out3;
+	}
+
+	memcpy(buf, newcon, len);
+	length = len;
+out3:
+	kfree(newcon);
+out2:
+	kfree(tcon);
+out:
+	kfree(scon);
 	return length;
 }
 
@@ -1117,6 +1181,7 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 		[SEL_COMMIT_BOOLS] = {"commit_pending_bools", &sel_commit_bools_ops, S_IWUSR},
 		[SEL_MLS] = {"mls", &sel_mls_ops, S_IRUGO},
 		[SEL_DISABLE] = {"disable", &sel_disable_ops, S_IWUSR},
+		[SEL_MEMBER] = {"member", &transaction_ops, S_IRUGO|S_IWUGO},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
