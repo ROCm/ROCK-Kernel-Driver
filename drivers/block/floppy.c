@@ -554,7 +554,7 @@ static void floppy_ready(void);
 static void floppy_start(void);
 static void process_fd_request(void);
 static void recalibrate_floppy(void);
-static void floppy_shutdown(void);
+static void floppy_shutdown(unsigned long);
 
 static int floppy_grab_irq_and_dma(void);
 static void floppy_release_irq_and_dma(void);
@@ -628,7 +628,7 @@ static inline void debugt(const char *message)
 }
 
 typedef void (*timeout_fn)(unsigned long);
-static struct timer_list fd_timeout ={ function: (timeout_fn) floppy_shutdown };
+static struct timer_list fd_timeout = TIMER_INITIALIZER(floppy_shutdown, 0, 0);
 
 static const char *timeout_message;
 
@@ -1011,7 +1011,7 @@ static void schedule_bh( void (*handler)(void*) )
 	schedule_work(&floppy_work);
 }
 
-static struct timer_list fd_timer;
+static struct timer_list fd_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 static void cancel_activity(void)
 {
@@ -1900,7 +1900,7 @@ static void show_floppy(void)
 	printk("\n");
 }
 
-static void floppy_shutdown(void)
+static void floppy_shutdown(unsigned long data)
 {
 	unsigned long flags;
 	
