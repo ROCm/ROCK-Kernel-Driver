@@ -1469,6 +1469,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 		strcat(hid->name, buf);
 		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
 			snprintf(hid->name, 64, "%s %s", hid->name, buf);
+	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 128) > 0) {
+			snprintf(hid->name, 128, "%s", buf);
 	} else
 		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
