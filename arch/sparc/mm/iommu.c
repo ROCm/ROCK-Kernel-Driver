@@ -25,7 +25,7 @@ extern int viking_mxcc_present;
 BTFIXUPDEF_CALL(void, flush_page_for_dma, unsigned long)
 #define flush_page_for_dma(page) BTFIXUP_CALL(flush_page_for_dma)(page)
 extern int flush_page_for_dma_global;
-static int viking_flush = 0;
+static int viking_flush;
 /* viking.S */
 extern void viking_flush_page(unsigned long page);
 extern void viking_mxcc_flush_page(unsigned long page);

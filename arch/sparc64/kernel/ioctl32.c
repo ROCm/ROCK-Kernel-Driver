@@ -1061,7 +1061,7 @@ static int fb_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		break;
 	default:
 		do {
-			static int count = 0;
+			static int count;
 			if (++count <= 20)
 				printk("%s: Unknown fb ioctl cmd fd(%d) "
 				       "cmd(%08x) arg(%08lx)\n",
@@ -1714,7 +1714,7 @@ static int ppp_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		break;
 	default:
 		do {
-			static int count = 0;
+			static int count;
 			if (++count <= 20)
 				printk("ppp_ioctl: Unknown cmd fd(%d) "
 				       "cmd(%08x) arg(%08x)\n",
@@ -1824,7 +1824,7 @@ static int mt_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		break;
 	default:
 		do {
-			static int count = 0;
+			static int count;
 			if (++count <= 20)
 				printk("mt_ioctl: Unknown cmd fd(%d) "
 				       "cmd(%08x) arg(%08x)\n",
@@ -1942,7 +1942,7 @@ static int cdrom_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long ar
 		break;
 	default:
 		do {
-			static int count = 0;
+			static int count;
 			if (++count <= 20)
 				printk("cdrom_ioctl: Unknown cmd fd(%d) "
 				       "cmd(%08x) arg(%08x)\n",
@@ -2029,7 +2029,7 @@ static int loop_status(unsigned int fd, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	default: {
-		static int count = 0;
+		static int count;
 		if (++count <= 20)
 			printk("%s: Unknown loop ioctl cmd, fd(%d) "
 			       "cmd(%08x) arg(%08lx)\n",
@@ -4882,7 +4882,7 @@ asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		handler = (void *)(long)t->handler;
 		error = handler(fd, cmd, arg, filp);
 	} else {
-		static int count = 0;
+		static int count;
 		if (++count <= 20)
 			printk("sys32_ioctl(%s:%d): Unknown cmd fd(%d) "
 			       "cmd(%08x) arg(%08x)\n",

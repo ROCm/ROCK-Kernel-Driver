@@ -380,7 +380,7 @@ out:
 asmlinkage unsigned long
 c_sys_nis_syscall (struct pt_regs *regs)
 {
-	static int count=0;
+	static int count;
 	
 	/* Don't make the system unusable, if someone goes stuck */
 	if (count++ > 5)
@@ -450,7 +450,7 @@ asmlinkage int sys_aplib(void)
 
 asmlinkage int solaris_syscall(struct pt_regs *regs)
 {
-	static int count = 0;
+	static int count;
 
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;
@@ -470,7 +470,7 @@ asmlinkage int solaris_syscall(struct pt_regs *regs)
 #ifndef CONFIG_SUNOS_EMUL
 asmlinkage int sunos_syscall(struct pt_regs *regs)
 {
-	static int count = 0;
+	static int count;
 
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;

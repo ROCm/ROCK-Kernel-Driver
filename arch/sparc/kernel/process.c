@@ -63,9 +63,9 @@ int cpu_idle(void)
 	for (;;) {
 		if (ARCH_SUN4C_SUN4) {
 			static int count = HZ;
-			static unsigned long last_jiffies = 0;
-			static unsigned long last_faults = 0;
-			static unsigned long fps = 0;
+			static unsigned long last_jiffies;
+			static unsigned long last_faults;
+			static unsigned long fps;
 			unsigned long now;
 			unsigned long faults;
 			unsigned long flags;

@@ -11,8 +11,8 @@
 
 #define BARG_LEN  256
 int bootstr_len = BARG_LEN;
-static int bootstr_valid = 0;
-static char bootstr_buf[BARG_LEN] = { 0 };
+static int bootstr_valid;
+static char bootstr_buf[BARG_LEN];
 
 char * __init
 prom_getbootargs(void)

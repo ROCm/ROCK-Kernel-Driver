@@ -1159,7 +1159,7 @@ static struct pcidev_cookie *alloc_bridge_cookie(struct pci_pbm_info *pbm)
 
 static void __init sabre_scan_bus(struct pci_controller_info *p)
 {
-	static int once = 0;
+	static int once;
 	struct pci_bus *sabre_bus;
 	struct pci_pbm_info *pbm;
 	struct pcidev_cookie *cookie;
