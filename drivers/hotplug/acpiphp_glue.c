@@ -801,7 +801,7 @@ static int power_off_slot (struct acpiphp_slot *slot)
 static int enable_device (struct acpiphp_slot *slot)
 {
 	u8 bus;
-	struct pci_dev dev0, *dev;
+	struct pci_dev *dev;
 	struct pci_bus *child;
 	struct list_head *l;
 	struct acpiphp_func *func;
@@ -824,16 +824,8 @@ static int enable_device (struct acpiphp_slot *slot)
 	if (retval)
 		goto err_exit;
 
-	memset(&dev0, 0, sizeof (struct pci_dev));
-
-	dev0.bus = slot->bridge->pci_bus;
-	dev0.devfn = PCI_DEVFN(slot->device, 0);
-	dev0.sysdata = dev0.bus->sysdata;
-	dev0.dev.parent = dev0.bus->dev;
-	dev0.dev.bus = &pci_bus_type;
-
 	/* returned `dev' is the *first function* only! */
-	dev = pci_scan_slot (&dev0);
+	dev = pci_scan_slot(slot->bridge->pci_bus, PCI_DEVFN(slot->device, 0));
 
 	if (!dev) {
 		err("No new device found\n");

@@ -374,7 +374,8 @@ int pci_setup_device(struct pci_dev * dev)
 	dev->class = class;
 	class >>= 8;
 
-	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn, dev->vendor, dev->device, class, dev->hdr_type);
+	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number, dev->devfn,
+		dev->vendor, dev->device, class, dev->hdr_type);
 
 	/* "Unknown power state" */
 	dev->current_state = 4;
@@ -427,23 +428,35 @@ int pci_setup_device(struct pci_dev * dev)
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
  */
-struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
+static struct pci_dev * __devinit
+pci_scan_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
 	u32 l;
+	u8 hdr_type;
 
-	if (pci_read_config_dword(temp, PCI_VENDOR_ID, &l))
+	if (pci_bus_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type))
+		return NULL;
+
+	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
 		return NULL;
 
 	/* some broken boards return 0 or ~0 if a slot is empty: */
 	if (l == 0xffffffff || l == 0x00000000 || l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 
-	memcpy(dev, temp, sizeof(*dev));
+	memset(dev, 0, sizeof(struct pci_dev));
+	dev->bus = bus;
+	dev->sysdata = bus->sysdata;
+	dev->dev.parent = bus->dev;
+	dev->dev.bus = &pci_bus_type;
+	dev->devfn = devfn;
+	dev->hdr_type = hdr_type & 0x7f;
+	dev->multifunction = !!(hdr_type & 0x80);
 	dev->vendor = l & 0xffff;
 	dev->device = (l >> 16) & 0xffff;
 
@@ -461,42 +474,44 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	strcpy(dev->dev.bus_id,dev->slot_name);
 	dev->dev.dma_mask = &dev->dma_mask;
 
-	device_register(&dev->dev);
 	return dev;
 }
 
-struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
+struct pci_dev * __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 {
-	struct pci_bus *bus = temp->bus;
-	struct pci_dev *dev;
 	struct pci_dev *first_dev = NULL;
-	int func = 0;
-	int is_multi = 0;
-	u8 hdr_type;
+	int func;
 
-	for (func = 0; func < 8; func++, temp->devfn++) {
-		if (func && !is_multi)		/* not a multi-function device */
-			continue;
-		if (pci_read_config_byte(temp, PCI_HEADER_TYPE, &hdr_type))
-			continue;
-		temp->hdr_type = hdr_type & 0x7f;
+	for (func = 0; func < 8; func++, devfn++) {
+		struct pci_dev *dev;
 
-		dev = pci_scan_device(temp);
+		dev = pci_scan_device(bus, devfn);
 		if (!dev)
 			continue;
-		if (!func) {
-			is_multi = hdr_type & 0x80;
+
+		if (func == 0) {
 			first_dev = dev;
+		} else {
+			dev->multifunction = 1;
 		}
+
+		/* Fix up broken headers */
+		pci_fixup_device(PCI_FIXUP_HEADER, dev);
 
 		/*
 		 * Link the device to both the global PCI device chain and
 		 * the per-bus list of devices and add the /proc entry.
+		 * Note: this also runs the hotplug notifiers (bad!) --rmk
 		 */
+		device_register(&dev->dev);
 		pci_insert_device (dev, bus);
 
-		/* Fix up broken headers */
-		pci_fixup_device(PCI_FIXUP_HEADER, dev);
+		/*
+		 * If this is a single function device,
+		 * don't scan past the first function.
+		 */
+		if (!dev->multifunction)
+			break;
 	}
 	return first_dev;
 }
@@ -507,28 +522,12 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	struct list_head *ln;
 	struct pci_dev *dev;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		printk(KERN_ERR "Out of memory in %s\n", __FUNCTION__);
-		return 0;
-	}
-
 	DBG("Scanning bus %02x\n", bus->number);
 	max = bus->secondary;
 
-	/* Create a device template */
-	memset(dev, 0, sizeof(*dev));
-	dev->bus = bus;
-	dev->sysdata = bus->sysdata;
-	dev->dev.parent = bus->dev;
-	dev->dev.bus = &pci_bus_type;
-
 	/* Go find them, Rover! */
-	for (devfn = 0; devfn < 0x100; devfn += 8) {
-		dev->devfn = devfn;
-		pci_scan_slot(dev);
-	}
-	kfree(dev);
+	for (devfn = 0; devfn < 0x100; devfn += 8)
+		pci_scan_slot(bus, devfn);
 
 	/*
 	 * After performing arch-dependent fixup of the bus, look behind
@@ -537,9 +536,9 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	DBG("Fixups for bus %02x\n", bus->number);
 	pcibios_fixup_bus(bus);
 	for (pass=0; pass < 2; pass++)
-		for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-			dev = pci_dev_b(ln);
-			if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE || dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
+		list_for_each_entry(dev, &bus->devices, bus_list) {
+			if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||
+			    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
 				max = pci_scan_bridge(bus, dev, max, pass);
 		}
 

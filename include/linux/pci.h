@@ -413,6 +413,7 @@ struct pci_dev {
 
 	/* These fields are used by common fixups */
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
+	unsigned int	multifunction:1;/* Part of multi-function device */
 };
 
 #define pci_dev_g(n) list_entry(n, struct pci_dev, global_list)
@@ -548,7 +549,7 @@ static inline struct pci_bus *pci_alloc_primary_bus(int bus)
 {
 	return pci_alloc_primary_bus_parented(NULL, bus);
 }
-struct pci_dev *pci_scan_slot(struct pci_dev *temp);
+struct pci_dev *pci_scan_slot(struct pci_bus *bus, int devfn);
 int pci_proc_attach_device(struct pci_dev *dev);
 int pci_proc_detach_device(struct pci_dev *dev);
 int pci_proc_attach_bus(struct pci_bus *bus);

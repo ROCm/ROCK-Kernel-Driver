@@ -574,19 +574,13 @@ int cpci_configure_slot(struct slot* slot)
 
 	/* Still NULL? Well then scan for it! */
 	if(slot->dev == NULL) {
-		struct pci_dev dev0;
-
 		dbg("pci_dev still null");
-		memset(&dev0, 0, sizeof (struct pci_dev));
-		dev0.bus = slot->bus;
-		dev0.devfn = slot->devfn;
-		dev0.sysdata = slot->bus->self->sysdata;
 
 		/*
 		 * This will generate pci_dev structures for all functions, but
 		 * we will only call this case when lookup fails.
 		 */
-		slot->dev = pci_scan_slot(&dev0);
+		slot->dev = pci_scan_slot(slot->bus, slot->devfn);
 		if(slot->dev == NULL) {
 			err("Could not find PCI device for slot %02x", slot->number);
 			return 0;
