@@ -89,6 +89,12 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 	if (!status) {
 		set_change_info(&open->op_cinfo, current_fh);
 		fh_dup2(current_fh, &resfh);
+		/* XXXJBF: keep a saved svc_fh struct instead?? */
+		open->op_stateowner->so_replay.rp_openfh_len =
+			resfh.fh_handle.fh_size;
+		memcpy(open->op_stateowner->so_replay.rp_openfh,
+				&resfh.fh_handle.fh_base,
+				resfh.fh_handle.fh_size);
 
 		accmode = MAY_NOP;
 		if (open->op_share_access & NFS4_SHARE_ACCESS_READ)
@@ -116,6 +122,19 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 
 	/* check seqid for replay. set nfs4_owner */
 	status = nfsd4_process_open1(open);
+	if (status == NFSERR_REPLAY_ME) {
+		struct nfs4_replay *rp = &open->op_stateowner->so_replay;
+		fh_put(current_fh);
+		current_fh->fh_handle.fh_size = rp->rp_openfh_len;
+		memcpy(&current_fh->fh_handle.fh_base, rp->rp_openfh,
+				rp->rp_openfh_len);
+		status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+		if (status)
+			dprintk("nfsd4_open: replay failed"
+				" restoring previous filehandle\n");
+		else
+			status = NFSERR_REPLAY_ME;
+	}
 	if (status)
 		return status;
 	/*

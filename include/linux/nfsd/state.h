@@ -113,6 +113,8 @@ struct nfs4_replay {
 	unsigned int		rp_buflen;
 	char			*rp_buf;
 	unsigned		intrp_allocated;
+	int			rp_openfh_len;
+	char			rp_openfh[NFS4_FHSIZE];
 	char			rp_ibuf[NFSD4_REPLAY_ISIZE];
 };
 

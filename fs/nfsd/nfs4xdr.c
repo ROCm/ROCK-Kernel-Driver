@@ -1913,6 +1913,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	default:
 		BUG();
 	}
+	/* XXX save filehandle here */
 
 	ENCODE_SEQID_OP_TAIL(open->op_stateowner);
 }
