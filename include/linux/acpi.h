@@ -29,6 +29,12 @@
 #define _LINUX
 #endif
 
+/*
+ * YES this is ugly.
+ * But, moving all of ACPI's private headers to include/acpi isn't the right
+ * answer either.
+ * Please just ignore it for now.
+ */
 #include "../../drivers/acpi/include/acpi.h"
 #include <asm/acpi.h>
 
@@ -270,7 +276,7 @@ struct acpi_table_slit {
 	struct acpi_table_header header;
 	u64			localities;
 	u8			entry[1];	/* real size = localities^2 */
-};
+} __attribute__ ((packed));
 
 /* Smart Battery Description Table (SBST) */
 
@@ -283,7 +289,6 @@ struct acpi_table_sbst {
 
 /* Embedded Controller Boot Resources Table (ECDT) */
 
-/* TBD: acpi_generic_address
 struct acpi_table_ecdt {
 	struct acpi_table_header header;
 	acpi_generic_address	ec_control;
@@ -292,7 +297,6 @@ struct acpi_table_ecdt {
 	u8			gpe_bit;
 	char			*ec_id;
 } __attribute__ ((packed));
-*/
 
 /* Table Handlers */
 
@@ -343,9 +347,9 @@ void acpi_table_print_madt_entry (acpi_table_entry_header *);
 
 #ifdef CONFIG_ACPI_PCI
 
-#define ACPI_PCI_ROUTING_PIC	0
-#define ACPI_PCI_ROUTING_IOAPIC 1
-#define ACPI_PCI_ROUTING_IOSAPIC 2
+#define ACPI_INT_MODEL_PIC	0
+#define ACPI_INT_MODEL_IOAPIC	1
+#define ACPI_INT_MODEL_IOSAPIC	2
 
 struct acpi_prt_entry {
 	struct list_head	node;

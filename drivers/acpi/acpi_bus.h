@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.h - ACPI Bus Driver ($Revision: 17 $)
+ *  acpi_bus.h - ACPI Bus Driver ($Revision: 19 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -96,8 +96,9 @@ typedef int (*acpi_op_stop)	(struct acpi_device *device, int type);
 typedef int (*acpi_op_suspend)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_resume)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_scan)	(struct acpi_device *device);
+typedef int (*acpi_op_bind)	(struct acpi_device *device);
 
-struct acpi_driver_ops {
+struct acpi_device_ops {
 	acpi_op_add		add;
 	acpi_op_remove		remove;
 	acpi_op_lock		lock;
@@ -106,6 +107,7 @@ struct acpi_driver_ops {
 	acpi_op_suspend		suspend;
 	acpi_op_resume		resume;
 	acpi_op_scan		scan;
+	acpi_op_bind		bind;
 };
 
 struct acpi_driver {
@@ -114,7 +116,7 @@ struct acpi_driver {
 	char			class[80];
 	int			references;
 	char			*ids;		/* Supported Hardware IDs */
-	struct acpi_driver_ops	ops;
+	struct acpi_device_ops	ops;
 };
 
 enum acpi_blacklist_predicates
@@ -157,14 +159,18 @@ struct acpi_device_status {
 /* Flags */
 
 struct acpi_device_flags {
-	u8			dynamic_status:1;
-	u8			compatible_ids:1;
-	u8			removable:1;
-	u8			ejectable:1;
-	u8			lockable:1;
-	u8			suprise_removal_ok:1;
-	u8			power_manageable:1;
-	u8			performance_manageable:1;
+	u32			dynamic_status:1;
+	u32			hardware_id:1;
+	u32			compatible_ids:1;
+	u32			bus_address:1;
+	u32			unique_id:1;
+	u32			removable:1;
+	u32			ejectable:1;
+	u32			lockable:1;
+	u32			suprise_removal_ok:1;
+	u32			power_manageable:1;
+	u32			performance_manageable:1;
+	u32			reserved:21;
 };
 
 
@@ -206,13 +212,13 @@ struct acpi_device_pnp {
 /* Power Management */
 
 struct acpi_device_power_flags {
-	u8			explicit_get:1;		     /* _PSC present? */
-	u8			power_resources:1;	   /* Power resources */
-	u8			inrush_current:1;	  /* Serialize Dx->D0 */
-	u8			wake_capable:1;		 /* Wakeup supported? */
-	u8			wake_enabled:1;		/* Enabled for wakeup */
-	u8			power_removed:1;	   /* Optimize Dx->D0 */
-	u8			reserved:2;
+	u32			explicit_get:1;		     /* _PSC present? */
+	u32			power_resources:1;	   /* Power resources */
+	u32			inrush_current:1;	  /* Serialize Dx->D0 */
+	u32			wake_capable:1;		 /* Wakeup supported? */
+	u32			wake_enabled:1;		/* Enabled for wakeup */
+	u32			power_removed:1;	   /* Optimize Dx->D0 */
+	u32			reserved:26;
 };
 
 struct acpi_device_power_state {
@@ -270,6 +276,7 @@ struct acpi_device {
 	struct acpi_device_power power;
 	struct acpi_device_perf	performance;
 	struct acpi_device_dir	dir;
+	struct acpi_device_ops	ops;
 	struct acpi_driver	*driver;
 	void			*driver_data;
 #ifdef CONFIG_LDM

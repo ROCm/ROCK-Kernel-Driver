@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 15 $
+ *       $Revision: 19 $
  *
  *****************************************************************************/
 
@@ -42,14 +42,20 @@
 
 #define strtoul simple_strtoul
 
+#ifdef _IA64
+#define ACPI_FLUSH_CPU_CACHE()
 #else
+#define ACPI_FLUSH_CPU_CACHE()	wbinvd()
+#endif
+
+#else /* !__KERNEL__ */
 
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 
-#endif
+#endif /* __KERNEL__ */
 
 /* Linux uses GCC */
 

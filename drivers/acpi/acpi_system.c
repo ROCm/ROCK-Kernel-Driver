@@ -1,5 +1,5 @@
 /*
- *  acpi_system.c - ACPI System Driver ($Revision: 40 $)
+ *  acpi_system.c - ACPI System Driver ($Revision: 45 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -31,6 +31,7 @@
 #include <linux/spinlock.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
+#include <linux/sysrq.h>
 #include <linux/pm.h>
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
@@ -86,9 +87,8 @@ static void
 acpi_power_off (void)
 {
 	acpi_enter_sleep_state_prep(ACPI_STATE_S5);
-	acpi_disable_irqs();
+	ACPI_DISABLE_IRQS();
 	acpi_enter_sleep_state(ACPI_STATE_S5);
-	acpi_disable_irqs();
 }
 
 #endif /*CONFIG_PM*/
@@ -123,7 +123,7 @@ acpi_system_restore_state (
 	device_resume(RESUME_POWER_ON);
 
 	/* enable interrupts once again */
-	acpi_enable_irqs();
+	ACPI_ENABLE_IRQS();
 
 	/* restore device context */
 	device_resume(RESUME_RESTORE_STATE);
@@ -200,7 +200,7 @@ acpi_system_save_state(
 	 * But, we want it done early, so we don't get any suprises during
 	 * the device suspend sequence.
 	 */
-	acpi_disable_irqs();
+	ACPI_DISABLE_IRQS();
 
 	/* Unconditionally turn off devices.
 	 * Obvious if we enter a sleep state.
@@ -304,7 +304,7 @@ acpi_suspend (
 		return status;
 
 	/* disable interrupts and flush caches */
-	acpi_disable_irqs();
+	ACPI_DISABLE_IRQS();
 	wbinvd();
 
 	/* perform OS-specific sleep actions */
@@ -318,7 +318,7 @@ acpi_suspend (
 	acpi_leave_sleep_state(state);
 
 	/* make sure interrupts are enabled */
-	acpi_enable_irqs();
+	ACPI_ENABLE_IRQS();
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) 0);
@@ -570,7 +570,6 @@ acpi_system_read_debug (
 {
 	char			*p = page;
 	int 			size = 0;
-	u32                     var;
 
 	if (off != 0)
 		goto end;
@@ -607,7 +606,6 @@ acpi_system_write_debug (
         void                    *data)
 {
 	char			debug_string[12] = {'\0'};
-	u32                     *pvar;
 
 	ACPI_FUNCTION_TRACE("acpi_system_write_debug");
 
@@ -1126,6 +1124,23 @@ acpi_system_remove_fs (
                                  Driver Interface
    -------------------------------------------------------------------------- */
 
+#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_PM)
+
+/* Simple wrapper calling power down function. */
+static void acpi_sysrq_power_off(int key, struct pt_regs *pt_regs,
+	struct kbd_struct *kbd, struct tty_struct *tty)
+{
+	acpi_power_off();
+}
+
+struct sysrq_key_op sysrq_acpi_poweroff_op = {
+	handler:	&acpi_sysrq_power_off,
+	help_msg:	"Off",
+	action_msg:	"Power Off\n"
+};
+
+#endif  /* CONFIG_MAGIC_SYSRQ */
+
 static int
 acpi_system_add (
 	struct acpi_device	*device)
@@ -1168,8 +1183,10 @@ acpi_system_add (
 
 #ifdef CONFIG_PM
 	/* Install the soft-off (S5) handler. */
-	if (system->states[ACPI_STATE_S5])
+	if (system->states[ACPI_STATE_S5]) {
 		pm_power_off = acpi_power_off;
+		register_sysrq_key('o', &sysrq_acpi_poweroff_op);
+	}
 #endif
 
 end:
@@ -1196,8 +1213,10 @@ acpi_system_remove (
 
 #ifdef CONFIG_PM
 	/* Remove the soft-off (S5) handler. */
-	if (system->states[ACPI_STATE_S5])
+	if (system->states[ACPI_STATE_S5]) {
+		unregister_sysrq_key('o', &sysrq_acpi_poweroff_op);
 		pm_power_off = NULL;
+	}
 #endif
 
 	acpi_system_remove_fs(device);

@@ -1,5 +1,5 @@
 /*
- *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 27 $)
+ *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 28 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -345,7 +345,7 @@ acpi_ec_gpe_handler (
 	if (0 != acpi_ec_query(ec, &value))
 		return;
 
-	query_data = kmalloc(sizeof(struct acpi_ec_query_data), GFP_KERNEL);
+	query_data = kmalloc(sizeof(struct acpi_ec_query_data), GFP_ATOMIC);
 	if (!query_data)
 		return;
 	query_data->handle = ec->handle;

@@ -1,5 +1,5 @@
 /*
- *  acpi_drivers.h  ($Revision: 17 $)
+ *  acpi_drivers.h  ($Revision: 23 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -30,7 +30,7 @@
 #include "acpi_bus.h"
 
 
-#define ACPI_DRIVER_VERSION		0x20020308
+#define ACPI_DRIVER_VERSION		0x20020404
 #define ACPI_MAX_STRING			80
 
 
@@ -84,26 +84,32 @@
    -------------------------------------------------------------------------- */
 
 #define ACPI_BUTTON_COMPONENT		0x00080000
-#define ACPI_BUTTON_CLASS		"button"
-#define ACPI_BUTTON_HID_LID		"PNP0C0D"
-#define ACPI_BUTTON_HID_POWER		"PNP0C0C"	
-#define ACPI_BUTTON_HID_POWERF		"ACPI_FPB"
-#define ACPI_BUTTON_HID_SLEEP		"PNP0C0E"
-#define ACPI_BUTTON_HID_SLEEPF		"ACPI_FSB"
 #define ACPI_BUTTON_DRIVER_NAME		"ACPI Button Driver"
-#define ACPI_BUTTON_DEVICE_NAME_POWER	"Power Button"
-#define ACPI_BUTTON_DEVICE_NAME_POWERF	"Power Button"
-#define ACPI_BUTTON_DEVICE_NAME_SLEEP	"Sleep Button"
-#define ACPI_BUTTON_DEVICE_NAME_SLEEPF	"Sleep Button"
-#define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
+#define ACPI_BUTTON_CLASS		"button"
 #define ACPI_BUTTON_FILE_INFO		"info"
 #define ACPI_BUTTON_TYPE_UNKNOWN	0x00
+#define ACPI_BUTTON_NOTIFY_STATUS	0x80
+
+#define ACPI_BUTTON_SUBCLASS_POWER	"power"
+#define ACPI_BUTTON_HID_POWER		"PNP0C0C"	
+#define ACPI_BUTTON_HID_POWERF		"ACPI_FPB"
+#define ACPI_BUTTON_DEVICE_NAME_POWER	"Power Button (CM)"
+#define ACPI_BUTTON_DEVICE_NAME_POWERF	"Power Button (FF)"
 #define ACPI_BUTTON_TYPE_POWER		0x01
 #define ACPI_BUTTON_TYPE_POWERF		0x02
+
+#define ACPI_BUTTON_SUBCLASS_SLEEP	"sleep"
+#define ACPI_BUTTON_HID_SLEEP		"PNP0C0E"
+#define ACPI_BUTTON_HID_SLEEPF		"ACPI_FSB"
+#define ACPI_BUTTON_DEVICE_NAME_SLEEP	"Sleep Button (CM)"
+#define ACPI_BUTTON_DEVICE_NAME_SLEEPF	"Sleep Button (FF)"
 #define ACPI_BUTTON_TYPE_SLEEP		0x03
 #define ACPI_BUTTON_TYPE_SLEEPF		0x04
+
+#define ACPI_BUTTON_SUBCLASS_LID	"lid"
+#define ACPI_BUTTON_HID_LID		"PNP0C0D"
+#define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
 #define ACPI_BUTTON_TYPE_LID		0x05
-#define ACPI_BUTTON_NOTIFY_STATUS	0x80
 
 
 /* --------------------------------------------------------------------------
@@ -217,7 +223,7 @@ void acpi_power_exit (void);
 #define ACPI_PROCESSOR_LIMIT_INCREMENT	0x01
 #define ACPI_PROCESSOR_LIMIT_DECREMENT	0x02
 
-int acpi_processor_set_limit(acpi_handle handle, int flags, int *state);
+int acpi_processor_set_thermal_limit(acpi_handle handle, int type);
 
 
 /* --------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /*
- *  acpi_osl.c - OS-dependent functions ($Revision: 65 $)
+ *  acpi_osl.c - OS-dependent functions ($Revision: 69 $)
  *
  *  Copyright (C) 2000 Andrew Henroid
  *  Copyright (C) 2001 Andrew Grover
@@ -125,13 +125,13 @@ acpi_os_vprintf(const NATIVE_CHAR *fmt, va_list args)
 }
 
 void *
-acpi_os_allocate(u32 size)
+acpi_os_allocate(ACPI_SIZE size)
 {
 	return kmalloc(size, GFP_KERNEL);
 }
 
 void *
-acpi_os_callocate(u32 size)
+acpi_os_callocate(ACPI_SIZE size)
 {
 	void *ptr = acpi_os_allocate(size);
 	if (ptr)
@@ -148,21 +148,22 @@ acpi_os_free(void *ptr)
 
 
 acpi_status
-acpi_os_get_root_pointer(u32 flags, ACPI_PHYSICAL_ADDRESS *phys_addr)
+acpi_os_get_root_pointer(u32 flags, ACPI_POINTER *addr)
 {
 #ifndef CONFIG_ACPI_EFI
-	if (ACPI_FAILURE(acpi_find_root_pointer(flags, phys_addr))) {
+	if (ACPI_FAILURE(acpi_find_root_pointer(flags, addr))) {
 		printk(KERN_ERR PREFIX "System description tables not found\n");
 		return AE_NOT_FOUND;
 	}
 #else /*CONFIG_ACPI_EFI*/
+	addr->pointer_type = ACPI_PHYSICAL_POINTER;
 	if (efi.acpi20)
-		*phys_addr = (ACPI_PHYSICAL_ADDRESS) efi.acpi20;
+		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) efi.acpi20;
 	else if (efi.acpi)
-		*phys_addr = (ACPI_PHYSICAL_ADDRESS) efi.acpi;
+		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) efi.acpi;
 	else {
 		printk(KERN_ERR PREFIX "System description tables not found\n");
-		*phys_addr = 0;
+		addr->pointer.physical = 0;
 		return AE_NOT_FOUND;
 	}
 #endif /*CONFIG_ACPI_EFI*/
@@ -171,7 +172,7 @@ acpi_os_get_root_pointer(u32 flags, ACPI_PHYSICAL_ADDRESS *phys_addr)
 }
 
 acpi_status
-acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
+acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
 {
 	if (phys > ULONG_MAX) {
 		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
@@ -189,7 +190,7 @@ acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
 }
 
 void
-acpi_os_unmap_memory(void *virt, u32 size)
+acpi_os_unmap_memory(void *virt, ACPI_SIZE size)
 {
 	iounmap(virt);
 }
@@ -441,14 +442,14 @@ acpi_os_load_module (
 	ACPI_FUNCTION_TRACE ("os_load_module");
 
 	if (!module_name)
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	if (0 > request_module(module_name)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to load module [%s].\n", module_name));
-		return AE_ERROR;
+		return_ACPI_STATUS (AE_ERROR);
 	}
 
-	return AE_OK;
+	return_ACPI_STATUS (AE_OK);
 }
 
 acpi_status
@@ -481,7 +482,7 @@ acpi_os_queue_exec (
 	strcpy(current->comm, "kacpidpc");
 
 	if (!dpc || !dpc->function)
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Executing function [%p(%p)].\n", dpc->function, dpc->context));
 
@@ -489,7 +490,7 @@ acpi_os_queue_exec (
 
 	kfree(dpc);
 
-	return 1;
+	return_ACPI_STATUS (AE_OK);
 }
 
 static void
@@ -504,7 +505,7 @@ acpi_os_schedule_exec (
 	dpc = (ACPI_OS_DPC*)context;
 	if (!dpc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
-		return;
+		return_VOID;
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
@@ -515,6 +516,7 @@ acpi_os_schedule_exec (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to kernel_thread() failed.\n"));
 		acpi_os_free(dpc);
 	}
+    return_VOID;
 }
 
 acpi_status
@@ -531,7 +533,7 @@ acpi_os_queue_for_execution(
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Scheduling function [%p(%p)] for deferred execution.\n", function, context));
 
 	if (!function)
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	/*
 	 * Queue via DPC:
@@ -554,7 +556,7 @@ acpi_os_queue_for_execution(
 		 */
 		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_ATOMIC);
 		if (!dpc)
-			return AE_NO_MEMORY;
+			return_ACPI_STATUS (AE_NO_MEMORY);
 
 		dpc->function = function;
 		dpc->context = context;
@@ -578,7 +580,7 @@ acpi_os_queue_for_execution(
 		 */
 		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_KERNEL);
 		if (!dpc)
-			return AE_NO_MEMORY;
+			return_ACPI_STATUS (AE_NO_MEMORY);
 
 		dpc->function = function;
 		dpc->context = context;
@@ -587,7 +589,7 @@ acpi_os_queue_for_execution(
 		break;
 	}
 
-	return status;
+	return_ACPI_STATUS (status);
 }
 
 
@@ -603,7 +605,7 @@ acpi_os_create_semaphore(
 
 	sem = acpi_os_callocate(sizeof(struct semaphore));
 	if (!sem)
-		return AE_NO_MEMORY;
+		return_ACPI_STATUS (AE_NO_MEMORY);
 
 	sema_init(sem, initial_units);
 
@@ -611,7 +613,7 @@ acpi_os_create_semaphore(
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating semaphore[%p|%d].\n", *handle, initial_units));
 
-	return AE_OK;
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -631,13 +633,13 @@ acpi_os_delete_semaphore(
 	ACPI_FUNCTION_TRACE ("os_delete_semaphore");
 
 	if (!sem)
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting semaphore[%p].\n", handle));
 
 	acpi_os_free(sem); sem =  NULL;
 
-	return AE_OK;
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -663,10 +665,10 @@ acpi_os_wait_semaphore(
 	ACPI_FUNCTION_TRACE ("os_wait_semaphore");
 
 	if (!sem || (units < 1))
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	if (units > 1)
-		return AE_SUPPORT;
+		return_ACPI_STATUS (AE_SUPPORT);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
 
@@ -724,7 +726,7 @@ acpi_os_wait_semaphore(
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
 	}
 
-	return status;
+	return_ACPI_STATUS (status);
 }
 
 
@@ -741,16 +743,16 @@ acpi_os_signal_semaphore(
 	ACPI_FUNCTION_TRACE ("os_signal_semaphore");
 
 	if (!sem || (units < 1))
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
 	if (units > 1)
-		return AE_SUPPORT;
+		return_ACPI_STATUS (AE_SUPPORT);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Signaling semaphore[%p|%d]\n", handle, units));
 
 	up(sem);
 
-	return AE_OK;
+	return_ACPI_STATUS (AE_OK);
 }
 
 u32

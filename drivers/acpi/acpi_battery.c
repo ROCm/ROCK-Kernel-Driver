@@ -1,5 +1,5 @@
 /*
- *  acpi_battery.c - ACPI Battery Driver ($Revision: 31 $)
+ *  acpi_battery.c - ACPI Battery Driver ($Revision: 32 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -112,8 +112,9 @@ acpi_battery_get_info (
 	struct acpi_battery	*battery,
 	struct acpi_battery_info **bif)
 {
+	int			result = 0;
 	acpi_status 		status = 0;
-	acpi_buffer 		buffer = {0, NULL};
+	acpi_buffer 		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	acpi_buffer		format = {sizeof(ACPI_BATTERY_FORMAT_BIF),
 						ACPI_BATTERY_FORMAT_BIF};
 	acpi_buffer		data = {0, NULL};
@@ -126,9 +127,11 @@ acpi_battery_get_info (
 
 	/* Evalute _BIF */
 
-	status = acpi_evaluate(battery->handle, "_BIF", NULL, &buffer);
-	if (ACPI_FAILURE(status))
+	status = acpi_evaluate_object(battery->handle, "_BIF", NULL, &buffer);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _BIF\n"));
 		return_VALUE(-ENODEV);
+	}
 
 	package = (acpi_object *) buffer.pointer;
 
@@ -136,29 +139,33 @@ acpi_battery_get_info (
 
 	status = acpi_extract_package(package, &format, &data);
 	if (status != AE_BUFFER_OVERFLOW) {
-		kfree(buffer.pointer);
-		return_VALUE(-ENODEV);
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error extracting _BIF\n"));
+		result = -ENODEV;
+		goto end;
 	}
 
 	data.pointer = kmalloc(data.length, GFP_KERNEL);
 	if (!data.pointer) {
-		kfree(buffer.pointer);
-		return_VALUE(-ENOMEM);
+		result = -ENOMEM;
+		goto end;
 	}
 	memset(data.pointer, 0, data.length);
 
 	status = acpi_extract_package(package, &format, &data);
 	if (ACPI_FAILURE(status)) {
-		kfree(buffer.pointer);
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error extracting _BIF\n"));
 		kfree(data.pointer);
-		return_VALUE(-ENODEV);
+		result = -ENODEV;
+		goto end;
 	}
 
+end:
 	kfree(buffer.pointer);
 
-	(*bif) = data.pointer;
+	if (0 == result)
+		(*bif) = (struct acpi_battery_info *) data.pointer;
 
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 static int
@@ -166,8 +173,9 @@ acpi_battery_get_status (
 	struct acpi_battery	*battery,
 	struct acpi_battery_status **bst)
 {
+	int			result = 0;
 	acpi_status 		status = 0;
-	acpi_buffer 		buffer = {0, NULL};
+	acpi_buffer 		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	acpi_buffer		format = {sizeof(ACPI_BATTERY_FORMAT_BST),
 						ACPI_BATTERY_FORMAT_BST};
 	acpi_buffer		data = {0, NULL};
@@ -180,9 +188,11 @@ acpi_battery_get_status (
 
 	/* Evalute _BST */
 
-	status = acpi_evaluate(battery->handle, "_BST", NULL, &buffer);
-	if (ACPI_FAILURE(status))
+	status = acpi_evaluate_object(battery->handle, "_BST", NULL, &buffer);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _BST\n"));
 		return_VALUE(-ENODEV);
+	}
 
 	package = (acpi_object *) buffer.pointer;
 
@@ -190,29 +200,33 @@ acpi_battery_get_status (
 
 	status = acpi_extract_package(package, &format, &data);
 	if (status != AE_BUFFER_OVERFLOW) {
-		kfree(buffer.pointer);
-		return_VALUE(-ENODEV);
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error extracting _BST\n"));
+		result = -ENODEV;
+		goto end;
 	}
 
 	data.pointer = kmalloc(data.length, GFP_KERNEL);
 	if (!data.pointer) {
-		kfree(buffer.pointer);
-		return_VALUE(-ENOMEM);
+		result = -ENOMEM;
+		goto end;
 	}
 	memset(data.pointer, 0, data.length);
 
 	status = acpi_extract_package(package, &format, &data);
 	if (ACPI_FAILURE(status)) {
-		kfree(buffer.pointer);
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error extracting _BST\n"));
 		kfree(data.pointer);
-		return_VALUE(-ENODEV);
+		result = -ENODEV;
+		goto end;
 	}
 
+end:
 	kfree(buffer.pointer);
 
-	(*bst) = data.pointer;
+	if (0 == result)
+		(*bst) = (struct acpi_battery_status *) data.pointer;
 
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
@@ -328,7 +342,7 @@ acpi_battery_read_info (
 {
 	int			result = 0;
 	struct acpi_battery	*battery = (struct acpi_battery *) data;
-	struct acpi_battery_info *bif = 0;
+	struct acpi_battery_info *bif = NULL;
 	char			*units = "?";
 	char			*p = page;
 	int			len = 0;
@@ -403,8 +417,7 @@ acpi_battery_read_info (
 		bif->oem_info);
 
 end:
-	if (bif)
-		kfree(bif);
+	kfree(bif);
 
 	len = (p - page);
 	if (len <= off+count) *eof = 1;
@@ -490,8 +503,7 @@ acpi_battery_read_state (
 			(u32) bst->present_voltage);
 
 end:
-	if (bst)
-		kfree(bst);
+	kfree(bst);
 
 	len = (p - page);
 	if (len <= off+count) *eof = 1;
