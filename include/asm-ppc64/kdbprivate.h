@@ -43,7 +43,7 @@ typedef unsigned long kdb_machinst_t;
 	/*
 	 * Platform specific environment entries
 	 */
-#define KDB_PLATFORM_ENV	"IDMODE=PPC64", "BYTESPERWORD=8", "IDCOUNT=16"
+#define KDB_PLATFORM_ENV	"IDMODE=PPC64", "BYTESPERWORD=8", "IDCOUNT=16", "RECURSE=2"
 
 	/*
 	 * Define the direction that the stack grows
