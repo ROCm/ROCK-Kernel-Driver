@@ -4,40 +4,34 @@
 # create a compressed vmlinux image from the original vmlinux
 #
 
-HEAD = head.o
-SYSTEM = $(TOPDIR)/vmlinux
+targets		:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o piggy.o
+EXTRA_AFLAGS	:= -traditional
 
-OBJECTS = $(HEAD) misc.o
+OBJECTS = $(obj)/head.o $(obj)/misc.o
 
 ifdef CONFIG_SH_STANDARD_BIOS
-OBJECTS += ../../kernel/sh_bios.o
+OBJECTS += $(obj)/../../kernel/sh_bios.o
 endif
 
-ZLDFLAGS = -e startup -T $(TOPDIR)/arch/sh/vmlinux.lds
-
 #
-# ZIMAGE_OFFSET is the load offset of the compression loader
+# IMAGE_OFFSET is the load offset of the compression loader
 #
-ZIMAGE_OFFSET = $(shell printf "0x%8x" $$[0x80000000+0x$(CONFIG_MEMORY_START)+0x200000+0x10000])
+IMAGE_OFFSET = $(shell printf "0x%8x" $$[0x80000000+0x$(CONFIG_MEMORY_START)+0x200000+0x10000])
 
-ZLINKFLAGS = -Ttext $(ZIMAGE_OFFSET) $(ZLDFLAGS)
+LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup -T $(obj)/../../vmlinux.lds.s
 
-all: vmlinux
+$(obj)/vmlinux: $(OBJECTS) $(obj)/piggy.o FORCE
+	$(call if_changed,ld)
+	@:
 
-vmlinux: piggy.o $(OBJECTS)
-	$(LD) $(LDFLAGS) $(ZLINKFLAGS) -o vmlinux $(OBJECTS) piggy.o
+$(obj)/vmlinux.bin: vmlinux FORCE
+	$(call if_changed,objcopy)
 
-head.o: head.S
-	$(CC) $(AFLAGS) -traditional -c head.S
+$(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
+	$(call if_changed,gzip)
 
-piggy.o:	$(SYSTEM)
-	tmppiggy=_tmp_$$$$piggy; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
-	$(OBJCOPY) $(OBJCOPYFLAGS) -R .empty_zero_page $(SYSTEM) $$tmppiggy; \
-	gzip -f -9 < $$tmppiggy > $$tmppiggy.gz; \
-	echo "SECTIONS { .data : { input_len = .; LONG(input_data_end - input_data) input_data = .; *(.data) input_data_end = .; }}" > $$tmppiggy.lnk; \
-	$(LD) $(LDFLAGS) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-sh-linux -T $$tmppiggy.lnk; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk
+LDFLAGS_piggy.o := -r --format binary --oformat elf32-sh-linux -T
+OBJCOPYFLAGS += -R .empty_zero_page
 
-clean:
-	rm -f vmlinux _tmp_*
+$(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
+	$(call if_changed,ld)
