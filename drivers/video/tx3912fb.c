@@ -10,7 +10,6 @@
  *
  *  Framebuffer for LCD controller in TMPR3912/05 and PR31700 processors
  */
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -35,11 +34,7 @@ static u32 cfb8[16];
 
 static struct fb_fix_screeninfo tx3912fb_fix __initdata = {
 	.id =		"tx3912fb",
-#ifdef CONFIG_NINO_16MB
-	.smem_len =	(240 * 320),
-#else
 	.smem_len =	((240 * 320)/2),
-#endif
 	.type =		FB_TYPE_PACKED_PIXELS,
 	.visual =	FB_VISUAL_TRUECOLOR, 
 	.xpanstep =	1,
@@ -53,17 +48,10 @@ static struct fb_var_screeninfo tx3912fb_var = {
 	.yres =		320,
 	.xres_virtual =	240,
 	.yres_virtual =	320,
-#ifdef CONFIG_NINO_16MB
-	.bits_per_pixel =8,
-	.red =		{ 5, 3, 0 },	/* RGB 332 */
-	.green =	{ 2, 3, 0 },
-	.blue =		{ 0, 2, 0 },
-#else
 	.bits_per_pixel =4,
 	.red =		{ 0, 4, 0 },	/* ??? */
 	.green =	{ 0, 4, 0 },
 	.blue =		{ 0, 4, 0 },
-#endif
 	.activate =	FB_ACTIVATE_NOW,
 	.width =	-1,
 	.height =	-1,
