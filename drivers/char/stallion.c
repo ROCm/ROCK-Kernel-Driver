@@ -137,7 +137,7 @@ static char	*stl_drvtitle = "Stallion Multiport Serial Driver";
 static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
 
-static struct tty_driver	stl_serial;
+static struct tty_driver	*stl_serial;
 
 /*
  *	We will need to allocate a temporary write buffer for chars that
@@ -783,7 +783,8 @@ static void __exit stallion_module_exit(void)
  *	a hangup on every open port - to try to flush out any processes
  *	hanging onto ports.
  */
-	i = tty_unregister_driver(&stl_serial);
+	i = tty_unregister_driver(stl_serial);
+	put_tty_driver(stl_serial);
 	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
 			"errno=%d\n", -i);
@@ -3120,6 +3121,28 @@ static int stl_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, uns
 	return(rc);
 }
 
+static struct tty_operations stl_ops = {
+	.open = stl_open,
+	.close = stl_close,
+	.write = stl_write,
+	.put_char = stl_putchar,
+	.flush_chars = stl_flushchars,
+	.write_room = stl_writeroom,
+	.chars_in_buffer = stl_charsinbuffer,
+	.ioctl = stl_ioctl,
+	.set_termios = stl_settermios,
+	.throttle = stl_throttle,
+	.unthrottle = stl_unthrottle,
+	.stop = stl_stop,
+	.start = stl_start,
+	.hangup = stl_hangup,
+	.flush_buffer = stl_flushbuffer,
+	.break_ctl = stl_breakctl,
+	.wait_until_sent = stl_waituntilsent,
+	.send_xchar = stl_sendxchar,
+	.read_proc = stl_readproc,
+};
+
 /*****************************************************************************/
 
 int __init stl_init(void)
@@ -3128,6 +3151,10 @@ int __init stl_init(void)
 	printk(KERN_INFO "%s: version %s\n", stl_drvtitle, stl_drvversion);
 
 	stl_initbrds();
+
+	stl_serial = alloc_tty_driver(STL_MAXBRDS * STL_MAXPORTS);
+	if (!stl_serial)
+		return -1;
 
 /*
  *	Allocate a temporary write buffer.
@@ -3151,45 +3178,23 @@ int __init stl_init(void)
 				&stl_fsiomem, NULL, "staliomem/%d", i);
 	}
 
-/*
- *	Set up the tty driver structure and register us as a driver.
- */
-	memset(&stl_serial, 0, sizeof(struct tty_driver));
-	stl_serial.magic = TTY_DRIVER_MAGIC;
-	stl_serial.owner = THIS_MODULE;
-	stl_serial.driver_name = stl_drvname;
-	stl_serial.name = "ttyE";
-	stl_serial.devfs_name = "tts/E";
-	stl_serial.major = STL_SERIALMAJOR;
-	stl_serial.minor_start = 0;
-	stl_serial.num = STL_MAXBRDS * STL_MAXPORTS;
-	stl_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stl_serial.subtype = SERIAL_TYPE_NORMAL;
-	stl_serial.init_termios = stl_deftermios;
-	stl_serial.flags = TTY_DRIVER_REAL_RAW;
-	
-	stl_serial.open = stl_open;
-	stl_serial.close = stl_close;
-	stl_serial.write = stl_write;
-	stl_serial.put_char = stl_putchar;
-	stl_serial.flush_chars = stl_flushchars;
-	stl_serial.write_room = stl_writeroom;
-	stl_serial.chars_in_buffer = stl_charsinbuffer;
-	stl_serial.ioctl = stl_ioctl;
-	stl_serial.set_termios = stl_settermios;
-	stl_serial.throttle = stl_throttle;
-	stl_serial.unthrottle = stl_unthrottle;
-	stl_serial.stop = stl_stop;
-	stl_serial.start = stl_start;
-	stl_serial.hangup = stl_hangup;
-	stl_serial.flush_buffer = stl_flushbuffer;
-	stl_serial.break_ctl = stl_breakctl;
-	stl_serial.wait_until_sent = stl_waituntilsent;
-	stl_serial.send_xchar = stl_sendxchar;
-	stl_serial.read_proc = stl_readproc;
+	stl_serial->owner = THIS_MODULE;
+	stl_serial->driver_name = stl_drvname;
+	stl_serial->name = "ttyE";
+	stl_serial->devfs_name = "tts/E";
+	stl_serial->major = STL_SERIALMAJOR;
+	stl_serial->minor_start = 0;
+	stl_serial->type = TTY_DRIVER_TYPE_SERIAL;
+	stl_serial->subtype = SERIAL_TYPE_NORMAL;
+	stl_serial->init_termios = stl_deftermios;
+	stl_serial->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(stl_serial, &stl_ops);
 
-	if (tty_register_driver(&stl_serial))
+	if (tty_register_driver(stl_serial)) {
+		put_tty_driver(stl_serial);
 		printk("STALLION: failed to register serial driver\n");
+		return -1;
+	}
 
 	return(0);
 }
