@@ -602,8 +602,12 @@ static void unmap_page_range(struct mmu_gather *tlb,
 	tlb_end_vma(tlb, vma);
 }
 
-/* go for improved straight-line efficiency */
-#define ZAP_BLOCK_SIZE (1024 * PAGE_SIZE)
+#ifdef CONFIG_SMP
+/* zap one pte page at a time */
+#define ZAP_BLOCK_SIZE		(FREE_PTE_NR * PAGE_SIZE)
+#else
+#define ZAP_BLOCK_SIZE		(128 * PAGE_SIZE)
+#endif
 
 /**
  * unmap_vmas - unmap a range of memory covered by a list of vma's
