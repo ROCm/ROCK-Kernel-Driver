@@ -1087,7 +1087,11 @@ sys_call_table:
 	data8 sys_sched_get_priority_min
 	data8 sys_sched_rr_get_interval
 	data8 sys_nanosleep
+#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
 	data8 sys_nfsservctl
+#else
+	data8 sys_ni_syscall
+#endif
 	data8 sys_prctl				// 1170
 	data8 sys_getpagesize
 	data8 sys_mmap2
@@ -1147,12 +1151,8 @@ sys_call_table:
 	data8 sys_removexattr
 	data8 sys_lremovexattr
 	data8 sys_fremovexattr
-#if 0
 	data8 sys_tkill
-#else
-	data8 ia64_ni_syscall
-#endif
-	data8 ia64_ni_syscall			// 1230
+	data8 sys_futex				// 1230
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall

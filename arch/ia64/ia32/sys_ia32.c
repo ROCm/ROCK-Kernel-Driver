@@ -3003,7 +3003,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		if (request != PTRACE_KILL)
 			goto out;
 	}
-	if (child->p_pptr != current)
+	if (child->parent != current)
 		goto out;
 
 	switch (request) {
