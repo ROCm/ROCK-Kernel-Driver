@@ -1,10 +1,10 @@
-/* $Id: capifunc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: capifunc.c,v 1.47 2003/09/09 06:52:29 schindler Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
  * 
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de) 
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de) 
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -25,10 +25,11 @@
 DIVA_CAPI_ADAPTER *adapter = (DIVA_CAPI_ADAPTER *) NULL;
 APPL *application = (APPL *) NULL;
 byte max_appl = MAX_APPL;
+byte max_adapter = 0;
 static CAPI_MSG *mapped_msg = (CAPI_MSG *) NULL;
 
 byte UnMapController(byte);
-char DRIVERRELEASE[32];
+char DRIVERRELEASE_CAPI[32];
 
 extern void AutomaticLaw(DIVA_CAPI_ADAPTER *);
 extern void callback(ENTITY *);
@@ -45,7 +46,6 @@ static dword notify_handle;
 static void DIRequest(ENTITY * e);
 static DESCRIPTOR MAdapter;
 static DESCRIPTOR DAdapter;
-byte max_adapter = 0;
 static byte ControllerMap[MAX_DESCRIPTORS + 1];
 
 
@@ -59,16 +59,14 @@ extern void diva_os_set_controller_struct(struct capi_ctr *);
 
 extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
 
-static void no_printf(unsigned char *, ...);
-
-DIVA_DI_PRINTF dprintf = no_printf;
-
 /*
  * debug
  */
+static void no_printf(unsigned char *, ...);
 #include "debuglib.c"
 void xlog(char *x, ...)
 {
+#ifndef DIVA_NO_DEBUGLIB
 	va_list ap;
 	if (myDriverDebugHandle.dbgMask & DL_XLOG) {
 		va_start(ap, x);
@@ -81,6 +79,7 @@ void xlog(char *x, ...)
 		}
 		va_end(ap);
 	}
+#endif
 }
 
 /*
@@ -162,13 +161,14 @@ static int find_free_id(void)
 		p = cards;
 		while (p) {
 			if (p->Id == num)
-				goto next_id;
+				break;
 			p = p->next;
 		}
+		if(!p) {
 		diva_os_leave_spin_lock(&ll_lock, &old_irql,
 					"find free id");
 		return (num);
-	      next_id:
+		}
 	}
 	diva_os_leave_spin_lock(&ll_lock, &old_irql, "find free id");
 	return (999);
@@ -315,10 +315,11 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 
 	/* if DATA_B3_IND, copy data too */
 	if (command == _DATA_B3_I) {
-		dword data = READ_DWORD(((byte *) & msg.info.data_b3_ind.Data));
+		dword data = READ_DWORD(&msg.info.data_b3_ind.Data);
 		memcpy(write + length, (void *) data, dlength);
 	}
 
+#ifndef DIVA_NO_DEBUGLIB
 	if (myDriverDebugHandle.dbgMask & DL_XLOG) {
 		switch (command) {
 		default:
@@ -332,8 +333,8 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 			if (myDriverDebugHandle.dbgMask & DL_BLK) {
 				xlog("\x00\x02", &msg, 0x81, length);
 				for (i = 0; i < dlength; i += 256) {
-				  DBG_BLK((((char *) msg.info.data_b3_ind.
-					 Data) + i, ((dlength - i) < 256) ? (dlength - i) : 256))
+				  DBG_BLK((((char *) READ_DWORD(&msg.info.data_b3_ind.Data)) + i,
+				  	((dlength - i) < 256) ? (dlength - i) : 256))
 				  if (!(myDriverDebugHandle.dbgMask & DL_PRV0))
 					  break; /* not more if not explicitely requested */
 				}
@@ -341,6 +342,7 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 			break;
 		}
 	}
+#endif
 
 	/* find the card structure for this controller */
 	if (!(card = find_card_by_ctrl(write[8] & 0x7f))) {
@@ -719,7 +721,7 @@ static int diva_add_card(DESCRIPTOR * d)
 	}
 
 	/* profile information */
-	ctrl->profile.nbchannel = card->d.channels;
+	WRITE_WORD(&ctrl->profile.nbchannel, card->d.channels);
 	ctrl->profile.goptions = a->profile.Global_Options;
 	ctrl->profile.support1 = a->profile.B1_Protocols;
 	ctrl->profile.support2 = a->profile.B2_Protocols;
@@ -745,17 +747,20 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 {
 	APPL *this;
 	word bnum, xnum;
-	int i = 0, j = 0;
+	int i = 0;
+	unsigned char *p;
 	void *DataNCCI, *DataFlags, *ReceiveBuffer, *xbuffer_used;
 	void **xbuffer_ptr, **xbuffer_internal;
 	diva_os_spin_lock_magic_t old_irql;
+	unsigned int mem_len;
+
 
 	if (diva_os_in_irq()) {
 		DBG_ERR(("CAPI_REGISTER - in irq context !"))
 		return;
 	}
 
-	DBG_TRC(("application register"))
+	DBG_TRC(("application register Id=%d", appl))
 
 	if (appl > MAX_APPL) {
 		DBG_ERR(("CAPI_REGISTER - appl.Id exceeds MAX_APPL"))
@@ -775,97 +780,47 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		return;	/* appl already registered */
 	}
 
-	if (!try_module_get(ctrl->owner)) {
-		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
-		return;
-	}
-
 	/* alloc memory */
 
 	bnum = rp->level3cnt * rp->datablkcnt;
 	xnum = rp->level3cnt * MAX_DATA_B3;
 
-	if (!(DataNCCI = diva_os_malloc(0, bnum * sizeof(word)))) {
+	mem_len  = bnum * sizeof(word);		/* DataNCCI */
+	mem_len += bnum * sizeof(word);		/* DataFlags */
+	mem_len += bnum * rp->datablklen;	/* ReceiveBuffer */
+	mem_len += xnum;			/* xbuffer_used */
+	mem_len += xnum * sizeof(void *);	/* xbuffer_ptr */
+	mem_len += xnum * sizeof(void *);	/* xbuffer_internal */
+	mem_len += xnum * rp->datablklen;	/* xbuffer_ptr[xnum] */
+
+	if (!(p = diva_os_malloc(0, mem_len))) {
 		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		module_put(ctrl->owner);
 		return;
 	}
-	memset(DataNCCI, 0, bnum * sizeof(word));
+	memset(p, 0, mem_len);
 
-	if (!(DataFlags = diva_os_malloc(0, bnum * sizeof(word)))) {
-		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		diva_os_free(0, DataNCCI);
-		module_put(ctrl->owner);
-		return;
-	}
-	memset(DataFlags, 0, bnum * sizeof(word));
-
-	if (!(ReceiveBuffer = diva_os_malloc(0, bnum * rp->datablklen))) {
-		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		diva_os_free(0, DataNCCI);
-		diva_os_free(0, DataFlags);
-		module_put(ctrl->owner);
-		return;
-	}
-	memset(ReceiveBuffer, 0, bnum * rp->datablklen);
-
-	if (!(xbuffer_used = (byte *) diva_os_malloc(0, xnum))) {
-		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		diva_os_free(0, DataNCCI);
-		diva_os_free(0, DataFlags);
-		diva_os_free(0, ReceiveBuffer);
-		module_put(ctrl->owner);
-		return;
-	}
-	memset(xbuffer_used, 0, xnum);
-
-	if (!(xbuffer_ptr = (void **) diva_os_malloc(0, xnum * sizeof(void *)))) {
-		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		diva_os_free(0, DataNCCI);
-		diva_os_free(0, DataFlags);
-		diva_os_free(0, ReceiveBuffer);
-		diva_os_free(0, xbuffer_used);
-		module_put(ctrl->owner);
-		return;
-	}
-	memset(xbuffer_ptr, 0, xnum * sizeof(void *));
-
-	if (!(xbuffer_internal = (void **) diva_os_malloc(0, xnum * sizeof(void *)))) {
-		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-		diva_os_free(0, DataNCCI);
-		diva_os_free(0, DataFlags);
-		diva_os_free(0, ReceiveBuffer);
-		diva_os_free(0, xbuffer_used);
-		diva_os_free(0, xbuffer_ptr);
-		module_put(ctrl->owner);
-		return;
-	}
-	memset(xbuffer_internal, 0, xnum * sizeof(void *));
-
+	DataNCCI = (void *)p;
+	p += bnum * sizeof(word);
+	DataFlags = (void *)p;
+	p += bnum * sizeof(word);
+	ReceiveBuffer = (void *)p;
+	p += bnum * rp->datablklen;
+	xbuffer_used = (void *)p;
+	p += xnum;
+	xbuffer_ptr = (void **)p;
+	p += xnum * sizeof(void *);
+	xbuffer_internal = (void **)p;
+	p += xnum * sizeof(void *);
 	for (i = 0; i < xnum; i++) {
-		xbuffer_ptr[i] = diva_os_malloc(0, rp->datablklen);
-		if (!xbuffer_ptr[i]) {
-			DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
-			if (i) {
-				for (j = 0; j < i; j++)
-					if (xbuffer_ptr[j])
-						diva_os_free(0, xbuffer_ptr [j]);
-			}
-			diva_os_free(0, DataNCCI);
-			diva_os_free(0, DataFlags);
-			diva_os_free(0, ReceiveBuffer);
-			diva_os_free(0, xbuffer_used);
-			diva_os_free(0, xbuffer_ptr);
-			diva_os_free(0, xbuffer_internal);
-			module_put(ctrl->owner);
-			return;
-		}
+		xbuffer_ptr[i] = (void *)p;
+		p += rp->datablklen;
 	}
 
 	DBG_LOG(("CAPI_REGISTER - Id = %d", appl))
 	DBG_LOG(("  MaxLogicalConnections = %d", rp->level3cnt))
 	DBG_LOG(("  MaxBDataBuffers       = %d", rp->datablkcnt))
 	DBG_LOG(("  MaxBDataLength        = %d", rp->datablklen))
+	DBG_LOG(("  Allocated Memory      = %d", mem_len))
 
 	/* initialize application data */
 	diva_os_enter_spin_lock(&api_lock, &old_irql, "register_appl");
@@ -874,9 +829,6 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	memset(this, 0, sizeof(APPL));
 
 	this->Id = appl;
-
-	/* We do not need a list */
-	/* InitializeListHead(&this->s_function); */
 
 	for (i = 0; i < max_adapter; i++) {
 		adapter[i].CIP_Mask[appl - 1] = 0;
@@ -911,14 +863,12 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 {
 	diva_os_spin_lock_magic_t old_irql;
 	APPL *this = &application[appl - 1];
-	int i = 0;
+
+	DBG_TRC(("application %d(%d) cleanup", this->Id, appl))
 
 	if (diva_os_in_irq()) {
 		DBG_ERR(("CAPI_RELEASE - in irq context !"))
 		return;
-	}
-	if (this->Id) {
-		DBG_TRC(("application %d cleanup", this->Id))
 	}
 
 	diva_os_enter_spin_lock(&api_lock, &old_irql, "release_appl");
@@ -926,26 +876,11 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 		CapiRelease(this->Id);
 		if (this->DataNCCI)
 			diva_os_free(0, this->DataNCCI);
-		if (this->DataFlags)
-			diva_os_free(0, this->DataFlags);
-		if (this->ReceiveBuffer)
-			diva_os_free(0, this->ReceiveBuffer);
-		if (this->xbuffer_ptr) {
-			for (i = 0; i < (MAX_DATA_B3 * this->MaxNCCI); i++) {
-				if (this->xbuffer_ptr[i])
-					diva_os_free(0, this->xbuffer_ptr[i]);
-			}
-			diva_os_free(0, this->xbuffer_ptr);
-		}
-		if (this->xbuffer_internal)
-			diva_os_free(0, this->xbuffer_internal);
-		if (this->xbuffer_used)
-			diva_os_free(0, this->xbuffer_used);
+		this->DataNCCI = NULL;
 		this->Id = 0;
 	}
 	diva_os_leave_spin_lock(&api_lock, &old_irql, "release_appl");
 
-	module_put(ctrl->owner);
 }
 
 /*
@@ -954,7 +889,7 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 static u16 diva_send_message(struct capi_ctr *ctrl,
 			     diva_os_message_buffer_s * dmb)
 {
-	int i = 0, j = 0;
+	int i = 0;
 	word ret = 0;
 	diva_os_spin_lock_magic_t old_irql;
 	CAPI_MSG *msg = (CAPI_MSG *) DIVA_MESSAGE_BUFFER_DATA(dmb);
@@ -971,6 +906,10 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 	}
 	DBG_PRV1(("Write - appl = %d, cmd = 0x%x", this->Id, command))
 
+	if (!this->Id) {
+		return CAPI_ILLAPPNR;
+	}
+
 	/* patch controller number */
 	msg->header.controller = ControllerMap[card->Id]
 	    | (msg->header.controller & 0x80);	/* preserve external controller bit */
@@ -983,13 +922,17 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 		break;
 
 	case _DATA_B3_I | RESPONSE:
+#ifndef DIVA_NO_DEBUGLIB
 		if (myDriverDebugHandle.dbgMask & DL_BLK)
 			xlog("\x00\x02", msg, 0x80, clength);
+#endif
 		break;
 
 	case _DATA_B3_R:
+#ifndef DIVA_NO_DEBUGLIB
 		if (myDriverDebugHandle.dbgMask & DL_BLK)
 			xlog("\x00\x02", msg, 0x80, clength);
+#endif
 
 		if (clength == 24)
 			clength = 22;	/* workaround for PPcom bug */
@@ -1016,8 +959,10 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 		memcpy(this->xbuffer_ptr[i], &((__u8 *) msg)[clength],
 		       READ_WORD(&msg->info.data_b3_req.Data_Length));
 
+#ifndef DIVA_NO_DEBUGLIB
 		if ((myDriverDebugHandle.dbgMask & DL_BLK)
 		    && (myDriverDebugHandle.dbgMask & DL_XLOG)) {
+			int j;
 			for (j = 0; j <
 			     READ_WORD(&msg->info.data_b3_req.Data_Length);
 			     j += 256) {
@@ -1028,6 +973,7 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 					break;	/* not more if not explicitely requested */
 			}
 		}
+#endif
 		break;
 	}
 
@@ -1091,7 +1037,7 @@ static void didd_callback(void *context, DESCRIPTOR * adapter, int removal)
 		} else {
 			memcpy(&MAdapter, adapter, sizeof(MAdapter));
 			dprintf = (DIVA_DI_PRINTF) MAdapter.request;
-			DbgRegister("CAPI20", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("CAPI20", DRIVERRELEASE_CAPI, DBG_DEFAULT);
 		}
 	} else if ((adapter->type > 0) && (adapter->type < 16)) {	/* IDI Adapter */
 		if (removal) {
@@ -1119,7 +1065,7 @@ static int divacapi_connect_didd(void)
 		if (DIDD_Table[x].type == IDI_DIMAINT) {	/* MAINT found */
 			memcpy(&MAdapter, &DIDD_Table[x], sizeof(DAdapter));
 			dprintf = (DIVA_DI_PRINTF) MAdapter.request;
-			DbgRegister("CAPI20", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("CAPI20", DRIVERRELEASE_CAPI, DBG_DEFAULT);
 			break;
 		}
 	}
@@ -1130,7 +1076,7 @@ static int divacapi_connect_didd(void)
 			req.didd_notify.e.Req = 0;
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
-			req.didd_notify.info.callback = didd_callback;
+			req.didd_notify.info.callback = (void *)didd_callback;
 			req.didd_notify.info.context = 0;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff) {
@@ -1260,4 +1206,7 @@ void DIVA_EXIT_FUNCTION finit_capifunc(void)
 	divacapi_remove_cards();
 
 	remove_main_structs();
+
+	diva_os_destroy_spin_lock(&api_lock, "capifunc");
+	diva_os_destroy_spin_lock(&ll_lock, "capifunc");
 }

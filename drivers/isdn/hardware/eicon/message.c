@@ -3590,7 +3590,7 @@ byte manufacturer_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * p
         {
           if (plci->channels)
           {
-            for (ncci = 1; ncci < MAX_NCCI+1; i++)
+            for (ncci = 1; ncci < MAX_NCCI+1; ncci++)
             {
               if ((a->ncci_plci[ncci] == plci->Id) && (a->ncci_state[ncci] == CONNECTED))
               {
