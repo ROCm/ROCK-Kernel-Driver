@@ -716,6 +716,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 			struct fb_videomode mode;
 			info->var = *var;
+			int err = 0;
 
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
@@ -728,15 +729,16 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			if (info->modelist.prev && info->modelist.next &&
 			    !list_empty(&info->modelist))
-				fb_add_videomode(&mode, &info->modelist);
+				err = fb_add_videomode(&mode, &info->modelist);
 
-			if (info->flags & FBINFO_MISC_USEREVENT) {
+			if (!err && info->flags & FBINFO_MISC_USEREVENT) {
 				struct fb_event event;
 
 				info->flags &= ~FBINFO_MISC_USEREVENT;
 				event.info = info;
 				notifier_call_chain(&fb_notifier_list,
-						    FB_EVENT_MODE_CHANGE, &event);
+						    FB_EVENT_MODE_CHANGE,
+						    &event);
 			}
 		}
 	}
