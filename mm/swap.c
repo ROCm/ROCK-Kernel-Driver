@@ -21,7 +21,6 @@
 #include <linux/init.h>
 #include <linux/mm_inline.h>
 #include <linux/buffer_head.h>
-#include <linux/prefetch.h>
 #include <linux/percpu.h>
 
 /* How many pages do we try to swap or page in/out together? */
