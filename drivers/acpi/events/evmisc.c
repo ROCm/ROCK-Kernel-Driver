@@ -5,21 +5,40 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2003, R. Byron Moore
+ * All rights reserved.
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  */
 
 #include <acpi/acpi.h>
@@ -67,27 +86,53 @@ acpi_ev_is_notify_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_get_gpe_register_index
+ * FUNCTION:    acpi_ev_get_gpe_register_info
  *
  * PARAMETERS:  gpe_number      - Raw GPE number
  *
- * RETURN:      None.
+ * RETURN:      Pointer to the info struct for this GPE register.
  *
  * DESCRIPTION: Returns the register index (index into the GPE register info
  *              table) associated with this GPE.
  *
  ******************************************************************************/
 
-u32
-acpi_ev_get_gpe_register_index (
+struct acpi_gpe_register_info *
+acpi_ev_get_gpe_register_info (
 	u32                             gpe_number)
 {
 
 	if (gpe_number > acpi_gbl_gpe_number_max) {
-		return (ACPI_GPE_INVALID);
+		return (NULL);
 	}
 
-	return (ACPI_DIV_8 (acpi_gbl_gpe_number_to_index[gpe_number].number_index));
+	return (&acpi_gbl_gpe_register_info [ACPI_DIV_8 (acpi_gbl_gpe_number_to_index[gpe_number].number_index)]);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_get_gpe_number_info
+ *
+ * PARAMETERS:  gpe_number      - Raw GPE number
+ *
+ * RETURN:      None.
+ *
+ * DESCRIPTION: Returns the number index (index into the GPE number info table)
+ *              associated with this GPE.
+ *
+ ******************************************************************************/
+
+struct acpi_gpe_number_info *
+acpi_ev_get_gpe_number_info (
+	u32                             gpe_number)
+{
+
+	if (gpe_number > acpi_gbl_gpe_number_max) {
+		return (NULL);
+	}
+
+	return (&acpi_gbl_gpe_number_info [acpi_gbl_gpe_number_to_index[gpe_number].number_index]);
 }
 
 

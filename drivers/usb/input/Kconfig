@@ -163,11 +163,10 @@ config USB_POWERMATE
 	tristate "Griffin PowerMate and Contour Jog support"
 	depends on USB && INPUT
 	---help---
-	  Say Y here if you want to use  Griffin PowerMate or Contour Jog devices.
-	  These are stainless steel dials which can measure clockwise and
-	  anticlockwise rotation. The dial also acts as a pushbutton. The base
-	  contains an LED which can be instructed to pulse or to switch to a
-	  particular intensity.
+	  Say Y here if you want to use Griffin PowerMate or Contour Jog devices.
+	  These are aluminum dials which can measure clockwise and anticlockwise
+	  rotation.  The dial also acts as a pushbutton.  The base contains an LED
+	  which can be instructed to pulse or to switch to a particular intensity.
 
 	  You can download userspace tools from http://sowerbutts.com/powermate/
 

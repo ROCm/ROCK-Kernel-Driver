@@ -14,10 +14,6 @@ extern int x25_asy_init_ctrl_dev(void);
   
 extern int dmascc_init(void);
 
-extern int awc4500_pci_probe(void);
-extern int awc4500_isa_probe(void);
-extern int awc4500_pnp_probe(void);
-extern int awc4500_365_probe(void);
 extern int arcnet_init(void); 
 extern int scc_enet_init(void); 
 extern int fec_enet_init(void); 
@@ -79,23 +75,6 @@ static struct net_probe pci_probes[] __initdata = {
 	{lmc_setup, 0},
 #endif
 	 
-/*
-*
-*	Wireless non-HAM
-*
-*/
-#ifdef CONFIG_AIRONET4500_NONCS
-
-#ifdef CONFIG_AIRONET4500_PCI
-	{awc4500_pci_probe,0},
-#endif
-
-#ifdef CONFIG_AIRONET4500_PNP
-	{awc4500_pnp_probe,0},
-#endif
-
-#endif
-
 /*
  *	Token Ring Drivers
  */  

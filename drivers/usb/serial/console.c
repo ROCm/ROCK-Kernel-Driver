@@ -141,7 +141,6 @@ static int __init usb_console_setup(struct console *co, char *options)
 	}
 
 	port = &serial->port[0];
-	down (&port->sem);
 	port->tty = NULL;
 
 	info->port = port;
@@ -157,8 +156,6 @@ static int __init usb_console_setup(struct console *co, char *options)
 		if (retval)
 			port->open_count = 0;
 	}
-
-	up (&port->sem);
 
 	if (retval) {
 		err ("could not open USB console port");
@@ -208,8 +205,6 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 	if (count == 0)
 		return;
 
-	down (&port->sem);
-
 	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
 
 	if (!port->open_count) {
@@ -224,7 +219,6 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 		retval = usb_serial_generic_write(port, 0, buf, count);
 
 exit:
-	up (&port->sem);
 	dbg("%s - return value (if we had one): %d", __FUNCTION__, retval);
 }
 

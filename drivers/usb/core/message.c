@@ -219,16 +219,25 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 	spin_lock_irqsave (&io->lock, flags);
 
 	/* In 2.5 we require hcds' endpoint queues not to progress after fault
-	 * reports, until the competion callback (this!) returns.  That lets
+	 * reports, until the completion callback (this!) returns.  That lets
 	 * device driver code (like this routine) unlink queued urbs first,
 	 * if it needs to, since the HC won't work on them at all.  So it's
 	 * not possible for page N+1 to overwrite page N, and so on.
+	 *
+	 * That's only for "hard" faults; "soft" faults (unlinks) sometimes
+	 * complete before the HCD can get requests away from hardware,
+	 * though never during cleanup after a hard fault.
 	 */
-	if (io->status && urb->actual_length) {
-		err ("driver for bus %s dev %s ep %d-%s corrupted data!",
-			io->dev->bus->bus_name, io->dev->devpath,
+	if (io->status
+			&& (io->status != -ECONNRESET
+				|| urb->status != -ECONNRESET)
+			&& urb->actual_length) {
+		dev_err (io->dev->bus->controller,
+			"dev %s ep%d%s scatterlist error %d/%d\n",
+			io->dev->devpath,
 			usb_pipeendpoint (urb->pipe),
-			usb_pipein (urb->pipe) ? "in" : "out");
+			usb_pipein (urb->pipe) ? "in" : "out",
+			urb->status, io->status);
 		// BUG ();
 	}
 
