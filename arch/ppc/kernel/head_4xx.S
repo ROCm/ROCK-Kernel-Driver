@@ -1082,8 +1082,6 @@ _GLOBAL(set_context)
  */
 	.data
 _GLOBAL(sdata)
-_GLOBAL(init_thread_union)
-	.space	8192
 _GLOBAL(empty_zero_page)
 	.space	4096
 _GLOBAL(swapper_pg_dir)
