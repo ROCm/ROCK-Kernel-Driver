@@ -425,17 +425,7 @@ source drivers/media/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'Console drivers'
-   bool 'VGA text console' CONFIG_VGA_CONSOLE
-   bool 'Video mode selection support' CONFIG_VIDEO_SELECT
-   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      tristate 'MDA text console (dual-headed) (EXPERIMENTAL)' CONFIG_MDA_CONSOLE
-      source drivers/video/Config.in
-   fi
-   endmenu
-fi
+source drivers/video/Config.in
 
 mainmenu_option next_comment
 comment 'Sound'
