@@ -21,6 +21,12 @@ void flush_tlb_all(void)
 	flush_tlb_mm(current->mm);
 }
   
+void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	CHOOSE_MODE_PROC(flush_tlb_kernel_range_tt, 
+			 flush_tlb_kernel_range_skas, start, end);
+}
+
 void flush_tlb_kernel_vm(void)
 {
 	CHOOSE_MODE(flush_tlb_kernel_vm_tt(), flush_tlb_kernel_vm_skas());

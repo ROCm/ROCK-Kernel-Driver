@@ -7,8 +7,15 @@
 #define __SYSDEP_I386_PTRACE_H
 
 #include "uml-config.h"
+
+#ifdef CONFIG_MODE_TT
 #include "ptrace-tt.h"
+#endif
+
+#ifdef CONFIG_MODE_SKAS
 #include "ptrace-skas.h"
+#endif
+
 #include "choose-mode.h"
 
 struct uml_pt_regs {
