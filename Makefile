@@ -11,7 +11,7 @@ KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
-TOPDIR	:= $(shell /bin/pwd)
+TOPDIR	:= $(CURDIR)
 
 HPATH   	= $(TOPDIR)/include
 FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
