@@ -171,10 +171,8 @@ void md_unplug_mddev(mddev_t *mddev)
 	ITERATE_RDEV(mddev, rdev, tmp) {
 		request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
-		if (r_queue->unplug_fn) {
-			set_bit(QUEUE_FLAG_PLUGGED, &r_queue->queue_flags);
+		if (r_queue->unplug_fn)
 			r_queue->unplug_fn(r_queue);
-		}
 	}
 }
 EXPORT_SYMBOL(md_unplug_mddev);
@@ -183,7 +181,6 @@ static void md_unplug_all(request_queue_t *q)
 {
 	mddev_t *mddev = q->queuedata;
 
-	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
 	md_unplug_mddev(mddev);
 }
 
