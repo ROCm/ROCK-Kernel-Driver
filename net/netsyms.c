@@ -320,6 +320,7 @@ EXPORT_SYMBOL(xfrm_parse_spi);
 EXPORT_SYMBOL(xfrm4_rcv);
 EXPORT_SYMBOL(xfrm4_tunnel_register);
 EXPORT_SYMBOL(xfrm4_tunnel_deregister);
+EXPORT_SYMBOL(xfrm4_tunnel_check_size);
 EXPORT_SYMBOL(xfrm_register_type);
 EXPORT_SYMBOL(xfrm_unregister_type);
 EXPORT_SYMBOL(xfrm_get_type);
