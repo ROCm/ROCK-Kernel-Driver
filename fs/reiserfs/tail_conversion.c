@@ -35,7 +35,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 				       tree. */
 
 
-    sb->u.reiserfs_sb.s_direct2indirect ++;
+    REISERFS_SB(sb)->s_direct2indirect ++;
 
     n_blk_size = sb->s_blocksize;
 
@@ -202,7 +202,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     loff_t pos, pos1; /* position of first byte of the tail */
     struct cpu_key key;
 
-    p_s_sb->u.reiserfs_sb.s_indirect2direct ++;
+    REISERFS_SB(p_s_sb)->s_indirect2direct ++;
 
     *p_c_mode = M_SKIP_BALANCING;
 

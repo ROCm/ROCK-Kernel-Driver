@@ -153,7 +153,7 @@ static void finish_unfinished (struct super_block * s)
     max_cpu_key.key_length = 3;
  
     done = 0;
-    s -> u.reiserfs_sb.s_is_unlinked_ok = 1;
+    REISERFS_SB(s)->s_is_unlinked_ok = 1;
     while (1) {
         retval = search_item (s, &max_cpu_key, &path);
         if (retval != ITEM_NOT_FOUND) {
@@ -239,7 +239,7 @@ static void finish_unfinished (struct super_block * s)
         printk ("done\n");
         done ++;
     }
-    s -> u.reiserfs_sb.s_is_unlinked_ok = 0;
+    REISERFS_SB(s)->s_is_unlinked_ok = 0;
      
     pathrelse (&path);
     if (done)
@@ -378,7 +378,7 @@ static void reiserfs_put_super (struct super_block * s)
   if (!(s->s_flags & MS_RDONLY)) {
     journal_begin(&th, s, 10) ;
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    set_sb_umount_state( SB_DISK_SUPER_BLOCK(s), s->u.reiserfs_sb.s_mount_state );
+    set_sb_umount_state( SB_DISK_SUPER_BLOCK(s), REISERFS_SB(s)->s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
   }
 
@@ -396,9 +396,9 @@ static void reiserfs_put_super (struct super_block * s)
 
   print_statistics (s);
 
-  if (s->u.reiserfs_sb.s_kmallocs != 0) {
+  if (REISERFS_SB(s)->s_kmallocs != 0) {
     reiserfs_warning ("vs-2004: reiserfs_put_super: allocated memory left %d\n",
-		      s->u.reiserfs_sb.s_kmallocs);
+		      REISERFS_SB(s)->s_kmallocs);
   }
 
   reiserfs_proc_unregister( s, "journal" );
@@ -409,6 +409,10 @@ static void reiserfs_put_super (struct super_block * s)
   reiserfs_proc_unregister( s, "super" );
   reiserfs_proc_unregister( s, "version" );
   reiserfs_proc_info_done( s );
+
+  kfree(s->u.generic_sbp);
+  s->u.generic_sbp = NULL;
+
   return;
 }
 
@@ -614,30 +618,30 @@ static int reiserfs_remount (struct super_block * s, int * flags, char * data)
   
   if (*flags & MS_RDONLY) {
     /* try to remount file system with read-only permissions */
-    if (sb_umount_state(rs) == REISERFS_VALID_FS || s->u.reiserfs_sb.s_mount_state != REISERFS_VALID_FS) {
+    if (sb_umount_state(rs) == REISERFS_VALID_FS || REISERFS_SB(s)->s_mount_state != REISERFS_VALID_FS) {
       return 0;
     }
 
     journal_begin(&th, s, 10) ;
     /* Mounting a rw partition read-only. */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    set_sb_umount_state( rs, s->u.reiserfs_sb.s_mount_state );
+    set_sb_umount_state( rs, REISERFS_SB(s)->s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
   } else {
-    s->u.reiserfs_sb.s_mount_state = sb_umount_state(rs) ;
+    REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
 
     /* Mount a partition which is read-only, read-write */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    s->u.reiserfs_sb.s_mount_state = sb_umount_state(rs);
+    REISERFS_SB(s)->s_mount_state = sb_umount_state(rs);
     s->s_flags &= ~MS_RDONLY;
     set_sb_umount_state( rs, REISERFS_ERROR_FS );
     /* mark_buffer_dirty (SB_BUFFER_WITH_SB (s), 1); */
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
-    s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;
+    REISERFS_SB(s)->s_mount_state = REISERFS_VALID_FS ;
   }
   /* this will force a full flush of all journal lists */
   SB_JOURNAL(s)->j_must_wait = 1 ;
@@ -1002,10 +1006,16 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     struct reiserfs_iget4_args args ;
     struct reiserfs_super_block * rs;
     char *jdev_name;
+    struct reiserfs_sb_info *sbi;
 
-    memset (&s->u.reiserfs_sb, 0, sizeof (struct reiserfs_sb_info));
+    sbi = kmalloc(sizeof(struct reiserfs_sb_info), GFP_KERNEL);
+    if (!sbi)
+	return -ENOMEM;
+    s->u.generic_sbp = sbi;
+    memset (sbi, 0, sizeof (struct reiserfs_sb_info));
+
     jdev_name = NULL;
-    if (parse_options ((char *) data, &(s->u.reiserfs_sb.s_mount_opt), &blocks, &jdev_name) == 0) {
+    if (parse_options ((char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
 	return -EINVAL;
     }
 
@@ -1022,8 +1032,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
       printk("sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", s->s_id);
       goto error;    
     }
-    s->u.reiserfs_sb.s_mount_state = SB_REISERFS_STATE(s);
-    s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;
+    sbi->s_mount_state = SB_REISERFS_STATE(s);
+    sbi->s_mount_state = REISERFS_VALID_FS ;
 
     if (old_format ? read_old_bitmaps(s) : read_bitmaps(s)) { 
 	printk ("reiserfs_fill_super: unable to read bitmap\n");
@@ -1069,8 +1079,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     }
 
     // define and initialize hash function
-    s->u.reiserfs_sb.s_hash_function = hash_function (s);
-    if (s->u.reiserfs_sb.s_hash_function == NULL) {
+    sbi->s_hash_function = hash_function (s);
+    if (sbi->s_hash_function == NULL) {
       dput(s->s_root) ;
       s->s_root = NULL ;
       goto error ;
@@ -1078,9 +1088,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 
     rs = SB_DISK_SUPER_BLOCK (s);
     if (is_reiserfs_3_5 (rs) || (is_reiserfs_jr (rs) && SB_VERSION (s) == REISERFS_VERSION_1))
-	set_bit(REISERFS_3_5, &(s->u.reiserfs_sb.s_properties));
+	set_bit(REISERFS_3_5, &(sbi->s_properties));
     else
-	set_bit(REISERFS_3_6, &(s->u.reiserfs_sb.s_properties));
+	set_bit(REISERFS_3_6, &(sbi->s_properties));
     
     if (!(s->s_flags & MS_RDONLY)) {
 
@@ -1105,8 +1115,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	    
 	    set_sb_version(rs,REISERFS_VERSION_2);
 	    reiserfs_convert_objectid_map_v1(s) ;
-	    set_bit(REISERFS_3_6, &(s->u.reiserfs_sb.s_properties));
-	    clear_bit(REISERFS_3_5, &(s->u.reiserfs_sb.s_properties));
+	    set_bit(REISERFS_3_6, &(sbi->s_properties));
+	    clear_bit(REISERFS_3_5, &(sbi->s_properties));
 	  } else {
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
 	  }
@@ -1125,7 +1135,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	}
     }
     // mark hash in super block: it could be unset. overwrite should be ok
-    set_sb_hash_function_code( rs, function2code(s->u.reiserfs_sb.s_hash_function ) );
+    set_sb_hash_function_code( rs, function2code(sbi->s_hash_function ) );
 
     reiserfs_proc_info_init( s );
     reiserfs_proc_register( s, "version", reiserfs_version_in_proc );
@@ -1135,7 +1145,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     reiserfs_proc_register( s, "on-disk-super", reiserfs_on_disk_super_in_proc );
     reiserfs_proc_register( s, "oidmap", reiserfs_oidmap_in_proc );
     reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
-    init_waitqueue_head (&(s->u.reiserfs_sb.s_wait));
+    init_waitqueue_head (&(sbi->s_wait));
 
     return 0;
 
@@ -1153,6 +1163,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     }
     if (SB_BUFFER_WITH_SB (s))
 	brelse(SB_BUFFER_WITH_SB (s));
+
+    kfree(sbi);
+    s->u.generic_sbp = NULL;
 
     return -EINVAL;
 }

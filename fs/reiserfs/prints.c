@@ -592,7 +592,7 @@ void store_print_tb (struct tree_balance * tb)
 	     "MODE=%c, ITEM_POS=%d POS_IN_ITEM=%d\n" 
 	     "=====================================================================\n"
 	     "* h *    S    *    L    *    R    *   F   *   FL  *   FR  *  CFL  *  CFR  *\n",
-	     tb->tb_sb->u.reiserfs_sb.s_do_balance,
+	     REISERFS_SB(tb->tb_sb)->s_do_balance,
 	     tb->tb_mode, PATH_LAST_POSITION (tb->tb_path), tb->tb_path->pos_in_item);
   
     for (h = 0; h < sizeof(tb->insert_size) / sizeof (tb->insert_size[0]); h ++) {
@@ -717,9 +717,9 @@ void print_statistics (struct super_block * s)
   /*
   printk ("reiserfs_put_super: session statistics: balances %d, fix_nodes %d, \
 bmap with search %d, without %d, dir2ind %d, ind2dir %d\n",
-	  s->u.reiserfs_sb.s_do_balance, s->u.reiserfs_sb.s_fix_nodes,
-	  s->u.reiserfs_sb.s_bmaps, s->u.reiserfs_sb.s_bmaps_without_search,
-	  s->u.reiserfs_sb.s_direct2indirect, s->u.reiserfs_sb.s_indirect2direct);
+	  REISERFS_SB(s)->s_do_balance, REISERFS_SB(s)->s_fix_nodes,
+	  REISERFS_SB(s)->s_bmaps, REISERFS_SB(s)->s_bmaps_without_search,
+	  REISERFS_SB(s)->s_direct2indirect, REISERFS_SB(s)->s_indirect2direct);
   */
 
 }

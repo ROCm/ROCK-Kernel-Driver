@@ -1176,7 +1176,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
        nlink==0: processing of open-unlinked and half-truncated files
        during mount (fs/reiserfs/super.c:finish_unfinished()). */
     if( ( inode -> i_nlink == 0 ) && 
-	! inode -> i_sb -> u.reiserfs_sb.s_is_unlinked_ok ) {
+	! REISERFS_SB(inode -> i_sb) -> s_is_unlinked_ok ) {
 	    reiserfs_warning( "vs-13075: reiserfs_read_inode2: "
 			      "dead inode read from disk %K. "
 			      "This is likely to be race with knfsd. Ignore\n", 
@@ -1515,7 +1515,7 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     else
 #if defined( USE_INODE_GENERATION_COUNTER )
       inode->i_generation = 
-	le32_to_cpu( sb -> u.reiserfs_sb.s_rs -> s_inode_generation );
+	le32_to_cpu( REISERFS_SB(sb) -> s_rs -> s_inode_generation );
 #else
       inode->i_generation = ++event;
 #endif
