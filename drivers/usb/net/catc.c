@@ -411,7 +411,7 @@ static void catc_tx_done(struct urb *urb, struct pt_regs *regs)
 
 static int catc_hard_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	unsigned long flags;
 	char *tx_buf;
 
@@ -442,7 +442,7 @@ static int catc_hard_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 static void catc_tx_timeout(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 
 	warn("Transmit timed out.");
 	catc->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
@@ -604,7 +604,7 @@ static void catc_stats_timer(unsigned long data)
 
 static struct net_device_stats *catc_get_stats(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	return &catc->stats;
 }
 
@@ -622,7 +622,7 @@ static void catc_multicast(unsigned char *addr, u8 *multicast)
 
 static void catc_set_multicast_list(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	struct dev_mc_list *mc;
 	u8 broadcast[6];
 	u8 rx = RxEnable | RxPolarity | RxMultiCast;
@@ -669,7 +669,7 @@ static void catc_set_multicast_list(struct net_device *netdev)
  */
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-        struct catc *catc = dev->priv;
+        struct catc *catc = netdev_priv(dev);
         u32 cmd;
         
         if (get_user(cmd, (u32 __user *)useraddr))
@@ -739,7 +739,7 @@ static int catc_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 static int catc_open(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	int status;
 
 	catc->irq_urb->dev = catc->usbdev;
@@ -758,7 +758,7 @@ static int catc_open(struct net_device *netdev)
 
 static int catc_stop(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 
 	netif_stop_queue(netdev);
 
@@ -791,17 +791,11 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		return -EIO;
 	}
 
-	catc = kmalloc(sizeof(struct catc), GFP_KERNEL);
-	if (!catc)
+	netdev = alloc_etherdev(sizeof(struct catc));
+	if (!netdev)
 		return -ENOMEM;
 
-	memset(catc, 0, sizeof(struct catc));
-
-	netdev = alloc_etherdev(0);
-	if (!netdev) {
-		kfree(catc);
-		return -EIO;
-	}
+	catc = netdev_priv(netdev);
 
 	netdev->open = catc_open;
 	netdev->hard_start_xmit = catc_hard_start_xmit;
@@ -811,7 +805,6 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	netdev->watchdog_timeo = TX_TIMEOUT;
 	netdev->set_multicast_list = catc_set_multicast_list;
 	netdev->do_ioctl = catc_ioctl;
-	netdev->priv = catc;
 
 	catc->usbdev = usbdev;
 	catc->netdev = netdev;
@@ -839,7 +832,6 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		if (catc->irq_urb)
 			usb_free_urb(catc->irq_urb);
 		free_netdev(netdev);
-		kfree(catc);
 		return -ENOMEM;
 	}
 
@@ -944,7 +936,6 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
 		free_netdev(netdev);
-		kfree(catc);
 		return -EIO;
 	}
 	return 0;
@@ -962,7 +953,6 @@ static void catc_disconnect(struct usb_interface *intf)
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
 		free_netdev(catc->netdev);
-		kfree(catc);
 	}
 }
 

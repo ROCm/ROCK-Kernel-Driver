@@ -308,7 +308,7 @@ static int read_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 * regd)
 
 static int mdio_read(struct net_device *dev, int phy_id, int loc)
 {
-	pegasus_t *pegasus = (pegasus_t *) dev->priv;
+	pegasus_t *pegasus = (pegasus_t *) netdev_priv(dev);
 	int res;
 
 	read_mii_word(pegasus, phy_id, loc, (u16 *) & res);
@@ -338,7 +338,7 @@ static int write_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 regd)
 
 static void mdio_write(struct net_device *dev, int phy_id, int loc, int val)
 {
-	pegasus_t *pegasus = (pegasus_t *) dev->priv;
+	pegasus_t *pegasus = (pegasus_t *) netdev_priv(dev);
 
 	write_mii_word(pegasus, phy_id, loc, val);
 }
@@ -471,7 +471,7 @@ static int enable_net_traffic(struct net_device *dev, struct usb_device *usb)
 {
 	__u16 linkpart;
 	__u8 data[4];
-	pegasus_t *pegasus = dev->priv;
+	pegasus_t *pegasus = netdev_priv(dev);
 
 	read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart);
 	data[0] = 0xc9;
@@ -754,11 +754,7 @@ static void intr_callback(struct urb *urb, struct pt_regs *regs)
 
 static void pegasus_tx_timeout(struct net_device *net)
 {
-	pegasus_t *pegasus = net->priv;
-
-	if (!pegasus)
-		return;
-
+	pegasus_t *pegasus = netdev_priv(net);
 	warn("%s: Tx timed out.", net->name);
 	pegasus->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb(pegasus->tx_urb);
@@ -767,7 +763,7 @@ static void pegasus_tx_timeout(struct net_device *net)
 
 static int pegasus_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
-	pegasus_t *pegasus = net->priv;
+	pegasus_t *pegasus = netdev_priv(net);
 	int count = ((skb->len + 2) & 0x3f) ? skb->len + 2 : skb->len + 3;
 	int res;
 	__u16 l16 = skb->len;
@@ -804,7 +800,7 @@ static int pegasus_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 static struct net_device_stats *pegasus_netdev_stats(struct net_device *dev)
 {
-	return &((pegasus_t *) dev->priv)->stats;
+	return &((pegasus_t *) netdev_priv(dev))->stats;
 }
 
 static inline void disable_net_traffic(pegasus_t * pegasus)
@@ -832,10 +828,9 @@ static inline void get_interrupt_interval(pegasus_t * pegasus)
 
 static void set_carrier(struct net_device *net)
 {
-	pegasus_t *pegasus;
+	pegasus_t *pegasus = netdev_priv(net);
 	short tmp;
 
-	pegasus = net->priv;
 	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &tmp);
 	if (tmp & BMSR_LSTATUS)
 		netif_carrier_on(net);
@@ -890,7 +885,7 @@ static int alloc_urbs(pegasus_t * pegasus)
 
 static int pegasus_open(struct net_device *net)
 {
-	pegasus_t *pegasus = (pegasus_t *) net->priv;
+	pegasus_t *pegasus = netdev_priv(net);
 	int res;
 
 	if (pegasus->rx_skb == NULL)
@@ -933,7 +928,7 @@ exit:
 
 static int pegasus_close(struct net_device *net)
 {
-	pegasus_t *pegasus = net->priv;
+	pegasus_t *pegasus = netdev_priv(net);
 
 	pegasus->flags &= ~PEGASUS_RUNNING;
 	netif_stop_queue(net);
@@ -949,7 +944,7 @@ static int pegasus_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 
 	u32 ethcmd;
-	pegasus_t *pegasus = dev->priv;
+	pegasus_t *pegasus = netdev_priv(dev);
 
 	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
 		return -EFAULT;
@@ -1029,7 +1024,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 	pegasus_t *pegasus;
 	int cmd;
 
-	pegasus = net->priv;
+	pegasus = netdev_priv(net);
 	if (get_user(cmd, (int __user *) uaddr))
 		return -EFAULT;
 	switch (cmd) {
@@ -1108,7 +1103,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	__u16 *data = (__u16 *) & rq->ifr_ifru;
-	pegasus_t *pegasus = net->priv;
+	pegasus_t *pegasus = netdev_priv(net);
 	int res;
 
 	switch (cmd) {
@@ -1135,7 +1130,7 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 
 static void pegasus_set_multicast(struct net_device *net)
 {
-	pegasus_t *pegasus = net->priv;
+	pegasus_t *pegasus = netdev_priv(net);
 
 	if (net->flags & IFF_PROMISC) {
 		pegasus->eth_regs[EthCtrl2] |= RX_PROMISCUOUS;
@@ -1211,11 +1206,13 @@ static int pegasus_probe(struct usb_interface *intf,
 	int res = -ENOMEM;
 
 	usb_get_dev(dev);
-	if (!(pegasus = kmalloc(sizeof (struct pegasus), GFP_KERNEL))) {
+	net = alloc_etherdev(sizeof(struct pegasus));
+	if (!net) {
 		err("out of memory allocating device structure");
 		goto out;
 	}
 
+	pegasus = netdev_priv(net);
 	memset(pegasus, 0, sizeof (struct pegasus));
 	pegasus->dev_index = dev_index;
 	init_waitqueue_head(&pegasus->ctrl_wait);
@@ -1223,16 +1220,11 @@ static int pegasus_probe(struct usb_interface *intf,
 	if (!alloc_urbs(pegasus))
 		goto out1;
 
-	net = alloc_etherdev(0);
-	if (!net)
-		goto out2;
-
 	tasklet_init(&pegasus->rx_tl, rx_fixup, (unsigned long) pegasus);
 
 	pegasus->usb = dev;
 	pegasus->net = net;
 	SET_MODULE_OWNER(net);
-	net->priv = pegasus;
 	net->open = pegasus_open;
 	net->stop = pegasus_close;
 	net->watchdog_timeo = PEGASUS_TX_TIMEOUT;
@@ -1254,7 +1246,7 @@ static int pegasus_probe(struct usb_interface *intf,
 	if (reset_mac(pegasus)) {
 		err("can't reset MAC");
 		res = -EIO;
-		goto out3;
+		goto out2;
 	}
 	set_ethernet_addr(pegasus);
 	fill_skb_pool(pegasus);
@@ -1271,19 +1263,17 @@ static int pegasus_probe(struct usb_interface *intf,
 	SET_NETDEV_DEV(net, &intf->dev);
 	res = register_netdev(net);
 	if (res)
-		goto out4;
+		goto out3;
 	printk("%s: %s\n", net->name, usb_dev_id[dev_index].name);
 	return 0;
 
-out4:
+out3:
 	usb_set_intfdata(intf, NULL);
 	free_skb_pool(pegasus);
-out3:
-	free_netdev(net);
 out2:
 	free_all_urbs(pegasus);
 out1:
-	kfree(pegasus);
+	free_netdev(net);
 out:
 	usb_put_dev(dev);
 	return res;
@@ -1307,7 +1297,6 @@ static void pegasus_disconnect(struct usb_interface *intf)
 	if (pegasus->rx_skb)
 		dev_kfree_skb(pegasus->rx_skb);
 	free_netdev(pegasus->net);
-	kfree(pegasus);
 }
 
 static struct usb_driver pegasus_driver = {

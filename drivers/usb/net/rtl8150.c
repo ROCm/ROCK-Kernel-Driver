@@ -304,15 +304,12 @@ static inline void set_ethernet_addr(rtl8150_t * dev)
 static int rtl8150_set_mac_address(struct net_device *netdev, void *p)
 {
 	struct sockaddr *addr = p;
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	int i;
 
 	if (netif_running(netdev))
 		return -EBUSY;
-	dev = netdev->priv;
-	if (dev == NULL) {
-		return -ENODEV;
-	}
+
 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
 	dbg("%s: Setting MAC address to ", netdev->name);
 	for (i = 0; i < 5; i++)
@@ -651,16 +648,12 @@ static void disable_net_traffic(rtl8150_t * dev)
 
 static struct net_device_stats *rtl8150_netdev_stats(struct net_device *dev)
 {
-	return &((rtl8150_t *) dev->priv)->stats;
+	return &((rtl8150_t *)netdev_priv(dev))->stats;
 }
 
 static void rtl8150_tx_timeout(struct net_device *netdev)
 {
-	rtl8150_t *dev;
-
-	dev = netdev->priv;
-	if (!dev)
-		return;
+	rtl8150_t *dev = netdev_priv(netdev);
 	warn("%s: Tx timeout.", netdev->name);
 	dev->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb(dev->tx_urb);
@@ -669,9 +662,7 @@ static void rtl8150_tx_timeout(struct net_device *netdev)
 
 static void rtl8150_set_multicast(struct net_device *netdev)
 {
-	rtl8150_t *dev;
-
-	dev = netdev->priv;
+	rtl8150_t *dev = netdev_priv(netdev);
 	netif_stop_queue(netdev);
 	if (netdev->flags & IFF_PROMISC) {
 		dev->rx_creg |= cpu_to_le16(0x0001);
@@ -691,11 +682,10 @@ static void rtl8150_set_multicast(struct net_device *netdev)
 
 static int rtl8150_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	int count, res;
 
 	netif_stop_queue(netdev);
-	dev = netdev->priv;
 	count = (skb->len < 60) ? 60 : skb->len;
 	count = (count & 0x3f) ? count : count + 1;
 	dev->tx_skb = skb;
@@ -717,7 +707,7 @@ static int rtl8150_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 static void set_carrier(struct net_device *netdev)
 {
-	rtl8150_t *dev = netdev->priv;
+	rtl8150_t *dev = netdev_priv(netdev);
 	short tmp;
 
 	get_registers(dev, CSCR, 2, &tmp);
@@ -729,13 +719,9 @@ static void set_carrier(struct net_device *netdev)
 
 static int rtl8150_open(struct net_device *netdev)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	int res;
 
-	dev = netdev->priv;
-	if (dev == NULL) {
-		return -ENODEV;
-	}
 	if (dev->rx_skb == NULL)
 		dev->rx_skb = pull_skb(dev);
 	if (!dev->rx_skb)
@@ -761,12 +747,8 @@ static int rtl8150_open(struct net_device *netdev)
 
 static int rtl8150_close(struct net_device *netdev)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	int res = 0;
-
-	dev = netdev->priv;
-	if (!dev)
-		return -ENODEV;
 
 	netif_stop_queue(netdev);
 	if (!test_bit(RTL8150_UNPLUG, &dev->flags))
@@ -778,10 +760,9 @@ static int rtl8150_close(struct net_device *netdev)
 
 static int rtl8150_ethtool_ioctl(struct net_device *netdev, void __user *uaddr)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	int cmd;
 
-	dev = netdev->priv;
 	if (get_user(cmd, (int __user *) uaddr))
 		return -EFAULT;
 
@@ -851,11 +832,10 @@ static int rtl8150_ethtool_ioctl(struct net_device *netdev, void __user *uaddr)
 
 static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 {
-	rtl8150_t *dev;
+	rtl8150_t *dev = netdev_priv(netdev);
 	u16 *data;
 	int res;
 
-	dev = netdev->priv;
 	data = (u16 *) & rq->ifr_ifru;
 	res = 0;
 
@@ -887,23 +867,18 @@ static int rtl8150_probe(struct usb_interface *intf,
 	rtl8150_t *dev;
 	struct net_device *netdev;
 
-	dev = kmalloc(sizeof(rtl8150_t), GFP_KERNEL);
-	if (!dev) {
+	netdev = alloc_etherdev(sizeof(rtl8150_t));
+	if (!netdev) {
 		err("Out of memory");
 		return -ENOMEM;
-	} else
-		memset(dev, 0, sizeof(rtl8150_t));
+	}
+
+	dev = netdev_priv(netdev);
+	memset(dev, 0, sizeof(rtl8150_t));
 
 	dev->intr_buff = kmalloc(INTBUFSIZE, GFP_KERNEL);
 	if (!dev->intr_buff) {
-		kfree(dev);
-		return -ENOMEM;
-	}
-	netdev = alloc_etherdev(0);
-	if (!netdev) {
-		kfree(dev->intr_buff);
-		kfree(dev);
-		err("Oh boy, out of memory again?!?");
+		free_netdev(netdev);
 		return -ENOMEM;
 	}
 
@@ -913,7 +888,6 @@ static int rtl8150_probe(struct usb_interface *intf,
 	dev->udev = udev;
 	dev->netdev = netdev;
 	SET_MODULE_OWNER(netdev);
-	netdev->priv = dev;
 	netdev->open = rtl8150_open;
 	netdev->stop = rtl8150_close;
 	netdev->do_ioctl = rtl8150_ioctl;
@@ -954,7 +928,6 @@ out1:
 out:
 	kfree(dev->intr_buff);
 	free_netdev(netdev);
-	kfree(dev);
 	return -EIO;
 }
 
@@ -971,9 +944,8 @@ static void rtl8150_disconnect(struct usb_interface *intf)
 		free_skb_pool(dev);
 		if (dev->rx_skb)
 			dev_kfree_skb(dev->rx_skb);
-		free_netdev(dev->netdev);
 		kfree(dev->intr_buff);
-		kfree(dev);
+		free_netdev(dev->netdev);
 	}
 }
 

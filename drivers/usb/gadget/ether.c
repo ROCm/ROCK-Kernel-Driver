@@ -1670,7 +1670,7 @@ eth_disconnect (struct usb_gadget *gadget)
 
 static int eth_change_mtu (struct net_device *net, int new_mtu)
 {
-	struct eth_dev	*dev = (struct eth_dev *) net->priv;
+	struct eth_dev	*dev = netdev_priv(net);
 
 	// FIXME if rndis, don't change while link's live
 
@@ -1685,12 +1685,12 @@ static int eth_change_mtu (struct net_device *net, int new_mtu)
 
 static struct net_device_stats *eth_get_stats (struct net_device *net)
 {
-	return &((struct eth_dev *) net->priv)->stats;
+	return &((struct eth_dev *)netdev_priv(net))->stats;
 }
 
 static int eth_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 {
-	struct eth_dev	*dev = (struct eth_dev *) net->priv;
+	struct eth_dev	*dev = netdev_priv(net);
 	u32		cmd;
 
 	if (get_user (cmd, (u32 __user *)useraddr))
@@ -1997,7 +1997,7 @@ static void tx_complete (struct usb_ep *ep, struct usb_request *req)
 
 static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 {
-	struct eth_dev		*dev = (struct eth_dev *) net->priv;
+	struct eth_dev		*dev = netdev_priv(net);
 	int			length = skb->len;
 	int			retval;
 	struct usb_request	*req = NULL;
@@ -2110,7 +2110,7 @@ static void rndis_control_ack_complete (struct usb_ep *ep, struct usb_request *r
 
 static int rndis_control_ack (struct net_device *net)
 {
-	struct eth_dev          *dev = (struct eth_dev *) net->priv;
+	struct eth_dev          *dev = netdev_priv(net);
 	u32                     length;
 	struct usb_request      *resp;
 	
@@ -2177,7 +2177,7 @@ static void eth_start (struct eth_dev *dev, int gfp_flags)
 
 static int eth_open (struct net_device *net)
 {
-	struct eth_dev		*dev = (struct eth_dev *) net->priv;
+	struct eth_dev		*dev = netdev_priv(net);
 
 	DEBUG (dev, "%s\n", __FUNCTION__);
 	if (netif_carrier_ok (dev->net))
@@ -2187,7 +2187,7 @@ static int eth_open (struct net_device *net)
 
 static int eth_stop (struct net_device *net)
 {
-	struct eth_dev		*dev = (struct eth_dev *) net->priv;
+	struct eth_dev		*dev = netdev_priv(net);
 
 	VDEBUG (dev, "%s\n", __FUNCTION__);
 	netif_stop_queue (net);
@@ -2474,7 +2474,7 @@ autoconf_fail:
  	net = alloc_etherdev (sizeof *dev);
  	if (!net)
 		return status;
-	dev = net->priv;
+	dev = netdev_priv(net);
 	spin_lock_init (&dev->lock);
 	INIT_WORK (&dev->work, eth_work, dev);
 	INIT_LIST_HEAD (&dev->tx_reqs);
