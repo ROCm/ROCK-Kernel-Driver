@@ -1633,13 +1633,6 @@ static void stall_callback(unsigned long ptr)
 		if (up->fsbr && !up->fsbr_timeout && time_after_eq(jiffies, up->fsbrtime + IDLE_TIMEOUT))
 			uhci_fsbr_timeout(uhci, u);
 
-		/* Check if the URB timed out */
-		if (u->timeout && u->status == -EINPROGRESS &&
-			time_after_eq(jiffies, up->inserttime + u->timeout)) {
-			u->status = -ETIMEDOUT;
-			list_move_tail(&up->urb_list, &list);
-		}
-
 		spin_unlock(&u->lock);
 	}
 	spin_unlock_irqrestore(&uhci->schedule_lock, flags);
