@@ -136,38 +136,6 @@ NCR_700_clear_flag(Scsi_Device *SDp, __u32 flag)
 	((unsigned long)SDp->hostdata) &= ~(flag & 0xffff0000);
 }
 
-/* These represent the Nexus hashing functions.  A Nexus in SCSI terms
- * just means the identification of an outstanding command, by ITL
- * (Initiator Target Lun) or ITLQ (Initiator Target Lun Tag).  I'm not
- * very keen on XOR based hashes, so these are based on number theory
- * instead.  All you need to do is to fix your hash bucket size and
- * then choose reasonable strides which are coprime with the chosen
- * bucket size
- *
- * Note: this mathematical hash can be made very efficient, if the
- * compiler is good at optimising: Choose the number of buckets to be
- * 2^n and the modulo becomes a logical and with (2^n-1).
- * Additionally, if you chose the coprimes of the form 2^n-2^n the
- * multiplication can be done by a shift and an addition. */
-#define MAX_ITL_HASH_BUCKETS	16
-#define ITL_HASH_PRIME		7
-
-#define MAX_ITLQ_HASH_BUCKETS	64
-#define ITLQ_PUN_PRIME		7
-#define ITLQ_LUN_PRIME		3
-
-static inline int
-hash_ITL(__u8 pun, __u8 lun)
-{
-	return (pun*ITL_HASH_PRIME + lun) % MAX_ITL_HASH_BUCKETS;
-}
-
-static inline int
-hash_ITLQ(__u8 pun, __u8 lun, __u8 tag)
-{
-	return (pun*ITLQ_PUN_PRIME + lun*ITLQ_LUN_PRIME + tag) % MAX_ITLQ_HASH_BUCKETS;
-}
-
 struct NCR_700_command_slot {
 	struct NCR_700_SG_List	SG[NCR_700_SG_SEGMENTS+1];
 	struct NCR_700_SG_List	*pSG;
@@ -186,12 +154,8 @@ struct NCR_700_command_slot {
 	/* if this command is a pci_single mapping, holds the dma address
 	 * for later unmapping in the done routine */
 	dma_addr_t	dma_handle;
-	/* Doubly linked ITL/ITLQ list kept in strict time order
-	 * (latest at the back) */
+	/* historical remnant, now used to link free commands */
 	struct NCR_700_command_slot *ITL_forw;
-	struct NCR_700_command_slot *ITL_back;
-	struct NCR_700_command_slot *ITLQ_forw;
-	struct NCR_700_command_slot *ITLQ_back;
 };
 
 struct NCR_700_Host_Parameters {
@@ -238,17 +202,6 @@ struct NCR_700_Host_Parameters {
 	__u8	tag_negotiated;
 	__u8	rev;
 	__u8	reselection_id;
-	/* flags for the host */
-
-	/* ITL list.  ALL outstanding commands are hashed here in strict
-	 * order, latest at the back */
-	struct NCR_700_command_slot *ITL_Hash_forw[MAX_ITL_HASH_BUCKETS];
-	struct NCR_700_command_slot *ITL_Hash_back[MAX_ITL_HASH_BUCKETS];
-
-	/* Only tagged outstanding commands are hashed here (also latest
-	 * at the back) */
-	struct NCR_700_command_slot *ITLQ_Hash_forw[MAX_ITLQ_HASH_BUCKETS];
-	struct NCR_700_command_slot *ITLQ_Hash_back[MAX_ITLQ_HASH_BUCKETS];
 
 	/* Free list, singly linked by ITL_forw elements */
 	struct NCR_700_command_slot *free_list;
