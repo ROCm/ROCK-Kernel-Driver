@@ -12,8 +12,11 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 
+#warning This module will be removed from the 2.6. kernel series soon after 2005-01-01
 
 #define CPUFREQ_ALL_CPUS		((NR_CPUS))
+
+static unsigned int warning_print = 0;
 
 /**
  * cpufreq_parse_policy - parse a policy string
@@ -110,6 +113,11 @@ static int cpufreq_proc_read (
 	if (off != 0)
 		goto end;
 
+	if (!warning_print) {
+		warning_print++;
+		printk(KERN_INFO "Access to /proc/cpufreq is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
+	}
+
 	p += sprintf(p, "          minimum CPU frequency  -  maximum CPU frequency  -  policy\n");
 	for (i=0;i<NR_CPUS;i++) {
 		if (!cpu_online(i))
@@ -179,6 +187,11 @@ static int cpufreq_proc_write (
 	
 	if (copy_from_user(proc_string, buffer, count))
 		return -EFAULT;
+
+	if (!warning_print) {
+		warning_print++;
+		printk(KERN_INFO "Access to /proc/cpufreq is deprecated and will be removed from (new) 2.6. kernels soon after 2005-01-01");
+	}
 	
 	proc_string[count] = '\0';
 
