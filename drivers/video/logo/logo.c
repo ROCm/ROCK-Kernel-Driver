@@ -16,7 +16,7 @@
 #include <asm/setup.h>
 #endif
 
-#if defined(CONFIG_MIPS) || defined(CONFIG_MIPS64)
+#ifdef CONFIG_MIPS
 #include <asm/bootinfo.h>
 #endif
 
