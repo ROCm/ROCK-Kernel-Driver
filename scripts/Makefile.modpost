@@ -35,10 +35,11 @@ targets += $(modules)
 # Compile version info for unresolved symbols
 
 quiet_cmd_cc_o_c = CC      $@
-      cmd_cc_o_c = $(CC) $(CFLAGS) $(CFLAGS_MODULE) -c -o $@ $<
+      cmd_cc_o_c = $(CC) -Wp,-MD,$(depfile) $(CFLAGS) $(CFLAGS_MODULE)	\
+		   -c -o $@ $<
 
 $(modules:.ko=.mod.o): %.mod.o: %.mod.c FORCE
-	$(call if_changed,cc_o_c)
+	$(call if_changed_dep,cc_o_c)
 
 targets += $(modules:.ko=.mod.o)
 
