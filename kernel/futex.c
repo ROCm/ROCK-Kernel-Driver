@@ -38,6 +38,7 @@
 #include <linux/futex.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 
 #define FUTEX_HASHBITS 8
 
