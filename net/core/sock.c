@@ -1172,7 +1172,7 @@ EXPORT_SYMBOL(release_sock);
 /* When > 0 there are consumers of rx skb time stamps */
 atomic_t netstamp_needed = ATOMIC_INIT(0); 
 
-int sock_get_timestamp(struct sock *sk, struct timeval *userstamp)
+int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
 { 
 	if (!sock_flag(sk, SOCK_TIMESTAMP))
 		sock_enable_timestamp(sk);

@@ -10,6 +10,8 @@
 #include <linux/kobject.h>
 #include "sysfs.h"
 
+DECLARE_RWSEM(sysfs_rename_sem);
+
 static int init_dir(struct inode * inode)
 {
 	inode->i_op = &simple_dir_inode_operations;
@@ -134,8 +136,14 @@ restart:
 			/**
 			 * Unlink and unhash.
 			 */
+			__d_drop(d);
 			spin_unlock(&dcache_lock);
-			d_delete(d);
+			/* release the target kobject in case of 
+			 * a symlink
+			 */
+			if (S_ISLNK(d->d_inode->i_mode))
+				kobject_put(d->d_fsdata);
+			
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
 			pr_debug(" done\n");
@@ -165,6 +173,7 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 	if (!kobj->parent)
 		return -EINVAL;
 
+	down_write(&sysfs_rename_sem);
 	parent = kobj->parent->dentry;
 
 	down(&parent->d_inode->i_sem);
@@ -179,6 +188,7 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 		dput(new_dentry);
 	}
 	up(&parent->d_inode->i_sem);	
+	up_write(&sysfs_rename_sem);
 
 	return error;
 }

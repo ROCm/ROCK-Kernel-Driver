@@ -163,7 +163,7 @@ __up_wakeup(struct semaphore *sem)
 void __sched
 down(struct semaphore *sem)
 {
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 #ifdef CONFIG_DEBUG_SEMAPHORE
@@ -177,7 +177,7 @@ down(struct semaphore *sem)
 int __sched
 down_interruptible(struct semaphore *sem)
 {
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 #ifdef CONFIG_DEBUG_SEMAPHORE
@@ -193,7 +193,7 @@ down_trylock(struct semaphore *sem)
 {
 	int ret;
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
@@ -212,7 +212,7 @@ down_trylock(struct semaphore *sem)
 void
 up(struct semaphore *sem)
 {
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 #ifdef CONFIG_DEBUG_SEMAPHORE

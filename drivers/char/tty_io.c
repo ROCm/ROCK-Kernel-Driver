@@ -134,9 +134,9 @@ extern void disable_early_printk(void);
 
 static void initialize_tty_struct(struct tty_struct *tty);
 
-static ssize_t tty_read(struct file *, char *, size_t, loff_t *);
-static ssize_t tty_write(struct file *, const char *, size_t, loff_t *);
-ssize_t redirected_tty_write(struct file *, const char *, size_t, loff_t *);
+static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
+static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
+ssize_t redirected_tty_write(struct file *, const char __user *, size_t, loff_t *);
 static unsigned int tty_poll(struct file *, poll_table *);
 static int tty_open(struct inode *, struct file *);
 static int tty_release(struct inode *, struct file *);
@@ -339,7 +339,7 @@ int tty_check_change(struct tty_struct * tty)
 
 EXPORT_SYMBOL(tty_check_change);
 
-static ssize_t hung_up_tty_read(struct file * file, char * buf,
+static ssize_t hung_up_tty_read(struct file * file, char __user * buf,
 				size_t count, loff_t *ppos)
 {
 	/* Can't seek (pread) on ttys.  */
@@ -348,7 +348,7 @@ static ssize_t hung_up_tty_read(struct file * file, char * buf,
 	return 0;
 }
 
-static ssize_t hung_up_tty_write(struct file * file, const char * buf,
+static ssize_t hung_up_tty_write(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 {
 	/* Can't seek (pwrite) on ttys.  */
@@ -638,7 +638,7 @@ void start_tty(struct tty_struct *tty)
 
 EXPORT_SYMBOL(start_tty);
 
-static ssize_t tty_read(struct file * file, char * buf, size_t count, 
+static ssize_t tty_read(struct file * file, char __user * buf, size_t count, 
 			loff_t *ppos)
 {
 	int i;
@@ -672,10 +672,10 @@ static ssize_t tty_read(struct file * file, char * buf, size_t count,
  * denial-of-service type attacks
  */
 static inline ssize_t do_tty_write(
-	ssize_t (*write)(struct tty_struct *, struct file *, const unsigned char *, size_t),
+	ssize_t (*write)(struct tty_struct *, struct file *, const unsigned char __user *, size_t),
 	struct tty_struct *tty,
 	struct file *file,
-	const unsigned char *buf,
+	const unsigned char __user *buf,
 	size_t count)
 {
 	ssize_t ret = 0, written = 0;
@@ -717,7 +717,7 @@ static inline ssize_t do_tty_write(
 }
 
 
-static ssize_t tty_write(struct file * file, const char * buf, size_t count,
+static ssize_t tty_write(struct file * file, const char __user * buf, size_t count,
 			 loff_t *ppos)
 {
 	struct tty_struct * tty;
@@ -735,10 +735,10 @@ static ssize_t tty_write(struct file * file, const char * buf, size_t count,
 	if (!tty->ldisc.write)
 		return -EIO;
 	return do_tty_write(tty->ldisc.write, tty, file,
-			    (const unsigned char *)buf, count);
+			    (const unsigned char __user *)buf, count);
 }
 
-ssize_t redirected_tty_write(struct file * file, const char * buf, size_t count,
+ssize_t redirected_tty_write(struct file * file, const char __user * buf, size_t count,
 			 loff_t *ppos)
 {
 	struct file *p = NULL;
@@ -1490,19 +1490,19 @@ static int tty_fasync(int fd, struct file * filp, int on)
 	return 0;
 }
 
-static int tiocsti(struct tty_struct *tty, char * arg)
+static int tiocsti(struct tty_struct *tty, char __user *p)
 {
 	char ch, mbz = 0;
 
 	if ((current->signal->tty != tty) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (get_user(ch, arg))
+	if (get_user(ch, p))
 		return -EFAULT;
 	tty->ldisc.receive_buf(tty, &ch, &mbz, 1);
 	return 0;
 }
 
-static int tiocgwinsz(struct tty_struct *tty, struct winsize * arg)
+static int tiocgwinsz(struct tty_struct *tty, struct winsize __user * arg)
 {
 	if (copy_to_user(arg, &tty->winsize, sizeof(*arg)))
 		return -EFAULT;
@@ -1510,7 +1510,7 @@ static int tiocgwinsz(struct tty_struct *tty, struct winsize * arg)
 }
 
 static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
-	struct winsize * arg)
+	struct winsize __user * arg)
 {
 	struct winsize tmp_ws;
 
@@ -1565,11 +1565,11 @@ static int tioccons(struct file *file)
 }
 
 
-static int fionbio(struct file *file, int *arg)
+static int fionbio(struct file *file, int __user *p)
 {
 	int nonblock;
 
-	if (get_user(nonblock, arg))
+	if (get_user(nonblock, p))
 		return -EFAULT;
 
 	if (nonblock)
@@ -1620,7 +1620,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 	return 0;
 }
 
-static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *arg)
+static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
 	/*
 	 * (tty == real_tty) is a cheap way of
@@ -1628,10 +1628,10 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	 */
 	if (tty == real_tty && current->signal->tty != real_tty)
 		return -ENOTTY;
-	return put_user(real_tty->pgrp, arg);
+	return put_user(real_tty->pgrp, p);
 }
 
-static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *arg)
+static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
 	pid_t pgrp;
 	int retval = tty_check_change(real_tty);
@@ -1644,7 +1644,7 @@ static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	    (current->signal->tty != real_tty) ||
 	    (real_tty->session != current->signal->session))
 		return -ENOTTY;
-	if (get_user(pgrp, (pid_t *) arg))
+	if (get_user(pgrp, p))
 		return -EFAULT;
 	if (pgrp < 0)
 		return -EINVAL;
@@ -1654,7 +1654,7 @@ static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	return 0;
 }
 
-static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *arg)
+static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
 {
 	/*
 	 * (tty == real_tty) is a cheap way of
@@ -1664,14 +1664,14 @@ static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *
 		return -ENOTTY;
 	if (real_tty->session <= 0)
 		return -ENOTTY;
-	return put_user(real_tty->session, arg);
+	return put_user(real_tty->session, p);
 }
 
-static int tiocsetd(struct tty_struct *tty, int *arg)
+static int tiocsetd(struct tty_struct *tty, int __user *p)
 {
 	int ldisc;
 
-	if (get_user(ldisc, arg))
+	if (get_user(ldisc, p))
 		return -EFAULT;
 	return tty_set_ldisc(tty, ldisc);
 }
@@ -1690,7 +1690,7 @@ static int send_break(struct tty_struct *tty, int duration)
 }
 
 static int
-tty_tiocmget(struct tty_struct *tty, struct file *file, unsigned long arg)
+tty_tiocmget(struct tty_struct *tty, struct file *file, int __user *p)
 {
 	int retval = -EINVAL;
 
@@ -1698,21 +1698,21 @@ tty_tiocmget(struct tty_struct *tty, struct file *file, unsigned long arg)
 		retval = tty->driver->tiocmget(tty, file);
 
 		if (retval >= 0)
-			retval = put_user(retval, (int *)arg);
+			retval = put_user(retval, p);
 	}
 	return retval;
 }
 
 static int
 tty_tiocmset(struct tty_struct *tty, struct file *file, unsigned int cmd,
-	     unsigned long arg)
+	     unsigned __user *p)
 {
 	int retval = -EINVAL;
 
 	if (tty->driver->tiocmset) {
 		unsigned int set, clear, val;
 
-		retval = get_user(val, (unsigned int *)arg);
+		retval = get_user(val, p);
 		if (retval)
 			return retval;
 
@@ -1745,6 +1745,7 @@ int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg)
 {
 	struct tty_struct *tty, *real_tty;
+	void __user *p = (void __user *)arg;
 	int retval;
 	
 	tty = (struct tty_struct *)file->private_data;
@@ -1802,15 +1803,15 @@ int tty_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 		case TIOCSTI:
-			return tiocsti(tty, (char *)arg);
+			return tiocsti(tty, p);
 		case TIOCGWINSZ:
-			return tiocgwinsz(tty, (struct winsize *) arg);
+			return tiocgwinsz(tty, p);
 		case TIOCSWINSZ:
-			return tiocswinsz(tty, real_tty, (struct winsize *) arg);
+			return tiocswinsz(tty, real_tty, p);
 		case TIOCCONS:
 			return real_tty!=tty ? -EINVAL : tioccons(file);
 		case FIONBIO:
-			return fionbio(file, (int *) arg);
+			return fionbio(file, p);
 		case TIOCEXCL:
 			set_bit(TTY_EXCLUSIVE, &tty->flags);
 			return 0;
@@ -1829,15 +1830,15 @@ int tty_ioctl(struct inode * inode, struct file * file,
 		case TIOCSCTTY:
 			return tiocsctty(tty, arg);
 		case TIOCGPGRP:
-			return tiocgpgrp(tty, real_tty, (pid_t *) arg);
+			return tiocgpgrp(tty, real_tty, p);
 		case TIOCSPGRP:
-			return tiocspgrp(tty, real_tty, (pid_t *) arg);
+			return tiocspgrp(tty, real_tty, p);
 		case TIOCGSID:
-			return tiocgsid(tty, real_tty, (pid_t *) arg);
+			return tiocgsid(tty, real_tty, p);
 		case TIOCGETD:
-			return put_user(tty->ldisc.num, (int *) arg);
+			return put_user(tty->ldisc.num, (int __user *)p);
 		case TIOCSETD:
-			return tiocsetd(tty, (int *) arg);
+			return tiocsetd(tty, p);
 #ifdef CONFIG_VT
 		case TIOCLINUX:
 			return tioclinux(tty, arg);
@@ -1865,12 +1866,12 @@ int tty_ioctl(struct inode * inode, struct file * file,
 			return send_break(tty, arg ? arg*(HZ/10) : HZ/4);
 
 		case TIOCMGET:
-			return tty_tiocmget(tty, file, arg);
+			return tty_tiocmget(tty, file, p);
 
 		case TIOCMSET:
 		case TIOCMBIC:
 		case TIOCMBIS:
-			return tty_tiocmset(tty, file, cmd, arg);
+			return tty_tiocmset(tty, file, cmd, p);
 	}
 	if (tty->driver->ioctl) {
 		int retval = (tty->driver->ioctl)(tty, file, cmd, arg);

@@ -269,12 +269,12 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->gs);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->gs);
 	__asm__("movl %%fs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->fs);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->fs);
 
-	err |= __put_user(regs->xes, (unsigned int *)&sc->es);
-	err |= __put_user(regs->xds, (unsigned int *)&sc->ds);
+	err |= __put_user(regs->xes, (unsigned int __user *)&sc->es);
+	err |= __put_user(regs->xds, (unsigned int __user *)&sc->ds);
 	err |= __put_user(regs->edi, &sc->edi);
 	err |= __put_user(regs->esi, &sc->esi);
 	err |= __put_user(regs->ebp, &sc->ebp);
@@ -286,10 +286,10 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 	err |= __put_user(current->thread.trap_no, &sc->trapno);
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user(regs->eip, &sc->eip);
-	err |= __put_user(regs->xcs, (unsigned int *)&sc->cs);
+	err |= __put_user(regs->xcs, (unsigned int __user *)&sc->cs);
 	err |= __put_user(regs->eflags, &sc->eflags);
 	err |= __put_user(regs->esp, &sc->esp_at_signal);
-	err |= __put_user(regs->xss, (unsigned int *)&sc->ss);
+	err |= __put_user(regs->xss, (unsigned int __user *)&sc->ss);
 
 	tmp = save_i387(fpstate);
 	if (tmp < 0)
@@ -381,9 +381,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	 * reasons and because gdb uses it as a signature to notice
 	 * signal handler stack frames.
 	 */
-	err |= __put_user(0xb858, (short *)(frame->retcode+0));
-	err |= __put_user(__NR_sigreturn, (int *)(frame->retcode+2));
-	err |= __put_user(0x80cd, (short *)(frame->retcode+6));
+	err |= __put_user(0xb858, (short __user *)(frame->retcode+0));
+	err |= __put_user(__NR_sigreturn, (int __user *)(frame->retcode+2));
+	err |= __put_user(0x80cd, (short __user *)(frame->retcode+6));
 
 	if (err)
 		goto give_sigsegv;
@@ -462,9 +462,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	 * reasons and because gdb uses it as a signature to notice
 	 * signal handler stack frames.
 	 */
-	err |= __put_user(0xb8, (char *)(frame->retcode+0));
-	err |= __put_user(__NR_rt_sigreturn, (int *)(frame->retcode+1));
-	err |= __put_user(0x80cd, (short *)(frame->retcode+5));
+	err |= __put_user(0xb8, (char __user *)(frame->retcode+0));
+	err |= __put_user(__NR_rt_sigreturn, (int __user *)(frame->retcode+1));
+	err |= __put_user(0x80cd, (short __user *)(frame->retcode+5));
 
 	if (err)
 		goto give_sigsegv;

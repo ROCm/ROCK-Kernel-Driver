@@ -80,7 +80,13 @@ cifs_open(struct inode *inode, struct file *file)
 		}
 	}
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(file->f_dentry);
+	up(&inode->i_sb->s_vfs_rename_sem);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
 	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
@@ -150,8 +156,6 @@ cifs_open(struct inode *inode, struct file *file)
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
 		cFYI(1, ("oplock: %d ", oplock));	
 	} else {
-		if(file->private_data)
-			kfree(file->private_data);
 		file->private_data =
 			kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
 		if (file->private_data) {
@@ -281,11 +285,24 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		return 0;
 	}
 
-
+	if(file->f_dentry == NULL) {
+		up(&pCifsFile->fh_sem);
+		cFYI(1,("failed file reopen, no valid name if dentry freed"));
+		FreeXid(xid);
+		return -EBADF;
+	}
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
-
+/* can not grab rename sem here because various ops, including
+those that already have the rename sem can end up causing writepage
+to get called and if the server was down that means we end up here,
+and we can never tell if the caller already has the rename_sem */
 	full_path = build_path_from_dentry(file->f_dentry);
+	if(full_path == NULL) {
+		up(&pCifsFile->fh_sem);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
 	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
@@ -546,6 +563,9 @@ cifs_write(struct file * file, const char *write_data,
 	int xid, long_op;
 	struct cifsFileInfo * open_file;
 
+	if(file->f_dentry == NULL)
+		return -EBADF;
+
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
@@ -608,12 +628,21 @@ cifs_write(struct file * file, const char *write_data,
 		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
 	}
 
+#ifdef CONFIG_CIFS_STATS
+	if(total_written > 0) {
+		atomic_inc(&pTcon->num_writes);
+		spin_lock(&pTcon->stat_lock);
+		pTcon->bytes_written += total_written;
+		spin_unlock(&pTcon->stat_lock);
+	}
+#endif		
+
 	/* since the write may have blocked check these pointers again */
 	if(file->f_dentry) {
 		if(file->f_dentry->d_inode) {
 			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
 				CURRENT_TIME;
-			if (bytes_written > 0) {
+			if (total_written > 0) {
 				if (*poffset > file->f_dentry->d_inode->i_size)
 					i_size_write(file->f_dentry->d_inode, *poffset);
 			}
@@ -634,25 +663,21 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	int bytes_written = 0;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
-	struct inode *inode = page->mapping->host;
+	struct inode *inode;
 	struct cifsInodeInfo *cifsInode;
 	struct cifsFileInfo *open_file = NULL;
 	struct list_head *tmp;
 	struct list_head *tmp1;
 
-	cifs_sb = CIFS_SB(inode->i_sb);
-	pTcon = cifs_sb->tcon;
-
-	/* figure out which file struct to use 
-	if (file->private_data == NULL) {
-		return -EBADF;
-	}     
-	 */
 	if (!mapping) {
 		return -EFAULT;
 	} else if(!mapping->host) {
 		return -EFAULT;
 	}
+
+	inode = page->mapping->host;
+	cifs_sb = CIFS_SB(inode->i_sb);
+	pTcon = cifs_sb->tcon;
 
 	offset += (loff_t)from;
 	write_data = kmap(page);
@@ -678,6 +703,8 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	read_lock(&GlobalSMBSeslock); 
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		if(open_file->closePend)
+			continue;
 		/* We check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
@@ -691,7 +718,15 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 			if ((bytes_written > 0) && (offset)) {
 				rc = 0;
 			} else if(bytes_written < 0) {
-				rc = bytes_written;
+				if(rc == -EBADF) {
+				/* have seen a case in which
+				kernel seemed to have closed/freed a file
+				even with writes active so we might as well
+				see if there are other file structs to try
+				for the same inode before giving up */
+					continue;
+				} else
+					rc = bytes_written;
 			}
 			break;  /* now that we found a valid file handle
 				and tried to write to it we are done, no
@@ -913,10 +948,15 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 				return rc;
 			}
 		} else {
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&pTcon->num_reads);
+			spin_lock(&pTcon->stat_lock);
+			pTcon->bytes_read += total_read;
+			spin_unlock(&pTcon->stat_lock);
+#endif
 			*poffset += bytes_read;
 		}
 	}
-
 	FreeXid(xid);
 	return total_read;
 }
@@ -1078,7 +1118,12 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
-
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&pTcon->num_reads);
+			spin_lock(&pTcon->stat_lock);
+			pTcon->bytes_read += bytes_read;
+			spin_unlock(&pTcon->stat_lock);
+#endif
 			if((int)(bytes_read & PAGE_CACHE_MASK) != bytes_read) {
 				cFYI(1,("Partial page %d of %d read to cache",i++,num_pages));
 

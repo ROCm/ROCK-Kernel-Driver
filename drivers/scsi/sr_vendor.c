@@ -107,7 +107,7 @@ void sr_vendor_init(Scsi_CD *cd)
 int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 {
 	unsigned char *buffer;	/* the buffer for the ioctl */
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct ccs_modesel_head *modesel;
 	int rc, density = 0;
 
@@ -123,7 +123,7 @@ int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 #ifdef DEBUG
 	printk("%s: MODE SELECT 0x%x/%d\n", cd->cdi.name, density, blocklength);
 #endif
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = MODE_SELECT;
 	cgc.cmd[1] = (1 << 4);
 	cgc.cmd[4] = 12;
@@ -157,7 +157,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	Scsi_CD *cd = cdi->handle;
 	unsigned long sector;
 	unsigned char *buffer;	/* the buffer for the ioctl */
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int rc, no_multi;
 
 	if (cd->cdi.mask & CDC_MULTI_SESSION)
@@ -171,7 +171,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	no_multi = 0;		/* flag: the drive can't handle multisession */
 	rc = 0;
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 
 	switch (cd->vendor) {
 

@@ -33,7 +33,7 @@ struct blkpg_ioctl_arg {
         int op;
         int flags;
         int datalen;
-        void *data;
+        void __user *data;
 };
 
 /* The subfunctions (for the op field) */

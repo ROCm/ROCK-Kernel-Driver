@@ -234,7 +234,7 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 	if (verify_area(VERIFY_READ, sf, sizeof(*sf)))
 		goto segv_and_exit;
 
-	if (((uint) sf) & 3)
+	if (((unsigned long) sf) & 3)
 		goto segv_and_exit;
 
 	err = __get_user(pc,  &sf->info.si_regs.pc);
@@ -289,8 +289,10 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 
 	synchronize_user_stack();
 
-	if (current->thread.new_signal)
-		return do_new_sigreturn(regs);
+	if (current->thread.new_signal) {
+		do_new_sigreturn(regs);
+		return;
+	}
 
 	scptr = (struct sigcontext __user *) regs->u_regs[UREG_I0];
 
@@ -347,6 +349,7 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 	struct rt_signal_frame __user *sf;
 	unsigned int psr, pc, npc;
 	__siginfo_fpu_t __user *fpu_save;
+	mm_segment_t old_fs;
 	sigset_t set;
 	stack_t st;
 	int err;
@@ -386,7 +389,10 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 	/* It is more difficult to avoid calling this function than to
 	 * call it and ignore errors.
 	 */
-	do_sigaltstack(&st, NULL, (unsigned long)sf);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	do_sigaltstack((const stack_t __user *) &st, NULL, (unsigned long)sf);
+	set_fs(old_fs);
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sighand->siglock);
@@ -849,7 +855,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 
 	/* Arguments passed to signal handler */
 	if (regs->u_regs[14]){
-		struct reg_window *rw = (struct reg_window __user *)
+		struct reg_window __user *rw = (struct reg_window __user *)
 			regs->u_regs[14];
 
 		err |= __put_user(signr, &rw->ins[0]);
@@ -860,8 +866,8 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 			goto sigsegv;
 
 		regs->u_regs[UREG_I0] = signr;
-		regs->u_regs[UREG_I1] = (uint) si;
-		regs->u_regs[UREG_I2] = (uint) uc;
+		regs->u_regs[UREG_I1] = (unsigned long) si;
+		regs->u_regs[UREG_I2] = (unsigned long) uc;
 	}
 	return;
 
@@ -932,6 +938,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 {
 	svr4_gregset_t  __user *gr;
 	unsigned long pc, npc, psr;
+	mm_segment_t old_fs;
 	sigset_t set;
 	svr4_sigset_t setv;
 	int err;
@@ -945,7 +952,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 	if (current_thread_info()->w_saved)
 		goto sigsegv_and_return;
 
-	if (((uint) c) & 3)
+	if (((unsigned long) c) & 3)
 		goto sigsegv_and_return;
 
 	if (!__access_ok((unsigned long)c, sizeof(*c)))
@@ -977,7 +984,11 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 		
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, regs->u_regs[UREG_I6]);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	do_sigaltstack((const stack_t __user *) &st, NULL,
+		       regs->u_regs[UREG_I6]);
+	set_fs(old_fs);
 	
 	set.sig[0] = setv.sigbits[0];
 	set.sig[1] = setv.sigbits[1];

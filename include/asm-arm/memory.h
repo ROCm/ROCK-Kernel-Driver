@@ -15,6 +15,37 @@
 #include <linux/config.h>
 #include <asm/arch/memory.h>
 
+#ifndef TASK_SIZE
+/*
+ * TASK_SIZE - the maximum size of a user space task.
+ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+ */
+#define TASK_SIZE		(0xbf000000UL)
+#define TASK_UNMAPPED_BASE	(0x40000000UL)
+#endif
+
+/*
+ * The maximum size of a 26-bit user space task.
+ */
+#define TASK_SIZE_26		(0x04000000UL)
+
+/*
+ * Page offset: 3GB
+ */
+#ifndef PAGE_OFFSET
+#define PAGE_OFFSET		(0xc0000000UL)
+#endif
+
+/*
+ * Physical vs virtual RAM address space conversion.  These are
+ * private definitions which should NOT be used outside memory.h
+ * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+ */
+#ifndef __virt_to_phys
+#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+#endif
+
 /*
  * The module space lives between the addresses given by TASK_SIZE
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.

@@ -106,7 +106,7 @@ alpha_fp_emul (unsigned long pc)
 	__u32 insn;
 	long si_code;
 
-	get_user(insn, (__u32*)pc);
+	get_user(insn, (__u32 __user *)pc);
 	fc     = (insn >>  0) & 0x1f;	/* destination register */
 	fb     = (insn >> 16) & 0x1f;
 	fa     = (insn >> 21) & 0x1f;
@@ -171,7 +171,7 @@ alpha_fp_emul (unsigned long pc)
 					_FP_FRAC_SET_1(DB, _FP_ZEROFRAC_1);
 			}
 			FP_CMP_D(res, DA, DB, 3);
-			vc = 0x4000000000000000;
+			vc = 0x4000000000000000UL;
 			/* CMPTEQ, CMPTUN don't trap on QNaN,
 			   while CMPTLT and CMPTLE do */
 			if (res == 3
@@ -351,7 +351,7 @@ alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 	 * up to the first occurrence of such an instruction.
 	 */
 	while (write_mask) {
-		get_user(insn, (__u32*)(trigger_pc));
+		get_user(insn, (__u32 __user *)(trigger_pc));
 		opcode = insn >> 26;
 		rc = insn & 0x1f;
 

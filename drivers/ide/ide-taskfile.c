@@ -1052,13 +1052,14 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 	int taskin		= 0;
 	int taskout		= 0;
 	u8 io_32bit		= drive->io_32bit;
+	char __user *buf = (char __user *)arg;
 
 //	printk("IDE Taskfile ...\n");
 
 	req_task = kmalloc(tasksize, GFP_KERNEL);
 	if (req_task == NULL) return -ENOMEM;
 	memset(req_task, 0, tasksize);
-	if (copy_from_user(req_task, (void *) arg, tasksize)) {
+	if (copy_from_user(req_task, buf, tasksize)) {
 		kfree(req_task);
 		return -EFAULT;
 	}
@@ -1074,7 +1075,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 			goto abort;
 		}
 		memset(outbuf, 0, taskout);
-		if (copy_from_user(outbuf, (void *)arg + outtotal, taskout)) {
+		if (copy_from_user(outbuf, buf + outtotal, taskout)) {
 			err = -EFAULT;
 			goto abort;
 		}
@@ -1088,7 +1089,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 			goto abort;
 		}
 		memset(inbuf, 0, taskin);
-		if (copy_from_user(inbuf, (void *)arg + intotal , taskin)) {
+		if (copy_from_user(inbuf, buf + intotal, taskin)) {
 			err = -EFAULT;
 			goto abort;
 		}
@@ -1196,20 +1197,20 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 	req_task->in_flags  = args.tf_in_flags;
 	req_task->out_flags = args.tf_out_flags;
 
-	if (copy_to_user((void *)arg, req_task, tasksize)) {
+	if (copy_to_user(buf, req_task, tasksize)) {
 		err = -EFAULT;
 		goto abort;
 	}
 	if (taskout) {
 		int outtotal = tasksize;
-		if (copy_to_user((void *)arg+outtotal, outbuf, taskout)) {
+		if (copy_to_user(buf + outtotal, outbuf, taskout)) {
 			err = -EFAULT;
 			goto abort;
 		}
 	}
 	if (taskin) {
 		int intotal = tasksize + taskout;
-		if (copy_to_user((void *)arg+intotal, inbuf, taskin)) {
+		if (copy_to_user(buf + intotal, inbuf, taskin)) {
 			err = -EFAULT;
 			goto abort;
 		}
@@ -1266,7 +1267,7 @@ int ide_cmd_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		return ide_do_drive_cmd(drive, &rq, ide_wait);
 	}
 
-	if (copy_from_user(args, (void *)arg, 4))
+	if (copy_from_user(args, (void __user *)arg, 4))
 		return -EFAULT;
 
 	memset(&tfargs, 0, sizeof(ide_task_t));
@@ -1299,7 +1300,7 @@ int ide_cmd_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		ide_driveid_update(drive);
 	}
 abort:
-	if (copy_to_user((void *)arg, argbuf, argsize))
+	if (copy_to_user((void __user *)arg, argbuf, argsize))
 		err = -EFAULT;
 	if (argsize > 4)
 		kfree(argbuf);
@@ -1325,14 +1326,15 @@ EXPORT_SYMBOL(ide_wait_cmd_task);
  */
 int ide_task_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
+	void __user *p = (void __user *)arg;
 	int err = 0;
 	u8 args[7], *argbuf = args;
 	int argsize = 7;
 
-	if (copy_from_user(args, (void *)arg, 7))
+	if (copy_from_user(args, p, 7))
 		return -EFAULT;
 	err = ide_wait_cmd_task(drive, argbuf);
-	if (copy_to_user((void *)arg, argbuf, argsize))
+	if (copy_to_user(p, argbuf, argsize))
 		err = -EFAULT;
 	return err;
 }

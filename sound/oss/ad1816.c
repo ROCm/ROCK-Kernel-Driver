@@ -874,10 +874,11 @@ ad1816_mixer_reset (ad1816_info * devc)
 }
 
 static int
-ad1816_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+ad1816_mixer_ioctl (int dev, unsigned int cmd, void __user * arg)
 {
 	ad1816_info    *devc = mixer_devs[dev]->devc;
 	int val;
+	int __user *p = arg;
   
 	DEBUGNOISE(printk(KERN_DEBUG "ad1816: mixer_ioctl called!\n"));
   
@@ -889,19 +890,19 @@ ad1816_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 			switch (cmd & 0xff){
 			case SOUND_MIXER_RECSRC:
 				
-				if (get_user(val, (int *)arg))
+				if (get_user(val, p))
 					return -EFAULT;
 				val=ad1816_set_recmask (devc, val);
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 				
 			default:
-				if (get_user(val, (int *)arg))
+				if (get_user(val, p))
 					return -EFAULT;
 				if ((val=ad1816_mixer_set (devc, cmd & 0xff, val))<0)
 				        return val;
 				else
-				        return put_user(val, (int *)arg);
+				        return put_user(val, p);
 			}
 		} else { 
 			/* read ioctl */
@@ -909,34 +910,34 @@ ad1816_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 				
 			case SOUND_MIXER_RECSRC:
 				val=devc->recmask;
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 				
 			case SOUND_MIXER_DEVMASK:
 				val=devc->supported_devices;
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 
 			case SOUND_MIXER_STEREODEVS:
 				val=devc->supported_devices & ~(SOUND_MASK_SPEAKER | SOUND_MASK_IMIX);
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 				
 			case SOUND_MIXER_RECMASK:
 				val=devc->supported_rec_devices;
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 				
 			case SOUND_MIXER_CAPS:
 				val=SOUND_CAP_EXCL_INPUT;
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 				break;
 				
 			default:
 			        if ((val=ad1816_mixer_get (devc, cmd & 0xff))<0)
 				        return val;
 				else
-				        return put_user(val, (int *)arg);
+				        return put_user(val, p);
 			}
 		}
 	} else

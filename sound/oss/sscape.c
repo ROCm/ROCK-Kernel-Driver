@@ -555,7 +555,7 @@ static int download_boot_block(void *dev_info, copr_buffer * buf)
 	return 0;
 }
 
-static int sscape_coproc_ioctl(void *dev_info, unsigned int cmd, caddr_t arg, int local)
+static int sscape_coproc_ioctl(void *dev_info, unsigned int cmd, void __user *arg, int local)
 {
 	copr_buffer *buf;
 	int err;

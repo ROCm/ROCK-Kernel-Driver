@@ -313,9 +313,10 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 	}
 }
 
-static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
-				   struct zilog_channel *channel,
-				   struct pt_regs *regs)
+static struct tty_struct *
+sunzilog_receive_chars(struct uart_sunzilog_port *up,
+		       struct zilog_channel *channel,
+		       struct pt_regs *regs)
 {
 	struct tty_struct *tty;
 	unsigned char ch, r1;
@@ -414,8 +415,7 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 		}
 	}
 
-	if (tty)
-		tty_flip_buffer_push(tty);
+	return tty;
 }
 
 static void sunzilog_status_handle(struct uart_sunzilog_port *up,
@@ -550,19 +550,21 @@ static irqreturn_t sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	while (up) {
 		struct zilog_channel *channel
 			= ZILOG_CHANNEL_FROM_PORT(&up->port);
+		struct tty_struct *tty;
 		unsigned char r3;
 
 		spin_lock(&up->port.lock);
 		r3 = read_zsreg(channel, R3);
 
 		/* Channel A */
+		tty = NULL;
 		if (r3 & (CHAEXT | CHATxIP | CHARxIP)) {
 			sbus_writeb(RES_H_IUS, &channel->control);
 			ZSDELAY();
 			ZS_WSYNC(channel);
 
 			if (r3 & CHARxIP)
-				sunzilog_receive_chars(up, channel, regs);
+				tty = sunzilog_receive_chars(up, channel, regs);
 			if (r3 & CHAEXT)
 				sunzilog_status_handle(up, channel, regs);
 			if (r3 & CHATxIP)
@@ -570,24 +572,31 @@ static irqreturn_t sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *reg
 		}
 		spin_unlock(&up->port.lock);
 
+		if (tty)
+			tty_flip_buffer_push(tty);
+
 		/* Channel B */
 		up = up->next;
 		channel = ZILOG_CHANNEL_FROM_PORT(&up->port);
 
 		spin_lock(&up->port.lock);
+		tty = NULL;
 		if (r3 & (CHBEXT | CHBTxIP | CHBRxIP)) {
 			sbus_writeb(RES_H_IUS, &channel->control);
 			ZSDELAY();
 			ZS_WSYNC(channel);
 
 			if (r3 & CHBRxIP)
-				sunzilog_receive_chars(up, channel, regs);
+				tty = sunzilog_receive_chars(up, channel, regs);
 			if (r3 & CHBEXT)
 				sunzilog_status_handle(up, channel, regs);
 			if (r3 & CHBTxIP)
 				sunzilog_transmit_chars(up, channel);
 		}
 		spin_unlock(&up->port.lock);
+
+		if (tty)
+			tty_flip_buffer_push(tty);
 
 		up = up->next;
 	}

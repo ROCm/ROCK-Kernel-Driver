@@ -217,9 +217,9 @@ SOCKCALL_WRAP(name, ioctl, (struct socket *sock, unsigned int cmd, \
 SOCKCALL_WRAP(name, listen, (struct socket *sock, int len), (sock, len)) \
 SOCKCALL_WRAP(name, shutdown, (struct socket *sock, int flags), (sock, flags)) \
 SOCKCALL_WRAP(name, setsockopt, (struct socket *sock, int level, int optname, \
-			 char *optval, int optlen), (sock, level, optname, optval, optlen)) \
+			 char __user *optval, int optlen), (sock, level, optname, optval, optlen)) \
 SOCKCALL_WRAP(name, getsockopt, (struct socket *sock, int level, int optname, \
-			 char *optval, int *optlen), (sock, level, optname, optval, optlen)) \
+			 char __user *optval, int __user *optlen), (sock, level, optname, optval, optlen)) \
 SOCKCALL_WRAP(name, sendmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, size_t len), \
 	      (iocb, sock, m, len)) \
 SOCKCALL_WRAP(name, recvmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, size_t len, int flags), \

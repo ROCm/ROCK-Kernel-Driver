@@ -84,11 +84,11 @@ static int acpi_thermal_remove (struct acpi_device *device, int type);
 static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file);
 static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file);
 static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file);
-static ssize_t acpi_thermal_write_trip_points (struct file*,const char *,size_t,loff_t *);
+static ssize_t acpi_thermal_write_trip_points (struct file*,const char __user *,size_t,loff_t *);
 static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file);
-static ssize_t acpi_thermal_write_cooling_mode (struct file*,const char *,size_t,loff_t *);
+static ssize_t acpi_thermal_write_cooling_mode (struct file*,const char __user *,size_t,loff_t *);
 static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file);
-static ssize_t acpi_thermal_write_polling(struct file*,const char *,size_t,loff_t *);
+static ssize_t acpi_thermal_write_polling(struct file*,const char __user *,size_t,loff_t *);
 
 static struct acpi_driver acpi_thermal_driver = {
 	.name =		ACPI_THERMAL_DRIVER_NAME,
@@ -885,7 +885,7 @@ static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file)
 static ssize_t
 acpi_thermal_write_trip_points (
         struct file		*file,
-        const char		*buffer,
+        const char		__user *buffer,
         size_t			count,
         loff_t			*ppos)
 {
@@ -954,7 +954,7 @@ static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file)
 static ssize_t
 acpi_thermal_write_cooling_mode (
 	struct file		*file,
-	const char		*buffer,
+	const char		__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
@@ -1015,7 +1015,7 @@ static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file)
 static ssize_t
 acpi_thermal_write_polling (
 	struct file		*file,
-	const char		*buffer,
+	const char		__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {

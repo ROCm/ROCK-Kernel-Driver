@@ -1,3 +1,5 @@
+/* Bluetooth HCI driver model support. */
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -7,7 +9,7 @@
 
 #ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #endif
 
 static ssize_t show_name(struct class_device *cdev, char *buf)

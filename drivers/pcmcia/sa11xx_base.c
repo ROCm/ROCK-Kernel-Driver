@@ -69,21 +69,6 @@ sa1100_pcmcia_default_mecr_timing(struct soc_pcmcia_socket *skt,
 	return sa1100_pcmcia_mecr_bs(cmd_time, cpu_speed);
 }
 
-static unsigned short
-calc_speed(unsigned short *spds, int num, unsigned short dflt)
-{
-	unsigned short speed = 0;
-	int i;
-
-	for (i = 0; i < num; i++)
-		if (speed < spds[i])
-			speed = spds[i];
-	if (speed == 0)
-		speed = dflt;
-
-	return speed;
-}
-
 /* sa1100_pcmcia_set_mecr()
  * ^^^^^^^^^^^^^^^^^^^^^^^^
  *
@@ -95,19 +80,16 @@ calc_speed(unsigned short *spds, int num, unsigned short dflt)
 static int
 sa1100_pcmcia_set_mecr(struct soc_pcmcia_socket *skt, unsigned int cpu_clock)
 {
+	struct soc_pcmcia_timing timing;
 	u32 mecr, old_mecr;
 	unsigned long flags;
-	unsigned short speed;
 	unsigned int bs_io, bs_mem, bs_attr;
 
-	speed = calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
-	bs_io = skt->ops->get_timing(skt, cpu_clock, speed);
+	soc_common_pcmcia_get_timing(skt, &timing);
 
-	speed = calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
-	bs_mem = skt->ops->get_timing(skt, cpu_clock, speed);
-
-	speed = calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
-	bs_attr = skt->ops->get_timing(skt, cpu_clock, speed);
+	bs_io = skt->ops->get_timing(skt, cpu_clock, timing.io);
+	bs_mem = skt->ops->get_timing(skt, cpu_clock, timing.mem);
+	bs_attr = skt->ops->get_timing(skt, cpu_clock, timing.attr);
 
 	local_irq_save(flags);
 
@@ -138,20 +120,20 @@ sa1100_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
 static int
 sa1100_pcmcia_show_timing(struct soc_pcmcia_socket *skt, char *buf)
 {
+	struct soc_pcmcia_timing timing;
 	unsigned int clock = cpufreq_get(0);
 	unsigned long mecr = MECR;
 	char *p = buf;
 
-	p+=sprintf(p, "I/O      : %u (%u)\n",
-		   calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS),
+	soc_common_pcmcia_get_timing(skt, &timing);
+
+	p+=sprintf(p, "I/O      : %u (%u)\n", timing.io,
 		   sa1100_pcmcia_cmd_time(clock, MECR_BSIO_GET(mecr, skt->nr)));
 
-	p+=sprintf(p, "attribute: %u (%u)\n",
-		   calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS),
+	p+=sprintf(p, "attribute: %u (%u)\n", timing.attr,
 		   sa1100_pcmcia_cmd_time(clock, MECR_BSA_GET(mecr, skt->nr)));
 
-	p+=sprintf(p, "common   : %u (%u)\n",
-		   calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS),
+	p+=sprintf(p, "common   : %u (%u)\n", timing.mem,
 		   sa1100_pcmcia_cmd_time(clock, MECR_BSM_GET(mecr, skt->nr)));
 
 	return p - buf;

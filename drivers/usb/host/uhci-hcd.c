@@ -95,6 +95,10 @@ static kmem_cache_t *uhci_up_cachep;	/* urb_priv */
 static int uhci_get_current_frame_number(struct uhci_hcd *uhci);
 static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb);
 static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb);
+static void uhci_remove_pending_urbps(struct uhci_hcd *uhci);
+static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs);
+static void uhci_free_pending_qhs(struct uhci_hcd *uhci);
+static void uhci_free_pending_tds(struct uhci_hcd *uhci);
 
 static void hc_state_transitions(struct uhci_hcd *uhci);
 
@@ -373,6 +377,7 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	struct uhci_qh *pqh;
 	u32 newlink;
+	unsigned int age;
 
 	if (!qh)
 		return;
@@ -424,6 +429,12 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 
 	list_del_init(&qh->urbp->queue_list);
 	qh->urbp = NULL;
+
+	age = uhci_get_current_frame_number(uhci);
+	if (age != uhci->qh_remove_age) {
+		uhci_free_pending_qhs(uhci);
+		uhci->qh_remove_age = age;
+	}
 
 	/* Check to see if the remove list is empty. Set the IOC bit */
 	/* to force an interrupt so we can remove the QH */
@@ -628,6 +639,7 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 {
 	struct list_head *head, *tmp;
 	struct urb_priv *urbp;
+	unsigned int age;
 
 	urbp = (struct urb_priv *)urb->hcpriv;
 	if (!urbp)
@@ -636,6 +648,12 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 	if (!list_empty(&urbp->urb_list))
 		dev_warn(uhci_dev(uhci), "urb %p still on uhci->urb_list "
 				"or uhci->remove_list!\n", urb);
+
+	age = uhci_get_current_frame_number(uhci);
+	if (age != uhci->td_remove_age) {
+		uhci_free_pending_tds(uhci);
+		uhci->td_remove_age = age;
+	}
 
 	/* Check to see if the remove list is empty. Set the IOC bit */
 	/* to force an interrupt so we can remove the TD's*/
@@ -1512,6 +1530,7 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
 	struct urb_priv *urbp;
+	unsigned int age;
 
 	spin_lock_irqsave(&uhci->schedule_lock, flags);
 	urbp = urb->hcpriv;
@@ -1520,6 +1539,12 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	list_del_init(&urbp->urb_list);
 
 	uhci_unlink_generic(uhci, urb);
+
+	age = uhci_get_current_frame_number(uhci);
+	if (age != uhci->urb_remove_age) {
+		uhci_remove_pending_urbps(uhci);
+		uhci->urb_remove_age = age;
+	}
 
 	/* If we're the first, set the next interrupt bit */
 	if (list_empty(&uhci->urb_remove_list))
@@ -1590,6 +1615,12 @@ static void stall_callback(unsigned long ptr)
 	INIT_LIST_HEAD(&list);
 
 	spin_lock_irqsave(&uhci->schedule_lock, flags);
+	if (!list_empty(&uhci->urb_remove_list) &&
+	    uhci_get_current_frame_number(uhci) != uhci->urb_remove_age) {
+		uhci_remove_pending_urbps(uhci);
+		uhci_finish_completion(hcd, NULL);
+	}
+
 	head = &uhci->urb_list;
 	tmp = head->next;
 	while (tmp != head) {
@@ -1728,6 +1759,7 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 	unsigned int io_addr = uhci->io_addr;
 	unsigned short status;
 	struct list_head *tmp, *head;
+	unsigned int age;
 
 	/*
 	 * Read the interrupt status, and write it back to clear the
@@ -1758,11 +1790,20 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 	spin_lock(&uhci->schedule_lock);
 
-	uhci_free_pending_qhs(uhci);
-	uhci_free_pending_tds(uhci);
-	uhci_remove_pending_urbps(uhci);
+	age = uhci_get_current_frame_number(uhci);
+	if (age != uhci->qh_remove_age)
+		uhci_free_pending_qhs(uhci);
+	if (age != uhci->td_remove_age)
+		uhci_free_pending_tds(uhci);
+	if (age != uhci->urb_remove_age)
+		uhci_remove_pending_urbps(uhci);
 
-	uhci_clear_next_interrupt(uhci);
+	if (list_empty(&uhci->urb_remove_list) &&
+	    list_empty(&uhci->td_remove_list) &&
+	    list_empty(&uhci->qh_remove_list))
+		uhci_clear_next_interrupt(uhci);
+	else
+		uhci_set_next_interrupt(uhci);
 
 	/* Walk the list of pending URB's to see which ones completed */
 	head = &uhci->urb_list;

@@ -184,7 +184,7 @@ static loff_t msr_seek(struct file *file, loff_t offset, int orig)
 static ssize_t msr_read(struct file *file, char __user * buf,
 			size_t count, loff_t * ppos)
 {
-	u32 *tmp = (u32 *) buf;
+	u32 __user *tmp = (u32 __user *) buf;
 	u32 data[2];
 	size_t rv;
 	u32 reg = *ppos;
@@ -203,13 +203,13 @@ static ssize_t msr_read(struct file *file, char __user * buf,
 		tmp += 2;
 	}
 
-	return ((char *)tmp) - buf;
+	return ((char __user *)tmp) - buf;
 }
 
 static ssize_t msr_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
-	const u32 *tmp = (const u32 *)buf;
+	const u32 __user *tmp = (const u32 __user *)buf;
 	u32 data[2];
 	size_t rv;
 	u32 reg = *ppos;
@@ -228,7 +228,7 @@ static ssize_t msr_write(struct file *file, const char __user *buf,
 		tmp += 2;
 	}
 
-	return ((char *)tmp) - buf;
+	return ((char __user *)tmp) - buf;
 }
 
 static int msr_open(struct inode *inode, struct file *file)

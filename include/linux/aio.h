@@ -149,11 +149,11 @@ struct mm_struct;
 extern void FASTCALL(exit_aio(struct mm_struct *mm));
 extern struct kioctx *lookup_ioctx(unsigned long ctx_id);
 extern int FASTCALL(io_submit_one(struct kioctx *ctx,
-			struct iocb *user_iocb, struct iocb *iocb));
+			struct iocb __user *user_iocb, struct iocb *iocb));
 
 /* semi private, but used by the 32bit emulations: */
 struct kioctx *lookup_ioctx(unsigned long ctx_id);
-int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
+int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 				  struct iocb *iocb));
 
 #define get_ioctx(kioctx)	do { if (unlikely(atomic_read(&(kioctx)->users) <= 0)) BUG(); atomic_inc(&(kioctx)->users); } while (0)

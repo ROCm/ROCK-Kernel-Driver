@@ -31,7 +31,7 @@ static void module_unmap(void * addr)
 		return;
 	}
 
-	for (p = &modvmlist ; (tmp = *p) ; p = &tmp->next) {
+	for (p = &modvmlist; (tmp = *p) != NULL; p = &tmp->next) {
 		if (tmp->addr == addr) {
 			*p = tmp->next;
 			goto found;
@@ -66,7 +66,7 @@ static void *module_map(unsigned long size)
 		return NULL;
 		
 	addr = (void *) MODULES_VADDR;
-	for (p = &modvmlist; (tmp = *p) ; p = &tmp->next) {
+	for (p = &modvmlist; (tmp = *p) != NULL; p = &tmp->next) {
 		if (size + (unsigned long) addr < (unsigned long) tmp->addr)
 			break;
 		addr = (void *) (tmp->size + (unsigned long) tmp->addr);

@@ -2491,7 +2491,7 @@ static int cdrom_get_toc_entry(ide_drive_t *drive, int track,
 
 /* the generic packet interface to cdrom.c */
 static int ide_cdrom_packet(struct cdrom_device_info *cdi,
-			    struct cdrom_generic_command *cgc)
+			    struct packet_command *cgc)
 {
 	struct request req;
 	ide_drive_t *drive = (ide_drive_t*) cdi->handle;
@@ -2524,7 +2524,7 @@ static
 int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
 			 unsigned int cmd, unsigned long arg)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[16];
 	int stat;
 
@@ -2535,7 +2535,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  	case CDROMSETSPINDOWN: {
  		char spindown;
  
- 		if (copy_from_user(&spindown, (void *) arg, sizeof(char)))
+ 		if (copy_from_user(&spindown, (void __user *) arg, sizeof(char)))
 			return -EFAULT;
  
                 if ((stat = cdrom_mode_sense(cdi, &cgc, GPMODE_CDROM_PAGE, 0)))
@@ -2554,7 +2554,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  
  		spindown = buffer[11] & 0x0f;
  
-		if (copy_to_user((void *) arg, &spindown, sizeof (char)))
+		if (copy_to_user((void __user *) arg, &spindown, sizeof (char)))
 			return -EFAULT;
  
  		return 0;
@@ -2908,7 +2908,7 @@ int ide_cdrom_get_capabilities(ide_drive_t *drive, struct atapi_capabilities_pag
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int stat, attempts = 3, size = sizeof(*cap);
 
 	/*

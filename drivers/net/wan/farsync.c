@@ -21,9 +21,10 @@
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
 #include <linux/if.h>
 #include <linux/hdlc.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include "farsync.h"
 

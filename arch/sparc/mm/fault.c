@@ -412,10 +412,10 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 		address = regs->pc;
 	} else if (!write &&
 		   !(regs->psr & PSR_PS)) {
-		unsigned int insn, *ip;
+		unsigned int insn, __user *ip;
 
-		ip = (unsigned int *)regs->pc;
-		if (! get_user(insn, ip)) {
+		ip = (unsigned int __user *)regs->pc;
+		if (!get_user(insn, ip)) {
 			if ((insn & 0xc1680000) == 0xc0680000)
 				write = 1;
 		}

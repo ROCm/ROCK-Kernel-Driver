@@ -385,6 +385,7 @@ pci_enable_device_bars(struct pci_dev *dev, int bars)
 int
 pci_enable_device(struct pci_dev *dev)
 {
+	dev->is_enabled = 1;
 	return pci_enable_device_bars(dev, (1 << PCI_NUM_RESOURCES) - 1);
 }
 
@@ -399,6 +400,9 @@ void
 pci_disable_device(struct pci_dev *dev)
 {
 	u16 pci_command;
+	
+	dev->is_enabled = 0;
+	dev->is_busmaster = 0;
 
 	pci_read_config_word(dev, PCI_COMMAND, &pci_command);
 	if (pci_command & PCI_COMMAND_MASTER) {
@@ -601,6 +605,7 @@ pci_set_master(struct pci_dev *dev)
 		cmd |= PCI_COMMAND_MASTER;
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
+	dev->is_busmaster = 1;
 	pcibios_set_master(dev);
 }
 

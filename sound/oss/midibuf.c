@@ -256,7 +256,7 @@ void MIDIbuf_release(int dev, struct file *file)
 	module_put(midi_devs[dev]->owner);
 }
 
-int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
+int MIDIbuf_write(int dev, struct file *file, const char __user *buf, int count)
 {
 	int c, n, i;
 	unsigned char tmp_data;
@@ -310,7 +310,7 @@ out:
 }
 
 
-int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
+int MIDIbuf_read(int dev, struct file *file, char __user *buf, int count)
 {
 	int n, c = 0;
 	unsigned char tmp_data;
@@ -359,7 +359,7 @@ out:
 }
 
 int MIDIbuf_ioctl(int dev, struct file *file,
-		  unsigned int cmd, caddr_t arg)
+		  unsigned int cmd, void __user *arg)
 {
 	int val;
 
@@ -377,13 +377,13 @@ int MIDIbuf_ioctl(int dev, struct file *file,
 		switch (cmd) 
 		{
 			case SNDCTL_MIDI_PRETIME:
-				if (get_user(val, (int *)arg))
+				if (get_user(val, (int __user *)arg))
 					return -EFAULT;
 				if (val < 0)
 					val = 0;
 				val = (HZ * val) / 10;
 				parms[dev].prech_timeout = val;
-				return put_user(val, (int *)arg);
+				return put_user(val, (int __user *)arg);
 			
 			default:
 				if (!midi_devs[dev]->ioctl)

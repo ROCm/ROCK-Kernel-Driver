@@ -455,7 +455,7 @@ int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 		unsigned long p4, unsigned long p5, unsigned long p6,
 		struct pt_regs *regs);
-int sys_pipe(int *fildes);
+int sys_pipe(int __user *fildes);
 int sys_ptrace(long request, long pid, long addr, long data);
 struct sigaction;
 long sys_rt_sigaction(int sig, const struct sigaction __user *act,

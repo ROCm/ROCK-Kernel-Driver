@@ -34,12 +34,4 @@ config EFI_VARS
 	  Subsequent efibootmgr releases may be found at:
 	  http://linux.dell.com/efibootmgr
 
-config SMBIOS
-	tristate "BIOS SMBIOS table access driver."
-	help
-	  Say Y or M here if you want to enable access to the SMBIOS table
-	  via driverfs. It exposes /sys/firmware/smbios/ subdirectory tree
-	  containing a binary dump of the SMBIOS table header as well as the SMBIOS
-	  table.
-
 endmenu

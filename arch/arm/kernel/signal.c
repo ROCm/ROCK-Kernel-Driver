@@ -427,8 +427,8 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 		 * arguments for the signal handler.
 		 *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk> 2000-12-06
 		 */
-		regs->ARM_r1 = (unsigned long)frame->pinfo;
-		regs->ARM_r2 = (unsigned long)frame->puc;
+		regs->ARM_r1 = (unsigned long)&frame->info;
+		regs->ARM_r2 = (unsigned long)&frame->uc;
 	}
 
 	return err;
@@ -564,10 +564,10 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 				regs->ARM_r7 = __NR_restart_syscall;
 				regs->ARM_pc -= 2;
 			} else {
-				u32 *usp;
+				u32 __user *usp;
 
 				regs->ARM_sp -= 12;
-				usp = (u32 *)regs->ARM_sp;
+				usp = (u32 __user *)regs->ARM_sp;
 
 				put_user(regs->ARM_pc, &usp[0]);
 				/* swi __NR_restart_syscall */

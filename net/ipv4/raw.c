@@ -568,7 +568,7 @@ static int raw_init(struct sock *sk)
 	return 0;
 }
 
-static int raw_seticmpfilter(struct sock *sk, char *optval, int optlen)
+static int raw_seticmpfilter(struct sock *sk, char __user *optval, int optlen)
 {
 	if (optlen > sizeof(struct icmp_filter))
 		optlen = sizeof(struct icmp_filter);
@@ -577,7 +577,7 @@ static int raw_seticmpfilter(struct sock *sk, char *optval, int optlen)
 	return 0;
 }
 
-static int raw_geticmpfilter(struct sock *sk, char *optval, int *optlen)
+static int raw_geticmpfilter(struct sock *sk, char __user *optval, int __user *optlen)
 {
 	int len, ret = -EFAULT;
 
@@ -597,7 +597,7 @@ out:	return ret;
 }
 
 static int raw_setsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	if (level != SOL_RAW)
 		return ip_setsockopt(sk, level, optname, optval, optlen);
@@ -612,7 +612,7 @@ static int raw_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int raw_getsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int *optlen)
+			  char __user *optval, int __user *optlen)
 {
 	if (level != SOL_RAW)
 		return ip_getsockopt(sk, level, optname, optval, optlen);
@@ -631,7 +631,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 	switch (cmd) {
 		case SIOCOUTQ: {
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCINQ: {
 			struct sk_buff *skb;
@@ -642,7 +642,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 			if (skb != NULL)
 				amount = skb->len;
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:

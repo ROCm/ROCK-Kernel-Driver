@@ -599,7 +599,7 @@ extern void close_private_file(struct file *file);
 #if BITS_PER_LONG==32
 #define MAX_LFS_FILESIZE	(((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG-1))-1) 
 #elif BITS_PER_LONG==64
-#define MAX_LFS_FILESIZE 	0x7fffffffffffffff
+#define MAX_LFS_FILESIZE 	0x7fffffffffffffffUL
 #endif
 
 #define FL_POSIX	1

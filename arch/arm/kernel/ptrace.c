@@ -622,7 +622,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			ret = access_process_vm(child, addr, &tmp,
 						sizeof(unsigned long), 0);
 			if (ret == sizeof(unsigned long))
-				ret = put_user(tmp, (unsigned long *) data);
+				ret = put_user(tmp, (unsigned long __user *) data);
 			else
 				ret = -EIO;
 			break;

@@ -256,7 +256,7 @@ midi_synth_output(int dev)
 	 */
 }
 
-int midi_synth_ioctl(int dev, unsigned int cmd, caddr_t arg)
+int midi_synth_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	/*
 	 * int orig_dev = synth_devs[dev]->midi_dev;
@@ -466,7 +466,7 @@ midi_synth_hw_control(int dev, unsigned char *event)
 }
 
 int
-midi_synth_load_patch(int dev, int format, const char *addr,
+midi_synth_load_patch(int dev, int format, const char __user *addr,
 		      int offs, int count, int pmgr_flag)
 {
 	int             orig_dev = synth_devs[dev]->midi_dev;
@@ -514,7 +514,7 @@ midi_synth_load_patch(int dev, int format, const char *addr,
 	{
 		unsigned char   data;
 
-		get_user(*(unsigned char *) &data, (unsigned char *) &((addr)[hdr_size + i]));
+		get_user(*(unsigned char *) &data, (unsigned char __user *) &((addr)[hdr_size + i]));
 
 		eox_seen = (i > 0 && data & 0x80);	/* End of sysex */
 

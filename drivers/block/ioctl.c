@@ -5,7 +5,7 @@
 #include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
-static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
+static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg __user *arg)
 {
 	struct block_device *bdevp;
 	struct gendisk *disk;
@@ -109,27 +109,27 @@ static int blkdev_reread_part(struct block_device *bdev)
 
 static int put_ushort(unsigned long arg, unsigned short val)
 {
-	return put_user(val, (unsigned short *)arg);
+	return put_user(val, (unsigned short __user *)arg);
 }
 
 static int put_int(unsigned long arg, int val)
 {
-	return put_user(val, (int *)arg);
+	return put_user(val, (int __user *)arg);
 }
 
 static int put_long(unsigned long arg, long val)
 {
-	return put_user(val, (long *)arg);
+	return put_user(val, (long __user *)arg);
 }
 
 static int put_ulong(unsigned long arg, unsigned long val)
 {
-	return put_user(val, (unsigned long *)arg);
+	return put_user(val, (unsigned long __user *)arg);
 }
 
 static int put_u64(unsigned long arg, u64 val)
 {
-	return put_user(val, (u64 *)arg);
+	return put_user(val, (u64 __user *)arg);
 }
 
 int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
@@ -172,7 +172,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			return -EACCES;
 		if (!arg)
 			return -EINVAL;
-		if (get_user(n, (int *) arg))
+		if (get_user(n, (int __user *) arg))
 			return -EFAULT;
 		if (bd_claim(bdev, file) < 0)
 			return -EBUSY;
@@ -180,7 +180,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 		bd_release(bdev);
 		return ret;
 	case BLKPG:
-		return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
+		return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg __user *) arg);
 	case BLKRRPART:
 		return blkdev_reread_part(bdev);
 	case BLKGETSIZE:
@@ -209,7 +209,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 		}
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
-		if (get_user(n, (int *)(arg)))
+		if (get_user(n, (int __user *)(arg)))
 			return -EFAULT;
 		set_device_ro(bdev, n);
 		return 0;

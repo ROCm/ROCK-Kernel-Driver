@@ -33,6 +33,7 @@
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <linux/usb.h>
 
 #define POWERMATE_VENDOR	0x077d	/* Griffin Technology, Inc. */
@@ -67,7 +68,7 @@ struct powermate_device {
 	dma_addr_t configcr_dma;
 	struct usb_device *udev;
 	struct input_dev input;
-	struct semaphore lock;
+	spinlock_t lock;
 	int static_brightness;
 	int pulse_speed;
 	int pulse_table;
@@ -116,7 +117,7 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-/* Decide if we need to issue a control message and do so. Must be called with pm->lock down */
+/* Decide if we need to issue a control message and do so. Must be called with pm->lock taken */
 static void powermate_sync_state(struct powermate_device *pm)
 {
 	if (pm->requires_update == 0) 
@@ -194,19 +195,22 @@ static void powermate_sync_state(struct powermate_device *pm)
 static void powermate_config_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct powermate_device *pm = urb->context;
+	unsigned long flags;
 
 	if (urb->status)
 		printk(KERN_ERR "powermate: config urb returned %d\n", urb->status);
 	
-	down(&pm->lock);
+	spin_lock_irqsave(&pm->lock, flags);
 	powermate_sync_state(pm);
-	up(&pm->lock);
+	spin_unlock_irqrestore(&pm->lock, flags);
 }
 
 /* Set the LED up as described and begin the sync with the hardware if required */
 static void powermate_pulse_led(struct powermate_device *pm, int static_brightness, int pulse_speed, 
 				int pulse_table, int pulse_asleep, int pulse_awake)
 {
+	unsigned long flags;
+
 	if (pulse_speed < 0)
 		pulse_speed = 0;
 	if (pulse_table < 0)
@@ -219,7 +223,8 @@ static void powermate_pulse_led(struct powermate_device *pm, int static_brightne
 	pulse_asleep = !!pulse_asleep;
 	pulse_awake = !!pulse_awake;
 
-	down(&pm->lock);
+
+	spin_lock_irqsave(&pm->lock, flags);
 
 	/* mark state updates which are required */
 	if (static_brightness != pm->static_brightness){
@@ -242,7 +247,7 @@ static void powermate_pulse_led(struct powermate_device *pm, int static_brightne
 
 	powermate_sync_state(pm);
    
-	up(&pm->lock);
+	spin_unlock_irqrestore(&pm->lock, flags);
 }
 
 /* Callback from the Input layer when an event arrives from userspace to configure the LED */
@@ -344,7 +349,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 		return -ENOMEM;
 	}
 
-	init_MUTEX(&pm->lock);
+	pm->lock = SPIN_LOCK_UNLOCKED;
 	init_input_dev(&pm->input);
 
 	/* get a handle to the interrupt data pipe */
@@ -411,7 +416,6 @@ static void powermate_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 	if (pm) {
-		down(&pm->lock);
 		pm->requires_update = 0;
 		usb_unlink_urb(pm->irq);
 		input_unregister_device(&pm->input);

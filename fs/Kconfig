@@ -1569,20 +1569,30 @@ config CIFS
 	  This is the client VFS module for the Common Internet File System
 	  (CIFS) protocol which is the successor to the Server Message Block 
 	  (SMB) protocol, the native file sharing mechanism for most early
-	  PC operating systems.  CIFS is fully supported by current network
-	  file servers such as Windows 2000 (including Windows NT version 4 
+	  PC operating systems.  The CIFS protocol is fully supported by 
+	  file servers such as Windows 2000 (including Windows 2003, NT 4  
 	  and Windows XP) as well by Samba (which provides excellent CIFS
-	  server support for Linux and many other operating systems).  For
-	  production systems the smbfs module may be used instead of this
-	  cifs module since smbfs is currently more stable and provides
-	  support for older servers.  The intent of this module is to provide the
-	  most advanced network file system function for CIFS compliant servers, 
+	  server support for Linux and many other operating systems). Currently
+	  you must use the smbfs client filesystem to access older SMB servers
+	  such as Windows 9x and OS/2.
+
+	  The intent of the cifs module is to provide an advanced
+	  network file system client for mounting to CIFS compliant servers, 
 	  including support for dfs (hierarchical name space), secure per-user
 	  session establishment, safe distributed caching (oplock), optional
-	  packet signing, Unicode and other internationalization improvements, and
-	  optional Winbind (nsswitch) integration.  This module is in an early
-	  development stage, so unless you are specifically interested in this
-	  filesystem, just say N.
+	  packet signing, Unicode and other internationalization improvements, 
+	  and optional Winbind (nsswitch) integration. You do not need to enable
+	  cifs if running only a (Samba) server. It is possible to enable both
+	  smbfs and cifs (e.g. if you are using CIFS for accessing Windows 2003
+	  and Samba 3 servers, and smbfs for accessing old servers). If you need 
+	  to mount to Samba or Windows 2003 servers from this machine, say Y.
+
+config CIFS_STATS
+        bool "CIFS statistics"
+        depends on CIFS
+        help
+          Enabling this option will cause statistics for each server share
+	  mounted by the cifs client to be displayed in /proc/fs/cifs/DebugData
 
 config NCP_FS
 	tristate "NCP file system support (to mount NetWare volumes)"

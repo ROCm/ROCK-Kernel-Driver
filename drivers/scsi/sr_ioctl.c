@@ -34,7 +34,7 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 {
 	struct cdrom_tocentry trk0_te, trk1_te;
 	struct cdrom_tochdr tochdr;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int ntracks, ret;
 
 	if ((ret = sr_audio_ioctl(cdi, CDROMREADTOCHDR, &tochdr)))
@@ -57,7 +57,7 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 	if ((ret = sr_audio_ioctl(cdi, CDROMREADTOCENTRY, &trk1_te)))
 		return ret;
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_PLAY_AUDIO_MSF;
 	cgc.cmd[3] = trk0_te.cdte_addr.msf.minute;
 	cgc.cmd[4] = trk0_te.cdte_addr.msf.second;
@@ -74,7 +74,7 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
    error code is.  Normally the UNIT_ATTENTION code will automatically
    clear after one error */
 
-int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
+int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 {
 	struct scsi_request *SRpnt;
 	struct scsi_device *SDev;
@@ -178,9 +178,9 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 
 static int test_unit_ready(Scsi_CD *cd)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_TEST_UNIT_READY;
 	cgc.quiet = 1;
 	cgc.data_direction = SCSI_DATA_NONE;
@@ -191,9 +191,9 @@ static int test_unit_ready(Scsi_CD *cd)
 int sr_tray_move(struct cdrom_device_info *cdi, int pos)
 {
 	Scsi_CD *cd = cdi->handle;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_START_STOP_UNIT;
 	cgc.cmd[4] = (pos == 0) ? 0x03 /* close */ : 0x02 /* eject */ ;
 	cgc.data_direction = SCSI_DATA_NONE;
@@ -269,11 +269,11 @@ int sr_get_last_session(struct cdrom_device_info *cdi,
 int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 {
 	Scsi_CD *cd = cdi->handle;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
 	int result;
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_READ_SUBCHANNEL;
 	cgc.cmd[2] = 0x40;	/* I do want the subchannel info */
 	cgc.cmd[3] = 0x02;	/* Give me medium catalog number info */
@@ -299,14 +299,14 @@ int sr_reset(struct cdrom_device_info *cdi)
 int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 {
 	Scsi_CD *cd = cdi->handle;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
 	if (speed == 0)
 		speed = 0xffff;	/* set to max */
 	else
 		speed *= 177;	/* Nx to kbyte/s */
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_SET_SPEED;	/* SET CD SPEED */
 	cgc.cmd[2] = (speed >> 8) & 0xff;	/* MSB for speed (in kbytes/sec) */
 	cgc.cmd[3] = speed & 0xff;	/* LSB */
@@ -327,11 +327,11 @@ int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 {
 	Scsi_CD *cd = cdi->handle;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int result;
 	unsigned char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.timeout = IOCTL_TIMEOUT;
 
 	switch (cmd) {
@@ -428,14 +428,14 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 
 static int sr_read_cd(Scsi_CD *cd, unsigned char *dest, int lba, int format, int blksize)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
 #ifdef DEBUG
 	printk("%s: sr_read_cd lba=%d format=%d blksize=%d\n",
 	       cd->cdi.name, lba, format, blksize);
 #endif
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_READ_CD;	/* READ_CD */
 	cgc.cmd[1] = ((format & 7) << 2);
 	cgc.cmd[2] = (unsigned char) (lba >> 24) & 0xff;
@@ -470,7 +470,7 @@ static int sr_read_cd(Scsi_CD *cd, unsigned char *dest, int lba, int format, int
 
 static int sr_read_sector(Scsi_CD *cd, int lba, int blksize, unsigned char *dest)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int rc;
 
 	/* we try the READ CD command first... */
@@ -491,7 +491,7 @@ static int sr_read_sector(Scsi_CD *cd, int lba, int blksize, unsigned char *dest
 	printk("%s: sr_read_sector lba=%d blksize=%d\n", cd->cdi.name, lba, blksize);
 #endif
 
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_READ_10;
 	cgc.cmd[2] = (unsigned char) (lba >> 24) & 0xff;
 	cgc.cmd[3] = (unsigned char) (lba >> 16) & 0xff;
@@ -541,5 +541,5 @@ int sr_dev_ioctl(struct cdrom_device_info *cdi,
 		 unsigned int cmd, unsigned long arg)
 {
 	Scsi_CD *cd = cdi->handle;
-	return scsi_ioctl(cd->device, cmd, (void *)arg);
+	return scsi_ioctl(cd->device, cmd, (void __user *)arg);
 }

@@ -185,6 +185,11 @@ W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
 W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
 S:	Maintained
 
+ADT746X FAN DRIVER
+P:	Colin Leroy
+M:	colin@colino.net
+S:	Maintained
+
 ADVANSYS SCSI DRIVER
 P:	Bob Frey
 M:	linux@advansys.com
@@ -354,6 +359,8 @@ P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 L:	bluez-devel@lists.sf.net
 W:	http://bluez.sf.net
+W:	http://www.bluez.org
+W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH RFCOMM LAYER
@@ -361,7 +368,6 @@ P:	Marcel Holtmann
 M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH BNEP LAYER
@@ -369,21 +375,11 @@ P:	Marcel Holtmann
 M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH CMTP LAYER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
-S:	Maintained
-
-BLUETOOTH HCI USB DRIVER
-P:	Marcel Holtmann
-M:	marcel@holtmann.org
-P:	Maxim Krasnyansky
-M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH HCI UART DRIVER
@@ -391,49 +387,48 @@ P:	Marcel Holtmann
 M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI USB DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
 S:	Maintained
 
 BLUETOOTH HCI BCM203X DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI BFUSB DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI DTL1 DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI BLUECARD DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI BT3C DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI BTUART DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
-W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI VHCI DRIVER
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
 S:	Maintained
 
 BONDING DRIVER
@@ -628,10 +623,9 @@ W:	http://www.debian.org/~dz/i8k/
 S:	Maintained
 
 DEVICE-MAPPER
-P:	Joe Thornber
-M:	dm@uk.sistina.com
-L:	linux-lvm@sistina.com
-W:	http://www.sistina.com/lvm
+P:	Alasdair Kergon
+L:	dm-devel@redhat.com
+W:	http://sources.redhat.com/dm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY

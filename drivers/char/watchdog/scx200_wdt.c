@@ -25,6 +25,7 @@
 #include <linux/watchdog.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
+#include <linux/fs.h>
 #include <linux/pci.h>
 #include <linux/scx200.h>
 

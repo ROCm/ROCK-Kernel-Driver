@@ -76,9 +76,9 @@
 #define A(__x)		((unsigned long)(__x))
 #define AA(__x)		((unsigned long)(__x))
 #define ROUND_UP(x,a)	((__typeof__(x))(((unsigned long)(x) + ((a) - 1)) & ~((a) - 1)))
-#define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
+#define NAME_OFFSET(de) ((int) ((de)->d_name - (char __user *) (de)))
 
-int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
+int cp_compat_stat(struct kstat *kbuf, struct compat_stat __user *ubuf)
 {
 	typeof(ubuf->st_uid) uid = 0;
 	typeof(ubuf->st_gid) gid = 0;
@@ -110,7 +110,7 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 }
 
 asmlinkage long
-sys32_truncate64(char * filename, unsigned long offset_low, unsigned long offset_high)
+sys32_truncate64(char __user * filename, unsigned long offset_low, unsigned long offset_high)
 {
        return sys_truncate(filename, ((loff_t) offset_high << 32) | offset_low);
 }
@@ -125,7 +125,7 @@ sys32_ftruncate64(unsigned int fd, unsigned long offset_low, unsigned long offse
    support for 64bit inode numbers. */
 
 static int
-cp_stat64(struct stat64 *ubuf, struct kstat *stat)
+cp_stat64(struct stat64 __user *ubuf, struct kstat *stat)
 {
 	typeof(ubuf->st_uid) uid = 0;
 	typeof(ubuf->st_gid) gid = 0;
@@ -154,7 +154,7 @@ cp_stat64(struct stat64 *ubuf, struct kstat *stat)
 }
 
 asmlinkage long
-sys32_stat64(char * filename, struct stat64 *statbuf)
+sys32_stat64(char __user * filename, struct stat64 __user *statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_stat(filename, &stat);
@@ -164,7 +164,7 @@ sys32_stat64(char * filename, struct stat64 *statbuf)
 }
 
 asmlinkage long
-sys32_lstat64(char * filename, struct stat64 *statbuf)
+sys32_lstat64(char __user * filename, struct stat64 __user *statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_lstat(filename, &stat);
@@ -174,7 +174,7 @@ sys32_lstat64(char * filename, struct stat64 *statbuf)
 }
 
 asmlinkage long
-sys32_fstat64(unsigned int fd, struct stat64 *statbuf)
+sys32_fstat64(unsigned int fd, struct stat64 __user *statbuf)
 {
 	struct kstat stat;
 	int ret = vfs_fstat(fd, &stat);
@@ -199,7 +199,7 @@ struct mmap_arg_struct {
 };
 
 asmlinkage long
-sys32_mmap(struct mmap_arg_struct *arg)
+sys32_mmap(struct mmap_arg_struct __user *arg)
 {
 	struct mmap_arg_struct a;
 	struct file *file = NULL;
@@ -241,7 +241,7 @@ sys32_mprotect(unsigned long start, size_t len, unsigned long prot)
 }
 
 asmlinkage long
-sys32_pipe(int *fd)
+sys32_pipe(int __user *fd)
 {
 	int retval;
 	int fds[2];
@@ -256,8 +256,8 @@ sys32_pipe(int *fd)
 }
 
 asmlinkage long
-sys32_rt_sigaction(int sig, struct sigaction32 *act,
-		   struct sigaction32 *oact,  unsigned int sigsetsize)
+sys32_rt_sigaction(int sig, struct sigaction32 __user *act,
+		   struct sigaction32 __user *oact,  unsigned int sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -321,7 +321,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act,
 }
 
 asmlinkage long
-sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *oact)
+sys32_sigaction (int sig, struct old_sigaction32 __user *act, struct old_sigaction32 __user *oact)
 {
         struct k_sigaction new_ka, old_ka;
         int ret;
@@ -395,7 +395,7 @@ sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
 }
 
 static inline long
-get_tv32(struct timeval *o, struct compat_timeval *i)
+get_tv32(struct timeval *o, struct compat_timeval __user *i)
 {
 	int err = -EFAULT; 
 	if (access_ok(VERIFY_READ, i, sizeof(*i))) { 
@@ -406,7 +406,7 @@ get_tv32(struct timeval *o, struct compat_timeval *i)
 }
 
 static inline long
-put_tv32(struct compat_timeval *o, struct timeval *i)
+put_tv32(struct compat_timeval __user *o, struct timeval *i)
 {
 	int err = -EFAULT;
 	if (access_ok(VERIFY_WRITE, o, sizeof(*o))) { 
@@ -442,7 +442,7 @@ sys32_alarm(unsigned int seconds)
 extern struct timezone sys_tz;
 
 asmlinkage long
-sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
+sys32_gettimeofday(struct compat_timeval __user *tv, struct timezone __user *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -458,7 +458,7 @@ sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 }
 
 asmlinkage long
-sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
+sys32_settimeofday(struct compat_timeval __user *tv, struct timezone __user *tz)
 {
 	struct timeval ktv;
 	struct timespec kts;
@@ -493,14 +493,14 @@ struct old_linux32_dirent {
 };
 
 struct getdents32_callback {
-	struct linux32_dirent * current_dir;
-	struct linux32_dirent * previous;
+	struct linux32_dirent __user * current_dir;
+	struct linux32_dirent __user * previous;
 	int count;
 	int error;
 };
 
 struct readdir32_callback {
-	struct old_linux32_dirent * dirent;
+	struct old_linux32_dirent __user * dirent;
 	int count;
 };
 
@@ -508,7 +508,7 @@ static int
 filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	   unsigned int d_type)
 {
-	struct linux32_dirent * dirent;
+	struct linux32_dirent __user * dirent;
 	struct getdents32_callback * buf = (struct getdents32_callback *) __buf;
 	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 2, 4);
 
@@ -524,18 +524,18 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	put_user(d_type, (char *)dirent + reclen - 1); 
-	dirent = ((void *)dirent) + reclen;
+	put_user(d_type, (char __user *)dirent + reclen - 1); 
+	dirent = ((void __user *)dirent) + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
 }
 
 asmlinkage long
-sys32_getdents (unsigned int fd, void * dirent, unsigned int count)
+sys32_getdents (unsigned int fd, void __user * dirent, unsigned int count)
 {
 	struct file * file;
-	struct linux32_dirent * lastdirent;
+	struct linux32_dirent __user * lastdirent;
 	struct getdents32_callback buf;
 	int error;
 
@@ -544,7 +544,7 @@ sys32_getdents (unsigned int fd, void * dirent, unsigned int count)
 	if (!file)
 		goto out;
 
-	buf.current_dir = (struct linux32_dirent *) dirent;
+	buf.current_dir = (struct linux32_dirent __user *) dirent;
 	buf.previous = NULL;
 	buf.count = count;
 	buf.error = 0;
@@ -569,7 +569,7 @@ static int
 fillonedir32 (void * __buf, const char * name, int namlen, loff_t offset, ino_t ino, unsigned d_type)
 {
 	struct readdir32_callback * buf = (struct readdir32_callback *) __buf;
-	struct old_linux32_dirent * dirent;
+	struct old_linux32_dirent __user * dirent;
 
 	if (buf->count)
 		return -EINVAL;
@@ -584,7 +584,7 @@ fillonedir32 (void * __buf, const char * name, int namlen, loff_t offset, ino_t 
 }
 
 asmlinkage long
-sys32_oldreaddir (unsigned int fd, void * dirent, unsigned int count)
+sys32_oldreaddir (unsigned int fd, void __user * dirent, unsigned int count)
 {
 	int error;
 	struct file * file;
@@ -615,7 +615,7 @@ struct sel_arg_struct {
 };
 
 asmlinkage long
-sys32_old_select(struct sel_arg_struct *arg)
+sys32_old_select(struct sel_arg_struct __user *arg)
 {
 	struct sel_arg_struct a;
 
@@ -630,7 +630,7 @@ sys32_old_select(struct sel_arg_struct *arg)
  * sys_gettimeofday().  x86-64 did this but i386 Linux did not
  * so we have to implement this system call here.
  */
-asmlinkage long sys32_time(int * tloc)
+asmlinkage long sys32_time(int __user * tloc)
 {
 	int i;
 	struct timeval tv;
@@ -693,7 +693,7 @@ struct sysinfo32 {
 };
 
 asmlinkage long
-sys32_sysinfo(struct sysinfo32 *info)
+sys32_sysinfo(struct sysinfo32 __user *info)
 {
 	struct sysinfo s;
 	int ret;
@@ -742,7 +742,7 @@ sys32_sysinfo(struct sysinfo32 *info)
 }
                 
 asmlinkage long
-sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_timespec *interval)
+sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_timespec __user *interval)
 {
 	struct timespec t;
 	int ret;
@@ -782,8 +782,8 @@ sys32_rt_sigpending(compat_sigset_t __user *set, compat_size_t sigsetsize)
 
 
 asmlinkage long
-sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
-		      struct compat_timespec *uts, compat_size_t sigsetsize)
+sys32_rt_sigtimedwait(compat_sigset_t __user *uthese, siginfo_t32 __user *uinfo,
+		      struct compat_timespec __user *uts, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -820,7 +820,7 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 }
 
 asmlinkage long
-sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
+sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
@@ -856,7 +856,7 @@ struct sysctl_ia32 {
 
 
 asmlinkage long
-sys32_sysctl(struct sysctl_ia32 *args32)
+sys32_sysctl(struct sysctl_ia32 __user *args32)
 {
 #ifndef CONFIG_SYSCTL
 	return -ENOSYS; 
@@ -906,14 +906,14 @@ sys32_sysctl(struct sysctl_ia32 *args32)
 
 /* warning: next two assume little endian */ 
 asmlinkage long
-sys32_pread(unsigned int fd, char *ubuf, u32 count, u32 poslo, u32 poshi)
+sys32_pread(unsigned int fd, char __user *ubuf, u32 count, u32 poslo, u32 poshi)
 {
 	return sys_pread64(fd, ubuf, count,
 			 ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
 asmlinkage long
-sys32_pwrite(unsigned int fd, char *ubuf, u32 count, u32 poslo, u32 poshi)
+sys32_pwrite(unsigned int fd, char __user *ubuf, u32 count, u32 poslo, u32 poshi)
 {
 	return sys_pwrite64(fd, ubuf, count,
 			  ((loff_t)AA(poshi) << 32) | AA(poslo));
@@ -934,7 +934,7 @@ sys32_personality(unsigned long personality)
 }
 
 asmlinkage long
-sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
+sys32_sendfile(int out_fd, int in_fd, compat_off_t __user *offset, s32 count)
 {
 	mm_segment_t old_fs = get_fs();
 	int ret;
@@ -971,7 +971,7 @@ struct timex32 {
 extern int do_adjtimex(struct timex *);
 
 asmlinkage long
-sys32_adjtimex(struct timex32 *utp)
+sys32_adjtimex(struct timex32 __user *utp)
 {
 	struct timex txc;
 	int ret;
@@ -1056,7 +1056,7 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 	return error;
 }
 
-asmlinkage long sys32_olduname(struct oldold_utsname * name)
+asmlinkage long sys32_olduname(struct oldold_utsname __user * name)
 {
 	int error;
 
@@ -1090,7 +1090,7 @@ asmlinkage long sys32_olduname(struct oldold_utsname * name)
 	 return error;
 }
 
-long sys32_uname(struct old_utsname * name)
+long sys32_uname(struct old_utsname __user * name)
 {
 	int err;
 	if (!name)
@@ -1124,7 +1124,7 @@ long sys32_ustat(unsigned dev, struct ustat32 __user *u32p)
 	return ret;
 } 
 
-asmlinkage long sys32_execve(char *name, compat_uptr_t __user *argv,
+asmlinkage long sys32_execve(char __user *name, compat_uptr_t __user *argv,
 			     compat_uptr_t __user *envp, struct pt_regs regs)
 {
 	long error;
@@ -1143,8 +1143,8 @@ asmlinkage long sys32_execve(char *name, compat_uptr_t __user *argv,
 
 asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp, struct pt_regs regs)
 {
-	void *parent_tid = (void *)regs.rdx;
-	void *child_tid = (void *)regs.rdi; 
+	void __user *parent_tid = (void __user *)regs.rdx;
+	void __user *child_tid = (void __user *)regs.rdi; 
 	if (!newsp)
 		newsp = regs.rsp;
         return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
@@ -1166,7 +1166,7 @@ long sys32_kill(int pid, int sig)
 }
  
 
-long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
+long sys32_io_setup(unsigned nr_reqs, u32 __user *ctx32p)
 { 
 	long ret; 
 	aio_context_t ctx64;
@@ -1181,7 +1181,7 @@ long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
 } 
 
 asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
-		   compat_uptr_t *iocbpp)
+		   compat_uptr_t __user *iocbpp)
 {
 	struct kioctx *ctx;
 	long ret = 0;
@@ -1201,7 +1201,8 @@ asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 
 	for (i=0; i<nr; i++) {
 		compat_uptr_t p32;
-		struct iocb *user_iocb, tmp;
+		struct iocb __user *user_iocb;
+		struct iocb tmp;
 
 		if (unlikely(__get_user(p32, iocbpp + i))) {
 			ret = -EFAULT;
@@ -1227,8 +1228,8 @@ asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
 				 unsigned long min_nr,
 				 unsigned long nr,
-				 struct io_event *events,
-				 struct compat_timespec *timeout)
+				 struct io_event __user *events,
+				 struct compat_timespec __user *timeout)
 { 	
 	long ret;
 	mm_segment_t oldfs; 
@@ -1248,7 +1249,7 @@ asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
 	return ret;
 } 
 
-asmlinkage long sys32_open(const char * filename, int flags, int mode)
+asmlinkage long sys32_open(const char __user * filename, int flags, int mode)
 {
 	char * tmp;
 	int fd, error;
@@ -1285,11 +1286,11 @@ sys_timer_create(clockid_t which_clock,
 		 timer_t __user * created_timer_id);
 
 long
-sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
+sys32_timer_create(u32 clock, struct sigevent32 __user *se32, timer_t __user *timer_id)
 {
 	struct sigevent se;
-       mm_segment_t oldfs;
-       long err;
+	mm_segment_t oldfs;
+	long err;
 
 	if (se32) { 
 		memset(&se, 0, sizeof(struct sigevent)); 
@@ -1303,9 +1304,9 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
 		return -EFAULT;
 
-       oldfs = get_fs();
+	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-       err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
+	err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
 	set_fs(oldfs); 
 	
 	return err; 

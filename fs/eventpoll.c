@@ -1451,11 +1451,10 @@ static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 		epi->revents = revents & epi->event.events;
 
 		if (epi->revents) {
-			if (__put_user(epi->event.events,
-					&events[eventcnt].events))
-				return -EFAULT;
-			if (__put_user(epi->event.data,
-					&events[eventcnt].data))
+			if (__put_user(epi->revents,
+				       &events[eventcnt].events) ||
+			    __put_user(epi->event.data,
+				       &events[eventcnt].data))
 				return -EFAULT;
 			if (epi->event.events & EPOLLONESHOT)
 				epi->event.events &= EP_PRIVATE_BITS;

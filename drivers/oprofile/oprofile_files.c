@@ -19,9 +19,9 @@ unsigned long fs_cpu_buffer_size = 8192;
 unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
 
  
-static ssize_t pointer_size_read(struct file * file, char * buf, size_t count, loff_t * offset)
+static ssize_t pointer_size_read(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
-	return oprofilefs_ulong_to_user((unsigned long)sizeof(void *), buf, count, offset);
+	return oprofilefs_ulong_to_user(sizeof(void *), buf, count, offset);
 }
 
 
@@ -30,7 +30,7 @@ static struct file_operations pointer_size_fops = {
 };
 
 
-static ssize_t cpu_type_read(struct file * file, char * buf, size_t count, loff_t * offset)
+static ssize_t cpu_type_read(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
 	return oprofilefs_str_to_user(oprofile_ops->cpu_type, buf, count, offset);
 }
@@ -41,13 +41,13 @@ static struct file_operations cpu_type_fops = {
 };
  
  
-static ssize_t enable_read(struct file * file, char * buf, size_t count, loff_t * offset)
+static ssize_t enable_read(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
 	return oprofilefs_ulong_to_user(oprofile_started, buf, count, offset);
 }
 
 
-static ssize_t enable_write(struct file *file, char const * buf, size_t count, loff_t * offset)
+static ssize_t enable_write(struct file *file, char const __user * buf, size_t count, loff_t * offset)
 {
 	unsigned long val;
 	int retval;
@@ -76,7 +76,7 @@ static struct file_operations enable_fops = {
 };
 
 
-static ssize_t dump_write(struct file *file, char const * buf, size_t count, loff_t * offset)
+static ssize_t dump_write(struct file *file, char const __user * buf, size_t count, loff_t * offset)
 {
 	wake_up_buffer_waiter();
 	return count;

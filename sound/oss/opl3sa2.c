@@ -389,9 +389,10 @@ static inline int ret_vol_stereo(int left, int right)
 }
 
 
-static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	int retval, value, cmdf = cmd & 0xff;
+	int __user *p = (int __user *)arg;
 
 	opl3sa2_state_t* devc = &opl3sa2_state[dev];
 	
@@ -416,23 +417,23 @@ static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	if (_SIOC_DIR (cmd) & _SIOC_WRITE) {
 		switch (cmdf) {
 			case SOUND_MIXER_VOLUME:
-				retval = get_user(value, (unsigned int *) arg);
+				retval = get_user(value, (unsigned __user *) arg);
 				if (retval)
 					break;
 				arg_to_vol_stereo(value, &devc->volume_l, &devc->volume_r);
 				opl3sa2_set_volume(devc, devc->volume_l, devc->volume_r);
 				value = ret_vol_stereo(devc->volume_l, devc->volume_r);
-				retval = put_user(value, (int *) arg);
+				retval = put_user(value, p);
 				break;
 		  
 			case SOUND_MIXER_MIC:
-				retval = get_user(value, (unsigned int *) arg);
+				retval = get_user(value, (unsigned __user *) arg);
 				if (retval)
 					break;
 				arg_to_vol_mono(value, &devc->mic);
 				opl3sa2_set_mic(devc, devc->mic);
 				value = ret_vol_mono(devc->mic);
-				retval = put_user(value, (int *) arg);
+				retval = put_user(value, p);
 				break;
 
 			default:
@@ -445,35 +446,35 @@ static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		 */
 		switch (cmdf) {
 			case SOUND_MIXER_DEVMASK:
-				retval = put_user(SOUND_MASK_VOLUME | SOUND_MASK_MIC, (int *) arg);
+				retval = put_user(SOUND_MASK_VOLUME | SOUND_MASK_MIC, p);
 				break;
 		  
 			case SOUND_MIXER_STEREODEVS:
-				retval = put_user(SOUND_MASK_VOLUME, (int *) arg);
+				retval = put_user(SOUND_MASK_VOLUME, p);
 				break;
 		  
 			case SOUND_MIXER_RECMASK:
 				/* No recording devices */
-				retval = put_user(0, (int *) arg);
+				retval = put_user(0, p);
 				break;
 
 			case SOUND_MIXER_CAPS:
-				retval = put_user(SOUND_CAP_EXCL_INPUT, (int *) arg);
+				retval = put_user(SOUND_CAP_EXCL_INPUT, p);
 				break;
 
 			case SOUND_MIXER_RECSRC:
 				/* No recording source */
-				retval = put_user(0, (int *) arg);
+				retval = put_user(0, p);
 				break;
 
 			case SOUND_MIXER_VOLUME:
 				value = ret_vol_stereo(devc->volume_l, devc->volume_r);
-				retval = put_user(value, (int *) arg);
+				retval = put_user(value, p);
 				break;
 			  
 			case SOUND_MIXER_MIC:
 				value = ret_vol_mono(devc->mic);
-				put_user(value, (int *) arg);
+				put_user(value, p);
 				break;
 
 			default:
@@ -485,7 +486,7 @@ static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 /* opl3sa2_mixer_ioctl end */
 
 
-static int opl3sa3_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int opl3sa3_mixer_ioctl(int dev, unsigned int cmd, void __user * arg)
 {
 	int value, retval, cmdf = cmd & 0xff;
 
@@ -494,17 +495,17 @@ static int opl3sa3_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	switch (cmdf) {
 	case SOUND_MIXER_BASS:
 		value = ret_vol_stereo(devc->bass_l, devc->bass_r);
-		retval = put_user(value, (int *) arg);
+		retval = put_user(value, (int __user *) arg);
 		break;
 		
 	case SOUND_MIXER_TREBLE:
 		value = ret_vol_stereo(devc->treble_l, devc->treble_r);
-		retval = put_user(value, (int *) arg);
+		retval = put_user(value, (int __user *) arg);
 		break;
 
 	case SOUND_MIXER_DIGITAL1:
 		value = ret_vol_stereo(devc->wide_l, devc->wide_r);
-		retval = put_user(value, (int *) arg);
+		retval = put_user(value, (int __user *) arg);
 		break;
 
 	default:

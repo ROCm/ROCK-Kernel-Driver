@@ -155,8 +155,8 @@ static rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
 static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
 static struct hlist_head dn_wild_sk;
 
-static int __dn_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen, int flags);
-static int __dn_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen, int flags);
+static int __dn_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen, int flags);
+static int __dn_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen, int flags);
 
 static struct hlist_head *dn_find_list(struct sock *sk)
 {
@@ -1248,7 +1248,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		err = dev_ioctl(cmd, (void *)arg);
+		err = dev_ioctl(cmd, (void __user *)arg);
 		break;
 	}
 
@@ -1313,7 +1313,7 @@ out:
 	return err;
 }
 
-static int dn_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+static int dn_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int err;
@@ -1325,7 +1325,7 @@ static int dn_setsockopt(struct socket *sock, int level, int optname, char *optv
 	return err;
 }
 
-static int __dn_setsockopt(struct socket *sock, int level,int optname, char *optval, int optlen, int flags) 
+static int __dn_setsockopt(struct socket *sock, int level,int optname, char __user __user *optval, int optlen, int flags) 
 {
 	struct	sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
@@ -1490,7 +1490,7 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 	return 0;
 }
 
-static int dn_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+static int dn_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int err;
@@ -1502,7 +1502,7 @@ static int dn_getsockopt(struct socket *sock, int level, int optname, char *optv
 	return err;
 }
 
-static int __dn_getsockopt(struct socket *sock, int level,int optname, char *optval,int *optlen, int flags)
+static int __dn_getsockopt(struct socket *sock, int level,int optname, char __user *optval,int __user *optlen, int flags)
 {
 	struct	sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);

@@ -216,7 +216,7 @@ void inet_sock_release(struct sock *sk)
  *	Set socket options on an inet socket.
  */
 int inet_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
+		    char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 
@@ -232,7 +232,7 @@ int inet_setsockopt(struct socket *sock, int level, int optname,
  */
 
 int inet_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
+		    char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 
@@ -843,7 +843,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 		case SIOCGSTAMP:
-			err = sock_get_timestamp(sk, (struct timeval *)arg);
+			err = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 		case SIOCADDRT:
 		case SIOCDELRT:
@@ -853,7 +853,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCDARP:
 		case SIOCGARP:
 		case SIOCSARP:
-			err = arp_ioctl(cmd, (void *)arg);
+			err = arp_ioctl(cmd, (void __user *)arg);
 			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:
@@ -866,13 +866,13 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFPFLAGS:
 		case SIOCGIFPFLAGS:
 		case SIOCSIFFLAGS:
-			err = devinet_ioctl(cmd, (void *)arg);
+			err = devinet_ioctl(cmd, (void __user *)arg);
 			break;
 		default:
 			if (!sk->sk_prot->ioctl ||
 			    (err = sk->sk_prot->ioctl(sk, cmd, arg)) ==
 			    					-ENOIOCTLCMD)
-				err = dev_ioctl(cmd, (void *)arg);
+				err = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 	return err;
@@ -978,7 +978,7 @@ void inet_register_protosw(struct inet_protosw *p)
 
 	spin_lock_bh(&inetsw_lock);
 
-	if (p->type > SOCK_MAX)
+	if (p->type >= SOCK_MAX)
 		goto out_illegal;
 
 	/* If we are trying to override a permanent protocol, bail. */

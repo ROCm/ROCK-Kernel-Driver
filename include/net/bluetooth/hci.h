@@ -22,10 +22,6 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- *  $Id: hci.h,v 1.4 2002/04/18 22:26:15 maxk Exp $
- */
-
 #ifndef __HCI_H
 #define __HCI_H
 

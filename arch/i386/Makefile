@@ -18,6 +18,7 @@
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=
+CHECK		:= $(CHECK) -D__i386__=1
 
 CFLAGS += -pipe -msoft-float
 
