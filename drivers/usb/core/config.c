@@ -26,10 +26,20 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 		return -EINVAL;
 	}
 
-	if (header->bLength == USB_DT_ENDPOINT_AUDIO_SIZE)
+	if (header->bLength >= USB_DT_ENDPOINT_AUDIO_SIZE)
 		memcpy(&endpoint->desc, buffer, USB_DT_ENDPOINT_AUDIO_SIZE);
-	else
+	else if (header->bLength >= USB_DT_ENDPOINT_SIZE)
 		memcpy(&endpoint->desc, buffer, USB_DT_ENDPOINT_SIZE);
+	else {
+		warn("invalid endpoint descriptor");
+		return -EINVAL;
+	}
+
+	if ((endpoint->desc.bEndpointAddress & ~USB_ENDPOINT_DIR_MASK) >= 16) {
+		warn("invalid endpoint address 0x%X",
+		    endpoint->desc.bEndpointAddress);
+		return -EINVAL;
+	}
 
 	le16_to_cpus(&endpoint->desc.wMaxPacketSize);
 
@@ -144,6 +154,11 @@ static int usb_parse_interface(struct usb_host_config *config, unsigned char *bu
 	}
 
 	ifp = &interface->altsetting[asnum];
+	if (ifp->desc.bLength) {
+		warn("duplicate descriptor for interface %d altsetting %d",
+		    inum, asnum);
+		return -EINVAL;
+	}
 	memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
 
 	buffer += d->bLength;
@@ -183,7 +198,8 @@ static int usb_parse_interface(struct usb_host_config *config, unsigned char *bu
 	}
 
 	if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
-		warn("too many endpoints");
+		warn("too many endpoints for interface %d altsetting %d",
+		    inum, asnum);
 		return -EINVAL;
 	}
 
@@ -197,7 +213,7 @@ static int usb_parse_interface(struct usb_host_config *config, unsigned char *bu
 
 	for (i = 0; i < ifp->desc.bNumEndpoints; i++) {
 		if (size < USB_DT_ENDPOINT_SIZE) {
-			err("ran out of descriptors parsing");
+			warn("ran out of descriptors while parsing endpoints");
 			return -EINVAL;
 		}
 
@@ -212,10 +228,10 @@ static int usb_parse_interface(struct usb_host_config *config, unsigned char *bu
 	return buffer - buffer0;
 }
 
-int usb_parse_configuration(struct usb_host_config *config, char *buffer)
+int usb_parse_configuration(struct usb_host_config *config, char *buffer, int size)
 {
 	int nintf, nintf_orig;
-	int i, j, size;
+	int i, j;
 	struct usb_interface *interface;
 	char *buffer2;
 	int size2;
@@ -225,8 +241,12 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	int retval;
 
 	memcpy(&config->desc, buffer, USB_DT_CONFIG_SIZE);
-	le16_to_cpus(&config->desc.wTotalLength);
-	size = config->desc.wTotalLength;
+	if (config->desc.bDescriptorType != USB_DT_CONFIG ||
+	    config->desc.bLength < USB_DT_CONFIG_SIZE) {
+		warn("invalid configuration descriptor");
+		return -EINVAL;
+	}
+	config->desc.wTotalLength = size;
 
 	nintf = nintf_orig = config->desc.bNumInterfaces;
 	if (nintf > USB_MAXINTERFACES) {
@@ -259,7 +279,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	while (size2 >= sizeof(struct usb_descriptor_header)) {
 		header = (struct usb_descriptor_header *) buffer2;
 		if ((header->bLength > size2) || (header->bLength < 2)) {
-			err("invalid descriptor of length %d", header->bLength);
+			warn("invalid descriptor of length %d", header->bLength);
 			return -EINVAL;
 		}
 
@@ -359,6 +379,17 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 		size -= retval;
 	}
 
+	/* Check for missing altsettings */
+	for (i = 0; i < nintf; ++i) {
+		interface = config->interface[i];
+		for (j = 0; j < interface->num_altsetting; ++j) {
+			if (!interface->altsetting[j].desc.bLength) {
+				warn("missing altsetting %d for interface %d", j, i);
+				return -EINVAL;
+			}
+		}
+	}
+
 	return size;
 }
 
@@ -446,14 +477,14 @@ int usb_get_configuration(struct usb_device *dev)
 			if (result < 0)
 				err("unable to get descriptor");
 			else {
-				err("config descriptor too short (expected %i, got %i)", 8, result);
+				warn("config descriptor too short (expected %i, got %i)", 8, result);
 				result = -EINVAL;
 			}
 			goto err;
 		}
 
   	  	/* Get the full buffer */
-		length = le16_to_cpu(desc->wTotalLength);
+		length = max((int) le16_to_cpu(desc->wTotalLength), USB_DT_CONFIG_SIZE);
 
 		bigbuffer = kmalloc(length, GFP_KERNEL);
 		if (!bigbuffer) {
@@ -479,7 +510,7 @@ int usb_get_configuration(struct usb_device *dev)
 
 		dev->rawdescriptors[cfgno] = bigbuffer;
 
-		result = usb_parse_configuration(&dev->config[cfgno], bigbuffer);
+		result = usb_parse_configuration(&dev->config[cfgno], bigbuffer, length);
 		if (result > 0)
 			dbg("descriptor data left");
 		else if (result < 0) {
