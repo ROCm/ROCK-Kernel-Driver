@@ -552,7 +552,7 @@ static void psmouse_disconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
 
-	psmouse->state = PSMOUSE_IGNORE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 
 	if (psmouse->ptport) {
 		if (psmouse->ptport->deactivate)
@@ -564,6 +564,8 @@ static void psmouse_disconnect(struct serio *serio)
 
 	if (psmouse->disconnect)
 		psmouse->disconnect(psmouse);
+
+	psmouse->state = PSMOUSE_IGNORE;
 
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
@@ -592,7 +594,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 
-	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
 
@@ -650,7 +652,7 @@ static int psmouse_reconnect(struct serio *serio)
 		return -1;
 	}
 
-	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
