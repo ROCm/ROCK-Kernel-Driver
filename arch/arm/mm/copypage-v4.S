@@ -26,7 +26,7 @@
  * instruction.  If your processor does not supply this, you have to write your
  * own copy_user_page that does the right thing.
  */
-ENTRY(armv4_copy_user_page)
+ENTRY(v4_copy_user_page)
 	stmfd	sp!, {r4, lr}			@ 2
 	mov	r2, #PAGE_SZ/64			@ 1
 	ldmia	r1!, {r3, r4, ip, lr}		@ 4
@@ -51,7 +51,7 @@ ENTRY(armv4_copy_user_page)
  *
  * Same story as above.
  */
-ENTRY(armv4_clear_user_page)
+ENTRY(v4_clear_user_page)
 	str	lr, [sp, #-4]!
 	mov	r1, #PAGE_SZ/64			@ 1
 	mov	r2, #0				@ 1
@@ -68,3 +68,10 @@ ENTRY(armv4_clear_user_page)
 	bne	1b				@ 1
 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB
 	ldr	pc, [sp], #4
+
+	.section ".text.init", #alloc, #execinstr
+
+ENTRY(v4_user_fns)
+	.long	v4_clear_user_page
+	.long	v4_copy_user_page
+

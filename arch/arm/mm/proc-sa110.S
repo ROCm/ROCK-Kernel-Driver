@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mm/proc-sa110.S
  *
- *  Copyright (C) 1997-2000 Russell King
+ *  Copyright (C) 1997-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -468,7 +468,9 @@ ENTRY(cpu_sa1100_set_pmd)
 	.align	5
 ENTRY(cpu_sa110_set_pte)
 ENTRY(cpu_sa1100_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
@@ -538,7 +540,7 @@ __setup_common:
 
 	.type	sa110_processor_functions, #object
 ENTRY(sa110_processor_functions)
-	.word	armv4_early_abort
+	.word	v4_early_abort
 	.word	cpu_sa110_check_bugs
 	.word	cpu_sa110_proc_init
 	.word	cpu_sa110_proc_fin
@@ -564,10 +566,6 @@ ENTRY(sa110_processor_functions)
 	.word	cpu_sa110_set_pgd
 	.word	cpu_sa110_set_pmd
 	.word	cpu_sa110_set_pte
-
-	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
 
 	.size	sa110_processor_functions, . - sa110_processor_functions
 
@@ -610,10 +608,6 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_set_pmd
 	.word	cpu_sa1100_set_pte
 
-	/* misc */
-	.word	armv4_mc_clear_user_page
-	.word	armv4_mc_copy_user_page
-
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
 cpu_sa1100_info:
@@ -651,6 +645,7 @@ __sa110_proc_info:
 	.long	cpu_sa110_info
 	.long	sa110_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_user_fns
 	.size	__sa110_proc_info, . - __sa110_proc_info
 
 	.type	__sa1100_proc_info,#object
@@ -665,6 +660,7 @@ __sa1100_proc_info:
 	.long	cpu_sa1100_info
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_mc_user_fns
 	.size	__sa1100_proc_info, . - __sa1100_proc_info
 
 	.type	__sa1110_proc_info,#object
@@ -679,4 +675,5 @@ __sa1110_proc_info:
 	.long	cpu_sa1110_info
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
+	.long	v4_mc_user_fns
 	.size	__sa1110_proc_info, . - __sa1110_proc_info

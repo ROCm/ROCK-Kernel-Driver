@@ -17,29 +17,34 @@
  * will stop our MCLK signal (which provides the clock for the glue
  * logic, and therefore the timer interrupt).
  *
- * Instead, we spin, waiting for either hlt_counter or need_resched()
- * to be set.  If we have been spinning for 2cs, then we drop the
- * core clock down to the memory clock.
+ * Instead, we spin, polling the IRQ_STAT register for the occurrence
+ * of any interrupt with core clock down to the memory clock.
  */
 static void arch_idle(void)
 {
-	unsigned long start_idle;
+	const char *irq_stat = (char *)0xff000000;
+	long flags;
 
-	start_idle = jiffies;
+	if (!hlt_counter)
+		return;
 
 	do {
-		if (need_resched() || hlt_counter)
-			goto slow_out;
-	} while (time_before(jiffies, start_idle + HZ/50));
-
-	cpu_do_idle(IDLE_CLOCK_SLOW);
-
-	while (!need_resched() && !hlt_counter) {
-		/* do nothing slowly */
-	}
-
-	cpu_do_idle(IDLE_CLOCK_FAST);
-slow_out:
+		/* disable interrupts */
+		cli();
+		/* check need_resched here to avoid races */
+		if (need_resched()) {
+			sti();
+			return;
+		}
+		/* disable clock switching */
+		asm volatile ("mcr%? p15, 0, ip, c15, c2, 2");
+		/* wait for an interrupt to occur */
+		while (!*irq_stat);
+		/* enable clock switching */
+		asm volatile ("mcr%? p15, 0, ip, c15, c1, 2");
+		/* allow the interrupt to happen */
+		sti();
+	} while (!need_resched());
 }
 
 #define arch_reset(mode)	cpu_reset(0x80000000)
