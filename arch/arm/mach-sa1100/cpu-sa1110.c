@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Russell King
  *
- *  $Id: cpu-sa1110.c,v 1.8 2002/01/09 17:13:27 rmk Exp $
+ *  $Id: cpu-sa1110.c,v 1.9 2002/07/06 16:53:18 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,6 +31,7 @@
 
 extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
 extern unsigned int sa11x0_validatespeed(unsigned int khz);
+extern unsigned int sa11x0_getspeed(void);
 
 struct sdram_params {
 	u_char  rows;		/* bits				 */
@@ -84,6 +85,16 @@ static struct sdram_params samsung_km416s4030ct __initdata = {
 	trcd:		    24,	/* 3 CLKs */
 	trp:		    24,	/* 3 CLKs */
 	twr:		    16,	/* Trdl: 2 CLKs */
+	refresh:	 64000,
+	cas_latency:	     3,
+};
+
+static struct sdram_params wbond_w982516ah75l_cl3_params __initdata = {
+	rows:		    16,
+	tck:		     8,
+	trcd:		    20,
+	trp:		    20,
+	twr:		     8,
 	refresh:	 64000,
 	cas_latency:	     3,
 };
@@ -287,6 +298,8 @@ static int __init sa1110_clk_init(void)
 		sdram = &samsung_km416s4030ct;
 
 	if (sdram) {
+		struct cpufreq_driver cpufreq_driver;
+
 		printk(KERN_DEBUG "SDRAM: tck: %d trcd: %d trp: %d"
 			" twr: %d refresh: %d cas_latency: %d\n",
 			sdram->tck, sdram->trcd, sdram->trp,
@@ -294,8 +307,15 @@ static int __init sa1110_clk_init(void)
 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
-		sa1110_setspeed(cpufreq_get(0));
-		cpufreq_setfunctions(sa11x0_validatespeed, sa1110_setspeed);
+		sa1110_setspeed(sa11x0_getspeed());
+
+		cpufreq_driver.freq.min = 59000;
+		cpufreq_driver.freq.max = 287000;
+		cpufreq_driver.freq.cur = sa11x0_getspeed();
+		cpufreq_driver.validate = &sa11x0_validatespeed;
+		cpufreq_driver.setspeed = &sa1110_setspeed;
+
+		return cpufreq_register(cpufreq_driver);
 	}
 
 	return 0;
