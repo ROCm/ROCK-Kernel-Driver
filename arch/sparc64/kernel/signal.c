@@ -404,8 +404,8 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	err |= copy_from_user(regs->u_regs, sf->regs.u_regs, sizeof(regs->u_regs));
 
 	/* User can only change condition codes in %tstate. */
-	regs->tstate &= ~(TSTATE_ICC);
-	regs->tstate |= (tstate & TSTATE_ICC);
+	regs->tstate &= ~(TSTATE_ICC | TSTATE_XCC);
+	regs->tstate |= (tstate & (TSTATE_ICC | TSTATE_XCC));
 
 	err |= __get_user(fpu_save, &sf->fpu_save);
 	if (fpu_save)
