@@ -2867,6 +2867,48 @@ need_resched:
 }
 
 EXPORT_SYMBOL(preempt_schedule);
+
+/*
+ * this is is the entry point to schedule() from kernel preemption
+ * off of irq context.
+ * Note, that this is called and return with irqs disabled. This will
+ * protect us against recursive calling from irq.
+ */
+asmlinkage void __sched preempt_schedule_irq(void)
+{
+	struct thread_info *ti = current_thread_info();
+#ifdef CONFIG_PREEMPT_BKL
+	struct task_struct *task = current;
+	int saved_lock_depth;
+#endif
+	/* Catch callers which need to be fixed*/
+	BUG_ON(ti->preempt_count || !irqs_disabled());
+
+need_resched:
+	add_preempt_count(PREEMPT_ACTIVE);
+	/*
+	 * We keep the big kernel semaphore locked, but we
+	 * clear ->lock_depth so that schedule() doesnt
+	 * auto-release the semaphore:
+	 */
+#ifdef CONFIG_PREEMPT_BKL
+	saved_lock_depth = task->lock_depth;
+	task->lock_depth = -1;
+#endif
+	local_irq_enable();
+	schedule();
+	local_irq_disable();
+#ifdef CONFIG_PREEMPT_BKL
+	task->lock_depth = saved_lock_depth;
+#endif
+	sub_preempt_count(PREEMPT_ACTIVE);
+
+	/* we could miss a preemption opportunity between schedule and now */
+	barrier();
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
+		goto need_resched;
+}
+
 #endif /* CONFIG_PREEMPT */
 
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)

@@ -176,6 +176,7 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
+	cli
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
@@ -184,10 +185,7 @@ need_resched:
 	jz restore_all
 	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
 	jz restore_all
-	sti
-	call preempt_schedule
-	cli
-	movl $0,TI_preempt_count(%ebp)
+	call preempt_schedule_irq
 	jmp need_resched
 #endif
 
