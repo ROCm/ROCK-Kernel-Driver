@@ -190,7 +190,7 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
  * @table: pointer to the desired resource table
  *
  */
-void pnp_init_resources(struct pnp_resource_table *table)
+void pnp_init_resource_table(struct pnp_resource_table *table)
 {
 	int idx;
 	down(&pnp_res_mutex);
@@ -226,7 +226,7 @@ void pnp_init_resources(struct pnp_resource_table *table)
  * @res - the resources to clean
  *
  */
-static void pnp_clean_resources(struct pnp_resource_table * res)
+static void pnp_clean_resource_table(struct pnp_resource_table * res)
 {
 	int idx;
 	for (idx = 0; idx < PNP_MAX_IRQ; idx++) {
@@ -278,7 +278,7 @@ int pnp_assign_resources(struct pnp_dev *dev, int depnum)
 		return -ENODEV;
 
 	down(&pnp_res_mutex);
-	pnp_clean_resources(&dev->res); /* start with a fresh slate */
+	pnp_clean_resource_table(&dev->res); /* start with a fresh slate */
 	if (dev->independent) {
 		port = dev->independent->port;
 		mem = dev->independent->mem;
@@ -351,7 +351,7 @@ int pnp_assign_resources(struct pnp_dev *dev, int depnum)
 	return 1;
 
 fail:
-	pnp_clean_resources(&dev->res);
+	pnp_clean_resource_table(&dev->res);
 	up(&pnp_res_mutex);
 	return 0;
 }
@@ -510,7 +510,7 @@ int pnp_disable_dev(struct pnp_dev *dev)
 
 	/* release the resources so that other devices can use them */
 	down(&pnp_res_mutex);
-	pnp_clean_resources(&dev->res);
+	pnp_clean_resource_table(&dev->res);
 	up(&pnp_res_mutex);
 
 	return 1;
@@ -539,4 +539,4 @@ EXPORT_SYMBOL(pnp_auto_config_dev);
 EXPORT_SYMBOL(pnp_activate_dev);
 EXPORT_SYMBOL(pnp_disable_dev);
 EXPORT_SYMBOL(pnp_resource_change);
-EXPORT_SYMBOL(pnp_init_resources);
+EXPORT_SYMBOL(pnp_init_resource_table);
