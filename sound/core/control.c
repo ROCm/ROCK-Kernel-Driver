@@ -995,6 +995,7 @@ static int snd_ctl_subscribe_events(snd_ctl_file_t *file, int *ptr)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 /*
  * change the power state
  */
@@ -1019,6 +1020,7 @@ static int snd_ctl_set_power_state(snd_card_t *card, unsigned int power_state)
 	}
 	return 0;
 }
+#endif
 
 static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
@@ -1065,7 +1067,7 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 #ifdef CONFIG_PM
 		if (card->pm_suspend && card->pm_resume) {
 			snd_power_lock(card);
-			snd_ctl_set_power_state(card, err);
+			err = snd_ctl_set_power_state(card, err);
 			snd_power_unlock(card);
 		} else
 #endif
