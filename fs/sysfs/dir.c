@@ -351,6 +351,8 @@ static int sysfs_dir_close(struct inode *inode, struct file *file)
 	list_del_init(&cursor->s_sibling);
 	up(&dentry->d_inode->i_sem);
 
+	release_sysfs_dirent(cursor);
+
 	return 0;
 }
 
