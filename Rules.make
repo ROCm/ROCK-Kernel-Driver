@@ -88,6 +88,9 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Get things started.
 # ==========================================================================
 
+# If a Makefile does define neither O_TARGET nor L_TARGET,
+# use a standard O_TARGET named "built-in.o"
+
 ifndef O_TARGET
 ifndef L_TARGET
 O_TARGET := built-in.o
@@ -172,9 +175,6 @@ cmd_as_o_S       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
-
-# If a Makefile does define neither O_TARGET nor L_TARGET,
-# use a standard O_TARGET named "built-in.o"
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
