@@ -5,8 +5,6 @@
 
 O_TARGET     := _ad1848.o
 
-list-multi   := snd-ad1848-lib.o snd-ad1848.o
-
 export-objs  := ad1848_lib.o
 
 snd-ad1848-lib-objs := ad1848_lib.o
@@ -19,9 +17,3 @@ obj-$(CONFIG_SND_AD1848) += snd-ad1848.o snd-ad1848-lib.o
 obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-ad1848-lib.o
 
 include $(TOPDIR)/Rules.make
-
-snd-ad1848-lib.o: $(snd-ad1848-lib-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ad1848-lib-objs)
-
-snd-ad1848.o: $(snd-ad1848-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ad1848-objs)

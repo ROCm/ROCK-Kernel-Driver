@@ -5,8 +5,6 @@
 
 O_TARGET     := _emux.o
 
-list-multi   := snd-emux-synth.o
-
 export-objs  := emux.o
 
 snd-emux-synth-objs := emux.o emux_synth.o emux_seq.o emux_nrpn.o \
@@ -19,6 +17,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 include $(TOPDIR)/Rules.make
-
-snd-emux-synth.o: $(snd-emux-synth-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-emux-synth-objs)
