@@ -547,6 +547,9 @@ static int pxamci_remove(struct device *dev)
 
 		pxa_set_cken(CKEN12_MMC, 0);
 
+		DRCMRRXMMC = 0;
+		DRCMRTXMMC = 0;
+
 		free_irq(host->irq, host);
 		pxa_free_dma(host->dma);
 		iounmap(host->base);
