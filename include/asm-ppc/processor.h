@@ -655,9 +655,9 @@ struct thread_struct {
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
 
 #define INIT_THREAD  { \
-	ksp: INIT_SP, \
-	fs: KERNEL_DS, \
-	pgdir: swapper_pg_dir, \
+	.ksp = INIT_SP, \
+	.fs = KERNEL_DS, \
+	.pgdir = swapper_pg_dir, \
 }
 
 /*
