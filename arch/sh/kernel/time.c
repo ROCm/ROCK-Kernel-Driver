@@ -1,10 +1,10 @@
-/* $Id: time.c,v 1.19 2004/02/27 00:40:48 lethal Exp $
+/* $Id: time.c,v 1.21 2004/04/21 00:09:15 lethal Exp $
  *
  *  linux/arch/sh/kernel/time.c
  *
  *  Copyright (C) 1999  Tetsuya Okada & Niibe Yutaka
  *  Copyright (C) 2000  Philipp Rumpf <prumpf@tux.org>
- *  Copyright (C) 2002, 2003  Paul Mundt
+ *  Copyright (C) 2002, 2003, 2004  Paul Mundt
  *  Copyright (C) 2002  M. R. Brown  <mrbrown@linux-sh.org>
  *
  *  Some code taken from i386 version.
@@ -47,12 +47,26 @@
 #define TMU0_TCR_CALIB	0x0000
 
 #if defined(CONFIG_CPU_SH3)
+#if defined(CONFIG_CPU_SUBTYPE_SH7300)
+#define TMU_TSTR        0xA412FE92      /* Byte access */
+
+#define TMU0_TCOR       0xA412FE94      /* Long access */
+#define TMU0_TCNT       0xA412FE98      /* Long access */
+#define TMU0_TCR        0xA412FE9C      /* Word access */
+
+#define TMU1_TCOR	0xA412FEA0	/* Long access */
+#define TMU1_TCNT	0xA412FEA4	/* Long access */
+#define TMU1_TCR	0xA412FEA8	/* Word access */
+
+#define FRQCR           0xA415FF80
+#else
 #define TMU_TOCR	0xfffffe90	/* Byte access */
 #define TMU_TSTR	0xfffffe92	/* Byte access */
 
 #define TMU0_TCOR	0xfffffe94	/* Long access */
 #define TMU0_TCNT	0xfffffe98	/* Long access */
 #define TMU0_TCR	0xfffffe9c	/* Word access */
+#endif
 #elif defined(CONFIG_CPU_SH4)
 #define TMU_TOCR	0xffd80000	/* Byte access */
 #define TMU_TSTR	0xffd80004	/* Byte access */
@@ -85,6 +99,9 @@ void (*rtc_get_time)(struct timespec *) = 0;
 int (*rtc_set_time)(const time_t) = 0;
 #endif
 
+#if defined(CONFIG_CPU_SUBTYPE_SH7300)
+static int md_table[] = { 1, 2, 3, 4, 6, 8, 12 };
+#endif
 #if defined(CONFIG_CPU_SH3)
 static int stc_multipliers[] = { 1, 2, 3, 4, 6, 1, 1, 1 };
 static int stc_values[]      = { 0, 1, 4, 2, 5, 0, 0, 0 };
@@ -337,7 +354,9 @@ static unsigned int __init get_timer_frequency(void)
 	 * have it count down at its natural rate.
 	 */
 	ctrl_outb(0, TMU_TSTR);
+#if !defined(CONFIG_CPU_SUBTYPE_SH7300)
 	ctrl_outb(TMU_TOCR_INIT, TMU_TOCR);
+#endif
 	ctrl_outw(TMU0_TCR_CALIB, TMU0_TCR);
 	ctrl_outl(0xffffffff, TMU0_TCOR);
 	ctrl_outl(0xffffffff, TMU0_TCNT);
@@ -398,6 +417,15 @@ void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsign
 	unsigned int frqcr = ctrl_inw(FRQCR);
 
 #if defined(CONFIG_CPU_SH3)
+#if defined(CONFIG_CPU_SUBTYPE_SH7300)
+	*ifc = md_table[((frqcr & 0x0070) >> 4)];
+	*bfc = md_table[((frqcr & 0x0700) >> 8)];
+	*pfc = md_table[frqcr & 0x0007];
+#elif defined(CONFIG_CPU_SUBTYPE_SH7705)
+	*bfc = stc_multipliers[(frqcr & 0x0300) >> 8];
+	*ifc = ifc_divisors[(frqcr & 0x0030) >> 4];
+	*pfc = pfc_divisors[frqcr & 0x0003];
+#else
 	unsigned int tmp;
 
 	tmp  = (frqcr & 0x8000) >> 13;
@@ -409,6 +437,7 @@ void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsign
 	tmp  = (frqcr & 0x2000) >> 11;
 	tmp |= frqcr & 0x0003;
 	*pfc = pfc_divisors[tmp];
+#endif
 #elif defined(CONFIG_CPU_SH4)
 	*ifc = ifc_divisors[(frqcr >> 6) & 0x0007];
 	*bfc = bfc_divisors[(frqcr >> 3) & 0x0007];
@@ -431,26 +460,139 @@ _FREQ_TABLE(ifc);
 _FREQ_TABLE(bfc);
 _FREQ_TABLE(pfc);
 
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+
+/* The ST40 divisors are totally different so we set the cpu data
+** clocks using a different algorithm
+**
+** I've just plugged this from the 2.4 code - Alex Bennee <kernel-hacker@bennee.com>
+*/
+#define CCN_PVR_CHIP_SHIFT 24
+#define CCN_PVR_CHIP_MASK  0xff
+#define CCN_PVR_CHIP_ST40STB1 0x4
+
+
+struct frqcr_data {
+    unsigned short frqcr;
+    struct {
+	unsigned char multiplier;
+	unsigned char divisor;
+    } factor[3];
+};
+
+static struct frqcr_data st40_frqcr_table[] = {
+    { 0x000, {{1,1}, {1,1}, {1,2}}},
+    { 0x002, {{1,1}, {1,1}, {1,4}}},
+    { 0x004, {{1,1}, {1,1}, {1,8}}},
+    { 0x008, {{1,1}, {1,2}, {1,2}}},
+    { 0x00A, {{1,1}, {1,2}, {1,4}}},
+    { 0x00C, {{1,1}, {1,2}, {1,8}}},
+    { 0x011, {{1,1}, {2,3}, {1,6}}},
+    { 0x013, {{1,1}, {2,3}, {1,3}}},
+    { 0x01A, {{1,1}, {1,2}, {1,4}}},
+    { 0x01C, {{1,1}, {1,2}, {1,8}}},
+    { 0x023, {{1,1}, {2,3}, {1,3}}},
+    { 0x02C, {{1,1}, {1,2}, {1,8}}},
+    { 0x048, {{1,2}, {1,2}, {1,4}}},
+    { 0x04A, {{1,2}, {1,2}, {1,6}}},
+    { 0x04C, {{1,2}, {1,2}, {1,8}}},
+    { 0x05A, {{1,2}, {1,3}, {1,6}}},
+    { 0x05C, {{1,2}, {1,3}, {1,6}}},
+    { 0x063, {{1,2}, {1,4}, {1,4}}},
+    { 0x06C, {{1,2}, {1,4}, {1,8}}},
+    { 0x091, {{1,3}, {1,3}, {1,6}}},
+    { 0x093, {{1,3}, {1,3}, {1,6}}},
+    { 0x0A3, {{1,3}, {1,6}, {1,6}}},
+    { 0x0DA, {{1,4}, {1,4}, {1,8}}},
+    { 0x0DC, {{1,4}, {1,4}, {1,8}}},
+    { 0x0EC, {{1,4}, {1,8}, {1,8}}},
+    { 0x123, {{1,4}, {1,4}, {1,8}}},
+    { 0x16C, {{1,4}, {1,8}, {1,8}}},
+};
+
+struct memclk_data {
+    unsigned char multiplier;
+    unsigned char divisor;
+};
+static struct memclk_data st40_memclk_table[8] = {
+    {1,1},	// 000
+    {1,2},	// 001
+    {1,3},	// 010
+    {2,3},	// 011
+    {1,4},	// 100
+    {1,6},	// 101
+    {1,8},	// 110
+    {1,8}	// 111
+};
+
+static void st40_specific_time_init(unsigned int module_clock, unsigned short frqcr)
+{
+    unsigned int cpu_clock, master_clock, bus_clock, memory_clock;
+    struct frqcr_data *d;
+    int a;
+    unsigned long memclkcr;
+    struct memclk_data *e;
+
+    for (a=0; a<ARRAY_SIZE(st40_frqcr_table); a++) {
+	d = &st40_frqcr_table[a];
+	if (d->frqcr == (frqcr & 0x1ff))
+	    break;
+    }
+    if (a == ARRAY_SIZE(st40_frqcr_table)) {
+	d = st40_frqcr_table;
+	printk("ERROR: Unrecognised FRQCR value (0x%x), using default multipliers\n",frqcr);
+    }
+
+    memclkcr = ctrl_inl(CLOCKGEN_MEMCLKCR);
+    e = &st40_memclk_table[memclkcr & MEMCLKCR_RATIO_MASK];
+
+    printk("Clock multipliers: CPU: %d/%d Bus: %d/%d Mem: %d/%d Periph: %d/%d\n",
+	    d->factor[0].multiplier, d->factor[0].divisor,
+	    d->factor[1].multiplier, d->factor[1].divisor,
+	    e->multiplier,           e->divisor,
+	    d->factor[2].multiplier, d->factor[2].divisor);
+
+    master_clock = module_clock * d->factor[2].divisor    / d->factor[2].multiplier;
+    bus_clock    = master_clock * d->factor[1].multiplier / d->factor[1].divisor;
+    memory_clock = master_clock * e->multiplier           / e->divisor;
+    cpu_clock    = master_clock * d->factor[0].multiplier / d->factor[0].divisor;
+
+    current_cpu_data.cpu_clock    = cpu_clock;
+    current_cpu_data.master_clock = master_clock;
+    current_cpu_data.bus_clock    = bus_clock;
+    current_cpu_data.memory_clock = memory_clock;
+    current_cpu_data.module_clock = module_clock;
+
+}
+
+#endif
+
 void __init time_init(void)
 {
 	unsigned int timer_freq = 0;
 	unsigned int ifc, pfc, bfc;
 	unsigned long interval;
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	unsigned long pvr;
+	unsigned short frqcr;
+#endif
 
 	if (board_time_init)
 		board_time_init();
 
-	get_current_frequency_divisors(&ifc, &bfc, &pfc);
 
 	/*
 	 * If we don't have an RTC (such as with the SH7300), don't attempt to
 	 * probe the timer frequency. Rely on an either hardcoded peripheral
-	 * clock value, or on the sh_pclk command line option.
+	 * clock value, or on the sh_pclk command line option. Note that we
+	 * still need to have CONFIG_SH_PCLK_FREQ set in order for things like
+	 * CLOCK_TICK_RATE to be sane.
 	 */
 	current_cpu_data.module_clock = sh_pclk_freq;
 
+#ifdef CONFIG_SH_PCLK_CALC
 	/* XXX: Switch this over to a more generic test. */
-	if (current_cpu_data.type != CPU_SH7300) {
+	{
 		unsigned int freq;
 
 		/* 
@@ -466,15 +608,31 @@ void __init time_init(void)
 		timer_freq = get_timer_frequency();
 		freq = timer_freq * 4;
 
-		if (sh_pclk_freq && sh_pclk_freq != freq) {
+		if (sh_pclk_freq && (sh_pclk_freq/100*99 > freq || sh_pclk_freq/100*101 < freq)) {
 			printk(KERN_NOTICE "Calculated peripheral clock value "
 			       "%d differs from sh_pclk value %d, fixing..\n",
 			       freq, sh_pclk_freq);
 			current_cpu_data.module_clock = freq;
 		}
 	}
+#endif
 
-	rtc_get_time(&xtime);
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	pvr = ctrl_inl(CCN_PVR);
+	frqcr = ctrl_inw(FRQCR);
+	printk("time.c ST40 Probe: PVR %08lx, FRQCR %04hx\n", pvr, frqcr);
+	if (((pvr >>CCN_PVR_CHIP_SHIFT) & CCN_PVR_CHIP_MASK) == CCN_PVR_CHIP_ST40STB1)
+	    st40_specific_time_init(current_cpu_data.module_clock, frqcr);
+	else
+#endif
+	    get_current_frequency_divisors(&ifc, &bfc, &pfc);
+
+	if (rtc_get_time)
+		rtc_get_time(&xtime);
+	else {
+         	xtime.tv_sec = mktime(2000, 1, 1, 0, 0, 0);
+         	xtime.tv_nsec = 0;
+	}
 
         set_normalized_timespec(&wall_to_monotonic,
                                 -xtime.tv_sec, -xtime.tv_nsec);
@@ -485,6 +643,10 @@ void __init time_init(void)
 		setup_irq(TIMER_IRQ, &irq0);
 	}
 
+	/*
+	** for ST40 chips the current_cpu_data should already be set
+	** so not having valid pfc/bfc/ifc shouldn't be a problem
+	*/
 	if (!current_cpu_data.master_clock)
 		current_cpu_data.master_clock = current_cpu_data.module_clock * pfc;
 	if (!current_cpu_data.bus_clock)
@@ -506,13 +668,19 @@ void __init time_init(void)
 	printk("Module clock: %d.%02dMHz\n",
 	       (current_cpu_data.module_clock / 1000000),
 	       (current_cpu_data.module_clock % 1000000)/10000);
+#if defined(CONFIG_SH_HS7751RVOIP) || defined(CONFIG_SH_RTS7751R2D)
+	interval = ((current_cpu_data.module_clock/4 + HZ/2) / HZ) - 1;
+#else
 	interval = (current_cpu_data.module_clock/4 + HZ/2) / HZ;
+#endif
 
 	printk("Interval = %ld\n", interval);
 
 	/* Start TMU0 */
 	ctrl_outb(0, TMU_TSTR);
+#if !defined(CONFIG_CPU_SUBTYPE_SH7300)
 	ctrl_outb(TMU_TOCR_INIT, TMU_TOCR);
+#endif
 	ctrl_outw(TMU0_TCR_INIT, TMU0_TCR);
 	ctrl_outl(interval, TMU0_TCOR);
 	ctrl_outl(interval, TMU0_TCNT);

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.35 2004/02/21 14:45:47 lethal Exp $
+/* $Id: entry.S,v 1.37 2004/06/11 13:02:46 doyu Exp $
  *
  *  linux/arch/sh/entry.S
  *
@@ -77,7 +77,8 @@ EINVAL = 22
 #if defined(CONFIG_CPU_SH3)
 TRA     = 0xffffffd0
 EXPEVT  = 0xffffffd4
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7300) || defined(CONFIG_CPU_SUBTYPE_SH7705)
 INTEVT  = 0xa4000000		! INTEVTE2(0xa4000000)
 #else
 INTEVT  = 0xffffffd8
