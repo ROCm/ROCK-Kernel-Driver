@@ -30,6 +30,8 @@
 #include <linux/backing-dev.h>
 #include <linux/rmap-locking.h>
 #include <linux/topology.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -1102,13 +1104,39 @@ int shrink_all_memory(int nr_pages)
 }
 #endif
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* It's optimal to keep kswapds on the same CPUs as their memory, but
+   not required for correctness.  So if the last cpu in a node goes
+   away, we get changed to run anywhere: as the first one comes back,
+   restore their cpu bindings. */
+static int __devinit cpu_callback(struct notifier_block *nfb,
+				  unsigned long action,
+				  void *hcpu)
+{
+	pg_data_t *pgdat;
+	cpumask_t mask;
+
+	if (action == CPU_ONLINE) {
+		for_each_pgdat(pgdat) {
+			mask = node_to_cpumask(pgdat->node_id);
+			if (any_online_cpu(mask) != NR_CPUS)
+				/* One of our CPUs online: restore mask */
+				set_cpus_allowed(pgdat->kswapd, mask);
+		}
+	}
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 static int __init kswapd_init(void)
 {
 	pg_data_t *pgdat;
 	swap_setup();
 	for_each_pgdat(pgdat)
-		kernel_thread(kswapd, pgdat, CLONE_KERNEL);
+		pgdat->kswapd
+		= find_task_by_pid(kernel_thread(kswapd, pgdat, CLONE_KERNEL));
 	total_memory = nr_free_pagecache_pages();
+	hotcpu_notifier(cpu_callback, 0);
 	return 0;
 }
 
