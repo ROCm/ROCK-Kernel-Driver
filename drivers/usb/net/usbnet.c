@@ -538,25 +538,25 @@ static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 
 		// allocate the skb for the individual packet
 		gl_skb = alloc_skb (size, GFP_ATOMIC);
-		if (gl_skb == 0)
-			return 0;
+		if (gl_skb) {
 
-		// copy the packet data to the new skb
-		memcpy (gl_skb->data, packet->packet_data, size);
+			// copy the packet data to the new skb
+			memcpy (gl_skb->data, packet->packet_data, size);
 
-		// set skb data size
-		gl_skb->len = size;
-		gl_skb->dev = &dev->net;
+			// set skb data size
+			gl_skb->len = size;
+			gl_skb->dev = &dev->net;
 
-		// determine the packet's protocol ID
-		gl_skb->protocol = eth_type_trans (gl_skb, &dev->net);
+			// determine the packet's protocol ID
+			gl_skb->protocol = eth_type_trans (gl_skb, &dev->net);
 
-		// update the status
-		dev->stats.rx_packets++;
-		dev->stats.rx_bytes += size;
+			// update the status
+			dev->stats.rx_packets++;
+			dev->stats.rx_bytes += size;
 
-		// notify os of the received packet
-		status = netif_rx (gl_skb);
+			// notify os of the received packet
+			status = netif_rx (gl_skb);
+		}
 
 		// advance to the next packet
 		packet = (struct gl_packet *)
