@@ -2,6 +2,7 @@
 
 #include <linux/types.h>
 
+static int scsi_debug_slave_alloc(struct scsi_device *);
 static int scsi_debug_slave_configure(struct scsi_device *);
 static void scsi_debug_slave_destroy(struct scsi_device *);
 static int scsi_debug_queuecommand(struct scsi_cmnd *, 
@@ -27,8 +28,9 @@ static Scsi_Host_Template sdebug_driver_template = {
 	.proc_info =		scsi_debug_proc_info,
 	.name =			"SCSI DEBUG",
 	.info =			scsi_debug_info,
+	.slave_alloc =		scsi_debug_slave_alloc,
 	.slave_configure =	scsi_debug_slave_configure,
-	.slave_destroy =		scsi_debug_slave_destroy,
+	.slave_destroy =	scsi_debug_slave_destroy,
 	.ioctl =		scsi_debug_ioctl,
 	.queuecommand =		scsi_debug_queuecommand,
 	.eh_abort_handler =	scsi_debug_abort,
