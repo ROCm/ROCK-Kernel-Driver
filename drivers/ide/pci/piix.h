@@ -38,7 +38,7 @@ static void init_dma_piix(ide_hwif_t *, unsigned long);
  *
  */
  
-static ide_pci_device_t piix_pci_info[] __devinit = {
+static ide_pci_device_t piix_pci_info[] __initdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_INTEL,
 		device:		PCI_DEVICE_ID_INTEL_82371FB_0,
