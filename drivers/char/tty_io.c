@@ -1874,7 +1874,7 @@ static void __do_SAK(void *arg)
 		}
 		task_lock(p);
 		if (p->files) {
-			read_lock(&p->files->file_lock);
+			spin_lock(&p->files->file_lock);
 			for (i=0; i < p->files->max_fds; i++) {
 				filp = fcheck_files(p->files, i);
 				if (filp && (filp->f_op == &tty_fops) &&
@@ -1886,7 +1886,7 @@ static void __do_SAK(void *arg)
 					break;
 				}
 			}
-			read_unlock(&p->files->file_lock);
+			spin_unlock(&p->files->file_lock);
 		}
 		task_unlock(p);
 	}

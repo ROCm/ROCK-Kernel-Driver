@@ -749,7 +749,7 @@ static inline void flush_old_files(struct files_struct * files)
 {
 	long j = -1;
 
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	for (;;) {
 		unsigned long set, i;
 
@@ -761,16 +761,16 @@ static inline void flush_old_files(struct files_struct * files)
 		if (!set)
 			continue;
 		files->close_on_exec->fds_bits[j] = 0;
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		for ( ; set ; i++,set >>= 1) {
 			if (set & 1) {
 				sys_close(i);
 			}
 		}
-		write_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 
 	}
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 }
 
 int flush_old_exec(struct linux_binprm * bprm)
