@@ -1015,6 +1015,10 @@ static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi,
 	if (intfd->bNumEndpoints < 1)
 		return -ENOENT;
 
+	/*
+	 * For each port there is one MIDI_IN/OUT_JACK descriptor, not
+	 * necessarily with any useful contents.  So simply count 'em.
+	 */
 	for (cs_desc = hostif->extra;
 	     cs_desc < hostif->extra + hostif->extralen && cs_desc[0] >= 2;
 	     cs_desc += cs_desc[0]) {
@@ -1049,6 +1053,16 @@ static int snd_usbmidi_create_endpoints_midiman(snd_usb_midi_t* umidi,
 		return -ENOENT;
 	hostif = intf->altsetting;
 	intfd = get_iface_desc(hostif);
+	/*
+	 * The various MidiSport devices have more or less random endpoint
+	 * numbers, so we have to identify the endpoints by their index in
+	 * the descriptor array, like the driver for that other OS does.
+	 *
+	 * There is one interrupt input endpoint for all input ports, one
+	 * bulk output endpoint for even-numbered ports, and one for odd-
+	 * numbered ports.  Both bulk output endpoints have corresponding
+	 * input bulk endpoints (at indices 1 and 3) which aren't used.
+	 */
 	if (intfd->bNumEndpoints < (endpoint->out_cables > 0x0001 ? 5 : 3)) {
 		snd_printdd(KERN_ERR "not enough endpoints\n");
 		return -ENOENT;
