@@ -16,7 +16,7 @@
  *   LVS	Lawrence V. Stefani <lstefani@yahoo.com>
  *
  * Maintainers:
- *   macro	Maciej W. Rozycki <macro@ds2.pg.gda.pl>
+ *   macro	Maciej W. Rozycki <macro@linux-mips.org>
  *
  * Modification History:
  *		Date		Name	Description

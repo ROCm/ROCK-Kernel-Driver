@@ -19,7 +19,7 @@
  *   LVS	Lawrence V. Stefani <lstefani@yahoo.com>
  *
  * Maintainers:
- *   macro	Maciej W. Rozycki <macro@ds2.pg.gda.pl>
+ *   macro	Maciej W. Rozycki <macro@linux-mips.org>
  *
  * Credits:
  *   I'd like to thank Patricia Cross for helping me get started with
@@ -439,7 +439,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 
 	if (!request_region (ioaddr, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, DRV_NAME)) {
 		printk (KERN_ERR "%s: Cannot reserve I/O resource 0x%x @ 0x%lx, aborting\n",
-			DRV_NAME, PFI_K_CSR_IO_LEN, ioaddr);
+			DRV_NAME, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, ioaddr);
 		err = -EBUSY;
 		goto err_out;
 	}
@@ -2666,12 +2666,12 @@ static int dfx_hw_dma_uninit(DFX_board_t *bp, PI_UINT32 type)
  
 static void my_skb_align(struct sk_buff *skb, int n)
 {
-	unsigned long x=(unsigned long)skb->data;	
+	unsigned long x = (unsigned long)skb->data;
 	unsigned long v;
 	
-	v=(x+n-1)&~(n-1);	/* Where we want to be */
+	v = ALIGN(x, n);	/* Where we want to be */
 	
-	skb_reserve(skb, v-x);
+	skb_reserve(skb, v - x);
 }
 
 
