@@ -18,6 +18,7 @@ extern unsigned long tb_ticks_per_usec;
 /* define these here to prevent circular dependencies */ 
 #define __HMT_low()	asm volatile("or 1,1,1")
 #define __HMT_medium()	asm volatile("or 2,2,2")
+#define __barrier()	asm volatile("":::"memory")
 
 static inline unsigned long __get_tb(void)
 {
@@ -34,6 +35,7 @@ static inline void __delay(unsigned long loops)
 	while((__get_tb()-start) < loops)
 		__HMT_low();
 	__HMT_medium();
+	__barrier();
 }
 
 static inline void udelay(unsigned long usecs)
