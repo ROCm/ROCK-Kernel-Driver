@@ -580,7 +580,7 @@ static int __devinit pci_setup(char *str)
 	return 1;
 }
 
-subsys_initcall(pci_init);
+device_initcall(pci_init);
 
 __setup("pci=", pci_setup);
 
