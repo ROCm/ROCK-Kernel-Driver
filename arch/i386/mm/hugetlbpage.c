@@ -12,7 +12,6 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 #include <linux/err.h>
 #include <linux/sysctl.h>
 #include <asm/mman.h>
