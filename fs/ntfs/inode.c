@@ -594,14 +594,26 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * Also if not a directory, it could be something else, rather than
 	 * a regular file. But again, will do for now.
 	 */
+	/* Everyone gets all permissions. */
+	vi->i_mode |= S_IRWXUGO;
+	/* If read-only, noone gets write permissions. */
+	if (IS_RDONLY(vi))
+		vi->i_mode &= ~S_IWUGO;
 	if (m->flags & MFT_RECORD_IS_DIRECTORY) {
 		vi->i_mode |= S_IFDIR;
+		/*
+		 * Apply the directory permissions mask set in the mount
+		 * options.
+		 */
+		vi->i_mode &= ~vol->dmask;
 		/* Things break without this kludge! */
 		if (vi->i_nlink > 1)
 			vi->i_nlink = 1;
-	} else
+	} else {
 		vi->i_mode |= S_IFREG;
-
+		/* Apply the file permissions mask set in the mount options. */
+		vi->i_mode &= ~vol->fmask;
+	}
 	/*
 	 * Find the standard information attribute in the mft record. At this
 	 * stage we haven't setup the attribute list stuff yet, so this could
@@ -944,16 +956,6 @@ skip_attr_list_load:
 			goto unm_err_out;
 		}
 skip_large_dir_stuff:
-		/* Everyone gets read and scan permissions. */
-		vi->i_mode |= S_IRUGO | S_IXUGO;
-		/* If not read-only, set write permissions. */
-		if (!IS_RDONLY(vi))
-			vi->i_mode |= S_IWUGO;
-		/*
-		 * Apply the directory permissions mask set in the mount
-		 * options.
-		 */
-		vi->i_mode &= ~vol->dmask;
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_dir_inode_ops;
 		vi->i_fop = &ntfs_dir_ops;
@@ -1090,13 +1092,6 @@ no_data_attr_special_case:
 		unmap_mft_record(ni);
 		m = NULL;
 		ctx = NULL;
-		/* Everyone gets all permissions. */
-		vi->i_mode |= S_IRWXUGO;
-		/* If read-only, noone gets write permissions. */
-		if (IS_RDONLY(vi))
-			vi->i_mode &= ~S_IWUGO;
-		/* Apply the file permissions mask set in the mount options. */
-		vi->i_mode &= ~vol->fmask;
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_file_inode_ops;
 		vi->i_fop = &ntfs_file_ops;
