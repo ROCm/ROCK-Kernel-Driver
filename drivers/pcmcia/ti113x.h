@@ -145,6 +145,26 @@
 #define ti_diag(socket)		((socket)->private[3])
 #define ti_irqmux(socket)	((socket)->private[4])
 
+/*
+ * These are the TI specific power management handlers.
+ */
+static void ti_save_state(struct yenta_socket *socket)
+{
+	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
+	ti_cardctl(socket) = config_readb(socket, TI113X_CARD_CONTROL);
+	ti_devctl(socket) = config_readb(socket, TI113X_DEVICE_CONTROL);
+	ti_diag(socket) = config_readb(socket, TI1250_DIAGNOSTIC);
+}
+
+static void ti_restore_state(struct yenta_socket *socket)
+{
+	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
+	config_writel(socket, TI122X_IRQMUX, ti_irqmux(socket));
+	config_writeb(socket, TI113X_CARD_CONTROL, ti_cardctl(socket));
+	config_writeb(socket, TI113X_DEVICE_CONTROL, ti_devctl(socket));
+	config_writeb(socket, TI1250_DIAGNOSTIC, ti_diag(socket));
+}
 
 static int ti_intctl(struct yenta_socket *socket)
 {

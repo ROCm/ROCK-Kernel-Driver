@@ -156,38 +156,45 @@ static void ricoh_set_zv(struct yenta_socket *socket)
         }
 }
 
-static int ricoh_init(struct yenta_socket *socket)
-{
-	config_writew(socket, RL5C4XX_MISC, rl_misc(socket));
-	config_writew(socket, RL5C4XX_16BIT_CTL, rl_ctl(socket));
-	config_writew(socket, RL5C4XX_16BIT_IO_0, rl_io(socket));
-	config_writew(socket, RL5C4XX_16BIT_MEM_0, rl_mem(socket));
-	config_writew(socket, RL5C4XX_CONFIG, rl_config(socket));
-	
-	return 0;
-}
-
-
-/*
- * Magic Ricoh initialization code.. Save state at
- * beginning, re-initialize it after suspend.
- */
-static int ricoh_override(struct yenta_socket *socket)
+static void ricoh_save_state(struct yenta_socket *socket)
 {
 	rl_misc(socket) = config_readw(socket, RL5C4XX_MISC);
 	rl_ctl(socket) = config_readw(socket, RL5C4XX_16BIT_CTL);
 	rl_io(socket) = config_readw(socket, RL5C4XX_16BIT_IO_0);
 	rl_mem(socket) = config_readw(socket, RL5C4XX_16BIT_MEM_0);
 	rl_config(socket) = config_readw(socket, RL5C4XX_CONFIG);
+}
+
+static void ricoh_restore_state(struct yenta_socket *socket)
+{
+	config_writew(socket, RL5C4XX_MISC, rl_misc(socket));
+	config_writew(socket, RL5C4XX_16BIT_CTL, rl_ctl(socket));
+	config_writew(socket, RL5C4XX_16BIT_IO_0, rl_io(socket));
+	config_writew(socket, RL5C4XX_16BIT_MEM_0, rl_mem(socket));
+	config_writew(socket, RL5C4XX_CONFIG, rl_config(socket));
+}
+
+
+/*
+ * Magic Ricoh initialization code..
+ */
+static int ricoh_override(struct yenta_socket *socket)
+{
+	u16 config, ctl;
+
+	config = config_readw(socket, RL5C4XX_CONFIG);
 
 	/* Set the default timings, don't trust the original values */
-	rl_ctl(socket) = RL5C4XX_16CTL_IO_TIMING | RL5C4XX_16CTL_MEM_TIMING;
+	ctl = RL5C4XX_16CTL_IO_TIMING | RL5C4XX_16CTL_MEM_TIMING;
 
 	if(socket->dev->device < PCI_DEVICE_ID_RICOH_RL5C475) {
-		rl_ctl(socket) |= RL5C46X_16CTL_LEVEL_1 | RL5C46X_16CTL_LEVEL_2;
+		ctl |= RL5C46X_16CTL_LEVEL_1 | RL5C46X_16CTL_LEVEL_2;
 	} else {
-		rl_config(socket) |= RL5C4XX_CONFIG_PREFETCH;
+		config |= RL5C4XX_CONFIG_PREFETCH;
 	}
+
+	config_writew(socket, RL5C4XX_16BIT_CTL, ctl);
+	config_writew(socket, RL5C4XX_CONFIG, config);
 
 	ricoh_set_zv(socket);
 

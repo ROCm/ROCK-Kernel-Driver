@@ -99,6 +99,8 @@ struct yenta_socket;
 
 struct cardbus_type {
 	int	(*override)(struct yenta_socket *);
+	void	(*save_state)(struct yenta_socket *);
+	void	(*restore_state)(struct yenta_socket *);
 	int	(*sock_init)(struct yenta_socket *);
 };
 
@@ -113,6 +115,9 @@ struct yenta_socket {
 
 	/* A few words of private data for special stuff of overrides... */
 	unsigned int private[8];
+
+	/* PCI saved state */
+	u32 saved_state[18];
 };
 
 

@@ -601,18 +601,6 @@ static int yenta_sock_suspend(struct pcmcia_socket *sock)
 	/* Disable CSC interrupts */
 	cb_writel(socket, CB_SOCKET_MASK, 0x0);
 
-	/*
-	 * This does not work currently. The controller
-	 * loses too much information during D3 to come up
-	 * cleanly. We should probably fix yenta_sock_init()
-	 * to update all the critical registers, notably
-	 * the IO and MEM bridging region data.. That is
-	 * something that pci_set_power_state() should
-	 * probably know about bridges anyway.
-	 *
-	pci_set_power_state(socket->dev, 3);
-	 */
-
 	return 0;
 }
 
@@ -792,23 +780,32 @@ enum {
 struct cardbus_type cardbus_type[] = {
 	[CARDBUS_TYPE_TI]	= {
 		.override	= ti_override,
+		.save_state	= ti_save_state,
+		.restore_state	= ti_restore_state,
 		.sock_init	= ti_init,
 	},
 	[CARDBUS_TYPE_TI113X]	= {
 		.override	= ti113x_override,
+		.save_state	= ti_save_state,
+		.restore_state	= ti_restore_state,
 		.sock_init	= ti113x_init,
 	},
 	[CARDBUS_TYPE_TI12XX]	= {
 		.override	= ti12xx_override,
+		.save_state	= ti_save_state,
+		.restore_state	= ti_restore_state,
 		.sock_init	= ti113x_init,
 	},
 	[CARDBUS_TYPE_TI1250]	= {
 		.override	= ti1250_override,
+		.save_state	= ti_save_state,
+		.restore_state	= ti_restore_state,
 		.sock_init	= ti1250_init,
 	},
 	[CARDBUS_TYPE_RICOH]	= {
 		.override	= ricoh_override,
-		.sock_init	= ricoh_init,
+		.save_state	= ricoh_save_state,
+		.restore_state	= ricoh_restore_state,
 	},
 };
 
@@ -929,12 +926,41 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 
 static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+	struct yenta_socket *socket = pci_get_drvdata(dev);
+	int ret;
+
+	ret = pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+
+	if (socket) {
+		if (socket->type && socket->type->save_state)
+			socket->type->save_state(socket);
+
+		/* FIXME: pci_save_state needs to have a better interface */
+		pci_save_state(dev, socket->saved_state);
+		pci_read_config_dword(dev, 16*4, &socket->saved_state[16]);
+		pci_read_config_dword(dev, 17*4, &socket->saved_state[17]);
+		pci_set_power_state(dev, 3);
+	}
+
+	return ret;
 }
 
 
 static int yenta_dev_resume (struct pci_dev *dev)
 {
+	struct yenta_socket *socket = pci_get_drvdata(dev);
+
+	if (socket) {
+		pci_set_power_state(dev, 0);
+		/* FIXME: pci_restore_state needs to have a better interface */
+		pci_restore_state(dev, socket->saved_state);
+		pci_write_config_dword(dev, 16*4, socket->saved_state[16]);
+		pci_write_config_dword(dev, 17*4, socket->saved_state[17]);
+
+		if (socket->type && socket->type->restore_state)
+			socket->type->restore_state(socket);
+	}
+
 	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
 }
 
