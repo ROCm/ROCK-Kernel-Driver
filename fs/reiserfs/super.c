@@ -430,6 +430,8 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&ei->i_prealloc_list) ;
 		inode_init_once(&ei->vfs_inode);
+		ei->i_acl_access = NULL;
+		ei->i_acl_default = NULL;
 	}
 }
  
