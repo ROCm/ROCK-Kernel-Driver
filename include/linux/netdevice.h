@@ -45,6 +45,10 @@ struct divert_blk;
 struct vlan_group;
 struct ethtool_ops;
 
+					/* source back-compat hook */
+#define SET_ETHTOOL_OPS(netdev,ops) \
+	( (netdev)->ethtool_ops = (ops) )
+
 #define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
 					   functions are available. */
 
