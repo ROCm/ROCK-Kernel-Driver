@@ -14,6 +14,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (11/19/2002) gkh
+ *	removed a few #ifdefs for the generic code and cleaned up the failure
+ *	logic in initialization.
+ *
  * (10/02/2002) gkh
  *	moved the console code to console.c and out of this file.
  *
@@ -341,7 +345,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.6"
+#define DRIVER_VERSION "v1.7"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux/"
 #define DRIVER_DESC "USB Serial Driver core"
 
@@ -382,7 +386,29 @@ static struct usb_device_id generic_serial_ids[] = {
 	{.driver_info = 42},
 	{}
 };
-#endif
+
+static int generic_register (void)
+{
+	generic_device_ids[0].idVendor = vendor;
+	generic_device_ids[0].idProduct = product;
+	generic_device_ids[0].match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_PRODUCT;
+
+	/* register our generic driver with ourselves */
+	return usb_serial_register (&generic_device);
+}
+
+static void generic_deregister (void)
+{
+	/* remove our generic driver */
+	usb_serial_deregister (&generic_device);
+}
+
+#else
+
+static inline int generic_register (void) { return 0; }
+static inline void generic_deregister (void) { }
+
+#endif /* CONFIG_USB_SERIAL_GENERIC */
 
 /* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
@@ -408,7 +434,6 @@ static struct termios *		serial_termios[SERIAL_TTY_MINORS];
 static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
-
 
 struct usb_serial *usb_serial_get_by_minor (unsigned int minor)
 {
@@ -839,7 +864,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 
 		length += sprintf (page+length, "%d:", i);
 		if (serial->type->owner)
-			length += sprintf (page+length, " module:%s", serial->type->owner->name);
+			length += sprintf (page+length, " module:%s", module_name(serial->type->owner));
 		length += sprintf (page+length, " name:\"%s\"", serial->type->name);
 		length += sprintf (page+length, " vendor:%04x product:%04x", serial->vendor, serial->product);
 		length += sprintf (page+length, " num_ports:%d", serial->num_ports);
@@ -1574,40 +1599,49 @@ static struct tty_driver serial_tty_driver = {
 static int __init usb_serial_init(void)
 {
 	int i;
-	int result;
+	int result = 0;
 
 	/* Initalize our global data */
 	for (i = 0; i < SERIAL_TTY_MINORS; ++i) {
 		serial_table[i] = NULL;
 	}
 
+	/* register the generic driver, if we should */
+	result = generic_register();
+	if (result < 0) {
+		err("%s - registering generic driver failed", __FUNCTION__);
+		goto exit;
+	}
+
 	/* register the tty driver */
 	serial_tty_driver.init_termios          = tty_std_termios;
 	serial_tty_driver.init_termios.c_cflag  = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	if (tty_register_driver (&serial_tty_driver)) {
-		err("%s - failed to register tty driver", __FUNCTION__);
-		return -1;
+	result = tty_register_driver (&serial_tty_driver);
+	if (result) {
+		err("%s - tty_register_driver failed", __FUNCTION__);
+		goto exit_generic;
 	}
 
 	/* register the USB driver */
 	result = usb_register(&usb_serial_driver);
 	if (result < 0) {
-		tty_unregister_driver(&serial_tty_driver);
-		err("usb_register failed for the usb-serial driver. Error number %d", result);
-		return -1;
+		err("%s - usb_register failed", __FUNCTION__);
+		goto exit_tty;
 	}
-
-#ifdef CONFIG_USB_SERIAL_GENERIC
-	generic_device_ids[0].idVendor = vendor;
-	generic_device_ids[0].idProduct = product;
-	generic_device_ids[0].match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_PRODUCT;
-	/* register our generic driver with ourselves */
-	usb_serial_register (&generic_device);
-#endif
 
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
-	return 0;
+	return result;
+
+exit_tty:
+	tty_unregister_driver(&serial_tty_driver);
+
+exit_generic:
+	generic_deregister();
+
+exit:
+	err ("%s - returning with error %d", __FUNCTION__, result);
+	return result;
 }
 
 
@@ -1615,11 +1649,8 @@ static void __exit usb_serial_exit(void)
 {
 	usb_serial_console_exit();
 
-#ifdef CONFIG_USB_SERIAL_GENERIC
-	/* remove our generic driver */
-	usb_serial_deregister (&generic_device);
-#endif
-	
+	generic_deregister();
+
 	usb_deregister(&usb_serial_driver);
 	tty_unregister_driver(&serial_tty_driver);
 }
