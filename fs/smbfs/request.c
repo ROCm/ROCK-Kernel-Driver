@@ -112,6 +112,7 @@ struct smb_request *smb_alloc_request(struct smb_sb_info *server, int bufsize)
 #else
 		/* FIXME: we want something like nfs does above, but that
 		   requires changes to all callers and can wait. */
+		atomic_dec(&server->nr_requests);
 		break;
 #endif
 	}
@@ -316,7 +317,7 @@ int smb_add_request(struct smb_request *req)
 	if (server->state == CONN_VALID) {
 		if (list_empty(&server->xmitq))
 			result = smb_request_send_req(req);
-		if (result < 0) {
+		if (result < 0 && result != -EAGAIN) {
 			/* Connection lost? */
 			server->conn_error = result;
 			server->state = CONN_INVALID;
@@ -394,7 +395,6 @@ int smb_request_send_req(struct smb_request *req)
 	if (result < 0 && result != -EAGAIN)
 		goto out;
 
-	result = 0;
 	if (!(req->rq_flags & SMB_REQ_TRANSMITTED))
 		goto out;
 
@@ -431,7 +431,7 @@ int smb_request_send_server(struct smb_sb_info *server)
 		return 0;
 
 	result = smb_request_send_req(req);
-	if (result < 0) {
+	if (result < 0 && result != -EAGAIN) {
 		server->conn_error = result;
 		list_del_init(&req->rq_queue);
 		list_add(&req->rq_queue, &server->xmitq);
