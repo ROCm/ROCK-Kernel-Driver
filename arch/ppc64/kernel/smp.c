@@ -392,17 +392,6 @@ void smp_send_reschedule(int cpu)
 	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
 }
 
-/*
- * this function sends a reschedule IPI to all (other) CPUs.
- * This should only be used if some 'global' task became runnable,
- * such as a RT task, that must be handled now. The first CPU
- * that manages to grab the task will run it.
- */
-void smp_send_reschedule_all(void)
-{
-	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_RESCHEDULE, 0, 0);
-}
-
 #ifdef CONFIG_XMON
 void smp_send_xmon_break(int cpu)
 {

@@ -336,7 +336,7 @@ int simple_commit_write(struct file *file, struct page *page,
 
 int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files)
 {
-	static struct super_operations s_ops = {statfs:simple_statfs};
+	static struct super_operations s_ops = {.statfs = simple_statfs};
 	struct inode *inode;
 	struct dentry *root;
 	struct dentry *dentry;
