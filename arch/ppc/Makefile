@@ -39,7 +39,7 @@ aflags-$(CONFIG_6xx)		+= -maltivec
 cflags-$(CONFIG_6xx)		+= -Wa,-maltivec
 aflags-$(CONFIG_E500)		+= -me500
 cflags-$(CONFIG_E500)		+= -Wa,-me500
-aflags-$(CONFIG_PPC64BRIDGE)	+= -mppc64bridge
+aflags-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 cflags-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 
 AFLAGS += $(aflags-y)
