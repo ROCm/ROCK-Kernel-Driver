@@ -328,11 +328,9 @@ static void pd_print_error(struct pd_unit *disk, char *msg, int status)
 
 static void pd_reset(struct pd_unit *disk)
 {				/* called only for MASTER drive */
-	pi_connect(disk->pi);
 	write_status(disk, 4);
 	udelay(50);
 	write_status(disk, 0);
-	pi_disconnect(disk->pi);
 	udelay(250);
 }
 
@@ -416,6 +414,7 @@ static void ps_tq_int(void *data)
 }
 
 static enum action do_pd_io_start(void);
+static enum action pd_special(void);
 static enum action do_pd_read_start(void);
 static enum action do_pd_write_start(void);
 static enum action do_pd_read_drq(void);
@@ -482,22 +481,32 @@ static char *pd_buf;		/* buffer for request in progress */
 
 static enum action do_pd_io_start(void)
 {
-	pd_block = pd_req->sector;
-	pd_run = pd_req->nr_sectors;
-	pd_count = pd_req->current_nr_sectors;
-	if (pd_block + pd_count > get_capacity(pd_req->rq_disk))
-		return Fail;
+	if (pd_req->flags & REQ_SPECIAL) {
+		phase = pd_special;
+		return pd_special();
+	}
 
 	pd_cmd = rq_data_dir(pd_req);
-	pd_buf = pd_req->buffer;
-	pd_retries = 0;
+	if (pd_cmd == READ || pd_cmd == WRITE) {
+		pd_block = pd_req->sector;
+		pd_count = pd_req->current_nr_sectors;
+		if (pd_block + pd_count > get_capacity(pd_req->rq_disk))
+			return Fail;
+		pd_run = pd_req->nr_sectors;
+		pd_buf = pd_req->buffer;
+		pd_retries = 0;
+		if (pd_cmd == READ)
+			return do_pd_read_start();
+		else
+			return do_pd_write_start();
+	}
+	return Fail;
+}
 
-	if (pd_cmd == READ) {
-		return do_pd_read_start();
-	} else if (pd_cmd == WRITE) {
-		return do_pd_write_start();
-	} else
-		return Fail;
+static enum action pd_special(void)
+{
+	enum action (*func)(struct pd_unit *) = pd_req->special;
+	return func(pd_current);
 }
 
 static int pd_next_buf(void)
@@ -614,43 +623,45 @@ static enum action do_pd_write_done(void)
 
 static void pd_init_dev_parms(struct pd_unit *disk)
 {
-	pi_connect(disk->pi);
 	pd_wait_for(disk, 0, DBMSG("before init_dev_parms"));
 	pd_send_command(disk, disk->sectors, 0, disk->heads - 1, 0, 0,
 			IDE_INIT_DEV_PARMS);
 	udelay(300);
 	pd_wait_for(disk, 0, "Initialise device parameters");
-	pi_disconnect(disk->pi);
 }
 
-static void pd_doorlock(struct pd_unit *disk, int func)
+static enum action pd_door_lock(struct pd_unit *disk)
 {
-	pi_connect(disk->pi);
 	if (!(pd_wait_for(disk, STAT_READY, "Lock") & STAT_ERR)) {
-		pd_send_command(disk, 1, 0, 0, 0, 0, func);
+		pd_send_command(disk, 1, 0, 0, 0, 0, IDE_DOORLOCK);
 		pd_wait_for(disk, STAT_READY, "Lock done");
 	}
-	pi_disconnect(disk->pi);
+	return Ok;
 }
 
-static void pd_eject(struct pd_unit *disk)
+static enum action pd_door_unlock(struct pd_unit *disk)
 {
-	pi_connect(disk->pi);
+	if (!(pd_wait_for(disk, STAT_READY, "Lock") & STAT_ERR)) {
+		pd_send_command(disk, 1, 0, 0, 0, 0, IDE_DOORUNLOCK);
+		pd_wait_for(disk, STAT_READY, "Lock done");
+	}
+	return Ok;
+}
+
+static enum action pd_eject(struct pd_unit *disk)
+{
 	pd_wait_for(disk, 0, DBMSG("before unlock on eject"));
 	pd_send_command(disk, 1, 0, 0, 0, 0, IDE_DOORUNLOCK);
 	pd_wait_for(disk, 0, DBMSG("after unlock on eject"));
 	pd_wait_for(disk, 0, DBMSG("before eject"));
 	pd_send_command(disk, 0, 0, 0, 0, 0, IDE_EJECT);
 	pd_wait_for(disk, 0, DBMSG("after eject"));
-	pi_disconnect(disk->pi);
+	return Ok;
 }
 
-static void pd_media_check(struct pd_unit *disk)
+static enum action pd_media_check(struct pd_unit *disk)
 {
-	int r;
-
-	pi_connect(disk->pi);
-	r = pd_wait_for(disk, STAT_READY, DBMSG("before media_check"));
+	int r = pd_wait_for(disk, STAT_READY, DBMSG("before media_check"));
 	if (!(r & STAT_ERR)) {
 		pd_send_command(disk, 1, 1, 0, 0, 0, IDE_READ_VRFY);
 		r = pd_wait_for(disk, STAT_READY, DBMSG("RDY after READ_VRFY"));
@@ -663,17 +674,14 @@ static void pd_media_check(struct pd_unit *disk)
 		pd_send_command(disk, 1, 1, 0, 0, 0, IDE_READ_VRFY);
 		r = pd_wait_for(disk, STAT_READY, DBMSG("RDY after VRFY"));
 	}
-	pi_disconnect(disk->pi);
-
+	return Ok;
 }
 
 static void pd_standby_off(struct pd_unit *disk)
 {
-	pi_connect(disk->pi);
 	pd_wait_for(disk, 0, DBMSG("before STANDBY"));
 	pd_send_command(disk, 0, 0, 0, 0, 0, IDE_STANDBY);
 	pd_wait_for(disk, 0, DBMSG("after STANDBY"));
-	pi_disconnect(disk->pi);
 }
 
 static int pd_identify(struct pd_unit *disk)
@@ -687,10 +695,11 @@ static int pd_identify(struct pd_unit *disk)
    settings on the SLAVE drive.
 */
 
+	pi_connect(disk->pi);
+
 	if (disk->drive == 0)
 		pd_reset(disk);
 
-	pi_connect(disk->pi);
 	write_reg(disk, 6, DRIVE(disk));
 	pd_wait_for(disk, 0, DBMSG("before IDENT"));
 	pd_send_command(disk, 1, 0, 0, 0, 0, IDE_IDENTIFY);
@@ -700,7 +709,6 @@ static int pd_identify(struct pd_unit *disk)
 		return 0;
 	}
 	pi_read_block(disk->pi, pd_scratch, 512);
-	pi_disconnect(disk->pi);
 	disk->can_lba = pd_scratch[99] & 2;
 	disk->sectors = le16_to_cpu(*(u16 *) (pd_scratch + 12));
 	disk->heads = le16_to_cpu(*(u16 *) (pd_scratch + 6));
@@ -732,6 +740,7 @@ static int pd_identify(struct pd_unit *disk)
 	if (!disk->standby)
 		pd_standby_off(disk);
 
+	pi_disconnect(disk->pi);
 	return 1;
 }
 
@@ -746,6 +755,28 @@ static void do_pd_request(request_queue_t * q)
 	schedule_fsm();
 }
 
+static int pd_special_command(struct pd_unit *disk,
+		      enum action (*func)(struct pd_unit *disk))
+{
+	DECLARE_COMPLETION(wait);
+	struct request rq;
+	int err = 0;
+
+	memset(&rq, 0, sizeof(rq));
+	rq.errors = 0;
+	rq.rq_status = RQ_ACTIVE;
+	rq.rq_disk = disk->gd;
+	rq.ref_count = 1;
+	rq.waiting = &wait;
+	blk_insert_request(disk->gd->queue, &rq, 0, func, 0);
+	wait_for_completion(&wait);
+	rq.waiting = NULL;
+	if (rq.errors)
+		err = -EIO;
+	blk_put_request(&rq);
+	return err;
+}
+
 /* kernel glue structures */
 
 static int pd_open(struct inode *inode, struct file *file)
@@ -755,8 +786,8 @@ static int pd_open(struct inode *inode, struct file *file)
 	disk->access++;
 
 	if (disk->removable) {
-		pd_media_check(disk);
-		pd_doorlock(disk, IDE_DOORLOCK);
+		pd_special_command(disk, pd_media_check);
+		pd_special_command(disk, pd_door_lock);
 	}
 	return 0;
 }
@@ -771,7 +802,7 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case CDROMEJECT:
 		if (disk->access == 1)
-			pd_eject(disk);
+			pd_special_command(disk, pd_eject);
 		return 0;
 	case HDIO_GETGEO:
 		if (disk->alt_geom) {
@@ -797,7 +828,7 @@ static int pd_release(struct inode *inode, struct file *file)
 	struct pd_unit *disk = inode->i_bdev->bd_disk->private_data;
 
 	if (!--disk->access && disk->removable)
-		pd_doorlock(disk, IDE_DOORUNLOCK);
+		pd_special_command(disk, pd_door_unlock);
 
 	return 0;
 }
@@ -808,7 +839,7 @@ static int pd_check_media(struct gendisk *p)
 	int r;
 	if (!disk->removable)
 		return 0;
-	pd_media_check(disk);
+	pd_special_command(disk, pd_media_check);
 	r = disk->changed;
 	disk->changed = 0;
 	return r;
