@@ -13,7 +13,7 @@
 #include <linux/topology.h>
 #include <asm/processor.h>
 
-#define SD_NODES_PER_DOMAIN 4
+#define SD_NODES_PER_DOMAIN 6
 
 #ifdef CONFIG_NUMA
 /**
@@ -36,12 +36,15 @@ static int __devinit find_next_best_node(int node, unsigned long *used_nodes)
 		/* Start at @node */
 		n = (node + i) % MAX_NUMNODES;
 
+		if (!nr_cpus_node(n))
+			continue;
+
 		/* Skip already used nodes */
 		if (test_bit(n, used_nodes))
 			continue;
 
 		/* Simple min distance search */
-		val = node_distance(node, i);
+		val = node_distance(node, n);
 
 		if (val < min_val) {
 			min_val = val;
@@ -65,16 +68,18 @@ static int __devinit find_next_best_node(int node, unsigned long *used_nodes)
 static cpumask_t __devinit sched_domain_node_span(int node)
 {
 	int i;
-	cpumask_t span;
+	cpumask_t span, nodemask;
 	DECLARE_BITMAP(used_nodes, MAX_NUMNODES);
 
 	cpus_clear(span);
 	bitmap_zero(used_nodes, MAX_NUMNODES);
 
-	for (i = 0; i < SD_NODES_PER_DOMAIN; i++) {
-		int next_node = find_next_best_node(node, used_nodes);
-		cpumask_t  nodemask;
+	nodemask = node_to_cpumask(node);
+	cpus_or(span, span, nodemask);
+	set_bit(node, used_nodes);
 
+	for (i = 1; i < SD_NODES_PER_DOMAIN; i++) {
+		int next_node = find_next_best_node(node, used_nodes);
 		nodemask = node_to_cpumask(next_node);
 		cpus_or(span, span, nodemask);
 	}
@@ -137,16 +142,17 @@ void __devinit arch_init_sched_domains(void)
 	 * Set up domains. Isolated domains just stay on the dummy domain.
 	 */
 	for_each_cpu_mask(i, cpu_default_map) {
+		int node = cpu_to_node(i);
 		int group;
 		struct sched_domain *sd = NULL, *p;
-		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
+		cpumask_t nodemask = node_to_cpumask(node);
 
 		cpus_and(nodemask, nodemask, cpu_default_map);
 
 #ifdef CONFIG_NUMA
 		sd = &per_cpu(node_domains, i);
 		*sd = SD_NODE_INIT;
-		sd->span = sched_domain_node_span(cpu_to_node(i));
+		sd->span = sched_domain_node_span(node);
 		cpus_and(sd->span, sd->span, cpu_default_map);
 #endif
 
