@@ -1058,12 +1058,10 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 		 *  and BUS width.
 		 */
 		if (np->features & FE_ULTRA3) {
-			if (tp->tinfo.user.period <= 9	&&
-			    tp->tinfo.user.width == BUS_16_BIT) {
-				tp->tinfo.user.options |= PPR_OPT_DT;
-				tp->tinfo.user.offset   = np->maxoffs_dt;
-				tp->tinfo.user.spi_version = 3;
-			}
+			tp->tinfo.user.options |= PPR_OPT_DT;
+			tp->tinfo.user.period = np->minsync_dt;
+			tp->tinfo.user.offset = np->maxoffs_dt;
+			tp->tinfo.user.spi_version = 3;
 		}
 
 		if (!tp->usrtags)
@@ -2126,9 +2124,15 @@ sym_setsync(hcb_p np, int target,
 
 	sym_settrans(np, target, 0, ofs, per, wide, div, fak);
 
-	tp->tinfo.goal.period	= tp->tinfo.curr.period  = per;
-	tp->tinfo.goal.offset	= tp->tinfo.curr.offset  = ofs;
-	tp->tinfo.goal.options	= tp->tinfo.curr.options = 0;
+	tp->tinfo.curr.period  = per;
+	tp->tinfo.curr.offset  = ofs;
+	tp->tinfo.curr.options = 0;
+
+	if (!(tp->tinfo.goal.options & PPR_OPT_MASK)) {
+		tp->tinfo.goal.period	= per;
+		tp->tinfo.goal.offset	= ofs;
+		tp->tinfo.goal.options	= 0;
+	}
 
 	sym_xpt_async_nego_sync(np, target);
 }
