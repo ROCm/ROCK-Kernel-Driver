@@ -5,13 +5,11 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static int init_setup_opti621(struct pci_dev *, ide_pci_device_t *);
 static void init_hwif_opti621(ide_hwif_t *);
 
 static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 	{	/* 0 */
 		.name		= "OPTI621",
-		.init_setup	= init_setup_opti621,
 		.init_hwif	= init_hwif_opti621,
 		.channels	= 2,
 		.autodma	= AUTODMA,
@@ -19,7 +17,6 @@ static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 		.bootable	= ON_BOARD,
 	},{	/* 1 */
 		.name		= "OPTI621X",
-		.init_setup	= init_setup_opti621,
 		.init_hwif	= init_hwif_opti621,
 		.channels	= 2,
 		.autodma	= AUTODMA,

@@ -2185,13 +2185,6 @@ P:	Christoph Hellwig
 M:	hch@infradead.org
 S:	Maintained
 
-TI GRAPH LINK USB (SilverLink) CABLE DRIVER
-P:	Romain Lievin
-M:	roms@lpg.ticalc.org
-P:	Julien Blache
-M:	jb@technologeek.org
-S:	Maintained
-
 TI PARALLEL LINK CABLE DRIVER
 P:     Romain Lievin
 M:     roms@lpg.ticalc.org

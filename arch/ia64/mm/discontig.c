@@ -26,7 +26,6 @@
 #include <asm/meminit.h>
 #include <asm/numa.h>
 #include <asm/sections.h>
-#include <asm/mca.h>
 
 /*
  * Track per-node information needed to setup the boot memory allocator, the
@@ -294,9 +293,6 @@ static int early_nr_cpus_node(int node)
  *   |------------------------|
  *   |  local ia64_node_data  |
  *   |------------------------|
- *   |    MCA/INIT data *     |
- *   |    cpus_on_this_node   |
- *   |------------------------|
  *   |          ???           |
  *   |________________________|
  *
@@ -310,7 +306,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 {
 	unsigned long epfn, cpu, cpus, phys_cpus;
 	unsigned long pernodesize = 0, pernode, pages, mapsize;
-	void *cpu_data, *mca_data_phys;
+	void *cpu_data;
 	struct bootmem_data *bdp = &mem_data[node].bootmem_data;
 
 	epfn = (start + len) >> PAGE_SHIFT;
@@ -339,7 +335,6 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 	pernodesize += node * L1_CACHE_BYTES;
 	pernodesize += L1_CACHE_ALIGN(sizeof(pg_data_t));
 	pernodesize += L1_CACHE_ALIGN(sizeof(struct ia64_node_data));
-	pernodesize += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
 	pernodesize = PAGE_ALIGN(pernodesize);
 	pernode = NODEDATA_ALIGN(start, node);
 
@@ -362,9 +357,6 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 		mem_data[node].pgdat->bdata = bdp;
 		pernode += L1_CACHE_ALIGN(sizeof(pg_data_t));
 
-		mca_data_phys = (void *)pernode;
-		pernode += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
-
 		/*
 		 * Copy the static per-cpu data into the region we
 		 * just set aside and then setup __per_cpu_offset
@@ -374,18 +366,6 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 			if (node == node_cpuid[cpu].nid) {
 				memcpy(__va(cpu_data), __phys_per_cpu_start,
 				       __per_cpu_end - __per_cpu_start);
-				if ((cpu == 0) || (node_cpuid[cpu].phys_id > 0)) {
-					/* 
-					 * The memory for the cpuinfo structure is allocated
-					 * here, but the data in the structure is initialized
-					 * later.  Save the physical address of the MCA save
-					 * area in __per_cpu_mca[cpu].  When the cpuinfo struct 
-					 * is initialized, the value in __per_cpu_mca[cpu]
-					 * will be put in the cpuinfo structure.
-					 */
-					__per_cpu_mca[cpu] = __pa(mca_data_phys);
-					mca_data_phys += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t));
-				}
 				__per_cpu_offset[cpu] = (char*)__va(cpu_data) -
 					__per_cpu_start;
 				cpu_data += PERCPU_PAGE_SIZE;
