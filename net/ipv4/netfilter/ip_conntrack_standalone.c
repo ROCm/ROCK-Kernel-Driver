@@ -46,6 +46,14 @@
 MODULE_LICENSE("GPL");
 
 extern atomic_t ip_conntrack_count;
+/* We export these symbols here rather than where they're defined
+ * to prevent them from showing up in ipfwadm.ko
+ */
+EXPORT_SYMBOL(ip_conntrack_count);
+#ifdef CONFIG_IP_NF_NAT_NEEDED
+EXPORT_SYMBOL(ip_conntrack_tcp_update);
+#endif
+
 DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
 unsigned int ip_ct_log_invalid = 0;
