@@ -68,9 +68,10 @@ static struct sock *volatile x25_list /* = NULL initially */;
 
 static struct proto_ops x25_proto_ops;
 
-static x25_address null_x25_address = {"               "};
+static struct x25_address null_x25_address = {"               "};
 
-int x25_addr_ntoa(unsigned char *p, x25_address *called_addr, x25_address *calling_addr)
+int x25_addr_ntoa(unsigned char *p, struct x25_address *called_addr,
+		  struct x25_address *calling_addr)
 {
 	int called_len, calling_len;
 	char *called, *calling;
@@ -107,7 +108,8 @@ int x25_addr_ntoa(unsigned char *p, x25_address *called_addr, x25_address *calli
 	return 1 + (called_len + calling_len + 1) / 2;
 }
 
-int x25_addr_aton(unsigned char *p, x25_address *called_addr, x25_address *calling_addr)
+int x25_addr_aton(unsigned char *p, struct x25_address *called_addr,
+		  struct x25_address *calling_addr)
 {
 	unsigned int called_len, calling_len;
 	char *called, *calling;
@@ -238,7 +240,7 @@ static void x25_insert_socket(struct sock *sk)
  *	Find a socket that wants to accept the Call Request we just
  *	received.
  */
-static struct sock *x25_find_listener(x25_address *addr)
+static struct sock *x25_find_listener(struct x25_address *addr)
 {
 	unsigned long flags;
 	struct sock *s;
@@ -767,7 +769,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	struct sock *sk;
 	struct sock *make;
 	x25_cb *makex25;
-	x25_address source_addr, dest_addr;
+	struct x25_address source_addr, dest_addr;
 	struct x25_facilities facilities;
 	int len;
 
