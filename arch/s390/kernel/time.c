@@ -281,29 +281,6 @@ int stop_cpu_timer(void)
 	return 0;
 }
 
-void do_monitor_call(struct pt_regs *regs, long interruption_code)
-{
-	/* disable monitor call class 0 */
-	__ctl_clear_bit(8, 15);
-
-	start_cpu_timer();
-}
-
-/*
- * called from cpu_idle to stop any timers
- * returns 1 if CPU should not be stopped
- */
-int stop_timers(void)
-{
-	if (stop_cpu_timer())
-		return 1;
-
-	/* enable monitor call class 0 */
-	__ctl_set_bit(8, 15);
-
-	return 0;
-}
-
 void set_vtimer(__u64 expires)
 {
 	asm volatile ("SPT %0" : : "m" (expires));
@@ -422,6 +399,139 @@ static void do_cpu_timer_interrupt(struct pt_regs *regs, __u16 error_code)
 	spin_unlock(&vt_list->lock);
 	set_vtimer(next);
 }
+#endif
+
+#ifdef CONFIG_NO_IDLE_HZ
+
+#ifdef CONFIG_NO_IDLE_HZ_INIT
+int sysctl_hz_timer = 0;
+#else
+int sysctl_hz_timer = 1;
+#endif
+
+/*
+ * Start the HZ tick on the current CPU.
+ * Only cpu_idle may call this function.
+ */
+void start_hz_timer(struct pt_regs *regs)
+{
+	__u64 tmp;
+	__u32 ticks;
+
+	if (!cpu_isset(smp_processor_id(), idle_cpu_mask))
+		return;
+
+	/* Calculate how many ticks have passed */
+	asm volatile ("STCK 0(%0)" : : "a" (&tmp) : "memory", "cc");
+	tmp = tmp + CLK_TICKS_PER_JIFFY - S390_lowcore.jiffy_timer;
+	ticks = __calculate_ticks(tmp);
+	S390_lowcore.jiffy_timer += CLK_TICKS_PER_JIFFY * (__u64) ticks;
+
+	/* Set the clock comparator to the next tick. */
+	tmp = S390_lowcore.jiffy_timer + CPU_DEVIATION;
+	asm volatile ("SCKC %0" : : "m" (tmp));
+
+	/* Charge the ticks. */
+	if (ticks > 0) {
+#ifdef CONFIG_SMP
+		/*
+		 * Do not rely on the boot cpu to do the calls to do_timer.
+		 * Spread it over all cpus instead.
+		 */
+		write_seqlock(&xtime_lock);
+		if (S390_lowcore.jiffy_timer > xtime_cc) {
+			__u32 xticks;
+
+			tmp = S390_lowcore.jiffy_timer - xtime_cc;
+			if (tmp >= 2*CLK_TICKS_PER_JIFFY) {
+				xticks = __calculate_ticks(tmp);
+				xtime_cc += (__u64) xticks*CLK_TICKS_PER_JIFFY;
+			} else {
+				xticks = 1;
+				xtime_cc += CLK_TICKS_PER_JIFFY;
+			}
+			while (xticks--)
+				do_timer(regs);
+		}
+		write_sequnlock(&xtime_lock);
+		while (ticks--)
+			update_process_times(user_mode(regs));
+#else
+		while (ticks--)
+			do_timer(regs);
+#endif
+	}
+	cpu_clear(smp_processor_id(), idle_cpu_mask);
+}
+
+/*
+ * Stop the HZ tick on the current CPU.
+ * Only cpu_idle may call this function.
+ */
+int stop_hz_timer(void)
+{
+	__u64 timer;
+
+	if (sysctl_hz_timer != 0)
+		return 1;
+
+	/*
+	 * Leave the clock comparator set up for the next timer
+	 * tick if either rcu or a softirq is pending.
+	 */
+	if (rcu_pending(smp_processor_id()) || local_softirq_pending())
+		return 1;
+
+	/*
+	 * This cpu is going really idle. Set up the clock comparator
+	 * for the next event.
+	 */
+	cpu_set(smp_processor_id(), idle_cpu_mask);
+	timer = (__u64) (next_timer_interrupt() - jiffies) + jiffies_64;
+	timer = jiffies_timer_cc + timer * CLK_TICKS_PER_JIFFY;
+	asm volatile ("SCKC %0" : : "m" (timer));
+
+	return 0;
+}
+#endif
+
+#if defined(CONFIG_VIRT_TIMER) || defined(CONFIG_NO_IDLE_HZ)
+
+void do_monitor_call(struct pt_regs *regs, long interruption_code)
+{
+	/* disable monitor call class 0 */
+	__ctl_clear_bit(8, 15);
+
+#ifdef CONFIG_VIRT_TIMER
+	start_cpu_timer();
+#endif
+#ifdef CONFIG_NO_IDLE_HZ
+	start_hz_timer(regs);
+#endif
+}
+
+/*
+ * called from cpu_idle to stop any timers
+ * returns 1 if CPU should not be stopped
+ */
+int stop_timers(void)
+{
+#ifdef CONFIG_VIRT_TIMER
+	if (stop_cpu_timer())
+		return 1;
+#endif
+
+#ifdef CONFIG_NO_IDLE_HZ
+	if (stop_hz_timer())
+		return 1;
+#endif
+
+	/* enable monitor call class 0 */
+	__ctl_set_bit(8, 15);
+
+	return 0;
+}
+
 #endif
 
 /*

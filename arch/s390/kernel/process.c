@@ -40,7 +40,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/irq.h>
-#ifdef CONFIG_VIRT_TIMER
+#if defined(CONFIG_VIRT_TIMER) || defined (CONFIG_NO_IDLE_HZ)
 #include <asm/timer.h>
 #endif
 
@@ -75,17 +75,21 @@ void default_idle(void)
 	psw_t wait_psw;
 	unsigned long reg;
 
+	local_irq_disable();
         if (need_resched()) {
+		local_irq_enable();
                 schedule();
                 return;
         }
 
-#ifdef CONFIG_VIRT_TIMER
+#if defined(CONFIG_VIRT_TIMER) || defined (CONFIG_NO_IDLE_HZ)
 	/*
 	 * hook to stop timers that should not tick while CPU is idle
 	 */
-	if (stop_timers())
+	if (stop_timers()) {
+		local_irq_enable();
 		return;
+	}
 #endif
 
 	/* 

@@ -83,6 +83,7 @@ CONFIG_PFAULT=y
 # CONFIG_SHARED_KERNEL is not set
 # CONFIG_CMM is not set
 # CONFIG_VIRT_TIMER is not set
+# CONFIG_NO_IDLE_HZ is not set
 # CONFIG_PCMCIA is not set
 
 #

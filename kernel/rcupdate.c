@@ -103,6 +103,8 @@ static void rcu_do_batch(struct list_head *list)
  */
 static void rcu_start_batch(long newbatch)
 {
+	cpumask_t active;
+
 	if (rcu_batch_before(rcu_ctrlblk.maxbatch, newbatch)) {
 		rcu_ctrlblk.maxbatch = newbatch;
 	}
@@ -111,7 +113,9 @@ static void rcu_start_batch(long newbatch)
 		return;
 	}
 	/* Can't change, since spin lock held. */
-	rcu_ctrlblk.rcu_cpu_mask = cpu_online_map;
+	active = idle_cpu_mask;
+	cpus_complement(active);
+	cpus_and(rcu_ctrlblk.rcu_cpu_mask, cpu_online_map, active);
 }
 
 /*

@@ -149,6 +149,8 @@ typedef struct task_struct task_t;
 extern void sched_init(void);
 extern void init_idle(task_t *idle, int cpu);
 
+extern cpumask_t idle_cpu_mask;
+
 extern void show_state(void);
 extern void show_regs(struct pt_regs *);
 
