@@ -376,18 +376,3 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 	runtime->dma_private = NULL;
 	return 0;
 }
-
-#ifndef MODULE
-
-/* format is: snd-pcm=preallocate_dma,maximum_substreams */
-
-static int __init alsa_pcm_setup(char *str)
-{
-	(void)(get_option(&str,&preallocate_dma) == 2 &&
-	       get_option(&str,&maximum_substreams) == 2);
-	return 1;
-}
-
-__setup("snd-pcm=", alsa_pcm_setup);
-
-#endif /* ifndef MODULE */
