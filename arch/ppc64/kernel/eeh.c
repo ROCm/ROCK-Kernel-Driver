@@ -430,7 +430,7 @@ static void eeh_event_handler(void *dummy)
 				      BUID_LO(event->dn->phb->buid), NULL, 0,
 				      virt_to_phys(slot_errbuf), eeh_error_buf_size,
 				      2 /* Permanent Error */);
-		if (log_event)
+		if (log_event == 0) 
 			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
 
 		rc = 1;
