@@ -395,21 +395,6 @@ M:	scott@spiteful.org
 L:	pcihpd-discuss@lists.sourceforge.net
 S:	Supported
 
-COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
-P:	Amy Vanzant-Hodge 
-W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Orphan
-
-COMPAQ SMART2 RAID DRIVER
-P:	Charles White	
-W:	ftp.compaq.com/pub/products/drivers/linux
-S:	Orphan
-
-COMPAQ SMART CISS RAID DRIVER 
-P:	Charles White
-W:	ftp.compaq.com/pub/products/drivers/linux	
-S:	Orphan
-
 COMPUTONE INTELLIPORT MULTIPORT CARD
 P:	Michael H. Warfield
 M:	Michael H. Warfield <mhw@wittsend.com>
@@ -785,6 +770,27 @@ P:	Jes Sorensen
 M:	jes@trained-monkey.org
 L:	linux-hippi@sunsite.dk
 S:	Maintained
+
+HP (was COMPAQ) FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
+P:	Stephen Cameron
+M:	arrays@hp.com 
+M:	steve.cameron@hp.com
+L:	cpqfc-discuss@lists.sourceforge.net
+S:	Odd Fixes
+
+HP (was COMPAQ) SMART2 RAID DRIVER
+P:	Stephen Cameron
+M:	arrays@hp.com
+M:	steve.cameron@hp.com
+L:	cpqarray-discuss@lists.sourceforge.net
+S:	Odd Fixes
+
+HP (was COMPAQ) SMART CISS RAID DRIVER
+P:	Stephen Cameron
+M:	arrays@hp.com
+M:	steve.cameron@hp.com
+L:	cciss-discuss@lists.sourceforge.net
+S:	Supported
 
 HP100:	Driver for HP 10/100 Mbit/s Voice Grade Network Adapter Series
 P:	Jaroslav Kysela
