@@ -852,12 +852,8 @@ icmp_reply_translation(struct sk_buff **pskb,
 	}
 
 	/* Must be RELATED */
-	IP_NF_ASSERT((*pskb)->nfct
-		     - ((struct ip_conntrack *)(*pskb)->nfct->master)->infos
-		     == IP_CT_RELATED
-		     || (*pskb)->nfct
-		     - ((struct ip_conntrack *)(*pskb)->nfct->master)->infos
-		     == IP_CT_RELATED+IP_CT_IS_REPLY);
+	IP_NF_ASSERT((*pskb)->nfctinfo == IP_CT_RELATED ||
+		     (*pskb)->nfctinfo == IP_CT_RELATED+IP_CT_IS_REPLY);
 
 	/* Redirects on non-null nats must be dropped, else they'll
            start talking to each other without our translation, and be
