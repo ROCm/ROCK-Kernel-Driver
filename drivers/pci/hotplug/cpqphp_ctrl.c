@@ -2446,7 +2446,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 				   u8 behind_bridge, struct resource_lists * resources)
 {
 	int cloop;
-	u8 IRQ;
+	u8 IRQ = 0;
 	u8 temp_byte;
 	u8 device;
 	u8 class_code;
@@ -3021,6 +3021,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			}
 		}		// End of base register loop
 
+#if !defined(CONFIG_X86_IO_APIC)
 		// Figure out which interrupt pin this function uses
 		rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_INTERRUPT_PIN, &temp_byte);
 
@@ -3045,6 +3046,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 		// IRQ Line
 		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_INTERRUPT_LINE, IRQ);
+#endif
 
 		if (!behind_bridge) {
 			rc = cpqhp_set_irq(func->bus, func->device, temp_byte + 0x09, IRQ);
