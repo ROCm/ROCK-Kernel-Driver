@@ -119,6 +119,7 @@ int __init ircomm_tty_init(void)
 
 	driver->driver_name     = "ircomm";
 	driver->name            = "ircomm";
+	driver->devfs_name      = "ircomm";
 	driver->major           = IRCOMM_TTY_MAJOR;
 	driver->minor_start     = IRCOMM_TTY_MINOR;
 	driver->type            = TTY_DRIVER_TYPE_SERIAL;
