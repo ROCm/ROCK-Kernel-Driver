@@ -273,7 +273,8 @@ static int wdt977_release(struct inode *inode, struct file *file)
  *      write of data will do, as we we don't define content meaning.
  */
 
-static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t wdt977_write(struct file *file, const char __user *buf,
+			    size_t count, loff_t *ppos)
 {
 	/* Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -325,6 +326,12 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
 	int status;
 	int new_options, retval = -EINVAL;
 	int new_timeout;
+	union {
+		struct watchdog_info __user *ident;
+		int __user *i;
+	} uarg;
+
+	uarg.i = (int __user *)arg;
 
 	switch(cmd)
 	{
@@ -332,22 +339,22 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
-		return copy_to_user((struct watchdog_info *)arg, &ident,
+		return copy_to_user(uarg.ident, &ident,
 			sizeof(ident)) ? -EFAULT : 0;
 
 	case WDIOC_GETSTATUS:
 		wdt977_get_status(&status);
-		return put_user(status, (int *) arg);
+		return put_user(status, uarg.i);
 
 	case WDIOC_GETBOOTSTATUS:
-		return put_user(0, (int *) arg);
+		return put_user(0, uarg.i);
 
 	case WDIOC_KEEPALIVE:
 		wdt977_keepalive();
 		return 0;
 
 	case WDIOC_SETOPTIONS:
-		if (get_user (new_options, (int *) arg))
+		if (get_user (new_options, uarg.i))
 			return -EFAULT;
 
 		if (new_options & WDIOS_DISABLECARD) {
@@ -363,7 +370,7 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
 		return retval;
 
 	case WDIOC_SETTIMEOUT:
-		if (get_user(new_timeout, (int *) arg))
+		if (get_user(new_timeout, uarg.i))
 			return -EFAULT;
 
 		if (wdt977_set_timeout(new_timeout))
@@ -373,7 +380,7 @@ static int wdt977_ioctl(struct inode *inode, struct file *file,
 		/* Fall */
 
 	case WDIOC_GETTIMEOUT:
-		return put_user(timeout, (int *)arg);
+		return put_user(timeout, uarg.i);
 
 	}
 }
