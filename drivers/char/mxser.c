@@ -101,10 +101,6 @@
 
 #define IRQ_T(info) ((info->flags & ASYNC_SHARE_IRQ) ? SA_SHIRQ : SA_INTERRUPT)
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  *    Define the Moxa PCI vendor and device IDs.
  */
@@ -849,7 +845,7 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 	if (from_user) {
 		down(&mxvar_tmp_buf_sem);
 		while (1) {
-			c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					   SERIAL_XMIT_SIZE - info->xmit_head));
 			if (c <= 0)
 				break;
@@ -862,7 +858,7 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 			}
 
 			cli();
-			c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				       SERIAL_XMIT_SIZE - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, mxvar_tmp_buf, c);
 			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
@@ -877,7 +873,7 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 	} else {
 		while (1) {
 			cli();
-			c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					   SERIAL_XMIT_SIZE - info->xmit_head));
 			if (c <= 0) {
 				restore_flags(flags);
