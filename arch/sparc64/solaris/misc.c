@@ -724,6 +724,7 @@ extern int init_socksys(void);
 
 MODULE_AUTHOR("Jakub Jelinek (jj@ultra.linux.cz), Patrik Rak (prak3264@ss1000.ms.mff.cuni.cz)");
 MODULE_DESCRIPTION("Solaris binary emulation module");
+MODULE_LICENSE("GPL");
 
 #ifdef __sparc_v9__
 extern u32 tl0_solaris[8];
