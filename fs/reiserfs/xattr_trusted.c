@@ -14,7 +14,7 @@ trusted_get (struct inode *inode, const char *name, void *buffer, size_t size)
     if (strlen(name) < sizeof(XATTR_TRUSTED_PREFIX))
         return -EINVAL;
 
-    if (!reiserfs_xattrs_trusted (inode->i_sb))
+    if (!reiserfs_xattrs (inode->i_sb))
         return -EOPNOTSUPP;
 
     if (!(capable(CAP_SYS_ADMIN) || is_reiserfs_priv_object(inode)))
@@ -30,7 +30,7 @@ trusted_set (struct inode *inode, const char *name, const void *buffer,
     if (strlen(name) < sizeof(XATTR_TRUSTED_PREFIX))
         return -EINVAL;
 
-    if (!reiserfs_xattrs_trusted (inode->i_sb))
+    if (!reiserfs_xattrs (inode->i_sb))
         return -EOPNOTSUPP;
 
     if (!(capable(CAP_SYS_ADMIN) || is_reiserfs_priv_object(inode)))
@@ -45,7 +45,7 @@ trusted_del (struct inode *inode, const char *name)
     if (strlen(name) < sizeof(XATTR_TRUSTED_PREFIX))
         return -EINVAL;
 
-    if (!reiserfs_xattrs_trusted (inode->i_sb))
+    if (!reiserfs_xattrs (inode->i_sb))
         return -EOPNOTSUPP;
 
     if (!(capable(CAP_SYS_ADMIN) || is_reiserfs_priv_object(inode)))
@@ -59,7 +59,7 @@ trusted_list (struct inode *inode, const char *name, int namelen, char *out)
 {
     int len = namelen;
 
-    if (!reiserfs_xattrs_trusted (inode->i_sb))
+    if (!reiserfs_xattrs (inode->i_sb))
         return 0;
 
     if (!(capable(CAP_SYS_ADMIN) || is_reiserfs_priv_object(inode)))

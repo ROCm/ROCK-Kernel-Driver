@@ -468,16 +468,10 @@ enum reiserfs_mount_options {
 #define reiserfs_data_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_LOG))
 #define reiserfs_data_ordered(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_ORDERED))
 #define reiserfs_data_writeback(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_WRITEBACK))
+#define reiserfs_xattrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS))
 #define reiserfs_xattrs_user(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS_USER))
 #define reiserfs_posixacl(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_POSIXACL))
 #define reiserfs_xattrs_optional(s) (reiserfs_xattrs_user(s) || reiserfs_posixacl(s))
-#define reiserfs_xattrs(s) reiserfs_xattrs_trusted(s)
-#ifndef CONFIG_REISERFS_FS_XATTR
-# define reiserfs_xattrs_trusted(s) (0)
-#else
-/* If xattrs are compiled in, trusted xattrs are "always on." */
-# define reiserfs_xattrs_trusted(s) (1)
-#endif
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;
@@ -509,4 +503,3 @@ static inline char *reiserfs_bdevname(struct super_block *s)
 }
 
 #endif	/* _LINUX_REISER_FS_SB */
-

@@ -17,6 +17,7 @@
 #include <linux/raw.h>
 #include <linux/capability.h>
 #include <linux/uio.h>
+#include <linux/cdev.h>
 
 #include <asm/uaccess.h>
 
@@ -260,11 +261,28 @@ static struct file_operations raw_ctl_fops = {
 	.owner	=	THIS_MODULE,
 };
 
+static struct cdev raw_cdev;
+
 static int __init raw_init(void)
 {
-	int i;
+	int i, rc;
 
-	register_chrdev(RAW_MAJOR, "raw", &raw_fops);
+	rc = register_chrdev_region(MKDEV(RAW_MAJOR, 0), 
+				MAX_RAW_MINORS, "raw");
+	if (rc)
+		 return rc;
+
+	cdev_init(&raw_cdev, &raw_fops);
+	raw_cdev.owner = THIS_MODULE;
+	kobject_set_name(&raw_cdev.kobj, "raw");
+
+	rc = cdev_add(&raw_cdev, MKDEV(RAW_MAJOR, 0), MAX_RAW_MINORS);
+	if (rc) {
+		kobject_put(&raw_cdev.kobj);
+		unregister_chrdev_region(MKDEV(RAW_MAJOR, 0), 
+					MAX_RAW_MINORS);
+		return rc;
+	}
 	devfs_mk_cdev(MKDEV(RAW_MAJOR, 0),
 		      S_IFCHR | S_IRUGO | S_IWUGO,
 		      "raw/rawctl");
@@ -283,7 +301,9 @@ static void __exit raw_exit(void)
 		devfs_remove("raw/raw%d", i);
 	devfs_remove("raw/rawctl");
 	devfs_remove("raw");
-	unregister_chrdev(RAW_MAJOR, "raw");
+	cdev_del(&raw_cdev);
+	unregister_chrdev_region(MKDEV(RAW_MAJOR, 0), 
+				MAX_RAW_MINORS);
 }
 
 module_init(raw_init);
