@@ -72,6 +72,8 @@ enum pid_directory_inos {
 	PROC_TGID_ATTR_FSCREATE,
 #endif
 	PROC_TGID_FD_DIR,
+	PROC_TGID_OOM_SCORE,
+	PROC_TGID_OOM_ADJUST,
 	PROC_TID_INO,
 	PROC_TID_STATUS,
 	PROC_TID_MEM,
@@ -98,6 +100,8 @@ enum pid_directory_inos {
 	PROC_TID_ATTR_FSCREATE,
 #endif
 	PROC_TID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
+	PROC_TID_OOM_SCORE,
+	PROC_TID_OOM_ADJUST,
 };
 
 struct pid_entry {
@@ -136,6 +140,8 @@ static struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_SCHEDSTATS
 	E(PROC_TGID_SCHEDSTAT, "schedstat", S_IFREG|S_IRUGO),
 #endif
+	E(PROC_TGID_OOM_SCORE, "oom_score",S_IFREG|S_IRUGO),
+	E(PROC_TGID_OOM_ADJUST,"oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -161,6 +167,8 @@ static struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_SCHEDSTATS
 	E(PROC_TID_SCHEDSTAT, "schedstat",S_IFREG|S_IRUGO),
 #endif
+	E(PROC_TID_OOM_SCORE,  "oom_score",S_IFREG|S_IRUGO),
+	E(PROC_TID_OOM_ADJUST, "oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 
@@ -427,6 +435,14 @@ static int proc_pid_schedstat(struct task_struct *task, char *buffer)
 			task->sched_info.pcnt);
 }
 #endif
+
+/* The badness from the OOM killer */
+int badness(struct task_struct *p);
+static int proc_oom_score(struct task_struct *task, char *buffer)
+{
+	unsigned long points = badness(task);
+	return sprintf(buffer, "%ul\n", points);
+}
 
 /************************************************************************/
 /*                       Here the fs part begins                        */
@@ -749,6 +765,55 @@ static struct file_operations proc_mapbase_operations = {
 	write:		mapbase_write,
 };
 #endif /* __HAS_ARCH_PROC_MAPPED_BASE */
+
+static ssize_t oom_adjust_read(struct file * file, char * buf,
+				size_t count, loff_t *ppos)
+{
+	struct task_struct *task = proc_task(file->f_dentry->d_inode);
+	char buffer[8];
+	size_t len;
+	int oom_adjust = task->oomkilladj;
+
+	len = sprintf(buffer, "%i\n", oom_adjust) + 1;
+	if (*ppos >= len)
+		return 0;
+	if (count > len-*ppos)
+		count = len-*ppos;
+	if (copy_to_user(buf, buffer + *ppos, count)) 
+		return -EFAULT;
+	*ppos += count;
+	return count;
+}
+
+static ssize_t oom_adjust_write(struct file * file, const char * buf,
+				size_t count, loff_t *ppos)
+{
+	struct task_struct *task = proc_task(file->f_dentry->d_inode);
+	char buffer[8], *end;
+	int oom_adjust;
+
+	if (!capable(CAP_SYS_RESOURCE))
+		return -EPERM;
+	memset(buffer, 0, 8);	
+	if (count > 6)
+		count = 6;
+	if (copy_from_user(buffer, buf, count)) 
+		return -EFAULT;
+	oom_adjust = simple_strtol(buffer, &end, 0);
+	if (oom_adjust < -16 || oom_adjust > 15)
+		return -EINVAL;
+	if (*end == '\n')
+		end++;
+	task->oomkilladj = oom_adjust;
+	if (end - buffer == 0) 
+		return -EIO;
+	return end - buffer;
+}
+
+static struct file_operations proc_oom_adjust_operations = {
+	read:		oom_adjust_read,
+	write:		oom_adjust_write,
+};
 
 static struct inode_operations proc_mem_inode_operations = {
 	.permission	= proc_permission,
@@ -1436,6 +1501,15 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			ei->op.proc_read = proc_pid_schedstat;
 			break;
 #endif
+		case PROC_TID_OOM_SCORE:	
+		case PROC_TGID_OOM_SCORE:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_oom_score;
+			break;
+		case PROC_TID_OOM_ADJUST:
+		case PROC_TGID_OOM_ADJUST:
+			inode->i_fop = &proc_oom_adjust_operations;
+			break;
 		default:
 			printk("procfs: impossible type (%d)",p->type);
 			iput(inode);

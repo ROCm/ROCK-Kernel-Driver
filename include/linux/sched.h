@@ -521,7 +521,9 @@ struct task_struct {
 	struct user_struct *user;
 /* limits */
 	struct rlimit rlim[RLIM_NLIMITS];
-	unsigned short used_math;
+	unsigned short used_math:1;
+	unsigned short rcvd_sigterm:1;	/* Received SIGTERM by oom killer already */
+	short oomkilladj:5;		/* OOM kill score adjustment (bit shift) */
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
