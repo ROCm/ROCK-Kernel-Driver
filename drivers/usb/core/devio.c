@@ -60,6 +60,11 @@ struct async {
 	struct urb *urb;
 };
 
+static inline int connected (struct usb_device *dev)
+{
+	return dev->state != USB_STATE_NOTATTACHED;
+}
+
 static loff_t usbdev_lseek(struct file *file, loff_t offset, int orig)
 {
 	loff_t ret;
@@ -94,7 +99,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 
 	pos = *ppos;
 	down_read(&ps->devsem);
-	if (!ps->dev) {
+	if (!connected(ps->dev)) {
 		ret = -ENODEV;
 		goto err;
 	} else if (pos < 0) {
@@ -343,8 +348,6 @@ static void driver_disconnect(struct usb_interface *intf)
 	 * all pending I/O requests; 2.6 does that.
 	 */
 
-	/* prevent new I/O requests */
-	ps->dev = 0;
 	clear_bit(intf->cur_altsetting->desc.bInterfaceNumber, &ps->ifclaimed);
 	usb_set_intfdata (intf, NULL);
 
@@ -365,7 +368,7 @@ static int claimintf(struct dev_state *ps, unsigned int intf)
 	struct usb_interface *iface;
 	int err;
 
-	if (intf >= 8*sizeof(ps->ifclaimed) || !dev
+	if (intf >= 8*sizeof(ps->ifclaimed)
 			|| intf >= dev->actconfig->desc.bNumInterfaces)
 		return -EINVAL;
 	/* already claimed */
@@ -506,7 +509,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 
 	lock_kernel();
 	ret = -ENOENT;
-	dev = inode->u.generic_ip;
+	dev = usb_get_dev(inode->u.generic_ip);
 	if (!dev) {
 		kfree(ps);
 		goto out;
@@ -540,13 +543,15 @@ static int usbdev_release(struct inode *inode, struct file *file)
 	lock_kernel();
 	list_del_init(&ps->list);
 
-	if (ps->dev) {
+	if (connected(ps->dev)) {
 		for (i = 0; ps->ifclaimed && i < 8*sizeof(ps->ifclaimed); i++)
 			if (test_bit(i, &ps->ifclaimed))
 				releaseintf(ps, i);
+		destroy_all_async(ps);
 	}
 	unlock_kernel();
-	destroy_all_async(ps);
+	usb_put_dev(ps->dev);
+	ps->dev = NULL;
 	kfree(ps);
         return 0;
 }
@@ -1021,7 +1026,7 @@ static int proc_reapurb(struct dev_state *ps, void __user *arg)
 	int ret;
 
 	add_wait_queue(&ps->wait, &wait);
-	while (ps->dev) {
+	while (connected(ps->dev)) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		if ((as = async_getcompleted(ps)))
 			break;
@@ -1131,7 +1136,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		}
 	}
 
-	if (!ps->dev) {
+	if (!connected(ps->dev)) {
 		if (buf)
 			kfree(buf);
 		return -ENODEV;
@@ -1201,7 +1206,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EPERM;
 	down_read(&ps->devsem);
-	if (!ps->dev) {
+	if (!connected(ps->dev)) {
 		up_read(&ps->devsem);
 		return -ENODEV;
 	}
@@ -1299,7 +1304,7 @@ static unsigned int usbdev_poll(struct file *file, struct poll_table_struct *wai
 	poll_wait(file, &ps->wait, wait);
 	if (file->f_mode & FMODE_WRITE && !list_empty(&ps->async_completed))
 		mask |= POLLOUT | POLLWRNORM;
-	if (!ps->dev)
+	if (!connected(ps->dev))
 		mask |= POLLERR | POLLHUP;
 	return mask;
 }
