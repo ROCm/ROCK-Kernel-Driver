@@ -65,6 +65,10 @@ rwlock_t hci_task_lock = RW_LOCK_UNLOCKED;
 LIST_HEAD(hci_dev_list);
 rwlock_t hci_dev_list_lock = RW_LOCK_UNLOCKED;
 
+/* HCI callback list */
+LIST_HEAD(hci_cb_list);
+rwlock_t hci_cb_list_lock = RW_LOCK_UNLOCKED;
+
 /* HCI protocols */
 #define HCI_MAX_PROTO	2
 struct hci_proto *hci_proto[HCI_MAX_PROTO];
@@ -929,6 +933,30 @@ int hci_unregister_proto(struct hci_proto *hp)
 	return err;
 }
 EXPORT_SYMBOL(hci_unregister_proto);
+
+int hci_register_cb(struct hci_cb *cb)
+{
+	BT_DBG("%p name %s", cb, cb->name);
+
+	write_lock_bh(&hci_cb_list_lock);
+	list_add(&cb->list, &hci_cb_list);
+	write_unlock_bh(&hci_cb_list_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(hci_register_cb);
+
+int hci_unregister_cb(struct hci_cb *cb)
+{
+	BT_DBG("%p name %s", cb, cb->name);
+
+	write_lock_bh(&hci_cb_list_lock);
+	list_del(&cb->list);
+	write_unlock_bh(&hci_cb_list_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(hci_unregister_cb);
 
 static int hci_send_frame(struct sk_buff *skb)
 {

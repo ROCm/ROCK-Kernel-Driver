@@ -51,7 +51,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.6"
+#define VERSION "2.7"
 
 struct proc_dir_entry *proc_bt;
 EXPORT_SYMBOL(proc_bt);
