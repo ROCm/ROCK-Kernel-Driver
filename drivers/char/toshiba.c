@@ -292,7 +292,7 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
  * Print the information for /proc/toshiba
  */
 #ifdef CONFIG_PROC_FS
-int tosh_get_info(char *buffer, char **start, off_t fpos, int length)
+static int tosh_get_info(char *buffer, char **start, off_t fpos, int length)
 {
 	char *temp;
 	int key;
