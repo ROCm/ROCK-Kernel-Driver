@@ -221,12 +221,12 @@ static const char *proc_arch[] = {
 #define CACHE_M(y)	((y) & (1 << 2))
 #define CACHE_LINE(y)	((y) & 3)
 
-static inline void dump_cache(const char *prefix, unsigned int cache)
+static inline void dump_cache(const char *prefix, int cpu, unsigned int cache)
 {
 	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
-	printk("%s: %d bytes, associativity %d, %d byte lines, %d sets\n",
-		prefix,
+	printk("CPU%u: %s: %d bytes, associativity %d, %d byte lines, %d sets\n",
+		cpu, prefix,
 		mult << (8 + CACHE_SIZE(cache)),
 		(mult << CACHE_ASSOC(cache)) >> 1,
 		8 << CACHE_LINE(cache),
@@ -234,18 +234,18 @@ static inline void dump_cache(const char *prefix, unsigned int cache)
 			CACHE_LINE(cache)));
 }
 
-static void __init dump_cpu_info(void)
+static void __init dump_cpu_info(int cpu)
 {
 	unsigned int info = read_cpuid(CPUID_CACHETYPE);
 
 	if (info != processor_id) {
-		printk("CPU: D %s %s cache\n", cache_is_vivt() ? "VIVT" : "VIPT",
+		printk("CPU%u: D %s %s cache\n", cpu, cache_is_vivt() ? "VIVT" : "VIPT",
 		       cache_types[CACHE_TYPE(info)]);
 		if (CACHE_S(info)) {
-			dump_cache("CPU: I cache", CACHE_ISIZE(info));
-			dump_cache("CPU: D cache", CACHE_DSIZE(info));
+			dump_cache("I cache", cpu, CACHE_ISIZE(info));
+			dump_cache("D cache", cpu, CACHE_DSIZE(info));
 		} else {
-			dump_cache("CPU: cache", CACHE_ISIZE(info));
+			dump_cache("cache", cpu, CACHE_ISIZE(info));
 		}
 	}
 }
@@ -310,7 +310,7 @@ static void __init setup_processor(void)
 	       cpu_name, processor_id, (int)processor_id & 15,
 	       proc_arch[cpu_architecture()]);
 
-	dump_cpu_info();
+	dump_cpu_info(smp_processor_id());
 
 	sprintf(system_utsname.machine, "%s%c", list->arch_name, ENDIANNESS);
 	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);
