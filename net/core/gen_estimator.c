@@ -1,5 +1,5 @@
 /*
- * net/sched/estimator.c	Simple rate estimator.
+ * net/sched/gen_estimator.c	Simple rate estimator.
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -7,6 +7,10 @@
  *		2 of the License, or (at your option) any later version.
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+ *
+ * Changes:
+ *              Jamal Hadi Salim - moved it to net/core and reshulfed
+ *              names to make it usable in general net subsystem.
  */
 
 #include <asm/uaccess.h>
@@ -28,7 +32,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <net/sock.h>
-#include <net/pkt_sched.h>
+#include <net/gen_stats.h>
 
 /*
    This code is NOT intended to be used for statistics collection,
@@ -73,10 +77,11 @@
 
 #define EST_MAX_INTERVAL	5
 
-struct qdisc_estimator
+struct gen_estimator
 {
-	struct qdisc_estimator	*next;
-	struct tc_stats		*stats;
+	struct gen_estimator	*next;
+	struct gnet_stats_basic	*bstats;
+	struct gnet_stats_rate_est	*rate_est;
 	spinlock_t		*stats_lock;
 	unsigned		interval;
 	int			ewma_log;
@@ -86,13 +91,13 @@ struct qdisc_estimator
 	u32			avbps;
 };
 
-struct qdisc_estimator_head
+struct gen_estimator_head
 {
 	struct timer_list	timer;
-	struct qdisc_estimator	*list;
+	struct gen_estimator	*list;
 };
 
-static struct qdisc_estimator_head elist[EST_MAX_INTERVAL+1];
+static struct gen_estimator_head elist[EST_MAX_INTERVAL+1];
 
 /* Estimator array lock */
 static rwlock_t est_lock = RW_LOCK_UNLOCKED;
@@ -100,27 +105,26 @@ static rwlock_t est_lock = RW_LOCK_UNLOCKED;
 static void est_timer(unsigned long arg)
 {
 	int idx = (int)arg;
-	struct qdisc_estimator *e;
+	struct gen_estimator *e;
 
 	read_lock(&est_lock);
 	for (e = elist[idx].list; e; e = e->next) {
-		struct tc_stats *st = e->stats;
 		u64 nbytes;
 		u32 npackets;
 		u32 rate;
 
 		spin_lock(e->stats_lock);
-		nbytes = st->bytes;
-		npackets = st->packets;
+		nbytes = e->bstats->bytes;
+		npackets = e->bstats->packets;
 		rate = (nbytes - e->last_bytes)<<(7 - idx);
 		e->last_bytes = nbytes;
 		e->avbps += ((long)rate - (long)e->avbps) >> e->ewma_log;
-		st->bps = (e->avbps+0xF)>>5;
+		e->rate_est->bps = (e->avbps+0xF)>>5;
 
 		rate = (npackets - e->last_packets)<<(12 - idx);
 		e->last_packets = npackets;
 		e->avpps += ((long)rate - (long)e->avpps) >> e->ewma_log;
-		e->stats->pps = (e->avpps+0x1FF)>>10;
+		e->rate_est->pps = (e->avpps+0x1FF)>>10;
 		spin_unlock(e->stats_lock);
 	}
 
@@ -128,10 +132,11 @@ static void est_timer(unsigned long arg)
 	read_unlock(&est_lock);
 }
 
-int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct rtattr *opt)
+int gen_new_estimator(struct gnet_stats_basic *bstats,
+	struct gnet_stats_rate_est *rate_est, spinlock_t *stats_lock, struct rtattr *opt)
 {
-	struct qdisc_estimator *est;
-	struct tc_estimator *parm = RTA_DATA(opt);
+	struct gen_estimator *est;
+	struct gnet_estimator *parm = RTA_DATA(opt);
 
 	if (RTA_PAYLOAD(opt) < sizeof(*parm))
 		return -EINVAL;
@@ -145,13 +150,14 @@ int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct r
 
 	memset(est, 0, sizeof(*est));
 	est->interval = parm->interval + 2;
-	est->stats = stats;
+	est->bstats = bstats;
+	est->rate_est = rate_est;
 	est->stats_lock = stats_lock;
 	est->ewma_log = parm->ewma_log;
-	est->last_bytes = stats->bytes;
-	est->avbps = stats->bps<<5;
-	est->last_packets = stats->packets;
-	est->avpps = stats->pps<<10;
+	est->last_bytes = bstats->bytes;
+	est->avbps = rate_est->bps<<5;
+	est->last_packets = bstats->packets;
+	est->avpps = rate_est->pps<<10;
 
 	est->next = elist[est->interval].list;
 	if (est->next == NULL) {
@@ -167,16 +173,17 @@ int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct r
 	return 0;
 }
 
-void qdisc_kill_estimator(struct tc_stats *stats)
+void gen_kill_estimator(struct gnet_stats_basic *bstats,
+	struct gnet_stats_rate_est *rate_est)
 {
 	int idx;
-	struct qdisc_estimator *est, **pest;
+	struct gen_estimator *est, **pest;
 
 	for (idx=0; idx <= EST_MAX_INTERVAL; idx++) {
 		int killed = 0;
 		pest = &elist[idx].list;
 		while ((est=*pest) != NULL) {
-			if (est->stats != stats) {
+			if (est->rate_est != rate_est || est->bstats != bstats) {
 				pest = &est->next;
 				continue;
 			}
@@ -193,5 +200,5 @@ void qdisc_kill_estimator(struct tc_stats *stats)
 	}
 }
 
-EXPORT_SYMBOL(qdisc_kill_estimator);
-EXPORT_SYMBOL(qdisc_new_estimator);
+EXPORT_SYMBOL(gen_kill_estimator);
+EXPORT_SYMBOL(gen_new_estimator);

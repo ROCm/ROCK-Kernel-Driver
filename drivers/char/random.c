@@ -2187,7 +2187,7 @@ static __u32 twothirdsMD4Transform (__u32 const buf[4], __u32 const in[12])
 #undef K3
 
 /* This should not be decreased so low that ISNs wrap too fast. */
-#define REKEY_INTERVAL	300
+#define REKEY_INTERVAL	(300*HZ)
 /*
  * Bit layout of the tcp sequence numbers (before adding current time):
  * bit 24-31: increased after every key exchange
@@ -2213,47 +2213,54 @@ static __u32 twothirdsMD4Transform (__u32 const buf[4], __u32 const in[12])
 #define HASH_MASK	( (1<<HASH_BITS)-1 )
 
 static struct keydata {
-	time_t rekey_time;
 	__u32	count;		// already shifted to the final position
 	__u32	secret[12];
 } ____cacheline_aligned ip_keydata[2];
 
-static spinlock_t ip_lock = SPIN_LOCK_UNLOCKED;
 static unsigned int ip_cnt;
 
-static void rekey_seq_generator(void *private_)
-{
-	struct keydata *keyptr;
-	struct timeval 	tv;
-
-	do_gettimeofday(&tv);
-
-	spin_lock_bh(&ip_lock);
-	keyptr = &ip_keydata[ip_cnt&1];
-
-	keyptr = &ip_keydata[1^(ip_cnt&1)];
-	keyptr->rekey_time = tv.tv_sec;
-	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
-	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
-	mb();
-	ip_cnt++;
-
-	spin_unlock_bh(&ip_lock);
-}
+static void rekey_seq_generator(void *private_);
 
 static DECLARE_WORK(rekey_work, rekey_seq_generator, NULL);
 
-static inline struct keydata *check_and_rekey(time_t time)
+/*
+ * Lock avoidance:
+ * The ISN generation runs lockless - it's just a hash over random data.
+ * State changes happen every 5 minutes when the random key is replaced.
+ * Synchronization is performed by having two copies of the hash function
+ * state and rekey_seq_generator always updates the inactive copy.
+ * The copy is then activated by updating ip_cnt.
+ * The implementation breaks down if someone blocks the thread
+ * that processes SYN requests for more than 5 minutes. Should never
+ * happen, and even if that happens only a not perfectly compliant
+ * ISN is generated, nothing fatal.
+ */
+static void rekey_seq_generator(void *private_)
+{
+	struct keydata *keyptr = &ip_keydata[1^(ip_cnt&1)];
+
+	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
+	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
+	smp_wmb();
+	ip_cnt++;
+	schedule_delayed_work(&rekey_work, REKEY_INTERVAL);
+}
+
+static inline struct keydata *get_keyptr(void)
 {
 	struct keydata *keyptr = &ip_keydata[ip_cnt&1];
 
-	rmb();
-	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		schedule_work(&rekey_work);
-	}
+	smp_rmb();
 
 	return keyptr;
 }
+
+static __init int seqgen_init(void)
+{
+	rekey_seq_generator(NULL);
+	return 0;
+}
+late_initcall(seqgen_init);
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
@@ -2262,14 +2269,12 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 	struct timeval 	tv;
 	__u32		seq;
 	__u32		hash[12];
-	struct keydata *keyptr;
+	struct keydata *keyptr = get_keyptr();
 
 	/* The procedure is the same as for IPv4, but addresses are longer.
 	 * Thus we must use twothirdsMD4Transform.
 	 */
 
-	do_gettimeofday(&tv);	/* We need the usecs below... */
-	keyptr = check_and_rekey(tv.tv_sec);
 
 	memcpy(hash, saddr, 16);
 	hash[4]=(sport << 16) + dport;
@@ -2277,6 +2282,8 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 
 	seq = twothirdsMD4Transform(daddr, hash) & HASH_MASK;
 	seq += keyptr->count;
+
+	do_gettimeofday(&tv);
 	seq += tv.tv_usec + tv.tv_sec*1000000;
 
 	return seq;
@@ -2290,13 +2297,7 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 	struct timeval 	tv;
 	__u32		seq;
 	__u32	hash[4];
-	struct keydata *keyptr;
-
-	/*
-	 * Pick a random secret every REKEY_INTERVAL seconds.
-	 */
-	do_gettimeofday(&tv);	/* We need the usecs below... */
-	keyptr = check_and_rekey(tv.tv_sec);
+	struct keydata *keyptr = get_keyptr();
 
 	/*
 	 *  Pick a unique starting offset for each TCP connection endpoints
@@ -2319,6 +2320,7 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 	 *	That's funny, Linux has one built in!  Use it!
 	 *	(Networks are faster now - should this be increased?)
 	 */
+	do_gettimeofday(&tv);
 	seq += tv.tv_usec + tv.tv_sec*1000000;
 #if 0
 	printk("init_seq(%lx, %lx, %d, %d) = %d\n",
@@ -2337,7 +2339,7 @@ __u32 secure_ip_id(__u32 daddr)
 	struct keydata *keyptr;
 	__u32 hash[4];
 
-	keyptr = check_and_rekey(get_seconds());
+	keyptr = get_keyptr();
 
 	/*
 	 *  Pick a unique starting offset for each IP destination.
