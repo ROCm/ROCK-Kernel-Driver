@@ -9,6 +9,10 @@
  *
  */
 
+#define DBG(format, arg...) do { \
+printk(KERN_DEBUG __FUNCTION__ ": " format "\n" , ## arg); \
+} while (0)
+
 #define CONFIG_AVMB1_COMPAT
 
 #include <linux/config.h>
@@ -97,15 +101,9 @@ static struct capi_version driver_version = {2, 0, 1, 1<<4};
 static char driver_serial[CAPI_SERIAL_LEN] = "0004711";
 static char capi_manufakturer[64] = "AVM Berlin";
 
-#define APPL(a)		   (&applications[(a)-1])
-#define	VALID_APPLID(a)	   ((a) && (a) <= CAPI_MAXAPPL && APPL(a)->applid == a)
-#define APPL_IS_FREE(a)    (APPL(a)->applid == 0)
-#define APPL_MARK_FREE(a)  do{ APPL(a)->applid=0; MOD_DEC_USE_COUNT; }while(0)
-#define APPL_MARK_USED(a)  do{ APPL(a)->applid=(a); MOD_INC_USE_COUNT; }while(0)
-
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
-static struct capi_appl applications[CAPI_MAXAPPL];
+static struct capi_appl *applications[CAPI_MAXAPPL];
 static struct capi_ctr *cards[CAPI_MAXCONTR];
 static int ncards;
 static struct sk_buff_head recv_queue;
@@ -125,11 +123,13 @@ static inline struct capi_ctr *
 capi_ctr_get(struct capi_ctr *card)
 {
 	if (card->driver->owner) {
-		if (try_inc_mod_count(card->driver->owner))
+		if (try_inc_mod_count(card->driver->owner)) {
+			DBG("MOD_COUNT INC");
 			return card;
-		else
+		} else
 			return NULL;
 	}
+	DBG("MOD_COUNT INC");
 	return card;
 }
 
@@ -138,7 +138,10 @@ capi_ctr_put(struct capi_ctr *card)
 {
 	if (card->driver->owner)
 		__MOD_DEC_USE_COUNT(card->driver->owner);
+	DBG("MOD_COUNT DEC");
 }
+
+/* ------------------------------------------------------------- */
 
 static inline struct capi_ctr *get_capi_ctr_by_nr(u16 contr)
 {
@@ -146,6 +149,14 @@ static inline struct capi_ctr *get_capi_ctr_by_nr(u16 contr)
 		return NULL;
 
 	return cards[contr - 1];
+}
+
+static inline struct capi_appl *get_capi_appl_by_nr(u16 applid)
+{
+	if (applid - 1 >= CAPI_MAXAPPL)
+		return NULL;
+
+	return applications[applid - 1];
 }
 
 /* -------- util functions ------------------------------------ */
@@ -207,9 +218,9 @@ static int proc_applications_read_proc(char *page, char **start, off_t off,
 	int i;
 	int len = 0;
 
-	for (i=0; i < CAPI_MAXAPPL; i++) {
-		ap = &applications[i];
-		if (ap->applid == 0) continue;
+	for (i=1; i <= CAPI_MAXAPPL; i++) {
+		ap = get_capi_appl_by_nr(i);
+		if (!ap) continue;
 		len += sprintf(page+len, "%u %d %d %d %d %d\n",
 			ap->applid,
 			ap->rparam.level3cnt,
@@ -246,9 +257,9 @@ static int proc_ncci_read_proc(char *page, char **start, off_t off,
 	int i;
 	int len = 0;
 
-	for (i=0; i < CAPI_MAXAPPL; i++) {
-		ap = &applications[i];
-		if (ap->applid == 0) continue;
+	for (i=1; i <= CAPI_MAXAPPL; i++) {
+		ap = get_capi_appl_by_nr(i);
+		if (!ap) continue;
 		for (np = ap->nccilist; np; np = np->next) {
 			len += sprintf(page+len, "%d 0x%x %d %d\n",
 				np->applid,
@@ -393,9 +404,9 @@ static int proc_applstats_read_proc(char *page, char **start, off_t off,
 	int i;
 	int len = 0;
 
-	for (i=0; i < CAPI_MAXAPPL; i++) {
-		ap = &applications[i];
-		if (ap->applid == 0) continue;
+	for (i=1; i <= CAPI_MAXAPPL; i++) {
+		ap = get_capi_appl_by_nr(i);
+		if (!ap) continue;
 		len += sprintf(page+len, "%u %lu %lu %lu %lu\n",
 			ap->applid,
 			ap->nrecvctlpkt,
@@ -514,15 +525,18 @@ static void register_appl(struct capi_ctr *card, u16 applid, capi_register_param
 
 static void release_appl(struct capi_ctr *card, u16 applid)
 {
+	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	struct capi_ncci **pp, **nextpp;
-
-	for (pp = &APPL(applid)->nccilist; *pp; pp = nextpp) {
+	
+	DBG("");
+	
+	for (pp = &ap->nccilist; *pp; pp = nextpp) {
 		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
 			struct capi_ncci *np = *pp;
 			*pp = np->next;
 			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", applid, np->ncci);
 			kfree(np);
-			APPL(applid)->nncci--;
+			ap->nncci--;
 			nextpp = pp;
 		} else {
 			nextpp = &(*pp)->next;
@@ -770,7 +784,9 @@ static void controllercb_new_ncci(struct capi_ctr * card,
 					u16 appl, u32 ncci, u32 winsize)
 {
 	struct capi_ncci *np;
-	if (!VALID_APPLID(appl)) {
+	struct capi_appl *ap = get_capi_appl_by_nr(appl);
+
+	if (!ap) {
 		printk(KERN_ERR "avmb1_handle_new_ncci: illegal appl %d\n", appl);
 		return;
 	}
@@ -787,9 +803,9 @@ static void controllercb_new_ncci(struct capi_ctr * card,
 	np->ncci = ncci;
 	np->winsize = winsize;
 	mq_init(np);
-	np->next = APPL(appl)->nccilist;
-	APPL(appl)->nccilist = np;
-	APPL(appl)->nncci++;
+	np->next = ap->nccilist;
+	ap->nccilist = np;
+	ap->nncci++;
 	printk(KERN_INFO "kcapi: appl %d ncci 0x%x up\n", appl, ncci);
 
 	notify_push(KCI_NCCIUP, card->cnr, appl, ncci);
@@ -799,16 +815,17 @@ static void controllercb_free_ncci(struct capi_ctr * card,
 				u16 appl, u32 ncci)
 {
 	struct capi_ncci **pp;
-	if (!VALID_APPLID(appl)) {
+	struct capi_appl *ap = get_capi_appl_by_nr(appl);
+	if (!ap) {
 		printk(KERN_ERR "free_ncci: illegal appl %d\n", appl);
 		return;
 	}
-	for (pp = &APPL(appl)->nccilist; *pp; pp = &(*pp)->next) {
+	for (pp = &ap->nccilist; *pp; pp = &(*pp)->next) {
 		if ((*pp)->ncci == ncci) {
 			struct capi_ncci *np = *pp;
 			*pp = np->next;
 			kfree(np);
-			APPL(appl)->nncci--;
+			ap->nncci--;
 			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down\n", appl, ncci);
 			notify_push(KCI_NCCIDOWN, card->cnr, appl, ncci);
 			return;
@@ -833,37 +850,38 @@ static struct capi_ncci *find_ncci(struct capi_appl * app, u32 ncci)
 static void recv_handler(void *dummy)
 {
 	struct sk_buff *skb;
+	struct capi_appl *ap;
+	struct capi_ncci *np;
 
 	while ((skb = skb_dequeue(&recv_queue)) != 0) {
-		u16 appl = CAPIMSG_APPID(skb->data);
-		struct capi_ncci *np;
-		if (!VALID_APPLID(appl)) {
+		ap = get_capi_appl_by_nr(CAPIMSG_APPID(skb->data));
+		if (!ap) {
 			printk(KERN_ERR "kcapi: recv_handler: applid %d ? (%s)\n",
-			       appl, capi_message2str(skb->data));
+			       ap->applid, capi_message2str(skb->data));
 			kfree_skb(skb);
 			continue;
 		}
-		if (APPL(appl)->signal == 0) {
+		if (ap->signal == 0) {
 			printk(KERN_ERR "kcapi: recv_handler: applid %d has no signal function\n",
-			       appl);
+			       ap->applid);
 			kfree_skb(skb);
 			continue;
 		}
 		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
 		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_CONF
-	            && (np = find_ncci(APPL(appl), CAPIMSG_NCCI(skb->data))) != 0
+	            && (np = find_ncci(ap, CAPIMSG_NCCI(skb->data))) != 0
 		    && mq_dequeue(np, CAPIMSG_MSGID(skb->data)) == 0) {
 			printk(KERN_ERR "kcapi: msgid %hu ncci 0x%x not on queue\n",
 				CAPIMSG_MSGID(skb->data), np->ncci);
 		}
 		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
 		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
-			APPL(appl)->nrecvdatapkt++;
+			ap->nrecvdatapkt++;
 		} else {
-			APPL(appl)->nrecvctlpkt++;
+			ap->nrecvctlpkt++;
 		}
-		skb_queue_tail(&APPL(appl)->recv_queue, skb);
-		(APPL(appl)->signal) (APPL(appl)->applid, APPL(appl)->param);
+		skb_queue_tail(&ap->recv_queue, skb);
+		(ap->signal) (ap->applid, ap->param);
 	}
 }
 
@@ -914,12 +932,14 @@ error:
 static void controllercb_ready(struct capi_ctr * card)
 {
 	u16 appl;
+	struct capi_appl *ap;
 
 	card->cardstate = CARD_RUNNING;
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
-		if (!VALID_APPLID(appl)) continue;
-		register_appl(card, appl, &APPL(appl)->rparam);
+		ap = get_capi_appl_by_nr(appl);
+		if (!ap) continue;
+		register_appl(card, appl, &ap->rparam);
 	}
 
         printk(KERN_NOTICE "kcapi: card %d \"%s\" ready.\n",
@@ -932,6 +952,8 @@ static void controllercb_reseted(struct capi_ctr * card)
 {
 	u16 appl;
 
+	DBG("");
+
         if (card->cardstate == CARD_DETECTED)
 		return;
 
@@ -943,8 +965,13 @@ static void controllercb_reseted(struct capi_ctr * card)
 	memset(card->serial, 0, sizeof(card->serial));
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
+		struct capi_appl *ap = get_capi_appl_by_nr(appl);
 		struct capi_ncci **pp, **nextpp;
-		for (pp = &APPL(appl)->nccilist; *pp; pp = nextpp) {
+
+		if (!ap)
+			continue;
+
+		for (pp = &ap->nccilist; *pp; pp = nextpp) {
 			if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
 				struct capi_ncci *np = *pp;
 				*pp = np->next;
@@ -1141,29 +1168,39 @@ static u16 capi_isinstalled(void)
 
 static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 {
+	struct capi_appl *ap;
 	int appl;
 	int i;
+
+	DBG("");
 
 	if (rparam->datablklen < 128)
 		return CAPI_LOGBLKSIZETOSMALL;
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
-		if (APPL_IS_FREE(appl))
+		if (applications[appl - 1] == NULL)
 			break;
 	}
 	if (appl > CAPI_MAXAPPL)
 		return CAPI_TOOMANYAPPLS;
 
-	APPL_MARK_USED(appl);
-	skb_queue_head_init(&APPL(appl)->recv_queue);
-	APPL(appl)->nncci = 0;
+	ap = kmalloc(sizeof(*ap), GFP_KERNEL);
+	if (!ap)
+		return CAPI_REGOSRESOURCEERR;
 
-	memcpy(&APPL(appl)->rparam, rparam, sizeof(capi_register_params));
+	memset(ap, 0, sizeof(*ap));
+	ap->applid = appl;
+	applications[appl - 1] = ap;
+	
+	skb_queue_head_init(&ap->recv_queue);
+	ap->nncci = 0;
+
+	memcpy(&ap->rparam, rparam, sizeof(capi_register_params));
 
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		register_appl(cards[i], appl, &APPL(appl)->rparam);
+		register_appl(cards[i], appl, &ap->rparam);
 	}
 	*applidp = appl;
 	printk(KERN_INFO "kcapi: appl %d up\n", appl);
@@ -1173,18 +1210,22 @@ static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 
 static u16 capi_release(u16 applid)
 {
+	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	int i;
 
-	if (!VALID_APPLID(applid))
+	DBG("applid %#x", applid);
+
+	if (!ap)
 		return CAPI_ILLAPPNR;
-	skb_queue_purge(&APPL(applid)->recv_queue);
+
+	skb_queue_purge(&ap->recv_queue);
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
 			continue;
 		release_appl(cards[i], applid);
 	}
-	APPL(applid)->signal = 0;
-	APPL_MARK_FREE(applid);
+	applications[applid - 1] = NULL;
+	kfree(ap);
 	printk(KERN_INFO "kcapi: appl %d down\n", applid);
 
 	return CAPI_NOERROR;
@@ -1193,13 +1234,17 @@ static u16 capi_release(u16 applid)
 static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 {
 	struct capi_ctr *card;
+	struct capi_appl *ap;
 	struct capi_ncci *np;
 	int showctl = 0;
 	u8 cmd, subcmd;
 
+	DBG("applid %#x", applid);
+ 
 	if (ncards == 0)
 		return CAPI_REGNOTINSTALLED;
-	if (!VALID_APPLID(applid))
+	ap = get_capi_appl_by_nr(applid);
+	if (!ap)
 		return CAPI_ILLAPPNR;
 	if (skb->len < 12
 	    || !capi_cmd_valid(CAPIMSG_COMMAND(skb->data))
@@ -1218,15 +1263,15 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
         subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
 	if (cmd == CAPI_DATA_B3 && subcmd== CAPI_REQ) {
-	    	if ((np = find_ncci(APPL(applid), CAPIMSG_NCCI(skb->data))) != 0
+	    	if ((np = find_ncci(ap, CAPIMSG_NCCI(skb->data))) != 0
 	            && mq_enqueue(np, CAPIMSG_MSGID(skb->data)) == 0)
 			return CAPI_SENDQUEUEFULL;
 		card->nsentdatapkt++;
-		APPL(applid)->nsentdatapkt++;
+		ap->nsentdatapkt++;
 	        if (card->traceflag > 2) showctl |= 2;
 	} else {
 		card->nsentctlpkt++;
-		APPL(applid)->nsentctlpkt++;
+		ap->nsentctlpkt++;
 	        if (card->traceflag) showctl |= 2;
 	}
 	showctl |= (card->traceflag & 1);
@@ -1250,11 +1295,12 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 
 static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
 {
+	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	struct sk_buff *skb;
 
-	if (!VALID_APPLID(applid))
+	if (!ap)
 		return CAPI_ILLAPPNR;
-	if ((skb = skb_dequeue(&APPL(applid)->recv_queue)) == 0)
+	if ((skb = skb_dequeue(&ap->recv_queue)) == 0)
 		return CAPI_RECEIVEQUEUEEMPTY;
 	*msgp = skb;
 	return CAPI_NOERROR;
@@ -1264,10 +1310,12 @@ static u16 capi_set_signal(u16 applid,
 			     void (*signal) (u16 applid, void *param),
 			     void *param)
 {
-	if (!VALID_APPLID(applid))
+	struct capi_appl *ap = get_capi_appl_by_nr(applid);
+
+	if (!ap)
 		return CAPI_ILLAPPNR;
-	APPL(applid)->signal = signal;
-	APPL(applid)->param = param;
+	ap->signal = signal;
+	ap->param = param;
 	return CAPI_NOERROR;
 }
 
