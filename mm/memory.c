@@ -683,7 +683,6 @@ static inline struct page *get_page_map(struct page *page)
 }
 
 
-#ifdef FIXADDR_START
 static struct vm_area_struct fixmap_vma = {
 	/* Catch users - if there are any valid
 	   ones, we can make this be "&init_mm" or
@@ -701,7 +700,6 @@ static int init_fixmap_vma(void)
 }
 
 __initcall(init_fixmap_vma);
-#endif
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,

@@ -91,3 +91,5 @@ obj-$(CONFIG_JFS_FS)		+= jfs/
 obj-$(CONFIG_XFS_FS)		+= xfs/
 obj-$(CONFIG_AFS_FS)		+= afs/
 obj-$(CONFIG_BEFS_FS)		+= befs/
+obj-$(CONFIG_HOSTFS)		+= hostfs/
+obj-$(CONFIG_HPPFS)		+= hppfs/

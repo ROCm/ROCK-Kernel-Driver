@@ -243,8 +243,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = 
-			desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
+		unsigned int status = desc->status & IRQ_DISABLED;
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
