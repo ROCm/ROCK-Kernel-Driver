@@ -747,7 +747,7 @@ static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_DROP:
 	{
 		int val;
-		if (get_user(val, (long __user *) argp))
+		if (get_user(val, (int __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -761,7 +761,7 @@ static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_DRAIN:
 	{
 		int val;
-		if (get_user(val, (long __user *) argp))
+		if (get_user(val, (int __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
