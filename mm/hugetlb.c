@@ -10,6 +10,7 @@
 #include <linux/hugetlb.h>
 #include <linux/sysctl.h>
 #include <linux/highmem.h>
+#include <linux/nodemask.h>
 
 const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
 static unsigned long nr_huge_pages, free_huge_pages;
@@ -54,10 +55,10 @@ static struct page *alloc_fresh_huge_page(void)
 	struct page *page;
 	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP|__GFP_NOWARN,
 					HUGETLB_PAGE_ORDER);
-	nid = (nid + 1) % numnodes;
+	nid = (nid + 1) % num_online_nodes();
 	if (page) {
 		nr_huge_pages++;
-		nr_huge_pages_node[page_zone(page)->zone_pgdat->node_id]++;
+		nr_huge_pages_node[page_to_nid(page)]++;
 	}
 	return page;
 }

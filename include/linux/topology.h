@@ -43,16 +43,9 @@
 	})
 #endif
 
-static inline int __next_node_with_cpus(int node)
-{
-	do
-		++node;
-	while (node < numnodes && !nr_cpus_node(node));
-	return node;
-}
-
-#define for_each_node_with_cpus(node) \
-	for (node = 0; node < numnodes; node = __next_node_with_cpus(node))
+#define for_each_node_with_cpus(node)						\
+	for_each_online_node(node)						\
+		if (nr_cpus_node(node))
 
 #ifndef node_distance
 /* Conform to ACPI 2.0 SLIT distance definitions */
