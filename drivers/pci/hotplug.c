@@ -2,8 +2,6 @@
 #include <linux/module.h>
 #include <linux/kmod.h>		/* for hotplug_path */
 
-extern int pci_announce_device(struct pci_driver *drv, struct pci_dev *dev);
-
 #ifndef FALSE
 #define FALSE	(0)
 #define TRUE	(!FALSE)
@@ -49,28 +47,6 @@ run_sbin_hotplug(struct pci_dev *pdev, int insert)
 }
 
 /**
- * pci_announce_device_to_drivers - tell the drivers a new device has appeared
- * @dev: the device that has shown up
- *
- * Notifys the drivers that a new device has appeared, and also notifys
- * userspace through /sbin/hotplug.
- */
-void
-pci_announce_device_to_drivers(struct pci_dev *dev)
-{
-	struct list_head *ln;
-
-	for(ln=pci_bus_type.drivers.next; ln != &pci_bus_type.drivers; ln=ln->next) {
-		struct pci_driver *drv = list_entry(ln, struct pci_driver, node);
-		if (drv->remove && pci_announce_device(drv, dev))
-			break;
-	}
-
-	/* notify userspace of new hotplug device */
-	run_sbin_hotplug(dev, TRUE);
-}
-
-/**
  * pci_insert_device - insert a hotplug device
  * @dev: the device to insert
  * @bus: where to insert it
@@ -85,7 +61,8 @@ pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
 #ifdef CONFIG_PROC_FS
 	pci_proc_attach_device(dev);
 #endif
-	pci_announce_device_to_drivers(dev);
+	/* notify userspace of new hotplug device */
+	run_sbin_hotplug(dev, TRUE);
 }
 
 static void
@@ -110,11 +87,7 @@ pci_free_resources(struct pci_dev *dev)
 void
 pci_remove_device(struct pci_dev *dev)
 {
-	if (dev->driver) {
-		if (dev->driver->remove)
-			dev->driver->remove(dev);
-		dev->driver = NULL;
-	}
+	put_device(&dev->dev);
 	list_del(&dev->bus_list);
 	list_del(&dev->global_list);
 	pci_free_resources(dev);
@@ -128,4 +101,3 @@ pci_remove_device(struct pci_dev *dev)
 
 EXPORT_SYMBOL(pci_insert_device);
 EXPORT_SYMBOL(pci_remove_device);
-EXPORT_SYMBOL(pci_announce_device_to_drivers);
