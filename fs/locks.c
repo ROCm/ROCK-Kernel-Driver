@@ -1412,7 +1412,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 
 	inode = filp->f_dentry->d_inode;
 
-#ifdef CONFIG_MMU
 	/* Don't allow mandatory locks on files that may be memory mapped
 	 * and shared.
 	 */
@@ -1425,7 +1424,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 			goto out;
 		}
 	}
-#endif
 
 	error = flock_to_posix_lock(filp, file_lock, &flock);
 	if (error)
