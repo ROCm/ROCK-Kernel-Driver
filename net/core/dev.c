@@ -877,6 +877,18 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 	return notifier_chain_unregister(&netdev_chain, nb);
 }
 
+/**
+ *	call_netdevice_notifiers - call all network notifier blocks
+ *
+ *	Call all network notifier blocks.  Parameters and return value
+ *	are as for notifier_call_chain().
+ */
+
+int call_netdevice_notifiers(unsigned long val, void *v)
+{
+	return notifier_call_chain(&netdev_chain, val, v);
+}
+
 /*
  *	Support routine. Sends outgoing frames to any network
  *	taps currently in use.
