@@ -6,16 +6,12 @@ menu "Cryptographic options"
 
 config CRYPTO
 	bool "Cryptographic API"
-	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m || INET6_AH=y || INET6_AH=m || \
-		     INET6_ESP=y || INET6_ESP=m || INET6_IPCOMP=y || INET6_IPCOMP=m || IPV6_PRIVACY=y
 	help
 	  This option provides the core Cryptographic API.
 
 config CRYPTO_HMAC
 	bool "HMAC support"
 	depends on CRYPTO
-	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m || INET6_AH=y || INET6_AH=m || \
-		     INET6_ESP=y || INET6_ESP=m
 	help
 	  HMAC: Keyed-Hashing for Message Authentication (RFC2104).
 	  This is required for IPSec.
@@ -35,16 +31,12 @@ config CRYPTO_MD4
 config CRYPTO_MD5
 	tristate "MD5 digest algorithm"
 	depends on CRYPTO
-	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m || INET6_AH=y || INET6_AH=m || \
-	             INET6_ESP=y || INET6_ESP=m || IPV6_PRIVACY=y
 	help
 	  MD5 message digest algorithm (RFC1321).
 
 config CRYPTO_SHA1
 	tristate "SHA1 digest algorithm"
 	depends on CRYPTO
-	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m  || INET6_AH=y || INET6_AH=m || \
-	             INET6_ESP=y || INET6_ESP=m
 	help
 	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2).
 
@@ -72,7 +64,6 @@ config CRYPTO_SHA512
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO
-	default y if INET_ESP=y || INET_ESP=m || INET6_ESP=y || INET6_ESP=m
 	help
 	  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
 
@@ -138,7 +129,6 @@ config CRYPTO_AES
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO
-	default y if INET_IPCOMP=y || INET_IPCOMP=m || INET6_IPCOMP=y || INET6_IPCOMP=m
 	help
 	  This is the Deflate algorithm (RFC1951), specified for use in
 	  IPSec with the IPCOMP protocol (RFC3173, RFC2394).

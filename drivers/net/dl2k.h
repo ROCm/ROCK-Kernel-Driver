@@ -243,7 +243,6 @@ enum TFC_bits {
 	VLANTagInsert = 0x0000000010000000,
 	TFDDone = 0x80000000,
 	VIDShift = 32,
-	CFI = 0x0000100000000000,
 	UsePriorityShift = 48,
 };
 

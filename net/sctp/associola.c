@@ -177,10 +177,10 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 * RFC 6 - A SCTP receiver MUST be able to receive a minimum of
 	 * 1500 bytes in one SCTP packet.
 	 */
-	if (sk->rcvbuf < SCTP_DEFAULT_MINWINDOW)
+	if (sk->sk_rcvbuf < SCTP_DEFAULT_MINWINDOW)
 		asoc->rwnd = SCTP_DEFAULT_MINWINDOW;
 	else
-		asoc->rwnd = sk->rcvbuf;
+		asoc->rwnd = sk->sk_rcvbuf;
 
 	asoc->a_rwnd = asoc->rwnd;
 
@@ -299,7 +299,7 @@ void sctp_association_free(struct sctp_association *asoc)
 
 	/* Decrement the backlog value for a TCP-style listening socket. */
 	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
-		sk->ack_backlog--;
+		sk->sk_ack_backlog--;
 
 	/* Mark as dead, so other users can know this structure is
 	 * going away.
@@ -857,7 +857,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 
 	/* Decrement the backlog value for a TCP-style socket. */
 	if (sctp_style(oldsk, TCP))
-		oldsk->ack_backlog--;
+		oldsk->sk_ack_backlog--;
 
 	/* Release references to the old endpoint and the sock.  */
 	sctp_endpoint_put(assoc->ep);
@@ -1026,7 +1026,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 	case SCTP_STATE_SHUTDOWN_RECEIVED:
 		if ((asoc->rwnd > asoc->a_rwnd) &&
 		    ((asoc->rwnd - asoc->a_rwnd) >=
-		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu)))
+		     min_t(__u32, (asoc->base.sk->sk_rcvbuf >> 1), asoc->pmtu)))
 			return 1;
 		break;
 	default:
@@ -1109,7 +1109,7 @@ int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *asoc, int gfp)
 	 * the endpoint.
 	 */
 	scope = sctp_scope(&asoc->peer.active_path->ipaddr);
-	flags = (PF_INET6 == asoc->base.sk->family) ? SCTP_ADDR6_ALLOWED : 0;
+	flags = (PF_INET6 == asoc->base.sk->sk_family) ? SCTP_ADDR6_ALLOWED : 0;
 	if (asoc->peer.ipv4_address)
 		flags |= SCTP_ADDR4_PEERSUPP;
 	if (asoc->peer.ipv6_address)

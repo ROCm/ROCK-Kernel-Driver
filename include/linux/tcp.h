@@ -17,11 +17,8 @@
 #ifndef _LINUX_TCP_H
 #define _LINUX_TCP_H
 
-#include <linux/config.h>
-#include <linux/skbuff.h>
+#include <linux/types.h>
 #include <asm/byteorder.h>
-#include <net/sock.h>
-#include <linux/ip.h>
 
 struct tcphdr {
 	__u16	source;
@@ -187,6 +184,13 @@ struct tcp_info
 	__u32	tcpi_advmss;
 	__u32	tcpi_reordering;
 };
+
+#ifdef __KERNEL__
+
+#include <linux/config.h>
+#include <linux/skbuff.h>
+#include <linux/ip.h>
+#include <net/sock.h>
 
 /* This defines a selective acknowledgement block. */
 struct tcp_sack_block {
@@ -383,5 +387,7 @@ struct tcp_sock {
 };
 
 #define tcp_sk(__sk) (&((struct tcp_sock *)__sk)->tcp)
+
+#endif
 
 #endif	/* _LINUX_TCP_H */

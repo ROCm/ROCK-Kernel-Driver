@@ -30,6 +30,31 @@ static void xp860_power_off(void)
 	while(1);
 }
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= 0x40000000,
+		.end		= 0x40001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 /*
  * Note: I replaced the sa1111_init() without the full SA1111 initialisation
  * because this machine doesn't appear to use the DMA features.  If this is
@@ -39,19 +64,7 @@ static int __init xp860_init(void)
 {
 	pm_power_off = xp860_power_off;
 
-	/*
-	 * Probe for SA1111.
-	 */
-	ret = sa1111_probe(0x40000000);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake();
-
-	return 0;
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
 arch_initcall(xp860_init);

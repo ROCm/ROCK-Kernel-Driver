@@ -201,7 +201,7 @@ static __inline__ int sendack(unsigned short seq)
  */
 static __inline__ int dn_congested(struct sock *sk)
 {
-        return atomic_read(&sk->rmem_alloc) > (sk->rcvbuf >> 1);
+        return atomic_read(&sk->sk_rmem_alloc) > (sk->sk_rcvbuf >> 1);
 }
 
 #define DN_MAX_NSP_DATA_HEADER (11)

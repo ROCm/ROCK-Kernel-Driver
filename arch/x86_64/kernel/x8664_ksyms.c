@@ -95,6 +95,7 @@ EXPORT_SYMBOL(__clear_user);
 EXPORT_SYMBOL(copy_user_generic);
 EXPORT_SYMBOL(copy_from_user);
 EXPORT_SYMBOL(copy_to_user);
+EXPORT_SYMBOL(copy_in_user);
 EXPORT_SYMBOL(strnlen_user);
 
 EXPORT_SYMBOL(pci_alloc_consistent);
@@ -119,11 +120,6 @@ EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
-#endif
-
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PM)
-EXPORT_SYMBOL_GPL(set_nmi_pm_callback);
-EXPORT_SYMBOL_GPL(unset_nmi_pm_callback);
 #endif
 
 #ifdef CONFIG_VT

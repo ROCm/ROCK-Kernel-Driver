@@ -105,7 +105,7 @@ static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, s
 	iph = skb->nh.ipv6h;
 	iph->payload_len = htons(skb->len);
 	
-	ip6_found_nexthdr(skb, &prevhdr);
+	ip6_find_1stfragopt(skb, &prevhdr);
 	*prevhdr = nexthdr;
 out:
 	if (tmp_hdr)
@@ -160,7 +160,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 		skb->nh.raw = skb->data; /* == top_iph */
 		skb->h.raw = skb->nh.raw + hdr_len;
 	} else {
-		hdr_len = ip6_found_nexthdr(skb, &prevhdr);
+		hdr_len = ip6_find_1stfragopt(skb, &prevhdr);
 		nexthdr = *prevhdr;
 	}
 
@@ -203,7 +203,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 
 	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	skb->nh.raw = skb->data; /* top_iph */
-	ip6_found_nexthdr(skb, &prevhdr); 
+	ip6_find_1stfragopt(skb, &prevhdr); 
 	*prevhdr = IPPROTO_COMP;
 
 	ipch = (struct ipv6_comp_hdr *)((unsigned char *)top_iph + hdr_len);

@@ -391,12 +391,6 @@ void blk_queue_dma_alignment(request_queue_t *q, int mask)
 	q->dma_alignment = mask;
 }
 
-void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
-{
-	spin_lock_init(lock);
-	q->queue_lock = lock;
-}
-
 /**
  * blk_queue_find_tag - find a request by its tag and queue
  *
@@ -1076,30 +1070,12 @@ static void blk_unplug_timeout(unsigned long data)
  *   blk_start_queue() will clear the stop flag on the queue, and call
  *   the request_fn for the queue if it was in a stopped state when
  *   entered. Also see blk_stop_queue(). Must not be called from driver
- *   request function due to recursion issues.
+ *   request function due to recursion issues. Queue lock must be held.
  **/
 void blk_start_queue(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-		unsigned long flags;
-
-		spin_lock_irqsave(q->queue_lock, flags);
-		if (!elv_queue_empty(q))
-			q->request_fn(q);
-		spin_unlock_irqrestore(q->queue_lock, flags);
-	}
-}
-
-/**
- * __blk_stop_queue: see blk_stop_queue()
- *
- * Description:
- *  Like blk_stop_queue(), but queue_lock must be held
- **/
-void __blk_stop_queue(request_queue_t *q)
-{
-	blk_remove_plug(q);
-	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
+	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+		schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1114,15 +1090,12 @@ void __blk_stop_queue(request_queue_t *q)
  *   or if it simply chooses not to queue more I/O at one point, it can
  *   call this function to prevent the request_fn from being called until
  *   the driver has signalled it's ready to go again. This happens by calling
- *   blk_start_queue() to restart queue operations.
+ *   blk_start_queue() to restart queue operations. Queue lock must be held.
  **/
 void blk_stop_queue(request_queue_t *q)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(q->queue_lock, flags);
-	__blk_stop_queue(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	blk_remove_plug(q);
+	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
 /**
@@ -2364,7 +2337,6 @@ EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
 EXPORT_SYMBOL(submit_bio);
-EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
@@ -2383,7 +2355,6 @@ EXPORT_SYMBOL(blk_queue_invalidate_tags);
 
 EXPORT_SYMBOL(blk_start_queue);
 EXPORT_SYMBOL(blk_stop_queue);
-EXPORT_SYMBOL(__blk_stop_queue);
 EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
 

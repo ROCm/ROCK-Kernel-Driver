@@ -87,6 +87,7 @@ typedef void (*flow_resolve_t)(struct flowi *key, u16 family, u8 dir,
 
 extern void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 			       flow_resolve_t resolver);
+extern void flow_cache_flush(void *object);
 extern atomic_t flow_cache_genid;
 
 #endif

@@ -2132,10 +2132,10 @@ static int ess_open_mixdev(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct ess_card *card = NULL;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct pci_driver *drvr;
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		drvr = pci_dev_driver (pdev);
 		if (drvr == &maestro_pci_driver) {
 			card = (struct ess_card*)pci_get_drvdata (pdev);
@@ -2978,13 +2978,13 @@ ess_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	struct ess_state *s = NULL;
 	unsigned char fmtm = ~0, fmts = 0;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	/*
 	 *	Scan the cards and find the channel. We only
 	 *	do this at open time so it is ok
 	 */
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		struct ess_card *c;
 		struct pci_driver *drvr;
 

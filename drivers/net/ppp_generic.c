@@ -387,7 +387,7 @@ static int ppp_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t ppp_read(struct file *file, char *buf,
+static ssize_t ppp_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	struct ppp_file *pf = file->private_data;
@@ -436,7 +436,7 @@ static ssize_t ppp_read(struct file *file, char *buf,
 	return ret;
 }
 
-static ssize_t ppp_write(struct file *file, const char *buf,
+static ssize_t ppp_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	struct ppp_file *pf = file->private_data;
@@ -617,7 +617,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 	case PPPIOCGIDLE:
 		idle.xmit_idle = (jiffies - ppp->last_xmit) / HZ;
 		idle.recv_idle = (jiffies - ppp->last_recv) / HZ;
-		if (copy_to_user((void *) arg, &idle, sizeof(idle)))
+		if (copy_to_user((void __user *) arg, &idle, sizeof(idle)))
 			break;
 		err = 0;
 		break;
@@ -646,7 +646,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 	case PPPIOCGNPMODE:
 	case PPPIOCSNPMODE:
-		if (copy_from_user(&npi, (void *) arg, sizeof(npi)))
+		if (copy_from_user(&npi, (void __user *) arg, sizeof(npi)))
 			break;
 		err = proto_to_npindex(npi.protocol);
 		if (err < 0)
@@ -655,7 +655,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 		if (cmd == PPPIOCGNPMODE) {
 			err = -EFAULT;
 			npi.mode = ppp->npmode[i];
-			if (copy_to_user((void *) arg, &npi, sizeof(npi)))
+			if (copy_to_user((void __user *) arg, &npi, sizeof(npi)))
 				break;
 		} else {
 			ppp->npmode[i] = npi.mode;
@@ -673,24 +673,22 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 		struct sock_filter *code = NULL;
 		int len;
 
-		if (copy_from_user(&uprog, (void *) arg, sizeof(uprog)))
+		if (copy_from_user(&uprog, (void __user *) arg, sizeof(uprog)))
 			break;
-		if (uprog.len > 0 && uprog.len < 65536) {
-			err = -ENOMEM;
-			len = uprog.len * sizeof(struct sock_filter);
-			code = kmalloc(len, GFP_KERNEL);
-			if (code == 0)
-				break;
-			err = -EFAULT;
-			if (copy_from_user(code, uprog.filter, len)) {
-				kfree(code);
-				break;
-			}
-			err = sk_chk_filter(code, uprog.len);
-			if (err) {
-				kfree(code);
-				break;
-			}
+		err = -ENOMEM;
+		len = uprog.len * sizeof(struct sock_filter);
+		code = kmalloc(len, GFP_KERNEL);
+		if (code == 0)
+			break;
+		err = -EFAULT;
+		if (copy_from_user(code, (void __user *) uprog.filter, len)) {
+			kfree(code);
+			break;
+		}
+		err = sk_chk_filter(code, uprog.len);
+		if (err) {
+			kfree(code);
+			break;
 		}
 		filtp = (cmd == PPPIOCSPASS)? &ppp->pass_filter: &ppp->active_filter;
 		ppp_lock(ppp);
@@ -879,7 +877,7 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ppp *ppp = dev->priv;
 	int err = -EFAULT;
-	void *addr = (void *) ifr->ifr_ifru.ifru_data;
+	void __user *addr = (void __user *) ifr->ifr_ifru.ifru_data;
 	struct ppp_stats stats;
 	struct ppp_comp_stats cstats;
 	char *vers;
@@ -1952,9 +1950,9 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 	unsigned char ccp_option[CCP_MAX_OPTION_LENGTH];
 
 	err = -EFAULT;
-	if (copy_from_user(&data, (void *) arg, sizeof(data))
+	if (copy_from_user(&data, (void __user *) arg, sizeof(data))
 	    || (data.length <= CCP_MAX_OPTION_LENGTH
-		&& copy_from_user(ccp_option, data.ptr, data.length)))
+		&& copy_from_user(ccp_option, (void __user *) data.ptr, data.length)))
 		goto out;
 	err = -EINVAL;
 	if (data.length > CCP_MAX_OPTION_LENGTH

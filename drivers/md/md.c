@@ -2860,7 +2860,7 @@ static void *md_seq_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 	mddev_t *mddev;
 
-	if (l > 0x10000)
+	if (l >= 0x10000)
 		return NULL;
 	if (!l--)
 		/* header */
@@ -2875,7 +2875,9 @@ static void *md_seq_start(struct seq_file *seq, loff_t *pos)
 			return mddev;
 		}
 	spin_unlock(&all_mddevs_lock);
-	return (void*)2;/* tail */
+	if (!l--)
+		return (void*)2;/* tail */
+	return NULL;
 }
 
 static void *md_seq_next(struct seq_file *seq, void *v, loff_t *pos)

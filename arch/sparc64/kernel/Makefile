@@ -39,3 +39,5 @@ endif
 
 head.o: head.S ttable.S itlb_base.S dtlb_base.S dtlb_backend.S dtlb_prot.S \
 	etrap.S rtrap.S winfixup.S entry.S
+
+CFLAGS_ioctl32.o += -Ifs/

@@ -205,7 +205,8 @@ static inline void proc_pid_flush(struct dentry *proc_dentry) { }
 static inline struct proc_dir_entry *create_proc_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *parent) { return NULL; }
 
-static inline void remove_proc_entry(const char *name, struct proc_dir_entry *parent) {};
+#define remove_proc_entry(name, parent) do {} while (0)
+
 static inline struct proc_dir_entry *proc_symlink(const char *name,
 		struct proc_dir_entry *parent,char *dest) {return NULL;}
 static inline struct proc_dir_entry *proc_mknod(const char *name,mode_t mode,
@@ -235,8 +236,6 @@ static inline struct kcore_list * kclist_del(void *addr)
 	return NULL;
 }
 
-static inline void kclist_add(struct kcore_list *new, void *addr, size_t size) {};
-static inline struct kcore_list * kclist_del(void *addr) {return NULL};
 #endif /* CONFIG_PROC_FS */
 
 struct proc_inode {

@@ -1331,12 +1331,13 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 		}
 	}
 
-	dev = init_etherdev(NULL, PRIV_BYTES);
+	dev = alloc_etherdev(PRIV_BYTES);
 	if (!dev) {
-		printk(KERN_ERR "init_etherdev failed, out of memory for BMAC %s\n",
+		printk(KERN_ERR "alloc_etherdev failed, out of memory for BMAC %s\n",
 		       bmac->full_name);
 		return;
 	}
+		
 	bp = (struct bmac_data *) dev->priv;
 	SET_MODULE_OWNER(dev);
 	bp->node = bmac;
@@ -1344,21 +1345,22 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 
 	if (!request_OF_resource(bmac, 0, " (bmac)")) {
 		printk(KERN_ERR "BMAC: can't request IO resource !\n");
-		goto err_out;
+		goto out1;
 	}
 	if (!request_OF_resource(bmac, 1, " (bmac tx dma)")) {
 		printk(KERN_ERR "BMAC: can't request TX DMA resource !\n");
-		goto err_out;
+		goto out2;
 	}
-
 	if (!request_OF_resource(bmac, 2, " (bmac rx dma)")) {
 		printk(KERN_ERR "BMAC: can't request RX DMA resource !\n");
-		goto err_out;
+		goto out3;
 	}
+
 	dev->base_addr = (unsigned long)
 		ioremap(bmac->addrs[0].address, bmac->addrs[0].size);
 	if (!dev->base_addr)
-		goto err_out;
+		goto out4;
+
 	dev->irq = bmac->intrs[0].line;
 
 	bmac_enable_and_reset_chip(dev);
@@ -1429,11 +1431,19 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	 */
 	disable_irq(dev->irq);
 	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+
+	if (register_netdev(dev) != 0) {
+		printk(KERN_ERR "registration failed for BMAC %s\n",
+		       bmac->full_name);
+		goto err_out_irq2;
+	}
 	
 	bp->next_bmac = bmac_devs;
 	bmac_devs = dev;
 	return;
 
+err_out_irq2:
+	free_irq(bmac->intrs[2].line, dev);
 err_out_irq1:
 	free_irq(bmac->intrs[1].line, dev);
 err_out_irq0:
@@ -1444,14 +1454,14 @@ err_out_iounmap_tx:
 	iounmap((void *)bp->tx_dma);
 err_out_iounmap:
 	iounmap((void *)dev->base_addr);
-err_out:
-	if (bp->node) {
-		release_OF_resource(bp->node, 0);
-		release_OF_resource(bp->node, 1);
-		release_OF_resource(bp->node, 2);
-		pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
-	}
-	unregister_netdev(dev);
+out4:
+	release_OF_resource(bp->node, 2);
+out3:
+	release_OF_resource(bp->node, 1);
+out2:
+	release_OF_resource(bp->node, 0);
+out1:
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
 	kfree(dev);
 }
 

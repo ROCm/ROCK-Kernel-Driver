@@ -597,7 +597,7 @@ int static inline __sctp_state(const struct sctp_association *asoc,
 #define sctp_sstate(sk, state) __sctp_sstate((sk), (SCTP_SS_##state))
 int static inline __sctp_sstate(const struct sock *sk, sctp_sock_state_t state)
 {
-	return sk->state == state;
+	return sk->sk_state == state;
 }
 
 #endif /* __net_sctp_h__ */

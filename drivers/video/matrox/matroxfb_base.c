@@ -115,7 +115,7 @@
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 unsigned char nvram_read_byte(int);
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
@@ -1763,7 +1763,7 @@ static int initMatrox2(WPMINFO struct board* b){
 	}
 
 	/* FIXME: Where to move this?! */
-#if defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_PPC_PMAC)
 #ifndef MODULE
 	if (_machine == _MACH_Pmac) {
 		struct fb_var_screeninfo var;
@@ -1783,7 +1783,7 @@ static int initMatrox2(WPMINFO struct board* b){
 		}
 	}
 #endif /* !MODULE */
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 	vesafb_defined.xres_virtual = vesafb_defined.xres;
 	if (nopan) {
 		vesafb_defined.yres_virtual = vesafb_defined.yres;
@@ -2270,7 +2270,7 @@ int __init matroxfb_setup(char *options) {
 			dfp_type = simple_strtoul(this_opt+4, NULL, 0);
 			dfp = 1;
 		}	
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		else if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
 			if (vmode > 0 && vmode <= VMODE_MAX)
@@ -2441,7 +2441,7 @@ MODULE_PARM(dfp, "i");
 MODULE_PARM_DESC(dfp, "Specifies whether to use digital flat panel interface of G200/G400 (0 or 1) (default=0)");
 MODULE_PARM(dfp_type, "i");
 MODULE_PARM_DESC(dfp_type, "Specifies DFP interface type (0 to 255) (default=read from hardware)");
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 MODULE_PARM(vmode, "i");
 MODULE_PARM_DESC(vmode, "Specify the vmode mode number that should be used (640x480 default)");
 MODULE_PARM(cmode, "i");

@@ -136,11 +136,6 @@ static int	stl_nrbrds = sizeof(stl_brdconf) / sizeof(stlconf_t);
 static char	*stl_drvtitle = "Stallion Multiport Serial Driver";
 static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
-#ifdef CONFIG_DEVFS_FS
-static char	*stl_serialname = "tts/E%d";
-#else
-static char	*stl_serialname = "ttyE";
-#endif
 
 static struct tty_driver	stl_serial;
 static struct tty_struct	*stl_ttys[STL_MAXDEVS];
@@ -3178,7 +3173,8 @@ int __init stl_init(void)
 	stl_serial.magic = TTY_DRIVER_MAGIC;
 	stl_serial.owner = THIS_MODULE;
 	stl_serial.driver_name = stl_drvname;
-	stl_serial.name = stl_serialname;
+	stl_serial.name = "ttyE";
+	stl_serial.devfs_name = "tts/E";
 	stl_serial.major = STL_SERIALMAJOR;
 	stl_serial.minor_start = 0;
 	stl_serial.num = STL_MAXBRDS * STL_MAXPORTS;

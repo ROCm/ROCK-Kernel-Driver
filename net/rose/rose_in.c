@@ -53,9 +53,9 @@ static int rose_state1_machine(struct sock *sk, struct sk_buff *skb, int framety
 		rose->vr        = 0;
 		rose->vl        = 0;
 		rose->state     = ROSE_STATE_3;
-		sk->state                    = TCP_ESTABLISHED;
+		sk->sk_state	= TCP_ESTABLISHED;
 		if (!sock_flag(sk, SOCK_DEAD))
-			sk->state_change(sk);
+			sk->sk_state_change(sk);
 		break;
 
 	case ROSE_CLEAR_REQUEST:
@@ -183,7 +183,8 @@ static int rose_state3_machine(struct sock *sk, struct sk_buff *skb, int framety
 				rose_stop_idletimer(sk);
 				break;
 			}
-			if (atomic_read(&sk->rmem_alloc) > (sk->rcvbuf / 2))
+			if (atomic_read(&sk->sk_rmem_alloc) >
+			    (sk->sk_rcvbuf / 2))
 				rose->condition |= ROSE_COND_OWN_RX_BUSY;
 		}
 		/*

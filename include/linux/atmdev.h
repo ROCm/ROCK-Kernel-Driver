@@ -30,7 +30,7 @@
 #define ATM_DS3_PCR	(8000*12)
 			/* DS3: 12 cells in a 125 usec time slot */
 
-#define atm_sk(__sk) ((struct atm_vcc *)(__sk)->protinfo)
+#define atm_sk(__sk) ((struct atm_vcc *)(__sk)->sk_protinfo)
 #define ATM_SD(s)	(atm_sk((s)->sk))
 
 
@@ -413,19 +413,20 @@ static inline int atm_guess_pdu2truesize(int pdu_size)
 
 static inline void atm_force_charge(struct atm_vcc *vcc,int truesize)
 {
-	atomic_add(truesize, &vcc->sk->rmem_alloc);
+	atomic_add(truesize, &vcc->sk->sk_rmem_alloc);
 }
 
 
 static inline void atm_return(struct atm_vcc *vcc,int truesize)
 {
-	atomic_sub(truesize, &vcc->sk->rmem_alloc);
+	atomic_sub(truesize, &vcc->sk->sk_rmem_alloc);
 }
 
 
 static inline int atm_may_send(struct atm_vcc *vcc,unsigned int size)
 {
-	return (size + atomic_read(&vcc->sk->wmem_alloc)) < vcc->sk->sndbuf;
+	return (size + atomic_read(&vcc->sk->sk_wmem_alloc)) <
+	       vcc->sk->sk_sndbuf;
 }
 
 

@@ -29,11 +29,8 @@
  * level driver of CPUFreq support, and its locking mutex. 
  * cpu_max_freq is in kHz.
  */
-struct cpufreq_driver   	*cpufreq_driver;
+static struct cpufreq_driver   	*cpufreq_driver;
 static DECLARE_MUTEX            (cpufreq_driver_sem);
-
-/* required for the proc interface, remove when that goes away */
-EXPORT_SYMBOL_GPL(cpufreq_driver);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -54,8 +51,12 @@ static DECLARE_MUTEX		(cpufreq_governor_sem);
 
 static struct class_interface cpufreq_interface;
 
-static int cpufreq_cpu_get(unsigned int cpu) {
+static int cpufreq_cpu_get(unsigned int cpu)
+{
 	if (cpu >= NR_CPUS)
+		return 0;
+
+	if (!cpufreq_driver)
 		return 0;
 
 	if (!try_module_get(cpufreq_driver->owner))
@@ -69,7 +70,8 @@ static int cpufreq_cpu_get(unsigned int cpu) {
 	return 1;
 }
 
-static void cpufreq_cpu_put(unsigned int cpu) {
+static void cpufreq_cpu_put(unsigned int cpu)
+{
 	kobject_put(&cpufreq_driver->policy[cpu].kobj);
 	module_put(cpufreq_driver->owner);
 }
@@ -81,7 +83,8 @@ static void cpufreq_cpu_put(unsigned int cpu) {
 /**
  * cpufreq_parse_governor - parse a governor string
  */
-int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor)
+int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
+				struct cpufreq_governor **governor)
 {
 	if (!strnicmp(str_governor, "performance", CPUFREQ_NAME_LEN)) {
 		*policy = CPUFREQ_POLICY_PERFORMANCE;
@@ -230,7 +233,8 @@ static ssize_t show_scaling_driver (struct cpufreq_policy * policy, char *buf)
 /**
  * show_scaling_available_governors - show the available CPUfreq governors
  */
-static ssize_t show_scaling_available_governors(struct cpufreq_policy * policy, char *buf)
+static ssize_t show_scaling_available_governors (struct cpufreq_policy * policy,
+				char *buf)
 {
 	ssize_t i = 0;
 	struct cpufreq_governor *t;

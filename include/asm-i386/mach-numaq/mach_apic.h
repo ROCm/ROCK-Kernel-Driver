@@ -107,37 +107,13 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 	return (1);
 }
 
+/* 
+ * We use physical apicids here, not logical, so just return the default
+ * physical broadcast to stop people from breaking us
+ */
 static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 {
-	int num_bits_set;
-	int cpus_found = 0;
-	int cpu;
-	int apicid;	
-
-	num_bits_set = hweight32(cpumask); 
-	/* Return id to all */
-	if (num_bits_set == 32)
-		return (int) 0xFF;
-	/* 
-	 * The cpus in the mask must all be on the apic cluster.  If are not 
-	 * on the same apicid cluster return default value of TARGET_CPUS. 
-	 */
-	cpu = ffs(cpumask)-1;
-	apicid = cpu_to_logical_apicid(cpu);
-	while (cpus_found < num_bits_set) {
-		if (cpumask & (1 << cpu)) {
-			int new_apicid = cpu_to_logical_apicid(cpu);
-			if (apicid_cluster(apicid) != 
-					apicid_cluster(new_apicid)){
-				printk ("%s: Not a valid mask!\n",__FUNCTION__);
-				return TARGET_CPUS;
-			}
-			apicid = apicid | new_apicid;
-			cpus_found++;
-		}
-		cpu++;
-	}
-	return apicid;
+	return (int) 0xF;
 }
 
 #endif /* __ASM_MACH_APIC_H */

@@ -24,8 +24,8 @@ static inline unix_socket *first_unix_socket(int *i)
 static inline unix_socket *next_unix_socket(int *i, unix_socket *s)
 {
 	/* More in this chain? */
-	if (s->next)
-		return s->next;
+	if (s->sk_next)
+		return s->sk_next;
 	/* Look for next non-empty chain. */
 	for ((*i)++; *i <= UNIX_HASH_SIZE; (*i)++) {
 		if (unix_socket_table[*i])

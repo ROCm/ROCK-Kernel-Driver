@@ -24,7 +24,7 @@
 #include <asm/uaccess.h>
 
 extern int __init init_rootfs(void);
-extern int __init fs_subsys_init(void);
+extern int __init sysfs_init(void);
 
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;
@@ -1144,7 +1144,7 @@ void __init mnt_init(unsigned long mempages)
 		d++;
 		i--;
 	} while (i);
-	fs_subsys_init();
+	sysfs_init();
 	init_rootfs();
 	init_mount_tree();
 }

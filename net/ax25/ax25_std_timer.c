@@ -38,7 +38,7 @@ void ax25_std_heartbeat_expiry(ax25_cb *ax25)
 		/* Magic here: If we listen() and a new link dies before it
 		   is accepted() it isn't 'dead' so doesn't get removed. */
 		if (!ax25->sk || sock_flag(ax25->sk, SOCK_DESTROY) ||
-		    (ax25->sk->state == TCP_LISTEN &&
+		    (ax25->sk->sk_state == TCP_LISTEN &&
 		     sock_flag(ax25->sk, SOCK_DEAD))) {
 			ax25_destroy_socket(ax25);
 			return;
@@ -51,7 +51,8 @@ void ax25_std_heartbeat_expiry(ax25_cb *ax25)
 		 * Check the state of the receive buffer.
 		 */
 		if (ax25->sk != NULL) {
-			if (atomic_read(&ax25->sk->rmem_alloc) < (ax25->sk->rcvbuf / 2) &&
+			if (atomic_read(&ax25->sk->sk_rmem_alloc) <
+			    (ax25->sk->sk_rcvbuf / 2) &&
 			    (ax25->condition & AX25_COND_OWN_RX_BUSY)) {
 				ax25->condition &= ~AX25_COND_OWN_RX_BUSY;
 				ax25->condition &= ~AX25_COND_ACK_PENDING;
@@ -93,11 +94,11 @@ void ax25_std_idletimer_expiry(ax25_cb *ax25)
 	ax25_stop_t3timer(ax25);
 
 	if (ax25->sk != NULL) {
-		ax25->sk->state     = TCP_CLOSE;
-		ax25->sk->err       = 0;
-		ax25->sk->shutdown |= SEND_SHUTDOWN;
+		ax25->sk->sk_state     = TCP_CLOSE;
+		ax25->sk->sk_err       = 0;
+		ax25->sk->sk_shutdown |= SEND_SHUTDOWN;
 		if (!sock_flag(ax25->sk, SOCK_DEAD)) {
-			ax25->sk->state_change(ax25->sk);
+			ax25->sk->sk_state_change(ax25->sk);
 			sock_set_flag(ax25->sk, SOCK_DEAD);
 		}
 	}

@@ -184,8 +184,8 @@ extern struct dn_fib_table *dn_fib_tables[];
 
 #else /* Endnode */
 
-#define dn_fib_init() (0)
-#define dn_fib_cleanup() (0)
+#define dn_fib_init()  do { } while(0)
+#define dn_fib_cleanup() do { } while(0)
 
 #define dn_fib_lookup(fl, res) (-ESRCH)
 #define dn_fib_info_put(fi) do { } while(0)

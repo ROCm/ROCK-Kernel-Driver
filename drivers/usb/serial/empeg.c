@@ -460,14 +460,15 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 
 static int  empeg_startup (struct usb_serial *serial)
 {
+	int r;
 
 	dbg("%s", __FUNCTION__);
 
 	dbg("%s - Set config to 1", __FUNCTION__);
-	usb_set_configuration (serial->dev, 1);
+	r = usb_set_configuration (serial->dev, 1);
 
 	/* continue on with initialization */
-	return 0;
+	return r;
 
 }
 

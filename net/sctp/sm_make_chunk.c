@@ -1895,7 +1895,7 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 	 */
 	switch (param.p->type) {
 	case SCTP_PARAM_IPV6_ADDRESS:
-		if( PF_INET6 != asoc->base.sk->family)
+		if (PF_INET6 != asoc->base.sk->sk_family)
 			break;
 		/* Fall through. */
 	case SCTP_PARAM_IPV4_ADDRESS:

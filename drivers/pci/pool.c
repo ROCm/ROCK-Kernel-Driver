@@ -31,7 +31,7 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 #define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
 #define	POOL_POISON_BYTE	0xa7
 
-DECLARE_MUTEX (pools_lock);
+static DECLARE_MUTEX (pools_lock);
 
 static ssize_t
 show_pools (struct device *dev, char *buf)

@@ -343,10 +343,39 @@ void device_unregister(struct device * dev)
 	put_device(dev);
 }
 
+/**
+ *	device_for_each_child - device child iterator.
+ *	@dev:	parent struct device.
+ *	@data:	data for the callback.
+ *	@fn:	function to be called for each device.
+ *
+ *	Iterate over @dev's child devices, and call @fn for each,
+ *	passing it @data. 
+ *
+ *	We check the return of @fn each time. If it returns anything
+ *	other than 0, we break out and return that value.
+ */
+int device_for_each_child(struct device * dev, void * data,
+		     int (*fn)(struct device *, void *))
+{
+	struct device * child;
+	int error = 0;
+
+	down_read(&devices_subsys.rwsem);
+	list_for_each_entry(child,&dev->children,node) {
+		if((error = fn(child,data)))
+			break;
+	}
+	up_read(&devices_subsys.rwsem);
+	return error;
+}
+
 int __init devices_init(void)
 {
 	return subsystem_register(&devices_subsys);
 }
+
+EXPORT_SYMBOL(device_for_each_child);
 
 EXPORT_SYMBOL(device_initialize);
 EXPORT_SYMBOL(device_add);

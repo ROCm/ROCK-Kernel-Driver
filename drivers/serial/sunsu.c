@@ -1285,11 +1285,8 @@ out:
 static struct uart_driver sunsu_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/",
-#else
+	.devfs_name		= "tts/",
 	.dev_name		= "ttyS",
-#endif
 	.major			= TTY_MAJOR,
 };
 

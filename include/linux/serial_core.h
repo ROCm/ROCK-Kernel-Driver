@@ -266,6 +266,7 @@ struct uart_driver {
 	struct module		*owner;
 	const char		*driver_name;
 	const char		*dev_name;
+	const char		*devfs_name;
 	int			 major;
 	int			 minor;
 	int			 nr;

@@ -81,11 +81,11 @@ static void sco_sock_timeout(unsigned long arg)
 {
 	struct sock *sk = (struct sock *) arg;
 
-	BT_DBG("sock %p state %d", sk, sk->state);
+	BT_DBG("sock %p state %d", sk, sk->sk_state);
 
 	bh_lock_sock(sk);
-	sk->err = ETIMEDOUT;
-	sk->state_change(sk);
+	sk->sk_err = ETIMEDOUT;
+	sk->sk_state_change(sk);
 	bh_unlock_sock(sk);
 
 	sco_sock_kill(sk);
@@ -94,25 +94,25 @@ static void sco_sock_timeout(unsigned long arg)
 
 static void sco_sock_set_timer(struct sock *sk, long timeout)
 {
-	BT_DBG("sock %p state %d timeout %ld", sk, sk->state, timeout);
+	BT_DBG("sock %p state %d timeout %ld", sk, sk->sk_state, timeout);
 
-	if (!mod_timer(&sk->timer, jiffies + timeout))
+	if (!mod_timer(&sk->sk_timer, jiffies + timeout))
 		sock_hold(sk);
 }
 
 static void sco_sock_clear_timer(struct sock *sk)
 {
-	BT_DBG("sock %p state %d", sk, sk->state);
+	BT_DBG("sock %p state %d", sk, sk->sk_state);
 
-	if (timer_pending(&sk->timer) && del_timer(&sk->timer))
+	if (timer_pending(&sk->sk_timer) && del_timer(&sk->sk_timer))
 		__sock_put(sk);
 }
 
 static void sco_sock_init_timer(struct sock *sk)
 {
-	init_timer(&sk->timer);
-	sk->timer.function = sco_sock_timeout;
-	sk->timer.data = (unsigned long)sk;
+	init_timer(&sk->sk_timer);
+	sk->sk_timer.function = sco_sock_timeout;
+	sk->sk_timer.data = (unsigned long)sk;
 }
 
 /* ---- SCO connections ---- */
@@ -232,10 +232,10 @@ int sco_connect(struct sock *sk)
 
 	if (hcon->state == BT_CONNECTED) {
 		sco_sock_clear_timer(sk);
-		sk->state = BT_CONNECTED;
+		sk->sk_state = BT_CONNECTED;
 	} else {
-		sk->state = BT_CONNECT;
-		sco_sock_set_timer(sk, sk->sndtimeo);
+		sk->sk_state = BT_CONNECT;
+		sco_sock_set_timer(sk, sk->sk_sndtimeo);
 	}
 done:
 	hci_dev_unlock_bh(hdev);
@@ -283,7 +283,7 @@ static inline void sco_recv_frame(struct sco_conn *conn, struct sk_buff *skb)
 
 	BT_DBG("sk %p len %d", sk, skb->len);
 
-	if (sk->state != BT_CONNECTED)
+	if (sk->sk_state != BT_CONNECTED)
 		goto drop;
 
 	if (!sock_queue_rcv_skb(sk, skb))
@@ -299,7 +299,7 @@ static struct sock *__sco_get_sock_by_addr(bdaddr_t *ba)
 {
 	struct sock *sk;
 
-	for (sk = sco_sk_list.head; sk; sk = sk->next) {
+	for (sk = sco_sk_list.head; sk; sk = sk->sk_next) {
 		if (!bacmp(&bt_sk(sk)->src, ba))
 			break;
 	}
@@ -316,8 +316,8 @@ static struct sock *sco_get_sock_listen(bdaddr_t *src)
 
 	read_lock(&sco_sk_list.lock);
 
-	for (sk = sco_sk_list.head; sk; sk = sk->next) {
-		if (sk->state != BT_LISTEN)
+	for (sk = sco_sk_list.head; sk; sk = sk->sk_next) {
+		if (sk->sk_state != BT_LISTEN)
 			continue;
 
 		/* Exact match. */
@@ -338,11 +338,11 @@ static void sco_sock_destruct(struct sock *sk)
 {
 	BT_DBG("sk %p", sk);
 
-	skb_queue_purge(&sk->receive_queue);
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 
-	if (sk->protinfo)
-		kfree(sk->protinfo);
+	if (sk->sk_protinfo)
+		kfree(sk->sk_protinfo);
 }
 
 static void sco_sock_cleanup_listen(struct sock *parent)
@@ -355,8 +355,8 @@ static void sco_sock_cleanup_listen(struct sock *parent)
 	while ((sk = bt_accept_dequeue(parent, NULL)))
 		sco_sock_close(sk);
 
-	parent->state  = BT_CLOSED;
-	parent->zapped = 1;
+	parent->sk_state  = BT_CLOSED;
+	parent->sk_zapped = 1;
 }
 
 /* Kill socket (only if zapped and orphan)
@@ -364,10 +364,10 @@ static void sco_sock_cleanup_listen(struct sock *parent)
  */
 static void sco_sock_kill(struct sock *sk)
 {
-	if (!sk->zapped || sk->socket)
+	if (!sk->sk_zapped || sk->sk_socket)
 		return;
 
-	BT_DBG("sk %p state %d", sk, sk->state);
+	BT_DBG("sk %p state %d", sk, sk->sk_state);
 
 	/* Kill poor orphan */
 	bt_sock_unlink(&sco_sk_list, sk);
@@ -388,9 +388,9 @@ static void sco_sock_close(struct sock *sk)
 
 	conn = sco_pi(sk)->conn;
 
-	BT_DBG("sk %p state %d conn %p socket %p", sk, sk->state, conn, sk->socket);
+	BT_DBG("sk %p state %d conn %p socket %p", sk, sk->sk_state, conn, sk->sk_socket);
 
-	switch (sk->state) {
+	switch (sk->sk_state) {
 	case BT_LISTEN:
 		sco_sock_cleanup_listen(sk);
 		break;
@@ -403,7 +403,7 @@ static void sco_sock_close(struct sock *sk)
 		break;
 
 	default:
-		sk->zapped = 1;
+		sk->sk_zapped = 1;
 		break;
 	};
 
@@ -417,7 +417,7 @@ static void sco_sock_init(struct sock *sk, struct sock *parent)
 	BT_DBG("sk %p", sk);
 
 	if (parent) 
-		sk->type = parent->type;
+		sk->sk_type = parent->sk_type;
 }
 
 static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
@@ -430,9 +430,9 @@ static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
 
 	sk_set_owner(sk, THIS_MODULE);
 
-	sk->destruct = sco_sock_destruct;
-	sk->sndtimeo = SCO_CONN_TIMEOUT;
-	sk->state    = BT_OPEN;
+	sk->sk_destruct = sco_sock_destruct;
+	sk->sk_sndtimeo = SCO_CONN_TIMEOUT;
+	sk->sk_state    = BT_OPEN;
 
 	sco_sock_init_timer(sk);
 
@@ -474,7 +474,7 @@ static int sco_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 
 	lock_sock(sk);
 
-	if (sk->state != BT_OPEN) {
+	if (sk->sk_state != BT_OPEN) {
 		err = -EBADFD;
 		goto done;
 	}
@@ -486,7 +486,7 @@ static int sco_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 	} else {
 		/* Save source address */
 		bacpy(&bt_sk(sk)->src, &sa->sco_bdaddr);
-		sk->state = BT_BOUND;
+		sk->sk_state = BT_BOUND;
 	}
 	
 	write_unlock_bh(&sco_sk_list.lock);
@@ -508,10 +508,10 @@ static int sco_sock_connect(struct socket *sock, struct sockaddr *addr, int alen
 	if (addr->sa_family != AF_BLUETOOTH || alen < sizeof(struct sockaddr_sco))
 		return -EINVAL;
 
-	if (sk->state != BT_OPEN && sk->state != BT_BOUND)
+	if (sk->sk_state != BT_OPEN && sk->sk_state != BT_BOUND)
 		return -EBADFD;
 
-	if (sk->type != SOCK_SEQPACKET)
+	if (sk->sk_type != SOCK_SEQPACKET)
 		return -EINVAL;
 
 	lock_sock(sk);
@@ -538,14 +538,14 @@ int sco_sock_listen(struct socket *sock, int backlog)
 
 	lock_sock(sk);
 
-	if (sk->state != BT_BOUND || sock->type != SOCK_SEQPACKET) {
+	if (sk->sk_state != BT_BOUND || sock->type != SOCK_SEQPACKET) {
 		err = -EBADFD;
 		goto done;
 	}
 
-	sk->max_ack_backlog = backlog;
-	sk->ack_backlog = 0;
-	sk->state = BT_LISTEN;
+	sk->sk_max_ack_backlog = backlog;
+	sk->sk_ack_backlog = 0;
+	sk->sk_state = BT_LISTEN;
 
 done:
 	release_sock(sk);
@@ -561,7 +561,7 @@ int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	lock_sock(sk);
 
-	if (sk->state != BT_LISTEN) {
+	if (sk->sk_state != BT_LISTEN) {
 		err = -EBADFD;
 		goto done;
 	}
@@ -571,7 +571,7 @@ int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 	BT_DBG("sk %p timeo %ld", sk, timeo);
 
 	/* Wait for an incoming connection. (wake-one). */
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	add_wait_queue_exclusive(sk->sk_sleep, &wait);
 	while (!(ch = bt_accept_dequeue(sk, newsock))) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!timeo) {
@@ -583,7 +583,7 @@ int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 		timeo = schedule_timeout(timeo);
 		lock_sock(sk);
 
-		if (sk->state != BT_LISTEN) {
+		if (sk->sk_state != BT_LISTEN) {
 			err = -EBADFD;
 			break;
 		}
@@ -594,7 +594,7 @@ int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 		}
 	}
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 
 	if (err)
 		goto done;
@@ -633,7 +633,7 @@ static int sco_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	if (sk->err)
+	if (sk->sk_err)
 		return sock_error(sk);
 
 	if (msg->msg_flags & MSG_OOB)
@@ -641,7 +641,7 @@ static int sco_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 
 	lock_sock(sk);
 
-	if (sk->state == BT_CONNECTED)
+	if (sk->sk_state == BT_CONNECTED)
 		err = sco_send_frame(sk, msg, len);
 	else
 		err = -ENOTCONN;
@@ -685,7 +685,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 	switch (optname) {
 	case SCO_OPTIONS:
-		if (sk->state != BT_CONNECTED) {
+		if (sk->sk_state != BT_CONNECTED) {
 			err = -ENOTCONN;
 			break;
 		}
@@ -701,7 +701,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case SCO_CONNINFO:
-		if (sk->state != BT_CONNECTED) {
+		if (sk->sk_state != BT_CONNECTED) {
 			err = -ENOTCONN;
 			break;
 		}
@@ -767,11 +767,11 @@ static void sco_chan_del(struct sock *sk, int err)
 		hci_conn_put(conn->hcon);
 	}
 
-	sk->state = BT_CLOSED;
-	sk->err   = err;
-	sk->state_change(sk);
+	sk->sk_state = BT_CLOSED;
+	sk->sk_err   = err;
+	sk->sk_state_change(sk);
 
-	sk->zapped = 1;
+	sk->sk_zapped = 1;
 }
 
 static void sco_conn_ready(struct sco_conn *conn)
@@ -785,8 +785,8 @@ static void sco_conn_ready(struct sco_conn *conn)
 	if ((sk = conn->sk)) {
 		sco_sock_clear_timer(sk);
 		bh_lock_sock(sk);
-		sk->state = BT_CONNECTED;
-		sk->state_change(sk);
+		sk->sk_state = BT_CONNECTED;
+		sk->sk_state_change(sk);
 		bh_unlock_sock(sk);
 	} else {
 		parent = sco_get_sock_listen(conn->src);
@@ -809,10 +809,10 @@ static void sco_conn_ready(struct sco_conn *conn)
 		hci_conn_hold(conn->hcon);
         	__sco_chan_add(conn, sk, parent);
 
-        	sk->state = BT_CONNECTED;
+        	sk->sk_state = BT_CONNECTED;
 
 		/* Wake up parent */
-		parent->data_ready(parent, 1);
+		parent->sk_data_ready(parent, 1);
 	
         	bh_unlock_sock(parent);
 	}
@@ -888,7 +888,7 @@ static void *sco_seq_start(struct seq_file *seq, loff_t *pos)
 
 	read_lock_bh(&sco_sk_list.lock);
 
-	for (sk = sco_sk_list.head; sk; sk = sk->next)
+	for (sk = sco_sk_list.head; sk; sk = sk->sk_next)
 		if (!l--)
 			return sk;
 	return NULL;
@@ -898,7 +898,7 @@ static void *sco_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
 	struct sock *sk = e;
 	(*pos)++;
-	return sk->next;
+	return sk->sk_next;
 }
 
 static void sco_seq_stop(struct seq_file *seq, void *e)
@@ -910,7 +910,7 @@ static int  sco_seq_show(struct seq_file *seq, void *e)
 {
 	struct sock *sk = e;
 	seq_printf(seq, "%s %s %d\n",
-			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), sk->state);
+			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), sk->sk_state);
 	return 0;
 }
 

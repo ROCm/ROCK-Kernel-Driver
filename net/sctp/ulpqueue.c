@@ -163,7 +163,7 @@ int sctp_clear_pd(struct sock *sk)
 	sp->pd_mode = 0;
 	if (!skb_queue_empty(&sp->pd_lobby)) {
 		struct list_head *list;
-		sctp_skb_list_tail(&sp->pd_lobby, &sk->receive_queue);
+		sctp_skb_list_tail(&sp->pd_lobby, &sk->sk_receive_queue);
 		list = (struct list_head *)&sctp_sk(sk)->pd_lobby;
 		INIT_LIST_HEAD(list);
 		return 1;
@@ -189,7 +189,7 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	/* If the socket is just going to throw this away, do not
 	 * even try to deliver it.
 	 */
-	if (sock_flag(sk, SOCK_DEAD) || (sk->shutdown & RCV_SHUTDOWN))
+	if (sock_flag(sk, SOCK_DEAD) || (sk->sk_shutdown & RCV_SHUTDOWN))
 		goto out_free;
 
 	/* Check if the user wishes to receive this event.  */
@@ -202,13 +202,13 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	 */
 
 	if (!sctp_sk(sk)->pd_mode) {
-		queue = &sk->receive_queue;
+		queue = &sk->sk_receive_queue;
 	} else if (ulpq->pd_mode) {
 		if (event->msg_flags & MSG_NOTIFICATION)
 		       	queue = &sctp_sk(sk)->pd_lobby;
 		else {
 			clear_pd = event->msg_flags & MSG_EOR;
-			queue = &sk->receive_queue;
+			queue = &sk->sk_receive_queue;
 		}
 	} else
 		queue = &sctp_sk(sk)->pd_lobby;
@@ -229,8 +229,8 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	if (clear_pd)
 		sctp_ulpq_clear_pd(ulpq);
 
-	if (queue == &sk->receive_queue)
-		sk->data_ready(sk, 0);
+	if (queue == &sk->sk_receive_queue)
+		sk->sk_data_ready(sk, 0);
 	return 1;
 
 out_free:
@@ -773,7 +773,7 @@ void sctp_ulpq_renege(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
 
 	freed = 0;
 
-	if (skb_queue_empty(&asoc->base.sk->receive_queue)) {
+	if (skb_queue_empty(&asoc->base.sk->sk_receive_queue)) {
 		freed = sctp_ulpq_renege_order(ulpq, needed);
 		if (freed < needed) {
 			freed += sctp_ulpq_renege_frags(ulpq, needed - freed);
@@ -812,9 +812,9 @@ void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int gfp)
 					      SCTP_PARTIAL_DELIVERY_ABORTED,
 					      gfp);
 	if (ev)
-		__skb_queue_tail(&sk->receive_queue, sctp_event2skb(ev));
+		__skb_queue_tail(&sk->sk_receive_queue, sctp_event2skb(ev));
 
 	/* If there is data waiting, send it up the socket now. */
 	if (sctp_ulpq_clear_pd(ulpq) || ev)
-		sk->data_ready(sk, 0);
+		sk->sk_data_ready(sk, 0);
 }

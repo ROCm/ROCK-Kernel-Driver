@@ -213,7 +213,7 @@ device_initcall(via_cuda_start);
 
 #ifdef CONFIG_ADB
 static int
-cuda_probe()
+cuda_probe(void)
 {
 #ifdef CONFIG_PPC
     if (sys_ctrler != SYS_CTRLER_CUDA)
@@ -258,7 +258,7 @@ cuda_init(void)
     } while (0)
 
 static int
-cuda_init_via()
+cuda_init_via(void)
 {
     out_8(&via[DIRB], (in_8(&via[DIRB]) | TACK | TIP) & ~TREQ);	/* TACK & TIP out */
     out_8(&via[B], in_8(&via[B]) | TACK | TIP);			/* negate them */
@@ -407,7 +407,7 @@ cuda_write(struct adb_request *req)
 }
 
 static void
-cuda_start()
+cuda_start(void)
 {
     struct adb_request *req;
 
@@ -427,7 +427,7 @@ cuda_start()
 }
 
 void
-cuda_poll()
+cuda_poll(void)
 {
     unsigned long flags;
 

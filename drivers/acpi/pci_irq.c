@@ -402,7 +402,7 @@ acpi_pci_irq_init (void)
 		iosapic_parse_prt();
 #endif
 
-	pci_for_each_dev(dev)
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 		acpi_pci_irq_enable(dev);
 
 	return_VALUE(0);

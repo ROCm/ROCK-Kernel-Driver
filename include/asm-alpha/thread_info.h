@@ -51,7 +51,7 @@ register struct thread_info *__current_thread_info __asm__("$8");
 
 /* Thread information allocation.  */
 #define THREAD_SIZE (2*PAGE_SIZE)
-#define alloc_thread_info() \
+#define alloc_thread_info(tsk) \
   ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
 #define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
 #define get_thread_info(ti) get_task_struct((ti)->task)

@@ -17,8 +17,8 @@
 static const char *_name = DM_NAME;
 #define MAX_DEVICES 1024
 
-static int major = 0;
-static int _major = 0;
+static unsigned int major = 0;
+static unsigned int _major = 0;
 
 struct dm_io {
 	struct mapped_device *md;
@@ -281,9 +281,6 @@ static sector_t max_io_len(struct mapped_device *md,
 	sector_t offset = sector - ti->begin;
 	sector_t len = ti->len - offset;
 
-	/* FIXME: obey io_restrictions ! */
-
-
 	/*
 	 * Does the target need to split even further ?
 	 */
@@ -524,7 +521,7 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 static spinlock_t _minor_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long _minor_bits[MAX_DEVICES / BITS_PER_LONG];
 
-static void free_minor(int minor)
+static void free_minor(unsigned int minor)
 {
 	spin_lock(&_minor_lock);
 	clear_bit(minor, _minor_bits);
@@ -534,7 +531,7 @@ static void free_minor(int minor)
 /*
  * See if the device with a specific minor # is free.
  */
-static int specific_minor(int minor)
+static int specific_minor(unsigned int minor)
 {
 	int r = -EBUSY;
 
@@ -546,21 +543,23 @@ static int specific_minor(int minor)
 
 	spin_lock(&_minor_lock);
 	if (!test_and_set_bit(minor, _minor_bits))
-		r = minor;
+		r = 0;
 	spin_unlock(&_minor_lock);
 
 	return r;
 }
 
-static int next_free_minor(void)
+static int next_free_minor(unsigned int *minor)
 {
-	int minor, r = -EBUSY;
+	int r = -EBUSY;
+	unsigned int m;
 
 	spin_lock(&_minor_lock);
-	minor = find_first_zero_bit(_minor_bits, MAX_DEVICES);
-	if (minor != MAX_DEVICES) {
-		set_bit(minor, _minor_bits);
-		r = minor;
+	m = find_first_zero_bit(_minor_bits, MAX_DEVICES);
+	if (m != MAX_DEVICES) {
+		set_bit(m, _minor_bits);
+		*minor = m;
+		r = 0;
 	}
 	spin_unlock(&_minor_lock);
 
@@ -570,8 +569,9 @@ static int next_free_minor(void)
 /*
  * Allocate and initialise a blank device with a given minor.
  */
-static struct mapped_device *alloc_dev(int minor)
+static struct mapped_device *alloc_dev(unsigned int minor)
 {
+	int r;
 	struct mapped_device *md = kmalloc(sizeof(*md), GFP_KERNEL);
 
 	if (!md) {
@@ -580,13 +580,12 @@ static struct mapped_device *alloc_dev(int minor)
 	}
 
 	/* get a minor number for the dev */
-	minor = (minor < 0) ? next_free_minor() : specific_minor(minor);
-	if (minor < 0) {
+	r = (minor < 0) ? next_free_minor(&minor) : specific_minor(minor);
+	if (r < 0) {
 		kfree(md);
 		return NULL;
 	}
 
-	DMWARN("allocating minor %d.", minor);
 	memset(md, 0, sizeof(*md));
 	init_rwsem(&md->lock);
 	atomic_set(&md->holders, 1);
@@ -597,7 +596,7 @@ static struct mapped_device *alloc_dev(int minor)
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
 	if (!md->io_pool) {
-		free_minor(md->disk->first_minor);
+		free_minor(minor);
 		kfree(md);
 		return NULL;
 	}
@@ -605,7 +604,7 @@ static struct mapped_device *alloc_dev(int minor)
 	md->disk = alloc_disk(1);
 	if (!md->disk) {
 		mempool_destroy(md->io_pool);
-		free_minor(md->disk->first_minor);
+		free_minor(minor);
 		kfree(md);
 		return NULL;
 	}
@@ -661,7 +660,8 @@ static void __unbind(struct mapped_device *md)
 /*
  * Constructor for a new device.
  */
-int dm_create(int minor, struct dm_table *table, struct mapped_device **result)
+int dm_create(unsigned int minor, struct dm_table *table,
+	      struct mapped_device **result)
 {
 	int r;
 	struct mapped_device *md;
@@ -675,6 +675,7 @@ int dm_create(int minor, struct dm_table *table, struct mapped_device **result)
 		free_dev(md);
 		return r;
 	}
+	dm_table_resume_targets(md->map);
 
 	*result = md;
 	return 0;
@@ -688,7 +689,8 @@ void dm_get(struct mapped_device *md)
 void dm_put(struct mapped_device *md)
 {
 	if (atomic_dec_and_test(&md->holders)) {
-		DMWARN("destroying md");
+		if (!test_bit(DMF_SUSPENDED, &md->flags))
+			dm_table_suspend_targets(md->map);
 		__unbind(md);
 		free_dev(md);
 	}
@@ -778,6 +780,7 @@ int dm_suspend(struct mapped_device *md)
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);
 	set_bit(DMF_SUSPENDED, &md->flags);
+	dm_table_suspend_targets(md->map);
 	up_write(&md->lock);
 
 	return 0;
@@ -794,6 +797,7 @@ int dm_resume(struct mapped_device *md)
 		return -EINVAL;
 	}
 
+	dm_table_resume_targets(md->map);
 	clear_bit(DMF_SUSPENDED, &md->flags);
 	clear_bit(DMF_BLOCK_IO, &md->flags);
 	def = md->deferred;

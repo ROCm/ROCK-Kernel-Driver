@@ -488,7 +488,7 @@ config HOTPLUG
 
 source "drivers/pcmcia/Kconfig"
 
-source "drivers/hotplug/Kconfig"
+source "drivers/pci/hotplug/Kconfig"
 
 endmenu
 

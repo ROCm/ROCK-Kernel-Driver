@@ -57,9 +57,9 @@ void tcp_init_xmit_timers(struct sock *sk)
 	tp->delack_timer.data = (unsigned long) sk;
 	tp->ack.pending = 0;
 
-	init_timer(&sk->timer);
-	sk->timer.function=&tcp_keepalive_timer;
-	sk->timer.data = (unsigned long) sk;
+	init_timer(&sk->sk_timer);
+	sk->sk_timer.function	= &tcp_keepalive_timer;
+	sk->sk_timer.data	= (unsigned long)sk;
 }
 
 void tcp_clear_xmit_timers(struct sock *sk)
@@ -77,14 +77,14 @@ void tcp_clear_xmit_timers(struct sock *sk)
 	    del_timer(&tp->delack_timer))
 		__sock_put(sk);
 
-	if(timer_pending(&sk->timer) && del_timer(&sk->timer))
+	if (timer_pending(&sk->sk_timer) && del_timer(&sk->sk_timer))
 		__sock_put(sk);
 }
 
 static void tcp_write_err(struct sock *sk)
 {
-	sk->err = sk->err_soft ? : ETIMEDOUT;
-	sk->error_report(sk);
+	sk->sk_err = sk->sk_err_soft ? : ETIMEDOUT;
+	sk->sk_error_report(sk);
 
 	tcp_done(sk);
 	NET_INC_STATS_BH(TCPAbortOnTimeout);
@@ -112,11 +112,11 @@ static int tcp_out_of_resources(struct sock *sk, int do_reset)
 		orphans <<= 1;
 
 	/* If some dubious ICMP arrived, penalize even more. */
-	if (sk->err_soft)
+	if (sk->sk_err_soft)
 		orphans <<= 1;
 
 	if (orphans >= sysctl_tcp_max_orphans ||
-	    (sk->wmem_queued > SOCK_MIN_SNDBUF &&
+	    (sk->sk_wmem_queued > SOCK_MIN_SNDBUF &&
 	     atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[2])) {
 		if (net_ratelimit())
 			printk(KERN_INFO "Out of socket memory\n");
@@ -142,7 +142,7 @@ static int tcp_orphan_retries(struct sock *sk, int alive)
 	int retries = sysctl_tcp_orphan_retries; /* May be zero. */
 
 	/* We know from an ICMP that something is wrong. */
-	if (sk->err_soft && !alive)
+	if (sk->sk_err_soft && !alive)
 		retries = 0;
 
 	/* However, if socket sent something recently, select some safe
@@ -159,9 +159,9 @@ static int tcp_write_timeout(struct sock *sk)
 	struct tcp_opt *tp = tcp_sk(sk);
 	int retry_until;
 
-	if ((1<<sk->state)&(TCPF_SYN_SENT|TCPF_SYN_RECV)) {
+	if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
 		if (tp->retransmits)
-			dst_negative_advice(&sk->dst_cache);
+			dst_negative_advice(&sk->sk_dst_cache);
 		retry_until = tp->syn_retries ? : sysctl_tcp_syn_retries;
 	} else {
 		if (tp->retransmits >= sysctl_tcp_retries1) {
@@ -185,7 +185,7 @@ static int tcp_write_timeout(struct sock *sk)
                            Golden words :-).
 		   */
 
-			dst_negative_advice(&sk->dst_cache);
+			dst_negative_advice(&sk->sk_dst_cache);
 		}
 
 		retry_until = sysctl_tcp_retries2;
@@ -224,7 +224,7 @@ static void tcp_delack_timer(unsigned long data)
 
 	tcp_mem_reclaim(sk);
 
-	if (sk->state == TCP_CLOSE || !(tp->ack.pending&TCP_ACK_TIMER))
+	if (sk->sk_state == TCP_CLOSE || !(tp->ack.pending & TCP_ACK_TIMER))
 		goto out;
 
 	if ((long)(tp->ack.timeout - jiffies) > 0) {
@@ -241,7 +241,7 @@ static void tcp_delack_timer(unsigned long data)
 				  skb_queue_len(&tp->ucopy.prequeue));
 
 		while ((skb = __skb_dequeue(&tp->ucopy.prequeue)) != NULL)
-			sk->backlog_rcv(sk, skb);
+			sk->sk_backlog_rcv(sk, skb);
 
 		tp->ucopy.memory = 0;
 	}
@@ -325,10 +325,10 @@ static void tcp_retransmit_timer(struct sock *sk)
 	if (tp->packets_out == 0)
 		goto out;
 
-	BUG_TRAP(!skb_queue_empty(&sk->write_queue));
+	BUG_TRAP(!skb_queue_empty(&sk->sk_write_queue));
 
 	if (!tp->snd_wnd && !sock_flag(sk, SOCK_DEAD) &&
-	    !((1<<sk->state)&(TCPF_SYN_SENT|TCPF_SYN_RECV))) {
+	    !((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))) {
 		/* Receiver dastardly shrinks window. Our retransmits
 		 * become zero probes, but we should not timeout this
 		 * connection. If the socket is an orphan, time it out,
@@ -347,7 +347,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 			goto out;
 		}
 		tcp_enter_loss(sk, 0);
-		tcp_retransmit_skb(sk, skb_peek(&sk->write_queue));
+		tcp_retransmit_skb(sk, skb_peek(&sk->sk_write_queue));
 		__sk_dst_reset(sk);
 		goto out_reset_timer;
 	}
@@ -381,7 +381,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 		tcp_enter_loss(sk, 0);
 	}
 
-	if (tcp_retransmit_skb(sk, skb_peek(&sk->write_queue)) > 0) {
+	if (tcp_retransmit_skb(sk, skb_peek(&sk->sk_write_queue)) > 0) {
 		/* Retransmission failed because of local congestion,
 		 * do not backoff.
 		 */
@@ -433,7 +433,7 @@ static void tcp_write_timer(unsigned long data)
 		goto out_unlock;
 	}
 
-	if (sk->state == TCP_CLOSE || !tp->pending)
+	if (sk->sk_state == TCP_CLOSE || !tp->pending)
 		goto out;
 
 	if ((long)(tp->timeout - jiffies) > 0) {
@@ -556,19 +556,19 @@ static void tcp_synack_timer(struct sock *sk)
 
 void tcp_delete_keepalive_timer (struct sock *sk)
 {
-	if (timer_pending(&sk->timer) && del_timer (&sk->timer))
+	if (timer_pending(&sk->sk_timer) && del_timer (&sk->sk_timer))
 		__sock_put(sk);
 }
 
 void tcp_reset_keepalive_timer (struct sock *sk, unsigned long len)
 {
-	if (!mod_timer(&sk->timer, jiffies+len))
+	if (!mod_timer(&sk->sk_timer, jiffies + len))
 		sock_hold(sk);
 }
 
 void tcp_set_keepalive(struct sock *sk, int val)
 {
-	if ((1<<sk->state)&(TCPF_CLOSE|TCPF_LISTEN))
+	if ((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN))
 		return;
 
 	if (val && !sock_flag(sk, SOCK_KEEPOPEN))
@@ -592,12 +592,12 @@ static void tcp_keepalive_timer (unsigned long data)
 		goto out;
 	}
 
-	if (sk->state == TCP_LISTEN) {
+	if (sk->sk_state == TCP_LISTEN) {
 		tcp_synack_timer(sk);
 		goto out;
 	}
 
-	if (sk->state == TCP_FIN_WAIT2 && sock_flag(sk, SOCK_DEAD)) {
+	if (sk->sk_state == TCP_FIN_WAIT2 && sock_flag(sk, SOCK_DEAD)) {
 		if (tp->linger2 >= 0) {
 			int tmo = tcp_fin_time(tp) - TCP_TIMEWAIT_LEN;
 
@@ -610,7 +610,7 @@ static void tcp_keepalive_timer (unsigned long data)
 		goto death;
 	}
 
-	if (!sock_flag(sk, SOCK_KEEPOPEN) || sk->state == TCP_CLOSE)
+	if (!sock_flag(sk, SOCK_KEEPOPEN) || sk->sk_state == TCP_CLOSE)
 		goto out;
 
 	elapsed = keepalive_time_when(tp);

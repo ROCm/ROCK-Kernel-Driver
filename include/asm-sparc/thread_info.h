@@ -78,7 +78,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #endif
 
 BTFIXUPDEF_CALL(struct thread_info *, alloc_thread_info, void)
-#define alloc_thread_info() BTFIXUP_CALL(alloc_thread_info)()
+#define alloc_thread_info(tsk) BTFIXUP_CALL(alloc_thread_info)()
 
 BTFIXUPDEF_CALL(void, free_thread_info, struct thread_info *)
 #define free_thread_info(ti) BTFIXUP_CALL(free_thread_info)(ti)

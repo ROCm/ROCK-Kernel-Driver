@@ -1710,6 +1710,13 @@ void devfs_remove(const char *fmt, ...)
 	if (n < 64 && buf[0]) {
 		devfs_handle_t de = _devfs_find_entry(NULL, buf, 0);
 
+		if (!de) {
+			printk(KERN_ERR "%s: %s not found, cannot remove\n",
+			       __FUNCTION__, buf);
+			dump_stack();
+			return;
+		}
+
 		write_lock(&de->parent->u.dir.lock);
 		_devfs_unregister(de->parent, de);
 		devfs_put(de);

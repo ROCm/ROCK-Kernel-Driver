@@ -191,7 +191,7 @@ static void class_dev_release(struct kobject * kobj)
 	pr_debug("device class '%s': release.\n",cd->class_id);
 
 	if (cls->release)
-		cd->release(cd);
+		cls->release(cd);
 }
 
 static struct kobj_type ktype_class_device = {

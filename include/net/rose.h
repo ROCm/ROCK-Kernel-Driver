@@ -138,7 +138,7 @@ typedef struct {
 	struct sock		*sk;		/* Backlink to socket */
 } rose_cb;
 
-#define rose_sk(__sk) ((rose_cb *)(__sk)->protinfo)
+#define rose_sk(__sk) ((rose_cb *)(__sk)->sk_protinfo)
 
 /* af_rose.c */
 extern ax25_address rose_callsign;

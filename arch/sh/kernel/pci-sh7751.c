@@ -386,13 +386,13 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 
 static void __init pcibios_allocate_resources(int pass)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int idx, disabled;
 	u16 command;
 	struct resource *r, *pr;
 
 	PCIDBG(2,"PCI: pcibios_allocate_resources pass %d called\n", pass);
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
 		for(idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
@@ -432,12 +432,12 @@ static void __init pcibios_allocate_resources(int pass)
 
 static void __init pcibios_assign_resources(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *devn = NULL;
 	int idx;
 	struct resource *r;
 
 	PCIDBG(2,"PCI: pcibios_assign_resources called\n");
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		int class = dev->class >> 8;
 
 		/* Don't touch classless devices and host bridges */

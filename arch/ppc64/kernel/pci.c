@@ -117,13 +117,13 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
  */
 struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int i;
 	unsigned long ioaddr;
 
 	ioaddr = (addr > isa_io_base) ? addr - isa_io_base : 0;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
 			continue;
 		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {

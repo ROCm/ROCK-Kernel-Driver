@@ -38,6 +38,8 @@ static inline int node_to_first_cpu(int node)
 
 #define pcibus_to_cpumask(bus)	(cpu_online_map)
 
+#define nr_cpus_node(node)	(nr_cpus_in_node[node])
+
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 10
 

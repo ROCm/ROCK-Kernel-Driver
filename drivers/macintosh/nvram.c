@@ -39,11 +39,11 @@ static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 	return file->f_pos;
 }
 
-static ssize_t read_nvram(struct file *file, char *buf,
+static ssize_t read_nvram(struct file *file, char __user *buf,
 			  size_t count, loff_t *ppos)
 {
 	unsigned int i;
-	char *p = buf;
+	char __user *p = buf;
 
 	if (verify_area(VERIFY_WRITE, buf, count))
 		return -EFAULT;
@@ -56,11 +56,11 @@ static ssize_t read_nvram(struct file *file, char *buf,
 	return p - buf;
 }
 
-static ssize_t write_nvram(struct file *file, const char *buf,
+static ssize_t write_nvram(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	unsigned int i;
-	const char *p = buf;
+	const char __user *p = buf;
 	char c;
 
 	if (verify_area(VERIFY_READ, buf, count))
@@ -83,12 +83,12 @@ static int nvram_ioctl(struct inode *inode, struct file *file,
 		case PMAC_NVRAM_GET_OFFSET:
 		{
 			int part, offset;
-			if (copy_from_user(&part,(void*)arg,sizeof(part))!=0)
+			if (copy_from_user(&part, (void __user*)arg, sizeof(part)) != 0)
 				return -EFAULT;
 			if (part < pmac_nvram_OF || part > pmac_nvram_NR)
 				return -EINVAL;
 			offset = pmac_get_partition(part);
-			if (copy_to_user((void*)arg,&offset,sizeof(offset))!=0)
+			if (copy_to_user((void __user*)arg, &offset, sizeof(offset)) != 0)
 				return -EFAULT;
 			break;
 		}

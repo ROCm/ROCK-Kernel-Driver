@@ -118,7 +118,6 @@ int set_selection(const unsigned long arg, struct tty_struct *tty, int user)
 	int i, ps, pe;
 	unsigned int currcons = fg_console;
 
-	unblank_screen();
 	poke_blanked_console();
 
 	{ unsigned short *args, xs, ys, xe, ye;

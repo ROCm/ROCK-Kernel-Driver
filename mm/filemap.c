@@ -81,8 +81,6 @@ void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	BUG_ON(PageDirty(page) && !PageSwapCache(page));
-
 	radix_tree_delete(&mapping->page_tree, page->index);
 	list_del(&page->list);
 	page->mapping = NULL;
@@ -1410,6 +1408,11 @@ void remove_suid(struct dentry *dentry)
 	}
 }
 
+/*
+ * Copy as much as we can into the page and return the number of bytes which
+ * were sucessfully copied.  If a fault is encountered then clear the page
+ * out to (offset+bytes) and return the number of bytes which were copied.
+ */
 static inline size_t
 filemap_copy_from_user(struct page *page, unsigned long offset,
 			const char __user *buf, unsigned bytes)
@@ -1427,30 +1430,42 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 		left = __copy_from_user(kaddr + offset, buf, bytes);
 		kunmap(page);
 	}
-	return left ? 0 : bytes;
+	return bytes - left;
 }
 
 static size_t
 __filemap_copy_from_user_iovec(char *vaddr, 
 			const struct iovec *iov, size_t base, size_t bytes)
 {
-	size_t copied = 0;
+	size_t copied = 0, left = 0;
 
 	while (bytes) {
 		char __user *buf = iov->iov_base + base;
 		int copy = min(bytes, iov->iov_len - base);
 
 		base = 0;
-		if (__copy_from_user(vaddr, buf, copy))
-			break;
+		left = __copy_from_user(vaddr, buf, copy);
 		copied += copy;
 		bytes -= copy;
 		vaddr += copy;
 		iov++;
+
+		if (unlikely(left)) {
+			/* zero the rest of the target like __copy_from_user */
+			if (bytes)
+				memset(vaddr, 0, bytes);
+			break;
+		}
 	}
-	return copied;
+	return copied - left;
 }
 
+/*
+ * This has the same sideeffects and return value as filemap_copy_from_user().
+ * The difference is that on a fault we need to memset the remainder of the
+ * page (out to offset+bytes), to emulate filemap_copy_from_user()'s
+ * single-segment behaviour.
+ */
 static inline size_t
 filemap_copy_from_user_iovec(struct page *page, unsigned long offset,
 			const struct iovec *iov, size_t base, size_t bytes)
@@ -1718,8 +1733,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 			copied = filemap_copy_from_user_iovec(page, offset,
 						cur_iov, iov_base, bytes);
 		flush_dcache_page(page);
-		status = a_ops->commit_write(file, page, offset,
-						offset + copied);
+		status = a_ops->commit_write(file, page, offset, offset+bytes);
 		if (likely(copied > 0)) {
 			if (!status)
 				status = copied;

@@ -994,11 +994,8 @@ static int sci_init_drivers(void)
 	sci_driver.magic = TTY_DRIVER_MAGIC;
 	sci_driver.owner = THIS_MODULE;
 	sci_driver.driver_name = "sci";
-#ifdef CONFIG_DEVFS_FS
-	sci_driver.name = "ttsc/";
-#else
 	sci_driver.name = "ttySC";
-#endif
+	sci_driver.devfs_name = "ttsc/";
 	sci_driver.major = SCI_MAJOR;
 	sci_driver.minor_start = SCI_MINOR_START;
 	sci_driver.num = SCI_NPORTS;

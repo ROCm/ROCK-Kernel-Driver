@@ -125,9 +125,9 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 
 static struct pci_dev *find_k8_nb(void)
 { 
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int cpu = smp_processor_id(); 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
 		    PCI_SLOT(dev->devfn) == (24U+cpu))
 			return dev;

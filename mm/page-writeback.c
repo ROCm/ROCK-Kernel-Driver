@@ -27,6 +27,7 @@
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/sysctl.h>
+#include <linux/cpu.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -220,7 +221,6 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	}
 	put_cpu();
 }
-EXPORT_SYMBOL_GPL(balance_dirty_pages_ratelimited);
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty

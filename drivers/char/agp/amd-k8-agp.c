@@ -244,7 +244,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
-	struct pci_dev *loop_dev;
+	struct pci_dev *loop_dev = NULL;
 	u8 rev_id;
 	u8 cap_ptr;
 	int i = 0;
@@ -297,7 +297,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
 	/* cache pci_devs of northbridges. */
-	pci_for_each_dev(loop_dev) {
+	while ((loop_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, loop_dev)) != NULL) {
 		if (loop_dev->bus->number == 0 &&
 		    PCI_FUNC(loop_dev->devfn) == 3 &&
 		    PCI_SLOT(loop_dev->devfn) >=24 &&

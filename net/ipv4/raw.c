@@ -89,11 +89,11 @@ static void raw_v4_hash(struct sock *sk)
 					   (RAWV4_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v4_lock);
-	if ((sk->next = *skp) != NULL)
-		(*skp)->pprev = &sk->next;
+	if ((sk->sk_next = *skp) != NULL)
+		(*skp)->sk_pprev = &sk->sk_next;
 	*skp = sk;
-	sk->pprev = skp;
-	sock_prot_inc_use(sk->prot);
+	sk->sk_pprev = skp;
+	sock_prot_inc_use(sk->sk_prot);
  	sock_hold(sk);
 	write_unlock_bh(&raw_v4_lock);
 }
@@ -101,12 +101,12 @@ static void raw_v4_hash(struct sock *sk)
 static void raw_v4_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v4_lock);
-	if (sk->pprev) {
-		if (sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev = NULL;
-		sock_prot_dec_use(sk->prot);
+	if (sk->sk_pprev) {
+		if (sk->sk_next)
+			sk->sk_next->sk_pprev = sk->sk_pprev;
+		*sk->sk_pprev = sk->sk_next;
+		sk->sk_pprev = NULL;
+		sock_prot_dec_use(sk->sk_prot);
 		__sock_put(sk);
 	}
 	write_unlock_bh(&raw_v4_lock);
@@ -118,13 +118,13 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
 {
 	struct sock *s = sk;
 
-	for (s = sk; s; s = s->next) {
+	for (; s; s = s->sk_next) {
 		struct inet_opt *inet = inet_sk(s);
 
 		if (inet->num == num 					&&
 		    !(inet->daddr && inet->daddr != raddr) 		&&
 		    !(inet->rcv_saddr && inet->rcv_saddr != laddr)	&&
-		    !(s->bound_dev_if && s->bound_dev_if != dif))
+		    !(s->sk_bound_dev_if && s->sk_bound_dev_if != dif))
 			break; /* gotcha */
 	}
 	return s;
@@ -174,7 +174,7 @@ void raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 			if (clone)
 				raw_rcv(sk, clone);
 		}
-		sk = __raw_v4_lookup(sk->next, iph->protocol,
+		sk = __raw_v4_lookup(sk->sk_next, iph->protocol,
 				     iph->saddr, iph->daddr,
 				     skb->dev->ifindex);
 	}
@@ -195,7 +195,7 @@ void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 	   2. Socket is connected (otherwise the error indication
 	      is useless without ip_recverr and error is hard.
 	 */
-	if (!inet->recverr && sk->state != TCP_ESTABLISHED)
+	if (!inet->recverr && sk->sk_state != TCP_ESTABLISHED)
 		return;
 
 	switch (type) {
@@ -231,8 +231,8 @@ void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 	}
 
 	if (inet->recverr || harderr) {
-		sk->err = err;
-		sk->error_report(sk);
+		sk->sk_err = err;
+		sk->sk_error_report(sk);
 	}
 }
 
@@ -288,7 +288,7 @@ static int raw_send_hdrinc(struct sock *sk, void *from, int length,
 		goto error; 
 	skb_reserve(skb, hh_len);
 
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	skb->dst = dst_clone(&rt->u.dst);
 
 	skb->nh.iph = iph = (struct iphdr *)skb_put(skb, length);
@@ -390,14 +390,14 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		 */
 	} else {
 		err = -EINVAL;
-		if (sk->state != TCP_ESTABLISHED) 
+		if (sk->sk_state != TCP_ESTABLISHED) 
 			goto out;
 		daddr = inet->daddr;
 	}
 
 	ipc.addr = inet->saddr;
 	ipc.opt = NULL;
-	ipc.oif = sk->bound_dev_if;
+	ipc.oif = sk->sk_bound_dev_if;
 
 	if (msg->msg_controllen) {
 		err = ip_cmsg_send(msg, &ipc);
@@ -426,7 +426,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			daddr = ipc.opt->faddr;
 		}
 	}
-	tos = RT_TOS(inet->tos) | sk->localroute;
+	tos = RT_TOS(inet->tos) | sk->sk_localroute;
 	if (msg->msg_flags & MSG_DONTROUTE)
 		tos |= RTO_ONLINK;
 
@@ -443,7 +443,9 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 					      { .daddr = daddr,
 						.saddr = saddr,
 						.tos = tos } },
-				    .proto = inet->hdrincl ? IPPROTO_RAW : sk->protocol };
+				    .proto = inet->hdrincl ? IPPROTO_RAW :
+					    		     sk->sk_protocol,
+				  };
 		err = ip_route_output_flow(&rt, &fl, sk, !(msg->msg_flags&MSG_DONTWAIT));
 	}
 	if (err)
@@ -506,7 +508,7 @@ static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	int ret = -EINVAL;
 	int chk_addr_ret;
 
-	if (sk->state != TCP_CLOSE || addr_len < sizeof(struct sockaddr_in))
+	if (sk->sk_state != TCP_CLOSE || addr_len < sizeof(struct sockaddr_in))
 		goto out;
 	chk_addr_ret = inet_addr_type(addr->sin_addr.s_addr);
 	ret = -EADDRNOTAVAIL;
@@ -645,18 +647,18 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 		case SIOCOUTQ: {
-			int amount = atomic_read(&sk->wmem_alloc);
+			int amount = atomic_read(&sk->sk_wmem_alloc);
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCINQ: {
 			struct sk_buff *skb;
 			int amount = 0;
 
-			spin_lock_irq(&sk->receive_queue.lock);
-			skb = skb_peek(&sk->receive_queue);
+			spin_lock_irq(&sk->sk_receive_queue.lock);
+			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb != NULL)
 				amount = skb->len;
-			spin_unlock_irq(&sk->receive_queue.lock);
+			spin_unlock_irq(&sk->sk_receive_queue.lock);
 			return put_user(amount, (int *)arg);
 		}
 
@@ -700,8 +702,8 @@ static struct sock *raw_get_first(struct seq_file *seq)
 
 	for (state->bucket = 0; state->bucket < RAWV4_HTABLE_SIZE; ++state->bucket) {
 		sk = raw_v4_htable[state->bucket];
-		while (sk && sk->family != PF_INET)
-			sk = sk->next;
+		while (sk && sk->sk_family != PF_INET)
+			sk = sk->sk_next;
 		if (sk)
 			break;
 	}
@@ -713,10 +715,10 @@ static struct sock *raw_get_next(struct seq_file *seq, struct sock *sk)
 	struct raw_iter_state* state = raw_seq_private(seq);
 
 	do {
-		sk = sk->next;
+		sk = sk->sk_next;
 try_again:
 		;
-	} while (sk && sk->family != PF_INET);
+	} while (sk && sk->sk_family != PF_INET);
 
 	if (!sk && ++state->bucket < RAWV4_HTABLE_SIZE) {
 		sk = raw_v4_htable[state->bucket];
@@ -768,10 +770,11 @@ static __inline__ char *get_raw_sock(struct sock *sp, char *tmpbuf, int i)
 
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i, src, srcp, dest, destp, sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		i, src, srcp, dest, destp, sp->sk_state, 
+		atomic_read(&sp->sk_wmem_alloc),
+		atomic_read(&sp->sk_rmem_alloc),
 		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
+		atomic_read(&sp->sk_refcnt), sp);
 	return tmpbuf;
 }
 

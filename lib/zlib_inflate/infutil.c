@@ -27,8 +27,8 @@ int zlib_inflate_flush(
 )
 {
   uInt n;
-  Bytef *p;
-  Bytef *q;
+  Byte *p;
+  Byte *q;
 
   /* local copies of source and destination pointers */
   p = z->next_out;
@@ -44,7 +44,7 @@ int zlib_inflate_flush(
   z->total_out += n;
 
   /* update check information */
-  if (s->checkfn != Z_NULL)
+  if (s->checkfn != NULL)
     z->adler = s->check = (*s->checkfn)(s->check, q, n);
 
   /* copy as far as end of window */
@@ -70,7 +70,7 @@ int zlib_inflate_flush(
     z->total_out += n;
 
     /* update check information */
-    if (s->checkfn != Z_NULL)
+    if (s->checkfn != NULL)
       z->adler = s->check = (*s->checkfn)(s->check, q, n);
 
     /* copy */

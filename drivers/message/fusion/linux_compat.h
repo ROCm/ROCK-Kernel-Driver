@@ -147,9 +147,7 @@ typedef void (*__cleanup_module_func_t)(void);
 
 
 /* PCI/driver subsystem { */
-#ifndef pci_for_each_dev
-#define pci_for_each_dev(dev)		for((dev)=pci_devices; (dev)!=NULL; (dev)=(dev)->next)
-#define pci_peek_next_dev(dev)		((dev)->next ? (dev)->next : NULL)
+#if 0	/* FIXME Don't know what to use to check for the proper kernel version */
 #define DEVICE_COUNT_RESOURCE           6
 #define PCI_BASEADDR_FLAGS(idx)         base_address[idx]
 #define PCI_BASEADDR_START(idx)         base_address[idx] & ~0xFUL
@@ -169,11 +167,10 @@ typedef void (*__cleanup_module_func_t)(void);
 	(4 - size); \
 })
 #else
-#define pci_peek_next_dev(dev)		((dev) != pci_dev_g(&pci_devices) ? pci_dev_g((dev)->global_list.next) : NULL)
 #define PCI_BASEADDR_FLAGS(idx)         resource[idx].flags
 #define PCI_BASEADDR_START(idx)         resource[idx].start
 #define PCI_BASEADDR_SIZE(dev,idx)      (dev)->resource[idx].end - (dev)->resource[idx].start + 1
-#endif		/* } ifndef pci_for_each_dev */
+#endif		/* } ifndef 0 */
 
 
 /* Compatability for the 2.3.x PCI DMA API. */

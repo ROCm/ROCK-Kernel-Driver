@@ -38,15 +38,15 @@ int zlib_inflate_fast(
   uInt e;               /* extra bits or operation */
   uLong b;              /* bit buffer */
   uInt k;               /* bits in bit buffer */
-  Bytef *p;             /* input data pointer */
+  Byte *p;              /* input data pointer */
   uInt n;               /* bytes available there */
-  Bytef *q;             /* output window write pointer */
+  Byte *q;              /* output window write pointer */
   uInt m;               /* bytes to end of window or read pointer */
   uInt ml;              /* mask for literal/length tree */
   uInt md;              /* mask for distance tree */
   uInt c;               /* bytes to copy */
   uInt d;               /* distance back to copy from */
-  Bytef *r;             /* copy source pointer */
+  Byte *r;              /* copy source pointer */
 
   /* load input, output, bit values */
   LOAD
@@ -90,28 +90,41 @@ int zlib_inflate_fast(
 
             /* do the copy */
             m -= c;
-            if ((uInt)(q - s->window) >= d)     /* offset before dest */
-            {                                   /*  just copy */
-              r = q - d;
-              *q++ = *r++;  c--;        /* minimum count is three, */
-              *q++ = *r++;  c--;        /*  so unroll loop a little */
-            }
-            else                        /* else offset after destination */
+            r = q - d;
+            if (r < s->window)                  /* wrap if needed */
             {
-              e = d - (uInt)(q - s->window); /* bytes from offset to end */
-              r = s->end - e;           /* pointer to offset */
-              if (c > e)                /* if source crosses, */
+              do {
+                r += s->end - s->window;        /* force pointer in window */
+              } while (r < s->window);          /* covers invalid distances */
+              e = s->end - r;
+              if (c > e)
               {
-                c -= e;                 /* copy to end of window */
+                c -= e;                         /* wrapped copy */
                 do {
-                  *q++ = *r++;
+                    *q++ = *r++;
                 } while (--e);
-                r = s->window;          /* copy rest from start of window */
+                r = s->window;
+                do {
+                    *q++ = *r++;
+                } while (--c);
+              }
+              else                              /* normal copy */
+              {
+                *q++ = *r++;  c--;
+                *q++ = *r++;  c--;
+                do {
+                    *q++ = *r++;
+                } while (--c);
               }
             }
-            do {                        /* copy all or what's left */
-              *q++ = *r++;
-            } while (--c);
+            else                                /* normal copy */
+            {
+              *q++ = *r++;  c--;
+              *q++ = *r++;  c--;
+              do {
+                *q++ = *r++;
+              } while (--c);
+            }
             break;
           }
           else if ((e & 64) == 0)

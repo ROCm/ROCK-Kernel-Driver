@@ -67,7 +67,8 @@ static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 #define GPTE_DECODE(x) (((x) & 0xfffff000) | (((u64)(x) & 0xff0) << 28))
 
 #define for_all_nb(dev) \
-	pci_for_each_dev(dev) \
+	dev=NULL; \
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) \
 		if (dev->bus->number == 0 && PCI_FUNC(dev->devfn) == 3 && \
 		    (PCI_SLOT(dev->devfn) >= 24) && (PCI_SLOT(dev->devfn) <= 31))
 

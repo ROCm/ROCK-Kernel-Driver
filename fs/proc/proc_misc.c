@@ -378,8 +378,23 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 {
 	int i, len;
 	extern unsigned long total_forks;
-	u64 jif = get_jiffies_64() - INITIAL_JIFFIES;
+	u64 jif;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
+	struct timeval now; 
+	unsigned long seq;
+
+	/* Atomically read jiffies and time of day */ 
+	do {
+		seq = read_seqbegin(&xtime_lock);
+
+		jif = get_jiffies_64();
+		do_gettimeofday(&now);
+	} while (read_seqretry(&xtime_lock, seq));
+
+	/* calc # of seconds since boot time */
+	jif -= INITIAL_JIFFIES;
+	jif = ((u64)now.tv_sec * HZ) + (now.tv_usec/(1000000/HZ)) - jif;
+	do_div(jif, HZ);
 
 	for (i = 0 ; i < NR_CPUS; i++) {
 		int j;
@@ -419,7 +434,6 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
 
-	do_div(jif, HZ);
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
@@ -427,7 +441,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		"procs_running %lu\n"
 		"procs_blocked %lu\n",
 		nr_context_switches(),
-		xtime.tv_sec - (unsigned long) jif,
+		(unsigned long)jif,
 		total_forks,
 		nr_running(),
 		nr_iowait());

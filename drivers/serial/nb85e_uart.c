@@ -524,11 +524,8 @@ static struct uart_ops nb85e_uart_ops = {
 static struct uart_driver nb85e_uart_driver = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "nb85e_uart",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/",
-#else
+	.devfs_name		= "tts/",
 	.dev_name		= "ttyS",
-#endif
 	.major			= TTY_MAJOR,
 	.minor			= NB85E_UART_MINOR_BASE,
 	.nr			= NB85E_UART_NUM_CHANNELS,

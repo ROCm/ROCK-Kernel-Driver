@@ -213,7 +213,8 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 	 * ABORT.
 	 */
 	if (!sctp_sstate(sk, LISTENING) ||
-	    (sctp_style(sk, TCP) && (sk->ack_backlog >= sk->max_ack_backlog)))
+	    (sctp_style(sk, TCP) &&
+	     (sk->sk_ack_backlog >= sk->sk_max_ack_backlog)))
 		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
 
 	/* Verify the INIT chunk before processing it. */

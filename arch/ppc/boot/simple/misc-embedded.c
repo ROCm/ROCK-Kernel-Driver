@@ -11,13 +11,17 @@
 #include <linux/elf.h>
 #include <linux/string.h>
 #include <asm/bootinfo.h>
-#include <asm/ibm4xx.h>
 #include <asm/mmu.h>
-#include <asm/mpc8xx.h>
-#include <asm/mpc8260.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/residual.h>
+#if defined(CONFIG_4xx)
+#include <asm/ibm4xx.h>
+#elif defined(CONFIG_8xx)
+#include <asm/mpc8xx.h>
+#elif defined(CONFIG_8260)
+#include <asm/mpc8260.h>
+#endif
 
 #include "nonstdio.h"
 #include "zlib.h"

@@ -580,15 +580,17 @@ static void set_ac3(struct cm_state *s, unsigned rate)
 	spin_unlock_irqrestore(&s->lock, flags);
 }
 
-static void trans_ac3(struct cm_state *s, void *dest, const char *source, int size)
+static int trans_ac3(struct cm_state *s, void *dest, const char *source, int size)
 {
 	int   i = size / 2;
+	int err;
 	unsigned long data;
 	unsigned long *dst = (unsigned long *) dest;
 	unsigned short *src = (unsigned short *)source;
 
 	do {
-		data = (unsigned long) *src++;
+		if ((err = __get_user(data, src++)))
+			return err;
 		data <<= 12;			// ok for 16-bit data
 		if (s->spdif_counter == 2 || s->spdif_counter == 3)
 			data |= 0x40000000;	// indicate AC-3 raw data
@@ -605,6 +607,8 @@ static void trans_ac3(struct cm_state *s, void *dest, const char *source, int si
 		if (s->spdif_counter == 384)
 			s->spdif_counter = 0;
 	} while (--i);
+
+	return 0;
 }
 
 static void set_adc_rate_unlocked(struct cm_state *s, unsigned rate)
@@ -1655,13 +1659,16 @@ static ssize_t cm_write(struct file *file, const char *buffer, size_t count, lof
 			continue;
 		}
 		if (s->status & DO_AC3_SW) {
+			int err;
+
 			// clip exceeded data, caught by 033 and 037
 			if (swptr + 2 * cnt > s->dma_dac.dmasize)
 				cnt = (s->dma_dac.dmasize - swptr) / 2;
-			trans_ac3(s, s->dma_dac.rawbuf + swptr, buffer, cnt);
+			if ((err = trans_ac3(s, s->dma_dac.rawbuf + swptr, buffer, cnt)))
+				return err;
 			swptr = (swptr + 2 * cnt) % s->dma_dac.dmasize;
 		} else if (s->status & DO_DUAL_DAC) {
-			int	i;
+			int	i, err;
 			unsigned long *src, *dst0, *dst1;
 
 			src = (unsigned long *) buffer;
@@ -1669,8 +1676,10 @@ static ssize_t cm_write(struct file *file, const char *buffer, size_t count, lof
 			dst1 = (unsigned long *) (s->dma_adc.rawbuf + swptr);
 			// copy left/right sample at one time
 			for (i = 0; i <= cnt / 4; i++) {
-				*dst0++ = *src++;
-				*dst1++ = *src++;
+				if ((err = __get_user(*dst0++, src++)))
+					return err;
+				if ((err = __get_user(*dst1++, src++)))
+					return err;
 			}
 			swptr = (swptr + cnt) % s->dma_dac.dmasize;
 		} else {

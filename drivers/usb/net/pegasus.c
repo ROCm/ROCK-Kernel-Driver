@@ -865,8 +865,6 @@ static int pegasus_open(struct net_device *net)
 	if (!pegasus->rx_skb)
 		return -ENOMEM;
 
-	down(&pegasus->sem);
-
 	set_registers(pegasus, EthID, 6, net->dev_addr);
 	
 	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
@@ -894,8 +892,6 @@ static int pegasus_open(struct net_device *net)
 	set_carrier(net);
 	res = 0;
 exit:
-	up(&pegasus->sem);
-
 	return res;
 }
 
@@ -903,13 +899,11 @@ static int pegasus_close(struct net_device *net)
 {
 	pegasus_t *pegasus = net->priv;
 
-	down(&pegasus->sem);
 	pegasus->flags &= ~PEGASUS_RUNNING;
 	netif_stop_queue(net);
 	if (!(pegasus->flags & PEGASUS_UNPLUG))
 		disable_net_traffic(pegasus);
 	unlink_all_urbs(pegasus);
-	up(&pegasus->sem);
 
 	return 0;
 }
@@ -1068,7 +1062,6 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 	pegasus_t *pegasus = net->priv;
 	int res;
 
-	down(&pegasus->sem);
 	switch (cmd) {
 	case SIOCETHTOOL:
 		res = pegasus_ethtool_ioctl(net, rq->ifr_data);
@@ -1080,17 +1073,14 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 		res = 0;
 		break;
 	case SIOCDEVPRIVATE + 2:
-		if (!capable(CAP_NET_ADMIN)) {
-			up(&pegasus->sem);
+		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		}
 		write_mii_word(pegasus, pegasus->phy, data[1] & 0x1f, data[2]);
 		res = 0;
 		break;
 	default:
 		res = -EOPNOTSUPP;
 	}
-	up(&pegasus->sem);
 	return res;
 }
 
@@ -1170,33 +1160,27 @@ static int pegasus_probe(struct usb_interface *intf,
 	struct net_device *net;
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
-
-	if (!(pegasus = kmalloc(sizeof (struct pegasus), GFP_KERNEL))) {
-		err("out of memory allocating device structure");
-		return -ENOMEM;
-	}
+	int res = -ENOMEM;
 
 	usb_get_dev(dev);
+	if (!(pegasus = kmalloc(sizeof (struct pegasus), GFP_KERNEL))) {
+		err("out of memory allocating device structure");
+		goto out;
+	}
+
 	memset(pegasus, 0, sizeof (struct pegasus));
 	pegasus->dev_index = dev_index;
 	init_waitqueue_head(&pegasus->ctrl_wait);
 
-	if (!alloc_urbs(pegasus)) {
-		kfree(pegasus);
-		return -ENOMEM;
-	}
+	if (!alloc_urbs(pegasus))
+		goto out1;
 
-	net = init_etherdev(NULL, 0);
-	if (!net) {
-		free_all_urbs(pegasus);
-		kfree(pegasus);
-		return -ENODEV;
-	}
+	net = alloc_etherdev(0);
+	if (!net)
+		goto out2;
 
-	init_MUTEX(&pegasus->sem);
 	tasklet_init(&pegasus->rx_tl, rx_fixup, (unsigned long) pegasus);
 
-	down(&pegasus->sem);
 	pegasus->usb = dev;
 	pegasus->net = net;
 	SET_MODULE_OWNER(net);
@@ -1221,12 +1205,8 @@ static int pegasus_probe(struct usb_interface *intf,
 	get_interrupt_interval(pegasus);
 	if (reset_mac(pegasus)) {
 		err("can't reset MAC");
-		unregister_netdev(pegasus->net);
-		free_all_urbs(pegasus);
-		kfree(pegasus->net);
-		kfree(pegasus);
-		pegasus = NULL;
-		goto exit;
+		res = -EIO;
+		goto out3;
 	}
 	set_ethernet_addr(pegasus);
 	fill_skb_pool(pegasus);
@@ -1240,13 +1220,24 @@ static int pegasus_probe(struct usb_interface *intf,
 		warn("can't locate MII phy, using default");
 		pegasus->phy = 1;
 	}
-exit:
-	up(&pegasus->sem);
-	if (pegasus) {
-		usb_set_intfdata(intf, pegasus);
-		return 0;
-	}
-	return -EIO;
+	usb_set_intfdata(intf, pegasus);
+	res = register_netdev(net);
+	if (res)
+		goto out4;
+	return 0;
+
+out4:
+	usb_set_intfdata(intf, NULL);
+	free_skb_pool(pegasus);
+out3:
+	kfree(net);
+out2:
+	free_all_urbs(pegasus);
+out1:
+	kfree(pegasus);
+out:
+	usb_put_dev(dev);
+	return res;
 }
 
 static void pegasus_disconnect(struct usb_interface *intf)
@@ -1269,7 +1260,6 @@ static void pegasus_disconnect(struct usb_interface *intf)
 		dev_kfree_skb(pegasus->rx_skb);
 	kfree(pegasus->net);
 	kfree(pegasus);
-	pegasus = NULL;
 }
 
 static struct usb_driver pegasus_driver = {

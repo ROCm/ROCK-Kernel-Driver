@@ -7,8 +7,7 @@
 #include <linux/init.h>
 #include <linux/memblk.h>
 #include <linux/node.h>
-
-#include <asm/topology.h>
+#include <linux/topology.h>
 
 
 static struct class memblk_class = {

@@ -50,7 +50,7 @@ MPC10X_PCI_OP(read, dword, u32 *, in_le32, 0)
 /*
  * Read the memory controller registers to determine the amount of memory in
  * the system.  This assumes that the firmware has correctly set up the memory
- * controller registers.  On CONFIG_ALL_PPC, we know we are being called
+ * controller registers.  On CONFIG_PPC_PREP, we know we are being called
  * under a PReP memory map. On all other machines, we assume we are under
  * a CHRP memory map.
  */
@@ -62,7 +62,7 @@ get_mem_size(void)
 	int i;
 	unsigned char bank_enables;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PREP
 	config_addr = (unsigned int *)MPC10X_MAPA_CNFG_ADDR;
 	config_data = (unsigned int *)MPC10X_MAPA_CNFG_DATA;
 #else

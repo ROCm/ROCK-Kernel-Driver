@@ -1,7 +1,7 @@
 /*
- * net/dst.c	Protocol independent destination cache.
+ * net/core/dst.c	Protocol independent destination cache.
  *
- * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+ * Authors:		Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
  */
 

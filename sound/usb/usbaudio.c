@@ -55,6 +55,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for this card */
 static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
+static int nrpacks = 4;		/* max. number of packets per urb */
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
@@ -71,6 +72,9 @@ MODULE_PARM_SYNTAX(vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 MODULE_PARM(pid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
 MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
+MODULE_PARM(nrpacks, "i");
+MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
+MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{2,10}}");
 
 
 /*
@@ -98,7 +102,7 @@ MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
  *
  */
 
-#define NRPACKS		4	/* 4ms per urb */
+#define MAX_PACKS	10	
 #define MAX_URBS	5	/* max. 20ms long packets */
 #define SYNC_URBS	2	/* always two urbs for sync */
 #define MIN_PACKS_URB	1	/* minimum 1 packet per urb */
@@ -176,7 +180,7 @@ struct snd_usb_substream {
 	unsigned int nurbs;			/* # urbs */
 	snd_urb_ctx_t dataurb[MAX_URBS];	/* data urb table */
 	snd_urb_ctx_t syncurb[SYNC_URBS];	/* sync urb table */
-	char syncbuf[SYNC_URBS * NRPACKS * 3]; /* sync buffer; it's so small - let's get static */
+	char syncbuf[SYNC_URBS * MAX_PACKS * 3]; /* sync buffer; it's so small - let's get static */
 	char *tmpbuf;			/* temporary buffer for playback */
 
 	u64 formats;			/* format bitmasks (all or'ed) */
@@ -839,7 +843,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 
 	/* allocate a temporary buffer for playback */
 	if (is_playback) {
-		subs->tmpbuf = kmalloc(maxsize * NRPACKS, GFP_KERNEL);
+		subs->tmpbuf = kmalloc(maxsize * nrpacks, GFP_KERNEL);
 		if (! subs->tmpbuf) {
 			snd_printk(KERN_ERR "cannot malloc tmpbuf\n");
 			return -ENOMEM;
@@ -850,16 +854,16 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 	total_packs = (frames_to_bytes(runtime, runtime->period_size) + maxsize - 1) / maxsize;
 	if (total_packs < 2 * MIN_PACKS_URB)
 		total_packs = 2 * MIN_PACKS_URB;
-	subs->nurbs = (total_packs + NRPACKS - 1) / NRPACKS;
+	subs->nurbs = (total_packs + nrpacks - 1) / nrpacks;
 	if (subs->nurbs > MAX_URBS) {
 		/* too much... */
 		subs->nurbs = MAX_URBS;
-		total_packs = MAX_URBS * NRPACKS;
+		total_packs = MAX_URBS * nrpacks;
 	}
 	n = total_packs;
 	for (i = 0; i < subs->nurbs; i++) {
-		npacks[i] = n > NRPACKS ? NRPACKS : n;
-		n -= NRPACKS;
+		npacks[i] = n > nrpacks ? nrpacks : n;
+		n -= nrpacks;
 	}
 	if (subs->nurbs <= 1) {
 		/* too little - we need at least two packets
@@ -918,14 +922,14 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 			snd_urb_ctx_t *u = &subs->syncurb[i];
 			u->index = i;
 			u->subs = subs;
-			u->packets = NRPACKS;
+			u->packets = nrpacks;
 			u->urb = usb_alloc_urb(u->packets, GFP_KERNEL);
 			if (! u->urb) {
 				release_substream_urbs(subs, 0);
 				return -ENOMEM;
 			}
-			u->urb->transfer_buffer = subs->syncbuf + i * NRPACKS * 3;
-			u->urb->transfer_buffer_length = NRPACKS * 3;
+			u->urb->transfer_buffer = subs->syncbuf + i * nrpacks * 3;
+			u->urb->transfer_buffer_length = nrpacks * 3;
 			u->urb->dev = subs->dev;
 			u->urb->pipe = subs->syncpipe;
 			u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
@@ -1096,16 +1100,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	attr = fmt->ep_attr & EP_ATTR_MASK;
 	if ((is_playback && attr == EP_ATTR_ASYNC) ||
 	    (! is_playback && attr == EP_ATTR_ADAPTIVE)) {
-		/*
-		 * QUIRK: plantronics headset has adaptive-in
-		 * although it's really not...
-		 */
-		if ((dev->descriptor.idVendor == 0x047f &&
-		     dev->descriptor.idProduct == 0x0ca1) ||
-		    /* Griffin iMic (note that there is an older model 77d:223) */
-		    (dev->descriptor.idVendor == 0x077d &&
-		     dev->descriptor.idProduct == 0x07af))
-			goto _ok;
 		/* check endpoint */
 		if (altsd->bNumEndpoints < 2 ||
 		    get_endpoint(alts, 1)->bmAttributes != 0x01 ||
@@ -1129,7 +1123,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->syncinterval = get_endpoint(alts, 1)->bRefresh;
 	}
 
- _ok:
 	if ((err = init_usb_pitch(dev, subs->interface, alts, fmt)) < 0 ||
 	    (err = init_usb_sample_rate(dev, subs->interface, alts, fmt,
 					runtime->rate)) < 0)
@@ -1497,7 +1490,7 @@ static int setup_hw_info(snd_pcm_runtime_t *runtime, snd_usb_substream_t *subs)
 	/* set the period time minimum 1ms */
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_PERIOD_TIME,
 				     1000 * MIN_PACKS_URB,
-				     /*(NRPACKS * MAX_URBS) * 1000*/ UINT_MAX);
+				     /*(nrpacks * MAX_URBS) * 1000*/ UINT_MAX);
 
 	if (check_hw_params_convention(subs)) {
 		hwc_debug("setting extra hw constraints...\n");
@@ -1656,11 +1649,9 @@ void *snd_usb_find_csint_desc(void *buffer, int buflen, void *after, u8 dsubtype
  * entry point for linux usb interface
  */
 
-#ifndef OLD_USB
 static int usb_audio_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id);
 static void usb_audio_disconnect(struct usb_interface *intf);
-#endif
 
 static struct usb_device_id usb_audio_ids [] = {
 #include "usbquirks.h"
@@ -1677,9 +1668,6 @@ static struct usb_driver usb_audio_driver = {
 	.name =		"snd-usb-audio",
 	.probe =	usb_audio_probe,
 	.disconnect =	usb_audio_disconnect,
-#ifdef OLD_USB
-	.driver_list =	LIST_HEAD_INIT(usb_audio_driver.driver_list), 
-#endif
 	.id_table =	usb_audio_ids,
 };
 
@@ -1944,7 +1932,7 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 	switch (format) {
 	case 0: /* some devices don't define this correctly... */
 		snd_printdd(KERN_INFO "%d:%u:%d : format type 0 is detected, processed as PCM\n",
-			    dev->devnum, iface_no, altno);
+			    dev->devnum, fp->iface, fp->altsetting);
 		/* fall-through */
 	case USB_AUDIO_FORMAT_PCM:
 		if (sample_width > sample_bytes * 8) {
@@ -2238,6 +2226,33 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
 		fp->attributes = csep[3];
 
+		/* some quirks for attributes here */
+
+		/* workaround for AudioTrak Optoplay */
+		if (dev->descriptor.idVendor == 0x0a92 &&
+		    dev->descriptor.idProduct == 0x0053) {
+			/* Optoplay sets the sample rate attribute although
+			 * it seems not supporting it in fact.
+			 */
+			fp->attributes &= ~EP_CS_ATTR_SAMPLE_RATE;
+		}
+		/*
+		 * plantronics headset and Griffin iMic have set adaptive-in
+		 * although it's really not...
+		 */
+		if ((dev->descriptor.idVendor == 0x047f &&
+		     dev->descriptor.idProduct == 0x0ca1) ||
+		    /* Griffin iMic (note that there is an older model 77d:223) */
+		    (dev->descriptor.idVendor == 0x077d &&
+		     dev->descriptor.idProduct == 0x07af)) {
+			fp->ep_attr &= ~EP_ATTR_MASK;
+			if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+				fp->ep_attr |= EP_ATTR_ADAPTIVE;
+			else
+				fp->ep_attr |= EP_ATTR_SYNC;
+		}
+
+		/* ok, let's parse further... */
 		if (parse_audio_format(dev, fp, format, fmt, stream) < 0) {
 			if (fp->rate_table)
 				kfree(fp->rate_table);
@@ -2461,6 +2476,11 @@ static int snd_usb_extigy_boot_quirk(struct usb_device *dev, struct usb_interfac
 
 /*
  * audio-interface quirks
+ *
+ * returns zero if no standard audio/MIDI parsing is needed.
+ * returns a postive value if standard audio/midi interfaces are parsed
+ * after this.
+ * returns a negative value at error.
  */
 static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 				struct usb_interface *iface,
@@ -2749,7 +2769,6 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	}
 }
 
-#ifndef OLD_USB
 /*
  * new 2.5 USB kernel API
  */
@@ -2770,12 +2789,14 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 	snd_usb_audio_disconnect(interface_to_usbdev(intf),
 				 dev_get_drvdata(&intf->dev));
 }
-#endif
-
 
 
 static int __init snd_usb_audio_init(void)
 {
+	if (nrpacks < 2 || nrpacks > MAX_PACKS) {
+		printk(KERN_WARNING "invalid nrpacks value.\n");
+		return -EINVAL;
+	}
 	usb_register(&usb_audio_driver);
 	return 0;
 }

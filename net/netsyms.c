@@ -337,7 +337,7 @@ EXPORT_SYMBOL(xfrm_find_acq);
 EXPORT_SYMBOL(xfrm_alloc_spi);
 EXPORT_SYMBOL(xfrm_state_flush);
 EXPORT_SYMBOL(xfrm_policy_kill);
-EXPORT_SYMBOL(xfrm_policy_delete);
+EXPORT_SYMBOL(xfrm_policy_bysel);
 EXPORT_SYMBOL(xfrm_policy_insert);
 EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
@@ -477,8 +477,10 @@ EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
-EXPORT_SYMBOL(ip_generic_getfrag);
+#endif
 
+#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE) || defined (CONFIG_IPV6_TUNNEL_MODULE)
+EXPORT_SYMBOL(ip_generic_getfrag);
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);

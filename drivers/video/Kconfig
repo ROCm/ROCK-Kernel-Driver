@@ -235,28 +235,28 @@ config FB_ATARI
 
 config FB_OF
 	bool "Open Firmware frame buffer device support"
-	depends on FB && (PPC64 || (PPC && ALL_PPC))
+	depends on FB && (PPC64 || PPC_OF)
 	help
 	  Say Y if you want support with Open Firmware for your graphics
 	  board.
 
 config FB_CONTROL
 	bool "Apple \"control\" display support"
-	depends on FB && PPC && ALL_PPC
+	depends on FB && PPC_PMAC
 	help
 	  This driver supports a frame buffer for the graphics adapter in the
 	  Power Macintosh 7300 and others.
 
 config FB_PLATINUM
 	bool "Apple \"platinum\" display support"
-	depends on FB && PPC && ALL_PPC
+	depends on FB && PPC_PMAC
 	help
 	  This driver supports a frame buffer for the "platinum" graphics
 	  adapter in some Power Macintoshes.
 
 config FB_VALKYRIE
 	bool "Apple \"valkyrie\" display support"
-	depends on FB && (MAC || PPC && ALL_PPC)
+	depends on FB && (MAC || PPC_PMAC)
 	help
 	  This driver supports a frame buffer for the "valkyrie" graphics
 	  adapter in some Power Macintoshes.

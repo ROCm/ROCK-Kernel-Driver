@@ -22,4 +22,5 @@ obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
 
 # 16-bit wireless PCMCIA client drivers
 obj-$(CONFIG_PCMCIA_RAYCS)	+= ray_cs.o
+obj-$(CONFIG_PCMCIA_ATMEL)      += atmel_cs.o atmel.o 
 

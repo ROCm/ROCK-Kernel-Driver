@@ -85,10 +85,8 @@ static int create_strip_zones (mddev_t *mddev)
 	conf->devlist = kmalloc(sizeof(mdk_rdev_t*)*
 				conf->nr_strip_zones*mddev->raid_disks,
 				GFP_KERNEL);
-	if (!conf->devlist) {
-		kfree(conf);
+	if (!conf->devlist)
 		return 1;
-	}
 
 	memset(conf->strip_zone, 0,sizeof(struct strip_zone)*
 				   conf->nr_strip_zones);
@@ -193,8 +191,6 @@ static int create_strip_zones (mddev_t *mddev)
 	printk("raid0: done.\n");
 	return 0;
  abort:
-	kfree(conf->devlist);
-	kfree(conf->strip_zone);
 	return 1;
 }
 
@@ -235,6 +231,8 @@ static int raid0_run (mddev_t *mddev)
 		goto out;
 	mddev->private = (void *)conf;
  
+	conf->strip_zone = NULL;
+	conf->devlist = NULL;
 	if (create_strip_zones (mddev)) 
 		goto out_free_conf;
 
@@ -273,7 +271,7 @@ static int raid0_run (mddev_t *mddev)
 				nb_zone*sizeof(struct strip_zone*));
 	conf->hash_table = kmalloc (sizeof (struct strip_zone *)*nb_zone, GFP_KERNEL);
 	if (!conf->hash_table)
-		goto out_free_zone_conf;
+		goto out_free_conf;
 	size = conf->strip_zone[cur].size;
 
 	for (i=0; i< nb_zone; i++) {
@@ -296,12 +294,11 @@ static int raid0_run (mddev_t *mddev)
 	blk_queue_merge_bvec(&mddev->queue, raid0_mergeable_bvec);
 	return 0;
 
-out_free_zone_conf:
-	kfree(conf->strip_zone);
-	conf->strip_zone = NULL;
-
 out_free_conf:
-	kfree (conf->devlist);
+	if (conf->strip_zone)
+		kfree(conf->strip_zone);
+	if (conf->devlist)
+		kfree (conf->devlist);
 	kfree(conf);
 	mddev->private = NULL;
 out:

@@ -124,6 +124,7 @@ struct tty_driver {
 	struct cdev cdev;
 	struct module	*owner;
 	const char	*driver_name;
+	const char	*devfs_name;
 	const char	*name;
 	int	name_base;	/* offset of printed name */
 	short	major;		/* major device number */

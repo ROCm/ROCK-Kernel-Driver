@@ -37,7 +37,40 @@
 #include <asm/io.h>
 #include <asm/mman.h>
 #include <asm/atomic.h>
+#include <asm/semaphore.h>
 
+
+/*
+ * LOCKING:
+ * There are three level of locking required by epoll :
+ *
+ * 1) epsem (semaphore)
+ * 2) ep->sem (rw_semaphore)
+ * 3) ep->lock (rw_lock)
+ *
+ * The acquire order is the one listed above, from 1 to 3.
+ * We need a spinlock (ep->lock) because we manipulate objects
+ * from inside the poll callback, that might be triggered from
+ * a wake_up() that in turn might be called from IRQ context.
+ * So we can't sleep inside the poll callback and hence we need
+ * a spinlock. During the event transfer loop (from kernel to
+ * user space) we could end up sleeping due a copy_to_user(), so
+ * we need a lock that will allow us to sleep. This lock is a
+ * read-write semaphore (ep->sem). It is acquired on read during
+ * the event transfer loop and in write during epoll_ctl(EPOLL_CTL_DEL)
+ * and during eventpoll_release(). Then we also need a global
+ * semaphore to serialize eventpoll_release() and ep_free().
+ * This semaphore is acquired by ep_free() during the epoll file
+ * cleanup path and it is also acquired by eventpoll_release()
+ * if a file has been pushed inside an epoll set and it is then
+ * close()d without a previous call toepoll_ctl(EPOLL_CTL_DEL).
+ * It is possible to drop the "ep->sem" and to use the global
+ * semaphore "epsem" (together with "ep->lock") to have it working,
+ * but having "ep->sem" will make the interface more scalable.
+ * Events that require holding "epsem" are very rare, while for
+ * normal operations the epoll private "ep->sem" will guarantee
+ * a greater scalability.
+ */
 
 
 #define EVENTPOLLFS_MAGIC 0x03111965 /* My birthday should work for this :) */
@@ -283,6 +316,10 @@ static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
 					      int flags, const char *dev_name,
 					      void *data);
 
+/*
+ * This semaphore is used to serialize ep_free() and eventpoll_release().
+ */
+struct semaphore epsem;
 
 /* Safe wake up implementation */
 static struct poll_safewake psw;
@@ -414,6 +451,7 @@ void eventpoll_init_file(struct file *file)
 void eventpoll_release(struct file *file)
 {
 	struct list_head *lsthead = &file->f_ep_links;
+	struct eventpoll *ep;
 	struct epitem *epi;
 
 	/*
@@ -432,17 +470,23 @@ void eventpoll_release(struct file *file)
 	 * necessary. It is not necessary because we're in the "struct file"
 	 * cleanup path, and this means that noone is using this file anymore.
 	 * The only hit might come from ep_free() but by holding the semaphore
-	 * will correctly serialize the operation.
+	 * will correctly serialize the operation. We do need to acquire
+	 * "ep->sem" after "epsem" because ep_remove() requires it when called
+	 * from anywhere but ep_free().
 	 */
+	down(&epsem);
 
 	while (!list_empty(lsthead)) {
 		epi = list_entry(lsthead->next, struct epitem, fllink);
 
+		ep = epi->ep;
 		EP_LIST_DEL(&epi->fllink);
-		down_write(&epi->ep->sem);
-		ep_remove(epi->ep, epi);
-		up_write(&epi->ep->sem);
+		down_write(&ep->sem);
+		ep_remove(ep, epi);
+		up_write(&ep->sem);
 	}
+
+	up(&epsem);
 }
 
 
@@ -545,14 +589,9 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 	 */
 	ep = file->private_data;
 
-	/*
-	 * Try to lookup the file inside our hash table. When an item is found
-	 * ep_find() increases the usage count of the item so that it won't
-	 * desappear underneath us. The only thing that might happen, if someone
-	 * tries very hard, is a double insertion of the same file descriptor.
-	 * This does not rapresent a problem though and we don't really want
-	 * to put an extra syncronization object to deal with this harmless condition.
-	 */
+	down_write(&ep->sem);
+
+	/* Try to lookup the file inside our hash table */
 	epi = ep_find(ep, tfile);
 
 	error = -EINVAL;
@@ -566,18 +605,9 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 			error = -EEXIST;
 		break;
 	case EPOLL_CTL_DEL:
-		if (epi) {
-			/*
-			 * We need to protect the remove operation because another
-			 * thread might be doing an epoll_wait() and using the
-			 * target file.
-			 */
-			down_write(&ep->sem);
-
+		if (epi)
 			error = ep_remove(ep, epi);
-
-			up_write(&ep->sem);
-		} else
+		else
 			error = -ENOENT;
 		break;
 	case EPOLL_CTL_MOD:
@@ -595,6 +625,8 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 	 */
 	if (epi)
 		ep_release_epitem(epi);
+
+	up_write(&ep->sem);
 
 eexit_3:
 	fput(tfile);
@@ -852,8 +884,12 @@ static void ep_free(struct eventpoll *ep)
 	/*
 	 * We need to lock this because we could be hit by
 	 * eventpoll_release() while we're freeing the "struct eventpoll".
+	 * We do not need to hold "ep->sem" here because the epoll file
+	 * is on the way to be removed and no one has references to it
+	 * anymore. The only hit might come from eventpoll_release() but
+	 * holding "epsem" is sufficent here.
 	 */
-	down_write(&ep->sem);
+	down(&epsem);
 
 	/*
 	 * Walks through the whole hash by unregistering poll callbacks.
@@ -884,7 +920,7 @@ static void ep_free(struct eventpoll *ep)
 		}
 	}
 
-	up_write(&ep->sem);
+	up(&epsem);
 
 	/* Free hash pages */
 	ep_free_pages(ep->hpages, EP_HASH_PAGES(ep->hashbits));
@@ -1208,6 +1244,7 @@ static int ep_remove(struct eventpoll *ep, struct epitem *epi)
 {
 	int error;
 	unsigned long flags;
+	struct file *file = epi->file;
 
 	/*
 	 * Removes poll wait queue hooks. We _have_ to do this without holding
@@ -1220,10 +1257,10 @@ static int ep_remove(struct eventpoll *ep, struct epitem *epi)
 	ep_unregister_pollwait(ep, epi);
 
 	/* Remove the current item from the list of epoll hooks */
-	spin_lock(&epi->file->f_ep_lock);
+	spin_lock(&file->f_ep_lock);
 	if (EP_IS_LINKED(&epi->fllink))
 		EP_LIST_DEL(&epi->fllink);
-	spin_unlock(&epi->file->f_ep_lock);
+	spin_unlock(&file->f_ep_lock);
 
 	/* We need to acquire the write IRQ lock before calling ep_unlink() */
 	write_lock_irqsave(&ep->lock, flags);
@@ -1242,7 +1279,7 @@ static int ep_remove(struct eventpoll *ep, struct epitem *epi)
 	error = 0;
 eexit_1:
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_remove(%p, %p) = %d\n",
-		     current, ep, epi->file, error));
+		     current, ep, file, error));
 
 	return error;
 }
@@ -1632,6 +1669,8 @@ eventpollfs_get_sb(struct file_system_type *fs_type, int flags,
 static int __init eventpoll_init(void)
 {
 	int error;
+
+	init_MUTEX(&epsem);
 
 	/* Initialize the structure used to perform safe poll wait head wake ups */
 	ep_poll_safewake_init(&psw);

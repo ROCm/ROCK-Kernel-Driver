@@ -998,7 +998,7 @@ struct gem {
 	dma_addr_t gblock_dvma;
 	struct pci_dev *pdev;
 	struct net_device *dev;
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	struct device_node	*of_node;
 #endif
 };

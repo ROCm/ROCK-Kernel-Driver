@@ -4272,13 +4272,13 @@ e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
 static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
-        struct pci_dev *pdev;
+        struct pci_dev *pdev = NULL;
 	
         switch(event) {
         case SYS_DOWN:
         case SYS_HALT:
         case SYS_POWER_OFF:
-                pci_for_each_dev(pdev) {
+		while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
                         if(pci_dev_driver(pdev) == &e100_driver) {
 				/* If net_device struct is allocated? */
                                 if (pci_get_drvdata(pdev))

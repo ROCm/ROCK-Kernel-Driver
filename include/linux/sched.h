@@ -288,11 +288,6 @@ struct user_struct {
 	uid_t uid;
 };
 
-#define get_current_user() ({ 				\
-	struct user_struct *__user = current->user;	\
-	atomic_inc(&__user->__count);			\
-	__user; })
-
 extern struct user_struct *find_user(uid_t);
 
 extern struct user_struct root_user;

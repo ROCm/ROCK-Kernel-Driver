@@ -201,7 +201,7 @@ typedef struct ax25_cb {
 	struct sock		*sk;		/* Backlink to socket */
 } ax25_cb;
 
-#define ax25_sk(__sk) ((ax25_cb *)(__sk)->protinfo)
+#define ax25_sk(__sk) ((ax25_cb *)(__sk)->sk_protinfo)
 
 /* af_ax25.c */
 extern ax25_cb *ax25_list;
@@ -233,7 +233,12 @@ extern void ax25_digi_invert(ax25_digi *, ax25_digi *);
 /* ax25_dev.c */
 extern ax25_dev *ax25_dev_list;
 extern spinlock_t ax25_dev_lock;
-extern ax25_dev *ax25_dev_ax25dev(struct net_device *);
+
+static inline ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
+{
+	return dev->ax25_ptr;
+}
+
 extern ax25_dev *ax25_addr_ax25dev(ax25_address *);
 extern void ax25_dev_device_up(struct net_device *);
 extern void ax25_dev_device_down(struct net_device *);

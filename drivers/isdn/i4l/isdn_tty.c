@@ -62,12 +62,6 @@ isdn_tty_event_callback(struct isdn_slot *slot, int pr, void *arg)
 #define MODEM_PARANOIA_CHECK
 #define MODEM_DO_RESTART
 
-#ifdef CONFIG_DEVFS_FS
-static char *isdn_ttyname_ttyI = "isdn/ttyI%d";
-#else
-static char *isdn_ttyname_ttyI = "ttyI";
-#endif
-
 struct isdn_modem isdn_mdm;
 
 static int bit2si[8] =
@@ -2013,7 +2007,8 @@ isdn_tty_init(void)
 	m = &isdn_mdm;
 	memset(&m->tty_modem, 0, sizeof(struct tty_driver));
 	m->tty_modem.magic = TTY_DRIVER_MAGIC;
-	m->tty_modem.name = isdn_ttyname_ttyI;
+	m->tty_modem.name = "ttyI";
+	m->tty_modem.devfs_name = "isdn/ttyI";
 	m->tty_modem.major = ISDN_TTY_MAJOR;
 	m->tty_modem.minor_start = 0;
 	m->tty_modem.num = ISDN_MAX_CHANNELS;

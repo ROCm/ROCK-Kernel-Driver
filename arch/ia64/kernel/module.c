@@ -887,3 +887,13 @@ module_arch_cleanup (struct module *mod)
 	if (mod->arch.unwind)
 		unw_remove_unwind_table(mod->arch.unw_table);
 }
+
+#ifdef CONFIG_SMP
+void percpu_modcopy(void *pcpudst, const void *src, unsigned long size)
+{
+	unsigned int i;
+	for (i = 0; i < NR_CPUS; i++)
+		if (cpu_possible(i))
+			memcpy(pcpudst + __per_cpu_offset[i], src, size);
+}
+#endif /* CONFIG_SMP */

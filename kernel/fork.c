@@ -38,8 +38,6 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static kmem_cache_t *task_struct_cachep;
-
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
 extern void exit_semundo(struct task_struct *tsk);
 
@@ -74,7 +72,13 @@ int nr_processes(void)
 	return total;
 }
 
-static void free_task_struct(struct task_struct *tsk)
+#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+# define alloc_task_struct()	kmem_cache_alloc(task_struct_cachep, GFP_KERNEL)
+# define free_task_struct(tsk)	kmem_cache_free(task_struct_cachep, (tsk))
+static kmem_cache_t *task_struct_cachep;
+#endif
+
+static void free_task(struct task_struct *tsk)
 {
 	/*
 	 * The task cache is effectively disabled right now.
@@ -84,14 +88,14 @@ static void free_task_struct(struct task_struct *tsk)
 	 */
 	if (tsk != current) {
 		free_thread_info(tsk->thread_info);
-		kmem_cache_free(task_struct_cachep,tsk);
+		free_task_struct(tsk);
 	} else {
 		int cpu = get_cpu();
 
 		tsk = task_cache[cpu];
 		if (tsk) {
 			free_thread_info(tsk->thread_info);
-			kmem_cache_free(task_struct_cachep,tsk);
+			free_task_struct(tsk);
 		}
 		task_cache[cpu] = current;
 		put_cpu();
@@ -106,7 +110,7 @@ void __put_task_struct(struct task_struct *tsk)
 
 	security_task_free(tsk);
 	free_uid(tsk->user);
-	free_task_struct(tsk);
+	free_task(tsk);
 }
 
 void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
@@ -186,6 +190,7 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 
 void __init fork_init(unsigned long mempages)
 {
+#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
@@ -193,6 +198,7 @@ void __init fork_init(unsigned long mempages)
 				  SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
 	if (!task_struct_cachep)
 		panic("fork_init(): cannot create task_struct SLAB cache");
+#endif
 
 	/*
 	 * The default maximum number of threads is set to a safe
@@ -222,13 +228,13 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	task_cache[cpu] = NULL;
 	put_cpu();
 	if (!tsk) {
-		ti = alloc_thread_info();
-		if (!ti)
+		tsk = alloc_task_struct();
+		if (!tsk)
 			return NULL;
 
-		tsk = kmem_cache_alloc(task_struct_cachep, GFP_KERNEL);
-		if (!tsk) {
-			free_thread_info(ti);
+		ti = alloc_thread_info(tsk);
+		if (!ti) {
+			free_task_struct(tsk);
 			return NULL;
 		}
 	} else
@@ -1041,7 +1047,7 @@ bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:
-	free_task_struct(p);
+	free_task(p);
 	goto fork_out;
 }
 

@@ -144,7 +144,7 @@ config I2C_ELEKTOR
 
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"
-	depends on I2C && ALL_PPC
+	depends on I2C && PPC_PMAC
 	help
 	  This supports the use of the I2C interface in the combo-I/O
 	  chip on recent Apple machines.  Say Y if you have such a machine.

@@ -4,6 +4,7 @@
 #
 
 snd-als4000-objs := als4000.o
+snd-azt3328-objs := azt3328.o
 snd-cmipci-objs := cmipci.o
 snd-cs4281-objs := cs4281.o
 snd-ens1370-objs := ens1370.o
@@ -33,5 +34,6 @@ obj-$(CONFIG_SND_RME32) += snd-rme32.o
 obj-$(CONFIG_SND_RME96) += snd-rme96.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-sonicvibes.o
 obj-$(CONFIG_SND_VIA82XX) += snd-via82xx.o
+obj-$(CONFIG_SND_AZT3328) += snd-azt3328.o
 
 obj-$(CONFIG_SND) += ac97/ ali5451/ cs46xx/ emu10k1/ korg1212/ nm256/ rme9652/ trident/ ymfpci/ ice1712/ vx222/

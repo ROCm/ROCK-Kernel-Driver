@@ -45,6 +45,7 @@
 #include <asm/smp.h>
 #include <asm/msr.h>
 #include <asm/desc.h>
+#include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/dma.h>
 #include <asm/mpspec.h>
@@ -52,8 +53,6 @@
 #include <asm/bootsetup.h>
 #include <asm/smp.h>
 #include <asm/proto.h>
-
-#define Dprintk(x...) printk(x)
 
 /*
  * Machine setup..
@@ -81,6 +80,7 @@ struct sys_desc_table_struct {
 	unsigned char table[0];
 };
 
+struct edid_info edid_info;
 struct e820map e820;
 
 unsigned char aux_device_present;
@@ -243,11 +243,10 @@ static void __init contig_initmem_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	Dprintk("setup_arch\n");
-
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
+	edid_info = EDID_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
 

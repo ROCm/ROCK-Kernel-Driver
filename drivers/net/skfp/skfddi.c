@@ -2539,72 +2539,25 @@ void drv_reset_indication(struct s_smc *smc)
 }				// drv_reset_indication
 
 
-
-//--------------- functions for use as a module ----------------
-
-#ifdef MODULE
-/************************
- *
- * Note now that module autoprobing is allowed under PCI. The
- * IRQ lines will not be auto-detected; instead I'll rely on the BIOSes
- * to "do the right thing".
- *
- ************************/
-#define LP(a) ((struct s_smc*)(a))
 static struct net_device *mdev;
 
-/************************
- *
- * init_module
- *
- *  If compiled as a module, find
- *  adapters and initialize them.
- *
- ************************/
-int init_module(void)
+static int __init skfd_init(void)
 {
 	struct net_device *p;
 
-	PRINTK(KERN_INFO "FDDI init module\n");
 	if ((mdev = insert_device(NULL, skfp_probe)) == NULL)
 		return -ENOMEM;
 
-	for (p = mdev; p != NULL; p = LP(p->priv)->os.next_module) {
-		PRINTK(KERN_INFO "device to register: %s\n", p->name);
+	for (p = mdev; p != NULL; p = ((struct s_smc *)p->priv)->os.next_module) {
 		if (register_netdev(p) != 0) {
 			printk("skfddi init_module failed\n");
 			return -EIO;
 		}
 	}
 
-	PRINTK(KERN_INFO "+++++ exit with success +++++\n");
 	return 0;
-}				// init_module
+}
 
-/************************
- *
- * cleanup_module
- *
- *  Release all resources claimed by this module.
- *
- ************************/
-void cleanup_module(void)
-{
-	PRINTK(KERN_INFO "cleanup_module\n");
-	while (mdev != NULL) {
-		mdev = unlink_modules(mdev);
-	}
-	return;
-}				// cleanup_module
-
-
-/************************
- *
- * unlink_modules
- *
- *  Unregister devices and release their memory.
- *
- ************************/
 static struct net_device *unlink_modules(struct net_device *p)
 {
 	struct net_device *next = NULL;
@@ -2638,5 +2591,11 @@ static struct net_device *unlink_modules(struct net_device *p)
 	return next;
 }				// unlink_modules
 
+static void __exit skfd_exit(void)
+{
+	while (mdev)
+		mdev = unlink_modules(mdev);
+}
 
-#endif				/* MODULE */
+module_init(skfd_init);
+module_exit(skfd_exit);

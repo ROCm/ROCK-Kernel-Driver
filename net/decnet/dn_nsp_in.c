@@ -120,7 +120,7 @@ static void dn_ack(struct sock *sk, struct sk_buff *skb, unsigned short ack)
 	}
 
 	if (wakeup && !sock_flag(sk, SOCK_DEAD))
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 }
 
 /*
@@ -324,14 +324,14 @@ err_out:
 
 static void dn_nsp_conn_init(struct sock *sk, struct sk_buff *skb)
 {
-	if (sk->ack_backlog >= sk->max_ack_backlog) {
+	if (sk->sk_ack_backlog >= sk->sk_max_ack_backlog) {
 		kfree_skb(skb);
 		return;
 	}
 
-	sk->ack_backlog++;
-	skb_queue_tail(&sk->receive_queue, skb);
-	sk->state_change(sk);
+	sk->sk_ack_backlog++;
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_state_change(sk);
 }
 
 static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
@@ -351,7 +351,7 @@ static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 	if ((scp->state == DN_CI) || (scp->state == DN_CD)) {
 		scp->persist = 0;
                 scp->addrrem = cb->src_port;
-                sk->state = TCP_ESTABLISHED;
+                sk->sk_state = TCP_ESTABLISHED;
                 scp->state = DN_RUN;
 		scp->services_rem = cb->services;
 		scp->info_rem = cb->info;
@@ -369,7 +369,7 @@ static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 		}
                 dn_nsp_send_link(sk, DN_NOCHANGE, 0);
                 if (!sock_flag(sk, SOCK_DEAD))
-                	sk->state_change(sk);
+                	sk->sk_state_change(sk);
         }
 
 out:
@@ -413,7 +413,7 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 	}
 
 	scp->addrrem = cb->src_port;
-	sk->state    = TCP_CLOSE;
+	sk->sk_state = TCP_CLOSE;
 
 	switch(scp->state) {
 		case DN_CI:
@@ -421,7 +421,7 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 			scp->state = DN_RJ;
 			break;
 		case DN_RUN:
-			sk->shutdown |= SHUTDOWN_MASK;
+			sk->sk_shutdown |= SHUTDOWN_MASK;
 			scp->state = DN_DN;
 			break;
 		case DN_DI:
@@ -430,9 +430,9 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		if (sk->socket->state != SS_UNCONNECTED)
-			sk->socket->state = SS_DISCONNECTING;
-		sk->state_change(sk);
+		if (sk->sk_socket->state != SS_UNCONNECTED)
+			sk->sk_socket->state = SS_DISCONNECTING;
+		sk->sk_state_change(sk);
 	}
 
 	/* 
@@ -465,7 +465,7 @@ static void dn_nsp_disc_conf(struct sock *sk, struct sk_buff *skb)
 
 	reason = dn_ntohs(*(__u16 *)skb->data);
 
-	sk->state = TCP_CLOSE;
+	sk->sk_state = TCP_CLOSE;
 
 	switch(scp->state) {
 		case DN_CI:
@@ -481,15 +481,15 @@ static void dn_nsp_disc_conf(struct sock *sk, struct sk_buff *skb)
 			scp->state = DN_DIC;
 			break;
 		case DN_RUN:
-			sk->shutdown |= SHUTDOWN_MASK;
+			sk->sk_shutdown |= SHUTDOWN_MASK;
 		case DN_CC:
 			scp->state = DN_CN;
 	}
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		if (sk->socket->state != SS_UNCONNECTED)
-			sk->socket->state = SS_DISCONNECTING;
-		sk->state_change(sk);
+		if (sk->sk_socket->state != SS_UNCONNECTED)
+			sk->sk_socket->state = SS_DISCONNECTING;
+		sk->sk_state_change(sk);
 	}
 
 	scp->persist_fxn = dn_destroy_timer;
@@ -559,7 +559,7 @@ static void dn_nsp_linkservice(struct sock *sk, struct sk_buff *skb)
 			break;
                 }
 		if (wake_up && !sock_flag(sk, SOCK_DEAD))
-			sk->state_change(sk);
+			sk->sk_state_change(sk);
         }
 
 	dn_nsp_send_oth_ack(sk);
@@ -580,7 +580,8 @@ static __inline__ int dn_queue_skb(struct sock *sk, struct sk_buff *skb, int sig
         /* Cast skb->rcvbuf to unsigned... It's pointless, but reduces
            number of warnings when compiling with -W --ANK
          */
-        if (atomic_read(&sk->rmem_alloc) + skb->truesize >= (unsigned)sk->rcvbuf) {
+        if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >=
+	    (unsigned)sk->sk_rcvbuf) {
         	err = -ENOMEM;
         	goto out;
         }
@@ -595,16 +596,16 @@ static __inline__ int dn_queue_skb(struct sock *sk, struct sk_buff *skb, int sig
 	/* This code only runs from BH or BH protected context.
 	 * Therefore the plain read_lock is ok here. -DaveM
 	 */
-	read_lock(&sk->callback_lock);
+	read_lock(&sk->sk_callback_lock);
         if (!sock_flag(sk, SOCK_DEAD)) {
-		struct socket *sock = sk->socket;
-		wake_up_interruptible(sk->sleep);
+		struct socket *sock = sk->sk_socket;
+		wake_up_interruptible(sk->sk_sleep);
 		if (sock && sock->fasync_list &&
 		    !test_bit(SOCK_ASYNC_WAITDATA, &sock->flags))
 			__kill_fasync(sock->fasync_list, sig, 
 				    (sig == SIGURG) ? POLL_PRI : POLL_IN);
 	}
-	read_unlock(&sk->callback_lock);
+	read_unlock(&sk->sk_callback_lock);
 out:
         return err;
 }
@@ -651,7 +652,7 @@ static void dn_nsp_data(struct sock *sk, struct sk_buff *skb)
 	skb_pull(skb, 2);
 
 	if (seq_next(scp->numdat_rcv, segnum)) {
-                if (dn_queue_skb(sk, skb, SIGIO, &sk->receive_queue) == 0) {
+                if (dn_queue_skb(sk, skb, SIGIO, &sk->sk_receive_queue) == 0) {
 			seq_add(&scp->numdat_rcv, 1);
                 	queued = 1;
                 }
@@ -679,9 +680,9 @@ static void dn_returned_conn_init(struct sock *sk, struct sk_buff *skb)
 
 	if (scp->state == DN_CI) {
 		scp->state = DN_NC;
-		sk->state = TCP_CLOSE;
+		sk->sk_state = TCP_CLOSE;
 		if (!sock_flag(sk, SOCK_DEAD))
-			sk->state_change(sk);
+			sk->sk_state_change(sk);
 	}
 
 	kfree_skb(skb);
@@ -884,8 +885,8 @@ int dn_nsp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 		/* both data and ack frames can kick a CC socket into RUN */
 		if ((scp->state == DN_CC) && !sock_flag(sk, SOCK_DEAD)) {
 			scp->state = DN_RUN;
-			sk->state = TCP_ESTABLISHED;
-			sk->state_change(sk);
+			sk->sk_state = TCP_ESTABLISHED;
+			sk->sk_state_change(sk);
 		}
 
 		if ((cb->nsp_flags & 0x1c) == 0)

@@ -129,7 +129,7 @@ xprt_pktdump(char *msg, u32 *packet, unsigned int count)
 static inline struct rpc_xprt *
 xprt_from_sock(struct sock *sk)
 {
-	return (struct rpc_xprt *) sk->user_data;
+	return (struct rpc_xprt *) sk->sk_user_data;
 }
 
 /*
@@ -367,18 +367,18 @@ xprt_close(struct rpc_xprt *xprt)
 	if (!sk)
 		return;
 
-	write_lock_bh(&sk->callback_lock);
+	write_lock_bh(&sk->sk_callback_lock);
 	xprt->inet = NULL;
 	xprt->sock = NULL;
 
-	sk->user_data    = NULL;
-	sk->data_ready   = xprt->old_data_ready;
-	sk->state_change = xprt->old_state_change;
-	sk->write_space  = xprt->old_write_space;
-	write_unlock_bh(&sk->callback_lock);
+	sk->sk_user_data    = NULL;
+	sk->sk_data_ready   = xprt->old_data_ready;
+	sk->sk_state_change = xprt->old_state_change;
+	sk->sk_write_space  = xprt->old_write_space;
+	write_unlock_bh(&sk->sk_callback_lock);
 
 	xprt_disconnect(xprt);
-	sk->no_check	 = 0;
+	sk->sk_no_check	 = 0;
 
 	sock_release(sock);
 }
@@ -448,7 +448,7 @@ xprt_connect(struct rpc_task *task)
 	status = sock->ops->connect(sock, (struct sockaddr *) &xprt->addr,
 				sizeof(xprt->addr), O_NONBLOCK);
 	dprintk("RPC: %4d  connect status %d connected %d sock state %d\n",
-		task->tk_pid, -status, xprt_connected(xprt), inet->state);
+		task->tk_pid, -status, xprt_connected(xprt), inet->sk_state);
 
 	if (status >= 0)
 		return;
@@ -458,12 +458,13 @@ xprt_connect(struct rpc_task *task)
 	case -EALREADY:
 		/* Protect against TCP socket state changes */
 		lock_sock(inet);
-		if (inet->state != TCP_ESTABLISHED) {
+		if (inet->sk_state != TCP_ESTABLISHED) {
 			dprintk("RPC: %4d  waiting for connection\n",
 					task->tk_pid);
 			task->tk_timeout = RPC_CONNECT_TIMEOUT;
 			/* if the socket is already closing, delay briefly */
-			if ((1 << inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
+			if ((1 << inet->sk_state) &
+			    ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
 				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
 			rpc_sleep_on(&xprt->pending, task, xprt_connect_status,
 									NULL);
@@ -679,7 +680,7 @@ udp_data_ready(struct sock *sk, int len)
 	struct sk_buff	*skb;
 	int		err, repsize, copied;
 
-	read_lock(&sk->callback_lock);
+	read_lock(&sk->sk_callback_lock);
 	dprintk("RPC:      udp_data_ready...\n");
 	if (!(xprt = xprt_from_sock(sk))) {
 		printk("RPC:      udp_data_ready request not found!\n");
@@ -728,9 +729,9 @@ udp_data_ready(struct sock *sk, int len)
  dropit:
 	skb_free_datagram(sk, skb);
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
-	read_unlock(&sk->callback_lock);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
+	read_unlock(&sk->sk_callback_lock);
 }
 
 /*
@@ -935,7 +936,7 @@ static void tcp_data_ready(struct sock *sk, int bytes)
 	struct rpc_xprt *xprt;
 	read_descriptor_t rd_desc;
 
-	read_lock(&sk->callback_lock);
+	read_lock(&sk->sk_callback_lock);
 	dprintk("RPC:      tcp_data_ready...\n");
 	if (!(xprt = xprt_from_sock(sk))) {
 		printk("RPC:      tcp_data_ready socket info not found!\n");
@@ -949,7 +950,7 @@ static void tcp_data_ready(struct sock *sk, int bytes)
 	rd_desc.count = 65536;
 	tcp_read_sock(sk, &rd_desc, tcp_data_recv);
 out:
-	read_unlock(&sk->callback_lock);
+	read_unlock(&sk->sk_callback_lock);
 }
 
 static void
@@ -957,15 +958,15 @@ tcp_state_change(struct sock *sk)
 {
 	struct rpc_xprt	*xprt;
 
-	read_lock(&sk->callback_lock);
+	read_lock(&sk->sk_callback_lock);
 	if (!(xprt = xprt_from_sock(sk)))
 		goto out;
 	dprintk("RPC:      tcp_state_change client %p...\n", xprt);
 	dprintk("RPC:      state %x conn %d dead %d zapped %d\n",
-				sk->state, xprt_connected(xprt),
-				sock_flag(sk, SOCK_DEAD), sk->zapped);
+				sk->sk_state, xprt_connected(xprt),
+				sock_flag(sk, SOCK_DEAD), sk->sk_zapped);
 
-	switch (sk->state) {
+	switch (sk->sk_state) {
 	case TCP_ESTABLISHED:
 		spin_lock_bh(&xprt->sock_lock);
 		if (!xprt_test_and_set_connected(xprt)) {
@@ -989,9 +990,9 @@ tcp_state_change(struct sock *sk)
 		break;
 	}
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible_all(sk->sleep);
-	read_unlock(&sk->callback_lock);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible_all(sk->sk_sleep);
+	read_unlock(&sk->sk_callback_lock);
 }
 
 /*
@@ -1006,8 +1007,8 @@ xprt_write_space(struct sock *sk)
 	struct rpc_xprt	*xprt;
 	struct socket	*sock;
 
-	read_lock(&sk->callback_lock);
-	if (!(xprt = xprt_from_sock(sk)) || !(sock = sk->socket))
+	read_lock(&sk->sk_callback_lock);
+	if (!(xprt = xprt_from_sock(sk)) || !(sock = sk->sk_socket))
 		goto out;
 	if (xprt->shutdown)
 		goto out;
@@ -1030,10 +1031,10 @@ xprt_write_space(struct sock *sk)
 	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
 		rpc_wake_up_task(xprt->snd_task);
 	spin_unlock_bh(&xprt->sock_lock);
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
 out:
-	read_unlock(&sk->callback_lock);
+	read_unlock(&sk->sk_callback_lock);
 }
 
 /*
@@ -1465,28 +1466,28 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 	if (xprt->inet)
 		return;
 
-	write_lock_bh(&sk->callback_lock);
-	sk->user_data = xprt;
-	xprt->old_data_ready = sk->data_ready;
-	xprt->old_state_change = sk->state_change;
-	xprt->old_write_space = sk->write_space;
+	write_lock_bh(&sk->sk_callback_lock);
+	sk->sk_user_data = xprt;
+	xprt->old_data_ready = sk->sk_data_ready;
+	xprt->old_state_change = sk->sk_state_change;
+	xprt->old_write_space = sk->sk_write_space;
 	if (xprt->prot == IPPROTO_UDP) {
-		sk->data_ready = udp_data_ready;
-		sk->no_check = UDP_CSUM_NORCV;
+		sk->sk_data_ready = udp_data_ready;
+		sk->sk_no_check = UDP_CSUM_NORCV;
 		xprt_set_connected(xprt);
 	} else {
 		struct tcp_opt *tp = tcp_sk(sk);
 		tp->nonagle = 1;	/* disable Nagle's algorithm */
-		sk->data_ready = tcp_data_ready;
-		sk->state_change = tcp_state_change;
+		sk->sk_data_ready = tcp_data_ready;
+		sk->sk_state_change = tcp_state_change;
 		xprt_clear_connected(xprt);
 	}
-	sk->write_space = xprt_write_space;
+	sk->sk_write_space = xprt_write_space;
 
 	/* Reset to new socket */
 	xprt->sock = sock;
 	xprt->inet = sk;
-	write_unlock_bh(&sk->callback_lock);
+	write_unlock_bh(&sk->sk_callback_lock);
 
 	return;
 }
@@ -1502,13 +1503,13 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
 	if (xprt->stream)
 		return;
 	if (xprt->rcvsize) {
-		sk->userlocks |= SOCK_RCVBUF_LOCK;
-		sk->rcvbuf = xprt->rcvsize * RPC_MAXCONG * 2;
+		sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
+		sk->sk_rcvbuf = xprt->rcvsize * RPC_MAXCONG * 2;
 	}
 	if (xprt->sndsize) {
-		sk->userlocks |= SOCK_SNDBUF_LOCK;
-		sk->sndbuf = xprt->sndsize * RPC_MAXCONG * 2;
-		sk->write_space(sk);
+		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
+		sk->sk_sndbuf = xprt->sndsize * RPC_MAXCONG * 2;
+		sk->sk_write_space(sk);
 	}
 }
 

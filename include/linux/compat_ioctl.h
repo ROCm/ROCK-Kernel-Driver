@@ -1,5 +1,6 @@
 /* List here explicitly which ioctl's are known to have
- * compatible types passed or none at all...
+ * compatible types passed or none at all... Please include
+ * only stuff that is compatible on *all architectures*.
  */
 /* Big T */
 COMPATIBLE_IOCTL(TCGETA)
@@ -354,6 +355,15 @@ COMPATIBLE_IOCTL(CDROM_CHANGER_NSLOTS)
 COMPATIBLE_IOCTL(CDROM_LOCKDOOR)
 COMPATIBLE_IOCTL(CDROM_DEBUG)
 COMPATIBLE_IOCTL(CDROM_GET_CAPABILITY)
+/* Ignore cdrom.h about these next 5 ioctls, they absolutely do
+ * not take a struct cdrom_read, instead they take a struct cdrom_msf
+ * which is compatible.
+ */
+COMPATIBLE_IOCTL(CDROMREADMODE2)
+COMPATIBLE_IOCTL(CDROMREADMODE1)
+COMPATIBLE_IOCTL(CDROMREADRAW)
+COMPATIBLE_IOCTL(CDROMREADCOOKED)
+COMPATIBLE_IOCTL(CDROMREADALL)
 /* DVD ioctls */
 COMPATIBLE_IOCTL(DVD_READ_STRUCT)
 COMPATIBLE_IOCTL(DVD_WRITE_STRUCT)

@@ -6,8 +6,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
-
-#include <asm/topology.h>
+#include <linux/topology.h>
 
 
 struct class cpu_class = {

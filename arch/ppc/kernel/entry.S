@@ -820,7 +820,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_601)
  * here so it's easy to add arch-specific sections later.
  * -- Cort
  */
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_OF
 /*
  * On CHRP, the Run-Time Abstraction Services (RTAS) have to be
  * called with the MMU off.
@@ -865,4 +865,4 @@ machine_check_in_rtas:
 	twi	31,0,0
 	/* XXX load up BATs and panic */
 
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */

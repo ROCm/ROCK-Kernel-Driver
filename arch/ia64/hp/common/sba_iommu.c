@@ -1413,7 +1413,7 @@ ioc_iova_init(struct ioc *ioc)
 	u32 iova_space_mask;
 	int iov_order, tcnfg;
 	int agp_found = 0;
-	struct pci_dev *device;
+	struct pci_dev *device = NULL;
 #ifdef FULL_VALID_PDIR
 	unsigned long index;
 #endif
@@ -1511,7 +1511,7 @@ ioc_iova_init(struct ioc *ioc)
 	** We program the next pdir index after we stop w/ a key for
 	** the GART code to handshake on.
 	*/
-	pci_for_each_dev(device)
+	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL)
 		agp_found |= pci_find_capability(device, PCI_CAP_ID_AGP);
 
 	if (agp_found && reserve_sba_gart) {

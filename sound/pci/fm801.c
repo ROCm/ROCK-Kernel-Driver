@@ -959,6 +959,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 
 	/* codec cold reset + AC'97 warm reset */
 	outw((1<<5)|(1<<6), FM801_REG(chip, CODEC_CTRL));
+	inw(FM801_REG(chip, CODEC_CTRL)); /* flush posting data */
 	udelay(100);
 	outw(0, FM801_REG(chip, CODEC_CTRL));
 

@@ -2549,11 +2549,8 @@ static int __init rs_init(void)
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
-#if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
-	serial_driver.name = "tts/";
-#else
+	serial_driver.devfs_name = "tts/";
 	serial_driver.name = "ttyS";
-#endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64 + SERIAL_DEV_OFFSET;
 	serial_driver.num = NR_PORTS;

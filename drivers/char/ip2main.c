@@ -94,9 +94,7 @@
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
-#ifdef	CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
@@ -229,11 +227,6 @@ static char *pcVersion = "1.2.14";
 
 /* String constants for port names */
 static char *pcDriver_name   = "ip2";
-#ifdef	CONFIG_DEVFS_FS
-static char *pcTty    		 = "tts/F%d";
-#else
-static char *pcTty    		 = "ttyF";
-#endif
 static char *pcIpl    		 = "ip2ipl";
 
 /* Serial subtype definitions */
@@ -564,10 +557,7 @@ cleanup_module(void)
 int
 ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize) 
 {
-#ifdef	CONFIG_DEVFS_FS
-	int j, box;
-#endif
-	int i;
+	int i, j, box;
 	int err;
 	int status = 0;
 	static int loaded;
@@ -786,7 +776,8 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	/* Initialise the relevant fields. */
 	ip2_tty_driver.magic                = TTY_DRIVER_MAGIC;
 	ip2_tty_driver.owner		    = THIS_MODULE;
-	ip2_tty_driver.name                 = pcTty;
+	ip2_tty_driver.name                 = "ttyF";
+	ip2_tty_driver.devfs_name	    = "tts/F";
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
 	ip2_tty_driver.driver_name          = pcDriver_name;
 	ip2_tty_driver.read_proc          	= ip2_read_proc;
@@ -798,11 +789,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	ip2_tty_driver.subtype              = SERIAL_TYPE_NORMAL;
 	ip2_tty_driver.init_termios         = tty_std_termios;
 	ip2_tty_driver.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
-#ifdef	CONFIG_DEVFS_FS
 	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-#else
-	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW;
-#endif
 	ip2_tty_driver.refcount             = &ref_count;
 	ip2_tty_driver.table                = TtyTable;
 	ip2_tty_driver.termios              = Termios;
@@ -851,7 +838,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				continue;
 			}
 
-#ifdef	CONFIG_DEVFS_FS
 			if ( NULL != ( pB = i2BoardPtrTable[i] ) ) {
 				devfs_mk_cdev(MKDEV(IP2_IPL_MAJOR, 4 * i),
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,
@@ -874,7 +860,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 			        }
 			    }
 			}
-#endif
 
 			if (poll_only) {
 //		Poll only forces driver to only use polling and

@@ -795,7 +795,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 
 	memset(catc, 0, sizeof(struct catc));
 
-	netdev = init_etherdev(0, 0);
+	netdev = alloc_etherdev(0);
 	if (!netdev) {
 		kfree(catc);
 		return -EIO;
@@ -933,6 +933,17 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	for (i = 0; i < 5; i++) printk("%2.2x:", netdev->dev_addr[i]);
 	printk("%2.2x.\n", netdev->dev_addr[i]);
 	usb_set_intfdata(intf, catc);
+
+	if (register_netdev(netdev) != 0) {
+		usb_set_intfdata(intf, NULL);
+		usb_free_urb(catc->ctrl_urb);
+		usb_free_urb(catc->tx_urb);
+		usb_free_urb(catc->rx_urb);
+		usb_free_urb(catc->irq_urb);
+		kfree(netdev);
+		kfree(catc);
+		return -EIO;
+	}
 	return 0;
 }
 

@@ -44,7 +44,7 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 		sap = list_entry(sap_entry, struct llc_sap, node);
 
 		read_lock_bh(&sap->sk_list.lock);
-		for (sk = sap->sk_list.list; sk; sk = sk->next)
+		for (sk = sap->sk_list.list; sk; sk = sk->sk_next)
 			if (!pos--) {
 				if (!sk)
 					read_unlock_bh(&sap->sk_list.lock);
@@ -76,8 +76,8 @@ static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	sk = v;
-	if (sk->next) {
-		sk = sk->next;
+	if (sk->sk_next) {
+		sk = sk->sk_next;
 		goto out;
 	}
 	llc = llc_sk(sk);
@@ -124,7 +124,7 @@ static int llc_seq_socket_show(struct seq_file *seq, void *v)
 	sk = v;
 	llc = llc_sk(sk);
 
-	seq_printf(seq, "%2X  %2X ", sk->type,
+	seq_printf(seq, "%2X  %2X ", sk->sk_type,
 		   !llc_mac_null(llc->addr.sllc_mmac));
 
 	if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
@@ -136,8 +136,10 @@ static int llc_seq_socket_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "@%02X ", llc->sap->laddr.lsap);
 	llc_ui_format_mac(seq, llc->addr.sllc_dmac);
 	seq_printf(seq, "@%02X %8d %8d %2d %3d %4d\n", llc->addr.sllc_dsap,
-		   atomic_read(&sk->wmem_alloc), atomic_read(&sk->rmem_alloc),
-		   sk->state, sk->socket ? SOCK_INODE(sk->socket)->i_uid : -1,
+		   atomic_read(&sk->sk_wmem_alloc),
+		   atomic_read(&sk->sk_rmem_alloc),
+		   sk->sk_state,
+		   sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_uid : -1,
 		   llc->link);
 out:
 	return 0;
@@ -181,7 +183,7 @@ static int llc_seq_core_show(struct seq_file *seq, void *v)
 		   timer_pending(&llc->pf_cycle_timer.timer),
 		   timer_pending(&llc->rej_sent_timer.timer),
 		   timer_pending(&llc->busy_state_timer.timer),
-		   !!sk->backlog.tail, sock_owned_by_user(sk));
+		   !!sk->sk_backlog.tail, sock_owned_by_user(sk));
 out:
 	return 0;
 }

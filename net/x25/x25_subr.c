@@ -49,7 +49,7 @@ void x25_clear_queues(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&x25->ack_queue);
 	skb_queue_purge(&x25->interrupt_in_queue);
 	skb_queue_purge(&x25->interrupt_out_queue);
@@ -90,7 +90,7 @@ void x25_requeue_frames(struct sock *sk)
 	 */
 	while ((skb = skb_dequeue(&x25_sk(sk)->ack_queue)) != NULL) {
 		if (!skb_prev)
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 		else
 			skb_append(skb_prev, skb);
 		skb_prev = skb;
@@ -340,12 +340,12 @@ void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
 	x25->causediag.cause      = cause;
 	x25->causediag.diagnostic = diagnostic;
 
-	sk->state     = TCP_CLOSE;
-	sk->err       = reason;
-	sk->shutdown |= SEND_SHUTDOWN;
+	sk->sk_state     = TCP_CLOSE;
+	sk->sk_err       = reason;
+	sk->sk_shutdown |= SEND_SHUTDOWN;
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 	}
 }
@@ -358,7 +358,7 @@ void x25_check_rbuf(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+	if (atomic_read(&sk->sk_rmem_alloc) < (sk->sk_rcvbuf / 2) &&
 	    (x25->condition & X25_COND_OWN_RX_BUSY)) {
 		x25->condition &= ~X25_COND_OWN_RX_BUSY;
 		x25->condition &= ~X25_COND_ACK_PENDING;

@@ -145,7 +145,7 @@ extern atomic_t			inet6_sock_nr;
 
 int snmp6_register_dev(struct inet6_dev *idev);
 int snmp6_unregister_dev(struct inet6_dev *idev);
-int snmp6_mib_init(void *ptr[2], size_t mibsize);
+int snmp6_mib_init(void *ptr[2], size_t mibsize, size_t mibalign);
 void snmp6_mib_free(void *ptr[2]);
 
 struct ip6_ra_chain
@@ -263,6 +263,21 @@ static inline void ipv6_addr_copy(struct in6_addr *a1, const struct in6_addr *a2
 	memcpy((void *) a1, (const void *) a2, sizeof(struct in6_addr));
 }
 
+static inline void ipv6_addr_prefix(struct in6_addr *pfx, 
+				    const struct in6_addr *addr,
+				    int plen)
+{
+	/* caller must guarantee 0 <= plen <= 128 */
+	int o = plen >> 3,
+	    b = plen & 0x7;
+
+	memcpy(pfx->s6_addr, addr, o);
+	if (b != 0)
+		pfx->s6_addr[o] = addr->s6_addr[o] & (0xff00 >> b);
+	if (o < 16)
+		memset(pfx->s6_addr + o, 0, 16 - o);
+}
+
 #ifndef __HAVE_ARCH_ADDR_SET
 static inline void ipv6_addr_set(struct in6_addr *addr, 
 				     __u32 w1, __u32 w2,
@@ -299,7 +314,8 @@ extern int			ipv6_rcv(struct sk_buff *skb,
 extern int			ip6_xmit(struct sock *sk,
 					 struct sk_buff *skb,
 					 struct flowi *fl,
-					 struct ipv6_txoptions *opt);
+					 struct ipv6_txoptions *opt,
+					 int ipfragok);
 
 extern int			ip6_nd_hdr(struct sock *sk,
 					   struct sk_buff *skb,
@@ -315,7 +331,7 @@ extern int			ip6_build_xmit(struct sock *sk,
 					       unsigned length,
 					       struct ipv6_txoptions *opt,
 					       int hlimit, int flags);
-extern int			ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr);
+extern int			ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr);
 
 extern int			ip6_append_data(struct sock *sk,
 						int getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb),

@@ -98,7 +98,6 @@ typedef struct pegasus {
 	struct sk_buff		*rx_skb;
 	struct usb_ctrlrequest	dr;
 	wait_queue_head_t	ctrl_wait;
-	struct semaphore	sem;
 	spinlock_t		rx_pool_lock;
 	int			chip;
 	unsigned char		intr_buff[8];

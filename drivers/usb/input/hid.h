@@ -324,8 +324,7 @@ struct hid_control_fifo {
 
 struct hid_input {
 	struct list_head list;
-	struct hid_field **fields;
-	int maxfield;
+	struct hid_report *report;
 	struct input_dev input;
 };
 

@@ -219,7 +219,6 @@ config IDE_TASK_IOCTL
 
 	  If you are unsure, say N here.
 
-#bool '  IDE Taskfile IO' CONFIG_IDE_TASKFILE_IO
 comment "IDE chipset support/bugfixes"
 	depends on BLK_DEV_IDE
 
@@ -268,7 +267,7 @@ config BLK_DEV_IDEPNP
 config BLK_DEV_IDEPCI
 	bool "PCI IDE chipset support" if PCI
 	depends on BLK_DEV_IDE
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDEDMA_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDEDMA_PMAC
 	help
 	  Say Y here for PCI systems which use IDE drive(s).
 	  This option helps the IDE driver to automatically detect and
@@ -409,7 +408,7 @@ config BLK_DEV_IDEDMA
 	bool
 	depends on BLK_DEV_IDE
 	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDE_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
 	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
 
 config IDEDMA_PCI_WIP
@@ -734,7 +733,7 @@ config BLK_DEV_SL82C105
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
-	depends on BLK_DEV_IDE && ALL_PPC
+	depends on BLK_DEV_IDE && PPC_PMAC
 	help
 	  This driver provides support for the built-in IDE controller on
 	  most of the recent Apple Power Macintoshes and PowerBooks.
@@ -1071,11 +1070,6 @@ config BLK_DEV_PDC202XX
 
 	  If unsure, say N.
 
-##if [ "$CONFIG_IDE_TASKFILE_IO" = "y" ]; then
-##  dep_mbool CONFIG_BLK_DEV_TF_DISK $CONFIG_BLK_DEV_IDEDISK
-##else
-##  dep_mbool CONFIG_BLK_DEV_NTF_DISK $CONFIG_BLK_DEV_IDEDISK
-##fi
 config BLK_DEV_IDE_MODES
 	bool
 	depends on BLK_DEV_4DRIVES || BLK_DEV_ALI14XX || BLK_DEV_DTC2278 || BLK_DEV_HT6560B || BLK_DEV_PDC4030 || BLK_DEV_QD65XX || BLK_DEV_UMC8672 || BLK_DEV_AEC62XX=y || BLK_DEV_ALI15X3=y || BLK_DEV_AMD74XX=y || BLK_DEV_CMD640 || BLK_DEV_CMD64X=y || BLK_DEV_CS5530=y || BLK_DEV_CY82C693=y || BLK_DEV_HPT34X=y || BLK_DEV_HPT366=y || BLK_DEV_IDE_PMAC || BLK_DEV_IT8172 || BLK_DEV_MPC8xx_IDE || BLK_DEV_NFORCE=y || BLK_DEV_OPTI621=y || BLK_DEV_PDC202XX || BLK_DEV_PIIX=y || BLK_DEV_SVWKS=y || BLK_DEV_SIIMAGE=y || BLK_DEV_SIS5513=y || BLK_DEV_SL82C105=y || BLK_DEV_SLC90E66=y || BLK_DEV_VIA82CXXX=y

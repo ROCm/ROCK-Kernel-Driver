@@ -447,10 +447,10 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 
 	inet = inet_sk(sk);
 	if (!sock_owned_by_user(sk) && inet->recverr) {
-		sk->err = err;
-		sk->error_report(sk);
+		sk->sk_err = err;
+		sk->sk_error_report(sk);
 	} else {  /* Only an error on timeout */
-		sk->err_soft = err;
+		sk->sk_err_soft = err;
 	}
 
 out_unlock:

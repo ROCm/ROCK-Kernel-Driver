@@ -131,11 +131,8 @@ static int scc_init_drivers(void)
 	scc_driver.magic = TTY_DRIVER_MAGIC;
 	scc_driver.owner = THIS_MODULE;
 	scc_driver.driver_name = "scc";
-#ifdef CONFIG_DEVFS_FS
-	scc_driver.name = "tts/";
-#else
 	scc_driver.name = "ttyS";
-#endif
+	scc_driver.devfs_name = "tts/";
 	scc_driver.major = TTY_MAJOR;
 	scc_driver.minor_start = SCC_MINOR_BASE;
 	scc_driver.num = 2;

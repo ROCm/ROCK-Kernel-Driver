@@ -68,7 +68,7 @@ unsigned long boot_mem_size;
 unsigned long ISA_DMA_THRESHOLD;
 unsigned long DMA_MODE_READ, DMA_MODE_WRITE;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
 int _machine = 0;
 
 extern void prep_init(unsigned long r3, unsigned long r4,
@@ -77,7 +77,7 @@ extern void pmac_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7);
 extern void chrp_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7);
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 #ifdef CONFIG_MAGIC_SYSRQ
 unsigned long SYSRQ_KEY = 0x54;
@@ -286,7 +286,7 @@ early_init(int r3, int r4, int r5)
 	identify_cpu(offset, 0);
 	do_cpu_ftr_fixups(offset);
 
-#if defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_PPC_MULTIPLATFORM)
 	reloc_got2(offset);
 
 	/* If we came here from BootX, clear the screen,
@@ -308,7 +308,7 @@ early_init(int r3, int r4, int r5)
 	return phys;
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 /*
  * Assume here that all clock rates are the same in a
  * smp system.  -- Cort
@@ -351,9 +351,11 @@ intuit_machine_type(void)
 		}
 	}
 }
+#endif
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
 /*
- * The ALL_PPC version of platform_init...
+ * The PPC_MULTIPLATFORM version of platform_init...
  */
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -459,7 +461,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		break;
 	}
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 struct bi_record *find_bootinfo(void)
 {
@@ -501,11 +503,11 @@ void parse_bootinfo(struct bi_record *rec)
 			initrd_end = data[0] + data[1] + KERNELBASE;
 			break;
 #endif /* CONFIG_BLK_DEV_INITRD */
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
 		case BI_MACHTYPE:
 			_machine = data[0];
 			break;
-#endif /* CONFIG_ALL_PPC */
+#endif
 		case BI_MEMSIZE:
 			boot_mem_size = data[0];
 			break;
@@ -596,13 +598,13 @@ void __init setup_arch(char **cmdline_p)
 	/* so udelay does something sensible, assume <= 1000 bogomips */
 	loops_per_jiffy = 500000000 / HZ;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
 	/* This could be called "early setup arch", it must be done
 	 * now because xmon need it
 	 */
 	if (_machine == _MACH_Pmac)
 		pmac_feature_init();	/* New cool way */
-#endif /* CONFIG_ALL_PPC */
+#endif
 
 #ifdef CONFIG_XMON
 	xmon_map_scc();

@@ -98,8 +98,8 @@ EXPORT_SYMBOL(remove_shrinker);
 EXPORT_SYMBOL(kmalloc);
 EXPORT_SYMBOL(kfree);
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(kmalloc_percpu);
-EXPORT_SYMBOL(kfree_percpu);
+EXPORT_SYMBOL(__alloc_percpu);
+EXPORT_SYMBOL(free_percpu);
 EXPORT_SYMBOL(percpu_counter_mod);
 #endif
 EXPORT_SYMBOL(vfree);

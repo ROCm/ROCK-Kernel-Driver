@@ -2,6 +2,4 @@
 # Makefile for the Baget/MIPS prom emulator library routines.
 #
 
-L_TARGET := lib.a
-
-obj-y	:= init.o
+lib-y	:= init.o

@@ -8,56 +8,56 @@
 #include "infblock.h"
 #include "infutil.h"
 
-int ZEXPORT zlib_inflate_workspacesize(void)
+int zlib_inflate_workspacesize(void)
 {
   return sizeof(struct inflate_workspace);
 }
 
 
-int ZEXPORT zlib_inflateReset(
+int zlib_inflateReset(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
+  if (z == NULL || z->state == NULL || z->workspace == NULL)
     return Z_STREAM_ERROR;
   z->total_in = z->total_out = 0;
-  z->msg = Z_NULL;
+  z->msg = NULL;
   z->state->mode = z->state->nowrap ? BLOCKS : METHOD;
-  zlib_inflate_blocks_reset(z->state->blocks, z, Z_NULL);
+  zlib_inflate_blocks_reset(z->state->blocks, z, NULL);
   return Z_OK;
 }
 
 
-int ZEXPORT zlib_inflateEnd(
+int zlib_inflateEnd(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
+  if (z == NULL || z->state == NULL || z->workspace == NULL)
     return Z_STREAM_ERROR;
-  if (z->state->blocks != Z_NULL)
+  if (z->state->blocks != NULL)
     zlib_inflate_blocks_free(z->state->blocks, z);
-  z->state = Z_NULL;
+  z->state = NULL;
   return Z_OK;
 }
 
 
-int ZEXPORT zlib_inflateInit2_(
+int zlib_inflateInit2_(
 	z_streamp z,
 	int w,
 	const char *version,
 	int stream_size
 )
 {
-  if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
-      stream_size != sizeof(z_stream) || z->workspace == Z_NULL)
+  if (version == NULL || version[0] != ZLIB_VERSION[0] ||
+      stream_size != sizeof(z_stream) || z->workspace == NULL)
       return Z_VERSION_ERROR;
 
   /* initialize state */
-  if (z == Z_NULL)
+  if (z == NULL)
     return Z_STREAM_ERROR;
-  z->msg = Z_NULL;
+  z->msg = NULL;
   z->state = &WS(z)->internal_state;
-  z->state->blocks = Z_NULL;
+  z->state->blocks = NULL;
 
   /* handle undocumented nowrap option (no zlib header or check) */
   z->state->nowrap = 0;
@@ -77,8 +77,8 @@ int ZEXPORT zlib_inflateInit2_(
 
   /* create inflate_blocks state */
   if ((z->state->blocks =
-      zlib_inflate_blocks_new(z, z->state->nowrap ? Z_NULL : zlib_adler32, (uInt)1 << w))
-      == Z_NULL)
+      zlib_inflate_blocks_new(z, z->state->nowrap ? NULL : zlib_adler32, (uInt)1 << w))
+      == NULL)
   {
     zlib_inflateEnd(z);
     return Z_MEM_ERROR;
@@ -103,7 +103,7 @@ static int zlib_inflate_packet_flush(inflate_blocks_statef *s)
 }
 
 
-int ZEXPORT zlib_inflateInit_(
+int zlib_inflateInit_(
 	z_streamp z,
 	const char *version,
 	int stream_size
@@ -117,7 +117,7 @@ int ZEXPORT zlib_inflateInit_(
 #define NEEDBYTE {if(z->avail_in==0)goto empty;r=trv;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
-int ZEXPORT zlib_inflate(
+int zlib_inflate(
 	z_streamp z,
 	int f
 )
@@ -125,7 +125,7 @@ int ZEXPORT zlib_inflate(
   int r, trv;
   uInt b;
 
-  if (z == Z_NULL || z->state == Z_NULL || z->next_in == Z_NULL)
+  if (z == NULL || z->state == NULL || z->next_in == NULL)
     return Z_STREAM_ERROR;
   trv = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
   r = Z_BUF_ERROR;
@@ -250,17 +250,17 @@ int ZEXPORT zlib_inflate(
 }
 
 
-int ZEXPORT zlib_inflateSync(
+int zlib_inflateSync(
 	z_streamp z
 )
 {
   uInt n;       /* number of bytes to look at */
-  Bytef *p;     /* pointer to bytes */
+  Byte *p;      /* pointer to bytes */
   uInt m;       /* number of marker bytes found in a row */
   uLong r, w;   /* temporaries to save total_in and total_out */
 
   /* set up */
-  if (z == Z_NULL || z->state == Z_NULL)
+  if (z == NULL || z->state == NULL)
     return Z_STREAM_ERROR;
   if (z->state->mode != I_BAD)
   {
@@ -309,11 +309,11 @@ int ZEXPORT zlib_inflateSync(
  * decompressing, PPP checks that at the end of input packet, inflate is
  * waiting for these length bytes.
  */
-int ZEXPORT zlib_inflateSyncPoint(
+int zlib_inflateSyncPoint(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->state->blocks == Z_NULL)
+  if (z == NULL || z->state == NULL || z->state->blocks == NULL)
     return Z_STREAM_ERROR;
   return zlib_inflate_blocks_sync_point(z->state->blocks);
 }
@@ -332,9 +332,9 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
     uLong b;              /* bit buffer */  /* NOT USED HERE */
     uInt k;               /* bits in bit buffer */ /* NOT USED HERE */
     uInt t;               /* temporary storage */
-    Bytef *p;             /* input data pointer */
+    Byte *p;              /* input data pointer */
     uInt n;               /* bytes available there */
-    Bytef *q;             /* output window write pointer */
+    Byte *q;              /* output window write pointer */
     uInt m;               /* bytes to end of window or read pointer */
 
     if (s->read != s->write)
@@ -352,7 +352,7 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
 	/* is there room until end of buffer? */
 	if (t > m) t = m;
 	/* update check information */
-	if (s->checkfn != Z_NULL)
+	if (s->checkfn != NULL)
 	    s->check = (*s->checkfn)(s->check, q, t);
 	memcpy(q, p, t);
 	q += t;
@@ -380,7 +380,7 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
  * will have been updated if need be.
  */
 
-int ZEXPORT zlib_inflateIncomp(
+int zlib_inflateIncomp(
 	z_stream *z
 	
 )

@@ -12,6 +12,8 @@
 #include <linux/bootmem.h>
 
 unsigned long dmi_broken;
+EXPORT_SYMBOL(dmi_broken);
+
 int is_sony_vaio_laptop;
 int is_unsafe_smbus;
 

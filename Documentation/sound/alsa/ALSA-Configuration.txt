@@ -187,6 +187,13 @@ Module parameters
     
     Module supports up to 8 cards, PnP and autoprobe.
     
+  Module snd-azt3328
+  ------------------
+
+    Module for soundcards based on Aztech AZF3328 PCI chip.
+
+    Module supports up to 8 cards.
+
   Module snd-cmi8330
   ------------------
 

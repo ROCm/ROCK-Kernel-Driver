@@ -3,7 +3,7 @@
 
 #if defined(__ASSEMBLY__)
 
-#define CONFIG_ALL_PPC
+#define CONFIG_PPC_MULTIPLATFORM
 #include "arch/processor.h"
 
 #else

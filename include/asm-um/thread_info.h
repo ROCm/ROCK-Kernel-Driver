@@ -49,7 +49,7 @@ static inline struct thread_info *current_thread_info(void)
 
 /* thread information allocation */
 #define THREAD_SIZE (4*PAGE_SIZE)
-#define alloc_thread_info() ((struct thread_info *) \
+#define alloc_thread_info(tsk) ((struct thread_info *) \
 	__get_free_pages(GFP_KERNEL,2))
 #define free_thread_info(ti) free_pages((unsigned long) (ti), 2)
 #define get_thread_info(ti) get_task_struct((ti)->task)

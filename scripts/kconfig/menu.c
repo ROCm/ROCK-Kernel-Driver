@@ -221,11 +221,18 @@ void menu_finalize(struct menu *parent)
 	for (menu = parent->list; menu; menu = menu->next) {
 		if (sym && sym_is_choice(sym) && menu->sym) {
 			menu->sym->flags |= SYMBOL_CHOICEVAL;
+			if (!menu->prompt)
+				fprintf(stderr, "%s:%d:warning: choice value must have a prompt\n",
+					menu->file->name, menu->lineno);
 			for (prop = menu->sym->prop; prop; prop = prop->next) {
-				if (prop->type != P_DEFAULT)
-					continue;
-				fprintf(stderr, "%s:%d:warning: defaults for choice values not supported\n",
-					prop->file->name, prop->lineno);
+				if (prop->type == P_PROMPT && prop->menu != menu) {
+					fprintf(stderr, "%s:%d:warning: choice values currently only support a single prompt\n",
+						prop->file->name, prop->lineno);
+					
+				}
+				if (prop->type == P_DEFAULT)
+					fprintf(stderr, "%s:%d:warning: defaults for choice values not supported\n",
+						prop->file->name, prop->lineno);
 			}
 			current_entry = menu;
 			menu_set_type(sym->type);
@@ -310,14 +317,6 @@ bool menu_is_visible(struct menu *menu)
 		visible = menu->prompt->visible.tri;
 	} else
 		visible = menu->prompt->visible.tri = expr_calc_value(menu->prompt->visible.expr);
-
-	if (sym && sym_is_choice(sym)) {
-		for (child = menu->list; child; child = child->next)
-			if (menu_is_visible(child))
-				break;
-		if (!child)
-			return false;
-	}
 
 	if (visible != no)
 		return true;
