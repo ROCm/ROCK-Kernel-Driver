@@ -106,7 +106,7 @@ pimfor_decode_header(void *data, int len)
 int
 islpci_mgmt_rx_fill(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =    /* volatile not needed */
 		(isl38xx_control_block *) priv->control_block;
 	u32 curr = le32_to_cpu(cb->driver_curr_frag[ISL38XX_CB_RX_MGMTQ]);
@@ -165,7 +165,7 @@ static int
 islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 		    void *data, int length)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =
 		(isl38xx_control_block *) priv->control_block;
 	void *p;
@@ -271,7 +271,7 @@ islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 int
 islpci_mgt_receive(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =
 		(isl38xx_control_block *) priv->control_block;
 	u32 curr_frag;
@@ -414,7 +414,7 @@ n",
 void
 islpci_mgt_cleanup_transmit(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =    /* volatile not needed */
 		(isl38xx_control_block *) priv->control_block;
 	u32 curr_frag;
@@ -451,7 +451,7 @@ islpci_mgt_transaction(struct net_device *ndev,
 		       void *senddata, int sendlen,
 		       struct islpci_mgmtframe **recvframe)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	const long wait_cycle_jiffies = (ISL38XX_WAIT_CYCLE * 10 * HZ) / 1000;
 	long timeout_left = ISL38XX_MAX_WAIT_CYCLES * wait_cycle_jiffies;
 	int err;

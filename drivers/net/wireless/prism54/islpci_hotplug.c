@@ -133,7 +133,7 @@ prism54_get_card_model(struct net_device *ndev)
 	islpci_private	*priv;
 	char		*modelp;
 
-	priv = ndev->priv;
+	priv = netdev_priv(ndev);
 	switch (priv->pdev->subsystem_device) {
 	case PCIDEVICE_ISL3877:
 		modelp = "PRISM Indigo";
@@ -269,7 +269,7 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto do_pci_release_regions;
 	}
 
-	priv = ndev->priv;
+	priv = netdev_priv(ndev);
 	islpci_set_state(priv, PRV_STATE_PREBOOT); /* we are attempting to boot */
 
 	/* card is in unknown state yet, might have some interrupts pending */
@@ -314,7 +314,7 @@ void
 prism54_remove(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? ndev->priv : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
 	BUG_ON(!priv);
 
 	if (!__in_cleanup_module) {
@@ -355,7 +355,7 @@ int
 prism54_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? ndev->priv : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got suspend request (state %d)\n",
@@ -380,7 +380,7 @@ int
 prism54_resume(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? ndev->priv : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got resume request\n", ndev->name);

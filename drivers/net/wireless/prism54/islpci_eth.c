@@ -72,7 +72,7 @@ islpci_eth_cleanup_transmit(islpci_private *priv,
 int
 islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb = priv->control_block;
 	u32 index;
 	dma_addr_t pci_map_address;
@@ -411,7 +411,7 @@ islpci_eth_receive(islpci_private *priv)
 void
 islpci_eth_tx_timeout(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct net_device_stats *statistics = &priv->statistics;
 
 	/* increment the transmit error counter */
