@@ -285,12 +285,14 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 	}
 
 	result = usb_storage_raw_bulk(us, SCSI_DATA_READ, sensebuf, buflen, &act_len);
-	if (result != USB_STOR_TRANSPORT_GOOD)
+	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("request sense bulk in failed\n");
-	else
+		return USB_STOR_TRANSPORT_ERROR;
+	}
+	else {
 		US_DEBUGP("request sense worked\n");
-
-	return result;
+		return USB_STOR_TRANSPORT_GOOD;
+	}
 }
 
 /*
@@ -344,11 +346,12 @@ sddr09_readX(struct us_data *us, int x, unsigned long fromaddress,
 	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       buf, bulklen, use_sg);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
+	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("Result for bulk_transport in sddr09_read2%d %d\n",
 			  x, result);
-
-	return result;
+		return USB_STOR_TRANSPORT_ERROR;
+	}
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 /*
@@ -510,11 +513,12 @@ sddr09_writeX(struct us_data *us,
 	result = usb_storage_bulk_transport(us, SCSI_DATA_WRITE,
 				       buf, bulklen, use_sg);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
+	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("Result for bulk_transport in sddr09_writeX %d\n",
 			  result);
-
-	return result;
+		return USB_STOR_TRANSPORT_ERROR;
+	}
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 /* erase address, write same address */
@@ -590,13 +594,14 @@ sddr09_read_sg_test_only(struct us_data *us) {
 
 	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       buf, bulklen, 0);
-	if (result != USB_STOR_TRANSPORT_GOOD)
+	kfree(buf);
+	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("Result for bulk_transport in sddr09_read_sg %d\n",
 			  result);
+		return USB_STOR_TRANSPORT_ERROR;
+	}
 
-	kfree(buf);
-
-	return result;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 #endif
 
@@ -629,7 +634,8 @@ sddr09_read_status(struct us_data *us, unsigned char *status) {
 	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       data, sizeof(data), 0);
 	*status = data[0];
-	return result;
+	return (result == USB_STOR_XFER_GOOD ?
+			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
 }
 
 static int
@@ -953,7 +959,8 @@ sddr09_read_deviceID(struct us_data *us, unsigned char *deviceID) {
 	for (i = 0; i < 4; i++)
 		deviceID[i] = content[i];
 
-	return result;
+	return (result == USB_STOR_XFER_GOOD ?
+			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
 }
 
 static int
@@ -1549,7 +1556,8 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 					       srb->request_bufflen,
 					       srb->use_sg);
 
-		return result;
+		return (result == USB_STOR_XFER_GOOD ?
+			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
 	} 
 
 	return USB_STOR_TRANSPORT_GOOD;
