@@ -52,24 +52,14 @@ void module_free(struct module *mod, void *module_region)
 }
 
 /* s390/s390x needs additional memory for GOT/PLT sections. */
-long module_core_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
+int module_frob_arch_sections(const Elf_Ehdr *hdr,
+			      const Elf_Shdr *sechdrs,
+			      const char *secstrings,
+			      struct module *mod)
 {
 	// FIXME: add space needed for GOT/PLT
-	return module->core_size;
+	return 0;
 }
-
-long module_init_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	return module->init_size;
-}
-
-
 
 int apply_relocate(Elf_Shdr *sechdrs,
 		   const char *strtab,

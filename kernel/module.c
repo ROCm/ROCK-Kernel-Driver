@@ -1,4 +1,5 @@
 /* Rewritten by Rusty Russell, on the backs of many others...
+   Copyright (C) 2002 Richard Henderson
    Copyright (C) 2001 Rusty Russell, 2002 Rusty Russell IBM.
 
     This program is free software; you can redistribute it and/or modify
@@ -27,6 +28,8 @@
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
 #include <linux/moduleparam.h>
+#include <linux/errno.h>
+#include <linux/err.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -37,6 +40,13 @@
 #else
 #define DEBUGP(fmt , a...)
 #endif
+
+#ifndef ARCH_SHF_SMALL
+#define ARCH_SHF_SMALL 0
+#endif
+
+/* If this is set, the section belongs in the init part of the module */
+#define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
 #define symbol_is(literal, string)				\
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
@@ -52,13 +62,6 @@ static inline int strong_try_module_get(struct module *mod)
 		return 0;
 	return try_module_get(mod);
 }
-
-/* Convenient structure for holding init and core sizes */
-struct sizes
-{
-	unsigned long init_size;
-	unsigned long core_size;
-};
 
 /* Stub function for modules which don't have an initfn */
 int init_module(void)
@@ -764,43 +767,6 @@ void *__symbol_get(const char *symbol)
 }
 EXPORT_SYMBOL_GPL(__symbol_get);
 
-/* Transfer one ELF section to the correct (init or core) area. */
-static void *copy_section(const char *name,
-			  void *base,
-			  Elf_Shdr *sechdr,
-			  struct module *mod,
-			  struct sizes *used)
-{
-	void *dest;
-	unsigned long *use;
-	unsigned long max;
-
-	/* Only copy to init section if there is one */
-	if (strstr(name, ".init") && mod->module_init) {
-		dest = mod->module_init;
-		use = &used->init_size;
-		max = mod->init_size;
-	} else {
-		dest = mod->module_core;
-		use = &used->core_size;
-		max = mod->core_size;
-	}
-
-	/* Align up */
-	*use = ALIGN(*use, sechdr->sh_addralign);
-	dest += *use;
-	*use += sechdr->sh_size;
-
-	if (*use > max)
-		return ERR_PTR(-ENOEXEC);
-
-	/* May not actually be in the file (eg. bss). */
-	if (sechdr->sh_type != SHT_NOBITS)
-		memcpy(dest, base + sechdr->sh_offset, sechdr->sh_size);
-
-	return dest;
-}
-
 /* Deal with the given section */
 static int handle_section(const char *name,
 			  Elf_Shdr *sechdrs,
@@ -902,33 +868,66 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 	return 0;
 }
 
-/* Get the total allocation size of the init and non-init sections */
-static struct sizes get_sizes(const Elf_Ehdr *hdr,
-			      const Elf_Shdr *sechdrs,
-			      const char *secstrings)
+/* Update size with this section: return offset. */
+static long get_offset(unsigned long *size, Elf_Shdr *sechdr)
 {
-	struct sizes ret = { 0, 0 };
-	unsigned i;
+	long ret;
 
-	/* Everything marked ALLOC (this includes the exported
-           symbols) */
-	for (i = 1; i < hdr->e_shnum; i++) {
-		unsigned long *add;
+	ret = ALIGN(*size, sechdr->sh_addralign ?: 1);
+	*size = ret + sechdr->sh_size;
+	return ret;
+}
 
-		/* If it's called *.init*, and we're init, we're interested */
-		if (strstr(secstrings + sechdrs[i].sh_name, ".init") != 0)
-			add = &ret.init_size;
-		else
-			add = &ret.core_size;
+/* Lay out the SHF_ALLOC sections in a way not dissimilar to how ld
+   might -- code, read-only data, read-write data, small data.  Tally
+   sizes, and place the offsets into sh_link fields: high bit means it
+   belongs in init. */
+static void layout_sections(struct module *mod,
+			    const Elf_Ehdr *hdr,
+			    Elf_Shdr *sechdrs,
+			    const char *secstrings)
+{
+	static unsigned long const masks[][2] = {
+		{ SHF_EXECINSTR | SHF_ALLOC, ARCH_SHF_SMALL },
+		{ SHF_ALLOC, SHF_WRITE | ARCH_SHF_SMALL },
+		{ SHF_WRITE | SHF_ALLOC, ARCH_SHF_SMALL },
+		{ ARCH_SHF_SMALL | SHF_ALLOC, 0 }
+	};
+	unsigned int m, i;
 
-		if (sechdrs[i].sh_flags & SHF_ALLOC) {
-			/* Pad up to required alignment */
-			*add = ALIGN(*add, sechdrs[i].sh_addralign ?: 1);
-			*add += sechdrs[i].sh_size;
+	for (i = 0; i < hdr->e_shnum; i++)
+		sechdrs[i].sh_link = ~0UL;
+
+	DEBUGP("Core section allocation order:\n");
+	for (m = 0; m < ARRAY_SIZE(masks); ++m) {
+		for (i = 0; i < hdr->e_shnum; ++i) {
+			Elf_Shdr *s = &sechdrs[i];
+
+			if ((s->sh_flags & masks[m][0]) != masks[m][0]
+			    || (s->sh_flags & masks[m][1])
+			    || s->sh_link != ~0UL
+			    || strstr(secstrings + s->sh_name, ".init"))
+				continue;
+			s->sh_link = get_offset(&mod->core_size, s);
+			DEBUGP("\t%s\n", name);
 		}
 	}
 
-	return ret;
+	DEBUGP("Init section allocation order:\n");
+	for (m = 0; m < ARRAY_SIZE(masks); ++m) {
+		for (i = 0; i < hdr->e_shnum; ++i) {
+			Elf_Shdr *s = &sechdrs[i];
+
+			if ((s->sh_flags & masks[m][0]) != masks[m][0]
+			    || (s->sh_flags & masks[m][1])
+			    || s->sh_link != ~0UL
+			    || !strstr(secstrings + s->sh_name, ".init"))
+				continue;
+			s->sh_link = (get_offset(&mod->init_size, s)
+				      | INIT_OFFSET_MASK);
+			DEBUGP("\t%s\n", name);
+		}
+	}
 }
 
 /* Allocate and load the module */
@@ -942,7 +941,6 @@ static struct module *load_module(void *umod,
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
 		modindex, obsparmindex;
 	long arglen;
-	struct sizes sizes, used;
 	struct module *mod;
 	long err = 0;
 	void *ptr = NULL; /* Stops spurious gcc uninitialized warning */
@@ -1063,23 +1061,15 @@ static struct module *load_module(void *umod,
 
 	mod->state = MODULE_STATE_COMING;
 
-	/* How much space will we need? */
-	sizes = get_sizes(hdr, sechdrs, secstrings);
-
-	/* Set these up, and allow archs to manipulate them. */
-	mod->core_size = sizes.core_size;
-	mod->init_size = sizes.init_size;
-
-	/* Allow archs to add to them. */
-	err = module_init_size(hdr, sechdrs, secstrings, mod);
+	/* Allow arches to frob section contents and sizes.  */
+	err = module_frob_arch_sections(hdr, sechdrs, secstrings, mod);
 	if (err < 0)
 		goto free_mod;
-	mod->init_size = err;
 
-	err = module_core_size(hdr, sechdrs, secstrings, mod);
-	if (err < 0)
-		goto free_mod;
-	mod->core_size = err;
+	/* Determine total sizes, and put offsets in sh_link.  For now
+	   this is done generically; there doesn't appear to be any
+	   special cases for the architectures. */
+	layout_sections(mod, hdr, sechdrs, secstrings);
 
 	/* Do the allocs. */
 	ptr = module_alloc(mod->core_size);
@@ -1098,25 +1088,27 @@ static struct module *load_module(void *umod,
 	memset(ptr, 0, mod->init_size);
 	mod->module_init = ptr;
 
-	/* Transfer each section which requires ALLOC, and set sh_addr
-	   fields to absolute addresses. */
-	used.core_size = 0;
-	used.init_size = 0;
-	for (i = 1; i < hdr->e_shnum; i++) {
-		if (sechdrs[i].sh_flags & SHF_ALLOC) {
-			ptr = copy_section(secstrings + sechdrs[i].sh_name,
-					   hdr, &sechdrs[i], mod, &used);
-			if (IS_ERR(ptr))
-				goto cleanup;
-			sechdrs[i].sh_addr = (unsigned long)ptr;
-			/* Have we just copied __this_module across? */ 
-			if (i == modindex)
-				mod = ptr;
-		}
+	/* Transfer each section which specifies SHF_ALLOC */
+	for (i = 0; i < hdr->e_shnum; i++) {
+		void *dest;
+
+		if (!(sechdrs[i].sh_flags & SHF_ALLOC))
+			continue;
+
+		if (sechdrs[i].sh_link & INIT_OFFSET_MASK)
+			dest = mod->module_init
+				+ (sechdrs[i].sh_link & ~INIT_OFFSET_MASK);
+		else
+			dest = mod->module_core + sechdrs[i].sh_link;
+
+		if (sechdrs[i].sh_type != SHT_NOBITS)
+			memcpy(dest, (void *)sechdrs[i].sh_addr,
+			       sechdrs[i].sh_size);
+		/* Update sh_addr to point to copy in image. */
+		sechdrs[i].sh_addr = (unsigned long)dest;
 	}
-	/* Don't use more than we allocated! */
-	if (used.init_size > mod->init_size || used.core_size > mod->core_size)
-		BUG();
+	/* Module has been moved. */
+	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now we've moved module, initialize linked lists, etc. */
 	module_unload_init(mod);

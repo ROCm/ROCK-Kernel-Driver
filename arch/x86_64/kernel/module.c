@@ -26,20 +26,12 @@
 #define DEBUGP(fmt...) 
  
 /* We don't need anything special. */
-long module_core_size(const Elf64_Ehdr *hdr,
-		      const Elf64_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
+int module_frob_arch_sections(const Elf_Ehdr *hdr,
+			      const Elf_Shdr *sechdrs,
+			      const char *secstrings,
+			      struct module *mod)
 {
-	return module->core_size;
-}
-
-long module_init_size(const Elf64_Ehdr *hdr,
-		      const Elf64_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	return module->init_size;
+	return 0;
 }
 
 int apply_relocate_add(Elf64_Shdr *sechdrs,
