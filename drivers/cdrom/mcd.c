@@ -1069,7 +1069,7 @@ int __init mcd_init(void)
 		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
 		return -EIO;
 	}
-	if (check_region(mcd_port, 4)) {
+	if (!request_region(mcd_port, 4, "mcd")) {
 		cleanup(1);
 		printk(KERN_ERR "mcd: Initialization failed, I/O port (%X) already in use\n", mcd_port);
 		return -EIO;
@@ -1092,7 +1092,7 @@ int __init mcd_init(void)
 	if (count >= 2000000) {
 		printk(KERN_INFO "mcd: initialisation failed - No mcd device at 0x%x irq %d\n",
 		       mcd_port, mcd_irq);
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 	count = inb(MCDPORT(0));	/* pick up the status */
@@ -1102,12 +1102,12 @@ int __init mcd_init(void)
 		if (getValue(result + count)) {
 			printk(KERN_ERR "mcd: mitsumi get version failed at 0x%x\n",
 			       mcd_port);
-			cleanup(1);
+			cleanup(2);
 			return -EIO;
 		}
 
 	if (result[0] == result[1] && result[1] == result[2]) {
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 
@@ -1120,7 +1120,7 @@ int __init mcd_init(void)
 
 	if (request_irq(mcd_irq, mcd_interrupt, SA_INTERRUPT, "Mitsumi CD", NULL)) {
 		printk(KERN_ERR "mcd: Unable to get IRQ%d for Mitsumi CD-ROM\n", mcd_irq);
-		cleanup(1);
+		cleanup(2);
 		return -EIO;
 	}
 
@@ -1133,8 +1133,6 @@ int __init mcd_init(void)
 	sprintf(msg, " mcd: Mitsumi %s Speed CD-ROM at port=0x%x,"
 		" irq=%d\n", mcd_info.speed == 1 ? "Single" : "Double",
 		mcd_port, mcd_irq);
-
-	request_region(mcd_port, 4, "mcd");
 
 	outb(MCMD_CONFIG_DRIVE, MCDPORT(0));
 	outb(0x02, MCDPORT(0));
