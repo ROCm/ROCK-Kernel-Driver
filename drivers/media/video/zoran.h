@@ -383,7 +383,7 @@ struct card_info {
 };
 
 struct zoran {
-	struct video_device video_dev;
+	struct video_device *video_dev;
 
 	struct i2c_adapter i2c_adapter;	/* */
 	struct i2c_algo_bit_data i2c_algo;	/* */

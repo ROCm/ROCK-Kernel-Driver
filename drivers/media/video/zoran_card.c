@@ -987,6 +987,7 @@ static int __devinit
 zr36057_init (struct zoran *zr)
 {
 	unsigned long mem;
+	void *vdev;
 	unsigned mem_needed;
 	int j;
 	int two = 2;
@@ -1041,11 +1042,16 @@ zr36057_init (struct zoran *zr)
 	 * in case allocation fails */
 	mem_needed = BUZ_NUM_STAT_COM * 4;
 	mem = (unsigned long) kmalloc(mem_needed, GFP_KERNEL);
-	if (!mem) {
+	vdev = (void *) kmalloc(sizeof(struct video_device), GFP_KERNEL);
+	if (!mem || !vdev) {
 		dprintk(1,
 			KERN_ERR
 			"%s: zr36057_init() - kmalloc (STAT_COM) failed\n",
 			ZR_DEVNAME(zr));
+		if (vdev)
+			kfree(vdev);
+		if (mem)
+			kfree((void *)mem);
 		return -ENOMEM;
 	}
 	memset((void *) mem, 0, mem_needed);
@@ -1057,12 +1063,14 @@ zr36057_init (struct zoran *zr)
 	/*
 	 *   Now add the template and register the device unit.
 	 */
-	memcpy(&zr->video_dev, &zoran_template, sizeof(zoran_template));
-	strcpy(zr->video_dev.name, ZR_DEVNAME(zr));
-	if (video_register_device
-	    (&zr->video_dev, VFL_TYPE_GRABBER, video_nr) < 0) {
+	zr->video_dev = vdev;
+	memcpy(zr->video_dev, &zoran_template, sizeof(zoran_template));
+	strcpy(zr->video_dev->name, ZR_DEVNAME(zr));
+	if (video_register_device(zr->video_dev, VFL_TYPE_GRABBER,
+				  video_nr) < 0) {
 		zoran_unregister_i2c(zr);
 		kfree((void *) zr->stat_com);
+		kfree(vdev);
 		return -1;
 	}
 
@@ -1110,7 +1118,13 @@ zoran_release (struct zoran *zr)
 	kfree((void *) zr->stat_com);
 	zoran_proc_cleanup(zr);
 	iounmap(zr->zr36057_mem);
-	video_unregister_device(&zr->video_dev);
+	video_unregister_device(zr->video_dev);
+}
+
+void
+zoran_vdev_release (struct video_device *vdev)
+{
+	kfree(vdev);
 }
 
 static struct videocodec_master * __devinit
