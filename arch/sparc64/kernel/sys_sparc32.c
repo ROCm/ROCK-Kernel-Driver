@@ -3026,7 +3026,8 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	if ((retval = bprm.envc) < 0)
 		goto out_mm;
 
-	if ((retval = security_bprm_alloc(&bprm)))
+	retval = security_bprm_alloc(&bprm);
+	if (retval)
 		goto out;
 
 	retval = prepare_binprm(&bprm);

@@ -1348,7 +1348,8 @@ asmlinkage long sys_nice(int increment)
 	if (nice > 19)
 		nice = 19;
 
-	if ((retval = security_task_setnice(current, nice)))
+	retval = security_task_setnice(current, nice);
+	if (retval)
 		return retval;
 
 	set_user_nice(current, nice);
@@ -1469,7 +1470,8 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	    !capable(CAP_SYS_NICE))
 		goto out_unlock;
 
-	if ((retval = security_task_setscheduler(p, policy, &lp)))
+	retval = security_task_setscheduler(p, policy, &lp);
+	if (retval)
 		goto out_unlock;
 
 	array = p->array;
@@ -1532,7 +1534,8 @@ asmlinkage long sys_sched_getscheduler(pid_t pid)
 	read_lock(&tasklist_lock);
 	p = find_process_by_pid(pid);
 	if (p) {
-		if (!(retval = security_task_getscheduler(p)))
+		retval = security_task_getscheduler(p);
+		if (!retval)
 			retval = p->policy;
 	}
 	read_unlock(&tasklist_lock);
@@ -1561,7 +1564,8 @@ asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param)
 	if (!p)
 		goto out_unlock;
 
-	if ((retval = security_task_getscheduler(p)))
+	retval = security_task_getscheduler(p);
+	if (retval)
 		goto out_unlock;
 
 	lp.sched_priority = p->rt_priority;
@@ -1820,7 +1824,8 @@ asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 	if (!p)
 		goto out_unlock;
 
-	if ((retval = security_task_getscheduler(p)))
+	retval = security_task_getscheduler(p);
+	if (retval)
 		goto out_unlock;
 
 	jiffies_to_timespec(p->policy & SCHED_FIFO ?

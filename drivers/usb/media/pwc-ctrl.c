@@ -256,8 +256,10 @@ static inline int set_video_mode_Nala(struct pwc_device *pdev, int size, int fra
 
 	memcpy(buf, pEntry->mode, 3);	
 	ret = send_video_command(pdev->udev, pdev->vendpoint, buf, 3);
-	if (ret < 0)
+	if (ret < 0) {
+		Debug("Failed to send video command... %d\n", ret);
 		return ret;
+	}
 	if (pEntry->compressed && pdev->decompressor != NULL)
 		pdev->decompressor->init(pdev->release, buf, pdev->decompress_data);
 		
@@ -1103,12 +1105,7 @@ int pwc_set_leds(struct pwc_device *pdev, int on_value, int off_value)
 	buf[0] = on_value;
 	buf[1] = off_value;
 
-	return usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
-		SET_STATUS_CTL,
-		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		LED_FORMATTER,
-		pdev->vcinterface,
-		&buf, 2, HZ / 2);
+	return SendControlMsg(SET_STATUS_CTL, LED_FORMATTER, 2);
 }
 
 int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value)
@@ -1122,13 +1119,7 @@ int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value)
 		return 0;
 	}
 
-	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
-   	        GET_STATUS_CTL,
-		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		LED_FORMATTER,
-		pdev->vcinterface,
-		&buf, 2, HZ / 2);
-
+	ret = RecvControlMsg(GET_STATUS_CTL, LED_FORMATTER, 2);
 	if (ret < 0)
 		return ret;
 	*on_value = buf[0] * 100;
@@ -1279,7 +1270,6 @@ static inline int pwc_get_dynamic_noise(struct pwc_device *pdev)
 	ret = RecvControlMsg(GET_LUM_CTL, DYNAMIC_NOISE_CONTROL_FORMATTER, 1);
 	if (ret < 0)
 		return ret;
-//Debug("pwc_get_dynamic_noise = %d\n", buf);
 	return buf;
 }
 
@@ -1363,12 +1353,10 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 
 	case VIDIOCPWCPROBE:
 	{
-		struct pwc_probe probe;
+		struct pwc_probe *probe = arg;
 		
-		strcpy(probe.name, pdev->vdev->name);
-		probe.type = pdev->type;
-		if (copy_to_user(arg, &probe, sizeof(probe)))
-			ret = -EFAULT;
+		strcpy(probe->name, pdev->vdev->name);
+		probe->type = pdev->type;
 		break;
 	}
 

@@ -717,7 +717,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & CLONE_DETACHED) && !(clone_flags & CLONE_THREAD))
 		return ERR_PTR(-EINVAL);
 
-	if ((retval = security_task_create(clone_flags)))
+	retval = security_task_create(clone_flags);
+	if (retval)
 		goto fork_out;
 
 	retval = -ENOMEM;

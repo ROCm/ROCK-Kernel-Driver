@@ -140,7 +140,8 @@ asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t *grouplist)
 		return -EFAULT;
 	for (i = 0 ; i < gidsetsize ; i++)
 		new_groups[i] = (gid_t)groups[i];
-	if ((i = security_task_setgroups(gidsetsize, new_groups)))
+	i = security_task_setgroups(gidsetsize, new_groups);
+	if (i)
 		return i;
 	memcpy(current->groups, new_groups, gidsetsize * sizeof(gid_t));
 	current->ngroups = gidsetsize;

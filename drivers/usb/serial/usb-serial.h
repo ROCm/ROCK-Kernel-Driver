@@ -237,24 +237,8 @@ extern void usb_serial_port_softint(void *private);
 extern int usb_serial_probe(struct usb_interface *iface, const struct usb_device_id *id);
 extern void usb_serial_disconnect(struct usb_interface *iface);
 
-/* determine if we should include the EzUSB loader functions */
-#undef USES_EZUSB_FUNCTIONS
-#if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_XIRCOM) || defined(CONFIG_USB_SERIAL_XIRCOM_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_KEYSPAN) || defined(CONFIG_USB_SERIAL_KEYSPAN_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#if defined(CONFIG_USB_SERIAL_WHITEHEAT) || defined(CONFIG_USB_SERIAL_WHITEHEAT_MODULE)
-	#define USES_EZUSB_FUNCTIONS
-#endif
-#ifdef USES_EZUSB_FUNCTIONS
 extern int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest);
 extern int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit);
-#endif
 
 /* USB Serial console functions */
 #ifdef CONFIG_USB_SERIAL_CONSOLE
@@ -265,10 +249,20 @@ static inline void usb_serial_console_init (int debug, int minor) { }
 static inline void usb_serial_console_exit (void) { }
 #endif
 
-/* Functions needed by the usb serial console code */
+/* Functions needed by other parts of the usbserial core */
 extern struct usb_serial *usb_serial_get_by_minor (unsigned int minor);
 extern int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp);
 extern int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+extern void usb_serial_generic_close (struct usb_serial_port *port, struct file *filp);
+extern int usb_serial_generic_write_room (struct usb_serial_port *port);
+extern int usb_serial_generic_chars_in_buffer (struct usb_serial_port *port);
+extern void usb_serial_generic_read_bulk_callback (struct urb *urb);
+extern void usb_serial_generic_write_bulk_callback (struct urb *urb);
+extern void usb_serial_generic_shutdown (struct usb_serial *serial);
+extern int usb_serial_generic_register (int debug);
+extern void usb_serial_generic_deregister (void);
+
+extern struct usb_serial_device_type usb_serial_generic_device;
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)
