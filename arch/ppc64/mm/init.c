@@ -533,6 +533,8 @@ void __init do_init_bootmem(void)
 	unsigned long total_pages = lmb_end_of_DRAM() >> PAGE_SHIFT;
 	int boot_mapsize;
 
+        max_pfn = max_low_pfn;
+
 	/*
 	 * Find an area to use for the bootmem bitmap.  Calculate the size of
 	 * bitmap required as (Total Memory) / PAGE_SIZE / BITS_PER_BYTE.
@@ -629,7 +631,6 @@ void __init mem_init(void)
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
-	max_pfn = max_low_pfn;
 
 #ifdef CONFIG_DISCONTIGMEM
 {
