@@ -60,8 +60,8 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 		}
 
 		if (offset + len > t->size) {
-			offset = 0;
 			count += t->size - offset;
+			offset = 0;
 			continue;
 		}
 
