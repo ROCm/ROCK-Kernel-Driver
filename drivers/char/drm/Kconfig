@@ -24,7 +24,7 @@ config DRM_TDFX
 
 config DRM_GAMMA
 	tristate "3dlabs GMX 2000"
-	depends on DRM
+	depends on DRM && BROKEN
 	help
 	  This is the old gamma driver, please tell me if it might actually
 	  work.
