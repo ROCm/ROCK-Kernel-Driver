@@ -289,6 +289,15 @@ S: Via Delle Palme, 9
 S: Terni 05100
 S: Italy
 
+N: Krzysztof Benedyczak
+E: golbi@mat.uni.torun.pl
+W: http://www.mat.uni.torun.pl/~golbi
+D: POSIX message queues fs (with M. Wronski)
+S: ul. Podmiejska 52
+S: Radunica
+S: 83-000 Pruszcz Gdanski
+S: Poland
+
 N: Randolph Bentson
 E: bentson@grieg.seaslug.org
 W: http://www.aa.net/~bentson/
@@ -3484,6 +3493,14 @@ S: c/o OSDL
 S: 12725 SW Millikan Way, Suite 400
 S: Beaverton, OR 97005
 S: USA
+
+N: Michal Wronski
+E: wrona@mat.uni.torun.pl
+W: http://www.mat.uni.torun.pl/~wrona
+D: POSIX message queues fs (with K. Benedyczak)
+S: ul. Teczowa 23/12
+S: 80-680 Gdansk-Sobieszewo
+S: Poland
 
 N: Frank Xia
 E: qx@math.columbia.edu
