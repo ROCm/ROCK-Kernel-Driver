@@ -246,9 +246,7 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	unsigned char *tmp_hdr = NULL;
 	u16 hdr_len;
 	u16 ah_hlen;
-	u16 nh_offset = 0;
-	u8 nexthdr = 0;
-	u8 *prevhdr;
+	int nexthdr;
 
 	if (!pskb_may_pull(skb, sizeof(struct ip_auth_hdr)))
 		goto out;
@@ -301,8 +299,6 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 
 	skb->nh.raw = skb_pull(skb, ah_hlen);
 	memcpy(skb->nh.raw, tmp_hdr, hdr_len);
-	prevhdr = (u8*)(skb->nh.raw + nh_offset);
-	*prevhdr = nexthdr;
 	skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	skb_pull(skb, hdr_len);
 	skb->h.raw = skb->data;
