@@ -133,6 +133,13 @@
 #define IDTECH_VID		0x0ACD	/* ID TECH Vendor ID */
 #define IDTECH_IDT1221U_PID	0x0300	/* IDT1221U USB to RS-232 adapter */
 
+/*
+ * Definitions for Omnidirectional Control Technology, Inc. devices
+ */
+#define OCT_VID			0x0B39	/* OCT vendor ID */
+/* Note: OCT US101 is also rebadged as Dick Smith Electronics (NZ) XH6381 */
+#define OCT_US101_PID		0x0421	/* OCT US101 USB to RS-232 */
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5)
+ * Driver for USB Scanners (linux-2.6)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Copyright (C) 2002, 2003 Henning Meier-Geinitz
@@ -368,6 +368,18 @@
  *    - Fixed race between open and probe (Oliver Neukum).
  *    - Added vendor/product ids for Avision, Canon, HP, Microtek and Relisys scanners.
  *    - Clean up irq urb when not enough memory is available.
+ *
+ * 0.4.15  2003-09-22
+ *    - Use static declarations for usb_scanner_init/usb_scanner_exit 
+ *      (Daniele Bellucci).
+ *    - Report back return codes of usb_register and usb_usbmit_urb instead of -1 or
+ *      -ENONMEM (Daniele Bellucci).
+ *    - Balancing usb_register_dev/usb_deregister_dev in probe_scanner when a fail 
+ *      condition occours (Daniele Bellucci).
+ *    - Added vendor/product ids for Canon, HP, Microtek, Mustek, Siemens, UMAX, and
+ *      Visioneer scanners.
+ *    - Added test for USB_CLASS_CDC_DATA which is used by some fingerprint scanners.
+ *
  *
  * TODO
  *    - Performance
@@ -950,6 +962,7 @@ probe_scanner(struct usb_interface *intf,
  
 	if (interface[0].desc.bInterfaceClass != USB_CLASS_VENDOR_SPEC &&
 	    interface[0].desc.bInterfaceClass != USB_CLASS_PER_INTERFACE &&
+	    interface[0].desc.bInterfaceClass != USB_CLASS_CDC_DATA &&
 	    interface[0].desc.bInterfaceClass != SCN_CLASS_SCANJET) {
 		dbg("probe_scanner: This interface doesn't look like a scanner (class=0x%x).", interface[0].desc.bInterfaceClass);
 		return -ENODEV;
@@ -1043,6 +1056,7 @@ probe_scanner(struct usb_interface *intf,
 
 	scn->scn_irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!scn->scn_irq) {
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
@@ -1061,11 +1075,13 @@ probe_scanner(struct usb_interface *intf,
 			     // endpoint[(int)have_intr].bInterval);
 			     250);
 
-	        if (usb_submit_urb(scn->scn_irq, GFP_KERNEL)) {
+		retval = usb_submit_urb(scn->scn_irq, GFP_KERNEL);
+		if (retval) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", intf->minor);
+			usb_deregister_dev(intf, &scanner_class);
                 	kfree(scn);
 			up(&scn_mutex);
-                	return -ENOMEM;
+                	return retval;
         	}
 	}
 
@@ -1076,6 +1092,7 @@ probe_scanner(struct usb_interface *intf,
 		if (have_intr)
 			usb_unlink_urb(scn->scn_irq);
 		usb_free_urb(scn->scn_irq);
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
@@ -1087,6 +1104,7 @@ probe_scanner(struct usb_interface *intf,
 		if (have_intr)
 			usb_unlink_urb(scn->scn_irq);
 		usb_free_urb(scn->scn_irq);
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn->obuf);
 		kfree(scn);
 		up(&scn_mutex);
@@ -1169,22 +1187,25 @@ usb_driver scanner_driver = {
 	.id_table =	ids,
 };
 
-void __exit
+static void __exit
 usb_scanner_exit(void)
 {
 	usb_deregister(&scanner_driver);
 }
 
-int __init
+static int __init
 usb_scanner_init (void)
 {
-        if (usb_register(&scanner_driver) < 0)
-                return -1;
+	int retval;
+	retval = usb_register(&scanner_driver);
+	if (retval)
+		goto out;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	if (vendor != -1 && product != -1)
 		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
-	return 0;
+ out:
+	return retval;
 }
 
 module_init(usb_scanner_init);
