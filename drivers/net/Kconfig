@@ -1876,6 +1876,8 @@ config NE_H8300
 	  Say Y here if you want to use the NE2000 compatible
 	  controller on the Renesas H8/300 processor.
 
+source "drivers/net/fec_8xx/Kconfig"
+
 endmenu
 
 #
@@ -2595,3 +2597,4 @@ config NETCONSOLE
 	---help---
 	If you want to log kernel messages over the network, enable this.
 	See Documentation/networking/netconsole.txt for details.
+
