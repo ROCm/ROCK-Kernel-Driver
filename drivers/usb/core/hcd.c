@@ -967,169 +967,20 @@ static void urb_unlink (struct urb *urb)
 }
 
 
-/* may be called in any context with a valid urb->dev usecount */
-/* caller surrenders "ownership" of urb */
-
+/* may be called in any context with a valid urb->dev usecount
+ * caller surrenders "ownership" of urb
+ * expects usb_submit_urb() to have sanity checked and conditioned all
+ * inputs in the urb
+ */
 static int hcd_submit_urb (struct urb *urb, int mem_flags)
 {
 	int			status;
-	struct usb_hcd		*hcd;
-	struct hcd_dev		*dev;
+	struct usb_hcd		*hcd = urb->dev->bus->hcpriv;
+	struct hcd_dev		*dev = urb->dev->hcpriv;
 	unsigned long		flags;
-	int			pipe, temp, max;
 
-	if (!urb || urb->hcpriv || !urb->complete)
-		return -EINVAL;
-
-	urb->status = -EINPROGRESS;
-	urb->actual_length = 0;
-	urb->bandwidth = 0;
-	INIT_LIST_HEAD (&urb->urb_list);
-
-	if (!urb->dev || !urb->dev->bus || urb->dev->devnum <= 0)
-		return -ENODEV;
-	hcd = urb->dev->bus->hcpriv;
-	dev = urb->dev->hcpriv;
 	if (!hcd || !dev)
 		return -ENODEV;
-
-	/* can't submit new urbs when quiescing, halted, ... */
-	if (hcd->state == USB_STATE_QUIESCING || !HCD_IS_RUNNING (hcd->state))
-		return -ESHUTDOWN;
-	pipe = urb->pipe;
-	temp = usb_pipetype (urb->pipe);
-	if (usb_endpoint_halted (urb->dev, usb_pipeendpoint (pipe),
-			usb_pipeout (pipe)))
-		return -EPIPE;
-
-	/* FIXME there should be a sharable lock protecting us against
-	 * config/altsetting changes and disconnects, kicking in here.
-	 */
-
-	/* Sanity check, so HCDs can rely on clean data */
-	max = usb_maxpacket (urb->dev, pipe, usb_pipeout (pipe));
-	if (max <= 0) {
-		err ("bogus endpoint (bad maxpacket)");
-		return -EINVAL;
-	}
-
-	/* "high bandwidth" mode, 1-3 packets/uframe? */
-	if (urb->dev->speed == USB_SPEED_HIGH) {
-		int	mult;
-		switch (temp) {
-		case PIPE_ISOCHRONOUS:
-		case PIPE_INTERRUPT:
-			mult = 1 + ((max >> 11) & 0x03);
-			max &= 0x03ff;
-			max *= mult;
-		}
-	}
-
-	/* periodic transfers limit size per frame/uframe */
-	switch (temp) {
-	case PIPE_ISOCHRONOUS: {
-		int	n, len;
-
-		if (urb->number_of_packets <= 0)		    
-			return -EINVAL;
-		for (n = 0; n < urb->number_of_packets; n++) {
-			len = urb->iso_frame_desc [n].length;
-			if (len < 0 || len > max) 
-				return -EINVAL;
-		}
-
-		}
-		break;
-	case PIPE_INTERRUPT:
-		if (urb->transfer_buffer_length > max)
-			return -EINVAL;
-	}
-
-	/* the I/O buffer must usually be mapped/unmapped */
-	if (urb->transfer_buffer_length < 0)
-		return -EINVAL;
-
-#ifdef DEBUG
-	/* stuff that drivers shouldn't do, but which shouldn't
-	 * cause problems in HCDs if they get it wrong.
-	 */
-	{
-	unsigned int	orig_flags = urb->transfer_flags;
-	unsigned int	allowed;
-
-	/* enforce simple/standard policy */
-	allowed = USB_ASYNC_UNLINK;	// affects later unlinks
-	allowed |= USB_NO_FSBR;		// only affects UHCI
-	switch (temp) {
-	case PIPE_CONTROL:
-		allowed |= USB_DISABLE_SPD;
-		break;
-	case PIPE_BULK:
-		allowed |= USB_DISABLE_SPD | USB_QUEUE_BULK
-				| USB_ZERO_PACKET | URB_NO_INTERRUPT;
-		break;
-	case PIPE_INTERRUPT:
-		allowed |= USB_DISABLE_SPD;
-		break;
-	case PIPE_ISOCHRONOUS:
-		allowed |= USB_ISO_ASAP;
-		break;
-	}
-	urb->transfer_flags &= allowed;
-
-	/* fail if submitter gave bogus flags */
-	if (urb->transfer_flags != orig_flags) {
-		err ("BOGUS urb flags, %x --> %x",
-			orig_flags, urb->transfer_flags);
-		return -EINVAL;
-	}
-	}
-#endif
-	/*
-	 * Force periodic transfer intervals to be legal values that are
-	 * a power of two (so HCDs don't need to).
-	 *
-	 * FIXME want bus->{intr,iso}_sched_horizon values here.  Each HC
-	 * supports different values... this uses EHCI/UHCI defaults (and
-	 * EHCI can use smaller non-default values).
-	 */
-	switch (temp) {
-	case PIPE_ISOCHRONOUS:
-	case PIPE_INTERRUPT:
-		/* too small? */
-		if (urb->interval <= 0)
-			return -EINVAL;
-		/* too big? */
-		switch (urb->dev->speed) {
-		case USB_SPEED_HIGH:	/* units are microframes */
-			// NOTE usb handles 2^15
-			if (urb->interval > (1024 * 8))
-				urb->interval = 1024 * 8;
-			temp = 1024 * 8;
-			break;
-		case USB_SPEED_FULL:	/* units are frames/msec */
-		case USB_SPEED_LOW:
-			if (temp == PIPE_INTERRUPT) {
-				if (urb->interval > 255)
-					return -EINVAL;
-				// NOTE ohci only handles up to 32
-				temp = 128;
-			} else {
-				if (urb->interval > 1024)
-					urb->interval = 1024;
-				// NOTE usb and ohci handle up to 2^15
-				temp = 1024;
-			}
-			break;
-		default:
-			return -EINVAL;
-		}
-		/* power of two? */
-		while (temp > urb->interval)
-			temp >>= 1;
-		urb->interval = temp;
-	}
-
 
 	/*
 	 * FIXME:  make urb timeouts be generic, keeping the HCD cores
@@ -1139,9 +990,6 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	// NOTE:  a generic device/urb monitoring hook would go here.
 	// hcd_monitor_hook(MONITOR_URB_SUBMIT, urb)
 	// It would catch submission paths for all urbs.
-
-	/* increment urb's reference count, we now control it. */
-	urb = usb_get_urb(urb);
 
 	/*
 	 * Atomically queue the urb,  first to our records, then to the HCD.
@@ -1164,18 +1012,15 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	if (status)
 		return status;
 
-	/* temporarily up refcount while queueing it in the HCD,
-	 * since we report some queuing/setup errors ourselves
+	/* increment urb's reference count as part of giving it to the HCD
+	 * (which now controls it).  HCD guarantees that it either returns
+	 * an error or calls giveback(), but not both.
 	 */
 	urb = usb_get_urb (urb);
 	if (urb->dev == hcd->self.root_hub)
 		status = rh_urb_enqueue (hcd, urb);
 	else
 		status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
-	/* urb->dev got nulled if hcd called giveback for us */
-	if (status && urb->dev)
-		urb_unlink (urb);
-	usb_put_urb (urb);
 	return status;
 }
 
