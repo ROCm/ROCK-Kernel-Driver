@@ -329,6 +329,12 @@ static int DRM(setup)( drm_device_t *dev )
 	memset(dev->maplist, 0, sizeof(*dev->maplist));
 	INIT_LIST_HEAD(&dev->maplist->head);
 
+	dev->ctxlist = DRM(alloc)(sizeof(*dev->ctxlist),
+				  DRM_MEM_CTXLIST);
+	if(dev->ctxlist == NULL) return -ENOMEM;
+	memset(dev->ctxlist, 0, sizeof(*dev->ctxlist));
+	INIT_LIST_HEAD(&dev->ctxlist->head);
+
 	dev->vmalist = NULL;
 	dev->sigdata.lock = dev->lock.hw_lock = NULL;
 	init_waitqueue_head( &dev->lock.lock_queue );
@@ -567,6 +573,7 @@ static int DRM(probe)(struct pci_dev *pdev)
 	dev->count_lock = SPIN_LOCK_UNLOCKED;
 	init_timer( &dev->timer );
 	sema_init( &dev->struct_sem, 1 );
+	sema_init( &dev->ctxlist_sem, 1 );
 
 	if ((dev->minor = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
 		return -EPERM;
@@ -893,6 +900,26 @@ int DRM(release)( struct inode *inode, struct file *filp )
 #endif
 
 	DRM(fasync)( -1, filp, 0 );
+
+	down( &dev->ctxlist_sem );
+	if ( !list_empty( &dev->ctxlist->head ) ) {
+		drm_ctx_list_t *pos, *n;
+
+		list_for_each_entry_safe( pos, n, &dev->ctxlist->head, head ) {
+			if ( pos->tag == priv &&
+			     pos->handle != DRM_KERNEL_CONTEXT ) {
+#ifdef DRIVER_CTX_DTOR
+				DRIVER_CTX_DTOR(pos->handle);
+#endif
+#if __HAVE_CTX_BITMAP
+				DRM(ctxbitmap_free)( dev, pos->handle );
+#endif
+				list_del( &pos->head );
+				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
+			}
+		}
+	}
+	up( &dev->ctxlist_sem );
 
 	down( &dev->struct_sem );
 	if ( priv->remove_auth_on_close == 1 ) {

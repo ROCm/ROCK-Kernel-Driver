@@ -148,6 +148,7 @@
 #define DRM_MEM_CTXBITMAP 18
 #define DRM_MEM_STUB      19
 #define DRM_MEM_SGLISTS   20
+#define DRM_MEM_CTXLIST  21
 
 #define DRM_MAX_CTXBITMAP (PAGE_SIZE * 8)
 	
@@ -608,6 +609,15 @@ typedef struct drm_map_list {
 
 typedef drm_map_t drm_local_map_t;
 
+/**
+ * Context handle list
+ */
+typedef struct drm_ctx_list {
+	struct list_head	head;   /**< list head */
+	drm_context_t		handle; /**< context handle */
+	drm_file_t		*tag;   /**< associated fd private data */
+} drm_ctx_list_t;
+
 #if __HAVE_VBL_IRQ
 
 typedef struct drm_vbl_sig {
@@ -667,6 +677,12 @@ typedef struct drm_device {
 	/*@{*/
 	drm_map_list_t	  *maplist;	/**< Linked list of regions */
 	int		  map_count;	/**< Number of mappable regions */
+
+	/** \name Context handle management */
+	/*@{*/
+	drm_ctx_list_t	  *ctxlist;	/**< Linked list of context handles */
+	int		  ctx_count;	/**< Number of context handles */
+	struct semaphore  ctxlist_sem;	/**< For ctxlist */
 
 	drm_map_t	  **context_sareas; /**< per-context SAREA's */
 	int		  max_context;
