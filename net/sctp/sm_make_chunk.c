@@ -66,6 +66,19 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
+/* What was the inbound interface for this chunk? */
+int sctp_chunk_iif(const struct sctp_chunk *chunk)
+{
+	struct sctp_af *af;
+	int iif = 0;
+
+	af = sctp_get_af_specific(ipver2af(chunk->skb->nh.iph->version));
+	if (af)
+		iif = af->skb_iif(chunk->skb);
+
+	return iif;
+}
+
 /* RFC 2960 3.3.2 Initiation (INIT) (1)
  *
  * Note 2: The ECN capable field is reserved for future use of
@@ -145,7 +158,7 @@ void  sctp_init_cause(sctp_chunk_t *chunk, __u16 cause_code,
  */
 sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 			     const sctp_bind_addr_t *bp,
-			     int priority, int vparam_len)
+			     int gfp, int vparam_len)
 {
 	sctp_inithdr_t init;
 	union sctp_params addrs;
@@ -165,7 +178,7 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	addrs.v = NULL;
 
 	/* Convert the provided bind address list to raw format */
-	addrs = sctp_bind_addrs_to_raw(bp, &addrs_len, priority);
+	addrs = sctp_bind_addrs_to_raw(bp, &addrs_len, gfp);
 	if (!addrs.v)
 		goto nodata;
 
@@ -225,7 +238,7 @@ nodata:
 
 sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 				 const sctp_chunk_t *chunk,
-				 int priority, int unkparam_len)
+				 int gfp, int unkparam_len)
 {
 	sctp_inithdr_t initack;
 	sctp_chunk_t *retval;
@@ -237,8 +250,7 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 
 	retval = NULL;
 
-	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, 
-				       priority);
+	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, gfp);
 	if (!addrs.v)
 		goto nomem_rawaddr;
 
@@ -1162,7 +1174,7 @@ int sctp_datachunks_from_user(sctp_association_t *asoc,
 			msg_len -= first_len;
 			whole = 1;
 		}
-	} 
+	}
 
 	/* How many full sized?  How many bytes leftover? */
 	whole += msg_len / max;
@@ -1198,7 +1210,7 @@ int sctp_datachunks_from_user(sctp_association_t *asoc,
 
 		__skb_queue_tail(chunks, (struct sk_buff *)chunk);
 
-		/* The first chunk, the first chunk was likely short 
+		/* The first chunk, the first chunk was likely short
 		 * to allow bundling, so reset to full size.
 		 */
 		if (0 == i)
@@ -1282,26 +1294,26 @@ void sctp_chunk_assign_tsn(sctp_chunk_t *chunk)
 }
 
 /* Create a CLOSED association to use with an incoming packet.  */
-sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *ep,
-					sctp_chunk_t *chunk,
-					int priority)
+sctp_association_t *sctp_make_temp_asoc(const struct sctp_endpoint *ep,
+					struct sctp_chunk *chunk, int gfp)
 {
 	sctp_association_t *asoc;
+	struct sk_buff *skb;
 	sctp_scope_t scope;
 
 	/* Create the bare association.  */
 	scope = sctp_scope(sctp_source(chunk));
-	asoc = sctp_association_new(ep, ep->base.sk, scope, priority);
+	asoc = sctp_association_new(ep, ep->base.sk, scope, gfp);
 	if (!asoc)
 		goto nodata;
-
+	skb = chunk->skb;
 	/* Create an entry for the source address of the packet.  */
-	switch (chunk->skb->nh.iph->version) {
+	/* FIXME: Use the af specific helpers. */
+	switch (skb->nh.iph->version) {
 	case 4:
 		asoc->c.peer_addr.v4.sin_family     = AF_INET;
 		asoc->c.peer_addr.v4.sin_port = ntohs(chunk->sctp_hdr->source);
-		asoc->c.peer_addr.v4.sin_addr.s_addr =
-			chunk->skb->nh.iph->saddr;
+		asoc->c.peer_addr.v4.sin_addr.s_addr = skb->nh.iph->saddr;
                 break;
 
 	case 6:
@@ -1309,8 +1321,9 @@ sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *ep,
 		asoc->c.peer_addr.v6.sin6_port
 			= ntohs(chunk->sctp_hdr->source);
 		asoc->c.peer_addr.v6.sin6_flowinfo = 0; /* BUG BUG BUG */
-		asoc->c.peer_addr.v6.sin6_addr = chunk->skb->nh.ipv6h->saddr;
-		asoc->c.peer_addr.v6.sin6_scope_id = 0; /* BUG BUG BUG */
+		asoc->c.peer_addr.v6.sin6_addr = skb->nh.ipv6h->saddr;
+		asoc->c.peer_addr.v6.sin6_scope_id =
+			((struct inet6_skb_parm *)skb->cb)->iif;
 		break;
 
         default:
@@ -1397,7 +1410,7 @@ nodata:
 /* Unpack the cookie from COOKIE ECHO chunk, recreating the association.  */
 sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 				       const sctp_association_t *asoc,
-				       sctp_chunk_t *chunk, int priority,
+				       sctp_chunk_t *chunk, int gfp,
 				       int *error, sctp_chunk_t **err_chk_p)
 {
 	sctp_association_t *retval = NULL;
@@ -1408,6 +1421,7 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	__u8 digest_buf[SCTP_SIGNATURE_SIZE];
 	int secret;
 	sctp_scope_t scope;
+	struct sk_buff *skb = chunk->skb;
 
 	headersize = sizeof(sctp_chunkhdr_t) + SCTP_SECRET_SIZE;
 	bodysize = ntohs(chunk->chunk_hdr->length) - headersize;
@@ -1450,7 +1464,7 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	 * an association, there is no need to check cookie's expiration
 	 * for init collision case of lost COOKIE ACK.
 	 */
-	if (!asoc && tv_lt(bear_cookie->expiration, chunk->skb->stamp)) {
+	if (!asoc && tv_lt(bear_cookie->expiration, skb->stamp)) {
 		__u16 len;
 		/*
 		 * Section 3.3.10.3 Stale Cookie Error (3)
@@ -1463,9 +1477,9 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 		len = ntohs(chunk->chunk_hdr->length);
 		*err_chk_p = sctp_make_op_error_space(asoc, chunk, len);
 		if (*err_chk_p) {
-			suseconds_t usecs = (chunk->skb->stamp.tv_sec -
+			suseconds_t usecs = (skb->stamp.tv_sec -
 				bear_cookie->expiration.tv_sec) * 1000000L +
-				chunk->skb->stamp.tv_usec -
+				skb->stamp.tv_usec -
 				bear_cookie->expiration.tv_usec;
 
 			usecs = htonl(usecs);
@@ -1480,7 +1494,7 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 
 	/* Make a new base association.  */
 	scope = sctp_scope(sctp_source(chunk));
-	retval = sctp_association_new(ep, ep->base.sk, scope, priority);
+	retval = sctp_association_new(ep, ep->base.sk, scope, gfp);
 	if (!retval) {
 		*error = -SCTP_IERROR_NOMEM;
 		goto fail;
@@ -1522,13 +1536,14 @@ malformed:
  * 3rd Level Abstractions
  ********************************************************************/
 
-/*
- * Report a missing mandatory parameter.
- */
 struct __sctp_missing {
 	__u32 num_missing;
 	__u16 type;
 }  __attribute__((packed));;
+
+/*
+ * Report a missing mandatory parameter.
+ */
 static int sctp_process_missing_param(const sctp_association_t *asoc,
 				      sctp_param_t paramtype,
 				      sctp_chunk_t *chunk,
@@ -1774,8 +1789,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
  */
 int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		      const union sctp_addr *peer_addr,
-		      sctp_init_chunk_t *peer_init,
-		      int priority)
+		      sctp_init_chunk_t *peer_init, int gfp)
 {
 	union sctp_params param;
 	struct sctp_transport *transport;
@@ -1793,14 +1807,14 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	 * be a a better choice than any of the embedded addresses.
 	 */
 	if (peer_addr)
-		if(!sctp_assoc_add_peer(asoc, peer_addr, priority))
+		if(!sctp_assoc_add_peer(asoc, peer_addr, gfp))
 			goto nomem;
 
 	/* Process the initialization parameters.  */
 
 	sctp_walk_params(param, peer_init, init_hdr.params) {
 
-		if (!sctp_process_param(asoc, param, peer_addr, priority))
+		if (!sctp_process_param(asoc, param, peer_addr, gfp))
                         goto clean_up;
 	}
 
@@ -1842,7 +1856,7 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	/* Copy cookie in case we need to resend COOKIE-ECHO. */
 	cookie = asoc->peer.cookie;
 	if (cookie) {
-		asoc->peer.cookie = kmalloc(asoc->peer.cookie_len, priority);
+		asoc->peer.cookie = kmalloc(asoc->peer.cookie_len, gfp);
 		if (!asoc->peer.cookie)
 			goto clean_up;
 		memcpy(asoc->peer.cookie, cookie, asoc->peer.cookie_len);
@@ -1871,8 +1885,7 @@ int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 
 	/* Allocate storage for the negotiated streams. */
 	asoc->ssnmap = sctp_ssnmap_new(asoc->peer.i.num_outbound_streams,
-				       asoc->c.sinit_num_ostreams,
-				       priority);
+				       asoc->c.sinit_num_ostreams, gfp);
 	if (!asoc->ssnmap)
 		goto nomem_ssnmap;
 
@@ -1914,7 +1927,7 @@ nomem:
  * structures for the addresses.
  */
 int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
-		       const union sctp_addr *peer_addr, int priority)
+		       const union sctp_addr *peer_addr, int gfp)
 {
 	union sctp_addr addr;
 	int i;
@@ -1933,10 +1946,10 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 			break;
 		/* Fall through. */
 	case SCTP_PARAM_IPV4_ADDRESS:
-		sctp_param2sockaddr(&addr, param.addr, asoc->peer.port);
+		sctp_param2sockaddr(&addr, param.addr, asoc->peer.port, 0);
 		scope = sctp_scope(peer_addr);
 		if (sctp_in_scope(&addr, scope))
-			if (!sctp_assoc_add_peer(asoc, &addr, priority))
+			if (!sctp_assoc_add_peer(asoc, &addr, gfp))
 				return 0;
 		break;
 
@@ -2051,7 +2064,7 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *ep)
 
 /* Convert from an SCTP IP parameter to a union sctp_addr.  */
 void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *param,
-			 __u16 port)
+			 __u16 port, int iif)
 {
 	switch(param->v4.param_hdr.type) {
 	case SCTP_PARAM_IPV4_ADDRESS:
@@ -2065,7 +2078,7 @@ void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *param,
 		addr->v6.sin6_port = port;
 		addr->v6.sin6_flowinfo = 0; /* BUG */
 		addr->v6.sin6_addr = param->v6.addr;
-		addr->v6.sin6_scope_id = 0; /* BUG */
+		addr->v6.sin6_scope_id = iif;
 		break;
 
 	default:

@@ -199,28 +199,28 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define sctp_spin_unlock_irqrestore(lock, flags)  \
        spin_unlock_irqrestore(lock, flags)
 #define sctp_local_bh_disable() local_bh_disable()
-#define sctp_local_bh_enable() local_bh_enable()
-#define sctp_spin_lock(lock) spin_lock(lock)
-#define sctp_spin_unlock(lock) spin_unlock(lock)
-#define sctp_write_lock(lock) write_lock(lock)
+#define sctp_local_bh_enable()  local_bh_enable()
+#define sctp_spin_lock(lock)    spin_lock(lock)
+#define sctp_spin_unlock(lock)  spin_unlock(lock)
+#define sctp_write_lock(lock)   write_lock(lock)
 #define sctp_write_unlock(lock) write_unlock(lock)
-#define sctp_read_lock(lock) read_lock(lock)
-#define sctp_read_unlock(lock) read_unlock(lock)
+#define sctp_read_lock(lock)    read_lock(lock)
+#define sctp_read_unlock(lock)  read_unlock(lock)
 
 /* sock lock wrappers. */
-#define sctp_lock_sock(sk) lock_sock(sk)
-#define sctp_release_sock(sk) release_sock(sk)
-#define sctp_bh_lock_sock(sk) bh_lock_sock(sk)
-#define sctp_bh_unlock_sock(sk) bh_unlock_sock(sk)
-#define SCTP_SOCK_SLEEP_PRE(sk) SOCK_SLEEP_PRE(sk)
+#define sctp_lock_sock(sk)       lock_sock(sk)
+#define sctp_release_sock(sk)    release_sock(sk)
+#define sctp_bh_lock_sock(sk)    bh_lock_sock(sk)
+#define sctp_bh_unlock_sock(sk)  bh_unlock_sock(sk)
+#define SCTP_SOCK_SLEEP_PRE(sk)  SOCK_SLEEP_PRE(sk)
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
 /* SCTP SNMP MIB stats handlers */
 DECLARE_SNMP_STAT(struct sctp_mib, sctp_statistics);
-#define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
-#define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
-#define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)
-#define SCTP_DEC_STATS(field)		SNMP_DEC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS(field)      SNMP_INC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS_BH(field)   SNMP_INC_STATS_BH(sctp_statistics, field)
+#define SCTP_INC_STATS_USER(field) SNMP_INC_STATS_USER(sctp_statistics, field)
+#define SCTP_DEC_STATS(field)      SNMP_DEC_STATS(sctp_statistics, field)
 
 /* Determine if this is a valid kernel address.  */
 static inline int sctp_is_valid_kaddr(unsigned long addr)
@@ -488,21 +488,24 @@ static inline struct sctp_protocol *sctp_get_protocol(void)
 /* Convert from an IP version number to an Address Family symbol.  */
 static inline int ipver2af(__u8 ipver)
 {
-	int family;
-
 	switch (ipver) {
 	case 4:
-		family = AF_INET;
-		break;
+	        return  AF_INET;
 	case 6:
-		family = AF_INET6;
-		break;
+		return AF_INET6;
 	default:
-		family = 0;
-		break;
+		return 0;
 	};
+}
 
-	return family;
+/* Perform some sanity checks. */
+static inline int sctp_sanity_check(void)
+{
+	SCTP_ASSERT(sizeof(struct sctp_ulpevent) <= 
+		    sizeof(((struct sk_buff *)0)->cb),
+		    "SCTP: ulpevent does not fit in skb!\n", return 0);
+	
+	return 1;
 }
 
 /* Warning: The following hash functions assume a power of two 'size'. */

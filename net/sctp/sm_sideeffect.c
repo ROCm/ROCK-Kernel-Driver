@@ -461,10 +461,9 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
  * their work in statefuns directly.
  */
 static int sctp_cmd_process_init(sctp_cmd_seq_t *commands,
-				 sctp_association_t *asoc,
-				 sctp_chunk_t *chunk,
-				 sctp_init_chunk_t *peer_init,
-				 int priority)
+				 struct sctp_association *asoc,
+				 struct sctp_chunk *chunk,
+				 sctp_init_chunk_t *peer_init, int gfp)
 {
 	int error;
 
@@ -473,10 +472,8 @@ static int sctp_cmd_process_init(sctp_cmd_seq_t *commands,
 	 * fail during INIT processing (due to malloc problems),
 	 * just return the error and stop processing the stack.
 	 */
-
 	if (!sctp_process_init(asoc, chunk->chunk_hdr->type,
-			       sctp_source(chunk), peer_init,
-			       priority))
+			       sctp_source(chunk), peer_init, gfp))
 		error = -ENOMEM;
 	else
 		error = 0;

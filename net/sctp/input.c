@@ -674,9 +674,9 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 }
 
 /* Look up an association. */
-sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
-					      const union sctp_addr *paddr,
-					      struct sctp_transport **transportp)
+sctp_association_t *__sctp_lookup_association(const union sctp_addr *local,
+					      const union sctp_addr *peer,
+					      struct sctp_transport **pt)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
@@ -687,12 +687,12 @@ sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
 	/* Optimize here for direct hit, only listening connections can
 	 * have wildcards anyways.
 	 */
-	hash = sctp_assoc_hashfn(laddr->v4.sin_port, paddr->v4.sin_port);
+	hash = sctp_assoc_hashfn(local->v4.sin_port, peer->v4.sin_port);
 	head = &sctp_proto.assoc_hashbucket[hash];
 	read_lock(&head->lock);
 	for (epb = head->chain; epb; epb = epb->next) {
 		asoc = sctp_assoc(epb);
-		transport = sctp_assoc_is_match(asoc, laddr, paddr);
+		transport = sctp_assoc_is_match(asoc, local, peer);
 		if (transport)
 			goto hit;
 	}
@@ -702,7 +702,7 @@ sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
 	return NULL;
 
 hit:
-	*transportp = transport;
+	*pt = transport;
 	sctp_association_hold(asoc);
 	sock_hold(epb->sk);
 	read_unlock(&head->lock);
@@ -805,7 +805,7 @@ static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
 		    (SCTP_PARAM_IPV6_ADDRESS != params.p->type))
 			continue;
 
-		sctp_param2sockaddr(paddr, params.addr, ntohs(sh->source));
+		sctp_param2sockaddr(paddr, params.addr, ntohs(sh->source), 0);
 		asoc = __sctp_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;

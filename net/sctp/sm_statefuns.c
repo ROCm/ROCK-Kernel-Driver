@@ -249,8 +249,8 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 
 	/* The call, sctp_process_init(), can fail on memory allocation.  */
 	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			       sctp_source(chunk),
-			       (sctp_init_chunk_t *)chunk->chunk_hdr,
+			       sctp_source(chunk), 
+			       (sctp_init_chunk_t *)chunk->chunk_hdr, 
 			       GFP_ATOMIC))
 		goto nomem_init;
 
@@ -1380,7 +1380,8 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	peer_init = &chunk->subh.cookie_hdr->c.peer_init[0];
 
 	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			       sctp_source(chunk), peer_init, GFP_ATOMIC))
+			       sctp_source(chunk), peer_init, 
+			       GFP_ATOMIC))
 		goto nomem;
 
 	/* Make sure no new addresses are being added during the
@@ -1445,7 +1446,8 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const sctp_endpoint_t *ep,
 	 */
 	peer_init = &chunk->subh.cookie_hdr->c.peer_init[0];
 	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			       sctp_source(chunk), peer_init, GFP_ATOMIC))
+			       sctp_source(chunk), peer_init, 
+			       GFP_ATOMIC))
 		goto nomem;
 
 	/* Update the content of current association.  */

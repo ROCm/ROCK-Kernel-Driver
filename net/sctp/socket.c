@@ -244,9 +244,6 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	if (!snum)
 		snum = inet_sk(sk)->num;
 
-
-
-
 	/* Add the address to the bind address list.  */
 	sctp_local_bh_disable();
 	sctp_write_lock(&ep->base.addr_lock);
@@ -257,7 +254,6 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	addr->v4.sin_port = htons(addr->v4.sin_port);
 	if (!ret && !bp->port)
 		bp->port = snum;
-
 	sctp_write_unlock(&ep->base.addr_lock);
 	sctp_local_bh_enable();
 
@@ -3152,7 +3148,10 @@ static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr,
 		return -EINVAL;
 
 	/* Is this a valid SCTP address?  */
-	if (!af->addr_valid((union sctp_addr *)addr))
+	if (!af->addr_valid(addr))
+		return -EINVAL;
+
+	if (!sctp_sk(sk)->pf->send_verify(sctp_sk(sk), (addr)))
 		return -EINVAL;
 
 	return 0;
