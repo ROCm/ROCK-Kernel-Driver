@@ -1440,3 +1440,27 @@ int make_pages_present(unsigned long addr, unsigned long end)
 			len, write, 0, NULL, NULL);
 	return ret == len ? 0 : -1;
 }
+
+/* 
+ * Map a vmalloc()-space virtual address to the physical page.
+ */
+struct page * vmalloc_to_page(pgd_t *pgd, unsigned long addr)
+{
+	struct page *page = NULL;
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+  
+	if (!pgd_none(*pgd)) {
+		pmd = pmd_offset(pgd, addr);
+		if (!pmd_none(*pmd)) {
+			preempt_disable();
+			ptep = pte_offset_map(pmd, addr);
+			pte = *ptep;
+			if (pte_present(pte))
+				page = pte_page(pte);
+			pte_unmap(ptep);
+			preempt_enable();
+		}
+	}
+	return page;
+}
