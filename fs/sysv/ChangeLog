@@ -1,13 +1,18 @@
+Thu Feb  7 2002  Alexander Viro  <viro@math.psu.edu>
+
+	* super.c: switched to ->get_sb()
+	* ChangeLog: fixed dates ;-)
+
 2002-01-24  David S. Miller  <davem@redhat.com>
 
 	* inode.c: Include linux/init.h
 
-Mon Jan 21 2001  Alexander Viro  <viro@math.psu.edu>
+Mon Jan 21 2002  Alexander Viro  <viro@math.psu.edu>
 	* ialloc.c (sysv_new_inode): zero SYSV_I(inode)->i_data out.
 	* i_vnode renamed to vfs_inode.  Sorry, but let's keep that
 	  consistent.
 
-Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
+Sat Jan 19 2002  Christoph Hellwig  <hch@infradead.org>
 
 	* include/linux/sysv_fs.h (SYSV_I): Get fs-private inode data using
 		list_entry() instead of inode->u.
@@ -19,7 +24,7 @@ Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
 		in the case of failed register_filesystem for V7.
 	(exit_sysv_fs): Destroy inode cache.
 
-Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
+Sat Jan 19 2002  Christoph Hellwig  <hch@infradead.org>
 
 	* include/linux/sysv_fs.h: Include <linux/sysv_fs_i.h>, declare SYSV_I().
 	* dir.c (sysv_find_entry): Use SYSV_I() instead of ->u.sysv_i to
@@ -32,7 +37,7 @@ Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
 	* symlink.c (sysv_readlink): Likewise.
 	(sysv_follow_link): Likewise.
 
-Fri Jan  4 2001  Alexander Viro  <viro@math.psu.edu>
+Fri Jan  4 2002  Alexander Viro  <viro@math.psu.edu>
 
 	* ialloc.c (sysv_free_inode): Use sb->s_id instead of bdevname().
 	* inode.c (sysv_read_inode): Likewise.
