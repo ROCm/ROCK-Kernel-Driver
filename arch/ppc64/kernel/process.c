@@ -388,48 +388,61 @@ void initialize_paca_hardware_interrupt_stack(void)
 	}
 }
 
-extern char _stext[], _etext[];
+extern char _stext[], _etext[], __init_begin[], __init_end[];
 
 static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {
 	unsigned long tb_flags;
 	unsigned short name_len;
 	unsigned long tb_start, code_start, code_ptr, code_offset;
-	unsigned code_len;
-	strcpy( buf, "Unknown" );
+	unsigned int code_len;
+	unsigned long end;
+
+	strcpy(buf, "Unknown");
 	code_ptr = (unsigned long)p;
 	code_offset = 0;
-	if ( ( (unsigned long)p >= (unsigned long)_stext ) && ( (unsigned long)p <= (unsigned long)_etext ) ) {
-		while ( (unsigned long)p <= (unsigned long)_etext ) {
-			if ( *p == 0 ) {
-				tb_start = (unsigned long)p;
-				++p;	/* Point to traceback flags */
-				tb_flags = *((unsigned long *)p);
-				p += 2;	/* Skip over traceback flags */
-				if ( tb_flags & TB_NAME_PRESENT ) {
-					if ( tb_flags & TB_PARMINFO )
-						++p;	/* skip over parminfo data */
-					if ( tb_flags & TB_HAS_TBOFF ) {
-						code_len = *p;	/* get code length */
-						code_start = tb_start - code_len;
-						code_offset = code_ptr - code_start + 1;
-						if ( code_offset > 0x100000 )
-							break;
-						++p;		/* skip over code size */
-					}
-					name_len = *((unsigned short *)p);
-					if ( name_len > (buflen-20) )
-						name_len = buflen-20;
-					memcpy( buf, ((char *)p)+2, name_len );
-					buf[name_len] = 0;
-					if ( code_offset )
-						sprintf( buf+name_len, "+0x%lx", code_offset-1 ); 
+
+	/* handle functions in text and init sections */
+	if (((unsigned long)p >= (unsigned long)_stext) && 
+	    ((unsigned long)p < (unsigned long)_etext))
+		end = (unsigned long)_etext;
+	else if (((unsigned long)p >= (unsigned long)__init_begin) && 
+		 ((unsigned long)p < (unsigned long)__init_end))
+		end = (unsigned long)__init_end;
+	else
+		return buf;
+
+	while ((unsigned long)p < end) {
+		if (*p == 0) {
+			tb_start = (unsigned long)p;
+			++p;	/* Point to traceback flags */
+			tb_flags = *((unsigned long *)p);
+			p += 2;	/* Skip over traceback flags */
+			if (tb_flags & TB_NAME_PRESENT) {
+				if (tb_flags & TB_PARMINFO)
+					++p;	/* skip over parminfo data */
+				if (tb_flags & TB_HAS_TBOFF) {
+					code_len = *p;	/* get code length */
+					code_start = tb_start - code_len;
+					code_offset = code_ptr - code_start + 1;
+					if (code_offset > 0x100000)
+						break;
+					++p;	/* skip over code size */
 				}
-				break;
+				name_len = *((unsigned short *)p);
+				if (name_len > (buflen-20))
+					name_len = buflen-20;
+				memcpy(buf, ((char *)p)+2, name_len);
+				buf[name_len] = 0;
+				if (code_offset)
+					sprintf(buf+name_len, "+0x%lx",
+						code_offset-1); 
 			}
-			++p;
+			break;
 		}
+		++p;
 	}
+
 	return buf;
 }
 
