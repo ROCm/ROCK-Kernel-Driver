@@ -65,9 +65,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-#include "../fbcon-accel.h"
-
 #include <video/mach64.h>
 #include "atyfb.h"
 
@@ -211,8 +208,6 @@ static struct fb_ops atyfb_ops = {
 	.fb_set_var	= gen_set_var,
 	.fb_check_var	= atyfb_check_var,
 	.fb_set_par	= atyfb_set_par,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= atyfb_setcolreg,
 	.fb_pan_display	= atyfb_pan_display,
 	.fb_blank	= atyfb_blank,
@@ -1843,17 +1838,12 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	fb_memset((void *) info->screen_base, 0,
 		  info->fix.smem_len);
 
-	disp = info->disp;
-
 	strcpy(info->modename, info->fix.id);
 	info->node = NODEV;
 	info->fbops = &atyfb_ops;
-	info->disp = disp;
 	info->pseudo_palette = pseudo_palette;
 	info->currcon = -1;
 	strcpy(info->fontname, fontname);
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
 	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
@@ -2029,18 +2019,17 @@ int __init atyfb_init(void)
 
 			info =
 			    kmalloc(sizeof(struct fb_info) +
-				    sizeof(struct display), GFP_ATOMIC);
+				    sizeof(struct atyfb_par), GFP_ATOMIC);
 			if (!info) {
 				printk
 				    ("atyfb_init: can't alloc fb_info\n");
 				return -ENXIO;
 			}
-			memset(info, 0,
-			       sizeof(struct fb_info) +
-			       sizeof(struct display));
+			memset(info, 0, sizeof(struct fb_info) + 
+				sizeof(struct atyfb_par));
 
-			default_par =
-			    kmalloc(sizeof(struct atyfb_par), GFP_ATOMIC);
+			default_par = (struct atyfb_par *) (info + 1);
+
 			if (!default_par) {
 				printk
 				    ("atyfb_init: can't alloc atyfb_par\n");

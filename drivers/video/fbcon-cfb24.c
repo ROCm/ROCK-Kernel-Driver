@@ -27,7 +27,7 @@ void fbcon_cfb24_setup(struct display *p)
 {
     struct fb_info *info = p->fb_info;	
 
-    p->next_line = info->fix.line_length ? info->fix.line_length : p->var.xres_virtual*3;
+    p->next_line = info->fix.line_length ? info->fix.line_length : info->var.xres_virtual*3;
     p->next_plane = 0;
 }
 
@@ -272,6 +272,7 @@ void fbcon_cfb24_revc(struct display *p, int xx, int yy)
 void fbcon_cfb24_clear_margins(struct vc_data *conp, struct display *p,
 			       int bottom_only)
 {
+    struct fb_info *info = p->fb_info;	
     int bytes = p->next_line;
     u32 bgx;
 
@@ -281,14 +282,13 @@ void fbcon_cfb24_clear_margins(struct vc_data *conp, struct display *p,
 
     bgx = ((u32 *)p->dispsw_data)[attr_bgcol_ec(p, conp)];
 
-    if (!bottom_only && (right_width = p->var.xres-right_start))
-	rectfill(p->fb_info->screen_base+right_start*3, right_width,
-		 p->var.yres_virtual, bgx, bytes);
-    if ((bottom_width = p->var.yres-bottom_start))
-	rectfill(p->fb_info->screen_base+(p->var.yoffset+bottom_start)*bytes,
+    if (!bottom_only && (right_width = info->var.xres-right_start))
+	rectfill(info->screen_base + right_start*3, right_width,
+		 info->var.yres_virtual, bgx, bytes);
+    if ((bottom_width = info->var.yres-bottom_start))
+	rectfill(info->screen_base + (info->var.yoffset+bottom_start)*bytes,
 		 right_start, bottom_width, bgx, bytes);
 }
-
 
     /*
      *  `switch' for the low level operations

@@ -450,7 +450,6 @@ int __init xxxfb_init(void)
      * mode. If we are setting the mode ourselves we don't call this. 
      */	
     info.var = xxxfb_var;
-    gen_set_disp(-1, &fb_info);
 	
     if (register_framebuffer(&info) < 0)
 	return -EINVAL;
@@ -512,8 +511,6 @@ static struct fb_ops xxxfb_ops = {
 	.fb_release	= xxxfb_release, /* only if you need it to do something */
 	/* Stuff to go away. Use generic functions for now */
 	.fb_set_var	= gen_set_var,	
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 
 	.fb_check_var	= xxxfb_check_var,
 	.fb_set_par	= xxxfb_set_par,	/* optional */	

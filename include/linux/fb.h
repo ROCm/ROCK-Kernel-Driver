@@ -3,6 +3,7 @@
 
 #include <linux/tty.h>
 #include <asm/types.h>
+#include <asm/io.h>
 
 /* Definitions of frame buffers						*/
 
@@ -319,12 +320,6 @@ struct fb_ops {
     /* set settable parameters */
     int (*fb_set_var)(struct fb_var_screeninfo *var, int con,
 		      struct fb_info *info);		
-    /* get colormap */
-    int (*fb_get_cmap)(struct fb_cmap *cmap, int kspc, int con,
-		       struct fb_info *info);
-    /* set colormap */
-    int (*fb_set_cmap)(struct fb_cmap *cmap, int kspc, int con,
-		       struct fb_info *info);
     /* checks var and creates a par based on it */
     int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* set the video mode according to par */
@@ -365,15 +360,11 @@ struct fb_info {
    struct fb_cmap cmap;                 /* Current cmap */
    struct fb_ops *fbops;
    char *screen_base;                   /* Virtual address */
-   struct display *disp;		/* initial display variable */
    struct vc_data *display_fg;		/* Console visible on this display */
    int currcon;				/* Current VC. */	
    char fontname[40];			/* default font name */
    devfs_handle_t devfs_handle;         /* Devfs handle for new name         */
    devfs_handle_t devfs_lhandle;        /* Devfs handle for compat. symlink  */
-   int (*changevar)(int);		/* tell console var has changed */
-   int (*switch_con)(int, struct fb_info*);
-					/* tell fb to switch consoles */
    int (*updatevar)(int, struct fb_info*);
 					/* tell fb to update the vars */
    void *pseudo_palette;                /* Fake palette of 16 colors and 
@@ -389,20 +380,52 @@ struct fb_info {
 #define FBINFO_FLAG_DEFAULT	0
 #endif
 
+#if defined(__sparc__)
+
+/* We map all of our framebuffers such that big-endian accesses
+ * are what we want, so the following is sufficient.
+ */
+
+#define fb_readb sbus_readb
+#define fb_readw sbus_readw
+#define fb_readl sbus_readl
+#define fb_writeb sbus_writeb
+#define fb_writew sbus_writew
+#define fb_writel sbus_writel
+#define fb_memset sbus_memset_io
+
+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__)
+
+#define fb_readb __raw_readb
+#define fb_readw __raw_readw
+#define fb_readl __raw_readl
+#define fb_writeb __raw_writeb
+#define fb_writew __raw_writew
+#define fb_writel __raw_writel
+#define fb_memset memset_io
+
+#else
+
+#define fb_readb(addr) (*(volatile u8 *) (addr))
+#define fb_readw(addr) (*(volatile u16 *) (addr))
+#define fb_readl(addr) (*(volatile u32 *) (addr))
+#define fb_writeb(b,addr) (*(volatile u8 *) (addr) = (b))
+#define fb_writew(b,addr) (*(volatile u16 *) (addr) = (b))
+#define fb_writel(b,addr) (*(volatile u32 *) (addr) = (b))
+#define fb_memset memset
+
+#endif
+
     /*
      *  `Generic' versions of the frame buffer device operations
      */
 
 extern int gen_set_var(struct fb_var_screeninfo *var, int con,
 		       struct fb_info *info);
-extern int gen_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info);
-extern int gen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info);
 extern int fb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *info);
 extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
-extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *region); 
+extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
 extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
 
     /*
@@ -411,7 +434,6 @@ extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
 
 extern int gen_update_var(int con, struct fb_info *info);
 extern int fb_blank(int blank, struct fb_info *info);
-extern int gen_switch(int con, struct fb_info *info);
 extern void gen_set_disp(int con, struct fb_info *info);
 
 /* drivers/video/fbmem.c */

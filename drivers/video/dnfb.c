@@ -15,8 +15,6 @@
 #include <linux/fb.h>
 #include <linux/module.h>
 
-#include <video/fbcon.h>
-
 /* apollo video HW definitions */
 
 /*
@@ -111,7 +109,6 @@
 #endif
 
 static struct fb_info fb_info;
-static struct display disp;
 
 /* frame buffer operations */
 
@@ -121,8 +118,6 @@ static void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 static struct fb_ops dn_fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_blank	= dnfb_blank,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= dnfb_copyarea,
@@ -240,21 +235,16 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 	int err;
 
 	strcpy(fb_info.modename, dnfb_fix.id);
-	fb_info.changevar = NULL;
 	fb_info.fontname[0] = 0;
-	fb_info.disp = &disp;
-	fb_info.switch_con = gen_switch;
 	fb_info.updatevar = gen_update_var;
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
 	fb_info.currcon = -1;
 	fb_info.fix = dnfb_fix;
 	fb_info.var = dnfb_var;
+	fb_info.screen_base = (u_char *) fb_info.fix.smem_start;
 
 	fb_alloc_cmap(&fb_info.cmap, 2, 0);
-	gen_set_disp(-1, &fb_info);
-
-	fb_info.screen_base = (u_char *) fb_info.fix.smem_start;
 
 	err = register_framebuffer(&fb_info);
 	if (err < 0)
