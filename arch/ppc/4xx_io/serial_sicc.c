@@ -462,7 +462,7 @@ siccuart_rx_chars(struct SICC_info *info)
 #ifdef SUPPORT_SYSRQ
         if (info->sysrq) {
             if (ch && time_before(jiffies, info->sysrq)) {
-                handle_sysrq(ch, regs, NULL, NULL);
+                handle_sysrq(ch, regs, NULL);
                 info->sysrq = 0;
                 goto ignore_char;
             }
