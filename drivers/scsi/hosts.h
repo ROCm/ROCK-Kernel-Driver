@@ -57,9 +57,6 @@ typedef struct scsi_disk Disk;
 
 typedef struct	SHT
 {
-
-    struct list_head	shtp_list;
-
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
 
@@ -520,8 +517,6 @@ typedef struct SHN
 	unsigned short host_registered;
 } Scsi_Host_Name;
 	
-extern struct Scsi_Device_Template * scsi_devicelist;
-
 extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
@@ -604,28 +599,6 @@ extern void scsi_host_hn_release(void);
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
-
-/*
- * This is an ugly hack.  If we expect to be able to load devices at run time,
- * we need to leave extra room in some of the data structures.	Doing a
- * realloc to enlarge the structures would be riddled with race conditions,
- * so until a better solution is discovered, we use this crude approach
- *
- * Even bigger hack for SparcSTORAGE arrays. Those are at least 6 disks, but
- * usually up to 30 disks, so everyone would need to change this. -jj
- *
- * Note: These things are all evil and all need to go away.  My plan is to
- * tackle the character devices first, as there aren't any locking implications
- * in the block device layer.   The block devices will require more work.
- *
- * The generics driver has been updated to resize as required.  So as the tape
- * driver. Two down, two more to go.
- */
-#ifndef CONFIG_SR_EXTRA_DEVS
-#define CONFIG_SR_EXTRA_DEVS 2
-#endif
-#define SR_EXTRA_DEVS CONFIG_SR_EXTRA_DEVS
-
 
 /**
  * scsi_find_device - find a device given the host
