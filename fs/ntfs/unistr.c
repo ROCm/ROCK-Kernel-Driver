@@ -96,7 +96,7 @@ int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len)
 {
-	u32 cnt, u32 min_len;
+	u32 cnt, min_len;
 	uchar_t c1, c2;
 
 	min_len = name1_len;
