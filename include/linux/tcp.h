@@ -271,7 +271,7 @@ struct tcp_opt {
 
 /* RTT measurement */
 	__u8	backoff;	/* backoff				*/
-	__u32	srtt;		/* smothed round trip time << 3		*/
+	__u32	srtt;		/* smoothed round trip time << 3	*/
 	__u32	mdev;		/* medium deviation			*/
 	__u32	mdev_max;	/* maximal mdev for the last rtt period	*/
 	__u32	rttvar;		/* smoothed mdev_max			*/

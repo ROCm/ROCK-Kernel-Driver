@@ -1097,7 +1097,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 	/* Yeah, we have to make difficult choice between forward transmission
 	 * and retransmission... Both ways have their merits...
 	 *
-	 * For now we do not retrnamsit anything, while we have some new
+	 * For now we do not retransmit anything, while we have some new
 	 * segments to send.
 	 */
 
