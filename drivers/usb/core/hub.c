@@ -2024,6 +2024,13 @@ static int hub_port_debounce(struct usb_device *hdev, int port)
 	return portstatus;
 }
 
+static void ep0_reinit(struct usb_device *udev)
+{
+	usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+	usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+	udev->ep_in[0] = udev->ep_out[0] = &udev->ep0;
+}
+
 #define usb_sndaddr0pipe()	(PIPE_CONTROL << 30)
 #define usb_rcvaddr0pipe()	((PIPE_CONTROL << 30) | USB_DIR_IN)
 
@@ -2041,12 +2048,8 @@ static int hub_set_address(struct usb_device *udev)
 		USB_REQ_SET_ADDRESS, 0, udev->devnum, 0,
 		NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (retval == 0) {
-		int m = udev->epmaxpacketin[0];
-
 		usb_set_device_state(udev, USB_STATE_ADDRESS);
-		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
-		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
-		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = m;
+		ep0_reinit(udev);
 	}
 	return retval;
 }
@@ -2104,22 +2107,21 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 	 */
 	switch (udev->speed) {
 	case USB_SPEED_HIGH:		/* fixed at 64 */
-		i = 64;
+		udev->ep0.desc.wMaxPacketSize = 64;
 		break;
 	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
 		/* to determine the ep0 maxpacket size, try to read
 		 * the device descriptor to get bMaxPacketSize0 and
 		 * then correct our initial guess.
 		 */
-		i = 64;
+		udev->ep0.desc.wMaxPacketSize = 64;
 		break;
 	case USB_SPEED_LOW:		/* fixed at 8 */
-		i = 8;
+		udev->ep0.desc.wMaxPacketSize = 8;
 		break;
 	default:
 		goto fail;
 	}
-	udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
  
 	dev_info (&udev->dev,
 			"%s %s speed USB device using %s and address %d\n",
@@ -2194,7 +2196,10 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 				retval = -ENODEV;
 				goto fail;
 			}
-			if (udev->descriptor.bMaxPacketSize0 == 0) {
+			switch (udev->descriptor.bMaxPacketSize0) {
+			case 64: case 32: case 16: case 8:
+				break;
+			default:
 				dev_err(&udev->dev, "device descriptor "
 						"read/%s, error %d\n",
 						"64", j);
@@ -2241,12 +2246,14 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 		goto fail;
 
 	/* Should we verify that the value is valid? */
-	i = udev->descriptor.bMaxPacketSize0;
-	if (udev->epmaxpacketin[0] != i) {
-		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
-		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
-		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
-		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
+	/* (YES!) */
+	if (udev->ep0.desc.wMaxPacketSize
+			!= udev->descriptor.bMaxPacketSize0) {
+		udev->ep0.desc.wMaxPacketSize
+				= udev->descriptor.bMaxPacketSize0;
+		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n",
+				udev->ep0.desc.wMaxPacketSize);
+		ep0_reinit(udev);
 	}
   
 	retval = usb_get_device_descriptor(udev, USB_DT_DEVICE_SIZE);
@@ -2508,8 +2515,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 
 loop:
 		hub_port_disable(hdev, port);
-		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
-		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+		ep0_reinit(udev);
 		release_address(udev);
 		usb_put_dev(udev);
 		if (status == -ENOTCONN)
@@ -2893,8 +2899,7 @@ int usb_reset_device(struct usb_device *udev)
 
 		/* ep0 maxpacket size may change; let the HCD know about it.
 		 * Other endpoints will be handled by re-enumeration. */
-		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
-		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+		ep0_reinit(udev);
 		ret = hub_port_init(parent, udev, port, i);
 		if (ret >= 0)
 			break;

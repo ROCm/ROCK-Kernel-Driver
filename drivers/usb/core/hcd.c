@@ -807,7 +807,7 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	down (&usb_bus_list_lock);
 	usb_dev->bus->root_hub = usb_dev;
 
-	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
+	usb_dev->ep0.desc.wMaxPacketSize = 64;
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
 	if (retval != sizeof usb_dev->descriptor) {
 		usb_dev->bus->root_hub = NULL;
@@ -1335,14 +1335,8 @@ static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 
 	local_irq_disable ();
 
+	/* ep is already gone from udev->ep_{in,out}[]; no more submits */
 rescan:
-	/* (re)block new requests, as best we can */
-	if (endpoint & USB_DIR_IN)
-		udev->epmaxpacketin [epnum] = 0;
-	else
-		udev->epmaxpacketout [epnum] = 0;
-
-	/* then kill any current requests */
 	spin_lock (&hcd_data_lock);
 	list_for_each_entry (urb, &dev->urb_list, urb_list) {
 		int	tmp = urb->pipe;

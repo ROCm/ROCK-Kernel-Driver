@@ -267,44 +267,6 @@ struct usb_host_interface *usb_altnum_to_altsetting(struct usb_interface *intf,
 }
 
 /**
- * usb_epnum_to_ep_desc - get the endpoint object with a given endpoint number
- * @dev: the device whose current configuration+altsettings is considered
- * @epnum: the desired endpoint, masked with USB_DIR_IN as appropriate.
- *
- * This walks the device descriptor for the currently active configuration,
- * and returns a pointer to the endpoint with that particular endpoint
- * number, or null.
- *
- * Note that interface descriptors are not required to list endpoint
- * numbers in any standardized order, so that it would be wrong to
- * assume that ep2in precedes either ep5in, ep2out, or even ep1out.
- * This routine helps device drivers avoid such mistakes.
- */
-struct usb_endpoint_descriptor *
-usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
-{
-	struct usb_host_config *config = dev->actconfig;
-	int i, k;
-
-	if (!config)
-		return NULL;
-	for (i = 0; i < config->desc.bNumInterfaces; i++) {
-		struct usb_interface		*intf;
-		struct usb_host_interface	*alt;
-
-		/* only endpoints in current altsetting are active */
-		intf = config->interface[i];
-		alt = intf->cur_altsetting;
-
-		for (k = 0; k < alt->desc.bNumEndpoints; k++)
-			if (epnum == alt->endpoint[k].desc.bEndpointAddress)
-				return &alt->endpoint[k].desc;
-	}
-
-	return NULL;
-}
-
-/**
  * usb_driver_claim_interface - bind a driver to an interface
  * @driver: the driver to be bound
  * @iface: the interface to which it will be bound; must be in the
@@ -727,6 +689,11 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.release = usb_release_dev;
 	dev->state = USB_STATE_ATTACHED;
+
+	dev->ep0.desc.bLength = USB_DT_ENDPOINT_SIZE;
+	dev->ep0.desc.bDescriptorType = USB_DT_ENDPOINT;
+	/* ep0 maxpacket comes later, from device descriptor */
+	dev->ep_in[0] = dev->ep_out[0] = &dev->ep0;
 
 	/* Save readable and stable topology id, distinguishing devices
 	 * by location for diagnostics, tools, driver model, etc.  The
@@ -1533,7 +1500,6 @@ module_exit(usb_exit);
  * These symbols are exported for device (or host controller)
  * driver modules to use.
  */
-EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 
 EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
