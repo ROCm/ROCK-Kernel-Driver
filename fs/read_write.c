@@ -146,7 +146,6 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 bad:
 	return retval;
 }
-EXPORT_SYMBOL_GPL(sys_lseek);
 
 #ifdef __ARCH_WANT_SYS_LLSEEK
 asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
