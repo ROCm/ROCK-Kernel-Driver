@@ -43,7 +43,7 @@ struct attribute_group {
 
 #define __ATTR_NULL { .attr = { .name = NULL } }
 
-
+#define attr_name(_attr) (_attr).attr.name
 
 struct bin_attribute {
 	struct attribute	attr;
