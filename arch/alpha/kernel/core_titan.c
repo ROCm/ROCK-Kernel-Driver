@@ -43,7 +43,6 @@ struct
  * BIOS32-style PCI interface:
  */
 
-#define DEBUG_MCHECK 0  /* 0 = minimum, 1 = debug, 2 = dump+dump */
 #define DEBUG_CONFIG 0
 
 #if DEBUG_CONFIG
@@ -123,7 +122,7 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 		 "pci_addr=0x%p, type1=0x%p)\n",
 		 bus, device_fn, where, pci_addr, type1));
 
-        if (hose->bus == pbus)
+	if (!pbus->parent) /* No parent means peer PCI bus. */
 		bus = 0;
         *type1 = (bus != 0);
 
