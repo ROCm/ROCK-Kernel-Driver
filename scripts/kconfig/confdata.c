@@ -243,7 +243,8 @@ int conf_read(const char *name)
 		prop = sym_get_choice_prop(sym);
 		sym->flags &= ~SYMBOL_NEW;
 		for (e = prop->expr; e; e = e->left.expr)
-			sym->flags |= e->right.sym->flags & SYMBOL_NEW;
+			if (e->right.sym->visible != no)
+				sym->flags |= e->right.sym->flags & SYMBOL_NEW;
 	}
 
 	sym_change_count = 1;

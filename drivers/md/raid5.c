@@ -940,7 +940,7 @@ static void handle_stripe(struct stripe_head *sh)
 			/* and fail all 'written' */
 			bi = sh->dev[i].written;
 			sh->dev[i].written = NULL;
-			while (bi && bi->bi_sector < dev->sector + STRIPE_SECTORS) {
+			while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS) {
 				struct bio *bi2 = bi->bi_next;
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {

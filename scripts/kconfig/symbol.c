@@ -201,6 +201,9 @@ static struct symbol *sym_calc_choice(struct symbol *sym)
 		if (def_sym->visible != no)
 			return def_sym;
 	}
+
+	/* no choice? reset tristate value */
+	sym->curr.tri = no;
 	return NULL;
 }
 
