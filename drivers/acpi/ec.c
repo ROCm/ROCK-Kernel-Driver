@@ -381,7 +381,7 @@ end:
 	acpi_enable_gpe(NULL, ec->gpe_bit, ACPI_NOT_ISR);
 }
 
-static void
+static u32
 acpi_ec_gpe_handler (
 	void			*data)
 {
@@ -389,12 +389,17 @@ acpi_ec_gpe_handler (
 	struct acpi_ec		*ec = (struct acpi_ec *) data;
 
 	if (!ec)
-		return;
+		return ACPI_INTERRUPT_NOT_HANDLED;
 
 	acpi_disable_gpe(NULL, ec->gpe_bit, ACPI_ISR);
 
 	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
 		acpi_ec_gpe_query, ec);
+
+	if (status == AE_OK)
+		return ACPI_INTERRUPT_HANDLED;
+	else
+		return ACPI_INTERRUPT_NOT_HANDLED;
 }
 
 /* --------------------------------------------------------------------------
