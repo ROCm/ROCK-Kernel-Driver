@@ -5,6 +5,7 @@
  *  Modified for big endian by J.F. Chadima and David S. Miller
  *  Modified 1997 Peter Waltenberg, Bill Hawes, David Woodhouse for 2.1 dcache
  *  Modified 1999 Wolfram Pienkoss for NLS
+ *  Modified 2000 Ben Harris, University of Cambridge for NFS NS meta-info
  *
  */
 
@@ -42,6 +43,10 @@ static void ncp_add_dword(struct ncp_server *server, __u32 x)
 	put_unaligned(x, (__u32 *) (&(server->packet[server->current_size])));
 	server->current_size += 4;
 	return;
+}
+
+static inline void ncp_add_dword_lh(struct ncp_server *server, __u32 x) {
+	ncp_add_dword(server, cpu_to_le32(x));
 }
 
 static void ncp_add_mem(struct ncp_server *server, const void *source, int size)
@@ -89,10 +94,20 @@ static inline char *
 	return &(server->packet[sizeof(struct ncp_reply_header) + offset]);
 }
 
+static inline __u8 BVAL(void* data)
+{
+	return get_unaligned((__u8*)data);
+}
+
 static __u8
  ncp_reply_byte(struct ncp_server *server, int offset)
 {
 	return get_unaligned((__u8 *) ncp_reply_data(server, offset));
+}
+
+static inline __u16 WVAL_LH(void* data)
+{
+	return le16_to_cpu(get_unaligned((__u16*)data));
 }
 
 static __u16
@@ -101,10 +116,19 @@ static __u16
 	return get_unaligned((__u16 *) ncp_reply_data(server, offset));
 }
 
+static inline __u32 DVAL_LH(void* data)
+{
+	return le32_to_cpu(get_unaligned((__u32*)data));
+}
+
 static __u32
  ncp_reply_dword(struct ncp_server *server, int offset)
 {
 	return get_unaligned((__u32 *) ncp_reply_data(server, offset));
+}
+
+static inline __u32 ncp_reply_dword_lh(struct ncp_server* server, int offset) {
+	return le32_to_cpu(ncp_reply_dword(server, offset));
 }
 
 int
@@ -159,10 +183,8 @@ ncp_negotiate_size_and_options(struct ncp_server *server,
 	return 0;
 }
 
-int
-ncp_get_volume_info_with_number(struct ncp_server *server, int n,
-				    struct ncp_volume_info *target)
-{
+int ncp_get_volume_info_with_number(struct ncp_server* server,
+			     int n, struct ncp_volume_info* target) {
 	int result;
 	int len;
 
@@ -172,12 +194,12 @@ ncp_get_volume_info_with_number(struct ncp_server *server, int n,
 	if ((result = ncp_request(server, 22)) != 0) {
 		goto out;
 	}
-	target->total_blocks = ncp_reply_dword(server, 0);
-	target->free_blocks = ncp_reply_dword(server, 4);
-	target->purgeable_blocks = ncp_reply_dword(server, 8);
-	target->not_yet_purgeable_blocks = ncp_reply_dword(server, 12);
-	target->total_dir_entries = ncp_reply_dword(server, 16);
-	target->available_dir_entries = ncp_reply_dword(server, 20);
+	target->total_blocks = ncp_reply_dword_lh(server, 0);
+	target->free_blocks = ncp_reply_dword_lh(server, 4);
+	target->purgeable_blocks = ncp_reply_dword_lh(server, 8);
+	target->not_yet_purgeable_blocks = ncp_reply_dword_lh(server, 12);
+	target->total_dir_entries = ncp_reply_dword_lh(server, 16);
+	target->available_dir_entries = ncp_reply_dword_lh(server, 20);
 	target->sectors_per_block = ncp_reply_byte(server, 28);
 
 	memset(&(target->volume_name), 0, sizeof(target->volume_name));
@@ -189,6 +211,40 @@ ncp_get_volume_info_with_number(struct ncp_server *server, int n,
 		goto out;
 	}
 	memcpy(&(target->volume_name), ncp_reply_data(server, 30), len);
+	result = 0;
+out:
+	ncp_unlock_server(server);
+	return result;
+}
+
+int ncp_get_directory_info(struct ncp_server* server, __u8 n, 
+			   struct ncp_volume_info* target) {
+	int result;
+	int len;
+
+	ncp_init_request_s(server, 45);
+	ncp_add_byte(server, n);
+
+	if ((result = ncp_request(server, 22)) != 0) {
+		goto out;
+	}
+	target->total_blocks = ncp_reply_dword_lh(server, 0);
+	target->free_blocks = ncp_reply_dword_lh(server, 4);
+	target->purgeable_blocks = 0;
+	target->not_yet_purgeable_blocks = 0;
+	target->total_dir_entries = ncp_reply_dword_lh(server, 8);
+	target->available_dir_entries = ncp_reply_dword_lh(server, 12);
+	target->sectors_per_block = ncp_reply_byte(server, 20);
+
+	memset(&(target->volume_name), 0, sizeof(target->volume_name));
+
+	result = -EIO;
+	len = ncp_reply_byte(server, 21);
+	if (len > NCP_VOLNAME_LEN) {
+		DPRINTK("ncpfs: volume name too long: %d\n", len);
+		goto out;
+	}
+	memcpy(&(target->volume_name), ncp_reply_data(server, 22), len);
 	result = 0;
 out:
 	ncp_unlock_server(server);
@@ -248,10 +304,37 @@ static void ncp_add_handle_path(struct ncp_server *server, __u8 vol_num,
 	}
 }
 
-static void ncp_extract_file_info(void *structure, struct nw_info_struct *target)
+int ncp_dirhandle_alloc(struct ncp_server* server, __u8 volnum, __u32 dirent,
+			__u8* dirhandle) {
+	int result;
+
+	ncp_init_request(server);
+	ncp_add_byte(server, 12);		/* subfunction */
+	ncp_add_byte(server, NW_NS_DOS);
+	ncp_add_byte(server, 0);
+	ncp_add_word(server, 0);
+	ncp_add_handle_path(server, volnum, dirent, 1, NULL);
+	if ((result = ncp_request(server, 87)) == 0) {
+		*dirhandle = ncp_reply_byte(server, 0);
+	}
+	ncp_unlock_server(server);
+	return result;
+}
+
+int ncp_dirhandle_free(struct ncp_server* server, __u8 dirhandle) {
+	int result;
+	
+	ncp_init_request_s(server, 20);
+	ncp_add_byte(server, dirhandle);
+	result = ncp_request(server, 22);
+	ncp_unlock_server(server);
+	return result;
+}
+
+void ncp_extract_file_info(void *structure, struct nw_info_struct *target)
 {
 	__u8 *name_len;
-	const int info_struct_size = sizeof(struct nw_info_struct) - 257;
+	const int info_struct_size = offsetof(struct nw_info_struct, nameLen);
 
 	memcpy(target, structure, info_struct_size);
 	name_len = structure + info_struct_size;
@@ -259,6 +342,56 @@ static void ncp_extract_file_info(void *structure, struct nw_info_struct *target
 	memcpy(target->entryName, name_len + 1, *name_len);
 	target->entryName[*name_len] = '\0';
 	return;
+}
+
+#ifdef CONFIG_NCPFS_NFS_NS
+static inline void ncp_extract_nfs_info(unsigned char *structure,
+				 struct nw_nfs_info *target)
+{
+	target->mode = DVAL_LH(structure);
+	target->rdev = DVAL_LH(structure + 8);
+}
+#endif
+
+int ncp_obtain_nfs_info(struct ncp_server *server,
+		        struct nw_info_struct *target)
+
+{
+	int result = 0;
+#ifdef CONFIG_NCPFS_NFS_NS
+	__u32 volnum = target->volNumber;
+
+	if (ncp_is_nfs_extras(server, volnum)) {
+		ncp_init_request(server);
+		ncp_add_byte(server, 19);	/* subfunction */
+		ncp_add_byte(server, server->name_space[volnum]);
+		ncp_add_byte(server, NW_NS_NFS);
+		ncp_add_byte(server, 0);
+		ncp_add_byte(server, volnum);
+		ncp_add_dword(server, target->dirEntNum);
+		/* We must retrieve both nlinks and rdev, otherwise some server versions
+		   report zeroes instead of valid data */
+		ncp_add_dword_lh(server, NSIBM_NFS_MODE | NSIBM_NFS_NLINKS | NSIBM_NFS_RDEV);
+
+		if ((result = ncp_request(server, 87)) == 0) {
+			ncp_extract_nfs_info(ncp_reply_data(server, 0), &target->nfs);
+			DPRINTK(KERN_DEBUG
+				"ncp_obtain_nfs_info: (%s) mode=0%o, rdev=0x%x\n",
+				target->entryName, target->nfs.mode,
+				target->nfs.rdev);
+		} else {
+			target->nfs.mode = 0;
+			target->nfs.rdev = 0;
+		}
+	        ncp_unlock_server(server);
+
+	} else
+#endif
+	{
+		target->nfs.mode = 0;
+		target->nfs.rdev = 0;
+	}
+	return result;
 }
 
 /*
@@ -287,6 +420,10 @@ int ncp_obtain_info(struct ncp_server *server, struct inode *dir, char *path,
 	if ((result = ncp_request(server, 87)) != 0)
 		goto out;
 	ncp_extract_file_info(ncp_reply_data(server, 0), target);
+	ncp_unlock_server(server);
+	
+	result = ncp_obtain_nfs_info(server, target);
+	return result;
 
 out:
 	ncp_unlock_server(server);
@@ -463,6 +600,7 @@ ncp_lookup_volume(struct ncp_server *server, char *volname,
 	/* set dates to Jan 1, 1986  00:00 */
 	target->creationTime = target->modifyTime = cpu_to_le16(0x0000);
 	target->creationDate = target->modifyDate = target->lastAccessDate = cpu_to_le16(0x0C21);
+	target->nfs.mode = 0;
 	return 0;
 }
 
@@ -499,6 +637,34 @@ int ncp_modify_file_or_subdir_dos_info(struct ncp_server *server,
 	return ncp_modify_file_or_subdir_dos_info_path(server, dir, NULL,
 		info_mask, info);
 }
+
+#ifdef CONFIG_NCPFS_NFS_NS
+int ncp_modify_nfs_info(struct ncp_server *server, __u8 volnum, __u32 dirent,
+			       __u32 mode, __u32 rdev)
+
+{
+	int result = 0;
+
+	if (server->name_space[volnum] == NW_NS_NFS) {
+		ncp_init_request(server);
+		ncp_add_byte(server, 25);	/* subfunction */
+		ncp_add_byte(server, server->name_space[volnum]);
+		ncp_add_byte(server, NW_NS_NFS);
+		ncp_add_byte(server, volnum);
+		ncp_add_dword(server, dirent);
+		/* we must always operate on both nlinks and rdev, otherwise
+		   rdev is not set */
+		ncp_add_dword_lh(server, NSIBM_NFS_MODE | NSIBM_NFS_NLINKS | NSIBM_NFS_RDEV);
+		ncp_add_dword_lh(server, mode);
+		ncp_add_dword_lh(server, 1);	/* nlinks */
+		ncp_add_dword_lh(server, rdev);
+		result = ncp_request(server, 87);
+		ncp_unlock_server(server);
+	}
+	return result;
+}
+#endif
+
 
 static int
 ncp_DeleteNSEntry(struct ncp_server *server,
@@ -577,15 +743,12 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 				   struct ncp_entry_info *target)
 {
 	__u16 search_attribs = ntohs(0x0600);
-	__u8  volnum = target->i.volNumber;
-	__u32 dirent = target->i.dirEntNum;
+	__u8  volnum;
+	__u32 dirent;
 	int result;
 
-	if (dir)
-	{
-		volnum = NCP_FINFO(dir)->volNumber;
-		dirent = NCP_FINFO(dir)->dirEntNum;
-	}
+	volnum = NCP_FINFO(dir)->volNumber;
+	dirent = NCP_FINFO(dir)->dirEntNum;
 
 	if ((create_attributes & aDIR) != 0) {
 		search_attribs |= ntohs(0x0080);
@@ -606,12 +769,16 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 		goto out;
 	if (!(create_attributes & aDIR))
 		target->opened = 1;
-	target->server_file_handle = ncp_reply_dword(server, 0);
-	target->open_create_action = ncp_reply_byte(server, 4);
 
 	/* in target there's a new finfo to fill */
 	ncp_extract_file_info(ncp_reply_data(server, 6), &(target->i));
-	ConvertToNWfromDWORD(target->server_file_handle, target->file_handle);
+	target->volume = target->i.volNumber;
+	ConvertToNWfromDWORD(ncp_reply_dword(server, 0), target->file_handle);
+	
+	ncp_unlock_server(server);
+
+	(void)ncp_obtain_nfs_info(server, &(target->i));
+	return 0;
 
 out:
 	ncp_unlock_server(server);
@@ -672,9 +839,62 @@ int ncp_search_for_file_or_subdir(struct ncp_server *server,
 	memcpy(seq, ncp_reply_data(server, 0), sizeof(*seq));
 	ncp_extract_file_info(ncp_reply_data(server, 10), target);
 
+	ncp_unlock_server(server);
+	
+	result = ncp_obtain_nfs_info(server, target);
+	return result;
+
 out:
 	ncp_unlock_server(server);
 	return result;
+}
+
+int ncp_search_for_fileset(struct ncp_server *server,
+			   struct nw_search_sequence *seq,
+			   int* more,
+			   int* cnt,
+			   char* buffer,
+			   size_t bufsize,
+			   char** rbuf,
+			   size_t* rsize)
+{
+	int result;
+
+	ncp_init_request(server);
+	ncp_add_byte(server, 20);
+	ncp_add_byte(server, server->name_space[seq->volNumber]);
+	ncp_add_byte(server, 0);		/* datastream */
+	ncp_add_word(server, htons(0x0680));
+	ncp_add_dword(server, RIM_ALL);
+	ncp_add_word(server, 32767);		/* max returned items */
+	ncp_add_mem(server, seq, 9);
+#ifdef CONFIG_NCPFS_NFS_NS
+	if (server->name_space[seq->volNumber] == NW_NS_NFS) {
+		ncp_add_byte(server, 0);	/* 0 byte pattern */
+	} else 
+#endif
+	{
+		ncp_add_byte(server, 2);	/* 2 byte pattern */
+		ncp_add_byte(server, 0xff);	/* following is a wildcard */
+		ncp_add_byte(server, '*');
+	}
+	result = ncp_request2(server, 87, buffer, bufsize);
+	if (result) {
+		ncp_unlock_server(server);
+		return result;
+	}
+	if (server->ncp_reply_size < 12) {
+		ncp_unlock_server(server);
+		return 0xFF;
+	}
+	*rsize = server->ncp_reply_size - 12;
+	ncp_unlock_server(server);
+	buffer = buffer + sizeof(struct ncp_reply_header);
+	*rbuf = buffer + 12;
+	*cnt = WVAL_LH(buffer + 10);
+	*more = BVAL(buffer + 9);
+	memcpy(seq, buffer, 9);
+	return 0;
 }
 
 int

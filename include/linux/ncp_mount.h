@@ -21,6 +21,7 @@
 #define NCP_MOUNT_NO_NFS	0x0010	/* do not use NFS namespace */
 #define NCP_MOUNT_EXTRAS	0x0020
 #define NCP_MOUNT_SYMLINKS	0x0040	/* enable symlinks */
+#define NCP_MOUNT_NFS_EXTRAS	0x0080	/* Enable use of NFS NS meta-info */
 
 struct ncp_mount_data {
 	int version;
