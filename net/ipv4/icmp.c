@@ -620,11 +620,11 @@ static void icmp_unreach(struct sk_buff *skb)
 			break;
 		case ICMP_FRAG_NEEDED:
 			if (ipv4_config.no_pmtu_disc) {
-				if (net_ratelimit())
+				LIMIT_NETDEBUG(
 					printk(KERN_INFO "ICMP: %u.%u.%u.%u: "
 							 "fragmentation needed "
 							 "and DF set.\n",
-					       NIPQUAD(iph->daddr));
+					       NIPQUAD(iph->daddr)));
 			} else {
 				info = ip_rt_frag_needed(iph,
 						     ntohs(icmph->un.frag.mtu));
@@ -633,10 +633,10 @@ static void icmp_unreach(struct sk_buff *skb)
 			}
 			break;
 		case ICMP_SR_FAILED:
-			if (net_ratelimit())
+			LIMIT_NETDEBUG(
 				printk(KERN_INFO "ICMP: %u.%u.%u.%u: Source "
 						 "Route Failed.\n",
-				       NIPQUAD(iph->daddr));
+				       NIPQUAD(iph->daddr)));
 			break;
 		default:
 			break;

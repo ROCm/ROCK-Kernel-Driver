@@ -1058,8 +1058,10 @@ extern int sock_get_timestamp(struct sock *, struct timeval *);
 
 #if 0
 #define NETDEBUG(x)	do { } while (0)
+#define LIMIT_NETDEBUG(x) do {} while(0)
 #else
 #define NETDEBUG(x)	do { x; } while (0)
+#define LIMIT_NETDEBUG(x) do { if (net_ratelimit()) { x; } } while(0)
 #endif
 
 /*

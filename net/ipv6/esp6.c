@@ -278,9 +278,9 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 
 		padlen = nexthdr[0];
 		if (padlen+2 >= elen) {
-			if (net_ratelimit()) {
+			LIMIT_NETDEBUG(
 				printk(KERN_WARNING "ipsec esp packet is garbage padlen=%d, elen=%d\n", padlen+2, elen);
-			}
+			});
 			ret = -EINVAL;
 			goto out;
 		}

@@ -92,8 +92,8 @@ static int ipv6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int d
 			*nh_offset = offset;
 			offset += ipv6_optlen(exthdr);
 			if (!zero_out_mutable_opts(exthdr)) {
-				if (net_ratelimit())
-					printk(KERN_WARNING "overrun hopopts\n"); 
+				LIMIT_NETDEBUG(
+				printk(KERN_WARNING "overrun hopopts\n")); 
 				return 0;
 			}
 			nexthdr = exthdr->nexthdr;
@@ -112,8 +112,8 @@ static int ipv6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int d
 			*nh_offset = offset;
 			offset += ipv6_optlen(exthdr);
 			if (!zero_out_mutable_opts(exthdr))  {
-				if (net_ratelimit())
-					printk(KERN_WARNING "overrun destopt\n"); 
+				LIMIT_NETDEBUG(
+					printk(KERN_WARNING "overrun destopt\n")); 
 				return 0;
 			}
 			nexthdr = exthdr->nexthdr;
@@ -130,8 +130,8 @@ static int ipv6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int d
 				exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
 				nextnexthdr = exthdr->nexthdr;
 				if (!zero_out_mutable_opts(exthdr)) {
-					if (net_ratelimit())
-						printk(KERN_WARNING "overrun destopt\n");
+					LIMIT_NETDEBUG(
+						printk(KERN_WARNING "overrun destopt\n"));
 					return 0;
 				}
 			}
@@ -322,8 +322,8 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 		skb_push(skb, skb->data - skb->nh.raw);
 		ahp->icv(ahp, skb, ah->auth_data);
 		if (memcmp(ah->auth_data, auth_data, ahp->icv_trunc_len)) {
-			if (net_ratelimit())
-				printk(KERN_WARNING "ipsec ah authentication error\n");
+			LIMIT_NETDEBUG(
+				printk(KERN_WARNING "ipsec ah authentication error\n"));
 			x->stats.integrity_failed++;
 			goto free_out;
 		}
@@ -368,9 +368,9 @@ void ah6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	if (!x)
 		return;
 
-	printk(KERN_DEBUG "pmtu discovery on SA AH/%08x/"
+	NETDEBUG(printk(KERN_DEBUG "pmtu discovery on SA AH/%08x/"
 			"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
-	       ntohl(ah->spi), NIP6(iph->daddr));
+	       ntohl(ah->spi), NIP6(iph->daddr)));
 
 	xfrm_state_put(x);
 }
