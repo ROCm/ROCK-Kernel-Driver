@@ -105,12 +105,17 @@
       #define IPS_ADD_HOST(shost,device)
       #define IPS_REMOVE_HOST(shost)
       #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_pci_device(sh, (ha)->pcidev)
+      #define IPS_PRINTK(level, pcidev, format, arg...)                 \
+            printk(level "%s %s:" format , (pcidev)->driver->name ,     \
+            (pcidev)->slot_name , ## arg)
    #else
       #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
       #define IPS_UNREGISTER_HOSTS(SHT)
       #define IPS_ADD_HOST(shost,device)   scsi_add_host(shost,device)
       #define IPS_REMOVE_HOST(shost)       scsi_remove_host(shost)
       #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_device(sh, &(ha)->pcidev->dev)
+      #define IPS_PRINTK(level, pcidev, format, arg...)                 \
+            dev_printk(level , &((pcidev)->dev) , format , ## arg)
    #endif
 
    #ifndef MDELAY
