@@ -8,28 +8,18 @@ HEAD = head.o
 
 OBJECTS = $(HEAD) misc.o
 
-ZLDFLAGS = -e startup_32
-
 #
 # ZIMAGE_OFFSET is the load offset of the compression loader
 # BZIMAGE_OFFSET is the load offset of the high loaded compression loader
 #
-ZIMAGE_OFFSET = 0x1000
-BZIMAGE_OFFSET = 0x100000
-
-ZLINKFLAGS = -Ttext $(ZIMAGE_OFFSET) $(ZLDFLAGS)
-BZLINKFLAGS = -Ttext $(BZIMAGE_OFFSET) $(ZLDFLAGS)
-
 EXTRA_TARGETS	:= vmlinux.bin vmlinux.bin.gz head.o misc.o
+LDFLAGS_vmlinux	:= -Ttext $(IMAGE_OFFSET) -e startup_32
 EXTRA_AFLAGS	:= -traditional
 
 include $(TOPDIR)/Rules.make
 
 vmlinux: piggy.o $(OBJECTS)
-	$(LD) $(LDFLAGS) $(ZLINKFLAGS) -o vmlinux $(OBJECTS) piggy.o
-
-bvmlinux: piggy.o $(OBJECTS)
-	$(LD) $(LDFLAGS) $(BZLINKFLAGS) -o bvmlinux $(OBJECTS) piggy.o
+	$(LD) $(LDFLAGS) $(LDFLAGS_$@) -o vmlinux $(OBJECTS) piggy.o
 
 vmlinux.bin: $(TOPDIR)/vmlinux FORCE
 	$(call if_changed,objcopy)

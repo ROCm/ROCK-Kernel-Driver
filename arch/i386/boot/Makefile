@@ -34,23 +34,20 @@ include $(TOPDIR)/Rules.make
 
 # ---------------------------------------------------------------------------
 
-zImage: bootsect setup vmlinux.bin tools/build
-	tools/build bootsect setup vmlinux.bin $(ROOT_DEV) > $@
+zImage:  IMAGE_OFFSET := 0x1000
+zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
+bzImage: IMAGE_OFFSET := 0x100000
+bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
+bzImage: BUILDFLAGS   := -b
 
-bzImage: bbootsect bsetup bvmlinux.bin tools/build
-	tools/build -b bbootsect bsetup bvmlinux.bin $(ROOT_DEV) > $@
+zImage bzImage: bootsect setup vmlinux.bin tools/build
+	tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin $(ROOT_DEV) > $@
 
 vmlinux.bin: compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 
-bvmlinux.bin: compressed/bvmlinux FORCE
-	$(call if_changed,objcopy)
-
 compressed/vmlinux: FORCE
-	@$(MAKE) -C compressed vmlinux
-
-compressed/bvmlinux: FORCE
-	@$(MAKE) -C compressed bvmlinux
+	@$(MAKE) IMAGE_OFFSET=$(IMAGE_OFFSET) -C compressed vmlinux
 
 zdisk: $(BOOTIMAGE)
 	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
@@ -65,24 +62,11 @@ zlilo: $(BOOTIMAGE)
 install: $(BOOTIMAGE)
 	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-EXTRA_AFLAGS		:= -traditional $(SVGA_MODE) $(RAMDISK)
-AFLAGS_bbootsect.o	:= -D__BIG_KERNEL__
-AFLAGS_bsetup.o	  	:= -D__BIG_KERNEL__
-
 bootsect: bootsect.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -o $@ $<
 
-bbootsect: bbootsect.o
-	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary $< -o $@
-
 setup: setup.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
-
-bsetup: bsetup.o
-	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
-
-b%.S: %.S
-	cp $< $@
 
 clean:
 	@echo 'Cleaning up (boot)'
