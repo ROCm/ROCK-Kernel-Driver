@@ -1868,7 +1868,7 @@ save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 	ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+		put_fpreg(i, &save->st_space[i], ptp, swp, tos);
 	return 0;
 }
 
@@ -1901,7 +1901,7 @@ restore_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *sav
 	ptp = ia64_task_regs(tsk);
 	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+		get_fpreg(i, &save->st_space[i], ptp, swp, tos);
 	return 0;
 }
 

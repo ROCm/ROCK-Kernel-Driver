@@ -108,7 +108,8 @@ struct ia32_user_i387_struct {
 	int	fcs;
 	int	foo;
 	int	fos;
-	int	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
+	/* 8*10 bytes for each FP-reg = 80 bytes */
+	struct _fpreg_ia32 	st_space[8];
 };
 
 struct ia32_user_fxsr_struct {
