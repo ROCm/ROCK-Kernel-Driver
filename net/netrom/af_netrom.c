@@ -1,38 +1,13 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from the AX25 code.
- *	NET/ROM 002	Darryl(G7LED)	Fixes and address enhancement.
- *			Jonathan(G4KLX)	Complete bind re-think.
- *			Alan(GW4PTS)	Trivial tweaks into new format.
- *	NET/ROM	003	Jonathan(G4KLX)	Added G8BPQ extensions.
- *					Added NET/ROM routing ioctl.
- *			Darryl(G7LED)	Fix autobinding (on connect).
- *					Fixed nr_release(), set TCP_CLOSE, wakeup app
- *					context, THEN make the sock dead.
- *					Circuit ID check before allocating it on
- *					a connection.
- *			Alan(GW4PTS)	sendmsg/recvmsg only. Fixed connect clear bug
- *					inherited from AX.25
- *	NET/ROM 004	Jonathan(G4KLX)	Converted to module.
- *	NET/ROM 005	Jonathan(G4KLX) Linux 2.1
- *			Alan(GW4PTS)	Started POSIXisms
- *	NET/ROM 006	Alan(GW4PTS)	Brought in line with the ANK changes
- *			Jonathan(G4KLX)	Removed hdrincl.
- *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
- *					Implemented Idle timer.
- *			Arnaldo C. Melo s/suser/capable/, micro cleanups
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright Darryl Miles G7LED (dlm@g7led.demon.co.uk)
  */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -1264,36 +1239,33 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 }
 
 static struct net_proto_family nr_family_ops = {
-	.family =	PF_NETROM,
-	.create =	nr_create,
+	.family		=	PF_NETROM,
+	.create		=	nr_create,
 };
 
-static struct proto_ops SOCKOPS_WRAPPED(nr_proto_ops) = {
-	.family =	PF_NETROM,
+static struct proto_ops nr_proto_ops = {
+	.family		=	PF_NETROM,
 
-	.release =	nr_release,
-	.bind =		nr_bind,
-	.connect =	nr_connect,
-	.socketpair =	sock_no_socketpair,
-	.accept =	nr_accept,
-	.getname =	nr_getname,
-	.poll =		datagram_poll,
-	.ioctl =	nr_ioctl,
-	.listen =	nr_listen,
-	.shutdown =	sock_no_shutdown,
-	.setsockopt =	nr_setsockopt,
-	.getsockopt =	nr_getsockopt,
-	.sendmsg =	nr_sendmsg,
-	.recvmsg =	nr_recvmsg,
-	.mmap =		sock_no_mmap,
-	.sendpage =	sock_no_sendpage,
+	.release	=	nr_release,
+	.bind		=	nr_bind,
+	.connect	=	nr_connect,
+	.socketpair	=	sock_no_socketpair,
+	.accept		=	nr_accept,
+	.getname	=	nr_getname,
+	.poll		=	datagram_poll,
+	.ioctl		=	nr_ioctl,
+	.listen		=	nr_listen,
+	.shutdown	=	sock_no_shutdown,
+	.setsockopt	=	nr_setsockopt,
+	.getsockopt	=	nr_getsockopt,
+	.sendmsg	=	nr_sendmsg,
+	.recvmsg	=	nr_recvmsg,
+	.mmap		=	sock_no_mmap,
+	.sendpage	=	sock_no_sendpage,
 };
-
-#include <linux/smp_lock.h>
-SOCKOPS_WRAP(nr_proto, PF_NETROM);
 
 static struct notifier_block nr_dev_notifier = {
-	.notifier_call =nr_device_event,
+	.notifier_call	=	nr_device_event,
 };
 
 static struct net_device *dev_nr;

@@ -1,20 +1,11 @@
 /*
- *	ROSE release 003
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	ROSE 001	Jonathan(G4KLX)	Cloned from nr_subr.c
- *	ROSE 002	Jonathan(G4KLX)	Centralised disconnect processing.
- *	ROSE 003	Jonathan(G4KLX)	Added use count to neighbours.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -103,7 +94,7 @@ int rose_validate_nr(struct sock *sk, unsigned short nr)
 	return nr == rose->vs;
 }
 
-/* 
+/*
  *  This routine is called when the packet layer internally generates a
  *  control frame.
  */
@@ -138,7 +129,7 @@ void rose_write_internal(struct sock *sk, int frametype)
 	 *	Space for AX.25 header and PID.
 	 */
 	skb_reserve(skb, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + 1);
-	
+
 	dptr = skb_put(skb, skb_tailroom(skb));
 
 	lci1 = (rose->lci >> 8) & 0x0F;

@@ -1,27 +1,14 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 028b	Jonathan(G4KLX)	Extracted AX25 control block from the
- *					sock structure.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *	AX.25 032	Joerg(DL1BKE)	Fixed DAMA timeout bug
- *	AX.25 033	Jonathan(G4KLX)	Modularisation functions.
- *	AX.25 035	Frederic(F1OAT)	Support for pseudo-digipeating.
- *	AX.25 036	Jonathan(G4KLX)	Split from ax25_timer.c.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -116,7 +103,7 @@ void ax25_std_idletimer_expiry(ax25_cb *ax25)
 void ax25_std_t1timer_expiry(ax25_cb *ax25)
 {
 	switch (ax25->state) {
-	case AX25_STATE_1: 
+	case AX25_STATE_1:
 		if (ax25->n2count == ax25->n2) {
 			if (ax25->modulus == AX25_MODULUS) {
 				ax25_disconnect(ax25, ETIMEDOUT);
@@ -147,7 +134,7 @@ void ax25_std_t1timer_expiry(ax25_cb *ax25)
 		}
 		break;
 
-	case AX25_STATE_3: 
+	case AX25_STATE_3:
 		ax25->n2count = 1;
 		ax25_std_transmit_enquiry(ax25);
 		ax25->state   = AX25_STATE_4;

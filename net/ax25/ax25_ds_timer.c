@@ -1,20 +1,12 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Cloned from ax25_timer.c.
- *			Joerg(DL1BKE)	Added DAMA Slave Timeout timer
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -42,7 +34,7 @@ static void ax25_ds_timeout(unsigned long);
 
 /*
  *	Add DAMA slave timeout timer to timer list.
- *	Unlike the connection based timers the timeout function gets 
+ *	Unlike the connection based timers the timeout function gets
  *	triggered every second. Please note that NET_AX25_DAMA_SLAVE_TIMEOUT
  *	(aka /proc/sys/net/ax25/{dev}/dama_slave_timeout) is still in
  *	1/10th of a second.
@@ -83,15 +75,15 @@ static void ax25_ds_timeout(unsigned long arg)
 	ax25_dev *ax25_dev = (struct ax25_dev *) arg;
 	unsigned long flags;
 	ax25_cb *ax25;
-	
+
 	if (ax25_dev == NULL || !ax25_dev->dama.slave)
 		return;			/* Yikes! */
-	
+
 	if (!ax25_dev->dama.slave_timeout || --ax25_dev->dama.slave_timeout) {
 		ax25_ds_set_timer(ax25_dev);
 		return;
 	}
-	
+
 	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (ax25=ax25_list; ax25 != NULL; ax25 = ax25->next) {
 		if (ax25->ax25_dev != ax25_dev || !(ax25->condition & AX25_COND_DAMA_MODE))
@@ -101,7 +93,7 @@ static void ax25_ds_timeout(unsigned long arg)
 		ax25_disconnect(ax25, ETIMEDOUT);
 	}
 	spin_unlock_irqrestore(&ax25_list_lock, flags);
-	
+
 	ax25_dev_dama_off(ax25_dev);
 }
 
@@ -123,7 +115,7 @@ void ax25_ds_heartbeat_expiry(ax25_cb *ax25)
 		 * Check the state of the receive buffer.
 		 */
 		if (ax25->sk != NULL) {
-			if (atomic_read(&ax25->sk->rmem_alloc) < (ax25->sk->rcvbuf / 2) && 
+			if (atomic_read(&ax25->sk->rmem_alloc) < (ax25->sk->rcvbuf / 2) &&
 			    (ax25->condition & AX25_COND_OWN_RX_BUSY)) {
 				ax25->condition &= ~AX25_COND_OWN_RX_BUSY;
 				ax25->condition &= ~AX25_COND_ACK_PENDING;
@@ -135,7 +127,7 @@ void ax25_ds_heartbeat_expiry(ax25_cb *ax25)
 
 	ax25_start_heartbeat(ax25);
 }
-	
+
 /* dl1bke 960114: T3 works much like the IDLE timeout, but
  *                gets reloaded with every frame for this
  *		  connection.
@@ -173,7 +165,7 @@ void ax25_ds_idletimer_expiry(ax25_cb *ax25)
 }
 
 /* dl1bke 960114: The DAMA protocol requires to send data and SABM/DISC
- *                within the poll of any connected channel. Remember 
+ *                within the poll of any connected channel. Remember
  *                that we are not allowed to send anything unless we
  *                get polled by the Master.
  *
@@ -181,9 +173,9 @@ void ax25_ds_idletimer_expiry(ax25_cb *ax25)
  *                ax25_enquiry_response().
  */
 void ax25_ds_t1_timeout(ax25_cb *ax25)
-{	
+{
 	switch (ax25->state) {
-	case AX25_STATE_1: 
+	case AX25_STATE_1:
 		if (ax25->n2count == ax25->n2) {
 			if (ax25->modulus == AX25_MODULUS) {
 				ax25_disconnect(ax25, ETIMEDOUT);

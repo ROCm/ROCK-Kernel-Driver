@@ -1,10 +1,11 @@
-/* -*- linux-c -*-
- * sysctl_net_ax25.c: sysctl interface to net AX.25 subsystem.
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Begun April 1, 1996, Mike Shaver.
- * Added /proc/sys/net/ax25 directory entry (empty =) ). [MS]
+ * Copyright (C) 1996 Mike Shaver (shaver@zeroknowledge.com)
  */
-
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
@@ -132,7 +133,7 @@ void ax25_register_sysctl(void)
 		ax25_table[n].mode         = 0555;
 
 #ifndef CONFIG_AX25_DAMA_SLAVE
-		/* 
+		/*
 		 * We do not wish to have a representation of this parameter
 		 * in /proc/sys/ when configured *not* to include the
 		 * AX.25 DAMA slave code, do we?

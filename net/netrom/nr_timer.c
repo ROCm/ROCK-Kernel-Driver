@@ -1,20 +1,11 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from ax25_timer.c
- *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
- *					Implemented idle timer.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -223,7 +214,7 @@ static void nr_t1timer_expiry(unsigned long param)
 
 	switch (nr->state) {
 
-		case NR_STATE_1: 
+		case NR_STATE_1:
 			if (nr->n2count == nr->n2) {
 				nr_disconnect(sk, ETIMEDOUT);
 				return;

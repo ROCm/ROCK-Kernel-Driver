@@ -1,44 +1,14 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 028b	Jonathan(G4KLX) Extracted AX25 control block from
- *					the sock structure.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *			Jonathan(G4KLX)	Added IP mode registration.
- *	AX.25 030	Jonathan(G4KLX)	Added AX.25 fragment reception.
- *					Upgraded state machine for SABME.
- *					Added arbitrary protocol id support.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *			HaJo(DD8NE)	Added Idle Disc Timer T5
- *			Joerg(DL1BKE)   Renamed it to "IDLE" with a slightly
- *					different behaviour. Fixed defrag
- *					routine (I hope)
- *	AX.25 032	Darryl(G7LED)	AX.25 segmentation fixed.
- *	AX.25 033	Jonathan(G4KLX)	Remove auto-router.
- *					Modularisation changes.
- *	AX.25 035	Hans(PE1AYX)	Fixed interface to IP layer.
- *	AX.25 036	Jonathan(G4KLX)	Move DAMA code into own file.
- *			Joerg(DL1BKE)	Fixed DAMA Slave.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
- *			Thomas(DL9SAU)  Fixed missing initialization of skb->protocol.
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Hans-Joachim Hetscher DD8NE (dd8ne@bnv-bamberg.de)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -146,7 +116,7 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 
 #ifdef CONFIG_INET
 	if (pid == AX25_P_IP) {
-		/* working around a TCP bug to keep additional listeners 
+		/* working around a TCP bug to keep additional listeners
 		 * happy. TCP re-uses the buffer and destroys the original
 		 * content.
 		 */
@@ -220,17 +190,12 @@ static int ax25_process_rx_frame(ax25_cb *ax25, struct sk_buff *skb, int type, i
 static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	ax25_address *dev_addr, struct packet_type *ptype)
 {
-	struct sock *make;
-	struct sock *sk;
-	int type = 0;
+	ax25_address src, dest, *next_digi = NULL;
+	int type = 0, mine = 0, dama;
+	struct sock *make, *sk, *raw;
 	ax25_digi dp, reverse_dp;
 	ax25_cb *ax25;
-	ax25_address src, dest;
-	ax25_address *next_digi = NULL;
 	ax25_dev *ax25_dev;
-	struct sock *raw;
-	int mine = 0;
-	int dama;
 
 	/*
 	 *	Process the AX.25/LAPB frame.
@@ -275,8 +240,10 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	if ((*skb->data & ~0x10) == AX25_UI && dp.lastrepeat + 1 == dp.ndigi) {
 		skb->h.raw = skb->data + 2;		/* skip control and pid */
 
-		if ((raw = ax25_addr_match(&dest)) != NULL)
+		if ((raw = ax25_addr_match(&dest)) != NULL) {
 			ax25_send_to_raw(raw, skb, skb->data[1]);
+			release_sock(raw);
+		}
 
 		if (!mine && ax25cmp(&dest, (ax25_address *)dev->broadcast) != 0) {
 			kfree_skb(skb);
@@ -308,7 +275,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 #endif
 		case AX25_P_TEXT:
 			/* Now find a suitable dgram socket */
-			if ((sk = ax25_find_socket(&dest, &src, SOCK_DGRAM)) != NULL) {
+			sk = ax25_get_socket(&dest, &src, SOCK_DGRAM);
+			if (sk != NULL) {
 				if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf) {
 					kfree_skb(skb);
 				} else {
@@ -319,6 +287,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 					if (sock_queue_rcv_skb(sk, skb) != 0)
 						kfree_skb(skb);
 				}
+				release_sock(sk);
 			} else {
 				kfree_skb(skb);
 			}
@@ -350,9 +319,10 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	if ((ax25 = ax25_find_cb(&dest, &src, &reverse_dp, dev)) != NULL) {
 		/*
-		 *	Process the frame. If it is queued up internally it returns one otherwise we
-		 *	free it immediately. This routine itself wakes the user context layers so we
-		 *	do no further work
+		 *	Process the frame. If it is queued up internally it
+		 *	returns one otherwise we free it immediately. This
+		 *	routine itself wakes the user context layers so we do
+		 *	no further work
 		 */
 		if (ax25_process_rx_frame(ax25, skb, type, dama) == 0)
 			kfree_skb(skb);
@@ -364,7 +334,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* a) received not a SABM(E) */
 
-	if ((*skb->data & ~AX25_PF) != AX25_SABM && (*skb->data & ~AX25_PF) != AX25_SABME) {
+	if ((*skb->data & ~AX25_PF) != AX25_SABM &&
+	    (*skb->data & ~AX25_PF) != AX25_SABME) {
 		/*
 		 *	Never reply to a DM. Also ignore any connects for
 		 *	addresses that are not our interfaces and not a socket.
@@ -384,9 +355,12 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		sk = ax25_find_listener(next_digi, 1, dev, SOCK_SEQPACKET);
 
 	if (sk != NULL) {
-		if (sk->ack_backlog == sk->max_ack_backlog || (make = ax25_make_new(sk, ax25_dev)) == NULL) {
-			if (mine) ax25_return_dm(dev, &src, &dest, &dp);
+		if (sk->ack_backlog == sk->max_ack_backlog ||
+		    (make = ax25_make_new(sk, ax25_dev)) == NULL) {
+			if (mine)
+				ax25_return_dm(dev, &src, &dest, &dp);
 			kfree_skb(skb);
+
 			return 0;
 		}
 

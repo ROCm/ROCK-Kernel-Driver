@@ -1,27 +1,16 @@
 /*
- *	ROSE release 003
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	ROSE 001	Jonathan(G4KLX)	Cloned from nr_in.c
- *	ROSE 002	Jonathan(G4KLX)	Return cause and diagnostic codes from Clear Requests.
- *	ROSE 003	Jonathan(G4KLX)	New timer architecture.
- *					Removed M bit processing.
+ * Most of this code is based on the SDL diagrams published in the 7th ARRL
+ * Computer Networking Conference papers. The diagrams have mistakes in them,
+ * but are mostly correct. Before you modify the code could you read the SDL
+ * diagrams as the code is not obvious and probably very easy to break.
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>

@@ -1,20 +1,11 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from ax25_subr.c
- *	NET/ROM	003	Jonathan(G4KLX)	Added G8BPQ NET/ROM extensions.
- *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -125,7 +116,7 @@ int nr_in_rx_window(struct sock *sk, unsigned short ns)
 	return 0;
 }
 
-/* 
+/*
  *  This routine is called when the HDLC layer internally generates a
  *  control frame.
  */
@@ -161,7 +152,7 @@ void nr_write_internal(struct sock *sk, int frametype)
 	 *	Space for AX.25 and NET/ROM network header
 	 */
 	skb_reserve(skb, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN);
-	
+
 	dptr = skb_put(skb, skb_tailroom(skb));
 
 	switch (frametype & 0x0F) {
@@ -243,7 +234,7 @@ void nr_transmit_refusal(struct sk_buff *skb, int mine)
 	dptr[6] &= ~AX25_EBIT;
 	dptr[6] |= AX25_SSSID_SPARE;
 	dptr += AX25_ADDR_LEN;
-	
+
 	memcpy(dptr, skb->data + 0, AX25_ADDR_LEN);
 	dptr[6] &= ~AX25_CBIT;
 	dptr[6] |= AX25_EBIT;

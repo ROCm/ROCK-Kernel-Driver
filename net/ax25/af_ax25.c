@@ -1,109 +1,18 @@
 /*
- *	AX.25 release 038
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 006	Alan(GW4PTS)		Nearly died of shock - it's working 8-)
- *	AX.25 007	Alan(GW4PTS)		Removed the silliest bugs
- *	AX.25 008	Alan(GW4PTS)		Cleaned up, fixed a few state machine problems, added callbacks
- *	AX.25 009	Alan(GW4PTS)		Emergency patch kit to fix memory corruption
- * 	AX.25 010	Alan(GW4PTS)		Added RAW sockets/Digipeat.
- *	AX.25 011	Alan(GW4PTS)		RAW socket and datagram fixes (thanks) - Raw sendto now gets PID right
- *						datagram sendto uses correct target address.
- *	AX.25 012	Alan(GW4PTS)		Correct incoming connection handling, send DM to failed connects.
- *						Use skb->data not skb+1. Support sk->priority correctly.
- *						Correct receive on SOCK_DGRAM.
- *	AX.25 013	Alan(GW4PTS)		Send DM to all unknown frames, missing initialiser fixed
- *						Leave spare SSID bits set (DAMA etc) - thanks for bug report,
- *						removed device registration (it's not used or needed). Clean up for
- *						gcc 2.5.8. PID to AX25_P_
- *	AX.25 014	Alan(GW4PTS)		Cleanup and NET3 merge
- *	AX.25 015	Alan(GW4PTS)		Internal test version.
- *	AX.25 016	Alan(GW4PTS)		Semi Internal version for PI card
- *						work.
- *	AX.25 017	Alan(GW4PTS)		Fixed some small bugs reported by
- *						G4KLX
- *	AX.25 018	Alan(GW4PTS)		Fixed a small error in SOCK_DGRAM
- *	AX.25 019	Alan(GW4PTS)		Clean ups for the non INET kernel and device ioctls in AX.25
- *	AX.25 020	Jonathan(G4KLX)		/proc support and other changes.
- *	AX.25 021	Alan(GW4PTS)		Added AX25_T1, AX25_N2, AX25_T3 as requested.
- *	AX.25 022	Jonathan(G4KLX)		More work on the ax25 auto router and /proc improved (again)!
- *			Alan(GW4PTS)		Added TIOCINQ/OUTQ
- *	AX.25 023	Alan(GW4PTS)		Fixed shutdown bug
- *	AX.25 023	Alan(GW4PTS)		Linus changed timers
- *	AX.25 024	Alan(GW4PTS)		Small bug fixes
- *	AX.25 025	Alan(GW4PTS)		More fixes, Linux 1.1.51 compatibility stuff, timers again!
- *	AX.25 026	Alan(GW4PTS)		Small state fix.
- *	AX.25 027	Alan(GW4PTS)		Socket close crash fixes.
- *	AX.25 028	Alan(GW4PTS)		Callsign control including settings per uid.
- *						Small bug fixes.
- *						Protocol set by sockets only.
- *						Small changes to allow for start of NET/ROM layer.
- *	AX.25 028a	Jonathan(G4KLX)		Changes to state machine.
- *	AX.25 028b	Jonathan(G4KLX)		Extracted ax25 control block
- *						from sock structure.
- *	AX.25 029	Alan(GW4PTS)		Combined 028b and some KA9Q code
- *			Jonathan(G4KLX)		and removed all the old Berkeley, added IP mode registration.
- *			Darryl(G7LED)		stuff. Cross-port digipeating. Minor fixes and enhancements.
- *			Alan(GW4PTS)		Missed suser() on axassociate checks
- *	AX.25 030	Alan(GW4PTS)		Added variable length headers.
- *			Jonathan(G4KLX)		Added BPQ Ethernet interface.
- *			Steven(GW7RRM)		Added digi-peating control ioctl.
- *						Added extended AX.25 support.
- *						Added AX.25 frame segmentation.
- *			Darryl(G7LED)		Changed connect(), recvfrom(), sendto() sockaddr/addrlen to
- *						fall inline with bind() and new policy.
- *						Moved digipeating ctl to new ax25_dev structs.
- *						Fixed ax25_release(), set TCP_CLOSE, wakeup app
- *						context, THEN make the sock dead.
- *			Alan(GW4PTS)		Cleaned up for single recvmsg methods.
- *			Alan(GW4PTS)		Fixed not clearing error on connect failure.
- *	AX.25 031	Jonathan(G4KLX)		Added binding to any device.
- *			Joerg(DL1BKE)		Added DAMA support, fixed (?) digipeating, fixed buffer locking
- *						for "virtual connect" mode... Result: Probably the
- *						"Most Buggiest Code You've Ever Seen" (TM)
- *			HaJo(DD8NE)		Implementation of a T5 (idle) timer
- *			Joerg(DL1BKE)		Renamed T5 to IDLE and changed behaviour:
- *						the timer gets reloaded on every received or transmitted
- *						I frame for IP or NETROM. The idle timer is not active
- *						on "vanilla AX.25" connections. Furthermore added PACLEN
- *						to provide AX.25-layer based fragmentation (like WAMPES)
- *      AX.25 032	Joerg(DL1BKE)		Fixed DAMA timeout error.
- *						ax25_send_frame() limits the number of enqueued
- *						datagrams per socket.
- *	AX.25 033	Jonathan(G4KLX)		Removed auto-router.
- *			Hans(PE1AYX)		Converted to Module.
- *			Joerg(DL1BKE)		Moved BPQ Ethernet to separate driver.
- *	AX.25 034	Jonathan(G4KLX)		2.1 changes
- *			Alan(GW4PTS)		Small POSIXisations
- *	AX.25 035	Alan(GW4PTS)		Started fixing to the new
- *						format.
- *			Hans(PE1AYX)		Fixed interface to IP layer.
- *			Alan(GW4PTS)		Added asynchronous support.
- *			Frederic(F1OAT)		Support for pseudo-digipeating.
- *			Jonathan(G4KLX)		Support for packet forwarding.
- *	AX.25 036	Jonathan(G4KLX)		Major restructuring.
- *			Joerg(DL1BKE)		Fixed DAMA Slave.
- *			Jonathan(G4KLX)		Fix wildcard listen parameter setting.
- *	AX.25 037	Jonathan(G4KLX)		New timer architecture.
- *      AX.25 038       Matthias(DG2FEF)        Small fixes to the syscall interface to make kernel
- *                                              independent of AX25_MAX_DIGIS used by applications.
- *                      Tomi(OH2BNS)            Fixed ax25_getname().
- *			Joerg(DL1BKE)		Starting to phase out the support for full_sockaddr_ax25
- *						with only 6 digipeaters and sockaddr_ax25 in ax25_bind(),
- *						ax25_connect() and ax25_sendmsg()
- *			Joerg(DL1BKE)		Added support for SO_BINDTODEVICE
- *			Arnaldo C. Melo		s/suser/capable(CAP_NET_ADMIN)/, some more cleanups
- *			Michal Ostrowski	Module initialization cleanup.
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Darryl Miles G7LED (dlm@g7led.demon.co.uk)
+ * Copyright (C) Steven Whitehouse GW7RRM (stevew@acm.org)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Hans-Joachim Hetscher DD8NE (dd8ne@bnv-bamberg.de)
+ * Copyright (C) Hans Alblas PE1AYX (hans@esrac.ele.tue.nl)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
  */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -177,7 +86,6 @@ static void ax25_remove_socket(ax25_cb *ax25)
 	unsigned long flags;
 
 	spin_lock_irqsave(&ax25_list_lock, flags);
-
 	if ((s = ax25_list) == ax25) {
 		ax25_list = s->next;
 		spin_unlock_irqrestore(&ax25_list_lock, flags);
@@ -193,7 +101,6 @@ static void ax25_remove_socket(ax25_cb *ax25)
 
 		s = s->next;
 	}
-
 	spin_unlock_irqrestore(&ax25_list_lock, flags);
 }
 
@@ -222,7 +129,7 @@ static void ax25_kill_by_device(struct net_device *dev)
 /*
  *	Handle device status changes.
  */
-static int ax25_device_event(struct notifier_block *this,unsigned long event,
+static int ax25_device_event(struct notifier_block *this, unsigned long event,
 	void *ptr)
 {
 	struct net_device *dev = (struct net_device *)ptr;
@@ -291,20 +198,23 @@ struct sock *ax25_find_listener(ax25_address *addr, int digi,
 /*
  *	Find an AX.25 socket given both ends.
  */
-struct sock *ax25_find_socket(ax25_address *my_addr, ax25_address *dest_addr,
+struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
 	int type)
 {
-	ax25_cb *s;
+	struct sock *sk = NULL;
 	unsigned long flags;
+	ax25_cb *s;
 
 	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, my_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->sk->type == type) {
-			spin_unlock_irqrestore(&ax25_list_lock, flags);
-
-			return s->sk;
+			sk = s->sk;
+			lock_sock(sk);
+			break;
 		}
 	}
+
+out:
 	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
 	return NULL;
@@ -352,18 +262,21 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 struct sock *ax25_addr_match(ax25_address *addr)
 {
 	unsigned long flags;
+	struct sock *sk = NULL;
 	ax25_cb *s;
 
 	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
-		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 && s->sk->type == SOCK_RAW) {
-			spin_unlock_irqrestore(&ax25_list_lock, flags);
-			return s->sk;
+		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 &&
+		    s->sk->type == SOCK_RAW) {
+			sk = s->sk;
+			lock_sock(sk);
+			break;
 		}
 	}
 	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
-	return NULL;
+	return sk;
 }
 
 void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
@@ -409,7 +322,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	ax25_remove_socket(ax25);
 
 	ax25_stop_heartbeat(ax25);
 	ax25_stop_t1timer(ax25);
@@ -417,15 +330,17 @@ void ax25_destroy_socket(ax25_cb *ax25)
 	ax25_stop_t3timer(ax25);
 	ax25_stop_idletimer(ax25);
 
-	ax25_remove_socket(ax25);
 	ax25_clear_queues(ax25);	/* Flush the queues */
 
 	if (ax25->sk != NULL) {
 		while ((skb = skb_dequeue(&ax25->sk->receive_queue)) != NULL) {
-			if (skb->sk != ax25->sk) {			/* A pending connection */
+			if (skb->sk != ax25->sk) {
+				/* A pending connection */
 				ax25_cb *sax25 = ax25_sk(skb->sk);
 
-				skb->sk->dead = 1;	/* Queue the unaccepted socket for death */
+				/* Queue the unaccepted socket for death */
+				skb->sk->dead = 1;
+
 				ax25_start_heartbeat(sax25);
 				sax25->state = AX25_STATE_0;
 			}
@@ -449,8 +364,6 @@ void ax25_destroy_socket(ax25_cb *ax25)
 	} else {
 		ax25_free_cb(ax25);
 	}
-
-	restore_flags(flags);
 }
 
 /*
@@ -648,7 +561,7 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 	if (get_user(opt, (int *)optval))
 		return -EFAULT;
 
-	lock_kernel();
+	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	switch (optname) {
@@ -750,12 +663,12 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 			break;
 		}
 
-		if (sk->type == SOCK_SEQPACKET && 
+		if (sk->type == SOCK_SEQPACKET &&
 		   (sock->state != SS_UNCONNECTED || sk->state == TCP_LISTEN)) {
 			res = -EADDRNOTAVAIL;
 			break;
 		}
-		
+
 		ax25->ax25_dev = ax25_dev_ax25dev(dev);
 		ax25_fillin_cb(ax25, ax25->ax25_dev);
 		break;
@@ -763,7 +676,7 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 	default:
 		res = -ENOPROTOOPT;
 	}
-	unlock_kernel();
+	release_sock(sk);
 
 	return res;
 }
@@ -784,14 +697,14 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 
 	if (get_user(maxlen, optlen))
 		return -EFAULT;
-		
+
 	if (maxlen < 1)
 		return -EFAULT;
 
 	valptr = (void *) &val;
 	length = min_t(unsigned int, maxlen, sizeof(int));
 
-	lock_kernel();
+	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	switch (optname) {
@@ -855,10 +768,10 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 		break;
 
 	default:
-		unlock_kernel();
+		release_sock(sk);
 		return -ENOPROTOOPT;
 	}
-	unlock_kernel();
+	release_sock(sk);
 
 	if (put_user(length, optlen))
 		return -EFAULT;
@@ -869,17 +782,20 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 static int ax25_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
+	int res = 0;
 
-	lock_kernel();
+	lock_sock(sk);
 	if (sk->type == SOCK_SEQPACKET && sk->state != TCP_LISTEN) {
 		sk->max_ack_backlog = backlog;
 		sk->state           = TCP_LISTEN;
-		unlock_kernel();
-		return 0;
+		goto out;
 	}
-	unlock_kernel();
+	res = -EOPNOTSUPP;
 
-	return -EOPNOTSUPP;
+out:
+	release_sock(sk);
+
+	return res;
 }
 
 int ax25_create(struct socket *sock, int protocol)
@@ -1028,12 +944,10 @@ static int ax25_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
 
-	lock_kernel();
-	if (sk == NULL) {
-		unlock_kernel();
+	if (sk == NULL)
 		return 0;
-	}
 
+	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	if (sk->type == SOCK_SEQPACKET) {
@@ -1054,6 +968,7 @@ static int ax25_release(struct socket *sock)
 		case AX25_STATE_4:
 			ax25_clear_queues(ax25);
 			ax25->n2count = 0;
+
 			switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 			case AX25_PROTO_STD_SIMPLEX:
 			case AX25_PROTO_STD_DUPLEX:
@@ -1093,9 +1008,9 @@ static int ax25_release(struct socket *sock)
 		ax25_destroy_socket(ax25);
 	}
 
-	sock->sk   = NULL;	
+	sock->sk   = NULL;
 	sk->socket = NULL;	/* Not used, but we should do this */
-	unlock_kernel();
+	release_sock(sk);
 
 	return 0;
 }
@@ -1103,29 +1018,23 @@ static int ax25_release(struct socket *sock)
 /*
  *	We support a funny extension here so you can (as root) give any callsign
  *	digipeated via a local address as source. This hack is obsolete now
- *	that we've implemented support for SO_BINDTODEVICE. It is however small 
+ *	that we've implemented support for SO_BINDTODEVICE. It is however small
  *	and trivially backward compatible.
  */
 static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
-	ax25_cb *ax25 = ax25_sk(sk);
 	struct full_sockaddr_ax25 *addr = (struct full_sockaddr_ax25 *)uaddr;
-	ax25_address *call;
 	ax25_dev *ax25_dev = NULL;
+	ax25_address *call;
+	ax25_cb *ax25;
+	int err = 0;
 
-	lock_kernel();
-	if (sk->zapped == 0) {
-		unlock_kernel();
-		return -EINVAL;
-	}
-
-	if (addr_len != sizeof(struct sockaddr_ax25) && 
+	if (addr_len != sizeof(struct sockaddr_ax25) &&
 	    addr_len != sizeof(struct full_sockaddr_ax25)) {
 		/* support for old structure may go away some time */
 		if ((addr_len < sizeof(struct sockaddr_ax25) + sizeof(ax25_address) * 6) ||
 		    (addr_len > sizeof(struct full_sockaddr_ax25))) {
-			unlock_kernel();
 			return -EINVAL;
 	}
 
@@ -1133,15 +1042,20 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			current->comm);
 	}
 
-	if (addr->fsa_ax25.sax25_family != AF_AX25) {
-		unlock_kernel();
+	if (addr->fsa_ax25.sax25_family != AF_AX25)
 		return -EINVAL;
-	}
 
 	call = ax25_findbyuid(current->euid);
 	if (call == NULL && ax25_uid_policy && !capable(CAP_NET_ADMIN)) {
-		unlock_kernel();
 		return -EACCES;
+	}
+
+	lock_sock(sk);
+
+	ax25 = ax25_sk(sk);
+	if (sk->zapped == 0) {
+		err = -EINVAL;
+		goto out;
 	}
 
 	if (call == NULL)
@@ -1152,20 +1066,19 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	/*
 	 * User already set interface with SO_BINDTODEVICE
 	 */
-
 	if (ax25->ax25_dev != NULL)
 		goto done;
 
 	if (addr_len > sizeof(struct sockaddr_ax25) && addr->fsa_ax25.sax25_ndigis == 1) {
 		if (ax25cmp(&addr->fsa_digipeater[0], &null_ax25_address) != 0 &&
 		    (ax25_dev = ax25_addr_ax25dev(&addr->fsa_digipeater[0])) == NULL) {
-			unlock_kernel();
-			return -EADDRNOTAVAIL;
+			err = -EADDRNOTAVAIL;
+			goto out;
 		}
-	}  else {
+	} else {
 		if ((ax25_dev = ax25_addr_ax25dev(&addr->fsa_ax25.sax25_call)) == NULL) {
-			unlock_kernel();
-			return -EADDRNOTAVAIL;
+			err = -EADDRNOTAVAIL;
+			goto out;
 		}
 	}
 
@@ -1175,7 +1088,9 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 done:
 	ax25_insert_socket(ax25);
 	sk->zapped = 0;
-	unlock_kernel();
+
+out:
+	release_sock(sk);
 
 	return 0;
 }
@@ -1190,35 +1105,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	ax25_cb *ax25 = ax25_sk(sk);
 	struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)uaddr;
 	ax25_digi *digi = NULL;
-	int ct = 0, err;
-
-	lock_kernel();
-	/* deal with restarts */
-	if (sock->state == SS_CONNECTING) {
-		switch (sk->state) {
-		case TCP_SYN_SENT: /* still trying */
-			unlock_kernel();
-			return -EINPROGRESS;
-
-		case TCP_ESTABLISHED: /* connection established */
-			unlock_kernel();
-			sock->state = SS_CONNECTED;
-			return 0;
-
-		case TCP_CLOSE: /* connection refused */
-			unlock_kernel();
-			sock->state = SS_UNCONNECTED;
-			return -ECONNREFUSED;
-		}
-	}
-
-	if (sk->state == TCP_ESTABLISHED && sk->type == SOCK_SEQPACKET) {
-		unlock_kernel();
-		return -EISCONN;	/* No reconnect on a seqpacket socket */
-	}
-
-	sk->state   = TCP_CLOSE;
-	sock->state = SS_UNCONNECTED;
+	int ct = 0, err = 0;
 
 	/*
 	 * some sanity checks. code further down depends on this
@@ -1233,7 +1120,6 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		/* support for old structure may go away some time */
 		if ((addr_len < sizeof(struct sockaddr_ax25) + sizeof(ax25_address) * 6) ||
 		    (addr_len > sizeof(struct full_sockaddr_ax25))) {
-			unlock_kernel();
 			return -EINVAL;
 		}
 
@@ -1241,29 +1127,56 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 			current->comm);
 	}
 
-	if (fsa->fsa_ax25.sax25_family != AF_AX25) {
-		unlock_kernel();
+	if (fsa->fsa_ax25.sax25_family != AF_AX25)
 		return -EINVAL;
+
+	lock_sock(sk);
+
+	/* deal with restarts */
+	if (sock->state == SS_CONNECTING) {
+		switch (sk->state) {
+		case TCP_SYN_SENT: /* still trying */
+			err = -EINPROGRESS;
+			goto out;
+
+		case TCP_ESTABLISHED: /* connection established */
+			sock->state = SS_CONNECTED;
+			goto out;
+
+		case TCP_CLOSE: /* connection refused */
+			sock->state = SS_UNCONNECTED;
+			err = -ECONNREFUSED;
+			goto out;
+		}
 	}
+
+	if (sk->state == TCP_ESTABLISHED && sk->type == SOCK_SEQPACKET) {
+		err = -EISCONN;	/* No reconnect on a seqpacket socket */
+		goto out;
+	}
+
+	sk->state   = TCP_CLOSE;
+	sock->state = SS_UNCONNECTED;
 
 	if (ax25->digipeat != NULL) {
 		kfree(ax25->digipeat);
 		ax25->digipeat = NULL;
 	}
-	
+
 	/*
 	 *	Handle digi-peaters to be used.
 	 */
-	if (addr_len > sizeof(struct sockaddr_ax25) && fsa->fsa_ax25.sax25_ndigis != 0) {
+	if (addr_len > sizeof(struct sockaddr_ax25) &&
+	    fsa->fsa_ax25.sax25_ndigis != 0) {
 		/* Valid number of digipeaters ? */
 		if (fsa->fsa_ax25.sax25_ndigis < 1 || fsa->fsa_ax25.sax25_ndigis > AX25_MAX_DIGIS) {
-			unlock_kernel();
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 
 		if ((digi = kmalloc(sizeof(ax25_digi), GFP_KERNEL)) == NULL) {
-			unlock_kernel();
-			return -ENOBUFS;
+			err = -ENOBUFS;
+			goto out;
 		}
 
 		digi->ndigi      = fsa->fsa_ax25.sax25_ndigis;
@@ -1292,13 +1205,14 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		printk(KERN_WARNING "ax25_connect(): %s uses autobind, please contact jreuter@yaina.de\n",
 			current->comm);
 		if ((err = ax25_rt_autobind(ax25, &fsa->fsa_ax25.sax25_call)) < 0)
-			return err;
+			goto out;
+
 		ax25_fillin_cb(ax25, ax25->ax25_dev);
 		ax25_insert_socket(ax25);
 	} else {
 		if (ax25->ax25_dev == NULL) {
-			unlock_kernel();
-			return -EHOSTUNREACH;
+			err = -EHOSTUNREACH;
+			goto out;
 		}
 	}
 
@@ -1307,8 +1221,8 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		    	 ax25->ax25_dev->dev)) {
 		if (digi != NULL)
 			kfree(digi);
-		unlock_kernel();
-		return -EADDRINUSE;			/* Already such a connection */
+		err = -EADDRINUSE;		/* Already such a connection */
+		goto out;
 	}
 
 	ax25->dest_addr = fsa->fsa_ax25.sax25_call;
@@ -1318,8 +1232,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (sk->type != SOCK_SEQPACKET) {
 		sock->state = SS_CONNECTED;
 		sk->state   = TCP_ESTABLISHED;
-		unlock_kernel();
-		return 0;
+		goto out;
 	}
 
 	/* Move to connecting socket, ax.25 lapb WAIT_UA.. */
@@ -1350,8 +1263,8 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	/* Now the loop */
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK)) {
-		unlock_kernel();
-		return -EINPROGRESS;
+		err = -EINPROGRESS;
+		goto out;
 	}
 
 	if (sk->state == TCP_SYN_SENT) {
@@ -1360,11 +1273,13 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 		add_wait_queue(sk->sleep, &wait);
 		for (;;) {
-			set_current_state(TASK_INTERRUPTIBLE);
 			if (sk->state != TCP_SYN_SENT)
 				break;
+			set_current_state(TASK_INTERRUPTIBLE);
+			release_sock(sk);
 			if (!signal_pending(tsk)) {
 				schedule();
+				lock_sock(sk);
 				continue;
 			}
 			return -ERESTARTSYS;
@@ -1376,12 +1291,14 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (sk->state != TCP_ESTABLISHED) {
 		/* Not in ABM, not in WAIT_UA -> failed */
 		sock->state = SS_UNCONNECTED;
-		unlock_kernel();
-		return sock_error(sk);	/* Always set at this point */
+		err = sock_error(sk);	/* Always set at this point */
+		goto out;
 	}
 
 	sock->state = SS_CONNECTED;
-	unlock_kernel();
+
+out:
+	release_sock(sk);
 
 	return 0;
 }
@@ -1457,19 +1374,19 @@ out:
 static int ax25_getname(struct socket *sock, struct sockaddr *uaddr,
 	int *uaddr_len, int peer)
 {
-	struct sock *sk;
-	ax25_cb *ax25;
 	struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)uaddr;
+	struct sock *sk = sock->sk;
 	unsigned char ndigi, i;
+	ax25_cb *ax25;
+	int err = 0;
 
-	lock_kernel();
-	sk = sock->sk;
+	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	if (peer != 0) {
 		if (sk->state != TCP_ESTABLISHED) {
-			unlock_kernel();
-			return -ENOTCONN;
+			err = -ENOTCONN;
+			goto out;
 		}
 
 		fsa->fsa_ax25.sax25_family = AF_AX25;
@@ -1495,54 +1412,52 @@ static int ax25_getname(struct socket *sock, struct sockaddr *uaddr,
 		}
 	}
 	*uaddr_len = sizeof (struct full_sockaddr_ax25);
-	unlock_kernel();
 
-	return 0;
+out:
+	release_sock(sk);
+
+	return err;
 }
 
 static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	struct scm_cookie *scm)
 {
-	struct sock *sk = sock->sk;
-	ax25_cb *ax25;
 	struct sockaddr_ax25 *usax = (struct sockaddr_ax25 *)msg->msg_name;
-	int err;
+	struct sock *sk = sock->sk;
 	struct sockaddr_ax25 sax;
 	struct sk_buff *skb;
+	ax25_digi dtmp, *dp;
 	unsigned char *asmptr;
-	int size;
-	ax25_digi *dp;
-	ax25_digi dtmp;
-	int lv;
-	int addr_len = msg->msg_namelen;
+	ax25_cb *ax25;
+	int lv, size, err, addr_len = msg->msg_namelen;
 
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR)) {
 		return -EINVAL;
 	}
 
-	lock_kernel();
+	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	if (sk->zapped) {
-		unlock_kernel();
-		return -EADDRNOTAVAIL;
+		err = -EADDRNOTAVAIL;
+		goto out;
 	}
 
 	if (sk->shutdown & SEND_SHUTDOWN) {
-		unlock_kernel();
 		send_sig(SIGPIPE, current, 0);
-		return -EPIPE;
+		err = -EPIPE;
+		goto out;
 	}
 
 	if (ax25->ax25_dev == NULL) {
-		unlock_kernel();
-		return -ENETUNREACH;
+		err = -ENETUNREACH;
+		goto out;
 	}
 
 	if (usax != NULL) {
 		if (usax->sax25_family != AF_AX25) {
-			unlock_kernel();
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 
 		if (addr_len == sizeof(struct sockaddr_ax25)) {
@@ -1553,8 +1468,8 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 			/* support for old structure may go away some time */
 			if ((addr_len < sizeof(struct sockaddr_ax25) + sizeof(ax25_address) * 6) ||
 		    	    (addr_len > sizeof(struct full_sockaddr_ax25))) {
-				unlock_kernel();
-		    		return -EINVAL;
+		    		err = -EINVAL;
+				goto out;
 			}
 
 			printk(KERN_WARNING "ax25_sendmsg(): %s uses old (6 digipeater) socket structure.\n",
@@ -1567,8 +1482,8 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 
 			/* Valid number of digipeaters ? */
 			if (usax->sax25_ndigis < 1 || usax->sax25_ndigis > AX25_MAX_DIGIS) {
-				unlock_kernel();
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 
 			dtmp.ndigi      = usax->sax25_ndigis;
@@ -1584,8 +1499,8 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 
 		sax = *usax;
 		if (sk->type == SOCK_SEQPACKET && ax25cmp(&ax25->dest_addr, &sax.sax25_call) != 0) {
-			unlock_kernel();
-			return -EISCONN;
+			err = -EISCONN;
+			goto out;
 		}
 		if (usax->sax25_ndigis == 0)
 			dp = NULL;
@@ -1597,8 +1512,10 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		 *	it has become closed (not started closed) and is VC
 		 *	we ought to SIGPIPE, EPIPE
 		 */
-		if (sk->state != TCP_ESTABLISHED)
-			return -ENOTCONN;
+		if (sk->state != TCP_ESTABLISHED) {
+			err = -ENOTCONN;
+			goto out;
+		}
 		sax.sax25_family = AF_AX25;
 		sax.sax25_call   = ax25->dest_addr;
 		dp = ax25->digipeat;
@@ -1612,10 +1529,9 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	/* Assume the worst case */
 	size = len + 3 + ax25_addr_size(dp) + AX25_BPQ_HEADER_LEN;
 
-	if ((skb = sock_alloc_send_skb(sk, size, msg->msg_flags & MSG_DONTWAIT, &err)) == NULL) {
-		unlock_kernel();
-		return err;
-	}
+	skb = sock_alloc_send_skb(sk, size, msg->msg_flags&MSG_DONTWAIT, &err);
+	if (skb == NULL)
+		goto out;
 
 	skb_reserve(skb, size - len);
 
@@ -1637,71 +1553,73 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		/* Connected mode sockets go via the LAPB machine */
 		if (sk->state != TCP_ESTABLISHED) {
 			kfree_skb(skb);
-			unlock_kernel();
-			return -ENOTCONN;
+			err = -ENOTCONN;
+			goto out;
 		}
 
 		/* Shove it onto the queue and kick */
 		ax25_output(ax25, ax25->paclen, skb);
-		unlock_kernel();
 
-		return len;
-	} else {
-		asmptr = skb_push(skb, 1 + ax25_addr_size(dp));
-
-		SOCK_DEBUG(sk, "Building AX.25 Header (dp=%p).\n", dp);
-
-		if (dp != NULL)
-			SOCK_DEBUG(sk, "Num digipeaters=%d\n", dp->ndigi);
-
-		/* Build an AX.25 header */
-		asmptr += (lv = ax25_addr_build(asmptr, &ax25->source_addr,
-						&sax.sax25_call, dp,
-						AX25_COMMAND, AX25_MODULUS));
-
-		SOCK_DEBUG(sk, "Built header (%d bytes)\n",lv);
-
-		skb->h.raw = asmptr;
-
-		SOCK_DEBUG(sk, "base=%p pos=%p\n", skb->data, asmptr);
-
-		*asmptr = AX25_UI;
-
-		/* Datagram frames go straight out of the door as UI */
-		skb->dev = ax25->ax25_dev->dev;
-
-		ax25_queue_xmit(skb);
-		unlock_kernel();
-
-		return len;
+		err = len;
+		goto out;
 	}
+
+	asmptr = skb_push(skb, 1 + ax25_addr_size(dp));
+
+	SOCK_DEBUG(sk, "Building AX.25 Header (dp=%p).\n", dp);
+
+	if (dp != NULL)
+		SOCK_DEBUG(sk, "Num digipeaters=%d\n", dp->ndigi);
+
+	/* Build an AX.25 header */
+	asmptr += (lv = ax25_addr_build(asmptr, &ax25->source_addr,
+					&sax.sax25_call, dp,
+					AX25_COMMAND, AX25_MODULUS));
+
+	SOCK_DEBUG(sk, "Built header (%d bytes)\n",lv);
+
+	skb->h.raw = asmptr;
+
+	SOCK_DEBUG(sk, "base=%p pos=%p\n", skb->data, asmptr);
+
+	*asmptr = AX25_UI;
+
+	/* Datagram frames go straight out of the door as UI */
+	skb->dev = ax25->ax25_dev->dev;
+
+	ax25_queue_xmit(skb);
+
+	err = len;
+
+out:
+	release_sock(sk);
+
+	return err;
 }
 
 static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	int flags, struct scm_cookie *scm)
 {
-	struct sock *sk;
-	int copied;
+	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
-	int er;
+	int copied;
+	int err = 0;
 
-	lock_kernel();
-	sk = sock->sk;
-
+	lock_sock(sk);
 	/*
 	 * 	This works for seqpacket too. The receiver has ordered the
 	 *	queue for us! We do one quick check first though
 	 */
 	if (sk->type == SOCK_SEQPACKET && sk->state != TCP_ESTABLISHED) {
-		unlock_kernel();
-		return -ENOTCONN;
+		err =  -ENOTCONN;
+		goto out;
 	}
 
 	/* Now we can treat all alike */
-	if ((skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT, flags & MSG_DONTWAIT, &er)) == NULL) {
-		unlock_kernel();
-		return er;
-	}
+	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
+	                        flags & MSG_DONTWAIT, &err);
+	if (skb == NULL)
+		goto out;
 
 	if (!ax25_sk(sk)->pidincl)
 		skb_pull(skb, 1);		/* Remove PID */
@@ -1712,7 +1630,7 @@ static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	if (copied > size) {
 		copied = size;
 		msg->msg_flags |= MSG_TRUNC;
-	}		
+	}
 
 	skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
@@ -1741,9 +1659,12 @@ static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	}
 
 	skb_free_datagram(sk, skb);
-	unlock_kernel();
+	err = copied;
 
-	return copied;
+out:
+	release_sock(sk);
+
+	return err;
 }
 
 static int ax25_shutdown(struct socket *sk, int how)
@@ -1757,7 +1678,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 	int res = 0;
 
-	lock_kernel();
+	lock_sock(sk);
 	switch (cmd) {
 	case TIOCOUTQ: {
 		long amount;
@@ -1839,7 +1760,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		res = ax25_ctl_ioctl(cmd, (void *)arg);
 		break;
 
-	case SIOCAX25GETINFO: 
+	case SIOCAX25GETINFO:
 	case SIOCAX25GETINFOOLD: {
 		ax25_cb *ax25 = ax25_sk(sk);
 		struct ax25_info_struct ax25_info;
@@ -1882,7 +1803,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				res = -EINVAL;
 				break;
 			}
-		} 
+		}
 		res = 0;
 		break;
 	}
@@ -1919,8 +1840,8 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		res = dev_ioctl(cmd, (void *)arg);
 		break;
 	}
+	release_sock(sk);
 
-	unlock_kernel();
 	return res;
 }
 
@@ -1937,24 +1858,24 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 
 	/*
 	 * New format:
-	 * magic dev src_addr dest_addr,digi1,digi2,.. st vs vr va t1 t1 t2 t2 t3 t3 idle idle n2 n2 rtt window paclen Snd-Q Rcv-Q inode 
+	 * magic dev src_addr dest_addr,digi1,digi2,.. st vs vr va t1 t1 t2 t2 t3 t3 idle idle n2 n2 rtt window paclen Snd-Q Rcv-Q inode
 	 */
-	
+
 	for (ax25 = ax25_list; ax25 != NULL; ax25 = ax25->next) {
-		len += sprintf(buffer+len, "%8.8lx %s %s%s ", 
-				(long) ax25, 
+		len += sprintf(buffer+len, "%8.8lx %s %s%s ",
+				(long) ax25,
 				ax25->ax25_dev == NULL? "???" : ax25->ax25_dev->dev->name,
 				ax2asc(&ax25->source_addr),
 				ax25->iamdigi? "*":"");
 
 		len += sprintf(buffer+len, "%s", ax2asc(&ax25->dest_addr));
-				
+
 		for (k=0; (ax25->digipeat != NULL) && (k < ax25->digipeat->ndigi); k++) {
 			len += sprintf(buffer+len, ",%s%s",
 					ax2asc(&ax25->digipeat->calls[k]),
 					ax25->digipeat->repeated[k]? "*":"");
 		}
-		
+
 		len += sprintf(buffer+len, " %d %d %d %d %lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %d %d",
 			ax25->state,
 			ax25->vs, ax25->vr, ax25->va,

@@ -1,25 +1,11 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Split from ax25_out.c.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -80,7 +66,7 @@ void ax25_std_transmit_enquiry(ax25_cb *ax25)
 	ax25_calculate_t1(ax25);
 	ax25_start_t1timer(ax25);
 }
- 	
+
 void ax25_std_enquiry_response(ax25_cb *ax25)
 {
 	if (ax25->condition & AX25_COND_OWN_RX_BUSY)

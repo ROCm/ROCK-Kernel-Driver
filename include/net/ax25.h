@@ -207,7 +207,7 @@ extern spinlock_t ax25_list_lock;
 extern void ax25_free_cb(ax25_cb *);
 extern void ax25_insert_socket(ax25_cb *);
 struct sock *ax25_find_listener(ax25_address *, int, struct net_device *, int);
-struct sock *ax25_find_socket(ax25_address *, ax25_address *, int);
+struct sock *ax25_get_socket(ax25_address *, ax25_address *, int);
 extern ax25_cb *ax25_find_cb(ax25_address *, ax25_address *, ax25_digi *, struct net_device *);
 extern struct sock *ax25_addr_match(ax25_address *);
 extern void ax25_send_to_raw(struct sock *, struct sk_buff *, int);

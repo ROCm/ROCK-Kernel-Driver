@@ -1,29 +1,12 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from ax25_in.c
- *	NET/ROM 003	Jonathan(G4KLX)	Added NET/ROM fragment reception.
- *			Darryl(G7LED)	Added missing INFO with NAK case, optimized
- *					INFOACK handling, removed reconnect on error.
- *	NET/ROM 006	Jonathan(G4KLX)	Hdrincl removal changes.
- *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright Darryl Miles G7LED (dlm@g7led.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -77,7 +60,7 @@ static int nr_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 			kfree_skb(skbo);
 		}
 
-		nr->fraglen = 0;		
+		nr->fraglen = 0;
 	}
 
 	return sock_queue_rcv_skb(sk, skbn);

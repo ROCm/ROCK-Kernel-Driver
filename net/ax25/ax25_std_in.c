@@ -1,42 +1,19 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Hans-Joachim Hetscher DD8NE (dd8ne@bnv-bamberg.de)
  *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 028b	Jonathan(G4KLX) Extracted AX25 control block from
- *					the sock structure.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *			Jonathan(G4KLX)	Added IP mode registration.
- *	AX.25 030	Jonathan(G4KLX)	Added AX.25 fragment reception.
- *					Upgraded state machine for SABME.
- *					Added arbitrary protocol id support.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *			HaJo(DD8NE)	Added Idle Disc Timer T5
- *			Joerg(DL1BKE)   Renamed it to "IDLE" with a slightly
- *					different behaviour. Fixed defrag
- *					routine (I hope)
- *	AX.25 032	Darryl(G7LED)	AX.25 segmentation fixed.
- *	AX.25 033	Jonathan(G4KLX)	Remove auto-router.
- *					Modularisation changes.
- *	AX.25 035	Hans(PE1AYX)	Fixed interface to IP layer.
- *	AX.25 036	Jonathan(G4KLX)	Cloned from ax25_in.c.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Most of this code is based on the SDL diagrams published in the 7th ARRL
+ * Computer Networking Conference papers. The diagrams have mistakes in them,
+ * but are mostly correct. Before you modify the code could you read the SDL
+ * diagrams as the code is not obvious and probably very easy to break.
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>

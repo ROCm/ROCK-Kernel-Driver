@@ -1,44 +1,15 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Other kernels modules in this kit are generally BSD derived. See the copyright headers.
- *
- *
- *	History
- *	AX.25 020	Jonathan(G4KLX)	First go.
- *	AX.25 022	Jonathan(G4KLX)	Added the actual meat to this - we now have a nice heard list.
- *	AX.25 025	Alan(GW4PTS)	First cut at autobinding by route scan.
- *	AX.25 028b	Jonathan(G4KLX)	Extracted AX25 control block from the
- *					sock structure. Device removal now
- *					removes the heard structure.
- *	AX.25 029	Steven(GW7RRM)	Added /proc information for uid/callsign mapping.
- *			Jonathan(G4KLX)	Handling of IP mode in the routing list and /proc entry.
- *	AX.25 030	Jonathan(G4KLX)	Added digi-peaters to routing table, and
- *					ioctls to manipulate them. Added port
- *					configuration.
- *	AX.25 031	Jonathan(G4KLX)	Added concept of default route.
- *			Joerg(DL1BKE)	ax25_rt_build_path() find digipeater list and device by 
- *					destination call. Needed for IP routing via digipeater
- *			Jonathan(G4KLX)	Added routing for IP datagram packets.
- *			Joerg(DL1BKE)	Changed routing for IP datagram and VC to use a default
- *					route if available. Does not overwrite default routes
- *					on route-table overflow anymore.
- *			Joerg(DL1BKE)	Fixed AX.25 routing of IP datagram and VC, new ioctl()
- *					"SIOCAX25OPTRT" to set IP mode and a 'permanent' flag
- *					on routes.
- *	AX.25 033	Jonathan(G4KLX)	Remove auto-router.
- *			Joerg(DL1BKE)	Moved BPQ Ethernet driver to separate device.
- *	AX.25 035	Frederic(F1OAT)	Support for pseudo-digipeating.
- *			Jonathan(G4KLX)	Support for packet forwarding.
- *			Arnaldo C. Melo s/suser/capable/
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Steven Whitehouse GW7RRM (stevew@acm.org)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Hans-Joachim Hetscher DD8NE (dd8ne@bnv-bamberg.de)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
  */
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -315,7 +286,7 @@ int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t begin = 0;
 	char *callsign;
 	int i;
-  
+
 	read_lock(&ax25_route_lock);
 
 	len += sprintf(buffer, "callsign  dev  mode digipeaters\n");
@@ -366,7 +337,7 @@ int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
 		len = length;
 
 	return len;
-} 
+}
 
 /*
  *	Find AX.25 route
@@ -426,7 +397,7 @@ static inline void ax25_adjust_path(ax25_address *addr, ax25_digi *digipeat)
 
 	digipeat->ndigi = k;
 }
- 
+
 
 /*
  *	Find which interface to use.

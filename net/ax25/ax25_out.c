@@ -1,39 +1,13 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *			Jonathan(G4KLX)	Only poll when window is full.
- *	AX.25 030	Jonathan(G4KLX)	Added fragmentation to ax25_output.
- *					Added support for extended AX.25.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *			Joerg(DL1BKE)	Modified fragmenter to fragment vanilla 
- *					AX.25 I-Frames. Added PACLEN parameter.
- *			Joerg(DL1BKE)	Fixed a problem with buffer allocation
- *					for fragments.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
- *			Joerg(DL1BKE)	Fixed DAMA Slave mode: will work
- *					on non-DAMA interfaces like AX25L2V2
- *					again (this behaviour is _required_).
- *			Joerg(DL1BKE)	ax25_check_iframes_acked() returns a 
- *					value now (for DAMA n2count handling)
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -167,9 +141,9 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 
 			if (skb->sk != NULL)
 				skb_set_owner_w(skbn, skb->sk);
-			
+
 			spin_unlock_irqrestore(&ax25_frag_lock, flags);
-			
+
 			len = (paclen > skb->len) ? skb->len : paclen;
 
 			if (ka9qfrag == 1) {
@@ -209,7 +183,7 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-	/* 
+	/*
 	 * A DAMA slave is _required_ to work as normal AX.25L2V2
 	 * if no DAMA master is available.
 	 */
@@ -220,7 +194,7 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 	}
 }
 
-/* 
+/*
  *  This procedure is passed a buffer descriptor for an iframe. It builds
  *  the rest of the control part of the frame and then writes it out.
  */

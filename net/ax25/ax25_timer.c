@@ -1,30 +1,16 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 028b	Jonathan(G4KLX)	Extracted AX25 control block from the
- *					sock structure.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *	AX.25 032	Joerg(DL1BKE)	Fixed DAMA timeout bug
- *	AX.25 033	Jonathan(G4KLX)	Modularisation functions.
- *	AX.25 035	Frederic(F1OAT)	Support for pseudo-digipeating.
- *	AX.25 036	Jonathan(G4KLX)	Split Standard and DAMA code into separate files.
- *			Joerg(DL1BKE)	Fixed DAMA Slave. We are *required* to start with
- *					standard AX.25 mode.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
- *                      Tomi(OH2BNS)    Fixed heartbeat expiry (check ax25_dev).
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Tomi Manninen OH2BNS (oh2bns@sral.fi)
+ * Copyright (C) Darryl Miles G7LED (dlm@g7led.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>

@@ -1,18 +1,11 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Split from af_ax25.c.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -168,7 +161,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 			skb_pull(ourskb, AX25_HEADER_LEN - 1);	/* Keep PID */
 			ourskb->nh.raw = ourskb->data;
 
-			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c, 
+			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c,
 &dst_c, route->digipeat, dev);
 
 			goto put;

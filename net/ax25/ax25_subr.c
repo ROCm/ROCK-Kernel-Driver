@@ -1,38 +1,14 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names. Removed
- *					old BSD code.
- *	AX.25 030	Jonathan(G4KLX)	Added support for extended AX.25.
- *					Added fragmentation support.
- *			Darryl(G7LED)	Added function ax25_requeue_frames() to split
- *					it up from ax25_frames_acked().
- *	AX.25 031	Joerg(DL1BKE)	DAMA needs KISS Fullduplex ON/OFF.
- *					Thus we have ax25_kiss_cmd() now... ;-)
- *			Dave Brown(N2RJT)
- *					Killed a silly bug in the DAMA code.
- *			Joerg(DL1BKE)	Found the real bug in ax25.h, sri.
- *	AX.25 032	Joerg(DL1BKE)	Added ax25_queue_length to count the number of
- *					enqueued buffers of a socket..
- *	AX.25 035	Frederic(F1OAT)	Support for pseudo-digipeating.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -172,9 +148,9 @@ int ax25_decode(ax25_cb *ax25, struct sk_buff *skb, int *ns, int *nr, int *pf)
 	return frametype;
 }
 
-/* 
+/*
  *	This routine is called when the HDLC layer internally  generates a
- *	command or  response  for  the remote machine ( eg. RR, UA etc. ). 
+ *	command or  response  for  the remote machine ( eg. RR, UA etc. ).
  *	Only supervisory or unnumbered frames are processed.
  */
 void ax25_send_control(ax25_cb *ax25, int frametype, int poll_bit, int type)
@@ -231,7 +207,7 @@ void ax25_return_dm(struct net_device *dev, ax25_address *src, ax25_address *des
 
 	skb_reserve(skb, AX25_BPQ_HEADER_LEN + ax25_addr_size(digi));
 	skb->nh.raw = skb->data;
-	
+
 	ax25_digi_invert(digi, &retdigi);
 
 	dptr = skb_put(skb, 1);
