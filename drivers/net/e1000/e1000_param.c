@@ -47,7 +47,7 @@
 #define E1000_PARAM(X, desc) \
 	static int __devinitdata X[E1000_MAX_NIC+1] = E1000_PARAM_INIT; \
 	static int num_##X = 0; \
-	module_param_array(X, int, &num_##X, 0); \
+	module_param_array_named(X, X, int, &num_##X, 0); \
 	MODULE_PARM_DESC(X, desc);
 
 /* Transmit Descriptor Count
