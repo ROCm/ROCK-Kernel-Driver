@@ -259,6 +259,7 @@ static int __init iph5526_probe_pci(struct net_device *dev)
 
 static int __init fcdev_init(struct net_device *dev)
 {
+	SET_MODULE_OWNER(dev);
 	dev->open = iph5526_open;
 	dev->stop = iph5526_close;
 	dev->hard_start_xmit = iph5526_send_packet;
@@ -2896,14 +2897,12 @@ static void update_EDB_indx(struct fc_info *fi)
 static int iph5526_open(struct net_device *dev)
 {
 	netif_start_queue(dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static int iph5526_close(struct net_device *dev)
 {
 	netif_stop_queue(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
