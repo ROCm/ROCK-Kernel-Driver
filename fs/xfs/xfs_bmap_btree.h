@@ -479,7 +479,6 @@ xfs_bmbt_decrement(
 int
 xfs_bmbt_delete(
 	struct xfs_btree_cur *,
-	int,
 	int *);
 
 void

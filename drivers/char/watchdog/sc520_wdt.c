@@ -229,6 +229,8 @@ static int fop_open(struct inode * inode, struct file * file)
 				return -EBUSY;
 			/* Good, fire up the show */
 			wdt_startup();
+			if (nowayout)
+				MOD_INC_USE_COUNT;
 
 			return 0;
 		default:

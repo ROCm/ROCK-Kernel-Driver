@@ -62,10 +62,6 @@ STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 /* local state machine functions */
 STATIC void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
 STATIC void xlog_state_do_callback(xlog_t *log,int aborted, xlog_in_core_t *iclog);
-static inline void xlog_state_finish_copy(xlog_t	*log,
-					xlog_in_core_t	*iclog,
-					int		first_write,
-					int		bytes);
 STATIC int  xlog_state_get_iclog_space(xlog_t		*log,
 				       int		len,
 				       xlog_in_core_t	**iclog,
@@ -876,7 +872,7 @@ xfs_log_need_covered(xfs_mount_t *mp)
  * We may be holding the log iclog lock upon entering this routine.
  */
 xfs_lsn_t
-xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
+xlog_assign_tail_lsn(xfs_mount_t *mp)
 {
 	xfs_lsn_t tail_lsn;
 	SPLDECL(s);
@@ -888,8 +884,6 @@ xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
 		log->l_tail_lsn = tail_lsn;
 	else
 		tail_lsn = log->l_tail_lsn = log->l_last_sync_lsn;
-	if (iclog)
-		INT_SET(iclog->ic_header.h_tail_lsn, ARCH_CONVERT, tail_lsn);
 	GRANT_UNLOCK(log, s);
 
 	return tail_lsn;
@@ -1402,7 +1396,7 @@ xlog_sync(xlog_t		*log,
 {
 	xfs_caddr_t	dptr;		/* pointer to byte sized element */
 	xfs_buf_t	*bp;
-	int		i;
+	int		i, ops;
 	uint		roundup;
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
@@ -1439,7 +1433,12 @@ xlog_sync(xlog_t		*log,
 	log->l_roundoff += iclog->ic_roundoff;
 
 	xlog_pack_data(log, iclog);	  /* put cycle number in every block */
-	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);	/* real byte length */
+
+	/* real byte length */
+	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);
+	/* put ops count in correct order */
+	ops = iclog->ic_header.h_num_logops;
+	INT_SET(iclog->ic_header.h_num_logops, ARCH_CONVERT, ops);
 
 	bp	    = iclog->ic_bp;
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long)1);
@@ -1596,6 +1595,28 @@ xlog_unalloc_log(xlog_t *log)
 	kmem_free(log, sizeof(xlog_t));
 }	/* xlog_unalloc_log */
 
+/*
+ * Update counters atomically now that memcpy is done.
+ */
+/* ARGSUSED */
+static inline void
+xlog_state_finish_copy(xlog_t		*log,
+		       xlog_in_core_t	*iclog,
+		       int		record_cnt,
+		       int		copy_bytes)
+{
+	SPLDECL(s);
+
+	s = LOG_LOCK(log);
+
+	iclog->ic_header.h_num_logops += record_cnt;
+	iclog->ic_offset += copy_bytes;
+
+	LOG_UNLOCK(log, s);
+}	/* xlog_state_finish_copy */
+
+
+
 
 /*
  * Write some region out to in-core log
@@ -1663,6 +1684,7 @@ xlog_write(xfs_mount_t *	mp,
     int		     contwr;	     /* continued write of in-core log? */
     int		     firstwr = 0;    /* first write of transaction */
     int		     error;
+    int		     record_cnt = 0, data_cnt = 0;
 
     partial_copy_len = partial_copy = 0;
 
@@ -1725,7 +1747,8 @@ xlog_write(xfs_mount_t *	mp,
 		logop_head->oh_flags	= XLOG_START_TRANS;
 		INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
 		ticket->t_flags		&= ~XLOG_TIC_INITED;	/* clear bit */
-		firstwr++;			  /* increment log ops below */
+		firstwr = 1;			  /* increment log ops below */
+		record_cnt++;
 
 		start_rec_copy = sizeof(xlog_op_header_t);
 		xlog_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
@@ -1793,10 +1816,13 @@ xlog_write(xfs_mount_t *	mp,
 
 	    /* make copy_len total bytes copied, including headers */
 	    copy_len += start_rec_copy + sizeof(xlog_op_header_t);
-	    xlog_state_finish_copy(log, iclog, firstwr, (contwr? copy_len : 0));
+	    record_cnt++;
+	    data_cnt += contwr ? copy_len : 0;
 	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		    /* already marked WANT_SYNC by xlog_state_get_iclog_space */
+		    xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);
+		    record_cnt = data_cnt = 0;
 		    if ((error = xlog_state_release_iclog(log, iclog)))
 			    return (error);
 		    break;			/* don't increment index */
@@ -1805,6 +1831,8 @@ xlog_write(xfs_mount_t *	mp,
 		partial_copy_len = partial_copy = 0;
 
 		if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
+		    xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);
+		    record_cnt = data_cnt = 0;
 		    xlog_state_want_sync(log, iclog);
 		    if (commit_iclog) {
 			ASSERT(flags & XLOG_COMMIT_TRANS);
@@ -1821,6 +1849,7 @@ xlog_write(xfs_mount_t *	mp,
     } /* for (index = 0; index < nentries; ) */
     ASSERT(len == 0);
 
+    xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);
     if (commit_iclog) {
 	ASSERT(flags & XLOG_COMMIT_TRANS);
 	*commit_iclog = iclog;
@@ -2205,30 +2234,6 @@ xlog_state_done_syncing(
 	LOG_UNLOCK(log, s);
 	xlog_state_do_callback(log, aborted, iclog);	/* also cleans log */
 }	/* xlog_state_done_syncing */
-
-
-/*
- * Update counters atomically now that memcpy is done.
- */
-/* ARGSUSED */
-static inline void
-xlog_state_finish_copy(xlog_t		*log,
-		       xlog_in_core_t	*iclog,
-		       int		first_write,
-		       int		copy_bytes)
-{
-	SPLDECL(s);
-
-	s = LOG_LOCK(log);
-
-	if (first_write)
-		INT_MOD(iclog->ic_header.h_num_logops, ARCH_CONVERT, +1);
-	INT_MOD(iclog->ic_header.h_num_logops, ARCH_CONVERT, +1);
-	iclog->ic_offset += copy_bytes;
-
-	LOG_UNLOCK(log, s);
-}	/* xlog_state_finish_copy */
-
 
 
 /*
@@ -2722,7 +2727,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	SPLDECL(s);
 	int		sync = 0;	/* do we sync? */
 
-	xlog_assign_tail_lsn(log->l_mp, 0);
+	xlog_assign_tail_lsn(log->l_mp);
 
 	s = LOG_LOCK(log);
 
@@ -3594,7 +3599,10 @@ xlog_iclogs_empty(xlog_t *log)
 
 	iclog = log->l_iclog;
 	do {
-		if (INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT))
+		/* endianness does not matter here, zero is zero in
+		 * any language.
+		 */
+		if (iclog->ic_header.h_num_logops)
 			return(0);
 		iclog = iclog->ic_next;
 	} while (iclog != log->l_iclog);

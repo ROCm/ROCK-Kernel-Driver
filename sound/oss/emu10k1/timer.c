@@ -59,7 +59,7 @@ void emu10k1_timer_irqhandler(struct emu10k1_card *card)
 	return;
 }
 
-void emu10k1_timer_install(struct emu10k1_card *card, struct emu_timer *timer, u32 delay)
+void emu10k1_timer_install(struct emu10k1_card *card, struct emu_timer *timer, u16 delay)
 {
 	struct emu_timer *t;
 	struct list_head *entry;
@@ -85,7 +85,7 @@ void emu10k1_timer_install(struct emu10k1_card *card, struct emu_timer *timer, u
 		card->timer_delay = delay;
 		delay = (delay < 1024 ? delay : 1024);
 
-		emu10k1_writefn0(card, TIMER_RATE, delay);
+		emu10k1_timer_set(card, delay);
 
 		list_for_each(entry, &card->timers) {
 			t = list_entry(entry, struct emu_timer, list);
@@ -108,7 +108,7 @@ void emu10k1_timer_uninstall(struct emu10k1_card *card, struct emu_timer *timer)
 {
 	struct emu_timer *t;
 	struct list_head *entry;
-	u32 delay = TIMER_STOPPED;
+	u16 delay = TIMER_STOPPED;
 	unsigned long flags;
 
 	if (timer->state == TIMER_STATE_UNINSTALLED)
@@ -133,7 +133,7 @@ void emu10k1_timer_uninstall(struct emu10k1_card *card, struct emu_timer *timer)
 		else {
 			delay = (delay < 1024 ? delay : 1024);
 
-			emu10k1_writefn0(card, TIMER_RATE, delay);
+			emu10k1_timer_set(card, delay);
 
 			list_for_each(entry, &card->timers) {
 				t = list_entry(entry, struct emu_timer, list);

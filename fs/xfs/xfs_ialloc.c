@@ -1303,14 +1303,11 @@ xfs_ialloc_read_agi(
 		INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC &&
 		XFS_AGI_GOOD_VERSION(
 			INT_GET(agi->agi_versionnum, ARCH_CONVERT));
-	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IALLOC_READ_AGI,
-			XFS_RANDOM_IALLOC_READ_AGI)) {
+	if (unlikely(XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IALLOC_READ_AGI,
+			XFS_RANDOM_IALLOC_READ_AGI))) {
+		XFS_CORRUPTION_ERROR("xfs_ialloc_read_agi", XFS_ERRLEVEL_LOW,
+				     mp, agi);
 		xfs_trans_brelse(tp, bp);
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	pag = &mp->m_perag[agno];

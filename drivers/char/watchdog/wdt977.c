@@ -99,6 +99,8 @@ static int wdt977_open(struct inode *inode, struct file *file)
 
 	if (nowayout)
 	{
+		MOD_INC_USE_COUNT;
+
 		/* do not permit disabling the watchdog by writing 0 to reg. 0xF2 */
 		if (!timeoutM) timeoutM = DEFAULT_TIMEOUT;
 	}

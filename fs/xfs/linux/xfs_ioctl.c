@@ -130,7 +130,6 @@ xfs_find_handle(
 		int		lock_mode;
 
 		/* need to get access to the xfs_inode to read the generation */
-		VN_BHV_READ_LOCK(&(vp)->v_bh);
 		bhv = VNODE_TO_FIRST_BHV(vp);
 		ASSERT(bhv);
 		ip = XFS_BHVTOI(bhv);
@@ -145,7 +144,6 @@ xfs_find_handle(
 		handle.ha_fid.xfs_fid_ino = ip->i_ino;
 
 		xfs_iunlock_map_shared(ip, lock_mode);
-		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
 
 		hsize = XFS_HSIZE(handle);
 	}
@@ -585,6 +583,14 @@ xfs_ioctl(
 	case XFS_IOC_FREESP64:
 	case XFS_IOC_RESVSP64:
 	case XFS_IOC_UNRESVSP64:
+		/* 
+		 * Only allow the sys admin to reserve space unless
+		 * unwritten extents are enabled.
+		 */
+		if (!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) &&
+		    !capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		return xfs_ioc_space(bdp, vp, filp, cmd, arg);
 
 	case XFS_IOC_DIOINFO: {
@@ -685,11 +691,7 @@ xfs_ioctl(
 		xfs_fsop_resblks_t inout;
 		__uint64_t	   in;
 
-		/* Only allow the sys admin to reserve space unless
-		 * unwritten extents are enabled.
-		 */
-		if (!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) &&
-		    !capable(CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
 		if (copy_from_user(&inout, (char *)arg, sizeof(inout)))
@@ -810,9 +812,6 @@ xfs_ioc_space(
 	int			attr_flags = 0;
 	int			error;
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -XFS_ERROR(EPERM);
-
 	if (filp->f_flags & O_RDONLY)
 		return -XFS_ERROR(EBADF);
 
@@ -847,10 +846,7 @@ xfs_ioc_bulkstat(
 	/* done = 1 if there are more stats to get and if bulkstat */
 	/* should be called again (unused here, but used in dmapi) */
 
-	/* Do not allow space reservation if this is not the admin and
-	 * unwritten extents are turned off.
-	 */
-	if (!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) && !capable(CAP_SYS_ADMIN))
+	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	if (XFS_FORCED_SHUTDOWN(mp))

@@ -280,9 +280,6 @@ typedef unsigned char	byte;	/* used everywhere */
 	return ((hwif)->chipset == chipset) ? 1 : 0;		\
 }
 
-#define IDE_DEBUG(lineno) \
-	printk("%s,%s,line=%d\n", __FILE__, __FUNCTION__, (lineno))
-
 /*
  * Check for an interrupt and acknowledge the interrupt status
  */
@@ -302,7 +299,8 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_qd65xx,	ide_umc8672,	ide_ht6560b,
 		ide_pdc4030,	ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
-		ide_pmac,	ide_etrax100,	ide_acorn
+		ide_pmac,	ide_etrax100,	ide_acorn,
+		ide_pc9800
 } hwif_chipset_t;
 
 /*
@@ -728,6 +726,7 @@ typedef struct ide_drive_s {
 
 	unsigned present	: 1;	/* drive is physically present */
 	unsigned dead		: 1;	/* device ejected hint */
+	unsigned id_read	: 1;	/* 1=id read from disk 0 = synthetic */
 	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned is_flash	: 1;	/* 1 if probed as flash */
@@ -847,7 +846,7 @@ typedef struct ide_dma_ops_s {
 #define task_rq_offset(rq) \
 	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
 
-extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
+static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 {
 	/*
 	 * fs request
@@ -861,7 +860,7 @@ extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 	return rq->buffer + task_rq_offset(rq);
 }
 
-extern inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
+static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
 {
 	if (rq->bio)
 		bio_kunmap_irq(buffer, flags);
@@ -975,7 +974,7 @@ typedef struct hwif_s {
 	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 
 	void (*OUTB)(u8 addr, unsigned long port);
-	void (*OUTBSYNC)(u8 addr, unsigned long port);
+	void (*OUTBSYNC)(ide_drive_t *drive, u8 addr, unsigned long port);
 	void (*OUTW)(u16 addr, unsigned long port);
 	void (*OUTL)(u32 addr, unsigned long port);
 	void (*OUTSW)(unsigned long port, void *addr, u32 count);
@@ -1181,6 +1180,7 @@ typedef struct ide_driver_s {
 	int		(*end_request)(ide_drive_t *, int, int);
 	u8		(*sense)(ide_drive_t *, const char *, u8);
 	ide_startstop_t	(*error)(ide_drive_t *, const char *, u8);
+	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
 	unsigned long	(*capacity)(ide_drive_t *);
@@ -1280,6 +1280,13 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat);
 ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
 
 /*
+ * Abort a running command on the controller triggering the abort
+ * from a host side, non error situation
+ * (drive, msg)
+ */
+extern ide_startstop_t ide_abort(ide_drive_t *, const char *);
+
+/*
  * Issue a simple drive command
  * The drive must be selected beforehand.
  *
@@ -1325,12 +1332,6 @@ extern unsigned long current_capacity (ide_drive_t *drive);
  * The caller should return immediately after invoking this.
  */
 extern ide_startstop_t ide_do_reset (ide_drive_t *);
-
-/*
- * Re-Start an operation for an IDE interface.
- * The caller should return immediately after invoking this.
- */
-extern int restart_request (ide_drive_t *, struct request *);
 
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
@@ -1727,6 +1728,19 @@ extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
 
 extern spinlock_t ide_lock;
+extern struct semaphore ide_cfg_sem;
+/*
+ * Structure locking:
+ *
+ * ide_cfg_sem and ide_lock together protect changes to
+ * ide_hwif_t->{next,hwgroup}
+ * ide_drive_t->next
+ *
+ * ide_hwgroup_t->busy: ide_lock
+ * ide_hwgroup_t->hwif: ide_lock
+ * ide_hwif_t->mate: constant, no locking
+ * ide_drive_t->hwif: constant, no locking
+ */
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
 

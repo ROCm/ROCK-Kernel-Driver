@@ -5,7 +5,6 @@
  *
  * Copyright (C) 2001 Mountainview Data, Inc.
  */
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>

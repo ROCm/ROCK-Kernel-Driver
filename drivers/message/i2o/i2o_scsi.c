@@ -85,7 +85,7 @@ static int i2o_scsi_hosts;
 static u32 *retry[32];
 static struct i2o_controller *retry_ctrl[32];
 static struct timer_list retry_timer;
-static spinlock_t retry_lock;
+static spinlock_t retry_lock = SPIN_LOCK_UNLOCKED;
 static int retry_ct = 0;
 
 static atomic_t queue_depth;

@@ -98,6 +98,7 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 	unsigned int v, u, i;
 	unsigned short c, w;
 	unsigned char t;
+	int len;
 	char *p = buffer;
 
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
@@ -167,7 +168,11 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 	amd_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	amd_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
-	return p - buffer;	/* hoping it is less than 4K... */
+	/* hoping p - buffer is less than 4K... */
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 
 #endif

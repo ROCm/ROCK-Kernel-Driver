@@ -39,20 +39,13 @@
 
 /* setting this to other than a power of two may break some applications */
 #define WAVEOUT_MAXBUFSIZE	MAXBUFSIZE
-#define WAVEOUT_MINBUFSIZE	64
 
 #define WAVEOUT_DEFAULTFRAGLEN	20 /* Time to play a fragment in ms (latency) */
 #define WAVEOUT_DEFAULTBUFLEN	500 /* Time to play the entire buffer in ms */
 
-#define WAVEOUT_MINFRAGSHIFT	6
-#define WAVEOUT_MAXVOICES 6
-
-/* waveout_mem is cardwo internal */
-struct waveout_mem {
-	int emupageindex;
-	void *addr[BUFMAXPAGES];
-	dma_addr_t dma_handle[BUFMAXPAGES];
-};
+#define WAVEOUT_MINFRAGSHIFT	6 /* Minimum fragment size in bytes is 2^6 */
+#define WAVEOUT_MINFRAGS	3 /* _don't_ go bellow 3, it would break silence filling */
+#define WAVEOUT_MAXVOICES	6
 
 struct waveout_buffer {
 	u16 ossfragshift;
@@ -60,7 +53,6 @@ struct waveout_buffer {
 	u32 fragment_size;	/* in bytes units */
 	u32 size;		/* in bytes units */
 	u32 pages;		/* buffer size in page units*/
-	struct waveout_mem mem[WAVEOUT_MAXVOICES];
 	u32 silence_pos;	/* software cursor position (including silence bytes) */
 	u32 hw_pos;		/* hardware cursor position */
 	u32 free_bytes;		/* free bytes available on the buffer (not including silence bytes) */

@@ -140,6 +140,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 		 uen[4], udma[4], umul[4], active8b[4], recover8b[4];
 	struct pci_dev *dev = bmide_dev;
 	unsigned int v, u, i;
+	int len;
 	u16 c, w;
 	u8 t, x;
 	char *p = buffer;
@@ -269,7 +270,10 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 		speed[i] / 1000, speed[i] / 100 % 10);
 
 	/* hoping it is less than 4K... */
-	return p - buffer;
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+
+	return len > count ? count : len;
 }
 
 #endif /* DISPLAY_VIA_TIMINGS && CONFIG_PROC_FS */

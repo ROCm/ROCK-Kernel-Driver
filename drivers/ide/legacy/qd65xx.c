@@ -359,9 +359,7 @@ void __init qd_setup (int unit, int base, int config, unsigned int data0, unsign
 	hwif->drives[0].io_32bit =
 	hwif->drives[1].io_32bit = 1;
 	hwif->tuneproc = tuneproc;
-#ifndef HWIF_PROBE_CLASSIC_METHOD
 	probe_hwif_init(hwif);
-#endif /* HWIF_PROBE_CLASSIC_METHOD */
 }
 
 /*

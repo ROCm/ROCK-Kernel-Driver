@@ -1,4 +1,3 @@
-#define __NO_VERSION__
 
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>

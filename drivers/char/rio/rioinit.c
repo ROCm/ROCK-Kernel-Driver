@@ -33,7 +33,6 @@
 static char *_rioinit_c_sccs_ = "@(#)rioinit.c	1.3";
 #endif
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>

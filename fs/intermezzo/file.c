@@ -45,7 +45,6 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/fsfilter.h>

@@ -50,13 +50,8 @@
 #ifndef _LINUX_MWAVEPUB_H
 #define _LINUX_MWAVEPUB_H
 
-#ifndef MWAVEM_APP_DIST
 #include <linux/miscdevice.h>
-#endif
 
-#ifdef MWAVEM_APP_DIST
-#define MWAVE_MINOR      219
-#endif
 
 typedef struct _MW_ABILITIES {
 	unsigned long instr_per_sec;

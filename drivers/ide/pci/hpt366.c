@@ -85,7 +85,7 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 	char *chipset_nums[] = {"366", "366",  "368",
 				"370", "370A", "372",
 				"302", "371",  "374" };
-	int i;
+	int i, len;
 
 	p += sprintf(p, "\n                             "
 		"HighPoint HPT366/368/370/372/374\n");
@@ -153,8 +153,12 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 		}
 	}
 	p += sprintf(p, "\n");
+
+	/* p - buffer must be less than 4k! */
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
 	
-	return p-buffer;/* => must be less than 4k! */
+	return len > count ? count : len;
 }
 #endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
 

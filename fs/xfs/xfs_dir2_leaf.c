@@ -1059,6 +1059,9 @@ xfs_dir2_leaf_getdents(
 					XFS_DIR2_DB_OFF_TO_BYTE(mp,
 					    XFS_DIR2_BYTE_TO_DB(mp, curoff),
 					    (char *)ptr - (char *)data);
+				if (ptr >= (char *)data + mp->m_dirblksize) {
+					continue;
+				}
 			}
 		}
 		/*
@@ -1086,13 +1089,7 @@ xfs_dir2_leaf_getdents(
 
 		length = XFS_DIR2_DATA_ENTSIZE(p.namelen);
 
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
-		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff);
+		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff + length);
 
 #if XFS_BIG_FILESYSTEMS
 		p.ino = INT_GET(dep->inumber, ARCH_CONVERT) + mp->m_inoadd;

@@ -736,8 +736,7 @@ static int try_to_unuse(unsigned int type)
 		 * interactive performance.  Interruptible check on
 		 * signal_pending() would be nice, but changes the spec?
 		 */
-		if (need_resched())
-			schedule();
+		cond_resched();
 	}
 
 	mmput(start_mm);

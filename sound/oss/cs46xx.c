@@ -4314,7 +4314,7 @@ static void cs461x_download_image(struct cs_card *card)
     {
         offset = ClrStat[i].BA1__DestByteOffset;
         count  = ClrStat[i].BA1__SourceSize;
-        for(  temp1 = offset; temp1<(offset+count); temp1+=4 );
+        for(  temp1 = offset; temp1<(offset+count); temp1+=4 )
               writel(0, pBA1+temp1);
     }
 

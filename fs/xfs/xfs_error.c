@@ -238,3 +238,79 @@ xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 	xfs_fs_vcmn_err(level, mp, fmt, ap);
 	va_end(ap);
 }
+
+void
+xfs_stack_trace(void)
+{
+	dump_stack();
+}
+
+void
+xfs_error_report(
+	char		*tag,
+	int		level,
+	xfs_mount_t	*mp,
+	char		*fname,
+	int		linenum,
+	inst_t		*ra)
+{
+	if (level <= xfs_error_level) {
+		if (mp != NULL) {
+			xfs_cmn_err(XFS_PTAG_ERROR_REPORT,
+				    CE_ALERT, mp,
+		"XFS internal error %s at line %d of file %s.  Caller 0x%x\n",
+				    tag, linenum, fname, ra);
+		} else {
+			cmn_err(CE_ALERT,
+		"XFS internal error %s at line %d of file %s.  Caller 0x%x\n",
+				tag, linenum, fname, ra);
+		}
+
+		xfs_stack_trace();
+	}
+}
+
+void
+xfs_hex_dump(void *p, int length)
+{
+	__uint8_t *uip = (__uint8_t*)p;
+	int	i;
+	char	sbuf[128], *s;
+	
+	s = sbuf;
+	*s = '\0';
+	for (i=0; i<length; i++, uip++) {
+		if ((i % 16) == 0) {
+			if (*s != '\0')
+				cmn_err(CE_ALERT, "%s\n", sbuf);
+			s = sbuf;
+			sprintf(s, "0x%x: ", i);
+			while( *s != '\0')
+				s++;
+		}
+		sprintf(s, "%02x ", *uip);
+
+		/*
+		 * the kernel sprintf is a void; user sprintf returns
+		 * the sprintf'ed string's length.  Find the new end-
+		 * of-string
+		 */
+		while( *s != '\0')
+			s++;
+	}
+	cmn_err(CE_ALERT, "%s\n", sbuf);
+}
+
+void
+xfs_corruption_error(
+	char		*tag,
+	int		level,
+	xfs_mount_t	*mp,
+	void		*p,
+	char		*fname,
+	int		linenum,
+	inst_t		*ra)
+{
+	xfs_hex_dump(p, 16);
+	xfs_error_report(tag, level, mp, fname, linenum, ra);
+}

@@ -34,7 +34,6 @@
 static char *_riocmd_c_sccs_ = "@(#)riocmd.c	1.2";
 #endif
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>

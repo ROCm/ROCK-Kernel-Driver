@@ -1600,12 +1600,16 @@ static int cdromsubchnl(unsigned long arg)
 
 static int cdromread(unsigned long arg, int blocksize, int cmd)
 {
-	int status;
+	int status, ret = 0;
 	struct cdrom_msf msf;
-	char buf[CD_FRAMESIZE_RAWER];
+	char *buf;
 
 	if (copy_from_user(&msf, (void *) arg, sizeof msf))
 		return -EFAULT;
+
+	buf = kmalloc(CD_FRAMESIZE_RAWER, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
 	bin2bcd(&msf);
 	msf.cdmsf_min1 = 0;
@@ -1615,11 +1619,19 @@ static int cdromread(unsigned long arg, int blocksize, int cmd)
 
 	DEBUG((DEBUG_VFS, "read cmd status 0x%x", status));
 
-	if (!sleep_flag_low(FL_DTEN, SLEEP_TIMEOUT))
-		return -EIO;
+	if (!sleep_flag_low(FL_DTEN, SLEEP_TIMEOUT)) {
+		ret = -EIO;
+		goto cdr_free;
+	}
+
 	fetch_data(buf, blocksize);
 
-	return copy_to_user((void *)arg, &buf, blocksize) ? -EFAULT : 0;
+	if (copy_to_user((void *)arg, &buf, blocksize))
+		ret = -EFAULT;
+
+cdr_free:
+	kfree(buf);
+	return ret;
 }
 
 

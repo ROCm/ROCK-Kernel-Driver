@@ -991,7 +991,7 @@ xfs_buf_iodone_callbacks(
 	xfs_buf_t	*bp)
 {
 	xfs_log_item_t	*lip;
-	static time_t	lasttime;
+	static ulong	lasttime;
 	static dev_t	lastdev;
 	xfs_mount_t	*mp;
 

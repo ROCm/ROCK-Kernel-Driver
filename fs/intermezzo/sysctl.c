@@ -21,7 +21,6 @@
  *  Sysctrl entries for Intermezzo!
  */
 
-#define __NO_VERSION__
 #include <linux/config.h> /* for CONFIG_PROC_FS */
 #include <linux/module.h>
 #include <linux/sched.h>

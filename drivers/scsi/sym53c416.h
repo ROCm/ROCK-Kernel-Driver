@@ -18,14 +18,6 @@
 #ifndef _SYM53C416_H
 #define _SYM53C416_H
 
-#if !defined(LINUX_VERSION_CODE)
-#include <linux/version.h>
-#endif
-
-#ifndef LinuxVersionCode
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-#endif
-
 #include <linux/types.h>
 
 #define SYM53C416_SCSI_ID 7

@@ -189,6 +189,10 @@ static int sh_wdt_open(struct inode *inode, struct file *file)
 			if (test_and_set_bit(0, &sh_is_open))
 				return -EBUSY;
 
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
+
 			sh_wdt_start();
 
 			break;

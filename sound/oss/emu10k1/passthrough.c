@@ -29,7 +29,6 @@
  **********************************************************************
  */
                        
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
@@ -165,15 +164,12 @@ ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
 
 		DPD(3, "prepend size %d, prepending %d bytes\n", pt->prepend_size, needed);
 		if (count < needed) {
-			if (copy_from_user(pt->buf + pt->prepend_size, buffer,
-					   count))
-				return -EFAULT;
+			copy_from_user(pt->buf + pt->prepend_size, buffer, count);
 			pt->prepend_size += count;
 			DPD(3, "prepend size now %d\n", pt->prepend_size);
 			return count;
 		}
-		if (copy_from_user(pt->buf + pt->prepend_size, buffer, needed))
-			return -EFAULT;
+		copy_from_user(pt->buf + pt->prepend_size, buffer, needed);
 		r = pt_putblock(wave_dev, (u16 *) pt->buf, nonblock);
 		if (r)
 			return r;
@@ -184,8 +180,7 @@ ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
 	blocks_copied = 0;
 	while (blocks > 0) {
 		u16 *bufptr = (u16 *) buffer + (bytes_copied/2);
-		if (copy_from_user(pt->buf, bufptr, PT_BLOCKSIZE))
-			return -EFAULT;
+		copy_from_user(pt->buf, bufptr, PT_BLOCKSIZE);
 		bufptr = (u16 *) pt->buf;
 		r = pt_putblock(wave_dev, bufptr, nonblock);
 		if (r) {
@@ -201,8 +196,7 @@ ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
 	i = count - bytes_copied;
 	if (i) {
 		pt->prepend_size = i;
-		if (copy_from_user(pt->buf, buffer + bytes_copied, i))
-			return -EFAULT;
+		copy_from_user(pt->buf, buffer + bytes_copied, i);
 		bytes_copied += i;
 		DPD(3, "filling prepend buffer with %d bytes", i);
 	}

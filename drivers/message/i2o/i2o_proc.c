@@ -836,9 +836,13 @@ int i2o_proc_read_ddm_table(char *buf, char **start, off_t offset, int len,
 		u16 row_count;
 		u16 more_flag;
 		i2o_exec_execute_ddm_table ddm_table[MAX_I2O_MODULES];
-	} result;
+	} *result;
 
 	i2o_exec_execute_ddm_table ddm_table;
+
+	result = kmalloc(sizeof(*result), GFP_KERNEL);
+	if(!result)
+		return -ENOMEM;
 
 	spin_lock(&i2o_proc_lock);
 	len = 0;
@@ -847,18 +851,17 @@ int i2o_proc_read_ddm_table(char *buf, char **start, off_t offset, int len,
 				c, ADAPTER_TID, 
 				0x0003, -1,
 				NULL, 0,
-				&result, sizeof(result));
+				result, sizeof(*result));
 
 	if (token < 0) {
 		len += i2o_report_query_status(buf+len, token,"0x0003 Executing DDM List");
-		spin_unlock(&i2o_proc_lock);
-		return len;
+		goto out;
 	}
 
 	len += sprintf(buf+len, "Tid   Module_type     Vendor Mod_id  Module_name             Vrs  Data_size Code_size\n");
-	ddm_table=result.ddm_table[0];
+	ddm_table=result->ddm_table[0];
 
-	for(i=0; i < result.row_count; ddm_table=result.ddm_table[++i])
+	for(i=0; i < result->row_count; ddm_table=result->ddm_table[++i])
 	{
 		len += sprintf(buf+len, "0x%03x ", ddm_table.ddm_tid & 0xFFF);
 
@@ -882,9 +885,9 @@ int i2o_proc_read_ddm_table(char *buf, char **start, off_t offset, int len,
 
 		len += sprintf(buf+len, "\n");
 	}
-
+out:
 	spin_unlock(&i2o_proc_lock);
-
+	kfree(result);
 	return len;
 }
 
@@ -1047,7 +1050,11 @@ int i2o_proc_read_groups(char *buf, char **start, off_t offset, int len,
 		u16 row_count;
 		u16 more_flag;
 		i2o_group_info group[256];
-	} result;
+	} *result;
+
+	result = kmalloc(sizeof(*result), GFP_KERNEL);
+	if(!result)
+		return -ENOMEM;
 
 	spin_lock(&i2o_proc_lock);
 
@@ -1055,24 +1062,23 @@ int i2o_proc_read_groups(char *buf, char **start, off_t offset, int len,
 
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				d->controller, d->lct_data.tid, 0xF000, -1, NULL, 0,
-				&result, sizeof(result));
+				result, sizeof(*result));
 
 	if (token < 0) {
 		len = i2o_report_query_status(buf+len, token, "0xF000 Params Descriptor");
-		spin_unlock(&i2o_proc_lock);
-		return len;
+		goto out;
 	}
 
 	len += sprintf(buf+len, "#  Group   FieldCount RowCount Type   Add Del Clear\n");
 
-	for (i=0; i < result.row_count; i++)
+	for (i=0; i < result->row_count; i++)
 	{
 		len += sprintf(buf+len, "%-3d", i);
-		len += sprintf(buf+len, "0x%04X ", result.group[i].group_number);
-		len += sprintf(buf+len, "%10d ", result.group[i].field_count);
-		len += sprintf(buf+len, "%8d ",  result.group[i].row_count);
+		len += sprintf(buf+len, "0x%04X ", result->group[i].group_number);
+		len += sprintf(buf+len, "%10d ", result->group[i].field_count);
+		len += sprintf(buf+len, "%8d ",  result->group[i].row_count);
 
-		properties = result.group[i].properties;
+		properties = result->group[i].properties;
 		if (properties & 0x1)	len += sprintf(buf+len, "Table  ");
 				else	len += sprintf(buf+len, "Scalar ");
 		if (properties & 0x2)	len += sprintf(buf+len, " + ");
@@ -1085,11 +1091,11 @@ int i2o_proc_read_groups(char *buf, char **start, off_t offset, int len,
 		len += sprintf(buf+len, "\n");
 	}
 
-	if (result.more_flag)
+	if (result->more_flag)
 		len += sprintf(buf+len, "There is more...\n");
-
+out:
 	spin_unlock(&i2o_proc_lock);
-
+	kfree(result);
 	return len;
 }
 
@@ -1220,7 +1226,11 @@ int i2o_proc_read_users(char *buf, char **start, off_t offset, int len,
 		u16 row_count;
 		u16 more_flag;
 		i2o_user_table user[64];
-	} result;
+	} *result;
+
+	result = kmalloc(sizeof(*result), GFP_KERNEL);
+	if(!result)
+		return -ENOMEM;
 
 	spin_lock(&i2o_proc_lock);
 	len = 0;
@@ -1228,28 +1238,28 @@ int i2o_proc_read_users(char *buf, char **start, off_t offset, int len,
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				d->controller, d->lct_data.tid,
 				0xF003, -1, NULL, 0,
-				&result, sizeof(result));
+				result, sizeof(*result));
 
 	if (token < 0) {
 		len += i2o_report_query_status(buf+len, token,"0xF003 User Table");
-		spin_unlock(&i2o_proc_lock);
-		return len;
+		goto out;
 	}
 
 	len += sprintf(buf+len, "#  Instance UserTid ClaimType\n");
 
-	for(i=0; i < result.row_count; i++)
+	for(i=0; i < result->row_count; i++)
 	{
 		len += sprintf(buf+len, "%-3d", i);
-		len += sprintf(buf+len, "%#8x ", result.user[i].instance);
-		len += sprintf(buf+len, "%#7x ", result.user[i].user_tid);
-		len += sprintf(buf+len, "%#9x\n", result.user[i].claim_type);
+		len += sprintf(buf+len, "%#8x ", result->user[i].instance);
+		len += sprintf(buf+len, "%#7x ", result->user[i].user_tid);
+		len += sprintf(buf+len, "%#9x\n", result->user[i].claim_type);
 	}
 
-	if (result.more_flag)
+	if (result->more_flag)
 		len += sprintf(buf+len, "There is more...\n");
-
+out:
 	spin_unlock(&i2o_proc_lock);
+	kfree(result);
 	return len;
 }
 
@@ -2264,24 +2274,27 @@ int i2o_proc_read_lan_mcast_addr(char *buf, char **start, off_t offset,
 		u16 row_count;
 		u16 more_flag;
 		u8  mc_addr[256][8];
-	} result;	
+	} *result;	
+
+	result = kmalloc(sizeof(*result), GFP_KERNEL);
+	if(!result)
+		return -ENOMEM;
 
 	spin_lock(&i2o_proc_lock);	
 	len = 0;
 
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				d->controller, d->lct_data.tid, 0x0002, -1, 
-				NULL, 0, &result, sizeof(result));
+				NULL, 0, result, sizeof(*result));
 
 	if (token < 0) {
 		len += i2o_report_query_status(buf+len, token,"0x002 LAN Multicast MAC Address");
-		spin_unlock(&i2o_proc_lock);
-		return len;
+		goto out;
 	}
 
-	for (i = 0; i < result.row_count; i++)
+	for (i = 0; i < result->row_count; i++)
 	{
-		memcpy(mc_addr, result.mc_addr[i], 8);
+		memcpy(mc_addr, result->mc_addr[i], 8);
 
 		len += sprintf(buf+len, "MC MAC address[%d]: "
 			       "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -2289,8 +2302,9 @@ int i2o_proc_read_lan_mcast_addr(char *buf, char **start, off_t offset,
 			       mc_addr[3], mc_addr[4], mc_addr[5],
 			       mc_addr[6], mc_addr[7]);
 	}
-
+out:
 	spin_unlock(&i2o_proc_lock);
+	kfree(result);
 	return len;
 }
 
@@ -2495,32 +2509,36 @@ int i2o_proc_read_lan_alt_addr(char *buf, char **start, off_t offset, int len,
 		u16 row_count;
 		u16 more_flag;
 		u8  alt_addr[256][8];
-	} result;	
+	} *result;	
+
+	result = kmalloc(sizeof(*result), GFP_KERNEL);
+	if(!result)
+		return -ENOMEM;
 
 	spin_lock(&i2o_proc_lock);	
 	len = 0;
 
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				d->controller, d->lct_data.tid,
-				0x0006, -1, NULL, 0, &result, sizeof(result));
+				0x0006, -1, NULL, 0, result, sizeof(*result));
 
 	if (token < 0) {
 		len += i2o_report_query_status(buf+len, token, "0x0006 LAN Alternate Address (optional)");
-		spin_unlock(&i2o_proc_lock);
-		return len;
+		goto out;
 	}
 
-	for (i=0; i < result.row_count; i++)
+	for (i=0; i < result->row_count; i++)
 	{
-		memcpy(alt_addr,result.alt_addr[i],8);
+		memcpy(alt_addr,result->alt_addr[i],8);
 		len += sprintf(buf+len, "Alternate address[%d]: "
 			       "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
 			       i, alt_addr[0], alt_addr[1], alt_addr[2],
 			       alt_addr[3], alt_addr[4], alt_addr[5],
 			       alt_addr[6], alt_addr[7]);
 	}
-
+out:
 	spin_unlock(&i2o_proc_lock);
+	kfree(result);
 	return len;
 }
 

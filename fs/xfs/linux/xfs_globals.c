@@ -46,7 +46,7 @@ unsigned long	xfs_physmem;
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
  * other XFS code uses these values.
  */
-xfs_param_t xfs_params = { 0, 1, 0, 0, 0 };
+xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3 };
 
 /*
  * Used to serialize atomicIncWithWrap.

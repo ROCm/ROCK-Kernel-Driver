@@ -48,7 +48,23 @@ typedef struct xfs_param {
 				/*  not a member of the parent dir GID.  */
 	ulong	symlink_mode;	/* Symlink creat mode affected by umask. */
 	ulong	panic_mask;	/* bitmask to specify panics on errors.  */
+	ulong	error_level;	/* Degree of reporting for internal probs*/
 } xfs_param_t;
+
+/*
+ * xfs_error_level:
+ *
+ * How much error reporting will be done when internal problems are
+ * encountered.  These problems normally return an EFSCORRUPTED to their
+ * caller, with no other information reported.
+ *
+ * 0	No error reports
+ * 1	Report EFSCORRUPTED errors that will cause a filesystem shutdown
+ * 5	Report all EFSCORRUPTED errors (all of the above errors, plus any
+ *	additional errors that are known to not cause shutdowns)
+ *
+ * xfs_panic_mask bit 0x8 turns the error reports into panics
+ */
 
 enum {
 	XFS_STATS_CLEAR = 1,
@@ -56,6 +72,7 @@ enum {
 	XFS_SGID_INHERIT = 3,
 	XFS_SYMLINK_MODE = 4,
 	XFS_PANIC_MASK = 5,
+	XFS_ERRLEVEL = 6,
 };
 
 extern xfs_param_t	xfs_params;

@@ -30,7 +30,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "i810.h"
 #include "drmP.h"
 #include "drm.h"

@@ -65,6 +65,7 @@ static int cs5520_get_info(char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
 	unsigned long bmiba = pci_resource_start(bmide_dev, 2);
+	int len;
 	u8 c0 = 0, c1 = 0;
 	u16 reg16;
 	u32 reg32;
@@ -94,7 +95,10 @@ static int cs5520_get_info(char *buffer, char **addr, off_t offset, int count)
 	pci_read_config_dword(bmide_dev, 0x68, &reg32);
 	p += sprintf(p, "16bit Secondary: %08x\n", reg32);
 	
-	return p-buffer;
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 
 #endif
@@ -259,9 +263,9 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 {
 	ata_index_t index;
 	ide_pci_device_t *d = &cyrix_chipsets[id->driver_data];
-	
-	ide_setup_pci_noise(dev, d);	
-	
+
+	ide_setup_pci_noise(dev, d);
+
 	/* We must not grab the entire device, it has 'ISA' space in its
 	   BARS too and we will freak out other bits of the kernel */
 	if(pci_enable_device_bars(dev, 1<<2))
@@ -271,15 +275,15 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	}
 	pci_set_master(dev);
 	pci_set_dma_mask(dev, 0xFFFFFFFF);
-	init_chipset_cs5520(dev, d->name);	
-	
+	init_chipset_cs5520(dev, d->name);
+
 	index.all = 0xf0f0;
 
 	/*
 	 *	Now the chipset is configured we can let the core
 	 *	do all the device setup for us
 	 */
-	 	
+
 	ide_pci_setup_ports(dev, d, 1, 14, &index);
 
 	printk("Index.b %d %d\n", index.b.low, index.b.high);
@@ -288,7 +292,7 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 		probe_hwif_init(&ide_hwifs[index.b.low]);
 	if((index.b.high & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index.b.high]);
-		
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

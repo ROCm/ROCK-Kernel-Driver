@@ -16,7 +16,6 @@
  * Copyright (C) 2000  Alexander Larsson (alex@cendio.se), Cendio Systems AB
  *
  */
-#define __NO_VERSION__
 #include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/jffs.h>
