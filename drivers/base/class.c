@@ -316,11 +316,8 @@ void class_device_del(struct class_device *class_dev)
 		up_write(&parent->subsys.rwsem);
 	}
 
-	if (class_dev->dev) {
-		class_device_dev_unlink(class_dev);
-		class_device_driver_unlink(class_dev);
-		put_device(class_dev->dev);
-	}
+	class_device_dev_unlink(class_dev);
+	class_device_driver_unlink(class_dev);
 	
 	kobject_del(&class_dev->kobj);
 
