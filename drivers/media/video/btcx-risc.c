@@ -1,5 +1,5 @@
 /*
-    $Id: btcx-risc.c,v 1.4 2004/11/07 13:17:14 kraxel Exp $
+    $Id: btcx-risc.c,v 1.5 2004/12/10 12:33:39 kraxel Exp $
 
     btcx-risc.c
 
@@ -24,6 +24,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
