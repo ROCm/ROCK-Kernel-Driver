@@ -93,7 +93,7 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
 static void sctp_wait_for_close(struct sock *sk, long timeo);
-static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
+static struct sctp_af *sctp_sockaddr_af(struct sctp_sock *opt,
 					union sctp_addr *addr, int len);
 static int sctp_bindx_add(struct sock *, struct sockaddr *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr *, int);
@@ -269,7 +269,7 @@ SCTP_STATIC int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 static long sctp_get_port_local(struct sock *, union sctp_addr *);
 
 /* Verify this is a valid sockaddr. */
-static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
+static struct sctp_af *sctp_sockaddr_af(struct sctp_sock *opt,
 					union sctp_addr *addr, int len)
 {
 	struct sctp_af *af;
@@ -294,7 +294,7 @@ static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
 /* Bind a local address either to an endpoint or to an association.  */
 SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
@@ -467,7 +467,7 @@ static int sctp_send_asconf_add_ip(struct sock		*sk,
 				   struct sockaddr	*addrs,
 				   int 			addrcnt)
 {
-	struct sctp_opt			*sp;
+	struct sctp_sock		*sp;
 	struct sctp_endpoint		*ep;
 	struct sctp_association		*asoc;
 	struct sctp_bind_addr		*bp;
@@ -572,7 +572,7 @@ out:
  */
 int sctp_bindx_rem(struct sock *sk, struct sockaddr *addrs, int addrcnt)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 	int cnt;
 	struct sctp_bind_addr *bp = &ep->base.bind_addr;
@@ -656,7 +656,7 @@ static int sctp_send_asconf_del_ip(struct sock		*sk,
 				   struct sockaddr	*addrs,
 				   int			addrcnt)
 {
-	struct sctp_opt		*sp;
+	struct sctp_sock	*sp;
 	struct sctp_endpoint	*ep;
 	struct sctp_association	*asoc;
 	struct sctp_bind_addr	*bp;
@@ -1051,7 +1051,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			     struct msghdr *msg, size_t msg_len)
 {
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	struct sctp_endpoint *ep;
 	struct sctp_association *new_asoc=NULL, *asoc=NULL;
 	struct sctp_transport *transport, *chunk_tp;
@@ -1492,7 +1492,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 			     int flags, int *addr_len)
 {
 	struct sctp_ulpevent *event = NULL;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	struct sk_buff *skb;
 	int copied;
 	int err = 0;
@@ -1637,7 +1637,7 @@ static int sctp_setsockopt_events(struct sock *sk, char __user *optval,
 static int sctp_setsockopt_autoclose(struct sock *sk, char __user *optval,
 					    int optlen)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	/* Applicable to UDP-style socket only */
 	if (sctp_style(sk, TCP))
@@ -1779,7 +1779,7 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 static int sctp_setsockopt_initmsg(struct sock *sk, char __user *optval, int optlen)
 {
 	struct sctp_initmsg sinit;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (optlen != sizeof(struct sctp_initmsg))
 		return -EINVAL;
@@ -1817,7 +1817,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (optlen != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -1934,7 +1934,7 @@ static int sctp_setsockopt_rtoinfo(struct sock *sk, char __user *optval, int opt
 		/* If there is no association or the association-id = 0
 		 * set the values to the endpoint.
 		 */
-		struct sctp_opt *sp = sctp_sk(sk);
+		struct sctp_sock *sp = sctp_sk(sk);
 
 		if (rtoinfo.srto_initial != 0)
 			sp->rtoinfo.srto_initial = rtoinfo.srto_initial;
@@ -1987,7 +1987,7 @@ static int sctp_setsockopt_associnfo(struct sock *sk, char __user *optval, int o
 		}
 	} else {
 		/* Set the values to the endpoint */
-		struct sctp_opt *sp = sctp_sk(sk);
+		struct sctp_sock *sp = sctp_sk(sk);
 
 		if (assocparams.sasoc_asocmaxrxt != 0)
 			sp->assocparams.sasoc_asocmaxrxt =
@@ -2012,7 +2012,7 @@ static int sctp_setsockopt_associnfo(struct sock *sk, char __user *optval, int o
 static int sctp_setsockopt_mappedv4(struct sock *sk, char __user *optval, int optlen)
 {
 	int val;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (optlen < sizeof(int))
 		return -EINVAL;
@@ -2040,7 +2040,7 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char __user *optval, int optl
 {
 	struct sctp_association *asoc;
 	struct list_head *pos;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	int val;
 
 	if (optlen < sizeof(int))
@@ -2074,7 +2074,7 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char __user *optval, int optl
 static int sctp_setsockopt_peer_primary_addr(struct sock *sk, char __user *optval,
 					     int optlen)
 {
-	struct sctp_opt		*sp;
+	struct sctp_sock	*sp;
 	struct sctp_endpoint	*ep;
 	struct sctp_association	*asoc = NULL;
 	struct sctp_setpeerprim	prim;
@@ -2269,7 +2269,7 @@ out_nounlock:
 SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 			     int addr_len)
 {
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	struct sctp_endpoint *ep;
 	struct sctp_association *asoc;
 	struct sctp_transport *transport;
@@ -2390,7 +2390,7 @@ SCTP_STATIC int sctp_disconnect(struct sock *sk, int flags)
  */
 SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 {
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	struct sctp_endpoint *ep;
 	struct sock *newsk = NULL;
 	struct sctp_association *asoc;
@@ -2453,7 +2453,7 @@ SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	struct sctp_endpoint *ep;
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 
 	SCTP_DEBUG_PRINTK("sctp_init_sock(sk: %p)\n", sk);
 
@@ -3007,7 +3007,7 @@ static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 	struct sctp_transport *from;
 	void __user *to;
 	union sctp_addr temp;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	int addrlen;
 
 	if (len != sizeof(struct sctp_getaddrs))
@@ -3164,7 +3164,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	struct sctp_sockaddr_entry *addr;
 	void __user *to;
 	union sctp_addr temp;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	int addrlen;
 	rwlock_t *addr_lock;
 	int err = 0;
@@ -3250,7 +3250,7 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
 {
 	struct sctp_prim prim;
 	struct sctp_association *asoc;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (len != sizeof(struct sctp_prim))
 		return -EINVAL;
@@ -3329,7 +3329,7 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (len != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -3423,7 +3423,7 @@ static int sctp_getsockopt_rtoinfo(struct sock *sk, int len,
 		rtoinfo.srto_min = jiffies_to_msecs(asoc->rto_min);
 	} else {
 		/* Values corresponding to the endpoint. */
-		struct sctp_opt *sp = sctp_sk(sk);
+		struct sctp_sock *sp = sctp_sk(sk);
 
 		rtoinfo.srto_initial = sp->rtoinfo.srto_initial;
 		rtoinfo.srto_max = sp->rtoinfo.srto_max;
@@ -3489,7 +3489,7 @@ static int sctp_getsockopt_associnfo(struct sock *sk, int len,
 		assocparams.sasoc_number_peer_destinations = cnt;
 	} else {
 		/* Values corresponding to the endpoint */
-		struct sctp_opt *sp = sctp_sk(sk);
+		struct sctp_sock *sp = sctp_sk(sk);
 
 		assocparams.sasoc_asocmaxrxt = sp->assocparams.sasoc_asocmaxrxt;
 		assocparams.sasoc_peer_rwnd = sp->assocparams.sasoc_peer_rwnd;
@@ -3524,7 +3524,7 @@ static int sctp_getsockopt_mappedv4(struct sock *sk, int len,
 				    char __user *optval, int __user *optlen)
 {
 	int val;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	if (len < sizeof(int))
 		return -EINVAL;
@@ -3876,7 +3876,7 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
  */
 SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 
 	/* Only UDP style sockets that are not peeled off are allowed to
@@ -3925,7 +3925,7 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
  */
 SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 {
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 
 	/* If backlog is zero, disable listening. */
@@ -4026,7 +4026,7 @@ cleanup:
 unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
-	struct sctp_opt *sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 	unsigned int mask;
 
 	poll_wait(file, sk->sk_sleep, wait);
@@ -4654,8 +4654,8 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 			      struct sctp_association *assoc,
 			      sctp_socket_type_t type)
 {
-	struct sctp_opt *oldsp = sctp_sk(oldsk);
-	struct sctp_opt *newsp = sctp_sk(newsk);
+	struct sctp_sock *oldsp = sctp_sk(oldsk);
+	struct sctp_sock *newsp = sctp_sk(newsk);
 	struct sctp_bind_bucket *pp; /* hash list port iterator */
 	struct sctp_endpoint *newep = newsp->ep;
 	struct sk_buff *skb, *tmp;
@@ -4667,7 +4667,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	newsk->sk_sndbuf = oldsk->sk_sndbuf;
 	newsk->sk_rcvbuf = oldsk->sk_rcvbuf;
 	/* Brute force copy old sctp opt. */
-	memcpy(newsp, oldsp, sizeof(struct sctp_opt));
+	inet_sk_copy_descendant(newsk, oldsk);
 
 	/* Restore the ep value that was overwritten with the above structure
 	 * copy.

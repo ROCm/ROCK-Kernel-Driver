@@ -40,26 +40,15 @@
 #include <asm/system.h>
 
 /*
- * hippi_net_init()
- *
- * Do nothing, this is just to pursuade the stupid linker to behave.
- */
-
-void hippi_net_init(void)
-{
-	return;
-}
-
-/*
  * Create the HIPPI MAC header for an arbitrary protocol layer 
  *
  * saddr=NULL	means use device source address
  * daddr=NULL	means leave destination address (eg unresolved arp)
  */
 
-int hippi_header(struct sk_buff *skb, struct net_device *dev,
-		 unsigned short type, void *daddr, void *saddr,
-		 unsigned len)
+static int hippi_header(struct sk_buff *skb, struct net_device *dev,
+			unsigned short type, void *daddr, void *saddr,
+			unsigned len)
 {
 	struct hippi_hdr *hip = (struct hippi_hdr *)skb_push(skb, HIPPI_HLEN);
 
@@ -107,7 +96,7 @@ int hippi_header(struct sk_buff *skb, struct net_device *dev,
  * completed on this sk_buff. We now let ARP fill in the other fields.
  */
 
-int hippi_rebuild_header(struct sk_buff *skb)
+static int hippi_rebuild_header(struct sk_buff *skb)
 {
 	struct hippi_hdr *hip = (struct hippi_hdr *)skb->data;
 

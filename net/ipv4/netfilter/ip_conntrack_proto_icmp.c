@@ -196,7 +196,7 @@ icmp_error_message(struct sk_buff *skb,
 	}
 
 	/* Update skb to refer to this connection */
-	skb->nfct = &h->ctrack->ct_general;
+	skb->nfct = &tuplehash_to_ctrack(h)->ct_general;
 	skb->nfctinfo = *ctinfo;
 	return -NF_ACCEPT;
 }

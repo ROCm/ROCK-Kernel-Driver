@@ -629,7 +629,6 @@ int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock, long t
 		}
 		return 1;
 	}
-	skb_orphan(skb);
 	skb_set_owner_r(skb, sk);
 	return 0;
 }
@@ -663,14 +662,11 @@ void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
 
 static inline void netlink_trim(struct sk_buff *skb, int allocation)
 {
-	int delta = skb->end - skb->tail;
+	int delta;
 
-	/* If the packet is charged to a socket, the modification
-	 * of truesize below is illegal and will corrupt socket
-	 * buffer accounting state.
-	 */
-	BUG_ON(skb->list != NULL);
+	skb_orphan(skb);
 
+	delta = skb->end - skb->tail;
 	if (delta * 2 < skb->truesize)
 		return;
 	if (pskb_expand_head(skb, 0, -delta, allocation))
@@ -707,14 +703,12 @@ static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff 
 	struct netlink_opt *nlk = nlk_sk(sk);
 #ifdef NL_EMULATE_DEV
 	if (nlk->handler) {
-		skb_orphan(skb);
 		nlk->handler(sk->sk_protocol, skb);
 		return 0;
 	} else
 #endif
 	if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf &&
 	    !test_bit(0, &nlk->state)) {
-                skb_orphan(skb);
 		skb_set_owner_r(skb, sk);
 		skb_queue_tail(&sk->sk_receive_queue, skb);
 		sk->sk_data_ready(sk, skb->len);

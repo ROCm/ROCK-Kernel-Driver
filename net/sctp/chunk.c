@@ -77,7 +77,7 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 {
 	struct list_head *pos, *temp;
 	struct sctp_chunk *chunk;
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	struct sctp_ulpevent *ev;
 	struct sctp_association *asoc = NULL;
 	int error = 0, notify;

@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.15"
-#define DRV_MODULE_RELDATE	"January 6, 2005"
+#define DRV_MODULE_VERSION	"3.16"
+#define DRV_MODULE_RELDATE	"January 17, 2005"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2706,7 +2706,11 @@ static int tg3_rx(struct tg3 *tp, int budget)
 
 		len = ((desc->idx_len & RXD_LEN_MASK) >> RXD_LEN_SHIFT) - 4; /* omit crc */
 
-		if (len > RX_COPY_THRESHOLD) {
+		if (len > RX_COPY_THRESHOLD 
+			&& tp->rx_offset == 2
+			/* rx_offset != 2 iff this is a 5701 card running
+			 * in PCI-X mode [see tg3_get_invariants()] */
+		) {
 			int skb_size;
 
 			skb_size = tg3_alloc_rx_skb(tp, opaque_key,

@@ -345,6 +345,7 @@ struct net_device
 	unsigned char		broadcast[MAX_ADDR_LEN];	/* hw bcast add	*/
 	unsigned char		dev_addr[MAX_ADDR_LEN];	/* hw address	*/
 	unsigned char		addr_len;	/* hardware address length	*/
+	unsigned short          dev_id;		/* for shared network cards */
 
 	struct dev_mc_list	*mc_list;	/* Multicast mac addresses	*/
 	int			mc_count;	/* Number of installed mcasts	*/

@@ -181,7 +181,7 @@ struct sctp_chunk *sctp_make_init(const struct sctp_association *asoc,
 	size_t chunksize;
 	struct sctp_chunk *retval = NULL;
 	int num_types, addrs_len = 0;
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	sctp_supported_addrs_param_t sat;
 	__u16 types[2];
 	sctp_adaption_ind_param_t aiparam;

@@ -574,7 +574,6 @@ static int command_do (amb_dev * dev, command * cmd) {
   amb_cq * cq = &dev->cq;
   volatile amb_cq_ptrs * ptrs = &cq->ptrs;
   command * my_slot;
-  unsigned long timeout;
   
   PRINTD (DBG_FLOW|DBG_CMD, "command_do %p", dev);
   
@@ -599,20 +598,14 @@ static int command_do (amb_dev * dev, command * cmd) {
     // mail the command
     wr_mem (dev, offsetof(amb_mem, mb.adapter.cmd_address), virt_to_bus (ptrs->in));
     
-    // prepare to wait for cq->pending milliseconds
-    // effectively one centisecond on i386
-    timeout = (cq->pending*HZ+999)/1000;
-    
     if (cq->pending > cq->high)
       cq->high = cq->pending;
     spin_unlock (&cq->lock);
     
-    while (timeout) {
-      // go to sleep
-      // PRINTD (DBG_CMD, "wait: sleeping %lu for command", timeout);
-      set_current_state(TASK_UNINTERRUPTIBLE);
-      timeout = schedule_timeout (timeout);
-    }
+    // these comments were in a while-loop before, msleep removes the loop
+    // go to sleep
+    // PRINTD (DBG_CMD, "wait: sleeping %lu for command", timeout);
+    msleep(cq->pending);
     
     // wait for my slot to be reached (all waiters are here or above, until...)
     while (ptrs->out != my_slot) {
@@ -1799,12 +1792,11 @@ static int __init do_loader_command (volatile loader_block * lb,
   // dump_loader_block (lb);
   wr_mem (dev, offsetof(amb_mem, doorbell), virt_to_bus (lb) & ~onegigmask);
   
-  timeout = command_timeouts[cmd] * HZ/100;
+  timeout = command_timeouts[cmd] * 10;
   
   while (!lb->result || lb->result == cpu_to_be32 (COMMAND_IN_PROGRESS))
     if (timeout) {
-      set_current_state(TASK_UNINTERRUPTIBLE);
-      timeout = schedule_timeout (timeout);
+      timeout = msleep_interruptible(timeout);
     } else {
       PRINTD (DBG_LOAD|DBG_ERR, "command %d timed out", cmd);
       dump_registers (dev);
@@ -1814,10 +1806,10 @@ static int __init do_loader_command (volatile loader_block * lb,
   
   if (cmd == adapter_start) {
     // wait for start command to acknowledge...
-    timeout = HZ/10;
+    timeout = 100;
     while (rd_plain (dev, offsetof(amb_mem, doorbell)))
       if (timeout) {
-	timeout = schedule_timeout (timeout);
+	timeout = msleep_interruptible(timeout);
       } else {
 	PRINTD (DBG_LOAD|DBG_ERR, "start command did not clear doorbell, res=%08x",
 		be32_to_cpu (lb->result));
@@ -1932,17 +1924,12 @@ static int amb_reset (amb_dev * dev, int diags) {
   if (diags) { 
     unsigned long timeout;
     // 4.2 second wait
-    timeout = HZ*42/10;
-    while (timeout) {
-      set_current_state(TASK_UNINTERRUPTIBLE);
-      timeout = schedule_timeout (timeout);
-    }
+    msleep(4200);
     // half second time-out
-    timeout = HZ/2;
+    timeout = 500;
     while (!rd_plain (dev, offsetof(amb_mem, mb.loader.ready)))
       if (timeout) {
-        set_current_state(TASK_UNINTERRUPTIBLE);
-	timeout = schedule_timeout (timeout);
+	timeout = msleep_interruptible(timeout);
       } else {
 	PRINTD (DBG_LOAD|DBG_ERR, "reset timed out");
 	return -ETIMEDOUT;
@@ -2056,14 +2043,12 @@ static int __init amb_talk (amb_dev * dev) {
   wr_mem (dev, offsetof(amb_mem, doorbell), virt_to_bus (&a));
   
   // 2.2 second wait (must not touch doorbell during 2 second DMA test)
-  timeout = HZ*22/10;
-  while (timeout)
-    timeout = schedule_timeout (timeout);
+  msleep(2200);
   // give the adapter another half second?
-  timeout = HZ/2;
+  timeout = 500;
   while (rd_plain (dev, offsetof(amb_mem, doorbell)))
     if (timeout) {
-      timeout = schedule_timeout (timeout);
+      timeout = msleep_interruptible(timeout);
     } else {
       PRINTD (DBG_INIT|DBG_ERR, "adapter init timed out");
       return -ETIMEDOUT;
@@ -2228,17 +2213,12 @@ static void setup_dev(amb_dev *dev, struct pci_dev *pci_dev)
 	spin_lock_init (&dev->rxq[pool].lock);
 }
 
-static int setup_pci_dev(struct pci_dev *pci_dev)
+static void setup_pci_dev(struct pci_dev *pci_dev)
 {
 	unsigned char lat;
-	int ret;
       
 	// enable bus master accesses
 	pci_set_master(pci_dev);
-      
-	ret = pci_enable_device(pci_dev);
-	if (ret < 0)
-		goto out;
 
 	// frobnicate latency (upwards, usually)
 	pci_read_config_byte (pci_dev, PCI_LATENCY_TIMER, &lat);
@@ -2251,22 +2231,27 @@ static int setup_pci_dev(struct pci_dev *pci_dev)
 			lat, pci_lat);
 		pci_write_config_byte(pci_dev, PCI_LATENCY_TIMER, pci_lat);
 	}
-out:
-	return ret;
 }
 
 static int __devinit amb_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 {
 	amb_dev * dev;
 	int err;
+	unsigned int irq;
+      
+	err = pci_enable_device(pci_dev);
+	if (err < 0) {
+		PRINTK (KERN_ERR, "skipped broken (PLX rev 2) card");
+		goto out;
+	}
 
 	// read resources from PCI configuration space
-	unsigned int irq = pci_dev->irq;
+	irq = pci_dev->irq;
 
 	if (pci_dev->device == PCI_DEVICE_ID_MADGE_AMBASSADOR_BAD) {
 		PRINTK (KERN_ERR, "skipped broken (PLX rev 2) card");
 		err = -EINVAL;
-		goto out;
+		goto out_disable;
 	}
 
 	PRINTD (DBG_INFO, "found Madge ATM adapter (amb) at"
@@ -2277,7 +2262,7 @@ static int __devinit amb_probe(struct pci_dev *pci_dev, const struct pci_device_
 	err = pci_request_region(pci_dev, 1, DEV_LABEL);
 	if (err < 0) {
 		PRINTK (KERN_ERR, "IO range already in use!");
-		goto out;
+		goto out_disable;
 	}
 
 	dev = kmalloc (sizeof(amb_dev), GFP_KERNEL);
@@ -2295,15 +2280,13 @@ static int __devinit amb_probe(struct pci_dev *pci_dev, const struct pci_device_
 		goto out_free;
 	}
 
-	err = setup_pci_dev(pci_dev);
-	if (err < 0)
-		goto out_reset;
+	setup_pci_dev(pci_dev);
 
 	// grab (but share) IRQ and install handler
 	err = request_irq(irq, interrupt_handler, SA_SHIRQ, DEV_LABEL, dev);
 	if (err < 0) {
 		PRINTK (KERN_ERR, "request IRQ failed!");
-		goto out_disable;
+		goto out_reset;
 	}
 
 	dev->atm_dev = atm_dev_register (DEV_LABEL, &amb_ops, -1, NULL);
@@ -2337,14 +2320,14 @@ out:
 
 out_free_irq:
 	free_irq(irq, dev);
-out_disable:
-	pci_disable_device(pci_dev);
 out_reset:
 	amb_reset(dev, 0);
 out_free:
 	kfree(dev);
 out_release:
 	pci_release_region(pci_dev, 1);
+out_disable:
+	pci_disable_device(pci_dev);
 	goto out;
 }
 

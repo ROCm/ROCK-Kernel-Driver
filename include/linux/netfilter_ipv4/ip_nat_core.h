@@ -8,20 +8,13 @@
 extern int ip_nat_init(void);
 extern void ip_nat_cleanup(void);
 
-extern unsigned int do_bindings(struct ip_conntrack *ct,
-				enum ip_conntrack_info conntrackinfo,
-				struct ip_nat_info *info,
-				unsigned int hooknum,
-				struct sk_buff **pskb);
+extern unsigned int nat_packet(struct ip_conntrack *ct,
+			       enum ip_conntrack_info conntrackinfo,
+			       unsigned int hooknum,
+			       struct sk_buff **pskb);
 
 extern int icmp_reply_translation(struct sk_buff **pskb,
-				  struct ip_conntrack *conntrack,
-				  unsigned int hooknum,
-				  int dir);
-
-extern void replace_in_hashes(struct ip_conntrack *conntrack,
-			      struct ip_nat_info *info);
-extern void place_in_hashes(struct ip_conntrack *conntrack,
-			    struct ip_nat_info *info);
-
+				  struct ip_conntrack *ct,
+				  enum ip_nat_manip_type manip,
+				  enum ip_conntrack_dir dir);
 #endif /* _IP_NAT_CORE_H */

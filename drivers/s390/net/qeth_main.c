@@ -5033,27 +5033,6 @@ qeth_neigh_setup(struct net_device *dev, struct neigh_parms *np)
 	return 0;
 }
 
-#ifdef CONFIG_QETH_IPV6
-int
-qeth_ipv6_generate_eui64(u8 * eui, struct net_device *dev)
-{
-	switch (dev->type) {
-	case ARPHRD_ETHER:
-	case ARPHRD_FDDI:
-	case ARPHRD_IEEE802_TR:
-		if (dev->addr_len != ETH_ALEN)
-			return -1;
-		memcpy(eui, dev->dev_addr, 3);
-		memcpy(eui + 5, dev->dev_addr + 3, 3);
-		eui[3] = (dev->dev_id >> 8) & 0xff;
-		eui[4] = dev->dev_id & 0xff;
-		return 0;
-	}
-	return -1;
-
-}
-#endif
-
 static void
 qeth_get_mac_for_ipm(__u32 ipm, char *mac, struct net_device *dev)
 {
@@ -5587,11 +5566,8 @@ qeth_netdev_init(struct net_device *dev)
 	}
 #ifdef CONFIG_QETH_IPV6
 	/*IPv6 address autoconfiguration stuff*/
-	card->dev->dev_id = card->info.unique_id & 0xffff;
 	if (!(card->info.unique_id & UNIQUE_ID_NOT_BY_CARD))
-		card->dev->generate_eui64 = qeth_ipv6_generate_eui64;
-
-
+		card->dev->dev_id = card->info.unique_id & 0xffff;
 #endif
 	dev->hard_header_parse = NULL;
 	dev->set_mac_address = qeth_layer2_set_mac_address;

@@ -97,7 +97,7 @@ struct ipt_hashlimit_htable {
 	struct list_head hash[0];	/* hashtable itself */
 };
 
-DECLARE_RWLOCK(hashlimit_lock);		/* protects htables list */
+static DECLARE_RWLOCK(hashlimit_lock);	/* protects htables list */
 static LIST_HEAD(hashlimit_htables);
 static kmem_cache_t *hashlimit_cachep;
 
@@ -668,11 +668,9 @@ static int init_or_fini(int fini)
 		goto cleanup_nothing;
 	}
 
-	/* FIXME: do we really want HWCACHE_ALIGN since our objects are
-	 * quite small ? */
 	hashlimit_cachep = kmem_cache_create("ipt_hashlimit",
 					    sizeof(struct dsthash_ent), 0,
-					    SLAB_HWCACHE_ALIGN, NULL, NULL);
+					    0, NULL, NULL);
 	if (!hashlimit_cachep) {
 		printk(KERN_ERR "Unable to create ipt_hashlimit slab cache\n");
 		ret = -ENOMEM;
