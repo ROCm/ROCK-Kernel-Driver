@@ -223,6 +223,20 @@ static struct file_operations proc_ksyms_operations = {
 };
 #endif
 
+extern struct seq_operations slabinfo_op;
+extern ssize_t slabinfo_write(struct file *, const char *, size_t, loff_t *);
+static int slabinfo_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &slabinfo_op);
+}
+static struct file_operations proc_slabinfo_operations = {
+	open:		slabinfo_open,
+	read:		seq_read,
+	write:		slabinfo_write,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+
 static int kstat_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -551,6 +565,7 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
+	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 #ifdef CONFIG_MODULES
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif
@@ -575,8 +590,4 @@ void __init proc_misc_init(void)
 			entry->proc_fops = &ppc_htab_operations;
 	}
 #endif
-	entry = create_proc_read_entry("slabinfo", S_IWUSR | S_IRUGO, NULL,
-				       slabinfo_read_proc, NULL);
-	if (entry)
-		entry->write_proc = slabinfo_write_proc;
 }
