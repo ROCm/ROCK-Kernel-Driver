@@ -520,7 +520,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment
    comment 'Network device support'
 
-   bool 'Network device support?' CONFIG_NETDEVICES
+   bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
       source drivers/net/Config.in
    fi
