@@ -267,7 +267,7 @@ static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
 			 * just indicate that we did the pre flush
 			 */
 			real_rq->flags |= REQ_BAR_PREFLUSH;
-			elv_requeue_request(drive->queue, real_rq);
+			__elv_add_request(drive->queue, real_rq, ELEVATOR_INSERT_FRONT, 0);
 		}
 		/*
 		 * all is fine, return
