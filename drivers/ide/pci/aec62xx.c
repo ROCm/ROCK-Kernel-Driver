@@ -101,8 +101,7 @@ static int aec6210_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	/* 0x40|(2*drive->dn): Active, 0x41|(2*drive->dn): Recovery */
 	pci_read_config_word(dev, 0x40|(2*drive->dn), &d_conf);
 	tmp0 = pci_bus_clock_list(speed, BUSCLOCK(dev));
-	SPLIT_BYTE(tmp0,tmp1,tmp2);
-	MAKE_WORD(d_conf,tmp1,tmp2);
+	d_conf = ((tmp0 & 0xf0) << 4) | (tmp0 & 0xf);
 	pci_write_config_word(dev, 0x40|(2*drive->dn), d_conf);
 
 	tmp1 = 0x00;
