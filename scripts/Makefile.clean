@@ -39,8 +39,8 @@ subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
 
 __clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files))
 
-quiet_cmd_clean = CLEAN   $(__cleanfiles)
-      cmd_clean = 	rm -f $(__clean-files);	$(clean-rule)
+quiet_cmd_clean = CLEAN   $(obj)
+      cmd_clean = rm -f $(__clean-files); $(clean-rule)
 
 __clean: $(subdir-ymn)
 ifneq ($(strip $(__clean-files) $(clean-rule)),)
@@ -58,7 +58,7 @@ endif
 
 .PHONY: $(subdir-ymn)
 $(subdir-ymn):
-	$(Q)$(MAKE) -rR -f scripts/Makefile.clean obj=$@
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$@
 
 # If quiet is set, only print short version of command
 

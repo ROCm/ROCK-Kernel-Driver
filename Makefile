@@ -106,6 +106,11 @@ endif
 
 MAKEFLAGS += --no-print-directory
 
+# For maximum performance (+ possibly random breakage, uncomment
+# the following)
+
+#MAKEFLAGS += -rR
+
 #	If the user wants quiet mode, echo short versions of the commands 
 #	only
 
@@ -146,7 +151,6 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
-MAKEFILES	= .config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= /sbin/kallsyms
@@ -165,7 +169,7 @@ AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE GENKSYMS PERL
 
 export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
@@ -369,7 +373,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	+@$(call descend,$@,)
+	+$(call descend,$@,)
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -476,9 +480,11 @@ ifdef CONFIG_MODVERSIONS
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: FORCE
+.PHONY: __rm_tmp_export-objs
+__rm_tmp_export-objs: 
 	@rm -rf .tmp_export-objs
-	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+
+include/linux/modversions.h: $(patsubst %,_modver_%,$(SUBDIRS))
 	@echo -n '  Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
@@ -491,8 +497,9 @@ include/linux/modversions.h: FORCE
 	) > $@.tmp; \
 	$(update-if-changed)
 
-$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	+@$(call descend,$(patsubst _sfdep_%,%,$@),fastdep)
+.PHONY: $(patsubst %, _modver_%, $(SUBDIRS))
+$(patsubst %, _modver_%, $(SUBDIRS)): __rm_tmp_export-objs
+	$(Q)$(MAKE) -f scripts/Makefile.modver obj=$(patsubst _modver_%,%,$@)
 
 else # !CONFIG_MODVERSIONS
 
@@ -544,7 +551,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(Q)$(MAKE) MAKEFILES= -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
+	$(Q)$(MAKE) -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -701,7 +708,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	$(Q)$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
@@ -890,9 +897,6 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 
-ifeq ($(KBUILD_VERBOSE),1)
-descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
-endif
-descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
+descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:
