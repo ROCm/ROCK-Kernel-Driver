@@ -222,22 +222,21 @@
 .mem.offset 8,0; st8.spill [r3]=r29,16;		\
 	;;					\
 .mem.offset 0,0; st8.spill [r2]=r30,16;		\
-.mem.offset 8,0; st8.spill [r3]=r31,16;		\
+.mem.offset 8,0; st8.spill [r3]=r31,32;		\
 	;;					\
 	mov ar.fpsr=r11;	/* M-unit */	\
 	st8 [r2]=r8,8;		/* ar.ccv */	\
-	adds r3=16,r3;				\
+	adds r24=PT(B6)-PT(F7),r3;		\
 	;;					\
 	stf.spill [r2]=f6,32;			\
 	stf.spill [r3]=f7,32;			\
 	;;					\
 	stf.spill [r2]=f8,32;			\
 	stf.spill [r3]=f9,32;			\
-	adds r24=PT(B6)+16,r12			\
 	;;					\
-	stf.spill [r2]=f10,32;			\
-	stf.spill [r3]=f11,32;			\
-	adds r25=PT(B7)+16,r12			\
+	stf.spill [r2]=f10;			\
+	stf.spill [r3]=f11;			\
+	adds r25=PT(B7)-PT(F11),r3;		\
 	;;					\
 	st8 [r24]=r18,16;       /* b6 */	\
 	st8 [r25]=r19,16;       /* b7 */	\
