@@ -579,7 +579,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	addr_type = ipv6_addr_type(&usin->sin6_addr);
 
-	if(addr_type & IPV6_ADDR_MULTICAST)
+	if (addr_type & (IPV6_ADDR_ANYCAST | IPV6_ADDR_MULTICAST))
 		return -ENETUNREACH;
 
 	if (addr_type&IPV6_ADDR_LINKLOCAL) {
