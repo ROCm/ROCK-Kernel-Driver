@@ -204,7 +204,7 @@ struct dscc4_dev_priv {
         dma_addr_t iqtx_dma;
         dma_addr_t iqrx_dma;
 
-	volatile u32 scc_regs[SCC_REGISTERS_MAX]; /* Cf errata DS5 p.4 */
+	u32 scc_regs[SCC_REGISTERS_MAX]; /* Cf errata DS5 p.4 */
 
 	struct timer_list timer;
 
@@ -356,10 +356,10 @@ static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
 	u32 state;
 
 	/* Cf scc_writel for concern regarding thread-safety */
-	state = dpriv->scc_regs[offset];
+	state = dpriv->scc_regs[offset >> 2];
 	state &= ~mask;
 	state |= value;
-	dpriv->scc_regs[offset] = state;
+	dpriv->scc_regs[offset >> 2] = state;
 	writel(state, dev->base_addr + SCC_REG_START(dpriv) + offset);
 }
 
@@ -370,13 +370,13 @@ static void scc_writel(u32 bits, struct dscc4_dev_priv *dpriv,
 	 * Thread-UNsafe.
 	 * As of 2002/02/16, there are no thread racing for access.
 	 */
-	dpriv->scc_regs[offset] = bits;
+	dpriv->scc_regs[offset >> 2] = bits;
 	writel(bits, dev->base_addr + SCC_REG_START(dpriv) + offset);
 }
 
 static inline u32 scc_readl(struct dscc4_dev_priv *dpriv, int offset)
 {
-	return dpriv->scc_regs[offset];
+	return dpriv->scc_regs[offset >> 2];
 }
 
 static u32 scc_readl_star(struct dscc4_dev_priv *dpriv, struct net_device *dev)
