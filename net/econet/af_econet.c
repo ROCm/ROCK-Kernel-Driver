@@ -1011,26 +1011,25 @@ release:
 
 static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct ec_framehdr *hdr = (struct ec_framehdr *)skb->data;
+	struct ec_framehdr *hdr;
 	struct sock *sk;
 	struct ec_device *edev = dev->ec_ptr;
 
-	if (! edev)
-	{
+	if (!edev) {
 		kfree_skb(skb);
 		return 0;
 	}
 
-	if (skb->len < sizeof(struct ec_framehdr))
-	{
+	if (!pskb_may_pull(skb, sizeof(struct ec_framehdr))) {
 		/* Frame is too small to be any use */
 		kfree_skb(skb);
 		return 0;
 	}
 
+	hdr = (struct ec_framehdr *) skb->data;
+
 	/* First check for encapsulated IP */
-	if (hdr->port == EC_PORT_IP)
-	{
+	if (hdr->port == EC_PORT_IP) {
 		skb->protocol = htons(ETH_P_IP);
 		skb_pull(skb, sizeof(struct ec_framehdr));
 		netif_rx(skb);
@@ -1038,8 +1037,7 @@ static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 	}
 
 	sk = ec_listening_socket(hdr->port, hdr->src_stn, hdr->src_net);
-	if (!sk) 
-	{
+	if (!sk) {
 		kfree_skb(skb);
 		return 0;
 	}
@@ -1051,6 +1049,7 @@ static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 static struct packet_type econet_packet_type = {
 	.type =		__constant_htons(ETH_P_ECONET),
 	.func =		econet_rcv,
+	.data =		PKT_CAN_SHARE_SKB,
 };
 
 static void econet_hw_initialise(void)
