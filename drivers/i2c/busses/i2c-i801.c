@@ -44,6 +44,7 @@
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -207,7 +208,7 @@ static int i801_transaction(void)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i2c_delay(1);
+		msleep(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -335,7 +336,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i2c_delay(1);
+			msleep(1);
 		}
 		    while ((!(temp & 0x80))
 			   && (timeout++ < MAX_TIMEOUT));
@@ -395,7 +396,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i2c_delay(1);
+			msleep(1);
 		} while ((!(temp & 0x02))
 			   && (timeout++ < MAX_TIMEOUT));
 
