@@ -140,7 +140,7 @@ int pcxx_nbios=sizeof(pcxx_bios);
 #define SERIAL_TYPE_NORMAL	1
 #define PCXE_EVENT_HANGUP   1
 
-struct tty_driver pcxe_driver;
+static struct tty_driver *pcxe_driver;
 
 static struct timer_list pcxx_timer;
 
@@ -232,9 +232,10 @@ void cleanup_module()
 	del_timer_sync(&pcxx_timer);
 	remove_bh(DIGI_BH);
 
-	if ((e1 = tty_unregister_driver(&pcxe_driver)))
+	if ((e1 = tty_unregister_driver(pcxe_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n", e1);
 
+	put_tty_driver(pcxe_driver);
 	cleanup_board_resources();
 	kfree(digi_channels);
 	restore_flags(flags);
@@ -1026,6 +1027,24 @@ void __init pcxx_setup(char *str, int *ints)
 }
 #endif
 
+static struct tty_operations pcxe_ops = {
+	.open = pcxe_open,
+	.close = pcxe_close,
+	.write = pcxe_write,
+	.put_char = pcxe_put_char,
+	.flush_chars = pcxe_flush_chars,
+	.write_room = pcxe_write_room,
+	.chars_in_buffer = pcxe_chars_in_buffer,
+	.flush_buffer = pcxe_flush_buffer,
+	.ioctl = pcxe_ioctl,
+	.throttle = pcxe_throttle,
+	.unthrottle = pcxe_unthrottle,
+	.set_termios = pcxe_set_termios,
+	.stop = pcxe_stop,
+	.start = pcxe_start,
+	.hangup = pcxe_hangup,
+};
+
 /*
  * function to initialize the driver with the given parameters, which are either
  * the default values from this file or the parameters given at boot.
@@ -1119,6 +1138,10 @@ int __init pcxe_init(void)
 		return -EIO;
 	}
 
+	pcxe_driver = alloc_tty_driver(nbdevs);
+	if (!pcxe_driver)
+		return -ENOMEM;
+
 	/*
 	 * this turns out to be more memory efficient, as there are no 
 	 * unused spaces.
@@ -1126,6 +1149,7 @@ int __init pcxe_init(void)
 	digi_channels = kmalloc(sizeof(struct channel) * nbdevs, GFP_KERNEL);
 	if (!digi_channels) {
 		printk(KERN_ERR "Unable to allocate digi_channel struct\n");
+		put_tty_driver(pcxe_driver);
 		return -ENOMEM;
 	}
 	memset(digi_channels, 0, sizeof(struct channel) * nbdevs);
@@ -1135,36 +1159,16 @@ int __init pcxe_init(void)
 	init_timer(&pcxx_timer);
 	pcxx_timer.function = pcxxpoll;
 
-	memset(&pcxe_driver, 0, sizeof(struct tty_driver));
-	pcxe_driver.magic = TTY_DRIVER_MAGIC;
-	pcxe_driver.owner = THIS_MODULE;
-	pcxe_driver.name = "ttyD";
-	pcxe_driver.major = DIGI_MAJOR; 
-	pcxe_driver.minor_start = 0;
-
-	pcxe_driver.num = nbdevs;
-
-	pcxe_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	pcxe_driver.subtype = SERIAL_TYPE_NORMAL;
-	pcxe_driver.init_termios = tty_std_termios;
-	pcxe_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
-	pcxe_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	pcxe_driver.open = pcxe_open;
-	pcxe_driver.close = pcxe_close;
-	pcxe_driver.write = pcxe_write;
-	pcxe_driver.put_char = pcxe_put_char;
-	pcxe_driver.flush_chars = pcxe_flush_chars;
-	pcxe_driver.write_room = pcxe_write_room;
-	pcxe_driver.chars_in_buffer = pcxe_chars_in_buffer;
-	pcxe_driver.flush_buffer = pcxe_flush_buffer;
-	pcxe_driver.ioctl = pcxe_ioctl;
-	pcxe_driver.throttle = pcxe_throttle;
-	pcxe_driver.unthrottle = pcxe_unthrottle;
-	pcxe_driver.set_termios = pcxe_set_termios;
-	pcxe_driver.stop = pcxe_stop;
-	pcxe_driver.start = pcxe_start;
-	pcxe_driver.hangup = pcxe_hangup;
+	pcxe_driver->owner = THIS_MODULE;
+	pcxe_driver->name = "ttyD";
+	pcxe_driver->major = DIGI_MAJOR; 
+	pcxe_driver->minor_start = 0;
+	pcxe_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	pcxe_driver->subtype = SERIAL_TYPE_NORMAL;
+	pcxe_driver->init_termios = tty_std_termios;
+	pcxe_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
+	pcxe_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(pcxe_driver, &pcxe_ops);
 
 	for(crd=0; crd < numcards; crd++) {
 		bd = &boards[crd];
@@ -1546,7 +1550,7 @@ load_fep:
 		goto cleanup_boards;
 	}
 
-	ret = tty_register_driver(&pcxe_driver);
+	ret = tty_register_driver(pcxe_driver);
 	if(ret) {
 		printk(KERN_ERR "Couldn't register PC/Xe driver\n");
 		goto cleanup_boards;
@@ -1561,9 +1565,10 @@ load_fep:
 		printk(KERN_NOTICE "PC/Xx: Driver with %d card(s) ready.\n", enabled_cards);
 
 	return 0;
-cleanup_pcxe_driver:	tty_unregister_driver(&pcxe_driver);
-cleanup_boards:		cleanup_board_resources();
-			kfree(digi_channels);
+cleanup_boards:
+	cleanup_board_resources();
+	kfree(digi_channels);
+	put_tty_driver(pcxe_driver);
 	return ret;
 }
 
