@@ -387,26 +387,27 @@ void bdput(struct block_device *bdev)
 
 EXPORT_SYMBOL(bdput);
  
-int bd_acquire(struct inode *inode)
+static struct block_device *bd_acquire(struct inode *inode)
 {
 	struct block_device *bdev;
 	spin_lock(&bdev_lock);
-	if (inode->i_bdev && igrab(inode->i_bdev->bd_inode)) {
+	bdev = inode->i_bdev;
+	if (bdev && igrab(bdev->bd_inode)) {
 		spin_unlock(&bdev_lock);
-		return 0;
+		return bdev;
 	}
 	spin_unlock(&bdev_lock);
 	bdev = bdget(inode->i_rdev);
-	if (!bdev)
-		return -ENOMEM;
-	spin_lock(&bdev_lock);
-	if (inode->i_bdev)
-		__bd_forget(inode);
-	inode->i_bdev = bdev;
-	inode->i_mapping = bdev->bd_inode->i_mapping;
-	list_add(&inode->i_devices, &bdev->bd_inodes);
-	spin_unlock(&bdev_lock);
-	return 0;
+	if (bdev) {
+		spin_lock(&bdev_lock);
+		if (inode->i_bdev)
+			__bd_forget(inode);
+		inode->i_bdev = bdev;
+		inode->i_mapping = bdev->bd_inode->i_mapping;
+		list_add(&inode->i_devices, &bdev->bd_inodes);
+		spin_unlock(&bdev_lock);
+	}
+	return bdev;
 }
 
 /* Call when you free inode */
@@ -666,8 +667,7 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	 */
 	filp->f_flags |= O_LARGEFILE;
 
-	bd_acquire(inode);
-	bdev = inode->i_bdev;
+	bdev = bd_acquire(inode);
 
 	res = do_open(bdev, filp);
 	if (res)
@@ -829,11 +829,10 @@ struct block_device *lookup_bdev(const char *path)
 	error = -EACCES;
 	if (nd.mnt->mnt_flags & MNT_NODEV)
 		goto fail;
-	error = bd_acquire(inode);
-	if (error)
+	error = -ENOMEM;
+	bdev = bd_acquire(inode);
+	if (!bdev)
 		goto fail;
-	bdev = inode->i_bdev;
-
 out:
 	path_release(&nd);
 	return bdev;
