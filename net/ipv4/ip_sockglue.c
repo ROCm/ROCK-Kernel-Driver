@@ -626,6 +626,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 	                break;			
  
 		case IP_IPSEC_POLICY:
+		case IP_XFRM_POLICY:
 			err = xfrm_user_policy(sk, optname, optval, optlen);
 			break;
 

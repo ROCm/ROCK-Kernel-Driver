@@ -187,22 +187,6 @@ struct xfrm_tmpl
 
 #define XFRM_MAX_DEPTH		3
 
-enum
-{
-	XFRM_SHARE_ANY,		/* No limitations */
-	XFRM_SHARE_SESSION,	/* For this session only */
-	XFRM_SHARE_USER,	/* For this user only */
-	XFRM_SHARE_UNIQUE	/* Use once */
-};
-
-enum
-{
-	XFRM_POLICY_IN	= 0,
-	XFRM_POLICY_OUT	= 1,
-	XFRM_POLICY_FWD	= 2,
-	XFRM_POLICY_MAX	= 3
-};
-
 struct xfrm_policy
 {
 	struct xfrm_policy	*next;
@@ -218,10 +202,7 @@ struct xfrm_policy
 	struct xfrm_lifetime_cur curlft;
 	struct dst_entry       *bundles;
 	__u8			action;
-#define XFRM_POLICY_ALLOW	0
-#define XFRM_POLICY_BLOCK	1
 	__u8			flags;
-#define XFRM_POLICY_LOCALOK	1	/* Allow user to override global policy */
 	__u8			dead;
 	__u8			xfrm_nr;
 	struct xfrm_tmpl       	xfrm_vec[XFRM_MAX_DEPTH];
