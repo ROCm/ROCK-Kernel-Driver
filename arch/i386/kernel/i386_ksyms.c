@@ -187,9 +187,6 @@ EXPORT_SYMBOL_NOVERS(memcmp);
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif
 
-extern int is_sony_vaio_laptop;
-EXPORT_SYMBOL(is_sony_vaio_laptop);
-
 EXPORT_SYMBOL(__PAGE_KERNEL);
 
 #ifdef CONFIG_HIGHMEM
