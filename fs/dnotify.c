@@ -20,8 +20,6 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 
-extern void send_sigio(struct fown_struct *fown, int fd, int band);
-
 int dir_notify_enable = 1;
 
 static rwlock_t dn_lock = RW_LOCK_UNLOCKED;
