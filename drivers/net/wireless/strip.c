@@ -409,12 +409,12 @@ static const MetricomAddress zero_address;
 static const MetricomAddress broadcast_address =
     { {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF} };
 
-static const MetricomKey SIP0Key = { {"SIP0"} };
-static const MetricomKey ARP0Key = { {"ARP0"} };
-static const MetricomKey ATR_Key = { {"ATR "} };
-static const MetricomKey ACK_Key = { {"ACK_"} };
-static const MetricomKey INF_Key = { {"INF_"} };
-static const MetricomKey ERR_Key = { {"ERR_"} };
+static const MetricomKey SIP0Key = { "SIP0" };
+static const MetricomKey ARP0Key = { "ARP0" };
+static const MetricomKey ATR_Key = { "ATR " };
+static const MetricomKey ACK_Key = { "ACK_" };
+static const MetricomKey INF_Key = { "INF_" };
+static const MetricomKey ERR_Key = { "ERR_" };
 
 static const long MaxARPInterval = 60 * HZ;	/* One minute */
 
@@ -2733,14 +2733,14 @@ static int strip_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch (cmd) {
 	case SIOCGIFNAME:
-		if(copy_to_user((void *) arg, strip_info->dev->name, strlen(strip_info->dev->name) + 1))
+		if(copy_to_user((void __user *) arg, strip_info->dev->name, strlen(strip_info->dev->name) + 1))
 			return -EFAULT;
 		break;
 	case SIOCSIFHWADDR:
 	{
 		MetricomAddress addr;
 		//printk(KERN_INFO "%s: SIOCSIFHWADDR\n", strip_info->dev->name);
-		if(copy_from_user(&addr, (void *) arg, sizeof(MetricomAddress)))
+		if(copy_from_user(&addr, (void __user *) arg, sizeof(MetricomAddress)))
 			return -EFAULT;
 		return set_mac_address(strip_info, &addr);
 	}
@@ -2750,7 +2750,7 @@ static int strip_ioctl(struct tty_struct *tty, struct file *file,
 
 	case TCGETS:
 	case TCGETA:
-		return n_tty_ioctl(tty, (struct file *) file, cmd, (unsigned long) arg);
+		return n_tty_ioctl(tty, file, cmd, arg);
 		break;
 	default:
 		return -ENOIOCTLCMD;
