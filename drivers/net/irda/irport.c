@@ -124,7 +124,7 @@ static void __exit irport_cleanup(void)
 {
  	int i;
 
-        IRDA_DEBUG( 4, __FUNCTION__ "()\n");
+        IRDA_DEBUG( 4, "%s()\n", __FUNCTION__);
 
 	for (i=0; i < 4; i++) {
  		if (dev_self[i])
@@ -140,15 +140,15 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	void *ret;
 	int err;
 
-	IRDA_DEBUG(1, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 
 	/*
 	 *  Allocate new instance of the driver
 	 */
 	self = kmalloc(sizeof(struct irport_cb), GFP_KERNEL);
 	if (!self) {
-		ERROR(__FUNCTION__ "(), can't allocate memory for "
-		      "control block!\n");
+		ERROR("%s(), can't allocate memory for "
+		      "control block!\n", __FUNCTION__);
 		return NULL;
 	}
 	memset(self, 0, sizeof(struct irport_cb));
@@ -168,8 +168,8 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	/* Lock the port that we need */
 	ret = request_region(self->io.sir_base, self->io.sir_ext, driver_name);
 	if (!ret) { 
-		IRDA_DEBUG(0, __FUNCTION__ "(), can't get iobase of 0x%03x\n",
-			   self->io.sir_base);
+		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
+			   __FUNCTION__, self->io.sir_base);
 		return NULL;
 	}
 
@@ -212,7 +212,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	self->mode = IRDA_IRLAP;
 
 	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
 		return NULL;
 	}
 	self->netdev = dev;
@@ -240,7 +240,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
-		ERROR(__FUNCTION__ "(), register_netdev() failed!\n");
+		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
 		return NULL;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
@@ -265,8 +265,8 @@ int irport_close(struct irport_cb *self)
 	}
 
 	/* Release the IO-port that this driver is using */
-	IRDA_DEBUG(0 , __FUNCTION__ "(), Releasing Region %03x\n", 
-		   self->io.sir_base);
+	IRDA_DEBUG(0 , "%s(), Releasing Region %03x\n", 
+		   __FUNCTION__, self->io.sir_base);
 	release_region(self->io.sir_base, self->io.sir_ext);
 
 	if (self->tx_buff.head)
@@ -323,7 +323,7 @@ void irport_stop(struct irport_cb *self)
  */
 int irport_probe(int iobase)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "(), iobase=%#x\n", iobase);
+	IRDA_DEBUG(4, "%s(), iobase=%#x\n", __FUNCTION__, iobase);
 
 	return 0;
 }
@@ -402,7 +402,7 @@ int __irport_change_speed(struct irda_task *task)
 	int wasunlocked = 0;
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), <%ld>\n", jiffies); 
+	IRDA_DEBUG(2, "%s(), <%ld>\n", __FUNCTION__, jiffies); 
 
 	self = (struct irport_cb *) task->instance;
 
@@ -455,8 +455,7 @@ int __irport_change_speed(struct irda_task *task)
 			irda_task_next_state(task, IRDA_TASK_CHILD_DONE);
 		break;
 	case IRDA_TASK_CHILD_WAIT:
-		WARNING(__FUNCTION__ 
-			"(), changing speed of dongle timed out!\n");
+		WARNING("%s(), changing speed of dongle timed out!\n", __FUNCTION__);
 		ret = -1;		
 		break;
 	case IRDA_TASK_CHILD_DONE:
@@ -466,7 +465,7 @@ int __irport_change_speed(struct irda_task *task)
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		ret = -1;
 		break;
@@ -494,7 +493,7 @@ static void irport_write_wakeup(struct irport_cb *self)
 
 	ASSERT(self != NULL, return;);
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	iobase = self->io.sir_base;
 
@@ -556,7 +555,7 @@ static int irport_write(int iobase, int fifo_size, __u8 *buf, int len)
 
 	/* Tx FIFO should be empty! */
 	if (!(inb(iobase+UART_LSR) & UART_LSR_THRE)) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), failed, fifo not empty!\n");
+		IRDA_DEBUG(0, "%s(), failed, fifo not empty!\n", __FUNCTION__);
 		return 0;
 	}
         
@@ -581,7 +580,7 @@ static int irport_change_speed_complete(struct irda_task *task)
 {
 	struct irport_cb *self;
 
-	IRDA_DEBUG(1, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 
 	self = (struct irport_cb *) task->instance;
 
@@ -638,7 +637,7 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	int iobase;
 	s32 speed;
 
-	IRDA_DEBUG(1, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 
 	ASSERT(dev != NULL, return 0;);
 	
@@ -712,7 +711,7 @@ static void irport_receive(struct irport_cb *self)
 
 		/* Make sure we don't stay here to long */
 		if (boguscount++ > 32) {
-			IRDA_DEBUG(2,__FUNCTION__ "(), breaking!\n");
+			IRDA_DEBUG(2,"%s(), breaking!\n", __FUNCTION__);
 			break;
 		}
 	} while (inb(iobase+UART_LSR) & UART_LSR_DR);	
@@ -732,7 +731,7 @@ void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int iir, lsr;
 
 	if (!dev) {
-		WARNING(__FUNCTION__ "() irq %d for unknown device.\n", irq);
+		WARNING("%s() irq %d for unknown device.\n", __FUNCTION__, irq);
 		return;
 	}
 	self = (struct irport_cb *) dev->priv;
@@ -746,13 +745,12 @@ void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		/* Clear interrupt */
 		lsr = inb(iobase+UART_LSR);
 
-		IRDA_DEBUG(4, __FUNCTION__ 
-			   "(), iir=%02x, lsr=%02x, iobase=%#x\n", 
-			   iir, lsr, iobase);
+		IRDA_DEBUG(4, "%s(), iir=%02x, lsr=%02x, iobase=%#x\n", 
+			   __FUNCTION__, iir, lsr, iobase);
 
 		switch (iir) {
 		case UART_IIR_RLSI:
-			IRDA_DEBUG(2, __FUNCTION__ "(), RLSI\n");
+			IRDA_DEBUG(2, "%s(), RLSI\n", __FUNCTION__);
 			break;
 		case UART_IIR_RDI:
 			/* Receive interrupt */
@@ -764,7 +762,7 @@ void irport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				irport_write_wakeup(self);
 			break;
 		default:
-			IRDA_DEBUG(0, __FUNCTION__ "(), unhandled IIR=%#x\n", iir);
+			IRDA_DEBUG(0, "%s(), unhandled IIR=%#x\n", __FUNCTION__, iir);
 			break;
 		} 
 		
@@ -800,7 +798,7 @@ int irport_net_open(struct net_device *dev)
 	char hwname[16];
 	unsigned long flags;
 
-	IRDA_DEBUG(1, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 	
 	ASSERT(dev != NULL, return -1;);
 	self = (struct irport_cb *) dev->priv;
@@ -809,8 +807,8 @@ int irport_net_open(struct net_device *dev)
 
 	if (request_irq(self->io.irq, self->interrupt, 0, dev->name, 
 			(void *) dev)) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), unable to allocate irq=%d\n",
-			   self->io.irq);
+		IRDA_DEBUG(0, "%s(), unable to allocate irq=%d\n",
+			   __FUNCTION__, self->io.irq);
 		return -EAGAIN;
 	}
 
@@ -850,7 +848,7 @@ int irport_net_close(struct net_device *dev)
 	int iobase;
 	unsigned long flags;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	ASSERT(dev != NULL, return -1;);
 	self = (struct irport_cb *) dev->priv;
@@ -893,7 +891,7 @@ void irport_wait_until_sent(struct irport_cb *self)
 
 	/* Wait until Tx FIFO is empty */
 	while (!(inb(iobase+UART_LSR) & UART_LSR_THRE)) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), waiting!\n");
+		IRDA_DEBUG(2, "%s(), waiting!\n", __FUNCTION__);
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(MSECS_TO_JIFFIES(60));
 	}
@@ -948,7 +946,7 @@ static int irport_raw_write(struct net_device *dev, __u8 *buf, int len)
 
 	/* Tx FIFO should be empty! */
 	if (!(inb(iobase+UART_LSR) & UART_LSR_THRE)) {
-		IRDA_DEBUG( 0, __FUNCTION__ "(), failed, fifo not empty!\n");
+		IRDA_DEBUG( 0, "%s(), failed, fifo not empty!\n", __FUNCTION__);
 		return -1;
 	}
         
@@ -982,7 +980,7 @@ static int irport_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
+	IRDA_DEBUG(2, "%s(), %s, (cmd=0x%X)\n", __FUNCTION__, dev->name, cmd);
 	
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */

@@ -949,14 +949,14 @@ static void ircc_dma_receive_complete(struct ircc_cb *self, int iobase)
 		len -= 4;
 
 	if ((len < 2) || (len > 2050)) {
-		WARNING(__FUNCTION__ "(), bogus len=%d\n", len);
+		WARNING("%s(), bogus len=%d\n", __FUNCTION__, len);
 		return;
 	}
 	IRDA_DEBUG(2, __FUNCTION__ ": msgcnt = %d, len=%d\n", msgcnt, len);
 
 	skb = dev_alloc_skb(len+1);
 	if (!skb)  {
-		WARNING(__FUNCTION__ "(), memory squeeze, dropping frame.\n");
+		WARNING("%s(), memory squeeze, dropping frame.\n", __FUNCTION__);
 		return;
 	}			
 	/* Make sure IP header gets aligned */
@@ -1086,7 +1086,7 @@ static int ircc_net_open(struct net_device *dev)
 	if (request_dma(self->io->dma, dev->name)) {
 		irport_net_close(dev);
 
-		WARNING(__FUNCTION__ "(), unable to allocate DMA=%d\n", self->io->dma);
+		WARNING("%s(), unable to allocate DMA=%d\n", __FUNCTION__, self->io->dma);
 		return -EAGAIN;
 	}
 	
@@ -1107,7 +1107,7 @@ static int ircc_net_close(struct net_device *dev)
 	struct ircc_cb *self;
 	int iobase;
 
-	IRDA_DEBUG(0, __FUNCTION__ "\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__);
 	
 	ASSERT(dev != NULL, return -1;);
 	irport = (struct irport_cb *) dev->priv;

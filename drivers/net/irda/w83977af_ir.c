@@ -237,7 +237,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	self->rx_buff.data = self->rx_buff.head;
 	
 	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	dev->priv = (void *) self;
@@ -255,7 +255,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
-		ERROR(__FUNCTION__ "(), register_netdevice() failed!\n");
+		ERROR("%s(), register_netdevice() failed!\n", __FUNCTION__);
 		return -1;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
@@ -891,8 +891,8 @@ int w83977af_dma_receive_complete(struct w83977af_ir *self)
 						
 			skb = dev_alloc_skb(len+1);
 			if (skb == NULL)  {
-				printk(KERN_INFO __FUNCTION__ 
-				       "(), memory squeeze, dropping frame.\n");
+				printk(KERN_INFO
+				       "%s(), memory squeeze, dropping frame.\n", __FUNCTION__);
 				/* Restore set register */
 				outb(set, iobase+SSR);
 

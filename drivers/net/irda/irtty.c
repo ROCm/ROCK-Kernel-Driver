@@ -120,9 +120,8 @@ static void __exit irtty_cleanup(void)
 	
 	/* Unregister tty line-discipline */
 	if ((ret = tty_register_ldisc(N_IRDA, NULL))) {
-		ERROR(__FUNCTION__ 
-		      "(), can't unregister line discipline (err = %d)\n",
-		      ret);
+		ERROR("%s(), can't unregister line discipline (err = %d)\n",
+		      __FUNCTION__, ret);
 	}
 
 	/*
@@ -229,7 +228,7 @@ static int irtty_open(struct tty_struct *tty)
 	self->rx_buff.data = self->rx_buff.head;
 	
 	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 
@@ -248,7 +247,7 @@ static int irtty_open(struct tty_struct *tty)
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
-		ERROR(__FUNCTION__ "(), register_netdev() failed!\n");
+		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
 		return -1;
 	}
 
@@ -467,8 +466,7 @@ static int irtty_change_speed(struct irda_task *task)
 			irda_task_next_state(task, IRDA_TASK_CHILD_DONE);
 		break;
 	case IRDA_TASK_CHILD_WAIT:
-		WARNING(__FUNCTION__ 
-			"(), changing speed of dongle timed out!\n");
+		WARNING("%s(), changing speed of dongle timed out!\n", __FUNCTION__);
 		ret = -1;		
 		break;
 	case IRDA_TASK_CHILD_DONE:
@@ -479,7 +477,7 @@ static int irtty_change_speed(struct irda_task *task)
 		self->task = NULL;
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->task = NULL;
 		ret = -1;
