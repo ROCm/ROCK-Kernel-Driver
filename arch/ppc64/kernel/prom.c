@@ -178,8 +178,6 @@ extern unsigned long reloc_offset(void);
 
 extern void enter_prom(void *dummy,...);
 
-void cacheable_memzero(void *, unsigned int);
-
 extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
 
@@ -1047,21 +1045,21 @@ unsigned long __init
 prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	  unsigned long r6, unsigned long r7)
 {
-	int chrp = 0;
 	unsigned long mem;
-	ihandle prom_mmu, prom_op, prom_root, prom_cpu;
+	ihandle prom_root, prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
 	long l;
 	char *p, *d;
  	unsigned long phys;
         u32 getprop_rval;
-        struct naca_struct   *_naca = RELOC(naca);
+        struct naca_struct *_naca = RELOC(naca);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Default machine type. */
 	_naca->platform = PLATFORM_PSERIES;
+
 	/* Reset klimit to take into account the embedded system map */
 	if (RELOC(embedded_sysmap_end))
 		RELOC(klimit) = __va(PAGE_ALIGN(RELOC(embedded_sysmap_end)));
@@ -1072,9 +1070,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if ( _prom->bi_recs != NULL ) {
 		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs + _prom->bi_recs->data[1]);
 	}
-
- 	/* Default */
- 	phys = KERNELBASE - offset;
 
 	/* First get a handle for the stdout device */
 	_prom->chosen = (ihandle)call_prom(RELOC("finddevice"), 1, 1,
@@ -1107,34 +1102,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		    &getprop_rval, sizeof(getprop_rval));
 	}
 	_prom->encode_phys_size = (getprop_rval==1) ? 32 : 64;
-
-#ifdef DEBUG_PROM
-	prom_print(RELOC("DRENG:    Detect OF version...\n"));
-#endif
-	/* Find the OF version */
-	prom_op = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/openprom"));
-	if (prom_op != (ihandle)-1) {
-		char model[64];
-		long sz;
-		sz = (long)call_prom(RELOC("getprop"), 4, 1, prom_op,
-				    RELOC("model"), model, 64);
-		if (sz > 0) {
-			char *c;
-			/* hack to skip the ibm chrp firmware # */
-			if ( strncmp(model,RELOC("IBM"),3) ) {
-				for (c = model; *c; c++)
-					if (*c >= '0' && *c <= '9') {
-						_prom->version = *c - '0';
-						break;
-					}
-			}
-			else
-				chrp = 1;
-		}
-	}
-	if (_prom->version >= 3)
-		prom_print(RELOC("OF Version 3 detected.\n"));
-
 
 	/* Determine which cpu is actually running right _now_ */
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
@@ -1205,35 +1172,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_naca->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
- 	if ((long) call_prom(RELOC("getprop"), 4, 1,
-				_prom->chosen,
-				RELOC("mmu"),
-				&getprop_rval,
-				sizeof(getprop_rval)) <= 0) {	
-		prom_print(RELOC(" no MMU found\n"));
-                prom_exit();
-	}
-
-	/* We assume the phys. address size is 3 cells */
-	RELOC(prom_mmu) = (ihandle)(unsigned long)getprop_rval;
-
-	if ((long)call_prom(RELOC("call-method"), 4, 4,
-				RELOC("translate"),
-				prom_mmu,
-				(void *)(KERNELBASE - offset),
-				(void *)1) != 0) {
-		prom_print(RELOC(" (translate failed) "));
-	} else {
-		prom_print(RELOC(" (translate ok) "));
-		phys = (unsigned long)_prom->args.rets[3];
-	}
-
-	/* If OpenFirmware version >= 3, then use quiesce call */
-	if (_prom->version >= 3) {
-		prom_print(RELOC("Calling quiesce ...\n"));
-		call_prom(RELOC("quiesce"), 0, 0);
-		phys = KERNELBASE - offset;
-	}
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
+	phys = KERNELBASE - offset;
 
 	prom_print(RELOC("returning from prom_init\n"));
 	return phys;
