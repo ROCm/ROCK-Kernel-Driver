@@ -826,7 +826,7 @@ static int init_one_kcs(int kcs_port,
 	if (kcs_port && kcs_physaddr)
 		return -EINVAL;
 
-	new_kcs = kmalloc(kcs_size(), GFP_KERNEL);
+	new_kcs = kmalloc(sizeof(*new_kcs), GFP_KERNEL);
 	if (!new_kcs) {
 		printk(KERN_ERR "ipmi_kcs: out of memory\n");
 		return -ENOMEM;

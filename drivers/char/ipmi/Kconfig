@@ -7,8 +7,14 @@ config IPMI_HANDLER
        tristate 'IPMI top-level message handler'
        help
          This enables the central IPMI message handler, required for IPMI
-	 to work.  Note that you must have this enabled to do any other IPMI
-	 things.  See IPMI.txt for more details.
+	 to work.
+
+         IPMI is a standard for managing sensors (temperature,
+         voltage, etc.) in a system.
+
+         See Documentation/IPMI.txt for more details on the driver.
+
+	 If unsure, say N.
 
 config IPMI_PANIC_EVENT
        bool 'Generate a panic event to all BMCs on a panic'

@@ -217,7 +217,7 @@ static int map(mddev_t *mddev, mdk_rdev_t **rdevp)
 	}
 	spin_unlock_irq(&conf->device_lock);
 
-	printk (KERN_ERR "raid1_map(): huh, no more operational devices?\n");
+	printk(KERN_ERR "raid1_map(): huh, no more operational devices?\n");
 	return -1;
 }
 
@@ -305,7 +305,7 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 			 * oops, read error:
 			 */
 			printk(KERN_ERR "raid1: %s: rescheduling sector %llu\n",
-			       bdev_partition_name(conf->mirrors[mirror].rdev->bdev), (unsigned long long)r1_bio->sector);
+				bdev_partition_name(conf->mirrors[mirror].rdev->bdev), (unsigned long long)r1_bio->sector);
 			reschedule_retry(r1_bio);
 		}
 	} else {
@@ -584,22 +584,6 @@ static void status(struct seq_file *seq, mddev_t *mddev)
 	seq_printf(seq, "]");
 }
 
-#define LAST_DISK KERN_ALERT \
-"raid1: only one disk left and IO error.\n"
-
-#define NO_SPARE_DISK KERN_ALERT \
-"raid1: no spare disk left, degrading mirror level by one.\n"
-
-#define DISK_FAILED KERN_ALERT \
-"raid1: Disk failure on %s, disabling device. \n" \
-"	Operation continuing on %d devices\n"
-
-#define START_SYNCING KERN_ALERT \
-"raid1: start syncing spare disk.\n"
-
-#define ALREADY_SYNCING KERN_INFO \
-"raid1: syncing already in progress.\n"
-
 
 static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
@@ -629,7 +613,9 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 	rdev->in_sync = 0;
 	rdev->faulty = 1;
 	mddev->sb_dirty = 1;
-	printk(DISK_FAILED, bdev_partition_name(rdev->bdev), conf->working_disks);
+	printk(KERN_ALERT "raid1: Disk failure on %s, disabling device. \n"
+		"	Operation continuing on %d devices\n",
+		bdev_partition_name(rdev->bdev), conf->working_disks);
 }
 
 static void print_conf(conf_t *conf)
@@ -643,14 +629,14 @@ static void print_conf(conf_t *conf)
 		return;
 	}
 	printk(" --- wd:%d rd:%d\n", conf->working_disks,
-			conf->raid_disks);
+		conf->raid_disks);
 
 	for (i = 0; i < conf->raid_disks; i++) {
 		tmp = conf->mirrors + i;
 		if (tmp->rdev)
 			printk(" disk %d, wo:%d, o:%d, dev:%s\n",
-			       i, !tmp->rdev->in_sync, !tmp->rdev->faulty,
-			       bdev_partition_name(tmp->rdev->bdev));
+				i, !tmp->rdev->in_sync, !tmp->rdev->faulty,
+				bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -743,11 +729,6 @@ abort:
 	return err;
 }
 
-#define IO_ERROR KERN_ALERT \
-"raid1: %s: unrecoverable I/O read error for block %llu\n"
-
-#define REDIRECT_SECTOR KERN_ERR \
-"raid1: %s: redirecting sector %llu to another mirror\n"
 
 static int end_sync_read(struct bio *bio, unsigned int bytes_done, int error)
 {
@@ -823,7 +804,10 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * There is no point trying a read-for-reconstruct as
 		 * reconstruct is about to be aborted
 		 */
-		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), (unsigned long long)r1_bio->sector);
+		printk(KERN_ALERT "raid1: %s: unrecoverable I/O read error"
+			" for block %llu\n",
+			bdev_partition_name(bio->bi_bdev), 
+			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		put_buf(r1_bio);
 		return;
@@ -874,7 +858,8 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * Nowhere to write this to... I guess we
 		 * must be done
 		 */
-		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %llu\n", 
+		printk(KERN_ALERT "raid1: sync aborting as there is nowhere"
+			" to write sector %llu\n", 
 			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		put_buf(r1_bio);
@@ -928,12 +913,17 @@ static void raid1d(mddev_t *mddev)
 		case READ:
 		case READA:
 			if (map(mddev, &rdev) == -1) {
-				printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), (unsigned long long)r1_bio->sector);
+				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
+				" read error for block %llu\n",
+				bdev_partition_name(bio->bi_bdev), 
+				(unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio, 0);
 				break;
 			}
-			printk(REDIRECT_SECTOR,
-				bdev_partition_name(rdev->bdev), (unsigned long long)r1_bio->sector);
+			printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
+				" another mirror\n",
+				bdev_partition_name(rdev->bdev), 
+				(unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
 			bio->bi_sector = r1_bio->sector + rdev->data_offset;
 			bio->bi_rw = r1_bio->cmd;
@@ -1063,45 +1053,6 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	return nr_sectors;
 }
 
-#define INVALID_LEVEL KERN_WARNING \
-"raid1: md%d: raid level not set to mirroring (%d)\n"
-
-#define NO_SB KERN_ERR \
-"raid1: disabled mirror %s (couldn't access raid superblock)\n"
-
-#define ERRORS KERN_ERR \
-"raid1: disabled mirror %s (errors detected)\n"
-
-#define NOT_IN_SYNC KERN_ERR \
-"raid1: disabled mirror %s (not in sync)\n"
-
-#define INCONSISTENT KERN_ERR \
-"raid1: disabled mirror %s (inconsistent descriptor)\n"
-
-#define ALREADY_RUNNING KERN_ERR \
-"raid1: disabled mirror %s (mirror %d already operational)\n"
-
-#define OPERATIONAL KERN_INFO \
-"raid1: device %s operational as mirror %d\n"
-
-#define MEM_ERROR KERN_ERR \
-"raid1: couldn't allocate memory for md%d\n"
-
-#define SPARE KERN_INFO \
-"raid1: spare disk %s\n"
-
-#define NONE_OPERATIONAL KERN_ERR \
-"raid1: no operational mirrors for md%d\n"
-
-#define ARRAY_IS_ACTIVE KERN_INFO \
-"raid1: raid set md%d active with %d out of %d mirrors\n"
-
-#define THREAD_ERROR KERN_ERR \
-"raid1: couldn't allocate thread for md%d\n"
-
-#define START_RESYNC KERN_WARNING \
-"raid1: raid set md%d not clean; reconstructing mirrors\n"
-
 static int run(mddev_t *mddev)
 {
 	conf_t *conf;
@@ -1110,10 +1061,9 @@ static int run(mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	if (mddev->level != 1) {
-		printk(INVALID_LEVEL, mdidx(mddev), mddev->level);
+		printk("raid1: md%d: raid level not set to mirroring (%d)\n",
+		       mdidx(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -1124,7 +1074,8 @@ static int run(mddev_t *mddev)
 	conf = kmalloc(sizeof(conf_t), GFP_KERNEL);
 	mddev->private = conf;
 	if (!conf) {
-		printk(MEM_ERROR, mdidx(mddev));
+		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n",
+			mdidx(mddev));
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
@@ -1132,7 +1083,8 @@ static int run(mddev_t *mddev)
 	conf->r1bio_pool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
 						r1bio_pool_free, NULL);
 	if (!conf->r1bio_pool) {
-		printk(MEM_ERROR, mdidx(mddev));
+		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n", 
+			mdidx(mddev));
 		goto out;
 	}
 
@@ -1160,7 +1112,8 @@ static int run(mddev_t *mddev)
 	init_waitqueue_head(&conf->wait_resume);
 
 	if (!conf->working_disks) {
-		printk(NONE_OPERATIONAL, mdidx(mddev));
+		printk(KERN_ERR "raid1: no operational mirrors for md%d\n",
+			mdidx(mddev));
 		goto out_free_conf;
 	}
 
@@ -1190,12 +1143,16 @@ static int run(mddev_t *mddev)
 	{
 		mddev->thread = md_register_thread(raid1d, mddev, "md%d_raid1");
 		if (!mddev->thread) {
-			printk(THREAD_ERROR, mdidx(mddev));
+			printk(KERN_ERR 
+				"raid1: couldn't allocate thread for md%d\n", 
+				mdidx(mddev));
 			goto out_free_conf;
 		}
 	}
-
-	printk(ARRAY_IS_ACTIVE, mdidx(mddev), mddev->raid_disks - mddev->degraded, mddev->raid_disks);
+	printk(KERN_INFO 
+		"raid1: raid set md%d active with %d out of %d mirrors\n",
+		mdidx(mddev), mddev->raid_disks - mddev->degraded, 
+		mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
 	 */
@@ -1207,7 +1164,6 @@ out_free_conf:
 	kfree(conf);
 	mddev->private = NULL;
 out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1221,13 +1177,13 @@ static int stop(mddev_t *mddev)
 		mempool_destroy(conf->r1bio_pool);
 	kfree(conf);
 	mddev->private = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static mdk_personality_t raid1_personality =
 {
 	.name		= "raid1",
+	.owner		= THIS_MODULE,
 	.make_request	= make_request,
 	.run		= run,
 	.stop		= stop,

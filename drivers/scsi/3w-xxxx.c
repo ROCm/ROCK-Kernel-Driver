@@ -677,7 +677,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 			dprintk(KERN_WARNING "3w-xxxx: tw_chrdev_ioctl(): caught TW_AEN_LISTEN.\n");
 			memset(tw_ioctl->data_buffer, 0, tw_ioctl->data_buffer_length);
 
-			spin_lock_irqsave(&tw_dev->host->host_lock, flags);
+			spin_lock_irqsave(tw_dev->host->host_lock, flags);
 			if (tw_dev->aen_head == tw_dev->aen_tail) {
 				tw_aen_code = TW_AEN_QUEUE_EMPTY;
 			} else {
@@ -688,7 +688,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 					tw_dev->aen_head = tw_dev->aen_head + 1;
 				}
 			}
-			spin_unlock_irqrestore(&tw_dev->tw_lock, flags);
+			spin_unlock_irqrestore(tw_dev->host->host_lock, flags);
 			memcpy(tw_ioctl->data_buffer, &tw_aen_code, sizeof(tw_aen_code));
 			break;
 		case TW_CMD_PACKET_WITH_DATA:

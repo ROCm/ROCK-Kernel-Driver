@@ -449,7 +449,7 @@ static void ipmi_new_smi(int if_num)
 	if (if_num > MAX_DEVICES)
 		return;
 
-	snprinf(name, sizeof(name), "ipmidev/%d", if_num);
+	snprintf(name, sizeof(name), "ipmidev/%d", if_num);
 
 	handles[if_num] = devfs_register(NULL, name, DEVFS_FL_NONE,
 					 ipmi_major, if_num,

@@ -78,7 +78,7 @@ static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdevp)
 	}
 	spin_unlock_irq(&conf->device_lock);
 
-	printk (KERN_ERR "multipath_map(): no more operational IO paths?\n");
+	printk(KERN_ERR "multipath_map(): no more operational IO paths?\n");
 	return (-1);
 }
 
@@ -130,7 +130,8 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 */
 		md_error (mp_bh->mddev, rdev);
 		printk(KERN_ERR "multipath: %s: rescheduling sector %llu\n", 
-		       bdev_partition_name(rdev->bdev), (unsigned long long)bio->bi_sector);
+		       bdev_partition_name(rdev->bdev), 
+		       (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	}
 	atomic_dec(&rdev->nr_pending);
@@ -198,16 +199,6 @@ static void multipath_status (struct seq_file *seq, mddev_t *mddev)
 	seq_printf (seq, "]");
 }
 
-#define LAST_DISK KERN_ALERT \
-"multipath: only one IO path left and IO error.\n"
-
-#define NO_SPARE_DISK KERN_ALERT \
-"multipath: no spare IO path left!\n"
-
-#define DISK_FAILED KERN_ALERT \
-"multipath: IO failure on %s, disabling IO path. \n" \
-"	Operation continuing on %d IO paths.\n"
-
 
 /*
  * Careful, this can execute in IRQ contexts as well!
@@ -222,7 +213,8 @@ static void multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 		 * first check if this is a queued request for a device
 		 * which has just failed.
 		 */
-		printk (LAST_DISK);
+		printk(KERN_ALERT 
+			"multipath: only one IO path left and IO error.\n");
 		/* leave it active... it's all we have */
 	} else {
 		/*
@@ -233,16 +225,14 @@ static void multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 			rdev->faulty = 1;
 			mddev->sb_dirty = 1;
 			conf->working_disks--;
-			printk (DISK_FAILED, bdev_partition_name (rdev->bdev),
+			printk(KERN_ALERT "multipath: IO failure on %s,"
+				" disabling IO path. \n	Operation continuing"
+				" on %d IO paths.\n",
+				bdev_partition_name (rdev->bdev),
 				conf->working_disks);
 		}
 	}
 }
-
-#undef LAST_DISK
-#undef NO_SPARE_DISK
-#undef DISK_FAILED
-
 
 static void print_multipath_conf (multipath_conf_t *conf)
 {
@@ -302,7 +292,7 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 	if (p->rdev) {
 		if (p->rdev->in_sync ||
 		    atomic_read(&p->rdev->nr_pending)) {
-			printk(KERN_ERR "hot-remove-disk, slot %d is identified but is still operational!\n", number);
+			printk(KERN_ERR "hot-remove-disk, slot %d is identified"				" but is still operational!\n", number);
 			err = -EBUSY;
 			goto abort;
 		}
@@ -318,11 +308,7 @@ abort:
 	return err;
 }
 
-#define IO_ERROR KERN_ALERT \
-"multipath: %s: unrecoverable IO read error for block %llu\n"
 
-#define REDIRECT_SECTOR KERN_ERR \
-"multipath: %s: redirecting sector %llu to another IO path\n"
 
 /*
  * This is a kernel thread which:
@@ -354,59 +340,22 @@ static void multipathd (mddev_t *mddev)
 		
 		rdev = NULL;
 		if (multipath_map (mddev, &rdev)<0) {
-			printk(IO_ERROR,
-				bdev_partition_name(bio->bi_bdev), (unsigned long long)bio->bi_sector);
+			printk(KERN_ALERT "multipath: %s: unrecoverable IO read"
+				" error for block %llu\n",
+				bdev_partition_name(bio->bi_bdev), 
+				(unsigned long long)bio->bi_sector);
 			multipath_end_bh_io(mp_bh, 0);
 		} else {
-			printk(REDIRECT_SECTOR,
-				bdev_partition_name(bio->bi_bdev), (unsigned long long)bio->bi_sector);
+			printk(KERN_ERR "multipath: %s: redirecting sector %llu"
+				" to another IO path\n",
+				bdev_partition_name(bio->bi_bdev), 
+				(unsigned long long)bio->bi_sector);
 			bio->bi_bdev = rdev->bdev;
 			generic_make_request(bio);
 		}
 	}
 	spin_unlock_irqrestore(&retry_list_lock, flags);
 }
-#undef IO_ERROR
-#undef REDIRECT_SECTOR
-
-#define INVALID_LEVEL KERN_WARNING \
-"multipath: md%d: raid level not set to multipath IO (%d)\n"
-
-#define NO_SB KERN_ERR \
-"multipath: disabled IO path %s (couldn't access raid superblock)\n"
-
-#define ERRORS KERN_ERR \
-"multipath: disabled IO path %s (errors detected)\n"
-
-#define NOT_IN_SYNC KERN_ERR \
-"multipath: making IO path %s a spare path (not in sync)\n"
-
-#define INCONSISTENT KERN_ERR \
-"multipath: disabled IO path %s (inconsistent descriptor)\n"
-
-#define ALREADY_RUNNING KERN_ERR \
-"multipath: disabled IO path %s (multipath %d already operational)\n"
-
-#define OPERATIONAL KERN_INFO \
-"multipath: device %s operational as IO path %d\n"
-
-#define MEM_ERROR KERN_ERR \
-"multipath: couldn't allocate memory for md%d\n"
-
-#define SPARE KERN_INFO \
-"multipath: spare IO path %s\n"
-
-#define NONE_OPERATIONAL KERN_ERR \
-"multipath: no operational IO paths for md%d\n"
-
-#define SB_DIFFERENCES KERN_ERR \
-"multipath: detected IO path differences!\n"
-
-#define ARRAY_IS_ACTIVE KERN_INFO \
-"multipath: array md%d active with %d out of %d IO paths\n"
-
-#define THREAD_ERROR KERN_ERR \
-"multipath: couldn't allocate thread for md%d\n"
 
 static int multipath_run (mddev_t *mddev)
 {
@@ -416,10 +365,9 @@ static int multipath_run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	MOD_INC_USE_COUNT;
-
 	if (mddev->level != LEVEL_MULTIPATH) {
-		printk(INVALID_LEVEL, mdidx(mddev), mddev->level);
+		printk("multipath: md%d: raid level not set to multipath IO (%d)\n",
+		       mdidx(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -431,7 +379,9 @@ static int multipath_run (mddev_t *mddev)
 	conf = kmalloc(sizeof(multipath_conf_t), GFP_KERNEL);
 	mddev->private = conf;
 	if (!conf) {
-		printk(MEM_ERROR, mdidx(mddev));
+		printk(KERN_ERR 
+			"multipath: couldn't allocate memory for md%d\n",
+			mdidx(mddev));
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
@@ -455,7 +405,8 @@ static int multipath_run (mddev_t *mddev)
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
 
 	if (!conf->working_disks) {
-		printk(NONE_OPERATIONAL, mdidx(mddev));
+		printk(KERN_ERR "multipath: no operational IO paths for md%d\n",
+			mdidx(mddev));
 		goto out_free_conf;
 	}
 	mddev->degraded = conf->raid_disks = conf->working_disks;
@@ -464,7 +415,9 @@ static int multipath_run (mddev_t *mddev)
 				    mp_pool_alloc, mp_pool_free,
 				    NULL);
 	if (conf->pool == NULL) {
-		printk(MEM_ERROR, mdidx(mddev));
+		printk(KERN_ERR 
+			"multipath: couldn't allocate memory for md%d\n",
+			mdidx(mddev));
 		goto out_free_conf;
 	}
 
@@ -473,13 +426,15 @@ static int multipath_run (mddev_t *mddev)
 
 		mddev->thread = md_register_thread(multipathd, mddev, name);
 		if (!mddev->thread) {
-			printk(THREAD_ERROR, mdidx(mddev));
+			printk(KERN_ERR "multipath: couldn't allocate thread"
+				" for md%d\n", mdidx(mddev));
 			goto out_free_conf;
 		}
 	}
 
-	printk(ARRAY_IS_ACTIVE, mdidx(mddev), conf->working_disks,
-			mddev->raid_disks);
+	printk(KERN_INFO 
+		"multipath: array md%d active with %d out of %d IO paths\n",
+		mdidx(mddev), conf->working_disks, mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
 	 */
@@ -491,21 +446,9 @@ out_free_conf:
 	kfree(conf);
 	mddev->private = NULL;
 out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
-#undef INVALID_LEVEL
-#undef NO_SB
-#undef ERRORS
-#undef NOT_IN_SYNC
-#undef INCONSISTENT
-#undef ALREADY_RUNNING
-#undef OPERATIONAL
-#undef SPARE
-#undef NONE_OPERATIONAL
-#undef SB_DIFFERENCES
-#undef ARRAY_IS_ACTIVE
 
 static int multipath_stop (mddev_t *mddev)
 {
@@ -515,13 +458,13 @@ static int multipath_stop (mddev_t *mddev)
 	mempool_destroy(conf->pool);
 	kfree(conf);
 	mddev->private = NULL;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static mdk_personality_t multipath_personality=
 {
 	.name		= "multipath",
+	.owner		= THIS_MODULE,
 	.make_request	= multipath_make_request,
 	.run		= multipath_run,
 	.stop		= multipath_stop,

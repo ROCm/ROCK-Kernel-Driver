@@ -30,9 +30,9 @@
 #ifndef _LINUX_DS_H
 #define _LINUX_DS_H
 
-#include <pcmcia/driver_ops.h>
 #include <pcmcia/bulkmem.h>
 #include <linux/device.h>
+#include <pcmcia/cs_types.h>
 
 typedef struct tuple_parse_t {
     tuple_t		tuple;
@@ -108,6 +108,12 @@ typedef union ds_ioctl_arg_t {
 
 #ifdef __KERNEL__
 
+typedef struct dev_node_t {
+    char		dev_name[DEV_NAME_LEN];
+    u_short		major, minor;
+    struct dev_node_t	*next;
+} dev_node_t;
+
 typedef struct dev_link_t {
     dev_node_t		*dev;
     u_int		state, open;
@@ -144,7 +150,7 @@ int unregister_pccard_driver(dev_info_t *dev_info);
 extern struct bus_type pcmcia_bus_type;
 
 struct pcmcia_driver {
-	int			use_count, status;
+	int			use_count;
 	dev_link_t		*(*attach)(void);
 	void			(*detach)(dev_link_t *);
 	struct module		*owner;
