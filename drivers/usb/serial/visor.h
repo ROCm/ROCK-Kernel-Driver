@@ -94,7 +94,36 @@ struct visor_connection_info {
  * PALM_GET_SOME_UNKNOWN_INFORMATION is sent by the host during enumeration to
  * get some information from the M series devices, that is currently unknown.
  ****************************************************************************/
-#define PALM_GET_SOME_UNKNOWN_INFORMATION	0x04
+#define PALM_GET_EXT_CONNECTION_INFORMATION	0x04
+
+/**
+ * struct palm_ext_connection_info - return data from a PALM_GET_EXT_CONNECTION_INFORMATION request
+ * @num_ports: maximum number of functions/connections in use
+ * @endpoint_numbers_different: will be 1 if in and out endpoints numbers are
+ *	different, otherwise it is 0.  If value is 1, then
+ *	connections.end_point_info is non-zero.  If value is 0, then
+ *	connections.port contains the endpoint number, which is the same for in
+ *	and out.
+ * @port_function_id: contains the creator id of the applicaton that opened
+ *	this connection.
+ * @port: contains the in/out endpoint number.  Is 0 if in and out endpoint
+ *	numbers are different.
+ * @end_point_info: high nubbe is in endpoint and low nibble will indicate out
+ *	endpoint.  Is 0 if in and out endpoints are the same.
+ *
+ * The maximum number of connections currently supported is 2
+ */
+struct palm_ext_connection_info {
+	__u8 num_ports;		
+	__u8 endpoint_numbers_different;
+	__u16 reserved1;
+	struct {
+		__u32 port_function_id;
+		__u8 port;
+		__u8 end_point_info;
+		__u16 reserved;
+	} connections[2];
+};
 
 #endif
 
