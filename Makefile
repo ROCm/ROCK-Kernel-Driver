@@ -48,10 +48,34 @@ ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
 
-# 	Decide whether to build built-in, modular, or both
+# 	Decide whether to build built-in, modular, or both.
+#	Normally, just do built-in.
 
-KBUILD_MODULES := 1
+KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
+
+#	If we have only "make modules", don't compile built-in objects.
+
+ifeq ($(MAKECMDGOALS),modules)
+  KBUILD_BUILTIN :=
+endif
+
+#	If we have "make <whatever> modules", compile modules
+#	in addition to whatever we do anyway.
+
+ifneq ($(filter modules,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
+
+#	Just "make" or "make all" shall build modules as well
+
+ifeq ($(MAKECMDGOALS),)
+  KBUILD_MODULES := 1
+endif
+
+ifneq ($(filter all,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
 
 export KBUILD_MODULES KBUILD_BUILTIN
 
@@ -120,6 +144,8 @@ export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean \
@@ -182,7 +208,7 @@ endif
 
 # Link components for vmlinux
 # ---------------------------------------------------------------------------
-SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 INIT		:= init/init.o
 CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 LIBS		:= lib/lib.a
@@ -254,6 +280,7 @@ $(SUBDIRS): .hdepend prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
+	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -384,8 +411,7 @@ MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
-modules:
-	@$(MAKE) KBUILD_BUILTIN= $(SUBDIRS)
+modules: $(SUBDIRS)
 
 #	Install modules
 
