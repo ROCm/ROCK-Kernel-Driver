@@ -11,7 +11,6 @@
 #include <linux/unistd.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
-#include <linux/kmod.h>		/* for hotplug_path */
 #include <linux/kthread.h>
 #include <linux/stop_machine.h>
 #include <asm/semaphore.h>

@@ -1261,6 +1261,11 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct Qdisc *q;
 	int rc = -ENOMEM;
 
+	/* Disable soft irqs for various locks below. Also 
+	 * stops preemption for RCU. 
+	 */
+	local_bh_disable(); 
+
 	if (skb_shinfo(skb)->frag_list &&
 	    !(dev->features & NETIF_F_FRAGLIST) &&
 	    __skb_linearize(skb, GFP_ATOMIC))
@@ -1284,12 +1289,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	      skb->protocol != htons(ETH_P_IP))))
 	      	if (skb_checksum_help(skb, 0))
 	      		goto out_kfree_skb;
-
-
-	/* Disable soft irqs for various locks below. Also 
-	 * stops preemption for RCU. 
-	 */
-	local_bh_disable(); 
 
 	/* Updates of qdisc are serialized by queue_lock. 
 	 * The struct Qdisc which is pointed to by qdisc is now a 
@@ -3242,7 +3241,6 @@ EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_name);
 EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
-EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);

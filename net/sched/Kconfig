@@ -393,7 +393,7 @@ config NET_ACT_GACT
         ---help---
         You must have new iproute2 to use this feature.
         This adds simple filtering actions like drop, accept etc.
-                                                                                
+
 config GACT_PROB
         bool "generic Actions probability"
         depends on NET_ACT_GACT
@@ -406,6 +406,13 @@ config NET_ACT_MIRRED
         ---help---
         requires new iproute2
         This allows packets to be mirrored or redirected to netdevices
+
+config NET_ACT_IPT
+        tristate "iptables Actions"
+        depends on NET_CLS_ACT && NETFILTER && IP_NF_IPTABLES
+        ---help---
+        requires new iproute2
+        This allows iptables targets to be used by tc filters
 
 config NET_ACT_PEDIT
         tristate "Generic Packet Editor Actions"

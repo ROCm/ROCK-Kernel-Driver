@@ -391,9 +391,9 @@ typedef enum {
 struct cirrusfb_info {
 	struct fb_info *info;
 
-	caddr_t fbmem;
-	caddr_t regbase;
-	caddr_t mem;
+	u8 __iomem *fbmem;
+	u8 __iomem *regbase;
+	u8 __iomem *mem;
 	unsigned long size;
 	cirrusfb_board_t btype;
 	unsigned char SFR;	/* Shadow of special function register */
@@ -571,13 +571,13 @@ static void RClut (struct cirrusfb_info *cinfo, unsigned char regnum, unsigned c
 		   unsigned char *green,
 		   unsigned char *blue);
 #endif
-static void cirrusfb_WaitBLT (caddr_t regbase);
-static void cirrusfb_BitBLT (caddr_t regbase, int bits_per_pixel,
+static void cirrusfb_WaitBLT (u8 __iomem *regbase);
+static void cirrusfb_BitBLT (u8 __iomem *regbase, int bits_per_pixel,
 			     u_short curx, u_short cury,
 			     u_short destx, u_short desty,
 			     u_short width, u_short height,
 			     u_short line_length);
-static void cirrusfb_RectFill (caddr_t regbase, int bits_per_pixel,
+static void cirrusfb_RectFill (u8 __iomem *regbase, int bits_per_pixel,
 			       u_short x, u_short y,
 			       u_short width, u_short height,
 			       u_char color, u_short line_length);
@@ -1016,7 +1016,7 @@ static int cirrusfb_set_par_foo (struct fb_info *info)
 	struct cirrusfb_info *cinfo = info->par;
 	struct fb_var_screeninfo *var = &info->var;
 	struct cirrusfb_regs regs;
-	caddr_t regbase = cinfo->regbase;
+	u8 __iomem *regbase = cinfo->regbase;
 	unsigned char tmp;
 	int offset = 0, err;
 	const struct cirrusfb_board_info_rec *bi;
@@ -2149,7 +2149,7 @@ static int release_io_ports = 0;
  * based on the DRAM bandwidth bit and DRAM bank switching bit.  This
  * works with 1MB, 2MB and 4MB configurations (which the Motorola boards
  * seem to have. */
-static unsigned int cirrusfb_get_memsize (caddr_t regbase)
+static unsigned int cirrusfb_get_memsize (u8 __iomem *regbase)
 {
 	unsigned long mem;
 	unsigned char SRF;
@@ -2394,7 +2394,7 @@ static int cirrusfb_pci_register (struct pci_dev *pdev,
 		get_prep_addrs (&board_addr, &cinfo->fbregs_phys);
 #endif
 		/* PReP dies if we ioremap the IO registers, but it works w/out... */
-		cinfo->regbase = (char *) cinfo->fbregs_phys;
+		cinfo->regbase = (char __iomem *) cinfo->fbregs_phys;
 	} else {
 		DPRINTK ("Attempt to get PCI info for Cirrus Graphics Card\n");
 		get_pci_addrs (pdev, &board_addr, &cinfo->fbregs_phys);
@@ -2865,7 +2865,7 @@ static void RClut (struct cirrusfb_info *cinfo, unsigned char regnum, unsigned c
 *********************************************************************/
 
 /* FIXME: use interrupts instead */
-static void cirrusfb_WaitBLT (caddr_t regbase)
+static void cirrusfb_WaitBLT (u8 __iomem *regbase)
 {
 	/* now busy-wait until we're done */
 	while (vga_rgfx (regbase, CL_GR31) & 0x08)
@@ -2878,7 +2878,7 @@ static void cirrusfb_WaitBLT (caddr_t regbase)
 	perform accelerated "scrolling"
 ********************************************************************/
 
-static void cirrusfb_BitBLT (caddr_t regbase, int bits_per_pixel,
+static void cirrusfb_BitBLT (u8 __iomem *regbase, int bits_per_pixel,
 			     u_short curx, u_short cury, u_short destx, u_short desty,
 			     u_short width, u_short height, u_short line_length)
 {
@@ -2969,7 +2969,7 @@ static void cirrusfb_BitBLT (caddr_t regbase, int bits_per_pixel,
 	perform accelerated rectangle fill
 ********************************************************************/
 
-static void cirrusfb_RectFill (caddr_t regbase, int bits_per_pixel,
+static void cirrusfb_RectFill (u8 __iomem *regbase, int bits_per_pixel,
 		     u_short x, u_short y, u_short width, u_short height,
 		     u_char color, u_short line_length)
 {

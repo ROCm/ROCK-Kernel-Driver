@@ -263,6 +263,7 @@ extern int suid_keys(struct task_struct *tsk);
 extern int exec_keys(struct task_struct *tsk);
 extern void key_fsuid_changed(struct task_struct *tsk);
 extern void key_fsgid_changed(struct task_struct *tsk);
+extern void key_init(void);
 
 #else /* CONFIG_KEYS */
 
@@ -278,6 +279,7 @@ extern void key_fsgid_changed(struct task_struct *tsk);
 #define exec_keys(t)			do { } while(0)
 #define key_fsuid_changed(t)		do { } while(0)
 #define key_fsgid_changed(t)		do { } while(0)
+#define key_init()			do { } while(0)
 
 #endif /* CONFIG_KEYS */
 #endif /* __KERNEL__ */

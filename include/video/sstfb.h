@@ -18,11 +18,14 @@
 
 #ifdef SST_DEBUG
 #  define dprintk(X...)		printk("sstfb: " X)
+#  define SST_DEBUG_REG  1
+#  define SST_DEBUG_FUNC 1
+#  define SST_DEBUG_VAR  1
 #else
 #  define dprintk(X...)
-#  undef SST_DEBUG_REG
-#  undef SST_DEBUG_FUNC
-#  undef SST_DEBUG_VAR
+#  define SST_DEBUG_REG  0
+#  define SST_DEBUG_FUNC 0
+#  define SST_DEBUG_VAR  0
 #endif
 
 #if (SST_DEBUG_REG > 0)
@@ -340,7 +343,7 @@ struct sstfb_par {
 	unsigned int vBackPorch;
 	struct pll_timing pll;
 	unsigned int tiles_in_X;/* num of tiles in X res */
-	unsigned long mmio_vbase;
+	u8 __iomem *mmio_vbase;
 	struct dac_switch 	dac_sw;	/* dac specific functions */
 	struct pci_dev		*dev;
 	int	type;

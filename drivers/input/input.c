@@ -19,7 +19,7 @@
 #include <linux/major.h>
 #include <linux/pm.h>
 #include <linux/proc_fs.h>
-#include <linux/kmod.h>
+#include <linux/kobject_uevent.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/device.h>

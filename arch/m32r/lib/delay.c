@@ -51,7 +51,7 @@ void __delay(unsigned long loops)
 		"addi	%0, #-1			\n\t"
 		"bgtz	%0, 1b			\n\t"
 		" .fillinsn			\n\t"
-		"2:i				\n\t"
+		"2:				\n\t"
 		: "+r" (loops)
 		: "r" (0)
 	);

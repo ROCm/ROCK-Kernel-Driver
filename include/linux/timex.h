@@ -285,20 +285,18 @@ extern long pps_stbcnt;		/* stability limit exceeded */
  * for the compensation is that the timer routines are not as scalable anymore.
  */
 
-#define INTERPOLATOR_ADJUST 65536
-#define INTERPOLATOR_MAX_SKIP 10*INTERPOLATOR_ADJUST
-
 struct time_interpolator {
-	unsigned short source;		/* time source flags */
-	unsigned char shift;		/* increases accuracy of multiply by shifting. */
-			/* Note that bits may be lost if shift is set too high */
-	unsigned char jitter;		/* if set compensate for fluctuations */
-	unsigned nsec_per_cyc;		/* set by register_time_interpolator() */
+	u16 source;			/* time source flags */
+	u8 shift;			/* increases accuracy of multiply by shifting. */
+				/* Note that bits may be lost if shift is set too high */
+	u8 jitter;			/* if set compensate for fluctuations */
+	u32 nsec_per_cyc;		/* set by register_time_interpolator() */
 	void *addr;			/* address of counter or function */
+	u64 mask;			/* mask the valid bits of the counter */
 	unsigned long offset;		/* nsec offset at last update of interpolator */
-	unsigned long last_counter;	/* counter value in units of the counter at last update */
-	unsigned long last_cycle;	/* Last timer value if TIME_SOURCE_JITTER is set */
-	unsigned long frequency;	/* frequency in counts/second */
+	u64 last_counter;		/* counter value in units of the counter at last update */
+	u64 last_cycle;			/* Last timer value if TIME_SOURCE_JITTER is set */
+	u64 frequency;			/* frequency in counts/second */
 	long drift;			/* drift in parts-per-million (or -1) */
 	unsigned long skips;		/* skips forward */
 	unsigned long ns_skipped;	/* nanoseconds skipped */
@@ -308,7 +306,6 @@ struct time_interpolator {
 extern void register_time_interpolator(struct time_interpolator *);
 extern void unregister_time_interpolator(struct time_interpolator *);
 extern void time_interpolator_reset(void);
-extern unsigned long time_interpolator_resolution(void);
 extern unsigned long time_interpolator_get_offset(void);
 
 #else /* !CONFIG_TIME_INTERPOLATION */

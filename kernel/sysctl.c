@@ -394,7 +394,7 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_HOTPLUG,
 		.procname	= "hotplug",
 		.data		= &hotplug_path,
-		.maxlen		= KMOD_PATH_LEN,
+		.maxlen		= HOTPLUG_PATH_LEN,
 		.mode		= 0644,
 		.proc_handler	= &proc_dostring,
 		.strategy	= &sysctl_string,
@@ -894,6 +894,7 @@ static ctl_table fs_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#ifdef CONFIG_DNOTIFY
 	{
 		.ctl_name	= FS_DIR_NOTIFY,
 		.procname	= "dir-notify-enable",
@@ -902,6 +903,7 @@ static ctl_table fs_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
 	{
 		.ctl_name	= FS_LEASE_TIME,
 		.procname	= "lease-break-time",

@@ -1438,7 +1438,7 @@ struct time_interpolator *time_interpolator;
 static struct time_interpolator *time_interpolator_list;
 static spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
 
-static inline unsigned long time_interpolator_get_cycles(unsigned int src)
+static inline u64 time_interpolator_get_cycles(unsigned int src)
 {
 	unsigned long (*x)(void);
 
@@ -1453,23 +1453,25 @@ static inline unsigned long time_interpolator_get_cycles(unsigned int src)
 
 		case TIME_SOURCE_MMIO32	:
 			return readl(time_interpolator->addr);
+
 		default: return get_cycles();
 	}
 }
 
-static inline unsigned long time_interpolator_get_counter(void)
+static inline u64 time_interpolator_get_counter(void)
 {
 	unsigned int src = time_interpolator->source;
 
 	if (time_interpolator->jitter)
 	{
-		unsigned long lcycle;
-		unsigned long now;
+		u64 lcycle;
+		u64 now;
 
 		do {
 			lcycle = time_interpolator->last_cycle;
 			now = time_interpolator_get_cycles(src);
-			if (lcycle && time_after(lcycle, now)) return lcycle;
+			if (lcycle && time_after(lcycle, now))
+				return lcycle;
 			/* Keep track of the last timer value returned. The use of cmpxchg here
 			 * will cause contention in an SMP environment.
 			 */
@@ -1486,26 +1488,29 @@ void time_interpolator_reset(void)
 	time_interpolator->last_counter = time_interpolator_get_counter();
 }
 
-unsigned long time_interpolator_resolution(void)
-{
-	if (time_interpolator->frequency < NSEC_PER_SEC)
-		return NSEC_PER_SEC / time_interpolator->frequency;
-	else
-		return 1;
-}
-
-#define GET_TI_NSECS(count,i) ((((count) - i->last_counter) * i->nsec_per_cyc) >> i->shift)
+#define GET_TI_NSECS(count,i) (((((count) - i->last_counter) & (i)->mask) * (i)->nsec_per_cyc) >> (i)->shift)
 
 unsigned long time_interpolator_get_offset(void)
 {
+	/* If we do not have a time interpolator set up then just return zero */
+	if (!time_interpolator)
+		return 0;
+
 	return time_interpolator->offset +
 		GET_TI_NSECS(time_interpolator_get_counter(), time_interpolator);
 }
 
+#define INTERPOLATOR_ADJUST 65536
+#define INTERPOLATOR_MAX_SKIP 10*INTERPOLATOR_ADJUST
+
 static void time_interpolator_update(long delta_nsec)
 {
-	unsigned long counter = time_interpolator_get_counter();
-	unsigned long offset = time_interpolator->offset + GET_TI_NSECS(counter, time_interpolator);
+	u64 counter;
+	unsigned long offset;
+
+	/* If there is no time interpolator set up then do nothing */
+	if (!time_interpolator)
+		return;
 
 	/* The interpolator compensates for late ticks by accumulating
          * the late time in time_interpolator->offset. A tick earlier than
@@ -1514,6 +1519,9 @@ static void time_interpolator_update(long delta_nsec)
 	 * interpolator clock is running slightly slower than the regular clock
 	 * and the tuning logic insures that.
          */
+
+	counter = time_interpolator_get_counter();
+	offset = time_interpolator->offset + GET_TI_NSECS(counter, time_interpolator);
 
 	if (delta_nsec < 0 || (unsigned long) delta_nsec < offset)
 		time_interpolator->offset = offset - delta_nsec;
@@ -1553,7 +1561,11 @@ register_time_interpolator(struct time_interpolator *ti)
 {
 	unsigned long flags;
 
-	ti->nsec_per_cyc = (NSEC_PER_SEC << ti->shift) / ti->frequency;
+	/* Sanity check */
+	if (ti->frequency == 0 || ti->mask == 0)
+		BUG();
+
+	ti->nsec_per_cyc = ((u64)NSEC_PER_SEC << ti->shift) / ti->frequency;
 	spin_lock(&time_interpolator_lock);
 	write_seqlock_irqsave(&xtime_lock, flags);
 	if (is_better_time_interpolator(ti)) {

@@ -56,7 +56,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/slab.h>
-#include <linux/kmod.h>
+#include <linux/kobject_uevent.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>
 #include <linux/dmi.h>

@@ -256,14 +256,14 @@ extern void dmac_flush_range(unsigned long, unsigned long);
 
 static inline void flush_cache_mm(struct mm_struct *mm)
 {
-	if (current->active_mm == mm)
+	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask))
 		__cpuc_flush_user_all();
 }
 
 static inline void
 flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
-	if (current->active_mm == vma->vm_mm)
+	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask))
 		__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
 					vma->vm_flags);
 }
@@ -271,7 +271,7 @@ flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long
 static inline void
 flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
 {
-	if (current->active_mm == vma->vm_mm) {
+	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask)) {
 		unsigned long addr = user_addr & PAGE_MASK;
 		__cpuc_flush_user_range(addr, addr + PAGE_SIZE, vma->vm_flags);
 	}

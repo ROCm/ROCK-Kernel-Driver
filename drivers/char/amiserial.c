@@ -84,7 +84,6 @@ static char *serial_version = "4.30";
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/delay.h>
 #include <linux/bitops.h>
 
 #include <asm/setup.h>

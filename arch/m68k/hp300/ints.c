@@ -57,14 +57,21 @@ static irqreturn_t hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t hp300_badint(int irq, void *dev_id, struct pt_regs *fp)
+{
+	num_spurious += 1;
+	return IRQ_NONE;
+}
+
 irqreturn_t (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	[0] = hp300_int_handler,
+	[0] = hp300_badint,
 	[1] = hp300_int_handler,
 	[2] = hp300_int_handler,
 	[3] = hp300_int_handler,
 	[4] = hp300_int_handler,
 	[5] = hp300_int_handler,
 	[6] = hp300_int_handler,
+	[7] = hp300_int_handler
 };
 
 /* dev_id had better be unique to each handler because it's the only way we have

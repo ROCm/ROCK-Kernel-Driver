@@ -66,8 +66,8 @@ struct cfb_info {
 	struct display_switch	*dispsw;
 	struct display		*display;
 	struct pci_dev		*dev;
-	unsigned char 		*region;
-	unsigned char		*regs;
+	unsigned char 		__iomem *region;
+	unsigned char		__iomem *regs;
 	u_int			id;
 	int			func_use_count;
 	u_long			ref_ps;

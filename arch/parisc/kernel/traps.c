@@ -135,9 +135,31 @@ void dump_stack(void)
 
 EXPORT_SYMBOL(dump_stack);
 
-void show_stack(struct task_struct *task, unsigned long *s)
+static void do_show_stack(struct unwind_frame_info *info)
 {
 	int i = 1;
+
+	printk("Backtrace:\n");
+	while (i <= 16) {
+		if (unwind_once(info) < 0 || info->ip == 0)
+			break;
+
+		if (__kernel_text_address(info->ip)) {
+			printk(" [<" RFMT ">] ", info->ip);
+#ifdef CONFIG_KALLSYMS
+			print_symbol("%s\n", info->ip);
+#else
+			if ((i & 0x03) == 0)
+				printk("\n");
+#endif
+			i++;
+		}
+	}
+	printk("\n");
+}
+
+void show_stack(struct task_struct *task, unsigned long *s)
+{
 	struct unwind_frame_info info;
 
 	if (!task) {
@@ -152,23 +174,7 @@ HERE:
 		unwind_frame_init_from_blocked_task(&info, task);
 	}
 
-	printk("Backtrace:\n");
-	while (i <= 16) {
-		if (unwind_once(&info) < 0 || info.ip == 0)
-			break;
-
-		if (__kernel_text_address(info.ip)) {
-			printk(" [<" RFMT ">] ", info.ip);
-#ifdef CONFIG_KALLSYMS
-			print_symbol("%s\n", info.ip);
-#else
-			if ((i & 0x03) == 0)
-				printk("\n");
-#endif
-			i++;
-		}
-	}
-	printk("\n");
+	do_show_stack(&info);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
@@ -407,7 +413,12 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 
 	}
 	    
-	show_stack(NULL, (unsigned long *)regs->gr[30]);
+	{
+		/* show_stack(NULL, (unsigned long *)regs->gr[30]); */
+		struct unwind_frame_info info;
+		unwind_frame_init(&info, current, regs->gr[30], regs->iaoq[0], regs->gr[2]);
+		do_show_stack(&info);
+	}
 
 	printk("\n");
 	printk(KERN_CRIT "%s: Code=%d regs=%p (Addr=" RFMT ")\n",

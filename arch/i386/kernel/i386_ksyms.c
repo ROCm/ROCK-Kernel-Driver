@@ -174,7 +174,7 @@ EXPORT_SYMBOL(memcmp);
 
 EXPORT_SYMBOL(register_die_notifier);
 #ifdef CONFIG_HAVE_DEC_LOCK
-EXPORT_SYMBOL(atomic_dec_and_lock);
+EXPORT_SYMBOL(_atomic_dec_and_lock);
 #endif
 
 EXPORT_SYMBOL(__PAGE_KERNEL);

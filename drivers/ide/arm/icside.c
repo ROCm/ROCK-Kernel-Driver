@@ -197,6 +197,11 @@ static void icside_maskproc(ide_drive_t *drive, int mask)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_ICS
+
+#ifndef CONFIG_IDEDMA_ICS_AUTO
+#warning CONFIG_IDEDMA_ICS_AUTO=n support is obsolete, and will be removed soon.
+#endif
+
 /*
  * SG-DMA support.
  *
@@ -466,7 +471,7 @@ static int icside_dma_setup(ide_drive_t *drive)
 	return 0;
 }
 
-static void icside_dma_exec_cmd(ide_drive_t *drive, u8 command)
+static void icside_dma_exec_cmd(ide_drive_t *drive, u8 cmd)
 {
 	/* issue cmd to drive */
 	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);

@@ -22,7 +22,7 @@
 DECLARE_MUTEX(pm_sem);
 
 struct pm_ops * pm_ops = NULL;
-u32 pm_disk_mode = PM_DISK_SHUTDOWN;
+suspend_disk_method_t pm_disk_mode = PM_DISK_SHUTDOWN;
 
 /**
  *	pm_set_ops - Set the global power method table. 
@@ -46,7 +46,7 @@ void pm_set_ops(struct pm_ops * ops)
  *	the platform can enter the requested state.
  */
 
-static int suspend_prepare(u32 state)
+static int suspend_prepare(suspend_state_t state)
 {
 	int error = 0;
 
@@ -102,7 +102,7 @@ static int suspend_enter(u32 state)
  *	console that we've allocated.
  */
 
-static void suspend_finish(u32 state)
+static void suspend_finish(suspend_state_t state)
 {
 	device_resume();
 	if (pm_ops && pm_ops->finish)
@@ -133,7 +133,7 @@ char * pm_states[] = {
  *	we've woken up).
  */
 
-static int enter_state(u32 state)
+static int enter_state(suspend_state_t state)
 {
 	int error;
 
@@ -183,7 +183,7 @@ int software_suspend(void)
  *	structure, and enter (above).
  */
 
-int pm_suspend(u32 state)
+int pm_suspend(suspend_state_t state)
 {
 	if (state > PM_SUSPEND_ON && state < PM_SUSPEND_MAX)
 		return enter_state(state);
@@ -221,7 +221,7 @@ static ssize_t state_show(struct subsystem * subsys, char * buf)
 
 static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n)
 {
-	u32 state = PM_SUSPEND_STANDBY;
+	suspend_state_t state = PM_SUSPEND_STANDBY;
 	char ** s;
 	char *p;
 	int error;

@@ -33,10 +33,8 @@
 #include <asm/mach-types.h>
 #include <asm/irq.h>
 #include <asm/system.h>
-#include <asm/hardware.h>
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
-#include <asm/mach-types.h>
 
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>

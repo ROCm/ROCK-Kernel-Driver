@@ -239,7 +239,7 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	 *	do all the device setup for us
 	 */
 
-	ide_pci_setup_ports(dev, d, 1, 14, &index);
+	ide_pci_setup_ports(dev, d, 14, &index);
 
 	printk("Index.b %d %d\n", index.b.low, index.b.high);
 	mdelay(2000);

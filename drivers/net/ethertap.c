@@ -124,7 +124,7 @@ static int ethertap_open(struct net_device *dev)
 	struct net_local *lp = netdev_priv(dev);
 
 	if (ethertap_debug > 2)
-		printk(KERN_DEBUG "%s: Doing ethertap_open()...", dev->name);
+		printk(KERN_DEBUG "%s: Doing ethertap_open()...\n", dev->name);
 
 	lp->nl = netlink_kernel_create(dev->base_addr, ethertap_rx);
 	if (lp->nl == NULL)

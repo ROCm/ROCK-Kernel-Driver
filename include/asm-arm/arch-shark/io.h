@@ -170,7 +170,7 @@ DECLARE_IO(long,l,"")
 	addr;									\
 })
 
-#define __mem_pci(addr) addr
+#define __mem_pci(addr) (addr)
 
 #define inb(p)	 	(__builtin_constant_p((p)) ? __inbc(p)    : __inb(p))
 #define inw(p)	 	(__builtin_constant_p((p)) ? __inwc(p)    : __inw(p))

@@ -535,6 +535,8 @@ inline struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
 	return sk;
 }
 
+EXPORT_SYMBOL_GPL(tcp_v4_lookup);
+
 static inline __u32 tcp_v4_init_sequence(struct sock *sk, struct sk_buff *skb)
 {
 	return secure_tcp_sequence_number(skb->nh.iph->daddr,

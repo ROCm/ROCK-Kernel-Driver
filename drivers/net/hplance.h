@@ -4,15 +4,10 @@
  */
 
 /* Registers */
-struct hplance_reg
-{
-        u_char pad0;
-        volatile u_char id;                       /* DIO register: ID byte */
-        u_char pad1;
-        volatile u_char status;                   /* DIO register: interrupt enable */
-};
+#define HPLANCE_ID		0x01		/* DIO register: ID byte */
+#define HPLANCE_STATUS		0x03		/* DIO register: interrupt enable/status */
 
-/* Control and status bits for the hplance->status register */
+/* Control and status bits for the status register */
 #define LE_IE 0x80                                /* interrupt enable */
 #define LE_IR 0x40                                /* interrupt requested */
 #define LE_LOCK 0x08                              /* lock status register */
@@ -25,7 +20,7 @@ struct hplance_reg
 /* These are the offsets for the DIO regs (hplance_reg), lance_ioreg,
  * memory and NVRAM:
  */
-#define HPLANCE_IDOFF 0                           /* board baseaddr, struct hplance_reg */
-#define HPLANCE_REGOFF 0x4000                     /* struct lance_regs */
+#define HPLANCE_IDOFF 0                           /* board baseaddr */
+#define HPLANCE_REGOFF 0x4000                     /* lance registers */
 #define HPLANCE_MEMOFF 0x8000                     /* struct lance_init_block */
 #define HPLANCE_NVRAMOFF 0xC008                   /* etheraddress as one *nibble* per byte */

@@ -627,7 +627,7 @@ static void rhine_chip_reset(struct net_device *dev)
 }
 
 #ifdef USE_MMIO
-static void __devinit enable_mmio(long pioaddr, u32 quirks)
+static void enable_mmio(long pioaddr, u32 quirks)
 {
 	int n;
 	if (quirks & rqRhineI) {

@@ -188,34 +188,32 @@ static inline void pm_dev_idle(struct pm_dev *dev) {}
 extern void (*pm_idle)(void);
 extern void (*pm_power_off)(void);
 
-enum {
-	PM_SUSPEND_ON = 0,
-	PM_SUSPEND_STANDBY = 1,
-	/* NOTE: PM_SUSPEND_MEM == PCI_D3hot */
-	PM_SUSPEND_MEM = 3,
-	PM_SUSPEND_DISK = 4,
-	PM_SUSPEND_MAX = 5,
-};
+typedef int __bitwise suspend_state_t;
 
-enum {
-	PM_DISK_FIRMWARE = 1,
-	PM_DISK_PLATFORM,
-	PM_DISK_SHUTDOWN,
-	PM_DISK_REBOOT,
-	PM_DISK_MAX,
-};
+#define PM_SUSPEND_ON		((__force suspend_state_t) 0)
+#define PM_SUSPEND_STANDBY	((__force suspend_state_t) 1)
+#define PM_SUSPEND_MEM		((__force suspend_state_t) 3)
+#define PM_SUSPEND_DISK		((__force suspend_state_t) 4)
+#define PM_SUSPEND_MAX		((__force suspend_state_t) 5)
 
+typedef int __bitwise suspend_disk_method_t;
+
+#define	PM_DISK_FIRMWARE	((__force suspend_disk_method_t) 1)
+#define	PM_DISK_PLATFORM	((__force suspend_disk_method_t) 2)
+#define	PM_DISK_SHUTDOWN	((__force suspend_disk_method_t) 3)
+#define	PM_DISK_REBOOT		((__force suspend_disk_method_t) 4)
+#define	PM_DISK_MAX		((__force suspend_disk_method_t) 5)
 
 struct pm_ops {
-	u32	pm_disk_mode;
-	int (*prepare)(u32 state);
-	int (*enter)(u32 state);
-	int (*finish)(u32 state);
+	suspend_disk_method_t pm_disk_mode;
+	int (*prepare)(suspend_state_t state);
+	int (*enter)(suspend_state_t state);
+	int (*finish)(suspend_state_t state);
 };
 
 extern void pm_set_ops(struct pm_ops *);
 
-extern int pm_suspend(u32 state);
+extern int pm_suspend(suspend_state_t state);
 
 
 /*

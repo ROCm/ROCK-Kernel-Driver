@@ -141,7 +141,7 @@ struct clcd_fb {
 	struct clcd_panel	*panel;
 	struct clcd_board	*board;
 	void			*board_data;
-	void			*regs;
+	void __iomem		*regs;
 	u32			clcd_cntl;
 	u32			cmap[16];
 };

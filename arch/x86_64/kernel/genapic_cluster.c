@@ -57,14 +57,6 @@ static void cluster_init_apic_ldr(void)
 	apic_write_around(APIC_LDR, val);
 }
 
-static int cluster_cpu_present_to_apicid(int mps_cpu)
-{
-	if ((unsigned)mps_cpu < NR_CPUS)
-		return (int)bios_cpu_apicid[mps_cpu];
-	else
-		return BAD_APICID;
-}
-
 /* Start with all IRQs pointing to boot CPU.  IRQ balancing will shift them. */
 
 static cpumask_t cluster_target_cpus(void)

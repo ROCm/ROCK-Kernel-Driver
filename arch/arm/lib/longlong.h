@@ -161,7 +161,6 @@
 #define UDIV_NEEDS_NORMALIZATION 1
 #define udiv_qrnnd __udiv_qrnnd_c
 
-extern const UQItype __clz_tab[];
 #define count_leading_zeros(count, x) \
   do {									\
     USItype __xr = (x);							\
