@@ -366,6 +366,13 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Submitted Alexander Oltu <alexander@all-2.com> */
+UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
+		"", 
+		"USB TO IDE",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_MODE_XLATE ), 
+
 /* Reported by Peter Marks <peter.marks@turner.com>
  * Like the SIIG unit above, this unit needs an INQUIRY to ask for exactly
  * 36 bytes of data.  No more, no less. That is the only reason this entry
