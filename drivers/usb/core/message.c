@@ -823,9 +823,19 @@ int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
  */
 int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, data, 2,
-		HZ * USB_CTRL_GET_TIMEOUT);
+	int ret;
+	u16 *status = kmalloc(sizeof(*status), GFP_KERNEL);
+
+	if (!status)
+		return -ENOMEM;
+
+	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, status,
+		sizeof(*status), HZ * USB_CTRL_GET_TIMEOUT);
+
+	*(u16 *)data = *status;
+	kfree(status);
+	return ret;
 }
 
 /**

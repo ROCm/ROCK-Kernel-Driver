@@ -353,8 +353,8 @@ static void intr_deschedule (
 	hcd_to_bus (&ehci->hcd)->bandwidth_allocated -= 
 		(qh->usecs + qh->c_usecs) / qh->period;
 
-	dbg ("descheduled qh %p, period = %d frame = %d count = %d, urbs = %d",
-		qh, qh->period, frame,
+	ehci_dbg (ehci, "descheduled qh%d/%p frame=%d count=%d, urbs=%d\n",
+		qh->period, qh, frame,
 		atomic_read (&qh->kref.refcount), ehci->periodic_sched);
 }
 
@@ -486,13 +486,14 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		qh->hw_info2 &= ~__constant_cpu_to_le32(0xffff);
 		qh->hw_info2 |= cpu_to_le32 (1 << uframe) | c_mask;
 	} else
-		dbg ("reused previous qh %p schedule", qh);
+		ehci_dbg (ehci, "reused qh %p schedule\n", qh);
 
 	/* stuff into the periodic schedule */
 	qh->qh_state = QH_STATE_LINKED;
-	dbg ("scheduled qh %p usecs %d/%d period %d.0 starting %d.%d (gap %d)",
-		qh, qh->usecs, qh->c_usecs,
-		qh->period, frame, uframe, qh->gap_uf);
+	ehci_dbg(ehci,
+		"scheduled qh%d/%p usecs %d/%d starting %d.%d (gap %d)\n",
+		qh->period, qh, qh->usecs, qh->c_usecs,
+		frame, uframe, qh->gap_uf);
 	do {
 		if (unlikely (ehci->pshadow [frame].ptr != 0)) {
 

@@ -925,6 +925,7 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 		case -ECONNRESET:	/* unlink */
 		case -ENOENT:
 		case -ESHUTDOWN:
+		case -EPERM:
 			return;
 		case -ETIMEDOUT:	/* NAK */
 			break;
@@ -1833,6 +1834,30 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	return 0;
 }
 
+static int hid_suspend(struct usb_interface *intf, u32 state)
+{
+	struct hid_device *hid = usb_get_intfdata (intf);
+
+	usb_kill_urb(hid->urbin);
+	intf->dev.power.power_state = state;
+	dev_dbg(&intf->dev, "suspend\n");
+	return 0;
+}
+
+static int hid_resume(struct usb_interface *intf)
+{
+	struct hid_device *hid = usb_get_intfdata (intf);
+	int status;
+
+	intf->dev.power.power_state = PM_SUSPEND_ON;
+	if (hid->open)
+		status = usb_submit_urb(hid->urbin, GFP_NOIO);
+	else
+		status = 0;
+	dev_dbg(&intf->dev, "resume status %d\n", status);
+	return status;
+}
+
 static struct usb_device_id hid_usb_ids [] = {
 	{ .match_flags = USB_DEVICE_ID_MATCH_INT_CLASS,
 	    .bInterfaceClass = USB_INTERFACE_CLASS_HID },
@@ -1846,6 +1871,8 @@ static struct usb_driver hid_driver = {
 	.name =		"usbhid",
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,
+	.suspend =	hid_suspend,
+	.resume =	hid_resume,
 	.id_table =	hid_usb_ids,
 };
 

@@ -56,6 +56,31 @@ static int blinkenlights = 0;
 module_param (blinkenlights, bool, S_IRUGO);
 MODULE_PARM_DESC (blinkenlights, "true to cycle leds on hubs");
 
+/*
+ * As of 2.6.10 we introduce a new USB device initialization scheme which
+ * closely resembles the way Windows works.  Hopefully it will be compatible
+ * with a wider range of devices than the old scheme.  However some previously
+ * working devices may start giving rise to "device not accepting address"
+ * errors; if that happens the user can try the old scheme by adjusting the
+ * following module parameters.
+ *
+ * For maximum flexibility there are two boolean parameters to control the
+ * hub driver's behavior.  On the first initialization attempt, if the
+ * "old_scheme_first" parameter is set then the old scheme will be used,
+ * otherwise the new scheme is used.  If that fails and "use_both_schemes"
+ * is set, then the driver will make another attempt, using the other scheme.
+ */
+static int old_scheme_first = 0;
+module_param(old_scheme_first, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(old_scheme_first,
+		 "start with the old device initialization scheme");
+
+static int use_both_schemes = 0;
+module_param(use_both_schemes, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(use_both_schemes,
+		"try the other device initialization scheme if the "
+		"first one fails");
+
 
 #ifdef	DEBUG
 static inline char *portspeed (int portstatus)
@@ -78,9 +103,17 @@ static inline struct device *hubdev (struct usb_device *hdev)
 /* USB 2.0 spec Section 11.24.4.5 */
 static int get_hub_descriptor(struct usb_device *hdev, void *data, int size)
 {
-	return usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
-		USB_REQ_GET_DESCRIPTOR, USB_DIR_IN | USB_RT_HUB,
-		USB_DT_HUB << 8, 0, data, size, HZ * USB_CTRL_GET_TIMEOUT);
+	int i, ret;
+
+	for (i = 0; i < 3; i++) {
+		ret = usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
+			USB_REQ_GET_DESCRIPTOR, USB_DIR_IN | USB_RT_HUB,
+			USB_DT_HUB << 8, 0, data, size,
+			HZ * USB_CTRL_GET_TIMEOUT);
+		if (ret >= (USB_DT_HUB_NONVAR_SIZE + 2))
+			return ret;
+	}
+	return -EINVAL;
 }
 
 /*
@@ -1265,7 +1298,8 @@ static int hub_port_status(struct usb_device *hdev, int port,
 #define PORT_RESET_TRIES	5
 #define SET_ADDRESS_TRIES	2
 #define GET_DESCRIPTOR_TRIES	2
-#define SET_CONFIG_TRIES	2
+#define SET_CONFIG_TRIES	(2 * (use_both_schemes + 1))
+#define USE_NEW_SCHEME(i)	((i) / 2 == old_scheme_first)
 
 #define HUB_ROOT_RESET_TIME	50	/* times are in msec */
 #define HUB_SHORT_RESET_TIME	10
@@ -1983,20 +2017,30 @@ static int hub_port_debounce(struct usb_device *hdev, int port)
 	return portstatus;
 }
 
+#define usb_sndaddr0pipe()	(PIPE_CONTROL << 30)
+#define usb_rcvaddr0pipe()	((PIPE_CONTROL << 30) | USB_DIR_IN)
+
 static int hub_set_address(struct usb_device *udev)
 {
 	int retval;
 
 	if (udev->devnum == 0)
 		return -EINVAL;
-	if (udev->state != USB_STATE_DEFAULT &&
-			udev->state != USB_STATE_ADDRESS)
+	if (udev->state == USB_STATE_ADDRESS)
+		return 0;
+	if (udev->state != USB_STATE_DEFAULT)
 		return -EINVAL;
-	retval = usb_control_msg(udev, (PIPE_CONTROL << 30) /* Address 0 */,
+	retval = usb_control_msg(udev, usb_sndaddr0pipe(),
 		USB_REQ_SET_ADDRESS, 0, udev->devnum, 0,
 		NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
-	if (retval == 0)
+	if (retval == 0) {
+		int m = udev->epmaxpacketin[0];
+
 		usb_set_device_state(udev, USB_STATE_ADDRESS);
+		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = m;
+	}
 	return retval;
 }
 
@@ -2010,7 +2054,8 @@ static int hub_set_address(struct usb_device *udev)
  * pointers, it's not necessary to lock the device.
  */
 static int
-hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
+hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
+		int retry_counter)
 {
 	static DECLARE_MUTEX(usb_address0_sem);
 
@@ -2049,6 +2094,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 		dev_dbg(&udev->dev, "device reset changed speed!\n");
 		goto fail;
 	}
+	oldspeed = udev->speed;
   
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
@@ -2058,22 +2104,22 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 		i = 64;
 		break;
 	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
-		/* to determine the ep0 maxpacket size, read the first 8
-		 * bytes from the device descriptor to get bMaxPacketSize0;
-		 * then correct our initial (small) guess.
+		/* to determine the ep0 maxpacket size, try to read
+		 * the device descriptor to get bMaxPacketSize0 and
+		 * then correct our initial guess.
 		 */
-		// FALLTHROUGH
+		i = 64;
+		break;
 	case USB_SPEED_LOW:		/* fixed at 8 */
 		i = 8;
 		break;
 	default:
 		goto fail;
 	}
-	udev->epmaxpacketin [0] = i;
-	udev->epmaxpacketout[0] = i;
+	udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
  
 	dev_info (&udev->dev,
-			"%s %s speed USB device using address %d\n",
+			"%s %s speed USB device using %s and address %d\n",
 			(udev->config) ? "reset" : "new",
 			({ char *speed; switch (udev->speed) {
 			case USB_SPEED_LOW:	speed = "low";	break;
@@ -2081,6 +2127,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 			case USB_SPEED_HIGH:	speed = "high";	break;
 			default: 		speed = "?";	break;
 			}; speed;}),
+			udev->bus->controller->driver->name,
 			udev->devnum);
 
 	/* Set up TT records, if needed  */
@@ -2101,11 +2148,59 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 	 * this area, and this is how Linux has done it for ages.
 	 * Change it cautiously.
 	 *
-	 * NOTE:  Windows gets the descriptor first, seemingly to help
-	 * work around device bugs like "can't use addresses with bit 3
-	 * set in certain configurations".  Yes, really.
+	 * NOTE:  If USE_NEW_SCHEME() is true we will start by issuing
+	 * a 64-byte GET_DESCRIPTOR request.  This is what Windows does,
+	 * so it may help with some non-standards-compliant devices.
+	 * Otherwise we start with SET_ADDRESS and then try to read the
+	 * first 8 bytes of the device descriptor to get the ep0 maxpacket
+	 * value.
 	 */
-	for (i = 0; i < GET_DESCRIPTOR_TRIES; ++i) {
+	for (i = 0; i < GET_DESCRIPTOR_TRIES; (++i, msleep(100))) {
+		if (USE_NEW_SCHEME(retry_counter)) {
+			struct usb_device_descriptor *buf;
+
+#define GET_DESCRIPTOR_BUFSIZE	64
+			buf = kmalloc(GET_DESCRIPTOR_BUFSIZE, GFP_NOIO);
+			if (!buf) {
+				retval = -ENOMEM;
+				continue;
+			}
+			buf->bMaxPacketSize0 = 0;
+
+			/* Use a short timeout the first time through,
+			 * so that recalcitrant full-speed devices with
+			 * 8- or 16-byte ep0-maxpackets won't slow things
+			 * down tremendously by NAKing the unexpectedly
+			 * early status stage.
+			 */
+			j = usb_control_msg(udev, usb_rcvaddr0pipe(),
+					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+					USB_DT_DEVICE << 8, 0,
+					buf, GET_DESCRIPTOR_BUFSIZE,
+					(i ? HZ * USB_CTRL_GET_TIMEOUT : HZ));
+			udev->descriptor.bMaxPacketSize0 =
+					buf->bMaxPacketSize0;
+			kfree(buf);
+
+			retval = hub_port_reset(hdev, port, udev, delay);
+			if (retval < 0)		/* error or disconnect */
+				goto fail;
+			if (oldspeed != udev->speed) {
+				dev_dbg(&udev->dev,
+					"device reset changed speed!\n");
+				retval = -ENODEV;
+				goto fail;
+			}
+			if (udev->descriptor.bMaxPacketSize0 == 0) {
+				dev_err(&udev->dev, "device descriptor "
+						"read/%s, error %d\n",
+						"64", j);
+				retval = -EMSGSIZE;
+				continue;
+			}
+#undef GET_DESCRIPTOR_BUFSIZE
+		}
+
 		for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
 			retval = hub_set_address(udev);
 			if (retval >= 0)
@@ -2124,25 +2219,31 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 		 *  - read ep0 maxpacket even for high and low speed,
   		 */
 		msleep(10);
-		retval = usb_get_device_descriptor(udev, 8);
-		if (retval >= 8)
+		if (USE_NEW_SCHEME(retry_counter))
 			break;
-		msleep(100);
+
+		retval = usb_get_device_descriptor(udev, 8);
+		if (retval < 8) {
+			dev_err(&udev->dev, "device descriptor "
+					"read/%s, error %d\n",
+					"8", retval);
+			if (retval >= 0)
+				retval = -EMSGSIZE;
+		} else {
+			retval = 0;
+			break;
+		}
 	}
-	if (retval != 8) {
-		dev_err(&udev->dev, "device descriptor read/%s, error %d\n",
-				"8", retval);
-		if (retval >= 0)
-			retval = -EMSGSIZE;
+	if (retval)
 		goto fail;
-	}
-	if (udev->speed == USB_SPEED_FULL
-			&& (udev->epmaxpacketin [0]
-				!= udev->descriptor.bMaxPacketSize0)) {
+
+	/* Should we verify that the value is valid? */
+	i = udev->descriptor.bMaxPacketSize0;
+	dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
+	if (udev->epmaxpacketin[0] != i) {
 		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
-		udev->epmaxpacketin [0] = udev->descriptor.bMaxPacketSize0;
-		udev->epmaxpacketout[0] = udev->descriptor.bMaxPacketSize0;
+		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
 	}
   
 	retval = usb_get_device_descriptor(udev, USB_DT_DEVICE_SIZE);
@@ -2312,7 +2413,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		}
 
 		/* reset and get descriptor */
-		status = hub_port_init(hdev, udev, port);
+		status = hub_port_init(hdev, udev, port, i);
 		if (status < 0)
 			goto loop;
 
@@ -2732,7 +2833,7 @@ int usb_reset_device(struct usb_device *udev)
 {
 	struct usb_device *parent = udev->parent;
 	struct usb_device_descriptor descriptor = udev->descriptor;
-	int i, ret, port = -1;
+	int i, ret = 0, port = -1;
 	int udev_is_a_hub = 0;
 
 	if (udev->state == USB_STATE_NOTATTACHED ||
@@ -2768,12 +2869,16 @@ int usb_reset_device(struct usb_device *udev)
 		hub_pre_reset(udev);
 	}
 
-	/* ep0 maxpacket size may change; let the HCD know about it.
-	 * Other endpoints will be handled by re-enumeration. */
-	usb_disable_endpoint(udev, 0);
-	usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+	for (i = 0; i < SET_CONFIG_TRIES; ++i) {
 
-	ret = hub_port_init(parent, udev, port);
+		/* ep0 maxpacket size may change; let the HCD know about it.
+		 * Other endpoints will be handled by re-enumeration. */
+		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+		ret = hub_port_init(parent, udev, port, i);
+		if (ret >= 0)
+			break;
+	}
 	if (ret < 0)
 		goto re_enumerate;
  

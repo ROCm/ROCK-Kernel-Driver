@@ -175,7 +175,7 @@ static int queuecommand(struct scsi_cmnd *srb,
 	US_DEBUGP("%s called\n", __FUNCTION__);
 	srb->host_scribble = (unsigned char *)us;
 
-	/* enqueue the command */
+	/* check for state-transition errors */
 	if (us->sm_state != US_STATE_IDLE || us->srb != NULL) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: " 
 			"state = %d, us->srb = %p\n",
@@ -183,10 +183,17 @@ static int queuecommand(struct scsi_cmnd *srb,
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
+	/* fail the command if we are disconnecting */
+	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		US_DEBUGP("Fail command during disconnect\n");
+		srb->result = DID_NO_CONNECT << 16;
+		done(srb);
+		return 0;
+	}
+
+	/* enqueue the command and wake up the control thread */
 	srb->scsi_done = done;
 	us->srb = srb;
-
-	/* wake up the process task */
 	up(&(us->sema));
 
 	return 0;

@@ -1,11 +1,12 @@
-Revised: 2002-Feb-09.
+Revised: 2004-Oct-21
 
 This is the documentation of (hopefully) all possible error codes (and
 their interpretation) that can be returned from usbcore.
 
 Some of them are returned by the Host Controller Drivers (HCDs), which
 device drivers only see through usbcore.  As a rule, all the HCDs should
-behave the same except for transfer speed dependent behaviors.
+behave the same except for transfer speed dependent behaviors and the
+way certain faults are reported.
 
 
 **************************************************************************
@@ -26,28 +27,34 @@ USB-specific:
 		of urb.  (treat as a host controller bug.)
 
 -EINVAL		a) Invalid transfer type specified (or not supported)
-		b) Invalid interrupt interval (0<=n<256)
-		c) more than one interrupt packet requested
+		b) Invalid or unsupported periodic transfer interval
+		c) ISO: attempted to change transfer interval
 		d) ISO: number_of_packets is < 0
+		e) various other cases
 
 -EAGAIN		a) specified ISO start frame too early
 		b) (using ISO-ASAP) too much scheduled for the future
 		   wait some time and try again.
 
--EFBIG		too much ISO frames requested (currently uhci>900)
+-EFBIG		Host controller driver can't schedule that many ISO frames.
 
 -EPIPE		Specified endpoint is stalled.  For non-control endpoints,
 		reset this status with usb_clear_halt().
 
--EMSGSIZE	endpoint message size is zero, do interface/alternate setting
+-EMSGSIZE	(a) endpoint maxpacket size is zero; it is not usable
+		    in the current interface altsetting.
+		(b) ISO packet is biger than endpoint maxpacket
+		(c) requested data transfer size is invalid (negative)
 
--ENOSPC		The host controller's bandwidth is already consumed and
-		this request would push it past its allowed limit.
+-ENOSPC		This request would overcommit the usb bandwidth reserved
+		for periodic transfers (interrupt, isochronous).
 
--ESHUTDOWN	The host controller has been disabled due to some
+-ESHUTDOWN	The device or host controller has been disabled due to some
 		problem that could not be worked around.
 
 -EPERM		Submission failed because urb->reject was set.
+
+-EHOSTUNREACH	URB was rejected because the device is suspended.
 
 
 **************************************************************************
@@ -71,14 +78,14 @@ one or more packets could finish before an error stops further endpoint I/O.
 -EINPROGRESS		URB still pending, no results yet
 			(That is, if drivers see this it's a bug.)
 
--EPROTO (*)		a) bitstuff error
+-EPROTO (*, **)		a) bitstuff error
 			b) no response packet received within the
 			   prescribed bus turn-around time
 			c) unknown USB error 
 
--EILSEQ (*)		CRC mismatch
+-EILSEQ (*, **)		CRC mismatch
 
--EPIPE			Endpoint stalled.  For non-control endpoints,
+-EPIPE (**)		Endpoint stalled.  For non-control endpoints,
 			reset this status with usb_clear_halt().
 
 -ECOMM			During an IN transfer, the host controller
@@ -97,7 +104,7 @@ one or more packets could finish before an error stops further endpoint I/O.
 			specified buffer, and URB_SHORT_NOT_OK was set in
 			urb->transfer_flags.
 
--ETIMEDOUT		transfer timed out, NAK
+-ETIMEDOUT (**)		transfer timed out, NAK
 
 -ENODEV			Device was removed.  Often preceded by a burst of
 			other errors, since the hub driver does't detect
@@ -110,12 +117,18 @@ one or more packets could finish before an error stops further endpoint I/O.
 
 -ECONNRESET		URB was asynchronously unlinked by usb_unlink_urb
 
--ESHUTDOWN		The host controller has been disabled due to some
-			problem that could not be worked around.
+-ESHUTDOWN		The device or host controller has been disabled due
+			to some problem that could not be worked around,
+			such as a physical disconnect.
 
 
 (*) Error codes like -EPROTO, -EILSEQ and -EOVERFLOW normally indicate
 hardware problems such as bad devices (including firmware) or cables.
+
+(**) This is also one of several codes that different kinds of host
+controller use to to indicate a transfer has failed because of device
+disconnect.  In the interval before the hub driver starts disconnect
+processing, devices may receive such fault reports for every request.
 
 
 

@@ -550,9 +550,7 @@ static int usb_device_match (struct device *dev, struct device_driver *drv)
 		return 0;
 
 	intf = to_usb_interface(dev);
-
 	usb_drv = to_usb_driver(drv);
-	id = usb_drv->id_table;
 	
 	id = usb_match_id (intf, usb_drv->id_table);
 	if (id)
@@ -765,6 +763,7 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 
 	if (dev->bus->op->allocate)
 		if (dev->bus->op->allocate(dev)) {
+			usb_bus_put(bus);
 			kfree(dev);
 			return NULL;
 		}

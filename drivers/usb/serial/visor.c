@@ -381,10 +381,17 @@ static struct usb_serial_device_type clie_3_5_device = {
 	.read_bulk_callback =	visor_read_bulk_callback,
 };
 
+struct visor_private {
+	spinlock_t lock;
+	int bytes_in;
+	int bytes_out;
+	int outstanding_urbs;
+};
 
-static int bytes_in;
-static int bytes_out;
+/* number of outstanding urbs to prevent userspace DoS from happening */
+#define URB_UPPER_LIMIT	42
 
+static int stats;
 
 /******************************************************************************
  * Handspring Visor specific driver functions
@@ -392,6 +399,8 @@ static int bytes_out;
 static int visor_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
+	struct visor_private *priv = usb_get_serial_port_data(port);
+	unsigned long flags;
 	int result = 0;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
@@ -402,8 +411,11 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 		return -ENODEV;
 	}
 
-	bytes_in = 0;
-	bytes_out = 0;
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->bytes_in = 0;
+	priv->bytes_out = 0;
+	priv->outstanding_urbs = 0;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/*
 	 * Force low_latency on so that our tty_push actually forces the data
@@ -441,6 +453,7 @@ exit:
 
 static void visor_close (struct usb_serial_port *port, struct file * filp)
 {
+	struct visor_private *priv = usb_get_serial_port_data(port);
 	unsigned char *transfer_buffer;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
@@ -461,19 +474,31 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 		kfree (transfer_buffer);
 	}
 
-	/* Uncomment the following line if you want to see some statistics in your syslog */
-	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
+	if (stats)
+		dev_info(&port->dev, "Bytes In = %d  Bytes Out = %d\n",
+			 priv->bytes_in, priv->bytes_out);
 }
 
 
 static int visor_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
+	struct visor_private *priv = usb_get_serial_port_data(port);
 	struct usb_serial *serial = port->serial;
 	struct urb *urb;
 	unsigned char *buffer;
+	unsigned long flags;
 	int status;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	spin_lock_irqsave(&priv->lock, flags);
+	if (priv->outstanding_urbs > URB_UPPER_LIMIT) {
+		spin_unlock_irqrestore(&priv->lock, flags);
+		dev_dbg(&port->dev, "write limit hit\n");
+		return 0;
+	}
+	++priv->outstanding_urbs;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	buffer = kmalloc (count, GFP_ATOMIC);
 	if (!buffer) {
@@ -506,7 +531,10 @@ static int visor_write (struct usb_serial_port *port, const unsigned char *buf, 
 		count = status;
 		kfree (buffer);
 	} else {
-		bytes_out += count;
+		spin_lock_irqsave(&priv->lock, flags);
+		++priv->outstanding_urbs;
+		priv->bytes_out += count;
+		spin_unlock_irqrestore(&priv->lock, flags);
 	}
 
 	/* we are done with this urb, so let the host driver
@@ -547,6 +575,8 @@ static int visor_chars_in_buffer (struct usb_serial_port *port)
 static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
+	struct visor_private *priv = usb_get_serial_port_data(port);
+	unsigned long flags;
 
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
@@ -557,6 +587,10 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		dbg("%s - nonzero write bulk status received: %d",
 		    __FUNCTION__, urb->status);
 
+	spin_lock_irqsave(&priv->lock, flags);
+	--priv->outstanding_urbs;
+	spin_unlock_irqrestore(&priv->lock, flags);
+
 	schedule_work(&port->work);
 }
 
@@ -564,8 +598,10 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct tty_struct *tty;
+	struct visor_private *priv = usb_get_serial_port_data(port);
 	unsigned char *data = urb->transfer_buffer;
+	struct tty_struct *tty;
+	unsigned long flags;
 	int i;
 	int result;
 
@@ -590,7 +626,9 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		}
 		tty_flip_buffer_push(tty);
 	}
-	bytes_in += urb->actual_length;
+	spin_lock_irqsave(&priv->lock, flags);
+	priv->bytes_in += urb->actual_length;
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* Continue trying to always read  */
 	usb_fill_bulk_urb (port->read_urb, port->serial->dev,
@@ -825,6 +863,22 @@ static int visor_calc_num_ports (struct usb_serial *serial)
 	return num_ports;
 }
 
+static int generic_startup(struct usb_serial *serial)
+{
+	struct visor_private *priv;
+	int i;
+
+	for (i = 0; i < serial->num_ports; ++i) {
+		priv = kmalloc (sizeof(*priv), GFP_KERNEL);
+		if (!priv)
+			return -ENOMEM;
+		memset (priv, 0x00, sizeof(*priv));
+		spin_lock_init(&priv->lock);
+		usb_set_serial_port_data(serial->port[i], priv);
+	}
+	return 0;
+}
+
 static int clie_3_5_startup (struct usb_serial *serial)
 {
 	struct device *dev = &serial->dev->dev;
@@ -864,7 +918,7 @@ static int clie_3_5_startup (struct usb_serial *serial)
 		return -EIO;
 	}
 
-	return 0;
+	return generic_startup(serial);
 }
  
 static int treo_attach (struct usb_serial *serial)
@@ -903,7 +957,7 @@ static int treo_attach (struct usb_serial *serial)
 	COPY_PORT(serial->port[1], swap_port);
 	kfree(swap_port);
 
-	return 0;
+	return generic_startup(serial);
 }
 
 static int clie_5_attach (struct usb_serial *serial)
@@ -924,7 +978,7 @@ static int clie_5_attach (struct usb_serial *serial)
 	/* port 0 now uses the modified endpoint Address */
 	serial->port[0]->bulk_out_endpointAddress = serial->port[1]->bulk_out_endpointAddress;
 
-	return 0;
+	return generic_startup(serial);
 }
 
 static void visor_shutdown (struct usb_serial *serial)
@@ -1080,8 +1134,11 @@ MODULE_LICENSE("GPL");
 
 module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
+module_param(stats, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(stats, "Enables statistics or not");
 
 module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified vendor ID");
 module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified product ID");
+
