@@ -171,7 +171,14 @@ cifs_open(struct inode *inode, struct file *file)
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
 			if(pCifsInode) {
-				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				/* want handles we can use to read with first */
+				/* in the list so we do not have to walk the */
+				/* list to search for one in prepare_write */
+				if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+					list_add_tail(&pCifsFile->flist,&pCifsInode->openFileList);
+				} else {
+					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				}
 				write_unlock(&GlobalSMBSeslock);
 				write_unlock(&file->f_owner.lock);
 				if(pCifsInode->clientCanCacheRead) {
@@ -910,6 +917,11 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	}
 	open_file = (struct cifsFileInfo *)file->private_data;
 
+	if((file->f_flags & O_ACCMODE) == O_WRONLY) {
+		cFYI(1,("attempting read on write only file instance"));
+	}
+
+
 	for (total_read = 0,current_offset=read_data; read_size > total_read;
 				total_read += bytes_read,current_offset+=bytes_read) {
 		current_read_size = min_t(const int,read_size - total_read,cifs_sb->rsize);
@@ -1145,11 +1157,42 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	return rc;
 }
 
+static int cifs_readpage_worker(struct file *file, struct page *page, loff_t * poffset)
+{
+	char * read_data;
+	int rc;
+
+        page_cache_get(page);
+        read_data = kmap(page);
+        /* for reads over a certain size could initiate async read ahead */
+                                                                                                                           
+        rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, poffset);
+                                                                                                                           
+        if (rc < 0)
+                goto io_error;
+        else {
+                cFYI(1,("Bytes read %d ",rc));
+        }
+                                                                                                                           
+        file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+                                                                                                                           
+        if(PAGE_CACHE_SIZE > rc) {
+                memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
+        }
+        flush_dcache_page(page);
+        SetPageUptodate(page);
+        rc = 0;
+                                                                                                                           
+io_error:
+        kunmap(page);
+	page_cache_release(page);
+	return rc;
+}
+
 static int
 cifs_readpage(struct file *file, struct page *page)
 {
 	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	char * read_data;
 	int rc = -EACCES;
 	int xid;
 
@@ -1160,34 +1203,12 @@ cifs_readpage(struct file *file, struct page *page)
 		return -EBADF;
 	}
 
-	cFYI(0,("readpage %p at offset %d 0x%x\n",page,(int)offset,(int)offset));
+	cFYI(1,("readpage %p at offset %d 0x%x\n",page,(int)offset,(int)offset));
 
-	page_cache_get(page);
-	read_data = kmap(page);
-	/* for reads over a certain size could initiate async read ahead */
+	rc = cifs_readpage_worker(file,page,&offset);
 
-	rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, &offset);
-
-	if (rc < 0)
-		goto io_error;
-	else {
-		cFYI(1,("Bytes read %d ",rc));
-	}
-
-	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
-
-	if(PAGE_CACHE_SIZE > rc) {
-		memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
-	}
-	flush_dcache_page(page);
-	SetPageUptodate(page);
-	rc = 0;
-
-io_error:
-	kunmap(page);
 	unlock_page(page);
 
-	page_cache_release(page);
 	FreeXid(xid);
 	return rc;
 }
@@ -1252,8 +1273,11 @@ fill_in_inode(struct inode *tmp_inode,
 	}
 
 	i_size_write(tmp_inode,pfindData->EndOfFile);
-	tmp_inode->i_blocks =
-		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
+
+	/* 512 bytes (2**9) is the fake blocksize that must be used */
+	/* for this calculation, even though the reported blocksize is larger */
+	tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
 	cFYI(1,
@@ -1326,8 +1350,10 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
 	i_size_write(tmp_inode,pfindData->EndOfFile);
-	tmp_inode->i_blocks =
-                (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
+
+	/* 512 bytes (2**9) is the fake blocksize that must be used */
+	/* for this calculation, not the real blocksize */
+	tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
 
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, ("File inode"));
@@ -1937,17 +1963,30 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 int cifs_prepare_write(struct file *file, struct page *page,
 			unsigned from, unsigned to)
 {
+	int rc = 0;
+        loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
 	cFYI(1,("prepare write for page %p from %d to %d",page,from,to));
 	if (!PageUptodate(page)) {
-		if (to - from != PAGE_CACHE_SIZE) {
+	/*	if (to - from != PAGE_CACHE_SIZE) {
 			void *kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr, 0, from);
 			memset(kaddr + to, 0, PAGE_CACHE_SIZE - to);
 			flush_dcache_page(page);
 			kunmap_atomic(kaddr, KM_USER0);
-		}
-		SetPageUptodate(page);
+		} */
+		/* If we are writing a full page it will be up to date,
+		no need to read from the server */
+		if((to==PAGE_CACHE_SIZE) && (from == 0))
+			SetPageUptodate(page);
+
+		/* might as well read a page, it is fast enough */
+		rc = cifs_readpage_worker(file,page,&offset);
+		/* if this returns an error should we try using another
+		file handle if there is one - how would we lock it
+		to prevent close of that handle racing with this read? */
 	}
+
+	/* BB should we pass any errors back? e.g. if we do not have read access to the file */
 	return 0;
 }
 
@@ -1956,8 +1995,7 @@ struct address_space_operations cifs_addr_ops = {
 	.readpage = cifs_readpage,
 	.readpages = cifs_readpages,
 	.writepage = cifs_writepage,
-	.prepare_write = simple_prepare_write, /* BB fixme BB */
-/*	.prepare_write = cifs_prepare_write, */  /* BB removeme BB */
+	.prepare_write = cifs_prepare_write, 
 	.commit_write = cifs_commit_write,
    /* .sync_page = cifs_sync_page, */
 	/*.direct_IO = */
