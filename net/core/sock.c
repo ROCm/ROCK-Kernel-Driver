@@ -1099,6 +1099,23 @@ void sk_send_sigurg(struct sock *sk)
 			sk_wake_async(sk, 3, POLL_PRI);
 }
 
+void sk_reset_timer(struct sock *sk, struct timer_list* timer,
+		    unsigned long expires)
+{
+	if (!mod_timer(timer, expires))
+		sock_hold(sk);
+}
+
+EXPORT_SYMBOL(sk_reset_timer);
+
+void sk_stop_timer(struct sock *sk, struct timer_list* timer)
+{
+	if (timer_pending(timer) && del_timer(timer))
+		__sock_put(sk);
+}
+
+EXPORT_SYMBOL(sk_stop_timer);
+
 void sock_init_data(struct socket *sock, struct sock *sk)
 {
 	skb_queue_head_init(&sk->sk_receive_queue);

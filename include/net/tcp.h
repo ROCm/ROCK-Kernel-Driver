@@ -989,9 +989,7 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 		tp->pending = 0;
 
 #ifdef TCP_CLEAR_TIMERS
-		if (timer_pending(&tp->retransmit_timer) &&
-		    del_timer(&tp->retransmit_timer))
-			__sock_put(sk);
+		sk_stop_timer(sk, &tp->retransmit_timer);
 #endif
 		break;
 	case TCP_TIME_DACK:
@@ -999,9 +997,7 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 		tp->ack.pending = 0;
 
 #ifdef TCP_CLEAR_TIMERS
-		if (timer_pending(&tp->delack_timer) &&
-		    del_timer(&tp->delack_timer))
-			__sock_put(sk);
+		sk_stop_timer(sk, &tp->delack_timer);
 #endif
 		break;
 	default:
@@ -1030,15 +1026,13 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 	case TCP_TIME_PROBE0:
 		tp->pending = what;
 		tp->timeout = jiffies+when;
-		if (!mod_timer(&tp->retransmit_timer, tp->timeout))
-			sock_hold(sk);
+		sk_reset_timer(sk, &tp->retransmit_timer, tp->timeout);
 		break;
 
 	case TCP_TIME_DACK:
 		tp->ack.pending |= TCP_ACK_TIMER;
 		tp->ack.timeout = jiffies+when;
-		if (!mod_timer(&tp->delack_timer, tp->ack.timeout))
-			sock_hold(sk);
+		sk_reset_timer(sk, &tp->delack_timer, tp->ack.timeout);
 		break;
 
 	default:
