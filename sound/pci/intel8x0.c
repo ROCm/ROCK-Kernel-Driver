@@ -235,6 +235,7 @@ DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
 #define   ICH_P2INT		0x02000000	/* ICH4: PCM2-In interrupt */
 #define   ICH_M2INT		0x01000000	/* ICH4: Mic2-In interrupt */
 #define   ICH_SAMPLE_CAP	0x00c00000	/* ICH4: sample capability bits (RO) */
+#define   ICH_SAMPLE_16_20	0x00400000	/* ICH4: 16- and 20-bit samples */
 #define   ICH_MULTICHAN_CAP	0x00300000	/* ICH4: multi-channel capability bits (RO) */
 #define   ICH_MD3		0x00020000	/* modem power down semaphore */
 #define   ICH_AD3		0x00010000	/* audio power down semaphore */
@@ -378,6 +379,7 @@ typedef struct {
         unsigned int fragsize;
         unsigned int fragsize1;
         unsigned int position;
+	unsigned int pos_shift;
         int frags;
         int lvi;
         int lvi_frag;
@@ -441,7 +443,6 @@ struct _snd_intel8x0 {
 	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
-	unsigned int pcm_pos_shift;
 	
 #ifdef CONFIG_PM
 	int in_suspend;
@@ -719,10 +720,10 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 		for (idx = 0; idx < (ICH_REG_LVI_MASK + 1) * 2; idx += 4) {
 			bdbar[idx + 0] = cpu_to_le32(ichdev->physbuf);
 			bdbar[idx + 1] = cpu_to_le32(0x80000000 | /* interrupt on completion */
-						     ichdev->fragsize1 >> chip->pcm_pos_shift);
+						     ichdev->fragsize1 >> ichdev->pos_shift);
 			bdbar[idx + 2] = cpu_to_le32(ichdev->physbuf + (ichdev->size >> 1));
 			bdbar[idx + 3] = cpu_to_le32(0x80000000 | /* interrupt on completion */
-						     ichdev->fragsize1 >> chip->pcm_pos_shift);
+						     ichdev->fragsize1 >> ichdev->pos_shift);
 		}
 		ichdev->frags = 2;
 	} else {
@@ -731,7 +732,7 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 		for (idx = 0; idx < (ICH_REG_LVI_MASK + 1) * 2; idx += 2) {
 			bdbar[idx + 0] = cpu_to_le32(ichdev->physbuf + (((idx >> 1) * ichdev->fragsize) % ichdev->size));
 			bdbar[idx + 1] = cpu_to_le32(0x80000000 | /* interrupt on completion */
-						     ichdev->fragsize >> chip->pcm_pos_shift);
+						     ichdev->fragsize >> ichdev->pos_shift);
 			// printk("bdbar[%i] = 0x%x [0x%x]\n", idx + 0, bdbar[idx + 0], bdbar[idx + 1]);
 		}
 		ichdev->frags = ichdev->size / ichdev->fragsize;
@@ -981,7 +982,8 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 	return snd_pcm_lib_free_pages(substream);
 }
 
-static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
+static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
+				       int channels, int sample_bits)
 {
 	unsigned int cnt;
 	switch (chip->device_type) {
@@ -1005,7 +1007,7 @@ static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
 		break;
 	default:
 		cnt = igetdword(chip, ICHREG(GLOB_CNT));
-		cnt &= ~ICH_PCM_246_MASK;
+		cnt &= ~(ICH_PCM_246_MASK | ICH_PCM_20BIT);
 		if (chip->multi4 && channels == 4)
 			cnt |= ICH_PCM_4;
 		else if (chip->multi6 && channels == 6)
@@ -1016,6 +1018,9 @@ static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
 			 */
 			iputdword(chip, ICHREG(GLOB_CNT), (cnt & 0xcfffff));
 			mdelay(50); /* grrr... */
+		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
+			if (sample_bits > 16)
+				cnt |= ICH_PCM_20BIT;
 		}
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
 		break;
@@ -1033,8 +1038,12 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 	ichdev->fragsize = snd_pcm_lib_period_bytes(substream);
 	if (ichdev->ichd == ICHD_PCMOUT) {
 		spin_lock(&chip->reg_lock);
-		snd_intel8x0_setup_multi_channels(chip, runtime->channels);
+		snd_intel8x0_setup_pcm_out(chip, runtime->channels,
+					   runtime->sample_bits);
 		spin_unlock(&chip->reg_lock);
+		if (chip->device_type == DEVICE_INTEL_ICH4) {
+			ichdev->pos_shift = (runtime->sample_bits > 16) ? 2 : 1;
+		}
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
 	return 0;
@@ -1047,7 +1056,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 	unsigned long flags;
 	size_t ptr1, ptr;
 
-	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << chip->pcm_pos_shift;
+	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
 	if (ptr1 != 0)
 		ptr = ichdev->fragsize1 - ptr1;
 	else
@@ -1142,6 +1151,8 @@ static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
 		runtime->hw.channels_max = 4;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels4);
 	}
+	if (chip->smp20bit)
+		runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
 	return 0;
 }
 
@@ -1946,6 +1957,10 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		if (pbus->pcms[0].r[0].slots & (1 << AC97_SLOT_LFE))
 			chip->multi6 = 1;
 	}
+	if (chip->device_type == DEVICE_INTEL_ICH4) {
+		if ((igetdword(chip, ICHREG(GLOB_STA)) & ICH_SAMPLE_CAP) == ICH_SAMPLE_16_20)
+			chip->smp20bit = 1;
+	}
 	if (chip->device_type == DEVICE_NFORCE) {
 		/* 48kHz only */
 		chip->ichd[spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
@@ -2305,7 +2320,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	/* check the position */
 	pos = ichdev->fragsize1;
-	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << chip->pcm_pos_shift;
+	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
 	pos += ichdev->position;
 	do_gettimeofday(&stop_time);
 	/* stop */
@@ -2546,9 +2561,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		}
 		if (device_type == DEVICE_ALI)
 			ichdev->ali_slot = (ichdev->reg_offset - 0x40) / 0x10;
+		/* SIS7012 handles the pcm data in bytes, others are in samples */
+		ichdev->pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 	}
-	/* SIS7012 handles the pcm data in bytes, others are in words */
-	chip->pcm_pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 
 	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
 	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
