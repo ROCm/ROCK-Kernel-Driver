@@ -132,13 +132,20 @@ __change_page_attr(struct page *page, pgprot_t prot)
 	} else
 		BUG();
 
-	/* memleak and potential failed 2M page regeneration */
-	BUG_ON(!page_count(kpte_page));
+	/*
+	 * If the pte was reserved, it means it was created at boot
+	 * time (not via split_large_page) and in turn we must not
+	 * replace it with a largepage.
+	 */
+	if (!PageReserved(kpte_page)) {
+		/* memleak and potential failed 2M page regeneration */
+		BUG_ON(!page_count(kpte_page));
 
-	if (cpu_has_pse && (page_count(kpte_page) == 1)) {
-		list_add(&kpte_page->lru, &df_list);
-		revert_page(kpte_page, address);
-	} 
+		if (cpu_has_pse && (page_count(kpte_page) == 1)) {
+			list_add(&kpte_page->lru, &df_list);
+			revert_page(kpte_page, address);
+		}
+	}
 	return 0;
 } 
 

@@ -143,6 +143,9 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
 	} else
 		BUG();
 
+	/* on x86-64 the direct mapping set at boot is not using 4k pages */
+	BUG_ON(PageReserved(kpte_page));
+
 	switch (page_count(kpte_page)) {
 	case 1:
 		save_page(address, kpte_page); 		     
