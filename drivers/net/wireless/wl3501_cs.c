@@ -1444,7 +1444,7 @@ static int wl3501_close(struct net_device *dev)
 	unsigned long flags;
 	dev_link_t *link;
 
-	//spin_lock_irqsave(&this->lock, flags);
+	spin_lock_irqsave(&this->lock, flags);
 	/* Check if the device is in wl3501_dev_list */
 	for (link = wl3501_dev_list; link; link = link->next)
 		if (link->priv == dev)
@@ -1469,7 +1469,7 @@ static int wl3501_close(struct net_device *dev)
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 closed\n", dev->name);
 out:
-	//spin_unlock_irqrestore(&this->lock, flags);
+	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
 }
 
@@ -1487,7 +1487,7 @@ static int wl3501_reset(struct net_device *dev)
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = -ENODEV;
 
-	//spin_lock_irqsave(&this->lock, flags);
+	spin_lock_irqsave(&this->lock, flags);
 	/* Stop processing interrupt from the card */
 	wl3501_block_interrupt(this);
 
@@ -1515,7 +1515,7 @@ static int wl3501_reset(struct net_device *dev)
 	printk(KERN_INFO "%s: device reset\n", dev->name);
 	rc = 0;
 out:
-	//spin_unlock_irqrestore(&this->lock, flags);
+	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
 }
 
@@ -1600,7 +1600,7 @@ static int wl3501_open(struct net_device *dev)
 	unsigned long flags;
 	dev_link_t *link;
 
-	//spin_lock_irqsave(&this->lock, flags);
+	spin_lock_irqsave(&this->lock, flags);
 	/* Check if the device is in wl3501_dev_list */
 	for (link = wl3501_dev_list; link; link = link->next)
 		if (link->priv == dev)
@@ -1627,7 +1627,7 @@ static int wl3501_open(struct net_device *dev)
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 opened\n", dev->name);
 out:
-	//spin_unlock_irqrestore(&this->lock, flags);
+	spin_unlock_irqrestore(&this->lock, flags);
 	return rc;
 fail:
 	printk(KERN_WARNING "%s: Can't initialize firmware!\n", dev->name);
@@ -1692,11 +1692,11 @@ static void wl3501_set_multicast_list(struct net_device *dev)
 		/* Allow multicast */
 		filter |= RMR_ALL_MULTICAST;
 
-	//spin_lock_irqsave(&this->lock, flags);
+	spin_lock_irqsave(&this->lock, flags);
 	/* Must not be interrupted */
 	wl3501_set_mib_value(this, TYPE_EXTRA_MIB, IDX_RECEIVEMODE,
 			     &filter, sizeof(filter));
-	//spin_unlock_irqrestore(&this->lock, flags);
+	spin_unlock_irqrestore(&this->lock, flags);
 #endif
 }
 
@@ -2044,7 +2044,7 @@ static void wl3501_config(dev_link_t *link)
 	this->essid[2]		= 'A';
 	this->essid[3]		= 'N';
 	this->essid[4]		= 'Y';
-	//spin_lock_init(&this->lock);
+	spin_lock_init(&this->lock);
 
 	switch (this->freq_domain) {
 	case 0x31:
