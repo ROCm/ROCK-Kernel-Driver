@@ -1272,11 +1272,6 @@ running once the system is up.
 	specialix=	[HW,SERIAL] Specialix multi-serial port adapter
 			See Documentation/specialix.txt.
 
-	speedstep_coppermine=
-			[HW,IA-32] Take CPU in your notebook as SpeedStep-capable
-			See comment before function speedstep_setup() in
-			arch/i386/kernel/cpu/cpufreq/speedstep.c.
-
 	spia_io_base=	[HW,MTD]
 	spia_fio_base=
 	spia_pedr=
