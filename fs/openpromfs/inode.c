@@ -94,7 +94,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 	openprom_property *op;
 	char buffer[64];
 	
-	if (filp->f_pos >= 0xffffff)
+	if (filp->f_pos >= 0xffffff || count >= 0xffffff)
 		return -EINVAL;
 	if (!filp->private_data) {
 		node = nodes[(u16)((long)inode->u.generic_ip)].node;
@@ -282,11 +282,11 @@ static ssize_t property_read(struct file *filp, char *buf,
 		k += count;
 
 	} else if (op->flag & OPP_HEXSTRING) {
-		char buffer[8];
+		char buffer[3];
 
 		if ((k < i - 1) && (k & 1)) {
 			sprintf (buffer, "%02x",
-				 (unsigned) *(op->value + (k >> 1)) & 0xff);
+				 (unsigned char) *(op->value + (k >> 1)) & 0xff);
 			if (put_user(buffer[1], &buf[k++ - filp->f_pos]))
 				return -EFAULT;
 			count--;
@@ -294,7 +294,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 
 		for (; (count > 1) && (k < i - 1); k += 2) {
 			sprintf (buffer, "%02x",
-				 (unsigned) *(op->value + (k >> 1)) & 0xff);
+				 (unsigned char) *(op->value + (k >> 1)) & 0xff);
 			if (copy_to_user(buf + k - filp->f_pos, buffer, 2))
 				return -EFAULT;
 			count -= 2;
@@ -302,7 +302,7 @@ static ssize_t property_read(struct file *filp, char *buf,
 
 		if (count && (k < i - 1)) {
 			sprintf (buffer, "%02x",
-				 (unsigned) *(op->value + (k >> 1)) & 0xff);
+				 (unsigned char) *(op->value + (k >> 1)) & 0xff);
 			if (put_user(buffer[0], &buf[k++ - filp->f_pos]))
 				return -EFAULT;
 			count--;
@@ -327,7 +327,7 @@ static ssize_t property_write(struct file *filp, const char *buf,
 	void *b;
 	openprom_property *op;
 	
-	if ((filp->f_pos + count) >= 0xffffff)
+	if (filp->f_pos >= 0xffffff || count >= 0xffffff)
 		return -EINVAL;
 	if (!filp->private_data) {
 		i = property_read (filp, NULL, 0, 0);
