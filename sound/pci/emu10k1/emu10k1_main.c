@@ -674,6 +674,14 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	if (emu->serial == 0x40011102) {
 		emu->card_type = EMU10K1_CARD_EMUAPS;
 		emu->APS = 1;
+		emu->no_ac97 = 1; /* APS has no AC97 chip */
+	}
+	else if (emu->revision == 4 && emu->serial == 0x10051102) {
+		/* Audigy 2 EX has apparently no effective AC97 controls
+		 * (for both input and output), so we skip the AC97 detections
+		 */
+		snd_printdd(KERN_INFO "Audigy2 EX is detected. skpping ac97.\n");
+		emu->no_ac97 = 1;
 	}
 	
 	emu->fx8010.fxbus_mask = 0x303f;

@@ -518,6 +518,10 @@ int getput_index(int format)
 	int sign, width, endian;
 	sign = !snd_pcm_format_signed(format);
 	width = snd_pcm_format_width(format) / 8 - 1;
+	if (width < 0 || width > 3) {
+		snd_printk(KERN_ERR "snd-pcm-oss: invalid format %d\n", format);
+		width = 0;
+	}
 #ifdef SNDRV_LITTLE_ENDIAN
 	endian = snd_pcm_format_big_endian(format);
 #else

@@ -840,7 +840,7 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 	}
       if (IRQ_Channel == 0)
 	{
-	  BusLogic_Error("BusLogic: IRQ Channel %d illegal for "
+	  BusLogic_Error("BusLogic: IRQ Channel %d invalid for "
 			 "MultiMaster Host Adapter\n", NULL, IRQ_Channel);
 	  BusLogic_Error("at PCI Bus %d Device %d I/O Address 0x%X\n",
 			 NULL, Bus, Device, IO_Address);
@@ -1112,7 +1112,7 @@ static int BusLogic_InitializeFlashPointProbeInfo(BusLogic_HostAdapter_T
 	}
       if (IRQ_Channel == 0)
 	{
-	  BusLogic_Error("BusLogic: IRQ Channel %d illegal for "
+	  BusLogic_Error("BusLogic: IRQ Channel %d invalid for "
 			 "FlashPoint Host Adapter\n", NULL, IRQ_Channel);
 	  BusLogic_Error("at PCI Bus %d Device %d I/O Address 0x%X\n",
 			 NULL, Bus, Device, IO_Address);
@@ -4847,7 +4847,7 @@ static int __init BusLogic_ParseDriverOptions(char *OptionsString)
 		  break;
 		default:
 		  BusLogic_Error("BusLogic: Invalid Driver Options "
-				 "(illegal I/O Address 0x%X)\n",
+				 "(invalid I/O Address 0x%X)\n",
 				 NULL, IO_Address);
 		  return 0;
 		}
@@ -4877,7 +4877,7 @@ static int __init BusLogic_ParseDriverOptions(char *OptionsString)
 		  if (QueueDepth > BusLogic_MaxTaggedQueueDepth)
 		    {
 		      BusLogic_Error("BusLogic: Invalid Driver Options "
-				     "(illegal Queue Depth %d)\n",
+				     "(invalid Queue Depth %d)\n",
 				     NULL, QueueDepth);
 		      return 0;
 		    }
@@ -4911,7 +4911,7 @@ static int __init BusLogic_ParseDriverOptions(char *OptionsString)
 	      if (QueueDepth == 0 || QueueDepth > BusLogic_MaxTaggedQueueDepth)
 		{
 		  BusLogic_Error("BusLogic: Invalid Driver Options "
-				 "(illegal Queue Depth %d)\n",
+				 "(invalid Queue Depth %d)\n",
 				 NULL, QueueDepth);
 		  return 0;
 		}
@@ -5029,7 +5029,7 @@ static int __init BusLogic_ParseDriverOptions(char *OptionsString)
 	      if (BusSettleTime > 5 * 60)
 		{
 		  BusLogic_Error("BusLogic: Invalid Driver Options "
-				 "(illegal Bus Settle Time %d)\n",
+				 "(invalid Bus Settle Time %d)\n",
 				 NULL, BusSettleTime);
 		  return 0;
 		}

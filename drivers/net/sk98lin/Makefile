@@ -2,11 +2,32 @@
 # Makefile for the SysKonnect SK-98xx device driver.
 #
 
-obj-$(CONFIG_SK98LIN) += sk98lin.o
 
-sk98lin-objs := skge.o skaddr.o skgehwt.o skgeinit.o skgepnmi.o skgesirq.o \
-		ski2c.o sklm80.o skqueue.o skrlmt.o sktimer.o skvpd.o \
-		skxmac2.o skproc.o skcsum.o
+#
+# Standalone driver params
+# SKPARAM += -DSK_KERNEL_24
+# SKPARAM += -DSK_KERNEL_24_26
+# SKPARAM += -DSK_KERNEL_26
+# SKPARAM += -DSK_KERNEL_22_24
+
+obj-$(CONFIG_SK98LIN) += sk98lin.o
+sk98lin-objs    :=	\
+		skge.o		\
+		skdim.o		\
+		skaddr.o	\
+		skgehwt.o	\
+		skgeinit.o	\
+		skgepnmi.o	\
+		skgesirq.o	\
+		ski2c.o		\
+		sklm80.o	\
+		skqueue.o	\
+		skrlmt.o	\
+		sktimer.o	\
+		skvpd.o		\
+		skxmac2.o	\
+		skproc.o	\
+		skcsum.o
 
 # DBGDEF =  \
 # -DDEBUG
@@ -55,4 +76,13 @@ endif
 # SK_DBGCAT_DRV_INT_SRC         0x04000000      interrupts sources
 # SK_DBGCAT_DRV_EVENT           0x08000000      driver events
 
-EXTRA_CFLAGS += -Idrivers/net/sk98lin -DSK_USE_CSUM $(DBGDEF)
+EXTRA_CFLAGS += -Idrivers/net/sk98lin -DSK_USE_CSUM -DGENESIS -DYUKON $(DBGDEF) $(SKPARAM)
+
+clean:
+	rm -f core *.o *.a *.s
+
+
+
+
+
+

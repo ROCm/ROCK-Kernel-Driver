@@ -37,18 +37,12 @@ MODULE_DESCRIPTION("Memory allocator for ALSA system.");
 MODULE_LICENSE("GPL");
 
 
-/* so far, pre-defined allocation is only for hammerfall cards... */
-/* #define ENABLE_PREALLOC */
-
-
-#ifdef ENABLE_PREALLOC
 #ifndef SNDRV_CARDS
 #define SNDRV_CARDS	8
 #endif
 static int enable[8] = {[0 ... (SNDRV_CARDS-1)] = 1};
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
-#endif
 
 
 /*
@@ -154,6 +148,7 @@ static int compare_device(const struct snd_dma_device *a, const struct snd_dma_d
 		return a->dev.flags == b->dev.flags;
 #ifdef CONFIG_PCI
 	case SNDRV_DMA_TYPE_PCI:
+	case SNDRV_DMA_TYPE_PCI_SG:
 		return a->dev.pci == b->dev.pci;
 #endif
 #ifdef CONFIG_SBUS
@@ -336,7 +331,7 @@ int snd_dma_free_reserved(const struct snd_dma_device *dev)
  * and replaced with the new one.
  *
  * When NULL buffer pointer or zero buffer size is given, the existing
- * release buffer is released and the entry is removed.
+ * buffer is released and the entry is removed.
  * 
  * Returns zero if successful, or a negative code at error.
  */
@@ -785,7 +780,6 @@ void snd_free_sbus_pages(struct sbus_dev *sdev,
 #endif /* CONFIG_SBUS */
 
 
-#ifdef ENABLE_PREALLOC
 /*
  * allocation of buffers for pre-defined devices
  */
@@ -861,7 +855,6 @@ static void __init preallocate_cards(void)
 		}
 	}
 }
-#endif
 
 
 #ifdef CONFIG_PROC_FS
@@ -873,9 +866,56 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 {
 	int len = 0;
 	long pages = snd_allocated_pages >> (PAGE_SHIFT-12);
+	struct list_head *p;
+	struct snd_mem_list *mem;
+	int devno;
 
+	down(&list_mutex);
 	len += sprintf(page + len, "pages  : %li bytes (%li pages per %likB)\n",
 		       pages * PAGE_SIZE, pages, PAGE_SIZE / 1024);
+	devno = 0;
+	list_for_each(p, &mem_list_head) {
+		mem = list_entry(p, struct snd_mem_list, list);
+		devno++;
+		len += sprintf(page + len, "buffer %d : ", devno);
+		if (mem->dev.id == SNDRV_DMA_DEVICE_UNUSED)
+			len += sprintf(page + len, "UNUSED");
+		else
+			len += sprintf(page + len, "ID %08x", mem->dev.id);
+		len += sprintf(page + len, " : type ");
+		switch (mem->dev.type) {
+		case SNDRV_DMA_TYPE_CONTINUOUS:
+			len += sprintf(page + len, "CONT [%x]", mem->dev.dev.flags);
+			break;
+#ifdef CONFIG_PCI
+		case SNDRV_DMA_TYPE_PCI:
+		case SNDRV_DMA_TYPE_PCI_SG:
+			if (mem->dev.dev.pci) {
+				len += sprintf(page + len, "PCI [%04x:%04x]",
+					       mem->dev.dev.pci->vendor,
+					       mem->dev.dev.pci->device);
+			}
+			break;
+#endif
+#ifdef CONFIG_ISA
+		case SNDRV_DMA_TYPE_ISA:
+			len += sprintf(page + len, "ISA [%x]", mem->dev.dev.flags);
+			break;
+#endif
+#ifdef CONFIG_SBUS
+		case SNDRV_DMA_TYPE_SBUS:
+			len += sprintf(page + len, "SBUS [%x]", mem->dev.dev.sbus->slot);
+			break;
+#endif
+		default:
+			len += sprintf(page + len, "UNKNOWN");
+			break;
+		}
+		len += sprintf(page + len, "\n  addr = 0x%lx, size = %d bytes, used = %s\n",
+			       (unsigned long)mem->buffer.addr, (int)mem->buffer.bytes,
+			       mem->used ? "yes" : "no");
+	}
+	up(&list_mutex);
 	return len;
 }
 #endif /* CONFIG_PROC_FS */
@@ -886,10 +926,10 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 
 static int __init snd_mem_init(void)
 {
+#ifdef CONFIG_PROC_FS
 	create_proc_read_entry("driver/snd-page-alloc", 0, 0, snd_mem_proc_read, NULL);
-#ifdef ENABLE_PREALLOC
-	preallocate_cards();
 #endif
+	preallocate_cards();
 	return 0;
 }
 
@@ -905,6 +945,25 @@ static void __exit snd_mem_exit(void)
 module_init(snd_mem_init)
 module_exit(snd_mem_exit)
 
+
+#ifndef MODULE
+
+/* format is: snd-page-alloc=enable */
+
+static int __init snd_mem_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&enable[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-page-alloc=", snd_mem_setup);
+
+#endif
 
 /*
  * exports

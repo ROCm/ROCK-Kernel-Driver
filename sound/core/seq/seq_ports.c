@@ -352,6 +352,11 @@ int snd_seq_set_port_info(client_port_t * port, snd_seq_port_info_t * info)
 	port->midi_voices = info->midi_voices;
 	port->synth_voices = info->synth_voices;
 
+	/* timestamping */
+	port->timestamping = (info->flags & SNDRV_SEQ_PORT_FLG_TIMESTAMP) ? 1 : 0;
+	port->time_real = (info->flags & SNDRV_SEQ_PORT_FLG_TIME_REAL) ? 1 : 0;
+	port->time_queue = info->time_queue;
+
 	return 0;
 }
 
@@ -378,6 +383,15 @@ int snd_seq_get_port_info(client_port_t * port, snd_seq_port_info_t * info)
 	info->read_use = port->c_src.count;
 	info->write_use = port->c_dest.count;
 	
+	/* timestamping */
+	info->flags = 0;
+	if (port->timestamping) {
+		info->flags |= SNDRV_SEQ_PORT_FLG_TIMESTAMP;
+		if (port->time_real)
+			info->flags |= SNDRV_SEQ_PORT_FLG_TIME_REAL;
+		info->time_queue = port->time_queue;
+	}
+
 	return 0;
 }
 

@@ -1616,8 +1616,40 @@ static void schizo_pbm_strbuf_init(struct pci_pbm_info *pbm)
 static void schizo_pbm_iommu_init(struct pci_pbm_info *pbm)
 {
 	struct pci_iommu *iommu = pbm->iommu;
-	unsigned long tsbbase, i, tagbase, database;
+	unsigned long tsbbase, i, tagbase, database, order;
+	u32 vdma[2], dma_mask;
 	u64 control;
+	int err, tsbsize;
+
+	err = prom_getproperty(pbm->prom_node, "virtual-dma",
+			       (char *)&vdma[0], sizeof(vdma));
+	if (err == 0 || err == -1) {
+		/* No property, use default values. */
+		vdma[0] = 0xc0000000;
+		vdma[1] = 0x40000000;
+	}
+
+	dma_mask = vdma[0];
+	switch (vdma[1]) {
+		case 0x20000000:
+			dma_mask |= 0x1fffffff;
+			tsbsize = 64;
+			break;
+
+		case 0x40000000:
+			dma_mask |= 0x3fffffff;
+			tsbsize = 128;
+			break;
+
+		case 0x80000000:
+			dma_mask |= 0x7fffffff;
+			tsbsize = 128;
+			break;
+
+		default:
+			prom_printf("SCHIZO: strange virtual-dma size.\n");
+			prom_halt();
+	};
 
 	/* Setup initial software IOMMU state. */
 	spin_lock_init(&iommu->lock);
@@ -1656,16 +1688,32 @@ static void schizo_pbm_iommu_init(struct pci_pbm_info *pbm)
 	 * table (128K ioptes * 8 bytes per iopte).  This is
 	 * page order 7 on UltraSparc.
 	 */
-	tsbbase = __get_free_pages(GFP_KERNEL, get_order(IO_TSB_SIZE));
+	order = get_order(tsbsize * 8 * 1024);
+	tsbbase = __get_free_pages(GFP_KERNEL, order);
 	if (!tsbbase) {
 		prom_printf("%s: Error, gfp(tsb) failed.\n", pbm->name);
 		prom_halt();
 	}
+
 	iommu->page_table = (iopte_t *)tsbbase;
-	iommu->page_table_sz_bits = 17;
-	iommu->page_table_map_base = 0xc0000000;
-	iommu->dma_addr_mask = 0xffffffff;
-	memset((char *)tsbbase, 0, IO_TSB_SIZE);
+	iommu->page_table_map_base = vdma[0];
+	iommu->dma_addr_mask = dma_mask;
+	memset((char *)tsbbase, 0, PAGE_SIZE << order);
+
+	switch (tsbsize) {
+	case 64:
+		iommu->page_table_sz_bits = 16;
+		break;
+
+	case 128:
+		iommu->page_table_sz_bits = 17;
+		break;
+
+	default:
+		prom_printf("iommu_init: Illegal TSB size %d\n", tsbsize);
+		prom_halt();
+		break;
+	};
 
 	/* We start with no consistent mappings. */
 	iommu->lowest_consistent_map =
@@ -1680,7 +1728,16 @@ static void schizo_pbm_iommu_init(struct pci_pbm_info *pbm)
 
 	control = schizo_read(iommu->iommu_control);
 	control &= ~(SCHIZO_IOMMU_CTRL_TSBSZ | SCHIZO_IOMMU_CTRL_TBWSZ);
-	control |= (SCHIZO_IOMMU_TSBSZ_128K | SCHIZO_IOMMU_CTRL_ENAB);
+	switch (tsbsize) {
+	case 64:
+		control |= SCHIZO_IOMMU_TSBSZ_64K;
+		break;
+	case 128:
+		control |= SCHIZO_IOMMU_TSBSZ_128K;
+		break;
+	};
+
+	control |= SCHIZO_IOMMU_CTRL_ENAB;
 	schizo_write(iommu->iommu_control, control);
 }
 

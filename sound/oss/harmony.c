@@ -1296,7 +1296,6 @@ static void __exit cleanup_harmony(void)
 	unregister_parisc_driver(&harmony_driver);
 }
 
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Alex DeVries <alex@linuxcare.com>");
 MODULE_DESCRIPTION("Harmony sound driver");

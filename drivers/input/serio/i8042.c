@@ -59,6 +59,7 @@ static struct serio i8042_aux_port;
 static unsigned char i8042_initial_ctr;
 static unsigned char i8042_ctr;
 static unsigned char i8042_last_e0;
+static unsigned char i8042_last_release;
 static unsigned char i8042_mux_open;
 struct timer_list i8042_timer;
 
@@ -406,15 +407,22 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		if (data > 0x7f) {
 			unsigned char index = (data & 0x7f) | (i8042_last_e0 << 7);
+			/* work around hardware that doubles key releases */
+			if (index == i8042_last_release) {
+				dbg("i8042 skipped double release (%d)\n", index);
+				continue;
+			}
 			if (index == 0xaa || index == 0xb6)
 				set_bit(index, i8042_unxlate_seen);
 			if (test_and_clear_bit(index, i8042_unxlate_seen)) {
 				serio_interrupt(&i8042_kbd_port, 0xf0, dfl, regs);
 				data = i8042_unxlate_table[data & 0x7f];
+				i8042_last_release = index;
 			}
 		} else {
 			set_bit(data | (i8042_last_e0 << 7), i8042_unxlate_seen);
 			data = i8042_unxlate_table[data];
+			i8042_last_release = 0;
 		}
 
 		i8042_last_e0 = (data == 0xe0);

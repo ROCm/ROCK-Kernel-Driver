@@ -664,7 +664,7 @@ static int pms_capture(struct pms_device *dev, char *buf, int rgb555, int count)
 				dt=count-len;
 			cnt += dev->height;
 			if (copy_to_user(buf, tmp+32, dt))
-				return -EFAULT;
+				return len ? len : -EFAULT;
 			buf += dt;    
 			len += dt;
 		}

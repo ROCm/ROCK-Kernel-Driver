@@ -521,6 +521,32 @@ static int bounce_error_event(client_t *client, snd_seq_event_t *event,
 
 
 /*
+ * rewrite the time-stamp of the event record with the curren time
+ * of the given queue.
+ * return non-zero if updated.
+ */
+static int update_timestamp_of_queue(snd_seq_event_t *event, int queue, int real_time)
+{
+	queue_t *q;
+
+	q = queueptr(queue);
+	if (! q)
+		return 0;
+	event->queue = queue;
+	event->flags &= ~SNDRV_SEQ_TIME_STAMP_MASK;
+	if (real_time) {
+		event->time.time = snd_seq_timer_get_cur_time(q->timer);
+		event->flags |= SNDRV_SEQ_TIME_STAMP_REAL;
+	} else {
+		event->time.tick = snd_seq_timer_get_cur_tick(q->timer);
+		event->flags |= SNDRV_SEQ_TIME_STAMP_TICK;
+	}
+	queuefree(q);
+	return 1;
+}
+
+
+/*
  * deliver an event to the specified destination.
  * if filter is non-zero, client filter bitmap is tested.
  *
@@ -551,6 +577,10 @@ static int snd_seq_deliver_single_event(client_t *client,
 		goto __skip;
 	}
 		
+	if (dest_port->timestamping)
+		update_timestamp_of_queue(event, dest_port->time_queue,
+					  dest_port->time_real);
+
 	/* expand the quoted event */
 	if (event->type == SNDRV_SEQ_EVENT_KERNEL_QUOTE) {
 		quoted = 1;
@@ -597,27 +627,6 @@ static int snd_seq_deliver_single_event(client_t *client,
 }
 
 
-static void snd_seq_subs_update_event_header(subscribers_t *subs, snd_seq_event_t *event)
-{
-	if (subs->info.flags & SNDRV_SEQ_PORT_SUBS_TIMESTAMP) {
-		/* convert time according to flag with subscription */
-		queue_t *q;
-		q = queueptr(subs->info.queue);
-		if (q) {
-			event->queue = subs->info.queue;
-			event->flags &= ~SNDRV_SEQ_TIME_STAMP_MASK;
-			if (subs->info.flags & SNDRV_SEQ_PORT_SUBS_TIME_REAL) {
-				event->time.time = snd_seq_timer_get_cur_time(q->timer);
-				event->flags |= SNDRV_SEQ_TIME_STAMP_REAL;
-			} else {
-				event->time.tick = snd_seq_timer_get_cur_tick(q->timer);
-				event->flags |= SNDRV_SEQ_TIME_STAMP_TICK;
-			}
-			queuefree(q);
-		}
-	}
-}
-
 /*
  * send the event to all subscribers:
  */
@@ -647,7 +656,10 @@ static int deliver_to_subscribers(client_t *client,
 	list_for_each(p, &grp->list_head) {
 		subs = list_entry(p, subscribers_t, src_list);
 		event->dest = subs->info.dest;
-		snd_seq_subs_update_event_header(subs, event);
+		if (subs->info.flags & SNDRV_SEQ_PORT_SUBS_TIMESTAMP)
+			/* convert time according to flag with subscription */
+			update_timestamp_of_queue(event, subs->info.queue,
+						  subs->info.flags & SNDRV_SEQ_PORT_SUBS_TIME_REAL);
 		err = snd_seq_deliver_single_event(client, event,
 						   0, atomic, hop);
 		if (err < 0)

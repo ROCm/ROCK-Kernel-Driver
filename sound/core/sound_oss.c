@@ -23,7 +23,7 @@
 
 #ifdef CONFIG_SND_OSSEMUL
 
-#if !defined(CONFIG_SOUND) && !defined(CONFIG_SOUND_MODULE)
+#if !defined(CONFIG_SOUND) && !(defined(MODULE) && defined(CONFIG_SOUND_MODULE))
 #error "Enable the OSS soundcore multiplexer (CONFIG_SOUND) in the kernel."
 #endif
 

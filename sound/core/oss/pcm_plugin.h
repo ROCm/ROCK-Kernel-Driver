@@ -106,6 +106,7 @@ typedef struct _snd_pcm_channel_area {
 typedef struct _snd_pcm_plugin_channel {
 	void *aptr;			/* pointer to the allocated area */
 	snd_pcm_channel_area_t area;
+	snd_pcm_uframes_t frames;	/* allocated frames */
 	unsigned int enabled:1;		/* channel need to be processed */
 	unsigned int wanted:1;		/* channel is wanted */
 } snd_pcm_plugin_channel_t;

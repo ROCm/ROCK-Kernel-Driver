@@ -1437,7 +1437,7 @@ static int snd_rawmidi_dev_free(snd_device_t *device)
 	return snd_rawmidi_free(rmidi);
 }
 
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 static void snd_rawmidi_dev_seq_free(snd_seq_device_t *device)
 {
 	snd_rawmidi_t *rmidi = snd_magic_cast(snd_rawmidi_t, device->private_data, return);
@@ -1513,7 +1513,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 		}
 	}
 	rmidi->proc_entry = entry;
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (!rmidi->ops || !rmidi->ops->dev_register) { /* own registration mechanism */
 		if (snd_seq_device_new(rmidi->card, rmidi->device, SNDRV_SEQ_DEV_ID_MIDISYNTH, 0, &rmidi->seq_dev) >= 0) {
 			rmidi->seq_dev->private_data = rmidi;
@@ -1568,7 +1568,7 @@ static int snd_rawmidi_dev_unregister(snd_device_t *device)
 		rmidi->ops->dev_unregister(rmidi);
 	snd_unregister_device(SNDRV_DEVICE_TYPE_RAWMIDI, rmidi->card, rmidi->device);
 	up(&register_mutex);
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (rmidi->seq_dev) {
 		snd_device_free(rmidi->card, rmidi->seq_dev);
 		rmidi->seq_dev = NULL;
@@ -1629,6 +1629,26 @@ static void __exit alsa_rawmidi_exit(void)
 
 module_init(alsa_rawmidi_init)
 module_exit(alsa_rawmidi_exit)
+
+#ifndef MODULE
+#ifdef CONFIG_SND_OSSEMUL
+/* format is: snd-rawmidi=midi_map,amidi_map */
+
+static int __init alsa_rawmidi_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&midi_map[nr_dev]) == 2 &&
+	       get_option(&str,&amidi_map[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-rawmidi=", alsa_rawmidi_setup);
+#endif /* CONFIG_SND_OSSEMUL */
+#endif /* ifndef MODULE */
 
 EXPORT_SYMBOL(snd_rawmidi_output_params);
 EXPORT_SYMBOL(snd_rawmidi_input_params);

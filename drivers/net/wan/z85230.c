@@ -890,12 +890,12 @@ int z8530_sync_dma_open(struct net_device *dev, struct z8530_channel *c)
 	if(c->mtu  > PAGE_SIZE/2)
 		return -EMSGSIZE;
 	 
-	c->rx_buf[0]=(void *)get_zeroed_page(GFP_KERNEL|GFP_DMA);
+	c->rx_buf[0]=(void *)get_free_page(GFP_KERNEL|GFP_DMA);
 	if(c->rx_buf[0]==NULL)
 		return -ENOBUFS;
 	c->rx_buf[1]=c->rx_buf[0]+PAGE_SIZE/2;
 	
-	c->tx_dma_buf[0]=(void *)get_zeroed_page(GFP_KERNEL|GFP_DMA);
+	c->tx_dma_buf[0]=(void *)get_free_page(GFP_KERNEL|GFP_DMA);
 	if(c->tx_dma_buf[0]==NULL)
 	{
 		free_page((unsigned long)c->rx_buf[0]);
@@ -1080,7 +1080,7 @@ int z8530_sync_txdma_open(struct net_device *dev, struct z8530_channel *c)
 	if(c->mtu  > PAGE_SIZE/2)
 		return -EMSGSIZE;
 	 
-	c->tx_dma_buf[0]=(void *)get_zeroed_page(GFP_KERNEL|GFP_DMA);
+	c->tx_dma_buf[0]=(void *)get_free_page(GFP_KERNEL|GFP_DMA);
 	if(c->tx_dma_buf[0]==NULL)
 		return -ENOBUFS;
 
@@ -1261,7 +1261,6 @@ static int do_z8530_init(struct z8530_dev *dev)
 	dev->chanB.dcdcheck=DCD;
 
 	/* Set up the chip level lock */
-	spin_lock_init(&dev->lock);
 	dev->chanA.lock = &dev->lock;
 	dev->chanB.lock = &dev->lock;
 
@@ -1452,7 +1451,6 @@ static void z8530_tx_begin(struct z8530_channel *c)
 	c->tx_next_skb=NULL;
 	c->tx_ptr=c->tx_next_ptr;
 	
-	netif_wake_queue(c->netdevice);
 	if(c->tx_skb==NULL)
 	{
 		/* Idle on */
@@ -1514,7 +1512,6 @@ static void z8530_tx_begin(struct z8530_channel *c)
 			/* ABUNDER off */
 			write_zsreg(c, R10, c->regs[10]);
 			write_zsctrl(c, RES_Tx_CRC);
-//???			write_zsctrl(c, RES_EOM_L);
 	
 			while(c->txcount && (read_zsreg(c,R0)&Tx_BUF_EMP))
 			{		
@@ -1524,6 +1521,10 @@ static void z8530_tx_begin(struct z8530_channel *c)
 
 		}
 	}
+	/*
+	 *	Since we emptied tx_skb we can ask for more
+	 */
+	netif_wake_queue(c->netdevice);
 }
 
 /**
@@ -1541,7 +1542,6 @@ static void z8530_tx_done(struct z8530_channel *c)
 {
 	struct sk_buff *skb;
 
-	netif_wake_queue(c->netdevice);
 	/* Actually this can happen.*/
 	if(c->tx_skb==NULL)
 		return;
@@ -1635,7 +1635,7 @@ static void z8530_rx_done(struct z8530_channel *c)
 			write_zsreg(c, R0, RES_Rx_CRC);
 		}
 		else
-			/* Can't occur as we don't reenable the DMA irq until
+			/* Can't occur as we dont reenable the DMA irq until
 			   after the flip is done */
 			printk(KERN_WARNING "%s: DMA flip overrun!\n", c->netdevice->name);
 			
@@ -1796,7 +1796,6 @@ int z8530_queue_xmit(struct z8530_channel *c, struct sk_buff *skb)
 	z8530_tx_begin(c);
 	spin_unlock_irqrestore(c->lock, flags);
 	
-	netif_wake_queue(c->netdevice);
 	return 0;
 }
 

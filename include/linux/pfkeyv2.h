@@ -245,6 +245,7 @@ struct sadb_x_nat_t_port {
 
 /* Security Association flags */
 #define SADB_SAFLAGS_PFS	1
+#define SADB_SAFLAGS_NOECN	0x80000000
 
 /* Security Association states */
 #define SADB_SASTATE_LARVAL	0

@@ -288,9 +288,9 @@ static int sound_release(struct inode *inode, struct file *file)
 static int get_mixer_info(int dev, caddr_t arg)
 {
 	mixer_info info;
-
-	strncpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
-	strncpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
+	memset(&info, 0, sizeof(info));
+	strlcpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
+	strlcpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
 	info.modify_counter = mixer_devs[dev]->modify_counter;
 	if (__copy_to_user(arg, &info,  sizeof(info)))
 		return -EFAULT;
@@ -300,9 +300,9 @@ static int get_mixer_info(int dev, caddr_t arg)
 static int get_old_mixer_info(int dev, caddr_t arg)
 {
 	_old_mixer_info info;
-
- 	strncpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
- 	strncpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
+	memset(&info, 0, sizeof(info));
+ 	strlcpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
+ 	strlcpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
  	if (copy_to_user(arg, &info,  sizeof(info)))
 		return -EFAULT;
 	return 0;

@@ -819,7 +819,7 @@ static int __init eepro_probe1(struct net_device *dev, short ioaddr)
 					}
 				}
 				if (dev->irq < 2) {
-			printk(KERN_ERR " Duh! illegal interrupt vector stored in EEPROM.\n");
+			printk(KERN_ERR " Duh! invalid interrupt vector stored in EEPROM.\n");
 			retval = -ENODEV;
 			goto freeall;
 				} else

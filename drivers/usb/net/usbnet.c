@@ -890,7 +890,7 @@ static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 	le32_to_cpus (&header->packet_count);
 	if ((header->packet_count > GL_MAX_TRANSMIT_PACKETS)
 			|| (header->packet_count < 0)) {
-		dbg ("genelink: illegal received packet count %d",
+		dbg ("genelink: invalid received packet count %d",
 			header->packet_count);
 		return 0;
 	}
@@ -907,7 +907,7 @@ static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 
 		// this may be a broken packet
 		if (size > GL_MAX_PACKET_LEN) {
-			dbg ("genelink: illegal rx length %d", size);
+			dbg ("genelink: invalid rx length %d", size);
 			return 0;
 		}
 
@@ -943,7 +943,7 @@ static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 	skb_pull (skb, 4);
 
 	if (skb->len > GL_MAX_PACKET_LEN) {
-		dbg ("genelink: illegal rx length %d", skb->len);
+		dbg ("genelink: invalid rx length %d", skb->len);
 		return 0;
 	}
 	return 1;
@@ -2769,6 +2769,15 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceSubClass = 0x0a,
 	.bInterfaceProtocol = 0x00,
 	.driver_info =  (unsigned long) &zaurus_slc700_info,
+}, {
+	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
+		 | USB_DEVICE_ID_MATCH_DEVICE,
+	.idVendor               = 0x04DD,
+	.idProduct              = 0x9031,
+	.bInterfaceClass        = 0x02,
+	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceProtocol     = 0x00,
+	.driver_info =  (unsigned long) &zaurus_sla300_info,
 },
 #endif
 

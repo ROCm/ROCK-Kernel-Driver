@@ -23,6 +23,7 @@
 #include <asm/io.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include "burgundy.h"
@@ -34,17 +35,27 @@
 inline static void
 snd_pmac_burgundy_busy_wait(pmac_t *chip)
 {
-	while (in_le32(&chip->awacs->codec_ctrl) & MASK_NEWECMD)
-		;
+	int timeout = 50;
+	while ((in_le32(&chip->awacs->codec_ctrl) & MASK_NEWECMD) && timeout--)
+		udelay(1);
+	if (! timeout)
+		printk(KERN_DEBUG "burgundy_busy_wait: timeout\n");
 }
 
 inline static void
 snd_pmac_burgundy_extend_wait(pmac_t *chip)
 {
-	while (!(in_le32(&chip->awacs->codec_stat) & MASK_EXTEND))
-		;
-	while (in_le32(&chip->awacs->codec_stat) & MASK_EXTEND)
-		;
+	int timeout;
+	timeout = 50;
+	while (!(in_le32(&chip->awacs->codec_stat) & MASK_EXTEND) && timeout--)
+		udelay(1);
+	if (! timeout)
+		printk(KERN_DEBUG "burgundy_extend_wait: timeout #1\n");
+	timeout = 50;
+	while ((in_le32(&chip->awacs->codec_stat) & MASK_EXTEND) && timeout--)
+		udelay(1);
+	if (! timeout)
+		printk(KERN_DEBUG "burgundy_extend_wait: timeout #2\n");
 }
 
 static void
@@ -66,7 +77,6 @@ snd_pmac_burgundy_rcw(pmac_t *chip, unsigned addr)
 	unsigned val = 0;
 	unsigned long flags;
 
-	/* should have timeouts here */
 	spin_lock_irqsave(&chip->reg_lock, flags);
 
 	out_le32(&chip->awacs->codec_ctrl, addr + 0x100000);
@@ -107,7 +117,6 @@ snd_pmac_burgundy_rcb(pmac_t *chip, unsigned int addr)
 	unsigned val = 0;
 	unsigned long flags;
 
-	/* should have timeouts here */
 	spin_lock_irqsave(&chip->reg_lock, flags);
 
 	out_le32(&chip->awacs->codec_ctrl, addr + 0x100000);

@@ -311,7 +311,7 @@ inline	const struct  key * get_lkey  (
   struct buffer_head  * p_s_parent;
   
   RFALSE( n_path_offset < FIRST_PATH_ELEMENT_OFFSET, 
-	  "PAP-5010: illegal offset in the path");
+	  "PAP-5010: invalid offset in the path");
 
   /* While not higher in path than first element. */
   while ( n_path_offset-- > FIRST_PATH_ELEMENT_OFFSET ) {
@@ -351,7 +351,7 @@ inline	const struct  key * get_rkey  (
   struct buffer_head  * p_s_parent;
 
   RFALSE( n_path_offset < FIRST_PATH_ELEMENT_OFFSET,
-	  "PAP-5030: illegal offset in the path");
+	  "PAP-5030: invalid offset in the path");
 
   while ( n_path_offset-- > FIRST_PATH_ELEMENT_OFFSET ) {
 
@@ -393,7 +393,7 @@ static  inline  int key_in_buffer (
 
   RFALSE( ! p_s_key || p_s_chk_path->path_length < FIRST_PATH_ELEMENT_OFFSET ||
 	  p_s_chk_path->path_length > MAX_HEIGHT,
-	  "PAP-5050: pointer to the key(%p) is NULL or illegal path length(%d)",
+	  "PAP-5050: pointer to the key(%p) is NULL or invalid path length(%d)",
 	  p_s_key, p_s_chk_path->path_length);
   RFALSE( !PATH_PLAST_BUFFER(p_s_chk_path)->b_bdev,
 	  "PAP-5060: device must not be NODEV");
@@ -430,7 +430,7 @@ void decrement_counters_in_path (
 
   RFALSE( n_path_offset < ILLEGAL_PATH_ELEMENT_OFFSET ||
 	  n_path_offset > EXTENDED_MAX_HEIGHT - 1,
-	  "PAP-5080: illegal path offset of %d", n_path_offset);
+	  "PAP-5080: invalid path offset of %d", n_path_offset);
 
   while ( n_path_offset > ILLEGAL_PATH_ELEMENT_OFFSET ) {
     struct buffer_head * bh;
@@ -461,7 +461,7 @@ void  pathrelse_and_restore (
   int n_path_offset = p_s_search_path->path_length;
 
   RFALSE( n_path_offset < ILLEGAL_PATH_ELEMENT_OFFSET, 
-	  "clm-4000: illegal path offset");
+	  "clm-4000: invalid path offset");
   
   while ( n_path_offset > ILLEGAL_PATH_ELEMENT_OFFSET )  {
     reiserfs_restore_prepared_buffer(s, PATH_OFFSET_PBUFFER(p_s_search_path, 
@@ -478,7 +478,7 @@ void  pathrelse (
   int n_path_offset = p_s_search_path->path_length;
 
   RFALSE( n_path_offset < ILLEGAL_PATH_ELEMENT_OFFSET,
-	  "PAP-5090: illegal path offset");
+	  "PAP-5090: invalid path offset");
   
   while ( n_path_offset > ILLEGAL_PATH_ELEMENT_OFFSET )  
     brelse(PATH_OFFSET_PBUFFER(p_s_search_path, n_path_offset--));
@@ -1044,7 +1044,7 @@ static char  prepare_for_delete_or_cut(
 
 	    RFALSE( ! is_indirect_le_ih(&s_ih) || ! n_unfm_number ||
 		    pos_in_item (p_s_path) + 1 !=  n_unfm_number,
-		    "PAP-5240: illegal item %h "
+		    "PAP-5240: invalid item %h "
 		    "n_unfm_number = %d *p_n_pos_in_item = %d", 
 		    &s_ih, n_unfm_number, pos_in_item (p_s_path));
 
@@ -1065,7 +1065,7 @@ static char  prepare_for_delete_or_cut(
 		    pos_in_item (p_s_path) = (n_new_file_length + n_blk_size - le_ih_k_offset (&s_ih) ) >> p_s_sb->s_blocksize_bits;
 
 		    RFALSE( pos_in_item (p_s_path) > n_unfm_number,
-			    "PAP-5250: illegal position in the item");
+			    "PAP-5250: invalid position in the item");
 
 		    /* Either convert last unformatted node of indirect item to direct item or increase
 		       its free space.  */
@@ -1081,7 +1081,7 @@ static char  prepare_for_delete_or_cut(
 	    }
 
 	    RFALSE( n_unfm_number <= pos_in_item (p_s_path),
-		    "PAP-5260: illegal position in the indirect item");
+		    "PAP-5260: invalid position in the indirect item");
 
 	    /* pointers to be cut */
 	    n_unfm_number -= pos_in_item (p_s_path);
@@ -1573,7 +1573,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
     /* go ahead and perform balancing */
     
-    RFALSE( c_mode == M_PASTE || c_mode == M_INSERT, "illegal mode");
+    RFALSE( c_mode == M_PASTE || c_mode == M_INSERT, "invalid mode");
 
     /* Calculate number of bytes that need to be cut from the item. */
     if (retval2 == -1)
