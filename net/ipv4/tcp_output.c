@@ -566,8 +566,6 @@ static unsigned char *__pskb_trim_head(struct sk_buff *skb, int len)
 
 int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
-
 	if (skb_cloned(skb) &&
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 		return -ENOMEM;
@@ -590,7 +588,7 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 	/* Any change of skb->len requires recalculation of tso
 	 * factor and mss.
 	 */
-	tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
+	tcp_set_skb_tso_segs(skb, tcp_skb_mss(skb));
 
 	return 0;
 }
