@@ -865,12 +865,21 @@ static task_t *copy_process(unsigned long clone_flags,
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
 
-	p->it_real_value = p->it_virt_value = p->it_prof_value = 0;
-	p->it_real_incr = p->it_virt_incr = p->it_prof_incr = 0;
+	p->it_real_value = 0;
+	p->it_real_incr = 0;
+	p->it_virt_value = 0;
+	p->it_virt_incr = 0;
+	p->it_prof_value = 0;
+	p->it_prof_incr = 0;
 	init_timer(&p->real_timer);
 	p->real_timer.data = (unsigned long) p;
 
-	p->utime = p->stime = 0;
+	p->utime = 0;
+	p->stime = 0;
+	p->rchar = 0;		/* I/O counter: bytes read */
+	p->wchar = 0;		/* I/O counter: bytes written */
+	p->syscr = 0;		/* I/O counter: read syscalls */
+	p->syscw = 0;		/* I/O counter: write syscalls */
 	p->lock_depth = -1;		/* -1 = no lock */
 	do_posix_clock_monotonic_gettime(&p->start_time);
 	p->security = NULL;

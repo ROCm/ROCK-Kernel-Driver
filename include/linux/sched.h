@@ -660,6 +660,8 @@ struct task_struct {
  * to a stack based synchronous wait) if its doing sync IO.
  */
 	wait_queue_t *io_wait;
+/* i/o counters(bytes read/written, #syscalls */
+	u64 rchar, wchar, syscr, syscw;
 #ifdef CONFIG_NUMA
   	struct mempolicy *mempolicy;
   	short il_next;		/* could be shared with used_math */
