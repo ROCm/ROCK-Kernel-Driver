@@ -19,8 +19,8 @@
  
 #ifdef CONFIG_MODULES
 
-extern struct module *module_list;
-extern struct module kernel_module;
+/* FIXME: Accessed without a lock --RR */
+extern struct list_head modules;
 
 static inline int kernel_text_address(unsigned long addr)
 {
