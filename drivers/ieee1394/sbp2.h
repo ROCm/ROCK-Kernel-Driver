@@ -470,6 +470,7 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
  */
 static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host);
 static void sbp2_remove_host(struct hpsb_host *host);
+static void sbp2_host_reset(struct hpsb_host *host);
 
 static int sbp2_probe(struct device *dev);
 static int sbp2_remove(struct device *dev);
@@ -512,7 +513,8 @@ static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense
 static void sbp2_check_sbp2_command(struct scsi_id_instance_data *scsi_id, unchar *cmd);
 static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id, Scsi_Cmnd *SCpnt);
 static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
-				      struct unit_directory *ud);
+				      struct unit_directory *ud,
+				      struct sbp2scsi_host_info *hi);
 static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id);
 static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id);
 
