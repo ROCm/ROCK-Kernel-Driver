@@ -71,7 +71,7 @@ ax25_cb *ax25_send_frame(struct sk_buff *skb, int paclen, ax25_address *src, ax2
 
 	if (digi != NULL) {
 		if ((ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
-			ax25_free_cb(ax25);
+			ax25_cb_put(ax25);
 			return NULL;
 		}
 		memcpy(ax25->digipeat, digi, sizeof(ax25_digi));
@@ -93,7 +93,7 @@ ax25_cb *ax25_send_frame(struct sk_buff *skb, int paclen, ax25_address *src, ax2
 #endif
 	}
 
-	ax25_insert_socket(ax25);
+	ax25_cb_add(ax25);
 
 	ax25->state = AX25_STATE_1;
 

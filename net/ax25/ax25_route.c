@@ -162,6 +162,7 @@ static void ax25_rt_destroy(ax25_route *ax25_rt)
 		if (ax25_rt->digipeat != NULL)
 			kfree(ax25_rt->digipeat);
 		kfree(ax25_rt);
+		return;
 	}
 
 	/*
@@ -434,8 +435,11 @@ int ax25_rt_autobind(ax25_cb *ax25, ax25_address *addr)
 		ax25_adjust_path(addr, ax25->digipeat);
 	}
 
-	if (ax25->sk != NULL)
+	if (ax25->sk != NULL) {
+		bh_lock_sock(ax25->sk);
 		ax25->sk->sk_zapped = 0;
+		bh_unlock_sock(ax25->sk);
+	}
 
 put:
 	ax25_put_route(ax25_rt);

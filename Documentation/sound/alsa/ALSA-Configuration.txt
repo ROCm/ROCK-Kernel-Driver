@@ -1033,6 +1033,7 @@ Module parameters
     Module for Digigram VX-Pocket VX222, V222 v2 and Mic cards.
 
     mic		- Enable Microphone on V222 Mic (NYI)
+    ibl		- Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.
 
@@ -1042,12 +1043,21 @@ Module parameters
 
 	post-install snd-vx222 "/usr/bin/vxload"
 
+    IBL size defines the interrupts period for PCM.  The smaller size
+    gives smaller latency but leads to more CPU consumption, too.
+    The size is usually aligned to 126.  As default (=0), the smallest
+    size is chosen.  The possible IBL values can be found in
+    /proc/asound/cardX/vx-status proc file.
+
   Module snd-vxpocket
   -------------------
 
     Module for Digigram VX-Pocket VX2 PCMCIA card.
 
     irq_mask - IRQ bitmask, specifies the available IRQs as bits
+               (default = 0xffff, all available)
+    irq_list - List of available interrupts (default = -1, not specified)
+    ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
     PCMCIA is supported on kernel.
@@ -1058,12 +1068,19 @@ Module parameters
     For loading the firmware, use vxloader utility in alsa-tools
     package.
 
+    The irq_mask and irq_list are provided to avoid allocation of
+    specific IRQs.  Usually you don't need to specify them.
+
+    About capture IBL, see the description of snd-vx222 module.
+
   Module snd-vxp440
   -----------------
 
     Module for Digigram VX-Pocket 440 PCMCIA card.
 
     irq_mask - IRQ bitmask, specifies the available IRQs as bits
+    irq_list - List of available interrupts (default = -1, not specified)
+    ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
     PCMCIA is supported on kernel.
@@ -1073,6 +1090,11 @@ Module parameters
 
     For loading the firmware, use vxloader utility in alsa-tools
     package.
+
+    The irq_mask and irq_list are provided to avoid allocation of
+    specific IRQs.  Usually you don't need to specify them.
+
+    About capture IBL, see the description of snd-vx222 module.
 
   Module snd-ymfpci
   -----------------

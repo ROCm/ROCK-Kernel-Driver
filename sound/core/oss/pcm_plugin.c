@@ -923,47 +923,6 @@ int snd_pcm_area_silence(const snd_pcm_channel_area_t *dst_area, size_t dst_offs
 	return 0;
 }
 
-int snd_pcm_areas_silence(const snd_pcm_channel_area_t *dst_areas, snd_pcm_uframes_t dst_offset,
-			  unsigned int channels, snd_pcm_uframes_t frames, int format)
-{
-	int width = snd_pcm_format_physical_width(format);
-	while (channels > 0) {
-		void *addr = dst_areas->addr;
-		unsigned int step = dst_areas->step;
-		const snd_pcm_channel_area_t *begin = dst_areas;
-		int vc = channels;
-		unsigned int v = 0;
-		int err;
-		while (1) {
-			vc--;
-			v++;
-			dst_areas++;
-			if (vc == 0 ||
-			    dst_areas->addr != addr ||
-			    dst_areas->step != step ||
-			    dst_areas->first != dst_areas[-1].first + width)
-				break;
-		}
-		if (v > 1 && v * width == step) {
-			/* Collapse the areas */
-			snd_pcm_channel_area_t d;
-			d.addr = begin->addr;
-			d.first = begin->first;
-			d.step = width;
-			err = snd_pcm_area_silence(&d, dst_offset * v, frames * v, format);
-			channels -= v;
-		} else {
-			err = snd_pcm_area_silence(begin, dst_offset, frames, format);
-			dst_areas = begin + 1;
-			channels--;
-		}
-		if (err < 0)
-			return err;
-	}
-	return 0;
-}
-
-
 int snd_pcm_area_copy(const snd_pcm_channel_area_t *src_area, size_t src_offset,
 		      const snd_pcm_channel_area_t *dst_area, size_t dst_offset,
 		      size_t samples, int format)
@@ -1055,53 +1014,6 @@ int snd_pcm_area_copy(const snd_pcm_channel_area_t *src_area, size_t src_offset,
 	}
 	default:
 		snd_BUG();
-	}
-	return 0;
-}
-
-int snd_pcm_areas_copy(const snd_pcm_channel_area_t *src_areas, snd_pcm_uframes_t src_offset,
-		       const snd_pcm_channel_area_t *dst_areas, snd_pcm_uframes_t dst_offset,
-		       unsigned int channels, snd_pcm_uframes_t frames, int format)
-{
-	int width = snd_pcm_format_physical_width(format);
-	while (channels > 0) {
-		unsigned int step = src_areas->step;
-		void *src_addr = src_areas->addr;
-		const snd_pcm_channel_area_t *src_start = src_areas;
-		void *dst_addr = dst_areas->addr;
-		const snd_pcm_channel_area_t *dst_start = dst_areas;
-		int vc = channels;
-		unsigned int v = 0;
-		while (dst_areas->step == step) {
-			vc--;
-			v++;
-			src_areas++;
-			dst_areas++;
-			if (vc == 0 ||
-			    src_areas->step != step ||
-			    src_areas->addr != src_addr ||
-			    dst_areas->addr != dst_addr ||
-			    src_areas->first != src_areas[-1].first + width ||
-			    dst_areas->first != dst_areas[-1].first + width)
-				break;
-		}
-		if (v > 1 && v * width == step) {
-			/* Collapse the areas */
-			snd_pcm_channel_area_t s, d;
-			s.addr = src_start->addr;
-			s.first = src_start->first;
-			s.step = width;
-			d.addr = dst_start->addr;
-			d.first = dst_start->first;
-			d.step = width;
-			snd_pcm_area_copy(&s, src_offset * v, &d, dst_offset * v, frames * v, format);
-			channels -= v;
-		} else {
-			snd_pcm_area_copy(src_start, src_offset, dst_start, dst_offset, frames, format);
-			src_areas = src_start + 1;
-			dst_areas = dst_start + 1;
-			channels--;
-		}
 	}
 	return 0;
 }

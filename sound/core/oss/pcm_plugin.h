@@ -219,14 +219,9 @@ snd_pcm_sframes_t snd_pcm_plugin_client_channels(snd_pcm_plugin_t *plugin,
 
 int snd_pcm_area_silence(const snd_pcm_channel_area_t *dst_channel, size_t dst_offset,
 			 size_t samples, int format);
-int snd_pcm_areas_silence(const snd_pcm_channel_area_t *dst_channels, snd_pcm_uframes_t dst_offset,
-			  unsigned int channels, snd_pcm_uframes_t frames, int format);
 int snd_pcm_area_copy(const snd_pcm_channel_area_t *src_channel, size_t src_offset,
 		      const snd_pcm_channel_area_t *dst_channel, size_t dst_offset,
 		      size_t samples, int format);
-int snd_pcm_areas_copy(const snd_pcm_channel_area_t *src_channels, snd_pcm_uframes_t src_offset,
-		       const snd_pcm_channel_area_t *dst_channels, snd_pcm_uframes_t dst_offset,
-		       unsigned int channels, snd_pcm_uframes_t frames, int format);
 
 void *snd_pcm_plug_buf_alloc(snd_pcm_plug_t *plug, snd_pcm_uframes_t size);
 void snd_pcm_plug_buf_unlock(snd_pcm_plug_t *plug, void *ptr);

@@ -437,10 +437,8 @@ M:	hpa@zytor.com
 S:	Maintained
 
 CRAMFS FILESYSTEM
-P:	Daniel Quinlan
-M:	quinlan@transmeta.com
-W:	http://sourceforge.net/projects/cramfs/
-S:	Maintained
+W:     http://sourceforge.net/projects/cramfs/
+S:     Orphan
 
 CREDITS FILE
 P:	John A. Martin
