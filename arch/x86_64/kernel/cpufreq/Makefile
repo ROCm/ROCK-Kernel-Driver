@@ -10,4 +10,4 @@ obj-$(CONFIG_X86_ACPI_CPUFREQ) += acpi-cpufreq.o
 
 powernow-k8-objs := ${SRCDIR}/powernow-k8.o
 speedstep-centrino-objs := ${SRCDIR}/speedstep-centrino.o
-acpi-objs := ${SRCDIR}/acpi-cpufreq.o
+acpi-cpufreq-objs := ${SRCDIR}/acpi-cpufreq.o
