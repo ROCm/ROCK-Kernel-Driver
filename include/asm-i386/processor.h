@@ -297,6 +297,8 @@ extern unsigned int mca_pentium_flag;
  */
 #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
+
 /*
  * Size of io_bitmap.
  */
