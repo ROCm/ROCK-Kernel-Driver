@@ -2453,6 +2453,7 @@ struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
 {
 	struct scsi_host_sg_pool *sgp;
 	struct scatterlist *sgl;
+	int pf_flags;
 
 	BUG_ON(!SCpnt->use_sg);
 
@@ -2467,9 +2468,10 @@ struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
 
 	sgp = scsi_sg_pools + SCpnt->sglist_len;
 
+	pf_flags = current->flags;
 	current->flags |= PF_NOWARN;
 	sgl = mempool_alloc(sgp->pool, gfp_mask);
-	current->flags &= ~PF_NOWARN;
+	current->flags = pf_flags;
 	if (sgl) {
 		memset(sgl, 0, sgp->size);
 		return sgl;
