@@ -56,6 +56,7 @@ EXPORT_SYMBOL(empty_zero_page);
 EXPORT_SYMBOL(machine_flags);
 EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(kernel_thread);
+EXPORT_SYMBOL(cpint_cpcmd);
 EXPORT_SYMBOL(csum_fold);
 EXPORT_SYMBOL(console_mode);
 EXPORT_SYMBOL(console_devno);
