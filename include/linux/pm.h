@@ -119,29 +119,29 @@ extern int pm_active;
 /*
  * Register a device with power management
  */
-struct pm_dev __deprecated *pm_register(pm_dev_t type,
-					unsigned long id,
-					pm_callback callback);
+struct pm_dev *pm_register(pm_dev_t type,
+			   unsigned long id,
+			   pm_callback callback);
 
 /*
  * Unregister a device with power management
  */
-void __deprecated pm_unregister(struct pm_dev *dev);
+void pm_unregister(struct pm_dev *dev);
 
 /*
  * Unregister all devices with matching callback
  */
-void __deprecated pm_unregister_all(pm_callback callback);
+void pm_unregister_all(pm_callback callback);
 
 /*
  * Send a request to a single device
  */
-int __deprecated pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
+int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
 
 /*
  * Send a request to all devices
  */
-int __deprecated pm_send_all(pm_request_t rqst, void *data);
+int pm_send_all(pm_request_t rqst, void *data);
 
 /*
  * Find a device
