@@ -54,7 +54,7 @@ static unsigned int netlink_poll(struct file *file, poll_table * wait)
  *	Write a message to the kernel side of a communication link
  */
  
-static ssize_t netlink_write(struct file * file, const char * buf,
+static ssize_t netlink_write(struct file * file, const char __user * buf,
 			     size_t count, loff_t *pos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -62,7 +62,7 @@ static ssize_t netlink_write(struct file * file, const char * buf,
 	struct msghdr msg;
 	struct iovec iov;
 
-	iov.iov_base = (void*)buf;
+	iov.iov_base = (void __user*)buf;
 	iov.iov_len = count;
 	msg.msg_name=NULL;
 	msg.msg_namelen=0;
@@ -78,7 +78,7 @@ static ssize_t netlink_write(struct file * file, const char * buf,
  *	Read a message from the kernel side of the communication link
  */
 
-static ssize_t netlink_read(struct file * file, char * buf,
+static ssize_t netlink_read(struct file * file, char __user * buf,
 			    size_t count, loff_t *pos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
