@@ -301,12 +301,12 @@ struct fbcursor {
 #define ROP_XOR  1
 
 struct fb_copyarea {
-	__u32 sx;	/* screen-relative */
-	__u32 sy;
 	__u32 dx;
 	__u32 dy;
 	__u32 width;
 	__u32 height;
+	__u32 sx;
+	__u32 sy;
 };
 
 struct fb_fillrect {

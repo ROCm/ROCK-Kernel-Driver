@@ -402,6 +402,9 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (!info || ! info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_read)
+		return info->fbops->fb_read(file, buf, count, ppos);
+	
 	if (p >= info->fix.smem_len)
 	    return 0;
 	if (count >= info->fix.smem_len)
@@ -432,6 +435,9 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (!info || !info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_write)
+		return info->fbops->fb_write(file, buf, count, ppos);
+	
 	if (p > info->fix.smem_len)
 	    return -ENOSPC;
 	if (count >= info->fix.smem_len)
