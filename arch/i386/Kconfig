@@ -40,15 +40,15 @@ menu "Processor type and features"
 
 choice
 	prompt "Subarchitecture Type"
-	default PC
+	default X86_PC
 
 config X86_PC
-	bool "IBM PC (and compatible)"
+	bool "PC-compatible"
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
 config X86_VOYAGER
-	bool "NCR Voyager"
+	bool "Voyager (NCR)"
 	help
 	  Voyager is a MCA based 32 way capable SMP architecture proprietary
 	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are voyager based.
@@ -59,7 +59,7 @@ config X86_VOYAGER
 	  say N here otherwise the kernel you build will not be bootable.
 
 config X86_NUMAQ
-	bool "IBM/Sequent NUMAQ"
+	bool "NUMAQ (IBM/Sequent)"
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
 	  multiquad box. This changes the way that processors are bootstrapped,
@@ -68,7 +68,7 @@ config X86_NUMAQ
 	  email to Martin.Bligh@us.ibm.com
 
 config X86_SUMMIT
-	bool "IBM x440 (Summit/EXA)"
+	bool "Summit/EXA (IBM x440)"
 	help
 	  This option is needed for IBM systems that use the Summit/EXA chipset.
 	  In particular, it is needed for the x440.
