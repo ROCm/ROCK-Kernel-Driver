@@ -55,6 +55,8 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 	instructions += 2;
 	if ((rc = btcx_riscmem_alloc(btv->c.pci,risc,instructions*8)) < 0)
 		return rc;
+	dprintk("bttv%d: risc packed: bpl %d lines %d instr %d size %d ptr %p\n",
+		btv->c.nr, bpl, lines, instructions, risc->size, risc->cpu);
 
 	/* sync instruction */
 	rp = risc->cpu;
@@ -99,8 +101,10 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 			offset += todo;
 		}
 		offset += padding;
+		dprintk("bttv%d: risc packed:   line %d ptr %p\n",
+			btv->c.nr, line, rp);
 	}
-	dprintk("bttv%d: risc planar: %d sglist elems\n", btv->c.nr, (int)(sg-sglist));
+	dprintk("bttv%d: risc packed: %d sglist elems\n", btv->c.nr, (int)(sg-sglist));
 
 	/* save pointer to jmp instruction address */
 	risc->jmp = rp;
@@ -145,11 +149,26 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 		    (line >= (ylines - VCR_HACK_LINES)))
 			continue;
 		switch (vshift) {
-		case 0:  chroma = 1;           break;
-		case 1:  chroma = !(line & 1); break;
-		case 2:  chroma = !(line & 3); break;
-		default: chroma = 0;
+		case 0:
+			chroma = 1;
+			break;
+		case 1:
+			if (!yoffset)
+				chroma = (line & 1) == 0;
+			else
+				chroma = (line & 1) == 1;
+			break;
+		case 2:
+			if (!yoffset)
+				chroma = (line & 3) == 0;
+			else
+				chroma = (line & 3) == 2;
+			break;
+		default:
+			chroma = 0;
+			break;
 		}
+
 		for (todo = ybpl; todo > 0; todo -= ylen) {
 			/* go to next sg entry if needed */
 			while (yoffset && yoffset >= sg_dma_len(ysg)) {
