@@ -7,10 +7,11 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-O_TARGET := e100.o
+O_TARGET := built-in.o
 
-obj-y   := e100_main.o e100_config.o e100_proc.o e100_phy.o \
-	   e100_eeprom.o e100_test.o
-obj-m   := $(O_TARGET)
+obj-$(CONFIG_E100) += e100.o
+
+e100-objs := e100_main.o e100_config.o e100_proc.o e100_phy.o \
+	     e100_eeprom.o e100_test.o
 
 include $(TOPDIR)/Rules.make
