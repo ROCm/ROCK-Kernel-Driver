@@ -60,13 +60,18 @@ static int debug = 0;
 #define LOF_HI			10600000
 #define LOF_LO			9750000
 
-enum ttusb_model {
+enum ttusb_dec_model {
 	TTUSB_DEC2000T,
 	TTUSB_DEC3000S
 };
 
+enum ttusb_dec_packet_type {
+	PACKET_AV_PES,
+	PACKET_SECTION
+};
+
 struct ttusb_dec {
-	enum ttusb_model		model;
+	enum ttusb_dec_model		model;
 	char				*model_name;
 	char				*firmware_name;
 
@@ -98,10 +103,14 @@ struct ttusb_dec {
 	int			iso_stream_count;
 	struct semaphore	iso_sem;
 
-	u8			av_pes[MAX_AV_PES_LENGTH + 4];
-	int			av_pes_state;
-	int			av_pes_length;
-	int			av_pes_payload_length;
+	u8				packet[MAX_AV_PES_LENGTH + 4];
+	enum ttusb_dec_packet_type	packet_type;
+	int				packet_state;
+	int				packet_length;
+	int				packet_payload_length;
+
+	int				av_pes_stream_count;
+	int				filter_stream_count;
 
 	struct dvb_filter_pes2ts	a_pes2ts;
 	struct dvb_filter_pes2ts	v_pes2ts;
@@ -114,6 +123,9 @@ struct ttusb_dec {
 	struct tasklet_struct	urb_tasklet;
 	spinlock_t		urb_frame_list_lock;
 
+	struct list_head	filter_info_list;
+	spinlock_t		filter_info_list_lock;
+
 	int			active; /* Loaded successfully */
 };
 
@@ -121,6 +133,12 @@ struct urb_frame {
 	u8			data[ISO_FRAME_SIZE];
 	int			length;
 	struct list_head	urb_frame_list;
+};
+
+struct filter_info {
+	u8			stream_id;
+	struct dvb_demux_filter	*filter;
+	struct list_head	filter_info_list;
 };
 
 static struct dvb_frontend_info dec2000t_frontend_info = {
@@ -179,8 +197,8 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 		printk("\n");
 	}
 
-	result = usb_bulk_msg(dec->udev, dec->command_pipe, b, sizeof(b),
-			      &actual_len, HZ);
+	result = usb_bulk_msg(dec->udev, dec->command_pipe, b,
+			      sizeof(b), &actual_len, HZ);
 
 	if (result) {
 		printk("%s: command bulk message failed: error %d\n",
@@ -189,8 +207,8 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 		return result;
 	}
 
-	result = usb_bulk_msg(dec->udev, dec->result_pipe, c, sizeof(c),
-			      &actual_len, HZ);
+	result = usb_bulk_msg(dec->udev, dec->result_pipe, c,
+			      sizeof(c), &actual_len, HZ);
 
 	if (result) {
 		printk("%s: result bulk message failed: error %d\n",
@@ -227,8 +245,9 @@ static int ttusb_dec_av_pes2ts_cb(void *priv, unsigned char *data)
 
 static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 {
-	u8 b[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
-		   0xff, 0xff };
+	u8 b[] = { 0x00, 0x00, 0x00, 0x00,
+		   0x00, 0x00, 0xff, 0xff,
+		   0xff, 0xff, 0xff, 0xff };
 
 	u16 pcr = htons(dec->pid[DMX_PES_PCR]);
 	u16 audio = htons(dec->pid[DMX_PES_AUDIO]);
@@ -253,34 +272,13 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 				     int length)
 {
-	int i;
-	u16 csum = 0;
-	u8 c;
-
-	if (length < 16) {
-		printk("%s: packet too short.\n", __FUNCTION__);
+	if (length < 8) {
+		printk("%s: packet too short - discarding\n", __FUNCTION__);
 		return;
 	}
 
-	for (i = 0; i < length; i += 2) {
-		csum ^= le16_to_cpup((u16 *)(av_pes + i));
-		c = av_pes[i];
-		av_pes[i] = av_pes[i + 1];
-		av_pes[i + 1] = c;
-	}
-
-	if (csum) {
-		printk("%s: checksum failed.\n", __FUNCTION__);
-		return;
-	}
-
-	if (length > 8 + MAX_AV_PES_LENGTH + 4) {
-		printk("%s: packet too long.\n", __FUNCTION__);
-		return;
-	}
-
-	if (!(av_pes[0] == 'A' && av_pes[1] == 'V')) {
-		printk("%s: invalid AV_PES packet.\n", __FUNCTION__);
+	if (length > 8 + MAX_AV_PES_LENGTH) {
+		printk("%s: packet too long - discarding\n", __FUNCTION__);
 		return;
 	}
 
@@ -297,16 +295,14 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 				       &av_pes[12], prebytes);
 
 				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-						  dec->v_pes_length + prebytes,
-						  1);
+					  dec->v_pes_length + prebytes, 1);
 			}
 
 			if (av_pes[5] & 0x10) {
 				dec->v_pes[7] = 0x80;
 				dec->v_pes[8] = 0x05;
 
-				dec->v_pes[9] = 0x21 |
-						((av_pes[8] & 0xc0) >> 5);
+			dec->v_pes[9] = 0x21 | ((av_pes[8] & 0xc0) >> 5);
 				dec->v_pes[10] = ((av_pes[8] & 0x3f) << 2) |
 						 ((av_pes[9] & 0xc0) >> 6);
 				dec->v_pes[11] = 0x01 |
@@ -314,18 +310,17 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 						 ((av_pes[10] & 0x80) >> 6);
 				dec->v_pes[12] = ((av_pes[10] & 0x7f) << 1) |
 						 ((av_pes[11] & 0xc0) >> 7);
-				dec->v_pes[13] = 0x01 |
-						 ((av_pes[11] & 0x7f) << 1);
+			dec->v_pes[13] = 0x01 | ((av_pes[11] & 0x7f) << 1);
 
 				memcpy(&dec->v_pes[14], &av_pes[12 + prebytes],
-				       length - 16 - prebytes);
-				dec->v_pes_length = 14 + length - 16 - prebytes;
+			       length - 12 - prebytes);
+			dec->v_pes_length = 14 + length - 12 - prebytes;
 			} else {
 				dec->v_pes[7] = 0x00;
 				dec->v_pes[8] = 0x00;
 
-				memcpy(&dec->v_pes[9], &av_pes[8], length - 12);
-				dec->v_pes_length = 9 + length - 12;
+			memcpy(&dec->v_pes[9], &av_pes[8], length - 8);
+			dec->v_pes_length = 9 + length - 8;
 			}
 
 			dec->v_pes_postbytes = postbytes;
@@ -349,7 +344,7 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 		}
 
 	case 0x02:		/* MainAudioStream */
-		dvb_filter_pes2ts(&dec->a_pes2ts, &av_pes[8], length - 12,
+		dvb_filter_pes2ts(&dec->a_pes2ts, &av_pes[8], length - 8,
 				  av_pes[5] & 0x10);
 		break;
 
@@ -357,93 +352,194 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 		printk("%s: unknown AV_PES type: %02x.\n", __FUNCTION__,
 		       av_pes[2]);
 		break;
+	}
+}
 
+static void ttusb_dec_process_filter(struct ttusb_dec *dec, u8 *packet,
+				     int length)
+{
+	struct list_head *item;
+	struct filter_info *finfo;
+	struct dvb_demux_filter *filter = NULL;
+	unsigned long flags;
+	u8 sid;
+
+	sid = packet[1];
+	spin_lock_irqsave(&dec->filter_info_list_lock, flags);
+	for (item = dec->filter_info_list.next; item != &dec->filter_info_list;
+	     item = item->next) {
+		finfo = list_entry(item, struct filter_info, filter_info_list);
+		if (finfo->stream_id == sid) {
+			filter = finfo->filter;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&dec->filter_info_list_lock, flags);
+
+	if (filter)
+		filter->feed->cb.sec(&packet[2], length - 2, NULL, 0,
+				     &filter->filter, DMX_OK);
+}
+
+static void ttusb_dec_process_packet(struct ttusb_dec *dec)
+{
+	int i;
+	u16 csum = 0;
+
+	if (dec->packet_length % 2) {
+		printk("%s: odd sized packet - discarding\n", __FUNCTION__);
+		return;
+	}
+
+	for (i = 0; i < dec->packet_length; i += 2)
+		csum ^= ((dec->packet[i] << 8) + dec->packet[i + 1]);
+
+	if (csum) {
+		printk("%s: checksum failed - discarding\n", __FUNCTION__);
+		return;
+	}
+
+	switch (dec->packet_type) {
+	case PACKET_AV_PES:
+		if (dec->av_pes_stream_count)
+			ttusb_dec_process_av_pes(dec, dec->packet,
+						 dec->packet_payload_length);
+		break;
+
+	case PACKET_SECTION:
+		if (dec->filter_stream_count)
+			ttusb_dec_process_filter(dec, dec->packet,
+						 dec->packet_payload_length);
+		break;
+	}
+}
+
+static void swap_bytes(u8 *b, int length)
+{
+	u8 c;
+
+	length -= length % 2;
+	for (; length; b += 2, length -= 2) {
+		c = *b;
+		*b = *(b + 1);
+		*(b + 1) = c;
 	}
 }
 
 static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 					int length)
 {
+	swap_bytes(b, length);
+
 	while (length) {
-		switch (dec->av_pes_state) {
+		switch (dec->packet_state) {
 
 		case 0:
 		case 1:
-		case 3:
-			if (*b++ == 0xaa) {
-				dec->av_pes_state++;
-				if (dec->av_pes_state == 4)
-					dec->av_pes_length = 0;
-			} else {
-				dec->av_pes_state = 0;
-			}
+		case 2:
+			if (*b++ == 0xaa)
+				dec->packet_state++;
+			else
+				dec->packet_state = 0;
 
 			length--;
 			break;
 
-		case 2:
+		case 3:
 			if (*b++ == 0x00) {
-				dec->av_pes_state++;
+				dec->packet_state++;
+				dec->packet_length = 0;
 			} else {
-				dec->av_pes_state = 0;
+				dec->packet_state = 0;
 			}
 
 			length--;
 			break;
 
 		case 4:
-			dec->av_pes[dec->av_pes_length++] = *b++;
+			dec->packet[dec->packet_length++] = *b++;
 
-			if (dec->av_pes_length == 8) {
-				dec->av_pes_state++;
-				dec->av_pes_payload_length = le16_to_cpup(
-						(u16 *)(dec->av_pes + 6));
+			if (dec->packet_length == 3) {
+				if (dec->packet[0] == 'A' &&
+				    dec->packet[1] == 'V') {
+					dec->packet_type = PACKET_AV_PES;
+					dec->packet_state++;
+				} else if (dec->packet[0] == 'S') {
+					dec->packet_type = PACKET_SECTION;
+					dec->packet_state++;
+			} else {
+					dec->packet_state = 0;
+				}
 			}
 
 			length--;
 			break;
 
-		case 5: {
-				int remainder = dec->av_pes_payload_length +
-						8 - dec->av_pes_length;
+		case 5:
+			dec->packet[dec->packet_length++] = *b++;
+
+			if (dec->packet_type == PACKET_AV_PES &&
+			    dec->packet_length == 8) {
+				dec->packet_state++;
+				dec->packet_payload_length = 8 +
+					(dec->packet[6] << 8) +
+					dec->packet[7];
+			} else if (dec->packet_type == PACKET_SECTION &&
+				   dec->packet_length == 5) {
+				dec->packet_state++;
+				dec->packet_payload_length = 5 +
+					((dec->packet[3] & 0x0f) << 8) +
+					dec->packet[4];
+			}
+
+			length--;
+			break;
+
+		case 6: {
+			int remainder = dec->packet_payload_length -
+					dec->packet_length;
 
 				if (length >= remainder) {
-					memcpy(dec->av_pes + dec->av_pes_length,
+				memcpy(dec->packet + dec->packet_length,
 					       b, remainder);
-					dec->av_pes_length += remainder;
+				dec->packet_length += remainder;
 					b += remainder;
 					length -= remainder;
-					dec->av_pes_state++;
+				dec->packet_state++;
 				} else {
-					memcpy(&dec->av_pes[dec->av_pes_length],
+				memcpy(&dec->packet[dec->packet_length],
 					       b, length);
-					dec->av_pes_length += length;
+				dec->packet_length += length;
 					length = 0;
 				}
 
 				break;
 			}
 
-		case 6:
-			dec->av_pes[dec->av_pes_length++] = *b++;
+		case 7: {
+			int tail = 4;
 
-			if (dec->av_pes_length ==
-			    8 + dec->av_pes_payload_length + 4) {
-				ttusb_dec_process_av_pes(dec, dec->av_pes,
-							 dec->av_pes_length);
-				dec->av_pes_state = 0;
+			dec->packet[dec->packet_length++] = *b++;
+
+			if (dec->packet_type == PACKET_SECTION &&
+			    dec->packet_payload_length % 2)
+				tail++;
+
+			if (dec->packet_length ==
+			    dec->packet_payload_length + tail) {
+				ttusb_dec_process_packet(dec);
+				dec->packet_state = 0;
 			}
 
 			length--;
 			break;
+		}
 
 		default:
 			printk("%s: illegal packet state encountered.\n",
 			       __FUNCTION__);
-			dec->av_pes_state = 0;
-
+			dec->packet_state = 0;
 		}
-
 	}
 }
 
@@ -561,12 +657,8 @@ static void ttusb_dec_stop_iso_xfer(struct ttusb_dec *dec)
 	dec->iso_stream_count--;
 
 	if (!dec->iso_stream_count) {
-		u8 b0[] = { 0x00 };
-
 		for (i = 0; i < ISO_BUF_COUNT; i++)
 			usb_unlink_urb(dec->iso_urb[i]);
-
-		ttusb_dec_send_command(dec, 0x81, sizeof(b0), b0, NULL, NULL);
 	}
 
 	up(&dec->iso_sem);
@@ -594,10 +686,6 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 		return -EAGAIN;
 
 	if (!dec->iso_stream_count) {
-		u8 b0[] = { 0x05 };
-
-		ttusb_dec_send_command(dec, 0x80, sizeof(b0), b0, NULL, NULL);
-
 		ttusb_dec_setup_urbs(dec);
 
 		for (i = 0; i < ISO_BUF_COUNT; i++) {
@@ -616,7 +704,7 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 			}
 		}
 
-		dec->av_pes_state = 0;
+		dec->packet_state = 0;
 		dec->v_pes_postbytes = 0;
 	}
 
@@ -627,33 +715,13 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 	return 0;
 }
 
-static int ttusb_dec_start_feed(struct dvb_demux_feed *dvbdmxfeed)
+static int ttusb_dec_start_ts_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
 	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
 	struct ttusb_dec *dec = dvbdmx->priv;
+	u8 b0[] = { 0x05 };
 
 	dprintk("%s\n", __FUNCTION__);
-
-	if (!dvbdmx->dmx.frontend)
-		return -EINVAL;
-
-	dprintk("  pid: 0x%04X\n", dvbdmxfeed->pid);
-
-	switch (dvbdmxfeed->type) {
-
-	case DMX_TYPE_TS:
-		dprintk("  type: DMX_TYPE_TS\n");
-		break;
-
-	case DMX_TYPE_SEC:
-		dprintk("  type: DMX_TYPE_SEC\n");
-		break;
-
-	default:
-		dprintk("  type: unknown (%d)\n", dvbdmxfeed->type);
-		return -EINVAL;
-
-	}
 
 	dprintk("  ts_type:");
 
@@ -704,18 +772,147 @@ static int ttusb_dec_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 	}
 
+	ttusb_dec_send_command(dec, 0x80, sizeof(b0), b0, NULL, NULL);
+
+	dec->av_pes_stream_count++;
 	ttusb_dec_start_iso_xfer(dec);
+
+	return 0;
+}
+
+static int ttusb_dec_start_sec_feed(struct dvb_demux_feed *dvbdmxfeed)
+{
+	struct ttusb_dec *dec = dvbdmxfeed->demux->priv;
+	u8 b0[] = { 0x00, 0x00, 0x00, 0x01,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00, 0xff, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00 };
+	u16 pid;
+	u8 c[COMMAND_PACKET_SIZE];
+	int c_length;
+	int result;
+	struct filter_info *finfo;
+	unsigned long flags;
+	u8 x = 1;
+
+	dprintk("%s\n", __FUNCTION__);
+
+	pid = htons(dvbdmxfeed->pid);
+	memcpy(&b0[0], &pid, 2);
+	memcpy(&b0[4], &x, 1);
+	memcpy(&b0[5], &dvbdmxfeed->filter->filter.filter_value[0], 1);
+
+	result = ttusb_dec_send_command(dec, 0x60, sizeof(b0), b0,
+					&c_length, c);
+
+	if (!result) {
+		if (c_length == 2) {
+			if (!(finfo = kmalloc(sizeof(struct filter_info),
+					      GFP_ATOMIC)))
+				return -ENOMEM;
+
+			finfo->stream_id = c[1];
+			finfo->filter = dvbdmxfeed->filter;
+
+			spin_lock_irqsave(&dec->filter_info_list_lock, flags);
+			list_add_tail(&finfo->filter_info_list,
+				      &dec->filter_info_list);
+			spin_unlock_irqrestore(&dec->filter_info_list_lock,
+					       flags);
+
+			dvbdmxfeed->priv = finfo;
+
+			dec->filter_stream_count++;
+			ttusb_dec_start_iso_xfer(dec);
+
+			return 0;
+		}
+
+		return -EAGAIN;
+	} else
+		return result;
+}
+
+static int ttusb_dec_start_feed(struct dvb_demux_feed *dvbdmxfeed)
+{
+	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
+
+	dprintk("%s\n", __FUNCTION__);
+
+	if (!dvbdmx->dmx.frontend)
+		return -EINVAL;
+
+	dprintk("  pid: 0x%04X\n", dvbdmxfeed->pid);
+
+	switch (dvbdmxfeed->type) {
+
+	case DMX_TYPE_TS:
+		return ttusb_dec_start_ts_feed(dvbdmxfeed);
+		break;
+
+	case DMX_TYPE_SEC:
+		return ttusb_dec_start_sec_feed(dvbdmxfeed);
+		break;
+
+	default:
+		dprintk("  type: unknown (%d)\n", dvbdmxfeed->type);
+		return -EINVAL;
+
+	}
+}
+
+static int ttusb_dec_stop_ts_feed(struct dvb_demux_feed *dvbdmxfeed)
+{
+	struct ttusb_dec *dec = dvbdmxfeed->demux->priv;
+	u8 b0[] = { 0x00 };
+
+	ttusb_dec_send_command(dec, 0x81, sizeof(b0), b0, NULL, NULL);
+
+	dec->av_pes_stream_count--;
+
+	ttusb_dec_stop_iso_xfer(dec);
+
+	return 0;
+}
+
+static int ttusb_dec_stop_sec_feed(struct dvb_demux_feed *dvbdmxfeed)
+{
+	struct ttusb_dec *dec = dvbdmxfeed->demux->priv;
+	u8 b0[] = { 0x00, 0x00 };
+	struct filter_info *finfo = (struct filter_info *)dvbdmxfeed->priv;
+	unsigned long flags;
+
+	b0[1] = finfo->stream_id;
+	spin_lock_irqsave(&dec->filter_info_list_lock, flags);
+	list_del(&finfo->filter_info_list);
+	spin_unlock_irqrestore(&dec->filter_info_list_lock, flags);
+	kfree(finfo);
+	ttusb_dec_send_command(dec, 0x62, sizeof(b0), b0, NULL, NULL);
+
+	dec->filter_stream_count--;
+
+	ttusb_dec_stop_iso_xfer(dec);
 
 	return 0;
 }
 
 static int ttusb_dec_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
-	struct ttusb_dec *dec = dvbdmxfeed->demux->priv;
-
 	dprintk("%s\n", __FUNCTION__);
 
-	ttusb_dec_stop_iso_xfer(dec);
+	switch (dvbdmxfeed->type) {
+	case DMX_TYPE_TS:
+		return ttusb_dec_stop_ts_feed(dvbdmxfeed);
+		break;
+
+	case DMX_TYPE_SEC:
+		return ttusb_dec_stop_sec_feed(dvbdmxfeed);
+		break;
+	}
 
 	return 0;
 }
@@ -802,8 +999,9 @@ static void ttusb_dec_init_usb(struct ttusb_dec *dec)
 static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 {
 	int i, j, actual_len, result, size, trans_count;
-	u8 b0[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		    0x00 };
+	u8 b0[] = { 0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00, 0x00, 0x00,
+		    0x00, 0x00 };
 	u8 b1[] = { 0x61 };
 	u8 b[ARM_PACKET_SIZE];
 	u8 *firmware = NULL;
@@ -1067,9 +1265,11 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 	case FE_SET_FRONTEND: {
 			struct dvb_frontend_parameters *p =
 				(struct dvb_frontend_parameters *)arg;
-			u8 b[] = { 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-				   0x00, 0xff, 0x00, 0x00, 0x00, 0xff };
+		u8 b[] = { 0x00, 0x00, 0x00, 0x03,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x01,
+			   0x00, 0x00, 0x00, 0xff,
+			   0x00, 0x00, 0x00, 0xff };
 			u32 freq;
 
 			dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
@@ -1112,8 +1312,8 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 	return 0;
 }
 
-static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe, unsigned int cmd,
-				  void *arg)
+static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
+					  unsigned int cmd, void *arg)
 {
 	struct ttusb_dec *dec = fe->data;
 
@@ -1165,12 +1365,16 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 	case FE_SET_FRONTEND: {
 			struct dvb_frontend_parameters *p =
 				(struct dvb_frontend_parameters *)arg;
-			u8 b[] = { 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00,
-				   0x00, 0x00, 0x00, 0x00, 0x00 };
+		u8 b[] = { 0x00, 0x00, 0x00, 0x01,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x01,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x0d,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00 };
 			u32 freq;
 			u32 sym_rate;
 			u32 band;
@@ -1183,7 +1387,8 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 				p->u.qam.symbol_rate);
 			dprintk("            inversion->%d\n", p->inversion);
 
-			freq = htonl(p->frequency * 1000 + (dec->hi_band ? LOF_HI : LOF_LO));
+		freq = htonl(p->frequency * 1000 +
+		       (dec->hi_band ? LOF_HI : LOF_LO));
 			memcpy(&b[4], &freq, sizeof(u32));
 			sym_rate = htonl(p->u.qam.symbol_rate);
 			memcpy(&b[12], &sym_rate, sizeof(u32));
@@ -1265,6 +1470,24 @@ static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
 	dvb_unregister_frontend(dec->frontend_ioctl, &dec->i2c_bus);
 }
 
+static void ttusb_dec_init_filters(struct ttusb_dec *dec)
+{
+	INIT_LIST_HEAD(&dec->filter_info_list);
+	dec->filter_info_list_lock = SPIN_LOCK_UNLOCKED;
+}
+
+static void ttusb_dec_exit_filters(struct ttusb_dec *dec)
+{
+	struct list_head *item;
+	struct filter_info *finfo;
+
+	while ((item = dec->filter_info_list.next) != &dec->filter_info_list) {
+		finfo = list_entry(item, struct filter_info, filter_info_list);
+		list_del(&finfo->filter_info_list);
+		kfree(finfo);
+	}
+}
+
 static int ttusb_dec_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id)
 {
@@ -1288,13 +1511,13 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 		case 0x1006:
 			dec->model = TTUSB_DEC3000S;
 			dec->model_name = "DEC3000-s";
-			dec->firmware_name = "dec3000s.bin";
+		dec->firmware_name = "dvb-ttusb-dec-3000s-2.15a.fw";
 			break;
 
 		case 0x1008:
 			dec->model = TTUSB_DEC2000T;
 			dec->model_name = "DEC2000-t";
-			dec->firmware_name = "dec2000t.bin";
+		dec->firmware_name = "dvb-ttusb-dec-2000t-2.15a.fw";
 			break;
 	}
 
@@ -1308,6 +1531,7 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	ttusb_dec_init_dvb(dec);
 	ttusb_dec_init_frontend(dec);
 	ttusb_dec_init_v_pes(dec);
+	ttusb_dec_init_filters(dec);
 	ttusb_dec_init_tasklet(dec);
 
 	dec->active = 1;
@@ -1327,6 +1551,7 @@ static void ttusb_dec_disconnect(struct usb_interface *intf)
 
 	if (dec->active) {
 	ttusb_dec_exit_tasklet(dec);
+		ttusb_dec_exit_filters(dec);
 	ttusb_dec_exit_usb(dec);
 		ttusb_dec_exit_frontend(dec);
 	ttusb_dec_exit_dvb(dec);

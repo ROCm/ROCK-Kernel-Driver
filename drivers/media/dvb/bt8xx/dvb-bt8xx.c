@@ -1,7 +1,7 @@
 /*
  * Bt8xx based DVB adapter driver 
  *
- * Copyright (C) 2002,2003 Florian Schirmer <schirmer@taytron.net>
+ * Copyright (C) 2002,2003 Florian Schirmer <jolt@tuxbox.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -525,6 +525,6 @@ static void __exit dvb_bt8xx_exit(void)
 module_init(dvb_bt8xx_init);
 module_exit(dvb_bt8xx_exit);
 MODULE_DESCRIPTION("Bt8xx based DVB adapter driver");
-MODULE_AUTHOR("Florian Schirmer <schirmer@taytron.net>");
+MODULE_AUTHOR("Florian Schirmer <jolt@tuxbox.org>");
 MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");

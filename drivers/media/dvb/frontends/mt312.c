@@ -1,7 +1,7 @@
 /* 
     Driver for Zarlink MT312 Satellite Channel Decoder
 
-    Copyright (C) 2003 Andreas Oberritter <obi@saftware.de>
+    Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -813,5 +813,5 @@ MODULE_PARM_DESC(debug, "enable verbose debug messages");
 #endif
 
 MODULE_DESCRIPTION("MT312 Satellite Channel Decoder Driver");
-MODULE_AUTHOR("Andreas Oberritter <obi@saftware.de>");
+MODULE_AUTHOR("Andreas Oberritter <obi@linuxtv.org>");
 MODULE_LICENSE("GPL");

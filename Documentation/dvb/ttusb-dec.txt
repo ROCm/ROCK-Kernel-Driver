@@ -9,6 +9,7 @@ Supported:
 	Linux Kernels 2.4 and 2.6
 	Video Streaming
 	Audio Streaming
+	Section Filters
 	Channel Zapping
 	Hotplug firmware loader under 2.6 kernels
 
@@ -16,13 +17,9 @@ In Progress:
 	DEC3000-s
 
 To Do:
-	Section data
-	Teletext streams
 	Tuner status information
 	DVB network interface
 	Streaming video PC->DEC
-
-Note:	Since section data can not be retreived yet, scan apps will not work.
 
 Getting the Firmware
 --------------------
@@ -46,7 +43,7 @@ mv STB_PC_S.bin /etc/dvb/dec3000s.bin
 Hotplug Firmware Loading for 2.6 kernels
 ----------------------------------------
 For 2.6 kernels the firmware is loaded at the point that the driver module is
-loaded.  See linux/Documentation/dvb/FIRMWARE for more information.
+loaded.  See linux/Documentation/dvb/firmware.txt for more information.
 
-mv STB_PC_T.bin /usr/lib/hotplug/firmware/dec2000t.bin
-mv STB_PC_S.bin /usr/lib/hotplug/firmware/dec3000s.bin
+mv STB_PC_T.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2000t-2.15a.fw
+mv STB_PC_S.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-3000s-2.15a.fw

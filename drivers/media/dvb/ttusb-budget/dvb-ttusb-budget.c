@@ -2,7 +2,7 @@
  * TTUSB DVB driver
  *
  * Copyright (c) 2002 Holger Waechtler <holger@convergence.de>
- * Copyright (c) 2003 Felix Domke <tmbinc@gmx.net>
+ * Copyright (c) 2003 Felix Domke <tmbinc@elitedvb.net>
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
