@@ -1754,23 +1754,17 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return 0;
 	}
 
-#ifdef BROKEN
 	/* Blink LED for identification */
 	case ETHTOOL_PHYS_ID: {
 		struct ethtool_value edata;
 		u_long flags;
-		long delay, ret;
 		u_char cr;
 		int count;
-		wait_queue_head_t wait;
-
-		init_waitqueue_head(&wait);
 
 		if (copy_from_user(&edata, useraddr, sizeof(edata)))
 			return -EFAULT;
 
 		/* Toggle LED 4x per second */
-		delay = HZ >> 2;
 		count = edata.data << 2;
 
 		spin_lock_irqsave(&lp->hw_lock, flags);
@@ -1791,24 +1785,21 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 			/* Wait a little while */
 			spin_unlock_irqrestore(&lp->hw_lock, flags);
-			ret = delay;
-			__wait_event_interruptible_timeout(wait, 0, ret);
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ>>2);
 			spin_lock_irqsave(&lp->hw_lock, flags);
 
 			/* Exit if we got a signal */
-			if (ret == -ERESTARTSYS)
-				goto out;
+			if (signal_pending(current))
+				break;
 		}
 
-		ret = 0;
-out:
 		lp->led_mask = CR_LED;
 		cr = inb(EWRK3_CR);
 		outb(cr & ~CR_LED, EWRK3_CR);
 		spin_unlock_irqrestore(&lp->hw_lock, flags);
-		return ret;
+		return signal_pending(current) ? -ERESTARTSYS : 0;
 	}
-#endif /* BROKEN */
 
 	}
 
