@@ -333,11 +333,11 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->reg_mutex);
 	ac97->regs[reg] = value;
-	spin_unlock(&ac97->reg_lock);
 	ac97->bus->ops->write(ac97, reg, value);
 	set_bit(reg, ac97->reg_accessed);
+	up(&ac97->reg_mutex);
 }
 
 /**
@@ -358,14 +358,13 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return -EINVAL;
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->reg_mutex);
 	change = ac97->regs[reg] != value;
 	if (change) {
 		ac97->regs[reg] = value;
-		spin_unlock(&ac97->reg_lock);
 		ac97->bus->ops->write(ac97, reg, value);
-	} else
-		spin_unlock(&ac97->reg_lock);
+	}
+	up(&ac97->reg_mutex);
 	return change;
 }
 
@@ -385,20 +384,29 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
 {
 	int change;
-	unsigned short old, new;
 
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return -EINVAL;
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->reg_mutex);
+	change = snd_ac97_update_bits_nolock(ac97, reg, mask, value);
+	up(&ac97->reg_mutex);
+	return change;
+}
+
+/* no lock version - see snd_ac97_updat_bits() */
+int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg,
+				unsigned short mask, unsigned short value)
+{
+	int change;
+	unsigned short old, new;
+
 	old = snd_ac97_read_cache(ac97, reg);
 	new = (old & ~mask) | value;
 	change = old != new;
 	if (change) {
 		ac97->regs[reg] = new;
-		spin_unlock(&ac97->reg_lock);
 		ac97->bus->ops->write(ac97, reg, new);
-	} else
-		spin_unlock(&ac97->reg_lock);
+	}
 	return change;
 }
 
@@ -407,15 +415,14 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 	int change;
 	unsigned short old, new, cfg;
 
-	down(&ac97->mutex);
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->page_mutex);
 	old = ac97->spec.ad18xx.pcmreg[codec];
 	new = (old & ~mask) | value;
-	cfg = snd_ac97_read_cache(ac97, AC97_AD_SERIAL_CFG);
 	change = old != new;
 	if (change) {
+		down(&ac97->reg_mutex);
+		cfg = snd_ac97_read_cache(ac97, AC97_AD_SERIAL_CFG);
 		ac97->spec.ad18xx.pcmreg[codec] = new;
-		spin_unlock(&ac97->reg_lock);
 		/* select single codec */
 		ac97->bus->ops->write(ac97, AC97_AD_SERIAL_CFG,
 				 (cfg & ~0x7000) |
@@ -425,9 +432,9 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 		/* select all codecs */
 		ac97->bus->ops->write(ac97, AC97_AD_SERIAL_CFG,
 				 cfg | 0x7000);
-	} else
-		spin_unlock(&ac97->reg_lock);
-	up(&ac97->mutex);
+		up(&ac97->reg_mutex);
+	}
+	up(&ac97->page_mutex);
 	return change;
 }
 
@@ -611,12 +618,12 @@ static int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *
 	    (reg >= 0x60 && reg < 0x70)) {
 		unsigned short page_save;
 		unsigned short page = (kcontrol->private_value >> 25) & 0x0f;
-		down(&ac97->mutex); /* lock paging */
+		down(&ac97->page_mutex); /* lock paging */
 		page_save = snd_ac97_read(ac97, AC97_INT_PAGING) & AC97_PAGE_MASK;
 		snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page);
 		err = func(kcontrol, ucontrol);
 		snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page_save);
-		up(&ac97->mutex); /* unlock paging */
+		up(&ac97->page_mutex); /* unlock paging */
 	} else
 		err = func(kcontrol, ucontrol);
 	return err;
@@ -760,12 +767,12 @@ static int snd_ac97_spdif_default_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->reg_mutex);
 	ucontrol->value.iec958.status[0] = ac97->spdif_status & 0xff;
 	ucontrol->value.iec958.status[1] = (ac97->spdif_status >> 8) & 0xff;
 	ucontrol->value.iec958.status[2] = (ac97->spdif_status >> 16) & 0xff;
 	ucontrol->value.iec958.status[3] = (ac97->spdif_status >> 24) & 0xff;
-	spin_unlock(&ac97->reg_lock);
+	up(&ac97->reg_mutex);
 	return 0;
 }
                         
@@ -776,7 +783,6 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	unsigned short val = 0;
 	int change;
 
-	spin_lock(&ac97->reg_lock);
 	new = val = ucontrol->value.iec958.status[0] & (IEC958_AES0_PROFESSIONAL|IEC958_AES0_NONAUDIO);
 	if (ucontrol->value.iec958.status[0] & IEC958_AES0_PROFESSIONAL) {
 		new |= ucontrol->value.iec958.status[0] & (IEC958_AES0_PRO_FS|IEC958_AES0_PRO_EMPHASIS_5015);
@@ -805,9 +811,9 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		}
 	}
 
+	down(&ac97->reg_mutex);
 	change = ac97->spdif_status != new;
 	ac97->spdif_status = new;
-	spin_unlock(&ac97->reg_lock);
 
 	if (ac97->flags & AC97_CS_SPDIF) {
 		int x = (val >> 12) & 0x03;
@@ -816,23 +822,24 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		case 2: x = 0; break;  // 48.0
 		default: x = 0; break; // illegal.
 		}
-		change |= snd_ac97_update_bits(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
+		change |= snd_ac97_update_bits_nolock(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
 	} else if (ac97->flags & AC97_CX_SPDIF) {
 		int v;
 		v = new & (IEC958_AES0_CON_EMPHASIS_5015|IEC958_AES0_CON_NOT_COPYRIGHT) ? 0 : AC97_CXR_COPYRGT;
 		v |= new & IEC958_AES0_NONAUDIO ? AC97_CXR_SPDIF_AC3 : AC97_CXR_SPDIF_PCM;
-		change |= snd_ac97_update_bits(ac97, AC97_CXR_AUDIO_MISC, 
-					       AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
-					       v);
+		change |= snd_ac97_update_bits_nolock(ac97, AC97_CXR_AUDIO_MISC, 
+						      AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
+						      v);
 	} else {
 		unsigned short extst = snd_ac97_read_cache(ac97, AC97_EXTENDED_STATUS);
-		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
+		snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
 
-		change |= snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
+		change |= snd_ac97_update_bits_nolock(ac97, AC97_SPDIF, 0x3fff, val);
 		if (extst & AC97_EA_SPDIF) {
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
+			snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
                 }
 	}
+	up(&ac97->reg_mutex);
 
 	return change;
 }
@@ -841,30 +848,30 @@ static int snd_ac97_put_spsa(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *uco
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value & 0xff;
-	int shift = (kcontrol->private_value >> 8) & 0x0f; /* single only */
+	int shift = (kcontrol->private_value >> 8) & 0xff;
 	int mask = (kcontrol->private_value >> 16) & 0xff;
 	// int invert = (kcontrol->private_value >> 24) & 0xff;
 	unsigned short value, old, new;
+	int change;
 
 	value = (ucontrol->value.integer.value[0] & mask);
 
+	down(&ac97->reg_mutex);
 	mask <<= shift;
 	value <<= shift;
-	spin_lock(&ac97->reg_lock);
 	old = snd_ac97_read_cache(ac97, reg);
 	new = (old & ~mask) | value;
-	spin_unlock(&ac97->reg_lock);
+	change = old != new;
 
-	if (old != new) {
-		int change;
+	if (change) {
 		unsigned short extst = snd_ac97_read_cache(ac97, AC97_EXTENDED_STATUS);
-		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
-		change = snd_ac97_update_bits(ac97, reg, mask, value);
+		snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
+		change = snd_ac97_update_bits_nolock(ac97, reg, mask, value);
 		if (extst & AC97_EA_SPDIF)
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
-		return change;
+			snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
 	}
-	return 0;
+	up(&ac97->reg_mutex);
+	return change;
 }
 
 const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
@@ -974,10 +981,10 @@ static int snd_ac97_ad18xx_pcm_get_volume(snd_kcontrol_t * kcontrol, snd_ctl_ele
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int codec = kcontrol->private_value & 3;
 	
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->page_mutex);
 	ucontrol->value.integer.value[0] = 31 - ((ac97->spec.ad18xx.pcmreg[codec] >> 0) & 31);
 	ucontrol->value.integer.value[1] = 31 - ((ac97->spec.ad18xx.pcmreg[codec] >> 8) & 31);
-	spin_unlock(&ac97->reg_lock);
+	up(&ac97->page_mutex);
 	return 0;
 }
 
@@ -1902,8 +1909,8 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 	ac97->limited_regs = template->limited_regs;
 	memcpy(ac97->reg_accessed, template->reg_accessed, sizeof(ac97->reg_accessed));
 	bus->codec[ac97->num] = ac97;
-	spin_lock_init(&ac97->reg_lock);
-	init_MUTEX(&ac97->mutex);
+	init_MUTEX(&ac97->reg_mutex);
+	init_MUTEX(&ac97->page_mutex);
 
 	if (ac97->pci) {
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_VENDOR_ID, &ac97->subsystem_vendor);

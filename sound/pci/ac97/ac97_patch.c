@@ -55,12 +55,12 @@ static int ac97_update_bits_page(ac97_t *ac97, unsigned short reg, unsigned shor
 	unsigned short page_save;
 	int ret;
 
-	down(&ac97->mutex);
+	down(&ac97->page_mutex);
 	page_save = snd_ac97_read(ac97, AC97_INT_PAGING) & AC97_PAGE_MASK;
 	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page);
 	ret = snd_ac97_update_bits(ac97, reg, mask, value);
 	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page_save);
-	up(&ac97->mutex); /* unlock paging */
+	up(&ac97->page_mutex); /* unlock paging */
 	return ret;
 }
 

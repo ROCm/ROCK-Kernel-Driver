@@ -52,6 +52,9 @@ void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst);
 void snd_ac97_restore_status(ac97_t *ac97);
 void snd_ac97_restore_iec958(ac97_t *ac97);
 
+int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg,
+				unsigned short mask, unsigned short value);
+
 /* ac97_proc.c */
 #ifdef CONFIG_PROC_FS
 void snd_ac97_bus_proc_init(ac97_bus_t * ac97);
