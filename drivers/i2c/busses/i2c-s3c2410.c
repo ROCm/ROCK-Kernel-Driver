@@ -36,6 +36,7 @@
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/io.h>
 
 #include <asm/hardware/clock.h>
 #include <asm/arch/regs-gpio.h>
@@ -534,7 +535,6 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
 
 static struct i2c_algorithm s3c24xx_i2c_algorithm = {
 	.name			= "S3C2410-I2C-Algorithm",
-	.id			= I2C_ALGO_S3C2410,
 	.master_xfer		= s3c24xx_i2c_xfer,
 };
 
@@ -543,7 +543,6 @@ static struct s3c24xx_i2c s3c24xx_i2c = {
 	.wait	= __WAIT_QUEUE_HEAD_INITIALIZER(s3c24xx_i2c.wait),
 	.adap	= {
 		.name			= "s3c2410-i2c",
-		.id			= I2C_ALGO_S3C2410,
 		.algo			= &s3c24xx_i2c_algorithm,
 		.retries		= 2,
 	},
