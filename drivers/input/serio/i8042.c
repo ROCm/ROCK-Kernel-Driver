@@ -52,6 +52,13 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+__obsolete_setup("i8042_noaux");
+__obsolete_setup("i8042_nomux");
+__obsolete_setup("i8042_unlock");
+__obsolete_setup("i8042_reset");
+__obsolete_setup("i8042_direct");
+__obsolete_setup("i8042_dumbkbd");
+
 #undef DEBUG
 #include "i8042.h"
 

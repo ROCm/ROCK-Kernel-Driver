@@ -111,7 +111,7 @@ your needs:
 	alias tty-ldisc-2 serport
 	alias char-major-13 input
 	above input joydev ns558 analog
-	options analog js=gamepad
+	options analog map=gamepad,none,2btn
 
 2.5 Verifying that it works
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,7 +185,7 @@ you'll need to specify the types either on the kernel command line or on the
 module command line, when inserting analog.o into the kernel. The
 parameters are:
 
-	js=type,type,type,....
+	analog.map=<type1>,<type2>,<type3>,....
 
   'type' is type of the joystick from the table below, defining joysticks
 present on gameports in the system, starting with gameport0, second 'type'
@@ -419,7 +419,7 @@ card.
   Amiga joysticks, connected to an Amiga, are supported by the amijoy.c
 driver. Since they can't be autodetected, the driver has a command line.
 
-	amijoy=a,b
+	amijoy.map=<a>,<b>
 
   a and b define the joysticks connected to the JOY0DAT and JOY1DAT ports of
 the Amiga.
