@@ -2061,6 +2061,16 @@ config TIGON3
 	  To compile this driver as a module, choose M here: the module
 	  will be called tg3.  This is recommended.
 
+config NET_BROADCOM
+	tristate "Broadcom bcm5700 support"
+	depends on PCI
+	help
+	  This driver supports Broadcom based gigabit Ethernet cards.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  This is
+	  recommended.  The module will be called bcm5700.
 endmenu
 
 #
