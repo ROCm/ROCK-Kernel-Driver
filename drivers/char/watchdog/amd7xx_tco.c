@@ -1,6 +1,6 @@
 /*
  *	AMD 766/768 TCO Timer Driver
- *	(c) Copyright 2002 Zwane Mwaikambo <zwane@commfireservices.com>
+ *	(c) Copyright 2002 Zwane Mwaikambo <zwane@holomorphy.com>
  *	All Rights Reserved.
  *
  *	Parts from;
@@ -34,34 +34,47 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
-#define AMDTCO_MODULE_VER	"build 20020601"
+#define AMDTCO_MODULE_VER	"build 20021116"
 #define AMDTCO_MODULE_NAME	"amd7xx_tco"
 #define PFX			AMDTCO_MODULE_NAME ": "
 
-#define	MAX_TIMEOUT	38	/* max of 38 seconds */
+#define	MAX_TIMEOUT	38	/* max of 38 seconds, although the system will only
+				 * reset itself after the second timeout */
 
 /* pmbase registers */
-#define GLOBAL_SMI_REG	0x2a
-#define TCO_EN		(1 << 1)	/* bit 1 in global SMI register */
 #define TCO_RELOAD_REG	0x40		/* bits 0-5 are current count, 6-7 are reserved */
 #define TCO_INITVAL_REG	0x41		/* bits 0-5 are value to load, 6-7 are reserved */
 #define TCO_TIMEOUT_MASK	0x3f
+#define TCO_STATUS1_REG 0x44
 #define TCO_STATUS2_REG	0x46
 #define NDTO_STS2	(1 << 1)	/* we're interested in the second timeout */ 
 #define BOOT_STS	(1 << 2)	/* will be set if NDTO_STS2 was set before reboot */
 #define TCO_CTRL1_REG	0x48
 #define TCO_HALT	(1 << 11)
+#define NO_REBOOT	(1 << 10)	/* in DevB:3x48 */
 
-static char banner[] __initdata = KERN_INFO PFX AMDTCO_MODULE_VER;
-static int timeout = 38;
+static char banner[] __initdata = KERN_INFO PFX AMDTCO_MODULE_VER "\n";
+static int timeout = MAX_TIMEOUT;
 static u32 pmbase;		/* PMxx I/O base */
 static struct pci_dev *dev;
 static struct semaphore open_sem;
-spinlock_t amdtco_lock;	/* only for device access */
+static spinlock_t amdtco_lock;	/* only for device access */
 static int expect_close = 0;
 
 MODULE_PARM(timeout, "i");
 MODULE_PARM_DESC(timeout, "range is 0-38 seconds, default is 38");
+
+static inline u8 seconds_to_ticks(int seconds)
+{
+	/* the internal timer is stored as ticks which decrement
+	 * every 0.6 seconds */
+	return (seconds * 10) / 6;
+}
+
+static inline int ticks_to_seconds(u8 ticks)
+{
+	return (ticks * 6) / 10;
+}
 
 static inline int amdtco_status(void)
 {
@@ -81,28 +94,19 @@ static inline int amdtco_status(void)
 
 static inline void amdtco_ping(void)
 {
-	u8 reg;
-
-	spin_lock(&amdtco_lock);
-	reg = inb(pmbase+TCO_RELOAD_REG);
-	outb(1 | reg, pmbase+TCO_RELOAD_REG);
-	spin_unlock(&amdtco_lock);
+	outb(1, pmbase+TCO_RELOAD_REG);
 }
 
 static inline int amdtco_gettimeout(void)
 {
-	return inb(TCO_RELOAD_REG) & TCO_TIMEOUT_MASK;
+	u8 reg = inb(pmbase+TCO_RELOAD_REG) & TCO_TIMEOUT_MASK;
+	return ticks_to_seconds(reg);
 }
 
 static inline void amdtco_settimeout(unsigned int timeout)
 {
-	u8 reg;
-
-	spin_lock(&amdtco_lock);
-	reg = inb(pmbase+TCO_INITVAL_REG);
-	reg |= timeout & TCO_TIMEOUT_MASK;
+	u8 reg = seconds_to_ticks(timeout) & TCO_TIMEOUT_MASK;
 	outb(reg, pmbase+TCO_INITVAL_REG);
-	spin_unlock(&amdtco_lock);
 }
 
 static inline void amdtco_global_enable(void)
@@ -110,9 +114,12 @@ static inline void amdtco_global_enable(void)
 	u16 reg;
 
 	spin_lock(&amdtco_lock);
-	reg = inw(pmbase+GLOBAL_SMI_REG);
-	reg |= TCO_EN;
-	outw(reg, pmbase+GLOBAL_SMI_REG);
+
+	/* clear NO_REBOOT on DevB:3x48 p97 */
+	pci_read_config_word(dev, 0x48, &reg);
+	reg &= ~NO_REBOOT;
+	pci_write_config_word(dev, 0x48, reg);
+
 	spin_unlock(&amdtco_lock);
 }
 
@@ -146,10 +153,12 @@ static int amdtco_fop_open(struct inode *inode, struct file *file)
 	if (timeout > MAX_TIMEOUT)
 		timeout = MAX_TIMEOUT;
 
+	amdtco_disable();
 	amdtco_settimeout(timeout);	
 	amdtco_global_enable();
+	amdtco_enable();
 	amdtco_ping();
-	printk(KERN_INFO PFX "Watchdog enabled, timeout = %d/%d seconds",
+	printk(KERN_INFO PFX "Watchdog enabled, timeout = %ds of %ds\n",
 		amdtco_gettimeout(), timeout);
 	
 	return 0;
@@ -198,7 +207,7 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 		case WDIOC_GETTIMEOUT:
 			return put_user(amdtco_gettimeout(), (int *)arg);
-	
+		
 		case WDIOC_SETOPTIONS:
 			if (copy_from_user(&tmp, (int *)arg, sizeof tmp))
                                 return -EFAULT;
@@ -221,7 +230,7 @@ static int amdtco_fop_release(struct inode *inode, struct file *file)
 		printk(KERN_INFO PFX "Watchdog disabled\n");
 	} else {
 		amdtco_ping();
-		printk(KERN_CRIT PFX "Unexpected close!, timeout in %d seconds)\n", timeout);
+		printk(KERN_CRIT PFX "Unexpected close!, timeout in %d seconds\n", timeout);
 	}	
 	
 	up(&open_sem);
@@ -249,10 +258,9 @@ static ssize_t amdtco_fop_write(struct file *file, const char *data, size_t len,
 		}
 #endif
 		amdtco_ping();
-		return len;
 	}
 
-	return 0;
+	return len;
 }
 
 
@@ -357,6 +365,9 @@ static int __init amdtco_setup(char *str)
 	if (ints[0] > 0)
 		timeout = ints[1];
 
+	if (!timeout || timeout > MAX_TIMEOUT)
+		timeout = MAX_TIMEOUT;
+
 	return 1;
 }
 
@@ -366,8 +377,7 @@ __setup("amd7xx_tco=", amdtco_setup);
 module_init(amdtco_init);
 module_exit(amdtco_exit);
 
-MODULE_AUTHOR("Zwane Mwaikambo <zwane@commfireservices.com>");
+MODULE_AUTHOR("Zwane Mwaikambo <zwane@holomorphy.com>");
 MODULE_DESCRIPTION("AMD 766/768 TCO Timer Driver");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
