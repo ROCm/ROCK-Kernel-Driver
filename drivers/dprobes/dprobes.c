@@ -1619,10 +1619,8 @@ static int __init dprobes_init_module(void)
 		printk("<1>register_sysrq_key returned %i\n", retval);
 #endif
 	return retval;
-err2:	unregister_rmmodule_notifier(&dp_module_load_nb);
-	printk("called unreg\n");
-err1:	unregister_module_notifier(&dp_rmmodule_load_nb);
-	printk("called unreg\n");
+err2:	unregister_rmmodule_notifier(&dp_rmmodule_load_nb);
+err1:	unregister_module_notifier(&dp_module_load_nb);
 err:	return retval;
 
 }
@@ -1635,8 +1633,8 @@ static void __exit dprobes_cleanup_module(void)
 	printk("IBM Dynamic Probes v%d.%d.%d unloaded.\n", DP_MAJOR_VER, 
 			DP_MINOR_VER, DP_PATCH_VER);
 
-	unregister_rmmodule_notifier(&dp_module_load_nb);
-	unregister_module_notifier(&dp_rmmodule_load_nb);
+	unregister_rmmodule_notifier(&dp_rmmodule_load_nb);
+	unregister_module_notifier(&dp_module_load_nb);
 #ifdef CONFIG_MAGIC_SYSRQ        
 	destroy_workqueue(dprobes_wq);
 	if ((retval = unregister_sysrq_key('v', &key_op)))

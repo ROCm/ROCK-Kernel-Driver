@@ -117,7 +117,7 @@ int unregister_rmmodule_notifier(struct notifier_block * nb)
 {
 	int err;
 	down(&rmmod_notify_mutex);
-	err = notifier_chain_unregister(&module_notify_list, nb);
+	err = notifier_chain_unregister(&rmmodule_notify_list, nb);
 	up(&rmmod_notify_mutex);
 	return err;
 }
@@ -1002,14 +1002,14 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 static void free_module(struct module *mod)
 {
 	TRIG_EVENT(free_module_hook, mod);
+	down(&rmmod_notify_mutex);
+	notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
+	up(&rmmod_notify_mutex);
+
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
-
-	down(&rmmod_notify_mutex);
-	notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
-	up(&rmmod_notify_mutex);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
