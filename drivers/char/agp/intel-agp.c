@@ -998,7 +998,7 @@ struct agp_bridge_data intel_generic_bridge = {
 };
 
 struct agp_bridge_data intel_810_bridge = {
-	.type			= INTEL_I810,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_i810_masks,
 	.aperture_sizes		= (void *)intel_i810_sizes,
 	.size_type		= FIXED_APER_SIZE,
@@ -1051,7 +1051,7 @@ struct agp_bridge_data intel_815_bridge = {
 };
 
 struct agp_bridge_data intel_830_bridge = {
-	.type			= INTEL_I810,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_i810_masks,
 	.aperture_sizes		= (void *)intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
@@ -1079,7 +1079,7 @@ struct agp_bridge_data intel_830_bridge = {
 
 
 struct agp_bridge_data intel_820_bridge = {
-	.type			= INTEL_I820,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1104,7 +1104,7 @@ struct agp_bridge_data intel_820_bridge = {
 };
 
 struct agp_bridge_data intel_830mp_bridge = {
-	.type			= INTEL_I830_M,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_830mp_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1153,7 +1153,7 @@ struct agp_bridge_data intel_840_bridge = {
 };
 
 struct agp_bridge_data intel_845_bridge = {
-	.type			= INTEL_I845,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1178,7 +1178,7 @@ struct agp_bridge_data intel_845_bridge = {
 };
 
 struct agp_bridge_data intel_850_bridge = {
-	.type			= INTEL_I850,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1203,7 +1203,7 @@ struct agp_bridge_data intel_850_bridge = {
 };
 
 struct agp_bridge_data intel_860_bridge = {
-	.type			= INTEL_I860,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1228,7 +1228,7 @@ struct agp_bridge_data intel_860_bridge = {
 };
 
 struct agp_bridge_data intel_7505_bridge = {
-	.type			= INTEL_E7505,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1303,17 +1303,17 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_INTEL_82443LX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_LX;
+		bridge->type = INTEL_GENERIC;
 		name = "440LX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82443BX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_BX;
+		bridge->type = INTEL_GENERIC;
 		name = "440BX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82443GX_0:
 		bridge = &intel_generic_bridge;
-		bridge->type = INTEL_GX;
+		bridge->type = INTEL_GENERIC;
 		name = "440GX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82810_MC1:
@@ -1371,7 +1371,7 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			bridge = &intel_830_bridge;
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_I845_G;
+			bridge->type = INTEL_GENERIC;
 		}
 		name = "845G";
 		break;
@@ -1385,7 +1385,7 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			name = "855";
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_I855_PM;
+			bridge->type = INTEL_GENERIC;
 			name = "855PM";
 		}
 		break;
@@ -1398,7 +1398,7 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 			bridge = &intel_830_bridge;
 		} else {
 			bridge = &intel_845_bridge;
-			bridge->type = INTEL_I865_G;
+			bridge->type = INTEL_GENERIC;
 		}
 		name = "865";
 		break;
