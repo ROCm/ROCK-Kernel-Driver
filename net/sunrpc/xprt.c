@@ -68,8 +68,6 @@
 
 #include <asm/uaccess.h>
 
-extern spinlock_t rpc_queue_lock;
-
 /*
  * Local variables
  */
@@ -465,20 +463,16 @@ xprt_reconn_status(struct rpc_task *task)
 static inline struct rpc_rqst *
 xprt_lookup_rqst(struct rpc_xprt *xprt, u32 xid)
 {
-	struct rpc_rqst	*req;
-	struct list_head *le;
-	struct rpc_task *task;
+	struct list_head *pos;
+	struct rpc_rqst	*req = NULL;
 
-	spin_lock_bh(&rpc_queue_lock);
-	task_for_each(task, le, &xprt->pending.tasks)
-		if ((req = task->tk_rqstp) && req->rq_xid == xid)
-			goto out;
-	dprintk("RPC:      unknown XID %08x in reply.\n", xid);
-	req = NULL;
- out:
-	if (req && !__rpc_lock_task(req->rq_task))
-		req = NULL;
-	spin_unlock_bh(&rpc_queue_lock);
+	list_for_each(pos, &xprt->recv) {
+		struct rpc_rqst *entry = list_entry(pos, struct rpc_rqst, rq_list);
+		if (entry->rq_xid == xid) {
+			req = entry;
+			break;
+		}
+	}
 	return req;
 }
 
@@ -515,7 +509,7 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 
 	dprintk("RPC: %4d has input (%d bytes)\n", task->tk_pid, copied);
 	task->tk_status = copied;
-	req->rq_received = 1;
+	req->rq_received = copied;
 
 	/* ... and wake up the process. */
 	rpc_wake_up_task(task);
@@ -613,9 +607,10 @@ udp_data_ready(struct sock *sk, int len)
 	}
 
 	/* Look up and lock the request corresponding to the given XID */
+	spin_lock(&xprt->sock_lock);
 	rovr = xprt_lookup_rqst(xprt, *(u32 *) (skb->h.raw + sizeof(struct udphdr)));
 	if (!rovr)
-		goto dropit;
+		goto out_unlock;
 	task = rovr->rq_task;
 
 	dprintk("RPC: %4d received reply\n", task->tk_pid);
@@ -635,8 +630,7 @@ udp_data_ready(struct sock *sk, int len)
 	xprt_complete_rqst(xprt, rovr, copied);
 
  out_unlock:
-	rpc_unlock_task(task);
-
+	spin_unlock(&xprt->sock_lock);
  dropit:
 	skb_free_datagram(sk, skb);
  out:
@@ -738,11 +732,13 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	size_t len;
 
 	/* Find and lock the request corresponding to this xid */
+	spin_lock(&xprt->sock_lock);
 	req = xprt_lookup_rqst(xprt, xprt->tcp_xid);
 	if (!req) {
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 		dprintk("RPC:      XID %08x request not found!\n",
 				xprt->tcp_xid);
+		spin_unlock(&xprt->sock_lock);
 		return;
 	}
 
@@ -776,7 +772,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 				req->rq_task->tk_pid);
 		xprt_complete_rqst(xprt, req, xprt->tcp_copied);
 	}
-	rpc_unlock_task(req->rq_task); 
+	spin_unlock(&xprt->sock_lock);
 	tcp_check_recm(xprt);
 }
 
@@ -933,16 +929,21 @@ static void
 xprt_timer(struct rpc_task *task)
 {
 	struct rpc_rqst	*req = task->tk_rqstp;
+	struct rpc_xprt *xprt = req->rq_xprt;
 
-	if (req)
-		xprt_adjust_cwnd(task->tk_xprt, -ETIMEDOUT);
+	spin_lock(&xprt->sock_lock);
+	if (req->rq_received)
+		goto out;
+	xprt_adjust_cwnd(xprt, -ETIMEDOUT);
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
 		task->tk_pid, req ? "pending" : "backlogged");
 
 	task->tk_status  = -ETIMEDOUT;
+out:
 	task->tk_timeout = 0;
 	rpc_wake_up_task(task);
+	spin_unlock(&xprt->sock_lock);
 }
 
 /*
@@ -995,14 +996,6 @@ do_xprt_transmit(struct rpc_task *task)
 	int status, retry = 0;
 
 
-	/* For fast networks/servers we have to put the request on
-	 * the pending list now:
-	 * Note that we don't want the task timing out during the
-	 * call to xprt_sendmsg(), so we initially disable the timeout,
-	 * and then reset it later...
-	 */
-	xprt_receive(task);
-
 	/* Continue transmitting the packet/record. We must be careful
 	 * to cope with writespace callbacks arriving _after_ we have
 	 * called xprt_sendmsg().
@@ -1034,15 +1027,11 @@ do_xprt_transmit(struct rpc_task *task)
 		if (retry++ > 50)
 			break;
 	}
-	rpc_unlock_task(task);
 
 	/* Note: at this point, task->tk_sleeping has not yet been set,
 	 *	 hence there is no danger of the waking up task being put on
 	 *	 schedq, and being picked up by a parallel run of rpciod().
 	 */
-	rpc_wake_up_task(task);
-	if (!RPC_IS_RUNNING(task))
-		goto out_release;
 	if (req->rq_received)
 		goto out_release;
 
@@ -1077,28 +1066,12 @@ do_xprt_transmit(struct rpc_task *task)
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);
 	/* Set the task's receive timeout value */
 	task->tk_timeout = req->rq_timeout.to_current;
-	rpc_add_timer(task, xprt_timer);
-	rpc_unlock_task(task);
+	spin_lock_bh(&xprt->sock_lock);
+	if (!req->rq_received)
+		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
+	spin_unlock_bh(&xprt->sock_lock);
  out_release:
 	xprt_release_write(xprt, task);
-}
-
-/*
- * Queue the task for a reply to our call.
- * When the callback is invoked, the congestion window should have
- * been updated already.
- */
-void
-xprt_receive(struct rpc_task *task)
-{
-	struct rpc_rqst	*req = task->tk_rqstp;
-	struct rpc_xprt	*xprt = req->rq_xprt;
-
-	dprintk("RPC: %4d xprt_receive\n", task->tk_pid);
-
-	req->rq_received = 0;
-	task->tk_timeout = 0;
-	rpc_sleep_locked(&xprt->pending, task, NULL, NULL);
 }
 
 /*
@@ -1188,6 +1161,10 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	req->rq_xid     = xid++;
 	if (!xid)
 		xid++;
+	INIT_LIST_HEAD(&req->rq_list);
+	spin_lock_bh(&xprt->sock_lock);
+	list_add_tail(&req->rq_list, &xprt->recv);
+	spin_unlock_bh(&xprt->sock_lock);
 }
 
 /*
@@ -1206,6 +1183,10 @@ xprt_release(struct rpc_task *task)
 	}
 	if (!(req = task->tk_rqstp))
 		return;
+	spin_lock_bh(&xprt->sock_lock);
+	if (!list_empty(&req->rq_list))
+		list_del(&req->rq_list);
+	spin_unlock_bh(&xprt->sock_lock);
 	task->tk_rqstp = NULL;
 	memset(req, 0, sizeof(*req));	/* mark unused */
 
@@ -1279,6 +1260,8 @@ xprt_setup(struct socket *sock, int proto,
 	spin_lock_init(&xprt->sock_lock);
 	spin_lock_init(&xprt->xprt_lock);
 	init_waitqueue_head(&xprt->cong_wait);
+
+	INIT_LIST_HEAD(&xprt->recv);
 
 	/* Set timeout parameters */
 	if (to) {
