@@ -1559,11 +1559,14 @@ static int bond_enslave(struct net_device *master_dev,
 #endif
 			bond_set_slave_inactive_flags(new_slave);
 		}
-		read_lock_irqsave(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
-		ifap= &(((struct in_device *)slave_dev->ip_ptr)->ifa_list);
-		ifa = *ifap;
-		my_ip = ifa->ifa_address;
-		read_unlock_irqrestore(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+		if (((struct in_device *)slave_dev->ip_ptr) != NULL) {
+			read_lock_irqsave(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+			ifap= &(((struct in_device *)slave_dev->ip_ptr)->ifa_list);
+			ifa = *ifap;
+			if (ifa != NULL)
+				my_ip = ifa->ifa_address;
+			read_unlock_irqrestore(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+		}
 
 		/* if there is a primary slave, remember it */
 		if (primary != NULL) {
@@ -2730,10 +2733,8 @@ static void activebackup_arp_monitor(struct net_device *master)
 		/* the current slave must tx an arp to ensure backup slaves
 		 * rx traffic
 		 */
-		if ((slave != NULL) &&
-		    (((jiffies - slave->dev->last_rx) >= the_delta_in_ticks) &&
-		     (my_ip != 0))) {
-		  arp_send_all(slave);
+		if ((slave != NULL) && (my_ip != 0)) {
+			arp_send_all(slave);
 		}
 	}
 
