@@ -338,6 +338,9 @@ module_param (qmult, uint, S_IRUGO|S_IWUSR);
  *
  * NOTE:  Controllers like superh_udc should probably be able to use
  * an RNDIS-only configuration.
+ *
+ * FIXME define some higher-powered configurations to make it easier
+ * to recharge batteries ...
  */
 
 #define DEV_CONFIG_VALUE	1	/* cdc or subset */
@@ -361,6 +364,14 @@ device_desc = {
 	.bNumConfigurations =	1,
 };
 
+static struct usb_otg_descriptor
+otg_descriptor = {
+	.bLength =		sizeof otg_descriptor,
+	.bDescriptorType =	USB_DT_OTG,
+
+	.bmAttributes =		USB_OTG_SRP,
+};
+
 static struct usb_config_descriptor
 eth_config = {
 	.bLength =		sizeof eth_config,
@@ -375,7 +386,7 @@ eth_config = {
 };
 
 #ifdef	CONFIG_USB_ETH_RNDIS
-static const struct usb_config_descriptor 
+static struct usb_config_descriptor 
 rndis_config = {
 	.bLength =              sizeof rndis_config,
 	.bDescriptorType =      USB_DT_CONFIG,
@@ -671,7 +682,8 @@ fs_sink_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static const struct usb_descriptor_header *fs_eth_function [10] = {
+static const struct usb_descriptor_header *fs_eth_function [11] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 #ifdef DEV_CONFIG_CDC
 	/* "cdc" mode descriptors */
 	(struct usb_descriptor_header *) &control_intf,
@@ -692,17 +704,18 @@ static const struct usb_descriptor_header *fs_eth_function [10] = {
 static inline void __init fs_subset_descriptors(void)
 {
 #ifdef DEV_CONFIG_SUBSET
-	fs_eth_function[0] = (struct usb_descriptor_header *) &subset_data_intf;
-	fs_eth_function[1] = (struct usb_descriptor_header *) &fs_source_desc;
-	fs_eth_function[2] = (struct usb_descriptor_header *) &fs_sink_desc;
-	fs_eth_function[3] = 0;
+	fs_eth_function[1] = (struct usb_descriptor_header *) &subset_data_intf;
+	fs_eth_function[2] = (struct usb_descriptor_header *) &fs_source_desc;
+	fs_eth_function[3] = (struct usb_descriptor_header *) &fs_sink_desc;
+	fs_eth_function[4] = 0;
 #else
-	fs_eth_function[0] = 0;
+	fs_eth_function[1] = 0;
 #endif
 }
 
 #ifdef	CONFIG_USB_ETH_RNDIS
 static const struct usb_descriptor_header *fs_rndis_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	/* control interface matches ACM, not Ethernet */
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
@@ -766,7 +779,8 @@ dev_qualifier = {
 	.bNumConfigurations =	1,
 };
 
-static const struct usb_descriptor_header *hs_eth_function [10] = {
+static const struct usb_descriptor_header *hs_eth_function [11] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 #ifdef DEV_CONFIG_CDC
 	/* "cdc" mode descriptors */
 	(struct usb_descriptor_header *) &control_intf,
@@ -787,17 +801,18 @@ static const struct usb_descriptor_header *hs_eth_function [10] = {
 static inline void __init hs_subset_descriptors(void)
 {
 #ifdef DEV_CONFIG_SUBSET
-	hs_eth_function[0] = (struct usb_descriptor_header *) &subset_data_intf;
-	hs_eth_function[1] = (struct usb_descriptor_header *) &fs_source_desc;
-	hs_eth_function[2] = (struct usb_descriptor_header *) &fs_sink_desc;
-	hs_eth_function[3] = 0;
+	hs_eth_function[1] = (struct usb_descriptor_header *) &subset_data_intf;
+	hs_eth_function[2] = (struct usb_descriptor_header *) &fs_source_desc;
+	hs_eth_function[3] = (struct usb_descriptor_header *) &fs_sink_desc;
+	hs_eth_function[4] = 0;
 #else
-	hs_eth_function[0] = 0;
+	hs_eth_function[1] = 0;
 #endif
 }
 
 #ifdef	CONFIG_USB_ETH_RNDIS
 static const struct usb_descriptor_header *hs_rndis_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	/* control interface matches ACM, not Ethernet */
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
@@ -870,18 +885,20 @@ static struct usb_gadget_strings	stringtab = {
  * complications: class descriptors, and an altsetting.
  */
 static int
-config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
+config_buf (enum usb_device_speed speed,
+	u8 *buf, u8 type,
+	unsigned index, int is_otg)
 {
-	int				len;
+	int					len;
+	const struct usb_config_descriptor	*config;
+	const struct usb_descriptor_header	**function;
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 	int				hs = (speed == USB_SPEED_HIGH);
 
 	if (type == USB_DT_OTHER_SPEED_CONFIG)
 		hs = !hs;
-#define which_config(t)	(hs ? & t ## _config   : & t ## _config)
 #define which_fn(t)	(hs ? & hs_ ## t ## _function : & fs_ ## t ## _function)
 #else
-#define	which_config(t)	(& t ## _config)
 #define	which_fn(t)	(& fs_ ## t ## _function)
 #endif
 
@@ -892,15 +909,23 @@ config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
 	/* list the RNDIS config first, to make Microsoft's drivers
 	 * happy. DOCSIS 1.0 needs this too.
 	 */
-	if (device_desc.bNumConfigurations == 2 && index == 0)
-		len = usb_gadget_config_buf (which_config (rndis), buf,
-			USB_BUFSIZ, (const struct usb_descriptor_header **)
-				which_fn (rndis));
-	else
+	if (device_desc.bNumConfigurations == 2 && index == 0) {
+		config = &rndis_config;
+		function = (const struct usb_descriptor_header **)
+				which_fn (rndis);
+	} else
 #endif
-		len = usb_gadget_config_buf (which_config (eth), buf,
-			USB_BUFSIZ, (const struct usb_descriptor_header **)
-				which_fn (eth));
+	{
+		config = &eth_config;
+		function = (const struct usb_descriptor_header **)
+				which_fn (eth);
+	}
+
+	/* for now, don't advertise srp-only devices */
+	if (!is_otg)
+		function++;
+
+	len = usb_gadget_config_buf (config, buf, USB_BUFSIZ, function);
 	if (len < 0)
 		return len;
 	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
@@ -1387,6 +1412,7 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	/* descriptors just go into the pre-allocated ep0 buffer,
 	 * while config change events may enable network traffic.
 	 */
+	req->complete = eth_setup_complete;
 	switch (ctrl->bRequest) {
 
 	case USB_REQ_GET_DESCRIPTOR:
@@ -1414,7 +1440,8 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		case USB_DT_CONFIG:
 			value = config_buf (gadget->speed, req->buf,
 					ctrl->wValue >> 8,
-					ctrl->wValue & 0xff);
+					ctrl->wValue & 0xff,
+					gadget->is_otg);
 			if (value >= 0)
 				value = min (ctrl->wLength, (u16) value);
 			break;
@@ -1431,6 +1458,10 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	case USB_REQ_SET_CONFIGURATION:
 		if (ctrl->bRequestType != 0)
 			break;
+		if (gadget->a_hnp_support)
+			DEBUG (dev, "HNP available\n");
+		else if (gadget->a_alt_hnp_support)
+			DEBUG (dev, "HNP needs a different root port\n");
 		spin_lock (&dev->lock);
 		value = eth_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
@@ -1724,9 +1755,10 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 
 	/* Padding up to RX_EXTRA handles minor disagreements with host.
 	 * Normally we use the USB "terminate on short read" convention;
-	 * so allow up to (N*maxpacket)-1, since that memory is normally
-	 * already allocated.  Major loss of synch means -EOVERFLOW; any
-	 * obviously corrupted packets will automatically be discarded. 
+	 * so allow up to (N*maxpacket), since that memory is normally
+	 * already allocated.  Some hardware doesn't deal well with short
+	 * reads (e.g. DMA must be N*maxpacket), so for now don't trim a
+	 * byte off the end (to force hardware errors on overflow).
 	 *
 	 * RNDIS uses internal framing, and explicitly allows senders to
 	 * pad to end-of-packet.  That's potentially nice for speed,
@@ -1739,10 +1771,6 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 		size += sizeof (struct rndis_packet_msg_type);
 #endif	
 	size -= size % dev->out_ep->maxpacket;
-#ifdef CONFIG_USB_ETH_RNDIS
-	if (!dev->rndis)
-#endif	
-		size--;
 
 	if ((skb = alloc_skb (size, gfp_flags)) == 0) {
 		DEBUG (dev, "no rx skb\n");
@@ -2429,6 +2457,14 @@ autoconf_fail:
 
 	device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
 	usb_gadget_set_selfpowered (gadget);
+
+	if (gadget->is_otg) {
+		otg_descriptor.bmAttributes |= USB_OTG_HNP,
+		eth_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+#ifdef	CONFIG_USB_ETH_RNDIS
+		rndis_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+#endif
+	}
 
  	net = alloc_etherdev (sizeof *dev);
  	if (!net)
