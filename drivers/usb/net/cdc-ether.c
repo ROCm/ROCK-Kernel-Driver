@@ -132,7 +132,7 @@ goon:
 
 	// Give this to the USB subsystem so it can tell us
 	// when more data arrives.
-	if ( (res = usb_submit_urb(ether_dev->rx_urb, GFP_KERNEL)) ) {
+	if ( (res = usb_submit_urb(ether_dev->rx_urb, GFP_ATOMIC)) ) {
 		warn("%s failed submint rx_urb %d", __FUNCTION__, res);
 	}
 
@@ -302,7 +302,7 @@ static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 	ether_dev->tx_urb->transfer_buffer_length = count;
 	
 	// Send the URB on its merry way.
-	if ((res = usb_submit_urb(ether_dev->tx_urb, GFP_KERNEL)))  {
+	if ((res = usb_submit_urb(ether_dev->tx_urb, GFP_ATOMIC)))  {
 		// Hmm...  It didn't go. Tell someone...
 		warn("failed tx_urb %d", res);
 		// update some stats...

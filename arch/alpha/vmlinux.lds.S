@@ -55,6 +55,12 @@ SECTIONS
 	__setup_end = .;
   }
 
+  __param ALIGN(8): {
+	__start___param = .;
+	*(__param)
+	__stop___param = .;
+  }
+
   .initcall.init ALIGN(8): {
 	__initcall_start = .;
 	*(.initcall1.init) 

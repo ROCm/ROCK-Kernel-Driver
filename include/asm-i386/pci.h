@@ -6,9 +6,6 @@
 #ifdef __KERNEL__
 #include <linux/mm.h>		/* for struct page */
 
-/* we support the new DMA API, but still provide the old one */
-#define PCI_NEW_DMA_COMPAT_API	1
-
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes
    or architectures with incomplete PCI setup by the loader */
@@ -104,5 +101,8 @@ extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			       enum pci_mmap_state mmap_state, int write_combine);
 
 #endif /* __KERNEL__ */
+
+/* implement the pci_ DMA API in terms of the generic device dma_ one */
+#include <asm-generic/pci-dma-compat.h>
 
 #endif /* __i386_PCI_H */
