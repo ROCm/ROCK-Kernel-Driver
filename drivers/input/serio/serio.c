@@ -245,7 +245,6 @@ static ssize_t serio_show_description(struct device *dev, char *buf)
 	struct serio *serio = to_serio_port(dev);
 	return sprintf(buf, "%s\n", serio->name);
 }
-static DEVICE_ATTR(description, S_IRUGO, serio_show_description, NULL);
 
 static ssize_t serio_show_driver(struct device *dev, char *buf)
 {
@@ -283,7 +282,13 @@ static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t c
 
 	return retval;
 }
-static DEVICE_ATTR(driver, S_IWUSR | S_IRUGO, serio_show_driver, serio_rebind_driver);
+
+static struct device_attribute serio_device_attrs[] = {
+	__ATTR(description, S_IRUGO, serio_show_description, NULL),
+	__ATTR(driver, S_IWUSR | S_IRUGO, serio_show_driver, serio_rebind_driver),
+	__ATTR_NULL
+};
+
 
 static void serio_release_port(struct device *dev)
 {
@@ -305,8 +310,6 @@ static void serio_create_port(struct serio *serio)
 	if (serio->parent)
 		serio->dev.parent = &serio->parent->dev;
 	device_register(&serio->dev);
-	device_create_file(&serio->dev, &dev_attr_description);
-	device_create_file(&serio->dev, &dev_attr_driver);
 }
 
 /*
@@ -481,7 +484,11 @@ static ssize_t serio_driver_show_description(struct device_driver *drv, char *bu
 	struct serio_driver *driver = to_serio_driver(drv);
 	return sprintf(buf, "%s\n", driver->description ? driver->description : "(none)");
 }
-static DRIVER_ATTR(description, S_IRUGO, serio_driver_show_description, NULL);
+
+static struct driver_attribute serio_driver_attrs[] = {
+	__ATTR(description, S_IRUGO, serio_driver_show_description, NULL),
+	__ATTR_NULL
+};
 
 void serio_register_driver(struct serio_driver *drv)
 {
@@ -493,7 +500,6 @@ void serio_register_driver(struct serio_driver *drv)
 
 	drv->driver.bus = &serio_bus;
 	driver_register(&drv->driver);
-	driver_create_file(&drv->driver, &driver_attr_description);
 
 	if (drv->manual_bind)
 		goto out;
@@ -597,6 +603,8 @@ static int __init serio_init(void)
 		return -1;
 	}
 
+	serio_bus.dev_attrs = serio_device_attrs;
+	serio_bus.drv_attrs = serio_driver_attrs;
 	bus_register(&serio_bus);
 
 	return 0;
