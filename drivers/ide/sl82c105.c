@@ -209,6 +209,7 @@ static void sl82c105_dma_enable(struct ata_device *drive, int on, int verbose)
 static int sl82c105_dma_init(struct ata_device *drive, struct request *rq)
 {
 	sl82c105_reset_host(drive->channel->pci_dev);
+
 	return udma_pci_init(drive, rq);
 }
 

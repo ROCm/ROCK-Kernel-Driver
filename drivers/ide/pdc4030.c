@@ -784,7 +784,7 @@ ide_startstop_t promise_do_request(struct ata_device *drive, struct request *rq,
 	args.taskfile.high_cylinder	= (block>>=8);
 	args.taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
 	args.cmd = (rq_data_dir(rq) == READ) ? PROMISE_READ : PROMISE_WRITE;
-	args.handler	= NULL;
+	args.XXX_handler	= NULL;
 	rq->special	= &args;
 
 	return do_pdc4030_io(drive, &args, rq);

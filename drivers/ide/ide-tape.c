@@ -2290,7 +2290,7 @@ static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive,
 		udma_enable(drive, 0, 1);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok = !udma_init(drive, rq);
+		dma_ok = udma_init(drive, rq);
 #endif
 
 	ata_irq_enable(drive, 1);

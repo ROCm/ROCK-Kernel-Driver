@@ -84,7 +84,7 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	request_queue_t *q = &drive->queue;
-	struct ata_taskfile *args;
+	struct ata_taskfile *ar;
 	struct request *rq;
 	unsigned long flags;
 
@@ -110,8 +110,8 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	 * executed before any new commands are started. issue a NOP
 	 * to clear internal queue on drive.
 	 */
-	args = kmalloc(sizeof(*args), GFP_ATOMIC);
-	if (!args) {
+	ar = kmalloc(sizeof(*ar), GFP_ATOMIC);
+	if (!ar) {
 		printk(KERN_ERR "ATA: %s: failed to issue NOP\n", drive->name);
 		goto out;
 	}
@@ -126,10 +126,10 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	 */
 	BUG_ON(!rq);
 
-	rq->special = args;
-	args->cmd = WIN_NOP;
-	args->handler = tcq_nop_handler;
-	args->command_type = IDE_DRIVE_TASK_NO_DATA;
+	rq->special = ar;
+	ar->cmd = WIN_NOP;
+	ar->XXX_handler = tcq_nop_handler;
+	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	rq->rq_dev = mk_kdev(drive->channel->major, (drive->select.b.unit)<<PARTN_BITS);
 	_elv_add_request(q, rq, 0, 0);
@@ -539,10 +539,9 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 		return ide_stopped;
 
 	set_irq(drive, ide_dmaq_intr);
-	if (!udma_start(drive, rq))
-		return ide_started;
+	udma_start(drive, rq);
 
-	return ide_stopped;
+	return ide_started;
 }
 
 /*
@@ -550,7 +549,7 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
  *
  * Channel lock should be held.
  */
-ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
+ide_startstop_t udma_tcq_init(struct ata_device *drive, struct request *rq)
 {
 	u8 stat;
 	u8 feat;

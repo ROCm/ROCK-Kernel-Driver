@@ -573,8 +573,6 @@ static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 	 */
 
 	outb(inb(ch->dma_base) | 1, ch->dma_base); /* start DMA */
-
-	return 0;
 }
 
 int pdc202xx_udma_stop(struct ata_device *drive)

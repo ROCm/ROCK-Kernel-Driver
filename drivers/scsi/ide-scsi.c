@@ -444,7 +444,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	if (drive->using_dma && rq->bio)
-		dma_ok = !udma_init(drive, rq);
+		dma_ok = udma_init(drive, rq);
 
 	ata_select(drive, 10);
 	ata_irq_enable(drive, 1);

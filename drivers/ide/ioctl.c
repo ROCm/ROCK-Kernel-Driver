@@ -54,9 +54,6 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 	if (copy_from_user(vals, (void *)arg, 4))
 		return -EFAULT;
 
-	memset(&req, 0, sizeof(req));
-	req.flags = REQ_SPECIAL;
-
 	memset(&args, 0, sizeof(args));
 
 	args.taskfile.feature = vals[2];
@@ -83,10 +80,14 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 
 	/* Issue ATA command and wait for completion.
 	 */
-	args.handler = ata_special_intr;
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
+	args.XXX_handler = ata_special_intr;
+
+	memset(&req, 0, sizeof(req));
+	req.flags = REQ_SPECIAL;
+	req.special = &args;
 
 	req.buffer = argbuf + 4;
-	req.special = &args;
 	err = ide_do_drive_cmd(drive, &req, ide_wait);
 
 	argbuf[0] = drive->status;

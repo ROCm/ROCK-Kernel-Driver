@@ -259,7 +259,7 @@ no_dma_set:
 static int ali15x3_udma_init(struct ata_device *drive, struct request *rq)
 {
 	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
-		return 1;	/* try PIO instead of DMA */
+		return ide_stopped;	/* try PIO instead of DMA */
 
 	return udma_pci_init(drive, rq);
 }

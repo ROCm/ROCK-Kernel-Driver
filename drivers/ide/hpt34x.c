@@ -175,7 +175,7 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 	u8 cmd;
 
 	if (!(count = udma_new_table(drive, rq)))
-		return 1;	/* try PIO instead of DMA */
+		return ide_stopped;	/* try PIO instead of DMA */
 
 	if (rq_data_dir(rq) == READ)
 		cmd = 0x09;
@@ -192,7 +192,7 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 		OUT_BYTE((cmd == 0x09) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 	}
 
-	return 0;
+	return ide_started;
 }
 #endif
 

@@ -858,7 +858,7 @@ static void do_udma_start(struct ata_device *drive)
 	udelay(10);
 }
 
-static int hpt370_udma_start(struct ata_device *drive, struct request *__rq)
+static void hpt370_udma_start(struct ata_device *drive, struct request *__rq)
 {
 	struct ata_channel *ch = drive->channel;
 
@@ -870,8 +870,6 @@ static int hpt370_udma_start(struct ata_device *drive, struct request *__rq)
 	 */
 
 	outb(inb(ch->dma_base) | 1, ch->dma_base);	/* start DMA */
-
-	return 0;
 }
 
 static void do_timeout_irq(struct ata_device *drive)

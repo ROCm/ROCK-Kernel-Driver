@@ -702,7 +702,8 @@ kill_rq:
 			spin_unlock_irq(ch->lock);
 			ata_ops(drive)->end_request(drive, rq, 0);
 			spin_lock_irq(ch->lock);
-		}
+		} else
+			__ata_end_request(drive, rq, 0, 0);
 	} else
 		__ata_end_request(drive, rq, 0, 0);
 
