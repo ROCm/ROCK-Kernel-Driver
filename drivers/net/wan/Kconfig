@@ -62,7 +62,7 @@ config COSA
 #
 config COMX
 	tristate "MultiGate (COMX) synchronous serial boards support"
-	depends on WAN
+	depends on WAN && (ISA || PCI)
 	---help---
 	  Say Y if you want to use any board from the MultiGate (COMX) family.
 	  These boards are synchronous serial adapters for the PC,
@@ -176,7 +176,7 @@ config COMX_PROTO_FR
 #
 config DSCC4
 	tristate "Etinc PCISYNC serial board support"
-	depends on WAN && m
+	depends on WAN && PCI && m
 	help
 	  This is a driver for Etinc PCISYNC boards based on the Infineon
 	  (ex. Siemens) DSCC4 chipset. It is supposed to work with the four
@@ -193,7 +193,7 @@ config DSCC4
 #
 config LANMEDIA
 	tristate "LanMedia Corp. SSI/V.35, T1/E1, HSSI, T3 boards"
-	depends on WAN
+	depends on WAN && PCI
 	---help---
 	  This is a driver for the following Lan Media family of serial
 	  boards.
@@ -222,7 +222,7 @@ config LANMEDIA
 # There is no way to detect a Sealevel board. Force it modular
 config SEALEVEL_4021
 	tristate "Sealevel Systems 4021 support"
-	depends on WAN && m
+	depends on WAN && ISA && m
 	help
 	  This is a driver for the Sealevel Systems ACB 56 serial I/O adapter.
 
@@ -336,7 +336,7 @@ comment "Refer to the file README.mlppp, provided by PC300 package."
 
 config N2
 	tristate "SDL RISCom/N2 support"
-	depends on HDLC
+	depends on HDLC && ISA
 	help
 	  This driver is for RISCom/N2 single or dual channel ISA cards
 	  made by SDL Communications Inc.  If you have such a card,
@@ -348,7 +348,7 @@ config N2
 
 config C101
 	tristate "Moxa C101 support"
-	depends on HDLC
+	depends on HDLC && ISA
 	help
 	  This driver is for C101 SuperSync ISA cards made by Moxa
 	  Technologies Co., Ltd. If you have such a card,
@@ -358,7 +358,7 @@ config C101
 
 config FARSYNC
 	tristate "FarSync T-Series support"
-	depends on HDLC
+	depends on HDLC && PCI
 	---help---
 	  This driver supports the FarSync T-Series X.21 (and V.35/V.24) cards
 	  from FarSite Communications Ltd.
@@ -432,7 +432,7 @@ config DLCI_MAX
 
 config SDLA
 	tristate "SDLA (Sangoma S502/S508) support"
-	depends on DLCI
+	depends on DLCI && ISA
 	help
 	  Say Y here if you need a driver for the Sangoma S502A, S502E, and
 	  S508 Frame Relay Access Devices. These are multi-protocol cards, but
@@ -465,7 +465,7 @@ config WAN_ROUTER_DRIVERS
 
 config VENDOR_SANGOMA
 	tristate "Sangoma WANPIPE(tm) multiprotocol cards"
-	depends on WAN_ROUTER_DRIVERS && WAN_ROUTER
+	depends on WAN_ROUTER_DRIVERS && WAN_ROUTER && (PCI || ISA)
 	---help---
 	  WANPIPE from Sangoma Technologies Inc. (<http://www.sangoma.com/>)
 	  is a family of intelligent multiprotocol WAN adapters with data
@@ -559,7 +559,7 @@ config WANPIPE_MULTPPP
 
 config CYCLADES_SYNC
 	tristate "Cyclom 2X(tm) cards (EXPERIMENTAL)"
-	depends on WAN_ROUTER_DRIVERS
+	depends on WAN_ROUTER_DRIVERS && (PCI || ISA)
 	---help---
 	  Cyclom 2X from Cyclades Corporation (<http://www.cyclades.com/> and
 	  <http://www.cyclades.com.br/>) is an intelligent multiprotocol WAN
