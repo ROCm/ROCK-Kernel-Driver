@@ -8,6 +8,7 @@ jiffies = jiffies_64;
 SECTIONS
 {
   . = 0xC0000000 + 0x100000;
+  /* read-only */
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)
@@ -33,16 +34,30 @@ SECTIONS
   __kallsyms : { *(__kallsyms) }
   __stop___kallsyms = .;
 
+  /* writeable */
   .data : {			/* Data */
 	*(.data)
 	CONSTRUCTORS
 	}
+
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
+
+  . = ALIGN(4096);
+  .data.page_aligned : { *(.data.idt) }
+
+  . = ALIGN(32);
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
   _edata = .;			/* End of data section */
 
   . = ALIGN(8192);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
+  /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .text.init : { *(.text.init) }
@@ -68,19 +83,8 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
-
-  . = ALIGN(4096);
-  __nosave_begin = .;
-  .data_nosave : { *(.data.nosave) }
-  . = ALIGN(4096);
-  __nosave_end = .;
-
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
-
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-
+  /* freed after init ends here */
+	
   __bss_start = .;		/* BSS */
   .bss : { *(.bss) }
   __bss_stop = .; 
