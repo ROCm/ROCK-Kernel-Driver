@@ -28,7 +28,7 @@
  *	- driver buffers, read/written by HC ... single shot DMA mapped 
  *
  * There's also PCI "register" data, which is memory mapped.
- * No memory seen by this driver is pagable.
+ * No memory seen by this driver is pageable.
  */
 
 /*-------------------------------------------------------------------------*/
@@ -131,6 +131,7 @@ static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	}
 	if (qh->dummy)
 		ehci_qtd_free (ehci, qh->dummy);
+	usb_put_dev (qh->dev);
 	pci_pool_free (ehci->qh_pool, qh, qh->qh_dma);
 }
 

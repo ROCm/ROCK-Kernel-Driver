@@ -63,6 +63,7 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 
 		buf[0] = 0;
 		for (i = 0; i < HCS_N_PORTS (params); i++) {
+			// FIXME MIPS won't readb() ...
 			byte = readb (&ehci->caps->portroute[(i>>1)]);
 			sprintf(tmp, "%d ", 
 				((i & 0x1) ? ((byte)&0xf) : ((byte>>4)&0xf)));
@@ -115,7 +116,7 @@ static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 #ifdef	DEBUG
 
 static void __attribute__((__unused__))
-dbg_qtd (char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
+dbg_qtd (const char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 {
 	ehci_dbg (ehci, "%s td %p n%08x %08x t%08x p0=%08x\n", label, qtd,
 		cpu_to_le32p (&qtd->hw_next),
@@ -131,12 +132,42 @@ dbg_qtd (char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 }
 
 static void __attribute__((__unused__))
-dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
+dbg_qh (const char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	ehci_dbg (ehci, "%s qh %p n%08x info %x %x qtd %x\n", label,
 		qh, qh->hw_next, qh->hw_info1, qh->hw_info2,
 		qh->hw_current);
 	dbg_qtd ("overlay", ehci, (struct ehci_qtd *) &qh->hw_qtd_next);
+}
+
+static void __attribute__((__unused__))
+dbg_itd (const char *label, struct ehci_hcd *ehci, struct ehci_itd *itd) 
+{
+	ehci_dbg (ehci, "%s [%d] itd %p, next %08x, urb %p\n",
+		label, itd->frame, itd, le32_to_cpu(itd->hw_next), itd->urb);
+	ehci_dbg (ehci,
+		"  trans: %08x %08x %08x %08x %08x %08x %08x %08x\n", 
+		le32_to_cpu(itd->hw_transaction[0]),
+		le32_to_cpu(itd->hw_transaction[1]),
+		le32_to_cpu(itd->hw_transaction[2]),
+		le32_to_cpu(itd->hw_transaction[3]),
+		le32_to_cpu(itd->hw_transaction[4]),
+		le32_to_cpu(itd->hw_transaction[5]),
+		le32_to_cpu(itd->hw_transaction[6]),
+		le32_to_cpu(itd->hw_transaction[7]));
+	ehci_dbg (ehci,
+		"  buf:   %08x %08x %08x %08x %08x %08x %08x\n", 
+		le32_to_cpu(itd->hw_bufp[0]),
+		le32_to_cpu(itd->hw_bufp[1]),
+		le32_to_cpu(itd->hw_bufp[2]),
+		le32_to_cpu(itd->hw_bufp[3]),
+		le32_to_cpu(itd->hw_bufp[4]),
+		le32_to_cpu(itd->hw_bufp[5]),
+		le32_to_cpu(itd->hw_bufp[6]));
+	ehci_dbg (ehci, "  index: %d %d %d %d %d %d %d %d\n",
+		itd->index[0], itd->index[1], itd->index[2],
+		itd->index[3], itd->index[4], itd->index[5],
+		itd->index[6], itd->index[7]);
 }
 
 static int __attribute__((__unused__))
@@ -591,7 +622,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	/* Capability Registers */
-	i = readw (&ehci->caps->hci_version);
+	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	temp = snprintf (next, size,
 		"PCI device %s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
 		pci_name(hcd->pdev),

@@ -113,7 +113,7 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 		return -EPERM;
 	if (ipv6_addr_type(addr) & IPV6_ADDR_MULTICAST)
 		return -EINVAL;
-	if (ipv6_chk_addr(addr, NULL))
+	if (ipv6_chk_addr(addr, NULL, 0))
 		return -EINVAL;
 
 	pac = sock_kmalloc(sk, sizeof(struct ipv6_ac_socklist), GFP_KERNEL);

@@ -12,4 +12,6 @@
 #define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
 #define XATTR_REPLACE	0x2	/* set value, fail if attr does not exist */
 
+#define XATTR_SECURITY_PREFIX	"security."
+
 #endif	/* _LINUX_XATTR_H */

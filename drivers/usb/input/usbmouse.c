@@ -183,6 +183,7 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	mouse->dev.id.vendor = dev->descriptor.idVendor;
 	mouse->dev.id.product = dev->descriptor.idProduct;
 	mouse->dev.id.version = dev->descriptor.bcdDevice;
+	mouse->dev.dev = &intf->dev;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);

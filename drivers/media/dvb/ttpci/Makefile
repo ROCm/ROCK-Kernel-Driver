@@ -3,7 +3,7 @@
 # and the AV7110 DVB device driver
 #
 
-dvb-ttpci-objs := av7110.o av7110_ipack.o av7110_ir.o
+dvb-ttpci-objs := av7110_hw.o av7110_v4l.o av7110_av.o av7110_ca.o av7110.o av7110_ipack.o av7110_ir.o
 
 obj-$(CONFIG_DVB_BUDGET) += budget-core.o budget.o ttpci-eeprom.o
 obj-$(CONFIG_DVB_BUDGET_AV) += budget-core.o budget-av.o ttpci-eeprom.o

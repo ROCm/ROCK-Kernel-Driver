@@ -11,8 +11,6 @@
 #include <linux/ext3_fs.h>
 #include "xattr.h"
 
-#define XATTR_SECURITY_PREFIX "security."
-
 static size_t
 ext3_xattr_security_list(char *list, struct inode *inode,
 		    const char *name, int name_len)

@@ -372,6 +372,7 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_MTXORB_5_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_MTXORB_6_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_PERLE_ULTRAPORT_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_PIEGROUP_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2101_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2102_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2103_PID, 0x400, 0xffff) },
@@ -576,6 +577,8 @@ static int  ftdi_chars_in_buffer	(struct usb_serial_port *port);
 static void ftdi_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void ftdi_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void ftdi_set_termios		(struct usb_serial_port *port, struct termios * old);
+static int  ftdi_tiocmget               (struct usb_serial_port *port, struct file *file);
+static int  ftdi_tiocmset		(struct usb_serial_port *port, struct file * file, unsigned int set, unsigned int clear);
 static int  ftdi_ioctl			(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void ftdi_break_ctl		(struct usb_serial_port *port, int break_state );
 static void ftdi_throttle		(struct usb_serial_port *port);
@@ -603,6 +606,8 @@ static struct usb_serial_device_type ftdi_SIO_device = {
 	.chars_in_buffer =	ftdi_chars_in_buffer,
 	.read_bulk_callback =	ftdi_read_bulk_callback,
 	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
 	.ioctl =		ftdi_ioctl,
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
@@ -627,6 +632,8 @@ static struct usb_serial_device_type ftdi_8U232AM_device = {
 	.chars_in_buffer =	ftdi_chars_in_buffer,
 	.read_bulk_callback =	ftdi_read_bulk_callback,
 	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
 	.ioctl =		ftdi_ioctl,
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
@@ -651,6 +658,8 @@ static struct usb_serial_device_type ftdi_FT232BM_device = {
 	.chars_in_buffer =	ftdi_chars_in_buffer,
 	.read_bulk_callback =	ftdi_read_bulk_callback,
 	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
 	.ioctl =		ftdi_ioctl,
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
@@ -675,6 +684,8 @@ static struct usb_serial_device_type ftdi_USB_UIRT_device = {
 	.chars_in_buffer =	ftdi_chars_in_buffer,
 	.read_bulk_callback =	ftdi_read_bulk_callback,
 	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
 	.ioctl =		ftdi_ioctl,
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
@@ -701,6 +712,8 @@ static struct usb_serial_device_type ftdi_HE_TIRA1_device = {
 	.chars_in_buffer =	ftdi_chars_in_buffer,
 	.read_bulk_callback =	ftdi_read_bulk_callback,
 	.write_bulk_callback =	ftdi_write_bulk_callback,
+	.tiocmget =             ftdi_tiocmget,
+	.tiocmset =             ftdi_tiocmset,
 	.ioctl =		ftdi_ioctl,
 	.set_termios =		ftdi_set_termios,
 	.break_ctl =		ftdi_break_ctl,
@@ -1808,13 +1821,92 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 } /* ftdi_termios */
 
 
-static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+static int ftdi_tiocmget (struct usb_serial_port *port, struct file *file)
 {
 	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	unsigned char buf[2];
+	int ret;
 
-	__u16 urb_value=0; /* Will hold the new flags */
-	char buf[2];
+	dbg("%s TIOCMGET", __FUNCTION__);
+	switch (priv->chip_type) {
+	case SIO:
+		/* Request the status from the device */
+		if ((ret = usb_control_msg(serial->dev, 
+					   usb_rcvctrlpipe(serial->dev, 0),
+					   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
+					   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
+					   0, 0, 
+					   buf, 1, WDR_TIMEOUT)) < 0 ) {
+			err("%s Could not get modem status of device - err: %d", __FUNCTION__,
+			    ret);
+			return(ret);
+		}
+		break;
+	case FT8U232AM:
+	case FT232BM:
+		/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same
+		   format as the data returned from the in point */
+		if ((ret = usb_control_msg(serial->dev, 
+					   usb_rcvctrlpipe(serial->dev, 0),
+					   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
+					   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
+					   0, 0, 
+					   buf, 2, WDR_TIMEOUT)) < 0 ) {
+			err("%s Could not get modem status of device - err: %d", __FUNCTION__,
+			    ret);
+			return(ret);
+		}
+		break;
+	default:
+		return -EFAULT;
+		break;
+	}
+	
+	return  (buf[0] & FTDI_SIO_DSR_MASK ? TIOCM_DSR : 0) |
+		(buf[0] & FTDI_SIO_CTS_MASK ? TIOCM_CTS : 0) |
+		(buf[0]  & FTDI_SIO_RI_MASK  ? TIOCM_RI  : 0) |
+		(buf[0]  & FTDI_SIO_RLSD_MASK ? TIOCM_CD  : 0) |
+		priv->last_dtr_rts;			
+}
+
+static int ftdi_tiocmset(struct usb_serial_port *port, struct file * file, unsigned int set, unsigned int clear)
+{
+	int ret;
+	
+	if (set & TIOCM_DTR){
+		if ((ret = set_dtr(port, HIGH)) < 0) {
+			err("Urb to set DTR failed");
+			return(ret);
+		}
+	}
+	if (set & TIOCM_RTS) {
+		if ((ret = set_rts(port, HIGH)) < 0){
+			err("Urb to set RTS failed");
+			return(ret);
+		}
+	}
+	
+	if (clear & TIOCM_DTR){
+		if ((ret = set_dtr(port, LOW)) < 0){
+			err("Urb to unset DTR failed");
+			return(ret);
+		}
+	}	
+	if (clear & TIOCM_RTS) {
+		if ((ret = set_rts(port, LOW)) < 0){
+			err("Urb to unset RTS failed");
+			return(ret);
+		}
+	}
+	return(0);
+}
+
+
+static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+{
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+
 	int  ret, mask;
 	
 	dbg("%s cmd 0x%04x", __FUNCTION__, cmd);
@@ -1822,67 +1914,6 @@ static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigne
 	/* Based on code from acm.c and others */
 	switch (cmd) {
 
-	case TIOCMGET:
-		dbg("%s TIOCMGET", __FUNCTION__);
-		switch (priv->chip_type) {
-		case SIO:
-			/* Request the status from the device */
-			if ((ret = usb_control_msg(serial->dev, 
-						   usb_rcvctrlpipe(serial->dev, 0),
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
-						   0, 0, 
-						   buf, 1, WDR_TIMEOUT)) < 0 ) {
-				err("%s Could not get modem status of device - err: %d", __FUNCTION__,
-				    ret);
-				return(ret);
-			}
-			break;
-		case FT8U232AM:
-		case FT232BM:
-			/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same
-			   format as the data returned from the in point */
-			if ((ret = usb_control_msg(serial->dev, 
-						   usb_rcvctrlpipe(serial->dev, 0),
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
-						   0, 0, 
-						   buf, 2, WDR_TIMEOUT)) < 0 ) {
-				err("%s Could not get modem status of device - err: %d", __FUNCTION__,
-				    ret);
-				return(ret);
-			}
-			break;
-		default:
-			return -EFAULT;
-			break;
-		}
-
-		return put_user((buf[0] & FTDI_SIO_DSR_MASK ? TIOCM_DSR : 0) |
-				(buf[0] & FTDI_SIO_CTS_MASK ? TIOCM_CTS : 0) |
-				(buf[0]  & FTDI_SIO_RI_MASK  ? TIOCM_RI  : 0) |
-				(buf[0]  & FTDI_SIO_RLSD_MASK ? TIOCM_CD  : 0) |
-				priv->last_dtr_rts,
-				(unsigned long *) arg);
-		break;
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-		dbg("%s TIOCMSET", __FUNCTION__);
-		if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-		urb_value = ((mask & TIOCM_DTR) ? HIGH : LOW);
-		if ((ret = set_dtr(port, urb_value)) < 0){
-			err("Error from DTR set urb (TIOCMSET)");
-			return(ret);
-		}
-		urb_value = ((mask & TIOCM_RTS) ? HIGH : LOW);
-		if ((ret = set_rts(port, urb_value)) < 0){
-			err("Error from RTS set urb (TIOCMSET)");
-			return(ret);
-		}
-		return(0);
-		break;
-					
 	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
 		dbg("%s TIOCMBIS", __FUNCTION__);
  	        if (get_user(mask, (unsigned long *) arg))

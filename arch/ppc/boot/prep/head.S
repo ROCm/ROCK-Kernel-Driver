@@ -35,9 +35,28 @@ start_:
 
 	mr	r11,r3		/* Save pointer to residual/board data */
 
-	/* Establish default MSR value */
-	li	r3,MSR_IP|MSR_FP
-	mtmsr	r3
+/*
+ * Save the OF pointer to r25, but only if the entry point is in a sane
+ * location; if not we store 0.  If there is no entry point, or it is
+ * invalid, we establish the default MSR value immediately.  Otherwise,
+ * we defer doing that, to allow OF functions to be called, until we
+ * begin uncompressing the kernel.
+ */
+	lis	r3,0x0fff		/* r3 = 0x0fffffff */
+	ori	r3,r3,0xffff
+
+	subc	r3,r3,r5		/* r3 = (r5 <= r3) ? ~0 : 0 */
+	subfe	r3,r3,r3
+	nand	r3,r3,r3
+
+	and.	r5,r5,r3		/* r5 will be cleared if (r5 > r3) */
+	bne+	haveOF
+
+	li	r3,MSR_IP|MSR_FP	/* Not OF: set MSR immediately */
+  	mtmsr	r3
+	isync
+haveOF:
+	mr	r25,r5
 
 	/* compute the size of the whole image in words. */
 	lis	r4,start@h
@@ -111,6 +130,7 @@ start_ldr:
 	mr	r4,r7			/* Program length */
 	mr	r5,r6			/* Checksum */
 	mr	r6,r11			/* Residual data */
+	mr      r7,r25                  /* Validated OFW interface */
 	bl	decompress_kernel
 
 	/*

@@ -587,22 +587,13 @@ void do_generic_mapping_read(struct address_space *mapping,
 			     read_actor_t actor)
 {
 	struct inode *inode = mapping->host;
-	unsigned long index, offset, last;
+	unsigned long index, offset;
 	struct page *cached_page;
 	int error;
 
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
-	last = (*ppos + desc->count) >> PAGE_CACHE_SHIFT;
-
-	/*
-	 * Let the readahead logic know upfront about all
-	 * the pages we'll need to satisfy this request
-	 */
-	for (; index < last; index++)
-		page_cache_readahead(mapping, ra, filp, index);
-	index = *ppos >> PAGE_CACHE_SHIFT;
 
 	for (;;) {
 		struct page *page;
@@ -621,6 +612,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 		}
 
 		cond_resched();
+		page_cache_readahead(mapping, ra, filp, index);
 
 		nr = nr - offset;
 find_page:

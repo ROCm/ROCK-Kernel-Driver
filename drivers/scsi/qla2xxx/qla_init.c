@@ -1592,6 +1592,8 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 	if (!atomic_read(&ha->loop_down_timer) &&
 	    !(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags))) {
 
+		qla2x00_config_os(ha);
+
 		/* If we found all devices then go ready */
 		if (!(test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags))) {
 			atomic_set(&ha->loop_state, LOOP_READY);

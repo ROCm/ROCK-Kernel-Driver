@@ -490,7 +490,6 @@ void __init ppc64_calibrate_delay(void)
 }	
 
 extern void (*calibrate_delay)(void);
-extern void sort_exception_table(void);
 
 /*
  * Called into from start_kernel, after lock_kernel has been called.
@@ -538,7 +537,6 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 
 	paging_init();
-	sort_exception_table();
 	ppc64_boot_msg(0x15, "Setup Done");
 }
 

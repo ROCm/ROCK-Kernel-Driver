@@ -3036,6 +3036,7 @@ int ext3_change_inode_journal_flag(struct inode *inode, int val)
 		EXT3_I(inode)->i_flags |= EXT3_JOURNAL_DATA_FL;
 	else
 		EXT3_I(inode)->i_flags &= ~EXT3_JOURNAL_DATA_FL;
+	ext3_set_aops(inode);
 
 	journal_unlock_updates(journal);
 

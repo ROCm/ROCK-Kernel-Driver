@@ -530,17 +530,22 @@ static void add_softcursor(int currcons)
 		sw->con_putc(vc_cons[currcons].d, i, y, x);
 }
 
-static void hide_cursor(int currcons)
+static void hide_softcursor(int currcons)
 {
-	if (currcons == sel_cons)
-		clear_selection();
 	if (softcursor_original != -1) {
 		scr_writew(softcursor_original,(u16 *) pos);
 		if (DO_UPDATE)
 			sw->con_putc(vc_cons[currcons].d, softcursor_original, y, x);
 		softcursor_original = -1;
 	}
+}
+
+static void hide_cursor(int currcons)
+{
+	if (currcons == sel_cons)
+		clear_selection();
 	sw->con_cursor(vc_cons[currcons].d,CM_ERASE);
+	hide_softcursor(currcons);
 }
 
 static void set_cursor(int currcons)

@@ -302,6 +302,9 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 
 static struct ethtool_ops usbnet_ethtool_ops;
 static void usbnet_get_drvinfo (struct net_device *, struct ethtool_drvinfo *);
+static u32 usbnet_get_link (struct net_device *);
+static u32 usbnet_get_msglevel (struct net_device *);
+static void usbnet_set_msglevel (struct net_device *, u32);
 
 /* mostly for PDA style devices, which are always connected if present */
 static int always_connected (struct usbnet *dev)
@@ -658,6 +661,21 @@ static int ax8817x_set_settings(struct net_device *net, struct ethtool_cmd *cmd)
 	return mii_ethtool_sset(&dev->mii,cmd);
 }
 
+/* We need to override some ethtool_ops so we require our
+   own structure so we don't interfere with other usbnet
+   devices that may be connected at the same time. */
+static struct ethtool_ops ax8817x_ethtool_ops = {
+	.get_drvinfo		= ax8817x_get_drvinfo,
+	.get_link		= ax8817x_get_link,
+	.get_msglevel		= usbnet_get_msglevel,
+	.set_msglevel		= usbnet_set_msglevel,
+	.get_wol		= ax8817x_get_wol,
+	.set_wol		= ax8817x_set_wol,
+	.get_eeprom		= ax8817x_get_eeprom,
+	.get_settings		= ax8817x_get_settings,
+	.set_settings		= ax8817x_set_settings,
+};
+
 static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 {
 	int ret;
@@ -744,14 +762,7 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 	}
 
 	dev->net->set_multicast_list = ax8817x_set_multicast;
-
-	usbnet_ethtool_ops.get_drvinfo = &ax8817x_get_drvinfo;
-	usbnet_ethtool_ops.get_link = &ax8817x_get_link;
-	usbnet_ethtool_ops.get_wol = &ax8817x_get_wol;
-	usbnet_ethtool_ops.set_wol = &ax8817x_set_wol;
-	usbnet_ethtool_ops.get_eeprom = &ax8817x_get_eeprom;
-	usbnet_ethtool_ops.get_settings = &ax8817x_get_settings;
-	usbnet_ethtool_ops.set_settings = &ax8817x_set_settings;
+	dev->net->ethtool_ops = &ax8817x_ethtool_ops;
 
 	return 0;
 }

@@ -6,6 +6,11 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 
+void sort_extable(struct exception_table_entry *start,
+		  struct exception_table_entry *finish)
+{
+}
+
 const struct exception_table_entry *
 search_extable(const struct exception_table_entry *first,
 	       const struct exception_table_entry *last,

@@ -38,13 +38,41 @@
 #include "hosts.h"
 #include <linux/libata.h>
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */
 
-#define DRV_NAME	"ata_k2"
-#define DRV_VERSION	"1.03"
+#define DRV_NAME	"sata_svw"
+#define DRV_VERSION	"1.04"
+
+/* Taskfile registers offsets */
+#define K2_SATA_TF_CMD_OFFSET		0x00
+#define K2_SATA_TF_DATA_OFFSET		0x00
+#define K2_SATA_TF_ERROR_OFFSET		0x04
+#define K2_SATA_TF_NSECT_OFFSET		0x08
+#define K2_SATA_TF_LBAL_OFFSET		0x0c
+#define K2_SATA_TF_LBAM_OFFSET		0x10
+#define K2_SATA_TF_LBAH_OFFSET		0x14
+#define K2_SATA_TF_DEVICE_OFFSET	0x18
+#define K2_SATA_TF_CMDSTAT_OFFSET      	0x1c
+#define K2_SATA_TF_CTL_OFFSET		0x20
+
+/* DMA base */
+#define K2_SATA_DMA_CMD_OFFSET		0x30
+
+/* SCRs base */
+#define K2_SATA_SCR_STATUS_OFFSET	0x40
+#define K2_SATA_SCR_ERROR_OFFSET	0x44
+#define K2_SATA_SCR_CONTROL_OFFSET	0x48
+
+/* Others */
+#define K2_SATA_SICR1_OFFSET		0x80
+#define K2_SATA_SICR2_OFFSET		0x84
+#define K2_SATA_SIM_OFFSET		0x88
+
+/* Port stride */
+#define K2_SATA_PORT_OFFSET		0x100
 
 
 static u32 k2_sata_scr_read (struct ata_port *ap, unsigned int sc_reg)
@@ -139,7 +167,7 @@ static void k2_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 }
 
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 /*
  * k2_sata_proc_info
  * inout : decides on the direction of the dataflow and the meaning of the
@@ -151,29 +179,15 @@ static void k2_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
  * length: If inout==FALSE max number of bytes to be written into the buffer
  *	   else number of bytes in the buffer
  */
-static int k2_sata_proc_info(char *page, char **start, off_t offset, int count,
-		   int hostno, int inout)
+static int k2_sata_proc_info(struct Scsi_Host *shost, char *page, char **start,
+			     off_t offset, int count, int inout)
 {
-	struct Scsi_Host *hpnt;
 	struct ata_port *ap;
 	struct device_node *np;
 	int len, index;
 
-	/* Find ourself. That's locking-broken, shitty etc... but thanks to
-	 * /proc/scsi interface and lack of state kept around in this driver,
-	 * its best I want to do for now...
-	 */
-	hpnt = scsi_hostlist;
-	while (hpnt) {
-		if (hostno == hpnt->host_no)
-			break;
-		hpnt = hpnt->next;
-	}
-	if (!hpnt)
-		return 0;
-
 	/* Find  the ata_port */
-	ap = (struct ata_port *) &hpnt->hostdata[0];
+	ap = (struct ata_port *) &shost->hostdata[0];
 	if (ap == NULL)
 		return 0;
 
@@ -198,7 +212,7 @@ static int k2_sata_proc_info(char *page, char **start, off_t offset, int count,
 
 	return len;
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */
 
 
 static Scsi_Host_Template k2_sata_sht = {
@@ -216,8 +230,8 @@ static Scsi_Host_Template k2_sata_sht = {
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
-#ifdef CONFIG_ALL_PPC
-	.proc_info		= k2_sata_proc_info
+#ifdef CONFIG_PPC_OF
+	.proc_info		= k2_sata_proc_info,
 #endif
 	.bios_param		= ata_std_bios_param,
 };
@@ -243,21 +257,20 @@ static struct ata_port_operations k2_sata_ops = {
 	.port_stop		= ata_port_stop,
 };
 
-
 static void k2_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
-	port->cmd_addr = base;
-	port->data_addr = base;
-	port->error_addr = base + 0x4;
-	port->nsect_addr = base + 0x8;
-	port->lbal_addr = base + 0xc;
-	port->lbam_addr = base + 0x10;
-	port->lbah_addr = base + 0x14;
-	port->device_addr = base + 0x18;
-	port->cmdstat_addr = base + 0x1c;
-	port->ctl_addr = base + 0x20;
-	port->bmdma_addr = base + 0x30;
-	port->scr_addr = base + 0x40;
+	port->cmd_addr		= base + K2_SATA_TF_CMD_OFFSET;
+	port->data_addr		= base + K2_SATA_TF_DATA_OFFSET;
+	port->error_addr	= base + K2_SATA_TF_ERROR_OFFSET;
+	port->nsect_addr	= base + K2_SATA_TF_NSECT_OFFSET;
+	port->lbal_addr		= base + K2_SATA_TF_LBAL_OFFSET;
+	port->lbam_addr		= base + K2_SATA_TF_LBAM_OFFSET;
+	port->lbah_addr		= base + K2_SATA_TF_LBAH_OFFSET;
+	port->device_addr	= base + K2_SATA_TF_DEVICE_OFFSET;
+	port->cmdstat_addr	= base + K2_SATA_TF_CMDSTAT_OFFSET;
+	port->ctl_addr		= base + K2_SATA_TF_CTL_OFFSET;
+	port->bmdma_addr	= base + K2_SATA_DMA_CMD_OFFSET;
+	port->scr_addr		= base + K2_SATA_SCR_STATUS_OFFSET;
 }
 
 
@@ -279,7 +292,14 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	rc = pci_enable_device(pdev);
 	if (rc)
 		return rc;
+	/*
+	 * Check if we have resources mapped at all (second function may
+	 * have been disabled by firmware)
+	 */
+	if (pci_resource_len(pdev, 5) == 0)
+		return -ENODEV;
 
+	/* Request PCI regions */
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
 		goto err_out;
@@ -306,44 +326,37 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	}
 	base = (unsigned long) mmio_base;
 
-	/*
-	 * Check for the "disabled" second function to avoid registering
-	 * useless interfaces on K2
-	 */
-	if (readl(mmio_base + 0x40)  == 0xffffffffUL &&
-	    readl(mmio_base + 0x140) == 0xffffffffUL) {
-		rc = -ENODEV;
-		goto err_out_unmap;
-	}
-
 	/* Clear a magic bit in SCR1 according to Darwin, those help
 	 * some funky seagate drives (though so far, those were already
 	 * set by the firmware on the machines I had access to
 	 */
-	writel(readl(mmio_base + 0x80) & ~0x00040000, mmio_base + 0x80);
+	writel(readl(mmio_base + K2_SATA_SICR1_OFFSET) & ~0x00040000,
+	       mmio_base + K2_SATA_SICR1_OFFSET);
 
 	/* Clear SATA error & interrupts we don't use */
-	writel(0xffffffff, mmio_base + 0x44);
-	writel(0x0, mmio_base + 0x88);
+	writel(0xffffffff, mmio_base + K2_SATA_SCR_ERROR_OFFSET);
+	writel(0x0, mmio_base + K2_SATA_SIM_OFFSET);
 
 	probe_ent->sht = &k2_sata_sht;
 	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
 				ATA_FLAG_NO_LEGACY | ATA_FLAG_MMIO;
 	probe_ent->port_ops = &k2_sata_ops;
-	probe_ent->n_ports = 2;
+	probe_ent->n_ports = 4;
 	probe_ent->irq = pdev->irq;
 	probe_ent->irq_flags = SA_SHIRQ;
 	probe_ent->mmio_base = mmio_base;
 
-	/*
-	 * We don't care much about the PIO/UDMA masks, but the core won't like us
+	/* We don't care much about the PIO/UDMA masks, but the core won't like us
 	 * if we don't fill these
 	 */
 	probe_ent->pio_mask = 0x1f;
-	probe_ent->udma_mask = 0x7f;
+	probe_ent->udma_mask = 0x3f;
 
-	k2_sata_setup_port(&probe_ent->port[0], base);
-	k2_sata_setup_port(&probe_ent->port[1], base + 0x100);
+	/* We have 4 ports per PCI function */
+	k2_sata_setup_port(&probe_ent->port[0], base + 0 * K2_SATA_PORT_OFFSET);
+	k2_sata_setup_port(&probe_ent->port[1], base + 1 * K2_SATA_PORT_OFFSET);
+	k2_sata_setup_port(&probe_ent->port[2], base + 2 * K2_SATA_PORT_OFFSET);
+	k2_sata_setup_port(&probe_ent->port[3], base + 3 * K2_SATA_PORT_OFFSET);
 
 	pci_set_master(pdev);
 
@@ -353,8 +366,6 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 
 	return 0;
 
-err_out_unmap:
-	iounmap((void *)base);
 err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:

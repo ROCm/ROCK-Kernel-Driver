@@ -2,7 +2,7 @@
 # Makefile for the Linux/MIPS-specific parts of the memory manager.
 #
 
-obj-y				+= cache.o extable.o fault.o loadmmu.o pgtable.o
+obj-y				+= cache.o fault.o loadmmu.o pgtable.o
 
 obj-$(CONFIG_MIPS32)		+= ioremap.o pgtable-32.o
 obj-$(CONFIG_MIPS64)		+= pgtable-64.o

@@ -38,13 +38,6 @@
 #include <linux/swapops.h>
 
 /*
- * The "priority" of VM scanning is how much of the queues we will scan in one
- * go. A value of 12 for DEF_PRIORITY implies that we will scan 1/4096th of the
- * queues ("queue_length >> 12") during an aging round.
- */
-#define DEF_PRIORITY 12
-
-/*
  * From 0 .. 100.  Higher means more swappy.
  */
 int vm_swappiness = 60;

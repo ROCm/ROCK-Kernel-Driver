@@ -1,5 +1,6 @@
 /*
  * P6 specific Machine Check Exception Reporting
+ * (C) Copyright 2002 Alan Cox <alan@redhat.com>
  */
 
 #include <linux/init.h>

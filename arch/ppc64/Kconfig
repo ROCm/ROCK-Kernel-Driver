@@ -112,6 +112,7 @@ config IRQ_ALL_CPUS
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-128)"
+	range 2 128
 	depends on SMP
 	default "32"
 
@@ -284,6 +285,8 @@ source "drivers/telephony/Kconfig"
 source "drivers/input/Kconfig"
 
 source "drivers/char/Kconfig"
+
+source "drivers/i2c/Kconfig"
 
 source "drivers/media/Kconfig"
 

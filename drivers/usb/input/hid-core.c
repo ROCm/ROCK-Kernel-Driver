@@ -1357,6 +1357,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_BERKSHIRE		0x0c98
 #define USB_DEVICE_ID_BERKSHIRE_PCWD	0x1140
 
+#define USB_VENDOR_ID_ALPS		0x0433
+#define USB_DEVICE_ID_IBM_GAMEPAD	0x1101
+
 struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
@@ -1407,6 +1410,7 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_ESSENTIAL_REALITY, USB_DEVICE_ID_ESSENTIAL_REALITY_P5, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU, HID_QUIRK_2WHEEL_MOUSE_HACK },
 	{ USB_VENDOR_ID_BERKSHIRE, USB_DEVICE_ID_BERKSHIRE_PCWD, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ALPS, USB_DEVICE_ID_IBM_GAMEPAD, HID_QUIRK_BADPAD },
 	{ 0, 0 }
 };
 
@@ -1525,9 +1529,9 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 				continue;
 			if (!(hid->urbout = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
-			pipe = usb_sndbulkpipe(dev, endpoint->bEndpointAddress);
-			usb_fill_bulk_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
-					  hid_irq_out, hid);
+			pipe = usb_sndintpipe(dev, endpoint->bEndpointAddress);
+			usb_fill_int_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
+					  hid_irq_out, hid, 1);
 			hid->urbout->transfer_dma = hid->outbuf_dma;
 			hid->urbout->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		}
@@ -1546,6 +1550,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;
 	hid->dev = dev;
+	hid->intf = intf;
 	hid->ifnum = interface->desc.bInterfaceNumber;
 
 	hid->name[0] = 0;

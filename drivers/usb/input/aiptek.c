@@ -318,6 +318,7 @@ aiptek_probe(struct usb_interface *intf,
 	aiptek->dev.id.vendor = dev->descriptor.idVendor;
 	aiptek->dev.id.product = dev->descriptor.idProduct;
 	aiptek->dev.id.version = dev->descriptor.bcdDevice;
+	aiptek->dev.dev = &intf->dev;
 	aiptek->usbdev = dev;
 
 	endpoint = &intf->altsetting[0].endpoint[0].desc;

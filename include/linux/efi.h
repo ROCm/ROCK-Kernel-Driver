@@ -297,14 +297,22 @@ extern u64 efi_mem_attributes (unsigned long phys_addr);
 extern void efi_initialize_iomem_resources(struct resource *code_resource,
 					struct resource *data_resource);
 extern efi_status_t phys_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
-extern unsigned long inline __init efi_get_time(void);
-extern int inline __init efi_set_rtc_mmss(unsigned long nowtime);
+extern inline unsigned long __init efi_get_time(void);
+extern inline int __init efi_set_rtc_mmss(unsigned long nowtime);
 extern struct efi_memory_map memmap;
 
+/*
+ * We play games with efi_enabled so that the compiler will, if possible, remove
+ * EFI-related code altogether.
+ */
 #ifdef CONFIG_EFI
-extern int efi_enabled;
+# ifdef CONFIG_X86
+   extern int efi_enabled;
+# else
+#  define efi_enabled 1
+# endif
 #else
-#define efi_enabled 0
+# define efi_enabled 0
 #endif
 
 /*

@@ -492,6 +492,7 @@ config SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
+	range 2 32
 	depends on SMP
 	default "2"
 	help
@@ -789,7 +790,7 @@ config SERIAL_CONSOLE
 
 	  If unsure, say N.
 
-comment "Unix 98 PTY support"
+comment "Unix98 PTY support"
 
 config UNIX98_PTYS
 	bool "Unix98 PTY support"

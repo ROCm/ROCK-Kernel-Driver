@@ -270,6 +270,8 @@ static int __init mca_init(void)
 
 	/* All MCA systems have at least a primary bus */
 	bus = mca_attach_bus(MCA_PRIMARY_BUS);
+	if (!bus)
+		goto out_nomem;
 	bus->default_dma_mask = 0xffffffffLL;
 	bus->f.mca_write_pos = mca_pc_write_pos;
 	bus->f.mca_read_pos = mca_pc_read_pos;

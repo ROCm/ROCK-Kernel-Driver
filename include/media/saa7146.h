@@ -67,6 +67,8 @@ struct saa7146_pgtable {
 	dma_addr_t	dma;
 	/* used for offsets for u,v planes for planar capture modes */
 	unsigned long	offset;
+	/* used for custom pagetables (used for example by budget dvb cards) */
+	struct scatterlist *slist;
 };
 
 struct saa7146_pci_extension_data {

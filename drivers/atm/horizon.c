@@ -359,8 +359,8 @@ static struct timer_list housekeeping;
 
 static unsigned short debug = 0;
 static unsigned short vpi_bits = 0;
-static unsigned short max_tx_size = 9000;
-static unsigned short max_rx_size = 9000;
+static int max_tx_size = 9000;
+static int max_rx_size = 9000;
 static unsigned char pci_lat = 0;
 
 /********** access functions **********/
@@ -2898,11 +2898,11 @@ static void __init hrz_check_args (void) {
     PRINTK (KERN_ERR, "vpi_bits has been limited to %hu",
 	    vpi_bits = HRZ_MAX_VPI);
   
-  if (max_tx_size > TX_AAL5_LIMIT)
+  if (max_tx_size < 0 || max_tx_size > TX_AAL5_LIMIT)
     PRINTK (KERN_NOTICE, "max_tx_size has been limited to %hu",
 	    max_tx_size = TX_AAL5_LIMIT);
   
-  if (max_rx_size > RX_AAL5_LIMIT)
+  if (max_rx_size < 0 || max_rx_size > RX_AAL5_LIMIT)
     PRINTK (KERN_NOTICE, "max_rx_size has been limited to %hu",
 	    max_rx_size = RX_AAL5_LIMIT);
   
@@ -2914,8 +2914,8 @@ MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "h");
 MODULE_PARM(vpi_bits, "h");
-MODULE_PARM(max_tx_size, "h");
-MODULE_PARM(max_rx_size, "h");
+MODULE_PARM(max_tx_size, "i");
+MODULE_PARM(max_rx_size, "i");
 MODULE_PARM(pci_lat, "b");
 MODULE_PARM_DESC(debug, "debug bitmap, see .h file");
 MODULE_PARM_DESC(vpi_bits, "number of bits (0..4) to allocate to VPIs");

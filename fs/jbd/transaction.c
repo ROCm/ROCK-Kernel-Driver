@@ -85,7 +85,7 @@ static int start_this_handle(journal_t *journal, handle_t *handle)
 	int needed;
 	int nblocks = handle->h_buffer_credits;
 	transaction_t *new_transaction = NULL;
-	int ret;
+	int ret = 0;
 
 	if (nblocks > journal->j_max_transaction_buffers) {
 		printk(KERN_ERR "JBD: %s wants too many credits (%d > %d)\n",
@@ -231,7 +231,7 @@ repeat_locked:
 out:
 	if (new_transaction)
 		kfree(new_transaction);
-	return 0;
+	return ret;
 }
 
 /* Allocate a new handle.  This should probably be in a slab... */

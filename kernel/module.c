@@ -687,8 +687,8 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 		goto out;
 	}
 
-	/* Already dying? */
-	if (mod->state == MODULE_STATE_GOING) {
+	/* Doing init or already dying? */
+	if (mod->state != MODULE_STATE_LIVE) {
 		/* FIXME: if (force), slam module count and wake up
                    waiter --RR */
 		DEBUGP("%s already dying\n", mod->name);
@@ -1395,6 +1395,7 @@ static struct module *load_module(void __user *umod,
 	struct module *mod;
 	long err = 0;
 	void *percpu = NULL, *ptr = NULL; /* Stops spurious gcc warning */
+	struct exception_table_entry *extable;
 
 	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
 	       umod, len, uargs);
@@ -1420,6 +1421,9 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 
+	if (len < hdr->e_shoff + hdr->e_shnum * sizeof(Elf_Shdr))
+		goto truncated;
+
 	/* Convenience variables */
 	sechdrs = (void *)hdr + hdr->e_shoff;
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
@@ -1429,6 +1433,10 @@ static struct module *load_module(void __user *umod,
 	symindex = strindex = 0;
 
 	for (i = 1; i < hdr->e_shnum; i++) {
+		if (sechdrs[i].sh_type != SHT_NOBITS
+		    && len < sechdrs[i].sh_offset + sechdrs[i].sh_size)
+			goto truncated;
+
 		/* Mark all sections sh_addr with their address in the
 		   temporary image. */
 		sechdrs[i].sh_addr = (size_t)hdr + sechdrs[i].sh_offset;
@@ -1611,10 +1619,6 @@ static struct module *load_module(void __user *umod,
 	}
 #endif
 
-  	/* Set up exception table */
-	mod->num_exentries = sechdrs[exindex].sh_size / sizeof(*mod->extable);
-	mod->extable = (void *)sechdrs[exindex].sh_addr;
-
 	/* Now do relocations. */
 	for (i = 1; i < hdr->e_shnum; i++) {
 		const char *strtab = (char *)sechdrs[strindex].sh_addr;
@@ -1636,6 +1640,11 @@ static struct module *load_module(void __user *umod,
 		if (err < 0)
 			goto cleanup;
 	}
+
+  	/* Set up and sort exception table */
+	mod->num_exentries = sechdrs[exindex].sh_size / sizeof(*mod->extable);
+	mod->extable = extable = (void *)sechdrs[exindex].sh_addr;
+	sort_extable(extable, extable + mod->num_exentries);
 
 	/* Finally, copy percpu area over. */
 	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
@@ -1692,6 +1701,11 @@ static struct module *load_module(void __user *umod,
 	vfree(hdr);
 	if (err < 0) return ERR_PTR(err);
 	else return ptr;
+
+ truncated:
+	printk(KERN_ERR "Module len %lu truncated\n", len);
+	err = -ENOEXEC;
+	goto free_hdr;
 }
 
 /* This is where the real work happens */

@@ -27,5 +27,6 @@
 #define check_apicid_used (genapic->check_apicid_used)
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
 #define enable_apic_mode (genapic->enable_apic_mode)
+#define phys_pkg_id (genapic->phys_pkg_id)
 
 #endif /* __ASM_MACH_APIC_H */

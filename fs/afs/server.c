@@ -26,11 +26,13 @@ spinlock_t afs_server_peer_lock = SPIN_LOCK_UNLOCKED;
 #define FS_SERVICE_ID		1	/* AFS Volume Location Service ID */
 #define VL_SERVICE_ID		52	/* AFS Volume Location Service ID */
 
-static void __afs_server_timeout(afs_timer_t *timer)
+static void __afs_server_timeout(struct afs_timer *timer)
 {
-	afs_server_t *server = list_entry(timer,afs_server_t,timeout);
+	struct afs_server *server =
+		list_entry(timer, struct afs_server, timeout);
 
-	_debug("SERVER TIMEOUT [%p{u=%d}]",server,atomic_read(&server->usage));
+	_debug("SERVER TIMEOUT [%p{u=%d}]",
+	       server, atomic_read(&server->usage));
 
 	afs_server_do_timeout(server);
 }
@@ -44,23 +46,23 @@ static const struct afs_timer_ops afs_server_timer_ops = {
  * lookup a server record in a cell
  * - TODO: search the cell's server list
  */
-int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t **_server)
+int afs_server_lookup(struct afs_cell *cell, const struct in_addr *addr,
+		      struct afs_server **_server)
 {
-	struct list_head *_p;
-	afs_server_t *server, *active, *zombie;
+	struct afs_server *server, *active, *zombie;
 	int loop;
 
-	_enter("%p,%08x,",cell,ntohl(addr->s_addr));
+	_enter("%p,%08x,", cell, ntohl(addr->s_addr));
 
 	/* allocate and initialise a server record */
-	server = kmalloc(sizeof(afs_server_t),GFP_KERNEL);
+	server = kmalloc(sizeof(struct afs_server), GFP_KERNEL);
 	if (!server) {
 		_leave(" = -ENOMEM");
 		return -ENOMEM;
 	}
 
-	memset(server,0,sizeof(afs_server_t));
-	atomic_set(&server->usage,1);
+	memset(server, 0, sizeof(struct afs_server));
+	atomic_set(&server->usage, 1);
 
 	INIT_LIST_HEAD(&server->link);
 	init_rwsem(&server->sem);
@@ -69,43 +71,39 @@ int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t
 	INIT_LIST_HEAD(&server->cb_promises);
 	spin_lock_init(&server->cb_lock);
 
-	for (loop=0; loop<AFS_SERVER_CONN_LIST_SIZE; loop++)
+	for (loop = 0; loop < AFS_SERVER_CONN_LIST_SIZE; loop++)
 		server->fs_conn_cnt[loop] = 4;
 
-	memcpy(&server->addr,addr,sizeof(struct in_addr));
+	memcpy(&server->addr, addr, sizeof(struct in_addr));
 	server->addr.s_addr = addr->s_addr;
 
-	afs_timer_init(&server->timeout,&afs_server_timer_ops);
+	afs_timer_init(&server->timeout, &afs_server_timer_ops);
 
 	/* add to the cell */
 	write_lock(&cell->sv_lock);
 
 	/* check the active list */
-	list_for_each(_p,&cell->sv_list) {
-		active = list_entry(_p,afs_server_t,link);
-
-		if (active->addr.s_addr==addr->s_addr)
+	list_for_each_entry(active, &cell->sv_list, link) {
+		if (active->addr.s_addr == addr->s_addr)
 			goto use_active_server;
 	}
 
 	/* check the inactive list */
 	spin_lock(&cell->sv_gylock);
-	list_for_each(_p,&cell->sv_graveyard) {
-		zombie = list_entry(_p,afs_server_t,link);
-
-		if (zombie->addr.s_addr==addr->s_addr)
+	list_for_each_entry(zombie, &cell->sv_graveyard, link) {
+		if (zombie->addr.s_addr == addr->s_addr)
 			goto resurrect_server;
 	}
 	spin_unlock(&cell->sv_gylock);
 
 	afs_get_cell(cell);
 	server->cell = cell;
-	list_add_tail(&server->link,&cell->sv_list);
+	list_add_tail(&server->link, &cell->sv_list);
 
 	write_unlock(&cell->sv_lock);
 
 	*_server = server;
-	_leave(" = 0 (%p)",server);
+	_leave(" = 0 (%p)", server);
 	return 0;
 
 	/* found a matching active server */
@@ -117,15 +115,16 @@ int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t
 	kfree(server);
 
 	*_server = active;
-	_leave(" = 0 (%p)",active);
+	_leave(" = 0 (%p)", active);
 	return 0;
 
-	/* found a matching server in the graveyard, so resurrect it and dispose of the new rec */
+	/* found a matching server in the graveyard, so resurrect it and
+	 * dispose of the new record */
  resurrect_server:
 	_debug("resurrecting server");
 
 	list_del(&zombie->link);
-	list_add_tail(&zombie->link,&cell->sv_list);
+	list_add_tail(&zombie->link, &cell->sv_list);
 	afs_get_server(zombie);
 	afs_kafstimod_del_timer(&zombie->timeout);
 	spin_unlock(&cell->sv_gylock);
@@ -134,7 +133,7 @@ int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t
 	kfree(server);
 
 	*_server = zombie;
-	_leave(" = 0 (%p)",zombie);
+	_leave(" = 0 (%p)", zombie);
 	return 0;
 
 } /* end afs_server_lookup() */
@@ -144,22 +143,22 @@ int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t
  * destroy a server record
  * - removes from the cell list
  */
-void afs_put_server(afs_server_t *server)
+void afs_put_server(struct afs_server *server)
 {
-	afs_cell_t *cell;
+	struct afs_cell *cell;
 
 	if (!server)
 		return;
 
-	_enter("%p",server);
+	_enter("%p", server);
 
 	cell = server->cell;
 
 	/* sanity check */
-	if (atomic_read(&server->usage)<=0)
-		BUG();
+	BUG_ON(atomic_read(&server->usage) <= 0);
 
-	/* to prevent a race, the decrement and the dequeue must be effectively atomic */
+	/* to prevent a race, the decrement and the dequeue must be effectively
+	 * atomic */
 	write_lock(&cell->sv_lock);
 
 	if (likely(!atomic_dec_and_test(&server->usage))) {
@@ -170,10 +169,10 @@ void afs_put_server(afs_server_t *server)
 
 	spin_lock(&cell->sv_gylock);
 	list_del(&server->link);
-	list_add_tail(&server->link,&cell->sv_graveyard);
+	list_add_tail(&server->link, &cell->sv_graveyard);
 
 	/* time out in 10 secs */
-	afs_kafstimod_add_timer(&server->timeout,10*HZ);
+	afs_kafstimod_add_timer(&server->timeout, 10 * HZ);
 
 	spin_unlock(&cell->sv_gylock);
 	write_unlock(&cell->sv_lock);
@@ -186,21 +185,21 @@ void afs_put_server(afs_server_t *server)
  * timeout server record
  * - removes from the cell's graveyard if the usage count is zero
  */
-void afs_server_do_timeout(afs_server_t *server)
+void afs_server_do_timeout(struct afs_server *server)
 {
 	struct rxrpc_peer *peer;
-	afs_cell_t *cell;
+	struct afs_cell *cell;
 	int loop;
 
-	_enter("%p",server);
+	_enter("%p", server);
 
 	cell = server->cell;
 
-	if (atomic_read(&server->usage)<0) BUG();
+	BUG_ON(atomic_read(&server->usage) < 0);
 
 	/* remove from graveyard if still dead */
 	spin_lock(&cell->vl_gylock);
-	if (atomic_read(&server->usage)==0)
+	if (atomic_read(&server->usage) == 0)
 		list_del_init(&server->link);
 	else
 		server = NULL;
@@ -224,7 +223,7 @@ void afs_server_do_timeout(afs_server_t *server)
 	spin_unlock(&afs_server_peer_lock);
 
 	/* finish cleaning up the server */
-	for (loop=AFS_SERVER_CONN_LIST_SIZE-1; loop>=0; loop--)
+	for (loop = AFS_SERVER_CONN_LIST_SIZE - 1; loop >= 0; loop--)
 		if (server->fs_conn[loop])
 			rxrpc_put_connection(server->fs_conn[loop]);
 
@@ -240,7 +239,8 @@ void afs_server_do_timeout(afs_server_t *server)
 /*
  * get a callslot on a connection to the fileserver on the specified server
  */
-int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot *callslot)
+int afs_server_request_callslot(struct afs_server *server,
+				struct afs_server_callslot *callslot)
 {
 	struct afs_server_callslot *pcallslot;
 	struct rxrpc_connection *conn;
@@ -262,10 +262,10 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 
 	/* resurrect the server if it's death timeout has expired */
 	if (server->fs_state) {
-		if (time_before(jiffies,server->fs_dead_jif)) {
+		if (time_before(jiffies, server->fs_dead_jif)) {
 			ret = server->fs_state;
 			spin_unlock(&server->fs_lock);
-			_leave(" = %d [still dead]",ret);
+			_leave(" = %d [still dead]", ret);
 			return ret;
 		}
 
@@ -273,8 +273,8 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 	}
 
 	/* try and find a connection that has spare callslots */
-	for (nconn=0; nconn<AFS_SERVER_CONN_LIST_SIZE; nconn++) {
-		if (server->fs_conn_cnt[nconn]>0) {
+	for (nconn = 0; nconn < AFS_SERVER_CONN_LIST_SIZE; nconn++) {
+		if (server->fs_conn_cnt[nconn] > 0) {
 			server->fs_conn_cnt[nconn]--;
 			spin_unlock(&server->fs_lock);
 			callslot->nconn = nconn;
@@ -282,9 +282,10 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 		}
 	}
 
-	/* none were available - wait interruptibly for one to become available */
+	/* none were available - wait interruptibly for one to become
+	 * available */
 	set_current_state(TASK_INTERRUPTIBLE);
-	list_add_tail(&callslot->link,&server->fs_callq);
+	list_add_tail(&callslot->link, &server->fs_callq);
 	spin_unlock(&server->fs_lock);
 
 	while (!callslot->ready && !signal_pending(current)) {
@@ -303,22 +304,24 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 
 	nconn = callslot->nconn;
 
-	/* if interrupted, we must release any slot we also got before returning an error */
+	/* if interrupted, we must release any slot we also got before
+	 * returning an error */
 	if (signal_pending(current)) {
 		ret = -EINTR;
 		goto error_release;
 	}
 
-	/* if we were woken up with an error, then pass that error back to the called */
-	if (nconn<0) {
-		_leave(" = %d",callslot->errno);
+	/* if we were woken up with an error, then pass that error back to the
+	 * called */
+	if (nconn < 0) {
+		_leave(" = %d", callslot->errno);
 		return callslot->errno;
 	}
 
 	/* were we given a connection directly? */
 	if (callslot->conn) {
 		/* yes - use it */
-		_leave(" = 0 (nc=%d)",nconn);
+		_leave(" = 0 (nc=%d)", nconn);
 		return 0;
 	}
 
@@ -347,7 +350,7 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 					      NULL,
 					      &server->fs_conn[nconn]);
 
-		if (ret<0)
+		if (ret < 0)
 			goto error_release_upw;
 
 		callslot->conn = server->fs_conn[0];
@@ -364,10 +367,11 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 	up_write(&server->sem);
 
  error_release:
-	/* either release the callslot or pass it along to another deserving task */
+	/* either release the callslot or pass it along to another deserving
+	 * task */
 	spin_lock(&server->fs_lock);
 
-	if (nconn<0) {
+	if (nconn < 0) {
 		/* no callslot allocated */
 	}
 	else if (list_empty(&server->fs_callq)) {
@@ -377,13 +381,15 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 	}
 	else {
 		/* someone's waiting - dequeue them and wake them up */
-		pcallslot = list_entry(server->fs_callq.next,struct afs_server_callslot,link);
+		pcallslot = list_entry(server->fs_callq.next,
+				       struct afs_server_callslot, link);
 		list_del_init(&pcallslot->link);
 
 		pcallslot->errno = server->fs_state;
 		if (!pcallslot->errno) {
 			/* pass them out callslot details */
-			callslot->conn = xchg(&pcallslot->conn,callslot->conn);
+			callslot->conn = xchg(&pcallslot->conn,
+					      callslot->conn);
 			pcallslot->nconn = nconn;
 			callslot->nconn = nconn = -1;
 		}
@@ -392,10 +398,10 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
 		spin_unlock(&server->fs_lock);
 	}
 
-	if (callslot->conn) rxrpc_put_connection(callslot->conn);
+	rxrpc_put_connection(callslot->conn);
 	callslot->conn = NULL;
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
 } /* end afs_server_request_callslot() */
@@ -405,7 +411,8 @@ int afs_server_request_callslot(afs_server_t *server, struct afs_server_callslot
  * release a callslot back to the server
  * - transfers the RxRPC connection to the next pending callslot if possible
  */
-void afs_server_release_callslot(afs_server_t *server, struct afs_server_callslot *callslot)
+void afs_server_release_callslot(struct afs_server *server,
+				 struct afs_server_callslot *callslot)
 {
 	struct afs_server_callslot *pcallslot;
 
@@ -414,7 +421,7 @@ void afs_server_release_callslot(afs_server_t *server, struct afs_server_callslo
 	       server->fs_conn_cnt[callslot->nconn],
 	       callslot->nconn);
 
-	if (callslot->nconn<0) BUG();
+	BUG_ON(callslot->nconn < 0);
 
 	spin_lock(&server->fs_lock);
 
@@ -425,13 +432,14 @@ void afs_server_release_callslot(afs_server_t *server, struct afs_server_callslo
 	}
 	else {
 		/* someone's waiting - dequeue them and wake them up */
-		pcallslot = list_entry(server->fs_callq.next,struct afs_server_callslot,link);
+		pcallslot = list_entry(server->fs_callq.next,
+				       struct afs_server_callslot, link);
 		list_del_init(&pcallslot->link);
 
 		pcallslot->errno = server->fs_state;
 		if (!pcallslot->errno) {
 			/* pass them out callslot details */
-			callslot->conn = xchg(&pcallslot->conn,callslot->conn);
+			callslot->conn = xchg(&pcallslot->conn, callslot->conn);
 			pcallslot->nconn = callslot->nconn;
 			callslot->nconn = -1;
 		}
@@ -441,21 +449,23 @@ void afs_server_release_callslot(afs_server_t *server, struct afs_server_callslo
 		spin_unlock(&server->fs_lock);
 	}
 
-	if (callslot->conn) rxrpc_put_connection(callslot->conn);
+	rxrpc_put_connection(callslot->conn);
 
 	_leave("");
 } /* end afs_server_release_callslot() */
 
 /*****************************************************************************/
 /*
- * get a handle to a connection to the vlserver (volume location) on the specified server
+ * get a handle to a connection to the vlserver (volume location) on the
+ * specified server
  */
-int afs_server_get_vlconn(afs_server_t *server, struct rxrpc_connection **_conn)
+int afs_server_get_vlconn(struct afs_server *server,
+			  struct rxrpc_connection **_conn)
 {
 	struct rxrpc_connection *conn;
 	int ret;
 
-	_enter("%p,",server);
+	_enter("%p,", server);
 
 	ret = 0;
 	conn = NULL;
@@ -479,7 +489,7 @@ int afs_server_get_vlconn(afs_server_t *server, struct rxrpc_connection **_conn)
 						      NULL,
 						      &server->vlserver);
 		}
-		if (ret==0) {
+		if (ret == 0) {
 			rxrpc_get_connection(server->vlserver);
 			conn = server->vlserver;
 		}
@@ -487,6 +497,6 @@ int afs_server_get_vlconn(afs_server_t *server, struct rxrpc_connection **_conn)
 	}
 
 	*_conn = conn;
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 } /* end afs_server_get_vlconn() */

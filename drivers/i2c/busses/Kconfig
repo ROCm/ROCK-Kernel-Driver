@@ -3,6 +3,7 @@
 #
 
 menu "I2C Hardware Bus support"
+	depends on I2C
 
 config I2C_ALI1535
 	tristate "ALI 1535"
@@ -48,7 +49,8 @@ config I2C_AMD8111
 
 config I2C_ELEKTOR
 	tristate "Elektor ISA card"
-	depends on I2C_ALGOPCF && BROKEN_ON_SMP
+	depends on I2C && ISA && BROKEN_ON_SMP
+	select I2C_ALGOPCF
 	help
 	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
 	  such an adapter.
@@ -58,7 +60,8 @@ config I2C_ELEKTOR
 
 config I2C_ELV
 	tristate "ELV adapter"
-	depends on I2C_ALGOBIT && ISA
+	depends on I2C
+	select I2C_ALGOBIT
 	help
 	  This supports parallel-port I2C adapters called ELV.  Say Y if you
 	  own such an adapter.
@@ -72,19 +75,21 @@ config I2C_I801
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  801 family of mainboard I2C interfaces.  Specifically, the following
-	  versions of the chipset is supported:
+	  versions of the chipset are supported:
 	    82801AA
 	    82801AB
 	    82801BA
 	    82801CA/CAM
 	    82801DB
+	    82801EB
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-i801.
 
 config I2C_I810
 	tristate "Intel 810/815"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  810/815 family of mainboard I2C interfaces.  Specifically, the 
@@ -107,7 +112,7 @@ config I2C_IOP3XX
 
 config I2C_ISA
 	tristate "ISA Bus support"
-	depends on I2C && ISA && EXPERIMENTAL
+	depends on I2C && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for i2c
 	  interfaces that are on the ISA bus.
@@ -117,7 +122,8 @@ config I2C_ISA
 
 config I2C_ITE
 	tristate "ITE I2C Adapter"
-	depends on I2C_ALGOITE
+	depends on I2C && MIPS_ITE8172
+	select I2C_ALGOITE
 	help
 	  This supports the ITE8172 I2C peripheral found on some MIPS
 	  systems. Say Y if you have one of these. You should also say Y for
@@ -148,12 +154,58 @@ config I2C_NFORCE2
 
 config I2C_PHILIPSPAR
 	tristate "Philips style parallel port adapter"
-	depends on I2C_ALGOBIT && PARPORT
+	depends on I2C && PARPORT
+	select I2C_ALGOBIT
 	help
 	  This supports parallel-port I2C adapters made by Philips.
 
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-philips-par.
+
+config I2C_PARPORT
+	tristate "Parallel port adapter"
+	depends on I2C && PARPORT
+	select I2C_ALGOBIT
+	help
+	  This supports parallel port I2C adapters such as the ones made by
+	  Philips or Velleman, Analog Devices evaluation boards, and more.
+	  Basically any adapter using the parallel port as an I2C bus with
+	  no extra chipset is supported by this driver, or could be.
+
+	  This driver is a replacement for (and was inspired by) an older
+	  driver named i2c-philips-par.  The new driver supports more devices,
+	  and makes it easier to add support for new devices.
+	  
+	  Another driver exists, named i2c-parport-light, which doesn't depend
+	  on the parport driver.  This is meant for embedded systems. Don't say
+	  Y here if you intend to say Y or M there.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-parport.
+
+config I2C_PARPORT_LIGHT
+	tristate "Parallel port adapter (light)"
+	depends on I2C
+	select I2C_ALGOBIT
+	help
+	  This supports parallel port I2C adapters such as the ones made by
+	  Philips or Velleman, Analog Devices evaluation boards, and more.
+	  Basically any adapter using the parallel port as an I2C bus with
+	  no extra chipset is supported by this driver, or could be.
+
+	  This driver is a light version of i2c-parport.  It doesn't depend
+	  on the parport driver, and uses direct I/O access instead.  This
+	  might be prefered on embedded systems where wasting memory for
+	  the clean but heavy parport handling is not an option.  The
+	  drawback is a reduced portability and the impossibility to
+	  dasiy-chain other parallel port devices.
+	  
+	  Don't say Y here if you said Y or M to i2c-parport.  Saying M to
+	  both is possible but both modules should not be loaded at the same
+	  time.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-parport-light.
 
 config I2C_PIIX4
 	tristate "Intel PIIX4"
@@ -174,7 +226,8 @@ config I2C_PIIX4
 
 config I2C_PROSAVAGE
 	tristate "S3/VIA (Pro)Savage"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the
 	  I2C bus and DDC bus of the S3VIA embedded Savage4 and ProSavage8
@@ -187,12 +240,14 @@ config I2C_PROSAVAGE
 	  will be called i2c-prosavage.
 
 config I2C_RPXLITE
-	tristate "Embedded Planet RPX Lite/Classic suppoort"
-	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
+	tristate "Embedded Planet RPX Lite/Classic support"
+	depends on (RPXLITE || RPXCLASSIC) && I2C
+	select I2C_ALGO8XX
 
 config I2C_SAVAGE4
 	tristate "S3 Savage 4"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the 
 	  S3 Savage 4 I2C interface.
@@ -202,7 +257,8 @@ config I2C_SAVAGE4
 
 config SCx200_I2C
 	tristate "NatSemi SCx200 I2C using GPIO pins"
-	depends on SCx200_GPIO && I2C_ALGOBIT
+	depends on SCx200_GPIO && I2C
+	select I2C_ALGOBIT
 	help
 	  Enable the use of two GPIO pins of a SCx200 processor as an I2C bus.
 
@@ -277,7 +333,8 @@ config I2C_SIS96X
 
 config I2C_VELLEMAN
 	tristate "Velleman K8000 adapter"
-	depends on I2C_ALGOBIT && ISA
+	depends on I2C
+	select I2C_ALGOBIT
 	help
 	  This supports the Velleman K8000 parallel-port I2C adapter.  Say Y
 	  if you own such an adapter.
@@ -287,7 +344,8 @@ config I2C_VELLEMAN
 
 config I2C_VIA
 	tristate "VIA 82C586B"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 
 	  If you say yes to this option, support will be included for the VIA
@@ -317,7 +375,8 @@ config I2C_VIAPRO
 
 config I2C_VOODOO3
 	tristate "Voodoo 3"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 
 	  If you say yes to this option, support will be included for the

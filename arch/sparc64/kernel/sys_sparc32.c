@@ -1950,6 +1950,8 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	int retval;
 	int i;
 
+	sched_balance_exec();
+
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
@@ -2023,7 +2025,8 @@ out:
 		security_bprm_free(&bprm);
 
 out_mm:
-	mmdrop(bprm.mm);
+	if (bprm.mm)
+		mmdrop(bprm.mm);
 
 out_file:
 	if (bprm.file) {

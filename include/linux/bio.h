@@ -266,8 +266,7 @@ extern inline char *bvec_kmap_irq(struct bio_vec *bvec, unsigned long *flags)
 	local_irq_save(*flags);
 	addr = (unsigned long) kmap_atomic(bvec->bv_page, KM_BIO_SRC_IRQ);
 
-	if (addr & ~PAGE_MASK)
-		BUG();
+	BUG_ON(addr & ~PAGE_MASK);
 
 	return (char *) addr + bvec->bv_offset;
 }

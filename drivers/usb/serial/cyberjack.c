@@ -36,6 +36,8 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
+#define CYBERJACK_LOCAL_BUF_SIZE 32
+
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
 #else
@@ -62,6 +64,7 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp);
 static void cyberjack_close (struct usb_serial_port *port, struct file *filp);
 static int cyberjack_write (struct usb_serial_port *port, int from_user,
 	const unsigned char *buf, int count);
+static int cyberjack_write_room( struct usb_serial_port *port );
 static void cyberjack_read_int_callback (struct urb *urb, struct pt_regs *regs);
 static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
@@ -95,6 +98,7 @@ static struct usb_serial_device_type cyberjack_device = {
 	.open =			cyberjack_open,
 	.close =		cyberjack_close,
 	.write =		cyberjack_write,
+	.write_room =	cyberjack_write_room,
 	.read_int_callback =	cyberjack_read_int_callback,
 	.read_bulk_callback =	cyberjack_read_bulk_callback,
 	.write_bulk_callback =	cyberjack_write_bulk_callback,
@@ -156,6 +160,11 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
+	dbg("%s - usb_clear_halt", __FUNCTION__ );
+	usb_clear_halt(port->serial->dev, port->write_urb->pipe);
+	usb_clear_halt(port->serial->dev, port->read_urb->pipe);
+	usb_clear_halt(port->serial->dev, port->interrupt_in_urb->pipe);
+
 	/* force low_latency on so that our tty_push actually forces
 	 * the data through, otherwise it is scheduled, and with high
 	 * data rates (like with OHCI) data can get lost.
@@ -192,6 +201,10 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 		usb_unlink_urb (port->write_urb);
 		usb_unlink_urb (port->read_urb);
 		usb_unlink_urb (port->interrupt_in_urb);
+		dbg("%s - usb_clear_halt", __FUNCTION__ );
+		usb_clear_halt(port->serial->dev, port->write_urb->pipe);
+		usb_clear_halt(port->serial->dev, port->read_urb->pipe);
+		usb_clear_halt(port->serial->dev, port->interrupt_in_urb->pipe);
 	}
 }
 
@@ -202,6 +215,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 	unsigned long flags;
 	int result;
 	int wrexpected;
+	unsigned char localbuf[CYBERJACK_LOCAL_BUF_SIZE];	/* Buffer for collecting data to write */
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	dbg("%s - from_user %d", __FUNCTION__, from_user);
@@ -218,22 +232,29 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 
 	spin_lock_irqsave(&priv->lock, flags);
 
-	if( (count+priv->wrfilled)>sizeof(priv->wrbuf) ) {
+	if( (count+priv->wrfilled)>sizeof(priv->wrbuf) ||
+		(count>sizeof(localbuf)) ) {
 		/* To much data  for buffer. Reset buffer. */
 		priv->wrfilled=0;
 		spin_unlock_irqrestore(&priv->lock, flags);
 		return (0);
 	}
 
+	spin_unlock_irqrestore(&priv->lock, flags);
+
 	/* Copy data */
 	if (from_user) {
-		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count)) {
-			spin_unlock_irqrestore(&priv->lock, flags);
+		if (copy_from_user(localbuf, buf, count)) {
 			return -EFAULT;
 		}
 	} else {
-		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
+		memcpy (localbuf, buf, count);
 	}  
+
+	spin_lock_irqsave(&priv->lock, flags);
+
+	memcpy (priv->wrbuf+priv->wrfilled, localbuf, count);
+
 	usb_serial_debug_data (__FILE__, __FUNCTION__, count,
 		priv->wrbuf+priv->wrfilled);
 	priv->wrfilled += count;
@@ -290,6 +311,11 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 
 	return (count);
 } 
+
+static int cyberjack_write_room( struct usb_serial_port *port )
+{
+	return CYBERJACK_LOCAL_BUF_SIZE;
+}
 
 static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {

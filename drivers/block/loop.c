@@ -55,6 +55,7 @@
 #include <linux/errno.h>
 #include <linux/major.h>
 #include <linux/wait.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
@@ -682,6 +683,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
+	error = -EINVAL;
 	if (S_ISBLK(inode->i_mode)) {
 		lo_device = I_BDEV(inode);
 		if (lo_device == bdev) {
@@ -697,7 +699,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		error = -EINVAL;
 		if (!inode->i_fop->sendfile)
 			goto out_putf;
 
@@ -706,7 +707,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 		lo_blocksize = inode->i_blksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
-		error = 0;
 	} else
 		goto out_putf;
 
@@ -1120,6 +1120,7 @@ static struct block_device_operations lo_fops = {
 MODULE_PARM(max_loop, "i");
 MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);
 
 int loop_register_transfer(struct loop_func_table *funcs)
 {

@@ -44,8 +44,7 @@ extern struct quotactl_ops vfs_quotactl_ops;
 
 static __inline__ void DQUOT_INIT(struct inode *inode)
 {
-	if (!inode->i_sb)
-		BUG();
+	BUG_ON(!inode->i_sb);
 	if (sb_any_quota_enabled(inode->i_sb) && !IS_NOQUOTA(inode))
 		inode->i_sb->dq_op->initialize(inode, -1);
 }
@@ -53,8 +52,7 @@ static __inline__ void DQUOT_INIT(struct inode *inode)
 static __inline__ void DQUOT_DROP(struct inode *inode)
 {
 	if (IS_QUOTAINIT(inode)) {
-		if (!inode->i_sb)
-			BUG();
+		BUG_ON(!inode->i_sb);
 		inode->i_sb->dq_op->drop(inode);	/* Ops must be set when there's any quota... */
 	}
 }

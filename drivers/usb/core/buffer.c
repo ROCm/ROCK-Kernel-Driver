@@ -127,6 +127,8 @@ void hcd_buffer_free (
 	struct usb_hcd		*hcd = bus->hcpriv;
 	int 			i;
 
+	if (!addr)
+		return;
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
 		if (size <= pool_max [i]) {
 			pci_pool_free (hcd->pool [i], addr, dma);

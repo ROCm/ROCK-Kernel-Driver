@@ -269,7 +269,6 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	return 0;
 }
 
-/* FIXME: Sort exception table --RR */
 int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)

@@ -189,18 +189,18 @@ struct input_absinfo {
 #define KEY_KP3			81
 #define KEY_KP0			82
 #define KEY_KPDOT		83
-#define KEY_103RD		84
-#define KEY_F13			85
+
+#define KEY_ZENKAKUHANKAKU	85
 #define KEY_102ND		86
 #define KEY_F11			87
 #define KEY_F12			88
-#define KEY_F14			89
-#define KEY_F15			90
-#define KEY_F16			91
-#define KEY_F17			92
-#define KEY_F18			93
-#define KEY_F19			94
-#define KEY_F20			95
+#define KEY_RO			89
+#define KEY_KATAKANA		90
+#define KEY_HIRAGANA		91
+#define KEY_HENKAN		92
+#define KEY_KATAKANAHIRAGANA	93
+#define KEY_MUHENKAN		94
+#define KEY_KPJPCOMMA		95
 #define KEY_KPENTER		96
 #define KEY_RIGHTCTRL		97
 #define KEY_KPSLASH		98
@@ -225,11 +225,11 @@ struct input_absinfo {
 #define KEY_KPEQUAL		117
 #define KEY_KPPLUSMINUS		118
 #define KEY_PAUSE		119
-#define KEY_F21			120
-#define KEY_F22			121
-#define KEY_F23			122
-#define KEY_F24			123
-#define KEY_KPCOMMA		124
+
+#define KEY_KPCOMMA		121
+#define KEY_HANGUEL		122
+#define KEY_HANJA		123
+#define KEY_YEN			124
 #define KEY_LEFTMETA		125
 #define KEY_RIGHTMETA		126
 #define KEY_COMPOSE		127
@@ -288,24 +288,18 @@ struct input_absinfo {
 #define KEY_KPLEFTPAREN		179
 #define KEY_KPRIGHTPAREN	180
 
-#define KEY_INTL1		181
-#define KEY_INTL2		182
-#define KEY_INTL3		183
-#define KEY_INTL4		184
-#define KEY_INTL5		185
-#define KEY_INTL6		186
-#define KEY_INTL7		187
-#define KEY_INTL8		188
-#define KEY_INTL9		189
-#define KEY_LANG1		190
-#define KEY_LANG2		191
-#define KEY_LANG3		192
-#define KEY_LANG4		193
-#define KEY_LANG5		194
-#define KEY_LANG6		195
-#define KEY_LANG7		196
-#define KEY_LANG8		197
-#define KEY_LANG9		198
+#define KEY_F13			183
+#define KEY_F14			184
+#define KEY_F15			185
+#define KEY_F16			186
+#define KEY_F17			187
+#define KEY_F18			188
+#define KEY_F19			189
+#define KEY_F20			190
+#define KEY_F21			191
+#define KEY_F22			192
+#define KEY_F23			193
+#define KEY_F24			194
 
 #define KEY_PLAYCD		200
 #define KEY_PAUSECD		201
@@ -580,6 +574,7 @@ struct input_absinfo {
 #define BUS_ISAPNP		0x02
 #define BUS_USB			0x03
 #define BUS_HIL			0x04
+#define BUS_BLUETOOTH		0x05
 
 #define BUS_ISA			0x10
 #define BUS_I8042		0x11
@@ -809,6 +804,7 @@ struct input_dev {
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
 
 	struct input_handle *grab;
+	struct device *dev;
 
 	struct list_head	h_list;
 	struct list_head	node;
@@ -921,7 +917,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 #define input_regs(a,b)		do { (a)->regs = (b); } while (0)
 #define input_sync(a)		do { input_event(a, EV_SYN, SYN_REPORT, 0); (a)->regs = NULL; } while (0)
 
-extern struct class input_class;
+extern struct class_simple *input_class;
 
 #endif
 #endif

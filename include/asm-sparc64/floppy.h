@@ -320,10 +320,9 @@ static void sun_pci_fd_lde_broken_outb(unsigned char val, unsigned long port)
 
 static void sun_pci_fd_enable_dma(void)
 {
-	if ((NULL == sun_pci_dma_pending.buf) 	||
+	BUG_ON((NULL == sun_pci_dma_pending.buf) 	||
 	    (0	  == sun_pci_dma_pending.len) 	||
-	    (0	  == sun_pci_dma_pending.direction))
-		BUG();
+	    (0	  == sun_pci_dma_pending.direction));
 
 	sun_pci_dma_current.buf = sun_pci_dma_pending.buf;
 	sun_pci_dma_current.len = sun_pci_dma_pending.len;

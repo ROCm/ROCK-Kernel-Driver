@@ -24,8 +24,7 @@ extern __inline__ pmd_t *get_pmd(void)
 
 extern __inline__ void pmd_free(pmd_t *pmd)
 {
-	if ((unsigned long)pmd & (PAGE_SIZE-1)) 
-		BUG(); 
+	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
 	free_page((unsigned long)pmd);
 }
 
@@ -41,8 +40,7 @@ static inline pgd_t *pgd_alloc (struct mm_struct *mm)
 
 static inline void pgd_free (pgd_t *pgd)
 {
-	if ((unsigned long)pgd & (PAGE_SIZE-1)) 
-		BUG(); 
+	BUG_ON((unsigned long)pgd & (PAGE_SIZE-1));
 	free_page((unsigned long)pgd);
 }
 
@@ -64,8 +62,7 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 
 extern __inline__ void pte_free_kernel(pte_t *pte)
 {
-	if ((unsigned long)pte & (PAGE_SIZE-1))
-		BUG();
+	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
 	free_page((unsigned long)pte); 
 }
 

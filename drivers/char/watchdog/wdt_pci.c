@@ -8,10 +8,10 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide 
- *	warranty for any of this software. This material is provided 
- *	"AS-IS" and at no charge.	
+ *
+ *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+ *	warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
@@ -72,7 +72,7 @@
 
 static struct semaphore open_sem;
 static spinlock_t wdtpci_lock;
-static int expect_close = 0;
+static char expect_close;
 
 static int io;
 static int irq;
@@ -95,7 +95,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 /*
  *	Programming support
  */
- 
+
 static void wdtpci_ctr_mode(int ctr, int mode)
 {
 	ctr<<=6;
@@ -113,29 +113,29 @@ static void wdtpci_ctr_load(int ctr, int val)
 /*
  *	Kernel methods.
  */
- 
- 
+
+
 /**
  *	wdtpci_status:
- *	
+ *
  *	Extract the status information from a WDT watchdog device. There are
  *	several board variants so we have to know which bits are valid. Some
  *	bits default to one and some to zero in order to be maximally painful.
  *
  *	we then map the bits onto the status ioctl flags.
  */
- 
+
 static int wdtpci_status(void)
 {
 	/*
 	 *	Status register to bit flags
 	 */
-	 
+
 	int flag=0;
 	unsigned char status=inb_p(WDT_SR);
 	status|=FEATUREMAP1;
-	status&=~FEATUREMAP2;	
-	
+	status&=~FEATUREMAP2;
+
 	if(!(status&WDC_SR_TGOOD))
 		flag|=WDIOF_OVERHEAT;
 	if(!(status&WDC_SR_PSUOVER))
@@ -161,21 +161,21 @@ static int wdtpci_status(void)
  *	map changes in what the board considers an interesting way. That means
  *	a failure condition occurring.
  */
- 
+
 static irqreturn_t wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/*
 	 *	Read the status register see what is up and
-	 *	then printk it. 
+	 *	then printk it.
 	 */
-	 
+
 	unsigned char status=inb_p(WDT_SR);
-	
+
 	status|=FEATUREMAP1;
-	status&=~FEATUREMAP2;	
-	
+	status&=~FEATUREMAP2;
+
 	printk(KERN_CRIT "WDT status %d\n", status);
-	
+
 	if(!(status&WDC_SR_TGOOD))
 		printk(KERN_CRIT "Overheat alarm.(%d)\n",inb_p(WDT_RT));
 	if(!(status&WDC_SR_PSUOVER))
@@ -188,10 +188,10 @@ static irqreturn_t wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef SOFTWARE_REBOOT
 #ifdef ONLY_TESTING
 		printk(KERN_CRIT "Would Reboot.\n");
-#else		
+#else
 		printk(KERN_CRIT "Initiating system reboot.\n");
 		machine_restart(NULL);
-#endif		
+#endif
 #else
 		printk(KERN_CRIT "Reset in 5ms.\n");
 #endif
@@ -203,9 +203,9 @@ static irqreturn_t wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  *	wdtpci_ping:
  *
  *	Reload counter one with the watchdog timeout. We don't bother reloading
- *	the cascade counter. 
+ *	the cascade counter.
  */
- 
+
 static void wdtpci_ping(void)
 {
 	unsigned long flags;
@@ -222,14 +222,14 @@ static void wdtpci_ping(void)
 /**
  *	wdtpci_write:
  *	@file: file handle to the watchdog
- *	@buf: buffer to write (unused as data does not matter here 
+ *	@buf: buffer to write (unused as data does not matter here
  *	@count: count of bytes
  *	@ppos: pointer to the position to write. No seeks allowed
  *
  *	A write to a watchdog device is defined as a keepalive signal. Any
  *	write of data will do, as we we don't define content meaning.
  */
- 
+
 static ssize_t wdtpci_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
@@ -247,7 +247,7 @@ static ssize_t wdtpci_write(struct file *file, const char *buf, size_t count, lo
 				if(get_user(c, buf+i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		wdtpci_ping();
@@ -266,12 +266,12 @@ static ssize_t wdtpci_write(struct file *file, const char *buf, size_t count, lo
  *	Read reports the temperature in degrees Fahrenheit. The API is in
  *	fahrenheit. It was designed by an imperial measurement luddite.
  */
- 
+
 static ssize_t wdtpci_read(struct file *file, char *buf, size_t count, loff_t *ptr)
 {
 	unsigned short c=inb_p(WDT_RT);
 	unsigned char cp;
-	
+
 	/*  Can't seek (pread) on this device  */
 	if (ptr != &file->f_pos)
 		return -ESPIPE;
@@ -299,9 +299,9 @@ static ssize_t wdtpci_read(struct file *file, char *buf, size_t count, loff_t *p
  *
  *	The watchdog API defines a common set of functions for all watchdogs
  *	according to their available features. We only actually usefully support
- *	querying capabilities and current status. 
+ *	querying capabilities and current status.
  */
- 
+
 static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -314,12 +314,12 @@ static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		.firmware_version = 1,
 		.identity	  = "WDT500/501PCI",
 	};
-	
+
 	ident.options&=WDT_OPTION_MASK;	/* Mask down to the card we have */
 	switch(cmd)
 	{
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
 
@@ -351,12 +351,12 @@ static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd
  *	@file: file handle to device
  *
  *	One of our two misc devices has been opened. The watchdog device is
- *	single open and on opening we load the counters. Counter zero is a 
+ *	single open and on opening we load the counters. Counter zero is a
  *	100Hz cascade, into counter 1 which downcounts to reboot. When the
  *	counter triggers counter 2 downcounts the length of the reset pulse
- *	which set set to be as long as possible. 
+ *	which set set to be as long as possible.
  */
- 
+
 static int wdtpci_open(struct inode *inode, struct file *file)
 {
 	unsigned long flags;
@@ -371,17 +371,17 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 				__module_get(THIS_MODULE);
 			}
 			/*
-			 *	Activate 
+			 *	Activate
 			 */
 			spin_lock_irqsave(&wdtpci_lock, flags);
-			
+
 			inb_p(WDT_DC);		/* Disable */
 
 			/*
 			 * "pet" the watchdog, as Access says.
 			 * This resets the clock outputs.
 			 */
-				
+
 			wdtpci_ctr_mode(2,0);
 			outb_p(0, WDT_DC);
 
@@ -413,19 +413,19 @@ static int wdtpci_open(struct inode *inode, struct file *file)
  *	@inode: inode to board
  *	@file: file handle to board
  *
- *	The watchdog has a configurable API. There is a religious dispute 
- *	between people who want their watchdog to be able to shut down and 
+ *	The watchdog has a configurable API. There is a religious dispute
+ *	between people who want their watchdog to be able to shut down and
  *	those who want to be sure if the watchdog manager dies the machine
  *	reboots. In the former case we disable the counters, in the latter
  *	case you have to open it again very soon.
  */
- 
+
 static int wdtpci_release(struct inode *inode, struct file *file)
 {
 
 	if (iminor(inode)==WATCHDOG_MINOR) {
 		unsigned long flags;
-		if (expect_close) {
+		if (expect_close == 42) {
 			spin_lock_irqsave(&wdtpci_lock, flags);
 			inb_p(WDT_DC);		/* Disable counters */
 			wdtpci_ctr_load(2,0);	/* 0 length reset pulses now */
@@ -434,6 +434,7 @@ static int wdtpci_release(struct inode *inode, struct file *file)
 			printk(KERN_CRIT PFX "Unexpected close, not stopping timer!");
 			wdtpci_ping();
 		}
+		expect_close = 0;
 		up(&open_sem);
 	}
 	return 0;
@@ -465,12 +466,12 @@ static int wdtpci_notify_sys(struct notifier_block *this, unsigned long code,
 	}
 	return NOTIFY_DONE;
 }
- 
+
 /*
  *	Kernel Interfaces
  */
- 
- 
+
+
 static struct file_operations wdtpci_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
@@ -497,9 +498,9 @@ static struct miscdevice temp_miscdev = {
 
 /*
  *	The WDT card needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
- 
+
 static struct notifier_block wdtpci_notifier = {
 	.notifier_call = wdtpci_notify_sys,
 };
@@ -584,7 +585,7 @@ static void __devexit wdtpci_remove_one (struct pci_dev *pdev)
 	unregister_reboot_notifier(&wdtpci_notifier);
 #ifdef CONFIG_WDT_501_PCI
 	misc_deregister(&temp_miscdev);
-#endif	
+#endif
 	misc_deregister(&wdtpci_miscdev);
 	free_irq(irq, &wdtpci_miscdev);
 	release_region(io, 16);
@@ -620,7 +621,7 @@ static struct pci_driver wdtpci_driver = {
  *	will not touch PC memory so all is fine. You just have to load a new
  *	module in 60 seconds or reboot.
  */
- 
+
 static void __exit wdtpci_cleanup(void)
 {
 	pci_unregister_driver (&wdtpci_driver);
@@ -634,14 +635,14 @@ static void __exit wdtpci_cleanup(void)
  *	resources we require and bitch if anyone beat us to them.
  *	The open() function will actually kick the board off.
  */
- 
+
 static int __init wdtpci_init(void)
 {
 	int rc = pci_register_driver (&wdtpci_driver);
-	
+
 	if (rc < 1)
 		return -ENODEV;
-	
+
 	return 0;
 }
 

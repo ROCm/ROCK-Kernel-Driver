@@ -1067,6 +1067,9 @@ static int usb_stor_reset_common(struct us_data *us,
 	int result;
 	int result2;
 
+	/* Let the SCSI layer know we are doing a reset */
+	usb_stor_report_device_reset(us);
+
 	/* A 20-second timeout may seem rather long, but a LaCie
 	 *  StudioDrive USB2 device takes 16+ seconds to get going
 	 *  following a powerup or USB attach event. */
@@ -1088,6 +1091,9 @@ static int usb_stor_reset_common(struct us_data *us,
 		US_DEBUGP("Reset interrupted by disconnect\n");
 		return FAILED;
 	}
+
+	/* permit the clear-halt transfers to take place */
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
 
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
 	result = usb_stor_clear_halt(us, us->recv_bulk_pipe);

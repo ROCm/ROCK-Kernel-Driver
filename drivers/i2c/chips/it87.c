@@ -31,6 +31,11 @@
     type at module load time.
 */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_CHIP
+#define DEBUG	1
+#endif
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -667,10 +672,10 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 		}
 		else {
 			if (kind == 0)
-				printk
-				    ("it87.o: Ignoring 'force' parameter for unknown chip at "
-				     "adapter %d, address 0x%02x\n",
-				     i2c_adapter_id(adapter), address);
+				dev_info(&adapter->dev, 
+					"Ignoring 'force' parameter for unknown chip at "
+					"adapter %d, address 0x%02x\n",
+					i2c_adapter_id(adapter), address);
 			goto ERROR1;
 		}
 	}

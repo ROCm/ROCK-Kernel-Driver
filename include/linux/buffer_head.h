@@ -125,8 +125,7 @@ BUFFER_FNS(Write_EIO,write_io_error)
 /* If we *know* page->private refers to buffer_heads */
 #define page_buffers(page)					\
 	({							\
-		if (!PagePrivate(page))				\
-			BUG();					\
+		BUG_ON(!PagePrivate(page));		\
 		((struct buffer_head *)(page)->private);	\
 	})
 #define page_has_buffers(page)	PagePrivate(page)

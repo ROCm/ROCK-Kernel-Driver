@@ -167,6 +167,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case RTC_RD_TIME:
+		memset(&rtctm, 0, sizeof(struct rtc_time));
 		get_rtc_time(&rtc_raw, &year);
 		rtctm.tm_sec  = rtc_raw.secs;
 		rtctm.tm_min  = rtc_raw.mins;
