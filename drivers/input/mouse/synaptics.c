@@ -171,9 +171,9 @@ static void print_ident(struct synaptics_data *priv)
 static int query_hardware(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
-	int retries = 3;
+	int retries = 0;
 
-	while ((retries++ <= 3) && synaptics_reset(psmouse))
+	while ((retries++ < 3) && synaptics_reset(psmouse))
 		printk(KERN_ERR "synaptics reset failed\n");
 
 	if (synaptics_identify(psmouse, &priv->identity))
@@ -266,8 +266,7 @@ void synaptics_disconnect(struct psmouse *psmouse)
  *	Functions to interpret the absolute mode packets
  ****************************************************************************/
 
-static void synaptics_parse_hw_state(struct synaptics_data *priv,
-				     struct synaptics_hw_state *hw)
+static void synaptics_parse_hw_state(struct synaptics_data *priv, struct synaptics_hw_state *hw)
 {
 	unsigned char *buf = priv->proto_buf;
 

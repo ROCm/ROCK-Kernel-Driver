@@ -358,6 +358,7 @@ struct input_absinfo {
 #define BTN_EXTRA		0x114
 #define BTN_FORWARD		0x115
 #define BTN_BACK		0x116
+#define BTN_TASK		0x117
 
 #define BTN_JOYSTICK		0x120
 #define BTN_TRIGGER		0x120

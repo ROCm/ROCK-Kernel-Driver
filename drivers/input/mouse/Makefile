@@ -14,7 +14,4 @@ obj-$(CONFIG_MOUSE_PC9800)	+= 98busmouse.o
 obj-$(CONFIG_MOUSE_PS2)		+= psmouse.o
 obj-$(CONFIG_MOUSE_SERIAL)	+= sermouse.o
 
-psmouse-objs  := psmouse-base.o
-ifeq ($(CONFIG_MOUSE_PS2_SYNAPTICS),y)
-        psmouse-objs += synaptics.o
-endif
+psmouse-objs  := psmouse-base.o logips2pp.o synaptics.o

@@ -19,13 +19,23 @@
 #include <linux/init.h>
 #include "psmouse.h"
 #include "synaptics.h"
+#include "logips2pp.h"
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
 MODULE_PARM(psmouse_noext, "1i");
+MODULE_PARM_DESC(psmouse_noext, "Disable any protocol extensions. Useful for KVM switches.");
+MODULE_PARM(psmouse_resolution, "i");
+MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
+MODULE_PARM(psmouse_smartscroll, "i");
+MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
 MODULE_LICENSE("GPL");
 
+#define PSMOUSE_LOGITECH_SMARTSCROLL	1
+
 static int psmouse_noext;
+int psmouse_resolution;
+int psmouse_smartscroll = PSMOUSE_LOGITECH_SMARTSCROLL;
 
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "Synaptics"};
 
@@ -45,43 +55,8 @@ static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs
  * The PS2++ protocol is a little bit complex
  */
 
-	if (psmouse->type == PSMOUSE_PS2PP || psmouse->type == PSMOUSE_PS2TPP) {
-
-		if ((packet[0] & 0x40) == 0x40 && abs((int)packet[1] - (((int)packet[0] & 0x10) << 4)) > 191 ) {
-
-			switch (((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0x0c)) {
-
-			case 1: /* Mouse extra info */
-
-				input_report_rel(dev, packet[2] & 0x80 ? REL_HWHEEL : REL_WHEEL,
-					(int) (packet[2] & 8) - (int) (packet[2] & 7));
-				input_report_key(dev, BTN_SIDE, (packet[2] >> 4) & 1);
-				input_report_key(dev, BTN_EXTRA, (packet[2] >> 5) & 1);
-					
-				break;
-
-			case 3: /* TouchPad extra info */
-
-				input_report_rel(dev, packet[2] & 0x08 ? REL_HWHEEL : REL_WHEEL,
-					(int) ((packet[2] >> 4) & 8) - (int) ((packet[2] >> 4) & 7));
-				packet[0] = packet[2] | 0x08;
-
-				break;
-
-#ifdef DEBUG
-			default:
-				printk(KERN_WARNING "psmouse.c: Received PS2++ packet #%x, but don't know how to handle.\n",
-					((packet[1] >> 4) & 0x03) | ((packet[0] >> 2) & 0x0c));
-#endif
-
-			}
-
-		packet[0] &= 0x0f;
-		packet[1] = 0;
-		packet[2] = 0;
-
-		}
-	}
+	if (psmouse->type == PSMOUSE_PS2PP || psmouse->type == PSMOUSE_PS2TPP)
+		ps2pp_process_packet(psmouse);
 
 /*
  * Scroll wheel on IntelliMice, scroll buttons on NetMice
@@ -259,33 +234,6 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 }
 
 /*
- * psmouse_ps2pp_cmd() sends a PS2++ command, sliced into two bit
- * pieces through the SETRES command. This is needed to send extended
- * commands to mice on notebooks that try to understand the PS/2 protocol
- * Ugly.
- */
-
-static int psmouse_ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned char command)
-{
-	unsigned char d;
-	int i;
-
-	if (psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11))
-		return -1;
-
-	for (i = 6; i >= 0; i -= 2) {
-		d = (command >> i) & 3;
-		if(psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
-			return -1;
-	}
-
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_POLL))
-		return -1;
-
-	return 0;
-}
-
-/*
  * psmouse_extensions() probes for any extensions to the basic PS/2 protocol
  * the mouse may have.
  */
@@ -353,73 +301,13 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	param[1] = 0;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
 	if (param[1]) {
-
-		int i;
-		static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
-		static int logitech_wheel[] = { 52, 53, 75, 76, 80, 81, 83, 88, -1 };
-		static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
-							76, 80, 81, 83, 88, 96, 97, -1 };
-		psmouse->vendor = "Logitech";
-		psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
-
-		if (param[1] < 3)
-			clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
-		if (param[1] < 2)
-			clear_bit(BTN_RIGHT, psmouse->dev.keybit);
-
-		psmouse->type = PSMOUSE_PS2;
-
-		for (i = 0; logitech_ps2pp[i] != -1; i++)
-			if (logitech_ps2pp[i] == psmouse->model)
-				psmouse->type = PSMOUSE_PS2PP;
-
-		if (psmouse->type == PSMOUSE_PS2PP) {
-
-			for (i = 0; logitech_4btn[i] != -1; i++)
-				if (logitech_4btn[i] == psmouse->model)
-					set_bit(BTN_SIDE, psmouse->dev.keybit);
-
-			for (i = 0; logitech_wheel[i] != -1; i++)
-				if (logitech_wheel[i] == psmouse->model) {
-					set_bit(REL_WHEEL, psmouse->dev.relbit);
-					psmouse->name = "Wheel Mouse";
-				}
-
-/*
- * Do Logitech PS2++ / PS2T++ magic init.
- */
-
-			if (psmouse->model == 97) { /* TouchPad 3 */
-
-				set_bit(REL_WHEEL, psmouse->dev.relbit);
-				set_bit(REL_HWHEEL, psmouse->dev.relbit);
-
-				param[0] = 0x11; param[1] = 0x04; param[2] = 0x68; /* Unprotect RAM */
-				psmouse_command(psmouse, param, 0x30d1);
-				param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b; /* Enable features */
-				psmouse_command(psmouse, param, 0x30d1);
-				param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3; /* Enable PS2++ */
-				psmouse_command(psmouse, param, 0x30d1);
-
-				param[0] = 0;
-				if (!psmouse_command(psmouse, param, 0x13d1) &&
-					param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14)
-					return PSMOUSE_PS2TPP;
-
-			} else {
-				param[0] = param[1] = param[2] = 0;
-
-				psmouse_ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
-				psmouse_ps2pp_cmd(psmouse, param, 0xDB);
-
-				if ((param[0] & 0x78) == 0x48 && (param[1] & 0xf3) == 0xc2 &&
-					(param[2] & 3) == ((param[1] >> 2) & 3))
-						return PSMOUSE_PS2PP;
-			}
-		}
+		int type = ps2pp_detect_model(psmouse, param);
+		if (type)
+			return type;
 	}
 
 /*
@@ -508,6 +396,31 @@ static int psmouse_probe(struct psmouse *psmouse)
 }
 
 /*
+ * Here we set the mouse resolution.
+ */
+
+static void psmouse_set_resolution(struct psmouse *psmouse)
+{
+	unsigned char param[1];
+
+	if (psmouse->type == PSMOUSE_PS2PP && psmouse_resolution > 400) {
+		ps2pp_set_800dpi(psmouse);
+		return;
+	}
+
+	if (!psmouse_resolution || psmouse_resolution >= 200)
+		param[0] = 3;
+	else if (psmouse_resolution >= 100)
+		param[0] = 2;
+	else if (psmouse_resolution >= 50)
+		param[0] = 1;
+	else if (psmouse_resolution)
+		param[0] = 0;
+
+        psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+}
+
+/*
  * psmouse_initialize() initializes the mouse to a sane state.
  */
 
@@ -519,7 +432,6 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * We set the mouse report rate to a highest possible value.
  * We try 100 first in case mouse fails to set 200.
  */
-
 	param[0] = 100;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
 
@@ -530,8 +442,7 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * We also set the resolution and scaling.
  */
 
-	param[0] = 3;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	psmouse_set_resolution(psmouse);
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
 
 /*
@@ -638,12 +549,28 @@ static struct serio_dev psmouse_dev = {
 };
 
 #ifndef MODULE
-static int __init psmouse_setup(char *str)
+static int __init psmouse_noext_setup(char *str)
 {
 	psmouse_noext = 1;
 	return 1;
 }
-__setup("psmouse_noext", psmouse_setup);
+
+static int __init psmouse_resolution_setup(char *str)
+{
+	get_option(&str, &psmouse_resolution);
+	return 1;
+}
+
+static int __init psmouse_smartscroll_setup(char *str)
+{
+	get_option(&str, &psmouse_smartscroll);
+	return 1;
+}
+
+__setup("psmouse_noext", psmouse_noext_setup);
+__setup("psmouse_resolution=", psmouse_resolution_setup);
+__setup("psmouse_smartscroll=", psmouse_smartscroll_setup);
+
 #endif
 
 int __init psmouse_init(void)
