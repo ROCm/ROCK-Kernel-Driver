@@ -1,7 +1,7 @@
 /* 
  * Direct MTD block device access
  *
- * $Id: mtdblock.c,v 1.64 2003/10/04 17:14:14 dwmw2 Exp $
+ * $Id: mtdblock.c,v 1.65 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * (C) 2000-2003 Nicolas Pitre <nico@cam.org>
  * (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>
@@ -361,7 +361,7 @@ static void mtdblock_remove_dev(struct mtd_blktrans_dev *dev)
 	kfree(dev);
 }
 
-struct mtd_blktrans_ops mtdblock_tr = {
+static struct mtd_blktrans_ops mtdblock_tr = {
 	.name		= "mtdblock",
 	.major		= 31,
 	.part_bits	= 0,
@@ -375,7 +375,7 @@ struct mtd_blktrans_ops mtdblock_tr = {
 	.owner		= THIS_MODULE,
 };
 
-int __init init_mtdblock(void)
+static int __init init_mtdblock(void)
 {
 	return register_mtd_blktrans(&mtdblock_tr);
 }

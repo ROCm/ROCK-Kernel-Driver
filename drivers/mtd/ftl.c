@@ -1,5 +1,5 @@
 /* This version ported to the Linux-MTD system by dwmw2@infradead.org
- * $Id: ftl.c,v 1.53 2004/08/09 13:55:43 dwmw2 Exp $
+ * $Id: ftl.c,v 1.54 2004/11/16 18:33:15 dwmw2 Exp $
  *
  * Fixes: Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  * - fixes some leaks on failure in build_maps and ftl_notify_add, cleanups
@@ -1067,16 +1067,18 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 		partition->mbd.blksize = SECTOR_SIZE;
 		partition->mbd.tr = tr;
 		partition->mbd.devnum = -1;
-		if (add_mtd_blktrans_dev((void *)partition))
-			kfree(partition);
-	
-	} else
-		kfree(partition);
+		if (!add_mtd_blktrans_dev((void *)partition))
+			return;
+	}
+
+	ftl_freepart(partition);
+	kfree(partition);
 }
 
 static void ftl_remove_dev(struct mtd_blktrans_dev *dev)
 {
 	del_mtd_blktrans_dev(dev);
+	ftl_freepart((partition_t *)dev);
 	kfree(dev);
 }
 
@@ -1094,7 +1096,7 @@ struct mtd_blktrans_ops ftl_tr = {
 
 int init_ftl(void)
 {
-	DEBUG(0, "$Id: ftl.c,v 1.53 2004/08/09 13:55:43 dwmw2 Exp $\n");
+	DEBUG(0, "$Id: ftl.c,v 1.54 2004/11/16 18:33:15 dwmw2 Exp $\n");
 
 	return register_mtd_blktrans(&ftl_tr);
 }

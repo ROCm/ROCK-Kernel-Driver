@@ -1,6 +1,6 @@
 /**
  *
- * $Id: phram.c,v 1.2 2004/08/09 13:19:44 dwmw2 Exp $
+ * $Id: phram.c,v 1.3 2004/11/16 18:29:01 dwmw2 Exp $
  *
  * Copyright (c) Jochen Schaeuble <psionic@psionic.de>
  * 07/2003	rewritten by Joern Engel <joern@wh.fh-wedel.de>
@@ -39,7 +39,7 @@ static LIST_HEAD(phram_list);
 
 
 
-int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
+static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	u_char *start = (u_char *)mtd->priv;
 
@@ -60,7 +60,7 @@ int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 	return 0;
 }
 
-int phram_point(struct mtd_info *mtd, loff_t from, size_t len,
+static int phram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char **mtdbuf)
 {
 	u_char *start = (u_char *)mtd->priv;
@@ -73,11 +73,11 @@ int phram_point(struct mtd_info *mtd, loff_t from, size_t len,
 	return 0;
 }
 
-void phram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_t len)
+static void phram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_t len)
 {
 }
 
-int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
+static int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
 	u_char *start = (u_char *)mtd->priv;
@@ -91,7 +91,7 @@ int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 	return 0;
 }
 
-int phram_write(struct mtd_info *mtd, loff_t to, size_t len,
+static int phram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
 	u_char *start = (u_char *)mtd->priv;
@@ -340,7 +340,7 @@ module_param_call(slram, slram_setup, NULL, NULL, 000);
 MODULE_PARM_DESC(slram, "List of memory regions to map. \"map=<name>,<start><length/end>\"");
 
 
-int __init init_phram(void)
+static int __init init_phram(void)
 {
 	printk(KERN_ERR "phram loaded\n");
 	return 0;

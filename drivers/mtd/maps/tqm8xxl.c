@@ -2,7 +2,7 @@
  * Handle mapping of the flash memory access routines 
  * on TQM8xxL based devices.
  *
- * $Id: tqm8xxl.c,v 1.11 2004/07/12 21:59:45 dwmw2 Exp $
+ * $Id: tqm8xxl.c,v 1.13 2004/10/20 22:21:53 dwmw2 Exp $
  *
  * based on rpxlite.c
  *

@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.12 2004/08/10 13:12:18 dwmw2 Exp $
+# $Id: Kconfig,v 1.13 2004/10/01 21:47:13 gleixner Exp $
 
 menu "Self-contained MTD device drivers"
 	depends on MTD!=n
@@ -193,8 +193,8 @@ config MTD_DOCPROBE
 
 config MTD_DOCECC
 	tristate
-	default m if MTD_DOCPROBE!=y && MTD_NAND_DISKONCHIP!=y && (MTD_DOCPROBE=m || MTD_NAND_DISKONCHIP=m)
-	default y if MTD_DOCPROBE=y || MTD_NAND_DISKONCHIP=y
+	default m if MTD_DOCPROBE=m
+	default y if MTD_DOCPROBE=y
 	help
 	  This isn't a real config option; it's derived.
 
