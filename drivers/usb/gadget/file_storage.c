@@ -3834,6 +3834,7 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	}
 
 	/* Find all the endpoints we will use */
+	usb_ep_autoconfig_reset(gadget);
 	ep = usb_ep_autoconfig(gadget, &fs_bulk_in_desc);
 	if (!ep)
 		goto autoconf_fail;
