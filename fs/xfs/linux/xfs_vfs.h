@@ -87,8 +87,9 @@ typedef enum {
 #define SYNC_CLOSE		0x0002	/* close file system down */
 #define SYNC_DELWRI		0x0004	/* look at delayed writes */
 #define SYNC_WAIT		0x0008	/* wait for i/o to complete */
-#define SYNC_FSDATA		0x0020	/* flush fs data (e.g. superblocks) */
 #define SYNC_BDFLUSH		0x0010	/* BDFLUSH is calling -- don't block */
+#define SYNC_FSDATA		0x0020	/* flush fs data (e.g. superblocks) */
+#define SYNC_REFCACHE		0x0040  /* prune some of the nfs ref cache */
 
 
 typedef int	(*vfs_mount_t)(bhv_desc_t *,
