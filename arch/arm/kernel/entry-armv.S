@@ -1093,8 +1093,10 @@ vector_data:	@
 		@
 		@ now branch to the relevant MODE handling routine
 		@
-		mov	r13, #PSR_I_BIT | MODE_SVC
-		msr	spsr_c, r13			@ switch to SVC_32 mode
+		mrs	r13, cpsr
+		bic	r13, r13, #MODE_MASK
+		orr	r13, r13, #MODE_SVC
+		msr	spsr, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
@@ -1135,8 +1137,10 @@ vector_prefetch:
 		@
 		@ now branch to the relevant MODE handling routine
 		@
-		mov	r13, #PSR_I_BIT | MODE_SVC
-		msr	spsr_c, r13			@ switch to SVC_32 mode
+		mrs	r13, cpsr
+		bic	r13, r13, #MODE_MASK
+		orr	r13, r13, #MODE_SVC
+		msr	spsr, r13			@ switch to SVC_32 mode
 
 		ands	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
@@ -1176,8 +1180,10 @@ vector_undefinstr:
 		@
 		@ now branch to the relevant MODE handling routine
 		@
-		mov	r13, #PSR_I_BIT | MODE_SVC
-		msr	spsr_c, r13			@ switch to SVC_32 mode
+		mrs	r13, cpsr
+		bic	r13, r13, #MODE_MASK
+		orr	r13, r13, #MODE_SVC
+		msr	spsr, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
