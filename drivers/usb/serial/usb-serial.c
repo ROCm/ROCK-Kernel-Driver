@@ -896,7 +896,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	serial = create_serial (dev, interface, type);
 	if (!serial) {
 		dev_err(&interface->dev, "%s - out of memory\n", __FUNCTION__);
-		return -ENODEV;
+		return -ENOMEM;
 	}
 
 	/* if this device type has a probe function, call it */
