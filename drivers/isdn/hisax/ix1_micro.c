@@ -26,6 +26,7 @@
 
 extern const char *CardType[];
 const char *ix1_revision = "$Revision: 2.10.6.2 $";
+static spinlock_t ix1_micro_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -43,13 +44,12 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ix1_micro_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ix1_micro_lock, flags);
 	return (ret);
 }
 
@@ -66,13 +66,12 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ix1_micro_lock, flags);
 	byteout(ale, off);
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ix1_micro_lock, flags);
 }
 
 static inline void
@@ -184,19 +183,15 @@ release_io_ix1micro(struct IsdnCardState *cs)
 static void
 ix1_reset(struct IsdnCardState *cs)
 {
-	long flags;
 	int cnt;
 
 	/* reset isac */
-	save_flags(flags);
 	cnt = 3 * (HZ / 10) + 1;
-	sti();
 	while (cnt--) {
 		byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 1);
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
-	restore_flags(flags);
 }
 
 static int

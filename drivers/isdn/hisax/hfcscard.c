@@ -64,15 +64,11 @@ release_io_hfcs(struct IsdnCardState *cs)
 static void
 reset_hfcs(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "HFCS: resetting card\n");
 	cs->hw.hfcD.cirm = HFCD_RESET;
 	if (cs->typ == ISDN_CTYPE_TELES3C)
 		cs->hw.hfcD.cirm |= HFCD_MEM8K;
 	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);	/* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);
 	cs->hw.hfcD.cirm = 0;
@@ -103,14 +99,11 @@ reset_hfcs(struct IsdnCardState *cs)
 	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m); /* HFC Master */
 	cs->hw.hfcD.sctrl = 0;
 	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_SCTRL, cs->hw.hfcD.sctrl);
-	restore_flags(flags);
 }
 
 static int
 hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	long flags;
-
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "HFCS: card_msg %x", mt);
 	switch (mt) {
@@ -124,14 +117,11 @@ hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			cs->hw.hfcD.timer.expires = jiffies + 75;
 			add_timer(&cs->hw.hfcD.timer);
 			init2bds0(cs);
-			save_flags(flags);
-			sti();
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((80*HZ)/1000);
 			cs->hw.hfcD.ctmt |= HFCD_TIM800;
 			cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 
 			cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
-			restore_flags(flags);
 			return(0);
 		case CARD_TEST:
 			return(0);

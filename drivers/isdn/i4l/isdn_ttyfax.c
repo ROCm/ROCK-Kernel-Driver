@@ -1,6 +1,4 @@
-/* $Id: isdn_ttyfax.c,v 1.7.6.2 2001/09/23 22:24:32 kai Exp $
- *
- * Linux ISDN subsystem, tty_fax AT-command emulator (linklevel).
+/* Linux ISDN subsystem, tty_fax AT-command emulator
  *
  * Copyright 1999    by Armin Schindler (mac@melware.de)
  * Copyright 1999    by Ralf Spachmann (mel@melware.de)
@@ -8,7 +6,6 @@
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #undef ISDN_TTY_FAX_STAT_DEBUG
@@ -19,25 +16,7 @@
 #include "isdn_tty.h"
 #include "isdn_ttyfax.h"
 
-
-static char *isdn_tty_fax_revision = "$Revision: 1.7.6.2 $";
-
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
-
-static char *
-isdn_getrev(const char *revision)
-{
-	char *rev;
-	char *p;
-
-	if ((p = strchr(revision, ':'))) {
-		rev = p + 2;
-		p = strchr(rev, '$');
-		*--p = 0;
-	} else
-		rev = "???";
-	return rev;
-}
 
 /*
  * Fax Class 2 Modem results
@@ -74,7 +53,7 @@ isdn_tty_fax_modem_result(int code, modem_info * info)
 		case 2:	/* +FCON */
 			/* Append CPN, if enabled */
 			if ((m->mdmreg[REG_CPNFCON] & BIT_CPNFCON) &&
-				(!(isdn_slot_usage(info->isdn_slot) & ISDN_USAGE_OUTGOING))) {
+				(!(info->isdn_slot->usage & ISDN_USAGE_OUTGOING))) {
 				sprintf(rs, "/%s", m->cpn);
 				isdn_tty_at_cout(rs, info);
 			}
@@ -322,7 +301,8 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 	static char *cmd[] =
 	{"AE", "TS", "RS", "TM", "RM", "TH", "RH"};
 	isdn_ctrl c;
-	int par, i;
+	int par;
+	struct isdn_slot *slot;
 	long flags;
 
 	for (c.parm.aux.cmd = 0; c.parm.aux.cmd < 7; c.parm.aux.cmd++)
@@ -364,7 +344,7 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 	printk(KERN_DEBUG "isdn_tty_cmd_FCLASS1 %d/%d/%d)\n",
 	       c.parm.aux.cmd, c.parm.aux.subcmd, c.parm.aux.para[0]);
 #endif
-	if (info->isdn_slot < 0) {
+	if (!info->isdn_slot) {
 		save_flags(flags);
 		cli();
 		if ((c.parm.aux.subcmd == AT_EQ_VALUE) ||
@@ -373,18 +353,16 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 			PARSE_ERROR1;
 		}
 		/* get a temporary connection to the first free fax driver */
-		i = isdn_get_free_slot(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
+		slot = isdn_get_free_slot(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
 				       ISDN_PROTO_L3_FCLASS1, -1, -1, "00");
-		if (i < 0) {
+		if (!slot) {
 			restore_flags(flags);
 			PARSE_ERROR1;
 		}
-		info->isdn_slot = i;
-		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &c);
-		isdn_slot_free(info->isdn_slot);
-		isdn_slot_set_m_idx(i, -1);
-		info->isdn_slot = -1;
+		info->isdn_slot = slot;
+		isdn_slot_command(slot, ISDN_CMD_FAXCMD, &c);
+		isdn_slot_free(slot);
+		info->isdn_slot = NULL;
 		restore_flags(flags);
 	} else {
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &c);
@@ -1065,8 +1043,7 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 #ifdef ISDN_TTY_FAX_STAT_DEBUG
 		printk(KERN_DEBUG "isdn_tty: FREV?\n");
 #endif
-		strcpy(rss, isdn_tty_fax_revision);
-		sprintf(rs, "\r\nRev: %s", isdn_getrev(rss));
+		sprintf(rs, "\r\nRev: 1.0");
 		isdn_tty_at_cout(rs, info);
 		return 0;
 	}

@@ -25,6 +25,7 @@
 
 extern char *HiSax_getrev(const char *revision);
 const char *ni1_revision = "$Revision: 2.5.6.3 $";
+static spinlock_t l3ni1_lock = SPIN_LOCK_UNLOCKED;
 
 #define EXT_BEARER_CAPS 1
 
@@ -51,8 +52,7 @@ static unsigned char new_invoke_id(struct PStack *p)
   
 	i = 32; /* maximum search depth */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&l3ni1_lock, flags);
 
 	retval = p->prot.ni1.last_invoke_id + 1; /* try new id */
 	while ((i) && (p->prot.ni1.invoke_used[retval >> 3] == 0xFF)) {
@@ -66,7 +66,7 @@ static unsigned char new_invoke_id(struct PStack *p)
 		retval = 0;
 	p->prot.ni1.last_invoke_id = retval;
 	p->prot.ni1.invoke_used[retval >> 3] |= (1 << (retval & 7));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&l3ni1_lock, flags);
 
 	return(retval);  
 } /* new_invoke_id */
@@ -79,10 +79,9 @@ static void free_invoke_id(struct PStack *p, unsigned char id)
 
   if (!id) return; /* 0 = invalid value */
 
-  save_flags(flags);
-  cli();
+  spin_lock_irqsave(&l3ni1_lock, flags);
   p->prot.ni1.invoke_used[id >> 3] &= ~(1 << (id & 7));
-  restore_flags(flags);
+  spin_unlock_irqrestore(&l3ni1_lock, flags);
 } /* free_invoke_id */  
 
 

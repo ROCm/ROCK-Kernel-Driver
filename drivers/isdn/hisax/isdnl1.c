@@ -299,10 +299,10 @@ BChannel_proc_rcv(struct BCState *bcs)
 }
 
 void
-BChannel_bh(struct BCState *bcs)
+BChannel_bh(void *data)
 {
-	if (!bcs)
-		return;
+	struct BCState *bcs = data;
+
 	if (test_and_clear_bit(B_RCVBUFREADY, &bcs->event))
 		BChannel_proc_rcv(bcs);
 	if (test_and_clear_bit(B_XMTBUFREADY, &bcs->event))
@@ -345,7 +345,7 @@ init_bcstate(struct IsdnCardState *cs,
 
 	bcs->cs = cs;
 	bcs->channel = bc;
-	INIT_WORK(&bcs->tqueue, (void *) (void *) BChannel_bh, bcs);
+	INIT_WORK(&bcs->work, BChannel_bh, bcs);
 	bcs->BC_SetStack = NULL;
 	bcs->BC_Close = NULL;
 	bcs->Flag = 0;

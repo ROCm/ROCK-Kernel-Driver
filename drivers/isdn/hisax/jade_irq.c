@@ -9,6 +9,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
+static spinlock_t jade_irq_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
 waitforCEC(struct IsdnCardState *cs, int jade, int reg)
@@ -33,13 +34,12 @@ waitforXFW(struct IsdnCardState *cs, int jade)
 static inline void
 WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jade_irq_lock, flags);
 	waitforCEC(cs, jade, reg);
 	WRITEJADE(cs, jade, reg, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jade_irq_lock, flags);
 }
 
 
@@ -49,7 +49,7 @@ jade_empty_fifo(struct BCState *bcs, int count)
 {
 	u_char *ptr;
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "jade_empty_fifo");
@@ -63,11 +63,10 @@ jade_empty_fifo(struct BCState *bcs, int count)
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jade_irq_lock, flags);
 	READJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jade_irq_lock, flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -85,7 +84,7 @@ jade_fill_fifo(struct BCState *bcs)
 	int more, count;
 	int fifo_size = 32;
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "jade_fill_fifo");
@@ -103,15 +102,14 @@ jade_fill_fifo(struct BCState *bcs)
 		count = bcs->tx_skb->len;
 
 	waitforXFW(cs, bcs->hw.hscx.hscx);
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jade_irq_lock, flags);
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
 	bcs->hw.hscx.count += count;
 	WRITEJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jade_irq_lock, flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 

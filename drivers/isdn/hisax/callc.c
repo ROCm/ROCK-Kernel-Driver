@@ -37,6 +37,7 @@ static void release_b_st(struct Channel *chanp);
 
 static struct Fsm callcfsm;
 static int chancount;
+static spinlock_t callc_lock = SPIN_LOCK_UNLOCKED;
 
 /* experimental REJECT after ALERTING for CALLBACK to beat the 4s delay */
 #define ALERT_REJECT 0
@@ -1803,8 +1804,7 @@ HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb)
 			return 0;
 		} else if (chanp->debug & 0x800)
 			link_debug(chanp, 1, "writebuf %d/%d/%d", len, chanp->bcs->tx_cnt,MAX_DATA_MEM);
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&callc_lock, flags);
 		nskb = skb_clone(skb, GFP_ATOMIC);
 		if (nskb) {
 			nskb->truesize = nskb->len;
@@ -1819,7 +1819,7 @@ HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb)
 			dev_kfree_skb(skb);
 		} else
 			len = 0;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&callc_lock, flags);
 	}
 	return (len);
 }
