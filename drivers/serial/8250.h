@@ -38,8 +38,9 @@ struct old_serial_port {
  */
 struct serial8250_config {
 	const char	*name;
-	unsigned int	fifo_size;
-	unsigned int	tx_loadsz;
+	unsigned short	fifo_size;
+	unsigned short	tx_loadsz;
+	unsigned char	fcr;
 	unsigned int	flags;
 };
 

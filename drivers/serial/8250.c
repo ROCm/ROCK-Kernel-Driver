@@ -157,23 +157,109 @@ static struct irq_info irq_lists[NR_IRQS];
 /*
  * Here we define the default xmit fifo size used for each type of UART.
  */
-static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
-	{ "unknown",	1,	1,	0 },
-	{ "8250",	1,	1,	0 },
-	{ "16450",	1,	1,	0 },
-	{ "16550",	1,	1,	0 },
-	{ "16550A",	16,	16,	UART_CAP_FIFO },
-	{ "Cirrus",	1, 	1,	0 },
-	{ "ST16650",	1,	1,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
-	{ "ST16650V2",	32,	16,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
-	{ "TI16750",	64,	64,	UART_CAP_FIFO | UART_CAP_SLEEP },
-	{ "Startech",	1,	1,	0 },
-	{ "16C950/954",	128,	128,	UART_CAP_FIFO },
-	{ "ST16654",	64,	32,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
-	{ "XR16850",	128,	128,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
-	{ "RSA",	2048,	2048,	UART_CAP_FIFO },
-	{ "NS16550A",	16,	16,	UART_CAP_FIFO | UART_NATSEMI },
-	{ "XScale",	32,	32,	UART_CAP_FIFO },
+static const struct serial8250_config uart_config[] = {
+	[PORT_UNKNOWN] = {
+		.name		= "unknown",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_8250] = {
+		.name		= "8250",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_16450] = {
+		.name		= "16450",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_16550] = {
+		.name		= "16550",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_16550A] = {
+		.name		= "16550A",
+		.fifo_size	= 16,
+		.tx_loadsz	= 16,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO,
+	},
+	[PORT_CIRRUS] = {
+		.name		= "Cirrus",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_16650] = {
+		.name		= "ST16650",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
+	},
+	[PORT_16650V2] = {
+		.name		= "ST16650V2",
+		.fifo_size	= 32,
+		.tx_loadsz	= 16,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_01 |
+				  UART_FCR_T_TRIG_00,
+		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
+	},
+	[PORT_16750] = {
+		.name		= "TI16750",
+		.fifo_size	= 64,
+		.tx_loadsz	= 64,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10 |
+				  UART_FCR7_64BYTE,
+		.flags		= UART_CAP_FIFO | UART_CAP_SLEEP,
+	},
+	[PORT_STARTECH] = {
+		.name		= "Startech",
+		.fifo_size	= 1,
+		.tx_loadsz	= 1,
+	},
+	[PORT_16C950] = {
+		.name		= "16C950/954",
+		.fifo_size	= 128,
+		.tx_loadsz	= 128,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO,
+	},
+	[PORT_16654] = {
+		.name		= "ST16654",
+		.fifo_size	= 64,
+		.tx_loadsz	= 32,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_01 |
+				  UART_FCR_T_TRIG_10,
+		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
+	},
+	[PORT_16850] = {
+		.name		= "XR16850",
+		.fifo_size	= 128,
+		.tx_loadsz	= 128,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP,
+	},
+	[PORT_RSA] = {
+		.name		= "RSA",
+		.fifo_size	= 2048,
+		.tx_loadsz	= 2048,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_11,
+		.flags		= UART_CAP_FIFO,
+	},
+	[PORT_NS16550A] = {
+		.name		= "NS16550A",
+		.fifo_size	= 16,
+		.tx_loadsz	= 16,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO | UART_NATSEMI,
+	},
+	[PORT_XSCALE] = {
+		.name		= "XScale",
+		.fifo_size	= 32,
+		.tx_loadsz	= 32,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO,
+	},
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -1493,12 +1579,8 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	if (up->capabilities & UART_CAP_FIFO && up->port.fifosize > 1) {
 		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
-#ifdef CONFIG_SERIAL_8250_RSA
-		else if (up->port.type == PORT_RSA)
-			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_14;
-#endif
 		else
-			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_8;
+			fcr = uart_config[up->port.type].fcr;
 	}
 
 	/*
@@ -1510,8 +1592,6 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		up->mcr &= ~UART_MCR_AFE;
 		if (termios->c_cflag & CRTSCTS)
 			up->mcr |= UART_MCR_AFE;
-
-		fcr |= UART_FCR7_64BYTE;
 	}
 
 	/*
@@ -1797,7 +1877,7 @@ serial8250_verify_port(struct uart_port *port, struct serial_struct *ser)
 {
 	if (ser->irq >= NR_IRQS || ser->irq < 0 ||
 	    ser->baud_base < 9600 || ser->type < PORT_UNKNOWN ||
-	    ser->type > PORT_MAX_8250 || ser->type == PORT_CIRRUS ||
+	    ser->type >= ARRAY_SIZE(uart_config) || ser->type == PORT_CIRRUS ||
 	    ser->type == PORT_STARTECH)
 		return -EINVAL;
 	return 0;
