@@ -66,7 +66,12 @@
  * and dual port ram.
  */
 extern	cpm8xx_t	*cpmp;		/* Pointer to comm processor */
-uint		m8xx_cpm_dpalloc(uint size);
+extern void *m8xx_cpm_dpalloc(int size);
+extern int m8xx_cpm_dpfree(void *addr);
+extern void *m8xx_cpm_dpalloc_fixed(void *addr, int size);
+extern void m8xx_cpm_dpdump(void);
+extern int m8xx_cpm_dpram_offset(void *addr);
+extern void *m8xx_cpm_dpram_addr(int offset);
 uint		m8xx_cpm_hostalloc(uint size);
 void		m8xx_cpm_setbrg(uint brg, uint rate);
 

@@ -129,6 +129,7 @@ void scc4_lineif(struct uart_cpm_port *pinfo)
 int cpm_uart_allocbuf(struct uart_cpm_port *pinfo, unsigned int is_con)
 {
 	int dpmemsz, memsz;
+	u8 *dp_mem;
 	uint dp_addr;
 	u8 *mem_addr;
 	dma_addr_t dma_addr;
@@ -136,12 +137,13 @@ int cpm_uart_allocbuf(struct uart_cpm_port *pinfo, unsigned int is_con)
 	pr_debug("CPM uart[%d]:allocbuf\n", pinfo->port.line);
 
 	dpmemsz = sizeof(cbd_t) * (pinfo->rx_nrfifos + pinfo->tx_nrfifos);
-	dp_addr = m8xx_cpm_dpalloc(dpmemsz);
-	if (dp_addr == CPM_DP_NOSPACE) {
+	dp_mem = m8xx_cpm_dpalloc(dpmemsz);
+	if (dp_mem == NULL) {
 		printk(KERN_ERR
 		       "cpm_uart_cpm1.c: could not allocate buffer descriptors\n");
 		return -ENOMEM;
 	}
+	dp_addr = m8xx_cpm_dpram_offset(dp_mem);
 
 	memsz = L1_CACHE_ALIGN(pinfo->rx_nrfifos * pinfo->rx_fifosize) +
 	    L1_CACHE_ALIGN(pinfo->tx_nrfifos * pinfo->tx_fifosize);
@@ -152,10 +154,8 @@ int cpm_uart_allocbuf(struct uart_cpm_port *pinfo, unsigned int is_con)
 		mem_addr = dma_alloc_coherent(NULL, memsz, &dma_addr,
 					      GFP_KERNEL);
 
-	/* We cant really from memory allocated via cpm2_dpalloc,
-	 * fix this if in the future we can */
 	if (mem_addr == NULL) {
-		/* XXX cpm_dpalloc does not yet free */
+		m8xx_cpm_dpfree(dp_mem);
 		printk(KERN_ERR
 		       "cpm_uart_cpm1.c: could not allocate coherent memory\n");
 		return -ENOMEM;
@@ -169,7 +169,7 @@ int cpm_uart_allocbuf(struct uart_cpm_port *pinfo, unsigned int is_con)
 	pinfo->tx_buf = pinfo->rx_buf + L1_CACHE_ALIGN(pinfo->rx_nrfifos
 						       * pinfo->rx_fifosize);
 
-	pinfo->rx_bd_base = (volatile cbd_t *)(DPRAM_BASE + dp_addr);
+	pinfo->rx_bd_base = (volatile cbd_t *)dp_mem;
 	pinfo->tx_bd_base = pinfo->rx_bd_base + pinfo->rx_nrfifos;
 
 	return 0;
@@ -183,7 +183,7 @@ void cpm_uart_freebuf(struct uart_cpm_port *pinfo)
 					 pinfo->tx_fifosize), pinfo->mem_addr,
 			  pinfo->dma_addr);
 
-	/* XXX cannot free dpmem yet */
+	m8xx_cpm_dpfree(m8xx_cpm_dpram_addr(pinfo->dp_addr));
 }
 
 /* Setup any dynamic params in the uart desc */
