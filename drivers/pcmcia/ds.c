@@ -675,21 +675,43 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 {
 	client_t *client = NULL;
 	struct pcmcia_socket *s;
+	struct pcmcia_bus_socket *skt = NULL;
+	struct pcmcia_device *p_dev = NULL;
 
 	/* Look for unbound client with matching dev_info */
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
-		client = s->clients;
-		while (client != NULL) {
-			if ((strcmp(client->dev_info, (char *)req->dev_info) == 0)
-			    && (client->state & CLIENT_UNBOUND)) break;
-			client = client->next;
+		unsigned long flags;
+
+		if (s->state & SOCKET_CARDBUS)
+			continue;
+
+		skt = s->pcmcia;
+		if (!skt)
+			continue;
+		skt = pcmcia_get_bus_socket(skt);
+		if (!skt)
+			continue;
+		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+		list_for_each_entry(p_dev, &skt->devices_list, socket_device_list) {
+			if ((p_dev->client->state & CLIENT_UNBOUND) &&
+			    (!strcmp(p_dev->client->dev_info, (char *)req->dev_info))) {
+				p_dev = pcmcia_get_dev(p_dev);
+				if (p_dev)
+					client = p_dev->client;
+				spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+				goto found;
+			}
 		}
-		if (client != NULL) break;
+		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+		pcmcia_put_bus_socket(skt);
 	}
+ found:
 	up_read(&pcmcia_socket_list_rwsem);
-	if (client == NULL)
-		return CS_OUT_OF_RESOURCE;
+	if (!p_dev || !client)
+		return -ENODEV;
+
+	pcmcia_put_bus_socket(skt); /* safe, as we already hold a reference from bind_device */
 
 	/*
 	 * Prevent this racing with a card insertion.
@@ -735,10 +757,12 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	}
 
 	up(&s->skt_sem);
+	pcmcia_put_dev(p_dev); /* FIXME: put in deregister_client. */
 	return CS_SUCCESS;
 
  out_no_resource:
 	up(&s->skt_sem);
+	pcmcia_put_dev(p_dev);
 	return CS_OUT_OF_RESOURCE;
 } /* register_client */
 EXPORT_SYMBOL(pcmcia_register_client);
