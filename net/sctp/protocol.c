@@ -1049,10 +1049,6 @@ __init int sctp_init(void)
 	sctp_max_instreams    		= SCTP_DEFAULT_INSTREAMS;
 	sctp_max_outstreams   		= SCTP_DEFAULT_OUTSTREAMS;
 
-	/* Initialize default send & receive buffer sizes. */
-	sctp_rmem 			= SCTP_DEFAULT_MAXWINDOW;
-	sctp_wmem 			= SCTP_DEFAULT_MAXWINDOW;
-
 	/* Size and allocate the association hash table.
 	 * The methodology is similar to that of the tcp hash tables.
 	 */

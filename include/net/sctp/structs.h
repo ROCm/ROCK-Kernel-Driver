@@ -193,10 +193,6 @@ extern struct sctp_globals {
 	
 	/* Flag to indicate if addip is enabled. */
 	int addip_enable;
-
-	/* socket receive and send buffer sizes. */ 
-	int rmem;
-	int wmem;
 } sctp_globals;
 
 #define sctp_rto_initial		(sctp_globals.rto_initial)
@@ -225,8 +221,6 @@ extern struct sctp_globals {
 #define sctp_local_addr_list		(sctp_globals.local_addr_list)
 #define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
 #define sctp_addip_enable		(sctp_globals.addip_enable)
-#define sctp_rmem			(sctp_globals.rmem)
-#define sctp_wmem			(sctp_globals.wmem)
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
