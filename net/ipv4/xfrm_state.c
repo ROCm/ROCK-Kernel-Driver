@@ -386,7 +386,7 @@ xfrm_state_lookup(u32 daddr, u32 spi, u8 proto)
 }
 
 struct xfrm_state *
-xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
+xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr, int create)
 {
 	struct xfrm_state *x, *x0;
 	unsigned h = ntohl(daddr);
@@ -400,10 +400,11 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 		    mode == x->props.mode &&
 		    proto == x->id.proto &&
 		    saddr == x->props.saddr.xfrm4_addr &&
-		    reqid == x->props.reqid) {
+		    reqid == x->props.reqid &&
+		    x->km.state == XFRM_STATE_ACQ) {
 			    if (!x0)
 				    x0 = x;
-			    if (x->km.state != XFRM_STATE_ACQ)
+			    if (x->id.spi)
 				    continue;
 			    x0 = x;
 			    break;
@@ -411,7 +412,7 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 	}
 	if (x0) {
 		atomic_inc(&x0->refcnt);
-	} else if ((x0 = xfrm_state_alloc()) != NULL) {
+	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
 		x0->sel.daddr.xfrm4_addr = daddr;
 		x0->sel.daddr.xfrm4_mask = ~0;
 		x0->sel.saddr.xfrm4_addr = saddr;

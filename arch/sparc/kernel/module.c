@@ -90,7 +90,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			       me->name, strtab + sym->st_name);
 			return -ENOENT;
 		}
-		v += rel->r_addend;
+		v += rel[i].r_addend;
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_SPARC_32:
@@ -126,7 +126,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			       me->name,
 			       (int) (ELF32_R_TYPE(rel[i].r_info) & 0xff));
 			return -ENOEXEC;
-		}
+		};
 	}
 	return 0;
 }

@@ -296,6 +296,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	}
 
 	memset(mc, 0, sizeof(struct ifmcaddr6));
+	init_timer(&mc->mca_timer);
 	mc->mca_timer.function = igmp6_timer_handler;
 	mc->mca_timer.data = (unsigned long) mc;
 

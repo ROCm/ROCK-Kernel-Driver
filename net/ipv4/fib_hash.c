@@ -1092,16 +1092,4 @@ void __init fib_proc_exit(void)
 {
 	remove_proc_entry("route", proc_net);
 }
-
-#else /* CONFIG_PROC_FS */
-
-int __init fib_proc_init(void)
-{
-	return 0;
-}
-
-void __init fib_proc_exit(void)
-{
-	return 0;
-}
 #endif /* CONFIG_PROC_FS */

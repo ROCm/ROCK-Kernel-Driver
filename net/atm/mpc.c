@@ -104,7 +104,7 @@ extern void mpc_proc_clean(void);
 
 struct mpoa_client *mpcs = NULL; /* FIXME */
 static struct atm_mpoa_qos *qos_head = NULL;
-static struct timer_list mpc_timer;
+static struct timer_list mpc_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 
 static struct mpoa_client *find_mpc_by_itfnum(int itf)

@@ -10,6 +10,113 @@
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
 #include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
+
+static struct vm_struct * modvmlist = NULL;
+
+static void module_unmap(void * addr)
+{
+	struct vm_struct **p, *tmp;
+	int i;
+
+	if (!addr)
+		return;
+	if ((PAGE_SIZE-1) & (unsigned long) addr) {
+		printk("Trying to unmap module with bad address (%p)\n", addr);
+		return;
+	}
+
+	for (p = &modvmlist ; (tmp = *p) ; p = &tmp->next) {
+		if (tmp->addr == addr) {
+			*p = tmp->next;
+			goto found;
+		}
+	}
+	printk("Trying to unmap nonexistent module vm area (%p)\n", addr);
+	return;
+
+found:
+	unmap_vm_area(tmp);
+	
+	for (i = 0; i < tmp->nr_pages; i++) {
+		if (unlikely(!tmp->pages[i]))
+			BUG();
+		__free_page(tmp->pages[i]);
+	}
+
+	kfree(tmp->pages);
+	kfree(tmp);
+}
+
+
+static void *module_map(unsigned long size)
+{
+	struct vm_struct **p, *tmp, *area;
+	struct page **pages;
+	void * addr;
+	unsigned int nr_pages, array_size, i;
+
+	size = PAGE_ALIGN(size);
+	if (!size || size > MODULES_LEN)
+		return NULL;
+		
+	addr = (void *) MODULES_VADDR;
+	for (p = &modvmlist; (tmp = *p) ; p = &tmp->next) {
+		if (size + (unsigned long) addr < (unsigned long) tmp->addr)
+			break;
+		addr = (void *) (tmp->size + (unsigned long) tmp->addr);
+	}
+	if ((unsigned long) addr + size >= MODULES_END)
+		return NULL;
+	
+	area = (struct vm_struct *) kmalloc(sizeof(*area), GFP_KERNEL);
+	if (!area)
+		return NULL;
+	area->size = size + PAGE_SIZE;
+	area->addr = addr;
+	area->next = *p;
+	area->pages = NULL;
+	area->nr_pages = 0;
+	area->phys_addr = 0;
+	*p = area;
+
+	nr_pages = size >> PAGE_SHIFT;
+	array_size = (nr_pages * sizeof(struct page *));
+
+	area->nr_pages = nr_pages;
+	area->pages = pages = kmalloc(array_size, GFP_KERNEL);
+	if (!area->pages)
+		goto fail;
+
+	memset(area->pages, 0, array_size);
+
+	for (i = 0; i < area->nr_pages; i++) {
+		area->pages[i] = alloc_page(GFP_KERNEL);
+		if (unlikely(!area->pages[i]))
+			goto fail;
+	}
+	
+	if (map_vm_area(area, PAGE_KERNEL, &pages)) {
+		unmap_vm_area(area);
+		goto fail;
+	}
+
+	return area->addr;
+
+fail:
+	if (area->pages) {
+		for (i = 0; i < area->nr_pages; i++) {
+			if (area->pages[i])
+				__free_page(area->pages[i]);
+		}
+		kfree(area->pages);
+	}
+	kfree(area);
+
+	return NULL;
+}
 
 static void *alloc_and_zero(unsigned long size)
 {
@@ -19,7 +126,7 @@ static void *alloc_and_zero(unsigned long size)
 	if (size == 0)
 		return NULL;
 
-	ret = vmalloc(size);
+	ret = module_map(size);
 	if (!ret)
 		ret = ERR_PTR(-ENOMEM);
 	else
@@ -31,7 +138,7 @@ static void *alloc_and_zero(unsigned long size)
 /* Free memory returned from module_core_alloc/module_init_alloc */
 void module_free(struct module *mod, void *module_region)
 {
-	vfree(module_region);
+	module_unmap(module_region);
 	/* FIXME: If module_region == mod->init_region, trim exception
            table entries. */
 }
@@ -82,6 +189,9 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		location = (u8 *)sechdrs[sechdrs[relsec].sh_info].sh_offset
 			+ rel[i].r_offset;
 		loc32 = (u32 *) location;
+
+		BUG_ON(((u64)location >> (u64)32) != (u64)0);
+
 		/* This is the symbol it is referring to */
 		sym = (Elf64_Sym *)sechdrs[symindex].sh_offset
 			+ ELF64_R_SYM(rel[i].r_info);
@@ -90,7 +200,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			       me->name, strtab + sym->st_name);
 			return -ENOENT;
 		}
-		v += rel->r_addend;
+		v += rel[i].r_addend;
 
 		switch (ELF64_R_TYPE(rel[i].r_info) & 0xff) {
 		case R_SPARC_64:
@@ -137,7 +247,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			       me->name,
 			       (int) (ELF64_R_TYPE(rel[i].r_info) & 0xff));
 			return -ENOEXEC;
-		}
+		};
 	}
 	return 0;
 }
