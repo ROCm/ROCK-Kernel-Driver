@@ -895,6 +895,37 @@ config FB_68328
 	  Say Y here if you want to support the built-in frame buffer of
 	  the Motorola 68328 CPU family.
 
+config FB_PXA
+	tristate "PXA LCD framebuffer support"
+	depends on FB && ARCH_PXA
+	---help---
+	  Frame buffer driver for the built-in LCD controller in the Intel
+	  PXA2x0 processor.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want). The
+	  module will be called vfb. If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  If unsure, say N.
+
+config FB_PXA_PARAMETERS
+	bool "PXA LCD command line parameters"
+	default n
+	depends on FB_PXA
+	---help---
+	  Enable the use of kernel command line or module parameters
+	  to configure the physical properties of the LCD panel when
+	  using the PXA LCD driver.
+
+	  This option allows you to override the panel parameters
+	  supplied by the platform in order to support multiple
+	  different models of flatpanel. If you will only be using a
+	  single model of flatpanel then you can safely leave this
+	  option disabled.
+
+	  Documentation/fb/pxafb.txt describes the available parameters.
+
 config FB_VIRTUAL
 	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!)"
 	depends on FB

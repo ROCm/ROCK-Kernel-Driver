@@ -31,6 +31,7 @@
 #include <asm/mach/map.h>
 
 #include <asm/arch/udc.h>
+#include <asm/arch/pxafb.h>
 
 #include "generic.h"
 
@@ -205,9 +206,45 @@ static struct platform_device udc_device = {
 	}
 };
 
+static struct pxafb_mach_info pxa_fb_info;
+
+void __init set_pxa_fb_info(struct pxafb_mach_info *hard_pxa_fb_info)
+{
+	memcpy(&pxa_fb_info,hard_pxa_fb_info,sizeof(struct pxafb_mach_info));
+}
+EXPORT_SYMBOL(set_pxa_fb_info);
+
+static struct resource pxafb_resources[] = {
+	[0] = {
+		.start	= 0x44000000,
+		.end	= 0x4400ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_LCD,
+		.end	= IRQ_LCD,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static u64 fb_dma_mask = ~(u64)0;
+
+static struct platform_device pxafb_device = {
+	.name		= "pxafb",
+	.id		= 0,
+	.dev		= {
+ 		.platform_data	= &pxa_fb_info,
+		.dma_mask	= &fb_dma_mask,
+		.coherent_dma_mask = 0xffffffff,
+	},
+	.num_resources	= ARRAY_SIZE(pxafb_resources),
+	.resource	= pxafb_resources,
+};
+
 static struct platform_device *devices[] __initdata = {
 	&pxamci_device,
 	&udc_device,
+	&pxafb_device,
 };
 
 static int __init pxa_init(void)

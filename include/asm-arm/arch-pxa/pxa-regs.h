@@ -1175,6 +1175,12 @@ typedef void            (*ExcpHndlr) (void) ;
 #define TMEDRGBR	__REG(0x44000040)  /* TMED RGB Seed Register */
 #define TMEDCR		__REG(0x44000044)  /* TMED Control Register */
 
+#define LCCR3_1BPP (0 << 24)
+#define LCCR3_2BPP (1 << 24)
+#define LCCR3_4BPP (2 << 24)
+#define LCCR3_8BPP (3 << 24)
+#define LCCR3_16BPP (4 << 24)
+
 #define FDADR0		__REG(0x44000200)  /* DMA Channel 0 Frame Descriptor Address Register */
 #define FSADR0		__REG(0x44000204)  /* DMA Channel 0 Frame Source Address Register */
 #define FIDR0		__REG(0x44000208)  /* DMA Channel 0 Frame ID Register */
@@ -1185,15 +1191,27 @@ typedef void            (*ExcpHndlr) (void) ;
 #define LDCMD1		__REG(0x4400021C)  /* DMA Channel 1 Command Register */
 
 #define LCCR0_ENB	(1 << 0)	/* LCD Controller enable */
-#define LCCR0_CMS	(1 << 1)	/* Color = 0, Monochrome = 1 */
-#define LCCR0_SDS	(1 << 2)	/* Single Panel = 0, Dual Panel = 1 */
+#define LCCR0_CMS	(1 << 1)	/* Color/Monochrome Display Select */
+#define LCCR0_Color     (LCCR0_CMS*0)   /*  Color display                  */
+#define LCCR0_Mono      (LCCR0_CMS*1)   /*  Monochrome display             */
+#define LCCR0_SDS	(1 << 2)	/* Single/Dual Panel Display       */
+                                        /* Select                          */
+#define LCCR0_Sngl      (LCCR0_SDS*0)   /*  Single panel display           */
+#define LCCR0_Dual      (LCCR0_SDS*1)   /*  Dual panel display             */
+
 #define LCCR0_LDM	(1 << 3)	/* LCD Disable Done Mask */
 #define LCCR0_SFM	(1 << 4)	/* Start of frame mask */
 #define LCCR0_IUM	(1 << 5)	/* Input FIFO underrun mask */
 #define LCCR0_EFM	(1 << 6)	/* End of Frame mask */
-#define LCCR0_PAS	(1 << 7)	/* Passive = 0, Active = 1 */
-#define LCCR0_BLE	(1 << 8)	/* Little Endian = 0, Big Endian = 1 */
-#define LCCR0_DPD	(1 << 9)	/* Double Pixel mode, 4 pixel value = 0, 8 pixle values = 1 */
+#define LCCR0_PAS	(1 << 7)	/* Passive/Active display Select   */
+#define LCCR0_Pas       (LCCR0_PAS*0)   /*  Passive display (STN)          */
+#define LCCR0_Act       (LCCR0_PAS*1)   /*  Active display (TFT)           */
+#define LCCR0_DPD	(1 << 9)	/* Double Pixel Data (monochrome   */
+                                        /* display mode)                   */
+#define LCCR0_4PixMono  (LCCR0_DPD*0)   /*  4-Pixel/clock Monochrome       */
+                                        /*  display                        */
+#define LCCR0_8PixMono  (LCCR0_DPD*1)   /*  8-Pixel/clock Monochrome       */
+                                        /*  display                        */
 #define LCCR0_DIS	(1 << 10)	/* LCD Disable */
 #define LCCR0_QDM	(1 << 11)	/* LCD Quick Disable mask */
 #define LCCR0_PDD	(0xff << 12)	/* Palette DMA request delay */
@@ -1255,8 +1273,15 @@ typedef void            (*ExcpHndlr) (void) ;
 #define LCCR3_API_S	16
 #define LCCR3_VSP	(1 << 20)	/* vertical sync polarity */
 #define LCCR3_HSP	(1 << 21)	/* horizontal sync polarity */
-#define LCCR3_PCP	(1 << 22)	/* pixel clock polarity */
-#define LCCR3_OEP	(1 << 23)	/* output enable polarity */
+#define LCCR3_PCP	(1 << 22)	/* Pixel Clock Polarity (L_PCLK)   */
+#define LCCR3_PixRsEdg  (LCCR3_PCP*0)   /*  Pixel clock Rising-Edge        */
+#define LCCR3_PixFlEdg  (LCCR3_PCP*1)   /*  Pixel clock Falling-Edge       */
+
+#define LCCR3_OEP       (1 << 23)       /* Output Enable Polarity (L_BIAS, */
+                                        /* active display mode)            */
+#define LCCR3_OutEnH    (LCCR3_OEP*0)   /*  Output Enable active High      */
+#define LCCR3_OutEnL    (LCCR3_OEP*1)   /*  Output Enable active Low       */
+
 #if 0
 #define LCCR3_BPP	(7 << 24)	/* bits per pixel */
 #define LCCR3_BPP_S	24
