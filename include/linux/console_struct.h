@@ -9,6 +9,8 @@
  * to achieve effects such as fast scrolling by changing the origin.
  */
 
+struct vt_struct;
+
 #define NPAR 16
 
 struct vc_data {
@@ -87,6 +89,7 @@ struct vc_data {
 	struct vc_data **vc_display_fg;		/* [!] Ptr to var holding fg console for this display */
 	unsigned long	vc_uni_pagedir;
 	unsigned long	*vc_uni_pagedir_loc;  /* [!] Location of uni_pagedir variable for this console */
+	struct vt_struct *vc_vt;
 	/* additional information is in vt_kern.h */
 };
 
