@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#150 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#153 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -680,7 +680,6 @@ ahd_linux_run_complete_queue(struct ahd_softc *ahd)
 			with_errors++;
 
 		cmd->scsi_done(cmd);
-
 	}
 	ahd_done_unlock(ahd, &done_flags);
 	return (acmd);
@@ -1335,7 +1334,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	 * Start by searching the device queue.  If not found
 	 * there, check the pending_scb list.  If not found
 	 * at all, and the system wanted us to just abort the
-	 * command return success.
+	 * command, return success.
 	 */
 	dev = ahd_linux_get_device(ahd, cmd->device->channel,
 				   cmd->device->id, cmd->device->lun,
@@ -4036,9 +4035,8 @@ ahd_linux_device_queue_depth(struct ahd_softc *ahd,
 	 && dev->scsi_device->tagged_supported != 0) {
 
 		ahd_set_tags(ahd, &devinfo, AHD_QUEUE_TAGGED);
-		printf("scsi%d:%c:%d:%d: Tagged Queuing enabled.  Depth %d\n",
-	       	       ahd->platform_data->host->host_no, devinfo.channel,
-		       devinfo.target, devinfo.lun, tags);
+		ahd_print_devinfo(ahd, &devinfo);
+		printf("Tagged Queuing enabled.  Depth %d\n", tags);
 	} else {
 		ahd_set_tags(ahd, &devinfo, AHD_QUEUE_NONE);
 	}
@@ -4231,7 +4229,7 @@ void
 ahd_platform_flushwork(struct ahd_softc *ahd)
 {
 
-	while (ahd_linux_run_complete_queue(ahd) != 0)
+	while (ahd_linux_run_complete_queue(ahd) != NULL)
 		;
 }
 

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#213 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#215 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -3659,9 +3659,8 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc,
 	 && dev->scsi_device->tagged_supported != 0) {
 
 		ahc_set_tags(ahc, &devinfo, AHC_QUEUE_TAGGED);
-		printf("scsi%d:%c:%d:%d: Tagged Queuing enabled.  Depth %d\n",
-	       	       ahc->platform_data->host->host_no, devinfo.channel,
-		       devinfo.target, devinfo.lun, tags);
+		ahc_print_devinfo(ahc, &devinfo);
+		printf("Tagged Queuing enabled.  Depth %d\n", tags);
 	} else {
 		ahc_set_tags(ahc, &devinfo, AHC_QUEUE_NONE);
 	}
@@ -4780,7 +4779,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	 * Start by searching the device queue.  If not found
 	 * there, check the pending_scb list.  If not found
 	 * at all, and the system wanted us to just abort the
-	 * command return success.
+	 * command, return success.
 	 */
 	dev = ahc_linux_get_device(ahc, cmd->device->channel, cmd->device->id,
 				   cmd->device->lun, /*alloc*/FALSE);
