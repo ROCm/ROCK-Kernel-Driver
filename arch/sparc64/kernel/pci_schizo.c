@@ -1483,24 +1483,12 @@ static void __init schizo_resource_adjust(struct pci_dev *pdev,
 #define SCHIZO_PCI_B_IO_MATCH		0x00070UL
 #define SCHIZO_PCI_B_IO_MASK		0x00078UL
 
-/* VAL must be non-zero. */
-static unsigned long strip_to_lowest_bit_set(unsigned long val)
-{
-	unsigned long tmp;
-
-	tmp = 1UL;
-	while (!(tmp & val))
-		tmp <<= 1UL;
-
-	return tmp;
-}
-
 static void schizo_determine_mem_io_space(struct pci_pbm_info *pbm,
 					  int is_pbm_a, unsigned long reg_base)
 {
 	u64 mem_match, mem_mask;
 	u64 io_match;
-	u64 long a, b;
+	u64 a;
 
 	if (is_pbm_a) {
 		mem_match = reg_base + SCHIZO_PCI_A_MEM_MATCH;
@@ -1512,11 +1500,12 @@ static void schizo_determine_mem_io_space(struct pci_pbm_info *pbm,
 	mem_mask = mem_match + 0x8UL;
 
 	a = schizo_read(mem_match) & ~0x8000000000000000UL;
-	b = strip_to_lowest_bit_set(schizo_read(mem_mask));
 
-	/* It should be 2GB in size. */
+	/* It should be 2GB in size but the decode is set for the full
+	 * 4GB so we have to add the 2G by hand.
+	 */
 	pbm->mem_space.start = a;
-	pbm->mem_space.end = a + (b - 1UL);
+	pbm->mem_space.end = a + 0x80000000;
 	pbm->mem_space.flags = IORESOURCE_MEM;
 
 	/* This 32MB area is divided into two pieces.  The first
