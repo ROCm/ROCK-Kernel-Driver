@@ -293,7 +293,7 @@ _pagebuf_initialize(
 	atomic_set(&pb->pb_pin_count, 0);
 	init_waitqueue_head(&pb->pb_waiters);
 
-	PB_STATS_INC(pbstats.pb_create);
+	PB_STATS_INC(pb_create);
 	PB_TRACE(pb, PB_TRACE_REC(get), target);
 }
 
@@ -485,7 +485,7 @@ _pagebuf_lookup_pages(
 			page = find_or_create_page(aspace, index, gfp_mask);
 			if (!page) {
 				if (--retry_count > 0) {
-					PB_STATS_INC(pbstats.pb_page_retries);
+					PB_STATS_INC(pb_page_retries);
 					pagebuf_daemon_wakeup(1);
 					current->state = TASK_UNINTERRUPTIBLE;
 					schedule_timeout(10);
@@ -495,7 +495,7 @@ _pagebuf_lookup_pages(
 				all_mapped = 0;
 				continue;
 			}
-			PB_STATS_INC(pbstats.pb_page_found);
+			PB_STATS_INC(pb_page_found);
 			mark_page_accessed(page);
 			pb->pb_pages[pi] = page;
 		} else {
@@ -645,7 +645,7 @@ _pagebuf_find(				/* find buffer for block	*/
 		h->pb_count++;
 		list_add(&new_pb->pb_hash_list, &h->pb_hash);
 	} else {
-		PB_STATS_INC(pbstats.pb_miss_locked);
+		PB_STATS_INC(pb_miss_locked);
 	}
 
 	spin_unlock(&h->pb_hash_lock);
@@ -665,7 +665,7 @@ found:
 			/* wait for buffer ownership */
 			PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
 			pagebuf_lock(pb);
-			PB_STATS_INC(pbstats.pb_get_locked_waited);
+			PB_STATS_INC(pb_get_locked_waited);
 		} else {
 			/* We asked for a trylock and failed, no need
 			 * to look at file offset and length here, we
@@ -675,7 +675,7 @@ found:
 			 */
 
 			pagebuf_rele(pb);
-			PB_STATS_INC(pbstats.pb_busy_locked);
+			PB_STATS_INC(pb_busy_locked);
 			return (NULL);
 		}
 	} else {
@@ -691,7 +691,7 @@ found:
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED;
 	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
-	PB_STATS_INC(pbstats.pb_get_locked);
+	PB_STATS_INC(pb_get_locked);
 	return (pb);
 }
 
@@ -747,7 +747,7 @@ pagebuf_get(				/* allocate a buffer		*/
 			return (NULL);
 	}
 
-	PB_STATS_INC(pbstats.pb_get);
+	PB_STATS_INC(pb_get);
 
 	/* fill in any missing pages */
 	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
@@ -766,7 +766,7 @@ pagebuf_get(				/* allocate a buffer		*/
 	if (flags & PBF_READ) {
 		if (PBF_NOT_DONE(pb)) {
 			PB_TRACE(pb, PB_TRACE_REC(get_read), flags);
-			PB_STATS_INC(pbstats.pb_get_read);
+			PB_STATS_INC(pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
 			/*

@@ -37,6 +37,7 @@
 #ifndef __PAGE_BUF_PRIVATE_H__
 #define __PAGE_BUF_PRIVATE_H__
 
+#include <linux/percpu.h>
 #include "page_buf.h"
 
 #define _PAGE_BUF_INTERNAL_
@@ -120,9 +121,9 @@ struct pbstats {
 	u_int32_t	pb_get_read;
 };
 
-extern struct pbstats pbstats;
+DECLARE_PER_CPU(struct pbstats, pbstats);
 
-#define PB_STATS_INC(count)	( count ++ )
+#define PB_STATS_INC(count)   ( get_cpu_var(pbstats).count++ )
 
 #ifndef STATIC
 # define STATIC	static
