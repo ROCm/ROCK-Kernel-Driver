@@ -1289,6 +1289,49 @@ static u32 nfs4_ftypes[16] = {
         NF4SOCK, NF4BAD,  NF4LNK, NF4BAD,
 };
 
+static inline int
+xdr_padding(int l)
+{
+       return 3 - ((l - 1) & 3); /* smallest i>=0 such that (l+i)%4 = 0 */
+}
+
+static int
+nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
+			u32 **p, int *buflen)
+{
+	int status;
+	u32 len;
+
+	if (*buflen < (XDR_QUADLEN(IDMAP_NAMESZ) << 2) + 4)
+		return nfserr_resource;
+	if (group)
+		status = nfsd_map_gid_to_name(rqstp, id, (u8 *)(*p + 1));
+	else
+		status = nfsd_map_uid_to_name(rqstp, id, (u8 *)(*p + 1));
+	if (status < 0)
+		return nfserrno(status);
+	len = (unsigned)status;
+	*(*p)++ = htonl(len);
+	memset((u8 *)*p + len, 0, xdr_padding(len));
+	*p += XDR_QUADLEN(len);
+	*buflen -= (XDR_QUADLEN(len) << 2) + 4;
+	BUG_ON(*buflen < 0);
+	return 0;
+}
+
+static inline int
+nfsd4_encode_user(struct svc_rqst *rqstp, uid_t uid, u32 **p, int *buflen)
+{
+	return nfsd4_encode_name(rqstp, uid, 0, p, buflen);
+}
+
+static inline int
+nfsd4_encode_group(struct svc_rqst *rqstp, uid_t gid, u32 **p, int *buflen)
+{
+	return nfsd4_encode_name(rqstp, gid, 1, p, buflen);
+}
+
+
 /*
  * Note: @fhp can be NULL; in this case, we might have to compose the filehandle
  * ourselves.
@@ -1304,10 +1347,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
 	struct kstat stat;
-	char owner[IDMAP_NAMESZ];
-	u32 ownerlen = 0;
-	char group[IDMAP_NAMESZ];
-	u32 grouplen = 0;
 	struct svc_fh tempfh;
 	struct kstatfs statfs;
 	int buflen = *countp << 2;
@@ -1338,23 +1377,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out;
 		fhp = &tempfh;
 	}
-	if (bmval1 & FATTR4_WORD1_OWNER) {
-		int temp = nfsd_map_uid_to_name(rqstp, stat.uid, owner);
-		if (temp < 0) {
-			status = temp;
-			goto out_nfserr;
-		}
-		ownerlen = (unsigned) temp;
-	}
-	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		int temp = nfsd_map_gid_to_name(rqstp, stat.gid, group);
-		if (temp < 0) {
-			status = temp;
-			goto out_nfserr;
-		}
-		grouplen = (unsigned) temp;
-	}
-
 	if ((buflen -= 16) < 0)
 		goto out_resource;
 
@@ -1536,18 +1558,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.nlink);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		buflen -= (XDR_QUADLEN(ownerlen) << 2) + 4;
-		if (buflen < 0)
+		status = nfsd4_encode_user(rqstp, stat.uid, &p, &buflen);
+		if (status == nfserr_resource)
 			goto out_resource;
-		WRITE32(ownerlen);
-		WRITEMEM(owner, ownerlen);
+		if (status)
+			goto out;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		buflen -= (XDR_QUADLEN(grouplen) << 2) + 4;
-		if (buflen < 0)
+		status = nfsd4_encode_group(rqstp, stat.gid, &p, &buflen);
+		if (status == nfserr_resource)
 			goto out_resource;
-		WRITE32(grouplen);
-		WRITEMEM(group, grouplen);
+		if (status)
+			goto out;
 	}
 	if (bmval1 & FATTR4_WORD1_RAWDEV) {
 		if ((buflen -= 8) < 0)
