@@ -774,6 +774,7 @@ acpi_boot_init (void)
 /* --------------------------------------------------------------------------
                              PCI Interrupt Routing
    -------------------------------------------------------------------------- */
+#ifdef CONFIG_PCI
 
 int __init
 acpi_get_prt (struct pci_vector_struct **vectors, int *count)
@@ -815,7 +816,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*count = acpi_prt.count;
 	return 0;
 }
-
+#endif
 /* Assume IA64 always use I/O SAPIC */
 
 int __init
