@@ -2163,6 +2163,8 @@ static void snd_ac97_powerdown(ac97_t *ac97)
  */
 void snd_ac97_suspend(ac97_t *ac97)
 {
+	if (ac97->build_ops->suspend)
+		ac97->build_ops->suspend(ac97);
 	snd_ac97_powerdown(ac97);
 }
 
