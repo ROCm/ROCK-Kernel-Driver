@@ -2,6 +2,11 @@
  * Common framework for low-level network console, dump, and debugger code
  *
  * Sep 8 2003  Matt Mackall <mpm@selenic.com>
+ *
+ * based on the netconsole code from:
+ *
+ * Copyright (C) 2001  Ingo Molnar <mingo@redhat.com>
+ * Copyright (C) 2002  Red Hat, Inc.
  */
 
 #include <linux/smp_lock.h>

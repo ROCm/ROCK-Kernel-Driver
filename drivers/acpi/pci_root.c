@@ -119,6 +119,7 @@ acpi_pci_root_add (
 {
 	int			result = 0;
 	struct acpi_pci_root	*root = NULL;
+	struct acpi_pci_root	*tmp;
 	acpi_status		status = AE_OK;
 	unsigned long		value = 0;
 	acpi_handle		handle = NULL;
@@ -186,6 +187,13 @@ acpi_pci_root_add (
 		goto end;
 	}
 
+	/* Some systems have wrong _BBN */
+	list_for_each_entry(tmp, &acpi_pci_roots, node) {
+		if ((tmp->id.segment == root->id.segment)
+				&& (tmp->id.bus == root->id.bus))
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+				"Wrong _BBN value, please reboot and using option 'pci=noacpi'\n"));
+	}
 	/*
 	 * Device & Function
 	 * -----------------
@@ -272,7 +280,7 @@ static int __init acpi_pci_root_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_root_init");
 
-	if (acpi_disabled)
+	if (acpi_pci_disabled)
 		return_VALUE(0);
 
 	/* DEBUG:

@@ -994,7 +994,7 @@ void abort_timedouts(unsigned long __opaque)
  * packets that have a "complete" function are sent here. This way, the
  * completion is run out of kernel context, and doesn't block the rest of
  * the stack. */
-static int khpsbpkt_pid = -1;
+static int khpsbpkt_pid = -1, khpsbpkt_kill;
 static DECLARE_COMPLETION(khpsbpkt_complete);
 struct sk_buff_head hpsbpkt_queue;
 static DECLARE_MUTEX_LOCKED(khpsbpkt_sig);
@@ -1021,6 +1021,9 @@ static int hpsbpkt_thread(void *__hi)
 	daemonize("khpsbpkt");
 
 	while (!down_interruptible(&khpsbpkt_sig)) {
+		if (khpsbpkt_kill)
+			break;
+
 		while ((skb = skb_dequeue(&hpsbpkt_queue)) != NULL) {
 			packet = (struct hpsb_packet *)skb->data;
 
@@ -1094,7 +1097,9 @@ static void __exit ieee1394_cleanup(void)
 	bus_unregister(&ieee1394_bus_type);
 
 	if (khpsbpkt_pid >= 0) {
-		kill_proc(khpsbpkt_pid, SIGTERM, 1);
+		khpsbpkt_kill = 1;
+		mb();
+		up(&khpsbpkt_sig);
 		wait_for_completion(&khpsbpkt_complete);
 	}
 

@@ -438,6 +438,7 @@ struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
 int acpi_pci_irq_init (void);
+int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/completion.h>
 #include <asm/iSeries/HvLpConfig.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -81,7 +82,7 @@ struct VspCmdData {
 };
 
 struct VspRspData {
-	struct semaphore *sem;
+	struct completion com;
 	struct VspCmdData *response;
 };
 
@@ -276,12 +277,11 @@ static int signal_vsp_instruction(struct VspCmdData *vspCmd)
 	struct pending_event *ev = new_pending_event();
 	int rc;
 	struct VspRspData response;
-	DECLARE_MUTEX_LOCKED(Semaphore);
 
 	if (ev == NULL)
 		return -ENOMEM;
 
-	response.sem = &Semaphore;
+	init_completion(&response.com);
 	response.response = vspCmd;
 	ev->event.hp_lp_event.xSubtype = 6;
 	ev->event.hp_lp_event.x.xSubtypeData =
@@ -297,7 +297,7 @@ static int signal_vsp_instruction(struct VspCmdData *vspCmd)
 
 	rc = signal_event(ev);
 	if (rc == 0)
-		down(&Semaphore);
+		wait_for_completion(&response.com);
 	return rc;
 }
 
@@ -477,8 +477,7 @@ static void ackReceived(struct IoMFLpEvent *event)
 				if (rsp != NULL) {
 					if (rsp->response != NULL)
 						memcpy(rsp->response, &(event->data.vsp_cmd), sizeof(event->data.vsp_cmd));
-					if (rsp->sem != NULL)
-						up(rsp->sem);
+					complete(&rsp->com);
 				} else
 					printk(KERN_ERR "mf.c: no rsp\n");
 				freeIt = 1;
@@ -919,7 +918,7 @@ int mf_setRtcTime(unsigned long time)
 }
 
 struct RtcTimeData {
-	struct semaphore *sem;
+	struct completion com;
 	struct CeMsgData xCeMsg;
 	int xRc;
 };
@@ -930,7 +929,7 @@ void getRtcTimeComplete(void * token, struct CeMsgData *ceMsg)
 
 	memcpy(&(rtc->xCeMsg), ceMsg, sizeof(rtc->xCeMsg));
 	rtc->xRc = 0;
-	up(rtc->sem);
+	complete(&rtc->com);
 }
 
 static unsigned long lastsec = 1;
@@ -978,17 +977,16 @@ int mf_getRtc(struct rtc_time *tm)
 	struct CeMsgCompleteData ceComplete;
 	struct RtcTimeData rtcData;
 	int rc;
-	DECLARE_MUTEX_LOCKED(Semaphore);
 
 	memset(&ceComplete, 0, sizeof(ceComplete));
 	memset(&rtcData, 0, sizeof(rtcData));
-	rtcData.sem = &Semaphore;
+	init_completion(&rtcData.com);
 	ceComplete.handler = &getRtcTimeComplete;
 	ceComplete.token = (void *)&rtcData;
 	rc = signal_ce_msg("\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00",
 			&ceComplete);
 	if (rc == 0) {
-		down(&Semaphore);
+		wait_for_completion(&rtcData.com);
 
 		if (rtcData.xRc == 0) {
 			if ((rtcData.xCeMsg.ce_msg[2] == 0xa9) ||

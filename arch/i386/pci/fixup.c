@@ -187,6 +187,42 @@ static void __devinit pci_fixup_transparent_bridge(struct pci_dev *dev)
 		dev->transparent = 1;
 }
 
+/*
+ * Fixup for C1 Halt Disconnect problem on nForce2 systems.
+ *
+ * From information provided by "Allen Martin" <AMartin@nvidia.com>:
+ *
+ * A hang is caused when the CPU generates a very fast CONNECT/HALT cycle
+ * sequence.  Workaround is to set the SYSTEM_IDLE_TIMEOUT to 80 ns.
+ * This allows the state-machine and timer to return to a proper state within
+ * 80 ns of the CONNECT and probe appearing together.  Since the CPU will not
+ * issue another HALT within 80 ns of the initial HALT, the failure condition
+ * is avoided.
+ */
+static void __init pci_fixup_nforce2(struct pci_dev *dev)
+{
+	u32 val, fixed_val;
+	u8 rev;
+
+	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
+
+	/*
+	 * Chip  Old value   New value
+	 * C17   0x1F0FFF01  0x1F01FF01
+	 * C18D  0x9F0FFF01  0x9F01FF01
+	 *
+	 * Northbridge chip version may be determined by
+	 * reading the PCI revision ID (0xC1 or greater is C18D).
+	 */
+	fixed_val = rev < 0xC1 ? 0x1F01FF01 : 0x9F01FF01;
+
+	pci_read_config_dword(dev, 0x6c, &val);
+	if (val != fixed_val) {
+		printk(KERN_WARNING "PCI: nForce2 C1 Halt Disconnect fixup\n");
+		pci_write_config_dword(dev, 0x6c, fixed_val);
+	}
+}
+
 struct pci_fixup pcibios_fixups[] = {
 	{
 		.pass		= PCI_FIXUP_HEADER,
@@ -289,6 +325,12 @@ struct pci_fixup pcibios_fixups[] = {
 		.vendor		= PCI_VENDOR_ID_INTEL,
 		.device		= PCI_ANY_ID,
 		.hook		= pci_fixup_transparent_bridge
+	},
+	{
+		.pass		= PCI_FIXUP_HEADER,
+		.vendor		= PCI_VENDOR_ID_NVIDIA,
+		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE2,
+		.hook		= pci_fixup_nforce2
 	},
 	{ .pass = 0 }
 };

@@ -42,7 +42,10 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 		BUG();
 
 	spin_lock(&t->lock);
-	offset = t->last_off & ~align1;
+	if (len < t->last_size)
+		offset = t->first_free;
+	else
+		offset = t->last_off & ~align1;
 	count = 0;
 	for (;;) {
 		off_new = find_next_zero_bit(t->map, t->size, offset);
@@ -71,9 +74,14 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 			if (i == len) {
 				for (i = 0; i < len; i++)
 					__set_bit(offset + i, t->map);
+				if (offset == t->first_free)
+					t->first_free = find_next_zero_bit
+							(t->map, t->size,
+							 t->first_free + len);
 				if ((t->last_off = offset + len) >= t->size)
 					t->last_off = 0;
 				t->used += len;
+				t->last_size = len;
 				spin_unlock(&t->lock);
 				return offset;
 			}
@@ -96,6 +104,8 @@ void bit_map_clear(struct bit_map *t, int offset, int len)
 			BUG();
 		__clear_bit(offset + i, t->map);
 	}
+	if (offset < t->first_free)
+		t->first_free = offset;
 	t->used -= len;
 	spin_unlock(&t->lock);
 }
@@ -111,4 +121,6 @@ void bit_map_init(struct bit_map *t, unsigned long *map, int size)
 	spin_lock_init(&t->lock);
 	t->map = map;
 	t->size = size;
+	t->last_size = 0;
+	t->first_free = 0;
 }

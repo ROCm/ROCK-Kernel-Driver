@@ -578,7 +578,6 @@ heathrow_sleep(struct macio_chip* macio, int secondary)
 
 	/* Let things settle */
 	(void)MACIO_IN32(HEATHROW_FCR);
-	mdelay(1);
 }
 
 static void __pmac
@@ -2102,7 +2101,7 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		0,
 	},
 	{	"PowerMac3,6",			"PowerMac G4 Windtunnel",
-		PMAC_TYPE_WINDTUNNEL,		rackmac_features,
+		PMAC_TYPE_WINDTUNNEL,		core99_features,
 		0,
 	},
 	{	"PowerBook5,1",			"PowerBook G4 17\"",
@@ -2126,6 +2125,10 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
 	{	"PowerBook6,3",			"iBook G4",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook6,5",			"iBook G4",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},

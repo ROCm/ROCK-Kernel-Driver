@@ -1729,11 +1729,11 @@ static ide_driver_t idedisk_driver = {
 
 static int idedisk_open(struct inode *inode, struct file *filp)
 {
+	u8 cf;
 	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
 	drive->usage++;
 	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
-		u8 cf;
 		memset(&args, 0, sizeof(ide_task_t));
 		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORLOCK;
 		args.command_type = IDE_DRIVE_TASK_NO_DATA;
@@ -1746,18 +1746,18 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 		 */
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
-		drive->wcache = 0;
-		/* Cache enabled ? */
-		if (drive->id->csfo & 1)
-		drive->wcache = 1;
-		/* Cache command set available ? */
-		if (drive->id->cfs_enable_1 & (1<<5))
-			drive->wcache = 1;
-		/* ATA6 cache extended commands */
-		cf = drive->id->command_set_2 >> 24;
-		if((cf & 0xC0) == 0x40 && (cf & 0x30) != 0)
-			drive->wcache = 1;
 	}
+	drive->wcache = 0;
+	/* Cache enabled? */
+	if (drive->id->csfo & 1)
+		drive->wcache = 1;
+	/* Cache command set available? */
+	if (drive->id->cfs_enable_1 & (1 << 5))
+		drive->wcache = 1;
+	/* ATA6 cache extended commands */
+	cf = drive->id->command_set_2 >> 24;
+	if ((cf & 0xC0) == 0x40 && (cf & 0x30) != 0)
+		drive->wcache = 1;
 	return 0;
 }
 
@@ -1779,6 +1779,7 @@ static int ide_cacheflush_p(ide_drive_t *drive)
 static int idedisk_release(struct inode *inode, struct file *filp)
 {
 	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	ide_cacheflush_p(drive);
 	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
 		memset(&args, 0, sizeof(ide_task_t));
@@ -1788,7 +1789,6 @@ static int idedisk_release(struct inode *inode, struct file *filp)
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
 	}
-	ide_cacheflush_p(drive);
 	drive->usage--;
 	return 0;
 }

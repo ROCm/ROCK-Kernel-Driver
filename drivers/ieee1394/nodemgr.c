@@ -117,6 +117,7 @@ struct host_info {
 	struct semaphore reset_sem;
 	int pid;
 	char daemon_name[15];
+	int kill_me;
 };
 
 static int nodemgr_bus_match(struct device * dev, struct device_driver * drv);
@@ -1478,6 +1479,9 @@ static int nodemgr_host_thread(void *__hi)
 		unsigned int generation = 0;
 		int i;
 
+		if (hi->kill_me)
+			break;
+
 		/* Pause for 1/4 second in 1/16 second intervals,
 		 * to make sure things settle down. */
 		for (i = 0; i < 4 ; i++) {
@@ -1678,7 +1682,9 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 
 	if (hi) {
 		if (hi->pid >= 0) {
-			kill_proc(hi->pid, SIGTERM, 1);
+			hi->kill_me = 1;
+			mb();
+			up(&hi->reset_sem);
 			wait_for_completion(&hi->exited);
 			nodemgr_remove_host_dev(&host->device);
 		}

@@ -2266,18 +2266,10 @@ static inline void check_timer(void)
 
 /*
  *
- * IRQ's that are handled by the old PIC in all cases:
+ * IRQ's that are handled by the PIC in the MPS IOAPIC case.
  * - IRQ2 is the cascade IRQ, and cannot be a io-apic IRQ.
  *   Linux doesn't really care, as it's not actually used
  *   for any interrupt handling anyway.
- * - There used to be IRQ13 here as well, but all
- *   MPS-compliant must not use it for FPU coupling and we
- *   want to use exception 16 anyway.  And there are
- *   systems who connect it to an I/O APIC for other uses.
- *   Thus we don't mark it special any longer.
- *
- * Additionally, something is definitely wrong with irq9
- * on PIIX4 boards.
  */
 #define PIC_IRQS	(1 << PIC_CASCADE_IR)
 
@@ -2285,7 +2277,11 @@ void __init setup_IO_APIC(void)
 {
 	enable_IO_APIC();
 
-	io_apic_irqs = ~PIC_IRQS;
+	if (acpi_ioapic)
+		io_apic_irqs = ~0;	/* all IRQs go through IOAPIC */
+	else
+		io_apic_irqs = ~PIC_IRQS;
+
 	printk("ENABLING IO-APIC IRQs\n");
 
 	/*
@@ -2455,7 +2451,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 	entry.vector = assign_irq_vector(irq);
 
-	printk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
+	Dprintk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
 		"IRQ %d Mode:%i Active:%i)\n", ioapic, 
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq, edge_level, active_high_low);
 

@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.61 2004/03/26 19:48:48 armin Exp $
+/* $Id: capifunc.c,v 1.61.4.2 2004/05/05 16:09:25 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -732,6 +732,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	void **xbuffer_ptr, **xbuffer_internal;
 	diva_os_spin_lock_magic_t old_irql;
 	unsigned int mem_len;
+	int nconn = rp->level3cnt;
 
 
 	if (diva_os_in_irq()) {
@@ -746,8 +747,19 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		return;
 	}
 
-	if (rp->level3cnt < 1 ||
-	    rp->level3cnt > 255 ||
+	if (nconn <= 0)
+		nconn = ctrl->profile.nbchannel * -nconn;
+
+        if (nconn == 0)
+		nconn = ctrl->profile.nbchannel;
+
+	DBG_LOG(("CAPI_REGISTER - Id = %d", appl))
+	DBG_LOG(("  MaxLogicalConnections = %d(%d)", nconn, rp->level3cnt))
+	DBG_LOG(("  MaxBDataBuffers       = %d", rp->datablkcnt))
+	DBG_LOG(("  MaxBDataLength        = %d", rp->datablklen))
+
+	if (nconn < 1 ||
+	    nconn > 255 ||
 	    rp->datablklen < 80 ||
 	    rp->datablklen > 2150 || rp->datablkcnt > 255) {
 		DBG_ERR(("CAPI_REGISTER - invalid parameters"))
@@ -761,8 +773,8 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 
 	/* alloc memory */
 
-	bnum = rp->level3cnt * rp->datablkcnt;
-	xnum = rp->level3cnt * MAX_DATA_B3;
+	bnum = nconn * rp->datablkcnt;
+	xnum = nconn * MAX_DATA_B3;
 
 	mem_len  = bnum * sizeof(word);		/* DataNCCI */
 	mem_len += bnum * sizeof(word);		/* DataFlags */
@@ -772,6 +784,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	mem_len += xnum * sizeof(void *);	/* xbuffer_internal */
 	mem_len += xnum * rp->datablklen;	/* xbuffer_ptr[xnum] */
 
+	DBG_LOG(("  Allocated Memory      = %d", mem_len))
 	if (!(p = diva_os_malloc(0, mem_len))) {
 		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
 		return;
@@ -795,12 +808,6 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		p += rp->datablklen;
 	}
 
-	DBG_LOG(("CAPI_REGISTER - Id = %d", appl))
-	DBG_LOG(("  MaxLogicalConnections = %d", rp->level3cnt))
-	DBG_LOG(("  MaxBDataBuffers       = %d", rp->datablkcnt))
-	DBG_LOG(("  MaxBDataLength        = %d", rp->datablklen))
-	DBG_LOG(("  Allocated Memory      = %d", mem_len))
-
 	/* initialize application data */
 	diva_os_enter_spin_lock(&api_lock, &old_irql, "register_appl");
 
@@ -815,7 +822,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 
 	this->queue_size = 1000;
 
-	this->MaxNCCI = (byte) rp->level3cnt;
+	this->MaxNCCI = (byte) nconn;
 	this->MaxNCCIData = (byte) rp->datablkcnt;
 	this->MaxBuffer = bnum;
 	this->MaxDataLength = rp->datablklen;
