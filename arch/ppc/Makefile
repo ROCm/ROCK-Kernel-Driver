@@ -53,47 +53,17 @@ else
   endif
 endif
 
-ARCH_SUBDIRS = arch/ppc/kernel arch/ppc/platforms arch/ppc/mm arch/ppc/lib
-SUBDIRS := $(SUBDIRS) $(ARCH_SUBDIRS)
-CORE_FILES := arch/ppc/kernel/kernel.o arch/ppc/platforms/platform.o \
-	arch/ppc/mm/mm.o arch/ppc/lib/lib.o $(CORE_FILES)
-
-ifdef CONFIG_MATH_EMULATION
-SUBDIRS += arch/ppc/math-emu
-CORE_FILES += arch/ppc/math-emu/math-emu.o
-endif
-
-ifdef CONFIG_XMON
-SUBDIRS += arch/ppc/xmon
-CORE_FILES += arch/ppc/xmon/x.o
-endif
+core-y				+= arch/ppc/kernel/ arch/ppc/platforms/
+				   arch/ppc/mm/     arch/ppc/lib/
+core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
+core-$(CONFIG_XMON)		+= arch/ppc/xmon/
+core-$(CONFIG_APUS)		+= arch/ppc/amiga/
+core-$(CONFIG_PPC_ISERIES)	+= arch/ppc/iSeries/
+drivers-$(CONFIG_8xx)		+= arch/ppc/8xx_io/
+drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
+drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-ifdef CONFIG_8xx
-SUBDIRS += arch/ppc/8xx_io
-DRIVERS += arch/ppc/8xx_io/8xx_io.o
-endif
-
-ifdef CONFIG_8260
-SUBDIRS += arch/ppc/8260_io
-DRIVERS += arch/ppc/8260_io/8260_io.o
-endif
-
-ifdef CONFIG_4xx
-SUBDIRS += arch/ppc/4xx_io
-DRIVERS += arch/ppc/4xx_io/4xx_io.o
-endif
-
-ifdef CONFIG_APUS
-SUBDIRS += arch/ppc/amiga
-CORE_FILES += arch/ppc/amiga/amiga.o
-endif
-
-ifdef CONFIG_PPC_ISERIES
-SUBDIRS += arch/ppc/iSeries
-CORE_FILES += arch/ppc/iSeries/iSeries.o
-endif
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 

@@ -12,8 +12,6 @@ endif
 # Extra CFLAGS so we don't have to do relative includes
 CFLAGS_pmac_setup.o	+= -I$(TOPDIR)/arch/$(ARCH)/mm
 
-O_TARGET := platform.o
-
 export-objs			:= prep_setup.o
 
 obj-$(CONFIG_CEDER)		+= ceder.o ibmnp405l.o

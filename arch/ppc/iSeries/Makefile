@@ -2,7 +2,6 @@
 # Makefile for Linux arch/ppc/iSeries source directory
 #
 
-O_TARGET := iSeries.o
 export-objs := iSeries_ksyms.o
 obj-y   += LparData.o ItLpQueue.o HvLpEvent.o HvCall.o mf.o iSeries_proc.o mf_proc.o iSeries_ksyms.o HvLpConfig.o pmc_proc.o rtc.o
 

@@ -1,7 +1,5 @@
 # Makefile for xmon
 
-O_TARGET	:= x.o
-
 ifdef CONFIG_8xx
 obj-y		:= start_8xx.o
 else
