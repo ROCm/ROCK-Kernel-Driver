@@ -1,8 +1,10 @@
 /*
  * sys.c - pseudo-bus for system 'devices' (cpus, PICs, timers, etc)
  *
- * Copyright (c) 2002 Patrick Mochel
- *              2002 Open Source Development Lab
+ * Copyright (c) 2002-3 Patrick Mochel
+ *               2002-3 Open Source Development Lab
+ *
+ * This file is released under the GPLv2
  * 
  * This exports a 'system' bus type. 
  * By default, a 'sys' bus gets added to the root of the system. There will
