@@ -2252,7 +2252,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 	info->pseudo_palette = rinfo->pseudo_palette;
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeonfb_ops;
-        info->display_fg = NULL;
         info->screen_base = (char *)rinfo->fb_base;
 
 	/* Fill fix common fields */

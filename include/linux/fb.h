@@ -516,7 +516,6 @@ struct fb_info {
 	struct fb_cmap cmap;		/* Current cmap */
 	struct fb_ops *fbops;
 	char *screen_base;		/* Virtual address */
-	struct vc_data *display_fg;	/* Console visible on this display */
 	int currcon;			/* Current VC. */
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
 #define FBINFO_STATE_RUNNING	0
