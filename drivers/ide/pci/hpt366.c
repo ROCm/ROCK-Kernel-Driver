@@ -577,7 +577,7 @@ static int hpt366_ide_dma_lostirq (ide_drive_t *drive)
 	/* how about we flush and reset, mmmkay? */
 	pci_write_config_byte(dev, 0x51, 0x1F);
 	/* fall through to a reset */
-	case ide_dma_begin:
+	case dma_start:
 	case ide_dma_end:
 	/* reset the chips state over and over.. */
 	pci_write_config_byte(dev, 0x51, 0x13);
@@ -592,12 +592,12 @@ static void hpt370_clear_engine (ide_drive_t *drive)
 	udelay(10);
 }
 
-static int hpt370_ide_dma_begin (ide_drive_t *drive)
+static void hpt370_ide_dma_start(ide_drive_t *drive)
 {
 #ifdef HPT_RESET_STATE_ENGINE
 	hpt370_clear_engine(drive);
 #endif
-	return __ide_dma_begin(drive);
+	ide_dma_start(drive);
 }
 
 static int hpt370_ide_dma_end (ide_drive_t *drive)
@@ -1230,7 +1230,7 @@ static void __devinit init_hwif_hpt366(ide_hwif_t *hwif)
 		hwif->ide_dma_test_irq = &hpt374_ide_dma_test_irq;
 		hwif->ide_dma_end = &hpt374_ide_dma_end;
 	} else if (hpt_minimum_revision(dev,3)) {
-		hwif->ide_dma_begin = &hpt370_ide_dma_begin;
+		hwif->dma_start = &hpt370_ide_dma_start;
 		hwif->ide_dma_end = &hpt370_ide_dma_end;
 		hwif->ide_dma_timeout = &hpt370_ide_dma_timeout;
 		hwif->ide_dma_lostirq = &hpt370_ide_dma_lostirq;

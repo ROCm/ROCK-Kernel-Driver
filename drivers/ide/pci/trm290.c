@@ -220,9 +220,8 @@ static int trm290_ide_dma_setup(ide_drive_t *drive)
 	return 0;
 }
 
-static int trm290_ide_dma_begin (ide_drive_t *drive)
+static void trm290_ide_dma_start(ide_drive_t *drive)
 {
-	return 0;
 }
 
 static int trm290_ide_dma_end (ide_drive_t *drive)
@@ -295,7 +294,7 @@ void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->dma_setup = &trm290_ide_dma_setup;
 	hwif->dma_exec_cmd = &trm290_ide_dma_exec_cmd;
-	hwif->ide_dma_begin = &trm290_ide_dma_begin;
+	hwif->dma_start = &trm290_ide_dma_start;
 	hwif->ide_dma_end = &trm290_ide_dma_end;
 	hwif->ide_dma_test_irq = &trm290_ide_dma_test_irq;
 #endif /* CONFIG_BLK_DEV_IDEDMA */

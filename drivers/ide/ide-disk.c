@@ -431,7 +431,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 					command = lba48 ? WIN_READ_EXT: WIN_READ;
 			}
 			hwif->dma_exec_cmd(drive, command);
-			hwif->ide_dma_begin(drive);
+			hwif->dma_start(drive);
 			return ide_started;
 		}
 		/* fallback to PIO */

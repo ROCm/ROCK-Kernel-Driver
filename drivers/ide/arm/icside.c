@@ -400,14 +400,13 @@ static int icside_dma_end(ide_drive_t *drive)
 	return get_dma_residue(hwif->hw.dma) != 0;
 }
 
-static int icside_dma_begin(ide_drive_t *drive)
+static void icside_dma_start(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
 	/* We can not enable DMA on both channels simultaneously. */
 	BUG_ON(dma_channel_active(hwif->hw.dma));
 	enable_dma(hwif->hw.dma);
-	return 0;
 }
 
 /*
@@ -559,7 +558,7 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_on	= icside_dma_on;
 	hwif->dma_setup		= icside_dma_setup;
 	hwif->dma_exec_cmd	= icside_dma_exec_cmd;
-	hwif->ide_dma_begin	= icside_dma_begin;
+	hwif->dma_start		= icside_dma_start;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;
 	hwif->ide_dma_verbose	= icside_dma_verbose;

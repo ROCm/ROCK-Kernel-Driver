@@ -362,7 +362,6 @@ static int pmac_ide_tune_chipset(ide_drive_t *drive, u8 speed);
 static void pmac_ide_tuneproc(ide_drive_t *drive, u8 pio);
 static void pmac_ide_selectproc(ide_drive_t *drive);
 static void pmac_ide_kauai_selectproc(ide_drive_t *drive);
-static int pmac_ide_dma_begin (ide_drive_t *drive);
 
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
 
@@ -1918,8 +1917,8 @@ pmac_ide_dma_exec_cmd(ide_drive_t *drive, u8 command)
  * Kick the DMA controller into life after the DMA command has been issued
  * to the drive.
  */
-static int __pmac
-pmac_ide_dma_begin (ide_drive_t *drive)
+static void __pmac
+pmac_ide_dma_start(ide_drive_t *drive)
 {
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
 	volatile struct dbdma_regs __iomem *dma;
@@ -1929,7 +1928,6 @@ pmac_ide_dma_begin (ide_drive_t *drive)
 	writel((RUN << 16) | RUN, &dma->control);
 	/* Make sure it gets to the controller right now */
 	(void)readl(&dma->control);
-	return 0;
 }
 
 /*
@@ -2087,7 +2085,7 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_check = &pmac_ide_dma_check;
 	hwif->dma_setup = &pmac_ide_dma_setup;
 	hwif->dma_exec_cmd = &pmac_ide_dma_exec_cmd;
-	hwif->ide_dma_begin = &pmac_ide_dma_begin;
+	hwif->dma_start = &pmac_ide_dma_start;
 	hwif->ide_dma_end = &pmac_ide_dma_end;
 	hwif->ide_dma_test_irq = &pmac_ide_dma_test_irq;
 	hwif->ide_dma_host_off = &pmac_ide_dma_host_off;

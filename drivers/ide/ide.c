@@ -687,7 +687,7 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 
 	hwif->dma_setup			= tmp_hwif->dma_setup;
 	hwif->dma_exec_cmd		= tmp_hwif->dma_exec_cmd;
-	hwif->ide_dma_begin		= tmp_hwif->ide_dma_begin;
+	hwif->dma_start			= tmp_hwif->dma_start;
 	hwif->ide_dma_end		= tmp_hwif->ide_dma_end;
 	hwif->ide_dma_check		= tmp_hwif->ide_dma_check;
 	hwif->ide_dma_on		= tmp_hwif->ide_dma_on;

@@ -636,7 +636,7 @@ static void ide_dma_exec_cmd(ide_drive_t *drive, u8 command)
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 }
 
-int __ide_dma_begin (ide_drive_t *drive)
+void ide_dma_start(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 dma_cmd		= hwif->INB(hwif->dma_command);
@@ -650,10 +650,9 @@ int __ide_dma_begin (ide_drive_t *drive)
 	hwif->OUTB(dma_cmd|1, hwif->dma_command);
 	hwif->dma = 1;
 	wmb();
-	return 0;
 }
 
-EXPORT_SYMBOL(__ide_dma_begin);
+EXPORT_SYMBOL_GPL(ide_dma_start);
 
 /* returns 1 on error, 0 otherwise */
 int __ide_dma_end (ide_drive_t *drive)
@@ -955,8 +954,8 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->dma_setup = &ide_dma_setup;
 	if (!hwif->dma_exec_cmd)
 		hwif->dma_exec_cmd = &ide_dma_exec_cmd;
-	if (!hwif->ide_dma_begin)
-		hwif->ide_dma_begin = &__ide_dma_begin;
+	if (!hwif->dma_start)
+		hwif->dma_start = &ide_dma_start;
 	if (!hwif->ide_dma_end)
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)

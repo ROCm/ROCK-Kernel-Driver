@@ -208,7 +208,7 @@ etrax100_ide_inb(ide_ioreg_t reg)
 #define ATA_PIO0_HOLD    4
 
 static int e100_dma_check (ide_drive_t *drive);
-static int e100_dma_begin (ide_drive_t *drive);
+static void e100_dma_start(ide_drive_t *drive);
 static int e100_dma_end (ide_drive_t *drive);
 static void e100_ide_input_data (ide_drive_t *drive, void *, unsigned int);
 static void e100_ide_output_data (ide_drive_t *drive, void *, unsigned int);
@@ -335,7 +335,7 @@ init_e100_ide (void)
                 hwif->ide_dma_end = &e100_dma_end;
 		hwif->dma_setup = &e100_dma_setup;
 		hwif->dma_exec_cmd = &e100_dma_exec_cmd;
-		hwif->ide_dma_begin = &e100_dma_begin;
+		hwif->dma_start = &e100_dma_start;
 		hwif->OUTB = &etrax100_ide_outb;
 		hwif->OUTW = &etrax100_ide_outw;
 		hwif->OUTBSYNC = &etrax100_ide_outbsync;
@@ -815,7 +815,7 @@ static int e100_dma_end(ide_drive_t *drive)
 	return 0;
 }
 
-static int e100_dma_begin(ide_drive_t *drive)
+static void e100_dma_start(ide_drive_t *drive)
 {
 	if (e100_read_command) {
 		/* begin DMA */
@@ -872,5 +872,4 @@ static int e100_dma_begin(ide_drive_t *drive)
 
 		D(printk("dma write of %d bytes.\n", ata_tot_size));
 	}
-	return 0;
 }

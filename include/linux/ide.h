@@ -889,7 +889,7 @@ typedef struct hwif_s {
 
 	int (*dma_setup)(ide_drive_t *);
 	void (*dma_exec_cmd)(ide_drive_t *, u8);
-	int (*ide_dma_begin)(ide_drive_t *drive);
+	void (*dma_start)(ide_drive_t *);
 	int (*ide_dma_end)(ide_drive_t *drive);
 	int (*ide_dma_check)(ide_drive_t *drive);
 	int (*ide_dma_on)(ide_drive_t *drive);
@@ -1551,7 +1551,7 @@ extern int __ide_dma_host_on(ide_drive_t *);
 extern int __ide_dma_on(ide_drive_t *);
 extern int __ide_dma_check(ide_drive_t *);
 extern int ide_dma_setup(ide_drive_t *);
-extern int __ide_dma_begin(ide_drive_t *);
+extern void ide_dma_start(ide_drive_t *);
 extern int __ide_dma_end(ide_drive_t *);
 extern int __ide_dma_test_irq(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);

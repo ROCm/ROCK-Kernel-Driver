@@ -192,16 +192,13 @@ sgiioc4_clearirq(ide_drive_t * drive)
 	return intr_reg & 3;
 }
 
-static int
-sgiioc4_ide_dma_begin(ide_drive_t * drive)
+static void sgiioc4_ide_dma_start(ide_drive_t * drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned int reg = hwif->INL(hwif->dma_base + IOC4_DMA_CTRL * 4);
 	unsigned int temp_reg = reg | IOC4_S_DMA_START;
 
 	hwif->OUTL(temp_reg, hwif->dma_base + IOC4_DMA_CTRL * 4);
-
-	return 0;
 }
 
 static u32
@@ -625,7 +622,7 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->busproc = NULL;
 
 	hwif->dma_setup = &sgiioc4_ide_dma_setup;
-	hwif->ide_dma_begin = &sgiioc4_ide_dma_begin;
+	hwif->dma_start = &sgiioc4_ide_dma_start;
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
 	hwif->ide_dma_on = &sgiioc4_ide_dma_on;
