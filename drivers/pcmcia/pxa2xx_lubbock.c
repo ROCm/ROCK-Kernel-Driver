@@ -28,7 +28,7 @@
 
 static int
 lubbock_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
-				socket_state_t *state)
+				const socket_state_t *state)
 {
   unsigned long flags, gpio, misc_wr;
   int ret = 1;
@@ -168,8 +168,11 @@ again:
       /* Switch to 5V,  Configure socket with 5V voltage */
       PA_DWR &= ~(GPIO_bit(0) | GPIO_bit(1) | GPIO_bit(2) | GPIO_bit(3));
       PA_DDR &= ~(GPIO_bit(0) | GPIO_bit(1) | GPIO_bit(2) | GPIO_bit(3));
-      state->Vcc = 50;
-      state->Vpp = 50;
+      /* We need to hack around the const qualifier as well to keep this
+         ugly workaround localized and not force it to the rest of the code.
+         Barf bags avaliable in the seat pocket in front of you! */
+      ((socket_state_t *)state)->Vcc = 50;
+      ((socket_state_t *)state)->Vpp = 50;
       goto again;
     }
 #endif

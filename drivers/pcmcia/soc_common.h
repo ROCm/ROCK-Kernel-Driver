@@ -82,7 +82,7 @@ struct pcmcia_low_level {
 	void (*hw_shutdown)(struct soc_pcmcia_socket *);
 
 	void (*socket_state)(struct soc_pcmcia_socket *, struct pcmcia_state *);
-	int (*configure_socket)(struct soc_pcmcia_socket *, socket_state_t *);
+	int (*configure_socket)(struct soc_pcmcia_socket *, const socket_state_t *);
 
 	/*
 	 * Enable card status IRQs on (re-)initialisation.  This can
