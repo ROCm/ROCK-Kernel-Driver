@@ -1,5 +1,5 @@
 /*
- *  pci_irq.c - ACPI PCI Interrupt Routing ($Revision: 7 $)
+ *  pci_irq.c - ACPI PCI Interrupt Routing ($Revision: 10 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -250,8 +250,13 @@ acpi_pci_irq_lookup (
 		return_VALUE(0);
 	}
 
-	if (!entry->irq && entry->link.handle)
+	if (!entry->irq && entry->link.handle) {
 		entry->irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
+		if (!entry->irq) {
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid IRQ link routing entry\n"));
+			return_VALUE(0);
+		}
+	}
 	else if (!entry->irq) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Invalid static routing entry (IRQ 0)\n"));
 		return_VALUE(0);
@@ -323,7 +328,7 @@ acpi_pci_irq_enable (
 
 	/* 
 	 * First we check the PCI IRQ routing table (PRT) for an IRQ.  PRT
-	 * values override any BIOS-assinged IRQs set during boot.
+	 * values override any BIOS-assigned IRQs set during boot.
 	 */
  	irq = acpi_pci_irq_lookup(0, dev->bus->number, PCI_SLOT(dev->devfn), pin);
  
@@ -334,13 +339,18 @@ acpi_pci_irq_enable (
 	if (!irq)
  		irq = acpi_pci_irq_derive(dev, pin);
  
-	if (irq)
-		dev->irq = irq;
-		
-	if (!dev->irq) {
-		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s\n", ('A' + pin), dev->slot_name);
-		return_VALUE(0);
-	}
+	/*
+	 * No IRQ known to the ACPI subsystem - maybe the BIOS / 
+	 * driver reported one, then use it. Exit in any case.
+	 */
+	if (!irq) {
+		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), dev->slot_name);
+		if (dev->irq) 
+			printk(" - using IRQ %d\n", dev->irq);
+		return_VALUE(dev->irq);
+ 	}
+
+	dev->irq = irq;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", dev->slot_name, dev->irq));
 

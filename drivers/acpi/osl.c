@@ -1,5 +1,5 @@
 /*
- *  acpi_osl.c - OS-dependent functions ($Revision: 78 $)
+ *  acpi_osl.c - OS-dependent functions ($Revision: 83 $)
  *
  *  Copyright (C) 2000       Andrew Henroid
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
@@ -42,7 +42,7 @@
 u64 efi_mem_attributes (u64 phys_addr);
 #endif
 
-#ifdef _IA64
+#ifdef CONFIG_IA64
 #include <asm/hw_irq.h>
 #include <asm/delay.h>
 #endif
@@ -176,7 +176,7 @@ acpi_status
 acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
 {
 #ifdef CONFIG_ACPI_EFI
-	if (EFI_MEMORY_UC & efi_mem_attributes(phys)) {
+	if (!(EFI_MEMORY_WB & efi_mem_attributes(phys))) {
 		*virt = ioremap(phys, size);
 	} else {
 		*virt = phys_to_virt(phys);
@@ -234,9 +234,9 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 acpi_status
 acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 {
-#ifdef _IA64
-	irq = isa_irq_to_vector(irq);
-#endif /*_IA64*/
+#ifdef CONFIG_IA64
+	irq = gsi_to_vector(irq);
+#endif
 	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
@@ -252,9 +252,9 @@ acpi_status
 acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (acpi_irq_handler) {
-#ifdef _IA64
-		irq = isa_irq_to_vector(irq);
-#endif /*_IA64*/
+#ifdef CONFIG_IA64
+		irq = gsi_to_vector(irq);
+#endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
 	}
@@ -349,12 +349,13 @@ acpi_os_read_memory(
 #ifdef CONFIG_ACPI_EFI
 	int			iomem = 0;
 
-	if (EFI_MEMORY_UC & efi_mem_attributes(phys_addr)) {
+	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
+		virt_addr = phys_to_virt(phys_addr);
+	}
+	else {
 		iomem = 1;
 		virt_addr = ioremap(phys_addr, width);
-	} 
-	else
-		virt_addr = phys_to_virt(phys_addr);
+	}
 #else
 	virt_addr = phys_to_virt(phys_addr);
 #endif
@@ -394,12 +395,13 @@ acpi_os_write_memory(
 #ifdef CONFIG_ACPI_EFI
 	int			iomem = 0;
 
-	if (EFI_MEMORY_UC & efi_mem_attributes(phys_addr)) {
-		iomem = 1;
-		virt_addr = ioremap(phys_addr,width);
-	} 
-	else
+	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
 		virt_addr = phys_to_virt(phys_addr);
+	}
+	else {
+		iomem = 1;
+		virt_addr = ioremap(phys_addr, width);
+	}
 #else
 	virt_addr = phys_to_virt(phys_addr);
 #endif
@@ -627,31 +629,35 @@ acpi_os_queue_for_execution(
 
 	case OSD_PRIORITY_GPE:
 	{
-		static struct tq_struct task;
-
 		/*
 		 * Allocate/initialize DPC structure.  Note that this memory will be
-		 * freed by the callee.
+		 * freed by the callee.  The kernel handles the tq_struct list  in a
+		 * way that allows us to also free its memory inside the callee.
+		 * Because we may want to schedule several tasks with different
+		 * parameters we can't use the approach some kernel code uses of
+		 * having a static tq_struct.
+		 * We can save time and code by allocating the DPC and tq_structs
+		 * from the same memory.
 		 */
-		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_ATOMIC);
+		struct tq_struct *task;
+
+		dpc = kmalloc(sizeof(ACPI_OS_DPC)+sizeof(struct tq_struct), GFP_ATOMIC);
 		if (!dpc)
 			return_ACPI_STATUS (AE_NO_MEMORY);
 
 		dpc->function = function;
 		dpc->context = context;
 
-		memset(&task, 0, sizeof(struct tq_struct));
+		task = (void *)(dpc+1);
+		INIT_TQUEUE(task, acpi_os_schedule_exec, (void*)dpc);
 
-		task.routine = acpi_os_schedule_exec;
-		task.data = (void*)dpc;
-
-		if (schedule_task(&task) < 0) {
+		if (schedule_task(task) < 0) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_task() failed.\n"));
+			kfree(dpc);
 			status = AE_ERROR;
 		}
 	}
 	break;
-
 	default:
 		/*
 		 * Allocate/initialize DPC structure.  Note that this memory will be

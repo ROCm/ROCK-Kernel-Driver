@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 75 $
+ *              $Revision: 76 $
  *
  ******************************************************************************/
 
@@ -300,6 +300,11 @@ acpi_db_decode_internal_object (
 		return;
 	}
 
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
+		acpi_os_printf ("%p", obj_desc);
+		return;
+	}
+
 	acpi_os_printf (" %s", acpi_ut_get_object_type_name (obj_desc));
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
@@ -336,9 +341,42 @@ acpi_db_decode_internal_object (
 
 
 	default:
-		/* No additional display for other types */
+
+		acpi_os_printf ("%p", obj_desc);
 		break;
 	}
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_decode_node
+ *
+ * PARAMETERS:  Node        - Object to be displayed
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Short display of a namespace node
+ *
+ ******************************************************************************/
+
+void
+acpi_db_decode_node (
+	acpi_namespace_node     *node)
+{
+
+
+	acpi_os_printf ("<Node>          Name %4.4s Type-%s",
+		node->name.ascii, acpi_ut_get_type_name (node->type));
+
+	if (node->flags & ANOBJ_METHOD_ARG) {
+		acpi_os_printf (" [Method Arg]");
+	}
+	if (node->flags & ANOBJ_METHOD_LOCAL) {
+		acpi_os_printf (" [Method Local]");
+	}
+
+	acpi_db_decode_internal_object (acpi_ns_get_attached_object (node));
 }
 
 
@@ -381,16 +419,7 @@ acpi_db_display_internal_object (
 
 	case ACPI_DESC_TYPE_NAMED:
 
-		acpi_os_printf ("<Node>          Name %4.4s Type-%s",
-				  ((acpi_namespace_node *)obj_desc)->name.ascii,
-				  acpi_ut_get_type_name (((acpi_namespace_node *) obj_desc)->type));
-
-		if (((acpi_namespace_node *) obj_desc)->flags & ANOBJ_METHOD_ARG) {
-			acpi_os_printf (" [Method Arg]");
-		}
-		if (((acpi_namespace_node *) obj_desc)->flags & ANOBJ_METHOD_LOCAL) {
-			acpi_os_printf (" [Method Local]");
-		}
+		acpi_db_decode_node ((acpi_namespace_node *) obj_desc);
 		break;
 
 
@@ -406,8 +435,10 @@ acpi_db_display_internal_object (
 
 		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case INTERNAL_TYPE_REFERENCE:
+
 			switch (obj_desc->reference.opcode) {
 			case AML_LOCAL_OP:
+
 				acpi_os_printf ("[Local%d] ", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->local_variables[obj_desc->reference.offset].object;
@@ -416,7 +447,9 @@ acpi_db_display_internal_object (
 				}
 				break;
 
+
 			case AML_ARG_OP:
+
 				acpi_os_printf ("[Arg%d] ", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->arguments[obj_desc->reference.offset].object;
@@ -425,24 +458,51 @@ acpi_db_display_internal_object (
 				}
 				break;
 
+
 			case AML_DEBUG_OP:
+
 				acpi_os_printf ("[Debug] ");
 				break;
 
+
 			case AML_INDEX_OP:
-				acpi_os_printf ("[Index]         ");
+
+				acpi_os_printf ("[Index]        ");
 				acpi_db_decode_internal_object (obj_desc->reference.object);
 				break;
 
+
+			case AML_REF_OF_OP:
+
+				acpi_os_printf ("[Reference]    ");
+
+				/* Reference can be to a Node or an Operand object */
+
+				switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc->reference.object)) {
+				case ACPI_DESC_TYPE_NAMED:
+					acpi_db_decode_node (obj_desc->reference.object);
+					break;
+
+				case ACPI_DESC_TYPE_OPERAND:
+					acpi_db_decode_internal_object (obj_desc->reference.object);
+					break;
+
+				default:
+					break;
+				}
+				break;
+
+
 			default:
+
 				acpi_os_printf ("Unknown Reference opcode %X\n",
 					obj_desc->reference.opcode);
 				break;
-
 			}
 			break;
 
 		default:
+
 			acpi_os_printf ("<Obj> ");
 			acpi_os_printf ("         ");
 			acpi_db_decode_internal_object (obj_desc);

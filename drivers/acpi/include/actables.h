@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 41 $
+ *       $Revision: 42 $
  *
  *****************************************************************************/
 
@@ -43,8 +43,7 @@ acpi_tb_handle_to_object (
 
 acpi_status
 acpi_tb_convert_to_xsdt (
-	acpi_table_desc         *table_info,
-	u32                     *number_of_tables);
+	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_convert_table_fadt (
@@ -63,13 +62,31 @@ acpi_tb_get_table_count (
  * tbget - Table "get" routines
  */
 
-void
-acpi_tb_table_override (
+acpi_status
+acpi_tb_get_table (
+	ACPI_POINTER            *address,
 	acpi_table_desc         *table_info);
 
 acpi_status
-acpi_tb_get_table_with_override (
+acpi_tb_get_table_header (
 	ACPI_POINTER            *address,
+	acpi_table_header       *return_header);
+
+acpi_status
+acpi_tb_get_table_body (
+	ACPI_POINTER            *address,
+	acpi_table_header       *header,
+	acpi_table_desc         *table_info);
+
+acpi_status
+acpi_tb_get_this_table (
+	ACPI_POINTER            *address,
+	acpi_table_header       *header,
+	acpi_table_desc         *table_info);
+
+acpi_status
+acpi_tb_table_override (
+	acpi_table_header       *header,
 	acpi_table_desc         *table_info);
 
 acpi_status
@@ -77,11 +94,6 @@ acpi_tb_get_table_ptr (
 	acpi_table_type         table_type,
 	u32                     instance,
 	acpi_table_header       **table_ptr_loc);
-
-acpi_status
-acpi_tb_get_table (
-	ACPI_POINTER            *address,
-	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_verify_rsdp (
@@ -96,20 +108,19 @@ acpi_tb_validate_rsdt (
 	acpi_table_header       *table_ptr);
 
 acpi_status
-acpi_tb_get_table_pointer (
-	ACPI_POINTER            *address,
-	u32                     flags,
-	ACPI_SIZE               *size,
-	acpi_table_header       **table_ptr);
-
-/*
- * tbgetall - Get all firmware ACPI tables
- */
+acpi_tb_get_required_tables (
+	void);
 
 acpi_status
-acpi_tb_get_all_tables (
-	u32                     number_of_tables);
+acpi_tb_get_primary_table (
+	ACPI_POINTER            *address,
+	acpi_table_desc         *table_info);
 
+acpi_status
+acpi_tb_get_secondary_table (
+	ACPI_POINTER            *address,
+	acpi_string             signature,
+	acpi_table_desc         *table_info);
 
 /*
  * tbinstall - Table installation
@@ -122,11 +133,13 @@ acpi_tb_install_table (
 acpi_status
 acpi_tb_match_signature (
 	NATIVE_CHAR             *signature,
-	acpi_table_desc         *table_info);
+	acpi_table_desc         *table_info,
+	u8                      search_type);
 
 acpi_status
 acpi_tb_recognize_table (
-	acpi_table_desc         *table_info);
+	acpi_table_desc         *table_info,
+	u8                     search_type);
 
 acpi_status
 acpi_tb_init_table_descriptor (
@@ -165,7 +178,7 @@ acpi_tb_free_acpi_tables_of_type (
 
 acpi_status
 acpi_tb_get_table_rsdt (
-	u32                     *number_of_tables);
+	void);
 
 u8 *
 acpi_tb_scan_memory_for_rsdp (
@@ -188,12 +201,6 @@ acpi_tb_find_table (
 	NATIVE_CHAR             *oem_id,
 	NATIVE_CHAR             *oem_table_id,
 	acpi_table_header       **table_ptr);
-
-acpi_status
-acpi_tb_map_acpi_table (
-	ACPI_PHYSICAL_ADDRESS   physical_address,
-	ACPI_SIZE               *size,
-	acpi_table_header       **logical_address);
 
 acpi_status
 acpi_tb_verify_table_checksum (

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 127 $
+ *              $Revision: 128 $
  *
  *****************************************************************************/
 
@@ -581,6 +581,10 @@ acpi_ps_parse_loop (
 				pre_op.common.value.arg = NULL;
 				pre_op.common.aml_opcode = walk_state->opcode;
 
+				/*
+				 * Get and append arguments until we find the node that contains
+				 * the name (the type ARGP_NAME).
+				 */
 				while (GET_CURRENT_ARG_TYPE (walk_state->arg_types) != ARGP_NAME) {
 					arg = acpi_ps_get_next_arg (parser_state,
 							 GET_CURRENT_ARG_TYPE (walk_state->arg_types),

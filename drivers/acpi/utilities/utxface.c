@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 96 $
+ *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -191,6 +191,31 @@ acpi_enable_subsystem (
 			return_ACPI_STATUS (status);
 		}
 	}
+
+	return_ACPI_STATUS (status);
+}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_initialize_objects
+ *
+ * PARAMETERS:  Flags           - Init/enable Options
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Completes namespace initialization by initializing device
+ *              objects and executing AML code for Regions, buffers, etc.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_initialize_objects (
+	u32                     flags)
+{
+	acpi_status             status = AE_OK;
+
+
+	ACPI_FUNCTION_TRACE ("Acpi_initialize_objects");
 
 	/*
 	 * Initialize all device objects in the namespace

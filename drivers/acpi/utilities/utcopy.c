@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 101 $
+ *              $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -286,21 +286,23 @@ acpi_ut_copy_ipackage_to_epackage (
 	/*
 	 * Free space begins right after the first package
 	 */
-	info.length      = 0;
+	info.length      = ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
+	info.free_space  = buffer + ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 	info.object_space = 0;
 	info.num_packages = 1;
-	info.free_space  = buffer + ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 
-	external_object->type              = ACPI_GET_OBJECT_TYPE (internal_object);
-	external_object->package.count     = internal_object->package.count;
-	external_object->package.elements  = ACPI_CAST_PTR (acpi_object, info.free_space);
+	external_object->type            = ACPI_GET_OBJECT_TYPE (internal_object);
+	external_object->package.count   = internal_object->package.count;
+	external_object->package.elements = ACPI_CAST_PTR (acpi_object, info.free_space);
 
 	/*
-	 * Build an array of ACPI_OBJECTS in the buffer
+	 * Leave room for an array of ACPI_OBJECTS in the buffer
 	 * and move the free space past it
 	 */
+	info.length    += (ACPI_SIZE) external_object->package.count *
+			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 	info.free_space += external_object->package.count *
-			  ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
+			 ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object));
 
 	status = acpi_ut_walk_package_tree (internal_object, external_object,
 			 acpi_ut_copy_ielement_to_eelement, &info);
@@ -516,7 +518,6 @@ acpi_ut_copy_epackage_to_ipackage (
 	external_object->type              = ACPI_GET_OBJECT_TYPE (internal_object);
 	external_object->package.count     = internal_object->package.count;
 	external_object->package.elements  = (acpi_object *)free_space;
-
 
 	/*
 	 * Build an array of ACPI_OBJECTS in the buffer

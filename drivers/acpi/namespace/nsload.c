@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 55 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -115,12 +115,11 @@ acpi_ns_one_complete_parse (
 
 	/* Create and init a Root Node */
 
-	parse_root = acpi_ps_alloc_op (AML_SCOPE_OP);
+	parse_root = acpi_ps_create_scope_op ();
 	if (!parse_root) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	parse_root->named.name = ACPI_ROOT_NAME;
 
 	/* Create and initialize a new walk state */
 

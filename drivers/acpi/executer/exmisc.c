@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 106 $
+ *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -39,8 +39,9 @@
  *
  * FUNCTION:    Acpi_ex_get_object_reference
  *
- * PARAMETERS:  Obj_desc        - Create a reference to this object
- *              Return_desc        - Where to store the reference
+ * PARAMETERS:  Obj_desc            - Create a reference to this object
+ *              Return_desc         - Where to store the reference
+ *              Walk_state          - Current state
  *
  * RETURN:      Status
  *
@@ -55,65 +56,75 @@ acpi_ex_get_object_reference (
 	acpi_operand_object     **return_desc,
 	acpi_walk_state         *walk_state)
 {
-	acpi_status             status = AE_OK;
+	acpi_operand_object     *reference_obj;
+	acpi_operand_object     *referenced_obj;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ex_get_object_reference", obj_desc);
 
 
+	*return_desc = NULL;
+
 	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
 	case ACPI_DESC_TYPE_OPERAND:
 
 		if (ACPI_GET_OBJECT_TYPE (obj_desc) != INTERNAL_TYPE_REFERENCE) {
-			*return_desc = NULL;
-			status = AE_TYPE;
-			goto cleanup;
+			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
 		/*
-		 * Not a Name -- an indirect name pointer would have
-		 * been converted to a direct name pointer in Acpi_ex_resolve_operands
+		 * Must be a reference to a Local or Arg
 		 */
 		switch (obj_desc->reference.opcode) {
 		case AML_LOCAL_OP:
 		case AML_ARG_OP:
 
-			status = acpi_ds_method_data_get_node (obj_desc->reference.opcode,
-					  obj_desc->reference.offset, walk_state,
-					  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, return_desc));
+			/* The referenced object is the pseudo-node for the local/arg */
+
+			referenced_obj = obj_desc->reference.object;
 			break;
 
 		default:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(Internal) Unknown Ref subtype %02x\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference subtype %X\n",
 				obj_desc->reference.opcode));
-			*return_desc = NULL;
-			status = AE_AML_INTERNAL;
-			goto cleanup;
+			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 		break;
 
 
 	case ACPI_DESC_TYPE_NAMED:
 
-		/* Must be a named object;  Just return the Node */
-
-		*return_desc = obj_desc;
+		/*
+		 * A named reference that has already been resolved to a Node
+		 */
+		referenced_obj = obj_desc;
 		break;
 
 
 	default:
 
-		*return_desc = NULL;
-		status = AE_TYPE;
-		break;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid descriptor type %X in %p\n",
+			ACPI_GET_DESCRIPTOR_TYPE (obj_desc), obj_desc));
+		return_ACPI_STATUS (AE_TYPE);
 	}
 
 
-cleanup:
+	/* Create a new reference object */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p Ref=%p\n", obj_desc, *return_desc));
-	return_ACPI_STATUS (status);
+	reference_obj = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
+	if (!reference_obj) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	reference_obj->reference.opcode = AML_REF_OF_OP;
+	reference_obj->reference.object = referenced_obj;
+	*return_desc = reference_obj;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Object %p Type [%s], returning Reference %p\n",
+		obj_desc, acpi_ut_get_object_type_name (obj_desc), *return_desc));
+
+	return_ACPI_STATUS (AE_OK);
 }
 
 

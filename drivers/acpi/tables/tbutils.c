@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 54 $
+ *              $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -121,7 +121,8 @@ acpi_tb_validate_table_header (
 			"Table signature at %p [%p] has invalid characters\n",
 			table_header, &signature));
 
-		ACPI_REPORT_WARNING (("Invalid table signature found: [%4.4s]\n", (char *) &signature));
+		ACPI_REPORT_WARNING (("Invalid table signature found: [%4.4s]\n",
+			(char *) &signature));
 		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
 		return (AE_BAD_SIGNATURE);
 	}
@@ -133,97 +134,13 @@ acpi_tb_validate_table_header (
 			"Invalid length in table header %p name %4.4s\n",
 			table_header, (char *) &signature));
 
-		ACPI_REPORT_WARNING (("Invalid table header length (0x%X) found\n", table_header->length));
+		ACPI_REPORT_WARNING (("Invalid table header length (0x%X) found\n",
+			table_header->length));
 		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
 		return (AE_BAD_HEADER);
 	}
 
 	return (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_tb_map_acpi_table
- *
- * PARAMETERS:  Physical_address        - Physical address of table to map
- *              *Size                   - Size of the table.  If zero, the size
- *                                        from the table header is used.
- *                                        Actual size is returned here.
- *              **Logical_address       - Logical address of mapped table
- *
- * RETURN:      Logical address of the mapped table.
- *
- * DESCRIPTION: Maps the physical address of table into a logical address
- *
- ******************************************************************************/
-
-acpi_status
-acpi_tb_map_acpi_table (
-	ACPI_PHYSICAL_ADDRESS   physical_address,
-	ACPI_SIZE               *size,
-	acpi_table_header       **logical_address)
-{
-	acpi_table_header       *table;
-	ACPI_SIZE               table_size = *size;
-	acpi_status             status = AE_OK;
-
-
-	ACPI_FUNCTION_NAME ("Tb_map_acpi_table");
-
-
-	/* If size is zero, look at the table header to get the actual size */
-
-	if ((*size) == 0) {
-		/* Get the table header so we can extract the table length */
-
-		status = acpi_os_map_memory (physical_address, sizeof (acpi_table_header),
-				  (void **) &table);
-		if (ACPI_FAILURE (status)) {
-			return (status);
-		}
-
-		/* Extract the full table length before we delete the mapping */
-
-		table_size = (ACPI_SIZE) table->length;
-
-#if 0
-/* We don't want to validate the header here.  */
-		/*
-		 * Validate the header and delete the mapping.
-		 * We will create a mapping for the full table below.
-		 */
-		status = acpi_tb_validate_table_header (table);
-#endif
-
-		/* Always unmap the memory for the header */
-
-		acpi_os_unmap_memory (table, sizeof (acpi_table_header));
-
-#if 0
-		/* Exit if header invalid */
-
-		if (ACPI_FAILURE (status)) {
-			return (status);
-		}
-#endif
-	}
-
-	/* Map the physical memory for the correct length */
-
-	status = acpi_os_map_memory (physical_address, table_size,
-			  (void **) &table);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"Mapped memory for ACPI table, length=%d(%X) at %p\n",
-		table_size, table_size, table));
-
-	*size = table_size;
-	*logical_address = table;
-	return (status);
 }
 
 
