@@ -14,8 +14,7 @@
 
 extern unsigned long isa_io_base;
 
-extern struct pci_controller* pci_alloc_pci_controller(void);
-extern struct pci_controller* pci_alloc_phb_dynamic(void);
+extern void pci_setup_pci_controller(struct pci_controller *hose);
 extern void pci_setup_phb_io(struct pci_controller *hose, int primary);
 
 extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node);

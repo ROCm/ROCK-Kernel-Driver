@@ -614,9 +614,11 @@ static int __init add_bridge(struct device_node *dev)
        			       dev->full_name);
        	}
 
-       	hose = pci_alloc_pci_controller();
-       	if (!hose)
-       		return -ENOMEM;
+	hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+	if (hose == NULL)
+		return -ENOMEM;
+       	pci_setup_pci_controller(hose);
+
        	hose->arch_data = dev;
        	hose->first_busno = bus_range ? bus_range[0] : 0;
        	hose->last_busno = bus_range ? bus_range[1] : 0xff;

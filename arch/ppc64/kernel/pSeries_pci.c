@@ -266,48 +266,61 @@ static int phb_set_bus_ranges(struct device_node *dev,
 	return 0;
 }
 
-static struct pci_controller *alloc_phb(struct device_node *dev,
-				 unsigned int addr_size_words)
+static int __devinit setup_phb(struct device_node *dev,
+			       struct pci_controller *phb,
+			       unsigned int addr_size_words)
 {
-	struct pci_controller *phb;
 	struct reg_property64 reg_struct;
-	struct property *of_prop;
-	int rc;
 
-	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
-	if (rc)
-		return NULL;
+	if (get_phb_reg_prop(dev, addr_size_words, &reg_struct))
+		return 1;
 
-	phb = pci_alloc_pci_controller();
-	if (phb == NULL)
-		return NULL;
+	pci_setup_pci_controller(phb);
 
 	if (is_python(dev))
 		python_countermeasures(reg_struct.address);
 
-	rc = phb_set_bus_ranges(dev, phb);
-	if (rc)
-		return NULL;
+	if (phb_set_bus_ranges(dev, phb))
+		return 1;
 
-	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
-			sizeof(phb->global_number));        
+	phb->arch_data = dev;
+	phb->ops = &rtas_pci_ops;
+	phb->buid = get_phb_buid(dev);
 
-	if (!of_prop) {
-		kfree(phb);
-		return NULL;
-	}
+	return 0;
+}
 
+static void __devinit add_linux_pci_domain(struct device_node *dev,
+					   struct pci_controller *phb,
+					   struct property *of_prop)
+{
 	memset(of_prop, 0, sizeof(struct property));
 	of_prop->name = "linux,pci-domain";
 	of_prop->length = sizeof(phb->global_number);
 	of_prop->value = (unsigned char *)&of_prop[1];
 	memcpy(of_prop->value, &phb->global_number, sizeof(phb->global_number));
 	prom_add_property(dev, of_prop);
+}
 
-	phb->arch_data   = dev;
-	phb->ops = &rtas_pci_ops;
+static struct pci_controller * __init alloc_phb(struct device_node *dev,
+						unsigned int addr_size_words)
+{
+	struct pci_controller *phb;
+	struct property *of_prop;
 
-	phb->buid = get_phb_buid(dev);
+	phb = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+	if (phb == NULL)
+		return NULL;
+
+	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
+			sizeof(phb->global_number));
+	if (!of_prop)
+		return NULL;
+
+	if (setup_phb(dev, phb, addr_size_words))
+		return NULL;
+
+	add_linux_pci_domain(dev, phb, of_prop);
 
 	return phb;
 }
@@ -315,30 +328,18 @@ static struct pci_controller *alloc_phb(struct device_node *dev,
 static struct pci_controller * __devinit alloc_phb_dynamic(struct device_node *dev, unsigned int addr_size_words)
 {
 	struct pci_controller *phb;
-	struct reg_property64 reg_struct;
-	int rc;
 
-	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
-	if (rc)
-		return NULL;
-
-	phb = pci_alloc_phb_dynamic();
+	phb = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
+					       GFP_KERNEL);
 	if (phb == NULL)
 		return NULL;
 
-	if (is_python(dev))
-		python_countermeasures(reg_struct.address);
-
-	rc = phb_set_bus_ranges(dev, phb);
-	if (rc)
+	if (setup_phb(dev, phb, addr_size_words))
 		return NULL;
 
+	phb->is_dynamic = 1;
+
 	/* TODO: linux,pci-domain? */
-
-	phb->arch_data   = dev;
-	phb->ops = &rtas_pci_ops;
-
-	phb->buid = get_phb_buid(dev);
 
  	return phb;
 }

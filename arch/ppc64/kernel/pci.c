@@ -157,54 +157,19 @@ void pcibios_align_resource(void *data, struct resource *res,
 	res->start = start;
 }
 
-/*
- * Allocate pci_controller(phb) initialized common variables.
- */
-struct pci_controller * __init pci_alloc_pci_controller()
-{
-	struct pci_controller *hose;
-
-#ifdef CONFIG_PPC_ISERIES
-	hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
-						GFP_KERNEL);
-#else
-	hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
-#endif
-	if (hose == NULL) {
-		printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
-		return NULL;
-	}
-	memset(hose, 0, sizeof(struct pci_controller));
-
-	hose->is_dynamic = 0;
-	hose->global_number = global_phb_number++;
-
-	list_add_tail(&hose->list_node, &hose_list);
-
-	return hose;
-}
+static spinlock_t hose_spinlock = SPIN_LOCK_UNLOCKED;
 
 /*
- * Dymnamically allocate pci_controller(phb), initialize common variables.
+ * pci_controller(phb) initialized common variables.
  */
-struct pci_controller * pci_alloc_phb_dynamic()
+void __devinit pci_setup_pci_controller(struct pci_controller *hose)
 {
-	struct pci_controller *hose;
-
-	hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
-						GFP_KERNEL);
-	if(hose == NULL) {
-		printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
-		return NULL;
-	}
 	memset(hose, 0, sizeof(struct pci_controller));
 
-	hose->is_dynamic = 1;
+	spin_lock(&hose_spinlock);
 	hose->global_number = global_phb_number++;
-
 	list_add_tail(&hose->list_node, &hose_list);
-
-	return hose;
+	spin_unlock(&hose_spinlock);
 }
 
 static void __init pcibios_claim_one_bus(struct pci_bus *b)

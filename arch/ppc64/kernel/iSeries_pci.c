@@ -256,9 +256,12 @@ unsigned long __init find_and_init_phbs(void)
 		int ret = HvCallXm_testBus(bus);
 		if (ret == 0) {
 			printk("bus %d appears to exist\n", bus);
-			phb = pci_alloc_pci_controller();
+
+			phb = (struct pci_controller *)kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
 			if (phb == NULL)
-				return -1;
+				return -ENOMEM;
+       			pci_setup_pci_controller(phb);
+
 			phb->pci_mem_offset = phb->local_number = bus;
 			phb->first_busno = bus;
 			phb->last_busno = bus;
