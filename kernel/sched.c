@@ -2574,6 +2574,7 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	wait_for_completion(&req.done);
 	return 0;
 }
+EXPORT_SYMBOL(set_cpus_allowed);
 
 /* Move (not current) task off this cpu, onto dest cpu. */
 static void move_task_away(struct task_struct *p, int dest_cpu)
@@ -2874,7 +2875,6 @@ EXPORT_SYMBOL(interruptible_sleep_on);
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 EXPORT_SYMBOL(io_schedule);
 EXPORT_SYMBOL(schedule);
-EXPORT_SYMBOL(set_cpus_allowed);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(sleep_on);
 EXPORT_SYMBOL(sleep_on_timeout);

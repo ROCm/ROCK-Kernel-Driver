@@ -352,9 +352,6 @@ EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
 #endif
 EXPORT_SYMBOL(schedule_timeout);
 EXPORT_SYMBOL_GPL(idle_cpu);
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL_GPL(set_cpus_allowed);
-#endif
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 EXPORT_SYMBOL(kernel_flag);
 #endif
