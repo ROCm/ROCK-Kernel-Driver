@@ -217,8 +217,8 @@ free_address(
 {
 	a_list_t	*aentry;
 
-	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC);
-	if (aentry) {
+	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC & ~__GFP_HIGH);
+	if (likely(aentry)) {
 		spin_lock(&as_lock);
 		aentry->next = as_free_head;
 		aentry->vm_addr = addr;
@@ -1652,7 +1652,7 @@ xfs_mapping_buftarg(
 	mapping = &inode->i_data;
 	mapping->a_ops = &mapping_aops;
 	mapping->backing_dev_info = bdi;
-	mapping_set_gfp_mask(mapping, GFP_KERNEL);
+	mapping_set_gfp_mask(mapping, GFP_NOFS);
 	btp->pbr_mapping = mapping;
 	return 0;
 }
