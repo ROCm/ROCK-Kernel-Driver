@@ -644,15 +644,13 @@ static void scsi_eh_finish_cmd(struct scsi_cmnd *scmd,
  * Notes:
  *    This has the unfortunate side effect that if a shost adapter does
  *    not automatically request sense information, that we end up shutting
- *    it down before we request it.  All shosts should be doing this
- *    anyways, so for now all I have to say is tough noogies if you end up
- *    in here.  On second thought, this is probably a good idea.  We
- *    *really* want to give authors an incentive to automatically request
- *    this.
+ *    it down before we request it.
  *
- *    In 2.5 this capability will be going away.
+ *    All drivers should request sense information internally these days,
+ *    so for now all I have to say is tough noogies if you end up in here.
  *
- *    Really?  --hch
+ *    XXX: Long term this code should go away, but that needs an audit of
+ *         all LLDDs first.
  **/
 static int scsi_eh_get_sense(struct list_head *work_q,
 			     struct list_head *done_q)
