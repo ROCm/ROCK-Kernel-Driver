@@ -307,11 +307,12 @@ long sys_sigreturn(struct pt_regs regs)
 	struct sigframe __user *frame = (struct sigframe *)(sp - 8);
 	sigset_t set;
 	struct sigcontext __user *sc = &frame->sc;
-	unsigned long __user *mask = &sc->oldmask;
+	unsigned long __user *oldmask = &sc->oldmask;
+	unsigned long __user *extramask = frame->extramask;
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 
-	if(copy_from_user(&set.sig[0], mask, sizeof(&set.sig[0])) ||
-	   copy_from_user(&set.sig[1], mask, sig_size))
+	if(copy_from_user(&set.sig[0], oldmask, sizeof(&set.sig[0])) ||
+	   copy_from_user(&set.sig[1], extramask, sig_size))
 		goto segfault;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
