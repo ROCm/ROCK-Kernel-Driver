@@ -140,15 +140,24 @@ struct hw_interrupt_type i8259_pic = {
 };
 
 static struct resource pic1_iores = {
-	"8259 (master)", 0x20, 0x21, IORESOURCE_BUSY
+	.name = "8259 (master)",
+	.start = 0x20,
+	.end = 0x21,
+	.flags = IORESOURCE_BUSY,
 };
 
 static struct resource pic2_iores = {
-	"8259 (slave)", 0xa0, 0xa1, IORESOURCE_BUSY
+	.name = "8259 (slave)",
+	.start = 0xa0,
+	.end = 0xa1,
+	.flags = IORESOURCE_BUSY,
 };
 
 static struct resource pic_edgectrl_iores = {
-	"8259 edge control", 0x4d0, 0x4d1, IORESOURCE_BUSY
+	.name = "8259 edge control",
+	.start = 0x4d0,
+	.end = 0x4d1,
+	.flags = IORESOURCE_BUSY,
 };
 
 static struct irqaction i8259_irqaction = {
