@@ -523,13 +523,6 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!sdp->online) {
 		goto error_out;
 	}
-	/*
-	 * See if we are requesting a non-existent partition.  Do this
-	 * after checking for disk change.
-	 */
-	if (sd[SD_PARTITION(inode->i_rdev)].nr_sects == 0) {
-		goto error_out;
-	}
 
 	if (sdp->removable)
 		if (sdp->access_count==1)
