@@ -12,6 +12,7 @@
 #include <linux/irq.h>
 #include <linux/dmi.h>
 #include <linux/device.h>
+#include <asm/io.h>
 #include <linux/suspend.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -56,7 +57,8 @@ static int acpi_pm_prepare(u32 pm_state)
 		if (!acpi_wakeup_address)
 			return -EFAULT;
 		acpi_set_firmware_waking_vector(
-			(acpi_physical_address) acpi_wakeup_address);
+			(acpi_physical_address) virt_to_phys(
+			(void *)acpi_wakeup_address));
 	}
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);
