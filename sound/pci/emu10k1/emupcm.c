@@ -1167,70 +1167,41 @@ static void snd_emu10k1_fx8010_playback_tram_poke1(unsigned short *dst_left,
 	}
 }
 
-static void snd_emu10k1_fx8010_playback_tram_poke(emu10k1_t *emu,
-						  unsigned int *tram_pos,
-						  unsigned int *tram_shift,
-						  unsigned int tram_size,
-						  unsigned short *src,
-						  unsigned int frames)
+static void fx8010_pb_trans_copy(snd_pcm_substream_t *substream,
+				 snd_pcm_indirect_t *rec, size_t bytes)
 {
-	unsigned int count;
+	emu10k1_t *emu = snd_pcm_substream_chip(substream);
+	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
+	unsigned int tram_size = pcm->buffer_size;
+	unsigned short *src = (unsigned short *)(substream->runtime->dma_area + rec->sw_data);
+	unsigned int frames = bytes >> 2, count;
+	unsigned int tram_pos = pcm->tram_pos;
+	unsigned int tram_shift = pcm->tram_shift;
 
-	while (frames > *tram_pos) {
-		count = *tram_pos + 1;
-		snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
-						       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
-						       src, count, *tram_shift);
+	while (frames > tram_pos) {
+		count = tram_pos + 1;
+		snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + tram_pos,
+						       (unsigned short *)emu->fx8010.etram_pages.area + tram_pos + tram_size / 2,
+						       src, count, tram_shift);
 		src += count * 2;
 		frames -= count;
-		*tram_pos = (tram_size / 2) - 1;
-		(*tram_shift)++;
+		tram_pos = (tram_size / 2) - 1;
+		tram_shift++;
 	}
-	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
-					       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
-					       src, frames, *tram_shift++);
-	*tram_pos -= frames;
+	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + tram_pos,
+					       (unsigned short *)emu->fx8010.etram_pages.area + tram_pos + tram_size / 2,
+					       src, frames, tram_shift++);
+	tram_pos -= frames;
+	pcm->tram_pos = tram_pos;
+	pcm->tram_shift = tram_shift;
 }
 
 static int snd_emu10k1_fx8010_playback_transfer(snd_pcm_substream_t *substream)
 {
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
-	snd_pcm_sframes_t diff = appl_ptr - pcm->appl_ptr;
-	snd_pcm_uframes_t buffer_size = pcm->buffer_size / 2;
 
-	if (diff) {
-		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
-			diff += runtime->boundary;
-		pcm->sw_ready += diff;
-		pcm->appl_ptr = appl_ptr;
-	}
-	while (pcm->hw_ready < buffer_size &&
-	       pcm->sw_ready > 0) {
-	       	size_t hw_to_end = buffer_size - pcm->hw_data;
-	       	size_t sw_to_end = (runtime->buffer_size << 2) - pcm->sw_data;
-	       	size_t tframes = buffer_size - pcm->hw_ready;
-	       	if (pcm->sw_ready < tframes)
-	       		tframes = pcm->sw_ready;
-	       	if (hw_to_end < tframes)
-	       		tframes = hw_to_end;
-	       	if (sw_to_end < tframes)
-	       		tframes = sw_to_end;
-	       	snd_emu10k1_fx8010_playback_tram_poke(emu, &pcm->tram_pos, &pcm->tram_shift,
-	       					      pcm->buffer_size,
-	       					      (unsigned short *)(runtime->dma_area + (pcm->sw_data << 2)),
-	       					      tframes);
-		pcm->hw_data += tframes;
-		if (pcm->hw_data == buffer_size)
-			pcm->hw_data = 0;
-		pcm->sw_data += tframes;
-		if (pcm->sw_data == runtime->buffer_size)
-			pcm->sw_data = 0;
-		pcm->hw_ready += tframes;
-		pcm->sw_ready -= tframes;
-	}
+	snd_pcm_indirect_playback_transfer(substream, &pcm->pcm_rec, fx8010_pb_trans_copy);
 	return 0;
 }
 
@@ -1260,11 +1231,11 @@ static int snd_emu10k1_fx8010_playback_prepare(snd_pcm_substream_t * substream)
 	unsigned int i;
 	
 	// printk("prepare: etram_pages = 0x%p, dma_area = 0x%x, buffer_size = 0x%x (0x%x)\n", emu->fx8010.etram_pages, runtime->dma_area, runtime->buffer_size, runtime->buffer_size << 2);
-	pcm->sw_data = pcm->sw_io = pcm->sw_ready = 0;
-	pcm->hw_data = pcm->hw_io = pcm->hw_ready = 0;
+	memset(&pcm->pcm_rec, 0, sizeof(pcm->pcm_rec));
+	pcm->pcm_rec.hw_buffer_size = pcm->buffer_size * 2; /* byte size */
+	pcm->pcm_rec.sw_buffer_size = snd_pcm_lib_buffer_bytes(substream);
 	pcm->tram_pos = INITIAL_TRAM_POS(pcm->buffer_size);
 	pcm->tram_shift = 0;
-	pcm->appl_ptr = 0;
 	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_running, 0, 0);	/* reset */
 	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_trigger, 0, 0);	/* reset */
 	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_size, 0, runtime->buffer_size);
@@ -1325,24 +1296,13 @@ static int snd_emu10k1_fx8010_playback_trigger(snd_pcm_substream_t * substream, 
 static snd_pcm_uframes_t snd_emu10k1_fx8010_playback_pointer(snd_pcm_substream_t * substream)
 {
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	size_t ptr;
-	snd_pcm_sframes_t frames;
+	size_t ptr; /* byte pointer */
 
 	if (!snd_emu10k1_ptr_read(emu, emu->gpr_base + pcm->gpr_trigger, 0))
 		return 0;
-	ptr = snd_emu10k1_ptr_read(emu, emu->gpr_base + pcm->gpr_ptr, 0);
-	frames = ptr - pcm->hw_io;
-	if (frames < 0)
-		frames += runtime->buffer_size;
-	pcm->hw_io = ptr;
-	pcm->hw_ready -= frames;
-	pcm->sw_io += frames;
-	if (pcm->sw_io >= runtime->buffer_size)
-		pcm->sw_io -= runtime->buffer_size;
-	snd_emu10k1_fx8010_playback_transfer(substream);
-	return pcm->sw_io;
+	ptr = snd_emu10k1_ptr_read(emu, emu->gpr_base + pcm->gpr_ptr, 0) << 2;
+	return snd_pcm_indirect_playback_pointer(substream, &pcm->pcm_rec, ptr);
 }
 
 static snd_pcm_hardware_t snd_emu10k1_fx8010_playback =

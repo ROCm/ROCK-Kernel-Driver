@@ -688,84 +688,35 @@ static void snd_cs46xx_set_capture_sample_rate(cs46xx_t *chip, unsigned int rate
  *  PCM part
  */
 
-static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream)
+static void snd_cs46xx_pb_trans_copy(snd_pcm_substream_t *substream,
+				     snd_pcm_indirect_t *rec, size_t bytes)
 {
-	/* cs46xx_t *chip = snd_pcm_substream_chip(substream); */
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	cs46xx_pcm_t * cpcm = runtime->private_data;
-	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
-	snd_pcm_sframes_t diff = appl_ptr - cpcm->appl_ptr;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
+	memcpy(cpcm->hw_buf.area + rec->hw_data, runtime->dma_area + rec->sw_data, bytes);
+}
 
-	if (diff) {
-		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
-			diff += runtime->boundary;
-		cpcm->sw_ready += diff * (1 << cpcm->shift);
-		cpcm->appl_ptr = appl_ptr;
-	}
-	while (cpcm->hw_ready < buffer_size && 
-	       cpcm->sw_ready > 0) {
-		size_t hw_to_end = buffer_size - cpcm->hw_data;
-		size_t sw_to_end = cpcm->sw_bufsize - cpcm->sw_data;
-		size_t bytes = buffer_size - cpcm->hw_ready;
-		if (cpcm->sw_ready < (int)bytes)
-			bytes = cpcm->sw_ready;
-		if (hw_to_end < bytes)
-			bytes = hw_to_end;
-		if (sw_to_end < bytes)
-			bytes = sw_to_end;
-		memcpy(cpcm->hw_buf.area + cpcm->hw_data,
-		       runtime->dma_area + cpcm->sw_data,
-		       bytes);
-		cpcm->hw_data += bytes;
-		if ((int)cpcm->hw_data == buffer_size)
-			cpcm->hw_data = 0;
-		cpcm->sw_data += bytes;
-		if (cpcm->sw_data == cpcm->sw_bufsize)
-			cpcm->sw_data = 0;
-		cpcm->hw_ready += bytes;
-		cpcm->sw_ready -= bytes;
-	}
+static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	cs46xx_pcm_t * cpcm = runtime->private_data;
+	snd_pcm_indirect_playback_transfer(substream, &cpcm->pcm_rec, snd_cs46xx_pb_trans_copy);
 	return 0;
+}
+
+static void snd_cs46xx_cp_trans_copy(snd_pcm_substream_t *substream,
+				     snd_pcm_indirect_t *rec, size_t bytes)
+{
+	cs46xx_t *chip = snd_pcm_substream_chip(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	memcpy(runtime->dma_area + rec->sw_data,
+	       chip->capt.hw_buf.area + rec->hw_data, bytes);
 }
 
 static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream)
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
-	snd_pcm_sframes_t diff = appl_ptr - chip->capt.appl_ptr;
-	int buffer_size = runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
-
-	if (diff) {
-		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
-			diff += runtime->boundary;
-		chip->capt.sw_ready -= diff * (1 << chip->capt.shift);
-		chip->capt.appl_ptr = appl_ptr;
-	}
-	while (chip->capt.hw_ready > 0 && 
-	       chip->capt.sw_ready < (int)chip->capt.sw_bufsize) {
-		size_t hw_to_end = buffer_size - chip->capt.hw_data;
-		size_t sw_to_end = chip->capt.sw_bufsize - chip->capt.sw_data;
-		size_t bytes = chip->capt.sw_bufsize - chip->capt.sw_ready;
-		if (chip->capt.hw_ready < (int)bytes)
-			bytes = chip->capt.hw_ready;
-		if (hw_to_end < bytes)
-			bytes = hw_to_end;
-		if (sw_to_end < bytes)
-			bytes = sw_to_end;
-		memcpy(runtime->dma_area + chip->capt.sw_data,
-		       chip->capt.hw_buf.area + chip->capt.hw_data,
-		       bytes);
-		chip->capt.hw_data += bytes;
-		if ((int)chip->capt.hw_data == buffer_size)
-			chip->capt.hw_data = 0;
-		chip->capt.sw_data += bytes;
-		if (chip->capt.sw_data == chip->capt.sw_bufsize)
-			chip->capt.sw_data = 0;
-		chip->capt.hw_ready -= bytes;
-		chip->capt.sw_ready += bytes;
-	}
+	snd_pcm_indirect_capture_transfer(substream, &chip->capt.pcm_rec, snd_cs46xx_cp_trans_copy);
 	return 0;
 }
 
@@ -790,8 +741,6 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr;
 	cs46xx_pcm_t *cpcm = substream->runtime->private_data;
-	ssize_t bytes;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_assert (cpcm->pcm_channel,return -ENXIO);
@@ -800,18 +749,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 	ptr = snd_cs46xx_peek(chip, BA1_PBA);
 #endif
 	ptr -= cpcm->hw_buf.addr;
-
-	bytes = ptr - cpcm->hw_io;
-
-	if (bytes < 0)
-		bytes += buffer_size;
-	cpcm->hw_io = ptr;
-	cpcm->hw_ready -= bytes;
-	cpcm->sw_io += bytes;
-	if (cpcm->sw_io >= cpcm->sw_bufsize)
-		cpcm->sw_io -= cpcm->sw_bufsize;
-	snd_cs46xx_playback_transfer(substream);
-	return cpcm->sw_io >> cpcm->shift;
+	return snd_pcm_indirect_playback_pointer(substream, &cpcm->pcm_rec, ptr);
 }
 
 static snd_pcm_uframes_t snd_cs46xx_capture_direct_pointer(snd_pcm_substream_t * substream)
@@ -825,18 +763,7 @@ static snd_pcm_uframes_t snd_cs46xx_capture_indirect_pointer(snd_pcm_substream_t
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr = snd_cs46xx_peek(chip, BA1_CBA) - chip->capt.hw_buf.addr;
-	ssize_t bytes = ptr - chip->capt.hw_io;
-	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
-
-	if (bytes < 0)
-		bytes += buffer_size;
-	chip->capt.hw_io = ptr;
-	chip->capt.hw_ready += bytes;
-	chip->capt.sw_io += bytes;
-	if (chip->capt.sw_io >= chip->capt.sw_bufsize)
-		chip->capt.sw_io -= chip->capt.sw_bufsize;
-	snd_cs46xx_capture_transfer(substream);
-	return chip->capt.sw_io >> chip->capt.shift;
+	return snd_pcm_indirect_capture_pointer(substream, &chip->capt.pcm_rec, ptr);
 }
 
 static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
@@ -1143,10 +1070,9 @@ static int snd_cs46xx_playback_prepare(snd_pcm_substream_t * substream)
 			pfie |= 0x00004000;
 	}
 	
-	cpcm->sw_bufsize = snd_pcm_lib_buffer_bytes(substream);
-	cpcm->sw_data = cpcm->sw_io = cpcm->sw_ready = 0;
-	cpcm->hw_data = cpcm->hw_io = cpcm->hw_ready = 0;
-	cpcm->appl_ptr = 0;
+	memset(&cpcm->pcm_rec, 0, sizeof(cpcm->pcm_rec));
+	cpcm->pcm_rec.sw_buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	cpcm->pcm_rec.hw_buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 
@@ -1223,10 +1149,9 @@ static int snd_cs46xx_capture_prepare(snd_pcm_substream_t * substream)
 
 	snd_cs46xx_poke(chip, BA1_CBA, chip->capt.hw_buf.addr);
 	chip->capt.shift = 2;
-	chip->capt.sw_bufsize = snd_pcm_lib_buffer_bytes(substream);
-	chip->capt.sw_data = chip->capt.sw_io = chip->capt.sw_ready = 0;
-	chip->capt.hw_data = chip->capt.hw_io = chip->capt.hw_ready = 0;
-	chip->capt.appl_ptr = 0;
+	memset(&chip->capt.pcm_rec, 0, sizeof(chip->capt.pcm_rec));
+	chip->capt.pcm_rec.sw_buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	chip->capt.pcm_rec.hw_buffer_size = runtime->period_size * CS46XX_FRAGS << 2;
 	snd_cs46xx_set_capture_sample_rate(chip, runtime->rate);
 
 	return 0;

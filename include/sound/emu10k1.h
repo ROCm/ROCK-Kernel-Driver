@@ -30,6 +30,7 @@
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
 #include <sound/util_mem.h>
+#include <sound/pcm-indirect.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 
@@ -887,10 +888,7 @@ typedef struct {
 	unsigned char gpr_trigger;	/* GPR containing trigger (activate) information (host) */
 	unsigned char gpr_running;	/* GPR containing info if PCM is running (FX8010) */
 	unsigned char etram[32];	/* external TRAM address & data */
-	unsigned int sw_data, hw_data;
-	unsigned int sw_io, hw_io;
-	unsigned int sw_ready, hw_ready;
-	unsigned int appl_ptr;
+	snd_pcm_indirect_t pcm_rec;
 	unsigned int tram_pos;
 	unsigned int tram_shift;
 	snd_emu10k1_fx8010_irq_t *irq;
