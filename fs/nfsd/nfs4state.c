@@ -1333,8 +1333,6 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		/* remember the open */
 		set_bit(open->op_share_access, &stp->st_access_bmap);
 		set_bit(open->op_share_deny, &stp->st_deny_bmap);
-		/* bump the stateid */
-		update_stateid(&stp->st_stateid);
 	}
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
