@@ -131,8 +131,6 @@ NETjet_S_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_INIT:
 			inittiger(cs);
 			initisac(cs);
-			/* Reenable all IRQ */
-			cs->writeisac(cs, ISAC_MASK, 0);
 			return(0);
 		case CARD_TEST:
 			return(0);

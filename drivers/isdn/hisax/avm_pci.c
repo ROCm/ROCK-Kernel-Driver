@@ -731,11 +731,8 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			inithdlc(cs);
 			outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER,
 				cs->hw.avm.cfg_reg + 2);
-			WriteISAC(cs, ISAC_MASK, 0);
 			outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER |
 				AVM_STATUS0_ENA_IRQ, cs->hw.avm.cfg_reg + 2);
-			/* RESET Receiver and Transmitter */
-			WriteISAC(cs, ISAC_CMDR, 0x41);
 			return(0);
 		case CARD_TEST:
 			return(0);

@@ -158,10 +158,6 @@ ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
 			initisac(cs);
 			initisar(cs);
-			/* Reenable ISAC IRQ */
-			cs->writeisac(cs, ISAC_MASK, 0);
-			/* RESET Receiver and Transmitter */
-			cs->writeisac(cs, ISAC_CMDR, 0x41);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -179,8 +175,6 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 			reset_isurf(cs, ISURF_ISAR_EA | ISURF_ISAC_RESET |
 				ISURF_ARCOFI_RESET);
 			initisac(cs);
-			cs->writeisac(cs, ISAC_MASK, 0);
-			cs->writeisac(cs, ISAC_CMDR, 0x41);
 		}
 		return(ret);
 	}

@@ -268,7 +268,4 @@ inithscxisac(struct IsdnCardState *cs)
 {
 	initisac(cs);
 	inithscx(cs);
-	
-	/* RESET Receiver and Transmitter */
-	cs->writeisac(cs, ISAC_CMDR, 0x41);
 }

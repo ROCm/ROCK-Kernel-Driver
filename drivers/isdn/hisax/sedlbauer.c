@@ -483,10 +483,6 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 					ISAR_IRQBIT, 0);
 				initisac(cs);
 				initisar(cs);
-				/* Reenable all IRQ */
-				cs->writeisac(cs, ISAC_MASK, 0);
-				/* RESET Receiver and Transmitter */
-				cs->writeisac(cs, ISAC_CMDR, 0x41);
 			} else {
 				inithscxisac(cs);
 			}

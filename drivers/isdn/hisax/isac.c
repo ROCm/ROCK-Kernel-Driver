@@ -678,4 +678,7 @@ initisac(struct IsdnCardState *cs)
 	debugl1(cs, "ISAC CIR0 %x", val);
 	cs->dc.isac.ph_state = (val >> 2) & 0xf;
 	isac_sched_event(cs, D_L1STATECHANGE);
+
+	/* RESET Receiver and Transmitter */
+	cs->writeisac(cs, ISAC_CMDR, 0x41);
 }
