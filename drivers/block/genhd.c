@@ -108,13 +108,14 @@ void unlink_gendisk(struct gendisk *disk)
  * information for the given device @dev.
  */
 struct gendisk *
-get_gendisk(kdev_t dev)
+get_gendisk(dev_t dev, int *part)
 {
 	struct gendisk *disk;
 	struct list_head *p;
-	int major = major(dev);
-	int minor = minor(dev);
+	int major = MAJOR(dev);
+	int minor = MINOR(dev);
 
+	*part = 0;
 	read_lock(&gendisk_lock);
 	if (gendisks[major].get) {
 		disk = gendisks[major].get(minor);
@@ -128,6 +129,7 @@ get_gendisk(kdev_t dev)
 		if (disk->first_minor + (1<<disk->minor_shift) <= minor)
 			continue;
 		read_unlock(&gendisk_lock);
+		*part = minor - disk->first_minor;
 		return disk;
 	}
 	read_unlock(&gendisk_lock);

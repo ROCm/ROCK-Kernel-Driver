@@ -569,6 +569,7 @@ char *partition_name(dev_t dev)
 	static char nomem [] = "<nomem>";
 	struct dev_name *dname;
 	struct list_head *tmp;
+	int part;
 
 	list_for_each(tmp, &device_names) {
 		dname = list_entry(tmp, struct dev_name, list);
@@ -583,10 +584,10 @@ char *partition_name(dev_t dev)
 	/*
 	 * ok, add this new device name to the list
 	 */
-	hd = get_gendisk(to_kdev_t(dev));
+	hd = get_gendisk(dev, &part);
 	dname->name = NULL;
 	if (hd)
-		dname->name = disk_name(hd, MINOR(dev)-hd->first_minor, dname->namebuf);
+		dname->name = disk_name(hd, part, dname->namebuf);
 	if (!dname->name) {
 		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
 		dname->name = dname->namebuf;

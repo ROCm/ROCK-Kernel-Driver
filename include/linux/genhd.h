@@ -95,7 +95,7 @@ struct gendisk {
 extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
-extern struct gendisk *get_gendisk(kdev_t dev);
+extern struct gendisk *get_gendisk(dev_t dev, int *part);
 static inline unsigned long get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;
@@ -268,7 +268,8 @@ extern void blk_set_probe(int major, struct gendisk *(p)(int));
 
 static inline unsigned int disk_index (kdev_t dev)
 {
-	struct gendisk *g = get_gendisk(dev);
+	int part;
+	struct gendisk *g = get_gendisk(kdev_t_to_nr(dev), &part);
 	return g ? (minor(dev) >> g->minor_shift) : 0;
 }
 
