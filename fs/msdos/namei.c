@@ -607,7 +607,7 @@ int msdos_fill_super(struct super_block *sb,void *data, int silent)
 
 	res = fat_fill_super(sb, data, silent, &msdos_dir_inode_operations, 0);
 	if (res) {
-		if (!silent)
+		if (res == -EINVAL && !silent)
 			printk(KERN_INFO "VFS: Can't find a valid"
 			       " MSDOS filesystem on dev %s.\n", sb->s_id);
 		return res;
