@@ -2482,7 +2482,8 @@ out:
 #endif /* __sparc__ */
 #endif
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
+#if !defined(__alpha__) && !defined(__ia64__) && \
+    !defined(__arm__) && !defined(__s390__)
 /*
  * For backwards compatibility.  Functionality superseded by sigprocmask.
  */

@@ -454,8 +454,8 @@ config SMP
 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
 	  Management" code will be disabled if you say Y here.
 
-	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  See also the <file:Documentation/smp.txt>,
+	  <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
 	  <http://www.tldp.org/docs.html#howto>.
 
@@ -637,16 +637,7 @@ config X86_CPUID
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
 
-config EDD
-	tristate "BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	help
-	  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
-	  Services real mode BIOS calls to determine which disk
-	  BIOS tries boot from.  This information is then exported via driverfs.
-
-	  This option is experimental, but believed to be safe,
-	  and most disk controller BIOS vendors do not yet implement this feature.
+source "drivers/firmware/Kconfig"
 
 choice
 	prompt "High Memory Support"
@@ -1064,9 +1055,6 @@ choice
 	prompt "PCI access mode"
 	depends on PCI && !X86_VISWS
 	default PCI_GOANY
-
-config PCI_GOBIOS
-	bool "BIOS"
 	---help---
 	  On PCI systems, the BIOS can be used to detect the PCI devices and
 	  determine their configuration. However, some old PCI motherboards
@@ -1081,6 +1069,9 @@ config PCI_GOBIOS
 	  If you choose "Any", the kernel will try MMCONFIG, then the
 	  direct access method and falls back to the BIOS if that doesn't
 	  work. If unsure, go with the default, which is "Any".
+
+config PCI_GOBIOS
+	bool "BIOS"
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"

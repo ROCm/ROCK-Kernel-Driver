@@ -100,17 +100,42 @@ dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 /* We don't do anything here. */
 #define dma_unmap_sg(dev, sg, nents, dir)	do { } while (0)
 
-static inline void dma_sync_single(struct device *dev, dma_addr_t dma_handle,
-				   size_t size,
-				   enum dma_data_direction direction)
+static inline void
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
+			size_t size,
+			enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 
 	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
-static inline void dma_sync_sg(struct device *dev, struct scatterlist *sg,
-			       int nelems, enum dma_data_direction direction)
+static inline void
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
+			   size_t size,
+			   enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+
+	consistent_sync(bus_to_virt(dma_handle), size, direction);
+}
+
+static inline void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+		    int nelems, enum dma_data_direction direction)
+{
+	int i;
+
+	BUG_ON(direction == DMA_NONE);
+
+	for (i = 0; i < nelems; i++, sg++)
+		consistent_sync_page(sg->page, sg->offset,
+				     sg->length, direction);
+}
+
+static inline void
+dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+		       int nelems, enum dma_data_direction direction)
 {
 	int i;
 
@@ -137,12 +162,21 @@ static inline int dma_get_cache_alignment(void)
 }
 
 static inline void
-dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
-		      unsigned long offset, size_t size,
-		      enum dma_data_direction direction)
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
+			      unsigned long offset, size_t size,
+			      enum dma_data_direction direction)
 {
 	/* just sync everything, that's all the pci API can do */
-	dma_sync_single(dev, dma_handle, offset + size, direction);
+	dma_sync_single_for_cpu(dev, dma_handle, offset + size, direction);
+}
+
+static inline void
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+				 unsigned long offset, size_t size,
+				 enum dma_data_direction direction)
+{
+	/* just sync everything, that's all the pci API can do */
+	dma_sync_single_for_device(dev, dma_handle, offset + size, direction);
 }
 
 static inline void dma_cache_sync(void *vaddr, size_t size,

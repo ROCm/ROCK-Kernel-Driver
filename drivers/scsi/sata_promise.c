@@ -21,7 +21,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -201,7 +200,6 @@ static struct ata_port_operations pdc_sata_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = pdc_dma_start,
 	.fill_sg		= pdc_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -219,7 +217,6 @@ static struct ata_port_operations pdc_20621_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= pdc_20621_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = pdc20621_dma_start,
 	.fill_sg		= pdc20621_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -1670,6 +1667,9 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
+	if (rc)
+		goto err_out_regions;
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
 

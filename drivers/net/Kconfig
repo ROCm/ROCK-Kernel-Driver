@@ -2048,8 +2048,8 @@ config SK98LIN
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. This is recommended.
-	  The module will be called sk98lin. This is recommended.
+	  say M here and read Documentation/kbuild/modules.txt. The module will
+	  be called sk98lin. This is recommended.
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"

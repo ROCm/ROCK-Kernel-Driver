@@ -44,16 +44,6 @@
 #include "pci.h"
 
 
-/* Only used to pass OF initialization data set in prom.c into the main 
- * kernel code -- data ultimately copied into regular tce tables.
- */
-extern struct _of_tce_table of_tce_table[];
-
-
-extern struct pci_controller  *hose_head;
-extern struct pci_controller **hose_tail;
-
-
 static void tce_build_pSeries(struct iommu_table *tbl, long index, 
 			      long npages, unsigned long uaddr, 
 			      int direction)
@@ -97,13 +87,23 @@ static void tce_free_pSeries(struct iommu_table *tbl, long index, long npages)
 }
 
 
-
 static void iommu_buses_init(void)
 {
 	struct pci_controller* phb;
 	struct device_node *dn, *first_dn;
 	int num_slots, num_slots_ilog2;
 	int first_phb = 1;
+	unsigned long tcetable_ilog2;
+
+	/*
+	 * We default to a TCE table that maps 2GB (4MB table, 22 bits),
+	 * however some machines have a 3GB IO hole and for these we
+	 * create a table that maps 1GB (2MB table, 21 bits)
+	 */
+	if (io_hole_start < 0x80000000UL)
+		tcetable_ilog2 = 21;
+	else
+		tcetable_ilog2 = 22;
 
 	/* XXX Should we be using pci_root_buses instead?  -ojn 
 	 */
@@ -119,7 +119,7 @@ static void iommu_buses_init(void)
 		if ((1<<num_slots_ilog2) != num_slots)
 			num_slots_ilog2++;
 
-		phb->dma_window_size = 1 << (22 - num_slots_ilog2);
+		phb->dma_window_size = 1 << (tcetable_ilog2 - num_slots_ilog2);
 
 		/* Reserve 16MB of DMA space on the first PHB.
 		 * We should probably be more careful and use firmware props.
@@ -167,7 +167,7 @@ static void iommu_table_setparms(struct pci_controller *phb,
 {
 	phandle node;
 	unsigned long i;
-	struct _of_tce_table *oft;
+	struct of_tce_table *oft;
 
 	node = ((struct device_node *)(phb->arch_data))->node;
 

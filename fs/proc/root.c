@@ -74,9 +74,6 @@ void __init proc_root_init(void)
 #ifdef CONFIG_PROC_DEVICETREE
 	proc_device_tree_init();
 #endif
-#ifdef CONFIG_PPC_RTAS
-	proc_rtas_init();
-#endif
 	proc_bus = proc_mkdir("bus", 0);
 }
 

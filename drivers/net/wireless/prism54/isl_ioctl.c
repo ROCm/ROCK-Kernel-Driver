@@ -25,6 +25,7 @@
 #include <linux/kernel.h>
 #include <linux/if_arp.h>
 #include <linux/pci.h>
+#include <linux/moduleparam.h>
 
 #include <asm/uaccess.h>
 
@@ -44,26 +45,26 @@ static int init_dot1x = CARD_DEFAULT_DOT1X;
 static int init_conformance = CARD_DEFAULT_CONFORMANCE;
 static int init_mlme = CARD_DEFAULT_MLME_MODE;
 
-MODULE_PARM(init_mode, "i");
+module_param(init_mode, int, 0);
 MODULE_PARM_DESC(init_mode,
 		 "Set card mode:\n0: Auto\n1: Ad-Hoc\n2: Managed Client (Default)\n3: Master / Access Point\n4: Repeater (Not supported yet)\n5: Secondary (Not supported yet)\n6: Monitor");
 
-MODULE_PARM(init_channel, "i");
+module_param(init_channel, int, 0);
 MODULE_PARM_DESC(init_channel,
 		 "Check `iwpriv ethx channel` for available channels");
 
-MODULE_PARM(init_wep, "i");
-MODULE_PARM(init_filter, "i");
+module_param(init_wep, int, 0);
+module_param(init_filter, int, 0);
 
-MODULE_PARM(init_authen, "i");
+module_param(init_authen, int, 0);
 MODULE_PARM_DESC(init_authen,
 		 "Authentication method. Can be of seven types:\n0 0x0000: None\n1 0x0001: DOT11_AUTH_OS (Default)\n2 0x0002: DOT11_AUTH_SK\n3 0x0003: DOT11_AUTH_BOTH");
 
-MODULE_PARM(init_dot1x, "i");
+module_param(init_dot1x, int, 0);
 MODULE_PARM_DESC(init_dot1x,
 		 "\n0: None/not set	(Default)\n1: DOT11_DOT1X_AUTHENABLED\n2: DOT11_DOT1X_KEYTXENABLED");
 
-MODULE_PARM(init_mlme, "i");
+module_param(init_mlme, int, 0);
 MODULE_PARM_DESC(init_mlme,
 		 "Sets the MAC layer management entity (MLME) mode of operation,\n0: DOT11_MLME_AUTO (Default)\n1: DOT11_MLME_INTERMEDIATE\n2: DOT11_MLME_EXTENDED");
 
@@ -250,7 +251,7 @@ prism54_update_stats(islpci_private *priv)
 struct iw_statistics *
 prism54_get_wireless_stats(struct net_device *ndev)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	/* If the stats are being updated return old data */
 	if (down_trylock(&priv->stats_sem) == 0) {
@@ -277,7 +278,7 @@ static int
 prism54_commit(struct net_device *ndev, struct iw_request_info *info,
 	       char *cwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	/* simply re-set the last set SSID, this should commit most stuff */
 
@@ -293,7 +294,7 @@ static int
 prism54_get_name(struct net_device *ndev, struct iw_request_info *info,
 		 char *cwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	char *capabilities;
 	union oid_res_t r;
 	int rvalue;
@@ -324,7 +325,7 @@ static int
 prism54_set_freq(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_freq *fwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	int rvalue;
 	u32 c = 0;
 
@@ -363,7 +364,7 @@ static int
 prism54_get_freq(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_freq *fwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -379,7 +380,7 @@ static int
 prism54_set_mode(struct net_device *ndev, struct iw_request_info *info,
 		 __u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	u32 mlmeautolevel = CARD_DEFAULT_MLME_MODE;
 
 	/* Let's see if the user passed a valid Linux Wireless mode */
@@ -420,7 +421,7 @@ static int
 prism54_get_mode(struct net_device *ndev, struct iw_request_info *info,
 		 __u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	BUG_ON((priv->iw_mode < IW_MODE_AUTO) || (priv->iw_mode >
 						  IW_MODE_MONITOR));
@@ -438,7 +439,7 @@ static int
 prism54_set_sens(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	u32 sens;
 
 	/* by default  the card sets this to 20. */
@@ -452,7 +453,7 @@ static int
 prism54_get_sens(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -470,7 +471,7 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 		  struct iw_point *dwrq, char *extra)
 {
 	struct iw_range *range = (struct iw_range *) extra;
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	char *data;
 	int i, m, rvalue;
 	struct obj_frequencies *freq;
@@ -576,7 +577,7 @@ static int
 prism54_set_wap(struct net_device *ndev, struct iw_request_info *info,
 		struct sockaddr *awrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	char bssid[6];
 	int rvalue;
 
@@ -598,7 +599,7 @@ static int
 prism54_get_wap(struct net_device *ndev, struct iw_request_info *info,
 		struct sockaddr *awrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -630,7 +631,7 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 {
 	struct iw_event iwe;	/* Temporary buffer */
 	short cap;
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	/* The first entry must be the MAC address */
 	memcpy(iwe.u.ap_addr.sa_data, bss->address, 6);
@@ -721,7 +722,7 @@ int
 prism54_get_scan(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	int i, rvalue;
 	struct obj_bsslist *bsslist;
 	u32 noise = 0;
@@ -762,7 +763,7 @@ static int
 prism54_set_essid(struct net_device *ndev, struct iw_request_info *info,
 		  struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct obj_ssid essid;
 
 	memset(essid.octets, 0, 33);
@@ -789,7 +790,7 @@ static int
 prism54_get_essid(struct net_device *ndev, struct iw_request_info *info,
 		  struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct obj_ssid *essid;
 	union oid_res_t r;
 	int rvalue;
@@ -819,7 +820,7 @@ static int
 prism54_set_nick(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	if (dwrq->length > IW_ESSID_MAX_SIZE)
 		return -E2BIG;
@@ -836,7 +837,7 @@ static int
 prism54_get_nick(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	dwrq->length = 0;
 
@@ -856,7 +857,7 @@ prism54_set_rate(struct net_device *ndev,
 		 struct iw_param *vwrq, char *extra)
 {
 
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	u32 rate, profile;
 	char *data;
 	int ret, i;
@@ -924,7 +925,7 @@ prism54_get_rate(struct net_device *ndev,
 		 struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	int rvalue;
 	char *data;
 	union oid_res_t r;
@@ -948,7 +949,7 @@ static int
 prism54_set_rts(struct net_device *ndev, struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	return mgt_set_request(priv, DOT11_OID_RTSTHRESH, 0, &vwrq->value);
 }
@@ -957,7 +958,7 @@ static int
 prism54_get_rts(struct net_device *ndev, struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -972,7 +973,7 @@ static int
 prism54_set_frag(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	return mgt_set_request(priv, DOT11_OID_FRAGTHRESH, 0, &vwrq->value);
 }
@@ -981,7 +982,7 @@ static int
 prism54_get_frag(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -1004,7 +1005,7 @@ static int
 prism54_set_retry(struct net_device *ndev, struct iw_request_info *info,
 		  struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	u32 slimit = 0, llimit = 0;	/* short and long limit */
 	u32 lifetime = 0;
 	int rvalue = 0;
@@ -1048,7 +1049,7 @@ static int
 prism54_get_retry(struct net_device *ndev, struct iw_request_info *info,
 		  struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue = 0;
 	vwrq->disabled = 0;	/* It cannot be disabled */
@@ -1080,7 +1081,7 @@ static int
 prism54_set_encode(struct net_device *ndev, struct iw_request_info *info,
 		   struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	int rvalue = 0, force = 0;
 	int authen = DOT11_AUTH_OS, invoke = 0, exunencrypt = 0;
 	union oid_res_t r;
@@ -1170,7 +1171,7 @@ static int
 prism54_get_encode(struct net_device *ndev, struct iw_request_info *info,
 		   struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct obj_key *key;
 	u32 devindex, index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 	u32 authen = 0, invoke = 0, exunencrypt = 0;
@@ -1218,7 +1219,7 @@ static int
 prism54_get_txpower(struct net_device *ndev, struct iw_request_info *info,
 		    struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	union oid_res_t r;
 	int rvalue;
 
@@ -1238,7 +1239,7 @@ static int
 prism54_set_txpower(struct net_device *ndev, struct iw_request_info *info,
 		    struct iw_param *vwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	s32 u = vwrq->value;
 
 	/* intersil firmware operates in 0.25 dBm (1/4) */
@@ -1264,7 +1265,7 @@ static int
 prism54_reset(struct net_device *ndev, struct iw_request_info *info,
 	      __u32 * uwrq, char *extra)
 {
-	islpci_reset(ndev->priv, 0);
+	islpci_reset(netdev_priv(ndev), 0);
 
 	return 0;
 }
@@ -1273,7 +1274,7 @@ static int
 prism54_set_beacon(struct net_device *ndev, struct iw_request_info *info,
 		   __u32 * uwrq, char *extra)
 {
-	int rvalue = mgt_set_request((islpci_private *) ndev->priv,
+	int rvalue = mgt_set_request((islpci_private *) netdev_priv(ndev),
 				     DOT11_OID_BEACONPERIOD, 0, uwrq);
 
 	return (rvalue ? rvalue : -EINPROGRESS);
@@ -1287,7 +1288,7 @@ prism54_get_beacon(struct net_device *ndev, struct iw_request_info *info,
 	int rvalue;
 
 	rvalue =
-	    mgt_get_request((islpci_private *) ndev->priv,
+	    mgt_get_request((islpci_private *) netdev_priv(ndev),
 			    DOT11_OID_BEACONPERIOD, 0, NULL, &r);
 	*uwrq = r.u;
 
@@ -1337,7 +1338,7 @@ static int
 prism54_add_mac(struct net_device *ndev, struct iw_request_info *info,
 		struct sockaddr *awrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_acl *acl = &priv->acl;
 	struct mac_entry *entry;
 	struct sockaddr *addr = (struct sockaddr *) extra;
@@ -1366,7 +1367,7 @@ static int
 prism54_del_mac(struct net_device *ndev, struct iw_request_info *info,
 		struct sockaddr *awrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_acl *acl = &priv->acl;
 	struct mac_entry *entry;
 	struct list_head *ptr;
@@ -1396,7 +1397,7 @@ static int
 prism54_get_mac(struct net_device *ndev, struct iw_request_info *info,
 		struct iw_point *dwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_acl *acl = &priv->acl;
 	struct mac_entry *entry;
 	struct list_head *ptr;
@@ -1427,7 +1428,7 @@ static int
 prism54_set_policy(struct net_device *ndev, struct iw_request_info *info,
 		   __u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_acl *acl = &priv->acl;
 	u32 mlmeautolevel;
 
@@ -1460,7 +1461,7 @@ static int
 prism54_get_policy(struct net_device *ndev, struct iw_request_info *info,
 		   __u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_acl *acl = &priv->acl;
 
 	*uwrq = acl->policy;
@@ -1511,7 +1512,7 @@ prism54_kick_all(struct net_device *ndev, struct iw_request_info *info,
 
 	/* Tell the card to kick every client */
 	mlme->id = cpu_to_le16(0);
-	rvalue = mgt_set_request(ndev->priv, DOT11_OID_DISASSOCIATE, 0, mlme);
+	rvalue = mgt_set_request(netdev_priv(ndev), DOT11_OID_DISASSOCIATE, 0, mlme);
 	kfree(mlme);
 
 	return rvalue;
@@ -1535,7 +1536,7 @@ prism54_kick_mac(struct net_device *ndev, struct iw_request_info *info,
 	/* Tell the card to only kick the corresponding bastard */
 	memcpy(mlme->address, addr->sa_data, ETH_ALEN);
 	mlme->id = cpu_to_le16(-1);
-	rvalue = mgt_set_request(ndev->priv, DOT11_OID_DISASSOCIATE, 0, mlme);
+	rvalue = mgt_set_request(netdev_priv(ndev), DOT11_OID_DISASSOCIATE, 0, mlme);
 
 	kfree(mlme);
 
@@ -1595,7 +1596,7 @@ send_simple_event(islpci_private *priv, const char *str)
 static void
 link_changed(struct net_device *ndev, u32 bitrate)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	if (le32_to_cpu(bitrate)) {
 		if (priv->iw_mode == IW_MODE_INFRA) {
@@ -1604,9 +1605,9 @@ link_changed(struct net_device *ndev, u32 bitrate)
 					NULL);
 			wireless_send_event(ndev, SIOCGIWAP, &uwrq, NULL);
 		} else
-			send_simple_event(ndev->priv, "Link established");
+			send_simple_event(netdev_priv(ndev), "Link established");
 	} else
-		send_simple_event(ndev->priv, "Link lost");
+		send_simple_event(netdev_priv(ndev), "Link lost");
 }
 
 /* Beacon/ProbeResp payload header */
@@ -1889,16 +1890,17 @@ void
 prism54_process_trap(void *data)
 {
 	struct islpci_mgmtframe *frame = data;
+	struct net_device *ndev = frame->ndev;
 	enum oid_num_t n = mgt_oidtonum(frame->header->oid);
 
-	prism54_process_trap_helper(frame->ndev->priv, n, frame->data);
+	prism54_process_trap_helper(netdev_priv(ndev), n, frame->data);
 	islpci_mgt_release(frame);
 }
 
 int
 prism54_set_mac_address(struct net_device *ndev, void *addr)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	int ret;
 
 	if (ndev->addr_len != 6)
@@ -1923,7 +1925,7 @@ int
 prism54_set_wpa(struct net_device *ndev, struct iw_request_info *info,
 		__u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 
 	down_write(&priv->mib_sem);
 
@@ -1943,16 +1945,70 @@ int
 prism54_get_wpa(struct net_device *ndev, struct iw_request_info *info,
 		__u32 * uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	*uwrq = priv->wpa;
 	return 0;
+}
+
+int
+prism54_set_maxframeburst(struct net_device *ndev, struct iw_request_info *info,
+		__u32 *uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	u32 max_burst;
+
+	max_burst = (*uwrq) ? *uwrq : CARD_DEFAULT_MAXFRAMEBURST;
+	mgt_set_request(priv, DOT11_OID_MAXFRAMEBURST, 0, &max_burst);
+
+	return -EINPROGRESS; /* Call commit handler */
+}
+
+int
+prism54_get_maxframeburst(struct net_device *ndev, struct iw_request_info *info,
+		__u32 *uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	union oid_res_t r;
+	int rvalue;
+	
+	rvalue = mgt_get_request(priv, DOT11_OID_MAXFRAMEBURST, 0, NULL, &r);
+	*uwrq = r.u;
+	
+	return rvalue;
+}
+
+int
+prism54_set_profile(struct net_device *ndev, struct iw_request_info *info,
+		__u32 *uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	u32 profile;
+
+	profile = (*uwrq) ? *uwrq : CARD_DEFAULT_PROFILE;
+	mgt_set_request(priv, DOT11_OID_PROFILES, 0, &profile);
+	
+	return -EINPROGRESS; /* Call commit handler */
+}
+
+int
+prism54_get_profile(struct net_device *ndev, struct iw_request_info *info,
+		__u32 *uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	union oid_res_t r;
+	int rvalue;
+
+	rvalue = mgt_get_request(priv, DOT11_OID_PROFILES, 0, NULL, &r);
+	*uwrq = r.u;
+
+	return rvalue;
 }
 
 int
 prism54_oid(struct net_device *ndev, struct iw_request_info *info,
 		__u32 *uwrq, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	
 	priv->priv_oid = *uwrq;
 	printk("%s: oid 0x%08X\n", ndev->name, *uwrq);
@@ -1964,7 +2020,7 @@ int
 prism54_get_oid(struct net_device *ndev, struct iw_request_info *info,
 		struct iw_point *data, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_mgmtframe *response = NULL;
 	int ret = -EIO, response_op = PIMFOR_OP_ERROR;
 	
@@ -1998,7 +2054,7 @@ int
 prism54_set_oid(struct net_device *ndev, struct iw_request_info *info,
 		struct iw_point *data, char *extra)
 {
-	islpci_private *priv = ndev->priv;
+	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_mgmtframe *response = NULL;
 	int ret = 0, response_op = PIMFOR_OP_ERROR;
 	

@@ -106,8 +106,6 @@ static const char	hcd_name [] = "ehci_hcd";
 #undef EHCI_VERBOSE_DEBUG
 #undef EHCI_URB_TRACE
 
-// #define have_split_iso
-
 #ifdef DEBUG
 #define EHCI_STATS
 #endif
@@ -676,6 +674,7 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 	/* the IO watchdog guards against hardware or driver bugs that
 	 * misplace IRQs, and should let us run completely without IRQs.
+	 * such lossage has been observed on both VT6202 and VT8235. 
 	 */
 	if ((ehci->async->qh_next.ptr != 0) || (ehci->periodic_sched != 0))
 		timer_action (ehci, TIMER_IO_WATCHDOG);
@@ -796,13 +795,8 @@ static int ehci_urb_enqueue (
 	case PIPE_ISOCHRONOUS:
 		if (urb->dev->speed == USB_SPEED_HIGH)
 			return itd_submit (ehci, urb, mem_flags);
-#ifdef have_split_iso
 		else
 			return sitd_submit (ehci, urb, mem_flags);
-#else
-		dbg ("no split iso support yet");
-		return -ENOSYS;
-#endif /* have_split_iso */
 	}
 }
 

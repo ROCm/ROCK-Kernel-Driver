@@ -140,6 +140,12 @@ dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
 	pci_dma_sync_sg_for_device(to_pci_dev(dev), sg, nelems, (int)direction);
 }
 
+static inline int
+dma_error(dma_addr_t dma_addr)
+{
+	return pci_dma_error(dma_addr);
+}
+
 /* Now for the API extensions over the pci_ one */
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)

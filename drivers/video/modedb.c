@@ -554,5 +554,5 @@ done:
     return 0;
 }
 
-EXPORT_SYMBOL(fb_find_mode);
 EXPORT_SYMBOL(vesa_modes);
+EXPORT_SYMBOL(fb_find_mode);

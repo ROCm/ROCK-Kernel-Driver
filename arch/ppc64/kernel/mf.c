@@ -37,7 +37,6 @@
 #include <asm/nvram.h>
 #include <asm/time.h>
 #include <asm/iSeries/ItSpCommArea.h>
-#include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
 #include <linux/bcd.h>
@@ -683,8 +682,6 @@ void mf_init(void)
 
 	/* initialization complete */
 	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
-
-	iSeries_proc_callback(&mf_proc_init);
 }
 
 void mf_setSide(char side)

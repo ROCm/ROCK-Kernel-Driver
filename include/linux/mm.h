@@ -183,7 +183,7 @@ struct mmu_gather;
 struct inode;
 
 #ifdef ARCH_HAS_ATOMIC_UNSIGNED
-typedef unsigned page_flags_t; 
+typedef unsigned page_flags_t;
 #else
 typedef unsigned long page_flags_t;
 #endif

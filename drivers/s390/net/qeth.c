@@ -6404,6 +6404,8 @@ qeth_register_netdev(struct qeth_card *card)
 
 	QETH_DBF_CARD3(0, trace, "rgnd", card);
 
+	/* sysfs magic */
+	SET_NETDEV_DEV(card->dev, &card->gdev->dev);
 	result = register_netdev(card->dev);
 
 	return result;
@@ -10687,9 +10689,6 @@ qeth_activate(struct qeth_card *card)
 	/* this was previously done in chandev_initnetdevice */
 	snprintf(card->dev->name, 8, "%s%%d",
 		 qeth_get_dev_basename(card->type, card->link_type));
-	/* sysfs magic */
-	SET_NETDEV_DEV(card->dev, &card->gdev->dev);
-
 	if (qeth_init_netdev(card))
 		goto out_remove;
 

@@ -811,7 +811,6 @@ static struct pci_device_id svwks_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, svwks_pci_tbl);
 
-
 static struct pci_driver driver = {
 	.name		= "Serverworks IDE",
 	.id_table	= svwks_pci_tbl,

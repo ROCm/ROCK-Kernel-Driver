@@ -1,7 +1,7 @@
-Summary of empty_zero_page layout (kernel point of view)
+Summary of boot_params layout (kernel point of view)
      ( collected by Hans Lermen and Martin Mares )
  
-The contents of empty_zero_page are used to pass parameters from the
+The contents of boot_params are used to pass parameters from the
 16-bit realmode code of the kernel to the 32-bit part. References/settings
 to it mainly are in:
 
@@ -76,9 +76,3 @@ Offset	Type		Description
 0x2d0 - 0x600		E820MAP
 0x600 - 0x7ff		EDDBUF (setup.S) for disk signature read sector
 0x600 - 0x7eb		EDDBUF (setup.S) for edd data
-
-0x800	string, 2K max	COMMAND_LINE, the kernel commandline as
-			copied using CL_OFFSET.
-			Note: this will be copied once more by setup.c
-			into a local buffer which is only 256 bytes long.
-			( #define COMMAND_LINE_SIZE 256 )

@@ -261,28 +261,26 @@ static struct file_operations raw_ctl_fops = {
 	.owner	=	THIS_MODULE,
 };
 
-static struct cdev raw_cdev;
+static struct cdev raw_cdev = {
+	.kobj	=	{.name = "raw", },
+	.owner	=	THIS_MODULE,
+};
 
 static int __init raw_init(void)
 {
-	int i, rc;
+	int i;
+	dev_t dev = MKDEV(RAW_MAJOR, 0);
 
-	rc = register_chrdev_region(MKDEV(RAW_MAJOR, 0), 
-				MAX_RAW_MINORS, "raw");
-	if (rc)
-		 return rc;
+	if (register_chrdev_region(dev, MAX_RAW_MINORS, "raw"))
+		goto error;
 
 	cdev_init(&raw_cdev, &raw_fops);
-	raw_cdev.owner = THIS_MODULE;
-	kobject_set_name(&raw_cdev.kobj, "raw");
-
-	rc = cdev_add(&raw_cdev, MKDEV(RAW_MAJOR, 0), MAX_RAW_MINORS);
-	if (rc) {
+	if (cdev_add(&raw_cdev, dev, MAX_RAW_MINORS)) {
 		kobject_put(&raw_cdev.kobj);
-		unregister_chrdev_region(MKDEV(RAW_MAJOR, 0), 
-					MAX_RAW_MINORS);
-		return rc;
+		unregister_chrdev_region(dev, MAX_RAW_MINORS);
+		goto error;
 	}
+
 	devfs_mk_cdev(MKDEV(RAW_MAJOR, 0),
 		      S_IFCHR | S_IRUGO | S_IWUGO,
 		      "raw/rawctl");
@@ -291,6 +289,10 @@ static int __init raw_init(void)
 			      S_IFCHR | S_IRUGO | S_IWUGO,
 			      "raw/raw%d", i);
 	return 0;
+
+error:
+	printk(KERN_ERR "error register raw device\n");
+	return 1;
 }
 
 static void __exit raw_exit(void)
@@ -302,8 +304,7 @@ static void __exit raw_exit(void)
 	devfs_remove("raw/rawctl");
 	devfs_remove("raw");
 	cdev_del(&raw_cdev);
-	unregister_chrdev_region(MKDEV(RAW_MAJOR, 0), 
-				MAX_RAW_MINORS);
+	unregister_chrdev_region(MKDEV(RAW_MAJOR, 0), MAX_RAW_MINORS);
 }
 
 module_init(raw_init);

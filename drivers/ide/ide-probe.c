@@ -138,9 +138,6 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	local_irq_enable();
 	ide_fix_driveid(id);
 
-	if (!drive->forced_lun)
-		drive->last_lun = id->last_lun & 0x7;
-
 #if defined (CONFIG_SCSI_EATA_DMA) || defined (CONFIG_SCSI_EATA_PIO) || defined (CONFIG_SCSI_EATA)
 	/*
 	 * EATA SCSI controllers do a hardware ATA emulation:
@@ -847,7 +844,6 @@ EXPORT_SYMBOL(probe_hwif);
 int hwif_init (ide_hwif_t *hwif);
 int probe_hwif_init (ide_hwif_t *hwif)
 {
-	hwif->initializing = 1;
 	probe_hwif(hwif);
 	hwif_init(hwif);
 
@@ -863,7 +859,6 @@ int probe_hwif_init (ide_hwif_t *hwif)
 			}
 		}
 	}
-	hwif->initializing = 0;
 	return 0;
 }
 

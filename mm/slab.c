@@ -586,7 +586,7 @@ static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
  * Add the CPU number into the expiry time to minimize the possibility of the
  * CPUs getting into lockstep and contending for the global cache chain lock.
  */
-static void start_cpu_timer(int cpu)
+static void __init start_cpu_timer(int cpu)
 {
 	struct timer_list *rt = &per_cpu(reap_timers, cpu);
 
@@ -599,12 +599,19 @@ static void start_cpu_timer(int cpu)
 	}
 }
 
-/*
- * Note: if someone calls kmem_cache_alloc() on the new
- * cpu before the cpuup callback had a chance to allocate
- * the head arrays, it will oops.
- * Is CPU_ONLINE early enough?
- */
+#ifdef CONFIG_HOTPLUG_CPU
+static void stop_cpu_timer(int cpu)
+{
+	struct timer_list *rt = &per_cpu(reap_timers, cpu);
+
+	if (rt->function) {
+		del_timer_sync(rt);
+		WARN_ON(timer_pending(rt));
+		rt->function = NULL;
+	}
+}
+#endif
+
 static int __devinit cpuup_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
@@ -640,18 +647,28 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 	case CPU_ONLINE:
 		start_cpu_timer(cpu);
 		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_DEAD:
+		stop_cpu_timer(cpu);
+		/* fall thru */
 	case CPU_UP_CANCELED:
 		down(&cache_chain_sem);
 
 		list_for_each_entry(cachep, &cache_chain, next) {
 			struct array_cache *nc;
 
+			spin_lock_irq(&cachep->spinlock);
+			/* cpu is dead; no one can alloc from it. */
 			nc = cachep->array[cpu];
 			cachep->array[cpu] = NULL;
+			cachep->free_limit -= cachep->batchcount;
+			free_block(cachep, ac_entry(nc), nc->avail);
+			spin_unlock_irq(&cachep->spinlock);
 			kfree(nc);
 		}
 		up(&cache_chain_sem);
 		break;
+#endif
 	}
 	return NOTIFY_OK;
 bad:
@@ -925,7 +942,7 @@ static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 		printk("\n");
 	}
 	realobj = (char*)objp+obj_dbghead(cachep);
-	size = cachep->objsize;
+	size = obj_reallen(cachep);
 	for (i=0; i<size && lines;i+=16, lines--) {
 		int limit;
 		limit = 16;
@@ -1505,6 +1522,9 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 		return 1;
 	}
 
+	/* no cpu_online check required here since we clear the percpu
+	 * array on cpu offline and set this to NULL.
+	 */
 	for (i = 0; i < NR_CPUS; i++)
 		kfree(cachep->array[i]);
 
@@ -2903,7 +2923,8 @@ void ptrinfo(unsigned long addr)
 #endif
 
 	page = virt_to_page((void*)addr);
-	printk("struct page at %p, flags %lxh.\n", page, page->flags);
+	printk("struct page at %p, flags %08lx\n",
+			page, (unsigned long)page->flags);
 	if (PageSlab(page)) {
 		kmem_cache_t *c;
 		struct slab *s;

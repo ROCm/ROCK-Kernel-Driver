@@ -343,8 +343,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
-	esid_data.data.v = 0; /* set class 0 */
-	asm volatile("slbie  %0" : : "r" (esid_data));
+	/* slbie not needed as the previous mapping is still valid. */
 
 	/* 
 	 * Write the new SLB entry.
@@ -354,7 +353,9 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	vsid_data.data.kp = 1;
 	if (large)
 		vsid_data.data.l = 1;
-	if (!kernel_segment)
+	if (kernel_segment)
+		vsid_data.data.c = 1;
+	else
 		vsid_data.data.ks = 1;
 
 	esid_data.word0 = 0;

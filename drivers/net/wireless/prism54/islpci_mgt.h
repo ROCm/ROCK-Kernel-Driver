@@ -87,11 +87,13 @@ static const int init_wds = 0;	/* help compiler optimize away dead code */
 #define CARD_DEFAULT_KEY4                       "default_key_4"
 #define CARD_DEFAULT_WEP                        0
 #define CARD_DEFAULT_FILTER                     0
-# define CARD_DEFAULT_WDS                        0
+#define CARD_DEFAULT_WDS                        0
 #define	CARD_DEFAULT_AUTHEN                     DOT11_AUTH_OS
 #define	CARD_DEFAULT_DOT1X			0
 #define CARD_DEFAULT_MLME_MODE			DOT11_MLME_AUTO
 #define CARD_DEFAULT_CONFORMANCE                OID_INL_CONFORMANCE_NONE
+#define CARD_DEFAULT_PROFILE			DOT11_PROFILE_MIXED_G_WIFI
+#define CARD_DEFAULT_MAXFRAMEBURST		DOT11_MAXFRAMEBURST_MIXED_SAFE
 
 /* PIMFOR package definitions */
 #define PIMFOR_ETHERTYPE                        0x8828

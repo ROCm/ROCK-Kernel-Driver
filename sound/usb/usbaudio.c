@@ -1074,7 +1074,6 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 {
 	struct usb_device *dev = subs->dev;
-	struct usb_host_config *config = dev->actconfig;
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
 	struct usb_interface *iface;
@@ -1082,7 +1081,8 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
 	int err;
 
-	iface = get_iface(config, fmt->iface);
+	iface = usb_ifnum_to_if(dev, fmt->iface);
+	snd_assert(iface, return -EINVAL);
 	alts = &iface->altsetting[fmt->altset_idx];
 	altsd = get_iface_desc(alts);
 	snd_assert(altsd->bAlternateSetting == fmt->altsetting, return -EINVAL);
@@ -1213,10 +1213,9 @@ static int snd_usb_hw_params(snd_pcm_substream_t *substream,
 		return ret;
 
 	if (subs->cur_rate != rate) {
-		struct usb_host_config *config = subs->dev->actconfig;
 		struct usb_host_interface *alts;
 		struct usb_interface *iface;
-		iface = get_iface(config, fmt->iface);
+		iface = usb_ifnum_to_if(subs->dev, fmt->iface);
 		alts = &iface->altsetting[fmt->altset_idx];
 		ret = init_usb_sample_rate(subs->dev, subs->interface, alts, fmt, rate);
 		if (ret < 0)
@@ -2269,7 +2268,6 @@ static int parse_audio_format(struct usb_device *dev, struct audioformat *fp,
 static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 {
 	struct usb_device *dev;
-	struct usb_host_config *config;
 	struct usb_interface *iface;
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
@@ -2279,10 +2277,9 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 	unsigned char *fmt, *csep;
 
 	dev = chip->dev;
-	config = dev->actconfig;
 
 	/* parse the interface's altsettings */
-	iface = get_iface(config, iface_no);
+	iface = usb_ifnum_to_if(dev, iface_no);
 	for (i = 0; i < iface->num_altsetting; i++) {
 		alts = &iface->altsetting[i];
 		altsd = get_iface_desc(alts);
@@ -2448,15 +2445,13 @@ static void snd_usb_stream_disconnect(struct list_head *head, struct usb_driver 
 static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif)
 {
 	struct usb_device *dev = chip->dev;
-	struct usb_host_config *config;
 	struct usb_host_interface *host_iface;
 	struct usb_interface *iface;
 	unsigned char *p1;
 	int i, j;
 
 	/* find audiocontrol interface */
-	config = dev->actconfig;
-	host_iface = &get_iface(config, ctrlif)->altsetting[0];
+	host_iface = &usb_ifnum_to_if(dev, ctrlif)->altsetting[0];
 	if (!(p1 = snd_usb_find_csint_desc(host_iface->extra, host_iface->extralen, NULL, HEADER))) {
 		snd_printk(KERN_ERR "cannot find HEADER\n");
 		return -EINVAL;
@@ -2473,12 +2468,12 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif)
 		struct usb_host_interface *alts;
 		struct usb_interface_descriptor *altsd;
 		j = p1[8 + i];
-		if (j >= get_cfg_desc(config)->bNumInterfaces) {
+		iface = usb_ifnum_to_if(dev, j);
+		if (!iface) {
 			snd_printk(KERN_ERR "%d:%u:%d : does not exist\n",
 				   dev->devnum, ctrlif, j);
 			continue;
 		}
-		iface = get_iface(config, j);
 		if (usb_interface_claimed(iface)) {
 			snd_printdd(KERN_INFO "%d:%d:%d: skipping, already claimed\n", dev->devnum, ctrlif, j);
 			continue;
@@ -2534,6 +2529,11 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 	if (err < 0) {
 		kfree(fp);
 		return err;
+	}
+	if (fp->iface != get_iface_desc(&iface->altsetting[0])->bInterfaceNumber ||
+	    fp->altset_idx >= iface->num_altsetting) {
+		kfree(fp);
+		return -EINVAL;
 	}
 	alts = &iface->altsetting[fp->altset_idx];
 	usb_set_interface(chip->dev, fp->iface, 0);

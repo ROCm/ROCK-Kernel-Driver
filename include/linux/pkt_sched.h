@@ -432,4 +432,10 @@ enum {
 
 #define TCA_ATM_MAX	TCA_ATM_STATE
 
+/* Delay section */
+struct tc_dly_qopt
+{
+	__u32	latency;
+	__u32   limit;
+};	
 #endif

@@ -209,7 +209,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
 	struct input_absinfo abs;
-	int t, u, v;
+	int i, t, u, v;
 
 	if (!evdev->exist) return -ENODEV;
 
@@ -234,6 +234,9 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			u = SET_INPUT_KEYCODE(dev, t, v);
 			clear_bit(u, dev->keybit);
 			set_bit(v, dev->keybit);
+			for (i = 0; i < dev->keycodemax; i++)
+				if (INPUT_KEYCODE(dev,i) == u)
+					set_bit(u, dev->keybit);
 			return 0;
 
 		case EVIOCSFF:

@@ -518,11 +518,6 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr && !hwif_request_region(hwif, addr, 1))
 		goto control_region_busy;
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	addr = hwif->io_ports[IDE_IRQ_OFFSET];
-	if (addr && !hwif_request_region(hwif, addr, 1))
-		goto irq_region_busy;
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
 	hwif->straight8 = 0;
 	addr = hwif->io_ports[IDE_DATA_OFFSET];
 	if ((addr | 7) == hwif->io_ports[IDE_STATUS_OFFSET]) {
@@ -542,12 +537,6 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 	return 0;
 
 data_region_busy:
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	addr = hwif->io_ports[IDE_IRQ_OFFSET];
-	if (addr)
-		hwif_release_region(addr, 1);
-irq_region_busy:
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr)
 		hwif_release_region(addr, 1);
@@ -577,20 +566,13 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 		return;
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
 		hwif_release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (hwif->io_ports[IDE_IRQ_OFFSET])
-		hwif_release_region(hwif->io_ports[IDE_IRQ_OFFSET], 1);
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
-
 	if (hwif->straight8) {
 		hwif_release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
 		return;
 	}
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		if (hwif->io_ports[i]) {
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
+		if (hwif->io_ports[i])
 			hwif_release_region(hwif->io_ports[i], 1);
-		}
-	}
 }
 
 EXPORT_SYMBOL(ide_hwif_release_regions);
@@ -869,7 +851,6 @@ void ide_unregister (unsigned int index)
 #ifndef CONFIG_BLK_DEV_IDECS
 	hwif->irq			= old_hwif.irq;
 #endif /* CONFIG_BLK_DEV_IDECS */
-	hwif->initializing		= old_hwif.initializing;
 
 	hwif->dma_base			= old_hwif.dma_base;
 	hwif->dma_master		= old_hwif.dma_master;
@@ -1798,9 +1779,7 @@ int __init ide_setup (char *s)
 	if (strncmp(s,"hd",2) == 0 && s[2] == '=')	/* hd= is for hd.c   */
 		return 0;				/* driver and not us */
 
-	if (strncmp(s,"ide",3) &&
-	    strncmp(s,"idebus",6) &&
-	    strncmp(s,"hd",2))		/* hdx= & hdxlun= */
+	if (strncmp(s,"ide",3) && strncmp(s,"idebus",6) && strncmp(s,"hd",2))
 		return 0;
 
 	printk(KERN_INFO "ide_setup: %s", s);
@@ -1845,19 +1824,6 @@ int __init ide_setup (char *s)
 		drive = &hwif->drives[unit];
 		if (strncmp(s + 4, "ide-", 4) == 0) {
 			strlcpy(drive->driver_req, s + 4, sizeof(drive->driver_req));
-			goto done;
-		}
-		/*
-		 * Look for last lun option:  "hdxlun="
-		 */
-		if (s[3] == 'l' && s[4] == 'u' && s[5] == 'n') {
-			if (match_parm(&s[6], NULL, vals, 1) != 1)
-				goto bad_option;
-			if (vals[0] >= 0 && vals[0] <= 7) {
-				drive->last_lun = vals[0];
-				drive->forced_lun = 1;
-			} else
-				printk(" -- BAD LAST LUN! Expected value from 0 to 7");
 			goto done;
 		}
 		switch (match_parm(&s[3], hd_words, vals, 3)) {

@@ -6,7 +6,6 @@
  *  operations with filenames
  */
 
-#include <linux/string.h>
 #include "hpfs_fn.h"
 
 char *text_postfix[]={

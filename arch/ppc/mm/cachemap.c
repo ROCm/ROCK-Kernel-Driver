@@ -145,7 +145,7 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 	switch (direction) {
 	case DMA_NONE:
 		BUG();
-	case DMA_FROMDEVICE:	/* invalidate only */
+	case DMA_FROM_DEVICE:	/* invalidate only */
 		invalidate_dcache_range(start, end);
 		break;
 	case DMA_TODEVICE:		/* writeback only */

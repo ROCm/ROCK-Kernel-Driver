@@ -230,8 +230,6 @@ static int __devinit triflex_init_one(struct pci_dev *dev,
 	return 0;
 }
 
-MODULE_DEVICE_TABLE(pci,triflex_pci_tbl);
-
 static struct pci_driver driver = {
 	.name		= "TRIFLEX IDE",
 	.id_table	= triflex_pci_tbl,

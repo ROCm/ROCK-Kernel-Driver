@@ -28,7 +28,7 @@ in the package: See the file COPYING.
 
 1. Usage
 ~~~~~~~~
-  The drivers/usb/acm.c drivers works with USB modems and USB ISDN terminal
+  The drivers/usb/class/cdc-acm.c drivers works with USB modems and USB ISDN terminal
 adapters that conform to the Universal Serial Bus Communication Device Class
 Abstract Control Model (USB CDC ACM) specification.
 
@@ -65,9 +65,9 @@ minor/major numbers anywhere you want, but either the above location or
 
   To use the modems you need these modules loaded:
 
-	usbcore.o
-	usb-[uo]hci.o or uhci.o
-	acm.o
+	usbcore.ko
+	uhci-hcd.ko ohci-hcd.ko or ehci-hcd.ko
+	cdc-acm.ko
 
   After that, the modem[s] should be accessible. You should be able to use
 minicom, ppp and mgetty with them.

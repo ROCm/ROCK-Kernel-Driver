@@ -42,7 +42,10 @@ static void blk_unplug_timeout(unsigned long data);
  */
 static kmem_cache_t *request_cachep;
 
-static wait_queue_head_t congestion_wqh[2];
+static wait_queue_head_t congestion_wqh[2] = {
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
+	};
 
 /*
  * Controlling structure to kblockd
@@ -2053,6 +2056,15 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 	if (!q->merge_requests_fn(q, req, next))
 		return 0;
 
+	/*
+	 * At this point we have either done a back merge
+	 * or front merge. We need the smaller start_time of
+	 * the merged requests to be the current request
+	 * for accounting purposes.
+	 */
+	if (time_after(req->start_time, next->start_time))
+		req->start_time = next->start_time;
+
 	req->biotail->bi_next = next->bio;
 	req->biotail = next->biotail;
 
@@ -2815,8 +2827,6 @@ void kblockd_flush(void)
 
 int __init blk_dev_init(void)
 {
-	int i;
-
 	kblockd_workqueue = create_workqueue("kblockd");
 	if (!kblockd_workqueue)
 		panic("Failed to create kblockd\n");
@@ -2828,9 +2838,6 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
-
-	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
-		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 }
 

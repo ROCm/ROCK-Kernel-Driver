@@ -18,15 +18,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-
-/*
- * Change Activity:
- * 2001       : mikec    : Created
- * 2001/06/05 : engebret : Software event count support.
- * 2003/02/13 : bergner  : Move PMC code to pmc.c
- * End Change Activity 
- */
-
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/mm.h>
@@ -34,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 
-#include <asm/proc_fs.h>
 #include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/systemcfg.h>
@@ -42,9 +32,6 @@
 #include <asm/uaccess.h>
 #include <asm/prom.h>
 
-struct proc_ppc64_t proc_ppc64;
-
-void proc_ppc64_create_paca(int num);
 void proc_ppc64_create_smt(void);
 
 static loff_t  page_map_seek( struct file *file, loff_t off, int whence);
@@ -60,7 +47,7 @@ static struct file_operations page_map_fops = {
 #ifdef CONFIG_PPC_PSERIES
 /* routines for /proc/ppc64/ofdt */
 static ssize_t ofdt_write(struct file *, const char __user *, size_t, loff_t *);
-static void proc_ppc64_create_ofdt(struct proc_dir_entry *);
+static void proc_ppc64_create_ofdt(void);
 static int do_remove_node(char *);
 static int do_add_node(char *, size_t);
 static void release_prop_list(const struct property *);
@@ -71,79 +58,19 @@ static struct file_operations ofdt_fops = {
 };
 #endif
 
-int __init proc_ppc64_init(void)
-{
-
-
-	if (proc_ppc64.root == NULL) {
-		printk(KERN_INFO "proc_ppc64: Creating /proc/ppc64/\n");
-		proc_ppc64.root = proc_mkdir("ppc64", 0);
-		if (!proc_ppc64.root)
-			return 0;
-	} else {
-		return 0;
-	}
-
-	proc_ppc64.naca = create_proc_entry("naca", S_IRUSR, proc_ppc64.root);
-	if ( proc_ppc64.naca ) {
-		proc_ppc64.naca->nlink = 1;
-		proc_ppc64.naca->data = naca;
-		proc_ppc64.naca->size = 4096;
-		proc_ppc64.naca->proc_fops = &page_map_fops;
-	}
-	
-	proc_ppc64.systemcfg = create_proc_entry("systemcfg", S_IFREG|S_IRUGO, proc_ppc64.root);
-	if ( proc_ppc64.systemcfg ) {
-		proc_ppc64.systemcfg->nlink = 1;
-		proc_ppc64.systemcfg->data = systemcfg;
-		proc_ppc64.systemcfg->size = 4096;
-		proc_ppc64.systemcfg->proc_fops = &page_map_fops;
-	}
-
-	/* /proc/ppc64/paca/XX -- raw paca contents.  Only readable to root */
-	proc_ppc64.paca = proc_mkdir("paca", proc_ppc64.root);
-	if (proc_ppc64.paca) {
-		unsigned long i;
-
-		for (i = 0; i < NR_CPUS; i++) {
-			if (!cpu_online(i))
-				continue;
-			proc_ppc64_create_paca(i);
-		}
-	}
-
-#ifdef CONFIG_PPC_PSERIES
-	/* Placeholder for rtas interfaces. */
-	if (proc_ppc64.rtas == NULL)
-		proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
-
-	if (proc_ppc64.rtas)
-		proc_symlink("rtas", 0, "ppc64/rtas");
-
-	proc_ppc64_create_smt();
-
-	proc_ppc64_create_ofdt(proc_ppc64.root);
-#endif
-
-	return 0;
-}
-
-
 /*
- * NOTE: since paca data is always in flux the values will never be a consistant set.
- * In theory it could be made consistent if we made the corresponding cpu
- * copy the page for us (via an IPI).  Probably not worth it.
- *
+ * NOTE: since paca data is always in flux the values will never be a
+ * consistant set.
  */
-void proc_ppc64_create_paca(int num)
+static void __init proc_create_paca(struct proc_dir_entry *dir, int num)
 {
 	struct proc_dir_entry *ent;
 	struct paca_struct *lpaca = paca + num;
 	char buf[16];
 
 	sprintf(buf, "%02x", num);
-	ent = create_proc_entry(buf, S_IRUSR, proc_ppc64.paca);
-	if ( ent ) {
+	ent = create_proc_entry(buf, S_IRUSR, dir);
+	if (ent) {
 		ent->nlink = 1;
 		ent->data = lpaca;
 		ent->size = 4096;
@@ -151,6 +78,69 @@ void proc_ppc64_create_paca(int num)
 	}
 }
 
+/*
+ * Create the ppc64 and ppc64/rtas directories early. This allows us to
+ * assume that they have been previously created in drivers.
+ */
+static int __init proc_ppc64_create(void)
+{
+	struct proc_dir_entry *root;
+
+	root = proc_mkdir("ppc64", 0);
+	if (!root)
+		return 1;
+
+	if (!(systemcfg->platform & PLATFORM_PSERIES))
+		return 0;
+
+	if (!proc_mkdir("rtas", root))
+		return 1;
+
+	if (!proc_symlink("rtas", 0, "ppc64/rtas"))
+		return 1;
+
+	return 0;
+}
+core_initcall(proc_ppc64_create);
+
+static int __init proc_ppc64_init(void)
+{
+	unsigned long i;
+	struct proc_dir_entry *pde;
+
+	pde = create_proc_entry("ppc64/naca", S_IRUSR, NULL);
+	if (!pde)
+		return 1;
+	pde->nlink = 1;
+	pde->data = naca;
+	pde->size = 4096;
+	pde->proc_fops = &page_map_fops;
+
+	pde = create_proc_entry("ppc64/systemcfg", S_IFREG|S_IRUGO, NULL);
+	if (!pde)
+		return 1;
+	pde->nlink = 1;
+	pde->data = systemcfg;
+	pde->size = 4096;
+	pde->proc_fops = &page_map_fops;
+
+	/* /proc/ppc64/paca/XX -- raw paca contents.  Only readable to root */
+	pde = proc_mkdir("ppc64/paca", NULL);
+	if (!pde)
+		return 1;
+	for_each_cpu(i)
+		proc_create_paca(pde, i);
+
+#ifdef CONFIG_PPC_PSERIES
+	proc_ppc64_create_smt();
+
+	if ((systemcfg->platform & PLATFORM_PSERIES))
+		proc_ppc64_create_ofdt();
+#endif
+
+	return 0;
+}
+__initcall(proc_ppc64_init);
 
 static loff_t page_map_seek( struct file *file, loff_t off, int whence)
 {
@@ -207,11 +197,11 @@ static int page_map_mmap( struct file *file, struct vm_area_struct *vma )
 
 #ifdef CONFIG_PPC_PSERIES
 /* create /proc/ppc64/ofdt write-only by root */
-static void proc_ppc64_create_ofdt(struct proc_dir_entry *parent)
+static void proc_ppc64_create_ofdt(void)
 {
 	struct proc_dir_entry *ent;
 
-	ent = create_proc_entry("ofdt", S_IWUSR, parent);
+	ent = create_proc_entry("ppc64/ofdt", S_IWUSR, NULL);
 	if (ent) {
 		ent->nlink = 1;
 		ent->data = NULL;
@@ -489,11 +479,10 @@ static int proc_ppc64_smt_state_read(char *page, char **start, off_t off,
 void proc_ppc64_create_smt(void)
 {
 	struct proc_dir_entry *ent_snooze = 
-		create_proc_entry("smt-snooze-delay", S_IRUGO | S_IWUSR, 
-				  proc_ppc64.root);
+		create_proc_entry("ppc64/smt-snooze-delay", S_IRUGO | S_IWUSR,
+				  NULL);
 	struct proc_dir_entry *ent_enabled = 
-		create_proc_entry("smt-enabled", S_IRUGO | S_IWUSR, 
-				  proc_ppc64.root);
+		create_proc_entry("ppc64/smt-enabled", S_IRUGO | S_IWUSR, NULL);
 	if (ent_snooze) {
 		ent_snooze->nlink = 1;
 		ent_snooze->data = NULL;
@@ -508,5 +497,3 @@ void proc_ppc64_create_smt(void)
 		ent_enabled->write_proc = NULL;
 	}
 }
-
-fs_initcall(proc_ppc64_init);

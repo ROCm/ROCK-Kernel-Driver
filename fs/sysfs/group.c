@@ -55,8 +55,8 @@ int sysfs_create_group(struct kobject * kobj,
 	if ((error = create_files(dir,grp))) {
 		if (grp->name)
 			sysfs_remove_subdir(dir);
-		dput(dir);
 	}
+	dput(dir);
 	return error;
 }
 

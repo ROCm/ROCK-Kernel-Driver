@@ -965,8 +965,6 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
                 do_rcvd = presto_do_rcvd(info, dir);
                 error = iops->unlink(dir->d_inode, dentry);
                 unlock_kernel();
-                if (!error)
-                        d_delete(dentry);
         }
 
         if (linkno > 1) { 
@@ -988,10 +986,6 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
         }
 
         //        up(&dir->d_inode->i_zombie);
-        if (error) {
-                EXIT;
-                goto exit;
-        }
 
         presto_debug_fail_blkdev(fset, KML_OPCODE_UNLINK | 0x10);
         if ( do_kml )
@@ -1048,6 +1042,8 @@ int lento_unlink(const char *pathname, struct lento_vfs_context *info)
                 if (nd.last.name[nd.last.len])
                         goto slashes;
                 error = presto_do_unlink(fset, nd.dentry, dentry, info);
+                if (!error)
+                        d_delete(dentry);
         exit2:
                 EXIT;
                 dput(dentry);

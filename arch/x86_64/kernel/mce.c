@@ -180,7 +180,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		   confused it's normally not necessary to panic, unless you are 
 		   paranoid (tolerant == 0) */ 
 		if (!user_space && (panic_on_oops || tolerant < 2))
-			mce_panic("Uncorrected machine check in kernel", &m, mcestart);
+			mce_panic("Uncorrected machine check", &m, mcestart);
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
 		   of deadlocking. If you don't want that don't set tolerant >= 2 */

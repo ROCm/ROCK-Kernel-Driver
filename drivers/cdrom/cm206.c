@@ -1389,7 +1389,7 @@ static struct gendisk *cm206_gendisk;
 
    Linus says it is too dangerous to use writes for probing, so we
    stick with pure reads for a while. Hope that 8 possible ranges,
-   check_region, 15 bits of one port and 6 of another make things
+   request_region, 15 bits of one port and 6 of another make things
    likely enough to accept the region on the first hit...
  */
 int __init probe_base_port(int base)
@@ -1400,13 +1400,15 @@ int __init probe_base_port(int base)
 	if (base)
 		b = e = base;
 	for (base = b; base <= e; base += 0x10) {
-		if (check_region(base, 0x10))
+		if (!request_region(base, 0x10,"cm206"))
 			continue;
 		for (i = 0; i < 3; i++)
 			fool = inw(base + 2);	/* empty possibly uart_receive_buffer */
 		if ((inw(base + 6) & 0xffef) != 0x0001 ||	/* line_status */
-		    (inw(base) & 0xad00) != 0)	/* data status */
+		    (inw(base) & 0xad00) != 0)	{ /* data status */
+		    	release_region(base,0x10);
 			continue;
+		}
 		return (base);
 	}
 	return 0;
@@ -1444,7 +1446,6 @@ int __init cm206_init(void)
 		return -EIO;
 	}
 	printk(" adapter at 0x%x", cm206_base);
-	request_region(cm206_base, 16, "cm206");
 	cd = (struct cm206_struct *) kmalloc(size, GFP_KERNEL);
 	if (!cd)
                goto out_base;

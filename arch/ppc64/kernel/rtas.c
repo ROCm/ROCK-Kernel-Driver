@@ -19,7 +19,6 @@
 #include <linux/init.h>
 
 #include <asm/prom.h>
-#include <asm/proc_fs.h>
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
 #include <asm/machdep.h>
@@ -261,6 +260,33 @@ rtas_get_power_level(int powerdomain, int *level)
 }
 
 int
+rtas_set_power_level(int powerdomain, int level, int *setlevel)
+{
+	int token = rtas_token("set-power-level");
+	unsigned int wait_time;
+	long returned_level;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while (1) {
+		rc = (int) rtas_call(token, 2, 2, &returned_level, powerdomain,
+					level);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else if (rtas_is_extended_busy(rc)) {
+			wait_time = rtas_extended_busy_delay_time(rc);
+			udelay(wait_time * 1000);
+		}
+		else
+			break;
+	}
+	*setlevel = (int) returned_level;
+	return rc;
+}
+
+int
 rtas_get_sensor(int sensor, int index, int *state)
 {
 	int token = rtas_token("get-sensor-state");
@@ -485,6 +511,25 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* This version can't take the spinlock. */
+
+void rtas_stop_self(void)
+{
+	struct rtas_args *rtas_args = &(get_paca()->xRtas);
+
+	rtas_args->token = rtas_token("stop-self");
+	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
+	rtas_args->nargs = 0;
+	rtas_args->nret  = 1;
+	rtas_args->rets  = &(rtas_args->args[0]);
+
+	printk("%u %u Ready to die...\n",
+	       smp_processor_id(), hard_smp_processor_id());
+	enter_rtas((void *)__pa(rtas_args));
+	panic("Alas, I survived.\n");
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 EXPORT_SYMBOL(rtas_firmware_flash_list);
 EXPORT_SYMBOL(rtas_token);
@@ -494,4 +539,5 @@ EXPORT_SYMBOL(rtas_data_buf_lock);
 EXPORT_SYMBOL(rtas_extended_busy_delay_time);
 EXPORT_SYMBOL(rtas_get_sensor);
 EXPORT_SYMBOL(rtas_get_power_level);
+EXPORT_SYMBOL(rtas_set_power_level);
 EXPORT_SYMBOL(rtas_set_indicator);

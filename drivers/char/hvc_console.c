@@ -111,7 +111,7 @@ static void hvc_push(struct hvc_struct *hp)
 {
 	int n;
 
-	n = hvc_put_chars(hp->index, hp->outbuf, hp->n_outbuf);
+	n = hvc_arch_put_chars(hp->index, hp->outbuf, hp->n_outbuf);
 	if (n <= 0) {
 		if (n == 0)
 			return;
@@ -130,31 +130,65 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 		     const unsigned char *buf, int count)
 {
 	struct hvc_struct *hp = tty->driver_data;
-	char *p;
-	int todo, written = 0;
+	char *tbuf, *p;
+	int tbsize, rsize, written = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&hp->lock, flags);
-	while (count > 0 && (todo = N_OUTBUF - hp->n_outbuf) > 0) {
-		if (todo > count)
-			todo = count;
-		p = hp->outbuf + hp->n_outbuf;
-		if (from_user) {
-			todo -= copy_from_user(p, buf, todo);
-			if (todo == 0) {
+	if (from_user) {
+		tbsize = min(count, (int)PAGE_SIZE);
+		if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
+			return -ENOMEM;
+
+		while ((rsize = count - written) > 0) {
+			int wsize;
+			if (rsize > tbsize)
+				rsize = tbsize;
+
+			p = tbuf;
+			rsize -= copy_from_user(p, buf, rsize);
+			if (!rsize) {
 				if (written == 0)
 					written = -EFAULT;
 				break;
 			}
-		} else
-			memcpy(p, buf, todo);
-		count -= todo;
-		buf += todo;
-		hp->n_outbuf += todo;
-		written += todo;
-		hvc_push(hp);
+			buf += rsize;
+			written += rsize;
+
+			spin_lock_irqsave(&hp->lock, flags);
+			for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
+					wsize = N_OUTBUF - hp->n_outbuf) {
+				if (wsize > rsize)
+					wsize = rsize;
+				memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
+				hp->n_outbuf += wsize;
+				hvc_push(hp);
+				rsize -= wsize;
+				p += wsize;
+			}
+			spin_unlock_irqrestore(&hp->lock, flags);
+
+			if (rsize)
+				break;
+
+			if (count < tbsize)
+				tbsize = count;
+		}
+
+		kfree(tbuf);
+	} else {
+		spin_lock_irqsave(&hp->lock, flags);
+		while (count > 0 && (rsize = N_OUTBUF - hp->n_outbuf) > 0) {
+			if (rsize > count)
+				rsize = count;
+			memcpy(hp->outbuf + hp->n_outbuf, buf, rsize);
+			count -= rsize;
+			buf += rsize;
+			hp->n_outbuf += rsize;
+			written += rsize;
+			hvc_push(hp);
+		}
+		spin_unlock_irqrestore(&hp->lock, flags);
 	}
-	spin_unlock_irqrestore(&hp->lock, flags);
 
 	return written;
 }
@@ -191,9 +225,14 @@ static void hvc_poll(int index)
 		for (;;) {
 			if (TTY_FLIPBUF_SIZE - tty->flip.count < sizeof(buf))
 				break;
-			n = hvc_get_chars(index, buf, sizeof(buf));
-			if (n <= 0)
+			n = hvc_arch_get_chars(index, buf, sizeof(buf));
+			if (n <= 0) {
+				if (n == -EPIPE) {
+					printk("tty_hangup\n");
+					tty_hangup(tty);
+				}
 				break;
+			}
 			for (i = 0; i < n; ++i) {
 #ifdef CONFIG_MAGIC_SYSRQ		/* Handle the SysRq Hack */
 				if (buf[i] == '\x0f') {	/* ^O -- should support a sequence */
@@ -246,6 +285,30 @@ int khvcd(void *unused)
 	}
 }
 
+static int hvc_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	struct hvc_struct *hp = tty->driver_data;
+	int ret = -EIO;
+
+	if (!file || !tty_hung_up_p(file)) {
+		ret = hvc_arch_tiocmget(hp->index);
+	}
+	return ret;
+}
+
+static int hvc_tiocmset(struct tty_struct *tty, struct file *file,
+	unsigned int set, unsigned int clear)
+{
+	struct hvc_struct *hp = tty->driver_data;
+	int ret = -EIO;
+
+	if (!file || !tty_hung_up_p(file)) {
+		ret = hvc_arch_tiocmset(hp->index, set, clear);
+	}
+
+	return ret;
+}
+
 static struct tty_operations hvc_ops = {
 	.open = hvc_open,
 	.close = hvc_close,
@@ -253,6 +316,8 @@ static struct tty_operations hvc_ops = {
 	.hangup = hvc_hangup,
 	.write_room = hvc_write_room,
 	.chars_in_buffer = hvc_chars_in_buffer,
+	.tiocmget = hvc_tiocmget,
+	.tiocmset = hvc_tiocmset,
 };
 
 int __init hvc_init(void)
@@ -304,7 +369,7 @@ void hvc_console_print(struct console *co, const char *b, unsigned count)
 				--count;
 			}
 		} else {
-			r = hvc_put_chars(co->index, c, i);
+			r = hvc_arch_put_chars(co->index, c, i);
 			if (r < 0) {
 				/* throw away chars on error */
 				i = 0;
@@ -340,7 +405,7 @@ struct console hvc_con_driver = {
 	.index		= -1,
 };
 
-/* hvc_instantiate - called once per discovered vterm by hvc_find_vterms */
+/* hvc_instantiate - called once per discovered vterm by hvc_arch_find_vterms */
 int hvc_instantiate(void)
 {
 	struct hvc_struct *hvc;
@@ -359,7 +424,7 @@ int hvc_instantiate(void)
 
 static int __init hvc_console_init(void)
 {
-	hvc_find_vterms(); /* populate hvc_struct[] early */
+	hvc_arch_find_vterms(); /* populate hvc_struct[] early */
 	register_console(&hvc_con_driver);
 	return 0;
 }

@@ -26,9 +26,11 @@
 
 #define MAX_NR_HVC_CONSOLES	4
 
-extern int hvc_get_chars(int index, char *buf, int count);
-extern int hvc_put_chars(int index, const char *buf, int count);
-extern int hvc_find_vterms(void);
+extern int hvc_arch_get_chars(int index, char *buf, int count);
+extern int hvc_arch_put_chars(int index, const char *buf, int count);
+extern int hvc_arch_tiocmset(int index, unsigned int set, unsigned int clear);
+extern int hvc_arch_tiocmget(int index);
+extern int hvc_arch_find_vterms(void);
 
 extern int hvc_instantiate(void);
 

@@ -313,7 +313,7 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 
 MODULE_PARM(eisa, "1-8i");
 
-/* This is a bit of a hack, 
+/* This is a bit of a hack,
  * necessary to support both eisa and pci
  */
 int __init cpqarray_init(void)
@@ -410,9 +410,9 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 	 * Find disks and fill in structs
 	 * Get an interrupt, set the Q depth and get into /proc
 	 */
-  	
+
 	/* If this successful it should insure that we are the only */
-	/* instance of the driver */	
+	/* instance of the driver */
 	if (register_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname)) {
 		goto Enomem4;
 	}
@@ -420,7 +420,7 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 	if (request_irq(hba[i]->intr, do_ida_intr,
 		SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i]))
 	{
-		printk(KERN_ERR "cpqarray: Unable to get irq %d for %s\n", 
+		printk(KERN_ERR "cpqarray: Unable to get irq %d for %s\n",
 				hba[i]->intr, hba[i]->devname);
 		goto Enomem3;
 	}
@@ -437,13 +437,13 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 	hba[i]->cmd_pool_bits = kmalloc(
 		((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long),
 		GFP_KERNEL);
-		
+
 	if (!hba[i]->cmd_pool_bits || !hba[i]->cmd_pool)
 			goto Enomem1;
 
 	memset(hba[i]->cmd_pool, 0, NR_CMDS * sizeof(cmdlist_t));
 	memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long));
-	printk(KERN_INFO "cpqarray: Finding drives on %s", 
+	printk(KERN_INFO "cpqarray: Finding drives on %s",
 		hba[i]->devname);
 
 	spin_lock_init(&hba[i]->lock);
@@ -455,7 +455,7 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 	q->queuedata = hba[i];
 
 	getgeometry(i);
-	start_fwbk(i); 
+	start_fwbk(i);
 
 	ida_procinit(i);
 
@@ -483,7 +483,7 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 		sprintf(disk->disk_name, "ida/c%dd%d", i, j);
 		disk->major = COMPAQ_SMART2_MAJOR + i;
 		disk->first_minor = j<<NWD_SHIFT;
-		disk->fops = &ida_fops; 
+		disk->fops = &ida_fops;
 		if (j && !drv->nr_blks)
 			continue;
 		blk_queue_hardsect_size(hba[i]->queue, drv->blk_size);
@@ -492,7 +492,7 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 		disk->private_data = drv;
 		add_disk(disk);
 	}
-	
+
 	/* done ! */
 	return(i);
 
@@ -511,7 +511,7 @@ Enomem2:
 Enomem3:
 	unregister_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname);
 Enomem4:
-	if (pdev)	
+	if (pdev)
 		pci_set_drvdata(pdev, NULL);
 	release_io_mem(hba[i]);
 	free_hba(i);
@@ -557,7 +557,7 @@ static struct pci_driver cpqarray_pci_driver = {
 };
 
 /*
- *  This is it.  Find all the controllers and register them. 
+ *  This is it.  Find all the controllers and register them.
  *  returns the number of block devices registered.
  */
 int __init cpqarray_init_step2(void)
@@ -647,10 +647,10 @@ static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &latency_timer);
 
 	pci_read_config_dword(pdev, 0x2c, &board_id);
-	
+
 	/* check to see if controller has been disabled */
 	if(!(command & 0x02)) {
-		printk(KERN_WARNING 
+		printk(KERN_WARNING
 			"cpqarray: controller appears to be disabled\n");
 		return(-1);
 	}
@@ -787,7 +787,7 @@ static int cpqarray_eisa_detect(void)
 				" to access the SMART Array controller %08lx\n",				 (unsigned long)board_id);
 			continue;
 		}
-		
+
 		memset(hba[ctlr], 0, sizeof(ctlr_info_t));
 		hba[ctlr]->io_mem_addr = eisa[i];
 		hba[ctlr]->io_mem_length = 0x7FF;
@@ -834,7 +834,7 @@ DBGINFO(
 			printk(KERN_WARNING
 				"cpqarray: Can't register EISA controller %d\n",
 				ctlr);
-		
+
 	}
 
 	return num_ctlr;

@@ -26,6 +26,7 @@
 #include <linux/tty.h>
 #include <linux/root_dev.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -354,8 +355,13 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 	}
 
-	if (!cpu_online(cpu_id))
+	/* We only show online cpus: disable preempt (overzealous, I
+	 * knew) to prevent cpu going down. */
+	preempt_disable();
+	if (!cpu_online(cpu_id)) {
+		preempt_enable();
 		return 0;
+	}
 
 #ifdef CONFIG_SMP
 	pvr = per_cpu(pvr, cpu_id);
@@ -405,7 +411,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		ppc_md.setup_residual(m, cpu_id);
 
 	seq_printf(m, "revision\t: %hd.%hd\n\n", maj, min);
-	
+
+	preempt_enable();
 	return 0;
 }
 

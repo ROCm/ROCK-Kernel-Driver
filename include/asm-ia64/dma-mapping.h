@@ -1,6 +1,12 @@
 #ifndef _ASM_IA64_DMA_MAPPING_H
 #define _ASM_IA64_DMA_MAPPING_H
 
+static inline int
+dma_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 /*
  * Copyright (C) 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>

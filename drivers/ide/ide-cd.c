@@ -554,53 +554,6 @@ static void cdrom_queue_request_sense(ide_drive_t *drive,
 	(void) ide_do_drive_cmd(drive, rq, ide_preempt);
 }
 
-
-/*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- */
-byte ide_cdrom_dump_status (ide_drive_t *drive, const char *msg, byte stat)
-{
-	unsigned long flags;
-
-	atapi_status_t status;
-	atapi_error_t error;
-
-	status.all = stat;
-	local_irq_set(flags);
-	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-#if FANCY_STATUS_DUMPS
-	printk(" { ");
-	if (status.b.bsy)
-		printk("Busy ");
-	else {
-		if (status.b.drdy)	printk("DriveReady ");
-		if (status.b.df)	printk("DeviceFault ");
-		if (status.b.dsc)	printk("SeekComplete ");
-		if (status.b.drq)	printk("DataRequest ");
-		if (status.b.corr)	printk("CorrectedError ");
-		if (status.b.idx)	printk("Index ");
-		if (status.b.check)	printk("Error ");
-	}
-	printk("}");
-#endif	/* FANCY_STATUS_DUMPS */
-	printk("\n");
-	if ((status.all & (status.b.bsy|status.b.check)) == status.b.check) {
-		error.all = HWIF(drive)->INB(IDE_ERROR_REG);
-		printk("%s: %s: error=0x%02x", drive->name, msg, error.all);
-#if FANCY_STATUS_DUMPS
-		if (error.b.ili)	printk("IllegalLengthIndication ");
-		if (error.b.eom)	printk("EndOfMedia ");
-		if (error.b.abrt)	printk("Aborted Command ");
-		if (error.b.mcr)	printk("MediaChangeRequested ");
-		if (error.b.sense_key)	printk("LastFailedSense 0x%02x ",
-						error.b.sense_key);
-#endif	/* FANCY_STATUS_DUMPS */
-		printk("\n");
-	}
-	local_irq_restore(flags);
-	return error.all;
-}
-
 /*
  * ide_error() takes action based on the error returned by the drive.
  */
@@ -609,7 +562,7 @@ ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
 	struct request *rq;
 	byte err;
 
-	err = ide_cdrom_dump_status(drive, msg, stat);
+	err = ide_dump_atapi_status(drive, msg, stat);
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 	/* retry only "normal" I/O: */
@@ -2930,6 +2883,8 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_MRW;
 	if (!CDROM_CONFIG_FLAGS(drive)->mrw_w)
 		devinfo->mask |= CDC_MRW_W;
+	if (!CDROM_CONFIG_FLAGS(drive)->ram)
+		devinfo->mask |= CDC_RAM;
 
 	devinfo->disk = drive->disk;
 	return register_cdrom(devinfo);
@@ -2966,7 +2921,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
 	struct atapi_capabilities_page cap;
-	int nslots = 1, mrw_write = 0;
+	int nslots = 1, mrw_write = 0, ram_write = 0;
 
 	if (drive->media == ide_optical) {
 		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
@@ -3002,6 +2957,9 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 			CDROM_CONFIG_FLAGS(drive)->ram = 1;
 		}
 	}
+	if (!cdrom_is_random_writable(cdi, &ram_write))
+		if (ram_write)
+			CDROM_CONFIG_FLAGS(drive)->ram = 1;
 
 	if (cap.lock == 0)
 		CDROM_CONFIG_FLAGS(drive)->no_doorlock = 1;
@@ -3412,7 +3370,7 @@ static ide_driver_t ide_cdrom_driver = {
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,
-	.sense			= ide_cdrom_dump_status,
+	.sense			= ide_dump_atapi_status,
 	.error			= ide_cdrom_error,
 	.abort			= ide_cdrom_abort,
 	.capacity		= ide_cdrom_capacity,

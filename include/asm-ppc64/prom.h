@@ -87,11 +87,12 @@ union pci_range {
 	} pci64;
 };
 
-struct _of_tce_table {
+struct of_tce_table {
 	phandle node;
 	unsigned long base;
 	unsigned long size;
 };
+extern struct of_tce_table of_tce_table[];
 
 struct reg_property {
 	unsigned long address;

@@ -151,7 +151,7 @@ static inline void seeq_load_eaddr(struct net_device *dev,
 
 static int seeq_init_ring(struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	volatile struct sgiseeq_init_block *ib = &sp->srings;
 	int i;
 
@@ -423,7 +423,7 @@ static inline void sgiseeq_tx(struct net_device *dev, struct sgiseeq_private *sp
 static irqreturn_t sgiseeq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	struct hpc3_ethregs *hregs = sp->hregs;
 	struct sgiseeq_regs *sregs = sp->sregs;
 
@@ -445,7 +445,7 @@ static irqreturn_t sgiseeq_interrupt(int irq, void *dev_id, struct pt_regs *regs
 
 static int sgiseeq_open(struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	struct sgiseeq_regs *sregs = sp->sregs;
 
 	int err = init_seeq(dev, sp, sregs);
@@ -459,7 +459,7 @@ static int sgiseeq_open(struct net_device *dev)
 
 static int sgiseeq_close(struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	struct sgiseeq_regs *sregs = sp->sregs;
 
 	netif_stop_queue(dev);
@@ -472,7 +472,7 @@ static int sgiseeq_close(struct net_device *dev)
 
 static inline int sgiseeq_reset(struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	struct sgiseeq_regs *sregs = sp->sregs;
 	int err;
 
@@ -494,7 +494,7 @@ void sgiseeq_my_reset(void)
 
 static int sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 	struct hpc3_ethregs *hregs = sp->hregs;
 	unsigned long flags;
 	struct sgiseeq_tx_desc *td;
@@ -560,7 +560,7 @@ static void timeout(struct net_device *dev)
 
 static struct net_device_stats *sgiseeq_get_stats(struct net_device *dev)
 {
-	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_private *sp = dev->priv;
 
 	return &sp->stats;
 }
@@ -710,7 +710,7 @@ static void __exit sgiseeq_exit(void)
 	struct net_device *next, *dev = root_sgiseeq_dev;
 
 	while (dev) {
-		sp = netdev_priv(dev);
+		sp = dev->priv;
 		next = sp->next_module;
 		unregister_netdev(dev);
 		free_irq(dev->irq, dev);

@@ -177,7 +177,7 @@ pipe_aio_readv(struct file *filp, const struct iovec *_iov,
 		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 	}
 	if (ret > 0)
-		update_atime(inode);
+		file_accessed(filp);
 	return ret;
 }
 

@@ -691,7 +691,7 @@ static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 			goto put_fail;
 
 		if (u->sk_type == type)
-			update_atime(nd.dentry->d_inode);
+			touch_atime(nd.mnt, nd.dentry);
 
 		path_release(&nd);
 
@@ -707,7 +707,7 @@ static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 			struct dentry *dentry;
 			dentry = unix_sk(u)->dentry;
 			if (dentry)
-				update_atime(dentry->d_inode);
+				touch_atime(unix_sk(u)->mnt, dentry);
 		} else
 			goto fail;
 	}

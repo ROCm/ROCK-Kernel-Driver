@@ -19,9 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+/* TODO:
+ * finish DTR/CD ioctls
+ * use #defines instead of "16" "12" etc
+ * comment lack of locking
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/list.h>
+#include <linux/time.h>
+#include <linux/ctype.h>
+#include <asm/delay.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/hvconsole.h>
@@ -37,10 +46,15 @@ struct vtty_struct {
 	uint32_t vtermno;
 	int (*get_chars)(struct vtty_struct *vtty, char *buf, int count);
 	int (*put_chars)(struct vtty_struct *vtty, const char *buf, int count);
-	int (*ioctl)(struct vtty_struct *vtty, unsigned int cmd, unsigned long val);
+	int (*tiocmget)(struct vtty_struct *vtty);
+	int (*tiocmset)(struct vtty_struct *vtty, uint16_t set, uint16_t clear);
 	uint16_t seqno; /* HVSI packet sequence number */
+	uint16_t mctrl;
 };
 static struct vtty_struct vttys[MAX_NR_HVC_CONSOLES];
+
+#define WAIT_LOOPS 10000
+#define WAIT_USECS 100
 
 #define HVSI_VERSION 1
 
@@ -56,53 +70,55 @@ static struct vtty_struct vttys[MAX_NR_HVC_CONSOLES];
 
 /* query verbs */
 #define VSV_SEND_VERSION_NUMBER 1
+#define VSV_SEND_MODEM_CTL_STATUS 2
 
 /* yes, these masks are not consecutive. */
-#define TSDTR 0x1
-#define TSCD 0x20
+#define HVSI_TSDTR 0x1
+#define HVSI_TSCD  0x20
 
-struct hvsi1_header {
+struct hvsi_header {
 	uint8_t  type;
 	uint8_t  len;
 	uint16_t seqno;
-};
+} __attribute__((packed));
 
-struct hvsi1_control {
+struct hvsi_control {
 	uint8_t  type;
 	uint8_t  len;
 	uint16_t seqno;
-	uint8_t  version;
-	uint8_t  verb;
+	uint16_t verb;
 	/* optional depending on verb: */
 	uint32_t word;
 	uint32_t mask;
-};
+} __attribute__((packed));
 
-struct hvsi1_query {
+struct hvsi_query {
 	uint8_t  type;
 	uint8_t  len;
 	uint16_t seqno;
-	uint8_t  version;
-	uint8_t  verb;
-};
+	uint16_t verb;
+} __attribute__((packed));
 
-struct hvsi1_query_resp {
+struct hvsi_query_response {
 	uint8_t  type;
 	uint8_t  len;
 	uint16_t seqno;
-	uint8_t  version;
-	uint8_t  verb;
+	uint16_t verb;
 	uint16_t query_seqno;
-	/* optional, depending on query type */
 	union {
-		uint8_t version;
-	} response;
-};
+		uint8_t  version;
+		uint32_t mctrl_word;
+	} u;
+} __attribute__((packed));
 
 /* ring buffer stuff: */
 struct packet_desc {
-	struct hvsi1_header *pkt;
-	int remaining;
+	union {
+		struct hvsi_header hdr;
+		char pkt[256]; /* console_initcall is pre-mem_init(), so no kmalloc */
+	} data;
+	unsigned int want;
+	unsigned int got;
 };
 #define N_PACKETS 4
 static struct packet_desc ring[N_PACKETS];
@@ -116,36 +132,110 @@ static struct packet_desc *next_desc(struct packet_desc *cur)
 	return (cur+1);
 }
 
-static inline int hdrlen(const struct hvsi1_header *pkt)
+static int desc_hdr_done(struct packet_desc *desc)
+{
+	if (desc->got < sizeof(struct hvsi_header))
+		return 0;
+	return 1;
+}
+
+static unsigned int desc_want(struct packet_desc *desc)
+{
+	if (desc_hdr_done(desc))
+		return desc->data.hdr.len;
+	else
+		return UINT_MAX;
+}
+
+static int desc_done(struct packet_desc *desc)
+{
+	if (!desc_hdr_done(desc) || (desc->got < desc->want))
+		return 0;
+	return 1;
+}
+
+static int desc_overflow(struct packet_desc *desc)
+{
+	int overflow = desc->got - desc->want;
+	if (desc_hdr_done(desc) && (overflow > 0))
+		return overflow;
+	return 0;
+}
+
+static void desc_clear(struct packet_desc *desc)
+{
+	desc->got = desc->want = 0;
+}
+
+/* these only work on well-formed and complete packets */
+
+static inline int hdrlen(const struct hvsi_header *pkt)
 {
 	const int lengths[] = { 4, 6, 6, 8, };
 	int index = VS_DATA_PACKET_HEADER - pkt->type;
 
-	if (index > sizeof(lengths)/sizeof(lengths[0]))
-		panic("%s: unknown packet type\n", __FUNCTION__);
-
 	return lengths[index];
 }
 
-static inline uint8_t *pktdata(const struct hvsi1_header *pkt)
+static inline uint8_t *payload(const struct hvsi_header *pkt)
 {
 	return (uint8_t *)pkt + hdrlen(pkt);
 }
 
-static inline int pktlen(const struct hvsi1_header *pkt)
+static inline int len_packet(const struct hvsi_header *pkt)
 {
 	return (int)pkt->len;
 }
 
-static inline int datalen(const struct hvsi1_header *pkt)
+static inline int len_payload(const struct hvsi_header *pkt)
 {
-	return pktlen(pkt) - hdrlen(pkt);
+	return len_packet(pkt) - hdrlen(pkt);
 }
 
-static void print_hdr(struct hvsi1_header *pkt)
+static void dump_packet(struct hvsi_header *pkt)
 {
-	printk("type 0x%x, len %i, seqno %i\n", pkt->type, pkt->len, pkt->seqno);
+	int i;
+	char *data = payload(pkt);
+
+	printk("type 0x%x, len %i, seqno %i:", pkt->type, pkt->len, pkt->seqno);
+
+	if (len_payload(pkt))
+		printk("\n     ");
+	for (i=0; i < len_payload(pkt); i++)
+		printk("%.2x", data[i]);
+
+	if (len_payload(pkt))
+		printk("\n     ");
+	for (i=0; i < len_payload(pkt); i++) {
+		if (isprint(data[i]))
+			printk(" %c", data[i]);
+		else
+			printk("..");
+	}
+	printk("\n");
 }
+
+#ifdef DEBUG
+static void dump_ring(void)
+{
+	int i;
+	for (i=0; i < N_PACKETS; i++) {
+		struct packet_desc *desc = &ring[i];
+		if (read == desc)
+			printk("r");
+		else
+			printk(" ");
+		if (write == desc)
+			printk("w");
+		else
+			printk(" ");
+		printk(" ");
+		printk("desc %i: want %i got %i\n", i, desc->want, desc->got);
+		printk("    ");
+		dump_packet(&desc->data.hdr);
+	}
+}
+#endif /* DEBUG */
 
 /* normal hypervisor virtual console code */
 int hvterm_get_chars(uint32_t vtermno, char *buf, int count)
@@ -193,7 +283,7 @@ int hvterm_put_chars(uint32_t vtermno, const char *buf, int count)
 		return count;
 	if (ret == H_Busy)
 		return 0;
-	return -1;
+	return -EIO;
 }
 EXPORT_SYMBOL(hvterm_put_chars);
 
@@ -206,7 +296,7 @@ int hvc_hvterm_put_chars(struct vtty_struct *vtty, const char *buf, int count)
 
 /* Host Virtual Serial Interface (HVSI) code */
 
-static int hvsi1_read(struct vtty_struct *vtty, char *buf, int count)
+static int hvsi_read(struct vtty_struct *vtty, char *buf, int count)
 {
 	unsigned long got;
 
@@ -217,341 +307,414 @@ static int hvsi1_read(struct vtty_struct *vtty, char *buf, int count)
 	return 0;
 }
 
-/* load up ring buffers */
-static int hvsi1_load_chunk(struct vtty_struct *vtty)
+/* like memcpy, but only copy at most a single packet from the src bytestream */
+static int copy_packet(uint8_t *dest, uint8_t *src, uint8_t len)
 {
-	uint8_t localbuf[16];
-	uint8_t *chunk = localbuf;
-	struct hvsi1_header *pkt;
-	int chunklen;
+	int copylen;
 
-	chunklen = hvsi1_read(vtty, chunk, 16);
+	if (len == 1) {
+		/* we don't have the len header */
+		*dest = *src;
+		return 1;
+	}
+
+	/* if we have more than one packet here, only copy the first */
+	copylen = min(len_packet((struct hvsi_header *)src), (int)len);
+	memcpy(dest, src, copylen);
+	return copylen;
+}
+
+/* load up ring buffers */
+static int hvsi_load_chunk(struct vtty_struct *vtty)
+{
+	struct packet_desc *old = write;
+	unsigned int chunklen;
+	unsigned int overflow;
+
+	/* copy up to 16 bytes into the write buffer */
+	chunklen = hvsi_read(vtty, write->data.pkt + write->got, 16);
 	if (!chunklen)
 		return 0;
+	write->got += chunklen;
+	write->want = desc_want(write);
 
-	printk("new chunk, len %i\n", chunklen);
+	overflow = desc_overflow(write);
+	while (overflow) {
+		/* copied too much into 'write'; memcpy it into the next buffers */
+		int nextlen;
+		write = next_desc(write);
 
-	/* fill in unfinished packet */
-	if (write->remaining) {
-		int size = min(write->remaining, chunklen);
-
-		printk("completing partial packet with %i bytes\n", size);
-		memcpy((uint8_t *)write->pkt + pktlen(write->pkt) - write->remaining, chunk, size);
-		write->remaining -= size;
-		if (write->remaining == 0)
-			write = next_desc(write);
-		chunklen -= size;
-		chunk += size;
+		nextlen = copy_packet(write->data.pkt, old->data.pkt + old->want,
+			overflow);
+		write->got = nextlen;
+		write->want = desc_want(write);
+		overflow -= nextlen;
 	}
-
-	/* new packet(s) */
-	while (chunklen > 0) {
-		int size;
-		pkt = (struct hvsi1_header *)chunk;
-
-		size = min(pktlen(pkt), chunklen);
-		printk("%i bytes of new packet\n", size);
-
-		/* XXX handle 1-byte read */
-		if (size == 1) {
-			panic("%s: can't handle 1-byte reads!\n", __FUNCTION__);
-		}
-
-		memcpy(write->pkt, chunk, size);
-		write->remaining = pktlen(pkt) - size;
-
-		if (write->remaining == 0)
-			write = next_desc(write);
-		chunklen -= size;
-		chunk += size;
-	}
+	if (desc_done(write))
+		write = next_desc(write);
 	return 1;
 }
 
-static void hvsi1_load_buffers(struct vtty_struct *vtty)
+/* keep reading from hypervisor until there's no more */
+static void hvsi_load_buffers(struct vtty_struct *vtty)
 {
-	while (hvsi1_load_chunk(vtty))
-		; /* keep reading from hypervisor until there's no more */
+	/* XXX perhaps we should limit this */
+	while (hvsi_load_chunk(vtty)) {
+		if (write == read) {
+			/* we've filled all our ring buffers; let the hypervisor queue
+			 * the rest for us */
+			break;
+		}
+	}
 }
 
-static int hvsi1_recv_control(struct vtty_struct *vtty,
-	struct hvsi1_control *pkt)
+static int hvsi_recv_control(struct vtty_struct *vtty, struct hvsi_control *pkt)
 {
+	int ret = 0;
+	
+	//dump_packet((struct hvsi_header *)pkt);
+	
 	switch (pkt->verb) {
 		case VSV_MODEM_CTL_UPDATE:
-			if ((pkt->word & TSCD) == 0) {
+			if ((pkt->word & HVSI_TSCD) == 0) {
 				/* CD went away; no more connection */
-				// XXX tty_hangup(hvc->tty);
-				return -EPIPE;
+				vtty->mctrl &= TIOCM_CD;
+				ret = -EPIPE;
 			}
 			break;
+		case VSV_CLOSE_PROTOCOL:
+			/* XXX handle this by reopening on open/read/write() ? */
+			panic("%s: service processor closed HVSI connection!\n", __FUNCTION__);
+			break;
+		default:
+			printk(KERN_WARNING "unknown HVSI control packet: ");
+			dump_packet((struct hvsi_header *)pkt);
+			break;
 	}
-	return 0;
+	return ret;
 }
 
 /* transfer from ring buffers to caller's buffer */
-static int hvsi1_deliver(struct vtty_struct *vtty, uint8_t *buf, int buflen)
+static int hvsi_deliver(struct vtty_struct *vtty, uint8_t *buf, int buflen)
 {
 	int written = 0;
+	int ret;
 
-	for (; (read != write) && buflen; read = next_desc(read)) {
-		struct hvsi1_header *pkt = read->pkt;
+	for (; (read != write) && (buflen > 0); read = next_desc(read)) {
+		struct hvsi_header *pkt = &read->data.hdr;
 		int size;
+
+#ifdef DEBUG
+		dump_ring();
+#endif
 
 		switch (pkt->type) {
 			case VS_DATA_PACKET_HEADER:
-				size = min(datalen(pkt), buflen);
-				printk("delivering %i-sized data packet\n", size);
-				memcpy(buf, pktdata(pkt), size);
+				size = min(len_payload(pkt), buflen);
+				memcpy(buf, payload(pkt), size);
 				buf += size;
 				buflen -= size;
 				written += size;
 				break;
 			case VS_CONTROL_PACKET_HEADER:
-				hvsi1_recv_control(vtty, (struct hvsi1_control *)pkt);
+				ret = hvsi_recv_control(vtty, (struct hvsi_control *)pkt);
+				/* if we got an error (like CD dropped), stop now.
+				 * otherwise keep dispatching packets */
+				if (ret < 0) {
+					desc_clear(read);
+					read = next_desc(read);
+					return ret;
+				}
 				break;
 			default:
-				printk("%s: ignoring HVSI packet ", __FUNCTION__);
-				print_hdr(pkt);
+				printk(KERN_WARNING "unknown HVSI packet: ");
+				dump_packet(pkt);
 				break;
 		}
+		desc_clear(read);
 	}
 
 	return written;
 }
 
-static int hvsi1_get_chars(struct vtty_struct *vtty, char *databuf, int count)
+static int hvsi_get_chars(struct vtty_struct *vtty, char *databuf, int count)
 {
-	hvsi1_load_buffers(vtty); /* get pending data */
-	return hvsi1_deliver(vtty, databuf, count); /* hand it up */
+	hvsi_load_buffers(vtty); /* get pending data */
+	return hvsi_deliver(vtty, databuf, count); /* hand it up */
 }
 
-/* Handshaking step 3:
- * 
- * We're waiting for the service processor to query our version, at which point
- * we immediately respond and then we have an open HVSI connection. */
-static int hvsi1_handshake3(struct vtty_struct *vtty, char *databuf, int count)
+static struct hvsi_header *search_for_packet(struct vtty_struct *vtty, int type)
 {
-	struct hvsi1_query_resp response __ALIGNED__ = {
-		.type = VS_QUERY_RESPONSE_PACKET_HEADER,
-		.len = 9,
-		.version = HVSI_VERSION,
-		.verb = VSV_SEND_VERSION_NUMBER,
-		.response.version = HVSI_VERSION,
-	};
-	int done;
-
 	/* bring in queued packets */
-	hvsi1_load_buffers(vtty);
-
-	/* look for the version query packet */
-	for (done = 0; (!done) && (read != write); read = next_desc(read)) {
-		struct hvsi1_header *pkt = read->pkt;
-		struct hvsi1_query *query;
-		int wrote;
-
-		switch (pkt->type) {
-			case VS_QUERY_PACKET_HEADER:
-				query = (struct hvsi1_query *)pkt;
-
-				/* send query response */
-				response.seqno = ++vtty->seqno;
-				response.query_seqno = query->seqno+1,
-				wrote = hvc_hvterm_put_chars(vtty, (char *)&response,
-					response.len);
-				if (wrote != response.len) {
-					/* uh oh, command didn't go through? */
-					printk(KERN_ERR "%s: couldn't send query response!\n",
-						__FUNCTION__);
-					return -EIO;
-				}
-
-				/* we're open for business */
-				vtty->get_chars = hvsi1_get_chars;
-				done = 1;
-				break;
-			default:
-				printk("%s: ignoring HVSI packet ", __FUNCTION__);
-				print_hdr(pkt);
-				break;
-		}
-	}
-
-	return 0; /* nothing written to databuf */
-}
-
-/* Handshaking step 2:
- *
- * We've sent a version query; now we're waiting for the service processor to
- * respond. Since we haven't established a connection yet, we won't be writing
- * anything into databuf. */
-static int hvsi1_handshake2(struct vtty_struct *vtty, char *databuf, int count)
-{
-	int done;
-
-	/* bring in queued packets */
-	hvsi1_load_buffers(vtty);
+	hvsi_load_buffers(vtty);
 
 	/* look for the version query response packet */
-	for (done = 0; (!done) && (read != write); read = next_desc(read)) {
-		struct hvsi1_header *pkt = read->pkt;
+	for (; read != write; read = next_desc(read)) {
+		struct hvsi_header *pkt = &read->data.hdr;
 
-		switch (pkt->type) {
-			case VS_QUERY_RESPONSE_PACKET_HEADER:
-				/* XXX check response */
-				vtty->get_chars = hvsi1_handshake3;
-				done = 1;
-				break;
-			default:
-				printk("%s: ignoring HVSI packet ", __FUNCTION__);
-				print_hdr(pkt);
-				break;
+		if (pkt->type == type) {
+			desc_clear(read);
+			read = next_desc(read);
+			return pkt;
 		}
+		printk("%s: ignoring packet while waiting for type 0x%x:\n",
+			__FUNCTION__, type);
+		dump_packet(pkt);
 	}
 
-	return 0; /* nothing written to databuf */
+	return NULL;
 }
 
-/* Handshaking step 1:
- *
- * Send a version query to SP. */
-static int hvsi1_handshake1(uint32_t vtermno)
+static int wait_for_packet(struct vtty_struct *vtty, struct hvsi_header **hdr,
+	int type)
 {
-	struct hvsi1_query packet __ALIGNED__ = {
-		.type = VS_QUERY_PACKET_HEADER,
-		.len = sizeof(struct hvsi1_query),
-		.seqno = 0,
-		.version = HVSI_VERSION,
-		.verb = VSV_SEND_VERSION_NUMBER,
-	};
-	uint64_t *lbuf = (uint64_t *)&packet;
-	uint64_t dummy;
+	struct hvsi_header *found;
+	int count = 0;
 
-	plpar_hcall(H_PUT_TERM_CHAR, vtermno, sizeof(struct hvsi1_query),
-	    lbuf[0], lbuf[1], &dummy, &dummy, &dummy);
+	do {
+		if (count++ > WAIT_LOOPS)
+			return -EIO;
+		udelay(WAIT_USECS);
+		found = search_for_packet(vtty, type);
+	} while (!found);
+
+	*hdr = found;
+	return 0;
+}
+
+static int hvsi_query(struct vtty_struct *vtty, uint16_t verb)
+{
+	struct hvsi_query query __ALIGNED__ = {
+		.type = VS_QUERY_PACKET_HEADER,
+		.len = sizeof(struct hvsi_query),
+	};
+	int wrote;
+
+	query.seqno = vtty->seqno++;
+	query.verb = verb;
+	wrote = hvc_hvterm_put_chars(vtty, (char *)&query, query.len);
+	if (wrote != query.len) {
+		printk(KERN_ERR "%s: couldn't send query!\n", __FUNCTION__);
+		return -EIO;
+	}
 
 	return 0;
 }
 
-static int hvsi1_put_chars(struct vtty_struct *vtty, const char *buf, int count)
+/* respond to service processor's version query */
+static int hvsi_version_respond(struct vtty_struct *vtty, uint16_t query_seqno)
+{
+	struct hvsi_query_response response __ALIGNED__ = {
+		.type = VS_QUERY_RESPONSE_PACKET_HEADER,
+		.len = sizeof(struct hvsi_query_response),
+		.verb = VSV_SEND_VERSION_NUMBER,
+		.u.version = HVSI_VERSION,
+	};
+	int wrote;
+
+	response.seqno = vtty->seqno++;
+	response.query_seqno = query_seqno+1,
+	wrote = hvc_hvterm_put_chars(vtty, (char *)&response, response.len);
+	if (wrote != response.len) {
+		printk(KERN_ERR "%s: couldn't send query response!\n", __FUNCTION__);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int hvsi_get_mctrl(struct vtty_struct *vtty)
+{
+	struct hvsi_header *hdr;
+	int ret = 0;
+	uint16_t mctrl;
+
+	if (hvsi_query(vtty, VSV_SEND_MODEM_CTL_STATUS)) {
+		ret = -EIO;
+		goto out;
+	}
+	if (wait_for_packet(vtty, &hdr, VS_QUERY_RESPONSE_PACKET_HEADER)) {
+		ret = -EIO;
+		goto out;
+	}
+	/* XXX see if it's the right response */
+
+	vtty->mctrl = 0;
+
+	mctrl = ((struct hvsi_query_response *)hdr)->u.mctrl_word;
+	if (mctrl & HVSI_TSDTR)
+		vtty->mctrl |= TIOCM_DTR;
+	if (mctrl & HVSI_TSCD)
+		vtty->mctrl |= TIOCM_CD;
+	pr_debug("%s: mctrl 0x%x\n", __FUNCTION__, vtty->mctrl);
+
+out:
+	return ret;
+}
+
+static int hvsi_handshake(struct vtty_struct *vtty)
+{
+	struct hvsi_header *hdr;
+	int ret = 0;
+
+	if (hvsi_query(vtty, VSV_SEND_VERSION_NUMBER)) {
+		ret = -EIO;
+		goto out;
+	}
+	if (wait_for_packet(vtty, &hdr, VS_QUERY_RESPONSE_PACKET_HEADER)) {
+		ret = -EIO;
+		goto out;
+	}
+	/* XXX see if it's the right response */
+
+	if (wait_for_packet(vtty, &hdr, VS_QUERY_PACKET_HEADER)) {
+		ret = -EIO;
+		goto out;
+	}
+	/* XXX see if it's the right query */
+	if (hvsi_version_respond(vtty, hdr->seqno)) {
+		ret = -EIO;
+		goto out;
+	}
+
+	if (hvsi_get_mctrl(vtty)) {
+		ret = -EIO;
+		goto out;
+	}
+
+out:
+	if (ret < 0)
+		printk(KERN_ERR "HVSI handshaking failed\n");
+	return ret;
+}
+
+static int hvsi_put_chars(struct vtty_struct *vtty, const char *buf, int count)
 {
 	char packet[16] __ALIGNED__;
-	uint64_t dummy;
 	uint64_t *lbuf = (uint64_t *)packet;
-	struct hvsi1_header *hdr = (struct hvsi1_header *)packet;
-	long ret;
+	struct hvsi_header *hdr = (struct hvsi_header *)packet;
+	int ret;
 
 	hdr->type = VS_DATA_PACKET_HEADER;
-	hdr->seqno = ++vtty->seqno;
+	hdr->seqno = vtty->seqno++;
 
 	if (count > 12)
 		count = 12; /* we'll leave some chars behind in buf */
-	hdr->len = count + sizeof(struct hvsi1_header);
-	memcpy(packet + sizeof(struct hvsi1_header), buf, count);
+	hdr->len = count + sizeof(struct hvsi_header);
+	memcpy(packet + sizeof(struct hvsi_header), buf, count);
 
-	ret = plpar_hcall(H_PUT_TERM_CHAR, vtty->vtermno, count, lbuf[0], lbuf[1],
-			  &dummy, &dummy, &dummy);
+	/* note: we can't use hvc_hvterm_put_chars() here, as it would return
+	 * _packet_ length, not _payload_ length */
+	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtty->vtermno, hdr->len,
+			lbuf[0], lbuf[1]);
 	if (ret == H_Success)
 		return count;
 	if (ret == H_Busy)
 		return 0;
-	return -1;
+	return -EIO;
 }
 
-#if 0
-static int hvsi1_send_dtr(struct vtty_struct *vtty, int set)
+/* note that we can only set DTR */
+static int hvsi_set_mctrl(struct vtty_struct *vtty, uint16_t mctrl)
 {
-	struct hvsi1_control command __ALIGNED__ = {
+	struct hvsi_control command __ALIGNED__ = {
 		.type = VS_CONTROL_PACKET_HEADER,
-		.len = 16,
-		.version = HVSI_VERSION,
+		.len = sizeof(struct hvsi_control),
 		.verb = VSV_SET_MODEM_CTL,
-		.mask = TSDTR,
+		.mask = HVSI_TSDTR,
 	};
 	int wrote;
 
-	command.seqno = ++vtty->seqno;
-
-	if (set)
-		command.word = TSDTR;
-	else
-		command.word = 0;
+	command.seqno = vtty->seqno++;
+	if (mctrl & TIOCM_DTR)
+		command.word = HVSI_TSDTR;
 
 	wrote = hvc_hvterm_put_chars(vtty, (char *)&command, command.len);
 	if (wrote != command.len) {
-		/* uh oh, command didn't go through? */
 		printk(KERN_ERR "%s: couldn't set DTR!\n", __FUNCTION__);
-		return -1;
+		return -EIO;
 	}
 
 	return 0;
 }
 
-/* XXX 2.6 tty layer turned TIO* into separate tty_struct functions, not
- * passed to tty_struct->ioctl() */
-static int hvsi1_ioctl(struct vtty_struct *vtty, unsigned int cmd,
-	unsigned long arg)
+static int hvsi_tiocmset(struct vtty_struct *vtty, uint16_t set, uint16_t clear)
 {
-	unsigned long *ptr = (unsigned long *)arg;
-	unsigned long val;
-	int newdtr = -1;
+	uint16_t old_mctrl;
 
-	switch (cmd) {
-		case TIOCMBIS:
-			if (get_user(val, ptr))
-				return -EFAULT;
-			if (val & TIOCM_DTR) {
-				newdtr = 1;
-			}
-			break;
-		case TIOCMBIC:
-			if (get_user(val, ptr))
-				return -EFAULT;
-			if (val & TIOCM_DTR) {
-				newdtr = 0;
-			}
-			break;
-		case TIOCMSET:
-			if (get_user(val, ptr))
-				return -EFAULT;
-			newdtr = val & TIOCM_DTR;
-			break;
-		default:
-			return -ENOIOCTLCMD;
-	}
+	/* we can only set DTR */
+	if (set & ~TIOCM_DTR)
+		return -EINVAL;
 
-	if (newdtr != -1) {
-		if (0 > hvsi1_send_dtr(vtty, newdtr))
+	old_mctrl = vtty->mctrl;
+	vtty->mctrl = (old_mctrl & ~clear) | set;
+
+	pr_debug("%s: new mctrl 0x%x\n", __FUNCTION__, vtty->mctrl);
+	if (old_mctrl != vtty->mctrl) {
+		if (hvsi_set_mctrl(vtty, vtty->mctrl) < 0)
 			return -EIO;
+	} else {
+		pr_debug("  (not writing to SP)\n");
 	}
 
 	return 0;
 }
-#endif
+
+static int hvsi_tiocmget(struct vtty_struct *vtty)
+{
+	if (hvsi_get_mctrl(vtty))
+		return -EIO;
+	pr_debug("%s: mctrl 0x%x\n", __FUNCTION__, vtty->mctrl);
+	return vtty->mctrl;
+}
 
 /* external (hvc_console.c) interface: */
 
-int hvc_get_chars(int index, char *buf, int count)
+int hvc_arch_get_chars(int index, char *buf, int count)
 {
 	struct vtty_struct *vtty = &vttys[index];
 
 	if (index >= MAX_NR_HVC_CONSOLES)
-		return -1;
+		return -ENODEV;
 
 	return vtty->get_chars(vtty, buf, count);
 }
 
-int hvc_put_chars(int index, const char *buf, int count)
+int hvc_arch_put_chars(int index, const char *buf, int count)
 {
 	struct vtty_struct *vtty = &vttys[index];
 
 	if (index >= MAX_NR_HVC_CONSOLES)
-		return -1;
+		return -ENODEV;
 
 	return vtty->put_chars(vtty, buf, count);
 }
 
-int hvc_find_vterms(void)
+int hvc_arch_tiocmset(int index, unsigned int set, unsigned int clear)
+{
+	struct vtty_struct *vtty = &vttys[index];
+
+	if (index >= MAX_NR_HVC_CONSOLES)
+		return -ENODEV;
+
+	if (vtty->tiocmset)
+		return vtty->tiocmset(vtty, set, clear);
+	return -EINVAL;
+}
+
+int hvc_arch_tiocmget(int index)
+{
+	struct vtty_struct *vtty = &vttys[index];
+
+	if (index >= MAX_NR_HVC_CONSOLES)
+		return -ENODEV;
+
+	if (vtty->tiocmset)
+		return vtty->tiocmget(vtty);
+	return -EINVAL;
+}
+
+int hvc_arch_find_vterms(void)
 {
 	struct device_node *vty;
 	int count = 0;
@@ -573,16 +736,21 @@ int hvc_find_vterms(void)
 			vtty->vtermno = *vtermno;
 			vtty->get_chars = hvc_hvterm_get_chars;
 			vtty->put_chars = hvc_hvterm_put_chars;
-			vtty->ioctl = NULL;
+			vtty->tiocmget = NULL;
+			vtty->tiocmset = NULL;
 			hvc_instantiate();
 			count++;
 		} else if (device_is_compatible(vty, "hvterm-protocol")) {
 			vtty->vtermno = *vtermno;
 			vtty->seqno = 0;
-			vtty->get_chars = hvsi1_handshake2;
-			vtty->put_chars = hvsi1_put_chars;
-			//vtty->ioctl = hvsi1_ioctl;
-			hvsi1_handshake1(vtty->vtermno);
+			vtty->get_chars = hvsi_get_chars;
+			vtty->put_chars = hvsi_put_chars;
+			vtty->tiocmget = hvsi_tiocmget;
+			vtty->tiocmset = hvsi_tiocmset;
+			if (hvsi_handshake(vtty)) {
+				continue;
+			}
+			vtty->put_chars(vtty, "\nHVSI\n", 6);
 			hvc_instantiate();
 			count++;
 		}

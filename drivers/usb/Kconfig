@@ -6,32 +6,36 @@ menu "USB support"
 
 # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
 config USB
-	tristate "Support for USB"
+	tristate "Support for Host-side USB"
 	depends on PCI || SA1111 || ARCH_OMAP1510 || ARCH_OMAP1610
 	---help---
 	  Universal Serial Bus (USB) is a specification for a serial bus
 	  subsystem which offers higher speeds and more features than the
 	  traditional PC serial port.  The bus supplies power to peripherals
 	  and allows for hot swapping.  Up to 127 USB peripherals can be
-	  connected to a single USB port in a tree structure.  The USB port is
-	  the root of the tree, the peripherals are the leaves and the inner
-	  nodes are special USB devices called hubs.  Many newer PC's have USB
-	  ports and newer peripherals such as scanners, keyboards, mice,
-	  modems, and printers support the USB protocol and can be connected
-	  to the PC via those ports.
+	  connected to a single USB host in a tree structure.
+	  
+	  The USB host is the root of the tree, the peripherals are the
+	  leaves and the inner nodes are special USB devices called hubs.
+	  Most PCs now have USB host ports, used to connect peripherals
+	  such as scanners, keyboards, mice, modems, cameras, disks,
+	  flash memory, network links, and printers to the PC.
 
-	  Say Y here if your computer has a USB port and you want to use USB
-	  devices.  You then need to say Y to at least one of "UHCI HCD support"
-	  or "OHCI HCD support" below (the type of interface that the USB hardware
-	  in your computer provides to the operating system) and then choose
-	  from amongst the drivers for USB peripherals.  You may want to check
-	  out the information provided in <file:Documentation/usb/> and
-	  especially the links given in <file:Documentation/usb/usb-help.txt>.
+	  Say Y here if your computer has a host-side USB port and you want
+	  to use USB devices.  You then need to say Y to at least one of the
+	  Host Controller Driver (HCD) options below.  Choose a USB 1.1
+	  controller, such as "UHCI HCD support" or "OHCI HCD support",
+	  and "EHCI HCD (USB 2.0) support" except for older systems that
+	  do not have USB 2.0 support.  It doesn't normally hurt to select
+	  them all if you are not certain.
 
-	  If you have a new USB 2.0 High Speed system, you should also choose
-	  "EHCI HCD (USB 2.0) support" as well as at least one of UHCI or OHCI.
+	  If your system has a device-side USB port, used in the peripheral
+	  side of the USB protocol, see the "USB Gadget" framework instead.
 
-	  It doesn't normally hurt to select them all if you are not certain.
+	  After choosing your HCD, then select drivers for the USB peripherals
+	  you'll be using.  You may want to check out the information provided
+	  in <file:Documentation/usb/> and especially the links given in
+	  <file:Documentation/usb/usb-help.txt>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called usbcore.

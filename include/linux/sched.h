@@ -565,6 +565,10 @@ extern void node_nr_running_init(void);
 #define node_nr_running_init() {}
 #endif
 
+/* Move tasks off this (offline) CPU onto another. */
+extern void migrate_all_tasks(void);
+/* Try to move me here, if possible. */
+void migrate_to_cpu(int dest_cpu);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
@@ -617,13 +621,9 @@ struct runqueue {
  */
 extern struct exec_domain	default_exec_domain;
 
-#ifndef INIT_THREAD_SIZE
-# define INIT_THREAD_SIZE	2048*sizeof(long)
-#endif
-
 union thread_union {
 	struct thread_info thread_info;
-	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
+	unsigned long stack[THREAD_SIZE/sizeof(long)];
 };
 
 #ifndef __HAVE_ARCH_KSTACK_END

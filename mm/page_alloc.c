@@ -80,7 +80,7 @@ static void bad_page(const char *function, struct page *page)
 	printk(KERN_EMERG "Bad page state at %s (in process '%s', page %p)\n",
 		function, current->comm, page);
 	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapped:%d count:%d\n",
-		page->flags, page->mapping,
+		(unsigned long)page->flags, page->mapping,
 		page_mapped(page), page_count(page));
 	printk(KERN_EMERG "Backtrace:\n");
 	dump_stack();
@@ -1737,9 +1737,29 @@ struct seq_operations vmstat_op = {
 
 #endif /* CONFIG_PROC_FS */
 
+#ifdef CONFIG_HOTPLUG_CPU
+static int page_alloc_cpu_notify(struct notifier_block *self,
+				 unsigned long action, void *hcpu)
+{
+	int cpu = (unsigned long)hcpu;
+	long *count;
+
+	if (action == CPU_DEAD) {
+		/* Drain local pagecache count. */
+		count = &per_cpu(nr_pagecache_local, cpu);
+		atomic_add(*count, &nr_pagecache);
+		*count = 0;
+		local_irq_disable();
+		__drain_pages(cpu);
+		local_irq_enable();
+	}
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 void __init page_alloc_init(void)
 {
+	hotcpu_notifier(page_alloc_cpu_notify, 0);
 }
 
 /*

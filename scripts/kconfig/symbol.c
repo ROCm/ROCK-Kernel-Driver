@@ -31,6 +31,7 @@ struct symbol symbol_yes = {
 
 int sym_change_count;
 struct symbol *modules_sym;
+tristate modules_val;
 
 void sym_add_default(struct symbol *sym, const char *def)
 {
@@ -79,11 +80,8 @@ enum symbol_type sym_get_type(struct symbol *sym)
 	if (type == S_TRISTATE) {
 		if (sym_is_choice_value(sym) && sym->visible == yes)
 			type = S_BOOLEAN;
-		else {
-			sym_calc_value(modules_sym);
-			if (modules_sym->curr.tri == no)
-				type = S_BOOLEAN;
-		}
+		else if (modules_val == no)
+			type = S_BOOLEAN;
 	}
 	return type;
 }
@@ -153,6 +151,8 @@ static void sym_calc_visibility(struct symbol *sym)
 		prop->visible.tri = expr_calc_value(prop->visible.expr);
 		tri = E_OR(tri, prop->visible.tri);
 	}
+	if (tri == mod && (sym->type != S_TRISTATE || modules_val == no))
+		tri = yes;
 	if (sym->visible != tri) {
 		sym->visible = tri;
 		sym_set_changed(sym);
@@ -162,6 +162,8 @@ static void sym_calc_visibility(struct symbol *sym)
 	tri = no;
 	if (sym->rev_dep.expr)
 		tri = expr_calc_value(sym->rev_dep.expr);
+	if (tri == mod && sym_get_type(sym) == S_BOOLEAN)
+		tri = yes;
 	if (sym->rev_dep.tri != tri) {
 		sym->rev_dep.tri = tri;
 		sym_set_changed(sym);
@@ -268,14 +270,8 @@ void sym_calc_value(struct symbol *sym)
 				newval.tri = expr_calc_value(prop->expr);
 			}
 		}
-		if (sym_get_type(sym) == S_BOOLEAN) {
-			if (newval.tri == mod)
-				newval.tri = yes;
-			if (sym->visible == mod)
-				sym->visible = yes;
-			if (sym->rev_dep.tri == mod)
-				sym->rev_dep.tri = yes;
-		}
+		if (newval.tri == mod && sym_get_type(sym) == S_BOOLEAN)
+			newval.tri = yes;
 		break;
 	case S_STRING:
 	case S_HEX:
@@ -307,6 +303,8 @@ void sym_calc_value(struct symbol *sym)
 
 	if (memcmp(&oldval, &sym->curr, sizeof(oldval)))
 		sym_set_changed(sym);
+	if (modules_sym == sym)
+		modules_val = modules_sym->curr.tri;
 
 	if (sym_is_choice(sym)) {
 		int flags = sym->flags & (SYMBOL_CHANGED | SYMBOL_WRITE);
@@ -327,6 +325,8 @@ void sym_clear_all_valid(void)
 	for_all_symbols(i, sym)
 		sym->flags &= ~SYMBOL_VALID;
 	sym_change_count++;
+	if (modules_sym)
+		sym_calc_value(modules_sym);
 }
 
 void sym_set_changed(struct symbol *sym)

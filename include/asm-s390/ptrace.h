@@ -277,6 +277,14 @@ typedef struct
 			 PSW_MASK_IO | PSW_MASK_EXT | PSW_MASK_MCHECK | \
 			 PSW_MASK_PSTATE)
 
+/* This macro merges a NEW PSW mask specified by the user into
+   the currently active PSW mask CURRENT, modifying only those
+   bits in CURRENT that the user may be allowed to change: this
+   is the condition code and the program mask bits.  */
+#define PSW_MASK_MERGE(CURRENT,NEW) \
+	(((CURRENT) & ~(PSW_MASK_CC|PSW_MASK_PM)) | \
+	 ((NEW) & (PSW_MASK_CC|PSW_MASK_PM)))
+
 /*
  * The first entries in pt_regs and user_regs_struct
  * are common for the two structures. The s390_regs structure

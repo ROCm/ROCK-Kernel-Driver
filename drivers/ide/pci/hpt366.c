@@ -1,7 +1,7 @@
 /*
  * linux/drivers/ide/pci/hpt366.c		Version 0.34	Sept 17, 2002
  *
- * Copyright (C) 1999-2002		Andre Hedrick <andre@linux-ide.org>
+ * Copyright (C) 1999-2003		Andre Hedrick <andre@linux-ide.org>
  * Portions Copyright (C) 2001	        Sun Microsystems, Inc.
  *
  * Thanks to HighPoint Technologies for their assistance, and hardware.
@@ -641,6 +641,31 @@ static int hpt370_ide_dma_lostirq (ide_drive_t *drive)
 	return __ide_dma_lostirq(drive);
 }
 
+/* returns 1 if DMA IRQ issued, 0 otherwise */
+static int hpt374_ide_dma_test_irq(ide_drive_t *drive)
+{
+	ide_hwif_t *hwif	= HWIF(drive);
+	u16 bfifo		= 0;
+	u8 reginfo		= hwif->channel ? 0x56 : 0x52;
+	u8 dma_stat;
+
+	pci_read_config_word(hwif->pci_dev, reginfo, &bfifo);
+	if (bfifo & 0x1FF) {
+//		printk("%s: %d bytes in FIFO\n", drive->name, bfifo);
+		return 0;
+	}
+
+	dma_stat = hwif->INB(hwif->dma_status);
+	/* return 1 if INTR asserted */
+	if ((dma_stat & 4) == 4)
+		return 1;
+
+	if (!drive->waiting_for_dma)
+		printk(KERN_WARNING "%s: (%s) called while not waiting\n",
+				drive->name, __FUNCTION__);
+	return 0;
+}
+
 static int hpt374_ide_dma_end (ide_drive_t *drive)
 {
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
@@ -796,7 +821,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 	 */
 	pci_read_config_word(dev, 0x78, &freq);
 	freq &= 0x1FF;
-	if (freq < 0x9c) {
+	if (freq < 0xa0) {
 		pll = F_LOW_PCI_33;
 		if (hpt_minimum_revision(dev,8))
 			pci_set_drvdata(dev, (void *) thirty_three_base_hpt374);
@@ -872,7 +897,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 						       pll & ~0x100);
 				pci_write_config_byte(dev, 0x5b, 0x21);
 				if (hpt_minimum_revision(dev,8))
-					return -EOPNOTSUPP;
+					pci_set_drvdata(dev, (void *) fifty_base_hpt370a);
 				else if (hpt_minimum_revision(dev,5))
 					pci_set_drvdata(dev, (void *) fifty_base_hpt372);
 				else if (hpt_minimum_revision(dev,4))
@@ -1069,11 +1094,13 @@ static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
 		hwif->udma_four = ((ata66 & regmask) ? 0 : 1);
 	hwif->ide_dma_check = &hpt366_config_drive_xfer_rate;
 
-	if (hpt_minimum_revision(dev,8))
+	if (hpt_minimum_revision(dev,8)) {
+		hwif->ide_dma_test_irq = &hpt374_ide_dma_test_irq;
 		hwif->ide_dma_end = &hpt374_ide_dma_end;
-	else if (hpt_minimum_revision(dev,5))
+	} else if (hpt_minimum_revision(dev,5)) {
+		hwif->ide_dma_test_irq = &hpt374_ide_dma_test_irq;
 		hwif->ide_dma_end = &hpt374_ide_dma_end;
-	else if (hpt_minimum_revision(dev,3)) {
+	} else if (hpt_minimum_revision(dev,3)) {
 		hwif->ide_dma_begin = &hpt370_ide_dma_begin;
 		hwif->ide_dma_end = &hpt370_ide_dma_end;
 		hwif->ide_dma_timeout = &hpt370_ide_dma_timeout;

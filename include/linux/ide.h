@@ -742,8 +742,6 @@ typedef struct ide_drive_s {
 
 	u64		capacity64;	/* total number of sectors */
 
-	int		last_lun;	/* last logical unit */
-	int		forced_lun;	/* if hdxlun was given at boot */
 	int		lun;		/* logical unit */
 	int		crc_count;	/* crc counter to reduce drive speed */
 	struct list_head list;
@@ -937,7 +935,6 @@ typedef struct hwif_s {
 	int		mmio;		/* hosts iomio (0), mmio (1) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
 	int		irq;		/* our irq number */
-	int		initializing;	/* set while initializing self */
 
 	unsigned long	dma_master;	/* reference base addr dmabase */
 	unsigned long	dma_base;	/* base addr for dma ports */
@@ -1612,6 +1609,7 @@ extern int ide_dma_enable(ide_drive_t *drive);
 extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
+extern byte ide_dump_atapi_status(ide_drive_t *drive, const char *msg, byte stat);
 
 typedef struct ide_pio_timings_s {
 	int	setup_time;	/* Address setup (ns) minimum */

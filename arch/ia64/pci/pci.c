@@ -367,6 +367,7 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 				dev->resource[i].end   += window->offset;
 			}
 		}
+		pci_claim_resource(dev, i);
 	}
 }
 

@@ -261,7 +261,7 @@ A userspace daemon, devfsd, exists to allow for automatic creation and
 management of symbolic links from the devfs name space to the conventional
 names.  More details on devfs can be found on the DEVFS home site at
 <http://www.atnf.csiro.au/~rgooch/linux/> or in the file kernel
-documentation files, .../linux/Documentation/filesystems/devfs/REAME.
+documentation files, .../linux/Documentation/filesystems/devfs/README.
 
 If you are using devfs, existing devices are automatically created within
 the devfs name space.  Normal devices will be tts/F0 - tts/F255 and callout

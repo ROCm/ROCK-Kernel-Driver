@@ -188,7 +188,7 @@ static inline void eeh_memcpy_fromio(void *dest, void *src, unsigned long n) {
 	/* Look for ffff's here at dest[n].  Assume that at least 4 bytes
 	 * were copied. Check all four bytes.
 	 */
-	if ((n >= 4) && 
+	if ((n >= 4) &&
 		(EEH_POSSIBLE_ERROR(src, vsrc, (*((u32 *) dest+n-4)), u32))) {
 		eeh_check_failure(src, (*((u32 *) dest+n-4)));
 	}

@@ -371,7 +371,7 @@ static void *usb_remote_probe(struct usb_device *dev, unsigned int ifnum,
 
 #if KERNEL26
 	dev = interface_to_usbdev(intf);
-	idesc = &intf->altsetting[intf->act_altsetting];
+	idesc = intf->cur_altsetting;
 	if (idesc->desc.bNumEndpoints != 2)
 		return -ENODEV;
 	ep_in = &idesc->endpoint[0].desc;

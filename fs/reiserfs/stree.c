@@ -712,8 +712,8 @@ int search_by_key (struct super_block * p_s_sb,
 	   to search is still in the tree rooted from the current buffer. If
 	   not then repeat search from the root. */
 	if ( fs_changed (fs_gen, p_s_sb) && 
-	    (!B_IS_IN_TREE (p_s_bh) || 
-	     B_LEVEL(p_s_bh) != expected_level || 
+	    (!B_IS_IN_TREE (p_s_bh) ||
+	     B_LEVEL(p_s_bh) != expected_level ||
 	     !key_in_buffer(p_s_search_path, p_s_key, p_s_sb))) {
 	    PROC_INFO_INC( p_s_sb, search_by_key_fs_changed );
 	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );

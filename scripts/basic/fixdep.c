@@ -1,5 +1,5 @@
 /*
- * "Optimize" a list of dependencies as spit out by gcc -MD 
+ * "Optimize" a list of dependencies as spit out by gcc -MD
  * for the kernel build
  * ===========================================================================
  *
@@ -11,7 +11,7 @@
  *
  *
  * Introduction:
- * 
+ *
  * gcc produces a very nice and correct list of dependencies which
  * tells make when to remake a file.
  *
@@ -23,21 +23,21 @@
  * regenerated.  make notices that and will rebuild every file which
  * includes autoconf.h, i.e. basically all files. This is extremely
  * annoying if the user just changed CONFIG_HIS_DRIVER from n to m.
- * 
+ *
  * So we play the same trick that "mkdep" played before. We replace
  * the dependency on linux/autoconf.h by a dependency on every config
  * option which is mentioned in any of the listed prequisites.
- *  
+ *
  * To be exact, split-include populates a tree in include/config/,
  * e.g. include/config/his/driver.h, which contains the #define/#undef
  * for the CONFIG_HIS_DRIVER option.
  *
  * So if the user changes his CONFIG_HIS_DRIVER option, only the objects
  * which depend on "include/linux/config/his/driver.h" will be rebuilt,
- * so most likely only his driver ;-) 
+ * so most likely only his driver ;-)
  *
  * The idea above dates, by the way, back to Michael E Chastain, AFAIK.
- * 
+ *
  * So to get dependencies right, there two issues:
  * o if any of the files the compiler read changed, we need to rebuild
  * o if the command line given to the compile the file changed, we
@@ -89,7 +89,7 @@
  * we cannot miss a rebuild. Since people tend to not mention totally
  * unrelated CONFIG_ options all over the place, it's not an
  * efficiency problem either.
- * 
+ *
  * (Note: it'd be easy to port over the complete mkdep state machine,
  *  but I don't think the added complexity is worth it)
  */
@@ -233,7 +233,7 @@ void parse_config_file(char *map, size_t len)
 		}
 		continue;
 
-	found: 
+	found:
 		use_config(p+7, q-p-7);
 	}
 }
@@ -243,10 +243,10 @@ int strrcmp(char *s, char *sub)
 {
 	int slen = strlen(s);
 	int sublen = strlen(sub);
-  
+
 	if (sublen > slen)
 		return 1;
-	
+
 	return memcmp(s + slen - sublen, sub, sublen);
 }
 
@@ -273,7 +273,7 @@ void do_config_file(char *filename)
 		close(fd);
 		return;
 	}
-	
+
 	parse_config_file(map, st.st_size);
 
 	munmap(map, st.st_size);
@@ -344,7 +344,7 @@ void print_deps(void)
 		close(fd);
 		return;
 	}
-	
+
 	parse_dep_file(map, st.st_size);
 
 	munmap(map, st.st_size);
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
 
 	if (argc != 4)
 		usage();
-		
+
 	depfile = argv[1];
 	target = argv[2];
 	cmdline = argv[3];

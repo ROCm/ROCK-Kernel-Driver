@@ -27,10 +27,12 @@ ifeq ($(CONFIG_HID_FF),y)
 endif
 
 obj-$(CONFIG_USB_AIPTEK)	+= aiptek.o
+obj-$(CONFIG_USB_ATI_REMOTE)	+= ati_remote.o
 obj-$(CONFIG_USB_HID)		+= hid.o
 obj-$(CONFIG_USB_KBD)		+= usbkbd.o
-obj-$(CONFIG_USB_MOUSE)		+= usbmouse.o
-obj-$(CONFIG_USB_WACOM)		+= wacom.o
 obj-$(CONFIG_USB_KBTAB)		+= kbtab.o
+obj-$(CONFIG_USB_MOUSE)		+= usbmouse.o
+obj-$(CONFIG_USB_MTOUCH)	+= mtouchusb.o
 obj-$(CONFIG_USB_POWERMATE)	+= powermate.o
+obj-$(CONFIG_USB_WACOM)		+= wacom.o
 obj-$(CONFIG_USB_XPAD)		+= xpad.o

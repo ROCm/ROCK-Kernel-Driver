@@ -82,6 +82,7 @@
  */
 static int max_id = 64;
 static int max_channel = 3;
+static int init_timeout = 5;
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -91,6 +92,8 @@ module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
 module_param_named(max_channel, max_channel, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_channel, "Largest channel value");
+module_param_named(init_timeout, init_timeout, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(init_timeout, "Initialization timeout in seconds");
 
 /* ------------------------------------------------------------
  * Routines for the event pool and event structs
@@ -342,8 +345,8 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 			srp_cmd->data_out_format = SRP_DIRECT_BUFFER;
 		else
 			srp_cmd->data_in_format = SRP_DIRECT_BUFFER;
-		data->virtual_address = sg[0].dma_address;
-		data->length = sg[0].dma_length;
+		data->virtual_address = sg_dma_address(&sg[0]);
+		data->length = sg_dma_len(&sg[0]);
 		data->memory_handle = 0;
 		return 1;
 	}
@@ -368,10 +371,10 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 	for (i = 0; i < sg_mapped; ++i) {
 		struct memory_descriptor *descr = &indirect->list[i];
 		struct scatterlist *sg_entry = &sg[i];
-		descr->virtual_address = sg_entry->dma_address;
-		descr->length = sg_entry->dma_length;
+		descr->virtual_address = sg_dma_address(sg_entry);
+		descr->length = sg_dma_len(sg_entry);
 		descr->memory_handle = 0;
-		total_length += sg_entry->dma_length;
+		total_length += sg_dma_len(sg_entry);
 	}
 	indirect->total_length = total_length;
 
@@ -397,6 +400,10 @@ static int map_single_data(struct scsi_cmnd *cmd,
 	    (u64) (unsigned long)dma_map_single(dev, cmd->request_buffer,
 						cmd->request_bufflen,
 						DMA_BIDIRECTIONAL);
+	/* FIXME: one day this should return something other than 
+	 * 0xFFFFFFFF in case of error. currently arch/ppc64 returns
+	 * ((dma_addr_t)-1) in some cases
+	 */
 	if (data->virtual_address == 0xFFFFFFFF) {
 		printk(KERN_ERR
 		       "ibmvscsi: Unable to map request_buffer for command!\n");
@@ -646,14 +653,14 @@ static void login_rsp(struct srp_event_struct *evt_struct)
 		break;
 	case SRP_LOGIN_REJ_TYPE:	/* refused! */
 		printk(KERN_INFO "ibmvscsi: SRP_LOGIN_REQ rejected\n");
-		/* Login failed.  we are still scsi_blocked */
+		/* Login failed.  */
 		atomic_set(&hostdata->request_limit, -1);
 		return;
 	default:
 		printk(KERN_ERR
 		       "ibmvscsi: Invalid login response typecode 0x%02x!\n",
 		       evt_struct->evt->srp.generic.type);
-		/* Login failed.  we are still scsi_blocked */
+		/* Login failed.  */
 		atomic_set(&hostdata->request_limit, -1);
 		return;
 	}
@@ -666,9 +673,6 @@ static void login_rsp(struct srp_event_struct *evt_struct)
 
 	hostdata->host->can_queue =
 	    evt_struct->evt->srp.login_rsp.request_limit_delta;
-
-	/* Now allow commands (such the queued up scans) to go */
-	scsi_unblock_requests(hostdata->host);
 
 	return;
 }
@@ -841,10 +845,15 @@ void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
 		case 0x01:	/* Initialization message */
 			printk(KERN_INFO "ibmvscsi: partner initialized\n");
 			/* Send back a response */
-			ibmvscsi_send_crq(hostdata, 0xC002000000000000, 0);
-
-			/* Now login */
-			send_srp_login(hostdata);
+			if (ibmvscsi_send_crq(hostdata, 
+					      0xC002000000000000, 0) == 0) {
+				/* Now login */
+				send_srp_login(hostdata);
+			} else {
+				printk(KERN_ERR 
+				       "ibmvscsi: Unable to send init rsp\n");
+			}
+				       
 			break;
 		case 0x02:	/* Initialization response */
 			printk(KERN_INFO
@@ -860,7 +869,6 @@ void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
 	case 0xFF:		/* Hypervisor telling us the connection is closed */
 		printk(KERN_INFO "ibmvscsi: Virtual adapter failed!\n");
 
-		scsi_block_requests(hostdata->host);
 		atomic_set(&hostdata->request_limit, -1);
 		purge_requests(hostdata);
 		return;
@@ -948,6 +956,7 @@ int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata,
  * SCSI driver registration
  */
 static struct scsi_host_template driver_template = {
+	.module = THIS_MODULE,
 	.name = "SCSI host adapter emulator for RPA/iSeries Virtual I/O",
 	.proc_name = "ibmvscsi",
 	.queuecommand = ibmvscsi_queue,
@@ -967,7 +976,7 @@ struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev)
 {
 	struct ibmvscsi_host_data *hostdata;
 	struct Scsi_Host *host;
-	int rc;
+	unsigned long wait_switch = 0;
 
 	host = scsi_host_alloc(&driver_template, sizeof(*hostdata));
 	if (!host) {
@@ -992,29 +1001,40 @@ struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev)
 		goto init_pool_failed;
 	}
 
-	/* Try to send an initialization message.  Note that this is allowed
-	 * to fail if the other end is not active.
-	 */
-	rc = ibmvscsi_send_crq(hostdata, 0xC001000000000000, 0);
-
 	host->max_lun = 8;
 	host->max_id = max_id;
 	host->max_channel = max_channel;
 
-	/* Block requests until we get the SRP login back */
-	scsi_block_requests(host);
-
-	if (!scsi_add_host(hostdata->host, hostdata->dev)) {
-		/* If we can communicate with our server, scan
-		 * for devices */
-		if (rc == 0) {
-			scsi_scan_host(host);
+	if (scsi_add_host(hostdata->host, hostdata->dev))
+		goto add_host_failed;
+		
+	/* Try to send an initialization message.  Note that this is allowed
+	 * to fail if the other end is not acive.  In that case we don't
+	 * want to scan
+	 */
+	if (ibmvscsi_send_crq(hostdata, 0xC001000000000000, 0) == 0) {
+		/*
+		 * Wait around max init_timeout secs for the adapter to finish
+		 * initializing. When we are done initializing, we will have a 
+		 * valid request_limit.  We don't want Linux scanning before 
+		 * we are ready.
+		 */
+		for (wait_switch = jiffies + (init_timeout * HZ);
+		     time_before(jiffies,wait_switch) &&
+			     atomic_read(&hostdata->request_limit) < 0;) {
+			
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(5);
 		}
-		return hostdata;
+
+		/* if we now have a valid request_limit, initiate a scan */
+		if (atomic_read(&hostdata->request_limit) > 0) 
+			scsi_scan_host(host);
 	}
+	
+	return hostdata;
 
-	printk(KERN_ERR "ibmvscsi: couldn't add host\n");
-
+      add_host_failed:
 	release_event_pool(&hostdata->pool, hostdata);
       init_pool_failed:
 	ibmvscsi_release_crq_queue(&hostdata->queue, hostdata);

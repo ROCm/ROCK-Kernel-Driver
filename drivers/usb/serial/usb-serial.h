@@ -55,6 +55,7 @@
 #define __LINUX_USB_SERIAL_H
 
 #include <linux/config.h>
+#include <linux/kref.h>
 
 #define SERIAL_TTY_MAJOR	188	/* Nice legal number now */
 #define SERIAL_TTY_MINORS	255	/* loads of devices :) */
@@ -163,10 +164,10 @@ struct usb_serial {
 	__u16				vendor;
 	__u16				product;
 	struct usb_serial_port *	port[MAX_NUM_PORTS];
-	struct kobject			kobj;
+	struct kref			kref;
 	void *				private;
 };
-#define to_usb_serial(d) container_of(d, struct usb_serial, kobj)
+#define to_usb_serial(d) container_of(d, struct usb_serial, kref)
 
 #define NUM_DONT_CARE	(-1)
 

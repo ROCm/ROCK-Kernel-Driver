@@ -384,6 +384,23 @@ static void skb_return (struct usbnet *dev, struct sk_buff *skb)
 }
 
 
+#ifdef	CONFIG_USB_ALI_M5632
+#define	HAVE_HARDWARE
+
+/*-------------------------------------------------------------------------
+ *
+ * ALi M5632 driver ... does high speed
+ *
+ *-------------------------------------------------------------------------*/
+
+static const struct driver_info	ali_m5632_info = {
+	.description =	"ALi M5632",
+};
+
+
+#endif
+
+
 #ifdef	CONFIG_USB_AN2720
 #define	HAVE_HARDWARE
 
@@ -3009,7 +3026,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		return -ENODEV;
 	}
 	xdev = interface_to_usbdev (udev);
-	interface = &udev->altsetting [udev->act_altsetting];
+	interface = udev->cur_altsetting;
 
 	usb_get_dev (xdev);
 
@@ -3132,6 +3149,13 @@ out:
  */
 
 static const struct usb_device_id	products [] = {
+
+#ifdef	CONFIG_USB_ALI_M5632
+{
+	USB_DEVICE (0x0402, 0x5632),	// ALi defaults
+	.driver_info =	(unsigned long) &ali_m5632_info,
+},
+#endif
 
 #ifdef	CONFIG_USB_AN2720
 {
@@ -3310,6 +3334,15 @@ static const struct usb_device_id	products [] = {
 		 | USB_DEVICE_ID_MATCH_DEVICE,
 	.idVendor               = 0x04DD,
 	.idProduct              = 0x9032,	/* SL-6000 */
+	.bInterfaceClass        = 0x02,
+	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceProtocol     = 0x00,
+	.driver_info =  (unsigned long) &zaurus_pxa_info,
+}, {
+	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
+		 | USB_DEVICE_ID_MATCH_DEVICE,
+	.idVendor               = 0x04DD,
+	.idProduct              = 0x9050,	/* C-860 */
 	.bInterfaceClass        = 0x02,
 	.bInterfaceSubClass     = 0x0a,
 	.bInterfaceProtocol     = 0x00,

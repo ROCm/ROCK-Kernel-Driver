@@ -1952,6 +1952,7 @@ static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long ar
 		set_fs (KERNEL_DS);
 		err = sys_ioctl(fd, cmd, (unsigned long)&a);
 		set_fs (old_fs);
+		break;
 	default:
 		return -EINVAL;
 	}                                        

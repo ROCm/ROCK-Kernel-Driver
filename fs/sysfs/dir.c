@@ -20,6 +20,18 @@ static int init_dir(struct inode * inode)
 	return 0;
 }
 
+static void sysfs_d_iput(struct dentry * dentry, struct inode * inode)
+{
+	struct kobject * kobj = dentry->d_fsdata;
+
+	if (kobj)
+		kobject_put(kobj);
+	iput(inode);
+}
+
+static struct dentry_operations sysfs_dentry_operations = {
+	.d_iput	= &sysfs_d_iput,
+};
 
 static int create_dir(struct kobject * k, struct dentry * p,
 		      const char * n, struct dentry ** d)
@@ -33,7 +45,8 @@ static int create_dir(struct kobject * k, struct dentry * p,
 					 S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO,
 					 init_dir);
 		if (!error) {
-			(*d)->d_fsdata = k;
+			(*d)->d_op = &sysfs_dentry_operations;
+			(*d)->d_fsdata = kobject_get(k);
 			p->d_inode->i_nlink++;
 		}
 		dput(*d);
@@ -96,8 +109,6 @@ static void remove_dir(struct dentry * d)
 void sysfs_remove_subdir(struct dentry * d)
 {
 	remove_dir(d);
-	/* release the "extra" ref taken during sysfs_create() */
-	dput(d);
 }
 
 

@@ -1,4 +1,7 @@
 /*
+ * (C) Copyright IBM Corp. 2004
+ * tape_class.c ($Revision: 1.6 $)
+ *
  * Tape class device support
  *
  * Author: Stefan Bader <shbader@de.ibm.com>
@@ -6,11 +9,12 @@
  */
 #include "tape_class.h"
 
-#ifndef TAPE390_INTERNAL_CLASS
 MODULE_AUTHOR("Stefan Bader <shbader@de.ibm.com>");
-MODULE_DESCRIPTION("Tape class");
+MODULE_DESCRIPTION(
+	"(C) Copyright IBM Corp. 2004   All Rights Reserved.\n"
+	"tape_class.c ($Revision: 1.6 $)"
+);
 MODULE_LICENSE("GPL");
-#endif
 
 struct class_simple *tape_class;
 
@@ -29,69 +33,94 @@ struct class_simple *tape_class;
  * devname
  *	The pointer to the name of the character device.
  */
-struct cdev *register_tape_dev(
+struct tape_class_device *register_tape_dev(
 	struct device *		device,
 	dev_t			dev,
 	struct file_operations *fops,
-	char *			devname
-) {
-	struct cdev *	cdev;
+	char *			device_name,
+	char *			mode_name)
+{
+	struct tape_class_device *	tcd;
 	int		rc;
 	char *		s;
 
-	cdev = cdev_alloc();
-	if (!cdev)
+	tcd = kmalloc(sizeof(struct tape_class_device), GFP_KERNEL);
+	if (!tcd)
 		return ERR_PTR(-ENOMEM);
 
-	cdev->owner = fops->owner;
-	cdev->ops   = fops;
-	cdev->dev   = dev;
+	memset(tcd, 0, sizeof(struct tape_class_device));
+	strncpy(tcd->device_name, device_name, TAPECLASS_NAME_LEN);
+	for (s = strchr(tcd->device_name, '/'); s; s = strchr(s, '/'))
+		*s = '!';
+	strncpy(tcd->mode_name, mode_name, TAPECLASS_NAME_LEN);
+	for (s = strchr(tcd->mode_name, '/'); s; s = strchr(s, '/'))
+		*s = '!';
 
-	rc = cdev_add(cdev, cdev->dev, 1);
-	if (rc) {
-		cdev_del(cdev);
-		return ERR_PTR(rc);
+	tcd->char_device = cdev_alloc();
+	if (!tcd->char_device) {
+		rc = -ENOMEM;
+		goto fail_with_tcd;
 	}
-	class_simple_device_add(tape_class, cdev->dev, device, "%s", devname);
 
-	return cdev;
+	tcd->char_device->owner = fops->owner;
+	tcd->char_device->ops   = fops;
+	tcd->char_device->dev   = dev;
+
+	rc = cdev_add(tcd->char_device, tcd->char_device->dev, 1);
+	if (rc)
+		goto fail_with_cdev;
+
+	tcd->class_device = class_simple_device_add(
+				tape_class,
+				tcd->char_device->dev,
+				device,
+				"%s", tcd->device_name
+			);
+	sysfs_create_link(
+		&device->kobj,
+		&tcd->class_device->kobj,
+		tcd->mode_name
+	);
+
+	return tcd;
+
+fail_with_cdev:
+	cdev_del(&tcd->char_device);
+
+fail_with_tcd:
+	kfree(tcd);
+
+	return ERR_PTR(rc);
 }
 EXPORT_SYMBOL(register_tape_dev);
 
-void unregister_tape_dev(struct cdev *cdev)
+void unregister_tape_dev(struct tape_class_device *tcd)
 {
-	if (cdev != NULL) {
-		class_simple_device_remove(cdev->dev);
-		cdev_del(cdev);
+	if (tcd != NULL && !IS_ERR(tcd)) {
+		sysfs_remove_link(
+			&tcd->class_device->dev->kobj,
+			tcd->mode_name
+		);
+		class_simple_device_remove(tcd->char_device->dev);
+		cdev_del(tcd->char_device);
+		kfree(tcd);
 	}
 }
 EXPORT_SYMBOL(unregister_tape_dev);
 
 
-#ifndef TAPE390_INTERNAL_CLASS
 static int __init tape_init(void)
-#else
-int tape_setup_class(void)
-#endif
 {
 	tape_class = class_simple_create(THIS_MODULE, "tape390");
+
 	return 0;
 }
 
-#ifndef TAPE390_INTERNAL_CLASS
 static void __exit tape_exit(void)
-#else
-void tape_cleanup_class(void)
-#endif
 {
 	class_simple_destroy(tape_class);
 	tape_class = NULL;
 }
 
-#ifndef TAPE390_INTERNAL_CLASS
 postcore_initcall(tape_init);
 module_exit(tape_exit);
-#else
-EXPORT_SYMBOL(tape_setup_class);
-EXPORT_SYMBOL(tape_cleanup_class);
-#endif

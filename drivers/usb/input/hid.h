@@ -201,15 +201,16 @@ struct hid_item {
  * HID device quirks.
  */
 
-#define HID_QUIRK_INVERT		0x001
-#define HID_QUIRK_NOTOUCH		0x002
-#define HID_QUIRK_IGNORE		0x004
-#define HID_QUIRK_NOGET			0x008
-#define HID_QUIRK_HIDDEV		0x010
-#define HID_QUIRK_BADPAD		0x020
-#define HID_QUIRK_MULTI_INPUT		0x040
-#define HID_QUIRK_2WHEEL_MOUSE_HACK	0x080
-#define HID_QUIRK_2WHEEL_MOUSE_HACK_ON	0x100
+#define HID_QUIRK_INVERT			0x001
+#define HID_QUIRK_NOTOUCH			0x002
+#define HID_QUIRK_IGNORE			0x004
+#define HID_QUIRK_NOGET				0x008
+#define HID_QUIRK_HIDDEV			0x010
+#define HID_QUIRK_BADPAD			0x020
+#define HID_QUIRK_MULTI_INPUT			0x040
+#define HID_QUIRK_2WHEEL_MOUSE_HACK_BACK	0x080
+#define HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA	0x100
+#define HID_QUIRK_2WHEEL_MOUSE_HACK_ON		0x200
 
 /*
  * This is the global environment of the parser. This information is
@@ -309,7 +310,7 @@ struct hid_report_enum {
 
 #define HID_REPORT_TYPES 3
 
-#define HID_BUFFER_SIZE		32
+#define HID_BUFFER_SIZE		64		/* use 64 for compatibility with all possible packetlen */
 #define HID_CONTROL_FIFO_SIZE	256		/* to init devices with >100 reports */
 #define HID_OUTPUT_FIFO_SIZE	64
 

@@ -55,8 +55,9 @@ Build and install the new kernel and modules.
 --------------------------------------
 This version of the bonding driver requires updated ifenslave program. The
 original one from extreme-linux and beowulf will not work. Kernels 2.4.12
-and above include the updated version of ifenslave.c in Documentation/network
-directory. For older kernels, please follow the links at the end of this file.
+and above include the updated version of ifenslave.c in
+Documentation/networking directory. For older kernels, please follow the
+links at the end of this file.
 
 IMPORTANT!!!  If you are running on Redhat 7.1 or greater, you need
 to be careful because /usr/include/linux is no longer a symbolic link

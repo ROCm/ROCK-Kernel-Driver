@@ -20,6 +20,7 @@
 #include <linux/ctype.h>
 #include <linux/time.h>
 #include <linux/string.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -194,18 +195,18 @@ int check_location (char *c, int idx, char * buf);
 /* ****************************************************************** */
 /* MAIN                                                               */
 /* ****************************************************************** */
-void proc_rtas_init(void)
+static int __init proc_rtas_init(void)
 {
 	struct proc_dir_entry *entry;
 
 	rtas = find_devices("rtas");
 	if ((rtas == 0) || (_machine != _MACH_chrp)) {
-		return;
+		return 1;
 	}
 
 	proc_rtas = proc_mkdir("rtas", 0);
 	if (proc_rtas == 0)
-		return;
+		return 1;
 
 	/* /proc/rtas entries */
 
@@ -226,7 +227,10 @@ void proc_rtas_init(void)
 
 	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
+
+	return 0;
 }
+__initcall(proc_rtas_init);
 
 /* ****************************************************************** */
 /* POWER-ON-TIME                                                      */

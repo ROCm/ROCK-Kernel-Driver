@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/topology.h>
+#include <linux/interrupt.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -618,6 +619,7 @@ EXPORT_SYMBOL(pci_unmap_single);
 EXPORT_SYMBOL(pci_dma_supported);
 EXPORT_SYMBOL(no_iommu);
 EXPORT_SYMBOL(force_iommu); 
+EXPORT_SYMBOL(bad_dma_address);
 
 static __init unsigned long check_iommu_size(unsigned long aper, u64 aper_size)
 { 

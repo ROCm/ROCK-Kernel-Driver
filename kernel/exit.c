@@ -1158,9 +1158,10 @@ end_wait4:
 	return retval;
 }
 
-EXPORT_SYMBOL(sys_wait4);
+EXPORT_SYMBOL(sys_wait4); /* kernel/arch/ia64/sn/kernel/xpc.ko needs unknown symbol sys_wait4 */
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
+#if !defined(__alpha__) && !defined(__ia64__) && \
+    !defined(__arm__) && !defined(__s390__)
 
 /*
  * sys_waitpid() remains for compatibility. waitpid() should be

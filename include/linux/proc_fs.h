@@ -141,10 +141,6 @@ static inline void proc_device_tree_add_node(struct device_node *np, struct proc
 	return;
 }
 #endif /* CONFIG_PROC_DEVICETREE */
-/*
- * proc_rtas.c
- */
-extern void proc_rtas_init(void);
 
 extern struct proc_dir_entry *proc_symlink(const char *,
 		struct proc_dir_entry *, const char *);

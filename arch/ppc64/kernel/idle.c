@@ -26,6 +26,7 @@
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/cpu.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -150,6 +151,8 @@ int default_idle(void)
 		}
 
 		schedule();
+		if (cpu_is_offline(smp_processor_id()) && system_running)
+			cpu_die();
 	}
 
 	return 0;
@@ -236,6 +239,8 @@ int dedicated_idle(void)
 		HMT_medium();
 		lpaca->xLpPaca.xIdle = 0;
 		schedule();
+		if (cpu_is_offline(smp_processor_id()) && system_running)
+			cpu_die();
 	}
 	return 0;
 }
@@ -245,6 +250,9 @@ int shared_idle(void)
 	struct paca_struct *lpaca = get_paca();
 
 	while (1) {
+		if (cpu_is_offline(smp_processor_id()) && system_running)
+			cpu_die();
+
 		/* Indicate to the HV that we are idle.  Now would be
 		 * a good time to find other work to dispatch. */
 		lpaca->xLpPaca.xIdle = 1;

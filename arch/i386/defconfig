@@ -66,7 +66,6 @@ CONFIG_MPENTIUM4=y
 # CONFIG_MK6 is not set
 # CONFIG_MK7 is not set
 # CONFIG_MK8 is not set
-# CONFIG_MELAN is not set
 # CONFIG_MCRUSOE is not set
 # CONFIG_MWINCHIPC6 is not set
 # CONFIG_MWINCHIP2 is not set
@@ -141,7 +140,6 @@ CONFIG_ACPI_EC=y
 CONFIG_ACPI_POWER=y
 CONFIG_ACPI_PCI=y
 CONFIG_ACPI_SYSTEM=y
-# CONFIG_ACPI_RELAXED_AML is not set
 # CONFIG_X86_PM_TIMER is not set
 
 #

@@ -144,6 +144,11 @@ typedef struct
 			 PSW32_MASK_IO | PSW32_MASK_EXT | PSW32_MASK_MCHECK | \
 			 PSW32_MASK_PSTATE)
 
+#define PSW32_MASK_MERGE(CURRENT,NEW) \
+        (((CURRENT) & ~(PSW32_MASK_CC|PSW32_MASK_PM)) | \
+         ((NEW) & (PSW32_MASK_CC|PSW32_MASK_PM)))
+
+
 typedef struct
 {
 	_psw_t32	psw;

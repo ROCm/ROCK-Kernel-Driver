@@ -618,7 +618,6 @@ void pdc202xx_reset (ide_drive_t *drive)
 	 */
 	if (hwif->present) {
 		u16 hunit = 0;
-		hwif->initializing = 1;
 		for (hunit = 0; hunit < MAX_DRIVES; ++hunit) {
 			ide_drive_t *hdrive = &hwif->drives[hunit];
 			if (hdrive->present) {
@@ -628,11 +627,9 @@ void pdc202xx_reset (ide_drive_t *drive)
 					hwif->tuneproc(hdrive, 5);
 			}
 		}
-		hwif->initializing = 0;
 	}
 	if (mate->present) {
 		u16 munit = 0;
-		mate->initializing = 1;
 		for (munit = 0; munit < MAX_DRIVES; ++munit) {
 			ide_drive_t *mdrive = &mate->drives[munit];
 			if (mdrive->present) {
@@ -642,7 +639,6 @@ void pdc202xx_reset (ide_drive_t *drive)
 					mate->tuneproc(mdrive, 5);
 			}
 		}
-		mate->initializing = 0;
 	}
 #else
 	hwif->tuneproc(drive, 5);

@@ -11,7 +11,7 @@
 #define H_LongBusyOrder1sec    9903  /* Long busy, hint that 1sec is a good time to retry */
 #define H_LongBusyOrder10sec   9904  /* Long busy, hint that 10sec is a good time to retry */
 #define H_LongBusyOrder100sec  9905  /* Long busy, hint that 100sec is a good time to retry */
-#define H_LongBusyEndRange     9905  /* End of long busy range */ 
+#define H_LongBusyEndRange     9905  /* End of long busy range */
 #define H_Hardware	-1	/* Hardware error */
 #define H_Function	-2	/* Function not supported */
 #define H_Privilege	-3	/* Caller not privileged */
@@ -35,7 +35,7 @@
  * firmware for long periods of time. Annoyingly the firmware can return
  * a range of return codes, hinting at how long we should wait before
  * retrying.  If you don't care for the hint, the macro below is a good
- * way to check for the long_busy return codes 
+ * way to check for the long_busy return codes
  */
 #define H_isLongBusy(x)  ((x >= H_LongBusyStartRange) && (x <= H_LongBusyEndRange))
 

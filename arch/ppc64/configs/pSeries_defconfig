@@ -47,6 +47,7 @@ CONFIG_MODULE_UNLOAD=y
 CONFIG_OBSOLETE_MODPARM=y
 # CONFIG_MODVERSIONS is not set
 # CONFIG_KMOD is not set
+CONFIG_STOP_MACHINE=y
 
 #
 # Platform support
@@ -134,6 +135,7 @@ CONFIG_BLK_DEV_FD=y
 CONFIG_BLK_DEV_LOOP=y
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 CONFIG_BLK_DEV_NBD=m
+# CONFIG_BLK_DEV_CARMEL is not set
 CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
@@ -221,6 +223,12 @@ CONFIG_SCSI_MULTI_LUN=y
 CONFIG_SCSI_REPORT_LUNS=y
 CONFIG_SCSI_CONSTANTS=y
 # CONFIG_SCSI_LOGGING is not set
+
+#
+# SCSI Transport Attributes
+#
+CONFIG_SCSI_SPI_ATTRS=y
+CONFIG_SCSI_FC_ATTRS=y
 
 #
 # SCSI low-level drivers
@@ -520,6 +528,7 @@ CONFIG_IBMOL=y
 # CONFIG_TMS380TR is not set
 # CONFIG_NET_FC is not set
 # CONFIG_SHAPER is not set
+CONFIG_NETCONSOLE=y
 
 #
 # Wan interfaces
@@ -540,6 +549,10 @@ CONFIG_IBMOL=y
 # Bluetooth support
 #
 # CONFIG_BT is not set
+CONFIG_NETPOLL=y
+CONFIG_NETPOLL_RX=y
+CONFIG_NETPOLL_TRAP=y
+CONFIG_NET_POLL_CONTROLLER=y
 
 #
 # ISDN subsystem
@@ -639,7 +652,6 @@ CONFIG_HVCS=m
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
-# CONFIG_NVRAM is not set
 # CONFIG_RTC is not set
 # CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
@@ -652,7 +664,7 @@ CONFIG_HVCS=m
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 CONFIG_RAW_DRIVER=y
-CONFIG_MAX_RAW_DEVS=256
+CONFIG_MAX_RAW_DEVS=2048
 
 #
 # I2C support
@@ -673,7 +685,6 @@ CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_ALI15X3 is not set
 # CONFIG_I2C_AMD756 is not set
 # CONFIG_I2C_AMD8111 is not set
-# CONFIG_I2C_ELV is not set
 # CONFIG_I2C_I801 is not set
 # CONFIG_I2C_I810 is not set
 # CONFIG_I2C_ISA is not set
@@ -685,7 +696,6 @@ CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_SIS5595 is not set
 # CONFIG_I2C_SIS630 is not set
 # CONFIG_I2C_SIS96X is not set
-# CONFIG_I2C_VELLEMAN is not set
 # CONFIG_I2C_VIA is not set
 # CONFIG_I2C_VIAPRO is not set
 # CONFIG_I2C_VOODOO3 is not set
@@ -824,16 +834,10 @@ CONFIG_USB_STORAGE=y
 #
 # USB Human Interface Devices (HID)
 #
-CONFIG_USB_HID=m
+CONFIG_USB_HID=y
 CONFIG_USB_HIDINPUT=y
 # CONFIG_HID_FF is not set
 CONFIG_USB_HIDDEV=y
-
-#
-# USB HID Boot Protocol drivers
-#
-# CONFIG_USB_KBD is not set
-# CONFIG_USB_MOUSE is not set
 # CONFIG_USB_AIPTEK is not set
 # CONFIG_USB_WACOM is not set
 # CONFIG_USB_KBTAB is not set

@@ -376,8 +376,10 @@ static inline int handle_irq_event(int irq, struct pt_regs *regs,
 	int status = 0;
 	int retval = 0;
 
+#ifndef CONFIG_PPC_ISERIES
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
+#endif
 
 	do {
 		status |= action->flags;
@@ -386,7 +388,9 @@ static inline int handle_irq_event(int irq, struct pt_regs *regs,
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
+#ifndef CONFIG_PPC_ISERIES
 	local_irq_disable();
+#endif
 	return retval;
 }
 
@@ -580,13 +584,13 @@ int do_IRQ(struct pt_regs *regs)
 	irq_enter();
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
-	/* Debugging check for stack overflow: is there less than 8KB free? */
+	/* Debugging check for stack overflow: is there less than 4KB free? */
 	{
 		long sp;
 
 		sp = __get_SP() & (THREAD_SIZE-1);
 
-		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
+		if (unlikely(sp < (sizeof(struct thread_info) + 4096))) {
 			printk("do_IRQ: stack overflow: %ld\n",
 				sp - sizeof(struct thread_info));
 			dump_stack();
@@ -681,6 +685,7 @@ static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
+/* Protected by get_irq_desc(irq)->lock. */
 #ifdef CONFIG_IRQ_ALL_CPUS
 cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 #else  /* CONFIG_IRQ_ALL_CPUS */
@@ -702,16 +707,16 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 {
 	unsigned int irq = (long)data;
 	irq_desc_t *desc = get_irq_desc(irq);
-	int full_count = count, err;
+	int ret;
 	cpumask_t new_value, tmp;
 	cpumask_t allcpus = CPU_MASK_ALL;
 
 	if (!desc->handler->set_affinity)
 		return -EIO;
 
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
+	ret = cpumask_parse(buffer, count, new_value);
+	if (ret != 0)
+		return ret;
 
 	/*
 	 * We check for CPU_MASK_ALL in xics to send irqs to all cpus.
@@ -721,18 +726,28 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 */
 	cpus_and(new_value, new_value, allcpus);
 
+	/* Grab lock here so cpu_online_map can't change, and also
+	 * protect irq_affinity[]. */
+        spin_lock(&desc->lock);
+
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
 	 */
 	cpus_and(tmp, new_value, cpu_online_map);
-	if (cpus_empty(tmp))
-		return -EINVAL;
+	if (cpus_empty(tmp)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	irq_affinity[irq] = new_value;
 	desc->handler->set_affinity(irq, new_value);
-	return full_count;
+	ret = count;
+
+out:
+	spin_unlock(&desc->lock);
+	return ret;
 }
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
@@ -927,7 +942,7 @@ unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
 
 	if (virq > MAX_VIRT_IRQ)
 		virq = (virq % NR_VIRT_IRQS) + MIN_VIRT_IRQ;
-	
+
 	first_virq = virq;
 
 	do {
@@ -940,10 +955,9 @@ unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
 			virq = 0;
 
 	} while (first_virq != virq);
-	      
-	return NO_IRQ;
-	
-}
 
+	return NO_IRQ;
+
+}
 
 #endif

@@ -207,7 +207,6 @@ static struct ata_port_operations vsc_sata_ops = {
 	.exec_command		= ata_exec_command_mmio,
 	.check_status		= ata_check_status_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,
@@ -268,10 +267,10 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	/*
 	 * Use 32 bit DMA mask, because 64 bit address support is poor.
 	 */
-	rc = pci_set_dma_mask(pdev, 0xFFFFFFFF);
+	rc = pci_set_dma_mask(pdev, 0xFFFFFFFFULL);
 	if (rc)
 		goto err_out_regions;
-	rc = pci_set_consistent_dma_mask(pdev, 0xFFFFFFFF);
+	rc = pci_set_consistent_dma_mask(pdev, 0xFFFFFFFFULL);
 	if (rc)
 		goto err_out_regions;
 
@@ -310,7 +309,7 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	 * if we don't fill these
 	 */
 	probe_ent->pio_mask = 0x1f;
-	probe_ent->udma_mask = 0x3f;
+	probe_ent->udma_mask = 0x7f;
 
 	/* We have 4 ports per PCI function */
 	vsc_sata_setup_port(&probe_ent->port[0], base + 1 * VSC_SATA_PORT_OFFSET);
