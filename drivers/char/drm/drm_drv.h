@@ -480,6 +480,9 @@ static int DRM(probe)(struct pci_dev *pdev)
 	if (DRM(numdevs) >= MAX_DEVICES)
 		return -ENODEV;
 
+	if ((retcode=pci_enable_device(pdev)))
+		return retcode;
+
 	dev = &(DRM(device)[DRM(numdevs)]);
 
 	memset( (void *)dev, 0, sizeof(*dev) );
