@@ -453,7 +453,7 @@ media_picked:
 		tulip_select_media(dev, 1);
 
 	/* Start the chip's Tx to process setup frame. */
-	tulip_stop_rxtx(tp);
+	(void)tulip_stop_rxtx(tp);
 	barrier();
 	udelay(5);
 	outl(tp->csr6 | TxOn, ioaddr + CSR6);
@@ -739,7 +739,8 @@ static void tulip_down (struct net_device *dev)
 	outl (0x00000000, ioaddr + CSR7);
 
 	/* Stop the Tx and Rx processes. */
-	tulip_stop_rxtx(tp);
+	if (tulip_stop_rxtx(tp))
+		printk (KERN_DEBUG "%s: tulip_down(): tulip_stop_rxtx() failed\n", dev->name);
 
 	/* prepare receive buffers */
 	tulip_refill_rx(dev);
@@ -1411,7 +1412,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #endif
 
 	/* Stop the chip's Tx and Rx processes. */
-	tulip_stop_rxtx(tp);
+	(void)tulip_stop_rxtx(tp);
 
 	pci_set_master(pdev);
 
@@ -1783,6 +1784,10 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 		return;
 
 	tp = netdev_priv(dev);
+
+	/* shoot NIC in the head before deallocating descriptors */
+	pci_disable_device(tp->pdev);
+
 	unregister_netdev(dev);
 	pci_free_consistent (pdev,
 			     sizeof (struct tulip_rx_desc) * RX_RING_SIZE +

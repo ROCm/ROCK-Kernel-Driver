@@ -471,16 +471,18 @@ static inline void tulip_start_rxtx(struct tulip_private *tp)
 	(void) inl(ioaddr + CSR6); /* mmio sync */
 }
 
-static inline void tulip_stop_rxtx(struct tulip_private *tp)
+static inline int tulip_stop_rxtx(struct tulip_private *tp)
 {
 	long ioaddr = tp->base_addr;
 	u32 csr6 = inl(ioaddr + CSR6);
+	unsigned int i = 13; /* min of 1250usec */
 
 	if (csr6 & RxTx) {
 		outl(csr6 & ~RxTx, ioaddr + CSR6);
 		barrier();
-		(void) inl(ioaddr + CSR6); /* mmio sync */
+		while (i-- && ((inl(ioaddr + CSR5) & (TxDied|RxDied)) != (TxDied|RxDied))) udelay(100); /* mmio sync */
 	}
+	return (!(i>0)); /* return 0 (success) or 1 (failure) */;
 }
 
 static inline void tulip_restart_rxtx(struct tulip_private *tp)
