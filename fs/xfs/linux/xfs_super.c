@@ -57,7 +57,7 @@ extern void xfs_cleanup(void);
 #endif
 
 #ifdef CONFIG_XFS_QUOTA
-static struct quotactl_ops linvfs_qops = {
+STATIC struct quotactl_ops linvfs_qops = {
 	.get_xstate		= linvfs_getxstate,
 	.set_xstate		= linvfs_setxstate,
 	.get_xquota		= linvfs_getxquota,
@@ -76,8 +76,8 @@ void dmapi_uninit(void);
 #define dmapi_uninit()
 #endif
 
-static struct super_operations linvfs_sops;
-static struct export_operations linvfs_export_ops;
+STATIC struct super_operations linvfs_sops;
+STATIC struct export_operations linvfs_export_ops;
 
 #define MNTOPT_LOGBUFS	"logbufs"	/* number of XFS log buffers */
 #define MNTOPT_LOGBSIZE "logbsize"	/* size of XFS log buffers */
@@ -111,21 +111,18 @@ static struct export_operations linvfs_export_ops;
 
 STATIC int
 xfs_parseargs(
-	char		*options,
-	int		flags,
-	struct xfs_mount_args *args)
+	char			*options,
+	int			flags,
+	struct xfs_mount_args	*args)
 {
-	char		*this_char, *value, *eov;
-	int		logbufs = -1;
-	int		logbufsize = -1;
-	int		dsunit, dswidth, vol_dsunit, vol_dswidth;
-	int		iosize;
-	int		rval = 1;	/* failure is default */
+	char			*this_char, *value, *eov;
+	int			logbufs = -1;
+	int			logbufsize = -1;
+	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
+	int			iosize;
+	int			rval = 1;	/* failure is default */
 
 	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
-	memset(args, 0, sizeof(struct xfs_mount_args));
-	args->slcount = args->stimeout = args->ctimeout = -1;
-	args->mtpt[0] = '\0';
 
 	/* Copy the already-parsed mount(2) flags we're interested in */
 	if (flags & MS_NOATIME)
@@ -137,10 +134,10 @@ xfs_parseargs(
 		return 0;
 	}
 
-	while ((this_char = strsep (&options, ",")) != NULL) {
+	while ((this_char = strsep(&options, ",")) != NULL) {
 		if (!*this_char)
 			continue;
-		if ((value = strchr (this_char, '=')) != NULL)
+		if ((value = strchr(this_char, '=')) != NULL)
 			*value++ = 0;
 
 		if (!strcmp(this_char, MNTOPT_LOGBUFS)) {
@@ -273,12 +270,12 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
  */
 STATIC int
 spectodev(
-	const char	*name,
-	const char	*id,
-	dev_t		*dev)
+	const char		*name,
+	const char		*id,
+	dev_t			*dev)
 {
-	struct nameidata nd;
-	int		error;
+	struct nameidata	nd;
+	int			error;
 
 	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
 	if (error)
@@ -294,13 +291,13 @@ spectodev(
  */
 int
 spectodevs(
-	struct super_block *sb,
-	struct xfs_mount_args *args,
-	dev_t		*ddevp,
-	dev_t		*logdevp,
-	dev_t		*rtdevp)
+	struct super_block	*sb,
+	struct xfs_mount_args	*args,
+	dev_t			*ddevp,
+	dev_t			*logdevp,
+	dev_t			*rtdevp)
 {
-	int		rval = 0;
+	int			rval = 0;
 
 	*ddevp = sb->s_dev;
 
@@ -317,9 +314,9 @@ spectodevs(
 }
 
 
-static kmem_cache_t * linvfs_inode_cachep;
+STATIC kmem_cache_t * linvfs_inode_cachep;
 
-static __inline__ unsigned int gfp_mask(void)
+STATIC __inline__ unsigned int gfp_mask(void)
 {
 	/* If we're not in a transaction, FS activity is ok */
 	if (current->flags & PF_FSTRANS) return GFP_NOFS;
@@ -327,9 +324,11 @@ static __inline__ unsigned int gfp_mask(void)
 }
 
 
-static struct inode *linvfs_alloc_inode(struct super_block *sb)
+STATIC struct inode *
+linvfs_alloc_inode(
+	struct super_block	*sb)
 {
-	vnode_t *vp;
+	vnode_t			*vp;
 
 	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, gfp_mask());
 	if (!vp)
@@ -337,20 +336,28 @@ static struct inode *linvfs_alloc_inode(struct super_block *sb)
 	return LINVFS_GET_IP(vp);
 }
 
-static void linvfs_destroy_inode(struct inode *inode)
+STATIC void
+linvfs_destroy_inode(
+	struct inode		*inode)
 {
 	kmem_cache_free(linvfs_inode_cachep, LINVFS_GET_VP(inode));
 }
 
-static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+STATIC void
+init_once(
+	void			*data,
+	kmem_cache_t		*cachep,
+	unsigned long		flags)
 {
-	vnode_t *vp = (vnode_t *)foo;
+	vnode_t			*vp = (vnode_t *)data;
+
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR)
 		inode_init_once(LINVFS_GET_IP(vp));
 }
 
-static int init_inodecache(void)
+STATIC int
+init_inodecache( void )
 {
 	linvfs_inode_cachep = kmem_cache_create("linvfs_icache",
 				sizeof(vnode_t), 0, SLAB_HWCACHE_ALIGN,
@@ -361,36 +368,36 @@ static int init_inodecache(void)
 	return 0;
 }
 
-static void destroy_inodecache(void)
+STATIC void
+destroy_inodecache( void )
 {
 	if (kmem_cache_destroy(linvfs_inode_cachep))
-		printk(KERN_INFO "linvfs_inode_cache: not all structures were freed\n");
+		printk(KERN_INFO
+			"linvfs_inode_cache: not all structures were freed\n");
 }
 
 static int
 linvfs_fill_super(
-	struct super_block *sb,
-	void		*data,
-	int		silent)
+	struct super_block	*sb,
+	void			*data,
+	int			silent)
 {
-	vfs_t		*vfsp;
-	vfsops_t	*vfsops;
-	vnode_t		*rootvp;
-	struct inode	*ip;
-	struct xfs_mount_args *args;
-	struct statfs	statvfs;
-	int		error = EINVAL;
+	vfs_t			*vfsp;
+	vfsops_t		*vfsops;
+	vnode_t			*rootvp;
+	struct inode		*ip;
+	struct xfs_mount_args	*args;
+	struct statfs		statvfs;
+	int			error = EINVAL;
 
-	args = (struct xfs_mount_args *)kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
+	args = kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
 	if (!args)
 		return	-EINVAL;
+	memset(args, 0, sizeof(struct xfs_mount_args));
+	args->slcount = args->stimeout = args->ctimeout = -1;
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
-
-	if (xfs_parseargs((char *)data, sb->s_flags, args)) {
+	if (xfs_parseargs((char *)data, sb->s_flags, args))
 		goto out_null;
-	}
-	strncpy(args->fsname, bdevname(sb->s_bdev), MAXNAMELEN);
-	/* args->rtdev and args->logdev done in xfs_parseargs */
 
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
@@ -482,9 +489,9 @@ out_null:
 
 void
 linvfs_set_inode_ops(
-	struct inode	*inode)
+	struct inode		*inode)
 {
-	vnode_t		*vp = LINVFS_GET_VP(inode);
+	vnode_t			*vp = LINVFS_GET_VP(inode);
 
 	inode->i_mode = VTTOIF(vp->v_type);
 
@@ -521,11 +528,11 @@ linvfs_set_inode_ops(
  */
 void
 linvfs_write_inode(
-	struct inode	*inode,
-	int		sync)
+	struct inode		*inode,
+	int			sync)
 {
-	vnode_t *vp = LINVFS_GET_VP(inode);
-	int	error, flags = FLUSH_INODE;
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+	int			error, flags = FLUSH_INODE;
 
 	if (vp) {
 		vn_trace_entry(vp, "linvfs_write_inode",
@@ -541,9 +548,9 @@ linvfs_write_inode(
 
 void
 linvfs_clear_inode(
-	struct inode	*inode)
+	struct inode		*inode)
 {
-	vnode_t		*vp = LINVFS_GET_VP(inode);
+	vnode_t			*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
 		vn_rele(vp);
@@ -559,10 +566,10 @@ linvfs_clear_inode(
 
 void
 linvfs_put_inode(
-	struct inode	*ip)
+	struct inode		*ip)
 {
-	vnode_t		*vp = LINVFS_GET_VP(ip);
-	int		error;
+	vnode_t			*vp = LINVFS_GET_VP(ip);
+	int			error;
 
 	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
 		VOP_RELEASE(vp, error);
@@ -570,11 +577,11 @@ linvfs_put_inode(
 
 void
 linvfs_put_super(
-	struct super_block *sb)
+	struct super_block	*sb)
 {
-	int		error;
-	int		sector_size;
-	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
+	int			sector_size;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
@@ -592,10 +599,10 @@ linvfs_put_super(
 
 void
 linvfs_write_super(
-	struct super_block *sb)
+	struct super_block	*sb)
 {
-	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
-	int		error;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
 
 	sb->s_dirt = 0;
 	if (sb->s_flags & MS_RDONLY)
@@ -606,11 +613,11 @@ linvfs_write_super(
 
 int
 linvfs_statfs(
-	struct super_block *sb,
-	struct statfs	*statp)
+	struct super_block	*sb,
+	struct statfs		*statp)
 {
-	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
-	int		error;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
 
 	VFS_STATVFS(vfsp, statp, NULL, error);
 
@@ -619,33 +626,34 @@ linvfs_statfs(
 
 int
 linvfs_remount(
-	struct super_block *sb,
-	int		*flags,
-	char		*options)
+	struct super_block	*sb,
+	int			*flags,
+	char			*options)
 {
-	struct xfs_mount_args *args;
-	vfs_t		*vfsp;
-	xfs_mount_t	*mp;
-	int		error = 0;
-
-	args = (struct xfs_mount_args *)kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
-	if (!args)
-		return -ENOMEM;
+	struct xfs_mount_args	*args;
+	vfs_t			*vfsp;
+	xfs_mount_t		*mp;
+	int			error = 0;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
 
+	args = kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
+	if (!args)
+		return -ENOMEM;
+	memset(args, 0, sizeof(struct xfs_mount_args));
+	args->slcount = args->stimeout = args->ctimeout = -1;
 	if (xfs_parseargs(options, *flags, args)) {
 		error = -EINVAL;
 		goto out;
 	}
-	set_posix_acl(sb);
 
 	if (args->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;
 	else
 		mp->m_flags &= ~XFS_MOUNT_NOATIME;
 
+	set_posix_acl(sb);
 	linvfs_write_super(sb);
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
@@ -666,11 +674,11 @@ out:
 
 void
 linvfs_freeze_fs(
-	struct super_block *sb)
+	struct super_block	*sb)
 {
-	vfs_t		*vfsp;
-	vnode_t		*vp;
-	int		error;
+	vfs_t			*vfsp;
+	vnode_t			*vp;
+	int			error;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	if (sb->s_flags & MS_RDONLY)
@@ -682,11 +690,11 @@ linvfs_freeze_fs(
 
 void
 linvfs_unfreeze_fs(
-	struct super_block *sb)
+	struct super_block	*sb)
 {
-	vfs_t		*vfsp;
-	vnode_t		*vp;
-	int		error;
+	vfs_t			*vfsp;
+	vnode_t			*vp;
+	int			error;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	VFS_ROOT(vfsp, &vp, error);
@@ -695,13 +703,15 @@ linvfs_unfreeze_fs(
 }
 
 
-struct dentry *linvfs_get_parent(struct dentry *child)
+STATIC struct dentry *
+linvfs_get_parent(
+	struct dentry		*child)
 {
-	int		error;
-	vnode_t		*vp, *cvp;
-	struct dentry	*parent;
-	struct inode	*ip = NULL;
-	struct dentry dotdot;
+	int			error;
+	vnode_t			*vp, *cvp;
+	struct dentry		*parent;
+	struct inode		*ip = NULL;
+	struct dentry		dotdot;
 
 	dotdot.d_name.name = "..";
 	dotdot.d_name.len = 2;
@@ -730,24 +740,30 @@ struct dentry *linvfs_get_parent(struct dentry *child)
 	return parent;
 }
 
-static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+STATIC struct super_block *
+linvfs_get_sb(
+	struct file_system_type	*fs_type,
+	int			flags,
+	char			*dev_name,
+	void			*data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
 }
 
-static struct export_operations linvfs_export_ops = {
+STATIC struct export_operations linvfs_export_ops = {
 	.get_parent		= linvfs_get_parent,
 };
 
-int
-linvfs_show_options(struct seq_file *m, struct vfsmount *mnt)
+STATIC int
+linvfs_show_options(
+	struct seq_file		*m,
+	struct vfsmount		*mnt)
 {
-	vfs_t		*vfsp;
-	xfs_mount_t	*mp;
+	vfs_t			*vfsp;
+	xfs_mount_t		*mp;
 	static struct proc_xfs_info {
-		int flag;
-		char *str;
+		int	flag;
+		char	*str;
 	} xfs_info[] = {
 		/* the few simple ones we can get from the mount struct */
 		{ XFS_MOUNT_NOALIGN,		",noalign" },
@@ -757,8 +773,7 @@ linvfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		{ XFS_MOUNT_IRIXSGID,		",irixsgid" },
 		{ 0, NULL }
 	};
-
-	struct proc_xfs_info *xfs_infop;
+	struct proc_xfs_info	*xfs_infop;
 
 	vfsp = LINVFS_GET_VFS(mnt->mnt_sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
@@ -812,7 +827,7 @@ linvfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	return 0;
 }
 
-static struct super_operations linvfs_sops = {
+STATIC struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,
 	.destroy_inode		= linvfs_destroy_inode,
 	.write_inode		= linvfs_write_inode,
@@ -827,7 +842,7 @@ static struct super_operations linvfs_sops = {
 	.show_options		= linvfs_show_options,
 };
 
-static struct file_system_type xfs_fs_type = {
+STATIC struct file_system_type xfs_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "xfs",
 	.get_sb			= linvfs_get_sb,
@@ -835,13 +850,16 @@ static struct file_system_type xfs_fs_type = {
 	.fs_flags		= FS_REQUIRES_DEV,
 };
 
-static int __init init_xfs_fs(void)
+STATIC int __init
+init_xfs_fs( void )
 {
-	int error;
-	struct sysinfo	si;
-	static char message[] __initdata =
+	int			error;
+	struct sysinfo		si;
+	static char		message[] __initdata =
 		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with " 
 		XFS_BUILD_OPTIONS " enabled\n";
+
+	printk(message);
 
 	error = init_inodecache();
 	if (error < 0)
@@ -853,8 +871,6 @@ static int __init init_xfs_fs(void)
 
 	si_meminfo(&si);
 	xfs_physmem = si.totalram;
-
-	printk(message);
 
 	vn_init();
 	xfs_init();
@@ -870,8 +886,8 @@ out:
 	return error;
 }
 
-
-static void __exit exit_xfs_fs(void)
+STATIC void __exit
+exit_xfs_fs( void )
 {
 	dmapi_uninit();
 	xfs_cleanup();
