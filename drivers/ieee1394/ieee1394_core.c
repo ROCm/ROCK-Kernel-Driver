@@ -1030,14 +1030,18 @@ static int hpsbpkt_thread(void *__hi)
 
 	daemonize("khpsbpkt");
 
-	while (!down_interruptible(&khpsbpkt_sig)) {
+	while (1) {
+		if (down_interruptible(&khpsbpkt_sig)) {
+			if (current->flags & PF_FREEZE) {
+				refrigerator(0);
+				continue;
+			}
+			printk("khpsbpkt: received unexpected signal?!\n" );
+			break;
+		}
+
 		if (khpsbpkt_kill)
 			break;
-
-		if (current->flags & PF_FREEZE) {
-			refrigerator(0);
-			continue;
-		}
 
 		while ((skb = skb_dequeue(&hpsbpkt_queue)) != NULL) {
 			packet = (struct hpsb_packet *)skb->data;
