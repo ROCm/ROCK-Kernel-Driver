@@ -38,7 +38,7 @@
 #include "mode_kern.h"
 #include "mode.h"
 
-#define DEFAULT_COMMAND_LINE "root=ubd0"
+#define DEFAULT_COMMAND_LINE "root=98:0"
 
 struct cpuinfo_um boot_cpu_data = { 
 	.loops_per_jiffy	= 0,

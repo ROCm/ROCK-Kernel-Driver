@@ -275,7 +275,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_fadvise64_64
+#define LAST_GENERIC_SYSCALL __NR_vserver
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -536,6 +536,7 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_tgkill ] = sys_tgkill,
 	[ __NR_utimes ] = sys_utimes,
 	[ __NR_fadvise64_64 ] = sys_fadvise64_64,
+	[ __NR_vserver ] = sys_ni_syscall,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 

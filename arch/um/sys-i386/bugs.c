@@ -107,7 +107,7 @@ static int check_cpu_feature(char *feature, int *have_it)
 
 static void disable_lcall(void)
 {
-	struct user_desc ldt;
+	struct modify_ldt_ldt_s ldt;
 	int err;
 
 	bzero(&ldt, sizeof(ldt));

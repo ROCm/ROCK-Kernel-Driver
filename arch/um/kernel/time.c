@@ -9,7 +9,6 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
-#include "linux/module.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -17,6 +16,11 @@
 #include "signal_user.h"
 #include "time_user.h"
 #include "kern_constants.h"
+
+/* XXX This really needs to be declared and initialized in a kernel file since 
+ * it's in <linux/time.h>
+ */
+extern struct timespec wall_to_monotonic;
 
 extern struct timeval xtime;
 
@@ -82,9 +86,15 @@ void uml_idle_timer(void)
 
 void time_init(void)
 {
+	struct timespec now;
+ 
 	if(signal(SIGVTALRM, boot_timer_handler) == SIG_ERR)
 		panic("Couldn't set SIGVTALRM handler");
 	set_interval(ITIMER_VIRTUAL);
+
+	do_posix_clock_monotonic_gettime(&now);
+	wall_to_monotonic.tv_sec = -now.tv_sec;
+	wall_to_monotonic.tv_nsec = -now.tv_nsec;
 }
 
 void do_gettimeofday(struct timeval *tv)
@@ -96,8 +106,6 @@ void do_gettimeofday(struct timeval *tv)
 	timeradd(tv, &local_offset, tv);
 	time_unlock(flags);
 }
-
-EXPORT_SYMBOL(do_gettimeofday);
 
 int do_settimeofday(struct timespec *tv)
 {
@@ -118,8 +126,6 @@ int do_settimeofday(struct timespec *tv)
 
 	return(0);
 }
-
-EXPORT_SYMBOL(do_settimeofday);
 
 void idle_sleep(int secs)
 {

@@ -27,7 +27,7 @@ struct module_symbol
 #define __MODULE_STRING_1(x)	#x
 #define __MODULE_STRING(x)	__MODULE_STRING_1(x)
 
-#if !defined(__AUTOCONF_INCLUDED__)
+#if !defined(AUTOCONF_INCLUDED)
 
 #define __EXPORT_SYMBOL(sym,str)   error config_must_be_included_before_module
 #define EXPORT_SYMBOL(var)	   error config_must_be_included_before_module

@@ -694,10 +694,8 @@ static struct vm_area_struct fixmap_vma = {
 
 static int init_fixmap_vma(void)
 {
-#ifdef FIXADDR_START
 	fixmap_vma.vm_start = FIXADDR_START;
 	fixmap_vma.vm_end = FIXADDR_TOP;
-#endif
 	return(0);
 }
 

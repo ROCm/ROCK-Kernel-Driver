@@ -30,6 +30,14 @@ int hz(void)
 	return(HZ);
 }
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies_64 * (1000000000 / HZ);
+}
+
 /* Changed at early boot */
 int timer_irq_inited = 0;
 

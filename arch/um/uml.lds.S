@@ -9,15 +9,7 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
 
-#if 0
   . = ALIGN(4096);
-#else
-/* dirty trick time -- don't page align the binary start, otherwise the
- * first page will not be mapped and a tls-enabled glibc will crash
- * while trying to read the ELF headers located there ... */
-  . = ALIGN(2048);
-#endif
-
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {

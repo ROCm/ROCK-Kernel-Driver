@@ -218,8 +218,11 @@ inline void synchronize_irq(unsigned int irq)
  
 void disable_irq(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
+
 	disable_irq_nosync(irq);
-	synchronize_irq(irq);
+	if(desc->action)
+		synchronize_irq(irq);
 }
 
 /**
@@ -240,7 +243,8 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~IRQ_DISABLED;
+		unsigned int status = 
+			desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -588,8 +592,8 @@ static unsigned int parse_hex_value (const char *buffer,
 		return -EFAULT;
 
 	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
-	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
+	 * Parse the first HEX_DIGITS characters as a hex string, any non-hex 
+	 * char is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
 
 	for (i = 0; i < count; i++) {
@@ -616,12 +620,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
-	cpumask_t new_value, tmp;
+	cpumask_t new_value;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
 	err = parse_hex_value(buffer, count, &new_value);
+	if(err)
+		return(err);
 
 #ifdef CONFIG_SMP
 	/*
