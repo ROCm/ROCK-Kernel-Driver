@@ -22,7 +22,7 @@
  */
 #ifdef CONFIG_SMP
   #define FREE_PTE_NR	507
-  #define tlb_fast_mode(tlb) ((tlb)->nr == ~0UL) 
+  #define tlb_fast_mode(tlb) ((tlb)->nr == ~0U)
 #else
   #define FREE_PTE_NR	1
   #define tlb_fast_mode(tlb) 1
@@ -35,7 +35,8 @@
  */
 typedef struct free_pte_ctx {
 	struct mm_struct	*mm;
-	unsigned long		nr;	/* set to ~0UL means fast mode */
+	unsigned int		nr;	/* set to ~0U means fast mode */
+	unsigned int		fullmm; /* non-zero means full mm flush */
 	unsigned long		freed;
 	struct page *		pages[FREE_PTE_NR];
 } mmu_gather_t;
@@ -46,15 +47,18 @@ extern mmu_gather_t	mmu_gathers[NR_CPUS];
 /* tlb_gather_mmu
  *	Return a pointer to an initialized mmu_gather_t.
  */
-static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
+static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
 {
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
 
 	tlb->mm = mm;
-	tlb->freed = 0;
 
 	/* Use fast mode if only one CPU is online */
 	tlb->nr = smp_num_cpus > 1 ? 0UL : ~0UL;
+
+	tlb->fullmm = full_mm_flush;
+	tlb->freed = 0;
+
 	return tlb;
 }
 
