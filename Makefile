@@ -590,7 +590,7 @@ quiet_cmd_vmlinux_version = GEN     .version
 	. $(srctree)/scripts/mkversion > .tmp_version;	\
 	mv -f .tmp_version .version;			\
 	$(MAKE) $(build)=init
-	
+
 # Generate System.map
 quiet_cmd_sysmap = SYSMAP 
       cmd_sysmap = $(CONFIG_SHELL) $(srctree)/scripts/mksysmap
@@ -600,11 +600,11 @@ quiet_cmd_sysmap = SYSMAP
 # Generate System.map and verify that the content is consistent
 
 define rule_vmlinux__
-	$(if $(CONFIG_KALLSYMS),,$(call cmd,vmlinux_version))
-	
+	$(if $(CONFIG_KALLSYMS),,+$(call cmd,vmlinux_version))
+
 	$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
-	
+
 	$(Q)$(if $($(quiet)cmd_sysmap),                 \
 	  echo '  $($(quiet)cmd_sysmap) System.map' &&) \
 	$(cmd_sysmap) $@ System.map;                    \
@@ -653,9 +653,10 @@ define verify_kallsyms
 endef
 
 # Update vmlinux version before link
+# Use + in front of this rule to silent warning about make -j1
 cmd_ksym_ld = $(cmd_vmlinux__)
 define rule_ksym_ld
-	$(call cmd,vmlinux_version)
+	+$(call cmd,vmlinux_version)
 	$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
