@@ -17,19 +17,37 @@
 
 ###############################################################################
 #
-# declare the main trap and vector tables
+# Declare the main trap and vector tables
 #
-# - the first instruction in each slot is a branch to the appropriate
-#   kernel-mode handler routine
+# There are six tables:
 #
-# - the second instruction in each slot is a branch to the debug-mode hardware
-#   single-step bypass handler - this is called from break.S to deal with the
-#   CPU stepping in to exception handlers (particular where external interrupts
-#   are concerned)
+# (1) The trap table for debug mode
+# (2) The trap table for kernel mode
+# (3) The trap table for user mode
 #
-# - the linker script places the user mode and kernel mode trap tables on to
-#   the same 8Kb page, so that break.S can be more efficient when performing
-#   single-step bypass management
+#     The CPU jumps to an appropriate slot in the appropriate table to perform
+#     exception processing. We have three different tables for the three
+#     different CPU modes because there is no hardware differentiation between
+#     stack pointers for these three modes, and so we have to invent one when
+#     crossing mode boundaries.
+#
+# (4) The exception handler vector table
+#
+#     The user and kernel trap tables use the same prologue for normal
+#     exception processing. The prologue then jumps to the handler in this
+#     table, as indexed by the exception ID from the TBR.
+#
+# (5) The fixup table for kernel-trap single-step
+# (6) The fixup table for user-trap single-step
+#
+#     Due to the way single-stepping works on this CPU (single-step is not
+#     disabled when crossing exception boundaries, only when in debug mode),
+#     we have to catch the single-step event in break.S and jump to the fixup
+#     routine pointed to by this table.
+#
+# The linker script places the user mode and kernel mode trap tables on to
+# the same 8Kb page, so that break.S can be more efficient when performing
+# single-step bypass management
 #
 ###############################################################################
 
