@@ -63,6 +63,7 @@ struct hd_struct {
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
+	unsigned reads, read_sectors, writes, write_sectors;
 	int policy;
 };
 

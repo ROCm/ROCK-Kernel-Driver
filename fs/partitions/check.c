@@ -298,6 +298,14 @@ static ssize_t part_size_read(struct device *dev,
 	struct hd_struct *p = dev->driver_data;
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->nr_sects);
 }
+static ssize_t part_stat_read(struct device *dev,
+			char *page, size_t count, loff_t off)
+{
+	struct hd_struct *p = dev->driver_data;
+	return off ? 0 : sprintf(page, "%u %u %u %u\n",
+				p->reads, p->read_sectors,
+				p->writes, p->write_sectors);
+}
 static struct device_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
 	.show	= part_dev_read
@@ -310,6 +318,10 @@ static struct device_attribute part_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= part_size_read
 };
+static struct device_attribute part_attr_stat = {
+	.attr = {.name = "stat", .mode = S_IRUGO },
+	.show	= part_stat_read
+};
 
 void delete_partition(struct gendisk *disk, int part)
 {
@@ -319,10 +331,12 @@ void delete_partition(struct gendisk *disk, int part)
 		return;
 	p->start_sect = 0;
 	p->nr_sects = 0;
+	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_unregister(p->de);
 	dev = p->hd_driverfs_dev;
 	p->hd_driverfs_dev = NULL;
 	if (dev) {
+		device_remove_file(dev, &part_attr_stat);
 		device_remove_file(dev, &part_attr_size);
 		device_remove_file(dev, &part_attr_start);
 		device_remove_file(dev, &part_attr_dev);
@@ -356,6 +370,7 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	device_create_file(dev, &part_attr_dev);
 	device_create_file(dev, &part_attr_start);
 	device_create_file(dev, &part_attr_size);
+	device_create_file(dev, &part_attr_stat);
 	p->hd_driverfs_dev = dev;
 }
 
