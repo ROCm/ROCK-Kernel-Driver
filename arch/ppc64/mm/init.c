@@ -72,8 +72,6 @@ static int boot_mapsize;
 
 extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
-extern char __chrp_begin, __chrp_end;
-extern char __openfirmware_begin, __openfirmware_end;
 extern char _start[], _end[];
 extern char _stext[], etext[];
 extern struct task_struct *current_set[NR_CPUS];

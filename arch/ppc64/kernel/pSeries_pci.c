@@ -35,7 +35,6 @@
 #include <asm/irq.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
@@ -70,7 +69,7 @@ static int s7a_workaround;
  *
  *****************************************************************************/
 #define RTAS_PCI_READ_OP(size, type, nbytes) \
-int __chrp \
+int \
 rtas_read_config_##size(struct device_node *dn, int offset, type val) {  \
 	unsigned long returnval = ~0L; \
 	unsigned long buid; \
@@ -95,7 +94,7 @@ rtas_read_config_##size(struct device_node *dn, int offset, type val) {  \
 	*val = returnval; \
 	return ret; \
 } \
-int __chrp \
+int \
 rtas_pci_read_config_##size(struct pci_dev *dev, int offset, type val) {  \
         struct device_node *dn = pci_device_to_OF_node(dev); \
 	int ret = rtas_read_config_##size(dn, offset, val); \
@@ -104,7 +103,7 @@ rtas_pci_read_config_##size(struct pci_dev *dev, int offset, type val) {  \
 }
 
 #define RTAS_PCI_WRITE_OP(size, type, nbytes) \
-int __chrp \
+int \
 rtas_write_config_##size(struct device_node *dn, int offset, type val) { \
 	unsigned long buid; \
 	unsigned int addr; \
@@ -125,7 +124,7 @@ rtas_write_config_##size(struct device_node *dn, int offset, type val) { \
 	} \
 	return ret; \
 } \
-int __chrp \
+int \
 rtas_pci_write_config_##size(struct pci_dev *dev, int offset, type val) { \
 	struct device_node*  dn = pci_device_to_OF_node(dev); \
 	int  ret = rtas_write_config_##size(dn, offset, val); \

@@ -8,7 +8,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <asm/atomic.h>
 #include <asm/hardirq.h>
 
 #define local_bh_disable()	do { local_bh_count(smp_processor_id())++; barrier(); } while (0)

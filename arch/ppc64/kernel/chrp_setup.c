@@ -56,7 +56,6 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 #include <asm/keyboard.h>
-#include <asm/init.h>
 #include <asm/naca.h>
 #include <asm/time.h>
 
@@ -307,7 +306,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.progress("Linux ppc64\n", 0x0);
 }
 
-void __chrp
+void
 chrp_progress(char *s, unsigned short hex)
 {
 	struct device_node *root;

@@ -9,7 +9,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/kdev_t.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
@@ -78,18 +77,12 @@ extern void (*xmon_fault_handler)(struct pt_regs *regs);
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
-extern void hard_reset_now(void);
-extern void poweroff_now(void);
 extern int _get_PVR(void);
 extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
-extern void giveup_altivec(struct task_struct *);
-extern void load_up_altivec(struct task_struct *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
-
-struct device_node;
 
 struct task_struct;
 #define prepare_to_switch()	do { } while(0)

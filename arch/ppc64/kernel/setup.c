@@ -22,7 +22,6 @@
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
 #include <linux/tty.h>
-#include <asm/init.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -498,6 +497,7 @@ void __init ppc64_calibrate_delay(void)
 }	
 
 extern void (*calibrate_delay)(void);
+extern void sort_exception_table(void);
 
 /*
  * Called into from start_kernel, after lock_kernel has been called.

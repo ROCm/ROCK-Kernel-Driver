@@ -53,7 +53,6 @@
 #include <asm/nvram.h>
 #include <asm/cache.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/HvCallXm.h>
 #endif

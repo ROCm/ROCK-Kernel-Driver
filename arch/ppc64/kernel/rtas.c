@@ -16,7 +16,6 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 
-#include <asm/init.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
@@ -110,7 +109,6 @@ call_rtas_display_status(char c)
 #if 0
 #define DEBUG_RTAS
 #endif
-__openfirmware
 int
 rtas_token(const char *service)
 {
@@ -125,7 +123,6 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
-__openfirmware
 long
 rtas_call(int token, int nargs, int nret,
 	  unsigned long *outputs, ...)
@@ -264,7 +261,7 @@ void rtas_flash_bypass_warning(void)
 }
 
 
-void __chrp
+void
 rtas_restart(char *cmd)
 {
 	if (rtas_firmware_flash_list.next)
@@ -275,7 +272,7 @@ rtas_restart(char *cmd)
         for (;;);
 }
 
-void __chrp
+void
 rtas_power_off(void)
 {
 	if (rtas_firmware_flash_list.next)
@@ -286,7 +283,7 @@ rtas_power_off(void)
         for (;;);
 }
 
-void __chrp
+void
 rtas_halt(void)
 {
 	if (rtas_firmware_flash_list.next)
