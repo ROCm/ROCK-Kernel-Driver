@@ -1313,7 +1313,7 @@ static int parse_format(tuple_t *tuple, cistpl_format_t *fmt)
 
 /*====================================================================*/
 
-int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+int pccard_parse_tuple(tuple_t *tuple, cisparse_t *parse)
 {
     int ret = CS_SUCCESS;
     
@@ -1394,6 +1394,7 @@ int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse
     }
     return ret;
 }
+EXPORT_SYMBOL(pccard_parse_tuple);
 
 /*======================================================================
 
@@ -1530,3 +1531,8 @@ int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
 }
 EXPORT_SYMBOL(pcmcia_get_tuple_data);
 
+int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+{
+	return pccard_parse_tuple(tuple, parse);
+}
+EXPORT_SYMBOL(pcmcia_parse_tuple);

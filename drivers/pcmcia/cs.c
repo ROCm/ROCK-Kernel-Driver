@@ -2109,7 +2109,6 @@ EXPORT_SYMBOL(pcmcia_get_status);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);
-EXPORT_SYMBOL(pcmcia_parse_tuple);
 EXPORT_SYMBOL(pcmcia_register_client);
 EXPORT_SYMBOL(pcmcia_release_configuration);
 EXPORT_SYMBOL(pcmcia_release_io);
