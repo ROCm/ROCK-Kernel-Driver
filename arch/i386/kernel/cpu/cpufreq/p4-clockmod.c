@@ -171,7 +171,7 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
 	}
 
-	if ((c->x86 == 0x06) && (c->x86_model == 0x13)) {
+	if ((c->x86 == 0x06) && (c->x86_model == 0x0D)) {
 		/* Pentium M (Dothan) */
 		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
 		       "The speedstep_centrino module offers voltage scaling"
