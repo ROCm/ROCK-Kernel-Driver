@@ -169,7 +169,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	}
 
 	/* Create the ELF interpreter info */
-	elf_info = current->mm->saved_auxv;
+	elf_info = (elf_addr_t *) current->mm->saved_auxv;
 #define NEW_AUX_ENT(id, val) \
 	do { elf_info[ei_index++] = id; elf_info[ei_index++] = val; } while (0)
 
@@ -197,8 +197,10 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (k_platform) {
 		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}
-	NEW_AUX_ENT(AT_NULL, 0);
 #undef NEW_AUX_ENT
+	/* AT_NULL is zero; clear the rest too */
+	memset(&elf_info[ei_index], 0,
+	       sizeof current->mm->saved_auxv - ei_index * sizeof elf_info[0]);
 
 	sp = STACK_ADD(p, ei_index);
 
@@ -1209,6 +1211,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	elf_fpxregset_t *xfpu = NULL;
 #endif
 	int thread_status_size = 0;
+	elf_addr_t *auxv;
 
 	/*
 	 * We no longer stop all VM operations.
@@ -1290,13 +1293,14 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
   
 	numnote = 3;
 
+	auxv = (elf_addr_t *) current->mm->saved_auxv;
+
 	i = 0;
 	do
 		i += 2;
-	while (current->mm->saved_auxv[i - 2] != AT_NULL);
+	while (auxv[i - 2] != AT_NULL);
 	fill_note(&notes[numnote++], "CORE", NT_AUXV,
-		  i * sizeof current->mm->saved_auxv[0],
-		  current->mm->saved_auxv);
+		  i * sizeof (elf_addr_t), auxv);
 
   	/* Try to dump the FPU. */
 	if ((prstatus->pr_fpvalid = elf_core_copy_task_fpregs(current, regs, fpu)))
