@@ -316,16 +316,14 @@ static int tda9875_command(struct i2c_client *client,
 		/* min is -84 max is 24 */
 		left = (t->lvol+84)*606;
 		right = (t->rvol+84)*606;
-		va->volume=MAX(left,right);
-		va->balance=(32768*MIN(left,right))/
+		va->volume=max(left,right);
+		va->balance=(32768*min(left,right))/
 			(va->volume ? va->volume : 1);
 		va->balance=(left<right)?
 			(65535-va->balance) : va->balance;
 		va->bass = (t->bass+12)*2427;    /* min -12 max +15 */
 		va->treble = (t->treble+12)*2730;/* min -12 max +12 */
-
 		va->mode |= VIDEO_SOUND_MONO;
-
 
 		break; /* VIDIOCGAUDIO case */
 	}
@@ -336,9 +334,9 @@ static int tda9875_command(struct i2c_client *client,
 		int left,right;
 
 		dprintk("VIDEOCSAUDIO...\n"); 
-		left = (MIN(65536 - va->balance,32768) *
+		left = (min(65536 - va->balance,32768) *
 			va->volume) / 32768;
-		right = (MIN(va->balance,32768) *
+		right = (min(va->balance,(__u16)32768) *
 			 va->volume) / 32768;
 		t->lvol = ((left/606)-84) & 0xff;
 		if (t->lvol > 24)

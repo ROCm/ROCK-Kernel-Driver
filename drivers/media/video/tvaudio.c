@@ -1477,8 +1477,8 @@ static int chip_command(struct i2c_client *client,
 
 		if (desc->flags & CHIP_HAS_VOLUME) {
 			va->flags  |= VIDEO_AUDIO_VOLUME;
-			va->volume  = MAX(chip->left,chip->right);
-			va->balance = (32768*MIN(chip->left,chip->right))/
+			va->volume  = max(chip->left,chip->right);
+			va->balance = (32768*min(chip->left,chip->right))/
 				(va->volume ? va->volume : 1);
 		}
 		if (desc->flags & CHIP_HAS_BASSTREBLE) {
@@ -1500,9 +1500,9 @@ static int chip_command(struct i2c_client *client,
 		struct video_audio *va = arg;
 		
 		if (desc->flags & CHIP_HAS_VOLUME) {
-			chip->left = (MIN(65536 - va->balance,32768) *
+			chip->left = (min(65536 - va->balance,32768) *
 				      va->volume) / 32768;
-			chip->right = (MIN(va->balance,32768) *
+			chip->right = (min(va->balance,(__u16)32768) *
 				       va->volume) / 32768;
 			chip_write(chip,desc->leftreg,desc->volfunc(chip->left));
 			chip_write(chip,desc->rightreg,desc->volfunc(chip->right));
