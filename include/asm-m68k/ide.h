@@ -51,12 +51,12 @@
 #endif
 
 
-static __inline__ int ide_default_irq(ide_ioreg_t base)
+static __inline__ int ide_default_irq(unsigned long base)
 {
 	  return 0;
 }
 
-static __inline__ ide_ioreg_t ide_default_io_base(int index)
+static __inline__ unsigned long ide_default_io_base(int index)
 {
           return 0;
 }
@@ -66,7 +66,9 @@ static __inline__ ide_ioreg_t ide_default_io_base(int index)
  * Set up a hw structure for a specified data port, control port and IRQ.
  * This should follow whatever the default interface uses.
  */
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
+					   unsigned long data_port,
+					   unsigned long ctrl_port, int *irq)
 {
 	if (data_port || ctrl_port)
 		printk("ide_init_hwif_ports: must not be called\n");
