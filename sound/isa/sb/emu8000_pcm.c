@@ -159,22 +159,22 @@ static int calc_rate_offset(int hz)
 
 static snd_pcm_hardware_t emu8k_pcm_hw = {
 #ifdef USE_NONINTERLEAVE
-	info:			SNDRV_PCM_INFO_NONINTERLEAVED,
+	.info =			SNDRV_PCM_INFO_NONINTERLEAVED,
 #else
-	info:			SNDRV_PCM_INFO_INTERLEAVED,
+	.info =			SNDRV_PCM_INFO_INTERLEAVED,
 #endif
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	1024,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	1024,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 
 };
 
@@ -672,16 +672,16 @@ static snd_pcm_uframes_t emu8k_pcm_pointer(snd_pcm_substream_t *subs)
 
 
 static snd_pcm_ops_t emu8k_pcm_ops = {
-	open:		emu8k_pcm_open,
-	close:		emu8k_pcm_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	emu8k_pcm_hw_params,
-	hw_free:	emu8k_pcm_hw_free,
-	prepare:	emu8k_pcm_prepare,
-	trigger:	emu8k_pcm_trigger,
-	pointer:	emu8k_pcm_pointer,
-	copy:		emu8k_pcm_copy,
-	silence:	emu8k_pcm_silence,
+	.open =		emu8k_pcm_open,
+	.close =	emu8k_pcm_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	emu8k_pcm_hw_params,
+	.hw_free =	emu8k_pcm_hw_free,
+	.prepare =	emu8k_pcm_prepare,
+	.trigger =	emu8k_pcm_trigger,
+	.pointer =	emu8k_pcm_pointer,
+	.copy =		emu8k_pcm_copy,
+	.silence =	emu8k_pcm_silence,
 };
 
 

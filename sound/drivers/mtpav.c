@@ -606,15 +606,15 @@ static int snd_mtpav_get_ISA(mtpav_t * mcard)
  */
 
 static snd_rawmidi_ops_t snd_mtpav_output = {
-	open:		snd_mtpav_output_open,
-	close:		snd_mtpav_output_close,
-	trigger:	snd_mtpav_output_trigger,
+	.open =		snd_mtpav_output_open,
+	.close =	snd_mtpav_output_close,
+	.trigger =	snd_mtpav_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_mtpav_input = {
-	open:		snd_mtpav_input_open,
-	close:		snd_mtpav_input_close,
-	trigger:	snd_mtpav_input_trigger,
+	.open =		snd_mtpav_input_open,
+	.close =	snd_mtpav_input_close,
+	.trigger =	snd_mtpav_input_trigger,
 };
 
 

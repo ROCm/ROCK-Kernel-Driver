@@ -30,6 +30,7 @@
 #include <linux/percpu.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
+#include <linux/workqueue.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -432,6 +433,7 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+	page_address_init();
 	mem_init();
 	kmem_cache_sizes_init();
 	pidhash_init();
@@ -477,7 +479,7 @@ static void __init do_initcalls(void)
 	} while (call < &__initcall_end);
 
 	/* Make sure there is no pending stuff from the initcall sequence */
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 }
 
 /*
@@ -493,17 +495,10 @@ static void __init do_basic_setup(void)
 	sysctl_init();
 #endif
 
-	/*
-	 * Ok, at this point all CPU's should be initialized, so
-	 * we can start looking into devices..
-	 */
-#if defined(CONFIG_ARCH_S390)
-	s390_init_machine_check();
-#endif
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
-	start_context_thread();
+	init_workqueues();
 	do_initcalls();
 }
 
@@ -553,8 +548,6 @@ static int init(void * unused)
 	free_initmem();
 	unlock_kernel();
 	system_running = 1;
-
-	kstat.pgfree = 0;
 
 	if (open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");

@@ -632,7 +632,7 @@ struct amb_dev {
   u32 *            membase;
 
 #ifdef FILL_RX_POOLS_IN_BH
-  struct tq_struct bh;
+  struct work_struct bh;
 #endif
   
   amb_cq           cq;

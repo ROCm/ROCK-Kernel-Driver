@@ -15,9 +15,6 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
-#include <stdarg.h>
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -78,9 +75,10 @@ void default_idle(void)
 
 	/* 
 	 * Wait for external, I/O or machine check interrupt and
-	 * switch of machine check bit after the wait has ended.
+	 * switch off machine check bit after the wait has ended.
 	 */
-	wait_psw.mask = _WAIT_PSW_MASK;
+	wait_psw.mask = PSW_KERNEL_BITS | PSW_MASK_MCHECK | PSW_MASK_WAIT |
+		PSW_MASK_IO | PSW_MASK_EXT;
 	asm volatile (
 		"    larl  %0,0f\n"
 		"    stg   %0,8(%1)\n"
@@ -114,35 +112,39 @@ void show_regs(struct pt_regs *regs)
 
 	show_registers(regs);
 	/* Show stack backtrace if pt_regs is from kernel mode */
-	if (!(regs->psw.mask & PSW_PROBLEM_STATE))
+	if (!(regs->psw.mask & PSW_MASK_PSTATE))
 		show_trace((unsigned long *) regs->gprs[15]);
 }
 
+extern void kernel_thread_starter(void);
+__asm__(".align 4\n"
+	"kernel_thread_starter:\n"
+	"    lg    15,0(8)\n"
+	"    sgr   15,7\n"
+	"    stosm 48(15),3\n"
+	"    lgr   2,10\n"
+	"    basr  14,9\n"
+	"    sgr   2,2\n"
+	"    br    11\n");
+
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-        int clone_arg = flags | CLONE_VM;
-        int retval;
+	struct task_struct *p;
+	struct pt_regs regs;
 
-        __asm__ __volatile__(
-                "     slgr  2,2\n"
-                "     lgr   3,%1\n"
-                "     lg    4,%6\n"     /* load kernel stack ptr of parent */
-                "     svc   %b2\n"                     /* Linux system call*/
-                "     clg   4,%6\n"    /* compare ksp's: child or parent ? */
-                "     je    0f\n"                          /* parent - jump*/
-                "     lg    15,%6\n"            /* fix kernel stack pointer*/
-                "     aghi  15,%7\n"
-                "     xc    0(160,15),0(15)\n"          /* clear save area */
-                "     lgr   2,%4\n"                        /* load argument*/
-                "     basr  14,%5\n"                             /* call fn*/
-                "     svc   %b3\n"                     /* Linux system call*/
-                "0:   lgr   %0,2"
-                : "=a" (retval)
-                : "d" (clone_arg), "i" (__NR_clone), "i" (__NR_exit),
-                  "d" (arg), "a" (fn), "i" (__LC_KERNEL_STACK) ,
-                  "i" (-STACK_FRAME_OVERHEAD)
-                : "2", "3", "4" );
-        return retval;
+	memset(&regs, 0, sizeof(regs));
+	regs.psw.mask = PSW_KERNEL_BITS;
+	regs.psw.addr = (__u64) kernel_thread_starter;
+	regs.gprs[7] = STACK_FRAME_OVERHEAD;
+	regs.gprs[8] = __LC_KERNEL_STACK;
+	regs.gprs[9] = (unsigned long) fn;
+	regs.gprs[10] = (unsigned long) arg;
+	regs.gprs[11] = (unsigned long) do_exit;
+	regs.orig_gpr2 = -1;
+
+	/* Ok, create the new process.. */
+	p = do_fork(flags | CLONE_VM, 0, &regs, 0, NULL);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -184,17 +186,20 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
         frame->childregs = *regs;
+	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
         frame->childregs.gprs[15] = new_stackp;
         frame->back_chain = frame->eos = 0;
 
-        /* new return point is ret_from_sys_call */
-        frame->gprs[8] = (unsigned long) &ret_from_fork;
+        /* new return point is ret_from_fork */
+        frame->gprs[8] = (unsigned long) ret_from_fork;
 
         /* fake return stack for resume(), don't go back to schedule */
         frame->gprs[9] = (unsigned long) frame;
-        /* save fprs, if used in last task */
+        /* save fprs */
 	save_fp_regs(&p->thread.fp_regs);
         p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _REGION_TABLE;
+	/* start new process with ar4 pointing to the correct address space */
+	p->thread.ar4 = get_fs().ar4;
         /* Don't copy debug registers */
         memset(&p->thread.per_info,0,sizeof(p->thread.per_info));
         return 0;
@@ -203,7 +208,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 asmlinkage int sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
-        p = do_fork(SIGCHLD, regs.gprs[15], &regs, 0);
+        p = do_fork(SIGCHLD, regs.gprs[15], &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -212,12 +217,14 @@ asmlinkage int sys_clone(struct pt_regs regs)
         unsigned long clone_flags;
         unsigned long newsp;
 	struct task_struct *p;
+	int *user_tid;
 
         clone_flags = regs.gprs[3];
         newsp = regs.orig_gpr2;
+	user_tid = (int *) regs.gprs[4];
         if (!newsp)
                 newsp = regs.gprs[15];
-        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -234,7 +241,8 @@ asmlinkage int sys_clone(struct pt_regs regs)
 asmlinkage int sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.gprs[15], &regs, 0);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD,
+		    regs.gprs[15], &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -250,15 +258,12 @@ asmlinkage int sys_execve(struct pt_regs regs)
         error = PTR_ERR(filename);
         if (IS_ERR(filename))
                 goto out;
-        error = do_execve(filename, (char **) regs.gprs[3], (char **) regs.gprs[4], &regs);
-	if (error == 0)
-	{
+        error = do_execve(filename, (char **) regs.gprs[3],
+			  (char **) regs.gprs[4], &regs);
+	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
-		current->thread.fp_regs.fpc=0;
-		__asm__ __volatile__
-		        ("sr  0,0\n\t"
-		         "sfpc 0,0\n\t"
-			 : : :"0");
+		current->thread.fp_regs.fpc = 0;
+		asm volatile("sfpc %0,%0" : : "d" (0));
 	}
         putname(filename);
 out:
@@ -285,15 +290,15 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->magic = CMAGIC;
 	dump->start_code = 0;
 	dump->start_stack = regs->gprs[15] & ~(PAGE_SIZE - 1);
-	dump->u_tsize = ((unsigned long) current->mm->end_code) >> PAGE_SHIFT;
-	dump->u_dsize = ((unsigned long) (current->mm->brk + (PAGE_SIZE-1))) >> PAGE_SHIFT;
+	dump->u_tsize = current->mm->end_code >> PAGE_SHIFT;
+	dump->u_dsize = (current->mm->brk + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	dump->u_dsize -= dump->u_tsize;
 	dump->u_ssize = 0;
 	if (dump->start_stack < TASK_SIZE)
-		dump->u_ssize = ((unsigned long) (TASK_SIZE - dump->start_stack)) >> PAGE_SHIFT;
-	memcpy(&dump->regs.gprs[0],regs,sizeof(s390_regs));
+		dump->u_ssize = (TASK_SIZE - dump->start_stack) >> PAGE_SHIFT;
+	memcpy(&dump->regs, regs, sizeof(s390_regs));
 	dump_fpu (regs, &dump->regs.fp_regs);
-	memcpy(&dump->regs.per_info,&current->thread.per_info,sizeof(per_struct));
+	dump->regs.per_info = current->thread.per_info;
 }
 
 /*

@@ -289,7 +289,7 @@ static snd_card_t *snd_opti9xx_card = SNDRV_DEFAULT_PTR1;
 #define ISAPNP_OPTI9XX(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs: { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
+		.devs = { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
 			ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
 	}
 
@@ -821,9 +821,9 @@ unsigned int rates[] = {  5512,  6615,  8000,  9600, 11025, 16000, 18900,
 #define RATES sizeof(rates) / sizeof(rates[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: RATES,
-	list: rates,
-	mask: 0,
+	.count = RATES,
+	.list = rates,
+	.mask = 0,
 };
 
 unsigned char bits[] = {  0x01,  0x0f,  0x00,  0x0e,  0x03,  0x02,  0x05,
@@ -1135,39 +1135,39 @@ void snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 
 static snd_pcm_hardware_t snd_opti93x_playback = {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5512,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5512,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_opti93x_capture = {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5512,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5512,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_opti93x_playback_open(snd_pcm_substream_t *substream)
@@ -1289,7 +1289,7 @@ int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
 		       opti93x_t **rcodec)
 {
 	static snd_device_ops_t ops = {
-		dev_free:	snd_opti93x_dev_free,
+		.dev_free =	snd_opti93x_dev_free,
 	};
 	int error;
 	opti93x_t *codec;
@@ -1348,25 +1348,25 @@ int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
 }
 
 static snd_pcm_ops_t snd_opti93x_playback_ops = {
-	open:		snd_opti93x_playback_open,
-	close:		snd_opti93x_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_opti93x_hw_params,
-	hw_free:	snd_opti93x_hw_free,
-	prepare:	snd_opti93x_playback_prepare,
-	trigger:	snd_opti93x_playback_trigger,
-	pointer:	snd_opti93x_playback_pointer,
+	.open =		snd_opti93x_playback_open,
+	.close =	snd_opti93x_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_opti93x_hw_params,
+	.hw_free =	snd_opti93x_hw_free,
+	.prepare =	snd_opti93x_playback_prepare,
+	.trigger =	snd_opti93x_playback_trigger,
+	.pointer =	snd_opti93x_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_opti93x_capture_ops = {
-	open:		snd_opti93x_capture_open,
-	close:		snd_opti93x_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_opti93x_hw_params,
-	hw_free:	snd_opti93x_hw_free,
-	prepare:	snd_opti93x_capture_prepare,
-	trigger:	snd_opti93x_capture_trigger,
-	pointer:	snd_opti93x_capture_pointer,
+	.open =		snd_opti93x_capture_open,
+	.close =	snd_opti93x_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_opti93x_hw_params,
+	.hw_free =	snd_opti93x_hw_free,
+	.prepare =	snd_opti93x_capture_prepare,
+	.trigger =	snd_opti93x_capture_trigger,
+	.pointer =	snd_opti93x_capture_pointer,
 };
 
 static void snd_opti93x_pcm_free(snd_pcm_t *pcm)
@@ -1458,10 +1458,10 @@ static int snd_opti93x_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 #if 0
 
 #define OPTi93X_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_opti93x_info_single, \
-  get: snd_opti93x_get_single, put: snd_opti93x_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_opti93x_info_single, \
+  .get = snd_opti93x_get_single, .put = snd_opti93x_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_opti93x_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1517,10 +1517,10 @@ static int snd_opti93x_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 #endif /* single */
 
 #define OPTi93X_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_opti93x_info_double, \
-  get: snd_opti93x_get_double, put: snd_opti93x_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_opti93x_info_double, \
+  .get = snd_opti93x_get_double, .put = snd_opti93x_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 #define OPTi93X_DOUBLE_INVERT_INVERT(xctl) \
 	do { xctl.private_value ^= 22; } while (0)
@@ -1612,11 +1612,11 @@ OPTi93X_DOUBLE("Aux Playback Switch", 0, OPTi931_AUX_LEFT_INPUT, OPTi931_AUX_RIG
 OPTi93X_DOUBLE("Aux Playback Volume", 0, OPTi931_AUX_LEFT_INPUT, OPTi931_AUX_RIGHT_INPUT, 1, 1, 15, 1), 
 OPTi93X_DOUBLE("Capture Volume", 0, OPTi93X_MIXOUT_LEFT, OPTi93X_MIXOUT_RIGHT, 0, 0, 15, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_opti93x_info_mux,
-	get: snd_opti93x_get_mux,
-	put: snd_opti93x_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_opti93x_info_mux,
+	.get = snd_opti93x_get_mux,
+	.put = snd_opti93x_put_mux,
 }
 };
                                         

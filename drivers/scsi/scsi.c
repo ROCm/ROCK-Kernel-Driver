@@ -616,25 +616,17 @@ static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * If the host/device isn't busy, assume that something actually
 	 * completed, and that we should be able to queue a command now.
 	 *
-	 * Note that there is an implicit assumption that every host can
-	 * always queue at least one command.  If a host is inactive and
-	 * cannot queue any commands, I don't see how things could
-	 * possibly work anyways.
+	 * Note that the prior mid-layer assumption that any host could
+	 * always queue at least one command is now broken.  The mid-layer
+	 * will implement a user specifiable stall (see
+	 * scsi_host.max_host_blocked and scsi_device.max_device_blocked)
+	 * if a command is requeued with no other commands outstanding
+	 * either for the device or for the host.
 	 */
 	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
-		if (host->host_busy == 0) {
-			if (scsi_retry_command(cmd) == 0) {
-				return 0;
-			}
-		}
-		host->host_blocked = TRUE;
+		host->host_blocked = host->max_host_blocked;
 	} else {
-		if (cmd->device->device_busy == 0) {
-			if (scsi_retry_command(cmd) == 0) {
-				return 0;
-			}
-		}
-		cmd->device->device_blocked = TRUE;
+                cmd->device->device_blocked = cmd->device->max_device_blocked;
 	}
 
 	/*
@@ -793,7 +785,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			spin_unlock_irqrestore(host->host_lock, flags);
 			if (rtn != 0) {
 				scsi_delete_timer(SCpnt);
-				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
+				scsi_mlqueue_insert(SCpnt, rtn == SCSI_MLQUEUE_DEVICE_BUSY ? rtn : SCSI_MLQUEUE_HOST_BUSY);
 				SCSI_LOG_MLQUEUE(3,
 				   printk("queuecommand : request rejected\n"));                                
 			}
@@ -1396,8 +1388,8 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
          * for both the queue full condition on a device, and for a
          * host full condition on the host.
          */
-        host->host_blocked = FALSE;
-        device->device_blocked = FALSE;
+        host->host_blocked = 0;
+        device->device_blocked = 0;
 
 	/*
 	 * If we have valid sense information, then some kind of recovery

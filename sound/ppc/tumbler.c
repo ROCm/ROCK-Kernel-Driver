@@ -1,5 +1,5 @@
 /*
- * PMac Tumbler lowlevel functions
+ * PMac Tumbler/Snapper lowlevel functions
  *
  * Copyright (c) by Takashi Iwai <tiwai@suse.de>
  *
@@ -19,13 +19,13 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/kmod.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -46,17 +46,27 @@
 #define TAS_REG_VOL	0x04
 #define TAS_REG_TREBLE	0x05
 #define TAS_REG_BASS	0x06
-#define TAS_REG_INPUT1	0x07	/* pcm */
-#define TAS_REG_INPUT2	0x08	/* ??? */
+#define TAS_REG_INPUT1	0x07
+#define TAS_REG_INPUT2	0x08
 
+/* tas3001c */
 #define TAS_REG_PCM	TAS_REG_INPUT1
+ 
+/* tas3004 */
+#define TAS_REG_LMIX	TAS_REG_INPUT1
+#define TAS_REG_RMIX	TAS_REG_INPUT2
 
-#define TAS_MIXER_VOL_MAX	200
-
+/* mono volumes for tas3001c/tas3004 */
 enum {
-	VOL_IDX_PCM, VOL_IDX_BASS, VOL_IDX_TREBLE,
-	//VOL_IDX_ALTPCM,
-	VOL_IDX_LAST
+	VOL_IDX_PCM_MONO, /* tas3001c only */
+	VOL_IDX_BASS, VOL_IDX_TREBLE,
+	VOL_IDX_LAST_MONO
+};
+
+/* stereo volumes for tas3004 */
+enum {
+	VOL_IDX_PCM, VOL_IDX_PCM2, VOL_IDX_ADC,
+	VOL_IDX_LAST_MIX
 };
 
 typedef struct pmac_gpio {
@@ -77,7 +87,8 @@ typedef struct pmac_tumber_t {
 	int headphone_irq;
 	unsigned int master_vol[2];
 	unsigned int master_switch[2];
-	unsigned int mono_vol[VOL_IDX_LAST];
+	unsigned int mono_vol[VOL_IDX_LAST_MONO];
+	unsigned int mix_vol[VOL_IDX_LAST_MIX][2]; /* stereo volumes for tas3004 */
 	int drc_range;
 	int drc_enable;
 } pmac_tumbler_t;
@@ -90,9 +101,16 @@ typedef struct pmac_tumber_t {
 
 static int tumbler_init_client(pmac_keywest_t *i2c)
 {
-       /* normal operation, SCLK=64fps, i2s output, i2s input, 16bit width */
-       return snd_pmac_keywest_write_byte(i2c, TAS_REG_MCS,
-                                          (1<<6)+(2<<4)+(2<<2)+0);
+	int err, count = 10;
+	do {
+		/* normal operation, SCLK=64fps, i2s output, i2s input, 16bit width */
+		err =  snd_pmac_keywest_write_byte(i2c, TAS_REG_MCS,
+						   (1<<6)+(2<<4)+(2<<2)+0);
+		if (err >= 0)
+			return err;
+		mdelay(10);
+	} while (count--);
+	return -ENXIO;
 }
 
 
@@ -245,8 +263,11 @@ static int tumbler_put_master_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 
 
 /*
- * dynamic range compression
+ * TAS3001c dynamic range compression
  */
+
+#define TAS3001_DRC_MAX		0x5f
+
 static int tumbler_set_drc(pmac_tumbler_t *mix)
 {
 	unsigned char val[2];
@@ -256,7 +277,7 @@ static int tumbler_set_drc(pmac_tumbler_t *mix)
   
 	if (mix->drc_enable) {
 		val[0] = 0xc1; /* enable, 3:1 compression */
-		if (mix->drc_range > 0x5f)
+		if (mix->drc_range > TAS3001_DRC_MAX)
 			val[1] = 0xf0;
 		else if (mix->drc_range < 0)
 			val[1] = 0x91;
@@ -274,12 +295,49 @@ static int tumbler_set_drc(pmac_tumbler_t *mix)
 	return 0;
 }
 
+/*
+ * TAS3004
+ */
+
+#define TAS3004_DRC_MAX		0xef
+
+static int snapper_set_drc(pmac_tumbler_t *mix)
+{
+	unsigned char val[6];
+
+	if (! mix->i2c.client)
+		return -ENODEV;
+  
+	if (mix->drc_enable)
+		val[0] = 0x50; /* 3:1 above threshold */
+	else
+		val[0] = 0x51; /* disabled */
+	val[1] = 0x02; /* 1:1 below threshold */
+	if (mix->drc_range > 0xef)
+		val[2] = 0xef;
+	else if (mix->drc_range < 0)
+		val[2] = 0x00;
+	else
+		val[2] = mix->drc_range;
+	val[3] = 0xb0;
+	val[4] = 0x60;
+	val[5] = 0xa0;
+
+	if (snd_pmac_keywest_write(&mix->i2c, TAS_REG_DRC, 6, val) < 0) {
+		snd_printk("failed to set DRC\n");  
+		return -EINVAL; 
+	}
+	return 0;
+}
+
 static int tumbler_info_drc_value(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 0x5f;
+	uinfo->value.integer.max =
+		chip->model == PMAC_TUMBLER ? TAS3001_DRC_MAX : TAS3004_DRC_MAX;
 	return 0;
 }
 
@@ -304,7 +362,10 @@ static int tumbler_put_drc_value(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	change = mix->drc_range != ucontrol->value.integer.value[0];
 	if (change) {
 		mix->drc_range = ucontrol->value.integer.value[0];
-		tumbler_set_drc(mix);
+		if (chip->model == PMAC_TUMBLER)
+			tumbler_set_drc(mix);
+		else
+			snapper_set_drc(mix);
 	}
 	return change;
 }
@@ -330,7 +391,10 @@ static int tumbler_put_drc_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	change = mix->drc_enable != ucontrol->value.integer.value[0];
 	if (change) {
 		mix->drc_enable = !!ucontrol->value.integer.value[0];
-		tumbler_set_drc(mix);
+		if (chip->model == PMAC_TUMBLER)
+			tumbler_set_drc(mix);
+		else
+			snapper_set_drc(mix);
 	}
 	return change;
 }
@@ -409,23 +473,14 @@ static int tumbler_put_mono(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucon
 	return change;
 }
 
+/* TAS3001c mono volumes */
 static struct tumbler_mono_vol tumbler_pcm_vol_info = {
-	.index = VOL_IDX_PCM,
+	.index = VOL_IDX_PCM_MONO,
 	.reg = TAS_REG_PCM,
 	.bytes = 3,
 	.max = number_of(mixer_volume_table),
 	.table = mixer_volume_table,
 };
-
-#if 0 // for what?
-static struct tumbler_mono_vol tumbler_altpcm_vol_info = {
-	.index = VOL_IDX_ALTPCM,
-	.reg = TAS_REG_INPUT2,
-	.bytes = 3,
-	.max = number_of(mixer_volume_table),
-	.table = mixer_volume_table,
-};
-#endif
 
 static struct tumbler_mono_vol tumbler_bass_vol_info = {
 	.index = VOL_IDX_BASS,
@@ -443,6 +498,24 @@ static struct tumbler_mono_vol tumbler_treble_vol_info = {
 	.table = treble_volume_table,
 };
 
+/* TAS3004 mono volumes */
+static struct tumbler_mono_vol snapper_bass_vol_info = {
+	.index = VOL_IDX_BASS,
+	.reg = TAS_REG_BASS,
+	.bytes = 1,
+	.max = number_of(snapper_bass_volume_table),
+	.table = snapper_bass_volume_table,
+};
+
+static struct tumbler_mono_vol snapper_treble_vol_info = {
+	.index = VOL_IDX_TREBLE,
+	.reg = TAS_REG_TREBLE,
+	.bytes = 1,
+	.max = number_of(snapper_treble_volume_table),
+	.table = snapper_treble_volume_table,
+};
+
+
 #define DEFINE_MONO(xname,type) { \
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
 	.name = xname, \
@@ -451,6 +524,95 @@ static struct tumbler_mono_vol tumbler_treble_vol_info = {
 	.put = tumbler_put_mono, \
 	.private_value = (unsigned long)(&tumbler_##type##_vol_info), \
 }
+
+#define DEFINE_SNAPPER_MONO(xname,type) { \
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
+	.name = xname, \
+	.info = tumbler_info_mono, \
+	.get = tumbler_get_mono, \
+	.put = tumbler_put_mono, \
+	.private_value = (unsigned long)(&snapper_##type##_vol_info), \
+}
+
+
+/*
+ * snapper mixer volumes
+ */
+
+static int snapper_set_mix_vol1(pmac_tumbler_t *mix, int idx, int ch, int reg)
+{
+	int i, j, vol;
+	unsigned char block[9];
+
+	vol = mix->mix_vol[idx][ch];
+	if (vol >= number_of(mixer_volume_table)) {
+		vol = number_of(mixer_volume_table) - 1;
+		mix->mix_vol[idx][ch] = vol;
+	}
+
+	for (i = 0; i < 3; i++) {
+		vol = mix->mix_vol[i][ch];
+		vol = mixer_volume_table[vol];
+		for (j = 0; j < 3; j++)
+			block[i * 3 + j] = (vol >> ((2 - j) * 8)) & 0xff;
+	}
+	if (snd_pmac_keywest_write(&mix->i2c, reg, 9, block) < 0) {
+		snd_printk("failed to set mono volume %d\n", reg);  
+		return -EINVAL; 
+	}
+	return 0;
+}
+
+static int snapper_set_mix_vol(pmac_tumbler_t *mix, int idx)
+{
+	if (! mix->i2c.client)
+		return -ENODEV;
+	if (snapper_set_mix_vol1(mix, idx, 0, TAS_REG_LMIX) < 0 ||
+	    snapper_set_mix_vol1(mix, idx, 1, TAS_REG_RMIX) < 0)
+		return -EINVAL;
+	return 0;
+}
+
+static int snapper_info_mix(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = number_of(mixer_volume_table) - 1;
+	return 0;
+}
+
+static int snapper_get_mix(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	int idx = (int)kcontrol->private_value;
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	pmac_tumbler_t *mix;
+	if (! (mix = chip->mixer_data))
+		return -ENODEV;
+	ucontrol->value.integer.value[0] = mix->mix_vol[idx][0];
+	ucontrol->value.integer.value[1] = mix->mix_vol[idx][1];
+	return 0;
+}
+
+static int snapper_put_mix(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	int idx = (int)kcontrol->private_value;
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	pmac_tumbler_t *mix;
+	int change;
+
+	if (! (mix = chip->mixer_data))
+		return -ENODEV;
+	change = mix->mix_vol[idx][0] != ucontrol->value.integer.value[0] ||
+		mix->mix_vol[idx][1] != ucontrol->value.integer.value[1];
+	if (change) {
+		mix->mix_vol[idx][0] = ucontrol->value.integer.value[0];
+		mix->mix_vol[idx][1] = ucontrol->value.integer.value[1];
+		snapper_set_mix_vol(mix, idx);
+	}
+	return change;
+}
+
 
 /*
  * mute switches
@@ -487,6 +649,16 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	return 0;
 }
 
+#define DEFINE_SNAPPER_MIX(xname,idx,ofs) { \
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
+	.name = xname, \
+	.info = snapper_info_mix, \
+	.get = snapper_get_mix, \
+	.put = snapper_put_mix, \
+	.index = idx,\
+	.private_value = ofs, \
+}
+
 
 /*
  */
@@ -495,29 +667,60 @@ static snd_kcontrol_new_t tumbler_mixers[] __initdata = {
 	  .name = "Master Playback Volume",
 	  .info = tumbler_info_master_volume,
 	  .get = tumbler_get_master_volume,
-	  put: tumbler_put_master_volume
+	  .put = tumbler_put_master_volume
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "Master Playback Switch",
 	  .info = snd_pmac_boolean_stereo_info,
 	  .get = tumbler_get_master_switch,
-	  put: tumbler_put_master_switch
+	  .put = tumbler_put_master_switch
 	},
 	DEFINE_MONO("Tone Control - Bass", bass),
 	DEFINE_MONO("Tone Control - Treble", treble),
 	DEFINE_MONO("PCM Playback Volume", pcm),
-	//  DEFINE_MONO("Mixer2 Playback Volume", altpcm),
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "DRC Switch",
 	  .info = snd_pmac_boolean_mono_info,
 	  .get = tumbler_get_drc_switch,
-	  put: tumbler_put_drc_switch
+	  .put = tumbler_put_drc_switch
 	},
 	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	  .name = "DRC Range",
 	  .info = tumbler_info_drc_value,
 	  .get = tumbler_get_drc_value,
-	  put: tumbler_put_drc_value
+	  .put = tumbler_put_drc_value
+	},
+};
+
+static snd_kcontrol_new_t snapper_mixers[] __initdata = {
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Master Playback Volume",
+	  .info = tumbler_info_master_volume,
+	  .get = tumbler_get_master_volume,
+	  .put = tumbler_put_master_volume
+	},
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Master Playback Switch",
+	  .info = snd_pmac_boolean_stereo_info,
+	  .get = tumbler_get_master_switch,
+	  .put = tumbler_put_master_switch
+	},
+	DEFINE_SNAPPER_MIX("PCM Playback Volume", 0, VOL_IDX_PCM),
+	DEFINE_SNAPPER_MIX("PCM Playback Volume", 1, VOL_IDX_PCM2),
+	DEFINE_SNAPPER_MIX("Monitor Mix Volume", 0, VOL_IDX_ADC),
+	DEFINE_SNAPPER_MONO("Tone Control - Bass", bass),
+	DEFINE_SNAPPER_MONO("Tone Control - Treble", treble),
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "DRC Switch",
+	  .info = snd_pmac_boolean_mono_info,
+	  .get = tumbler_get_drc_switch,
+	  .put = tumbler_put_drc_switch
+	},
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "DRC Range",
+	  .info = tumbler_info_drc_value,
+	  .get = tumbler_get_drc_value,
+	  .put = tumbler_put_drc_value
 	},
 };
 
@@ -675,10 +878,17 @@ static void tumbler_resume(pmac_t *chip)
 	tumbler_reset_audio(chip);
 	if (mix->i2c.client)
 		tumbler_init_client(&mix->i2c);
-	tumbler_set_mono_volume(mix, &tumbler_pcm_vol_info);
-	tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
-	tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
-	// tumbler_set_mono_volume(mix, &tumbler_altpcm_vol_info);
+	if (chip->model == PMAC_TUMBLER) {
+		tumbler_set_mono_volume(mix, &tumbler_pcm_vol_info);
+		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
+		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+	} else {
+		snapper_set_mix_vol(mix, VOL_IDX_PCM);
+		snapper_set_mix_vol(mix, VOL_IDX_PCM2);
+		snapper_set_mix_vol(mix, VOL_IDX_ADC);
+		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
+		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+	}
 	tumbler_set_drc(mix);
 	tumbler_set_master_volume(mix);
 	if (chip->update_automute)
@@ -741,6 +951,7 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	pmac_tumbler_t *mix;
 	u32 *paddr;
 	struct device_node *tas_node;
+	char *chipname;
 
 #ifdef CONFIG_KMOD
 	request_module("i2c-keywest");
@@ -770,18 +981,32 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 		mix->i2c.addr = TAS_I2C_ADDR;
 
 	mix->i2c.init_client = tumbler_init_client;
-	mix->i2c.name = "TAS3001c";
+	if (chip->model == PMAC_TUMBLER) {
+		mix->i2c.name = "TAS3001c";
+		chipname = "Tumbler";
+	} else {
+		mix->i2c.name = "TAS3004";
+		chipname = "Snapper";
+	}
+
 	if ((err = snd_pmac_keywest_init(&mix->i2c)) < 0)
 		return err;
 
 	/*
 	 * build mixers
 	 */
-	strcpy(chip->card->mixername, "PowerMac Tumbler");
+	sprintf(chip->card->mixername, "PowerMac %s", chipname);
 
-	for (i = 0; i < number_of(tumbler_mixers); i++) {
-		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&tumbler_mixers[i], chip))) < 0)
-			return err;
+	if (chip->model == PMAC_TUMBLER) {
+		for (i = 0; i < number_of(tumbler_mixers); i++) {
+			if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&tumbler_mixers[i], chip))) < 0)
+				return err;
+		}
+	} else {
+		for (i = 0; i < number_of(snapper_mixers); i++) {
+			if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snapper_mixers[i], chip))) < 0)
+				return err;
+		}
 	}
 	chip->master_sw_ctl = snd_ctl_new1(&tumbler_hp_sw, chip);
 	if ((err = snd_ctl_add(chip->card, chip->master_sw_ctl)) < 0)

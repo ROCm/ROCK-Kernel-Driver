@@ -362,7 +362,7 @@ typedef struct isdn_net_local_s {
   char cisco_line_state;		/* state of line according to keepalive packets */
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
   struct timer_list cisco_timer;
-  struct tq_struct tqueue;
+  struct work_struct tqueue;
   struct isdn_netif_ops   *ops;
 } isdn_net_local;
 

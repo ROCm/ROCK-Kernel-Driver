@@ -2617,6 +2617,7 @@
 10fc  I-O Data Device, Inc.
 # What's in the cardbus end of a Sony ACR-A01 card, comes with newer Vaio CD-RW drives
 	0003  Cardbus IDE Controller
+	0005  Cardbus SCSI CBSC II
 10fd  Soyo Computer, Inc
 10fe  Fast Multimedia AG
 10ff  NCube
@@ -3027,6 +3028,12 @@
 1144  Cincinnati Milacron
 	0001  Noservo controller
 1145  Workbit Corporation
+	f007  NinjaSCSI-32 KME
+	8007  NinjaSCSI-32 Workbit
+	f010  NinjaSCSI-32 Workbit
+	f012  NinjaSCSI-32 Logitec
+	f013  NinjaSCSI-32 Logitec
+	f015  NinjaSCSI-32 Melco
 1146  Force Computers
 1147  Interface Corp
 1148  Syskonnect (Schneider & Koch)

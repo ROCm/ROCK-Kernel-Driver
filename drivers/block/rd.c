@@ -77,7 +77,7 @@ int initrd_below_start_ok;
  */
 
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
-static struct gendisk rd_disks[NUM_RAMDISKS];
+static struct gendisk *rd_disks[NUM_RAMDISKS];
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
@@ -213,7 +213,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 		kunmap(vec->bv_page);
 
 		if (rw == READ) {
-			flush_dcache_page(page);
+			flush_dcache_page(sbh->b_page);
 		} else {
 			SetPageDirty(page);
 		}
@@ -310,13 +310,7 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 #ifdef CONFIG_BLK_DEV_INITRD
 
 static struct block_device_operations rd_bd_op;
-static struct gendisk initrd_disk = {
-	.major = MAJOR_NR,
-	.first_minor = INITRD_MINOR,
-	.minor_shift = 0,
-	.fops = &rd_bd_op,	
-	.disk_name = "initrd"
-};
+static struct gendisk *initrd_disk;
 
 static ssize_t initrd_read(struct file *file, char *buf,
 			   size_t count, loff_t *ppos)
@@ -340,7 +334,7 @@ static int initrd_release(struct inode *inode,struct file *file)
 	spin_lock(&initrd_users_lock);
 	if (!--initrd_users) {
 		spin_unlock(&initrd_users_lock);
-		del_gendisk(&initrd_disk);
+		del_gendisk(initrd_disk);
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
 	} else {
@@ -412,8 +406,12 @@ static void __exit rd_cleanup (void)
 			invalidate_bdev(bdev, 1);
 			blkdev_put(bdev, BDEV_FILE);
 		}
-		del_gendisk(rd_disks + i);
+		del_gendisk(rd_disks[i]);
+		put_disk(rd_disks[i]);
 	}
+#ifdef CONFIG_BLK_DEV_INITRD
+	put_disk(initrd_disk);
+#endif
 
 	devfs_unregister (devfs_handle);
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
@@ -423,6 +421,7 @@ static void __exit rd_cleanup (void)
 static int __init rd_init (void)
 {
 	int i;
+	int err = -ENOMEM;
 
 	if (rd_blocksize > PAGE_SIZE || rd_blocksize < 512 ||
 	    (rd_blocksize & (rd_blocksize-1))) {
@@ -431,15 +430,32 @@ static int __init rd_init (void)
 		rd_blocksize = BLOCK_SIZE;
 	}
 
+#ifdef CONFIG_BLK_DEV_INITRD
+	initrd_disk = alloc_disk();
+	if (!initrd_disk)
+		return -ENOMEM;
+	initrd_disk->major = MAJOR_NR;
+	initrd_disk->first_minor = INITRD_MINOR;
+	initrd_disk->minor_shift = 0;
+	initrd_disk->fops = &rd_bd_op;	
+	sprintf(initrd_disk->disk_name, "initrd");
+#endif
+	for (i = 0; i < NUM_RAMDISKS; i++) {
+		rd_disks[i] = alloc_disk();
+		if (!rd_disks[i])
+			goto out;
+	}
+
 	if (register_blkdev(MAJOR_NR, "ramdisk", &rd_bd_op)) {
 		printk("RAMDISK: Could not get major %d", MAJOR_NR);
-		return -EIO;
+		err = -EIO;
+		goto out;
 	}
 
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), &rd_make_request);
 
 	for (i = 0; i < NUM_RAMDISKS; i++) {
-		struct gendisk *disk = rd_disks + i;
+		struct gendisk *disk = rd_disks[i];
 		/* rd_size is given in kB */
 		rd_length[i] = rd_size << 10;
 		disk->major = MAJOR_NR;
@@ -456,11 +472,12 @@ static int __init rd_init (void)
 			       &rd_bd_op, NULL);
 
 	for (i = 0; i < NUM_RAMDISKS; i++)
-		add_disk(rd_disks + i);
+		add_disk(rd_disks[i]);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */
-	add_disk(&initrd_disk);
+	set_capacity(initrd_disk, (initrd_end-initrd_start+511)>>9);
+	add_disk(initrd_disk);
 	devfs_register(devfs_handle, "initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
@@ -471,6 +488,13 @@ static int __init rd_init (void)
 	       NUM_RAMDISKS, rd_size, rd_blocksize);
 
 	return 0;
+out:
+	while (i--)
+		put_disk(rd_disks[i]);
+#ifdef CONFIG_BLK_DEV_INITRD
+	put_disk(initrd_disk);
+#endif
+	return err;
 }
 
 module_init(rd_init);

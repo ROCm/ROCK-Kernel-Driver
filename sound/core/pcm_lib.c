@@ -20,7 +20,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/time.h>

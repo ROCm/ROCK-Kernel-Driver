@@ -743,7 +743,7 @@ static int handle_remote_request(struct file_info *fi,
         }
 
         req->tq.data = req;
-        queue_task(&req->tq, &packet->complete_tq);
+        hpsb_add_packet_complete_task(packet, &req->tq);
 
         spin_lock_irq(&fi->reqlists_lock);
         list_add_tail(&req->list, &fi->req_pending);
@@ -786,7 +786,7 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
         req->tq.data = req;
         req->tq.routine = (void (*)(void*))queue_complete_req;
         req->req.length = 0;
-        queue_task(&req->tq, &packet->complete_tq);
+	hpsb_add_packet_complete_task(packet, &req->tq);
 
         spin_lock_irq(&fi->reqlists_lock);
         list_add_tail(&req->list, &fi->req_pending);

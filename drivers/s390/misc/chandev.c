@@ -24,6 +24,7 @@
 #include <asm/s390dyn.h>
 #include <asm/queue.h>
 #include <linux/kmod.h>
+#include <linux/tqueue.h>
 #ifndef MIN
 #define MIN(a,b) ((a<b)?a:b)
 #endif
@@ -2825,6 +2826,7 @@ static void chandev_read_conf(void)
 	struct stat statbuf;
 	char        *buff;
 	int         curr,left,len,fd;
+	mm_segment_t oldfs;
 
 	/* if called from chandev_register_and_probe & 
 	   the driver is compiled into the kernel the
@@ -2835,6 +2837,7 @@ static void chandev_read_conf(void)
 	if(in_interrupt()||current->fs->root==NULL)
 		return;
 	atomic_set(&chandev_conf_read,TRUE);
+	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 	if(stat(CHANDEV_FILE,&statbuf)==0)
 	{
@@ -2859,7 +2862,7 @@ static void chandev_read_conf(void)
 			vfree(buff);
 		}
 	}
-	set_fs(USER_DS);
+	set_fs(oldfs);
 }
 
 static void chandev_read_conf_if_necessary(void)

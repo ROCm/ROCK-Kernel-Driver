@@ -320,7 +320,7 @@ typedef struct {
 
 #include <linux/sdladrv.h>	/* SDLA support module API definitions */
 #include <linux/sdlasfm.h>	/* SDLA firmware module definitions */
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #ifdef LINUX_2_4
   #include <linux/serial.h>
   #include <linux/serialP.h>
@@ -389,7 +389,7 @@ typedef struct sdla
 	unsigned int tty_open;
 	unsigned char *tty_buf;
 	unsigned char *tty_rx;
-	struct tq_struct tty_task_queue;
+	struct work_struct tty_work;
 	
 	union
 	{
@@ -422,7 +422,7 @@ typedef struct sdla
 			u8 oob_on_modem;	/* Option to send modem status to the api */
 			u16 num_of_ch;		/* Number of channels configured by the user */
 
-			struct tq_struct x25_poll_task;
+			struct work_struct x25_poll_work;
 			struct timer_list x25_timer;
 		} x;
 		struct
@@ -545,7 +545,7 @@ int wsppp_init (sdla_t* card, wandev_conf_t* conf);	/* Sync PPP on top of RAW CH
 extern sdla_t * wanpipe_find_card(char *);
 extern sdla_t * wanpipe_find_card_num (int);
 
-extern void wanpipe_queue_tq (struct tq_struct *);
+extern void wanpipe_queue_work (struct work_struct *);
 extern void wanpipe_mark_bh (void);
 extern void wakeup_sk_bh (netdevice_t *);
 extern int change_dev_flags (netdevice_t *, unsigned); 

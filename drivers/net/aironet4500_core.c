@@ -22,7 +22,7 @@
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -2202,10 +2202,9 @@ awc_tx_complete_check(struct net_device * dev){
 
 
 #define AWC_QUEUE_BH {\
-	if (!priv->bh_active && !priv->bh_running){\
-		priv->bh_active = 1;\
-		queue_task(&priv->immediate_bh, &tq_immediate);\
-		mark_bh(IMMEDIATE_BH);\
+	if (!priv->work_active && !priv->work_running){\
+		priv->work_active = 1;\
+		schedule_work(&priv->work); \
 	}\
 	}
 
@@ -2223,7 +2222,7 @@ awc_bh(struct net_device *dev){
 
 	DEBUG(8, "awc_bh awoken on jiffie %ld \n",jiffies);
 
-	priv->bh_running = 1;
+	priv->work_running = 1;
 	
 	active_interrupts = awc_event_status(dev->base_addr);
 	
@@ -2233,7 +2232,7 @@ awc_bh(struct net_device *dev){
 
         if (test_and_set_bit( 0, (void *) &priv->tx_chain_active) ) {
 //		printk(KERN_ERR "tx chain active in bh \n");
-//		queue_task(&priv->immediate_bh, &tq_immediate);
+//		schedule_work(&priv->work);
 		goto bad_end;
 	}
 start:
@@ -2281,8 +2280,8 @@ start:
 				goto start;
 			}
 		};
-		priv->bh_active  = 0;
-		priv->bh_running = 0;
+		priv->work_active  = 0;
+		priv->work_running = 0;
 
         priv->tx_chain_active = 0;
 
@@ -2292,8 +2291,8 @@ start:
 //	if (!priv->tx_chain_active) 
 //		wake_up(&priv->tx_chain_wait_queue);
   
-  	priv->bh_running = 0;
-	priv->bh_active = 0;
+  	priv->work_running = 0;
+	priv->work_active = 0;
 	return ;
 };
 
@@ -2366,7 +2365,7 @@ start:
 		//priv->
 		netif_device_detach (dev);
 		priv->ejected = 1;
-		if (priv->bh_active || priv->bh_running){
+		if (priv->work_active || priv->work_running){
 			priv->interrupt_count--;
 			goto bad_end;
 		} else if (priv->command_semaphore_on){
@@ -2498,8 +2497,8 @@ start:
 	active_interrupts = awc_event_status(dev->base_addr);
 
 	if ((active_interrupts & 0x7) && 
-	     !priv->bh_active && 
-	     !priv->bh_running ){
+	     !priv->work_active && 
+	     !priv->work_running ){
 		if (multi_ints++ < 5)
 			goto start;
         }
@@ -2874,12 +2873,9 @@ int awc_private_init(struct net_device * dev){
 	
 	priv->command_semaphore_on = 0;
 	priv->unlock_command_postponed = 0;
-	INIT_LIST_HEAD(&priv->immediate_bh.list);
-	priv->immediate_bh.sync 	= 0;
-	priv->immediate_bh.routine 	= (void *)(void *)awc_bh;
-	priv->immediate_bh.data 	= dev;
-	priv->bh_running	= 0;
-	priv->bh_active		= 0;
+	INIT_WORK(&priv->work, (void *)(void *)awc_work, dev);
+	priv->work_running	= 0;
+	priv->work_active	= 0;
 	priv->tx_chain_active	= 0;
 	priv->enabled_interrupts= 0x00;
 	priv->waiting_interrupts= 0x00;

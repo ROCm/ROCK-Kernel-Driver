@@ -195,19 +195,19 @@ odev_poll(struct file *file, poll_table * wait)
 static struct file_operations seq_oss_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		odev_read,
-	write:		odev_write,
-	open:		odev_open,
-	release:	odev_release,
-	poll:		odev_poll,
-	ioctl:		odev_ioctl,
+	.read =		odev_read,
+	.write =	odev_write,
+	.open =		odev_open,
+	.release =	odev_release,
+	.poll =		odev_poll,
+	.ioctl =	odev_ioctl,
 };
 
 static snd_minor_t seq_oss_reg = {
-	comment:	"sequencer",
-	f_ops:		&seq_oss_f_ops,
+	.comment =	"sequencer",
+	.f_ops =	&seq_oss_f_ops,
 };
 
 static int __init

@@ -350,16 +350,16 @@ static void snd_mpu401_uart_output_trigger(snd_rawmidi_substream_t * substream, 
 
 static snd_rawmidi_ops_t snd_mpu401_uart_output =
 {
-	open:		snd_mpu401_uart_output_open,
-	close:		snd_mpu401_uart_output_close,
-	trigger:	snd_mpu401_uart_output_trigger,
+	.open =		snd_mpu401_uart_output_open,
+	.close =	snd_mpu401_uart_output_close,
+	.trigger =	snd_mpu401_uart_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_mpu401_uart_input =
 {
-	open:		snd_mpu401_uart_input_open,
-	close:		snd_mpu401_uart_input_close,
-	trigger:	snd_mpu401_uart_input_trigger,
+	.open =		snd_mpu401_uart_input_open,
+	.close =	snd_mpu401_uart_input_close,
+	.trigger =	snd_mpu401_uart_input_trigger,
 };
 
 static void snd_mpu401_uart_free(snd_rawmidi_t *rmidi)

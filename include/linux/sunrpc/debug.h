@@ -12,7 +12,7 @@
 #include <linux/config.h>
 
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 /*
  * Enable RPC debugging/profiling.

@@ -20,12 +20,12 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <asm/nvram.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 
@@ -82,9 +82,18 @@ snd_pmac_awacs_write_noreg(pmac_t *chip, int reg, int val)
 	snd_pmac_awacs_write(chip, val | (reg << 12));
 }
 
+static void do_mdelay(int msec, int can_schedule)
+{
+	if (can_schedule) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((msec * HZ + 999) / 1000);
+	} else
+		mdelay(msec);
+}
+
 #ifdef CONFIG_PMAC_PBOOK
 /* Recalibrate chip */
-static void screamer_recalibrate(pmac_t *chip)
+static void screamer_recalibrate(pmac_t *chip, int can_schedule)
 {
 	if (chip->model != PMAC_SCREAMER)
 		return;
@@ -92,15 +101,15 @@ static void screamer_recalibrate(pmac_t *chip)
 	/* Sorry for the horrible delays... I hope to get that improved
 	 * by making the whole PM process asynchronous in a future version
 	 */
-	mdelay(750);
+	do_mdelay(750, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1,
 				   chip->awacs_reg[1] | MASK_RECALIBRATE | MASK_CMUTE | MASK_AMUTE);
-	mdelay(1000);
+	do_mdelay(1000, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
 }
 
 #else
-#define screamer_recalibrate(chip) /* NOP */
+#define screamer_recalibrate(chip, can_schedule) /* NOP */
 #endif
 
 
@@ -135,12 +144,20 @@ static int snd_pmac_awacs_get_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	pmac_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value & 0xff;
 	int lshift = (kcontrol->private_value >> 8) & 0xff;
+	int inverted = (kcontrol->private_value >> 16) & 1;
 	unsigned long flags;
+	int vol[2];
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	ucontrol->value.integer.value[0] = 0x0f - ((chip->awacs_reg[reg] >> lshift) & 0xf);
-	ucontrol->value.integer.value[1] = 0x0f - (chip->awacs_reg[reg] & 0xf);
+	vol[0] = (chip->awacs_reg[reg] >> lshift) & 0xf;
+	vol[1] = chip->awacs_reg[reg] & 0xf;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	if (inverted) {
+		vol[0] = 0x0f - vol[0];
+		vol[1] = 0x0f - vol[1];
+	}
+	ucontrol->value.integer.value[0] = vol[0];
+	ucontrol->value.integer.value[1] = vol[1];
 	return 0;
 }
 
@@ -149,14 +166,24 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	pmac_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value & 0xff;
 	int lshift = (kcontrol->private_value >> 8) & 0xff;
+	int inverted = (kcontrol->private_value >> 16) & 1;
 	int val, oldval;
 	unsigned long flags;
+	int vol[2];
 
+	vol[0] = ucontrol->value.integer.value[0];
+	vol[1] = ucontrol->value.integer.value[1];
+	if (inverted) {
+		vol[0] = 0x0f - vol[0];
+		vol[1] = 0x0f - vol[1];
+	}
+	vol[0] &= 0x0f;
+	vol[1] &= 0x0f;
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	oldval = chip->awacs_reg[reg];
 	val = oldval & ~(0xf | (0xf << lshift));
-	val |= ((0x0f - (ucontrol->value.integer.value[0] & 0xf)) << lshift);
-	val |= 0x0f - (ucontrol->value.integer.value[1] & 0xf);
+	val |= vol[0] << lshift;
+	val |= vol[1];
 	if (oldval != val)
 		snd_pmac_awacs_write_reg(chip, reg, val);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -164,12 +191,12 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 }
 
 
-#define AWACS_VOLUME(xname, xreg, xshift) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+#define AWACS_VOLUME(xname, xreg, xshift, xinverted) \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = 0, \
   .info = snd_pmac_awacs_info_volume, \
   .get = snd_pmac_awacs_get_volume, \
   .put = snd_pmac_awacs_put_volume, \
-  private_value: (xreg) | ((xshift) << 8) }
+  .private_value = (xreg) | ((xshift) << 8) | ((xinverted) << 16) }
 
 /*
  * mute master/ogain for AWACS: mono
@@ -214,11 +241,11 @@ static int snd_pmac_awacs_put_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 }
 
 #define AWACS_SWITCH(xname, xreg, xshift, xinvert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = 0, \
   .info = snd_pmac_boolean_mono_info, \
   .get = snd_pmac_awacs_get_switch, \
   .put = snd_pmac_awacs_put_switch, \
-  private_value: (xreg) | ((xshift) << 8) | ((xinvert) << 16) }
+  .private_value = (xreg) | ((xshift) << 8) | ((xinvert) << 16) }
 
 
 #ifdef PMAC_AMP_AVAIL
@@ -540,9 +567,9 @@ static int snd_pmac_screamer_mic_boost_put(snd_kcontrol_t *kcontrol, snd_ctl_ele
  * lists of mixer elements
  */
 static snd_kcontrol_new_t snd_pmac_awacs_mixers[] __initdata = {
-	AWACS_VOLUME("Master Playback Volume", 2, 6),
+	AWACS_VOLUME("Master Playback Volume", 2, 6, 1),
 	AWACS_SWITCH("Master Capture Switch", 1, SHIFT_LOOPTHRU, 0),
-	AWACS_VOLUME("Capture Volume", 0, 4),
+	AWACS_VOLUME("Capture Volume", 0, 4, 0),
 	AWACS_SWITCH("Line Capture Switch", 0, SHIFT_MUX_LINE, 0),
 	AWACS_SWITCH("CD Capture Switch", 0, SHIFT_MUX_CD, 0),
 	AWACS_SWITCH("Mic Capture Switch", 0, SHIFT_MUX_MIC, 0),
@@ -565,7 +592,7 @@ static snd_kcontrol_new_t snd_pmac_screamer_mic_boost[] __initdata = {
 };
 
 static snd_kcontrol_new_t snd_pmac_awacs_speaker_vol[] __initdata = {
-	AWACS_VOLUME("PC Speaker Playback Volume", 4, 6),
+	AWACS_VOLUME("PC Speaker Playback Volume", 4, 6, 1),
 };
 static snd_kcontrol_new_t snd_pmac_awacs_speaker_sw __initdata =
 AWACS_SWITCH("PC Speaker Playback Switch", 1, SHIFT_SPKMUTE, 1);
@@ -591,7 +618,7 @@ static int build_mixers(pmac_t *chip, int nums, snd_kcontrol_new_t *mixers)
 /*
  * restore all registers
  */
-static void awacs_restore_all_regs(pmac_t *chip)
+static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
 {
 	snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -599,7 +626,7 @@ static void awacs_restore_all_regs(pmac_t *chip)
 	snd_pmac_awacs_write_noreg(chip, 4, chip->awacs_reg[4]);
 	if (chip->model == PMAC_SCREAMER) {
 		snd_pmac_awacs_write_noreg(chip, 5, chip->awacs_reg[5]);
-		mdelay(100);
+		do_mdelay(100, can_schedule);
 		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
 		mdelay(2);
 		snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -611,8 +638,8 @@ static void awacs_restore_all_regs(pmac_t *chip)
 #ifdef CONFIG_PMAC_PBOOK
 static void snd_pmac_awacs_resume(pmac_t *chip)
 {
-	awacs_restore_all_regs(chip);
-	screamer_recalibrate(chip);
+	awacs_restore_all_regs(chip, 0);
+	screamer_recalibrate(chip, 0);
 #ifdef PMAC_AMP_AVAIL
 	if (chip->mixer_data) {
 		awacs_amp_t *amp = chip->mixer_data;
@@ -720,8 +747,8 @@ snd_pmac_awacs_init(pmac_t *chip)
 		chip->awacs_reg[7] = 0;
 	}
 
-	awacs_restore_all_regs(chip);
-	screamer_recalibrate(chip);
+	awacs_restore_all_regs(chip, 1);
+	screamer_recalibrate(chip, 1);
 
 	chip->revision = (in_le32(&chip->awacs->codec_stat) >> 12) & 0xf;
 #ifdef PMAC_AMP_AVAIL
@@ -831,6 +858,10 @@ snd_pmac_awacs_init(pmac_t *chip)
 	chip->update_automute = snd_pmac_awacs_update_automute;
 	snd_pmac_awacs_update_automute(chip, 0); /* update the status only */
 #endif
+	if (chip->model == PMAC_SCREAMER) {
+		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
+		snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
+	}
 
 	return 0;
 }

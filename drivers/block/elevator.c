@@ -217,9 +217,11 @@ struct request *elevator_noop_next_request(request_queue_t *q)
 /*
  * general block -> elevator interface starts here
  */
-int elevator_init(request_queue_t *q, elevator_t *e, elevator_t type)
+int elevator_init(request_queue_t *q, elevator_t *type)
 {
-	*e = type;
+	elevator_t *e = &q->elevator;
+
+	memcpy(e, type, sizeof(*e));
 
 	INIT_LIST_HEAD(&q->queue_head);
 	q->last_merge = NULL;
@@ -230,8 +232,10 @@ int elevator_init(request_queue_t *q, elevator_t *e, elevator_t type)
 	return 0;
 }
 
-void elevator_exit(request_queue_t *q, elevator_t *e)
+void elevator_exit(request_queue_t *q)
 {
+	elevator_t *e = &q->elevator;
+
 	if (e->elevator_exit_fn)
 		e->elevator_exit_fn(q, e);
 }

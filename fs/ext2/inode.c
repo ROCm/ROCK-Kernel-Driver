@@ -629,14 +629,7 @@ ext2_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 static int
 ext2_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
-	int ret;
-	int err;
-
-	ret = write_mapping_buffers(mapping);
-	err = mpage_writepages(mapping, wbc, ext2_get_block);
-	if (!ret)
-		ret = err;
-	return ret;
+	return mpage_writepages(mapping, wbc, ext2_get_block);
 }
 
 struct address_space_operations ext2_aops = {

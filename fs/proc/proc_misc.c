@@ -252,6 +252,18 @@ static struct file_operations proc_cpuinfo_operations = {
 	.release	= seq_release,
 };
 
+extern struct seq_operations vmstat_op;
+static int vmstat_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &vmstat_op);
+}
+static struct file_operations proc_vmstat_file_operations = {
+	open:		vmstat_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+
 #ifdef CONFIG_PROC_HARDWARE
 static int hardware_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -327,7 +339,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	int i, len;
 	extern unsigned long total_forks;
 	unsigned long jif = jiffies;
-	unsigned int sum = 0, user = 0, nice = 0, system = 0;
+	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
 	int major, disk;
 
 	for (i = 0 ; i < NR_CPUS; i++) {
@@ -337,38 +349,32 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		user += kstat.per_cpu_user[i];
 		nice += kstat.per_cpu_nice[i];
 		system += kstat.per_cpu_system[i];
+		idle += kstat.per_cpu_idle[i];
+		iowait += kstat.per_cpu_iowait[i];
 #if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat.irqs[i][j];
 #endif
 	}
 
-	len = sprintf(page, "cpu  %u %u %u %lu\n",
+	len = sprintf(page, "cpu  %u %u %u %u %u\n",
 		jiffies_to_clock_t(user),
 		jiffies_to_clock_t(nice),
 		jiffies_to_clock_t(system),
-		jiffies_to_clock_t(jif * num_online_cpus() - (user + nice + system)));
+		jiffies_to_clock_t(idle),
+		jiffies_to_clock_t(iowait));
 	for (i = 0 ; i < NR_CPUS; i++){
 		if (!cpu_online(i)) continue;
-		len += sprintf(page + len, "cpu%d %u %u %u %lu\n",
+		len += sprintf(page + len, "cpu%d %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat.per_cpu_user[i]),
 			jiffies_to_clock_t(kstat.per_cpu_nice[i]),
 			jiffies_to_clock_t(kstat.per_cpu_system[i]),
-			jiffies_to_clock_t(jif - (  kstat.per_cpu_user[i] \
-				   + kstat.per_cpu_nice[i] \
-				   + kstat.per_cpu_system[i])));
+			jiffies_to_clock_t(kstat.per_cpu_idle[i]),
+			jiffies_to_clock_t(kstat.per_cpu_iowait[i]));
 	}
-	len += sprintf(page + len,
-		"page %u %u\n"
-		"swap %u %u\n"
-		"intr %u",
-			kstat.pgpgin >> 1,
-			kstat.pgpgout >> 1,
-			kstat.pswpin,
-			kstat.pswpout,
-			sum
-	);
+	len += sprintf(page + len, "intr %u", sum);
+
 #if !defined(CONFIG_ARCH_S390)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
@@ -395,29 +401,9 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 
 	len += sprintf(page + len,
-		"\npageallocs %u\n"
-		"pagefrees %u\n"
-		"pageactiv %u\n"
-		"pagedeact %u\n"
-		"pagefault %u\n"
-		"majorfault %u\n"
-		"pagescan %u\n"
-		"pagesteal %u\n"
-		"pageoutrun %u\n"
-		"allocstall %u\n"
-		"ctxt %lu\n"
+		"\nctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n",
-		kstat.pgalloc,
-		kstat.pgfree,
-		kstat.pgactivate,
-		kstat.pgdeactivate,
-		kstat.pgfault,
-		kstat.pgmajfault,
-		kstat.pgscan,
-		kstat.pgsteal,
-		kstat.pageoutrun,
-		kstat.allocstall,
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks);
@@ -432,6 +418,7 @@ static int devices_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+#if !defined(CONFIG_ARCH_S390)
 extern int show_interrupts(struct seq_file *p, void *v);
 static int interrupts_open(struct inode *inode, struct file *file)
 {
@@ -461,6 +448,7 @@ static struct file_operations proc_interrupts_operations = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+#endif
 
 static int filesystems_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -643,9 +631,12 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("partitions", 0, &proc_partitions_operations);
+#if !defined(CONFIG_ARCH_S390)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
+#endif
 	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 	create_seq_entry("buddyinfo",S_IRUGO, &fragmentation_file_operations);
+	create_seq_entry("vmstat",S_IRUGO, &proc_vmstat_file_operations);
 #ifdef CONFIG_MODULES
 	create_seq_entry("modules", 0, &proc_modules_operations);
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);

@@ -37,7 +37,7 @@ static unsigned int init_chipset_svwks(struct pci_dev *, const char *);
 static void init_hwif_svwks(ide_hwif_t *);
 static void init_dma_svwks(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t serverworks_chipsets[] __initdata = {
+static ide_pci_device_t serverworks_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_SERVERWORKS,
 		device:		PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,

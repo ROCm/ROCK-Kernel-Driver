@@ -64,12 +64,12 @@
 #include <asm/irq.h>
 #include <asm/s390dyn.h>
 
-#define CONFIG_DASD_DYNAMIC
-
 /*
  * SECTION: Type definitions
  */
-typedef int (*dasd_ioctl_fn_t) (void *inp, int no, long args);
+struct dasd_device_t;
+
+typedef int (*dasd_ioctl_fn_t) (struct block_device *bdev, int no, long args);
 
 typedef struct {
 	struct list_head list;
@@ -139,9 +139,8 @@ do { \
 /* messages to be written via klogd and dbf */
 #define DEV_MESSAGE(d_loglevel,d_device,d_string,d_args...)\
 do { \
-	printk(d_loglevel PRINTK_HEADER " /dev/%-7s(%3d:%3d),%04x@%02x: " \
-	       d_string "\n", d_device->name, \
-	       major(d_device->kdev), minor(d_device->kdev), \
+	printk(d_loglevel PRINTK_HEADER " %s,%04x@%02x: " \
+	       d_string "\n", bdevname(d_device->bdev), \
 	       d_device->devinfo.devno, d_device->devinfo.irq, \
 	       d_args); \
 	DBF_DEV_EVENT(DBF_ALERT, d_device, d_string, d_args); \
@@ -152,8 +151,6 @@ do { \
 	printk(d_loglevel PRINTK_HEADER " " d_string "\n", d_args); \
 	DBF_EVENT(DBF_ALERT, d_string, d_args); \
 } while(0)
-
-struct dasd_device_t;
 
 typedef struct dasd_ccw_req_t {
 	unsigned int magic;		/* Eye catcher */
@@ -262,7 +259,8 @@ typedef struct dasd_discipline_t {
 typedef struct dasd_device_t {
 	/* Block device stuff. */
 	char name[16];			/* The device name in /dev. */
-	kdev_t kdev;
+	struct block_device *bdev;
+	struct gendisk *gdp;
 	devfs_handle_t devfs_entry;
 	request_queue_t *request_queue;
 	spinlock_t request_queue_lock;
@@ -467,6 +465,7 @@ dasd_devmap_t *dasd_devmap_from_devno(int);
 dasd_devmap_t *dasd_devmap_from_devindex(int);
 dasd_devmap_t *dasd_devmap_from_irq(int);
 dasd_devmap_t *dasd_devmap_from_kdev(kdev_t);
+dasd_devmap_t *dasd_devmap_from_bdev(struct block_device *bdev);
 dasd_device_t *dasd_get_device(dasd_devmap_t *);
 void dasd_put_device(dasd_devmap_t *);
 
@@ -478,9 +477,9 @@ int dasd_add_range(int, int, int);
 /* externals in dasd_gendisk.c */
 int  dasd_gendisk_init(void);
 void dasd_gendisk_exit(void);
-int  dasd_gendisk_new_major(void);
 int  dasd_gendisk_major_index(int);
-struct gendisk *dasd_gendisk_from_devindex(int);
+int  dasd_gendisk_index_major(int);
+struct gendisk *dasd_gendisk_alloc(char *, int);
 void dasd_setup_partitions(dasd_device_t *);
 void dasd_destroy_partitions(dasd_device_t *);
 

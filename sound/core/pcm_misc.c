@@ -19,7 +19,6 @@
  *
  */
   
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -329,6 +328,18 @@ u_int64_t snd_pcm_format_silence_64(snd_pcm_format_t format)
 		return 0x0000800000008000ULL;
 	case SNDRV_PCM_FORMAT_U32_BE:
 		return 0x0000008000000080ULL;
+	case SNDRV_PCM_FORMAT_U24_3LE:
+		return 0x0000800000800000ULL;
+	case SNDRV_PCM_FORMAT_U24_3BE:
+		return 0x0080000080000080ULL;
+	case SNDRV_PCM_FORMAT_U20_3LE:
+		return 0x0000080000080000ULL;
+	case SNDRV_PCM_FORMAT_U20_3BE:
+		return 0x0008000008000008ULL;
+	case SNDRV_PCM_FORMAT_U18_3LE:
+		return 0x0000020000020000ULL;
+	case SNDRV_PCM_FORMAT_U18_3BE:
+		return 0x0002000002000002ULL;
 #else
 	case SNDRV_PCM_FORMAT_U16_LE:
 		return 0x0080008000800080ULL;
@@ -342,16 +353,19 @@ u_int64_t snd_pcm_format_silence_64(snd_pcm_format_t format)
 		return 0x0080000000800000ULL;
 	case SNDRV_PCM_FORMAT_U32_BE:
 		return 0x8000000080000000ULL;
-#endif
 	case SNDRV_PCM_FORMAT_U24_3LE:
+		return 0x0080000080000080ULL;
 	case SNDRV_PCM_FORMAT_U24_3BE:
 		return 0x0000800000800000ULL;
 	case SNDRV_PCM_FORMAT_U20_3LE:
+		return 0x0008000008000008ULL;
 	case SNDRV_PCM_FORMAT_U20_3BE:
 		return 0x0000080000080000ULL;
 	case SNDRV_PCM_FORMAT_U18_3LE:
+		return 0x0002000002000002ULL;
 	case SNDRV_PCM_FORMAT_U18_3BE:
 		return 0x0000020000020000ULL;
+#endif
 	case SNDRV_PCM_FORMAT_FLOAT_LE:
 	{
 		union {
@@ -471,11 +485,16 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 		if (! silence)
 			memset(data, 0, samples * 3);
 		else {
-			/* FIXME: rewrite in the more better way.. */
-			int i;
 			while (samples-- > 0) {
-				for (i = 0; i < 3; i++)
-					*((u_int8_t *)data)++ = silence >> (i * 8);
+#ifdef SNDRV_LITTLE_ENDIAN
+				*((u_int8_t *)data)++ = silence >> 0;
+				*((u_int8_t *)data)++ = silence >> 8;
+				*((u_int8_t *)data)++ = silence >> 16;
+#else
+				*((u_int8_t *)data)++ = silence >> 16;
+				*((u_int8_t *)data)++ = silence >> 8;
+				*((u_int8_t *)data)++ = silence >> 0;
+#endif
 			}
 		}
 	}

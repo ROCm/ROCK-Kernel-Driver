@@ -159,24 +159,10 @@ CONFIG_IPL_TAPE
   Select "vm_reader" if you are running under VM/ESA and want
   to IPL the image from the emulated card reader.
 
-CONFIG_FAST_IRQ
-  Select this option in order to get the interrupts processed faster
-  on your S/390 or zSeries machine.  If selected, after an interrupt
-  is processed, the channel subsystem will be asked for other pending
-  interrupts which will also be processed before leaving the interrupt
-  context.  This speeds up the I/O a lot. Say "Y".
-
 CONFIG_MACHCHK_WARNING
   Select this option if you want the machine check handler on IBM S/390 or
   zSeries to process warning machine checks (e.g. on power failures). 
   If unsure, say "Y".
-
-CONFIG_CHSC
-  Select this option if you want the s390 common I/O layer to use information
-  obtained by channel subsystem calls. This will enable Linux to process link
-  failures and resource accessibility events. Moreover, if you have procfs
-  enabled, you'll be able to toggle chpids logically offline and online. Even
-  if you don't understand what this means, you should say "Y".
 
 CONFIG_S390_SUPPORT
   Select this option if you want to enable your system kernel to

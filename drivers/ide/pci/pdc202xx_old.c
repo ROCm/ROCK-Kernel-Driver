@@ -397,6 +397,9 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 				cable ? "40" : "80", cable);
 #endif /* PDC202_DEBUG_CABLE */
 			break;
+		case PCI_DEVICE_ID_PROMISE_20246:
+			ultra_66 = 0;
+			break;
 		default:
 			BUG();
 	}
@@ -544,16 +547,18 @@ static int pdc202xx_old_ide_dma_begin(ide_drive_t *drive)
 	if (drive->addressing == 1) {
 		struct request *rq	= HWGROUP(drive)->rq;
 		ide_hwif_t *hwif	= HWIF(drive);
-		struct pci_dev *dev	= hwif->pci_dev;
-		u32 high_16	= pci_resource_start(dev, 4);
+//		struct pci_dev *dev	= hwif->pci_dev;
+//		u32 high_16	= pci_resource_start(dev, 4);
+		u32 high_16	= hwif->dma_master;
 		u32 atapi_reg	= high_16 + (hwif->channel ? 0x24 : 0x20);
 		u32 word_count	= 0;
 		u8 clock = hwif->INB(high_16 + 0x11);
 
 		hwif->OUTB(clock|(hwif->channel ? 0x08 : 0x02), high_16+0x11);
 		word_count = (rq->nr_sectors << 8);
-		word_count = (rq->cmd == READ) ? word_count | 0x05000000 :
-						 word_count | 0x06000000;
+		word_count = (rq_data_dir(rq) == READ) ?
+					word_count | 0x05000000 :
+					word_count | 0x06000000;
 		hwif->OUTL(word_count, atapi_reg);
 	}
 	return __ide_dma_begin(drive);
@@ -563,7 +568,8 @@ static int pdc202xx_old_ide_dma_end(ide_drive_t *drive)
 {
 	if (drive->addressing == 1) {
 		ide_hwif_t *hwif	= HWIF(drive);
-		u32 high_16	= pci_resource_start(hwif->pci_dev, 4);
+//		u32 high_16	= pci_resource_start(hwif->pci_dev, 4);
+		u32 high_16	= hwif->dma_master;
 		u32 atapi_reg	= high_16 + (hwif->channel ? 0x24 : 0x20);
 		u8 clock	= 0;
 
@@ -577,8 +583,9 @@ static int pdc202xx_old_ide_dma_end(ide_drive_t *drive)
 static int pdc202xx_old_ide_dma_test_irq(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
-	struct pci_dev *dev	= hwif->pci_dev;
-	unsigned long high_16	= pci_resource_start(dev, 4);
+//	struct pci_dev *dev	= hwif->pci_dev;
+//	unsigned long high_16	= pci_resource_start(dev, 4);
+	u32 high_16		= hwif->dma_master;
 	u8 dma_stat		= hwif->INB(hwif->dma_status);
 	u8 sc1d			= hwif->INB((high_16 + 0x001d));
 
@@ -935,6 +942,7 @@ static int __devinit pdc202xx_init_one(struct pci_dev *dev, const struct pci_dev
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

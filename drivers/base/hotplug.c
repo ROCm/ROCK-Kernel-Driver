@@ -62,6 +62,7 @@ int dev_hotplug (struct device *dev, const char *action)
 	envp = (char **) kmalloc (NUM_ENVP * sizeof (char *), GFP_KERNEL);
 	if (!envp)
 		return -ENOMEM;
+	memset (envp, 0x00, NUM_ENVP * sizeof (char *));
 
 	buffer = kmalloc (BUFFER_SIZE, GFP_KERNEL);
 	if (!buffer) {

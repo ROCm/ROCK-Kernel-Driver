@@ -3,7 +3,7 @@
  *   S/390 common I/O routines -- special interrupt registration
  *   currently used only by qdio
  *
- *   $Revision: 1.2 $
+ *   $Revision: 1.3 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -60,7 +60,7 @@ s390_register_adapter_interrupt (adapter_int_handler_t handler)
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	return (ret);
+	return ret;
 }
 
 int
@@ -85,7 +85,7 @@ s390_unregister_adapter_interrupt (adapter_int_handler_t handler)
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	return (ret);
+	return ret;
 }
 
 void

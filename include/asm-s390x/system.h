@@ -12,21 +12,70 @@
 #define __ASM_SYSTEM_H
 
 #include <linux/config.h>
-#include <asm/types.h>
-#ifdef __KERNEL__
-#include <asm/lowcore.h>
-#endif
 #include <linux/kernel.h>
+#include <asm/types.h>
+#include <asm/ptrace.h>
+#include <asm/setup.h>
 
-#define switch_to(prev,next),last do {					     \
+#ifdef __KERNEL__
+
+struct task_struct;
+
+extern struct task_struct *resume(void *, void *);
+
+static inline void save_fp_regs(s390_fp_regs *fpregs)
+{
+	asm volatile (
+		"   stfpc 0(%0)\n"
+		"   std   0,8(%0)\n"
+		"   std   1,16(%0)\n"
+		"   std   2,24(%0)\n"
+		"   std   3,32(%0)\n"
+		"   std   4,40(%0)\n"
+		"   std   5,48(%0)\n"
+		"   std   6,56(%0)\n"
+		"   std   7,64(%0)\n"
+		"   std   8,72(%0)\n"
+		"   std   9,80(%0)\n"
+		"   std   10,88(%0)\n"
+		"   std   11,96(%0)\n"
+		"   std   12,104(%0)\n"
+		"   std   13,112(%0)\n"
+		"   std   14,120(%0)\n"
+		"   std   15,128(%0)\n"
+		: : "a" (fpregs) : "memory" );
+}
+
+static inline void restore_fp_regs(s390_fp_regs *fpregs)
+{
+	asm volatile (
+		"   lfpc  0(%0)\n"
+		"   ld    0,8(%0)\n"
+		"   ld    1,16(%0)\n"
+		"   ld    2,24(%0)\n"
+		"   ld    3,32(%0)\n"
+		"   ld    4,40(%0)\n"
+		"   ld    5,48(%0)\n"
+		"   ld    6,56(%0)\n"
+		"   ld    7,64(%0)\n"
+		"   ld    8,72(%0)\n"
+		"   ld    9,80(%0)\n"
+		"   ld    10,88(%0)\n"
+		"   ld    11,96(%0)\n"
+		"   ld    12,104(%0)\n"
+		"   ld    13,112(%0)\n"
+		"   ld    14,120(%0)\n"
+		"   ld    15,128(%0)\n"
+		: : "a" (fpregs));
+}
+
+#define switch_to(prev,next,last) do {					     \
 	if (prev == next)						     \
 		break;							     \
 	save_fp_regs(&prev->thread.fp_regs);				     \
 	restore_fp_regs(&next->thread.fp_regs);				     \
 	resume(prev,next);						     \
 } while (0)
-
-struct task_struct;
 
 #define nop() __asm__ __volatile__ ("nop")
 
@@ -39,79 +88,139 @@ extern void __misaligned_u64(void);
 
 static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 {
+	unsigned long addr, old;
+	int shift;
+
         switch (size) {
-                case 1:
-                        asm volatile (
-                                "   lghi  1,3\n"
-                                "   nr    1,%0\n"     /* isolate last 2 bits */
-                                "   xr    %0,1\n"     /* align ptr */
-                                "   bras  2,0f\n"
-                                "   icm   1,8,7(%1)\n"   /* for ptr&3 == 0 */
-                                "   stcm  0,8,7(%1)\n"
-                                "   icm   1,4,7(%1)\n"   /* for ptr&3 == 1 */
-                                "   stcm  0,4,7(%1)\n"
-                                "   icm   1,2,7(%1)\n"   /* for ptr&3 == 2 */
-                                "   stcm  0,2,7(%1)\n"
-                                "   icm   1,1,7(%1)\n"   /* for ptr&3 == 3 */
-                                "   stcm  0,1,7(%1)\n"
-                                "0: sll   1,3\n"
-                                "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,0(%0)\n"  /* get fullword */
-                                "1: lr    1,0\n"      /* cs loop */
-                                "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,0(%0)\n"
-                                "   jl    1b\n"
-                                "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+&a" (ptr) : "a" (&x)
-                                : "memory", "cc", "0", "1", "2");
-			break;
-                case 2:
-                        if(((addr_t)ptr)&1)
-				__misaligned_u16();
-                        asm volatile (
-                                "   lghi  1,2\n"
-                                "   nr    1,%0\n"     /* isolate bit 2^1 */
-                                "   xr    %0,1\n"     /* align ptr */
-                                "   bras  2,0f\n"
-                                "   icm   1,12,6(%1)\n"   /* for ptr&2 == 0 */
-                                "   stcm  0,12,6(%1)\n"
-                                "   icm   1,3,2(%1)\n"    /* for ptr&2 == 1 */
-                                "   stcm  0,3,2(%1)\n"
-                                "0: sll   1,2\n"
-                                "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,0(%0)\n"  /* get fullword */
-                                "1: lr    1,0\n"      /* cs loop */
-                                "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,0(%0)\n"
-                                "   jl    1b\n"
-                                "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+&a" (ptr) : "a" (&x)
-                                : "memory", "cc", "0", "1", "2");
-                        break;
-                case 4:
-                        if(((addr_t)ptr)&3)
-				__misaligned_u32();
-                        asm volatile (
-                                "    l    0,0(%1)\n"
-                                "0:  cs   0,%0,0(%1)\n"
-                                "    jl   0b\n"
-                                "    lgfr %0,0\n"
-                                : "+d" (x) : "a" (ptr)
-                                : "memory", "cc", "0" );
-                        break;
-                case 8:
-                        if(((addr_t)ptr)&7)
-				__misaligned_u64();
-                        asm volatile (
-                                "    lg  0,0(%1)\n"
-                                "0:  csg 0,%0,0(%1)\n"
-                                "    jl  0b\n"
-                                "    lgr %0,0\n"
-                                : "+d" (x) : "a" (ptr)
-                                : "memory", "cc", "0" );
-                        break;
+	case 1:
+		addr = (unsigned long) ptr;
+		shift = (3 ^ (addr & 3)) << 3;
+		addr ^= addr & 3;
+		asm volatile(
+			"    l   %0,0(%3)\n"
+			"0:  lr  0,%0\n"
+			"    nr  0,%2\n"
+			"    or  0,%1\n"
+			"    cs  %0,0,0(%3)\n"
+			"    jl  0b\n"
+			: "=&d" (old)
+			: "d" (x << shift), "d" (~(255 << shift)), "a" (addr)
+			: "memory", "cc", "0" );
+		x = old >> shift;
+		break;
+	case 2:
+		addr = (unsigned long) ptr;
+		shift = (2 ^ (addr & 2)) << 3;
+		addr ^= addr & 2;
+		asm volatile(
+			"    l   %0,0(%3)\n"
+			"0:  lr  0,%0\n"
+			"    nr  0,%2\n"
+			"    or  0,%1\n"
+			"    cs  %0,0,0(%3)\n"
+			"    jl  0b\n"
+			: "=&d" (old) 
+			: "d" (x << shift), "d" (~(65535 << shift)), "a" (addr)
+			: "memory", "cc", "0" );
+		x = old >> shift;
+		break;
+	case 4:
+		asm volatile (
+			"    l   %0,0(%2)\n"
+			"0:  cs  %0,%1,0(%2)\n"
+			"    jl  0b\n"
+			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "memory", "cc", "0" );
+		x = old;
+		break;
+	case 8:
+		asm volatile (
+			"    lg  %0,0(%2)\n"
+			"0:  csg %0,%1,0(%2)\n"
+			"    jl  0b\n"
+			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "memory", "cc", "0" );
+		x = old;
+		break;
         }
         return x;
+}
+
+/*
+ * Atomic compare and exchange.  Compare OLD with MEM, if identical,
+ * store NEW in MEM.  Return the initial value in MEM.  Success is
+ * indicated by comparing RETURN with OLD.
+ */
+
+#define __HAVE_ARCH_CMPXCHG 1
+
+#define cmpxchg(ptr,o,n)\
+	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
+					(unsigned long)(n),sizeof(*(ptr))))
+
+static inline unsigned long
+__cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
+{
+	unsigned long addr, prev, tmp;
+	int shift;
+
+        switch (size) {
+	case 1:
+		addr = (unsigned long) ptr;
+		shift = (3 ^ (addr & 3)) << 3;
+		addr ^= addr & 3;
+		asm volatile(
+			"    l   %0,0(%4)\n"
+			"0:  nr  %0,%5\n"
+                        "    lr  %1,%0\n"
+			"    or  %0,%2\n"
+			"    or  %1,%3\n"
+			"    cs  %0,%1,0(%4)\n"
+			"    jnl 1f\n"
+			"    xr  %1,%0\n"
+			"    nr  %1,%5\n"
+			"    jnz 0b\n"
+			"1:"
+			: "=&d" (prev), "=&d" (tmp)
+			: "d" (old << shift), "d" (new << shift), "a" (ptr),
+			  "d" (~(255 << shift))
+			: "memory", "cc" );
+		return prev >> shift;
+	case 2:
+		addr = (unsigned long) ptr;
+		shift = (2 ^ (addr & 2)) << 3;
+		addr ^= addr & 2;
+		asm volatile(
+			"    l   %0,0(%4)\n"
+			"0:  nr  %0,%5\n"
+                        "    lr  %1,%0\n"
+			"    or  %0,%2\n"
+			"    or  %1,%3\n"
+			"    cs  %0,%1,0(%4)\n"
+			"    jnl 1f\n"
+			"    xr  %1,%0\n"
+			"    nr  %1,%5\n"
+			"    jnz 0b\n"
+			"1:"
+			: "=&d" (prev), "=&d" (tmp)
+			: "d" (old << shift), "d" (new << shift), "a" (ptr),
+			  "d" (~(65535 << shift))
+			: "memory", "cc" );
+		return prev >> shift;
+	case 4:
+		asm volatile (
+			"    cs  %0,%2,0(%3)\n"
+			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
+			: "memory", "cc" );
+		return prev;
+	case 8:
+		asm volatile (
+			"    csg %0,%2,0(%3)\n"
+			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
+			: "memory", "cc" );
+		return prev;
+        }
+        return old;
 }
 
 /*
@@ -142,21 +251,28 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 #define local_irq_enable() ({ \
         unsigned long __dummy; \
         __asm__ __volatile__ ( \
-                "stosm 0(%0),0x03" : : "a" (&__dummy) : "memory"); \
+                "stosm 0(%1),0x03" : "=m" (__dummy) : "a" (&__dummy) ); \
         })
 
 #define local_irq_disable() ({ \
         unsigned long __flags; \
         __asm__ __volatile__ ( \
-                "stnsm 0(%0),0xFC" : : "a" (&__flags) : "memory"); \
+                "stnsm 0(%1),0xfc" : "=m" (__flags) : "a" (&__flags) ); \
         __flags; \
         })
 
 #define local_save_flags(x) \
-        __asm__ __volatile__("stosm 0(%0),0" : : "a" (&x) : "memory")
+        __asm__ __volatile__("stosm 0(%1),0" : "=m" (x) : "a" (&x) )
 
 #define local_irq_restore(x) \
-        __asm__ __volatile__("ssm   0(%0)" : : "a" (&x) : "memory")
+        __asm__ __volatile__("ssm   0(%0)" : : "a" (&x) )
+
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+        !((flags >> 56) & 3);		\
+})
 
 #define __load_psw(psw) \
         __asm__ __volatile__("lpswe 0(%0)" : : "a" (&psw) : "cc" );
@@ -220,16 +336,6 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 
 #ifdef CONFIG_SMP
 
-extern void __global_cli(void);
-extern void __global_sti(void);
-
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
-
 extern void smp_ctl_set_bit(int cr, int bit);
 extern void smp_ctl_clear_bit(int cr, int bit);
 #define ctl_set_bit(cr, bit) smp_ctl_set_bit(cr, bit)
@@ -237,32 +343,16 @@ extern void smp_ctl_clear_bit(int cr, int bit);
 
 #else
 
-#define cli() local_irq_disable()
-#define sti() local_irq_enable()
-#define save_flags(x) local_save_flags(x)
-#define restore_flags(x) local_irq_restore(x)
-
 #define ctl_set_bit(cr, bit) __ctl_set_bit(cr, bit)
 #define ctl_clear_bit(cr, bit) __ctl_clear_bit(cr, bit)
 
-
-#endif
-
-#ifdef __KERNEL__
-extern struct task_struct *resume(void *, void *);
-
-extern int save_fp_regs1(s390_fp_regs *fpregs);
-extern void save_fp_regs(s390_fp_regs *fpregs);
-extern int restore_fp_regs1(s390_fp_regs *fpregs);
-extern void restore_fp_regs(s390_fp_regs *fpregs);
+#endif /* CONFIG_SMP */
 
 extern void (*_machine_restart)(char *command);
 extern void (*_machine_halt)(void);
 extern void (*_machine_power_off)(void);
 
-#endif
+#endif /* __KERNEL __ */
 
 #endif
-
-
 

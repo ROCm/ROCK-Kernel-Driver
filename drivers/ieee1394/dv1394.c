@@ -170,6 +170,15 @@ static spinlock_t dv1394_cards_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *hl_handle; /* = NULL; */
 
+static LIST_HEAD(dv1394_devfs);
+struct dv1394_devfs_entry {
+	struct list_head list;
+    devfs_handle_t devfs;
+	char name[32];
+	struct dv1394_devfs_entry *parent;
+};
+static spinlock_t dv1394_devfs_lock = SPIN_LOCK_UNLOCKED;
+
 /* translate from a struct file* to the corresponding struct video_card* */
 
 static inline struct video_card* file_to_video_card(struct file *file)
@@ -2130,7 +2139,7 @@ static int dv1394_procfs_write( struct file *file,
 			const char *buffer, unsigned long count, void *data)
 {
 	int len = 0;
-	char new_value[64];
+	char new_value[65];
 	char *pos;
 	struct video_card *video = (struct video_card*) data;
 	
@@ -2142,11 +2151,12 @@ static int dv1394_procfs_write( struct file *file,
 	if (copy_from_user( new_value, buffer, len))
 		return -EFAULT;
 	
+	new_value[len] = 0;
 	pos = strchr(new_value, '=');
 	if (pos != NULL) {
 		int val_len = len - (pos-new_value) - 1;
-		char buf[64];
-		memset(buf, 0, 64);
+		char buf[65];
+		memset(buf, 0, 65);
 		strncpy(buf, pos+1, val_len);
 		if (buf[val_len-1] == '\n') buf[val_len-1] = 0;
 		
@@ -2555,17 +2565,6 @@ static struct file_operations dv1394_fops=
 
 /*** DEVFS HELPERS *********************************************************/
 
-#ifdef CONFIG_DEVFS_FS
-
-static LIST_HEAD(dv1394_devfs);
-struct dv1394_devfs_entry {
-	struct list_head list;
-    devfs_handle_t devfs;
-	char name[32];
-	struct dv1394_devfs_entry *parent;
-};
-static spinlock_t dv1394_devfs_lock = SPIN_LOCK_UNLOCKED;
-
 struct dv1394_devfs_entry *
 dv1394_devfs_find( char *name)
 {
@@ -2695,7 +2694,6 @@ void dv1394_devfs_del( char *name)
 		kfree(p);
 	}
 }
-#endif /* CONFIG_DEVFS */
 
 /*** IEEE1394 HPSB CALLBACKS ***********************************************/
 
@@ -2854,6 +2852,7 @@ static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
 	char buf[16];
+	struct dv1394_devfs_entry *devfs_entry;
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2875,8 +2874,6 @@ static void dv1394_add_host (struct hpsb_host *host)
 #endif
 
 #ifdef CONFIG_DEVFS_FS
-{
-	struct dv1394_devfs_entry *devfs_entry;
 	devfs_entry = dv1394_devfs_find("dv");
 	if (devfs_entry != NULL) {
 		snprintf(buf, sizeof(buf), "host%d", ohci->id);
@@ -2884,7 +2881,6 @@ static void dv1394_add_host (struct hpsb_host *host)
 		dv1394_devfs_add_dir("NTSC", devfs_entry, NULL);
 		dv1394_devfs_add_dir("PAL", devfs_entry, NULL);
 	}
-}
 #endif
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);

@@ -1283,7 +1283,6 @@ int radeon_cp_clear( DRM_IOCTL_ARGS )
 }
 
 
-
 /* Not sure why this isn't set all the time:
  */ 
 static int radeon_do_init_pageflip( drm_device_t *dev )
@@ -2172,8 +2171,8 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 		dev_priv->stats.last_clear_reads++;
 		value = GET_SCRATCH( 2 );
 		break;
-	case RADEON_PARAM_IRQ_ACTIVE:
-		value = dev->irq ? 1 : 0;
+	case RADEON_PARAM_IRQ_NR:
+		value = dev->irq;
 		break;
 	case RADEON_PARAM_AGP_BASE:
 		value = dev_priv->agp_vm_start;

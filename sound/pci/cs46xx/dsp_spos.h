@@ -23,6 +23,10 @@
  * 2002-07 Benny Sjostrand benny@hostmobility.com
  */
 
+#ifdef  CONFIG_SND_CS46XX_NEW_DSP /* hack ... */
+#ifndef __DSP_SPOS_H__
+#define __DSP_SPOS_H__
+
 #define DSP_MAX_SYMBOLS 1024
 #define DSP_MAX_MODULES 64
 
@@ -40,20 +44,20 @@
    needs to be reallocated when load
    code into DSP */
 typedef enum  {
-  WIDE_FOR_BEGIN_LOOP = 0x20,
-  WIDE_FOR_BEGIN_LOOP2,
+	WIDE_FOR_BEGIN_LOOP = 0x20,
+	WIDE_FOR_BEGIN_LOOP2,
 
-  WIDE_COND_GOTO_ADDR = 0x30,
-  WIDE_COND_GOTO_CALL,
+	WIDE_COND_GOTO_ADDR = 0x30,
+	WIDE_COND_GOTO_CALL,
 
-  WIDE_TBEQ_COND_GOTO_ADDR = 0x70,
-  WIDE_TBEQ_COND_CALL_ADDR,
-  WIDE_TBEQ_NCOND_GOTO_ADDR,
-  WIDE_TBEQ_NCOND_CALL_ADDR,
-  WIDE_TBEQ_COND_GOTO1_ADDR,
-  WIDE_TBEQ_COND_CALL1_ADDR,
-  WIDE_TBEQ_NCOND_GOTOI_ADDR,
-  WIDE_TBEQ_NCOND_CALL1_ADDR,
+	WIDE_TBEQ_COND_GOTO_ADDR = 0x70,
+	WIDE_TBEQ_COND_CALL_ADDR,
+	WIDE_TBEQ_NCOND_GOTO_ADDR,
+	WIDE_TBEQ_NCOND_CALL_ADDR,
+	WIDE_TBEQ_COND_GOTO1_ADDR,
+	WIDE_TBEQ_COND_CALL1_ADDR,
+	WIDE_TBEQ_NCOND_GOTOI_ADDR,
+	WIDE_TBEQ_NCOND_CALL1_ADDR,
 } wide_opcode_t;
 
 /* SAMPLE segment */
@@ -69,9 +73,7 @@ typedef enum  {
 #define SPDIFI_IP_OUTPUT_BUFFER1 0x0E00
 #define SPDIFO_IP_OUTPUT_BUFFER1 0x1000
 #define MIX_SAMPLE_BUF1          0x1400
-
-// #define SRC_OUTPUT_BUF2          0x1280
-// #define SRC_DELAY_BUF2           0x1288
+#define MIX_SAMPLE_BUF2          0x3000
 
 /* Task stack address */
 #define HFG_STACK                0x066A
@@ -100,6 +102,8 @@ typedef enum  {
 #define SPIOWRITE_SCB_ADDR       0x130
 #define SEC_CODECOUT_SCB_ADDR    0x140
 #define OUTPUTSNOOPII_SCB_ADDR   0x150
+#define PCMSERIALIN_PCM_SCB_ADDR 0x160
+#define RECORD_MIXER_SCB_ADDR    0x170
 
 /* hyperforground SCB's*/
 #define HFG_TREE_SCB             0xBA0
@@ -123,19 +127,45 @@ typedef enum  {
 /* conf */
 #define UseASER1Input 1
 
-/* constants */
+
+
+/*
+ * The following defines are for the flags in the rsConfig01/23 registers of
+ * the SP.
+ */
+
+#define RSCONFIG_MODULO_SIZE_MASK               0x0000000FL
+#define RSCONFIG_MODULO_16                      0x00000001L
+#define RSCONFIG_MODULO_32                      0x00000002L
+#define RSCONFIG_MODULO_64                      0x00000003L
+#define RSCONFIG_MODULO_128                     0x00000004L
+#define RSCONFIG_MODULO_256                     0x00000005L
+#define RSCONFIG_MODULO_512                     0x00000006L
+#define RSCONFIG_MODULO_1024                    0x00000007L
+#define RSCONFIG_MODULO_4                       0x00000008L
+#define RSCONFIG_MODULO_8                       0x00000009L
+#define RSCONFIG_SAMPLE_SIZE_MASK               0x000000C0L
+#define RSCONFIG_SAMPLE_8MONO                   0x00000000L
+#define RSCONFIG_SAMPLE_8STEREO                 0x00000040L
+#define RSCONFIG_SAMPLE_16MONO                  0x00000080L
+#define RSCONFIG_SAMPLE_16STEREO                0x000000C0L
+#define RSCONFIG_UNDERRUN_ZERO                  0x00004000L
+#define RSCONFIG_DMA_TO_HOST                    0x00008000L
+#define RSCONFIG_STREAM_NUM_MASK                0x00FF0000L
+#define RSCONFIG_MAX_DMA_SIZE_MASK              0x1F000000L
+#define RSCONFIG_DMA_ENABLE                     0x20000000L
+#define RSCONFIG_PRIORITY_MASK                  0xC0000000L
+#define RSCONFIG_PRIORITY_HIGH                  0x00000000L
+#define RSCONFIG_PRIORITY_MEDIUM_HIGH           0x40000000L
+#define RSCONFIG_PRIORITY_MEDIUM_LOW            0x80000000L
+#define RSCONFIG_PRIORITY_LOW                   0xC0000000L
+#define RSCONFIG_STREAM_NUM_SHIFT               16L
+#define RSCONFIG_MAX_DMA_SIZE_SHIFT             24L
+
+/* SP constants */
 #define FG_INTERVAL_TIMER_PERIOD                0x0051
 #define BG_INTERVAL_TIMER_PERIOD                0x0100
-#define RSCONFIG_MODULO_32                      0x00000002
-#define RSCONFIG_MODULO_64                      0x00000003
-#define RSCONFIG_MODULO_256                     0x00000005
-#define RSCONFIG_MODULO_8                       0x00000009
-#define RSCONFIG_SAMPLE_16STEREO                0x000000C0
-#define RSCONFIG_SAMPLE_16MONO                  0x00000080
-#define RSCONFIG_DMA_TO_HOST                    0x00008000
-#define RSCONFIG_DMA_ENABLE                     0x20000000
-#define RSCONFIG_STREAM_NUM_SHIFT               16
-#define RSCONFIG_MAX_DMA_SIZE_SHIFT             24
+
 
 /* Only SP accesible registers */
 #define SP_ASER_COUNTDOWN 0x8040
@@ -148,3 +178,6 @@ typedef enum  {
 #define SP_SPDOUT_STATUS  0x804C
 #define SP_SPDOUT_CONTROL 0x804D
 #define SP_SPDOUT_CSUV    0x808E
+
+#endif /* __DSP_SPOS_H__ */
+#endif /* CONFIG_SND_CS46XX_NEW_DSP  */

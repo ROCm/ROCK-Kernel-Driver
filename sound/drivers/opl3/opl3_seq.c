@@ -146,13 +146,13 @@ int snd_opl3_synth_unuse(void *private_data, snd_seq_port_subscribe_t * info)
  * MIDI emulation operators
  */
 snd_midi_op_t opl3_ops = {
-	snd_opl3_note_on,
-	snd_opl3_note_off,
-	snd_opl3_key_press,
-	snd_opl3_terminate_note,
-	snd_opl3_control,
-	snd_opl3_nrpn,
-	snd_opl3_sysex,
+	.note_on =		snd_opl3_note_on,
+	.note_off =		snd_opl3_note_off,
+	.key_press =		snd_opl3_key_press,
+	.note_terminate =	snd_opl3_terminate_note,
+	.control =		snd_opl3_control,
+	.nrpn =			snd_opl3_nrpn,
+	.sysex =		snd_opl3_sysex,
 };
 
 static int snd_opl3_synth_event_input(snd_seq_event_t * ev, int direct,

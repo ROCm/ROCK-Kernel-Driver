@@ -31,7 +31,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/slab.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
@@ -971,7 +971,6 @@ void cpqhp_ctrl_intr(int IRQ, struct controller * ctrl, struct pt_regs *regs)
 	if (schedule_flag) {
 		up(&event_semaphore);
 		dbg("Signal event_semaphore\n");
-		mark_bh(IMMEDIATE_BH);
 	}
 
 }

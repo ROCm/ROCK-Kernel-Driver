@@ -174,7 +174,7 @@
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/mii.h>
 
 #include "tlan.h"
@@ -600,10 +600,7 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 	
 	/* This will be used when we get an adapter error from
 	 * within our irq handler */
-	INIT_LIST_HEAD(&priv->tlan_tqueue.list);
-	priv->tlan_tqueue.sync = 0;
-	priv->tlan_tqueue.routine = (void *)(void*)TLan_tx_timeout;
-	priv->tlan_tqueue.data = dev;
+	INIT_WORK(&priv->tlan_tqueue, (void *)(void*)TLan_tx_timeout, dev);
 
 	spin_lock_init(&priv->lock);
 	
@@ -1708,7 +1705,7 @@ u32 TLan_HandleStatusCheck( struct net_device *dev, u16 host_int )
 		TLan_ReadAndClearStats( dev, TLAN_RECORD );
 		outl( TLAN_HC_AD_RST, dev->base_addr + TLAN_HOST_CMD );
 
-		schedule_task(&priv->tlan_tqueue);
+		schedule_work(&priv->tlan_tqueue);
 
 		netif_wake_queue(dev);
 		ack = 0;

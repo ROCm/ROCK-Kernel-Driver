@@ -40,7 +40,7 @@
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/random.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -584,7 +584,7 @@ static int gem_abnormal_irq(struct net_device *dev, struct gem *gp, u32 gem_stat
 
 do_reset:
 	gp->reset_task_pending = 2;
-	schedule_task(&gp->reset_task);
+	schedule_work(&gp->reset_task);
 
 	return 1;
 }
@@ -821,7 +821,7 @@ static void gem_tx_timeout(struct net_device *dev)
 	spin_lock_irq(&gp->lock);
 
 	gp->reset_task_pending = 2;
-	schedule_task(&gp->reset_task);
+	schedule_work(&gp->reset_task);
 
 	spin_unlock_irq(&gp->lock);
 }
@@ -975,10 +975,10 @@ static int gem_change_mtu(struct net_device *dev, int new_mtu)
 	spin_lock_irq(&gp->lock);
 	dev->mtu = new_mtu;
 	gp->reset_task_pending = 1;
-	schedule_task(&gp->reset_task);
+	schedule_work(&gp->reset_task);
 	spin_unlock_irq(&gp->lock);
 
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 
 	return 0;
 }
@@ -1384,7 +1384,7 @@ static void gem_link_timer(unsigned long data)
 					printk(KERN_INFO "%s: Link down\n",
 						gp->dev->name);
 				gp->reset_task_pending = 2;
-				schedule_task(&gp->reset_task);
+				schedule_work(&gp->reset_task);
 				restart = 1;
 			} else if (++gp->timer_ticks > 10)
 				restart = gem_mdio_link_not_up(gp);
@@ -2299,7 +2299,7 @@ static void gem_pm_timer(unsigned long data)
 {
 	struct gem *gp = (struct gem *) data;
 
-	schedule_task(&gp->pm_task);
+	schedule_work(&gp->pm_task);
 }
 
 static int gem_open(struct net_device *dev)
@@ -2313,7 +2313,7 @@ static int gem_open(struct net_device *dev)
 
 	/* Stop the PM timer/task */
 	del_timer(&gp->pm_timer);
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 
 	/* The power-management semaphore protects the hw_running
 	 * etc. state so it is safe to do this bit without gp->lock
@@ -2445,7 +2445,7 @@ static int gem_suspend(struct pci_dev *pdev, u32 state)
 	if (gp->hw_running) {
 		/* Kill PM timer if any */
 		del_timer_sync(&gp->pm_timer);
-		flush_scheduled_tasks();
+		flush_scheduled_work();
 
 		gem_shutdown(gp);
 	}
@@ -2955,8 +2955,8 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	gp->pm_timer.function = gem_pm_timer;
 	gp->pm_timer.data = (unsigned long) gp;
 
-	INIT_TQUEUE(&gp->pm_task, gem_pm_task, gp);
-	INIT_TQUEUE(&gp->reset_task, gem_reset_task, gp);
+	INIT_WORK(&gp->pm_task, gem_pm_task, gp);
+	INIT_WORK(&gp->reset_task, gem_reset_task, gp);
 	
 	/* Default link parameters */
 	if (link_mode >= 0 && link_mode <= 6)
@@ -3061,7 +3061,7 @@ err_out_iounmap:
 	down(&gp->pm_sem);
 	/* Stop the PM timer & task */
 	del_timer_sync(&gp->pm_timer);
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 	if (gp->hw_running)
 		gem_shutdown(gp);
 	up(&gp->pm_sem);
@@ -3090,7 +3090,7 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 		down(&gp->pm_sem);
 		/* Stop the PM timer & task */
 		del_timer_sync(&gp->pm_timer);
-		flush_scheduled_tasks();
+		flush_scheduled_work();
 		if (gp->hw_running)
 			gem_shutdown(gp);
 		up(&gp->pm_sem);

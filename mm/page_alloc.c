@@ -13,7 +13,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/kernel_stat.h>
+#include <linux/stddef.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/interrupt.h>
@@ -24,6 +24,7 @@
 #include <linux/suspend.h>
 #include <linux/pagevec.h>
 #include <linux/blkdev.h>
+#include <linux/slab.h>
 
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -47,7 +48,7 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  */
 static inline int bad_range(struct zone *zone, struct page *page)
 {
-	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->size)
+	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->spanned_pages)
 		return 1;
 	if (page_to_pfn(page) < zone->zone_start_pfn)
 		return 1;
@@ -86,7 +87,7 @@ void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	struct zone *zone;
 
-	KERNEL_STAT_ADD(pgfree, 1<<order);
+	mod_page_state(pgfree, 1<<order);
 
 	BUG_ON(PageLRU(page));
 	BUG_ON(PagePrivate(page));
@@ -324,7 +325,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	if (gfp_mask & __GFP_WAIT)
 		might_sleep();
 
-	KERNEL_STAT_ADD(pgalloc, 1<<order);
+	mod_page_state(pgalloc, 1<<order);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	classzone = zones[0]; 
@@ -345,8 +346,6 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		}
 	}
 
-	classzone->need_balance = 1;
-	mb();
 	/* we're somewhat low on memory, failed to find what we needed */
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
@@ -397,7 +396,7 @@ nopage:
 	if (!(gfp_mask & __GFP_WAIT))
 		goto nopage;
 
-	KERNEL_STAT_INC(allocstall);
+	inc_page_state(allocstall);
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
@@ -508,7 +507,7 @@ static unsigned int nr_free_zone_pages(int offset)
 		struct zone *zone;
 
 		for (zone = *zonep++; zone; zone = *zonep++) {
-			unsigned long size = zone->size;
+			unsigned long size = zone->present_pages;
 			unsigned long high = zone->pages_high;
 			if (size > high)
 				sum += size - high;
@@ -555,26 +554,37 @@ unsigned int nr_free_highpages (void)
 struct page_state page_states[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(page_states);
 
-void get_page_state(struct page_state *ret)
+void __get_page_state(struct page_state *ret, int nr)
 {
-	int pcpu;
+	int cpu;
 
 	memset(ret, 0, sizeof(*ret));
-	for (pcpu = 0; pcpu < NR_CPUS; pcpu++) {
-		struct page_state *ps;
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		unsigned long *in, *out, off;
 
-		if (!cpu_online(pcpu))
+		if (!cpu_online(cpu))
 			continue;
 
-		ps = &page_states[pcpu];
-		ret->nr_dirty += ps->nr_dirty;
-		ret->nr_writeback += ps->nr_writeback;
-		ret->nr_pagecache += ps->nr_pagecache;
-		ret->nr_page_table_pages += ps->nr_page_table_pages;
-		ret->nr_reverse_maps += ps->nr_reverse_maps;
-		ret->nr_mapped += ps->nr_mapped;
-		ret->nr_slab += ps->nr_slab;
+		in = (unsigned long *)(page_states + cpu);
+		out = (unsigned long *)ret;
+		for (off = 0; off < nr; off++)
+			*out++ += *in++;
 	}
+}
+
+void get_page_state(struct page_state *ret)
+{
+	int nr;
+
+	nr = offsetof(struct page_state, GET_PAGE_STATE_LAST);
+	nr /= sizeof(unsigned long);
+
+	__get_page_state(ret, nr + 1);
+}
+
+void get_full_page_state(struct page_state *ret)
+{
+	__get_page_state(ret, sizeof(*ret) / sizeof(unsigned long));
 }
 
 void get_zone_counts(unsigned long *active, unsigned long *inactive)
@@ -669,7 +679,7 @@ void show_free_areas(void)
 			struct zone *zone = &pgdat->node_zones[type];
  			unsigned long nr, flags, order, total = 0;
 
-			if (!zone->size)
+			if (!zone->present_pages)
 				continue;
 
 			spin_lock_irqsave(&zone->lock, flags);
@@ -698,7 +708,7 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 		BUG();
 	case ZONE_HIGHMEM:
 		zone = pgdat->node_zones + ZONE_HIGHMEM;
-		if (zone->size) {
+		if (zone->present_pages) {
 #ifndef CONFIG_HIGHMEM
 			BUG();
 #endif
@@ -706,11 +716,11 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 		}
 	case ZONE_NORMAL:
 		zone = pgdat->node_zones + ZONE_NORMAL;
-		if (zone->size)
+		if (zone->present_pages)
 			zonelist->zones[j++] = zone;
 	case ZONE_DMA:
 		zone = pgdat->node_zones + ZONE_DMA;
-		if (zone->size)
+		if (zone->present_pages)
 			zonelist->zones[j++] = zone;
 	}
 
@@ -854,13 +864,13 @@ void __init free_area_init_core(pg_data_t *pgdat,
 			realsize -= zholes_size[j];
 
 		printk("  %s zone: %lu pages\n", zone_names[j], realsize);
-		zone->size = size;
+		zone->spanned_pages = size;
+		zone->present_pages = realsize;
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
-		zone->need_balance = 0;
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
 		atomic_set(&zone->refill_counter, 0);
@@ -911,12 +921,15 @@ void __init free_area_init_core(pg_data_t *pgdat,
 			set_page_count(page, 0);
 			SetPageReserved(page);
 			INIT_LIST_HEAD(&page->list);
+#ifdef WANT_PAGE_VIRTUAL
 			if (j != ZONE_HIGHMEM)
 				/*
 				 * The shift left won't overflow because the
 				 * ZONE_NORMAL is below 4G.
 				 */
-				set_page_address(page, __va(zone_start_pfn << PAGE_SHIFT));
+				set_page_address(page,
+					__va(zone_start_pfn << PAGE_SHIFT));
+#endif
 			zone_start_pfn++;
 		}
 
@@ -1022,7 +1035,7 @@ static int frag_show(struct seq_file *m, void *arg)
 	int order;
 
 	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
-		if (!zone->size)
+		if (!zone->present_pages)
 			continue;
 
 		spin_lock_irqsave(&zone->lock, flags);
@@ -1046,6 +1059,78 @@ struct seq_operations fragmentation_op = {
 	.next	= frag_next,
 	.stop	= frag_stop,
 	.show	= frag_show,
+};
+
+static char *vmstat_text[] = {
+	"nr_dirty",
+	"nr_writeback",
+	"nr_pagecache",
+	"nr_page_table_pages",
+	"nr_reverse_maps",
+	"nr_mapped",
+	"nr_slab",
+
+	"pgpgin",
+	"pgpgout",
+	"pswpin",
+	"pswpout",
+	"pgalloc",
+	"pgfree",
+	"pgactivate",
+	"pgdeactivate",
+	"pgfault",
+	"pgmajfault",
+	"pgscan",
+	"pgrefill",
+	"pgsteal",
+	"kswapd_steal",
+	"pageoutrun",
+	"allocstall",
+};
+
+static void *vmstat_start(struct seq_file *m, loff_t *pos)
+{
+	struct page_state *ps;
+
+	if (*pos >= ARRAY_SIZE(vmstat_text))
+		return NULL;
+
+	ps = kmalloc(sizeof(*ps), GFP_KERNEL);
+	m->private = ps;
+	if (!ps)
+		return ERR_PTR(-ENOMEM);
+	get_full_page_state(ps);
+	return (unsigned long *)ps + *pos;
+}
+
+static void *vmstat_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	(*pos)++;
+	if (*pos >= ARRAY_SIZE(vmstat_text))
+		return NULL;
+	return (unsigned long *)m->private + *pos;
+}
+
+static int vmstat_show(struct seq_file *m, void *arg)
+{
+	unsigned long *l = arg;
+	unsigned long off = l - (unsigned long *)m->private;
+
+	seq_printf(m, "%s %lu\n", vmstat_text[off], *l);
+	return 0;
+}
+
+static void vmstat_stop(struct seq_file *m, void *arg)
+{
+	kfree(m->private);
+	m->private = NULL;
+}
+
+struct seq_operations vmstat_op = {
+	.start	= vmstat_start,
+	.next	= vmstat_next,
+	.stop	= vmstat_stop,
+	.show	= vmstat_show,
 };
 
 #endif /* CONFIG_PROC_FS */

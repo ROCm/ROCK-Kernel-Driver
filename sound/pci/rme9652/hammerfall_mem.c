@@ -25,7 +25,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
-    $Id: hammerfall_mem.c,v 1.2 2002/06/19 08:52:11 perex Exp $
+    $Id: hammerfall_mem.c,v 1.3 2002/09/12 09:03:28 tiwai Exp $
 
 
     Tue Oct 17 2000  Jaroslav Kysela <perex@suse.cz>
@@ -92,11 +92,6 @@ static hammerfall_buf_t hammerfall_buffers[NBUFS];
    memory after starting things running, that would be very
    undesirable.  
 */
-
-/* remove hack for pci_alloc_consistent to avoid dependecy on snd module */
-#ifdef HACK_PCI_ALLOC_CONSISTENT
-#undef pci_alloc_consistent
-#endif
 
 static void *hammerfall_malloc_pages(struct pci_dev *pci,
 				  unsigned long size,

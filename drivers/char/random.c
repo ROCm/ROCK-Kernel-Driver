@@ -252,7 +252,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -624,8 +624,8 @@ static __u32	*batch_entropy_pool;
 static int	*batch_entropy_credit;
 static int	batch_max;
 static int	batch_head, batch_tail;
-static struct tq_struct	batch_tqueue;
 static void batch_entropy_process(void *private_);
+static DECLARE_WORK(batch_work, batch_entropy_process, NULL);
 
 /* note: the size must be a power of 2 */
 static int __init batch_entropy_init(int size, struct entropy_store *r)
@@ -640,8 +640,7 @@ static int __init batch_entropy_init(int size, struct entropy_store *r)
 	}
 	batch_head = batch_tail = 0;
 	batch_max = size;
-	batch_tqueue.routine = batch_entropy_process;
-	batch_tqueue.data = r;
+	batch_work.data = r;
 	return 0;
 }
 
@@ -664,8 +663,10 @@ void batch_entropy_store(u32 a, u32 b, int num)
 
 	new = (batch_head+1) & (batch_max-1);
 	if (new != batch_tail) {
-		// FIXME: is this correct?
-		schedule_task(&batch_tqueue);
+		/*
+		 * Schedule it for the next timer tick:
+		 */
+		schedule_delayed_work(&batch_work, 1);
 		batch_head = new;
 	} else {
 		DEBUG_ENT("batch entropy buffer full\n");
@@ -1749,7 +1750,7 @@ static int change_poolsize(int poolsize)
 
 	sysctl_init_random(new_store);
 	old_store = random_state;
-	random_state = batch_tqueue.data = new_store;
+	random_state = batch_work.data = new_store;
 	free_entropy_store(old_store);
 	return 0;
 }

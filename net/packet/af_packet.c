@@ -1458,16 +1458,6 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			spin_unlock_bh(&sk->receive_queue.lock);
 			return put_user(amount, (int *)arg);
 		}
-		case FIOSETOWN:
-		case SIOCSPGRP: {
-			int pid;
-			if (get_user(pid, (int *) arg))
-				return -EFAULT; 
-			return f_setown(sock->file, pid, 1);
-		}
-		case FIOGETOWN:
-		case SIOCGPGRP:
-			return put_user(sock->file->f_owner.pid, (int *)arg);
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;
@@ -1542,14 +1532,6 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 #endif
 
 		default:
-			if ((cmd >= SIOCDEVPRIVATE) &&
-			    (cmd <= (SIOCDEVPRIVATE + 15)))
-				return(dev_ioctl(cmd,(void *) arg));
-
-#ifdef CONFIG_NET_RADIO
-			if((cmd >= SIOCIWFIRST) && (cmd <= SIOCIWLAST))
-				return(dev_ioctl(cmd,(void *) arg));
-#endif
 			return -EOPNOTSUPP;
 	}
 	return 0;

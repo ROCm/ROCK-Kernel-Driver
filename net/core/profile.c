@@ -35,7 +35,7 @@ long alpha_hi;
 static void alpha_tick(unsigned long);
 
 static struct timer_list alpha_timer =
-	{ NULL, NULL, 0, 0L, alpha_tick };
+	{ .function = alpha_tick };
 
 void alpha_tick(unsigned long dummy)
 {
@@ -158,7 +158,7 @@ static void whitehole_inject(unsigned long);
 int whitehole_init(struct net_device *dev);
 
 static struct timer_list whitehole_timer =
-	{ NULL, NULL, 0, 0L, whitehole_inject };
+	{ .function = whitehole_inject };
 
 static struct net_device whitehole_dev = {
 	"whitehole", 0x0, 0x0, 0x0, 0x0, 0, 0, 0, 0, 0, NULL, whitehole_init, };

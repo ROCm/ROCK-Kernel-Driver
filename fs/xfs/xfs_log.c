@@ -2714,7 +2714,7 @@ xlog_state_put_ticket(xlog_t	    *log,
 	LOG_UNLOCK(log, s);
 }	/* xlog_state_put_ticket */
 
-void xlog_sync_sched(
+void xlog_sync_work(
 	void	*v)
 {
 	xlog_in_core_t	*iclog = (xlog_in_core_t *)v;
@@ -2773,13 +2773,12 @@ xlog_state_release_iclog(xlog_t		*log,
 	 * flags after this point.
 	 */
 	if (sync) {
-		INIT_TQUEUE(&iclog->ic_write_sched,
-			xlog_sync_sched, (void *) iclog);
+		INIT_WORK(&iclog->ic_write_work, xlog_sync_work, iclog);
 		switch (xlog_mode) {
 		case 0:
 			return xlog_sync(log, iclog, 0);
 		case 1:
-			pagebuf_queue_task(&iclog->ic_write_sched);
+		        queue_work(pagebuf_workqueue, &iclog->ic_write_work);
 		}
 	}
 	return (0);

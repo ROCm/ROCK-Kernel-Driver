@@ -24,7 +24,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -788,46 +787,46 @@ static void snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_ymfpci_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID | 
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	256 * 1024, /* FIXME: enough? */
-	period_bytes_min:	64,
-	period_bytes_max:	256 * 1024, /* FIXME: enough? */
-	periods_min:		3,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	256 * 1024, /* FIXME: enough? */
+	.period_bytes_min =	64,
+	.period_bytes_max =	256 * 1024, /* FIXME: enough? */
+	.periods_min =		3,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ymfpci_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	256 * 1024, /* FIXME: enough? */
-	period_bytes_min:	64,
-	period_bytes_max:	256 * 1024, /* FIXME: enough? */
-	periods_min:		3,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	256 * 1024, /* FIXME: enough? */
+	.period_bytes_min =	64,
+	.period_bytes_max =	256 * 1024, /* FIXME: enough? */
+	.periods_min =		3,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static void snd_ymfpci_pcm_free_substream(snd_pcm_runtime_t *runtime)
@@ -1053,25 +1052,25 @@ static int snd_ymfpci_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_ymfpci_playback_ops = {
-	open:			snd_ymfpci_playback_open,
-	close:			snd_ymfpci_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_ymfpci_playback_hw_params,
-	hw_free:		snd_ymfpci_playback_hw_free,
-	prepare:		snd_ymfpci_playback_prepare,
-	trigger:		snd_ymfpci_playback_trigger,
-	pointer:		snd_ymfpci_playback_pointer,
+	.open =			snd_ymfpci_playback_open,
+	.close =		snd_ymfpci_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_ymfpci_playback_hw_params,
+	.hw_free =		snd_ymfpci_playback_hw_free,
+	.prepare =		snd_ymfpci_playback_prepare,
+	.trigger =		snd_ymfpci_playback_trigger,
+	.pointer =		snd_ymfpci_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_ymfpci_capture_rec_ops = {
-	open:			snd_ymfpci_capture_rec_open,
-	close:			snd_ymfpci_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_ymfpci_capture_hw_params,
-	hw_free:		snd_ymfpci_capture_hw_free,
-	prepare:		snd_ymfpci_capture_prepare,
-	trigger:		snd_ymfpci_capture_trigger,
-	pointer:		snd_ymfpci_capture_pointer,
+	.open =			snd_ymfpci_capture_rec_open,
+	.close =		snd_ymfpci_capture_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_ymfpci_capture_hw_params,
+	.hw_free =		snd_ymfpci_capture_hw_free,
+	.prepare =		snd_ymfpci_capture_prepare,
+	.trigger =		snd_ymfpci_capture_trigger,
+	.pointer =		snd_ymfpci_capture_pointer,
 };
 
 static void snd_ymfpci_pcm_free(snd_pcm_t *pcm)
@@ -1109,14 +1108,14 @@ int __devinit snd_ymfpci_pcm(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 }
 
 static snd_pcm_ops_t snd_ymfpci_capture_ac97_ops = {
-	open:			snd_ymfpci_capture_ac97_open,
-	close:			snd_ymfpci_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_ymfpci_capture_hw_params,
-	hw_free:		snd_ymfpci_capture_hw_free,
-	prepare:		snd_ymfpci_capture_prepare,
-	trigger:		snd_ymfpci_capture_trigger,
-	pointer:		snd_ymfpci_capture_pointer,
+	.open =			snd_ymfpci_capture_ac97_open,
+	.close =		snd_ymfpci_capture_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_ymfpci_capture_hw_params,
+	.hw_free =		snd_ymfpci_capture_hw_free,
+	.prepare =		snd_ymfpci_capture_prepare,
+	.trigger =		snd_ymfpci_capture_trigger,
+	.pointer =		snd_ymfpci_capture_pointer,
 };
 
 static void snd_ymfpci_pcm2_free(snd_pcm_t *pcm)
@@ -1153,14 +1152,14 @@ int __devinit snd_ymfpci_pcm2(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 }
 
 static snd_pcm_ops_t snd_ymfpci_playback_spdif_ops = {
-	open:			snd_ymfpci_playback_spdif_open,
-	close:			snd_ymfpci_playback_spdif_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_ymfpci_playback_hw_params,
-	hw_free:		snd_ymfpci_playback_hw_free,
-	prepare:		snd_ymfpci_playback_prepare,
-	trigger:		snd_ymfpci_playback_trigger,
-	pointer:		snd_ymfpci_playback_pointer,
+	.open =			snd_ymfpci_playback_spdif_open,
+	.close =		snd_ymfpci_playback_spdif_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_ymfpci_playback_hw_params,
+	.hw_free =		snd_ymfpci_playback_hw_free,
+	.prepare =		snd_ymfpci_playback_prepare,
+	.trigger =		snd_ymfpci_playback_trigger,
+	.pointer =		snd_ymfpci_playback_pointer,
 };
 
 static void snd_ymfpci_pcm_spdif_free(snd_pcm_t *pcm)
@@ -1193,14 +1192,14 @@ int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm
 }
 
 static snd_pcm_ops_t snd_ymfpci_playback_4ch_ops = {
-	open:			snd_ymfpci_playback_4ch_open,
-	close:			snd_ymfpci_playback_4ch_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_ymfpci_playback_hw_params,
-	hw_free:		snd_ymfpci_playback_hw_free,
-	prepare:		snd_ymfpci_playback_prepare,
-	trigger:		snd_ymfpci_playback_trigger,
-	pointer:		snd_ymfpci_playback_pointer,
+	.open =			snd_ymfpci_playback_4ch_open,
+	.close =		snd_ymfpci_playback_4ch_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_ymfpci_playback_hw_params,
+	.hw_free =		snd_ymfpci_playback_hw_free,
+	.prepare =		snd_ymfpci_playback_prepare,
+	.trigger =		snd_ymfpci_playback_trigger,
+	.pointer =		snd_ymfpci_playback_pointer,
 };
 
 static void snd_ymfpci_pcm_4ch_free(snd_pcm_t *pcm)
@@ -1273,11 +1272,11 @@ static int snd_ymfpci_spdif_default_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ymfpci_spdif_default __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_ymfpci_spdif_default_info,
-	get:		snd_ymfpci_spdif_default_get,
-	put:		snd_ymfpci_spdif_default_put
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_ymfpci_spdif_default_info,
+	.get =		snd_ymfpci_spdif_default_get,
+	.put =		snd_ymfpci_spdif_default_put
 };
 
 static int snd_ymfpci_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1302,11 +1301,11 @@ static int snd_ymfpci_spdif_mask_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ymfpci_spdif_mask __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	info:		snd_ymfpci_spdif_mask_info,
-	get:		snd_ymfpci_spdif_mask_get,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_ymfpci_spdif_mask_info,
+	.get =		snd_ymfpci_spdif_mask_get,
 };
 
 static int snd_ymfpci_spdif_stream_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1350,12 +1349,12 @@ static int snd_ymfpci_spdif_stream_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ymfpci_spdif_stream __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_ymfpci_spdif_stream_info,
-	get:		snd_ymfpci_spdif_stream_get,
-	put:		snd_ymfpci_spdif_stream_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_ymfpci_spdif_stream_info,
+	.get =		snd_ymfpci_spdif_stream_get,
+	.put =		snd_ymfpci_spdif_stream_put
 };
 
 /*
@@ -1363,10 +1362,10 @@ static snd_kcontrol_new_t snd_ymfpci_spdif_stream __devinitdata =
  */
 
 #define YMFPCI_SINGLE(xname, xindex, reg) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_ymfpci_info_single, \
-  get: snd_ymfpci_get_single, put: snd_ymfpci_put_single, \
-  private_value: reg }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_ymfpci_info_single, \
+  .get = snd_ymfpci_get_single, .put = snd_ymfpci_put_single, \
+  .private_value = reg }
 
 static int snd_ymfpci_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1429,10 +1428,10 @@ static int snd_ymfpci_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define YMFPCI_DOUBLE(xname, xindex, reg) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_ymfpci_info_double, \
-  get: snd_ymfpci_get_double, put: snd_ymfpci_put_double, \
-  private_value: reg }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_ymfpci_info_double, \
+  .get = snd_ymfpci_get_double, .put = snd_ymfpci_put_double, \
+  .private_value = reg }
 
 static int snd_ymfpci_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1546,11 +1545,11 @@ YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,VOLUME), 1, YDSXGR_SPDIFLOOPVOL),
 YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), 0, YDSXGR_SPDIFOUTCTRL),
 YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH), 0, YDSXGR_SPDIFINCTRL),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "4ch Duplication",
-	info: snd_ymfpci_info_dup4ch,
-	get: snd_ymfpci_get_dup4ch,
-	put: snd_ymfpci_put_dup4ch,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "4ch Duplication",
+	.info = snd_ymfpci_info_dup4ch,
+	.get = snd_ymfpci_get_dup4ch,
+	.put = snd_ymfpci_put_dup4ch,
 },
 };
 
@@ -1627,12 +1626,12 @@ static int snd_ymfpci_gpio_sw_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 }
 
 static snd_kcontrol_new_t snd_ymfpci_rear_shared __devinitdata = {
-	name: "Shared Rear/Line-In Switch",
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	info: snd_ymfpci_gpio_sw_info,
-	get: snd_ymfpci_gpio_sw_get,
-	put: snd_ymfpci_gpio_sw_put,
-	private_value: 2,
+	.name = "Shared Rear/Line-In Switch",
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.info = snd_ymfpci_gpio_sw_info,
+	.get = snd_ymfpci_gpio_sw_get,
+	.put = snd_ymfpci_gpio_sw_put,
+	.private_value = 2,
 };
 
 
@@ -1779,19 +1778,19 @@ static int snd_ymfpci_joystick_addr_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 }
 
 static snd_kcontrol_new_t snd_ymfpci_control_joystick __devinitdata = {
-	name: "Joystick",
-	iface: SNDRV_CTL_ELEM_IFACE_CARD,
-	info: snd_ymfpci_joystick_info,
-	get: snd_ymfpci_joystick_get,
-	put: snd_ymfpci_joystick_put,
+	.name = "Joystick",
+	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
+	.info = snd_ymfpci_joystick_info,
+	.get = snd_ymfpci_joystick_get,
+	.put = snd_ymfpci_joystick_put,
 };
 
 static snd_kcontrol_new_t snd_ymfpci_control_joystick_addr __devinitdata = {
-	name: "Joystick Address",
-	iface: SNDRV_CTL_ELEM_IFACE_CARD,
-	info: snd_ymfpci_joystick_addr_info,
-	get: snd_ymfpci_joystick_addr_get,
-	put: snd_ymfpci_joystick_addr_put,
+	.name = "Joystick Address",
+	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
+	.info = snd_ymfpci_joystick_addr_info,
+	.get = snd_ymfpci_joystick_addr_get,
+	.put = snd_ymfpci_joystick_addr_put,
 };
 
 int __devinit snd_ymfpci_joystick(ymfpci_t *chip)
@@ -2200,7 +2199,7 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	ymfpci_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_ymfpci_dev_free,
+		.dev_free =	snd_ymfpci_dev_free,
 	};
 	
 	*rchip = NULL;

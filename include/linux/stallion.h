@@ -104,7 +104,7 @@ typedef struct stlport {
 #endif
 	struct termios		normaltermios;
 	struct termios		callouttermios;
-	struct tq_struct	tqueue;
+	struct work_struct	tqueue;
 	comstats_t		stats;
 	stlrq_t			tx;
 } stlport_t;

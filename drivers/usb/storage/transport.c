@@ -350,7 +350,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 */
 	if (len != srb->request_bufflen) {
 		printk(KERN_ERR "USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
-		printk(KERN_ERR "Fix this -- future 2.5 kernels will not work if this is not fixed!\n");
+		dump_stack();
 	}
 
 	return len;

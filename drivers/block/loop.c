@@ -83,7 +83,7 @@
 
 static int max_loop = 8;
 static struct loop_device *loop_dev;
-static struct gendisk *disks;
+static struct gendisk **disks;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -159,9 +159,7 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 static void figure_loop_size(struct loop_device *lo)
 {
 	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_size;
-
-	set_capacity(disks + lo->lo_number,
-		     (size - lo->lo_offset) >> 9);
+	set_capacity(disks[lo->lo_number], (size - lo->lo_offset) >> 9);
 }
 
 static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
@@ -809,7 +807,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
 	memset(lo->lo_name, 0, LO_NAME_SIZE);
 	invalidate_bdev(bdev, 0);
-	set_capacity(disks + lo->lo_number, 0);
+	set_capacity(disks[lo->lo_number], 0);
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
@@ -1048,20 +1046,25 @@ int __init loop_init(void)
 	if (!loop_dev)
 		return -ENOMEM;
 
-	disks = kmalloc(max_loop * sizeof(struct gendisk), GFP_KERNEL);
+	disks = kmalloc(max_loop * sizeof(struct gendisk *), GFP_KERNEL);
 	if (!disks)
 		goto out_mem;
 
 	for (i = 0; i < max_loop; i++) {
+		disks[i] = alloc_disk();
+		if (!disks[i])
+			goto out_mem2;
+	}
+
+	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
-		struct gendisk *disk = disks + i;
+		struct gendisk *disk = disks[i];
 		memset(lo, 0, sizeof(struct loop_device));
 		init_MUTEX(&lo->lo_ctl_mutex);
 		init_MUTEX_LOCKED(&lo->lo_sem);
 		init_MUTEX_LOCKED(&lo->lo_bh_mutex);
 		lo->lo_number = i;
 		spin_lock_init(&lo->lo_lock);
-		memset(disk, 0, sizeof(struct gendisk));
 		disk->major = LOOP_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &lo_fops;
@@ -1074,6 +1077,9 @@ int __init loop_init(void)
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
+out_mem2:
+	while (i--)
+		put_disk(disks[i]);
 out_mem:
 	kfree(disks);
 	kfree(loop_dev);
@@ -1084,8 +1090,10 @@ out_mem:
 void loop_exit(void) 
 {
 	int i;
-	for (i = 0; i < max_loop; i++)
-		del_gendisk(disks + i);
+	for (i = 0; i < max_loop; i++) {
+		del_gendisk(disks[i]);
+		put_disk(disks[i]);
+	}
 	devfs_unregister(devfs_handle);
 	if (unregister_blkdev(MAJOR_NR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");

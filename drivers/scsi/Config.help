@@ -788,6 +788,16 @@ CONFIG_SCSI_NCR53C8XX_PQS_PDS
 
   The common answer here is N, but answering Y is safe.
 
+CONFIG_SCSI_NSP32
+  This is support for the Workbit NinjaSCSI-32Bi/UDE PCI/Cardbus
+  SCSI host adapter. Please read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called nsp32.o.
+
 CONFIG_SCSI_IBMMCA
   This is support for the IBM SCSI adapter found in many of the PS/2
   series computers.  These machines have an MCA bus, so you need to

@@ -44,7 +44,7 @@
 #include <linux/skbuff.h>
 #include <net/syncppp.h>
 #include <linux/inet.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/proc_fs.h>
 
 #include "lmc_ver.h"

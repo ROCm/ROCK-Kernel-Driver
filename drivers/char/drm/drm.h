@@ -345,6 +345,19 @@ typedef struct drm_irq_busid {
 	int funcnum;
 } drm_irq_busid_t;
 
+typedef enum {
+    _DRM_VBLANK_ABSOLUTE = 0x0,	/* Wait for specific vblank sequence number */
+    _DRM_VBLANK_RELATIVE = 0x1	/* Wait for given number of vblanks */
+} drm_vblank_seq_type_t;
+
+typedef struct drm_radeon_vbl_wait {
+	drm_vblank_seq_type_t type;
+	unsigned int sequence;
+	long tval_sec;
+	long tval_usec;
+} drm_wait_vblank_t;
+
+
 typedef struct drm_agp_mode {
 	unsigned long mode;
 } drm_agp_mode_t;
@@ -438,6 +451,8 @@ typedef struct drm_scatter_gather {
 
 #define DRM_IOCTL_SG_ALLOC		DRM_IOW( 0x38, drm_scatter_gather_t)
 #define DRM_IOCTL_SG_FREE		DRM_IOW( 0x39, drm_scatter_gather_t)
+
+#define DRM_IOCTL_WAIT_VBLANK		DRM_IOWR(0x3a, drm_wait_vblank_t)
 
 /* Device specfic ioctls should only be in their respective headers
  * The device specific ioctl range is 0x40 to 0x79.                  */

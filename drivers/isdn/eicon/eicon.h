@@ -117,7 +117,7 @@ typedef struct {
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/skbuff.h>
 #include <linux/errno.h>
@@ -321,9 +321,9 @@ typedef struct eicon_card {
 	struct sk_buff_head sackq;       /* Data-Ack-Message queue           */
 	struct sk_buff_head statq;       /* Status-Message queue             */
 	int statq_entries;
-	struct tq_struct snd_tq;         /* Task struct for xmit bh          */
-	struct tq_struct rcv_tq;         /* Task struct for rcv bh           */
-	struct tq_struct ack_tq;         /* Task struct for ack bh           */
+	struct work_struct snd_tq;         /* Task struct for xmit bh          */
+	struct work_struct rcv_tq;         /* Task struct for rcv bh           */
+	struct work_struct ack_tq;         /* Task struct for ack bh           */
 	eicon_chan*	IdTable[256];	 /* Table to find entity   */
 	__u16  ref_in;
 	__u16  ref_out;
@@ -349,20 +349,17 @@ extern char *eicon_ctype_name[];
 
 extern __inline__ void eicon_schedule_tx(eicon_card *card)
 {
-        queue_task(&card->snd_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->snd_tq);
 }
 
 extern __inline__ void eicon_schedule_rx(eicon_card *card)
 {
-        queue_task(&card->rcv_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->rcv_tq);
 }
 
 extern __inline__ void eicon_schedule_ack(eicon_card *card)
 {
-        queue_task(&card->ack_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->ack_tq);
 }
 
 extern int eicon_addcard(int, int, int, char *, int);

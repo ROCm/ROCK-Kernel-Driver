@@ -1893,7 +1893,7 @@ static void done(struct Scsi_Host *shpnt, int error)
 		printk(KERN_ERR "aha152x: done() called outside of command\n");
 }
 
-static struct tq_struct aha152x_tq;
+static struct work_struct aha152x_tq;
 
 /*
  * Run service completions on the card with interrupts enabled.
@@ -1940,9 +1940,8 @@ static void intr(int irqno, void *dev_id, struct pt_regs *regs)
 	
 	/* Poke the BH handler */
 	HOSTDATA(shpnt)->service++;
-	aha152x_tq.routine = (void *) run;
-	queue_task(&aha152x_tq, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&aha152x_tq, (void *) run, NULL);
+	schedule_work(&aha152x_tq);
 }
 
 /*

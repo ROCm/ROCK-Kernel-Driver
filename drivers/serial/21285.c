@@ -94,7 +94,7 @@ static void serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 	status = *CSR_UARTFLG;
 	while (!(status & 0x10) && max_count--) {
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.tqueue.routine((void *)tty);
+			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
 				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
 				return;

@@ -1363,45 +1363,45 @@ static snd_pcm_uframes_t snd_es1968_pcm_pointer(snd_pcm_substream_t *substream)
 }
 
 static snd_pcm_hardware_t snd_es1968_playback = {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
                		         SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	256,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	256,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_es1968_capture = {
-	info:			(SNDRV_PCM_INFO_NONINTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_NONINTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		/*SNDRV_PCM_FMTBIT_U8 |*/ SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	256,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		/*SNDRV_PCM_FMTBIT_U8 |*/ SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	256,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /* *************************
@@ -1752,26 +1752,26 @@ static int snd_es1968_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_es1968_playback_ops = {
-	open:		snd_es1968_playback_open,
-	close:		snd_es1968_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_es1968_hw_params,
-	hw_free:	snd_es1968_hw_free,
-	prepare:	snd_es1968_pcm_prepare,
-	trigger:	snd_es1968_pcm_trigger,
-	pointer:	snd_es1968_pcm_pointer,
+	.open =		snd_es1968_playback_open,
+	.close =	snd_es1968_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es1968_hw_params,
+	.hw_free =	snd_es1968_hw_free,
+	.prepare =	snd_es1968_pcm_prepare,
+	.trigger =	snd_es1968_pcm_trigger,
+	.pointer =	snd_es1968_pcm_pointer,
 };
 
 static snd_pcm_ops_t snd_es1968_capture_ops = {
-	open:		snd_es1968_capture_open,
-	close:		snd_es1968_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_es1968_hw_params,
-	hw_free:	snd_es1968_hw_free,
-	prepare:	snd_es1968_pcm_prepare,
-	trigger:	snd_es1968_pcm_trigger,
-	pointer:	snd_es1968_pcm_pointer,
-	copy:		snd_es1968_capture_copy,
+	.open =		snd_es1968_capture_open,
+	.close =	snd_es1968_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es1968_hw_params,
+	.hw_free =	snd_es1968_hw_free,
+	.prepare =	snd_es1968_pcm_prepare,
+	.trigger =	snd_es1968_pcm_trigger,
+	.pointer =	snd_es1968_pcm_pointer,
+	.copy =		snd_es1968_capture_copy,
 };
 
 
@@ -2501,11 +2501,13 @@ static int snd_es1968_set_power_state(snd_card_t *card, unsigned int power_state
 
 static int snd_es1968_free(es1968_t *chip)
 {
+	if (chip->res_io_port)
+		snd_es1968_reset(chip);
+
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
 	if (chip->res_io_port) {
-		snd_es1968_reset(chip);
 		release_resource(chip->res_io_port);
 		kfree_nocheck(chip->res_io_port);
 	}
@@ -2529,7 +2531,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 				    es1968_t **chip_ret)
 {
 	static snd_device_ops_t ops = {
-		dev_free:       snd_es1968_dev_free,
+		.dev_free =	snd_es1968_dev_free,
 	};
 	es1968_t *chip;
 	int i, err;
@@ -2654,11 +2656,11 @@ static int snd_es1968_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 
 static snd_kcontrol_new_t snd_es1968_control_switches[] __devinitdata = {
 	{
-		name: "Joystick",
-		iface: SNDRV_CTL_ELEM_IFACE_CARD,
-		info: snd_es1968_joystick_info,
-		get: snd_es1968_joystick_get,
-		put: snd_es1968_joystick_put,
+		.name = "Joystick",
+		.iface = SNDRV_CTL_ELEM_IFACE_CARD,
+		.info = snd_es1968_joystick_info,
+		.get = snd_es1968_joystick_get,
+		.put = snd_es1968_joystick_put,
 	}
 };
 
@@ -2761,13 +2763,13 @@ static void __devexit snd_es1968_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "ES1968 (ESS Maestro)",
-	id_table: snd_es1968_ids,
-	probe: snd_es1968_probe,
-	remove: __devexit_p(snd_es1968_remove),
+	.name = "ES1968 (ESS Maestro)",
+	.id_table = snd_es1968_ids,
+	.probe = snd_es1968_probe,
+	.remove = __devexit_p(snd_es1968_remove),
 #ifdef CONFIG_PM
-	suspend: snd_es1968_suspend,
-	resume: snd_es1968_resume,
+	.suspend = snd_es1968_suspend,
+	.resume = snd_es1968_resume,
 #endif
 };
 

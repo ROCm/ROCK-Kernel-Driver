@@ -1710,9 +1710,12 @@
 #define CS46XX_SECONDARY_CODEC_OFFSET		0x80
 #define CS46XX_DSP_CAPTURE_CHANNEL          1
 
-/*
- *
- */
+/* capture */
+#define CS46XX_DSP_CAPTURE_CHANNEL          1
+
+/* mixer */
+#define CS46XX_MIXER_SPDIF_INPUT_ELEMENT    1
+#define CS46XX_MIXER_SPDIF_OUTPUT_ELEMENT   2
 
 typedef struct _snd_cs46xx cs46xx_t;
 
@@ -1799,6 +1802,7 @@ struct _snd_cs46xx {
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);
 	void (*active_ctrl)(cs46xx_t *, int);
+  	void (*mixer_init)(cs46xx_t *);
 	struct pci_dev *acpi_dev;
 	int acpi_port;
 	snd_kcontrol_t *eapd_switch; /* for amplifier hack */
@@ -1809,8 +1813,12 @@ struct _snd_cs46xx {
 #ifdef CONFIG_PM
 	struct pm_dev *pm_dev;
 #endif
-
+#ifdef CONFIG_SND_CS46XX_DEBUG_GPIO
+  int current_gpio;
+#endif
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+	struct semaphore spos_mutex;
+
 	dsp_spos_instance_t * dsp_spos_instance;
 #else /* for compatibility */
 	cs46xx_pcm_t *playback_pcm;

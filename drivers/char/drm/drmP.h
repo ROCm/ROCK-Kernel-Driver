@@ -66,7 +66,7 @@
 #include <linux/types.h>
 #include <linux/agp_backend.h>
 #endif
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/poll.h>
 #include <asm/pgalloc.h>
 #include "drm.h"
@@ -575,7 +575,11 @@ typedef struct drm_device {
 	int		  last_checked;	/* Last context checked for DMA	   */
 	int		  last_context;	/* Last current context		   */
 	unsigned long	  last_switch;	/* jiffies at last context switch  */
-	struct tq_struct  tq;
+	struct work_struct		  work;
+#if __HAVE_VBL_IRQ
+   	wait_queue_head_t vbl_queue;
+   	atomic_t          vbl_received;
+#endif
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
 #if __HAVE_DMA_HISTOGRAM
@@ -808,6 +812,14 @@ extern int           DRM(irq_install)( drm_device_t *dev, int irq );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
 extern void          DRM(dma_service)( int irq, void *device,
 				       struct pt_regs *regs );
+extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
+extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );
+extern void          DRM(driver_irq_uninstall)( drm_device_t *dev );
+#if __HAVE_VBL_IRQ
+extern int           DRM(wait_vblank)(struct inode *inode, struct file *filp,
+				      unsigned int cmd, unsigned long arg);
+extern int           DRM(vblank_wait)(drm_device_t *dev, unsigned int *vbl_seq);
+#endif
 #if __HAVE_DMA_IRQ_BH
 extern void          DRM(dma_immediate_bh)( void *dev );
 #endif

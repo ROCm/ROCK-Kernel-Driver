@@ -4,7 +4,6 @@
 #include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/genhd.h>
-#include <linux/tqueue.h>
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
@@ -400,5 +399,9 @@ static inline void put_dev_sector(Sector p)
 {
 	page_cache_release(p.v);
 }
+
+extern atomic_t nr_iowait_tasks;
+void io_schedule(void);
+void io_schedule_timeout(long timeout);
 
 #endif

@@ -1058,3 +1058,12 @@ CONFIG_SOFTWARE_SUSPEND
   absence of features.
 
   For more information take a look at Documentation/swsusp.txt.
+
+CONFIG_SCx200
+  This provides basic support for the National Semiconductor SCx200 
+  processor.  Right now this is just a driver for the GPIO pins.
+
+  If you don't know what to do here, say N.
+
+  This support is also available as a module.  If compiled as a
+  module, it will be called scx200.o.

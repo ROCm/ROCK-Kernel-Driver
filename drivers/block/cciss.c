@@ -703,7 +703,7 @@ static int cciss_revalidate(kdev_t dev)
 {
         int ctlr = major(dev) - MAJOR_NR;
 	int target = minor(dev) >> NWD_SHIFT;
-        struct gendisk *disk = &hba[ctlr]->gendisk[target];
+        struct gendisk *disk = hba[ctlr]->gendisk[target];
 	set_capacity(disk, hba[ctlr]->drv[target].nr_blocks);
 	return 0;
 }
@@ -739,7 +739,7 @@ static int revalidate_allvol(kdev_t dev)
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	for(i=0; i< NWD; i++) {
-		struct gendisk *disk = &hba[ctlr]->gendisk[i];
+		struct gendisk *disk = hba[ctlr]->gendisk[i];
 		if (disk->part)
 			del_gendisk(disk);
 	}
@@ -761,7 +761,7 @@ static int revalidate_allvol(kdev_t dev)
 
 	/* Loop through each real device */ 
 	for (i = 0; i < NWD; i++) {
-		struct gendisk *disk = &hba[ctlr]->gendisk[i];
+		struct gendisk *disk = hba[ctlr]->gendisk[i];
 		drive_info_struct *drv = &(hba[ctlr]->drv[i]);
 		if (!drv->nr_blocks)
 			continue;
@@ -776,7 +776,7 @@ static int revalidate_allvol(kdev_t dev)
 static int deregister_disk(int ctlr, int logvol)
 {
 	unsigned long flags;
-	struct gendisk *disk = &hba[ctlr]->gendisk[logvol];
+	struct gendisk *disk = hba[ctlr]->gendisk[logvol];
 	ctlr_info_t  *h = hba[ctlr];
 
 	if (!capable(CAP_SYS_RAWIO))
@@ -1231,7 +1231,7 @@ static int register_new_disk(int ctlr)
 	hba[ctlr]->drv[logvol].usage_count = 0;
 	++hba[ctlr]->num_luns;
 	/* setup partitions per disk */
-        disk = &hba[ctlr]->gendisk[logvol];
+        disk = hba[ctlr]->gendisk[logvol];
 	set_capacity(disk, hba[ctlr]->drv[logvol].nr_blocks);
 	add_disk(disk);
 	
@@ -2271,29 +2271,47 @@ static void cciss_getgeometry(int cntl_num)
 /* Returns -1 if no free entries are left.  */
 static int alloc_cciss_hba(void)
 {
-	int i;
-	for(i=0; i< MAX_CTLR; i++)
-	{
-		if (hba[i] == NULL)
-		{
-			hba[i] = kmalloc(sizeof(ctlr_info_t), GFP_KERNEL);
-			if(hba[i]==NULL)
-			{
-				printk(KERN_ERR "cciss: out of memory.\n");
-				return (-1);
-			}
-			return (i);
+	struct gendisk *disk[NWD];
+	int i, n;
+	for (n = 0; n < NWD; n++) {
+		disk[n] = disk_alloc();
+		if (!disk[n])
+			goto out;
+	}
+
+	for(i=0; i< MAX_CTLR; i++) {
+		if (!hba[i]) {
+			ctlr_info_t *p;
+			p = kmalloc(sizeof(ctlr_info_t), GFP_KERNEL);
+			if (!p)
+				goto Enomem;
+			memset(p, 0, sizeof(ctlr_info_t));
+			for (n = 0; n < NWD; n++)
+				p->gendisk[n] = disk[n];
+			hba[i] = p;
+			return i;
 		}
 	}
 	printk(KERN_WARNING "cciss: This driver supports a maximum"
 		" of 8 controllers.\n");
-	return(-1);
+	goto out;
+Enomem:
+	printk(KERN_ERR "cciss: out of memory.\n");
+out:
+	while (n--)
+		put_disk(disk[n]);
+	return -1;
 }
 
 static void free_hba(int i)
 {
-	kfree(hba[i]);
-	hba[i]=NULL;
+	ctlr_info_t *p = hba[i];
+	int n;
+
+	hba[i] = NULL;
+	for (n = 0; n < NWD; n++)
+		put_disk(p->gendisk[n]);
+	kfree(p);
 }
 
 /*
@@ -2315,7 +2333,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	i = alloc_cciss_hba();
 	if( i < 0 ) 
 		return (-1);
-	memset(hba[i], 0, sizeof(ctlr_info_t));
 	if (cciss_pci_init(hba[i], pdev) != 0)
 	{
 		release_io_mem(hba[i]);
@@ -2425,7 +2442,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	for(j=0; j<NWD; j++) {
 		drive_info_struct *drv = &(hba[i]->drv[j]);
-		struct gendisk *disk = hba[i]->gendisk + j;
+		struct gendisk *disk = hba[i]->gendisk[j];
 
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
 		disk->major = MAJOR_NR + i;
@@ -2482,7 +2499,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	
 	/* remove it from the disk list */
 	for (j = 0; j < NWD; j++) {
-		struct gendisk *disk = &hba[i]->gendisk[j];
+		struct gendisk *disk = hba[i]->gendisk[j];
 		if (disk->part)
 			del_gendisk(disk);
 	}

@@ -131,14 +131,14 @@
         - Added check of device_id when handling non
           QLA12160s during detect().
     Rev  3.22 Beta January 5, 2001 BN Qlogic
-        - Changed queue_task() to schedule_task()
+        - Changed queue_task() to schedule_work()
           for kernels 2.4.0 and higher.
           Note: 2.4.0-testxx kernels released prior to
                 the actual 2.4.0 kernel release on January 2001
-                will get compile/link errors with schedule_task().
+                will get compile/link errors with schedule_work().
                 Please update your kernel to released 2.4.0 level,
                 or comment lines in this file flagged with  3.22
-                to resolve compile/link error of schedule_task().
+                to resolve compile/link error of schedule_work().
         - Added -DCONFIG_SMP in addition to -D__SMP__
           in Makefile for 2.4.0 builds of driver as module.
     Rev  3.21 Beta January 4, 2001 BN Qlogic
@@ -253,7 +253,7 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
 
@@ -1190,9 +1190,9 @@ qla1280_queuecommand(Scsi_Cmnd * cmd, void (*fn) (Scsi_Cmnd *))
 					   &ha->done_q_last);
 /* 3.22 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)	/* 3.22 */
-			queue_task(&ha->run_qla_bh, &tq_scheduler);
+			schedule_work(&ha->run_qla_bh);
 #else				/* 3.22 */
-			schedule_task(&ha->run_qla_bh);	/* 3.22 */
+			schedule_work(&ha->run_qla_bh);	/* 3.22 */
 #endif				/* 3.22 */
 			return 0;
 		}

@@ -186,8 +186,10 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 		/*
 		 * Try to merge with the previous vma.
 		 */
-		if (mprotect_attempt_merge(vma, *pprev, end, newflags))
+		if (mprotect_attempt_merge(vma, *pprev, end, newflags)) {
+			vma = *pprev;
 			goto success;
+		}
 	} else {
 		error = split_vma(mm, vma, start, 1);
 		if (error)

@@ -924,7 +924,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 {
 	unsigned char *tbuf;
-	int err;
+	int err, len;
 	unsigned int u, idx;
 
 	if (size <= 0 || !buf || !index)
@@ -954,10 +954,15 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	}
 
 	/*
-	 * Just ask for a maximum length string and then take the length
-	 * that was returned.
+	 * ask for the length of the string 
 	 */
-	err = usb_get_string(dev, dev->string_langid, index, tbuf, 255);
+
+	err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
+	if(err<2)
+		goto errout;
+	len=tbuf[0];	
+	
+	err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
 	if (err < 0)
 		goto errout;
 

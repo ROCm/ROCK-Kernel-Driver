@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <sound/core.h>
@@ -86,8 +85,8 @@ static void snd_gf1_mem_proc_free(snd_info_entry_t *entry)
 }
 
 static struct snd_info_entry_ops snd_gf1_mem_proc_ops = {
-	read: snd_gf1_mem_proc_dump,
-	llseek: snd_gf1_mem_proc_llseek,
+	.read = snd_gf1_mem_proc_dump,
+	.llseek = snd_gf1_mem_proc_llseek,
 };
 
 int snd_gf1_mem_proc_init(snd_gus_card_t * gus)

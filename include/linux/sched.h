@@ -172,9 +172,6 @@ extern unsigned long cache_decay_ticks;
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
 
-extern int start_context_thread(void);
-extern int current_is_keventd(void);
-
 struct namespace;
 
 /* Maximum number of active map areas.. This is a random (large) number */
@@ -381,7 +378,7 @@ struct task_struct {
 /* signal handlers */
 	struct signal_struct *sig;
 
-	sigset_t blocked, real_blocked, shared_unblocked;
+	sigset_t blocked, real_blocked;
 	struct sigpending pending;
 
 	unsigned long sas_ss_sp;
@@ -433,6 +430,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
 #define PF_SYNC		0x00080000	/* performing fsync(), etc */
 #define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
+#define PF_KSWAPD	0x00200000	/* I am kswapd */
 
 /*
  * Ptrace flags
@@ -532,7 +530,7 @@ extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
 extern void sig_exit(int, int, struct siginfo *);
-extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info);
+extern int dequeue_signal(sigset_t *mask, siginfo_t *info);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);

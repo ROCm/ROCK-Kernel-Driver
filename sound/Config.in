@@ -31,11 +31,15 @@ fi
 if [ "$CONFIG_SND" != "n" -a "$CONFIG_ARM" = "y" ]; then
   source sound/arm/Config.in
 fi
-if [ "$CONFIG_SND" != "n" -a "$CONFIG_SPARC32" = "y" ]; then
-  source sound/sparc/Config.in
+# the following will depenend on the order of config.
+# here assuming USB is defined before ALSA
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_USB" != "n" ]; then
+  source sound/usb/Config.in
 fi
-if [ "$CONFIG_SND" != "n" -a "$CONFIG_SPARC64" = "y" ]; then
-  source sound/sparc/Config.in
+if [ "$CONFIG_SND" != "n" ]; then
+  if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+    source sound/sparc/Config.in
+  fi
 fi
 
 endmenu

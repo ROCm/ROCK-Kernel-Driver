@@ -47,10 +47,12 @@ typedef struct tvec_root_s {
 	struct list_head vec[TVR_SIZE];
 } tvec_root_t;
 
+typedef struct timer_list timer_t;
+
 struct tvec_t_base_s {
 	spinlock_t lock;
 	unsigned long timer_jiffies;
-	volatile timer_t * volatile running_timer;
+	timer_t *running_timer;
 	tvec_root_t tv1;
 	tvec_t tv2;
 	tvec_t tv3;
@@ -69,7 +71,7 @@ static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
 {
 	unsigned long expires = timer->expires;
 	unsigned long idx = expires - base->timer_jiffies;
-	struct list_head * vec;
+	struct list_head *vec;
 
 	if (idx < TVR_SIZE) {
 		int i = expires & TVR_MASK;
@@ -94,22 +96,36 @@ static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
 		vec = base->tv5.vec + i;
 	} else {
 		/* Can only get here on architectures with 64-bit jiffies */
-		INIT_LIST_HEAD(&timer->list);
+		INIT_LIST_HEAD(&timer->entry);
 		return;
 	}
 	/*
 	 * Timers are FIFO:
 	 */
-	list_add_tail(&timer->list, vec);
+	list_add_tail(&timer->entry, vec);
 }
 
+/***
+ * add_timer - start a timer
+ * @timer: the timer to be added
+ *
+ * The kernel will do a ->function(->data) callback from the
+ * timer interrupt at the ->expired point in the future. The
+ * current time is 'jiffies'.
+ *
+ * The timer's ->expired, ->function (and if the handler uses it, ->data)
+ * fields must be set prior calling this function.
+ *
+ * Timers with an ->expired field in the past will be executed in the next
+ * timer tick. It's illegal to add an already pending timer.
+ */
 void add_timer(timer_t *timer)
 {
 	int cpu = get_cpu();
 	tvec_base_t *base = tvec_bases + cpu;
   	unsigned long flags;
   
-  	BUG_ON(timer_pending(timer));
+  	BUG_ON(timer_pending(timer) || !timer->function);
 
 	spin_lock_irqsave(&base->lock, flags);
 	internal_add_timer(base, timer);
@@ -118,25 +134,38 @@ void add_timer(timer_t *timer)
 	put_cpu();
 }
 
-static inline int detach_timer (timer_t *timer)
-{
-	if (!timer_pending(timer))
-		return 0;
-	list_del(&timer->list);
-	return 1;
-}
-
-/*
- * mod_timer() has subtle locking semantics because parallel
- * calls to it must happen serialized.
+/***
+ * mod_timer - modify a timer's timeout
+ * @timer: the timer to be modified
+ *
+ * mod_timer is a more efficient way to update the expire field of an
+ * active timer (if the timer is inactive it will be activated)
+ *
+ * mod_timer(timer, expires) is equivalent to:
+ *
+ *     del_timer(timer); timer->expires = expires; add_timer(timer);
+ *
+ * Note that if there are multiple unserialized concurrent users of the
+ * same timer, then mod_timer() is the only safe way to modify the timeout,
+ * since add_timer() cannot modify an already running timer.
+ *
+ * The function returns whether it has modified a pending timer or not.
+ * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
+ * active timer returns 1.)
  */
 int mod_timer(timer_t *timer, unsigned long expires)
 {
 	tvec_base_t *old_base, *new_base;
 	unsigned long flags;
-	int ret;
+	int ret = 0;
 
-	if (timer_pending(timer) && timer->expires == expires)
+	BUG_ON(!timer->function);
+	/*
+	 * This is a common optimization triggered by the
+	 * networking code - if the timer is re-modified
+	 * to be the same thing then just return:
+	 */
+	if (timer->expires == expires && timer_pending(timer))
 		return 1;
 
 	local_irq_save(flags);
@@ -156,8 +185,8 @@ repeat:
 			spin_lock(&new_base->lock);
 		}
 		/*
-		 * Subtle, we rely on timer->base being always
-		 * valid and being updated atomically.
+		 * The timer base might have changed while we were
+		 * trying to take the lock(s):
 		 */
 		if (timer->base != old_base) {
 			spin_unlock(&new_base->lock);
@@ -167,8 +196,15 @@ repeat:
 	} else
 		spin_lock(&new_base->lock);
 
+	/*
+	 * Delete the previous timeout (if there was any), and install
+	 * the new one:
+	 */
+	if (old_base) {
+		list_del(&timer->entry);
+		ret = 1;
+	}
 	timer->expires = expires;
-	ret = detach_timer(timer);
 	internal_add_timer(new_base, timer);
 	timer->base = new_base;
 
@@ -179,66 +215,74 @@ repeat:
 	return ret;
 }
 
-int del_timer(timer_t * timer)
+/***
+ * del_timer - deactive a timer.
+ * @timer: the timer to be deactivated
+ *
+ * del_timer() deactivates a timer - this works on both active and inactive
+ * timers.
+ *
+ * The function returns whether it has deactivated a pending timer or not.
+ * (ie. del_timer() of an inactive timer returns 0, del_timer() of an
+ * active timer returns 1.)
+ */
+int del_timer(timer_t *timer)
 {
 	unsigned long flags;
-	tvec_base_t * base;
-	int ret;
+	tvec_base_t *base;
 
-	if (!timer->base)
-		return 0;
 repeat:
  	base = timer->base;
+	if (!base)
+		return 0;
 	spin_lock_irqsave(&base->lock, flags);
 	if (base != timer->base) {
 		spin_unlock_irqrestore(&base->lock, flags);
 		goto repeat;
 	}
-	ret = detach_timer(timer);
-	timer->list.next = timer->list.prev = NULL;
+	list_del(&timer->entry);
+	timer->base = NULL;
 	spin_unlock_irqrestore(&base->lock, flags);
 
-	return ret;
+	return 1;
 }
 
 #ifdef CONFIG_SMP
-/*
- * SMP specific function to delete periodic timer.
- * Caller must disable by some means restarting the timer
- * for new. Upon exit the timer is not queued and handler is not running
- * on any CPU. It returns number of times, which timer was deleted
- * (for reference counting).
+/***
+ * del_timer_sync - deactivate a timer and wait for the handler to finish.
+ * @timer: the timer to be deactivated
+ *
+ * This function only differs from del_timer() on SMP: besides deactivating
+ * the timer it also makes sure the handler has finished executing on other
+ * CPUs.
+ *
+ * Synchronization rules: callers must prevent restarting of the timer,
+ * otherwise this function is meaningless. It must not be called from
+ * interrupt contexts. Upon exit the timer is not queued and the handler
+ * is not running on any CPU.
+ *
+ * The function returns whether it has deactivated a pending timer or not.
  */
-
-int del_timer_sync(timer_t * timer)
+int del_timer_sync(timer_t *timer)
 {
-	tvec_base_t * base;
-	int ret = 0;
+	tvec_base_t *base = tvec_bases;
+	int i, ret;
 
-	if (!timer->base)
-		return 0;
-	for (;;) {
-		unsigned long flags;
-		int running;
+	ret = del_timer(timer);
 
-repeat:
-	 	base = timer->base;
-		spin_lock_irqsave(&base->lock, flags);
-		if (base != timer->base) {
-			spin_unlock_irqrestore(&base->lock, flags);
-			goto repeat;
-		}
-		ret += detach_timer(timer);
-		timer->list.next = timer->list.prev = 0;
-		running = timer_is_running(base, timer);
-		spin_unlock_irqrestore(&base->lock, flags);
-
-		if (!running)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (base->running_timer == timer) {
+			while (base->running_timer == timer) {
+				cpu_relax();
+				preempt_disable();
+				preempt_enable();
+			}
 			break;
-
-		timer_synchronize(base, timer);
+		}
+		base++;
 	}
-
 	return ret;
 }
 #endif
@@ -258,11 +302,10 @@ static void cascade(tvec_base_t *base, tvec_t *tv)
 	while (curr != head) {
 		timer_t *tmp;
 
-		tmp = list_entry(curr, timer_t, list);
+		tmp = list_entry(curr, timer_t, entry);
 		if (tmp->base != base)
 			BUG();
 		next = curr->next;
-		list_del(curr); // not needed
 		internal_add_timer(base, tmp);
 		curr = next;
 	}
@@ -270,7 +313,14 @@ static void cascade(tvec_base_t *base, tvec_t *tv)
 	tv->index = (tv->index + 1) & TVN_MASK;
 }
 
-static void __run_timers(tvec_base_t *base)
+/***
+ * __run_timers - run all expired timers (if any) on this CPU.
+ * @base: the timer vector to be processed.
+ *
+ * This function cascades all vectors and executes all expired timer
+ * vectors.
+ */
+static inline void __run_timers(tvec_base_t *base)
 {
 	unsigned long flags;
 
@@ -300,22 +350,26 @@ repeat:
 			unsigned long data;
 			timer_t *timer;
 
-			timer = list_entry(curr, timer_t, list);
+			timer = list_entry(curr, timer_t, entry);
  			fn = timer->function;
  			data = timer->data;
 
-			detach_timer(timer);
-			timer->list.next = timer->list.prev = NULL;
-			timer_enter(base, timer);
+			list_del(&timer->entry);
+			timer->base = NULL;
+#if CONFIG_SMP
+			base->running_timer = timer;
+#endif
 			spin_unlock_irq(&base->lock);
 			fn(data);
 			spin_lock_irq(&base->lock);
-			timer_exit(base);
 			goto repeat;
 		}
 		++base->timer_jiffies; 
 		base->tv1.index = (base->tv1.index + 1) & TVR_MASK;
 	}
+#if CONFIG_SMP
+	base->running_timer = NULL;
+#endif
 	spin_unlock_irqrestore(&base->lock, flags);
 }
 
@@ -607,6 +661,7 @@ void update_process_times(int user_tick)
 	int cpu = smp_processor_id(), system = user_tick ^ 1;
 
 	update_one_process(p, user_tick, system, cpu);
+	run_local_timers();
 	scheduler_tick(user_tick, system);
 }
 

@@ -13,7 +13,7 @@
 
 #include <linux/pci.h>
 #include <linux/sched.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 
@@ -36,8 +36,7 @@ void tpam_enqueue(tpam_card *card, struct sk_buff *skb) {
 	skb_queue_tail(&card->sendq, skb);
 
 	/* queue the board's send task struct for immediate treatment */
-	queue_task(&card->send_tq, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&card->send_tq);
 }
 
 /*
@@ -58,8 +57,7 @@ void tpam_enqueue_data(tpam_channel *channel, struct sk_buff *skb) {
 		skb_queue_tail(&channel->sendq, skb);
 
 	/* queue the channel's send task struct for immediate treatment */
-	queue_task(&channel->card->send_tq, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&channel->card->send_tq);
 }
 
 /*
@@ -169,8 +167,7 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 		else {
 			/* put the message in the receive queue */
 			skb_queue_tail(&card->recvq, skb);
-			queue_task(&card->recv_tq, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_work(&card->recv_tq);
 		}
 		return;
 	}
@@ -187,8 +184,7 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 		spin_unlock(&card->lock);
 
 		/* schedule the send queue for execution */
-		queue_task(&card->send_tq, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&card->send_tq);
 		return;
 	}
 

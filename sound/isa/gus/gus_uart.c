@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -51,7 +50,6 @@ static void snd_gf1_interrupt_midi_in(snd_gus_card_t * gus)
 		if (stat & 0x10) {	/* framing error */
 			gus->gf1.uart_framing++;
 			spin_unlock_irqrestore(&gus->uart_cmd_lock, flags);
-			snd_rawmidi_receive_reset(gus->midi_substream_input);
 			continue;
 		}
 		byte = snd_gf1_uart_get(gus);
@@ -59,7 +57,6 @@ static void snd_gf1_interrupt_midi_in(snd_gus_card_t * gus)
 		snd_rawmidi_receive(gus->midi_substream_input, &byte, 1);
 		if (stat & 0x20) {
 			gus->gf1.uart_overrun++;
-			snd_rawmidi_receive_reset(gus->midi_substream_input);
 		}
 	}
 }
@@ -227,16 +224,16 @@ static void snd_gf1_uart_output_trigger(snd_rawmidi_substream_t * substream, int
 
 static snd_rawmidi_ops_t snd_gf1_uart_output =
 {
-	open:		snd_gf1_uart_output_open,
-	close:		snd_gf1_uart_output_close,
-	trigger:	snd_gf1_uart_output_trigger,
+	.open =		snd_gf1_uart_output_open,
+	.close =	snd_gf1_uart_output_close,
+	.trigger =	snd_gf1_uart_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_gf1_uart_input =
 {
-	open:           snd_gf1_uart_input_open,
-	close:          snd_gf1_uart_input_close,
-	trigger:        snd_gf1_uart_input_trigger,
+	.open =		snd_gf1_uart_input_open,
+	.close =	snd_gf1_uart_input_close,
+	.trigger =	snd_gf1_uart_input_trigger,
 };
 
 int snd_gf1_rawmidi_new(snd_gus_card_t * gus, int device, snd_rawmidi_t ** rrawmidi)

@@ -352,15 +352,12 @@ static void hci_cs_link_ctl(struct hci_dev *hdev, __u16 ocf, __u8 status)
 			hci_dev_lock(hdev);
 	
 			acl = conn_hash_lookup_handle(hdev, handle);
-			if (!acl || !(sco = acl->link)) {
-				hci_dev_unlock(hdev);
-				break;
+			if (acl && (sco = acl->link)) {
+				sco->state = BT_CLOSED;
+
+				hci_proto_connect_cfm(sco, status);
+				hci_conn_del(sco);
 			}
-
-			sco->state = BT_CLOSED;
-
-			hci_proto_connect_cfm(sco, status);
-			hci_conn_del(sco);
 
 			hci_dev_unlock(hdev);
 		}

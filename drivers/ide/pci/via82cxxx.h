@@ -29,7 +29,7 @@ static unsigned int init_chipset_via82cxxx(struct pci_dev *, const char *);
 static void init_hwif_via82cxxx(ide_hwif_t *);
 static void init_dma_via82cxxx(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t via82cxxx_chipsets[] __initdata = {
+static ide_pci_device_t via82cxxx_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_VIA,
 		device:		PCI_DEVICE_ID_VIA_82C576_1,

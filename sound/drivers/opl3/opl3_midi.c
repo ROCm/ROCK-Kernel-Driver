@@ -22,7 +22,6 @@
 #undef DEBUG_ALLOC
 #undef DEBUG_MIDI
 
-#define __NO_VERSION__
 #include "opl3_voice.h"
 #include <sound/asoundef.h>
 

@@ -262,38 +262,38 @@ static snd_pcm_uframes_t snd_card_dummy_capture_pointer(snd_pcm_substream_t * su
 
 static snd_pcm_hardware_t snd_card_dummy_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		USE_FORMATS,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		USE_CHANNELS_MIN,
-	channels_max:		USE_CHANNELS_MAX,
-	buffer_bytes_max:	MAX_BUFFER_SIZE,
-	period_bytes_min:	64,
-	period_bytes_max:	MAX_BUFFER_SIZE,
-	periods_min:		USE_PERIODS_MIN,
-	periods_max:		USE_PERIODS_MAX,
-	fifo_size:		0,
+	.formats =		USE_FORMATS,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		USE_CHANNELS_MIN,
+	.channels_max =		USE_CHANNELS_MAX,
+	.buffer_bytes_max =	MAX_BUFFER_SIZE,
+	.period_bytes_min =	64,
+	.period_bytes_max =	MAX_BUFFER_SIZE,
+	.periods_min =		USE_PERIODS_MIN,
+	.periods_max =		USE_PERIODS_MAX,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_card_dummy_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		USE_FORMATS,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		USE_CHANNELS_MIN,
-	channels_max:		USE_CHANNELS_MAX,
-	buffer_bytes_max:	MAX_BUFFER_SIZE,
-	period_bytes_min:	64,
-	period_bytes_max:	MAX_BUFFER_SIZE,
-	periods_min:		USE_PERIODS_MIN,
-	periods_max:		USE_PERIODS_MAX,
-	fifo_size:		0,
+	.formats =		USE_FORMATS,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5500,
+	.rate_max =		48000,
+	.channels_min =		USE_CHANNELS_MIN,
+	.channels_max =		USE_CHANNELS_MAX,
+	.buffer_bytes_max =	MAX_BUFFER_SIZE,
+	.period_bytes_min =	64,
+	.period_bytes_max =	MAX_BUFFER_SIZE,
+	.periods_min =		USE_PERIODS_MIN,
+	.periods_max =		USE_PERIODS_MAX,
+	.fifo_size =		0,
 };
 
 static void snd_card_dummy_runtime_free(snd_pcm_runtime_t *runtime)
@@ -376,21 +376,21 @@ static int snd_card_dummy_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_card_dummy_playback_ops = {
-	open:			snd_card_dummy_playback_open,
-	close:			snd_card_dummy_playback_close,
-	ioctl:			snd_card_dummy_playback_ioctl,
-	prepare:		snd_card_dummy_playback_prepare,
-	trigger:		snd_card_dummy_playback_trigger,
-	pointer:		snd_card_dummy_playback_pointer,
+	.open =			snd_card_dummy_playback_open,
+	.close =		snd_card_dummy_playback_close,
+	.ioctl =		snd_card_dummy_playback_ioctl,
+	.prepare =		snd_card_dummy_playback_prepare,
+	.trigger =		snd_card_dummy_playback_trigger,
+	.pointer =		snd_card_dummy_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_card_dummy_capture_ops = {
-	open:			snd_card_dummy_capture_open,
-	close:			snd_card_dummy_capture_close,
-	ioctl:			snd_card_dummy_capture_ioctl,
-	prepare:		snd_card_dummy_capture_prepare,
-	trigger:		snd_card_dummy_capture_trigger,
-	pointer:		snd_card_dummy_capture_pointer,
+	.open =			snd_card_dummy_capture_open,
+	.close =		snd_card_dummy_capture_close,
+	.ioctl =		snd_card_dummy_capture_ioctl,
+	.prepare =		snd_card_dummy_capture_prepare,
+	.trigger =		snd_card_dummy_capture_trigger,
+	.pointer =		snd_card_dummy_capture_pointer,
 };
 
 static int __init snd_card_dummy_pcm(snd_card_dummy_t *dummy, int device, int substreams)
@@ -409,10 +409,10 @@ static int __init snd_card_dummy_pcm(snd_card_dummy_t *dummy, int device, int su
 }
 
 #define DUMMY_VOLUME(xname, xindex, addr) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_dummy_volume_info, \
-  get: snd_dummy_volume_get, put: snd_dummy_volume_put, \
-  private_value: addr }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_dummy_volume_info, \
+  .get = snd_dummy_volume_get, .put = snd_dummy_volume_put, \
+  .private_value = addr }
 
 static int snd_dummy_volume_info(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -446,7 +446,7 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	left = ucontrol->value.integer.value[0] % 101;
 	right = ucontrol->value.integer.value[1] % 101;
 	spin_lock_irqsave(&dummy->mixer_lock, flags);
-	change = dummy->mixer_volume[addr][0] != left &&
+	change = dummy->mixer_volume[addr][0] != left ||
 	         dummy->mixer_volume[addr][1] != right;
 	dummy->mixer_volume[addr][0] = left;
 	dummy->mixer_volume[addr][1] = right;
@@ -455,10 +455,10 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 }                                                                                                                                                                                                                                                                                                            
 
 #define DUMMY_CAPSRC(xname, xindex, addr) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_dummy_capsrc_info, \
-  get: snd_dummy_capsrc_get, put: snd_dummy_capsrc_put, \
-  private_value: addr }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_dummy_capsrc_info, \
+  .get = snd_dummy_capsrc_get, .put = snd_dummy_capsrc_put, \
+  .private_value = addr }
 
 static int snd_dummy_capsrc_info(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {

@@ -93,7 +93,7 @@
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/init.h>
 #include <linux/ip.h>	/* for iph */
 #include <linux/in.h>	/* for IPPROTO_... */
@@ -411,7 +411,7 @@ struct ns83820 {
 	struct tasklet_struct	rx_tasklet;
 
 	unsigned		ihr;
-	struct tq_struct	tq_refill;
+	struct work_struct	tq_refill;
 
 	/* protects everything below.  irqsave when using. */
 	spinlock_t		misc_lock;
@@ -784,7 +784,7 @@ static void ns83820_rx_kick(struct ns83820 *dev)
 	}
 
 	if (dev->rx_info.up && nr_rx_empty(dev) > NR_RX_DESC*3/4)
-		schedule_task(&dev->tq_refill);
+		schedule_work(&dev->tq_refill);
 	else
 		kick_rx(dev);
 	if (dev->rx_info.idle)
@@ -1438,7 +1438,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	dev->ee.lock = &dev->misc_lock;
 	dev->net_dev.owner = THIS_MODULE;
 
-	PREPARE_TQUEUE(&dev->tq_refill, queue_refill, dev);
+	INIT_WORK(&dev->tq_refill, queue_refill, dev);
 	tasklet_init(&dev->rx_tasklet, rx_action, (unsigned long)dev);
 
 	err = pci_enable_device(pci_dev);

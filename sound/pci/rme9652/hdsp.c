@@ -1022,16 +1022,16 @@ static int snd_hdsp_midi_output_close(snd_rawmidi_substream_t * substream)
 
 snd_rawmidi_ops_t snd_hdsp_midi_output =
 {
-	open:		snd_hdsp_midi_output_open,
-	close:		snd_hdsp_midi_output_close,
-	trigger:	snd_hdsp_midi_output_trigger,
+	.open =		snd_hdsp_midi_output_open,
+	.close =	snd_hdsp_midi_output_close,
+	.trigger =	snd_hdsp_midi_output_trigger,
 };
 
 snd_rawmidi_ops_t snd_hdsp_midi_input =
 {
-	open:		snd_hdsp_midi_input_open,
-	close:		snd_hdsp_midi_input_close,
-	trigger:	snd_hdsp_midi_input_trigger,
+	.open =		snd_hdsp_midi_input_open,
+	.close =	snd_hdsp_midi_input_close,
+	.trigger =	snd_hdsp_midi_input_trigger,
 };
 
 static int __devinit snd_hdsp_create_midi (snd_card_t *card, hdsp_t *hdsp, int id)
@@ -1166,9 +1166,9 @@ static int snd_hdsp_control_spdif_mask_get(snd_kcontrol_t * kcontrol, snd_ctl_el
 }
 
 #define HDSP_SPDIF_IN(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_spdif_in, \
-  get: snd_hdsp_get_spdif_in, put: snd_hdsp_put_spdif_in }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_spdif_in, \
+  .get = snd_hdsp_get_spdif_in, .put = snd_hdsp_put_spdif_in }
 
 static unsigned int hdsp_spdif_in(hdsp_t *hdsp)
 {
@@ -1226,9 +1226,9 @@ static int snd_hdsp_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define HDSP_SPDIF_OUT(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_spdif_out, \
-  get: snd_hdsp_get_spdif_out, put: snd_hdsp_put_spdif_out }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_spdif_out, \
+  .get = snd_hdsp_get_spdif_out, .put = snd_hdsp_put_spdif_out }
 
 static int hdsp_spdif_out(hdsp_t *hdsp)
 {
@@ -1284,9 +1284,9 @@ static int snd_hdsp_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define HDSP_SYNC_PREF(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_sync_pref, \
-  get: snd_hdsp_get_sync_pref, put: snd_hdsp_put_sync_pref }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_sync_pref, \
+  .get = snd_hdsp_get_sync_pref, .put = snd_hdsp_put_sync_pref }
 
 static int hdsp_sync_pref(hdsp_t *hdsp)
 {
@@ -1399,10 +1399,10 @@ static int snd_hdsp_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define HDSP_PASSTHRU(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_passthru, \
-  put: snd_hdsp_put_passthru, \
-  get: snd_hdsp_get_passthru }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_passthru, \
+  .put = snd_hdsp_put_passthru, \
+  .get = snd_hdsp_get_passthru }
 
 static int snd_hdsp_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1445,9 +1445,9 @@ static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define HDSP_LINE_OUT(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_line_out, \
-  get: snd_hdsp_get_line_out, put: snd_hdsp_put_line_out }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_line_out, \
+  .get = snd_hdsp_get_line_out, .put = snd_hdsp_put_line_out }
 
 static int hdsp_line_out(hdsp_t *hdsp)
 {
@@ -1503,9 +1503,9 @@ static int snd_hdsp_put_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define HDSP_MIXER(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_hdsp_info_mixer, \
-  get: snd_hdsp_get_mixer, put: snd_hdsp_put_mixer }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_hdsp_info_mixer, \
+  .get = snd_hdsp_get_mixer, .put = snd_hdsp_put_mixer }
 
 static int snd_hdsp_info_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1577,11 +1577,11 @@ static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 */
 
 #define HDSP_PLAYBACK_MIXER \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE | \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE | \
 		 SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_playback_mixer, \
-  get: snd_hdsp_get_playback_mixer, put: snd_hdsp_put_playback_mixer }
+  .info = snd_hdsp_info_playback_mixer, \
+  .get = snd_hdsp_get_playback_mixer, .put = snd_hdsp_put_playback_mixer }
 
 static int snd_hdsp_info_playback_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1634,10 +1634,10 @@ static int snd_hdsp_put_playback_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 }
 
 #define HDSP_PEAK_PLAYBACK \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_peak_playback, \
-  get: snd_hdsp_get_peak_playback \
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_hdsp_info_peak_playback, \
+  .get = snd_hdsp_get_peak_playback \
 }
 
 static int snd_hdsp_info_peak_playback(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1657,10 +1657,10 @@ static int snd_hdsp_get_peak_playback(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 }
 
 #define HDSP_PEAK_INPUT \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_peak_input, \
-  get: snd_hdsp_get_peak_input \
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_hdsp_info_peak_input, \
+  .get = snd_hdsp_get_peak_input \
 }
 
 static int snd_hdsp_info_peak_input(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1680,10 +1680,10 @@ static int snd_hdsp_get_peak_input(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 }
 
 #define HDSP_PEAK_OUTPUT \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_peak_output, \
-  get: snd_hdsp_get_peak_output \
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_hdsp_info_peak_output, \
+  .get = snd_hdsp_get_peak_output \
 }
 
 static int snd_hdsp_info_peak_output(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1703,10 +1703,10 @@ static int snd_hdsp_get_peak_output(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 #define HDSP_RMS_INPUT \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_rms_input, \
-  get: snd_hdsp_get_rms_input \
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_hdsp_info_rms_input, \
+  .get = snd_hdsp_get_rms_input \
 }
 
 static int snd_hdsp_info_rms_input(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1724,10 +1724,10 @@ static int snd_hdsp_get_rms_input(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define HDSP_RMS_PLAYBACK \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_hdsp_info_rms_playback, \
-  get: snd_hdsp_get_rms_playback \
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_hdsp_info_rms_playback, \
+  .get = snd_hdsp_get_rms_playback \
 }
 
 static int snd_hdsp_info_rms_playback(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1746,37 +1746,37 @@ static int snd_hdsp_get_rms_playback(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static snd_kcontrol_new_t snd_hdsp_controls[] = {
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_hdsp_control_spdif_info,
-	get:		snd_hdsp_control_spdif_get,
-	put:		snd_hdsp_control_spdif_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_hdsp_control_spdif_info,
+	.get =		snd_hdsp_control_spdif_get,
+	.put =		snd_hdsp_control_spdif_put,
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_hdsp_control_spdif_stream_info,
-	get:		snd_hdsp_control_spdif_stream_get,
-	put:		snd_hdsp_control_spdif_stream_put,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_hdsp_control_spdif_stream_info,
+	.get =		snd_hdsp_control_spdif_stream_get,
+	.put =		snd_hdsp_control_spdif_stream_put,
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	info:		snd_hdsp_control_spdif_mask_info,
-	get:		snd_hdsp_control_spdif_mask_get,
-	private_value:	IEC958_AES0_NONAUDIO |
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_hdsp_control_spdif_mask_info,
+	.get =		snd_hdsp_control_spdif_mask_get,
+	.private_value = IEC958_AES0_NONAUDIO |
 			IEC958_AES0_PROFESSIONAL |
 			IEC958_AES0_CON_EMPHASIS,	                                                                                      
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
-	info:		snd_hdsp_control_spdif_mask_info,
-	get:		snd_hdsp_control_spdif_mask_get,
-	private_value:	IEC958_AES0_NONAUDIO |
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
+	.info =		snd_hdsp_control_spdif_mask_info,
+	.get =		snd_hdsp_control_spdif_mask_get,
+	.private_value = IEC958_AES0_NONAUDIO |
 			IEC958_AES0_PROFESSIONAL |
 			IEC958_AES0_PRO_EMPHASIS,
 },
@@ -2546,53 +2546,53 @@ static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 
 static snd_pcm_hardware_t snd_hdsp_playback_subinfo =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_NONINTERLEAVED |
 				 SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_DOUBLE),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			(SNDRV_PCM_RATE_32000 |
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		(SNDRV_PCM_RATE_32000 |
 				 SNDRV_PCM_RATE_44100 | 
 				 SNDRV_PCM_RATE_48000 | 
 				 SNDRV_PCM_RATE_64000 | 
 				 SNDRV_PCM_RATE_88200 | 
 				 SNDRV_PCM_RATE_96000),
-	rate_min:		32000,
-	rate_max:		96000,
-	channels_min:		10,
-	channels_max:		HDSP_MAX_CHANNELS,
-	buffer_bytes_max:	1024*1024,
-	period_bytes_min:	1,
-	period_bytes_max:	1024*1024,
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.rate_min =		32000,
+	.rate_max =		96000,
+	.channels_min =		10,
+	.channels_max =		HDSP_MAX_CHANNELS,
+	.buffer_bytes_max =	1024*1024,
+	.period_bytes_min =	1,
+	.period_bytes_max =	1024*1024,
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_hdsp_capture_subinfo =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_NONINTERLEAVED |
 				 SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			(SNDRV_PCM_RATE_32000 |
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		(SNDRV_PCM_RATE_32000 |
 				 SNDRV_PCM_RATE_44100 | 
 				 SNDRV_PCM_RATE_48000 | 
 				 SNDRV_PCM_RATE_64000 | 
 				 SNDRV_PCM_RATE_88200 | 
 				 SNDRV_PCM_RATE_96000),
-	rate_min:		32000,
-	rate_max:		96000,
-	channels_min:		10,
-	channels_max:		HDSP_MAX_CHANNELS,
-	buffer_bytes_max:	1024*1024,
-	period_bytes_min:	1,
-	period_bytes_max:	1024*1024,
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.rate_min =		32000,
+	.rate_max =		96000,
+	.channels_min =		10,
+	.channels_max =		HDSP_MAX_CHANNELS,
+	.buffer_bytes_max =	1024*1024,
+	.period_bytes_min =	1,
+	.period_bytes_max =	1024*1024,
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -2600,9 +2600,9 @@ static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192
 #define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
-	count: PERIOD_SIZES,
-	list: period_sizes,
-	mask: 0
+	.count = PERIOD_SIZES,
+	.list = period_sizes,
+	.mask = 0
 };
 
 static int snd_hdsp_hw_rule_channels(snd_pcm_hw_params_t *params,
@@ -2785,26 +2785,26 @@ static int snd_hdsp_capture_release(snd_pcm_substream_t *substream)
 }
 
 static snd_pcm_ops_t snd_hdsp_playback_ops = {
-	open:		snd_hdsp_playback_open,
-	close:		snd_hdsp_playback_release,
-	ioctl:		snd_hdsp_ioctl,
-	hw_params:	snd_hdsp_hw_params,
-	prepare:	snd_hdsp_prepare,
-	trigger:	snd_hdsp_trigger,
-	pointer:	snd_hdsp_hw_pointer,
-	copy:		snd_hdsp_playback_copy,
-	silence:	snd_hdsp_hw_silence,
+	.open =		snd_hdsp_playback_open,
+	.close =	snd_hdsp_playback_release,
+	.ioctl =	snd_hdsp_ioctl,
+	.hw_params =	snd_hdsp_hw_params,
+	.prepare =	snd_hdsp_prepare,
+	.trigger =	snd_hdsp_trigger,
+	.pointer =	snd_hdsp_hw_pointer,
+	.copy =		snd_hdsp_playback_copy,
+	.silence =	snd_hdsp_hw_silence,
 };
 
 static snd_pcm_ops_t snd_hdsp_capture_ops = {
-	open:		snd_hdsp_capture_open,
-	close:		snd_hdsp_capture_release,
-	ioctl:		snd_hdsp_ioctl,
-	hw_params:	snd_hdsp_hw_params,
-	prepare:	snd_hdsp_prepare,
-	trigger:	snd_hdsp_trigger,
-	pointer:	snd_hdsp_hw_pointer,
-	copy:		snd_hdsp_capture_copy,
+	.open =		snd_hdsp_capture_open,
+	.close =	snd_hdsp_capture_release,
+	.ioctl =	snd_hdsp_ioctl,
+	.hw_params =	snd_hdsp_hw_params,
+	.prepare =	snd_hdsp_prepare,
+	.trigger =	snd_hdsp_trigger,
+	.pointer =	snd_hdsp_hw_pointer,
+	.copy =		snd_hdsp_capture_copy,
 };
 
 static int __devinit snd_hdsp_create_pcm(snd_card_t *card,
@@ -3115,10 +3115,10 @@ static void __devexit snd_hdsp_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name:"RME Hammerfall DSP",
-	id_table:snd_hdsp_ids,
-	probe:snd_hdsp_probe,
-	remove:__devexit_p(snd_hdsp_remove),
+	.name = "RME Hammerfall DSP",
+	.id_table = snd_hdsp_ids,
+	.probe = snd_hdsp_probe,
+	.remove = __devexit_p(snd_hdsp_remove),
 };
 
 static int __init alsa_card_hdsp_init(void)

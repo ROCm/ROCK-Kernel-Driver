@@ -161,7 +161,7 @@ static struct timer_list battery_timer;
 
 static int num_cards = 0;
 
-static struct gendisk mm_gendisk[MM_MAXCARDS];
+static struct gendisk *mm_gendisk[MM_MAXCARDS];
 
 static void check_batteries(struct cardinfo *card);
 
@@ -813,7 +813,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	set_capacity(mm_gendisk + card_number, cards[card_number].mm_size << 1);
+	set_capacity(mm_gendisk[card_number], cards[card_number].mm_size << 1);
 	return 0;
 }
 /*
@@ -1186,11 +1186,17 @@ int __init mm_init(void)
 		printk(KERN_ERR "MM: Could not register block device\n");
 		return -EIO;
 	}
+
+	for (i = 0; i < num_cards; i++) {
+		mm_gendisk[i] = alloc_disk();
+		if (!mm_gendisk[i])
+			goto out;
+	}
 	devfs_handle = devfs_mk_dir(NULL, "umem", NULL);
 
 	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	for (i = 0; i < num_cards; i++) {
-		struct gendisk *disk = mm_gendisk + i;
+		struct gendisk *disk = mm_gendisk[i];
 		sprintf(disk->disk_name, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
@@ -1205,6 +1211,12 @@ int __init mm_init(void)
 	printk("MM: desc_per_page = %ld\n", DESC_PER_PAGE);
 /* printk("mm_init: Done. 10-19-01 9:00\n"); */
 	return 0;
+
+out:
+	unregister_blkdev(MAJOR_NR, "umem");
+	while (i--)
+		put_disk(mm_gendisk[i]);
+	return -ENOMEM;
 }
 /*
 -----------------------------------------------------------------------------------
@@ -1217,8 +1229,10 @@ void __exit mm_cleanup(void)
 
 	del_battery_timer();
 
-	for (i=0; i < num_cards ; i++)
-		del_gendisk(mm_gendisk + i);
+	for (i=0; i < num_cards ; i++) {
+		del_gendisk(mm_gendisk[i]);
+		put_disk(mm_gendisk[i]);
+	}
 	if (devfs_handle)
 		devfs_unregister(devfs_handle);
 	devfs_handle = NULL;

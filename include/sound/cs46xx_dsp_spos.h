@@ -109,6 +109,7 @@ typedef struct _dsp_scb_descriptor_t {
 
 	snd_info_entry_t *proc_info;
 	int ref_count;
+	spinlock_t lock;
 
 	int deleted;
 } dsp_scb_descriptor_t;
@@ -141,8 +142,6 @@ typedef struct _dsp_spos_instance_t {
 	segment_desc_t code;
 
 	/* PCM playback */
-	struct semaphore pcm_mutex;
-
 	dsp_scb_descriptor_t * master_mix_scb;
 	int npcm_channels;
 	int nsrc_scb;
@@ -162,7 +161,6 @@ typedef struct _dsp_spos_instance_t {
 	snd_info_entry_t * proc_sample_dump_info_entry;
 
 	/* SCB's descriptors */
-	struct semaphore scb_mutex;
 	int nscb;
 	int scb_highest_frag_index;
 	dsp_scb_descriptor_t scbs[DSP_MAX_SCB_DESC];
@@ -177,6 +175,27 @@ typedef struct _dsp_spos_instance_t {
 	/* SPDIF status */
 	int spdif_status_out;
 	int spdif_status_in;
+	u32 spdif_input_volume;
+
+	/* SPDIF input sample rate converter */
+	dsp_scb_descriptor_t * spdif_in_src;
+	/* SPDIF input asynch. receiver */
+	dsp_scb_descriptor_t * asynch_rx_scb;
+
+	/* Capture record mixer SCB */
+	dsp_scb_descriptor_t * record_mixer_scb;
+    
+	/* CODEC input SCB */
+	dsp_scb_descriptor_t * codec_in_scb;
+
+	/* reference snooper */
+	dsp_scb_descriptor_t * ref_snoop_scb;
+
+	/* record sources */
+	dsp_scb_descriptor_t * pcm_input;
+	dsp_scb_descriptor_t * adc_input;
+
+	int spdif_in_sample_rate;
 } dsp_spos_instance_t;
 
 #endif /* __DSP_SPOS_H__ */

@@ -1867,19 +1867,9 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 {
 	struct sock *sk = sock->sk;
 	int err;
-	int pid;
 
 	switch(cmd) 
 	{
-		case FIOSETOWN:
-		case SIOCSPGRP:
-			err = get_user(pid, (int *) arg);
-			if (err)
-				return err; 
-			return f_setown(sock->file, pid, 1);
-		case FIOGETOWN:
-		case SIOCGPGRP:
-			return put_user(sock->file->f_owner.pid, (int *)arg);
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;
@@ -1979,14 +1969,6 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 #endif
 
 		default:
-			if ((cmd >= SIOCDEVPRIVATE) &&
-			    (cmd <= (SIOCDEVPRIVATE + 15)))
-				return(dev_ioctl(cmd,(void *) arg));
-
-#ifdef CONFIG_NET_RADIO
-			if((cmd >= SIOCIWFIRST) && (cmd <= SIOCIWLAST))
-				return(dev_ioctl(cmd,(void *) arg));
-#endif
 			return -EOPNOTSUPP;
 	}
 	/*NOTREACHED*/

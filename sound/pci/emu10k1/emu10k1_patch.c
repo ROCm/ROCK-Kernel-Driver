@@ -22,7 +22,6 @@
  * chip specific here.  Just the actual writing to the board.
  */
 
-#define __NO_VERSION__
 #include "emu10k1_synth_local.h"
 
 /*

@@ -9,7 +9,7 @@
 #include <linux/smp.h>
 #include <linux/config.h>
 #include <linux/irq.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 
 #include <asm/processor.h> 
@@ -306,15 +306,13 @@ static void do_mce_timer(void *data)
 	add_timer (&mce_timer);
 } 
 
-static struct tq_struct mce_task = { 
-	.routine = do_mce_timer	
-};
+static DECLARE_WORK(mce_work, do_mce_timer, NULL);
 
 static void mce_timerfunc (unsigned long data)
 {
 #ifdef CONFIG_SMP
 	if (num_online_cpus() > 1) { 
-		schedule_task(&mce_task); 
+		schedule_work(&mce_work); 
 		return;
 	}
 #endif

@@ -21,6 +21,7 @@
 #include <asm/semaphore.h>
 
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/debug.h>
 
@@ -146,7 +147,7 @@ static debug_info_t *debug_area_first = NULL;
 static debug_info_t *debug_area_last = NULL;
 DECLARE_MUTEX(debug_lock);
 
-static int initialized = 0;
+static int initialized;
 
 static struct file_operations debug_file_ops = {
 	read:    debug_output,
@@ -591,7 +592,7 @@ debug_info_t *debug_register
 
 	MOD_INC_USE_COUNT;
 	if (!initialized)
-		debug_init();
+		BUG();
 	down(&debug_lock);
 
         /* create new debug_info */
@@ -828,18 +829,16 @@ debug_entry_t *debug_sprintf_exception(debug_info_t* id,
  * - is called exactly once to initialize the debug feature
  */
 
-int debug_init(void)
+static int __init debug_init(void)
 {
 	int rc = 0;
 
 	down(&debug_lock);
-	if (!initialized) {
 #ifdef CONFIG_PROC_FS
-		debug_proc_root_entry = proc_mkdir(DEBUG_DIR_ROOT, NULL);
+	debug_proc_root_entry = proc_mkdir(DEBUG_DIR_ROOT, NULL);
 #endif /* CONFIG_PROC_FS */
-		printk(KERN_INFO "debug: Initialization complete\n");
-		initialized = 1;
-	}
+	printk(KERN_INFO "debug: Initialization complete\n");
+	initialized = 1;
 	up(&debug_lock);
 
 	return rc;
@@ -1173,27 +1172,9 @@ out:
 }
 
 /*
- * init_module:
+ * clean up module
  */
-
-#ifdef MODULE
-int init_module(void)
-{
-	int rc = 0;
-#ifdef DEBUG
-	printk("debug_module_init: \n");
-#endif
-	rc = debug_init();
-	if (rc) 
-		printk(KERN_INFO "debug: an error occurred with debug_init\n");
-	return rc;
-}
-
-/*
- * cleanup_module:
- */
-
-void cleanup_module(void)
+void __exit debug_exit(void)
 {
 #ifdef DEBUG
 	printk("debug_cleanup_module: \n");
@@ -1204,7 +1185,12 @@ void cleanup_module(void)
 	return;
 }
 
-#endif			/* MODULE */
+/*
+ * module definitions
+ */
+core_initcall(debug_init);
+module_exit(debug_exit);
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(debug_register);
 EXPORT_SYMBOL(debug_unregister); 

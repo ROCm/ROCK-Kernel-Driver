@@ -80,7 +80,7 @@ struct zorro_dev *zorro_find_device(zorro_id id, struct zorro_dev *from)
      *  FIXME: use the normal resource management
      */
 
-bitmap_member(zorro_unused_z2ram, 128);
+DECLARE_BITMAP(zorro_unused_z2ram, 128);
 
 
 static void __init mark_region(unsigned long start, unsigned long end,

@@ -820,11 +820,6 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 	return -ENOIOCTLCMD;
 }
 
-void snd_rawmidi_receive_reset(snd_rawmidi_substream_t * substream)
-{
-	/* TODO: reset current state */
-}
-
 int snd_rawmidi_receive(snd_rawmidi_substream_t * substream, const unsigned char *buffer, int count)
 {
 	unsigned long flags;
@@ -967,11 +962,6 @@ static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff
 		count -= count1;
 	}
 	return result;
-}
-
-void snd_rawmidi_transmit_reset(snd_rawmidi_substream_t * substream)
-{
-	/* TODO: reset current state */
 }
 
 int snd_rawmidi_transmit_empty(snd_rawmidi_substream_t * substream)
@@ -1280,20 +1270,20 @@ static void snd_rawmidi_proc_info_read(snd_info_entry_t *entry,
 static struct file_operations snd_rawmidi_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_rawmidi_read,
-	write:		snd_rawmidi_write,
-	open:		snd_rawmidi_open,
-	release:	snd_rawmidi_release,
-	poll:		snd_rawmidi_poll,
-	ioctl:		snd_rawmidi_ioctl,
+	.read =		snd_rawmidi_read,
+	.write =	snd_rawmidi_write,
+	.open =		snd_rawmidi_open,
+	.release =	snd_rawmidi_release,
+	.poll =		snd_rawmidi_poll,
+	.ioctl =	snd_rawmidi_ioctl,
 };
 
 static snd_minor_t snd_rawmidi_reg =
 {
-	comment:	"raw midi",
-	f_ops:		&snd_rawmidi_f_ops,
+	.comment =	"raw midi",
+	.f_ops =	&snd_rawmidi_f_ops,
 };
 
 static int snd_rawmidi_alloc_substreams(snd_rawmidi_t *rmidi,
@@ -1326,9 +1316,9 @@ int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 	snd_rawmidi_t *rmidi;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_rawmidi_dev_free,
-		dev_register:	snd_rawmidi_dev_register,
-		dev_unregister:	snd_rawmidi_dev_unregister
+		.dev_free = snd_rawmidi_dev_free,
+		.dev_register = snd_rawmidi_dev_register,
+		.dev_unregister = snd_rawmidi_dev_unregister
 	};
 
 	snd_assert(rrawmidi != NULL, return -EINVAL);
@@ -1564,9 +1554,7 @@ EXPORT_SYMBOL(snd_rawmidi_input_params);
 EXPORT_SYMBOL(snd_rawmidi_drop_output);
 EXPORT_SYMBOL(snd_rawmidi_drain_output);
 EXPORT_SYMBOL(snd_rawmidi_drain_input);
-EXPORT_SYMBOL(snd_rawmidi_receive_reset);
 EXPORT_SYMBOL(snd_rawmidi_receive);
-EXPORT_SYMBOL(snd_rawmidi_transmit_reset);
 EXPORT_SYMBOL(snd_rawmidi_transmit_empty);
 EXPORT_SYMBOL(snd_rawmidi_transmit_peek);
 EXPORT_SYMBOL(snd_rawmidi_transmit_ack);

@@ -76,6 +76,7 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
+#include <linux/workqueue.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../scsi/sd.h"
@@ -244,7 +245,7 @@ static struct proc_dir_entry proc_mpt_scsihost =
  */
 static spinlock_t mytaskQ_lock = SPIN_LOCK_UNLOCKED;
 static int mytaskQ_bh_active = 0;
-static struct tq_struct	mptscsih_ptaskfoo;
+static struct work_struct	mptscsih_ptaskfoo;
 static atomic_t	mpt_taskQdepth;
 #endif
 
@@ -255,7 +256,7 @@ static atomic_t	mpt_taskQdepth;
 static spinlock_t dvtaskQ_lock = SPIN_LOCK_UNLOCKED;
 static int dvtaskQ_active = 0;
 static int dvtaskQ_release = 0;
-static struct tq_struct	mptscsih_dvTask;
+static struct work_struct	mptscsih_dvTask;
 #endif
 
 /*
@@ -2019,10 +2020,7 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 					if (!dvtaskQ_active) {
 						dvtaskQ_active = 1;
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
-						mptscsih_dvTask.sync = 0;
-						mptscsih_dvTask.routine = mptscsih_domainValidation;
-						mptscsih_dvTask.data = (void *) hd;
-
+						INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd);
 						SCHEDULE_TASK(&mptscsih_dvTask);
 					} else {
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
@@ -3048,7 +3046,7 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 {
 	MPT_SCSI_HOST		*hd;
 	MPT_FRAME_HDR		*mf;
-	struct tq_struct	*ptaskfoo;
+	struct work_struct	*ptaskfoo;
 	unsigned long		 flags;
 	int			 scpnt_idx;
 
@@ -3156,7 +3154,7 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 		 *  Oh how cute, no alloc/free/mgmt needed if we use
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
-		ptaskfoo = (struct tq_struct *) &mptscsih_ptaskfoo;
+		ptaskfoo = (struct work_struct *) &mptscsih_ptaskfoo;
 		ptaskfoo->sync = 0;
 		ptaskfoo->routine = mptscsih_taskmgmt_bh;
 		ptaskfoo->data = SCpnt;
@@ -3184,7 +3182,7 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 {
 	MPT_SCSI_HOST		*hd;
 	MPT_FRAME_HDR		*mf;
-	struct tq_struct	*ptaskfoo;
+	struct work_struct	*ptaskfoo;
 	unsigned long		 flags;
 	int			 scpnt_idx;
 
@@ -3286,7 +3284,7 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 		 *  Oh how cute, no alloc/free/mgmt needed if we use
 		 *  (bottom/unused portion of) MPT request frame.
 		 */
-		ptaskfoo = (struct tq_struct *) &mptscsih_ptaskfoo;
+		ptaskfoo = (struct work_struct *) &mptscsih_ptaskfoo;
 		ptaskfoo->sync = 0;
 		ptaskfoo->routine = mptscsih_taskmgmt_bh;
 		ptaskfoo->data = SCpnt;

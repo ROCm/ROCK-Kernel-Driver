@@ -111,14 +111,14 @@ static const struct isapnp_card_id *snd_wavefront_isapnp_id[SNDRV_CARDS] = SNDRV
 static struct isapnp_card_id snd_wavefront_pnpids[] __devinitdata = {
 	{
 		ISAPNP_CARD_ID('C','S','C',0x7532),	/* Tropez */
-		devs: { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
+		.devs = { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
 			ISAPNP_DEVICE_ID('C','S','C',0x0010),	/* CTRL */
 			ISAPNP_DEVICE_ID('P','n','P',0xb006),	/* MPU */
 			ISAPNP_DEVICE_ID('C','S','C',000004), }, /* SYNTH */
 	},
 	{
 		ISAPNP_CARD_ID('C','S','C',0x7632),	/* Tropez+ */
-		devs: { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
+		.devs = { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
 			ISAPNP_DEVICE_ID('C','S','C',0x0010),	/* CTRL */
 			ISAPNP_DEVICE_ID('P','n','P',0xb006),	/* MPU */
 			ISAPNP_DEVICE_ID('C','S','C',000004), }, /* SYNTH */
@@ -495,6 +495,7 @@ snd_wavefront_probe (int dev)
 	}
 	acard = (snd_wavefront_card_t *)card->private_data;
 	acard->wavefront.irq = -1;
+	spin_lock_init(&acard->wavefront.irq_lock);
 	init_waitqueue_head(&acard->wavefront.interrupt_sleeper);
 	spin_lock_init(&acard->wavefront.midi.open);
 	spin_lock_init(&acard->wavefront.midi.virtual);

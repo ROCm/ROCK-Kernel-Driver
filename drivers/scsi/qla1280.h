@@ -1234,7 +1234,7 @@ struct scsi_qla_host {
 	struct scsi_lu *dev[MAX_EQ];	/* Logical unit queues */
 
 	/* bottom half run queue */
-	struct tq_struct run_qla_bh;
+	struct work_struct run_qla_bh;
 
 	/* Received ISP mailbox data. */
 	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];

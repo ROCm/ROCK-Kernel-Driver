@@ -131,7 +131,7 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/fd.h>
 #include <linux/fd1772.h>
 #include <linux/errno.h>
@@ -203,7 +203,7 @@ static struct archy_disk_type {
  */
 #define MAX_DISK_SIZE 720
 
-static struct gendisk disks[FD_MAX_UNIT];
+static struct gendisk *disks[FD_MAX_UNIT];
 
 /* current info on each unit */
 static struct archy_floppy_struct {
@@ -324,8 +324,7 @@ static unsigned long changed_floppies = 0xff, fake_change = 0;
 
 static void fd1772_checkint(void);
 
-struct tq_struct fd1772_tq = 
-{ 0,0, (void *)fd1772_checkint, 0 };
+DECLARE_WORK(fd1772_tq, (void *)fd1772_checkint, NULL);
 /*
  * The driver is trying to determine the correct media format
  * while Probing is set. fd_rwsec_done() clears it after a
@@ -962,7 +961,7 @@ static void fd_rwsec_done(int status)
 			if (unit[SelectedDrive].disktype > disk_type) {
 				/* try another disk type */
 				unit[SelectedDrive].disktype--;
-				set_capacity(&disks[SelectedDrive],
+				set_capacity(disks[SelectedDrive],
 				    unit[SelectedDrive].disktype->blocks);
 			} else
 				Probing = 0;
@@ -970,7 +969,7 @@ static void fd_rwsec_done(int status)
 			/* record not found, but not probing. Maybe stretch wrong ? Restart probing */
 			if (unit[SelectedDrive].autoprobe) {
 				unit[SelectedDrive].disktype = disk_type + NUM_DISK_TYPES - 1;
-				set_capacity(&disks[SelectedDrive],
+				set_capacity(disks[SelectedDrive],
 				    unit[SelectedDrive].disktype->blocks);
 				Probing = 1;
 			}
@@ -1243,7 +1242,7 @@ repeat:
 		if (!floppy->disktype) {
 			Probing = 1;
 			floppy->disktype = disk_type + NUM_DISK_TYPES - 1;
-			set_capacity(&disks[drive], floppy->disktype->blocks);
+			set_capacity(disks[drive], floppy->disktype->blocks);
 			floppy->autoprobe = 1;
 		}
 	} else {
@@ -1255,7 +1254,7 @@ repeat:
 			goto repeat;
 		}
 		floppy->disktype = &disk_type[type];
-		set_capacity(&disks[drive], floppy->disktype->blocks);
+		set_capacity(disks[drive], floppy->disktype->blocks);
 		floppy->autoprobe = 0;
 	}
 
@@ -1288,8 +1287,7 @@ static void fd1772_checkint(void)
 		floppy_irqconsequencehandler();
 	if ((MultReadInProgress) && (fdc1772_bytestogo==0)) fd_readtrack_check(0);
 	if (fdc_busy) {
-		queue_task(&fd1772_tq,&tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&fd1772_tq);
 	}
 }
 
@@ -1311,8 +1309,7 @@ static void do_fd_request(request_queue_t* q)
 
 	redo_fd_request();
 
-	queue_task(&fd1772_tq,&tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&fd1772_tq);
 }
 
 
@@ -1543,7 +1540,7 @@ static struct gendisk *floppy_find(int minor)
 	int drive = minor & 3;
 	if ((minor>> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
-	return &disks[drive];
+	return disks[drive];
 }
 
 int fd1772_init(void)
@@ -1553,20 +1550,28 @@ int fd1772_init(void)
 	if (!machine_is_archimedes())
 		return 0;
 
+	for (i = 0; i < FD_MAX_UNITS; i++) {
+		disks[i] = alloc_disk();
+		if (!disks[i])
+			goto out;
+	}
+
 	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
 		printk("Unable to get major %d for floppy\n", MAJOR_NR);
-		return 1;
+		goto out;
 	}
 
 	if (request_dma(FLOPPY_DMA, "fd1772")) {
 		printk("Unable to grab DMA%d for the floppy (1772) driver\n", FLOPPY_DMA);
-		return 1;
+		unregister_blkdev(MAJOR_NR, "fd");
+		goto out;
 	};
 
 	if (request_dma(FIQ_FD1772, "fd1772 end")) {
 		printk("Unable to grab DMA%d for the floppy (1772) driver\n", FIQ_FD1772);
+		unregister_blkdev(MAJOR_NR, "fd");
 		free_dma(FLOPPY_DMA);
-		return 1;
+		goto out;
 	};
 	enable_dma(FIQ_FD1772);	/* This inserts a call to our command end routine */
 
@@ -1585,18 +1590,22 @@ int fd1772_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
-		disks[i].major = MAJOR_NR;
-		disks[i].first_minor = 0;
-		disks[i].fops = &floppy_fops;
-		sprintf(disks[i].disk_name, "fd%d", i);
-		set_capacity(&disks[i], MAX_DISK_SIZE * 2);
+		disks[i]->major = MAJOR_NR;
+		disks[i]->first_minor = 0;
+		disks[i]->fops = &floppy_fops;
+		sprintf(disks[i]->disk_name, "fd%d", i);
+		set_capacity(disks[i], MAX_DISK_SIZE * 2);
 	}
 	blk_set_probe(MAJOR_NR, floppy_find);
 
 	for (i = 0; i < FD_MAX_UNITS; i++)
-		add_disk(disks + i);
+		add_disk(disks[i]);
 
 	config_types();
 
 	return 0;
+out:
+	while (i--)
+		put_disk(disks[i]);
+	return 1;
 }

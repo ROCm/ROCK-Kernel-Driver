@@ -653,5 +653,5 @@ _stext:	basr  %r13,0                    # get base
 .Lstart:    .long  start_kernel
 .Lbss_bgn:  .long  __bss_start
 .Lbss_end:  .long  _end
-.Laregs:    .long  0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
+.Laregs:    .long  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 

@@ -147,10 +147,12 @@ static void destroy_inode(struct inode *inode)
 	if (inode_has_buffers(inode))
 		BUG();
 	security_ops->inode_free_security(inode);
-	if (inode->i_sb->s_op->destroy_inode)
+	if (inode->i_sb->s_op->destroy_inode) {
 		inode->i_sb->s_op->destroy_inode(inode);
-	else
+	} else {
+		BUG_ON(inode->i_data.page_tree.rnode != NULL);
 		kmem_cache_free(inode_cachep, (inode));
+	}
 }
 
 

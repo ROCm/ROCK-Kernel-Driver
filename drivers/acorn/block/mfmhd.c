@@ -880,19 +880,7 @@ static void mfm_rerequest(void)
 	mfm_request();
 }
 
-static struct gendisk mfm_gendisk[2] = {
-{
-	.major		= MAJOR_NR,
-	.first_minor	= 0,
-	.disk_name	= "mfma",
-	.minor_shift	= 6,
-},
-{
-	.major		= MAJOR_NR,
-	.first_minor	= 64,
-	.disk_name	= "mfmb",
-	.minor_shift	= 6,
-};
+static struct gendisk *mfm_gendisk[2];
 
 static void mfm_request(void)
 {
@@ -908,6 +896,7 @@ static void mfm_request(void)
 
 	while (1) {
 		unsigned int dev, block, nsect, unit;
+		struct gendisk *disk;
 
 		DBG("mfm_request: loop start\n");
 		sti();
@@ -930,14 +919,13 @@ static void mfm_request(void)
 #ifdef DEBUG
 		/*if (unit==1) */ console_printf("mfm_request:                                raw vals: dev=%d (block=512 bytes) block=%d nblocks=%d\n", dev, block, nsect);
 #endif
-		if (unit >= mfm_drives ||
-		    block >= get_capacity(mfm_gendisk + unit) ||
-		    ((block+nsect) > get_capacity(mfm_gendisk + unit))) {
-			if (unit >= mfm_drives)
-				printk("mfm: bad minor number: device=%s\n", kdevname(CURRENT->rq_dev));
-			else
-				printk("mfm%c: bad access: block=%d, count=%d, nr_sects=%ld\n", unit+'a',
-				       block, nsect, get_capacity(mfm_gendisk+unit));
+		if (unit >= mfm_drives)
+			printk("mfm: bad disk number: %d\n", unit);
+		disk = mfm_gendisk[unit];
+		if (block >= get_capacity(disk) ||
+		    block+nsect > get_capacity(disk)) {
+			printk("%s: bad access: block=%d, count=%d, nr_sects=%ld\n",
+			       disk->disk_name, block, nsect, get_capacity(disk));
 			printk("mfm: continue 1\n");
 			end_request(CURRENT, 0);
 			Busy = 0;
@@ -1017,7 +1005,7 @@ static void mfm_interrupt_handler(int unused, void *dev_id, struct pt_regs *regs
 static void mfm_geometry(int drive)
 {
 	struct mfm_info *p = mfm_info + drive;
-	struct gendisk *disk = mfm_gendisk + drive;
+	struct gendisk *disk = mfm_gendisk[drive];
 	if (p->cylinders)
 		printk ("%s: %dMB CHS=%d/%d/%d LCC=%d RECOMP=%d\n",
 			disk->disk_name,
@@ -1255,26 +1243,6 @@ static struct block_device_operations mfm_fops =
 	.ioctl		= mfm_ioctl,
 };
 
-static void mfm_geninit (void)
-{
-	int i;
-
-	mfm_drives = mfm_initdrives();
-
-	printk("mfm: detected %d hard drive%s\n", mfm_drives,
-				mfm_drives == 1 ? "" : "s");
-	if (request_irq(mfm_irq, mfm_interrupt_handler, SA_INTERRUPT, "MFM harddisk", NULL))
-		printk("mfm: unable to get IRQ%d\n", mfm_irq);
-
-	if (mfm_irqenable)
-		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
-
-	for (i = 0; i < mfm_drives; i++) {
-		mfm_geometry(i);
-		add_disk(mfm_gendisk + i);
-	}
-}
-
 static struct expansion_card *ecs;
 
 /*
@@ -1317,9 +1285,10 @@ static int mfm_probecontroller (unsigned int mfm_addr)
  *
  * The HDC is accessed at MEDIUM IOC speeds.
  */
-int mfm_init (void)
+static int __init mfm_init (void)
 {
 	unsigned char irqmask;
+	int i;
 
 	if (mfm_probecontroller(ONBOARD_MFM_ADDRESS)) {
 		mfm_addr	= ONBOARD_MFM_ADDRESS;
@@ -1344,16 +1313,12 @@ int mfm_init (void)
 	}
 
 	printk("mfm: found at address %08X, interrupt %d\n", mfm_addr, mfm_irq);
-	if (!request_region (mfm_addr, 10, "mfm")) {
-		ecard_release(ecs);
-		return -1;
-	}
+	if (!request_region (mfm_addr, 10, "mfm"))
+		goto out1;
 
 	if (register_blkdev(MAJOR_NR, "mfm", &mfm_fops)) {
 		printk("mfm_init: unable to get major number %d\n", MAJOR_NR);
-		ecard_release(ecs);
-		release_region(mfm_addr, 10);
-		return -1;
+		goto out2;
 	}
 
 	/* Stuff for the assembler routines to get to */
@@ -1366,31 +1331,73 @@ int mfm_init (void)
 	Busy = 0;
 	lastspecifieddrive = -1;
 
-	mfm_geninit();
+	mfm_drives = mfm_initdrives();
+	if (!mfm_drives)
+		goto out3;
+	
+	for (i = 0; i < mfm_drives; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto Enomem;
+		disk->major = MAJOR_NR;
+		disk->first_minor = i << 6;
+		disk->minor_shift = 6;
+		disk->fops = &mfm_fops;
+		sprintf(disk->disk_name, "mfm%c", 'a'+i);
+		mfm_gendisk[i] = disk;
+	}
+
+	printk("mfm: detected %d hard drive%s\n", mfm_drives,
+				mfm_drives == 1 ? "" : "s");
+	if (request_irq(mfm_irq, mfm_interrupt_handler, SA_INTERRUPT, "MFM harddisk", NULL)) {
+		printk("mfm: unable to get IRQ%d\n", mfm_irq);
+		goto out4;
+	}
+
+	if (mfm_irqenable)
+		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
+
+	for (i = 0; i < mfm_drives; i++) {
+		mfm_geometry(i);
+		add_disk(mfm_gendisk[i]);
+	}
 	return 0;
+
+out4:
+	for (i = 0; i < mfm_drives; i++)
+		put_disk(mfm_gendisk[i]);
+out3:
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	unregister_blkdev(MAJOR_NR, "mfm");
+out2:
+	release_region(mfm_addr, 10);
+out1:
+	ecard_release(ecs);
+	return -1;
+Enomem:
+	while (i--)
+		put_disk(mfm_gendisk[i]);
+	goto out3;
 }
 
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	return mfm_init();
-}
-
-void cleanup_module(void)
+static void __exit mfm_exit(void)
 {
 	int i;
 	if (ecs && mfm_irqenable)
 		outw (0, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 	free_irq(mfm_irq, NULL);
+	for (i = 0; i < mfm_drives; i++) {
+		del_gendisk(mfm_gendisk[i]);
+		put_disk(mfm_gendisk[i]);
+	}
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	unregister_blkdev(MAJOR_NR, "mfm");
-	for (i = 0; i < mfm_drives; i++)
-		del_gendisk(mfm_gendisk + i);
 	if (ecs)
 		ecard_release(ecs);
 	if (mfm_addr)
 		release_region(mfm_addr, 10);
 }
-#endif
+
+module_init(mfm_init)
+module_exit(mfm_exit)
+MODULE_LICENSE("GPL");

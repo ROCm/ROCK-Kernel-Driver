@@ -243,7 +243,7 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
@@ -437,7 +437,7 @@ struct digi_port {
 	wait_queue_head_t dp_flush_wait;
 	int dp_in_close;			/* close in progress */
 	wait_queue_head_t dp_close_wait;	/* wait queue for close */
-	struct tq_struct dp_wakeup_task;
+	struct work_struct dp_wakeup_work;
 };
 
 
@@ -1416,7 +1416,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 
 	/* also queue up a wakeup at scheduler time, in case we */
 	/* lost the race in write_chan(). */
-	schedule_task(&priv->dp_wakeup_task);
+	schedule_work(&priv->dp_wakeup_work);
 
 	spin_unlock( &priv->dp_port_lock );
 
@@ -1714,10 +1714,8 @@ dbg( "digi_startup: TOP" );
 		init_waitqueue_head( &priv->dp_flush_wait );
 		priv->dp_in_close = 0;
 		init_waitqueue_head( &priv->dp_close_wait );
-		INIT_LIST_HEAD(&priv->dp_wakeup_task.list);
-		priv->dp_wakeup_task.sync = 0;
-		priv->dp_wakeup_task.routine = (void *)digi_wakeup_write_lock;
-		priv->dp_wakeup_task.data = (void *)(&serial->port[i]);
+		INIT_WORK(&priv->dp_wakeup_work, (void *)digi_wakeup_write_lock,
+				(void *)(&serial->port[i]));
 
 		/* initialize write wait queue for this port */
 		init_waitqueue_head( &serial->port[i].write_wait );

@@ -648,6 +648,21 @@ CONFIG_INTEL_RNG
 
   If unsure, say N.
 
+CONFIG_AMD_RNG
+  This driver provides kernel-side support for the Random Number
+  Generator hardware found on AMD 76x based motherboards.
+
+  Both a character driver, used to read() entropy data, and a timer
+  function which automatically adds entropy directly into the
+  kernel pool, are exported by this driver.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  i810_rng.o.
+
+  If unsure, say N.
+
 CONFIG_WATCHDOG
   If you say Y here (and to one of the following options) and create a
   character special file /dev/watchdog with major number 10 and minor
@@ -802,6 +817,12 @@ CONFIG_MIXCOMWD
   The module is called mixcomwd.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.  Most
   people will say N.
+
+CONFIG_SCx200_WDT
+  Enable the built-in watchdog timer support on the National 
+  Semiconductor SCx200 processors.
+
+  If compiled as a module, it will be called scx200_watchdog.o.
 
 CONFIG_MACHZ_WDT
   If you are using a ZF Micro MachZ processor, say Y here, otherwise
@@ -1005,4 +1026,10 @@ CONFIG_RAW_DRIVER
   The raw driver permits block devices to be bound to /dev/raw/rawN. 
   Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
   See the raw(8) manpage for more details.
+
+CONFIG_SCx200_GPIO
+  Give userspace access to the GPIO pins on the National
+  Semiconductor SCx200 processors.
+
+  If compiled as a module, it will be called scx200_gpio.o.
 

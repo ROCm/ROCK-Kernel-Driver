@@ -150,7 +150,7 @@ static int print_unex=1;
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #define FDPATCHES
 #include <linux/fdreg.h>
 
@@ -415,8 +415,7 @@ static struct floppy_drive_params drive_params[N_DRIVE];
 static struct floppy_drive_struct drive_state[N_DRIVE];
 static struct floppy_write_errors write_errors[N_DRIVE];
 static struct timer_list motor_off_timer[N_DRIVE];
-static struct gendisk disks[N_DRIVE];
-static char names[N_DRIVE][4];
+static struct gendisk *disks[N_DRIVE];
 static struct floppy_raw_cmd *raw_cmd, default_raw_cmd;
 
 /*
@@ -1004,12 +1003,12 @@ static void empty(void)
 {
 }
 
-static struct tq_struct floppy_tq;
+static DECLARE_WORK(floppy_work, NULL, NULL);
 
 static void schedule_bh( void (*handler)(void*) )
 {
-	floppy_tq.routine = (void *)(void *) handler;
-	schedule_task(&floppy_tq);
+	PREPARE_WORK(&floppy_work, handler, NULL);
+	schedule_work(&floppy_work);
 }
 
 static struct timer_list fd_timer;
@@ -1017,7 +1016,7 @@ static struct timer_list fd_timer;
 static void cancel_activity(void)
 {
 	do_floppy = NULL;
-	floppy_tq.routine = (void *)(void *) empty;
+	PREPARE_WORK(&floppy_work, (void*)(void*)empty, NULL);
 	del_timer(&fd_timer);
 }
 
@@ -1886,8 +1885,8 @@ static void show_floppy(void)
 	printk("fdc_busy=%lu\n", fdc_busy);
 	if (do_floppy)
 		printk("do_floppy=%p\n", do_floppy);
-	if (floppy_tq.sync)
-		printk("floppy_tq.routine=%p\n", floppy_tq.routine);
+	if (floppy_work.pending)
+		printk("floppy_work.func=%p\n", floppy_work.func);
 	if (timer_pending(&fd_timer))
 		printk("fd_timer.function=%p\n", fd_timer.function);
 	if (timer_pending(&fd_timeout)){
@@ -3772,7 +3771,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	}
 
 	UDRS->fd_device = minor(inode->i_rdev);
-	set_capacity(&disks[drive], floppy_sizes[minor(inode->i_rdev)]);
+	set_capacity(disks[drive], floppy_sizes[minor(inode->i_rdev)]);
 	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
@@ -3952,7 +3951,7 @@ static int floppy_revalidate(kdev_t dev)
 			process_fd_request();
 		}
 	}
-	set_capacity(&disks[drive], floppy_sizes[minor(dev)]);
+	set_capacity(disks[drive], floppy_sizes[minor(dev)]);
 	return res;
 }
 
@@ -4230,26 +4229,34 @@ static struct gendisk *floppy_find(int minor)
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
 		return NULL;
-	return &disks[drive];
+	return disks[drive];
 }
 
 int __init floppy_init(void)
 {
 	int i,unit,drive;
+	int err;
 
 	raw_cmd = NULL;
+
+	for (i=0; i<N_DRIVE; i++) {
+		disks[i] = alloc_disk();
+		if (!disks[i])
+			goto Enomem;
+	}
 
 	devfs_handle = devfs_mk_dir (NULL, "floppy", NULL);
 	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
 		printk("Unable to get major %d for floppy\n",MAJOR_NR);
-		return -EBUSY;
+		err = -EBUSY;
+		goto out;
 	}
 
 	for (i=0; i<N_DRIVE; i++) {
-		disks[i].major = MAJOR_NR;
-		disks[i].first_minor = TOMINOR(i);
-		disks[i].fops = &floppy_fops;
-		sprintf(disks[i].disk_name, "fd%d", i);
+		disks[i]->major = MAJOR_NR;
+		disks[i]->first_minor = TOMINOR(i);
+		disks[i]->fops = &floppy_fops;
+		sprintf(disks[i]->disk_name, "fd%d", i);
 	}
 
 	blk_set_probe(MAJOR_NR, floppy_find);
@@ -4281,11 +4288,8 @@ int __init floppy_init(void)
 	use_virtual_dma = can_use_virtual_dma & 1;
 	fdc_state[0].address = FDC1;
 	if (fdc_state[0].address == -1) {
-		unregister_blkdev(MAJOR_NR,"fd");
-		del_timer(&fd_timeout);
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		blk_set_probe(MAJOR_NR, NULL);
-		return -ENODEV;
+		err = -ENODEV;
+		goto out1;
 	}
 #if N_FDC > 1
 	fdc_state[1].address = FDC2;
@@ -4293,11 +4297,8 @@ int __init floppy_init(void)
 
 	fdc = 0; /* reset fdc in case of unexpected interrupt */
 	if (floppy_grab_irq_and_dma()){
-		del_timer(&fd_timeout);
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		unregister_blkdev(MAJOR_NR,"fd");
-		blk_set_probe(MAJOR_NR, NULL);
-		return -EBUSY;
+		err = -EBUSY;
+		goto out1;
 	}
 
 	/* initialise drive state */
@@ -4352,15 +4353,13 @@ int __init floppy_init(void)
 	current_drive = 0;
 	floppy_release_irq_and_dma();
 	initialising=0;
-	if (have_no_fdc) 
-	{
+	if (have_no_fdc) {
 		DPRINT("no floppy controllers found\n");
-		flush_scheduled_tasks();
+		flush_scheduled_work();
 		if (usage_count)
 			floppy_release_irq_and_dma();
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		unregister_blkdev(MAJOR_NR,"fd");
-		blk_set_probe(MAJOR_NR, NULL);
+		err = have_no_fdc;
+		goto out2;
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
@@ -4370,12 +4369,27 @@ int __init floppy_init(void)
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
-		add_disk(disks + drive);
+		add_disk(disks[drive]);
 	}
 
 	platform_device_register(&floppy_device);
+	return 0;
 
-	return have_no_fdc;
+out1:
+	del_timer(&fd_timeout);
+out2:
+	unregister_blkdev(MAJOR_NR,"fd");
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_set_probe(MAJOR_NR, NULL);
+out:
+	for (i=0; i<N_DRIVE; i++)
+		put_disk(disks[i]);
+	return err;
+
+Enomem:
+	while (i--)
+		put_disk(disks[i]);
+	return -ENOMEM;
 }
 
 static spinlock_t floppy_usage_lock = SPIN_LOCK_UNLOCKED;
@@ -4511,8 +4525,8 @@ static void floppy_release_irq_and_dma(void)
 		printk("floppy timer still active:%s\n", timeout_message);
 	if (timer_pending(&fd_timer))
 		printk("auxiliary floppy timer still active\n");
-	if (floppy_tq.sync)
-		printk("task queue still active\n");
+	if (floppy_work.pending)
+		printk("work still pending\n");
 #endif
 	old_fdc = fdc;
 	for (fdc = 0; fdc < N_FDC; fdc++)
@@ -4564,7 +4578,8 @@ void cleanup_module(void)
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if ((allowed_drive_mask & (1 << drive)) &&
 		    fdc_state[FDC(drive)].version != FDC_NONE)
-			del_gendisk(disks + drive);
+			del_gendisk(disks[drive]);
+		put_disk(disks[drive]);
 	}
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));

@@ -573,18 +573,6 @@ __syscall_return(type,__res); \
  */
 #define __NR__exit __NR_exit
 
-extern long sys_pause(void);
-static inline long pause(void)
-{
-	return sys_pause();
-}
-
-extern long sys_sync(void);
-static inline long sync(void)
-{
-	return sys_sync();
-}
-
 extern pid_t sys_setsid(void);
 static inline pid_t setsid(void)
 {
@@ -636,23 +624,12 @@ extern inline long exit(int error_code)
 	sys_exit(error_code);
 }
 
-extern long sys_delete_module(const char *);
-static inline long delete_module(const char *name_user)
-{
-	return sys_delete_module(name_user);
-}
-
 struct rusage; 
 asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, 
 			int options, struct rusage * ru);
 static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 {
 	return sys_wait4(pid, wait_stat, flags, NULL);
-}
-
-static inline pid_t wait(int * wait_stat)
-{
-	return waitpid(-1,wait_stat,0);
 }
 
 #endif /* __KERNEL_SYSCALLS__ */

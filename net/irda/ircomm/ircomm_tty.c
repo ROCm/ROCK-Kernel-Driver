@@ -420,8 +420,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		self->flow = FLOW_STOP;
 
 		self->line = line;
-		self->tqueue.routine = ircomm_tty_do_softint;
-		self->tqueue.data = self;
+		INIT_WORK(&self->tqueue, ircomm_tty_do_softint, self);
 		self->max_header_size = IRCOMM_TTY_HDR_UNITIALISED;
 		self->max_data_size = 64-self->max_header_size;
 		self->close_delay = 5*HZ/10;
@@ -632,8 +631,7 @@ static void ircomm_tty_flush_buffer(struct tty_struct *tty)
 	 * Let do_softint() do this to avoid race condition with 
 	 * do_softint() ;-) 
 	 */
-	queue_task(&self->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&self->tqueue);
 }
 
 /*
@@ -806,8 +804,7 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 	 * its 256 byte tx buffer). We will then defragment and send out
 	 * all this data as one single packet.  
 	 */
-	queue_task(&self->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&self->tqueue);
 	
 	return len;
 }
@@ -1132,8 +1129,7 @@ void ircomm_tty_check_modem_status(struct ircomm_tty_cb *self)
 				/* Wake up processes blocked on open */
 				wake_up_interruptible(&self->open_wait);
 
-				queue_task(&self->tqueue, &tq_immediate);
-				mark_bh(IMMEDIATE_BH);
+				schedule_work(&self->tqueue);
 				return;
 			}
 		} else {
@@ -1246,8 +1242,7 @@ static void ircomm_tty_flow_indication(void *instance, void *sap,
 		tty->hw_stopped = 0;
 
 		/* ircomm_tty_do_softint will take care of the rest */
-		queue_task(&self->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&self->tqueue);
 		break;
 	default:  /* If we get here, something is very wrong, better stop */
 	case FLOW_STOP:

@@ -62,7 +62,7 @@ typedef struct act2000_fwid {
 
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/skbuff.h>
 #include <linux/errno.h>
@@ -162,9 +162,9 @@ typedef struct act2000_card {
 	__u16 need_b3ack;                /* Flag: Need ACK for current skb   */
 	struct sk_buff *sbuf;            /* skb which is currently sent      */
 	struct timer_list ptimer;        /* Poll timer                       */
-	struct tq_struct snd_tq;         /* Task struct for xmit bh          */
-	struct tq_struct rcv_tq;         /* Task struct for rcv bh           */
-	struct tq_struct poll_tq;        /* Task struct for polled rcv bh    */
+	struct work_struct snd_tq;         /* Task struct for xmit bh          */
+	struct work_struct rcv_tq;         /* Task struct for rcv bh           */
+	struct work_struct poll_tq;        /* Task struct for polled rcv bh    */
 	msn_entry *msn_list;
 	unsigned short msgnum;           /* Message number fur sending       */
 	act2000_chan bch[ACT2000_BCH];   /* B-Channel status/control         */
@@ -179,20 +179,17 @@ typedef struct act2000_card {
 
 extern __inline__ void act2000_schedule_tx(act2000_card *card)
 {
-        queue_task(&card->snd_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->snd_tq);
 }
 
 extern __inline__ void act2000_schedule_rx(act2000_card *card)
 {
-        queue_task(&card->rcv_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->rcv_tq);
 }
 
 extern __inline__ void act2000_schedule_poll(act2000_card *card)
 {
-        queue_task(&card->poll_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+        schedule_work(&card->poll_tq);
 }
 
 extern char *act2000_find_eaz(act2000_card *, char);

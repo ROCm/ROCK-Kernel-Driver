@@ -175,8 +175,7 @@ hysdn_tx_cfgline(hysdn_card * card, uchar * line, word chan)
 	card->async_busy = 1;	/* request transfer */
 
 	/* now queue the task */
-	queue_task(&card->irq_queue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&card->irq_queue);
 	sti();
 
 	if (card->debug_flags & LOG_SCHED_ASYN)

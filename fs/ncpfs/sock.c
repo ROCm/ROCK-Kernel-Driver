@@ -86,14 +86,14 @@ void ncp_tcp_data_ready(struct sock *sk, int len) {
 	struct ncp_server *server = sk->user_data;
 
 	server->data_ready(sk, len);
-	schedule_task(&server->rcv.tq);
+	schedule_work(&server->rcv.tq);
 }
 
 void ncp_tcp_error_report(struct sock *sk) {
 	struct ncp_server *server = sk->user_data;
 	
 	server->error_report(sk);
-	schedule_task(&server->rcv.tq);
+	schedule_work(&server->rcv.tq);
 }
 
 void ncp_tcp_write_space(struct sock *sk) {
@@ -103,14 +103,14 @@ void ncp_tcp_write_space(struct sock *sk) {
 	   not vice versa... */
 	server->write_space(sk);
 	if (server->tx.creq) {
-		schedule_task(&server->tx.tq);
+		schedule_work(&server->tx.tq);
 	}
 }
 
 void ncpdgram_timeout_call(unsigned long v) {
 	struct ncp_server *server = (void*)v;
 	
-	schedule_task(&server->timeout_tq);
+	schedule_work(&server->timeout_tq);
 }
 
 static inline void ncp_finish_request(struct ncp_request_reply *req, int result) {

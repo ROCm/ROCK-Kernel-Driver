@@ -32,7 +32,7 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/in.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -999,17 +999,17 @@ struct airo_info {
 	tdsRssiEntry *rssi;
 	struct semaphore sem;
 	struct task_struct *task;
-	struct tq_struct promisc_task;
+	struct work_struct promisc_task;
 	struct {
 		struct sk_buff *skb;
 		int fid;
-		struct tq_struct task;
+		struct work_struct task;
 	} xmit, xmit11;
 	struct net_device *wifidev;
 #ifdef WIRELESS_EXT
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
-	struct tq_struct	event_task;
+	struct work_struct	event_task;
 #ifdef WIRELESS_SPY
 	int			spy_number;
 	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
@@ -1019,7 +1019,7 @@ struct airo_info {
 	/* MIC stuff */
 	mic_module		mod[2];
 	mic_statistics		micstats;
-	struct tq_struct 	mic_task;
+	struct work_struct 	mic_task;
 };
 
 static inline int bap_read(struct airo_info *ai, u16 *pu16Dst, int bytelen,
@@ -1316,9 +1316,9 @@ static void airo_do_xmit(struct net_device *dev) {
 
 	if (down_trylock(&priv->sem) != 0) {
 		netif_stop_queue(dev);
-		priv->xmit.task.routine = (void (*)(void *))airo_do_xmit;
+		priv->xmit.task.func = (void (*)(void *))airo_do_xmit;
 		priv->xmit.task.data = (void *)dev;
-		schedule_task(&priv->xmit.task);
+		schedule_work(&priv->xmit.task);
 		return;
 	}
 	status = transmit_802_3_packet (priv, fids[fid], skb->data);
@@ -1378,9 +1378,9 @@ static void airo_do_xmit11(struct net_device *dev) {
 
 	if (down_trylock(&priv->sem) != 0) {
 		netif_stop_queue(dev);
-		priv->xmit11.task.routine = (void (*)(void *))airo_do_xmit11;
+		priv->xmit11.task.func = (void (*)(void *))airo_do_xmit11;
 		priv->xmit11.task.data = (void *)dev;
-		schedule_task(&priv->xmit11.task);
+		schedule_work(&priv->xmit11.task);
 		return;
 	}
 	status = transmit_802_11_packet (priv, fids[fid], skb->data);
@@ -1464,9 +1464,9 @@ static void airo_end_promisc(struct airo_info *ai) {
 		completecommand(ai, &rsp);
 		up(&ai->sem);
 	} else {
-		ai->promisc_task.routine = (void (*)(void *))airo_end_promisc;
+		ai->promisc_task.func = (void (*)(void *))airo_end_promisc;
 		ai->promisc_task.data = (void *)ai;
-		schedule_task(&ai->promisc_task);
+		schedule_work(&ai->promisc_task);
 	}
 }
 
@@ -1480,9 +1480,9 @@ static void airo_set_promisc(struct airo_info *ai) {
 		sendcommand(ai, &cmd);
 		airo_end_promisc(ai);
 	} else {
-		ai->promisc_task.routine = (void (*)(void *))airo_set_promisc;
+		ai->promisc_task.func = (void (*)(void *))airo_set_promisc;
 		ai->promisc_task.data = (void *)ai;
-		schedule_task(&ai->promisc_task);
+		schedule_work(&ai->promisc_task);
 	}
 }
 
@@ -1550,7 +1550,7 @@ static void del_airo_dev( struct net_device *dev );
 void stop_airo_card( struct net_device *dev, int freeres )
 {
 	struct airo_info *ai = dev->priv;
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 	if (ai->flash)
 		kfree(ai->flash);
 	if (ai->rssi)
@@ -1812,9 +1812,9 @@ static void airo_send_event(struct net_device *dev) {
 		/* Send event to user space */
 		wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
 	} else {
-		ai->event_task.routine = (void (*)(void *))airo_send_event;
+		ai->event_task.func = (void (*)(void *))airo_send_event;
 		ai->event_task.data = (void *)dev;
-		schedule_task(&ai->event_task);
+		schedule_work(&ai->event_task);
 	}
 }
 #endif
@@ -1831,9 +1831,9 @@ static void airo_read_mic(struct airo_info *ai) {
 		micinit (ai, &mic_rid);
 #endif
 	} else {
-		ai->mic_task.routine = (void (*)(void *))airo_read_mic;
+		ai->mic_task.func = (void (*)(void *))airo_read_mic;
 		ai->mic_task.data = (void *)ai;
-		schedule_task(&ai->mic_task);
+		schedule_work(&ai->mic_task);
 	}
 }
 

@@ -183,39 +183,30 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 			return task->prehandler(drive, task->rq);
 		return ide_started;
 	}
-	/* for dma commands we down set the handler */
-	if (blk_fs_request(task->rq) && drive->using_dma) {
-		if (rq_data_dir(task->rq) == READ) {
-			if (hwif->ide_dma_read(drive))
-				return ide_stopped;
-		} else {
+
+	if (!drive->using_dma)
+		return ide_stopped;
+
+	switch (taskfile->command) {
+		case WIN_WRITEDMA_ONCE:
+		case WIN_WRITEDMA:
+		case WIN_WRITEDMA_EXT:
 			if (hwif->ide_dma_write(drive))
 				return ide_stopped;
-		}
-	} else {
-		if (!drive->using_dma && (task->handler == NULL))
-			return ide_stopped;
-
-		switch(taskfile->command) {
-			case WIN_WRITEDMA_ONCE:
-			case WIN_WRITEDMA:
-			case WIN_WRITEDMA_EXT:
-				if (hwif->ide_dma_write(drive))
-					return ide_stopped;
-				break;
-			case WIN_READDMA_ONCE:
-			case WIN_READDMA:
-			case WIN_READDMA_EXT:
-			case WIN_IDENTIFY_DMA:
-				if (hwif->ide_dma_read(drive))
-					return ide_stopped;
-				break;
-			default:
-				if (task->handler == NULL)
-					return ide_stopped;
-		}
+			break;
+		case WIN_READDMA_ONCE:
+		case WIN_READDMA:
+		case WIN_READDMA_EXT:
+		case WIN_IDENTIFY_DMA:
+			if (hwif->ide_dma_read(drive))
+				return ide_stopped;
+			break;
+		default:
+			if (task->handler == NULL)
+				return ide_stopped;
 	}
-	return ide_started;
+
+	return ide_stopped;
 }
 
 EXPORT_SYMBOL(do_rw_taskfile);

@@ -42,7 +42,7 @@ static struct mtdblk_dev {
 	unsigned long cache_offset;
 	unsigned int cache_size;
 	enum { STATE_EMPTY, STATE_CLEAN, STATE_DIRTY } cache_state;
-	struct gendisk disk;
+	struct gendisk *disk;
 } *mtdblks[MAX_MTD_DEVICES];
 
 static spinlock_t mtdblks_lock;
@@ -263,6 +263,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	struct mtdblk_dev *mtdblk;
 	struct mtd_info *mtd;
 	int dev = minor(inode->i_rdev);
+	struct gendisk *disk;
 
 	DEBUG(MTD_DEBUG_LEVEL1,"mtdblock_open\n");
 
@@ -294,10 +295,9 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	spin_unlock(&mtdblks_lock);
 
 	mtdblk = kmalloc(sizeof(struct mtdblk_dev), GFP_KERNEL);
-	if (!mtdblk) {
-		put_mtd_device(mtd);
-		return -ENOMEM;
-	}
+	disk = alloc_disk();
+	if (!mtdblk || !disk)
+		goto Enomem;
 	memset(mtdblk, 0, sizeof(*mtdblk));
 	mtdblk->count = 1;
 	mtdblk->mtd = mtd;
@@ -308,17 +308,15 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	    mtdblk->mtd->erasesize) {
 		mtdblk->cache_size = mtdblk->mtd->erasesize;
 		mtdblk->cache_data = vmalloc(mtdblk->mtd->erasesize);
-		if (!mtdblk->cache_data) {
-			put_mtd_device(mtdblk->mtd);
-			kfree(mtdblk);
-			return -ENOMEM;
-		}
+		if (!mtdblk->cache_data)
+			goto Enomem;
 	}
-	mtdblk->disk.major = MAJOR_NR;
-	mtdblk->disk.first_minor = dev;
-	mtdblk->disk.minor_shift = 0;
-	mtdblk->disk.fops = &mtd_fops;
-	sprintf(mtdblk->disk.disk_name, "mtd%d", dev);
+	disk->major = MAJOR_NR;
+	disk->first_minor = dev;
+	disk->minor_shift = 0;
+	disk->fops = &mtd_fops;
+	sprintf(disk->disk_name, "mtd%d", dev);
+	mtdblk->disk = disk;
 
 	/* OK, we've created a new one. Add it to the list. */
 
@@ -331,19 +329,25 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		put_mtd_device(mtdblk->mtd);
 		vfree(mtdblk->cache_data);
 		kfree(mtdblk);
+		put_disk(disk);
 		return 0;
 	}
 
 	mtdblks[dev] = mtdblk;
-	set_capacity(&mtdblk->disk, mtdblk->mtd->size/512);
-	add_disk(&mtdblk->disk);
+	set_capacity(disk, mtdblk->mtd->size/512);
+	add_disk(disk);
 	set_device_ro (inode->i_rdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
-	
+
 	spin_unlock(&mtdblks_lock);
-	
+
 	DEBUG(MTD_DEBUG_LEVEL1, "ok\n");
 
 	return 0;
+Enomem:
+	put_mtd_device(mtd);
+	put_disk(disk);
+	kfree(mtdblk);
+	return -ENOMEM;
 }
 
 static release_t mtdblock_release(struct inode *inode, struct file *file)
@@ -367,7 +371,8 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 		/* It was the last usage. Free the device */
 		mtdblks[dev] = NULL;
 		spin_unlock(&mtdblks_lock);
-		del_gendisk(&mtdblk->disk);
+		del_gendisk(mtdblk->disk);
+		put_disk(mtdblk->disk);
 		if (mtdblk->mtd->sync)
 			mtdblk->mtd->sync(mtdblk->mtd);
 		put_mtd_device(mtdblk->mtd);

@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
@@ -532,16 +531,16 @@ static int snd_info_entry_mmap(struct file *file, struct vm_area_struct *vma)
 static struct file_operations snd_info_entry_operations =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	llseek:		snd_info_entry_llseek,
-	read:		snd_info_entry_read,
-	write:		snd_info_entry_write,
-	poll:		snd_info_entry_poll,
-	ioctl:		snd_info_entry_ioctl,
-	mmap:		snd_info_entry_mmap,
-	open:		snd_info_entry_open,
-	release:	snd_info_entry_release,
+	.llseek =	snd_info_entry_llseek,
+	.read =		snd_info_entry_read,
+	.write =	snd_info_entry_write,
+	.poll =		snd_info_entry_poll,
+	.ioctl =	snd_info_entry_ioctl,
+	.mmap =		snd_info_entry_mmap,
+	.open =		snd_info_entry_open,
+	.release =	snd_info_entry_release,
 };
 
 #ifdef LINUX_2_2
@@ -603,10 +602,10 @@ static struct file_operations snd_info_card_link_operations =
 struct inode_operations snd_info_card_link_inode_operations =
 {
 #ifdef LINUX_2_2
-	default_file_ops:	&snd_info_card_link_operations,
+	.default_file_ops =	&snd_info_card_link_operations,
 #endif
-	readlink:		snd_info_card_readlink,
-	follow_link:		snd_info_card_followlink,
+	.readlink =		snd_info_card_readlink,
+	.follow_link =		snd_info_card_followlink,
 };
 
 struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
@@ -961,7 +960,6 @@ void snd_info_free_device(snd_info_entry_t * entry)
 {
 #ifdef CONFIG_DEVFS_FS
 	char dname[32];
-	devfs_handle_t master;
 #endif
 
 	snd_runtime_check(entry, return);
@@ -971,12 +969,7 @@ void snd_info_free_device(snd_info_entry_t * entry)
 #ifdef CONFIG_DEVFS_FS
 	if (entry->p && strncmp(entry->name, "controlC", 8)) {
 		sprintf(dname, "snd/%s", entry->name);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-		master = devfs_find_handle(NULL, dname, strlen(dname), 0, 0, DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister(master);
-#else
 		devfs_find_and_unregister(NULL, dname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-#endif
 	}
 #endif
 	snd_info_free_entry(entry);

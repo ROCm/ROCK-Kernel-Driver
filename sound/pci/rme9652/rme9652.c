@@ -878,10 +878,10 @@ static int snd_rme9652_control_spdif_mask_get(snd_kcontrol_t * kcontrol, snd_ctl
 }
 
 #define RME9652_ADAT1_IN(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_adat1_in, \
-  get: snd_rme9652_get_adat1_in, \
-  put: snd_rme9652_put_adat1_in }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_adat1_in, \
+  .get = snd_rme9652_get_adat1_in, \
+  .put = snd_rme9652_put_adat1_in }
 
 static unsigned int rme9652_adat1_in(rme9652_t *rme9652)
 {
@@ -958,9 +958,9 @@ static int snd_rme9652_put_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 #define RME9652_SPDIF_IN(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_spdif_in, \
-  get: snd_rme9652_get_spdif_in, put: snd_rme9652_put_spdif_in }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_spdif_in, \
+  .get = snd_rme9652_get_spdif_in, .put = snd_rme9652_put_spdif_in }
 
 static unsigned int rme9652_spdif_in(rme9652_t *rme9652)
 {
@@ -1031,9 +1031,9 @@ static int snd_rme9652_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 #define RME9652_SPDIF_OUT(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_spdif_out, \
-  get: snd_rme9652_get_spdif_out, put: snd_rme9652_put_spdif_out }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_spdif_out, \
+  .get = snd_rme9652_get_spdif_out, .put = snd_rme9652_put_spdif_out }
 
 static int rme9652_spdif_out(rme9652_t *rme9652)
 {
@@ -1101,9 +1101,9 @@ static int snd_rme9652_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 }
 
 #define RME9652_SYNC_MODE(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_sync_mode, \
-  get: snd_rme9652_get_sync_mode, put: snd_rme9652_put_sync_mode }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_sync_mode, \
+  .get = snd_rme9652_get_sync_mode, .put = snd_rme9652_put_sync_mode }
 
 static int rme9652_sync_mode(rme9652_t *rme9652)
 {
@@ -1188,9 +1188,9 @@ static int snd_rme9652_put_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 }
 
 #define RME9652_SYNC_PREF(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_sync_pref, \
-  get: snd_rme9652_get_sync_pref, put: snd_rme9652_put_sync_pref }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_sync_pref, \
+  .get = snd_rme9652_get_sync_pref, .put = snd_rme9652_put_sync_pref }
 
 static int rme9652_sync_pref(rme9652_t *rme9652)
 {
@@ -1336,10 +1336,10 @@ static int snd_rme9652_put_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 }
 
 #define RME9652_PASSTHRU(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  info: snd_rme9652_info_passthru, \
-  put: snd_rme9652_put_passthru, \
-  get: snd_rme9652_get_passthru }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .info = snd_rme9652_info_passthru, \
+  .put = snd_rme9652_put_passthru, \
+  .get = snd_rme9652_get_passthru }
 
 static int snd_rme9652_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1384,10 +1384,10 @@ static int snd_rme9652_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 /* Read-only switches */
 
 #define RME9652_SPDIF_RATE(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_rme9652_info_spdif_rate, \
-  get: snd_rme9652_get_spdif_rate }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_rme9652_info_spdif_rate, \
+  .get = snd_rme9652_get_spdif_rate }
 
 static int snd_rme9652_info_spdif_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1410,10 +1410,10 @@ static int snd_rme9652_get_spdif_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 }
 
 #define RME9652_ADAT_SYNC(xname, xindex, xidx) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_rme9652_info_adat_sync, \
-  get: snd_rme9652_get_adat_sync, private_value: xidx }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_rme9652_info_adat_sync, \
+  .get = snd_rme9652_get_adat_sync, .private_value = xidx }
 
 static int snd_rme9652_info_adat_sync(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1446,10 +1446,10 @@ static int snd_rme9652_get_adat_sync(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 }
 
 #define RME9652_TC_VALID(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_PCM, name: xname, index: xindex, \
-  access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
-  info: snd_rme9652_info_tc_valid, \
-  get: snd_rme9652_get_tc_valid }
+{ .iface = SNDRV_CTL_ELEM_IFACE_PCM, .name = xname, .index = xindex, \
+  .access = SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE, \
+  .info = snd_rme9652_info_tc_valid, \
+  .get = snd_rme9652_get_tc_valid }
 
 static int snd_rme9652_info_tc_valid(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1530,37 +1530,37 @@ static int snd_rme9652_get_tc_value(void *private_data,
 
 static snd_kcontrol_new_t snd_rme9652_controls[] = {
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_rme9652_control_spdif_info,
-	get:		snd_rme9652_control_spdif_get,
-	put:		snd_rme9652_control_spdif_put,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_rme9652_control_spdif_info,
+	.get =		snd_rme9652_control_spdif_get,
+	.put =		snd_rme9652_control_spdif_put,
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_rme9652_control_spdif_stream_info,
-	get:		snd_rme9652_control_spdif_stream_get,
-	put:		snd_rme9652_control_spdif_stream_put,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_rme9652_control_spdif_stream_info,
+	.get =		snd_rme9652_control_spdif_stream_get,
+	.put =		snd_rme9652_control_spdif_stream_put,
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	info:		snd_rme9652_control_spdif_mask_info,
-	get:		snd_rme9652_control_spdif_mask_get,
-	private_value:	IEC958_AES0_NONAUDIO |
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_rme9652_control_spdif_mask_info,
+	.get =		snd_rme9652_control_spdif_mask_get,
+	.private_value = IEC958_AES0_NONAUDIO |
 			IEC958_AES0_PROFESSIONAL |
 			IEC958_AES0_CON_EMPHASIS,	                                                                                      
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
-	info:		snd_rme9652_control_spdif_mask_info,
-	get:		snd_rme9652_control_spdif_mask_get,
-	private_value:	IEC958_AES0_NONAUDIO |
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
+	.info =		snd_rme9652_control_spdif_mask_info,
+	.get =		snd_rme9652_control_spdif_mask_get,
+	.private_value = IEC958_AES0_NONAUDIO |
 			IEC958_AES0_PROFESSIONAL |
 			IEC958_AES0_PRO_EMPHASIS,
 },
@@ -1569,12 +1569,12 @@ RME9652_SPDIF_OUT("IEC958 Output also on ADAT1", 0),
 RME9652_SYNC_MODE("Sync Mode", 0),
 RME9652_SYNC_PREF("Preferred Sync Source", 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_PCM,
-	name: "Channels Thru",
-	index: 0,
-	info: snd_rme9652_info_thru,
-	get: snd_rme9652_get_thru,
-	put: snd_rme9652_put_thru,
+	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+	.name = "Channels Thru",
+	.index = 0,
+	.info = snd_rme9652_info_thru,
+	.get = snd_rme9652_get_thru,
+	.put = snd_rme9652_put_thru,
 },
 RME9652_SPDIF_RATE("IEC958 Sample Rate", 0),
 RME9652_ADAT_SYNC("ADAT1 Sync Check", 0, 0),
@@ -2265,49 +2265,49 @@ static int snd_rme9652_prepare(snd_pcm_substream_t *substream)
 
 static snd_pcm_hardware_t snd_rme9652_playback_subinfo =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_NONINTERLEAVED |
 				 SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_DOUBLE),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			(SNDRV_PCM_RATE_44100 | 
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		(SNDRV_PCM_RATE_44100 | 
 				 SNDRV_PCM_RATE_48000 | 
 				 SNDRV_PCM_RATE_88200 | 
 				 SNDRV_PCM_RATE_96000),
-	rate_min:		44100,
-	rate_max:		96000,
-	channels_min:		10,
-	channels_max:		26,
-	buffer_bytes_max:	1024*1024,
-	period_bytes_min:	1,
-	period_bytes_max:	1024*1024,
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.rate_min =		44100,
+	.rate_max =		96000,
+	.channels_min =		10,
+	.channels_max =		26,
+	.buffer_bytes_max =	1024*1024,
+	.period_bytes_min =	1,
+	.period_bytes_max =	1024*1024,
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_rme9652_capture_subinfo =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_NONINTERLEAVED |
 				 SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			(SNDRV_PCM_RATE_44100 | 
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =		(SNDRV_PCM_RATE_44100 | 
 				 SNDRV_PCM_RATE_48000 | 
 				 SNDRV_PCM_RATE_88200 | 
 				 SNDRV_PCM_RATE_96000),
-	rate_min:		44100,
-	rate_max:		96000,
-	channels_min:		10,
-	channels_max:		26,
-	buffer_bytes_max:	1024*1024,
-	period_bytes_min:	1,
-	period_bytes_max:	1024*1024,
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.rate_min =		44100,
+	.rate_max =		96000,
+	.channels_min =		10,
+	.channels_max =		26,
+	.buffer_bytes_max =	1024*1024,
+	.period_bytes_min =	1,
+	.period_bytes_max =	1024*1024,
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -2315,9 +2315,9 @@ static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192
 #define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
-	count: PERIOD_SIZES,
-	list: period_sizes,
-	mask: 0
+	.count = PERIOD_SIZES,
+	.list = period_sizes,
+	.mask = 0
 };
 
 static int snd_rme9652_hw_rule_channels(snd_pcm_hw_params_t *params,
@@ -2492,26 +2492,26 @@ static int snd_rme9652_capture_release(snd_pcm_substream_t *substream)
 }
 
 static snd_pcm_ops_t snd_rme9652_playback_ops = {
-	open:		snd_rme9652_playback_open,
-	close:		snd_rme9652_playback_release,
-	ioctl:		snd_rme9652_ioctl,
-	hw_params:	snd_rme9652_hw_params,
-	prepare:	snd_rme9652_prepare,
-	trigger:	snd_rme9652_trigger,
-	pointer:	snd_rme9652_hw_pointer,
-	copy:		snd_rme9652_playback_copy,
-	silence:	snd_rme9652_hw_silence,
+	.open =		snd_rme9652_playback_open,
+	.close =	snd_rme9652_playback_release,
+	.ioctl =	snd_rme9652_ioctl,
+	.hw_params =	snd_rme9652_hw_params,
+	.prepare =	snd_rme9652_prepare,
+	.trigger =	snd_rme9652_trigger,
+	.pointer =	snd_rme9652_hw_pointer,
+	.copy =		snd_rme9652_playback_copy,
+	.silence =	snd_rme9652_hw_silence,
 };
 
 static snd_pcm_ops_t snd_rme9652_capture_ops = {
-	open:		snd_rme9652_capture_open,
-	close:		snd_rme9652_capture_release,
-	ioctl:		snd_rme9652_ioctl,
-	hw_params:	snd_rme9652_hw_params,
-	prepare:	snd_rme9652_prepare,
-	trigger:	snd_rme9652_trigger,
-	pointer:	snd_rme9652_hw_pointer,
-	copy:		snd_rme9652_capture_copy,
+	.open =		snd_rme9652_capture_open,
+	.close =	snd_rme9652_capture_release,
+	.ioctl =	snd_rme9652_ioctl,
+	.hw_params =	snd_rme9652_hw_params,
+	.prepare =	snd_rme9652_prepare,
+	.trigger =	snd_rme9652_trigger,
+	.pointer =	snd_rme9652_hw_pointer,
+	.copy =		snd_rme9652_capture_copy,
 };
 
 static int __init snd_rme9652_create_pcm(snd_card_t *card,
@@ -2733,10 +2733,10 @@ static void __devexit snd_rme9652_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name:"RME Digi9652 (Hammerfall)",
-	id_table:snd_rme9652_ids,
-	probe:snd_rme9652_probe,
-	remove:__devexit_p(snd_rme9652_remove),
+	.name ="RME Digi9652 (Hammerfall)",
+	.id_table = snd_rme9652_ids,
+	.probe = snd_rme9652_probe,
+	.remove = __devexit_p(snd_rme9652_remove),
 };
 
 static int __init alsa_card_hammerfall_init(void)

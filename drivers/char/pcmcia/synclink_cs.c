@@ -68,7 +68,7 @@
 #include <asm/bitops.h>
 #include <asm/types.h>
 #include <linux/termios.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -195,7 +195,7 @@ typedef struct _mgslpc_info {
 	unsigned char  pim_value;
 
 	spinlock_t lock;
-	struct tq_struct task;		/* task structure for scheduling bh */
+	struct work_struct task;		/* task structure for scheduling bh */
 
 	u32 max_frame_size;
 
@@ -562,9 +562,7 @@ static dev_link_t *mgslpc_attach(void)
 
     memset(info, 0, sizeof(MGSLPC_INFO));
     info->magic = MGSLPC_MAGIC;
-    info->task.sync = 0;
-    info->task.routine = bh_handler;
-    info->task.data    = info;
+    INIT_WORK(&info->task, bh_handler, info);
     info->max_frame_size = 4096;
     info->close_delay = 5*HZ/10;
     info->closing_wait = 30*HZ;
@@ -1460,8 +1458,7 @@ static void mgslpc_isr(int irq, void *dev_id, struct pt_regs * regs)
 		if ( debug_level >= DEBUG_LEVEL_ISR )	
 			printk("%s(%d):%s queueing bh task.\n",
 				__FILE__,__LINE__,info->device_name);
-		queue_task(&info->task, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&info->task);
 		info->bh_requested = 1;
 	}
 

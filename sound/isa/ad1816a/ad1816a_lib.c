@@ -334,41 +334,41 @@ static void snd_ad1816a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 
 static snd_pcm_hardware_t snd_ad1816a_playback = {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		55200,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		55200,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ad1816a_capture = {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		55200,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		55200,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_ad1816a_timer_close(snd_timer_t *timer)
@@ -425,14 +425,14 @@ static int snd_ad1816a_timer_stop(snd_timer_t *timer)
 }
 
 static struct _snd_timer_hardware snd_ad1816a_timer_table = {
-	flags:		SNDRV_TIMER_HW_AUTO,
-	resolution:	10000,
-	ticks:		65535,
-	open:		snd_ad1816a_timer_open,
-	close:		snd_ad1816a_timer_close,
-	c_resolution:	snd_ad1816a_timer_resolution,
-	start:		snd_ad1816a_timer_start,
-	stop:		snd_ad1816a_timer_stop,
+	.flags =	SNDRV_TIMER_HW_AUTO,
+	.resolution =	10000,
+	.ticks =	65535,
+	.open =		snd_ad1816a_timer_open,
+	.close =	snd_ad1816a_timer_close,
+	.c_resolution =	snd_ad1816a_timer_resolution,
+	.start =	snd_ad1816a_timer_start,
+	.stop =		snd_ad1816a_timer_stop,
 };
 
 
@@ -575,7 +575,7 @@ int snd_ad1816a_create(snd_card_t *card,
 		       ad1816a_t **rchip)
 {
         static snd_device_ops_t ops = {
-		dev_free:       snd_ad1816a_dev_free,
+		.dev_free =	snd_ad1816a_dev_free,
 	};
 	int error;
 	ad1816a_t *chip;
@@ -631,25 +631,25 @@ int snd_ad1816a_create(snd_card_t *card,
 }
 
 static snd_pcm_ops_t snd_ad1816a_playback_ops = {
-	open:		snd_ad1816a_playback_open,
-	close:		snd_ad1816a_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ad1816a_hw_params,
-	hw_free:	snd_ad1816a_hw_free,
-	prepare:	snd_ad1816a_playback_prepare,
-	trigger:	snd_ad1816a_playback_trigger,
-	pointer:	snd_ad1816a_playback_pointer,
+	.open =		snd_ad1816a_playback_open,
+	.close =	snd_ad1816a_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ad1816a_hw_params,
+	.hw_free =	snd_ad1816a_hw_free,
+	.prepare =	snd_ad1816a_playback_prepare,
+	.trigger =	snd_ad1816a_playback_trigger,
+	.pointer =	snd_ad1816a_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_ad1816a_capture_ops = {
-	open:		snd_ad1816a_capture_open,
-	close:		snd_ad1816a_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_ad1816a_hw_params,
-	hw_free:	snd_ad1816a_hw_free,
-	prepare:	snd_ad1816a_capture_prepare,
-	trigger:	snd_ad1816a_capture_trigger,
-	pointer:	snd_ad1816a_capture_pointer,
+	.open =		snd_ad1816a_capture_open,
+	.close =	snd_ad1816a_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_ad1816a_hw_params,
+	.hw_free =	snd_ad1816a_hw_free,
+	.prepare =	snd_ad1816a_capture_prepare,
+	.trigger =	snd_ad1816a_capture_trigger,
+	.pointer =	snd_ad1816a_capture_pointer,
 };
 
 static void snd_ad1816a_pcm_free(snd_pcm_t *pcm)
@@ -768,9 +768,9 @@ static int snd_ad1816a_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 }
 
 #define AD1816A_SINGLE(xname, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ad1816a_info_single, \
-  get: snd_ad1816a_get_single, put: snd_ad1816a_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ad1816a_info_single, \
+  .get = snd_ad1816a_get_single, .put = snd_ad1816a_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_ad1816a_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -825,9 +825,9 @@ static int snd_ad1816a_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define AD1816A_DOUBLE(xname, reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ad1816a_info_double, \
-  get: snd_ad1816a_get_double, put: snd_ad1816a_put_double, \
-  private_value: reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ad1816a_info_double, \
+  .get = snd_ad1816a_get_double, .put = snd_ad1816a_put_double, \
+  .private_value = reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
 
 static int snd_ad1816a_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -917,11 +917,11 @@ AD1816A_SINGLE("Phone Capture Volume", AD1816A_PHONE_IN_GAIN_ATT, 0, 15, 1),
 AD1816A_SINGLE("Phone Playback Switch", AD1816A_PHONE_OUT_ATT, 7, 1, 1),
 AD1816A_SINGLE("Phone Playback Volume", AD1816A_PHONE_OUT_ATT, 0, 31, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_ad1816a_info_mux,
-	get: snd_ad1816a_get_mux,
-	put: snd_ad1816a_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_ad1816a_info_mux,
+	.get = snd_ad1816a_get_mux,
+	.put = snd_ad1816a_put_mux,
 },
 AD1816A_DOUBLE("Capture Switch", AD1816A_ADC_PGA, 15, 7, 1, 1),
 AD1816A_DOUBLE("Capture Volume", AD1816A_ADC_PGA, 8, 0, 15, 0),
@@ -962,4 +962,3 @@ static void __exit alsa_ad1816a_exit(void)
 
 module_init(alsa_ad1816a_init)
 module_exit(alsa_ad1816a_exit)
-

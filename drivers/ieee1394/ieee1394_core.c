@@ -19,6 +19,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
+#include <linux/tqueue.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -66,6 +67,29 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
         printk("\n");
 }
 
+static void process_complete_tasks(struct hpsb_packet *packet)
+{
+	struct list_head *lh, *next;
+
+	list_for_each_safe(lh, next, &packet->complete_tq) {
+		struct tq_struct *tq = list_entry(lh, struct tq_struct, list);
+		list_del(&tq->list);
+		schedule_task(tq);
+	}
+
+	return;
+}
+
+/**
+ * hpsb_add_packet_complete_task - add a new task for when a packet completes
+ * @packet: the packet whose completion we want the task added to
+ * @tq: the tq_struct describing the task to add
+ */
+void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct tq_struct *tq)
+{
+	list_add_tail(&tq->list, &packet->complete_tq);
+	return;
+}
 
 /**
  * alloc_hpsb_packet - allocate new packet structure
@@ -160,7 +184,10 @@ int hpsb_bus_reset(struct hpsb_host *host)
         abort_requests(host);
         host->in_bus_reset = 1;
         host->irm_id = -1;
+	host->is_irm = 0;
         host->busmgr_id = -1;
+	host->is_busmgr = 0;
+	host->is_cycmst = 0;
         host->node_count = 0;
         host->selfid_count = 0;
 
@@ -354,7 +381,10 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         }
 
         host->reset_retries = 0;
-        if (isroot) host->driver->devctl(host, ACT_CYCLE_MASTER, 1);
+        if (isroot) {
+		host->driver->devctl(host, ACT_CYCLE_MASTER, 1);
+		host->is_cycmst = 1;
+	}
 	atomic_inc(&host->generation);
 	host->in_bus_reset = 0;
         highlevel_host_reset(host);
@@ -378,7 +408,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
                 packet->state = hpsb_complete;
                 up(&packet->state_change);
                 up(&packet->state_change);
-                run_task_queue(&packet->complete_tq);
+                process_complete_tasks(packet);
                 return;
         }
 
@@ -390,7 +420,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         up(&packet->state_change);
-        queue_task(&host->timeout_tq, &tq_timer);
+        schedule_task(&host->timeout_tq);
 }
 
 /**
@@ -528,7 +558,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
 
         packet->state = hpsb_complete;
         up(&packet->state_change);
-        run_task_queue(&packet->complete_tq);
+	process_complete_tasks(packet);
 }
 
 
@@ -748,7 +778,7 @@ void abort_requests(struct hpsb_host *host)
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
-                run_task_queue(&packet->complete_tq);
+		process_complete_tasks(packet);
         }
 }
 
@@ -780,9 +810,9 @@ void abort_timedouts(struct hpsb_host *host)
                 }
         }
 
-        if (!list_empty(&host->pending_packets)) {
-                queue_task(&host->timeout_tq, &tq_timer);
-        }
+        if (!list_empty(&host->pending_packets))
+		schedule_task(&host->timeout_tq);
+
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         list_for_each(lh, &expiredlist) {
@@ -790,7 +820,7 @@ void abort_timedouts(struct hpsb_host *host)
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
-                run_task_queue(&packet->complete_tq);
+		process_complete_tasks(packet);
         }
 }
 
@@ -1049,6 +1079,7 @@ EXPORT_SYMBOL(hpsb_remove_host);
 EXPORT_SYMBOL(hpsb_ref_host);
 EXPORT_SYMBOL(hpsb_unref_host);
 EXPORT_SYMBOL(hpsb_speedto_str);
+EXPORT_SYMBOL(hpsb_add_packet_complete_task);
 
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);

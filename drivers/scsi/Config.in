@@ -51,6 +51,9 @@ fi
 if [ "$CONFIG_EISA" = "y" ]; then
   dep_tristate 'Adaptec AHA1740 support' CONFIG_SCSI_AHA1740 $CONFIG_SCSI
 fi
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   dep_tristate 'Adaptec AACRAID support (EXPERIMENTAL)' CONFIG_SCSI_AACRAID $CONFIG_SCSI $CONFIG_PCI
+fi
 source drivers/scsi/aic7xxx/Config.in
 if [ "$CONFIG_SCSI_AIC7XXX" != "y" ]; then
    dep_tristate 'Old Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX_OLD $CONFIG_SCSI
@@ -210,6 +213,7 @@ fi
 if [ "$CONFIG_X86" = "y" -a "$CONFIG_ISA" = "y" ]; then
    dep_tristate 'UltraStor SCSI support' CONFIG_SCSI_ULTRASTOR $CONFIG_SCSI
 fi
+dep_tristate 'Workbit NinjaSCSI-32Bi/UDE support' CONFIG_SCSI_NSP32 $CONFIG_SCSI
 #
 # Note - this is a very special 'host' adapter that simulates the presence of some disks.
 # It can come in very handy for troubleshooting.  Anyone else is welcome to use it - all
