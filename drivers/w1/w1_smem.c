@@ -104,12 +104,12 @@ static struct w1_family w1_smem_family = {
 	.fops = &w1_smem_fops,
 };
 
-int __init w1_smem_init(void)
+static int __init w1_smem_init(void)
 {
 	return w1_register_family(&w1_smem_family);
 }
 
-void __exit w1_smem_fini(void)
+static void __exit w1_smem_fini(void)
 {
 	w1_unregister_family(&w1_smem_family);
 }
