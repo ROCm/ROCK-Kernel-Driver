@@ -1,6 +1,6 @@
 /*  D-Link DL2000-based Gigabit Ethernet Adapter Linux driver */
 /*
-    Copyright (c) 2001,2002 by D-Link Corporation
+    Copyright (c) 2001, 2002 by D-Link Corporation
     Written by Edward Peng.<edward_peng@dlink.com.tw>
     Created 03-May-2001, base on Linux' sundance.c.
 
@@ -33,12 +33,13 @@
     1.11	2002/05/23	Added ISR schedule scheme.
     				Fixed miscount of rx frame error for DGE-550SX.
     				Fixed VLAN bug.
+    1.12	2002/06/13	Lock tx_coalesce=1 on 10/100Mbps mode.
  */
 
 #include "dl2k.h"
 
 static char version[] __devinitdata =
-    KERN_INFO "D-Link DL2000-based linux driver v1.11 2002/05/23\n";
+    KERN_INFO "D-Link DL2000-based linux driver v1.12 2002/06/13\n";
 
 #define MAX_UNITS 8
 static int mtu[MAX_UNITS];
@@ -138,15 +139,15 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	SET_MODULE_OWNER (dev);
 
-#ifdef USE_IO_OPS
-	ioaddr = pci_resource_start (pdev, 0);
-#else
+#ifdef MEM_MAPPING
 	ioaddr = pci_resource_start (pdev, 1);
 	ioaddr = (long) ioremap (ioaddr, RIO_IO_SIZE);
 	if (!ioaddr) {
 		err = -ENOMEM;
 		goto err_out_dev;
 	}
+#else
+	ioaddr = pci_resource_start (pdev, 0);
 #endif
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -158,6 +159,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* Parse manual configuration */
 	np->an_enable = 1;
+	np->tx_coalesce = 1;
 	if (card_idx < MAX_UNITS) {
 		if (media[card_idx] != NULL) {
 			np->an_enable = 0;
@@ -213,7 +215,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 		if (tx_coalesce < 1)
 			tx_coalesce = 1;
-		if (tx_coalesce > TX_RING_SIZE-1)
+		else if (tx_coalesce > TX_RING_SIZE-1)
 			tx_coalesce = TX_RING_SIZE - 1;
 	}
 	dev->open = &rio_open;
@@ -303,7 +305,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
       err_out_unmap_tx:
 	pci_free_consistent (pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
       err_out_iounmap:
-#ifndef USE_IO_OPS
+#ifdef MEM_MAPPING
 	iounmap ((void *) ioaddr);
 
       err_out_dev:
@@ -361,7 +363,7 @@ parse_eeprom (struct net_device *dev)
 	}
 
 	/* Check CRC */
-	crc = ~ether_crc_le(256 - 4, sromdata);
+	crc = ~ether_crc_le (256 - 4, sromdata);
 	if (psrom->crc != crc) {
 		printk (KERN_ERR "%s: EEPROM data CRC error.\n", dev->name);
 		return -1;
@@ -636,7 +638,7 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	/* DL2K bug: DMA fails to get next descriptor ptr in 10Mbps mode
 	 * Work around: Always use 1 descriptor in 10Mbps mode */
-	if (entry % tx_coalesce == 0 || np->speed == 10)
+	if (entry % np->tx_coalesce == 0 || np->speed == 10)
 		txdesc->status = cpu_to_le64 (entry | tfc_vlan_tag |
 					      WordAlignDisable | 
 					      TxDMAIndicate |
@@ -936,6 +938,10 @@ rio_error (struct net_device *dev, int int_status)
 				mii_get_media_pcs (dev);
 			else
 				mii_get_media (dev);
+			if (np->speed == 1000)
+				np->tx_coalesce = tx_coalesce;
+			else 
+				np->tx_coalesce = 1;
 			macctrl = 0;
 			macctrl |= (np->vlan) ? AutoVLANuntagging : 0;
 			macctrl |= (np->full_duplex) ? DuplexSelect : 0;
@@ -1671,7 +1677,7 @@ rio_remove1 (struct pci_dev *pdev)
 				     np->rx_ring_dma);
 		pci_free_consistent (pdev, TX_TOTAL_SIZE, np->tx_ring,
 				     np->tx_ring_dma);
-#ifndef USE_IO_OPS
+#ifdef MEM_MAPPING
 		iounmap ((char *) (dev->base_addr));
 #endif
 		kfree (dev);

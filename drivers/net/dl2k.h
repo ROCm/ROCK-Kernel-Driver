@@ -33,15 +33,15 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/time.h>
-#define TX_RING_SIZE	128
-#define TX_QUEUE_LEN	120	/* Limit ring entries actually used.  */
-#define RX_RING_SIZE 	128
+#define TX_RING_SIZE	256
+#define TX_QUEUE_LEN	(TX_RING_SIZE - 1) /* Limit ring entries actually used.*/
+#define RX_RING_SIZE 	256
 #define TX_TOTAL_SIZE	TX_RING_SIZE*sizeof(struct netdev_desc)
 #define RX_TOTAL_SIZE	RX_RING_SIZE*sizeof(struct netdev_desc)
 
 /* This driver was written to use PCI memory space, however x86-oriented
    hardware often uses I/O space accesses. */
-#ifdef USE_IO_OPS
+#ifndef MEM_MAPPING
 #undef readb
 #undef readw
 #undef readl
@@ -658,6 +658,7 @@ struct netdev_private {
 	unsigned int chip_id;		/* PCI table chip id */
 	unsigned int rx_coalesce; 	/* Maximum frames each RxDMAComplete intr */
 	unsigned int rx_timeout; 	/* Wait time between RxDMAComplete intr */
+	unsigned int tx_coalesce;	/* Maximum frames each tx interrupt */
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
 	unsigned int an_enable:2;	/* Auto-Negotiated Enable */
 	unsigned int jumbo:1;		/* Jumbo frame enable */
@@ -681,10 +682,10 @@ struct netdev_private {
 };
 
 /* The station address location in the EEPROM. */
-#ifdef USE_IO_OPS
-#define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_IO  | PCI_ADDR0)
-#else
+#ifdef MEM_MAPPING
 #define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_MEM | PCI_ADDR1)
+#else
+#define PCI_IOTYPE (PCI_USES_MASTER | PCI_USES_IO  | PCI_ADDR0)
 #endif
 /* The struct pci_device_id consist of:
         vendor, device          Vendor and device ID to match (or PCI_ANY_ID)
