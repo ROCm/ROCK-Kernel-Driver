@@ -1828,14 +1828,14 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 
 static int as_may_queue(request_queue_t *q, int rw)
 {
-	int ret = 0;
+	int ret = ELV_MQUEUE_MAY;
 	struct as_data *ad = q->elevator->elevator_data;
 	struct io_context *ioc;
 	if (ad->antic_status == ANTIC_WAIT_REQ ||
 			ad->antic_status == ANTIC_WAIT_NEXT) {
 		ioc = as_get_io_context();
 		if (ad->io_context == ioc)
-			ret = 1;
+			ret = ELV_MQUEUE_MUST;
 		put_io_context(ioc);
 	}
 

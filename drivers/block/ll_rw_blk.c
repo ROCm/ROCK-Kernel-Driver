@@ -243,6 +243,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
 	blk_queue_congestion_threshold(q);
+	q->nr_batching = BLK_BATCH_REQ;
 
 	q->unplug_thresh = 4;		/* hmm */
 	q->unplug_delay = (3 * HZ) / 1000;	/* 3 milliseconds */
@@ -1511,8 +1512,10 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	/*
 	 * all done
 	 */
-	if (!elevator_init(q, NULL))
+	if (!elevator_init(q, NULL)) {
+		blk_queue_congestion_threshold(q);
 		return q;
+	}
 
 	blk_cleanup_queue(q);
 out_init:
@@ -1540,12 +1543,19 @@ static inline void blk_free_request(request_queue_t *q, struct request *rq)
 	mempool_free(rq, q->rq.rq_pool);
 }
 
-static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
+static inline struct request *blk_alloc_request(request_queue_t *q, int rw,
+						int gfp_mask)
 {
 	struct request *rq = mempool_alloc(q->rq.rq_pool, gfp_mask);
 
 	if (!rq)
 		return NULL;
+
+	/*
+	 * first three bits are identical in rq->flags and bio->bi_rw,
+	 * see bio.h and blkdev.h
+	 */
+	rq->flags = rw;
 
 	if (!elv_set_request(q, rq, gfp_mask))
 		return rq;
@@ -1558,7 +1568,7 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
  * ioc_batching returns true if the ioc is a valid batching request and
  * should be given priority access to a request.
  */
-static inline int ioc_batching(struct io_context *ioc)
+static inline int ioc_batching(request_queue_t *q, struct io_context *ioc)
 {
 	if (!ioc)
 		return 0;
@@ -1568,7 +1578,7 @@ static inline int ioc_batching(struct io_context *ioc)
 	 * even if the batch times out, otherwise we could theoretically
 	 * lose wakeups.
 	 */
-	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
+	return ioc->nr_batch_requests == q->nr_batching ||
 		(ioc->nr_batch_requests > 0
 		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
 }
@@ -1579,12 +1589,12 @@ static inline int ioc_batching(struct io_context *ioc)
  * is the behaviour we want though - once it gets a wakeup it should be given
  * a nice run.
  */
-void ioc_set_batching(struct io_context *ioc)
+void ioc_set_batching(request_queue_t *q, struct io_context *ioc)
 {
-	if (!ioc || ioc_batching(ioc))
+	if (!ioc || ioc_batching(q, ioc))
 		return;
 
-	ioc->nr_batch_requests = BLK_BATCH_REQ;
+	ioc->nr_batch_requests = q->nr_batching;
 	ioc->last_waited = jiffies;
 }
 
@@ -1600,10 +1610,10 @@ static void freed_request(request_queue_t *q, int rw)
 	if (rl->count[rw] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, rw);
 	if (rl->count[rw]+1 <= q->nr_requests) {
+		smp_mb();
 		if (waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
-		if (!waitqueue_active(&rl->wait[rw]))
-			blk_clear_queue_full(q, rw);
+		blk_clear_queue_full(q, rw);
 	}
 	if (unlikely(waitqueue_active(&rl->drain)) &&
 	    !rl->count[READ] && !rl->count[WRITE])
@@ -1632,13 +1642,22 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		 * will be blocked.
 		 */
 		if (!blk_queue_full(q, rw)) {
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			blk_set_queue_full(q, rw);
 		}
 	}
 
-	if (blk_queue_full(q, rw)
-			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
+	switch (elv_may_queue(q, rw)) {
+		case ELV_MQUEUE_NO:
+			spin_unlock_irq(q->queue_lock);
+			goto out;
+		case ELV_MQUEUE_MAY:
+			break;
+		case ELV_MQUEUE_MUST:
+			goto get_rq;
+	}
+
+	if (blk_queue_full(q, rw) && !ioc_batching(q, ioc)) {
 		/*
 		 * The queue is full and the allocating process is not a
 		 * "batcher", and not exempted by the IO scheduler
@@ -1647,12 +1666,13 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
+get_rq:
 	rl->count[rw]++;
 	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
-	rq = blk_alloc_request(q, gfp_mask);
+	rq = blk_alloc_request(q, rw, gfp_mask);
 	if (!rq) {
 		/*
 		 * Allocation failed presumably due to memory. Undo anything
@@ -1667,16 +1687,10 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
-	if (ioc_batching(ioc))
+	if (ioc_batching(q, ioc))
 		ioc->nr_batch_requests--;
 	
 	INIT_LIST_HEAD(&rq->queuelist);
-
-	/*
-	 * first three bits are identical in rq->flags and bio->bi_rw,
-	 * see bio.h and blkdev.h
-	 */
-	rq->flags = rw;
 
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
@@ -1726,7 +1740,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			 * See ioc_batching, ioc_set_batching
 			 */
 			ioc = get_io_context(GFP_NOIO);
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			put_io_context(ioc);
 		}
 		finish_wait(&rl->wait[rw], &wait);
@@ -3082,6 +3096,9 @@ void put_io_context(struct io_context *ioc)
 	if (atomic_dec_and_test(&ioc->refcount)) {
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
+		if (ioc->cic && ioc->cic->dtor)
+			ioc->cic->dtor(ioc->cic);
+
 		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
@@ -3095,14 +3112,15 @@ void exit_io_context(void)
 
 	local_irq_save(flags);
 	ioc = current->io_context;
-	if (ioc) {
-		if (ioc->aic && ioc->aic->exit)
-			ioc->aic->exit(ioc->aic);
-		put_io_context(ioc);
-		current->io_context = NULL;
-	} else
-		WARN_ON(1);
+	current->io_context = NULL;
 	local_irq_restore(flags);
+
+	if (ioc->aic && ioc->aic->exit)
+		ioc->aic->exit(ioc->aic);
+	if (ioc->cic && ioc->cic->exit)
+		ioc->cic->exit(ioc->cic);
+
+	put_io_context(ioc);
 }
 
 /*
@@ -3121,20 +3139,39 @@ struct io_context *get_io_context(int gfp_flags)
 
 	local_irq_save(flags);
 	ret = tsk->io_context;
-	if (ret == NULL) {
-		ret = kmem_cache_alloc(iocontext_cachep, GFP_ATOMIC);
-		if (ret) {
-			atomic_set(&ret->refcount, 1);
-			ret->pid = tsk->pid;
-			ret->last_waited = jiffies; /* doesn't matter... */
-			ret->nr_batch_requests = 0; /* because this is 0 */
-			ret->aic = NULL;
-			tsk->io_context = ret;
-		}
-	}
 	if (ret)
-		atomic_inc(&ret->refcount);
+		goto out;
+
 	local_irq_restore(flags);
+
+	ret = kmem_cache_alloc(iocontext_cachep, gfp_flags);
+	if (ret) {
+		atomic_set(&ret->refcount, 1);
+		ret->pid = tsk->pid;
+		ret->last_waited = jiffies; /* doesn't matter... */
+		ret->nr_batch_requests = 0; /* because this is 0 */
+		ret->aic = NULL;
+		ret->cic = NULL;
+		spin_lock_init(&ret->lock);
+
+		local_irq_save(flags);
+
+		/*
+		 * very unlikely, someone raced with us in setting up the task
+		 * io context. free new context and just grab a reference.
+		 */
+		if (!tsk->io_context)
+			tsk->io_context = ret;
+		else {
+			kmem_cache_free(iocontext_cachep, ret);
+			ret = tsk->io_context;
+		}
+
+out:
+		atomic_inc(&ret->refcount);
+		local_irq_restore(flags);
+	}
+
 	return ret;
 }
 EXPORT_SYMBOL(get_io_context);

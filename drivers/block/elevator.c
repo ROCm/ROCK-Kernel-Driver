@@ -437,7 +437,7 @@ int elv_may_queue(request_queue_t *q, int rw)
 	if (e->ops->elevator_may_queue_fn)
 		return e->ops->elevator_may_queue_fn(q, rw);
 
-	return 0;
+	return ELV_MQUEUE_MAY;
 }
 
 void elv_completed_request(request_queue_t *q, struct request *rq)

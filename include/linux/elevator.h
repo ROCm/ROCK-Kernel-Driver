@@ -130,4 +130,13 @@ extern int elv_try_last_merge(request_queue_t *, struct bio *);
 #define ELEVATOR_INSERT_BACK	2
 #define ELEVATOR_INSERT_SORT	3
 
+/*
+ * return values from elevator_may_queue_fn
+ */
+enum {
+	ELV_MQUEUE_MAY,
+	ELV_MQUEUE_NO,
+	ELV_MQUEUE_MUST,
+};
+
 #endif

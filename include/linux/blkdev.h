@@ -52,6 +52,20 @@ struct as_io_context {
 	sector_t seek_mean;
 };
 
+struct cfq_queue;
+struct cfq_io_context {
+	void (*dtor)(struct cfq_io_context *);
+	void (*exit)(struct cfq_io_context *);
+
+	struct io_context *ioc;
+
+	/*
+	 * circular list of cfq_io_contexts belonging to a process io context
+	 */
+	struct list_head list;
+	struct cfq_queue *cfqq;
+};
+
 /*
  * This is the per-process I/O subsystem state.  It is refcounted and
  * kmalloc'ed. Currently all fields are modified in process io context
@@ -67,7 +81,10 @@ struct io_context {
 	unsigned long last_waited; /* Time last woken after wait for request */
 	int nr_batch_requests;     /* Number of requests left in the batch */
 
+	spinlock_t lock;
+
 	struct as_io_context *aic;
+	struct cfq_io_context *cic;
 };
 
 void put_io_context(struct io_context *ioc);
@@ -343,6 +360,7 @@ struct request_queue
 	unsigned long		nr_requests;	/* Max # of requests */
 	unsigned int		nr_congestion_on;
 	unsigned int		nr_congestion_off;
+	unsigned int		nr_batching;
 
 	unsigned short		max_sectors;
 	unsigned short		max_hw_sectors;
