@@ -2,7 +2,7 @@
 # Makefile for all Linux ACPI interpreter subdirectories
 #
 
-obj-$(CONFIG_ACPI_INTERPRETER) := $(patsubst %.c,%.o,$(wildcard *.c))
+obj-y := hwacpi.o  hwgpe.o  hwregs.o  hwsleep.o  hwtimer.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
 
