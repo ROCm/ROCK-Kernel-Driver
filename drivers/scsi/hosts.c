@@ -27,6 +27,7 @@
  *  hosts currently present in the system.
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/blk.h>
 #include <linux/kernel.h>
