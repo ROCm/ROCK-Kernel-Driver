@@ -153,10 +153,7 @@ static int i2c_is_busy_wait(struct saa7134_dev *dev)
 		status = i2c_get_status(dev);
 		if (!i2c_is_busy(status))
 			break;
-		if (need_resched())
-                        schedule();
-		else
-			udelay(I2C_WAIT_DELAY);
+		saa_wait(I2C_WAIT_DELAY);
 	}
 	if (I2C_WAIT_RETRY == count)
 		return FALSE;
@@ -318,7 +315,7 @@ static u32 functionality(struct i2c_adapter *adap)
 static int attach_inform(struct i2c_client *client)
 {
         struct saa7134_dev *dev = client->adapter->algo_data;
-	int tuner = card(dev).tuner_type;
+	int tuner = dev->tuner_type;
 
 	saa7134_i2c_call_clients(dev,TUNER_SET_TYPE,&tuner);
         return 0;
@@ -334,9 +331,9 @@ static struct i2c_algorithm saa7134_algo = {
 
 static struct i2c_adapter saa7134_adap_template = {
 	.owner         = THIS_MODULE,
+	.class         = I2C_ADAP_CLASS_TV_ANALOG,
 	I2C_DEVNAME("saa7134"),
 	.id            = I2C_ALGO_SAA7134,
-	.class         = I2C_ADAP_CLASS_TV_ANALOG,
 	.algo          = &saa7134_algo,
 	.client_register = attach_inform,
 };

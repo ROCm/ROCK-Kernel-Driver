@@ -85,6 +85,7 @@ static int buffer_activate(struct saa7134_dev *dev,
 
 	dprintk("buffer_activate [%p]\n",buf);
 	buf->vb.state = STATE_ACTIVE;
+	buf->top_seen = 0;
 
 	task_init(dev,buf,TASK_A);
 	task_init(dev,buf,TASK_B);
@@ -119,7 +120,8 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 	struct saa7134_dev *dev = fh->dev;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	struct saa7134_tvnorm *norm = dev->tvnorm;
-	int lines, llength, size, err;
+	unsigned int lines, llength, size;
+	int err;
 
 	lines   = norm->vbi_v_stop - norm->vbi_v_start +1;
 	if (lines > VBI_LINE_COUNT)
@@ -155,7 +157,6 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 			goto oops;
 	}
 	buf->vb.state = STATE_PREPARED;
-	buf->top_seen = 0;
 	buf->activate = buffer_activate;
 	buf->vb.field = field;
 	return 0;
@@ -166,7 +167,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, int *count, int *size)
+buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	struct saa7134_fh *fh   = file->private_data;
 	struct saa7134_dev *dev = fh->dev;
@@ -241,7 +242,7 @@ void saa7134_irq_vbi_done(struct saa7134_dev *dev, unsigned long status)
 	if (dev->vbi_q.curr) {
 		dev->vbi_fieldcount++;
 		/* make sure we have seen both fields */
-		if ((status & 0x10) == 0x10) {
+		if ((status & 0x10) == 0x00) {
 			dev->vbi_q.curr->top_seen = 1;
 			goto done;
 		}

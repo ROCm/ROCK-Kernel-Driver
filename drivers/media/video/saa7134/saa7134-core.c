@@ -2,7 +2,7 @@
  * device driver for philips saa7134 based TV cards
  * driver core
  *
- * (c) 2001,02 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
+ * (c) 2001-03 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -67,6 +67,10 @@ static unsigned int radio_nr = -1;
 MODULE_PARM(radio_nr,"i");
 MODULE_PARM_DESC(radio_nr,"radio device number");
 
+static unsigned int oss = 0;
+MODULE_PARM(oss,"i");
+MODULE_PARM_DESC(oss,"register oss devices (default: no)");
+
 static unsigned int dsp_nr = -1;
 MODULE_PARM(dsp_nr,"i");
 MODULE_PARM_DESC(dsp_nr,"oss dsp device number");
@@ -75,20 +79,20 @@ static unsigned int mixer_nr = -1;
 MODULE_PARM(mixer_nr,"i");
 MODULE_PARM_DESC(mixer_nr,"oss mixer device number");
 
-static int tuner[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = -1};
+static unsigned int tuner[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
 MODULE_PARM(tuner,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(tuner,"tuner type");
 
-static int card[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = -1};
+static unsigned int card[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
 MODULE_PARM(card,"1-" __stringify(SAA7134_MAXBOARDS) "i");
 MODULE_PARM_DESC(card,"card type");
 
-static int latency = -1;
+static unsigned int latency = UNSET;
 MODULE_PARM(latency,"i");
 MODULE_PARM_DESC(latency,"pci latency timer");
 
 struct list_head  saa7134_devlist;
-int               saa7134_devcount;
+unsigned int      saa7134_devcount;
 
 #define dprintk(fmt, arg...)	if (core_debug) \
 	printk(KERN_DEBUG "%s/core: " fmt, dev->name, ## arg)
@@ -102,7 +106,7 @@ static const char *v4l1_ioctls[] = {
 	"SFREQ", "GAUDIO", "SAUDIO", "SYNC", "MCAPTURE", "GMBUF", "GUNIT",
 	"GCAPTURE", "SCAPTURE", "SPLAYMODE", "SWRITEMODE", "GPLAYINFO",
 	"SMICROCODE", "GVBIFMT", "SVBIFMT" };
-#define V4L1_IOCTLS (sizeof(v4l1_ioctls)/sizeof(char*))
+#define V4L1_IOCTLS ARRAY_SIZE(v4l1_ioctls)
 
 static const char *v4l2_ioctls[] = {
 	"QUERYCAP", "1", "ENUM_PIXFMT", "ENUM_FBUFFMT", "G_FMT", "S_FMT",
@@ -116,7 +120,7 @@ static const char *v4l2_ioctls[] = {
 	"S_AUDOUT", "ENUMFX", "G_EFFECT", "S_EFFECT", "G_MODULATOR",
 	"S_MODULATOR"
 };
-#define V4L2_IOCTLS (sizeof(v4l2_ioctls)/sizeof(char*))
+#define V4L2_IOCTLS ARRAY_SIZE(v4l2_ioctls)
 
 static const char *osspcm_ioctls[] = {
 	"RESET", "SYNC", "SPEED", "STEREO", "GETBLKSIZE", "SETFMT",
@@ -125,7 +129,7 @@ static const char *osspcm_ioctls[] = {
 	"GETIPTR", "GETOPTR", "MAPINBUF", "MAPOUTBUF", "SETSYNCRO",
 	"SETDUPLEX", "GETODELAY"
 };
-#define OSSPCM_IOCTLS (sizeof(v4l2_ioctls)/sizeof(char*))
+#define OSSPCM_IOCTLS ARRAY_SIZE(v4l2_ioctls)
 
 void saa7134_print_ioctl(char *name, unsigned int cmd)
 {
@@ -236,9 +240,9 @@ int saa7134_buffer_pages(int size)
 
 /* calc max # of buffers from size (must not exceed the 4MB virtual
  * address space per DMA channel) */
-int saa7134_buffer_count(int size, int count)
+int saa7134_buffer_count(unsigned int size, unsigned int count)
 {
-	int maxcount;
+	unsigned int maxcount;
 	
 	maxcount = 1024 / saa7134_buffer_pages(size);
 	if (count > maxcount)
@@ -277,11 +281,11 @@ int saa7134_pgtable_alloc(struct pci_dev *pci, struct saa7134_pgtable *pt)
 }
 
 int saa7134_pgtable_build(struct pci_dev *pci, struct saa7134_pgtable *pt,
-			  struct scatterlist *list, int length,
-			  int startpage)
+			  struct scatterlist *list, unsigned int length,
+			  unsigned int startpage)
 {
-	u32   *ptr;
-	int   i,p;
+	u32           *ptr;
+	unsigned int  i,p;
 
 	BUG_ON(NULL == pt || NULL == pt->cpu);
 
@@ -319,14 +323,25 @@ int saa7134_buffer_queue(struct saa7134_dev *dev,
 			 struct saa7134_dmaqueue *q,
 			 struct saa7134_buf *buf)
 {
+	struct saa7134_buf *next = NULL;
 #if DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	
 	dprintk("buffer_queue %p\n",buf);
 	if (NULL == q->curr) {
-		q->curr = buf;
-		buf->activate(dev,buf,NULL);
+		if (!q->need_two) {
+			q->curr = buf;
+			buf->activate(dev,buf,NULL);
+		} else if (list_empty(&q->queue)) {
+			list_add_tail(&buf->vb.queue,&q->queue);
+			buf->vb.state = STATE_QUEUED;
+		} else {
+			next = list_entry(q->queue.next,struct saa7134_buf,
+					  vb.queue);
+			q->curr = buf;
+			buf->activate(dev,buf,next);
+		}
 	} else {
 		list_add_tail(&buf->vb.queue,&q->queue);
 		buf->vb.state = STATE_QUEUED;
@@ -336,7 +351,7 @@ int saa7134_buffer_queue(struct saa7134_dev *dev,
 
 void saa7134_buffer_finish(struct saa7134_dev *dev,
 			   struct saa7134_dmaqueue *q,
-			   int state)
+			   unsigned int state)
 {
 #if DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
@@ -388,6 +403,14 @@ void saa7134_buffer_timeout(unsigned long data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev->slock,flags);
+
+	/* try to reset the hardware (SWRST) */
+	saa_writeb(SAA7134_REGION_ENABLE, 0x00);
+	saa_writeb(SAA7134_REGION_ENABLE, 0x80);
+	saa_writeb(SAA7134_REGION_ENABLE, 0x00);
+
+	/* flag current buffer as failed,
+	   try to start over with the next one. */
 	if (q->curr) {
 		dprintk("timeout on %p\n",q->curr);
 		saa7134_buffer_finish(dev,q,STATE_ERROR);
@@ -400,7 +423,7 @@ void saa7134_buffer_timeout(unsigned long data)
 
 int saa7134_set_dmabits(struct saa7134_dev *dev)
 {
-	unsigned long task=0, ctrl=0, irq=0, split = 0;
+	u32 split, task=0, ctrl=0, irq=0;
 	enum v4l2_field cap = V4L2_FIELD_ANY;
 	enum v4l2_field ov  = V4L2_FIELD_ANY;
 
@@ -460,12 +483,12 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 	
 	/* set task conditions + field handling */
 	if (V4L2_FIELD_HAS_BOTH(cap) || V4L2_FIELD_HAS_BOTH(ov) || cap == ov) {
-		/* default config -- use full frames:
-		   odd A, even A, odd B, even B, repeat */
+		/* default config -- use full frames */
 		saa_writeb(SAA7134_TASK_CONDITIONS(TASK_A), 0x0d);
 		saa_writeb(SAA7134_TASK_CONDITIONS(TASK_B), 0x0d);
 		saa_writeb(SAA7134_FIELD_HANDLING(TASK_A),  0x02);
 		saa_writeb(SAA7134_FIELD_HANDLING(TASK_B),  0x02);
+		split = 0;
 	} else {
 		/* split fields between tasks */
 		if (V4L2_FIELD_TOP == cap) {
@@ -494,7 +517,7 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 		   SAA7134_MAIN_CTRL_TE5 |
 		   SAA7134_MAIN_CTRL_TE6,
 		   ctrl);
-	dprintk("dmabits: task=0x%02lx ctrl=0x%02lx irq=0x%lx split=%s\n",
+	dprintk("dmabits: task=0x%02x ctrl=0x%02x irq=0x%x split=%s\n",
 		task, ctrl, irq, split ? "no" : "yes");
 
 	return 0;
@@ -508,12 +531,12 @@ static char *irqbits[] = {
 	"AR", "PE", "PWR_ON", "RDCAP", "INTL", "FIDT", "MMC",
 	"TRIG_ERR", "CONF_ERR", "LOAD_ERR"
 };
-#define IRQBITS (sizeof(irqbits)/sizeof(char*))
+#define IRQBITS ARRAY_SIZE(irqbits)
 
 static void print_irqstatus(struct saa7134_dev *dev, int loop,
 			    unsigned long report, unsigned long status)
 {
-	int i;
+	unsigned int i;
 	
 	printk(KERN_DEBUG "%s/irq[%d,%ld]: r=0x%lx s=0x%02lx",
 	       dev->name,loop,jiffies,report,status);
@@ -536,18 +559,19 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct saa7134_dev *dev = (struct saa7134_dev*) dev_id;
 	unsigned long report,status;
-	int loop;
+	int loop, handled = 0;
 
 	for (loop = 0; loop < 10; loop++) {
 		report = saa_readl(SAA7134_IRQ_REPORT);
 		status = saa_readl(SAA7134_IRQ_STATUS);
-		saa_writel(SAA7134_IRQ_REPORT,report);
 		if (0 == report) {
 			if (irq_debug > 1)
 				printk(KERN_DEBUG "%s/irq: no (more) work\n",
 				       dev->name);
 			goto out;
 		}
+		handled = 1;
+		saa_writel(SAA7134_IRQ_REPORT,report);
 		if (irq_debug)
 			print_irqstatus(dev,loop,report,status);
 
@@ -582,8 +606,9 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		saa_writel(SAA7134_IRQ1,0);
 		saa_writel(SAA7134_IRQ2,0);
 	}
-out:
-	return IRQ_HANDLED;
+
+ out:
+	return IRQ_RETVAL(handled);
 }
 
 /* ------------------------------------------------------------------ */
@@ -599,8 +624,14 @@ static int saa7134_hwinit(struct saa7134_dev *dev)
 	saa7134_vbi_init(dev);
 	if (card_has_ts(dev))
 		saa7134_ts_init(dev);
-	if (card_has_audio(dev))
+
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
 		saa7134_oss_init(dev);
+		break;
+	}
 	
 	/* RAM FIFO config */
 	saa_writel(SAA7134_FIFO_SIZE, 0x08070503);
@@ -634,12 +665,15 @@ static int saa7134_hwinit(struct saa7134_dev *dev)
 	/* enable peripheral devices */
 	saa_writeb(SAA7134_SPECIAL_MODE, 0x01);
 
+	/* set vertical line numbering start (vbi needs this) */
+	saa_writeb(SAA7134_SOURCE_TIMING2, 0x20);
+	
 	return 0;
 }
 
 static void __devinit must_configure_manually(void)
 {
-	int i,p;
+	unsigned int i,p;
 
 	printk(KERN_WARNING
 	       "saa7134: <rant>\n"
@@ -675,18 +709,39 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		return -ENOMEM;
 	memset(dev,0,sizeof(*dev));
 
-	/* pci stuff */
+	/* pci init */
 	dev->pci = pci_dev;
 	if (pci_enable_device(pci_dev)) {
 		err = -EIO;
 		goto fail1;
 	}
 	sprintf(dev->name,"saa%x[%d]",pci_dev->device,saa7134_devcount);
-	if (-1 != latency) {
+
+	/* pci quirks */
+	if (pci_pci_problems) {
+		if (pci_pci_problems & PCIPCI_TRITON)
+			printk(KERN_INFO "%s: quirk: PCIPCI_TRITON\n", dev->name);
+		if (pci_pci_problems & PCIPCI_NATOMA)
+			printk(KERN_INFO "%s: quirk: PCIPCI_NATOMA\n", dev->name);
+		if (pci_pci_problems & PCIPCI_VIAETBF)
+			printk(KERN_INFO "%s: quirk: PCIPCI_VIAETBF\n", dev->name);
+		if (pci_pci_problems & PCIPCI_VSFX)
+			printk(KERN_INFO "%s: quirk: PCIPCI_VSFX\n",dev->name);
+#ifdef PCIPCI_ALIMAGIK
+		if (pci_pci_problems & PCIPCI_ALIMAGIK) {
+			printk(KERN_INFO "%s: quirk: PCIPCI_ALIMAGIK -- latency fixup\n",
+			       dev->name);
+			latency = 0x0A;
+		}
+#endif
+	}
+	if (UNSET != latency) {
 		printk(KERN_INFO "%s: setting pci latency timer to %d\n",
 		       dev->name,latency);
 		pci_write_config_byte(pci_dev, PCI_LATENCY_TIMER, latency);
 	}
+
+	/* print pci info */
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &dev->pci_rev);
         pci_read_config_byte(pci_dev, PCI_LATENCY_TIMER,  &dev->pci_lat);
         printk(KERN_INFO "%s: found at %s, rev: %d, irq: %d, "
@@ -710,7 +765,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		dev->board = SAA7134_BOARD_UNKNOWN;
 	}
 	dev->tuner_type = saa7134_boards[dev->board].tuner_type;
-	if (-1 != tuner[saa7134_devcount])
+	if (UNSET != tuner[saa7134_devcount])
 		dev->tuner_type = tuner[saa7134_devcount];
         printk(KERN_INFO "%s: subsystem: %04x:%04x, board: %s [card=%d,%s]\n",
 	       dev->name,pci_dev->subsystem_vendor,
@@ -730,6 +785,13 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	dev->lmmio = ioremap(pci_resource_start(pci_dev,0), 0x1000);
 	dev->bmmio = (__u8*)dev->lmmio;
 
+	/* register i2c bus */
+	saa7134_i2c_register(dev);
+
+	/* initialize hardware */
+	saa7134_board_init(dev);
+	saa7134_hwinit(dev);
+
 	/* get irq */
 	err = request_irq(pci_dev->irq, saa7134_irq,
 			  SA_SHIRQ | SA_INTERRUPT, dev->name, dev);
@@ -739,12 +801,8 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		goto fail2;
 	}
 
-	/* initialize hardware */
-	saa7134_hwinit(dev);
-
-	/* register i2c bus + load i2c helpers */
-	saa7134_i2c_register(dev);
-	if (TUNER_ABSENT != card(dev).tuner_type)
+	/* load i2c helpers */
+	if (TUNER_ABSENT != dev->tuner_type)
 		request_module("tuner");
 	if (saa7134_boards[dev->board].need_tda9887)
 		request_module("tda9887");
@@ -793,19 +851,27 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 
 	/* register oss devices */
-	if (card_has_audio(dev)) {
-		dev->oss.minor_dsp = register_sound_dsp(&saa7134_dsp_fops,dsp_nr);
-		if (dev->oss.minor_dsp < 0)
-			goto fail7;
-		printk(KERN_INFO "%s: registered device dsp%d\n",
-		       dev->name,dev->oss.minor_dsp >> 4);
-		
-		dev->oss.minor_mixer =
-			register_sound_mixer(&saa7134_mixer_fops,mixer_nr);
-		if (dev->oss.minor_mixer < 0)
-			goto fail8;
-		printk(KERN_INFO "%s: registered device mixer%d\n",
-		       dev->name,dev->oss.minor_mixer >> 4);
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		if (oss) {
+			err = dev->oss.minor_dsp =
+				register_sound_dsp(&saa7134_dsp_fops,dsp_nr);
+			if (err < 0) {
+				goto fail7;
+			}
+			printk(KERN_INFO "%s: registered device dsp%d\n",
+			       dev->name,dev->oss.minor_dsp >> 4);
+			
+			err = dev->oss.minor_mixer =
+				register_sound_mixer(&saa7134_mixer_fops,mixer_nr);
+			if (err < 0)
+				goto fail8;
+			printk(KERN_INFO "%s: registered device mixer%d\n",
+			       dev->name,dev->oss.minor_mixer >> 4);
+		}
+		break;
 	}
 
 	/* everything worked */
@@ -815,8 +881,14 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	return 0;
 
  fail8:
-	if (card_has_audio(dev))
-		unregister_sound_dsp(dev->oss.minor_dsp);
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		if (oss)
+			unregister_sound_dsp(dev->oss.minor_dsp);
+		break;
+	}
  fail7:
 	if (card_has_radio(dev))
 		video_unregister_device(&dev->radio_dev);
@@ -828,16 +900,21 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
  fail4:
 	video_unregister_device(&dev->video_dev);
  fail3:
-	if (card_has_audio(dev))
+	saa7134_i2c_unregister(dev);
+	free_irq(pci_dev->irq, dev);
+ fail2:
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
 		saa7134_oss_fini(dev);
+		break;
+	}
 	if (card_has_ts(dev))
 		saa7134_ts_fini(dev);
 	saa7134_vbi_fini(dev);
 	saa7134_video_fini(dev);
 	saa7134_tvaudio_fini(dev);
-	saa7134_i2c_unregister(dev);
-	free_irq(pci_dev->irq, dev);
- fail2:
 	release_mem_region(pci_resource_start(pci_dev,0),
 			   pci_resource_len(pci_dev,0));
  fail1:
@@ -849,6 +926,13 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 {
         struct saa7134_dev *dev = pci_get_drvdata(pci_dev);
 
+	/* debugging ... */
+	if (irq_debug) {
+		u32 report = saa_readl(SAA7134_IRQ_REPORT);
+		u32 status = saa_readl(SAA7134_IRQ_STATUS);
+		print_irqstatus(dev,42,report,status);
+	}
+
 	/* disable peripheral devices */
 	saa_writeb(SAA7134_SPECIAL_MODE,0);
 
@@ -858,8 +942,13 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 	saa_writel(SAA7134_MAIN_CTRL,0);
 
 	/* shutdown subsystems */
-	if (card_has_audio(dev))
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
 		saa7134_oss_fini(dev);
+		break;
+	}
 	if (card_has_ts(dev))
 		saa7134_ts_fini(dev);
 	saa7134_vbi_fini(dev);
@@ -874,9 +963,15 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 
 	/* unregister */
 	saa7134_i2c_unregister(dev);
-	if (card_has_audio(dev)) {
-		unregister_sound_mixer(dev->oss.minor_mixer);
-		unregister_sound_dsp(dev->oss.minor_dsp);
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		if (oss) {
+			unregister_sound_mixer(dev->oss.minor_mixer);
+			unregister_sound_dsp(dev->oss.minor_dsp);
+		}
+		break;
 	}
 	if (card_has_radio(dev))
 		video_unregister_device(&dev->radio_dev);
