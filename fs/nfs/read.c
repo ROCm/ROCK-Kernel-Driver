@@ -179,7 +179,7 @@ nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 	nfs_mark_request_read(new);
 
 	if (nfsi->nread >= NFS_SERVER(inode)->rpages ||
-	    page_index(page) == (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
+	    page->index == (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
 		nfs_pagein_inode(inode, 0, 0);
 	return 0;
 }
@@ -207,7 +207,7 @@ nfs_read_rpcsetup(struct list_head *head, struct nfs_read_data *data)
 	data->inode	  = req->wb_inode;
 	data->cred	  = req->wb_cred;
 	data->args.fh     = NFS_FH(req->wb_inode);
-	data->args.offset = page_offset(req->wb_page) + req->wb_offset;
+	data->args.offset = req_offset(req) + req->wb_offset;
 	data->args.pgbase = req->wb_offset;
 	data->args.count  = count;
 	data->res.fattr   = &data->fattr;
@@ -441,7 +441,7 @@ nfs_readpage_result(struct rpc_task *task)
                         req->wb_inode->i_sb->s_id,
                         (long long)NFS_FILEID(req->wb_inode),
                         req->wb_bytes,
-                        (long long)(page_offset(page) + req->wb_offset));
+                        (long long)(req_offset(req) + req->wb_offset));
 		nfs_clear_request(req);
 		nfs_release_request(req);
 		nfs_unlock_request(req);

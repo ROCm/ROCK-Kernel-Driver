@@ -193,6 +193,7 @@ EXPORT_SYMBOL(invalidate_bdev);
 EXPORT_SYMBOL(invalidate_inodes);
 EXPORT_SYMBOL(invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
+EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 EXPORT_SYMBOL(truncate_inode_pages);
 EXPORT_SYMBOL(fsync_bdev);
 EXPORT_SYMBOL(permission);
