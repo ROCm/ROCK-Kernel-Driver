@@ -321,7 +321,6 @@ repeat:
 	}
 
 	mapped_data = kmap_atomic(new_page, KM_USER0);
-
 	/*
 	 * Check for escaping
 	 */
@@ -330,6 +329,7 @@ repeat:
 		need_copy_out = 1;
 		do_escape = 1;
 	}
+	kunmap_atomic(mapped_data, KM_USER0);
 
 	/*
 	 * Do we need to do a data copy?
@@ -337,7 +337,6 @@ repeat:
 	if (need_copy_out && !done_copy_out) {
 		char *tmp;
 
-		kunmap_atomic(mapped_data, KM_USER0);
 		jbd_unlock_bh_state(bh_in);
 		tmp = jbd_rep_kmalloc(bh_in->b_size, GFP_NOFS);
 		jbd_lock_bh_state(bh_in);
@@ -349,10 +348,8 @@ repeat:
 		jh_in->b_frozen_data = tmp;
 		mapped_data = kmap_atomic(new_page, KM_USER0);
 		memcpy(tmp, mapped_data + new_offset, jh2bh(jh_in)->b_size);
+		kunmap_atomic(mapped_data, KM_USER0);
 
-		/* If we get to this path, we'll always need the new
-		   address kmapped so that we can clear the escaped
-		   magic number below. */
 		new_page = virt_to_page(tmp);
 		new_offset = offset_in_page(tmp);
 		done_copy_out = 1;
@@ -362,9 +359,11 @@ repeat:
 	 * Did we need to do an escaping?  Now we've done all the
 	 * copying, we can finally do so.
 	 */
-	if (do_escape)
+	if (do_escape) {
+		mapped_data = kmap_atomic(new_page, KM_USER0);
 		*((unsigned int *)(mapped_data + new_offset)) = 0;
-	kunmap_atomic(mapped_data, KM_USER0);
+		kunmap_atomic(mapped_data, KM_USER0);
+	}
 
 	/* keep subsequent assertions sane */
 	new_bh->b_state = 0;
