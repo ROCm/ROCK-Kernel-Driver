@@ -201,18 +201,8 @@ pci_fixup_bus_sysdata_list(struct list_head *bus_list)
 
 	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
-		if (bus->self) {
+		if (bus->self)
 			bus->sysdata = bus->self->sysdata;
-			/* Also fixup the bus number on large bus systems to
-			 * include the PHB# in the next byte
-			 */
-			phb = PCI_GET_DN(bus)->phb;
-			if (phb && phb->buid) {
-				newnum = (phb->global_number << 8) | bus->number;
-				bus->number = newnum;
-				sprintf(bus->name, "PCI Bus #%x", bus->number);
-			}
-		}
 		pci_fixup_bus_sysdata_list(&bus->children);
 	}
 }

@@ -380,6 +380,19 @@ int pci_domain_nr(struct pci_bus *bus)
 	return hose->global_number;
 }
 
+/* Set the name of the bus as it appears in /proc/bus/pci */
+int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+
+	if (hose->buid)
+		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
+	else
+		sprintf(name, "%02x", bus->number);
+
+	return 0;
+}
+
 /*
  * Platform support for /proc/bus/pci/X/Y mmap()s,
  * modelled on the sparc64 implementation by Dave Miller.

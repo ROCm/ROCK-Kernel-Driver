@@ -295,6 +295,7 @@ struct pci_controller *alloc_phb(struct device_node *dev,
 	int *buid_vals;
 	char *model;
 	enum phb_types phb_type;
+ 	struct property *of_prop;
 
 	model = (char *)get_property(dev, "model", NULL);
 
@@ -341,6 +342,21 @@ struct pci_controller *alloc_phb(struct device_node *dev,
 		return NULL;
 	}
 
+	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
+			sizeof(phb->global_number));        
+
+	if (!of_prop) {
+		kfree(phb);
+		return NULL;
+	}
+
+	memset(of_prop, 0, sizeof(struct property));
+	of_prop->name = "linux,pci-domain";
+	of_prop->length = sizeof(phb->global_number);
+	of_prop->value = (unsigned char *)&of_prop[1];
+	memcpy(of_prop->value, &phb->global_number, sizeof(phb->global_number));
+	prom_add_property(dev, of_prop);
+
 	phb->first_busno =  bus_range[0];
 	phb->last_busno  =  bus_range[1];
 
@@ -352,26 +368,12 @@ struct pci_controller *alloc_phb(struct device_node *dev,
 	if (buid_vals == NULL) {
 		phb->buid = 0;
 	} else {
-		struct pci_bus check;
-		if (sizeof(check.number) == 1 || sizeof(check.primary) == 1 ||
-		    sizeof(check.secondary) == 1 || sizeof(check.subordinate) == 1) {
-			udbg_printf("pSeries_pci:  this system has large bus numbers and the kernel was not\n"
-			      "built with the patch that fixes include/linux/pci.h struct pci_bus so\n"
-			      "number, primary, secondary and subordinate are ints.\n");
-			panic("pSeries_pci:  this system has large bus numbers and the kernel was not\n"
-			      "built with the patch that fixes include/linux/pci.h struct pci_bus so\n"
-			      "number, primary, secondary and subordinate are ints.\n");
-		}
-
 		if (len < 2 * sizeof(int))
 			// Support for new OF that only has 1 integer for buid.
 			phb->buid = (unsigned long)buid_vals[0];
 		else
 			phb->buid = (((unsigned long)buid_vals[0]) << 32UL) |
 				(((unsigned long)buid_vals[1]) & 0xffffffff);
-
-		phb->first_busno += (phb->global_number << 8);
-		phb->last_busno += (phb->global_number << 8);
 	}
 
 	return phb;
