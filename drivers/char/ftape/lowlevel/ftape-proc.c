@@ -207,11 +207,9 @@ int __init ftape_proc_init(void)
 		ftape_read_proc, NULL) != NULL;
 }
 
-#ifdef MODULE
 void ftape_proc_destroy(void)
 {
 	remove_proc_entry("ftape", &proc_root);
 }
-#endif
 
 #endif /* defined(CONFIG_PROC_FS) && defined(CONFIG_FT_PROC_FS) */
