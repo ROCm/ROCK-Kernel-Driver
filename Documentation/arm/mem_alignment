@@ -51,7 +51,7 @@ fixing up or sending SIGBUS signals:
 	echo 1 > /proc/sys/debug/alignment
 
 You can also read the content of the same file to get statistical
-information on unaligned access occurences plus the current mode of
+information on unaligned access occurrences plus the current mode of
 operation for user space code.
 
 

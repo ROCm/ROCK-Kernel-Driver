@@ -395,7 +395,7 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 			goto io_error;
 		group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
 	}
-	if (bit >= sbi->s_groups_count) {
+	if (!group_alloc) {
 		*err = -ENOSPC;
 		goto out_release;
 	}

@@ -3784,11 +3784,15 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 		return -EOPNOTSUPP;
 	}
 
-	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
+	if (copy_to_user(ifr->ifr_data, &info, sizeof (info))) {
+		kfree(strings);
 		return -EFAULT;
+	}
 
-	if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN))
+	if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN)) {
+		kfree(strings);
 		return -EFAULT;
+	}
 
 	kfree(strings);
 	return 0;

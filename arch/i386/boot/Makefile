@@ -25,9 +25,8 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
-		   setup setup.o zImage bzImage
-
+targets		:= vmlinux.bin bootsect bootsect.o setup setup.o \
+		   zImage bzImage
 subdir- 	:= compressed
 
 host-progs	:= tools/build

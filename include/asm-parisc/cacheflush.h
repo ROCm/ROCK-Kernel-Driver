@@ -25,9 +25,14 @@ flush_page_to_ram(struct page *page)
 
 extern void flush_cache_all_local(void);
 
+static inline void cacheflush_h_tmp_function(void *dummy)
+{
+	flush_cache_all_local();
+}
+
 static inline void flush_cache_all(void)
 {
-	on_each_cpu((void (*)(void *))flush_cache_all_local, NULL, 1, 1);
+	on_each_cpu(cacheflush_h_tmp_function, NULL, 1, 1);
 }
 
 /* The following value needs to be tuned and probably scaled with the
@@ -62,13 +67,15 @@ flush_user_icache_range(unsigned long start, unsigned long end)
 #endif
 }
 
+extern void __flush_dcache_page(struct page *page);
+
 static inline void flush_dcache_page(struct page *page)
 {
 	if (page->mapping && list_empty(&page->mapping->i_mmap) &&
 			list_empty(&page->mapping->i_mmap_shared)) {
 		set_bit(PG_dcache_dirty, &page->flags);
 	} else {
-		flush_kernel_dcache_page(page_address(page));
+		__flush_dcache_page(page);
 	}
 }
 

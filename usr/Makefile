@@ -25,10 +25,10 @@ quiet_cmd_cpio = CPIO    $@
 $(obj)/initramfs_data.cpio: $(obj)/gen_init_cpio $(initramfs-y) FORCE
 	$(call if_changed,cpio)
 
-targets += $(obj)/initramfs_data.cpio
+targets += initramfs_data.cpio
 
 $(obj)/initramfs_data.cpio.gz: $(obj)/initramfs_data.cpio FORCE
 	$(call if_changed,gzip)
 
-targets += $(obj)/initramfs_data.cpio.gz
+targets += initramfs_data.cpio.gz
 

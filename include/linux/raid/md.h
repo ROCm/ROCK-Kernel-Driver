@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/hdreg.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
 #include <net/checksum.h>
@@ -68,13 +69,14 @@ extern inline char * bdev_partition_name (struct block_device *bdev)
 }
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);
-extern mdk_thread_t * md_register_thread (void (*run) (void *data),
-				void *data, const char *name);
+extern mdk_thread_t * md_register_thread (void (*run) (mddev_t *mddev),
+				mddev_t *mddev, const char *name);
 extern void md_unregister_thread (mdk_thread_t *thread);
 extern void md_wakeup_thread(mdk_thread_t *thread);
+extern void md_check_recovery(mddev_t *mddev);
 extern void md_interrupt_thread (mdk_thread_t *thread);
 extern void md_write_start(mddev_t *mddev);
-extern void md_write_end(mddev_t *mddev, mdk_thread_t *thread);
+extern void md_write_end(mddev_t *mddev);
 extern void md_handle_safemode(mddev_t *mddev);
 extern void md_done_sync(mddev_t *mddev, int blocks, int ok);
 extern void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors);

@@ -69,7 +69,7 @@ applicable everywhere (see syntax).
   default values are visible, only the first defined one is active.
   Default values are not limited to the menu entry, where they are
   defined, this means the default can be defined somewhere else or be
-  overriden by an earlier definition.
+  overridden by an earlier definition.
   The default value is only assigned to the config symbol if no other
   value was set by the user (via the input prompt above). If an input
   prompt is visible the default value is presented to the user and can
@@ -142,7 +142,7 @@ Menu structure
 --------------
 
 The position of a menu entry in the tree is determined in two ways. First
-it can be specified explicitely:
+it can be specified explicitly:
 
 menu "Network device support"
 	depends NET

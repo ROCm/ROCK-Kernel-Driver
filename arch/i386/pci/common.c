@@ -90,11 +90,6 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 	}
 }
 
-void __devinit
-pcibios_fixup_pbus_ranges (struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
-{
-}
-
 /*
  *  Called after each bus is probed, but before its children
  *  are examined.

@@ -2,8 +2,8 @@
 # Makefile for the linux s390-specific parts of the memory manager.
 #
 
-EXTRA_TARGETS := image listing
-EXTRA_AFLAGS  := -traditional
+targets		:= image listing
+EXTRA_AFLAGS	:= -traditional
 
 quiet_cmd_listing = OBJDUMP $@
       cmd_listing = $(OBJDUMP) --disassemble --disassemble-all \

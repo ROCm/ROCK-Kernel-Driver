@@ -480,7 +480,7 @@ static void hidinput_close(struct input_dev *dev)
 /*
  * Register the input device; print a message.
  * Configure the input layer interface
- * Read all reports and initalize the absoulte field values.
+ * Read all reports and initialize the absolute field values.
  */
 
 int hidinput_connect(struct hid_device *hid)

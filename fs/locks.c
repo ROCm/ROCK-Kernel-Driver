@@ -565,7 +565,7 @@ static int interruptible_sleep_on_locked(wait_queue_head_t *fl_wait, int timeout
 	int result = 0;
 	DECLARE_WAITQUEUE(wait, current);
 
-	current->state = TASK_INTERRUPTIBLE;
+	__set_current_state(TASK_INTERRUPTIBLE);
 	add_wait_queue(fl_wait, &wait);
 	if (timeout == 0)
 		schedule();
@@ -574,7 +574,7 @@ static int interruptible_sleep_on_locked(wait_queue_head_t *fl_wait, int timeout
 	if (signal_pending(current))
 		result = -ERESTARTSYS;
 	remove_wait_queue(fl_wait, &wait);
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	return result;
 }
 

@@ -1231,6 +1231,7 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 
 	if (root->size > sizeof(root->data)) {
 		printk("nfs_get_sb: invalid root filehandle\n");
+		kfree(server);
 		return ERR_PTR(-EINVAL);
 	}
 	/* We now require that the mount process passes the remote address */

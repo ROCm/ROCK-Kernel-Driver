@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 64
+SUBLEVEL = 65
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -198,7 +198,7 @@ export MODVERDIR := .tmp_versions
 comma := ,
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
-noconfig_targets := xconfig menuconfig config oldconfig randconfig \
+noconfig_targets := xconfig gconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean rpm \
 		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
@@ -327,15 +327,16 @@ endef
 #	set -e makes the rule exit immediately on error
 
 define rule_vmlinux__
-	set -e								\
+	set -e;								\
 	$(if $(filter .tmp_kallsyms%,$^),,				\
 	  echo '  GEN     .version';					\
 	  . $(srctree)/scripts/mkversion > .tmp_version;		\
 	  mv -f .tmp_version .version;					\
 	  $(MAKE) $(build)=init;					\
-	)
-	set -e								\
-	$(call cmd,vmlinux__);						\
+	)								\
+	$(if $($(quiet)cmd_vmlinux__),					\
+	  echo '  $($(quiet)cmd_vmlinux__)' &&) 			\
+	$(cmd_vmlinux__);						\
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
@@ -478,17 +479,19 @@ include/linux/autoconf.h: .config scripts/fixdep
 
 uts_len := 64
 
-include/linux/version.h: Makefile
-	@if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
+define filechk_version.h
+	if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n '  GEN     $@'
-	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
+	(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
-	) > $@.tmp
-	@$(update-if-changed)
+	)
+endef
+
+include/linux/version.h: Makefile
+	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
 
@@ -557,7 +560,7 @@ endif # CONFIG_MODULES
 # Generate asm-offsets.h 
 # ---------------------------------------------------------------------------
 
-define generate-asm-offsets.h
+define filechk_gen-asm-offsets
 	(set -e; \
 	 echo "#ifndef __ASM_OFFSETS_H__"; \
 	 echo "#define __ASM_OFFSETS_H__"; \
@@ -572,7 +575,6 @@ define generate-asm-offsets.h
 	 echo ""; \
 	 echo "#endif" )
 endef
-
 
 else # ifdef include_config
 
@@ -604,14 +606,17 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 # Kernel configuration
 # ---------------------------------------------------------------------------
 
-.PHONY: oldconfig xconfig menuconfig config \
+.PHONY: oldconfig xconfig gconfig menuconfig config \
 	make_with_config rpm
 
-scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
+scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf scripts/kconfig/gconf: scripts/fixdep FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 xconfig: scripts/kconfig/qconf
 	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
+
+gconfig: scripts/kconfig/gconf
+	./scripts/kconfig/gconf arch/$(ARCH)/Kconfig
 
 menuconfig: scripts/kconfig/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
@@ -881,13 +886,28 @@ if_changed_rule = $(if $(strip $? \
 
 cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 
-define update-if-changed
-	if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-		echo ' (unchanged)'; \
-		rm -f $@.tmp; \
-	else \
-		echo ' (updated)'; \
-		mv -f $@.tmp $@; \
+# filechk is used to check if the content of a generated file is updated.
+# Sample usage:
+# define filechk_sample
+#	echo $KERNELRELEASE
+# endef
+# version.h : Makefile
+#	$(call filechk,sample)
+# The rule defined shall write to stdout the content of the new file.
+# The existing file will be compared with the new one.
+# - If no file exist it is created
+# - If the content differ the new file is used
+# - If they are equal no change, and no timestamp update
+
+define filechk
+	@set -e;				\
+	echo '  CHK     $@';			\
+	$(filechk_$(1)) < $< > $@.tmp;		\
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
+		rm -f $@.tmp;			\
+	else					\
+		echo '  UPD     $@';		\
+		mv -f $@.tmp $@;		\
 	fi
 endef
 

@@ -79,7 +79,7 @@ static struct raparms *		raparm_cache;
  * N.B. After this call _both_ fhp and resfh need an fh_put
  *
  * If the lookup would cross a mountpoint, and the mounted filesystem
- * is exported to the client with NFSEXP_CROSSMNT, then the lookup is
+ * is exported to the client with NFSEXP_NOHIDE, then the lookup is
  * accepted as it stands and the mounted directory is
  * returned. Otherwise the covered directory is returned.
  * NOTE: this mountpoint crossing is not supported properly by all
@@ -115,7 +115,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			read_lock(&dparent_lock);
 			dentry = dget(dparent->d_parent);
 			read_unlock(&dparent_lock);
-		} else  if (!EX_CROSSMNT(exp))
+		} else  if (!EX_NOHIDE(exp))
 			dentry = dget(dparent); /* .. == . just like at / */
 		else {
 			/* checking mountpoint crossing is very different when stepping up */
@@ -133,6 +133,12 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 
 			exp2 = exp_parent(exp->ex_client, mnt, dentry,
 					  &rqstp->rq_chandle);
+			if (IS_ERR(exp2)) {
+				err = PTR_ERR(exp2);
+				dput(dentry);
+				mntput(mnt);
+				goto out;
+			}
 			if (!exp2) {
 				dput(dentry);
 				dentry = dget(dparent);
@@ -157,9 +163,19 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			struct dentry *mounts = dget(dentry);
 			while (follow_down(&mnt,&mounts)&&d_mountpoint(mounts))
 				;
+
 			exp2 = exp_get_by_name(exp->ex_client, mnt, 
 					       mounts, &rqstp->rq_chandle);
-			if (exp2 && EX_CROSSMNT(exp2)) {
+			if (IS_ERR(exp2)) {
+				err = PTR_ERR(exp2);
+				dput(mounts);
+				dput(dentry);
+				mntput(mnt);
+				goto out;
+			}
+			if (exp2 &&
+			    ((exp->ex_flags & NFSEXP_CROSSMNT)
+			     || EX_NOHIDE(exp2))) {
 				/* successfully crossed mount point */
 				exp_put(exp);
 				exp = exp2;
@@ -426,7 +442,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 {
 	struct dentry	*dentry;
 	struct inode	*inode;
-	int		flags = O_RDONLY|O_LARGEFILE, mode = FMODE_READ, err;
+	int		flags = O_RDONLY|O_LARGEFILE, err;
 
 	/*
 	 * If we get here, then the client has already done an "open",
@@ -463,14 +479,12 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 			goto out_nfserr;
 
 		flags = O_WRONLY|O_LARGEFILE;
-		mode  = FMODE_WRITE;
 
 		DQUOT_INIT(inode);
 	}
 
-	err = init_private_file(filp, dentry, mode);
+	err = open_private_file(filp, dentry, flags);
 	if (!err) {
-		filp->f_flags = flags;
 		filp->f_vfsmnt = fhp->fh_export->ex_mnt;
 	} else if (access & MAY_WRITE)
 		put_write_access(inode);
@@ -491,8 +505,7 @@ nfsd_close(struct file *filp)
 	struct dentry	*dentry = filp->f_dentry;
 	struct inode	*inode = dentry->d_inode;
 
-	if (filp->f_op->release)
-		filp->f_op->release(inode, filp);
+	close_private_file(filp);
 	if (filp->f_mode & FMODE_WRITE)
 		put_write_access(inode);
 }
@@ -1190,7 +1203,9 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
 					| S_IFLNK;
 				err = notify_change(dnew, iap);
-				if (!err && EX_ISSYNC(fhp->fh_export))
+				if (err)
+					err = nfserrno(err);
+				else if (EX_ISSYNC(fhp->fh_export))
 					write_inode_now(dentry->d_inode, 1);
 		       }
 		}

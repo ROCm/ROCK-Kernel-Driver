@@ -71,7 +71,7 @@
  * usb_serial_port: structure for the specific ports of a device.
  * @magic: magic number for internal validity of this pointer.
  * @serial: pointer back to the struct usb_serial owner of this port.
- * @tty: pointer to the coresponding tty for this port.
+ * @tty: pointer to the corresponding tty for this port.
  * @number: the number of the port (the minor number).
  * @interrupt_in_buffer: pointer to the interrupt in buffer for this port.
  * @interrupt_in_urb: pointer to the interrupt in struct urb for this port.

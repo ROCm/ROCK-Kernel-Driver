@@ -21,7 +21,7 @@ are:
 
   This is a program for converting SGML template files into SGML
   files. When a file is referenced it is searched for symbols
-  exported (EXPORT_SYMBOL), to be able to distingush between internal
+  exported (EXPORT_SYMBOL), to be able to distinguish between internal
   and external functions.
   It invokes kernel-doc, giving it the list of functions that
   are to be documented.

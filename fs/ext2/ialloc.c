@@ -545,10 +545,7 @@ repeat:
 	ei->i_prealloc_count = 0;
 	ei->i_dir_start_lookup = 0;
 	ei->i_state = EXT2_STATE_NEW;
-	if (ei->i_flags & EXT2_SYNC_FL)
-		inode->i_flags |= S_SYNC;
-	if (ei->i_flags & EXT2_DIRSYNC_FL)
-		inode->i_flags |= S_DIRSYNC;
+	ext2_set_inode_flags(inode);
 	inode->i_generation = EXT2_SB(sb)->s_next_generation++;
 	insert_inode_hash(inode);
 

@@ -83,16 +83,9 @@ struct pci_hba_data *parisc_pci_hba[PCI_HBA_MAX];
 u##size in##type (int addr) \
 { \
 	int b = PCI_PORT_HBA(addr); \
-	u##size d = (u##size) -1; \
 	EISA_IN(size); \
-	ASSERT(pci_port); /* make sure services are defined */ \
-	ASSERT(parisc_pci_hba[b]); /* make sure ioaddr are "fixed up" */ \
-	if (parisc_pci_hba[b] == NULL) { \
-		printk(KERN_WARNING "\nPCI or EISA Host Bus Adapter %d not registered. in" #size "(0x%x) returning -1\n", b, addr); \
-	} else { \
-		d = pci_port->in##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr)); \
-	} \
-	return d; \
+	if (!parisc_pci_hba[b]) return (u##size) -1; \
+	return pci_port->in##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr)); \
 }
 
 PCI_PORT_IN(b,  8)
@@ -105,7 +98,7 @@ void out##type (u##size d, int addr) \
 { \
 	int b = PCI_PORT_HBA(addr); \
 	EISA_OUT(size); \
-	ASSERT(pci_port); \
+	if (!parisc_pci_hba[b]) return; \
 	pci_port->out##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr), d); \
 }
 
@@ -192,74 +185,6 @@ void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 }
 
 
-/* ------------------------------------
-**
-** Program one BAR in PCI config space.
-**
-** ------------------------------------
-** PAT PDC systems need this routine. PA legacy PDC does not.
-**
-** When BAR's are configured by linux, this routine will update
-** configuration space with the "normalized" address. "root" indicates
-** where the range starts and res is some portion of that range.
-**
-** VCLASS: For all PA-RISC systems except V-class, root->start would be zero.
-**
-** PAT PDC can tell us which MMIO ranges are available or already in use.
-** I/O port space and such are not memory mapped anyway for PA-Risc.
-*/
-void __devinit
-pcibios_update_resource(
-	struct pci_dev *dev,
-	struct resource *root,
-	struct resource *res,
-	int barnum
-	)
-{
-	int where;
-	u32 barval = 0;
-
-	DBG_RES("pcibios_update_resource(%s, ..., %d) [%lx,%lx]/%x\n",
-		dev->slot_name,
-		barnum, res->start, res->end, (int) res->flags);
-
-	if (barnum >= PCI_BRIDGE_RESOURCES) {
-		/* handled in PCI-PCI bridge specific support */
-		return;
-	}
-
-	if (barnum == PCI_ROM_RESOURCE) {
-		where = PCI_ROM_ADDRESS;
-	} else {
-		/* 0-5  standard PCI "regions" */
-		where = PCI_BASE_ADDRESS_0 + (barnum * 4);
-	}
-
-	if (res->flags & IORESOURCE_IO) {
-		barval = PCI_PORT_ADDR(res->start);
-	} else if (res->flags & IORESOURCE_MEM) {
-		barval = PCI_BUS_ADDR(HBA_DATA(dev->bus->dev->platform_data), res->start);
-	} else {
-		panic("pcibios_update_resource() WTF? flags not IO or MEM");
-	}
-
-	pci_write_config_dword(dev, where, barval);
-
-/* XXX FIXME - Elroy does support 64-bit (dual cycle) addressing.
-** But at least one device (Symbios 53c896) which has 64-bit BAR
-** doesn't actually work right with dual cycle addresses.
-** So ignore the whole mess for now.
-*/
-
-	if ((res->flags & (PCI_BASE_ADDRESS_SPACE
-			   | PCI_BASE_ADDRESS_MEM_TYPE_MASK))
-	    == (PCI_BASE_ADDRESS_SPACE_MEMORY
-		| PCI_BASE_ADDRESS_MEM_TYPE_64)) {
-		pci_write_config_dword(dev, where+4, 0);
-		DBGC("PCIBIOS: dev %s type 64-bit\n", dev->name);
-	}
-}
-
 /*
 ** Called by pci_set_master() - a driver interface.
 **
@@ -345,30 +270,34 @@ pcibios_link_hba_resources( struct resource *hba_res, struct resource *r)
 /*
 ** called by drivers/pci/setup-res.c:pci_setup_bridge().
 */
-void __devinit pcibios_fixup_pbus_ranges(
-	struct pci_bus *bus,
-	struct pbus_set_ranges_data *ranges
+void __devinit pcibios_resource_to_bus(
+ 	struct pci_dev *dev,
+	struct pci_bus_region *region,
+	struct resource *res
 	)
 {
+	struct pci_bus *bus = dev->bus;
 	struct pci_hba_data *hba = HBA_DATA(bus->dev->platform_data);
 
-	/*
-	** I/O space may see busnumbers here. Something
-	** in the form of 0xbbxxxx where bb is the bus num
-	** and xxxx is the I/O port space address.
-	** Remaining address translation are done in the
-	** PCI Host adapter specific code - ie dino_out8.
-	*/
-	ranges->io_start = PCI_PORT_ADDR(ranges->io_start);
-	ranges->io_end   = PCI_PORT_ADDR(ranges->io_end);
+	if (res->flags & IORESOURCE_IO) {
+		/*
+		** I/O space may see busnumbers here. Something
+		** in the form of 0xbbxxxx where bb is the bus num
+		** and xxxx is the I/O port space address.
+		** Remaining address translation are done in the
+		** PCI Host adapter specific code - ie dino_out8.
+		*/
+		region->start = PCI_PORT_ADDR(res->start);
+		region->end   = PCI_PORT_ADDR(res->end);
+	} else if (res->flags & IORESOURCE_MEM) {
+		/* Convert MMIO addr to PCI addr (undo global virtualization) */
+		region->start = PCI_BUS_ADDR(hba, res->start);
+		region->end   = PCI_BUS_ADDR(hba, res->end);
+	}
 
-	/* Convert MMIO addr to PCI addr (undo global virtualization) */
-	ranges->mem_start = PCI_BUS_ADDR(hba, ranges->mem_start);
-	ranges->mem_end   = PCI_BUS_ADDR(hba, ranges->mem_end);
-
-	DBG_RES("pcibios_fixup_pbus_ranges(%02x, [%lx,%lx %lx,%lx])\n", bus->number,
-		ranges->io_start, ranges->io_end,
-		ranges->mem_start, ranges->mem_end);
+	DBG_RES("pcibios_resource_to_bus(%02x %s [%lx,%lx])\n",
+		bus->number, res->flags & IORESOURCE_IO ? "IO" : "MEM",
+		region->start, region->end);
 
 	/* KLUGE ALERT
 	** if this resource isn't linked to a "parent", then it seems
@@ -378,8 +307,9 @@ void __devinit pcibios_fixup_pbus_ranges(
 	pcibios_link_hba_resources(&hba->lmmio_space, bus->resource[1]);
 }
 
-#define MAX(val1, val2)   ((val1) > (val2) ? (val1) : (val2))
-
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 /*
 ** pcibios align resources() is called everytime generic PCI code
@@ -409,7 +339,7 @@ pcibios_align_resource(void *data, struct resource *res,
 	align = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
 
 	/* Align to largest of MIN or input size */
-	mask = MAX(alignment, align) - 1;
+	mask = max(alignment, align) - 1;
 	res->start += mask;
 	res->start &= ~mask;
 

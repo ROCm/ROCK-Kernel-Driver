@@ -266,6 +266,25 @@ sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
 sdev_rw_attr_bit (online);
 
+static ssize_t
+show_rescan_field (struct device *dev, char *buf)
+{
+	return 0; 
+}
+
+static ssize_t
+store_rescan_field (struct device *dev, const char *buf, size_t count) 
+{
+	int ret = ENODEV;
+	struct scsi_device *sdev;
+	sdev = to_scsi_device(dev);
+	if (sdev)
+		ret = scsi_rescan_device(sdev);
+	return ret;
+}
+
+static DEVICE_ATTR(rescan, S_IRUGO | S_IWUSR, show_rescan_field, store_rescan_field)
+
 static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_device_blocked,
 	&dev_attr_queue_depth,
@@ -276,6 +295,7 @@ static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_model,
 	&dev_attr_rev,
 	&dev_attr_online,
+	&dev_attr_rescan,
 };
 
 /**

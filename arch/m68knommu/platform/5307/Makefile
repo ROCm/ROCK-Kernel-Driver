@@ -20,5 +20,5 @@ obj-$(CONFIG_COLDFIRE)	+= entry.o timers.o vectors.o
 obj-$(CONFIG_M5307)	+= config.o
 
 ifeq ($(CONFIG_M5307),y)
-EXTRA_TARGETS := $(BOARD)/crt0_$(MODEL).o
+extra-y := $(BOARD)/crt0_$(MODEL).o
 endif

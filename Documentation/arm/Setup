@@ -97,7 +97,7 @@ below:
  initrd_size
 
    This describes the kernel virtual start address and size of the
-   inital ramdisk.
+   initial ramdisk.
 
  rd_start
 

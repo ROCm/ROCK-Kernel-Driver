@@ -56,11 +56,7 @@ static int batch_requests;
 unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
 
-static struct congestion_state {
-	wait_queue_head_t wqh;
-	atomic_t nr_congested_queues;
-	atomic_t nr_active_queues;
-} congestion_states[2];
+static wait_queue_head_t congestion_wqh[2];
 
 /*
  * Return the threshold (number of free requests) at which the queue is
@@ -98,14 +94,12 @@ static inline int queue_congestion_off_threshold(void)
 static void clear_queue_congested(request_queue_t *q, int rw)
 {
 	enum bdi_state bit;
-	struct congestion_state *cs = &congestion_states[rw];
+	wait_queue_head_t *wqh = &congestion_wqh[rw];
 
 	bit = (rw == WRITE) ? BDI_write_congested : BDI_read_congested;
-
-	if (test_and_clear_bit(bit, &q->backing_dev_info.state))
-		atomic_dec(&cs->nr_congested_queues);
-	if (waitqueue_active(&cs->wqh))
-		wake_up(&cs->wqh);
+	clear_bit(bit, &q->backing_dev_info.state);
+	if (waitqueue_active(wqh))
+		wake_up(wqh);
 }
 
 /*
@@ -117,37 +111,7 @@ static void set_queue_congested(request_queue_t *q, int rw)
 	enum bdi_state bit;
 
 	bit = (rw == WRITE) ? BDI_write_congested : BDI_read_congested;
-
-	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
-		atomic_inc(&congestion_states[rw].nr_congested_queues);
-}
-
-/*
- * A queue has just put back its last read or write request and has fallen
- * idle.
- */
-static void clear_queue_active(request_queue_t *q, int rw)
-{
-	enum bdi_state bit;
-
-	bit = (rw == WRITE) ? BDI_write_active : BDI_read_active;
-
-	if (test_and_clear_bit(bit, &q->backing_dev_info.state))
-		atomic_dec(&congestion_states[rw].nr_active_queues);
-}
-
-/*
- * A queue has just taken its first read or write request and has become
- * active.
- */
-static void set_queue_active(request_queue_t *q, int rw)
-{
-	enum bdi_state bit;
-
-	bit = (rw == WRITE) ? BDI_write_active : BDI_read_active;
-
-	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
-		atomic_inc(&congestion_states[rw].nr_active_queues);
+	set_bit(bit, &q->backing_dev_info.state);
 }
 
 /**
@@ -1040,7 +1004,8 @@ void generic_unplug_device(void *data)
 
 static void blk_unplug_work(void *data)
 {
-	generic_unplug_device(data);
+	request_queue_t *q = data;
+	q->unplug_fn(q);
 }
 
 static void blk_unplug_timeout(unsigned long data)
@@ -1324,8 +1289,6 @@ static struct request *get_request(request_queue_t *q, int rw)
 		rq = blkdev_free_rq(&rl->free);
 		list_del_init(&rq->queuelist);
 		rq->ref_count = 1;
-		if (rl->count == queue_nr_requests)
-			set_queue_active(q, rw);
 		rl->count--;
 		if (rl->count < queue_congestion_on_threshold())
 			set_queue_congested(q, rw);
@@ -1568,8 +1531,6 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		rl->count++;
 		if (rl->count >= queue_congestion_off_threshold())
 			clear_queue_congested(q, rw);
-		if (rl->count == queue_nr_requests)
-			clear_queue_active(q, rw);
 		if (rl->count >= batch_requests && waitqueue_active(&rl->wait))
 			wake_up(&rl->wait);
 	}
@@ -1604,12 +1565,12 @@ void blk_put_request(struct request *req)
 void blk_congestion_wait(int rw, long timeout)
 {
 	DEFINE_WAIT(wait);
-	struct congestion_state *cs = &congestion_states[rw];
+	wait_queue_head_t *wqh = &congestion_wqh[rw];
 
 	blk_run_queues();
-	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
+	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 	io_schedule_timeout(timeout);
-	finish_wait(&cs->wqh, &wait);
+	finish_wait(wqh, &wait);
 }
 
 /*
@@ -2248,11 +2209,8 @@ int __init blk_dev_init(void)
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
-	for (i = 0; i < ARRAY_SIZE(congestion_states); i++) {
-		init_waitqueue_head(&congestion_states[i].wqh);
-		atomic_set(&congestion_states[i].nr_congested_queues, 0);
-		atomic_set(&congestion_states[i].nr_active_queues, 0);
-	}
+	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
+		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 };
 

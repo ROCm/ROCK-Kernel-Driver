@@ -208,12 +208,11 @@ struct uart_state {
 #define USF_CLOSING_WAIT_NONE	(65535)
 
 	int			count;
+	int			pm_state;
 	struct uart_info	*info;
 	struct uart_port	*port;
 
-#ifdef CONFIG_PM
-	struct pm_dev		*pm;
-#endif
+	struct semaphore	sem;
 };
 
 #define UART_XMIT_SIZE 1024
@@ -224,8 +223,6 @@ struct uart_state {
  * stuff here.
  */
 struct uart_info {
-	struct uart_port	*port;
-	struct uart_state	*state;
 	struct tty_struct	*tty;
 	struct circ_buf		xmit;
 	unsigned int		flags;
@@ -237,7 +234,6 @@ struct uart_info {
  */
 #define UIF_CHECK_CD		(1 << 25)
 #define UIF_CTS_FLOW		(1 << 26)
-#define UIF_CLOSING		(1 << 27)
 #define UIF_NORMAL_ACTIVE	(1 << 29)
 #define UIF_INITIALIZED		(1 << 31)
 
@@ -306,6 +302,12 @@ void uart_unregister_port(struct uart_driver *reg, int line);
 int uart_register_port(struct uart_driver *reg, struct uart_port *port);
 int uart_add_one_port(struct uart_driver *reg, struct uart_port *port);
 int uart_remove_one_port(struct uart_driver *reg, struct uart_port *port);
+
+/*
+ * Power Management
+ */
+int uart_suspend_port(struct uart_driver *reg, struct uart_port *port, u32 level);
+int uart_resume_port(struct uart_driver *reg, struct uart_port *port, u32 level);
 
 #define uart_circ_empty(circ)		((circ)->head == (circ)->tail)
 #define uart_circ_clear(circ)		((circ)->head = (circ)->tail = 0)

@@ -8,7 +8,7 @@ ROOT_IMG	:= /usr/src/root.img
 ELFTOAOUT	:= elftoaout
 
 host-progs	:= piggyback btfixupprep
-EXTRA_TARGETS	:= tftpboot.img btfix.o btfix.s image
+targets		:= tftpboot.img btfix.o btfix.s image
 
 quiet_cmd_elftoaout	= ELFTOAOUT $@
       cmd_elftoaout	= $(ELFTOAOUT) $(obj)/image -o $@

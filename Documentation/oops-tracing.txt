@@ -219,7 +219,7 @@ characters, each representing a particular tainted value.
   2: 'F' if any module was force loaded by insmod -f, ' ' if all
      modules were loaded normally.
 
-  3: 'S' if the oops occured on an SMP kernel running on hardware that
+  3: 'S' if the oops occurred on an SMP kernel running on hardware that
       hasn't been certified as safe to run multiprocessor.
 	  Currently this occurs only on various Athlons that are not
 	  SMP capable.

@@ -34,10 +34,12 @@
 #include <linux/pci.h>
 #include <asm/scatterlist.h>
 
+#include <media/video-buf.h>
+#include <media/audiochip.h>
+#include <media/tuner.h>
+
 #include "bt848.h"
 #include "bttv.h"
-#include "video-buf.h"
-#include "audiochip.h"
 
 #ifdef __KERNEL__
 

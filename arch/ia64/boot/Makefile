@@ -8,16 +8,14 @@
 # Copyright (C) 1998 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
-EXTRA_TARGETS := vmlinux.bin vmlinux.gz
-
 targets-$(CONFIG_IA64_HP_SIM)  += bootloader
 targets-$(CONFIG_IA64_GENERIC) += bootloader
-EXTRA_TARGETS += $(sort $(targets-y))
+targets := vmlinux.bin vmlinux.gz $(targets-y)
 
 quiet_cmd_cptotop = LN      $@
       cmd_cptotop = ln -f $< $@
 
-vmlinux.gz: $(obj)/vmlinux.gz $(targets-y)
+vmlinux.gz: $(obj)/vmlinux.gz $(addprefix $(obj)/,$(targets-y))
 	$(call cmd,cptotop)
 	@echo '  Kernel: $@ is ready'
 

@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.6 2002/10/21 16:13:22 varenet Exp $
+/* $Id: ioctl32.c,v 1.5 2002/10/18 00:21:43 varenet Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -65,6 +65,9 @@
 #include <scsi/scsi_ioctl.h>
 #define __KERNEL__
 #include <scsi/sg.h>
+
+#include <linux/raid/md_u.h>
+#include <linux/dm-ioctl.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -2824,6 +2827,27 @@ static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, struct blkpg_ioc
 	return err;
 }
 
+/* Fix sizeof(sizeof()) breakage */
+#define BLKBSZGET_32	_IOR(0x12,112,int)
+#define BLKBSZSET_32	_IOW(0x12,113,int)
+#define BLKGETSIZE64_32	_IOR(0x12,114,int)
+
+static int do_blkbszget(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return sys_ioctl(fd, BLKBSZGET, arg);
+}
+
+static int do_blkbszset(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	return sys_ioctl(fd, BLKBSZSET, arg);
+}
+
+static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
+			   unsigned long arg)
+{
+	return sys_ioctl(fd, BLKGETSIZE64, arg);
+}
+
 static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	return rw_long(fd, AUTOFS_IOC_SETTIMEOUT, arg);
@@ -2997,14 +3021,13 @@ COMPATIBLE_IOCTL(BLKROGET)
 COMPATIBLE_IOCTL(BLKRRPART)
 COMPATIBLE_IOCTL(BLKFLSBUF)
 COMPATIBLE_IOCTL(BLKSECTSET)
-COMPATIBLE_IOCTL(BLKSSZGET)
-COMPATIBLE_IOCTL(BLKBSZGET)
 
 /* RAID */
 COMPATIBLE_IOCTL(RAID_VERSION)
 COMPATIBLE_IOCTL(GET_ARRAY_INFO)
 COMPATIBLE_IOCTL(GET_DISK_INFO)
 COMPATIBLE_IOCTL(PRINT_RAID_DEBUG)
+COMPATIBLE_IOCTL(RAID_AUTORUN)
 COMPATIBLE_IOCTL(CLEAR_ARRAY)
 COMPATIBLE_IOCTL(ADD_NEW_DISK)
 COMPATIBLE_IOCTL(HOT_REMOVE_DISK)
@@ -3015,11 +3038,25 @@ COMPATIBLE_IOCTL(UNPROTECT_ARRAY)
 COMPATIBLE_IOCTL(PROTECT_ARRAY)
 COMPATIBLE_IOCTL(HOT_ADD_DISK)
 COMPATIBLE_IOCTL(SET_DISK_FAULTY)
+COMPATIBLE_IOCTL(HOT_GENERATE_ERROR)
 COMPATIBLE_IOCTL(RUN_ARRAY)
 COMPATIBLE_IOCTL(START_ARRAY)
 COMPATIBLE_IOCTL(STOP_ARRAY)
 COMPATIBLE_IOCTL(STOP_ARRAY_RO)
 COMPATIBLE_IOCTL(RESTART_ARRAY_RW)
+
+/* DM */
+COMPATIBLE_IOCTL(DM_VERSION)
+COMPATIBLE_IOCTL(DM_REMOVE_ALL)
+COMPATIBLE_IOCTL(DM_DEV_CREATE)
+COMPATIBLE_IOCTL(DM_DEV_REMOVE)
+COMPATIBLE_IOCTL(DM_DEV_RELOAD)
+COMPATIBLE_IOCTL(DM_DEV_SUSPEND)
+COMPATIBLE_IOCTL(DM_DEV_RENAME)
+COMPATIBLE_IOCTL(DM_DEV_DEPS)
+COMPATIBLE_IOCTL(DM_DEV_STATUS)
+COMPATIBLE_IOCTL(DM_TARGET_STATUS)
+COMPATIBLE_IOCTL(DM_TARGET_WAIT)
 
 /* Big K */
 COMPATIBLE_IOCTL(PIO_FONT)
@@ -3570,6 +3607,11 @@ HANDLE_IOCTL(BLKGETSIZE, w_long)
 HANDLE_IOCTL(0x1260, broken_blkgetsize)
 HANDLE_IOCTL(BLKSECTGET, w_long)
 HANDLE_IOCTL(BLKPG, blkpg_ioctl_trans)
+/* take care of sizeof(sizeof()) breakage */
+/* block stuff */
+HANDLE_IOCTL(BLKBSZGET_32, do_blkbszget)
+HANDLE_IOCTL(BLKBSZSET_32, do_blkbszset)
+HANDLE_IOCTL(BLKGETSIZE64_32, do_blkgetsize64)
 
 HANDLE_IOCTL(FBIOGET_FSCREENINFO, fb_ioctl_trans)
 HANDLE_IOCTL(FBIOGETCMAP, fb_ioctl_trans)

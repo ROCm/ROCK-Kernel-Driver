@@ -138,7 +138,7 @@ Insert a line of the form:
 options sk98lin ...
 
 For "...", use the same syntax as described below for the command
-line paramaters of modprobe.
+line parameters of modprobe.
 You either have to reboot your computer or unload and reload
 the driver to activate the new parameters.
 The syntax of the driver parameters is:
@@ -276,7 +276,7 @@ which you set the parameter (A or B).
 
 Large frames (also called jumbo frames) are now supported by the
 driver. This can result in a greatly improved throughput if
-transfering large amounts of data.
+transferring large amounts of data.
 To enable large frames, set the MTU (maximum transfer unit)
 of the interface to the value you wish (up to 9000). The command
 for this is:
@@ -489,7 +489,7 @@ Problems fixed:
   established (#10402)
 - Installation problems with RedHat 6.0 (#10409)
 New Features:
-- Connection state ouput at "network connection up"
+- Connection state output at "network connection up"
 Known limitations:
 - None
 

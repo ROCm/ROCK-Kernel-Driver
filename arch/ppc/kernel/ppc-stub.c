@@ -420,18 +420,6 @@ static void kgdb_flush_cache_all(void)
 	flush_instruction_cache();
 }
 
-static inline int get_msr(void)
-{
-	int msr;
-	asm volatile("mfmsr %0" : "=r" (msr):);
-	return msr;
-}
-
-static inline void set_msr(int msr)
-{
-	asm volatile("mtmsr %0" : : "r" (msr));
-}
-
 /* Set up exception handlers for tracing and breakpoints
  * [could be called kgdb_init()]
  */
@@ -598,8 +586,8 @@ handle_exception (struct pt_regs *regs)
 
 	kgdb_interruptible(0);
 	lock_kernel();
-	msr = get_msr();
-	set_msr(msr & ~MSR_EE);	/* disable interrupts */
+	msr = mfmsr();
+	mtmsr(msr & ~MSR_EE);	/* disable interrupts */
 
 	if (regs->nip == (unsigned long)breakinst) {
 		/* Skip over breakpoint trap insn */
@@ -626,7 +614,7 @@ handle_exception (struct pt_regs *regs)
 	*ptr++ = hexchars[SP_REGNUM >> 4];
 	*ptr++ = hexchars[SP_REGNUM & 0xf];
 	*ptr++ = ':';
-	ptr = mem2hex(((char *)&regs) + SP_REGNUM*4, ptr, 4);
+	ptr = mem2hex(((char *)regs) + SP_REGNUM*4, ptr, 4);
 	*ptr++ = ';';
 #endif
 
@@ -786,7 +774,7 @@ handle_exception (struct pt_regs *regs)
 			strcpy(remcomOutBuffer, "OK");
 			putpacket(remcomOutBuffer);
 #endif
-			set_msr(msr);
+			mtmsr(msr);
 
 			kgdb_interruptible(1);
 			unlock_kernel();
@@ -802,10 +790,9 @@ handle_exception (struct pt_regs *regs)
 #if defined(CONFIG_40x)
 			regs->msr |= MSR_DE;
 			regs->dbcr0 |= (DBCR0_IDM | DBCR0_IC);
-			set_msr(msr);
+			mtmsr(msr);
 #else
 			regs->msr |= MSR_SE;
-			set_msr(msr | MSR_SE);
 #endif
 			unlock_kernel();
 			kgdb_active = 0;

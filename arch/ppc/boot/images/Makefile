@@ -2,9 +2,8 @@
 # This dir holds all of the images for PPC machines.
 # Tom Rini	January 2001
 
-EXTRA_TARGETS	:= vmlinux.gz
-
-GZIP_FLAGS = -v9f
+targets		:= vmlinux.gz
+GZIP_FLAGS	:= -v9f
 
 $(obj)/vmlinux.gz: vmlinux
 	$(OBJCOPY) -O binary $< $(@:.gz=)

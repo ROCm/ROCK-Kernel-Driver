@@ -9,7 +9,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-static struct device legacy_bus = {
+struct device legacy_bus = {
 	.name		= "legacy bus",
 	.bus_id		= "legacy",
 };
@@ -75,5 +75,7 @@ int __init platform_bus_init(void)
 	return bus_register(&platform_bus_type);
 }
 
+EXPORT_SYMBOL(legacy_bus);
+EXPORT_SYMBOL(platform_bus_type);
 EXPORT_SYMBOL(platform_device_register);
 EXPORT_SYMBOL(platform_device_unregister);

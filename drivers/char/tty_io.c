@@ -1034,7 +1034,9 @@ static void release_mem(struct tty_struct *tty, int idx)
 		}
 		o_tty->magic = 0;
 		(*o_tty->driver.refcount)--;
+		file_list_lock();
 		list_del(&o_tty->tty_files);
+		file_list_unlock();
 		free_tty_struct(o_tty);
 	}
 
@@ -1046,7 +1048,9 @@ static void release_mem(struct tty_struct *tty, int idx)
 	}
 	tty->magic = 0;
 	(*tty->driver.refcount)--;
+	file_list_lock();
 	list_del(&tty->tty_files);
+	file_list_unlock();
 	module_put(tty->driver.owner);
 	free_tty_struct(tty);
 }
@@ -2235,14 +2239,19 @@ struct device_class tty_devclass = {
 };
 EXPORT_SYMBOL(tty_devclass);
 
+static int __init tty_devclass_init(void)
+{
+	return devclass_register(&tty_devclass);
+}
+
+postcore_initcall(tty_devclass_init);
+
 /*
  * Ok, now we can initialize the rest of the tty devices and can count
  * on memory allocations, interrupts etc..
  */
 void __init tty_init(void)
 {
-	devclass_register(&tty_devclass);
-
 	/*
 	 * dev_tty_driver and dev_console_driver are actually magic
 	 * devices which get redirected at open time.  Nevertheless,

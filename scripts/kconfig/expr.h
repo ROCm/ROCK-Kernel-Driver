@@ -155,9 +155,11 @@ struct property {
 #define for_all_properties(sym, st, tok) \
 	for (st = sym->prop; st; st = st->next) \
 		if (st->type == (tok))
-#define for_all_prompts(sym, st) for_all_properties(sym, st, P_PROMPT)
 #define for_all_defaults(sym, st) for_all_properties(sym, st, P_DEFAULT)
 #define for_all_choices(sym, st) for_all_properties(sym, st, P_CHOICE)
+#define for_all_prompts(sym, st) \
+	for (st = sym->prop; st; st = st->next) \
+		if (st->text)
 
 struct menu {
 	struct menu *next;

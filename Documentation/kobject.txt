@@ -7,7 +7,7 @@ Patrick Mochel <mochel@osdl.org>
 
 0. Introduction
 
-The kobject infrastructure performs basic object managment that larger
+The kobject infrastructure performs basic object management that larger
 data structures and subsystems can leverage, rather than reimplement
 similar functionality. This functionality consists primarily concerns:
 

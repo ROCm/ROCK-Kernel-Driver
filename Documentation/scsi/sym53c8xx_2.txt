@@ -205,7 +205,7 @@ Queuing more than 1 command at a time to a device allows it to perform
 optimizations based on actual head positions and its mechanical 
 characteristics. This feature may also reduce average command latency.
 In order to really gain advantage of this feature, devices must have 
-a reasonnable cache size (No miracle is to be expected for a low-end 
+a reasonable cache size (No miracle is to be expected for a low-end 
 hard disk with 128 KB or less).
 Some kown old SCSI devices do not properly support tagged command queuing.
 Generally, firmware revisions that fix this kind of problems are available 
@@ -579,7 +579,7 @@ characters and digits are allowed.
 
     Available option bits:
         0x0:   No check.
-        0x1:   Check and donnot attach the controller on error.  
+        0x1:   Check and do not attach the controller on error.  
         0x2:   Check and just warn on error.
 
 10.2.16 Exclude a host from being attached
@@ -698,7 +698,7 @@ following things:
 - terminations at both end of the SCSI chain
 - linux syslog messages (some of them may help you)
 
-If you donnot find the source of problems, you can configure the
+If you do not find the source of problems, you can configure the
 driver or devices in the NVRAM with minimal features.
 
 - only asynchronous data transfers
@@ -756,14 +756,14 @@ Field B : DSTAT io register (DMA STATUS)
 Field C : SIST io register (SCSI Interrupt Status)
   Bit 0x08 : SGE  SCSI GROSS ERROR
              Indicates that the chip detected a severe error condition 
-             on the SCSI BUS that prevents the SCSI protocol from functionning
+             on the SCSI BUS that prevents the SCSI protocol from functioning
              properly.
-  Bit 0x04 : UDC  Undexpected Disconnection
+  Bit 0x04 : UDC  Unexpected Disconnection
              Indicates that the device released the SCSI BUS when the chip 
              was not expecting this to happen. A device may behave so to 
-             indicate the SCSI initiator that an error condition not reportable              using the SCSI protocol has occured.
+             indicate the SCSI initiator that an error condition not reportable              using the SCSI protocol has occurred.
   Bit 0x02 : RST  SCSI BUS Reset
-             Generally SCSI targets donnot reset the SCSI BUS, although any 
+             Generally SCSI targets do not reset the SCSI BUS, although any 
              device on the BUS can reset it at any time.
   Bit 0x01 : PAR  Parity
              SCSI parity error detected.

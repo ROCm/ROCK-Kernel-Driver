@@ -854,13 +854,6 @@ char * __init pcibios_setup(char *str)
 	return str;
 }
 
-/*
- */
-void pcibios_update_resource(struct pci_dev *pdev, struct resource *res1,
-			     struct resource *res2, int index)
-{
-}
-
 void pcibios_align_resource(void *data, struct resource *res,
 			    unsigned long size, unsigned long align)
 {

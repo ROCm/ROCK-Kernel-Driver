@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS	:= head.o
+extra-y		:= head.o
 EXTRA_AFLAGS	:= $(CFLAGS)
 EXTRA_CFLAGS	:= -Werror -Wno-sign-compare
 

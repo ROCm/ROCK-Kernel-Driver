@@ -190,6 +190,11 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 
 /* Return the index of the PCI controller for device PDEV. */
 extern int pci_controller_num(struct pci_dev *pdev);
+
+extern void
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res);
+
 #endif /* __KERNEL__ */
 
 /* Values for the `which' argument to sys_pciconfig_iobase.  */

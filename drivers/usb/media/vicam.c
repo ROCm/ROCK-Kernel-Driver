@@ -531,7 +531,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 		return -ENODEV;
 
 	switch (ioctlnr) {
-		/* query capabilites */
+		/* query capabilities */
 	case VIDIOCGCAP:
 		{
 			struct video_capability b;

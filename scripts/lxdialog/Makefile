@@ -15,8 +15,8 @@ endif
 endif
 endif
 
-host-progs    := lxdialog
-build-targets := $(host-progs)
+host-progs	:= lxdialog
+always		:= $(host-progs)
 
 lxdialog-objs := checklist.o menubox.o textbox.o yesno.o inputbox.o \
 		 util.o lxdialog.o msgbox.o

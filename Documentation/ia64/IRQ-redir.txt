@@ -29,7 +29,7 @@ delivery mode (redirectable):
 The output of the command
      cat /proc/irq/IRQ#/smp_affinity
 gives the target CPU mask for the specified interrupt vector. If the CPU
-mask is preceeded by the character "r", the interrupt is redirectable
+mask is preceded by the character "r", the interrupt is redirectable
 (i.e. lowest priority mode routing is used), otherwise its route is
 fixed.
 

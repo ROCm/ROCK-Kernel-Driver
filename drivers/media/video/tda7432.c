@@ -49,8 +49,8 @@
 #include <linux/i2c-algo-bit.h>
 
 #include "bttv.h"
-#include "audiochip.h"
-#include "id.h"
+#include <media/audiochip.h>
+#include <media/id.h>
 
 #ifndef VIDEO_AUDIO_BALANCE
 # define VIDEO_AUDIO_BALANCE 32

@@ -129,6 +129,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
+		inode->i_rdev = to_kdev_t(0);
 		inode->i_security = NULL;
 		if (security_inode_alloc(inode)) {
 			if (inode->i_sb->s_op->destroy_inode)
@@ -1213,7 +1214,7 @@ repeat:
 		goto repeat;
 	}
 	remove_wait_queue(wq, &wait);
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 }
 
 void wake_up_inode(struct inode *inode)

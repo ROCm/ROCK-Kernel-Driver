@@ -186,4 +186,8 @@ extern inline void pcibios_register_hba(struct pci_hba_data *x)
 /* export the pci_ DMA API in terms of the dma_ one */
 #include <asm-generic/pci-dma-compat.h>
 
+extern void
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res);
+
 #endif /* __ASM_PARISC_PCI_H */

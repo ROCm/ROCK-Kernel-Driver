@@ -8,6 +8,8 @@ comma   := ,
 empty   :=
 space   := $(empty) $(empty)
 
+# Backward compatibility - to be removed...
+extra-y	+= $(EXTRA_TARGETS)
 # Figure out what we need to build from the various variables
 # ===========================================================================
 
@@ -51,7 +53,7 @@ multi-objs   := $(multi-objs-y) $(multi-objs-m)
 subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
 
 # Replace multi-part objects by their individual parts, look at local dir only
-real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(EXTRA_TARGETS)
+real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(extra-y)
 real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m)))
 
 # C code
@@ -84,8 +86,9 @@ host-cshobjs	:= $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
 
 # Add subdir path
 
-EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
-build-targets	:= $(addprefix $(obj)/,$(build-targets))
+extra-y		:= $(addprefix $(obj)/,$(extra-y))
+always		:= $(addprefix $(obj)/,$(always))
+targets		:= $(addprefix $(obj)/,$(targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
 subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))

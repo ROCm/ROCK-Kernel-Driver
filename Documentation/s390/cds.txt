@@ -214,7 +214,7 @@ int read_conf_data(struct ccw_device, void **buffer, int *length, __u8 lpm);
 cdev   - the ccw_device the data is requested for.
 buffer - Pointer to a buffer pointer. The read_conf_data() routine
          will allocate a buffer and initialize the buffer pointer
-         accordingly. It's the device driver's responsability to
+         accordingly. It's the device driver's responsibility to
          release the kernel memory if no longer needed. 
 length - Length of the buffer allocated and retrieved.
 lpm    - Logical path mask to be used for retrieving the data. If
@@ -224,7 +224,7 @@ The read_conf_data() function returns :
           0 - Successful completion
 -ENODEV     - cdev invalid.
 -EINVAL     - An invalid parameter was detected, or the function was called early.
--EIO        - An irrecoverable I/O error occured or the device is
+-EIO        - An irrecoverable I/O error occurred or the device is
               not operational.
 -ENOMEM     - The read_conf_data() routine couldn't obtain storage.
 -EOPNOTSUPP - The device doesn't support the read configuration 
@@ -428,7 +428,7 @@ Above flag allows to exploit this feature, e.g. for communication devices that
 can handle lost data on the network to allow for enhanced I/O processing.
 
 Unless the channel subsystem at any time presents a secondary status interrupt,
-exploiting this feature will cause only primary status interrups to be
+exploiting this feature will cause only primary status interrupts to be
 presented to the device driver while overlapping I/O is performed. When a
 secondary status without error (alert status) is presented, this indicates
 successful completion for all overlapping ccw_device_start() requests that have

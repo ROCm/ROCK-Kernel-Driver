@@ -557,7 +557,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_umount
 	.llong .sys_ni_syscall		/* old lock syscall */
 	.llong .sys32_ioctl
-	.llong .sys32_fcntl		/* 55 */
+	.llong .compat_sys_fcntl	/* 55 */
 	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys32_setpgid
 	.llong .sys_ni_syscall		/* old ulimit syscall */
@@ -706,7 +706,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
 	.llong .sys_pivot_root
-	.llong .sys32_fcntl64
+	.llong .compat_sys_fcntl64
 	.llong .sys_madvise		/* 205 */
 	.llong .sys_mincore
 	.llong .sys_gettid

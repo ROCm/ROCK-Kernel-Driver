@@ -4,7 +4,7 @@
 ==============================================================================
 
    
-   The hdparm utility can be used to controll various IDE features on a
+   The hdparm utility can be used to control various IDE features on a
    running system. It is packaged separately.  Please Look for it on popular
    linux FTP sites.
    
@@ -37,7 +37,7 @@
 ================================================================================
 Common pitfalls:
 
-- 40-conductor IDE cables are capable of transfering data in DMA modes up to
+- 40-conductor IDE cables are capable of transferring data in DMA modes up to
   udma2, but no faster.
 
 - If possible devices should be attached to separate channels if they are

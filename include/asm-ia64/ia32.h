@@ -306,7 +306,7 @@ struct old_linux32_dirent {
 #define ELF_ET_DYN_BASE		(IA32_PAGE_OFFSET/3 + 0x1000000)
 
 void ia64_elf32_init(struct pt_regs *regs);
-#define ELF_PLAT_INIT(_r)	ia64_elf32_init(_r)
+#define ELF_PLAT_INIT(_r, load_addr)	ia64_elf32_init(_r)
 
 #define elf_addr_t	u32
 

@@ -36,7 +36,7 @@ typedef s390_regs elf_gregset_t;
 
 /* For SVR4/S390 the function pointer to be registered with `atexit` is
    passed in R14. */
-#define ELF_PLAT_INIT(_r) \
+#define ELF_PLAT_INIT(_r, load_addr) \
 	_r->gprs[14] = 0
 
 #define USE_ELF_CORE_DUMP

@@ -216,7 +216,7 @@ calls.
 <para>
 A new feature of jbd since 2.5.25 is commit callbacks with the new
 journal_callback_set() function you can now ask the journalling layer
-to call you back when the transaction is finally commited to disk, so that
+to call you back when the transaction is finally committed to disk, so that
 you can do some of your own management. The key to this is the journal_callback
 struct, this maintains the internal callback information but you can
 extend it like this:-
@@ -232,7 +232,7 @@ extend it like this:-
 </programlisting>
 
 <para>
-this would be useful if you needed to know when data was commited to a 
+this would be useful if you needed to know when data was committed to a 
 particular inode.
 </para>
 

@@ -90,7 +90,7 @@ checks whether we have anything in our run queue tq_bdflush. Since we queued up
 function do_software_suspend, it is called. Here we shrink everything including
 dcache, inodes, buffers and memory (here mainly processes are swapped out). We
 count how many pages we need to duplicate (we have to be atomical!) then we
-create an appropiate sized page directory. It will point to the original and
+create an appropriate sized page directory. It will point to the original and
 the new (copied) address of the page. We get the free pages by
 __get_free_pages() but since it changes state we have to be able to track it
 later so it also flips in a bit in page's flags (a new Nosave flag). We

@@ -7,8 +7,8 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
-#include "id.h"
-#include "audiochip.h"
+#include <media/audiochip.h>
+#include <media/id.h>
 
 /* Chips:
    TDA9885 (PAL, NTSC)

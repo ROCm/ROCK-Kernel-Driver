@@ -1,7 +1,7 @@
 /*
  * linux/fs/seq_file.c
  *
- * helper functions for making syntetic files from sequences of records.
+ * helper functions for making synthetic files from sequences of records.
  * initial implementation -- AV, Oct 2001.
  */
 
@@ -215,7 +215,7 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 				while ((retval=traverse(m, offset)) == -EAGAIN)
 					;
 				if (retval) {
-					/* with extreme perjudice... */
+					/* with extreme prejudice... */
 					file->f_pos = 0;
 					m->index = 0;
 					m->count = 0;

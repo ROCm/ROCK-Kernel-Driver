@@ -297,11 +297,6 @@ void __init pcibios_update_irq(struct pci_dev *dev, int irq)
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *bus,
-					 struct pbus_set_ranges_data *ranges)
-{
-}
-
 int pcibios_enable_resources(struct pci_dev *dev)
 {
 	u16 cmd, old_cmd;
@@ -339,37 +334,6 @@ int pcibios_enable_resources(struct pci_dev *dev)
 int pcibios_enable_device(struct pci_dev *dev)
 {
 	return pcibios_enable_resources(dev);
-}
-
-void pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
-{
-	u32 new, check;
-	int reg;
-
-	new = res->start | (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4 * resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/*
-		 * Somebody might have asked allocation of a non-standard
-		 * resource
-		 */
-		return;
-	}
-
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) &
-	    ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK :
-	     PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
 }
 
 void pcibios_align_resource(void *data, struct resource *res,

@@ -1,6 +1,7 @@
 #ifndef _ASM_PPC64_TOPOLOGY_H
 #define _ASM_PPC64_TOPOLOGY_H
 
+#include <linux/config.h>
 #include <asm/mmzone.h>
 
 #ifdef CONFIG_NUMA

@@ -338,6 +338,7 @@ void __init do_init_bootmem(void)
 
 	min_low_pfn = start >> PAGE_SHIFT;
 	max_low_pfn = (PPC_MEMSTART + total_lowmem) >> PAGE_SHIFT;
+	max_pfn = (PPC_MEMSTART + total_memory) >> PAGE_SHIFT;
 	boot_mapsize = init_bootmem_node(&contig_page_data, min_low_pfn,
 					 PPC_MEMSTART >> PAGE_SHIFT,
 					 max_low_pfn);

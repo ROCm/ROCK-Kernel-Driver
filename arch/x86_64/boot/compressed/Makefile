@@ -6,7 +6,7 @@
 # Note all the files here are compiled/linked as 32bit executables.
 #
 
-EXTRA_TARGETS	:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o piggy.o
+targets		:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o piggy.o
 EXTRA_AFLAGS	:= -traditional -m32
 
 # cannot use EXTRA_CFLAGS because base CFLAGS contains -mkernel which conflicts with

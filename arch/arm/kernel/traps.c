@@ -208,12 +208,13 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 {
 	struct task_struct *tsk = current;
+	static int die_counter;
 
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 
-	printk("Internal error: %s: %x\n", str, err);
+	printk("Internal error: %s: %x [#%d]\n", str, err, ++die_counter);
 	print_modules();
 	printk("CPU: %d\n", smp_processor_id());
 	show_regs(regs);

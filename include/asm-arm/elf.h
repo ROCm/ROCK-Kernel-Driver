@@ -48,7 +48,7 @@ typedef struct { void *null; } elf_fpregset_t;
 /* When the program starts, a1 contains a pointer to a function to be 
    registered with atexit, as per the SVR4 ABI.  A value of 0 means we 
    have no such handler.  */
-#define ELF_PLAT_INIT(_r)	(_r)->ARM_r0 = 0
+#define ELF_PLAT_INIT(_r, load_addr)	(_r)->ARM_r0 = 0
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this cpu supports. */
