@@ -146,6 +146,6 @@ static char *PPA_MODE_STRING[] =
 #define w_ctr(x,y)      outb(y, (x)+2)
 #endif
 
-static int ppa_engine(ppa_struct *, Scsi_Cmnd *);
+static int ppa_engine(ppa_struct *, struct scsi_cmnd *);
 
 #endif				/* _PPA_H */
