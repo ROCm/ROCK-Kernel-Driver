@@ -248,7 +248,7 @@ config IP_NF_MATCH_TCPMSS
 
 config IP_NF_MATCH_HELPER
 	tristate "Helper match support"
-	depends on IP_NF_CONNTRACK!=n && IP_NF_IPTABLES
+	depends on IP_NF_CONNTRACK && IP_NF_IPTABLES
 	help
 	  Helper matching allows you to match packets in dynamic connections
 	  tracked by a conntrack-helper, ie. ip_conntrack_ftp
