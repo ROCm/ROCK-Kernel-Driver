@@ -99,7 +99,8 @@ static void warrior_process_packet(struct warrior *warrior, struct pt_regs *regs
  * packet processing routine.
  */
 
-static void warrior_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t warrior_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct warrior* warrior = serio->private;
 
@@ -117,6 +118,7 @@ static void warrior_interrupt(struct serio *serio, unsigned char data, unsigned 
 		warrior->idx = 0;
 		warrior->len = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /*

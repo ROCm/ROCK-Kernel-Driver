@@ -204,7 +204,8 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data, str
  * packets or passing them to the command routine as command output.
  */
 
-static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t sermouse_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct sermouse *sermouse = serio->private;
 
@@ -215,6 +216,7 @@ static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned
 		sermouse_process_ms(sermouse, data, regs);
 	else
 		sermouse_process_msc(sermouse, data, regs);
+	return IRQ_HANDLED;
 }
 
 /*

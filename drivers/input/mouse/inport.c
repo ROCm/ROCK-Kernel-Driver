@@ -85,7 +85,7 @@ MODULE_PARM(inport_irq, "i");
 static int inport_irq = INPORT_IRQ;
 static int inport_used = 0;
 
-static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t inport_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static int inport_open(struct input_dev *dev)
 {
@@ -124,7 +124,7 @@ static struct input_dev inport_dev = {
 	},
 };
 
-static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned char buttons;
 
@@ -150,6 +150,7 @@ static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(INPORT_MODE_IRQ | INPORT_MODE_BASE, INPORT_DATA_PORT);
 
 	input_sync(&inport_dev);
+	return IRQ_HANDLED;
 }
 
 #ifndef MODULE

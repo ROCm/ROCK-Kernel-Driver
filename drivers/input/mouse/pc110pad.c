@@ -60,7 +60,7 @@ static int pc110pad_used;
 static char *pc110pad_name = "IBM PC110 TouchPad";
 static char *pc110pad_phys = "isa15e0/input0";
 
-static void pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 {
 	int value     = inb_p(pc110pad_io);
 	int handshake = inb_p(pc110pad_io + 2);
@@ -83,6 +83,7 @@ static void pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 	input_sync(&pc110pad_dev);
 
 	pc110pad_count = 0;
+	return IRQ_HANDLED;
 }
 
 static void pc110pad_close(struct input_dev *dev)

@@ -167,7 +167,8 @@ static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs
  * packets or passing them to the command routine as command output.
  */
 
-static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t psmouse_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct psmouse *psmouse = serio->private;
 
@@ -186,12 +187,12 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 				break;
 		}
 		psmouse->acking = 0;
-		return;
+		goto out;
 	}
 
 	if (psmouse->cmdcnt) {
 		psmouse->cmdbuf[--psmouse->cmdcnt] = data;
-		return;
+		goto out;
 	}
 
 	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
@@ -205,13 +206,15 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
 		psmouse_process_packet(psmouse, regs);
 		psmouse->pktcnt = 0;
-		return;
+		goto out;
 	}
 
 	if (psmouse->pktcnt == 1 && psmouse->packet[0] == PSMOUSE_RET_BAT) {
 		serio_rescan(serio);
-		return;
-	}	
+		goto out;
+	}
+out:
+	return IRQ_HANDLED;
 }
 
 /*

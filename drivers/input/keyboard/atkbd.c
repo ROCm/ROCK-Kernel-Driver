@@ -132,7 +132,8 @@ struct atkbd {
  * the keyboard into events.
  */
 
-static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
+			unsigned int flags, struct pt_regs *regs)
 {
 	struct atkbd *atkbd = serio->private;
 	int code = data;
@@ -145,7 +146,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 		printk("atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
 		atkbd->resend = 1;
-		return;
+		goto out;
 	}
 	
 	if (!flags)
@@ -154,34 +155,35 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 	switch (code) {
 		case ATKBD_RET_ACK:
 			atkbd->ack = 1;
-			return;
+			goto out;
 		case ATKBD_RET_NAK:
 			atkbd->ack = -1;
-			return;
+			goto out;
 	}
 
 	if (atkbd->cmdcnt) {
 		atkbd->cmdbuf[--atkbd->cmdcnt] = code;
-		return;
+		goto out;
 	}
 
 	switch (atkbd->keycode[code]) {
 		case ATKBD_KEY_BAT:
 			serio_rescan(atkbd->serio);
-			return;
+			goto out;
 		case ATKBD_KEY_EMUL0:
 			atkbd->emul = 1;
-			return;
+			goto out;
 		case ATKBD_KEY_EMUL1:
 			atkbd->emul = 2;
-			return;
+			goto out;
 		case ATKBD_KEY_RELEASE:
 			atkbd->release = 1;
-			return;
+			goto out;
 	}
 
 	if (atkbd->emul) {
-		if (--atkbd->emul) return;
+		if (--atkbd->emul)
+			goto out;
 		code |= 0x100;
 	}
 
@@ -197,8 +199,10 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 			input_report_key(&atkbd->dev, atkbd->keycode[code], !atkbd->release);
 			input_sync(&atkbd->dev);
 	}
-		
+
 	atkbd->release = 0;
+out:
+	return IRQ_HANDLED;
 }
 
 /*

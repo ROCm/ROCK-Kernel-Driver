@@ -98,7 +98,8 @@ static void stinger_process_packet(struct stinger *stinger, struct pt_regs *regs
  * packet processing routine.
  */
 
-static void stinger_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t stinger_interrupt(struct serio *serio,
+	unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct stinger* stinger = serio->private;
 
@@ -112,7 +113,7 @@ static void stinger_interrupt(struct serio *serio, unsigned char data, unsigned 
 		stinger->idx = 0;
 	}
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /*
