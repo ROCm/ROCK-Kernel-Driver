@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 54 $
+ *              $Revision: 59 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "acinterp.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dswstate")
+	 ACPI_MODULE_NAME    ("dswstate")
 
 
 /*******************************************************************************
@@ -57,7 +57,7 @@ acpi_ds_result_insert (
 	acpi_generic_state      *state;
 
 
-	PROC_NAME ("Ds_result_insert");
+	ACPI_FUNCTION_NAME ("Ds_result_insert");
 
 
 	state = walk_state->results;
@@ -116,7 +116,7 @@ acpi_ds_result_remove (
 	acpi_generic_state      *state;
 
 
-	PROC_NAME ("Ds_result_remove");
+	ACPI_FUNCTION_NAME ("Ds_result_remove");
 
 
 	state = walk_state->results;
@@ -181,7 +181,7 @@ acpi_ds_result_pop (
 	acpi_generic_state      *state;
 
 
-	PROC_NAME ("Ds_result_pop");
+	ACPI_FUNCTION_NAME ("Ds_result_pop");
 
 
 	state = walk_state->results;
@@ -241,7 +241,7 @@ acpi_ds_result_pop_from_bottom (
 	acpi_generic_state      *state;
 
 
-	PROC_NAME ("Ds_result_pop_from_bottom");
+	ACPI_FUNCTION_NAME ("Ds_result_pop_from_bottom");
 
 
 	state = walk_state->results;
@@ -307,7 +307,7 @@ acpi_ds_result_push (
 	acpi_generic_state      *state;
 
 
-	PROC_NAME ("Ds_result_push");
+	ACPI_FUNCTION_NAME ("Ds_result_push");
 
 
 	state = walk_state->results;
@@ -360,7 +360,7 @@ acpi_ds_result_stack_push (
 {
 	acpi_generic_state      *state;
 
-	PROC_NAME ("Ds_result_stack_push");
+	ACPI_FUNCTION_NAME ("Ds_result_stack_push");
 
 
 	state = acpi_ut_create_generic_state ();
@@ -396,7 +396,7 @@ acpi_ds_result_stack_pop (
 {
 	acpi_generic_state      *state;
 
-	PROC_NAME ("Ds_result_stack_pop");
+	ACPI_FUNCTION_NAME ("Ds_result_stack_pop");
 
 
 	/* Check for stack underflow */
@@ -440,7 +440,7 @@ acpi_ds_obj_stack_delete_all (
 	u32                     i;
 
 
-	FUNCTION_TRACE_PTR ("Ds_obj_stack_delete_all", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_obj_stack_delete_all", walk_state);
 
 
 	/* The stack size is configurable, but fixed */
@@ -474,7 +474,7 @@ acpi_ds_obj_stack_push (
 	void                    *object,
 	acpi_walk_state         *walk_state)
 {
-	PROC_NAME ("Ds_obj_stack_push");
+	ACPI_FUNCTION_NAME ("Ds_obj_stack_push");
 
 
 	/* Check for stack overflow */
@@ -519,7 +519,7 @@ acpi_ds_obj_stack_pop_object (
 	acpi_operand_object     **object,
 	acpi_walk_state         *walk_state)
 {
-	PROC_NAME ("Ds_obj_stack_pop_object");
+	ACPI_FUNCTION_NAME ("Ds_obj_stack_pop_object");
 
 
 	/* Check for stack underflow */
@@ -580,7 +580,7 @@ acpi_ds_obj_stack_pop (
 {
 	u32                     i;
 
-	PROC_NAME ("Ds_obj_stack_pop");
+	ACPI_FUNCTION_NAME ("Ds_obj_stack_pop");
 
 
 	for (i = 0; i < pop_count; i++) {
@@ -628,7 +628,7 @@ acpi_ds_obj_stack_pop_and_delete (
 	u32                     i;
 	acpi_operand_object     *obj_desc;
 
-	PROC_NAME ("Ds_obj_stack_pop_and_delete");
+	ACPI_FUNCTION_NAME ("Ds_obj_stack_pop_and_delete");
 
 
 	for (i = 0; i < pop_count; i++) {
@@ -679,7 +679,7 @@ acpi_ds_obj_stack_get_value (
 	acpi_walk_state         *walk_state)
 {
 
-	FUNCTION_TRACE_PTR ("Ds_obj_stack_get_value", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_obj_stack_get_value", walk_state);
 
 
 	/* Can't do it if the stack is empty */
@@ -704,31 +704,32 @@ acpi_ds_obj_stack_get_value (
  *
  * FUNCTION:    Acpi_ds_get_current_walk_state
  *
- * PARAMETERS:  Walk_list       - Get current active state for this walk list
+ * PARAMETERS:  Thread          - Get current active state for this Thread
  *
  * RETURN:      Pointer to the current walk state
  *
  * DESCRIPTION: Get the walk state that is at the head of the list (the "current"
- *              walk state.
+ *              walk state.)
  *
  ******************************************************************************/
 
 acpi_walk_state *
 acpi_ds_get_current_walk_state (
-	acpi_walk_list          *walk_list)
+	ACPI_THREAD_STATE       *thread)
 
 {
-	PROC_NAME ("Ds_get_current_walk_state");
+	ACPI_FUNCTION_NAME ("Ds_get_current_walk_state");
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Ds_get_current_walk_state, =%p\n",
-		walk_list->walk_state));
-
-	if (!walk_list) {
+	if (!thread) {
 		return (NULL);
 	}
 
-	return (walk_list->walk_state);
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Ds_get_current_walk_state, =%p\n",
+		thread->walk_state_list));
+
+
+	return (thread->walk_state_list);
 }
 
 
@@ -748,13 +749,13 @@ acpi_ds_get_current_walk_state (
 void
 acpi_ds_push_walk_state (
 	acpi_walk_state         *walk_state,
-	acpi_walk_list          *walk_list)
+	ACPI_THREAD_STATE       *thread)
 {
-	FUNCTION_TRACE ("Ds_push_walk_state");
+	ACPI_FUNCTION_TRACE ("Ds_push_walk_state");
 
 
-	walk_state->next    = walk_list->walk_state;
-	walk_list->walk_state = walk_state;
+	walk_state->next      = thread->walk_state_list;
+	thread->walk_state_list = walk_state;
 
 	return_VOID;
 }
@@ -776,25 +777,25 @@ acpi_ds_push_walk_state (
 
 acpi_walk_state *
 acpi_ds_pop_walk_state (
-	acpi_walk_list          *walk_list)
+	ACPI_THREAD_STATE       *thread)
 {
 	acpi_walk_state         *walk_state;
 
 
-	FUNCTION_TRACE ("Ds_pop_walk_state");
+	ACPI_FUNCTION_TRACE ("Ds_pop_walk_state");
 
 
-	walk_state = walk_list->walk_state;
+	walk_state = thread->walk_state_list;
 
 	if (walk_state) {
 		/* Next walk state becomes the current walk state */
 
-		walk_list->walk_state = walk_state->next;
+		thread->walk_state_list = walk_state->next;
 
 		/*
 		 * Don't clear the NEXT field, this serves as an indicator
 		 * that there is a parent WALK STATE
-		 *     Walk_state->Next = NULL;
+		 *     NO: Walk_state->Next = NULL;
 		 */
 	}
 
@@ -807,12 +808,12 @@ acpi_ds_pop_walk_state (
  * FUNCTION:    Acpi_ds_create_walk_state
  *
  * PARAMETERS:  Origin          - Starting point for this walk
- *              Walk_list       - Owning walk list
+ *              Thread          - Current thread state
  *
  * RETURN:      Pointer to the new walk state.
  *
- * DESCRIPTION: Allocate and initialize a new walk state.  The current walk state
- *              is set to this new state.
+ * DESCRIPTION: Allocate and initialize a new walk state.  The current walk
+ *              state is set to this new state.
  *
  ******************************************************************************/
 
@@ -821,13 +822,13 @@ acpi_ds_create_walk_state (
 	acpi_owner_id           owner_id,
 	acpi_parse_object       *origin,
 	acpi_operand_object     *mth_desc,
-	acpi_walk_list          *walk_list)
+	ACPI_THREAD_STATE       *thread)
 {
 	acpi_walk_state         *walk_state;
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ds_create_walk_state");
+	ACPI_FUNCTION_TRACE ("Ds_create_walk_state");
 
 
 	walk_state = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_WALK);
@@ -839,7 +840,7 @@ acpi_ds_create_walk_state (
 	walk_state->owner_id        = owner_id;
 	walk_state->origin          = origin;
 	walk_state->method_desc     = mth_desc;
-	walk_state->walk_list       = walk_list;
+	walk_state->thread          = thread;
 
 	/* Init the method args/local */
 
@@ -856,8 +857,8 @@ acpi_ds_create_walk_state (
 
 	/* Put the new state at the head of the walk list */
 
-	if (walk_list) {
-		acpi_ds_push_walk_state (walk_state, walk_list);
+	if (thread) {
+		acpi_ds_push_walk_state (walk_state, thread);
 	}
 
 	return_PTR (walk_state);
@@ -892,7 +893,7 @@ acpi_ds_init_aml_walk (
 	acpi_parse_state        *parser_state = &walk_state->parser_state;
 
 
-	FUNCTION_TRACE ("Ds_init_aml_walk");
+	ACPI_FUNCTION_TRACE ("Ds_init_aml_walk");
 
 
 	walk_state->parser_state.aml    =
@@ -901,7 +902,6 @@ acpi_ds_init_aml_walk (
 	walk_state->parser_state.pkg_end = aml_start + aml_length;
 
 	/* The Next_op of the Next_walk will be the beginning of the method */
-	/* TBD: [Restructure] -- obsolete? */
 
 	walk_state->next_op             = NULL;
 	walk_state->params              = params;
@@ -914,7 +914,7 @@ acpi_ds_init_aml_walk (
 
 	if (method_node) {
 		walk_state->parser_state.start_node = method_node;
-		walk_state->walk_type               = WALK_METHOD;
+		walk_state->walk_type               = ACPI_WALK_METHOD;
 		walk_state->method_node             = method_node;
 		walk_state->method_desc             = acpi_ns_get_attached_object (method_node);
 
@@ -972,7 +972,7 @@ acpi_ds_delete_walk_state (
 	acpi_generic_state      *state;
 
 
-	FUNCTION_TRACE_PTR ("Ds_delete_walk_state", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_delete_walk_state", walk_state);
 
 
 	if (!walk_state) {
@@ -1038,7 +1038,7 @@ void
 acpi_ds_delete_walk_state_cache (
 	void)
 {
-	FUNCTION_TRACE ("Ds_delete_walk_state_cache");
+	ACPI_FUNCTION_TRACE ("Ds_delete_walk_state_cache");
 
 
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_WALK);

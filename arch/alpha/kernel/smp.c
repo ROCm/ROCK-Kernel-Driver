@@ -460,7 +460,7 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 	if (fork_by_hand() < 0)
 		panic("failed fork for CPU %d", cpuid);
 
-	idle = init_task.prev_task;
+	idle = prev_task(&init_task);
 	if (!idle)
 		panic("No idle process for CPU %d", cpuid);
 

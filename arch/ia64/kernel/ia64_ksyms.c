@@ -59,7 +59,7 @@ EXPORT_SYMBOL(clear_page);
 
 #include <asm/processor.h>
 # ifndef CONFIG_NUMA
-EXPORT_SYMBOL(_cpu_data);
+EXPORT_SYMBOL(cpu_info);
 # endif
 EXPORT_SYMBOL(kernel_thread);
 

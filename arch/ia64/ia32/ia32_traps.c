@@ -20,7 +20,7 @@ ia32_intercept (struct pt_regs *regs, unsigned long isr)
 {
 	switch ((isr >> 16) & 0xff) {
 	      case 0:	/* Instruction intercept fault */
-	      case 3:	/* Locked Data reference fault */
+	      case 4:	/* Locked Data reference fault */
 	      case 1:	/* Gate intercept trap */
 		return -1;
 

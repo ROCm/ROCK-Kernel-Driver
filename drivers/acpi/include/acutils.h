@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 117 $
+ *       $Revision: 130 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ acpi_ut_walk_package_tree (
 typedef struct acpi_pkg_info
 {
 	u8                      *free_space;
-	u32                     length;
+	ACPI_SIZE               length;
 	u32                     object_space;
 	u32                     num_packages;
 } acpi_pkg_info;
@@ -102,14 +102,18 @@ acpi_ut_get_mutex_name (
 
 NATIVE_CHAR *
 acpi_ut_get_type_name (
-	u32                     type);
+	acpi_object_type        type);
+
+#endif
+
 
 NATIVE_CHAR *
 acpi_ut_get_region_name (
 	u8                      space_id);
 
-#endif
-
+NATIVE_CHAR *
+acpi_ut_get_event_name (
+	u32                     event_id);
 
 u8
 acpi_ut_hex_to_ascii_char (
@@ -118,7 +122,7 @@ acpi_ut_hex_to_ascii_char (
 
 u8
 acpi_ut_valid_object_type (
-	u32                     type);
+	acpi_object_type        type);
 
 acpi_owner_id
 acpi_ut_allocate_owner_id (
@@ -244,6 +248,17 @@ acpi_ut_copy_ipackage_to_ipackage (
 	acpi_operand_object     *dest_obj,
 	acpi_walk_state         *walk_state);
 
+acpi_status
+acpi_ut_copy_simple_object (
+	acpi_operand_object     *source_desc,
+	acpi_operand_object     *dest_desc);
+
+acpi_status
+acpi_ut_copy_iobject_to_iobject (
+	acpi_operand_object     *source_desc,
+	acpi_operand_object     **dest_desc,
+	acpi_walk_state         *walk_state);
+
 
 /*
  * Ut_create - Object creation
@@ -338,7 +353,7 @@ acpi_ut_dump_buffer (
 	u32                     display,
 	u32                     component_id);
 
-void
+void ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print (
 	u32                     requested_debug_level,
 	u32                     line_number,
@@ -346,7 +361,7 @@ acpi_ut_debug_print (
 	char                    *format,
 	...) ACPI_PRINTF_LIKE_FUNC;
 
-void
+void ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print_raw (
 	u32                     requested_debug_level,
 	u32                     line_number,
@@ -383,6 +398,7 @@ acpi_ut_delete_internal_object_list (
 /* Method name strings */
 
 #define METHOD_NAME__HID        "_HID"
+#define METHOD_NAME__CID        "_CID"
 #define METHOD_NAME__UID        "_UID"
 #define METHOD_NAME__ADR        "_ADR"
 #define METHOD_NAME__STA        "_STA"
@@ -402,6 +418,11 @@ acpi_status
 acpi_ut_execute_HID (
 	acpi_namespace_node     *device_node,
 	acpi_device_id          *hid);
+
+acpi_status
+acpi_ut_execute_CID (
+	acpi_namespace_node     *device_node,
+	acpi_device_id          *cid);
 
 acpi_status
 acpi_ut_execute_STA (
@@ -452,7 +473,7 @@ acpi_ut_create_internal_object_dbg (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id,
-	acpi_object_type8       type);
+	acpi_object_type        type);
 
 void *
 acpi_ut_allocate_object_desc_dbg (
@@ -491,17 +512,17 @@ acpi_ut_remove_reference (
 acpi_status
 acpi_ut_get_simple_object_size (
 	acpi_operand_object     *obj,
-	u32                     *obj_length);
+	ACPI_SIZE               *obj_length);
 
 acpi_status
 acpi_ut_get_package_object_size (
 	acpi_operand_object     *obj,
-	u32                     *obj_length);
+	ACPI_SIZE               *obj_length);
 
 acpi_status
 acpi_ut_get_object_size(
 	acpi_operand_object     *obj,
-	u32                     *obj_length);
+	ACPI_SIZE               *obj_length);
 
 
 /*
@@ -520,6 +541,10 @@ acpi_ut_pop_generic_state (
 
 acpi_generic_state *
 acpi_ut_create_generic_state (
+	void);
+
+ACPI_THREAD_STATE *
+acpi_ut_create_thread_state (
 	void);
 
 acpi_generic_state *
@@ -596,6 +621,14 @@ acpi_status
 acpi_ut_resolve_package_references (
 	acpi_operand_object     *obj_desc);
 
+u8 *
+acpi_ut_get_resource_end_tag (
+	acpi_operand_object     *obj_desc);
+
+u8
+acpi_ut_generate_checksum (
+	u8                      *buffer,
+	u32                     length);
 
 #ifdef ACPI_DEBUG
 void
@@ -623,31 +656,73 @@ void
 acpi_ut_delete_generic_cache (
 	u32                     list_id);
 
+acpi_status
+acpi_ut_validate_buffer (
+	acpi_buffer             *buffer);
 
-/* Debug Memory allocation functions */
+acpi_status
+acpi_ut_initialize_buffer (
+	acpi_buffer             *buffer,
+	ACPI_SIZE               required_length);
+
+
+/* Memory allocation functions */
 
 void *
 acpi_ut_allocate (
-	u32                     size,
+	ACPI_SIZE               size,
 	u32                     component,
 	NATIVE_CHAR             *module,
 	u32                     line);
 
 void *
 acpi_ut_callocate (
-	u32                     size,
+	ACPI_SIZE               size,
+	u32                     component,
+	NATIVE_CHAR             *module,
+	u32                     line);
+
+
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+
+void *
+acpi_ut_allocate_and_track (
+	ACPI_SIZE               size,
+	u32                     component,
+	NATIVE_CHAR             *module,
+	u32                     line);
+
+void *
+acpi_ut_callocate_and_track (
+	ACPI_SIZE               size,
 	u32                     component,
 	NATIVE_CHAR             *module,
 	u32                     line);
 
 void
-acpi_ut_free (
+acpi_ut_free_and_track (
 	void                    *address,
 	u32                     component,
 	NATIVE_CHAR             *module,
 	u32                     line);
+acpi_status
+acpi_ut_track_allocation (
+	u32                     list_id,
+	acpi_debug_mem_block    *address,
+	ACPI_SIZE               size,
+	u8                      alloc_type,
+	u32                     component,
+	NATIVE_CHAR             *module,
+	u32                     line);
 
-#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+acpi_status
+acpi_ut_remove_allocation (
+	u32                     list_id,
+	acpi_debug_mem_block    *address,
+	u32                     component,
+	NATIVE_CHAR             *module,
+	u32                     line);
+
 void
 acpi_ut_dump_allocation_info (
 	void);

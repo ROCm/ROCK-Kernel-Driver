@@ -1252,6 +1252,7 @@ kmem_cache_t *dquot_cachep;
 /* SLAB cache for buffer_head structures */
 kmem_cache_t *bh_cachep;
 EXPORT_SYMBOL(bh_cachep);
+EXPORT_SYMBOL(d_genocide);
 
 extern void bdev_cache_init(void);
 extern void cdev_cache_init(void);

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acevents.h - Event subcomponent prototypes and defines
- *       $Revision: 66 $
+ *       $Revision: 75 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,9 +31,13 @@ acpi_status
 acpi_ev_initialize (
 	void);
 
+acpi_status
+acpi_ev_handler_initialize (
+	void);
+
 
 /*
- * Acpi_evfixed - Fixed event handling
+ * Evfixed - Fixed event handling
  */
 
 acpi_status
@@ -46,16 +50,16 @@ acpi_ev_fixed_event_detect (
 
 u32
 acpi_ev_fixed_event_dispatch (
-	u32                     acpi_event);
+	u32                     event);
 
 
 /*
- * Acpi_evglock - Global Lock support
+ * Evmisc
  */
 
 acpi_status
 acpi_ev_acquire_global_lock(
-	void);
+	u32                     timeout);
 
 void
 acpi_ev_release_global_lock(
@@ -65,9 +69,26 @@ acpi_status
 acpi_ev_init_global_lock_handler (
 	void);
 
+u32
+acpi_ev_get_gpe_register_index (
+	u32                     gpe_number);
+
+u32
+acpi_ev_get_gpe_number_index (
+	u32                     gpe_number);
+
+acpi_status
+acpi_ev_queue_notify_request (
+	acpi_namespace_node     *node,
+	u32                     notify_value);
+
+void ACPI_SYSTEM_XFACE
+acpi_ev_notify_dispatch (
+	void                    *context);
+
 
 /*
- * Acpi_evgpe - GPE handling and dispatch
+ * Evgpe - GPE handling and dispatch
  */
 
 acpi_status
@@ -86,22 +107,8 @@ u32
 acpi_ev_gpe_detect (
 	void);
 
-
 /*
- * Acpi_evnotify - Device Notify handling and dispatch
- */
-
-acpi_status
-acpi_ev_queue_notify_request (
-	acpi_namespace_node     *node,
-	u32                     notify_value);
-
-void
-acpi_ev_notify_dispatch (
-	void                    *context);
-
-/*
- * Acpi_evregion - Address Space handling
+ * Evregion - Address Space handling
  */
 
 acpi_status
@@ -114,8 +121,7 @@ acpi_ev_address_space_dispatch (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
 	u32                     bit_width,
-	u32                     *value);
-
+	acpi_integer            *value);
 
 acpi_status
 acpi_ev_addr_handler_helper (
@@ -129,7 +135,6 @@ acpi_ev_disassociate_region_from_handler(
 	acpi_operand_object    *region_obj,
 	u8                      acpi_ns_is_locked);
 
-
 acpi_status
 acpi_ev_associate_region_and_handler (
 	acpi_operand_object     *handler_obj,
@@ -138,7 +143,7 @@ acpi_ev_associate_region_and_handler (
 
 
 /*
- * Acpi_evregini - Region initialization and setup
+ * Evregini - Region initialization and setup
  */
 
 acpi_status
@@ -204,10 +209,6 @@ acpi_ev_remove_sci_handler (
 u32
 acpi_ev_initialize_sCI (
 	u32                     program_sCI);
-
-void
-acpi_ev_restore_acpi_state (
-	void);
 
 void
 acpi_ev_terminate (

@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dbstats - Generation and display of ACPI table statistics
- *              $Revision: 47 $
+ *              $Revision: 55 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbstats")
+	 ACPI_MODULE_NAME    ("dbstats")
 
 /*
  * Statistics subcommands
@@ -67,9 +67,8 @@ ARGUMENT_INFO               acpi_db_stat_types [] =
  * RETURN:      None
  *
  * DESCRIPTION: Add this object to the global counts, by object type.
- *              Recursively handles subobjects and packages.
- *
- *              [TBD] Restructure - remove recursion.
+ *              Limited recursion handles subobjects and packages, and this
+ *              is probably acceptable within the AML debugger only.
  *
  ******************************************************************************/
 
@@ -77,7 +76,6 @@ void
 acpi_db_enumerate_object (
 	acpi_operand_object     *obj_desc)
 {
-	u32                     type;
 	u32                     i;
 
 
@@ -91,22 +89,21 @@ acpi_db_enumerate_object (
 
 	acpi_gbl_num_objects++;
 
-	type = obj_desc->common.type;
-	if (type > INTERNAL_TYPE_NODE_MAX)
+	if (obj_desc->common.type > INTERNAL_TYPE_NODE_MAX)
 	{
 		acpi_gbl_obj_type_count_misc++;
 	}
 	else
 	{
-		acpi_gbl_obj_type_count [type]++;
+		acpi_gbl_obj_type_count [obj_desc->common.type]++;
 	}
 
 	/* Count the sub-objects */
 
-	switch (type)
+	switch (obj_desc->common.type)
 	{
 	case ACPI_TYPE_PACKAGE:
-		for (i = 0; i< obj_desc->package.count; i++)
+		for (i = 0; i < obj_desc->package.count; i++)
 		{
 			acpi_db_enumerate_object (obj_desc->package.elements[i]);
 		}
@@ -118,7 +115,15 @@ acpi_db_enumerate_object (
 		acpi_db_enumerate_object (obj_desc->device.addr_handler);
 		break;
 
+	case ACPI_TYPE_BUFFER_FIELD:
+		if (acpi_ns_get_secondary_object (obj_desc))
+		{
+			acpi_gbl_obj_type_count [ACPI_TYPE_BUFFER_FIELD]++;
+		}
+		break;
+
 	case ACPI_TYPE_REGION:
+		acpi_gbl_obj_type_count [INTERNAL_TYPE_REGION_FIELD ]++;
 		acpi_db_enumerate_object (obj_desc->region.addr_handler);
 		break;
 
@@ -172,7 +177,7 @@ acpi_db_classify_one_object (
 	acpi_gbl_num_nodes++;
 
 	node = (acpi_namespace_node *) obj_handle;
-	obj_desc = ((acpi_namespace_node *) obj_handle)->object;
+	obj_desc = acpi_ns_get_attached_object (node);
 
 	acpi_db_enumerate_object (obj_desc);
 
@@ -271,8 +276,10 @@ acpi_db_display_statistics (
 {
 	u32                     i;
 	u32                     type;
-	u32                     outstanding;
 	u32                     size;
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+	u32                     outstanding;
+#endif
 
 
 	if (!acpi_gbl_DSDT)
@@ -286,7 +293,7 @@ acpi_db_display_statistics (
 		return (AE_OK);
 	}
 
-	STRUPR (type_arg);
+	ACPI_STRUPR (type_arg);
 	type = acpi_db_match_argument (type_arg, acpi_db_stat_types);
 	if (type == (u32) -1)
 	{
@@ -368,11 +375,11 @@ acpi_db_display_statistics (
 
 			if (acpi_gbl_memory_lists[i].object_size)
 			{
-				size = ROUND_UP_TO_1K (outstanding * acpi_gbl_memory_lists[i].object_size);
+				size = ACPI_ROUND_UP_TO_1K (outstanding * acpi_gbl_memory_lists[i].object_size);
 			}
 			else
 			{
-				size = ROUND_UP_TO_1K (acpi_gbl_memory_lists[i].current_total_size);
+				size = ACPI_ROUND_UP_TO_1K (acpi_gbl_memory_lists[i].current_total_size);
 			}
 
 			acpi_os_printf ("  Mem:   [Alloc Free Outstanding Size]  % 7d % 7d % 7d % 7d Kb\n",
@@ -425,6 +432,7 @@ acpi_db_display_statistics (
 		acpi_os_printf ("Notify_handler %3d\n", sizeof (ACPI_OBJECT_NOTIFY_HANDLER));
 		acpi_os_printf ("Addr_handler   %3d\n", sizeof (ACPI_OBJECT_ADDR_HANDLER));
 		acpi_os_printf ("Extra          %3d\n", sizeof (ACPI_OBJECT_EXTRA));
+		acpi_os_printf ("Data           %3d\n", sizeof (ACPI_OBJECT_DATA));
 
 		acpi_os_printf ("\n");
 

@@ -76,7 +76,7 @@ static struct tasklet_struct rtc_tq;
 static int
 rtctimer_open(snd_timer_t *t)
 {
-	err = rtc_register(&rtc_task);
+	int err = rtc_register(&rtc_task);
 	if (err < 0)
 		return err;
 	t->private_data = &rtc_task;

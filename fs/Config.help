@@ -211,30 +211,12 @@ CONFIG_CRAMFS
 CONFIG_TMPFS
   Tmpfs is a file system which keeps all files in virtual memory.
 
-  In contrast to RAM disks, which get allocated a fixed amount of
-  physical RAM, tmpfs grows and shrinks to accommodate the files it
-  contains and is able to swap unneeded pages out to swap space.
-
-  Everything is "virtual" in the sense that no files will be created
-  on your hard drive; if you reboot, everything in tmpfs will be
+  Everything in tmpfs is temporary in the sense that no files will be
+  created on your hard drive. The files live in memory and swap
+  space. If you unmount a tmpfs instance, everything stored therein is
   lost.
 
-  You should mount the file system somewhere to be able to use
-  POSIX shared memory. Adding the following line to /etc/fstab should
-  take care of things:
-
-  tmpfs		/dev/shm	tmpfs		defaults	0 0
-
-  Remember to create the directory that you intend to mount tmpfs on
-  if necessary (/dev/shm is automagically created if you use devfs).
-
-  You can set limits for the number of blocks and inodes used by the
-  file system with the mount options "size", "nr_blocks" and
-  "nr_inodes". These parameters accept a suffix k, m or g for kilo,
-  mega and giga and can be changed on remount.
-
-  The initial permissions of the root directory can be set with the
-  mount option "mode".
+  See <file:Documentation/filesystems/tmpfs.txt> for details.
 
 CONFIG_RAMFS
   Ramfs is a file system which keeps all files in RAM. It allows

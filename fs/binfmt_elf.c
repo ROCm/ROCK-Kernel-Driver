@@ -548,7 +548,11 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			// printk(KERN_WARNING "ELF: Ambiguous type, using ELF\n");
 			interpreter_type = INTERPRETER_ELF;
 		}
+	} else {
+		/* Executables without an interpreter also need a personality  */
+		SET_PERSONALITY(elf_ex, ibcs2_interpreter);
 	}
+
 
 	/* OK, we are done with that, now set up the arg stuff,
 	   and then start this sucker up */
@@ -1094,7 +1098,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	prstatus.pr_sigpend = current->pending.signal.sig[0];
 	prstatus.pr_sighold = current->blocked.sig[0];
 	psinfo.pr_pid = prstatus.pr_pid = current->pid;
-	psinfo.pr_ppid = prstatus.pr_ppid = current->p_pptr->pid;
+	psinfo.pr_ppid = prstatus.pr_ppid = current->parent->pid;
 	psinfo.pr_pgrp = prstatus.pr_pgrp = current->pgrp;
 	psinfo.pr_sid = prstatus.pr_sid = current->session;
 	prstatus.pr_utime.tv_sec = CT_TO_SECS(current->times.tms_utime);

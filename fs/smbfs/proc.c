@@ -2884,7 +2884,7 @@ smb_proc_settime(struct dentry *dentry, struct smb_fattr *fattr)
 int
 smb_proc_dskattr(struct super_block *sb, struct statfs *attr)
 {
-	struct smb_sb_info *server = &(sb->u.smbfs_sb);
+	struct smb_sb_info *server = SMB_SB(sb);
 	int result;
 	char *p;
 	long unit;

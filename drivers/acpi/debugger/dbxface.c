@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dbxface - AML Debugger external interfaces
- *              $Revision: 45 $
+ *              $Revision: 55 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbxface")
+	 ACPI_MODULE_NAME    ("dbxface")
 
 
 /*******************************************************************************
@@ -64,24 +64,32 @@ acpi_db_single_step (
 	acpi_status             status = AE_OK;
 	u32                     original_debug_level;
 	acpi_parse_object       *display_op;
+	acpi_parse_object       *parent_op;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
-	/* Is there a breakpoint set? */
+	/* Check for single-step breakpoint */
 
-	if (walk_state->method_breakpoint) {
+	if (walk_state->method_breakpoint && (walk_state->method_breakpoint <= op->aml_offset)) {
 		/* Check if the breakpoint has been reached or passed */
+		/* Hit the breakpoint, resume single step, reset breakpoint */
 
-		if (walk_state->method_breakpoint <= op->aml_offset) {
-			/* Hit the breakpoint, resume single step, reset breakpoint */
-
-			acpi_os_printf ("***Break*** at AML offset %X\n", op->aml_offset);
-			acpi_gbl_cm_single_step = TRUE;
-			acpi_gbl_step_to_next_call = FALSE;
-			walk_state->method_breakpoint = 0;
-		}
+		acpi_os_printf ("***Break*** at AML offset %X\n", op->aml_offset);
+		acpi_gbl_cm_single_step = TRUE;
+		acpi_gbl_step_to_next_call = FALSE;
+		walk_state->method_breakpoint = 0;
 	}
+
+	/* Check for user breakpoint (Must be on exact Aml offset) */
+
+	else if (walk_state->user_breakpoint && (walk_state->user_breakpoint == op->aml_offset)) {
+		acpi_os_printf ("***User_breakpoint*** at AML offset %X\n", op->aml_offset);
+		acpi_gbl_cm_single_step = TRUE;
+		acpi_gbl_step_to_next_call = FALSE;
+		walk_state->method_breakpoint = 0;
+	}
+
 
 	/*
 	 * Check if this is an opcode that we are interested in --
@@ -95,7 +103,6 @@ acpi_db_single_step (
 	case AML_CLASS_UNKNOWN:
 	case AML_CLASS_ARGUMENT:    /* constants, literals, etc.  do nothing */
 		return (AE_OK);
-		break;
 	}
 
 	/*
@@ -121,10 +128,36 @@ acpi_db_single_step (
 
 
 		display_op = op;
-		if (op->parent) {
-			if ((op->parent->opcode == AML_IF_OP) ||
-				(op->parent->opcode == AML_WHILE_OP)) {
-				display_op = op->parent;
+		parent_op = op->parent;
+		if (parent_op) {
+			if ((walk_state->control_state) &&
+				(walk_state->control_state->common.state == ACPI_CONTROL_PREDICATE_EXECUTING)) {
+				/*
+				 * We are executing the predicate of an IF or WHILE statement
+				 * Search upwards for the containing IF or WHILE so that the
+				 * entire predicate can be displayed.
+				 */
+				while (parent_op) {
+					if ((parent_op->opcode == AML_IF_OP) ||
+						(parent_op->opcode == AML_WHILE_OP)) {
+						display_op = parent_op;
+						break;
+					}
+					parent_op = parent_op->parent;
+				}
+			}
+			else {
+				while (parent_op) {
+					if ((parent_op->opcode == AML_IF_OP)    ||
+						(parent_op->opcode == AML_ELSE_OP)  ||
+						(parent_op->opcode == AML_SCOPE_OP) ||
+						(parent_op->opcode == AML_METHOD_OP) ||
+						(parent_op->opcode == AML_WHILE_OP)) {
+						break;
+					}
+					display_op = parent_op;
+					parent_op = parent_op->parent;
+				}
 			}
 		}
 
@@ -135,15 +168,15 @@ acpi_db_single_step (
 		if ((op->opcode == AML_IF_OP) ||
 			(op->opcode == AML_WHILE_OP)) {
 			if (walk_state->control_state->common.value) {
-				acpi_os_printf ("Predicate was TRUE, executed block\n");
+				acpi_os_printf ("Predicate = [True], IF block was executed\n");
 			}
 			else {
-				acpi_os_printf ("Predicate is FALSE, skipping block\n");
+				acpi_os_printf ("Predicate = [False], Skipping IF block\n");
 			}
 		}
 
 		else if (op->opcode == AML_ELSE_OP) {
-			/* TBD */
+			acpi_os_printf ("Predicate = [False], ELSE block was executed\n");
 		}
 
 		/* Restore everything */
@@ -158,7 +191,6 @@ acpi_db_single_step (
 	if (!acpi_gbl_cm_single_step) {
 		return (AE_OK);
 	}
-
 
 	/*
 	 * If we are executing a step-to-call command,
@@ -176,7 +208,6 @@ acpi_db_single_step (
 		acpi_gbl_step_to_next_call = FALSE;
 	}
 
-
 	/*
 	 * If the next opcode is a method call, we will "step over" it
 	 * by default.
@@ -184,11 +215,9 @@ acpi_db_single_step (
 	if (op->opcode == AML_INT_METHODCALL_OP) {
 		acpi_gbl_cm_single_step = FALSE; /* No more single step while executing called method */
 
-		/* Set the breakpoint on the call, it will stop execution as soon as we return */
+		/* Set the breakpoint on/before the call, it will stop execution as soon as we return */
 
-		/* TBD: [Future] don't kill the user breakpoint! */
-
-		walk_state->method_breakpoint = /* Op->Aml_offset + */ 1; /* Must be non-zero! */
+		walk_state->method_breakpoint = 1; /* Must be non-zero! */
 	}
 
 
@@ -204,8 +233,14 @@ acpi_db_single_step (
 		if (acpi_gbl_debugger_configuration == DEBUGGER_MULTI_THREADED) {
 			/* Handshake with the front-end that gets user command lines */
 
-			acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
-			acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_READY);
+			status = acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
+			if (ACPI_FAILURE (status)) {
+				return (status);
+			}
+			status = acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_READY);
+			if (ACPI_FAILURE (status)) {
+				return (status);
+			}
 		}
 
 		else {
@@ -213,15 +248,15 @@ acpi_db_single_step (
 
 			/* Force output to console until a command is entered */
 
-			acpi_db_set_output_destination (DB_CONSOLE_OUTPUT);
+			acpi_db_set_output_destination (ACPI_DB_CONSOLE_OUTPUT);
 
 			/* Different prompt if method is executing */
 
 			if (!acpi_gbl_method_executing) {
-				acpi_os_printf ("%1c ", DB_COMMAND_PROMPT);
+				acpi_os_printf ("%1c ", ACPI_DEBUGGER_COMMAND_PROMPT);
 			}
 			else {
-				acpi_os_printf ("%1c ", DB_EXECUTE_PROMPT);
+				acpi_os_printf ("%1c ", ACPI_DEBUGGER_EXECUTE_PROMPT);
 			}
 
 			/* Get the user input line */
@@ -256,16 +291,33 @@ int
 acpi_db_initialize (void)
 {
 
-
 	/* Init globals */
 
-	acpi_gbl_db_buffer = acpi_os_callocate (ACPI_DEBUG_BUFFER_SIZE);
+	acpi_gbl_db_buffer          = NULL;
+	acpi_gbl_db_filename        = NULL;
+	acpi_gbl_db_output_to_file  = FALSE;
+
+	acpi_gbl_db_debug_level     = ACPI_LV_VERBOSITY2;
+	acpi_gbl_db_console_debug_level = NORMAL_DEFAULT | ACPI_LV_TABLES;
+	acpi_gbl_db_output_flags    = ACPI_DB_CONSOLE_OUTPUT;
+
+	acpi_gbl_db_opt_tables      = FALSE;
+	acpi_gbl_db_opt_disasm      = FALSE;
+	acpi_gbl_db_opt_stats       = FALSE;
+	acpi_gbl_db_opt_verbose     = TRUE;
+	acpi_gbl_db_opt_ini_methods = TRUE;
+
+	acpi_gbl_db_buffer = acpi_os_allocate (ACPI_DEBUG_BUFFER_SIZE);
+	if (!acpi_gbl_db_buffer) {
+		return 0;
+	}
+	ACPI_MEMSET (acpi_gbl_db_buffer, 0, ACPI_DEBUG_BUFFER_SIZE);
 
 	/* Initial scope is the root */
 
 	acpi_gbl_db_scope_buf [0] = '\\';
 	acpi_gbl_db_scope_buf [1] = 0;
-
+	acpi_gbl_db_scope_node = acpi_gbl_root_node;
 
 	/*
 	 * If configured for multi-thread support, the debug executor runs in

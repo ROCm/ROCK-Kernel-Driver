@@ -775,35 +775,17 @@ asmlinkage void math_emulate(long arg)
 
 #endif /* CONFIG_MATH_EMULATION */
 
-#ifndef CONFIG_M686
+#ifdef CONFIG_X86_F00F_BUG
 void __init trap_init_f00f_bug(void)
 {
-	unsigned long page;
-	pgd_t * pgd;
-	pmd_t * pmd;
-	pte_t * pte;
-
-	/*
-	 * Allocate a new page in virtual address space, 
-	 * move the IDT into it and write protect this page.
-	 */
-	page = (unsigned long) vmalloc(PAGE_SIZE);
-	pgd = pgd_offset(&init_mm, page);
-	pmd = pmd_offset(pgd, page);
-	pte = pte_offset_kernel(pmd, page);
-	__free_page(pte_page(*pte));
-	*pte = mk_pte_phys(__pa(&idt_table), PAGE_KERNEL_RO);
-	/*
-	 * Not that any PGE-capable kernel should have the f00f bug ...
-	 */
-	__flush_tlb_all();
+	__set_fixmap(FIX_F00F_IDT, __pa(&idt_table), PAGE_KERNEL_RO);
 
 	/*
 	 * "idt" is magic - it overlaps the idt_descr
 	 * variable so that updating idt will automatically
 	 * update the idt descriptor..
 	 */
-	idt = (struct desc_struct *)page;
+	idt = (struct desc_struct *) fix_to_virt(FIX_F00F_IDT);
 	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
 }
 #endif

@@ -282,6 +282,7 @@ bad_area:
 		return;
 	}
 
+#ifdef CONFIG_X86_F00F_BUG
 	/*
 	 * Pentium F0 0F C7 C8 bug workaround.
 	 */
@@ -295,6 +296,7 @@ bad_area:
 			return;
 		}
 	}
+#endif
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 58 $
+ *              $Revision: 63 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "acinterp.h"
 
 #define _COMPONENT          ACPI_PARSER
-	 MODULE_NAME         ("pswalk")
+	 ACPI_MODULE_NAME    ("pswalk")
 
 
 /*******************************************************************************
@@ -61,12 +61,12 @@ acpi_ps_get_next_walk_op (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE_PTR ("Ps_get_next_walk_op", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ps_get_next_walk_op", op);
 
 
 	/* Check for a argument only if we are descending in the tree */
 
-	if (walk_state->next_op_info != NEXT_OP_UPWARD) {
+	if (walk_state->next_op_info != ACPI_NEXT_OP_UPWARD) {
 		/* Look for an argument or child of the current op */
 
 		next = acpi_ps_get_arg (op, 0);
@@ -75,11 +75,10 @@ acpi_ps_get_next_walk_op (
 
 			walk_state->prev_op     = op;
 			walk_state->next_op     = next;
-			walk_state->next_op_info = NEXT_OP_DOWNWARD;
+			walk_state->next_op_info = ACPI_NEXT_OP_DOWNWARD;
 
 			return_ACPI_STATUS (AE_OK);
 		}
-
 
 		/*
 		 * No more children, this Op is complete.  Save Next and Parent
@@ -115,7 +114,7 @@ acpi_ps_get_next_walk_op (
 
 			walk_state->prev_op     = op;
 			walk_state->next_op     = next;
-			walk_state->next_op_info = NEXT_OP_DOWNWARD;
+			walk_state->next_op_info = ACPI_NEXT_OP_DOWNWARD;
 
 			/* Continue downward */
 
@@ -127,7 +126,6 @@ acpi_ps_get_next_walk_op (
 		 * the tree
 		 */
 	}
-
 	else {
 		/*
 		 * We are resuming a walk, and we were (are) going upward in the tree.
@@ -135,7 +133,6 @@ acpi_ps_get_next_walk_op (
 		 */
 		parent = op;
 	}
-
 
 	/*
 	 * Look for a sibling of the current Op's parent
@@ -175,7 +172,7 @@ acpi_ps_get_next_walk_op (
 
 			walk_state->prev_op     = parent;
 			walk_state->next_op     = next;
-			walk_state->next_op_info = NEXT_OP_DOWNWARD;
+			walk_state->next_op_info = ACPI_NEXT_OP_DOWNWARD;
 
 			return_ACPI_STATUS (status);
 		}
@@ -188,9 +185,10 @@ acpi_ps_get_next_walk_op (
 	}
 
 
-	/* Got all the way to the top of the tree, we must be done! */
-	/* However, the code should have terminated in the loop above */
-
+	/*
+	 * Got all the way to the top of the tree, we must be done!
+	 * However, the code should have terminated in the loop above
+	 */
 	walk_state->next_op     = NULL;
 
 	return_ACPI_STATUS (AE_OK);
@@ -212,7 +210,7 @@ acpi_ps_get_next_walk_op (
  *
  ******************************************************************************/
 
-static acpi_status
+acpi_status
 acpi_ps_delete_completed_op (
 	acpi_walk_state         *walk_state)
 {
@@ -239,10 +237,10 @@ acpi_ps_delete_parse_tree (
 	acpi_parse_object       *subtree_root)
 {
 	acpi_walk_state         *walk_state;
-	acpi_walk_list          walk_list;
+	ACPI_THREAD_STATE       *thread;
 
 
-	FUNCTION_TRACE_PTR ("Ps_delete_parse_tree", subtree_root);
+	ACPI_FUNCTION_TRACE_PTR ("Ps_delete_parse_tree", subtree_root);
 
 
 	if (!subtree_root) {
@@ -251,11 +249,13 @@ acpi_ps_delete_parse_tree (
 
 	/* Create and initialize a new walk list */
 
-	walk_list.walk_state = NULL;
-	walk_list.acquired_mutex_list.prev = NULL;
-	walk_list.acquired_mutex_list.next = NULL;
+	thread = acpi_ut_create_thread_state ();
+	if (!thread) {
+		return_VOID;
+	}
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, &walk_list);
+
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, thread);
 	if (!walk_state) {
 		return_VOID;
 	}
@@ -264,14 +264,12 @@ acpi_ps_delete_parse_tree (
 	walk_state->descending_callback = NULL;
 	walk_state->ascending_callback  = NULL;
 
-
 	walk_state->origin = subtree_root;
 	walk_state->next_op = subtree_root;
 
-
 	/* Head downward in the tree */
 
-	walk_state->next_op_info = NEXT_OP_DOWNWARD;
+	walk_state->next_op_info = ACPI_NEXT_OP_DOWNWARD;
 
 	/* Visit all nodes in the subtree */
 
@@ -282,7 +280,7 @@ acpi_ps_delete_parse_tree (
 
 	/* We are done with this walk */
 
-	acpi_ex_release_all_mutexes ((acpi_operand_object *) &walk_list.acquired_mutex_list);
+	acpi_ut_delete_generic_state ((acpi_generic_state *) thread);
 	acpi_ds_delete_walk_state (walk_state);
 
 	return_VOID;

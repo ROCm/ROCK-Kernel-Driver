@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 92 $
+ *              $Revision: 100 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exmisc")
+	 ACPI_MODULE_NAME    ("exmisc")
 
 
 /*******************************************************************************
@@ -59,10 +59,12 @@ acpi_ex_get_object_reference (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_PTR ("Ex_get_object_reference", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_get_object_reference", obj_desc);
 
 
-	if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_INTERNAL)) {
+	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
+	case ACPI_DESC_TYPE_INTERNAL:
+
 		if (obj_desc->common.type != INTERNAL_TYPE_REFERENCE) {
 			*return_desc = NULL;
 			status = AE_TYPE;
@@ -77,8 +79,9 @@ acpi_ex_get_object_reference (
 		case AML_LOCAL_OP:
 		case AML_ARG_OP:
 
-			*return_desc = (void *) acpi_ds_method_data_get_node (obj_desc->reference.opcode,
-					  obj_desc->reference.offset, walk_state);
+			status = acpi_ds_method_data_get_node (obj_desc->reference.opcode,
+					  obj_desc->reference.offset, walk_state,
+					  (acpi_namespace_node **) return_desc);
 			break;
 
 		default:
@@ -89,18 +92,22 @@ acpi_ex_get_object_reference (
 			status = AE_AML_INTERNAL;
 			goto cleanup;
 		}
+		break;
 
-	}
 
-	else if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
+	case ACPI_DESC_TYPE_NAMED:
+
 		/* Must be a named object;  Just return the Node */
 
 		*return_desc = obj_desc;
-	}
+		break;
 
-	else {
+
+	default:
+
 		*return_desc = NULL;
 		status = AE_TYPE;
+		break;
 	}
 
 
@@ -113,10 +120,103 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_do_concatenate
+ * FUNCTION:    Acpi_ex_concat_template
  *
  * PARAMETERS:  *Obj_desc           - Object to be converted.  Must be an
  *                                    Integer, Buffer, or String
+ *              Walk_state          - Current walk state
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Concatenate two resource templates
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ex_concat_template (
+	acpi_operand_object     *obj_desc1,
+	acpi_operand_object     *obj_desc2,
+	acpi_operand_object     **actual_return_desc,
+	acpi_walk_state         *walk_state)
+{
+	acpi_status             status;
+	acpi_operand_object     *return_desc;
+	NATIVE_CHAR             *new_buf;
+	u8                      *end_tag1;
+	u8                      *end_tag2;
+	ACPI_SIZE               length1;
+	ACPI_SIZE               length2;
+
+
+	ACPI_FUNCTION_TRACE ("Ex_concat_template");
+
+
+	/* Find the End_tags in each resource template */
+
+	end_tag1 = acpi_ut_get_resource_end_tag (obj_desc1);
+	end_tag2 = acpi_ut_get_resource_end_tag (obj_desc2);
+	if (!end_tag1 || !end_tag2) {
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+	}
+
+	/* Create a new buffer object for the result */
+
+	return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+	if (!return_desc) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	/* Allocate a new buffer for the result */
+
+	length1 = ACPI_PTR_DIFF (end_tag1, obj_desc1->buffer.pointer);
+	length2 = ACPI_PTR_DIFF (end_tag2, obj_desc2->buffer.pointer) +
+			  2; /* Size of END_TAG */
+
+	new_buf = ACPI_MEM_ALLOCATE (length1 + length2);
+	if (!new_buf) {
+		ACPI_REPORT_ERROR
+			(("Ex_concat_template: Buffer allocation failure\n"));
+		status = AE_NO_MEMORY;
+		goto cleanup;
+	}
+
+	/* Copy the templates to the new descriptor */
+
+	ACPI_MEMCPY (new_buf, obj_desc1->buffer.pointer, length1);
+	ACPI_MEMCPY (new_buf + length1, obj_desc2->buffer.pointer, length2);
+
+	/*
+	 * Point the return object to the new buffer
+	 */
+	return_desc->buffer.pointer = (u8 *) new_buf;
+	return_desc->buffer.length = length1 + length2;
+
+	/* Compute the new checksum */
+
+	new_buf[return_desc->buffer.length - 1] =
+			acpi_ut_generate_checksum (return_desc->buffer.pointer,
+					 (return_desc->buffer.length - 1));
+
+	/* Return the completed template descriptor */
+
+	*actual_return_desc = return_desc;
+	return_ACPI_STATUS (AE_OK);
+
+
+cleanup:
+
+	acpi_ut_remove_reference (return_desc);
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ex_do_concatenate
+ *
+ * PARAMETERS:  Obj_desc1           - First source object
+ *              Obj_desc2           - Second source object
+ *              Actual_return_desc  - Where to place the return object
  *              Walk_state          - Current walk state
  *
  * RETURN:      Status
@@ -127,7 +227,7 @@ cleanup:
 
 acpi_status
 acpi_ex_do_concatenate (
-	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *obj_desc1,
 	acpi_operand_object     *obj_desc2,
 	acpi_operand_object     **actual_return_desc,
 	acpi_walk_state         *walk_state)
@@ -140,7 +240,7 @@ acpi_ex_do_concatenate (
 	u32                     integer_size = sizeof (acpi_integer);
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*
@@ -149,7 +249,7 @@ acpi_ex_do_concatenate (
 	 * 2) Two Strings concatenated to produce a string
 	 * 3) Two Buffers concatenated to produce a buffer
 	 */
-	switch (obj_desc->common.type) {
+	switch (obj_desc1->common.type) {
 	case ACPI_TYPE_INTEGER:
 
 		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
@@ -175,7 +275,7 @@ acpi_ex_do_concatenate (
 		return_desc->buffer.length = integer_size * 2;
 		new_buf = ACPI_MEM_CALLOCATE (return_desc->buffer.length);
 		if (!new_buf) {
-			REPORT_ERROR
+			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: Buffer allocation failure\n"));
 			status = AE_NO_MEMORY;
 			goto cleanup;
@@ -185,7 +285,7 @@ acpi_ex_do_concatenate (
 
 		/* Convert the first integer */
 
-		this_integer = obj_desc->integer.value;
+		this_integer = obj_desc1->integer.value;
 		for (i = 0; i < integer_size; i++) {
 			new_buf[i] = (u8) this_integer;
 			this_integer >>= 8;
@@ -211,24 +311,24 @@ acpi_ex_do_concatenate (
 
 		/* Operand0 is string  */
 
-		new_buf = ACPI_MEM_ALLOCATE (obj_desc->string.length +
+		new_buf = ACPI_MEM_ALLOCATE (obj_desc1->string.length +
 				  obj_desc2->string.length + 1);
 		if (!new_buf) {
-			REPORT_ERROR
+			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: String allocation failure\n"));
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		STRCPY (new_buf, obj_desc->string.pointer);
-		STRCPY (new_buf + obj_desc->string.length,
+		ACPI_STRCPY (new_buf, obj_desc1->string.pointer);
+		ACPI_STRCPY (new_buf + obj_desc1->string.length,
 				  obj_desc2->string.pointer);
 
 		/* Point the return object to the new string */
 
 		return_desc->string.pointer = new_buf;
-		return_desc->string.length = obj_desc->string.length +=
-				  obj_desc2->string.length;
+		return_desc->string.length = obj_desc1->string.length +
+				   obj_desc2->string.length;
 		break;
 
 
@@ -241,27 +341,27 @@ acpi_ex_do_concatenate (
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = ACPI_MEM_ALLOCATE (obj_desc->buffer.length +
+		new_buf = ACPI_MEM_ALLOCATE (obj_desc1->buffer.length +
 				  obj_desc2->buffer.length);
 		if (!new_buf) {
-			REPORT_ERROR
+			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: Buffer allocation failure\n"));
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		MEMCPY (new_buf, obj_desc->buffer.pointer,
-				  obj_desc->buffer.length);
-		MEMCPY (new_buf + obj_desc->buffer.length, obj_desc2->buffer.pointer,
+		ACPI_MEMCPY (new_buf, obj_desc1->buffer.pointer,
+				  obj_desc1->buffer.length);
+		ACPI_MEMCPY (new_buf + obj_desc1->buffer.length, obj_desc2->buffer.pointer,
 				   obj_desc2->buffer.length);
 
 		/*
 		 * Point the return object to the new buffer
 		 */
 
-		return_desc->buffer.pointer    = (u8 *) new_buf;
-		return_desc->buffer.length     = obj_desc->buffer.length +
-				 obj_desc2->buffer.length;
+		return_desc->buffer.pointer = (u8 *) new_buf;
+		return_desc->buffer.length = obj_desc1->buffer.length +
+				  obj_desc2->buffer.length;
 		break;
 
 
@@ -269,7 +369,6 @@ acpi_ex_do_concatenate (
 		status = AE_AML_INTERNAL;
 		return_desc = NULL;
 	}
-
 
 	*actual_return_desc = return_desc;
 	return (AE_OK);
@@ -288,7 +387,7 @@ cleanup:
  *
  * PARAMETERS:  Opcode              - AML opcode
  *              Operand0            - Integer operand #0
- *              Operand0            - Integer operand #1
+ *              Operand1            - Integer operand #1
  *
  * RETURN:      Integer result of the operation
  *
@@ -369,7 +468,7 @@ acpi_ex_do_math_op (
  *
  * PARAMETERS:  Opcode              - AML opcode
  *              Operand0            - Integer operand #0
- *              Operand0            - Integer operand #1
+ *              Operand1            - Integer operand #1
  *
  * RETURN:      TRUE/FALSE result of the operation
  *

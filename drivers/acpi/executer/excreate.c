@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 71 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,10 +31,11 @@
 #include "acnamesp.h"
 #include "acevents.h"
 #include "acdispat.h"
+#include "actables.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("excreate")
+	 ACPI_MODULE_NAME    ("excreate")
 
 
 /*****************************************************************************
@@ -58,7 +59,7 @@ acpi_ex_create_alias (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ex_create_alias");
+	ACPI_FUNCTION_TRACE ("Ex_create_alias");
 
 
 	/* Get the source/alias operands (both namespace nodes) */
@@ -69,7 +70,7 @@ acpi_ex_create_alias (
 	/* Attach the original source object to the new Alias Node */
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) walk_state->operands[0],
-			   source_node->object,
+			   acpi_ns_get_attached_object (source_node),
 			   source_node->type);
 
 	/*
@@ -105,7 +106,7 @@ acpi_ex_create_event (
 	acpi_operand_object     *obj_desc;
 
 
-	FUNCTION_TRACE ("Ex_create_event");
+	ACPI_FUNCTION_TRACE ("Ex_create_event");
 
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_EVENT);
@@ -114,11 +115,11 @@ acpi_ex_create_event (
 		goto cleanup;
 	}
 
-	/* Create the actual OS semaphore */
-
-	/* TBD: [Investigate] should be created with 0 or 1 units? */
-
-	status = acpi_os_create_semaphore (ACPI_NO_UNIT_LIMIT, 1,
+	/*
+	 * Create the actual OS semaphore, with zero initial units -- meaning
+	 * that the event is created in an unsignalled state
+	 */
+	status = acpi_os_create_semaphore (ACPI_NO_UNIT_LIMIT, 0,
 			   &obj_desc->event.semaphore);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
@@ -127,7 +128,7 @@ acpi_ex_create_event (
 	/* Attach object to the Node */
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) walk_state->operands[0],
-			   obj_desc, (u8) ACPI_TYPE_EVENT);
+			   obj_desc, ACPI_TYPE_EVENT);
 
 cleanup:
 	/*
@@ -161,7 +162,7 @@ acpi_ex_create_mutex (
 	acpi_operand_object     *obj_desc;
 
 
-	FUNCTION_TRACE_PTR ("Ex_create_mutex", WALK_OPERANDS);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_create_mutex", ACPI_WALK_OPERANDS);
 
 
 	/* Create the new mutex object */
@@ -172,8 +173,11 @@ acpi_ex_create_mutex (
 		goto cleanup;
 	}
 
-	/* Create the actual OS semaphore */
-
+	/*
+	 * Create the actual OS semaphore.
+	 * One unit max to make it a mutex, with one initial unit to allow
+	 * the mutex to be acquired.
+	 */
 	status = acpi_os_create_semaphore (1, 1, &obj_desc->mutex.semaphore);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
@@ -184,7 +188,7 @@ acpi_ex_create_mutex (
 	obj_desc->mutex.sync_level = (u8) walk_state->operands[1]->integer.value;
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) walk_state->operands[0],
-			  obj_desc, (u8) ACPI_TYPE_MUTEX);
+			  obj_desc, ACPI_TYPE_MUTEX);
 
 
 cleanup:
@@ -222,20 +226,21 @@ acpi_ex_create_region (
 	acpi_status             status;
 	acpi_operand_object     *obj_desc;
 	acpi_namespace_node     *node;
+	acpi_operand_object     *region_obj2;
 
 
-	FUNCTION_TRACE ("Ex_create_region");
+	ACPI_FUNCTION_TRACE ("Ex_create_region");
 
 
 	/* Get the Node from the object stack  */
 
-	node = (acpi_namespace_node *) walk_state->operands[0];
+	node = walk_state->op->node;
 
 	/*
 	 * If the region object is already attached to this node,
 	 * just return
 	 */
-	if (node->object) {
+	if (acpi_ns_get_attached_object (node)) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -243,9 +248,9 @@ acpi_ex_create_region (
 	 * Space ID must be one of the predefined IDs, or in the user-defined
 	 * range
 	 */
-	if ((region_space >= NUM_REGION_TYPES) &&
-		(region_space < USER_REGION_BEGIN)) {
-		REPORT_ERROR (("Invalid Address_space type %X\n", region_space));
+	if ((region_space >= ACPI_NUM_PREDEFINED_REGIONS) &&
+		(region_space < ACPI_USER_REGION_BEGIN)) {
+		ACPI_REPORT_ERROR (("Invalid Address_space type %X\n", region_space));
 		return_ACPI_STATUS (AE_AML_INVALID_SPACE_ID);
 	}
 
@@ -261,21 +266,13 @@ acpi_ex_create_region (
 		goto cleanup;
 	}
 
-	/* Allocate a method object for this region */
-
-	obj_desc->region.extra = acpi_ut_create_internal_object (
-			 INTERNAL_TYPE_EXTRA);
-	if (!obj_desc->region.extra) {
-		status = AE_NO_MEMORY;
-		goto cleanup;
-	}
-
 	/*
 	 * Remember location in AML stream of address & length
 	 * operands since they need to be evaluated at run time.
 	 */
-	obj_desc->region.extra->extra.aml_start = aml_start;
-	obj_desc->region.extra->extra.aml_length = aml_length;
+	region_obj2                 = obj_desc->common.next_object;
+	region_obj2->extra.aml_start = aml_start;
+	region_obj2->extra.aml_length = aml_length;
 
 	/* Init the region from the operands */
 
@@ -286,34 +283,14 @@ acpi_ex_create_region (
 
 	/* Install the new region object in the parent Node */
 
-	status = acpi_ns_attach_object (node, obj_desc,
-			  (u8) ACPI_TYPE_REGION);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
+	status = acpi_ns_attach_object (node, obj_desc, ACPI_TYPE_REGION);
 
-	/*
-	 * If we have a valid region, initialize it
-	 * Namespace is NOT locked at this point.
-	 */
-	status = acpi_ev_initialize_region (obj_desc, FALSE);
-	if (ACPI_FAILURE (status)) {
-		/*
-		 *  If AE_NOT_EXIST is returned, it is not fatal
-		 *  because many regions get created before a handler
-		 *  is installed for said region.
-		 */
-		if (AE_NOT_EXIST == status) {
-			status = AE_OK;
-		}
-	}
 
 cleanup:
 
 	/* Remove local reference to the object */
 
 	acpi_ut_remove_reference (obj_desc);
-
 	return_ACPI_STATUS (status);
 }
 
@@ -334,24 +311,81 @@ acpi_status
 acpi_ex_create_table_region (
 	acpi_walk_state         *walk_state)
 {
-	acpi_status             status = AE_OK;
+	acpi_status             status;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *node;
+	acpi_table_header       *table;
+	acpi_operand_object     *region_obj2;
 
 
-	FUNCTION_TRACE ("Ex_create_table_region");
+	ACPI_FUNCTION_TRACE ("Ex_create_table_region");
 
-/*
-	acpi_operand_object     *Obj_desc;
-	Obj_desc = Acpi_ut_create_internal_object (ACPI_TYPE_REGION);
-	if (!Obj_desc)
-	{
-		Status = AE_NO_MEMORY;
-		goto Cleanup;
+	/* Get the Node from the object stack  */
+
+	node = walk_state->op->node;
+
+	/*
+	 * If the region object is already attached to this node,
+	 * just return
+	 */
+	if (acpi_ns_get_attached_object (node)) {
+		return_ACPI_STATUS (AE_OK);
 	}
 
+	/* Find the ACPI table */
 
-Cleanup:
-*/
+	status = acpi_tb_find_table (operand[1]->string.pointer,
+			   operand[2]->string.pointer,
+			   operand[3]->string.pointer, &table);
 
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Create the region descriptor */
+
+	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_REGION);
+	if (!obj_desc) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	region_obj2                     = obj_desc->common.next_object;
+	region_obj2->extra.region_context = NULL;
+
+	/* Init the region from the operands */
+
+	obj_desc->region.space_id = REGION_DATA_TABLE;
+	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) ACPI_TO_INTEGER (table);
+	obj_desc->region.length = table->length;
+	obj_desc->region.node   = node;
+	obj_desc->region.flags  = AOPOBJ_DATA_VALID;
+
+	/* Install the new region object in the parent Node */
+
+	status = acpi_ns_attach_object (node, obj_desc, ACPI_TYPE_REGION);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
+
+	status = acpi_ev_initialize_region (obj_desc, FALSE);
+	if (ACPI_FAILURE (status)) {
+		if (status == AE_NOT_EXIST) {
+			status = AE_OK;
+		}
+		else {
+			goto cleanup;
+		}
+	}
+
+	obj_desc->region.flags |= AOPOBJ_SETUP_COMPLETE;
+
+
+cleanup:
+
+	/* Remove local reference to the object */
+
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
 
@@ -381,7 +415,7 @@ acpi_ex_create_processor (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE_PTR ("Ex_create_processor", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_create_processor", walk_state);
 
 
 	/* Create the processor object */
@@ -401,7 +435,7 @@ acpi_ex_create_processor (
 	/* Install the processor object in the parent Node */
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) operand[0],
-			  obj_desc, (u8) ACPI_TYPE_PROCESSOR);
+			  obj_desc, ACPI_TYPE_PROCESSOR);
 
 
 	/* Remove local reference to the object */
@@ -436,7 +470,7 @@ acpi_ex_create_power_resource (
 	acpi_operand_object     *obj_desc;
 
 
-	FUNCTION_TRACE_PTR ("Ex_create_power_resource", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_create_power_resource", walk_state);
 
 
 	/* Create the power resource object */
@@ -454,7 +488,7 @@ acpi_ex_create_power_resource (
 	/* Install the  power resource object in the parent Node */
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) operand[0],
-			  obj_desc, (u8) ACPI_TYPE_POWER);
+			  obj_desc, ACPI_TYPE_POWER);
 
 
 	/* Remove local reference to the object */
@@ -491,7 +525,7 @@ acpi_ex_create_method (
 	u8                      method_flags;
 
 
-	FUNCTION_TRACE_PTR ("Ex_create_method", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_create_method", walk_state);
 
 
 	/* Create a new method object */
@@ -533,7 +567,7 @@ acpi_ex_create_method (
 	/* Attach the new object to the method Node */
 
 	status = acpi_ns_attach_object ((acpi_namespace_node *) operand[0],
-			  obj_desc, (u8) ACPI_TYPE_METHOD);
+			  obj_desc, ACPI_TYPE_METHOD);
 
 	/* Remove local reference to the object */
 

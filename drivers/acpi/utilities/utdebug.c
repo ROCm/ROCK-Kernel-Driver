@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 90 $
+ *              $Revision: 96 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 #include "acpi.h"
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("utdebug")
+	 ACPI_MODULE_NAME    ("utdebug")
 
 
 u32             acpi_gbl_prev_thread_id = 0xFFFFFFFF;
@@ -57,7 +57,7 @@ acpi_ut_init_stack_ptr_trace (
 	u32                 current_sp;
 
 
-	acpi_gbl_entry_stack_pointer = (u32) &current_sp;
+	acpi_gbl_entry_stack_pointer = ACPI_PTR_DIFF (&current_sp, NULL);
 }
 
 
@@ -77,9 +77,10 @@ void
 acpi_ut_track_stack_ptr (
 	void)
 {
-	u32                 current_sp;
+	ACPI_SIZE           current_sp;
 
-	current_sp = (u32) &current_sp;
+
+	current_sp = ACPI_PTR_DIFF (&current_sp, NULL);
 
 	if (current_sp < acpi_gbl_lowest_stack_pointer) {
 		acpi_gbl_lowest_stack_pointer = current_sp;
@@ -111,7 +112,7 @@ acpi_ut_track_stack_ptr (
  *
  ****************************************************************************/
 
-void
+void  ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print (
 	u32                     requested_debug_level,
 	u32                     line_number,
@@ -184,7 +185,7 @@ acpi_ut_debug_print (
  *
  ****************************************************************************/
 
-void
+void  ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print_raw (
 	u32                     requested_debug_level,
 	u32                     line_number,
@@ -431,7 +432,8 @@ acpi_ut_value_exit (
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
-			"%s %8.8X%8.8X\n", acpi_gbl_fn_exit_str, HIDWORD(value), LODWORD(value));
+			"%s %8.8X%8.8X\n", acpi_gbl_fn_exit_str,
+			ACPI_HIDWORD (value), ACPI_LODWORD (value));
 
 	acpi_gbl_nesting_level--;
 }
@@ -539,8 +541,8 @@ acpi_ut_dump_buffer (
 
 			case DB_WORD_DISPLAY:
 
-				MOVE_UNALIGNED16_TO_32 (&temp32,
-						 &buffer[i + j]);
+				ACPI_MOVE_UNALIGNED16_TO_32 (&temp32,
+						   &buffer[i + j]);
 				acpi_os_printf ("%04X ", temp32);
 				j += 2;
 				break;
@@ -548,8 +550,8 @@ acpi_ut_dump_buffer (
 
 			case DB_DWORD_DISPLAY:
 
-				MOVE_UNALIGNED32_TO_32 (&temp32,
-						 &buffer[i + j]);
+				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
+						   &buffer[i + j]);
 				acpi_os_printf ("%08X ", temp32);
 				j += 4;
 				break;
@@ -557,12 +559,12 @@ acpi_ut_dump_buffer (
 
 			case DB_QWORD_DISPLAY:
 
-				MOVE_UNALIGNED32_TO_32 (&temp32,
-						 &buffer[i + j]);
+				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
+						   &buffer[i + j]);
 				acpi_os_printf ("%08X", temp32);
 
-				MOVE_UNALIGNED32_TO_32 (&temp32,
-						 &buffer[i + j + 4]);
+				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
+						   &buffer[i + j + 4]);
 				acpi_os_printf ("%08X ", temp32);
 				j += 8;
 				break;

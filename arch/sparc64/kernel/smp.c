@@ -270,7 +270,7 @@ void __init smp_boot_cpus(void)
 			kernel_thread(NULL, NULL, CLONE_PID);
 			cpucount++;
 
-			p = init_task.prev_task;
+			p = prev_task(&init_task);
 
 			init_idle(p, i);
 

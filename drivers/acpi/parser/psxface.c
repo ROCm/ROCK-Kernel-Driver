@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 52 $
+ *              $Revision: 59 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 
 #define _COMPONENT          ACPI_PARSER
-	 MODULE_NAME         ("psxface")
+	 ACPI_MODULE_NAME    ("psxface")
 
 
 /*******************************************************************************
@@ -67,7 +67,7 @@ acpi_psx_execute (
 	acpi_walk_state         *walk_state;
 
 
-	FUNCTION_TRACE ("Psx_execute");
+	ACPI_FUNCTION_TRACE ("Psx_execute");
 
 
 	/* Validate the Node and get the attached object */
@@ -113,9 +113,16 @@ acpi_psx_execute (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
+	/*
+	 * Get a new Owner_id for objects created by this method. Namespace
+	 * objects (such as Operation Regions) can be created during the
+	 * first pass parse.
+	 */
+	obj_desc->method.owning_id = acpi_ut_allocate_owner_id (ACPI_OWNER_TYPE_METHOD);
+
 	/* Create and initialize a new walk state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+	walk_state = acpi_ds_create_walk_state (obj_desc->method.owning_id,
 			   NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
@@ -124,7 +131,7 @@ acpi_psx_execute (
 	status = acpi_ds_init_aml_walk (walk_state, op, method_node, obj_desc->method.aml_start,
 			  obj_desc->method.aml_length, NULL, NULL, 1);
 	if (ACPI_FAILURE (status)) {
-		/* TBD: delete walk state */
+		acpi_ds_delete_walk_state (walk_state);
 		return_ACPI_STATUS (status);
 	}
 
@@ -164,7 +171,7 @@ acpi_psx_execute (
 	status = acpi_ds_init_aml_walk (walk_state, op, method_node, obj_desc->method.aml_start,
 			  obj_desc->method.aml_length, params, return_obj_desc, 3);
 	if (ACPI_FAILURE (status)) {
-		/* TBD: delete walk state */
+		acpi_ds_delete_walk_state (walk_state);
 		return_ACPI_STATUS (status);
 	}
 
@@ -182,13 +189,6 @@ acpi_psx_execute (
 		}
 	}
 
-
-	if (ACPI_FAILURE (status)) {
-		DUMP_PATHNAME (method_node, "Ps_execute: method failed -",
-			ACPI_LV_ERROR, _COMPONENT);
-	}
-
-
 	/*
 	 * If the method has returned an object, signal this to the caller with
 	 * a control exception code
@@ -196,11 +196,10 @@ acpi_psx_execute (
 	if (*return_obj_desc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Method returned Obj_desc=%p\n",
 			*return_obj_desc));
-		DUMP_STACK_ENTRY (*return_obj_desc);
+		ACPI_DUMP_STACK_ENTRY (*return_obj_desc);
 
 		status = AE_CTRL_RETURN_VALUE;
 	}
-
 
 	return_ACPI_STATUS (status);
 }

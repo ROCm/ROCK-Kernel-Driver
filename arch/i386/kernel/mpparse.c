@@ -14,6 +14,7 @@
 
 #include <linux/mm.h>
 #include <linux/irq.h>
+#include <linux/acpi.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/config.h>
@@ -29,6 +30,9 @@
 
 /* Have we found an MP table */
 int smp_found_config;
+
+/* Have we found an ACPI MADT table */
+int acpi_found_madt = 0;
 
 /*
  * Various Linux-internal data structures created from the
@@ -64,6 +68,19 @@ static unsigned int num_processors;
 
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
+
+/* ACPI MADT entry parsing functions */
+#ifdef CONFIG_ACPI_BOOT
+extern struct acpi_boot_flags acpi_boot;
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int acpi_parse_lapic (acpi_table_entry_header *header);
+extern int acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header);
+extern int acpi_parse_lapic_nmi (acpi_table_entry_header *header);
+#endif /*CONFIG_X86_LOCAL_APIC*/
+#ifdef CONFIG_X86_IO_APIC
+extern int acpi_parse_ioapic (acpi_table_entry_header *header);
+#endif /*CONFIG_X86_IO_APIC*/
+#endif /*CONFIG_ACPI_BOOT*/
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -122,13 +139,7 @@ static char __init *mpc_family(int family,int model)
 	return n;
 }
 
-#ifdef CONFIG_X86_IO_APIC
-extern int have_acpi_tables;	/* set by acpitable.c */
-#else
-#define have_acpi_tables (0)
-#endif
-
-/* 
+/*
  * Have to match translation table entries to main table entries by counter
  * hence the mpc_record variable .... can't see a less disgusting way of
  * doing this ....
@@ -427,10 +438,11 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
-	/* save the local APIC address, it might be non-default,
+	/*
+	 * Save the local APIC address, it might be non-default,
 	 * but only if we're not using the ACPI tables
 	 */
-	if (!have_acpi_tables)
+	if (!acpi_found_madt)
 		mp_lapic_addr = mpc->mpc_lapic;
 
 	if (clustered_apic_mode && mpc->mpc_oemptr) {
@@ -451,7 +463,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 					(struct mpc_config_processor *)mpt;
 
 				/* ACPI may already have provided this one for us */
-				if (!have_acpi_tables)
+				if (!acpi_found_madt)
 					MP_processor_info(m);
 				mpt += sizeof(*m);
 				count += sizeof(*m);
@@ -665,7 +677,6 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 }
 
 static struct intel_mp_floating *mpf_found;
-extern void 	config_acpi_tables(void);
 
 /*
  * Scan the memory blocks for an SMP configuration block.
@@ -674,16 +685,19 @@ void __init get_smp_config (void)
 {
 	struct intel_mp_floating *mpf = mpf_found;
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_ACPI_BOOT
 	/*
-	 * Check if the ACPI tables are provided. Use them only to get
-	 * the processor information, mainly because it provides
-	 * the info on the logical processor(s), rather than the physical
-	 * processor(s) that are provided by the MPS. We attempt to 
-	 * check only if the user provided a commandline override
+	 * Check if the MADT exists, and if so, use it to get processor
+	 * information (ACPI_MADT_LAPIC).  The MADT supports the concept
+	 * of both logical (e.g. HT) and physical processor(s); where the
+	 * MPS only supports physical.
 	 */
-	config_acpi_tables();
-#endif
+	if (acpi_boot.madt) {
+		acpi_found_madt = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
+		if (acpi_found_madt > 0)
+			acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
+	}
+#endif /*CONFIG_ACPI_BOOT*/
 	
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {

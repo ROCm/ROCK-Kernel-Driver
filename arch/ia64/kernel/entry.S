@@ -486,6 +486,7 @@ END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
@@ -493,6 +494,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
 .ret8:
+#endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld4 r2=[r2]
@@ -620,7 +622,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
-	movl r17=PERCPU_ADDR+IA64_CPU_PHYS_STACKED_SIZE_P8_OFFSET
+	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
 	;;
 	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
 (pKern)	br.cond.dpnt skip_rbs_switch
@@ -756,6 +758,7 @@ ENTRY(handle_syscall_error)
 	br.cond.sptk ia64_leave_kernel
 END(handle_syscall_error)
 
+#ifdef CONFIG_SMP
 	/*
 	 * Invoke schedule_tail(task) while preserving in0-in7, which may be needed
 	 * in case a system call gets restarted.
@@ -771,6 +774,8 @@ GLOBAL_ENTRY(ia64_invoke_schedule_tail)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(ia64_invoke_schedule_tail)
+
+#endif /* CONFIG_SMP */
 
 #if __GNUC__ < 3
 

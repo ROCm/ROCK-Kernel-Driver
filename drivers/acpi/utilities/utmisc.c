@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 52 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,50 @@
 
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("utmisc")
+	 ACPI_MODULE_NAME    ("utmisc")
+
+
+#ifdef ACPI_DEBUG
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_display_init_pathname
+ *
+ * PARAMETERS:  Obj_handle          - Handle whose pathname will be displayed
+ *              Path                - Additional path string to be appended
+ *
+ * RETURN:      acpi_status
+ *
+ * DESCRIPTION: Display full pathnbame of an object, DEBUG ONLY
+ *
+ ******************************************************************************/
+
+void
+acpi_ut_display_init_pathname (
+	acpi_handle             obj_handle,
+	char                    *path)
+{
+	acpi_status             status;
+	acpi_buffer             buffer;
+
+
+	ACPI_FUNCTION_NAME ("Ut_display_init_pathname");
+
+
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+	status = acpi_ns_handle_to_pathname (obj_handle, &buffer);
+	if (ACPI_SUCCESS (status)) {
+		if (path) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s.%s\n", (char *) buffer.pointer, path));
+		}
+		else {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s\n", (char *) buffer.pointer));
+		}
+
+		ACPI_MEM_FREE (buffer.pointer);
+	}
+}
+#endif
 
 
 /*******************************************************************************
@@ -60,7 +103,7 @@ acpi_ut_valid_acpi_name (
 	u32                     i;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	for (i = 0; i < ACPI_NAME_SIZE; i++) {
@@ -92,7 +135,7 @@ acpi_ut_valid_acpi_character (
 	NATIVE_CHAR             character)
 {
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 	return ((u8)   ((character == '_') ||
 			   (character >= 'A' && character <= 'Z') ||
@@ -119,13 +162,13 @@ acpi_ut_strupr (
 	NATIVE_CHAR             *string;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Walk entire string, uppercasing the letters */
 
 	for (string = src_string; *string; ) {
-		*string = (char) TOUPPER (*string);
+		*string = (char) ACPI_TOUPPER (*string);
 		string++;
 	}
 
@@ -153,7 +196,7 @@ acpi_ut_mutex_initialize (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ut_mutex_initialize");
+	ACPI_FUNCTION_TRACE ("Ut_mutex_initialize");
 
 
 	/*
@@ -189,7 +232,7 @@ acpi_ut_mutex_terminate (
 	u32                     i;
 
 
-	FUNCTION_TRACE ("Ut_mutex_terminate");
+	ACPI_FUNCTION_TRACE ("Ut_mutex_terminate");
 
 
 	/*
@@ -222,7 +265,7 @@ acpi_ut_create_mutex (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_U32 ("Ut_create_mutex", mutex_id);
+	ACPI_FUNCTION_TRACE_U32 ("Ut_create_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
@@ -260,7 +303,7 @@ acpi_ut_delete_mutex (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE_U32 ("Ut_delete_mutex", mutex_id);
+	ACPI_FUNCTION_TRACE_U32 ("Ut_delete_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
@@ -298,7 +341,7 @@ acpi_ut_acquire_mutex (
 	u32                     this_thread_id;
 
 
-	PROC_NAME ("Ut_acquire_mutex");
+	ACPI_FUNCTION_NAME ("Ut_acquire_mutex");
 
 
 	if (mutex_id > MAX_MTX) {
@@ -340,7 +383,6 @@ acpi_ut_acquire_mutex (
 
 	status = acpi_os_wait_semaphore (acpi_gbl_acpi_mutex_info[mutex_id].mutex,
 			   1, WAIT_FOREVER);
-
 	if (ACPI_SUCCESS (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X acquired Mutex [%s]\n",
 				 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
@@ -380,7 +422,7 @@ acpi_ut_release_mutex (
 	u32                     this_thread_id;
 
 
-	PROC_NAME ("Ut_release_mutex");
+	ACPI_FUNCTION_NAME ("Ut_release_mutex");
 
 
 	this_thread_id = acpi_os_get_thread_id ();
@@ -469,7 +511,7 @@ acpi_ut_create_update_state_and_push (
 	acpi_generic_state       *state;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Ignore null objects; these are expected */
@@ -513,7 +555,7 @@ acpi_ut_create_pkg_state_and_push (
 	acpi_generic_state       *state;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	state = acpi_ut_create_pkg_state (internal_object, external_object, index);
@@ -545,7 +587,7 @@ acpi_ut_push_generic_state (
 	acpi_generic_state      **list_head,
 	acpi_generic_state      *state)
 {
-	FUNCTION_TRACE ("Ut_push_generic_state");
+	ACPI_FUNCTION_TRACE ("Ut_push_generic_state");
 
 
 	/* Push the state object onto the front of the list (stack) */
@@ -576,7 +618,7 @@ acpi_ut_pop_generic_state (
 	acpi_generic_state      *state;
 
 
-	FUNCTION_TRACE ("Ut_pop_generic_state");
+	ACPI_FUNCTION_TRACE ("Ut_pop_generic_state");
 
 
 	/* Remove the state object at the head of the list (stack) */
@@ -611,7 +653,7 @@ acpi_ut_create_generic_state (void)
 	acpi_generic_state      *state;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	state = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_STATE);
@@ -623,6 +665,45 @@ acpi_ut_create_generic_state (void)
 	}
 
 	return (state);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_create_thread_state
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Thread State
+ *
+ * DESCRIPTION: Create a "Thread State" - a flavor of the generic state used
+ *              to track per-thread info during method execution
+ *
+ ******************************************************************************/
+
+ACPI_THREAD_STATE *
+acpi_ut_create_thread_state (
+	void)
+{
+	acpi_generic_state      *state;
+
+
+	ACPI_FUNCTION_TRACE ("Ut_create_thread_state");
+
+
+	/* Create the generic state object */
+
+	state = acpi_ut_create_generic_state ();
+	if (!state) {
+		return_PTR (NULL);
+	}
+
+	/* Init fields specific to the update struct */
+
+	state->common.data_type = ACPI_DESC_TYPE_STATE_THREAD;
+	state->thread.thread_id = acpi_os_get_thread_id ();
+
+	return_PTR ((ACPI_THREAD_STATE *) state);
 }
 
 
@@ -650,14 +731,14 @@ acpi_ut_create_update_state (
 	acpi_generic_state      *state;
 
 
-	FUNCTION_TRACE_PTR ("Ut_create_update_state", object);
+	ACPI_FUNCTION_TRACE_PTR ("Ut_create_update_state", object);
 
 
 	/* Create the generic state object */
 
 	state = acpi_ut_create_generic_state ();
 	if (!state) {
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 	/* Init fields specific to the update struct */
@@ -693,14 +774,14 @@ acpi_ut_create_pkg_state (
 	acpi_generic_state      *state;
 
 
-	FUNCTION_TRACE_PTR ("Ut_create_pkg_state", internal_object);
+	ACPI_FUNCTION_TRACE_PTR ("Ut_create_pkg_state", internal_object);
 
 
 	/* Create the generic state object */
 
 	state = acpi_ut_create_generic_state ();
 	if (!state) {
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 	/* Init fields specific to the update struct */
@@ -735,21 +816,21 @@ acpi_ut_create_control_state (
 	acpi_generic_state      *state;
 
 
-	FUNCTION_TRACE ("Ut_create_control_state");
+	ACPI_FUNCTION_TRACE ("Ut_create_control_state");
 
 
 	/* Create the generic state object */
 
 	state = acpi_ut_create_generic_state ();
 	if (!state) {
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 
 	/* Init fields specific to the control struct */
 
 	state->common.data_type = ACPI_DESC_TYPE_STATE_CONTROL;
-	state->common.state     = CONTROL_CONDITIONAL_EXECUTING;
+	state->common.state     = ACPI_CONTROL_CONDITIONAL_EXECUTING;
 
 	return_PTR (state);
 }
@@ -772,7 +853,7 @@ void
 acpi_ut_delete_generic_state (
 	acpi_generic_state      *state)
 {
-	FUNCTION_TRACE ("Ut_delete_generic_state");
+	ACPI_FUNCTION_TRACE ("Ut_delete_generic_state");
 
 
 	acpi_ut_release_to_cache (ACPI_MEM_LIST_STATE, state);
@@ -797,11 +878,76 @@ void
 acpi_ut_delete_generic_state_cache (
 	void)
 {
-	FUNCTION_TRACE ("Ut_delete_generic_state_cache");
+	ACPI_FUNCTION_TRACE ("Ut_delete_generic_state_cache");
 
 
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_STATE);
 	return_VOID;
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_resolve_reference
+ *
+ * PARAMETERS:  ACPI_PKG_CALLBACK
+ *
+ * RETURN:      Status          - the status of the call
+ *
+ * DESCRIPTION: Resolve a reference object to an actual value
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_resolve_reference (
+	u8                      object_type,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
+	void                    *context)
+{
+	acpi_pkg_info           *info = (acpi_pkg_info *) context;
+
+
+	switch (object_type) {
+	case ACPI_COPY_TYPE_SIMPLE:
+
+		/*
+		 * Simple object - check for a reference
+		 */
+		if (source_object->common.type == INTERNAL_TYPE_REFERENCE) {
+			switch (source_object->reference.opcode) {
+			case AML_ZERO_OP:
+
+				source_object->common.type = ACPI_TYPE_INTEGER;
+				source_object->integer.value = 0;
+				break;
+
+			case AML_ONE_OP:
+
+				source_object->common.type = ACPI_TYPE_INTEGER;
+				source_object->integer.value = 1;
+				break;
+
+			case AML_ONES_OP:
+
+				source_object->common.type = ACPI_TYPE_INTEGER;
+				source_object->integer.value = ACPI_INTEGER_MAX;
+				break;
+			}
+		}
+		break;
+
+
+	case ACPI_COPY_TYPE_PACKAGE:
+
+		/* Package object - nothing much to do here, let the walk handle it */
+
+		info->num_packages++;
+		state->pkg.this_target_obj = NULL;
+		break;
+	}
+
+	return (AE_OK);
 }
 
 
@@ -821,86 +967,30 @@ acpi_status
 acpi_ut_resolve_package_references (
 	acpi_operand_object     *obj_desc)
 {
-	u32                     count;
-	acpi_operand_object     *sub_object;
+	acpi_pkg_info           info;
+	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ut_resolve_package_references");
+	ACPI_FUNCTION_TRACE ("Ut_resolve_package_references");
 
 
 	if (obj_desc->common.type != ACPI_TYPE_PACKAGE) {
 		/* The object must be a package */
 
-		REPORT_ERROR (("Must resolve Package Refs on a Package\n"));
-		return_ACPI_STATUS(AE_ERROR);
+		ACPI_REPORT_ERROR (("Expecting a Package object\n"));
+		return_ACPI_STATUS (AE_TYPE);
 	}
 
-	/*
-	 * TBD: what about nested packages? */
+	info.length      = 0;
+	info.object_space = 0;
+	info.num_packages = 1;
 
-	for (count = 0; count < obj_desc->package.count; count++) {
-		sub_object = obj_desc->package.elements[count];
+	status = acpi_ut_walk_package_tree (obj_desc, NULL,
+			 acpi_ut_resolve_reference, &info);
 
-		if (sub_object->common.type == INTERNAL_TYPE_REFERENCE) {
-			if (sub_object->reference.opcode == AML_ZERO_OP) {
-				sub_object->common.type = ACPI_TYPE_INTEGER;
-				sub_object->integer.value = 0;
-			}
-
-			else if (sub_object->reference.opcode == AML_ONE_OP) {
-				sub_object->common.type = ACPI_TYPE_INTEGER;
-				sub_object->integer.value = 1;
-			}
-
-			else if (sub_object->reference.opcode == AML_ONES_OP) {
-				sub_object->common.type = ACPI_TYPE_INTEGER;
-				sub_object->integer.value = ACPI_INTEGER_MAX;
-			}
-		}
-	}
-
-	return_ACPI_STATUS(AE_OK);
+	return_ACPI_STATUS (status);
 }
 
-#ifdef ACPI_DEBUG
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ut_display_init_pathname
- *
- * PARAMETERS:  Obj_handle          - Handle whose pathname will be displayed
- *              Path                - Additional path string to be appended
- *
- * RETURN:      acpi_status
- *
- * DESCRIPTION: Display full pathnbame of an object, DEBUG ONLY
- *
- ******************************************************************************/
-
-void
-acpi_ut_display_init_pathname (
-	acpi_handle             obj_handle,
-	char                    *path)
-{
-	acpi_status             status;
-	u32                     length = 128;
-	char                    buffer[128];
-
-
-	PROC_NAME ("Ut_display_init_pathname");
-
-
-	status = acpi_ns_handle_to_pathname (obj_handle, &length, buffer);
-	if (ACPI_SUCCESS (status)) {
-		if (path) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s.%s\n", buffer, path));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s\n", buffer));
-		}
-	}
-}
-#endif
 
 /*******************************************************************************
  *
@@ -928,7 +1018,7 @@ acpi_ut_walk_package_tree (
 	acpi_operand_object     *this_source_obj;
 
 
-	FUNCTION_TRACE ("Ut_walk_package_tree");
+	ACPI_FUNCTION_TRACE ("Ut_walk_package_tree");
 
 
 	state = acpi_ut_create_pkg_state (source_object, target_object, 0);
@@ -942,24 +1032,19 @@ acpi_ut_walk_package_tree (
 				  state->pkg.source_object->package.elements[this_index];
 
 		/*
-		 * Check for
+		 * Check for:
 		 * 1) An uninitialized package element.  It is completely
-		 *      legal to declare a package and leave it uninitialized
+		 *    legal to declare a package and leave it uninitialized
 		 * 2) Not an internal object - can be a namespace node instead
 		 * 3) Any type other than a package.  Packages are handled in else
-		 *      case below.
+		 *    case below.
 		 */
 		if ((!this_source_obj) ||
-			(!VALID_DESCRIPTOR_TYPE (
-					this_source_obj, ACPI_DESC_TYPE_INTERNAL)) ||
-			(!IS_THIS_OBJECT_TYPE (
-					this_source_obj, ACPI_TYPE_PACKAGE))) {
-
+			(ACPI_GET_DESCRIPTOR_TYPE (this_source_obj) != ACPI_DESC_TYPE_INTERNAL) ||
+			(this_source_obj->common.type != ACPI_TYPE_PACKAGE)) {
 			status = walk_callback (ACPI_COPY_TYPE_SIMPLE, this_source_obj,
 					 state, context);
 			if (ACPI_FAILURE (status)) {
-				/* TBD: must delete package created up to this point */
-
 				return_ACPI_STATUS (status);
 			}
 
@@ -974,7 +1059,6 @@ acpi_ut_walk_package_tree (
 				 */
 				acpi_ut_delete_generic_state (state);
 				state = acpi_ut_pop_generic_state (&state_list);
-
 
 				/* Finished when there are no more states */
 
@@ -994,32 +1078,23 @@ acpi_ut_walk_package_tree (
 				state->pkg.index++;
 			}
 		}
-
 		else {
-			/* This is a sub-object of type package */
+			/* This is a subobject of type package */
 
 			status = walk_callback (ACPI_COPY_TYPE_PACKAGE, this_source_obj,
 					  state, context);
 			if (ACPI_FAILURE (status)) {
-				/* TBD: must delete package created up to this point */
-
 				return_ACPI_STATUS (status);
 			}
 
-
-			/*
-			 * The callback above returned a new target package object.
-			 */
-
 			/*
 			 * Push the current state and create a new one
+			 * The callback above returned a new target package object.
 			 */
 			acpi_ut_push_generic_state (&state_list, state);
 			state = acpi_ut_create_pkg_state (this_source_obj,
 					   state->pkg.this_target_obj, 0);
 			if (!state) {
-				/* TBD: must delete package created up to this point */
-
 				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 		}
@@ -1027,7 +1102,89 @@ acpi_ut_walk_package_tree (
 
 	/* We should never get here */
 
-	return (AE_AML_INTERNAL);
+	return_ACPI_STATUS (AE_AML_INTERNAL);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_generate_checksum
+ *
+ * PARAMETERS:  Buffer          - Buffer to be scanned
+ *              Length          - number of bytes to examine
+ *
+ * RETURN:      checksum
+ *
+ * DESCRIPTION: Generate a checksum on a raw buffer
+ *
+ ******************************************************************************/
+
+u8
+acpi_ut_generate_checksum (
+	u8                      *buffer,
+	u32                     length)
+{
+	u32                     i;
+	signed char             sum = 0;
+
+	for (i = 0; i < length; i++) {
+		sum = (signed char) (sum + buffer[i]);
+	}
+
+	return ((u8) (0 - sum));
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_get_resource_end_tag
+ *
+ * PARAMETERS:  Obj_desc        - The resource template buffer object
+ *
+ * RETURN:      Pointer to the end tag
+ *
+ * DESCRIPTION: Find the END_TAG resource descriptor in a resource template
+ *
+ ******************************************************************************/
+
+
+u8 *
+acpi_ut_get_resource_end_tag (
+	acpi_operand_object     *obj_desc)
+{
+	u8                      buffer_byte;
+	u8                      *buffer;
+	u8                      *end_buffer;
+
+
+	buffer    = obj_desc->buffer.pointer;
+	end_buffer = buffer + obj_desc->buffer.length;
+
+	while (buffer < end_buffer) {
+		buffer_byte = *buffer;
+		if (buffer_byte & ACPI_RDESC_TYPE_MASK) {
+			/* Large Descriptor - Length is next 2 bytes */
+
+			buffer += ((*(buffer+1) | (*(buffer+2) << 8)) + 3);
+		}
+		else {
+			/* Small Descriptor.  End Tag will be found here */
+
+			if ((buffer_byte & ACPI_RDESC_SMALL_MASK) == ACPI_RDESC_TYPE_END_TAG) {
+				/* Found the end tag descriptor, all done. */
+
+				return (buffer);
+			}
+
+			/* Length is in the header */
+
+			buffer += ((buffer_byte & 0x07) + 1);
+		}
+	}
+
+	/* End tag not found */
+
+	return (NULL);
 }
 
 

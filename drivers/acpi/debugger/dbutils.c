@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 45 $
+ *              $Revision: 51 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbutils")
+	 ACPI_MODULE_NAME    ("dbutils")
 
 
 /*******************************************************************************
@@ -61,10 +61,8 @@ acpi_db_set_output_destination (
 
 	acpi_gbl_db_output_flags = (u8) output_flags;
 
-	if (output_flags & DB_REDIRECTABLE_OUTPUT) {
-		if (acpi_gbl_db_output_to_file) {
-			acpi_dbg_level = acpi_gbl_db_debug_level;
-		}
+	if ((output_flags & ACPI_DB_REDIRECTABLE_OUTPUT) && acpi_gbl_db_output_to_file) {
+		acpi_dbg_level = acpi_gbl_db_debug_level;
 	}
 	else {
 		acpi_dbg_level = acpi_gbl_db_console_debug_level;
@@ -92,7 +90,7 @@ acpi_db_dump_buffer (
 	acpi_os_printf ("\n_location %X:\n", address);
 
 	acpi_dbg_level |= ACPI_LV_TABLES;
-	acpi_ut_dump_buffer ((u8 *) address, 64, DB_BYTE_DISPLAY, ACPI_UINT32_MAX);
+	acpi_ut_dump_buffer (ACPI_TO_POINTER (address), 64, DB_BYTE_DISPLAY, ACPI_UINT32_MAX);
 }
 
 
@@ -135,8 +133,9 @@ acpi_db_dump_object (
 
 	case ACPI_TYPE_INTEGER:
 
-		acpi_os_printf ("[Integer] = %8.8X%8.8X\n", HIDWORD (obj_desc->integer.value),
-				 LODWORD (obj_desc->integer.value));
+		acpi_os_printf ("[Integer] = %8.8X%8.8X\n",
+				 ACPI_HIDWORD (obj_desc->integer.value),
+				 ACPI_LODWORD (obj_desc->integer.value));
 		break;
 
 
@@ -215,7 +214,7 @@ acpi_db_prep_namestring (
 		return;
 	}
 
-	STRUPR (name);
+	ACPI_STRUPR (name);
 
 	/* Convert a leading forward slash to a backslash */
 
@@ -268,7 +267,7 @@ acpi_db_second_pass_parse (
 	acpi_walk_state         *walk_state;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Pass two parse ....\n");
@@ -339,6 +338,9 @@ acpi_db_second_pass_parse (
  *
  * DESCRIPTION: Lookup a name in the ACPI namespace
  *
+ * Note: Currently begins search from the root.  Could be enhanced to use
+ * the current prefix (scope) node as the search beginning point.
+ *
  ******************************************************************************/
 
 acpi_namespace_node *
@@ -360,21 +362,17 @@ acpi_db_local_ns_lookup (
 		return (NULL);
 	}
 
-	/* Lookup the name */
-
-	/* TBD: [Investigate] what scope do we use? */
-	/* Use the root scope for the start of the search */
-
-	status = acpi_ns_lookup (NULL, internal_path, ACPI_TYPE_ANY, IMODE_EXECUTE,
-			   NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE, NULL, &node);
-
+	/*
+	 * Lookup the name.
+	 * (Uses root node as the search starting point)
+	 */
+	status = acpi_ns_lookup (NULL, internal_path, ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+			   ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE, NULL, &node);
 	if (ACPI_FAILURE (status)) {
 		acpi_os_printf ("Could not locate name: %s %s\n", name, acpi_format_exception (status));
 	}
 
-
 	ACPI_MEM_FREE (internal_path);
-
 	return (node);
 }
 

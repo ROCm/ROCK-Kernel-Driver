@@ -193,7 +193,10 @@ ia64_save_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
 
-	if (local_cpu_data->pfm_syst_wide) pfm_syst_wide_update_task(task, 0);
+# ifdef CONFIG_SMP
+	if (local_cpu_data->pfm_syst_wide)
+		pfm_syst_wide_update_task(task, 0);
+# endif
 #endif
 
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
@@ -210,7 +213,9 @@ ia64_load_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
 
+# ifdef CONFIG_SMP
 	if (local_cpu_data->pfm_syst_wide) pfm_syst_wide_update_task(task, 1);
+# endif
 #endif
 
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))

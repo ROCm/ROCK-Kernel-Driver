@@ -21,7 +21,7 @@
 
 static struct device device_root = {
 	bus_id:		"root",
-	name:		"System Root",
+	name:		"System root",
 };
 
 int (*platform_notify)(struct device * dev) = NULL;
@@ -30,7 +30,7 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
 extern int device_make_dir(struct device * dev);
 extern void device_remove_dir(struct device * dev);
 
-static spinlock_t device_lock;
+static spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * device_register - register a device
@@ -126,20 +126,15 @@ static int __init device_init_root(void)
 
 static int __init device_init(void)
 {
-	int error = 0;
-
-	DBG("DEV: Initialising Device Tree\n");
-
-	spin_lock_init(&device_lock);
+	int error;
 
 	error = init_driverfs_fs();
-
 	if (error) {
-		panic("DEV: could not initialise driverfs\n");
+		panic("DEV: could not initialize driverfs");
 		return error;
 	}
-
-	if ((error = device_init_root()))
+	error = device_init_root();
+	if (error)
 		printk(KERN_ERR "%s: device root init failed!\n", __FUNCTION__);
 	return error;
 }

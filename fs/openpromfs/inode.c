@@ -995,20 +995,9 @@ static void openprom_read_inode(struct inode * inode)
 	}
 }
 
-static int openprom_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = OPENPROM_SUPER_MAGIC;
-	buf->f_bsize = PAGE_SIZE/sizeof(long);	/* ??? */
-	buf->f_bfree = 0;
-	buf->f_bavail = 0;
-	buf->f_ffree = 0;
-	buf->f_namelen = NAME_MAX;
-	return 0;
-}
-
 static struct super_operations openprom_sops = { 
 	read_inode:	openprom_read_inode,
-	statfs:		openprom_statfs,
+	statfs:		simple_statfs,
 };
 
 static int openprom_fill_super(struct super_block *s, void *data, int silent)

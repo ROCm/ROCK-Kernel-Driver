@@ -1013,13 +1013,15 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 			l = 0;
 		if ((l & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY) {
 			res->start = l & PCI_BASE_ADDRESS_MEM_MASK;
+			res->flags |= l & ~PCI_BASE_ADDRESS_MEM_MASK;
 			sz = pci_size(sz, PCI_BASE_ADDRESS_MEM_MASK);
 		} else {
 			res->start = l & PCI_BASE_ADDRESS_IO_MASK;
+			res->flags |= l & ~PCI_BASE_ADDRESS_IO_MASK;
 			sz = pci_size(sz, PCI_BASE_ADDRESS_IO_MASK & 0xffff);
 		}
 		res->end = res->start + (unsigned long) sz;
-		res->flags |= (l & 0xf) | pci_calc_resource_flags(l);
+		res->flags |= pci_calc_resource_flags(l);
 		if ((l & (PCI_BASE_ADDRESS_SPACE | PCI_BASE_ADDRESS_MEM_TYPE_MASK))
 		    == (PCI_BASE_ADDRESS_SPACE_MEMORY | PCI_BASE_ADDRESS_MEM_TYPE_64)) {
 			pci_read_config_dword(dev, reg+4, &l);

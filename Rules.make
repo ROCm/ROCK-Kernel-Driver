@@ -120,6 +120,24 @@ $(L_TARGET): $(obj-y)
 	) > $(dir $@)/.$(notdir $@).flags
 endif
 
+#
+# Rule to link composite objects
+#
+
+# for make >= 3.78 the following is cleaner:
+# multi-used := $(foreach m,$(obj-y) $(obj-m), $(if $($(basename $(m))-objs), $(m)))
+multi-used := $(sort $(foreach m,$(obj-y) $(obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
+ld-multi-used := $(filter-out $(list-multi),$(multi-used))
+ld-multi-objs := $(foreach m, $(ld-multi-used), $($(basename $(m))-objs))
+
+$(ld-multi-used) : %.o: $(ld-multi-objs)
+	rm -f $@
+	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
+	@ ( \
+	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
+	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
+	    echo 'endif' \
+	) > $(dir $@)/.$(notdir $@).flags
 
 #
 # This make dependencies quickly
@@ -200,8 +218,7 @@ script:
 #
 ifdef CONFIG_MODULES
 
-multi-used	:= $(filter $(list-multi), $(obj-y) $(obj-m))
-multi-objs	:= $(foreach m, $(multi-used), $($(basename $(m))-objs))
+multi-objs	:= $(foreach m, $(obj-y) $(obj-m), $($(basename $(m))-objs))
 active-objs	:= $(sort $(multi-objs) $(obj-y) $(obj-m))
 
 ifdef CONFIG_MODVERSIONS
