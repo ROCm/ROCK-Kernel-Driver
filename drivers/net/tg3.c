@@ -2729,7 +2729,7 @@ static void tg3_free_rings(struct tg3 *tp)
 				 pci_unmap_addr(rxp, mapping),
 				 RX_PKT_BUF_SZ - tp->rx_offset,
 				 PCI_DMA_FROMDEVICE);
-		dev_kfree_skb(rxp->skb);
+		dev_kfree_skb_any(rxp->skb);
 		rxp->skb = NULL;
 	}
 #if TG3_MINI_RING_WORKS
@@ -2742,7 +2742,7 @@ static void tg3_free_rings(struct tg3 *tp)
 				 pci_unmap_addr(rxp, mapping),
 				 RX_MINI_PKT_BUF_SZ - tp->rx_offset,
 				 PCI_DMA_FROMDEVICE);
-		dev_kfree_skb(rxp->skb);
+		dev_kfree_skb_any(rxp->skb);
 		rxp->skb = NULL;
 	}
 #endif
@@ -2755,7 +2755,7 @@ static void tg3_free_rings(struct tg3 *tp)
 				 pci_unmap_addr(rxp, mapping),
 				 RX_JUMBO_PKT_BUF_SZ - tp->rx_offset,
 				 PCI_DMA_FROMDEVICE);
-		dev_kfree_skb(rxp->skb);
+		dev_kfree_skb_any(rxp->skb);
 		rxp->skb = NULL;
 	}
 
