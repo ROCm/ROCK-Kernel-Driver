@@ -458,9 +458,9 @@ void smp4d_percpu_timer_interrupt(struct pt_regs *regs)
 	if(!--prof_counter[cpu]) {
 		int user = user_mode(regs);
 
-		irq_enter(cpu, 0);
+		irq_enter();
 		update_process_times(user);
-		irq_exit(cpu, 0);
+		irq_exit();
 
 		prof_counter[cpu] = prof_multiplier[cpu];
 	}

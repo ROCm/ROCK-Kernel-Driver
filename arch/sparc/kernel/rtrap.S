@@ -86,7 +86,8 @@ ret_trap_continue:
 	wr	%t_psr, 0x0, %psr
 	WRITE_PAUSE
 
-	ld	[%curptr + AOFF_task_thread + AOFF_thread_w_saved], %twin_tmp1
+	ld	[%curptr + TI_TASK], %o5
+	ld	[%o5 + AOFF_task_thread + AOFF_thread_w_saved], %twin_tmp1
 	orcc	%g0, %twin_tmp1, %g0
 	be	ret_trap_nobufwins
 	 nop

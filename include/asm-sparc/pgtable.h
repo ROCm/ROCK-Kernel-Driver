@@ -11,9 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/spinlock.h>
-/* XXX This creates many nasty warnings. */
-/* #include <linux/highmem.h> */	/* kmap_atomic in pte_offset_map */
-#include <asm/asi.h>
+/* #include <asm/asi.h> */	/* doesn't seem like being used XXX */
 #ifdef CONFIG_SUN4
 #include <asm/pgtsun4.h>
 #else
@@ -32,10 +30,6 @@ struct vm_area_struct;
 
 extern void load_mmu(void);
 extern unsigned long calc_highpages(void);
-			       
-BTFIXUPDEF_CALL(void, quick_kernel_fault, unsigned long)
-
-#define quick_kernel_fault(addr) BTFIXUP_CALL(quick_kernel_fault)(addr)
 
 /* Routines for data transfer buffers. */
 BTFIXUPDEF_CALL(char *, mmu_lockarea, char *, unsigned long)
@@ -189,14 +183,8 @@ extern unsigned long empty_zero_page;
 #define BAD_PAGE __bad_page()
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
-/* number of bits that fit into a memory pointer */
-#define BITS_PER_PTR      (8*sizeof(unsigned long))
-
-/* to align the pointer to a pointer address */
-#define PTR_MASK          (~(sizeof(void*)-1))
-
-#define SIZEOF_PTR_LOG2   2
-
+/*
+ */
 BTFIXUPDEF_CALL_CONST(struct page *, pmd_page, pmd_t)
 BTFIXUPDEF_CALL_CONST(unsigned long, pgd_page, pgd_t)
 
@@ -340,20 +328,15 @@ BTFIXUPDEF_CALL(pmd_t *, pmd_offset, pgd_t *, unsigned long)
 BTFIXUPDEF_CALL(pte_t *, pte_offset_kernel, pmd_t *, unsigned long)
 #define pte_offset_kernel(dir,addr) BTFIXUP_CALL(pte_offset_kernel)(dir,addr)
 
-/* __pte_offset is not BTFIXUP-ed, but PTRS_PER_PTE is, so it's ok. */
-#define __pte_offset(address) \
-	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#if 0 /* XXX Should we expose pmd_page_kernel? */
-#define pte_offset_kernel(dir, addr) \
-	((pte_t *) pmd_page_kernel(*(dir)) + __pte_offset(addr))
-#endif
-#define pte_offset_map(dir, addr) \
-	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE0) + __pte_offset(addr))
-#define pte_offset_map_nested(dir, addr) \
-	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE1) + __pte_offset(addr))
+/*
+ * This shortcut works on sun4m (and sun4d) because the nocache area is static,
+ * and sun4c is guaranteed to have no highmem anyway.
+ */
+#define pte_offset_map(d, a)		pte_offset_kernel(d,a)
+#define pte_offset_map_nested(d, a)	pte_offset_kernel(d,a)
 
-#define pte_unmap(pte)		kunmap_atomic(pte, KM_PTE0)
-#define pte_unmap_nested(pte)	kunmap_atomic(pte, KM_PTE1)
+#define pte_unmap(pte)		do{}while(0)
+#define pte_unmap_nested(pte)	do{}while(0)
 
 /* The permissions for pgprot_val to make a page mapped on the obio space */
 extern unsigned int pg_iobits;

@@ -10,11 +10,11 @@
 #include <asm/page.h>
 #include <asm/thread_info.h>	/* TI_UWINMASK for WINDOW_FLUSH */
 
-/* PMD_SHIFT determines the size of the area a second-level page table can map */
+/* PMD_SHIFT determines the size of the area a second-level page table entry can map */
 #define SRMMU_PMD_SHIFT         18
 #define SRMMU_PMD_SIZE          (1UL << SRMMU_PMD_SHIFT)
 #define SRMMU_PMD_MASK          (~(SRMMU_PMD_SIZE-1))
-#define SRMMU_PMD_ALIGN(addr)   (((addr)+SRMMU_PMD_SIZE-1)&SRMMU_PMD_MASK)
+/* #define SRMMU_PMD_ALIGN(addr)   (((addr)+SRMMU_PMD_SIZE-1)&SRMMU_PMD_MASK) */
 
 /* PGDIR_SHIFT determines what a third-level page table entry can map */
 #define SRMMU_PGDIR_SHIFT       24
