@@ -1032,15 +1032,12 @@ asmlinkage void preempt_schedule(void)
 {
 	struct thread_info *ti = current_thread_info();
 
-	if (unlikely(ti->preempt_count))
+	/*
+	 * If there is a non-zero preempt_count or interrupts are disabled,
+	 * we do not want to preempt the current task.  Just return..
+	 */
+	if (unlikely(ti->preempt_count || irqs_disabled()))
 		return;
-	if (unlikely(irqs_disabled())) {
-		preempt_disable();
-		printk("bad: schedule() with irqs disabled!\n");
-		show_stack(NULL);
-		preempt_enable_no_resched();
-		return;
-	}
 
 need_resched:
 	ti->preempt_count = PREEMPT_ACTIVE;
