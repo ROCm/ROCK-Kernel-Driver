@@ -885,9 +885,9 @@ typedef struct hwif_s {
 	char name[6];			/* name of interface, eg. "ide0" */
 
 		/* task file registers for pata and sata */
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];
-	sata_ioreg_t	sata_scr[SATA_NR_PORTS];
-	sata_ioreg_t	sata_misc[SATA_NR_PORTS];
+	unsigned long	io_ports[IDE_NR_PORTS];
+	unsigned long	sata_scr[SATA_NR_PORTS];
+	unsigned long	sata_misc[SATA_NR_PORTS];
 
 	hw_regs_t	hw;		/* Hardware info */
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
@@ -951,9 +951,6 @@ typedef struct hwif_s {
 	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
 #endif
 
-#if 0
-	ide_dma_ops_t	*dmaops;
-#else
 	int (*ide_dma_read)(ide_drive_t *drive);
 	int (*ide_dma_write)(ide_drive_t *drive);
 	int (*ide_dma_begin)(ide_drive_t *drive);
@@ -979,23 +976,19 @@ typedef struct hwif_s {
 	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
 	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
 	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
-#endif
 
-#if 0
-	ide_io_ops_t	*iops;
-#else
-	void (*OUTB)(u8 addr, ide_ioreg_t port);
-	void (*OUTW)(u16 addr, ide_ioreg_t port);
-	void (*OUTL)(u32 addr, ide_ioreg_t port);
-	void (*OUTSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*OUTSL)(ide_ioreg_t port, void *addr, u32 count);
+	void (*OUTB)(u8 addr, unsigned long port);
+	void (*OUTBSYNC)(u8 addr, unsigned long port);
+	void (*OUTW)(u16 addr, unsigned long port);
+	void (*OUTL)(u32 addr, unsigned long port);
+	void (*OUTSW)(unsigned long port, void *addr, u32 count);
+	void (*OUTSL)(unsigned long port, void *addr, u32 count);
 
-	u8  (*INB)(ide_ioreg_t port);
-	u16 (*INW)(ide_ioreg_t port);
-	u32 (*INL)(ide_ioreg_t port);
-	void (*INSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*INSL)(ide_ioreg_t port, void *addr, u32 count);
-#endif
+	u8  (*INB)(unsigned long port);
+	u16 (*INW)(unsigned long port);
+	u32 (*INL)(unsigned long port);
+	void (*INSW)(unsigned long port, void *addr, u32 count);
+	void (*INSL)(unsigned long port, void *addr, u32 count);
 
 	/* dma physical region descriptor table (cpu view) */
 	unsigned int	*dmatable_cpu;
