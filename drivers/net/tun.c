@@ -475,7 +475,8 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 		if (err)
 			return err;
 
-		copy_to_user((void *)arg, &ifr, sizeof(ifr));
+		if (copy_to_user((void *)arg, &ifr, sizeof(ifr)))
+			return -EFAULT;
 		return 0;
 	}
 
