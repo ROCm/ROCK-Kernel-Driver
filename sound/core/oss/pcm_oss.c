@@ -1516,14 +1516,14 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 		runtime->oss.prev_hw_ptr_interrupt = delay;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			snd_pcm_oss_simulate_fill(substream, delay);
-		info.bytes = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr);
+		info.bytes = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr) & INT_MAX;
 	} else {
 		delay = snd_pcm_oss_bytes(substream, delay) + fixup;
 		info.blocks = delay / runtime->oss.period_bytes;
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			info.bytes = runtime->oss.bytes - delay;
+			info.bytes = (runtime->oss.bytes - delay) & INT_MAX;
 		else
-			info.bytes = runtime->oss.bytes + delay;
+			info.bytes = (runtime->oss.bytes + delay) & INT_MAX;
 	}
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
