@@ -1,0 +1,384 @@
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_BINFMT_ELF
+  ELF (Executable and Linkable Format) is a format for libraries and
+  executables used across different architectures and operating
+  systems. Saying Y here will enable your kernel to run ELF binaries
+  and enlarge it by about 13 KB. ELF support under Linux has now all
+  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+  because it is portable (this does *not* mean that you will be able
+  to run executables from different architectures or operating systems
+  however) and makes building run-time libraries very easy. Many new
+  executables are distributed solely in ELF format. You definitely
+  want to say Y here.
+
+  Information about ELF is contained in the ELF HOWTO available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you find that after upgrading from Linux kernel 1.2 and saying Y
+  here, you still can't run any ELF binaries (they just crash), then
+  you'll have to install the newest ELF runtime libraries, including
+  ld.so (check the file <file:Documentation/Changes> for location and
+  latest version).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called binfmt_elf.o. Saying M or N here is dangerous because
+  some crucial programs on your system might be in ELF format.
+
+CONFIG_SCSI
+  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+  any other SCSI device under Linux, say Y and make sure that you know
+  the name of your SCSI host adapter (the card inside your computer
+  that "speaks" the SCSI protocol, also called SCSI controller),
+  because you will be asked for it.
+
+  You also need to say Y here if you want support for the parallel
+  port version of the 100 MB IOMEGA ZIP drive.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scsi_mod.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  However, do not compile this as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI device.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_CD_NO_IDESCSI
+  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+  here, otherwise N. Read the CD-ROM-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about these CD-ROM drives. If you are unsure what you
+  have, say Y and find out whether you have one of the following
+  drives.
+
+  For each of these drivers, a file Documentation/cdrom/{driver_name}
+  exists. Especially in cases where you do not know exactly which kind
+  of drive you have you should read there. Most of these drivers use a
+  file drivers/cdrom/{driver_name}.h where you can define your
+  interface parameters and switch some internal goodies.
+
+  All these CD-ROM drivers are also usable as a module ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want). If you want to compile them as module, say M instead of Y and
+  read <file:Documentation/modules.txt>.
+
+  If you want to use any of these CD-ROM drivers, you also have to
+  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+  answer will get "defaulted" for you if you enable any of the Linux
+  CD-ROM drivers).
+
+CONFIG_SOUND
+  If you have a sound card in your computer, i.e. if it can say more
+  than an occasional beep, say Y.  Be sure to have all the information
+  about your sound card and its configuration down (I/O port,
+  interrupt and DMA channel), because you will be asked for it.
+
+  You want to read the Sound-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. General information about
+  the modular sound system is contained in the files
+  <file:Documentation/sound/Introduction>.  The file
+  <file:Documentation/sound/README.OSS> contains some slightly
+  outdated but still useful information as well.
+
+  If you have a PnP sound card and you want to configure it at boot
+  time using the ISA PnP tools (read
+  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+  compile the sound card support as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want)
+  and load that module after the PnP configuration is finished.  To do
+  this, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/sound/README.modules>; the module will be
+  called soundcore.o.
+
+  I'm told that even without a sound card, you can make your computer
+  say more than an occasional beep, by programming the PC speaker.
+  Kernel patches and supporting utilities to do that are in the pcsp
+  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+CONFIG_ISDN
+  ISDN ("Integrated Services Digital Networks", called RNIS in France)
+  is a special type of fully digital telephone service; it's mostly
+  used to connect to your Internet service provider (with SLIP or
+  PPP).  The main advantage is that the speed is higher than ordinary
+  modem/telephone connections, and that you can have voice
+  conversations while downloading stuff.  It only works if your
+  computer is equipped with an ISDN card and both you and your service
+  provider purchased an ISDN line from the phone company.  For
+  details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
+
+  This driver allows you to use an ISDN-card for networking
+  connections and as dialin/out device.  The isdn-tty's have a built
+  in AT-compatible modem emulator.  Network devices support autodial,
+  channel-bundling, callback and caller-authentication without having
+  a daemon running.  A reduced T.70 protocol is supported with tty's
+  suitable for German BTX.  On D-Channel, the protocols EDSS1
+  (Euro-ISDN) and 1TR6 (German style) are supported.  See
+  <file:Documentation/isdn/README> for more information.
+
+  If you want to compile the ISDN code as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want), say M here and read <file:Documentation/modules.txt>.  The
+  module will be called isdn.o. If unsure, say N.
+
+CONFIG_SVINTO_SIM
+  Support the xsim ETRAX Simulator.
+
+CONFIG_ETRAX_DRAM_SIZE
+  Size of DRAM (decimal in MB) typically 2, 8 or 16.
+
+CONFIG_ETRAX_FLASH_BUSWIDTH
+  Width in bytes of the Flash bus (1, 2 or 4). Is usually 2.
+
+CONFIG_ETRAX_LED1G
+  Bit to use for the first green LED.
+  Most Axis products use bit 2 here.
+
+CONFIG_ETRAX_LED1R
+  Bit to use for the first red LED.
+  Most Axis products use bit 3 here.
+  For products with only one controllable LED,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED2G
+  Bit to use for the second green LED. The "Active" LED.
+  Most Axis products use bit 4 here.
+  For products with only one controllable LED,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED2R
+  Bit to use for the second red LED.
+  Most Axis products use bit 5 here.
+  For products with only one controllable LED,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED3G
+  Bit to use for the third green LED. The "Drive" LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED3R
+  Bit to use for the third red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED4G
+  Bit to use for the fourth green LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED4R
+  Bit to use for the fourth red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED5G
+  Bit to use for the fifth green LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED5R
+  Bit to use for the fifth red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED6G
+  Bit to use for the sixth green LED. The "Drive" LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED6R
+  Bit to use for the sixth red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED7G
+  Bit to use for the seventh green LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED7R
+  Bit to use for the seventh red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED8Y
+  Bit to use for the eighth yellow LED. The "Drive" LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED9Y
+  Bit to use for the ninth yellow LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED10Y
+  Bit to use for the tenth yellow LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED11Y
+  Bit to use for the eleventh yellow LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_LED12R
+  Bit to use for the twelfth red LED.
+  For products with only one or two controllable LEDs,
+  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+CONFIG_ETRAX_KGDB
+  The CRIS version of gdb can be used to remotely debug a running
+  Linux kernel via the serial debug port.  Provided you have gdb-cris
+  installed, run gdb-cris vmlinux, then type
+
+  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
+  (gdb) target remote /dev/ttyS0        <- maybe you use another port
+
+  This should connect you to your booted kernel (or boot it now if you
+  didn't before).  The kernel halts when it boots, waiting for gdb if
+  this option is turned on!
+
+CONFIG_ETRAX_DEF_R_WAITSTATES
+  Waitstates for SRAM, Flash and peripherials (not DRAM).  95f8 is a
+  good choice for most Axis products...
+
+CONFIG_ETRAX_DEF_R_BUS_CONFIG
+  Assorted bits controlling write mode, DMA burst length etc.  104 is
+  a good choice for most Axis products...
+
+CONFIG_ETRAX_SDRAM
+  Enable this if you use SDRAM chips and configure
+  R_SDRAM_CONFIG and R_SDRAM_TIMING as well.
+
+CONFIG_ETRAX_DEF_R_DRAM_CONFIG
+  The R_DRAM_CONFIG register specifies everything on how the DRAM
+  chips in the system are connected to the Etrax CPU.  This is
+  different depending on the manufacturer, chip type and number of
+  chips.  So this value often needs to be different for each Axis
+  product.
+
+CONFIG_ETRAX_DEF_R_DRAM_TIMING
+  Different DRAM chips have different speeds.  Current Axis products
+  use 50ns DRAM chips which can use the timing: 5611.
+
+CONFIG_ETRAX_DEF_R_SDRAM_CONFIG
+  The R_SDRAM_CONFIG register specifies everything on how the SDRAM
+  chips in the system are connected to the Etrax CPU.  This is
+  different depending on the manufacturer, chip type and number of
+  chips.  So this value often needs to be different for each Axis
+  product.
+
+CONFIG_ETRAX_DEF_R_SDRAM_TIMING
+  Different SDRAM chips have different timing.
+
+CONFIG_ETRAX_DEF_R_PORT_PA_DIR
+  Configures the direction of general port A bits.  1 is out, 0 is in.
+  This is often totally different depending on the product used.
+  There are some guidelines though - if you know that only LED's are
+  connected to port PA, then they are usually connected to bits 2-4
+  and you can therefore use 1c.  On other boards which don't have the
+  LED's at the general ports, these bits are used for all kinds of
+  stuff.  If you don't know what to use, it is always safe to put all
+  as inputs, although floating inputs isn't good.
+
+CONFIG_ETRAX_DEF_R_PORT_PA_DATA
+  Configures the initial data for the general port A bits.  Most
+  products should use 00 here.
+
+CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG
+  Configures the type of the general port B bits.  1 is chip select,
+  0 is port.  Most products should use 00 here.
+
+CONFIG_ETRAX_DEF_R_PORT_PB_DIR
+  Configures the direction of general port B bits. 1 is out, 0 is in.
+  This is often totally different depending on the product used.  Bits
+  0 and 1 on port PB are usually used for I2C communication, but the
+  kernel I2C driver sets the appropriate directions itself so you
+  don't need to take that into consideration when setting this option.
+  If you don't know what to use, it is always safe to put all as
+  inputs.
+
+CONFIG_ETRAX_DEF_R_PORT_PB_DATA
+  Configures the initial data for the general port A bits.  Most
+  products should use FF here.
+
+CONFIG_ETRAX_WATCHDOG
+  Enable the built-in watchdog timer support on Etrax100 embedded
+  network computers.
+

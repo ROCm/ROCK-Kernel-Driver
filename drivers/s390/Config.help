@@ -1,0 +1,439 @@
+CONFIG_BLK_DEV_RAM
+  Saying Y here will allow you to use a portion of your RAM memory as
+  a block device, so that you can make file systems on it, read and
+  write to it and do all the other things that you can do with normal
+  block devices (such as hard drives). It is usually used to load and
+  store a copy of a minimal root file system off of a floppy into RAM
+  during the initial install of Linux.
+
+  Note that the kernel command line option "ramdisk=XX" is now
+  obsolete. For details, read <file:Documentation/ramdisk.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M and read <file:Documentation/modules.txt>. The module will be
+  called rd.o.
+
+  Most normal users won't need the RAM disk functionality, and can
+  thus say N here.
+
+CONFIG_BLK_DEV_RAM_SIZE
+  The default value is 4096. Only change this if you know what are
+  you doing. If you are using IBM S/390, then set this to 8192.
+
+CONFIG_BLK_DEV_INITRD
+  The initial RAM disk is a RAM disk that is loaded by the boot loader
+  (loadlin or lilo) and that is mounted as root before the normal boot
+  procedure. It is typically used to load modules needed to mount the
+  "real" root file system, etc. See <file:Documentation/initrd.txt>
+  for details.
+
+CONFIG_BLK_DEV_LOOP
+  Saying Y here will allow you to use a regular file as a block
+  device; you can then create a file system on that block device and
+  mount it just as you would mount other block devices such as hard
+  drive partitions, CD-ROM drives or floppy drives. The loop devices
+  are block special device files with major number 7 and typically
+  called /dev/loop0, /dev/loop1 etc.
+
+  This is useful if you want to check an ISO 9660 file system before
+  burning the CD, or if you want to use floppy images without first
+  writing them to floppy. Furthermore, some Linux distributions avoid
+  the need for a dedicated Linux partition by keeping their complete
+  root file system inside a DOS FAT file using this loop device
+  driver.
+
+  The loop device driver can also be used to "hide" a file system in a
+  disk partition, floppy, or regular file, either using encryption
+  (scrambling the data) or steganography (hiding the data in the low
+  bits of, say, a sound file). This is also safe if the file resides
+  on a remote file server. If you want to do this, you will first have
+  to acquire and install a kernel patch from
+  <ftp://ftp.kerneli.org/pub/kerneli/>, and then you need to
+  say Y to this option.
+
+  Note that alternative ways to use encrypted file systems are
+  provided by the cfs package, which can be gotten from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>, and the newer tcfs
+  package, available at <http://tcfs.dia.unisa.it/>. You do not need
+  to say Y here if you want to use one of these. However, using cfs
+  requires saying Y to "NFS file system support" below while using
+  tcfs requires applying a kernel patch. An alternative steganography
+  solution is provided by StegFS, also available from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>.
+
+  To use the loop device, you need the losetup utility and a recent
+  version of the mount program, both contained in the util-linux
+  package. The location and current version number of util-linux is
+  contained in the file <file:Documentation/Changes>.
+
+  Note that this loop device has nothing to do with the loopback
+  device used for network connections from the machine to itself.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called loop.o.
+
+  Most users will answer N here.
+
+CONFIG_BLK_DEV_NBD
+  Saying Y here will allow your computer to be a client for network
+  block devices, i.e. it will be able to use block devices exported by
+  servers (mount file systems on them etc.). Communication between
+  client and server works over TCP/IP networking, but to the client
+  program this is hidden: it looks like a regular local file access to
+  a block device special file such as /dev/nd0.
+
+  Network block devices also allows you to run a block-device in
+  userland (making server and client physically the same computer,
+  communicating using the loopback network device).
+
+  Read <file:Documentation/nbd.txt> for more information, especially
+  about where to find the server code, which runs in user space and
+  does not need special kernel support.
+
+  Note that this has nothing to do with the network file systems NFS
+  or Coda; you can say N here even if you intend to use NFS or Coda.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called nbd.o.
+
+  If unsure, say N.
+
+CONFIG_HOTPLUG
+  Say Y here if you want to plug devices into your computer while
+  the system is running, and be able to use them quickly.  In many
+  cases, the devices can likewise be unplugged at any time too.
+
+  One well known example of this is PCMCIA- or PC-cards, credit-card
+  size devices such as network cards, modems or hard drives which are
+  plugged into slots found on all modern laptop computers.  Another
+  example, used on modern desktops as well as laptops, is USB.
+
+  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+  Then your kernel will automatically call out to a user mode "policy
+  agent" (/sbin/hotplug) to load modules and set up software needed
+  to use devices as you hotplug them.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_DUMMY
+  This is essentially a bit-bucket device (i.e. traffic you send to
+  this device is consigned into oblivion) with a configurable IP
+  address. It is most commonly used in order to make your currently
+  inactive SLIP address seem like a real address for local programs.
+  If you use SLIP or PPP, you might want to say Y here. Since this
+  thing often comes in handy, the default is Y. It won't enlarge your
+  kernel either. What a deal. Read about it in the Network
+  Administrator's Guide, available from
+  <http://www.linuxdoc.org/docs.html#guide>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called dummy.o.  If you want to use more than one dummy
+  device at a time, you need to compile this driver as a module.
+  Instead of 'dummy', the devices will then be called 'dummy0',
+  'dummy1' etc.
+
+CONFIG_BONDING
+  Say 'Y' or 'M' if you wish to be able to 'bond' multiple Ethernet
+  Channels together. This is called 'Etherchannel' by Cisco,
+  'Trunking' by Sun, and 'Bonding' in Linux.
+
+  If you have two Ethernet connections to some other computer, you can
+  make them behave like one double speed connection using this driver.
+  Naturally, this has to be supported at the other end as well, either
+  with a similar Bonding Linux driver, a Cisco 5500 switch or a
+  SunTrunking SunSoft driver.
+
+  This is similar to the EQL driver, but it merges Ethernet segments
+  instead of serial lines.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called bonding.o.
+
+CONFIG_EQUALIZER
+  If you have two serial connections to some other computer (this
+  usually requires two modems and two telephone lines) and you use
+  SLIP (the protocol for sending Internet traffic over telephone
+  lines) or PPP (a better SLIP) on them, you can make them behave like
+  one double speed connection using this driver.  Naturally, this has
+  to be supported at the other end as well, either with a similar EQL
+  Linux driver or with a Livingston Portmaster 2e.
+
+  Say Y if you want this and read
+  <file:Documentation/networking/eql.txt>.  You may also want to read
+  section 6.2 of the NET-3-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eql.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  If
+  unsure, say N.
+
+CONFIG_TUN
+  TUN/TAP provides packet reception and transmission for user space
+  programs.  It can be viewed as a simple Point-to-Point or Ethernet
+  device, which instead of receiving packets from a physical media,
+  receives them from user space program and instead of sending packets
+  via physical media writes them to the user space program.
+
+  When a program opens /dev/net/tun, driver creates and registers
+  corresponding net device tunX or tapX.  After a program closed above
+  devices, driver will automatically delete tunXX or tapXX device and
+  all routes corresponding to it.
+
+  Please read <file:Documentation/networking/tuntap.txt> for more
+  information.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tun.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If you don't know what to use this for, you don't need it.
+
+CONFIG_NET_ETHERNET
+  Ethernet (also called IEEE 802.3 or ISO 8802-2) is the most common
+  type of Local Area Network (LAN) in universities and companies.
+
+  Common varieties of Ethernet are: 10BASE-2 or Thinnet (10 Mbps over
+  coaxial cable, linking computers in a chain), 10BASE-T or twisted
+  pair (10 Mbps over twisted pair cable, linking computers to central
+  hubs), 10BASE-F (10 Mbps over optical fiber links, using hubs),
+  100BASE-TX (100 Mbps over two twisted pair cables, using hubs),
+  100BASE-T4 (100 Mbps over 4 standard voice-grade twisted pair
+  cables, using hubs), 100BASE-FX (100 Mbps over optical fiber links)
+  [the 100BASE varieties are also known as Fast Ethernet], and Gigabit
+  Ethernet (1 Gbps over optical fiber or short copper links).
+
+  If your Linux machine will be connected to an Ethernet and you have
+  an Ethernet network interface card (NIC) installed in your computer,
+  say Y here and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. You will then also have
+  to say Y to the driver for your particular NIC.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about Ethernet network cards. If unsure, say N.
+
+CONFIG_TR
+  Token Ring is IBM's way of communication on a local network; the
+  rest of the world uses Ethernet. To participate on a Token Ring
+  network, you need a special Token ring network card. If you are
+  connected to such a Token Ring network and want to use your Token
+  Ring card under Linux, say Y here and to the driver for your
+  particular card below and read the Token-Ring mini-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>. Most people can
+  say N here.
+
+CONFIG_FDDI
+  Fiber Distributed Data Interface is a high speed local area network
+  design; essentially a replacement for high speed Ethernet. FDDI can
+  run over copper or fiber. If you are connected to such a network and
+  want a driver for the FDDI card in your computer, say Y here (and
+  then also Y to the driver for your FDDI card, below). Most people
+  will say N.
+
+CONFIG_UNIX98_PTYS
+  A pseudo terminal (PTY) is a software device consisting of two
+  halves: a master and a slave. The slave device behaves identical to
+  a physical terminal; the master device is used by a process to
+  read data from and write data to the slave, thereby emulating a
+  terminal. Typical programs for the master side are telnet servers
+  and xterms.
+
+  Linux has traditionally used the BSD-like names /dev/ptyxx for
+  masters and /dev/ttyxx for slaves of pseudo terminals. This scheme
+  has a number of problems. The GNU C library glibc 2.1 and later,
+  however, supports the Unix98 naming standard: in order to acquire a
+  pseudo terminal, a process opens /dev/ptmx; the number of the pseudo
+  terminal is then made available to the process and the pseudo
+  terminal slave can be accessed as /dev/pts/<number>. What was
+  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
+
+  The entries in /dev/pts/ are created on the fly by a virtual
+  file system; therefore, if you say Y here you should say Y to
+  "/dev/pts file system for Unix98 PTYs" as well.
+
+  If you want to say Y here, you need to have the C library glibc 2.1
+  or later (equal to libc-6.1, check with "ls -l /lib/libc.so.*").
+  Read the instructions in <file:Documentation/Changes> pertaining to
+  pseudo terminals. It's safe to say N.
+
+CONFIG_UNIX98_PTY_COUNT
+  The maximum number of Unix98 PTYs that can be used at any one time.
+  The default is 256, and should be enough for desktop systems. Server
+  machines which support incoming telnet/rlogin/ssh connections and/or
+  serve several X terminals may want to increase this: every incoming
+  connection and every xterm uses up one PTY.
+
+  When not in use, each additional set of 256 PTYs occupy
+  approximately 8 KB of kernel memory on 32-bit architectures.
+
+CONFIG_DASD
+  Enable this option if you want to access DASDs directly utilizing
+  S/390s channel subsystem commands. This is necessary for running
+  natively on a single image or an LPAR.
+
+CONFIG_DASD_ECKD
+  ECKD devices are the most commonly used devices. you should enable
+  this option unless you are very sure to have no ECKD device.
+
+CONFIG_DASD_CKD
+  CKD devices are currently unsupported.
+
+CONFIG_DASD_FBA
+  FBA devices are currently unsupported.
+
+CONFIG_TN3215
+  Include support for IBM 3215 line-mode terminals.
+
+CONFIG_TN3215_CONSOLE
+  Include support for using an IBM 3215 line-mode terminal as a
+  Linux system console.
+
+CONFIG_TN3270
+  Include support for IBM 3270 line-mode terminals.
+
+CONFIG_TN3270_CONSOLE
+  Include support for using an IBM 3270 line-mode terminal as a Linux
+  system console.  Available only if 3270 support is compiled in
+  statically.
+
+CONFIG_HWC
+  Include support for IBM HWC line-mode terminals.
+
+CONFIG_HWC_CONSOLE
+  Include support for using an IBM HWC line-mode terminal as the Linux
+  system console.
+
+CONFIG_S390_TAPE
+  Select this option if you want to access channel-attached tape
+  devices on IBM S/390 or zSeries.
+  If you select this option you will also want to select at
+  least one of the tape interface options and one of the tape
+  hardware options in order to access a tape device.
+  This option is also available as a module. The module will be
+  called tape390.o and include all selected interfaces and
+  hardware drivers.
+
+CONFIG_S390_TAPE_CHAR
+  Select this option if you want to access your channel-attached
+  tape devices using the character device interface.
+  This interface is similar to other Linux tape devices like
+  SCSI-Tapes (st) and the floppy tape device (ftape).
+  If unsure, say "Y".
+
+CONFIG_S390_TAPE_BLOCK
+  Select this option if you want to access your channel-attached tape
+  devices using the block device interface.  This interface is similar
+  to CD-ROM devices on other platforms.  The tapes can only be
+  accessed read-only when using this interface.  Have a look at
+  Documentation/s390/TAPE for further information about creating
+  volumes for and using this interface.  It is safe to say "Y" here.
+
+CONFIG_S390_TAPE_3490
+  Select this option if you want to access IBM 3480 magnetic
+  tape subsystems and 100% compatibles.
+  It is safe to say "Y" here.
+
+CONFIG_S390_TAPE_3480
+  Select this option if you want to access IBM 3490 magnetic
+  tape subsystems and 100% compatibles.
+
+CONFIG_CTC
+  Select this option if you want to use channel-to-channel networking
+  on IBM S/390 or zSeries. This device driver supports real CTC
+  coupling using ESCON. It also supports virtual CTCs when running
+  under VM. It will use the channel device configuration if this is
+  available.  This option is also available as a module which will be
+  called ctc.o.  If you do not know what it is, it's safe to say "Y".
+
+CONFIG_DASD_DIAG
+  Select this option if you want to use CMS reserved Disks under VM
+  with the Diagnose250 command.  If you are not running under VM or
+  unsure what it is, say "N".
+
+CONFIG_BLK_DEV_XPRAM
+  Select this option if you want to use your expanded storage on S/390
+  or zSeries as a disk.  This is useful as a _fast_ swap device if you
+  want to access more than 2G of memory when running in 31 bit mode.
+  This option is also available as a module which will be called
+  xpram.o.  If unsure, say "N".
+
+CONFIG_IUCV
+  Select this option if you want to use inter-user communication
+  vehicle networking under VM or VIF.  This option is also available
+  as a module which will be called iucv.o. If unsure, say "Y".
+
+CONFIG_CHANDEV
+  The channel device layer is a layer to provide a consistent
+  interface for configuration & default machine check (devices
+  appearing & disappearing) handling on Linux for s/390 & z/Series
+  channel devices.
+
+  s/390 & z/Series channel devices include among others
+
+  lcs (the most common ethernet/token ring/fddi standard on
+  zSeries)
+  ctc/escon hi speed like serial link standard on zSeries
+  claw used to talk to cisco routers.
+  qeth gigabit ethernet.
+
+  These devices use two channels one read & one write for
+  configuration & communication (& a third channel, the data
+  channel the case of gigabit ethernet). The motivation
+  behind developing this layer was that there was a lot of
+  duplicate code among the channel device drivers for
+  configuration.
+
+  Also the lcs & ctc drivers tended to fight over
+  3088/08's & 3088/1F's which could be either 2216/3172
+  channel attached lcs compatible devices or escon/ctc pipes
+  had to be configured separately as they couldn't autodetect,
+  this is now simplified by doing the configuration in a single
+  place (the channel device layer).
+
+  This layer isn't invasive & it is quite okay to use channel
+  drivers which don't use the channel device layer in
+  conjunction with drivers which do.
+
+  For more info see the chandev manpage usually distributed in
+  <file:Documentation/s390/chandev.8> in the Linux source tree.
+

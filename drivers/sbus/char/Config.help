@@ -1,0 +1,84 @@
+CONFIG_APM_RTC_IS_GMT
+  Say Y here if your RTC (Real Time Clock a.k.a. hardware clock)
+  stores the time in GMT (Greenwich Mean Time). Say N if your RTC
+  stores localtime.
+
+  It is in fact recommended to store GMT in your RTC, because then you
+  don't have to worry about daylight savings time changes. The only
+  reason not to use GMT in your RTC is if you also run a broken OS
+  that doesn't understand GMT.
+
+CONFIG_RTC
+  If you say Y here and create a character special file /dev/rtc with
+  major number 10 and minor number 135 using mknod ("man mknod"), you
+  will get access to the real time clock (or hardware clock) built
+  into your computer.
+
+  Every PC has such a clock built in. It can be used to generate
+  signals from as low as 1Hz up to 8192Hz, and can also be used
+  as a 24 hour alarm. It reports status information via the file
+  /proc/driver/rtc and its behaviour is set by various ioctls on
+  /dev/rtc.
+
+  If you run Linux on a multiprocessor machine and said Y to
+  "Symmetric Multi Processing" above, you should say Y here to read
+  and set the RTC in an SMP compatible fashion.
+
+  If you think you have a use for such a device (such as periodic data
+  sampling), then say Y here, and read <file:Documentation/rtc.txt>
+  for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called rtc.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SUN_OPENPROMIO
+  This driver provides user programs with an interface to the SPARC
+  PROM device tree. The driver implements a SunOS-compatible
+  interface and a NetBSD-compatible interface.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M and read <file:Documentation/modules.txt>. If unsure, say Y.
+
+CONFIG_SUN_MOSTEK_RTC
+  The Mostek RTC chip is used on all known Sun computers except
+  some JavaStations. For a JavaStation you need to say Y both here
+  and to "Enhanced Real Time Clock Support".
+
+  Say Y here unless you are building a special purpose kernel.
+
+CONFIG_OBP_FLASH
+  The OpenBoot PROM on Ultra systems is flashable. If you want to be
+  able to upgrade the OBP firmware, say Y here.
+
+CONFIG_SUN_JSFLASH
+  If you say Y here, you will be able to boot from your JavaStation's
+  Flash memory.
+
+CONFIG_SAB82532
+  This driver supports the serial ports on newer (PCI) Ultra systems.
+  Say Y if you want to be able to use your serial ports.
+
+CONFIG_SUN_VIDEOPIX
+  Say Y here to support the Videopix Frame Grabber from Sun
+  Microsystems, commonly found on SPARCstations.  This card, which is
+  based on the Phillips SAA9051, can handle NTSC and PAL/SECAM and
+  SVIDEO signals.
+
+CONFIG_SUN_BPP
+  Say Y here to support Sun's obsolete variant of IEEE1284
+  bidirectional parallel port protocol as /dev/bppX.  Can be built on
+  x86 machines.
+
+CONFIG_SUN_AURORA
+  The Aurora Multiboard is a multi-port high-speed serial controller.
+  If you have one of these, say Y.
+
+CONFIG_TADPOLE_TS102_UCTRL
+  Say Y here to directly support the TS102 Microcontroller interface
+  on the Tadpole Sparcbook 3.  This device handles power-management
+  events, and can also notice the attachment/detachment of external
+  monitors and mice.
+

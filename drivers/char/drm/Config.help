@@ -1,0 +1,39 @@
+CONFIG_DRM
+  Kernel-level support for the Direct Rendering Infrastructure (DRI)
+  introduced in XFree86 4.0. If you say Y here, you need to select
+  the module that's right for your graphics card from the list below.
+  These modules provide support for synchronization, security, and
+  DMA transfers. Please see <http://dri.sourceforge.net/> for more
+  details.  You should also select and configure AGP
+  (/dev/agpgart) support.
+
+CONFIG_DRM_TDFX
+  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
+  graphics card.  If M is selected, the module will be called tdfx.o.
+
+CONFIG_DRM_GAMMA
+  Choose this option if you have a 3dlabs GMX 2000 graphics card.
+  If M is selected, the module will be called gamma.o.
+
+CONFIG_DRM_R128
+  Choose this option if you have an ATI Rage 128 graphics card.  If M
+  is selected, the module will be called r128.o.  AGP support for
+  this card is strongly suggested (unless you have a PCI version).
+
+CONFIG_DRM_RADEON
+  Choose this option if you have an ATI Radeon graphics card.  There
+  are both PCI and AGP versions.  You don't need to choose this to
+  run the Radeon in plain VGA mode.  There is a product page at
+  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
+  If M is selected, the module will be called radeon.o.
+
+CONFIG_DRM_I810
+  Choose this option if you have an Intel I810 graphics card.  If M is
+  selected, the module will be called i810.o.  AGP support is required
+  for this driver to work.
+
+CONFIG_DRM_MGA
+  Choose this option if you have a Matrox G200, G400 or G450 graphics
+  card.  If M is selected, the module will be called mga.o.  AGP
+  support is required for this driver to work.
+

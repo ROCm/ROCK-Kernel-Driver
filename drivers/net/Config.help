@@ -1,0 +1,1704 @@
+CONFIG_BAGETLANCE
+  Say Y to enable kernel support for AMD Lance Ethernet cards on the
+  MIPS-32-based Baget embedded system.  This chipset is better known
+  via the NE2100 cards.
+
+CONFIG_MIPS_JAZZ_SONIC
+  This is the driver for the onboard card of MIPS Magnum 4000,
+  Acer PICA, Olivetti M700-10 and a few other identical OEM systems.
+
+CONFIG_MIPS_GT96100ETH
+  Say Y here to support the Ethernet subsystem on your GT96100 card.
+
+CONFIG_DUMMY
+  This is essentially a bit-bucket device (i.e. traffic you send to
+  this device is consigned into oblivion) with a configurable IP
+  address. It is most commonly used in order to make your currently
+  inactive SLIP address seem like a real address for local programs.
+  If you use SLIP or PPP, you might want to say Y here. Since this
+  thing often comes in handy, the default is Y. It won't enlarge your
+  kernel either. What a deal. Read about it in the Network
+  Administrator's Guide, available from
+  <http://www.linuxdoc.org/docs.html#guide>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called dummy.o.  If you want to use more than one dummy
+  device at a time, you need to compile this driver as a module.
+  Instead of 'dummy', the devices will then be called 'dummy0',
+  'dummy1' etc.
+
+CONFIG_BONDING
+  Say 'Y' or 'M' if you wish to be able to 'bond' multiple Ethernet
+  Channels together. This is called 'Etherchannel' by Cisco,
+  'Trunking' by Sun, and 'Bonding' in Linux.
+
+  If you have two Ethernet connections to some other computer, you can
+  make them behave like one double speed connection using this driver.
+  Naturally, this has to be supported at the other end as well, either
+  with a similar Bonding Linux driver, a Cisco 5500 switch or a
+  SunTrunking SunSoft driver.
+
+  This is similar to the EQL driver, but it merges Ethernet segments
+  instead of serial lines.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called bonding.o.
+
+CONFIG_SLIP
+  Say Y if you intend to use SLIP or CSLIP (compressed SLIP) to
+  connect to your Internet service provider or to connect to some
+  other local Unix box or if you want to configure your Linux box as a
+  Slip/CSlip server for other people to dial in. SLIP (Serial Line
+  Internet Protocol) is a protocol used to send Internet traffic over
+  serial connections such as telephone lines or null modem cables;
+  nowadays, the protocol PPP is more commonly used for this same
+  purpose.
+
+  Normally, your access provider has to support SLIP in order for you
+  to be able to use it, but there is now a SLIP emulator called SLiRP
+  around (available from
+  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
+  allows you to use SLIP over a regular dial up shell connection. If
+  you plan to use SLiRP, make sure to say Y to CSLIP, below. The
+  NET-3-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, explains how to
+  configure SLIP. Note that you don't need this option if you just
+  want to run term (term is a program which gives you almost full
+  Internet connectivity if you have a regular dial up shell account on
+  some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>). SLIP
+  support will enlarge your kernel by about 4 KB. If unsure, say N.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>. The module will be
+  called slip.o.
+
+CONFIG_SLIP_COMPRESSED
+  This protocol is faster than SLIP because it uses compression on the
+  TCP/IP headers (not on the data itself), but it has to be supported
+  on both ends. Ask your access provider if you are not sure and
+  answer Y, just in case. You will still be able to use plain SLIP. If
+  you plan to use SLiRP, the SLIP emulator (available from
+  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
+  allows you to use SLIP over a regular dial up shell connection, you
+  definitely want to say Y here. The NET-3-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, explains how to configure
+  CSLIP. This won't enlarge your kernel.
+
+CONFIG_SLIP_SMART
+  Adds additional capabilities to the SLIP driver to support the
+  RELCOM line fill and keepalive monitoring. Ideal on poor quality
+  analogue lines.
+
+CONFIG_SLIP_MODE_SLIP6
+  Just occasionally you may need to run IP over hostile serial
+  networks that don't pass all control characters or are only seven
+  bit. Saying Y here adds an extra mode you can use with SLIP:
+  "slip6". In this mode, SLIP will only send normal ASCII symbols over
+  the serial device. Naturally, this has to be supported at the other
+  end of the link as well. It's good enough, for example, to run IP
+  over the async ports of a Camtec JNT Pad. If unsure, say N.
+
+CONFIG_PPP
+  PPP (Point to Point Protocol) is a newer and better SLIP.  It serves
+  the same purpose: sending Internet traffic over telephone (and other
+  serial) lines.  Ask your access provider if they support it, because
+  otherwise you can't use it; most Internet access providers these
+  days support PPP rather than SLIP.
+
+  To use PPP, you need an additional program called pppd as described
+  in the PPP-HOWTO, available at
+  <http://www.linuxdoc.org/docs.html#howto>.  Make sure that you have
+  the version of pppd recommended in <file:Documentation/Changes>.
+  The PPP option enlarges your kernel by about 16 KB.
+
+  There are actually two versions of PPP: the traditional PPP for
+  asynchronous lines, such as regular analog phone lines, and
+  synchronous PPP which can be used over digital ISDN lines for
+  example.  If you want to use PPP over phone lines or other
+  asynchronous serial lines, you need to say Y (or M) here and also to
+  the next option, "PPP support for async serial ports".  For PPP over
+  synchronous lines, you should say Y (or M) here and to "Support
+  synchronous PPP", below.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you said Y to "Version information on all symbols" above, then
+  you cannot compile the PPP driver into the kernel; you can then only
+  compile it as a module.  The module will be called ppp_generic.o.
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_PPP_MULTILINK
+  PPP multilink is a protocol (defined in RFC 1990) which allows you
+  to combine several (logical or physical) lines into one logical PPP
+  connection, so that you can utilize your full bandwidth.
+
+  This has to be supported at the other end as well and you need a
+  version of the pppd daemon which understands the multilink protocol.
+
+  If unsure, say N.
+
+CONFIG_PPP_FILTER
+  Say Y here if you want to be able to filter the packets passing over
+  PPP interfaces.  This allows you to control which packets count as
+  activity (i.e. which packets will reset the idle timer or bring up
+  a demand-dialled link) and which packets are to be dropped entirely.
+  You need to say Y here if you wish to use the pass-filter and
+  active-filter options to pppd.
+
+  If unsure, say N.
+
+CONFIG_PPP_ASYNC
+  Say Y (or M) here if you want to be able to use PPP over standard
+  asynchronous serial ports, such as COM1 or COM2 on a PC.  If you use
+  a modem (not a synchronous or ISDN modem) to contact your ISP, you
+  need this option.
+
+  This code is also available as a module (code which can be inserted
+  into and removed from the running kernel).  If you want to compile
+  it as a module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say Y.
+
+CONFIG_PPP_SYNC_TTY
+  Say Y (or M) here if you want to be able to use PPP over synchronous
+  (HDLC) tty devices, such as the SyncLink adapter. These devices
+  are often used for high-speed leased lines like T1/E1.
+
+  This code is also available as a module (code which can be inserted
+  into and removed from the running kernel).  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_PPP_DEFLATE
+  Support for the Deflate compression method for PPP, which uses the
+  Deflate algorithm (the same algorithm that gzip uses) to compress
+  each PPP packet before it is sent over the wire.  The machine at the
+  other end of the PPP link (usually your ISP) has to support the
+  Deflate compression method as well for this to be useful.  Even if
+  they don't support it, it is safe to say Y here.
+
+  This code is also available as a module (code which can be inserted
+  into and removed from the running kernel).  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_PPP_BSDCOMP
+  Support for the BSD-Compress compression method for PPP, which uses
+  the LZW compression method to compress each PPP packet before it is
+  sent over the wire. The machine at the other end of the PPP link
+  (usually your ISP) has to support the BSD-Compress compression
+  method as well for this to be useful. Even if they don't support it,
+  it is safe to say Y here.
+
+  The PPP Deflate compression method ("PPP Deflate compression",
+  above) is preferable to BSD-Compress, because it compresses better
+  and is patent-free.
+
+  Note that the BSD compression code will always be compiled as a
+  module; it is called bsd_comp.o and will show up in the directory
+  modules once you have said "make modules". If unsure, say N.
+
+CONFIG_PPPOE
+  Support for PPP over Ethernet.
+
+  This driver requires a specially patched pppd daemon.  The patch to
+  pppd, along with binaries of a patched pppd package can be found at:
+  <http://www.shoshin.uwaterloo.ca/~mostrows/>.
+
+CONFIG_NET_RADIO
+  Support for wireless LANs and everything having to do with radio,
+  but not with amateur radio or FM broadcasting.
+
+  Saying Y here also enables the Wireless Extensions (creates
+  /proc/net/wireless and enables ifconfig access). The Wireless
+  Extension is a generic API allowing a driver to expose to the user
+  space configuration and statistics specific to common Wireless LANs.
+  The beauty of it is that a single set of tool can support all the
+  variations of Wireless LANs, regardless of their type (as long as
+  the driver supports Wireless Extension). Another advantage is that
+  these parameters may be changed on the fly without restarting the
+  driver (or Linux). If you wish to use Wireless Extensions with
+  wireless PCMCIA (PC-) cards, you need to say Y here; you can fetch
+  the tools from
+  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>.
+
+  Some user-level drivers for scarab devices which don't require
+  special kernel support are available from
+  <ftp://shadow.cabi.net/pub/Linux/>.
+
+CONFIG_STRIP
+  Say Y if you have a Metricom radio and intend to use Starmode Radio
+  IP. STRIP is a radio protocol developed for the MosquitoNet project
+  (on the WWW at <http://mosquitonet.stanford.edu/>) to send Internet
+  traffic using Metricom radios.  Metricom radios are small, battery
+  powered, 100kbit/sec packet radio transceivers, about the size and
+  weight of a cellular telephone. (You may also have heard them called
+  "Metricom modems" but we avoid the term "modem" because it misleads
+  many people into thinking that you can plug a Metricom modem into a
+  phone line and use it as a modem.)
+
+  You can use STRIP on any Linux machine with a serial port, although
+  it is obviously most useful for people with laptop computers. If you
+  think you might get a Metricom radio in the future, there is no harm
+  in saying Y to STRIP now, except that it makes the kernel a bit
+  bigger.
+
+  You can also compile this as a module ( = code which can be inserted
+  in and removed from the running kernel whenever you want), say M
+  here and read <file:Documentation/modules.txt>.  The module will be
+  called strip.o.
+
+CONFIG_ARLAN
+  Aironet makes Arlan, a class of wireless LAN adapters. These use the
+  www.Telxon.com chip, which is also used on several similar cards.
+  This driver is tested on the 655 and IC2200 series cards. Look at
+  <http://www.ylenurme.ee/~elmer/655/> for the latest information.
+
+  The driver is built as two modules, arlan and arlan-proc. The latter
+  is the /proc interface and is not needed most of time.
+
+  On some computers the card ends up in non-valid state after some
+  time. Use a ping-reset script to clear it.
+
+CONFIG_AIRONET4500
+  www.aironet.com (recently bought by Cisco) makes these 802.11 DS
+  adapters.  Driver by Elmer Joandi (elmer@ylenurme.ee).
+
+  Say Y here if you have such an adapter, and then say Y below to
+  the option that applies to your particular type of card (PCI, ISA,
+  or PCMCIA).
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aironet4500_core.o. If you want to
+  compile it as a module, say M here and read
+  <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.
+
+  quick config parameters:
+	SSID=tsunami - "The Password"
+	adhoc=1  	there are no Access Points around
+	master=1 	Adhoc master (the one who creates network
+                        sync)
+	slave=1		Adhoc slave (btw, it is still forming own net
+			sometimes, and has problems with firmware...
+			change IbssJoinNetTimeout from /proc...)
+	channel=1..? 	meaningful in adhoc mode
+
+  If you have problems with screwing up card, both_bap_lock=1 is a
+  conservative value (performance hit 15%).
+
+  All other parameters can be set via the proc interface.
+
+CONFIG_AIRONET4500_NONCS
+  If you have an ISA, PCI or PCMCIA Aironet 4500/4800 wireless LAN
+  card, say Y here, and then also to the options below that apply
+  to you.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aironet4500_card.o.  If you want to
+  compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_AIRONET4500_PNP
+  If you have an ISA Aironet 4500/4800 card which you want to use in
+  PnP (Plug and Play) mode, say Y here. This is the recommended mode
+  for ISA cards. Remember however to enable the PnP jumper on the
+  board if you say Y here.
+
+CONFIG_AIRONET4500_PCI
+  If you have an PCI Aironet 4500/4800 card, say Y here.
+
+CONFIG_AIRONET4500_ISA
+  If you have an ISA Aironet 4500/4800 card which you want to run in
+  non-PnP mode, say Y here. This is not recommended and does not work
+  correctly at this point. Say N.
+
+CONFIG_AIRONET4500_I365
+  If you have a PCMCIA Aironet 4500/4800 card which you want to use
+  without the standard PCMCIA cardservices provided by the pcmcia-cs
+  package, say Y here. This is not recommended, so say N.
+
+CONFIG_AIRONET4500_PROC
+  If you say Y here (and to the "/proc file system" below), you will
+  be able to configure your Aironet card via the
+  /proc/sys/aironet4500 interface.
+
+  Additional info: look in <file:drivers/net/aironet4500_rid.c>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aironet4500_proc.o. If you want to
+  compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+  NOTE: the proc interface uses a lot of memory, so it is recommended
+        to compile it as a module and remove the module after
+        configuration.
+
+CONFIG_PLIP
+  PLIP (Parallel Line Internet Protocol) is used to create a
+  reasonably fast mini network consisting of two (or, rarely, more)
+  local machines.  A PLIP link from a Linux box is a popular means to
+  install a Linux distribution on a machine which doesn't have a
+  CD-ROM drive (a minimal system has to be transferred with floppies
+  first). The kernels on both machines need to have this PLIP option
+  enabled for this to work.
+
+  The PLIP driver has two modes, mode 0 and mode 1.  The parallel
+  ports (the connectors at the computers with 25 holes) are connected
+  with "null printer" or "Turbo Laplink" cables which can transmit 4
+  bits at a time (mode 0) or with special PLIP cables, to be used on
+  bidirectional parallel ports only, which can transmit 8 bits at a
+  time (mode 1); you can find the wiring of these cables in
+  <file:Documentation/networking/PLIP.txt>.  The cables can be up to
+  15m long.  Mode 0 works also if one of the machines runs DOS/Windows
+  and has some PLIP software installed, e.g. the Crynwr PLIP packet
+  driver (<http://oak.oakland.edu/simtel.net/msdos/pktdrvr-pre.html>)
+  and winsock or NCSA's telnet.
+
+  If you want to use PLIP, say Y and read the PLIP mini-HOWTO as well
+  as the NET-3-HOWTO, both available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Note that the PLIP
+  protocol has been changed and this PLIP driver won't work together
+  with the PLIP support in Linux versions 1.0.x.  This option enlarges
+  your kernel by about 8 KB.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called plip.o.  If unsure, say Y or M, in case you buy a laptop
+  later.
+
+CONFIG_EQUALIZER
+  If you have two serial connections to some other computer (this
+  usually requires two modems and two telephone lines) and you use
+  SLIP (the protocol for sending Internet traffic over telephone
+  lines) or PPP (a better SLIP) on them, you can make them behave like
+  one double speed connection using this driver.  Naturally, this has
+  to be supported at the other end as well, either with a similar EQL
+  Linux driver or with a Livingston Portmaster 2e.
+
+  Say Y if you want this and read
+  <file:Documentation/networking/eql.txt>.  You may also want to read
+  section 6.2 of the NET-3-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eql.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  If
+  unsure, say N.
+
+CONFIG_TUN
+  TUN/TAP provides packet reception and transmission for user space
+  programs.  It can be viewed as a simple Point-to-Point or Ethernet
+  device, which instead of receiving packets from a physical media,
+  receives them from user space program and instead of sending packets
+  via physical media writes them to the user space program.
+
+  When a program opens /dev/net/tun, driver creates and registers
+  corresponding net device tunX or tapX.  After a program closed above
+  devices, driver will automatically delete tunXX or tapXX device and
+  all routes corresponding to it.
+
+  Please read <file:Documentation/networking/tuntap.txt> for more
+  information.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tun.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If you don't know what to use this for, you don't need it.
+
+CONFIG_ETHERTAP
+  If you say Y here (and have said Y to "Kernel/User network link
+  driver", above) and create a character special file /dev/tap0 with
+  major number 36 and minor number 16 using mknod ("man mknod"), you
+  will be able to have a user space program read and write raw
+  Ethernet frames from/to that special file.  tap0 can be configured
+  with ifconfig and route like any other Ethernet device but it is not
+  connected to any physical LAN; everything written by the user to
+  /dev/tap0 is treated by the kernel as if it had come in from a LAN
+  to the device tap0; everything the kernel wants to send out over the
+  device tap0 can instead be read by the user from /dev/tap0: the user
+  mode program replaces the LAN that would be attached to an ordinary
+  Ethernet device. Please read the file
+  <file:Documentation/networking/ethertap.txt> for more information.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ethertap.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If you don't know what to use this for, you don't need it.
+
+CONFIG_NET_FC
+  Fibre Channel is a high speed serial protocol mainly used to connect
+  large storage devices to the computer; it is compatible with and
+  intended to replace SCSI.
+
+  If you intend to use Fibre Channel, you need to have a Fibre channel
+  adaptor card in your computer; say Y here and to the driver for your
+  adaptor below. You also should have said Y to "SCSI support" and
+  "SCSI generic support".
+
+CONFIG_IPHASE5526
+  Say Y here if you have a Fibre Channel adaptor of this kind.
+
+  The driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called iph5526.o. For general information about
+  modules read <file:Documentation/modules.txt>.
+
+CONFIG_RCPCI
+  This is a driver for hardware which provides a Virtual Private
+  Network (VPN). Say Y if you have it.
+
+  This code is also available as a module called rcpci.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_ETHERNET
+  Ethernet (also called IEEE 802.3 or ISO 8802-2) is the most common
+  type of Local Area Network (LAN) in universities and companies.
+
+  Common varieties of Ethernet are: 10BASE-2 or Thinnet (10 Mbps over
+  coaxial cable, linking computers in a chain), 10BASE-T or twisted
+  pair (10 Mbps over twisted pair cable, linking computers to central
+  hubs), 10BASE-F (10 Mbps over optical fiber links, using hubs),
+  100BASE-TX (100 Mbps over two twisted pair cables, using hubs),
+  100BASE-T4 (100 Mbps over 4 standard voice-grade twisted pair
+  cables, using hubs), 100BASE-FX (100 Mbps over optical fiber links)
+  [the 100BASE varieties are also known as Fast Ethernet], and Gigabit
+  Ethernet (1 Gbps over optical fiber or short copper links).
+
+  If your Linux machine will be connected to an Ethernet and you have
+  an Ethernet network interface card (NIC) installed in your computer,
+  say Y here and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. You will then also have
+  to say Y to the driver for your particular NIC.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about Ethernet network cards. If unsure, say N.
+
+CONFIG_NET_VENDOR_SMC
+  If you have a network (Ethernet) card belonging to this class, say Y
+  and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about Western Digital cards. If you say Y, you will be
+  asked for your specific card in the following questions.
+
+CONFIG_WD80x3
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called wd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ULTRAMCA
+  If you have a network (Ethernet) card of this type and are running
+  an MCA based system (PS/2), say Y and read the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called smc-mca.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ULTRA
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Important: There have been many reports that, with some motherboards
+  mixing an SMC Ultra and an Adaptec AHA154x SCSI card (or compatible,
+  such as some BusLogic models) causes corruption problems with many
+  operating systems. The Linux smc-ultra driver has a work-around for
+  this but keep it in mind if you have such a SCSI card and have
+  problems.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called smc-ultra.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ULTRA32
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called smc-ultra32.o.  If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_SMC9194
+  This is support for the SMC9xxx based Ethernet cards. Choose this
+  option if you have a DELL laptop with the docking station, or
+  another SMC9192/9194 based chipset.  Say Y if you want it compiled
+  into the kernel, and read the file
+  <file:Documentation/networking/smc9.txt> and the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called smc9194.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NE2K_PCI
+  This driver is for NE2000 compatible PCI cards. It will not work
+  with ISA NE2000 cards (they have their own driver, "NE2000/NE1000
+  support" below). If you have a PCI NE2000 network (Ethernet) card,
+  say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver also works for the following NE2000 clone cards:
+    RealTek RTL-8029  Winbond 89C940  Compex RL2000  KTI ET32P2
+    NetVin NV5000SC   Via 86C926      SureCom NE34   Winbond
+    Holtek HT80232    Holtek HT80229
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ne2k-pci.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NET_VENDOR_RACAL
+  If you have a network (Ethernet) card belonging to this class, such
+  as the NI5010, NI5210 or NI6210, say Y and read the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about NI cards. If you say Y, you will be asked for
+  your specific card in the following questions.
+
+CONFIG_NI5010
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. Note that this is still
+  experimental code.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ni5010.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NI52
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ni52.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NI65
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ni65.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_8139CP
+  This is a driver for the Fast Ethernet PCI network cards based on
+  the RTL8139C+ chips. If you have one of those, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. This is recommended.
+  The module will be called 8139cp.o.
+
+CONFIG_8139TOO
+  This is a driver for the Fast Ethernet PCI network cards based on
+  the RTL8139 chips. If you have one of those, say Y and read
+  <file:Documentation/networking/8139too.txt> as well as the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called 8139too.o.
+
+CONFIG_8139TOO_PIO
+  This instructs the driver to use programmed I/O ports (PIO) instead
+  of PCI shared memory (MMIO).  This can possibly solve some problems
+  in case your mainboard has memory consistency issues.  If unsure,
+  say N.
+
+CONFIG_8139TOO_TUNE_TWISTER
+  This implements a function which might come in handy in case you are
+  using low quality on long cabling. It tries to match the transceiver
+  to the cable characteristics. This is experimental since hardly
+  documented by the manufacturer.  If unsure, say N.
+
+CONFIG_8139TOO_8129
+  This enables support for the older and uncommon RTL-8129 and
+  RTL-8130 chips, which support MII via an external transceiver,
+  instead of an internal one.  Disabling this option will save some
+  memory by making the code size smaller.  If unsure, say Y.
+
+CONFIG_SIS900
+  This is a driver for the Fast Ethernet PCI network cards based on
+  the SiS 900 and SiS 7016 chips. The SiS 900 core is also embedded in
+  SiS 630 and SiS 540 chipsets.  If you have one of those, say Y and
+  read the Ethernet-HOWTO, available at
+  <http://www.linuxdoc.org/docs.html#howto>.  Please read
+  <file:Documentation/networking/sis900.txt> and comments at the
+  beginning of <file:drivers/net/sis900.c> for more information.
+
+  This driver also supports AMD 79C901 HomePNA so that you can use
+  your phone line as a network cable.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called sis900.o.
+
+CONFIG_YELLOWFIN
+  Say Y here if you have a Packet Engines G-NIC PCI Gigabit Ethernet
+  adapter or the SYM53C885 Ethernet controller. The Gigabit adapter is
+  used by the Beowulf Linux cluster project.  See
+  <http://cesdis.gsfc.nasa.gov/linux/drivers/yellowfin.html> for more
+  information about this driver in particular and Beowulf in general.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called yellowfin.o.
+
+CONFIG_NET_SB1000
+  This is a driver for the General Instrument (also known as
+  NextLevel) SURFboard 1000 internal
+  cable modem. This is an ISA card which is used by a number of cable
+  TV companies to provide cable modem access. It's a one-way
+  downstream-only cable modem, meaning that your upstream net link is
+  provided by your regular phone modem.
+
+  At present this driver only compiles as a module, so say M here if
+  you have this card. The module will be called sb1000.o. Then read
+  <file:Documentation/networking/README.sb1000> for information on how
+  to use this module, as it needs special ppp scripts for establishing
+  a connection. Further documentation and the necessary scripts can be
+  found at:
+
+  <http://www.jacksonville.net/~fventuri/>
+  <http://home.adelphia.net/~siglercm/sb1000.html>
+  <http://linuxpower.cx/~cable/>
+
+  If you don't have this card, of course say N.
+
+CONFIG_ADAPTEC_STARFIRE
+  Say Y here if you have an Adaptec Starfire (or DuraLAN) PCI network
+  adapter. The DuraLAN chip is used on the 64 bit PCI boards from
+  Adaptec e.g. the ANA-6922A. The older 32 bit boards use the tulip
+  driver.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called starfire.o.
+
+CONFIG_ACENIC
+  Say Y here if you have an Alteon AceNIC, 3Com 3C985(B), NetGear
+  GA620, SGI Gigabit or Farallon PN9000-SX PCI Gigabit Ethernet
+  adapter. The driver allows for using the Jumbo Frame option (9000
+  bytes/frame) however it requires that your switches can handle this
+  as well. To enable Jumbo Frames, add `mtu 9000' to your ifconfig
+  line.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called acenic.o.
+
+CONFIG_ACENIC_OMIT_TIGON_I
+  Say Y here if you only have Tigon II based AceNICs and want to leave
+  out support for the older Tigon I based cards which are no longer
+  being sold (ie. the original Alteon AceNIC and 3Com 3C985 (non B
+  version)).  This will reduce the size of the driver object by
+  app. 100KB.  If you are not sure whether your card is a Tigon I or a
+  Tigon II, say N here.
+
+  The safe and default value for this is N.
+
+CONFIG_SK98LIN
+  Say Y here if you have a SysKonnect SK-98xx Gigabit Ethernet Server
+  Adapter. The following adapters are supported by this driver:
+  - SK-9841 (single link 1000Base-LX)
+  - SK-9842 (dual link   1000Base-LX)
+  - SK-9843 (single link 1000Base-SX)
+  - SK-9844 (dual link   1000Base-SX)
+  - SK-9821 (single link 1000Base-T)
+  - SK-9822 (dual link   1000Base-T)
+  - SK-9861 (single link Volition connector)
+  - SK-9862 (dual link   Volition connector)
+  The driver also supports the following adapters from Allied Telesyn:
+  - AT2970...
+
+  The dual link adapters support a link-failover feature.  Read
+  <file:Documentation/networking/sk98lin.txt> for information about
+  optional driver parameters.
+  Questions concerning this driver may be addressed to:
+    linux@syskonnect.de
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called sk98lin.o.
+
+CONFIG_SUNGEM
+  Support for the Sun GEM chip, aka Sun GigabitEthernet/P 2.0.  See also
+  <http://www.sun.com/products-n-solutions/hardware/docs/pdf/806-3985-10.pdf>.
+
+CONFIG_MYRI_SBUS
+  This driver supports MyriCOM Sbus gigabit Ethernet cards.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called myri_sbus.o.
+
+CONFIG_DL2K
+  This driver supports D-Link 2000-based gigabit ethernet cards, which
+  includes
+       D-Link DGE-550T Gigabit Ethernet Adapter.
+       D-Link DL2000-based Gigabit Ethernet Adapter.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called dl2k.o.
+
+CONFIG_LANCE
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. Some LinkSys cards are
+  of this type.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called lance.o.
+
+CONFIG_SGI_IOC3_ETH
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_STNIC
+  Support for cards based on the National Semiconductor DP83902AV
+  ST-NIC Serial Network Interface Controller for Twisted Pair.  This
+  is a 10Mbit/sec Ethernet controller.  Product overview and specs at
+  <http://www.national.com/pf/DP/DP83902A.html>.
+
+  If unsure, say N.
+
+CONFIG_NET_VENDOR_3COM
+  If you have a network (Ethernet) card belonging to this class, say Y
+  and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about 3COM cards. If you say Y, you will be asked for
+  your specific card in the following questions.
+
+CONFIG_EL1
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Also, consider buying a
+  new card, since the 3c501 is slow, broken, and obsolete: you will
+  have problems.  Some people suggest to ping ("man ping") a nearby
+  machine every minute ("man cron") when using this card.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 3c501.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EL2
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 3c503.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ELPLUS
+  Information about this network (Ethernet) card can be found in
+  <file:Documentation/networking/3c505.txt>.  If you have a card of
+  this type, say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called 3c505.o.
+
+CONFIG_EL16
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 3c507.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ELMC
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 3c523.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ELMC_II
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 3c527.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EL3
+  If you have a network (Ethernet) card belonging to the 3Com
+  EtherLinkIII series, say Y and read the Ethernet-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>.
+
+  If your card is not working you may need to use the DOS
+  setup disk to disable Plug & Play mode, and to select the default
+  media type.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called 3c509.o.
+
+CONFIG_3C515
+  If you have a 3Com ISA EtherLink XL "Corkscrew" 3c515 Fast Ethernet
+  network card, say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called 3c515.o.
+
+CONFIG_VORTEX
+  This option enables driver support for a large number of 10mbps and
+  10/100mbps EISA, PCI and PCMCIA 3Com network cards:
+
+  "Vortex"    (Fast EtherLink 3c590/3c592/3c595/3c597) EISA and PCI
+  "Boomerang" (EtherLink XL 3c900 or 3c905)            PCI
+  "Cyclone"   (3c540/3c900/3c905/3c980/3c575/3c656)    PCI and Cardbus
+  "Tornado"   (3c905)                                  PCI
+  "Hurricane" (3c555/3cSOHO)                           PCI
+
+  If you have such a card, say Y and read the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>. More
+  specific information is in
+  <file:Documentation/networking/vortex.txt> and in the comments at
+  the beginning of <file:drivers/net/3c59x.c>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NET_ISA
+  If your network (Ethernet) card hasn't been mentioned yet and its
+  bus system (that's the way the cards talks to the other components
+  of your computer) is ISA (as opposed to EISA, VLB or PCI), say Y.
+  Make sure you know the name of your card. Read the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  If unsure, say Y.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the remaining ISA network card questions. If you say Y, you will be
+  asked for your specific card in the following questions.
+
+CONFIG_E2100
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called e2100.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_CS89x0
+  Support for CS89x0 chipset based Ethernet cards. If you have a
+  network (Ethernet) card of this type, say Y and read the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto> as well as
+  <file:Documentation/networking/cs89x0.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called cs89x.o.
+
+CONFIG_DEPCA
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto> as well as
+  <file:drivers/net/depca.c>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called
+  depca.o.
+
+CONFIG_EWRK3
+  This driver supports the DE203, DE204 and DE205 network (Ethernet)
+  cards. If this is for you, say Y and read
+  <file:Documentation/networking/ewrk3.txt> in the kernel source as
+  well as the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called ewrk3.o.
+
+CONFIG_SEEQ8005
+  This is a driver for the SEEQ 8005 network (Ethernet) card.  If this
+  is for you, read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called ewrk3.o.
+
+CONFIG_AT1700
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called at1700.o.
+
+CONFIG_FMV18X
+  If you have a Fujitsu FMV-181/182/183/184 network (Ethernet) card,
+  say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you use an FMV-183 or FMV-184 and it is not working, you may need
+  to disable Plug & Play mode of the card.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called fmv18x.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EEXPRESS_PRO
+  If you have a network (Ethernet) card of this type, say Y. This
+  driver supports intel i82595{FX,TX} based boards. Note however
+  that the EtherExpress PRO/100 Ethernet card has its own separate
+  driver.  Please read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eepro.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EEXPRESS
+  If you have an EtherExpress16 network (Ethernet) card, say Y and
+  read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Note that the Intel
+  EtherExpress16 card used to be regarded as a very poor choice
+  because the driver was very unreliable. We now have a new driver
+  that should do better.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called eexpress.o.
+
+CONFIG_HAMACHI
+  If you have a Gigabit Ethernet card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called hamachi.o.
+
+CONFIG_HPLAN_PLUS
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called hp-plus.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_HPLAN
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called hp.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_HP100
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called hp100.o.
+
+CONFIG_NE2000
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Many Ethernet cards
+  without a specific driver are compatible with NE2000.
+
+  If you have a PCI NE2000 card however, say N here and Y to "PCI
+  NE2000 support", above. If you have a NE2000 card and are running on
+  an MCA system (a bus system used on some IBM PS/2 computers and
+  laptops), say N here and Y to "NE/2 (ne2000 MCA version) support",
+  below.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ne.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NATSEMI
+  This driver is for the National Semiconductor DP83810 series,
+  which is used in cards from PureData, NetGear, Linksys
+  and others, including the 83815 chip.
+  More specific information and updates are available from
+  <http://www.scyld.com/network/natsemi.html>.
+
+CONFIG_SK_G16
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_NE2_MCA
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ne2.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_SKMC
+  These are Micro Channel Ethernet adapters. You need to say Y to "MCA
+  support" in order to use this driver.  Supported cards are the SKnet
+  Junior MC2 and the SKnet MC2(+).  The driver automatically
+  distinguishes between the two cards. Note that using multiple boards
+  of different type hasn't been tested with this driver.  Say Y if you
+  have one of these Ethernet adapters.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called sk_mca.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_IBMLANA
+  This is a Micro Channel Ethernet adapter.  You need to set
+  CONFIG_MCA to use this driver.  It is both available as an in-kernel
+  driver and as a module ( = code which can be inserted in and removed
+  from the running kernel whenever you want).  If you want to compile
+  it as a module, say M here and read <file:Documentation/modules.txt>
+  as well as <file:Documentation/networking/net-modules.txt>. The only
+  currently supported card is the IBM LAN Adapter/A for Ethernet.  It
+  will both support 16K and 32K memory windows, however a 32K window
+  gives a better security against packet losses.  Usage of multiple
+  boards with this driver should be possible, but has not been tested
+  up to now due to lack of hardware.
+
+CONFIG_NET_PCI
+  This is another class of network cards which attach directly to the
+  bus. If you have one of those, say Y and read the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about this class of network cards. If you say Y, you
+  will be asked for your specific card in the following questions. If
+  you are unsure, say Y.
+
+CONFIG_PCNET32
+  If you have a PCnet32 or PCnetPCI based network (Ethernet) card,
+  answer Y here and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pcnet32.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_AC3200
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ac3200.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_LNE390
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called lne390.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_NE3210
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Note that this driver
+  will NOT WORK for NE3200 cards as they are completely different.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ne3210.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_APRICOT
+  If you have a network (Ethernet) controller of this type, say Y and
+  read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called apricot.o.
+
+CONFIG_DE4X5
+  This is support for the DIGITAL series of PCI/EISA Ethernet cards.
+  These include the DE425, DE434, DE435, DE450 and DE500 models.  If
+  you have a network card of this type, say Y and read the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. More specific
+  information is contained in
+  <file:Documentation/networking/de4x5.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called de4x5.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_TULIP
+  This driver is developed for the SMC EtherPower series Ethernet
+  cards and also works with cards based on the DECchip 
+  21040/21041/21140 (Tulip series) chips.  Some LinkSys PCI cards are
+  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
+  (smc9332dst), you can also try the driver for "Generic DECchip"
+  cards, above.  However, most people with a network card of this type
+  will say Y here.) Do read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+  information is contained in 
+  <file:Documentation/networking/tulip.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tulip.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_DGRS
+  This is support for the Digi International RightSwitch series of
+  PCI/EISA Ethernet switch cards. These include the SE-4 and the SE-6
+  models.  If you have a network card of this type, say Y and read the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+  information is contained in <file:Documentation/networking/dgrs.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dgrs.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EEPRO100
+  If you have an Intel EtherExpress PRO/100 PCI network (Ethernet)
+  card, say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eepro100.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_FEALNX
+  Say Y here to support the Mysom MTD-800 family of PCI-based Ethernet
+  cards. Specifications and data at
+  <http://www.myson.com.hk/mtd/datasheet/>.
+
+CONFIG_ETH16I
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eth16i.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_TLAN
+  If you have a PCI Ethernet network card based on the ThunderLAN chip
+  which is supported by this driver, say Y and read the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Devices currently supported by this driver are Compaq Netelligent,
+  Compaq NetFlex and Olicom cards.  Please read the file
+  <file:Documentation/networking/tlan.txt> for more details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tlan.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+  Please email feedback to  torben.mathiasen@compaq.com.
+
+CONFIG_VIA_RHINE
+  If you have a VIA "rhine" based network card (Rhine-I (3043) or
+  Rhine-2 (VT86c100A)), say Y here.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called via-rhine.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_DM9102
+  This driver is for DM9102(A)/DM9132/DM9801 compatible PCI cards from
+  Davicom (<http://www.davicom.com.tw/>).  If you have such a network
+  (Ethernet) card, say Y.  Some information is contained in the file
+  <file:Documentation/networking/dmfe.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dmfe.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ES3210
+  If you have a network (Ethernet) card of this type, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called es3210.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_EPIC100
+  This driver is for the SMC EtherPower II 9432 PCI Ethernet NIC,
+  which is based on the SMC83c17x (EPIC/100).
+  More specific information and updates are available from
+  <http://www.scyld.com/network/epic100.html>.
+
+CONFIG_DECLANCE
+  This driver is for the series of Ethernet controllers produced by
+  DEC (now Compaq) based on the AMD Lance chipset, including the
+  DEPCA series.  (This chipset is better known via the NE2100 cards.)
+
+CONFIG_SGISEEQ
+  Say Y here if you have an Seeq based Ethernet network card. This is
+  used in many Silicon Graphics machines.
+
+CONFIG_SUNDANCE
+  This driver is for the Sundance "Alta" chip.
+  More specific information and updates are available from
+  <http://www.scyld.com/network/sundance.html>.
+
+CONFIG_WINBOND_840
+  This driver is for the Winbond W89c840 chip.  It also works with
+  the TX9882 chip on the Compex RL100-ATX board.
+  More specific information and updates are available from
+  <http://www.scyld.com/network/drivers.html>.
+
+CONFIG_ZNET
+  The Zenith Z-Note notebook computer has a built-in network
+  (Ethernet) card, and this is the Linux driver for it. Note that the
+  IBM Thinkpad 300 is compatible with the Z-Note and is also supported
+  by this driver. Read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_LAN_SAA9730
+  The SAA9730 is a combined multimedia and peripheral controller used
+  in thin clients, Internet access terminals, and diskless
+  workstations.
+  See <http://www.semiconductors.philips.com/pip/SAA9730_flyer_1>.
+
+CONFIG_NET_POCKET
+  Cute little network (Ethernet) devices which attach to the parallel
+  port ("pocket adapters"), commonly used with laptops. If you have
+  one of those, say Y and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to plug a network (or some other) card into the PCMCIA
+  (or PC-card) slot of your laptop instead (PCMCIA is the standard for
+  credit card size extension cards used by all modern laptops), you
+  need the pcmcia-cs package (location contained in the file
+  <file:Documentation/Changes>) and you can say N here.
+
+  Laptop users should read the Linux Laptop home page at
+  <http://www.cs.utexas.edu/users/kharker/linux-laptop/>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about this class of network devices. If you say Y, you
+  will be asked for your specific device in the following questions.
+
+CONFIG_ATP
+  This is a network (Ethernet) device which attaches to your parallel
+  port. Read <file:drivers/net/atp.c> as well as the Ethernet-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>, if you
+  want to use this.  If you intend to use this driver, you should have
+  said N to the "Parallel printer support", because the two drivers
+  don't like each other.
+
+  If you want to compile this driver as a module however ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want), say M here and read
+  <file:Documentation/modules.txt>.  The module will be called atp.o.
+
+CONFIG_DE600
+  This is a network (Ethernet) device which attaches to your parallel
+  port. Read <file:Documentation/networking/DLINK.txt> as well as the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, if you want to use
+  this. It is possible to have several devices share a single parallel
+  port and it is safe to compile the corresponding drivers into the
+  kernel.
+
+  If you want to compile this driver as a module however ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want), say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called de600.o.
+
+CONFIG_DE620
+  This is a network (Ethernet) device which attaches to your parallel
+  port. Read <file:Documentation/networking/DLINK.txt> as well as the
+  Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, if you want to use
+  this. It is possible to have several devices share a single parallel
+  port and it is safe to compile the corresponding drivers into the
+  kernel.
+
+  If you want to compile this driver as a module however ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want), say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called de620.o.
+
+CONFIG_HAPPYMEAL
+  This driver supports the "hme" interface present on most Ultra
+  systems and as an option on older Sbus systems. This driver supports
+  both PCI and Sbus devices. This driver also supports the "qfe" quad
+  100baseT device available in both PCI and Sbus configurations.
+
+  This support is also available as a module called sunhme.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SUNLANCE
+  This driver supports the "le" interface present on all 32-bit Sparc
+  systems, on some older Ultra systems and as an Sbus option.  These
+  cards are based on the AMD Lance chipset, which is better known
+  via the NE2100 cards.
+
+  This support is also available as a module called sunlance.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SUNBMAC
+  This driver supports the "be" interface available as an Sbus option.
+  This is Sun's older 100baseT Ethernet device.
+
+  This support is also available as a module called sunbmac.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SUNQE
+  This driver supports the "qe" 10baseT Ethernet device, available as
+  an Sbus option. Note that this is not the same as Quad FastEthernet
+  "qfe" which is supported by the Happy Meal driver instead.
+
+  This support is also available as a module called sunqe.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SHAPER
+  The traffic shaper is a virtual network device that allows you to
+  limit the rate of outgoing data flow over some other network device.
+  The traffic that you want to slow down can then be routed through
+  these virtual devices. See
+  <file:Documentation/networking/shaper.txt> for more information.
+
+  An alternative to this traffic shaper is the experimental
+  Class-Based Queueing (CBQ) scheduling support which you get if you
+  say Y to "QoS and/or fair queueing" above.
+
+  To set up and configure shaper devices, you need the shapecfg
+  program, available from <ftp://shadow.cabi.net/pub/Linux/> in the
+  shaper package.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called shaper.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  If
+  unsure, say N.
+
+CONFIG_FDDI
+  Fiber Distributed Data Interface is a high speed local area network
+  design; essentially a replacement for high speed Ethernet. FDDI can
+  run over copper or fiber. If you are connected to such a network and
+  want a driver for the FDDI card in your computer, say Y here (and
+  then also Y to the driver for your FDDI card, below). Most people
+  will say N.
+
+CONFIG_DEFXX
+  This is support for the DIGITAL series of EISA (DEFEA) and PCI
+  (DEFPA) controllers which can connect you to a local FDDI network.
+
+CONFIG_SKFP
+  Say Y here if you have a SysKonnect FDDI PCI adapter.
+  The following adapters are supported by this driver:
+  - SK-5521 (SK-NET FDDI-UP)
+  - SK-5522 (SK-NET FDDI-UP DAS)
+  - SK-5541 (SK-NET FDDI-FP)
+  - SK-5543 (SK-NET FDDI-LP)
+  - SK-5544 (SK-NET FDDI-LP DAS)
+  - SK-5821 (SK-NET FDDI-UP64)
+  - SK-5822 (SK-NET FDDI-UP64 DAS)
+  - SK-5841 (SK-NET FDDI-FP64)
+  - SK-5843 (SK-NET FDDI-LP64)
+  - SK-5844 (SK-NET FDDI-LP64 DAS)
+  - Netelligent 100 FDDI DAS Fibre SC
+  - Netelligent 100 FDDI SAS Fibre SC
+  - Netelligent 100 FDDI DAS UTP
+  - Netelligent 100 FDDI SAS UTP
+  - Netelligent 100 FDDI SAS Fibre MIC
+
+  Read <file:Documentation/networking/skfp.txt> for information about
+  the driver.
+
+  Questions concerning this driver can be addressed to:
+    linux@syskonnect.de
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called skfp.o.
+
+CONFIG_HIPPI
+  HIgh Performance Parallel Interface (HIPPI) is a 800Mbit/sec and
+  1600Mbit/sec dual-simplex switched or point-to-point network. HIPPI
+  can run over copper (25m) or fiber (300m on multi-mode or 10km on
+  single-mode). HIPPI networks are commonly used for clusters and to
+  connect to super computers. If you are connected to a HIPPI network
+  and have a HIPPI network card in your computer that you want to use
+  under Linux, say Y here (you must also remember to enable the driver
+  for your HIPPI card below). Most people will say N here.
+
+CONFIG_ROADRUNNER
+  Say Y here if this is your PCI HIPPI network card.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called rrunner.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  If
+  unsure, say N.
+
+CONFIG_ROADRUNNER_LARGE_RINGS
+  If you say Y here, the RoadRunner driver will preallocate up to 2 MB
+  of additional memory to allow for fastest operation, both for
+  transmitting and receiving. This memory cannot be used by any other
+  kernel code or by user space programs. Say Y here only if you have
+  the memory.
+
+CONFIG_ARM_AM79C961A
+  If you wish to compile a kernel for the EBSA-110, then you should
+  always answer Y to this.
+
+CONFIG_ARIADNE
+  If you have a Village Tronic Ariadne Ethernet adapter, say Y.
+  Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). The module is called ariadne.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_A2065
+  If you have a Commodore A2065 Ethernet adapter, say Y. Otherwise,
+  say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). The module is called a2065.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_HYDRA
+  If you have a Hydra Ethernet adapter, say Y. Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). The module is called hydra.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_MACE
+  Power Macintoshes and clones with Ethernet built-in on the
+  motherboard will usually use a MACE (Medium Access Control for
+  Ethernet) interface. Say Y to include support for the MACE chip.
+
+  This driver is also available as a module called mace.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_MACE_AAUI_PORT
+  Some Apple machines (notably the Apple Network Server) which use the
+  MACE ethernet chip have an Apple AUI port (small 15-pin connector),
+  instead of an 8-pin RJ45 connector for twisted-pair ethernet.  Say
+  Y here if you have such a machine.  If unsure, say N.
+  The driver will default to AAUI on ANS anyway, and if you use it as
+  a module, you can provide the port_aaui=0|1 to force the driver.
+
+CONFIG_BMAC
+  Say Y for support of BMAC Ethernet interfaces. These are used on G3
+  computers.
+
+  This driver is also available as a module called bmac.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_GMAC
+  Say Y for support of GMAC Ethernet interfaces. These are used on G4
+  and iBook computers.
+
+  This driver is also available as a module called gmac.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_OAKNET
+  Say Y if your machine has this type of Ethernet network card.
+
+  This driver is also available as a module called oaknet.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NS83820
+  This is a driver for the National Semiconductor DP83820 series
+  of gigabit ethernet MACs.  Cards using this chipset include
+  the D-Link DGE-500T, PureData's PDP8023Z-TG, SMC's SMC9462TX,
+  SOHO-GA2000T, SOHO-GA2500T.  The driver supports the use of
+  zero copy.
+

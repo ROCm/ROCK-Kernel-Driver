@@ -1,0 +1,24 @@
+CONFIG_FEC_ENET
+  Enable Ethernet support via the Fast Ethernet Controller (FCC) on
+  the Motorola MPC8260.
+
+CONFIG_FCC1_ENET
+  Use MPC8260 fast Ethernet controller 1 to drive Ethernet (default).
+
+CONFIG_FCC2_ENET
+  Use MPC8260 fast Ethernet controller 2 to drive Ethernet.
+
+CONFIG_FCC3_ENET
+  Use MPC8260 fast Ethernet controller 3 to drive Ethernet.
+
+CONFIG_SCC_ENET
+  Enable Ethernet support via the Motorola MPC8xx serial
+  commmunications controller.
+
+CONFIG_SCC1_ENET
+  Use MPC8xx serial communications controller 1 to drive Ethernet
+  (default).
+
+CONFIG_SCC2_ENET
+  Use MPC8xx serial communications controller 2 to drive Ethernet.
+

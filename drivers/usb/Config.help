@@ -1,0 +1,600 @@
+CONFIG_USB
+  Universal Serial Bus (USB) is a specification for a serial bus
+  subsystem which offers higher speeds and more features than the
+  traditional PC serial port.  The bus supplies power to peripherals
+  and allows for hot swapping.  Up to 127 USB peripherals can be
+  connected to a single USB port in a tree structure.  The USB port is
+  the root of the tree, the peripherals are the leaves and the inner
+  nodes are special USB devices called hubs.  Many newer PC's have USB
+  ports and newer peripherals such as scanners, keyboards, mice,
+  modems, and printers support the USB protocol and can be connected
+  to the PC via those ports.
+
+  Say Y here if your computer has a USB port and you want to use USB
+  devices.  You then need to say Y to at least one of "UHCI support"
+  or "OHCI support" below (the type of interface that the USB hardware
+  in your computer provides to the operating system) and then choose
+  from among the drivers for USB peripherals.  You may want to check
+  out the information provided in <file:Documentation/usb/> and
+  especially the links given in <file:Documentation/usb/usb-help.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbcore.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_DEBUG
+  Say Y here if you want the USB core & hub drivers to produce a bunch
+  of debug messages to the system log. Select this if you are having a
+  problem with USB support and want to see more of what is going on.
+
+CONFIG_USB_LONG_TIMEOUT
+  This option makes the standard time out a bit longer.  Basically,
+  some devices are just slow to respond, so this makes usb more
+  patient.  There should be no harm in selecting this, but it is
+  needed for some MGE Ellipse UPSes.
+
+  If you have an MGE Ellipse UPS, or you see timeouts in HID
+  transactions, say Y; otherwise say N.
+
+CONFIG_USB_UHCI
+  The Universal Host Controller Interface is a standard by Intel for
+  accessing the USB hardware in the PC (which is also called the USB
+  host controller). If your USB host controller conforms to this
+  standard, you may want to say Y, but see below. All recent boards
+  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
+  i810, i820) conform to this standard. Also all VIA PCI chipsets
+  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
+  133).
+
+  Currently there exist two drivers for UHCI host controllers: this
+  one and the so-called JE driver, which you can get from
+  "UHCI alternate (JE) support", below. You need only one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-uhci.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_UHCI_ALT
+  The Universal Host Controller Interface is a standard by Intel for
+  accessing the USB hardware in the PC (which is also called the USB
+  host controller). If your USB host controller conforms to this
+  standard, you may want to say Y, but see below. All recent boards
+  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
+  i810, i820) conform to this standard. Also all VIA PCI chipsets
+  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
+  133). If unsure, say Y.
+
+  Currently there exist two drivers for UHCI host controllers: this
+  so-called JE driver, and the one you get from "UHCI support", above.
+  You need only one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called uhci.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_OHCI
+  The Open Host Controller Interface is a standard by
+  Compaq/Microsoft/National for accessing the USB PC hardware (also
+  called USB host controller). If your USB host controller conforms to
+  this standard, say Y. The USB host controllers on most non-Intel
+  architectures and on several x86 compatibles with non-Intel chipsets
+  -- like SiS (aktual 610, 610 and so on) or ALi (ALi IV, ALi V,
+  Aladdin Pro..) -- conform to this standard.
+
+  You may want to read <file:Documentation/usb/ohci.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-ohci.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_HID
+  Say Y here if you want full HID support to connect keyboards,
+  mice, joysticks, graphic tablets, or any other HID based devices
+  to your computer via USB. You can't use this driver and the
+  HIDBP (Boot Protocol) keyboard and mouse drivers at the same time.
+  More information is available: <file:Documentation/input/input.txt>.
+
+  If unsure, say Y.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called hid.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_HIDDEV
+  Say Y here if you want to support HID devices (from the USB
+  specification standpoint) that aren't strictly user interface
+  devices, like monitor controls and Uninterruptable Power Supplies.
+
+  This module supports these devices separately using a separate
+  event interface on /dev/usb/hiddevX (char 180:96 to 180:111).
+  This driver requires CONFIG_USB_HID.
+
+  If unsure, say N.
+
+CONFIG_USB_KBD
+  Say Y here if you don't want to use the generic HID driver for your
+  USB keyboard and prefer to use the keyboard in its limited Boot
+  Protocol mode instead. This driver is much smaller than the HID one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_USB_MOUSE
+  Say Y here if you don't want to use the generic HID driver for your
+  USB mouse and prefer to use the mouse in its limited Boot Protocol
+  mode instead. This driver is much smaller than the HID one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbmouse.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_USB_WACOM
+  Say Y here if you want to use the USB version of the Wacom Intuos
+  or Graphire tablet.  Make sure to say Y to "Mouse support"
+  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
+  (CONFIG_INPUT_EVDEV) as well.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called wacom.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SCANNER
+  Say Y here if you want to connect a USB scanner to your computer's
+  USB port. Please read <file:Documentation/usb/scanner.txt> and
+  <file:Documentation/usb/scanner-hp-sane.txt> for more information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scanner.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_AUDIO
+  Say Y here if you want to connect USB audio equipment such as
+  speakers to your computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called audio.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_ACM
+  This driver supports USB modems and ISDN adapters which support the
+  Communication Device Class Abstract Control Model interface.
+  Please read <file:Documentation/usb/acm.txt> for details.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called acm.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_PRINTER
+  Say Y here if you want to connect a USB printer to your computer's
+  USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called printer.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_IBMCAM
+  Say Y here if you want to connect a IBM "C-It" camera, also known as
+  "Xirlink PC Camera" to your computer's USB port.  For more
+  information, read <file:Documentation/usb/ibmcam.txt>.
+
+  This driver uses the Video For Linux API.  You must enable
+  (Y or M in config) Video For Linux (under Character Devices)
+  to use this driver.  Information on this API and pointers to
+  "v4l" programs may be found on the WWW at
+  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ibmcam.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>. This
+  camera has several configuration options which can be specified when
+  you load the module.  Read <file:Documentation/usb/ibmcam.txt> to
+  learn more.
+
+CONFIG_USB_OV511
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. See <file:Documentation/usb/ov511.txt> for more
+  information and for a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Character Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ov511.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_CDCETHER
+  This driver supports devices conforming to the Communication Device
+  Class Ethernet Control Model.  This is used in some cable modems.
+  For more details on the specification, get the Communication Device
+  Class specification from <http://www.usb.org/>.
+
+  This driver should work with the following devices:
+        * Ericsson PipeRider (all variants)
+        * Motorola (DM100 and SB4100)
+        * Broadcom Cable Modem (reference design)
+        * Toshiba PCX1100U and possibly other cable modems
+
+  The device creates a network device (ethX, where X depends on what
+  other networking devices you have in use), as for a normal PCI
+  or ISA based ethernet network card.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called CDCEther.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_PWC
+  Say Y or M here if you want to use one of these Philips USB webcams:
+  PCA645, PCA646, PCVC675, PCVC680, PCVC690, PCVC730, PCVC740, or
+  the Askey VC010. The PCA635, PCVC665 and PCVC720 are not supported
+  by this driver and never will be.
+
+  This driver has an optional plugin, which is distributed as a binary
+  module only.  It contains code that allow you to use higher
+  resolutions and framerates but may not be distributed as source.
+  But even without this plugin you can these cams for most
+  applications.
+
+  See <file:Documentation/usb/philips.txt> for more information and
+  installation instructions.
+
+  The built-in microphone is enabled by selecting USB Audio support.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Character Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pwc.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SE401
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. See <file:Documentation/usb/se401.txt> for more
+  information and for a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called se401.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_STV680
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. This includes the Pencam line of cameras.
+  See <file:Documentation/usb/stv680.txt> for more information and for
+  a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called stv680.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_VICAM
+  Say Y here if you have 3com homeconnect camera (vicam).
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called vicam.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_PEGASUS
+  Say Y here if you know you have Pegasus or Pegasus II based adapter.
+  If in doubt then look at linux/drivers/usb/pegasus.h for the complete
+  list of supported devices.
+  If your particular adapter is not in the list and you are _sure_ it
+  is Pegasus or Pegasus II based then send me (pmanolov@lnxw.com) vendor
+  and device IDs.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pegasus.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_KAWETH
+  Say Y here if you want to use one of the following 10Mbps only
+  USB Ethernet adapters based on the KLSI KL5KUSB101B chipset:
+       3Com 3C19250
+       ADS USB-10BT
+       ATEN USB Ethernet
+       ASANTE USB To Ethernet Adapter
+       AOX Endpoints USB Ethernet
+       Correga K.K.
+       D-Link DSB-650C and DU-E10
+       Entrega / Portgear E45
+       I-O DATA USB-ET/T
+       Jaton USB Ethernet Device Adapter
+       Kingston Technology USB Ethernet Adapter
+       Linksys USB10T
+       Mobility USB-Ethernet Adapter
+       NetGear EA-101
+       Peracom Enet and Enet2
+       Portsmith Express Ethernet Adapter
+       Shark Pocket Adapter
+       SMC 2202USB
+       Sony Vaio port extender
+
+  This driver is likely to work with most 10Mbps only USB Ethernet
+  adapters, including some "no brand" devices. It does NOT work on
+  SmartBridges smartNIC or on Belkin F5U111 devices - you should use
+  the CATC NetMate driver for those. If you are not sure which one
+  you need, select both, and the correct one should be selected for
+  you.
+
+  This driver makes the adapter appear as a normal Ethernet interface,
+  typically on eth0, if it is the only ethernet device, or perhaps on
+  eth1, if you have a PCI or ISA ethernet card installed.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called kaweth.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_CATC
+  Say Y if you want to use one of the following 10Mbps USB Ethernet
+  device based on the EL1210A chip. Supported devices are:
+    Belkin F5U111
+    CATC NetMate
+    CATC NetMate II
+    smartBridges smartNIC
+
+  This driver makes the adapter appear as a normal Ethernet interface,
+  typically on eth0, if it is the only ethernet device, or perhaps on
+  eth1, if you have a PCI or ISA ethernet card installed.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called catc.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_DC2XX
+  Say Y here if you want to connect this type of still camera to your
+  computer's USB port.  See <file:Documentation/usb/dc2xx.txt> for
+  more information; some non-Kodak cameras may also work with this
+  driver, given application support (such as <http://www.gphoto.org/>).
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dc2xx.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_MDC800
+  Say Y here if you want to connect this type of still camera to
+  your computer's USB port. This driver can be used with gphoto 0.4.3
+  and higher (look at <http://www.gphoto.org/>).
+  To use it create a device node with "mknod /dev/mustek c 180 32" and
+  configure it in your software.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mdc800.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_STORAGE
+  Say Y here if you want to connect USB mass storage devices to your
+  computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-storage.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_STORAGE_DEBUG
+  Say Y here in order to have the USB Mass Storage code generate
+  verbose debugging messages.
+
+CONFIG_USB_STORAGE_ISD200
+  Say Y here if you want to use USB Mass Store devices based
+  on the In-Systems Design ISD-200 USB/ATA bridge.
+
+  Some of the products that use this chip are:
+
+    - Archos Jukebox 6000
+    - ISD SmartCable for Storage
+    - Taiwan Skymaster CD530U/DEL-0241 IDE bridge
+    - Sony CRX10U CD-R/RW drive
+    - CyQ've CQ8060A CDRW drive
+    - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
+
+CONFIG_USB_USS720
+  This driver is for USB parallel port adapters that use the Lucent
+  Technologies USS-720 chip. These cables are plugged into your USB
+  port and provide USB compatibility to peripherals designed with
+  parallel port interfaces.
+
+  The chip has two modes: automatic mode and manual mode. In automatic
+  mode, it looks to the computer like a standard USB printer. Only
+  printers may be connected to the USS-720 in this mode. The generic
+  USB printer driver ("USB Printer support", above) may be used in
+  that mode, and you can say N here if you want to use the chip only
+  in this mode.
+
+  Manual mode is not limited to printers, any parallel port
+  device should work. This driver utilizes manual mode.
+  Note however that some operations are three orders of magnitude
+  slower than on a PCI/ISA Parallel Port, so timing critical
+  applications might not work.
+
+  Say Y here if you own an USS-720 USB->Parport cable and intend to
+  connect anything other than a printer to it.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called uss720.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_DEVICEFS
+  If you say Y here (and to "/proc file system support" in the "File
+  systems section, above), you will get a file /proc/bus/usb/devices
+  which lists the devices currently connected to your USB bus or
+  busses, a file /proc/bus/usb/drivers which lists the USB kernel
+  client drivers currently loaded, and for every connected device a
+  file named  "/proc/bus/usb/xxx/yyy", where xxx is the bus number and
+  yyy the device number; the latter files can be used by user space
+  programs to talk directly to the device. These files are "virtual",
+  meaning they are generated on the fly and not stored on the hard
+  drive.
+
+  You may need to mount the usbdevfs file system to see the files, use
+   mount -t usbdevfs none /proc/bus/usb
+
+  For the format of the various /proc/bus/usb/ files, please read
+  <file:Documentation/usb/proc_usb_info.txt>.
+
+  Please note that this code is completely unrelated to devfs, the
+  "/dev file system support".
+
+  Most users want to say Y here.
+
+CONFIG_USB_BANDWIDTH
+  If you say Y here, the USB subsystem enforces USB bandwidth
+  allocation and will prevent some device opens from succeeding
+  if they would cause USB bandwidth usage to go above 90% of
+  the bus bandwidth.
+
+  If you say N here, these conditions will cause warning messages
+  about USB bandwidth usage to be logged and some devices or
+  drivers may not work correctly.
+
+CONFIG_USB_DABUSB
+  A Digital Audio Broadcasting (DAB) Receiver for USB and Linux
+  brought to you by the DAB-Team (<http://dab.in.tum.de/>).  This
+  driver can be taken as an example for URB-based bulk, control, and
+  isochronous transactions. URB's are explained in
+  <file:Documentation/usb/URB.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dabusb.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_USBNET
+  This driver supports network links over USB with USB "Network"
+  or "data transfer" cables, often used to network laptops to PCs.
+  Such cables have chips from suppliers such as Belkin/eTEK, GeneSys
+  (GeneLink), NetChip and Prolific. Intelligent USB devices could also
+  use this approach to provide Internet access, using standard USB
+  cabling. You can find these chips also on some motherboards with
+  USB PC2PC support.
+
+  These links will have names like "usb0", "usb1", etc.  They act
+  like two-node Ethernets, so you can use 802.1d Ethernet Bridging
+  (CONFIG_BRIDGE) to simplify your network routing.
+
+  This code is also available as a kernel module (code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbnet.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_STORAGE_FREECOM
+  Support for the Freecom USB to IDE/ATAPI adaptor.
+  Freecom has a web page at <http://www.freecom.de/>.
+
+CONFIG_USB_STORAGE_DPCM
+  Say Y here to support the Microtech ZiO! CompactFlash/SmartMedia
+  reader, details at <http://www.microtechint.com/zio/index.html>.
+  This driver treats the flash card as a removable storage device.
+
+CONFIG_USB_STORAGE_SDDR09
+  Say Y here to include additional code to support the Sandisk SDDR-09
+  SmartMedia reader in the USB Mass Storage driver.
+
+CONFIG_USB_RIO500
+  Say Y here if you want to connect a USB Rio500 mp3 player to your
+  computer's USB port. Please read <file:Documentation/usb/rio.txt>
+  for more information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called rio500.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_AUERSWALD
+  Say Y here if you want to connect an Auerswald USB ISDN Device
+  to your computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called auerswald.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_DSBR
+  Say Y here if you want to connect this type of radio to your
+  computer's USB port. Note that the audio is not digital, and
+  you must connect the line out connector to a sound card or a
+  set of speakers.
+
+  This driver uses the Video For Linux API.  You must enable
+  (Y or M in config) Video For Linux (under Character Devices)
+  to use this driver.  Information on this API and pointers to
+  "v4l" programs may be found on the WWW at
+  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dsbr100.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_MICROTEK
+  Say Y here if you want support for the Microtek X6USB and
+  possibly the Phantom 336CX, Phantom C6 and ScanMaker V6U(S)L.
+  Support for anything but the X6 is experimental.
+  Please report failures and successes.
+  The scanner will appear as a scsi generic device to the rest
+  of the system. Scsi support is required for this driver to compile
+  and work. SANE 1.0.4 or newer is needed to make use of your scanner.
+  This driver can be compiled as a module.
+
+CONFIG_USB_HPUSBSCSI
+  Say Y here if you want support for the HP 53xx series of scanners
+  and the Minolta Scan Dual. This driver is experimental.
+  The scanner will be accessible as a SCSI device.
+
+CONFIG_USB_BLUETOOTH
+  Say Y here if you want to connect a USB Bluetooth device to your
+  computer's USB port. You will need the Bluetooth stack (available
+  at <http://developer.axis.com/software/index.shtml>) to fully use
+  the device.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called bluetooth.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+

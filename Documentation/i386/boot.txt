@@ -2,7 +2,7 @@
 		     ----------------------------
 
 		    H. Peter Anvin <hpa@zytor.com>
-			Last update 2000-10-29
+			Last update 2002-01-01
 
 On the i386 platform, the Linux kernel uses a rather complicated boot
 convention.  This has evolved partially due to historical aspects, as
@@ -25,11 +25,14 @@ Protocol 2.00:	(Kernel 1.3.73) Added bzImage and initrd support, as
 Protocol 2.01:	(Kernel 1.3.76) Added a heap overrun warning.
 
 Protocol 2.02:	(Kernel 2.4.0-test3-pre3) New command line protocol.
-		Lower the conventional memory ceiling.  No overwrite
+		Lower the conventional memory ceiling.	No overwrite
 		of the traditional setup area, thus making booting
 		safe for systems which use the EBDA from SMM or 32-bit
 		BIOS entry points.  zImage deprecated but still
 		supported.
+
+Protocol 2.03:	(Kernel 2.4.18-pre1) Explicitly makes the highest possible
+		initrd address available to the bootloader.
 
 
 **** MEMORY LAYOUT
@@ -45,7 +48,7 @@ zImage kernels, typically looks like:
 098000	+------------------------+	
 	|  Kernel setup		 |	The kernel real-mode code.
 090200	+------------------------+
-	|  Kernel boot sector    |	The kernel legacy boot sector.
+	|  Kernel boot sector	 |	The kernel legacy boot sector.
 090000	+------------------------+
 	|  Protected-mode kernel |	The bulk of the kernel image.
 010000	+------------------------+
@@ -62,16 +65,16 @@ zImage kernels, typically looks like:
 When using bzImage, the protected-mode kernel was relocated to
 0x100000 ("high memory"), and the kernel real-mode block (boot sector,
 setup, and stack/heap) was made relocatable to any address between
-0x10000 and end of low memory.  Unfortunately, in protocols 2.00 and
+0x10000 and end of low memory.	Unfortunately, in protocols 2.00 and
 2.01 the command line is still required to live in the 0x9XXXX memory
 range, and that memory range is still overwritten by the early kernel.
-The 2.02 protocol fixes that.
+The 2.02 protocol resolves that problem.
 
 It is desirable to keep the "memory ceiling" -- the highest point in
 low memory touched by the boot loader -- as low as possible, since
 some newer BIOSes have begun to allocate some rather large amounts of
 memory, called the Extended BIOS Data Area, near the top of low
-memory.  The boot loader should use the "INT 12h" BIOS call to verify
+memory.	 The boot loader should use the "INT 12h" BIOS call to verify
 how much low memory is available.
 
 Unfortunately, if INT 12h reports that the amount of memory is too
@@ -112,7 +115,8 @@ Offset	Proto	Name		Meaning
 0202/4	2.00+	header		Magic signature "HdrS"
 0206/2	2.00+	version		Boot protocol version supported
 0208/4	2.00+	realmode_swtch	Boot loader hook (see below)
-020C/4	2.00+	start_sys	Points to kernel version string
+020C/2	2.00+	start_sys	The load-low segment (0x1000) (obsolete)
+020E/2	2.00+	kernel_version	Pointer to kernel version string
 0210/1	2.00+	type_of_loader	Boot loader identifier
 0211/1	2.00+	loadflags	Boot protocol option flags
 0212/2	2.00+	setup_move_size	Move to high memory size (used with hooks)
@@ -123,6 +127,7 @@ Offset	Proto	Name		Meaning
 0224/2	2.01+	heap_end_ptr	Free memory after setup end
 0226/2	N/A	pad1		Unused
 0228/4	2.02+	cmd_line_ptr	32-bit pointer to the kernel command line
+022C/4	2.03+	initrd_addr_max	Highest legal initrd address
 
 For backwards compatibility, if the setup_sects field contains 0, the
 real value is 4.
@@ -139,6 +144,15 @@ Otherwise, the "version" field contains the protocol version,
 e.g. protocol version 2.01 will contain 0x0201 in this field.  When
 setting fields in the header, you must make sure only to set fields
 supported by the protocol version in use.
+
+The "kernel_version" field, if set to a nonzero value, contains a
+pointer to a null-terminated human-readable kernel version number
+string, less 0x200.  This can be used to display the kernel version to
+the user.  This value should be less than (0x200*setup_sects).  For
+example, if this value is set to 0x1c00, the kernel version number
+string can be found at offset 0x1e00 in the kernel file.  This is a
+valid value if and only if the "setup_sects" field contains the value
+14 or higher.
 
 Most boot loaders will simply load the kernel at its target address
 directly.  Such boot loaders do not need to worry about filling in
@@ -160,6 +174,9 @@ filled out, however:
 	3  SYSLINUX
 	4  EtherBoot
 
+	Please contact <hpa@zytor.com> if you need a bootloader ID
+	value assigned.
+
   loadflags, heap_end_ptr:
 	If the protocol version is 2.01 or higher, enter the
 	offset limit of the setup heap into heap_end_ptr and set the
@@ -180,9 +197,9 @@ filled out, however:
 
 	The initrd should typically be located as high in memory as
 	possible, as it may otherwise get overwritten by the early
-	kernel initialization sequence.  However, it must never be
-	located above address 0x3C000000 if you want all kernels to
-	read it.
+	kernel initialization sequence.	 However, it must never be
+	located above the address specified in the initrd_addr_max
+	field.	The initrd should be at least 4K page aligned.
 
   cmd_line_ptr:
 	If the protocol version is 2.02 or higher, this is a 32-bit
@@ -192,7 +209,15 @@ filled out, however:
 	command line, in which case you can point this to an empty
 	string (or better yet, to the string "auto".)  If this field
 	is left at zero, the kernel will assume that your boot loader
-	does not support the 2.02 protocol.
+	does not support the 2.02+ protocol.
+
+  ramdisk_max:
+	The maximum address that may be occupied by the initrd
+	contents.  For boot protocols 2.02 or earlier, this field is
+	not present, and the maximum address is 0x37FFFFFF.  (This
+	address is defined as the address of the highest safe byte, so
+	if your ramdisk is exactly 131072 bytes long and this field is
+	0x37FFFFFF, you can start your ramdisk at 0x37FE0000.)
 
 
 **** THE KERNEL COMMAND LINE
@@ -254,14 +279,14 @@ Such a boot loader should enter the following fields in the header:
 		if ( protocol >= 0x0202 ) {
 			cmd_line_ptr = base_ptr + 0x9000;
 		} else {
-			cmd_line_magic  = 0xA33F;
+			cmd_line_magic	= 0xA33F;
 			cmd_line_offset = 0x9000;
 			setup_move_size = 0x9100;
 		}
 	} else {
 		/* Very old kernel */
 
-		cmd_line_magic  = 0xA33F;
+		cmd_line_magic	= 0xA33F;
 		cmd_line_offset = 0x9000;
 
 		/* A very old kernel MUST have its real-mode code
@@ -411,4 +436,3 @@ IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
 
 	After completing your hook, you should jump to the address
 	that was in this field before your boot loader overwrote it.
-

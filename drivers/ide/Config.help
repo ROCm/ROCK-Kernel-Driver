@@ -1,0 +1,783 @@
+CONFIG_BLK_DEV_IDE
+  If you say Y here, you will use the full-featured IDE driver to
+  control up to ten ATA/IDE interfaces, each being able to serve a
+  "master" and a "slave" device, for a total of up to twenty ATA/IDE
+  disk/cdrom/tape/floppy drives.
+
+  Useful information about large (>540 MB) IDE disks, multiple
+  interfaces, what to do if ATA/IDE devices are not automatically
+  detected, sound card ATA/IDE ports, module support, and other
+  topics, is contained in <file:Documentation/ide.txt>. For detailed
+  information about hard drives, consult the Disk-HOWTO and the
+  Multi-Disk-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  To fine-tune ATA/IDE drive/interface parameters for improved
+  performance, look for the hdparm package at
+  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/ide.txt>. The module will be called ide-mod.o.
+  Do not compile this driver as a module if your root file system (the
+  one containing the directory /) is located on an IDE device.
+
+  If you have one or more IDE drives, say Y or M here. If your system
+  has no IDE drives, or if memory requirements are really tight, you
+  could say N here, and select the "Old hard disk driver" below
+  instead to save about 13 KB of memory in the kernel.
+
+CONFIG_BLK_DEV_HD_ONLY
+  There are two drivers for MFM/RLL/IDE hard disks. Most people use
+  the newer enhanced driver, but this old one is still around for two
+  reasons. Some older systems have strange timing problems and seem to
+  work only with the old driver (which itself does not work with some
+  newer systems). The other reason is that the old driver is smaller,
+  since it lacks the enhanced functionality of the new one. This makes
+  it a good choice for systems with very tight memory restrictions, or
+  for systems with only older MFM/RLL/ESDI drives. Choosing the old
+  driver can save 13 KB or so of kernel memory.
+
+  If you are unsure, then just choose the Enhanced IDE/MFM/RLL driver
+  instead of this one. For more detailed information, read the
+  Disk-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_BLK_DEV_HD_IDE
+  There are two drivers for MFM/RLL/IDE disks.  Most people use just
+  the new enhanced driver by itself.  This option however installs the
+  old hard disk driver to control the primary IDE/disk interface in
+  the system, leaving the new enhanced IDE driver to take care of only
+  the 2nd/3rd/4th IDE interfaces.  Doing this will prevent you from
+  having an IDE/ATAPI CD-ROM or tape drive connected to the primary
+  IDE interface.  Choosing this option may be useful for older systems
+  which have MFM/RLL/ESDI controller+drives at the primary port
+  address (0x1f0), along with IDE drives at the secondary/3rd/4th port
+  addresses.
+
+  Normally, just say N here; you will then use the new driver for all
+  4 interfaces.
+
+CONFIG_BLK_DEV_IDEDISK
+  This will include enhanced support for MFM/RLL/IDE hard disks.  If
+  you have a MFM/RLL/IDE disk, and there is no special reason to use
+  the old hard disk driver instead, say Y.  If you have an SCSI-only
+  system, you can say N here.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-disk.o.  Do not compile this driver as a module
+  if your root file system (the one containing the directory /) is
+  located on the IDE disk. If unsure, say Y.
+
+CONFIG_IDEDISK_MULTI_MODE
+  If you get this error, try to say Y here:
+
+  hda: set_multmode: status=0x51 { DriveReady SeekComplete Error }
+  hda: set_multmode: error=0x04 { DriveStatusError }
+
+  If in doubt, say N.
+
+CONFIG_BLK_DEV_IDECS
+  Support for outboard IDE disks, tape drives, and CD-ROM drives
+  connected through a  PCMCIA card.
+
+CONFIG_BLK_DEV_IDECD
+  If you have a CD-ROM drive using the ATAPI protocol, say Y. ATAPI is
+  a newer protocol used by IDE CD-ROM and TAPE drives, similar to the
+  SCSI protocol. Most new CD-ROM drives use ATAPI, including the
+  NEC-260, Mitsumi FX400, Sony 55E, and just about all non-SCSI
+  double(2X) or better speed drives.
+
+  If you say Y here, the CD-ROM drive will be identified at boot time
+  along with other IDE devices, as "hdb" or "hdc", or something
+  similar (check the boot messages with dmesg). If this is your only
+  CD-ROM drive, you can say N to all other CD-ROM options, but be sure
+  to say Y or M to "ISO 9660 CD-ROM file system support".
+
+  Note that older versions of LILO (LInux LOader) cannot properly deal
+  with IDE/ATAPI CD-ROMs, so install LILO 16 or higher, available from
+  <ftp://brun.dyndns.org/pub/linux/lilo/>.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-cd.o.
+
+CONFIG_BLK_DEV_IDETAPE
+  If you have an IDE tape drive using the ATAPI protocol, say Y.
+  ATAPI is a newer protocol used by IDE tape and CD-ROM drives,
+  similar to the SCSI protocol.  If you have an SCSI tape drive
+  however, you can say N here.
+
+  You should also say Y if you have an OnStream DI-30 tape drive; this
+  will not work with the SCSI protocol, until there is support for the
+  SC-30 and SC-50 versions.
+
+  If you say Y here, the tape drive will be identified at boot time
+  along with other IDE devices, as "hdb" or "hdc", or something
+  similar, and will be mapped to a character device such as "ht0"
+  (check the boot messages with dmesg).  Be sure to consult the
+  <file:drivers/ide/ide-tape.c> and <file:Documentation/ide.txt> files
+  for usage information.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-tape.o.
+
+CONFIG_BLK_DEV_IDEFLOPPY
+  If you have an IDE floppy drive which uses the ATAPI protocol,
+  answer Y.  ATAPI is a newer protocol used by IDE CD-ROM/tape/floppy
+  drives, similar to the SCSI protocol.
+
+  The LS-120 and the IDE/ATAPI Iomega ZIP drive are also supported by
+  this driver. For information about jumper settings and the question
+  of when a ZIP drive uses a partition table, see
+  <http://www.win.tue.nl/~aeb/linux/zip/zip-1.html>.
+  (ATAPI PD-CD/CDR drives are not supported by this driver; support
+  for PD-CD/CDR drives is available if you answer Y to
+  "SCSI emulation support", below).
+
+  If you say Y here, the FLOPPY drive will be identified along with
+  other IDE devices, as "hdb" or "hdc", or something similar (check
+  the boot messages with dmesg).
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-floppy.o.
+
+CONFIG_BLK_DEV_IDESCSI
+  This will provide SCSI host adapter emulation for IDE ATAPI devices,
+  and will allow you to use a SCSI device driver instead of a native
+  ATAPI driver.
+
+  This is useful if you have an ATAPI device for which no native
+  driver has been written (for example, an ATAPI PD-CD or CDR drive);
+  you can then use this emulation together with an appropriate SCSI
+  device driver. In order to do this, say Y here and to "SCSI support"
+  and "SCSI generic support", below. You must then provide the kernel
+  command line "hdx=scsi" (try "man bootparam" or see the
+  documentation of your boot loader (lilo or loadlin) about how to
+  pass options to the kernel at boot time) for devices if you want the
+  native EIDE sub-drivers to skip over the native support, so that
+  this SCSI emulation can be used instead. This is required for use of
+  CD-RW's.
+
+  Note that this option does NOT allow you to attach SCSI devices to a
+  box that doesn't have a SCSI host adapter installed.
+
+  If both this SCSI emulation and native ATAPI support are compiled
+  into the kernel, the native support will be used.
+
+CONFIG_BLK_DEV_ISAPNP
+  If you have an ISA EIDE card that is PnP (Plug and Play) and
+  requires setup first before scanning for devices, say Y here.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_CMD640
+  The CMD-Technologies CMD640 IDE chip is used on many common 486 and
+  Pentium motherboards, usually in combination with a "Neptune" or
+  "SiS" chipset. Unfortunately, it has a number of rather nasty
+  design flaws that can cause severe data corruption under many common
+  conditions. Say Y here to include code which tries to automatically
+  detect and correct the problems under Linux. This option also
+  enables access to the secondary IDE ports in some CMD640 based
+  systems.
+
+  This driver will work automatically in PCI based systems (most new
+  systems have PCI slots). But if your system uses VESA local bus
+  (VLB) instead of PCI, you must also supply a kernel boot parameter
+  to enable the CMD640 bugfix/support: "ide0=cmd640_vlb". (Try "man
+  bootparam" or see the documentation of your boot loader about how to
+  pass options to the kernel.)
+
+  The CMD640 chip is also used on add-in cards by Acculogic, and on
+  the "CSA-6400E PCI to IDE controller" that some people have. For
+  details, read <file:Documentation/ide.txt>.
+
+CONFIG_BLK_DEV_CMD640_ENHANCED
+  This option includes support for setting/autotuning PIO modes and
+  prefetch on CMD640 IDE interfaces.  For details, read
+  <file:Documentation/ide.txt>. If you have a CMD640 IDE interface
+  and your BIOS does not already do this for you, then say Y here.
+  Otherwise say N.
+
+CONFIG_BLK_DEV_RZ1000
+  The PC-Technologies RZ1000 IDE chip is used on many common 486 and
+  Pentium motherboards, usually along with the "Neptune" chipset.
+  Unfortunately, it has a rather nasty design flaw that can cause
+  severe data corruption under many conditions. Say Y here to include
+  code which automatically detects and corrects the problem under
+  Linux. This may slow disk throughput by a few percent, but at least
+  things will operate 100% reliably.
+
+CONFIG_BLK_DEV_IDEPCI
+  Say Y here for PCI systems which use IDE drive(s).
+  This option helps the IDE driver to automatically detect and
+  configure all PCI-based IDE interfaces in your system.
+
+CONFIG_IDEPCI_SHARE_IRQ
+  Some ATA/IDE chipsets have hardware support which allows for
+  sharing a single IRQ with other cards. To enable support for
+  this in the ATA/IDE driver, say Y here.
+
+  It is safe to say Y to this question, in most cases.
+  If unsure, say N.
+
+CONFIG_BLK_DEV_IDEDMA_PCI
+  If your PCI system uses IDE drive(s) (as opposed to SCSI, say) and
+  is capable of bus-master DMA operation (most Pentium PCI systems),
+  you will want to say Y here to reduce CPU overhead. You can then use
+  the "hdparm" utility to enable DMA for drives for which it was not
+  enabled automatically. By default, DMA is not enabled automatically
+  for these drives, but you can change that by saying Y to the
+  following question "Use DMA by default when available". You can get
+  the latest version of the hdparm utility from
+  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
+
+  Read the comments at the beginning of <file:drivers/ide/ide-dma.c>
+  and the file <file:Documentation/ide.txt> for more information.
+
+  It is safe to say Y to this question.
+
+CONFIG_IDEDMA_NEW_DRIVE_LISTINGS
+  If you say Y here, the model and firmware revision of your drive
+  will be compared against a blacklist of buggy drives that claim to
+  be (U)DMA capable but aren't. This is a blanket on/off test with no
+  speed limit options.
+
+  Straight GNU GCC 2.7.3/2.8.X compilers are known to be safe;
+  whereas, many versions of EGCS have a problem and miscompile if you
+  say Y here.
+
+  If in doubt, say N.
+
+CONFIG_BLK_DEV_IDEDMA_TIMEOUT
+  If you say Y here, this is a NASTY UGLY HACK!
+
+  We have to issue an abort and requeue the request DMA engine got
+  turned off by a goofy ASIC, and we have to clean up the mess, and
+  here is as good as any.  Do it globally for all chipsets.
+
+  If in doubt, say N.
+
+CONFIG_BLK_DEV_OFFBOARD
+  Normally, IDE controllers built into the motherboard (on-board
+  controllers) are assigned to ide0 and ide1 while those on add-in PCI
+  cards (off-board controllers) are relegated to ide2 and ide3.
+  Answering Y here will allow you to reverse the situation, with
+  off-board controllers on ide0/1 and on-board controllers on ide2/3.
+  This can improve the usability of some boot managers such as lilo
+  when booting from a drive on an off-board controller.
+
+  If you say Y here, and you actually want to reverse the device scan
+  order as explained above, you also need to issue the kernel command
+  line option "ide=reverse". (Try "man bootparam" or see the
+  documentation of your boot loader (lilo or loadlin) about how to
+  pass options to the kernel at boot time.)
+
+  Note that, if you do this, the order of the hd* devices will be
+  rearranged which may require modification of fstab and other files.
+
+  If in doubt, say N.
+
+CONFIG_IDEDMA_PCI_AUTO
+  Prior to kernel version 2.1.112, Linux used to automatically use
+  DMA for IDE drives and chipsets which support it. Due to concerns
+  about a couple of cases where buggy hardware may have caused damage,
+  the default is now to NOT use DMA automatically. To revert to the
+  previous behaviour, say Y to this question.
+
+  If you suspect your hardware is at all flakey, say N here.
+  Do NOT email the IDE kernel people regarding this issue!
+
+  It is normally safe to answer Y to this question unless your
+  motherboard uses a VIA VP2 chipset, in which case you should say N.
+
+CONFIG_IDEDMA_IVB
+  There are unclear terms is ATA-4 and ATA-5 standards how certain
+  hardware (an 80c ribbon) should be detected. Different interpretations
+  of the standards have been released in hardware. This causes problems:
+  for example, a host with Ultra Mode 4 (or higher) will not run
+  in that mode with an 80c ribbon.
+
+  If you are experiencing compatibility or performance problems, you
+  MAY try to answering Y here. However, it does not necessarily solve
+  any of your problems, it could even cause more of them.
+
+  It is normally safe to answer Y; however, the default is N.
+
+CONFIG_IDEDMA_PCI_WIP
+  If you enable this you will be able to use and test highly
+  developmental projects. If you say N, the configurator will
+  simply skip those options.
+
+  It is SAFEST to say N to this question.
+
+CONFIG_BLK_DEV_ADMA
+  Please read the comments at the top of
+  <file:drivers/ide/ide-adma.c>.
+
+CONFIG_BLK_DEV_PDC_ADMA
+  Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
+
+CONFIG_BLK_DEV_AEC62XX
+  This driver adds up to 4 more EIDE devices sharing a single
+  interrupt. This add-on card is a bootable PCI UDMA controller. In
+  order to get this card to initialize correctly in some cases, you
+  should say Y here, and preferably also to "Use DMA by default when
+  available".
+
+  The ATP850U/UF is an UltraDMA 33 chipset base.
+  The ATP860 is an UltraDMA 66 chipset base.
+  The ATP860M(acintosh) version is an UltraDMA 66 chipset base.
+
+  Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
+  If you say Y here, then say Y to "Use DMA by default when available"
+  as well.
+
+CONFIG_AEC62XX_TUNING
+  Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
+  If unsure, say N.
+
+CONFIG_BLK_DEV_ALI15X3
+  This driver ensures (U)DMA support for ALI 1533, 1543 and 1543C
+  onboard chipsets.  It also tests for Simplex mode and enables
+  normal dual channel support.
+
+  If you say Y here, you also need to say Y to "Use DMA by default
+  when available", above.  Please read the comments at the top of
+  <file:drivers/ide/alim15x3.c>.
+
+  If unsure, say N.
+
+CONFIG_WDC_ALI15X3
+  This allows for UltraDMA support for WDC drives that ignore CRC
+  checking. You are a fool for enabling this option, but there have
+  been requests. DO NOT COMPLAIN IF YOUR DRIVE HAS FS CORRUPTION, IF
+  YOU ENABLE THIS! No one will listen, just laugh for ignoring this
+  SERIOUS WARNING.
+
+  Using this option can allow WDC drives to run at ATA-4/5 transfer
+  rates with only an ATA-2 support structure.
+
+  SAY N!
+
+CONFIG_BLK_DEV_AMD74XX
+  This driver ensures (U)DMA support for the AMD756/760 Viper
+  chipsets.
+
+  If you say Y here, you also need to say Y to "Use DMA by default
+  when available", above.
+  Please read the comments at the top of <file:drivers/ide/amd74xx.c>.
+
+  If unsure, say N.
+
+CONFIG_AMD74XX_OVERRIDE
+  This option auto-forces the ata66 flag.
+  This effect can be also invoked by calling "idex=ata66"
+  If unsure, say N.
+
+CONFIG_BLK_DEV_CMD64X
+  Say Y here if you have an IDE controller which uses any of these
+  chipsets: CMD643, CMD646, or CMD648.
+
+CONFIG_BLK_DEV_CY82C693
+  This driver adds detection and support for the CY82C693 chipset
+  used on Digital's PC-Alpha 164SX boards.
+
+  If you say Y here, you need to say Y to "Use DMA by default
+  when available" as well.
+
+CONFIG_BLK_DEV_CS5530
+  Include support for UDMA on the Cyrix MediaGX 5530 chipset. This
+  will automatically be detected and configured if found.
+
+  It is safe to say Y to this question.
+
+  People with SCSI-only systems should say N here. If unsure, say Y.
+
+CONFIG_BLK_DEV_HPT34X
+  This driver adds up to 4 more EIDE devices sharing a single
+  interrupt. The HPT343 chipset in its current form is a non-bootable
+  controller; the HPT345/HPT363 chipset is a bootable (needs BIOS FIX)
+  PCI UDMA controllers. This driver requires dynamic tuning of the
+  chipset during the ide-probe at boot time. It is reported to support
+  DVD II drives, by the manufacturer.
+
+CONFIG_HPT34X_AUTODMA
+  This is a dangerous thing to attempt currently! Please read the
+  comments at the top of <file:drivers/ide/hpt34x.c>.  If you say Y
+  here, then say Y to "Use DMA by default when available" as well.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_HPT366
+  HPT366 is an Ultra DMA chipset for ATA-66.
+  HPT368 is an Ultra DMA chipset for ATA-66 RAID Based.
+  HPT370 is an Ultra DMA chipset for ATA-100.
+
+  This driver adds up to 4 more EIDE devices sharing a single
+  interrupt.
+
+  The HPT366 chipset in its current form is bootable. One solution
+  for this problem are special LILO commands for redirecting the
+  reference to device 0x80. The other solution is to say Y to "Boot
+  off-board chipsets first support" (CONFIG_BLK_DEV_OFFBOARD) unless
+  your mother board has the chipset natively mounted. Regardless one
+  should use the fore mentioned option and call at LILO or include
+  "ide=reverse" in LILO's append-line.
+
+  This driver requires dynamic tuning of the chipset during the
+  ide-probe at boot. It is reported to support DVD II drives, by the
+  manufacturer.
+
+CONFIG_BLK_DEV_NS87415
+  This driver adds detection and support for the NS87415 chip
+  (used in SPARC64, among others).
+
+  Please read the comments at the top of <file:drivers/ide/ns87415.c>.
+
+CONFIG_BLK_DEV_OPTI621
+  This is a driver for the OPTi 82C621 EIDE controller.
+  Please read the comments at the top of <file:drivers/ide/opti621.c>.
+
+CONFIG_BLK_DEV_SVWKS
+  This driver adds PIO/(U)DMA support for the ServerWorks OSB4/CSB5
+  chipsets.
+
+CONFIG_BLK_DEV_PIIX
+  This driver adds PIO mode setting and tuning for all PIIX IDE
+  controllers by Intel.  Since the BIOS can sometimes improperly tune
+  PIO 0-4 mode settings, this allows dynamic tuning of the chipset
+  via the standard end-user tool 'hdparm'.
+
+  Please read the comments at the top of <file:drivers/ide/piix.c>.
+
+  If you say Y here, you should also say Y to "PIIXn Tuning support",
+  below.
+
+  If unsure, say N.
+
+CONFIG_PIIX_TUNING
+  This driver extension adds DMA mode setting and tuning for all PIIX
+  IDE controllers by Intel. Since the BIOS can sometimes improperly
+  set up the device/adapter combination and speed limits, it has
+  become a necessity to back/forward speed devices as needed.
+
+  Case 430HX/440FX PIIX3 need speed limits to reduce UDMA to DMA mode
+  2 if the BIOS can not perform this task at initialization.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_PDC202XX
+  Promise Ultra33 or PDC20246
+  Promise Ultra66 or PDC20262
+  Promise Ultra100 or PDC20265/PDC20267/PDC20268
+
+  This driver adds up to 4 more EIDE devices sharing a single
+  interrupt. This add-on card is a bootable PCI UDMA controller. Since
+  multiple cards can be installed and there are BIOS ROM problems that
+  happen if the BIOS revisions of all installed cards (three-max) do
+  not match, the driver attempts to do dynamic tuning of the chipset
+  at boot-time for max-speed.  Ultra33 BIOS 1.25 or newer is required
+  for more than one card. This card may require that you say Y to
+  "Special UDMA Feature".
+
+  If you say Y here, you need to say Y to "Use DMA by default when
+  available" as well.
+
+  Please read the comments at the top of
+  <file:drivers/ide/pdc202xx.c>.
+
+  If unsure, say N.
+
+CONFIG_PDC202XX_BURST
+  This option causes the pdc202xx driver to enable UDMA modes on the
+  PDC202xx even when the PDC202xx BIOS has not done so.
+
+  It was originally designed for the PDC20246/Ultra33, whose BIOS will
+  only setup UDMA on the first two PDC20246 cards.  It has also been
+  used succesfully on a PDC20265/Ultra100, allowing use of UDMA modes
+  when the PDC20265 BIOS has been disabled (for faster boot up).
+
+  Please read the comments at the top of
+  <file:drivers/ide/pdc202xx.c>.
+
+  If unsure, say N.
+
+CONFIG_PDC202XX_FORCE
+  For FastTrak enable overriding BIOS.
+
+CONFIG_BLK_DEV_SIS5513
+  This driver ensures (U)DMA support for SIS5513 chipset based
+  mainboards. SiS620/530 UDMA mode 4, SiS5600/5597 UDMA mode 2, all
+  other DMA mode 2 limited chipsets are unsupported to date.
+
+  If you say Y here, you need to say Y to "Use DMA by default when
+  available" as well.
+
+  Please read the comments at the top of <file:drivers/ide/sis5513.c>.
+
+CONFIG_BLK_DEV_SLC90E66
+  This driver ensures (U)DMA support for Victroy66 SouthBridges for
+  SMsC with Intel NorthBridges.  This is an Ultra66 based chipset.
+  The nice thing about it is that you can mix Ultra/DMA/PIO devices
+  and it will handle timing cycles.  Since this is an improved
+  look-a-like to the PIIX4 it should be a nice addition.
+
+  If you say Y here, you need to say Y to "Use DMA by default when
+  available" as well.
+
+  Please read the comments at the top of
+  <file:drivers/ide/slc90e66.c>.
+
+CONFIG_BLK_DEV_SL82C105
+  If you have a Winbond SL82c105 IDE controller, say Y here to enable
+  special configuration for this chip. This is common on various CHRP
+  motherboards, but could be used elsewhere. If in doubt, say Y.
+
+CONFIG_BLK_DEV_TRM290
+  This driver adds support for bus master DMA transfers
+  using the Tekram TRM290 PCI IDE chip. Volunteers are
+  needed for further tweaking and development.
+  Please read the comments at the top of <file:drivers/ide/trm290.c>.
+
+CONFIG_BLK_DEV_VIA82CXXX
+  This allows you to configure your chipset for a better use while
+  running PIO/(U)DMA, it will allow you to enable efficiently the
+  second channel dma usage, as it may not be set by BIOS.  It will try
+  to set fifo configuration at its best.  It will allow you to get
+  information from /proc/ide/via provided you enabled "/proc file
+  system" support.
+
+  Please read the comments at the top of
+  <file:drivers/ide/via82cxxx.c>.
+
+  If you say Y here, then say Y to "Use DMA by default when available"
+  as well.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_IDE_RAPIDE
+  Say Y here if you want to support the Yellowstone RapIDE controller
+  manufactured for use with Acorn computers.
+
+CONFIG_IDE_CHIPSETS
+  Say Y here if you want to include enhanced support for various IDE
+  interface chipsets used on motherboards and add-on cards. You can
+  then pick your particular IDE chip from among the following options.
+  This enhanced support may be necessary for Linux to be able to
+  access the 3rd/4th drives in some systems. It may also enable
+  setting of higher speed I/O rates to improve system performance with
+  these chipsets. Most of these also require special kernel boot
+  parameters to actually turn on the support at runtime; you can find
+  a list of these in the file <file:Documentation/ide.txt>.
+
+  People with SCSI-only systems can say N here.
+
+CONFIG_BLK_DEV_4DRIVES
+  Certain older chipsets, including the Tekram 690CD, use a single set
+  of I/O ports at 0x1f0 to control up to four drives, instead of the
+  customary two drives per port. Support for this can be enabled at
+  runtime using the "ide0=four" kernel boot parameter if you say Y
+  here.
+
+CONFIG_BLK_DEV_ALI14XX
+  This driver is enabled at runtime using the "ide0=ali14xx" kernel
+  boot parameter.  It enables support for the secondary IDE interface
+  of the ALI M1439/1443/1445/1487/1489 chipsets, and permits faster
+  I/O speeds to be set as well.  See the files
+  <file:Documentation/ide.txt> and <file:drivers/ide/ali14xx.c> for
+  more info.
+
+CONFIG_BLK_DEV_DTC2278
+  This driver is enabled at runtime using the "ide0=dtc2278" kernel
+  boot parameter. It enables support for the secondary IDE interface
+  of the DTC-2278 card, and permits faster I/O speeds to be set as
+  well. See the <file:Documentation/ide.txt> and
+  <file:drivers/ide/dtc2278.c> files for more info.
+
+CONFIG_BLK_DEV_HT6560B
+  This driver is enabled at runtime using the "ide0=ht6560b" kernel
+  boot parameter. It enables support for the secondary IDE interface
+  of the Holtek card, and permits faster I/O speeds to be set as well.
+  See the <file:Documentation/ide.txt> and
+  <file:drivers/ide/ht6560b.c> files for more info.
+
+CONFIG_BLK_DEV_PDC4030
+  This driver provides support for the secondary IDE interface and
+  cache of Promise IDE chipsets, e.g. DC4030 and DC5030.  This driver
+  is known to incur timeouts/retries during heavy I/O to drives
+  attached to the secondary interface.  CD-ROM and TAPE devices are
+  not supported yet.  This driver is enabled at runtime using the
+  "ide0=dc4030" kernel boot parameter.  See the
+  <file:Documentation/ide.txt> and <file:drivers/ide/pdc4030.c> files
+  for more info.
+
+CONFIG_BLK_DEV_QD65XX
+  This driver is enabled at runtime using the "ide0=qd65xx" kernel
+  boot parameter.  It permits faster I/O speeds to be set.  See the
+  <file:Documentation/ide.txt> and <file:drivers/ide/qd65xx.c> for
+  more info.
+
+CONFIG_BLK_DEV_UMC8672
+  This driver is enabled at runtime using the "ide0=umc8672" kernel
+  boot parameter. It enables support for the secondary IDE interface
+  of the UMC-8672, and permits faster I/O speeds to be set as well.
+  See the files <file:Documentation/ide.txt> and
+  <file:drivers/ide/umc8672.c> for more info.
+
+CONFIG_BLK_DEV_GAYLE
+  This is the IDE driver for the builtin IDE interface on some Amiga
+  models. It supports both the `A1200 style' (used in A600 and A1200)
+  and `A4000 style' (used in A4000 and A4000T) of the Gayle IDE
+  interface. Say Y if you have such an Amiga model and want to use IDE
+  devices (hard disks, CD-ROM drives, etc.) that are connected to the
+  builtin IDE interface.
+
+CONFIG_BLK_DEV_FALCON_IDE
+  This is the IDE driver for the builtin IDE interface on the Atari
+  Falcon. Say Y if you have a Falcon and want to use IDE devices (hard
+  disks, CD-ROM drives, etc.) that are connected to the builtin IDE
+  interface.
+
+CONFIG_BLK_DEV_BUDDHA
+  This is the IDE driver for the IDE interfaces on the Buddha, 
+  Catweasel and X-Surf expansion boards.  It supports up to two interfaces 
+  on the Buddha, three on the Catweasel and two on the X-Surf.
+
+  Say Y if you have a Buddha or Catweasel expansion board and want to
+  use IDE devices (hard disks, CD-ROM drives, etc.) that are connected
+  to one of its IDE interfaces.
+
+CONFIG_BLK_DEV_IDEDOUBLER
+  This driver provides support for the so-called `IDE doublers' (made
+  by various manufacturers, e.g. Eyetech) that can be connected to the
+  builtin IDE interface of some Amiga models. Using such an IDE
+  doubler, you can connect up to four instead of two IDE devices on
+  the Amiga's builtin IDE interface.
+
+  Note that the normal Amiga Gayle IDE driver may not work correctly
+  if you have an IDE doubler and don't enable this driver!
+
+  Say Y if you have an IDE doubler.  The driver is enabled at kernel
+  runtime using the "ide=doubler" kernel boot parameter.
+
+CONFIG_BLK_DEV_IDE_PMAC
+  This driver provides support for the built-in IDE controller on
+  most of the recent Apple Power Macintoshes and PowerBooks.
+  If unsure, say Y.
+
+CONFIG_BLK_DEV_IDEDMA_PMAC
+  This option allows the driver for the built-in IDE controller on
+  Power Macintoshes and PowerBooks to use DMA (direct memory access)
+  to transfer data to and from memory.  Saying Y is safe and improves
+  performance.
+
+CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
+  This option allows the driver for the built-in IDE controller on
+  Power Macintoshes and PowerBooks to use DMA automatically, without
+  it having to be explicitly enabled.  This option is provided because
+  of concerns about a couple of cases where using DMA on buggy PC
+  hardware may have caused damage.  Saying Y should be safe on all
+  Apple machines.
+
+CONFIG_BLK_DEV_MAC_IDE
+  This is the IDE driver for the builtin IDE interface on some m68k
+  Macintosh models. It supports both the `Quadra style' (used in
+  Quadra/ Centris 630 and Performa 588 models) and `Powerbook style'
+  (used in the Powerbook 150 and 190 models) IDE interface.
+
+  Say Y if you have such an Macintosh model and want to use IDE
+  devices (hard disks, CD-ROM drives, etc.) that are connected to the
+  builtin IDE interface.
+
+CONFIG_BLK_DEV_IDE_ICSIDE
+  On Acorn systems, say Y here if you wish to use the ICS IDE
+  interface card.  This is not required for ICS partition support.
+  If you are unsure, say N to this.
+
+CONFIG_BLK_DEV_IDEDMA_ICS
+  Say Y here if you want to add DMA (Direct Memory Access) support to
+  the ICS IDE driver.
+
+CONFIG_IDEDMA_ICS_AUTO
+  Prior to kernel version 2.1.112, Linux used to automatically use
+  DMA for IDE drives and chipsets which support it. Due to concerns
+  about a couple of cases where buggy hardware may have caused damage,
+  the default is now to NOT use DMA automatically. To revert to the
+  previous behaviour, say Y to this question.
+
+  If you suspect your hardware is at all flakey, say N here.
+  Do NOT email the IDE kernel people regarding this issue!
+
+CONFIG_BLK_DEV_ATARAID
+  Say Y or M if you have an IDE Raid controller and want linux
+  to use its softwareraid feature.  You must also select an
+  appropriate for your board low-level driver below.
+
+  Note, that Linux does not use the Raid implemetation in BIOS, and
+  the main purpose for this feature is to retain compatibility and
+  data integrity with other OS-es, using the same disk array. Linux
+  has its own Raid drivers, which you should use if you need better
+  performance.
+
+CONFIG_BLK_DEV_ATARAID_PDC
+  Say Y or M if you have a Promise Fasttrak (tm) Raid controller
+  and want linux to use the softwareraid feature of this card.
+  This driver uses /dev/ataraid/dXpY (X and Y numbers) as device
+  names.
+
+  If you choose to compile this as a module, the module will be called
+  pdcraid.o.
+
+CONFIG_BLK_DEV_ATARAID_HPT
+  Say Y or M if you have a Highpoint HPT 370 Raid controller
+  and want linux to use the softwareraid feature of this card.
+  This driver uses /dev/ataraid/dXpY (X and Y numbers) as device
+  names.
+
+  If you choose to compile this as a module, the module will be called
+  hptraid.o.
+
+CONFIG_BLK_DEV_MPC8xx_IDE
+  This option provides support for IDE on Motorola MPC8xx Systems.
+  Please see 'Type of MPC8xx IDE interface' for details.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_IDEDISK_FUJITSU
+  Enable vendor-specific code for Fujitsu IDE disks.  Unless you are
+  the IDE maintainer, you probably do not want to mess with this.
+
+CONFIG_BLK_DEV_IDEDISK_IBM
+  Enable vendor-specific code for IBM IDE disks.  Unless you are the
+  IDE maintainer, you probably do not want to mess with this.
+
+CONFIG_BLK_DEV_IDEDISK_MAXTOR
+  Enable vendor-specific code for Maxtor IDE disks.  Unless you are
+  the IDE maintainer, you probably do not want to mess with this.
+
+CONFIG_BLK_DEV_IDEDISK_QUANTUM
+  Enable vendor-specific code for Quantum IDE disks.  Unless you are
+  the IDE maintainer, you probably do not want to mess with this.
+
+CONFIG_BLK_DEV_IDEDISK_SEAGATE
+  Enable vendor-specific code for Seagate IDE disks.  Unless you are
+  the IDE maintainer, you probably do not want to mess with this.
+
+CONFIG_BLK_DEV_IDEDISK_WD
+  Enable vendor-specific code for Western Digital IDE disks.  Unless
+  you are the IDE maintainer, you probably do not want to mess with
+  this.
+
+CONFIG_BLK_DEV_TIVO
+  Enable vendor-specific code for TiVo IDE disks.  Unless you are the
+  IDE maintainer, you probably do not want to mess with this.
+

@@ -704,10 +704,8 @@ void __init setup_arch(char **cmdline_p)
 #define PFN_PHYS(x)	((x) << PAGE_SHIFT)
 
 /*
- * 128MB for vmalloc and initrd
+ * Reserved space for vmalloc and iomap - defined in asm/page.h
  */
-#define VMALLOC_RESERVE	(unsigned long)(128 << 20)
-#define MAXMEM		(unsigned long)(-PAGE_OFFSET-VMALLOC_RESERVE)
 #define MAXMEM_PFN	PFN_DOWN(MAXMEM)
 #define MAX_NONPAE_PFN	(1 << 20)
 

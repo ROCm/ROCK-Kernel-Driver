@@ -488,15 +488,15 @@ static int do_bio_blockbacked(struct loop_device *lo, struct bio *bio,
 			      struct bio *rbh)
 {
 	unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
-	struct bio_vec *to;
+	struct bio_vec *from;
 	char *vto, *vfrom;
 	int ret = 0, i;
 
-	bio_for_each_segment(to, bio, i) {
-		vfrom = page_address(rbh->bi_io_vec[i].bv_page) + rbh->bi_io_vec[i].bv_offset;
-		vto = page_address(to->bv_page) + to->bv_offset;
+	bio_for_each_segment(from, rbh, i) {
+		vfrom = page_address(from->bv_page) + from->bv_offset;
+		vto = page_address(bio->bi_io_vec[i].bv_page) + bio->bi_io_vec[i].bv_offset;
 		ret |= lo_do_transfer(lo, bio_data_dir(bio), vto, vfrom,
-					to->bv_len, IV);
+					from->bv_len, IV);
 	}
 
 	return ret;

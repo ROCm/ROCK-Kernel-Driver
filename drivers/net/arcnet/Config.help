@@ -1,0 +1,91 @@
+CONFIG_ARCNET
+  If you have a network card of this type, say Y and check out the
+  (arguably) beautiful poetry in
+  <file:Documentation/networking/arcnet.txt>.
+
+  You need both this driver, and the driver for the particular ARCnet
+  chipset of your card. If you don't know, then it's probably a
+  COM90xx type card, so say Y (or M) to "ARCnet COM90xx chipset
+  support" below.
+
+  You might also want to have a look at the Ethernet-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>(even though ARCnet
+  is not really Ethernet).
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called arcnet.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ARCNET_1051
+  This allows you to use RFC1051 with your ARCnet card via the virtual
+  arc0s device. You only need arc0s if you want to talk to ARCnet
+  software complying with the "old" standard, specifically, the DOS
+  arcnet.com packet driver, Amigas running AmiTCP, and some variants
+  of NetBSD. You do not need to say Y here to communicate with
+  industry-standard RFC1201 implementations, like the arcether.com
+  packet driver or most DOS/Windows ODI drivers. RFC1201 is included
+  automatically as the arc0 device. Please read the ARCnet
+  documentation in <file:Documentation/networking/arcnet.txt> for more
+  information about using arc0e and arc0s.
+
+CONFIG_ARCNET_1201
+  This allows you to use RFC1201 with your ARCnet card via the virtual
+  arc0 device.  You need to say Y here to communicate with
+  industry-standard RFC1201 implementations, like the arcether.com
+  packet driver or most DOS/Windows ODI drivers.  Please read the
+  ARCnet documentation in <file:Documentation/networking/arcnet.txt>
+  for more information about using arc0.
+
+CONFIG_ARCNET_RAW
+  ARCnet "raw mode" packet encapsulation, no soft headers.  Unlikely
+  to work unless talking to a copy of the same Linux arcnet driver,
+  but perhaps marginally faster in that case.
+
+CONFIG_ARCNET_COM90xx
+  This is the chipset driver for the standard COM90xx cards. If you
+  have always used the old ARCnet driver without knowing what type of
+  card you had, this is probably the one for you.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called com90xx.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ARCNET_COM90xxIO
+  This is the chipset driver for the COM90xx cards, using them in
+  IO-mapped mode instead of memory-mapped mode. This is slower than
+  the normal driver. Only use it if your card doesn't support shared
+  memory.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called com90io.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ARCNET_RIM_I
+  This is yet another chipset driver for the COM90xx cards, but this
+  time only using memory-mapped mode, and no IO ports at all. This
+  driver is completely untested, so if you have one of these cards,
+  please mail dwmw2@infradead.org, especially if it works!
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). The module will be called arc-rimi.o.  If you want to compile
+  it as a module, say M here and read <file:Documentation/modules.txt>
+  as  well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_ARCNET_COM20020
+  This is the driver for the new COM20020 chipset. It supports such
+  things as promiscuous mode, so packet sniffing is possible, and
+  extra diagnostic information.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called com20020.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> as
+  well as <file:Documentation/networking/net-modules.txt>.
+

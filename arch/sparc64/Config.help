@@ -1,0 +1,1316 @@
+CONFIG_SMP
+  This enables support for systems with more than one CPU. If you have
+  a system with only one CPU, like most personal computers, say N. If
+  you have a system with more than one CPU, say Y.
+
+  If you say N here, the kernel will run on single and multiprocessor
+  machines, but will use only one CPU of a multiprocessor machine. If
+  you say Y here, the kernel will run on many, but not all,
+  singleprocessor machines. On a singleprocessor machine, the kernel
+  will run faster if you say N here.
+
+  Note that if you say Y here and choose architecture "586" or
+  "Pentium" under "Processor family", the kernel will not work on 486
+  architectures. Similarly, multiprocessor kernels for the "PPro"
+  architecture may not work on all Pentium based boards.
+
+  People using multiprocessor machines who say Y here should also say
+  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+  Management" code will be disabled if you say Y here.
+
+  See also the <file:Documentation/smp.tex>,
+  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you don't know what to do here, say N.
+
+CONFIG_SPARC64
+  SPARC is a family of RISC microprocessors designed and marketed by
+  Sun Microsystems, incorporated.  This port covers the newer 64-bit
+  UltraSPARC.  The UltraLinux project maintains both the SPARC32 and
+  SPARC64 ports; its web page is available at
+  <http://www.ultralinux.org/>.
+
+CONFIG_BLK_DEV_FD
+  If you want to use the floppy disk drive(s) of your PC under Linux,
+  say Y. Information about this driver, especially important for IBM
+  Thinkpad users, is contained in <file:Documentation/floppy.txt>.
+  That file also contains the location of the Floppy driver FAQ as
+  well as location of the fdutils package used to configure additional
+  parameters of the driver at run time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called floppy.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_BLK_DEV_RAM
+  Saying Y here will allow you to use a portion of your RAM memory as
+  a block device, so that you can make file systems on it, read and
+  write to it and do all the other things that you can do with normal
+  block devices (such as hard drives). It is usually used to load and
+  store a copy of a minimal root file system off of a floppy into RAM
+  during the initial install of Linux.
+
+  Note that the kernel command line option "ramdisk=XX" is now
+  obsolete. For details, read <file:Documentation/ramdisk.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M and read <file:Documentation/modules.txt>. The module will be
+  called rd.o.
+
+  Most normal users won't need the RAM disk functionality, and can
+  thus say N here.
+
+CONFIG_BLK_DEV_RAM_SIZE
+  The default value is 4096. Only change this if you know what are
+  you doing. If you are using IBM S/390, then set this to 8192.
+
+CONFIG_BLK_DEV_INITRD
+  The initial RAM disk is a RAM disk that is loaded by the boot loader
+  (loadlin or lilo) and that is mounted as root before the normal boot
+  procedure. It is typically used to load modules needed to mount the
+  "real" root file system, etc. See <file:Documentation/initrd.txt>
+  for details.
+
+CONFIG_BLK_DEV_LOOP
+  Saying Y here will allow you to use a regular file as a block
+  device; you can then create a file system on that block device and
+  mount it just as you would mount other block devices such as hard
+  drive partitions, CD-ROM drives or floppy drives. The loop devices
+  are block special device files with major number 7 and typically
+  called /dev/loop0, /dev/loop1 etc.
+
+  This is useful if you want to check an ISO 9660 file system before
+  burning the CD, or if you want to use floppy images without first
+  writing them to floppy. Furthermore, some Linux distributions avoid
+  the need for a dedicated Linux partition by keeping their complete
+  root file system inside a DOS FAT file using this loop device
+  driver.
+
+  The loop device driver can also be used to "hide" a file system in a
+  disk partition, floppy, or regular file, either using encryption
+  (scrambling the data) or steganography (hiding the data in the low
+  bits of, say, a sound file). This is also safe if the file resides
+  on a remote file server. If you want to do this, you will first have
+  to acquire and install a kernel patch from
+  <ftp://ftp.kerneli.org/pub/kerneli/>, and then you need to
+  say Y to this option.
+
+  Note that alternative ways to use encrypted file systems are
+  provided by the cfs package, which can be gotten from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>, and the newer tcfs
+  package, available at <http://tcfs.dia.unisa.it/>. You do not need
+  to say Y here if you want to use one of these. However, using cfs
+  requires saying Y to "NFS file system support" below while using
+  tcfs requires applying a kernel patch. An alternative steganography
+  solution is provided by StegFS, also available from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>.
+
+  To use the loop device, you need the losetup utility and a recent
+  version of the mount program, both contained in the util-linux
+  package. The location and current version number of util-linux is
+  contained in the file <file:Documentation/Changes>.
+
+  Note that this loop device has nothing to do with the loopback
+  device used for network connections from the machine to itself.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called loop.o.
+
+  Most users will answer N here.
+
+CONFIG_BLK_DEV_NBD
+  Saying Y here will allow your computer to be a client for network
+  block devices, i.e. it will be able to use block devices exported by
+  servers (mount file systems on them etc.). Communication between
+  client and server works over TCP/IP networking, but to the client
+  program this is hidden: it looks like a regular local file access to
+  a block device special file such as /dev/nd0.
+
+  Network block devices also allows you to run a block-device in
+  userland (making server and client physically the same computer,
+  communicating using the loopback network device).
+
+  Read <file:Documentation/nbd.txt> for more information, especially
+  about where to find the server code, which runs in user space and
+  does not need special kernel support.
+
+  Note that this has nothing to do with the network file systems NFS
+  or Coda; you can say N here even if you intend to use NFS or Coda.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called nbd.o.
+
+  If unsure, say N.
+
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_ISA
+  Find out whether you have ISA slots on your motherboard.  ISA is the
+  name of a bus system, i.e. the way the CPU talks to the other stuff
+  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+CONFIG_PCI
+  Find out whether you have a PCI motherboard. PCI is the name of a
+  bus system, i.e. the way the CPU talks to the other stuff inside
+  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+  VESA. If you have PCI, say Y, otherwise N.
+
+  The PCI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+  information about which PCI hardware does work under Linux and which
+  doesn't.
+
+CONFIG_MCA
+  MicroChannel Architecture is found in some IBM PS/2 machines and
+  laptops.  It is a bus system similar to PCI or ISA. See
+  <file:Documentation/mca.txt> (and especially the web page given
+  there) before attempting to build an MCA bus kernel.
+
+CONFIG_EISA
+  The Extended Industry Standard Architecture (EISA) bus was
+  developed as an open alternative to the IBM MicroChannel bus.
+
+  The EISA bus provided some of the features of the IBM MicroChannel
+  bus while maintaining backward compatibility with cards made for
+  the older ISA bus.  The EISA bus saw limited use between 1988 and
+  1995 when it was made obsolete by the PCI bus.
+
+  Say Y here if you are building a kernel for an EISA-based machine.
+
+  Otherwise, say N.
+
+CONFIG_ISAPNP
+  Say Y here if you would like support for ISA Plug and Play devices.
+  Some information is in <file:Documentation/isapnp.txt>.
+
+  This support is also available as a module called isapnp.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+  If unsure, say Y.
+
+CONFIG_HOTPLUG
+  Say Y here if you want to plug devices into your computer while
+  the system is running, and be able to use them quickly.  In many
+  cases, the devices can likewise be unplugged at any time too.
+
+  One well known example of this is PCMCIA- or PC-cards, credit-card
+  size devices such as network cards, modems or hard drives which are
+  plugged into slots found on all modern laptop computers.  Another
+  example, used on modern desktops as well as laptops, is USB.
+
+  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+  Then your kernel will automatically call out to a user mode "policy
+  agent" (/sbin/hotplug) to load modules and set up software needed
+  to use devices as you hotplug them.
+
+CONFIG_PCMCIA
+  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+  computer.  These are credit-card size devices such as network cards,
+  modems or hard drives often used with laptops computers.  There are
+  actually two varieties of these cards: the older 16 bit PCMCIA cards
+  and the newer 32 bit CardBus cards.  If you want to use CardBus
+  cards, you need to say Y here and also to "CardBus support" below.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  Please also read the PCMCIA-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  When compiled this way, there will be modules called pcmcia_core.o
+  and ds.o.  If you want to compile it as a module, say M here and
+  read <file:Documentation/modules.txt>.
+
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_BINFMT_ELF
+  ELF (Executable and Linkable Format) is a format for libraries and
+  executables used across different architectures and operating
+  systems. Saying Y here will enable your kernel to run ELF binaries
+  and enlarge it by about 13 KB. ELF support under Linux has now all
+  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+  because it is portable (this does *not* mean that you will be able
+  to run executables from different architectures or operating systems
+  however) and makes building run-time libraries very easy. Many new
+  executables are distributed solely in ELF format. You definitely
+  want to say Y here.
+
+  Information about ELF is contained in the ELF HOWTO available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you find that after upgrading from Linux kernel 1.2 and saying Y
+  here, you still can't run any ELF binaries (they just crash), then
+  you'll have to install the newest ELF runtime libraries, including
+  ld.so (check the file <file:Documentation/Changes> for location and
+  latest version).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called binfmt_elf.o. Saying M or N here is dangerous because
+  some crucial programs on your system might be in ELF format.
+
+CONFIG_BINFMT_MISC
+  If you say Y here, it will be possible to plug wrapper-driven binary
+  formats into the kernel. You will like this especially when you use
+  programs that need an interpreter to run like Java, Python or
+  Emacs-Lisp. It's also useful if you often run DOS executables under
+  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+  registered such a binary class with the kernel, you can start one of
+  those programs simply by typing in its name at a shell prompt; Linux
+  will automatically feed it to the correct interpreter.
+
+  You can do other nice things, too. Read the file
+  <file:Documentation/binfmt_misc.txt> to learn how to use this
+  feature, and <file:Documentation/java.txt> for information about how
+  to include Java support.
+
+  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+  use this part of the kernel.
+
+  You may say M here for module support and later load the module when
+  you have use for it; the module is called binfmt_misc.o. If you
+  don't know what to answer at this point, say Y.
+
+CONFIG_SOLARIS_EMUL
+  This is experimental code which will enable you to run (many)
+  Solaris binaries on your SPARC Linux machine.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called solaris.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_ENVCTRL
+  Kernel support for temperature and fan monitoring on Sun SME
+  machines.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called envctrl.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI
+  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+  any other SCSI device under Linux, say Y and make sure that you know
+  the name of your SCSI host adapter (the card inside your computer
+  that "speaks" the SCSI protocol, also called SCSI controller),
+  because you will be asked for it.
+
+  You also need to say Y here if you want support for the parallel
+  port version of the 100 MB IOMEGA ZIP drive.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scsi_mod.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  However, do not compile this as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI device.
+
+CONFIG_BLK_DEV_SD
+  If you want to use a SCSI hard disk or the SCSI or parallel port
+  version of the IOMEGA ZIP drive under Linux, say Y and read the
+  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sd_mod.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI disk. In this case, do not compile the driver
+  for your SCSI host adapter (below) as a module either.
+
+CONFIG_SD_EXTRA_DEVS
+  This controls the amount of additional space allocated in tables for
+  drivers that are loaded as modules after the kernel is booted.  In
+  the event that the SCSI core itself was loaded as a module, this
+  value is the number of additional disks that can be loaded after the
+  first host driver is loaded.
+
+  Admittedly this isn't pretty, but there are tons of race conditions
+  involved with resizing the internal arrays on the fly.  Someday this
+  flag will go away, and everything will work automatically.
+
+  If you don't understand what's going on, go with the default.
+
+CONFIG_CHR_DEV_ST
+  If you want to use a SCSI tape drive under Linux, say Y and read the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, and
+  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
+  SCSI CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called st.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_CHR_DEV_OSST
+  The OnStream SC-x0 SCSI tape drives can not be driven by the
+  standard st driver, but instead need this special osst driver and
+  use the  /dev/osstX char device nodes (major 206).  Via usb-storage
+  and ide-scsi, you may be able to drive the USB-x0 and DI-x0 drives
+  as well.  Note that there is also a second generation of OnStream
+  tape drives (ADR-x0) that supports the standard SCSI-2 commands for
+  tapes (QIC-157) and can be driven by the standard driver st.
+  For more information, you may have a look at the SCSI-HOWTO
+  <http://www.linuxdoc.org/docs.html#howto>  and
+  <file:drivers/scsi/README.osst>  in the kernel source.
+  More info on the OnStream driver may be found on
+  <http://linux1.onstream.nl/test/>
+  Please also have a look at the standard st docu, as most of it
+  applies to osst as well.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called osst.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_BLK_DEV_SR
+  If you want to use a SCSI CD-ROM under Linux, say Y and read the
+  SCSI-HOWTO and the CD-ROM-HOWTO at
+  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+  or M to "ISO 9660 CD-ROM file system support" later.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sr_mod.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_SR_EXTRA_DEVS
+  This controls the amount of additional space allocated in tables for
+  drivers that are loaded as modules after the kernel is booted. In
+  the event that the SCSI core itself was loaded as a module, this
+  value is the number of additional CD-ROMs that can be loaded after
+  the first host driver is loaded.
+
+  Admittedly this isn't pretty, but there are tons of race conditions
+  involved with resizing the internal arrays on the fly.  Someday this
+  flag will go away, and everything will work automatically.
+
+  If you don't understand what's going on, go with the default.
+
+CONFIG_BLK_DEV_SR_VENDOR
+  This enables the usage of vendor specific SCSI commands. This is
+  required to support multisession CDs with old NEC/TOSHIBA cdrom
+  drives (and HP Writers). If you have such a drive and get the first
+  session only, try saying Y here; everybody else says N.
+
+CONFIG_CHR_DEV_SG
+  If you want to use SCSI scanners, synthesizers or CD-writers or just
+  about anything having "SCSI" in its name other than hard disks,
+  CD-ROMs or tapes, say Y here. These won't be supported by the kernel
+  directly, so you need some additional software which knows how to
+  talk to these devices using the SCSI protocol:
+
+  For scanners, look at SANE (<http://www.mostang.com/sane/>). For CD
+  writer software look at Cdrtools
+  (<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/cdrecord.html>)
+  and for burning a "disk at once": CDRDAO
+  (<http://cdrdao.sourceforge.net/>). Cdparanoia is a high
+  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
+  For other devices, it's possible that you'll have to write the
+  driver software yourself. Please read the file
+  <file:Documentation/scsi-generic.txt> for more information.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
+  say N.
+
+CONFIG_SCSI_MULTI_LUN
+  If you have a SCSI device that supports more than one LUN (Logical
+  Unit Number), e.g. a CD jukebox, and only one LUN is detected, you
+  can say Y here to force the SCSI driver to probe for multiple LUNs.
+  A SCSI device with multiple LUNs acts logically like multiple SCSI
+  devices. The vast majority of SCSI devices have only one LUN, and
+  so most people can say N here and should in fact do so, because it
+  is safer.
+
+CONFIG_SCSI_CONSTANTS
+  The error messages regarding your SCSI hardware will be easier to
+  understand if you say Y here; it will enlarge your kernel by about
+  12 KB. If in doubt, say Y.
+
+CONFIG_SCSI_LOGGING
+  This turns on a logging facility that can be used to debug a number
+  of SCSI related problems.
+
+  If you say Y here, no logging output will appear by default, but you
+  can enable logging by saying Y to "/proc file system support" and
+  "Sysctl support" below and executing the command
+
+     echo "scsi log token [level]" > /proc/scsi/scsi
+
+  at boot time after the /proc file system has been mounted.
+
+  There are a number of things that can be used for 'token' (you can
+  find them in the source: <file:drivers/scsi/scsi.c>), and this
+  allows you to select the types of information you want, and the
+  level allows you to select the level of verbosity.
+
+  If you say N here, it may be harder to track down some types of SCSI
+  problems. If you say Y here your kernel will be somewhat larger, but
+  there should be no noticeable performance impact as long as you have
+  logging turned off.
+
+CONFIG_SCSI_AIC7XXX_OLD
+  WARNING This driver is an older aic7xxx driver and is no longer
+  under active development.  Adaptec, Inc. is writing a new driver to
+  take the place of this one, and it is recommended that whenever
+  possible, people should use the new Adaptec written driver instead
+  of this one.  This driver will eventually be phased out entirely.
+
+  This is support for the various aic7xxx based Adaptec SCSI
+  controllers. These include the 274x EISA cards; 284x VLB cards;
+  2902, 2910, 293x, 294x, 394x, 3985 and several other PCI and
+  motherboard based SCSI controllers from Adaptec. It does not support
+  the AAA-13x RAID controllers from Adaptec, nor will it likely ever
+  support them. It does not support the 2920 cards from Adaptec that
+  use the Future Domain SCSI controller chip. For those cards, you
+  need the "Future Domain 16xx SCSI support" driver.
+
+  In general, if the controller is based on an Adaptec SCSI controller
+  chip from the aic777x series or the aic78xx series, this driver
+  should work. The only exception is the 7810 which is specifically
+  not supported (that's the RAID controller chip on the AAA-13x
+  cards).
+
+  Note that the AHA2920 SCSI host adapter is *not* supported by this
+  driver; choose "Future Domain 16xx SCSI support" instead if you have
+  one of those.
+
+  Information on the configuration options for this controller can be
+  found by checking the help file for each of the available
+  configuration options. You should read
+  <file:drivers/scsi/aic7xxx_old/README.aic7xxx> at a minimum before
+  contacting the maintainer with any questions.  The SCSI-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>, can also
+  be of great help.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called aic7xxx_old.o.
+
+CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
+  This option causes the aic7xxx driver to attempt to use Tagged
+  Command Queueing (TCQ) on all devices that claim to support it.
+
+  TCQ is a feature of SCSI-2 which improves performance: the host
+  adapter can send several SCSI commands to a device's queue even if
+  previous commands haven't finished yet.  Because the device is
+  intelligent, it can optimize its operations (like head positioning)
+  based on its own request queue.  Not all devices implement this
+  correctly.
+
+  If you say Y here, you can still turn off TCQ on troublesome devices
+  with the use of the tag_info boot parameter.  See the file
+  <file:drivers/scsi/README.aic7xxx> for more information on that and
+  other aic7xxx setup commands.  If this option is turned off, you may
+  still enable TCQ on known good devices by use of the tag_info boot
+  parameter.
+
+  If you are unsure about your devices then it is safest to say N
+  here.
+
+  However, TCQ can increase performance on some hard drives by as much
+  as 50% or more, so it is recommended that if you say N here, you
+  should at least read the <file:drivers/scsi/README.aic7xxx> file so
+  you will know how to enable this option manually should your drives
+  prove to be safe in regards to TCQ.
+
+  Conversely, certain drives are known to lock up or cause bus resets
+  when TCQ is enabled on them.  If you have a Western Digital
+  Enterprise SCSI drive for instance, then don't even bother to enable
+  TCQ on it as the drive will become unreliable, and it will actually
+  reduce performance.
+
+CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  Reasonable figures are in the range of 8 to 24 commands per device,
+  but depending on hardware could be increased or decreased from that
+  figure. If the number is too high for any particular device, the
+  driver will automatically compensate usually after only 10 minutes
+  of uptime. It will not hinder performance if some of your devices
+  eventually have their command depth reduced, but is a waste of
+  memory if all of your devices end up reducing this number down to a
+  more reasonable figure.
+
+  NOTE: Certain very broken drives are known to lock up when given
+  more commands than they like to deal with. Quantum Fireball drives
+  are the most common in this category. For the Quantum Fireball
+  drives it is suggested to use no more than 8 commands per device.
+
+  Default: 8
+
+CONFIG_AIC7XXX_OLD_PROC_STATS
+  This option tells the driver to keep track of how many commands have
+  been sent to each particular device and report that information to
+  the user via the /proc/scsi/aic7xxx/n file, where n is the number of
+  the aic7xxx controller you want the information on. This adds a
+  small amount of overhead to each and every SCSI command the aic7xxx
+  driver handles, so if you aren't really interested in this
+  information, it is best to leave it disabled. This will only work if
+  you also say Y to "/proc file system support", below.
+
+  If unsure, say N.
+
+CONFIG_SCSI_SYM53C8XX_2
+  This driver supports the whole NCR53C8XX/SYM53C8XX family of 
+  PCI-SCSI controllers. It also supports the subset of LSI53C10XX 
+  Ultra-160 controllers that are based on the SYM53C8XX SCRIPTS 
+  language. It does not support LSI53C10XX Ultra-320 PCI-X SCSI 
+  controllers.
+
+  If your system has problems using this new major version of the
+  SYM53C8XX driver, you may switch back to driver version 1.
+
+  Please read <file:drivers/scsi/sym53c8xx_2/Documentation.txt> for more
+  information.
+
+CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
+  This option only applies to PCI-SCSI chip that are PCI DAC capable 
+  (875A, 895A, 896, 1010-33, 1010-66, 1000).
+
+  When set to 0, only PCI 32 bit DMA addressing (SAC) will be performed.
+  When set to 1, 40 bit DMA addressing (with upper 24 bits of address 
+  set to zero) is supported. The addressable range is here 1 TB.
+  When set to 2, full 64 bits of address for DMA are supported, but only
+  16 segments of 4 GB can be addressed. The addressable range is so 
+  limited to 64 GB.
+
+  The safest value is 0 (32 bit DMA addressing) that is guessed to still 
+  fit most of real machines.
+
+  The preferred value 1 (40 bit DMA addressing) should make happy 
+  properly engineered PCI DAC capable host bridges. You may configure
+  this option for Intel platforms with more than 4 GB of memory.
+
+  The still experimental value 2 (64 bit DMA addressing with 16 x 4GB 
+  segments limitation) can be used on systems that require PCI address 
+  bits past bit 39 to be set for the addressing of memory using PCI 
+  DAC cycles.
+
+CONFIG_SCSI_SYM53C8XX_IOMAPPED
+  If you say Y here, the driver will preferently use normal IO rather than 
+  memory mapped IO.
+
+CONFIG_SCSI_SYM53C8XX_MAX_TAGS
+  This option allows you to specify the maximum number of commands
+  that can be queued to any device, when tagged command queuing is
+  possible. The driver supports up to 256 queued commands per device.
+  This value is used as a compiled-in hard limit.
+
+CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS
+  This is the default value of the command queue depth the driver will 
+  announce to the generic SCSI layer for devices that support tagged 
+  command queueing. This value can be changed from the boot command line.
+  This is a soft limit that cannot exceed CONFIG_SCSI_SYM53C8XX_MAX_TAGS.
+
+CONFIG_SCSI_NCR53C8XX
+  This is the BSD ncr driver adapted to Linux for the NCR53C8XX family
+  of PCI-SCSI controllers.  This driver supports parity checking,
+  tagged command queuing and fast synchronous data transfers up to 80
+  MB/s with wide FAST-40 LVD devices and controllers.
+
+  Recent versions of the 53C8XX chips are better supported by the
+  option "SYM53C8XX SCSI support", below.
+
+  Note: there is yet another driver for the 53c8xx family of
+  controllers ("NCR53c7,8xx SCSI support" above).  If you want to use
+  them both, you need to say M to both and build them as modules, but
+  only one may be active at a time.  If you have a 53c8xx board, you
+  probably do not want to use the "NCR53c7,8xx SCSI support".
+
+  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+  information.
+
+CONFIG_SCSI_SYM53C8XX
+  This driver supports all the features of recent 53C8XX chips (used
+  in PCI SCSI controllers), notably the hardware phase mismatch
+  feature of the SYM53C896.
+
+  Older versions of the 53C8XX chips are not supported by this
+  driver.  If your system uses either a 810 rev. < 16, a 815, or a 825
+  rev. < 16 PCI SCSI processor, you must use the generic NCR53C8XX
+  driver ("NCR53C8XX SCSI support" above) or configure both the
+  NCR53C8XX and this SYM53C8XX drivers either as module or linked to
+  the kernel image.
+
+  When both drivers are linked into the kernel, the SYM53C8XX driver
+  is called first at initialization and you can use the 'excl=ioaddr'
+  driver boot option to exclude attachment of adapters by the
+  SYM53C8XX driver.  For example, entering
+  'sym53c8xx=excl:0xb400,excl=0xc000' at the lilo prompt prevents
+  adapters at io address 0xb400 and 0xc000 from being attached by the
+  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
+  The 'excl' option is also supported by the NCR53C8XX driver.
+
+  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+  information.
+
+CONFIG_SCSI_NCR53C8XX_SYNC
+  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
+  rates: FAST-5, FAST-10, FAST-20, FAST-40 and FAST-80.  The numbers
+  are respectively the maximum data transfer rates in mega-transfers
+  per second for each class.  For example, a FAST-20 Wide 16 device is
+  able to transfer data at 20 million 16 bit packets per second for a
+  total rate of 40 MB/s.
+
+  You may specify 0 if you want to only use asynchronous data
+  transfers. This is the safest and slowest option. Otherwise, specify
+  a value between 5 and 80, depending on the capability of your SCSI
+  controller.  The higher the number, the faster the data transfer.
+  Note that 80 should normally be ok since the driver decreases the
+  value automatically according to the controller's capabilities.
+
+  Your answer to this question is ignored for controllers with NVRAM,
+  since the driver will get this information from the user set-up.  It
+  also can be overridden using a boot setup option, as follows
+  (example): 'ncr53c8xx=sync:12' will allow the driver to negotiate
+  for FAST-20 synchronous data transfer (20 mega-transfers per
+  second).
+
+  The normal answer therefore is not to go with the default but to
+  select the maximum value 80 allowing the driver to use the maximum
+  value supported by each controller. If this causes problems with
+  your SCSI devices, you should come back and decrease the value.
+
+  There is no safe option other than using good cabling, right
+  terminations and SCSI conformant devices.
+
+CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT
+  This option is only provided for safety if you suspect some SCSI
+  device of yours to not support properly the target-disconnect
+  feature. In that case, you would say Y here. In general however, to
+  not allow targets to disconnect is not reasonable if there is more
+  than 1 device on a SCSI bus. The normal answer therefore is N.
+
+CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS
+  "Tagged command queuing" is a feature of SCSI-2 which improves
+  performance: the host adapter can send several SCSI commands to a
+  device's queue even if previous commands haven't finished yet.
+  Because the device is intelligent, it can optimize its operations
+  (like head positioning) based on its own request queue. Some SCSI
+  devices don't implement this properly; if you want to disable this
+  feature, enter 0 or 1 here (it doesn't matter which).
+
+  The default value is 8 and should be supported by most hard disks.
+  This value can be overridden from the boot command line using the
+  'tags' option as follows (example):
+  'ncr53c8xx=tags:4/t2t3q16/t0u2q10' will set default queue depth to
+  4, set queue depth to 16 for target 2 and target 3 on controller 0
+  and set queue depth to 10 for target 0 / lun 2 on controller 1.
+
+  The normal answer therefore is to go with the default 8 and to use
+  a boot command line option for devices that need to use a different
+  command queue depth.
+
+  There is no safe option other than using good SCSI devices.
+
+CONFIG_SCSI_NCR53C8XX_MAX_TAGS
+  This option allows you to specify the maximum number of commands
+  that can be queued to any device, when tagged command queuing is
+  possible. The default value is 32. Minimum is 2, maximum is 64.
+  Modern hard disks are able to support 64 tags and even more, but
+  do not seem to be faster when more than 32 tags are being used.
+
+  So, the normal answer here is to go with the default value 32 unless
+  you are using very large hard disks with large cache (>= 1 MB) that
+  are able to take advantage of more than 32 tagged commands.
+
+  There is no safe option and the default answer is recommended.
+
+CONFIG_SCSI_NCR53C8XX_SYMBIOS_COMPAT
+  This option allows you to enable some features depending on GPIO
+  wiring. These General Purpose Input/Output pins can be used for
+  vendor specific features or implementation of the standard SYMBIOS
+  features. Genuine SYMBIOS controllers use GPIO0 in output for
+  controller LED and GPIO3 bit as a flag indicating
+  singled-ended/differential interface. The Tekram DC-390U/F boards
+  uses a different GPIO wiring.
+
+  Your answer to this question is ignored if all your controllers have
+  NVRAM, since the driver is able to detect the board type from the
+  NVRAM format.
+
+  If all the controllers in your system are genuine SYMBIOS boards or
+  use BIOS and drivers from SYMBIOS, you would want to say Y here,
+  otherwise N. N is the safe answer.
+
+CONFIG_SCSI_NCR53C8XX_PROFILE
+  This option allows you to enable profiling information gathering.
+  These statistics are not very accurate due to the low frequency
+  of the kernel clock (100 Hz on i386) and have performance impact
+  on systems that use very fast devices.
+
+  The normal answer therefore is N.
+
+CONFIG_SCSI_NCR53C8XX_PQS_PDS
+  Say Y here if you have a special SCSI adapter produced by NCR
+  corporation called a PCI Quad SCSI or PCI Dual SCSI. You do not need
+  this if you do not have one of these adapters. However, since this
+  device is detected as a specific PCI device, this option is quite
+  safe.
+
+  The common answer here is N, but answering Y is safe.
+
+CONFIG_SCSI_QLOGIC_ISP
+  This driver works for all QLogic PCI SCSI host adapters (IQ-PCI,
+  IQ-PCI-10, IQ_PCI-D) except for the PCI-basic card.  (This latter
+  card is supported by the "AM53/79C974 PCI SCSI" driver.)
+
+  If you say Y here, make sure to choose "BIOS" at the question "PCI
+  access mode".
+
+  Please read the file <file:drivers/scsi/README.qlogicisp>.  You
+  should also read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qlogicisp.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGIC_FC
+  This is a driver for the QLogic ISP2100 SCSI-FCP host adapter.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qlogicfc.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_VT
+  If you say Y here, you will get support for terminal devices with
+  display and keyboard devices. These are called "virtual" because you
+  can run several virtual terminals (also called virtual consoles) on
+  one physical terminal. This is rather useful, for example one
+  virtual terminal can collect system messages and warnings, another
+  one can be used for a text-mode user session, and a third could run
+  an X session, all in parallel. Switching between virtual terminals
+  is done with certain key combinations, usually Alt-<function key>.
+
+  The setterm command ("man setterm") can be used to change the
+  properties (such as colors or beeping) of a virtual terminal. The
+  man page console_codes(4) ("man console_codes") contains the special
+  character sequences that can be used to change those properties
+  directly. The fonts used on virtual terminals can be changed with
+  the setfont ("man setfont") command and the key bindings are defined
+  with the loadkeys ("man loadkeys") command.
+
+  You need at least one virtual terminal device in order to make use
+  of your keyboard and monitor. Therefore, only people configuring an
+  embedded system would want to say N here in order to save some
+  memory; the only way to log into such a system is then via a serial
+  or network connection.
+
+  If unsure, say Y, or else you won't be able to do much with your new
+  shiny Linux system :-)
+
+CONFIG_VT_CONSOLE
+  The system console is the device which receives all kernel messages
+  and warnings and which allows logins in single user mode. If you
+  answer Y here, a virtual terminal (the device used to interact with
+  a physical terminal) can be used as system console. This is the most
+  common mode of operations, so you should say Y here unless you want
+  the kernel messages be output only to a serial port (in which case
+  you should say Y to "Console on serial port", below).
+
+  If you do say Y here, by default the currently visible virtual
+  terminal (/dev/tty0) will be used as system console. You can change
+  that with a kernel command line option such as "console=tty3" which
+  would use the third virtual terminal as system console. (Try "man
+  bootparam" or see the documentation of your boot loader (lilo or
+  loadlin) about how to pass options to the kernel at boot time.)
+
+  If unsure, say Y.
+
+CONFIG_SERIAL
+  This selects whether you want to include the driver for the standard
+  serial ports.  The standard answer is Y.  People who might say N
+  here are those that are setting up dedicated Ethernet WWW/FTP
+  servers, or users that have one of the various bus mice instead of a
+  serial mouse and don't intend to use their machine's standard serial
+  port for anything.  (Note that the Cyclades and Stallion multi
+  serial port drivers do not need this driver built in for them to
+  work.)
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  serial.o.
+  [WARNING: Do not compile this driver as a module if you are using
+  non-standard serial ports, since the configuration information will
+  be lost when the driver is unloaded.  This limitation may be lifted
+  in the future.]
+
+  BTW1: If you have a mouseman serial mouse which is not recognized by
+  the X window system, try running gpm first.
+
+  BTW2: If you intend to use a software modem (also called Winmodem)
+  under Linux, forget it.  These modems are crippled and require
+  proprietary drivers which are only available under Windows.
+
+  Most people will say Y or M here, so that they can use serial mice,
+  modems and similar devices connecting to the standard serial ports.
+
+CONFIG_SERIAL_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode). This could be useful if some terminal or printer is connected
+  to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first serial line, /dev/ttyS0, as
+  system console.
+
+  If unsure, say N.
+
+CONFIG_UNIX98_PTYS
+  A pseudo terminal (PTY) is a software device consisting of two
+  halves: a master and a slave. The slave device behaves identical to
+  a physical terminal; the master device is used by a process to
+  read data from and write data to the slave, thereby emulating a
+  terminal. Typical programs for the master side are telnet servers
+  and xterms.
+
+  Linux has traditionally used the BSD-like names /dev/ptyxx for
+  masters and /dev/ttyxx for slaves of pseudo terminals. This scheme
+  has a number of problems. The GNU C library glibc 2.1 and later,
+  however, supports the Unix98 naming standard: in order to acquire a
+  pseudo terminal, a process opens /dev/ptmx; the number of the pseudo
+  terminal is then made available to the process and the pseudo
+  terminal slave can be accessed as /dev/pts/<number>. What was
+  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
+
+  The entries in /dev/pts/ are created on the fly by a virtual
+  file system; therefore, if you say Y here you should say Y to
+  "/dev/pts file system for Unix98 PTYs" as well.
+
+  If you want to say Y here, you need to have the C library glibc 2.1
+  or later (equal to libc-6.1, check with "ls -l /lib/libc.so.*").
+  Read the instructions in <file:Documentation/Changes> pertaining to
+  pseudo terminals. It's safe to say N.
+
+CONFIG_UNIX98_PTY_COUNT
+  The maximum number of Unix98 PTYs that can be used at any one time.
+  The default is 256, and should be enough for desktop systems. Server
+  machines which support incoming telnet/rlogin/ssh connections and/or
+  serve several X terminals may want to increase this: every incoming
+  connection and every xterm uses up one PTY.
+
+  When not in use, each additional set of 256 PTYs occupy
+  approximately 8 KB of kernel memory on 32-bit architectures.
+
+CONFIG_PRINTER
+  If you intend to attach a printer to the parallel port of your Linux
+  box (as opposed to using a serial printer; if the connector at the
+  printer has 9 or 25 holes ["female"], then it's serial), say Y.
+  Also read the Printing-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  It is possible to share one parallel port among several devices
+  (e.g. printer and ZIP drive) and it is safe to compile the
+  corresponding drivers into the kernel.  If you want to compile this
+  driver as a module however ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt> and
+  <file:Documentation/parport.txt>.  The module will be called lp.o.
+
+  If you have several parallel ports, you can specify which ports to
+  use with the "lp" kernel command line option.  (Try "man bootparam"
+  or see the documentation of your boot loader (lilo or loadlin) about
+  how to pass options to the kernel at boot time.)  The syntax of the
+  "lp" command line option can be found in <file:drivers/char/lp.c>.
+
+  If you have more than 8 printers, you need to increase the LP_NO
+  macro in lp.c and the PARPORT_MAX macro in parport.h.
+
+CONFIG_BBC_I2C
+  The BBC devices on the UltraSPARC III have two I2C controllers.  The
+  first I2C controller connects mainly to configuration PROMs (NVRAM,
+  CPU configuration, DIMM types, etc.).  The second I2C controller
+  connects to environmental control devices such as fans and
+  temperature sensors.  The second controller also connects to the
+  smartcard reader, if present.  Say Y to enable support for these.
+
+CONFIG_BUSMOUSE
+  Say Y here if your machine has a bus mouse as opposed to a serial
+  mouse. Most people have a regular serial MouseSystem or
+  Microsoft mouse (made by Logitech) that plugs into a COM port
+  (rectangular with 9 or 25 pins). These people say N here. 
+
+  If you have a laptop, you either have to check the documentation or
+  experiment a bit to find out whether the trackball is a serial mouse
+  or not; it's best to say Y here for you.
+
+  This is the generic bus mouse driver code. If you have a bus mouse,
+  you will have to say Y here and also to the specific driver for your
+  mouse below.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called busmouse.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_DRM
+  Kernel-level support for the Direct Rendering Infrastructure (DRI)
+  introduced in XFree86 4.0. If you say Y here, you need to select
+  the module that's right for your graphics card from the list below.
+  These modules provide support for synchronization, security, and
+  DMA transfers. Please see <http://dri.sourceforge.net/> for more
+  details.  You should also select and configure AGP
+  (/dev/agpgart) support.
+
+CONFIG_DRM_TDFX
+  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
+  graphics card.  If M is selected, the module will be called tdfx.o.
+
+CONFIG_DRM_R128
+  Choose this option if you have an ATI Rage 128 graphics card.  If M
+  is selected, the module will be called r128.o.  AGP support for
+  this card is strongly suggested (unless you have a PCI version).
+
+CONFIG_DRM_FFB
+  Choose this option if you have one of Sun's Creator3D-based graphics
+  and frame buffer cards.  Product page at
+  <http://www.sun.com/desktop/products/Graphics/creator3d.html>.
+
+CONFIG_SOFT_WATCHDOG
+  A software monitoring watchdog. This will fail to reboot your system
+  from some situations that the hardware watchdog will recover
+  from. Equally it's a lot cheaper to install.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>. The module will be called
+   softdog.o.
+
+CONFIG_RTC
+  If you say Y here and create a character special file /dev/rtc with
+  major number 10 and minor number 135 using mknod ("man mknod"), you
+  will get access to the real time clock (or hardware clock) built
+  into your computer.
+
+  Every PC has such a clock built in. It can be used to generate
+  signals from as low as 1Hz up to 8192Hz, and can also be used
+  as a 24 hour alarm. It reports status information via the file
+  /proc/driver/rtc and its behaviour is set by various ioctls on
+  /dev/rtc.
+
+  If you run Linux on a multiprocessor machine and said Y to
+  "Symmetric Multi Processing" above, you should say Y here to read
+  and set the RTC in an SMP compatible fashion.
+
+  If you think you have a use for such a device (such as periodic data
+  sampling), then say Y here, and read <file:Documentation/rtc.txt>
+  for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called rtc.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SOUND
+  If you have a sound card in your computer, i.e. if it can say more
+  than an occasional beep, say Y.  Be sure to have all the information
+  about your sound card and its configuration down (I/O port,
+  interrupt and DMA channel), because you will be asked for it.
+
+  You want to read the Sound-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. General information about
+  the modular sound system is contained in the files
+  <file:Documentation/sound/Introduction>.  The file
+  <file:Documentation/sound/README.OSS> contains some slightly
+  outdated but still useful information as well.
+
+  If you have a PnP sound card and you want to configure it at boot
+  time using the ISA PnP tools (read
+  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+  compile the sound card support as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want)
+  and load that module after the PnP configuration is finished.  To do
+  this, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/sound/README.modules>; the module will be
+  called soundcore.o.
+
+  I'm told that even without a sound card, you can make your computer
+  say more than an occasional beep, by programming the PC speaker.
+  Kernel patches and supporting utilities to do that are in the pcsp
+  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+CONFIG_MAGIC_SYSRQ
+  If you say Y here, you will have some control over the system even
+  if the system crashes for example during kernel debugging (e.g., you
+  will be able to flush the buffer cache to disk, reboot the system
+  immediately or dump some status information). This is accomplished
+  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+  also works on a serial console (on PC hardware at least), if you
+  send a BREAK and then within 5 seconds a command keypress. The
+  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+  unless you really know what this hack does.
+
+CONFIG_SCSI_SUNESP
+  This is the driver for the Sun ESP SCSI host adapter. The ESP
+  chipset is present in most SPARC SBUS-based computers.
+
+  This support is also available as a module called esp.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGICPTI
+  This driver supports SBUS SCSI controllers from PTI or QLogic. These
+  controllers are known under Solaris as qpti and in the openprom as
+  PTI,ptisp or QLGC,isp. Note that PCI QLogic SCSI controllers are
+  driven by a different driver.
+
+  This support is also available as a module called qlogicpti.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_PROM_CONSOLE
+  Say Y to build a console driver for Sun machines that uses the
+  terminal emulation built into their console PROMS.
+
+CONFIG_SUN_OPENPROMFS
+  If you say Y, the OpenPROM device tree will be available as a
+  virtual file system, which you can mount to /proc/openprom by "mount
+  -t openpromfs none /proc/openprom".
+
+  If you want to compile the /proc/openprom support as a module ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want), say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called openpromfs.o.  If unsure, say M.
+
+CONFIG_SPARC32_COMPAT
+  This allows you to run 32-bit binaries on your Ultra.
+  Everybody wants this; say Y.
+
+CONFIG_BINFMT_ELF32
+  This allows you to run 32-bit Linux/ELF binaries on your Ultra.
+  Everybody wants this; say Y.
+
+CONFIG_BINFMT_AOUT32
+  This allows you to run 32-bit a.out format binaries on your Ultra.
+  If you want to run SunOS binaries (see SunOS binary emulation below)
+  or other a.out binaries, say Y. If unsure, say N.
+
+CONFIG_SUNOS_EMUL
+  This allows you to run most SunOS binaries.  If you want to do this,
+  say Y here and place appropriate files in /usr/gnemul/sunos. See
+  <http://www.ultralinux.org/faq.html> for more information.  If you
+  want to run SunOS binaries on an Ultra you must also say Y to
+  "Kernel support for 32-bit a.out binaries" above.
+
+CONFIG_SUN_KEYBOARD
+  Say Y here to support the keyboard found on Sun 3 and 3x
+  workstations.  It can also be used support Sun Type-5 keyboards
+  through an adaptor.  See
+  <http://www.suse.cz/development/input/adapters.html> and
+  <http://sourceforge.net/projects/linuxconsole/> for details on the
+  latter.
+
+CONFIG_VIDEO_DEV
+  Support for audio/video capture and overlay devices and FM radio
+  cards. The exact capabilities of each device vary. User tools for
+  this are available from
+  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
+
+  If you are interested in writing a driver for such an audio/video
+  device or user software interacting with such a driver, please read
+  the file <file:Documentation/video4linux/API.html>.
+
+  This driver is also available as a module called videodev.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_VIDEO_BT848
+  Support for BT848 based frame grabber/overlay boards. This includes
+  the Miro, Hauppauge and STB boards. Please read the material in
+  <file:Documentation/video4linux/bttv> for more information.
+
+  If you say Y or M here, you need to say Y or M to "I2C support" and
+  "I2C bit-banging interfaces" in the character device section.
+
+  This driver is available as a module called bttv.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_DISPLAY7SEG
+  This is the driver for the 7-segment display and LED present on
+  Sun Microsystems CompactPCI models CP1400 and CP1500.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called display7seg.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  If you do not have a CompactPCI model CP1400 or CP1500, or
+  another UltraSPARC-IIi-cEngine boardset with a 7-segment display,
+  you should say N to this option.
+
+CONFIG_WATCHDOG_RIO
+  Say Y here to support the hardware watchdog capability on Sun RIO
+  machines.  The watchdog timeout period is normally one minute but
+  can be changed with a boot-time parameter.
+
+CONFIG_WATCHDOG_CP1XXX
+  This is the driver for the hardware watchdog timers present on
+  Sun Microsystems CompactPCI models CP1400 and CP1500.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cpwatchdog.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  If you do not have a CompactPCI model CP1400 or CP1500, or
+  another UltraSPARC-IIi-cEngine boardset with hardware watchdog,
+  you should say N to this option.
+
+CONFIG_DEBUG_KERNEL
+  Say Y here if you are developing drivers or trying to debug and
+  identify kernel problems.
+
+CONFIG_DEBUG_SLAB
+  Say Y here to have the kernel do limited verification on memory
+  allocation as well as poisoning memory on free to catch use of freed
+  memory.
+
+CONFIG_DEBUG_SPINLOCK
+  Say Y here and build SMP to catch missing spinlock initialization
+  and certain other kinds of spinlock errors commonly made.  This is
+  best used in conjunction with the NMI watchdog so that spinlock
+  deadlocks are also debuggable.
+
+CONFIG_DEBUG_BUGVERBOSE
+  Say Y here to make BUG() panics output the file name and line number
+  of the BUG call as well as the EIP and oops trace.  This aids
+  debugging but costs about 70-100K of memory.
+

@@ -1,0 +1,242 @@
+CONFIG_BLK_DEV_FD
+  If you want to use the floppy disk drive(s) of your PC under Linux,
+  say Y. Information about this driver, especially important for IBM
+  Thinkpad users, is contained in <file:Documentation/floppy.txt>.
+  That file also contains the location of the Floppy driver FAQ as
+  well as location of the fdutils package used to configure additional
+  parameters of the driver at run time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called floppy.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_BLK_DEV_RAM
+  Saying Y here will allow you to use a portion of your RAM memory as
+  a block device, so that you can make file systems on it, read and
+  write to it and do all the other things that you can do with normal
+  block devices (such as hard drives). It is usually used to load and
+  store a copy of a minimal root file system off of a floppy into RAM
+  during the initial install of Linux.
+
+  Note that the kernel command line option "ramdisk=XX" is now
+  obsolete. For details, read <file:Documentation/ramdisk.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M and read <file:Documentation/modules.txt>. The module will be
+  called rd.o.
+
+  Most normal users won't need the RAM disk functionality, and can
+  thus say N here.
+
+CONFIG_BLK_DEV_RAM_SIZE
+  The default value is 4096. Only change this if you know what are
+  you doing. If you are using IBM S/390, then set this to 8192.
+
+CONFIG_BLK_DEV_INITRD
+  The initial RAM disk is a RAM disk that is loaded by the boot loader
+  (loadlin or lilo) and that is mounted as root before the normal boot
+  procedure. It is typically used to load modules needed to mount the
+  "real" root file system, etc. See <file:Documentation/initrd.txt>
+  for details.
+
+CONFIG_BLK_DEV_LOOP
+  Saying Y here will allow you to use a regular file as a block
+  device; you can then create a file system on that block device and
+  mount it just as you would mount other block devices such as hard
+  drive partitions, CD-ROM drives or floppy drives. The loop devices
+  are block special device files with major number 7 and typically
+  called /dev/loop0, /dev/loop1 etc.
+
+  This is useful if you want to check an ISO 9660 file system before
+  burning the CD, or if you want to use floppy images without first
+  writing them to floppy. Furthermore, some Linux distributions avoid
+  the need for a dedicated Linux partition by keeping their complete
+  root file system inside a DOS FAT file using this loop device
+  driver.
+
+  The loop device driver can also be used to "hide" a file system in a
+  disk partition, floppy, or regular file, either using encryption
+  (scrambling the data) or steganography (hiding the data in the low
+  bits of, say, a sound file). This is also safe if the file resides
+  on a remote file server. If you want to do this, you will first have
+  to acquire and install a kernel patch from
+  <ftp://ftp.kerneli.org/pub/kerneli/>, and then you need to
+  say Y to this option.
+
+  Note that alternative ways to use encrypted file systems are
+  provided by the cfs package, which can be gotten from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>, and the newer tcfs
+  package, available at <http://tcfs.dia.unisa.it/>. You do not need
+  to say Y here if you want to use one of these. However, using cfs
+  requires saying Y to "NFS file system support" below while using
+  tcfs requires applying a kernel patch. An alternative steganography
+  solution is provided by StegFS, also available from
+  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>.
+
+  To use the loop device, you need the losetup utility and a recent
+  version of the mount program, both contained in the util-linux
+  package. The location and current version number of util-linux is
+  contained in the file <file:Documentation/Changes>.
+
+  Note that this loop device has nothing to do with the loopback
+  device used for network connections from the machine to itself.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called loop.o.
+
+  Most users will answer N here.
+
+CONFIG_BLK_DEV_NBD
+  Saying Y here will allow your computer to be a client for network
+  block devices, i.e. it will be able to use block devices exported by
+  servers (mount file systems on them etc.). Communication between
+  client and server works over TCP/IP networking, but to the client
+  program this is hidden: it looks like a regular local file access to
+  a block device special file such as /dev/nd0.
+
+  Network block devices also allows you to run a block-device in
+  userland (making server and client physically the same computer,
+  communicating using the loopback network device).
+
+  Read <file:Documentation/nbd.txt> for more information, especially
+  about where to find the server code, which runs in user space and
+  does not need special kernel support.
+
+  Note that this has nothing to do with the network file systems NFS
+  or Coda; you can say N here even if you intend to use NFS or Coda.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called nbd.o.
+
+  If unsure, say N.
+
+CONFIG_BLK_DEV_XD
+  Very old 8 bit hard disk controllers used in the IBM XT computer
+  will be supported if you say Y here.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called xd.o.
+
+  It's pretty unlikely that you have one of these: say N.
+
+CONFIG_BLK_DEV_PS2
+  Say Y here if you have a PS/2 machine with a MCA bus and an ESDI
+  hard disk.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ps2esdi.o.
+
+CONFIG_BLK_DEV_DAC960
+  This driver adds support for the Mylex DAC960, AcceleRAID, and
+  eXtremeRAID PCI RAID controllers.  See the file
+  <file:Documentation/README.DAC960> for further information about
+  this driver.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called DAC960.o.
+
+CONFIG_PARIDE
+  There are many external CD-ROM and disk devices that connect through
+  your computer's parallel port. Most of them are actually IDE devices
+  using a parallel port IDE adapter. This option enables the PARIDE
+  subsystem which contains drivers for many of these external drives.
+  Read <file:Documentation/paride.txt> for more information.
+
+  If you have said Y to the "Parallel-port support" configuration
+  option, you may share a single port between your printer and other
+  parallel port devices. Answer Y to build PARIDE support into your
+  kernel, or M if you would like to build it as a loadable module. If
+  your parallel port support is in a loadable module, you must build
+  PARIDE as a module. If you built PARIDE support into your kernel,
+  you may still build the individual protocol modules and high-level
+  drivers as loadable modules. If you build this support as a module,
+  it will be called paride.o.
+
+  To use the PARIDE support, you must say Y or M here and also to at
+  least one high-level driver (e.g. "Parallel port IDE disks",
+  "Parallel port ATAPI CD-ROMs", "Parallel port ATAPI disks" etc.) and
+  to at least one protocol driver (e.g. "ATEN EH-100 protocol",
+  "MicroSolutions backpack protocol", "DataStor Commuter protocol"
+  etc.).
+
+CONFIG_BLK_CPQ_CISS_DA
+  This is the driver for Compaq Smart Array 5xxx controllers.
+  Everyone using these boards should say Y here.
+  See <file:Documentation/cciss.txt> for the current list of
+  boards supported by this driver, and for further information
+  on the use of this driver.
+
+CONFIG_CISS_SCSI_TAPE
+  When enabled (Y), this option allows SCSI tape drives and SCSI medium
+  changers (tape robots) to be accessed via a Compaq 5xxx array 
+  controller.  (See Documentation/cciss.txt for more details.)
+
+  "SCSI support" and "SCSI tape support" must also be enabled for this 
+  option to work.
+
+  When this option is disabled (N), the SCSI portion of the driver 
+  is not compiled.
+
+CONFIG_BLK_DEV_SWIM_IOP
+  Say Y here to support the SWIM (Super Woz Integrated Machine) IOP
+  floppy controller on the Macintosh IIfx and Quadra 900/950.
+
+CONFIG_AMIGA_Z2RAM
+  This enables support for using Chip RAM and Zorro II RAM as a
+  ramdisk or as a swap partition. Say Y if you want to include this
+  driver in the kernel. This driver is also available as a module
+  ( = code which can be inserted in and removed from the running
+  kernel whenever you want). The module is called z2ram.o. If you want
+  to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_ATARI_ACSI
+  This enables support for the Atari ACSI interface. The driver
+  supports hard disks and CD-ROMs, which have 512-byte sectors, or can
+  be switched to that mode. Due to the ACSI command format, only disks
+  up to 1 GB are supported. Special support for certain ACSI to SCSI
+  adapters, which could relax that, isn't included yet. The ACSI
+  driver is also the basis for certain other drivers for devices
+  attached to the ACSI bus: Atari SLM laser printer, BioNet-100
+  Ethernet, and PAMsNet Ethernet. If you want to use one of these
+  devices, you need ACSI support, too.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called acsi.o.
+
+CONFIG_ACSI_MULTI_LUN
+  If you have a ACSI device that supports more than one LUN (Logical
+  Unit Number), e.g. a CD jukebox, you should say Y here so that all
+  will be found by the ACSI driver. An ACSI device with multiple LUNs
+  acts logically like multiple ACSI devices. The vast majority of ACSI
+  devices have only one LUN, and so most people can say N here and
+  should in fact do so, because it is safer.
+
+CONFIG_ATARI_SLM
+  If you have an Atari SLM laser printer, say Y to include support for
+  it in the kernel. Otherwise, say N. This driver is also available as
+  a module ( = code which can be inserted in and removed from the
+  running kernel whenever you want). The module will be called
+  acsi_slm.o. Be warned: the driver needs much ST-RAM and can cause
+  problems due to that fact!
+
+CONFIG_BLK_CPQ_DA
+  This is the driver for Compaq Smart Array controllers.  Everyone
+  using these boards should say Y here.  See the file
+  <file:Documentation/cpqarray.txt> for the current list of boards
+  supported by this driver, and for further information on the use of
+  this driver.
+

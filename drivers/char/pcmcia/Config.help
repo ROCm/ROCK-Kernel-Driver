@@ -1,0 +1,12 @@
+CONFIG_PCMCIA_SERIAL_CS
+  Say Y here to enable support for 16-bit PCMCIA serial devices,
+  including serial port cards, modems, and the modem functions of
+  multi-function Ethernet/modem cards. (PCMCIA- or PC-cards are
+  credit-card size devices often used with laptops.)
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called serial_cs.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+  If unsure, say N.
+

@@ -1,0 +1,279 @@
+CONFIG_INET_ECN
+  Explicit Congestion Notification (ECN) allows routers to notify
+  clients about network congestion, resulting in fewer dropped packets
+  and increased network performance.  This option adds ECN support to
+  the Linux kernel, as well as a sysctl (/proc/sys/net/ipv4/tcp_ecn)
+  which allows ECN support to be disabled at runtime.
+
+  Note that, on the Internet, there are many broken firewalls which
+  refuse connections from ECN-enabled machines, and it may be a while
+  before these firewalls are fixed.  Until then, to access a site
+  behind such a firewall (some of which are major sites, at the time
+  of this writing) you will have to disable this option, either by
+  saying N now or by using the sysctl.
+
+  If in doubt, say N.
+
+CONFIG_SYN_COOKIES
+  Normal TCP/IP networking is open to an attack known as "SYN
+  flooding". This denial-of-service attack prevents legitimate remote
+  users from being able to connect to your computer during an ongoing
+  attack and requires very little work from the attacker, who can
+  operate from anywhere on the Internet.
+
+  SYN cookies provide protection against this type of attack. If you
+  say Y here, the TCP/IP stack will use a cryptographic challenge
+  protocol known as "SYN cookies" to enable legitimate users to
+  continue to connect, even when your machine is under attack. There
+  is no need for the legitimate users to change their TCP/IP software;
+  SYN cookies work transparently to them. For technical information
+  about SYN cookies, check out <http://cr.yp.to/syncookies.html>.
+
+  If you are SYN flooded, the source address reported by the kernel is
+  likely to have been forged by the attacker; it is only reported as
+  an aid in tracing the packets to their actual source and should not
+  be taken as absolute truth.
+
+  SYN cookies may prevent correct error reporting on clients when the
+  server is really overloaded. If this happens frequently better turn
+  them off.
+
+  If you say Y here, note that SYN cookies aren't enabled by default;
+  you can enable them by saying Y to "/proc file system support" and
+  "Sysctl support" below and executing the command
+
+    echo 1 >/proc/sys/net/ipv4/tcp_syncookies
+
+  at boot time after the /proc file system has been mounted.
+
+  If unsure, say N.
+
+CONFIG_ARPD
+  Normally, the kernel maintains an internal cache which maps IP
+  addresses to hardware addresses on the local network, so that
+  Ethernet/Token Ring/ etc. frames are sent to the proper address on
+  the physical networking layer. For small networks having a few
+  hundred directly connected hosts or less, keeping this address
+  resolution (ARP) cache inside the kernel works well. However,
+  maintaining an internal ARP cache does not work well for very large
+  switched networks, and will use a lot of kernel memory if TCP/IP
+  connections are made to many machines on the network.
+
+  If you say Y here, the kernel's internal ARP cache will never grow
+  to more than 256 entries (the oldest entries are expired in a LIFO
+  manner) and communication will be attempted with the user space ARP
+  daemon arpd. Arpd then answers the address resolution request either
+  from its own cache or by asking the net.
+
+  This code is experimental and also obsolete. If you want to use it,
+  you need to find a version of the daemon arpd on the net somewhere,
+  and you should also say Y to "Kernel/User network link driver",
+  below. If unsure, say N.
+
+CONFIG_IP_MULTICAST
+  This is code for addressing several networked computers at once,
+  enlarging your kernel by about 2 KB. You need multicasting if you
+  intend to participate in the MBONE, a high bandwidth network on top
+  of the Internet which carries audio and video broadcasts. More
+  information about the MBONE is on the WWW at
+  <http://www-itg.lbl.gov/mbone/>. Information about the multicast
+  capabilities of the various network cards is contained in
+  <file:Documentation/networking/multicast.txt>. For most people, it's
+  safe to say N.
+
+CONFIG_IP_ADVANCED_ROUTER
+  If you intend to run your Linux box mostly as a router, i.e. as a
+  computer that forwards and redistributes network packets, say Y; you
+  will then be presented with several options that allow more precise
+  control about the routing process.
+
+  The answer to this question won't directly affect the kernel:
+  answering N will just cause the configurator to skip all the
+  questions about advanced routing.
+
+  Note that your box can only act as a router if you enable IP
+  forwarding in your kernel; you can do that by saying Y to "/proc
+  file system support" and "Sysctl support" below and executing the
+  line
+
+    echo "1" > /proc/sys/net/ipv4/ip_forward
+
+  at boot time after the /proc file system has been mounted.
+
+  If you turn on IP forwarding, you will also get the rp_filter, which
+  automatically rejects incoming packets if the routing table entry
+  for their source address doesn't match the network interface they're
+  arriving on. This has security advantages because it prevents the
+  so-called IP spoofing, however it can pose problems if you use
+  asymmetric routing (packets from you to a host take a different path
+  than packets from that host to you) or if you operate a non-routing
+  host which has several IP addresses on different interfaces. To turn
+  rp_filter off use:
+
+        echo 0 > /proc/sys/net/ipv4/conf/<device>/rp_filter
+  or
+        echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+
+  If unsure, say N here.
+
+CONFIG_IP_MULTIPLE_TABLES
+  Normally, a router decides what to do with a received packet based
+  solely on the packet's final destination address. If you say Y here,
+  the Linux router will also be able to take the packet's source
+  address into account. Furthermore, if you also say Y to "Use TOS
+  value as routing key" below, the TOS (Type-Of-Service) field of the
+  packet can be used for routing decisions as well. In addition, if
+  you say Y here and to "Fast network address translation" below,
+  the router will also be able to modify source and destination
+  addresses of forwarded packets.
+
+  If you are interested in this, please see the preliminary
+  documentation at <http://www.compendium.com.ar/policy-routing.txt>
+  and <ftp://post.tepkom.ru/pub/vol2/Linux/docs/advanced-routing.tex>.
+  You will need supporting software from
+  <ftp://ftp.inr.ac.ru/ip-routing/>.
+
+  If unsure, say N.
+
+CONFIG_IP_ROUTE_MULTIPATH
+  Normally, the routing tables specify a single action to be taken in
+  a deterministic manner for a given packet. If you say Y here
+  however, it becomes possible to attach several actions to a packet
+  pattern, in effect specifying several alternative paths to travel
+  for those packets. The router considers all these paths to be of
+  equal "cost" and chooses one of them in a non-deterministic fashion
+  if a matching packet arrives.
+
+CONFIG_IP_ROUTE_TOS
+  The header of every IP packet carries a TOS (Type Of Service) value
+  with which the packet requests a certain treatment, e.g. low
+  latency (for interactive traffic), high throughput, or high
+  reliability.  If you say Y here, you will be able to specify
+  different routes for packets with different TOS values.
+
+CONFIG_IP_ROUTE_FWMARK
+  If you say Y here, you will be able to specify different routes for
+  packets with different mark values (see iptables(8), MARK target).
+
+CONFIG_IP_ROUTE_VERBOSE
+  If you say Y here, which is recommended, then the kernel will print
+  verbose messages regarding the routing, for example warnings about
+  received packets which look strange and could be evidence of an
+  attack or a misconfigured system somewhere. The information is
+  handled by the klogd daemon which is responsible for kernel messages
+  ("man klogd").
+
+CONFIG_IP_ROUTE_LARGE_TABLES
+  If you have routing zones that grow to more than about 64 entries,
+  you may want to say Y here to speed up the routing process.
+
+CONFIG_IP_ROUTE_NAT
+  If you say Y here, your router will be able to modify source and
+  destination addresses of packets that pass through it, in a manner
+  you specify.  General information about Network Address Translation
+  can be gotten from the document
+  <http://www.csn.tu-chemnitz.de/~mha/linux-ip-nat/diplom/nat.html>.
+
+CONFIG_IP_PNP
+  This enables automatic configuration of IP addresses of devices and
+  of the routing table during kernel boot, based on either information
+  supplied on the kernel command line or by BOOTP or RARP protocols.
+  You need to say Y only for diskless machines requiring network
+  access to boot (in which case you want to say Y to "Root file system
+  on NFS" as well), because all other machines configure the network
+  in their startup scripts.
+
+CONFIG_IP_PNP_BOOTP
+  If you want your Linux box to mount its whole root file system (the
+  one containing the directory /) from some other computer over the
+  net via NFS and you want the IP address of your computer to be
+  discovered automatically at boot time using the BOOTP protocol (a
+  special protocol designed for doing this job), say Y here. In case
+  the boot ROM of your network card was designed for booting Linux and
+  does BOOTP itself, providing all necessary information on the kernel
+  command line, you can say N here. If unsure, say Y. Note that if you
+  want to use BOOTP, a BOOTP server must be operating on your network.
+  Read <file:Documentation/nfsroot.txt> for details.
+
+CONFIG_IP_PNP_DHCP
+  If you want your Linux box to mount its whole root file system (the
+  one containing the directory /) from some other computer over the
+  net via NFS and you want the IP address of your computer to be
+  discovered automatically at boot time using the DHCP protocol (a
+  special protocol designed for doing this job), say Y here. In case
+  the boot ROM of your network card was designed for booting Linux and
+  does DHCP itself, providing all necessary information on the kernel
+  command line, you can say N here.
+
+  If unsure, say Y. Note that if you want to use DHCP, a DHCP server
+  must be operating on your network.  Read
+  <file:Documentation/nfsroot.txt> for details.
+
+CONFIG_IP_PNP_RARP
+  If you want your Linux box to mount its whole root file system (the
+  one containing the directory /) from some other computer over the
+  net via NFS and you want the IP address of your computer to be
+  discovered automatically at boot time using the RARP protocol (an
+  older protocol which is being obsoleted by BOOTP and DHCP), say Y
+  here. Note that if you want to use RARP, a RARP server must be
+  operating on your network. Read <file:Documentation/nfsroot.txt> for
+  details.
+
+CONFIG_NET_IPIP
+  Tunneling means encapsulating data of one protocol type within
+  another protocol and sending it over a channel that understands the
+  encapsulating protocol. This particular tunneling driver implements
+  encapsulation of IP within IP, which sounds kind of pointless, but
+  can be useful if you want to make your (or some other) machine
+  appear on a different network than it physically is, or to use
+  mobile-IP facilities (allowing laptops to seamlessly move between
+  networks without changing their IP addresses; check out
+  <http://anchor.cs.binghamton.edu/~mobileip/LJ/index.html>).
+
+  Saying Y to this option will produce two modules ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want). Most people won't need this and can say N.
+
+CONFIG_NET_IPGRE
+  Tunneling means encapsulating data of one protocol type within
+  another protocol and sending it over a channel that understands the
+  encapsulating protocol. This particular tunneling driver implements
+  GRE (Generic Routing Encapsulation) and at this time allows
+  encapsulating of IPv4 or IPv6 over existing IPv4 infrastructure.
+  This driver is useful if the other endpoint is a Cisco router: Cisco
+  likes GRE much better than the other Linux tunneling driver ("IP
+  tunneling" above). In addition, GRE allows multicast redistribution
+  through the tunnel.
+
+CONFIG_NET_IPGRE_BROADCAST
+  One application of GRE/IP is to construct a broadcast WAN (Wide Area
+  Network), which looks like a normal Ethernet LAN (Local Area
+  Network), but can be distributed all over the Internet. If you want
+  to do that, say Y here and to "IP multicast routing" below.
+
+CONFIG_IP_MROUTE
+  This is used if you want your machine to act as a router for IP
+  packets that have several destination addresses. It is needed on the
+  MBONE, a high bandwidth network on top of the Internet which carries
+  audio and video broadcasts. In order to do that, you would most
+  likely run the program mrouted. Information about the multicast
+  capabilities of the various network cards is contained in
+  <file:Documentation/networking/multicast.txt>. If you haven't heard
+  about it, you don't need it.
+
+CONFIG_IP_PIMSM_V1
+  Kernel side support for Sparse Mode PIM (Protocol Independent
+  Multicast) version 1. This multicast routing protocol is used widely
+  because Cisco supports it. You need special software to use it
+  (pimd-v1). Please see <http://netweb.usc.edu/pim/> for more
+  information about PIM.
+
+  Say Y if you want to use PIM-SM v1. Note that you can say N here if
+  you just want to use Dense Mode PIM.
+
+CONFIG_IP_PIMSM_V2
+  Kernel side support for Sparse Mode PIM version 2. In order to use
+  this, you need an experimental routing daemon supporting it (pimd or
+  gated-5). This routing protocol is not used widely, so say N unless
+  you want to play with it.
+

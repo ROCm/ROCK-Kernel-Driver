@@ -1,0 +1,541 @@
+CONFIG_SMP
+  This enables support for systems with more than one CPU. If you have
+  a system with only one CPU, like most personal computers, say N. If
+  you have a system with more than one CPU, say Y.
+
+  If you say N here, the kernel will run on single and multiprocessor
+  machines, but will use only one CPU of a multiprocessor machine. If
+  you say Y here, the kernel will run on many, but not all,
+  singleprocessor machines. On a singleprocessor machine, the kernel
+  will run faster if you say N here.
+
+  Note that if you say Y here and choose architecture "586" or
+  "Pentium" under "Processor family", the kernel will not work on 486
+  architectures. Similarly, multiprocessor kernels for the "PPro"
+  architecture may not work on all Pentium based boards.
+
+  People using multiprocessor machines who say Y here should also say
+  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+  Management" code will be disabled if you say Y here.
+
+  See also the <file:Documentation/smp.tex>,
+  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you don't know what to do here, say N.
+
+CONFIG_IA64
+  The Itanium is Intel's 64-bit successor to the 32-bit X86 line.  As
+  of early 2001 it is not yet in widespread production use.  The Linux
+  IA-64 project has a home page at <http://www.linuxia64.org/>.
+
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_DISCONTIGMEM
+  Say Y to upport efficient handling of discontiguous physical memory,
+  for architectures which are either NUMA (Non-Uniform Memory Access)
+  or have huge holes in the physical address space for other reasons.
+  See <file:Documentation/vm/numa> for more.
+
+CONFIG_NUMA
+  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
+  Access).  This option is for configuring high-end multiprocessor
+  server machines.  If in doubt, say N.
+
+CONFIG_ISA
+  Find out whether you have ISA slots on your motherboard.  ISA is the
+  name of a bus system, i.e. the way the CPU talks to the other stuff
+  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+CONFIG_PCI
+  Find out whether you have a PCI motherboard. PCI is the name of a
+  bus system, i.e. the way the CPU talks to the other stuff inside
+  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+  VESA. If you have PCI, say Y, otherwise N.
+
+  The PCI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+  information about which PCI hardware does work under Linux and which
+  doesn't.
+
+CONFIG_MCA
+  MicroChannel Architecture is found in some IBM PS/2 machines and
+  laptops.  It is a bus system similar to PCI or ISA. See
+  <file:Documentation/mca.txt> (and especially the web page given
+  there) before attempting to build an MCA bus kernel.
+
+CONFIG_EISA
+  The Extended Industry Standard Architecture (EISA) bus was
+  developed as an open alternative to the IBM MicroChannel bus.
+
+  The EISA bus provided some of the features of the IBM MicroChannel
+  bus while maintaining backward compatibility with cards made for
+  the older ISA bus.  The EISA bus saw limited use between 1988 and
+  1995 when it was made obsolete by the PCI bus.
+
+  Say Y here if you are building a kernel for an EISA-based machine.
+
+  Otherwise, say N.
+
+CONFIG_HOTPLUG
+  Say Y here if you want to plug devices into your computer while
+  the system is running, and be able to use them quickly.  In many
+  cases, the devices can likewise be unplugged at any time too.
+
+  One well known example of this is PCMCIA- or PC-cards, credit-card
+  size devices such as network cards, modems or hard drives which are
+  plugged into slots found on all modern laptop computers.  Another
+  example, used on modern desktops as well as laptops, is USB.
+
+  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+  Then your kernel will automatically call out to a user mode "policy
+  agent" (/sbin/hotplug) to load modules and set up software needed
+  to use devices as you hotplug them.
+
+CONFIG_PCMCIA
+  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+  computer.  These are credit-card size devices such as network cards,
+  modems or hard drives often used with laptops computers.  There are
+  actually two varieties of these cards: the older 16 bit PCMCIA cards
+  and the newer 32 bit CardBus cards.  If you want to use CardBus
+  cards, you need to say Y here and also to "CardBus support" below.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  Please also read the PCMCIA-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  When compiled this way, there will be modules called pcmcia_core.o
+  and ds.o.  If you want to compile it as a module, say M here and
+  read <file:Documentation/modules.txt>.
+
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_BINFMT_ELF
+  ELF (Executable and Linkable Format) is a format for libraries and
+  executables used across different architectures and operating
+  systems. Saying Y here will enable your kernel to run ELF binaries
+  and enlarge it by about 13 KB. ELF support under Linux has now all
+  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+  because it is portable (this does *not* mean that you will be able
+  to run executables from different architectures or operating systems
+  however) and makes building run-time libraries very easy. Many new
+  executables are distributed solely in ELF format. You definitely
+  want to say Y here.
+
+  Information about ELF is contained in the ELF HOWTO available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you find that after upgrading from Linux kernel 1.2 and saying Y
+  here, you still can't run any ELF binaries (they just crash), then
+  you'll have to install the newest ELF runtime libraries, including
+  ld.so (check the file <file:Documentation/Changes> for location and
+  latest version).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called binfmt_elf.o. Saying M or N here is dangerous because
+  some crucial programs on your system might be in ELF format.
+
+CONFIG_BINFMT_MISC
+  If you say Y here, it will be possible to plug wrapper-driven binary
+  formats into the kernel. You will like this especially when you use
+  programs that need an interpreter to run like Java, Python or
+  Emacs-Lisp. It's also useful if you often run DOS executables under
+  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+  registered such a binary class with the kernel, you can start one of
+  those programs simply by typing in its name at a shell prompt; Linux
+  will automatically feed it to the correct interpreter.
+
+  You can do other nice things, too. Read the file
+  <file:Documentation/binfmt_misc.txt> to learn how to use this
+  feature, and <file:Documentation/java.txt> for information about how
+  to include Java support.
+
+  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+  use this part of the kernel.
+
+  You may say M here for module support and later load the module when
+  you have use for it; the module is called binfmt_misc.o. If you
+  don't know what to answer at this point, say Y.
+
+CONFIG_VGA_CONSOLE
+  Saying Y here will allow you to use Linux in text mode through a
+  display that complies with the generic VGA standard. Virtually
+  everyone wants that.
+
+  The program SVGATextMode can be used to utilize SVGA video cards to
+  their full potential in text mode. Download it from
+  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+  Say Y.
+
+CONFIG_SCSI
+  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+  any other SCSI device under Linux, say Y and make sure that you know
+  the name of your SCSI host adapter (the card inside your computer
+  that "speaks" the SCSI protocol, also called SCSI controller),
+  because you will be asked for it.
+
+  You also need to say Y here if you want support for the parallel
+  port version of the 100 MB IOMEGA ZIP drive.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scsi_mod.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  However, do not compile this as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI device.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_CD_NO_IDESCSI
+  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+  here, otherwise N. Read the CD-ROM-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about these CD-ROM drives. If you are unsure what you
+  have, say Y and find out whether you have one of the following
+  drives.
+
+  For each of these drivers, a file Documentation/cdrom/{driver_name}
+  exists. Especially in cases where you do not know exactly which kind
+  of drive you have you should read there. Most of these drivers use a
+  file drivers/cdrom/{driver_name}.h where you can define your
+  interface parameters and switch some internal goodies.
+
+  All these CD-ROM drivers are also usable as a module ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want). If you want to compile them as module, say M instead of Y and
+  read <file:Documentation/modules.txt>.
+
+  If you want to use any of these CD-ROM drivers, you also have to
+  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+  answer will get "defaulted" for you if you enable any of the Linux
+  CD-ROM drivers).
+
+CONFIG_DEVFS_FS
+  This is support for devfs, a virtual file system (like /proc) which
+  provides the file system interface to device drivers, normally found
+  in /dev. Devfs does not depend on major and minor number
+  allocations. Device drivers register entries in /dev which then
+  appear automatically, which means that the system administrator does
+  not have to create character and block special device files in the
+  /dev directory using the mknod command (or MAKEDEV script) anymore.
+
+  This is work in progress. If you want to use this, you *must* read
+  the material in <file:Documentation/filesystems/devfs/>, especially
+  the file README there.
+
+  If unsure, say N.
+
+CONFIG_DEVFS_DEBUG
+  If you say Y here, then the /dev file system code will generate
+  debugging messages. See the file
+  <file:Documentation/filesystems/devfs/boot-options> for more
+  details.
+
+  If unsure, say N.
+
+CONFIG_PM
+  "Power Management" means that parts of your computer are shut
+  off or put into a power conserving "sleep" mode if they are not
+  being used.  There are two competing standards for doing this: APM
+  and ACPI.  If you want to use either one, say Y here and then also
+  to the requisite support below.
+
+  Power Management is most important for battery powered laptop
+  computers; if you have a laptop, check out the Linux Laptop home
+  page on the WWW at
+  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
+  Battery Powered Linux mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that, even if you say N here, Linux on the x86 architecture
+  will issue the hlt instruction if nothing is to be done, thereby
+  sending the processor to sleep and saving power.
+
+CONFIG_ACPI
+  ACPI/OSPM support for Linux is currently under development. As such,
+  this support is preliminary and EXPERIMENTAL.  Configuring ACPI
+  support enables kernel interfaces that allow higher level software
+  (OSPM) to manipulate ACPI defined hardware and software interfaces,
+  including the evaluation of ACPI control methods.  If unsure, choose
+  N here.  Note, this option will enlarge your kernel by about 120K.
+
+  This support requires an ACPI compliant platform (hardware/firmware).
+  If both ACPI and Advanced Power Management (APM) support are
+  configured, whichever is loaded first shall be used.
+
+  This code DOES NOT currently provide a complete OSPM implementation
+  -- it has not yet reached APM's level of functionality.  When fully
+  implemented, Linux ACPI/OSPM will provide a more robust functional
+  replacement for legacy configuration and power management
+  interfaces, including the Plug-and-Play BIOS specification (PnP
+  BIOS), the Multi-Processor Specification (MPS), and the Advanced
+  Power Management specification (APM).
+
+  Linux support for ACPI/OSPM is based on Intel Corporation's ACPI
+  Component Architecture (ACPI CA). The latest ACPI CA source code,
+  documentation, debug builds, and implementation status information
+  can be downloaded from:
+  <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
+
+  The ACPI Sourceforge project may also be of interest:
+  <http://sf.net/projects/acpi/>
+
+CONFIG_ACPI_KERNEL_CONFIG
+  If you say `Y' here, Linux's ACPI support will use the
+  hardware-level system descriptions found on IA64 machines.
+
+CONFIG_SOUND
+  If you have a sound card in your computer, i.e. if it can say more
+  than an occasional beep, say Y.  Be sure to have all the information
+  about your sound card and its configuration down (I/O port,
+  interrupt and DMA channel), because you will be asked for it.
+
+  You want to read the Sound-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. General information about
+  the modular sound system is contained in the files
+  <file:Documentation/sound/Introduction>.  The file
+  <file:Documentation/sound/README.OSS> contains some slightly
+  outdated but still useful information as well.
+
+  If you have a PnP sound card and you want to configure it at boot
+  time using the ISA PnP tools (read
+  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+  compile the sound card support as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want)
+  and load that module after the PnP configuration is finished.  To do
+  this, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/sound/README.modules>; the module will be
+  called soundcore.o.
+
+  I'm told that even without a sound card, you can make your computer
+  say more than an occasional beep, by programming the PC speaker.
+  Kernel patches and supporting utilities to do that are in the pcsp
+  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+CONFIG_MAGIC_SYSRQ
+  If you say Y here, you will have some control over the system even
+  if the system crashes for example during kernel debugging (e.g., you
+  will be able to flush the buffer cache to disk, reboot the system
+  immediately or dump some status information). This is accomplished
+  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+  also works on a serial console (on PC hardware at least), if you
+  send a BREAK and then within 5 seconds a command keypress. The
+  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+  unless you really know what this hack does.
+
+CONFIG_ISDN
+  ISDN ("Integrated Services Digital Networks", called RNIS in France)
+  is a special type of fully digital telephone service; it's mostly
+  used to connect to your Internet service provider (with SLIP or
+  PPP).  The main advantage is that the speed is higher than ordinary
+  modem/telephone connections, and that you can have voice
+  conversations while downloading stuff.  It only works if your
+  computer is equipped with an ISDN card and both you and your service
+  provider purchased an ISDN line from the phone company.  For
+  details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
+
+  This driver allows you to use an ISDN-card for networking
+  connections and as dialin/out device.  The isdn-tty's have a built
+  in AT-compatible modem emulator.  Network devices support autodial,
+  channel-bundling, callback and caller-authentication without having
+  a daemon running.  A reduced T.70 protocol is supported with tty's
+  suitable for German BTX.  On D-Channel, the protocols EDSS1
+  (Euro-ISDN) and 1TR6 (German style) are supported.  See
+  <file:Documentation/isdn/README> for more information.
+
+  If you want to compile the ISDN code as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want), say M here and read <file:Documentation/modules.txt>.  The
+  module will be called isdn.o. If unsure, say N.
+
+CONFIG_ITANIUM_BSTEP_SPECIFIC
+  Select this option to build a kernel for an Itanium prototype system
+  with a B-step CPU.  You have a B-step CPU if the "revision" field in
+  /proc/cpuinfo has a value in the range from 1 to 4.
+
+CONFIG_IA64_MCA
+  Say Y here to enable machine check support for IA-64.  If you're
+  unsure, answer Y.
+
+CONFIG_DISABLE_VHPT
+  The Virtual Hash Page Table (VHPT) enhances virtual address
+  translation performance.  Normally you want the VHPT active but you
+  can select this option to disable the VHPT for debugging.  If you're
+  unsure, answer N.
+
+CONFIG_MCKINLEY_ASTEP_SPECIFIC
+  Select this option to build a kernel for an IA64 McKinley system
+  with any A-stepping CPU.
+
+CONFIG_MCKINLEY_A0_SPECIFIC
+  Select this option to build a kernel for an IA64 McKinley system
+  with an A0 or A1 stepping CPU.
+
+CONFIG_IA64_DEBUG_CMPXCHG
+  Selecting this option turns on bug checking for the IA64
+  compare-and-exchange instructions.  This is slow!  Itaniums
+  from step B3 or later don't have this problem. If you're unsure,
+  select N.
+
+CONFIG_IA64_DEBUG_IRQ
+  Selecting this option turns on bug checking for the IA64 irq_save
+  and restore instructions.  It's useful for tracking down spinlock
+  problems, but slow!  If you're unsure, select N.
+
+CONFIG_IA64_EARLY_PRINTK
+  Selecting this option uses the VGA screen for printk() output before
+  the consoles are initialised.  It is useful for debugging problems
+  early in the boot process, but only if you have a VGA screen
+  attached.  If you're unsure, select N.
+
+CONFIG_IA64_PRINT_HAZARDS
+  Selecting this option prints more information for Illegal Dependency
+  Faults, that is, for Read after Write, Write after Write or Write
+  after Read violations.  This option is ignored if you are compiling
+  for an Itanium A step processor (CONFIG_ITANIUM_ASTEP_SPECIFIC).  If
+  you're unsure, select Y.
+
+CONFIG_PERFMON
+  Selects whether support for the IA-64 performance monitor hardware
+  is included in the kernel.  This makes some kernel data-structures a
+  little bigger and slows down execution a bit, but it is still
+  usually a good idea to turn this on.  If you're unsure, say N.
+
+CONFIG_IA64_PALINFO
+  If you say Y here, you are able to get PAL (Processor Abstraction
+  Layer) information in /proc/pal.  This contains useful information
+  about the processors in your systems, such as cache and TLB sizes
+  and the PAL firmware version in use.
+
+  To use this option, you have to check that the "/proc file system
+  support" (CONFIG_PROC_FS) is enabled, too.
+
+CONFIG_IA32_SUPPORT
+  IA64 processors can run IA32 (that is, x86) binaries by emulating
+  the IA32 instruction set.  Say Y here to build in kernel support for
+  this.  If in doubt, say Y.
+
+CONFIG_EFI_VARS
+  If you say Y here, you are able to get EFI (Extensible Firmware
+  Interface) variable information in /proc/efi/vars.  You may read,
+  write, create, and destroy EFI variables through this interface.
+
+  To use this option, you have to check that the "/proc file system
+  support" (CONFIG_PROC_FS) is enabled, too.
+
+CONFIG_DEBUG_KERNEL
+  Say Y here if you are developing drivers or trying to debug and
+  identify kernel problems.
+
+CONFIG_DEBUG_SLAB
+  Say Y here to have the kernel do limited verification on memory
+  allocation as well as poisoning memory on free to catch use of freed
+  memory.
+
+CONFIG_DEBUG_SPINLOCK
+  Say Y here and build SMP to catch missing spinlock initialization
+  and certain other kinds of spinlock errors commonly made.  This is
+  best used in conjunction with the NMI watchdog so that spinlock
+  deadlocks are also debuggable.
+

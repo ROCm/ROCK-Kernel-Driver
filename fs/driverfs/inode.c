@@ -241,9 +241,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	}
 
 	dev = list_entry(entry->parent,struct device, dir);
-
-	if (!valid_device(dev))
-		return -EFAULT;
+	get_device(dev);
 
 	if (!entry->show)
 		goto done;
@@ -309,9 +307,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	}
 
 	dev = list_entry(entry->parent,struct device, dir);
-
-	if (!valid_device(dev))
-		return -EFAULT;
+	get_device(dev);
 
 	if (!entry->store)
 		goto done;

@@ -1,0 +1,755 @@
+CONFIG_ARM
+  The ARM series is a line of low-power-consumption RISC chip designs
+  licensed by ARM ltd and targeted at embedded applications and
+  handhelds such as the Compaq IPAQ.  ARM-based PCs are no longer
+  manufactured, but  legacy ARM-based PC hardware remains popular in
+  Europe.  There is an ARM Linux project with a web page at
+  <http://www.arm.linux.org.uk/>.
+
+CONFIG_LEDS
+  If you say Y here, the LEDs on your machine will be used
+  to provide useful information about your current system status.
+
+  If you are compiling a kernel for a NetWinder or EBSA-285, you will
+  be able to select which LEDs are active using the options below. If
+  you are compiling a kernel for the EBSA-110 or the LART however, the
+  red LED will simply flash regularly to indicate that the system is
+  still functional. It is safe to say Y here if you have a CATS
+  system, but the driver will do nothing.
+
+CONFIG_LEDS_TIMER
+  If you say Y here, one of the system LEDs (the green one on the
+  NetWinder, the amber one on the EBSA285, or the red one on the LART)
+  will flash regularly to indicate that the system is still
+  operational. This is mainly useful to kernel hackers who are
+  debugging unstable kernels.
+
+  The LART uses the same LED for both Timer LED and CPU usage LED
+  functions. You may choose to use both, but the Timer LED function
+  will overrule the CPU usage LED.
+
+CONFIG_LEDS_CPU
+  If you say Y here, the red LED will be used to give a good real
+  time indication of CPU usage, by lighting whenever the idle task
+  is not currently executing.
+
+  The LART uses the same LED for both Timer LED and CPU usage LED
+  functions. You may choose to use both, but the Timer LED function
+  will overrule the CPU usage LED.
+
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_DISCONTIGMEM
+  Say Y to upport efficient handling of discontiguous physical memory,
+  for architectures which are either NUMA (Non-Uniform Memory Access)
+  or have huge holes in the physical address space for other reasons.
+  See <file:Documentation/vm/numa> for more.
+
+CONFIG_ISA
+  Find out whether you have ISA slots on your motherboard.  ISA is the
+  name of a bus system, i.e. the way the CPU talks to the other stuff
+  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+CONFIG_PCI
+  Find out whether you have a PCI motherboard. PCI is the name of a
+  bus system, i.e. the way the CPU talks to the other stuff inside
+  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+  VESA. If you have PCI, say Y, otherwise N.
+
+  The PCI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+  information about which PCI hardware does work under Linux and which
+  doesn't.
+
+CONFIG_PCI_INTEGRATOR
+  Find out whether you have a PCI motherboard. PCI is the name of a
+  bus system, i.e. the way the CPU talks to the other stuff inside
+  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+  VESA. If you have PCI, say Y, otherwise N.
+
+  The PCI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+  information about which PCI hardware does work under Linux and which
+  doesn't.
+
+CONFIG_MCA
+  MicroChannel Architecture is found in some IBM PS/2 machines and
+  laptops.  It is a bus system similar to PCI or ISA. See
+  <file:Documentation/mca.txt> (and especially the web page given
+  there) before attempting to build an MCA bus kernel.
+
+CONFIG_EISA
+  The Extended Industry Standard Architecture (EISA) bus was
+  developed as an open alternative to the IBM MicroChannel bus.
+
+  The EISA bus provided some of the features of the IBM MicroChannel
+  bus while maintaining backward compatibility with cards made for
+  the older ISA bus.  The EISA bus saw limited use between 1988 and
+  1995 when it was made obsolete by the PCI bus.
+
+  Say Y here if you are building a kernel for an EISA-based machine.
+
+  Otherwise, say N.
+
+CONFIG_HOTPLUG
+  Say Y here if you want to plug devices into your computer while
+  the system is running, and be able to use them quickly.  In many
+  cases, the devices can likewise be unplugged at any time too.
+
+  One well known example of this is PCMCIA- or PC-cards, credit-card
+  size devices such as network cards, modems or hard drives which are
+  plugged into slots found on all modern laptop computers.  Another
+  example, used on modern desktops as well as laptops, is USB.
+
+  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+  Then your kernel will automatically call out to a user mode "policy
+  agent" (/sbin/hotplug) to load modules and set up software needed
+  to use devices as you hotplug them.
+
+CONFIG_PCMCIA
+  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+  computer.  These are credit-card size devices such as network cards,
+  modems or hard drives often used with laptops computers.  There are
+  actually two varieties of these cards: the older 16 bit PCMCIA cards
+  and the newer 32 bit CardBus cards.  If you want to use CardBus
+  cards, you need to say Y here and also to "CardBus support" below.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  Please also read the PCMCIA-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  When compiled this way, there will be modules called pcmcia_core.o
+  and ds.o.  If you want to compile it as a module, say M here and
+  read <file:Documentation/modules.txt>.
+
+CONFIG_BINFMT_ELF
+  ELF (Executable and Linkable Format) is a format for libraries and
+  executables used across different architectures and operating
+  systems. Saying Y here will enable your kernel to run ELF binaries
+  and enlarge it by about 13 KB. ELF support under Linux has now all
+  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+  because it is portable (this does *not* mean that you will be able
+  to run executables from different architectures or operating systems
+  however) and makes building run-time libraries very easy. Many new
+  executables are distributed solely in ELF format. You definitely
+  want to say Y here.
+
+  Information about ELF is contained in the ELF HOWTO available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you find that after upgrading from Linux kernel 1.2 and saying Y
+  here, you still can't run any ELF binaries (they just crash), then
+  you'll have to install the newest ELF runtime libraries, including
+  ld.so (check the file <file:Documentation/Changes> for location and
+  latest version).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called binfmt_elf.o. Saying M or N here is dangerous because
+  some crucial programs on your system might be in ELF format.
+
+CONFIG_BINFMT_AOUT
+  A.out (Assembler.OUTput) is a set of formats for libraries and
+  executables used in the earliest versions of UNIX. Linux used the
+  a.out formats QMAGIC and ZMAGIC until they were replaced with the
+  ELF format.
+
+  As more and more programs are converted to ELF, the use for a.out
+  will gradually diminish. If you disable this option it will reduce
+  your kernel by one page. This is not much and by itself does not
+  warrant removing support. However its removal is a good idea if you
+  wish to ensure that absolutely none of your programs will use this
+  older executable format. If you don't know what to answer at this
+  point then answer Y. If someone told you "You need a kernel with
+  QMAGIC support" then you'll have to say Y here. You may answer M to
+  compile a.out support as a module and later load the module when you
+  want to use a program or library in a.out format. The module will be
+  called binfmt_aout.o. Saying M or N here is dangerous though,
+  because some crucial programs on your system might still be in A.OUT
+  format.
+
+CONFIG_BINFMT_MISC
+  If you say Y here, it will be possible to plug wrapper-driven binary
+  formats into the kernel. You will like this especially when you use
+  programs that need an interpreter to run like Java, Python or
+  Emacs-Lisp. It's also useful if you often run DOS executables under
+  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+  registered such a binary class with the kernel, you can start one of
+  those programs simply by typing in its name at a shell prompt; Linux
+  will automatically feed it to the correct interpreter.
+
+  You can do other nice things, too. Read the file
+  <file:Documentation/binfmt_misc.txt> to learn how to use this
+  feature, and <file:Documentation/java.txt> for information about how
+  to include Java support.
+
+  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+  use this part of the kernel.
+
+  You may say M here for module support and later load the module when
+  you have use for it; the module is called binfmt_misc.o. If you
+  don't know what to answer at this point, say Y.
+
+CONFIG_VGA_CONSOLE
+  Saying Y here will allow you to use Linux in text mode through a
+  display that complies with the generic VGA standard. Virtually
+  everyone wants that.
+
+  The program SVGATextMode can be used to utilize SVGA video cards to
+  their full potential in text mode. Download it from
+  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+  Say Y.
+
+CONFIG_ARCH_CAMELOT
+  This enables support for Altera's Excalibur XA10 development board.
+  If you would like to build your kernel to run on one of these boards
+  then you must say 'Y' here. Otherwise say 'N'
+
+CONFIG_SCSI
+  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+  any other SCSI device under Linux, say Y and make sure that you know
+  the name of your SCSI host adapter (the card inside your computer
+  that "speaks" the SCSI protocol, also called SCSI controller),
+  because you will be asked for it.
+
+  You also need to say Y here if you want support for the parallel
+  port version of the 100 MB IOMEGA ZIP drive.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scsi_mod.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  However, do not compile this as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI device.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_ARM_THUMB
+  Say Y if you want to have kernel support for ARM Thumb instructions,
+  fault handlers, and system calls.
+
+  The Thumb instruction set is a compressed form of the standard ARM
+  instruction set resulting in smaller binaries at the expense of
+  slightly less efficient code.
+
+  If you don't know what this all is, saying Y is a safe choice.
+
+CONFIG_PM
+  "Power Management" means that parts of your computer are shut
+  off or put into a power conserving "sleep" mode if they are not
+  being used.  There are two competing standards for doing this: APM
+  and ACPI.  If you want to use either one, say Y here and then also
+  to the requisite support below.
+
+  Power Management is most important for battery powered laptop
+  computers; if you have a laptop, check out the Linux Laptop home
+  page on the WWW at
+  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
+  Battery Powered Linux mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that, even if you say N here, Linux on the x86 architecture
+  will issue the hlt instruction if nothing is to be done, thereby
+  sending the processor to sleep and saving power.
+
+CONFIG_APM
+  APM is a BIOS specification for saving power using several different
+  techniques. This is mostly useful for battery powered laptops with
+  APM compliant BIOSes. If you say Y here, the system time will be
+  reset after a RESUME operation, the /proc/apm device will provide
+  battery status information, and user-space programs will receive
+  notification of APM "events" (e.g. battery status change).
+
+  If you select "Y" here, you can disable actual use of the APM
+  BIOS by passing the "apm=off" option to the kernel at boot time.
+
+  Note that the APM support is almost completely disabled for
+  machines with more than one CPU.
+
+  In order to use APM, you will need supporting software. For location
+  and more information, read <file:Documentation/pm.txt> and the
+  Battery Powered Linux mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver does not spin down disk drives (see the hdparm(8)
+  manpage ("man 8 hdparm") for that), and it doesn't turn off
+  VESA-compliant "green" monitors.
+
+  This driver does not support the TI 4000M TravelMate and the ACER
+  486/DX4/75 because they don't have compliant BIOSes. Many "green"
+  desktop machines also don't have compliant BIOSes, and this driver
+  may cause those machines to panic during the boot phase.
+
+  Generally, if you don't have a battery in your machine, there isn't
+  much point in using this driver and you should say N. If you get
+  random kernel OOPSes or reboots that don't seem to be related to
+  anything, try disabling/enabling this option (or disabling/enabling
+  APM in your BIOS).
+
+  Some other things you should try when experiencing seemingly random,
+  "weird" problems:
+
+   1) make sure that you have enough swap space and that it is
+      enabled.
+   2) pass the "no-hlt" option to the kernel
+   3) switch on floating point emulation in the kernel and pass
+      the "no387" option to the kernel
+   4) pass the "floppy=nodma" option to the kernel
+   5) pass the "mem=4M" option to the kernel (thereby disabling
+      all but the first 4 MB of RAM)
+   6) make sure that the CPU is not over clocked.
+   7) read the sig11 FAQ at <http://www.bitwizard.nl/sig11/>
+   8) disable the cache from your BIOS settings
+   9) install a fan for the video card or exchange video RAM
+   10) install a better fan for the CPU
+   11) exchange RAM chips
+   12) exchange the motherboard.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  apm.o.
+
+CONFIG_SOUND
+  If you have a sound card in your computer, i.e. if it can say more
+  than an occasional beep, say Y.  Be sure to have all the information
+  about your sound card and its configuration down (I/O port,
+  interrupt and DMA channel), because you will be asked for it.
+
+  You want to read the Sound-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. General information about
+  the modular sound system is contained in the files
+  <file:Documentation/sound/Introduction>.  The file
+  <file:Documentation/sound/README.OSS> contains some slightly
+  outdated but still useful information as well.
+
+  If you have a PnP sound card and you want to configure it at boot
+  time using the ISA PnP tools (read
+  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+  compile the sound card support as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want)
+  and load that module after the PnP configuration is finished.  To do
+  this, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/sound/README.modules>; the module will be
+  called soundcore.o.
+
+  I'm told that even without a sound card, you can make your computer
+  say more than an occasional beep, by programming the PC speaker.
+  Kernel patches and supporting utilities to do that are in the pcsp
+  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+CONFIG_MAGIC_SYSRQ
+  If you say Y here, you will have some control over the system even
+  if the system crashes for example during kernel debugging (e.g., you
+  will be able to flush the buffer cache to disk, reboot the system
+  immediately or dump some status information). This is accomplished
+  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+  also works on a serial console (on PC hardware at least), if you
+  send a BREAK and then within 5 seconds a command keypress. The
+  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+  unless you really know what this hack does.
+
+CONFIG_ISDN
+  ISDN ("Integrated Services Digital Networks", called RNIS in France)
+  is a special type of fully digital telephone service; it's mostly
+  used to connect to your Internet service provider (with SLIP or
+  PPP).  The main advantage is that the speed is higher than ordinary
+  modem/telephone connections, and that you can have voice
+  conversations while downloading stuff.  It only works if your
+  computer is equipped with an ISDN card and both you and your service
+  provider purchased an ISDN line from the phone company.  For
+  details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
+
+  This driver allows you to use an ISDN-card for networking
+  connections and as dialin/out device.  The isdn-tty's have a built
+  in AT-compatible modem emulator.  Network devices support autodial,
+  channel-bundling, callback and caller-authentication without having
+  a daemon running.  A reduced T.70 protocol is supported with tty's
+  suitable for German BTX.  On D-Channel, the protocols EDSS1
+  (Euro-ISDN) and 1TR6 (German style) are supported.  See
+  <file:Documentation/isdn/README> for more information.
+
+  If you want to compile the ISDN code as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want), say M here and read <file:Documentation/modules.txt>.  The
+  module will be called isdn.o. If unsure, say N.
+
+CONFIG_ARCH_A5K
+  Say Y here to to support the Acorn A5000.  Linux can support the
+  internal IDE disk and CD-ROM interface, serial and parallel port,
+  and the floppy drive.  Note that on some A5000s the floppy is
+  plugged into the wrong socket on the motherboard.
+
+CONFIG_ARCH_ARC
+  The Acorn Archimedes was an personal computer based on an 8K ARM2
+  processor, released in 1987.  It supported 512K of RAM and 2 800K
+  floppy disks.  Picture and more detailed specifications at
+  <http://www.computingmuseum.com/museum/archi.htm>.
+
+CONFIG_PAGESIZE_16
+  Say Y here if your Archimedes or A5000 system has only 2MB of
+  memory, otherwise say N.  The resulting kernel will not run on a
+  machine with 4MB of memory.
+
+CONFIG_ARCH_CATS
+  Say Y here if you intend to run this kernel on the CATS.
+
+  Saying N will reduce the size of the Footbridge kernel.
+
+CONFIG_ARCH_EBSA285_ADDIN
+  Say Y here if you intend to run this kernel on the EBSA285 card
+  in addin mode.
+
+  Saying N will reduce the size of the Footbridge kernel.
+
+CONFIG_ARCH_EBSA285_HOST
+  Say Y here if you intend to run this kernel on the EBSA285 card
+  in host ("central function") mode.
+
+  Saying N will reduce the size of the Footbridge kernel.
+
+CONFIG_ARCH_NETWINDER
+  Say Y here if you intend to run this kernel on the Rebel.COM
+  NetWinder.  Information about this machine can be found at:
+
+  <http://www.netwinder.org/>
+
+  Saying N will reduce the size of the Footbridge kernel.
+
+CONFIG_ARCH_P720T
+  Say Y here if you intend to run this kernel on the ARM Prospector
+  720T.
+
+CONFIG_ARCH_PERSONAL_SERVER
+  Say Y here if you intend to run this kernel on the Compaq
+  Personal Server.
+
+  Saying N will reduce the size of the Footbridge kernel.
+
+  The Compaq Personal Server is not available for purchase.
+  There are no product plans beyond the current research
+  prototypes at this time.  Information is available at:
+
+  <http://crl.research.compaq.com/projects/personalserver/>
+
+  If you have any questions or comments about the  Compaq Personal
+  Server, send e-mail to skiff@crl.dec.com.
+
+CONFIG_SA1100_ASSABET
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+  Microprocessor Development Board (also known as the Assabet).
+
+CONFIG_ASSABET_NEPONSET
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+  Microprocessor Development Board (Assabet)  with the SA-1111
+  Development Board (Nepon).
+
+CONFIG_SA1100_H3600
+  Say Y here if you intend to run this kernel on the Compaq iPAQ
+  H3600 handheld computer.  Information about this machine and the
+  Linux port to this machine can be found at:
+
+  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
+  <http://www.compaq.com/products/handhelds/pocketpc/>
+
+CONFIG_SA1100_BRUTUS
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1100
+  Microprocessor Development Board (also known as the Brutus).
+
+CONFIG_SA1100_LART
+  Say Y here if you are using the Linux Advanced Radio Terminal
+  (also known as the LART).  See <http://www.lart.tudelft.nl/> for
+  information on the LART.
+
+CONFIG_SA1100_GRAPHICSCLIENT
+  Say Y here if you are using an Applied Data Systems Intel(R)
+  StrongARM(R) SA-1100 based Graphics Client SBC.  See
+  <http://www.flatpanels.com/> for information on this system.
+
+CONFIG_SA1100_CERF
+  The Intrinsyc CerfBoard is based on the StrongARM 1110.
+  More information is available at:
+  <http://www.intrinsyc.com/products/referenceplatforms/cerfboard.html>.
+
+  Say Y if configuring for an Intrinsyc CerfBoard.
+  Say N otherwise.
+
+CONFIG_SA1100_FLEXANET
+  Say Y here if you intend to run this kernel on the FlexaNet
+  handheld instruments. Information about this machine can be
+  found at: <http://www.flexanet.com/>.
+
+CONFIG_SA1100_NANOENGINE
+  The nanoEngine is a StrongARM 1110-based single board computer
+  from Bright Star Engineering. More information is available at:
+  <http://www.brightstareng.com/arm/nanoeng.htm>.
+
+  Say Y if configuring for a nanoEngine.
+  Say N otherwise.
+
+CONFIG_SA1100_PANGOLIN
+  Pangolin is a StrongARM 1110-based evaluation platform produced
+  by Dialogue Technology.  It has EISA slots for ease of configuration
+  with SDRAM/Flash memory card, USB/Serial/Audio card, Compact Flash
+  card, and TFT-LCD card.
+
+  Say Y if configuring for a Pangolin.
+  Say N otherwise.
+
+CONFIG_SA1100_VICTOR
+  Say Y here if you are using a Visu Aide Intel(R) StrongARM(R)
+  SA-1100 based Victor Digital Talking Book Reader.  See
+  <http://www.visuaide.com/pagevictor.en.html> for information on
+  this system.
+
+CONFIG_CPU_ARM610
+  The ARM610 is the successor to the ARM3 processor
+  and was produced by VLSI Technology Inc.
+
+  Say Y if you want support for the ARM610 processor.
+  Otherwise, say N.
+
+CONFIG_CPU_ARM710
+  A 32-bit RISC microprocessor based on the ARM7 processor core
+  designed by Advanced RISC Machines Ltd. The ARM710 is the
+  successor to the ARM610 processor. It was released in
+  July 1994 by VLSI Technology Inc.
+
+  Say Y if you want support for the ARM710 processor.
+  Otherwise, say N.
+
+CONFIG_CPU_ARM720T
+  A 32-bit RISC processor with 8kByte Cache, Write Buffer and
+  MMU built around an ARM7TDMI core.
+
+  Say Y if you want support for the ARM720T processor.
+  Otherwise, say N.
+
+CONFIG_CPU_ARM920T
+  The ARM920T is licensed to be produced by numerous vendors,
+  and is used in the Maverick EP9312.  More information at
+  <http://linuxdevices.com/products/PD2382866068.html>.
+
+  Say Y if you want support for the ARM920T processor.
+  Otherwise, say N.
+
+CONFIG_CPU_ARM1020
+  The ARM1020 is the cached version of the ARM10 processor,
+  with an addition of a floating-point unit.
+
+  Say Y if you want support for the ARM1020 processor.
+  Otherwise, say N.
+
+CONFIG_CPU_SA110
+  The Intel StrongARM(R) SA-110 is a 32-bit microprocessor and
+  is available at five speeds ranging from 100 MHz to 233 MHz.
+  More information is available at
+  <http://developer.intel.com/design/strong/sa110.htm>.
+
+  Say Y if you want support for the SA-110 processor.
+  Otherwise, say N.
+
+CONFIG_FPE_NWFPE
+  Say Y to include the NWFPE floating point emulator in the kernel.
+  This is necessary to run most binaries. Linux does not currently
+  support floating point hardware so you need to say Y here even if
+  your machine has an FPA or floating point co-processor podule.
+
+  It is also possible to say M to build the emulator as a module
+  (nwfpe.o) or indeed to leave it out altogether. However, unless you
+  know what you are doing this can easily render your machine
+  unbootable. Saying Y is the safe option.
+
+  You may say N here if you are going to load the Acorn FPEmulator
+  early in the bootup.
+
+CONFIG_FPE_FASTFPE
+  Say Y here to include the FAST floating point emulator in the kernel.
+  This is an experimental much faster emulator which has only 32 bit
+  precision for the mantissa.  It does not support any exceptions.
+  This makes it very simple, it is approximately 4-8 times faster than
+  NWFPE.
+
+  It should be sufficient for most programs.  It is definitely not
+  suitable if you do scientific calculations that need double
+  precision for iteration formulas that sum up lots of very small
+  numbers.  If you do not feel you need a faster FP emulation you
+  should better choose NWFPE.
+
+  It is also possible to say M to build the emulator as a module
+  (fastfpe.o).  But keep in mind that you should only load the FP
+  emulator early in the bootup.  You should never change from NWFPE to
+  FASTFPE or vice versa in an active system!
+
+CONFIG_DEBUG_ERRORS
+  This option controls verbose debugging information which can be
+  printed when the kernel detects an internal error. This debugging
+  information is useful to kernel hackers when tracking down problems,
+  but mostly meaningless to other people. It's safe to say Y unless
+  you are concerned with the code size or don't want to see these
+  messages.
+
+CONFIG_NO_FRAME_POINTER
+  If you say Y here, the resulting kernel will be slightly smaller and
+  faster. However, when a problem occurs with the kernel, the
+  information that is reported is severely limited. Most people
+  should say N here.
+
+CONFIG_DEBUG_USER
+  When a user program crashes due to an exception, the kernel can
+  print a brief message explaining what the problem was. This is
+  sometimes helpful for debugging but serves no purpose on a
+  production system. Most people should say N here.
+
+CONFIG_DEBUG_INFO
+  Say Y here to include source-level debugging information in the
+  `vmlinux' binary image. This is handy if you want to use gdb or
+  addr2line to debug the kernel. It has no impact on the in-memory
+  footprint of the running kernel but it can increase the amount of
+  time and disk space needed for compilation of the kernel. If in
+  doubt say N.
+
+CONFIG_DEBUG_LL
+  Say Y here to include definitions of printascii, printchar, printhex
+  in the kernel.  This is helpful if you are debugging code that
+  executes before the console is initialized.
+
+CONFIG_DEBUG_DC21285_PORT
+  Say Y here if you want the debug print routines to direct their
+  output to the serial port in the DC21285 (Footbridge). Saying N
+  will cause the debug messages to appear on the first 16550
+  serial port.
+
+CONFIG_DEBUG_CLPS711X_UART2
+  Say Y here if you want the debug print routines to direct their
+  output to the second serial port on these devices.  Saying N will
+  cause the debug messages to appear on the first serial port.
+
+CONFIG_NO_PGT_CACHE
+  Normally the kernel maintains a `quicklist' of preallocated
+  pagetable structures in order to increase performance. On machines
+  with very few pages this may however be a loss. Say Y here to
+  disable the pgtable cache.
+
+CONFIG_ARTHUR
+  Say Y here to include the kernel code necessary if you want to run
+  Acorn RISC OS/Arthur binaries under Linux. This code is still very
+  experimental; if this sounds frightening, say N and sleep in peace.
+  You can also say M here to compile this support as a module (which
+  will be called arthur.o).
+
+CONFIG_CMDLINE
+  On some architectures (EBSA110 and CATS), there is currently no way
+  for the boot loader to pass arguments to the kernel. For these
+  architectures, you should supply some command-line options at build
+  time by entering them here. As a minimum, you should specify the
+  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+
+CONFIG_ALIGNMENT_TRAP
+  ARM processors can not fetch/store information which is not
+  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
+  address divisible by 4. On 32-bit ARM processors, these non-aligned
+  fetch/store instructions will be emulated in software if you say
+  here, which has a severe performance impact. This is necessary for
+  correct operation of some network protocols. With an IP-only
+  configuration it is safe to say N, otherwise say Y.
+
+CONFIG_DEBUG_KERNEL
+  Say Y here if you are developing drivers or trying to debug and
+  identify kernel problems.
+
+CONFIG_DEBUG_SLAB
+  Say Y here to have the kernel do limited verification on memory
+  allocation as well as poisoning memory on free to catch use of freed
+  memory.
+
+CONFIG_DEBUG_SPINLOCK
+  Say Y here and build SMP to catch missing spinlock initialization
+  and certain other kinds of spinlock errors commonly made.  This is
+  best used in conjunction with the NMI watchdog so that spinlock
+  deadlocks are also debuggable.
+
+CONFIG_DEBUG_BUGVERBOSE
+  Say Y here to make BUG() panics output the file name and line number
+  of the BUG call as well as the EIP and oops trace.  This aids
+  debugging but costs about 70-100K of memory.
+

@@ -1,0 +1,39 @@
+CONFIG_SCSI_AIC7XXX
+  This driver supports all of Adaptec's PCI based SCSI controllers
+  (not the hardware RAID controllers though) as well as the aic7770
+  based EISA and VLB SCSI controllers (the 274x and 284x series).
+  This is an Adaptec sponsored driver written by Justin Gibbs.  It is
+  intended to replace the previous aic7xxx driver maintained by Doug
+  Ledford since Doug is no longer maintaining that driver.
+
+CONFIG_AIC7XXX_CMDS_PER_DEVICE
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  This is an upper bound value for the number of tagged transactions
+  to be used for any device.  The aic7xxx driver will automatically
+  vary this number based on device behavior.  For devices with a
+  fixed maximum, the driver will eventually lock to this maximum
+  and display a console message inidicating this value.
+
+  Note: Unless you experience some type of device failure, the default
+	value, no enforced limit, should work for you.
+
+  Default: 253
+
+CONFIG_AIC7XXX_RESET_DELAY_MS
+  The number of milliseconds to delay after an initial bus reset.
+  The bus settle delay following all error recovery actions is
+  dictated by the SCSI layer and is not affected by this value.
+
+  Default: 15000 (15 seconds)
+
+CONFIG_AIC7XXX_BUILD_FIRMWARE
+  This option should only be enabled if you are modifying the firmware
+  source to the aic7xxx driver and wish to have the generated firmware
+  include files updated during a normal kernel build.  The assembler
+  for the firmware requires lex and yacc or their equivalents, as well
+  as the db v1 library.  You may have to install additional packages
+  or modify the assembler make file or the files it includes if your
+  build environment is different than that of the author.
+

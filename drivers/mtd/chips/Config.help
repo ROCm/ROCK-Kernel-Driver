@@ -1,0 +1,114 @@
+CONFIG_MTD_CFI
+  The Common Flash Interface specification was developed by Intel,
+  AMD and other flash manufactures that provides a universal method
+  for probing the capabilities of flash devices. If you wish to
+  support any device that is CFI-compliant, you need to enable this
+  option. Visit <http://www.amd.com/products/nvd/overview/cfi.html>
+  for more information on CFI.
+
+CONFIG_MTD_CFI_ADV_OPTIONS
+  If you need to specify a specific endianness for access to flash
+  chips, or if you wish to reduce the size of the kernel by including
+  support for only specific arrangements of flash chips, say 'Y'. This
+  option does not directly affect the code, but will enable other 
+  configuration options which allow you to do so.
+
+  If unsure, say 'N'.
+
+CONFIG_MTD_CFI_GEOMETRY
+  This option does not affect the code directly, but will enable 
+  some other configuration options which would allow you to reduce
+  the size of the kernel by including support for only certain 
+  arrangements of CFI chips. If unsure, say 'N' and all options 
+  which are supported by the current code will be enabled.
+
+CONFIG_MTD_CFI_B1
+  If you wish to support CFI devices on a physical bus which is
+  8 bits wide, say 'Y'.
+
+CONFIG_MTD_CFI_B2
+  If you wish to support CFI devices on a physical bus which is
+  16 bits wide, say 'Y'.
+
+CONFIG_MTD_CFI_B4
+  If you wish to support CFI devices on a physical bus which is
+  32 bits wide, say 'Y'.
+
+CONFIG_MTD_CFI_I1
+  If your flash chips are not interleaved - i.e. you only have one
+  flash chip addressed by each bus cycle, then say 'Y'.
+
+CONFIG_MTD_CFI_I2
+  If your flash chips are interleaved in pairs - i.e. you have two
+  flash chips addressed by each bus cycle, then say 'Y'.
+
+CONFIG_MTD_CFI_I4
+  If your flash chips are interleaved in fours - i.e. you have four
+  flash chips addressed by each bus cycle, then say 'Y'.
+
+CONFIG_MTD_CFI_INTELEXT
+  The Common Flash Interface defines a number of different command
+  sets which a CFI-compliant chip may claim to implement. This code
+  provides support for one of those command sets, used on Intel
+  StrataFlash and other parts.
+
+CONFIG_MTD_CFI_AMDSTD
+  The Common Flash Interface defines a number of different command
+  sets which a CFI-compliant chip may claim to implement. This code
+  provides support for one of those command sets, used on chips 
+  chips including the AMD Am29LV320.
+
+CONFIG_MTD_SHARP
+  This option enables support for flash chips using Sharp-compatible
+  commands, including some which are not CFI-compatible and hence 
+  cannot be used with the CONFIG_MTD_CFI_INTELxxx options.
+
+CONFIG_MTD_AMDSTD
+  This option enables support for flash chips using AMD-compatible
+  commands, including some which are not CFI-compatible and hence 
+  cannot be used with the CONFIG_MTD_CFI_AMDSTD option.
+
+  It also works on AMD compatible chips that do conform to CFI.
+
+CONFIG_MTD_RAM
+  This option enables basic support for RAM chips accessed through 
+  a bus mapping driver.
+
+CONFIG_MTD_ROM
+  This option enables basic support for ROM chips accessed through 
+  a bus mapping driver.
+
+CONFIG_MTD_JEDEC
+  Enable older older JEDEC flash interface devices for self
+  programming flash.  It is commonly used in older AMD chips.  It is
+  only called JEDEC because the JEDEC association
+  <http://www.jedec.org/> distributes the identification codes for the
+  chips. WARNING!!!! This code does not compile and is incomplete as
+  are the specific JEDEC devices drivers.
+
+CONFIG_MTD_ABSENT
+  This option enables support for a dummy probing driver used to
+  allocated placeholder MTD devices on systems that have socketed
+  or removable media.  Use of this driver as a fallback chip probe
+  preserves the expected registration order of MTD device nodes on
+  the system regardless of media presence.  Device nodes created
+  with this driver will return -ENODEV upon access.
+
+CONFIG_MTD_JEDECPROBE
+  This option enables JEDEC-style probing of flash chips which are not
+  compatible with the Common Flash Interface, but will use the common
+  CFI-targetted flash drivers for any chips which are identified which
+  are in fact compatible in all but the probe method. This actually
+  covers most AMD/Fujitsu-compatible chips, and will shortly cover also
+  non-CFI Intel chips (that code is in MTD CVS and should shortly be sent
+  for inclusion in Linus' tree)
+
+CONFIG_MTD_OBSOLETE_CHIPS
+  This option does not enable any code directly, but will allow you to
+  select some other chip drivers which are now considered obsolete,
+  because the generic CONFIG_JEDEC_PROBE code above should now detect
+  the chips which are supported by these drivers, and allow the generic
+  CFI-compatible drivers to drive the chips. Say 'N' here unless you have
+  already tried the CONFIG_JEDEC_PROBE method and reported its failure
+  to the MTD mailing list at <linux-mtd@lists.infradead.org>
+

@@ -1,0 +1,101 @@
+CONFIG_I2C
+  I2C (pronounce: I-square-C) is a slow serial bus protocol used in
+  many micro controller applications and developed by Philips.  SMBus,
+  or System Management Bus is a subset of the I2C protocol.  More
+  information is contained in the directory <file:Documentation/i2c/>,
+  especially in the file called "summary" there.
+
+  Both I2C and SMBus are supported here. You will need this for
+  hardware sensors support, and also for Video For Linux support.
+  Specifically, if you want to use a BT848 based frame grabber/overlay
+  boards under Linux, say Y here and also to "I2C bit-banging
+  interfaces", below.
+
+  If you want I2C support, you should say Y here and also to the
+  specific driver for your bus adapter(s) below.  If you say Y to
+  "/proc file system" below, you will then get a /proc interface which
+  is documented in <file:Documentation/i2c/proc-interface>.
+
+  This I2C support is also available as a module.  If you want to
+  compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-core.o.
+
+CONFIG_I2C_ALGOBIT
+  This allows you to use a range of I2C adapters called bit-banging
+  adapters.  Say Y if you own an I2C adapter belonging to this class
+  and then say Y to the specific driver for you adapter below.
+
+  This support is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-algo-bit.o.
+
+CONFIG_I2C_PHILIPSPAR
+  This supports parallel-port I2C adapters made by Philips.  Say Y if
+  you own such an adapter.
+
+  This driver is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-philips-par.o.
+
+  Note that if you want support for different parallel port devices,
+  life will be much easier if you compile them all as modules.
+
+CONFIG_I2C_ELV
+  This supports parallel-port I2C adapters called ELV.  Say Y if you
+  own such an adapter.
+
+  This driver is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-elv.o.
+
+CONFIG_I2C_VELLEMAN
+  This supports the Velleman K9000 parallel-port I2C adapter.  Say Y
+  if you own such an adapter.
+
+  This driver is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-velleman.o.
+
+CONFIG_I2C_ALGOPCF
+  This allows you to use a range of I2C adapters called PCF adapters.
+  Say Y if you own an I2C adapter belonging to this class and then say
+  Y to the specific driver for you adapter below.
+
+  This support is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-algo-pcf.o.
+
+CONFIG_I2C_ELEKTOR
+  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
+  such an adapter.
+
+  This driver is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-elektor.o.
+
+CONFIG_I2C_CHARDEV
+  Say Y here to use i2c-* device files, usually found in the /dev
+  directory on your system.  They make it possible to have user-space
+  programs use the I2C bus.  Information on how to do this is
+  contained in the file <file:Documentation/i2c/dev-interface>.
+
+  This code is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called i2c-dev.o.
+
+CONFIG_I2C_PROC
+  This provides support for i2c device entries in the /proc filesystem.
+  The entries will be found in /proc/sys/dev/sensors.
+
+  This code is also available as a module. If you want to compile
+  it as a module, say M here and read <file:Documentation/modules.txt>.
+  The module will be called i2c-proc.o.
+

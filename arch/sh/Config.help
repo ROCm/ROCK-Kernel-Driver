@@ -1,0 +1,775 @@
+CONFIG_SUPERH
+  The SuperH is a RISC processor targeted for use in embedded systems
+  and consumer electronics; it was also used in the Sega Dreamcast
+  gaming console.  The SuperH port has a home page at
+  <http://www.sh-linux.org/>.
+
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_DISCONTIGMEM
+  Say Y to upport efficient handling of discontiguous physical memory,
+  for architectures which are either NUMA (Non-Uniform Memory Access)
+  or have huge holes in the physical address space for other reasons.
+  See <file:Documentation/vm/numa> for more.
+
+CONFIG_CPU_LITTLE_ENDIAN
+  Some MIPS machines can be configured for either little or big endian
+  byte order. These modes require different kernels. Say Y if your
+  machine is little endian, N if it's a big endian machine.
+
+CONFIG_HEARTBEAT
+  Use the power-on LED on your machine as a load meter.  The exact
+  behavior is platform-dependent, but normally the flash frequency is
+  a hyperbolic function of the 5-minute load average.
+
+CONFIG_ISA
+  Find out whether you have ISA slots on your motherboard.  ISA is the
+  name of a bus system, i.e. the way the CPU talks to the other stuff
+  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+CONFIG_PCI
+  Find out whether you have a PCI motherboard. PCI is the name of a
+  bus system, i.e. the way the CPU talks to the other stuff inside
+  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+  VESA. If you have PCI, say Y, otherwise N.
+
+  The PCI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+  information about which PCI hardware does work under Linux and which
+  doesn't.
+
+CONFIG_MCA
+  MicroChannel Architecture is found in some IBM PS/2 machines and
+  laptops.  It is a bus system similar to PCI or ISA. See
+  <file:Documentation/mca.txt> (and especially the web page given
+  there) before attempting to build an MCA bus kernel.
+
+CONFIG_EISA
+  The Extended Industry Standard Architecture (EISA) bus was
+  developed as an open alternative to the IBM MicroChannel bus.
+
+  The EISA bus provided some of the features of the IBM MicroChannel
+  bus while maintaining backward compatibility with cards made for
+  the older ISA bus.  The EISA bus saw limited use between 1988 and
+  1995 when it was made obsolete by the PCI bus.
+
+  Say Y here if you are building a kernel for an EISA-based machine.
+
+  Otherwise, say N.
+
+CONFIG_HOTPLUG
+  Say Y here if you want to plug devices into your computer while
+  the system is running, and be able to use them quickly.  In many
+  cases, the devices can likewise be unplugged at any time too.
+
+  One well known example of this is PCMCIA- or PC-cards, credit-card
+  size devices such as network cards, modems or hard drives which are
+  plugged into slots found on all modern laptop computers.  Another
+  example, used on modern desktops as well as laptops, is USB.
+
+  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+  Then your kernel will automatically call out to a user mode "policy
+  agent" (/sbin/hotplug) to load modules and set up software needed
+  to use devices as you hotplug them.
+
+CONFIG_PCMCIA
+  Say Y here if you want to attach PCMCIA- or PC-cards to your Linux
+  computer.  These are credit-card size devices such as network cards,
+  modems or hard drives often used with laptops computers.  There are
+  actually two varieties of these cards: the older 16 bit PCMCIA cards
+  and the newer 32 bit CardBus cards.  If you want to use CardBus
+  cards, you need to say Y here and also to "CardBus support" below.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  Please also read the PCMCIA-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  When compiled this way, there will be modules called pcmcia_core.o
+  and ds.o.  If you want to compile it as a module, say M here and
+  read <file:Documentation/modules.txt>.
+
+CONFIG_BINFMT_ELF
+  ELF (Executable and Linkable Format) is a format for libraries and
+  executables used across different architectures and operating
+  systems. Saying Y here will enable your kernel to run ELF binaries
+  and enlarge it by about 13 KB. ELF support under Linux has now all
+  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+  because it is portable (this does *not* mean that you will be able
+  to run executables from different architectures or operating systems
+  however) and makes building run-time libraries very easy. Many new
+  executables are distributed solely in ELF format. You definitely
+  want to say Y here.
+
+  Information about ELF is contained in the ELF HOWTO available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you find that after upgrading from Linux kernel 1.2 and saying Y
+  here, you still can't run any ELF binaries (they just crash), then
+  you'll have to install the newest ELF runtime libraries, including
+  ld.so (check the file <file:Documentation/Changes> for location and
+  latest version).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called binfmt_elf.o. Saying M or N here is dangerous because
+  some crucial programs on your system might be in ELF format.
+
+CONFIG_BINFMT_MISC
+  If you say Y here, it will be possible to plug wrapper-driven binary
+  formats into the kernel. You will like this especially when you use
+  programs that need an interpreter to run like Java, Python or
+  Emacs-Lisp. It's also useful if you often run DOS executables under
+  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+  registered such a binary class with the kernel, you can start one of
+  those programs simply by typing in its name at a shell prompt; Linux
+  will automatically feed it to the correct interpreter.
+
+  You can do other nice things, too. Read the file
+  <file:Documentation/binfmt_misc.txt> to learn how to use this
+  feature, and <file:Documentation/java.txt> for information about how
+  to include Java support.
+
+  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
+  use this part of the kernel.
+
+  You may say M here for module support and later load the module when
+  you have use for it; the module is called binfmt_misc.o. If you
+  don't know what to answer at this point, say Y.
+
+CONFIG_VGA_CONSOLE
+  Saying Y here will allow you to use Linux in text mode through a
+  display that complies with the generic VGA standard. Virtually
+  everyone wants that.
+
+  The program SVGATextMode can be used to utilize SVGA video cards to
+  their full potential in text mode. Download it from
+  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+  Say Y.
+
+CONFIG_VIDEO_SELECT
+  This enables support for text mode selection on kernel startup. If
+  you want to take advantage of some high-resolution text mode your
+  card's BIOS offers, but the traditional Linux utilities like
+  SVGATextMode don't, you can say Y here and set the mode using the
+  "vga=" option from your boot loader (lilo or loadlin) or set
+  "vga=ask" which brings up a video mode menu on kernel startup. (Try
+  "man bootparam" or see the documentation of your boot loader about
+  how to pass options to the kernel.)
+
+  Read the file <file:Documentation/svga.txt> for more information
+  about the Video mode selection support. If unsure, say N.
+
+CONFIG_MDA_CONSOLE
+  Say Y here if you have an old MDA or monochrome Hercules graphics
+  adapter in your system acting as a second head ( = video card). You
+  will then be able to use two monitors with your Linux system. Do not
+  say Y here if your MDA card is the primary card in your system; the
+  normal VGA driver will handle it.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want).
+  The module will be called mdacon.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_SCSI
+  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+  any other SCSI device under Linux, say Y and make sure that you know
+  the name of your SCSI host adapter (the card inside your computer
+  that "speaks" the SCSI protocol, also called SCSI controller),
+  because you will be asked for it.
+
+  You also need to say Y here if you want support for the parallel
+  port version of the 100 MB IOMEGA ZIP drive.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scsi_mod.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  However, do not compile this as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI device.
+
+CONFIG_NETDEVICES
+  You can say N here if you don't intend to connect your Linux box to
+  any other computer at all or if all your connections will be over a
+  telephone line with a modem either via UUCP (UUCP is a protocol to
+  forward mail and news between unix hosts over telephone lines; read
+  the UUCP-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+  account or a BBS, even using term (term is a program which gives you
+  almost full Internet connectivity if you have a regular dial up
+  shell account on some Internet connected Unix computer. Read
+  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+  You'll have to say Y if your computer contains a network card that
+  you want to use under Linux (make sure you know its name because you
+  will be asked for it and read the Ethernet-HOWTO (especially if you
+  plan to use more than one network card under Linux)) or if you want
+  to use SLIP (Serial Line Internet Protocol is the protocol used to
+  send Internet traffic over telephone lines or null modem cables) or
+  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+  Protocol is mainly used to create a mini network by connecting the
+  parallel ports of two local machines) or AX.25/KISS (protocol for
+  sending Internet traffic over amateur radio links).
+
+  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+  Olaf Kirch's excellent and free book "Network Administrator's
+  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+  unsure, say Y.
+
+CONFIG_CD_NO_IDESCSI
+  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+  here, otherwise N. Read the CD-ROM-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that the answer to this question doesn't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about these CD-ROM drives. If you are unsure what you
+  have, say Y and find out whether you have one of the following
+  drives.
+
+  For each of these drivers, a file Documentation/cdrom/{driver_name}
+  exists. Especially in cases where you do not know exactly which kind
+  of drive you have you should read there. Most of these drivers use a
+  file drivers/cdrom/{driver_name}.h where you can define your
+  interface parameters and switch some internal goodies.
+
+  All these CD-ROM drivers are also usable as a module ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want). If you want to compile them as module, say M instead of Y and
+  read <file:Documentation/modules.txt>.
+
+  If you want to use any of these CD-ROM drivers, you also have to
+  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+  answer will get "defaulted" for you if you enable any of the Linux
+  CD-ROM drivers).
+
+CONFIG_MEMORY_SET
+  This is an option about which you will never be asked a question.
+  Therefore, I conclude that you do not exist - go away.
+
+  There is a grue here.
+
+CONFIG_MEMORY_SIZE
+  This sets the default memory size assumed by your SH kernel. It can
+  be overridden as normal by the 'mem=' argument on the kernel command
+  line. If unsure, consult your board specifications or just leave it
+  as 0x00400000 which was the default value before this became
+  configurable.
+
+CONFIG_SH_PCIDMA_NONCOHERENT
+  Enable this option if your platform does not have a CPU cache which
+  remains coherent with PCI DMA. It is safest to say 'Y', although you
+  will see better performance if you can say 'N', because the PCI DMA
+  code will not have to flush the CPU's caches. If you have a PCI host
+  bridge integrated with your SH CPU, refer carefully to the chip specs
+  to see if you can say 'N' here. Otherwise, leave it as 'Y'.
+
+CONFIG_VT
+  If you say Y here, you will get support for terminal devices with
+  display and keyboard devices. These are called "virtual" because you
+  can run several virtual terminals (also called virtual consoles) on
+  one physical terminal. This is rather useful, for example one
+  virtual terminal can collect system messages and warnings, another
+  one can be used for a text-mode user session, and a third could run
+  an X session, all in parallel. Switching between virtual terminals
+  is done with certain key combinations, usually Alt-<function key>.
+
+  The setterm command ("man setterm") can be used to change the
+  properties (such as colors or beeping) of a virtual terminal. The
+  man page console_codes(4) ("man console_codes") contains the special
+  character sequences that can be used to change those properties
+  directly. The fonts used on virtual terminals can be changed with
+  the setfont ("man setfont") command and the key bindings are defined
+  with the loadkeys ("man loadkeys") command.
+
+  You need at least one virtual terminal device in order to make use
+  of your keyboard and monitor. Therefore, only people configuring an
+  embedded system would want to say N here in order to save some
+  memory; the only way to log into such a system is then via a serial
+  or network connection.
+
+  If unsure, say Y, or else you won't be able to do much with your new
+  shiny Linux system :-)
+
+CONFIG_VT_CONSOLE
+  The system console is the device which receives all kernel messages
+  and warnings and which allows logins in single user mode. If you
+  answer Y here, a virtual terminal (the device used to interact with
+  a physical terminal) can be used as system console. This is the most
+  common mode of operations, so you should say Y here unless you want
+  the kernel messages be output only to a serial port (in which case
+  you should say Y to "Console on serial port", below).
+
+  If you do say Y here, by default the currently visible virtual
+  terminal (/dev/tty0) will be used as system console. You can change
+  that with a kernel command line option such as "console=tty3" which
+  would use the third virtual terminal as system console. (Try "man
+  bootparam" or see the documentation of your boot loader (lilo or
+  loadlin) about how to pass options to the kernel at boot time.)
+
+  If unsure, say Y.
+
+CONFIG_SERIAL
+  This selects whether you want to include the driver for the standard
+  serial ports.  The standard answer is Y.  People who might say N
+  here are those that are setting up dedicated Ethernet WWW/FTP
+  servers, or users that have one of the various bus mice instead of a
+  serial mouse and don't intend to use their machine's standard serial
+  port for anything.  (Note that the Cyclades and Stallion multi
+  serial port drivers do not need this driver built in for them to
+  work.)
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  serial.o.
+  [WARNING: Do not compile this driver as a module if you are using
+  non-standard serial ports, since the configuration information will
+  be lost when the driver is unloaded.  This limitation may be lifted
+  in the future.]
+
+  BTW1: If you have a mouseman serial mouse which is not recognized by
+  the X window system, try running gpm first.
+
+  BTW2: If you intend to use a software modem (also called Winmodem)
+  under Linux, forget it.  These modems are crippled and require
+  proprietary drivers which are only available under Windows.
+
+  Most people will say Y or M here, so that they can use serial mice,
+  modems and similar devices connecting to the standard serial ports.
+
+CONFIG_SERIAL_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode). This could be useful if some terminal or printer is connected
+  to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first serial line, /dev/ttyS0, as
+  system console.
+
+  If unsure, say N.
+
+CONFIG_UNIX98_PTYS
+  A pseudo terminal (PTY) is a software device consisting of two
+  halves: a master and a slave. The slave device behaves identical to
+  a physical terminal; the master device is used by a process to
+  read data from and write data to the slave, thereby emulating a
+  terminal. Typical programs for the master side are telnet servers
+  and xterms.
+
+  Linux has traditionally used the BSD-like names /dev/ptyxx for
+  masters and /dev/ttyxx for slaves of pseudo terminals. This scheme
+  has a number of problems. The GNU C library glibc 2.1 and later,
+  however, supports the Unix98 naming standard: in order to acquire a
+  pseudo terminal, a process opens /dev/ptmx; the number of the pseudo
+  terminal is then made available to the process and the pseudo
+  terminal slave can be accessed as /dev/pts/<number>. What was
+  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
+
+  The entries in /dev/pts/ are created on the fly by a virtual
+  file system; therefore, if you say Y here you should say Y to
+  "/dev/pts file system for Unix98 PTYs" as well.
+
+  If you want to say Y here, you need to have the C library glibc 2.1
+  or later (equal to libc-6.1, check with "ls -l /lib/libc.so.*").
+  Read the instructions in <file:Documentation/Changes> pertaining to
+  pseudo terminals. It's safe to say N.
+
+CONFIG_UNIX98_PTY_COUNT
+  The maximum number of Unix98 PTYs that can be used at any one time.
+  The default is 256, and should be enough for desktop systems. Server
+  machines which support incoming telnet/rlogin/ssh connections and/or
+  serve several X terminals may want to increase this: every incoming
+  connection and every xterm uses up one PTY.
+
+  When not in use, each additional set of 256 PTYs occupy
+  approximately 8 KB of kernel memory on 32-bit architectures.
+
+CONFIG_PRINTER
+  If you intend to attach a printer to the parallel port of your Linux
+  box (as opposed to using a serial printer; if the connector at the
+  printer has 9 or 25 holes ["female"], then it's serial), say Y.
+  Also read the Printing-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  It is possible to share one parallel port among several devices
+  (e.g. printer and ZIP drive) and it is safe to compile the
+  corresponding drivers into the kernel.  If you want to compile this
+  driver as a module however ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt> and
+  <file:Documentation/parport.txt>.  The module will be called lp.o.
+
+  If you have several parallel ports, you can specify which ports to
+  use with the "lp" kernel command line option.  (Try "man bootparam"
+  or see the documentation of your boot loader (lilo or loadlin) about
+  how to pass options to the kernel at boot time.)  The syntax of the
+  "lp" command line option can be found in <file:drivers/char/lp.c>.
+
+  If you have more than 8 printers, you need to increase the LP_NO
+  macro in lp.c and the PARPORT_MAX macro in parport.h.
+
+CONFIG_LP_CONSOLE
+  If you want kernel messages to be printed out as they occur, you
+  can have a console on the printer. This option adds support for
+  doing that; to actually get it to happen you need to pass the
+  option "console=lp0" to the kernel at boot time.
+
+  If the printer is out of paper (or off, or unplugged, or too
+  busy..) the kernel will stall until the printer is ready again.
+  By defining CONSOLE_LP_STRICT to 0 (at your own risk) you
+  can make the kernel continue when this happens,
+  but it'll lose the kernel messages.
+
+  If unsure, say N.
+
+CONFIG_PPDEV
+  Saying Y to this adds support for /dev/parport device nodes.  This
+  is needed for programs that want portable access to the parallel
+  port, for instance deviceid (which displays Plug-and-Play device
+  IDs).
+
+  This is the parallel port equivalent of SCSI generic support (sg).
+  It is safe to say N to this -- it is not needed for normal printing
+  or parallel port CD-ROM/disk support.
+
+  This support is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  ppdev.o.
+
+  If unsure, say N.
+
+CONFIG_PSMOUSE
+  The PS/2 mouse connects to a special mouse port that looks much like
+  the keyboard port (small circular connector with 6 pins). This way,
+  the mouse does not use any serial ports. This port can also be used
+  for other input devices like light pens, tablets, keypads. Compaq,
+  AST and IBM all use this as their mouse port on currently shipping
+  machines. The trackballs of some laptops are PS/2 mice also. In
+  particular, the C&T 82C710 mouse on TI Travelmates is a PS/2 mouse.
+
+  Although PS/2 mice are not technically bus mice, they are explained
+  in detail in the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  When using a PS/2 mouse, you can get problems if you want to use the
+  mouse both on the Linux console and under X. Using the "-R" option
+  of the Linux mouse managing program gpm (available from
+  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
+  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
+
+CONFIG_WATCHDOG
+  If you say Y here (and to one of the following options) and create a
+  character special file /dev/watchdog with major number 10 and minor
+  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
+  subsequently opening the file and then failing to write to it for
+  longer than 1 minute will result in rebooting the machine. This
+  could be useful for a networked machine that needs to come back
+  online as fast as possible after a lock-up. There's both a watchdog
+  implementation entirely in software (which can sometimes fail to
+  reboot the machine) and a driver for hardware watchdog boards, which
+  are more robust and can also keep track of the temperature inside
+  your computer. For details, read <file:Documentation/watchdog.txt>
+  in the kernel source.
+
+  The watchdog is usually used together with the watchdog daemon
+  which is available from
+  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
+  also monitor NFS connections and can reboot the machine when the process
+  table is full.
+
+  If unsure, say N.
+
+CONFIG_WATCHDOG_NOWAYOUT
+  The default watchdog behaviour (which you get if you say N here) is
+  to stop the timer if the process managing it closes the file
+  /dev/watchdog. It's always remotely possible that this process might
+  get killed. If you say Y here, the watchdog cannot be stopped once
+  it has been started.
+
+CONFIG_SH_WDT
+  This driver adds watchdog support for the integrated watchdog in the
+  SuperH 3 and 4 processors. If you have one of these processors, say Y,
+  otherwise say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called shwdt.o. If you want to compile it as a module,
+  say M here and read Documentation/modules.txt.
+
+CONFIG_RTC
+  If you say Y here and create a character special file /dev/rtc with
+  major number 10 and minor number 135 using mknod ("man mknod"), you
+  will get access to the real time clock (or hardware clock) built
+  into your computer.
+
+  Every PC has such a clock built in. It can be used to generate
+  signals from as low as 1Hz up to 8192Hz, and can also be used
+  as a 24 hour alarm. It reports status information via the file
+  /proc/driver/rtc and its behaviour is set by various ioctls on
+  /dev/rtc.
+
+  If you run Linux on a multiprocessor machine and said Y to
+  "Symmetric Multi Processing" above, you should say Y here to read
+  and set the RTC in an SMP compatible fashion.
+
+  If you think you have a use for such a device (such as periodic data
+  sampling), then say Y here, and read <file:Documentation/rtc.txt>
+  for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called rtc.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SOUND
+  If you have a sound card in your computer, i.e. if it can say more
+  than an occasional beep, say Y.  Be sure to have all the information
+  about your sound card and its configuration down (I/O port,
+  interrupt and DMA channel), because you will be asked for it.
+
+  You want to read the Sound-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. General information about
+  the modular sound system is contained in the files
+  <file:Documentation/sound/Introduction>.  The file
+  <file:Documentation/sound/README.OSS> contains some slightly
+  outdated but still useful information as well.
+
+  If you have a PnP sound card and you want to configure it at boot
+  time using the ISA PnP tools (read
+  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+  compile the sound card support as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want)
+  and load that module after the PnP configuration is finished.  To do
+  this, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/sound/README.modules>; the module will be
+  called soundcore.o.
+
+  I'm told that even without a sound card, you can make your computer
+  say more than an occasional beep, by programming the PC speaker.
+  Kernel patches and supporting utilities to do that are in the pcsp
+  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+CONFIG_MAGIC_SYSRQ
+  If you say Y here, you will have some control over the system even
+  if the system crashes for example during kernel debugging (e.g., you
+  will be able to flush the buffer cache to disk, reboot the system
+  immediately or dump some status information). This is accomplished
+  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+  also works on a serial console (on PC hardware at least), if you
+  send a BREAK and then within 5 seconds a command keypress. The
+  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+  unless you really know what this hack does.
+
+CONFIG_SH_RTC
+  Selecting this option will allow the Linux kernel to emulate
+  PC's RTC.
+
+  If unsure, say N.
+
+CONFIG_SH_DMA
+  Selecting this option will provide same API as PC's Direct Memory
+  Access Controller(8237A) for SuperH DMAC.
+
+  If unsure, say N.
+
+CONFIG_CF_AREA5
+  If your board has "Directly Connected" CompactFlash, You should
+  select the area where your CF is connected to.
+  
+  - "Area5" if CompactFlash is connected to Area 5 (0x14000000)
+  - "Area6" if it is connected to Area 6 (0x18000000)
+
+  "Area6" will work for most boards. For ADX, select "Area5".
+
+CONFIG_CF_ENABLER
+  Compact Flash is a small, removable mass storage device introduced
+  in 1994 originally as a PCMCIA device.  If you say `Y' here, you
+  compile in support for Compact Flash devices directly connected to
+  a SuperH processor.  A Compact Flash FAQ is available at
+  <http://www.compactflash.org/faqs/faq.htm>.
+
+  If your board has "Directly Connected" CompactFlash at area 5 or 6,
+  you may want to enable this option.  Then, you can use CF as
+  primary IDE drive (only tested for SanDisk).
+
+  If in doubt, select 'N'.
+
+CONFIG_CPU_SUBTYPE_SH7707
+  Select the type of SuperH processor you have. This information is
+  used for optimizing and configuration purposes.
+
+  Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
+
+  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
+                if you have a 100 Mhz SH-3 HD6417708R CPU.
+
+  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
+
+  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+  Select SH7751 if you have a SH7751
+
+  Select ST40STB1 if you have a ST40STB1
+
+CONFIG_CPU_SUBTYPE_SH7708
+  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
+                if you have a 100 Mhz SH-3 HD6417708R CPU.
+
+CONFIG_CPU_SUBTYPE_SH7709
+  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
+
+CONFIG_CPU_SUBTYPE_SH7750
+  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+CONFIG_MEMORY_START
+  Computers built with Hitachi SuperH processors always
+  map the ROM starting at address zero.  But the processor
+  does not specify the range that RAM takes.  
+
+  The physical memory (RAM) start address will be automatically
+  set to 08000000, unless you selected one of the following
+  processor types: SolutionEngine, Overdrive, HP620, HP680, HP690,
+  in which case the start address will be set to 0c000000.
+
+  Tweak this only when porting to a new machine which is not already
+  known by the config system.  Changing it from the known correct
+  value on any of the known systems will only lead to disaster.
+
+CONFIG_HD64461
+  The Hitachi HD64461 provides an interface for
+  the SH7709 CPU, supporting a LCD controller,
+  CRT color controller, IrDA up to 4 Mbps, and a
+  PCMCIA controller supporting 2 slots.
+
+  More information is available at
+  <http://semiconductor.hitachi.com/windowsce/superh/sld013.htm>.
+
+  Say Y if you want support for the HD64461.
+  Otherwise, say N.
+
+CONFIG_HD64461_ENABLER
+  Say Y here if you want to enable PCMCIA support
+  via the HD64461 companion chip.
+  Otherwise, say N.
+
+CONFIG_HD64461_IRQ
+  The default setting of the HD64461 IRQ is 36.
+
+  Do not change this unless you know what you are doing.
+
+CONFIG_HD64465
+  The Hitachi HD64465 provides an interface for
+  the SH7750 CPU, supporting a LCD controller,
+  CRT color controller, IrDA, USB, PCMCIA,
+  keyboard controller, and a printer interface.
+
+  More information is available at
+  <http://global.hitachi.com/New/cnews/E/1998/981019B.html>.
+
+  Say Y if you want support for the HD64465.
+  Otherwise, say N.
+
+CONFIG_HD64465_IRQ
+  The default setting of the HD64465 IRQ is 5.
+
+  Do not change this unless you know what you are doing.
+
+CONFIG_HD64465_IOBASE
+  The default setting of the HD64465 IO base address is 0xb0000000.
+
+  Do not change this unless you know what you are doing.
+
+CONFIG_SH_EARLY_PRINTK
+  Say Y here to redirect kernel printk messages to the serial port
+  used by the SH-IPL bootloader, starting very early in the boot
+  process and ending when the kernel's serial console is initialised.
+  This option is only useful porting the kernel to a new machine,
+  when the kernel may crash or hang before the serial console is
+  initialised. If unsure, say N.
+
+CONFIG_SH_SCI
+  Selecting this option will allow the Linux kernel to transfer data
+  over SCI (Serial Communication Interface) and/or SCIF (Serial
+  Communication Interface with FIFO) which are built into the Hitachi
+  SuperH processor.  The option provides 1 to 3 (depending
+  on the CPU model) standard Linux tty devices, /dev/ttySC[012]; one
+  of these is normally used as the system console.
+
+  If in doubt, press "y".
+
+CONFIG_SH_STANDARD_BIOS
+  Say Y here if your target has the gdb-sh-stub
+  package from www.m17n.org (or any conforming standard LinuxSH BIOS)
+  in FLASH or EPROM.  The kernel will use standard BIOS calls during
+  boot for various housekeeping tasks (including calls to read and
+  write characters to a system console, get a MAC address from an
+  on-board Ethernet interface, and shut down the hardware).  Note this
+  does not work with machines with an existing operating system in
+  mask ROM and no flash (WindowsCE machines fall in this category).
+  If unsure, say N.
+

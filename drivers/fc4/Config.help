@@ -1,0 +1,57 @@
+CONFIG_FC4
+  Fibre Channel is a high speed serial protocol mainly used to
+  connect large storage devices to the computer; it is compatible with
+  and intended to replace SCSI.
+
+  This is an experimental support for storage arrays connected to your
+  computer using optical fibre cables and the "X3.269-199X Fibre
+  Channel Protocol for SCSI" specification. If you want to use this,
+  you need to say Y here and to "SCSI support" as well as to the
+  drivers for the storage array itself and for the interface adapter
+  such as SOC or SOC+. This subsystem could even serve for IP
+  networking, with some code extensions.
+
+  If unsure, say N.
+
+CONFIG_FC4_SOC
+  Serial Optical Channel is an interface card with one or two Fibre
+  Optic ports, each of which can be connected to a disk array. Note
+  that if you have older firmware in the card, you'll need the
+  microcode from the Solaris driver to make it work.
+
+  This support is also available as a module called soc.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_FC4_SOCAL
+  Serial Optical Channel Plus is an interface card with up to two
+  Fibre Optic ports. This card supports FC Arbitrated Loop (usually
+  A5000 or internal FC disks in E[3-6]000 machines through the
+  Interface Board). You'll probably need the microcode from the
+  Solaris driver to make it work.
+
+  This support is also available as a module called socal.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_PLUTO
+  If you never bought a disk array made by Sun, go with N.
+
+  This support is also available as a module called pluto.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_FCAL
+  This driver drives FC-AL disks connected through a Fibre Channel
+  card using the drivers/fc4 layer (currently only SOCAL). The most
+  common is either A5000 array or internal disks in E[3-6]000
+  machines.
+
+  This support is also available as a module called fcal.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>. If unsure, say N.
+

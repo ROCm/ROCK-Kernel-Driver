@@ -1,0 +1,30 @@
+CONFIG_BLUEZ
+  Bluetooth is low-cost, low-power, short-range wireless technology.
+  It was designed as a replacement for cables and other short-range
+  technologies like IrDA.  Bluetooth operates in personal area range
+  that typically extends up to 10 meters.  More information about
+  Bluetooth can be found at <http://www.bluetooth.com/>.
+
+  Linux Bluetooth subsystem consist of several layers:
+               HCI Core (device and connection manager, scheduler)
+               HCI Device drivers (interface to the hardware)
+               L2CAP Module (L2CAP protocol)
+
+  Say Y here to enable Linux Bluetooth support and to build HCI Core
+  layer.
+
+  To use Linux Bluetooth subsystem, you will need several user-space
+  utilities like hciconfig and hcid.  These utilities and updates to
+  Bluetooth kernel modules are provided in the BlueZ package.
+  For more information, see <http://bluez.sourceforge.net/>.
+
+  If you want to compile HCI Core as module (hci.o) say M here.
+
+CONFIG_BLUEZ_L2CAP
+  L2CAP (Logical Link Control and Adaptation Protocol) provides
+  connection oriented and connection-less data transport.  L2CAP
+  support is required for most Bluetooth applications.
+
+  Say Y here to compile L2CAP support into the kernel or say M to
+  compile it as module (l2cap.o).
+

@@ -1,0 +1,21 @@
+CONFIG_MTD_NAND
+  This enables support for accessing all type of NAND flash
+  devices.
+
+CONFIG_MTD_NAND_ECC
+  This enables software-based ECC for use with NAND flash chips. It
+  can detect and correct 1 bit errors per 256 byte blocks. This
+  should be used to increase the reliability of the data stored and
+  read on the device.
+
+CONFIG_MTD_NAND_VERIFY_WRITE
+  This adds an extra check when data is written to the flash. The
+  NAND flash device internally checks only bits transitioning
+  from 1 to 0. There is a rare possibility that even though the
+  device thinks the write was successful, a bit could have been
+  flipped accidentaly due to device wear, gamma rays, whatever.
+  Enable this if you are really paranoid.
+
+CONFIG_MTD_NAND_SPIA
+  If you had to ask, you don't have one. Say 'N'.
+

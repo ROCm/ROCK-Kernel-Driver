@@ -1,0 +1,47 @@
+CONFIG_DMASOUND
+  Support built-in audio chips accessible by DMA on various machines
+  that have them.  Note that this symbol does not affect the kernel
+  directly; rather, it controls whether configuration questions
+  enabling DMA sound drivers for various specific machine
+  architectures will be used.
+
+CONFIG_DMASOUND_ATARI
+  If you want to use the internal audio of your Atari in Linux, answer
+  Y to this question. This will provide a Sun-like /dev/audio,
+  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_DMASOUND_AWACS
+  If you want to use the internal audio of your PowerMac in Linux,
+  answer Y to this question. This will provide a Sun-like /dev/audio,
+  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_DMASOUND_PAULA
+  If you want to use the internal audio of your Amiga in Linux, answer
+  Y to this question. This will provide a Sun-like /dev/audio,
+  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_DMASOUND_Q40
+  If you want to use the internal audio of your Q40 in Linux, answer
+  Y to this question. This will provide a Sun-like /dev/audio,
+  compatible with the Linux/i386 sound system. Otherwise, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+

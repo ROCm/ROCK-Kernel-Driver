@@ -1,0 +1,268 @@
+CONFIG_USB_SERIAL
+  Say Y here if you have a USB device that provides normal serial
+  ports, or acts like a serial device, and you want to connect it to
+  your USB bus.
+
+  Please read <file:Documentation/usb/usb-serial.txt> for more
+  information on the specifics of the different devices that are
+  supported, and on how to use them.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbserial.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_GENERIC
+  Say Y here if you want to use the generic USB serial driver.  Please
+  read <file:Documentation/usb/usb-serial.txt> for more information on
+  using this driver.  It is recommended that the "USB Serial converter
+  support" be compiled as a module for this driver to be used
+  properly.
+
+CONFIG_USB_SERIAL_WHITEHEAT
+  Say Y here if you want to use a ConnectTech WhiteHEAT 4 port
+  USB to serial converter device.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called whiteheat.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_VISOR
+  Say Y here if you want to connect to your HandSpring Visor, Palm
+  m500 or m505 through its USB docking station. See
+  <http://usbvisor.sourceforge.net/> for more information on using this
+  driver.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called visor.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_IPAQ
+  Say Y here if you want to connect to your Compaq iPAQ running
+  Windows CE 3.0 using a USB autosync cable. For information on using
+  the driver, read <file:Documentation/usb/usb-serial.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ipaq.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_IR
+  Say Y here if you want to enable simple serial support for USB IrDA
+  devices.  This is useful if you do not want to use the full IrDA
+  stack.
+  
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ir-usb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_IR
+  Say Y here if you want to enable simple serial support for USB IrDA
+  devices.  This is useful if you do not want to use the full IrDA
+  stack.
+  
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ir-usb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_BELKIN
+  Say Y here if you want to use a Belkin USB Serial single port
+  adaptor (F5U103 is one of the model numbers) or the Peracom single
+  port USB to serial adapter.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called belkin_sa.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_FTDI_SIO
+  Say Y here if you want to use a FTDI SIO single port USB to serial
+  converter device. The implementation I have is called the USC-1000.
+  This driver has also be tested with the 245 and 232 devices.
+
+  See <http://ftdi-usb-sio.sourceforge.net/> for more
+  information on this driver and the device.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ftdi_sio.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_KEYSPAN_PDA
+  Say Y here if you want to use a Keyspan PDA single port USB to
+  serial converter device.  This driver makes use of firmware
+  developed from scratch by Brian Warner.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called keyspan_pda.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_XIRCOM
+  Say Y here if you want to use a Xircom or Entregra single port USB to
+  serial converter device.  This driver makes use of firmware
+  developed from scratch by Brian Warner.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called keyspan_pda.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_KEYSPAN
+  Say Y here if you want to use Keyspan USB to serial converter
+  devices.  This driver makes use of Keyspan's official firmware
+  and was developed with their support.  You must also include
+  firmware to support your particular device(s).
+
+  See <http://misc.nu/hugh/keyspan.html> for more information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called keyspan.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA28
+  Say Y here to include firmware for the USA-28 converter.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA28X
+  Say Y here to include firmware for the USA-28X converter.
+  Be sure you have a USA-28X, there are also 28XA and 28XB
+  models, the label underneath has the actual part number.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA28XA
+  Say Y here to include firmware for the USA-28XA converter.
+  Be sure you have a USA-28XA, there are also 28X and 28XB
+  models, the label underneath has the actual part number.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA28XB
+  Say Y here to include firmware for the USA-28XB converter.
+  Be sure you have a USA-28XB, there are also 28X and 28XA
+  models, the label underneath has the actual part number.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA19
+  Say Y here to include firmware for the USA-19 converter.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA18X
+  Say Y here to include firmware for the USA-18X converter.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA19W
+  Say Y here to include firmware for the USA-19W converter.
+
+CONFIG_USB_SERIAL_KEYSPAN_USA49W
+  Say Y here to include firmware for the USA-49W converter.
+
+CONFIG_USB_SERIAL_OMNINET
+  Say Y here if you want to use a ZyXEL omni.net LCD ISDN TA.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called omninet.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_DIGI_ACCELEPORT
+  Say Y here if you want to use Digi AccelePort USB 2 or 4 devices,
+  2 port (plus parallel port) and 4 port USB serial converters.  The
+  parallel port on the USB 2 appears as a third serial port on Linux.
+  The Digi Acceleport USB 8 is not yet supported by this driver.
+
+  This driver works under SMP with the usb-uhci driver.  It does not
+  work under SMP with the uhci driver.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called digi_acceleport.o.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_EMPEG
+  Say Y here if you want to connect to your Empeg empeg-car Mark I/II
+  mp3 player via USB.  The driver uses a single ttyUSB{0,1,2,...}
+  device node.  See <file:Documentation/usb/usb-serial.txt> for more
+  tidbits of information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called empeg.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_MCT_U232
+  Say Y here if you want to use a USB Serial single port adapter from
+  Magic Control Technology Corp. (U232 is one of the model numbers).
+
+  This driver also works with Sitecom U232-P25 and D-Link DU-H3SP USB
+  BAY devices.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mct_u232.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_PL2303
+  Say Y here if you want to use the PL2303 USB Serial single port
+  adapter from Prolific.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pl2303.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_CYBERJACK
+  Say Y here if you want to use a cyberJack pinpad/e-com USB chipcard
+  reader. This is an interface to ISO 7816 compatible contactbased
+  chipcards, e.g. GSM SIMs.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cyberjack.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_USB_SERIAL_EDGEPORT
+  Say Y here if you want to use any of the following devices from
+  Inside Out Networks (Digi):
+       Edgeport/4
+       Rapidport/4
+       Edgeport/4t
+       Edgeport/2
+       Edgeport/4i
+       Edgeport/2i
+       Edgeport/421
+       Edgeport/21
+       Edgeport/8
+       Edgeport/8 Dual
+       Edgeport/2D8
+       Edgeport/4D8
+       Edgeport/8i
+       Edgeport/2 DIN
+       Edgeport/4 DIN
+       Edgeport/16 Dual
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called io_edgeport.o.  If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_KLSI
+  Say Y here if you want to use a KL5KUSB105 - based single port
+  serial adapter. The most widely known -- and currently the only
+  tested -- device in this category is the PalmConnect USB Serial
+  adapter sold by Palm Inc. for use with their Palm III and Palm V
+  series PDAs.
+
+  Please read <file:Documentation/usb/usb-serial.txt> for more
+  information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called kl5kusb105.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SERIAL_DEBUG
+  Say Y here if you want verbose debug messages from the USB Serial
+  Drivers sent to the kernel debug log.
+

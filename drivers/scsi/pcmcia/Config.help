@@ -1,0 +1,46 @@
+CONFIG_SCSI_PCMCIA
+  Say Y here if you intend to attach a PCMCIA or CardBus card to your
+  computer which acts as a SCSI host adapter. These are credit card
+  size devices often used with laptops.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions PCMCIA SCSI host adapters.
+
+CONFIG_PCMCIA_NINJA_SCSI
+  If you intend to attach this type of PCMCIA SCSI host adapter to
+  your computer, say Y here and read
+  <file:Documentation/README.nsp_cs.eng>.
+
+  This driver is also available as a module called nsp_cs.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_PCMCIA_AHA152X
+  Say Y here if you intend to attach this type of PCMCIA SCSI host
+  adapter to your computer.
+
+  This driver is also available as a module called aha152x_cs.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_PCMCIA_QLOGIC
+  Say Y here if you intend to attach this type of PCMCIA SCSI host
+  adapter to your computer.
+
+  This driver is also available as a module called qlogic_cs.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_PCMCIA_FDOMAIN
+  Say Y here if you intend to attach this type of PCMCIA SCSI host
+  adapter to your computer.
+
+  This driver is also available as a module called fdomain_cs.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+

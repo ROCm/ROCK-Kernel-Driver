@@ -688,7 +688,7 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 		ftmp = *chainptr;
 		*chainptr = ftmp->fw_next;
 		kfree(ftmp);
-		MOD_DEC_USE_COUNT();
+		MOD_DEC_USE_COUNT;
 	}
 	restore_flags(flags);
 }
@@ -732,7 +732,7 @@ static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	ftmp->fw_next = *chainptr;
        	*chainptr=ftmp;
 	restore_flags(flags);
-	MOD_INC_USE_COUNT();
+	MOD_INC_USE_COUNT;
 	return(0);
 }
 
@@ -783,7 +783,7 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	else
         	*chainptr=ftmp;
 	restore_flags(flags);
-	MOD_INC_USE_COUNT();
+	MOD_INC_USE_COUNT;
 	return(0);
 }
 
@@ -858,7 +858,7 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 	}
 	restore_flags(flags);
 	if (was_found) {
-		MOD_DEC_USE_COUNT();
+		MOD_DEC_USE_COUNT;
 		return 0;
 	} else
 		return(EINVAL);

@@ -1,0 +1,15 @@
+CONFIG_VIDEO_DEV
+  Support for audio/video capture and overlay devices and FM radio
+  cards. The exact capabilities of each device vary. User tools for
+  this are available from
+  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
+
+  If you are interested in writing a driver for such an audio/video
+  device or user software interacting with such a driver, please read
+  the file <file:Documentation/video4linux/API.html>.
+
+  This driver is also available as a module called videodev.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+

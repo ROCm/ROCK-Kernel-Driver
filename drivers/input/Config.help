@@ -1,0 +1,59 @@
+CONFIG_INPUT
+  Say Y here if you want to enable any of the following options for
+  USB Human Interface Device (HID) support.
+
+  Say Y here if you want to enable any of the USB HID options in the
+  USB support section which require Input core support.
+
+  Otherwise, say N.
+
+CONFIG_INPUT_KEYBDEV
+  Say Y here if you want your USB HID keyboard (or an ADB keyboard
+  handled by the input layer) to be able to serve as a system
+  keyboard.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called keybdev.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_INPUT_MOUSEDEV
+  Say Y here if you want your USB HID mouse (or ADB mouse handled by
+  the input layer) to be accessible as char devices 13:32+ -
+  /dev/input/mouseX and 13:63 - /dev/input/mice as an emulated ImPS/2
+  mouse.  That way, all user space programs will be able to use your
+  mouse.
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mousedev.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_INPUT_MOUSEDEV_SCREEN_X
+  If you're using a digitizer, or a graphic tablet, and want to use
+  it as a mouse then the mousedev driver needs to know the X window
+  screen resolution you are using to correctly scale the data. If
+  you're not using a digitizer, this value is ignored.
+
+CONFIG_INPUT_MOUSEDEV_SCREEN_Y
+  If you're using a digitizer, or a graphic tablet, and want to use
+  it as a mouse then the mousedev driver needs to know the X window
+  screen resolution you are using to correctly scale the data. If
+  you're not using a digitizer, this value is ignored.
+
+CONFIG_INPUT_JOYDEV
+  Say Y here if you want your USB HID joystick or gamepad to be
+  accessible as char device 13:0+ - /dev/input/jsX device.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called joydev.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_INPUT_EVDEV
+  Say Y here if you want your USB or ADB HID device events be
+  accessible under char device 13:64+ - /dev/input/eventX in a generic
+  way.  This is the future ...
+

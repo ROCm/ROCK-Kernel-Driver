@@ -4,10 +4,7 @@
 #
 mainmenu_name "Linux Kernel Configuration"
 
-mainmenu_option next_comment
-comment 'Code maturity level options'
-bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
-endmenu
+source init/Config.in
 
 mainmenu_option next_comment
 comment 'Machine selection'
@@ -101,8 +98,6 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    bool 'Kernel floating-point emulation' CONFIG_MIPS_FPU_EMULATOR
 fi
 
-bool 'Networking support' CONFIG_NET
-
 source drivers/pci/Config.in
 
 bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
@@ -112,10 +107,6 @@ if [ "$CONFIG_HOTPLUG" = "y" ] ; then
 else
    define_bool CONFIG_PCMCIA n
 fi
-
-bool 'System V IPC' CONFIG_SYSVIPC
-bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
-bool 'Sysctl support' CONFIG_SYSCTL
 
 if [ "$CONFIG_ARC32" = "y" ]; then
    bool 'ARC console support' CONFIG_ARC_CONSOLE
@@ -129,14 +120,6 @@ fi
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 endmenu
-
-mainmenu_option next_comment
-comment 'Loadable module support'
-bool 'Enable loadable module support' CONFIG_MODULES
-if [ "$CONFIG_MODULES" = "y" ]; then
-   bool 'Set version information on all symbols for modules' CONFIG_MODVERSIONS
-   bool 'Kernel module loader' CONFIG_KMOD
-fi
 
 source drivers/pci/Config.in
 

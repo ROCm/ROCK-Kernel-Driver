@@ -1,0 +1,133 @@
+CONFIG_WAVELAN
+  The Lucent WaveLAN (formerly NCR and AT&T; or DEC RoamAbout DS) is
+  a Radio LAN (wireless Ethernet-like Local Area Network) using the
+  radio frequencies 900 MHz and 2.4 GHz.
+
+  This driver support the ISA version of the WaveLAN card.  A separate
+  driver for the PCMCIA (PC-card) hardware is available in David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).
+
+  If you want to use an ISA WaveLAN card under Linux, say Y and read
+  the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. Some more specific
+  information is contained in
+  <file:Documentation/networking/wavelan.txt> and in the source code
+  <file:drivers/net/wavelan.p.h>.
+
+  You will also need the wireless tools package available from
+  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>.
+  Please read the man pages contained therein.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called wavelan.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_HERMES
+  A driver for 802.11b wireless cards based based on the "Hermes" or
+  Intersil HFA384x (Prism 2) MAC controller.  This includes the vast
+  majority of the PCMCIA 802.11b cards (which are nearly all rebadges)
+  - except for the Cisco/Aironet cards.  Cards supported include the
+  Apple Airport (not a PCMCIA card), WavelanIEEE/Orinoco,
+  Cabletron/EnteraSys Roamabout, ELSA AirLancer, MELCO Buffalo, Avaya,
+  IBM High Rate Wireless, Farralon Syyline, Samsung MagicLAN, Netgear
+  MA401, LinkSys WPC-11, D-Link DWL-650, 3Com AirConnect, Intel
+  PRO/Wireless, and Symbol Spectrum24 High Rate amongst others.
+
+  This option includes the guts of the driver, but in order to
+  actually use a card you will also need to enable support for PCMCIA
+  Hermes cards, PLX9052 based PCI adaptors or the Apple Airport below.
+
+  You will also very likely also need the Wireless Tools in order to
+  configure your card and that /etc/pcmcia/wireless.opts works :
+  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>
+
+CONFIG_PLX_HERMES
+  Enable support for PCMCIA cards supported by the "Hermes" (aka
+  orinoco_cs) driver when used in PLX9052 based PCI adaptors.  These
+  adaptors are not a full PCMCIA controller but act as a more limited
+  PCI <-> PCMCIA bridge.  Several vendors sell such adaptors so that
+  802.11b PCMCIA cards can be used in desktop machines.  The Netgear
+  MA301 is such an adaptor.
+
+  Support for these adaptors is so far still incomplete and buggy.
+  You have been warned.
+
+CONFIG_PCMCIA_HERMES
+  A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
+  as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
+  EnteraSys RoamAbout 802.11, ELSA Airlancer, Melco Buffalo and
+  others).  It should also be usable on various Prism II based cards
+  such as the Linksys, D-Link and Farallon Skyline.  It should also
+  work on Symbol cards such as the 3Com AirConnect and Ericsson WLAN.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  You also want to check out the PCMCIA-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  You will also very likely also need the Wireless Tools in order to
+  configure your card and that /etc/pcmcia/wireless.opts works:
+  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>.
+
+CONFIG_AIRO
+  This is the standard Linux driver to support Cisco/Aironet ISA and
+  PCI 802.11 wireless cards.
+  It supports the new 802.11b cards from Cisco (Cisco 34X, Cisco 35X
+  - with or without encryption) as well as card before the Cisco
+  aquisition (Aironet 4500, Aironet 4800, Aironet 4800B).
+
+  This driver support both the standard Linux Wireless Extensions
+  and Cisco proprietary API, so both the Linux Wireless Tools and the
+  Cisco Linux utilities can be used to configure the card.
+
+  The driver can be compiled as a module and will be named "airo.o".
+
+CONFIG_AIRO_CS
+  This is the standard Linux driver to support Cisco/Aironet PCMCIA
+  802.11 wireless cards.  This driver is the same as the Aironet
+  driver part of the Linux Pcmcia package.
+  It supports the new 802.11b cards from Cisco (Cisco 34X, Cisco 35X
+  - with or without encryption) as well as card before the Cisco
+  aquisition (Aironet 4500, Aironet 4800, Aironet 4800B). It also
+  supports OEM of Cisco such as the DELL TrueMobile 4800 and Xircom
+  802.11b cards.
+
+  This driver support both the standard Linux Wireless Extensions
+  and Cisco proprietary API, so both the Linux Wireless Tools and the
+  Cisco Linux utilities can be used to configure the card.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
+  for location).  You also want to check out the PCMCIA-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_APPLE_AIRPORT
+  Say Y here to support the Airport 802.11b wireless Ethernet hardware
+  built into the Macintosh iBook and other recent PowerPC-based
+  Macintosh machines. This is essentially a Lucent Orinoco card with 
+  a non-standard interface
+
+CONFIG_PCMCIA_NETWAVE
+  Say Y here if you intend to attach this type of PCMCIA (PC-card)
+  wireless Ethernet networking card to your computer.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called netwave_cs.o.  If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+  If unsure, say N.
+
+CONFIG_PCMCIA_WAVELAN
+  Say Y here if you intend to attach an AT&T/Lucent Wavelan PCMCIA
+  (PC-card) wireless Ethernet networking card to your computer.  This
+  driver is for the non-IEEE-802.11 Wavelan cards.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called wavelan_cs.o.  If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+  If unsure, say N.
+

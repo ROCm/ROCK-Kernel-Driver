@@ -1,0 +1,227 @@
+CONFIG_CDU31A
+  These CD-ROM drives have a spring-pop-out caddyless drawer, and a
+  rectangular green LED centered beneath it.  NOTE: these CD-ROM
+  drives will not be auto detected by the kernel at boot time; you
+  have to provide the interface address as an option to the kernel at
+  boot time as described in <file:Documentation/cdrom/cdu31a> or fill
+  in your parameters into <file:drivers/cdrom/cdu31a.c>.  Try "man
+  bootparam" or see the documentation of your boot loader (lilo or
+  loadlin) about how to pass options to the kernel.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cdu31a.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_MCD
+  This is the older of the two drivers for the older Mitsumi models
+  LU-005, FX-001 and FX-001D. This is not the right driver for the
+  FX-001DE and the triple or quad speed models (all these are
+  IDE/ATAPI models). Please also the file
+  <file:Documentation/cdrom/mcd>.
+
+  With the old LU-005 model, the whole drive chassis slides out for cd
+  insertion. The FX-xxx models use a motorized tray type mechanism.
+  Note that this driver does not support XA or MultiSession CDs
+  (PhotoCDs). There is a new driver (next question) which can do
+  this. If you want that one, say N here.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mcd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_MCD_IRQ
+  This allows you to specify the default value of the IRQ used by the
+  driver. This setting can be overridden by passing the "mcd="
+  parameter to the kernel at boot time (or at module load time if you
+  said M to "Standard Mitsumi CD-ROM support").
+
+CONFIG_MCD_BASE
+  This allows you to specify the default value of the I/O base address
+  used by the driver. This setting can be overridden by passing the
+  "mcd=" parameter to the kernel at boot time (or at module load time
+  if you said M to "Standard Mitsumi CD-ROM support").
+
+CONFIG_MCDX
+  Use this driver if you want to be able to read XA or MultiSession
+  CDs (PhotoCDs) as well as ordinary CDs with your Mitsumi LU-005,
+  FX-001 or FX-001D CD-ROM drive. In addition, this driver uses much
+  less kernel memory than the old one, if that is a concern. This
+  driver is able to support more than one drive, but each drive needs
+  a separate interface card. Please read the file
+  <file:Documentation/cdrom/mcdx>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mcdx.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SBPCD
+  This driver supports most of the drives which use the Panasonic or
+  Sound Blaster interface.  Please read the file
+  <file:Documentation/cdrom/sbpcd>.
+
+  The Matsushita CR-521, CR-522, CR-523, CR-562, CR-563 drives
+  (sometimes labeled "Creative"), the Creative Labs CD200, the
+  Longshine LCS-7260, the "IBM External ISA CD-ROM" (in fact a CR-56x
+  model), the TEAC CD-55A fall under this category.  Some other
+  "electrically compatible" drives (Vertos, Genoa, some Funai models)
+  are currently not supported; for the Sanyo H94A drive currently a
+  separate driver (asked later) is responsible.  Most drives have a
+  uniquely shaped faceplate, with a caddyless motorized drawer, but
+  without external brand markings.  The older CR-52x drives have a
+  caddy and manual loading/eject, but still no external markings.  The
+  driver is able to do an extended auto-probing for interface
+  addresses and drive types; this can help to find facts in cases you
+  are not sure, but can consume some time during the boot process if
+  none of the supported drives gets found.  Once your drive got found,
+  you should enter the reported parameters into
+  <file:drivers/cdrom/sbpcd.h> and set "DISTRIBUTION 0" there.
+
+  This driver can support up to four CD-ROM controller cards, and each
+  card can support up to four CD-ROM drives; if you say Y here, you
+  will be asked how many controller cards you have.  If compiled as a
+  module, only one controller card (but with up to four drives) is
+  usable.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sbpcd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SBPCD2
+  Say Y here only if you have two CD-ROM controller cards of this type
+  (usually only if you have more than four drives).  You should enter
+  the parameters for the second, third and fourth interface card into
+  <file:drivers/cdrom/sbpcd.h> before compiling the new kernel.  Read
+  the file <file:Documentation/cdrom/sbpcd>.
+
+CONFIG_SBPCD3
+  Say Y here only if you have three CD-ROM controller cards of this
+  type (usually only if you have more than six drives).  You should
+  enter the parameters for the second, third and fourth interface card
+  into <file:include/linux/sbpcd.h> before compiling the new kernel.
+  Read the file <file:Documentation/cdrom/sbpcd>.
+
+CONFIG_SBPCD4
+  Say Y here only if you have four CD-ROM controller cards of this
+  type (usually only if you have more than eight drives).  You should
+  enter the parameters for the second, third and fourth interface card
+  into <file:include/linux/sbpcd.h> before compiling the new kernel.
+  Read the file <file:Documentation/cdrom/sbpcd>.
+
+CONFIG_AZTCD
+  This is your driver if you have an Aztech CDA268-01A, Orchid
+  CD-3110, Okano or Wearnes CDD110, Conrad TXC, or CyCD-ROM CR520 or
+  CR540 CD-ROM drive.  This driver -- just like all these CD-ROM
+  drivers -- is NOT for CD-ROM drives with IDE/ATAPI interfaces, such
+  as Aztech CDA269-031SE. Please read the file
+  <file:Documentation/cdrom/aztcd>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aztcd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_CDU535
+  This is the driver for the older Sony CDU-535 and CDU-531 CD-ROM
+  drives. Please read the file <file:Documentation/cdrom/sonycd535>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sonycd535.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GSCD
+  If this is your CD-ROM drive, say Y here.  As described in the file
+  <file:Documentation/cdrom/gscd>, you might have to change a setting
+  in the file <file:drivers/cdrom/gscd.h> before compiling the
+  kernel.  Please read the file <file:Documentation/cdrom/gscd>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called gscd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_CM206
+  If you have a Philips/LMS CD-ROM drive cm206 in combination with a
+  cm260 host adapter card, say Y here. Please also read the file
+  <file:Documentation/cdrom/cm206>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cm206.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_OPTCD
+  This is the driver for the 'DOLPHIN' drive with a 34-pin Sony
+  compatible interface. It also works with the Lasermate CR328A. If
+  you have one of those, say Y. This driver does not work for the
+  Optics Storage 8001 drive; use the IDE-ATAPI CD-ROM driver for that
+  one. Please read the file <file:Documentation/cdrom/optcd>.
+
+  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
+  file system support" below, because that's the file system used on
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called optcd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SJCD
+  If this is your CD-ROM drive, say Y here and read the file
+  <file:Documentation/cdrom/sjcd>. You should then also say Y or M to
+  "ISO 9660 CD-ROM file system support" below, because that's the
+  file system used on CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sjcd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_ISP16_CDI
+  These are sound cards with built-in cdrom interfaces using the OPTi
+  82C928 or 82C929 chips. Say Y here to have them detected and
+  possibly configured at boot time. In addition, You'll have to say Y
+  to a driver for the particular cdrom drive you have attached to the
+  card. Read <file:Documentation/cdrom/isp16> for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called isp16.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+

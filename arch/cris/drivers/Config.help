@@ -1,0 +1,574 @@
+CONFIG_IDE
+  If you say Y here, your kernel will be able to manage low cost mass
+  storage units such as ATA/(E)IDE and ATAPI units. The most common
+  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+  If your system is pure SCSI and doesn't use these interfaces, you
+  can say N here.
+
+  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+  for mass storage units such as hard disks. It was designed by
+  Western Digital and Compaq Computer in 1984. It was then named
+  ST506. Quite a number of disks use the IDE interface.
+
+  AT Attachment (ATA) is the superset of the IDE specifications.
+  ST506 was also called ATA-1.
+
+  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+  the LBA standard), more disks (4 instead of 2) and for other mass
+  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+  ATA-4 and provides faster (and more CPU friendly) transfer modes
+  than previous PIO (Programmed processor Input/Output) from previous
+  ATA/IDE standards by means of fast DMA controllers.
+
+  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+  designed in order to prevent data corruption and disk crash by
+  detecting pre hardware failure conditions (heat, access time, and
+  the like...). Disks built since June 1995 may follow this standard.
+  The kernel itself don't manage this; however there are quite a
+  number of user programs such as smart that can query the status of
+  SMART parameters disk.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module
+  will be called ide.o.
+
+  For further information, please read <file:Documentation/ide.txt>.
+
+  If unsure, say Y.
+
+CONFIG_BLK_DEV_IDE
+  If you say Y here, you will use the full-featured IDE driver to
+  control up to ten ATA/IDE interfaces, each being able to serve a
+  "master" and a "slave" device, for a total of up to twenty ATA/IDE
+  disk/cdrom/tape/floppy drives.
+
+  Useful information about large (>540 MB) IDE disks, multiple
+  interfaces, what to do if ATA/IDE devices are not automatically
+  detected, sound card ATA/IDE ports, module support, and other
+  topics, is contained in <file:Documentation/ide.txt>. For detailed
+  information about hard drives, consult the Disk-HOWTO and the
+  Multi-Disk-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  To fine-tune ATA/IDE drive/interface parameters for improved
+  performance, look for the hdparm package at
+  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/ide.txt>. The module will be called ide-mod.o.
+  Do not compile this driver as a module if your root file system (the
+  one containing the directory /) is located on an IDE device.
+
+  If you have one or more IDE drives, say Y or M here. If your system
+  has no IDE drives, or if memory requirements are really tight, you
+  could say N here, and select the "Old hard disk driver" below
+  instead to save about 13 KB of memory in the kernel.
+
+CONFIG_BLK_DEV_IDEDISK
+  This will include enhanced support for MFM/RLL/IDE hard disks.  If
+  you have a MFM/RLL/IDE disk, and there is no special reason to use
+  the old hard disk driver instead, say Y.  If you have an SCSI-only
+  system, you can say N here.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-disk.o.  Do not compile this driver as a module
+  if your root file system (the one containing the directory /) is
+  located on the IDE disk. If unsure, say Y.
+
+CONFIG_BLK_DEV_IDECD
+  If you have a CD-ROM drive using the ATAPI protocol, say Y. ATAPI is
+  a newer protocol used by IDE CD-ROM and TAPE drives, similar to the
+  SCSI protocol. Most new CD-ROM drives use ATAPI, including the
+  NEC-260, Mitsumi FX400, Sony 55E, and just about all non-SCSI
+  double(2X) or better speed drives.
+
+  If you say Y here, the CD-ROM drive will be identified at boot time
+  along with other IDE devices, as "hdb" or "hdc", or something
+  similar (check the boot messages with dmesg). If this is your only
+  CD-ROM drive, you can say N to all other CD-ROM options, but be sure
+  to say Y or M to "ISO 9660 CD-ROM file system support".
+
+  Note that older versions of LILO (LInux LOader) cannot properly deal
+  with IDE/ATAPI CD-ROMs, so install LILO 16 or higher, available from
+  <ftp://brun.dyndns.org/pub/linux/lilo/>.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ide-cd.o.
+
+CONFIG_PARPORT
+  If you want to use devices connected to your machine's parallel port
+  (the connector at the computer with 25 holes), e.g. printer, ZIP
+  drive, PLIP link (Parallel Line Internet Protocol is mainly used to
+  create a mini network by connecting the parallel ports of two local
+  machines) etc., then you need to say Y here; please read
+  <file:Documentation/parport.txt> and
+  <file:drivers/parport/BUGS-parport>.
+
+  For extensive information about drivers for many devices attaching
+  to the parallel port see <http://www.torque.net/linux-pp.html> on
+  the WWW.
+
+  It is possible to share a single parallel port among several devices
+  and it is safe to compile all the corresponding drivers into the
+  kernel.  If you want to compile parallel port support as a module
+  ( = code which can be inserted in and removed from the running
+  kernel whenever you want), say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  parport.o.  If you have more than one parallel port and want to
+  specify which port and IRQ to be used by this driver at module load
+  time, take a look at <file:Documentation/parport.txt>.
+
+  If unsure, say Y.
+
+CONFIG_PARPORT_1284
+  If you have a printer that supports status readback or device ID, or
+  want to use a device that uses enhanced parallel port transfer modes
+  such as EPP and ECP, say Y here to enable advanced IEEE 1284
+  transfer modes. Also say Y if you want device ID information to
+  appear in /proc/sys/dev/parport/*/autoprobe*. It is safe to say N.
+
+CONFIG_NET_ETHERNET
+  Ethernet (also called IEEE 802.3 or ISO 8802-2) is the most common
+  type of Local Area Network (LAN) in universities and companies.
+
+  Common varieties of Ethernet are: 10BASE-2 or Thinnet (10 Mbps over
+  coaxial cable, linking computers in a chain), 10BASE-T or twisted
+  pair (10 Mbps over twisted pair cable, linking computers to central
+  hubs), 10BASE-F (10 Mbps over optical fiber links, using hubs),
+  100BASE-TX (100 Mbps over two twisted pair cables, using hubs),
+  100BASE-T4 (100 Mbps over 4 standard voice-grade twisted pair
+  cables, using hubs), 100BASE-FX (100 Mbps over optical fiber links)
+  [the 100BASE varieties are also known as Fast Ethernet], and Gigabit
+  Ethernet (1 Gbps over optical fiber or short copper links).
+
+  If your Linux machine will be connected to an Ethernet and you have
+  an Ethernet network interface card (NIC) installed in your computer,
+  say Y here and read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. You will then also have
+  to say Y to the driver for your particular NIC.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about Ethernet network cards. If unsure, say N.
+
+CONFIG_MTD
+  Memory Technology Devices are flash, RAM and similar chips, often
+  used for solid state file systems on embedded devices. This option
+  will provide the generic support for MTD drivers to register
+  themselves with the kernel and for potential users of MTD devices
+  to enumerate the devices which are present and obtain a handle on
+  them. It will also allow you to select individual drivers for 
+  particular hardware and users of MTD devices. If unsure, say N.
+
+CONFIG_MTD_PARTITIONS
+  If you have a device which needs to divide its flash chip(s) up
+  into multiple 'partitions', each of which appears to the user as
+  a separate MTD device, you require this option to be enabled. If
+  unsure, say 'Y'.
+
+  Note, however, that you don't need this option for the DiskOnChip
+  devices. Partitioning on NFTL 'devices' is a different - that's the
+  'normal' form of partitioning used on a block device.
+
+CONFIG_MTD_CHAR
+  This provides a character device for each MTD device present in
+  the system, allowing the user to read and write directly to the
+  memory chips, and also use ioctl() to obtain information about
+  the device, or to erase parts of it.
+
+CONFIG_MTD_BLOCK
+  Although most flash chips have an erase size too large to be useful
+  as block devices, it is possible to use MTD devices which are based
+  on RAM chips in this manner. This block device is a user of MTD
+  devices performing that function.
+
+  At the moment, it is also required for the Journalling Flash File
+  System(s) to obtain a handle on the MTD device when it's mounted
+  (although JFFS and JFFS2 don't actually use any of the functionality
+  of the mtdblock device).
+
+  Later, it may be extended to perform read/erase/modify/write cycles
+  on flash chips to emulate a smaller block size. Needless to say,
+  this is very unsafe, but could be useful for file systems which are
+  almost never written to.
+
+  You do not need this option for use with the DiskOnChip devices. For
+  those, enable NFTL support (CONFIG_NFTL) instead.
+
+CONFIG_MTD_CFI
+  The Common Flash Interface specification was developed by Intel,
+  AMD and other flash manufactures that provides a universal method
+  for probing the capabilities of flash devices. If you wish to
+  support any device that is CFI-compliant, you need to enable this
+  option. Visit <http://www.amd.com/products/nvd/overview/cfi.html>
+  for more information on CFI.
+
+CONFIG_MTD_CFI_INTELEXT
+  The Common Flash Interface defines a number of different command
+  sets which a CFI-compliant chip may claim to implement. This code
+  provides support for one of those command sets, used on Intel
+  StrataFlash and other parts.
+
+CONFIG_MTD_CFI_AMDSTD
+  The Common Flash Interface defines a number of different command
+  sets which a CFI-compliant chip may claim to implement. This code
+  provides support for one of those command sets, used on chips 
+  chips including the AMD Am29LV320.
+
+CONFIG_MTD_AMDSTD
+  This option enables support for flash chips using AMD-compatible
+  commands, including some which are not CFI-compatible and hence 
+  cannot be used with the CONFIG_MTD_CFI_AMDSTD option.
+
+  It also works on AMD compatible chips that do conform to CFI.
+
+CONFIG_USB
+  Universal Serial Bus (USB) is a specification for a serial bus
+  subsystem which offers higher speeds and more features than the
+  traditional PC serial port.  The bus supplies power to peripherals
+  and allows for hot swapping.  Up to 127 USB peripherals can be
+  connected to a single USB port in a tree structure.  The USB port is
+  the root of the tree, the peripherals are the leaves and the inner
+  nodes are special USB devices called hubs.  Many newer PC's have USB
+  ports and newer peripherals such as scanners, keyboards, mice,
+  modems, and printers support the USB protocol and can be connected
+  to the PC via those ports.
+
+  Say Y here if your computer has a USB port and you want to use USB
+  devices.  You then need to say Y to at least one of "UHCI support"
+  or "OHCI support" below (the type of interface that the USB hardware
+  in your computer provides to the operating system) and then choose
+  from among the drivers for USB peripherals.  You may want to check
+  out the information provided in <file:Documentation/usb/> and
+  especially the links given in <file:Documentation/usb/usb-help.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usbcore.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_PRINTER
+  If you intend to attach a printer to the parallel port of your Linux
+  box (as opposed to using a serial printer; if the connector at the
+  printer has 9 or 25 holes ["female"], then it's serial), say Y.
+  Also read the Printing-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  It is possible to share one parallel port among several devices
+  (e.g. printer and ZIP drive) and it is safe to compile the
+  corresponding drivers into the kernel.  If you want to compile this
+  driver as a module however ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt> and
+  <file:Documentation/parport.txt>.  The module will be called lp.o.
+
+  If you have several parallel ports, you can specify which ports to
+  use with the "lp" kernel command line option.  (Try "man bootparam"
+  or see the documentation of your boot loader (lilo or loadlin) about
+  how to pass options to the kernel at boot time.)  The syntax of the
+  "lp" command line option can be found in <file:drivers/char/lp.c>.
+
+  If you have more than 8 printers, you need to increase the LP_NO
+  macro in lp.c and the PARPORT_MAX macro in parport.h.
+
+CONFIG_ETRAX_PA_BUTTON_BITMASK
+  This is a bitmask with information about what bits on PA that
+  are used for buttons.
+  Most products has a so called TEST button on PA1, if that's true
+  use 02 here.
+  Use 00 if there are no buttons on PA.
+  If the bitmask is <> 00 a button driver will be included in the gpio
+  driver. Etrax general I/O support must be enabled.
+
+CONFIG_ETRAX_PA_CHANGEABLE_DIR
+  This is a bitmask with information of what bits in PA that a user
+  can change direction on using ioctl's.
+  Bit set = changeable.
+  You probably want 00 here.
+
+CONFIG_ETRAX_PA_CHANGEABLE_BITS
+  This is a bitmask with information of what bits in PA that a user
+  can change change the value on using ioctl's.
+  Bit set = changeable.
+  You probably want 00 here.
+
+CONFIG_ETRAX_PB_CHANGEABLE_DIR
+  This is a bitmask with information of what bits in PB that a user
+  can change direction on using ioctl's.
+  Bit set = changeable.
+  You probably want 00 here.
+
+CONFIG_ETRAX_PB_CHANGEABLE_BITS
+  This is a bitmask with information of what bits in PB that a user
+  can change the value on using ioctl's.
+  Bit set = changeable.
+  You probably want 00 here.
+
+CONFIG_ETRAX_GPIO
+  Enables the Etrax general port device (major 120, minors 0 and 1).
+  You can use this driver to access the general port bits. It supports
+  these ioctl's:
+        #include <linux/etraxgpio.h>
+       fd = open("/dev/gpioa", O_RDWR); // or /dev/gpiob
+       ioctl(fd, _IO(ETRAXGPIO_IOCTYPE, IO_SETBITS), bits_to_set);
+       ioctl(fd, _IO(ETRAXGPIO_IOCTYPE, IO_CLRBITS), bits_to_clear);
+       val = ioctl(fd, _IO(ETRAXGPIO_IOCTYPE, IO_READBITS), NULL);
+  Remember that you need to setup the port directions appropriately in
+  the General configuration.
+
+CONFIG_ETRAX_SERIAL
+  Enables the ETRAX 100 serial driver for ser0 (ttyS0)
+  You probably want this enabled.
+
+CONFIG_ETRAX_SERIAL_FAST_TIMER
+  Select this to have the serial DMAs flushed at a higher rate than
+  normally, possible by using the fast timer API, the timeout is
+  approx. 4 character times.
+  If unsure, say N.
+
+CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
+  Select this to have the serial DMAs flushed at a higher rate than
+  normally possible through a fast timer interrupt (currently at
+  15360 Hz).
+  If unsure, say N.
+
+CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS
+  Number of timer ticks between flush of receive fifo (1 tick = 10ms).
+  Try 0-3 for low latency applications.  Approx 5 for high load
+  applications (e.g. PPP).  Maybe this should be more adaptive some
+  day...
+
+CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB
+  Enables the status and control signals DTR, RI, DSR and CD on PB for
+  ser0.
+
+CONFIG_ETRAX_SERIAL_PORT1
+  Enables the ETRAX 100 serial driver for ser1 (ttyS1).
+
+CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB
+  Enables the status and control signals DTR, RI, DSR and CD on PB for
+  ser1.
+
+CONFIG_ETRAX_SERIAL_PORT2
+  Enables the ETRAX 100 serial driver for ser2 (ttyS2).
+
+CONFIG_ETRAX_SER2_DTR_RI_DSR_CD_ON_PA
+  Enables the status and control signals DTR, RI, DSR and CD on PA for
+  ser2.
+
+CONFIG_ETRAX_SERIAL_PORT3
+  Enables the ETRAX 100 serial driver for ser3 (ttyS3).
+
+CONFIG_ETRAX_RS485
+  Enables support for RS-485 serial communication.  For a primer on
+  RS-485, see <http://www.hw.cz/english/docs/rs485/rs485.html>.
+
+CONFIG_ETRAX_RS485_ON_PA
+  Control Driver Output Enable on RS485 tranceiver using a pin on PA
+  port:
+          Axis 2400/2401 uses PA 3.
+
+CONFIG_ETRAX_RS485_ON_PA_BIT
+  Control Driver Output Enable on RS485 tranceiver using a this bit
+  on PA port.
+
+CONFIG_ETRAX_SER0_DTR_ON_PB_BIT
+  Specify the pin of the PB port to carry the DTR signal for serial
+  port 0.
+
+CONFIG_ETRAX_SER0_RI_ON_PB_BIT
+  Specify the pin of the PB port to carry the RI signal for serial
+  port 0.
+
+CONFIG_ETRAX_SER0_DSR_ON_PB_BIT
+  Specify the pin of the PB port to carry the DSR signal for serial
+  port 0.
+
+CONFIG_ETRAX_SER0_CD_ON_PB_BIT
+  Specify the pin of the PB port to carry the CD signal for serial
+  port 0.
+
+CONFIG_ETRAX_SER1_DTR_ON_PB_BIT
+  Specify the pin of the PB port to carry the DTR signal for serial
+  port 1.
+
+CONFIG_ETRAX_SER1_RI_ON_PB_BIT
+  Specify the pin of the PB port to carry the RI signal for serial
+  port 1.
+
+CONFIG_ETRAX_SER1_DSR_ON_PB_BIT
+  Specify the pin of the PB port to carry the DSR signal for serial
+  port 1.
+
+CONFIG_ETRAX_SER1_CD_ON_PB_BIT
+  Specify the pin of the PB port to carry the CD signal for serial
+  port 1.
+
+CONFIG_ETRAX_SER2_DTR_ON_PA_BIT
+  Specify the pin of the PA port to carry the DTR signal for serial
+  port 2.
+
+CONFIG_ETRAX_SER2_RI_ON_PA_BIT
+  Specify the pin of the PA port to carry the RI signal for serial
+  port 2.
+
+CONFIG_ETRAX_SER2_DSR_ON_PA_BIT
+  Specify the pin of the PA port to carry the DTR signal for serial
+  port 2.
+
+CONFIG_ETRAX_SER2_CD_ON_PA_BIT
+  Specify the pin of the PA port to carry the CD signal for serial
+  port 2.
+
+CONFIG_ETRAX_RS485_DISABLE_RECEIVER
+  It's necessary to disable the serial receiver to avoid serial
+  loopback.  Not all products are able to do this in software only.
+  Axis 2400/2401 must disable receiver.
+
+CONFIG_ETRAX_I2C
+  Enables an I2C driver on PB0 and PB1 on ETRAX100.
+  EXAMPLE usage:
+        i2c_arg = I2C_WRITEARG(STA013_WRITE_ADDR, reg, val);
+       ioctl(fd, _IO(ETRAXI2C_IOCTYPE, I2C_WRITEREG), i2c_arg);
+       i2c_arg = I2C_READARG(STA013_READ_ADDR, reg);
+       val = ioctl(fd, _IO(ETRAXI2C_IOCTYPE, I2C_READREG), i2c_arg);
+
+CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
+  Select whether to use the special I2C mode in the PB I/O register or
+  not.  This option needs to be selected in order to use some drivers
+  that access the I2C I/O pins directly instead of going through the
+  I2C driver, like the DS1302 realtime-clock driver.  If you are
+  uncertain, choose Y here.
+
+CONFIG_ETRAX_I2C_EEPROM
+  Enables I2C EEPROM (non-volatile RAM) on PB0 and PB1 using the I2C
+  driver.  Select size option: Probed, 2k, 8k, 16k.
+  (Probing works for 2k and 8k but not that well for 16k)
+
+CONFIG_ETRAX_I2C_EEPROM_16KB
+  Use a 16kB EEPROM.
+
+CONFIG_ETRAX_I2C_EEPROM_2KB
+  Use a 2kB EEPROM.
+
+CONFIG_ETRAX_I2C_EEPROM_8KB
+  Use a 8kB EEPROM.
+
+CONFIG_ETRAX_I2C_EEPROM_PROBE
+  Specifies size or auto probe of the EEPROM size.
+  Options: Probed, 2k, 8k, 16k.
+  (Probing works for 2k and 8k but not that well for 16k)
+
+CONFIG_ETRAX_DS1302
+  Enables the driver for the DS1302 Real-Time Clock battery-backed
+  chip on some products.  The kernel reads the time when booting, and
+  the date can be set using ioctl(fd, RTC_SET_TIME, &rt) with rt a
+  rtc_time struct (see <file:include/asm-cris/rtc.h>) on the /dev/rtc
+  device, major 121.  You can check the time with cat /proc/rtc, but
+  normal time reading should be done using libc function time and
+  friends.
+
+CONFIG_ETRAX_DS1302_RST_ON_GENERIC_PORT
+  If your product has the RST signal line for the DS1302 RTC on the
+  Generic Port then say Y here, otherwise leave it as N in which
+  case the RST signal line is assumed to be connected to Port PB
+  (just like the SCL and SDA lines).
+
+CONFIG_ETRAX_DS1302_RSTBIT
+  This is the bit number for the RST signal line of the DS1302 RTC on
+  the selected port. If you have selected the generic port then it
+  should be bit 27, otherwise your best bet is bit 5.
+
+CONFIG_ETRAX_DS1302_SCLBIT
+  This is the bit number for the SCL signal line of the DS1302 RTC on
+  Port PB. This is probably best left at 3.
+
+CONFIG_ETRAX_DS1302_SDABIT
+  This is the bit number for the SDA signal line of the DS1302 RTC on
+  Port PB. This is probably best left at 2.
+
+CONFIG_ETRAX_IDE_CSP0_8_RESET
+  Configures the pin used to reset the IDE bus.
+
+CONFIG_ETRAX_IDE_DELAY
+  Sets the time to wait for disks to regain consciousness after reset.
+
+CONFIG_ETRAX_IDE_G27_RESET
+  Configures the pin used to reset the IDE bus.
+
+CONFIG_ETRAX_IDE_PB7_RESET
+  Configures the pin used to reset the IDE bus.
+
+CONFIG_ETRAX_USB_HOST
+  This option enables the host functionality of the ETRAX 100LX
+  built-in USB controller. In host mode the controller is designed
+  for CTRL and BULK traffic only, INTR traffic may work as well
+  however (depending on the requirements of timeliness).
+
+CONFIG_ETRAX_USB_HOST_PORT1
+  This option enables port 1 of the ETRAX 100LX USB root hub (RH).
+
+CONFIG_ETRAX_USB_HOST_PORT2
+  This option enables port 2 of the ETRAX 100LX USB root hub (RH).
+
+CONFIG_ETRAX_ETHERNET
+  This option enables the ETRAX 100LX built-in 10/100Mbit Ethernet
+  controller.
+
+CONFIG_ETRAX_SYNCHRONOUS_SERIAL
+  This option enables support for the ETRAX 100LX built-in
+  synchronous serial ports. These ports are used for continuous
+  streamed data like audio. The default setting is compatible
+  with the STA 013 MP3 decoder, but can easily be tuned to fit
+  any other audio encoder/decoder and SPI.
+
+CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT0
+  Enables the ETRAX 100LX synchronous serial port 0 (syncser0).
+
+CONFIG_ETRAX_SYNCHRONOUS_SERIAL0_DMA
+  Makes synchronous serial port 0 use DMA.
+
+CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1
+  Enables the ETRAX 100LX synchronous serial port 1 (syncser1).
+
+CONFIG_ETRAX_SYNCHRONOUS_SERIAL1_DMA
+  Makes synchronous serial port 1 use DMA.
+
+CONFIG_JULIETTE
+  The ARTPEC-1 is a video-compression chip used in the AXIS 2100
+  network camera, which is built around an ETRAX-100 board.  With this
+  option selected, the ETRAX kernel configures a DMA channel at boot
+  time to talk to the chip.
+
+CONFIG_ETRAX_AXISFLASHMAP
+  This option enables MTD mapping of flash devices.  Needed to use
+  flash memories.  If unsure, say Y.
+
+CONFIG_ETRAX_PTABLE_SECTOR
+  Byte-offset of the partition table in the first flash chip.
+  The default value is 64kB and should not be changed unless
+  you know exactly what you are doing. The only valid reason
+  for changing this is when the flash block size is bigger
+  than 64kB (e.g. when using two parallel 16 bit flashes).
+
+CONFIG_ETRAX_PARPORT
+  Say Y here to enable the ETRAX on-board parallel ports.
+
+CONFIG_ETRAX_PARALLEL_PORT0
+  Say Y here to enable parallel port 0.
+
+CONFIG_ETRAX_PARALLEL_PORT1
+  Say Y here to enable parallel port 1.
+

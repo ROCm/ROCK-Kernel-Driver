@@ -1,0 +1,120 @@
+CONFIG_FUSION
+  LSI Logic Fusion(TM) Message Passing Technology (MPT) device support
+  provides high performance SCSI host initiator, and LAN [1] interface
+  services to a host system.  The Fusion architecture is capable of
+  duplexing these protocols on high-speed Fibre Channel
+  (up to 2 GHz x 2 ports = 4 GHz) and parallel SCSI (up to Ultra-320)
+  physical medium.
+
+          [1] LAN is not supported on parallel SCSI medium.
+
+  These drivers require a Fusion MPT compatible PCI adapter installed
+  in the host system.  MPT adapters contain specialized I/O processors
+  to handle I/O workload, and more importantly to offload this work
+  from the host CPU(s).
+
+  If you have Fusion MPT hardware and want to use it, you can say
+  Y or M here to add MPT (base + ScsiHost) drivers.
+    <Y> = build lib (fusion.o), and link [static] into the kernel [2]
+          proper
+    <M> = compiled as [dynamic] modules [3] named: (mptbase.o,
+          mptscsih.o)
+
+          [2] In order enable capability to boot the linux kernel
+              natively from a Fusion MPT target device, you MUST
+               answer Y here! (currently requires CONFIG_BLK_DEV_SD)
+          [3] This support is also available as a module ( = code
+              which can be inserted in and removed from the running
+              kernel whenever you want).  If you want to compile as
+              modules, say M here and read
+              <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+  If you say Y or M here you will get a choice of these
+  additional protocol and support module options:         Module Name:
+    <M>   Enhanced SCSI error reporting                     (isense.o)
+    <M>   Fusion MPT misc device (ioctl) driver             (mptctl.o)
+    <M>   Fusion MPT LAN driver                             (mptlan.o)
+
+  ---
+  Fusion MPT is trademark of LSI Logic Corporation, and its
+  architecture is based on LSI Logic's Message Passing Interface (MPI)
+  specification.
+
+CONFIG_FUSION_ISENSE
+  The isense module (roughly stands for Interpret SENSE data) is
+  completely optional.  It simply provides extra English readable
+  strings in SCSI Error Report(s) that might be generated from the
+  Fusion MPT SCSI Host driver, for example when a target device
+  returns a SCSI check condition on a I/O.  Without this module
+  loaded you might see:
+
+    SCSI Error Report =-=-= (ioc0,scsi5:0)
+      SCSI_Status=02h (CHECK_CONDITION)
+      Original_CDB[]: 2A 00 00 00 00 41 00 00 02 00
+      SenseData[12h]: 70 00 02 00 00 00 00 0A 00 00 00 00 04 02 02 00 00 00
+      SenseKey=2h (NOT READY); FRU=02h
+      ASC/ASCQ=29h/00h
+
+  Where otherwise, if this module had been loaded, you would see:
+
+    SCSI Error Report =-=-= (ioc0,scsi5:0)
+      SCSI_Status=02h (CHECK_CONDITION)
+      Original_CDB[]: 2A 00 00 00 00 41 00 00 02 00 - "WRITE(10)"
+      SenseData[12h]: 70 00 02 00 00 00 00 0A 00 00 00 00 04 02 02 00 00 00
+      SenseKey=2h (NOT READY); FRU=02h
+      ASC/ASCQ=29h/00h "LOGICAL UNIT NOT READY, INITIALIZING CMD. REQUIRED"
+
+  Say M for "Enhanced SCSI error reporting" to compile this optional module,
+  creating a driver named: isense.o.
+
+  NOTE: Support for building this feature into the kernel is not
+  available, due to kernel size considerations.
+
+CONFIG_FUSION_CTL
+  The Fusion MPT misc device driver provides specialized control
+  of MPT adapters via system ioctl calls.  Use of ioctl calls to
+  the MPT driver requires that you create and use a misc device
+  node ala:
+    mknod /dev/mptctl c 10 240
+
+  One use of this ioctl interface is to perform an upgrade (reflash)
+  of the MPT adapter firmware.  Refer to readme file(s) distributed
+  with the Fusion MPT linux driver for additional details.
+
+  If enabled by saying M to this, a driver named: mptctl.o
+  will be compiled.
+
+  If unsure whether you really want or need this, say N.
+
+CONFIG_FUSION_LAN
+  This module supports LAN IP traffic over Fibre Channel port(s)
+  on Fusion MPT compatible hardware (LSIFC9xx chips).
+  The physical interface used is defined in RFC 2625.
+  Please refer to that document for details.
+
+  Installing this driver requires the knowledge to configure and
+  activate a new network interface, "fc0", using standard Linux tools.
+
+  If enabled by saying M to this, a driver named: mptlan.o
+  will be compiled.
+
+  If unsure whether you really want or need this, say N.
+
+  NOTES: This feature is NOT available nor supported for linux-2.2.x
+  kernels.  You must be building a linux-2.3.x or linux-2.4.x kernel
+  in order to configure this option.
+  Support for building this feature into the linux kernel is not
+  yet available.
+
+CONFIG_NET_FC
+  Fibre Channel is a high speed serial protocol mainly used to connect
+  large storage devices to the computer; it is compatible with and
+  intended to replace SCSI.
+
+  If you intend to use Fibre Channel, you need to have a Fibre channel
+  adaptor card in your computer; say Y here and to the driver for your
+  adaptor below. You also should have said Y to "SCSI support" and
+  "SCSI generic support".
+

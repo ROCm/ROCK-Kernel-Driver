@@ -1014,7 +1014,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
  */
 unsigned int apic_timer_irqs [NR_CPUS];
 
-void smp_apic_timer_interrupt(struct pt_regs * regs)
+void smp_apic_timer_interrupt(struct pt_regs regs)
 {
 	int cpu = smp_processor_id();
 
@@ -1034,7 +1034,7 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	irq_enter(cpu, 0);
-	smp_local_timer_interrupt(regs);
+	smp_local_timer_interrupt(&regs);
 	irq_exit(cpu, 0);
 
 	if (softirq_pending(cpu))

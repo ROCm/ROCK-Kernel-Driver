@@ -50,7 +50,8 @@
 #include <linux/compile.h>
 #include <asm/boot.h>
 #include <asm/e820.h>
-
+#include <asm/page.h>
+	
 /* Signature words to ensure LILO loaded us right */
 #define SIG1	0xAA55
 #define SIG2	0x5A5A
@@ -79,7 +80,7 @@ start:
 # This is the setup header, and it must start at %cs:2 (old 0x9020:2)
 
 		.ascii	"HdrS"		# header signature
-		.word	0x0202		# header version number (>= 0x0105)
+		.word	0x0203		# header version number (>= 0x0105)
 					# or else old loadlin-1.5 will fail)
 realmode_swtch:	.word	0, 0		# default_switch, SETUPSEG
 start_sys_seg:	.word	SYSSEG
@@ -152,6 +153,10 @@ cmd_line_ptr:	.long 0			# (Header version 0x0202 or later)
 					# 0x90000 segment; the setup
 					# can be located anywhere in
 					# low memory 0x10000 or higher.
+
+ramdisk_max:	.long __MAXMEM-1	# (Header version 0x0203 or later)
+					# The highest safe address for
+					# the contents of an initrd
 
 trampoline:	call	start_of_setup
 		.space	1024

@@ -10,19 +10,7 @@ define_bool CONFIG_HAVE_DEC_LOCK y
 
 mainmenu_name "Linux/PowerPC Kernel Configuration"
 
-mainmenu_option next_comment
-comment 'Code maturity level options'
-bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
-endmenu
-
-mainmenu_option next_comment
-comment 'Loadable module support'
-bool 'Enable loadable module support' CONFIG_MODULES
-if [ "$CONFIG_MODULES" = "y" ]; then
-   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
-   bool '  Kernel module loader' CONFIG_KMOD
-fi
-endmenu
+source init/Config.in
 
 mainmenu_option next_comment
 comment 'Platform support'
@@ -151,11 +139,6 @@ else
      fi
   fi
 fi
-
-bool 'Networking support' CONFIG_NET
-bool 'Sysctl support' CONFIG_SYSCTL
-bool 'System V IPC' CONFIG_SYSVIPC
-bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 
 # only elf supported, a.out is not -- Cort
 if [ "$CONFIG_PROC_FS" = "y" ]; then

@@ -85,9 +85,7 @@ int device_create_file(struct device * dev, struct driver_file_entry * entry)
 
 	if (!dev)
 		return -EINVAL;
-
-	if (!valid_device(dev))
-		return -EFAULT;
+	get_device(dev);
 
 	new_entry = kmalloc(sizeof(*new_entry),GFP_KERNEL);
 	if (!new_entry)
@@ -110,15 +108,11 @@ int device_create_file(struct device * dev, struct driver_file_entry * entry)
  */
 void device_remove_file(struct device * dev, const char * name)
 {
-	if (!dev)
-		return;
-
-	if (!valid_device(dev))
-		return;
-
-	driverfs_remove_file(&dev->dir,name);
-
-	put_device(dev);
+	if (dev) {
+		get_device(dev);
+		driverfs_remove_file(&dev->dir,name);
+		put_device(dev);
+	}
 }
 
 /**
@@ -204,41 +198,26 @@ static int iobus_make_dir(struct iobus * iobus)
  */
 int device_register(struct device *dev)
 {
-	struct iobus * parent;
-	int error = -EFAULT;
+	int error;
 
-	if (!dev)
+	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
+	BUG_ON(!dev->parent);
 
-	if (!dev->parent)
-		dev->parent = &device_root;
-	parent = dev->parent;
+	spin_lock(&device_lock);
+	INIT_LIST_HEAD(&dev->node);
+	spin_lock_init(&dev->lock);
+	atomic_set(&dev->refcount,2);
+
+	get_iobus(dev->parent);
+	list_add_tail(&dev->node,&dev->parent->devices);
+	spin_unlock(&device_lock);
 
 	DBG("DEV: registering device: ID = '%s', name = %s, parent = %s\n",
 	    dev->bus_id, dev->name, parent->bus_id);
 
-	if (valid_iobus(parent)) {
-		if (!valid_device(dev)) {
-			put_iobus(parent);
-			goto register_done;
-		}
-	} else
-		return -EFAULT;
-
-	if (!strlen(dev->name)) {
-		error = -EINVAL;
+	if ((error = device_make_dir(dev)))
 		goto register_done;
-	}
-
-	error = device_make_dir(dev);
-	if (error)
-		goto register_done;
-
-
-	/* finally add it to its parent's list */
-	lock_iobus(parent);
-	list_add_tail(&dev->node, &parent->devices);
-	unlock_iobus(parent);
 
 	/* notify platform of device entry */
 	if (platform_notify)
@@ -246,8 +225,8 @@ int device_register(struct device *dev)
 
  register_done:
 	put_device(dev);
-	put_iobus(parent);
-
+	if (error)
+		put_iobus(dev->parent);
 	return error;
 }
 
@@ -265,22 +244,13 @@ int device_register(struct device *dev)
  */
 void put_device(struct device * dev)
 {
-	struct iobus * parent;
-
-	if (!atomic_dec_and_lock(&dev->refcount,&dev->lock))
+	if (!atomic_dec_and_lock(&dev->refcount,&device_lock))
 		return;
-
-	parent = dev->parent;
-	dev->parent = NULL;
-	unlock_device(dev);
+	list_del_init(&dev->node);
+	spin_unlock(&device_lock);
 
 	DBG("DEV: Unregistering device. ID = '%s', name = '%s'\n",
 	    dev->bus_id,dev->name);
-
-	/* disavow parent's knowledge */
-	lock_iobus(parent);
-	list_del_init(&dev->node);
-	unlock_iobus(parent);
 
 	/* remove the driverfs directory */
 	device_remove_dir(dev);
@@ -301,47 +271,39 @@ void put_device(struct device * dev)
 	if (dev->driver && dev->driver->remove)
 		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
 
-	put_iobus(parent);
+	put_iobus(dev->parent);
 }
 
 int iobus_register(struct iobus *bus)
 {
-	struct iobus * parent;
-	int error = -EINVAL;
+	int error;
 
-	if (!bus)
+	if (!bus || !strlen(bus->bus_id))
 		return -EINVAL;
+	
+	spin_lock(&device_lock);
+	atomic_set(&bus->refcount,2);
+	spin_lock_init(&bus->lock);
+	INIT_LIST_HEAD(&bus->node);
+	INIT_LIST_HEAD(&bus->devices);
+	INIT_LIST_HEAD(&bus->children);
 
-	if (!bus->parent)
-		bus->parent = &device_root;
-	parent = bus->parent;
+	if (bus != &device_root) {
+		if (!bus->parent)
+			bus->parent = &device_root;
+		get_iobus(bus->parent);
+		list_add_tail(&bus->node,&bus->parent->children);
+	}
+	spin_unlock(&device_lock);
 
 	DBG("DEV: registering bus. ID = '%s' name = '%s' parent = %p\n",
 	    bus->bus_id,bus->name,bus->parent);
 
-	if (valid_iobus(parent)) {
-		if (!valid_iobus(bus)) {
-			put_iobus(parent);
-			goto register_done;
-		}
-	} else
-		goto register_done;
-
-	if (!strlen(bus->bus_id))
-		goto register_done_put;
-
 	error = iobus_make_dir(bus);
-	if (error)
-		goto register_done_put;
 
-	lock_iobus(parent);
-	list_add_tail(&bus->node,&parent->children);
-	unlock_iobus(parent);
-
- register_done_put:
 	put_iobus(bus);
-	put_iobus(parent);
- register_done:
+	if (error && bus->parent)
+		put_iobus(bus->parent);
 	return error;
 }
 
@@ -355,88 +317,18 @@ int iobus_register(struct iobus *bus)
  */
 void put_iobus(struct iobus * iobus)
 {
-	struct iobus * parent;
-
-	if (!atomic_dec_and_lock(&iobus->refcount,&iobus->lock))
+	if (!atomic_dec_and_lock(&iobus->refcount,&device_lock))
 		return;
-
-	parent = iobus->parent;
-	iobus->parent = NULL;
-	unlock_iobus(iobus);
+	list_del_init(&iobus->node);
+	spin_unlock(&device_lock);
 
 	if (!list_empty(&iobus->devices) ||
 	    !list_empty(&iobus->children))
 		BUG();
 
-	/* disavow parent's knowledge */
-	if (parent) {
-		lock_iobus(parent);
-		list_del(&iobus->node);
-		unlock_iobus(parent);
-
-		put_iobus(parent);
-	}
-
+	put_iobus(iobus->parent);
 	/* unregister itself */
 	put_device(iobus->self);
-
-	return;
-}
-
-/**
- * device_init_dev - initialise a struct device
- * @dev:	pointer to device struct
- */
-void device_init_dev(struct device * dev)
-{
-	INIT_LIST_HEAD(&dev->node);
-	spin_lock_init(&dev->lock);
-	atomic_set(&dev->refcount,1);
-}
-
-/**
- * device_alloc_dev - allocate and initialise a device structure
- *
- */
-struct device * device_alloc(void)
-{
-	struct device * dev;
-
-	dev = kmalloc(sizeof(struct device), GFP_KERNEL);
-
-	if (!dev)
-		return NULL;
-
-	memset(dev,0,sizeof(struct device));
-	device_init_dev(dev);
-
-	return dev;
-}
-
-void iobus_init(struct iobus *bus)
-{
-	spin_lock_init(&bus->lock);
-	atomic_set(&bus->refcount,1);
-
-	INIT_LIST_HEAD(&bus->node);
-	INIT_LIST_HEAD(&bus->children);
-	INIT_LIST_HEAD(&bus->devices);
-}
-
-struct iobus *iobus_alloc(void)
-{
-	struct iobus *bus;
-
-	bus = kmalloc(sizeof(struct iobus), GFP_KERNEL);
-
-	if (!bus)
-		return NULL;
-
-	memset(bus,0,sizeof(struct iobus));
-
-	iobus_init(bus);
-
-	return bus;
 }
 
 /**
@@ -588,13 +480,7 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 static int __init device_init_root(void)
 {
 	/* initialize parent bus lists */
-	iobus_init(&device_root);
-
-	/* don't call iobus_register, as the only thing it really
-	 * needs to do is create the root directory. Easier
-	 * to just do it here than special case it elsewhere..
-	 */
-	return iobus_make_dir(&device_root);
+	return iobus_register(&device_root);
 }
 
 int __init device_driver_init(void)
@@ -635,14 +521,7 @@ static int __init device_setup(char *str)
 __setup("device=",device_setup);
 
 EXPORT_SYMBOL(device_register);
-EXPORT_SYMBOL(device_alloc);
-EXPORT_SYMBOL(device_init_dev);
-
 EXPORT_SYMBOL(device_create_file);
 EXPORT_SYMBOL(device_remove_file);
-
 EXPORT_SYMBOL(iobus_register);
-EXPORT_SYMBOL(iobus_alloc);
-EXPORT_SYMBOL(iobus_init);
-
 EXPORT_SYMBOL(device_driver_init);

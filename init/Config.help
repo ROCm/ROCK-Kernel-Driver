@@ -1,0 +1,117 @@
+CONFIG_EXPERIMENTAL
+  Some of the various things that Linux supports (such as network
+  drivers, file systems, network protocols, etc.) can be in a state
+  of development where the functionality, stability, or the level of
+  testing is not yet high enough for general use. This is usually
+  known as the "alpha-test" phase among developers. If a feature is
+  currently in alpha-test, then the developers usually discourage
+  uninformed widespread use of this feature by the general public to
+  avoid "Why doesn't this work?" type mail messages. However, active
+  testing and use of these systems is welcomed. Just be aware that it
+  may not meet the normal level of reliability or it may fail to work
+  in some special cases. Detailed bug reports from people familiar
+  with the kernel internals are usually welcomed by the developers
+  (before submitting bug reports, please read the documents
+  <file:README>, <file:MAINTAINERS>, <file:REPORTING-BUGS>,
+  <file:Documentation/BUG-HUNTING>, and
+  <file:Documentation/oops-tracing.txt> in the kernel source).
+
+  This option will also make obsoleted drivers available. These are
+  drivers that have been replaced by something else, and/or are
+  scheduled to be removed in a future kernel release.
+
+  Unless you intend to help test and develop a feature or driver that
+  falls into this category, or you have a situation that requires
+  using these features, you should probably say N here, which will
+  cause the configurator to present you with fewer choices. If
+  you say Y here, you will be offered the choice of using features or
+  drivers that are currently considered to be in the alpha-test phase.
+
+CONFIG_NET
+  Unless you really know what you are doing, you should say Y here.
+  The reason is that some programs need kernel networking support even
+  when running on a stand-alone machine that isn't connected to any
+  other computer. If you are upgrading from an older kernel, you
+  should consider updating your networking tools too because changes
+  in the kernel and the tools often go hand in hand. The tools are
+  contained in the package net-tools, the location and version number
+  of which are given in <file:Documentation/Changes>.
+
+  For a general introduction to Linux networking, it is highly
+  recommended to read the NET-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_SYSVIPC
+  Inter Process Communication is a suite of library functions and
+  system calls which let processes (running programs) synchronize and
+  exchange information. It is generally considered to be a good thing,
+  and some programs won't run unless you say Y here. In particular, if
+  you want to run the DOS emulator dosemu under Linux (read the
+  DOSEMU-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>), you'll need to say Y
+  here.
+
+  You can find documentation about IPC with "info ipc" and also in
+  section 6.4 of the Linux Programmer's Guide, available from
+  <http://www.linuxdoc.org/docs.html#guide>.
+
+CONFIG_BSD_PROCESS_ACCT
+  If you say Y here, a user level program will be able to instruct the
+  kernel (via a special system call) to write process accounting
+  information to a file: whenever a process exits, information about
+  that process will be appended to the file by the kernel.  The
+  information includes things such as creation time, owning user,
+  command name, memory usage, controlling terminal etc. (the complete
+  list is in the struct acct in <file:include/linux/acct.h>).  It is
+  up to the user level program to do useful things with this
+  information.  This is generally a good idea, so say Y.
+
+CONFIG_SYSCTL
+  The sysctl interface provides a means of dynamically changing
+  certain kernel parameters and variables on the fly without requiring
+  a recompile of the kernel or reboot of the system.  The primary
+  interface consists of a system call, but if you say Y to "/proc
+  file system support", a tree of modifiable sysctl entries will be
+  generated beneath the /proc/sys directory. They are explained in the
+  files in <file:Documentation/sysctl/>.  Note that enabling this
+  option will enlarge the kernel by at least 8 KB.
+
+  As it is generally a good thing, you should say Y here unless
+  building a kernel for install/rescue disks or your system is very
+  limited in memory.
+
+CONFIG_MODULES
+  Kernel modules are small pieces of compiled code which can be
+  inserted in or removed from the running kernel, using the programs
+  insmod and rmmod. This is described in the file
+  <file:Documentation/modules.txt>, including the fact that you have
+  to say "make modules" in order to compile the modules that you chose
+  during kernel configuration.  Modules can be device drivers, file
+  systems, binary executable formats, and so on. If you think that you
+  may want to make use of modules with this kernel in the future, then
+  say Y here.  If unsure, say Y.
+
+CONFIG_MODVERSIONS
+  Usually, modules have to be recompiled whenever you switch to a new
+  kernel.  Saying Y here makes it possible, and safe, to use the
+  same modules even after compiling a new kernel; this requires the
+  program modprobe. All the software needed for module support is in
+  the modutils package (check the file <file:Documentation/Changes>
+  for location and latest version).  NOTE: if you say Y here but don't
+  have the program genksyms (which is also contained in the above
+  mentioned modutils package), then the building of your kernel will
+  fail.  If you are going to use modules that are generated from
+  non-kernel sources, you would benefit from this option.  Otherwise
+  it's not that important.  So, N ought to be a safe bet.
+
+CONFIG_KMOD
+  Normally when you have selected some drivers and/or file systems to
+  be created as loadable modules, you also have the responsibility to
+  load the corresponding modules (using the programs insmod or
+  modprobe) before you can use them. If you say Y here however, the
+  kernel will be able to load modules for itself: when a part of the
+  kernel needs a module, it runs modprobe with the appropriate
+  arguments, thereby loading the module if it is available. (This is a
+  replacement for kerneld.) Say Y here and read about configuring it
+  in <file:Documentation/kmod.txt>.
+

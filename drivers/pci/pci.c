@@ -1064,7 +1064,6 @@ static struct pci_bus * __devinit  pci_alloc_bus(void)
 		memset(b, 0, sizeof(*b));
 		INIT_LIST_HEAD(&b->children);
 		INIT_LIST_HEAD(&b->devices);
-		iobus_init(&b->iobus);
 	}
 	return b;
 }
@@ -1297,9 +1296,6 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	dev->vendor = l & 0xffff;
 	dev->device = (l >> 16) & 0xffff;
 
-	/* make sure generic fields are setup properly */
-	device_init_dev(&dev->dev);
-
 	/* Assume 32-bit PCI; let 64-bit PCI cards (which are far rarer)
 	   set this higher, assuming the system even supports it.  */
 	dev->dma_mask = 0xffffffff;
@@ -1370,7 +1366,6 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 
 	/* Create a device template */
 	memset(&dev0, 0, sizeof(dev0));
-	device_init_dev(&dev0.dev);
 	dev0.bus = bus;
 	dev0.sysdata = bus->sysdata;
 	dev0.dev.parent = &bus->iobus;

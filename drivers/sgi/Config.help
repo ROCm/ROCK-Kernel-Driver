@@ -1,0 +1,38 @@
+CONFIG_SGI_SERIAL
+  If you want to use your SGI's built-in serial ports under Linux,
+  answer Y.
+
+CONFIG_SGI_NEWPORT_GFX
+  If you have an SGI machine and you want to compile the graphics
+  drivers, say Y here. This will include the code for the
+  /dev/graphics and /dev/gfx drivers into the kernel for supporting
+  virtualized access to your graphics hardware.
+
+CONFIG_SGI_DS1286
+  If you say Y here and create a character special file /dev/rtc with
+  major number 10 and minor number 135 using mknod ("man mknod"), you
+  will get access to the real time clock built into your computer.
+  Every SGI has such a clock built in. It reports status information
+  via the file /proc/rtc and its behaviour is set by various ioctls on
+  /dev/rtc.
+
+CONFIG_SERIAL_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode). This could be useful if some terminal or printer is connected
+  to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first serial line, /dev/ttyS0, as
+  system console.
+
+  If unsure, say N.
+

@@ -1,0 +1,238 @@
+CONFIG_NET_SCH_CBQ
+  Say Y here if you want to use the Class-Based Queueing (CBQ) packet
+  scheduling algorithm for some of your network devices.  This
+  algorithm classifies the waiting packets into a tree-like hierarchy
+  of classes; the leaves of this tree are in turn scheduled by
+  separate algorithms (called "disciplines" in this context).
+
+  See the top of <file:net/sched/sch_cbq.c> for references about the
+  CBQ algorithm.
+
+  CBQ is a commonly used scheduler, so if you're unsure, you should
+  say Y here. Then say Y to all the queueing algorithms below that you
+  want to use as CBQ disciplines.  Then say Y to "Packet classifier
+  API" and say Y to all the classifiers you want to use; a classifier
+  is a routine that allows you to sort your outgoing traffic into
+  classes based on a certain criterion.
+
+  This code is also available as a module called sch_cbq.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_CSZ
+  Say Y here if you want to use the Clark-Shenker-Zhang (CSZ) packet
+  scheduling algorithm for some of your network devices.  At the
+  moment, this is the only algorithm that can guarantee service for
+  real-time applications (see the top of <file:net/sched/sch_csz.c>
+  for details and references about the algorithm).
+
+  Note: this scheduler is currently broken.
+
+  This code is also available as a module called sch_csz.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_ATM
+  Say Y here if you want to use the ATM pseudo-scheduler.  This
+  provides a framework for invoking classifiers (aka "filters"), which
+  in turn select classes of this queuing discipline.  Each class maps
+  the flow(s) it is handling to a given virtual circuit (see the top of
+  <file:net/sched/sch_atm.c>).
+
+  This code is also available as a module called sch_atm.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_PRIO
+  Say Y here if you want to use an n-band priority queue packet
+  "scheduler" for some of your network devices or as a leaf discipline
+  for the CBQ scheduling algorithm. If unsure, say Y.
+
+  This code is also available as a module called sch_prio.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_DSMARK
+  Say Y if you want to schedule packets avccording to the
+  Differentiated Services architecture proposed in RFC 2475.
+  Technical information on this method, with pointers to associated
+  RFCs, is available at <http://www.gta.ufrj.br/diffserv/>.
+
+  This code is also available as a module called sch_dsmark.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_GRED
+  Say Y here if you want to use the Generic Random Early Detection
+  (RED) packet scheduling algorithm for some of your network devices
+  (see the top of <file:net/sched/sch_red.c> for details and
+  references about the algorithm).
+
+  This code is also available as a module called sch_gred.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_RED
+  Say Y here if you want to use the Random Early Detection (RED)
+  packet scheduling algorithm for some of your network devices (see
+  the top of <file:net/sched/sch_red.c> for details and references
+  about the algorithm).
+
+  This code is also available as a module called sch_red.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_SFQ
+  Say Y here if you want to use the Stochastic Fairness Queueing (SFQ)
+  packet scheduling algorithm for some of your network devices or as a
+  leaf discipline for the CBQ scheduling algorithm (see the top of
+  <file:net/sched/sch_sfq.c> for details and references about the SFQ
+  algorithm).
+
+  This code is also available as a module called sch_sfq.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_TEQL
+  Say Y here if you want to use the True Link Equalizer (TLE) packet
+  scheduling algorithm for some of your network devices or as a leaf
+  discipline for the CBQ scheduling algorithm. This queueing
+  discipline allows the combination of several physical devices into
+  one virtual device. (see the top of <file:net/sched/sch_teql.c> for
+  details).
+
+  This code is also available as a module called sch_teql.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_TBF
+  Say Y here if you want to use the Simple Token Bucket Filter (TBF)
+  packet scheduling algorithm for some of your network devices or as a
+  leaf discipline for the CBQ scheduling algorithm (see the top of
+  <file:net/sched/sch_tbf.c> for a description of the TBF algorithm).
+
+  This code is also available as a module called sch_tbf.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_SCH_INGRESS
+  If you say Y here, you will be able to police incoming bandwidth
+  and drop packets when this bandwidth exceeds your desired rate.
+  If unsure, say Y.
+
+  This code is also available as a module called cls_ingress.o
+  ( = code which can be inserted in and removed from the running
+  kernel whenever you want).  If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_QOS
+  Say Y here if you want to include Quality Of Service scheduling
+  features, which means that you will be able to request certain
+  rate-of-flow limits for your network devices.
+
+  This Quality of Service (QoS) support will enable you to use
+  Differentiated Services (diffserv) and Resource Reservation Protocol
+  (RSVP) on your Linux router if you also say Y to "Packet classifier
+  API" and to some classifiers below. Documentation and software is at
+  <http://icawww1.epfl.ch/linux-diffserv/>.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about QoS support.
+
+CONFIG_NET_ESTIMATOR
+  In order for Quality of Service scheduling to work, the current
+  rate-of-flow for a network device has to be estimated; if you say Y
+  here, the kernel will do just that.
+
+CONFIG_NET_CLS
+  The CBQ scheduling algorithm requires that network packets which are
+  scheduled to be sent out over a network device be classified
+  according to some criterion. If you say Y here, you will get a
+  choice of several different packet classifiers with the following
+  questions.
+
+  This will enable you to use Differentiated Services (diffserv) and
+  Resource Reservation Protocol (RSVP) on your Linux router.
+  Documentation and software is at
+  <http://icawww1.epfl.ch/linux-diffserv/>.
+
+CONFIG_NET_CLS_POLICE
+  Say Y to support traffic policing (bandwidth limits).  Needed for
+  ingress and egress rate limiting.
+
+CONFIG_NET_CLS_TCINDEX
+  If you say Y here, you will be able to classify outgoing packets
+  according to the tc_index field of the skb. You will want this
+  feature if you want to implement Differentiated Services using
+  sch_dsmark. If unsure, say Y.
+
+  This code is also available as a module called cls_tcindex.o
+  ( = code which can be inserted in and removed from the running
+  kernel whenever you want). If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_CLS_ROUTE4
+  If you say Y here, you will be able to classify outgoing packets
+  according to the route table entry they matched. If unsure, say Y.
+
+  This code is also available as a module called cls_route.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_CLS_FW
+  If you say Y here, you will be able to classify outgoing packets
+  according to firewall criteria you specified.
+
+  This code is also available as a module called cls_fw.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_CLS_U32
+  If you say Y here, you will be able to classify outgoing packets
+  according to their destination address. If unsure, say Y.
+
+  This code is also available as a module called cls_u32.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_CLS_RSVP
+  The Resource Reservation Protocol (RSVP) permits end systems to
+  request a minimum and maximum data flow rate for a connection; this
+  is important for real time data such as streaming sound or video.
+
+  Say Y here if you want to be able to classify outgoing packets based
+  on their RSVP requests.
+
+  This code is also available as a module called cls_rsvp.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_NET_CLS_RSVP6
+  The Resource Reservation Protocol (RSVP) permits end systems to
+  request a minimum and maximum data flow rate for a connection; this
+  is important for real time data such as streaming sound or video.
+
+  Say Y here if you want to be able to classify outgoing packets based
+  on their RSVP requests and you are using the new Internet Protocol
+  IPv6 as opposed to the older and more common IPv4.
+
+  This code is also available as a module called cls_rsvp6.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+

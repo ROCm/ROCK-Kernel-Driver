@@ -1,0 +1,97 @@
+CONFIG_IP6_NF_MATCH_MAC
+  mac matching allows you to match packets based on the source
+  Ethernet address of the packet.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_MATCH_MARK
+  Netfilter mark matching allows you to match packets based on the
+  `nfmark' value in the packet.  This can be set by the MARK target
+  (see below).
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_MATCH_MULTIPORT
+  Multiport matching allows you to match TCP or UDP packets based on
+  a series of source or destination ports: normally a rule can only
+  match a single range of ports.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_QUEUE
+
+  This option adds a queue handler to the kernel for IPv6
+  packets which lets us to receive the filtered packets
+  with QUEUE target using libiptc as we can do with
+  the IPv4 now.
+
+  (C) Fernando Anton 2001
+  IPv64 Project - Work based in IPv64 draft by Arturo Azcorra.
+  Universidad Carlos III de Madrid
+  Universidad Politecnica de Alcala de Henares
+  email: fanton@it.uc3m.es
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt. If unsure, say `N'.
+
+CONFIG_IP6_NF_MATCH_OWNER
+  Packet owner matching allows you to match locally-generated packets
+  based on who created them: the user, group, process or session.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_FILTER
+  Packet filtering defines a table `filter', which has a series of
+  rules for simple packet filtering at local input, forwarding and
+  local output.  See the man page for iptables(8).
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_MANGLE
+  This option adds a `mangle' table to iptables: see the man page for
+  iptables(8).  This table is used for various packet alterations
+  which can effect how the packet is routed.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_TARGET_MARK
+  This option adds a `MARK' target, which allows you to create rules
+  in the `mangle' table which alter the netfilter mark (nfmark) field
+  associated with the packet packet prior to routing. This can change
+  the routing method (see `Use netfilter MARK value as routing
+  key') and can also be used by other subsystems to change their
+  behavior.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_IPTABLES
+  ip6tables is a general, extensible packet identification framework.
+  Currently only the packet filtering and packet mangling subsystem
+  for IPv6 use this, but connection tracking is going to follow.
+  Say 'Y' or 'M' here if you want to use either of those.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_MATCH_LIMIT
+  limit matching allows you to control the rate at which a rule can be
+  matched: mainly useful in combination with the LOG target ("LOG
+  target support", below) and to avoid some Denial of Service attacks.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_TARGET_LOG
+  This option adds a `LOG' target, which allows you to create rules in
+  any iptables table which records the packet header to the syslog.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+

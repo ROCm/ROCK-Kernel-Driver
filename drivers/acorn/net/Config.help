@@ -1,0 +1,12 @@
+CONFIG_ARM_ETHER1
+  If you have an Acorn system with one of these (AKA25) network cards,
+  you should say Y to this option if you wish to use it with Linux.
+
+CONFIG_ARM_ETHER3
+  If you have an Acorn system with one of these network cards, you
+  should say Y to this option if you wish to use it with Linux.
+
+CONFIG_ARM_ETHERH
+  If you have an Acorn system with one of these network cards, you
+  should say Y to this option if you wish to use it with Linux.
+

@@ -1,0 +1,171 @@
+CONFIG_MTD_SA1100
+  This enables access to the flash chips on most platforms based on
+  the SA1100 and SA1110, including the Assabet and the Compaq iPAQ.
+  If you have such a board, say 'Y'.
+
+CONFIG_MTD_PHYSMAP
+  This provides a 'mapping' driver which allows the CFI probe and
+  command set driver code to communicate with flash chips which
+  are mapped physically into the CPU's memory. You will need to
+  configure the physical address and size of the flash chips on
+  your particular board as well as the bus width.
+
+CONFIG_MTD_PHYSMAP_START
+  This is the physical memory location at which the flash chips
+  are mapped on your particular target board. Refer to the
+  memory map which should hopefully be in the documentation for
+  your board.
+
+CONFIG_MTD_PHYSMAP_LEN
+  This is the total length of the mapping of the flash chips on
+  your particular board. If there is space, or aliases, in the
+  physical memory map between the chips, this could be larger
+  than the total amount of flash present. Refer to the memory
+  map which should hopefully be in the documentation for your
+  board.
+
+CONFIG_MTD_PHYSMAP_BUSWIDTH
+  This is the total width of the data bus of the flash devices
+  in octets. For example, if you have a data bus width of 32
+  bits, you would set the bus width octect value to 4. This is
+  used internally by the CFI drivers.
+
+CONFIG_MTD_SUN_UFLASH
+  This provides a 'mapping' driver which supports the way in 
+  which user-programmable flash chips are connected on various 
+  Sun Microsystems boardsets.  This driver will require CFI support 
+  in the kernel, so if you did not enable CFI previously, do that now.
+
+CONFIG_MTD_NORA
+  If you had to ask, you don't have one. Say 'N'.
+
+CONFIG_MTD_PNC2000
+  PNC-2000 is the name of Network Camera product from PHOTRON
+  Ltd. in Japan. It uses CFI-compliant flash.
+
+CONFIG_MTD_RPXLITE
+  The RPXLite PowerPC board has CFI-compliant chips mapped in
+  a strange sparse mapping. This 'mapping' driver supports that
+  arrangement, allowing the CFI probe and command set driver code
+  to communicate with the chips on the RPXLite board. More at
+  <http://www.embeddedplanet.com/rpx_lite_specification_sheet.htm>.
+
+CONFIG_MTD_SC520CDP
+  The SC520 CDP board has two banks of CFI-compliant chips and one
+  Dual-in-line JEDEC chip. This 'mapping' driver supports that
+  arrangement, implementing three MTD devices.
+
+CONFIG_MTD_SBC_GXX
+  This provides a driver for the on-board flash of Arcom Control
+  Systems' SBC-GXn family of boards, formerly known as SBC-MediaGX.
+  By default the flash is split into 3 partitions which are accessed
+  as separate MTD devices.  This board utilizes Intel StrataFlash.
+  More info at
+  <http://www.arcomcontrols.com/products/icp/pc104/processors/>.
+
+CONFIG_MTD_DBOX2
+  This enables access routines for the flash chips on the Nokia/Sagem
+  D-Box 2 board. If you have one of these boards and would like to use
+  the flash chips on it, say 'Y'.
+
+CONFIG_MTD_IQ80310
+  This enables access routines for the flash chips on the Intel XScale
+  IQ80310 evaluation board. If you have one of these boards and would 
+  like to use the flash chips on it, say 'Y'.
+
+CONFIG_MTD_NETSC520
+  This enables access routines for the flash chips on the AMD NetSc520
+  demonstration board. If you have one of these boards and would like 
+  to use the flash chips on it, say 'Y'.
+
+CONFIG_MTD_ELAN_104NC
+  This provides a driver for the on-board flash of the Arcom Control
+  System's ELAN-104NC development board. By default the flash
+  is split into 3 partitions which are accessed as separate MTD
+  devices. This board utilizes Intel StrataFlash. More info at
+  <http://www.arcomcontrols.com/products/icp/pc104/processors/>.
+
+CONFIG_MTD_DC21285
+  This provides a driver for the flash accessed using Intel's
+  21285 bridge used with Intel's StrongARM processors. More info at
+  <http://developer.intel.com/design/bridge/quicklist/dsc-21285.htm>.
+
+CONFIG_MTD_CSTM_MIPS_IXX
+  This provides a mapping driver for the Integrated Tecnology Express,
+  Inc (ITE) QED-4N-S01B eval board and the Globespan IVR Reference
+  Board.  It provides the necessary addressing, length, buswidth, vpp
+  code and addition setup of the flash device for these boards.  In
+  addition, this mapping driver can be used for other boards via
+  setting of the CONFIG_MTD_CSTM_MIPS_IXX_START/LEN/BUSWIDTH
+  parameters.  This mapping will provide one mtd device using one
+  partition.  The start address can be offset from the beginning of
+  flash and the len can be less than the total flash device size to
+  allow a window into the flash.  Both CFI and JEDEC probes are
+  called.
+
+CONFIG_MTD_CSTM_MIPS_IXX_START
+  This is the physical memory location that the MTD driver will
+  use for the flash chips on your particular target board. 
+  Refer to the memory map which should hopefully be in the 
+  documentation for your board.
+
+CONFIG_MTD_CSTM_MIPS_IXX_LEN
+  This is the total length that the MTD driver will use for the 
+  flash chips on your particular board.  Refer to the memory
+  map which should hopefully be in the documentation for your
+  board.
+
+CONFIG_MTD_CSTM_MIPS_IXX_BUSWIDTH
+  This is the total bus width of the mapping of the flash chips
+  on your particular board.
+
+CONFIG_MTD_MIXMEM
+  This supports the paging arrangement for access to flash chips
+  on the MixCOM piggyback card, allowing the flash chip drivers
+  to get on with their job of driving the flash chips without
+  having to know about the paging. If you have one of these boards,
+  you probably want to enable this mapping driver. More info is at
+  <http://www.itc.hu/>.
+
+CONFIG_MTD_OCTAGON
+  This provides a 'mapping' driver which supports the way in which
+  the flash chips are connected in the Octagon-5066 Single Board
+  Computer. More information on the board is available at
+  <http://www.octagonsystems.com/Products/5066/5066.html>.
+
+CONFIG_MTD_VMAX
+  This provides a 'mapping' driver which supports the way in which
+  the flash chips are connected in the Tempustech VMAX SBC301 Single
+  Board Computer. More information on the board is available at
+  <http://www.tempustech.com/tt301.htm>.
+
+CONFIG_MTD_CFI_FLAGADM
+  Mapping for the Flaga digital module.  If you don´t have one, ignore
+  this setting.
+
+CONFIG_MTD_OCELOT
+  This enables access routines for the boot flash device and for the
+  NVRAM on the Momenco Ocelot board.  If you have one of these boards
+  and would like access to either of these, say 'Y'.
+
+CONFIG_MTD_CDB89712
+  This enables access to the flash or ROM chips on the CDB89712 board.
+  If you have such a board, say 'Y'.
+
+CONFIG_MTD_L440GX
+  Support for treating the BIOS flash chip on Intel L440GX motherboards
+  as an MTD device - with this you can reprogram your BIOS.
+
+  BE VERY CAREFUL.
+
+CONFIG_MTD_SOLUTIONENGINE
+  This enables access to the flash chips on the Hitachi SolutionEngine and
+  similar boards. Say 'Y' if you are building a kernel for such a board.
+
+CONFIG_MTD_TQM8XXL
+  The TQM8xxL PowerPC board has up to two banks of CFI-compliant
+  chips, currently uses AMD one. This 'mapping' driver supports
+  that arrangement, allowing the CFI probe and command set driver
+  code to communicate with the chips on the TQM8xxL board. More at
+  <http://www.denx.de/embedded-ppc-en.html>.
+

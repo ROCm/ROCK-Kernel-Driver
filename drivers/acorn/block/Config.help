@@ -1,0 +1,18 @@
+CONFIG_BLK_DEV_MFM
+  Support the MFM hard drives on the Acorn Archimedes both
+  on-board the A4x0 motherboards and via the Acorn MFM podules.
+  Drives up to 64MB are supported. If you haven't got one of these
+  machines or drives just say N.
+
+CONFIG_BLK_DEV_FD1772
+  Support the floppy drive on the Acorn Archimedes (A300, A4x0, A540,
+  R140 and R260) series of computers; it supports only 720K floppies
+  at the moment. If you don't have one of these machines just answer
+  N.
+
+CONFIG_BLK_DEV_MFM_AUTODETECT
+  If you answer Y, the MFM code will attempt to automatically detect
+  the cylinders/heads/sectors count on your hard drive. WARNING: This
+  sometimes doesn't work and it also does some dodgy stuff which
+  potentially might damage your drive.
+

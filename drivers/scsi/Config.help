@@ -1,0 +1,1380 @@
+CONFIG_BLK_DEV_3W_XXXX_RAID
+  3ware is the only hardware ATA-Raid product in Linux to date.
+  This card is 2,4, or 8 channel master mode support only.
+  SCSI support required!!!
+
+  <http://www.3ware.com/>
+
+  Please read the comments at the top of
+  <file:drivers/scsi/3w-xxxx.c>.
+
+CONFIG_WARPENGINE_SCSI
+  Support for MacroSystem Development's WarpEngine Amiga SCSI-2
+  controller. Info at
+  <http://www.lysator.liu.se/amiga/ar/guide/ar310.guide?FEATURE5>.
+
+CONFIG_JAZZ_ESP
+  This is the driver for the onboard SCSI host adapter of MIPS Magnum
+  4000, Acer PICA, Olivetti M700-10 and a few other identical OEM
+  systems.
+
+CONFIG_BLK_DEV_SD
+  If you want to use a SCSI hard disk or the SCSI or parallel port
+  version of the IOMEGA ZIP drive under Linux, say Y and read the
+  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
+  CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sd_mod.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+  module if your root file system (the one containing the directory /)
+  is located on a SCSI disk. In this case, do not compile the driver
+  for your SCSI host adapter (below) as a module either.
+
+CONFIG_SD_EXTRA_DEVS
+  This controls the amount of additional space allocated in tables for
+  drivers that are loaded as modules after the kernel is booted.  In
+  the event that the SCSI core itself was loaded as a module, this
+  value is the number of additional disks that can be loaded after the
+  first host driver is loaded.
+
+  Admittedly this isn't pretty, but there are tons of race conditions
+  involved with resizing the internal arrays on the fly.  Someday this
+  flag will go away, and everything will work automatically.
+
+  If you don't understand what's going on, go with the default.
+
+CONFIG_CHR_DEV_ST
+  If you want to use a SCSI tape drive under Linux, say Y and read the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, and
+  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
+  SCSI CD-ROMs.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called st.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_CHR_DEV_OSST
+  The OnStream SC-x0 SCSI tape drives can not be driven by the
+  standard st driver, but instead need this special osst driver and
+  use the  /dev/osstX char device nodes (major 206).  Via usb-storage
+  and ide-scsi, you may be able to drive the USB-x0 and DI-x0 drives
+  as well.  Note that there is also a second generation of OnStream
+  tape drives (ADR-x0) that supports the standard SCSI-2 commands for
+  tapes (QIC-157) and can be driven by the standard driver st.
+  For more information, you may have a look at the SCSI-HOWTO
+  <http://www.linuxdoc.org/docs.html#howto>  and
+  <file:drivers/scsi/README.osst>  in the kernel source.
+  More info on the OnStream driver may be found on
+  <http://linux1.onstream.nl/test/>
+  Please also have a look at the standard st docu, as most of it
+  applies to osst as well.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called osst.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_BLK_DEV_SR
+  If you want to use a SCSI CD-ROM under Linux, say Y and read the
+  SCSI-HOWTO and the CD-ROM-HOWTO at
+  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+  or M to "ISO 9660 CD-ROM file system support" later.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sr_mod.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>.
+
+CONFIG_SR_EXTRA_DEVS
+  This controls the amount of additional space allocated in tables for
+  drivers that are loaded as modules after the kernel is booted. In
+  the event that the SCSI core itself was loaded as a module, this
+  value is the number of additional CD-ROMs that can be loaded after
+  the first host driver is loaded.
+
+  Admittedly this isn't pretty, but there are tons of race conditions
+  involved with resizing the internal arrays on the fly.  Someday this
+  flag will go away, and everything will work automatically.
+
+  If you don't understand what's going on, go with the default.
+
+CONFIG_BLK_DEV_SR_VENDOR
+  This enables the usage of vendor specific SCSI commands. This is
+  required to support multisession CDs with old NEC/TOSHIBA cdrom
+  drives (and HP Writers). If you have such a drive and get the first
+  session only, try saying Y here; everybody else says N.
+
+CONFIG_CHR_DEV_SG
+  If you want to use SCSI scanners, synthesizers or CD-writers or just
+  about anything having "SCSI" in its name other than hard disks,
+  CD-ROMs or tapes, say Y here. These won't be supported by the kernel
+  directly, so you need some additional software which knows how to
+  talk to these devices using the SCSI protocol:
+
+  For scanners, look at SANE (<http://www.mostang.com/sane/>). For CD
+  writer software look at Cdrtools
+  (<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/cdrecord.html>)
+  and for burning a "disk at once": CDRDAO
+  (<http://cdrdao.sourceforge.net/>). Cdparanoia is a high
+  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
+  For other devices, it's possible that you'll have to write the
+  driver software yourself. Please read the file
+  <file:Documentation/scsi-generic.txt> for more information.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> and
+  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
+  say N.
+
+CONFIG_SCSI_MULTI_LUN
+  If you have a SCSI device that supports more than one LUN (Logical
+  Unit Number), e.g. a CD jukebox, and only one LUN is detected, you
+  can say Y here to force the SCSI driver to probe for multiple LUNs.
+  A SCSI device with multiple LUNs acts logically like multiple SCSI
+  devices. The vast majority of SCSI devices have only one LUN, and
+  so most people can say N here and should in fact do so, because it
+  is safer.
+
+CONFIG_SCSI_CONSTANTS
+  The error messages regarding your SCSI hardware will be easier to
+  understand if you say Y here; it will enlarge your kernel by about
+  12 KB. If in doubt, say Y.
+
+CONFIG_SCSI_LOGGING
+  This turns on a logging facility that can be used to debug a number
+  of SCSI related problems.
+
+  If you say Y here, no logging output will appear by default, but you
+  can enable logging by saying Y to "/proc file system support" and
+  "Sysctl support" below and executing the command
+
+     echo "scsi log token [level]" > /proc/scsi/scsi
+
+  at boot time after the /proc file system has been mounted.
+
+  There are a number of things that can be used for 'token' (you can
+  find them in the source: <file:drivers/scsi/scsi.c>), and this
+  allows you to select the types of information you want, and the
+  level allows you to select the level of verbosity.
+
+  If you say N here, it may be harder to track down some types of SCSI
+  problems. If you say Y here your kernel will be somewhat larger, but
+  there should be no noticeable performance impact as long as you have
+  logging turned off.
+
+CONFIG_SCSI_DECNCR
+  Say Y here to support the NCR53C94 SCSI controller chips on IOASIC
+  based TURBOchannel DECstations and TURBOchannel PMAZ-A cards.
+
+CONFIG_SCSI_ADVANSYS
+  This is a driver for all SCSI host adapters manufactured by
+  AdvanSys. It is documented in the kernel source in
+  <file:drivers/scsi/advansys.c>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  advansys.o.
+
+CONFIG_SCSI_AHA152X
+  This is a driver for the AHA-1510, AHA-1520, AHA-1522, and AHA-2825
+  SCSI host adapters. It also works for the AVA-1505, but the IRQ etc.
+  must be manually specified in this case.
+
+  It is explained in section 3.3 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. You might also want to
+  read the file <file:drivers/scsi/README.aha152x>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aha152x.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_AHA1542
+  This is support for a SCSI host adapter.  It is explained in section
+  3.4 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Note that Trantor was
+  purchased by Adaptec, and some former Trantor products are being
+  sold under the Adaptec name.  If it doesn't work out of the box, you
+  may have to change some settings in <file:drivers/scsi/aha1542.h>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called aha1542.o.
+
+CONFIG_SCSI_AHA1740
+  This is support for a SCSI host adapter.  It is explained in section
+  3.5 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/aha1740.h>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aha1740.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_DPT_I2O
+  This driver supports all of Adaptec's I2O based RAID controllers as 
+  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
+  driver by Deanna Bonds.  See <file:drivers/scsi/README.dpti>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  dpt_i2o.o.
+
+CONFIG_SCSI_AIC7XXX_OLD
+  WARNING This driver is an older aic7xxx driver and is no longer
+  under active development.  Adaptec, Inc. is writing a new driver to
+  take the place of this one, and it is recommended that whenever
+  possible, people should use the new Adaptec written driver instead
+  of this one.  This driver will eventually be phased out entirely.
+
+  This is support for the various aic7xxx based Adaptec SCSI
+  controllers. These include the 274x EISA cards; 284x VLB cards;
+  2902, 2910, 293x, 294x, 394x, 3985 and several other PCI and
+  motherboard based SCSI controllers from Adaptec. It does not support
+  the AAA-13x RAID controllers from Adaptec, nor will it likely ever
+  support them. It does not support the 2920 cards from Adaptec that
+  use the Future Domain SCSI controller chip. For those cards, you
+  need the "Future Domain 16xx SCSI support" driver.
+
+  In general, if the controller is based on an Adaptec SCSI controller
+  chip from the aic777x series or the aic78xx series, this driver
+  should work. The only exception is the 7810 which is specifically
+  not supported (that's the RAID controller chip on the AAA-13x
+  cards).
+
+  Note that the AHA2920 SCSI host adapter is *not* supported by this
+  driver; choose "Future Domain 16xx SCSI support" instead if you have
+  one of those.
+
+  Information on the configuration options for this controller can be
+  found by checking the help file for each of the available
+  configuration options. You should read
+  <file:drivers/scsi/aic7xxx_old/README.aic7xxx> at a minimum before
+  contacting the maintainer with any questions.  The SCSI-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>, can also
+  be of great help.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called aic7xxx_old.o.
+
+CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
+  This option causes the aic7xxx driver to attempt to use Tagged
+  Command Queueing (TCQ) on all devices that claim to support it.
+
+  TCQ is a feature of SCSI-2 which improves performance: the host
+  adapter can send several SCSI commands to a device's queue even if
+  previous commands haven't finished yet.  Because the device is
+  intelligent, it can optimize its operations (like head positioning)
+  based on its own request queue.  Not all devices implement this
+  correctly.
+
+  If you say Y here, you can still turn off TCQ on troublesome devices
+  with the use of the tag_info boot parameter.  See the file
+  <file:drivers/scsi/README.aic7xxx> for more information on that and
+  other aic7xxx setup commands.  If this option is turned off, you may
+  still enable TCQ on known good devices by use of the tag_info boot
+  parameter.
+
+  If you are unsure about your devices then it is safest to say N
+  here.
+
+  However, TCQ can increase performance on some hard drives by as much
+  as 50% or more, so it is recommended that if you say N here, you
+  should at least read the <file:drivers/scsi/README.aic7xxx> file so
+  you will know how to enable this option manually should your drives
+  prove to be safe in regards to TCQ.
+
+  Conversely, certain drives are known to lock up or cause bus resets
+  when TCQ is enabled on them.  If you have a Western Digital
+  Enterprise SCSI drive for instance, then don't even bother to enable
+  TCQ on it as the drive will become unreliable, and it will actually
+  reduce performance.
+
+CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  Reasonable figures are in the range of 8 to 24 commands per device,
+  but depending on hardware could be increased or decreased from that
+  figure. If the number is too high for any particular device, the
+  driver will automatically compensate usually after only 10 minutes
+  of uptime. It will not hinder performance if some of your devices
+  eventually have their command depth reduced, but is a waste of
+  memory if all of your devices end up reducing this number down to a
+  more reasonable figure.
+
+  NOTE: Certain very broken drives are known to lock up when given
+  more commands than they like to deal with. Quantum Fireball drives
+  are the most common in this category. For the Quantum Fireball
+  drives it is suggested to use no more than 8 commands per device.
+
+  Default: 8
+
+CONFIG_AIC7XXX_OLD_PROC_STATS
+  This option tells the driver to keep track of how many commands have
+  been sent to each particular device and report that information to
+  the user via the /proc/scsi/aic7xxx/n file, where n is the number of
+  the aic7xxx controller you want the information on. This adds a
+  small amount of overhead to each and every SCSI command the aic7xxx
+  driver handles, so if you aren't really interested in this
+  information, it is best to leave it disabled. This will only work if
+  you also say Y to "/proc file system support", below.
+
+  If unsure, say N.
+
+CONFIG_SCSI_IPS
+  This is support for the IBM ServeRAID hardware RAID controllers.
+  See <http://www.developer.ibm.com/welcome/netfinity/serveraid.html>
+  for more information.  If this driver does not work correctly
+  without modification please contact the author by email at
+  ipslinux@us.ibm.com.
+
+  You can build this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  but only a single instance may be loaded. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+  The module will be called ips.o.
+
+CONFIG_SCSI_BUSLOGIC
+  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
+  Adapters. Consult the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, and the files
+  <file:drivers/scsi/README.BusLogic> and
+  <file:drivers/scsi/README.FlashPoint> for more information. If this
+  driver does not work correctly without modification, please contact
+  the author, Leonard N. Zubkoff, by email to lnz@dandelion.com.
+
+  You can also build this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  but only a single instance may be loaded. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+  The module will be called BusLogic.o.
+
+CONFIG_SCSI_OMIT_FLASHPOINT
+  This option allows you to omit the FlashPoint support from the
+  BusLogic SCSI driver. The FlashPoint SCCB Manager code is
+  substantial, so users of MultiMaster Host Adapters may wish to omit
+  it.
+
+CONFIG_SCSI_CPQFCTS
+  Say Y here to compile in support for the Compaq StorageWorks Fibre
+  Channel 64-bit/66Mhz Host Bus Adapter.
+
+CONFIG_SCSI_DMX3191D
+  This is support for Domex DMX3191D SCSI Host Adapters.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dmx3191d.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_DTC3280
+  This is support for DTC 3180/3280 SCSI Host Adapters.  Please read
+  the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, and the file
+  <file:drivers/scsi/README.dtc3x80>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dtc.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_EATA_DMA
+  This is support for the EATA-DMA protocol compliant SCSI Host
+  Adapters like the SmartCache III/IV, SmartRAID controller families
+  and the DPT PM2011B and PM2012B controllers.
+
+  Note that this driver is obsolete; if you have one of the above
+  SCSI Host Adapters, you should normally say N here and Y to "EATA
+  ISA/EISA/PCI support", below.  Please read the SCSI-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called eata_dma.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_EATA_PIO
+  This driver supports all EATA-PIO protocol compliant SCSI Host
+  Adapters like the DPT PM2001 and the PM2012A.  EATA-DMA compliant
+  host adapters could also use this driver but are discouraged from
+  doing so, since this driver only supports hard disks and lacks
+  numerous features.  You might want to have a look at the SCSI-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called eata_pio.o.
+
+CONFIG_SCSI_U14_34F
+  This is support for the UltraStor 14F and 34F SCSI-2 host adapters.
+  The source at <file:drivers/scsi/u14-34f.c> contains some
+  information about this hardware.  If the driver doesn't work out of
+  the box, you may have to change some settings in
+  <file: drivers/scsi/u14-34f.c>.  Read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  Note that there is also
+  another driver for the same hardware: "UltraStor SCSI support",
+  below.  You should say Y to both only if you want 24F support as
+  well.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called u14-34f.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_U14_34F_LINKED_COMMANDS
+  This option enables elevator sorting for all probed SCSI disks and
+  CD-ROMs. It definitely reduces the average seek distance when doing
+  random seeks, but this does not necessarily result in a noticeable
+  performance improvement: your mileage may vary...
+
+  The safe answer is N.
+
+CONFIG_SCSI_U14_34F_MAX_TAGS
+  This specifies how many SCSI commands can be maximally queued for
+  each probed SCSI device. You should reduce the default value of 8
+  only if you have disks with buggy or limited tagged command support.
+  Minimum is 2 and maximum is 14. This value is also the window size
+  used by the elevator sorting option above. The effective value used
+  by the driver for each probed SCSI device is reported at boot time.
+
+CONFIG_SCSI_FUTURE_DOMAIN
+  This is support for Future Domain's 16-bit SCSI host adapters
+  (TMC-1660/1680, TMC-1650/1670, TMC-3260, TMC-1610M/MER/MEX) and
+  other adapters based on the Future Domain chipsets (Quantum
+  ISA-200S, ISA-250MG; Adaptec AHA-2920A; and at least one IBM board).
+  It is explained in section 3.7 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  NOTE: Newer Adaptec AHA-2920C boards use the Adaptec AIC-7850 chip
+  and should use the aic7xxx driver ("Adaptec AIC7xxx chipset SCSI
+  controller support"). This Future Domain driver works with the older
+  Adaptec AHA-2920A boards with a Future Domain chip on them.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called fdomain.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_FD_MCS
+  This is support for Future Domain MCS 600/700 MCA SCSI adapters.
+  Some PS/2 computers are equipped with IBM Fast SCSI Adapter/A which
+  is identical to the MCS 700 and hence also supported by this driver.
+  This driver also supports the Reply SB16/SCSI card (the SCSI part).
+  It supports multiple adapters in the same system.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called fd_mcs.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_GENERIC_NCR5380
+  This is the generic NCR family of SCSI controllers, not to be
+  confused with the NCR 53c7 or 8xx controllers.  It is explained in
+  section 3.8 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/g_NCR5380.h>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called g_NCR5380.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_GENERIC_NCR53C400
+  This enables certain optimizations for the NCR53c400 SCSI cards.
+  You might as well try it out.  Note that this driver will only probe
+  for the Trantor T130B in its default configuration; you might have
+  to pass a command line option to the kernel at boot time if it does
+  not detect your card.  See the file
+  <file:drivers/scsi/README.g_NCR5380> for details.
+
+CONFIG_SCSI_G_NCR5380_PORT
+  The NCR5380 and NCR53c400 SCSI controllers come in two varieties:
+  port or memory mapped. You should know what you have. The most
+  common card, Trantor T130B, uses port mapped mode.
+
+CONFIG_SCSI_NCR_D700
+  This is a driver for the MicroChannel Dual 700 card produced by
+  NCR and commonly used in 345x/35xx/4100 class machines.  It always
+  tries to negotiate sync and uses tag command queueing.
+
+  Unless you have an NCR manufactured machine, the chances are that
+  you do not have this SCSI card, so say N.
+
+CONFIG_SCSI_LASI700
+  This is a driver for the lasi baseboard in some parisc machines
+  which is based on the 53c700 chip.  Will also support LASI subsystems
+  based on the 710 chip using 700 emulation mode.
+
+  Unless you know you have a 53c700 or 53c710 based lasi, say N here
+
+CONFIG_SCSI_NCR53C7xx
+  This is a driver for the 53c7 and 8xx NCR family of SCSI
+  controllers, not to be confused with the NCR 5380 controllers.  It
+  is explained in section 3.8 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/53c7,8xx.h>.  Please read
+  <file:drivers/scsi/README.ncr53c7xx> for the available boot time
+  command line options.
+
+  Note: there is another driver for the 53c8xx family of controllers
+  ("NCR53C8XX SCSI support" below).  If you want to use them both, you
+  need to say M to both and build them as modules, but only one may be
+  active at a time. If you have a 53c8xx board, it's better to use the
+  other driver.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called 53c7,8xx.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_NCR53C7xx_sync
+  In general, this is good; however, it is a bit dangerous since there
+  are some broken SCSI devices out there. Take your chances. Safe bet
+  is N.
+
+CONFIG_SCSI_NCR53C7xx_FAST
+  This will enable 10MHz FAST-SCSI transfers with your host
+  adapter. Some systems have problems with that speed, so it's safest
+  to say N here.
+
+CONFIG_SCSI_NCR53C7xx_DISCONNECT
+  This enables the disconnect/reconnect feature of the NCR SCSI
+  controller. When you say Y here, a slow SCSI device will not lock
+  the SCSI bus while processing a request, allowing simultaneous use
+  of e.g. a SCSI hard disk and SCSI tape or CD-ROM drive, and
+  providing much better performance when using slow and fast SCSI
+  devices at the same time. Some devices, however, do not operate
+  properly with this option enabled, and will cause your SCSI system
+  to hang, which might cause a system crash. The safe answer
+  therefore is to say N.
+
+CONFIG_SCSI_SYM53C8XX_2
+  This driver supports the whole NCR53C8XX/SYM53C8XX family of 
+  PCI-SCSI controllers. It also supports the subset of LSI53C10XX 
+  Ultra-160 controllers that are based on the SYM53C8XX SCRIPTS 
+  language. It does not support LSI53C10XX Ultra-320 PCI-X SCSI 
+  controllers.
+
+  If your system has problems using this new major version of the
+  SYM53C8XX driver, you may switch back to driver version 1.
+
+  Please read <file:drivers/scsi/sym53c8xx_2/Documentation.txt> for more
+  information.
+
+CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
+  This option only applies to PCI-SCSI chip that are PCI DAC capable 
+  (875A, 895A, 896, 1010-33, 1010-66, 1000).
+
+  When set to 0, only PCI 32 bit DMA addressing (SAC) will be performed.
+  When set to 1, 40 bit DMA addressing (with upper 24 bits of address 
+  set to zero) is supported. The addressable range is here 1 TB.
+  When set to 2, full 64 bits of address for DMA are supported, but only
+  16 segments of 4 GB can be addressed. The addressable range is so 
+  limited to 64 GB.
+
+  The safest value is 0 (32 bit DMA addressing) that is guessed to still 
+  fit most of real machines.
+
+  The preferred value 1 (40 bit DMA addressing) should make happy 
+  properly engineered PCI DAC capable host bridges. You may configure
+  this option for Intel platforms with more than 4 GB of memory.
+
+  The still experimental value 2 (64 bit DMA addressing with 16 x 4GB 
+  segments limitation) can be used on systems that require PCI address 
+  bits past bit 39 to be set for the addressing of memory using PCI 
+  DAC cycles.
+
+CONFIG_SCSI_SYM53C8XX_IOMAPPED
+  If you say Y here, the driver will preferently use normal IO rather than 
+  memory mapped IO.
+
+CONFIG_SCSI_SYM53C8XX_MAX_TAGS
+  This option allows you to specify the maximum number of commands
+  that can be queued to any device, when tagged command queuing is
+  possible. The driver supports up to 256 queued commands per device.
+  This value is used as a compiled-in hard limit.
+
+CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS
+  This is the default value of the command queue depth the driver will 
+  announce to the generic SCSI layer for devices that support tagged 
+  command queueing. This value can be changed from the boot command line.
+  This is a soft limit that cannot exceed CONFIG_SCSI_SYM53C8XX_MAX_TAGS.
+
+CONFIG_SCSI_NCR53C8XX
+  This is the BSD ncr driver adapted to Linux for the NCR53C8XX family
+  of PCI-SCSI controllers.  This driver supports parity checking,
+  tagged command queuing and fast synchronous data transfers up to 80
+  MB/s with wide FAST-40 LVD devices and controllers.
+
+  Recent versions of the 53C8XX chips are better supported by the
+  option "SYM53C8XX SCSI support", below.
+
+  Note: there is yet another driver for the 53c8xx family of
+  controllers ("NCR53c7,8xx SCSI support" above).  If you want to use
+  them both, you need to say M to both and build them as modules, but
+  only one may be active at a time.  If you have a 53c8xx board, you
+  probably do not want to use the "NCR53c7,8xx SCSI support".
+
+  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+  information.
+
+CONFIG_SCSI_SYM53C8XX
+  This driver supports all the features of recent 53C8XX chips (used
+  in PCI SCSI controllers), notably the hardware phase mismatch
+  feature of the SYM53C896.
+
+  Older versions of the 53C8XX chips are not supported by this
+  driver.  If your system uses either a 810 rev. < 16, a 815, or a 825
+  rev. < 16 PCI SCSI processor, you must use the generic NCR53C8XX
+  driver ("NCR53C8XX SCSI support" above) or configure both the
+  NCR53C8XX and this SYM53C8XX drivers either as module or linked to
+  the kernel image.
+
+  When both drivers are linked into the kernel, the SYM53C8XX driver
+  is called first at initialization and you can use the 'excl=ioaddr'
+  driver boot option to exclude attachment of adapters by the
+  SYM53C8XX driver.  For example, entering
+  'sym53c8xx=excl:0xb400,excl=0xc000' at the lilo prompt prevents
+  adapters at io address 0xb400 and 0xc000 from being attached by the
+  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
+  The 'excl' option is also supported by the NCR53C8XX driver.
+
+  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+  information.
+
+CONFIG_SCSI_NCR53C8XX_SYNC
+  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
+  rates: FAST-5, FAST-10, FAST-20, FAST-40 and FAST-80.  The numbers
+  are respectively the maximum data transfer rates in mega-transfers
+  per second for each class.  For example, a FAST-20 Wide 16 device is
+  able to transfer data at 20 million 16 bit packets per second for a
+  total rate of 40 MB/s.
+
+  You may specify 0 if you want to only use asynchronous data
+  transfers. This is the safest and slowest option. Otherwise, specify
+  a value between 5 and 80, depending on the capability of your SCSI
+  controller.  The higher the number, the faster the data transfer.
+  Note that 80 should normally be ok since the driver decreases the
+  value automatically according to the controller's capabilities.
+
+  Your answer to this question is ignored for controllers with NVRAM,
+  since the driver will get this information from the user set-up.  It
+  also can be overridden using a boot setup option, as follows
+  (example): 'ncr53c8xx=sync:12' will allow the driver to negotiate
+  for FAST-20 synchronous data transfer (20 mega-transfers per
+  second).
+
+  The normal answer therefore is not to go with the default but to
+  select the maximum value 80 allowing the driver to use the maximum
+  value supported by each controller. If this causes problems with
+  your SCSI devices, you should come back and decrease the value.
+
+  There is no safe option other than using good cabling, right
+  terminations and SCSI conformant devices.
+
+CONFIG_SCSI_NCR53C8XX_IOMAPPED
+  If you say Y here, the driver will use normal IO, as opposed to
+  memory mapped IO. Memory mapped IO has less latency than normal IO
+  and works for most Intel-based hardware. Under Linux/Alpha only
+  normal IO is currently supported by the driver and so, this option
+  has no effect on those systems.
+
+  The normal answer therefore is N; try Y only if you encounter SCSI
+  related problems.
+
+CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT
+  This option is only provided for safety if you suspect some SCSI
+  device of yours to not support properly the target-disconnect
+  feature. In that case, you would say Y here. In general however, to
+  not allow targets to disconnect is not reasonable if there is more
+  than 1 device on a SCSI bus. The normal answer therefore is N.
+
+CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS
+  "Tagged command queuing" is a feature of SCSI-2 which improves
+  performance: the host adapter can send several SCSI commands to a
+  device's queue even if previous commands haven't finished yet.
+  Because the device is intelligent, it can optimize its operations
+  (like head positioning) based on its own request queue. Some SCSI
+  devices don't implement this properly; if you want to disable this
+  feature, enter 0 or 1 here (it doesn't matter which).
+
+  The default value is 8 and should be supported by most hard disks.
+  This value can be overridden from the boot command line using the
+  'tags' option as follows (example):
+  'ncr53c8xx=tags:4/t2t3q16/t0u2q10' will set default queue depth to
+  4, set queue depth to 16 for target 2 and target 3 on controller 0
+  and set queue depth to 10 for target 0 / lun 2 on controller 1.
+
+  The normal answer therefore is to go with the default 8 and to use
+  a boot command line option for devices that need to use a different
+  command queue depth.
+
+  There is no safe option other than using good SCSI devices.
+
+CONFIG_SCSI_NCR53C8XX_MAX_TAGS
+  This option allows you to specify the maximum number of commands
+  that can be queued to any device, when tagged command queuing is
+  possible. The default value is 32. Minimum is 2, maximum is 64.
+  Modern hard disks are able to support 64 tags and even more, but
+  do not seem to be faster when more than 32 tags are being used.
+
+  So, the normal answer here is to go with the default value 32 unless
+  you are using very large hard disks with large cache (>= 1 MB) that
+  are able to take advantage of more than 32 tagged commands.
+
+  There is no safe option and the default answer is recommended.
+
+CONFIG_SCSI_NCR53C8XX_SYMBIOS_COMPAT
+  This option allows you to enable some features depending on GPIO
+  wiring. These General Purpose Input/Output pins can be used for
+  vendor specific features or implementation of the standard SYMBIOS
+  features. Genuine SYMBIOS controllers use GPIO0 in output for
+  controller LED and GPIO3 bit as a flag indicating
+  singled-ended/differential interface. The Tekram DC-390U/F boards
+  uses a different GPIO wiring.
+
+  Your answer to this question is ignored if all your controllers have
+  NVRAM, since the driver is able to detect the board type from the
+  NVRAM format.
+
+  If all the controllers in your system are genuine SYMBIOS boards or
+  use BIOS and drivers from SYMBIOS, you would want to say Y here,
+  otherwise N. N is the safe answer.
+
+CONFIG_SCSI_NCR53C8XX_PROFILE
+  This option allows you to enable profiling information gathering.
+  These statistics are not very accurate due to the low frequency
+  of the kernel clock (100 Hz on i386) and have performance impact
+  on systems that use very fast devices.
+
+  The normal answer therefore is N.
+
+CONFIG_SCSI_NCR53C8XX_PQS_PDS
+  Say Y here if you have a special SCSI adapter produced by NCR
+  corporation called a PCI Quad SCSI or PCI Dual SCSI. You do not need
+  this if you do not have one of these adapters. However, since this
+  device is detected as a specific PCI device, this option is quite
+  safe.
+
+  The common answer here is N, but answering Y is safe.
+
+CONFIG_SCSI_IBMMCA
+  This is support for the IBM SCSI adapter found in many of the PS/2
+  series computers.  These machines have an MCA bus, so you need to
+  answer Y to "MCA support" as well and read
+  <file:Documentation/mca.txt>.
+
+  If the adapter isn't found during boot (a common problem for models
+  56, 57, 76, and 77) you'll need to use the 'ibmmcascsi=<pun>' kernel
+  option, where <pun> is the id of the SCSI subsystem (usually 7, but
+  if that doesn't work check your reference diskette).  Owners of
+  model 95 with a LED-matrix-display can in addition activate some
+  activity info like under OS/2, but more informative, by setting
+  'ibmmcascsi=display' as an additional kernel parameter.  Try "man
+  bootparam" or see the documentation of your boot loader about how to
+  pass options to the kernel.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ibmmca.o.
+
+CONFIG_IBMMCA_SCSI_ORDER_STANDARD
+  In the PC-world and in most modern SCSI-BIOS-setups, SCSI-hard disks
+  are assigned to the drive letters, starting with the lowest SCSI-id
+  (physical number -- pun) to be drive C:, as seen from DOS and
+  similar operating systems. When looking into papers describing the
+  ANSI-SCSI-standard, this assignment of drives appears to be wrong.
+  The SCSI-standard follows a hardware-hierarchy which says that id 7
+  has the highest priority and id 0 the lowest. Therefore, the host
+  adapters are still today everywhere placed as SCSI-id 7 by default.
+  In the SCSI-standard, the drive letters express the priority of the
+  disk. C: should be the hard disk, or a partition on it, with the
+  highest priority. This must therefore be the disk with the highest
+  SCSI-id (e.g. 6) and not the one with the lowest! IBM-BIOS kept the
+  original definition of the SCSI-standard as also industrial- and
+  process-control-machines, like VME-CPUs running under realtime-OSes
+  (e.g. LynxOS, OS9) do.
+
+  If you like to run Linux on your MCA-machine with the same
+  assignment of hard disks as seen from e.g. DOS or OS/2 on your
+  machine, which is in addition conformant to the SCSI-standard, you
+  must say Y here. This is also necessary for MCA-Linux users who want
+  to keep downward compatibility to older releases of the
+  IBM-MCA-SCSI-driver (older than driver-release 2.00 and older than
+  June 1997).
+
+  If you like to have the lowest SCSI-id assigned as drive C:, as
+  modern SCSI-BIOSes do, which does not conform to the standard, but
+  is widespread and common in the PC-world of today, you must say N
+  here. If unsure, say Y.
+
+CONFIG_IBMMCA_SCSI_DEV_RESET
+  By default, SCSI-devices are reset when the machine is powered on.
+  However, some devices exist, like special-control-devices,
+  SCSI-CNC-machines, SCSI-printer or scanners of older type, that do
+  not reset when switched on. If you say Y here, each device connected
+  to your SCSI-bus will be issued a reset-command after it has been
+  probed, while the kernel is booting. This may cause problems with
+  more modern devices, like hard disks, which do not appreciate these
+  reset commands, and can cause your system to hang. So say Y only if
+  you know that one of your older devices needs it; N is the safe
+  answer.
+
+CONFIG_SCSI_MCA_53C9X
+  Some MicroChannel machines, notably the NCR 35xx line, use a SCSI
+  controller based on the NCR 53C94.  This driver will allow use of
+  the controller on the 3550, and very possibly others.
+
+  If you want to compile this as a module (= code which can be
+  inserted and removed from the running kernel whenever you want), say
+  M here and read <file:Documentation/modules.txt>.  The module will
+  be called mca_53c9x.o.
+
+CONFIG_SCSI_IN2000
+  This is support for an ISA bus SCSI host adapter.  You'll find more
+  information in <file:drivers/scsi/README.in2000>. If it doesn't work
+  out of the box, you may have to change the jumpers for IRQ or
+  address selection.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called in2000.o.
+
+CONFIG_SCSI_INITIO
+  This is support for the Initio 91XXU(W) SCSI host adapter.  Please
+  read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called initio.o.
+
+CONFIG_SCSI_PAS16
+  This is support for a SCSI host adapter.  It is explained in section
+  3.10 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/pas16.h>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pas16.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_INIA100
+  This is support for the Initio INI-A100U2W SCSI host adapter.
+  Please read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called a100u2w.o.
+
+CONFIG_SCSI_PCI2000
+  This is support for the PCI2000I EIDE interface card which acts as a
+  SCSI host adapter.  Please read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module called pci2000.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_PCI2220I
+  This is support for the PCI2220i EIDE interface card which acts as a
+  SCSI host adapter.  Please read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module called pci2220i.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_PSI240I
+  This is support for the PSI240i EIDE interface card which acts as a
+  SCSI host adapter.  Please read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module called psi240i.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGIC_FAS
+  This is a driver for the ISA, VLB, and PCMCIA versions of the Qlogic
+  FastSCSI! cards as well as any other card based on the FASXX chip
+  (including the Control Concepts SCSI/IDE/SIO/PIO/FDC cards).
+
+  This driver does NOT support the PCI versions of these cards. The
+  PCI versions are supported by the Qlogic ISP driver ("Qlogic ISP
+  SCSI support"), below.
+
+  Information about this driver is contained in
+  <file:drivers/scsi/README.qlogicfas>.  You should also read the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qlogicfas.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGIC_ISP
+  This driver works for all QLogic PCI SCSI host adapters (IQ-PCI,
+  IQ-PCI-10, IQ_PCI-D) except for the PCI-basic card.  (This latter
+  card is supported by the "AM53/79C974 PCI SCSI" driver.)
+
+  If you say Y here, make sure to choose "BIOS" at the question "PCI
+  access mode".
+
+  Please read the file <file:drivers/scsi/README.qlogicisp>.  You
+  should also read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qlogicisp.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGIC_FC
+  This is a driver for the QLogic ISP2100 SCSI-FCP host adapter.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qlogicfc.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_QLOGIC_1280
+  Say Y if you have a QLogic ISP1x80/1x160 SCSI host adapter.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qla1280.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_SEAGATE
+  These are 8-bit SCSI controllers; the ST-01 is also supported by
+  this driver.  It is explained in section 3.9 of the SCSI-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.  If it
+  doesn't work out of the box, you may have to change some settings in
+  <file:drivers/scsi/seagate.h>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called seagate.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_T128
+  This is support for a SCSI host adapter. It is explained in section
+  3.11 of the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/t128.h>.  Note that Trantor was purchased by
+  Adaptec, and some former Trantor products are being sold under the
+  Adaptec name.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called t128.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_ULTRASTOR
+  This is support for the UltraStor 14F, 24F and 34F SCSI-2 host
+  adapter family.  This driver is explained in section 3.12 of the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+  of the box, you may have to change some settings in
+  <file:drivers/scsi/ultrastor.h>.
+
+  Note that there is also another driver for the same hardware:
+  "UltraStor 14F/34F support", above.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ultrastor.o.
+
+CONFIG_SCSI_7000FASST
+  This driver supports the Western Digital 7000 SCSI host adapter
+  family.  Some information is in the source:
+  <file:drivers/scsi/wd7000.c>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called wd7000.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_ACARD
+  This driver supports the ACARD 870U/W SCSI host adapter.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called atp870u.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_EATA
+  This driver supports all EATA/DMA-compliant SCSI host adapters.  DPT
+  ISA and all EISA I/O addresses are probed looking for the "EATA"
+  signature.  If you chose "BIOS" at the question "PCI access mode",
+  the addresses of all the PCI SCSI controllers reported by the PCI
+  subsystem are probed as well.
+
+  You want to read the start of <file:drivers/scsi/eata.c> and the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Note that there is also another driver for the same hardware
+  available: "EATA-DMA [Obsolete] (DPT, NEC, AT&T, SNI, AST, Olivetti,
+  Alphatronix) support". You should say Y to only one of them.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called eata.o.
+
+CONFIG_SCSI_EATA_TAGGED_QUEUE
+  This is a feature of SCSI-2 which improves performance: the host
+  adapter can send several SCSI commands to a device's queue even if
+  previous commands haven't finished yet. Most EATA adapters negotiate
+  this feature automatically with the device, even if your answer is
+  N. The safe answer is N.
+
+CONFIG_SCSI_EATA_LINKED_COMMANDS
+  This option enables elevator sorting for all probed SCSI disks and
+  CD-ROMs. It definitely reduces the average seek distance when doing
+  random seeks, but this does not necessarily result in a noticeable
+  performance improvement: your mileage may vary...
+  The safe answer is N.
+
+CONFIG_SCSI_EATA_MAX_TAGS
+  This specifies how many SCSI commands can be maximally queued for
+  each probed SCSI device. You should reduce the default value of 16
+  only if you have disks with buggy or limited tagged command support.
+  Minimum is 2 and maximum is 62. This value is also the window size
+  used by the elevator sorting option above. The effective value used
+  by the driver for each probed SCSI device is reported at boot time.
+
+CONFIG_SCSI_NCR53C406A
+  This is support for the NCR53c406a SCSI host adapter.  For user
+  configurable parameters, check out <file:drivers/scsi/NCR53c406a.c>
+  in the kernel source.  Also read the SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called NCR53c406.o.
+
+CONFIG_SCSI_SYM53C416
+  This is support for the sym53c416 SCSI host adapter, the SCSI
+  adapter that comes with some HP scanners. This driver requires that
+  the sym53c416 is configured first using some sort of PnP
+  configuration program (e.g. isapnp) or by a PnP aware BIOS. If you
+  are using isapnp then you need to compile this driver as a module
+  and then load it using insmod after isapnp has run. The parameters
+  of the configured card(s) should be passed to the driver. The format
+  is:
+
+    insmod sym53c416 sym53c416=<base>,<irq> [sym53c416_1=<base>,<irq>]
+
+  There is support for up to four adapters. If you want to compile
+  this driver as a module ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt>. The module will be called
+  sym53c416.o.
+
+CONFIG_SCSI_SIM710
+  This is a simple driver for NCR53c710 based SCSI host adapters.
+
+  More complex drivers for this chip are available ("NCR53c7,8xx SCSI
+  support", above), but they require that the scsi chip be able to do
+  DMA block moves between memory and on-chip registers, which can
+  cause problems under certain conditions.  This driver is designed to
+  avoid these problems and is intended to work with any Intel machines
+  using 53c710 chips, including various Compaq and NCR machines.
+
+  Please read the comments at the top of the file
+  <file:drivers/scsi/sim710.c> for more information.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called sim710.o.
+
+CONFIG_SCSI_DC390T
+  This driver supports PCI SCSI host adapters based on the Am53C974A
+  chip, e.g. Tekram DC390(T), DawiControl 2974 and some onboard
+  PCscsi/PCnet (Am53/79C974) solutions.
+
+  Documentation can be found in <file:drivers/scsi/README.tmscsim>.
+
+  Note that this driver does NOT support Tekram DC390W/U/F, which are
+  based on NCR/Symbios chips. Use "NCR53C8XX SCSI support" for those.
+  Also note that there is another generic Am53C974 driver,
+  "AM53/79C974 PCI SCSI support" below.  You can pick either one.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called tmscsim.o.
+
+CONFIG_SCSI_DC390T_NOGENSUPP
+  If you say N here, the DC390(T) SCSI driver relies on the DC390
+  EEPROM to get initial values for its settings, such as speed,
+  termination, etc.  If it can't find this EEPROM, it will use
+  defaults or the user supplied boot/module parameters.  For details
+  on driver configuration see <file:drivers/scsi/README.tmscsim>.
+
+  If you say Y here and if no EEPROM is found, the driver gives up and
+  thus only supports Tekram DC390(T) adapters.  This can be useful if
+  you have a DC390(T) and another Am53C974 based adapter, which, for
+  some reason, you want to drive with the other AM53C974 driver.
+
+  If unsure, say N.
+
+CONFIG_SCSI_AM53C974
+  This is support for the AM53/79C974 SCSI host adapters.  Please read
+  <file:drivers/scsi/README.AM53C974> for details.  Also, the
+  SCSI-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>, is for you.
+
+  Note that there is another driver for AM53C974 based adapters:
+  "Tekram DC390(T) and Am53/79C974 (PCscsi) SCSI support", above.  You
+  can pick either one.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called AM53C974.o.
+
+CONFIG_SCSI_MEGARAID
+  This driver supports the AMI MegaRAID 418, 428, 438, 466, 762, 490
+  and 467 SCSI host adapters.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called megaraid.o.
+
+CONFIG_SCSI_GDTH
+  Formerly called GDT SCSI Disk Array Controller Support.
+ 
+  This is a driver for RAID/SCSI Disk Array Controllers (EISA/ISA/PCI) 
+  manufactured by Intel/ICP vortex (an Intel Company). It is documented
+  in the kernel source in <file:drivers/scsi/gdth.c> and
+  <file:drivers/scsi/gdth.h.>
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_PPA
+  This driver supports older versions of IOMEGA's parallel port ZIP
+  drive (a 100 MB removable media device).
+
+  Note that you can say N here if you have the SCSI version of the ZIP
+  drive: it will be supported automatically if you said Y to the
+  generic "SCSI disk support", above.
+
+  If you have the ZIP Plus drive or a more recent parallel port ZIP
+  drive (if the supplied cable with the drive is labeled "AutoDetect")
+  then you should say N here and Y to "IOMEGA parallel port (imm -
+  newer drives)", below.
+
+  For more information about this driver and how to use it you should
+  read the file <file:drivers/scsi/README.ppa>.  You should also read
+  the SCSI-HOWTO, which is available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
+  you will still be able to use the parallel port for other tasks,
+  such as a printer; it is safe to compile both drivers into the
+  kernel.
+
+  This driver is also available as a module which can be inserted in
+  and removed from the running kernel whenever you want.  To compile
+  this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called ppa.o.
+
+CONFIG_SCSI_IMM
+  This driver supports newer versions of IOMEGA's parallel port ZIP
+  drive (a 100 MB removable media device).
+
+  Note that you can say N here if you have the SCSI version of the ZIP
+  drive: it will be supported automatically if you said Y to the
+  generic "SCSI disk support", above.
+
+  If you have the ZIP Plus drive or a more recent parallel port ZIP
+  drive (if the supplied cable with the drive is labeled "AutoDetect")
+  then you should say Y here; if you have an older ZIP drive, say N
+  here and Y to "IOMEGA Parallel Port (ppa - older drives)", above.
+
+  For more information about this driver and how to use it you should
+  read the file <file:drivers/scsi/README.ppa>.  You should also read
+  the SCSI-HOWTO, which is available from
+  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
+  you will still be able to use the parallel port for other tasks,
+  such as a printer; it is safe to compile both drivers into the
+  kernel.
+
+  This driver is also available as a module which can be inserted in
+  and removed from the running kernel whenever you want.  To compile
+  this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called imm.o.
+
+CONFIG_SCSI_IZIP_EPP16
+  EPP (Enhanced Parallel Port) is a standard for parallel ports which
+  allows them to act as expansion buses that can handle up to 64
+  peripheral devices.
+
+  Some parallel port chipsets are slower than their motherboard, and
+  so we have to control the state of the chipset's FIFO queue every
+  now and then to avoid data loss. This will be done if you say Y
+  here.
+
+  Generally, saying Y is the safe option and slows things down a bit.
+
+CONFIG_SCSI_IZIP_SLOW_CTR
+  Some parallel ports are known to have excessive delays between
+  changing the parallel port control register and good data being
+  available on the parallel port data/status register. This option
+  forces a small delay (1.0 usec to be exact) after changing the
+  control register to let things settle out. Enabling this option may
+  result in a big drop in performance but some very old parallel ports
+  (found in 386 vintage machines) will not work properly.
+
+  Generally, saying N is fine.
+
+CONFIG_SCSI_DEBUG
+  This is a host adapter simulator that can be programmed to simulate
+  a large number of conditions that could occur on a real bus. The
+  advantage is that many hard to reproduce problems can be tested in a
+  controlled environment where there is reduced risk of losing
+  important data. This is primarily of use to people trying to debug
+  the middle and upper layers of the SCSI subsystem. If unsure, say N.
+
+CONFIG_A4000T_SCSI
+  Support for the NCR53C710 SCSI controller on the Amiga 4000T.
+
+CONFIG_A4091_SCSI
+  Support for the NCR53C710 chip on the Amiga 4091 Z3 SCSI2 controller
+  (1993).  Very obscure -- the 4091 was part of an Amiga 4000 upgrade
+  plan at the time the Amiga business was sold to DKB.
+
+CONFIG_A3000_SCSI
+  If you have an Amiga 3000 and have SCSI devices connected to the
+  built-in SCSI controller, say Y. Otherwise, say N. This driver is
+  also available as a module ( = code which can be inserted in and
+  removed from the running kernel whenever you want). The module is
+  called wd33c93.o. If you want to compile it as a module, say M here
+  and read <file:Documentation/modules.txt>.
+
+CONFIG_A2091_SCSI
+  If you have a Commodore A2091 SCSI controller, say Y. Otherwise,
+  say N. This driver is also available as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want). The module is called wd33c93.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_GVP11_SCSI
+  If you have a Great Valley Products Series II SCSI controller,
+  answer Y. Also say Y if you have a later model of GVP SCSI
+  controller (such as the GVP A4008 or a Combo board). Otherwise,
+  answer N. This driver does NOT work for the T-Rex series of
+  accelerators from TekMagic and GVP-M.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you
+  want). The module will be called gvp11.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_CYBERSTORM_SCSI
+  If you have an Amiga with an original (MkI) Phase5 Cyberstorm
+  accelerator board and the optional Cyberstorm SCSI controller,
+  answer Y. Otherwise, say N.
+
+CONFIG_CYBERSTORMII_SCSI
+  If you have an Amiga with a Phase5 Cyberstorm MkII accelerator board
+  and the optional Cyberstorm SCSI controller, say Y. Otherwise,
+  answer N.
+
+CONFIG_BLZ2060_SCSI
+  If you have an Amiga with a Phase5 Blizzard 2060 accelerator board
+  and want to use the onboard SCSI controller, say Y. Otherwise,
+  answer N.
+
+CONFIG_BLZ1230_SCSI
+  If you have an Amiga 1200 with a Phase5 Blizzard 1230IV or Blizzard
+  1260 accelerator, and the optional SCSI module, say Y. Otherwise,
+  say N.
+
+CONFIG_BLZ603EPLUS_SCSI
+  If you have an Amiga 1200 with a Phase5 Blizzard PowerUP 603e+
+  accelerator, say Y. Otherwise, say N.
+
+CONFIG_FASTLANE_SCSI
+  If you have the Phase5 Fastlane Z3 SCSI controller, or plan to use
+  one in the near future, say Y to this question. Otherwise, say N.
+
+CONFIG_OKTAGON_SCSI
+  If you have the BSC Oktagon SCSI disk controller for the Amiga, say
+  Y to this question.  If you're in doubt about whether you have one,
+  see the picture at
+  <http://amiga.multigraph.com/photos/oktagon.html>.
+
+CONFIG_SCSI_MESH
+  Many Power Macintoshes and clones have a MESH (Macintosh Enhanced
+  SCSI Hardware) SCSI bus adaptor (the 7200 doesn't, but all of the
+  other Power Macintoshes do). Say Y to include support for this SCSI
+  adaptor. This driver is also available as a module called mesh.o
+  ( = code which can be inserted in and removed from the running
+  kernel whenever you want). If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SCSI_MESH_SYNC_RATE
+  On Power Macintoshes (and clones) where the MESH SCSI bus adaptor
+  drives a bus which is entirely internal to the machine (such as the
+  7500, 7600, 8500, etc.), the MESH is capable of synchronous
+  operation at up to 10 MB/s. On machines where the SCSI bus
+  controlled by the MESH can have external devices connected, it is
+  usually rated at 5 MB/s. 5 is a safe value here unless you know the
+  MESH SCSI bus is internal only; in that case you can say 10. Say 0
+  to disable synchronous operation.
+
+CONFIG_SCSI_MAC53C94
+  On Power Macintoshes (and clones) with two SCSI buses, the external
+  SCSI bus is usually controlled by a 53C94 SCSI bus adaptor. Older
+  machines which only have one SCSI bus, such as the 7200, also use
+  the 53C94. Say Y to include support for the 53C94.
+
+  This driver is also available as a module called mac53c94.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+

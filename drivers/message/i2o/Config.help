@@ -1,0 +1,71 @@
+CONFIG_I2O
+  The Intelligent Input/Output (I2O) architecture allows hardware
+  drivers to be split into two parts: an operating system specific
+  module called the OSM and an hardware specific module called the
+  HDM. The OSM can talk to a whole range of HDM's, and ideally the
+  HDM's are not OS dependent. This allows for the same HDM driver to
+  be used under different operating systems if the relevant OSM is in
+  place. In order for this to work, you need to have an I2O interface
+  adapter card in your computer. This card contains a special I/O
+  processor (IOP), thus allowing high speeds since the CPU does not
+  have to deal with I/O.
+
+  If you say Y here, you will get a choice of interface adapter
+  drivers and OSM's with the following questions.
+
+  This support is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  You will get modules called
+  i2o_core.o and i2o_config.o.
+
+  If unsure, say N.
+
+CONFIG_I2O_PCI
+  Say Y for support of PCI bus I2O interface adapters. Currently this
+  is the only variety supported, so you should say Y.
+
+  This support is also available as a module called i2o_pci.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_I2O_BLOCK
+  Include support for the I2O Block OSM. The Block OSM presents disk
+  and other structured block devices to the operating system.
+
+  This support is also available as a module called i2o_block.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_I2O_LAN
+  Include support for the LAN OSM. You will also need to include
+  support for token ring or FDDI if you wish to use token ring or FDDI
+  I2O cards with this driver.
+
+  This support is also available as a module called i2o_lan.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_I2O_SCSI
+  Allows direct SCSI access to SCSI devices on a SCSI or FibreChannel
+  I2O controller. You can use both the SCSI and Block OSM together if
+  you wish.
+
+  This support is also available as a module called i2o_scsi.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+CONFIG_I2O_PROC
+  If you say Y here and to "/proc file system support", you will be
+  able to read I2O related information from the virtual directory
+  /proc/i2o.
+
+  This support is also available as a module called i2o_proc.o ( =
+  code which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+

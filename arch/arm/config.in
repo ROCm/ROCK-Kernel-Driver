@@ -14,20 +14,7 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 define_bool CONFIG_GENERIC_BUST_SPINLOCK n
 define_bool CONFIG_GENERIC_ISA_DMA n
 
-mainmenu_option next_comment
-comment 'Code maturity level options'
-bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
-bool 'Prompt for obsolete code/drivers' CONFIG_OBSOLETE
-endmenu
-
-
-mainmenu_option next_comment
-comment 'Loadable module support'
-bool 'Enable loadable module support' CONFIG_MODULES
-dep_bool '  Set version information on all module symbols' CONFIG_MODVERSIONS $CONFIG_MODULES
-dep_bool '  Kernel module loader' CONFIG_KMOD $CONFIG_MODULES
-endmenu
-
+source init/Config.in
 
 mainmenu_option next_comment
 comment 'System Type'
@@ -467,10 +454,6 @@ if [ "$CONFIG_HOTPLUG" = "y" ]; then
 else
    define_bool CONFIG_PCMCIA n
 fi
-bool 'Networking support' CONFIG_NET
-bool 'System V IPC' CONFIG_SYSVIPC
-bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
-bool 'Sysctl support' CONFIG_SYSCTL
 comment 'At least one math emulation must be selected'
 tristate 'NWFPE math emulation' CONFIG_FPE_NWFPE
 dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL

@@ -1,0 +1,23 @@
+CONFIG_BLUEZ_HCIUART
+  Bluetooth HCI UART driver.
+  This driver is required if you want to use Bluetooth devices with
+  serial port interface.
+
+  Say Y here to compile support for Bluetooth UART devices into the
+  kernel or say M to compile it as module (hci_uart.o).
+
+CONFIG_BLUEZ_HCIUSB
+  Bluetooth HCI USB driver.
+  This driver is required if you want to use Bluetooth devices with
+  USB interface.
+
+  Say Y here to compile support for Bluetooth USB devices into the
+  kernel or say M to compile it as module (hci_usb.o).
+
+CONFIG_BLUEZ_HCIVHCI
+  Bluetooth Virtual HCI device driver.
+  This driver is required if you want to use HCI Emulation software.
+
+  Say Y here to compile support for virtual HCI devices into the
+  kernel or say M to compile it as module (hci_vhci.o).
+

@@ -80,6 +80,12 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 #define __PAGE_OFFSET		(0xC0000000)
 
+/*
+ * This much address space is reserved for vmalloc() and iomap()
+ * as well as fixmap mappings.
+ */
+#define __VMALLOC_RESERVE	(128 << 20)
+
 #ifndef __ASSEMBLY__
 
 /*
@@ -118,6 +124,9 @@ static __inline__ int get_order(unsigned long size)
 #endif /* __ASSEMBLY__ */
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
+#define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
+#define __MAXMEM		(-__PAGE_OFFSET-__VMALLOC_RESERVE)
+#define MAXMEM			((unsigned long)(-PAGE_OFFSET-VMALLOC_RESERVE))
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))

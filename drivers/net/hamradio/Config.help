@@ -1,0 +1,247 @@
+CONFIG_MKISS
+  KISS is a protocol used for the exchange of data between a computer
+  and a Terminal Node Controller (a small embedded system commonly
+  used for networking over AX.25 amateur radio connections; it
+  connects the computer's serial port with the radio's microphone
+  input and speaker output).
+
+  Although KISS is less advanced than the 6pack protocol, it has
+  the advantage that it is already supported by most modern TNCs
+  without the need for a firmware upgrade.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called mkiss.o.
+
+CONFIG_6PACK
+  6pack is a transmission protocol for the data exchange between your
+  PC and your TNC (the Terminal Node Controller acts as a kind of
+  modem connecting your computer's serial port to your radio's
+  microphone input and speaker output). This protocol can be used as
+  an alternative to KISS for networking over AX.25 amateur radio
+  connections, but it has some extended functionality.
+
+  Note that this driver is still experimental and might cause
+  problems. For details about the features and the usage of the
+  driver, read <file:Documentation/networking/6pack.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called 6pack.o.
+
+CONFIG_BPQETHER
+  AX.25 is the protocol used for computer communication over amateur
+  radio. If you say Y here, you will be able to send and receive AX.25
+  traffic over Ethernet (also called "BPQ AX.25"), which could be
+  useful if some other computer on your local network has a direct
+  amateur radio connection.
+
+CONFIG_DMASCC
+  This is a driver for high-speed SCC boards, i.e. those supporting
+  DMA on one port. You usually use those boards to connect your
+  computer to an amateur radio modem (such as the WA4DSY 56kbps
+  modem), in order to send and receive AX.25 packet radio network
+  traffic.
+
+  Currently, this driver supports Ottawa PI/PI2, Paccomm/Gracilis
+  PackeTwin, and S5SCC/DMA boards. They are detected automatically.
+  If you have one of these cards, say Y here and read the AX25-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver can operate multiple boards simultaneously. If you
+  compile it as a module (by saying M instead of Y), it will be called
+  dmascc.o. If you don't pass any parameter to the driver, all
+  possible I/O addresses are probed. This could irritate other devices
+  that are currently not in use. You may specify the list of addresses
+  to be probed by "dmascc=addr1,addr2,..." (when compiled into the
+  kernel image) or "io=addr1,addr2,..." (when loaded as a module). The
+  network interfaces will be called dmascc0 and dmascc1 for the board
+  detected first, dmascc2 and dmascc3 for the second one, and so on.
+
+  Before you configure each interface with ifconfig, you MUST set
+  certain parameters, such as channel access timing, clock mode, and
+  DMA channel. This is accomplished with a small utility program,
+  dmascc_cfg, available at
+  <http://www.nt.tuwien.ac.at/~kkudielk/Linux/>. Please be sure to get
+  at least version 1.27 of dmascc_cfg, as older versions will not
+  work with the current driver.
+
+CONFIG_SCC
+  These cards are used to connect your Linux box to an amateur radio
+  in order to communicate with other computers. If you want to use
+  this, read <file:Documentation/networking/z8530drv.txt> and the
+  AX25-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+  to "Amateur Radio AX.25 Level 2" support.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called scc.o.
+
+CONFIG_SCC_TRXECHO
+  Some transmitters feed the transmitted signal back to the receive
+  line.  Say Y here to foil this by explicitly disabling the receiver
+  during data transmission.  If in doubt, say Y.
+
+CONFIG_SCC_DELAY
+  Say Y here if you experience problems with the SCC driver not
+  working properly; please read
+  <file:Documentation/networking/z8530drv.txt> for details. If unsure,
+  say N.
+
+CONFIG_YAM
+  The YAM is a modem for packet radio which connects to the serial
+  port and includes some of the functions of a Terminal Node
+  Controller. If you have one of those, say Y here.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_BAYCOM_PAR
+  This is a driver for Baycom style simple amateur radio modems that
+  connect to a parallel interface. The driver supports the picpar and
+  par96 designs. To configure the driver, use the sethdlc utility
+  available in the standard ax25 utilities package. For information on
+  the modems, see <http://www.baycom.de/> and the file
+  <file:Documentation/networking/baycom.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called baycom_par.o.
+
+CONFIG_BAYCOM_EPP
+  This is a driver for Baycom style simple amateur radio modems that
+  connect to a parallel interface. The driver supports the EPP
+  designs. To configure the driver, use the sethdlc utility available
+  in the standard ax25 utilities package. For information on the
+  modems, see <http://www.baycom.de/> and the file
+  <file:Documentation/networking/baycom.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called baycom_par.o.
+
+CONFIG_BAYCOM_SER_FDX
+  This is one of two drivers for Baycom style simple amateur radio
+  modems that connect to a serial interface. The driver supports the
+  ser12 design in full-duplex mode. In addition, it allows the
+  baudrate to be set between 300 and 4800 baud (however not all modems
+  support all baudrates). This is the preferred driver. The next
+  driver, "BAYCOM ser12 half-duplex driver for AX.25" is the old
+  driver and still provided in case this driver does not work with
+  your serial interface chip. To configure the driver, use the sethdlc
+  utility available in the standard ax25 utilities package. For
+  information on the modems, see <http://www.baycom.de/> and
+  <file:Documentation/networking/baycom.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called baycom_ser_fdx.o.
+
+CONFIG_BAYCOM_SER_HDX
+  This is one of two drivers for Baycom style simple amateur radio
+  modems that connect to a serial interface. The driver supports the
+  ser12 design in full-duplex mode. This is the old driver.  It is
+  still provided in case your serial interface chip does not work with
+  the full-duplex driver. This driver is depreciated.  To configure
+  the driver, use the sethdlc utility available in the standard ax25
+  utilities package. For information on the modems, see
+  <http://www.baycom.de/> and
+  <file:Documentation/networking/baycom.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called baycom_ser_hdx.o.
+
+CONFIG_SOUNDMODEM
+  This experimental driver allows a standard Sound Blaster or
+  WindowsSoundSystem compatible sound card to be used as a packet
+  radio modem (NOT as a telephone modem!), to send digital traffic
+  over amateur radio.
+
+  To configure the driver, use the sethdlc, smdiag and smmixer
+  utilities available in the standard ax25 utilities package. For
+  information on how to key the transmitter, see
+  <http://www.ife.ee.ethz.ch/~sailer/pcf/ptt_circ/ptt.html> and
+  <file:Documentation/networking/soundmodem.txt>.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called soundmodem.o.
+
+CONFIG_SOUNDMODEM_SBC
+  This option enables the soundmodem driver to use Sound Blaster and
+  compatible cards. If you have a dual mode card (i.e. a WSS cards
+  with a Sound Blaster emulation) you should say N here and Y to
+  "Sound card modem support for WSS and Crystal cards", below, because
+  this usually results in better performance. This option also
+  supports SB16/32/64 in full-duplex mode.
+
+CONFIG_SOUNDMODEM_WSS
+  This option enables the soundmodem driver to use WindowsSoundSystem
+  compatible cards. These cards feature a codec chip from either
+  Analog Devices (such as AD1848, AD1845, AD1812) or Crystal
+  Semiconductors (such as CS4248, CS423x). This option also supports
+  the WSS full-duplex operation which currently works with Crystal
+  CS423x chips. If you don't need full-duplex operation, do not enable
+  it to save performance.
+
+CONFIG_SOUNDMODEM_AFSK1200
+  This option enables the soundmodem driver 1200 baud AFSK modem,
+  compatible to popular modems using TCM3105 or AM7911. The
+  demodulator requires about 12% of the CPU power of a Pentium 75 CPU
+  per channel.
+
+CONFIG_SOUNDMODEM_AFSK2400_7
+  This option enables the soundmodem driver 2400 baud AFSK modem,
+  compatible to TCM3105 modems (over-)clocked with a 7.3728MHz
+  crystal. Note that the availability of this driver does _not_ imply
+  that I recommend building such links. It is only here since users
+  especially in eastern Europe have asked me to do so. In fact this
+  modulation scheme has many disadvantages, mainly its incompatibility
+  with many transceiver designs and the fact that the TCM3105 (if
+  used) is operated widely outside its specifications.
+
+CONFIG_SOUNDMODEM_AFSK2400_8
+  This option enables the soundmodem driver 2400 baud AFSK modem,
+  compatible to TCM3105 modems (over-)clocked with an 8MHz crystal.
+  Note that the availability of this driver does _not_ imply that I
+  recommend building such links. It is only here since users
+  especially in eastern Europe have asked me to do so. In fact this
+  modulation scheme has many disadvantages, mainly its incompatibility
+  with many transceiver designs and the fact that the TCM3105 (if
+  used) is operated widely outside its specifications.
+
+CONFIG_SOUNDMODEM_AFSK2666
+  This option enables the soundmodem driver 2666 baud AFSK modem.
+  This modem is experimental, and not compatible to anything
+  else I know of.
+
+CONFIG_SOUNDMODEM_PSK4800
+  This option enables the soundmodem driver 4800 baud 8PSK modem.
+  This modem is experimental, and not compatible to anything
+  else I know of.
+
+CONFIG_SOUNDMODEM_HAPN4800
+  This option enables the soundmodem driver 4800 baud HAPN-1
+  compatible modem. This modulation seems to be widely used 'down
+  under' and in the Netherlands. Here, nobody uses it, so I could not
+  test if it works. It is compatible to itself, however :-)
+
+CONFIG_SOUNDMODEM_FSK9600
+  This option enables the soundmodem driver 9600 baud FSK modem,
+  compatible to the G3RUH standard. The demodulator requires about 4%
+  of the CPU power of a Pentium 75 CPU per channel. You can say Y to
+  both 1200 baud AFSK and 9600 baud FSK if you want (but obviously you
+  can only use one protocol at a time, depending on what the other end
+  can understand).
+

@@ -1,0 +1,47 @@
+CONFIG_IPX_INTERN
+  Every IPX network has an address that identifies it. Sometimes it is
+  useful to give an IPX "network" address to your Linux box as well
+  (for example if your box is acting as a file server for different
+  IPX networks: it will then be accessible from everywhere using the
+  same address). The way this is done is to create a virtual internal
+  "network" inside your box and to assign an IPX address to this
+  network. Say Y here if you want to do this; read the IPX-HOWTO at
+  <http://www.linuxdoc.org/docs.html#howto> for details.
+
+  The full internal IPX network enables you to allocate sockets on
+  different virtual nodes of the internal network. This is done by
+  evaluating the field sipx_node of the socket address given to the
+  bind call. So applications should always initialize the node field
+  to 0 when binding a socket on the primary network. In this case the
+  socket is assigned the default node that has been given to the
+  kernel when the internal network was created. By enabling the full
+  internal IPX network the cross-forwarding of packets targeted at
+  'special' sockets to sockets listening on the primary network is
+  disabled. This might break existing applications, especially RIP/SAP
+  daemons. A RIP/SAP daemon that works well with the full internal net
+  can be found on <ftp://ftp.gwdg.de/pub/linux/misc/ncpfs/>.
+
+  If you don't know what you are doing, say N.
+
+CONFIG_SPX
+  * Orphaned entry retained 20 April 2001 by Petr Vandrovec     *
+  * If you read this note from the configurator, please contact *
+  * the Configure.help maintainers.                             *
+  The Sequenced Packet eXchange protocol is a transport layer protocol
+  built on top of IPX. It is used in Novell NetWare systems for
+  client-server applications and is similar to TCP (which runs on top
+  of IP).
+
+  Note that Novell NetWare file sharing does not use SPX; it uses a
+  protocol called NCP, for which separate Linux support is available
+  ("NCP file system support" below for the client side, and the user
+  space programs lwared or mars_nwe for the server side).
+
+  Say Y here if you have use for SPX; read the IPX-HOWTO at
+  <http://www.linuxdoc.org/docs.html#howto> for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called af_spx.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+

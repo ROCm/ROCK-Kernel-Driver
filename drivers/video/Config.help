@@ -1,0 +1,702 @@
+CONFIG_FB_SGIVW
+  SGI Visual Workstation support for framebuffer graphics.
+
+CONFIG_VIDEO_SELECT
+  This enables support for text mode selection on kernel startup. If
+  you want to take advantage of some high-resolution text mode your
+  card's BIOS offers, but the traditional Linux utilities like
+  SVGATextMode don't, you can say Y here and set the mode using the
+  "vga=" option from your boot loader (lilo or loadlin) or set
+  "vga=ask" which brings up a video mode menu on kernel startup. (Try
+  "man bootparam" or see the documentation of your boot loader about
+  how to pass options to the kernel.)
+
+  Read the file <file:Documentation/svga.txt> for more information
+  about the Video mode selection support. If unsure, say N.
+
+CONFIG_FB
+  The frame buffer device provides an abstraction for the graphics
+  hardware. It represents the frame buffer of some video hardware and
+  allows application software to access the graphics hardware through
+  a well-defined interface, so the software doesn't need to know
+  anything about the low-level (hardware register) stuff.
+
+  Frame buffer devices work identically across the different
+  architectures supported by Linux and make the implementation of
+  application programs easier and more portable; at this point, an X
+  server exists which uses the frame buffer device exclusively.
+  On several non-X86 architectures, the frame buffer device is the
+  only way to use the graphics hardware.
+
+  The device is accessed through special device nodes, usually located
+  in the /dev directory, i.e. /dev/fb*.
+
+  You need an utility program called fbset to make full use of frame
+  buffer devices. Please read <file:Documentation/fb/framebuffer.txt>
+  and the Framebuffer-HOWTO at
+  <http://www.tahallah.demon.co.uk/programming/prog.html> for more
+  information.
+
+  Say Y here and to the driver for your graphics board below if you
+  are compiling a kernel for a non-x86 architecture.
+
+  If you are compiling for the x86 architecture, you can say Y if you
+  want to play with it, but it is not essential. Please note that
+  running graphical applications that directly touch the hardware
+  (e.g. an accelerated X server) and that are not frame buffer
+  device-aware may cause unexpected results. If unsure, say N.
+
+CONFIG_FB_ACORN
+  This is the frame buffer device driver for the Acorn VIDC graphics
+  hardware found in Acorn RISC PCs and other ARM-based machines.  If
+  unsure, say N.
+
+CONFIG_FB_PM2
+  This is the frame buffer device driver for the Permedia2 AGP frame
+  buffer card from ASK, aka `Graphic Blaster Exxtreme'.  There is a
+  product page at
+  <http://www.ask.com.hk/product/Permedia%202/permedia2.htm>.
+
+CONFIG_FB_PM2_FIFO_DISCONNECT
+  Support the Permedia2 FIFOI disconnect feature (see CONFIG_FB_PM2).
+
+CONFIG_FB_PM2_PCI
+  Say Y to enable support for Permedia2 AGP frame buffer card from
+  3Dlabs (aka `Graphic Blaster Exxtreme') on the PCI bus.
+
+CONFIG_FB_PM2_CVPPC
+  Say Y to enable support for the Amiga Phase 5 CVisionPPC BVisionPPC
+  framebuffer cards.  Phase 5 is no longer with us, alas.
+
+CONFIG_FB_AMIGA
+  This is the frame buffer device driver for the builtin graphics
+  chipset found in Amigas.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called amifb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_FB_AMIGA_OCS
+  This enables support for the original Agnus and Denise video chips,
+  found in the Amiga 1000 and most A500's and A2000's. If you intend
+  to run Linux on any of these systems, say Y; otherwise say N.
+
+CONFIG_FB_AMIGA_ECS
+  This enables support for the Enhanced Chip Set, found in later
+  A500's, later A2000's, the A600, the A3000, the A3000T and CDTV. If
+  you intend to run Linux on any of these systems, say Y; otherwise
+  say N.
+
+CONFIG_FB_AMIGA_AGA
+  This enables support for the Advanced Graphics Architecture (also
+  known as the AGA or AA) Chip Set, found in the A1200, A4000, A4000T
+  and CD32. If you intend to run Linux on any of these systems, say Y;
+  otherwise say N.
+
+CONFIG_FB_CYBER
+  This enables support for the Cybervision 64 graphics card from
+  Phase5. Please note that its use is not all that intuitive (i.e. if
+  you have any questions, be sure to ask!). Say N unless you have a
+  Cybervision 64 or plan to get one before you next recompile the
+  kernel. Please note that this driver DOES NOT support the
+  Cybervision 64 3D card, as they use incompatible video chips.
+
+CONFIG_FB_CYBER2000
+  This enables support for the Integraphics CyberPro 20x0 and 5000
+  VGA chips used in the Rebel.com Netwinder and other machines.
+  Say Y if you have a NetWinder or a graphics card containing this
+  device, otherwise say N.
+
+CONFIG_FB_VIRGE
+  This enables support for the Cybervision 64/3D graphics card from
+  Phase5. Please note that its use is not all that intuitive (i.e. if
+  you have any questions, be sure to ask!). Say N unless you have a
+  Cybervision 64/3D or plan to get one before you next recompile the
+  kernel. Please note that this driver DOES NOT support the older
+  Cybervision 64 card, as they use incompatible video chips.
+
+CONFIG_FB_RETINAZ3
+  This enables support for the Retina Z3 graphics card. Say N unless
+  you have a Retina Z3 or plan to get one before you next recompile
+  the kernel.
+
+CONFIG_FB_CLGEN
+  This enables support for Cirrus Logic GD542x/543x based boards on
+  Amiga: SD64, Piccolo, Picasso II/II+, Picasso IV, or EGS Spectrum.
+
+  If you have a PCI-based system, this enables support for these
+  chips: GD-543x, GD-544x, GD-5480.
+
+  Please read the file <file:Documentation/fb/clgenfb.txt>.
+
+  Say N unless you have such a graphics board or plan to get one
+  before you next recompile the kernel.
+
+CONFIG_FB_ATARI
+  This is the frame buffer device driver for the builtin graphics
+  chipset found in Ataris.
+
+CONFIG_FB_FM2
+  This is the frame buffer device driver for the Amiga FrameMaster
+  card from BSC (exhibited 1992 but not shipped as a CBM product).
+
+CONFIG_FB_OF
+  Say Y if you want support with Open Firmware for your graphics
+  board.
+
+CONFIG_FB_S3TRIO
+  If you have a S3 Trio say Y. Say N for S3 Virge.
+
+CONFIG_FB_3DFX
+  This driver supports graphics boards with the 3Dfx Banshee/Voodoo3
+  chips. Say Y if you have such a graphics board.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called tdfxfb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_FB_RIVA
+  This driver supports graphics boards with the nVidia Riva/Geforce
+  chips.
+  Say Y if you have such a graphics board.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called rivafb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_FB_ATY
+  This driver supports graphics boards with the ATI Mach64 chips.
+  Say Y if you have such a graphics board.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called atyfb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_FB_ATY128
+  This driver supports graphics boards with the ATI Rage128 chips.
+  Say Y if you have such a graphics board and read
+  <file:Documentation/fb/aty128fb.txt>.
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called aty128fb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_FB_MAXINE
+  Say Y here to directly support the on-board framebuffer in the
+  Maxine (5000/20, /25, /33) version of the DECstation.  There is a
+  page dedicated to Linux on DECstations at <http://decstation.unix-ag.org/>.
+
+CONFIG_FB_PMAG_BA
+  Say Y here to directly support the on-board PMAG-BA framebuffer in
+  the 5000/1xx versions of the DECstation.  There is a page dedicated
+  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+
+CONFIG_FB_PMAGB_B
+  Say Y here to directly support the on-board PMAGB-B framebuffer in
+  the 5000/1xx versions of the DECstation.  There is a page dedicated
+  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+
+CONFIG_FB_NEOMAGIC
+  This driver supports notebooks with NeoMagic PCI chips.
+  Say Y if you have such a graphics card. 
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called neofb.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+CONFIG_FB_CONTROL
+  This driver supports a frame buffer for the graphics adapter in the
+  Power Macintosh 7300 and others.
+
+CONFIG_FB_PLATINUM
+  This driver supports a frame buffer for the "platinum" graphics
+  adapter in some Power Macintoshes.
+
+CONFIG_FB_VALKYRIE
+  This driver supports a frame buffer for the "valkyrie" graphics
+  adapter in some Power Macintoshes.
+
+CONFIG_FB_CT65550
+  This is the frame buffer device driver for the Chips & Technologies
+  65550 graphics chip in PowerBooks.
+
+CONFIG_FB_TGA
+  This is the frame buffer device driver for generic TGA graphic
+  cards. Say Y if you have one of those.
+
+CONFIG_FB_VESA
+  This is the frame buffer device driver for generic VESA 2.0
+  compliant graphic cards. The older VESA 1.2 cards are not supported.
+  You will get a boot time penguin logo at no additional cost. Please
+  read <file:Documentation/fb/vesafb.txt>. If unsure, say Y.
+
+CONFIG_FBCON_VGA_PLANES
+  This low level frame buffer console driver enable the kernel to use
+  the 16-color planar modes of the old VGA cards where the bits of
+  each pixel are separated into 4 planes.
+
+  Only answer Y here if you have a (very old) VGA card that isn't VESA
+  2 compatible.
+
+CONFIG_FB_VGA16
+  This is the frame buffer device driver for VGA 16 color graphic
+  cards. Say Y if you have such a card.
+
+  This code is also available as a module. If you want to compile it
+  as a module ( = code which can be inserted in and removed from the
+  running kernel whenever you want), say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  vga16fb.o.
+
+CONFIG_FB_STI
+  STI refers to the HP "Standard Text Interface" which is a set of
+  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
+  Enabling this option will implement the linux framebuffer device and
+  an fbcon color text console using calls to the STI BIOS routines.
+  The HP framebuffer device is usually planar, uses a strange memory
+  layout, and changing the plane mask to create colored pixels
+  requires a call to the STI routines, so do not expect /dev/fb to
+  actually be useful.  However, it is the best we have as far as
+  graphics on the HP chipsets due to lack of hardware level
+  documentation for the various on-board HP chipsets used in these
+  systems.  It is sufficient for basic text console functions,
+  including fonts.
+
+  You should probably enable this option, unless you are having
+  trouble getting video when booting the kernel (make sure it isn't
+  just that you are running the console on the serial port, though).
+  Really old HP boxes may not have STI, and must use the PDC BIOS
+  console or the IODC BIOS.
+
+CONFIG_FBCON_FONTS
+  Say Y here if you would like to use fonts other than the default
+  your frame buffer console usually use.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about foreign fonts.
+
+  If unsure, say N (the default choices are safe).
+
+CONFIG_FONT_8x16
+  This is the "high resolution" font for the VGA frame buffer (the one
+  provided by the VGA text console 80x25 mode.
+
+  If unsure, say Y.
+
+CONFIG_FBCON_FONTWIDTH8_ONLY
+  Answer Y here will make the kernel provide only the 8x8 fonts (these
+  are the less readable).
+
+  If unsure, say N.
+
+CONFIG_FONT_SUN8x16
+  This is the high resolution console font for Sun machines. Say Y.
+
+CONFIG_FONT_SUN12x22
+  This is the high resolution console font for Sun machines with very
+  big letters (like the letters used in the SPARC PROM). If the
+  standard font is unreadable for you, say Y, otherwise say N.
+
+CONFIG_FONT_8x8
+  This is the "high resolution" font for the VGA frame buffer (the one
+  provided by the text console 80x50 (and higher) modes).
+
+  Note that this is a poor quality font. The VGA 8x16 font is quite a
+  lot more readable.
+
+  Given the resolution provided by the frame buffer device, answer N
+  here is safe.
+
+CONFIG_FONT_6x11
+  Small console font with Macintosh-style high-half glyphs.  Some Mac
+  framebuffer drivers don't support this one at all.
+
+CONFIG_FONT_PEARL_8x8
+  Small console font with PC-style control-character and high-half
+  glyphs.
+
+CONFIG_FONT_ACORN_8x8
+  Small console font with PC-style control characters and high-half
+  glyphs.
+
+CONFIG_FB_HGA
+  Say Y here if you have a Hercules mono graphics card.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want).
+  The module will be called hgafb.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  As this card technology is 15 years old, most people will answer N
+  here.
+
+CONFIG_FB_E1355
+  Build in support for the SED1355 Epson Research Embedded RAMDAC
+  LCD/CRT Controller (since redesignated as the S1D13505) as a
+  framebuffer.  Product specs at
+  <http://www.erd.epson.com/vdc/html/products.htm>.
+
+CONFIG_E1355_REG_BASE
+  Epson SED1355/S1D13505 LCD/CRT controller register base address.
+  See the manuals at
+  <http://www.erd.epson.com/vdc/html/contents/S1D13505.htm> for
+  discussion.
+
+CONFIG_E1355_FB_BASE
+  Epson SED1355/S1D13505 LCD/CRT controller memory base address.  See
+  the manuals at
+  <http://www.erd.epson.com/vdc/html/contents/S1D13505.htm> for
+  discussion.
+
+CONFIG_FB_PVR2
+  Say Y here if you have a PowerVR 2 card in your box.  If you plan to
+  run linux on your Dreamcast, you will have to say Y here.
+  This driver may or may not work on other PowerVR 2 cards, but is
+  totally untested.  Use at your own risk.  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want).
+  The module will be called pvr2fb.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  You can pass several parameters to the driver at boot time or at
+  module load time.  The parameters look like "video=pvr2:XXX", where
+  the meaning of XXX can be found at the end of the main source file
+  (<file:drivers/video/pvr2fb.c>). Please see the file
+  <file:Documentation/fb/pvr2fb.txt>.
+
+CONFIG_FB_PVR2_DEBUG
+  Say Y here if you wish for the pvr2fb driver to print out debugging
+  messages. Most people will want to say N here. If unsure, you will
+  also want to say N.
+
+CONFIG_FB_MATROX
+  Say Y here if you have a Matrox Millennium, Matrox Millennium II,
+  Matrox Mystique, Matrox Mystique 220, Matrox Productiva G100, Matrox
+  Mystique G200, Matrox Millennium G200, Matrox Marvel G200 video,
+  Matrox G400 or G450 card in your box. At this time, support for the
+  G100 is untested and support for G450 is highly experimental.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want).
+  The module will be called matroxfb.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+  You can pass several parameters to the driver at boot time or at
+  module load time. The parameters look like "video=matrox:XXX", and
+  are described in <file:Documentation/fb/matroxfb.txt>.
+
+CONFIG_FB_MATROX_MILLENIUM
+  Say Y here if you have a Matrox Millennium or Matrox Millennium II
+  video card. If you select "Advanced lowlevel driver options" below,
+  you should check 4 bpp packed pixel, 8 bpp packed pixel, 16 bpp
+  packed pixel, 24 bpp packed pixel and 32 bpp packed pixel. You can
+  also use font widths different from 8.
+
+CONFIG_FB_MATROX_MYSTIQUE
+  Say Y here if you have a Matrox Mystique or Matrox Mystique 220
+  video card. If you select "Advanced lowlevel driver options" below,
+  you should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp
+  packed pixel and 32 bpp packed pixel. You can also use font widths
+  different from 8.
+
+CONFIG_FB_MATROX_G100
+  Say Y here if you have a Matrox G100, G200, G400 or G450 based
+  video card. If you select "Advanced lowlevel driver options", you
+  should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
+  pixel and 32 bpp packed pixel. You can also use font widths
+  different from 8.
+
+  If you need support for G400 secondary head, you must first say Y to
+  "I2C support" and "I2C bit-banging support" in the character devices
+  section, and then to "Matrox I2C support" and "G400 second head
+  support" here in the framebuffer section.
+
+CONFIG_FB_MATROX_I2C
+  This drivers creates I2C buses which are needed for accessing the
+  DDC (I2C) bus present on all Matroxes, an I2C bus which
+  interconnects Matrox optional devices, like MGA-TVO on G200 and
+  G400, and the secondary head DDC bus, present on G400 only.
+
+  You can say Y or M here if you want to experiment with monitor
+  detection code. You must say Y or M here if you want to use either
+  second head of G400 or MGA-TVO on G200 or G400.
+
+  If you compile it as module, it will create a module named
+  i2c-matroxfb.o.
+
+CONFIG_FB_MATROX_MAVEN
+  WARNING !!! This support does not work with G450 !!!
+
+  Say Y or M here if you want to use a secondary head (meaning two
+  monitors in parallel) on G400 or MGA-TVO add-on on G200. Secondary
+  head is not compatible with accelerated XFree 3.3.x SVGA servers -
+  secondary head output is blanked while you are in X. With XFree
+  3.9.17 preview you can use both heads if you use SVGA over fbdev or
+  the fbdev driver on first head and the fbdev driver on second head.
+
+  If you compile it as module, two modules are created,
+  matroxfb_crtc2.o and matroxfb_maven.o. Matroxfb_maven is needed for
+  both G200 and G400, matroxfb_crtc2 is needed only by G400. You must
+  also load i2c-matroxfb to get it to run.
+
+  The driver starts in monitor mode and you must use the matroxset
+  tool (available at
+  <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to switch it to
+  PAL or NTSC or to swap primary and secondary head outputs.
+  Secondary head driver also always start in 640x480 resolution, you
+  must use fbset to change it.
+
+  Also do not forget that second head supports only 16 and 32 bpp
+  packed pixels, so it is a good idea to compile them into the kernel
+  too.  You can use only some font widths, as the driver uses generic
+  painting procedures (the secondary head does not use acceleration
+  engine).
+
+CONFIG_FB_MATROX_G450
+  Say Y or M here if you want to use a secondary head (meaning two
+  monitors in parallel) on G450.
+
+  If you compile it as module, two modules are created,
+  matroxfb_crtc2.o and matroxfb_g450.o. Both modules are needed if you
+  want two independent display devices.
+
+  The driver starts in monitor mode and currently does not support
+  output in TV modes.  You must use the matroxset tool (available
+  at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to swap
+  primary and secondary head outputs.  Secondary head driver always
+  start in 640x480 resolution and you must use fbset to change it.
+
+  Also do not forget that second head supports only 16 and 32 bpp
+  packed pixels, so it is a good idea to compile them into the kernel
+  too. You can use only some font widths, as the driver uses generic
+  painting procedures (the secondary head does not use acceleration
+  engine).
+
+CONFIG_FB_MATROX_MULTIHEAD
+  Say Y here if you have more than one (supported) Matrox device in
+  your computer and you want to use all of them for different monitors
+  ("multihead"). If you have only one device, you should say N because
+  the driver compiled with Y is larger and a bit slower, especially on
+  ia32 (ix86).
+
+  If you said M to "Matrox unified accelerated driver" and N here, you
+  will still be able to use several Matrox devices simultaneously:
+  insert several instances of the module matroxfb.o into the kernel
+  with insmod, supplying the parameter "dev=N" where N is 0, 1, etc.
+  for the different Matrox devices. This method is slightly faster but
+  uses 40 KB of kernel memory per Matrox card.
+
+  There is no need for enabling 'Matrox multihead support' if you have
+  only one Matrox card in the box.
+
+CONFIG_FB_VOODOO1
+  Say Y here if you have a 3Dfx Voodoo Graphics (Voodoo1/sst1) or 
+  Voodoo2 (cvg) based graphics card.
+
+  This driver is also available as a module ( = code which can be 
+  inserted and removed from the running kernel whenever you want).
+  The module will be called sstfb.o. If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+
+  WARNING: Do not use any application that uses the 3D engine
+  (namely glide) while using this driver.
+  Please read the file Documentation/fb/README-sstfb.txt for supported
+  options and other important info  support.
+
+CONFIG_FB_SBUS
+  Say Y if you want support for SBUS or UPA based frame buffer device.
+
+CONFIG_FB_CREATOR
+  This is the frame buffer device driver for the Creator and Creator3D
+  graphics boards.
+
+CONFIG_FB_CGSIX
+  This is the frame buffer device driver for the CGsix (GX, TurboGX)
+  frame buffer.
+
+CONFIG_FB_BWTWO
+  This is the frame buffer device driver for the BWtwo frame buffer.
+
+CONFIG_FB_CGTHREE
+  This is the frame buffer device driver for the CGthree frame buffer.
+
+CONFIG_FB_CGFOURTEEN
+  This is the frame buffer device driver for the CGfourteen frame
+  buffer on Desktop SPARCsystems with the SX graphics option.
+
+CONFIG_FB_P9100
+  This is the frame buffer device driver for the P9100 card
+  supported on Sparcbook 3 machines.
+
+CONFIG_FB_LEO
+  This is the frame buffer device driver for the SBUS-based Sun ZX
+  (leo) frame buffer cards.
+
+CONFIG_FB_IGA
+  This is the framebuffer device for the INTERGRAPHICS 1680 and
+  successor frame buffer cards.
+
+CONFIG_FB_TCX
+  This is the frame buffer device driver for the TCX 24/8bit frame
+  buffer.
+
+CONFIG_FB_HIT
+  This is the frame buffer device driver for the Hitachi HD64461 LCD
+  frame buffer card.
+
+CONFIG_FB_SIS
+  This is the frame buffer device driver for the SiS 630 and 640 Super
+  Socket 7 UMA cards.  Specs available at <http://www.sis.com.tw/>.
+
+CONFIG_FB_SIS_300
+  This is the frame buffer device driver for the SiS 630 and related
+  Super Socket 7 UMA cards.  Specs available at
+  <http://www.sis.com.tw/>.
+
+CONFIG_FB_SIS_315
+  This is the frame buffer device driver for the SiS 315 graphics
+  card.  Specs available at <http://www.sis.com.tw/>.
+
+CONFIG_FB_IMSTT
+  The IMS Twin Turbo is a PCI-based frame buffer card bundled with
+  many Macintosh and compatible computers.
+
+CONFIG_FB_VIRTUAL
+  This is a `virtual' frame buffer device. It operates on a chunk of
+  unswappable kernel memory instead of on the memory of a graphics
+  board. This means you cannot see any output sent to this frame
+  buffer device, while it does consume precious memory. The main use
+  of this frame buffer device is testing and debugging the frame
+  buffer subsystem. Do NOT enable it for normal systems! To protect
+  the innocent, it has to be enabled explicitly at boot time using the
+  kernel option `video=vfb:'.
+
+  This driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called vfb.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_FB_ATY_CT
+  Say Y here to support use of ATI's 64-bit Rage boards (or other
+  boards based on the Mach64 CT, VT, GT, and LT chipsets) as a
+  framebuffer device.  The ATI product support page for these boards
+  is at <http://support.ati.com/products/pc/mach64/>.
+
+CONFIG_FB_ATY_GX
+  Say Y here to support use of the ATI Mach64 Graphics Expression
+  board (or other boards based on the Mach64 GX chipset) as a
+  framebuffer device.  The ATI product support page for these boards
+  is at
+  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
+
+CONFIG_FB_RADEON
+  Choose this option if you want to use an ATI Radeon graphics card as
+  a framebuffer device.  There are both PCI and AGP versions.  You
+  don't need to choose this to run the Radeon in plain VGA mode.
+  There is a product page at
+  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
+
+CONFIG_FB_SA1100
+  This is a framebuffer device for the SA-1100 LCD Controller.
+  See <http://www.linux-fbdev.org/> for information on framebuffer
+  devices.
+
+  If you plan to use the LCD display with your SA-1100 system, say
+  Y here.
+
+CONFIG_FBCON_ADVANCED
+  The frame buffer console uses character drawing routines that are
+  tailored to the specific organization of pixels in the memory of
+  your graphics hardware. These are called the low level frame buffer
+  console drivers. Note that they are used for text console output
+  only; they are NOT needed for graphical applications.
+
+  If you say N here, the needed low level drivers are automatically
+  enabled, depending on what frame buffer devices you selected above.
+  This is recommended for most users.
+
+  If you say Y here, you have more fine-grained control over which low
+  level drivers are enabled. You can e.g. leave out low level drivers
+  for color depths you do not intend to use for text consoles.
+
+  Low level frame buffer console drivers can be modules ( = code which
+  can be inserted and removed from the running kernel whenever you
+  want). The modules will be called fbcon-*.o. If you want to compile
+  (some of) them as modules, read <file:Documentation/modules.txt>.
+
+  If unsure, say N.
+
+CONFIG_FBCON_MFB
+  This is the low level frame buffer console driver for monochrome
+  (2 colors) packed pixels.
+
+CONFIG_FBCON_CFB2
+  This is the low level frame buffer console driver for 2 bits per
+  pixel (4 colors) packed pixels.
+
+CONFIG_FBCON_CFB4
+  This is the low level frame buffer console driver for 4 bits per
+  pixel (16 colors) packed pixels.
+
+CONFIG_FBCON_CFB8
+  This is the low level frame buffer console driver for 8 bits per
+  pixel (256 colors) packed pixels.
+
+CONFIG_FBCON_CFB16
+  This is the low level frame buffer console driver for 15 or 16 bits
+  per pixel (32K or 64K colors, also known as `hicolor') packed
+  pixels.
+
+CONFIG_FBCON_CFB24
+  This is the low level frame buffer console driver for 24 bits per
+  pixel (16M colors, also known as `truecolor') packed pixels. It is
+  NOT for `sparse' 32 bits per pixel mode.
+
+CONFIG_FBCON_CFB32
+  This is the low level frame buffer console driver for 32 bits per
+  pixel (16M colors, also known as `truecolor') sparse packed pixels.
+
+CONFIG_FBCON_AFB
+  This is the low level frame buffer console driver for 1 to 8
+  bitplanes (2 to 256 colors) on Amiga.
+
+CONFIG_FBCON_ILBM
+  This is the low level frame buffer console driver for 1 to 8
+  interleaved bitplanes (2 to 256 colors) on Amiga.
+
+CONFIG_FBCON_IPLAN2P2
+  This is the low level frame buffer console driver for 2 interleaved
+  bitplanes (4 colors) on Atari.
+
+CONFIG_FBCON_IPLAN2P4
+  This is the low level frame buffer console driver for 4 interleaved
+  bitplanes (16 colors) on Atari.
+
+CONFIG_FBCON_IPLAN2P8
+  This is the low level frame buffer console driver for 8 interleaved
+  bitplanes (256 colors) on Atari.
+
+CONFIG_FBCON_MAC
+  This is the low level frame buffer console driver for 1/2/4/8/16/32
+  bits per pixel packed pixels on Mac. It supports variable font
+  widths for low resolution screens.
+
+CONFIG_FBCON_HGA
+  This is the low level frame buffer console driver for Hercules mono
+  graphics cards.
+
+CONFIG_FBCON_VGA
+  This is the low level frame buffer console driver for VGA text mode;
+  it is used by frame buffer device drivers that support VGA text
+  mode.
+

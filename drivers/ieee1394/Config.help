@@ -1,0 +1,102 @@
+CONFIG_IEEE1394
+  IEEE 1394 describes a high performance serial bus, which is also
+  known as FireWire(tm) or i.Link(tm) and is used for connecting all
+  sorts of devices (most notably digital video cameras) to your
+  computer.
+
+  If you have FireWire hardware and want to use it, say Y here.  This
+  is the core support only, you will also need to select a driver for
+  your IEEE 1394 adapter.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ieee1394.o.
+
+CONFIG_IEEE1394_PCILYNX
+  Say Y here if you have an IEEE-1394 controller with the Texas
+  Instruments PCILynx chip.  Note: this driver is written for revision
+  2 of this chip and may not work with revision 0.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called pcilynx.o.
+
+CONFIG_IEEE1394_PCILYNX_LOCALRAM
+  This option makes the PCILynx driver use local RAM available on some
+  PCILynx setups for Packet Control Lists. Local RAM is random access
+  memory which resides on the PCILynx board as opposed to on your
+  computer's motherboard. Local RAM may speed up command processing
+  because no PCI transfers are necessary during use of the Packet
+  Control Lists.
+
+  Note that there are no known PCILynx systems providing local RAM
+  except for the evaluation boards by Texas Instruments and that the
+  PCILynx does not reliably report missing RAM. This means that it is
+  dangerous to say Y here if you are not absolutely sure that your
+  board provides 64KB of local RAM.
+
+  If unsure, say N.
+
+CONFIG_IEEE1394_PCILYNX_PORTS
+  This option enables driver code to access the RAM, ROM and AUX ports
+  of the PCILynx through character devices in /dev.  If you don't know
+  what this is about then you won't need it.
+
+  If unsure, say N.
+
+CONFIG_IEEE1394_OHCI1394
+  Enable this driver if you have an IEEE 1394 controller based on the
+  OHCI-1394 specification. The current driver is only tested with OHCI
+  chipsets made by Texas Instruments and NEC. Most third-party vendors
+  use one of these chipsets.  It should work with any OHCI-1394
+  compliant card, however.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called ohci1394.o.
+
+CONFIG_IEEE1394_VIDEO1394
+  This option enables video device usage for OHCI-1394 cards.  Enable
+  this option only if you have an IEEE 1394 video device connected to
+  an OHCI-1394 card.
+
+CONFIG_IEEE1394_DV1394
+  This driver allows you to transmit and receive DV (digital video)
+  streams on an OHCI-1394 card using a simple frame-oriented
+  interface.
+
+  The user-space API for dv1394 is documented in dv1394.h.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called dv1394.o.
+
+CONFIG_IEEE1394_SBP2
+  This option enables you to use SBP-2 devices connected to your IEEE
+  1394 bus.  SBP-2 devices include harddrives and DVD devices.
+
+CONFIG_IEEE1394_RAWIO
+  Say Y here if you want support for the raw device. This is generally
+  a good idea, so you should say Y here. The raw device enables
+  direct communication of user programs with the IEEE 1394 bus and
+  thus with the attached peripherals.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called raw1394.o.
+
+CONFIG_IEEE1394_VERBOSEDEBUG
+  If you say Y here, you will get very verbose debugging logs from the
+  subsystem which includes a dump of the header of every sent and
+  received packet.  This can amount to a high amount of data collected
+  in a very short time which is usually also saved to disk by the
+  system logging daemons.
+
+  Say Y if you really want or need the debugging output, everyone else
+  says N.
+

@@ -1,0 +1,1133 @@
+CONFIG_QTRONIX_KEYBOARD
+  Images of Qtronix keyboards are at
+  <http://www.qtronix.com/keyboard.html>.
+
+CONFIG_SERIAL_NONSTANDARD
+  Say Y here if you have any non-standard serial boards -- boards
+  which aren't supported using the standard "dumb" serial driver.
+  This includes intelligent serial boards such as Cyclades,
+  Digiboards, etc. These are usually used for systems that need many
+  serial ports because they serve many terminals or dial-in
+  connections.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about non-standard serial boards.
+
+  Most people can say N here.
+
+CONFIG_SERIAL_EXTENDED
+  If you wish to use any non-standard features of the standard "dumb"
+  driver, say Y here. This includes HUB6 support, shared serial
+  interrupts, special multiport support, support for more than the
+  four COM 1/2/3/4 boards, etc.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about serial driver options. If unsure, say N.
+
+CONFIG_SERIAL_MANY_PORTS
+  Say Y here if you have dumb serial boards other than the four
+  standard COM 1/2/3/4 ports. This may happen if you have an AST
+  FourPort, Accent Async, Boca (read the Boca mini-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>), or other custom
+  serial port hardware which acts similar to standard serial port
+  hardware. If you only use the standard COM 1/2/3/4 ports, you can
+  say N here to save some memory. You can also say Y if you have an
+  "intelligent" multiport card such as Cyclades, Digiboards, etc.
+
+CONFIG_SERIAL_ACPI
+  Legacy free machines may not have serial ports at the legacy COM1, 
+  COM2 etc addresses. Serial ports on such machines are described by
+  the ACPI tables SPCR (Serial Port Console Redirection) table and 
+  DBGP (Debug Port) table. Say Y here if you want to include support
+  for these serial ports.
+
+CONFIG_SERIAL_SHARE_IRQ
+  Some serial boards have hardware support which allows multiple dumb
+  serial ports on the same board to share a single IRQ. To enable
+  support for this in the serial driver, say Y here.
+
+CONFIG_SERIAL_DETECT_IRQ
+  Say Y here if you want the kernel to try to guess which IRQ
+  to use for your serial port.
+
+  This is considered unsafe; it is far better to configure the IRQ in
+  a boot script using the setserial command.
+
+  If unsure, say N.
+
+CONFIG_SERIAL_MULTIPORT
+  Some multiport serial ports have special ports which are used to
+  signal when there are any serial ports on the board which need
+  servicing. Say Y here to enable the serial driver to take advantage
+  of those special I/O ports.
+
+CONFIG_HUB6
+  Say Y here to enable support in the dumb serial driver to support
+  the HUB6 card.
+
+CONFIG_MWAVE
+  The ACP modem (Mwave) for Linux is a WinModem. It is composed of a
+  kernel driver and a user level application. Together these components
+  support direct attachment to public switched telephone networks (PSTNs)
+  and support selected world wide countries.
+
+  This version of the ACP Modem driver supports the IBM Thinkpad 600E,
+  600, and 770 that include on board ACP modem hardware.
+
+  The modem also supports the standard communications port interface
+  (ttySx) and is compatible with the Hayes AT Command Set.
+
+  The user level application needed to use this driver can be found at
+  the IBM Linux Technology Center (LTC) web site:
+  <http://www.ibm.com/linux/ltc/>.
+
+  If you own one of the above IBM Thinkpads which has the Mwave chipset
+  in it, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mwave.o. If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+
+CONFIG_AGP
+  AGP (Accelerated Graphics Port) is a bus system mainly used to
+  connect graphics cards to the rest of the system.
+
+  If you have an AGP system and you say Y here, it will be possible to
+  use the AGP features of your 3D rendering video card. This code acts
+  as a sort of "AGP driver" for the motherboard's chipset.
+
+  If you need more texture memory than you can get with the AGP GART
+  (theoretically up to 256 MB, but in practice usually 64 or 128 MB
+  due to kernel allocation issues), you could use PCI accesses
+  and have up to a couple gigs of texture space.
+
+  Note that this is the only means to have XFree4/GLX use
+  write-combining with MTRR support on the AGP bus. Without it, OpenGL
+  direct rendering will be a lot slower but still faster than PIO.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+  This driver is available as a module.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.  The
+  module will be called agpgart.o.
+
+CONFIG_AGP_INTEL
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850 and 860 chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_I810
+  This option gives you AGP support for the Xserver on the Intel 810
+  815 and 830m chipset boards for their on-board integrated graphics. This
+  is required to do any useful video modes with these boards.
+
+CONFIG_AGP_VIA
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_AMD
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_SIS
+  This option gives you AGP support for the GLX component of the "soon
+  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
+  chipsets.
+
+  Note that 5591/5592 AGP chipsets are NOT supported.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_SWORKS
+  Say Y here to support the Serverworks AGP card.  See 
+  <http://www.serverworks.com/> for product descriptions and images.
+
+CONFIG_AGP_ALI
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on the following ALi chipsets.  The supported chipsets
+  include M1541, M1621, M1631, M1632, M1641,M1647,and M1651.
+  For the ALi-chipset question, ALi suggests you refer to
+  <http://www.ali.com.tw/eng/support/index.shtml>.
+
+  The M1541 chipset can do AGP 1x and 2x, but note that there is an
+  acknowledged incompatibility with Matrox G200 cards. Due to
+  timing issues, this chipset cannot do AGP 2x with the G200.
+  This is a hardware limitation. AGP 1x seems to be fine, though.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
+
+CONFIG_I810_TCO
+  Hardware driver for the TCO timer built into the Intel i810 and i815
+  chipset family.  The TCO (Total Cost of Ownership) timer is a
+  watchdog timer that will reboot the machine after its second
+  expiration. The expiration time can be configured by commandline
+  argument "i810_margin=<n>" where <n> is the counter initial value.
+  It is decremented every 0.6 secs, the default is 50 which gives a
+  timeout of 30 seconds and one minute until reset.
+
+  On some motherboards the driver may fail to reset the chipset's
+  NO_REBOOT flag which prevents the watchdog from rebooting the
+  machine. If this is the case you will get a kernel message like
+  "i810tco init: failed to reset NO_REBOOT flag".
+
+  If you want to compile this as a module, say M and read
+  <file:Documentation/modules.txt>.  The module will be called
+  i810-tco.o.
+
+CONFIG_VT
+  If you say Y here, you will get support for terminal devices with
+  display and keyboard devices. These are called "virtual" because you
+  can run several virtual terminals (also called virtual consoles) on
+  one physical terminal. This is rather useful, for example one
+  virtual terminal can collect system messages and warnings, another
+  one can be used for a text-mode user session, and a third could run
+  an X session, all in parallel. Switching between virtual terminals
+  is done with certain key combinations, usually Alt-<function key>.
+
+  The setterm command ("man setterm") can be used to change the
+  properties (such as colors or beeping) of a virtual terminal. The
+  man page console_codes(4) ("man console_codes") contains the special
+  character sequences that can be used to change those properties
+  directly. The fonts used on virtual terminals can be changed with
+  the setfont ("man setfont") command and the key bindings are defined
+  with the loadkeys ("man loadkeys") command.
+
+  You need at least one virtual terminal device in order to make use
+  of your keyboard and monitor. Therefore, only people configuring an
+  embedded system would want to say N here in order to save some
+  memory; the only way to log into such a system is then via a serial
+  or network connection.
+
+  If unsure, say Y, or else you won't be able to do much with your new
+  shiny Linux system :-)
+
+CONFIG_VT_CONSOLE
+  The system console is the device which receives all kernel messages
+  and warnings and which allows logins in single user mode. If you
+  answer Y here, a virtual terminal (the device used to interact with
+  a physical terminal) can be used as system console. This is the most
+  common mode of operations, so you should say Y here unless you want
+  the kernel messages be output only to a serial port (in which case
+  you should say Y to "Console on serial port", below).
+
+  If you do say Y here, by default the currently visible virtual
+  terminal (/dev/tty0) will be used as system console. You can change
+  that with a kernel command line option such as "console=tty3" which
+  would use the third virtual terminal as system console. (Try "man
+  bootparam" or see the documentation of your boot loader (lilo or
+  loadlin) about how to pass options to the kernel at boot time.)
+
+  If unsure, say Y.
+
+CONFIG_SERIAL
+  This selects whether you want to include the driver for the standard
+  serial ports.  The standard answer is Y.  People who might say N
+  here are those that are setting up dedicated Ethernet WWW/FTP
+  servers, or users that have one of the various bus mice instead of a
+  serial mouse and don't intend to use their machine's standard serial
+  port for anything.  (Note that the Cyclades and Stallion multi
+  serial port drivers do not need this driver built in for them to
+  work.)
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  serial.o.
+  [WARNING: Do not compile this driver as a module if you are using
+  non-standard serial ports, since the configuration information will
+  be lost when the driver is unloaded.  This limitation may be lifted
+  in the future.]
+
+  BTW1: If you have a mouseman serial mouse which is not recognized by
+  the X window system, try running gpm first.
+
+  BTW2: If you intend to use a software modem (also called Winmodem)
+  under Linux, forget it.  These modems are crippled and require
+  proprietary drivers which are only available under Windows.
+
+  Most people will say Y or M here, so that they can use serial mice,
+  modems and similar devices connecting to the standard serial ports.
+
+CONFIG_SERIAL_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode). This could be useful if some terminal or printer is connected
+  to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first serial line, /dev/ttyS0, as
+  system console.
+
+  If unsure, say N.
+
+CONFIG_ROCKETPORT
+  This is a driver for the Comtrol Rocketport cards which provide
+  multiple serial ports. You would need something like this to connect
+  more than two modems to your Linux box, for instance in order to
+  become a dial-in server.
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  rocket.o.
+
+CONFIG_DIGIEPCA
+  This is a driver for Digi International's Xx, Xeve, and Xem series
+  of cards which provide multiple serial ports. You would need
+  something like this to connect more than two modems to your Linux
+  box, for instance in order to become a dial-in server. This driver
+  supports the original PC (ISA) boards as well as PCI, and EISA. If
+  you have a card like this, say Y here and read the file
+  <file:Documentation/digiepca.txt>.
+
+  NOTE: There is another, separate driver for the Digiboard PC boards:
+  "Digiboard PC/Xx Support" below. You should (and can) only select
+  one of the two drivers.
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>. The module will be called epca.o.
+
+CONFIG_DIGI
+  This is a driver for the Digiboard PC/Xe, PC/Xi, and PC/Xeve cards
+  that give you many serial ports. You would need something like this
+  to connect more than two modems to your Linux box, for instance in
+  order to become a dial-in server. If you have a card like that, say
+  Y here and read the file <file:Documentation/digiboard.txt>.
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>. The module will be called pcxx.o.
+
+CONFIG_RISCOM8
+  This is a driver for the SDL Communications RISCom/8 multiport card,
+  which gives you many serial ports. You would need something like
+  this to connect more than two modems to your Linux box, for instance
+  in order to become a dial-in server. If you have a card like that,
+  say Y here and read the file <file:Documentation/riscom8.txt>.
+
+  Also it's possible to say M here and compile this driver as kernel
+  loadable module; the module will be called riscom8.o.
+
+CONFIG_COMPUTONE
+  This driver supports the entire family of Intelliport II/Plus
+  controllers with the exception of the MicroChannel controllers and
+  products previous to the Intelliport II. These are multiport cards,
+  which give you many serial ports. You would need something like this
+  to connect more than two modems to your Linux box, for instance in
+  order to become a dial-in server. If you have a card like that, say
+  Y here and read <file:Documentation/computone.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. You will get
+  two modules called ip2.o and ip2main.o.
+
+CONFIG_SPECIALIX
+  This is a driver for the Specialix IO8+ multiport card (both the
+  ISA and the PCI version) which gives you many serial ports. You
+  would need something like this to connect more than two modems to
+  your Linux box, for instance in order to become a dial-in server.
+
+  If you have a card like that, say Y here and read the file
+  <file:Documentation/specialix.txt>. Also it's possible to say M here
+  and compile this driver as kernel loadable module which will be
+  called specialix.o.
+
+CONFIG_SPECIALIX_RTSCTS
+  The Specialix IO8+ card can only support either RTS or DTR. If you
+  say N here, the driver will use the pin as "DTR" when the tty is in
+  software handshake mode.  If you say Y here or hardware handshake is
+  on, it will always be RTS.  Read the file
+  <file:Documentation/specialix.txt> for more information.
+
+CONFIG_RIO
+  This is a driver for the Specialix RIO, a smart serial card which
+  drives an outboard box that can support up to 128 ports.  Product
+  information is at <http://www.sphinxcst.co.uk/perle/multi.htm>.
+  There are both ISA and PCI versions.
+
+CONFIG_RIO_OLDPCI
+  Older RIO PCI cards need some initialization-time configuration to
+  determine the IRQ and some control addresses.  If you have a RIO and
+  this doesn't seem to work, try setting this to Y.
+
+CONFIG_CYCLADES
+  This is a driver for a card that gives you many serial ports. You
+  would need something like this to connect more than two modems to
+  your Linux box, for instance in order to become a dial-in server.
+  For information about the Cyclades-Z card, read
+  <file:drivers/char/README.cycladesZ>.
+
+  As of 1.3.9x kernels, this driver's minor numbers start at 0 instead
+  of 32.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called cyclades.o.
+
+  If you haven't heard about it, it's safe to say N.
+
+CONFIG_CYZ_INTR
+  The Cyclades-Z family of multiport cards allows 2 (two) driver op
+  modes: polling and interrupt. In polling mode, the driver will check
+  the status of the Cyclades-Z ports every certain amount of time
+  (which is called polling cycle and is configurable). In interrupt
+  mode, it will use an interrupt line (IRQ) in order to check the
+  status of the Cyclades-Z ports. The default op mode is polling. If
+  unsure, say N.
+
+CONFIG_STALDRV
+  Stallion cards give you many serial ports.  You would need something
+  like this to connect more than two modems to your Linux box, for
+  instance in order to become a dial-in server.  If you say Y here,
+  you will be asked for your specific card model in the next
+  questions.  Make sure to read <file:Documentation/stallion.txt> in
+  this case.  If you have never heard about all this, it's safe to
+  say N.
+
+CONFIG_STALLION
+  If you have an EasyIO or EasyConnection 8/32 multiport Stallion
+  card, then this is for you; say Y.  Make sure to read
+  <file:Documentation/stallion.txt>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called stallion.o.
+
+CONFIG_ISTALLION
+  If you have an EasyConnection 8/64, ONboard, Brumby or Stallion
+  serial multiport card, say Y here. Make sure to read
+  <file:Documentation/stallion.txt>.
+
+  To compile it as a module ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt>. The module will be called
+  istallion.o.
+
+CONFIG_SYNCLINK
+  Provides support for the SyncLink ISA and PCI multiprotocol serial
+  adapters. These adapters support asynchronous and HDLC bit
+  synchronous communication up to 10Mbps (PCI adapter).
+
+  This driver can only be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called synclink.o.  If you want to do that, say M
+  here.
+
+CONFIG_N_HDLC
+  Allows synchronous HDLC communications with tty device drivers that
+  support synchronous HDLC such as the Microgate SyncLink adapter.
+
+  This driver can only be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called n_hdlc.o. If you want to do that, say M
+  here.
+
+CONFIG_SX
+  This is a driver for the SX and SI multiport serial cards.
+  Please read the file <file:Documentation/sx.txt> for details.
+
+  This driver can only be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sx.o. If you want to do that, say M here.
+
+CONFIG_ESPSERIAL
+  This is a driver which supports Hayes ESP serial ports.  Both single
+  port cards and multiport cards are supported.  Make sure to read
+  <file:Documentation/hayes-esp.txt>.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>.  The module will be
+  called esp.o.  If unsure, say N.
+
+CONFIG_MOXA_INTELLIO
+  Say Y here if you have a Moxa Intellio multiport serial card.
+
+  This driver can also be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called moxa.o. If you want to do that, say M
+  here.
+
+CONFIG_MOXA_SMARTIO
+  Say Y here if you have a Moxa SmartIO multiport serial card.
+
+  This driver can also be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mxser.o. If you want to do that, say M
+  here.
+
+CONFIG_ISI
+  This is a driver for the Multi-Tech cards which provide several
+  serial ports.  The driver is experimental and can currently only be
+  built as a module ( = code which can be inserted in and removed from
+  the running kernel whenever you want).  Please read
+  <file:Documentation/modules.txt>.  The module will be called
+  isicom.o.
+
+CONFIG_UNIX98_PTYS
+  A pseudo terminal (PTY) is a software device consisting of two
+  halves: a master and a slave. The slave device behaves identical to
+  a physical terminal; the master device is used by a process to
+  read data from and write data to the slave, thereby emulating a
+  terminal. Typical programs for the master side are telnet servers
+  and xterms.
+
+  Linux has traditionally used the BSD-like names /dev/ptyxx for
+  masters and /dev/ttyxx for slaves of pseudo terminals. This scheme
+  has a number of problems. The GNU C library glibc 2.1 and later,
+  however, supports the Unix98 naming standard: in order to acquire a
+  pseudo terminal, a process opens /dev/ptmx; the number of the pseudo
+  terminal is then made available to the process and the pseudo
+  terminal slave can be accessed as /dev/pts/<number>. What was
+  traditionally /dev/ttyp2 will then be /dev/pts/2, for example.
+
+  The entries in /dev/pts/ are created on the fly by a virtual
+  file system; therefore, if you say Y here you should say Y to
+  "/dev/pts file system for Unix98 PTYs" as well.
+
+  If you want to say Y here, you need to have the C library glibc 2.1
+  or later (equal to libc-6.1, check with "ls -l /lib/libc.so.*").
+  Read the instructions in <file:Documentation/Changes> pertaining to
+  pseudo terminals. It's safe to say N.
+
+CONFIG_UNIX98_PTY_COUNT
+  The maximum number of Unix98 PTYs that can be used at any one time.
+  The default is 256, and should be enough for desktop systems. Server
+  machines which support incoming telnet/rlogin/ssh connections and/or
+  serve several X terminals may want to increase this: every incoming
+  connection and every xterm uses up one PTY.
+
+  When not in use, each additional set of 256 PTYs occupy
+  approximately 8 KB of kernel memory on 32-bit architectures.
+
+CONFIG_PRINTER
+  If you intend to attach a printer to the parallel port of your Linux
+  box (as opposed to using a serial printer; if the connector at the
+  printer has 9 or 25 holes ["female"], then it's serial), say Y.
+  Also read the Printing-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  It is possible to share one parallel port among several devices
+  (e.g. printer and ZIP drive) and it is safe to compile the
+  corresponding drivers into the kernel.  If you want to compile this
+  driver as a module however ( = code which can be inserted in and
+  removed from the running kernel whenever you want), say M here and
+  read <file:Documentation/modules.txt> and
+  <file:Documentation/parport.txt>.  The module will be called lp.o.
+
+  If you have several parallel ports, you can specify which ports to
+  use with the "lp" kernel command line option.  (Try "man bootparam"
+  or see the documentation of your boot loader (lilo or loadlin) about
+  how to pass options to the kernel at boot time.)  The syntax of the
+  "lp" command line option can be found in <file:drivers/char/lp.c>.
+
+  If you have more than 8 printers, you need to increase the LP_NO
+  macro in lp.c and the PARPORT_MAX macro in parport.h.
+
+CONFIG_LP_CONSOLE
+  If you want kernel messages to be printed out as they occur, you
+  can have a console on the printer. This option adds support for
+  doing that; to actually get it to happen you need to pass the
+  option "console=lp0" to the kernel at boot time.
+
+  If the printer is out of paper (or off, or unplugged, or too
+  busy..) the kernel will stall until the printer is ready again.
+  By defining CONSOLE_LP_STRICT to 0 (at your own risk) you
+  can make the kernel continue when this happens,
+  but it'll lose the kernel messages.
+
+  If unsure, say N.
+
+CONFIG_PPDEV
+  Saying Y to this adds support for /dev/parport device nodes.  This
+  is needed for programs that want portable access to the parallel
+  port, for instance deviceid (which displays Plug-and-Play device
+  IDs).
+
+  This is the parallel port equivalent of SCSI generic support (sg).
+  It is safe to say N to this -- it is not needed for normal printing
+  or parallel port CD-ROM/disk support.
+
+  This support is also available as a module.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  ppdev.o.
+
+  If unsure, say N.
+
+CONFIG_BUSMOUSE
+  Say Y here if your machine has a bus mouse as opposed to a serial
+  mouse. Most people have a regular serial MouseSystem or
+  Microsoft mouse (made by Logitech) that plugs into a COM port
+  (rectangular with 9 or 25 pins). These people say N here. 
+
+  If you have a laptop, you either have to check the documentation or
+  experiment a bit to find out whether the trackball is a serial mouse
+  or not; it's best to say Y here for you.
+
+  This is the generic bus mouse driver code. If you have a bus mouse,
+  you will have to say Y here and also to the specific driver for your
+  mouse below.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called busmouse.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_MOUSE
+  This is for machines with a mouse which is neither a serial nor a
+  bus mouse. Examples are PS/2 mice (such as the track balls on some
+  laptops) and some digitizer pads. Most people have a regular serial
+  MouseSystem or Microsoft mouse (made by Logitech) that plugs into a
+  COM port (rectangular with 9 or 25 pins). These people say N here.
+  If you have something else, read the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. This HOWTO contains
+  information about all non-serial mice, not just bus mice.
+
+  If you have a laptop, you either have to check the documentation or
+  experiment a bit to find out whether the trackball is a serial mouse
+  or not; it's best to say Y here for you.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about non-serial mice. If unsure, say Y.
+
+CONFIG_LOGIBUSMOUSE
+  Logitech mouse connected to a proprietary interface card.  It's
+  generally a round connector with 9 pins. Note that the newer mice
+  made by Logitech don't use the Logitech protocol anymore; for those,
+  you don't need this option.  You want to read the Busmouse-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called busmouse.o.  If you are unsure, say N and read the
+  HOWTO nevertheless: it will tell you what you have.
+
+CONFIG_PSMOUSE
+  The PS/2 mouse connects to a special mouse port that looks much like
+  the keyboard port (small circular connector with 6 pins). This way,
+  the mouse does not use any serial ports. This port can also be used
+  for other input devices like light pens, tablets, keypads. Compaq,
+  AST and IBM all use this as their mouse port on currently shipping
+  machines. The trackballs of some laptops are PS/2 mice also. In
+  particular, the C&T 82C710 mouse on TI Travelmates is a PS/2 mouse.
+
+  Although PS/2 mice are not technically bus mice, they are explained
+  in detail in the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  When using a PS/2 mouse, you can get problems if you want to use the
+  mouse both on the Linux console and under X. Using the "-R" option
+  of the Linux mouse managing program gpm (available from
+  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
+  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
+
+CONFIG_82C710_MOUSE
+  This is a certain kind of PS/2 mouse used on the TI Travelmate. If
+  you are unsure, try first to say N here and come back if the mouse
+  doesn't work. Read the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+CONFIG_PC110_PAD
+  This drives the digitizer pad on the IBM PC110 palmtop.  It can turn
+  the digitizer pad into a PS/2 mouse emulation with tap gestures or
+  into an absolute pad.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called pc110pad.o.
+
+CONFIG_MS_BUSMOUSE
+  These animals (also called Inport mice) are connected to an
+  expansion board using a round connector with 9 pins. If this is what
+  you have, say Y and read the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you are unsure, say N and read the HOWTO nevertheless: it will
+  tell you what you have. Also be aware that several vendors talk
+  about 'Microsoft busmouse' and actually mean PS/2 busmouse -- so
+  count the pins on the connector.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called msbusmouse.o.
+
+CONFIG_ADBMOUSE
+  Say Y here if you have this type of bus mouse (4 pin connector) as
+  is common on Macintoshes.  You may want to read the Busmouse-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called adbmouse.o.
+
+CONFIG_ATIXL_BUSMOUSE
+  This is a rare type of busmouse that is connected to the back of an
+  ATI video card.  Say Y if you have one of those. Note however that
+  most mice by ATI are actually Microsoft busmice; you should say Y to
+  "Microsoft busmouse support" above if you have one of those.  Read
+  the Busmouse-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called atixlmouse.o.
+
+  If you are unsure, say N and read the HOWTO nevertheless: it will
+  tell you what you have.
+
+CONFIG_QIC02_TAPE
+  If you have a non-SCSI tape drive like that, say Y. Or, if you want
+  to compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  tpqic02.o.
+
+CONFIG_QIC02_DYNCONF
+  You can either configure this driver once and for all by editing a
+  header file (<file:include/linux/tpqic02.h>), in which case you
+  should say N, or you can fetch a program via anonymous FTP which is
+  able to configure this driver during runtime.  The program to do
+  this is called 'qic02conf' and it is part of the
+  tpqic02-support-X.Y.tar.gz support package.
+
+  If you want to use the qic02conf program, say Y.
+
+CONFIG_FTAPE
+  If you have a tape drive that is connected to your floppy
+  controller, say Y here.
+
+  Some tape drives (like the Seagate "Tape Store 3200" or the Iomega
+  "Ditto 3200" or the Exabyte "Eagle TR-3") come with a "high speed"
+  controller of their own. These drives (and their companion
+  controllers) are also supported if you say Y here.
+
+  If you have a special controller (such as the CMS FC-10, FC-20,
+  Mountain Mach-II, or any controller that is based on the Intel 82078
+  FDC like the high speed controllers by Seagate and Exabyte and
+  Iomega's "Ditto Dash") you must configure it by selecting the
+  appropriate entries from the "Floppy tape controllers" sub-menu
+  below and possibly modify the default values for the IRQ and DMA
+  channel and the IO base in ftape's configuration menu.
+
+  If you want to use your floppy tape drive on a PCI-bus based system,
+  please read the file <file:drivers/char/ftape/README.PCI>.
+
+  The ftape kernel driver is also available as a runtime loadable
+  module ( = code which can be inserted in and removed from the
+  running kernel whenever you want). If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>. The
+  module will be called ftape.o.
+
+  Note that the Ftape-HOWTO is out of date (sorry) and documents the
+  older version 2.08 of this software but still contains useful
+  information.  There is a web page with more recent documentation at
+  <http://www.instmath.rwth-aachen.de/~heine/ftape/>.  This page
+  always contains the latest release of the ftape driver and useful
+  information (backup software, ftape related patches and
+  documentation, FAQ).  Note that the file system interface has
+  changed quite a bit compared to previous versions of ftape.  Please
+  read <file:Documentation/ftape.txt>.
+
+CONFIG_DTLK
+  This driver is for the DoubleTalk PC, a speech synthesizer
+  manufactured by RC Systems (<http://www.rcsys.com/>).  It is also
+  called the `internal DoubleTalk'.  If you want to compile this as a
+  module ( = code which can be inserted in and removed from the
+  running kernel whenever you want), say M here and read
+  <file:Documentation/modules.txt>. The module will be called dtlk.o.
+
+CONFIG_R3964
+  This driver allows synchronous communication with devices using the
+  Siemens R3964 packet protocol. Unless you are dealing with special
+  hardware like PLCs, you are unlikely to need this.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  n_r3964.o.
+
+  If unsure, say N.
+
+CONFIG_APPLICOM
+  This driver provides the kernel-side support for the intelligent
+  fieldbus cards made by Applicom International. More information
+  about these cards can be found on the WWW at the address
+  <http://www.applicom-int.com/>, or by email from David Woodhouse
+  <dwmw2@infradead.org>.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  applicom.o.
+
+  If unsure, say N.
+
+CONFIG_SONYPI
+  This driver enables access to the Sony Programmable I/O Control
+  Device which can be found in many (all ?) Sony Vaio laptops.
+
+  If you have one of those laptops, read
+  <file:Documentation/sonypi.txt>, and say Y or M here.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called sonypi.o.
+
+CONFIG_INTEL_RNG
+  This driver provides kernel-side support for the Random Number
+  Generator hardware found on Intel i8xx-based motherboards.
+
+  Both a character driver, used to read() entropy data, and a timer
+  function which automatically adds entropy directly into the
+  kernel pool, are exported by this driver.
+
+  To compile this driver as a module ( = code which can be inserted in
+  and removed from the running kernel whenever you want), say M here
+  and read <file:Documentation/modules.txt>. The module will be called
+  i810_rng.o.
+
+  If unsure, say N.
+
+CONFIG_WATCHDOG_NOWAYOUT
+  The default watchdog behaviour (which you get if you say N here) is
+  to stop the timer if the process managing it closes the file
+  /dev/watchdog. It's always remotely possible that this process might
+  get killed. If you say Y here, the watchdog cannot be stopped once
+  it has been started.
+
+CONFIG_WDT
+  If you have a WDT500P or WDT501P watchdog board, say Y here,
+  otherwise N. It is not possible to probe for this board, which means
+  that you have to inform the kernel about the IO port and IRQ using
+  the "wdt=" kernel option (try "man bootparam" or see the
+  documentation of your boot loader (lilo or loadlin) about how to
+  pass options to the kernel at boot time).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called wdt.o.
+
+CONFIG_WDTPCI
+  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
+  N.  It is not possible to probe for this board, which means that you
+  have to inform the kernel about the IO port and IRQ using the "wdt="
+  kernel option (try "man bootparam" or see the documentation of your
+  boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time).
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called wdt_pci.o.
+
+CONFIG_WDT_501
+  Saying Y here and creating a character special file /dev/temperature
+  with major number 10 and minor number 131 ("man mknod") will give
+  you a thermometer inside your computer: reading from
+  /dev/temperature yields one byte, the temperature in degrees
+  Fahrenheit. This works only if you have a WDT501P watchdog board
+  installed.
+
+CONFIG_WDT_501_FAN
+  Enable the Fan Tachometer on the WDT501. Only do this if you have a
+  fan tachometer actually set up.
+
+CONFIG_SOFT_WATCHDOG
+  A software monitoring watchdog. This will fail to reboot your system
+  from some situations that the hardware watchdog will recover
+  from. Equally it's a lot cheaper to install.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>. The module will be called
+   softdog.o.
+
+CONFIG_PCWATCHDOG
+  This is the driver for the Berkshire Products PC Watchdog card.
+  This card simply watches your kernel to make sure it doesn't freeze,
+  and if it does, it reboots your computer after a certain amount of
+  time. This driver is like the WDT501 driver but for different
+  hardware. Please read <file:Documentation/pcwd-watchdog.txt>. The PC
+  watchdog cards can be ordered from <http://www.berkprod.com/>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called pcwd.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+  Most people will say N.
+
+CONFIG_ACQUIRE_WDT
+  This is the driver for the hardware watchdog on the PSC-6x86 Single
+  Board Computer produced by Acquire Inc (and others).  This watchdog
+  simply watches your kernel to make sure it doesn't freeze, and if
+  it does, it reboots your computer after a certain amount of time.
+
+  This driver is like the WDT501 driver but for different hardware.
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called pscwdt.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  Most
+  people will say N.
+
+CONFIG_ADVANTECH_WDT
+  If you are configuring a Linux kernel for the Advantech single-board
+  computer, say `Y' here to support its built-in watchdog timer
+  feature.  See the help for CONFIG_WATCHDOG for discussion.
+
+CONFIG_W83877F_WDT
+  This is the driver for the hardware watchdog on the W83877F chipset
+  as used in EMACS PC-104 motherboards (and likely others).  This
+  watchdog simply watches your kernel to make sure it doesn't freeze,
+  and if it does, it reboots your computer after a certain amount of
+  time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called mixcomwd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  Most
+  people will say N.
+
+CONFIG_IB700_WDT
+  This is the driver for the hardware watchdog on the IB700 Single
+  Board Computer produced by TMC Technology (www.tmc-uk.com). This watchdog
+  simply watches your kernel to make sure it doesn't freeze, and if
+  it does, it reboots your computer after a certain amount of time.
+
+  This driver is like the WDT501 driver but for slightly different hardware.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called ib700wdt.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt. Most people
+  will say N.
+
+CONFIG_MIXCOMWD
+  This is a driver for the Mixcom hardware watchdog cards.  This
+  watchdog simply watches your kernel to make sure it doesn't freeze,
+  and if it does, it reboots your computer after a certain amount of
+  time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called mixcomwd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.  Most
+  people will say N.
+
+CONFIG_MACHZ_WDT
+  If you are using a ZF Micro MachZ processor, say Y here, otherwise
+  N.  This is the driver for the watchdog timer builtin on that
+  processor using ZF-Logic interface.  This watchdog simply watches
+  your kernel to make sure it doesn't freeze, and if it does, it
+  reboots your computer after a certain amount of time.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called machzwd.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_60XX_WDT
+ This driver can be used with the watchdog timer found on some
+ single board computers, namely the 6010 PII based computer.
+ It may well work with other cards.  It reads port 0x443 to enable
+ and re-set the watchdog timer, and reads port 0x45 to disable
+ the watchdog.  If you have a card that behave in similar ways,
+ you can probably make this driver work with your card as well.
+
+ You can compile this driver directly into the kernel, or use
+ it as a module.  The module will be called sbc60xxwdt.o.
+
+CONFIG_RTC
+  If you say Y here and create a character special file /dev/rtc with
+  major number 10 and minor number 135 using mknod ("man mknod"), you
+  will get access to the real time clock (or hardware clock) built
+  into your computer.
+
+  Every PC has such a clock built in. It can be used to generate
+  signals from as low as 1Hz up to 8192Hz, and can also be used
+  as a 24 hour alarm. It reports status information via the file
+  /proc/driver/rtc and its behaviour is set by various ioctls on
+  /dev/rtc.
+
+  If you run Linux on a multiprocessor machine and said Y to
+  "Symmetric Multi Processing" above, you should say Y here to read
+  and set the RTC in an SMP compatible fashion.
+
+  If you think you have a use for such a device (such as periodic data
+  sampling), then say Y here, and read <file:Documentation/rtc.txt>
+  for details.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module is called rtc.o. If you want to compile it as a module,
+  say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_H8
+  The Hitachi H8/337 is a microcontroller used to deal with the power
+  and thermal environment. If you say Y here, you will be able to
+  communicate with it via a character special device.
+
+  If unsure, say N.
+
+CONFIG_NVRAM
+  If you say Y here and create a character special file /dev/nvram
+  with major number 10 and minor number 144 using mknod ("man mknod"),
+  you get read and write access to the 50 bytes of non-volatile memory
+  in the real time clock (RTC), which is contained in every PC and
+  most Ataris.
+
+  This memory is conventionally called "CMOS RAM" on PCs and "NVRAM"
+  on Ataris. /dev/nvram may be used to view settings there, or to
+  change them (with some utility). It could also be used to frequently
+  save a few bits of very important data that may not be lost over
+  power-off and for which writing to disk is too insecure. Note
+  however that most NVRAM space in a PC belongs to the BIOS and you
+  should NEVER idly tamper with it. See Ralf Brown's interrupt list
+  for a guide to the use of CMOS bytes by your BIOS.
+
+  On Atari machines, /dev/nvram is always configured and does not need
+  to be selected.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called nvram.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_ATOMWIDE_SERIAL
+  If you have an Atomwide Serial card for an Acorn system, say Y to
+  this option.  The driver can handle 1, 2, or 3 port cards.
+  If unsure, say N.
+
+CONFIG_DUALSP_SERIAL
+  If you have the Serial Port's dual serial card for an Acorn system,
+  say Y to this option.  If unsure, say N.
+
+CONFIG_NWBUTTON
+  If you say Y here and create a character device node /dev/nwbutton
+  with major and minor numbers 10 and 158 ("man mknod"), then every
+  time the orange button is pressed a number of times, the number of
+  times the button was pressed will be written to that device.
+
+  This is most useful for applications, as yet unwritten, which
+  perform actions based on how many times the button is pressed in a
+  row.
+
+  Do not hold the button down for too long, as the driver does not
+  alter the behaviour of the hardware reset circuitry attached to the
+  button; it will still execute a hard reset if the button is held
+  down for longer than approximately five seconds.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  nwbutton.o.
+
+  Most people will answer Y to this question and "Reboot Using Button"
+  below to be able to initiate a system shutdown from the button.
+
+CONFIG_NWBUTTON_REBOOT
+  If you say Y here, then you will be able to initiate a system
+  shutdown and reboot by pressing the orange button a number of times.
+  The number of presses to initiate the shutdown is two by default,
+  but this can be altered by modifying the value of NUM_PRESSES_REBOOT
+  in nwbutton.h and recompiling the driver or, if you compile the
+  driver as a module, you can specify the number of presses at load
+  time with "insmod button reboot_count=<something>".
+
+CONFIG_A2232
+  This option supports the 2232 7-port serial card shipped with the
+  Amiga 2000 and other Zorro-bus machines, dating from 1989.  At
+  a max of 19,200 bps, the ports are served by a 6551 ACIA UART chip
+  each, plus a 8520 CIA, and a master 6502 CPU and buffer as well. The
+  ports were connected with 8 pin DIN connectors on the card bracket,
+  for which 8 pin to DB25 adapters were supplied. The card also had
+  jumpers internally to toggle various pinning configurations.
+
+  This driver can be built as a module; but then "generic_serial.o"
+  will also be built as a module. This has to be loaded before
+  "ser_a2232.o". If you want to do this, answer M here and read
+  "<file:Documentation/modules.txt>".
+
+CONFIG_DS1620
+  Say Y here to include support for the thermal management hardware
+  found in the NetWinder. This driver allows the user to control the
+  temperature set points and to read the current temperature.
+
+  It is also possible to say M here to build it as a module (ds1620.o)
+  It is recommended to be used on a NetWinder, but it is not a
+  necessity.
+
+CONFIG_SERIAL_21285
+  If you have a machine based on a 21285 (Footbridge) StrongARM(R)/
+  PCI bridge you can enable its onboard serial port by enabling this
+  option. The device has major ID 4, minor 64.
+
+CONFIG_SERIAL_21285_CONSOLE
+  If you have enabled the serial port on the 21285 footbridge you can
+  make it the console by answering Y to this option.
+
+CONFIG_NWFLASH
+  If you say Y here and create a character device /dev/flash with
+  major 10 and minor 160 you can manipulate the flash ROM containing
+  the NetWinder firmware. Be careful as accidentally overwriting the
+  flash contents can render your computer unbootable. On no account
+  allow random users access to this device. :-)
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called nwflash.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If you're not sure, say N.
+
+CONFIG_21285_WATCHDOG
+  The Intel Footbridge chip contains a builtin watchdog circuit. Say Y
+  here if you wish to use this. Alternatively say M to compile the
+  driver as a module, which will be called wdt285.o.
+
+  This driver does not work on all machines. In particular, early CATS
+  boards have hardware problems that will cause the machine to simply
+  lock up if the watchdog fires.
+
+  "If in doubt, leave it out" - say N.
+
+CONFIG_977_WATCHDOG
+  Say Y here to include support for the WB977 watchdog included in
+  NetWinder machines. Alternatively say M to compile the driver as
+  a module, which will be called wdt977.o.
+
+  Not sure? It's safe to say N.
+

@@ -1,0 +1,31 @@
+CONFIG_HOTPLUG_PCI
+  Say Y here if you have a motherboard with a PCI Hotplug controller.
+  This allows you to add and remove PCI cards while the machine is
+  powered up and running.  The file system pcihpfs must be mounted
+  in order to interact with any PCI Hotplug controllers.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pci_hotplug.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  When in doubt, say N.
+
+CONFIG_HOTPLUG_PCI_COMPAQ
+  Say Y here if you have a motherboard with a Compaq PCI Hotplug
+  controller.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cpqphp.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  When in doubt, say N.
+
+CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM
+  Say Y here if you have a Compaq server that has a PCI Hotplug
+  controller.  This will allow the PCI Hotplug driver to store the PCI
+  system configuration options in NVRAM.
+
+  When in doubt, say N.
+

@@ -1,0 +1,131 @@
+CONFIG_TR
+  Token Ring is IBM's way of communication on a local network; the
+  rest of the world uses Ethernet. To participate on a Token Ring
+  network, you need a special Token ring network card. If you are
+  connected to such a Token Ring network and want to use your Token
+  Ring card under Linux, say Y here and to the driver for your
+  particular card below and read the Token-Ring mini-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>. Most people can
+  say N here.
+
+CONFIG_IBMTR
+  This is support for all IBM Token Ring cards that don't use DMA. If
+  you have such a beast, say Y and read the Token-Ring mini-HOWTO,
+  available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  Warning: this driver will almost definitely fail if more than one
+  active Token Ring card is present.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ibmtr.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_IBMOL
+  This is support for all non-Lanstreamer IBM PCI Token Ring Cards.
+  Specifically this is all IBM PCI, PCI Wake On Lan, PCI II, PCI II
+  Wake On Lan, and PCI 100/16/4 adapters.
+
+  If you have such an adapter, say Y and read the Token-Ring
+  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called olympic.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+  Also read <file:Documentation/networking/olympic.txt> or check the
+  Linux Token Ring Project site for the latest information at
+  <http://www.linuxtr.net/>.
+
+CONFIG_IBMLS
+  This is support for IBM Lanstreamer PCI Token Ring Cards.
+
+  If you have such an adapter, say Y and read the Token-Ring
+  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a modules ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The modules will be called lanstreamer.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_TMS380TR
+  This driver provides generic support for token ring adapters
+  based on the Texas Instruments TMS380 series chipsets.  This
+  includes the SysKonnect TR4/16(+) ISA (SK-4190), SysKonnect
+  TR4/16(+) PCI (SK-4590), SysKonnect TR4/16 PCI (SK-4591),
+  Compaq 4/16 PCI, Thomas-Conrad TC4048 4/16 PCI, and several
+  Madge adapters.  If you say Y here, you will be asked to select
+  which cards to support below.  If you're using modules, each
+  class of card will be supported by a separate module.
+
+  If you have such an adapter and would like to use it, say Y and
+  read the Token-Ring mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.
+
+  Also read the file <file:Documentation/networking/tms380tr.txt> or
+  check <http://www.auk.cx/tms380tr/>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tms380tr.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_TMSPCI
+  This tms380 module supports generic TMS380-based PCI cards.
+
+  These cards are known to work:
+     - Compaq 4/16 TR PCI
+     - SysKonnect TR4/16 PCI (SK-4590/SK-4591)
+     - Thomas-Conrad TC4048 PCI 4/16
+     - 3Com Token Link Velocity
+
+  This driver is available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tmspci.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_TMSISA
+  This tms380 module supports generic TMS380-based ISA cards.
+
+  These cards are known to work:
+     - SysKonnect TR4/16 ISA (SK-4190)
+
+  This driver is available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tmsisa.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_ABYSS
+  This tms380 module supports the Madge Smart 16/4 PCI Mk2
+  cards (51-02).
+
+  This driver is available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called abyss.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_MADGEMC
+  This tms380 module supports the Madge Smart 16/4 MC16 and MC32
+  MicroChannel adapters.
+
+  This driver is available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called madgemc.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SMCTR
+  This is support for the ISA and MCA SMC Token Ring cards,
+  specifically SMC TokenCard Elite (8115T) and SMC TokenCard Elite/A
+  (8115T/A) adapters.
+
+  If you have such an adapter and would like to use it, say Y or M and
+  read the Token-Ring mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto> and the file
+  <file:Documentation/networking/smctr.txt>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called smctr.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+

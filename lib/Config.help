@@ -1,0 +1,6 @@
+CONFIG_CRC32
+  This option is provided for the case where no in-kernel-tree
+  modules require CRC32 functions, but a module built outside the
+  kernel tree does. Such modules that use library CRC32 functions
+  require M here.
+

@@ -1,0 +1,124 @@
+CONFIG_BLK_DEV_LVM
+  This driver lets you combine several hard disks, hard disk
+  partitions, multiple devices or even loop devices (for evaluation
+  purposes) into a volume group.  Imagine a volume group as a kind of
+  virtual disk. Logical volumes, which can be thought of as virtual
+  partitions, can be created in the volume group.  You can resize
+  volume groups and logical volumes after creation time, corresponding
+  to new capacity needs.  Logical volumes are accessed as block
+  devices named /dev/VolumeGroupName/LogicalVolumeName.
+
+  For details see <file:Documentation/LVM-HOWTO>.  You will need
+  supporting user space software; location is in
+  <file:Documentation/Changes>.
+
+  If you want to compile this support as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want), say M here and read <file:Documentation/modules.txt>.  The
+  module will be called lvm-mod.o.
+
+CONFIG_MD
+  Support multiple physical spindles through a single logical device.
+  Required for RAID and logical volume management (LVM).
+
+CONFIG_BLK_DEV_MD
+  This driver lets you combine several hard disk partitions into one
+  logical block device. This can be used to simply append one
+  partition to another one or to combine several redundant hard disks
+  into a RAID1/4/5 device so as to provide protection against hard
+  disk failures. This is called "Software RAID" since the combining of
+  the partitions is done by the kernel. "Hardware RAID" means that the
+  combining is done by a dedicated controller; if you have such a
+  controller, you do not need to say Y here.
+
+  More information about Software RAID on Linux is contained in the
+  Software RAID mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. There you will also learn
+  where to get the supporting user space utilities raidtools.
+
+  If unsure, say N.
+
+CONFIG_MD_LINEAR
+  If you say Y here, then your multiple devices driver will be able to
+  use the so-called linear mode, i.e. it will combine the hard disk
+  partitions by simply appending one to the other.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called linear.o.
+
+  If unsure, say Y.
+
+CONFIG_MD_RAID0
+  If you say Y here, then your multiple devices driver will be able to
+  use the so-called raid0 mode, i.e. it will combine the hard disk
+  partitions into one logical device in such a fashion as to fill them
+  up evenly, one chunk here and one chunk there. This will increase
+  the throughput rate if the partitions reside on distinct disks.
+
+  Information about Software RAID on Linux is contained in the
+  Software-RAID mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. There you will also
+  learn where to get the supporting user space utilities raidtools.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called raid0.o.
+
+  If unsure, say Y.
+
+CONFIG_MD_RAID1
+  A RAID-1 set consists of several disk drives which are exact copies
+  of each other.  In the event of a mirror failure, the RAID driver
+  will continue to use the operational mirrors in the set, providing
+  an error free MD (multiple device) to the higher levels of the
+  kernel.  In a set with N drives, the available space is the capacity
+  of a single drive, and the set protects against a failure of (N - 1)
+  drives.
+
+  Information about Software RAID on Linux is contained in the
+  Software-RAID mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  There you will also
+  learn where to get the supporting user space utilities raidtools.
+
+  If you want to use such a RAID-1 set, say Y. This code is also
+  available as a module called raid1.o ( = code which can be inserted
+  in and removed from the running kernel whenever you want).  If you
+  want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+  If unsure, say Y.
+
+CONFIG_MD_RAID5
+  A RAID-5 set of N drives with a capacity of C MB per drive provides
+  the capacity of C * (N - 1) MB, and protects against a failure
+  of a single drive. For a given sector (row) number, (N - 1) drives
+  contain data sectors, and one drive contains the parity protection.
+  For a RAID-4 set, the parity blocks are present on a single drive,
+  while a RAID-5 set distributes the parity across the drives in one
+  of the available parity distribution methods.
+
+  Information about Software RAID on Linux is contained in the
+  Software-RAID mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. There you will also
+  learn where to get the supporting user space utilities raidtools.
+
+  If you want to use such a RAID-4/RAID-5 set, say Y. This code is
+  also available as a module called raid5.o ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+
+  If unsure, say Y.
+
+CONFIG_MD_MULTIPATH
+  Multipath-IO is the ability of certain devices to address the same
+  physical disk over multiple 'IO paths'. The code ensures that such
+  paths can be defined and handled at runtime, and ensures that a
+  transparent failover to the backup path(s) happens if a IO errors
+  arrives on the primary path.
+
+  If unsure, say N.
+
