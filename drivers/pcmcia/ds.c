@@ -107,7 +107,6 @@ struct pcmcia_bus_socket {
 	struct work_struct	removal;
 	socket_bind_t		*bind;
 	struct device		*socket_dev;
-	unsigned int		socket_no; /* deprecated */
 	struct pcmcia_socket	*parent;
 };
 
@@ -308,7 +307,7 @@ static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 	cs_error(NULL, BindMTD, ret);
 	printk(KERN_NOTICE "ds: unable to bind MTD '%s' to socket %d"
 	       " offset 0x%x\n",
-	       (char *)bind_req.dev_info, bus_sock->socket_no, bind_req.CardOffset);
+	       (char *)bind_req.dev_info, bus_sock->parent->sock, bind_req.CardOffset);
 	return -ENODEV;
     }
     return 0;
@@ -333,7 +332,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!s)
 	    return -EINVAL;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", s->socket_no,
+    DEBUG(2, "bind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
     if (!driver)
@@ -358,7 +357,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindDevice, ret);
 	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
-	       (char *)dev_info, s->socket_no);
+	       (char *)dev_info, s->parent->sock);
 	module_put(driver->owner);
 	return -ENODEV;
     }
@@ -464,7 +463,7 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", s->socket_no,
+    DEBUG(2, "unbind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
@@ -846,7 +845,6 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	/* initialize data */
 	s->socket_dev = socket->dev.dev;
 	INIT_WORK(&s->removal, handle_removal, s);
-	s->socket_no = socket->sock;
 	s->parent = socket;
 
 	/* Set up hotline to Card Services */
