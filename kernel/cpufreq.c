@@ -29,11 +29,8 @@
  * level driver of CPUFreq support, and its locking mutex. 
  * cpu_max_freq is in kHz.
  */
-struct cpufreq_driver   	*cpufreq_driver;
+static struct cpufreq_driver   	*cpufreq_driver;
 static DECLARE_MUTEX            (cpufreq_driver_sem);
-
-/* required for the proc interface, remove when that goes away */
-EXPORT_SYMBOL_GPL(cpufreq_driver);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -56,6 +53,9 @@ static struct class_interface cpufreq_interface;
 
 static int cpufreq_cpu_get(unsigned int cpu) {
 	if (cpu >= NR_CPUS)
+		return 0;
+
+	if (!cpufreq_driver)
 		return 0;
 
 	if (!try_module_get(cpufreq_driver->owner))

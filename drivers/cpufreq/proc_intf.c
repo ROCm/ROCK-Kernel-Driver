@@ -209,10 +209,7 @@ static int __init cpufreq_proc_init (void)
 {
 	struct proc_dir_entry *entry = NULL;
 
-	if (!cpufreq_driver)
-		return -ENODEV;
-
-        /* are these acceptable values? */
+	/* are these acceptable values? */
 	entry = create_proc_entry("cpufreq", S_IFREG|S_IRUGO|S_IWUSR, 
 				  &proc_root);
 
