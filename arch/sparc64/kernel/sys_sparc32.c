@@ -952,25 +952,40 @@ static long do_readv_writev32(int type, struct file *file,
 	io_fn_t fn;
 	iov_fn_t fnv;
 
+	/*
+	 * SuS says "The readv() function *may* fail if the iovcnt argument
+	 * was less than or equal to 0, or greater than {IOV_MAX}.  Linux has
+	 * traditionally returned zero for zero segments, so...
+	 */
+	retval = 0;
+	if (count == 0)
+		goto out;
+
 	/* First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
-	retval = 0;
-	if (!count)
-		goto out_nofree;
-	retval = -EFAULT;
-	if (verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
-		goto out_nofree;
 	retval = -EINVAL;
 	if (count > UIO_MAXIOV)
-		goto out_nofree;
+		goto out;
+	if (!file->f_op)
+		goto out;
 	if (count > UIO_FASTIOV) {
 		retval = -ENOMEM;
 		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
-			goto out_nofree;
+			goto out;
 	}
+	retval = -EFAULT;
+	if (verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
+		goto out;
 
+	/*
+	 * Single unix specification:
+	 * We should -EINVAL if an element length is not >= 0 and fitting an
+	 * ssize_t.  The total length is fitting an ssize_t
+	 *
+	 * Be careful here because iov_len is a size_t not an ssize_t
+	 */
 	tot_len = 0;
 	i = count;
 	ivp = iov;
@@ -980,9 +995,12 @@ static long do_readv_writev32(int type, struct file *file,
 		compat_ssize_t len;
 		u32 buf;
 
-		__get_user(len, &vector->iov_len);
-		__get_user(buf, &vector->iov_base);
-		if (len < 0)	/* size_t not fittina an compat_ssize_t .. */
+		if (__get_user(len, &vector->iov_len) ||
+		    __get_user(buf, &vector->iov_base)) {
+			retval = -EFAULT;
+			goto out;
+		}
+		if (len < 0)	/* size_t not fitting an ssize_t32 .. */
 			goto out;
 		tot_len += len;
 		if (tot_len < tmp) /* maths overflow on the compat_ssize_t */
@@ -993,25 +1011,32 @@ static long do_readv_writev32(int type, struct file *file,
 		ivp++;
 		i--;
 	}
+	if (tot_len == 0) {
+		retval = 0;
+		goto out;
+	}
 
 	inode = file->f_dentry->d_inode;
 	/* VERIFY_WRITE actually means a read, as we write to user space */
-	retval = locks_verify_area((type == VERIFY_WRITE
+	retval = locks_verify_area((type == READ
 				    ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
 				   inode, file, file->f_pos, tot_len);
 	if (retval)
 		goto out;
 
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	fnv = (type == VERIFY_WRITE ? file->f_op->readv : file->f_op->writev);
+	if (type == READ) {
+		fn = file->f_op->read;
+		fnv = file->f_op->readv;
+	} else {
+		fn = (io_fn_t)file->f_op->write;
+		fnv = file->f_op->writev;
+	}
 	if (fnv) {
 		retval = fnv(file, iov, count, &file->f_pos);
 		goto out;
 	}
 
-	fn = (type == VERIFY_WRITE ? file->f_op->read :
-	      (io_fn_t) file->f_op->write);
-
+	/* Do it by hand, with file-ops */
 	ivp = iov;
 	while (count > 0) {
 		void * base;
@@ -1021,7 +1046,9 @@ static long do_readv_writev32(int type, struct file *file,
 		len = ivp->iov_len;
 		ivp++;
 		count--;
+
 		nr = fn(file, base, len, &file->f_pos);
+
 		if (nr < 0) {
 			if (!retval)
 				retval = nr;
@@ -1034,11 +1061,9 @@ static long do_readv_writev32(int type, struct file *file,
 out:
 	if (iov != iovstack)
 		kfree(iov);
-out_nofree:
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	if ((retval + (type == VERIFY_WRITE)) > 0)
+	if ((retval + (type == READ)) > 0)
 		dnotify_parent(file->f_dentry,
-			(type == VERIFY_WRITE) ? DN_ACCESS : DN_MODIFY);
+			(type == READ) ? DN_ACCESS : DN_MODIFY);
 
 	return retval;
 }
@@ -1046,35 +1071,46 @@ out_nofree:
 asmlinkage long sys32_readv(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
-	long ret = -EBADF;
+	int ret;
 
 	file = fget(fd);
 	if(!file)
-		goto bad_file;
+		return -EBADF;
 
-	if (file->f_op && (file->f_mode & FMODE_READ) &&
-	    (file->f_op->readv || file->f_op->read))
-		ret = do_readv_writev32(VERIFY_WRITE, file, vector, count);
+	ret = -EBADF;
+	if (!(file->f_mode & FMODE_READ))
+		goto out;
+	ret = -EINVAL;
+	if (!file->f_op || (!file->f_op->readv && !file->f_op->read))
+		goto out;
+
+	ret = do_readv_writev32(READ, file, vector, count);
+
+out:
 	fput(file);
-
-bad_file:
 	return ret;
 }
 
 asmlinkage long sys32_writev(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
-	int ret = -EBADF;
+	int ret;
 
 	file = fget(fd);
 	if(!file)
-		goto bad_file;
-	if (file->f_op && (file->f_mode & FMODE_WRITE) &&
-	    (file->f_op->writev || file->f_op->write))
-		ret = do_readv_writev32(VERIFY_READ, file, vector, count);
-	fput(file);
+		return -EBADF;
 
-bad_file:
+	ret = -EBADF;
+	if (!(file->f_mode & FMODE_WRITE))
+		goto out;
+	ret = -EINVAL;
+	if (!file->f_op || (!file->f_op->writev && !file->f_op->write))
+		goto out;
+
+	ret = do_readv_writev32(WRITE, file, vector, count);
+
+out:
+	fput(file);
 	return ret;
 }
 
