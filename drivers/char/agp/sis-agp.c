@@ -227,9 +227,7 @@ static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
 {
 	if (bridge->dev->device == PCI_DEVICE_ID_SI_648 ||
 	    bridge->dev->device == PCI_DEVICE_ID_SI_746) {
-		if (agp_bridge->major_version == 3 && agp_bridge->minor_version < 5) {
-			sis_driver.agp_enable=sis_648_enable;
-		} else {
+		if (agp_bridge->major_version == 3) {
 			sis_driver.agp_enable			= sis_648_enable;
 			sis_driver.aperture_sizes		= agp3_generic_sizes;
 			sis_driver.size_type			= U16_APER_SIZE;
@@ -238,6 +236,8 @@ static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
 			sis_driver.fetch_size			= agp3_generic_fetch_size;
 			sis_driver.cleanup				= agp3_generic_cleanup;
 			sis_driver.tlb_flush			= agp3_generic_tlbflush;
+		} else {
+			sis_driver.agp_enable=sis_648_enable;
 		}
 	}
 }
