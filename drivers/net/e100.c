@@ -1392,12 +1392,12 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 	if(!(rx->skb = dev_alloc_skb(RFD_BUF_LEN + rx_offset)))
 		return -ENOMEM;
 
-	/* Align, init, and map the RFA. */
+	/* Align, init, and map the RFD. */
 	rx->skb->dev = nic->netdev;
 	skb_reserve(rx->skb, rx_offset);
 	memcpy(rx->skb->data, &nic->blank_rfd, sizeof(struct rfd));
 	rx->dma_addr = pci_map_single(nic->pdev, rx->skb->data,
-		RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+		RFD_BUF_LEN, PCI_DMA_BIDIRECTIONAL);
 
 	/* Link the RFD to end of RFA by linking previous RFD to
 	 * this one, and clearing EL bit of previous.  */
@@ -1408,7 +1408,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 		wmb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
 		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
-					       sizeof(struct rfd), PCI_DMA_TODEVICE);
+			sizeof(struct rfd), PCI_DMA_TODEVICE);
 	}
 
 	return 0;
@@ -1426,7 +1426,7 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 
 	/* Need to sync before taking a peek at cb_complete bit */
 	pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr,
-				    sizeof(struct rfd), PCI_DMA_FROMDEVICE);
+		sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 	rfd_status = le16_to_cpu(rfd->status);
 
 	DPRINTK(RX_STATUS, DEBUG, "status=0x%04X\n", rfd_status);
@@ -1442,7 +1442,7 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 
 	/* Get data */
 	pci_unmap_single(nic->pdev, rx->dma_addr,
-			 RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+		RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
 
 	/* Pull off the RFD and put the actual data (minus eth hdr) */
 	skb_reserve(skb, sizeof(struct rfd));
