@@ -99,10 +99,22 @@ advwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		return -ESPIPE;
 
 	if (count) {
+		if (!nowayout) {
+			size_t i;
+
+			adv_expect_close = 0;
+
+			for (i = 0; i != count; i++) {
+				char c;
+				if (get_user(c, buf+i))
+					return -EFAULT;
+				if (c == 'V')
+					adv_expect_close = 42;
+			}
+		}
 		advwdt_ping();
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 static ssize_t
@@ -116,9 +128,11 @@ advwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
 {
 	static struct watchdog_info ident = {
-		WDIOF_KEEPALIVEPING, 1, "Advantech WDT"
+		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "Advantech WDT"
 	};
-	
+
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
 	  if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)))
