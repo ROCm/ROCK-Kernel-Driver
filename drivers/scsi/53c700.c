@@ -238,39 +238,30 @@ struct Scsi_Host *
 NCR_700_detect(Scsi_Host_Template *tpnt,
 	       struct NCR_700_Host_Parameters *hostdata)
 {
-	dma_addr_t pScript, pMemory, pSlots;
+	dma_addr_t pScript, pSlots;
 	__u8 *memory;
 	__u32 *script;
 	struct Scsi_Host *host;
 	static int banner = 0;
 	int j;
 
-#ifdef CONFIG_53C700_USE_CONSISTENT
-	memory = pci_alloc_consistent(hostdata->pci_dev, TOTAL_MEM_SIZE,
-				      &pMemory);
-	hostdata->consistent = 1;
-	if(memory == NULL ) {
-		printk(KERN_WARNING "53c700: consistent memory allocation failed\n");
-#endif
-		memory = kmalloc(TOTAL_MEM_SIZE, GFP_KERNEL);
-		if(memory == NULL) {
-			printk(KERN_ERR "53c700: Failed to allocate memory for driver, detatching\n");
-			return NULL;
-		}
-		pMemory = pci_map_single(hostdata->pci_dev, memory,
-					 TOTAL_MEM_SIZE, PCI_DMA_BIDIRECTIONAL);
-#ifdef CONFIG_53C700_USE_CONSISTENT
-		hostdata->consistent = 0;
+	memory = dma_alloc_noncoherent(hostdata->dev, TOTAL_MEM_SIZE,
+					 &pScript);
+	if(memory == NULL) {
+		printk(KERN_ERR "53c700: Failed to allocate memory for driver, detatching\n");
+		return NULL;
 	}
-#endif
+
 	script = (__u32 *)memory;
-	pScript = pMemory;
 	hostdata->msgin = memory + MSGIN_OFFSET;
 	hostdata->msgout = memory + MSGOUT_OFFSET;
 	hostdata->status = memory + STATUS_OFFSET;
+	/* all of these offsets are L1_CACHE_BYTES separated.  It is fatal
+	 * if this isn't sufficient separation to avoid dma flushing issues */
+	BUG_ON(!dma_is_consistent(pScript) && L1_CACHE_BYTES < dma_get_cache_alignment());
 	hostdata->slots = (struct NCR_700_command_slot *)(memory + SLOTS_OFFSET);
 		
-	pSlots = pMemory + SLOTS_OFFSET;
+	pSlots = pScript + SLOTS_OFFSET;
 
 	/* Fill in the missing routines from the host template */
 	tpnt->queuecommand = NCR_700_queuecommand;
@@ -327,7 +318,7 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 
 	hostdata->script = script;
 	hostdata->pScript = pScript;
-	NCR_700_dma_cache_wback((unsigned long)script, sizeof(SCRIPT));
+	dma_sync_single(hostdata->dev, pScript, sizeof(SCRIPT), DMA_TO_DEVICE);
 	hostdata->state = NCR_700_HOST_FREE;
 	hostdata->cmd = NULL;
 	host->max_id = 7;
@@ -363,18 +354,8 @@ NCR_700_release(struct Scsi_Host *host)
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)host->hostdata[0];
 
-#ifdef CONFIG_53C700_USE_CONSISTENT
-	if(hostdata->consistent) {
-		pci_free_consistent(hostdata->pci_dev, TOTAL_MEM_SIZE,
-				    hostdata->script, hostdata->pScript);
-	} else {
-#endif
-		pci_unmap_single(hostdata->pci_dev, hostdata->pScript,
-				 TOTAL_MEM_SIZE, PCI_DMA_BIDIRECTIONAL);
-		kfree(hostdata->script);
-#ifdef CONFIG_53C700_USE_CONSISTENT
-	}
-#endif
+	dma_free_noncoherent(hostdata->dev, TOTAL_MEM_SIZE,
+			       hostdata->script, hostdata->pScript);
 	return 1;
 }
 
@@ -575,15 +556,16 @@ NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, Scsi_Cmnd *SCp,
 {
 	if(SCp->sc_data_direction != SCSI_DATA_NONE &&
 	   SCp->sc_data_direction != SCSI_DATA_UNKNOWN) {
-		int pci_direction = scsi_to_pci_dma_dir(SCp->sc_data_direction);
+		enum dma_data_direction direction = 
+			(enum dma_data_direction)scsi_to_pci_dma_dir(SCp->sc_data_direction);
 		if(SCp->use_sg) {
-			pci_unmap_sg(hostdata->pci_dev, SCp->buffer,
-				     SCp->use_sg, pci_direction);
+			dma_unmap_sg(hostdata->dev, SCp->buffer,
+				     SCp->use_sg, direction);
 		} else {
-			pci_unmap_single(hostdata->pci_dev,
+			dma_unmap_single(hostdata->dev,
 					 slot->dma_handle,
 					 SCp->request_bufflen,
-					 pci_direction);
+					 direction);
 		}
 	}
 }
@@ -600,8 +582,8 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 			(struct NCR_700_command_slot *)SCp->host_scribble;
 		
 		NCR_700_unmap(hostdata, SCp, slot);
-		pci_unmap_single(hostdata->pci_dev, slot->pCmd,
-				 sizeof(SCp->cmnd), PCI_DMA_TODEVICE);
+		dma_unmap_single(hostdata->dev, slot->pCmd,
+				 sizeof(SCp->cmnd), DMA_TO_DEVICE);
 		if(SCp->cmnd[0] == REQUEST_SENSE && SCp->cmnd[6] == NCR_700_INTERNAL_SENSE_MAGIC) {
 #ifdef NCR_700_DEBUG
 			printk(" ORIGINAL CMD %p RETURNED %d, new return is %d sense is\n",
@@ -819,7 +801,7 @@ process_extended_message(struct Scsi_Host *host,
 			printk(KERN_WARNING "scsi%d Unexpected SDTR msg\n",
 			       host->host_no);
 			hostdata->msgout[0] = A_REJECT_MSG;
-			NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
+			dma_cache_sync(hostdata->msgout, 1, DMA_TO_DEVICE);
 			script_patch_16(hostdata->script, MessageCount, 1);
 			/* SendMsgOut returns, so set up the return
 			 * address */
@@ -831,7 +813,7 @@ process_extended_message(struct Scsi_Host *host,
 		printk(KERN_INFO "scsi%d: (%d:%d), Unsolicited WDTR after CMD, Rejecting\n",
 		       host->host_no, pun, lun);
 		hostdata->msgout[0] = A_REJECT_MSG;
-		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		dma_cache_sync(hostdata->msgout, 1, DMA_TO_DEVICE);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		resume_offset = hostdata->pScript + Ent_SendMessageWithATN;
 
@@ -845,7 +827,7 @@ process_extended_message(struct Scsi_Host *host,
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
-		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		dma_cache_sync(hostdata->msgout, 1, DMA_TO_DEVICE);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		/* SendMsgOut returns, so set up the return
 		 * address */
@@ -923,7 +905,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
-		NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, 1);
+		dma_cache_sync(hostdata->msgout, 1, DMA_TO_DEVICE);
 		script_patch_16(hostdata->script, MessageCount, 1);
 		/* SendMsgOut returns, so set up the return
 		 * address */
@@ -933,7 +915,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 	}
 	NCR_700_writel(temp, host, TEMP_REG);
 	/* set us up to receive another message */
-	NCR_700_dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+	dma_cache_sync(hostdata->msgin, MSG_ARRAY_SIZE, DMA_FROM_DEVICE);
 	return resume_offset;
 }
 
@@ -997,19 +979,17 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				SCp->cmnd[7] = hostdata->status[0];
 				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
-				pci_dma_sync_single(hostdata->pci_dev,
-						    slot->pCmd,
-						    SCp->cmd_len,
-						    PCI_DMA_TODEVICE);
+				dma_sync_single(hostdata->dev, slot->pCmd,
+						SCp->cmd_len, DMA_TO_DEVICE);
 				SCp->request_bufflen = sizeof(SCp->sense_buffer);
-				slot->dma_handle = pci_map_single(hostdata->pci_dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), PCI_DMA_FROMDEVICE);
+				slot->dma_handle = dma_map_single(hostdata->dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), DMA_FROM_DEVICE);
 				slot->SG[0].ins = bS_to_host(SCRIPT_MOVE_DATA_IN | sizeof(SCp->sense_buffer));
 				slot->SG[0].pAddr = bS_to_host(slot->dma_handle);
 				slot->SG[1].ins = bS_to_host(SCRIPT_RETURN);
 				slot->SG[1].pAddr = 0;
 				slot->resume_offset = hostdata->pScript;
-				NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG[0])*2);
-				NCR_700_dma_cache_inv((unsigned long)SCp->sense_buffer, sizeof(SCp->sense_buffer));
+				dma_cache_sync(slot->SG, sizeof(slot->SG[0])*2, DMA_TO_DEVICE);
+				dma_cache_sync(SCp->sense_buffer, sizeof(SCp->sense_buffer), DMA_FROM_DEVICE);
 				
 				/* queue the command for reissue */
 				slot->state = NCR_700_SLOT_QUEUED;
@@ -1024,10 +1004,10 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			//   SCp->cmnd[0] == INQUIRY && SCp->use_sg == 0) {
 			//	/* Piggy back the tag queueing support
 			//	 * on this command */
-			//	pci_dma_sync_single(hostdata->pci_dev,
+			//	dma_sync_single(hostdata->dev,
 			//			    slot->dma_handle,
 			//			    SCp->request_bufflen,
-			//			    PCI_DMA_FROMDEVICE);
+			//			    DMA_FROM_DEVICE);
 			//	if(((char *)SCp->request_buffer)[7] & 0x02) {
 			//		printk(KERN_INFO "scsi%d: (%d:%d) Enabling Tag Command Queuing\n", host->host_no, pun, lun);
 			//		hostdata->tag_negotiated |= (1<<SCp->target);
@@ -1137,14 +1117,14 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			 * should therefore always clear ACK */
 			NCR_700_writeb(NCR_700_get_SXFER(hostdata->cmd->device),
 				       host, SXFER_REG);
-			NCR_700_dma_cache_inv((unsigned long)hostdata->msgin,
-				      MSG_ARRAY_SIZE);
-			NCR_700_dma_cache_wback((unsigned long)hostdata->msgout,
-					MSG_ARRAY_SIZE);
+			dma_cache_sync(hostdata->msgin,
+				       MSG_ARRAY_SIZE, DMA_FROM_DEVICE);
+			dma_cache_sync(hostdata->msgout,
+				       MSG_ARRAY_SIZE, DMA_TO_DEVICE);
 			/* I'm just being paranoid here, the command should
 			 * already have been flushed from the cache */
-			NCR_700_dma_cache_wback((unsigned long)slot->cmnd->cmnd,
-					slot->cmnd->cmd_len);
+			dma_cache_sync(slot->cmnd->cmnd,
+				       slot->cmnd->cmd_len, DMA_TO_DEVICE);
 
 
 			
@@ -1207,8 +1187,8 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		hostdata->reselection_id = reselection_id;
 		/* just in case we have a stale simple tag message, clear it */
 		hostdata->msgin[1] = 0;
-		NCR_700_dma_cache_wback_inv((unsigned long)hostdata->msgin,
-					    MSG_ARRAY_SIZE);
+		dma_cache_sync(hostdata->msgin,
+			       MSG_ARRAY_SIZE, DMA_BIDIRECTIONAL);
 		if(hostdata->tag_negotiated & (1<<reselection_id)) {
 			resume_offset = hostdata->pScript + Ent_GetReselectionWithTag;
 		} else {
@@ -1323,7 +1303,8 @@ process_selection(struct Scsi_Host *host, __u32 dsp)
 	hostdata->cmd = NULL;
 	/* clear any stale simple tag message */
 	hostdata->msgin[1] = 0;
-	NCR_700_dma_cache_wback_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
+	dma_cache_sync(hostdata->msgin, MSG_ARRAY_SIZE,
+		       DMA_BIDIRECTIONAL);
 
 	if(id == 0xff) {
 		/* Selected as target, Ignore */
@@ -1434,10 +1415,11 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 	if(slot->resume_offset == 0)
 		slot->resume_offset = hostdata->pScript;
 	/* now perform all the writebacks and invalidates */
-	NCR_700_dma_cache_wback((unsigned long)hostdata->msgout, count);
-	NCR_700_dma_cache_inv((unsigned long)hostdata->msgin, MSG_ARRAY_SIZE);
-	NCR_700_dma_cache_wback((unsigned long)SCp->cmnd, SCp->cmd_len);
-	NCR_700_dma_cache_inv((unsigned long)hostdata->status, 1);
+	dma_cache_sync(hostdata->msgout, count, DMA_TO_DEVICE);
+	dma_cache_sync(hostdata->msgin, MSG_ARRAY_SIZE,
+		       DMA_FROM_DEVICE);
+	dma_cache_sync(SCp->cmnd, SCp->cmd_len, DMA_TO_DEVICE);
+	dma_cache_sync(hostdata->status, 1, DMA_FROM_DEVICE);
 
 	/* set the synchronous period/offset */
 	NCR_700_writeb(NCR_700_get_SXFER(SCp->device),
@@ -1606,7 +1588,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 					slot->SG[i].ins = bS_to_host(SCRIPT_NOP);
 					slot->SG[i].pAddr = 0;
 				}
-				NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
+				dma_cache_sync(slot->SG, sizeof(slot->SG), DMA_TO_DEVICE);
 				/* and pretend we disconnected after
 				 * the command phase */
 				resume_offset = hostdata->pScript + Ent_MsgInDuringData;
@@ -1755,7 +1737,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SCp->host->hostdata[0];
 	__u32 move_ins;
-	int pci_direction;
+	enum dma_data_direction direction;
 	struct NCR_700_command_slot *slot;
 
 	if(hostdata->command_slot_count >= NCR_700_COMMAND_SLOTS_PER_HOST) {
@@ -1883,7 +1865,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	}
 
 	/* now build the scatter gather list */
-	pci_direction = scsi_to_pci_dma_dir(SCp->sc_data_direction);
+	direction = (enum dma_data_direction)scsi_to_pci_dma_dir(SCp->sc_data_direction);
 	if(move_ins != 0) {
 		int i;
 		int sg_count;
@@ -1891,13 +1873,13 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		__u32 count = 0;
 
 		if(SCp->use_sg) {
-			sg_count = pci_map_sg(hostdata->pci_dev, SCp->buffer,
-					      SCp->use_sg, pci_direction);
+			sg_count = dma_map_sg(hostdata->dev, SCp->buffer,
+					      SCp->use_sg, direction);
 		} else {
-			vPtr = pci_map_single(hostdata->pci_dev,
+			vPtr = dma_map_single(hostdata->dev,
 					      SCp->request_buffer, 
 					      SCp->request_bufflen,
-					      pci_direction);
+					      direction);
 			count = SCp->request_bufflen;
 			slot->dma_handle = vPtr;
 			sg_count = 1;
@@ -1920,14 +1902,14 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		}
 		slot->SG[i].ins = bS_to_host(SCRIPT_RETURN);
 		slot->SG[i].pAddr = 0;
-		NCR_700_dma_cache_wback((unsigned long)slot->SG, sizeof(slot->SG));
+		dma_cache_sync(slot->SG, sizeof(slot->SG), DMA_TO_DEVICE);
 		DEBUG((" SETTING %08lx to %x\n",
 		       (&slot->pSG[i].ins), 
 		       slot->SG[i].ins));
 	}
 	slot->resume_offset = 0;
-	slot->pCmd = pci_map_single(hostdata->pci_dev, SCp->cmnd,
-				    sizeof(SCp->cmnd), PCI_DMA_TODEVICE);
+	slot->pCmd = dma_map_single(hostdata->dev, SCp->cmnd,
+				    sizeof(SCp->cmnd), DMA_TO_DEVICE);
 	NCR_700_start_command(SCp);
 	return 0;
 }

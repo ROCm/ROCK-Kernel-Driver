@@ -900,11 +900,6 @@ config 53C700_LE_ON_BE
 	depends on SCSI_LASI700
 	default y
 
-config 53C700_USE_CONSISTENT
-	bool
-	depends on SCSI_LASI700
-	default y
-
 config SCSI_NCR53C7xx
 	tristate "NCR53c7,8xx SCSI support"
 	depends on SCSI && PCI
