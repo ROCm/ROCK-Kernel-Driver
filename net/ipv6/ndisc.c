@@ -423,7 +423,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *solicited_addr,
 	 	   int router, int solicited, int override, int inc_opt) 
 {
-	static struct in6_addr tmpaddr;
+	struct in6_addr tmpaddr;
 	struct inet6_ifaddr *ifp;
 	struct inet6_dev *idev;
 	struct flowi fl;
