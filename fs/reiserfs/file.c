@@ -39,7 +39,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 	return 0;
     }    
     
-    lock_kernel() ;
+    reiserfs_write_lock(inode->i_sb);
     down (&inode->i_sem); 
     journal_begin(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3) ;
     reiserfs_update_inode_transaction(inode) ;
@@ -61,14 +61,12 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 	pop_journal_writer(windex) ;
     }
     up (&inode->i_sem); 
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
     return 0;
 }
 
 static void reiserfs_vfs_truncate_file(struct inode *inode) {
-    lock_kernel();
     reiserfs_truncate_file(inode, 1) ;
-    unlock_kernel();
 }
 
 /* Sync a reiserfs file. */
@@ -86,21 +84,21 @@ static int reiserfs_sync_file(
   struct inode * p_s_inode = p_s_dentry->d_inode;
   int n_err;
 
-  lock_kernel() ;
+  reiserfs_write_lock(p_s_inode->i_sb);
 
   if (!S_ISREG(p_s_inode->i_mode))
       BUG ();
 
   n_err = sync_mapping_buffers(p_s_inode->i_mapping) ;
   reiserfs_commit_for_inode(p_s_inode) ;
-  unlock_kernel() ;
+  reiserfs_write_unlock(p_s_inode->i_sb);
   return ( n_err < 0 ) ? -EIO : 0;
 }
 
 static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
     struct inode *inode = dentry->d_inode ;
     int error ;
-    lock_kernel();
+    reiserfs_write_lock(inode->i_sb);
     if (attr->ia_valid & ATTR_SIZE) {
 	/* version 2 items will be caught by the s_maxbytes check
 	** done for us in vmtruncate
@@ -138,7 +136,7 @@ static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
         inode_setattr(inode, attr) ;
 
 out:
-    unlock_kernel();
+    reiserfs_write_unlock(inode->i_sb);
     return error ;
 }
 

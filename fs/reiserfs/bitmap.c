@@ -103,7 +103,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th, unsign
   if (nr >= sb_bmap_nr (rs)) {
 	  reiserfs_warning ("vs-4075: reiserfs_free_block: "
 			    "block %lu is out of range on %s\n", 
-			    block, s->s_id);
+			    block, reiserfs_bdevname (s));
 	  return;
   }
 
@@ -113,7 +113,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th, unsign
   if (!reiserfs_test_and_clear_le_bit (offset, apbh[nr]->b_data)) {
       reiserfs_warning ("vs-4080: reiserfs_free_block: "
 			"free_block (%s:%lu)[dev:blocknr]: bit already cleared\n", 
-	    s->s_id, block);
+			reiserfs_bdevname (s), block);
   }
   journal_mark_dirty (th, s, apbh[nr]);
 
@@ -139,10 +139,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
 /* preallocated blocks don't need to be run through journal_mark_freed */
 void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th, 
                           unsigned long block) {
-    struct super_block * s = th->t_super;
-
-    RFALSE(!s, "vs-4060: trying to free block on nonexistent device");
-    RFALSE(is_reusable (s, block, 1) == 0, "vs-4070: can not free such block");
+    RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
+    RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
     _reiserfs_free_block(th, block) ;
 }
 
@@ -670,10 +668,7 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   return ret;
 }
 
-//
-// a portion of this function, was derived from minix or ext2's
-// analog. You should be able to tell which portion by looking at the
-// ext2 code and comparing. 
+
 static void __discard_prealloc (struct reiserfs_transaction_handle * th,
 				struct reiserfs_inode_info *ei)
 {
