@@ -1060,15 +1060,15 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 	case AVMB1_LOAD_AND_CONFIG:
 
 		if (cmd == AVMB1_LOAD) {
-			if ((retval = copy_from_user((void *) &ldef, data,
-						sizeof(avmb1_loaddef))))
-				return retval;
+			if (copy_from_user((void *)&ldef, data,
+					   sizeof(avmb1_loaddef)))
+				return -EFAULT;
 			ldef.t4config.len = 0;
 			ldef.t4config.data = 0;
 		} else {
-			if ((retval = copy_from_user((void *) &ldef, data,
-					    	sizeof(avmb1_loadandconfigdef))))
-				return retval;
+			if (copy_from_user((void *)&ldef, data,
+					   sizeof(avmb1_loadandconfigdef)))
+				return -EFAULT;
 		}
 		card = get_capi_ctr_by_nr(ldef.contr);
 		card = capi_ctr_get(card);
@@ -1123,9 +1123,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		return 0;
 
 	case AVMB1_RESETCARD:
-		if ((retval = copy_from_user((void *) &rdef, data,
-					 sizeof(avmb1_resetdef))))
-			return retval;
+		if (copy_from_user((void *)&rdef, data, sizeof(avmb1_resetdef)))
+			return -EFAULT;
 		card = get_capi_ctr_by_nr(rdef.contr);
 		if (!card)
 			return -ESRCH;
@@ -1146,9 +1145,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		return 0;
 
 	case AVMB1_GET_CARDINFO:
-		if ((retval = copy_from_user((void *) &gdef, data,
-					 sizeof(avmb1_getdef))))
-			return retval;
+		if (copy_from_user((void *)&gdef, data, sizeof(avmb1_getdef)))
+			return -EFAULT;
 
 		card = get_capi_ctr_by_nr(gdef.contr);
 		if (!card)
@@ -1159,9 +1157,8 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 			gdef.cardtype = AVM_CARDTYPE_T1;
 		else gdef.cardtype = AVM_CARDTYPE_B1;
 
-		if ((retval = copy_to_user(data, (void *) &gdef,
-					 sizeof(avmb1_getdef))))
-			return retval;
+		if (copy_to_user(data, (void *)&gdef, sizeof(avmb1_getdef)))
+			return -EFAULT;
 
 		return 0;
 	}
@@ -1187,9 +1184,8 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 	{
 		kcapi_flagdef fdef;
 
-		if ((retval = copy_from_user((void *) &fdef, data,
-					 sizeof(kcapi_flagdef))))
-			return retval;
+		if (copy_from_user((void *)&fdef, data, sizeof(kcapi_flagdef)))
+			return -EFAULT;
 
 		card = get_capi_ctr_by_nr(fdef.contr);
 		if (!card)
