@@ -406,7 +406,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	return 0;
 
 fail:
-	printk(KERN_ERR "md: disabled device %s, could not read superblock.\n",
+	printk(KERN_WARNING "md: disabled device %s, could not read superblock.\n",
 		bdevname(rdev->bdev,b));
 	return -EINVAL;
 }
