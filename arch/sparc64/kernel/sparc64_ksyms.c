@@ -91,6 +91,7 @@ extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
 extern long sparc32_open(const char * filename, int flags, int mode);
 extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
+extern void (*prom_palette)(int);
 
 extern int __ashrdi3(int, int);
 
@@ -388,3 +389,5 @@ EXPORT_SYMBOL(xor_vis_2);
 EXPORT_SYMBOL(xor_vis_3);
 EXPORT_SYMBOL(xor_vis_4);
 EXPORT_SYMBOL(xor_vis_5);
+
+EXPORT_SYMBOL(prom_palette);
