@@ -20,7 +20,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-id.h,v 1.52 2002/07/10 13:28:44 abz Exp $ */
+/* $Id: i2c-id.h,v 1.56 2002/10/13 15:50:02 mds Exp $ */
 
 #ifndef I2C_ID_H
 #define I2C_ID_H
@@ -143,6 +143,8 @@
 #define I2C_DRIVERID_SMSC47M1 1031
 #define I2C_DRIVERID_VT1211 1032
 #define I2C_DRIVERID_LM92 1033
+#define I2C_DRIVERID_VT8231 1034
+#define I2C_DRIVERID_SMARTBATT 1035
 
 /*
  * ---- Adapter types ----------------------------------------------------
@@ -161,6 +163,7 @@
 #define I2C_ALGO_ACB 	0x070000	/* ACCESS.bus algorithm         */
 #define I2C_ALGO_IIC    0x080000 	/* ITE IIC bus */
 #define I2C_ALGO_SAA7134 0x090000
+#define I2C_ALGO_MPC824X 0x0a0000	/* Motorola 8240 / 8245         */
 #define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
 
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
@@ -206,6 +209,9 @@
 /* --- ACPI Embedded controller algorithms                              */
 #define I2C_HW_ACPI_EC          0x00
 
+/* --- MPC824x PowerPC adapters						*/
+#define I2C_HW_MPC824X 0x00	/* Motorola 8240 / 8245                 */
+
 /* --- MPC8xx PowerPC adapters						*/
 #define I2C_HW_MPC8XX_EPON 0x00	/* Eponymous MPC8xx I2C adapter 	*/
 
@@ -225,6 +231,8 @@
 #define I2C_HW_SMBUS_AMD756	0x05
 #define I2C_HW_SMBUS_SIS5595	0x06
 #define I2C_HW_SMBUS_ALI1535	0x07
+#define I2C_HW_SMBUS_SIS630	0x08
+#define I2C_HW_SMBUS_SIS645	0x09
 
 /* --- ISA pseudo-adapter						*/
 #define I2C_HW_ISA 0x00
