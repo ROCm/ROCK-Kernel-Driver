@@ -27,6 +27,7 @@
 #ifdef CONFIG_44x
 #include <asm/ibm4xx.h>
 #endif
+#include <asm/reg.h>
 
 #include "nonstdio.h"
 #include "zlib.h"
