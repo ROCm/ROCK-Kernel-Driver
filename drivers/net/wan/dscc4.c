@@ -438,12 +438,6 @@ int state_check(u32 state, struct dscc4_dev_priv *dpriv, struct net_device *dev,
 	return ret;
 }
 
-void inline reset_TxFD(struct TxFD *tx_fd) {
-	/* FIXME: test with the last arg (size specification) = 0 */
-	tx_fd->state = FrameEnd | Hold | 0x00100000;
-	tx_fd->complete = 0x00000000;
-}
-
 static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 {
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
@@ -886,54 +880,13 @@ err_out:
 	return -1;
 };
 
+/* FIXME: get rid of the unneeded code */
 static void dscc4_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct dscc4_dev_priv *dpriv;
-	struct dscc4_pci_priv *ppriv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
+//	struct dscc4_pci_priv *ppriv;
 
-	dpriv = dscc4_priv(dev);
-	if (netif_queue_stopped(dev) && 
-	   ((jiffies - dev->trans_start) > TX_TIMEOUT)) {
-		ppriv = dpriv->pci_priv;
-		if (dpriv->iqtx[dpriv->iqtx_current%IRQ_RING_SIZE]) {
-			u32 flags;
-
-			printk(KERN_DEBUG "%s: pending events\n", dev->name);
-			dev->trans_start = jiffies;
-			spin_lock_irqsave(&ppriv->lock, flags);
-			dscc4_tx_irq(ppriv, dpriv);
-			spin_unlock_irqrestore(&ppriv->lock, flags);
-		} else {
-			struct TxFD *tx_fd;
-			struct sk_buff *skb;
-			int i,j;
-
-			printk(KERN_DEBUG "%s: missing events\n", dev->name);
-			i = dpriv->tx_dirty%TX_RING_SIZE; 
-			j = dpriv->tx_current - dpriv->tx_dirty;
-			dev_to_hdlc(dev)->stats.tx_dropped += j;
-			while (j--) {
-				skb = dpriv->tx_skbuff[i];
-				tx_fd = dpriv->tx_fd + i;
-				if (skb) {
-					dpriv->tx_skbuff[i] = NULL;
-					pci_unmap_single(ppriv->pdev, tx_fd->data, skb->len,
-						 	 PCI_DMA_TODEVICE);
-					dev_kfree_skb_irq(skb);
-				} else 
-					printk(KERN_INFO "%s: hardware on drugs!\n", dev->name);
-				tx_fd->data = 0; /* DEBUG */
-				tx_fd->complete &= ~DataComplete;
-				i++;	
-				i %= TX_RING_SIZE; 
-			}
-			dpriv->tx_dirty = dpriv->tx_current;
-			dev->trans_start = jiffies;
-			netif_wake_queue(dev);
-			printk(KERN_DEBUG "%s: re-enabled\n", dev->name);	
-		}
-	}
 	goto done;
 done:
         dpriv->timer.expires = jiffies + TX_TIMEOUT;
