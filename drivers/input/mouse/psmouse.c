@@ -142,7 +142,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  */
 
 	if (psmouse->type == PSMOUSE_IMEX) {
-		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[2] & 8));
+		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[3] & 8));
 		input_report_key(dev, BTN_SIDE, (packet[3] >> 4) & 1);
 		input_report_key(dev, BTN_EXTRA, (packet[3] >> 5) & 1);
 	}
