@@ -45,11 +45,6 @@
  *
  */
 
-UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
-		"Mitsumi",
-		"CD-R/RW Drive",
-		US_SC_8020, US_PR_CBI, NULL, 0), 
-
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
 		"Mitsumi",
 		"USB FDD",
