@@ -324,7 +324,7 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 	}
 }
 
-void 
+static void 
 isdn_ciscohdlck_receive(isdn_net_dev *idev, isdn_net_local *olp,
 			struct sk_buff *skb)
 {
@@ -393,6 +393,7 @@ isdn_ciscohdlck_setup(isdn_net_dev *p)
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
+	p->local.receive = isdn_ciscohdlck_receive;
 
 	return 0;
 }

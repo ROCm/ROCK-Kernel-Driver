@@ -210,11 +210,6 @@ static int isdn_ether_setup(isdn_net_dev *p);
 static int isdn_uihdlc_setup(isdn_net_dev *p);
 static int isdn_iptyp_setup(isdn_net_dev *p);
 
-static void isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
-static void isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
-static void isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
-static void isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
-
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
  /*
@@ -1228,34 +1223,8 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 	skb->pkt_type = PACKET_HOST;
 	skb->mac.raw = skb->data;
 	isdn_dumppkt("R:", skb->data, skb->len, 40);
-	switch (lp->p_encap) {
-		case ISDN_NET_ENCAP_ETHER:
-			isdn_ether_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_UIHDLC:
-			isdn_uihdlc_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_RAWIP:
-			isdn_rawip_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_CISCOHDLCK:
-		case ISDN_NET_ENCAP_CISCOHDLC:
-			isdn_ciscohdlck_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_IPTYP:
-			isdn_iptyp_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_SYNCPPP:
-			isdn_ppp_receive(lp->netdev, olp, skb);
-			break;
-		case ISDN_NET_ENCAP_X25IFACE:
-			isdn_x25_receive(lp->netdev, olp, skb);
-			break;
-		default:
-			isdn_BUG();
-			kfree_skb(skb);
-			break;
-	}
+
+	lp->receive(lp->netdev, olp, skb);
 }
 
 /*
@@ -2514,6 +2483,7 @@ isdn_iptyp_setup(isdn_net_dev *p)
 	p->dev.hard_header_cache = NULL;
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+	p->local.receive = isdn_iptyp_receive;
 
 	return 0;
 }
@@ -2550,6 +2520,7 @@ isdn_uihdlc_setup(isdn_net_dev *p)
 	p->dev.hard_header_cache = NULL;
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+	p->local.receive = isdn_uihdlc_receive;
 
 	return 0;
 }
@@ -2576,6 +2547,7 @@ isdn_rawip_setup(isdn_net_dev *p)
 	p->dev.hard_header_cache = NULL;
 	p->dev.header_cache_update = NULL;
 	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+	p->local.receive = isdn_rawip_receive;
 
 	return 0;
 }
@@ -2656,6 +2628,7 @@ isdn_ether_setup(isdn_net_dev *p)
 	p->dev.hard_header_cache = eth_header_cache;
 	p->dev.header_cache_update = eth_header_cache_update;
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
+	p->local.receive = isdn_ether_receive;
 
 	return 0;
 }

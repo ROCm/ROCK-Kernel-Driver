@@ -124,32 +124,6 @@ void isdn_x25_cleanup(isdn_net_dev *p)
 	restore_flags(flags);
 }
 
-int isdn_x25_setup(isdn_net_dev *p, int encap)
-{
-	isdn_net_local *lp = &p->local;
-
-	/* ... ,  prepare for configuration of new one ... */
-	switch ( encap ){
-	case ISDN_NET_ENCAP_X25IFACE:
-		lp -> dops = &isdn_concap_reliable_dl_dops;
-	}
-	/* ... and allocate new one ... */
-	p -> cprot = isdn_concap_new( cfg -> p_encap );
-	/* p -> cprot == NULL now if p_encap is not supported
-	   by means of the concap_proto mechanism */
-	if (!p->cprot)
-		return -EINVAL;
-
-	isdn_other_setup(p);
-	p->dev.type = ARPHRD_X25;	/* change ARP type */
-	p->dev.addr_len = 0;
-
-	/* the protocol is not configured yet; this will
-	   happen later when isdn_x25_open() is called */
-
-	return 0;
-}
-
 void isdn_x25_open(struct net_device *dev)
 {
 	struct concap_device_ops * dops =
@@ -247,7 +221,8 @@ int isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return ret;
 }
 
-void isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
+static void 
+isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
 {
 	isdn_net_local *lp = &p->local;
 	struct concap_proto *cprot = lp -> netdev -> cprot;
@@ -265,6 +240,35 @@ void isdn_x25_realrm(isdn_net_dev *p)
 {
 	if( p -> cprot && p -> cprot -> pops )
 		p -> cprot -> pops -> proto_del ( p -> cprot );
+}
+
+int isdn_x25_setup(isdn_net_dev *p, int encap)
+{
+	isdn_net_local *lp = &p->local;
+
+	/* ... ,  prepare for configuration of new one ... */
+	switch ( encap ){
+	case ISDN_NET_ENCAP_X25IFACE:
+		lp -> dops = &isdn_concap_reliable_dl_dops;
+	}
+	/* ... and allocate new one ... */
+	p -> cprot = isdn_concap_new( cfg -> p_encap );
+	/* p -> cprot == NULL now if p_encap is not supported
+	   by means of the concap_proto mechanism */
+	if (!p->cprot)
+		return -EINVAL;
+
+	p->dev.type = ARPHRD_X25;	/* change ARP type */
+	p->dev.addr_len = 0;
+	p->dev.hard_header = NULL;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->local.receive = isdn_x25_receive;
+
+	/* the protocol is not configured yet; this will
+	   happen later when isdn_x25_open() is called */
+
+	return 0;
 }
 
 #endif /* CONFIG_ISDN_X25 */

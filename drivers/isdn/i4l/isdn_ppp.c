@@ -962,7 +962,8 @@ static int isdn_ppp_strip_proto(struct sk_buff *skb)
 /*
  * handler for incoming packets on a syncPPP interface
  */
-void isdn_ppp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff *skb)
+static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp, 
+			     struct sk_buff *skb)
 {
 	struct ippp_struct *is;
 	int slot;
@@ -2914,7 +2915,8 @@ isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
 
 
 
-int isdn_ppp_setup(isdn_net_dev *p)
+int
+isdn_ppp_setup(isdn_net_dev *p)
 {
 	p->dev.hard_header = isdn_ppp_header;
 	p->dev.hard_header_cache = NULL;
@@ -2923,6 +2925,7 @@ int isdn_ppp_setup(isdn_net_dev *p)
 	p->dev.type = ARPHRD_PPP;	/* change ARP type */
 	p->dev.addr_len = 0;
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
+	p->local.receive = isdn_ppp_receive;
 
 	return 0;
 }

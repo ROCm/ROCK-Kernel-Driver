@@ -371,6 +371,9 @@ typedef struct isdn_net_local_s {
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
   struct timer_list cisco_timer;
   struct tq_struct tqueue;
+  void                   (*receive)(struct isdn_net_dev_s *p,
+				    struct isdn_net_local_s *olp,
+				    struct sk_buff *skb);
 } isdn_net_local;
 
 /* the interface itself */

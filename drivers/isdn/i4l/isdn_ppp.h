@@ -25,7 +25,6 @@ int  isdn_ppp_setup(isdn_net_dev *p);
 void isdn_ppp_wakeup_daemon(isdn_net_local *);
 int  isdn_ppp_bind(isdn_net_local *);
 void isdn_ppp_free(isdn_net_local *);
-void isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *);
 int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 
 #else
@@ -50,11 +49,6 @@ isdn_ppp_bind(isdn_net_local *)
 
 static inline void
 isdn_ppp_free(isdn_net_local *lp)
-{
-}
-
-static inline void
-isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *)
 {
 }
 
