@@ -2726,6 +2726,7 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
    one for now. */
 static u16 transmit_allocate(struct airo_info *ai, int lenPayload, int raw)
 {
+	unsigned int loop = 3000;
 	Cmd cmd;
 	Resp rsp;
 	u16 txFid;
@@ -2746,7 +2747,12 @@ static u16 transmit_allocate(struct airo_info *ai, int lenPayload, int raw)
 	/* wait for the allocate event/indication
 	 * It makes me kind of nervous that this can just sit here and spin,
 	 * but in practice it only loops like four times. */
-	while ( (IN4500(ai, EVSTAT) & EV_ALLOC) == 0) ;
+	while (((IN4500(ai, EVSTAT) & EV_ALLOC) == 0) && --loop);
+	if (!loop) {
+		txFid = ERROR;
+		goto done;
+	}
+
 	// get the allocated fid and acknowledge
 	txFid = IN4500(ai, TXALLOCFID);
 	OUT4500(ai, EVACK, EV_ALLOC);
