@@ -151,7 +151,7 @@ void agp_free_memory(struct agp_memory *curr)
 	}
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
-			agp_bridge->driver->agp_destroy_page(phys_to_virt(curr->memory[i]));
+			agp_bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]));
 		}
 	}
 	agp_free_key(curr->key);
@@ -204,7 +204,7 @@ struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[i] = virt_to_phys(addr);
+		new->memory[i] = virt_to_gart(addr);
 		new->page_count++;
 	}
 
@@ -697,8 +697,7 @@ int agp_generic_create_gatt_table(void)
 				break;
 			}
 
-			table = (char *) __get_free_pages(GFP_KERNEL,
-							  page_order);
+			table = alloc_gatt_pages(page_order);
 
 			if (table == NULL) {
 				i++;
@@ -729,7 +728,7 @@ int agp_generic_create_gatt_table(void)
 		size = ((struct aper_size_info_fixed *) temp)->size;
 		page_order = ((struct aper_size_info_fixed *) temp)->page_order;
 		num_entries = ((struct aper_size_info_fixed *) temp)->num_entries;
-		table = (char *) __get_free_pages(GFP_KERNEL, page_order);
+		table = alloc_gatt_pages(page_order);
 	}
 
 	if (table == NULL)
@@ -744,7 +743,7 @@ int agp_generic_create_gatt_table(void)
 	agp_gatt_table = (void *)table;
 
 	agp_bridge->driver->cache_flush();
-	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
+	agp_bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
 					(PAGE_SIZE * (1 << page_order)));
 	agp_bridge->driver->cache_flush();
 
@@ -752,11 +751,11 @@ int agp_generic_create_gatt_table(void)
 		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 			ClearPageReserved(page);
 
-		free_pages((unsigned long) table, page_order);
+		free_gatt_pages(table, page_order);
 
 		return -ENOMEM;
 	}
-	agp_bridge->gatt_bus_addr = virt_to_phys(agp_bridge->gatt_table_real);
+	agp_bridge->gatt_bus_addr = virt_to_gart(agp_bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++) {
@@ -810,7 +809,7 @@ int agp_generic_free_gatt_table(void)
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		ClearPageReserved(page);
 
-	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
+	free_gatt_pages(agp_bridge->gatt_table_real, page_order);
 
 	agp_gatt_table = NULL;
 	agp_bridge->gatt_table = NULL;

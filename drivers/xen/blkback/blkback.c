@@ -66,6 +66,19 @@ static PEND_RING_IDX pending_prod, pending_cons;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 static kmem_cache_t *buffer_head_cachep;
+#else
+static request_queue_t *plugged_queue;
+static inline void flush_plugged_queue(void)
+{
+    request_queue_t *q = plugged_queue;
+    if ( q != NULL )
+    {
+        if ( q->unplug_fn != NULL )
+            q->unplug_fn(q);
+        blk_put_queue(q);
+        plugged_queue = NULL;
+    }
+}
 #endif
 
 static int do_block_io_op(blkif_t *blkif, int max_to_do);
@@ -176,9 +189,11 @@ static int blkio_schedule(void *arg)
             blkif_put(blkif);
         }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         /* Push the batch through to disc. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&tq_disk);
+#else
+        flush_plugged_queue();
 #endif
     }
 }
@@ -481,7 +496,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     for ( i = 0; i < nr_psegs; i++ )
     {
         struct bio *bio;
-        struct bio_vec *bv;
+        request_queue_t *q;
 
         bio = bio_alloc(GFP_ATOMIC, 1);
         if ( unlikely(bio == NULL) )
@@ -494,15 +509,19 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         bio->bi_private = pending_req;
         bio->bi_end_io  = end_block_io_op;
         bio->bi_sector  = phys_seg[i].sector_number;
-        bio->bi_rw      = operation;
 
-        bv = bio_iovec_idx(bio, 0);
-        bv->bv_page   = virt_to_page(MMAP_VADDR(pending_idx, i));
-        bv->bv_len    = phys_seg[i].nr_sects << 9;
-        bv->bv_offset = phys_seg[i].buffer & ~PAGE_MASK;
+        bio_add_page(
+            bio,
+            virt_to_page(MMAP_VADDR(pending_idx, i)),
+            phys_seg[i].nr_sects << 9,
+            phys_seg[i].buffer & ~PAGE_MASK);
 
-        bio->bi_size    = bv->bv_len;
-        bio->bi_vcnt++;
+        if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
+        {
+            flush_plugged_queue();
+            blk_get_queue(q);
+            plugged_queue = q;
+        }
 
         submit_bio(operation, bio);
     }

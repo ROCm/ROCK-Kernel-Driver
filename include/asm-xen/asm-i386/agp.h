@@ -3,6 +3,7 @@
 
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
+#include <asm/system.h>
 
 /* 
  * Functions to keep the agpgart mappings coherent with the MMU.
@@ -19,16 +20,18 @@ int unmap_page_from_agp(struct page *page);
 /* Could use CLFLUSH here if the cpu supports it. But then it would
    need to be called for each cacheline of the whole page so it may not be 
    worth it. Would need a page for it. */
-#define flush_agp_cache() asm volatile("wbinvd":::"memory")
+#define flush_agp_cache() wbinvd()
 
 /* Convert a physical address to an address suitable for the GART. */
-#define phys_to_gart(x) (x)
-#define gart_to_phys(x) (x)
+#define phys_to_gart(x) phys_to_machine(x)
+#define gart_to_phys(x) machine_to_phys(x)
 
 /* GATT allocation. Returns/accepts GATT kernel virtual address. */
-#define alloc_gatt_pages(order)		\
-	((char *)__get_free_pages(GFP_KERNEL, (order)))
+#define alloc_gatt_pages(order)	({                                          \
+	char *_t; dma_addr_t _d;                                            \
+	_t = dma_alloc_coherent(NULL,PAGE_SIZE<<(order),&_d,GFP_KERNEL);    \
+	_t; })
 #define free_gatt_pages(table, order)	\
-	free_pages((unsigned long)(table), (order))
+	dma_free_coherent(NULL,PAGE_SIZE<<(order),(table),virt_to_bus(table))
 
 #endif

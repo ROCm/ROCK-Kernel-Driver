@@ -142,7 +142,7 @@ static int agp_backend_initialize(struct agp_bridge_data *bridge)
 			return -ENOMEM;
 		}
 
-		bridge->scratch_page_real = virt_to_phys(addr);
+		bridge->scratch_page_real = virt_to_gart(addr);
 		bridge->scratch_page =
 		    bridge->driver->mask_memory(bridge->scratch_page_real, 0);
 	}
@@ -186,7 +186,7 @@ static int agp_backend_initialize(struct agp_bridge_data *bridge)
 err_out:
 	if (bridge->driver->needs_scratch_page)
 		bridge->driver->agp_destroy_page(
-				phys_to_virt(bridge->scratch_page_real));
+				gart_to_virt(bridge->scratch_page_real));
 	if (got_gatt)
 		bridge->driver->free_gatt_table();
 	if (got_keylist) {
@@ -211,7 +211,7 @@ static void agp_backend_cleanup(struct agp_bridge_data *bridge)
 	if (bridge->driver->agp_destroy_page &&
 	    bridge->driver->needs_scratch_page)
 		bridge->driver->agp_destroy_page(
-				phys_to_virt(bridge->scratch_page_real));
+				gart_to_virt(bridge->scratch_page_real));
 }
 
 /* XXX Kludge alert: agpgart isn't ready for multiple bridges yet */

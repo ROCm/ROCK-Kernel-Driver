@@ -51,7 +51,7 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	if (new == NULL)
 		return NULL;
 
-	new->memory[0] = virt_to_phys(addr);
+	new->memory[0] = virt_to_gart(addr);
 	new->page_count = 1;
 	new->num_scratch_pages = 1;
 	new->type = AGP_PHYS_MEMORY;
@@ -63,7 +63,7 @@ static void intel_i810_free_by_type(struct agp_memory *curr)
 {
 	agp_free_key(curr->key);
 	if(curr->type == AGP_PHYS_MEMORY) {
-		agp_bridge->driver->agp_destroy_page(phys_to_virt(curr->memory[0]));
+		agp_bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[0]));
 		vfree(curr->memory);
 	}
 	kfree(curr);
