@@ -33,6 +33,7 @@
 #include <linux/pci.h>
 #include <linux/list.h>
 #include <linux/delay.h>
+#include <linux/kref.h>
 #include <linux/workqueue.h>
 
 #include <asm/atomic.h>
@@ -86,7 +87,7 @@ typedef struct user_info_t {
 
 /* Socket state information */
 struct pcmcia_bus_socket {
-	atomic_t		refcount;
+	struct kref		refcount;
 	struct pcmcia_callback	callback;
 	int			state;
 	user_info_t		*user;
@@ -381,22 +382,21 @@ EXPORT_SYMBOL(cs_error);
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info);
 static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr);
 
-static void pcmcia_put_bus_socket(struct pcmcia_bus_socket *s)
+static void pcmcia_release_bus_socket(struct kref *refcount)
 {
-	if (atomic_dec_and_test(&s->refcount))
-		kfree(s);
+	struct pcmcia_bus_socket *s = container_of(refcount, struct pcmcia_bus_socket, refcount);
+	kfree(s);
 }
 
-static struct pcmcia_bus_socket *pcmcia_get_bus_socket(int nr)
+static void pcmcia_put_bus_socket(struct pcmcia_bus_socket *s)
 {
-	struct pcmcia_bus_socket *s;
+	kref_put(&s->refcount, pcmcia_release_bus_socket);
+}
 
-	s = get_socket_info_by_nr(nr);
-	if (s) {
-		WARN_ON(atomic_read(&s->refcount) == 0);
-		atomic_inc(&s->refcount);
-	}
-	return s;
+static struct pcmcia_bus_socket *pcmcia_get_bus_socket(struct pcmcia_bus_socket *s)
+{
+	kref_get(&s->refcount);
+	return (s);
 }
 
 /**
@@ -888,19 +888,27 @@ static int ds_open(struct inode *inode, struct file *file)
 
     ds_dbg(0, "ds_open(socket %d)\n", i);
 
-    s = pcmcia_get_bus_socket(i);
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
+    s = pcmcia_get_bus_socket(s);
     if (!s)
 	    return -ENODEV;
 
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	if (s->state & DS_SOCKET_BUSY)
-	    return -EBUSY;
+	    if (s->state & DS_SOCKET_BUSY) {
+		    pcmcia_put_bus_socket(s);
+		    return -EBUSY;
+	    }
 	else
 	    s->state |= DS_SOCKET_BUSY;
     }
     
     user = kmalloc(sizeof(user_info_t), GFP_KERNEL);
-    if (!user) return -ENOMEM;
+    if (!user) {
+	    pcmcia_put_bus_socket(s);
+	    return -ENOMEM;
+    }
     user->event_tail = user->event_head = 0;
     user->next = s->user;
     user->user_magic = USER_MAGIC;
@@ -1243,7 +1251,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	if(!s)
 		return -ENOMEM;
 	memset(s, 0, sizeof(struct pcmcia_bus_socket));
-	atomic_set(&s->refcount, 1);
+	kref_init(&s->refcount);
     
 	/*
 	 * Ugly. But we want to wait for the socket threads to have started up.
