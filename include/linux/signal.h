@@ -1,9 +1,10 @@
 #ifndef _LINUX_SIGNAL_H
 #define _LINUX_SIGNAL_H
 
+#include <linux/list.h>
+#include <linux/spinlock.h>
 #include <asm/signal.h>
 #include <asm/siginfo.h>
-#include <linux/list.h>
 
 #ifdef __KERNEL__
 /*
