@@ -2811,11 +2811,10 @@ static inline int tg3_4g_overflow_test(dma_addr_t mapping, int len)
 	u32 base = (u32) mapping & 0xffffffff;
 
 	return ((base > 0xffffdcc0) &&
-		((u64) mapping >> 32) == 0 &&
 		(base + len + 8 < base));
 }
 
-static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
+static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct tg3 *tp = netdev_priv(dev);
 	dma_addr_t mapping;
@@ -3012,165 +3011,6 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
-	spin_unlock_irqrestore(&tp->tx_lock, flags);
-
-	dev->trans_start = jiffies;
-
-	return 0;
-}
-
-static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-	struct tg3 *tp = netdev_priv(dev);
-	dma_addr_t mapping;
-	u32 len, entry, base_flags, mss;
-	unsigned long flags;
-
-	len = skb_headlen(skb);
-
-	/* No BH disabling for tx_lock here.  We are running in BH disabled
-	 * context and TX reclaim runs via tp->poll inside of a software
-	 * interrupt.  Rejoice!
-	 *
-	 * Actually, things are not so simple.  If we are to take a hw
-	 * IRQ here, we can deadlock, consider:
-	 *
-	 *       CPU1		CPU2
-	 *   tg3_start_xmit
-	 *   take tp->tx_lock
-	 *			tg3_timer
-	 *			take tp->lock
-	 *   tg3_interrupt
-	 *   spin on tp->lock
-	 *			spin on tp->tx_lock
-	 *
-	 * So we really do need to disable interrupts when taking
-	 * tx_lock here.
-	 */
-	spin_lock_irqsave(&tp->tx_lock, flags);
-
-	/* This is a hard error, log it. */
-	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
-		netif_stop_queue(dev);
-		spin_unlock_irqrestore(&tp->tx_lock, flags);
-		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
-		       dev->name);
-		return 1;
-	}
-
-	entry = tp->tx_prod;
-	base_flags = 0;
-	if (skb->ip_summed == CHECKSUM_HW)
-		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#if TG3_TSO_SUPPORT != 0
-	mss = 0;
-	if (skb->len > (tp->dev->mtu + ETH_HLEN) &&
-	    (mss = skb_shinfo(skb)->tso_size) != 0) {
-		int tcp_opt_len, ip_tcp_len;
-
-		tcp_opt_len = ((skb->h.th->doff - 5) * 4);
-		ip_tcp_len = (skb->nh.iph->ihl * 4) + sizeof(struct tcphdr);
-
-		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
-			       TXD_FLAG_CPU_POST_DMA);
-
-		skb->nh.iph->check = 0;
-		skb->nh.iph->tot_len = ntohs(mss + ip_tcp_len + tcp_opt_len);
-		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
-						      skb->nh.iph->daddr,
-						      0, IPPROTO_TCP, 0);
-
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
-			if (tcp_opt_len || skb->nh.iph->ihl > 5) {
-				int tsflags;
-
-				tsflags = ((skb->nh.iph->ihl - 5) +
-					   (tcp_opt_len >> 2));
-				mss |= (tsflags << 11);
-			}
-		} else {
-			if (tcp_opt_len || skb->nh.iph->ihl > 5) {
-				int tsflags;
-
-				tsflags = ((skb->nh.iph->ihl - 5) +
-					   (tcp_opt_len >> 2));
-				base_flags |= tsflags << 12;
-			}
-		}
-	}
-#else
-	mss = 0;
-#endif
-#if TG3_VLAN_TAG_USED
-	if (tp->vlgrp != NULL && vlan_tx_tag_present(skb))
-		base_flags |= (TXD_FLAG_VLAN |
-			       (vlan_tx_tag_get(skb) << 16));
-#endif
-
-	/* Queue skb data, a.k.a. the main skb fragment. */
-	mapping = pci_map_single(tp->pdev, skb->data, len, PCI_DMA_TODEVICE);
-
-	tp->tx_buffers[entry].skb = skb;
-	pci_unmap_addr_set(&tp->tx_buffers[entry], mapping, mapping);
-
-	tg3_set_txd(tp, entry, mapping, len, base_flags,
-		    (skb_shinfo(skb)->nr_frags == 0) | (mss << 1));
-
-	entry = NEXT_TX(entry);
-
-	/* Now loop through additional data fragments, and queue them. */
-	if (skb_shinfo(skb)->nr_frags > 0) {
-		unsigned int i, last;
-
-		last = skb_shinfo(skb)->nr_frags - 1;
-		for (i = 0; i <= last; i++) {
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-
-
-			len = frag->size;
-			mapping = pci_map_page(tp->pdev,
-					       frag->page,
-					       frag->page_offset,
-					       len, PCI_DMA_TODEVICE);
-
-			tp->tx_buffers[entry].skb = NULL;
-			pci_unmap_addr_set(&tp->tx_buffers[entry], mapping, mapping);
-
-			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
-				tg3_set_txd(tp, entry, mapping, len,
-					    base_flags, (i == last)|(mss << 1));
-			else
-				tg3_set_txd(tp, entry, mapping, len,
-					    base_flags, (i == last));
-
-			entry = NEXT_TX(entry);
-		}
-	}
-
-	/* Packets are ready, update Tx producer idx local and on card.
-	 * We know this is not a 5700 (by virtue of not being a chip
-	 * requiring the 4GB overflow workaround) so we can safely omit
-	 * the double-write bug tests.
-	 */
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
-			      TG3_64BIT_REG_LOW), entry);
-	} else {
-		/* First, make sure tg3 sees last descriptor fully
-		 * in SRAM.
-		 */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 +
-			     TG3_64BIT_REG_LOW);
-
-		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
-			      TG3_64BIT_REG_LOW), entry);
-	}
-
-	tp->tx_prod = entry;
-	if (TX_BUFFS_AVAIL(tp) <= (MAX_SKB_FRAGS + 1))
-		netif_stop_queue(dev);
-
 	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
@@ -7636,13 +7476,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	else
 		tp->tg3_flags &= ~TG3_FLAG_TXD_MBOX_HWBUG;
 
-	/* 5700 chips can get confused if TX buffers straddle the
-	 * 4GB address boundary in some cases.
+	/* It seems all chips can get confused if TX buffers
+	 * straddle the 4GB address boundary in some cases.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700)
-		tp->dev->hard_start_xmit = tg3_start_xmit_4gbug;
-	else
-		tp->dev->hard_start_xmit = tg3_start_xmit;
+	tp->dev->hard_start_xmit = tg3_start_xmit;
 
 	tp->rx_offset = 2;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
