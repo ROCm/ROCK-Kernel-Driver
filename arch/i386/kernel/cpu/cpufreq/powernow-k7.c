@@ -95,7 +95,7 @@ static int fid_codes[32] = {
  * configuration purpose.
  */
 
-static int powernow_acpi_force;
+static int acpi_force;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -572,7 +572,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	}
 	dprintk(KERN_INFO PFX "FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
 
-	if ((dmi_broken & BROKEN_CPUFREQ) || powernow_acpi_force) {
+	if ((dmi_broken & BROKEN_CPUFREQ) || acpi_force) {
 		printk (KERN_INFO PFX "PSB/PST known to be broken.  Trying ACPI instead\n");
 		result = powernow_acpi_init();
 	} else {
@@ -653,8 +653,7 @@ static void __exit powernow_exit (void)
 		kfree(powernow_table);
 }
 
-module_param(powernow_acpi_force,  int, 0444);
-
+module_param(acpi_force,  int, 0444);
 MODULE_PARM_DESC(acpi_force, "Force ACPI to be used");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
