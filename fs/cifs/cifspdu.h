@@ -68,6 +68,8 @@
 #define NT_TRANSACT_NOTIFY_CHANGE     0x04
 #define NT_TRANSACT_RENAME            0x05
 #define NT_TRANSACT_QUERY_SECURITY_DESC 0x06
+#define NT_TRANSACT_GET_USER_QUOTA    0x07
+#define NT_TRANSACT_SET_USER_QUOTA    0x08
 
 #define MAX_CIFS_HDR_SIZE 256	/* chained NTCreateXReadX will probably be biggest */
 
@@ -878,6 +880,21 @@ struct reparse_data {
 	char	LinkNamesBuf[1];
 };
 
+struct cifs_quota_data {
+	__u32	rsrvd1;  /* 0 */
+	__u32	sid_size;
+	__u64	rsrvd2;  /* 0 */
+	__u64	space_used;
+	__u64	soft_limit;
+	__u64	hard_limit;
+	char	sid[1];  /* variable size? */
+};
+
+/* quota sub commands */
+#define QUOTA_LIST_CONTINUE	    0
+#define QUOTA_LIST_START	0x100
+#define QUOTA_FOR_SID		0x101
+
 typedef union smb_com_transaction2 {
 	struct {
 		struct smb_hdr hdr;	/* wct = 14+ */
@@ -919,35 +936,36 @@ typedef union smb_com_transaction2 {
 } TRANSACTION2;
 
 /* PathInfo/FileInfo infolevels */
-#define SMB_INFO_STANDARD                1
-#define SMB_INFO_IS_NAME_VALID           6
-#define SMB_QUERY_FILE_BASIC_INFO    0x101
-#define SMB_QUERY_FILE_STANDARD_INFO 0x102
-#define SMB_QUERY_FILE_NAME_INFO     0x104
-#define SMB_QUERY_FILE_ALLOCATION_INFO	0x105
-#define SMB_QUERY_FILE_END_OF_FILEINFO	0x106
-#define SMB_QUERY_FILE_ALL_INFO      0x107
-#define SMB_QUERY_ALT_NAME_INFO      0x108
-#define SMB_QUERY_FILE_STREAM_INFO   0x109
+#define SMB_INFO_STANDARD                   1
+#define SMB_INFO_IS_NAME_VALID              6
+#define SMB_QUERY_FILE_BASIC_INFO       0x101
+#define SMB_QUERY_FILE_STANDARD_INFO    0x102
+#define SMB_QUERY_FILE_NAME_INFO        0x104
+#define SMB_QUERY_FILE_ALLOCATION_INFO  0x105
+#define SMB_QUERY_FILE_END_OF_FILEINFO  0x106
+#define SMB_QUERY_FILE_ALL_INFO         0x107
+#define SMB_QUERY_ALT_NAME_INFO         0x108
+#define SMB_QUERY_FILE_STREAM_INFO      0x109
 #define SMB_QUERY_FILE_COMPRESSION_INFO 0x10B
-#define SMB_QUERY_FILE_UNIX_BASIC    0x200
-#define SMB_QUERY_FILE_UNIX_LINK     0x201
+#define SMB_QUERY_FILE_UNIX_BASIC       0x200
+#define SMB_QUERY_FILE_UNIX_LINK        0x201
 
-#define SMB_SET_FILE_BASIC_INFO			0x101
-#define SMB_SET_FILE_DISPOSITION_INFO	0x102
-#define SMB_SET_FILE_ALLOCATION_INFO	0x103
-#define SMB_SET_FILE_END_OF_FILE_INFO	0x104
+#define SMB_SET_FILE_BASIC_INFO	        0x101
+#define SMB_SET_FILE_DISPOSITION_INFO   0x102
+#define SMB_SET_FILE_ALLOCATION_INFO    0x103
+#define SMB_SET_FILE_END_OF_FILE_INFO   0x104
 #define SMB_SET_FILE_UNIX_BASIC         0x200
 #define SMB_SET_FILE_UNIX_LINK          0x201
 #define SMB_SET_FILE_UNIX_HLINK         0x203
 #define SMB_SET_FILE_BASIC_INFO2        0x3ec
-#define SMB_SET_FILE_ALLOCATION_INFO2	0x3fb
-#define SMB_SET_FILE_END_OF_FILE_INFO2	0x3fc
+#define SMB_SET_FILE_RENAME_INFORMATION 0x3f2
+#define SMB_SET_FILE_ALLOCATION_INFO2   0x3fb
+#define SMB_SET_FILE_END_OF_FILE_INFO2  0x3fc
 
 /* Find File infolevels */
-#define SMB_FIND_FILE_DIRECTORY_INFO	  0x101
+#define SMB_FIND_FILE_DIRECTORY_INFO      0x101
 #define SMB_FIND_FILE_FULL_DIRECTORY_INFO 0x102
-#define SMB_FIND_FILE_NAMES_INFO		0x103
+#define SMB_FIND_FILE_NAMES_INFO          0x103
 #define SMB_FIND_FILE_BOTH_DIRECTORY_INFO 0x104
 #define SMB_FIND_FILE_UNIX                0x202
 
@@ -1036,6 +1054,13 @@ typedef struct smb_com_transaction2_spi_rsp {
 	__u16 Reserved2;	/* parameter word reserved - present for infolevels > 100 */
 } TRANSACTION2_SPI_RSP;
 
+struct set_file_rename {
+        __u32 overwrite;   /* 1 = overwrite dest */
+        __u32 root_fid;   /* zero */
+	__u32 target_name_len;
+        char  target_name[0];  /* Must be unicode */
+};
+
 struct smb_com_transaction2_sfi_req {
 	struct smb_hdr hdr;	/* wct = 15 */
 	__u16 TotalParameterCount;
@@ -1057,7 +1082,7 @@ struct smb_com_transaction2_sfi_req {
 	__u16 ByteCount;
 	__u8 Pad;
 	__u16 Pad1;
-    __u16 Fid;
+	__u16 Fid;
 	__u16 InformationLevel;
 	__u16 Reserved4;	
 };

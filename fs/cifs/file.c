@@ -1114,9 +1114,6 @@ construct_dentry(struct qstr *qstring, struct file *file,
 	}
 
 	tmp_dentry->d_time = jiffies;
-	(*ptmp_inode)->i_blksize =
-	    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
-	cFYI(1, ("i_blksize = %ld", (*ptmp_inode)->i_blksize));
 	*pnew_dentry = tmp_dentry;
 }
 
