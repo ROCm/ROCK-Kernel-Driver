@@ -63,6 +63,14 @@ ntfschar I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
  * This is to avoid polluting the dcache with short file names. We want them to
  * work but we don't care for how quickly one can access them. This also fixes
  * the dcache aliasing issues.
+ *
+ * Locking:  - Caller must hold i_sem on the directory.
+ *	     - Each page cache page in the index allocation mapping must be
+ *	       locked whilst being accessed otherwise we may find a corrupt
+ *	       page due to it being under ->writepage at the moment which
+ *	       applies the mst protection fixups before writing out and then
+ *	       removes them again after the write is complete after which it 
+ *	       unlocks the page.
  */
 MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		const int uname_len, ntfs_name **res)
@@ -83,6 +91,8 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	u8 *kaddr;
 	ntfs_name *name = NULL;
 
+	BUG_ON(!S_ISDIR(VFS_I(dir_ni)->i_mode));
+	BUG_ON(NInoAttr(dir_ni));
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(dir_ni);
 	if (unlikely(IS_ERR(m))) {
@@ -309,6 +319,7 @@ descend_into_child_node:
 		err = PTR_ERR(page);
 		goto err_out;
 	}
+	lock_page(page);
 	kaddr = (u8*)page_address(page);
 fast_descend_into_child_node:
 	/* Get to the index allocation block. */
@@ -429,6 +440,7 @@ found_it2:
 				*res = NULL;
 			}
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
+			unlock_page(page);
 			ntfs_unmap_page(page);
 			return mref;
 		}
@@ -461,6 +473,7 @@ found_it2:
 						"this message to "
 						"linux-ntfs-dev@lists."
 						"sourceforge.net.");
+				unlock_page(page);
 				ntfs_unmap_page(page);
 				goto dir_err_out;
 			}
@@ -543,6 +556,7 @@ found_it2:
 					vol->cluster_size_bits >>
 					PAGE_CACHE_SHIFT)
 				goto fast_descend_into_child_node;
+			unlock_page(page);
 			ntfs_unmap_page(page);
 			goto descend_into_child_node;
 		}
@@ -557,12 +571,14 @@ found_it2:
 	 * associated with it.
 	 */
 	if (name) {
+		unlock_page(page);
 		ntfs_unmap_page(page);
 		return name->mref;
 	}
 	ntfs_debug("Entry not found.");
 	err = -ENOENT;
 unm_err_out:
+	unlock_page(page);
 	ntfs_unmap_page(page);
 err_out:
 	if (ctx)
@@ -778,6 +794,7 @@ descend_into_child_node:
 		err = PTR_ERR(page);
 		goto err_out;
 	}
+	lock_page(page);
 	kaddr = (u8*)page_address(page);
 fast_descend_into_child_node:
 	/* Get to the index allocation block. */
@@ -880,6 +897,7 @@ fast_descend_into_child_node:
 				vol->upcase, vol->upcase_len)) {
 found_it2:
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
+			unlock_page(page);
 			ntfs_unmap_page(page);
 			return mref;
 		}
@@ -944,6 +962,7 @@ found_it2:
 					vol->cluster_size_bits >>
 					PAGE_CACHE_SHIFT)
 				goto fast_descend_into_child_node;
+			unlock_page(page);
 			ntfs_unmap_page(page);
 			goto descend_into_child_node;
 		}
@@ -956,6 +975,7 @@ found_it2:
 	ntfs_debug("Entry not found.");
 	err = -ENOENT;
 unm_err_out:
+	unlock_page(page);
 	ntfs_unmap_page(page);
 err_out:
 	if (ctx)
@@ -988,6 +1008,7 @@ typedef enum {
  * @ndir:	ntfs inode of current directory
  * @index_type:	specifies whether @iu is an index root or an index allocation
  * @iu:		index root or index allocation attribute to which @ie belongs
+ * @ia_page:	page in which the index allocation buffer @ie is in resides
  * @ie:		current index entry
  * @name:	buffer to use for the converted name
  * @dirent:	vfs filldir callback context
@@ -995,13 +1016,24 @@ typedef enum {
  *
  * Convert the Unicode @name to the loaded NLS and pass it to the @filldir
  * callback.
+ *
+ * If @index_type is INDEX_TYPE_ALLOCATION, @ia_page is the locked page
+ * containing the index allocation block containing the index entry @ie.
+ * Otherwise, @ia_page is NULL.
+ *
+ * Note, we drop (and then reacquire) the page lock on @ia_page across the
+ * @filldir() call otherwise we would deadlock with NFSd when it calls ->lookup
+ * since ntfs_lookup() will lock the same page.  As an optimization, we do not
+ * retake the lock if we are returning a non-zero value as ntfs_readdir()
+ * would need to drop the lock immediately anyway.
  */
 static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 		ntfs_inode *ndir, const INDEX_TYPE index_type,
-		index_union iu, INDEX_ENTRY *ie, u8 *name,
-		void *dirent, filldir_t filldir)
+		index_union iu, struct page *ia_page, INDEX_ENTRY *ie,
+		u8 *name, void *dirent, filldir_t filldir)
 {
-	int name_len;
+	unsigned long mref;
+	int name_len, rc;
 	unsigned dt_type;
 	FILE_NAME_TYPE_FLAGS name_type;
 
@@ -1039,24 +1071,42 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 		dt_type = DT_DIR;
 	else
 		dt_type = DT_REG;
+	mref = MREF_LE(ie->data.dir.indexed_file);
+	/*
+	 * Drop the page lock otherwise we deadlock with NFS when it calls
+	 * ->lookup since ntfs_lookup() will lock the same page.
+	 */
+	if (index_type == INDEX_TYPE_ALLOCATION)
+		unlock_page(ia_page);
 	ntfs_debug("Calling filldir for %s with len %i, fpos 0x%llx, inode "
-			"0x%lx, DT_%s.", name, name_len, *fpos,
-			MREF_LE(ie->data.dir.indexed_file),
+			"0x%lx, DT_%s.", name, name_len, *fpos, mref,
 			dt_type == DT_DIR ? "DIR" : "REG");
-	return filldir(dirent, name, name_len, *fpos,
-			MREF_LE(ie->data.dir.indexed_file), dt_type);
+	rc = filldir(dirent, name, name_len, *fpos, mref, dt_type);
+	/* Relock the page but not if we are aborting ->readdir. */
+	if (!rc && index_type == INDEX_TYPE_ALLOCATION)
+		lock_page(ia_page);
+	return rc;
 }
 
 /*
- * VFS calls readdir without BKL but with i_sem held. This protects the VFS
- * parts (e.g. ->f_pos and ->i_size, and it also protects against directory
- * modifications).
- *
  * We use the same basic approach as the old NTFS driver, i.e. we parse the
  * index root entries and then the index allocation entries that are marked
  * as in use in the index bitmap.
+ *
  * While this will return the names in random order this doesn't matter for
- * readdir but OTOH results in a faster readdir.
+ * ->readdir but OTOH results in a faster ->readdir.
+ *
+ * VFS calls ->readdir without BKL but with i_sem held. This protects the VFS
+ * parts (e.g. ->f_pos and ->i_size, and it also protects against directory
+ * modifications).
+ *
+ * Locking:  - Caller must hold i_sem on the directory.
+ *	     - Each page cache page in the index allocation mapping must be
+ *	       locked whilst being accessed otherwise we may find a corrupt
+ *	       page due to it being under ->writepage at the moment which
+ *	       applies the mst protection fixups before writing out and then
+ *	       removes them again after the write is complete after which it 
+ *	       unlocks the page.
  */
 static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
@@ -1186,8 +1236,8 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (ir_pos > (u8*)ie - (u8*)ir)
 			continue;
 		/* Submit the name to the filldir callback. */
-		rc = ntfs_filldir(vol, &fpos, ndir, INDEX_TYPE_ROOT, ir, ie,
-				name, dirent, filldir);
+		rc = ntfs_filldir(vol, &fpos, ndir, INDEX_TYPE_ROOT, ir, NULL,
+				ie, name, dirent, filldir);
 		if (rc) {
 			kfree(ir);
 			goto abort;
@@ -1268,8 +1318,10 @@ find_next_index_buffer:
 	/* If the current index buffer is in the same page we reuse the page. */
 	if ((prev_ia_pos & PAGE_CACHE_MASK) != (ia_pos & PAGE_CACHE_MASK)) {
 		prev_ia_pos = ia_pos;
-		if (likely(ia_page != NULL))
+		if (likely(ia_page != NULL)) {
+			unlock_page(ia_page);
 			ntfs_unmap_page(ia_page);
+		}
 		/*
 		 * Map the page cache page containing the current ia_pos,
 		 * reading it from disk if necessary.
@@ -1281,6 +1333,7 @@ find_next_index_buffer:
 			ia_page = NULL;
 			goto err_out;
 		}
+		lock_page(ia_page);
 		kaddr = (u8*)page_address(ia_page);
 	}
 	/* Get the current index buffer. */
@@ -1358,10 +1411,16 @@ find_next_index_buffer:
 		/* Skip index block entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)
 			continue;
-		/* Submit the name to the filldir callback. */
+		/*
+		 * Submit the name to the @filldir callback.  Note,
+		 * ntfs_filldir() drops the lock on @ia_page but it retakes it
+		 * before returning, unless a non-zero value is returned in
+		 * which case the page is left unlocked.
+		 */
 		rc = ntfs_filldir(vol, &fpos, ndir, INDEX_TYPE_ALLOCATION, ia,
-				ie, name, dirent, filldir);
+				ia_page, ie, name, dirent, filldir);
 		if (rc) {
+			/* @ia_page is already unlocked in this case. */
 			ntfs_unmap_page(ia_page);
 			ntfs_unmap_page(bmp_page);
 			goto abort;
@@ -1369,8 +1428,10 @@ find_next_index_buffer:
 	}
 	goto find_next_index_buffer;
 unm_EOD:
-	if (ia_page)
+	if (ia_page) {
+		unlock_page(ia_page);
 		ntfs_unmap_page(ia_page);
+	}
 	ntfs_unmap_page(bmp_page);
 EOD:
 	/* We are finished, set fpos to EOD. */
@@ -1390,8 +1451,10 @@ done:
 err_out:
 	if (bmp_page)
 		ntfs_unmap_page(bmp_page);
-	if (ia_page)
+	if (ia_page) {
+		unlock_page(ia_page);
 		ntfs_unmap_page(ia_page);
+	}
 	if (ir)
 		kfree(ir);
 	if (name)

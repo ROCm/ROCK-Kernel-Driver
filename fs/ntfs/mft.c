@@ -746,8 +746,8 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	/*
 	 * If the ntfs_inode is clean no need to do anything.  If it is dirty,
 	 * mark it as clean now so that it can be redirtied later on if needed.
-	 * There is no danger of races as as long as the caller is holding the
-	 * locks for the mft record @m and the page it is in.
+	 * There is no danger of races since the caller is holding the locks
+	 * for the mft record @m and the page it is in.
 	 */
 	if (!NInoTestClearDirty(ni))
 		goto done;
@@ -915,6 +915,7 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 	int nr, i, j;
 	BOOL is_dirty = FALSE;
 
+	BUG_ON(!PageLocked(page));
 	BUG_ON(mft_vi != vol->mft_ino);
 	/* The first mft record number in the page. */
 	mft_no = page->index << (PAGE_CACHE_SHIFT - vol->mft_record_size_bits);

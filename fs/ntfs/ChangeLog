@@ -56,6 +56,9 @@ ToDo/Notes:
 	- Use atomic kmap instead of kmap() in fs/ntfs/aops.c::ntfs_read_page()
 	  and ntfs_read_block().
 	- Use case sensitive attribute lookups instead of case insensitive ones.
+	- Lock all page cache pages belonging to mst protected attributes while
+	  accessing them to ensure we never see corrupt data while the page is
+	  under writeout.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 
