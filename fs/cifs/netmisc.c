@@ -791,7 +791,7 @@ ntstatus_to_dos(__u32 ntstatus, __u8 * eclass, __u16 * ecode)
 int
 map_smb_to_linux_error(struct smb_hdr *smb)
 {
-	int i;
+	unsigned int i;
 	int rc = -EIO;		/* if transport error smb error may not be set */
 	__u8 smberrclass;
 	__u16 smberrcode;
@@ -859,10 +859,10 @@ map_smb_to_linux_error(struct smb_hdr *smb)
  * calculate the size of the SMB message based on the fixed header
  * portion, the number of word parameters and the data portion of the message
  */
-int
+unsigned int
 smbCalcSize(struct smb_hdr *ptr)
 {
-	return (sizeof (struct smb_hdr) + (int) (2 * ptr->WordCount) +
+	return (sizeof (struct smb_hdr) + (2 * ptr->WordCount) +
 		BCC(ptr));
 }
 
