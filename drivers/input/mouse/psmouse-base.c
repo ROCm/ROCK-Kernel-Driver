@@ -36,12 +36,10 @@ MODULE_PARM(psmouse_resetafter, "i");
 MODULE_PARM_DESC(psmouse_resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 MODULE_LICENSE("GPL");
 
-#define PSMOUSE_LOGITECH_SMARTSCROLL	1
-
 static int psmouse_noext;
-int psmouse_resolution;
-unsigned int psmouse_rate;
-int psmouse_smartscroll = PSMOUSE_LOGITECH_SMARTSCROLL;
+int psmouse_resolution = 200;
+unsigned int psmouse_rate = 100;
+int psmouse_smartscroll = 1;
 unsigned int psmouse_resetafter;
 
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
@@ -466,22 +464,15 @@ static void psmouse_initialize(struct psmouse *psmouse)
 {
 	unsigned char param[2];
 	
-
 /*
- * We set the mouse report rate.
+ * We set the mouse report rate, resolution and scaling.
  */
 
-	if (psmouse_rate)
+	if (!psmouse_noext) {
 		psmouse_set_rate(psmouse);
-
-/*
- * We also set the resolution and scaling.
- */
-
-	if (psmouse_resolution)
 		psmouse_set_resolution(psmouse);
-
-	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+		psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	}
 
 /*
  * We set the mouse into streaming mode.
