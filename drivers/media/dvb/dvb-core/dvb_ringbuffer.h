@@ -3,9 +3,10 @@
  * dvb_ringbuffer.h: ring buffer implementation for the dvb driver
  *
  * Copyright (C) 2003 Oliver Endriss 
+ * Copyright (C) 2004 Andrew de Quincey
  * 
- * based on code originally found in av7110.c:
- * Copyright (C) 1999-2002 Ralph Metzler & Marcus Metzler
+ * based on code originally found in av7110.c & dvb_ci.c:
+ * Copyright (C) 1999-2003 Ralph Metzler & Marcus Metzler
  *                         for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
@@ -38,6 +39,8 @@ struct dvb_ringbuffer {
         wait_queue_head_t queue;
         spinlock_t        lock;
 };
+
+#define DVB_RINGBUFFER_PKTHDRSIZE 3
 
 
 /*
@@ -119,5 +122,53 @@ extern ssize_t dvb_ringbuffer_read(struct dvb_ringbuffer *rbuf, u8 *buf,
 */
 extern ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf,
                                     size_t len, int usermem);
+
+
+/**
+ * Write a packet into the ringbuffer.
+ *
+ * <rbuf> Ringbuffer to write to.
+ * <buf> Buffer to write.
+ * <len> Length of buffer (currently limited to 65535 bytes max).
+ * <usermem> Set to 1 if <buf> is in userspace.
+ * returns Number of bytes written, or -EFAULT, -ENOMEM, -EVINAL.
+ */
+extern ssize_t dvb_ringbuffer_pkt_write(struct dvb_ringbuffer *rbuf, u8* buf,
+                                        size_t len, int usermem);
+
+/**
+ * Read from a packet in the ringbuffer. Note: unlike dvb_ringbuffer_read(), this
+ * does NOT update the read pointer in the ringbuffer. You must use
+ * dvb_ringbuffer_pkt_dispose() to mark a packet as no longer required.
+ *
+ * <rbuf> Ringbuffer concerned.
+ * <idx> Packet index as returned by dvb_ringbuffer_pkt_next().
+ * <offset> Offset into packet to read from.
+ * <buf> Destination buffer for data.
+ * <len> Size of destination buffer.
+ * <usermem> Set to 1 if <buf> is in userspace.
+ * returns Number of bytes read, or -EFAULT.
+ */
+extern ssize_t dvb_ringbuffer_pkt_read(struct dvb_ringbuffer *rbuf, size_t idx,
+                                       int offset, u8* buf, size_t len, int usermem);
+
+/**
+ * Dispose of a packet in the ring buffer.
+ *
+ * <rbuf> Ring buffer concerned.
+ * <idx> Packet index as returned by dvb_ringbuffer_pkt_next().
+ */
+extern void dvb_ringbuffer_pkt_dispose(struct dvb_ringbuffer *rbuf, size_t idx);
+
+/**
+ * Get the index of the next packet in a ringbuffer.
+ *
+ * <rbuf> Ringbuffer concerned.
+ * <idx> Previous packet index, or -1 to return the first packet index.
+ * <pktlen> On success, will be updated to contain the length of the packet in bytes.
+ * returns Packet index (if >=0), or -1 if no packets available.
+ */
+extern ssize_t dvb_ringbuffer_pkt_next(struct dvb_ringbuffer *rbuf, size_t idx, size_t* pktlen);
+
 
 #endif /* _DVB_RINGBUFFER_H_ */

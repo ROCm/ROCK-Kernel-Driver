@@ -10,6 +10,7 @@
 #include "dvb_frontend.h"
 #include "dvb_net.h"
 #include "dvb_filter.h"
+#include "dvb_ca_en50221.h"
 
 EXPORT_SYMBOL(dvb_dmxdev_init);
 EXPORT_SYMBOL(dvb_dmxdev_release);
@@ -49,3 +50,8 @@ EXPORT_SYMBOL(dvb_filter_pes2ts_init);
 EXPORT_SYMBOL(dvb_filter_pes2ts);
 EXPORT_SYMBOL(dvb_filter_get_ac3info);
 
+EXPORT_SYMBOL(dvb_ca_en50221_init);
+EXPORT_SYMBOL(dvb_ca_en50221_release);
+EXPORT_SYMBOL(dvb_ca_en50221_frda_irq);
+EXPORT_SYMBOL(dvb_ca_en50221_camchange_irq);
+EXPORT_SYMBOL(dvb_ca_en50221_camready_irq);
