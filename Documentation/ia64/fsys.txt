@@ -229,3 +229,52 @@ PSR.ed	Unchanged.  Note: This bit could only have an effect if an fsys-mode
 PSR.bn	Unchanged.  Note: fsys-mode handlers may clear the bit, if needed.
 	Doing so requires clearing PSR.i and PSR.ic as well.
 PSR.ia	Unchanged.  Note: the ia64 linux kernel never sets this bit.
+
+* Using fast system calls
+
+To use fast system calls, userspace applications need simply call
+__kernel_syscall_via_epc().  For example
+
+-- example fgettimeofday() call --
+-- fgettimeofday.S --
+
+#include <asm/asmmacro.h>
+
+GLOBAL_ENTRY(fgettimeofday)
+.prologue
+.save ar.pfs, r11
+mov r11 = ar.pfs
+.body 
+
+mov r2 = 0xa000000000020660;;  // gate address 
+			       // found by inspection of System.map for the 
+			       // __kernel_syscall_via_epc() function.  See
+			       // below for how to do this for real.
+
+mov b7 = r2
+mov r15 = 1087		       // gettimeofday syscall
+;;
+br.call.sptk.many b6 = b7
+;;
+
+.restore sp
+
+mov ar.pfs = r11
+br.ret.sptk.many rp;;	      // return to caller
+END(fgettimeofday)
+
+-- end fgettimeofday.S --
+
+In reality, getting the gate address is accomplished by two extra
+values passed via the ELF auxiliary vector (include/asm-ia64/elf.h)
+
+ o AT_SYSINFO : is the address of __kernel_syscall_via_epc()
+ o AT_SYSINFO_EHDR : is the address of the kernel gate ELF DSO
+
+The ELF DSO is a pre-linked library that is mapped in by the kernel at
+the gate page.  It is a proper ELF shared object so, with a dynamic
+loader that recognises the library, you should be able to make calls to
+the exported functions within it as with any other shared library.
+AT_SYSINFO points into the kernel DSO at the
+__kernel_syscall_via_epc() function for historical reasons (it was
+used before the kernel DSO) and as a convenience.
