@@ -268,7 +268,6 @@ __init
 unsigned long
 early_init(int r3, int r4, int r5)
 {
-	extern char __bss_start, _end;
  	unsigned long phys;
 	unsigned long offset = reloc_offset();
 
@@ -277,7 +276,7 @@ early_init(int r3, int r4, int r5)
 
 	/* First zero the BSS -- use memset, some arches don't have
 	 * caches on yet */
-	memset_io(PTRRELOC(&__bss_start), 0, &_end - &__bss_start);
+	memset_io(PTRRELOC(&__bss_start), 0, _end - __bss_start);
 
 	/*
 	 * Identify the CPU type and fix up code sections
@@ -466,7 +465,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 struct bi_record *find_bootinfo(void)
 {
 	struct bi_record *rec;
-	extern char __bss_start[];
 
 	rec = (struct bi_record *)_ALIGN((ulong)__bss_start+(1<<20)-1,(1<<20));
 	if ( rec->tag != BI_FIRST ) {
@@ -591,7 +589,6 @@ arch_initcall(ppc_init);
 void __init setup_arch(char **cmdline_p)
 {
 	extern int panic_timeout;
-	extern char _etext[], _edata[];
 	extern char *klimit;
 	extern void do_init_bootmem(void);
 
