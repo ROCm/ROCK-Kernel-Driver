@@ -6,16 +6,14 @@ menu "PCMCIA devices"
 config SND_VXPOCKET
 	tristate "Digigram VXpocket"
 	depends on SND && PCMCIA && ISA
-	select SND_HWDEP
-	select SND_PCM
+	select SND_VX_LIB
 	help
 	  Say 'Y' or 'M' to include support for Digigram VXpocket soundcard.
 
 config SND_VXP440
 	tristate "Digigram VXpocket 440"
 	depends on SND && PCMCIA && ISA
-	select SND_HWDEP
-	select SND_PCM
+	select SND_VX_LIB
 	help
 	  Say 'Y' or 'M' to include support for Digigram VXpocket 440 soundcard.
 

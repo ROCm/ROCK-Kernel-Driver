@@ -266,8 +266,7 @@ config SND_VIA82XX
 config SND_VX222
 	tristate "Digigram VX222"
 	depends on SND
-	select SND_HWDEP
-	select SND_PCM
+	select SND_VX_LIB
 	help
 	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards.
 
