@@ -3187,6 +3187,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	write_lock_bh(&sk->sk_callback_lock);
 	res = __selinux_socket_sock_rcv_skb(sk, skb);
 	write_unlock_bh(&sk->sk_callback_lock);
+	return res;
 }
 
 static int selinux_socket_getpeersec(struct socket *sock, char __user *optval,
