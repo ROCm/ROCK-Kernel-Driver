@@ -104,7 +104,7 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"Communications   ",
 	"Unknown          ",
 	"Unknown          ",
-	"Unknown          ",
+	"RAID             ",
 	"Enclosure        ",
 };
 
