@@ -854,7 +854,7 @@ static struct tty_driver rfcomm_tty_driver = {
 #ifdef CONFIG_DEVFS_FS
 	.name			= "bluetooth/rfcomm/%d",
 #else
-	.name			= "rfcomm%d",
+	.name			= "rfcomm",
 #endif
 	.major			= RFCOMM_TTY_MAJOR,
 	.minor_start		= RFCOMM_TTY_MINOR,

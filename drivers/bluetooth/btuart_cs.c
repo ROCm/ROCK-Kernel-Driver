@@ -903,5 +903,3 @@ void __exit exit_btuart_cs(void)
 
 module_init(init_btuart_cs);
 module_exit(exit_btuart_cs);
-
-EXPORT_NO_SYMBOLS;

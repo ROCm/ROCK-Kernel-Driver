@@ -112,7 +112,7 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 }
 
 /* ---- Socket functions ---- */
-static struct sock *__rfcomm_get_sock_by_addr(int channel, bdaddr_t *src)
+static struct sock *__rfcomm_get_sock_by_addr(u8 channel, bdaddr_t *src)
 {
 	struct sock *sk;
 
@@ -128,7 +128,7 @@ static struct sock *__rfcomm_get_sock_by_addr(int channel, bdaddr_t *src)
 /* Find socket with channel and source bdaddr.
  * Returns closest match.
  */
-static struct sock *__rfcomm_get_sock_by_channel(int state, __u16 channel, bdaddr_t *src)
+static struct sock *__rfcomm_get_sock_by_channel(int state, u8 channel, bdaddr_t *src)
 {
 	struct sock *sk, *sk1 = NULL;
 
@@ -151,7 +151,7 @@ static struct sock *__rfcomm_get_sock_by_channel(int state, __u16 channel, bdadd
 
 /* Find socket with given address (channel, src).
  * Returns locked socket */
-static inline struct sock *rfcomm_get_sock_by_channel(int state, __u16 channel, bdaddr_t *src)
+static inline struct sock *rfcomm_get_sock_by_channel(int state, u8 channel, bdaddr_t *src)
 {
 	struct sock *s;
 	read_lock(&rfcomm_sk_list.lock);
