@@ -60,7 +60,7 @@ sysfs_remove_link(struct kobject *, char * name);
 
 struct attribute_group {
 	char			* name;
-	struct attribute	* attrs;
+	struct attribute	** attrs;
 };
 
 int sysfs_create_group(struct kobject *, struct attribute_group *);

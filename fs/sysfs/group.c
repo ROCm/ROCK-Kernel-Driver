@@ -17,20 +17,20 @@
 
 static void remove_files(struct dentry * dir, struct attribute_group * grp)
 {
-	struct attribute * attr;
+	struct attribute ** attr;
 
-	for (attr = grp->attrs; attr->name; attr++)
-		sysfs_hash_and_remove(dir,attr->name);
+	for (attr = grp->attrs; *attr; attr++)
+		sysfs_hash_and_remove(dir,(*attr)->name);
 }
 
-static int create_files(struct kobject * kobj, struct dentry * dir,
+static int create_files(struct dentry * dir,
 			struct attribute_group * grp)
 {
-	struct attribute * attr;
+	struct attribute ** attr;
 	int error = 0;
 
-	for (attr = grp->attrs; attr->name && !error; attr++) {
-		error = sysfs_add_file(dir,attr);
+	for (attr = grp->attrs; *attr && !error; attr++) {
+		error = sysfs_add_file(dir,*attr);
 	}
 	if (error)
 		remove_files(dir,grp);
@@ -50,7 +50,7 @@ int sysfs_create_group(struct kobject * kobj, struct attribute_group * grp)
 	} else
 		dir = kobj->dentry;
 	dir = dget(dir);
-	if ((error = create_files(kobj,dir,grp))) {
+	if ((error = create_files(dir,grp))) {
 		if (grp->name)
 			sysfs_remove_subdir(dir);
 		dput(dir);
