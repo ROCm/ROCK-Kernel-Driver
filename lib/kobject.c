@@ -343,7 +343,7 @@ int kobject_register(struct kobject * kobj)
  *	@kobj:	object.
  *	@name:	name. 
  *
- *	If strlen(name) < KOBJ_NAME_LEN, then use a dynamically allocated
+ *	If strlen(name) >= KOBJ_NAME_LEN, then use a dynamically allocated
  *	string that @kobj->k_name points to. Otherwise, use the static 
  *	@kobj->name array.
  */
