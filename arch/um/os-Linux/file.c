@@ -283,10 +283,9 @@ int os_rcv_fd(int fd, int *helper_pid_out)
 	msg.msg_flags = 0;
 
 	n = recvmsg(fd, &msg, 0);
-	if(n < 0){
-		printk("rcv_fd : recvmsg failed - errno = %d\n", errno);
-		return(-1);
-	}
+	if(n < 0)
+		return(-errno);
+
 	else if(n != sizeof(iov.iov_len))
 		*helper_pid_out = -1;
 

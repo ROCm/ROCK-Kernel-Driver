@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -8,6 +8,20 @@
 #include "kern_util.h"
 #include "kern.h"
 #include "os.h"
+
+#ifdef CONFIG_SMP
+static void kill_idlers(int me)
+{
+	struct task_struct *p;
+	int i;
+
+	for(i = 0; i < sizeof(idle_threads)/sizeof(idle_threads[0]); i++){
+		p = idle_threads[i];
+		if((p != NULL) && (p->thread.extern_pid != me))
+			os_kill_process(p->thread.extern_pid);
+	}
+}
+#endif
 
 static void kill_off_processes(void)
 {
@@ -21,6 +35,9 @@ static void kill_off_processes(void)
 	}
 	if(init_task.thread.extern_pid != me) 
 		os_kill_process(init_task.thread.extern_pid);
+#ifdef CONFIG_SMP
+	kill_idlers(me);
+#endif
 }
 
 void uml_cleanup(void)

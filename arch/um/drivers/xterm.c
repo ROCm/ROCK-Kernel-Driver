@@ -19,6 +19,7 @@
 #include "user_util.h"
 #include "user.h"
 #include "os.h"
+#include "xterm.h"
 
 struct xterm_chan {
 	int pid;
@@ -28,6 +29,7 @@ struct xterm_chan {
 	int raw;
 	struct termios tt;
 	unsigned long stack;
+	int direct_rcv;
 };
 
 void *xterm_init(char *str, int device, struct chan_opts *opts)
@@ -40,7 +42,8 @@ void *xterm_init(char *str, int device, struct chan_opts *opts)
 				       device :		device, 
 				       title :		opts->xterm_title,
 				       raw : 		opts->raw,
-				       stack :		opts->tramp_stack } );
+				       stack :		opts->tramp_stack,
+				       direct_rcv :	!opts->in_kernel } );
 	return(data);
 }
 
@@ -84,7 +87,7 @@ int xterm_open(int input, int output, int primary, void *d)
 {
 	struct xterm_chan *data = d;
 	unsigned long stack;
-	int pid, fd, new;
+	int pid, fd, new, err;
 	char title[256], file[] = "/tmp/xterm-pipeXXXXXX";
 	char *argv[] = { terminal_emulator, title_switch, title, exec_switch, 
 			 "/usr/lib/uml/port-helper", "-uml-socket",
@@ -105,21 +108,30 @@ int xterm_open(int input, int output, int primary, void *d)
 	fd = create_unix_socket(file, sizeof(file));
 	if(fd < 0){
 		printk("xterm_open : create_unix_socket failed, errno = %d\n", 
-		       errno);
-		return(-errno);
+		       -fd);
+		return(-fd);
 	}
 
 	sprintf(title, data->title, data->device);
 	stack = data->stack;
 	pid = run_helper(NULL, NULL, argv, &stack);
 	if(pid < 0){
-		printk("xterm_open : run_helper failed\n");
-		return(-1);
+		printk("xterm_open : run_helper failed, errno = %d\n", -pid);
+		return(pid);
 	}
 
 	if(data->stack == 0) free_stack(stack, 0);
 
-	new = os_rcv_fd(fd, &data->helper_pid);
+	if(data->direct_rcv)
+		new = os_rcv_fd(fd, &data->helper_pid);
+	else {
+		if((err = os_set_fd_block(fd, 0)) != 0){
+			printk("xterm_open : failed to set descriptor "
+			       "non-blocking, errno = %d\n", err);
+			return(err);
+		}
+		new = xterm_fd(fd, &data->helper_pid);
+	}
 	if(new < 0){
 		printk("xterm_open : os_rcv_fd failed, errno = %d\n", -new);
 		return(new);

@@ -219,13 +219,16 @@ CONFIG_EXT2_FS=y
 # CONFIG_INTERMEZZO_FS is not set
 # CONFIG_NFS_FS is not set
 # CONFIG_NFS_V3 is not set
+# CONFIG_NFS_V4 is not set
 # CONFIG_ROOT_NFS is not set
 # CONFIG_NFSD is not set
 # CONFIG_NFSD_V3 is not set
+# CONFIG_NFSD_V4 is not set
 # CONFIG_NFSD_TCP is not set
 # CONFIG_SUNRPC is not set
 # CONFIG_LOCKD is not set
 # CONFIG_EXPORTFS is not set
+# CONFIG_CIFS is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_NCPFS_PACKET_SIGNING is not set
@@ -236,6 +239,7 @@ CONFIG_EXT2_FS=y
 # CONFIG_NCPFS_SMALLDOS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
+# CONFIG_AFS_FS is not set
 # CONFIG_ZISOFS_FS is not set
 
 #
@@ -332,7 +336,9 @@ CONFIG_SCSI_DEBUG=y
 CONFIG_MTD=y
 # CONFIG_MTD_DEBUG is not set
 # CONFIG_MTD_PARTITIONS is not set
+# CONFIG_MTD_CONCAT is not set
 # CONFIG_MTD_REDBOOT_PARTS is not set
+# CONFIG_MTD_CMDLINE_PARTS is not set
 
 #
 # User Modules And Translation Layers
@@ -362,6 +368,8 @@ CONFIG_MTD_BLOCK=y
 # Mapping drivers for chip access
 #
 # CONFIG_MTD_PHYSMAP is not set
+# CONFIG_MTD_PCI is not set
+# CONFIG_MTD_PCMCIA is not set
 
 #
 # Self-contained MTD device drivers
