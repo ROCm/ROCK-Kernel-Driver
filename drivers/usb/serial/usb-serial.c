@@ -460,6 +460,10 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 
 	/* get the serial object associated with this tty pointer */
 	serial = usb_serial_get_by_index(tty->index);
+	if (!serial) {
+		retval = -ENODEV;
+		goto bailout;
+	}
 
 	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = tty->index - serial->minor;
@@ -493,6 +497,9 @@ bailout:
 static void serial_close(struct tty_struct *tty, struct file * filp)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
+
+	if (!port)
+		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
