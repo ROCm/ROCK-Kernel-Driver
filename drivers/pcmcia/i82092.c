@@ -384,7 +384,7 @@ static int card_present(int socketno)
 	unsigned int val;
 	enter("card_present");
 	
-	if ((socketno<0) || (socketno > MAX_SOCKETS))
+	if ((socketno<0) || (socketno >= MAX_SOCKETS))
 		return 0;
 	if (sockets[socketno].io_base == 0)
 		return 0;

@@ -677,7 +677,7 @@ static char *rq_flags[] = {
 	"REQ_SENSE",
 	"REQ_FAILED",
 	"REQ_QUIET",
-	"REQ_SPECIAL"
+	"REQ_SPECIAL",
 	"REQ_DRIVE_CMD",
 	"REQ_DRIVE_TASK",
 	"REQ_DRIVE_TASKFILE",

@@ -38,7 +38,6 @@
 #include <linux/proc_fs.h>
 
 EXPORT_SYMBOL(journal_start);
-EXPORT_SYMBOL(journal_try_start);
 EXPORT_SYMBOL(journal_restart);
 EXPORT_SYMBOL(journal_extend);
 EXPORT_SYMBOL(journal_stop);
