@@ -41,13 +41,14 @@
 #define DEFAULT_COMMAND_LINE "root=6200"
 
 struct cpuinfo_um boot_cpu_data = { 
-	.loops_per_jiffy = 	0,
-	.ipi_pipe = 		{ -1, -1 }
+	.loops_per_jiffy	= 0,
+	.ipi_pipe		= { -1, -1 }
 };
 
 unsigned long thread_saved_pc(struct task_struct *task)
 {
-	return(os_process_pc(task->thread.mode.tt.extern_pid));
+	return(os_process_pc(CHOOSE_MODE_PROC(thread_pid_tt, thread_pid_skas,
+					      thread)));
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)
@@ -96,16 +97,7 @@ pte_t * __bad_pagetable(void)
 	return(NULL);
 }
 
-#ifdef CONFIG_HOST_2G_2G
-#define TOP 0x80000000
-#else
-#define TOP 0xc0000000
-#endif
-
-#define SIZE ((CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS) * 0x20000000)
-#define START (TOP - SIZE)
-
-/* Set in main */
+/* Set in linux_main */
 unsigned long host_task_size;
 unsigned long task_size;
 
@@ -192,10 +184,47 @@ static int __init uml_ncpus_setup(char *line, int *add)
 
 __uml_setup("ncpus=", uml_ncpus_setup,
 "ncpus=<# of desired CPUs>\n"
-"    This tells an SMP kernel how many virtual processors to start.\n"
-"    Currently, this has no effect because SMP isn't enabled.\n\n" 
+"    This tells an SMP kernel how many virtual processors to start.\n\n" 
 );
 #endif
+
+int force_tt = 0;
+
+if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
++#define DEFAULT_TT 0
+
+static int __init mode_tt_setup(char *line, int *add)
+{
+	force_tt = 1;
+	return(0);
+}
+
+__uml_setup("mode=tt", mode_tt_setup,
+"mode=tt\n"
+"    When both CONFIG_MODE_TT and CONFIG_MODE_SKAS are enabled, this option\n"
+"    forces UML to run in tt (tracing thread) mode.  It is not the default\n"
+"    because it's slower and less secure than skas mode.\n\n"
+);
+
+#else
+#ifdef CONFIG_MODE_SKAS
+
+#define DEFAULT_TT 0
+
+#else
+#ifdef CONFIG_MODE_TT
+
+#define DEFAULT_TT 1
+
+#else
+
+#error Either CONFIG_MODE_TT or CONFIG_MODE_SKAS must be enabled
+
+#endif
+#endif
+#endif
+
+int mode_tt = DEFAULT_TT;
 
 static int __init Usage(char *line, int *add)
 {
@@ -244,9 +273,6 @@ static void __init uml_postsetup(void)
 	return;
 }
 
-extern int debug_trace;
-int mode_tt = 1;
-
 /* Set during early boot */
 unsigned long brk_start;
 static struct vm_reserved kernel_vm_reserved;
@@ -267,7 +293,7 @@ int linux_main(int argc, char **argv)
 	}
 	if(have_root == 0) add_arg(saved_command_line, DEFAULT_COMMAND_LINE);
 
-	mode_tt = 1;
+	mode_tt = force_tt ? 1 : !can_do_skas();
 	uml_start = CHOOSE_MODE_PROC(set_task_sizes_tt, set_task_sizes_skas, 0,
 				     &host_task_size, &task_size);
 
