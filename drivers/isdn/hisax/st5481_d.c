@@ -381,8 +381,8 @@ static void usb_d_out_complete(struct urb *urb, struct pt_regs *regs)
 	buf_nr = get_buf_nr(d_out->urb, urb);
 	test_and_clear_bit(buf_nr, &d_out->busy);
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 			if (d_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, EP_D_OUT | USB_DIR_OUT, fifo_reseted, adapter);
@@ -649,7 +649,7 @@ static void ph_disconnect(struct st5481_adapter *adapter)
 	st5481_usb_device_ctrl_msg(adapter, GPIO_OUT, adapter->leds, NULL, NULL);
 }
 
-static int __devinit st5481_setup_d_out(struct st5481_adapter *adapter)
+static int st5481_setup_d_out(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
 	struct usb_host_interface *altsetting;
@@ -682,7 +682,7 @@ static void st5481_release_d_out(struct st5481_adapter *adapter)
 	st5481_release_isocpipes(d_out->urb);
 }
 
-int __devinit st5481_setup_d(struct st5481_adapter *adapter)
+int st5481_setup_d(struct st5481_adapter *adapter)
 {
 	int retval;
 
