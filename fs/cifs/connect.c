@@ -168,7 +168,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			} else if (temp[0] != (char) 0) {
 				cERROR(1,
 				       ("\nUnknown RFC 1001 frame received not 0x00 nor 0x85"));
-				dump_mem(" Received Data is: ", temp, length);
+				cifs_dump_mem(" Received Data is: ", temp, length);
 				break;
 			} else {
 				if ((length != sizeof (struct smb_hdr) - 1)
@@ -757,8 +757,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
                /* Removed following few lines to not send old style password 
                   hash ever - for better security */
 			   /* toUpper(cifs_sb->local_nls, password_with_pad);
-				   SMBencrypt(password_with_pad, cryptKey,session_key); 
-				   dump_mem("\nCIFS (Samba encrypt): ", session_key,CIFS_SESSION_KEY_SIZE); */
+				   SMBencrypt(password_with_pad, cryptKey,session_key); */
 
 				rc = CIFSSessSetup(xid, pSesInfo,
 						   volume_info.username,
@@ -989,7 +988,6 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
-	/* dump_mem("\nSessSetup response is: ", smb_buffer_response, 92);*/
 	if (rc) {
 /* rc = map_smb_to_linux_error(smb_buffer_response); now done in SendReceive */
 	} else if ((smb_buffer_response->WordCount == 3)
@@ -1235,7 +1233,6 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	rc = SendReceive(xid, ses, smb_buffer, smb_buffer_response,
 			 &bytes_returned, 1);
-	/* dump_mem("\nSessSetup response is: ", smb_buffer_response, 92);  */
 	if (rc) {
 /*    rc = map_smb_to_linux_error(smb_buffer_response);  *//* done in SendReceive now */
 	} else if ((smb_buffer_response->WordCount == 3)
