@@ -106,8 +106,10 @@
       #define IPS_REMOVE_HOST(shost)
       #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_pci_device(sh, (ha)->pcidev)
       #define IPS_PRINTK(level, pcidev, format, arg...)                 \
-            printk(level "%s %s:" format , (pcidev)->driver->name ,     \
-            pci_name(pcidev) , ## arg)
+            printk(level "%s %s:" format , "ips" ,     \
+            (pcidev)->slot_name , ## arg)
+      #define scsi_host_alloc(sh,size)         scsi_register(sh,size)
+      #define scsi_host_put(sh)             scsi_unregister(sh)
    #else
       #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
       #define IPS_UNREGISTER_HOSTS(SHT)
@@ -451,9 +453,11 @@
     * Scsi_Host Template
     */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+   static int ips_proc24_info(char *, char **, off_t, int, int, int);
    static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
    static int ips_biosparam(Disk *disk, kdev_t dev, int geom[]);
 #else
+   int ips_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
    static int ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]);
    int ips_slave_configure(Scsi_Device *SDptr);

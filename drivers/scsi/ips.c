@@ -130,6 +130,7 @@
 /* 5.10.15  - remove unused code (sem, macros, etc.)                         */
 /* 5.30.00  - use __devexit_p()                                              */
 /* 6.00.00  - Add 6x Adapters and Battery Flash                              */
+/* 6.10.00  - Remove 1G Addressing Limitations                               */
 /*****************************************************************************/
 
 /*
@@ -202,6 +203,7 @@ MODULE_PARM(ips, "s");
 #endif
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
+#include <linux/blk.h>
 #include "sd.h"
 #define IPS_SG_ADDRESS(sg)       ((sg)->address)
 #define IPS_LOCK_SAVE(lock,flags) spin_lock_irqsave(&io_request_lock,flags)
@@ -257,9 +259,12 @@ static Scsi_Host_Template ips_driver_template = {
 	.queuecommand		= ips_queue,
 	.eh_abort_handler	= ips_eh_abort,
 	.eh_host_reset_handler	= ips_eh_reset,
+	.proc_name		= "ips",
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	.proc_info		= ips_proc_info,
 	.slave_configure	= ips_slave_configure,
 #else
+	.proc_info		= ips_proc24_info,
 	.select_queue_depths	= ips_select_queue_depth,
 #endif
 	.bios_param		= ips_biosparam,
@@ -319,8 +324,8 @@ static char ips_adapter_name[][30] = {
 	"ServeRAID 4Lx",
 	"ServeRAID 5i",
 	"ServeRAID 5i",
-	"ServeRAID 00",
-	"ServeRAID 00"
+	"ServeRAID 6M",
+	"ServeRAID 6i"
 };
 
 static struct notifier_block ips_notifier = {
@@ -592,9 +597,6 @@ ips_detect(Scsi_Host_Template * SHT)
 			       "ERROR: Can't Allocate Large Buffer for Flashing\n");
 		}
 	}
-
-	SHT->proc_info = ips_proc_info;
-	SHT->proc_name = "ips";
 
 	for (i = 0; i < ips_num_controllers; i++) {
 		if (ips_register_scsi(i))
@@ -1120,7 +1122,7 @@ ips_queue(Scsi_Cmnd * SC, void (*done) (Scsi_Cmnd *))
 
 		ips_copp_wait_item_t *scratch;
 
-		/* A Reset IOCTL is only sent by the ServeRAID boot CD in extreme cases. */
+		/* A Reset IOCTL is only sent by the boot CD in extreme cases.           */
 		/* There can never be any system activity ( network or disk ), but check */
 		/* anyway just as a good practice.                                       */
 		pt = (ips_passthru_t *) SC->request_buffer;
@@ -1220,6 +1222,24 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+
+/* ips_proc24_info is a wrapper around ips_proc_info *
+ * for compatibility with the 2.4 scsi parameters    */
+static int
+ips_proc24_info(char *buffer, char **start, off_t offset, int length,
+		              int hostno, int func)
+{
+	int i;
+
+	for (i = 0; i < ips_next_controller; i++) {
+		if (ips_sh[i] && ips_sh[i]->host_no == hostno) {
+			return ips_proc_info(ips_sh[i], buffer, start,
+					     offset, length, func);
+		}
+	}
+	return -EINVAL;	
+}
+
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_select_queue_depth                                     */
@@ -3499,7 +3519,7 @@ ips_done(ips_ha_t * ha, ips_scb_t * scb)
 /*                                                                          */
 /* Routine Description:                                                     */
 /*                                                                          */
-/*   Map ServeRAID error codes to Linux Error Codes                         */
+/*   Map Controller Error codes to Linux Error Codes                        */
 /*                                                                          */
 /****************************************************************************/
 static int
@@ -3753,8 +3773,8 @@ ips_send_cmd(ips_ha_t * ha, ips_scb_t * scb)
 		/* internal command */
 
 		if (scb->bus > 0) {
-			/* ServeRAID commands can't be issued */
-			/* to real devices -- fail them       */
+			/* Controller commands can't be issued */
+			/* to real devices -- fail them        */
 			if ((ha->waitflag == TRUE) &&
 			    (ha->cmd_in_progress == scb->cdb[0])) {
 				ha->waitflag = FALSE;
@@ -4865,6 +4885,7 @@ ips_enable_int_copperhead(ips_ha_t * ha)
 	METHOD_TRACE("ips_enable_int_copperhead", 1);
 
 	outb(ha->io_addr + IPS_REG_HISR, IPS_BIT_EI);
+	inb(ha->io_addr + IPS_REG_HISR);	/*Ensure PCI Posting Completes*/
 }
 
 /****************************************************************************/
@@ -4881,6 +4902,7 @@ ips_enable_int_copperhead_memio(ips_ha_t * ha)
 	METHOD_TRACE("ips_enable_int_copperhead_memio", 1);
 
 	writeb(IPS_BIT_EI, ha->mem_ptr + IPS_REG_HISR);
+	readb(ha->mem_ptr + IPS_REG_HISR);	/*Ensure PCI Posting Completes*/
 }
 
 /****************************************************************************/
@@ -4901,6 +4923,7 @@ ips_enable_int_morpheus(ips_ha_t * ha)
 	Oimr = readl(ha->mem_ptr + IPS_REG_I960_OIMR);
 	Oimr &= ~0x08;
 	writel(Oimr, ha->mem_ptr + IPS_REG_I960_OIMR);
+	readl(ha->mem_ptr + IPS_REG_I960_OIMR);	/*Ensure PCI Posting Completes*/
 }
 
 /****************************************************************************/
@@ -6190,7 +6213,7 @@ ips_ffdc_time(ips_ha_t * ha)
 	scb->cmd.ffdc.op_code = IPS_CMD_FFDC;
 	scb->cmd.ffdc.command_id = IPS_COMMAND_ID(ha, scb);
 	scb->cmd.ffdc.reset_count = 0;
-	scb->cmd.ffdc.reset_type = 0x80;
+	scb->cmd.ffdc.reset_type = 0;
 
 	/* convert time to what the card wants */
 	ips_fix_ffdc_time(ha, scb, ha->last_ffdc);
@@ -6779,7 +6802,7 @@ ips_verify_bios_memio(ips_ha_t * ha, char *buffer, uint32_t buffersize,
 /*     Assumes that ips_read_adapter_status() is called first filling in     */
 /*     the data for SubSystem Parameters.                                    */
 /*     Called from ips_write_driver_status() so it also assumes NVRAM Page 5 */
-/*     Data is availaible.                                                   */
+/*     Data is available.                                                    */
 /*                                                                           */
 /*---------------------------------------------------------------------------*/
 static void
@@ -6864,7 +6887,7 @@ ips_version_check(ips_ha_t * ha, int intr)
 /*   Routine Name: ips_get_version_info                                      */
 /*                                                                           */
 /*   Routine Description:                                                    */
-/*     Issue an internal GETVERSION ServeRAID Command                        */
+/*     Issue an internal GETVERSION Command                                  */
 /*                                                                           */
 /*   Return Value:                                                           */
 /*     0 if Successful, else non-zero                                        */
