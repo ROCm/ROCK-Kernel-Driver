@@ -1214,7 +1214,6 @@ static struct video_device vicam_template = {
 	.type 		= VID_TYPE_CAPTURE,
 	.hardware 	= VID_HARDWARE_VICAM,
 	.fops 		= &vicam_fops,
-//	.initialize 	= vicam_video_init,
 	.minor 		= -1,
 };
 
