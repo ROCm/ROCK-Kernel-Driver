@@ -21,6 +21,10 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.22-WIP
+
+	- Improve error handling in fs/ntfs/inode.c::ntfs_truncate().
+
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
 	- Implement extent mft record deallocation
