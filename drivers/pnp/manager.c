@@ -150,13 +150,19 @@ static int pnp_assign_irq(struct pnp_dev * dev, struct pnp_irq *rule, int idx)
 	*flags |= rule->flags | IORESOURCE_IRQ;
 	*flags &=  ~IORESOURCE_UNSET;
 
-	if (!rule->map) {
+	if (bitmap_empty(rule->map, PNP_IRQ_NR)) {
 		*flags |= IORESOURCE_DISABLED;
 		return 1; /* skip disabled resource requests */
 	}
 
+	/* TBD: need check for >16 IRQ */
+	*start = find_next_bit(rule->map, PNP_IRQ_NR, 16);
+	if (*start < PNP_IRQ_NR) {
+		*end = *start;
+		return 1;
+	}
 	for (i = 0; i < 16; i++) {
-		if(rule->map & (1<<xtab[i])) {
+		if(test_bit(xtab[i], rule->map)) {
 			*start = *end = xtab[i];
 			if(pnp_check_irq(dev, idx))
 				return 1;

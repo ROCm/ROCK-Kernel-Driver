@@ -82,8 +82,9 @@ struct pnp_port {
 	struct pnp_port *next;		/* next port */
 };
 
+#define PNP_IRQ_NR 256
 struct pnp_irq {
-	unsigned short map;		/* bitmaks for IRQ lines */
+	DECLARE_BITMAP(map, PNP_IRQ_NR); /* bitmaks for IRQ lines */
 	unsigned char flags;		/* IRQ flags */
 	unsigned char pad;		/* pad */
 	struct pnp_irq *next;		/* next IRQ */

@@ -477,12 +477,14 @@ static void __init isapnp_parse_irq_resource(struct pnp_option *option,
 {
 	unsigned char tmp[3];
 	struct pnp_irq *irq;
+	unsigned long bits;
 
 	isapnp_peek(tmp, size);
 	irq = isapnp_alloc(sizeof(struct pnp_irq));
 	if (!irq)
 		return;
-	irq->map = (tmp[1] << 8) | tmp[0];
+	bits = (tmp[1] << 8) | tmp[0];
+	bitmap_copy(irq->map, &bits, 16);
 	if (size > 2)
 		irq->flags = tmp[2];
 	else

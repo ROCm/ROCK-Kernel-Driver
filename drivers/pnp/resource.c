@@ -101,8 +101,8 @@ int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 	{
 		int i;
 
-		for (i=0; i<16; i++)
-			if (data->map & (1<<i))
+		for (i = 0; i < 16; i++)
+			if (test_bit(i, data->map))
 				pcibios_penalize_isa_irq(i);
 	}
 #endif
