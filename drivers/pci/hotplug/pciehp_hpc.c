@@ -1017,7 +1017,7 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static int hpc_get_max_lnk_speed (struct slot *slot, enum pcie_link_speed *value)
+static int hpc_get_max_lnk_speed (struct slot *slot, enum pci_bus_speed *value)
 {
 	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_speed lnk_speed;
@@ -1120,7 +1120,7 @@ static int hpc_get_max_lnk_width (struct slot *slot, enum pcie_link_width *value
 	return retval;
 }
 
-static int hpc_get_cur_lnk_speed (struct slot *slot, enum pcie_link_speed *value)
+static int hpc_get_cur_lnk_speed (struct slot *slot, enum pci_bus_speed *value)
 {
 	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_speed lnk_speed = PCI_SPEED_UNKNOWN;
