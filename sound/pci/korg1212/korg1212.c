@@ -2364,7 +2364,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
                "VolumeTablePhy  = %08x L[%08x]\n"
                "RoutingTablePhy = %08x L[%08x]\n"
                "AdatTimeCodePhy = %08x L[%08x]\n",
-	       korg1212->dma_dsp.addr,    UpperWordSwap(korg1212->dma_dsp.addr),
+	       (int)korg1212->dma_dsp.addr,    UpperWordSwap(korg1212->dma_dsp.addr),
                korg1212->PlayDataPhy,     LowerWordSwap(korg1212->PlayDataPhy),
                korg1212->RecDataPhy,      LowerWordSwap(korg1212->RecDataPhy),
                korg1212->VolumeTablePhy,  LowerWordSwap(korg1212->VolumeTablePhy),

@@ -187,7 +187,7 @@ static void snd_emu10k1_proc_read(snd_info_entry_t *entry,
 	snd_iprintf(buffer, "Card                  : %s\n",
 		    emu->audigy ? "Audigy" : (emu->APS ? "EMU APS" : "Creative"));
 	snd_iprintf(buffer, "Internal TRAM (words) : 0x%x\n", emu->fx8010.itram_size);
-	snd_iprintf(buffer, "External TRAM (words) : 0x%x\n", emu->fx8010.etram_pages.bytes);
+	snd_iprintf(buffer, "External TRAM (words) : 0x%x\n", (int)emu->fx8010.etram_pages.bytes);
 	snd_iprintf(buffer, "\n");
 	if (emu->audigy) {
 		snd_iprintf(buffer, "Effect Send Routing   : A=%i, B=%i, C=%i, D=%i\n",
