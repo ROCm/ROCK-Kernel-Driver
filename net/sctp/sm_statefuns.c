@@ -1228,13 +1228,13 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	new_addr = NULL;
 	list_for_each(pos, &new_asoc->peer.transport_addr_list) {
 		new_addr = list_entry(pos, sctp_transport_t, transports);
-		found = 1;
+		found = 0;
 		list_for_each_safe(pos2, temp, 
 				   &asoc->peer.transport_addr_list) {
 			addr = list_entry(pos2, sctp_transport_t, transports);
-			if (!sctp_cmp_addr_exact(&new_addr->ipaddr,
-						 &addr->ipaddr)) {
-				found = 0;
+			if (sctp_cmp_addr_exact(&new_addr->ipaddr,
+						&addr->ipaddr)) {
+				found = 1;
 				break;
 			}
 		}
@@ -1264,6 +1264,9 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 			goto nomem_abort;
 		sctp_init_cause(repl, SCTP_ERROR_RESTART, rawaddr.v, len);
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(repl));
+		/* Discard the rest of the packet too. */
+		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET, 
+				SCTP_NULL());
 		return SCTP_DISPOSITION_CONSUME;
 
 	nomem_abort:
@@ -2881,12 +2884,11 @@ sctp_disposition_t sctp_sf_discard_chunk(const sctp_endpoint_t *ep,
  *
  * The return value is the disposition of the chunk.
  */
-sctp_disposition_t
-sctp_sf_pdiscard(const sctp_endpoint_t *ep,
-		 const sctp_association_t *asoc,
-		 const sctp_subtype_t type,
-		 void *arg,
-		 sctp_cmd_seq_t *commands)
+sctp_disposition_t sctp_sf_pdiscard(const sctp_endpoint_t *ep,
+				    const sctp_association_t *asoc,
+				    const sctp_subtype_t type,
+				    void *arg,
+				    sctp_cmd_seq_t *commands)
 {
 	sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET, SCTP_NULL());
 

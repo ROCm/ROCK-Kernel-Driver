@@ -726,9 +726,9 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
  *  flags   - flags sent or received with the user message, see Section
  *            5 for complete description of the flags.
  *
- * NB: The argument 'msg' is a user space address.
+ * Note:  This function could use a rewrite especially when explicit
+ * connect support comes in.
  */
-/* BUG:  We do not implement timeouts.  */
 /* BUG:  We do not implement the equivalent of wait_for_tcp_memory(). */
 
 SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
@@ -737,7 +737,7 @@ SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 {
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
-	sctp_association_t *asoc = NULL;
+	sctp_association_t *new_asoc=NULL, *asoc=NULL;
 	sctp_transport_t *transport;
 	sctp_chunk_t *chunk = NULL;
 	sockaddr_storage_t to;
@@ -906,11 +906,12 @@ SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 		}
 
 		scope = sctp_scope(&to);
-		asoc = sctp_association_new(ep, sk, scope, GFP_KERNEL);
-		if (!asoc) {
+		new_asoc = sctp_association_new(ep, sk, scope, GFP_KERNEL);
+		if (!new_asoc) {
 			err = -ENOMEM;
 			goto out_unlock;
 		}
+		asoc = new_asoc;
 
 		/* If the SCTP_INIT ancillary data is specified, set all
 		 * the association init values accordingly.
@@ -945,7 +946,7 @@ SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	}
 
 	/* ASSERT: we have a valid association at this point.  */
-	SCTP_DEBUG_PRINTK("We have a valid association. \n");
+	SCTP_DEBUG_PRINTK("We have a valid association.\n");
 
 	/* API 7.1.7, the sndbuf size per association bounds the
 	 * maximum size of data that can be sent in a single send call.
@@ -1053,10 +1054,16 @@ SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 		err = msg_len;
 		goto out_unlock;
 	}
+	/* If we are already past ASSOCIATE, the lower
+	 * layers are responsible for its cleanup.
+	 */
+	goto out_free_chunk;
 
 out_free:
-	if (SCTP_STATE_CLOSED == asoc->state)
+	if (new_asoc)
 		sctp_association_free(asoc);
+
+out_free_chunk:
 	if (chunk)
 		sctp_free_chunk(chunk);
 
