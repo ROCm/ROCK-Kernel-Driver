@@ -70,7 +70,7 @@
  * that the Uptodate bit is set.  Once they have checked that they may
  * take buffers off the read queue.
  *
- * When a buffer on the write list is committed for write is it copied
+ * When a buffer on the write list is committed for write it is copied
  * into the cache buffer, which is then marked dirty, and moved onto a
  * third list, the written list (bh_written).  Once both the parity
  * block and the cached buffer are successfully written, any buffer on
