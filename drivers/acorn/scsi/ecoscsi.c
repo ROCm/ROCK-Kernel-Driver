@@ -98,61 +98,62 @@ void ecoscsi_setup(char *str, int *ints) {
 
 int ecoscsi_detect(Scsi_Host_Template * tpnt)
 {
-    struct Scsi_Host *instance;
+	struct Scsi_Host *instance;
 
-    tpnt->proc_name = "ecoscsi";
+	tpnt->proc_name = "ecoscsi";
 
-    instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
-    instance->io_port = 0x80ce8000;
-    instance->n_io_port = 144;
-    instance->irq = IRQ_NONE;
+	instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	if (!instance)
+		return 0;
 
-    if (check_region (instance->io_port, instance->n_io_port)) {
-	scsi_unregister (instance);
-	return 0;
-    }
+	instance->io_port = 0x80ce8000;
+	instance->n_io_port = 144;
+	instance->irq = IRQ_NONE;
 
-    ecoscsi_write (instance, MODE_REG, 0x20);		/* Is it really SCSI? */
-    if (ecoscsi_read (instance, MODE_REG) != 0x20) {	/* Write to a reg.    */
-        scsi_unregister(instance);
-        return 0;					/* and try to read    */
-    }
-    ecoscsi_write( instance, MODE_REG, 0x00 );		/* it back.	      */
-    if (ecoscsi_read (instance, MODE_REG) != 0x00) {
-        scsi_unregister(instance);
-        return 0;
-    }
+	if ( !(request_region(instance->io_port, instance->n_io_port, "ecoscsi")) )
+		goto unregister_scsi;
 
-    NCR5380_init(instance, 0);
-    if (request_region (instance->io_port, instance->n_io_port, "ecoscsi") == NULL)
-    	{
+	ecoscsi_write (instance, MODE_REG, 0x20);		/* Is it really SCSI? */
+	if (ecoscsi_read (instance, MODE_REG) != 0x20) /* Write to a reg.    */
+		goto release_reg;
+
+	ecoscsi_write( instance, MODE_REG, 0x00 );		/* it back.	      */
+	if (ecoscsi_read (instance, MODE_REG) != 0x00)
+		goto release_reg;
+
+	NCR5380_init(instance, 0);
+
+	if (instance->irq != IRQ_NONE) {
+		if (request_irq(instance->irq, do_ecoscsi_intr, SA_INTERRUPT, "ecoscsi", NULL)) {
+			printk("scsi%d: IRQ%d not free, interrupts disabled\n",
+			instance->host_no, instance->irq);
+			instance->irq = IRQ_NONE;
+		}
+	}
+
+	if (instance->irq != IRQ_NONE) {
+		printk("scsi%d: eek! Interrupts enabled, but I don't think\n", instance->host_no);
+		printk("scsi%d: that the board had an interrupt!\n", instance->host_no);
+	}
+
+	printk("scsi%d: at port %X irq", instance->host_no, instance->io_port);
+	if (instance->irq == IRQ_NONE)
+		printk ("s disabled");
+	else
+		printk (" %d", instance->irq);
+	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
+	CAN_QUEUE, CMD_PER_LUN, ECOSCSI_PUBLIC_RELEASE);
+	printk("\nscsi%d:", instance->host_no);
+	NCR5380_print_options(instance);
+	printk("\n");
+
+	return 1;
+
+release_reg:
+	release_region(instance->io_port, instance->n_io_port);
+unregister_scsi:
 	scsi_unregister(instance);
-	return 0;
-	}
-
-    if (instance->irq != IRQ_NONE)
-	if (request_irq(instance->irq, do_ecoscsi_intr, SA_INTERRUPT, "ecoscsi", NULL)) {
-	    printk("scsi%d: IRQ%d not free, interrupts disabled\n",
-	    instance->host_no, instance->irq);
-	    instance->irq = IRQ_NONE;
-	}
-
-    if (instance->irq != IRQ_NONE) {
-  	printk("scsi%d: eek! Interrupts enabled, but I don't think\n", instance->host_no);
-	printk("scsi%d: that the board had an interrupt!\n", instance->host_no);
-    }
-
-    printk("scsi%d: at port %X irq", instance->host_no, instance->io_port);
-    if (instance->irq == IRQ_NONE)
-	printk ("s disabled");
-    else
-        printk (" %d", instance->irq);
-    printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-        CAN_QUEUE, CMD_PER_LUN, ECOSCSI_PUBLIC_RELEASE);
-    printk("\nscsi%d:", instance->host_no);
-    NCR5380_print_options(instance);
-    printk("\n");
-    return 1;
+	return 0
 }
 
 int ecoscsi_release (struct Scsi_Host *shpnt)

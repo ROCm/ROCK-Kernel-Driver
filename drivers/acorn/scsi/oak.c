@@ -126,6 +126,8 @@ int oakscsi_detect(Scsi_Host_Template * tpnt)
             break;
 
         instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	if (!instance)
+		break;
         instance->io_port = OAK_ADDRESS(ecs[count]);
         instance->irq = OAK_IRQ(ecs[count]);
 
@@ -133,8 +135,11 @@ int oakscsi_detect(Scsi_Host_Template * tpnt)
 	ecard_claim(ecs[count]);
 
 	instance->n_io_port = 255;
-	if (!request_region (instance->io_port, instance->n_io_port, "Oak SCSI"))
+	if (!request_region (instance->io_port, instance->n_io_port, "Oak SCSI")) {
+		ecard_release(ecs[count]);
+		scsi_unregister(instance);
 		break;
+	}
 
 	if (instance->irq != IRQ_NONE)
 	    if (request_irq(instance->irq, do_oakscsi_intr, SA_INTERRUPT, "Oak SCSI", NULL)) {

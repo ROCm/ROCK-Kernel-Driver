@@ -2877,6 +2877,11 @@ int acornscsi_detect(Scsi_Host_Template * tpnt)
 	ecard_claim(ecs[count]); /* Must claim here - card produces irq on reset */
 
 	instance = scsi_register(tpnt, sizeof(AS_Host));
+	if (!instance) {
+		ecard_release(ecs[count]);
+		break;
+	}
+
 	host = (AS_Host *)instance->hostdata;
 
 	instance->io_port = ecard_address(ecs[count], ECARD_MEMC, 0);

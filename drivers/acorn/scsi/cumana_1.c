@@ -140,6 +140,8 @@ int cumanascsi_detect(Scsi_Host_Template * tpnt)
     		break;
 
         instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	if (!instance)
+		break;
         instance->io_port = CUMANA_ADDRESS(ecs[count]);
 	instance->irq = CUMANA_IRQ(ecs[count]);
 
@@ -147,7 +149,11 @@ int cumanascsi_detect(Scsi_Host_Template * tpnt)
 	ecard_claim(ecs[count]);
 
 	instance->n_io_port = 255;
-	request_region (instance->io_port, instance->n_io_port, "CumanaSCSI-1");
+	if ( !(request_region (instance->io_port, instance->n_io_port, "CumanaSCSI-1")) ) {
+		ecard_release(ecs[count]);
+		scsi_unregister(instance);
+		break;
+	}
 
         ((struct NCR5380_hostdata *)instance->hostdata)->ctrl = 0;
         outb(0x00, instance->io_port - 577);

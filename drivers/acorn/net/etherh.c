@@ -553,15 +553,15 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 
 	ecard_claim(ec);
 	
-	dev = init_etherdev(NULL, 0);
+	dev = init_etherdev(NULL, sizeof(struct etherh_priv));
 	if (!dev)
 		goto out;
 
-	eh = kmalloc(sizeof(struct etherh_priv), GFP_KERNEL);
-	if (!eh)
-		goto out_nopriv;
+	/*
+	 * init_etherdev allocs and zeros dev->priv
+	 */
+	eh = dev->priv;
 
-	memset(eh, 0, sizeof(struct etherh_priv));
 	spin_lock_init(&eh->eidev.page_lock);
 
 	SET_MODULE_OWNER(dev);
@@ -695,9 +695,8 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 release:
 	release_region(dev->base_addr, 16);
 free:
-	kfree(eh);
-out_nopriv:
 	unregister_netdev(dev);
+	kfree(dev->priv);
 	kfree(dev);
 out:
 	ecard_release(ec);
