@@ -1,7 +1,7 @@
 /*
  * USB Compaq iPAQ driver
  *
- *	Copyright (C) 2001
+ *	Copyright (C) 2001 - 2002
  *	    Ganesh Varadarajan <ganesh@veritas.com>
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -16,8 +16,12 @@
 #define __LINUX_USB_SERIAL_IPAQ_H
 
 
-#define IPAQ_VENDOR_ID			0x049f
-#define IPAQ_PRODUCT_ID			0x0003
+#define COMPAQ_VENDOR_ID	0x049f
+#define COMPAQ_IPAQ_ID		0x0003
+
+#define HP_VENDOR_ID		0x003f
+#define HP_JORNADA_548_ID	0x1016
+#define HP_JORNADA_568_ID	0x1116
 
 /*
  * Since we can't queue our bulk write urbs (don't know why - it just

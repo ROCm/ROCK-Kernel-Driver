@@ -61,7 +61,7 @@ do {			\
 #define ID_AUERSWALD  	0x09BF
 
 #ifndef AUER_MINOR_BASE		/* allow external override */
-#define AUER_MINOR_BASE	80	/* auerswald driver minor number */
+#define AUER_MINOR_BASE	112	/* auerswald driver minor number */
 #endif
 
 /* we can have up to this number of device plugged in at once */

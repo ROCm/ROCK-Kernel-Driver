@@ -124,9 +124,7 @@
  * conversions. We never do sample rate conversion; these are too
  * expensive to be performed in the kernel.
  *
- * Current status:
- * - Pretty stable on UHCI-Acher/Fliegl/Sailer
- * - Does not work on OHCI due to lack of OHCI driver supporting URB's
+ * Current status: no known HCD-specific issues.
  *
  * Generally: Due to the brokenness of the Audio Class spec
  * it seems generally impossible to write a generic Audio Class driver,
@@ -298,12 +296,10 @@ struct usb_audio_state;
 
 struct my_data_urb {
 	struct urb *urb;
-	struct usb_iso_packet_descriptor isoframe[DESCFRAMES];
 };
 
 struct my_sync_urb {
 	struct urb *urb;
-	struct usb_iso_packet_descriptor isoframe[SYNCFRAMES];
 };
 
 
@@ -2829,14 +2825,14 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 	init_waitqueue_head(&as->usbin.dma.wait);
 	init_waitqueue_head(&as->usbout.dma.wait);
 	spin_lock_init(&as->lock);
-	as->usbin.durb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbin.durb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbin.surb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbin.surb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbout.durb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbout.durb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbout.surb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
-	as->usbout.surb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbin.durb[0].urb = usb_alloc_urb (DESCFRAMES, GFP_KERNEL);
+	as->usbin.durb[1].urb = usb_alloc_urb (DESCFRAMES, GFP_KERNEL);
+	as->usbin.surb[0].urb = usb_alloc_urb (SYNCFRAMES, GFP_KERNEL);
+	as->usbin.surb[1].urb = usb_alloc_urb (SYNCFRAMES, GFP_KERNEL);
+	as->usbout.durb[0].urb = usb_alloc_urb (DESCFRAMES, GFP_KERNEL);
+	as->usbout.durb[1].urb = usb_alloc_urb (DESCFRAMES, GFP_KERNEL);
+	as->usbout.surb[0].urb = usb_alloc_urb (SYNCFRAMES, GFP_KERNEL);
+	as->usbout.surb[1].urb = usb_alloc_urb (SYNCFRAMES, GFP_KERNEL);
 	if ((!as->usbin.durb[0].urb) ||
 	    (!as->usbin.durb[1].urb) ||
 	    (!as->usbin.surb[0].urb) ||

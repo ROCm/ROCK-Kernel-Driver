@@ -252,8 +252,6 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	down (&port->sem);
-	
 	++port->open_count;
 	
 	if (port->open_count == 1) {
@@ -293,9 +291,6 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 		if (result)
 			err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
 	}
-	
-	up (&port->sem);
-	
 	return result;
 }
 
@@ -312,8 +307,6 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	down (&port->sem);
-
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -324,7 +317,6 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 		port->open_count = 0;
 
 	}
-	up (&port->sem);
 }
 
 static int ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)

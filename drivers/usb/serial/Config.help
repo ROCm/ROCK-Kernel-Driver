@@ -40,9 +40,10 @@ CONFIG_USB_SERIAL_VISOR
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_USB_SERIAL_IPAQ
-  Say Y here if you want to connect to your Compaq iPAQ running
-  Windows CE 3.0 using a USB autosync cable. For information on using
-  the driver, read <file:Documentation/usb/usb-serial.txt>.
+  Say Y here if you want to connect to your Compaq iPAQ or HP Jornada
+  548/568 running Windows CE 3.0 or PocketPC 2002 using a USB
+  cradle/cable. For information on using the driver,
+  read <file:Documentation/usb/usb-serial.txt>.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).

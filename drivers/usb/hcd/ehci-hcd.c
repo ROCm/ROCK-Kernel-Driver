@@ -44,6 +44,7 @@
 #include <linux/usb.h>
 #include "../hcd.h"
 
+#include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>

@@ -662,8 +662,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 	int rc = 0;
 	struct keyspan_pda_private *priv;
 
-	down (&port->sem);
-
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -707,12 +705,9 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 
 	}
 
-
-	up (&port->sem);
 	return rc;
 error:
 	--port->open_count;
-	up (&port->sem);
 	return rc;
 }
 
@@ -720,8 +715,6 @@ error:
 static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-
-	down (&port->sem);
 
 	--port->open_count;
 
@@ -737,8 +730,6 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 		}
 		port->open_count = 0;
 	}
-
-	up (&port->sem);
 }
 
 

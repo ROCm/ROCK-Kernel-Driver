@@ -12,6 +12,15 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (02/27/2002) gkh
+ *	Reworked the urb handling logic.  We have no more pool, but dynamically
+ *	allocate the urb and the transfer buffer on the fly.  In testing this
+ *	does not incure any measurable overhead.  This also relies on the fact
+ *	that we have proper reference counting logic for urbs.
+ *
+ * (02/21/2002) SilaS
+ *  Added initial support for the Palm m515 devices.
+ *
  * (02/14/2002) gkh
  *	Added support for the Clie S-360 device.
  *
@@ -134,7 +143,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.9"
+#define DRIVER_VERSION "v2.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB HandSpring Visor, Palm m50x, Sony Clié driver"
 
@@ -158,6 +167,7 @@ static int  clie_3_5_startup	(struct usb_serial *serial);
 static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
@@ -174,6 +184,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
@@ -233,12 +244,8 @@ static struct usb_serial_device_type clie_3_5_device = {
 };
 
 
-#define NUM_URBS			24
-#define URB_TRANSFER_BUFFER_SIZE	768
-static struct urb	*write_urb_pool[NUM_URBS];
-static spinlock_t	write_urb_pool_lock;
-static int		bytes_in;
-static int		bytes_out;
+static int bytes_in;
+static int bytes_out;
 
 
 /******************************************************************************
@@ -259,8 +266,6 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 		return -ENODEV;
 	}
 
-	down (&port->sem);
-	
 	++port->open_count;
 	
 	if (port->open_count == 1) {
@@ -284,8 +289,6 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
 	
-	up (&port->sem);
-	
 	return result;
 }
 
@@ -304,8 +307,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	down (&port->sem);
-
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -329,8 +330,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 		}
 		port->open_count = 0;
 	}
-	up (&port->sem);
-
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
 }
@@ -340,120 +339,84 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 {
 	struct usb_serial *serial = port->serial;
 	struct urb *urb;
-	const unsigned char *current_position = buf;
-	unsigned long flags;
+	unsigned char *buffer;
 	int status;
-	int i;
-	int bytes_sent = 0;
-	int transfer_size;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	while (count > 0) {
-		/* try to find a free urb in our list of them */
-		urb = NULL;
-		spin_lock_irqsave (&write_urb_pool_lock, flags);
-		for (i = 0; i < NUM_URBS; ++i) {
-			if (write_urb_pool[i]->status != -EINPROGRESS) {
-				urb = write_urb_pool[i];
-				break;
-			}
-		}
-		spin_unlock_irqrestore (&write_urb_pool_lock, flags);
-		if (urb == NULL) {
-			dbg (__FUNCTION__ " - no more free urbs");
-			goto exit;
-		}
-		if (urb->transfer_buffer == NULL) {
-			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
-			if (urb->transfer_buffer == NULL) {
-				err(__FUNCTION__" no more kernel memory...");
-				goto exit;
-			}
-		}
-		
-		transfer_size = min (count, URB_TRANSFER_BUFFER_SIZE);
-		if (from_user) {
-			if (copy_from_user (urb->transfer_buffer, current_position, transfer_size)) {
-				bytes_sent = -EFAULT;
-				break;
-			}
-		} else {
-			memcpy (urb->transfer_buffer, current_position, transfer_size);
-		}
-
-		usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, urb->transfer_buffer);
-
-		/* build up our urb */
-		usb_fill_bulk_urb (urb, serial->dev,
-				   usb_sndbulkpipe (serial->dev,
-						    port->bulk_out_endpointAddress),
-				   urb->transfer_buffer, transfer_size, 
-				   visor_write_bulk_callback, port);
-		urb->transfer_flags |= USB_QUEUE_BULK;
-
-		/* send it down the pipe */
-		status = usb_submit_urb(urb, GFP_KERNEL);
-		if (status) {
-			err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
-			bytes_sent = status;
-			break;
-		}
-
-		current_position += transfer_size;
-		bytes_sent += transfer_size;
-		count -= transfer_size;
-		bytes_out += transfer_size;
+	buffer = kmalloc (count, GFP_KERNEL);
+	if (!buffer) {
+		err ("out of memory");
+		return -ENOMEM;
 	}
 
-exit:
-	return bytes_sent;
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb) {
+		err ("no more free urbs");
+		kfree (buffer);
+		return -ENOMEM;
+	}
+
+	if (from_user) {
+		if (copy_from_user (buffer, buf, count)) {
+			kfree (buffer);
+			usb_free_urb (urb);
+			return -EFAULT;
+		}
+	} else {
+		memcpy (buffer, buf, count);
+	}
+
+	usb_serial_debug_data (__FILE__, __FUNCTION__, count, buffer);
+
+	usb_fill_bulk_urb (urb, serial->dev,
+			   usb_sndbulkpipe (serial->dev,
+					    port->bulk_out_endpointAddress),
+			   buffer, count, 
+			   visor_write_bulk_callback, port);
+	urb->transfer_flags |= USB_QUEUE_BULK;
+
+	/* send it down the pipe */
+	status = usb_submit_urb(urb, GFP_KERNEL);
+	if (status) {
+		err(__FUNCTION__ " - usb_submit_urb(write bulk) failed with status = %d", status);
+		count = status;
+	} else {
+		bytes_out += count;
+	}
+
+	/* we are done with this urb, so let the host driver
+	 * really free it when it is finished with it */
+	usb_free_urb (urb);
+
+	return count;
 } 
 
 
 static int visor_write_room (struct usb_serial_port *port)
 {
-	unsigned long flags;
-	int i;
-	int room = 0;
-
 	dbg(__FUNCTION__ " - port %d", port->number);
-	
-	spin_lock_irqsave (&write_urb_pool_lock, flags);
 
-	for (i = 0; i < NUM_URBS; ++i) {
-		if (write_urb_pool[i]->status != -EINPROGRESS) {
-			room += URB_TRANSFER_BUFFER_SIZE;
-		}
-	}
-	
-	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
-	
-	dbg(__FUNCTION__ " - returns %d", room);
-	return (room);
+	/*
+	 * We really can take anything the user throws at us
+	 * but let's pick a nice big number to tell the tty
+	 * layer that we have lots of free space
+	 */
+	return 2048;
 }
 
 
 static int visor_chars_in_buffer (struct usb_serial_port *port)
 {
-	unsigned long flags;
-	int i;
-	int chars = 0;
-
 	dbg(__FUNCTION__ " - port %d", port->number);
-	
-	spin_lock_irqsave (&write_urb_pool_lock, flags);
 
-	for (i = 0; i < NUM_URBS; ++i) {
-		if (write_urb_pool[i]->status == -EINPROGRESS) {
-			chars += URB_TRANSFER_BUFFER_SIZE;
-		}
-	}
-	
-	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
-
-	dbg (__FUNCTION__ " - returns %d", chars);
-	return (chars);
+	/* 
+	 * We can't really account for how much data we
+	 * have sent out, but hasn't made it through to the
+	 * device, so just tell the tty layer that everything
+	 * is flushed.
+	 */
+	return 0;
 }
 
 
@@ -471,9 +434,12 @@ static void visor_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
+	/* free up the transfer buffer, as usb_free_urb() does not do this */
+	kfree (urb->transfer_buffer);
+
 	queue_task(&port->tqueue, &tq_immediate);
 	mark_bh(IMMEDIATE_BH);
-	
+
 	return;
 }
 
@@ -534,16 +500,8 @@ static void visor_read_bulk_callback (struct urb *urb)
 
 static void visor_throttle (struct usb_serial_port *port)
 {
-
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	down (&port->sem);
-
 	usb_unlink_urb (port->read_urb);
-
-	up (&port->sem);
-
-	return;
 }
 
 
@@ -553,16 +511,10 @@ static void visor_unthrottle (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	down (&port->sem);
-
 	port->read_urb->dev = port->serial->dev;
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-
-	up (&port->sem);
-
-	return;
 }
 
 
@@ -783,30 +735,8 @@ static void visor_set_termios (struct usb_serial_port *port, struct termios *old
 
 static int __init visor_init (void)
 {
-	struct urb *urb;
-	int i;
-
 	usb_serial_register (&handspring_device);
 	usb_serial_register (&clie_3_5_device);
-	
-	/* create our write urb pool and transfer buffers */ 
-	spin_lock_init (&write_urb_pool_lock);
-	for (i = 0; i < NUM_URBS; ++i) {
-		urb = usb_alloc_urb(0, GFP_KERNEL);
-		write_urb_pool[i] = urb;
-		if (urb == NULL) {
-			err("No more urbs???");
-			continue;
-		}
-
-		urb->transfer_buffer = NULL;
-		urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
-		if (!urb->transfer_buffer) {
-			err (__FUNCTION__ " - out of memory for urb buffers.");
-			continue;
-		}
-	}
-
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
 	return 0;
@@ -815,27 +745,8 @@ static int __init visor_init (void)
 
 static void __exit visor_exit (void)
 {
-	int i;
-	unsigned long flags;
-
 	usb_serial_deregister (&handspring_device);
 	usb_serial_deregister (&clie_3_5_device);
-
-	spin_lock_irqsave (&write_urb_pool_lock, flags);
-
-	for (i = 0; i < NUM_URBS; ++i) {
-		if (write_urb_pool[i]) {
-			/* FIXME - uncomment the following usb_unlink_urb call when
-			 * the host controllers get fixed to set urb->dev = NULL after
-			 * the urb is finished.  Otherwise this call oopses. */
-			/* usb_unlink_urb(write_urb_pool[i]); */
-			if (write_urb_pool[i]->transfer_buffer)
-				kfree(write_urb_pool[i]->transfer_buffer);
-			usb_free_urb (write_urb_pool[i]);
-		}
-	}
-
-	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
 }
 
 
