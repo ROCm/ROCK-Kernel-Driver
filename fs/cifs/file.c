@@ -1724,7 +1724,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 
     /* BB removeme begin */
-    if(experimEnabled)
+	if(!experimEnabled)
 		return cifs_readdir2(file,direntry,filldir);
     /* BB removeme end */
 

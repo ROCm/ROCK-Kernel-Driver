@@ -344,7 +344,7 @@ cifs_proc_init(void)
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
 
-	pde = create_proc_read_entry("NewReaddirEnabled", 0, proc_fs_cifs,
+	pde = create_proc_read_entry("ReenableOldCifsReaddirCode", 0, proc_fs_cifs,
 				quotaEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = quotaEnabled_write;
