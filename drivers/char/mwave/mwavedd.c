@@ -502,8 +502,6 @@ static struct device_attribute * const mwave_dev_attrs[] = {
 	&dev_attr_uart_irq,
 	&dev_attr_uart_io,
 };
-static int nr_registered_attrs;
-static int device_registered;
 
 /*
 * mwave_init is called on module load
@@ -518,13 +516,13 @@ static void mwave_exit(void)
 
 	PRINTK_1(TRACE_MWAVE, "mwavedd::mwave_exit entry\n");
 
-	for (i = 0; i < nr_registered_attrs; i++)
+	for (i = 0; i < pDrvData->nr_registered_attrs; i++)
 		device_remove_file(&mwave_device, mwave_dev_attrs[i]);
-	nr_registered_attrs = 0;
+	pDrvData->nr_registered_attrs = 0;
 
-	if (device_registered) {
+	if (pDrvData->device_registered) {
 		device_unregister(&mwave_device);
-		device_registered = 0;
+		pDrvData->device_registered = FALSE;
 	}
 
 	if ( pDrvData->sLine >= 0 ) {
@@ -650,7 +648,7 @@ static int __init mwave_init(void)
 
 	if (device_register(&mwave_device))
 		goto cleanup_error;
-	device_registered = 1;
+	pDrvData->device_registered = TRUE;
 	for (i = 0; i < ARRAY_SIZE(mwave_dev_attrs); i++) {
 		if(device_create_file(&mwave_device, mwave_dev_attrs[i])) {
 			PRINTK_ERROR(KERN_ERR_MWAVE
@@ -659,7 +657,7 @@ static int __init mwave_init(void)
 					mwave_dev_attrs[i]->attr.name);
 			goto cleanup_error;
 		}
-		nr_registered_attrs++;
+		pDrvData->nr_registered_attrs++;
 	}
 
 	/* SUCCESS! */

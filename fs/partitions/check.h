@@ -8,7 +8,7 @@
 enum { MAX_PART = 256 };
 
 struct parsed_partitions {
-	char name[40];
+	char name[BDEVNAME_SIZE];
 	struct {
 		sector_t from;
 		sector_t size;

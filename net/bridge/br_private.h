@@ -43,8 +43,7 @@ struct mac_addr
 
 struct net_bridge_fdb_entry
 {
-	struct net_bridge_fdb_entry	*next_hash;
-	struct net_bridge_fdb_entry	**pprev_hash;
+	struct hlist_node		hlist;
 	atomic_t			use_count;
 	mac_addr			addr;
 	struct net_bridge_port		*dst;
@@ -86,7 +85,7 @@ struct net_bridge
 	struct net_device		dev;
 	struct net_device_stats		statistics;
 	rwlock_t			hash_lock;
-	struct net_bridge_fdb_entry	*hash[BR_HASH_SIZE];
+	struct hlist_head		hash[BR_HASH_SIZE];
 	struct timer_list		tick;
 
 	/* STP */

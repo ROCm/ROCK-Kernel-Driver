@@ -27,6 +27,7 @@
 #ifndef __ASSEMBLY__
 
 struct vm_area_struct;
+struct page;
 
 extern void load_mmu(void);
 extern unsigned long calc_highpages(void);
@@ -51,15 +52,30 @@ BTFIXUPDEF_CALL(void,  mmu_release_scsi_sgl, struct scatterlist *, int, struct s
 
 /*
  * mmu_map/unmap are provided by iommu/iounit; Invalid to call on IIep.
+ *
+ * The mmu_map_dma_area establishes two mappings in one go.
+ * These mappings point to pages normally mapped at 'va' (linear address).
+ * First mapping is for CPU visible address at 'a', uncached.
+ * This is an alias, but it works because it is an uncached mapping.
+ * Second mapping is for device visible address, or "bus" address.
+ * The bus address is returned at '*pba'.
+ *
+ * These functions seem distinct, but are hard to split. On sun4c,
+ * at least for now, 'a' is equal to bus address, and retured in *pba.
+ * On sun4m, page attributes depend on the CPU type, so we have to
+ * know if we are mapping RAM or I/O, so it has to be an additional argument
+ * to a separate mapping function for CPU visible mappings.
  */
-BTFIXUPDEF_CALL(void,  mmu_map_dma_area, unsigned long va, __u32 addr, int len)
-BTFIXUPDEF_CALL(unsigned long /*phys*/, mmu_translate_dvma, unsigned long busa)
+BTFIXUPDEF_CALL(int,  mmu_map_dma_area, dma_addr_t *, unsigned long, unsigned long, int len)
+BTFIXUPDEF_CALL(struct page *, mmu_translate_dvma, unsigned long busa)
 BTFIXUPDEF_CALL(void,  mmu_unmap_dma_area, unsigned long busa, int len)
 
-#define mmu_map_dma_area(va, ba,len) BTFIXUP_CALL(mmu_map_dma_area)(va,ba,len)
+#define mmu_map_dma_area(pba,va,a,len) BTFIXUP_CALL(mmu_map_dma_area)(pba,va,a,len)
 #define mmu_unmap_dma_area(ba,len) BTFIXUP_CALL(mmu_unmap_dma_area)(ba,len)
 #define mmu_translate_dvma(ba)     BTFIXUP_CALL(mmu_translate_dvma)(ba)
 
+/*
+ */
 BTFIXUPDEF_SIMM13(pmd_shift)
 BTFIXUPDEF_SETHI(pmd_size)
 BTFIXUPDEF_SETHI(pmd_mask)
@@ -376,6 +392,12 @@ BTFIXUPDEF_CALL(void, mmu_info, struct seq_file *)
 BTFIXUPDEF_CALL(void, update_mmu_cache, struct vm_area_struct *, unsigned long, pte_t)
 
 #define update_mmu_cache(vma,addr,pte) BTFIXUP_CALL(update_mmu_cache)(vma,addr,pte)
+
+BTFIXUPDEF_CALL(void, sparc_mapiorange, unsigned int, unsigned long,
+    unsigned long, unsigned int)
+BTFIXUPDEF_CALL(void, sparc_unmapiorange, unsigned long, unsigned int)
+#define sparc_mapiorange(bus,pa,va,len) BTFIXUP_CALL(sparc_mapiorange)(bus,pa,va,len)
+#define sparc_unmapiorange(va,len) BTFIXUP_CALL(sparc_unmapiorange)(va,len)
 
 extern int invalid_segment;
 

@@ -353,6 +353,11 @@ too_many_siblings:
 		break;
 	}
 #endif
+
+	if (c->x86 == 15) 
+		set_bit(X86_FEATURE_P4, c->x86_capability);
+	if (c->x86 == 6) 
+		set_bit(X86_FEATURE_P3, c->x86_capability);
 }
 
 

@@ -157,14 +157,9 @@ static int c101_open(struct net_device *dev)
 	port_t *port = hdlc_to_port(hdlc);
 	int result;
 
-	if (!try_module_get(THIS_MODULE))
-		return -EFAULT;	/* rmmod in progress */
-
 	result = hdlc_open(hdlc);
-	if (result) {
+	if (result)
 		return result;
-		module_put(THIS_MODULE);
-	}
 
 	writeb(1, port->win0base + C101_DTR);
 	sca_out(0, MSCI1_OFFSET + CTL, port); /* RTS uses ch#2 output */
@@ -183,7 +178,6 @@ static int c101_close(struct net_device *dev)
 	writeb(0, port->win0base + C101_DTR);
 	sca_out(CTL_NORTS, MSCI1_OFFSET + CTL, port);
 	hdlc_close(hdlc);
-	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -319,6 +313,7 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	dev = hdlc_to_dev(&card->hdlc);
 
 	spin_lock_init(&card->lock);
+	SET_MODULE_OWNER(dev);
 	dev->irq = irq;
 	dev->mem_start = winbase;
 	dev->mem_end = winbase + C101_MAPPED_RAM_SIZE - 1;

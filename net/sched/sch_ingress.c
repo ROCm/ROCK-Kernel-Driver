@@ -45,7 +45,7 @@
 
 /* Thanks to Doron Oz for this hack
 */
-static int nf_registered = 0; 
+static int nf_registered; 
 
 struct ingress_qdisc_data {
 	struct Qdisc		*q;
@@ -237,14 +237,12 @@ used on the egress (might slow things for an iota)
 }
 
 /* after ipt_filter */
-static struct nf_hook_ops ing_ops =
-{
-	{ NULL, NULL},
-	ing_hook,
-	THIS_MODULE,
-	PF_INET,
-	NF_IP_PRE_ROUTING,
-	NF_IP_PRI_FILTER + 1
+static struct nf_hook_ops ing_ops = {
+	.hook           = ing_hook,
+	.owner		= THIS_MODULE,
+	.pf             = PF_INET,
+	.hooknum        = NF_IP_PRE_ROUTING,
+	.priority       = NF_IP_PRI_FILTER + 1,
 };
 
 int ingress_init(struct Qdisc *sch,struct rtattr *opt)
@@ -255,7 +253,7 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 		if (nf_register_hook(&ing_ops) < 0) {
 			printk("ingress qdisc registration error \n");
 			goto error;
-			}
+		}
 		nf_registered++;
 	}
 

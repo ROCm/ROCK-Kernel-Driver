@@ -139,21 +139,19 @@ static rwlock_t qdisc_mod_lock = RW_LOCK_UNLOCKED;
 
 /* The list of all installed queueing disciplines. */
 
-static struct Qdisc_ops *qdisc_base = NULL;
+static struct Qdisc_ops *qdisc_base;
 
 /* Register/uregister queueing discipline */
 
 int register_qdisc(struct Qdisc_ops *qops)
 {
 	struct Qdisc_ops *q, **qp;
+	int rc = -EEXIST;
 
 	write_lock(&qdisc_mod_lock);
-	for (qp = &qdisc_base; (q=*qp)!=NULL; qp = &q->next) {
-		if (strcmp(qops->id, q->id) == 0) {
-			write_unlock(&qdisc_mod_lock);
-			return -EEXIST;
-		}
-	}
+	for (qp = &qdisc_base; (q = *qp) != NULL; qp = &q->next)
+		if (!strcmp(qops->id, q->id))
+			goto out;
 
 	if (qops->enqueue == NULL)
 		qops->enqueue = noop_qdisc_ops.enqueue;
@@ -164,8 +162,10 @@ int register_qdisc(struct Qdisc_ops *qops)
 
 	qops->next = NULL;
 	*qp = qops;
+	rc = 0;
+out:
 	write_unlock(&qdisc_mod_lock);
-	return 0;
+	return rc;
 }
 
 int unregister_qdisc(struct Qdisc_ops *qops)

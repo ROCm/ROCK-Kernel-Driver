@@ -65,37 +65,38 @@ struct tcf_proto_ops * tcf_proto_lookup_ops(struct rtattr *kind)
 int register_tcf_proto_ops(struct tcf_proto_ops *ops)
 {
 	struct tcf_proto_ops *t, **tp;
+	int rc = -EEXIST;
 
 	write_lock(&cls_mod_lock);
-	for (tp = &tcf_proto_base; (t=*tp) != NULL; tp = &t->next) {
-		if (strcmp(ops->kind, t->kind) == 0) {
-			write_unlock(&cls_mod_lock);
-			return -EEXIST;
-		}
-	}
+	for (tp = &tcf_proto_base; (t = *tp) != NULL; tp = &t->next)
+		if (!strcmp(ops->kind, t->kind))
+			goto out;
 
 	ops->next = NULL;
 	*tp = ops;
+	rc = 0;
+out:
 	write_unlock(&cls_mod_lock);
-	return 0;
+	return rc;
 }
 
 int unregister_tcf_proto_ops(struct tcf_proto_ops *ops)
 {
 	struct tcf_proto_ops *t, **tp;
+	int rc = -ENOENT;
 
 	write_lock(&cls_mod_lock);
 	for (tp = &tcf_proto_base; (t=*tp) != NULL; tp = &t->next)
 		if (t == ops)
 			break;
 
-	if (!t) {
-		write_unlock(&cls_mod_lock);
-		return -ENOENT;
-	}
+	if (!t)
+		goto out;
 	*tp = t->next;
+	rc = 0;
+out:
 	write_unlock(&cls_mod_lock);
-	return 0;
+	return rc;
 }
 
 static int tfilter_notify(struct sk_buff *oskb, struct nlmsghdr *n,
@@ -371,11 +372,8 @@ static int tc_dump_tfilter(struct sk_buff *skb, struct netlink_callback *cb)
 		q = dev->qdisc_sleeping;
 	else
 		q = qdisc_lookup(dev, TC_H_MAJ(tcm->tcm_parent));
-	if (q == NULL) {
-		read_unlock(&qdisc_tree_lock);
-		dev_put(dev);
-		return skb->len;
-	}
+	if (!q)
+		goto out;
 	if ((cops = q->ops->cl_ops) == NULL)
 		goto errout;
 	if (TC_H_MIN(tcm->tcm_parent)) {
@@ -425,7 +423,7 @@ static int tc_dump_tfilter(struct sk_buff *skb, struct netlink_callback *cb)
 errout:
 	if (cl)
 		cops->put(q, cl);
-
+out:
 	read_unlock(&qdisc_tree_lock);
 	dev_put(dev);
 	return skb->len;
