@@ -1,8 +1,8 @@
 /**
  * aops.c - NTFS kernel address space operations and page cache handling.
- * 	    Part of the Linux-NTFS project.
+ *	    Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -10,13 +10,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -575,11 +575,11 @@ static int ntfs_write_block(struct page *page)
 				// Again for each page do:
 				// - wait_on_page_locked()
 				// - Check (PageUptodate(page) &&
-				// 			!PageError(page))
+				//			!PageError(page))
 				// Update initialized size in the attribute and
 				// in the inode.
 				// Again, for each page do:
-				// 	__set_page_dirty_buffers();
+				//	__set_page_dirty_buffers();
 				// page_cache_release()
 				// We don't need to wait on the writes.
 				// Update iblock.
@@ -1121,11 +1121,11 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 				// Again for each page do:
 				// - wait_on_page_locked()
 				// - Check (PageUptodate(page) &&
-				// 			!PageError(page))
+				//			!PageError(page))
 				// Update initialized size in the attribute and
 				// in the inode.
 				// Again, for each page do:
-				// 	__set_page_dirty_buffers();
+				//	__set_page_dirty_buffers();
 				// page_cache_release()
 				// We don't need to wait on the writes.
 				// Update iblock.
@@ -1197,7 +1197,7 @@ lock_retry_remap:
 					// TODO: Instantiate the hole.
 					// clear_buffer_new(bh);
 					// unmap_underlying_metadata(bh->b_bdev,
-					// 		bh->b_blocknr);
+					//		bh->b_blocknr);
 					// For non-uptodate buffers, need to
 					// zero out the region outside the
 					// request in this bh or all bhs,
@@ -1288,7 +1288,7 @@ lock_retry_remap:
 		if (PageUptodate(page)) {
 			if (!buffer_uptodate(bh))
 				set_buffer_uptodate(bh);
-			continue; 
+			continue;
 		}
 		/*
 		 * The page is not uptodate. The buffer is mapped. If it is not
@@ -1534,6 +1534,7 @@ static int ntfs_commit_nonresident_write(struct page *page,
 	if (pos > vi->i_size) {
 		ntfs_error(vi->i_sb, "Writing beyond the existing file size is "
 				"not supported yet. Sorry.");
+		return -EOPNOTSUPP;
 		// vi->i_size = pos;
 		// mark_inode_dirty(vi);
 	}
@@ -1717,7 +1718,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 		/*
 		 * Bring the out of bounds area(s) uptodate by copying data
 		 * from the mft record to the page.
-	 	 */
+		 */
 		if (from > 0)
 			memcpy(kaddr, kattr, from);
 		if (to < bytes)
