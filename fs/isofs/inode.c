@@ -802,7 +802,7 @@ root_found:
 
 #ifdef CONFIG_JOLIET
 	if (joliet_level && opt.utf8 == 0) {
-		char * p = opt.iocharset ? opt.iocharset : "iso8859-1";
+		char * p = opt.iocharset ? opt.iocharset : CONFIG_NLS_DEFAULT;
 		sbi->s_nls_iocharset = load_nls(p);
 		if (! sbi->s_nls_iocharset) {
 			/* Fail only if explicit charset specified */
