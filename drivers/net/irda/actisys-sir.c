@@ -235,6 +235,8 @@ static int actisys_reset(struct sir_dev *dev)
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no> - Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("ACTiSYS IR-220L and IR-220L+ dongle driver");	
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-2"); /* IRDA_ACTISYS_DONGLE */
+MODULE_ALIAS("irda-dongle-3"); /* IRDA_ACTISYS_PLUS_DONGLE */
 
 module_init(actisys_sir_init);
 module_exit(actisys_sir_cleanup);

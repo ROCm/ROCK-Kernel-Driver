@@ -164,7 +164,7 @@ static int litelink_reset(struct irda_task *task)
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Parallax Litelink dongle driver");	
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS("irda-dongle-5"); /* IRDA_LITELINK_DONGLE */
 		
 /*
  * Function init_module (void)

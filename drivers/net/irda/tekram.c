@@ -264,6 +264,7 @@ int tekram_reset(struct irda_task *task)
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Tekram IrMate IR-210B dongle driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-0"); /* IRDA_TEKRAM_DONGLE */
 		
 /*
  * Function init_module (void)

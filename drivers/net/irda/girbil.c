@@ -231,7 +231,7 @@ static int girbil_reset(struct irda_task *task)
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Greenwich GIrBIL dongle driver");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS("irda-dongle-4"); /* IRDA_GIRBIL_DONGLE */
 	
 /*
  * Function init_module (void)
