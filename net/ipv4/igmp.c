@@ -1215,9 +1215,6 @@ void ip_mc_down(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
-	if (!in_dev->mc_initted)
-		return;
-
 #ifdef CONFIG_IP_MULTICAST
 	in_dev->mr_ifc_count = 0;
 	if (del_timer(&in_dev->mr_ifc_timer))
@@ -1263,8 +1260,6 @@ void ip_mc_up(struct in_device *in_dev)
 
 	for (i=in_dev->mc_list; i; i=i->next)
 		igmp_group_added(i);
-
-	in_dev->mc_initted = 1;
 }
 
 /*
