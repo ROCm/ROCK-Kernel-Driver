@@ -1,7 +1,7 @@
 /*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2004 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2005 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -286,17 +286,14 @@ static void sonypi_camera_on(void)
 
 	for (j = 5; j > 0; j--) {
 
-		while (sonypi_call2(0x91, 0x1)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
-		}
+		while (sonypi_call2(0x91, 0x1))
+			msleep(10);
 		sonypi_call1(0x93);
 
 		for (i = 400; i > 0; i--) {
 			if (sonypi_camera_ready())
 				break;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
+			msleep(10);
 		}
 		if (i)
 			break;
