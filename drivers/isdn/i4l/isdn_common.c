@@ -264,8 +264,6 @@ isdn_timer_funct(ulong dummy)
 	if (tf & ISDN_TIMER_SLOW) {
 		if (++isdn_timer_cnt2 >= ISDN_TIMER_1SEC) {
 			isdn_timer_cnt2 = 0;
-			if (tf & ISDN_TIMER_NETHANGUP)
-				isdn_net_autohup();
 			if (++isdn_timer_cnt3 >= ISDN_TIMER_RINGING) {
 				isdn_timer_cnt3 = 0;
 				if (tf & ISDN_TIMER_MODEMRING)
@@ -1397,10 +1395,12 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		printk(KERN_INFO "isdn: Verbose-Level is %d\n", dev->net_verbose);
 		return 0;
 	case IIOCSETGST:
-		if (arg)
+		if (arg) {
 			dev->global_flags |= ISDN_GLOBAL_STOPPED;
-		else
+			isdn_net_hangup_all();
+		} else {
 			dev->global_flags &= ~ISDN_GLOBAL_STOPPED;
+		}
 		printk(KERN_INFO "isdn: Global Mode %s\n",
 		       (dev->global_flags & ISDN_GLOBAL_STOPPED) ? "stopped" : "running");
 		return 0;

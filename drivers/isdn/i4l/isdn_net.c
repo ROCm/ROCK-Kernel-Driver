@@ -406,23 +406,6 @@ static void isdn_net_hup_timer(unsigned long data)
 	mod_timer(&lp->hup_timer, lp->hup_timer.expires + HZ);
 }
 
-void
-isdn_net_autohup()
-{
-	struct list_head *l;
-
-	list_for_each(l, &isdn_net_devs) {
-		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-		isdn_net_local *l = &p->local;
-
-		if(dev->global_flags & ISDN_GLOBAL_STOPPED || 
-		   ISDN_NET_DIALMODE(*l) == ISDN_NET_DM_OFF) {
-			isdn_net_hangup(l);
-			continue;
-		}
-	}
-}
-
 static void isdn_net_lp_disconnected(isdn_net_local *lp)
 {
 	isdn_net_rm_from_bundle(lp);
@@ -862,6 +845,17 @@ isdn_net_hangup(isdn_net_local *lp)
 		isdn_slot_all_eaz(lp->isdn_slot);
 	}
 	isdn_net_unbind_channel(lp);
+}
+
+void
+isdn_net_hangup_all()
+{
+	struct list_head *l;
+
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
+		isdn_net_hangup(&p->local);
+	}
 }
 
 typedef struct {
@@ -2842,6 +2836,9 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 		else {
 			lp->flags |= cfg->dialmode;  /* turn on selected bits */
 		}
+		if (lp->flags & ISDN_NET_DM_OFF)
+			isdn_net_hangup(lp);
+
 		if (cfg->chargehup)
 			lp->hupflags |= ISDN_CHARGEHUP;
 		else
@@ -3151,9 +3148,6 @@ isdn_net_realrm(isdn_net_dev *p)
 			}
 		}
 	}
-	/* If no more net-devices remain, disable auto-hangup timer */
-	if (list_empty(&isdn_net_devs))
-		isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, 0);
 	restore_flags(flags);
 	kfree(p);
 
