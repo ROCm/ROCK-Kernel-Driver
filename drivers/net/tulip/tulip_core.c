@@ -880,7 +880,6 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		if (tp->mii_cnt)
 			data->phy_id = phy;
 		else if (tp->flags & HAS_NWAY)
@@ -891,7 +890,6 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 			return -ENODEV;
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		if (data->phy_id == 32 && (tp->flags & HAS_NWAY)) {
 			int csr12 = inl (ioaddr + CSR12);
 			int csr14 = inl (ioaddr + CSR14);
@@ -927,7 +925,6 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		return 0;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN))
 			return -EPERM;
 		if (regnum & ~0x1f)
