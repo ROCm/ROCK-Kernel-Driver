@@ -162,11 +162,11 @@ static void *i8xx_alloc_pages(void)
 
 	page = alloc_pages(GFP_KERNEL, 2);
 	if (page == NULL) {
-		return 0;
+		return NULL;
 	}
 	if (change_page_attr(page, 4, PAGE_KERNEL_NOCACHE) < 0) {
 		__free_page(page);
-		return 0;
+		return NULL;
 	}
 	get_page(page);
 	SetPageLocked(page);
@@ -746,7 +746,7 @@ static int intel_i915_create_gatt_table(void)
 	size = agp_bridge->current_size;
 	page_order = size->page_order;
 	num_entries = size->num_entries;
-	agp_bridge->gatt_table_real = 0;
+	agp_bridge->gatt_table_real = NULL;
 
 	pci_read_config_dword(intel_i830_private.i830_dev, I915_MMADDR, &temp);
 	pci_read_config_dword(intel_i830_private.i830_dev, I915_PTEADDR,&temp2);
