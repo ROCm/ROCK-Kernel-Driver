@@ -30,6 +30,7 @@
 #include "sp887x.h"
 #include "dst.h"
 #include "nxt6000.h"
+#include "cx24110.h"
 
 struct dvb_bt8xx_card {
 	struct semaphore lock;
