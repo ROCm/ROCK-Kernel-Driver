@@ -260,6 +260,8 @@ static __inline__ int variable_test_bit(int nr, const volatile unsigned long * a
  constant_test_bit((nr),(addr)) : \
  variable_test_bit((nr),(addr)))
 
+#undef ADDR
+
 /**
  * find_first_zero_bit - find the first zero bit in a memory region
  * @addr: The address to start the search at
