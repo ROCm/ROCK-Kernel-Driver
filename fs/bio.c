@@ -20,7 +20,7 @@
 #include <linux/bio.h>
 #include <linux/blk.h>
 #include <linux/slab.h>
-#include <linux/iobuf.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mempool.h>
@@ -438,128 +438,6 @@ retry_segments:
 	return 0;
 }
 
-static int bio_end_io_kio(struct bio *bio, unsigned int bytes_done, int error)
-{
-	struct kiobuf *kio = (struct kiobuf *) bio->bi_private;
-
-	if (bio->bi_size)
-		return 1;
-
-	end_kio_request(kio, error);
-	bio_put(bio);
-	return 0;
-}
-
-/**
- * ll_rw_kio - submit a &struct kiobuf for I/O
- * @rw:   %READ or %WRITE
- * @kio:   the kiobuf to do I/O on
- * @bdev:   target device
- * @sector:   start location on disk
- *
- * Description:
- *   ll_rw_kio will map the page list inside the &struct kiobuf to
- *   &struct bio and queue them for I/O. The kiobuf given must describe
- *   a continous range of data, and must be fully prepared for I/O.
- **/
-void ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t sector)
-{
-	int i, offset, size, err, map_i, total_nr_pages, nr_pages;
-	struct bio *bio;
-
-	err = 0;
-	if ((rw & WRITE) && bdev_read_only(bdev)) {
-		printk("ll_rw_bio: WRITE to ro device %s\n", bdevname(bdev));
-		err = -EPERM;
-		goto out;
-	}
-
-	if (!kio->nr_pages) {
-		err = -EINVAL;
-		goto out;
-	}
-
-	/*
-	 * maybe kio is bigger than the max we can easily map into a bio.
-	 * if so, split it up in appropriately sized chunks.
-	 */
-	total_nr_pages = kio->nr_pages;
-	offset = kio->offset & ~PAGE_MASK;
-	size = kio->length;
-
-	atomic_set(&kio->io_count, 1);
-
-	map_i = 0;
-
-next_chunk:
-	nr_pages = BIO_MAX_PAGES;
-	if (nr_pages > total_nr_pages)
-		nr_pages = total_nr_pages;
-
-	atomic_inc(&kio->io_count);
-
-	/*
-	 * allocate bio and do initial setup
-	 */
-	if ((bio = bio_alloc(GFP_NOIO, nr_pages)) == NULL) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	bio->bi_sector = sector;
-	bio->bi_bdev = bdev;
-	bio->bi_idx = 0;
-	bio->bi_end_io = bio_end_io_kio;
-	bio->bi_private = kio;
-
-	for (i = 0; i < nr_pages; i++, map_i++) {
-		int nbytes = PAGE_SIZE - offset;
-
-		if (nbytes > size)
-			nbytes = size;
-
-		BUG_ON(kio->maplist[map_i] == NULL);
-
-		/*
-		 * if we can't add this page to the bio, submit for i/o
-		 * and alloc a new one if needed
-		 */
-		if (bio_add_page(bio, kio->maplist[map_i], nbytes, offset))
-			break;
-
-		/*
-		 * kiobuf only has an offset into the first page
-		 */
-		offset = 0;
-
-		sector += nbytes >> 9;
-		size -= nbytes;
-		total_nr_pages--;
-		kio->offset += nbytes;
-	}
-
-	submit_bio(rw, bio);
-
-	if (total_nr_pages)
-		goto next_chunk;
-
-	if (size) {
-		printk("ll_rw_kio: size %d left (kio %d)\n", size, kio->length);
-		BUG();
-	}
-
-out:
-	if (err)
-		kio->errno = err;
-
-	/*
-	 * final atomic_dec of io_count to match our initial setting of 1.
-	 * I/O may or may not have completed at this point, final completion
-	 * handler is only run on last decrement.
-	 */
-	end_kio_request(kio, !err);
-}
-
 /**
  * bio_endio - end I/O on a bio
  * @bio:	bio
@@ -662,7 +540,6 @@ module_init(init_bio);
 
 EXPORT_SYMBOL(bio_alloc);
 EXPORT_SYMBOL(bio_put);
-EXPORT_SYMBOL(ll_rw_kio);
 EXPORT_SYMBOL(bio_endio);
 EXPORT_SYMBOL(bio_init);
 EXPORT_SYMBOL(bio_copy);

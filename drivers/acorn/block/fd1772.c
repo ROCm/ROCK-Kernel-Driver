@@ -345,8 +345,6 @@ static void fd_select_drive(int drive);
 static void fd_deselect(void);
 static void fd_motor_off_timer(unsigned long dummy);
 static void check_change(unsigned long dummy);
-static __inline__ void set_head_settle_flag(void);
-static __inline__ int get_head_settle_flag(void);
 static void floppy_irqconsequencehandler(void);
 static void fd_error(void);
 static void do_fd_action(int drive);
@@ -363,7 +361,6 @@ static void fd_times_out(unsigned long dummy);
 static void finish_fdc(void);
 static void finish_fdc_done(int dummy);
 static void floppy_off(unsigned int nr);
-static __inline__ void copy_buffer(void *from, void *to);
 static void setup_req_params(int drive);
 static void redo_fd_request(void);
 static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int
@@ -543,12 +540,12 @@ static void check_change(unsigned long dummy)
  * seek operation, because we don't use seeks with verify.
  */
 
-static __inline__ void set_head_settle_flag(void)
+static inline void set_head_settle_flag(void)
 {
 	HeadSettleFlag = FDC1772CMDADD_E;
 }
 
-static __inline__ int get_head_settle_flag(void)
+static inline int get_head_settle_flag(void)
 {
 	int tmp = HeadSettleFlag;
 	HeadSettleFlag = 0;
@@ -559,6 +556,15 @@ static __inline__ int get_head_settle_flag(void)
 
 
 /* General Interrupt Handling */
+
+static inline void copy_buffer(void *from, void *to)
+{
+	ulong *p1 = (ulong *) from, *p2 = (ulong *) to;
+	int cnt;
+
+	for (cnt = 512 / 4; cnt; cnt--)
+		*p2++ = *p1++;
+}
 
 static void (*FloppyIRQHandler) (int status) = NULL;
 
@@ -1174,16 +1180,6 @@ static int floppy_revalidate(dev_t dev)
 	}
 	return 0;
 }
-
-static __inline__ void copy_buffer(void *from, void *to)
-{
-	ulong *p1 = (ulong *) from, *p2 = (ulong *) to;
-	int cnt;
-
-	for (cnt = 512 / 4; cnt; cnt--)
-		*p2++ = *p1++;
-}
-
 
 /* This sets up the global variables describing the current request. */
 

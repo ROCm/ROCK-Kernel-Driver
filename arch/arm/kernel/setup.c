@@ -193,26 +193,25 @@ static inline void dump_cache(const char *prefix, unsigned int cache)
 			CACHE_LINE(cache)));
 }
 
-static inline void dump_cpu_cache_id(void)
+static void __init dump_cpu_info(void)
 {
-	unsigned int cache_info;
+	unsigned int info;
 
-	asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (cache_info));
+	asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (info));
 
-	if (cache_info == processor_id)
-		return;
-
-	printk("CPU: D %s cache\n", cache_types[CACHE_TYPE(cache_info)]);
-	if (CACHE_S(cache_info)) {
-		dump_cache("CPU: I cache", CACHE_ISIZE(cache_info));
-		dump_cache("CPU: D cache", CACHE_DSIZE(cache_info));
-	} else {
-		dump_cache("CPU: cache", CACHE_ISIZE(cache_info));
+	if (info != processor_id) {
+		printk("CPU: D %s cache\n", cache_types[CACHE_TYPE(info)]);
+		if (CACHE_S(info)) {
+			dump_cache("CPU: I cache", CACHE_ISIZE(info));
+			dump_cache("CPU: D cache", CACHE_DSIZE(info));
+		} else {
+			dump_cache("CPU: cache", CACHE_ISIZE(info));
+		}
 	}
 }
 
 #else
-#define dump_cpu_cache_id() do { } while (0)
+#define dump_cpu_info() do { } while (0)
 #endif
 
 static void __init setup_processor(void)
@@ -255,7 +254,7 @@ static void __init setup_processor(void)
 	       proc_info.manufacturer, proc_info.cpu_name,
 	       (int)processor_id & 15);
 
-	dump_cpu_cache_id();
+	dump_cpu_info();
 
 	sprintf(system_utsname.machine, "%s%c", list->arch_name, ENDIANNESS);
 	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);

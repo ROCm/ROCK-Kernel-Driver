@@ -193,19 +193,29 @@ static int neponset_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver neponset_device_driver = {
-	.suspend = neponset_suspend,
-	.resume  = neponset_resume,
+	.name		= "NEPONSET",
+	.bus		= &system_bus_type,
+	.suspend	= neponset_suspend,
+	.resume		= neponset_resume,
 };
 
-static struct device neponset_device = {
-	.name	= "Neponset",
-	.bus_id	= "neponset",
-	.driver = &neponset_device_driver,
+static struct sys_device neponset_device = {
+	.name		= "NEPONSET",
+	.id		= 0,
+	.root		= NULL,
+	.dev = {
+		.name	= "Neponset",
+		.bus_id	= "neponset",
+		.bus	= &system_bus_type,
+		.driver = &neponset_device_driver,
+	},
 };
 
 static int __init neponset_init(void)
 {
 	int ret;
+
+	driver_register(&neponset_device_driver);
 
 	/*
 	 * The Neponset is only present on the Assabet machine type.
@@ -231,7 +241,7 @@ static int __init neponset_init(void)
 		return -ENODEV;
 	}
 
-	ret = register_sys_device(&neponset_device);
+	ret = sys_device_register(&neponset_device);
 	if (ret)
 		return ret;
 
@@ -256,7 +266,7 @@ static int __init neponset_init(void)
 	return sa1111_init(0x40000000, IRQ_NEPONSET_SA1111);
 }
 
-arch_initcall(neponset_init);
+subsys_initcall(neponset_init);
 
 static struct map_desc neponset_io_desc[] __initdata = {
  /* virtual     physical    length type */

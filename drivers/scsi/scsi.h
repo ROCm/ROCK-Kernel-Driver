@@ -977,4 +977,6 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 
 #define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
 
+int scsi_set_medium_removal(Scsi_Device *dev, char state);
+
 #endif

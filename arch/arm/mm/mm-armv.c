@@ -13,6 +13,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/highmem.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -20,6 +21,7 @@
 #include <asm/rmap.h>
 #include <asm/io.h>
 #include <asm/setup.h>
+#include <asm/tlbflush.h>
 
 #include <asm/mach/map.h>
 
@@ -213,6 +215,50 @@ static inline void clear_mapping(unsigned long virt)
 	pmd_clear(pmd_offset(pgd_offset_k(virt), virt));
 }
 
+struct mem_types {
+	unsigned int	prot_pte;
+	unsigned int	prot_sect;
+	unsigned int	domain;
+};
+
+static struct mem_types mem_types[] __initdata = {
+	[MT_DEVICE] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_WRITE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
+		.domain    = DOMAIN_IO,
+	},
+	[MT_CACHECLEAN] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_CACHEABLE | L_PTE_BUFFERABLE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
+				PMD_SECT_BUFFERABLE,
+		.domain    = DOMAIN_KERNEL,
+	},
+	[MT_MINICLEAN] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_CACHEABLE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE,
+		.domain    = DOMAIN_KERNEL,
+	},
+	[MT_VECTORS] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
+				L_PTE_EXEC,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
+				PMD_SECT_BUFFERABLE,
+		.domain    = DOMAIN_USER,
+	},
+	[MT_MEMORY] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
+				L_PTE_EXEC | L_PTE_WRITE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
+				PMD_SECT_BUFFERABLE | PMD_SECT_AP_WRITE,
+		.domain    = DOMAIN_KERNEL,
+	}
+};
+
 /*
  * Create the page directory entries and any necessary
  * page tables for the mapping specified by `md'.  We
@@ -232,42 +278,9 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-	prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY;
-	prot_sect = PMD_TYPE_SECT;
-
-	switch (md->type) {
-	case MT_DEVICE:
-		prot_pte  |= L_PTE_WRITE;
-		prot_sect |= PMD_SECT_AP_WRITE;
-		domain     = DOMAIN_IO;
-		break;
-
-	case MT_CACHECLEAN:
-		prot_pte  |= L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
-		prot_sect |= PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
-		domain     = DOMAIN_KERNEL;
-		break;
-
-	case MT_MINICLEAN:
-		prot_pte  |= L_PTE_CACHEABLE;
-		prot_sect |= PMD_SECT_CACHEABLE;
-		domain     = DOMAIN_KERNEL;
-		break;
-
-	case MT_VECTORS:
-		prot_pte  |= L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
-		prot_sect |= PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
-		domain     = DOMAIN_USER;
-		break;
-
-	case MT_MEMORY:
-		prot_pte  |= L_PTE_WRITE | L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE;
-		prot_sect |= PMD_SECT_AP_WRITE | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE;
-		domain     = DOMAIN_KERNEL;
-		break;
-	}
-
-	prot_sect |= PMD_DOMAIN(domain);
+	domain	  = mem_types[md->type].domain;
+	prot_pte  = mem_types[md->type].prot_pte;
+	prot_sect = mem_types[md->type].prot_sect | PMD_DOMAIN(domain);
 
 	virt   = md->virtual;
 	off    = md->physical - virt;

@@ -63,9 +63,9 @@ static inline long sync_writeback_pages(void)
 int dirty_background_ratio = 10;
 
 /*
- * The generator of dirty data starts async writeback at this percentage
+ * The generator of dirty data starts writeback at this percentage
  */
-int dirty_async_ratio = 40;
+int vm_dirty_ratio = 40;
 
 /*
  * The interval between `kupdate'-style writebacks, in centiseconds
@@ -84,9 +84,52 @@ int dirty_expire_centisecs = 30 * 100;
 static void background_writeout(unsigned long _min_pages);
 
 /*
+ * Work out the current dirty-memory clamping and background writeout
+ * thresholds.
+ *
+ * The main aim here is to lower them aggressively if there is a lot of mapped
+ * memory around.  To avoid stressing page reclaim with lots of unreclaimable
+ * pages.  It is better to clamp down on writers than to start swapping, and
+ * performing lots of scanning.
+ *
+ * We only allow 1/2 of the currently-unmapped memory to be dirtied.
+ *
+ * We don't permit the clamping level to fall below 5% - that is getting rather
+ * excessive.
+ *
+ * We make sure that the background writeout level is below the adjusted
+ * clamping level.
+ */
+static void
+get_dirty_limits(struct page_state *ps, long *background, long *dirty)
+{
+	int background_ratio;		/* Percentages */
+	int dirty_ratio;
+	int unmapped_ratio;
+
+	get_page_state(ps);
+
+	unmapped_ratio = 100 - (ps->nr_mapped * 100) / total_pages;
+
+	dirty_ratio = vm_dirty_ratio;
+	if (dirty_ratio > unmapped_ratio / 2)
+		dirty_ratio = unmapped_ratio / 2;
+
+	if (dirty_ratio < 5)
+		dirty_ratio = 5;
+
+	background_ratio = dirty_background_ratio;
+	if (background_ratio >= dirty_ratio)
+		background_ratio = dirty_ratio / 2;
+
+	*background = (background_ratio * total_pages) / 100;
+	*dirty = (dirty_ratio * total_pages) / 100;
+}
+
+/*
  * balance_dirty_pages() must be called by processes which are generating dirty
  * data.  It looks at the number of dirty pages in the machine and will force
- * the caller to perform writeback if the system is over `async_thresh'.
+ * the caller to perform writeback if the system is over `vm_dirty_ratio'.
  * If we're over `background_thresh' then pdflush is woken to perform some
  * writeout.
  */
@@ -94,32 +137,30 @@ void balance_dirty_pages(struct address_space *mapping)
 {
 	struct page_state ps;
 	long background_thresh;
-	long async_thresh;
-	unsigned long dirty_and_writeback;
-	struct backing_dev_info *bdi;
+	long dirty_thresh;
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 
-	get_page_state(&ps);
-	dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
-
-	background_thresh = (dirty_background_ratio * total_pages) / 100;
-	async_thresh = (dirty_async_ratio * total_pages) / 100;
-	bdi = mapping->backing_dev_info;
-
-	if (dirty_and_writeback > async_thresh) {
+	get_dirty_limits(&ps, &background_thresh, &dirty_thresh);
+	while (ps.nr_dirty + ps.nr_writeback > dirty_thresh) {
 		struct writeback_control wbc = {
 			.bdi		= bdi,
 			.sync_mode	= WB_SYNC_NONE,
 			.older_than_this = NULL,
 			.nr_to_write	= sync_writeback_pages(),
 		};
-		if (!dirty_exceeded)
-			dirty_exceeded = 1;
-		writeback_inodes(&wbc);
-		get_page_state(&ps);
-	} else {
-		if (dirty_exceeded)
-			dirty_exceeded = 0;
+
+		dirty_exceeded = 1;
+
+		if (ps.nr_dirty)
+			writeback_inodes(&wbc);
+
+		get_dirty_limits(&ps, &background_thresh, &dirty_thresh);
+		if (ps.nr_dirty + ps.nr_writeback <= dirty_thresh)
+			break;
+		blk_congestion_wait(WRITE, HZ/10);
 	}
+
+	dirty_exceeded = 0;
 
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
@@ -168,7 +209,6 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 static void background_writeout(unsigned long _min_pages)
 {
 	long min_pages = _min_pages;
-	long background_thresh;
 	struct writeback_control wbc = {
 		.bdi		= NULL,
 		.sync_mode	= WB_SYNC_NONE,
@@ -178,12 +218,12 @@ static void background_writeout(unsigned long _min_pages)
 	};
 
 	CHECK_EMERGENCY_SYNC
-
-	background_thresh = (dirty_background_ratio * total_pages) / 100;
 	for ( ; ; ) {
 		struct page_state ps;
+		long background_thresh;
+		long dirty_thresh;
 
-		get_page_state(&ps);
+		get_dirty_limits(&ps, &background_thresh, &dirty_thresh);
 		if (ps.nr_dirty < background_thresh && min_pages <= 0)
 			break;
 		wbc.encountered_congestion = 0;
@@ -336,8 +376,8 @@ static int __init page_writeback_init(void)
 	if (correction < 100) {
 		dirty_background_ratio *= correction;
 		dirty_background_ratio /= 100;
-		dirty_async_ratio *= correction;
-		dirty_async_ratio /= 100;
+		vm_dirty_ratio *= correction;
+		vm_dirty_ratio /= 100;
 	}
 
 	init_timer(&wb_timer);

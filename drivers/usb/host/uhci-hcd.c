@@ -2484,6 +2484,9 @@ static int __init uhci_hcd_init(void)
 
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
+	if (usb_disabled())
+		return -ENODEV;
+
 	if (debug) {
 		errbuf = kmalloc(ERRBUF_LEN, GFP_KERNEL);
 		if (!errbuf)

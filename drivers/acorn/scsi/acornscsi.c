@@ -319,12 +319,12 @@ acornscsi_csdelay(unsigned int cs)
 
     target_jiffies = jiffies + 1 + cs * HZ / 100;
 
-    save_flags(flags);
-    sti();
+    local_save_flags(flags);
+    local_irq_enable();
 
     while (time_before(jiffies, target_jiffies)) barrier();
 
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 static
@@ -403,8 +403,9 @@ void acornscsi_resetcard(AS_Host *host)
     host->scsi.phase = PHASE_IDLE;
     host->scsi.disconnectable = 0;
 
+    memset(host->busyluns, 0, sizeof(host->busyluns));
+
     for (i = 0; i < 8; i++) {
-	host->busyluns[i] = 0;
 	host->device[i].sync_state = SYNC_NEGOCIATE;
 	host->device[i].disconnect_ok = 1;
     }
@@ -1593,7 +1594,7 @@ void acornscsi_message(AS_Host *host)
 	    printk(KERN_NOTICE "scsi%d.%c: disabling tagged queueing\n",
 		    host->host->host_no, acornscsi_target(host));
 	    host->SCpnt->device->tagged_queue = 0;
-	    set_bit(host->SCpnt->target * 8 + host->SCpnt->lun, &host->busyluns);
+	    set_bit(host->SCpnt->target * 8 + host->SCpnt->lun, host->busyluns);
 	    break;
 #endif
 	case EXTENDED_MESSAGE | (EXTENDED_SDTR << 8):
@@ -2637,8 +2638,7 @@ acornscsi_do_abort(AS_Host *host, Scsi_Cmnd *SCpnt)
 		printk("executing ");
 //#endif
 
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		switch (host->scsi.phase) {
 		/*
 		 * If the interface is idle, and the command is 'disconnectable',
@@ -2671,7 +2671,7 @@ acornscsi_do_abort(AS_Host *host, Scsi_Cmnd *SCpnt)
 			acornscsi_abortcmd(host, host->SCpnt->tag);
 			res = res_snooze;
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	} else if (host->origSCpnt == SCpnt) {
 		/*
 		 * The command will be executed next, but a command

@@ -103,20 +103,15 @@ CONFIG_SERIAL_8250_MULTIPORT
 CONFIG_SERIAL_8250_RSA
   ::: To be written :::
 
-CONFIG_ATOMWIDE_SERIAL
-  If you have an Atomwide Serial card for an Acorn system, say Y to
-  this option.  The driver can handle 1, 2, or 3 port cards.
-  If unsure, say N.
-
-CONFIG_DUALSP_SERIAL
-  If you have the Serial Port's dual serial card for an Acorn system,
-  say Y to this option.  If unsure, say N.
+CONFIG_SERIAL_8250_ACORN
+  If you have an Atomwide Serial card or Serial Port card for an Acorn
+  system, say Y to this option.  The driver can handle 1, 2, or 3 port
+  cards.  If unsure, say N.
 
 CONFIG_SERIAL_ANAKIN
   ::: To be written :::
-CONFIG_SERIAL_ANAKIN_CONSOLE
-  ::: To be written :::
 
+CONFIG_SERIAL_ANAKIN_CONSOLE
   Even if you say Y here, the currently visible virtual console
   (/dev/tty0) will still be used as the system console by default, but
   you can alter that using a kernel command line option such as
@@ -149,8 +144,6 @@ CONFIG_SERIAL_CLPS711X
   ::: To be written :::
 
 CONFIG_SERIAL_CLPS711X_CONSOLE
-  ::: To be written :::
-
   Even if you say Y here, the currently visible virtual console
   (/dev/tty0) will still be used as the system console by default, but
   you can alter that using a kernel command line option such as

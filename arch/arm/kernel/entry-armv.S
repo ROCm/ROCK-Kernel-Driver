@@ -189,11 +189,10 @@ irq_prio_ld:	.byte	40,40,41,40,42,42,42,42,43,43,43,43,43,43,43,43
 
 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 		mov	r4, #0xe0000000
-		orr	r4, r4, #0x20
 
 		mov	\irqstat, #0x0C
-		strb	\irqstat, [r4]			@outb(0x0C, 0x20) /* Poll command */
-		ldrb	\irqnr, [r4]			@irq = inb(0x20) & 7
+		strb	\irqstat, [r4, #0x20]		@outb(0x0C, 0x20) /* Poll command */
+		ldrb	\irqnr, [r4, #0x10]		@irq = inb(0x20) & 7
 		and	\irqstat, \irqnr, #0x80
 		teq	\irqstat, #0
 		beq	43f
@@ -201,8 +200,8 @@ irq_prio_ld:	.byte	40,40,41,40,42,42,42,42,43,43,43,43,43,43,43,43
 		teq	\irqnr, #2
 		bne	44f
 43:		mov	\irqstat, #0x0C
-		strb	\irqstat, [r4, #0x80]		@outb(0x0C, 0xA0) /* Poll command */
-		ldrb	\irqnr, [r4, #0x80]		@irq = (inb(0xA0) & 7) + 8
+		strb	\irqstat, [r4, #0xa0]		@outb(0x0C, 0xA0) /* Poll command */
+		ldrb	\irqnr, [r4, #0xa0]		@irq = (inb(0xA0) & 7) + 8
 		and	\irqstat, \irqnr, #0x80
 		teq	\irqstat, #0
 		beq	44f
@@ -655,7 +654,7 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 		and	r2, r6, #31			@ int mode
 		b	bad_mode
 
-#if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
+#if 1 /* defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE */
 		/* The FPE is always present */
 		.equ	fpe_not_present, fpundefinstr
 #else
@@ -765,6 +764,8 @@ preempt_return:
 		ldr	r0, [sp, #S_PSR]		@ irqs are already disabled
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+
+		.ltorg
 
 #ifdef CONFIG_PREEMPT
 svc_preempt:	teq	r9, #0				@ was preempt count = 0
@@ -901,6 +902,8 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 #endif
 		mov	why, #0
 		b	ret_to_user
+
+		.ltorg
 
 		.align	5
 __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go

@@ -161,7 +161,7 @@ static Scsi_Cmnd *__queue_remove(Queue_t *queue, struct list_head *ent)
  *	     exclude - bit array of target&lun which is busy
  * Returns : Scsi_Cmnd if successful (and a reference), or NULL if no command available
  */
-Scsi_Cmnd *queue_remove_exclude(Queue_t *queue, void *exclude)
+Scsi_Cmnd *queue_remove_exclude(Queue_t *queue, unsigned long *exclude)
 {
 	unsigned long flags;
 	struct list_head *l;
