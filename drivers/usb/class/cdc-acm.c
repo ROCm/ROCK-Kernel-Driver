@@ -691,6 +691,8 @@ static void acm_disconnect(struct usb_interface *intf)
 	usb_unlink_urb(acm->readurb);
 	usb_unlink_urb(acm->writeurb);
 
+	flush_scheduled_work(); /* wait for acm_softint */
+
 	kfree(acm->ctrlurb->transfer_buffer);
 
 	usb_driver_release_interface(&acm_driver, acm->data);
