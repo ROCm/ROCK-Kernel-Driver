@@ -37,6 +37,7 @@ struct xfrm_selector
 	__u16	dport_mask;
 	__u16	sport;
 	__u16	sport_mask;
+	__u16	family;
 	__u8	prefixlen_d;
 	__u8	prefixlen_s;
 	__u8	proto;
@@ -125,6 +126,7 @@ enum
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
+	__u16			family;
 	xfrm_address_t		saddr;
 	__u32			reqid;
 	__u8			mode;
@@ -189,7 +191,6 @@ struct xfrm_userpolicy_info {
 	struct xfrm_lifetime_cur	curlft;
 	__u32				priority;
 	__u32				index;
-	__u16				family;
 	__u8				dir;
 	__u8				action;
 #define XFRM_POLICY_ALLOW	0
