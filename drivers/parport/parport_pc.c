@@ -3048,7 +3048,7 @@ static struct pnp_driver parport_pc_pnp_driver = {
 
 
 /* This is called by parport_pc_find_nonpci_ports (in asm/parport.h) */
-static int __init __attribute__((unused))
+static int __devinit __attribute__((unused))
 parport_pc_find_isa_ports (int autoirq, int autodma)
 {
 	int count = 0;
