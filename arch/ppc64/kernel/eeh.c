@@ -363,6 +363,7 @@ static unsigned long eeh_token_to_phys(unsigned long token)
 
 	return pa | (vaddr & (PAGE_SIZE-1));
 }
+EXPORT_SYMBOL(eeh_register_disable_func);
 
 /**
  * eeh_panic - call panic() for an eeh event that cannot be handled
