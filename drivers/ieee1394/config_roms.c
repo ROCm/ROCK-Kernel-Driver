@@ -67,8 +67,8 @@ int hpsb_default_host_entry(struct hpsb_host *host)
 	ret = csr1212_associate_keyval(vend_id, text);
 	csr1212_release_keyval(text);
 	ret |= csr1212_attach_keyval_to_directory(root, vend_id);
+	csr1212_release_keyval(vend_id);
 	if (ret != CSR1212_SUCCESS) {
-		csr1212_release_keyval(vend_id);
 		csr1212_destroy_csr(host->csr.rom);
 		return -ENOMEM;
 	}

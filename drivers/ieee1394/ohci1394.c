@@ -162,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, ohci->host->id , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1223 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1250 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -482,7 +482,9 @@ static void ohci_initialize(struct ti_ohci *ohci)
 
 	/* Put some defaults to these undefined bus options */
 	buf = reg_read(ohci, OHCI1394_BusOptions);
-	buf |=  0xE0000000; /* Enable IRMC, CMC and ISC */
+	buf |=  0x60000000; /* Enable CMC and ISC */
+	if (!hpsb_disable_irm)
+		buf |=  0x80000000; /* Enable IRMC */
 	buf &= ~0x00ff0000; /* XXX: Set cyc_clk_acc to zero for now */
 	buf &= ~0x18000000; /* Disable PMC and BMC */
 	reg_write(ohci, OHCI1394_BusOptions, buf);
@@ -497,10 +499,12 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
 
 	/* Enable cycle timer and cycle master and set the IRM
-	 * contender bit in our self ID packets. */
-	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_CycleTimerEnable |
+	 * contender bit in our self ID packets if appropriate. */
+	reg_write(ohci, OHCI1394_LinkControlSet,
+		  OHCI1394_LinkControl_CycleTimerEnable |
 		  OHCI1394_LinkControl_CycleMaster);
-	set_phy_reg_mask(ohci, 4, 0xc0);
+	set_phy_reg_mask(ohci, 4, PHY_04_LCTRL |
+			 (hpsb_disable_irm ? 0 : PHY_04_CONTENDER));
 
 	/* Set up self-id dma buffer */
 	reg_write(ohci, OHCI1394_SelfIDBuffer, ohci->selfid_buf_bus);
@@ -515,12 +519,6 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Now get our max packet size */
 	ohci->max_packet_size =
 		1<<(((reg_read(ohci, OHCI1394_BusOptions)>>12)&0xf)+1);
-
-	if (ohci->max_packet_size < 512) {
-		HPSB_ERR("warning: Invalid max packet size of %d, setting to 512",
-			     ohci->max_packet_size);
-		ohci->max_packet_size = 512;
-	}
 		
 	/* Don't accept phy packets into AR request context */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0x00000400);
@@ -2545,6 +2543,10 @@ static void insert_dma_buffer(struct dma_rcv_ctx *d, int idx)
 	idx = (idx + d->num_desc - 1 ) % d->num_desc;
 	d->prg_cpu[idx]->branchAddress |= le32_to_cpu(0x00000001);
 
+	/* To avoid a race, ensure 1394 interface hardware sees the inserted
+	 * context program descriptors before it sees the wakeup bit set. */
+	wmb();
+	
 	/* wake up the dma context if necessary */
 	if (!(reg_read(ohci, d->ctrlSet) & 0x400)) {
 		PRINT(KERN_INFO,

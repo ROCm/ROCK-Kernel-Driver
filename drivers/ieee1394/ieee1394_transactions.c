@@ -566,34 +566,6 @@ hpsb_lock_fail:
         return retval;
 }
 
-int hpsb_lock64(struct hpsb_host *host, nodeid_t node, unsigned int generation,
-		u64 addr, int extcode, octlet_t *data, octlet_t arg)
-{
-	struct hpsb_packet *packet;
-	int retval = 0;
-
-	BUG_ON(in_interrupt()); // We can't be called in an interrupt, yet
-
-	packet = hpsb_make_lock64packet(host, node, addr, extcode, data, arg);
-	if (!packet)
-		return -ENOMEM;
-
-	packet->generation = generation;
-	retval = hpsb_send_packet_and_wait(packet);
-	if (retval < 0)
-		goto hpsb_lock64_fail;
-
-	retval = hpsb_packet_success(packet);
-
-	if (retval == 0)
-		*data = (u64)packet->data[1] << 32 | packet->data[0];
-
-hpsb_lock64_fail:
-	hpsb_free_tlabel(packet);
-	hpsb_free_packet(packet);
-
-        return retval;
-}
 
 int hpsb_send_gasp(struct hpsb_host *host, int channel, unsigned int generation,
 		   quadlet_t *buffer, size_t length, u32 specifier_id,

@@ -127,16 +127,12 @@ void dma_region_free(struct dma_region *dma)
 		dma->dev = NULL;
 	}
 
-	if (dma->sglist) {
-		vfree(dma->sglist);
-		dma->sglist = NULL;
-	}
+	vfree(dma->sglist);
+	dma->sglist = NULL;
 
-	if (dma->kvirt) {
-		vfree(dma->kvirt);
-		dma->kvirt = NULL;
-		dma->n_pages = 0;
-	}
+	vfree(dma->kvirt);
+	dma->kvirt = NULL;
+	dma->n_pages = 0;
 }
 
 /* find the scatterlist index and remaining offset corresponding to a

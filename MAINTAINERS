@@ -1082,9 +1082,21 @@ M:	Gadi Oxman <gadio@netvision.net.il>
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+IEEE 1394 ETHERNET (eth1394)
+L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
+S:	Orphan
+
+IEEE 1394 SBP2
+L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
+S:	Orphan
+
 IEEE 1394 SUBSYSTEM
 P:	Ben Collins
 M:	bcollins@debian.org
+P:	Jody McIntyre
+M:	scjody@steamballoon.com
 L:	linux1394-devel@lists.sourceforge.net
 W:	http://www.linux1394.org/
 S:	Maintained
@@ -1092,13 +1104,15 @@ S:	Maintained
 IEEE 1394 OHCI DRIVER
 P:	Ben Collins
 M:	bcollins@debian.org
+P:	Jody McIntyre
+M:	scjody@steamballoon.com
 L:	linux1394-devel@lists.sourceforge.net
 W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 PCILYNX DRIVER
-P:	Andreas Bombe
-M:	andreas.bombe@munich.netsurf.de
+P:	Jody McIntyre
+M:	scjody@steamballoon.com
 L:	linux1394-devel@lists.sourceforge.net
 W:	http://www.linux1394.org/
 S:	Maintained
@@ -1106,6 +1120,8 @@ S:	Maintained
 IEEE 1394 RAW I/O DRIVER
 P:	Ben Collins
 M:	bcollins@debian.org
+P:	Dan Dennedy
+M:	dan@dennedy.org
 L:	linux1394-devel@lists.sourceforge.net
 W:	http://www.linux1394.org/
 S:	Maintained

@@ -87,7 +87,8 @@ static const u_int8_t csr1212_key_id_type_map[0x30] = {
 
 static inline void free_keyval(struct csr1212_keyval *kv)
 {
-	if (kv->key.type == CSR1212_KV_TYPE_LEAF)
+	if ((kv->key.type == CSR1212_KV_TYPE_LEAF) &&
+	    (kv->key.id != CSR1212_KV_ID_EXTENDED_ROM))
 		CSR1212_FREE(kv->value.leaf.data);
 
 	CSR1212_FREE(kv);
@@ -155,7 +156,7 @@ static inline struct csr1212_keyval *csr1212_find_keyval_offset(struct csr1212_k
 {
 	struct csr1212_keyval *kv;
 
-	for (kv = kv_list; kv != NULL; kv = kv->next) {
+	for (kv = kv_list->next; kv && (kv != kv_list); kv = kv->next) {
 		if (kv->offset == offset)
 			return kv;
 	}
@@ -181,9 +182,9 @@ struct csr1212_csr *csr1212_create_csr(struct csr1212_bus_ops *ops,
 		return NULL;
 	}
 
-        /* The keyval key id is not used for the root node, but a valid key id
-         * that can be used for a directory needs to be passed to
-         * csr1212_new_directory(). */
+	/* The keyval key id is not used for the root node, but a valid key id
+	 * that can be used for a directory needs to be passed to
+	 * csr1212_new_directory(). */
 	csr->root_kv = csr1212_new_directory(CSR1212_KV_ID_VENDOR);
 	if (!csr->root_kv) {
 		CSR1212_FREE(csr->cache_head);
@@ -709,7 +710,7 @@ void _csr1212_destroy_keyval(struct csr1212_keyval *kv)
 					tail->next = k->value.directory.dentries_head;
 					k->value.directory.dentries_head->prev = tail;
 					tail = k->value.directory.dentries_tail;
-                                }
+				}
 			}
 			free_keyval(k);
 			k = a;
@@ -796,7 +797,8 @@ static int csr1212_append_new_cache(struct csr1212_csr *csr, size_t romsize)
 		return CSR1212_ENOMEM;
 	}
 	cache->ext_rom->offset = csr_addr - CSR1212_REGISTER_SPACE_BASE;
-	cache->ext_rom->value.leaf.len = 0;
+	cache->ext_rom->value.leaf.len = -1;
+	cache->ext_rom->value.leaf.data = cache->data;
 
 	/* Add cache to tail of cache list */
 	cache->prev = csr->cache_tail;
@@ -864,20 +866,20 @@ static int csr1212_generate_layout_subdir(struct csr1212_keyval *dir,
 			default:
 			case CSR1212_KV_TYPE_IMMEDIATE:
 			case CSR1212_KV_TYPE_CSR_OFFSET:
-				continue;
+				break;
 			case CSR1212_KV_TYPE_LEAF:
 			case CSR1212_KV_TYPE_DIRECTORY:
 				/* Remove from list */
-				if (dkv->prev)
+				if (dkv->prev && (dkv->prev->next == dkv))
 					dkv->prev->next = dkv->next;
-				if (dkv->next)
+				if (dkv->next && (dkv->next->prev == dkv))
 					dkv->next->prev = dkv->prev;
-				if (dkv == *layout_tail)
-					*layout_tail = dkv->prev;
+				//if (dkv == *layout_tail)
+				//	*layout_tail = dkv->prev;
 
 				/* Special case: Extended ROM leafs */
 				if (dkv->key.id == CSR1212_KV_ID_EXTENDED_ROM) {
-					dkv->value.leaf.len = 0; /* initialize to zero */
+					dkv->value.leaf.len = -1;
 					/* Don't add Extended ROM leafs in the layout list,
 					 * they are handled differently. */
 					break;
@@ -919,8 +921,8 @@ size_t csr1212_generate_layout_order(struct csr1212_keyval *kv)
 }
 
 struct csr1212_keyval *csr1212_generate_positions(struct csr1212_csr_rom_cache *cache,
-                                                  struct csr1212_keyval *start_kv,
-                                                  int start_pos)
+						  struct csr1212_keyval *start_kv,
+						  int start_pos)
 {
 	struct csr1212_keyval *kv = start_kv;
 	struct csr1212_keyval *okv = start_kv;
@@ -930,7 +932,10 @@ struct csr1212_keyval *csr1212_generate_positions(struct csr1212_csr_rom_cache *
 	cache->layout_head = kv;
 
 	while(kv && pos < cache->size) {
-		kv->offset = cache->offset + pos;
+		/* Special case: Extended ROM leafs */
+		if (kv->key.id != CSR1212_KV_ID_EXTENDED_ROM) {
+			kv->offset = cache->offset + pos;
+		}
 
 		switch(kv->key.type) {
 		case CSR1212_KV_TYPE_LEAF:
@@ -1090,6 +1095,9 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 	bi->crc_length = bi->length;
 	bi->crc = csr1212_crc16(bi->data, bi->crc_length);
 
+	csr->root_kv->next = NULL;
+	csr->root_kv->prev = NULL;
+
 	agg_size = csr1212_generate_layout_order(csr->root_kv);
 
 	init_offset = csr->bus_info_len;
@@ -1158,6 +1166,17 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 
 		/* Copy the data into the cache buffer */
 		csr1212_fill_cache(cache);
+
+		if (cache != csr->cache_head) {
+			/* Set the length and CRC of the extended ROM. */
+			struct csr1212_keyval_img *kvi =
+				(struct csr1212_keyval_img*)cache->data;
+
+			kvi->length = CSR1212_CPU_TO_BE16(bytes_to_quads(cache->len) - 1);
+			kvi->crc = csr1212_crc16(kvi->data,
+						 bytes_to_quads(cache->len) - 1);
+
+		}
 	}
 
 	return CSR1212_SUCCESS;
@@ -1174,11 +1193,6 @@ int csr1212_read(struct csr1212_csr *csr, u_int32_t offset, void *buffer, u_int3
 			       &cache->data[bytes_to_quads(offset - cache->offset)],
 			       len);
 			return CSR1212_SUCCESS;
-		} else if (((offset < cache->offset) &&
-			    ((offset + len) >= cache->offset)) ||
-			   ((offset >= cache->offset) &&
-			    ((offset + len) > (cache->offset + cache->size)))) {
-			return CSR1212_EINVAL;
 		}
 	}
 	return CSR1212_ENOENT;
@@ -1227,8 +1241,8 @@ static int csr1212_parse_bus_info_block(struct csr1212_csr *csr)
 		return CSR1212_EINVAL;
 
 #if 0
-        /* Apparently there are too many differnt wrong implementations of the
-         * CRC algorithm that verifying them is moot. */
+	/* Apparently there are too many differnt wrong implementations of the
+	 * CRC algorithm that verifying them is moot. */
 	if ((csr1212_crc16(bi->data, bi->crc_length) != bi->crc) &&
 	    (csr1212_msft_crc16(bi->data, bi->crc_length) != bi->crc))
 		return CSR1212_EINVAL;
@@ -1249,10 +1263,9 @@ static int csr1212_parse_bus_info_block(struct csr1212_csr *csr)
 	return CSR1212_SUCCESS;
 }
 
-static inline int csr1212_parse_dir_entry(struct csr1212_keyval *dir,
-					  csr1212_quad_t ki,
-					  u_int32_t kv_pos,
-					  struct csr1212_csr_rom_cache *cache)
+static int csr1212_parse_dir_entry(struct csr1212_keyval *dir,
+				   csr1212_quad_t ki,
+				   u_int32_t kv_pos)
 {
 	int ret = CSR1212_SUCCESS;
 	struct csr1212_keyval *k = NULL;
@@ -1291,7 +1304,7 @@ static inline int csr1212_parse_dir_entry(struct csr1212_keyval *dir,
 			goto fail;
 		}
 
-		k = csr1212_find_keyval_offset(cache->layout_head, offset);
+		k = csr1212_find_keyval_offset(dir, offset);
 
 		if (k)
 			break;		/* Found it. */
@@ -1309,11 +1322,10 @@ static inline int csr1212_parse_dir_entry(struct csr1212_keyval *dir,
 		k->valid = 0;	/* Contents not read yet so it's not valid. */
 		k->offset = offset;
 
-		k->prev = cache->layout_tail;
-		k->next = NULL;
-		if (cache->layout_tail)
-			cache->layout_tail->next = k;
-		cache->layout_tail = k;
+		k->prev = dir;
+		k->next = dir->next;
+		dir->next->prev = k;
+		dir->next = k;
 	}
 	ret = csr1212_attach_keyval_to_directory(dir, k);
 
@@ -1324,6 +1336,7 @@ fail:
 	}
 	return ret;
 }
+
 
 int csr1212_parse_keyval(struct csr1212_keyval *kv,
 			 struct csr1212_csr_rom_cache *cache)
@@ -1338,8 +1351,8 @@ int csr1212_parse_keyval(struct csr1212_keyval *kv,
 	kvi_len = CSR1212_BE16_TO_CPU(kvi->length);
 
 #if 0
-        /* Apparently there are too many differnt wrong implementations of the
-         * CRC algorithm that verifying them is moot. */
+	/* Apparently there are too many differnt wrong implementations of the
+	 * CRC algorithm that verifying them is moot. */
 	if ((csr1212_crc16(kvi->data, kvi_len) != kvi->crc) &&
 	    (csr1212_msft_crc16(kvi->data, kvi_len) != kvi->crc)) {
 		ret = CSR1212_EINVAL;
@@ -1353,22 +1366,19 @@ int csr1212_parse_keyval(struct csr1212_keyval *kv,
 			csr1212_quad_t ki = kvi->data[i];
 
 			/* Some devices put null entries in their unit
-			 * directories.  If we come across such and entry,
+			 * directories.  If we come across such an entry,
 			 * then skip it. */
 			if (ki == 0x0)
 				continue;
 			ret = csr1212_parse_dir_entry(kv, ki,
 						      (kv->offset +
-						       quads_to_bytes(i + 1)),
-						      cache);
+						       quads_to_bytes(i + 1)));
 		}
 		kv->value.directory.len = kvi_len;
 		break;
 
 	case CSR1212_KV_TYPE_LEAF:
-		if (kv->key.id == CSR1212_KV_ID_EXTENDED_ROM) {
-			kv->value.leaf.data = cache->data;
-		} else {
+		if (kv->key.id != CSR1212_KV_ID_EXTENDED_ROM) {
 			kv->value.leaf.data = CSR1212_MALLOC(quads_to_bytes(kvi_len));
 			if (!kv->value.leaf.data)
 			{
@@ -1399,7 +1409,6 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 	u_int32_t *cache_ptr;
 	u_int16_t kv_len = 0;
 
-
 	if (!csr || !kv)
 		return CSR1212_EINVAL;
 
@@ -1413,7 +1422,7 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 
 	if (!cache) {
 		csr1212_quad_t q;
-		struct csr1212_csr_rom_cache *nc;
+		u_int32_t cache_size;
 
 		/* Only create a new cache for Extended ROM leaves. */
 		if (kv->key.id != CSR1212_KV_ID_EXTENDED_ROM)
@@ -1425,12 +1434,20 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 			return CSR1212_EIO;
 		}
 
-		kv->value.leaf.len = quads_to_bytes(CSR1212_BE32_TO_CPU(q)>>16);
+		kv->value.leaf.len = CSR1212_BE32_TO_CPU(q) >> 16;
 
-		nc = csr1212_rom_cache_malloc(kv->offset, kv->value.leaf.len);
-		cache->next = nc;
-		nc->prev = cache;
-		csr->cache_tail = nc;
+		cache_size = (quads_to_bytes(kv->value.leaf.len + 1) +
+			      (csr->max_rom - 1)) & ~(csr->max_rom - 1);
+
+		cache = csr1212_rom_cache_malloc(kv->offset, cache_size);
+		if (!cache)
+			return CSR1212_ENOMEM;
+
+		kv->value.leaf.data = &cache->data[1];
+		csr->cache_tail->next = cache;
+		cache->prev = csr->cache_tail;
+		cache->next = NULL;
+		csr->cache_tail = cache;
 		cache->filled_head =
 			CSR1212_MALLOC(sizeof(struct csr1212_cache_region));
 		if (!cache->filled_head) {
@@ -1443,6 +1460,10 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 		cache->filled_head->next = NULL;
 		cache->filled_head->prev = NULL;
 		cache->data[0] = q;
+
+		/* Don't read the entire extended ROM now.  Pieces of it will
+		 * be read when entries inside it are read. */
+		return csr1212_parse_keyval(kv, cache);
 	}
 
 	cache_index = kv->offset - cache->offset;
@@ -1548,6 +1569,7 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 int csr1212_parse_csr(struct csr1212_csr *csr)
 {
 	static const int mr_map[] = { 4, 64, 1024, 0 };
+	struct csr1212_dentry *dentry;
 	int ret;
 
 	if (!csr || !csr->ops->bus_read)
@@ -1570,7 +1592,21 @@ int csr1212_parse_csr(struct csr1212_csr *csr)
 		csr->bus_info_len;
 
 	csr->root_kv->valid = 0;
+	csr->root_kv->next = csr->root_kv;
+	csr->root_kv->prev = csr->root_kv;
 	csr1212_get_keyval(csr, csr->root_kv);
+
+	/* Scan through the Root directory finding all extended ROM regions
+	 * and make cache regions for them */
+	for (dentry = csr->root_kv->value.directory.dentries_head;
+	     dentry; dentry = dentry->next) {
+		if (dentry->kv->key.id == CSR1212_KV_ID_EXTENDED_ROM) {
+			csr1212_get_keyval(csr, dentry->kv);
+
+			if (ret != CSR1212_SUCCESS)
+				return ret;
+		}
+	}
 
 	return CSR1212_SUCCESS;
 }

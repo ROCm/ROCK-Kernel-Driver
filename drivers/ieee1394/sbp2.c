@@ -64,7 +64,10 @@
 #include <asm/system.h>
 #include <asm/scatterlist.h>
 
-#include "../scsi/scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 
 #include "csr1212.h"
@@ -224,12 +227,12 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
 					   u32 status);
 
 static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
-				      u32 scsi_status, Scsi_Cmnd *SCpnt,
-				      void (*done)(Scsi_Cmnd *));
+				      u32 scsi_status, struct scsi_cmnd *SCpnt,
+				      void (*done)(struct scsi_cmnd *));
 
-static Scsi_Host_Template scsi_driver_template;
+static struct scsi_host_template scsi_driver_template;
 
-const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
+static const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 
 static void sbp2_host_reset(struct hpsb_host *host);
 
@@ -373,7 +376,7 @@ static void sbp2_free_packet(struct hpsb_packet *packet)
 /* This is much like hpsb_node_write(), except it ignores the response
  * subaction and returns immediately. Can be used from interrupts.
  */
-int sbp2util_node_write_no_wait(struct node_entry *ne, u64 addr,
+static int sbp2util_node_write_no_wait(struct node_entry *ne, u64 addr,
 				quadlet_t *buffer, size_t length)
 {
 	struct hpsb_packet *packet;
@@ -520,8 +523,8 @@ static struct sbp2_command_info *sbp2util_find_command_for_SCpnt(struct scsi_id_
  */
 static struct sbp2_command_info *sbp2util_allocate_command_orb(
 		struct scsi_id_instance_data *scsi_id,
-		Scsi_Cmnd *Current_SCpnt,
-		void (*Current_done)(Scsi_Cmnd *))
+		struct scsi_cmnd *Current_SCpnt,
+		void (*Current_done)(struct scsi_cmnd *))
 {
 	struct list_head *lh;
 	struct sbp2_command_info *command = NULL;
@@ -1521,8 +1524,9 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id,
 
 				SBP2_DEBUG("sbp2_management_agent_addr = %x",
 					   (unsigned int) management_agent_addr);
-			} else
+			} else if (kv->key.type == CSR1212_KV_TYPE_IMMEDIATE) {
 				scsi_id->sbp2_device_type_and_lun = kv->value.immediate;
+			}
 			break;
 
 		case SBP2_COMMAND_SET_SPEC_ID_KEY:
@@ -1613,6 +1617,8 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id,
 		scsi_id->sbp2_unit_characteristics = unit_characteristics;
 		scsi_id->sbp2_firmware_revision = firmware_revision;
 		scsi_id->workarounds = workarounds;
+		if (ud->flags & UNIT_DIRECTORY_HAS_LUN)
+			scsi_id->sbp2_device_type_and_lun = ud->lun;
 	}
 }
 
@@ -1700,14 +1706,14 @@ static int sbp2_create_command_orb(struct scsi_id_instance_data *scsi_id,
 				   unsigned int scsi_use_sg,
 				   unsigned int scsi_request_bufflen,
 				   void *scsi_request_buffer,
-				   unsigned char scsi_dir)
+				   enum dma_data_direction dma_dir)
+
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	struct scatterlist *sgpnt = (struct scatterlist *) scsi_request_buffer;
 	struct sbp2_command_orb *command_orb = &command->command_orb;
 	struct sbp2_unrestricted_page_table *scatter_gather_element =
 		&command->scatter_gather_element[0];
-	int dma_dir = scsi_to_pci_dma_dir (scsi_dir);
 	u32 sg_count, sg_len, orb_direction;
 	dma_addr_t sg_addr;
 	int i;
@@ -1730,22 +1736,22 @@ static int sbp2_create_command_orb(struct scsi_id_instance_data *scsi_id,
 	 * Get the direction of the transfer. If the direction is unknown, then use our
 	 * goofy table as a back-up.
 	 */
-	switch (scsi_dir) {
-		case SCSI_DATA_NONE:
+	switch (dma_dir) {
+		case DMA_NONE:
 			orb_direction = ORB_DIRECTION_NO_DATA_TRANSFER;
 			break;
-		case SCSI_DATA_WRITE:
+		case DMA_TO_DEVICE:
 			orb_direction = ORB_DIRECTION_WRITE_TO_MEDIA;
 			break;
-		case SCSI_DATA_READ:
+		case DMA_FROM_DEVICE:
 			orb_direction = ORB_DIRECTION_READ_FROM_MEDIA;
 			break;
-		case SCSI_DATA_UNKNOWN:
+		case DMA_BIDIRECTIONAL:
 		default:
 			SBP2_ERR("SCSI data transfer direction not specified. "
 				 "Update the SBP2 direction table in sbp2.h if "
 				 "necessary for your application");
-			print_command (scsi_cmd);
+			__scsi_print_command(scsi_cmd);
 			orb_direction = sbp2scsi_direction_table[*scsi_cmd];
 			break;
 	}
@@ -2031,7 +2037,8 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
  * This function is called in order to begin a regular SBP-2 command.
  */
 static int sbp2_send_command(struct scsi_id_instance_data *scsi_id,
-			     Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+			     struct scsi_cmnd *SCpnt,
+			     void (*done)(struct scsi_cmnd *))
 {
 	unchar *cmd = (unchar *) SCpnt->cmnd;
 	unsigned int request_bufflen = SCpnt->request_bufflen;
@@ -2040,7 +2047,7 @@ static int sbp2_send_command(struct scsi_id_instance_data *scsi_id,
 	SBP2_DEBUG("sbp2_send_command");
 #if (CONFIG_IEEE1394_SBP2_DEBUG >= 2) || defined(CONFIG_IEEE1394_SBP2_PACKET_DUMP)
 	printk("[scsi command]\n   ");
-	print_command (cmd);
+	scsi_print_command(SCpnt);
 #endif
 	SBP2_DEBUG("SCSI transfer size = %x", request_bufflen);
 	SBP2_DEBUG("SCSI s/g elements = %x", (unsigned int)SCpnt->use_sg);
@@ -2233,7 +2240,7 @@ static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense
  * response data translations for the SCSI stack
  */
 static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id, 
-				     Scsi_Cmnd *SCpnt)
+				     struct scsi_cmnd *SCpnt)
 {
 	u8 *scsi_buf = SCpnt->request_buffer;
 	u8 device_type = SBP2_DEVICE_TYPE (scsi_id->sbp2_device_type_and_lun);
@@ -2312,7 +2319,7 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 	struct sbp2scsi_host_info *hi;
 	struct scsi_id_instance_data *scsi_id = NULL, *scsi_id_tmp;
 	u32 id;
-	Scsi_Cmnd *SCpnt = NULL;
+	struct scsi_cmnd *SCpnt = NULL;
 	u32 scsi_status = SBP2_SCSI_STATUS_GOOD;
 	struct sbp2_command_info *command;
 
@@ -2454,7 +2461,8 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
  * This routine is the main request entry routine for doing I/O. It is
  * called from the scsi stack directly.
  */
-static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int sbp2scsi_queuecommand(struct scsi_cmnd *SCpnt,
+				 void (*done)(struct scsi_cmnd *))
 {
 	struct scsi_id_instance_data *scsi_id =
 		(struct scsi_id_instance_data *)SCpnt->device->host->hostdata[0];
@@ -2550,9 +2558,8 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
 					    PCI_DMA_BIDIRECTIONAL);
 		sbp2util_mark_command_completed(scsi_id, command);
 		if (command->Current_SCpnt) {
-			void (*done)(Scsi_Cmnd *) = command->Current_done;
 			command->Current_SCpnt->result = status << 16;
-			done (command->Current_SCpnt);
+			command->Current_done(command->Current_SCpnt);
 		}
 	}
 
@@ -2565,8 +2572,8 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
  * This can be called in interrupt context.
  */
 static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
-				      u32 scsi_status, Scsi_Cmnd *SCpnt,
-				      void (*done)(Scsi_Cmnd *))
+				      u32 scsi_status, struct scsi_cmnd *SCpnt,
+				      void (*done)(struct scsi_cmnd *))
 {
 	unsigned long flags;
 
@@ -2611,8 +2618,8 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 			 * Debug stuff
 			 */
 #if CONFIG_IEEE1394_SBP2_DEBUG >= 1
-			print_command (SCpnt->cmnd);
-			print_sense("bh", SCpnt);
+			scsi_print_command(SCpnt);
+			scsi_print_sense("bh", SCpnt);
 #endif
 
 			break;
@@ -2620,7 +2627,7 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 		case SBP2_SCSI_STATUS_SELECTION_TIMEOUT:
 			SBP2_ERR("SBP2_SCSI_STATUS_SELECTION_TIMEOUT");
 			SCpnt->result = DID_NO_CONNECT << 16;
-			print_command (SCpnt->cmnd);
+			scsi_print_command(SCpnt);
 			break;
 
 		case SBP2_SCSI_STATUS_CONDITION_MET:
@@ -2628,7 +2635,7 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 		case SBP2_SCSI_STATUS_COMMAND_TERMINATED:
 			SBP2_ERR("Bad SCSI status = %x", scsi_status);
 			SCpnt->result = DID_ERROR << 16;
-			print_command (SCpnt->cmnd);
+			scsi_print_command(SCpnt);
 			break;
 
 		default:
@@ -2688,7 +2695,7 @@ static int sbp2scsi_slave_configure (struct scsi_device *sdev)
  * Called by scsi stack when something has really gone wrong.  Usually
  * called when a command has timed-out for some reason.
  */
-static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
+static int sbp2scsi_abort(struct scsi_cmnd *SCpnt)
 {
 	struct scsi_id_instance_data *scsi_id =
 		(struct scsi_id_instance_data *)SCpnt->device->host->hostdata[0];
@@ -2696,7 +2703,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 	struct sbp2_command_info *command;
 
 	SBP2_ERR("aborting sbp2 command");
-	print_command (SCpnt->cmnd);
+	scsi_print_command(SCpnt);
 
 	if (scsi_id) {
 
@@ -2717,9 +2724,8 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 						    PCI_DMA_BIDIRECTIONAL);
 			sbp2util_mark_command_completed(scsi_id, command);
 			if (command->Current_SCpnt) {
-				void (*done)(Scsi_Cmnd *) = command->Current_done;
 				command->Current_SCpnt->result = DID_ABORT << 16;
-				done (command->Current_SCpnt);
+				command->Current_done(command->Current_SCpnt);
 			}
 		}
 
@@ -2736,7 +2742,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 /*
  * Called by scsi stack when something has really gone wrong.
  */
-static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
+static int sbp2scsi_reset(struct scsi_cmnd *SCpnt)
 {
 	struct scsi_id_instance_data *scsi_id =
 		(struct scsi_id_instance_data *)SCpnt->device->host->hostdata[0];
@@ -2789,7 +2795,7 @@ MODULE_SUPPORTED_DEVICE(SBP2_DEVICE_NAME);
 MODULE_LICENSE("GPL");
 
 /* SCSI host template */
-static Scsi_Host_Template scsi_driver_template = {
+static struct scsi_host_template scsi_driver_template = {
 	.module =			THIS_MODULE,
 	.name =				"SBP-2 IEEE-1394",
 	.proc_name =			SBP2_DEVICE_NAME,

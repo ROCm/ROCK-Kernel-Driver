@@ -51,6 +51,7 @@ struct bus_options {
 #define UNIT_DIRECTORY_VERSION			0x08
 #define UNIT_DIRECTORY_HAS_LUN_DIRECTORY	0x10
 #define UNIT_DIRECTORY_LUN_DIRECTORY		0x20
+#define UNIT_DIRECTORY_HAS_LUN			0x40
 
 /*
  * A unit directory corresponds to a protocol supported by the
@@ -82,6 +83,7 @@ struct unit_directory {
 	struct class_device class_dev;
 
 	struct csr1212_keyval *ud_kv;
+	u32 lun;                /* logical unit number immediate value */
 };
 
 struct node_entry {

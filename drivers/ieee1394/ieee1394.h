@@ -77,6 +77,30 @@ extern const char *hpsb_speedto_str[];
 #define SELFID_PORT_NONE         0x0
 
 
+/* 1394a PHY bitmasks */
+#define PHY_00_PHYSICAL_ID       0xFC
+#define PHY_00_R                 0x02 /* Root */
+#define PHY_00_PS                0x01 /* Power Status*/
+#define PHY_01_RHB               0x80 /* Root Hold-Off */
+#define PHY_01_IBR               0x80 /* Initiate Bus Reset */
+#define PHY_01_GAP_COUNT         0x3F
+#define PHY_02_EXTENDED          0xE0 /* 0x7 for 1394a-compliant PHY */
+#define PHY_02_TOTAL_PORTS       0x1F
+#define PHY_03_MAX_SPEED         0xE0
+#define PHY_03_DELAY             0x0F
+#define PHY_04_LCTRL             0x80 /* Link Active Report Control */
+#define PHY_04_CONTENDER         0x40
+#define PHY_04_JITTER            0x38
+#define PHY_04_PWR_CLASS         0x07 /* Power Class */
+#define PHY_05_WATCHDOG          0x80
+#define PHY_05_ISBR              0x40 /* Initiate Short Bus Reset */
+#define PHY_05_LOOP              0x20 /* Loop Detect */
+#define PHY_05_PWR_FAIL          0x10 /* Cable Power Failure Detect */
+#define PHY_05_TIMEOUT           0x08 /* Arbitration State Machine Timeout */
+#define PHY_05_PORT_EVENT        0x04 /* Port Event Detect */
+#define PHY_05_ENAB_ACCEL        0x02 /* Enable Arbitration Acceleration */
+#define PHY_05_ENAB_MULTI        0x01 /* Ena. Multispeed Packet Concatenation */
+
 #include <asm/byteorder.h>
 
 #ifdef __BIG_ENDIAN_BITFIELD

@@ -384,7 +384,8 @@ static quadlet_t generate_own_selfid(struct ti_lynx *lynx,
         lsid = 0x80400000 | ((phyreg[0] & 0xfc) << 22);
         lsid |= (phyreg[1] & 0x3f) << 16; /* gap count */
         lsid |= (phyreg[2] & 0xc0) << 8; /* max speed */
-        lsid |= (phyreg[6] & 0x01) << 11; /* contender (phy dependent) */
+	if (!hpsb_disable_irm)
+		lsid |= (phyreg[6] & 0x01) << 11; /* contender (phy dependent) */
         /* lsid |= 1 << 11; *//* set contender (hack) */
         lsid |= (phyreg[6] & 0x10) >> 3; /* initiated reset */
 
@@ -500,7 +501,7 @@ static void send_next(struct ti_lynx *lynx, int what)
         pcl.async_error_next = PCL_NEXT_INVALID;
         pcl.pcl_status = 0;
         pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size;
-#ifdef __BIG_ENDIAN
+#ifndef __BIG_ENDIAN
         pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
         pcl.buffer[0].pointer = d->header_dma;
@@ -1521,10 +1522,6 @@ static int __devinit add_card(struct pci_dev *dev,
         int i;
         int error;
 
-        /* needed for i2c communication with serial eeprom */
-        struct i2c_adapter i2c_adapter;
-        struct i2c_algo_bit_data i2c_adapter_data;
-
         error = -ENXIO;
 
         if (pci_set_dma_mask(dev, 0xffffffff))
@@ -1697,7 +1694,7 @@ static int __devinit add_card(struct pci_dev *dev,
         pcl.async_error_next = PCL_NEXT_INVALID;
 
         pcl.buffer[0].control = PCL_CMD_RCV | 16;
-#ifdef __BIG_ENDIAN
+#ifndef __BIG_ENDIAN
 	pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
 	pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
@@ -1779,26 +1776,40 @@ static int __devinit add_card(struct pci_dev *dev,
                   | LINK_CONTROL_TX_ASYNC_EN | LINK_CONTROL_RX_ASYNC_EN
                   | LINK_CONTROL_RESET_TX    | LINK_CONTROL_RESET_RX);
 
-        if (!lynx->phyic.reg_1394a) {
-                /* attempt to enable contender bit -FIXME- would this work
-                 * elsewhere? */
-                reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
-                reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1);
-        } else {
-                /* set the contender and LCtrl bit in the extended PHY register
-                 * set. (Should check that bis 0,1,2 (=0xE0) is set
-                 * in register 2?)
-                 */
-                i = get_phy_reg(lynx, 4);
-                if (i != -1) set_phy_reg(lynx, 4, i | 0xc0);
-        }
-
-
+	if (!lynx->phyic.reg_1394a) {
+		if (!hpsb_disable_irm) {
+			/* attempt to enable contender bit -FIXME- would this
+			 * work elsewhere? */
+			reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
+			reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1);
+		}
+	} else {
+		/* set the contender (if appropriate) and LCtrl bit in the
+		 * extended PHY register set. (Should check that PHY_02_EXTENDED
+		 * is set in register 2?)
+		 */
+		i = get_phy_reg(lynx, 4);
+		i |= PHY_04_LCTRL;
+		if (hpsb_disable_irm)
+			i &= !PHY_04_CONTENDER;
+		else
+			i |= PHY_04_CONTENDER;
+		if (i != -1) set_phy_reg(lynx, 4, i);
+	}
+	
         if (!skip_eeprom)
         {
-                i2c_adapter = bit_ops;
+        	/* needed for i2c communication with serial eeprom */
+        	struct i2c_adapter *i2c_ad;
+        	struct i2c_algo_bit_data i2c_adapter_data;
+
+        	error = -ENOMEM;
+		i2c_ad = kmalloc(sizeof(struct i2c_adapter), SLAB_KERNEL);
+        	if (!i2c_ad) FAIL("failed to allocate I2C adapter memory");
+
+		memcpy(i2c_ad, &bit_ops, sizeof(struct i2c_adapter));
                 i2c_adapter_data = bit_data;
-                i2c_adapter.algo_data = &i2c_adapter_data;
+                i2c_ad->algo_data = &i2c_adapter_data;
                 i2c_adapter_data.data = lynx;
 
 		PRINTD(KERN_DEBUG, lynx->id,"original eeprom control: %d",
@@ -1808,8 +1819,9 @@ static int __devinit add_card(struct pci_dev *dev,
         	lynx->i2c_driven_state = 0x00000070;
         	reg_write(lynx, SERIAL_EEPROM_CONTROL, lynx->i2c_driven_state);
 
-        	if (i2c_bit_add_bus(&i2c_adapter) < 0)
+        	if (i2c_bit_add_bus(i2c_ad) < 0)
         	{
+			kfree(i2c_ad);
 			error = -ENXIO;
 			FAIL("unable to register i2c");
         	}
@@ -1825,13 +1837,13 @@ static int __devinit add_card(struct pci_dev *dev,
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
                         union i2c_smbus_data data;
 
-                        if (i2c_smbus_xfer(&i2c_adapter, 80, 0, I2C_SMBUS_WRITE, 0, I2C_SMBUS_BYTE,NULL))
+                        if (i2c_smbus_xfer(i2c_ad, 80, 0, I2C_SMBUS_WRITE, 0, I2C_SMBUS_BYTE,NULL))
                                 PRINT(KERN_ERR, lynx->id,"eeprom read start has failed");
                         else
                         {
                                 u16 addr;
                                 for (addr=0x00; addr < 0x100; addr++) {
-                                        if (i2c_smbus_xfer(&i2c_adapter, 80, 0, I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE,& data)) {
+                                        if (i2c_smbus_xfer(i2c_ad, 80, 0, I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE,& data)) {
                                                 PRINT(KERN_ERR, lynx->id, "unable to read i2c %x", addr);
                                                 break;
                                         }
@@ -1843,7 +1855,7 @@ static int __devinit add_card(struct pci_dev *dev,
 
                         /* we use i2c_transfer, because i2c_smbus_read_block_data does not work properly and we
                            do it more efficiently in one transaction rather then using several reads */
-                        if (i2c_transfer(&i2c_adapter, msg, 2) < 0) {
+                        if (i2c_transfer(i2c_ad, msg, 2) < 0) {
                                 PRINT(KERN_ERR, lynx->id, "unable to read bus info block from i2c");
                         } else {
                                 int i;
@@ -1863,13 +1875,15 @@ static int __devinit add_card(struct pci_dev *dev,
                                 {
                                         PRINT(KERN_DEBUG, lynx->id, "read a valid bus info block from");
                                 } else {
+					kfree(i2c_ad);
 					error = -ENXIO;
 					FAIL("read something from serial eeprom, but it does not seem to be a valid bus info block");
                                 }
 
                         }
 
-                        i2c_bit_del_bus(&i2c_adapter);
+                        i2c_bit_del_bus(i2c_ad);
+			kfree(i2c_ad);
                 }
         }
 
