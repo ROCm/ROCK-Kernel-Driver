@@ -470,7 +470,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 			      port);
 		
 		/* send the data out the bulk port */
-		result = usb_submit_urb(port->write_urb, GFP_KERNEL);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
 			err(__FUNCTION__
 			    " - failed submitting write urb, error %d", result);
