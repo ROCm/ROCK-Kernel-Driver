@@ -404,9 +404,6 @@ struct inode {
 	} u;
 };
 
-/* will die */
-#include <linux/coda_fs_i.h>
-
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
