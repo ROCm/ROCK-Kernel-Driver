@@ -312,6 +312,11 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
+/* extract the pgd cache used for optimizing the tlb miss
+ * slow path when executing 32-bit compat processes
+ */
+#define get_pgd_cache(pgd)	((unsigned long) pgd_val(*pgd) << 11)
+
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(pudp, address)	\
 	((pmd_t *) pud_page(*(pudp)) + \

@@ -894,9 +894,8 @@ static unsigned long penguins_are_doing_time;
 
 void smp_capture(void)
 {
-	int result = __atomic_add(1, &smp_capture_depth);
+	int result = atomic_add_ret(1, &smp_capture_depth);
 
-	membar("#StoreStore | #LoadStore");
 	if (result == 1) {
 		int ncpus = num_online_cpus();
 
