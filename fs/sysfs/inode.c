@@ -87,7 +87,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 	return inode;
 }
 
-static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode;
 	int error = 0;

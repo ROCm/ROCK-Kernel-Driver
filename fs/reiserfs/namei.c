@@ -605,7 +605,7 @@ out_failed:
 }
 
 
-static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, int rdev)
+static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
     int retval;
     struct inode * inode;
