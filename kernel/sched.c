@@ -613,12 +613,29 @@ static inline void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
+	int drop_task_ref;
 
 	rq->prev_mm = NULL;
+
+	/*
+	 * A task struct has one reference for the use as "current".
+	 * If a task dies, then it sets TASK_ZOMBIE in tsk->state and calls
+	 * schedule one last time. The schedule call will never return,
+	 * and the scheduled task must drop that reference.
+	 * The test for TASK_ZOMBIE must occur while the runqueue locks are
+	 * still held, otherwise prev could be scheduled on another cpu, die
+	 * there before we look at prev->state, and then the reference would
+	 * be dropped twice.
+	 * 		Manfred Spraul <manfred@colorfullife.com>
+	 */
+	drop_task_ref = 0;
+	if (unlikely(prev->state & (TASK_DEAD | TASK_ZOMBIE)))
+		drop_task_ref = 1;
+
 	finish_arch_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
-	if (prev->state & (TASK_DEAD | TASK_ZOMBIE))
+	if (drop_task_ref)
 		put_task_struct(prev);
 }
 
