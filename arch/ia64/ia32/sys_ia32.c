@@ -1576,19 +1576,35 @@ shmctl32 (int first, int second, void *uptr)
 	return err;
 }
 
+extern int sem_ctls[];
+#define sc_semopm	(sem_ctls[2])
+
 static long
-semtimedop32(int semid, struct sembuf *tsems, int nsems,
-	     const struct compat_timespec *timeout32)
+semtimedop32(int semid, struct sembuf *tsops, int nsops,
+	     struct compat_timespec *timeout32)
 {
 	struct timespec t;
-	if (get_user (t.tv_sec, &timeout32->tv_sec) ||
-	    get_user (t.tv_nsec, &timeout32->tv_nsec))
+	mm_segment_t oldfs;
+	long ret;
+
+	/* parameter checking precedence should mirror sys_semtimedop() */
+	if (nsops < 1 || semid < 0)
+		return -EINVAL;
+	if (nsops > sc_semopm)
+		return -E2BIG;
+	if (!access_ok(VERIFY_READ, tsops, nsops * sizeof(struct sembuf)) ||
+	    get_compat_timespec(&t, timeout32))
 		return -EFAULT;
-	return sys_semtimedop(semid, tsems, nsems, &t);
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_semtimedop(semid, tsops, nsops, &t);
+	set_fs(oldfs);
+	return ret;
 }
 
 asmlinkage long
-sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
+sys32_ipc(u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 {
 	int version;
 
@@ -1596,12 +1612,15 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	call &= 0xffff;
 
 	switch (call) {
+	      case SEMTIMEDOP:
+		if (fifth)
+			return semtimedop32(first, (struct sembuf *)AA(ptr),
+				second, (struct compat_timespec *)AA(fifth));
+		/* else fall through for normal semop() */
 	      case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
-		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second, NULL);
-	      case SEMTIMEDOP:
-		return semtimedop32(first, (struct sembuf *)AA(ptr), second,
-				    (const struct compat_timespec *)AA(fifth));
+		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				      NULL);
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:
