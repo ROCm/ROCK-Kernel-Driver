@@ -140,7 +140,6 @@ DRIVERS-y += drivers/base/base.o \
 DRIVERS-$(CONFIG_AGP) += drivers/char/agp/agp.o
 DRIVERS-$(CONFIG_DRM) += drivers/char/drm/drm.o
 DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
-DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 DRIVERS-$(CONFIG_NET_FC) += drivers/net/fc/fc.o
 DRIVERS-$(CONFIG_APPLETALK) += drivers/net/appletalk/appletalk.o
 DRIVERS-$(CONFIG_TR) += drivers/net/tokenring/tr.o
@@ -187,6 +186,7 @@ DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
 DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
 DRIVERS-$(CONFIG_HOTPLUG_PCI) += drivers/hotplug/vmlinux-obj.o
+DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 
 DRIVERS := $(DRIVERS-y)
 
