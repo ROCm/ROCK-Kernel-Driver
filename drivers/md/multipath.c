@@ -881,7 +881,6 @@ static int multipath_run (mddev_t *mddev)
 		disk->number = desc->number;
 		disk->raid_disk = desc->raid_disk;
 		disk->bdev = rdev->bdev;
-		atomic_inc(&rdev->bdev->bd_count);
 		disk->operational = 0;
 		disk->spare = 1;
 		disk->used_slot = 1;
@@ -1006,9 +1005,6 @@ static int multipath_run (mddev_t *mddev)
 
 out_free_conf:
 	multipath_shrink_mpbh(conf);
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (conf->multipaths[i].bdev)
-			bdput(conf->multipaths[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 out:
@@ -1031,13 +1027,9 @@ out:
 static int multipath_stop (mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	int i;
 
 	md_unregister_thread(conf->thread);
 	multipath_shrink_mpbh(conf);
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (conf->multipaths[i].bdev)
-			bdput(conf->multipaths[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 	MOD_DEC_USE_COUNT;

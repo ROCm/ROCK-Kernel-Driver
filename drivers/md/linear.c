@@ -61,7 +61,6 @@ static int linear_run (mddev_t *mddev)
 		}
 
 		disk->bdev = rdev->bdev;
-		atomic_inc(&rdev->bdev->bd_count);
 		disk->size = rdev->size;
 
 		if (!conf->smallest || (disk->size < conf->smallest->size))
@@ -112,12 +111,8 @@ static int linear_run (mddev_t *mddev)
 	return 0;
 
 out:
-	if (conf) {
-		for (i = 0; i < MD_SB_DISKS; i++)
-			if (conf->disks[i].bdev)
-				bdput(conf->disks[i].bdev);
+	if (conf)
 		kfree(conf);
-	}
 	MOD_DEC_USE_COUNT;
 	return 1;
 }
@@ -125,11 +120,7 @@ out:
 static int linear_stop (mddev_t *mddev)
 {
 	linear_conf_t *conf = mddev_to_conf(mddev);
-	int i;
   
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (conf->disks[i].bdev)
-			bdput(conf->disks[i].bdev);
 	kfree(conf->hash_table);
 	kfree(conf);
 

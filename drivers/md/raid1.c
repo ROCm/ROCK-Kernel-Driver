@@ -1301,7 +1301,6 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
-			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1333,7 +1332,6 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
-			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 1;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1348,7 +1346,6 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
-			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 1;
@@ -1434,9 +1431,6 @@ static int run(mddev_t *mddev)
 out_free_conf:
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (conf->mirrors[i].bdev)
-			bdput(conf->mirrors[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 out:
@@ -1447,14 +1441,10 @@ out:
 static int stop(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
-	int i;
 
 	md_unregister_thread(conf->thread);
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (conf->mirrors[i].bdev)
-			bdput(conf->mirrors[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 	MOD_DEC_USE_COUNT;
