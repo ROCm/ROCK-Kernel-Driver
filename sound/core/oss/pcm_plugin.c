@@ -385,7 +385,7 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 	snd_pcm_plugin_format_t srcformat;
 	int src_access, dst_access;
 	snd_pcm_plugin_t *plugin = NULL;
-	int err, first;
+	int err;
 	int stream = snd_pcm_plug_stream(plug);
 	int slave_interleaved = (params_channels(slave_params) == 1 ||
 				 params_access(slave_params) == SNDRV_PCM_ACCESS_RW_INTERLEAVED);
@@ -437,7 +437,6 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 			tmpformat.format = dstformat.format;
 		else
 			tmpformat.format = SNDRV_PCM_FORMAT_S16;
-		first = plugin == NULL;
 		switch (srcformat.format) {
 		case SNDRV_PCM_FORMAT_MU_LAW:
 			err = snd_pcm_plugin_build_mulaw(plug,
