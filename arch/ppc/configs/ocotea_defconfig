@@ -6,6 +6,7 @@ CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_PPC=y
 CONFIG_PPC32=y
+CONFIG_GENERIC_NVRAM=y
 
 #
 # Code maturity level options
@@ -23,14 +24,16 @@ CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=14
+# CONFIG_HOTPLUG is not set
 # CONFIG_IKCONFIG is not set
-# CONFIG_EMBEDDED is not set
+CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
 
 #
 # Loadable module support
@@ -63,9 +66,9 @@ CONFIG_4xx=y
 CONFIG_OCOTEA=y
 CONFIG_440GX=y
 CONFIG_440A=y
-CONFIG_PIN_TLB=y
 CONFIG_BOOKE=y
 CONFIG_IBM_OCP=y
+CONFIG_PPC_OCP=y
 CONFIG_IBM_EMAC4=y
 # CONFIG_PM is not set
 CONFIG_NOT_COHERENT_CACHE=y
@@ -90,12 +93,6 @@ CONFIG_PCI=y
 CONFIG_PCI_DOMAINS=y
 # CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
-# CONFIG_HOTPLUG is not set
-
-#
-# Parallel port support
-#
-# CONFIG_PARPORT is not set
 
 #
 # Advanced setup
@@ -112,8 +109,13 @@ CONFIG_TASK_SIZE=0x80000000
 CONFIG_BOOT_LOAD=0x01000000
 
 #
+# Device Drivers
+#
+
+#
 # Generic Driver Options
 #
+# CONFIG_DEBUG_DRIVER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -121,27 +123,27 @@ CONFIG_BOOT_LOAD=0x01000000
 # CONFIG_MTD is not set
 
 #
+# Parallel port support
+#
+# CONFIG_PARPORT is not set
+
+#
 # Plug and Play support
 #
-# CONFIG_PNP is not set
 
 #
 # Block devices
 #
+# CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_UMEM is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
+# CONFIG_BLK_DEV_CARMEL is not set
 # CONFIG_BLK_DEV_RAM is not set
-# CONFIG_BLK_DEV_INITRD is not set
 # CONFIG_LBD is not set
-
-#
-# Multi-device support (RAID and LVM)
-#
-# CONFIG_MD is not set
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -154,11 +156,17 @@ CONFIG_BOOT_LOAD=0x01000000
 # CONFIG_SCSI is not set
 
 #
-# Fusion MPT device support
+# Multi-device support (RAID and LVM)
 #
+# CONFIG_MD is not set
 
 #
-# IEEE 1394 (FireWire) support (EXPERIMENTAL)
+# Fusion MPT device support
+#
+# CONFIG_FUSION is not set
+
+#
+# IEEE 1394 (FireWire) support
 #
 # CONFIG_IEEE1394 is not set
 
@@ -166,6 +174,10 @@ CONFIG_BOOT_LOAD=0x01000000
 # I2O device support
 #
 # CONFIG_I2O is not set
+
+#
+# Macintosh device drivers
+#
 
 #
 # Networking support
@@ -190,7 +202,6 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_NET_IPIP is not set
 # CONFIG_NET_IPGRE is not set
 # CONFIG_ARPD is not set
-# CONFIG_INET_ECN is not set
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
@@ -219,7 +230,6 @@ CONFIG_NETFILTER=y
 #
 # SCTP Configuration (EXPERIMENTAL)
 #
-CONFIG_IPV6_SCTP__=y
 # CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
@@ -289,6 +299,12 @@ CONFIG_NET_ETHERNET=y
 # Ethernet (10000 Mbit)
 #
 # CONFIG_IXGB is not set
+CONFIG_IBM_EMAC=y
+# CONFIG_IBM_EMAC_ERRMSG is not set
+CONFIG_IBM_EMAC_RXB=128
+CONFIG_IBM_EMAC_TXB=128
+CONFIG_IBM_EMAC_FGAP=8
+CONFIG_IBM_EMAC_SKBRES=0
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
 # CONFIG_PPP is not set
@@ -305,6 +321,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_TR is not set
 # CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
+# CONFIG_NETCONSOLE is not set
 
 #
 # Wan interfaces
@@ -325,23 +342,18 @@ CONFIG_NET_ETHERNET=y
 # Bluetooth support
 #
 # CONFIG_BT is not set
+# CONFIG_NETPOLL is not set
+# CONFIG_NET_POLL_CONTROLLER is not set
 
 #
 # ISDN subsystem
 #
-# CONFIG_ISDN_BOOL is not set
+# CONFIG_ISDN is not set
 
 #
-# Graphics support
+# Telephony Support
 #
-# CONFIG_FB is not set
-
-#
-# Console display driver support
-#
-CONFIG_VGA_CONSOLE=y
-# CONFIG_MDA_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
+# CONFIG_PHONE is not set
 
 #
 # Input device support
@@ -381,15 +393,9 @@ CONFIG_SERIO=y
 # CONFIG_INPUT_MISC is not set
 
 #
-# Macintosh device drivers
-#
-
-#
 # Character devices
 #
-CONFIG_VT=y
-CONFIG_VT_CONSOLE=y
-CONFIG_HW_CONSOLE=y
+# CONFIG_VT is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
 
 #
@@ -411,30 +417,8 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
-CONFIG_UNIX98_PTY_COUNT=256
-
-#
-# I2C support
-#
-# CONFIG_I2C is not set
-
-#
-# I2C Algorithms
-#
-
-#
-# I2C Hardware Bus support
-#
-
-#
-# I2C Hardware Sensors Chip support
-#
-# CONFIG_I2C_SENSOR is not set
-
-#
-# Mice
-#
-# CONFIG_BUSMOUSE is not set
+CONFIG_LEGACY_PTYS=y
+CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_QIC02_TAPE is not set
 
 #
@@ -461,6 +445,15 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_RAW_DRIVER is not set
 
 #
+# I2C support
+#
+# CONFIG_I2C is not set
+
+#
+# Misc devices
+#
+
+#
 # Multimedia devices
 #
 # CONFIG_VIDEO_DEV is not set
@@ -469,6 +462,26 @@ CONFIG_UNIX98_PTY_COUNT=256
 # Digital Video Broadcasting Devices
 #
 # CONFIG_DVB is not set
+
+#
+# Graphics support
+#
+# CONFIG_FB is not set
+
+#
+# Sound
+#
+# CONFIG_SOUND is not set
+
+#
+# USB support
+#
+# CONFIG_USB is not set
+
+#
+# USB Gadget Support
+#
+# CONFIG_USB_GADGET is not set
 
 #
 # File systems
@@ -503,7 +516,6 @@ CONFIG_UNIX98_PTY_COUNT=256
 CONFIG_PROC_FS=y
 CONFIG_PROC_KCORE=y
 # CONFIG_DEVFS_FS is not set
-CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 # CONFIG_TMPFS is not set
 # CONFIG_HUGETLB_PAGE is not set
@@ -515,6 +527,7 @@ CONFIG_RAMFS=y
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
+# CONFIG_HFSPLUS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 # CONFIG_EFS_FS is not set
@@ -531,12 +544,13 @@ CONFIG_RAMFS=y
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 # CONFIG_NFS_V4 is not set
+# CONFIG_NFS_DIRECTIO is not set
 # CONFIG_NFSD is not set
 CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 # CONFIG_EXPORTFS is not set
 CONFIG_SUNRPC=y
-# CONFIG_SUNRPC_GSS is not set
+# CONFIG_RPCSEC_GSS_KRB5 is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
@@ -551,15 +565,9 @@ CONFIG_SUNRPC=y
 CONFIG_MSDOS_PARTITION=y
 
 #
-# Sound
+# Native Language Support
 #
-# CONFIG_SOUND is not set
-
-#
-# USB support
-#
-# CONFIG_USB is not set
-# CONFIG_USB_GADGET is not set
+# CONFIG_NLS is not set
 
 #
 # Library routines
