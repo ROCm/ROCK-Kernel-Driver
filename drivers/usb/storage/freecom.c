@@ -101,7 +101,8 @@ struct freecom_status {
 #define FCM_PACKET_IDE_READ	0xC0
 
 /* All packets (except for status) are 64 bytes long. */
-#define FCM_PACKET_LENGTH	64
+#define FCM_PACKET_LENGTH		64
+#define FCM_STATUS_PACKET_LENGTH	4
 
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
@@ -216,7 +217,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* There are times we can optimize out this status read, but it
 	 * doesn't hurt us to always do it now. */
 	result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
-			FCM_PACKET_LENGTH, &partial);
+			FCM_STATUS_PACKET_LENGTH, &partial);
 	US_DEBUGP("foo Status result %d %u\n", result, partial);
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
@@ -256,10 +257,10 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* get the data */
 		result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
-				FCM_PACKET_LENGTH, &partial);
+				FCM_STATUS_PACKET_LENGTH, &partial);
 
 		US_DEBUGP("bar Status result %d %u\n", result, partial);
-		if (result > USB_STOR_XFER_SHORT)
+		if (result != USB_STOR_XFER_GOOD)
 			return USB_STOR_TRANSPORT_ERROR;
 
 		US_DEBUG(pdump ((void *) fst, partial));
@@ -302,6 +303,9 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	switch (us->srb->sc_data_direction) {
 	case SCSI_DATA_READ:
+		/* catch bogus "read 0 length" case */
+		if (!length)
+			break;
 		/* Make sure that the status indicates that the device
 		 * wants data as well. */
 		if ((fst->Status & DRQ_STAT) == 0 || (fst->Reason & 3) != 2) {
@@ -331,6 +335,9 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		break;
 
 	case SCSI_DATA_WRITE:
+		/* catch bogus "write 0 length" case */
+		if (!length)
+			break;
 		/* Make sure the status indicates that the device wants to
 		 * send us data. */
 		/* !!IMPLEMENT!! */
@@ -362,6 +369,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		break;
 
 	default:
+		/* should never hit here -- filtered in usb.c */
 		US_DEBUGP ("freecom unimplemented direction: %d\n",
 				us->srb->sc_data_direction);
 		// Return fail, SCSI seems to handle this better.
