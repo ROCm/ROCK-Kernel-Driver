@@ -53,17 +53,11 @@ extern unsigned long phys_to_bus(unsigned long pa);
 extern unsigned long pci_phys_to_bus(unsigned long pa, int busnr);
 extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
     
-/* Dynamic DMA Mapping stuff, stolen from i386
- * 	++ajoshi
+/*
+ * Dynamic DMA Mapping stuff
+ * Originally stolen from i386 by ajoshi and updated by paulus
+ * Non-consistent cache support by Dan Malek
  */
-
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <asm/scatterlist.h>
-#include <asm/io.h>
-
-struct pci_dev;
 
 /* The PCI address space does equal the physical memory
  * address space.  The networking and block device layers use
@@ -101,8 +95,7 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 					size_t size, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
 	consistent_sync(ptr, size, direction);
 
@@ -130,10 +123,11 @@ static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
  * to pci_map_single, but takes a struct page instead of a virtual address
  */
 static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
-				      unsigned long offset, size_t size, int direction)
+				      unsigned long offset, size_t size,
+				      int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
+	consistent_sync_page(page, offset, size, direction);
 	return (page - mem_map) * PAGE_SIZE + PCI_DRAM_OFFSET + offset;
 }
 
@@ -171,10 +165,11 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	/*
 	 * temporary 2.4 hack
 	 */
-	for (i = 0; i < nents; i++) {
-		if (!sg[i].page)
-			BUG();
-		sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
+	for (i = 0; i < nents; i++, sg++) {
+		BUG_ON(!sg->page);
+		consistent_sync_page(sg->page, sg->offset,
+				     sg->length, direction);
+		sg->dma_address = page_to_bus(sg->page) + sg->offset;
 	}
 
 	return nents;
@@ -187,8 +182,7 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 				int nents, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */
 }
 
@@ -205,8 +199,7 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
 				       size_t size, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
 	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
@@ -221,9 +214,13 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 				   struct scatterlist *sg,
 				   int nelems, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
-	/* nothing to do */
+	int i;
+
+	BUG_ON(direction == PCI_DMA_NONE);
+
+	for (i = 0; i < nelems; i++, sg++)
+		consistent_sync_page(sg->page, sg->offset,
+				     sg->length, direction);
 }
 
 /* Return whether the given PCI device DMA address mask can
