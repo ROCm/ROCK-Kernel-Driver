@@ -1451,6 +1451,30 @@ clear_bats:
 	mtspr	IBAT2L,r10
 	mtspr	IBAT3U,r10
 	mtspr	IBAT3L,r10
+BEGIN_FTR_SECTION
+	/* Here's a tweak: at this point, CPU setup have
+	 * not been called yet, so HIGH_BAT_EN may not be
+	 * set in HID0 for the 745x processors. However, it
+	 * seems that doesn't affect our ability to actually
+	 * write to these SPRs.
+	 */
+	mtspr	SPRN_DBAT4U,r20
+	mtspr	SPRN_DBAT4L,r20
+	mtspr	SPRN_DBAT5U,r20
+	mtspr	SPRN_DBAT5L,r20
+	mtspr	SPRN_DBAT6U,r20
+	mtspr	SPRN_DBAT6L,r20
+	mtspr	SPRN_DBAT7U,r20
+	mtspr	SPRN_DBAT7L,r20
+	mtspr	SPRN_IBAT4U,r20
+	mtspr	SPRN_IBAT4L,r20
+	mtspr	SPRN_IBAT5U,r20
+	mtspr	SPRN_IBAT5L,r20
+	mtspr	SPRN_IBAT6U,r20
+	mtspr	SPRN_IBAT6L,r20
+	mtspr	SPRN_IBAT7U,r20
+	mtspr	SPRN_IBAT7L,r20
+END_FTR_SECTION_IFSET(CPU_FTR_HAS_HIGH_BATS)
 	blr
 
 flush_tlbs:

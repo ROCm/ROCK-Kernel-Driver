@@ -745,20 +745,20 @@ STATIC int toshoboe_invalid_dev(int irq)
   return 1;
 }
 
-STATIC void
+STATIC irqreturn_t
 toshoboe_probeinterrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
   struct toshoboe_cb *self = (struct toshoboe_cb *) dev_id;
   __u8 irqstat;
 
   if (self == NULL && toshoboe_invalid_dev(irq)) 
-    return;
+    return IRQ_NONE;
 
   irqstat = INB (OBOE_ISR);
 
 /* was it us */
   if (!(irqstat & OBOE_INT_MASK))
-    return;
+    return IRQ_NONE;
 
 /* Ack all the interrupts */
   OUTB (irqstat, OBOE_ISR);
@@ -791,6 +791,7 @@ toshoboe_probeinterrupt (int irq, void *dev_id, struct pt_regs *regs)
   if (irqstat & OBOE_INT_SIP) {
     self->int_sip++;
     PROBE_DEBUG("I"); }
+  return IRQ_HANDLED;
 }
 
 STATIC int

@@ -8,7 +8,7 @@
  *   them return 0 On success and 1 otherwise.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -145,33 +145,32 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	switch (ev->type) {
-		case LLC_CONN_EV_TYPE_PDU:
-			if (!LLC_PDU_IS_RSP(pdu) &&
-			    !LLC_PDU_TYPE_IS_U(pdu) &&
-			    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_FRMR) {
-				reason = LLC_RESET_REASON_LOCAL;
-				rc = 0;
-			} else if (!LLC_PDU_IS_CMD(pdu) &&
-				   !LLC_PDU_TYPE_IS_U(pdu) &&
-				   LLC_U_PDU_CMD(pdu) ==
-				   			LLC_2_PDU_CMD_SABME) {
-				reason = LLC_RESET_REASON_REMOTE;
-				rc = 0;
-			} else {
-				reason = 0;
-				rc  = 1;
-			}
-			break;
-		case LLC_CONN_EV_TYPE_ACK_TMR:
-		case LLC_CONN_EV_TYPE_P_TMR:
-		case LLC_CONN_EV_TYPE_REJ_TMR:
-		case LLC_CONN_EV_TYPE_BUSY_TMR:
-			if (llc->retry_count > llc->n2) {
-				reason = LLC_RESET_REASON_LOCAL;
-				rc = 0;
-			} else
-				rc = 1;
-			break;
+	case LLC_CONN_EV_TYPE_PDU:
+		if (!LLC_PDU_IS_RSP(pdu) &&
+		    !LLC_PDU_TYPE_IS_U(pdu) &&
+		    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_FRMR) {
+			reason = LLC_RESET_REASON_LOCAL;
+			rc = 0;
+		} else if (!LLC_PDU_IS_CMD(pdu) &&
+			   !LLC_PDU_TYPE_IS_U(pdu) &&
+			   LLC_U_PDU_CMD(pdu) == LLC_2_PDU_CMD_SABME) {
+			reason = LLC_RESET_REASON_REMOTE;
+			rc = 0;
+		} else {
+			reason = 0;
+			rc  = 1;
+		}
+		break;
+	case LLC_CONN_EV_TYPE_ACK_TMR:
+	case LLC_CONN_EV_TYPE_P_TMR:
+	case LLC_CONN_EV_TYPE_REJ_TMR:
+	case LLC_CONN_EV_TYPE_BUSY_TMR:
+		if (llc->retry_count > llc->n2) {
+			reason = LLC_RESET_REASON_LOCAL;
+			rc = 0;
+		} else
+			rc = 1;
+		break;
 	}
 	if (!rc) {
 		ev->reason   = reason;

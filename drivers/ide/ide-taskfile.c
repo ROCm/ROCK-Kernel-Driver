@@ -61,15 +61,6 @@
 #define task_map_rq(rq, flags)		ide_map_buffer((rq), (flags))
 #define task_unmap_rq(rq, buf, flags)	ide_unmap_buffer((rq), (buf), (flags))
 
-inline u32 task_read_24 (ide_drive_t *drive)
-{
-	return	(HWIF(drive)->INB(IDE_HCYL_REG)<<16) |
-		(HWIF(drive)->INB(IDE_LCYL_REG)<<8) |
-		 HWIF(drive)->INB(IDE_SECTOR_REG);
-}
-
-EXPORT_SYMBOL(task_read_24);
-
 static void ata_bswap_data (void *buffer, int wcount)
 {
 	u16 *p = buffer;
@@ -216,88 +207,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 EXPORT_SYMBOL(do_rw_taskfile);
 
 /*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- */
-u8 taskfile_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	u8 err = 0;
-
-	local_irq_set(flags);
-	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-#if FANCY_STATUS_DUMPS
-	printk(" { ");
-	if (stat & BUSY_STAT) {
-		printk("Busy ");
-	} else {
-		if (stat & READY_STAT)	printk("DriveReady ");
-		if (stat & WRERR_STAT)	printk("DeviceFault ");
-		if (stat & SEEK_STAT)	printk("SeekComplete ");
-		if (stat & DRQ_STAT)	printk("DataRequest ");
-		if (stat & ECC_STAT)	printk("CorrectedError ");
-		if (stat & INDEX_STAT)	printk("Index ");
-		if (stat & ERR_STAT)	printk("Error ");
-	}
-	printk("}");
-#endif  /* FANCY_STATUS_DUMPS */
-	printk("\n");
-	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
-		err = hwif->INB(IDE_ERROR_REG);
-		printk("%s: %s: error=0x%02x", drive->name, msg, err);
-#if FANCY_STATUS_DUMPS
-		if (drive->media == ide_disk)
-			goto media_out;
-
-		printk(" { ");
-		if (err & ABRT_ERR)	printk("DriveStatusError ");
-		if (err & ICRC_ERR)	printk("Bad%s", (err & ABRT_ERR) ? "CRC " : "Sector ");
-		if (err & ECC_ERR)	printk("UncorrectableError ");
-		if (err & ID_ERR)	printk("SectorIdNotFound ");
-		if (err & TRK0_ERR)	printk("TrackZeroNotFound ");
-		if (err & MARK_ERR)	printk("AddrMarkNotFound ");
-		printk("}");
-		if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR ||
-		    (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
-			if (drive->addressing == 1) {
-				u64 sectors = 0;
-				u32 high = 0;
-				u32 low = task_read_24(drive);
-				hwif->OUTB(0x80, IDE_CONTROL_REG);
-				high = task_read_24(drive);
-				sectors = ((u64)high << 24) | low;
-				printk(", LBAsect=%lld", (long long) sectors);
-			} else {
-				u8 cur  = hwif->INB(IDE_SELECT_REG);
-				u8 low  = hwif->INB(IDE_LCYL_REG);
-				u8 high = hwif->INB(IDE_HCYL_REG);
-				u8 sect = hwif->INB(IDE_SECTOR_REG);
-				/* using LBA? */
-				if (cur & 0x40) {
-					printk(", LBAsect=%d", (u32)
-						((cur&0xf)<<24)|(high<<16)|
-						(low<<8)|sect);
-				} else {
-					printk(", CHS=%d/%d/%d",
-						((high<<8) + low),
-						(cur & 0xf), sect);
-				}
-			}
-			if (HWGROUP(drive)->rq)
-				printk(", sector=%llu",
-					(unsigned long long)HWGROUP(drive)->rq->sector);
-		}
-media_out:
-#endif  /* FANCY_STATUS_DUMPS */
-		printk("\n");
-	}
-	local_irq_restore(flags);
-	return err;
-}
-
-EXPORT_SYMBOL(taskfile_dump_status);
-
-/*
  * Clean up after success/failure of an explicit taskfile operation.
  */
 void ide_end_taskfile (ide_drive_t *drive, u8 stat, u8 err)
@@ -356,99 +265,6 @@ void ide_end_taskfile (ide_drive_t *drive, u8 stat, u8 err)
 }
 
 EXPORT_SYMBOL(ide_end_taskfile);
-
-/*
- * try_to_flush_leftover_data() is invoked in response to a drive
- * unexpectedly having its DRQ_STAT bit set.  As an alternative to
- * resetting the drive, this routine tries to clear the condition
- * by read a sector's worth of data from the drive.  Of course,
- * this may not help if the drive is *waiting* for data from *us*.
- */
-void task_try_to_flush_leftover_data (ide_drive_t *drive)
-{
-	int i = (drive->mult_count ? drive->mult_count : 1) * SECTOR_WORDS;
-
-	if (drive->media != ide_disk)
-		return;
-	while (i > 0) {
-		u32 buffer[16];
-		unsigned int wcount = (i > 16) ? 16 : i;
-		i -= wcount;
-		taskfile_input_data(drive, buffer, wcount);
-	}
-}
-
-EXPORT_SYMBOL(task_try_to_flush_leftover_data);
-
-/*
- * taskfile_error() takes action based on the error returned by the drive.
- */
-ide_startstop_t taskfile_error (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	ide_hwif_t *hwif;
-	struct request *rq;
-	u8 err;
-
-        err = taskfile_dump_status(drive, msg, stat);
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
-		return ide_stopped;
-
-	hwif = HWIF(drive);
-	/* retry only "normal" I/O: */
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		rq->errors = 1;
-		ide_end_taskfile(drive, stat, err);
-		return ide_stopped;
-	}
-	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
-		/* other bits are useless when BUSY */
-		rq->errors |= ERROR_RESET;
-	} else {
-		if (drive->media != ide_disk)
-			goto media_out;
-		if (stat & ERR_STAT) {
-			/* err has different meaning on cdrom and tape */
-			if (err == ABRT_ERR) {
-				if (drive->select.b.lba &&
-				    (hwif->INB(IDE_COMMAND_REG) == WIN_SPECIFY))
-					/* some newer drives don't
-					 * support WIN_SPECIFY
-					 */
-					return ide_stopped;
-			} else if ((err & BAD_CRC) == BAD_CRC) {
-				/* UDMA crc error -- just retry the operation */
-				drive->crc_count++;
-			} else if (err & (BBD_ERR | ECC_ERR)) {
-				/* retries won't help these */
-				rq->errors = ERROR_MAX;
-			} else if (err & TRK0_ERR) {
-				/* help it find track zero */
-				rq->errors |= ERROR_RECAL;
-			}
-                }
-media_out:
-                if ((stat & DRQ_STAT) && rq_data_dir(rq) != WRITE)
-                        task_try_to_flush_leftover_data(drive);
-	}
-	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT)) {
-		/* force an abort */
-		hwif->OUTB(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);
-	}
-	if (rq->errors >= ERROR_MAX) {
-		DRIVER(drive)->end_request(drive, 0, 0);
-	} else {
-		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
-			++rq->errors;
-			return ide_do_reset(drive);
-		}
-		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
-			drive->special.b.recalibrate = 1;
-		++rq->errors;
-	}
-	return ide_stopped;
-}
-
-EXPORT_SYMBOL(taskfile_error);
 
 /*
  * set_multmode_intr() is invoked on completion of a WIN_SETMULT cmd.

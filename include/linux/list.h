@@ -437,6 +437,10 @@ static __inline__ void hlist_add_before(struct hlist_node *n, struct hlist_node 
 	for (pos = (head)->first; pos; \
 	     pos = pos->next) 
 
+#define hlist_for_each_safe(pos, n, head) \
+	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
+	     pos = n)
+
 #else
 #warning "don't include kernel headers in userspace"
 #endif /* __KERNEL__ */

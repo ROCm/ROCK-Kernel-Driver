@@ -24,7 +24,7 @@
  * in their comments, at below.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -485,11 +485,11 @@ int llc_conn_ev_rx_xxx_cmd_pbit_set_0(struct sock *sk, struct sk_buff *skb)
 				rc = 0;
 		} else if (!LLC_PDU_TYPE_IS_U(pdu))
 			switch (LLC_U_PDU_CMD(pdu)) {
-				case LLC_2_PDU_CMD_SABME:
-				case LLC_2_PDU_CMD_DISC:
-					if (!LLC_U_PF_IS_0(pdu))
-						rc = 0;
-					break;
+			case LLC_2_PDU_CMD_SABME:
+			case LLC_2_PDU_CMD_DISC:
+				if (!LLC_U_PF_IS_0(pdu))
+					rc = 0;
+				break;
 			}
 	}
 	return rc;
@@ -505,10 +505,10 @@ int llc_conn_ev_rx_xxx_cmd_pbit_set_x(struct sock *sk, struct sk_buff *skb)
 			rc = 0;
 		else if (!LLC_PDU_TYPE_IS_U(pdu))
 			switch (LLC_U_PDU_CMD(pdu)) {
-				case LLC_2_PDU_CMD_SABME:
-				case LLC_2_PDU_CMD_DISC:
-					rc = 0;
-					break;
+			case LLC_2_PDU_CMD_SABME:
+			case LLC_2_PDU_CMD_DISC:
+				rc = 0;
+				break;
 			}
 	}
 	return rc;
@@ -525,12 +525,12 @@ int llc_conn_ev_rx_xxx_rsp_fbit_set_1(struct sock *sk, struct sk_buff *skb)
 				rc = 0;
 		} else if (!LLC_PDU_TYPE_IS_U(pdu))
 			switch (LLC_U_PDU_RSP(pdu)) {
-				case LLC_2_PDU_RSP_UA:
-				case LLC_2_PDU_RSP_DM:
-				case LLC_2_PDU_RSP_FRMR:
-					if (!LLC_U_PF_IS_1(pdu))
-						rc = 0;
-					break;
+			case LLC_2_PDU_RSP_UA:
+			case LLC_2_PDU_RSP_DM:
+			case LLC_2_PDU_RSP_FRMR:
+				if (!LLC_U_PF_IS_1(pdu))
+					rc = 0;
+				break;
 			}
 	}
 	return rc;
@@ -546,11 +546,11 @@ int llc_conn_ev_rx_xxx_rsp_fbit_set_x(struct sock *sk, struct sk_buff *skb)
 			rc = 0;
 		else if (!LLC_PDU_TYPE_IS_U(pdu))
 			switch (LLC_U_PDU_RSP(pdu)) {
-				case LLC_2_PDU_RSP_UA:
-				case LLC_2_PDU_RSP_DM:
-				case LLC_2_PDU_RSP_FRMR:
-					rc = 0;
-					break;
+			case LLC_2_PDU_RSP_UA:
+			case LLC_2_PDU_RSP_DM:
+			case LLC_2_PDU_RSP_FRMR:
+				rc = 0;
+				break;
 			}
 	}
 
@@ -566,13 +566,13 @@ int llc_conn_ev_rx_xxx_yyy(struct sock *sk, struct sk_buff *skb)
 		rc = 0;
 	else if (!LLC_PDU_TYPE_IS_U(pdu))
 		switch (LLC_U_PDU_CMD(pdu)) {
-			case LLC_2_PDU_CMD_SABME:
-			case LLC_2_PDU_CMD_DISC:
-			case LLC_2_PDU_RSP_UA:
-			case LLC_2_PDU_RSP_DM:
-			case LLC_2_PDU_RSP_FRMR:
-				rc = 0;
-				break;
+		case LLC_2_PDU_CMD_SABME:
+		case LLC_2_PDU_CMD_DISC:
+		case LLC_2_PDU_RSP_UA:
+		case LLC_2_PDU_RSP_DM:
+		case LLC_2_PDU_RSP_FRMR:
+			rc = 0;
+			break;
 		}
 	return rc;
 }

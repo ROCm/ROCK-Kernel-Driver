@@ -556,8 +556,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_acct
 	.llong .sys32_umount
 	.llong .sys_ni_syscall		/* old lock syscall */
-	.llong .sys32_ioctl
-	.llong .compat_sys_fcntl	/* 55 */
+	.llong .compat_sys_ioctl
+	.llong .compat_sys_fcntl		/* 55 */
 	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys32_setpgid
 	.llong .sys_ni_syscall		/* old ulimit syscall */

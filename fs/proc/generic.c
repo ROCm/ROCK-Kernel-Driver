@@ -136,11 +136,11 @@ proc_file_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE;
 			}
-			if (n > count)
-				n = count;
 			n -= *ppos;
 			if (n <= 0)
 				break;
+			if (n > count)
+				n = count;
 			start = page + *ppos;
 		} else if (start < page) {
 			if (n > PAGE_SIZE) {

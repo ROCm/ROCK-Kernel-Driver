@@ -1,8 +1,8 @@
 /**
  * mft.c - NTFS kernel mft record operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,18 +39,18 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 	ATTR_RECORD *a;
 
 	memset(m, 0, size);
-	m->_MNR(magic) = magic_FILE;
+	m->magic = magic_FILE;
 	/* Aligned to 2-byte boundary. */
-	m->_MNR(usa_ofs) = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
-	m->_MNR(usa_count) = cpu_to_le16(size / NTFS_BLOCK_SIZE + 1);
+	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
+	m->usa_count = cpu_to_le16(size / NTFS_BLOCK_SIZE + 1);
 	/* Set the update sequence number to 1. */
 	*(u16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
 	m->lsn = cpu_to_le64(0LL);
 	m->sequence_number = cpu_to_le16(1);
 	m->link_count = cpu_to_le16(0);
 	/* Aligned to 8-byte boundary. */
-	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->_MNR(usa_ofs)) +
-			(le16_to_cpu(m->_MNR(usa_count)) << 1) + 7) & ~7);
+	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
+			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
 	m->flags = cpu_to_le16(0);
 	/*
 	 * Using attrs_offset plus eight bytes (for the termination attribute),
@@ -329,7 +329,7 @@ MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 	 */
 	down(&base_ni->extent_lock);
 	if (base_ni->nr_extents > 0) {
-		extent_nis = base_ni->_INE(extent_ntfs_inos);
+		extent_nis = base_ni->ext.extent_ntfs_inos;
 		for (i = 0; i < base_ni->nr_extents; i++) {
 			if (mft_no != extent_nis[i]->mft_no)
 				continue;
@@ -374,7 +374,7 @@ map_err_out:
 	ni->vol = base_ni->vol;
 	ni->seq_no = seq_no;
 	ni->nr_extents = -1;
-	ni->_INE(base_ntfs_ino) = base_ni;
+	ni->ext.base_ntfs_ino = base_ni;
 	/* Now map the record. */
 	m = map_mft_record(ni);
 	if (unlikely(IS_ERR(m))) {
@@ -404,14 +404,14 @@ map_err_out:
 			m = ERR_PTR(-ENOMEM);
 			goto unm_err_out;
 		}
-		if (base_ni->_INE(extent_ntfs_inos)) {
-			memcpy(tmp, base_ni->_INE(extent_ntfs_inos), new_size -
+		if (base_ni->ext.extent_ntfs_inos) {
+			memcpy(tmp, base_ni->ext.extent_ntfs_inos, new_size -
 					4 * sizeof(ntfs_inode *));
-			kfree(base_ni->_INE(extent_ntfs_inos));
+			kfree(base_ni->ext.extent_ntfs_inos);
 		}
-		base_ni->_INE(extent_ntfs_inos) = tmp;
+		base_ni->ext.extent_ntfs_inos = tmp;
 	}
-	base_ni->_INE(extent_ntfs_inos)[base_ni->nr_extents++] = ni;
+	base_ni->ext.extent_ntfs_inos[base_ni->nr_extents++] = ni;
 	up(&base_ni->extent_lock);
 	atomic_dec(&base_ni->count);
 	ntfs_debug("Done 2.");

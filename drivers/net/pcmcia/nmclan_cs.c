@@ -457,17 +457,6 @@ static void flush_stale_links(void)
 }
 
 /* ----------------------------------------------------------------------------
-cs_error
-	Report a Card Services related error.
----------------------------------------------------------------------------- */
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
-/* ----------------------------------------------------------------------------
 nmclan_attach
 	Creates an "instance" of the driver, allocating local data
 	structures for one device.  The device is registered with Card

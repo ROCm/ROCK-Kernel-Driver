@@ -26,7 +26,6 @@
 
 static volatile unsigned char *sccc, *sccd;
 unsigned int TXRDY, RXRDY, DLAB;
-extern void xmon_printf(const char *fmt, ...);
 static int xmon_expect(const char *str, unsigned int timeout);
 
 static int use_serial;

@@ -135,7 +135,7 @@ config JBD
 # CONFIG_JBD could be its own option (even modular), but until there are
 # other users than ext3, we will simply make it be the same as CONFIG_EXT3_FS
 # dep_tristate '  Journal Block Device support (JBD for ext3)' CONFIG_JBD $CONFIG_EXT3_FS
-	bool
+	tristate
 	default EXT3_FS
 	help
 	  This is a generic journaling layer for block devices.  It is

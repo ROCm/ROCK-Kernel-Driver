@@ -569,19 +569,6 @@ int bt3c_close(bt3c_info_t *info)
 	return 0;
 }
 
-
-
-/* ======================== Card services ======================== */
-
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-
-	CardServices(ReportError, handle, &err);
-}
-
-
 dev_link_t *bt3c_attach(void)
 {
 	bt3c_info_t *info;

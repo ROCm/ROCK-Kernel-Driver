@@ -263,7 +263,7 @@ void default_hwif_transport (ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(default_hwif_transport);
 
-u32 read_24 (ide_drive_t *drive)
+u32 ide_read_24 (ide_drive_t *drive)
 {
 	u8 hcyl = HWIF(drive)->INB(IDE_HCYL_REG);
 	u8 lcyl = HWIF(drive)->INB(IDE_LCYL_REG);
@@ -271,7 +271,7 @@ u32 read_24 (ide_drive_t *drive)
 	return (hcyl<<16)|(lcyl<<8)|sect;
 }
 
-EXPORT_SYMBOL(read_24);
+EXPORT_SYMBOL(ide_read_24);
 
 void SELECT_DRIVE (ide_drive_t *drive)
 {

@@ -550,6 +550,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		 unsigned int verdict)
 {
 	struct list_head *elem = &info->elem->list;
+	struct list_head *i;
 
 	rcu_read_lock();
 
@@ -592,10 +593,6 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 			      info->indev, info->outdev, info->okfn))
 			goto next_hook;
 		break;
-
-	case NF_DROP:
-		kfree_skb(skb);
-		break;
 	}
 	rcu_read_unlock();
 
@@ -610,6 +607,10 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 			dev_put(skb->nf_bridge->physoutdev);
 	}
 #endif
+
+
+	if (verdict == NF_DROP)
+		kfree_skb(skb);
 
 	kfree(info);
 	return;

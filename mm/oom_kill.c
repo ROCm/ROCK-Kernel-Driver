@@ -208,6 +208,11 @@ static void oom_kill(void)
  */
 void out_of_memory(void)
 {
+	/*
+	 * oom_lock protects out_of_memory()'s static variables.
+	 * It's a global lock; this is not performance-critical.
+	 */
+	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
 
@@ -217,6 +222,7 @@ void out_of_memory(void)
 	if (nr_swap_pages > 0)
 		return;
 
+	spin_lock(&oom_lock);
 	now = jiffies;
 	since = now - last;
 	last = now;
@@ -235,14 +241,14 @@ void out_of_memory(void)
 	 */
 	since = now - first;
 	if (since < HZ)
-		return;
+		goto out_unlock;
 
 	/*
 	 * If we have gotten only a few failures,
 	 * we're not really oom. 
 	 */
 	if (++count < 10)
-		return;
+		goto out_unlock;
 
 	/*
 	 * If we just killed a process, wait a while
@@ -251,15 +257,27 @@ void out_of_memory(void)
 	 */
 	since = now - lastkill;
 	if (since < HZ*5)
-		return;
+		goto out_unlock;
 
 	/*
 	 * Ok, really out of memory. Kill something.
 	 */
 	lastkill = now;
+
+	/* oom_kill() sleeps */
+	spin_unlock(&oom_lock);
 	oom_kill();
+	spin_lock(&oom_lock);
 
 reset:
-	first = now;
+	/*
+	 * We dropped the lock above, so check to be sure the variable
+	 * first only ever increases to prevent false OOM's.
+	 */
+	if (time_after(now, first))
+		first = now;
 	count = 0;
+
+out_unlock:
+	spin_unlock(&oom_lock);
 }

@@ -6,6 +6,7 @@
 #define _SPARC_IOMMU_H
 
 #include <asm/page.h>
+#include <asm/bitext.h>
 
 /* The iommu handles all virtual to physical address translations
  * that occur between the SBUS and physical memory.  Access by
@@ -100,11 +101,11 @@ struct iommu_regs {
 struct iommu_struct {
 	struct iommu_regs *regs;
 	iopte_t *page_table;
-	iopte_t *lowest;     /* to speed up searches... */
-	unsigned long plow;
 	/* For convenience */
 	unsigned long start; /* First managed virtual address */
 	unsigned long end;   /* Last managed virtual address */
+
+	struct bit_map usemap;
 };
 
 extern __inline__ void iommu_invalidate(struct iommu_regs *regs)
@@ -112,9 +113,9 @@ extern __inline__ void iommu_invalidate(struct iommu_regs *regs)
 	regs->tlbflush = 0;
 }
 
-extern __inline__ void iommu_invalidate_page(struct iommu_regs *regs, unsigned long page)
+extern __inline__ void iommu_invalidate_page(struct iommu_regs *regs, unsigned long ba)
 {
-	regs->pageflush = (page & PAGE_MASK);
+	regs->pageflush = (ba & PAGE_MASK);
 }
 
 #endif /* !(_SPARC_IOMMU_H) */

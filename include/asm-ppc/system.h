@@ -50,8 +50,6 @@
 #endif /* CONFIG_SMP */
 
 #ifdef __KERNEL__
-extern void xmon_irq(int, void *, struct pt_regs *);
-extern void xmon(struct pt_regs *excp);
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);

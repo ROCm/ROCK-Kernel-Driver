@@ -28,7 +28,6 @@ extern __u32 sysctl_rmem_default;
 
 extern int sysctl_core_destroy_delay;
 extern int sysctl_optmem_max;
-extern int sysctl_hot_list_len;
 
 #ifdef CONFIG_NET_DIVERT
 extern char sysctl_divert_version[];
@@ -146,14 +145,6 @@ ctl_table core_table[] = {
 		.ctl_name	= NET_CORE_OPTMEM_MAX,
 		.procname	= "optmem_max",
 		.data		= &sysctl_optmem_max,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
-	},
-	{
-		.ctl_name	= NET_CORE_HOT_LIST_LENGTH,
-		.procname	= "hot_list_length",
-		.data		= &sysctl_hot_list_len,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec

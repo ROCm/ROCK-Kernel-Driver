@@ -2,7 +2,7 @@
 #define _PPC_BUG_H
 
 #include <linux/config.h>
-#include <asm/system.h> /* for xmon definition */
+#include <asm/xmon.h>
 
 #ifdef CONFIG_XMON
 extern void xmon(struct pt_regs *);

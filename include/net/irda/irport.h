@@ -73,7 +73,7 @@ struct irport_cb {
 	/* For piggyback drivers */
 	void *priv;                
 	void (*change_speed)(void *priv, __u32 speed);
-	void (*interrupt)(int irq, void *dev_id, struct pt_regs *regs);
+	int (*interrupt)(int irq, void *dev_id, struct pt_regs *regs);
 };
 
 struct irport_cb *irport_open(int i, unsigned int iobase, unsigned int irq);

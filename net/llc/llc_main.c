@@ -3,7 +3,7 @@
  * 	and connections of the LLC.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -600,5 +600,5 @@ module_init(llc_init);
 module_exit(llc_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001, 2002");
+MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001-2003");
 MODULE_DESCRIPTION("LLC 2.0, NET4.0 IEEE 802.2 extended support");

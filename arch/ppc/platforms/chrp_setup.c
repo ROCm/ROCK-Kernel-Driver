@@ -36,6 +36,7 @@
 #include <linux/console.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/initrd.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -52,6 +53,7 @@
 #include <asm/btext.h>
 #include <asm/i8259.h>
 #include <asm/open_pic.h>
+#include <asm/xmon.h>
 
 unsigned long chrp_get_rtc_time(void);
 int chrp_set_rtc_time(unsigned long nowtime);
@@ -66,6 +68,13 @@ void btext_progress(char *, unsigned short);
 
 extern unsigned long pmac_find_end_of_memory(void);
 extern int of_show_percpuinfo(struct seq_file *, int);
+
+/*
+ * XXX this should be in xmon.h, but putting it there means xmon.h
+ * has to include <linux/interrupt.h> (to get irqreturn_t), which
+ * causes all sorts of problems.  -- paulus
+ */ 
+extern irqreturn_t xmon_irq(int, void *, struct pt_regs *);
 
 extern dev_t boot_dev;
 

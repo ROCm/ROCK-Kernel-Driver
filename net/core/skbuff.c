@@ -20,6 +20,7 @@
  *		Ray VanTassle	:	Fixed --skb->lock in free
  *		Alan Cox	:	skb_copy copy arp field
  *		Andi Kleen	:	slabified it.
+ *		Robert Olsson	:	Removed skb_head_pool
  *
  *	NOTE:
  *		The __skb_ routines should be called with interrupts
@@ -63,14 +64,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-int sysctl_hot_list_len = 128;
-
 static kmem_cache_t *skbuff_head_cache;
-
-static union {
-	struct sk_buff_head	list;
-	char			pad[SMP_CACHE_BYTES];
-} skb_head_pool[NR_CPUS];
 
 /*
  *	Keep out-of-line to prevent kernel bloat.
@@ -109,44 +103,6 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
 	BUG();
 }
 
-static __inline__ struct sk_buff *skb_head_from_pool(void)
-{
-	struct sk_buff_head *list;
-	struct sk_buff *skb = NULL;
-	unsigned long flags;
-
-	local_irq_save(flags);
-
-	list = &skb_head_pool[smp_processor_id()].list;
-
-	if (skb_queue_len(list))
-		skb = __skb_dequeue(list);
-
-	local_irq_restore(flags);
-	return skb;
-}
-
-static __inline__ void skb_head_to_pool(struct sk_buff *skb)
-{
-	struct sk_buff_head *list;
-	unsigned long flags;
-
-	local_irq_save(flags);
-
-	list = &skb_head_pool[smp_processor_id()].list;
-
-	if (skb_queue_len(list) < sysctl_hot_list_len) {
-		__skb_queue_head(list, skb);
-		local_irq_restore(flags);
-
-		return;
-	}
-
-	local_irq_restore(flags);
-	kmem_cache_free(skbuff_head_cache, skb);
-}
-
-
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
  *	'private' fields and also do memory statistics to find all the
  *	[BEEP] leaks.
@@ -174,13 +130,10 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 		might_sleep();
 
 	/* Get the HEAD */
-	skb = skb_head_from_pool();
-	if (!skb) {
-		skb = kmem_cache_alloc(skbuff_head_cache,
-				       gfp_mask & ~__GFP_DMA);
-		if (!skb)
-			goto out;
-	}
+	skb = kmem_cache_alloc(skbuff_head_cache,
+			       gfp_mask & ~__GFP_DMA);
+	if (!skb)
+		goto out;
 
 	/* Get the DATA. Size must match skb_add_mtu(). */
 	size = SKB_DATA_ALIGN(size);
@@ -204,7 +157,7 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 out:
 	return skb;
 nodata:
-	skb_head_to_pool(skb);
+	kmem_cache_free(skbuff_head_cache, skb);
 	skb = NULL;
 	goto out;
 }
@@ -254,7 +207,7 @@ static void skb_release_data(struct sk_buff *skb)
 void kfree_skbmem(struct sk_buff *skb)
 {
 	skb_release_data(skb);
-	skb_head_to_pool(skb);
+	kmem_cache_free(skbuff_head_cache, skb);
 }
 
 /**
@@ -309,13 +262,10 @@ void __kfree_skb(struct sk_buff *skb)
 
 struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 {
-	struct sk_buff *n = skb_head_from_pool();
+	struct sk_buff *n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
 
-	if (!n) {
-		n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
-		if (!n)
-			return NULL;
-	}
+	if (!n) 
+		return NULL;
 
 #define C(x) n->x = skb->x
 
@@ -1204,8 +1154,6 @@ void skb_add_mtu(int mtu)
 
 void __init skb_init(void)
 {
-	int i;
-
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
 					      sizeof(struct sk_buff),
 					      0,
@@ -1213,7 +1161,4 @@ void __init skb_init(void)
 					      NULL, NULL);
 	if (!skbuff_head_cache)
 		panic("cannot create skbuff cache");
-
-	for (i = 0; i < NR_CPUS; i++)
-		skb_queue_head_init(&skb_head_pool[i].list);
 }

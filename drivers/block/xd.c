@@ -57,7 +57,9 @@
 #include "xd.h"
 
 static void __init do_xd_setup (int *integers);
+#ifdef MODULE
 static int xd[5] = { -1,-1,-1,-1, };
+#endif
 
 #define XD_DONT_USE_DMA		0  /* Initial value. may be overriden using
 				      "nodma" module option */
@@ -148,16 +150,18 @@ static struct request_queue xd_queue;
 static int __init xd_init(void)
 {
 	u_char i,controller;
-	u_char count = 0;
 	unsigned int address;
 	int err;
 
 #ifdef MODULE
-	for (i = 4; i > 0; i--)
-		if (((xd[i] = xd[i-1]) >= 0) && !count)
-			count = i;
-	if ((xd[0] = count))
-		do_xd_setup(xd);
+	{
+		u_char count = 0;
+		for (i = 4; i > 0; i--)
+			if (((xd[i] = xd[i-1]) >= 0) && !count)
+				count = i;
+		if ((xd[0] = count))
+			do_xd_setup(xd);
+	}
 #endif
 
 	init_timer (&xd_watchdog_int); xd_watchdog_int.function = xd_watchdog;

@@ -55,10 +55,6 @@
 #include <asm/amigappc.h>
 #endif
 
-extern int cia_request_irq(int irq,
-                           void (*handler)(int, void *, struct pt_regs *),
-                           unsigned long flags, const char *devname, void *dev_id);
-extern void cia_free_irq(unsigned int irq, void *dev_id);
 extern void cia_init_IRQ(struct ciabase *base);
 
 unsigned short ami_intena_vals[AMI_STD_IRQS] = {

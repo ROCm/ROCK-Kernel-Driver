@@ -65,7 +65,6 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/miscdevice.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 
@@ -116,9 +115,10 @@ static struct file_operations microcode_fops = {
 };
 
 static struct miscdevice microcode_dev = {
-	.minor = MICROCODE_MINOR,
-	.name	= "microcode",
-	.fops	= &microcode_fops,
+	.minor		= MICROCODE_MINOR,
+	.name		= "microcode",
+	.devfs_name	= "cpu/microcode",
+	.fops		= &microcode_fops,
 };
 
 static int __init microcode_init(void)
@@ -127,26 +127,17 @@ static int __init microcode_init(void)
 
 	error = misc_register(&microcode_dev);
 	if (error)
-		goto fail;
-	error = devfs_mk_symlink("cpu/microcode", "../misc/microcode");
-	if (error)
-		goto fail_deregister;
+		return error;
 
 	printk(KERN_INFO 
 		"IA-32 Microcode Update Driver: v%s <tigran@veritas.com>\n", 
 		MICROCODE_VERSION);
 	return 0;
-
-fail_deregister:
-	misc_deregister(&microcode_dev);
-fail:
-	return error;
 }
 
 static void __exit microcode_exit(void)
 {
 	misc_deregister(&microcode_dev);
-	devfs_remove("cpu/microcode");
 	kfree(mc_applied);
 	printk(KERN_INFO "IA-32 Microcode Update Driver v%s unregistered\n", 
 			MICROCODE_VERSION);
