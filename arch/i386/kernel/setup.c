@@ -740,6 +740,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
+		else if (!memcmp(from, "noexec=", 7))
+			noexec_setup(from + 7);
+
+
 #ifdef  CONFIG_X86_SMP
 		/*
 		 * If the BIOS enumerates physical processors before logical,

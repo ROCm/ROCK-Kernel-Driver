@@ -50,7 +50,7 @@ Control non executable mappings for 64bit processes.
 on	Enable(default)
 off	Disable
 */ 
-static int __init nonx_setup(char *str)
+void __init nonx_setup(const char *str)
 {
 	if (!strcmp(str, "on")) {
                 __supported_pte_mask |= _PAGE_NX; 
@@ -59,10 +59,7 @@ static int __init nonx_setup(char *str)
 		do_not_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
         } 
-        return 1;
 } 
-
-__setup("noexec=", nonx_setup); 
 
 /*
  * Great future plan:

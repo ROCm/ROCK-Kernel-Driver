@@ -318,6 +318,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from,"oops=panic", 10))
 			panic_on_oops = 1;
 
+		if (!memcmp(from, "noexec=", 7))
+			nonx_setup(from + 7);
+
 	next_char:
 		c = *(from++);
 		if (!c)

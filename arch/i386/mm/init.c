@@ -430,7 +430,7 @@ u64 __supported_pte_mask = ~_PAGE_NX;
  * on      Enable
  * off     Disable
  */
-static int __init noexec_setup(char *str)
+void __init noexec_setup(const char *str)
 {
 	if (!strncmp(str, "on",2) && cpu_has_nx) {
 		__supported_pte_mask |= _PAGE_NX;
@@ -439,10 +439,7 @@ static int __init noexec_setup(char *str)
 		disable_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
 	}
-	return 1;
 }
-
-__setup("noexec=", noexec_setup);
 
 int nx_enabled = 0;
 #ifdef CONFIG_X86_PAE
