@@ -8,7 +8,7 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
-host-progs	:= tools/mkbb tools/objstrip
+hostprogs-y	:= tools/mkbb tools/objstrip
 targets		:= vmlinux.gz vmlinux \
 		   vmlinux.nh tools/lxboot tools/bootlx tools/bootph \
 		   tools/bootpzh bootloader bootpheader bootpzheader 

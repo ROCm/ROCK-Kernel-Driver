@@ -11,8 +11,8 @@
 #                include/config/...
 # docproc:	 Used in Documentation/docbook
 
-host-progs	:= fixdep split-include docproc
-always		:= $(host-progs)
+hostprogs-y	:= fixdep split-include docproc
+always		:= $(hostprogs-y)
 
 # fixdep is needed to compile other host programs
 $(addprefix $(obj)/,$(filter-out fixdep,$(always))): $(obj)/fixdep

@@ -29,7 +29,7 @@ targets		:= vmlinux.bin bootsect bootsect.o setup setup.o \
 		   zImage bzImage
 subdir- 	:= compressed
 
-host-progs	:= tools/build
+hostprogs-y	:= tools/build
 
 HOSTCFLAGS_build.o := $(LINUXINCLUDE)
 

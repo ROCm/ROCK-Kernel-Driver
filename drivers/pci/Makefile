@@ -35,7 +35,7 @@ ifndef CONFIG_X86
 obj-y += syscall.o
 endif
 
-host-progs := gen-devlist
+hostprogs-y := gen-devlist
 
 # Dependencies on generated files need to be listed explicitly
 $(obj)/names.o: $(obj)/devlist.h $(obj)/classlist.h

@@ -13,8 +13,7 @@ hostprogs-$(CONFIG_VT)           += conmakehash
 hostprogs-$(CONFIG_PROM_CONSOLE) += conmakehash
 hostprogs-$(CONFIG_IKCONFIG)     += bin2c
 
-host-progs	:= $(sort $(hostprogs-y))
-always		:= $(host-progs)
+always		:= $(hostprogs-y)
 
 subdir-$(CONFIG_MODVERSIONS) += genksyms
 subdir-$(CONFIG_MODULES)     += mod
