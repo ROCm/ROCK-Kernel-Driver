@@ -31,7 +31,6 @@
 #include <net/protocol.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
-#include <linux/mroute.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
 #include <net/ah.h>
 #endif
@@ -68,13 +67,10 @@ EXPORT_SYMBOL(inet_del_protocol);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(in_aton);
-EXPORT_SYMBOL(inet_addr_type); 
-EXPORT_SYMBOL(ip_dev_find);
 EXPORT_SYMBOL(ip_defrag);
 EXPORT_SYMBOL(inet_peer_idlock);
 
 /* Route manipulation */
-EXPORT_SYMBOL(ip_rt_ioctl);
 
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
