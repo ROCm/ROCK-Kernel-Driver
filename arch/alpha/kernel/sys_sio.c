@@ -77,7 +77,7 @@ alphabook1_init_arch(void)
 static void __init
 sio_pci_route(void)
 {
-	pcibios_write_config_dword(0, PCI_DEVFN(7, 0), 0x60,
+	pci_bus_write_config_dword(pci_isa_hose->bus, PCI_DEVFN(7, 0), 0x60,
 				   alpha_mv.sys.sio.route_tab);
 }
 
