@@ -553,6 +553,24 @@ out:
 	return ret;
 }
 
+void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
+{
+	struct siginfo info;
+
+	tsk->thread.trap_no = 1;
+	tsk->thread.error_code = error_code;
+
+	memset(&info, 0, sizeof(info));
+	info.si_signo = SIGTRAP;
+	info.si_code = TRAP_BRKPT;
+
+	/* User-mode eip? */
+	info.si_addr = user_mode(regs) ? (void __user *) regs->eip : NULL;
+
+	/* Send us the fakey SIGTRAP */
+	force_sig_info(SIGTRAP, &info, tsk);
+}
+
 /* notification of system call entry/exit
  * - triggered by current->work.syscall_trace
  */
@@ -568,15 +586,19 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 			audit_syscall_exit(current, regs->eax);
 	}
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
-	    !test_thread_flag(TIF_SINGLESTEP))
-		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
+
+	/* Fake a debug trap */
+	if (test_thread_flag(TIF_SINGLESTEP))
+		send_sigtrap(current, regs, 0);
+
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
-				 !test_thread_flag(TIF_SINGLESTEP) ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do

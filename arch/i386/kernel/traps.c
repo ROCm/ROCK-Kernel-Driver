@@ -682,7 +682,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
-	siginfo_t info;
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
@@ -723,18 +722,7 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	}
 
 	/* Ok, finally something we can handle */
-	tsk->thread.trap_no = 1;
-	tsk->thread.error_code = error_code;
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	
-	/* If this is a kernel mode trap, save the user PC on entry to 
-	 * the kernel, that's what the debugger can make sense of.
-	 */
-	info.si_addr = ((regs->xcs & 3) == 0) ? (void __user *)tsk->thread.eip
-	                                      : (void __user *)regs->eip;
-	force_sig_info(SIGTRAP, &info, tsk);
+	send_sigtrap(tsk, regs, error_code);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
