@@ -695,7 +695,7 @@ static void register_irq_proc (unsigned int irq)
 	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
 
-	if (!root_irq_dir || (irq_desc[irq].handler == NULL))
+	if (!root_irq_dir || (irq_desc[irq].handler == NULL) || irq_dir[irq])
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
