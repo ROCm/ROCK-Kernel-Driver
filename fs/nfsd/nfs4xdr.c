@@ -1805,73 +1805,62 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	 */
 	bmval0 = cd->rd_bmval[0];
 	bmval1 = cd->rd_bmval[1];
-	if ((bmval0 & ~(FATTR4_WORD0_RDATTR_ERROR)) || bmval1)  {
+
+	dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
+	if (IS_ERR(dentry)) {
+		nfserr = nfserrno(PTR_ERR(dentry));
+		goto error;
+	}
+
+	exp_get(exp);
+	if (d_mountpoint(dentry)) {
+		if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry,
+				 &exp))) {
 		/*
-		 * "Heavyweight" case: we have no choice except to
-		 * call nfsd4_encode_fattr(). 
+		 * -EAGAIN is the only error returned from
+		 * nfsd_cross_mnt() and it indicates that an
+		 * up-call has  been initiated to fill in the export
+		 * options on exp.  When the answer comes back,
+		 * this call will be retried.
 		 */
-		dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
-		if (IS_ERR(dentry)) {
-			nfserr = nfserrno(PTR_ERR(dentry));
+			dput(dentry);
+			exp_put(exp);
+			nfserr = nfserr_dropit;
 			goto error;
 		}
 
-		exp_get(exp);
-		if (d_mountpoint(dentry)) {
-			if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry, 
-					 &exp))) {	
-			/* 
-			 * -EAGAIN is the only error returned from 
-			 * nfsd_cross_mnt() and it indicates that an 
-			 * up-call has  been initiated to fill in the export 
-			 * options on exp.  When the answer comes back,
-			 * this call will be retried.
-			 */
-				dput(dentry);
-				exp_put(exp);
-				nfserr = nfserr_dropit;
-				goto error;
-			}
-
-		}
-
-		nfserr = nfsd4_encode_fattr(NULL, exp,
-				dentry, p, &buflen, cd->rd_bmval,
-				cd->rd_rqstp);
-		dput(dentry);
-		exp_put(exp);
-		if (!nfserr) {
-			p += buflen;
-			goto out;
-		}
-		if (nfserr == nfserr_resource)
-			goto nospc;
-
-error:
-		/*
-		 * If we get here, we experienced a miscellaneous
-		 * failure while writing the attributes.  If the
-		 * client requested the RDATTR_ERROR attribute,
-		 * we stuff the error code into this attribute
-		 * and continue.  If this attribute was not requested,
-		 * then in accordance with the spec, we fail the
-		 * entire READDIR operation(!)
-		 */
-		if (!(bmval0 & FATTR4_WORD0_RDATTR_ERROR)) {
-			cd->common.err = nfserr;
-			return -EINVAL;
-		}
-
-		bmval0 = FATTR4_WORD0_RDATTR_ERROR;
-		bmval1 = 0;
-		/* falling through here will do the right thing... */
 	}
 
+	nfserr = nfsd4_encode_fattr(NULL, exp,
+			dentry, p, &buflen, cd->rd_bmval,
+			cd->rd_rqstp);
+	dput(dentry);
+	exp_put(exp);
+	if (!nfserr) {
+		p += buflen;
+		goto out;
+	}
+	if (nfserr == nfserr_resource)
+		goto nospc;
+
+error:
 	/*
-	 * In the common "lightweight" case, we avoid
-	 * the overhead of nfsd4_encode_fattr() by assembling
-	 * a small fattr by hand.
+	 * If we get here, we experienced a miscellaneous
+	 * failure while writing the attributes.  If the
+	 * client requested the RDATTR_ERROR attribute,
+	 * we stuff the error code into this attribute
+	 * and continue.  If this attribute was not requested,
+	 * then in accordance with the spec, we fail the
+	 * entire READDIR operation(!)
 	 */
+	if (!(bmval0 & FATTR4_WORD0_RDATTR_ERROR)) {
+		cd->common.err = nfserr;
+		return -EINVAL;
+	}
+
+	bmval0 = FATTR4_WORD0_RDATTR_ERROR;
+	bmval1 = 0;
+
 	if (buflen < 6)
 		goto nospc;
 	*p++ = htonl(2);
@@ -1879,8 +1868,7 @@ error:
 	*p++ = htonl(bmval1);
 
 	attrlenp = p++;
-	if (bmval0 & FATTR4_WORD0_RDATTR_ERROR)
-		*p++ = nfserr;       /* no htonl */
+	*p++ = nfserr;       /* no htonl */
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 
 out:
