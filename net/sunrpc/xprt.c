@@ -952,8 +952,10 @@ tcp_state_change(struct sock *sk)
 }
 
 /*
- * The following 2 routines allow a task to sleep while socket memory is
- * low.
+ * Called when more output buffer space is available for this socket.
+ * We try not to wake our writers until they can make "significant"
+ * progress, otherwise we'll waste resources thrashing sock_sendmsg
+ * with a bunch of small requests.
  */
 static void
 xprt_write_space(struct sock *sk)
@@ -967,8 +969,15 @@ xprt_write_space(struct sock *sk)
 		return;
 
 	/* Wait until we have enough socket memory */
-	if (!sock_writeable(sk))
-		return;
+	if (xprt->stream) {
+		/* from net/ipv4/tcp.c:tcp_write_space */
+		if (tcp_wspace(sk) < tcp_min_write_space(sk))
+			return;
+	} else {
+		/* from net/core/sock.c:sock_def_write_space */
+		if (!sock_writeable(sk))
+			return;
+	}
 
 	if (!test_and_clear_bit(SOCK_NOSPACE, &sock->flags))
 		return;
