@@ -461,7 +461,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		next = prev->vm_next;
 		/* next cannot change under us, it's serialized by the mmap_sem */
 		if (next && prev->vm_end == next->vm_start &&
-+ 		    		mpol_equal(prev->vm_policy, next->vm_policy) &&
+		    		mpol_equal(prev->vm_policy, next->vm_policy) &&
 				can_vma_merge_before(prev, next, vm_flags, file,
 					pgoff, (end - addr) >> PAGE_SHIFT)) {
 			/*
