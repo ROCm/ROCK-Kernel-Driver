@@ -1442,6 +1442,8 @@ e1000_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 	case E1000_DEV_ID_82543GC_COPPER:
 	case E1000_DEV_ID_82544EI_FIBER:
 	case E1000_DEV_ID_82546EB_QUAD_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82545EM_COPPER:
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
