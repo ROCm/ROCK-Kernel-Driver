@@ -1313,22 +1313,22 @@ static int hal2_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations hal2_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		hal2_read,
-	write:		hal2_write,
-	poll:		hal2_poll,
-	ioctl:		hal2_ioctl,
-	open:		hal2_open,
-	release:	hal2_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= hal2_read,
+	.write		= hal2_write,
+	.poll		= hal2_poll,
+	.ioctl		= hal2_ioctl,
+	.open		= hal2_open,
+	.release	= hal2_release,
 };
 
 static struct file_operations hal2_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		hal2_ioctl_mixdev,
-	open:		hal2_open_mixdev,
-	release:	hal2_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= hal2_ioctl_mixdev,
+	.open		= hal2_open_mixdev,
+	.release	= hal2_release_mixdev,
 };
 
 static int hal2_request_irq(hal2_card_t *hal2, int irq)

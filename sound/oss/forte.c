@@ -361,11 +361,11 @@ forte_mixer_ioctl (struct inode *inode, struct file *file,
 
 
 static struct file_operations forte_mixer_fops = {
-	owner:	    		THIS_MODULE,
-	llseek:         	no_llseek,
-	ioctl:          	forte_mixer_ioctl,
-	open:           	forte_mixer_open,
-	release:        	forte_mixer_release,
+	.owner			= THIS_MODULE,
+	.llseek         	= no_llseek,
+	.ioctl          	= forte_mixer_ioctl,
+	.open           	= forte_mixer_open,
+	.release        	= forte_mixer_release,
 };
 
 
@@ -1632,15 +1632,15 @@ forte_dsp_read (struct file *file, char *buffer, size_t bytes,
 
 
 static struct file_operations forte_dsp_fops = {
-	owner:			THIS_MODULE,
-	llseek:     		&no_llseek,
-	read:       		&forte_dsp_read,
-	write:      		&forte_dsp_write,
-	poll:       		&forte_dsp_poll,
-	ioctl:      		&forte_dsp_ioctl,
-	open:       		&forte_dsp_open,
-	release:    		&forte_dsp_release,
-	mmap:			&forte_dsp_mmap,
+	.owner			= THIS_MODULE,
+	.llseek     		= &no_llseek,
+	.read       		= &forte_dsp_read,
+	.write      		= &forte_dsp_write,
+	.poll       		= &forte_dsp_poll,
+	.ioctl      		= &forte_dsp_ioctl,
+	.open       		= &forte_dsp_open,
+	.release    		= &forte_dsp_release,
+	.mmap			= &forte_dsp_mmap,
 };
 
 
@@ -2099,10 +2099,10 @@ static struct pci_device_id forte_pci_ids[] = {
 
 
 static struct pci_driver forte_pci_driver = {
-	name:       		DRIVER_NAME,
-	id_table:   		forte_pci_ids,
-	probe:      		forte_probe,
-	remove:     		forte_remove,
+	.name			= DRIVER_NAME,
+	.id_table		= forte_pci_ids,
+	.probe	 		= forte_probe,
+	.remove			= forte_remove,
 
 };
 

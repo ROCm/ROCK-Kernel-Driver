@@ -775,14 +775,14 @@ static int ad1889_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations ad1889_fops = {
-	llseek:         no_llseek,
-	read:           ad1889_read,
-	write:          ad1889_write,
-	poll:           ad1889_poll,
-	ioctl:          ad1889_ioctl,
-	mmap:           ad1889_mmap,
-	open:           ad1889_open,
-	release:        ad1889_release,
+	.llseek		= no_llseek,
+	.read		= ad1889_read,
+	.write		= ad1889_write,
+	.poll		= ad1889_poll,
+	.ioctl		= ad1889_ioctl,
+	.mmap		= ad1889_mmap,
+	.open		= ad1889_open,
+	.release	= ad1889_release,
 };
 
 /************************* /dev/mixer interfaces ************************ */
@@ -810,10 +810,10 @@ static int ad1889_mixer_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations ad1889_mixer_fops = {
-	llseek:         no_llseek,
-	ioctl:		ad1889_mixer_ioctl,
-	open:		ad1889_mixer_open,
-	release:	ad1889_mixer_release,
+	.llseek		= no_llseek,
+	.ioctl		= ad1889_mixer_ioctl,
+	.open		= ad1889_mixer_open,
+	.release	= ad1889_mixer_release,
 };
 
 /************************* AC97 interfaces ****************************** */
@@ -1064,10 +1064,10 @@ MODULE_DESCRIPTION("Analog Devices AD1889 PCI Audio");
 MODULE_LICENSE("GPL");
 
 static struct pci_driver ad1889_driver = {
-	name:		DEVNAME,
-	id_table:	ad1889_id_tbl,
-	probe:		ad1889_probe,
-	remove:		__devexit_p(ad1889_remove),
+	.name		= DEVNAME,
+	.id_table	= ad1889_id_tbl,
+	.probe		= ad1889_probe,
+	.remove		= __devexit_p(ad1889_remove),
 };
 
 static int __init ad1889_init_module(void)
