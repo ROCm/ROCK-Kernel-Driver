@@ -148,6 +148,29 @@ static inline void _raw_read_lock(rwlock_t * lock)
 }
 #endif /* CONFIG_DEBUG_RWLOCK */
 
+static inline int _raw_write_trylock(rwlock_t * lock)
+{
+	long regx;
+	int success;
+
+	__asm__ __volatile__(
+	"1:	ldl_l	%1,%0\n"
+	"	lda	%2,0\n"
+	"	bne	%1,2f\n"
+	"	or	$31,1,%1\n"
+	"	stl_c	%1,%0\n"
+	"	beq	%1,6f\n"
+	"	lda	%2,1\n"
+	"2:	mb\n"
+	".subsection 2\n"
+	"6:	br	1b\n"
+	".previous"
+	: "=m" (*lock), "=&r" (regx), "=&r" (success)
+	: "m" (*lock) : "memory");
+
+	return success;
+}
+
 static inline void _raw_write_unlock(rwlock_t * lock)
 {
 	mb();
