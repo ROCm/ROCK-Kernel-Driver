@@ -440,6 +440,7 @@ islpci_eth_receive(islpci_private *priv)
 			DEBUG(SHOW_ERROR_MESSAGES, "Error allocating skb \n");
 			break;
 		}
+		skb_reserve(skb, (4 - (long) skb->data) & 0x03);
 		/* store the new skb structure pointer */
 		index = index % ISL38XX_CB_RX_QSIZE;
 		priv->data_low_rx[index] = skb;

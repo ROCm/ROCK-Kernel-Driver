@@ -676,6 +676,7 @@ islpci_alloc_memory(islpci_private *priv)
 			skb = NULL;
 			goto out_free;
 		}
+		skb_reserve(skb, (4 - (long) skb->data) & 0x03);
 		/* add the new allocated sk_buff to the buffer array */
 		priv->data_low_rx[counter] = skb;
 
