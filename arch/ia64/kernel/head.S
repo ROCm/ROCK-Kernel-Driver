@@ -154,8 +154,7 @@ start_ap:
 #endif
 	;;
 	tpa r3=r2		// r3 == phys addr of task struct
-	;;
-	shr.u r16=r3,IA64_GRANULE_SHIFT
+	mov r16=-1
 (isBP)	br.cond.dpnt .load_current // BP stack is on region 5 --- no need to map it
 
 	// load mapping for stack (virtaddr in r2, physaddr in r3)
@@ -169,6 +168,7 @@ start_ap:
 	dep r2=-1,r3,61,3	// IMVA of task
 	;;
 	mov r17=rr[r2]
+	shr.u r16=r3,IA64_GRANULE_SHIFT
 	;;
 	dep r17=0,r17,8,24
 	;;
