@@ -27,7 +27,9 @@
 #include <linux/watchdog.h>
 #include <linux/init.h>
 
+#ifdef CONFIG_ARCH_PXA
 #include <asm/arch/pxa-regs.h>
+#endif
 
 #include <asm/hardware.h>
 #include <asm/bitops.h>
