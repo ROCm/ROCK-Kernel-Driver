@@ -8,7 +8,6 @@
 	__vermagic : { *(__vermagic) }                                        \
                                                                               \
 	/* Kernel symbol table */                                             \
-	. = ALIGN(64);                                                        \
 	__start___ksymtab = .;                                                \
 	__ksymtab : { *(__ksymtab) }                                          \
 	__stop___ksymtab = .;                                                 \
@@ -17,6 +16,9 @@
 	__start___gpl_ksymtab = .;                                            \
 	__gpl_ksymtab : { *(__gpl_ksymtab) }                                  \
 	__stop___gpl_ksymtab = .;                                             \
+                                                                              \
+	/* Kernel symbol table: strings */                                    \
+        __ksymtab_strings : { *(__ksymtab_strings) }                          \
                                                                               \
 	/* All kernel symbols */                                              \
 	__start___kallsyms = .;                                               \
