@@ -271,7 +271,7 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 	if (!first)
 		return ERR_PTR(-EFAULT);
 	prev = NULL;
-	for (vma = first; vma->vm_start < end; vma = vma->vm_next) {
+	for (vma = first; vma && vma->vm_start < end; vma = vma->vm_next) {
 		if (!vma->vm_next && vma->vm_end < end)
 			return ERR_PTR(-EFAULT);
 		if (prev && prev->vm_end < vma->vm_start)
@@ -317,7 +317,7 @@ static int mbind_range(struct vm_area_struct *vma, unsigned long start,
 	int err;
 
 	err = 0;
-	for (; vma->vm_start < end; vma = next) {
+	for (; vma && vma->vm_start < end; vma = next) {
 		next = vma->vm_next;
 		if (vma->vm_start < start)
 			err = split_vma(vma->vm_mm, vma, start, 1);
