@@ -121,6 +121,9 @@ struct capability_entry {
 
 static struct capability_entry capability_table[] __initdata = {
 	{ "6330", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "6331", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "6333", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "632A", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
 	{ "6321", CDC_LOCK },
 	{ "632B", 0 },
 	{ NULL  , CDC_LOCK },
