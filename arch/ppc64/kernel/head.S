@@ -193,7 +193,7 @@ _GLOBAL(__secondary_hold)
 	rfid
 
 /*
- * This is the start of the interrupt handlers for i_series
+ * This is the start of the interrupt handlers for iSeries
  * This code runs with relocation on.
  */
 #define EXCEPTION_PROLOG_ISERIES(n)	                                      \
@@ -660,7 +660,7 @@ InstructionAccessSLB_common:
 #else
 	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
 #endif
-	li	r6,0x380
+	li	r6,0x480
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
