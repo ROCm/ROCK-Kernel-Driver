@@ -317,8 +317,7 @@ struct irq_cpu_info {
 
 #define IRQ_ALLOWED(cpu, allowed_mask)	cpu_isset(cpu, allowed_mask)
 
-#define CPU_TO_PACKAGEINDEX(i) \
-		((physical_balance && i > cpu_sibling_map[i]) ? cpu_sibling_map[i] : i)
+#define CPU_TO_PACKAGEINDEX(i) (first_cpu(cpu_sibling_map[i]))
 
 #define MAX_BALANCED_IRQ_INTERVAL	(5*HZ)
 #define MIN_BALANCED_IRQ_INTERVAL	(HZ/2)
@@ -401,6 +400,7 @@ static void do_irq_balance(void)
 	unsigned long max_cpu_irq = 0, min_cpu_irq = (~0);
 	unsigned long move_this_load = 0;
 	int max_loaded = 0, min_loaded = 0;
+	int load;
 	unsigned long useful_load_threshold = balanced_irq_interval + 10;
 	int selected_irq;
 	int tmp_loaded, first_attempt = 1;
@@ -452,7 +452,7 @@ static void do_irq_balance(void)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_online(i))
 			continue;
-		if (physical_balance && i > cpu_sibling_map[i])
+		if (i != CPU_TO_PACKAGEINDEX(i))
 			continue;
 		if (min_cpu_irq > CPU_IRQ(i)) {
 			min_cpu_irq = CPU_IRQ(i);
@@ -471,7 +471,7 @@ tryanothercpu:
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_online(i))
 			continue;
-		if (physical_balance && i > cpu_sibling_map[i])
+		if (i != CPU_TO_PACKAGEINDEX(i))
 			continue;
 		if (max_cpu_irq <= CPU_IRQ(i)) 
 			continue;
@@ -551,9 +551,14 @@ tryanotherirq:
 	 * We seek the least loaded sibling by making the comparison
 	 * (A+B)/2 vs B
 	 */
-	if (physical_balance && (CPU_IRQ(min_loaded) >> 1) >
-					CPU_IRQ(cpu_sibling_map[min_loaded]))
-		min_loaded = cpu_sibling_map[min_loaded];
+	load = CPU_IRQ(min_loaded) >> 1;
+	for_each_cpu_mask(j, cpu_sibling_map[min_loaded]) {
+		if (load > CPU_IRQ(j)) {
+			/* This won't change cpu_sibling_map[min_loaded] */
+			load = CPU_IRQ(j);
+			min_loaded = j;
+		}
+	}
 
 	cpus_and(allowed_mask, cpu_online_map, irq_affinity[selected_irq]);
 	target_cpu_mask = cpumask_of_cpu(min_loaded);

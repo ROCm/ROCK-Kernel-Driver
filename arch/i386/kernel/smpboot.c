@@ -936,7 +936,7 @@ static int boot_cpu_logical_apicid;
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
 void *xquad_portio;
 
-int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
@@ -1081,32 +1081,34 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	Dprintk("Boot done.\n");
 
 	/*
-	 * If Hyper-Threading is avaialble, construct cpu_sibling_map[], so
-	 * that we can tell the sibling CPU efficiently.
+	 * construct cpu_sibling_map[], so that we can tell sibling CPUs
+	 * efficiently.
 	 */
-	if (cpu_has_ht && smp_num_siblings > 1) {
-		for (cpu = 0; cpu < NR_CPUS; cpu++)
-			cpu_sibling_map[cpu] = NO_PROC_ID;
-		
-		for (cpu = 0; cpu < NR_CPUS; cpu++) {
-			int 	i;
-			if (!cpu_isset(cpu, cpu_callout_map))
-				continue;
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		cpu_sibling_map[cpu] = CPU_MASK_NONE;
 
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		int siblings = 0;
+		int i;
+		if (!cpu_isset(cpu, cpu_callout_map))
+			continue;
+
+		if (smp_num_siblings > 1) {
 			for (i = 0; i < NR_CPUS; i++) {
-				if (i == cpu || !cpu_isset(i, cpu_callout_map))
+				if (!cpu_isset(i, cpu_callout_map))
 					continue;
 				if (phys_proc_id[cpu] == phys_proc_id[i]) {
-					cpu_sibling_map[cpu] = i;
-					printk("cpu_sibling_map[%d] = %d\n", cpu, cpu_sibling_map[cpu]);
-					break;
+					siblings++;
+					cpu_set(i, cpu_sibling_map[cpu]);
 				}
 			}
-			if (cpu_sibling_map[cpu] == NO_PROC_ID) {
-				smp_num_siblings = 1;
-				printk(KERN_WARNING "WARNING: No sibling found for CPU %d.\n", cpu);
-			}
+		} else {
+			siblings++;
+			cpu_set(cpu, cpu_sibling_map[cpu]);
 		}
+
+		if (siblings != smp_num_siblings)
+			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
 	}
 
 	smpboot_setup_io_apic();
