@@ -45,6 +45,13 @@ static void ncp_add_dword(struct ncp_server *server, __u32 x)
 	return;
 }
 
+static void ncp_add_be32(struct ncp_server *server, __u32 x)
+{
+	assert_server_locked(server);
+	put_unaligned(cpu_to_be32(x), (__be32 *)(&(server->packet[server->current_size])));
+	server->current_size += 4;
+}
+
 static inline void ncp_add_dword_lh(struct ncp_server *server, __u32 x) {
 	ncp_add_dword(server, cpu_to_le32(x));
 }
@@ -986,7 +993,7 @@ ncp_read_kernel(struct ncp_server *server, const char *file_id,
 	ncp_init_request(server);
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
-	ncp_add_dword(server, htonl(offset));
+	ncp_add_be32(server, offset);
 	ncp_add_word(server, htons(to_read));
 
 	if ((result = ncp_request(server, 72)) != 0) {
@@ -1022,7 +1029,7 @@ ncp_read_bounce(struct ncp_server *server, const char *file_id,
 	ncp_init_request(server);
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
-	ncp_add_dword(server, htonl(offset));
+	ncp_add_be32(server, offset);
 	ncp_add_word(server, htons(to_read));
 	result = ncp_request2(server, 72, bounce, bufsize);
 	ncp_unlock_server(server);
@@ -1055,7 +1062,7 @@ ncp_write_kernel(struct ncp_server *server, const char *file_id,
 	ncp_init_request(server);
 	ncp_add_byte(server, 0);
 	ncp_add_mem(server, file_id, 6);
-	ncp_add_dword(server, htonl(offset));
+	ncp_add_be32(server, offset);
 	ncp_add_word(server, htons(to_write));
 	ncp_add_mem(server, source, to_write);
 	
@@ -1075,8 +1082,8 @@ ncp_LogPhysicalRecord(struct ncp_server *server, const char *file_id,
 	ncp_init_request(server);
 	ncp_add_byte(server, locktype);
 	ncp_add_mem(server, file_id, 6);
-	ncp_add_dword(server, htonl(offset));
-	ncp_add_dword(server, htonl(length));
+	ncp_add_be32(server, offset);
+	ncp_add_be32(server, length);
 	ncp_add_word(server, htons(timeout));
 
 	if ((result = ncp_request(server, 0x1A)) != 0)
@@ -1097,8 +1104,8 @@ ncp_ClearPhysicalRecord(struct ncp_server *server, const char *file_id,
 	ncp_init_request(server);
 	ncp_add_byte(server, 0);	/* who knows... lanalyzer says that */
 	ncp_add_mem(server, file_id, 6);
-	ncp_add_dword(server, htonl(offset));
-	ncp_add_dword(server, htonl(length));
+	ncp_add_be32(server, offset);
+	ncp_add_be32(server, length);
 
 	if ((result = ncp_request(server, 0x1E)) != 0)
 	{
