@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-gpio.c,v 1.3 2004/09/15 16:15:24 kraxel Exp $
+    $Id: bttv-gpio.c,v 1.4 2004/10/13 10:39:00 kraxel Exp $
 
     bttv-gpio.c  --  gpio sub drivers
 
@@ -24,7 +24,7 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
 */
 
 #include <linux/module.h>

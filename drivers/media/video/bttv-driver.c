@@ -1,26 +1,26 @@
 
 /*
-    $Id: bttv-driver.c,v 1.22 2004/10/12 07:33:22 kraxel Exp $
+    $Id: bttv-driver.c,v 1.23 2004/10/13 10:39:00 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
-    
+
     Copyright (C) 1996,97,98 Ralph  Metzler <rjkm@thp.uni-koeln.de>
                            & Marcus Metzler <mocm@thp.uni-koeln.de>
     (c) 1999-2002 Gerd Knorr <kraxel@bytesex.org>
-    
+
     some v4l2 code lines are taken from Justin's bttv2 driver which is
     (c) 2000 Justin Schoeman <justin@suntiger.ee.up.ac.za>
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-    
+
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -195,7 +195,7 @@ const struct bttv_tvnorm bttv_tvnorms[] = {
 		.sheight        = 576,
 		.totalwidth     = 1135,
 		.adelay         = 0x7f,
-		.bdelay         = 0x72, 
+		.bdelay         = 0x72,
 		.iform          = (BT848_IFORM_PAL_BDGHI|BT848_IFORM_XT1),
 		.scaledtwidth   = 1135,
 		.hdelayx1       = 186,
@@ -683,20 +683,20 @@ void free_btres(struct bttv *btv, struct bttv_fh *fh, int bits)
 /* ----------------------------------------------------------------------- */
 /* If Bt848a or Bt849, use PLL for PAL/SECAM and crystal for NTSC          */
 
-/* Frequency = (F_input / PLL_X) * PLL_I.PLL_F/PLL_C 
-   PLL_X = Reference pre-divider (0=1, 1=2) 
+/* Frequency = (F_input / PLL_X) * PLL_I.PLL_F/PLL_C
+   PLL_X = Reference pre-divider (0=1, 1=2)
    PLL_C = Post divider (0=6, 1=4)
-   PLL_I = Integer input 
-   PLL_F = Fractional input 
-   
-   F_input = 28.636363 MHz: 
+   PLL_I = Integer input
+   PLL_F = Fractional input
+
+   F_input = 28.636363 MHz:
    PAL (CLKx2 = 35.46895 MHz): PLL_X = 1, PLL_I = 0x0E, PLL_F = 0xDCF9, PLL_C = 0
 */
 
 static void set_pll_freq(struct bttv *btv, unsigned int fin, unsigned int fout)
 {
         unsigned char fl, fh, fi;
-        
+
         /* prevent overflows */
         fin/=4;
         fout/=4;
@@ -747,7 +747,7 @@ static void set_pll(struct bttv *btv)
 		/*  Let other people run while the PLL stabilizes */
 		vprintk(".");
 		msleep(10);
-		
+
                 if (btread(BT848_DSTATUS) & BT848_DSTATUS_PLOCK) {
 			btwrite(0,BT848_DSTATUS);
                 } else {
@@ -810,7 +810,7 @@ static void bt848_bright(struct bttv *btv, int bright)
 static void bt848_hue(struct bttv *btv, int hue)
 {
 	int value;
-	
+
 	btv->hue = hue;
 
 	/* -128 to 127 */
@@ -821,9 +821,9 @@ static void bt848_hue(struct bttv *btv, int hue)
 static void bt848_contrast(struct bttv *btv, int cont)
 {
 	int value,hibit;
-	
+
 	btv->contrast = cont;
-	
+
 	/* 0-511 */
 	value = (cont  >> 7);
 	hibit = (value >> 6) & 4;
@@ -835,7 +835,7 @@ static void bt848_contrast(struct bttv *btv, int cont)
 static void bt848_sat(struct bttv *btv, int color)
 {
 	int val_u,val_v,hibits;
-	
+
 	btv->saturation = color;
 
 	/* 0-511 for the color */
@@ -977,7 +977,7 @@ static void
 set_input(struct bttv *btv, unsigned int input)
 {
 	unsigned long flags;
-	
+
 	btv->input = input;
 	if (irq_iswitch) {
 		spin_lock_irqsave(&btv->s_lock,flags);
@@ -1022,7 +1022,7 @@ static void init_irqreg(struct bttv *btv)
 static void init_bt848(struct bttv *btv)
 {
 	int val;
-	
+
 	if (bttv_tvcards[btv->c.type].no_video) {
 		/* very basic init only */
 		init_irqreg(btv);
@@ -1039,7 +1039,7 @@ static void init_bt848(struct bttv *btv)
                 BT848_GPIO_DMA_CTL_PLTP1_16|
                 BT848_GPIO_DMA_CTL_PLTP23_16|
                 BT848_GPIO_DMA_CTL_GPINTC|
-                BT848_GPIO_DMA_CTL_GPINTI, 
+                BT848_GPIO_DMA_CTL_GPINTI,
                 BT848_GPIO_DMA_CTL);
 
 	val = btv->opt_chroma_agc ? BT848_SCLOOP_CAGC : 0;
@@ -1091,7 +1091,7 @@ static int get_control(struct bttv *btv, struct v4l2_control *c)
 {
 	struct video_audio va;
 	int i;
-	
+
 	for (i = 0; i < BTTV_CTLS; i++)
 		if (bttv_ctls[i].id == c->id)
 			break;
@@ -1361,7 +1361,7 @@ static int bttv_prepare_buffer(struct bttv *btv, struct bttv_buffer *buf,
 {
 	int redo_dma_risc = 0;
 	int rc;
-	
+
 	/* check settings */
 	if (NULL == fmt)
 		return -EINVAL;
@@ -1381,7 +1381,7 @@ static int bttv_prepare_buffer(struct bttv *btv, struct bttv_buffer *buf,
 		if (0 != buf->vb.baddr  &&  buf->vb.bsize < buf->vb.size)
 			return -EINVAL;
 	}
-	
+
 	/* alloc + fill struct bttv_buffer (if changed) */
 	if (buf->vb.width != width || buf->vb.height != height ||
 	    buf->vb.field != field ||
@@ -1417,7 +1417,7 @@ static int
 buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
 	struct bttv_fh *fh = priv;
-	
+
 	*size = fh->fmt->depth*fh->width*fh->height >> 3;
 	if (0 == *count)
 		*count = gbuffers;
@@ -1503,7 +1503,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 	case VIDIOCGTUNER:
 	{
 		struct video_tuner *v = arg;
-		
+
 		if (UNSET == bttv_tvcards[btv->c.type].tuner)
 			return -EINVAL;
 		if (v->tuner) /* Only tuner 0 */
@@ -1532,7 +1532,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 		up(&btv->lock);
 		return 0;
 	}
-	
+
         case VIDIOCGCHAN:
         {
                 struct video_channel *v = arg;
@@ -1574,7 +1574,6 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 			return 0;
 		}
 
-		bttv_call_i2c_clients(btv,cmd,v);
 		btv->tvnorm = v->norm;
 		set_input(btv,v->channel);
 		up(&btv->lock);
@@ -1615,7 +1614,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 		/* card specific hooks */
 		if (btv->audio_hook)
 			btv->audio_hook(btv,v,1);
-		
+
 		up(&btv->lock);
 		return 0;
 	}
@@ -1625,7 +1624,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 	{
 		struct v4l2_standard *e = arg;
 		unsigned int index = e->index;
-		
+
 		if (index >= BTTV_TVNORMS)
 			return -EINVAL;
 		v4l2_video_std_construct(e, bttv_tvnorms[e->index].v4l2_id,
@@ -1659,7 +1658,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 	case VIDIOC_QUERYSTD:
 	{
 		v4l2_std_id *id = arg;
-		
+
 		if (btread(BT848_DSTATUS) & BT848_DSTATUS_NUML)
 			*id = V4L2_STD_625_50;
 		else
@@ -1671,7 +1670,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 	{
 		struct v4l2_input *i = arg;
 		unsigned int n;
-		
+
 		n = i->index;
 		if (n >= bttv_tvcards[btv->c.type].video_inputs)
 			return -EINVAL;
@@ -1708,7 +1707,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 	case VIDIOC_S_INPUT:
 	{
 		unsigned int *i = arg;
-		
+
 		if (*i > bttv_tvcards[btv->c.type].video_inputs)
 			return -EINVAL;
 		down(&btv->lock);
@@ -1716,7 +1715,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 		up(&btv->lock);
 		return 0;
 	}
-	
+
 	case VIDIOC_G_TUNER:
 	{
 		struct v4l2_tuner *t = arg;
@@ -1812,7 +1811,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 
 	default:
 		return -ENOIOCTLCMD;
-	
+
 	}
 	return 0;
 }
@@ -1907,25 +1906,25 @@ static int setup_window(struct bttv_fh *fh, struct bttv *btv,
 	default:
 		BUG();
 	}
-	
+
 	down(&fh->cap.lock);
 	if (fh->ov.clips)
 		kfree(fh->ov.clips);
 	fh->ov.clips    = clips;
 	fh->ov.nclips   = n;
-	
+
 	fh->ov.w        = win->w;
 	fh->ov.field    = win->field;
 	fh->ov.setup_ok = 1;
 	btv->init.ov.w.width   = win->w.width;
 	btv->init.ov.w.height  = win->w.height;
 	btv->init.ov.field     = win->field;
-	
+
 	/* update overlay if needed */
 	retval = 0;
 	if (check_btres(fh, RESOURCE_OVERLAY)) {
 		struct bttv_buffer *new;
-		
+
 		new = videobuf_alloc(sizeof(*new));
 		bttv_overlay_risc(btv, &fh->ov, fh->ovfmt, new);
 		retval = bttv_switch_overlay(btv,fh,new);
@@ -1939,7 +1938,7 @@ static int setup_window(struct bttv_fh *fh, struct bttv *btv,
 static struct videobuf_queue* bttv_queue(struct bttv_fh *fh)
 {
 	struct videobuf_queue* q = NULL;
-	
+
 	switch (fh->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		q = &fh->cap;
@@ -1956,7 +1955,7 @@ static struct videobuf_queue* bttv_queue(struct bttv_fh *fh)
 static int bttv_resource(struct bttv_fh *fh)
 {
 	int res = 0;
-	
+
 	switch (fh->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		res = RESOURCE_VIDEO;
@@ -2065,7 +2064,7 @@ static int bttv_try_fmt(struct bttv_fh *fh, struct bttv *btv,
 			(f->fmt.pix.width * fmt->depth) >> 3;
 		f->fmt.pix.sizeimage =
 			f->fmt.pix.height * f->fmt.pix.bytesperline;
-		
+
 		return 0;
 	}
 	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
@@ -2083,7 +2082,7 @@ static int bttv_s_fmt(struct bttv_fh *fh, struct bttv *btv,
 		      struct v4l2_format *f)
 {
 	int retval;
-	
+
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 	{
@@ -2096,7 +2095,7 @@ static int bttv_s_fmt(struct bttv_fh *fh, struct bttv *btv,
 		if (0 != retval)
 			return retval;
 		fmt = format_by_fourcc(f->fmt.pix.pixelformat);
-		
+
 		/* update our state informations */
 		down(&fh->cap.lock);
 		fh->fmt              = fmt;
@@ -2108,7 +2107,7 @@ static int bttv_s_fmt(struct bttv_fh *fh, struct bttv *btv,
 		btv->init.width      = f->fmt.pix.width;
 		btv->init.height     = f->fmt.pix.height;
 		up(&fh->cap.lock);
-		
+
 		return 0;
 	}
 	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
@@ -2218,7 +2217,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 	{
 		struct video_picture *pic = arg;
 		const struct bttv_format *fmt;
-		
+
 		fmt = format_by_palette(pic->palette);
 		if (NULL == fmt)
 			return -EINVAL;
@@ -2365,7 +2364,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 
 		if (!check_alloc_btres(btv,fh,RESOURCE_OVERLAY))
 			return -EBUSY;
-		
+
 		down(&fh->cap.lock);
 		if (*on) {
 			fh->ov.tvnorm = btv->tvnorm;
@@ -2419,7 +2418,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 		if (buf->vb.state == STATE_QUEUED ||
 		    buf->vb.state == STATE_ACTIVE)
 			goto fh_unlock_and_return;
-		
+
 		field = (vm->height > bttv_tvnorms[btv->tvnorm].sheight/2)
 			? V4L2_FIELD_INTERLACED
 			: V4L2_FIELD_BOTTOM;
@@ -2543,7 +2542,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 			V4L2_CAP_VIDEO_OVERLAY |
 			V4L2_CAP_VBI_CAPTURE |
 			V4L2_CAP_TUNER |
-			V4L2_CAP_READWRITE | 
+			V4L2_CAP_READWRITE |
 			V4L2_CAP_STREAMING;
 		return 0;
 	}
@@ -2628,7 +2627,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 	{
 		struct v4l2_framebuffer *fb = arg;
 		const struct bttv_format *fmt;
-		
+
 		if(!capable(CAP_SYS_ADMIN) &&
 		   !capable(CAP_SYS_RAWIO))
 			return -EPERM;
@@ -2657,7 +2656,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 			btv->fbuf.fmt.bytesperline = fb->fmt.bytesperline;
 		else
 			btv->fbuf.fmt.bytesperline = btv->fbuf.fmt.width*fmt->depth/8;
-		
+
 		retval = 0;
 		fh->ovfmt = fmt;
 		btv->init.ovfmt = fmt;
@@ -2675,7 +2674,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 
 			if (check_btres(fh, RESOURCE_OVERLAY)) {
 				struct bttv_buffer *new;
-		
+
 				new = videobuf_alloc(sizeof(*new));
 				bttv_overlay_risc(btv,&fh->ov,fh->ovfmt,new);
 				retval = bttv_switch_overlay(btv,fh,new);
@@ -2795,7 +2794,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 	}
 #endif
 
-	
+
 	case VIDIOC_ENUMSTD:
 	case VIDIOC_G_STD:
 	case VIDIOC_S_STD:
@@ -2908,7 +2907,7 @@ static unsigned int bttv_poll(struct file *file, poll_table *wait)
 		up(&fh->cap.lock);
 		buf = (struct bttv_buffer*)fh->cap.read_buf;
 	}
-	
+
 	poll_wait(file, &buf->vb.done, wait);
 	if (buf->vb.state == STATE_DONE ||
 	    buf->vb.state == STATE_ERROR)
@@ -2985,7 +2984,7 @@ static int bttv_release(struct inode *inode, struct file *file)
 	/* turn off overlay */
 	if (check_btres(fh, RESOURCE_OVERLAY))
 		bttv_switch_overlay(btv,fh,NULL);
-	
+
 	/* stop video capture */
 	if (check_btres(fh, RESOURCE_VIDEO)) {
 		videobuf_streamoff(file->private_data,&fh->cap);
@@ -3140,7 +3139,7 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
         case VIDIOCSTUNER:
 		/* nothing to do */
 		return 0;
-	
+
 	case BTTV_VERSION:
         case VIDIOCGFREQ:
         case VIDIOCSFREQ:
@@ -3206,7 +3205,7 @@ static char *irq_name[] = {
 static void bttv_print_irqbits(u32 print, u32 mark)
 {
 	unsigned int i;
-	
+
 	printk("bits:");
 	for (i = 0; i < ARRAY_SIZE(irq_name); i++) {
 		if (print & (1 << i))
@@ -3373,7 +3372,7 @@ static void bttv_irq_timeout(unsigned long data)
 	struct bttv_buffer *ovbi;
 	struct bttv_buffer *item;
 	unsigned long flags;
-	
+
 	if (bttv_verbose) {
 		printk(KERN_INFO "bttv%d: timeout: drop=%d irq=%d/%d, risc=%08x, ",
 		       btv->c.nr, btv->framedrop, btv->irq_me, btv->irq_total,
@@ -3383,7 +3382,7 @@ static void bttv_irq_timeout(unsigned long data)
 	}
 
 	spin_lock_irqsave(&btv->s_lock,flags);
-	
+
 	/* deactivate stuff */
 	memset(&new,0,sizeof(new));
 	old  = btv->curr;
@@ -3412,7 +3411,7 @@ static void bttv_irq_timeout(unsigned long data)
 		item->vb.state = STATE_ERROR;
 		wake_up(&item->vb.done);
 	}
-	
+
 	btv->errors++;
 	spin_unlock_irqrestore(&btv->s_lock,flags);
 }
@@ -3466,7 +3465,7 @@ bttv_irq_switch_video(struct bttv *btv)
 		spin_unlock(&btv->s_lock);
 		return;
 	}
-	
+
 	/* switch over */
 	old = btv->curr;
 	btv->curr = new;
@@ -3558,7 +3557,7 @@ static irqreturn_t bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
 			printk("\n");
 		}
 
-		if (astat&BT848_INT_VSYNC) 
+		if (astat&BT848_INT_VSYNC)
                         btv->field_count++;
 
 		if (astat & BT848_INT_GPINT) {
@@ -3603,7 +3602,7 @@ static irqreturn_t bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
 		count++;
 		if (count > 4) {
 			btwrite(0, BT848_INT_MASK);
-			printk(KERN_ERR 
+			printk(KERN_ERR
 			       "bttv%d: IRQ lockup, cleared int mask [", btv->c.nr);
 			bttv_print_irqbits(stat,astat);
 			printk("]\n");
@@ -3711,9 +3710,9 @@ static void pci_set_command(struct pci_dev *dev)
 {
 #if defined(__powerpc__)
         unsigned int cmd;
-	
+
         pci_read_config_dword(dev, PCI_COMMAND, &cmd);
-        cmd = (cmd | PCI_COMMAND_MEMORY ); 
+        cmd = (cmd | PCI_COMMAND_MEMORY );
         pci_write_config_dword(dev, PCI_COMMAND, cmd);
 #endif
 }
@@ -3750,14 +3749,14 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 	init_timer(&btv->timeout);
 	btv->timeout.function = bttv_irq_timeout;
 	btv->timeout.data     = (unsigned long)btv;
-	
+
         btv->i2c_rc = -1;
         btv->tuner_type  = UNSET;
         btv->pinnacle_id = UNSET;
 	btv->new_input   = UNSET;
 	btv->gpioirq     = 1;
 	btv->has_radio=radio[btv->c.nr];
-	
+
 	/* pci stuff (init, get irq/mmio, ... */
 	btv->c.pci = dev;
         btv->id  = dev->device;
@@ -3794,7 +3793,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
         printk("irq: %d, latency: %d, mmio: 0x%lx\n",
 	       btv->c.pci->irq, lat, pci_resource_start(dev,0));
 	schedule();
-	
+
 	btv->bt848_mmio=ioremap(pci_resource_start(dev,0), 0x1000);
 	if (NULL == ioremap(pci_resource_start(dev,0), 0x1000)) {
 		printk("bttv%d: ioremap() failed\n", btv->c.nr);
@@ -3829,7 +3828,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 	btv->opt_vcr_hack   = vcr_hack;
 	btv->opt_whitecrush_upper  = whitecrush_upper;
 	btv->opt_whitecrush_lower  = whitecrush_lower;
-	
+
 	/* fill struct bttv with some useful defaults */
 	btv->init.btv         = btv;
 	btv->init.ov.w.width  = 320;
@@ -3886,7 +3885,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 
  fail2:
         free_irq(btv->c.pci->irq,btv);
-	
+
  fail1:
 	if (btv->bt848_mmio)
 		iounmap(btv->bt848_mmio);
@@ -3915,7 +3914,7 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
 	btv->shutdown=1;
 	wake_up(&btv->gpioq);
 	bttv_sub_del_devices(&btv->c);
-	
+
         /* unregister i2c_bus + input */
 	fini_bttv_i2c(btv);
 
