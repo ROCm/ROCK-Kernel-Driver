@@ -609,15 +609,6 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 	}
 }
 
-static inline unsigned long computeHugeHptePP(unsigned int hugepte)
-{
-	unsigned long flags = 0x2;
-
-	if (! (hugepte & _HUGEPAGE_RW))
-		flags |= 0x1;
-	return flags;
-}
-
 int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		   unsigned long ea, unsigned long vsid, int local)
 {
@@ -671,7 +662,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	old_pte = *ptep;
 	new_pte = old_pte;
 
-	hpteflags = computeHugeHptePP(hugepte_val(new_pte));
+	hpteflags = 0x2 | (! (hugepte_val(new_pte) & _HUGEPAGE_RW));
 
 	/* Check if pte already has an hpte (case 2) */
 	if (unlikely(hugepte_val(old_pte) & _HUGEPAGE_HASHPTE)) {
