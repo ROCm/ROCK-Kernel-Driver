@@ -391,6 +391,14 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0x9999,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
 
+/* Reported by Hanno Boeck <hanno@gmx.de>
+ * Taken from the Lycoris Kernel */
+UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
+		"Vivitar",
+		"Vivicam 35Xx",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
+
 UNUSUAL_DEV(  0x0644, 0x0000, 0x0100, 0x0100, 
 		"TEAC",
 		"Floppy Drive",
