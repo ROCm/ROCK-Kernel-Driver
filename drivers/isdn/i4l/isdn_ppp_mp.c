@@ -27,20 +27,21 @@
 int
 ippp_mp_bind(isdn_net_dev *idev)
 {
-	isdn_net_local *lp = idev->mlp;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 
 	/* seq no last seen, maybe set to bundle min, when joining? */
-	idev->mp_rxseq = 0;
+	ind_ppp->mp_rxseq = 0;
 
-	if (!list_empty(&lp->online))
+	if (!list_empty(&idev->mlp->online))
 		return 0;
 
 	/* first channel for this link, do some setup */
 
-	lp->mp_cfg   = 0;        /* MPPP configuration */
-	lp->mp_txseq = 0;        /* MPPP tx sequence number */
-	lp->mp_rxseq = (u32) -1;
-	skb_queue_head_init(&lp->mp_frags);
+	inl_ppp->mp_cfg   = 0;        /* MPPP configuration */
+	inl_ppp->mp_txseq = 0;        /* MPPP tx sequence number */
+	inl_ppp->mp_rxseq = (u32) -1;
+	skb_queue_head_init(&inl_ppp->mp_frags);
 
 	return 0;
 }
@@ -51,6 +52,7 @@ ippp_mp_bundle(isdn_net_dev *idev, int unit)
 	isdn_net_local *lp = idev->mlp;
 	char ifn[IFNAMSIZ + 1];
 	isdn_net_dev *n_idev;
+	struct ind_ppp *ind_ppp;
 
 	printk(KERN_DEBUG "%s: %s: slave unit: %d\n",
 	       __FUNCTION__, idev->name, unit);
@@ -65,11 +67,12 @@ ippp_mp_bundle(isdn_net_dev *idev, int unit)
 	return -ENODEV;
 
  found:
-	if (!n_idev->ipppd) {
+	ind_ppp = n_idev->ind_priv;
+	if (!ind_ppp->ipppd) {
 		printk(KERN_INFO "%s: no ipppd?\n", __FUNCTION__);
 		return -ENXIO;
 	}
-	n_idev->pppcfg |= SC_ENABLE_IP;
+	ind_ppp->pppcfg |= SC_ENABLE_IP;
 	isdn_net_online(n_idev);
 
 	return 0;
@@ -78,32 +81,33 @@ ippp_mp_bundle(isdn_net_dev *idev, int unit)
 void
 ippp_mp_disconnected(isdn_net_dev *idev)
 {
-	isdn_net_local *lp = idev->mlp;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 
-	if (!list_empty(&lp->online))
+	if (!list_empty(&idev->mlp->online))
 		return;
 
 	/* we're the last link going down */
-	skb_queue_purge(&lp->mp_frags);
+	skb_queue_purge(&inl_ppp->mp_frags);
 }
 
 void
 ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
-	isdn_net_local *lp = idev->mlp;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 	unsigned char *p;
 	long txseq;
 
-	if (!(lp->mp_cfg & SC_MP_PROT)) {
+	if (!(inl_ppp->mp_cfg & SC_MP_PROT)) {
 		return ippp_xmit(idev, skb);
 	}
 
 	/* we could do something smarter than just sending
 	 * the complete packet as fragment... */
 
-	txseq = lp->mp_txseq++;
+	txseq = inl_ppp->mp_txseq++;
 	
-	if (lp->mp_cfg & SC_OUT_SHORT_SEQ) {
+	if (inl_ppp->mp_cfg & SC_OUT_SHORT_SEQ) {
 		/* sequence number: 12bit */
 		p = skb_push(skb, 2);
 		p[0] = MP_BEGIN_FRAG | MP_END_FRAG | ((txseq >> 8) & 0xf);
@@ -117,8 +121,8 @@ ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 		p[3] = (txseq >>  0) & 0xff;
 	}
 	proto = PPP_MP;
-	skb = ippp_ccp_compress(idev->ccp, skb, &proto);
-	ippp_push_proto(idev, skb, proto);
+	skb = ippp_ccp_compress(ind_ppp->ccp, skb, &proto);
+	ippp_push_proto(ind_ppp, skb, proto);
 	ippp_xmit(idev, skb);
 }
 
@@ -127,12 +131,13 @@ static void mp_receive(isdn_net_dev *idev, struct sk_buff *skb);
 void
 ippp_mp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
-	isdn_net_local *lp = idev->mlp;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 
- 	if (lp->mp_cfg & SC_REJ_MP_PROT)
+ 	if (inl_ppp->mp_cfg & SC_REJ_MP_PROT)
 		goto out;
 
-	skb = ippp_ccp_decompress(idev->ccp, skb, &proto);
+	skb = ippp_ccp_decompress(ind_ppp->ccp, skb, &proto);
 	if (!skb)
 		goto drop;
 
@@ -143,7 +148,7 @@ ippp_mp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 	return ippp_receive(idev, skb, proto);
 
  drop:
-	lp->stats.rx_errors++;
+	idev->mlp->stats.rx_errors++;
 	kfree_skb(skb);
 }
 
@@ -257,9 +262,10 @@ mp_complete_seq(isdn_net_local *lp, struct sk_buff *b, struct sk_buff *e)
 struct sk_buff *
 mp_reassemble(isdn_net_local *lp)
 {
-	struct sk_buff_head *frags = &lp->mp_frags;
+	struct inl_ppp *inl_ppp = lp->inl_priv;
+	struct sk_buff_head *frags = &inl_ppp->mp_frags;
 	struct sk_buff *p, *n, *pp, *start;
-	u32 min_seq = lp->mp_rxseq;
+	u32 min_seq = inl_ppp->mp_rxseq;
 	u32 next_seq = 0;
 
  again:
@@ -307,32 +313,35 @@ static void
 mp_receive(isdn_net_dev *idev, struct sk_buff *skb)
 {
 	isdn_net_local *lp = idev->mlp;
+	struct inl_ppp *inl_ppp = lp->inl_priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
 	isdn_net_dev *qdev;
-	struct sk_buff_head *frags = &lp->mp_frags;
+	struct sk_buff_head *frags = &inl_ppp->mp_frags;
 	u32 seq;
 	u16 proto;
 
 	print_recv_pkt(-1, skb);
 
-	if (skb->len < (lp->mp_cfg & SC_IN_SHORT_SEQ ? 2 : 4))
+	if (skb->len < (inl_ppp->mp_cfg & SC_IN_SHORT_SEQ ? 2 : 4))
 		goto drop;
 
-	seq = get_seq(skb, idev->mp_rxseq, lp->mp_cfg & SC_IN_SHORT_SEQ);
-	idev->mp_rxseq = seq;
+	seq = get_seq(skb, ind_ppp->mp_rxseq, inl_ppp->mp_cfg & SC_IN_SHORT_SEQ);
+	ind_ppp->mp_rxseq = seq;
 
-	if (lp->mp_rxseq == (u32) -1) { 
+	if (inl_ppp->mp_rxseq == (u32) -1) { 
 		/* first packet */
-		lp->mp_rxseq = seq;
+		inl_ppp->mp_rxseq = seq;
 	}
-	if (MP_LT(seq, lp->mp_rxseq)) {
+	if (MP_LT(seq, inl_ppp->mp_rxseq)) {
 		goto drop;
 	}
 	/* Find the minimum sequence number received over all channels.
 	 * No fragments with numbers lower than this will arrive later. */
-	lp->mp_rxseq = seq;
+	inl_ppp->mp_rxseq = seq;
 	list_for_each_entry(qdev, &lp->online, online) {
-		if (MP_LT(qdev->mp_rxseq, lp->mp_rxseq))
-			lp->mp_rxseq = qdev->mp_rxseq;
+		struct ind_ppp *ind_ppp = qdev->ind_priv;
+		if (MP_LT(ind_ppp->mp_rxseq, inl_ppp->mp_rxseq))
+			inl_ppp->mp_rxseq = ind_ppp->mp_rxseq;
 	}
 
 	/* Insert the skb into the list of received fragments, ordered by

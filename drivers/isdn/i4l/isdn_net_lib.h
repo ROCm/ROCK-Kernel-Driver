@@ -83,20 +83,15 @@ struct isdn_net_phone {
 	char num[ISDN_MSNLEN];
 };
 
-/*
-   Principles when extending structures for generic encapsulation protocol
-   ("concap") support:
-   - Stuff which is hardware specific (here i4l-specific) goes in 
-     the netdev -> local structure (here: isdn_net_local)
-   - Stuff which is encapsulation protocol specific goes in the structure
-     which holds the linux device structure (here: isdn_net_device)
-*/
-
 /* per network interface data (dev->priv) */
 
 struct isdn_net_local_s {
   ulong                  magic;
+  struct net_device      dev;          /* interface to upper levels        */
   struct net_device_stats stats;       /* Ethernet Statistics              */
+  struct isdn_netif_ops *ops;
+  void                  *inl_priv;     /* interface types can put their
+					  private data here                */
   int                    flags;        /* Connection-flags                 */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int	        	 dialtimeout;  /* How long shall we try on dialing */
@@ -134,25 +129,6 @@ struct isdn_net_local_s {
   struct list_head       running_devs; /* member of global running_devs    */
   atomic_t               refcnt;       /* references held by ISDN code     */
 
-#ifdef CONFIG_ISDN_PPP
-  unsigned int           mp_cfg;
-  u32                    mp_txseq;
-  struct sk_buff_head    mp_frags;     /* fragments sl list */
-  u32                    mp_rxseq;     /* last processed packet seq #: any 
-					  packets with smaller seq # will 
-					  be dropped unconditionally       */
-  struct ippp_ccp        *ccp;
-  unsigned long          debug;
-#ifdef CONFIG_ISDN_PPP_VJ
-  unsigned char         *cbuf;
-  struct slcompress     *slcomp;
-#endif
-#endif
-  void                  *inl_priv;      /* interface types can put their
-					   private data here               */
-  struct isdn_netif_ops  *ops;
-
-  struct net_device       dev;          /* interface to upper levels        */
 };
 
 
@@ -184,7 +160,6 @@ struct isdn_net_dev_s {
   int                    chargeint;    /* Interval between charge-infos    */
 
   int                    pppbind;      /* ippp device for bindings         */
-  struct ipppd          *ipppd;        /* /dev/ipppX which controls us     */
 
   struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
 	                               /* be transmitted asap              */
@@ -199,12 +174,6 @@ struct isdn_net_dev_s {
 
   char                   name[10];     /* Name of device                   */
   struct list_head       global_list;  /* global list of all isdn_net_devs */
-#ifdef CONFIG_ISDN_PPP
-  unsigned int           pppcfg;
-  u32                    mp_rxseq;     /* last seq no seen on this channel */
-  struct ippp_ccp        *ccp;
-  unsigned long          debug;
-#endif
   void                  *ind_priv;     /* interface types can put their
 					  private data here                */
 };

@@ -212,6 +212,8 @@ static ssize_t
 ipppd_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
 	isdn_net_dev *idev;
+	struct inl_ppp *inl_ppp;
+	struct ind_ppp *ind_ppp;
 	struct ipppd *ipppd;
 	struct sk_buff *skb;
 	char *p;
@@ -235,6 +237,8 @@ ipppd_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		retval = -ENODEV;
 		goto out;
 	}
+	ind_ppp = idev->ind_priv;
+	inl_ppp = idev->mlp->inl_priv;
 	/* Daemon needs to send at least full header, AC + proto */
 	if (count < 4) {
 		retval = -EMSGSIZE;
@@ -259,10 +263,10 @@ ipppd_write(struct file *file, const char *buf, size_t count, loff_t *off)
 	/* Keeps CCP/compression states in sync */
 	switch (proto) {
 	case PPP_CCP:
-		ippp_ccp_send_ccp(idev->mlp->ccp, skb);
+		ippp_ccp_send_ccp(inl_ppp->ccp, skb);
 		break;
 	case PPP_CCPFRAG:
-		ippp_ccp_send_ccp(idev->ccp, skb);
+		ippp_ccp_send_ccp(ind_ppp->ccp, skb);
 		break;
 	}
 	/* FIXME: Somewhere we need protection against the
@@ -334,6 +338,8 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 	    unsigned long arg)
 {
 	isdn_net_dev *idev;
+	struct ind_ppp *ind_ppp = NULL;
+	struct inl_ppp *inl_ppp = NULL;
 	unsigned long val;
 	int r;
 	struct ipppd *is;
@@ -346,7 +352,10 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 
 	// FIXME that needs locking?
 	idev = is->idev;
-
+	if (idev) {
+		ind_ppp = idev->ind_priv;
+		inl_ppp = idev->mlp->inl_priv;
+	}
 	switch (cmd) {
 	case PPPIOCGUNIT:	/* get ppp/isdn unit number */
 		r = set_arg(arg, &is->unit, sizeof(is->unit));
@@ -360,8 +369,8 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 			break;
 		is->debug = val;
 		if (idev) {
-			idev->debug = val;
-			idev->mlp->debug = val;
+			ind_ppp->debug = val;
+			inl_ppp->debug = val;
 		}
 		break;
 	case PPPIOCGCOMPRESSORS:
@@ -396,29 +405,29 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 		r = set_arg(arg, idev->name, strlen(idev->name)+1);
 		break;
 	case PPPIOCGMPFLAGS:	/* get configuration flags */
-		r = set_arg(arg, &idev->mlp->mp_cfg, sizeof(idev->mlp->mp_cfg));
+		r = set_arg(arg, &inl_ppp->mp_cfg, sizeof(inl_ppp->mp_cfg));
 		break;
 	case PPPIOCSMPFLAGS:	/* set configuration flags */
 		r = get_arg(arg, &val, sizeof(val));
 		if (r)
 			break;
-		idev->mlp->mp_cfg = val;
+		inl_ppp->mp_cfg = val;
 		break;
 	case PPPIOCGFLAGS:	/* get configuration flags */
-		cfg = idev->pppcfg | ippp_ccp_get_flags(idev->ccp);
+		cfg = ind_ppp->pppcfg | ippp_ccp_get_flags(ind_ppp->ccp);
 		r = set_arg(arg, &cfg, sizeof(cfg));
 		break;
 	case PPPIOCSFLAGS:	/* set configuration flags */
 		r = get_arg(arg, &val, sizeof(val));
 		if (r)
 			break;
-		if ((val & SC_ENABLE_IP) && !(idev->pppcfg & SC_ENABLE_IP)) {
-			idev->pppcfg = val;
+		if ((val & SC_ENABLE_IP) && !(ind_ppp->pppcfg & SC_ENABLE_IP)) {
+			ind_ppp->pppcfg = val;
 			/* OK .. we are ready to send buffers */
 			isdn_net_online(idev);
 			break;
 		}
-		idev->pppcfg = val;
+		ind_ppp->pppcfg = val;
 		break;
 	case PPPIOCGIDLE:	/* get idle time information */
 	{
@@ -431,7 +440,7 @@ ipppd_ioctl(struct inode *ino, struct file *file, unsigned int cmd,
 		r = get_arg(arg, &val, sizeof(val));
 		if (r)
 			break;
-		r = ippp_ccp_set_mru(idev->ccp, val);
+		r = ippp_ccp_set_mru(ind_ppp->ccp, val);
 		break;
 	case PPPIOCSMPMRU:
 		break;
@@ -580,13 +589,13 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
 }
 
 void
-ippp_push_proto(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+ippp_push_proto(struct ind_ppp *ind_ppp, struct sk_buff *skb, u16 proto)
 {
 	if (skb_headroom(skb) < 2) {
 		isdn_BUG();
 		return;
 	}
-	if ((idev->pppcfg & SC_COMP_PROT) && proto <= 0xff)
+	if ((ind_ppp->pppcfg & SC_COMP_PROT) && proto <= 0xff)
 		put_u8(skb_push(skb, 1), proto);
 	else
 		put_u16(skb_push(skb, 2), proto);
@@ -594,7 +603,7 @@ ippp_push_proto(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 }
 
 static void
-ippp_push_ac(isdn_net_dev *idev, struct sk_buff *skb)
+ippp_push_ac(struct ind_ppp *ind_ppp, struct sk_buff *skb)
 {
 	unsigned char *p;
 
@@ -602,7 +611,7 @@ ippp_push_ac(isdn_net_dev *idev, struct sk_buff *skb)
 		isdn_BUG();
 		return;
 	}
-	if (idev->pppcfg & SC_COMP_AC)
+	if (ind_ppp->pppcfg & SC_COMP_AC)
 		return;
 
 	p = skb_push(skb, 2);	
@@ -618,13 +627,13 @@ ippp_push_ac(isdn_net_dev *idev, struct sk_buff *skb)
 static void
 isdn_ppp_unbind(isdn_net_dev *idev)
 {
-	struct ipppd *is = idev->ipppd;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct ipppd *is = ind_ppp->ipppd;
 	
 	if (!is) {
 		isdn_BUG();
 		return;
 	}
-
 	ipppd_debug(is, "");
 
 	if (is->state != IPPPD_ST_ASSIGNED)
@@ -633,12 +642,15 @@ isdn_ppp_unbind(isdn_net_dev *idev)
 	is->state = IPPPD_ST_OPEN;
 
 	/* is->idev will be invalid shortly */
-	ippp_ccp_free(idev->ccp);
+	ippp_ccp_free(ind_ppp->ccp);
 
 	is->idev = NULL;
 	/* lose the reference we took on isdn_ppp_bind */
 	ipppd_put(is); 
-	idev->ipppd = NULL;
+	ind_ppp->ipppd = NULL;
+
+	kfree(ind_ppp);
+	idev->ind_priv = NULL;
 
 	return;
 }
@@ -649,15 +661,19 @@ isdn_ppp_unbind(isdn_net_dev *idev)
 int
 isdn_ppp_bind(isdn_net_dev *idev)
 {
+	struct ind_ppp *ind_ppp;
 	int unit = 0;
 	unsigned long flags;
 	int retval = 0;
 	struct ipppd *ipppd;
 
-	if (idev->ipppd) {
+	if (idev->ind_priv) {
 		isdn_BUG();
-		return 0;
+		return -EIO;
 	}
+	ind_ppp = kmalloc(sizeof(struct ind_ppp), GFP_KERNEL);
+	if (!ind_ppp)
+		return -ENOMEM;
 
 	spin_lock_irqsave(&ipppds_lock, flags);
 	if (idev->pppbind < 0) {  /* device bound to ippp device ? */
@@ -709,21 +725,22 @@ isdn_ppp_bind(isdn_net_dev *idev)
 	ipppd->state = IPPPD_ST_ASSIGNED;
 	ipppd->idev = idev;
 	/* we hold a reference until isdn_ppp_unbind() */
-	idev->ipppd = ipppd_get(ipppd);
+	ipppd_get(ipppd);
 	spin_unlock_irqrestore(&ipppds_lock, flags);
 
-	idev->pppcfg = 0;         /* config flags */
-
-	idev->ccp = ippp_ccp_alloc();
-	if (!idev->ccp) {
+	idev->ind_priv = ind_ppp;
+	ind_ppp->pppcfg = 0;         /* config flags */
+	ind_ppp->ipppd = ipppd;
+	ind_ppp->ccp = ippp_ccp_alloc();
+	if (!ind_ppp->ccp) {
 		retval = -ENOMEM;
 		goto out;
 	}
-	idev->ccp->proto       = PPP_COMPFRAG;
-	idev->ccp->priv        = idev;
-	idev->ccp->alloc_skb   = isdn_ppp_dev_alloc_skb;
-	idev->ccp->xmit        = isdn_ppp_dev_xmit;
-	idev->ccp->kick_up     = isdn_ppp_dev_kick_up;
+	ind_ppp->ccp->proto       = PPP_COMPFRAG;
+	ind_ppp->ccp->priv        = idev;
+	ind_ppp->ccp->alloc_skb   = isdn_ppp_dev_alloc_skb;
+	ind_ppp->ccp->xmit        = isdn_ppp_dev_xmit;
+	ind_ppp->ccp->kick_up     = isdn_ppp_dev_kick_up;
 
 	retval = ippp_mp_bind(idev);
 	if (retval)
@@ -732,13 +749,16 @@ isdn_ppp_bind(isdn_net_dev *idev)
 	return 0;
 
  out:
-	idev->ipppd->state = IPPPD_ST_OPEN;
-	ipppd_put(idev->ipppd);
-	idev->ipppd = NULL;
+	ipppd->state = IPPPD_ST_OPEN;
+	ipppd_put(ipppd);
+	ind_ppp->ipppd = NULL;
+	kfree(ind_ppp);
+	idev->ind_priv = NULL;
 	return retval;
 
  err:
 	spin_unlock_irqrestore(&ipppds_lock, flags);
+	kfree(ind_ppp);
 	return retval;
 }
 
@@ -750,7 +770,8 @@ isdn_ppp_bind(isdn_net_dev *idev)
 static void
 isdn_ppp_connected(isdn_net_dev *idev)
 {
-	struct ipppd *ipppd = idev->ipppd;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct ipppd *ipppd = ind_ppp->ipppd;
 
 	ipppd_debug(ipppd, "");
 
@@ -762,11 +783,12 @@ isdn_ppp_connected(isdn_net_dev *idev)
 static void
 isdn_ppp_disconnected(isdn_net_dev *idev)
 {
-	struct ipppd *ipppd = idev->ipppd;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct ipppd *ipppd = ind_ppp->ipppd;
 
 	ipppd_debug(ipppd, "");
 
-	if (idev->pppcfg & SC_ENABLE_IP)
+	if (ind_ppp->pppcfg & SC_ENABLE_IP)
 		isdn_net_offline(idev);
 
 	if (ipppd->state != IPPPD_ST_CONNECTED)
@@ -799,7 +821,7 @@ isdn_ppp_cleanup(void)
  * retval != 0 -> discard packet silently
  */
 static int
-isdn_ppp_skip_ac(isdn_net_dev *idev, struct sk_buff *skb) 
+isdn_ppp_skip_ac(struct ind_ppp *ind_ppp, struct sk_buff *skb) 
 {
 	u8 val;
 
@@ -810,7 +832,7 @@ isdn_ppp_skip_ac(isdn_net_dev *idev, struct sk_buff *skb)
 	if (val != PPP_ALLSTATIONS) {
 		/* if AC compression was not negotiated, but no AC present,
 		   discard packet */
-		if (idev->pppcfg & SC_REJ_COMP_AC)
+		if (ind_ppp->pppcfg & SC_REJ_COMP_AC)
 			return -EINVAL;
 
 		return 0;
@@ -859,10 +881,10 @@ isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto)
 static void
 isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev, struct sk_buff *skb)
 {
-	struct ipppd *is;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct ipppd *is = ind_ppp->ipppd;
 	u16 proto;
 
-	is = idev->ipppd;
 	if (!is) 
 		goto err;
 
@@ -872,7 +894,7 @@ isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev, struct sk_buff *skb)
 		isdn_ppp_frame_log("receive", skb->data, skb->len, 32,is->unit,-1);
 	}
 
- 	if (isdn_ppp_skip_ac(idev, skb) < 0)
+ 	if (isdn_ppp_skip_ac(ind_ppp, skb) < 0)
 		goto err;
 
   	if (isdn_ppp_strip_proto(skb, &proto))
@@ -887,22 +909,22 @@ isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev, struct sk_buff *skb)
 }
 
 /*
- * we receive a reassembled frame, MPPP has been taken care of before.
  * address/control and protocol have been stripped from the skb
- * note: net_dev has to be master net_dev
  */
 void
 ippp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_local *lp = idev->mlp;
- 	struct ipppd *is = idev->ipppd;
+	struct inl_ppp *inl_ppp = lp->inl_priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+ 	struct ipppd *is = ind_ppp->ipppd;
 
 	if (is->debug & 0x10) {
 		printk(KERN_DEBUG "push, skb %d %04x\n", (int) skb->len, proto);
 		isdn_ppp_frame_log("rpush", skb->data, skb->len, 256, is->unit, -1);
 	}
 	/* all packets need to be passed through the compressor */
-	skb = ippp_ccp_decompress(lp->ccp, skb, &proto);
+	skb = ippp_ccp_decompress(inl_ppp->ccp, skb, &proto);
 	if (!skb) /* decompression error */
 		goto error;
 
@@ -926,10 +948,10 @@ ippp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 			ippp_vj_decompress(idev, skb, proto);
 			break;
 		case PPP_CCPFRAG:
-			ippp_ccp_receive_ccp(idev->ccp, skb);
+			ippp_ccp_receive_ccp(ind_ppp->ccp, skb);
 			goto ccp;
 		case PPP_CCP:
-			ippp_ccp_receive_ccp(lp->ccp, skb);
+			ippp_ccp_receive_ccp(inl_ppp->ccp, skb);
 	ccp:
 			/* Dont pop up ResetReq/Ack stuff to the daemon any
 			   longer - the job is done already */
@@ -966,6 +988,8 @@ static int
 isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	isdn_net_local *mlp = ndev->priv;
+	struct inl_ppp *inl_ppp = mlp->inl_priv;
+	struct ind_ppp *ind_ppp;
 	isdn_net_dev *idev = list_entry(mlp->online.next, isdn_net_dev, online);
 	u16 proto = PPP_IP;     /* 0x21 */
 	struct ipppd *ipppd;
@@ -993,11 +1017,12 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		printk(KERN_INFO "%s: IP frame delayed.\n", ndev->name);
 		goto stop;
 	}
-	if (!(idev->pppcfg & SC_ENABLE_IP)) {	/* PPP connected ? */
+	ind_ppp = idev->ind_priv;
+	if (!(ind_ppp->pppcfg & SC_ENABLE_IP)) {	/* PPP connected ? */
 		isdn_BUG();
 		goto stop;
 	}
-	ipppd = idev->ipppd;
+	ipppd = ind_ppp->ipppd;
 	idev->huptimer = 0;
 
         if (ipppd->debug & 0x40)
@@ -1007,12 +1032,12 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	skb = ippp_vj_compress(idev, skb, &proto);
 
 	/* normal (single link) or bundle compression */
-	skb = ippp_ccp_compress(mlp->ccp, skb, &proto);
+	skb = ippp_ccp_compress(inl_ppp->ccp, skb, &proto);
 
 	if (ipppd->debug & 0x40)
                 isdn_ppp_frame_log("xmit1", skb->data, skb->len, 32, ipppd->unit, -1);
 
-	ippp_push_proto(idev, skb, proto);
+	ippp_push_proto(ind_ppp, skb, proto);
 	ippp_mp_xmit(idev, skb, proto);
 	return 0;
 
@@ -1029,9 +1054,10 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 void
 ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb)
 {
-	struct ipppd *ipppd = idev->ipppd;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct ipppd *ipppd = ind_ppp->ipppd;
 
-	ippp_push_ac(idev, skb);
+	ippp_push_ac(ind_ppp, skb);
 
 	if (ipppd->debug & 0x40) {
 		isdn_ppp_frame_log("xmit3", skb->data, skb->len, 32, ipppd->unit, -1);
@@ -1049,6 +1075,7 @@ isdn_ppp_dev_ioctl_stats(struct ifreq *ifr, struct net_device *dev)
 {
 	struct ppp_stats *res, t;
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
+	struct inl_ppp *inl_ppp = lp->inl_priv;
 	struct slcompress *slcomp;
 	int err;
 
@@ -1069,7 +1096,7 @@ isdn_ppp_dev_ioctl_stats(struct ifreq *ifr, struct net_device *dev)
 		t.p.ppp_obytes = lp->stats.tx_bytes;
 		t.p.ppp_oerrors = lp->stats.tx_errors;
 #ifdef CONFIG_ISDN_PPP_VJ
-		slcomp = lp->slcomp;
+		slcomp = inl_ppp->slcomp;
 		if (slcomp) {
 			t.vj.vjs_packets = slcomp->sls_o_compressed + slcomp->sls_o_uncompressed;
 			t.vj.vjs_compressed = slcomp->sls_o_compressed;
@@ -1152,21 +1179,24 @@ isdn_ppp_if_get_unit(char *name)
 static void isdn_ppp_dev_kick_up(void *priv)
 {
 	isdn_net_dev *idev = priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
 
-	ipppd_queue_read(idev->ipppd, PPP_COMPFRAG, NULL, 0);
+	ipppd_queue_read(ind_ppp->ipppd, PPP_COMPFRAG, NULL, 0);
 }
 
 static void isdn_ppp_lp_kick_up(void *priv)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
+	struct ind_ppp *ind_ppp;
 
 	if (list_empty(&lp->online)) {
 		isdn_BUG();
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	ipppd_queue_read(idev->ipppd, PPP_COMP, NULL, 0);
+	ind_ppp = idev->ind_priv;
+	ipppd_queue_read(ind_ppp->ipppd, PPP_COMP, NULL, 0);
 }
 
 /* Send a CCP Reset-Request or Reset-Ack directly from the kernel. */
@@ -1211,9 +1241,10 @@ static void
 isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_dev *idev = priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
 
-	ippp_push_proto(idev, skb, proto);
-	ippp_push_ac(idev, skb);
+	ippp_push_proto(ind_ppp, skb, proto);
+	ippp_push_ac(ind_ppp, skb);
 	isdn_net_write_super(idev, skb);
 }
 
@@ -1222,14 +1253,16 @@ isdn_ppp_lp_xmit(void *priv, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
+	struct ind_ppp *ind_ppp;
 
 	if (list_empty(&lp->online)) {
 		isdn_BUG();
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	ippp_push_proto(idev, skb, proto);
-	ippp_push_ac(idev, skb);
+	ind_ppp = idev->ind_priv;
+	ippp_push_proto(ind_ppp, skb, proto);
+	ippp_push_ac(ind_ppp, skb);
 	isdn_net_write_super(idev, skb);
 }
 
@@ -1237,13 +1270,15 @@ static int
 isdn_ppp_set_compressor(isdn_net_dev *idev, struct isdn_ppp_comp_data *data)
 {
 	struct ippp_ccp *ccp;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
 
 	if (data->flags & IPPP_COMP_FLAG_LINK)
-		ccp = idev->ccp;
+		ccp = ind_ppp->ccp;
 	else
-		ccp = idev->mlp->ccp;
+		ccp = inl_ppp->ccp;
 
-	return ippp_ccp_set_compressor(ccp, idev->ipppd->unit, data);
+	return ippp_ccp_set_compressor(ccp, ind_ppp->ipppd->unit, data);
 }
 
 // ISDN_NET_ENCAP_SYNCPPP
@@ -1252,37 +1287,48 @@ isdn_ppp_set_compressor(isdn_net_dev *idev, struct isdn_ppp_comp_data *data)
 static int
 isdn_ppp_open(isdn_net_local *lp)
 {
-	lp->slcomp = ippp_vj_alloc();
-	if (!lp->slcomp)
+	struct inl_ppp *inl_ppp;
+
+	inl_ppp = kmalloc(sizeof(*inl_ppp), GFP_KERNEL);
+	if (!inl_ppp)
+		return -ENOMEM;
+
+	lp->inl_priv = inl_ppp;
+
+	inl_ppp->slcomp = ippp_vj_alloc();
+	if (!inl_ppp->slcomp)
 		goto err;
 
-	lp->ccp = ippp_ccp_alloc();
-	if (!lp->ccp)
+	inl_ppp->ccp = ippp_ccp_alloc();
+	if (!inl_ppp->ccp)
 		goto err_vj;
 
-	lp->ccp->proto       = PPP_COMP;
-	lp->ccp->priv        = lp;
-	lp->ccp->alloc_skb   = isdn_ppp_lp_alloc_skb;
-	lp->ccp->xmit        = isdn_ppp_lp_xmit;
-	lp->ccp->kick_up     = isdn_ppp_lp_kick_up;
+	inl_ppp->ccp->proto       = PPP_COMP;
+	inl_ppp->ccp->priv        = lp;
+	inl_ppp->ccp->alloc_skb   = isdn_ppp_lp_alloc_skb;
+	inl_ppp->ccp->xmit        = isdn_ppp_lp_xmit;
+	inl_ppp->ccp->kick_up     = isdn_ppp_lp_kick_up;
 	
 	return 0;
 
  err_vj:
-	ippp_vj_free(lp->slcomp);
-	lp->slcomp = NULL;
+	ippp_vj_free(inl_ppp->slcomp);
  err:
+	kfree(inl_ppp);
+	lp->inl_priv = NULL;
 	return -ENOMEM;
 }
 
 static void
 isdn_ppp_close(isdn_net_local *lp)
 {
+	struct inl_ppp *inl_ppp = lp->inl_priv;
 	
-	ippp_ccp_free(lp->ccp);
-	lp->ccp = NULL;
-	ippp_vj_free(lp->slcomp);
-	lp->slcomp = NULL;
+	ippp_ccp_free(inl_ppp->ccp);
+	ippp_vj_free(inl_ppp->slcomp);
+
+	kfree(inl_ppp);
+	lp->inl_priv = NULL;
 }
 
 struct isdn_netif_ops isdn_ppp_ops = {

@@ -27,23 +27,25 @@ ippp_vj_free(struct slcompress *slcomp)
 int
 ippp_vj_set_maxcid(isdn_net_dev *idev, int val)
 {
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 	struct slcompress *sltmp;
 
 	sltmp = slhc_init(16, val + 1);
 	if (!sltmp)
 		return -ENOMEM;
 
-	if (idev->mlp->slcomp)
-		slhc_free(idev->mlp->slcomp);
+	if (inl_ppp->slcomp)
+		slhc_free(inl_ppp->slcomp);
 
-	idev->mlp->slcomp = sltmp;
+	inl_ppp->slcomp = sltmp;
 	return 0;
 }
 
 void
 ippp_vj_decompress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 proto)
 {
-	struct slcompress *slcomp = idev->mlp->slcomp;
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
+	struct slcompress *slcomp = inl_ppp->slcomp;
 	struct sk_buff *skb;
 	int len;
 
@@ -84,11 +86,14 @@ ippp_vj_decompress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 proto)
 struct sk_buff *
 ippp_vj_compress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 *proto)
 {
+	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
+	struct ind_ppp *ind_ppp = idev->ind_priv;
+	struct slcompress *slcomp = inl_ppp->slcomp;
 	struct sk_buff *skb;
 	unsigned char *buf;
 	int len;
 
-	if (!(idev->pppcfg & SC_COMP_TCP) || *proto != PPP_IP)
+	if (!(ind_ppp->pppcfg & SC_COMP_TCP) || *proto != PPP_IP)
 		return skb_old;
 
 	skb = isdn_ppp_dev_alloc_skb(idev, skb_old->len, GFP_ATOMIC);
@@ -97,8 +102,9 @@ ippp_vj_compress(isdn_net_dev *idev, struct sk_buff *skb_old, u16 *proto)
 
 	skb_put(skb, skb_old->len);
 	buf = skb_old->data;
-	len = slhc_compress(idev->mlp->slcomp, skb_old->data, skb_old->len,
-			    skb->data, &buf, !(idev->pppcfg & SC_NO_TCP_CCID));
+	// FIXME flag should be per bundle
+	len = slhc_compress(slcomp, skb_old->data, skb_old->len, skb->data,
+			    &buf, !(ind_ppp->pppcfg & SC_NO_TCP_CCID)); 
 
 	if (buf == skb_old->data) {
 		kfree_skb(skb);
