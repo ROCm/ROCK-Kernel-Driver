@@ -1077,7 +1077,7 @@ sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
 	SRpnt->sr_data_direction = SCSI_DATA_READ;
 
 	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-		      512, SD_TIMEOUT, MAX_RETRIES);
+		      255, SD_TIMEOUT, MAX_RETRIES);
 
 	the_result = SRpnt->sr_result;
 

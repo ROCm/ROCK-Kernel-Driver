@@ -176,10 +176,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page);
 /* linux/mm/page_alloc.c */
 
 /* linux/mm/swap_state.c */
-#define SWAP_CACHE_INFO
-#ifdef SWAP_CACHE_INFO
 extern void show_swap_cache_info(void);
-#endif
 extern int add_to_swap_cache(struct page *, swp_entry_t);
 extern int add_to_swap(struct page *);
 extern void __delete_from_swap_cache(struct page *page);

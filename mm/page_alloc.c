@@ -477,22 +477,21 @@ void free_pages(unsigned long addr, unsigned int order)
  */
 unsigned int nr_free_pages(void)
 {
-	unsigned int i, sum = 0;
-	pg_data_t *pgdat;
+	unsigned int sum = 0;
+	zone_t *zone;
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
-		for (i = 0; i < MAX_NR_ZONES; ++i)
-			sum += pgdat->node_zones[i].free_pages;
+	for_each_zone(zone)
+		sum += zone->free_pages;
 
 	return sum;
 }
 
 static unsigned int nr_free_zone_pages(int offset)
 {
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat;
 	unsigned int sum = 0;
 
-	do {
+	for_each_pgdat(pgdat) {
 		zonelist_t *zonelist = pgdat->node_zonelists + offset;
 		zone_t **zonep = zonelist->zones;
 		zone_t *zone;
@@ -503,9 +502,7 @@ static unsigned int nr_free_zone_pages(int offset)
 			if (size > high)
 				sum += size - high;
 		}
-
-		pgdat = pgdat->node_next;
-	} while (pgdat);
+	}
 
 	return sum;
 }
@@ -529,13 +526,12 @@ unsigned int nr_free_pagecache_pages(void)
 #if CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat;
 	unsigned int pages = 0;
 
-	while (pgdat) {
+	for_each_pgdat(pgdat)
 		pages += pgdat->node_zones[ZONE_HIGHMEM].free_pages;
-		pgdat = pgdat->node_next;
-	}
+
 	return pages;
 }
 #endif
@@ -566,8 +562,7 @@ void get_page_state(struct page_state *ret)
 		ret->nr_active += ps->nr_active;
 		ret->nr_inactive += ps->nr_inactive;
 		ret->nr_page_table_pages += ps->nr_page_table_pages;
-		ret->nr_pte_chain_pages += ps->nr_pte_chain_pages;
-		ret->used_pte_chains_bytes += ps->used_pte_chains_bytes;
+		ret->nr_reverse_maps += ps->nr_reverse_maps;
 	}
 }
 
@@ -602,12 +597,11 @@ void si_meminfo(struct sysinfo *val)
  * We also calculate the percentage fragmentation. We do this by counting the
  * memory on each free list with the exception of the first item on the list.
  */
-void show_free_areas_core(pg_data_t *pgdat)
+void show_free_areas(void)
 {
- 	unsigned int order;
-	unsigned type;
-	pg_data_t *tmpdat = pgdat;
+	pg_data_t *pgdat;
 	struct page_state ps;
+	int type;
 
 	get_page_state(&ps);
 
@@ -615,20 +609,20 @@ void show_free_areas_core(pg_data_t *pgdat)
 		K(nr_free_pages()),
 		K(nr_free_highpages()));
 
-	while (tmpdat) {
-		zone_t *zone;
-		for (zone = tmpdat->node_zones;
-			       	zone < tmpdat->node_zones + MAX_NR_ZONES; zone++)
-			printk("Zone:%s freepages:%6lukB min:%6lukB low:%6lukB " 
-				       "high:%6lukB\n", 
-					zone->name,
-					K(zone->free_pages),
-					K(zone->pages_min),
-					K(zone->pages_low),
-					K(zone->pages_high));
-			
-		tmpdat = tmpdat->node_next;
-	}
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
+		for (type = 0; type < MAX_NR_ZONES; ++type) {
+			zone_t *zone = &pgdat->node_zones[type];
+			printk("Zone:%s "
+				"freepages:%6lukB "
+				"min:%6lukB "
+				"low:%6lukB " 
+				"high:%6lukB\n", 
+				zone->name,
+				K(zone->free_pages),
+				K(zone->pages_min),
+				K(zone->pages_low),
+				K(zone->pages_high));
+		}
 
 	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
 		ps.nr_active,
@@ -637,40 +631,28 @@ void show_free_areas_core(pg_data_t *pgdat)
 		ps.nr_writeback,
 		nr_free_pages());
 
-	for (type = 0; type < MAX_NR_ZONES; type++) {
-		struct list_head *head, *curr;
-		zone_t *zone = pgdat->node_zones + type;
- 		unsigned long nr, total, flags;
+	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
+		for (type = 0; type < MAX_NR_ZONES; type++) {
+			list_t *elem;
+			zone_t *zone = &pgdat->node_zones[type];
+ 			unsigned long nr, flags, order, total = 0;
 
-		total = 0;
-		if (zone->size) {
+			if (!zone->size)
+				continue;
+
 			spin_lock_irqsave(&zone->lock, flags);
-		 	for (order = 0; order < MAX_ORDER; order++) {
-				head = &(zone->free_area + order)->free_list;
-				curr = head;
+			for (order = 0; order < MAX_ORDER; order++) {
 				nr = 0;
-				for (;;) {
-					curr = curr->next;
-					if (curr == head)
-						break;
-					nr++;
-				}
-				total += nr * (1 << order);
+				list_for_each(elem, &zone->free_area[order].free_list)
+					++nr;
+				total += nr << order;
 				printk("%lu*%lukB ", nr, K(1UL) << order);
 			}
 			spin_unlock_irqrestore(&zone->lock, flags);
+			printk("= %lukB)\n", K(total));
 		}
-		printk("= %lukB)\n", K(total));
-	}
 
-#ifdef SWAP_CACHE_INFO
 	show_swap_cache_info();
-#endif	
-}
-
-void show_free_areas(void)
-{
-	show_free_areas_core(pgdat_list);
 }
 
 /*

@@ -79,8 +79,7 @@ extern struct page_state {
 	unsigned long nr_active;	/* on active_list LRU */
 	unsigned long nr_inactive;	/* on inactive_list LRU */
 	unsigned long nr_page_table_pages;
-	unsigned long nr_pte_chain_pages;
-	unsigned long used_pte_chains_bytes;
+	unsigned long nr_reverse_maps;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
 
 extern void get_page_state(struct page_state *ret);
@@ -241,16 +240,20 @@ static inline void pte_chain_lock(struct page *page)
 	 * attempt to acquire the lock bit.
 	 */
 	preempt_disable();
+#ifdef CONFIG_SMP
 	while (test_and_set_bit(PG_chainlock, &page->flags)) {
 		while (test_bit(PG_chainlock, &page->flags))
 			cpu_relax();
 	}
+#endif
 }
 
 static inline void pte_chain_unlock(struct page *page)
 {
+#ifdef CONFIG_SMP
 	smp_mb__before_clear_bit();
 	clear_bit(PG_chainlock, &page->flags);
+#endif
 	preempt_enable();
 }
 

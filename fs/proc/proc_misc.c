@@ -126,11 +126,13 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+extern atomic_t vm_committed_space;
+
 static int meminfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
 	struct sysinfo i;
-	int len;
+	int len, committed;
 	struct page_state ps;
 
 	get_page_state(&ps);
@@ -140,6 +142,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
 	si_swapinfo(&i);
+	committed = atomic_read(&vm_committed_space);
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -160,9 +163,9 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"SwapFree:     %8lu kB\n"
 		"Dirty:        %8lu kB\n"
 		"Writeback:    %8lu kB\n"
+		"Committed_AS: %8u kB\n"
 		"PageTables:   %8lu kB\n"
-		"PteChainTot:  %8lu kB\n"
-		"PteChainUsed: %8lu kB\n",
+		"ReverseMaps:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -178,9 +181,9 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.freeswap),
 		K(ps.nr_dirty),
 		K(ps.nr_writeback),
+		K(committed),
 		K(ps.nr_page_table_pages),
-		K(ps.nr_pte_chain_pages),
-		ps.used_pte_chains_bytes >> 10
+		ps.nr_reverse_maps
 		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);

@@ -1110,3 +1110,9 @@ CONFIG_HVC_CONSOLE
   pSeries machines when partitioned support a hypervisor virtual
   console. This driver allows each pSeries partition to have a console
   which is accessed via the HMC.
+
+CONFIG_RAW_DRIVER
+  The raw driver permits block devices to be bound to /dev/raw/rawN. 
+  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
+  See the raw(8) manpage for more details.
+

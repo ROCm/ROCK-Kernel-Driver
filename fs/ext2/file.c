@@ -46,6 +46,7 @@ struct file_operations ext2_file_operations = {
 	open:		generic_file_open,
 	release:	ext2_release_file,
 	fsync:		ext2_sync_file,
+	sendfile:	generic_file_sendfile,
 };
 
 struct inode_operations ext2_file_inode_operations = {

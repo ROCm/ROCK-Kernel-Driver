@@ -1,7 +1,10 @@
 /*
- *	linux/mm/remap.c
+ *	mm/remap.c
  *
  *	(C) Copyright 1996 Linus Torvalds
+ *
+ *	Address space accounting code	<alan@redhat.com>
+ *	(C) Copyright 2002 Red Hat Inc, All Rights Reserved
  */
 
 #include <linux/mm.h>
@@ -17,8 +20,6 @@
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
-
-extern int vm_enough_memory(long pages);
 
 static inline pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
@@ -209,7 +210,11 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 				new_vma->vm_ops->open(new_vma);
 			insert_vm_struct(current->mm, new_vma);
 		}
-		do_munmap(current->mm, addr, old_len);
+		/*
+		 * The old VMA has been accounted for,
+		 * don't double account
+		 */
+		do_munmap(current->mm, addr, old_len, 0);
 		current->mm->total_vm += new_len >> PAGE_SHIFT;
 		if (new_vma->vm_flags & VM_LOCKED) {
 			current->mm->locked_vm += new_len >> PAGE_SHIFT;
@@ -224,6 +229,8 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	return -ENOMEM;
 }
 
+extern int sysctl_overcommit_memory;	/* FIXME!! */
+
 /*
  * Expand (or shrink) an existing mapping, potentially moving it at the
  * same time (controlled by the MREMAP_MAYMOVE flag and available VM space)
@@ -237,6 +244,7 @@ unsigned long do_mremap(unsigned long addr,
 {
 	struct vm_area_struct *vma;
 	unsigned long ret = -EINVAL;
+	unsigned long charged = 0;
 
 	if (flags & ~(MREMAP_FIXED | MREMAP_MAYMOVE))
 		goto out;
@@ -266,16 +274,17 @@ unsigned long do_mremap(unsigned long addr,
 		if ((addr <= new_addr) && (addr+old_len) > new_addr)
 			goto out;
 
-		do_munmap(current->mm, new_addr, new_len);
+		do_munmap(current->mm, new_addr, new_len, 1);
 	}
 
 	/*
 	 * Always allow a shrinking remap: that just unmaps
 	 * the unnecessary pages..
+	 * do_munmap does all the needed commit accounting
 	 */
 	ret = addr;
 	if (old_len >= new_len) {
-		do_munmap(current->mm, addr+new_len, old_len - new_len);
+		do_munmap(current->mm, addr+new_len, old_len - new_len, 1);
 		if (!(flags & MREMAP_FIXED) || (new_addr == addr))
 			goto out;
 	}
@@ -305,11 +314,14 @@ unsigned long do_mremap(unsigned long addr,
 	if ((current->mm->total_vm << PAGE_SHIFT) + (new_len - old_len)
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		goto out;
-	/* Private writable mapping? Check memory availability.. */
-	if ((vma->vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE &&
-	    !(flags & MAP_NORESERVE)				 &&
-	    !vm_enough_memory((new_len - old_len) >> PAGE_SHIFT))
-		goto out;
+
+	if (sysctl_overcommit_memory > 1)
+		flags &= ~MAP_NORESERVE;
+	if (vma->vm_flags & VM_ACCOUNT) {
+		charged = (new_len - old_len) >> PAGE_SHIFT;
+		if (!vm_enough_memory(charged))
+			goto out_nc;
+	}
 
 	/* old_len exactly to the end of the area..
 	 * And we're not relocating the area.
@@ -356,6 +368,9 @@ unsigned long do_mremap(unsigned long addr,
 		ret = move_vma(vma, addr, old_len, new_len, new_addr);
 	}
 out:
+	if (ret & ~PAGE_MASK)
+		vm_unacct_memory(charged);
+out_nc:
 	return ret;
 }
 

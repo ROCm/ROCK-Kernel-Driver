@@ -514,9 +514,8 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		if (!buffer_uptodate(tmp))
 			page_uptodate = 0;
 		if (buffer_async_read(tmp)) {
-			if (buffer_locked(tmp))
-				goto still_busy;
-			BUG();
+			BUG_ON(!buffer_locked(tmp));
+			goto still_busy;
 		}
 		tmp = tmp->b_this_page;
 	} while (tmp != bh);
@@ -564,9 +563,8 @@ static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (buffer_async_write(tmp)) {
-			if (buffer_locked(tmp))
-				goto still_busy;
-			BUG();
+			BUG_ON(!buffer_locked(tmp));
+			goto still_busy;
 		}
 		tmp = tmp->b_this_page;
 	}

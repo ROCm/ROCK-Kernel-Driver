@@ -200,8 +200,8 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			 * so the direct writes to the page cannot get lost.
 			 */
 			int (*writeback)(struct page *, int *);
-			const int nr_pages = SWAP_CLUSTER_MAX;
-			int nr_to_write = nr_pages;
+			const int cluster_size = SWAP_CLUSTER_MAX;
+			int nr_to_write = cluster_size;
 
 			writeback = mapping->a_ops->vm_writeback;
 			if (writeback == NULL)
@@ -209,7 +209,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			page_cache_get(page);
 			spin_unlock(&pagemap_lru_lock);
 			(*writeback)(page, &nr_to_write);
-			max_scan -= (nr_pages - nr_to_write);
+			max_scan -= (cluster_size - nr_to_write);
 			page_cache_release(page);
 			spin_lock(&pagemap_lru_lock);
 			continue;
@@ -471,7 +471,7 @@ static void kswapd_balance(void)
 		pgdat = pgdat_list;
 		do
 			need_more_balance |= kswapd_balance_pgdat(pgdat);
-		while ((pgdat = pgdat->node_next));
+		while ((pgdat = pgdat->pgdat_next));
 	} while (need_more_balance);
 }
 
@@ -499,7 +499,7 @@ static int kswapd_can_sleep(void)
 		if (kswapd_can_sleep_pgdat(pgdat))
 			continue;
 		return 0;
-	} while ((pgdat = pgdat->node_next));
+	} while ((pgdat = pgdat->pgdat_next));
 
 	return 1;
 }

@@ -293,10 +293,23 @@ static int jfs_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping, block, jfs_get_block);
 }
 
+static int
+jfs_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
+			struct buffer_head *bh_result, int create)
+{
+	int ret;
+
+	ret = jfs_get_block(inode, iblock, bh_result, create);
+	if (ret == 0)
+		bh_result->b_size = (1 << inode->i_blkbits);
+	return ret;
+}
+
 static int jfs_direct_IO(int rw, struct inode *inode, char *buf,
 			loff_t offset, size_t count)
 {
-	return generic_direct_IO(rw, inode, buf, offset, count, jfs_get_block);
+	return generic_direct_IO(rw, inode, buf,
+				offset, count, jfs_get_blocks);
 }
 
 struct address_space_operations jfs_aops = {

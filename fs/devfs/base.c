@@ -642,6 +642,9 @@
     20020725   Richard Gooch <rgooch@atnf.csiro.au>
 	       Created <devfs_find_and_unregister>.
   v1.19
+    20020728   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed deprecated <devfs_find_handle>.
+  v1.20
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -674,7 +677,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.19 (20020725)"
+#define DEVFS_VERSION            "1.20 (20020728)"
 
 #define DEVFS_NAME "devfs"
 
@@ -1889,24 +1892,10 @@ void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
 				char type, int traverse_symlinks)
 {
     devfs_handle_t de = devfs_get_handle (dir, name, major, minor,
-					  type,traverse_symlinks);
+					  type, traverse_symlinks);
     devfs_unregister (de);
     devfs_put (de);
 }
-
-
-/*  Compatibility function. Will be removed in sometime in 2.5  */
-
-devfs_handle_t devfs_find_handle (devfs_handle_t dir, const char *name,
-				  unsigned int major, unsigned int minor,
-				  char type, int traverse_symlinks)
-{
-    devfs_handle_t de;
-
-    de = devfs_get_handle (dir, name, major, minor, type, traverse_symlinks);
-    devfs_put (de);
-    return de;
-}   /*  End Function devfs_find_handle  */
 
 
 /**
@@ -2381,7 +2370,6 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
-EXPORT_SYMBOL(devfs_find_handle);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_maj_min);

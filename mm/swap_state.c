@@ -42,8 +42,7 @@ struct address_space swapper_space = {
 	private_list:	LIST_HEAD_INIT(swapper_space.private_list),
 };
 
-#ifdef SWAP_CACHE_INFO
-#define INC_CACHE_INFO(x)	(swap_cache_info.x++)
+#define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)
 
 static struct {
 	unsigned long add_total;
@@ -61,9 +60,6 @@ void show_swap_cache_info(void)
 		swap_cache_info.find_success, swap_cache_info.find_total,
 		swap_cache_info.noent_race, swap_cache_info.exist_race);
 }
-#else
-#define INC_CACHE_INFO(x)	do { } while (0)
-#endif
 
 int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {

@@ -489,24 +489,24 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations ext3_sops = {
-	alloc_inode:	ext3_alloc_inode,
-	destroy_inode:	ext3_destroy_inode,
-	read_inode:	ext3_read_inode,	/* BKL held */
-	write_inode:	ext3_write_inode,	/* BKL not held.  Don't need */
-	dirty_inode:	ext3_dirty_inode,	/* BKL not held.  We take it */
-	put_inode:	ext3_put_inode,		/* BKL not held.  Don't need */
-	delete_inode:	ext3_delete_inode,	/* BKL not held.  We take it */
-	put_super:	ext3_put_super,		/* BKL held */
-	write_super:	ext3_write_super,	/* BKL not held. We take it. Needed? */
-	write_super_lockfs: ext3_write_super_lockfs, /* BKL not held. Take it */
-	unlockfs:	ext3_unlockfs,		/* BKL not held.  We take it */
-	statfs:		ext3_statfs,		/* BKL not held. */
-	remount_fs:	ext3_remount,		/* BKL held */
+	.alloc_inode	= ext3_alloc_inode,
+	.destroy_inode	= ext3_destroy_inode,
+	.read_inode	= ext3_read_inode,	/* BKL held */
+	.write_inode	= ext3_write_inode,	/* BKL not held.  Don't need */
+	.dirty_inode	= ext3_dirty_inode,	/* BKL not held.  We take it */
+	.put_inode	= ext3_put_inode,		/* BKL not held.  Don't need */
+	.delete_inode	= ext3_delete_inode,	/* BKL not held.  We take it */
+	.put_super	= ext3_put_super,		/* BKL held */
+	.write_super	= ext3_write_super,	/* BKL not held. We take it. Needed? */
+	.write_super_lockfs = ext3_write_super_lockfs, /* BKL not held. Take it */
+	.unlockfs	= ext3_unlockfs,		/* BKL not held.  We take it */
+	.statfs		= ext3_statfs,		/* BKL not held. */
+	.remount_fs	= ext3_remount,		/* BKL held */
 };
 
 struct dentry *ext3_get_parent(struct dentry *child);
 static struct export_operations ext3_export_ops = {
-	get_parent: ext3_get_parent,
+	.get_parent = ext3_get_parent,
 };
 
 
@@ -1770,11 +1770,11 @@ static struct super_block *ext3_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ext3_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"ext3",
-	get_sb:		ext3_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "ext3",
+	.get_sb		= ext3_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_ext3_fs(void)

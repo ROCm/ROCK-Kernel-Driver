@@ -34,6 +34,6 @@ static int ext3_follow_link(struct dentry *dentry, struct nameidata *nd)
 }
 
 struct inode_operations ext3_fast_symlink_inode_operations = {
-	readlink:	ext3_readlink,		/* BKL not held.  Don't need */
-	follow_link:	ext3_follow_link,	/* BKL not held.  Don't need */
+	.readlink	= ext3_readlink,		/* BKL not held.  Don't need */
+	.follow_link	= ext3_follow_link,	/* BKL not held.  Don't need */
 };

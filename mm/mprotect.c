@@ -1,7 +1,10 @@
 /*
- *	linux/mm/mprotect.c
+ *  mm/mprotect.c
  *
  *  (C) Copyright 1994 Linus Torvalds
+ *
+ *  Address space accounting code	<alan@redhat.com>
+ *  (C) Copyright 2002 Red Hat Inc, All Rights Reserved
  */
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -248,6 +251,7 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 {
 	pgprot_t newprot;
 	int error;
+	unsigned long charged = 0;
 
 	if (newflags == vma->vm_flags) {
 		*pprev = vma;
@@ -264,9 +268,18 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 	else
 		error = mprotect_fixup_middle(vma, pprev, start, end, newflags, newprot);
 
-	if (error)
+	if (error) {
+		if (newflags & PROT_WRITE)
+			vm_unacct_memory(charged);
 		return error;
+	}
 
+	/*
+	 * Delayed accounting for reduction of memory use - done last to
+	 * avoid allocation races
+	 */
+	if (charged && !(newflags & PROT_WRITE))
+		vm_unacct_memory(charged);
 	change_protection(vma, start, end, newprot);
 	return 0;
 }

@@ -1119,127 +1119,23 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	return written;
 }
 
-static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t count, loff_t max)
+ssize_t generic_file_sendfile(struct file *in_file, struct file *out_file,
+			      loff_t *ppos, size_t count)
 {
-	ssize_t retval;
-	struct file * in_file, * out_file;
-	struct inode * in_inode, * out_inode;
+	read_descriptor_t desc;
 
-	/*
-	 * Get input file, and verify that it is ok..
-	 */
-	retval = -EBADF;
-	in_file = fget(in_fd);
-	if (!in_file)
-		goto out;
-	if (!(in_file->f_mode & FMODE_READ))
-		goto fput_in;
-	retval = -EINVAL;
-	in_inode = in_file->f_dentry->d_inode;
-	if (!in_inode)
-		goto fput_in;
-	if (!in_inode->i_mapping->a_ops->readpage)
-		goto fput_in;
-	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, in_file->f_pos, count);
-	if (retval)
-		goto fput_in;
+	if (!count)
+		return 0;
 
-	retval = security_ops->file_permission (in_file, MAY_READ);
-	if (retval)
-		goto fput_in;
+	desc.written = 0;
+	desc.count = count;
+	desc.buf = (char *)out_file;
+	desc.error = 0;
 
-	/*
-	 * Get output file, and verify that it is ok..
-	 */
-	retval = -EBADF;
-	out_file = fget(out_fd);
-	if (!out_file)
-		goto fput_in;
-	if (!(out_file->f_mode & FMODE_WRITE))
-		goto fput_out;
-	retval = -EINVAL;
-	if (!out_file->f_op || !out_file->f_op->sendpage)
-		goto fput_out;
-	out_inode = out_file->f_dentry->d_inode;
-	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
-	if (retval)
-		goto fput_out;
-
-	retval = security_ops->file_permission (out_file, MAY_WRITE);
-	if (retval)
-		goto fput_out;
-
-	retval = 0;
-	if (count) {
-		read_descriptor_t desc;
-		loff_t pos;
-
-		if (!offset)
-			offset = &in_file->f_pos;
-
-		pos = *offset;
-		retval = -EINVAL;
-		if (unlikely(pos < 0))
-			goto fput_out;
-		if (unlikely(pos + count > max)) {
-			retval = -EOVERFLOW;
-			if (pos >= max)
-				goto fput_out;
-			count = max - pos;
-		}
-
-		desc.written = 0;
-		desc.count = count;
-		desc.buf = (char *) out_file;
-		desc.error = 0;
-		do_generic_file_read(in_file, offset, &desc, file_send_actor);
-
-		retval = desc.written;
-		if (!retval)
-			retval = desc.error;
-		pos = *offset;
-		if (pos > max)
-			retval = -EOVERFLOW;
-	}
-
-fput_out:
-	fput(out_file);
-fput_in:
-	fput(in_file);
-out:
-	return retval;
-}
-
-asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
-{
-	loff_t pos, *ppos = NULL;
-	ssize_t ret;
-	if (offset) {
-		off_t off;
-		if (unlikely(get_user(off, offset)))
-			return -EFAULT;
-		pos = off;
-		ppos = &pos;
-	}
-	ret = common_sendfile(out_fd, in_fd, ppos, count, MAX_NON_LFS);
-	if (offset && put_user(pos, offset))
-		ret = -EFAULT;
-	return ret;
-}
-
-asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count)
-{
-	loff_t pos, *ppos = NULL;
-	ssize_t ret;
-	if (offset) {
-		if (unlikely(copy_from_user(&pos, offset, sizeof(loff_t))))
-			return -EFAULT;
-		ppos = &pos;
-	}
-	ret = common_sendfile(out_fd, in_fd, ppos, count, MAX_LFS_FILESIZE);
-	if (offset && put_user(pos, offset))
-		ret = -EFAULT;
-	return ret;
+	do_generic_file_read(in_file, ppos, &desc, file_send_actor);
+	if (desc.written)
+		return desc.written;
+	return desc.error;
 }
 
 static ssize_t
@@ -2056,8 +1952,6 @@ generic_file_write(struct file *file, const char *buf,
 				mark_inode_dirty(inode);
 			}
 			*ppos = end;
-			if (mapping->nrpages)
-				invalidate_inode_pages2(mapping);
 		}
 		/*
 		 * Sync the fs metadata but not the minor inode changes and

@@ -1950,3 +1950,10 @@ Changes for patch v215
   <devfs_find_and_unregister>
 
 - Switched many functions from <devfs_find_handle> to <devfs_get_handle>
+===============================================================================
+Changes for patch v216
+
+- Switched arch/ia64/sn/io/hcl.c from <devfs_find_handle> to
+  <devfs_get_handle>
+
+- Removed deprecated <devfs_find_handle>

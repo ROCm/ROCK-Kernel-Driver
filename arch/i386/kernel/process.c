@@ -675,6 +675,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	tss->esp0 = next->esp0;
 
 	/*
+	 * Load the per-thread Thread-Local Storage descriptor.
+	 *
+	 * NOTE: it's faster to do the two stores unconditionally
+	 * than to branch away.
+	 */
+	load_TLS_desc(next, cpu);
+
+	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
 	 * those are always kernel segments while inside the kernel.
 	 */
@@ -688,14 +696,6 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(fs, next->fs);
 		loadsegment(gs, next->gs);
 	}
-
-	/*
-	 * Load the per-thread Thread-Local Storage descriptor.
-	 *
-	 * NOTE: it's faster to do the two stores unconditionally
-	 * than to branch away.
-	 */
-	load_TLS_desc(next, cpu);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -831,18 +831,14 @@ unsigned long get_wchan(struct task_struct *p)
 /*
  * Set the Thread-Local Storage area:
  */
-asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsigned int flags)
+asmlinkage int sys_set_thread_area(unsigned long base, unsigned long flags)
 {
 	struct thread_struct *t = &current->thread;
-	int limit_in_pages = 0, writable = 0;
+	int writable = 0;
 	int cpu;
 
 	/* do not allow unused flags */
 	if (flags & ~TLS_FLAGS_MASK)
-		return -EINVAL;
-
-	/* check limit */
-	if (limit & 0xfff00000)
 		return -EINVAL;
 
 	/*
@@ -850,15 +846,12 @@ asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsign
 	 */
 	if (flags & TLS_FLAG_CLEAR) {
 		cpu = get_cpu();
-		t->tls_base = t->tls_limit = t->tls_flags = 0;
         	t->tls_desc.a = t->tls_desc.b = 0;
 		load_TLS_desc(t, cpu);
 		put_cpu();
 		return 0;
 	}
 
-	if (flags & TLS_FLAG_LIMIT_IN_PAGES)
-		limit_in_pages = 1;
 	if (flags & TLS_FLAG_WRITABLE)
 		writable = 1;
 
@@ -866,15 +859,12 @@ asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsign
 	 * We must not get preempted while modifying the TLS.
 	 */
 	cpu = get_cpu();
-	t->tls_base = base;
-	t->tls_limit = limit;
-	t->tls_flags = flags;
 
-        t->tls_desc.a = ((base & 0x0000ffff) << 16) | (limit & 0x0ffff);
+        t->tls_desc.a = ((base & 0x0000ffff) << 16) | 0xffff;
 
         t->tls_desc.b = (base & 0xff000000) | ((base & 0x00ff0000) >> 16) |
-                  (limit & 0xf0000) | (writable << 9) | (1 << 15) |
-		  (1 << 22) | (limit_in_pages << 23) | 0x7000;
+				0xf0000 | (writable << 9) | (1 << 15) |
+					(1 << 22) | (1 << 23) | 0x7000;
 
 	load_TLS_desc(t, cpu);
 	put_cpu();

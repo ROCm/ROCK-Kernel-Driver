@@ -360,5 +360,16 @@ static inline unsigned ld2(unsigned int x)
 	return r;
 }
 
-#endif /* __TRID4DWAVE_H */
+#ifdef DEBUG
 
+#define TRDBG(msg, args...) do {          \
+        printk(KERN_DEBUG msg , ##args ); \
+} while (0)
+
+#else /* !defined(DEBUG) */ 
+
+#define TRDBG(msg, args...) do { } while (0)
+
+#endif /* DEBUG */ 
+
+#endif /* __TRID4DWAVE_H */
