@@ -101,8 +101,10 @@ void snd_opl3_cs4281_command(opl3_t * opl3, unsigned short cmd, unsigned char va
 	spin_lock_irqsave(&opl3->reg_lock, flags);
 
 	writel((unsigned int)cmd, port << 2);
+	udelay(10);
 
 	writel((unsigned int)val, (port + 1) << 2);
+	udelay(30);
 
 	spin_unlock_irqrestore(&opl3->reg_lock, flags);
 }

@@ -776,6 +776,14 @@ typedef struct snd_m3 m3_t;
 #define chip_t m3_t
 
 
+/* quirk lists */
+struct m3_quirk {
+	u16 vendor, device;	/* subsystem ids */
+	int amp_gpio;		/* gpio pin #  for external amp, -1 = default */
+	int irda_workaround;	/* non-zero if avoid to touch 0x10 on GPIO_DIRECTION
+				   (e.g. for IrDA on Dell Inspirons) */
+};
+
 struct m3_list {
 	int curlen;
 	int mem_addr;
@@ -825,9 +833,7 @@ struct snd_m3 {
 	snd_pcm_t *pcm;
 
 	struct pci_dev *pci;
-	/* pci_dev in 2.2 kernel doesn't have them, so we keep them private */
-	u16 subsystem_vendor;
-	u16 subsystem_device;
+	struct m3_quirk *quirk;
 
 	int dacs_active;
 	int timer_users;
@@ -907,6 +913,33 @@ static struct pci_device_id snd_m3_ids[] __devinitdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, snd_m3_ids);
+
+static struct m3_quirk m3_quirk_list[] = {
+	/* panasonic CF-28 "toughbook" */
+	{
+		vendor: 0x10f7,
+		device: 0x833e,
+		amp_gpio: 0x0d,
+	},
+	/* Dell Inspiron 4000 */
+	{
+		vendor: 0x1028,
+		device: 0x00b0,
+		amp_gpio: -1,
+		irda_workaround: 1,
+	},
+	/* Dell Inspiron 8000 */
+	{
+		vendor: 0x1028,
+		device: 0x00a4,
+		amp_gpio: -1,
+		irda_workaround: 1,
+	},
+	/* FIXME: Inspiron 8100 and 8200 ids should be here, too */
+	/* END */
+	{ 0 }
+};
+
 
 /*
  * lowlevel functions
@@ -1859,10 +1892,7 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 
 	for (i = 0; i < 5; i++) {
 		dir = inw(io + GPIO_DIRECTION);
-		if (chip->subsystem_vendor == 0x1028 &&
-		    chip->subsystem_device == 0x00b0) /* Dell Inspiron 4000 */
-			; /* seems conflicting with IrDA */
-		else
+		if (! chip->quirk || ! chip->quirk->irda_workaround)
 			dir |= 0x10; /* assuming pci bus master? */
 
 		snd_m3_remote_codec_config(io, 0);
@@ -2470,6 +2500,8 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 {
 	m3_t *chip;
 	int i, err;
+	struct m3_quirk *quirk;
+	u16 subsystem_vendor, subsystem_device;
 	static snd_device_ops_t ops = {
 		dev_free:	snd_m3_dev_free,
 	};
@@ -2500,29 +2532,35 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		break;
 	}
 
-#ifndef LINUX_2_2
-	chip->subsystem_vendor = pci->subsystem_vendor;
-	chip->subsystem_device = pci->subsystem_device;
-#else
-	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &chip->subsystem_vendor);
-	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &chip->subsystem_device);
-#endif
-
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
+
+#ifndef LINUX_2_2
+	subsystem_vendor = pci->subsystem_vendor;
+	subsystem_device = pci->subsystem_device;
+#else
+	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
+	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
+#endif
+	for (quirk = m3_quirk_list; quirk->vendor; quirk++) {
+		if (subsystem_vendor == quirk->vendor &&
+		    subsystem_device == quirk->device) {
+			chip->quirk = quirk;
+			break;
+		}
+	}
+
 	chip->external_amp = enable_amp;
 	if (amp_gpio >= 0 && amp_gpio <= 0x0f)
 		chip->amp_gpio = amp_gpio;
-	else if (chip->allegro_flag) {
-		/* panasonic CF-28 "toughbook" has different GPIO connection.. */
-		if (chip->subsystem_vendor == 0x10f7 &&
-		    chip->subsystem_device == 0x833e)
-			chip->amp_gpio = 0x0d;
-		else
-			chip->amp_gpio = GPO_EXT_AMP_ALLEGRO;
-	} else
-		chip->amp_gpio = GPO_EXT_AMP_M3; /* presumably this is for all 'maestro3's.. */
+	else if (chip->quirk && chip->quirk->amp_gpio >= 0)
+		chip->amp_gpio = chip->quirk->amp_gpio;
+	else if (chip->allegro_flag)
+		chip->amp_gpio = GPO_EXT_AMP_ALLEGRO;
+	else /* presumably this is for all 'maestro3's.. */
+		chip->amp_gpio = GPO_EXT_AMP_M3;
+
 	chip->num_substreams = NR_DSPS;
 	chip->substreams = kmalloc(sizeof(m3_dma_t) * chip->num_substreams, GFP_KERNEL);
 	if (chip->substreams == NULL) {

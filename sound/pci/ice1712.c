@@ -960,17 +960,25 @@ static snd_i2c_bit_ops_t snd_ice1712_ewx_cs8427_bit_ops = {
 };
 
 /* AK4524 chip select; address 0x48 bit 0-3 */
-static void snd_ice1712_ews88mt_chip_select(ice1712_t *ice, int chip_mask)
+static int snd_ice1712_ews88mt_chip_select(ice1712_t *ice, int chip_mask)
 {
 	unsigned char data, ndata;
 
-	snd_assert(chip_mask >= 0 && chip_mask <= 0x0f, return);
+	snd_assert(chip_mask >= 0 && chip_mask <= 0x0f, return -EINVAL);
 	snd_i2c_lock(ice->i2c);
-	snd_runtime_check(snd_i2c_readbytes(ice->pcf8574[1], &data, 1) == 1, snd_i2c_unlock(ice->i2c); return);
+	if (snd_i2c_readbytes(ice->pcf8574[1], &data, 1) != 1)
+		goto __error;
 	ndata = (data & 0xf0) | chip_mask;
 	if (ndata != data)
-		snd_runtime_check(snd_i2c_sendbytes(ice->pcf8574[1], &ndata, 1) == 1, snd_i2c_unlock(ice->i2c); return);
+		if (snd_i2c_sendbytes(ice->pcf8574[1], &ndata, 1) != 1)
+			goto __error;
 	snd_i2c_unlock(ice->i2c);
+	return 0;
+
+     __error:
+	snd_i2c_unlock(ice->i2c);
+	snd_printk(KERN_ERR "AK4524 chip select failed, check cable to the front module\n");
+	return -EIO;
 }
 
 /*
@@ -988,7 +996,8 @@ static void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 
 	if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_EWS88MT) {
 		/* assert AK4524 CS */
-		snd_ice1712_ews88mt_chip_select(ice, ~(1 << chip) & 0x0f);
+		if (snd_ice1712_ews88mt_chip_select(ice, ~(1 << chip) & 0x0f) < 0)
+			return;
 		//snd_ice1712_ews88mt_chip_select(ice, 0x0f);
 	}
 
@@ -1147,11 +1156,11 @@ static int snd_ice1712_cs8427_set_input_clock(ice1712_t *ice, int spdif_clock)
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_sendbytes(ice->cs8427, reg, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	if (snd_i2c_readbytes(ice->cs8427, &val, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	nval = val & 0xf0;
 	if (spdif_clock)
@@ -1161,7 +1170,7 @@ static int snd_ice1712_cs8427_set_input_clock(ice1712_t *ice, int spdif_clock)
 	if (val != nval) {
 		reg[1] = nval;
 		if (snd_i2c_sendbytes(ice->cs8427, reg, 2) != 2) {
-			res = -EREMOTE;
+			res = -EIO;
 		} else {
 			res++;
 		}
@@ -3187,7 +3196,7 @@ static int snd_ice1712_ews88mt_output_sense_get(snd_kcontrol_t *kcontrol, snd_ct
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8574[1], &data, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	ucontrol->value.enumerated.item[0] = data & ICE1712_EWS88MT_OUTPUT_SENSE ? 1 : 0; /* high = -10dBV, low = +4dBu */
@@ -3203,12 +3212,12 @@ static int snd_ice1712_ews88mt_output_sense_put(snd_kcontrol_t *kcontrol, snd_ct
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8574[1], &data, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	ndata = (data & ~ICE1712_EWS88MT_OUTPUT_SENSE) | (ucontrol->value.enumerated.item[0] ? ICE1712_EWS88MT_OUTPUT_SENSE : 0);
 	if (ndata != data && snd_i2c_sendbytes(ice->pcf8574[1], &ndata, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return ndata != data;
@@ -3225,7 +3234,7 @@ static int snd_ice1712_ews88mt_input_sense_get(snd_kcontrol_t *kcontrol, snd_ctl
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8574[0], &data, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	/* reversed; high = +4dBu, low = -10dBV */
 	ucontrol->value.enumerated.item[0] = data & (1 << channel) ? 0 : 1;
@@ -3243,12 +3252,12 @@ static int snd_ice1712_ews88mt_input_sense_put(snd_kcontrol_t *kcontrol, snd_ctl
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8574[0], &data, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	ndata = (data & ~(1 << channel)) | (ucontrol->value.enumerated.item[0] ? 0 : (1 << channel));
 	if (ndata != data && snd_i2c_sendbytes(ice->pcf8574[0], &ndata, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return ndata != data;
@@ -3294,7 +3303,7 @@ static int snd_ice1712_ews88d_control_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8575, data, 2) != 2) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	data[0] = (data[shift >> 3] >> (shift & 7)) & 0x01;
@@ -3315,7 +3324,7 @@ static int snd_ice1712_ews88d_control_put(snd_kcontrol_t * kcontrol, snd_ctl_ele
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_readbytes(ice->pcf8575, data, 2) != 2) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	ndata[shift >> 3] = data[shift >> 3] & ~(1 << (shift & 7));
 	if (invert) {
@@ -3328,7 +3337,7 @@ static int snd_ice1712_ews88d_control_put(snd_kcontrol_t * kcontrol, snd_ctl_ele
 	change = (data[shift >> 3] != ndata[shift >> 3]);
 	if (change && snd_i2c_sendbytes(ice->pcf8575, data, 2) != 2) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return change;
@@ -3366,7 +3375,7 @@ static int snd_ice1712_6fire_read_pca(ice1712_t *ice)
 	snd_i2c_sendbytes(ice->pcf8575, &byte, 1);
 	if (snd_i2c_readbytes(ice->pcf8575, &byte, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return byte;
@@ -3380,7 +3389,7 @@ static int snd_ice1712_6fire_write_pca(ice1712_t *ice, unsigned char data)
 	bytes[1] = data;
 	if (snd_i2c_sendbytes(ice->pcf8575, bytes, 2) != 2) {
 		snd_i2c_unlock(ice->i2c);
-		return -EREMOTE;
+		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return 0;
@@ -3836,11 +3845,15 @@ static int __devinit snd_ice1712_chip_init(ice1712_t *ice)
 	}
 	/* second stage of initialization, analog parts and others */
 	switch (ice->eeprom.subvendor) {
+	case ICE1712_SUBDEVICE_EWS88MT:
+		/* Check if the front module is connected */
+		if ((err = snd_ice1712_ews88mt_chip_select(ice, 0x0f)) < 0)
+			return err;
+		/* Fall through */
 	case ICE1712_SUBDEVICE_DELTA66:
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 	case ICE1712_SUBDEVICE_EWX2496:
-	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		snd_ice1712_ak4524_init(ice);
 		break;

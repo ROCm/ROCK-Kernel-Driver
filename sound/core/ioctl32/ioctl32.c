@@ -460,7 +460,6 @@ static int __init snd_ioctl32_init(void)
 		return err;
 	}
 #endif
-
 	return 0;
 }
 

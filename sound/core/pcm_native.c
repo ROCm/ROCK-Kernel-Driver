@@ -1616,7 +1616,6 @@ int snd_pcm_hw_constraints_complete(snd_pcm_substream_t *substream)
 	snd_assert(err >= 0, return -EINVAL);
 
 	err = snd_pcm_hw_constraint_mask64(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
-	//err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
 	snd_assert(err >= 0, return -EINVAL);
 
 	err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_SUBFORMAT, 1 << SNDRV_PCM_SUBFORMAT_STD);
