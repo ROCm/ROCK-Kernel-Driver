@@ -48,7 +48,6 @@ MODULE_DESCRIPTION("Adaptec I2O RAID Driver");
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
 #include <linux/delay.h>	/* for udelay */
-#include <linux/tqueue.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>	/* for printk */
 #include <linux/sched.h>
@@ -356,23 +355,20 @@ static void adpt_inquiry(adpt_hba* pHba)
 }
 
 
-static void adpt_select_queue_depths(struct Scsi_Host *host, Scsi_Device * devicelist)
+static int adpt_slave_attach(Scsi_Device * device)
 {
-	Scsi_Device *device;	/* scsi layer per device information */
+	struct Scsi_Host *host = device->host;
 	adpt_hba* pHba;
 
 	pHba = (adpt_hba *) host->hostdata[0];
 
-	for (device = devicelist; device != NULL; device = device->next) {
-		if (device->host != host) {
-			continue;
-		}
-		if (host->can_queue) {
-			device->queue_depth =  host->can_queue - 1;
-		} else {
-			device->queue_depth = 1;
-		}
+	if (host->can_queue && device->tagged_supported) {
+		scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
+				host->can_queue - 1);
+	} else {
+		scsi_adjust_queue_depth(device, 0, 1);
 	}
+	return 0;
 }
 
 static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
@@ -2194,11 +2190,10 @@ static s32 adpt_scsi_register(adpt_hba* pHba,Scsi_Host_Template * sht)
 	host->max_id = 16;
 	host->max_lun = 256;
 	host->max_channel = pHba->top_scsi_channel + 1;
-	host->cmd_per_lun = 256;
+	host->cmd_per_lun = 1;
 	host->unique_id = (uint) pHba;
 	host->sg_tablesize = pHba->sg_tablesize;
 	host->can_queue = pHba->post_fifo_size;
-	host->select_queue_depths = adpt_select_queue_depths;
 
 	return 0;
 }

@@ -430,8 +430,7 @@ static void ahc_linux_freeze_sim_queue(struct ahc_softc *ahc);
 static void ahc_linux_release_sim_queue(u_long arg);
 static int  ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 static void ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc);
-static void ahc_linux_select_queue_depth(struct Scsi_Host *host,
-					 Scsi_Device *scsi_devs);
+static int  ahc_linux_slave_attach(Scsi_Device *device);
 static void ahc_linux_device_queue_depth(struct ahc_softc *ahc,
 					 Scsi_Device *device);
 static struct ahc_linux_target*	ahc_linux_alloc_target(struct ahc_softc*,
@@ -1131,7 +1130,6 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	host->can_queue = AHC_MAX_QUEUE;
 	host->cmd_per_lun = 2;
 	host->sg_tablesize = AHC_NSEG;
-	host->select_queue_depths = ahc_linux_select_queue_depth;
 	/* XXX No way to communicate the ID for multiple channels */
 	host->this_id = ahc->our_id;
 	host->irq = ahc->platform_data->irq;
@@ -1449,25 +1447,17 @@ ahc_platform_abort_scbs(struct ahc_softc *ahc, int target, char channel,
  * Sets the queue depth for each SCSI device hanging
  * off the input host adapter.
  */
-static void
-ahc_linux_select_queue_depth(struct Scsi_Host * host,
-			     Scsi_Device * scsi_devs)
+static int
+ahc_linux_slave_attach(Scsi_Device * device)
 {
-	Scsi_Device *device;
 	struct	ahc_softc *ahc;
 	u_long	flags;
-	int	scbnum;
 
-	ahc = *((struct ahc_softc **)host->hostdata);
+	ahc = *((struct ahc_softc **)device->host->hostdata);
 	ahc_lock(ahc, &flags);
-	scbnum = 0;
-	for (device = scsi_devs; device != NULL; device = device->next) {
-		if (device->host == host) {
-			ahc_linux_device_queue_depth(ahc, device);
-			scbnum += device->queue_depth;
-		}
-	}
+	ahc_linux_device_queue_depth(ahc, device);
 	ahc_unlock(ahc, &flags);
+	return 0;
 }
 
 /*
@@ -1512,7 +1502,8 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc, Scsi_Device * device)
 		}
 	}
 	if (tags != 0) {
-		device->queue_depth = tags;
+		scsi_adjust_queue_depth(device, MSG_ORDERED_TAG, tags);
+		/* device->queue_depth = tags; */
 		ahc_set_tags(ahc, &devinfo, AHC_QUEUE_TAGGED);
 		printf("scsi%d:%c:%d:%d: Tagged Queuing enabled.  Depth %d\n",
 	       	       ahc->platform_data->host->host_no, device->channel + 'A',
@@ -1523,8 +1514,9 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc, Scsi_Device * device)
 		 * us at any time even though we can only execute them
 		 * serially on the controller/device.  This should remove
 		 * some latency.
-		 */
 		device->queue_depth = 2;
+		 */
+		scsi_adjust_queue_depth(device, 0, device->host->cmd_per_lun);
 	}
 }
 

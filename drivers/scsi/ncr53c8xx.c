@@ -378,8 +378,6 @@ static Scsi_Host_Template	*the_template	= NULL;
 
 #define ScsiResult(host_code, scsi_code) (((host_code) << 16) + ((scsi_code) & 0x7f))
 
-static void ncr53c8xx_select_queue_depths(
-	struct Scsi_Host *host, struct scsi_device *devlist);
 static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ncr53c8xx_timeout(unsigned long np);
 
@@ -3710,7 +3708,6 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->dma_channel	= 0;
 	instance->cmd_per_lun	= MAX_TAGS;
 	instance->can_queue	= (MAX_START-4);
-	instance->select_queue_depths = ncr53c8xx_select_queue_depths;
 	scsi_set_pci_device(instance, device->pdev);
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
@@ -8500,56 +8497,57 @@ static void __init ncr_getclock (ncb_p np, int mult)
 **   Linux select queue depths function
 */
 
-static void ncr53c8xx_select_queue_depths(struct Scsi_Host *host, struct scsi_device *devlist)
+int ncr53c8xx_slave_attach(Scsi_Device *device)
 {
-	struct scsi_device *device;
+	struct Scsi_Host *host = device->host;
+	ncb_p np;
+	tcb_p tp;
+	lcb_p lp;
+	int numtags, depth_to_use;
 
-	for (device = devlist; device; device = device->next) {
-		ncb_p np;
-		tcb_p tp;
-		lcb_p lp;
-		int numtags;
+	np = ((struct host_data *) host->hostdata)->ncb;
+	tp = &np->target[device->id];
+	lp = tp->lp[device->lun];
 
-		if (device->host != host)
-			continue;
+	/*
+	**	Select queue depth from driver setup.
+	**	Donnot use more than configured by user.
+	**	Use at least 2.
+	**	Donnot use more than our maximum.
+	*/
+	numtags = device_queue_depth(np->unit, device->id, device->lun);
+	if (numtags > tp->usrtags)
+		numtags = tp->usrtags;
+	if (!device->tagged_supported)
+		numtags = 1;
+	depth_to_use = numtags;
+	if (depth_to_use < 2)
+		depth_to_use = 2;
+	if (depth_to_use > MAX_TAGS)
+		depth_to_use = MAX_TAGS;
 
-		np = ((struct host_data *) host->hostdata)->ncb;
-		tp = &np->target[device->id];
-		lp = tp->lp[device->lun];
+	scsi_adjust_queue_depth(device,
+				(device->tagged_supported ?
+				 MSG_SIMPLE_TAG : 0),
+				depth_to_use);
 
-		/*
-		**	Select queue depth from driver setup.
-		**	Donnot use more than configured by user.
-		**	Use at least 2.
-		**	Donnot use more than our maximum.
-		*/
-		numtags = device_queue_depth(np->unit, device->id, device->lun);
-		if (numtags > tp->usrtags)
-			numtags = tp->usrtags;
-		if (!device->tagged_supported)
-			numtags = 1;
-		device->queue_depth = numtags;
-		if (device->queue_depth < 2)
-			device->queue_depth = 2;
-		if (device->queue_depth > MAX_TAGS)
-			device->queue_depth = MAX_TAGS;
-
-		/*
-		**	Since the queue depth is not tunable under Linux,
-		**	we need to know this value in order not to 
-		**	announce stupid things to user.
-		*/
-		if (lp) {
-			lp->numtags = lp->maxtags = numtags;
-			lp->scdev_depth = device->queue_depth;
-		}
-		ncr_setup_tags (np, device->id, device->lun);
+	/*
+	**	Since the queue depth is not tunable under Linux,
+	**	we need to know this value in order not to 
+	**	announce stupid things to user.
+	*/
+	if (lp) {
+		lp->numtags = lp->maxtags = numtags;
+		lp->scdev_depth = depth_to_use;
+	}
+	ncr_setup_tags (np, device->id, device->lun);
 
 #ifdef DEBUG_NCR53C8XX
-printk("ncr53c8xx_select_queue_depth: host=%d, id=%d, lun=%d, depth=%d\n",
-	np->unit, device->id, device->lun, device->queue_depth);
+	printk("ncr53c8xx_select_queue_depth: host=%d, id=%d, lun=%d, depth=%d\n",
+	       np->unit, device->id, device->lun, depth_to_use);
 #endif
-	}
+
+	return 0;
 }
 
 /*

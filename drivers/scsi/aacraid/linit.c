@@ -128,7 +128,7 @@ static int aac_eh_device_reset(Scsi_Cmnd* cmd);
 static int aac_eh_bus_reset(Scsi_Cmnd* cmd);
 static int aac_eh_reset(Scsi_Cmnd* cmd);
 
-static void aac_queuedepth(struct Scsi_Host *, Scsi_Device *);
+static int aac_slave_attach(Scsi_Device *);
 
 /**
  *	aac_detect	-	Probe for aacraid cards
@@ -227,12 +227,6 @@ static int aac_detect(Scsi_Host_Template *template)
 			 * value returned as aac->id.
 			 */
 			host_ptr->unique_id = aac_count - 1;
-			/*
-			 *	This function is called after the device list has
-			 *	been built to find the tagged queueing depth 
-			 *	supported for each device.
-			 */
-			host_ptr->select_queue_depths = aac_queuedepth;
 			aac = (struct aac_dev *)host_ptr->hostdata;
 			/* attach a pointer back to Scsi_Host */
 			aac->scsi_host_ptr = host_ptr;	
@@ -520,31 +514,25 @@ static int aac_biosparm(Scsi_Disk *disk, struct block_device *bdev, int *geom)
 }
 
 /**
- *	aac_queuedepth		-	compute queue depths
- *	@host:	SCSI host in question
- *	@dev:	SCSI device we are considering
+ *	aac_slave_attach	-	do device specific setup
+ *	@dev:	SCSI device we are attaching
  *
- *	Selects queue depths for each target device based on the host adapter's
- *	total capacity and the queue depth supported by the target device.
- *	A queue depth of one automatically disables tagged queueing.
+ * 	Currently, all we do is set the queue depth on the device.
  */
 
-static void aac_queuedepth(struct Scsi_Host * host, Scsi_Device * dev )
+static int aac_slave_attach(Scsi_Device * dev )
 {
-	Scsi_Device * dptr;
 
-	dprintk((KERN_DEBUG "aac_queuedepth.\n"));
-	dprintk((KERN_DEBUG "Device #   Q Depth   Online\n"));
-	dprintk((KERN_DEBUG "---------------------------\n"));
-	for(dptr = dev; dptr != NULL; dptr = dptr->next)
-	{
-		if(dptr->host == host)
-		{
-			dptr->queue_depth = 10;		
-			dprintk((KERN_DEBUG "  %2d         %d        %d\n", 
-				dptr->id, dptr->queue_depth, dptr->online));
-		}
-	}
+	if(dev->tagged_supported)
+		scsi_adjust_queue_depth(dev, MSG_ORDERED_TAG, 128);
+	else
+		scsi_adjust_queue_depth(dev, 0, 1);
+
+	dprintk((KERN_DEBUG "(scsi%d:%d:%d:%d) Tagged Queue depth %2d, "
+				"%s\n", dev->host->host_no, dev->channel,
+				dev->id, dev->lun, dev->new_queue_depth,
+				dev->online ? "OnLine" : "OffLine"));
+	return 0;
 }
 
 
@@ -693,6 +681,7 @@ static Scsi_Host_Template driver_template = {
 	ioctl:          	aac_ioctl,
 	queuecommand:   	aac_queuecommand,
 	bios_param:     	aac_biosparm,	
+	slave_attach:		aac_slave_attach,
 	can_queue:      	AAC_NUM_IO_FIB,	
 	this_id:        	16,
 	sg_tablesize:   	16,
