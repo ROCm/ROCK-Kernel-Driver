@@ -1,8 +1,8 @@
 /*
  * Generic pidhash and scalable, time-bounded PID allocator
  *
- * (C) 2002 William Irwin, IBM
- * (C) 2002 Ingo Molnar, Red Hat
+ * (C) 2002-2004 William Irwin, Oracle
+ * (C) 2002-2004 Ingo Molnar, Red Hat
  *
  * pid-structures are backing objects for tasks sharing a given ID to chain
  * against. There is very little to them aside from hashing them and
@@ -38,6 +38,9 @@ int last_pid;
 #define PIDMAP_ENTRIES		(PID_MAX_LIMIT/PAGE_SIZE/8)
 #define BITS_PER_PAGE		(PAGE_SIZE*8)
 #define BITS_PER_PAGE_MASK	(BITS_PER_PAGE-1)
+#define mk_pid(map, off)	(((map) - pidmap_array)*BITS_PER_PAGE + (off))
+#define find_next_offset(map, off)					\
+		find_next_zero_bit((map)->page, BITS_PER_PAGE, off)
 
 /*
  * PID-map pages start out as NULL, they get allocated upon
@@ -53,8 +56,6 @@ typedef struct pidmap {
 static pidmap_t pidmap_array[PIDMAP_ENTRIES] =
 	 { [ 0 ... PIDMAP_ENTRIES-1 ] = { ATOMIC_INIT(BITS_PER_PAGE), NULL } };
 
-static pidmap_t *map_limit = pidmap_array + PIDMAP_ENTRIES;
-
 static spinlock_t pidmap_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 fastcall void free_pidmap(int pid)
@@ -66,15 +67,18 @@ fastcall void free_pidmap(int pid)
 	atomic_inc(&map->nr_free);
 }
 
-/*
- * Here we search for the next map that has free bits left.
- * Normally the next map has free PIDs.
- */
-static inline pidmap_t *next_free_map(pidmap_t *map, int *max_steps)
+int alloc_pidmap(void)
 {
-	while (--*max_steps) {
-		if (++map == map_limit)
-			map = pidmap_array;
+	int i, offset, max_scan, pid, last = last_pid;
+	pidmap_t *map;
+
+	pid = last + 1;
+	if (pid >= pid_max)
+		pid = RESERVED_PIDS;
+	offset = pid & BITS_PER_PAGE_MASK;
+	map = &pidmap_array[pid/BITS_PER_PAGE];
+	max_scan = (pid_max + BITS_PER_PAGE - 1)/BITS_PER_PAGE - !offset;
+	for (i = 0; i <= max_scan; ++i) {
 		if (unlikely(!map->page)) {
 			unsigned long page = get_zeroed_page(GFP_KERNEL);
 			/*
@@ -87,62 +91,39 @@ static inline pidmap_t *next_free_map(pidmap_t *map, int *max_steps)
 			else
 				map->page = (void *)page;
 			spin_unlock(&pidmap_lock);
-
-			if (!map->page)
+			if (unlikely(!map->page))
 				break;
 		}
-		if (atomic_read(&map->nr_free))
-			return map;
+		if (likely(atomic_read(&map->nr_free))) {
+			do {
+				if (!test_and_set_bit(offset, map->page)) {
+					atomic_dec(&map->nr_free);
+					last_pid = pid;
+					return pid;
+				}
+				offset = find_next_offset(map, offset);
+				pid = mk_pid(map, offset);
+			/*
+			 * find_next_offset() found a bit, the pid from it
+			 * is in-bounds, and if we fell back to the last
+			 * bitmap block and the final block was the same
+			 * as the starting point, pid is before last_pid.
+			 */
+			} while (offset < BITS_PER_PAGE && pid < pid_max &&
+					(i != max_scan || pid < last ||
+					    !((last+1) & BITS_PER_PAGE_MASK)));
+		}
+		if (map < &pidmap_array[(pid_max-1)/BITS_PER_PAGE]) {
+			++map;
+			offset = 0;
+		} else {
+			map = &pidmap_array[0];
+			offset = RESERVED_PIDS;
+			if (unlikely(last == offset))
+				break;
+		}
+		pid = mk_pid(map, offset);
 	}
-	return NULL;
-}
-
-int alloc_pidmap(void)
-{
-	int pid, offset, max_steps = PIDMAP_ENTRIES + 1;
-	pidmap_t *map;
-
-	pid = last_pid + 1;
-	if (pid >= pid_max)
-		pid = RESERVED_PIDS;
-
-	offset = pid & BITS_PER_PAGE_MASK;
-	map = pidmap_array + pid / BITS_PER_PAGE;
-
-	if (likely(map->page && !test_and_set_bit(offset, map->page))) {
-		/*
-		 * There is a small window for last_pid updates to race,
-		 * but in that case the next allocation will go into the
-		 * slowpath and that fixes things up.
-		 */
-return_pid:
-		atomic_dec(&map->nr_free);
-		last_pid = pid;
-		return pid;
-	}
-	
-	if (!offset || !atomic_read(&map->nr_free)) {
-next_map:
-		map = next_free_map(map, &max_steps);
-		if (!map)
-			goto failure;
-		offset = 0;
-	}
-	/*
-	 * Find the next zero bit:
-	 */
-scan_more:
-	offset = find_next_zero_bit(map->page, BITS_PER_PAGE, offset);
-	if (offset >= BITS_PER_PAGE)
-		goto next_map;
-	if (test_and_set_bit(offset, map->page))
-		goto scan_more;
-
-	/* we got the PID: */
-	pid = (map - pidmap_array) * BITS_PER_PAGE + offset;
-	goto return_pid;
-
-failure:
 	return -1;
 }
 
