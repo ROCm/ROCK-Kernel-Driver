@@ -5,8 +5,8 @@
 #include <linux/module.h>
 #include <linux/threads.h>
 #include <linux/smp.h>
-#include <linux/elfcore.h>
 #include <linux/sched.h>
+#include <linux/elfcore.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/tty.h>
