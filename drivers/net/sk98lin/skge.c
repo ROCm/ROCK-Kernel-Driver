@@ -541,6 +541,48 @@ static int __init skge_probe (void)
 
 		boards_found++;
 
+		/* More then one port found */
+		if ((pAC->GIni.GIMacsFound == 2 ) && (pAC->RlmtNets == 2)) {
+			if ((dev = init_etherdev(NULL, sizeof(DEV_NET))) == 0) {
+				printk(KERN_ERR "Unable to allocate etherdev "
+					"structure!\n");
+				break;
+			}
+
+			pAC->dev[1] = dev;
+			pNet = dev->priv;
+			pNet->PortNr = 1;
+			pNet->NetNr = 1;
+			pNet->pAC = pAC;
+			pNet->Mtu = 1500;
+			pNet->Up = 0;
+
+			dev->open =		&SkGeOpen;
+			dev->stop =		&SkGeClose;
+			dev->hard_start_xmit =	&SkGeXmit;
+			dev->get_stats =	&SkGeStats;
+			dev->set_multicast_list = &SkGeSetRxMode;
+			dev->set_mac_address =	&SkGeSetMacAddr;
+			dev->do_ioctl =		&SkGeIoctl;
+			dev->change_mtu =	&SkGeChangeMtu;
+
+			pProcFile = create_proc_entry(dev->name, 
+				S_IFREG | 0444, pSkRootDir);
+			pProcFile->read_proc = proc_read;
+			pProcFile->write_proc = NULL;
+			pProcFile->nlink = 1;
+			pProcFile->size = sizeof(dev->name+1);
+			pProcFile->data = (void*)pProcFile;
+
+			memcpy((caddr_t) &dev->dev_addr,
+			(caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);
+	
+			printk("%s: %s\n", dev->name, pAC->DeviceStr);
+			printk("      PrefPort:B  RlmtMode:Dual Check Link State\n");
+		
+		}
+
+
 		/*
 		 * This is bollocks, but we need to tell the net-init
 		 * code that it shall go for the next device.
