@@ -15,7 +15,6 @@
  *   Device specific file operations
  *        xpram_iotcl
  *        xpram_open
- *        xpram_release
  *
  * "ad-hoc" partitioning:
  *    the expanded memory can be partitioned among several devices 
@@ -36,6 +35,7 @@
 #include <linux/blkpg.h>
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
 #include <linux/device.h>
+#include <linux/bio.h>
 #include <asm/uaccess.h>
 
 #define XPRAM_NAME	"xpram"
@@ -47,10 +47,13 @@
 #define PRINT_WARN(x...)	printk(KERN_WARNING XPRAM_NAME " warning:" x)
 #define PRINT_ERR(x...)		printk(KERN_ERR XPRAM_NAME " error:" x)
 
-static struct device xpram_sys_device = {
-	name: "S/390 expanded memory RAM disk",
-	bus_id: "xpram",
-};
+static struct sys_device xpram_sys_device = {
+	.name = "S/390 expanded memory RAM disk",
+	.dev  = {
+		.name   = "S/390 expanded memory RAM disk",
+		.bus_id = "xpram",
+	},
+}; 
 
 typedef struct {
 	unsigned long	size;		/* size of xpram segment in pages */
@@ -312,10 +315,12 @@ static int xpram_make_request(request_queue_t *q, struct bio *bio)
 		}
 	}
 	set_bit(BIO_UPTODATE, &bio->bi_flags);
-	bio->bi_end_io(bio);
+	bytes = bio->bi_size;
+	bio->bi_size = 0;
+	bio->bi_end_io(bio, bytes, 0);
 	return 0;
 fail:
-	bio_io_error(bio);
+	bio_io_error(bio, bio->bi_size);
 	return 0;
 }
 
@@ -329,7 +334,6 @@ static int xpram_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-
 static int xpram_ioctl (struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
@@ -338,7 +342,7 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	int idx = minor(inode->i_rdev);
 	if (idx >= xpram_devs)
 		return -ENODEV;
-	if (cmd != HDIO_GETGEO)
+ 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
 	 * get geometry: we have to fake one...  trim the size to a
@@ -355,14 +359,12 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	put_user(4, &geo->start);
 	return 0;
 }
-}
 
 static struct block_device_operations xpram_devops =
 {
 	owner:   THIS_MODULE,
 	ioctl:   xpram_ioctl,
 	open:    xpram_open,
-	release: xpram_release,
 };
 
 /*
@@ -492,7 +494,7 @@ static void __exit xpram_exit(void)
 		del_gendisk(xpram_disks + i);
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);
-	unregister_sys_device(&xpram_sys_device);
+	sys_device_unregister(&xpram_sys_device);
 }
 
 static int __init xpram_init(void)
@@ -510,12 +512,12 @@ static int __init xpram_init(void)
 	rc = xpram_setup_sizes(xpram_pages);
 	if (rc)
 		return rc;
-	rc = register_sys_device(&xpram_sys_device);
+	rc = sys_device_register(&xpram_sys_device);
 	if (rc)
 		return rc;
 	rc = xpram_setup_blkdev();
 	if (rc)
-		unregister_sys_device(&xpram_sys_device);
+		sys_device_unregister(&xpram_sys_device);
 	return rc;
 }
 

@@ -33,6 +33,9 @@
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
 
+/* This is definitely a GPL-only symbol */
+EXPORT_SYMBOL_GPL(cpu_gdt_table);
+
 #if defined(CONFIG_APM_MODULE)
 extern void machine_real_restart(unsigned char *, int);
 EXPORT_SYMBOL(machine_real_restart);

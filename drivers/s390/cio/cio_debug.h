@@ -3,9 +3,9 @@
 
 #define SANITY_CHECK(irq) do { \
 if (irq > highest_subchannel || irq < 0) \
-		return (-ENODEV); \
+		return -ENODEV; \
 	if (ioinfo[irq] == INVALID_STORAGE_AREA) \
-		return (-ENODEV); \
+		return -ENODEV; \
         if (ioinfo[irq]->st) \
                 return -ENODEV; \
 	} while(0)
@@ -20,14 +20,14 @@ if (irq > highest_subchannel || irq < 0) \
 #define CIO_MSG_EVENT(imp, args...) do { \
         if (cio_debug_initialized) \
                 debug_sprintf_event(cio_debug_msg_id, \
-                                    imp, \
+                                    imp , \
                                     ##args); \
         } while (0)
 
 #define CIO_CRW_EVENT(imp, args...) do { \
         if (cio_debug_initialized) \
                 debug_sprintf_event(cio_debug_crw_id, \
-                                    imp, \
+                                    imp , \
                                     ##args); \
         } while (0)
 

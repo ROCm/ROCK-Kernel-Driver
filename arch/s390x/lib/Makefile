@@ -6,8 +6,7 @@ L_TARGET = lib.a
 
 EXTRA_AFLAGS := -traditional
 
-obj-y = checksum.o delay.o memset.o misaligned.o strcmp.o strncpy.o uaccess.o
-export-objs += misaligned.o
+obj-y = delay.o memset.o strcmp.o strncpy.o uaccess.o
 
 include $(TOPDIR)/Rules.make
 

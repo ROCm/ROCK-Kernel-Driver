@@ -21,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO			    */
+#include <linux/bio.h>
 
 #include <asm/dasd.h>
 #include <asm/debug.h>
@@ -52,31 +53,6 @@ typedef struct dasd_diag_req_t {
 	int block_count;
 	diag_bio_t bio[0];
 } dasd_diag_req_t;
-
-
-static __inline__ int
-dia210(void *devchar)
-{
-	int rc;
-
-	__asm__ __volatile__("	  diag	%1,0,0x210\n"
-			     "0:  ipm	%0\n"
-			     "	  srl	%0,28\n"
-			     "1:\n"
-			     ".section .fixup,\"ax\"\n"
-			     "2:  lhi	%0,3\n"
-			     "	  bras	1,3f\n"
-			     "	  .long 1b\n"
-			     "3:  l	1,0(1)\n"
-			     "	  br	1\n"
-			     ".previous\n"
-			     ".section __ex_table,\"a\"\n"
-			     "	  .align 4\n"
-			     "	  .long 0b,2b\n" ".previous\n":"=d"(rc)
-			     :"d"((void *) __pa(devchar))
-			     :"1");
-	return rc;
-}
 
 static __inline__ int
 dia250(void *iob, int cmd)
@@ -155,7 +131,7 @@ dasd_start_diag(dasd_ccw_req_t * cqr)
 	private->iob.key = 0;
 	private->iob.flags = 2;	/* do asynchronous io */
 	private->iob.block_count = dreq->block_count;
-	private->iob.interrupt_params = (u32) cqr;
+	private->iob.interrupt_params = (u32)(addr_t) cqr;
 	private->iob.bio_list = __pa(dreq->bio);
 
 	cqr->startclk = get_clock();
@@ -196,21 +172,21 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	ip = S390_lowcore.ext_params;
 
 	cpu = smp_processor_id();
-	irq_enter(cpu, -1);
+	irq_enter();
 
 	if (!ip) {		/* no intparm: unsolicited interrupt */
 		MESSAGE(KERN_DEBUG, "%s", "caught unsolicited interrupt");
-		irq_exit(cpu, -1);
+		irq_exit();
 		return;
 	}
-	cqr = (dasd_ccw_req_t *) ip;
+	cqr = (dasd_ccw_req_t *)(addr_t) ip;
 	device = (dasd_device_t *) cqr->device;
 	if (strncmp(device->discipline->ebcname, (char *) &cqr->magic, 4)) {
 		DEV_MESSAGE(KERN_WARNING, device,
 			    " magic number of dasd_ccw_req_t 0x%08X doesn't"
 			    " match discipline 0x%08X",
 			    cqr->magic, *(int *) (&device->discipline->name));
-		irq_exit(cpu, -1);
+		irq_exit();
 		return;
 	}
 
@@ -244,8 +220,7 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	dasd_schedule_bh(device);
 
 	spin_unlock_irqrestore(get_irq_lock(device->devinfo.irq), flags);
-	irq_exit(cpu, -1);
-
+	irq_exit();
 }
 
 static int
@@ -273,7 +248,7 @@ dasd_diag_check_device(dasd_device_t *device)
 	rdc_data->dev_nr = device->devinfo.devno;
 	rdc_data->rdc_len = sizeof (dasd_diag_characteristics_t);
 
-	rc = dia210(rdc_data);
+	rc = diag210((diag210_t *) rdc_data);
 	if (rc)
 		return -ENOTSUPP;
 

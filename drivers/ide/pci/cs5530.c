@@ -427,6 +427,7 @@ static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

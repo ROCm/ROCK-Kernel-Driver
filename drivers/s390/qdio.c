@@ -245,26 +245,21 @@ static __inline__ int atomic_return_add (int i, atomic_t *v)
 static void qdio_wait_nonbusy(unsigned int timeout)
 {
         unsigned int start;
-        unsigned long flags;
         char dbf_text[15];
 
 	sprintf(dbf_text,"wtnb%4x",timeout);
 	QDIO_DBF_TEXT3(0,trace,dbf_text);
 
 	start=qdio_get_millis();
-	save_flags(flags); cli();
 	for (;;) {
 		set_task_state(current,TASK_INTERRUPTIBLE);
 		if (qdio_get_millis()-start>timeout) {
 			goto out;
 		}
-		restore_flags(flags);
 		schedule_timeout(((start+timeout-qdio_get_millis())>>10)*HZ);
-		save_flags(flags); cli();
 	}
 out:
 	set_task_state(current,TASK_RUNNING);
-	restore_flags(flags);
 }
 
 static int qdio_wait_for_no_use_count(atomic_t *use_count)

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/hpt366.c		Version 0.33	April 17, 2002
+ * linux/drivers/ide/hpt366.c		Version 0.34	Sept 17, 2002
  *
  * Copyright (C) 1999-2002		Andre Hedrick <andre@linux-ide.org>
  * Portions Copyright (C) 2001	        Sun Microsystems, Inc.
@@ -1185,6 +1185,7 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

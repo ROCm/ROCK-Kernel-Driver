@@ -195,6 +195,10 @@ static int nodemgr_read_quadlet(struct hpsb_host *host,
 		ret = hpsb_read(host, nodeid, generation, address, quad, 4);
 		if (!ret)
 			break;
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (schedule_timeout (HZ/3))
+			return -1;
 	}
 	*quad = be32_to_cpu(*quad);
 
@@ -207,8 +211,10 @@ static int nodemgr_size_text_leaf(struct hpsb_host *host,
 {
 	quadlet_t quad;
 	int size = 0;
+
 	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 		return -1;
+
 	if (CONFIG_ROM_KEY(quad) == CONFIG_ROM_DESCRIPTOR_LEAF) {
 		/* This is the offset.  */
 		address += 4 * CONFIG_ROM_VALUE(quad); 
@@ -217,6 +223,7 @@ static int nodemgr_size_text_leaf(struct hpsb_host *host,
 		/* Now we got the size of the text descriptor leaf. */
 		size = CONFIG_ROM_LEAF_LENGTH(quad);
 	}
+
 	return size;
 }
 
@@ -228,7 +235,7 @@ static int nodemgr_read_text_leaf(struct node_entry *ne,
 	int i, size, ret;
 
 	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad)
-	    && CONFIG_ROM_KEY(quad) != CONFIG_ROM_DESCRIPTOR_LEAF)
+	    || CONFIG_ROM_KEY(quad) != CONFIG_ROM_DESCRIPTOR_LEAF)
 		return -1;
 
 	/* This is the offset.  */

@@ -98,7 +98,7 @@ static unsigned int init_chipset_aec62xx(struct pci_dev *, const char *);
 static void init_hwif_aec62xx(ide_hwif_t *);
 static void init_dma_aec62xx(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t aec62xx_chipsets[] __initdata = {
+static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP850UF,

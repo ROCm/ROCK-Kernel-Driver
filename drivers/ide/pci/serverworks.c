@@ -784,6 +784,7 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

@@ -29,7 +29,7 @@ static unsigned int init_chipset_cs5530(struct pci_dev *, const char *);
 static void init_hwif_cs5530(ide_hwif_t *);
 static void init_dma_cs5530(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t cs5530_chipsets[] __initdata = {
+static ide_pci_device_t cs5530_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CYRIX,
 		device:		PCI_DEVICE_ID_CYRIX_5530_IDE,

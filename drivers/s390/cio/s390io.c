@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/s390io.c
  *   S/390 common I/O routines
- *   $Revision: 1.11 $
+ *   $Revision: 1.33 $
  *
  *  S390 version
  *    Copyright (C) 1999, 2000 IBM Deutschland Entwicklung GmbH,
@@ -75,9 +75,8 @@ static schib_t p_init_schib;
 static __u64 irq_IPL_TOD; // FIXME: can be on stack
 
 static void s390_process_subchannels (void);
-static void s390_device_recognition_all (void);
 static int s390_SenseID (int irq, senseid_t * sid, __u8 lpm);
-static int s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid);
+static int s390_SetPGID (int irq, __u8 lpm);
 static int s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid);
 
 /* FIXME: intermixed with proc.c */
@@ -86,7 +85,6 @@ unsigned long s390_irq_count[NR_CPUS];	/* trace how many irqs have occured per c
 
 int cio_show_msg;
 static int cio_notoper_msg = 1;
-static int cio_sid_with_pgid;     /* if we need a PGID for SenseID, switch this on */
 
 static int __init
 cio_setup (char *parm)
@@ -124,25 +122,6 @@ cio_notoper_setup (char *parm)
 }
 
 __setup ("cio_notoper_msg=", cio_notoper_setup);
-
-static int __init
-cio_pgid_setup (char *parm)
-{
-	if (!strcmp (parm, "yes")) {
-		cio_sid_with_pgid = 1;
-	} else if (!strcmp (parm, "no")) {
-		cio_sid_with_pgid = 0;
-	} else {
-		printk (KERN_ERR 
-			"cio_pgid_setup : invalid cio_msg parameter '%s'",
-			parm);
-
-	}
-
-	return 1;
-}
-
-__setup ("cio_sid_with_pgid=", cio_pgid_setup);
 
 /* This function is replacing the init_IRQ function in
  * arch/s390(x)/kernel/irq.c and is called early during
@@ -199,13 +178,20 @@ s390_init_IRQ (void)
 	cr6 = 0x10000000;
 	__ctl_load (cr6, 6, 6);
 
-	s390_device_recognition_all ();
-
 	init_IRQ_complete = 1;
 
 	local_irq_restore (flags);
 
 	return;
+}
+
+/*
+ * init_IRQ wrapper
+ */
+void __init
+init_IRQ(void)
+{
+	s390_init_IRQ();
 }
 
 /*
@@ -217,6 +203,51 @@ init_IRQ_handler (int irq, void *dev_id, struct pt_regs *regs)
 	/* this is a dummy handler only ... */
 }
 
+/* 
+ * diag210 is used under VM to get information about a virtual device
+ */
+#ifdef CONFIG_ARCH_S390X
+int diag210(diag210_t * addr)
+{
+	/*
+	 * diag 210 needs its data below the 2GB border, so we
+	 * use a static data area to be sure
+	 */
+	static diag210_t diag210_tmp;
+	static spinlock_t diag210_lock = SPIN_LOCK_UNLOCKED;
+	unsigned long flags;
+	int ccode;
+
+	spin_lock_irqsave(&diag210_lock, flags);
+	diag210_tmp = *addr;
+
+	asm volatile (
+		"   sam31\n"
+		"   diag  %1,0,0x210\n"
+		"   sam64\n"
+		"   ipm   %0\n"
+		"   srl   %0,28"
+		: "=d" (ccode) : "a" (__pa(&diag210_tmp)) : "cc", "memory" );
+	
+	*addr = diag210_tmp;
+	spin_unlock_irqrestore(&diag210_lock, flags);
+
+	return ccode;
+}
+#else
+int diag210(diag210_t * addr)
+{
+	int ccode;
+
+	asm volatile (
+		"   diag  %1,0,0x210\n"
+		"   ipm   %0\n"
+		"   srl   %0,28"
+		: "=d" (ccode) : "a" (__pa(addr)) : "cc", "memory" );
+
+	return ccode;
+}
+#endif
 
 /*
  * Input :
@@ -225,31 +256,28 @@ init_IRQ_handler (int irq, void *dev_id, struct pt_regs *regs)
  * Output : none
  */
 static inline void
-_VM_virtual_device_info (__u16 devno, senseid_t * ps)
+VM_virtual_device_info (__u16 devno, senseid_t * ps)
 {
-	diag210_t *p_diag_data;
+	diag210_t diag_data;
 	int ccode;
 
 	int error = 0;
 
 	CIO_TRACE_EVENT (4, "VMvdinf");
 
-	if (init_IRQ_complete) {
-		p_diag_data = kmalloc (sizeof (diag210_t), GFP_DMA);
-	} else {
-		p_diag_data = alloc_bootmem_low (sizeof (diag210_t));
+	diag_data = (diag210_t) {
+		.vrdcdvno = devno,
+		.vrdclen = sizeof (diag_data),
+	};
 
-	}
-
-	p_diag_data->vrdcdvno = devno;
-	p_diag_data->vrdclen = sizeof (diag210_t);
-	ccode = diag210 ((diag210_t *) virt_to_phys (p_diag_data));
+	ccode = diag210 (&diag_data);
 	ps->reserved = 0xff;
 
-	switch (p_diag_data->vrdcvcla) {
+	/* FIXME: this would be much nicer if it were table driven */
+	switch (diag_data.vrdcvcla) {
 	case 0x80:
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 00:
 
 			ps->cu_type = 0x3215;
@@ -268,7 +296,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	case 0x40:
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 0xC0:
 
 			ps->cu_type = 0x5080;
@@ -305,7 +333,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	case 0x20:
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 0x84:
 
 			ps->cu_type = 0x3505;
@@ -336,7 +364,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	case 0x10:
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 0x84:
 
 			ps->cu_type = 0x3525;
@@ -413,7 +441,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	case 0x08:
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 0x82:
 
 			ps->cu_type = 0x3422;
@@ -468,7 +496,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	case 02:		/* special device class ... */
 
-		switch (p_diag_data->vrdcvtyp) {
+		switch (diag_data.vrdcvtyp) {
 		case 0x20:	/* OSA */
 
 			ps->cu_type = 0x3088;
@@ -493,13 +521,6 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 
 	}
 
-	if (init_IRQ_complete) {
-		kfree (p_diag_data);
-	} else {
-		free_bootmem ((unsigned long) p_diag_data, sizeof (diag210_t));
-
-	}
-
 	if (error) 
 		CIO_DEBUG_ALWAYS(KERN_ERR, 0,
 				 "DIAG X'210' for "
@@ -510,12 +531,11 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 				 "rdev model: %02X\n",
 				 devno,
 				 ccode,
-				 p_diag_data->vrdcvcla,
-				 p_diag_data->vrdcvtyp,
-				 p_diag_data->vrdcrccl,
-				 p_diag_data->vrdccrty,
-				 p_diag_data->vrdccrmd);
-		
+				 diag_data.vrdcvcla,
+				 diag_data.vrdcvtyp,
+				 diag_data.vrdcrccl,
+				 diag_data.vrdccrty,
+				 diag_data.vrdccrmd);
 }
 
 /*
@@ -544,7 +564,7 @@ _VM_virtual_device_info (__u16 devno, senseid_t * ps)
 int
 read_dev_chars (int irq, void **buffer, int length)
 {
-	unsigned int flags;
+	unsigned long flags;
 	ccw1_t *rdc_ccw;
 	devstat_t devstat;
 	char *rdc_buf;
@@ -556,17 +576,13 @@ read_dev_chars (int irq, void **buffer, int length)
 
 	char dbf_txt[15];
 
-	if (!buffer || !length) {
-		return (-EINVAL);
-
-	}
+	if (!buffer || !length) 
+		return -EINVAL;
 
 	SANITY_CHECK (irq);
 
-	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
-
-	}
+	if (ioinfo[irq]->ui.flags.oper == 0) 
+		return -ENODEV;
 
 	sprintf (dbf_txt, "rddevch%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
@@ -656,9 +672,11 @@ read_dev_chars (int irq, void **buffer, int length)
 
 		}
 
+	} else {
+		local_irq_restore(flags);
 	}
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -678,11 +696,11 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 	SANITY_CHECK (irq);
 
 	if (!buffer || !length) {
-		return (-EINVAL);
+		return -EINVAL;
 	} else if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 	} else if (ioinfo[irq]->ui.flags.esid == 0) {
-		return (-EOPNOTSUPP);
+		return -EOPNOTSUPP;
 
 	}
 
@@ -693,7 +711,7 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 	 * scan for RCD command in extended SenseID data
 	 */
 
-	for (ciw_cnt = 0; (found == 0) && (ciw_cnt < 62); ciw_cnt++) {
+	for (ciw_cnt = 0; (found == 0) && (ciw_cnt < MAX_CIWS); ciw_cnt++) {
 		if (ioinfo[irq]->senseid.ciw[ciw_cnt].ct == CIW_TYPE_RCD) {
 			/*
 			 * paranoia check ...
@@ -812,10 +830,9 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 				} while (retry);
 
 			}
-
-			local_irq_restore (flags);
-
 		}
+
+		local_irq_restore(flags);
 
 		/*
 		 * on success we update the user input parms
@@ -848,7 +865,7 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 
 	}
 
-	return (ret);
+	return ret;
 
 }
 
@@ -862,8 +879,8 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 void
 s390_device_recognition_irq (int irq)
 {
-	int ret;
 	char dbf_txt[15];
+	devstat_t devstat;
 
 	sprintf (dbf_txt, "devrec%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
@@ -872,52 +889,78 @@ s390_device_recognition_irq (int irq)
 	 * We issue the SenseID command on I/O subchannels we think are
 	 *  operational only.
 	 */
-	if ((ioinfo[irq] != INVALID_STORAGE_AREA)
-	    && (!ioinfo[irq]->st)
-	    && (ioinfo[irq]->schib.pmcw.st == 0)
-	    && (ioinfo[irq]->ui.flags.oper == 1)) {
-		int irq_ret;
-		devstat_t devstat;
+	if ((ioinfo[irq]->st) || (!ioinfo[irq]->ui.flags.oper))
+		goto out;
 
-		irq_ret = request_irq (irq,
-				       init_IRQ_handler,
-				       SA_PROBE, "INIT", &devstat);
+	if (request_irq (irq, init_IRQ_handler, SA_PROBE, "INIT", &devstat))
+		goto out;
 
-		if (!irq_ret) {
-			ret = enable_cpu_sync_isc (irq);
+	if (enable_cpu_sync_isc(irq))
+		goto out_freeirq;
 
-			if (!ret) {
-				ioinfo[irq]->ui.flags.unknown = 0;
+	ioinfo[irq]->ui.flags.unknown = 0;
 
-				memset (&ioinfo[irq]->senseid, '\0',
-					sizeof (senseid_t));
+	memset (&ioinfo[irq]->senseid, '\0', sizeof (senseid_t));
 
-				if (cio_sid_with_pgid) {
-					
-					ret = s390_DevicePathVerification(irq,0);
-					
-					if (ret == -EOPNOTSUPP) 
-						/* 
-						 * Doesn't prevent us from proceeding
-						 */
-						ret = 0;
-				}
+	s390_SenseID (irq, &ioinfo[irq]->senseid, 0xff);
 
-				/*
-				 * we'll fallthrough here if we don't want
-				 * to do SPID before SID
-				 */
-				if (!ret) {
-					s390_SenseID (irq, &ioinfo[irq]->senseid, 0xff);
-				}
-				disable_cpu_sync_isc (irq);
+	disable_cpu_sync_isc(irq);
+out_freeirq:
+	free_irq (irq, &devstat);
+out:
+	return;
+}
 
-			}
+static int
+css_bus_match (struct device *dev, struct device_driver *drv)
+{
+	struct subchannel *ioinfo;
+	struct subchannel_driver *sdrv;
 
-			free_irq (irq, &devstat);
+	ioinfo = list_entry (dev, struct subchannel, dev);
+	sdrv   = list_entry (drv, struct subchannel_driver, drv);
 
-		}
-	}
+	return (ioinfo->st == sdrv->st);
+}
+
+struct bus_type css_bus_type = {
+	.name  = "css",
+	.match = &css_bus_match,
+};
+
+static struct device css_bus_device = {
+	.name   = "Channel Subsystem",
+	.bus_id = "css0",
+};
+
+/*
+ * s390_register_subchannel
+ *
+ * initializes the struct device member of a subchannel and gives it to
+ * the device driver core
+ */
+static __devinit void
+s390_register_subchannel (struct subchannel *ioinfo)
+{
+	static const char *subchannel_types[] = {
+		"I/O Subchannel",
+		"CHSC Subchannel",
+		"Message Subchannel",
+		"ADM Subchannel",
+		"undefined subchannel type 4",
+		"undefined subchannel type 5",
+		"undefined subchannel type 6",
+		"undefined subchannel type 7",
+	};
+
+	strncpy (ioinfo->dev.name, subchannel_types[ioinfo->st], DEVICE_NAME_SIZE);
+	snprintf (ioinfo->dev.bus_id, DEVICE_ID_SIZE, "0:%04x", ioinfo->irq);
+
+	ioinfo->dev.bus    = &css_bus_type;
+	ioinfo->dev.parent = &css_bus_device;
+
+	if (device_register(&ioinfo->dev))
+		printk(KERN_WARNING "failed to register subchannel %04x\n", ioinfo->irq);
 }
 
 /*
@@ -926,18 +969,42 @@ s390_device_recognition_irq (int irq)
  * Used for system wide device recognition.
  *
  */
-static void __init
-s390_device_recognition_all (void)
+static int __init
+s390_probe_css (void)
 {
-	int irq = 0;		/* let's start with subchannel 0 ... */
+	int ret;
+	int irq;
 
-	do {
-		s390_device_recognition_irq (irq);
+	printk (KERN_INFO "probing %d subchannels...\n", highest_subchannel+1);
 
-		irq++;
+	if ((ret = bus_register(&css_bus_type)))
+		goto out;
 
-	} while (irq <= highest_subchannel);
+	if ((ret = device_register(&css_bus_device)))
+		goto out_unregister;
+
+	for (irq = 0; irq <= highest_subchannel; irq++) {
+		if (ioinfo[irq] == INVALID_STORAGE_AREA)
+			continue;
+
+		printk(KERN_INFO "subchannel %04x: devno %04x, ",
+				irq, ioinfo[irq]->devno);
+
+		if (irq != cons_dev) /* console has already been probed */
+			s390_device_recognition_irq (irq);
+
+		s390_register_subchannel(ioinfo[irq]);
+		printk("control unit type %04x\n", ioinfo[irq]->senseid.cu_type);
+	}
+
+out_unregister:
+	if (ret)
+		put_bus(&css_bus_type);
+out:
+	return ret;
 }
+
+subsys_initcall(s390_probe_css);
 
 /*
  * s390_process_subchannels
@@ -986,11 +1053,6 @@ s390_validate_subchannel (int irq, int enable)
 	int ccode2;		/* condition code for other I/O routines */
 	schib_t *p_schib;
 	int ret;
-#ifdef CONFIG_CHSC
-	int      chp = 0;
-	int      mask;
-#endif /* CONFIG_CHSC */
-
 	char dbf_txt[15];
 
 	sprintf (dbf_txt, "valsch%x", irq);
@@ -1112,19 +1174,7 @@ s390_validate_subchannel (int irq, int enable)
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-#ifdef CONFIG_CHSC
-	if (ioinfo[irq]->opm) {
-		for (chp=0;chp<=7;chp++) {
-			mask = 0x80 >> chp;
-			if (ioinfo[irq]->opm & mask) {
-				if (!chsc_chpid_logical (irq, chp)) {
-					/* disable using this path */
-					ioinfo[irq]->opm &= ~mask;
-				}
-			}
-		}
-	}
-#endif /* CONFIG_CHSC */
+	chsc_validate_chpids(irq);
 
 	CIO_DEBUG_IFMSG(KERN_INFO, 0,
 			"Detected device %04X "
@@ -1294,7 +1344,7 @@ s390_validate_subchannel (int irq, int enable)
 
 	}
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -1313,7 +1363,13 @@ s390_validate_subchannel (int irq, int enable)
 static int
 s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 {
-	ccw1_t *sense_ccw;	/* ccw area for SenseID command */
+	/* SenseID may be called during console initialization,
+	 * before we have a working kmalloc, using a static
+	 * ccw area is the least evil workaround */
+	static ccw1_t sense_ccw[2];	/* ccw area for SenseID command */
+	static spinlock_t sid_lock	/* lock to protect sense_ccw */
+		= SPIN_LOCK_UNLOCKED;
+
 	senseid_t isid;		/* internal sid */
 	devstat_t devstat;	/* required by request_irq() */
 	__u8 pathmask;		/* calulate path mask */
@@ -1330,54 +1386,36 @@ s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 	char dbf_txt[15];
 	int i;
 	int failure = 0;	/* nothing went wrong yet */
-
-	SANITY_CHECK (irq);
+	unsigned long flags;
 
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
 	sprintf (dbf_txt, "snsID%x", irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	inlreq = 0;		/* to make the compiler quiet... */
-
 	if (!ioinfo[irq]->ui.flags.ready) {
-
-		pdevstat = &devstat;
-
+		inlreq = 1;
 		/*
 		 * Perform SENSE ID command processing. We have to request device
 		 *  ownership and provide a dummy I/O handler. We issue sync. I/O
 		 *  requests and evaluate the devstat area on return therefore
 		 *  we don't need a real I/O handler in place.
 		 */
-		irq_ret =
-		    request_irq (irq, init_IRQ_handler, SA_PROBE, "SID",
-				 &devstat);
+		if ((irq_ret = request_irq (irq, init_IRQ_handler,
+						SA_PROBE, "SID", &devstat)))
+				return irq_ret;
 
-		if (irq_ret == 0)
-			inlreq = 1;
 	} else {
 		inlreq = 0;
-		irq_ret = 0;
-		pdevstat = ioinfo[irq]->irq_desc.dev_id;
-
 	}
 
-	if (irq_ret) {
-		return irq_ret;
-	}
+	pdevstat = ioinfo[irq]->irq_desc.dev_id;
 
+	spin_lock_irqsave(&sid_lock, flags);
 	s390irq_spin_lock (irq);
-
-	if (init_IRQ_complete) {
-		sense_ccw = kmalloc (2 * sizeof (ccw1_t), GFP_DMA);
-	} else {
-		sense_ccw = alloc_bootmem_low (2 * sizeof (ccw1_t));
-
-	}
 
 	/* more than one path installed ? */
 	if (ioinfo[irq]->schib.pmcw.pim != 0x80) {
@@ -1598,14 +1636,8 @@ s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 
 	}
 
-	if (init_IRQ_complete) {
-		kfree (sense_ccw);
-	} else {
-		free_bootmem ((unsigned long) sense_ccw, 2 * sizeof (ccw1_t));
-
-	}
-
 	s390irq_spin_unlock (irq);
+	spin_unlock_irqrestore(&sid_lock, flags);
 
 	/*
 	 * If we installed the irq action handler we have to
@@ -1620,7 +1652,7 @@ s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 	 */
 	if ((sid->cu_type == 0xFFFF)
 	    && (MACHINE_IS_VM)) {
-		_VM_virtual_device_info (ioinfo[irq]->schib.pmcw.dev, sid);
+		VM_virtual_device_info (ioinfo[irq]->schib.pmcw.dev, sid);
 	}
 
 	if (sid->cu_type == 0xFFFF) {
@@ -1636,43 +1668,18 @@ s390_SenseID (int irq, senseid_t * sid, __u8 lpm)
 			  ioinfo[irq]->schib.pmcw.dev, irq);
 
 		ioinfo[irq]->ui.flags.unknown = 1;
-
+		return -ENODEV;
 	}
 
 	/*
 	 * Issue device info message if unit was operational .
 	 */
-	if (!ioinfo[irq]->ui.flags.unknown) {
-		if (sid->dev_type != 0) {
+	CIO_DEBUG_IFMSG(KERN_INFO, 2, "SenseID : device %04X reports: "
+		"CU  Type/Mod = %04X/%02X, Dev Type/Mod = %04X/%02X\n",
+		ioinfo[irq]->schib.pmcw.dev, sid->cu_type, sid->cu_model,
+		sid->dev_type, sid->dev_model);
 
-			CIO_DEBUG_IFMSG(KERN_INFO, 2,
-					"SenseID : device %04X reports: "
-					"CU  Type/Mod = %04X/%02X,"
-					" Dev Type/Mod = %04X/%02X\n",
-					ioinfo[irq]->schib.pmcw.dev,
-					sid->cu_type,
-					sid->cu_model,
-					sid->dev_type,
-					sid->dev_model);
-
-		} else {
-
-			CIO_DEBUG_IFMSG(KERN_INFO, 2,
-					"SenseID : device %04X reports:"
-					" Dev Type/Mod = %04X/%02X\n",
-					ioinfo[irq]->schib.pmcw.dev,
-					sid->cu_type,
-					sid->cu_model);
-		}
-
-	}
-
-	if (!ioinfo[irq]->ui.flags.unknown)
-		irq_ret = 0;
-	else
-		irq_ret = -ENODEV;
-
-	return (irq_ret);
+	return 0;
 }
 
 /*
@@ -1691,17 +1698,12 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	int ccode;
 	__u8 pathmask;
 	__u8 domask;
-#ifdef CONFIG_CHSC
-	int chp;
-	int mask;
 	int old_opm = 0;
-#endif /* CONFIG_CHSC */
 
 	int ret = 0;
 	int i;
 	pgid_t pgid;
 	__u8 dev_path;
-	int first = 1;
 
 	char dbf_txt[15];
 
@@ -1711,9 +1713,7 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 	if (ioinfo[irq]->st) 
 		return -ENODEV;
 
-#ifdef CONFIG_CHSC
 	old_opm = ioinfo[irq]->opm;
-#endif /* CONFIG_CHSC */
 	ccode = stsch (irq, &(ioinfo[irq]->schib));
 
 	if (ccode) {
@@ -1726,7 +1726,6 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		ioinfo[irq]->ui.flags.pgid_supp = 0;
 		ret = 0;
 
-#ifdef CONFIG_CHSC
 		/*
 		 * disable if chpid is logically offline
 		 */
@@ -1772,25 +1771,13 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		} else {
 			ret = 0;
 		}
-#endif /* CONFIG_CHSC */
 		return ret;
 	}
 
 	ioinfo[irq]->opm = ioinfo[irq]->schib.pmcw.pim
 	    & ioinfo[irq]->schib.pmcw.pam & ioinfo[irq]->schib.pmcw.pom;
 
-#ifdef CONFIG_CHSC
-	if (ioinfo[irq]->opm) {
-		for (chp=0;chp<=7;chp++) {
-			mask = 0x80 >> chp;
-			if (ioinfo[irq]->opm & mask) {
-				if (!chsc_chpid_logical (irq, chp)) {
-					/* disable using this path */
-					ioinfo[irq]->opm &= ~mask;
-				}
-			}
-		}
-	}
+	chsc_validate_chpids(irq);
 	
 	if ((ioinfo[irq]->opm == 0) && (old_opm)) {
 		not_oper_handler_func_t nopfunc=ioinfo[irq]->nopfunc;
@@ -1821,10 +1808,9 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 				pdevreg->oper_func( irq, pdevreg);
 
 	}
-#endif /* CONFIG_CHSC */
 
 	if ( ioinfo[irq]->ui.flags.pgid_supp == 0 )
-		return( 0);	/* just exit ... */
+		return 0;	/* just exit ... */
 
 	if (usermask) {
 		dev_path = usermask;
@@ -1837,7 +1823,6 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		memcpy (&ioinfo[irq]->pgid, &global_pgid, sizeof (pgid_t));
 		ioinfo[irq]->ui.flags.pgid = 1;
 	}
-	memcpy (&pgid, &ioinfo[irq]->pgid, sizeof (pgid_t));
 
 	for (i = 0; i < 8 && !ret; i++) {
 		pathmask = 0x80 >> i;
@@ -1845,46 +1830,38 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 		domask = dev_path & pathmask;
 
 		if (domask) {
-			ret = s390_SetPGID (irq, domask, &pgid);
-
-			/*
-			 * For the *first* path we are prepared
-			 *  for recovery
-			 *
-			 *  - If we fail setting the PGID we assume its
-			 *     using  a different PGID already (VM) we
-			 *     try to sense.
-			 */
-			if (ret == -EOPNOTSUPP && first) {
+			if (MACHINE_IS_VM) {
+				/*
+				 * If we are running under VM, try to obtain
+				 * VM's PGID by SensePGID
+				 */
 				*(int *) &pgid = 0;
-
-				ret = s390_SensePGID (irq, domask, &pgid);
-				first = 0;
-
-				if (ret == 0) {
+				
+				if (!s390_SensePGID (irq, domask, &pgid)) 
 					/*
 					 * Check whether we retrieved
 					 *  a reasonable PGID ...
 					 */
 					if (pgid.inf.ps.state1 ==
-					    SNID_STATE1_GROUPED) {
+					    SNID_STATE1_GROUPED) 
 						memcpy (&ioinfo[irq]->pgid,
 							&pgid, sizeof (pgid_t));
-					} else {	/* ungrouped or garbage ... */
-						ret = -EOPNOTSUPP;
 
-					}
-				} else {
-					ioinfo[irq]->ui.flags.pgid_supp = 0;
+			}
+			
+			ret = s390_SetPGID (irq, domask);
 
-					CIO_DEBUG(KERN_WARNING, 2,
-						  "PathVerification(%04X) "
-						  "- Device %04X doesn't "
-						  " support path grouping\n",
-						  irq,
-						  ioinfo[irq]->schib.pmcw.dev);
-					
-				}
+			if (ret == -EOPNOTSUPP) {
+
+				ioinfo[irq]->ui.flags.pgid_supp = 0;
+				
+				CIO_DEBUG(KERN_WARNING, 2,
+					  "PathVerification(%04X) "
+					  "- Device %04X doesn't "
+					  " support path grouping\n",
+					  irq,
+					  ioinfo[irq]->schib.pmcw.dev);
+				
 			} else if (ret == -EIO) {
 
 				CIO_DEBUG(KERN_ERR, 2,
@@ -1907,12 +1884,19 @@ s390_DevicePathVerification (int irq, __u8 usermask)
 
 				ret = 0;
 
-			} else {
+			} else if (ret == -ENODEV) {
+
+				CIO_DEBUG(KERN_ERR, 2,
+					  "PathVerification(%04X) "
+					  "- Device %04X is no longer there?!?\n",
+					  irq, ioinfo[irq]->schib.pmcw.dev);
+
+			} else if (ret) {
 
 				CIO_DEBUG(KERN_ERR, 2,
 					  "PathVerification(%04X) - "
-					  "Unexpected error on device %04X\n",
-					  irq, ioinfo[irq]->schib.pmcw.dev);
+					  "Unexpected error %d on device %04X\n",
+					  irq, ret, ioinfo[irq]->schib.pmcw.dev);
 				
 				ioinfo[irq]->ui.flags.pgid_supp = 0;
 			}
@@ -1929,7 +1913,7 @@ s390_DevicePathVerification (int irq, __u8 usermask)
  *
  */
 static int
-s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
+s390_SetPGID (int irq, __u8 lpm)
 {
 	ccw1_t *spid_ccw;	/* ccw area for SPID command */
 	devstat_t devstat;	/* required by request_irq() */
@@ -1942,10 +1926,8 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 	int inlreq = 0;		/* inline request_irq() */
 	int mpath = 1;		/* try multi-path first */
 
-	SANITY_CHECK (irq);
-
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
@@ -1989,11 +1971,11 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 	spid_ccw[0].flags = CCW_FLAG_SLI | CCW_FLAG_CC;
 
 	spid_ccw[1].cmd_code = CCW_CMD_SET_PGID;
-	spid_ccw[1].cda = (__u32) virt_to_phys (pgid);
+	spid_ccw[1].cda = (__u32) virt_to_phys (&ioinfo[irq]->pgid);
 	spid_ccw[1].count = sizeof (pgid_t);
 	spid_ccw[1].flags = CCW_FLAG_SLI;
 
-	pgid->inf.fc = SPID_FUNC_MULTI_PATH | SPID_FUNC_ESTABLISH;
+	ioinfo[irq]->pgid.inf.fc = SPID_FUNC_MULTI_PATH | SPID_FUNC_ESTABLISH;
 
 	/*
 	 * We now issue a SetPGID request. In case of BUSY
@@ -2047,13 +2029,13 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 						spid_ccw[0].cmd_code =
 						    CCW_CMD_SET_PGID;
 						spid_ccw[0].cda = (__u32)
-						    virt_to_phys (pgid);
+						    virt_to_phys (&ioinfo[irq]->pgid);
 						spid_ccw[0].count =
 						    sizeof (pgid_t);
 						spid_ccw[0].flags =
 						    CCW_FLAG_SLI;
 
-						pgid->inf.fc =
+						ioinfo[irq]->pgid.inf.fc =
 						    SPID_FUNC_SINGLE_PATH
 						    | SPID_FUNC_ESTABLISH;
 						mpath = 0;
@@ -2107,6 +2089,7 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 
 				retry = 0;
 				ioinfo[irq]->opm &= ~lpm;
+				switch_off_chpids(irq, lpm);
 				irq_ret = -EAGAIN;
 
 			}
@@ -2153,7 +2136,7 @@ s390_SetPGID (int irq, __u8 lpm, pgid_t * pgid)
 	if (inlreq)
 		free_irq (irq, pdevstat);
 
-	return (irq_ret);
+	return irq_ret;
 }
 
 /*
@@ -2169,16 +2152,15 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 	devstat_t devstat;	/* required by request_irq() */
 	devstat_t *pdevstat = &devstat;
 	char dbf_txt[15];
+	pgid_t * tmp_pgid;
 
 	int irq_ret = 0;	/* return code */
 	int retry = 5;		/* retry count */
 	int inlreq = 0;		/* inline request_irq() */
 	unsigned long flags;
 
-	SANITY_CHECK (irq);
-
 	if (ioinfo[irq]->ui.flags.oper == 0) {
-		return (-ENODEV);
+		return -ENODEV;
 
 	}
 
@@ -2212,13 +2194,14 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 
 	if (init_IRQ_complete) {
 		snid_ccw = kmalloc (sizeof (ccw1_t), GFP_DMA);
+		tmp_pgid = kmalloc (sizeof (pgid_t), GFP_DMA);
 	} else {
 		snid_ccw = alloc_bootmem_low (sizeof (ccw1_t));
-
+		tmp_pgid = alloc_bootmem_low (sizeof (pgid_t));
 	}
 
 	snid_ccw->cmd_code = CCW_CMD_SENSE_PGID;
-	snid_ccw->cda = (__u32) virt_to_phys (pgid);
+	snid_ccw->cda = (__u32) virt_to_phys (tmp_pgid);
 	snid_ccw->count = sizeof (pgid_t);
 	snid_ccw->flags = CCW_FLAG_SLI;
 
@@ -2242,8 +2225,8 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 				 *  Sense Path Group ID command
 				 *  further retries wouldn't help ...
 				 */
-				if (pdevstat->ii.sense.
-				    data[0] & SNS0_CMD_REJECT) {
+				if (pdevstat->ii.sense.data[0] & 
+				    (SNS0_CMD_REJECT | SNS0_INTERVENTION_REQ)) {
 					retry = 0;
 					irq_ret = -EOPNOTSUPP;
 				} else {
@@ -2294,6 +2277,7 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 			} else {
 				retry = 0;	/* success ... */
 				irq_ret = 0;
+				memcpy(pgid, tmp_pgid, sizeof(pgid_t));
 
 			}
 		} else if (irq_ret != -ENODEV) {	/* -EIO, or -EBUSY */
@@ -2328,9 +2312,10 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 
 	if (init_IRQ_complete) {
 		kfree (snid_ccw);
+		kfree (tmp_pgid);
 	} else {
 		free_bootmem ((unsigned long) snid_ccw, sizeof (ccw1_t));
-
+		free_bootmem ((unsigned long) tmp_pgid, sizeof (tmp_pgid));
 	}
 
 	s390irq_spin_unlock_irqrestore (irq, flags);
@@ -2342,20 +2327,18 @@ s390_SensePGID (int irq, __u8 lpm, pgid_t * pgid)
 	if (inlreq)
 		free_irq (irq, pdevstat);
 
-	return (irq_ret);
+	return irq_ret;
 }
 
 /*
  * Function: s390_send_nop
  * 
  * sends a nop CCW to the specified subchannel down the given path(s)
- * FIXME: why not put nop_ccw on the stack, it's only 64 bits?
  */
 int
 s390_send_nop(int irq, __u8 lpm)
 {
  	char dbf_txt[15];
- 	ccw1_t *nop_ccw;
  	devstat_t devstat;
  	devstat_t *pdevstat = &devstat;
  	unsigned long flags;
@@ -2363,8 +2346,14 @@ s390_send_nop(int irq, __u8 lpm)
  	int irq_ret = 0;
  	int inlreq = 0;
 	
- 	SANITY_CHECK(irq);
-	
+	/* static allocation is necessary because nop_ccw has to be below
+	 * the 2GB border. locking is not required since it nop_ccw is
+	 * never modified */
+	static ccw1_t nop_ccw = {
+		.cmd_code  = CCW_CMD_NOOP,
+		.flags	   = CCW_FLAG_SLI,
+	};
+
  	if (!ioinfo[irq]->ui.flags.oper)
  		/* no sense in trying */
  		return -ENODEV;
@@ -2392,19 +2381,9 @@ s390_send_nop(int irq, __u8 lpm)
  
  	s390irq_spin_lock_irqsave (irq, flags);
  
- 	if (init_IRQ_complete)
- 		nop_ccw = kmalloc (sizeof (ccw1_t), GFP_DMA);
- 	else
- 		nop_ccw = alloc_bootmem_low (sizeof (ccw1_t));
- 
- 	nop_ccw->cmd_code = CCW_CMD_NOOP;
- 	nop_ccw->cda = 0;
- 	nop_ccw->count = 0;
- 	nop_ccw->flags = CCW_FLAG_SLI;
- 
  	memset (pdevstat, '\0', sizeof (devstat_t));
  	
- 	irq_ret = s390_start_IO (irq, nop_ccw, 0xE2D5D6D7, lpm,
+ 	irq_ret = s390_start_IO (irq, &nop_ccw, 0xE2D5D6D7, lpm,
  				 DOIO_WAIT_FOR_INTERRUPT
  				 | DOIO_TIMEOUT
  				 | DOIO_DONT_CALL_INTHDLR
@@ -2415,11 +2394,6 @@ s390_send_nop(int irq, __u8 lpm)
  		/* better cancel... */
  		cancel_IO(irq);
  	}
- 
- 	if (init_IRQ_complete) 
- 		kfree (nop_ccw);
- 	else
- 		free_bootmem ((unsigned long) nop_ccw, sizeof (ccw1_t));
  
  	s390irq_spin_unlock_irqrestore (irq, flags);
  

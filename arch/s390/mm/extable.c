@@ -48,7 +48,7 @@ search_exception_table(unsigned long addr)
         addr &= 0x7fffffff;  /* remove amode bit from address */
 	/* There is only the kernel to search.  */
 	ret = search_one_table(__start___ex_table, __stop___ex_table-1, addr);
-	if (ret) ret = FIX_PSW(ret);
+	if (ret) ret = ret | PSW_ADDR_AMODE31;
 	return ret;
 #else
 	unsigned long flags;
@@ -63,7 +63,7 @@ search_exception_table(unsigned long addr)
 		ret = search_one_table(mp->ex_table_start,
 				       mp->ex_table_end - 1, addr);
 		if (ret) {
-			ret = FIX_PSW(ret);
+			ret = ret | PSW_ADDR_AMODE31;
 			break;
 		}
 	}

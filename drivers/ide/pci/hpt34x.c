@@ -334,6 +334,7 @@ static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_devic
 	d->bootable = (pcicmd & PCI_COMMAND_MEMORY) ? OFF_BOARD : NEVER_BOARD;
 
 	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

@@ -12,6 +12,20 @@
 #define __ASM_SPINLOCK_H
 
 /*
+ * Grmph, take care of %&#! user space programs that include
+ * asm/spinlock.h. The diagnose is only available in kernel
+ * context.
+ */
+#ifdef __KERNEL__
+#include <asm/lowcore.h>
+#define __DIAG44_INSN "ex"
+#define __DIAG44_OPERAND __LC_DIAG44_OPCODE
+#else
+#define __DIAG44_INSN "#"
+#define __DIAG44_OPERAND 0
+#endif
+
+/*
  * Simple spin lock operations.  There are two variants, one clears IRQ's
  * on the local processor, one does not.
  *
@@ -31,12 +45,13 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
 {
 	unsigned long reg1, reg2;
         __asm__ __volatile("    bras  %1,1f\n"
-                           "0:  # diag  0,0,68\n"
+                           "0:  " __DIAG44_INSN " 0,%4\n"
                            "1:  slr   %0,%0\n"
                            "    cs    %0,%1,0(%3)\n"
                            "    jl    0b\n"
                            : "=&d" (reg1), "=&d" (reg2), "+m" (lp->lock)
-                           : "a" (&lp->lock) : "cc" );
+                           : "a" (&lp->lock), "i" (__DIAG44_OPERAND)
+			   : "cc" );
 }
 
 extern inline int _raw_spin_trylock(spinlock_t *lp)
@@ -76,46 +91,52 @@ typedef struct {
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
+#define rwlock_is_locked(x) ((x)->lock != 0)
+
 #define _raw_read_lock(rw)   \
         asm volatile("   lg    2,0(%1)\n"   \
                      "   j     1f\n"     \
-                     "0: # diag  0,0,68\n" \
+                     "0: " __DIAG44_INSN " 0,%2\n" \
                      "1: nihh  2,0x7fff\n" /* clear high (=write) bit */ \
                      "   la    3,1(2)\n"   /* one more reader */  \
                      "   csg   2,3,0(%1)\n" /* try to write new value */ \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
+                     : "+m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
 		     : "2", "3", "cc" )
 
 #define _raw_read_unlock(rw) \
         asm volatile("   lg    2,0(%1)\n"   \
                      "   j     1f\n"     \
-                     "0: # diag  0,0,68\n" \
+                     "0: " __DIAG44_INSN " 0,%2\n" \
                      "1: lgr   3,2\n"    \
                      "   bctgr 3,0\n"    /* one less reader */ \
                      "   csg   2,3,0(%1)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
+                     : "+m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
 		     : "2", "3", "cc" )
 
 #define _raw_write_lock(rw) \
         asm volatile("   llihh 3,0x8000\n" /* new lock value = 0x80...0 */ \
                      "   j     1f\n"       \
-                     "0: # diag  0,0,68\n"   \
+                     "0: " __DIAG44_INSN " 0,%2\n"   \
                      "1: slgr  2,2\n"      /* old lock value must be 0 */ \
                      "   csg   2,3,0(%1)\n" \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
+                     : "+m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
 		     : "2", "3", "cc" )
 
 #define _raw_write_unlock(rw) \
         asm volatile("   slgr  3,3\n"      /* new lock value = 0 */ \
                      "   j     1f\n"       \
-                     "0: # diag  0,0,68\n"   \
+                     "0: " __DIAG44_INSN " 0,%2\n"   \
                      "1: llihh 2,0x8000\n" /* old lock value must be 0x8..0 */\
                      "   csg   2,3,0(%1)\n"   \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
+                     : "+m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
 		     : "2", "3", "cc" )
 
 #endif /* __ASM_SPINLOCK_H */

@@ -1145,7 +1145,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (blk_queue_tagged(q))
 		blk_queue_free_tags(q);
 
-	elevator_exit(q, &q->elevator);
+	elevator_exit(q);
 
 	memset(q, 0, sizeof(*q));
 }
@@ -1227,7 +1227,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &q->elevator, iosched_deadline))) {
+	if ((ret = elevator_init(q, &iosched_deadline))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}

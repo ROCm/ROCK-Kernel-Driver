@@ -887,13 +887,14 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
         struct memdata *md = (struct memdata *)file->private_data;
         ssize_t bcount;
         size_t alignfix;
-        int off = (int)*offset; /* avoid useless 64bit-arithmetic */
+	loff_t off = *offset; /* avoid useless 64bit-arithmetic */
         ssize_t retval;
         void *membase;
 
 	if (*offset != off)	/* Check for EOF before we trust wrap */
 		return 0;
 	
+	/* FIXME: Signed wrap is undefined in C - wants fixing up */
 	if (off + count > off)
 		return 0;
 		

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ioinfo.c
  *   S/390 common I/O routines -- the ioinfo structure
- *   $Revision: 1.3 $
+ *   $Revision: 1.4 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -102,12 +102,12 @@ get_irq_next (int irq)
 int
 get_dev_info_by_irq (int irq, s390_dev_info_t * pdi)
 {
-	if (irq > highest_subchannel || irq < 0) \
-		return (-ENODEV); \
-	if (ioinfo[irq] == INVALID_STORAGE_AREA) \
-		return (-ENODEV); \
-        if (ioinfo[irq]->st) \
-                return -ENODEV; \
+	if (irq > highest_subchannel || irq < 0) 
+		return -ENODEV; 
+	if (ioinfo[irq] == INVALID_STORAGE_AREA) 
+		return -ENODEV; 
+        if (ioinfo[irq]->st) 
+                return -ENODEV; 
 
 	if (pdi == NULL)
 		return -EINVAL;
@@ -189,7 +189,7 @@ get_dev_info_by_devno (__u16 devno, s390_dev_info_t * pdi)
 		}
 	}
 
-	return (rc);
+	return rc;
 
 }
 
@@ -211,7 +211,7 @@ get_irq_by_devno (__u16 devno)
 		}
 	}
 
-	return (rc);
+	return rc;
 }
 
 unsigned int
@@ -235,7 +235,7 @@ get_devno_by_irq (int irq)
 	 *  defined who's device number isn't valid ...
 	 */
 	if (ioinfo[irq]->schib.pmcw.dnv)
-		return (ioinfo[irq]->schib.pmcw.dev);
+		return ioinfo[irq]->schib.pmcw.dev;
 	else
 		return -1;
 }
@@ -258,9 +258,9 @@ int
 s390_set_private_data(int irq, void *data)
 {
 	if (irq > highest_subchannel || irq < 0)
-		return (-ENODEV);
+		return -ENODEV;
 	if (ioinfo[irq] == INVALID_STORAGE_AREA)
-		return (-ENODEV);
+		return -ENODEV;
         if (ioinfo[irq]->st)
                 return -ENODEV;
 	ioinfo[irq]->private_data = data;

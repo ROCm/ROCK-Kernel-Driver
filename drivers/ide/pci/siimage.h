@@ -112,7 +112,7 @@ static void init_iops_siimage(ide_hwif_t *);
 static void init_hwif_siimage(ide_hwif_t *);
 static void init_dma_siimage(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t siimage_chipsets[] __initdata = {
+static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:		PCI_DEVICE_ID_SII_680,
