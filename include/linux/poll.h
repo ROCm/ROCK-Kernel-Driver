@@ -10,12 +10,31 @@
 #include <linux/mm.h>
 #include <asm/uaccess.h>
 
-struct poll_table_page;
+#define POLL_INLINE_BYTES 256
+#define FAST_SELECT_MAX  128
+#define FAST_POLL_MAX    128
+#define POLL_INLINE_ENTRIES (1+(POLL_INLINE_BYTES / sizeof(struct poll_table_entry)))
+
+struct poll_table_entry {
+	struct file * filp;
+	wait_queue_t wait;
+	wait_queue_head_t * wait_address;
+};
+
+struct poll_table_page {
+	struct poll_table_page * next;
+	struct poll_table_entry * entry;
+	struct poll_table_entry entries[0];
+};
 
 typedef struct poll_table_struct {
 	int error;
 	struct poll_table_page * table;
+	struct poll_table_page inline_page; 
+	struct poll_table_entry inline_table[POLL_INLINE_ENTRIES]; 
 } poll_table;
+
+#define POLL_INLINE_TABLE_LEN (sizeof(poll_table) - offsetof(poll_table, inline_page))
 
 extern void __pollwait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p);
 
@@ -30,6 +49,7 @@ static inline void poll_initwait(poll_table* pt)
 	pt->error = 0;
 	pt->table = NULL;
 }
+
 extern void poll_freewait(poll_table* pt);
 
 
@@ -49,38 +69,11 @@ typedef struct {
 #define FDS_LONGS(nr)	(((nr)+FDS_BITPERLONG-1)/FDS_BITPERLONG)
 #define FDS_BYTES(nr)	(FDS_LONGS(nr)*sizeof(long))
 
-/*
- * We do a VERIFY_WRITE here even though we are only reading this time:
- * we'll write to it eventually..
- *
- * Use "unsigned long" accesses to let user-mode fd_set's be long-aligned.
- */
-static inline
-int get_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
-{
-	nr = FDS_BYTES(nr);
-	if (ufdset) {
-		int error;
-		error = verify_area(VERIFY_WRITE, ufdset, nr);
-		if (!error && __copy_from_user(fdset, ufdset, nr))
-			error = -EFAULT;
-		return error;
-	}
-	memset(fdset, 0, nr);
-	return 0;
-}
-
 static inline
 void set_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
 {
 	if (ufdset)
 		__copy_to_user(ufdset, fdset, FDS_BYTES(nr));
-}
-
-static inline
-void zero_fd_set(unsigned long nr, unsigned long *fdset)
-{
-	memset(fdset, 0, FDS_BYTES(nr));
 }
 
 extern int do_select(int n, fd_set_bits *fds, long *timeout);
