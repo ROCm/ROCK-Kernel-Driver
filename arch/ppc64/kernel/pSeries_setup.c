@@ -81,6 +81,8 @@ extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 extern void find_udbg_vterm(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
+extern void generic_find_legacy_serial_ports(unsigned int *default_speed);
+
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
@@ -247,75 +249,6 @@ static int __init pSeries_init_panel(void)
 arch_initcall(pSeries_init_panel);
 
 
-
-void __init pSeries_find_serial_port(void)
-{
-	struct device_node *np;
-	unsigned long encode_phys_size = 32;
-	u32 *sizeprop;
-
-	struct isa_reg_property {
-		u32 space;
-		u32 address;
-		u32 size;
-	};
-	struct pci_reg_property {
-		struct pci_address addr;
-		u32 size_hi;
-		u32 size_lo;
-	};                                                                        
-
-	DBG(" -> pSeries_find_serial_port()\n");
-
-	naca->serialPortAddr = 0;
-
-	np = of_find_node_by_path("/");
-	if (!np)
-		return;
-	sizeprop = (u32 *)get_property(np, "#size-cells", NULL);
-	if (sizeprop != NULL)
-		encode_phys_size = (*sizeprop) << 5;
-	
-	for (np = NULL; (np = of_find_node_by_type(np, "serial"));) {
-		struct device_node *isa, *pci;
-		struct isa_reg_property *reg;
-		union pci_range *rangesp;
-		char *typep;
-
-	 	typep = (char *)get_property(np, "ibm,aix-loc", NULL);
-		if ((typep == NULL) || (typep && strcmp(typep, "S1")))
-			continue;
-
-		reg = (struct isa_reg_property *)get_property(np, "reg", NULL);	
-
-		isa = of_get_parent(np);
-		if (!isa) {
-			DBG("no isa parent found\n");
-			break;
-		}
-		pci = of_get_parent(isa);
-		if (!pci) {
-			DBG("no pci parent found\n");
-			break;
-		}
-
-		rangesp = (union pci_range *)get_property(pci, "ranges", NULL);
-
-		if ( encode_phys_size == 32 )
-			naca->serialPortAddr = rangesp->pci32.phys+reg->address;
-		else {
-			naca->serialPortAddr =
-				((((unsigned long)rangesp->pci64.phys_hi) << 32)
-				|
-			(rangesp->pci64.phys_lo)) + reg->address;
-		}
-		break;
-	}
-
-	DBG(" <- pSeries_find_serial_port()\n");
-}
-
-
 /* Build up the firmware_features bitmask field
  * using contents of device-tree/ibm,hypertas-functions.
  * Ultimately this functionality may be moved into prom.c prom_init().
@@ -395,6 +328,7 @@ static void __init pSeries_init_early(void)
 {
 	void *comport;
 	int iommu_off = 0;
+	unsigned int default_speed;
 
 	DBG(" -> pSeries_init_early()\n");
 
@@ -408,14 +342,14 @@ static void __init pSeries_init_early(void)
 			     get_property(of_chosen, "linux,iommu-off", NULL));
 	}
 
-	pSeries_find_serial_port();
+	generic_find_legacy_serial_ports(&default_speed);
 
 	if (systemcfg->platform & PLATFORM_LPAR)
 		find_udbg_vterm();
 	else if (naca->serialPortAddr) {
 		/* Map the uart for udbg. */
 		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
-		udbg_init_uart(comport);
+		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;
 		ppc_md.udbg_getc = udbg_getc;
