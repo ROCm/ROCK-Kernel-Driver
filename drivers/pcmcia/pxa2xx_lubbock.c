@@ -265,3 +265,5 @@ int __init pcmcia_lubbock_init(struct sa1111_dev *sadev)
 
 	return ret;
 }
+
+MODULE_LICENSE("GPL");
