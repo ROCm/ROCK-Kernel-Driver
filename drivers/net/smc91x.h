@@ -173,6 +173,11 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
 #define SMC_insw(a, r, p, l)	insw((a) + (r) - 0xa0000000, p, l)
 #define SMC_outsw(a, r, p, l)	outsw((a) + (r) - 0xa0000000, p, l)
 
+#define set_irq_type(irq, type)	do {} while(0)
+
+#define RPC_LSA_DEFAULT		RPC_LED_TX_RX
+#define RPC_LSB_DEFAULT		RPC_LED_100_10
+
 #else
 
 #define SMC_CAN_USE_8BIT	1
