@@ -853,11 +853,13 @@ _GLOBAL(do_stab_bolted)
 	ld	r22,8(r21)	/* get SRR1 */
 	andi.	r22,r22,MSR_PR	/* check if from user */
 	bne+	stab_bolted_user_return  /* from user, send the error on up */
+#if 0
 	li	r3,0
 #ifdef CONFIG_XMON
 	bl	.xmon
 #endif
 1:	b	1b
+#endif
 2:
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
 	mfspr	r21,DAR

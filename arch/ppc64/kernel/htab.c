@@ -210,7 +210,7 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 	 * If no pte found or not present, send the problem up to
 	 * do_page_fault
 	 */
-	if (!ptep || !pte_present(*ptep))
+	if (unlikely(!ptep || !pte_present(*ptep)))
 		return 1;
 
 	/* 
@@ -218,7 +218,7 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 	 * prevented then send the problem up to do_page_fault.
 	 */
 	access |= _PAGE_PRESENT;
-	if (access & ~(pte_val(*ptep)))
+	if (unlikely(access & ~(pte_val(*ptep))))
 		return 1;
 
 	/*
@@ -246,7 +246,8 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 #define PPC64_HWNOEXEC (1 << 2)
 
 	/* We do lazy icache flushing on POWER4 */
-	if (__is_processor(PV_POWER4) && pfn_valid(pte_pfn(new_pte))) {
+	if (unlikely(__is_processor(PV_POWER4) &&
+	    pfn_valid(pte_pfn(new_pte)))) {
 		struct page *page = pte_page(new_pte);
 
 		/* page is dirty */
@@ -262,7 +263,7 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 	}
 
 	/* Check if pte already has an hpte (case 2) */
-	if (pte_val(old_pte) & _PAGE_HASHPTE) {
+	if (unlikely(pte_val(old_pte) & _PAGE_HASHPTE)) {
 		/* There MIGHT be an HPTE for this pte */
 		unsigned long hash, slot, secondary;
 
@@ -282,7 +283,7 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 				*ptep = new_pte;
 	}
 
-	if (!(pte_val(old_pte) & _PAGE_HASHPTE)) {
+	if (likely(!(pte_val(old_pte) & _PAGE_HASHPTE))) {
 		/* XXX fix large pte flag */
 		unsigned long hash = hpt_hash(vpn, 0);
 		unsigned long hpte_group;
