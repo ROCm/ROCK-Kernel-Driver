@@ -20,9 +20,6 @@
 #define RXRPC_CALL_ACK_WINDOW_SIZE	16
 
 extern unsigned rxrpc_call_rcv_timeout;		/* receive activity timeout (secs) */
-extern unsigned rxrpc_call_acks_timeout;	/* pending ACK (retransmit) timeout (secs) */
-extern unsigned rxrpc_call_dfr_ack_timeout;	/* deferred ACK timeout (secs) */
-extern unsigned short rxrpc_call_max_resend;		/* maximum consecutive resend count */
 
 /* application call state
  * - only state 0 and ffff are reserved, the state is set to 1 after an opid is received
@@ -209,8 +206,6 @@ extern int rxrpc_call_write_data(struct rxrpc_call *call,
 				 int alloc_flags,
 				 int dup_data,
 				 size_t *size_sent);
-
-extern int rxrpc_call_flush(struct rxrpc_call *call);
 
 extern void rxrpc_call_handle_error(struct rxrpc_call *conn, int local, int errno);
 

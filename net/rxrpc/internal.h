@@ -73,7 +73,6 @@ extern struct list_head rxrpc_conns;
 extern struct rw_semaphore rxrpc_conns_sem;
 extern unsigned long rxrpc_conn_timeout;
 
-extern void rxrpc_conn_do_timeout(struct rxrpc_connection *conn);
 extern void rxrpc_conn_clearall(struct rxrpc_peer *peer);
 
 /*
@@ -88,8 +87,6 @@ extern void rxrpc_peer_calculate_rtt(struct rxrpc_peer *peer,
 				     struct rxrpc_message *resp);
 
 extern void rxrpc_peer_clearall(struct rxrpc_transport *trans);
-
-extern void rxrpc_peer_do_timeout(struct rxrpc_peer *peer);
 
 
 /*
