@@ -1525,6 +1525,13 @@ CONFIG_SUNDANCE
   More specific information and updates are available from
   <http://www.scyld.com/network/sundance.html>.
 
+CONFIG_SUNDANCE_MMIO
+  Enable memory-mapped I/O for interaction with Sundance NIC registers.
+  Do NOT enable this by default, PIO (enabled when MMIO is disabled)
+  is known to solve bugs on certain chips.
+
+  If unsure, say N.
+
 CONFIG_ZNET
   The Zenith Z-Note notebook computer has a built-in network
   (Ethernet) card, and this is the Linux driver for it. Note that the
