@@ -80,60 +80,13 @@ static void *detect_HRT_floating_pointer(void *begin, void *end)
 	return fp;
 }
 
-static int configure_visit_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus) 
-{
-	struct pci_bus* bus = wrapped_bus->bus;
-	struct pci_dev* dev = wrapped_dev->dev;
-	struct pci_func *temp_func;
-	int i=0;
-
-	//We need to fix up the hotplug function representation with the linux representation
-	do {
-		temp_func = cpqhp_slot_find(dev->bus->number, dev->devfn >> 3, i++);
-	} while (temp_func && (temp_func->function != (dev->devfn & 0x07)));
-
-	if (temp_func) {
-		temp_func->pci_dev = dev;
-	} else {
-		//We did not even find a hotplug rep of the function, create it
-		//This code might be taken out if we can guarantee the creation of functions
-		//in parallel (hotplug and Linux at the same time).
-		dbg("@@@@@@@@@@@ cpqhp_slot_create in %s\n", __FUNCTION__);
-		temp_func = cpqhp_slot_create(bus->number);
-		if (temp_func == NULL)
-			return -ENOMEM;
-		temp_func->pci_dev = dev;
-	}
-
-	//Create /proc/bus/pci proc entry for this device and bus device is on
-	//Notify the drivers of the change
-	if (temp_func->pci_dev) {
-//		pci_insert_device (temp_func->pci_dev, bus);
-//		pci_proc_attach_device(temp_func->pci_dev);
-//		pci_announce_device_to_drivers(temp_func->pci_dev);
-	}
-
-	return 0;
-}
-
-
-static struct pci_visit configure_functions = {
-	.visit_pci_dev =	configure_visit_pci_dev,
-};
-
 
 int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)  
 {
 	unsigned char bus;
 	struct pci_dev dev0;
 	struct pci_bus *child;
-	struct pci_dev* temp;
 	int rc = 0;
-
-	struct pci_dev_wrapped wrapped_dev;
-	struct pci_bus_wrapped wrapped_bus;
-	memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
-	memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
 
 	memset(&dev0, 0, sizeof(struct pci_dev));
 
@@ -162,13 +115,6 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 
 	}
 
-	temp = func->pci_dev;
-
-	if (temp) {
-		wrapped_dev.dev = temp;
-		wrapped_bus.bus = temp->bus;
-		rc = pci_visit_dev(&configure_functions, &wrapped_dev, &wrapped_bus);
-	}
 	return rc;
 }
 
