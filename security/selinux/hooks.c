@@ -1745,7 +1745,7 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 	spin_unlock(&files->file_lock);
 }
 
-static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
+static void selinux_bprm_apply_creds(struct linux_binprm *bprm)
 {
 	struct task_security_struct *tsec, *psec;
 	struct bprm_security_struct *bsec;
@@ -1755,7 +1755,7 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 	struct rlimit *rlim, *initrlim;
 	int rc, i;
 
-	secondary_ops->bprm_compute_creds(bprm);
+	secondary_ops->bprm_apply_creds(bprm);
 
 	tsec = current->security;
 
@@ -2560,7 +2560,7 @@ static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim
 	/* Control the ability to change the hard limit (whether
 	   lowering or raising it), so that the hard limit can
 	   later be used as a safe reset point for the soft limit
-	   upon context transitions. See selinux_bprm_compute_creds. */
+	   upon context transitions. See selinux_bprm_apply_creds. */
 	if (old_rlim->rlim_max != new_rlim->rlim_max)
 		return task_has_perm(current, current, PROCESS__SETRLIMIT);
 
@@ -3971,7 +3971,7 @@ struct security_operations selinux_ops = {
 
 	.bprm_alloc_security =		selinux_bprm_alloc_security,
 	.bprm_free_security =		selinux_bprm_free_security,
-	.bprm_compute_creds =		selinux_bprm_compute_creds,
+	.bprm_apply_creds =		selinux_bprm_apply_creds,
 	.bprm_set_security =		selinux_bprm_set_security,
 	.bprm_check_security =		selinux_bprm_check_security,
 	.bprm_secureexec =		selinux_bprm_secureexec,

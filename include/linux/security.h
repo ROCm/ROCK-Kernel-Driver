@@ -44,7 +44,7 @@ extern int cap_capget (struct task_struct *target, kernel_cap_t *effective, kern
 extern int cap_capset_check (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern int cap_bprm_set_security (struct linux_binprm *bprm);
-extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
+extern void cap_bprm_apply_creds (struct linux_binprm *bprm);
 extern int cap_bprm_secureexec(struct linux_binprm *bprm);
 extern int cap_inode_setxattr(struct dentry *dentry, char *name, void *value, size_t size, int flags);
 extern int cap_inode_removexattr(struct dentry *dentry, char *name);
@@ -102,7 +102,7 @@ struct swap_info_struct;
  * @bprm_free_security:
  *	@bprm contains the linux_binprm structure to be modified.
  *	Deallocate and clear the @bprm->security field.
- * @bprm_compute_creds:
+ * @bprm_apply_creds:
  *	Compute and set the security attributes of a process being transformed
  *	by an execve operation based on the old attributes (current->security)
  *	and the information saved in @bprm->security by the set_security hook.
@@ -115,7 +115,7 @@ struct swap_info_struct;
  *	@bprm contains the linux_binprm structure.
  * @bprm_set_security:
  *	Save security information in the bprm->security field, typically based
- *	on information about the bprm->file, for later use by the compute_creds
+ *	on information about the bprm->file, for later use by the apply_creds
  *	hook.  This hook may also optionally check permissions (e.g. for
  *	transitions between security domains).
  *	This hook may be called multiple times during a single execve, e.g. for
@@ -924,7 +924,7 @@ struct swap_info_struct;
  *	Check permission before allowing the @parent process to trace the
  *	@child process.
  *	Security modules may also want to perform a process tracing check
- *	during an execve in the set_security or compute_creds hooks of
+ *	during an execve in the set_security or apply_creds hooks of
  *	binprm_security_ops if the process is being traced and its security
  *	attributes would be changed by the execve.
  *	@parent contains the task_struct structure for parent process.
@@ -1026,7 +1026,7 @@ struct security_operations {
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
-	void (*bprm_compute_creds) (struct linux_binprm * bprm);
+	void (*bprm_apply_creds) (struct linux_binprm * bprm);
 	int (*bprm_set_security) (struct linux_binprm * bprm);
 	int (*bprm_check_security) (struct linux_binprm * bprm);
 	int (*bprm_secureexec) (struct linux_binprm * bprm);
@@ -1290,9 +1290,9 @@ static inline void security_bprm_free (struct linux_binprm *bprm)
 {
 	security_ops->bprm_free_security (bprm);
 }
-static inline void security_bprm_compute_creds (struct linux_binprm *bprm)
+static inline void security_bprm_apply_creds (struct linux_binprm *bprm)
 {
-	security_ops->bprm_compute_creds (bprm);
+	security_ops->bprm_apply_creds (bprm);
 }
 static inline int security_bprm_set (struct linux_binprm *bprm)
 {
@@ -1962,9 +1962,9 @@ static inline int security_bprm_alloc (struct linux_binprm *bprm)
 static inline void security_bprm_free (struct linux_binprm *bprm)
 { }
 
-static inline void security_bprm_compute_creds (struct linux_binprm *bprm)
+static inline void security_bprm_apply_creds (struct linux_binprm *bprm)
 { 
-	cap_bprm_compute_creds (bprm);
+	cap_bprm_apply_creds (bprm);
 }
 
 static inline int security_bprm_set (struct linux_binprm *bprm)

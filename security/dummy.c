@@ -26,6 +26,8 @@
 #include <net/sock.h>
 #include <linux/xattr.h>
 #include <linux/hugetlb.h>
+#include <linux/ptrace.h>
+#include <linux/file.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -116,7 +118,7 @@ static int dummy_vm_enough_memory(long pages)
 
 	vm_acct_memory(pages);
 
-        /*
+	/*
 	 * Sometimes we want to use more memory than we have
 	 */
 	if (sysctl_overcommit_memory == 1)
@@ -169,9 +171,30 @@ static void dummy_bprm_free_security (struct linux_binprm *bprm)
 	return;
 }
 
-static void dummy_bprm_compute_creds (struct linux_binprm *bprm)
+static inline int must_not_trace_exec (struct task_struct *p)
 {
-	return;
+	return ((p->ptrace & PT_PTRACED) && !(p->ptrace & PT_PTRACE_CAP))
+		|| atomic_read(&p->fs->count) > 1
+		|| atomic_read(&p->files->count) > 1
+		|| atomic_read(&p->sighand->count) > 1;
+}
+
+static void dummy_bprm_apply_creds (struct linux_binprm *bprm)
+{
+	task_lock(current);
+	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
+		current->mm->dumpable = 0;
+
+		if (must_not_trace_exec(current) && !capable(CAP_SETUID)) {
+			bprm->e_uid = current->uid;
+			bprm->e_gid = current->gid;
+		}
+	}
+
+	current->suid = current->euid = current->fsuid = bprm->e_uid;
+	current->sgid = current->egid = current->fsgid = bprm->e_gid;
+
+	task_unlock(current);
 }
 
 static int dummy_bprm_set_security (struct linux_binprm *bprm)
@@ -887,7 +910,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, vm_enough_memory);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
-	set_to_dummy_if_null(ops, bprm_compute_creds);
+	set_to_dummy_if_null(ops, bprm_apply_creds);
 	set_to_dummy_if_null(ops, bprm_set_security);
 	set_to_dummy_if_null(ops, bprm_check_security);
 	set_to_dummy_if_null(ops, bprm_secureexec);
