@@ -5,10 +5,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2004 Silicon Graphics, Inc.  All rights reserved.
  *
- * This driver implements a subset of the interface required by the
- * IA-PC Multimedia Timers Draft Specification (rev. 0.97) from Intel.
+ * This driver exports an API that should be supportable by any HPET or IA-PC
+ * multimedia timer.  The code below is currently specific to the SGI Altix
+ * SHub RTC, however.
  *
  * 11/01/01 - jbarnes - initial revision
  * 9/10/04 - Christoph Lameter - remove interrupt support for kernel inclusion
@@ -32,9 +33,15 @@ MODULE_AUTHOR("Jesse Barnes <jbarnes@sgi.com>");
 MODULE_DESCRIPTION("Multimedia timer support");
 MODULE_LICENSE("GPL");
 
+/* name of the device, usually in /dev */
+#define MMTIMER_NAME "mmtimer"
+#define MMTIMER_DESC "IA-PC Multimedia Timer"
+#define MMTIMER_VERSION "1.0"
+
 #define RTC_BITS 55 /* 55 bits for this implementation */
 
-static int mmtimer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+static int mmtimer_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, unsigned long arg);
 static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma);
 
 /*
@@ -55,8 +62,10 @@ static struct file_operations mmtimer_fops = {
  * @cmd: command to execute
  * @arg: optional argument to command
  *
- * Executes the command specified by @cmd.  Returns 0 for success, <0 for failure.
- * Valid commands are
+ * Executes the command specified by @cmd.  Returns 0 for success, < 0 for
+ * failure.
+ *
+ * Valid commands:
  *
  * %MMTIMER_GETOFFSET - Should return the offset (relative to the start
  * of the page where the registers are mapped) for the counter in question.
@@ -74,8 +83,8 @@ static struct file_operations mmtimer_fops = {
  * %MMTIMER_GETCOUNTER - Gets the current value in the counter and places it
  * in the address specified by @arg.
  */
-static int
-mmtimer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+static int mmtimer_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
 
@@ -91,12 +100,15 @@ mmtimer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		break;
 
 	case MMTIMER_GETRES: /* resolution of the clock in 10^-15 s */
-		if(copy_to_user((unsigned long *)arg, &mmtimer_femtoperiod, sizeof(unsigned long)))
+		if(copy_to_user((unsigned long *)arg, &mmtimer_femtoperiod,
+				sizeof(unsigned long)))
 			return -EFAULT;
 		break;
 
 	case MMTIMER_GETFREQ: /* frequency in Hz */
-		if(copy_to_user((unsigned long *)arg, &sn_rtc_cycles_per_second, sizeof(unsigned long)))
+		if(copy_to_user((unsigned long *)arg,
+				&sn_rtc_cycles_per_second,
+				sizeof(unsigned long)))
 			return -EFAULT;
 		ret = 0;
 		break;
@@ -110,7 +122,8 @@ mmtimer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		break;
 
 	case MMTIMER_GETCOUNTER:
-		if(copy_to_user((unsigned long *)arg, RTC_COUNTER_ADDR, sizeof(unsigned long)))
+		if(copy_to_user((unsigned long *)arg, RTC_COUNTER_ADDR,
+				sizeof(unsigned long)))
 			return -EFAULT;
 		break;
 	default:
@@ -129,8 +142,7 @@ mmtimer_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
  * Calls remap_page_range() to map the clock's registers into
  * the calling process' address space.
  */
-static int
-mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
+static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	unsigned long mmtimer_addr;
 
@@ -150,7 +162,8 @@ mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
 	mmtimer_addr &= ~(PAGE_SIZE - 1);
 	mmtimer_addr &= 0xfffffffffffffffUL;
 
-	if (remap_page_range(vma, vma->vm_start, mmtimer_addr, PAGE_SIZE, vma->vm_page_prot)) {
+	if (remap_page_range(vma, vma->vm_start, mmtimer_addr, PAGE_SIZE,
+			     vma->vm_page_prot)) {
 		printk(KERN_ERR "remap_page_range failed in mmtimer.c\n");
 		return -EAGAIN;
 	}
@@ -169,27 +182,29 @@ static struct miscdevice mmtimer_miscdev = {
  *
  * Does initial setup for the mmtimer device.
  */
-static int __init
-mmtimer_init(void)
+static int __init mmtimer_init(void)
 {
 	/*
 	 * Sanity check the cycles/sec variable
 	 */
 	if (sn_rtc_cycles_per_second < 100000) {
-		printk(KERN_ERR "%s: unable to determine clock frequency\n", MMTIMER_NAME);
+		printk(KERN_ERR "%s: unable to determine clock frequency\n",
+		       MMTIMER_NAME);
 		return -1;
 	}
 
-	mmtimer_femtoperiod = ((unsigned long)1E15 + sn_rtc_cycles_per_second / 2) /
-		sn_rtc_cycles_per_second;
+	mmtimer_femtoperiod = ((unsigned long)1E15 + sn_rtc_cycles_per_second /
+			       2) / sn_rtc_cycles_per_second;
 
 	strcpy(mmtimer_miscdev.devfs_name, MMTIMER_NAME);
 	if (misc_register(&mmtimer_miscdev)) {
-		printk(KERN_ERR "%s: failed to register device\n", MMTIMER_NAME);
+		printk(KERN_ERR "%s: failed to register device\n",
+		       MMTIMER_NAME);
 		return -1;
 	}
 
-	printk(KERN_INFO "%s: v%s, %ld MHz\n", MMTIMER_DESC, MMTIMER_VERSION, sn_rtc_cycles_per_second/(unsigned long)1E6);
+	printk(KERN_INFO "%s: v%s, %ld MHz\n", MMTIMER_DESC, MMTIMER_VERSION,
+	       sn_rtc_cycles_per_second/(unsigned long)1E6);
 
 	return 0;
 }
