@@ -67,6 +67,21 @@ config CRYPTO_SHA512
 	  This code also includes SHA-384, a 384 bit hash with 192 bits
 	  of security against collision attacks.
 
+config CRYPTO_WHIRLPOOL
+	tristate "Whirlpool digest algorithm"
+	depends on CRYPTO
+	help
+	  Whirlpool hash algorithm.
+
+	  Whirlpool is part of the NESSIE cryptographic primtives.
+	  Whirlpool works on messages shorter than 2^256 bits and
+	  produces a 512 bit hash.
+
+	  Whirlpool will be part of the ISO/IEC 10118-3:2003(E) standard
+
+	  See also:
+	  http://planeta.terra.com.br/informatica/paulobarreto/WhirlpoolPage.html
+
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO
