@@ -1602,14 +1602,14 @@ memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 
 	print_raid5_conf(conf);
 
-	/* read-ahead size must cover a whole stripe, which is
-	 * (n-1) * chunksize where 'n' is the number of raid devices
+	/* read-ahead size must cover two whole stripes, which is
+	 * 2 * (n-1) * chunksize where 'n' is the number of raid devices
 	 */
 	{
 		int stripe = (mddev->raid_disks-1) * mddev->chunk_size
 			/ PAGE_CACHE_SIZE;
-		if (mddev->queue->backing_dev_info.ra_pages < stripe)
-			mddev->queue->backing_dev_info.ra_pages = stripe;
+		if (mddev->queue->backing_dev_info.ra_pages < 2 * stripe)
+			mddev->queue->backing_dev_info.ra_pages = 2 * stripe;
 	}
 
 	/* Ok, everything is just fine now */
