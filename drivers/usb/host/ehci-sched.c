@@ -115,6 +115,7 @@ periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 			/* ... or C-mask? */
 			if (q->qh->hw_info2 & cpu_to_le32 (1 << (8 + uframe)))
 				usecs += q->qh->c_usecs;
+			hw_p = &q->qh->hw_next;
 			q = &q->qh->qh_next;
 			break;
 		case Q_TYPE_FSTN:
@@ -122,37 +123,35 @@ periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 			 * bandwidth from the previous frame
 			 */
 			if (q->fstn->hw_prev != EHCI_LIST_END) {
-				dbg ("not counting FSTN bandwidth yet ...");
+				ehci_dbg (ehci, "ignoring FSTN cost ...\n");
 			}
+			hw_p = &q->fstn->hw_next;
 			q = &q->fstn->fstn_next;
 			break;
 		case Q_TYPE_ITD:
 			usecs += q->itd->usecs [uframe];
+			hw_p = &q->itd->hw_next;
 			q = &q->itd->itd_next;
 			break;
 #ifdef have_split_iso
 		case Q_TYPE_SITD:
-			temp = q->sitd->hw_fullspeed_ep &
-				__constant_cpu_to_le32 (1 << 31);
-
-			// FIXME:  this doesn't count data bytes right...
-
 			/* is it in the S-mask?  (count SPLIT, DATA) */
 			if (q->sitd->hw_uframe & cpu_to_le32 (1 << uframe)) {
-				if (temp)
-					usecs += HS_USECS (188);
-				else
-					usecs += HS_USECS (1);
+				if (q->sitd->hw_fullspeed_ep &
+						__constant_cpu_to_le32 (1<<31))
+					usecs += q->sitd->stream->usecs;
+				else	/* worst case for OUT start-split */
+					usecs += HS_USECS_ISO (188);
 			}
 
 			/* ... C-mask?  (count CSPLIT, DATA) */
 			if (q->sitd->hw_uframe &
 					cpu_to_le32 (1 << (8 + uframe))) {
-				if (temp)
-					usecs += HS_USECS (0);
-				else
-					usecs += HS_USECS (188);
+				/* worst case for IN complete-split */
+				usecs += q->sitd->stream->c_usecs;
 			}
+
+			hw_p = &q->sitd->hw_next;
 			q = &q->sitd->sitd_next;
 			break;
 #endif /* have_split_iso */
@@ -1302,7 +1301,20 @@ restart:
 				break;
 #ifdef have_split_iso
 			case Q_TYPE_SITD:
-				// nyet!
+				if (q.sitd->hw_results & SITD_ACTIVE) {
+					q_p = &q.sitd->sitd_next;
+					hw_p = &q.sitd->hw_next;
+					type = Q_NEXT_TYPE (q.sitd->hw_next);
+					q = *q_p;
+					break;
+				}
+				*q_p = q.sitd->sitd_next;
+				*hw_p = q.sitd->hw_next;
+				type = Q_NEXT_TYPE (q.sitd->hw_next);
+				wmb();
+				modified = sitd_complete (ehci, q.sitd, regs);
+				q = *q_p;
+				break;
 #endif /* have_split_iso */
 			default:
 				dbg ("corrupt type %d frame %d shadow %p",

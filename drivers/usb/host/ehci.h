@@ -425,11 +425,11 @@ struct ehci_iso_stream {
 	int			next_uframe;
 
 	/* the rest is derived from the endpoint descriptor,
-	 * trusting urb->interval == (1 << (epdesc->bInterval - 1)),
+	 * trusting urb->interval == f(epdesc->bInterval) and
 	 * including the extra info for hw_bufp[0..2]
 	 */
 	u8			interval;
-	u8			usecs;		
+	u8			usecs, c_usecs;
 	u16			maxp;
 	unsigned		bandwidth;
 
@@ -492,22 +492,35 @@ struct ehci_sitd {
 	/* first part defined by EHCI spec */
 	u32			hw_next;
 /* uses bit field macros above - see EHCI 0.95 Table 3-8 */
-	u32			hw_fullspeed_ep;  /* see EHCI table 3-9 */
-	u32                     hw_uframe;        /* see EHCI table 3-10 */
-        u32                     hw_tx_results1;   /* see EHCI table 3-11 */
-	u32                     hw_tx_results2;   /* see EHCI table 3-12 */
-	u32                     hw_tx_results3;   /* see EHCI table 3-12 */
-        u32                     hw_backpointer;   /* see EHCI table 3-13 */
-	u32			hw_buf_hi [2];	  /* Appendix B */
+	u32			hw_fullspeed_ep;	/* see EHCI table 3-9 */
+	u32			hw_uframe;		/* see EHCI table 3-10 */
+	u32			hw_results;		/* see EHCI table 3-11 */
+#define	SITD_IOC	(1 << 31)	/* interrupt on completion */
+#define	SITD_PAGE	(1 << 30)	/* buffer 0/1 */
+#define	SITD_LENGTH(x)	(0x3ff & ((x)>>16))
+#define	SITD_STS_ACTIVE	(1 << 7)	/* HC may execute this */
+#define	SITD_STS_ERR	(1 << 6)	/* error from TT */
+#define	SITD_STS_DBE	(1 << 5)	/* data buffer error (in HC) */
+#define	SITD_STS_BABBLE	(1 << 4)	/* device was babbling */
+#define	SITD_STS_XACT	(1 << 3)	/* illegal IN response */
+#define	SITD_STS_MMF	(1 << 2)	/* incomplete split transaction */
+#define	SITD_STS_STS	(1 << 1)	/* split transaction state */
+
+#define SITD_ACTIVE	__constant_cpu_to_le32(SITD_STS_ACTIVE)
+
+	u32			hw_buf [2];		/* see EHCI table 3-12 */
+	u32			hw_backpointer;		/* see EHCI table 3-13 */
+	u32			hw_buf_hi [2];		/* Appendix B */
 
 	/* the rest is HCD-private */
 	dma_addr_t		sitd_dma;
 	union ehci_shadow	sitd_next;	/* ptr to periodic q entry */
-	struct urb		*urb;
-	dma_addr_t		buf_dma;	/* buffer address */
 
-	unsigned short		usecs;		/* start bandwidth */
-	unsigned short		c_usecs;	/* completion bandwidth */
+	struct urb		*urb;
+	struct ehci_iso_stream	*stream;	/* endpoint's queue */
+	struct list_head	sitd_list;	/* list of stream's sitds */
+	unsigned		frame;
+	unsigned		index;
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/
