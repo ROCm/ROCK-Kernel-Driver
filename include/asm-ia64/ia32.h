@@ -132,10 +132,6 @@ struct ia32_user_fxsr_struct {
 };
 
 /* signal.h */
-#define _IA32_NSIG	       64
-#define _IA32_NSIG_BPW	       32
-#define _IA32_NSIG_WORDS	       (_IA32_NSIG / _IA32_NSIG_BPW)
-
 #define IA32_SET_SA_HANDLER(ka,handler,restorer)				\
 				((ka)->sa.sa_handler = (__sighandler_t)		\
 					(((unsigned long)(restorer) << 32)	\
@@ -143,23 +139,17 @@ struct ia32_user_fxsr_struct {
 #define IA32_SA_HANDLER(ka)	((unsigned long) (ka)->sa.sa_handler & 0xffffffff)
 #define IA32_SA_RESTORER(ka)	((unsigned long) (ka)->sa.sa_handler >> 32)
 
-typedef struct {
-       unsigned int sig[_IA32_NSIG_WORDS];
-} sigset32_t;
-
 struct sigaction32 {
        unsigned int sa_handler;		/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
-       sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_sigset_t sa_mask;		/* A 32 bit mask */
 };
-
-typedef unsigned int old_sigset32_t;	/* at least 32 bits */
 
 struct old_sigaction32 {
        unsigned int  sa_handler;	/* Really a pointer, but need to deal
 					     with 32 bits */
-       old_sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_old_sigset_t sa_mask;		/* A 32 bit mask */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
 };

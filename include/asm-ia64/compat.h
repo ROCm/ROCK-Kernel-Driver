@@ -68,4 +68,11 @@ struct compat_flock {
        compat_pid_t	l_pid;
 };
 
+typedef u32		compat_old_sigset_t;	/* at least 32 bits */
+
+#define _COMPAT_NSIG		64
+#define _COMPAT_NSIG_BPW	32
+
+typedef u32		compat_sigset_word;
+
 #endif /* _ASM_IA64_COMPAT_H */
