@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <asm/acpi.h>
 #include <asm/arch_hooks.h>
 
 /**
@@ -17,8 +18,7 @@
  *	the "ordinary" interrupt call gates.  For legacy reasons, the ISA
  *	interrupts should be initialised here if the machine emulates a PC
  *	in any way.
- **/
-void __init pre_intr_init_hook(void)
+ **/void __init pre_intr_init_hook(void)
 {
 	init_ISA_irqs();
 }
@@ -43,7 +43,8 @@ void __init intr_init_hook(void)
 	apic_intr_init();
 #endif
 
-	setup_irq(2, &irq2);
+	if (!acpi_ioapic)
+		setup_irq(2, &irq2);
 }
 
 /**
