@@ -425,7 +425,7 @@ do_boot_cpu (int sapicid)
 
 	task_for_booting_cpu = idle;
 
-	Dprintk("Sending wakeup vector %u to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
+	Dprintk("Sending wakeup vector %lu to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
 
 	platform_send_ipi(cpu, ap_wakeup_vector, IA64_IPI_DM_INT, 0);
 
@@ -537,7 +537,7 @@ smp_boot_cpus (void)
 
 		printk("Before bogomips.\n");
 		if (!cpucount) {
-			printk(KERN_ERR "Error: only one processor found.\n");
+			printk(KERN_WARNING "Warning: only one processor found.\n");
 		} else {
 			unsigned long bogosum = 0;
   			for (cpu = 0; cpu < NR_CPUS; cpu++)

@@ -90,7 +90,7 @@ pcibios_penalize_isa_irq (int irq)
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_controller_num(PDEV)	(0)
 
-#define sg_dma_len(sg)		((sg)->length)
+#define sg_dma_len(sg)		((sg)->dma_length)
 
 #define HAVE_PCI_MMAP
 extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,

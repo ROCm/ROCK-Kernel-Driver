@@ -31,6 +31,7 @@
 #include <linux/serialP.h>
 
 #include <asm/irq.h>
+#include <asm/hw_irq.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_KDB

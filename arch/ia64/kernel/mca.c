@@ -82,27 +82,27 @@ extern void			ia64_slave_init_handler (void);
 extern struct hw_interrupt_type	irq_type_iosapic_level;
 
 static struct irqaction cmci_irqaction = {
-	handler:    ia64_mca_cmc_int_handler,
-	flags:      SA_INTERRUPT,
-	name:       "cmc_hndlr"
+	.handler =	ia64_mca_cmc_int_handler,
+	.flags =	SA_INTERRUPT,
+	.name =		"cmc_hndlr"
 };
 
 static struct irqaction mca_rdzv_irqaction = {
-	handler:    ia64_mca_rendez_int_handler,
-	flags:      SA_INTERRUPT,
-	name:       "mca_rdzv"
+	.handler =	ia64_mca_rendez_int_handler,
+	.flags =	SA_INTERRUPT,
+	.name =		"mca_rdzv"
 };
 
 static struct irqaction mca_wkup_irqaction = {
-	handler:    ia64_mca_wakeup_int_handler,
-	flags:      SA_INTERRUPT,
-	name:       "mca_wkup"
+	.handler =	ia64_mca_wakeup_int_handler,
+	.flags =	SA_INTERRUPT,
+	.name =		"mca_wkup"
 };
 
 static struct irqaction mca_cpe_irqaction = {
-	handler:    ia64_mca_cpe_int_handler,
-	flags:      SA_INTERRUPT,
-	name:       "cpe_hndlr"
+	.handler =	ia64_mca_cpe_int_handler,
+	.flags =	SA_INTERRUPT,
+	.name =		"cpe_hndlr"
 };
 
 /*

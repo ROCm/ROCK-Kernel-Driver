@@ -93,9 +93,9 @@ die (const char *str, struct pt_regs *regs, long err)
 		int lock_owner;
 		int lock_owner_depth;
 	} die = {
-		lock:			SPIN_LOCK_UNLOCKED,
-		lock_owner:		-1,
-		lock_owner_depth:	0
+		.lock =			SPIN_LOCK_UNLOCKED,
+		.lock_owner =		-1,
+		.lock_owner_depth =	0
 	};
 
 	if (die.lock_owner != smp_processor_id()) {
@@ -435,7 +435,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	unsigned long code, error = isr;
 	struct siginfo siginfo;
 	char buf[128];
-	int result;
+	int result, sig;
 	static const char *reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
@@ -479,6 +479,30 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		break;
 
 	      case 26: /* NaT Consumption */
+		if (user_mode(regs)) {
+			if (((isr >> 4) & 0xf) == 2) {
+				/* NaT page consumption */
+				sig = SIGSEGV;
+				code = SEGV_ACCERR;
+			} else {
+				/* register NaT consumption */
+				sig = SIGILL;
+				code = ILL_ILLOPN;
+			}
+			siginfo.si_signo = sig;
+			siginfo.si_code = code;
+			siginfo.si_errno = 0;
+			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_imm = vector;
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_isr = isr;
+			force_sig_info(sig, &siginfo, current);
+			return;
+		} else if (done_with_exception(regs))
+			return;
+		sprintf(buf, "NaT consumption");
+		break;
+
 	      case 31: /* Unsupported Data Reference */
 		if (user_mode(regs)) {
 			siginfo.si_signo = SIGILL;
@@ -491,7 +515,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			force_sig_info(SIGILL, &siginfo, current);
 			return;
 		}
-		sprintf(buf, (vector == 26) ? "NaT consumption" : "Unsupported data reference");
+		sprintf(buf, "Unsupported data reference");
 		break;
 
 	      case 29: /* Debug */
@@ -508,16 +532,15 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			if (ia64_psr(regs)->is == 0)
 			  ifa = regs->cr_iip;
 #endif
-			siginfo.si_addr = (void *) ifa;
 			break;
-		      case 35: siginfo.si_code = TRAP_BRANCH; break;
-		      case 36: siginfo.si_code = TRAP_TRACE; break;
+		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
+		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_flags = 0;
 		siginfo.si_isr = 0;
-		siginfo.si_addr = 0;
+		siginfo.si_addr = (void *) ifa;
 		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 		return;

@@ -8,6 +8,7 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <asm/hardirq.h>
+#include <linux/compiler.h>
 
 #define __local_bh_enable()	do { barrier(); really_local_bh_count()--; } while (0)
 

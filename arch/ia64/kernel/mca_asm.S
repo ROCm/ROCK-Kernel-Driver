@@ -684,9 +684,9 @@ ia64_os_mca_tlb_error_check:
 	movl	r3=SAL_GET_STATE_INFO;;
 	DATA_VA_TO_PA(r7);;		// convert to physical address
 	ld8	r8=[r7],8;;		// get pdesc function pointer
-	DATA_VA_TO_PA(r8)		// convert to physical address
+	dep	r8=0,r8,61,3;;		// convert SAL VA to PA
 	ld8	r1=[r7];;		// set new (ia64_sal) gp
-	DATA_VA_TO_PA(r1)		// convert to physical address
+	dep	r1=0,r1,61,3;;		// convert SAL VA to PA
 	mov	b6=r8
 
 	alloc	r5=ar.pfs,8,0,8,0;;	// allocate stack frame for SAL call

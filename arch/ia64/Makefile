@@ -26,7 +26,7 @@ CFLAGS_KERNEL := -mconstant-gp
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
-	CFLAGS += -frename-registers --param max-inline-insns=2000
+	CFLAGS += -frename-registers --param max-inline-insns=5000
 endif
 
 ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
