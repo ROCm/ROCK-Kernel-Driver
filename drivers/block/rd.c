@@ -96,16 +96,33 @@ int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
  *               2000 Transmeta Corp.
  * aops copied from ramfs.
  */
+
+/*
+ * If a ramdisk page has buffers, some may be uptodate and some may be not.
+ * To bring the page uptodate we zero out the non-uptodate buffers.  The
+ * page must be locked.
+ */
+static void make_page_uptodate(struct page *page)
+{
+	if (page_has_buffers(page)) {
+		struct buffer_head *bh = page_buffers(page);
+		struct buffer_head *head = bh;
+
+		do {
+			if (!buffer_uptodate(bh))
+				memset(bh->b_data, 0, bh->b_size);
+		} while ((bh = bh->b_this_page) != head);
+	} else {
+		memset(page_address(page), 0, PAGE_CACHE_SIZE);
+	}
+	flush_dcache_page(page);
+	SetPageUptodate(page);
+}
+
 static int ramdisk_readpage(struct file *file, struct page *page)
 {
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
+	if (!PageUptodate(page))
+		make_page_uptodate(page);
 	unlock_page(page);
 	return 0;
 }
@@ -113,14 +130,8 @@ static int ramdisk_readpage(struct file *file, struct page *page)
 static int ramdisk_prepare_write(struct file *file, struct page *page,
 				unsigned offset, unsigned to)
 {
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
+	if (!PageUptodate(page))
+		make_page_uptodate(page);
 	return 0;
 }
 
@@ -140,7 +151,9 @@ static int ramdisk_commit_write(struct file *file, struct page *page,
  */
 static int ramdisk_writepage(struct page *page, struct writeback_control *wbc)
 {
-	redirty_page_for_writepage(wbc, page);
+	if (!PageUptodate(page))
+		make_page_uptodate(page);
+	SetPageDirty(page);
 	if (wbc->for_reclaim)
 		return WRITEPAGE_ACTIVATE;
 	unlock_page(page);
@@ -191,10 +204,8 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 			goto out;
 		}
 
-		if (!PageUptodate(page)) {
-			clear_highpage(page);
-			SetPageUptodate(page);
-		}
+		if (!PageUptodate(page))
+			make_page_uptodate(page);
 
 		index++;
 
