@@ -265,7 +265,8 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 		case VIDIOCSFREQ:
 		{
 			int *freq = arg;
-			*freq = radio->curfreq;
+
+			radio->curfreq = *freq;
 			if (dsbr100_setfreq(radio, radio->curfreq)==-1)
 				warn("set frequency failed");
 			return 0;
