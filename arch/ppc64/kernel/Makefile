@@ -3,7 +3,7 @@
 #
 
 EXTRA_CFLAGS	+= -mno-minimal-toc
-extra-y		:= head.o vmlinux.lds.s
+extra-y		:= head.o vmlinux.lds
 
 obj-y               :=	setup.o entry.o traps.o irq.o idle.o dma.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \

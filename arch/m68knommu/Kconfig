@@ -5,6 +5,10 @@
 
 mainmenu "uClinux/68k (w/o MMU) Kernel Configuration"
 
+config M68KNOMMU
+	bool
+	default y
+
 config MMU
 	bool
 	default n
@@ -24,7 +28,6 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
-
 
 source "init/Kconfig"
 
@@ -388,7 +391,7 @@ config LARGE_ALLOCS
 	  a lot of RAM, and you need to able to allocate very large
 	  contiguous chunks. If unsure, say N.
 
-choice 
+choice
 	prompt "RAM size"
 	default AUTO
 
@@ -421,7 +424,7 @@ config RAM32MB
 
 endchoice
 
-choice 
+choice
 	prompt "RAM bus width"
 	default RAMAUTOBIT
 
@@ -472,7 +475,6 @@ endchoice
 
 endmenu
 
-
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
 config PCI
@@ -511,64 +513,10 @@ source "drivers/Kconfig"
 
 source "fs/Kconfig"
 
-menu "Kernel hacking"
-
-config FULLDEBUG
-	bool "Full Symbolic/Source Debugging support"
-	help
-	  Enable debuging symbols on kernel build.
-
-config FRAME_POINTER
-	bool "Compile the kernel with frame pointers"
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  and slower, but it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame pointers.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	help
-	  Enables console device to interpret special characters as
-	  commands to dump state information.
-
-config HIGHPROFILE
-	bool "Use fast second timer for profiling"
-	depends on COLDFIRE
-	help
-	  Use a fast secondary clock to produce profiling information.
-
-config BOOTPARAM
-	bool 'Compiled-in Kernel Boot Parameter'
-
-config BOOTPARAM_STRING 
-	string 'Kernel Boot Parameter'
-	default 'console=ttyS0,19200'
-	depends on BOOTPARAM
-
-config DUMPTOFLASH
-	bool "Panic/Dump to FLASH"
-	depends on COLDFIRE
-	help
-	  Dump any panic of trap output into a flash memory segment
-	  for later analysis.
-
-config NO_KERNEL_MSG
-	bool "Suppress Kernel BUG Messages"
-	help
-	  Do not output any debug BUG messages within the kernel.
-
-config BDM_DISABLE
-	bool "Disable BDM signals"
-	depends on (EXPERIMENTAL && COLDFIRE)
-	help
-	  Disable the ColdFire CPU's BDM signals.
-
-endmenu
+source "arch/m68knommu/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-

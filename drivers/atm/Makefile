@@ -3,7 +3,7 @@
 #
 
 fore_200e-objs	:= fore200e.o
-host-progs	:= fore200e_mkfirm
+hostprogs-y	:= fore200e_mkfirm
 
 # Files generated that shall be removed upon make clean
 clean-files := atmsar11.bin atmsar11.bin1 atmsar11.bin2 pca200e.bin \

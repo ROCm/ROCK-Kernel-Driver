@@ -1,7 +1,7 @@
 
 obj-y := initramfs_data.o
 
-host-progs  := gen_init_cpio
+hostprogs-y  := gen_init_cpio
 
 clean-files := initramfs_data.cpio.gz
 

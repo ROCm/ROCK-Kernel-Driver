@@ -1,6 +1,6 @@
 
-host-progs	:= mk_sc
-always		:= $(host-progs) mk_thread
+hostprogs-y	:= mk_sc
+always		:= $(hostprogs-y) mk_thread
 targets		:= mk_thread_kern.o mk_thread_user.o
 
 mk_sc-objs	:= mk_sc.o
