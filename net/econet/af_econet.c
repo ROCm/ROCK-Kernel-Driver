@@ -418,10 +418,18 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	/* tack our header on the front of the iovec */
 	size = sizeof(struct aunhdr);
+	/*
+	 * XXX: that is b0rken.  We can't mix userland and kernel pointers
+	 * in iovec, since on a lot of platforms copy_from_user() will
+	 * *not* work with the kernel and userland ones at the same time,
+	 * regardless of what we do with set_fs().  And we are talking about
+	 * econet-over-ethernet here, so "it's only ARM anyway" doesn't
+	 * apply.  Any suggestions on fixing that code?		-- AV
+	 */
 	iov[0].iov_base = (void *)&ah;
 	iov[0].iov_len = size;
 	for (i = 0; i < msg->msg_iovlen; i++) {
-		void *base = msg->msg_iov[i].iov_base;
+		void __user *base = msg->msg_iov[i].iov_base;
 		size_t len = msg->msg_iov[i].iov_len;
 		/* Check it now since we switch to KERNEL_DS later. */
 		if ((err = verify_area(VERIFY_READ, base, len)) < 0)
@@ -589,7 +597,7 @@ out:
  *	Handle Econet specific ioctls
  */
 
-static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void *arg)
+static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void __user *arg)
 {
 	struct ifreq ifr;
 	struct ec_device *edev;
@@ -662,18 +670,19 @@ static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void *arg)
 static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
+	void __user *argp = (void __user *)arg;
 
 	switch(cmd) {
 		case SIOCGSTAMP:
-			return sock_get_timestamp(sk,(struct timeval __user *)arg);
+			return sock_get_timestamp(sk, argp);
 
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:
-			return ec_dev_ioctl(sock, cmd, (void *)arg);
+			return ec_dev_ioctl(sock, cmd, argp);
 			break;
 
 		default:
-			return dev_ioctl(cmd,(void __user *) arg);
+			return dev_ioctl(cmd, argp);
 	}
 	/*NOTREACHED*/
 	return 0;
