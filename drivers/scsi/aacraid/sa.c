@@ -38,6 +38,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/completion.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <asm/semaphore.h>
 
@@ -329,26 +330,23 @@ static int aac_sa_check_health(struct aac_dev *dev)
 	 *	Everything is OK
 	 */
 	return 0;
-} /* aac_sa_check_health */
+}
 
 /**
  *	aac_sa_init	-	initialize an ARM based AAC card
  *	@dev: device to configure
- *	@devnum: adapter number
  *
  *	Allocate and set up resources for the ARM based AAC variants. The 
  *	device_interface in the commregion will be allocated and linked 
  *	to the comm region.
  */
 
-int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
+int aac_sa_init(struct aac_dev *dev)
 {
 	unsigned long start;
 	unsigned long status;
 	int instance;
 	const char *name;
-
-	dev->devnum = devnum;
 
 	dprintk(("PREINST\n"));
 	instance = dev->id;

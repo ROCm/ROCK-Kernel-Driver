@@ -689,8 +689,6 @@ static DEFINE_PER_CPU(struct list_head, scsi_done_q);
  */
 void scsi_done(struct scsi_cmnd *cmd)
 {
-	unsigned long flags;
-
 	/*
 	 * We don't have to worry about this one timing out any more.
 	 * If we are unable to remove the timer, then the command
@@ -701,6 +699,14 @@ void scsi_done(struct scsi_cmnd *cmd)
 	 */
 	if (!scsi_delete_timer(cmd))
 		return;
+	__scsi_done(cmd);
+}
+
+/* Private entry to scsi_done() to complete a command when the timer
+ * isn't running --- used by scsi_times_out */
+void __scsi_done(struct scsi_cmnd *cmd)
+{
+	unsigned long flags;
 
 	/*
 	 * Set the serial numbers back to zero
