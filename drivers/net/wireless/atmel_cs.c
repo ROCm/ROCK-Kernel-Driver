@@ -39,7 +39,6 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/netdevice.h>
 #include <linux/moduleparam.h>
 #include <linux/device.h>
@@ -108,7 +107,7 @@ void stop_atmel_card( struct net_device *, int );
 int reset_atmel_card( struct net_device * );
 
 static void atmel_config(dev_link_t *link);
-static void atmel_release(u_long arg);
+static void atmel_release(dev_link_t *link);
 static int atmel_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
@@ -222,9 +221,6 @@ static dev_link_t *atmel_attach(void)
 		return NULL;
 	}
 	memset(link, 0, sizeof(struct dev_link_t));
-	init_timer(&link->release);
-	link->release.function = &atmel_release;
-	link->release.data = (u_long)link;
 	
 	/* Interrupt setup */
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
@@ -300,9 +296,8 @@ static void atmel_detach(dev_link_t *link)
 	if (*linkp == NULL)
 		return;
 
-	del_timer(&link->release);
 	if ( link->state & DEV_CONFIG ) {
-		atmel_release( (int)link );
+		atmel_release(link);
 		if ( link->state & DEV_STALE_CONFIG ) {
 			link->state |= DEV_STALE_LINK;
 			return;
@@ -605,9 +600,8 @@ static void atmel_config(dev_link_t *link)
 	
  cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
-	atmel_release((u_long)link);
-	
-} /* atmel_config */
+	atmel_release(link);
+}
 
 /*======================================================================
   
@@ -617,9 +611,8 @@ static void atmel_config(dev_link_t *link)
   
   ======================================================================*/
 
-static void atmel_release(u_long arg)
+static void atmel_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	struct net_device *dev = ((local_info_t*)link->priv)->eth_dev;
 		
 	DEBUG(0, "atmel_release(0x%p)\n", link);
@@ -638,8 +631,7 @@ static void atmel_release(u_long arg)
 	if (link->irq.AssignedIRQ)
 		CardServices(ReleaseIRQ, link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
-	
-} /* atmel_release */
+}
 
 /*======================================================================
   
@@ -666,7 +658,7 @@ static int atmel_event(event_t event, int priority,
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			netif_device_detach(local->eth_dev);
-			mod_timer(&link->release, jiffies + HZ/20);
+			atmel_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -718,7 +710,7 @@ static void atmel_cs_cleanup(void)
         /* XXX: this really needs to move into generic code.. */
         while (dev_list != NULL) {
                 if (dev_list->state & DEV_CONFIG)
-                        atmel_release((u_long)dev_list);
+                        atmel_release(dev_list);
                 atmel_detach(dev_list);
         }
 }
