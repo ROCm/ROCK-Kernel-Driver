@@ -246,7 +246,7 @@ static int pvr2_update_par(void);
 static void pvr2_update_display(void);
 static void pvr2_init_display(void);
 static void pvr2_do_blank(void);
-static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
+static irqreturn_t pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static int pvr2_init_cable(void);
 static int pvr2_get_param(const struct pvr2_params *p, const char *s,
                             int val, int size);
@@ -939,7 +939,7 @@ static void pvr2_do_blank(void)
 	is_blanked = do_blank > 0 ? do_blank : 0;
 }
 
-static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
 	if (do_vmode_pan || do_vmode_full)
 		pvr2_update_display();
@@ -958,6 +958,7 @@ static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	if (do_vmode_full) {
 		do_vmode_full = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /*
