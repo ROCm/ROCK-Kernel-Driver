@@ -1,0 +1,16 @@
+menu "Integrator Options"
+	depends on ARCH_INTEGRATOR
+
+config INTEGRATOR_IMPD1
+	tristate "Include support for Integrator/IM-PD1"
+	help
+	  The IM-PD1 is an add-on logic module for the Integrator which
+	  allows ARM(R) Ltd PrimeCells to be developed and evaluated.
+	  The IM-PD1 can be found on the Integrator/PP2 platform.
+
+	  If you want to compile this as a module (=code which can be
+	  inserted into and removed from the running kernel), say M
+	  here and read <file:Documentation/modules.txt>.  The module
+	  will be called impd1.
+
+endmenu

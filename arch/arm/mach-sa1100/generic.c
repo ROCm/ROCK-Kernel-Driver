@@ -144,7 +144,6 @@ static struct platform_device sa11x0udc_device = {
 	.name		= "sa11x0-udc",
 	.id		= 0,
 	.dev		= {
-		.name	= "Intel Corporation SA11x0 [UDC]",
 		.dma_mask = &sa11x0udc_dma_mask,
 	},
 	.num_resources	= ARRAY_SIZE(sa11x0udc_resources),
@@ -162,9 +161,6 @@ static struct resource sa11x0mcp_resources[] = {
 static struct platform_device sa11x0mcp_device = {
 	.name		= "sa11x0-mcp",
 	.id		= 0,
-	.dev = {
-		.name	= "Intel Corporation SA11x0 [MCP]",
-	},
 	.num_resources	= ARRAY_SIZE(sa11x0mcp_resources),
 	.resource	= sa11x0mcp_resources,
 };
@@ -183,7 +179,6 @@ static struct platform_device sa11x0ssp_device = {
 	.name		= "sa11x0-ssp",
 	.id		= 0,
 	.dev = {
-		.name	= "Intel Corporation SA11x0 [SSP]",
 		.dma_mask = &sa11x0ssp_dma_mask,
 	},
 	.num_resources	= ARRAY_SIZE(sa11x0ssp_resources),
@@ -206,9 +201,6 @@ static struct resource sa11x0fb_resources[] = {
 static struct platform_device sa11x0fb_device = {
 	.name		= "sa11x0-fb",
 	.id		= 0,
-	.dev		= {
-		.name	= "Intel Corporation SA11x0 [LCD]",
-	},
 	.num_resources	= ARRAY_SIZE(sa11x0fb_resources),
 	.resource	= sa11x0fb_resources,
 };
@@ -216,9 +208,6 @@ static struct platform_device sa11x0fb_device = {
 static struct platform_device sa11x0pcmcia_device = {
 	.name		= "sa11x0-pcmcia",
 	.id		= 0,
-	.dev		= {
-		.name	= "Intel Corporation SA11x0 [PCMCIA]",
-	},
 };
 
 static struct platform_device *sa11x0_devices[] __initdata = {

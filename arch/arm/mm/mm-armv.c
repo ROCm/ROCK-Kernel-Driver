@@ -305,8 +305,34 @@ static struct mem_types mem_types[] __initdata = {
  */
 static void __init build_mem_type_table(void)
 {
+	unsigned int cr = get_cr();
 	int cpu_arch = cpu_architecture();
 	const char *policy;
+
+	/*
+	 * ARMv6 and above have extended page tables.
+	 */
+	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
+		/*
+		 * bit 4 becomes XN which we must clear for the
+		 * kernel memory mapping.
+		 */
+		mem_types[MT_MEMORY].prot_sect &= ~PMD_BIT4;
+		/*
+		 * Mark cache clean areas read only from SVC mode
+		 * and no access from userspace.
+		 */
+		mem_types[MT_MINICLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
+	}
+
+	/*
+	 * ARMv6 can map the vectors as write-through.
+	 */
+	if (cpu_arch >= CPU_ARCH_ARMv6)
+		mem_types[MT_VECTORS].prot_pte |= PTE_CACHEABLE;
+	else
+		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
 
 	/*
 	 * ARMv5 and higher can use ECC memory.
