@@ -345,7 +345,7 @@ xfs_log_force(xfs_mount_t *mp,
 
 	ASSERT(flags & XFS_LOG_FORCE);
 
-	XFS_STATS_INC(xfsstats.xs_log_force);
+	XFS_STATS_INC(xs_log_force);
 
 	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
@@ -446,7 +446,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
 
-	XFS_STATS_INC(xfsstats.xs_try_logspace);
+	XFS_STATS_INC(xs_try_logspace);
 
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
@@ -1428,7 +1428,7 @@ xlog_sync(xlog_t		*log,
 	int		split = 0;	/* split write into two regions */
 	int		error;
 
-	XFS_STATS_INC(xfsstats.xs_log_writes);
+	XFS_STATS_INC(xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
 
 	/* Round out the log write size */
@@ -1477,7 +1477,7 @@ xlog_sync(xlog_t		*log,
 
 	/* Add for LR header */
 	count += log->l_iclog_hsize;
-	XFS_STATS_ADD(xfsstats.xs_log_blocks, BTOBB(count));
+	XFS_STATS_ADD(xs_log_blocks, BTOBB(count));
 
 	/* Do we need to split this write into 2 parts? */
 	if (XFS_BUF_ADDR(bp) + BTOBB(count) > log->l_logBBsize) {
@@ -2308,7 +2308,7 @@ restart:
 		log->l_flushcnt++;
 		LOG_UNLOCK(log, s);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
-		XFS_STATS_INC(xfsstats.xs_log_noiclogs);
+		XFS_STATS_INC(xs_log_noiclogs);
 		/* Ensure that log writes happen */
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
@@ -2421,7 +2421,7 @@ xlog_grant_log_space(xlog_t	   *log,
 		if (XLOG_FORCED_SHUTDOWN(log))
 			goto error_return;
 
-		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, s);
 		/*
 		 * If we got an error, and the filesystem is shutting down,
@@ -2447,7 +2447,7 @@ redo:
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
-		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, s);
 
 		if (XLOG_FORCED_SHUTDOWN(log)) {
@@ -2558,7 +2558,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 
 			xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: sleep 1");
-			XFS_STATS_INC(xfsstats.xs_sleep_logspace);
+			XFS_STATS_INC(xs_sleep_logspace);
 			sv_wait(&tic->t_sema, PINOD|PLTWAIT,
 				&log->l_grant_lock, s);
 
@@ -2587,7 +2587,7 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
-		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, s);
 
 		/* If we're shutting down, this tic is already off the queue */
@@ -2952,7 +2952,7 @@ maybe_sleep:
 			LOG_UNLOCK(log, s);
 			return XFS_ERROR(EIO);
 		}
-		XFS_STATS_INC(xfsstats.xs_log_force_sleep);
+		XFS_STATS_INC(xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, s);
 		/*
 		 * No need to grab the log lock here since we're
@@ -3035,7 +3035,7 @@ try_again:
 		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
-			XFS_STATS_INC(xfsstats.xs_log_force_sleep);
+			XFS_STATS_INC(xs_log_force_sleep);
 			sv_wait(&iclog->ic_prev->ic_writesema, PSWP,
 				&log->l_icloglock, s);
 			already_slept = 1;
@@ -3061,7 +3061,7 @@ try_again:
 			LOG_UNLOCK(log, s);
 			return XFS_ERROR(EIO);
 		}
-		XFS_STATS_INC(xfsstats.xs_log_force_sleep);
+		XFS_STATS_INC(xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, s);
 		/*
 		 * No need to grab the log lock here since we're
@@ -3128,7 +3128,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 	 * The kmem_zalloc may sleep, so we shouldn't be holding the
 	 * global lock.  XXXmiken: may want to use zone allocator.
 	 */
-	buf = (xfs_caddr_t) kmem_zalloc(NBPP, 0);
+	buf = (xfs_caddr_t) kmem_zalloc(NBPP, KM_SLEEP);
 
 	s = LOG_LOCK(log);
 
@@ -3427,8 +3427,8 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			clientid = ophead->oh_clientid;
 		} else {
-			idx = BTOBB((xfs_caddr_t)&(ophead->oh_clientid) - iclog->ic_datap);
-			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+			idx = BTOBBT((xfs_caddr_t)&(ophead->oh_clientid) - iclog->ic_datap);
+			if (idx >= (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
 				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				clientid = GET_CLIENT_ID(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);
@@ -3445,9 +3445,9 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			op_len = INT_GET(ophead->oh_len, ARCH_CONVERT);
 		} else {
-			idx = BTOBB((__psint_t)&ophead->oh_len -
+			idx = BTOBBT((__psint_t)&ophead->oh_len -
 				    (__psint_t)iclog->ic_datap);
-			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+			if (idx >= (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
 				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				op_len = INT_GET(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);

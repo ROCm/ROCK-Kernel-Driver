@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sun Aug 3 16:26:10 2003
+# Last update: Sat Sep 13 00:22:34 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -367,3 +367,20 @@ cx861xx			ARCH_CX861XX		CX861XX			355
 ixp2000			ARCH_IXP2000		IXP2000			356
 xda			SA1100_XDA		XDA			357
 csir_ims		ARCH_CSIR_IMS		CSIR_IMS		358
+ixp421_dnaeeth		ARCH_IXP421_DNAEETH	IXP421_DNAEETH		359
+pocketserv9200		ARCH_POCKETSERV9200	POCKETSERV9200		360
+toto			ARCH_TOTO		TOTO			361
+s3c2440			ARCH_S3C2440		S3C2440			362
+ks8695p			ARCH_KS8695P		KS8695P			363
+se4000			ARCH_SE4000		SE4000			364
+quadriceps		ARCH_QUADRICEPS		QUADRICEPS		365
+bronco			ARCH_BRONCO		BRONCO			366
+esl_wireless_tab	ARCH_ESL_WIRELESS_TABLETESL_WIRELESS_TABLET	367
+esl_sofcomp		ARCH_ESL_SOFCOMP	ESL_SOFCOMP		368
+s5c7375			ARCH_S5C7375		S5C7375			369
+spearhead		ARCH_SPEARHEAD		SPEARHEAD		370
+pantera			ARCH_PANTERA		PANTERA			371
+prayoglite		ARCH_PRAYOGLITE		PRAYOGLITE		372
+gumstik			ARCH_GUMSTIK		GUMSTIK			373
+rcube			ARCH_RCUBE		RCUBE			374
+rea_olv			ARCH_REA_OLV		REA_OLV			375

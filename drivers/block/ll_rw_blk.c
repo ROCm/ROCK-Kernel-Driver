@@ -458,16 +458,19 @@ void blk_queue_free_tags(request_queue_t *q)
 	if (!bqt)
 		return;
 
-	BUG_ON(bqt->busy);
-	BUG_ON(!list_empty(&bqt->busy_list));
+	if (atomic_dec_and_test(&bqt->refcnt)) {
+		BUG_ON(bqt->busy);
+		BUG_ON(!list_empty(&bqt->busy_list));
 
-	kfree(bqt->tag_index);
-	bqt->tag_index = NULL;
+		kfree(bqt->tag_index);
+		bqt->tag_index = NULL;
 
-	kfree(bqt->tag_map);
-	bqt->tag_map = NULL;
+		kfree(bqt->tag_map);
+		bqt->tag_map = NULL;
 
-	kfree(bqt);
+		kfree(bqt);
+	}
+
 	q->queue_tags = NULL;
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
@@ -503,6 +506,9 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
 		__set_bit(i, tags->tag_map);
 
+	INIT_LIST_HEAD(&tags->busy_list);
+	tags->busy = 0;
+	atomic_set(&tags->refcnt, 1);
 	return 0;
 fail:
 	kfree(tags->tag_index);
@@ -514,19 +520,18 @@ fail:
  * @q:  the request queue for the device
  * @depth:  the maximum queue depth supported
  **/
-int blk_queue_init_tags(request_queue_t *q, int depth)
+int blk_queue_init_tags(request_queue_t *q, int depth,
+			struct blk_queue_tag *tags)
 {
-	struct blk_queue_tag *tags;
+	if (!tags) {
+		tags = kmalloc(sizeof(struct blk_queue_tag), GFP_ATOMIC);
+		if (!tags)
+			goto fail;
 
-	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
-	if (!tags)
-		goto fail;
-
-	if (init_tag_map(q, tags, depth))
-		goto fail;
-
-	INIT_LIST_HEAD(&tags->busy_list);
-	tags->busy = 0;
+		if (init_tag_map(q, tags, depth))
+			goto fail;
+	} else
+		atomic_inc(&tags->refcnt);
 
 	/*
 	 * assign it, all done

@@ -28,6 +28,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <asm/assembler.h>
+#include <asm/pgtable.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
@@ -337,19 +338,19 @@ ENTRY(cpu_arm926_switch_mm)
 ENTRY(cpu_arm926_set_pte)
 	str	r1, [r0], #-2048		@ linux version
 
-	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	bic	r2, r1, #0xff0
-	bic	r2, r2, #3
-	orr	r2, r2, #HPTE_TYPE_SMALL
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
+	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #LPTE_USER			@ User?
-	orrne	r2, r2, #HPTE_AP_READ
+	tst	r1, #L_PTE_USER			@ User?
+	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-	tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-	orreq	r2, r2, #HPTE_AP_WRITE
+	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-	tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young?
+	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
 	movne	r2, #0
 
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
@@ -436,7 +437,7 @@ __arm926_setup:
  */
 	.type	arm926_processor_functions, #object
 arm926_processor_functions:
-	.word	v5tej_early_abort
+	.word	v5tj_early_abort
 	.word	cpu_arm926_proc_init
 	.word	cpu_arm926_proc_fin
 	.word	cpu_arm926_reset
@@ -461,8 +462,8 @@ cpu_elf_name:
 
 	.type	__arm926_proc_info,#object
 __arm926_proc_info:
-	.long	0x41009260
-	.long	0xff00fff0
+	.long	0x41069260			@ ARM926EJ-S (v5TEJ)
+	.long	0xff0ffff0
 	.long	0x00000c1e			@ mmuflags
 	b	__arm926_setup
 	.long	cpu_arch_name

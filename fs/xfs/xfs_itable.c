@@ -156,13 +156,23 @@ xfs_bulkstat_one(
 	/*
 	 * convert di_flags to bs_xflags.
 	 */
-	di_flags=INT_GET(dic->di_flags, arch);
+	di_flags = INT_GET(dic->di_flags, arch);
 
 	buf->bs_xflags =
 		((di_flags & XFS_DIFLAG_REALTIME) ?
 			XFS_XFLAG_REALTIME : 0) |
 		((di_flags & XFS_DIFLAG_PREALLOC) ?
 			XFS_XFLAG_PREALLOC : 0) |
+	        ((di_flags & XFS_DIFLAG_IMMUTABLE) ?
+		        XFS_XFLAG_IMMUTABLE : 0) |
+		((di_flags & XFS_DIFLAG_APPEND) ?
+		        XFS_XFLAG_APPEND : 0) |
+		((di_flags & XFS_DIFLAG_SYNC) ?
+		        XFS_XFLAG_SYNC : 0) |
+		((di_flags & XFS_DIFLAG_NOATIME) ?
+		        XFS_XFLAG_NOATIME : 0) |
+		((di_flags & XFS_DIFLAG_NODUMP) ?
+		        XFS_XFLAG_NODUMP : 0) |
 		(XFS_CFORK_Q_ARCH(dic, arch) ?
 			XFS_XFLAG_HASATTR : 0);
 

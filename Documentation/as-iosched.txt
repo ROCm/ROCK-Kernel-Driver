@@ -1,0 +1,53 @@
+Anticipatory IO scheduler
+-------------------------
+Nick Piggin <piggin@cyberone.com.au>    13 Sep 2003
+
+Attention! Database servers, especially those using "TCQ" disks should
+investigate performance with the 'deadline' IO scheduler. Any system with high
+disk performance requirements should do so, in fact.
+
+If you see unusual performance characteristics of your disk systems, or you
+see big performance regressions versus the deadline scheduler, please email
+me. Database users don't bother unless you're willing to test a lot of patches
+from me ;) its a known issue.
+
+
+Selecting IO schedulers
+-----------------------
+To choose IO schedulers at boot time, use the argument 'elevator=deadline'.
+'noop' and 'as' (the default) are also available. IO schedulers are assigned
+globally at boot time only presently.
+
+
+Tuning the anticipatory IO scheduler
+------------------------------------
+When using 'as', the anticipatory IO scheduler there are 5 parameters under
+/sys/block/*/iosched/. All are units of milliseconds.
+
+The parameters are:
+* read_expire
+    Controls how long until a request becomes "expired". It also controls the
+    interval between which expired requests are served, so set to 50, a request
+    might take anywhere < 100ms to be serviced _if_ it is the next on the
+    expired list. Obviously it won't make the disk go faster. The result
+    basically equates to the timeslice a single reader gets in the presence of
+    other IO. 100*((seek time / read_expire) + 1) is very roughly the %
+    streaming read efficiency your disk should get with multiple readers.
+    
+* read_batch_expire
+    Controls how much time a batch of reads is given before pending writes are
+    served. Higher value is more efficient. This might be set below read_expire
+    if writes are to be given higher priority than reads, but reads are to be
+    as efficient as possible when there are no writes. Generally though, it
+    should be some multiple of read_expire.
+   
+* write_expire, and
+* write_batch_expire are equivalent to the above, for writes.
+
+* antic_expire
+    Controls the maximum amount of time we can anticipate a good read before
+    giving up. Many other factors may cause anticipation to be stopped early,
+    or some processes will not be "anticipated" at all. Should be a bit higher
+    for big seek time devices though not a linear correspondence - most
+    processes have only a few ms thinktime.
+

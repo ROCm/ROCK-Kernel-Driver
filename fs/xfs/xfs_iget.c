@@ -204,7 +204,7 @@ again:
 				if (ip->i_flags & XFS_IRECLAIM) {
 					read_unlock(&ih->ih_lock);
 					delay(1);
-					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
+					XFS_STATS_INC(xs_ig_frecycle);
 
 					goto again;
 				}
@@ -212,7 +212,7 @@ again:
 				vn_trace_exit(vp, "xfs_iget.alloc",
 					(inst_t *)__return_address);
 
-				XFS_STATS_INC(xfsstats.xs_ig_found);
+				XFS_STATS_INC(xs_ig_found);
 
 				ip->i_flags &= ~XFS_IRECLAIMABLE;
 				read_unlock(&ih->ih_lock);
@@ -232,7 +232,7 @@ again:
 				if (inode->i_state & (I_FREEING | I_CLEAR)) {
 					read_unlock(&ih->ih_lock);
 					delay(1);
-					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
+					XFS_STATS_INC(xs_ig_frecycle);
 
 					goto again;
 				}
@@ -247,7 +247,7 @@ again:
 
 			read_unlock(&ih->ih_lock);
 
-			XFS_STATS_INC(xfsstats.xs_ig_found);
+			XFS_STATS_INC(xs_ig_found);
 
 finish_inode:
 			if (lock_flags != 0) {
@@ -269,7 +269,7 @@ finish_inode:
 	 * Inode cache miss: save the hash chain version stamp and unlock
 	 * the chain, so we don't deadlock in vn_alloc.
 	 */
-	XFS_STATS_INC(xfsstats.xs_ig_missed);
+	XFS_STATS_INC(xs_ig_missed);
 
 	version = ih->ih_version;
 
@@ -305,7 +305,7 @@ finish_inode:
 				write_unlock(&ih->ih_lock);
 				xfs_idestroy(ip);
 
-				XFS_STATS_INC(xfsstats.xs_ig_dup);
+				XFS_STATS_INC(xs_ig_dup);
 				goto again;
 			}
 		}
@@ -442,7 +442,7 @@ xfs_iget(
 	int		error;
 
 retry:
-	XFS_STATS_INC(xfsstats.xs_ig_attempts);
+	XFS_STATS_INC(xs_ig_attempts);
 
 	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
 		bhv_desc_t	*bdp;
@@ -475,7 +475,7 @@ inode_allocate:
 
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
 			if (bdp == NULL) {
-				XFS_STATS_INC(xfsstats.xs_ig_dup);
+				XFS_STATS_INC(xs_ig_dup);
 				goto inode_allocate;
 			}
 			ip = XFS_BHVTOI(bdp);
@@ -484,7 +484,7 @@ inode_allocate:
 			newnode = (ip->i_d.di_mode == 0);
 			if (newnode)
 				xfs_iocore_inode_reinit(ip);
-			XFS_STATS_INC(xfsstats.xs_ig_found);
+			XFS_STATS_INC(xs_ig_found);
 			*ipp = ip;
 			error = 0;
 		}
@@ -604,7 +604,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	/*
 	 * Remove from old hash list and mount list.
 	 */
-	XFS_STATS_INC(xfsstats.xs_ig_reclaims);
+	XFS_STATS_INC(xs_ig_reclaims);
 
 	xfs_iextract(ip);
 

@@ -54,7 +54,6 @@
 #include "xfs_inode.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_ialloc.h"
-#include "xfs_error.h"
 #include "xfs_log_priv.h"
 #include "xfs_buf_item.h"
 #include "xfs_alloc_btree.h"
@@ -1360,7 +1359,7 @@ xlog_recover_add_item(
 {
 	xlog_recover_item_t	*item;
 
-	item = kmem_zalloc(sizeof(xlog_recover_item_t), 0);
+	item = kmem_zalloc(sizeof(xlog_recover_item_t), KM_SLEEP);
 	xlog_recover_insert_item_backq(itemq, item);
 }
 
@@ -1444,7 +1443,7 @@ xlog_recover_add_to_trans(
 		item->ri_total	= in_f->ilf_size;
 		ASSERT(item->ri_total <= XLOG_MAX_REGIONS_IN_ITEM);
 		item->ri_buf = kmem_zalloc((item->ri_total *
-					    sizeof(xfs_log_iovec_t)), 0);
+					    sizeof(xfs_log_iovec_t)), KM_SLEEP);
 	}
 	ASSERT(item->ri_total > item->ri_cnt);
 	/* Description region is ri_buf[0] */

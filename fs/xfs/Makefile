@@ -65,7 +65,6 @@ xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
 xfs-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
-				   xfs_attr_fetch.o \
 				   xfs_attr_leaf.o \
 				   xfs_bit.o \
 				   xfs_bmap.o \
