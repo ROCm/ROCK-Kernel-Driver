@@ -659,9 +659,6 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			buf->used    = 0;
 			buf->offset  = (dma->byte_count + byte_count + offset);
 			buf->address = (void *)(page + offset);
-#ifndef __sparc__
-			buf->bus_address = virt_to_bus(buf->address);
-#endif
 			buf->next    = NULL;
 			buf->waiting = 0;
 			buf->pending = 0;
