@@ -489,6 +489,8 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	mmu_gather_t *tlb;
 	unsigned long end, block;
 
+	might_sleep();
+
 	if (is_vm_hugetlb_page(vma)) {
 		zap_hugepage_range(vma, address, size);
 		return;
