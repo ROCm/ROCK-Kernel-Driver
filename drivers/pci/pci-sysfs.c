@@ -23,14 +23,13 @@
 /* show configuration fields */
 #define pci_config_attr(field, format_string)				\
 static ssize_t								\
-show_##field (struct device *dev, char *buf)				\
+field##_show(struct device *dev, char *buf)				\
 {									\
 	struct pci_dev *pdev;						\
 									\
 	pdev = to_pci_dev (dev);					\
 	return sprintf (buf, format_string, pdev->field);		\
-}									\
-static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
+}
 
 pci_config_attr(vendor, "0x%04x\n");
 pci_config_attr(device, "0x%04x\n");
@@ -41,7 +40,7 @@ pci_config_attr(irq, "%u\n");
 
 /* show resources */
 static ssize_t
-pci_show_resources(struct device * dev, char * buf)
+resource_show(struct device * dev, char * buf)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 	char * str = buf;
@@ -60,7 +59,16 @@ pci_show_resources(struct device * dev, char * buf)
 	return (str - buf);
 }
 
-static DEVICE_ATTR(resource,S_IRUGO,pci_show_resources,NULL);
+struct device_attribute pci_dev_attrs[] = {
+	__ATTR_RO(resource),
+	__ATTR_RO(vendor),
+	__ATTR_RO(device),
+	__ATTR_RO(subsystem_vendor),
+	__ATTR_RO(subsystem_device),
+	__ATTR_RO(class),
+	__ATTR_RO(irq),
+	__ATTR_NULL,
+};
 
 static ssize_t
 pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
@@ -180,21 +188,10 @@ static struct bin_attribute pcie_config_attr = {
 
 void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 {
-	struct device *dev = &pdev->dev;
-
-	/* current configuration's attributes */
-	device_create_file (dev, &dev_attr_vendor);
-	device_create_file (dev, &dev_attr_device);
-	device_create_file (dev, &dev_attr_subsystem_vendor);
-	device_create_file (dev, &dev_attr_subsystem_device);
-	device_create_file (dev, &dev_attr_class);
-	device_create_file (dev, &dev_attr_irq);
-	device_create_file (dev, &dev_attr_resource);
-
 	if (pdev->cfg_size < 4096)
-		sysfs_create_bin_file(&dev->kobj, &pci_config_attr);
+		sysfs_create_bin_file(&pdev->dev.kobj, &pci_config_attr);
 	else
-		sysfs_create_bin_file(&dev->kobj, &pcie_config_attr);
+		sysfs_create_bin_file(&pdev->dev.kobj, &pcie_config_attr);
 
 	/* add platform-specific attributes */
 	pcibios_add_platform_entries(pdev);

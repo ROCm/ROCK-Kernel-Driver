@@ -1015,15 +1015,23 @@ void __init mp_config_acpi_legacy_irqs (void)
 	for (i = 0; i < 16; i++) {
 		int idx;
 
-		for (idx = 0; idx < mp_irq_entries; idx++)
-			if (mp_irqs[idx].mpc_srcbus == MP_ISA_BUS &&
-				(mp_irqs[idx].mpc_dstapic == ioapic) &&
-				(mp_irqs[idx].mpc_srcbusirq == i ||
-				mp_irqs[idx].mpc_dstirq == i))
-					break;
+		for (idx = 0; idx < mp_irq_entries; idx++) {
+			struct mpc_config_intsrc *irq = mp_irqs + idx;
 
-		if (idx != mp_irq_entries)
-			continue;			  /* IRQ already used */
+			/* Do we already have a mapping for this ISA IRQ? */
+			if (irq->mpc_srcbus == MP_ISA_BUS && irq->mpc_srcbusirq == i)
+				break;
+
+			/* Do we already have a mapping for this IOAPIC pin */
+			if ((irq->mpc_dstapic == intsrc.mpc_dstapic) &&
+				(irq->mpc_dstirq == i))
+				break;
+		}
+
+		if (idx != mp_irq_entries) {
+			printk(KERN_DEBUG "ACPI: IRQ%d used by override.\n", i);
+			continue;			/* IRQ already used */
+		}
 
 		intsrc.mpc_irqtype = mp_INT;
 		intsrc.mpc_srcbusirq = i;		   /* Identity mapped */

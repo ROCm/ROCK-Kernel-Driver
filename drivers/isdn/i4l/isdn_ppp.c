@@ -320,8 +320,8 @@ isdn_ppp_open(int min, struct file *file)
 	is->slcomp = slhc_init(16, 16);	/* not necessary for 2. link in bundle */
 #endif
 #ifdef CONFIG_IPPP_FILTER
-	is->pass_filter.filter = NULL;
-	is->active_filter.filter = NULL;
+	is->pass_filter = NULL;
+	is->active_filter = NULL;
 #endif
 	is->state = IPPP_OPEN;
 
@@ -378,13 +378,13 @@ isdn_ppp_release(int min, struct file *file)
 	is->slcomp = NULL;
 #endif
 #ifdef CONFIG_IPPP_FILTER
-	if (is->pass_filter.filter) {
-		kfree(is->pass_filter.filter);
-		is->pass_filter.filter = NULL;
+	if (is->pass_filter) {
+		kfree(is->pass_filter);
+		is->pass_filter = NULL;
 	}
-	if (is->active_filter.filter) {
-		kfree(is->active_filter.filter);
-		is->active_filter.filter = NULL;
+	if (is->active_filter) {
+		kfree(is->active_filter);
+		is->active_filter = NULL;
 	}
 #endif
 
@@ -414,11 +414,11 @@ isdn_ppp_release(int min, struct file *file)
  * get_arg .. ioctl helper
  */
 static int
-get_arg(void *b, void *val, int len)
+get_arg(void __user *b, void *val, int len)
 {
 	if (len <= 0)
 		len = sizeof(void *);
-	if (copy_from_user((void *) val, b, len))
+	if (copy_from_user(val, b, len))
 		return -EFAULT;
 	return 0;
 }
@@ -427,13 +427,48 @@ get_arg(void *b, void *val, int len)
  * set arg .. ioctl helper
  */
 static int
-set_arg(void *b, void *val,int len)
+set_arg(void __user *b, void *val,int len)
 {
 	if(len <= 0)
 		len = sizeof(void *);
-	if (copy_to_user(b, (void *) val, len))
+	if (copy_to_user(b, val, len))
 		return -EFAULT;
 	return 0;
+}
+
+static int get_filter(void __user *arg, struct sock_filter **p)
+{
+	struct sock_fprog uprog;
+	struct sock_filter *code = NULL;
+	int len, err;
+
+	if (copy_from_user(&uprog, arg, sizeof(uprog)))
+		return -EFAULT;
+
+	if (!uprog.len) {
+		*p = NULL;
+		return 0;
+	}
+
+	/* uprog.len is unsigned short, so no overflow here */
+	len = uprog.len * sizeof(struct sock_filter);
+	code = kmalloc(len, GFP_KERNEL);
+	if (code == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(code, uprog.filter, len)) {
+		kfree(code);
+		return -EFAULT;
+	}
+
+	err = sk_chk_filter(code, uprog.len);
+	if (err) {
+		kfree(code);
+		return err;
+	}
+
+	*p = code;
+	return uprog.len;
 }
 
 /*
@@ -447,6 +482,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 	struct ippp_struct *is;
 	isdn_net_local *lp;
 	struct isdn_ppp_comp_data data;
+	void __user *argp = (void __user *)arg;
 
 	is = (struct ippp_struct *) file->private_data;
 	lp = is->lp;
@@ -462,7 +498,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_ISDN_MPP
 			if (!(is->state & IPPP_CONNECT))
 				return -EINVAL;
-			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
+			if ((r = get_arg(argp, &val, sizeof(val) )))
 				return r;
 			printk(KERN_DEBUG "iPPP-bundle: minor: %d, slave unit: %d, master unit: %d\n",
 			       (int) min, (int) is->unit, (int) val);
@@ -472,30 +508,30 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 #endif
 			break;
 		case PPPIOCGUNIT:	/* get ppp/isdn unit number */
-			if ((r = set_arg((void *) arg, &is->unit, sizeof(is->unit) )))
+			if ((r = set_arg(argp, &is->unit, sizeof(is->unit) )))
 				return r;
 			break;
 		case PPPIOCGIFNAME:
 			if(!lp)
 				return -EINVAL;
-			if ((r = set_arg((void *) arg, lp->name, strlen(lp->name))))
+			if ((r = set_arg(argp, lp->name, strlen(lp->name))))
 				return r;
 			break;
 		case PPPIOCGMPFLAGS:	/* get configuration flags */
-			if ((r = set_arg((void *) arg, &is->mpppcfg, sizeof(is->mpppcfg) )))
+			if ((r = set_arg(argp, &is->mpppcfg, sizeof(is->mpppcfg) )))
 				return r;
 			break;
 		case PPPIOCSMPFLAGS:	/* set configuration flags */
-			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
+			if ((r = get_arg(argp, &val, sizeof(val) )))
 				return r;
 			is->mpppcfg = val;
 			break;
 		case PPPIOCGFLAGS:	/* get configuration flags */
-			if ((r = set_arg((void *) arg, &is->pppcfg,sizeof(is->pppcfg) )))
+			if ((r = set_arg(argp, &is->pppcfg,sizeof(is->pppcfg) )))
 				return r;
 			break;
 		case PPPIOCSFLAGS:	/* set configuration flags */
-			if ((r = get_arg((void *) arg, &val, sizeof(val) ))) {
+			if ((r = get_arg(argp, &val, sizeof(val) ))) {
 				return r;
 			}
 			if (val & SC_ENABLE_IP && !(is->pppcfg & SC_ENABLE_IP) && (is->state & IPPP_CONNECT)) {
@@ -512,12 +548,12 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 			if (lp) {
 				struct ppp_idle pidle;
 				pidle.xmit_idle = pidle.recv_idle = lp->huptimer;
-				if ((r = set_arg((void *) arg, &pidle,sizeof(struct ppp_idle))))
+				if ((r = set_arg(argp, &pidle,sizeof(struct ppp_idle))))
 					 return r;
 			}
 			break;
 		case PPPIOCSMRU:	/* set receive unit size for PPP */
-			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
+			if ((r = get_arg(argp, &val, sizeof(val) )))
 				return r;
 			is->mru = val;
 			break;
@@ -526,7 +562,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 		case PPPIOCSMPMTU:
 			break;
 		case PPPIOCSMAXCID:	/* set the maximum compression slot id */
-			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
+			if ((r = get_arg(argp, &val, sizeof(val) )))
 				return r;
 			val++;
 			if (is->maxcid != val) {
@@ -549,11 +585,11 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 			}
 			break;
 		case PPPIOCGDEBUG:
-			if ((r = set_arg((void *) arg, &is->debug, sizeof(is->debug) )))
+			if ((r = set_arg(argp, &is->debug, sizeof(is->debug) )))
 				return r;
 			break;
 		case PPPIOCSDEBUG:
-			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
+			if ((r = get_arg(argp, &val, sizeof(val) )))
 				return r;
 			is->debug = val;
 			break;
@@ -568,12 +604,12 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 						protos[j] |= (0x1<<i);
 					ipc = ipc->next;
 				}
-				if ((r = set_arg((void *) arg,protos,8*sizeof(long) )))
+				if ((r = set_arg(argp,protos,8*sizeof(long) )))
 					return r;
 			}
 			break;
 		case PPPIOCSCOMPRESSOR:
-			if ((r = get_arg((void *) arg, &data, sizeof(struct isdn_ppp_comp_data))))
+			if ((r = get_arg(argp, &data, sizeof(struct isdn_ppp_comp_data))))
 				return r;
 			return isdn_ppp_set_compressor(is, &data);
 		case PPPIOCGCALLINFO:
@@ -594,38 +630,29 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 					if(lp->flags & ISDN_NET_CALLBACK)
 						pci.calltype |= CALLTYPE_CALLBACK;
 				}
-				return set_arg((void *)arg,&pci,sizeof(struct pppcallinfo));
+				return set_arg(argp,&pci,sizeof(struct pppcallinfo));
 			}
 #ifdef CONFIG_IPPP_FILTER
 		case PPPIOCSPASS:
+			{
+				struct sock_filter *code;
+				int len = get_filter(argp, &code);
+				if (len < 0)
+					return len;
+				kfree(is->pass_filter);
+				is->pass_filter = code;
+				is->pass_len = len;
+				break;
+			}
 		case PPPIOCSACTIVE:
 			{
-				struct sock_fprog uprog, *filtp;
-				struct sock_filter *code = NULL;
-				int len, err;
-
-				if (copy_from_user(&uprog, (void *) arg, sizeof(uprog)))
-					return -EFAULT;
-				if (uprog.len > 0) {
-					len = uprog.len * sizeof(struct sock_filter);
-					code = kmalloc(len, GFP_KERNEL);
-					if (code == NULL)
-						return -ENOMEM;
-					if (copy_from_user(code, uprog.filter, len)) {
-						kfree(code);
-						return -EFAULT;
-					}
-					err = sk_chk_filter(code, uprog.len);
-					if (err) {
-						kfree(code);
-						return err;
-					}
-				}
-				filtp = (cmd == PPPIOCSPASS) ? &is->pass_filter : &is->active_filter;
-				if (filtp->filter)
-					kfree(filtp->filter);
-				filtp->filter = code;
-				filtp->len = uprog.len;
+				struct sock_filter *code;
+				int len = get_filter(argp, &code);
+				if (len < 0)
+					return len;
+				kfree(is->active_filter);
+				is->active_filter = code;
+				is->active_len = len;
 				break;
 			}
 #endif /* CONFIG_IPPP_FILTER */
@@ -733,7 +760,7 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
  */
 
 int
-isdn_ppp_read(int min, struct file *file, char *buf, int count)
+isdn_ppp_read(int min, struct file *file, char __user *buf, int count)
 {
 	struct ippp_struct *is;
 	struct ippp_buf_queue *b;
@@ -746,7 +773,7 @@ isdn_ppp_read(int min, struct file *file, char *buf, int count)
 	if (!(is->state & IPPP_OPEN))
 		return 0;
 
-	if ((r = verify_area(VERIFY_WRITE, (void *) buf, count)))
+	if ((r = verify_area(VERIFY_WRITE, buf, count)))
 		return r;
 
 	spin_lock_irqsave(&is->buflock, flags);
@@ -773,7 +800,7 @@ isdn_ppp_read(int min, struct file *file, char *buf, int count)
  */
 
 int
-isdn_ppp_write(int min, struct file *file, const char *buf, int count)
+isdn_ppp_write(int min, struct file *file, const char __user *buf, int count)
 {
 	isdn_net_local *lp;
 	struct ippp_struct *is;
@@ -1128,17 +1155,16 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 		*p = 0;	/* indicate inbound in DLT_LINUX_SLL */
 	}
 
-	if (is->pass_filter.filter
-	    && sk_run_filter(skb, is->pass_filter.filter,
-	                    is->pass_filter.len) == 0) {
+	if (is->pass_filter
+	    && sk_run_filter(skb, is->pass_filter, is->pass_len) == 0) {
 		if (is->debug & 0x2)
 			printk(KERN_DEBUG "IPPP: inbound frame filtered.\n");
 		kfree_skb(skb);
 		return;
 	}
-	if (!(is->active_filter.filter
-	      && sk_run_filter(skb, is->active_filter.filter,
-	                       is->active_filter.len) == 0)) {
+	if (!(is->active_filter
+	      && sk_run_filter(skb, is->active_filter,
+	                       is->active_len) == 0)) {
 		if (is->debug & 0x2)
 			printk(KERN_DEBUG "IPPP: link-active filter: reseting huptimer.\n");
 		lp->huptimer = 0;
@@ -1276,17 +1302,16 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		*p   = htons(proto);
 	}
 
-	if (ipt->pass_filter.filter 
-	    && sk_run_filter(skb, ipt->pass_filter.filter,
-		             ipt->pass_filter.len) == 0) {
+	if (ipt->pass_filter
+	    && sk_run_filter(skb, ipt->pass_filter, ipt->pass_len) == 0) {
 		if (ipt->debug & 0x4)
 			printk(KERN_DEBUG "IPPP: outbound frame filtered.\n");
 		kfree_skb(skb);
 		goto unlock;
 	}
-	if (!(ipt->active_filter.filter
-	      && sk_run_filter(skb, ipt->active_filter.filter,
-		               ipt->active_filter.len) == 0)) {
+	if (!(ipt->active_filter
+	      && sk_run_filter(skb, ipt->active_filter,
+		               ipt->active_len) == 0)) {
 		if (ipt->debug & 0x4)
 			printk(KERN_DEBUG "IPPP: link-active filter: reseting huptimer.\n");
 		lp->huptimer = 0;
@@ -1475,12 +1500,10 @@ int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 		*p   = htons(proto);
 	}
 	
-	drop |= is->pass_filter.filter
-	        && sk_run_filter(skb, is->pass_filter.filter,
-	                         is->pass_filter.len) == 0;
-	drop |= is->active_filter.filter
-	        && sk_run_filter(skb, is->active_filter.filter,
-	                         is->active_filter.len) == 0;
+	drop |= is->pass_filter
+	        && sk_run_filter(skb, is->pass_filter, is->pass_len) == 0;
+	drop |= is->active_filter
+	        && sk_run_filter(skb, is->active_filter, is->active_len) == 0;
 	
 	skb_push(skb, IPPP_MAX_HEADER - 4);
 	return drop;
@@ -1969,12 +1992,11 @@ out:
 static int
 isdn_ppp_dev_ioctl_stats(int slot, struct ifreq *ifr, struct net_device *dev)
 {
-	struct ppp_stats *res,
-	 t;
+	struct ppp_stats __user *res = ifr->ifr_data;
+	struct ppp_stats t;
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
 	int err;
 
-	res = (struct ppp_stats *) ifr->ifr_ifru.ifru_data;
 	err = verify_area(VERIFY_WRITE, res, sizeof(struct ppp_stats));
 
 	if (err)
@@ -2004,7 +2026,8 @@ isdn_ppp_dev_ioctl_stats(int slot, struct ifreq *ifr, struct net_device *dev)
 		}
 #endif
 	}
-	if( copy_to_user(res, &t, sizeof(struct ppp_stats))) return -EFAULT;
+	if (copy_to_user(res, &t, sizeof(struct ppp_stats)))
+		return -EFAULT;
 	return 0;
 }
 
@@ -2012,7 +2035,6 @@ int
 isdn_ppp_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	int error=0;
-	char *r;
 	int len;
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
 
@@ -2023,9 +2045,8 @@ isdn_ppp_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 #define PPP_VERSION "2.3.7"
 		case SIOCGPPPVER:
-			r = (char *) ifr->ifr_ifru.ifru_data;
 			len = strlen(PPP_VERSION) + 1;
-			if (copy_to_user(r, PPP_VERSION, len))
+			if (copy_to_user(ifr->ifr_data, PPP_VERSION, len))
 				error = -EFAULT;
 			break;
 

@@ -108,15 +108,15 @@ struct if_settings
 	unsigned int size;	/* Size of the data allocated by the caller */
 	union {
 		/* {atm/eth/dsl}_settings anyone ? */
-		raw_hdlc_proto		*raw_hdlc;
-		cisco_proto		*cisco;
-		fr_proto		*fr;
-		fr_proto_pvc		*fr_pvc;
-		fr_proto_pvc_info	*fr_pvc_info;
+		raw_hdlc_proto		__user *raw_hdlc;
+		cisco_proto		__user *cisco;
+		fr_proto		__user *fr;
+		fr_proto_pvc		__user *fr_pvc;
+		fr_proto_pvc_info	__user *fr_pvc_info;
 
 		/* interface settings */
-		sync_serial_settings	*sync;
-		te1_settings		*te1;
+		sync_serial_settings	__user *sync;
+		te1_settings		__user *te1;
 	} ifs_ifsu;
 };
 

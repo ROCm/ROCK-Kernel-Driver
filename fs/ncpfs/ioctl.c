@@ -30,7 +30,7 @@
 #define NCP_PACKET_SIZE_INTERNAL 65536
 
 static int
-ncp_get_fs_info(struct ncp_server* server, struct inode* inode, struct ncp_fs_info* arg)
+ncp_get_fs_info(struct ncp_server* server, struct inode* inode, struct ncp_fs_info __user *arg)
 {
 	struct ncp_fs_info info;
 
@@ -58,7 +58,7 @@ ncp_get_fs_info(struct ncp_server* server, struct inode* inode, struct ncp_fs_in
 }
 
 static int
-ncp_get_fs_info_v2(struct ncp_server* server, struct inode* inode, struct ncp_fs_info_v2* arg)
+ncp_get_fs_info_v2(struct ncp_server* server, struct inode* inode, struct ncp_fs_info_v2 __user * arg)
 {
 	struct ncp_fs_info_v2 info2;
 
@@ -90,7 +90,7 @@ ncp_get_fs_info_v2(struct ncp_server* server, struct inode* inode, struct ncp_fs
  * Thanks Petr Vandrovec for idea and many hints.
  */
 static int
-ncp_set_charsets(struct ncp_server* server, struct ncp_nls_ioctl* arg)
+ncp_set_charsets(struct ncp_server* server, struct ncp_nls_ioctl __user *arg)
 {
 	struct ncp_nls_ioctl user;
 	struct nls_table *codepage;
@@ -148,7 +148,7 @@ ncp_set_charsets(struct ncp_server* server, struct ncp_nls_ioctl* arg)
 }
 
 static int
-ncp_get_charsets(struct ncp_server* server, struct ncp_nls_ioctl* arg)
+ncp_get_charsets(struct ncp_server* server, struct ncp_nls_ioctl __user *arg)
 {
 	struct ncp_nls_ioctl user;
 	int len;
@@ -185,6 +185,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 	int result;
 	struct ncp_ioctl_request request;
 	char* bouncebuffer;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 	case NCP_IOC_NCPREQUEST:
@@ -193,8 +194,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 		    && (current->uid != server->m.mounted_uid)) {
 			return -EACCES;
 		}
-		if (copy_from_user(&request, (struct ncp_ioctl_request *) arg,
-			       sizeof(request)))
+		if (copy_from_user(&request, argp, sizeof(request)))
 			return -EFAULT;
 
 		if ((request.function > 255)
@@ -245,10 +245,10 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 		return ncp_conn_logged_in(inode->i_sb);
 
 	case NCP_IOC_GET_FS_INFO:
-		return ncp_get_fs_info(server, inode, (struct ncp_fs_info *)arg);
+		return ncp_get_fs_info(server, inode, argp);
 
 	case NCP_IOC_GET_FS_INFO_V2:
-		return ncp_get_fs_info_v2(server, inode, (struct ncp_fs_info_v2 *)arg);
+		return ncp_get_fs_info_v2(server, inode, argp);
 
 	case NCP_IOC_GETMOUNTUID2:
 		{
@@ -259,7 +259,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 			{
 				return -EACCES;
 			}
-			if (put_user(tmp, (unsigned long*) arg)) 
+			if (put_user(tmp, (unsigned long __user *)argp)) 
 				return -EFAULT;
 			return 0;
 		}
@@ -292,9 +292,8 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 				sr.namespace = 0;
 				sr.dirEntNum = 0;
 			}
-			if (copy_to_user((struct ncp_setroot_ioctl*)arg, 
-				    	  &sr, 
-					  sizeof(sr))) return -EFAULT;
+			if (copy_to_user(argp, &sr, sizeof(sr)))
+				return -EFAULT;
 			return 0;
 		}
 	case NCP_IOC_SETROOT:
@@ -308,9 +307,8 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 				return -EACCES;
 			}
 			if (server->root_setuped) return -EBUSY;
-			if (copy_from_user(&sr,
-					   (struct ncp_setroot_ioctl*)arg, 
-					   sizeof(sr))) return -EFAULT;
+			if (copy_from_user(&sr, argp, sizeof(sr)))
+				return -EFAULT;
 			if (sr.volNumber < 0) {
 				server->m.mounted_vol[0] = 0;
 				vnum = NCP_NUMBER_OF_VOLUMES;
@@ -348,13 +346,13 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 		{
 			return -EACCES;
 		}
-		if (arg) {
+		if (argp) {
 			if (server->sign_wanted)
 			{
 				struct ncp_sign_init sign;
 
-				if (copy_from_user(&sign, (struct ncp_sign_init *) arg,
-				      sizeof(sign))) return -EFAULT;
+				if (copy_from_user(&sign, argp, sizeof(sign)))
+					return -EFAULT;
 				memcpy(server->sign_root,sign.sign_root,8);
 				memcpy(server->sign_last,sign.sign_last,16);
 				server->sign_active = 1;
@@ -372,7 +370,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 			return -EACCES;
 		}
 		
-                if (put_user(server->sign_wanted, (int*) arg))
+                if (put_user(server->sign_wanted, (int __user *)argp))
 			return -EFAULT;
                 return 0;
 	case NCP_IOC_SET_SIGN_WANTED:
@@ -385,7 +383,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 				return -EACCES;
 			}
 			/* get only low 8 bits... */
-			if (get_user(newstate, (unsigned char *) arg))
+			if (get_user(newstate, (unsigned char __user *)argp))
 				return -EFAULT;
 			if (server->sign_active) {
 				/* cannot turn signatures OFF when active */
@@ -409,8 +407,8 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 			struct ncp_lock_ioctl	 rqdata;
 			int result;
 
-			if (copy_from_user(&rqdata, (struct ncp_lock_ioctl*)arg,
-				sizeof(rqdata))) return -EFAULT;
+			if (copy_from_user(&rqdata, argp, sizeof(rqdata)))
+				return -EFAULT;
 			if (rqdata.origin != 0)
 				return -EINVAL;
 			/* check for cmd */
@@ -480,9 +478,8 @@ outrel:
 			struct ncp_objectname_ioctl user;
 			size_t outl;
 
-			if (copy_from_user(&user, 
-					   (struct ncp_objectname_ioctl*)arg,
-					   sizeof(user))) return -EFAULT;
+			if (copy_from_user(&user, argp, sizeof(user)))
+				return -EFAULT;
 			user.auth_type = server->auth.auth_type;
 			outl = user.object_name_len;
 			user.object_name_len = server->auth.object_name_len;
@@ -493,9 +490,8 @@ outrel:
 						 server->auth.object_name,
 						 outl)) return -EFAULT;
 			}
-			if (copy_to_user((struct ncp_objectname_ioctl*)arg,
-					 &user,
-					 sizeof(user))) return -EFAULT;
+			if (copy_to_user(argp, &user, sizeof(user)))
+				return -EFAULT;
 			return 0;
 		}
 	case NCP_IOC_SETOBJECTNAME:
@@ -510,9 +506,8 @@ outrel:
 			void* oldprivate;
 			size_t oldprivatelen;
 
-			if (copy_from_user(&user, 
-					   (struct ncp_objectname_ioctl*)arg,
-					   sizeof(user))) return -EFAULT;
+			if (copy_from_user(&user, argp, sizeof(user)))
+				return -EFAULT;
 			if (user.object_name_len > NCP_OBJECT_NAME_MAX_LEN)
 				return -ENOMEM;
 			if (user.object_name_len) {
@@ -550,9 +545,8 @@ outrel:
 			struct ncp_privatedata_ioctl user;
 			size_t outl;
 
-			if (copy_from_user(&user, 
-					   (struct ncp_privatedata_ioctl*)arg,
-					   sizeof(user))) return -EFAULT;
+			if (copy_from_user(&user, argp, sizeof(user)))
+				return -EFAULT;
 			outl = user.len;
 			user.len = server->priv.len;
 			if (outl > user.len) outl = user.len;
@@ -561,9 +555,8 @@ outrel:
 						 server->priv.data,
 						 outl)) return -EFAULT;
 			}
-			if (copy_to_user((struct ncp_privatedata_ioctl*)arg,
-					 &user,
-					 sizeof(user))) return -EFAULT;
+			if (copy_to_user(argp, &user, sizeof(user)))
+				return -EFAULT;
 			return 0;
 		}
 	case NCP_IOC_SETPRIVATEDATA:
@@ -576,9 +569,8 @@ outrel:
 			void* old;
 			size_t oldlen;
 
-			if (copy_from_user(&user, 
-					   (struct ncp_privatedata_ioctl*)arg,
-					   sizeof(user))) return -EFAULT;
+			if (copy_from_user(&user, argp, sizeof(user)))
+				return -EFAULT;
 			if (user.len > NCP_PRIVATE_DATA_MAX_LEN)
 				return -ENOMEM;
 			if (user.len) {
@@ -603,10 +595,10 @@ outrel:
 
 #ifdef CONFIG_NCPFS_NLS
 	case NCP_IOC_SETCHARSETS:
-		return ncp_set_charsets(server, (struct ncp_nls_ioctl *)arg);
+		return ncp_set_charsets(server, argp);
 		
 	case NCP_IOC_GETCHARSETS:
-		return ncp_get_charsets(server, (struct ncp_nls_ioctl *)arg);
+		return ncp_get_charsets(server, argp);
 
 #endif /* CONFIG_NCPFS_NLS */
 
@@ -617,7 +609,7 @@ outrel:
 		{
 			u_int32_t user;
 
-			if (copy_from_user(&user, (u_int32_t*)arg, sizeof(user)))
+			if (copy_from_user(&user, argp, sizeof(user)))
 				return -EFAULT;
 			/* 20 secs at most... */
 			if (user > 20000)
@@ -630,7 +622,7 @@ outrel:
 	case NCP_IOC_GETDENTRYTTL:
 		{
 			u_int32_t user = (server->dentry_ttl * 1000) / HZ;
-			if (copy_to_user((u_int32_t*)arg, &user, sizeof(user)))
+			if (copy_to_user(argp, &user, sizeof(user)))
 				return -EFAULT;
 			return 0;
 		}
@@ -646,7 +638,7 @@ outrel:
 			return -EACCES;
 		}
 		SET_UID(uid, server->m.mounted_uid);
-		if (put_user(uid, (__kernel_uid_t *) arg))
+		if (put_user(uid, (__kernel_uid_t __user *)argp))
 			return -EFAULT;
 		return 0;
 	}

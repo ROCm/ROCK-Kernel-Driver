@@ -405,11 +405,11 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 {								\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
-static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in##offset, NULL) 	\
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in##offset, NULL);\
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, 	\
-		show_in##offset##_min, set_in##offset##_min)	\
+		show_in##offset##_min, set_in##offset##_min);	\
 static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, 	\
-		show_in##offset##_max, set_in##offset##_max)
+		show_in##offset##_max, set_in##offset##_max);
 
 show_in_offset(0);
 show_in_offset(1);
@@ -473,11 +473,11 @@ static ssize_t set_temp_##offset##_hyst (struct device *dev, 		\
 {									\
 	return set_temp_hyst(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL) \
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL);\
 static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_over, set_temp_##offset##_over) 	\
+		show_temp_##offset##_over, set_temp_##offset##_over);	\
 static DEVICE_ATTR(temp##offset##_max_hyst, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_hyst, set_temp_##offset##_hyst)	
+		show_temp_##offset##_hyst, set_temp_##offset##_hyst);	
 
 show_temp_offset(1);
 show_temp_offset(2);
@@ -542,11 +542,11 @@ static ssize_t set_fan_##offset##_div (struct device *dev, 		\
 {									\
 	return set_fan_div(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL);\
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, 		\
-		show_fan_##offset##_min, set_fan_##offset##_min) 	\
+		show_fan_##offset##_min, set_fan_##offset##_min);	\
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, 		\
-		show_fan_##offset##_div, set_fan_##offset##_div)
+		show_fan_##offset##_div, set_fan_##offset##_div);
 
 show_fan_offset(1);
 show_fan_offset(2);
