@@ -52,7 +52,6 @@ static void rxrpc_proc_peers_stop(struct seq_file *p, void *v);
 static int rxrpc_proc_peers_show(struct seq_file *m, void *v);
 
 static struct seq_operations rxrpc_proc_peers_ops = {
-	.owner	= THIS_MODULE,
 	.start	= rxrpc_proc_peers_start,
 	.next	= rxrpc_proc_peers_next,
 	.stop	= rxrpc_proc_peers_stop,
@@ -102,6 +101,7 @@ static struct seq_operations rxrpc_proc_calls_ops = {
 };
 
 static struct file_operations rxrpc_proc_calls_fops = {
+	.owner		= THIS_MODULE,
 	.open		= rxrpc_proc_calls_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
