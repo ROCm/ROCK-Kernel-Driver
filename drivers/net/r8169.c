@@ -983,7 +983,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	tp->cp_cmd = PCIMulRW | RxChkSum;
 
-	if ((sizeof(dma_addr_t) > 32) &&
+	if ((sizeof(dma_addr_t) > 4) &&
 	    !pci_set_dma_mask(pdev, DMA_64BIT_MASK))
 		tp->cp_cmd |= PCIDAC;
 	else {
