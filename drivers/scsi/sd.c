@@ -1474,7 +1474,6 @@ static int sd_remove(struct device *dev)
 static void scsi_disk_release(struct kref *kref)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(kref);
-	struct scsi_device *sdev = sdkp->device;
 	struct gendisk *disk = sdkp->disk;
 	
 	spin_lock(&sd_index_lock);
