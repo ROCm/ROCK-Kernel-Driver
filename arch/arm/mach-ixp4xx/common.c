@@ -221,8 +221,6 @@ static unsigned long ixp4xx_gettimeoffset(void)
 
 static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned long flags;
-
 	/* Clear Pending Interrupt by writing '1' to it */
 	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
 
