@@ -92,6 +92,7 @@ static int userspace_tramp(void *arg)
 }
 
 /* Each element set once, and only accessed by a single processor anyway */
+#undef NR_CPUS
 #define NR_CPUS 1
 int userspace_pid[NR_CPUS];
 
