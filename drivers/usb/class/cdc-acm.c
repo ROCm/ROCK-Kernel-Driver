@@ -399,6 +399,7 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
 {
 	struct acm *acm = tty->driver_data;
+	int stat;
 
 	if (!ACM_READY(acm))
 		return -EINVAL;
@@ -418,8 +419,12 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	acm->writeurb->transfer_buffer_length = count;
 	acm->writeurb->dev = acm->dev;
 
-	if (usb_submit_urb(acm->writeurb, GFP_KERNEL))
+	/* GFP_KERNEL probably works if from_user */
+	stat = usb_submit_urb(acm->writeurb, GFP_ATOMIC);
+	if (stat < 0) {
 		dbg("usb_submit_urb(write bulk) failed");
+		return stat;
+	}
 
 	return count;
 }

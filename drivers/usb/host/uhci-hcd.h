@@ -372,7 +372,6 @@ struct urb_priv {
 	struct list_head urb_list;
 
 	struct urb *urb;
-	struct usb_device *dev;
 
 	struct uhci_qh *qh;		/* QH for this URB */
 	struct list_head td_list;	/* P: urb->lock */

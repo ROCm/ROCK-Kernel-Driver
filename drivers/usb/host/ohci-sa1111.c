@@ -254,8 +254,6 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 	hcd_buffer_destroy (hcd);
 
 	usb_deregister_bus (&hcd->self);
-	if (atomic_read (&hcd->self.refcnt) != 1)
-		err ("%s: %s, count != 1", __FUNCTION__, hcd->self.bus_name);
 
 	base = hcd->regs;
 	hcd->driver->hcd_free (hcd);

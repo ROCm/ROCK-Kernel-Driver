@@ -2239,8 +2239,8 @@ W:	http://www.linux-usb.org
 S:	Supported
 
 USB UHCI DRIVER
-P:	Johannes Erdfelt
-M:	johannes@erdfelt.com
+P:	Alan Stern
+M:	stern@rowland.harvard.edu
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained

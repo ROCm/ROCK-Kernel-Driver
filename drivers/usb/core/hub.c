@@ -179,7 +179,7 @@ static inline int
 hub_clear_tt_buffer (struct usb_device *hub, u16 devinfo, u16 tt)
 {
 	return usb_control_msg (hub, usb_rcvctrlpipe (hub, 0),
-		HUB_CLEAR_TT_BUFFER, USB_DIR_IN | USB_RECIP_OTHER,
+		HUB_CLEAR_TT_BUFFER, USB_RT_PORT,
 		devinfo, tt, 0, 0, HZ);
 }
 
@@ -930,11 +930,9 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 	down(&usb_address0_sem);
 
 	for (i = 0; i < HUB_PROBE_TRIES; i++) {
-		struct usb_device *pdev;
-		int	len;
 
 		/* Allocate a new device struct */
-		dev = usb_alloc_dev(hub, hub->bus);
+		dev = usb_alloc_dev(hub, hub->bus, port);
 		if (!dev) {
 			dev_err (&hubstate->intf->dev,
 				"couldn't allocate usb_device\n");
@@ -962,38 +960,18 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 			dev->ttport = port + 1;
 		}
 
-		/* Save readable and stable topology id, distinguishing
-		 * devices by location for diagnostics, tools, etc.  The
-		 * string is a path along hub ports, from the root.  Each
-		 * device's id will be stable until USB is re-cabled, and
-		 * hubs are often labeled with these port numbers.
-		 *
-		 * Initial size: ".NN" times five hubs + NUL = 16 bytes max
-		 * (quite rare, since most hubs have 4-6 ports).
-		 */
-		pdev = dev->parent;
-		if (pdev->devpath [0] != '0')	/* parent not root? */
-			len = snprintf (dev->devpath, sizeof dev->devpath,
-				"%s.%d", pdev->devpath, port + 1);
-		/* root == "0", root port 2 == "2", port 3 that hub "2.3" */
-		else
-			len = snprintf (dev->devpath, sizeof dev->devpath,
-				"%d", port + 1);
-		if (len == sizeof dev->devpath)
-			dev_err (&hubstate->intf->dev,
-				"devpath size! usb/%03d/%03d path %s\n",
-				dev->bus->busnum, dev->devnum, dev->devpath);
-		dev_info (&hubstate->intf->dev,
-			"new USB device on port %d, assigned address %d\n",
-			port + 1, dev->devnum);
-
-		/* put the device in the global device tree. the hub port
-		 * is the "bus_id"; hubs show in hierarchy like bridges
-		 */
-		dev->dev.parent = dev->parent->dev.parent->parent;
+		dev_info (&dev->dev,
+			"new %s speed USB device using address %d\n",
+			({ char *speed; switch (dev->speed) {
+			case USB_SPEED_LOW:	speed = "low";	break;
+			case USB_SPEED_FULL:	speed = "full";	break;
+			case USB_SPEED_HIGH:	speed = "high";	break;
+			default: 		speed = "?";	break;
+			}; speed;}),
+			dev->devnum);
 
 		/* Run it through the hoops (find a driver, etc) */
-		if (!usb_new_device(dev, &hub->dev)) {
+		if (usb_new_device(dev) == 0) {
 			hub->children[port] = dev;
 			goto done;
 		}

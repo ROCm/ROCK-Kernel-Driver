@@ -52,14 +52,15 @@ struct pxa2xx_ep {
 	struct list_head			queue;
 	unsigned long				pio_irqs;
 	unsigned long				dma_irqs;
-	int					dma;
+	short					dma; 
 
+	unsigned short				fifo_size;
 	u8					bEndpointAddress;
 	u8					bmAttributes;
 
 	unsigned				stopped : 1;
 	unsigned				dma_fixup : 1;
-
+							 
 	/* UDCCS = UDC Control/Status for this EP
 	 * UBCR = UDC Byte Count Remaining (contents of OUT fifo)
 	 * UDDR = UDC Endpoint Data Register (the fifo)
@@ -68,7 +69,12 @@ struct pxa2xx_ep {
 	volatile u32				*reg_udccs;
 	volatile u32				*reg_ubcr;
 	volatile u32				*reg_uddr;
+#ifdef USE_DMA
 	volatile u32				*reg_drcmr;
+#define	drcmr(n)  .reg_drcmr = & DRCMR ## n ,
+#else
+#define	drcmr(n)  
+#endif
 };
 
 struct pxa2xx_request {
@@ -76,7 +82,7 @@ struct pxa2xx_request {
 	struct list_head			queue;
 };
 
-enum ep0_state {
+enum ep0_state { 
 	EP0_IDLE,
 	EP0_IN_DATA_PHASE,
 	EP0_OUT_DATA_PHASE,
@@ -181,14 +187,14 @@ static inline void make_usb_disappear(void)
 {
 	if (!the_controller->mach->udc_command)
 		return;
-	the_controller->mach->udc_command(PXA2XX_UDC_CMD_CONNECT);
+	the_controller->mach->udc_command(PXA2XX_UDC_CMD_DISCONNECT);
 }
 
 static inline void let_usb_appear(void)
 {
 	if (!the_controller->mach->udc_command)
 		return;
-	the_controller->mach->udc_command(PXA2XX_UDC_CMD_DISCONNECT);
+	the_controller->mach->udc_command(PXA2XX_UDC_CMD_CONNECT);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -305,7 +311,7 @@ dump_state(struct pxa2xx_udc *dev)
 #define DBG(lvl, stuff...) do{if ((lvl) <= UDC_DEBUG) DMSG(stuff);}while(0)
 
 #define WARN(stuff...) printk(KERN_WARNING "udc: " stuff)
-
+#define INFO(stuff...) printk(KERN_INFO "udc: " stuff)
 
 
 #endif /* __LINUX_USB_GADGET_PXA2XX_H */

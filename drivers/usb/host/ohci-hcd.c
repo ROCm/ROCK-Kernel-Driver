@@ -81,6 +81,7 @@
 #endif
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -103,7 +104,7 @@
 #include <asm/byteorder.h>
 
 
-#define DRIVER_VERSION "2003 Oct 13"
+#define DRIVER_VERSION "2004 Feb 02"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -112,8 +113,7 @@
 // #define OHCI_VERBOSE_DEBUG	/* not always helpful */
 
 /* For initializing controller (mask in an HCFS mode too) */
-#define	OHCI_CONTROL_INIT \
-	 (OHCI_CTRL_CBSR & 0x3) | OHCI_CTRL_IE | OHCI_CTRL_PLE
+#define	OHCI_CONTROL_INIT 	OHCI_CTRL_CBSR
 
 #define OHCI_UNLINK_TIMEOUT	 (HZ / 10)
 
@@ -132,6 +132,12 @@ static inline void disable (struct ohci_hcd *ohci)
 #include "ohci-dbg.c"
 #include "ohci-mem.c"
 #include "ohci-q.c"
+
+
+/* Some boards don't support per-port power switching */
+static int power_switching = 0;
+module_param (power_switching, bool, 0);
+MODULE_PARM_DESC (power_switching, "true (not default) to switch port power");
 
 /*-------------------------------------------------------------------------*/
 
@@ -288,11 +294,8 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 * with HC dead, we won't respect hc queue pointers
 		 * any more ... just clean up every urb's memory.
 		 */
-		if (urb->hcpriv) {
-			spin_unlock (&ohci->lock);
+		if (urb->hcpriv)
 			finish_urb (ohci, urb, NULL);
-			spin_lock (&ohci->lock);
-		}
 	}
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return 0;
@@ -413,6 +416,14 @@ static int hc_reset (struct ohci_hcd *ohci)
 	ohci->hc_control = readl (&ohci->regs->control);
 	ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
 	writel (ohci->hc_control, &ohci->regs->control);
+	if (power_switching) {
+		unsigned ports = roothub_a (ohci) & RH_A_NDP; 
+
+		/* power down each port */
+		for (temp = 0; temp < ports; temp++)
+			writel (RH_PS_LSDA,
+				&ohci->regs->roothub.portstatus [temp]);
+	}
 	// flush those pci writes
 	(void) readl (&ohci->regs->control);
 	wait_ms (50);
@@ -502,15 +513,21 @@ static int hc_start (struct ohci_hcd *ohci)
 		/* NSC 87560 and maybe others */
 		tmp |= RH_A_NOCP;
 		tmp &= ~(RH_A_POTPGT | RH_A_NPS);
+	} else if (power_switching) {
+		/* act like most external hubs:  use per-port power
+		 * switching and overcurrent reporting.
+		 */
+		tmp &= ~(RH_A_NPS | RH_A_NOCP);
+		tmp |= RH_A_PSM | RH_A_OCPM;
 	} else {
 		/* hub power always on; required for AMD-756 and some
-		 * Mac platforms, use this mode everywhere by default
+		 * Mac platforms.  ganged overcurrent reporting, if any.
 		 */
 		tmp |= RH_A_NPS;
 	}
 	writel (tmp, &ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
-	writel (0, &ohci->regs->roothub.b);
+	writel (power_switching ? RH_B_PPCM : 0, &ohci->regs->roothub.b);
 	// flush those pci writes
 	(void) readl (&ohci->regs->control);
 
@@ -519,7 +536,7 @@ static int hc_start (struct ohci_hcd *ohci)
  
 	/* connect the virtual root hub */
 	bus = hcd_to_bus (&ohci->hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
 	ohci->hcd.state = USB_STATE_RUNNING;
 	if (!udev) {
 		disable (ohci);
@@ -545,7 +562,7 @@ static int hc_start (struct ohci_hcd *ohci)
 
 /* an interrupt happens */
 
-static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
+static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 	struct ohci_regs	*regs = ohci->regs;
@@ -560,11 +577,11 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	} else if ((ints = readl (&regs->intrstatus)) == ~(u32)0) {
 		disable (ohci);
 		ohci_dbg (ohci, "device removed!\n");
-		return;
+		return IRQ_HANDLED;
 
 	/* interrupt for some other device? */
 	} else if ((ints &= readl (&regs->intrenable)) == 0) {
-		return;
+		return IRQ_NONE;
 	} 
 
 	if (ints & OHCI_INTR_UE) {
@@ -604,6 +621,8 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		// flush those pci writes
 		(void) readl (&ohci->regs->control);
 	}
+
+	return IRQ_HANDLED;
 }
 
 /*-------------------------------------------------------------------------*/

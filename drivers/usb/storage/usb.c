@@ -834,7 +834,7 @@ void usb_stor_release_resources(struct us_data *us)
 
 	/* Finish the SCSI host removal sequence */
 	if (us->host) {
-		(struct us_data *) us->host->hostdata[0] = NULL;
+		us->host->hostdata[0] = 0;
 		scsi_host_put(us->host);
 	}
 
