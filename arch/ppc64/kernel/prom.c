@@ -1412,11 +1412,11 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 				unsigned long needed, unsigned long align)
 {
 	void *ret;
-	unsigned long offset = reloc_offset();
 
 	*mem_start = ALIGN(*mem_start, align);
 	if (*mem_start + needed > *mem_end) {
 #ifdef CONFIG_BLK_DEV_INITRD
+		unsigned long offset = reloc_offset();
 		/* FIXME: Apple OF doesn't map unclaimed mem.  If this
 		 * ever happened on G5, we'd need to fix. */
 		unsigned long initrd_len;

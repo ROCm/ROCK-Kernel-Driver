@@ -178,8 +178,8 @@ static __inline__ u8 ipv6_addr_hash(const struct in6_addr *addr)
 	 * This will include the IEEE address token on links that support it.
 	 */
 
-	word = addr->s6_addr[2] ^ addr->s6_addr32[3];
-	word  ^= (word>>16);
+	word = addr->s6_addr32[2] ^ addr->s6_addr32[3];
+	word ^= (word >> 16);
 	word ^= (word >> 8);
 
 	return ((word ^ (word >> 4)) & 0x0f);

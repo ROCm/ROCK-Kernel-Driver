@@ -16,7 +16,7 @@
 
 #define CPSR2SPSR(rt) \
 		mrs	rt, cpsr; \
-		msr	spsr, rt
+		msr	spsr_cxsf, rt
 
 @ Purpose: call an expansion card loader to read bytes.
 @ Proto  : char read_loader(int offset, char *card_base, char *loader);

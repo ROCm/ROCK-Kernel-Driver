@@ -29,8 +29,8 @@ typedef void ia64_mv_timer_interrupt_t (int, void *, struct pt_regs *);
 typedef void ia64_mv_global_tlb_purge_t (unsigned long, unsigned long, unsigned long);
 typedef void ia64_mv_tlb_migrate_finish_t (struct mm_struct *);
 typedef struct irq_desc *ia64_mv_irq_desc (unsigned int);
-typedef u8 ia64_mv_irq_to_vector (u8);
-typedef unsigned int ia64_mv_local_vector_to_irq (u8 vector);
+typedef u8 ia64_mv_irq_to_vector (unsigned int);
+typedef unsigned int ia64_mv_local_vector_to_irq (u8);
 
 /* DMA-mapping interface: */
 typedef void ia64_mv_dma_init (void);

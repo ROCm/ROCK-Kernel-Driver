@@ -27,8 +27,8 @@
 #include <linux/list.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
-#include <net/icmp.h>
 #include <net/ipv6.h>
+#include <net/protocol.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
 
@@ -342,25 +342,6 @@ void xfrm6_tunnel_free_spi(xfrm_address_t *saddr)
 }
 
 EXPORT_SYMBOL(xfrm6_tunnel_free_spi);
-
-int xfrm6_tunnel_check_size(struct sk_buff *skb)
-{
-	int mtu, ret = 0;
-	struct dst_entry *dst = skb->dst;
-
-	mtu = dst_pmtu(dst) - sizeof(struct ipv6hdr);
-	if (mtu < IPV6_MIN_MTU)
-		mtu = IPV6_MIN_MTU;
-
-	if (skb->len > mtu) {
-		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
-		ret = -EMSGSIZE;
-	}
-
-	return ret;
-}
-
-EXPORT_SYMBOL(xfrm6_tunnel_check_size);
 
 static int xfrm6_tunnel_output(struct sk_buff **pskb)
 {

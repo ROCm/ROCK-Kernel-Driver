@@ -628,7 +628,7 @@ void shrink_dcache_anon(struct hlist_head *head)
 			struct dentry *this = hlist_entry(lp, struct dentry, d_hash);
 			if (!list_empty(&this->d_lru)) {
 				dentry_stat.nr_unused--;
-				list_del(&this->d_lru);
+				list_del_init(&this->d_lru);
 			}
 
 			/* 

@@ -32,7 +32,6 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ipcomp.h>

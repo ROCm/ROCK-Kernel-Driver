@@ -169,17 +169,20 @@ mpc85xx_setup_pci1(struct pci_controller *hose)
 	pci->piwar2 = 0;
 	pci->piwar3 = 0;
 
-	/* Setup 512M Phys:PCI 1:1 outbound mem window @ 0x80000000 */
+	/* Setup Phys:PCI 1:1 outbound mem window @ MPC85XX_PCI1_LOWER_MEM */
 	pci->potar1 = (MPC85XX_PCI1_LOWER_MEM >> 12) & 0x000fffff;
 	pci->potear1 = 0x00000000;
 	pci->powbar1 = (MPC85XX_PCI1_LOWER_MEM >> 12) & 0x000fffff;
-	pci->powar1 = 0x8004401c;	/* Enable, Mem R/W, 512M */
+	/* Enable, Mem R/W */
+	pci->powar1 = 0x80044000 |
+	   (__ilog2(MPC85XX_PCI1_UPPER_MEM - MPC85XX_PCI1_LOWER_MEM + 1) - 1);
 
-	/* Setup 16M outboud IO windows @ 0xe2000000 */
+	/* Setup outboud IO windows @ MPC85XX_PCI1_IO_BASE */
 	pci->potar2 = 0x00000000;
 	pci->potear2 = 0x00000000;
 	pci->powbar2 = (MPC85XX_PCI1_IO_BASE >> 12) & 0x000fffff;
-	pci->powar2 = 0x80088017;	/* Enable, IO R/W, 16M */
+	/* Enable, IO R/W */
+	pci->powar2 = 0x80088000 | (__ilog2(MPC85XX_PCI1_IO_SIZE) - 1);
 
 	/* Setup 2G inbound Memory Window @ 0 */
 	pci->pitar1 = 0x00000000;
@@ -192,7 +195,7 @@ mpc85xx_setup_pci1(struct pci_controller *hose)
 extern int mpc85xx_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin);
 extern int mpc85xx_exclude_device(u_char bus, u_char devfn);
 
-#if CONFIG_85xx_PCI2
+#ifdef CONFIG_85xx_PCI2
 static void __init
 mpc85xx_setup_pci2(struct pci_controller *hose)
 {
@@ -203,10 +206,10 @@ mpc85xx_setup_pci2(struct pci_controller *hose)
 	pci = ioremap(binfo->bi_immr_base + MPC85xx_PCI2_OFFSET,
 		    MPC85xx_PCI2_SIZE);
 
-	early_read_config_word(hose, 0, 0, PCI_COMMAND, &temps);
+	early_read_config_word(hose, hose->bus_offset, 0, PCI_COMMAND, &temps);
 	temps |= PCI_COMMAND_SERR | PCI_COMMAND_MASTER | PCI_COMMAND_MEMORY;
-	early_write_config_word(hose, 0, 0, PCI_COMMAND, temps);
-	early_write_config_byte(hose, 0, 0, PCI_LATENCY_TIMER, 0x80);
+	early_write_config_word(hose, hose->bus_offset, 0, PCI_COMMAND, temps);
+	early_write_config_byte(hose, hose->bus_offset, 0, PCI_LATENCY_TIMER, 0x80);
 
 	/* Disable all windows (except powar0 since its ignored) */
 	pci->powar1 = 0;
@@ -217,17 +220,20 @@ mpc85xx_setup_pci2(struct pci_controller *hose)
 	pci->piwar2 = 0;
 	pci->piwar3 = 0;
 
-	/* Setup 512M Phys:PCI 1:1 outbound mem window @ 0xa0000000 */
+	/* Setup Phys:PCI 1:1 outbound mem window @ MPC85XX_PCI2_LOWER_MEM */
 	pci->potar1 = (MPC85XX_PCI2_LOWER_MEM >> 12) & 0x000fffff;
 	pci->potear1 = 0x00000000;
 	pci->powbar1 = (MPC85XX_PCI2_LOWER_MEM >> 12) & 0x000fffff;
-	pci->powar1 = 0x8004401c;	/* Enable, Mem R/W, 512M */
+	/* Enable, Mem R/W */
+	pci->powar1 = 0x80044000 |
+	   (__ilog2(MPC85XX_PCI1_UPPER_MEM - MPC85XX_PCI1_LOWER_MEM + 1) - 1);
 
-	/* Setup 16M outboud IO windows @ 0xe3000000 */
+	/* Setup outboud IO windows @ MPC85XX_PCI2_IO_BASE */
 	pci->potar2 = 0x00000000;
 	pci->potear2 = 0x00000000;
 	pci->powbar2 = (MPC85XX_PCI2_IO_BASE >> 12) & 0x000fffff;
-	pci->powar2 = 0x80088017;	/* Enable, IO R/W, 16M */
+	/* Enable, IO R/W */
+	pci->powar2 = 0x80088000 | (__ilog2(MPC85XX_PCI1_IO_SIZE) - 1);
 
 	/* Setup 2G inbound Memory Window @ 0 */
 	pci->pitar1 = 0x00000000;

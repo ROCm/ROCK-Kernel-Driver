@@ -376,6 +376,115 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 			      len, offset);
 }
 
+/**
+ *	bio_uncopy_user	-	finish previously mapped bio
+ *	@bio: bio being terminated
+ *
+ *	Free pages allocated from bio_copy_user() and write back data
+ *	to user space in case of a read.
+ */
+int bio_uncopy_user(struct bio *bio)
+{
+	struct bio_vec *bvec;
+	int i, ret = 0;
+
+	if (bio_data_dir(bio) == READ) {
+		char *uaddr = bio->bi_private;
+
+		__bio_for_each_segment(bvec, bio, i, 0) {
+			char *addr = page_address(bvec->bv_page);
+
+			if (!ret && copy_to_user(uaddr, addr, bvec->bv_len))
+				ret = -EFAULT;
+
+			__free_page(bvec->bv_page);
+			uaddr += bvec->bv_len;
+		}
+	}
+
+	bio_put(bio);
+	return ret;
+}
+
+/**
+ *	bio_copy_user	-	copy user data to bio
+ *	@q: destination block queue
+ *	@uaddr: start of user address
+ *	@len: length in bytes
+ *	@write_to_vm: bool indicating writing to pages or not
+ *
+ *	Prepares and returns a bio for indirect user io, bouncing data
+ *	to/from kernel pages as necessary. Must be paired with
+ *	call bio_uncopy_user() on io completion.
+ */
+struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
+			  unsigned int len, int write_to_vm)
+{
+	unsigned long end = (uaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	unsigned long start = uaddr >> PAGE_SHIFT;
+	struct bio_vec *bvec;
+	struct page *page;
+	struct bio *bio;
+	int i, ret;
+
+	bio = bio_alloc(GFP_KERNEL, end - start);
+	if (!bio)
+		return ERR_PTR(-ENOMEM);
+
+	ret = 0;
+	while (len) {
+		unsigned int bytes = PAGE_SIZE;
+
+		if (bytes > len)
+			bytes = len;
+
+		page = alloc_page(q->bounce_gfp | GFP_KERNEL);
+		if (!page) {
+			ret = -ENOMEM;
+			break;
+		}
+
+		if (__bio_add_page(q, bio, page, bytes, 0) < bytes) {
+			ret = -EINVAL;
+			break;
+		}
+
+		len -= bytes;
+	}
+
+	/*
+	 * success
+	 */
+	if (!ret) {
+		if (!write_to_vm) {
+			bio->bi_rw |= (1 << BIO_RW);
+			/*
+	 		 * for a write, copy in data to kernel pages
+			 */
+			ret = -EFAULT;
+			bio_for_each_segment(bvec, bio, i) {
+				char *addr = page_address(bvec->bv_page);
+
+				if (copy_from_user(addr, (char *) uaddr, bvec->bv_len))
+					goto cleanup;
+			}
+		}
+
+		bio->bi_private = (void *) uaddr;
+		return bio;
+	}
+
+	/*
+	 * cleanup
+	 */
+cleanup:
+	bio_for_each_segment(bvec, bio, i)
+		__free_page(bvec->bv_page);
+
+	bio_put(bio);
+	return ERR_PTR(ret);
+}
+
 static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 				  unsigned long uaddr, unsigned int len,
 				  int write_to_vm)
@@ -392,12 +501,13 @@ static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 	 * size for now, in the future we can relax this restriction
 	 */
 	if ((uaddr & queue_dma_alignment(q)) || (len & queue_dma_alignment(q)))
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
 	bio = bio_alloc(GFP_KERNEL, nr_pages);
 	if (!bio)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
+	ret = -ENOMEM;
 	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_KERNEL);
 	if (!pages)
 		goto out;
@@ -446,11 +556,12 @@ static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 	if (!write_to_vm)
 		bio->bi_rw |= (1 << BIO_RW);
 
+	bio->bi_flags |= (1 << BIO_USER_MAPPED);
 	return bio;
 out:
 	kfree(pages);
 	bio_put(bio);
-	return NULL;
+	return ERR_PTR(ret);
 }
 
 /**
@@ -461,7 +572,7 @@ out:
  *	@write_to_vm: bool indicating writing to pages or not
  *
  *	Map the user space address into a bio suitable for io to a block
- *	device.
+ *	device. Returns an error pointer in case of error.
  */
 struct bio *bio_map_user(request_queue_t *q, struct block_device *bdev,
 			 unsigned long uaddr, unsigned int len, int write_to_vm)
@@ -470,26 +581,29 @@ struct bio *bio_map_user(request_queue_t *q, struct block_device *bdev,
 
 	bio = __bio_map_user(q, bdev, uaddr, len, write_to_vm);
 
-	if (bio) {
-		/*
-		 * subtle -- if __bio_map_user() ended up bouncing a bio,
-		 * it would normally disappear when its bi_end_io is run.
-		 * however, we need it for the unmap, so grab an extra
-		 * reference to it
-		 */
-		bio_get(bio);
+	if (IS_ERR(bio))
+		return bio;
 
-		if (bio->bi_size < len) {
-			bio_endio(bio, bio->bi_size, 0);
-			bio_unmap_user(bio, 0);
-			return NULL;
-		}
-	}
+	/*
+	 * subtle -- if __bio_map_user() ended up bouncing a bio,
+	 * it would normally disappear when its bi_end_io is run.
+	 * however, we need it for the unmap, so grab an extra
+	 * reference to it
+	 */
+	bio_get(bio);
 
-	return bio;
+	if (bio->bi_size == len)
+		return bio;
+
+	/*
+	 * don't support partial mappings
+	 */
+	bio_endio(bio, bio->bi_size, 0);
+	bio_unmap_user(bio);
+	return ERR_PTR(-EINVAL);
 }
 
-static void __bio_unmap_user(struct bio *bio, int write_to_vm)
+static void __bio_unmap_user(struct bio *bio)
 {
 	struct bio_vec *bvec;
 	int i;
@@ -510,7 +624,7 @@ static void __bio_unmap_user(struct bio *bio, int write_to_vm)
 	 * make sure we dirty pages we wrote to
 	 */
 	__bio_for_each_segment(bvec, bio, i, 0) {
-		if (write_to_vm)
+		if (bio_data_dir(bio) == READ)
 			set_page_dirty_lock(bvec->bv_page);
 
 		page_cache_release(bvec->bv_page);
@@ -522,17 +636,15 @@ static void __bio_unmap_user(struct bio *bio, int write_to_vm)
 /**
  *	bio_unmap_user	-	unmap a bio
  *	@bio:		the bio being unmapped
- *	@write_to_vm:	bool indicating whether pages were written to
  *
- *	Unmap a bio previously mapped by bio_map_user(). The @write_to_vm
- *	must be the same as passed into bio_map_user(). Must be called with
+ *	Unmap a bio previously mapped by bio_map_user(). Must be called with
  *	a process context.
  *
  *	bio_unmap_user() may sleep.
  */
-void bio_unmap_user(struct bio *bio, int write_to_vm)
+void bio_unmap_user(struct bio *bio)
 {
-	__bio_unmap_user(bio, write_to_vm);
+	__bio_unmap_user(bio);
 	bio_put(bio);
 }
 
@@ -863,3 +975,5 @@ EXPORT_SYMBOL(bio_unmap_user);
 EXPORT_SYMBOL(bio_pair_release);
 EXPORT_SYMBOL(bio_split);
 EXPORT_SYMBOL(bio_split_pool);
+EXPORT_SYMBOL(bio_copy_user);
+EXPORT_SYMBOL(bio_uncopy_user);

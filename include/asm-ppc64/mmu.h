@@ -37,12 +37,6 @@ typedef struct {
 		mm_context_t ctx = { .id = REGION_ID(ea), KERNEL_LOW_HPAGES}; \
 		ctx; })
 
-/*
- * Hardware Segment Lookaside Buffer Entry
- * This structure has been padded out to two 64b doublewords (actual SLBE's are
- * 94 bits).  This padding facilites use by the segment management
- * instructions.
- */
 typedef struct {
 	unsigned long esid: 36; /* Effective segment ID */
 	unsigned long resv0:20; /* Reserved */
@@ -70,35 +64,6 @@ typedef struct _STE {
 		ste_dword1    dw1;
 	} dw1;
 } STE;
-
-typedef struct {
-	unsigned long esid: 36; /* Effective segment ID */
-	unsigned long v:     1; /* Entry valid (v=1) or invalid */
-	unsigned long null1:15; /* padding to a 64b boundary */
-	unsigned long index:12; /* Index to select SLB entry. Used by slbmte */
-} slb_dword0;
-
-typedef struct {
-	unsigned long vsid: 52; /* Virtual segment ID */
-	unsigned long ks:    1; /* Supervisor (privileged) state storage key */
-	unsigned long kp:    1; /* Problem state storage key */
-	unsigned long n:     1; /* No-execute if n=1 */
-	unsigned long l:     1; /* Virt pages are large (l=1) or 4KB (l=0) */
-	unsigned long c:     1; /* Class */
-	unsigned long resv0: 7; /* Padding to a 64b boundary */
-} slb_dword1;
-
-typedef struct {
-	union {
-		unsigned long dword0;
-		slb_dword0    dw0;
-	} dw0;
-
-	union {
-		unsigned long dword1;
-		slb_dword1    dw1;
-	} dw1;
-} SLBE;
 
 /* Hardware Page Table Entry */
 
@@ -258,6 +223,30 @@ extern void htab_finish_init(void);
 #define STAB0_PAGE	0x9
 #define STAB0_PHYS_ADDR	(STAB0_PAGE<<PAGE_SHIFT)
 #define STAB0_VIRT_ADDR	(KERNELBASE+STAB0_PHYS_ADDR)
+
+#define SLB_NUM_BOLTED		2
+#define SLB_CACHE_ENTRIES	8
+
+/* Bits in the SLB ESID word */
+#define SLB_ESID_V		0x0000000008000000	/* entry is valid */
+
+/* Bits in the SLB VSID word */
+#define SLB_VSID_SHIFT		12
+#define SLB_VSID_KS		0x0000000000000800
+#define SLB_VSID_KP		0x0000000000000400
+#define SLB_VSID_N		0x0000000000000200	/* no-execute */
+#define SLB_VSID_L		0x0000000000000100	/* largepage (4M) */
+#define SLB_VSID_C		0x0000000000000080	/* class */
+
+#define SLB_VSID_KERNEL		(SLB_VSID_KP|SLB_VSID_C)
+#define SLB_VSID_USER		(SLB_VSID_KP|SLB_VSID_KS)
+
+#define VSID_RANDOMIZER ASM_CONST(42470972311)
+#define VSID_MASK	0xfffffffffUL
+/* Because we never access addresses below KERNELBASE as kernel
+ * addresses, this VSID is never used for anything real, and will
+ * never have pages hashed into it */
+#define BAD_VSID	ASM_CONST(0)
 
 /* Block size masks */
 #define BL_128K	0x000

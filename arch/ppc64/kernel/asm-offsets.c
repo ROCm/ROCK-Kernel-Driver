@@ -86,10 +86,17 @@ int main(void)
         DEFINE(PACASAVEDMSR, offsetof(struct paca_struct, saved_msr));
         DEFINE(PACASTABREAL, offsetof(struct paca_struct, stab_real));
         DEFINE(PACASTABVIRT, offsetof(struct paca_struct, stab_addr));
-	DEFINE(PACASTABRR, offsetof(struct paca_struct, stab_next_rr));
+	DEFINE(PACASTABRR, offsetof(struct paca_struct, stab_rr));
         DEFINE(PACAR1, offsetof(struct paca_struct, saved_r1));
 	DEFINE(PACATOC, offsetof(struct paca_struct, kernel_toc));
 	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, proc_enabled));
+	DEFINE(PACASLBCACHE, offsetof(struct paca_struct, slb_cache));
+	DEFINE(PACASLBCACHEPTR, offsetof(struct paca_struct, slb_cache_ptr));
+	DEFINE(PACACONTEXTID, offsetof(struct paca_struct, context.id));
+	DEFINE(PACASLBR3, offsetof(struct paca_struct, slb_r3));
+#ifdef CONFIG_HUGETLB_PAGE
+	DEFINE(PACAHTLBSEGS, offsetof(struct paca_struct, context.htlb_segs));
+#endif /* CONFIG_HUGETLB_PAGE */
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
 	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
 	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));

@@ -571,22 +571,7 @@ static ssize_t uhci_proc_read(struct file *file, char __user *buf,
 				size_t nbytes, loff_t *ppos)
 {
 	struct uhci_proc *up = file->private_data;
-	unsigned int pos;
-	unsigned int size;
-
-	pos = *ppos;
-	size = up->size;
-	if (pos >= size)
-		return 0;
-	if (nbytes > size - pos)
-		nbytes = size - pos;
-
-	if (copy_to_user(buf, up->data + pos, nbytes))
-		return -EFAULT;
-
-	*ppos += nbytes;
-
-	return nbytes;
+	return simple_read_from_buffer(buf, nbytes, ppos, up->data, up->size);
 }
 
 static int uhci_proc_release(struct inode *inode, struct file *file)

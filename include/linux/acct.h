@@ -17,6 +17,7 @@
 
 #include <linux/types.h>
 #include <asm/param.h>
+#include <asm/byteorder.h>
 
 /* 
  *  comp_t is a 16-bit "floating" point number with a 3-bit base 8
@@ -104,7 +105,12 @@ struct acct_v3
 #define ACOMPAT		0x04	/* ... used compatibility mode (VAX only not used) */
 #define ACORE		0x08	/* ... dumped core */
 #define AXSIG		0x10	/* ... was killed by a signal */
-#define ABYTESEX	0x80	/* always set, allows to detect byteorder */
+
+#ifdef __BIG_ENDIAN
+#define ACCT_BYTEORDER	0x80	/* accounting file is big endian */
+#else
+#define ACCT_BYTEORDER	0x00	/* accounting file is little endian */
+#endif
 
 #ifdef __KERNEL__
 

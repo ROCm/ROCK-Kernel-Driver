@@ -76,7 +76,7 @@ Major new features in SG 3.x driver (cf SG 2.x drivers)
 	http://www.torque.net/sg/p/scsi-generic_long.txt
  A version of this document (potentially out of date) may also be found in
  the kernel source tree, probably at:
-        /usr/src/linux/Documentation/scsi/scsi-generic.txt .
+        Documentation/scsi/scsi-generic.txt .
 
  Utility and test programs are available at the sg web site. They are 
  bundled as sg_utils (for the lk 2.2 series) and sg3_utils (for the

@@ -632,7 +632,7 @@ S:	Maintained
 
 DEFXX FDDI NETWORK DRIVER
 P:	Maciej W. Rozycki
-M:	macro@ds2.pg.gda.pl
+M:	macro@linux-mips.org
 S:	Maintained
 
 DELL LAPTOP SMM DRIVER
@@ -1283,6 +1283,13 @@ W:	http://www.penguinppc.org/
 L:	linuxppc-embedded@lists.linuxppc.org
 S:	Maintained
 
+LINUX FOR POWERPC EMBEDDED PPC8XX AND BOOT CODE
+P:	Tom Rini
+M:	trini@kernel.crashing.org
+W:	http://www.penguinppc.org/
+L:	linuxppc-embedded@lists.linuxppc.org
+S:	Maintained
+
 LINUX FOR POWERPC EMBEDDED PPC85XX
 P:     Kumar Gala
 M:     kumar.gala@freescale.com
@@ -1377,7 +1384,7 @@ MEMORY TECHNOLOGY DEVICES
 P:	David Woodhouse
 M:	dwmw2@redhat.com
 W:	http://www.linux-mtd.infradead.org/
-L:	mtd@infradead.org
+L:	linux-mtd@lists.infradead.org
 S:	Maintained
 
 MICROTEK X6 SCANNER

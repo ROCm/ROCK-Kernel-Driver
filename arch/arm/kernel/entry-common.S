@@ -102,7 +102,7 @@ ENTRY(ret_from_fork)
 	ldr	r0, [sp, #S_PSR]		@ Get calling cpsr
 	sub	lr, lr, #4
 	str	lr, [r8]
-	msr	spsr, r0
+	msr	spsr_cxsf, r0
 	ldmia	sp, {r0 - lr}^			@ Get calling r0 - lr
 	mov	r0, r0
 	ldr	lr, [sp, #S_PC]			@ Get PC

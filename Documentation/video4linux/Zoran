@@ -308,7 +308,7 @@ details (structs/ioctls).
 
 Information - video4linux:
 http://roadrunner.swansea.linux.org.uk/v4lapi.shtml
-/usr/src/linux/Documentation/video4linux/API.html
+Documentation/video4linux/API.html
 /usr/include/linux/videodev.h
 
 Information - video4linux/mjpeg extensions:

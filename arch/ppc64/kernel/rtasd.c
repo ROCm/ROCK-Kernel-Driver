@@ -33,7 +33,7 @@
 #define DEBUG(A...)
 #endif
 
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t rtasd_log_lock = SPIN_LOCK_UNLOCKED;
 
 DECLARE_WAIT_QUEUE_HEAD(rtas_log_wait);
 
@@ -152,7 +152,7 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	if (buf == NULL)
 		return;
 
-	spin_lock_irqsave(&log_lock, s);
+	spin_lock_irqsave(&rtasd_log_lock, s);
 
 	/* get length and increase count */
 	switch (err_type & ERR_TYPE_MASK) {
@@ -163,7 +163,7 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 		break;
 	case ERR_TYPE_KERNEL_PANIC:
 	default:
-		spin_unlock_irqrestore(&log_lock, s);
+		spin_unlock_irqrestore(&rtasd_log_lock, s);
 		return;
 	}
 
@@ -174,7 +174,7 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	/* Check to see if we need to or have stopped logging */
 	if (fatal || no_more_logging) {
 		no_more_logging = 1;
-		spin_unlock_irqrestore(&log_lock, s);
+		spin_unlock_irqrestore(&rtasd_log_lock, s);
 		return;
 	}
 
@@ -199,12 +199,12 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 		else
 			rtas_log_start += 1;
 
-		spin_unlock_irqrestore(&log_lock, s);
+		spin_unlock_irqrestore(&rtasd_log_lock, s);
 		wake_up_interruptible(&rtas_log_wait);
 		break;
 	case ERR_TYPE_KERNEL_PANIC:
 	default:
-		spin_unlock_irqrestore(&log_lock, s);
+		spin_unlock_irqrestore(&rtasd_log_lock, s);
 		return;
 	}
 
@@ -247,24 +247,24 @@ static ssize_t rtas_log_read(struct file * file, char * buf,
 		return -ENOMEM;
 
 
-	spin_lock_irqsave(&log_lock, s);
+	spin_lock_irqsave(&rtasd_log_lock, s);
 	/* if it's 0, then we know we got the last one (the one in NVRAM) */
 	if (rtas_log_size == 0 && !no_more_logging)
 		nvram_clear_error_log();
-	spin_unlock_irqrestore(&log_lock, s);
+	spin_unlock_irqrestore(&rtasd_log_lock, s);
 
 
 	error = wait_event_interruptible(rtas_log_wait, rtas_log_size);
 	if (error)
 		goto out;
 
-	spin_lock_irqsave(&log_lock, s);
+	spin_lock_irqsave(&rtasd_log_lock, s);
 	offset = rtas_error_log_buffer_max * (rtas_log_start & LOG_NUMBER_MASK);
 	memcpy(tmp, &rtas_log_buf[offset], count);
 
 	rtas_log_start += 1;
 	rtas_log_size -= 1;
-	spin_unlock_irqrestore(&log_lock, s);
+	spin_unlock_irqrestore(&rtasd_log_lock, s);
 
 	error = copy_to_user(buf, tmp, count) ? -EFAULT : count;
 out:
