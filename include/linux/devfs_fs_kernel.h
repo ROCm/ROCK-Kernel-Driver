@@ -34,10 +34,6 @@ extern void devfs_remove(const char *fmt, ...)
 	__attribute__((format (printf, 1, 2)));
 extern int devfs_register_tape(const char *name);
 extern void devfs_unregister_tape(int num);
-extern void devfs_create_partitions(struct gendisk *dev);
-extern void devfs_create_cdrom(struct gendisk *dev);
-extern void devfs_remove_partitions(struct gendisk *dev);
-extern void devfs_remove_cdrom(struct gendisk *dev);
 extern void devfs_register_partition(struct gendisk *dev, int part);
 extern void mount_devfs_fs(void);
 #else  /*  CONFIG_DEVFS_FS  */
@@ -71,18 +67,6 @@ static inline int devfs_register_tape (devfs_handle_t de)
     return -1;
 }
 static inline void devfs_unregister_tape(int num)
-{
-}
-static inline void devfs_create_partitions(struct gendisk *dev)
-{
-}
-static inline void devfs_create_cdrom(struct gendisk *dev)
-{
-}
-static inline void devfs_remove_partitions(struct gendisk *dev)
-{
-}
-static inline void devfs_remove_cdrom(struct gendisk *dev)
 {
 }
 static inline void devfs_register_partition(struct gendisk *dev, int part)

@@ -74,8 +74,6 @@
 #include <asm/bitops.h>
 #include "internal.h"
 
-#define PRINTK(format, args...) \
-   {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
 
 int devfs_register_tape(const char *name)
 {
@@ -257,139 +255,6 @@ void devfs_dealloc_devnum(umode_t mode, dev_t devnum)
 	up(&device_list_mutex);
 }
 
-struct unique_numspace
-{
-    spinlock_t init_lock;
-    unsigned char sem_initialised;
-    unsigned int num_free;          /*  Num free in bits       */
-    unsigned int length;            /*  Array length in bytes  */
-    unsigned long *bits;
-    struct semaphore semaphore;
-};
-
-#define UNIQUE_NUMBERSPACE_INITIALISER {SPIN_LOCK_UNLOCKED, 0, 0, 0, NULL}
-
-
-/**
- *	devfs_alloc_unique_number - Allocate a unique (positive) number.
- *	@space: The number space to allocate from.
- *
- *	Returns the allocated unique number, else a negative error code.
- *	This routine is thread safe and may block.
- */
-
-int devfs_alloc_unique_number (struct unique_numspace *space)
-{
-    int number;
-    unsigned int length;
-
-    /*  Get around stupid lack of semaphore initialiser  */
-    spin_lock (&space->init_lock);
-    if (!space->sem_initialised)
-    {
-	sema_init (&space->semaphore, 1);
-	space->sem_initialised = 1;
-    }
-    spin_unlock (&space->init_lock);
-    down (&space->semaphore);
-    if (space->num_free < 1)
-    {
-	void *bits;
-
-	if (space->length < 16) length = 16;
-	else length = space->length << 1;
-	if ( ( bits = vmalloc (length) ) == NULL )
-	{
-	    up (&space->semaphore);
-	    return -ENOMEM;
-	}
-	if (space->bits != NULL)
-	{
-	    memcpy (bits, space->bits, space->length);
-	    vfree (space->bits);
-	}
-	space->num_free = (length - space->length) << 3;
-	space->bits = bits;
-	memset (bits + space->length, 0, length - space->length);
-	space->length = length;
-    }
-    number = find_first_zero_bit (space->bits, space->length << 3);
-    --space->num_free;
-    __set_bit (number, space->bits);
-    up (&space->semaphore);
-    return number;
-}   /*  End Function devfs_alloc_unique_number  */
-EXPORT_SYMBOL(devfs_alloc_unique_number);
-
-
-/**
- *	devfs_dealloc_unique_number - Deallocate a unique (positive) number.
- *	@space: The number space to deallocate from.
- *	@number: The number to deallocate.
- *
- *	This routine is thread safe and may block.
- */
-
-void devfs_dealloc_unique_number (struct unique_numspace *space, int number)
-{
-    int was_set;
-
-    if (number < 0) return;
-    down (&space->semaphore);
-    was_set = __test_and_clear_bit (number, space->bits);
-    if (was_set) ++space->num_free;
-    up (&space->semaphore);
-    if (!was_set) PRINTK ("(): number %d was already free\n", number);
-}   /*  End Function devfs_dealloc_unique_number  */
-EXPORT_SYMBOL(devfs_dealloc_unique_number);
-
-static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
-static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
-
-void devfs_create_partitions(struct gendisk *disk)
-{
-	char dirname[64], diskname[64], symlink[16];
-
-	if (!disk->devfs_name)
-		sprintf(disk->devfs_name, "%s/disc%d", disk->disk_name,
-				disk->first_minor >> disk->minor_shift);
-
-	devfs_mk_dir(disk->devfs_name);
-	disk->number = devfs_alloc_unique_number(&disc_numspace);
-
-	sprintf(diskname, "%s/disc", disk->devfs_name);
-	devfs_register(NULL, diskname, 0,
-			disk->major, disk->first_minor,
-			S_IFBLK | S_IRUSR | S_IWUSR,
-			disk->fops, NULL);
-
-	sprintf(symlink, "discs/disc%d", disk->number);
-	sprintf(dirname, "../%s", disk->devfs_name);
-	devfs_mk_symlink(symlink, dirname);
-
-}
-
-void devfs_create_cdrom(struct gendisk *disk)
-{
-	char dirname[64], cdname[64], symlink[16];
-
-	if (!disk->devfs_name)
-		strcat(disk->devfs_name, disk->disk_name);
-
-	devfs_mk_dir(disk->devfs_name);
-	disk->number = devfs_alloc_unique_number(&cdrom_numspace);
-
-	sprintf(cdname, "%s/cd", disk->devfs_name);
-	devfs_register(NULL, cdname, 0,
-			disk->major, disk->first_minor,
-			S_IFBLK | S_IRUGO | S_IWUGO,
-			disk->fops, NULL);
-
-	sprintf(symlink, "cdroms/cdrom%d", disk->number);
-	sprintf(dirname, "../%s", disk->devfs_name);
-	devfs_mk_symlink(symlink, dirname);
-}
-
 void devfs_register_partition(struct gendisk *dev, int part)
 {
 	char devname[64];
@@ -399,18 +264,4 @@ void devfs_register_partition(struct gendisk *dev, int part)
 			dev->major, dev->first_minor + part,
 			S_IFBLK | S_IRUSR | S_IWUSR,
 			dev->fops, NULL);
-}
-
-void devfs_remove_partitions(struct gendisk *disk)
-{
-	devfs_remove("discs/disc%d", disk->number);
-	devfs_remove(disk->devfs_name);
-	devfs_dealloc_unique_number(&disc_numspace, disk->number);
-}
-
-void devfs_remove_cdrom(struct gendisk *disk)
-{
-	devfs_remove("cdroms/cdrom%d", disk->number);
-	devfs_remove(disk->devfs_name);
-	devfs_dealloc_unique_number(&cdrom_numspace, disk->number);
 }

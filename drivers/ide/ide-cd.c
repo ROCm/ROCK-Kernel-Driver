@@ -3366,7 +3366,8 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	DRIVER(drive)->busy++;
 	g->minors = 1;
 	g->minor_shift = 0;
-	strcpy(g->devfs_name, drive->devfs_name);
+	snprintf(g->devfs_name, sizeof(g->devfs_name),
+			"%s/cd", drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
 	g->flags = GENHD_FL_CD;
 	if (ide_cdrom_setup(drive)) {

@@ -19,8 +19,10 @@
 #include <linux/blk.h>
 #include <linux/kmod.h>
 #include <linux/ctype.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include "check.h"
+#include "devfs.h"
 
 #include "acorn.h"
 #include "amiga.h"
@@ -94,25 +96,24 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name(struct gendisk *hd, int part, char *buf)
 {
-	if (!part) {
 #ifdef CONFIG_DEVFS_FS
-		if (hd->devfs_name)
-			sprintf(buf, "%s/%s", hd->devfs_name,
-				(hd->flags & GENHD_FL_CD) ? "cd" : "disc");
-		else
-#endif
-			sprintf(buf, "%s", hd->disk_name);
-	} else {
-#ifdef CONFIG_DEVFS_FS
-		if (hd->devfs_name)
+	if (hd->devfs_name[0] != '\0') {
+		if (part)
 			sprintf(buf, "%s/part%d", hd->devfs_name, part);
+		else if (hd->minors != 1)
+			sprintf(buf, "%s/disc", hd->devfs_name);
 		else
-#endif
-		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
-			sprintf(buf, "%sp%d", hd->disk_name, part);
-		else
-			sprintf(buf, "%s%d", hd->disk_name, part);
+			sprintf(buf, "%s", hd->devfs_name);
+		return buf;
 	}
+#endif
+
+	if (!part)
+		sprintf(buf, "%s", hd->disk_name);
+	else if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
+		sprintf(buf, "%sp%d", hd->disk_name, part);
+	else
+		sprintf(buf, "%s%d", hd->disk_name, part);
 
 	return buf;
 }
@@ -128,7 +129,7 @@ check_partition(struct gendisk *hd, struct block_device *bdev)
 		return NULL;
 
 #ifdef CONFIG_DEVFS_FS
-	if (hd->devfs_name) {
+	if (hd->devfs_name[0] != '\0') {
 		printk(KERN_INFO " /dev/%s:", hd->devfs_name);
 		sprintf(state->name, "p");
 	}
@@ -284,12 +285,12 @@ void register_disk(struct gendisk *disk)
 		return;
 	disk_sysfs_symlinks(disk);
 
-	if (disk->flags & GENHD_FL_CD)
-		devfs_create_cdrom(disk);
-
 	/* No minors to use for partitions */
-	if (disk->minors == 1)
+	if (disk->minors == 1) {
+		if (disk->devfs_name[0] != '\0')
+			devfs_add_disk(disk);
 		return;
+	}
 
 	/* No such device (e.g., media were just removed) */
 	if (!get_capacity(disk))
@@ -299,7 +300,7 @@ void register_disk(struct gendisk *disk)
 	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
 		return;
 	state = check_partition(disk, bdev);
-	devfs_create_partitions(disk);
+	devfs_add_partitioned(disk);
 	if (state) {
 		for (j = 1; j < state->limit; j++) {
 			sector_t size = state->parts[j].size;
@@ -392,10 +393,9 @@ void del_gendisk(struct gendisk *disk)
 	unlink_gendisk(disk);
 	disk_stat_set_all(disk, 0);
 	disk->stamp = disk->stamp_idle = 0;
-	if (disk->flags & GENHD_FL_CD)
-		devfs_remove_cdrom(disk);
-	else
-		devfs_remove_partitions(disk);
+
+	devfs_remove_disk(disk);
+
 	if (disk->driverfs_dev) {
 		sysfs_remove_link(&disk->kobj, "device");
 		sysfs_remove_link(&disk->driverfs_dev->kobj, "block");
