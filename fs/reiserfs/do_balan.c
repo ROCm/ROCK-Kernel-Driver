@@ -1078,13 +1078,9 @@ static int balance_leaf (struct tree_balance * tb,
 	memcpy (insert_key + i,B_N_PKEY(S_new[i],0),KEY_SIZE);
 	insert_ptr[i] = S_new[i];
 
-	RFALSE( (atomic_read (&(S_new[i]->b_count)) != 1) &&
-		(atomic_read(&(S_new[i]->b_count)) != 2 ||
-		 !(buffer_journaled(S_new[i]) || 
-		   buffer_journal_dirty(S_new[i]))), 
+	RFALSE (!buffer_journaled (S_new [i]) || buffer_journal_dirty (S_new [i]) ||
+		buffer_dirty (S_new [i]),
 		"PAP-12247: S_new[%d] : (%b)\n", i, S_new[i]);
-
-
     }
 
     /* if the affected item was not wholly shifted then we perform all necessary operations on that part or whole of the
