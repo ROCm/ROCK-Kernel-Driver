@@ -251,8 +251,8 @@ struct olympic_private {
 	u16 arb;      /* be16 */
 	u16 asb;      /* be16 */
 
-	u8 *olympic_mmio;
-	u8 *olympic_lap;
+	u8 __iomem *olympic_mmio;
+	u8 __iomem *olympic_lap;
 	struct pci_dev *pdev ; 
 	char *olympic_card_name ; 
 
