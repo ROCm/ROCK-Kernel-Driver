@@ -164,11 +164,6 @@ config ACPI
 	  The ACPI Sourceforge project may also be of interest:
 	  <http://sf.net/projects/acpi/>
 
-config ACPI_EFI
-	bool
-	depends on !IA64_HP_SIM
-	default y
-
 config ACPI_INTERPRETER
 	bool
 	depends on !IA64_HP_SIM
@@ -375,6 +370,11 @@ config COMPAT
 	depends on IA32_SUPPORT
 	default y
 
+config HAVE_DEC_LOCK
+	bool
+	depends on (SMP || PREEMPT)
+	default y
+
 config PERFMON
 	bool "Performance monitor support"
 	help
@@ -394,15 +394,11 @@ config IA64_PALINFO
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
-config IA64_SALINFO
-	tristate "/proc/sal support"
-	help
-	  The /proc/sal directory exports the SAL (system abstraction layer)
-	  feature bits, like whether the platform is subject to ITC drift.  It
-	  is intended to be used by user programs that care about such things.
 
-	  To use this option, you have to ensure that the "/proc file system
-	  support" (CONFIG_PROC_FS) is enabled, too.
+config EFI
+	bool
+	depends on !IA64_HP_SIM
+	default y
 
 config EFI_VARS
 	tristate "/proc/efi/vars support"
@@ -579,6 +575,7 @@ config IA64_GRANULE_16MB
 
 config IA64_GRANULE_64MB
 	bool "64MB"
+	depends on !(IA64_GENERIC || IA64_HP_ZX1)
 
 endchoice
 

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#90 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#95 $
  *
  * $FreeBSD$
  */
@@ -229,8 +229,10 @@ typedef enum {
 	AHD_RTI			= 0x04000,/* Retained Training Support */
 	AHD_NEW_IOCELL_OPTS	= 0x08000,/* More Signal knobs in the IOCELL */
 	AHD_NEW_DFCNTRL_OPTS	= 0x10000,/* SCSIENWRDIS bit */
+	AHD_FAST_CDB_DELIVERY	= 0x20000,/* CDB acks released to Output Sync */
 	AHD_REMOVABLE		= 0x00000,/* Hot-Swap supported - None so far*/
 	AHD_AIC7901_FE		= AHD_FENONE,
+	AHD_AIC7901A_FE		= AHD_FENONE,
 	AHD_AIC7902_FE		= AHD_MULTI_FUNC
 } ahd_feature;
 
@@ -372,7 +374,8 @@ typedef enum {
 	AHD_HP_BOARD	      = 0x100000,
 	AHD_RESET_POLL_ACTIVE = 0x200000,
 	AHD_UPDATE_PEND_CMDS  = 0x400000,
-	AHD_RUNNING_QOUTFIFO  = 0x800000
+	AHD_RUNNING_QOUTFIFO  = 0x800000,
+	AHD_HAD_FIRST_SEL     = 0x1000000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -494,21 +497,21 @@ struct hardware_scb {
  *	  transfer.
  */ 
 #define SG_PTR_MASK	0xFFFFFFF8
-/*16*/	uint64_t dataptr;
-/*24*/	uint32_t datacnt;	/* Byte 3 is spare. */
-/*28*/	uint32_t sgptr;
-/*32*/	uint32_t hscb_busaddr;
-/*36*/	uint32_t next_hscb_busaddr;
-/*40*/	uint8_t  control;	/* See SCB_CONTROL in aic79xx.reg for details */
-/*41*/	uint8_t	 scsiid;	/*
+/*16*/	uint16_t tag;		/* Reused by Sequencer. */
+/*18*/	uint8_t  control;	/* See SCB_CONTROL in aic79xx.reg for details */
+/*19*/	uint8_t	 scsiid;	/*
 				 * Selection out Id
 				 * Our Id (bits 0-3) Their ID (bits 4-7)
 				 */
-/*42*/	uint8_t  lun;
-/*43*/	uint8_t  task_attribute;
-/*44*/	uint8_t  cdb_len;
-/*45*/	uint8_t  task_management;
-/*46*/	uint16_t tag;		/* Reused by Sequencer. */
+/*20*/	uint8_t  lun;
+/*21*/	uint8_t  task_attribute;
+/*22*/	uint8_t  cdb_len;
+/*23*/	uint8_t  task_management;
+/*24*/	uint64_t dataptr;
+/*32*/	uint32_t datacnt;	/* Byte 3 is spare. */
+/*36*/	uint32_t sgptr;
+/*40*/	uint32_t hscb_busaddr;
+/*44*/	uint32_t next_hscb_busaddr;
 /********** Long lun field only downloaded for full 8 byte lun support ********/
 /*48*/  uint8_t	 pkt_long_lun[8];
 /******* Fields below are not Downloaded (Sequencer may use for scratch) ******/
@@ -1379,13 +1382,13 @@ struct scb		*ahd_get_scb(struct ahd_softc *ahd, u_int col_idx);
 void			 ahd_free_scb(struct ahd_softc *ahd, struct scb *scb);
 void			 ahd_alloc_scbs(struct ahd_softc *ahd);
 void			 ahd_free(struct ahd_softc *ahd);
-int			 ahd_reset(struct ahd_softc *ahd);
+int			 ahd_reset(struct ahd_softc *ahd, int reinit);
 void			 ahd_shutdown(void *arg);
-int			ahd_write_flexport(struct ahd_softc *ahd,
-					   u_int addr, u_int value);
-int			ahd_read_flexport(struct ahd_softc *ahd, u_int addr,
-					  uint8_t *value);
-int			ahd_wait_flexport(struct ahd_softc *ahd);
+int			 ahd_write_flexport(struct ahd_softc *ahd,
+					    u_int addr, u_int value);
+int			 ahd_read_flexport(struct ahd_softc *ahd, u_int addr,
+					   uint8_t *value);
+int			 ahd_wait_flexport(struct ahd_softc *ahd);
 
 /*************************** Interrupt Services *******************************/
 void			ahd_pci_intr(struct ahd_softc *ahd);

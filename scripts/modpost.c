@@ -324,6 +324,19 @@ handle_modversions(struct module *mod, struct elf_info *info,
 	}
 }
 
+int
+is_vmlinux(const char *modname)
+{
+	const char *myname;
+
+	if ((myname = strrchr(modname, '/')))
+		myname++;
+	else
+		myname = modname;
+
+	return strcmp(myname, "vmlinux") == 0;
+}
+
 void
 read_symbols(char *modname)
 {
@@ -335,8 +348,7 @@ read_symbols(char *modname)
 
 	/* When there's no vmlinux, don't print warnings about
 	 * unresolved symbols (since there'll be too many ;) */
-	if (strcmp(modname, "vmlinux") == 0)
-		have_vmlinux = 1;
+	have_vmlinux = is_vmlinux(modname);
 
 	parse_elf(&info, modname);
 
@@ -460,10 +472,7 @@ add_depends(struct buffer *b, struct module *mod, struct module *modules)
 	int first = 1;
 
 	for (m = modules; m; m = m->next) {
-		if (strcmp(m->name, "vmlinux") == 0)
-			m->seen = 1;
-		else 
-			m->seen = 0;
+		m->seen = is_vmlinux(m->name);
 	}
 
 	buf_printf(b, "\n");
@@ -543,7 +552,7 @@ main(int argc, char **argv)
 	}
 
 	for (mod = modules; mod; mod = mod->next) {
-		if (strcmp(mod->name, "vmlinux") == 0)
+		if (is_vmlinux(mod->name))
 			continue;
 
 		buf.pos = 0;

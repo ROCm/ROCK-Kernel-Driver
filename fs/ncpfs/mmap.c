@@ -26,7 +26,7 @@
  * Fill in the supplied page for mmap
  */
 static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
-				     unsigned long address, int write_access)
+				     unsigned long address, int *type)
 {
 	struct file *file = area->vm_file;
 	struct dentry *dentry = file->f_dentry;
@@ -85,6 +85,15 @@ static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
 		memset(pg_addr + already_read, 0, PAGE_SIZE - already_read);
 	flush_dcache_page(page);
 	kunmap(page);
+
+	/*
+	 * If I understand ncp_read_kernel() properly, the above always
+	 * fetches from the network, here the analogue of disk.
+	 * -- wli
+	 */
+	if (type)
+		*type = VM_FAULT_MAJOR;
+	inc_page_state(pgmajfault);
 	return page;
 }
 

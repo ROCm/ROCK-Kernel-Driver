@@ -75,25 +75,25 @@ spinlock_t sun4d_imsk_lock = SPIN_LOCK_UNLOCKED;
 
 int show_sun4d_interrupts(struct seq_file *p, void *v)
 {
-	int i, j = 0, k = 0, sbusl;
+	int i = *(loff_t *) v, j = 0, k = 0, sbusl;
 	struct irqaction * action;
 #ifdef CONFIG_SMP
 	int x;
 #endif
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		sbusl = pil_to_sbus[i];
 		if (!sbusl) {
 	 		action = *(i + irq_action);
 			if (!action) 
-		        	continue;
+		        	goto out;
 		} else {
 			for (j = 0; j < nsbi; j++) {
 				for (k = 0; k < 4; k++)
 					if ((action = sbus_actions [(j << 5) + (sbusl << 2) + k].action))
 						goto found_it;
 			}
-			continue;
+			goto out;
 		}
 found_it:	seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
@@ -128,6 +128,7 @@ found_it:	seq_printf(p, "%3d: ", i);
 		}
 		seq_putc(p, '\n');
 	}
+out:
 	return 0;
 }
 

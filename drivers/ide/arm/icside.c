@@ -214,7 +214,7 @@ static void icside_maskproc(ide_drive_t *drive, int mask)
 #define NR_ENTRIES 256
 #define TABLE_SIZE (NR_ENTRIES * 8)
 
-static void ide_build_sglist(ide_drive_t *drive, struct request *rq)
+static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = drive->hwif;
 	struct icside_state *state = hwif->hwif_data;
@@ -543,7 +543,7 @@ icside_dma_common(ide_drive_t *drive, struct request *rq,
 	BUG_ON(hwif->sg_dma_active);
 	BUG_ON(dma_channel_active(hwif->hw.dma));
 
-	ide_build_sglist(drive, rq);
+	icside_build_sglist(drive, rq);
 
 	/*
 	 * Ensure that we have the right interrupt routed.

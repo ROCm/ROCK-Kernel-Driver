@@ -278,9 +278,9 @@ void M68360_disable_irq(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 
-	for (i = 0; i < NR_IRQS; i++) {
+	if (i < NR_IRQS) {
 		if (int_irq_list[i].flags & IRQ_FLG_STD)
 			continue;
 
@@ -291,7 +291,8 @@ int show_interrupts(struct seq_file *p, void *v)
 			seq_printf(p, "  ");
 		seq_printf(p, "%s\n", int_irq_list[i].devname);
 	}
-	seq_printf(p, "   : %10u   spurious\n", num_spurious);
+	if (i == NR_IRQS)
+		seq_printf(p, "   : %10u   spurious\n", num_spurious);
 
 	return 0;
 }

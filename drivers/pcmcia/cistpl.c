@@ -341,8 +341,11 @@ void destroy_cis_cache(struct pcmcia_socket *s)
 int verify_cis_cache(struct pcmcia_socket *s)
 {
 	struct cis_cache_entry *cis;
-	char buf[256];
+	char *buf;
 
+	buf = kmalloc(256, GFP_KERNEL);
+	if (buf == NULL)
+		return -1;
 	list_for_each_entry(cis, &s->cis_cache, node) {
 		int len = cis->len;
 
@@ -355,9 +358,12 @@ int verify_cis_cache(struct pcmcia_socket *s)
 #endif
 			read_cis_mem(s, cis->attr, cis->addr, len, buf);
 
-		if (memcmp(buf, cis->cache, len) != 0)
+		if (memcmp(buf, cis->cache, len) != 0) {
+			kfree(buf);
 			return -1;
+		}
 	}
+	kfree(buf);
 	return 0;
 }
 
@@ -1404,19 +1410,24 @@ int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse
 int read_tuple(client_handle_t handle, cisdata_t code, void *parse)
 {
     tuple_t tuple;
-    cisdata_t buf[255];
+    cisdata_t *buf;
     int ret;
-    
+
+    buf = kmalloc(256, GFP_KERNEL);
+    if (buf == NULL)
+	return CS_OUT_OF_RESOURCE;
     tuple.DesiredTuple = code;
     tuple.Attributes = TUPLE_RETURN_COMMON;
     ret = pcmcia_get_first_tuple(handle, &tuple);
-    if (ret != CS_SUCCESS) return ret;
+    if (ret != CS_SUCCESS) goto done;
     tuple.TupleData = buf;
     tuple.TupleOffset = 0;
-    tuple.TupleDataMax = sizeof(buf);
+    tuple.TupleDataMax = 255;
     ret = pcmcia_get_tuple_data(handle, &tuple);
-    if (ret != CS_SUCCESS) return ret;
+    if (ret != CS_SUCCESS) goto done;
     ret = pcmcia_parse_tuple(handle, &tuple, parse);
+done:
+    kfree(buf);
     return ret;
 }
 
@@ -1432,50 +1443,61 @@ int read_tuple(client_handle_t handle, cisdata_t code, void *parse)
 
 int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
 {
-    tuple_t tuple;
-    cisparse_t p;
+    tuple_t *tuple;
+    cisparse_t *p;
     int ret, reserved, dev_ok = 0, ident_ok = 0;
 
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
+    tuple = kmalloc(sizeof(*tuple), GFP_KERNEL);
+    if (tuple == NULL)
+	return CS_OUT_OF_RESOURCE;
+    p = kmalloc(sizeof(*p), GFP_KERNEL);
+    if (p == NULL) {
+	kfree(tuple);
+	return CS_OUT_OF_RESOURCE;
+    }
 
     info->Chains = reserved = 0;
-    tuple.DesiredTuple = RETURN_FIRST_TUPLE;
-    tuple.Attributes = TUPLE_RETURN_COMMON;
-    ret = pcmcia_get_first_tuple(handle, &tuple);
+    tuple->DesiredTuple = RETURN_FIRST_TUPLE;
+    tuple->Attributes = TUPLE_RETURN_COMMON;
+    ret = pcmcia_get_first_tuple(handle, tuple);
     if (ret != CS_SUCCESS)
-	return CS_SUCCESS;
+	goto done;
 
     /* First tuple should be DEVICE; we should really have either that
        or a CFTABLE_ENTRY of some sort */
-    if ((tuple.TupleCode == CISTPL_DEVICE) ||
-	(read_tuple(handle, CISTPL_CFTABLE_ENTRY, &p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_CFTABLE_ENTRY_CB, &p) == CS_SUCCESS))
+    if ((tuple->TupleCode == CISTPL_DEVICE) ||
+	(read_tuple(handle, CISTPL_CFTABLE_ENTRY, p) == CS_SUCCESS) ||
+	(read_tuple(handle, CISTPL_CFTABLE_ENTRY_CB, p) == CS_SUCCESS))
 	dev_ok++;
 
     /* All cards should have a MANFID tuple, and/or a VERS_1 or VERS_2
        tuple, for card identification.  Certain old D-Link and Linksys
        cards have only a broken VERS_2 tuple; hence the bogus test. */
-    if ((read_tuple(handle, CISTPL_MANFID, &p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_VERS_1, &p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_VERS_2, &p) != CS_NO_MORE_ITEMS))
+    if ((read_tuple(handle, CISTPL_MANFID, p) == CS_SUCCESS) ||
+	(read_tuple(handle, CISTPL_VERS_1, p) == CS_SUCCESS) ||
+	(read_tuple(handle, CISTPL_VERS_2, p) != CS_NO_MORE_ITEMS))
 	ident_ok++;
 
     if (!dev_ok && !ident_ok)
-	return CS_SUCCESS;
+	goto done;
 
     for (info->Chains = 1; info->Chains < MAX_TUPLES; info->Chains++) {
-	ret = pcmcia_get_next_tuple(handle, &tuple);
+	ret = pcmcia_get_next_tuple(handle, tuple);
 	if (ret != CS_SUCCESS) break;
-	if (((tuple.TupleCode > 0x23) && (tuple.TupleCode < 0x40)) ||
-	    ((tuple.TupleCode > 0x47) && (tuple.TupleCode < 0x80)) ||
-	    ((tuple.TupleCode > 0x90) && (tuple.TupleCode < 0xff)))
+	if (((tuple->TupleCode > 0x23) && (tuple->TupleCode < 0x40)) ||
+	    ((tuple->TupleCode > 0x47) && (tuple->TupleCode < 0x80)) ||
+	    ((tuple->TupleCode > 0x90) && (tuple->TupleCode < 0xff)))
 	    reserved++;
     }
     if ((info->Chains == MAX_TUPLES) || (reserved > 5) ||
 	((!dev_ok || !ident_ok) && (info->Chains > 10)))
 	info->Chains = 0;
 
+done:
+    kfree(tuple);
+    kfree(p);
     return CS_SUCCESS;
 }
 

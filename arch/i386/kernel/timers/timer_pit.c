@@ -149,6 +149,7 @@ static unsigned long get_offset_pit(void)
 
 /* tsc timer_opts struct */
 struct timer_opts timer_pit = {
+	.name = 	"pit",
 	.init =		init_pit, 
 	.mark_offset =	mark_offset_pit, 
 	.get_offset =	get_offset_pit,

@@ -1632,12 +1632,12 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 #endif /* CONFIG_IDE_TASK_IOCTL */
 
 		case HDIO_DRIVE_CMD:
-			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+			if (!capable(CAP_SYS_RAWIO))
 				return -EACCES;
 			return ide_cmd_ioctl(drive, cmd, arg);
 
 		case HDIO_DRIVE_TASK:
-			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+			if (!capable(CAP_SYS_RAWIO))
 				return -EACCES;
 			return ide_task_ioctl(drive, cmd, arg);
 

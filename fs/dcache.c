@@ -639,24 +639,9 @@ void shrink_dcache_anon(struct hlist_head *head)
 
 /*
  * This is called from kswapd when we think we need some more memory.
- *
- * We don't want the VM to steal _all_ unused dcache.  Because that leads to
- * the VM stealing all unused inodes, which shoots down recently-used
- * pagecache.  So what we do is to tell fibs to the VM about how many reapable
- * objects there are in this cache.   If the number of unused dentries is
- * less than half of the total dentry count then return zero.  The net effect
- * is that the number of unused dentries will be, at a minimum, equal to the
- * number of used ones.
- *
- * If unused_ratio is set to 5, the number of unused dentries will not fall
- * below 5* the number of used ones.
  */
 static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 {
-	int nr_used;
-	int nr_unused;
-	const int unused_ratio = 1;
-
 	if (nr) {
 		/*
 		 * Nasty deadlock avoidance.
@@ -672,11 +657,7 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_dcache(nr);
 	}
-	nr_unused = dentry_stat.nr_unused;
-	nr_used = dentry_stat.nr_dentry - nr_unused;
-	if (nr_unused < nr_used * unused_ratio)
-		return 0;
-	return nr_unused - nr_used * unused_ratio;
+	return dentry_stat.nr_unused;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)

@@ -41,7 +41,11 @@ static int vbi_workaround(struct saa7146_dev *dev)
 	/* wait for vbi_a or vbi_b*/
 	if ( 0 != (SAA7146_USE_PORT_B_FOR_VBI & dev->ext_vv_data->flags)) {
 		DEB_D(("...using port b\n"));
+		WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | CMD_E_FID_B);
+		WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | CMD_O_FID_B);
+/*
 		WRITE_RPS1(CMD_PAUSE | MASK_09);
+*/
 	} else {
 		DEB_D(("...using port a\n"));
 		WRITE_RPS1(CMD_PAUSE | MASK_10);
@@ -137,10 +141,10 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
 /*
-	vdma3.base_even	= (u32)dev->ov_fb.base+2048*70;
-	vdma3.base_odd	= (u32)dev->ov_fb.base;
-	vdma3.prot_addr	= (u32)dev->ov_fb.base+2048*164;
-	vdma3.pitch	= 2048;
+	vdma3.base_even	= 0xc8000000+2560*70;
+	vdma3.base_odd	= 0xc8000000;
+	vdma3.prot_addr	= 0xc8000000+2560*164;
+	vdma3.pitch	= 2560;
 	vdma3.base_page	= 0;
 	vdma3.num_line_byte = (64<<16)|((vbi_pixel_to_capture)<<0); // set above!
 */
@@ -244,7 +248,9 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l
 		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
-		saa7146_pgtable_build_single(dev->pci, &buf->pt[2], buf->vb.dma.sglist, buf->vb.dma.sglen);
+		err = saa7146_pgtable_build_single(dev->pci, &buf->pt[2], buf->vb.dma.sglist, buf->vb.dma.sglen);
+		if (0 != err)
+			return err;
 	}
 	buf->vb.state = STATE_PREPARED;
 	buf->activate = buffer_activate;
@@ -303,7 +309,7 @@ static struct videobuf_queue_ops vbi_qops = {
 
 /* ------------------------------------------------------------------ */
 
-static void vbi_stop(struct saa7146_fh *fh)
+static void vbi_stop(struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -321,23 +327,29 @@ static void vbi_stop(struct saa7146_fh *fh)
 	/* shut down dma 3 transfers */
 	saa7146_write(dev, MC1, MASK_20);
 
+	if (vv->vbi_q.curr) {
+		saa7146_buffer_finish(dev,&vv->vbi_q,STATE_DONE);
+	}
+
+	videobuf_queue_cancel(file,&fh->vbi_q);
+
 	vv->vbi_streaming = NULL;
 
 	del_timer(&vv->vbi_q.timeout);
 	del_timer(&fh->vbi_read_timeout);
 
-	DEB_VBI(("out\n"));
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
 
 static void vbi_read_timeout(unsigned long data)
 {
-	struct saa7146_fh *fh = (struct saa7146_fh *)data;
+	struct file *file = (struct file*)data;
+	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	
 	DEB_VBI(("dev:%p, fh:%p\n",dev, fh));
 
-	vbi_stop(fh);
+	vbi_stop(fh, file);
 }
 
 static void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
@@ -354,10 +366,21 @@ static void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 	init_waitqueue_head(&vv->vbi_wq);
 }
 
-static void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void vbi_open(struct saa7146_dev *dev, struct file *file)
 {
+	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
+	
+	u32 arbtr_ctrl	= saa7146_read(dev, PCI_BT_V1);
+	int ret = 0;
+	
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
 
+	/* adjust arbitrition control for video dma 3 */
+	arbtr_ctrl &= ~0x1f0000;
+	arbtr_ctrl |=  0x1d0000;
+	saa7146_write(dev, PCI_BT_V1, arbtr_ctrl);
+	saa7146_write(dev, MC2, (MASK_04|MASK_20));		
+	
 	memset(&fh->vbi_fmt,0,sizeof(fh->vbi_fmt));
 
 	fh->vbi_fmt.sampling_rate	= 27000000;
@@ -380,21 +403,32 @@ static void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 
 	init_timer(&fh->vbi_read_timeout);
 	fh->vbi_read_timeout.function = vbi_read_timeout;
-	fh->vbi_read_timeout.data = (unsigned long)fh;
+	fh->vbi_read_timeout.data = (unsigned long)file;
 
-	/* fixme: enable this again, if the dvb-c w/ analog module work properly */
-/*
-	vbi_workaround(dev);
-*/
+	/* initialize the brs */
+	if ( 0 != (SAA7146_USE_PORT_B_FOR_VBI & dev->ext_vv_data->flags)) {
+		saa7146_write(dev, BRS_CTRL, MASK_30|MASK_29 | (7 << 19));
+	} else {
+		saa7146_write(dev, BRS_CTRL, 0x00000001);
+
+		if (0 != (ret = vbi_workaround(dev))) {
+			DEB_VBI(("vbi workaround failed!\n"));
+			/* return ret;*/
+		}
+	}
+
+	/* upload brs register */
+	saa7146_write(dev, MC2, (MASK_08|MASK_24));		
 }
 
-static void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
+static void vbi_close(struct saa7146_dev *dev, struct file *file)
 {
+	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	struct saa7146_vv *vv = dev->vv_data;
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
 
 	if( fh == vv->vbi_streaming ) {
-		vbi_stop(fh);
+		vbi_stop(fh, file);
 	}
 }
 

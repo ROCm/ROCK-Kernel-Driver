@@ -199,6 +199,8 @@ typedef union sigval32 {
 	unsigned int sival_ptr;
 } sigval_t32;
 
+#define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
+
 typedef struct siginfo32 {
 	int si_signo;
 	int si_errno;
@@ -250,6 +252,19 @@ typedef struct siginfo32 {
 		} _sigpoll;
 	} _sifields;
 } siginfo_t32;
+
+typedef struct sigevent32 {
+	sigval_t32 sigev_value;
+	int sigev_signo;
+	int sigev_notify;
+	union {
+		int _pad[SIGEV_PAD_SIZE32];
+		struct {
+			u32 _function;
+			u32 _attribute; /* really pthread_attr_t */
+		} _sigev_thread;
+	} _sigev_un;
+} sigevent_t32;
 
 struct old_linux32_dirent {
 	u32	d_ino;

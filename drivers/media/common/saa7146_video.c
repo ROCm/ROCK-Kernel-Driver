@@ -116,7 +116,7 @@ static int try_win(struct saa7146_dev *dev, struct v4l2_window *win)
 		DEB_D(("no fb fmt set.\n"));
 		return -EINVAL;
 	}
-	if (win->w.width < 64 || win->w.height <  64) {
+	if (win->w.width < 48 || win->w.height <  32) {
 		DEB_D(("min width/height. (%d,%d)\n",win->w.width,win->w.height));
 		return -EINVAL;
 	}
@@ -661,7 +661,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 */				
 	} else {
 		struct saa7146_pgtable *pt = &buf->pt[0];
-		saa7146_pgtable_build_single(pci, pt, list, length);
+		return saa7146_pgtable_build_single(pci, pt, list, length);
 	}
 
 	return 0;
@@ -704,7 +704,7 @@ static int video_begin(struct saa7146_fh *fh)
 	return 0;
 }
 
-static int video_end(struct saa7146_fh *fh)
+static int video_end(struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -735,82 +735,9 @@ static int video_end(struct saa7146_fh *fh)
 	saa7146_write(dev, MC1, 0x00700000);
 
 	vv->streaming = NULL;
+
 	spin_unlock_irqrestore(&dev->slock, flags);
 	
-	return 0;
-}
-
-/* capturing to framebuffer */
-
-int overlay_reqbufs(struct saa7146_dev *dev, struct v4l2_requestbuffers *req)
-{
-/*	struct saa7146_fh *fh = file->private_data;
-
-	if (req->count > VIDEO_MAX_FRAME)
-		req->count = VIDEO_MAX_FRAME;
-
-	*size = fh->video_fmt.sizeimage;
-
-*/
-	return 0;
-}
-int overlay_querybuf(struct saa7146_dev *dev, struct v4l2_buffer *buf)
-{
-	return 0;
-}
-int overlay_qbuf(struct saa7146_dev *dev, struct v4l2_buffer *b)
-{
-/*	if (b->index < 0 || b->index >= VIDEO_MAX_FRAME) {
-		DEB_D(("index %d out of bounds.\n",b->index));
-		goto -EINVAL;
-	}
-	
-	buf = q->bufs[b->index];
-	if (NULL == buf) {
-		printk("videobuf_qbuf: NULL == buf\n");
-		goto done;
-	}
-	if (0 == buf->baddr) {
-		printk("videobuf_qbuf: 0 == buf->baddr\n");
-		goto done;
-	}
-	if (buf->state == STATE_QUEUED ||
-	    buf->state == STATE_ACTIVE) {
-		printk("videobuf_qbuf: already queued or activated.\n");
-		goto done;
-	}
-
-	field = videobuf_next_field(q);
-	retval = q->ops->buf_prepare(file,buf,field);
-	if (0 != retval) {
-		printk("videobuf_qbuf: buf_prepare() failed.\n");
-		goto done;
-	}
-	
-	list_add_tail(&buf->stream,&q->stream);
-	if (q->streaming) {
-		spin_lock_irqsave(q->irqlock,flags);
-		q->ops->buf_queue(file,buf);
-		spin_unlock_irqrestore(q->irqlock,flags);
-	}
-	retval = 0;
-	
- done:
-	up(&q->lock);
-	return retval;
-*/
-	return 0;
-}
-int overlay_dqbuf(struct saa7146_dev *dev, struct v4l2_buffer *buf)
-{
-	return 0;
-}
-int overlay_streamon(struct saa7146_dev *dev)
-{
-	return 0;
-}
-int overlay_streamoff(struct saa7146_dev *dev)
-{
 	return 0;
 }
 
@@ -818,7 +745,7 @@ int overlay_streamoff(struct saa7146_dev *dev)
 /*
  * This function is _not_ called directly, but from
  * video_generic_ioctl (and maybe others).  userspace
- * copying is done already, arg is a kernel fhinter.
+ * copying is done already, arg is a kernel pointer.
  */
 
 int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int cmd, void *arg)
@@ -1141,38 +1068,24 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case VIDIOC_REQBUFS: {
 		struct v4l2_requestbuffers *req = arg;
 		DEB_D(("VIDIOC_REQBUFS, type:%d\n",req->type));
-/*
-		if( req->type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			return overlay_reqbufs(dev,req);
-		} 
-*/
 		return videobuf_reqbufs(file,q,req);
 	}
 	case VIDIOC_QUERYBUF: {
 		struct v4l2_buffer *buf = arg;
 		DEB_D(("VIDIOC_QUERYBUF, type:%d, offset:%d\n",buf->type,buf->m.offset));
-/* 		if( buf->type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			return overlay_querybuf(dev,buf);
-		} 
- */		return videobuf_querybuf(q,buf);
+		return videobuf_querybuf(q,buf);
 	}
 	case VIDIOC_QBUF: {
 		struct v4l2_buffer *buf = arg;
 		int ret = 0;
-/* 		if( buf->type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			return overlay_qbuf(dev,buf);
-		} 
- */		ret = videobuf_qbuf(file,q,buf);
+		ret = videobuf_qbuf(file,q,buf);
 		DEB_D(("VIDIOC_QBUF: ret:%d, index:%d\n",ret,buf->index));
 		return ret;
 	}
 	case VIDIOC_DQBUF: {
 		struct v4l2_buffer *buf = arg;
 		int ret = 0;
-/* 		if( buf->type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			return overlay_dqbuf(dev,buf);
-		} 
- */		ret = videobuf_dqbuf(file,q,buf);
+		ret = videobuf_dqbuf(file,q,buf);
 		DEB_D(("VIDIOC_DQBUF: ret:%d, index:%d\n",ret,buf->index));
 		return ret;
 	}
@@ -1180,29 +1093,18 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		int *type = arg;
 		DEB_D(("VIDIOC_STREAMON, type:%d\n",*type));
 
-		if( 0 != ops->capture_begin ) {
-			if( 0 != (err = ops->capture_begin(fh))) {
+		if( 0 != (err = video_begin(fh))) {
 				return err;
 			}
-		}
-/* 		if( *type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			err = overlay_streamon(dev);
-		} else { */
 		err = videobuf_streamon(file,q);
-/* 		} */
 		return err;
 	}
 	case VIDIOC_STREAMOFF: {
 		int *type = arg;
 
 		DEB_D(("VIDIOC_STREAMOFF, type:%d\n",*type));
-		if( 0 != ops->capture_end ) {
-			ops->capture_end(fh);
-		}
-/* 		if( *type == V4L2_BUF_TYPE_VIDEO_OVERLAY ) {
-			return overlay_streamoff(dev);
-		} 
- */		err = videobuf_streamoff(file,q);
+		err = videobuf_streamoff(file,q);
+		video_end(fh, file);
 		return err;
 	}
 	case VIDIOCGMBUF:
@@ -1267,8 +1169,8 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4
 	DEB_CAP(("vbuf:%p\n",vb));
 
 	/* sanity checks */
-	if (fh->video_fmt.width  < 64 ||
-	    fh->video_fmt.height < 64 ||
+	if (fh->video_fmt.width  < 48 ||
+	    fh->video_fmt.height < 32 ||
 	    fh->video_fmt.width  > vv->standard->h_max_out ||
 	    fh->video_fmt.height > vv->standard->v_max_out) {
 		DEB_D(("w (%d) / h (%d) out of bounds.\n",fh->video_fmt.width,fh->video_fmt.height));
@@ -1407,8 +1309,9 @@ static void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 }
 
 
-static void video_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void video_open(struct saa7146_dev *dev, struct file *file)
 {
+	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	struct saa7146_format *sfmt;
 
 	fh->video_fmt.width = 384;
@@ -1429,8 +1332,9 @@ static void video_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 }
 
 
-static void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
+static void video_close(struct saa7146_dev *dev, struct file *file)
 {
+	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	struct saa7146_vv *vv = dev->vv_data;
 	unsigned long flags;
 	
@@ -1443,10 +1347,8 @@ static void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct f
 	}
 	
 	if( fh == vv->streaming ) {
-		video_end(fh);		
+		video_end(fh, file);		
 	}
-
-	videobuf_queue_cancel(file,&fh->video_q);
 }
 
 
@@ -1489,7 +1391,7 @@ static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *p
 		return -EAGAIN;
 	}
 	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos);
-	video_end(fh);
+	video_end(fh, file);
 
 	/* restart overlay if it was active before */
 	if( 0 != restart_overlay ) {
@@ -1505,6 +1407,4 @@ struct saa7146_use_ops saa7146_video_uops = {
 	.release = video_close,
 	.irq_done = video_irq_done,
 	.read = video_read,
-	.capture_begin = video_begin,
-	.capture_end = video_end,
 };

@@ -187,7 +187,7 @@ void dma_region_sync(struct dma_region *dma, unsigned long offset, unsigned long
 /* nopage() handler for mmap access */
 
 static struct page*
-dma_region_pagefault(struct vm_area_struct *area, unsigned long address, int write_access)
+dma_region_pagefault(struct vm_area_struct *area, unsigned long address, int *type)
 {
 	unsigned long offset;
 	unsigned long kernel_virt_addr;
@@ -202,6 +202,8 @@ dma_region_pagefault(struct vm_area_struct *area, unsigned long address, int wri
 	    (address > (unsigned long) area->vm_start + (PAGE_SIZE * dma->n_pages)) )
 		goto out;
 
+	if (type)
+		*type = VM_FAULT_MINOR;
 	offset = address - area->vm_start;
 	kernel_virt_addr = (unsigned long) dma->kvirt + offset;
 	ret = vmalloc_to_page((void*) kernel_virt_addr);

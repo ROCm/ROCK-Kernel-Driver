@@ -17,7 +17,7 @@
 		unsigned short Addr;
 		unsigned short Len;
 		unsigned char  Data[0];
-	};
+	} __attribute__ ((packed));
 
 	struct edge_firmware_version_info {
 		unsigned char	 MajorVersion;

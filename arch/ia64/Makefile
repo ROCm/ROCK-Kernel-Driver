@@ -14,7 +14,7 @@ export AWK
 
 OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
-LDFLAGS_MODULE	+= -T arch/ia64/module.lds
+LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
 EXTRA		:=
 
@@ -25,9 +25,9 @@ CFLAGS_KERNEL	:= -mconstant-gp
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f2 -d'.')
 
-GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
+GAS_STATUS=$(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
-CPPFLAGS	+= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
+CPPFLAGS	+= $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\
@@ -88,12 +88,15 @@ CLEAN_FILES += include/asm-ia64/.offsets.h.stamp include/asm-ia64/offsets.h vmli
 
 prepare: include/asm-ia64/offsets.h
 
-include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
+arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h
+
+include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 arch/ia64/kernel/asm-offsets.s: include/asm-ia64/.offsets.h.stamp
 
 include/asm-ia64/.offsets.h.stamp:
+	mkdir -p include/asm-ia64
 	[ -s include/asm-ia64/offsets.h ] \
 	 || echo "#define IA64_TASK_SIZE 0" > include/asm-ia64/offsets.h
 	touch $@

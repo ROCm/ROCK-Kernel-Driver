@@ -35,7 +35,6 @@
 
 #define __KERNEL_SYSCALLS__
 #include <linux/module.h>
-#include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
@@ -43,7 +42,6 @@
 #include <linux/poll.h>
 #include <linux/unistd.h>
 #include <linux/byteorder/swabb.h>
-#include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <stdarg.h>
 
@@ -55,15 +53,15 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/firmware.h>
+#include <linux/crc32.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -108,6 +106,7 @@ static int vidmode=CVBS_RGB_OUT;
 static int pids_off;
 static int adac=DVB_ADAC_TI;
 static int hw_sections = 1;
+static int rgb_on = 0;
 
 int av7110_num = 0;
 
@@ -118,41 +117,11 @@ int av7110_num = 0;
  * DEBI functions
  ****************************************************************************/
 
+#define wait_for_debi_done(x) \
+       saa7146_wait_for_debi_done(x->dev) \
+
 /* This DEBI code is based on the Stradis driver 
    by Nathan Laredo <laredo@gnu.org> */
-
-static int wait_for_debi_done(struct av7110 *av7110)
-{
-	struct saa7146_dev *dev = av7110->dev;
-	int start;
-
-	/* wait for registers to be programmed */
-	start = jiffies;
-	while (1) {
-                if (saa7146_read(dev, MC2) & 2)
-                        break;
-		if (jiffies-start > HZ/20) {
-			printk ("%s: timed out while waiting for registers "
-				"getting programmed\n", __FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	/* wait for transfer to complete */
-	start = jiffies;
-	while (1) {
-		if (!(saa7146_read(dev, PSR) & SPCI_DEBI_S))
-			break;
-		saa7146_read(dev, MC2);
-		if (jiffies-start > HZ/4) {
-			printk ("%s: timed out while waiting for transfer "
-				"completion\n", __FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	return 0;
-}
 
 static int debiwrite(struct av7110 *av7110, u32 config, 
                      int addr, u32 val, int count)
@@ -375,7 +344,7 @@ static int record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) p2t->priv;
 
-	DEB_EE(("struct dvb_filter_pes2ts:%p\n",p2t));
+//	DEB_EE(("struct dvb_filter_pes2ts:%p\n",p2t));
 
         if (!(dvbdmxfeed->ts_type & TS_PACKET)) 
                 return 0;
@@ -385,14 +354,14 @@ static int record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
                 return dvbdmxfeed->cb.ts(buf, len, 0, 0, 
                                          &dvbdmxfeed->feed.ts, DMX_OK); 
         else
-                return dvb_filter_pes2ts(p2t, buf, len);
+                return dvb_filter_pes2ts(p2t, buf, len, 1);
 }
 
 static int dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) priv;
 
-	DEB_EE(("dvb_demux_feed:%p\n",dvbdmxfeed));
+//	DEB_EE(("dvb_demux_feed:%p\n",dvbdmxfeed));
         
         dvbdmxfeed->cb.ts(data, 188, 0, 0,
                           &dvbdmxfeed->feed.ts,
@@ -886,10 +855,10 @@ static void gpioirq (unsigned long data)
         txbuf=irdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
         len=(av7110->debilen+3)&(~3);
 
-        DEB_D(("GPIO0 irq %d %d\n", av7110->debitype, av7110->debilen));
+//        DEB_D(("GPIO0 irq %d %d\n", av7110->debitype, av7110->debilen));
         print_time("gpio");
 
-        DEB_D(("GPIO0 irq %02x\n", av7110->debitype&0xff));        
+//       DEB_D(("GPIO0 irq %02x\n", av7110->debitype&0xff));        
         switch (av7110->debitype&0xff) {
 
         case DATA_TS_PLAY:
@@ -2002,8 +1971,6 @@ static u8 bootcode[] = {
         0x2c, 0x00, 0x03, 0xf8, 0x2c, 0x00, 0x04, 0x00,
 };
 
-#include "av7110_firm.h"
-
 static int bootarm(struct av7110 *av7110)
 {
 	struct saa7146_dev *dev= av7110->dev;
@@ -2056,7 +2023,7 @@ static int bootarm(struct av7110 *av7110)
         
         DEB_D(("bootarm: load dram code\n"));
 
-	if (load_dram(av7110, (u32 *)Root, sizeof(Root))<0)
+	if (load_dram(av7110, (u32 *)av7110->bin_root, av7110->size_root)<0)
 		return -1;
 
 	saa7146_setgpio(dev, RESET_LINE, SAA7146_GPIO_OUTLO);
@@ -2064,7 +2031,7 @@ static int bootarm(struct av7110 *av7110)
         
         DEB_D(("bootarm: load dpram code\n"));
 
-	mwdebi(av7110, DEBISWAB, DPRAM_BASE, Dpram, sizeof(Dpram));
+	mwdebi(av7110, DEBISWAB, DPRAM_BASE, av7110->bin_dpram, av7110->size_dpram);
 
 	wait_for_debi_done(av7110);
 
@@ -2706,9 +2673,9 @@ static int tuner_set_tv_freq (struct saa7146_dev *dev, u32 freq)
 	buf[1] = div & 0xff;
 	buf[2] = 0x8e;
 
-	if (freq < (u32) (16*168.25) ) 
+	if (freq < (u32) 16*168.25 )
 		config = 0xa0;
-	else if (freq < (u32) (16*447.25)) 
+	else if (freq < (u32) 16*447.25)
 		config = 0x90;
 	else
 		config = 0x30;
@@ -4294,8 +4261,10 @@ static void av7110_before_after_tune (fe_status_t s, void *data)
                         av7110->pids[DMX_PES_TELETEXT], 0, 
                         av7110->pids[DMX_PES_PCR]);
         	outcom(av7110, COMTYPE_PIDFILTER, Scan, 0);
-	} else 
+	} else {
 		SetPIDs(av7110, 0, 0, 0, 0, 0);
+        	outcom(av7110, COMTYPE_PIDFILTER, FlushTSQueue, 0);
+	}
 
         up(&av7110->pid_mutex);
 }
@@ -4529,31 +4498,117 @@ static u8 saa7113_init_regs[] = {
 static struct saa7146_ext_vv av7110_vv_data_st;
 static struct saa7146_ext_vv av7110_vv_data_c;
 
+
+
+
+
+#ifdef CONFIG_DVB_AV7110_FIRMWARE_FILE
+#include "av7110_firm.h"
+#endif
+
 static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
 {
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE
+	const struct firmware *fw;
+#endif
 	struct av7110 *av7110 = NULL;
 	int ret = 0;
-	
+	u32 crc = 0, len = 0;
+	unsigned char *ptr;
+		
+	DEB_EE(("dev: %p, av7110: %p\n",dev,av7110));
+
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
+	/* request the av7110 firmware, this will block until someone uploads it */
+	ret = request_firmware(&fw, "dvb-ttpci-01.fw", &dev->pci->dev);
+	if ( 0 != ret ) {
+		printk("dvb-ttpci: cannot request firmware!\n");
+		return -EINVAL;
+	}
+
+	if (fw->size <= 200000) {
+		printk("dvb-ttpci: this firmware is way too small.\n");
+		return -EINVAL;
+	}
+#endif
+
+	/* prepare the av7110 device struct */
 	if (!(av7110 = kmalloc (sizeof (struct av7110), GFP_KERNEL))) {
 		printk ("%s: out of memory!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
-
 	memset(av7110, 0, sizeof(struct av7110));
+	
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
+	/* check if the firmware is available */
+	av7110->bin_fw = (unsigned char*)vmalloc(fw->size);
+	if (NULL == av7110->bin_fw) {
+		DEB_D(("out of memory\n"));
+		kfree(av7110);
+		return -ENOMEM;
+	}
+	memcpy(av7110->bin_fw, fw->data, fw->size);
+	av7110->size_fw = fw->size;
+#else
+	av7110->bin_fw = dvb_ttpci_fw;
+	av7110->size_fw = sizeof dvb_ttpci_fw;
+#endif
 
+	/* check for firmware magic */
+	ptr = av7110->bin_fw;
+	if (ptr[0] != 'A' || ptr[1] != 'V' || 
+	    ptr[2] != 'F' || ptr[3] != 'W') {
+		printk("dvb-ttpci: this is not an av7110 firmware\n");
+		goto fw_error;
+	}
+	ptr += 4;
+
+	/* check dpram file */
+	crc = ntohl(*(u32*)ptr);
+	ptr += 4;
+	len = ntohl(*(u32*)ptr);
+	ptr += 4;
+	if (len >= 512) {
+		printk("dvb-ttpci: dpram file is way to big.\n");
+		goto fw_error;
+	}
+	if( crc != crc32_le(0,ptr,len)) {
+		printk("dvb-ttpci: crc32 of dpram file does not match.\n");
+		goto fw_error;
+	}
+	av7110->bin_dpram = ptr;
+	av7110->size_dpram = len;
+	ptr += len;
+	
+	/* check root file */
+	crc = ntohl(*(u32*)ptr);
+	ptr += 4;
+	len = ntohl(*(u32*)ptr);
+	ptr += 4;
+	
+	if (len <= 200000 || len >= 300000 || len > ((av7110->bin_fw+av7110->size_fw)-ptr) ) {
+		printk("dvb-ttpci: root file has strange size (%d). aborting.\n",len);
+		goto fw_error;
+	}
+	if( crc != crc32_le(0,ptr,len)) {
+		printk("dvb-ttpci: crc32 of dpram file does not match.\n");
+		goto fw_error;
+	}
+	av7110->bin_root = ptr;
+	av7110->size_root = len;
+	
+	/* go on with regular device initialization */
 	av7110->card_name = (char*)pci_ext->ext_priv;
+	av7110->dev=(struct saa7146_dev *)dev;
 	(struct av7110*)dev->ext_priv = av7110;
 
-	DEB_EE(("dev: %p, av7110: %p\n",dev,av7110));
-
-	av7110->dev=(struct saa7146_dev *)dev;
 	dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name);
 
 	/* the Siemens DVB needs this if you want to have the i2c chips
 	   get recognized before the main driver is fully loaded */
 	saa7146_write(dev, GPIO_CTRL, 0x500000);
 
-	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_3200);
+	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
 
 	av7110->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
 						av7110->dvb_adapter, 0);
@@ -4571,7 +4626,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 
 	/* set dd1 stream a & b */
       	saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-	saa7146_write(dev, DD1_INIT, 0x02000000);
+	saa7146_write(dev, DD1_INIT, 0x03000000);
 	saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 
 	/* upload all */
@@ -4729,7 +4784,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		memcpy(standard,dvb_standard,sizeof(struct saa7146_standard)*2);
 		/* set dd1 stream a & b */
       		saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-		saa7146_write(dev, DD1_INIT, 0x02000700);
+		saa7146_write(dev, DD1_INIT, 0x03000700);
 		saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 	}
 	else if (dev->pci->subsystem_vendor == 0x110a) {
@@ -4747,7 +4802,8 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		// switch DVB SCART on
 		outcom(av7110, COMTYPE_AUDIODAC, MainSwitch, 1, 0);
 		outcom(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, 1);
-		//saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
+		if (rgb_on)
+			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
 		//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
 	}
 	
@@ -4786,6 +4842,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	}	
 
 	printk(KERN_INFO "av7110: found av7110-%d.\n",av7110_num);
+	av7110->device_initialized = 1;
 	av7110_num++;
         return 0;
 
@@ -4809,12 +4866,22 @@ err:
 	dvb_unregister_adapter (av7110->dvb_adapter);
 
 	return ret;
+fw_error:
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
+	vfree(av7110->bin_fw);
+#endif
+	kfree(av7110);
+	return -EINVAL;
 }
 
 static int av7110_detach (struct saa7146_dev* saa)
 {
 	struct av7110 *av7110 = (struct av7110*)saa->ext_priv;
 	DEB_EE(("av7110: %p\n",av7110));
+	
+	if( 0 == av7110->device_initialized ) {
+		return 0;
+	}
 
 	saa7146_unregister_device(&av7110->v4l_dev, saa);
 	if (2 == av7110->has_analog_tuner) {
@@ -4845,11 +4912,15 @@ static int av7110_detach (struct saa7146_dev* saa)
 	dvb_unregister_i2c_bus (master_xfer,av7110->i2c_bus->adapter, av7110->i2c_bus->id);
 	dvb_unregister_adapter (av7110->dvb_adapter);
 
-	kfree (av7110);
-
-	saa->ext_priv = NULL;
 	av7110_num--;
-	
+#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
+	if (NULL != av7110->bin_fw ) {
+		vfree(av7110->bin_fw);
+	}
+#endif
+	kfree (av7110);
+	saa->ext_priv = NULL;
+
 	return 0;
 }
 
@@ -4858,7 +4929,7 @@ static void av7110_irq(struct saa7146_dev* dev, u32 *isr)
 {
 	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
 
-	DEB_INT(("dev: %p, av7110: %p\n",dev,av7110));
+//	DEB_INT(("dev: %p, av7110: %p\n",dev,av7110));
 
 	if (*isr & MASK_19)
 		tasklet_schedule (&av7110->debi_tasklet);
@@ -4887,7 +4958,7 @@ static struct saa7146_standard standard[] = {
 static struct saa7146_standard analog_standard[] = {
 	{
 		.name	= "PAL", 	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x18,	.v_field 	= 288,		.v_calc	= 576,
+		.v_offset	= 0x18 /* 0 */ ,	.v_field 	= 288,		.v_calc	= 576,
 		.h_offset	= 0x08,	.h_pixels 	= 708,		.h_calc	= 709,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
@@ -4975,7 +5046,7 @@ static struct saa7146_ext_vv av7110_vv_data_st = {
 	.inputs		= 1,
 	.audios 	= 1,
 	.capabilities	= 0,
-	.flags		= SAA7146_EXT_SWAP_ODD_EVEN,
+	.flags		= 0, 
 
 	.stds		= &standard[0],
 	.num_stds	= sizeof(standard)/sizeof(struct saa7146_standard),
@@ -5002,6 +5073,7 @@ static struct saa7146_ext_vv av7110_vv_data_c = {
 
 static struct saa7146_extension av7110_extension = {
 	.name		= "dvb\0",
+	.flags		= SAA7146_I2C_SHORT_DELAY,
 
 	.module		= THIS_MODULE,
 	.pci_tbl	= &pci_tbl[0],
@@ -5054,4 +5126,6 @@ MODULE_PARM(adac,"i");
 MODULE_PARM_DESC(adac,"audio DAC type: 0 TI, 1 CRYSTAL, 2 MSP (use if autodetection fails)");
 MODULE_PARM(hw_sections, "i");
 MODULE_PARM_DESC(hw_sections, "0 use software section filter, 1 use hardware");
-
+MODULE_PARM(rgb_on, "i");
+MODULE_PARM_DESC(rgb_on, "For Siemens DVB-C cards only: Enable RGB control"
+		" signal on SCART pin 16 to switch SCART video mode from CVBS to RGB");

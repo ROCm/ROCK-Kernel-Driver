@@ -1,7 +1,7 @@
 Documentation for the SoundPro CMI8330 extensions in the WSS driver (ad1848.o)
 ------------------------------------------------------------------------------
 
-( Be sure to read Documentation/sound/CMI8330 too )
+( Be sure to read Documentation/sound/oss/CMI8330 too )
 
 Ion Badulescu, ionut@cs.columbia.edu
 February 24, 1999

@@ -432,6 +432,7 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 	int window = 0, err;
 	unsigned long pc = regs->pc;
 	unsigned long npc = regs->npc;
+	struct thread_info *tp = current_thread_info();
 	void *sig_address;
 	int sig_code;
 
@@ -459,20 +460,20 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 	err |= __put_user(regs->psr, &sc->sigc_psr);
 	err |= __put_user(regs->u_regs[UREG_G1], &sc->sigc_g1);
 	err |= __put_user(regs->u_regs[UREG_I0], &sc->sigc_o0);
-	err |= __put_user(current->thread.w_saved, &sc->sigc_oswins);
-	if (current->thread.w_saved)
-		for (window = 0; window < current->thread.w_saved; window++) {
-			put_user((char *)current->thread.rwbuf_stkptrs[window],
+	err |= __put_user(tp->w_saved, &sc->sigc_oswins);
+	if (tp->w_saved)
+		for (window = 0; window < tp->w_saved; window++) {
+			put_user((char *)tp->rwbuf_stkptrs[window],
 				 &sc->sigc_spbuf[window]);
 			err |= __copy_to_user(&sc->sigc_wbuf[window],
-					      &current->thread.reg_window[window],
+					      &tp->reg_window[window],
 					      sizeof(struct reg_window));
 		}
 	else
 		err |= __copy_to_user(sframep, (char *) regs->u_regs[UREG_FP],
 				      sizeof(struct reg_window));
 
-	current->thread.w_saved = 0; /* So process is allowed to execute. */
+	tp->w_saved = 0; /* So process is allowed to execute. */
 
 	err |= __put_user(signr, &sframep->sig_num);
 	sig_address = NULL;
@@ -601,7 +602,7 @@ new_setup_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	if (invalid_frame_pointer(sf, sigframe_size))
 		goto sigill_and_return;
 
-	if (current->thread.w_saved != 0)
+	if (current_thread_info()->w_saved != 0)
 		goto sigill_and_return;
 
 	/* 2. Save the current process state */
@@ -675,7 +676,7 @@ new_setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 		get_sigframe(&ka->sa, regs, sigframe_size);
 	if (invalid_frame_pointer(sf, sigframe_size))
 		goto sigill;
-	if (current->thread.w_saved != 0)
+	if (current_thread_info()->w_saved != 0)
 		goto sigill;
 
 	err  = __put_user(regs->pc, &sf->regs.pc);
@@ -752,6 +753,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	svr4_gwindows_t __user *gw;
 	svr4_ucontext_t __user *uc;
 	svr4_sigset_t	setv;
+	struct thread_info *tp = current_thread_info();
 	int window = 0, err;
 
 	synchronize_user_stack();
@@ -808,7 +810,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	err |= __put_user(gw, &mc->gwin);
 	    
 	/* 2. Number of windows to restore at setcontext(): */
-	err |= __put_user(current->thread.w_saved, &gw->count);
+	err |= __put_user(tp->w_saved, &gw->count);
 
 	/* 3. Save each valid window
 	 *    Currently, it makes a copy of the windows from the kernel copy.
@@ -821,16 +823,16 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	 *    These windows are just used in case synchronize_user_stack failed
 	 *    to flush the user windows.
 	 */
-	for (window = 0; window < current->thread.w_saved; window++) {
+	for (window = 0; window < tp->w_saved; window++) {
 		err |= __put_user((int *) &(gw->win[window]), &gw->winptr[window]);
 		err |= __copy_to_user(&gw->win[window],
-				      &current->thread.reg_window[window],
+				      &tp->reg_window[window],
 				      sizeof(svr4_rwindow_t));
 		err |= __put_user(0, gw->winptr[window]);
 	}
 
 	/* 4. We just pay attention to the gw->count field on setcontext */
-	current->thread.w_saved = 0; /* So process is allowed to execute. */
+	tp->w_saved = 0; /* So process is allowed to execute. */
 
 	/* Setup the signal information.  Solaris expects a bunch of
 	 * information to be passed to the signal handler, we don't provide
@@ -878,7 +880,7 @@ asmlinkage int svr4_getcontext(svr4_ucontext_t __user *uc, struct pt_regs *regs)
 
 	synchronize_user_stack();
 
-	if (current->thread.w_saved)
+	if (current_thread_info()->w_saved)
 		goto sigsegv_and_return;
 
 	err = clear_user(uc, sizeof(*uc));
@@ -928,7 +930,6 @@ sigsegv_and_return:
 /* Set the context for a svr4 application, this is Solaris way to sigreturn */
 asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 {
-	struct thread_struct *tp = &current->thread;
 	svr4_gregset_t  __user *gr;
 	unsigned long pc, npc, psr;
 	sigset_t set;
@@ -940,8 +941,8 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 	 * svr4_setup_frame when sync_user_windows is done?
 	 */
 	flush_user_windows();
-	
-	if (tp->w_saved)
+
+	if (current_thread_info()->w_saved)
 		goto sigsegv_and_return;
 
 	if (((uint) c) & 3)

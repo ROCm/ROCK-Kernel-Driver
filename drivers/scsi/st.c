@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20030811";
+static char *verstr = "20031228";
 
 #include <linux/module.h>
 
@@ -35,6 +35,7 @@ static char *verstr = "20030811";
 #include <linux/blkdev.h>
 #include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/cdev.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -140,14 +141,19 @@ DEB( static int debugging = DEBUG; )
 #define ST_TIMEOUT (900 * HZ)
 #define ST_LONG_TIMEOUT (14000 * HZ)
 
-#define TAPE_NR(x) (iminor(x) & ~(-1 << ST_MODE_SHIFT))
+/* Remove mode bits and auto-rewind bit (7) */
+#define TAPE_NR(x) ( ((iminor(x) & ~255) >> (ST_NBR_MODE_BITS + 1)) | \
+    (iminor(x) & ~(-1 << ST_MODE_SHIFT)) )
 #define TAPE_MODE(x) ((iminor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
+
+/* Construct the minor number from the device (d), mode (m), and non-rewind (n) data */
+#define TAPE_MINOR(d, m, n) (((d & ~(255 >> (ST_NBR_MODE_BITS + 1))) << (ST_NBR_MODE_BITS + 1)) | \
+  (d & (255 >> (ST_NBR_MODE_BITS + 1))) | (m << ST_MODE_SHIFT) | ((n != 0) << 7) )
 
 /* Internal ioctl to set both density (uppermost 8 bits) and blocksize (lower
    24 bits) */
 #define SET_DENS_AND_BLK 0x10001
 
-#define ST_DEV_ARR_LUMP  6
 static rwlock_t st_dev_arr_lock = RW_LOCK_UNLOCKED;
 
 static int st_fixed_buffer_size = ST_FIXED_BUFFER_SIZE;
@@ -1005,7 +1011,6 @@ static int st_open(struct inode *inode, struct file *filp)
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (iminor(inode) & 0x80) == 0;
-
 
 	if (!scsi_block_when_processing_errors(STp->device)) {
 		retval = (-ENXIO);
@@ -1970,10 +1975,13 @@ static int st_set_options(Scsi_Tape *STp, long options)
 	long code;
 	ST_mode *STm;
 	char *name = tape_name(STp);
+	struct cdev *cd0, *cd1;
 
 	STm = &(STp->modes[STp->current_mode]);
 	if (!STm->defined) {
+		cd0 = STm->cdevs[0]; cd1 = STm->cdevs[1];
 		memcpy(STm, &(STp->modes[0]), sizeof(ST_mode));
+		STm->cdevs[0] = cd0; STm->cdevs[1] = cd1;
 		modes_defined = TRUE;
                 DEBC(printk(ST_DEB_MSG
                             "%s: Initialized mode %d definition from mode 0\n",
@@ -3704,12 +3712,13 @@ static struct file_operations st_fops =
 static int st_probe(struct device *dev)
 {
 	struct scsi_device *SDp = to_scsi_device(dev);
-	struct gendisk *disk;
-	Scsi_Tape *tpnt;
+	struct gendisk *disk = NULL;
+	struct cdev *cdev = NULL;
+	Scsi_Tape *tpnt = NULL;
 	ST_mode *STm;
 	ST_partstat *STps;
 	ST_buffer *buffer;
-	int i, mode, dev_num;
+	int i, j, mode, dev_num, error;
 	char *stp;
 	u64 bounce_limit;
 
@@ -3743,7 +3752,7 @@ static int st_probe(struct device *dev)
 		Scsi_Tape **tmp_da;
 		int tmp_dev_max;
 
-		tmp_dev_max = st_nr_dev + ST_DEV_ARR_LUMP;
+		tmp_dev_max = max(st_nr_dev * 2, 8);
 		if (tmp_dev_max > ST_MAX_TAPES)
 			tmp_dev_max = ST_MAX_TAPES;
 		if (tmp_dev_max <= st_nr_dev) {
@@ -3837,6 +3846,42 @@ static int st_probe(struct device *dev)
 		STm->default_compression = ST_DONT_TOUCH;
 		STm->default_blksize = (-1);	/* No forced size */
 		STm->default_density = (-1);	/* No forced density */
+
+		for (j=0; j < 2; j++) {
+			cdev = cdev_alloc();
+			if (!cdev) {
+				printk(KERN_ERR
+				       "st: out of memory. Device not attached.\n");
+				goto out_put_disk;
+			}
+			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%sm%d%s", disk->disk_name,
+				 i, j ? "n" : "");
+			cdev->owner = THIS_MODULE;
+			cdev->ops = &st_fops;
+			STm->cdevs[j] = cdev;
+
+			error = cdev_add(STm->cdevs[j],
+					 MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, i, j)),
+					 1);
+			if (error) {
+				printk(KERN_ERR "st%d: Can't add %s-rewind mode %d\n",
+				       dev_num, j ? "non" : "auto", i);
+			}
+
+			error = sysfs_create_link(&STm->cdevs[j]->kobj, &SDp->sdev_gendev.kobj,
+						  "device");
+			if (error) {
+				printk(KERN_ERR
+				       "st%d: Can't create sysfs link from SCSI device.\n",
+				       dev_num);
+			}
+		}
+	}
+	error = sysfs_create_link(&SDp->sdev_gendev.kobj, &tpnt->modes[0].cdevs[0]->kobj,
+				  "tape");
+	if (error) {
+		printk(KERN_ERR "st%d: Can't create sysfs link from SCSI device.\n",
+		       dev_num);
 	}
 
 	for (i = 0; i < ST_NBR_PARTITIONS; i++) {
@@ -3881,17 +3926,28 @@ static int st_probe(struct device *dev)
 
 out_put_disk:
 	put_disk(disk);
+	if (tpnt) {
+		for (i=0; i < ST_NBR_MODES; i++) {
+			STm = &(tpnt->modes[i]);
+			if (STm->cdevs[0])
+				kobject_put(&STm->cdevs[0]->kobj);
+			if (STm->cdevs[1])
+				kobject_put(&STm->cdevs[1]->kobj);
+		}
+		kfree(tpnt);
+	}
 out_buffer_free:
 	kfree(buffer);
 out:
 	return -ENODEV;
 };
 
+
 static int st_remove(struct device *dev)
 {
 	Scsi_Device *SDp = to_scsi_device(dev);
 	Scsi_Tape *tpnt;
-	int i, mode;
+	int i, j, mode;
 
 	write_lock(&st_dev_arr_lock);
 	for (i = 0; i < st_dev_max; i++) {
@@ -3901,9 +3957,16 @@ static int st_remove(struct device *dev)
 			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
 			devfs_unregister_tape(tpnt->disk->number);
+			sysfs_remove_link(&SDp->sdev_gendev.kobj, "tape");
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[mode]);
 				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[mode]);
+				for (j=0; j < 2; j++) {
+					sysfs_remove_link(&tpnt->modes[mode].cdevs[j]->kobj,
+							  "device");
+					cdev_del(tpnt->modes[mode].cdevs[j]);
+					tpnt->modes[mode].cdevs[j] = NULL;
+				}
 			}
 			tpnt->device = NULL;
 
@@ -3930,12 +3993,14 @@ static int __init init_st(void)
 		"st: Version %s, fixed bufsize %d, s/g segs %d\n",
 		verstr, st_fixed_buffer_size, st_max_sg_segs);
 
-	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
+	if (!register_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
+				    ST_MAX_TAPE_ENTRIES, "st")) {
 		if (scsi_register_driver(&st_template.gendrv) == 0) {
 			do_create_driverfs_files();
 			return 0;
 		}
-		unregister_chrdev(SCSI_TAPE_MAJOR, "st");
+		unregister_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
+					 ST_MAX_TAPE_ENTRIES);
 	}
 
 	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", SCSI_TAPE_MAJOR);
@@ -3946,7 +4011,8 @@ static void __exit exit_st(void)
 {
 	do_remove_driverfs_files();
 	scsi_unregister_driver(&st_template.gendrv);
-	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
+	unregister_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
+				 ST_MAX_TAPE_ENTRIES);
 	kfree(scsi_tapes);
 	printk(KERN_INFO "st: Unloaded.\n");
 }

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#23 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#25 $
  */
 
 #include "aic79xx_osm.h"
@@ -52,11 +52,9 @@ static int	ahd_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
 static int	ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd,
 						 u_long *base, u_long *base2);
-#ifdef MMAPIO
 static int	ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 						 u_long *bus_addr,
 						 uint8_t **maddr);
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahd_linux_pci_dev_remove(struct pci_dev *pdev);
 
@@ -163,8 +161,8 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		bus_addr_t mask_39bit;
 
 		memsize = ahd_linux_get_memsize();
-		mask_64bit = (bus_addr_t)(0xFFFFFFFFFFFFFFFFULL&(bus_addr_t)~0);
-		mask_39bit = (bus_addr_t)(0x7FFFFFFFFFULL&(bus_addr_t)~0);
+		mask_64bit = (bus_addr_t)0xFFFFFFFFFFFFFFFFULL;
+		mask_39bit = (bus_addr_t)0x7FFFFFFFFFULL;
 		if (memsize >= 0x8000000000ULL
 	 	 && ahd_pci_set_dma_mask(pdev, mask_64bit) == 0) {
 			ahd->flags |= AHD_64BIT_ADDRESSING;
@@ -273,7 +271,6 @@ ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd, u_long *base,
 	return (0);
 }
 
-#ifdef MMAPIO
 static int
 ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 				 u_long *bus_addr,
@@ -321,7 +318,6 @@ ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 		error = ENOMEM;
 	return (error);
 }
-#endif
 
 int
 ahd_pci_map_registers(struct ahd_softc *ahd)
@@ -338,7 +334,6 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 	command &= ~(PCIM_CMD_PORTEN|PCIM_CMD_MEMEN);
 	base = 0;
 	maddr = NULL;
-#ifdef MMAPIO
 	error = ahd_linux_pci_reserve_mem_region(ahd, &base, &maddr);
 	if (error == 0) {
 		ahd->platform_data->mem_busaddr = base;
@@ -373,7 +368,6 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 		       ahd_get_pci_function(ahd->dev_softc),
 		       base);
 	}
-#endif
 
 	if (maddr == NULL) {
 		u_long	 base2;

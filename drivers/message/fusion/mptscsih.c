@@ -21,10 +21,10 @@
  *
  *      (see mptbase.c)
  *
- *  Copyright (c) 1999-2002 LSI Logic Corporation
+ *  Copyright (c) 1999-2003 LSI Logic Corporation
  *  Original author: Steven J. Ralston
  *  (mailto:sjralston1@netscape.net)
- *  (mailto:Pam.Delaney@lsil.com)
+ *  (mailto:mpt_linux_developer@lsil.com)
  *
  *  $Id: mptscsih.c,v 1.104 2002/12/03 21:26:34 pdelaney Exp $
  */
@@ -178,8 +178,11 @@ static int	mptscsih_writeSDP1(MPT_SCSI_HOST *hd, int portnum, int target, int fl
 static int	mptscsih_scandv_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r);
 static void	mptscsih_timer_expired(unsigned long data);
 static void	mptscsih_taskmgmt_timeout(unsigned long data);
+static void	mptscsih_schedule_reset(void *hd);
 static int	mptscsih_do_cmd(MPT_SCSI_HOST *hd, INTERNAL_CMD *iocmd);
 static int	mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, int portnum);
+
+static struct mpt_work_struct   mptscsih_rstTask;
 
 #ifndef MPTSCSIH_DISABLE_DOMAIN_VALIDATION
 static int	mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io);
@@ -1058,7 +1061,7 @@ mptscsih_flush_running_cmds(MPT_SCSI_HOST *hd)
 					    SCpnt->use_sg, scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
 			} else if (SCpnt->request_bufflen) {
 				scPrivate	*my_priv;
-		
+
 				my_priv = (scPrivate *) &SCpnt->SCp;
 				pci_unmap_single(hd->ioc->pcidev, (dma_addr_t)(ulong)my_priv->p1,
 					   SCpnt->request_bufflen,
@@ -2155,7 +2158,7 @@ int mptscsih_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t
 	MPT_SCSI_HOST	*hd = NULL;
 	int size = 0;
 
-	dprintk(("Called mptscsih_proc_info: hostno=%d, func=%d\n", hostno, func));
+	dprintk(("Called mptscsih_proc_info: hostno=%d, func=%d\n", host->host_no, func));
 	dprintk(("buffer %p, start=%p (%p) offset=%ld length = %d\n",
 			buffer, start, *start, offset, length));
 
@@ -2788,13 +2791,14 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	MPT_FRAME_HDR	*mf;
 	u32		 ctx2abort;
 	int		 scpnt_idx;
+	spinlock_t	*host_lock = SCpnt->device->host->host_lock;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
 	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL) {
 		SCpnt->result = DID_RESET << 16;
 		SCpnt->scsi_done(SCpnt);
-		nehprintk((KERN_WARNING MYNAM ": mptscsih_abort: "
+		dtmprintk((KERN_WARNING MYNAM ": mptscsih_abort: "
 			   "Can't locate host! (sc=%p)\n",
 			   SCpnt));
 		return FAILED;
@@ -2816,7 +2820,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 
 		SCpnt->result = DID_RESET << 16;
 		SCpnt->scsi_done(SCpnt);
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
+		dtmprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
 			   "Command not in the active list! (sc=%p)\n",
 			   hd->ioc->name, SCpnt));
 		return SUCCESS;
@@ -2827,13 +2831,16 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	 *  call to mptscsih_tm_pending_wait() will set the pending flag if we are
 	 *  successful.
 	 */
+	spin_unlock_irq(host_lock);
 	if (mptscsih_tm_pending_wait(hd) == FAILED){
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
+		dtmprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
 			   "Timed out waiting for previous TM to complete! "
 			   "(sc = %p)\n",
 			   hd->ioc->name, SCpnt));
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
+	spin_lock_irq(host_lock);
 
 	/* If this command is pended, then timeout/hang occurred
 	 * during DV. Post command and flush pending Q
@@ -2842,7 +2849,7 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	if ((mf = mptscsih_search_pendingQ(hd, scpnt_idx)) != NULL) {
 		mptscsih_put_msgframe(ScsiDoneCtx, hd->ioc->id, mf);
 		post_pendingQ_commands(hd);
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
+		dtmprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
 			   "Found command in pending queue! (sc=%p)\n",
 			   hd->ioc->name, SCpnt));
 	}
@@ -2858,8 +2865,10 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	ctx2abort = mf->u.frame.hwhdr.msgctxu.MsgContext;
 
 	hd->abortSCpnt = SCpnt;
+
+	spin_unlock_irq(host_lock);
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK,
-	                       SCpnt->device->id, SCpnt->device->lun, ctx2abort, NO_SLEEP)
+	                       SCpnt->device->id, SCpnt->device->lun, ctx2abort, CAN_SLEEP)
 		< 0) {
 
 		/* The TM request failed and the subsequent FW-reload failed!
@@ -2873,8 +2882,10 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 		hd->tmPending = 0;
 		hd->tmState = TM_STATE_NONE;
 
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
+	spin_lock_irq(host_lock);
 	return FAILED;
 
 }
@@ -2892,11 +2903,12 @@ int
 mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 {
 	MPT_SCSI_HOST	*hd;
+	spinlock_t	*host_lock = SCpnt->device->host->host_lock;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
 	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
-		nehprintk((KERN_WARNING MYNAM ": mptscsih_dev_reset: "
+		dtmprintk((KERN_WARNING MYNAM ": mptscsih_dev_reset: "
 			   "Can't locate host! (sc=%p)\n",
 			   SCpnt));
 		return FAILED;
@@ -2915,16 +2927,18 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 	 *  call to mptscsih_tm_pending_wait() will set the pending flag if we are
 	 *  successful.
 	 */
+	spin_unlock_irq(host_lock);
 	if (mptscsih_tm_pending_wait(hd) == FAILED) {
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_dev_reset: "
+		dtmprintk((KERN_WARNING MYNAM ": %s: mptscsih_dev_reset: "
 			   "Timed out waiting for previous TM to complete! "
 			   "(sc = %p)\n",
 			   hd->ioc->name, SCpnt));
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
 
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET,
-	                       SCpnt->device->id, 0, 0, NO_SLEEP)
+	                       SCpnt->device->id, 0, 0, CAN_SLEEP)
 		< 0){
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
@@ -2933,8 +2947,10 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 		 		hd->ioc->name, SCpnt);
 		hd->tmPending = 0;
 		hd->tmState = TM_STATE_NONE;
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
+	spin_lock_irq(host_lock);
 	return SUCCESS;
 
 }
@@ -2952,11 +2968,12 @@ int
 mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 {
 	MPT_SCSI_HOST	*hd;
+	spinlock_t	*host_lock = SCpnt->device->host->host_lock;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
 	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
-		nehprintk((KERN_WARNING MYNAM ": mptscsih_bus_reset: "
+		dtmprintk((KERN_WARNING MYNAM ": mptscsih_bus_reset: "
 			   "Can't locate host! (sc=%p)\n",
 			   SCpnt ) );
 		return FAILED;
@@ -2973,17 +2990,19 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 	 *  call to mptscsih_tm_pending_wait() will set the pending flag if we are
 	 *  successful.
 	 */
+	spin_unlock_irq(host_lock);
 	if (mptscsih_tm_pending_wait(hd) == FAILED) {
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_bus_reset: "
+		dtmprintk((KERN_WARNING MYNAM ": %s: mptscsih_bus_reset: "
 			   "Timed out waiting for previous TM to complete! "
 			   "(sc = %p)\n",
 			   hd->ioc->name, SCpnt));
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
 
 	/* We are now ready to execute the task management request. */
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS,
-	                       0, 0, 0, NO_SLEEP)
+	                       0, 0, 0, CAN_SLEEP)
 	    < 0){
 
 		/* The TM request failed and the subsequent FW-reload failed!
@@ -2994,9 +3013,10 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 		       hd->ioc->name, SCpnt);
 		hd->tmPending = 0;
 		hd->tmState = TM_STATE_NONE;
+		spin_lock_irq(host_lock);
 		return FAILED;
 	}
-
+	spin_lock_irq(host_lock);
 	return SUCCESS;
 }
 
@@ -3015,10 +3035,11 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 {
 	MPT_SCSI_HOST *  hd;
 	int              status = SUCCESS;
+	spinlock_t	*host_lock = SCpnt->device->host->host_lock;
 
 	/*  If we can't locate the host to reset, then we failed. */
 	if ((hd = (MPT_SCSI_HOST *) SCpnt->device->host->hostdata) == NULL){
-		nehprintk( ( KERN_WARNING MYNAM ": mptscsih_host_reset: "
+		dtmprintk( ( KERN_WARNING MYNAM ": mptscsih_host_reset: "
 			     "Can't locate host! (sc=%p)\n",
 			     SCpnt ) );
 		return FAILED;
@@ -3032,7 +3053,8 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 	/*  If our attempts to reset the host failed, then return a failed
 	 *  status.  The host will be taken off line by the SCSI mid-layer.
 	 */
-	if (mpt_HardResetHandler(hd->ioc, NO_SLEEP) < 0){
+	spin_unlock_irq(host_lock);
+	if (mpt_HardResetHandler(hd->ioc, CAN_SLEEP) < 0){
 		status = FAILED;
 	} else {
 		/*  Make sure TM pending is cleared and TM state is set to
@@ -3041,9 +3063,10 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 		hd->tmPending = 0;
 		hd->tmState = TM_STATE_NONE;
 	}
+	spin_lock_irq(host_lock);
 
 
-	nehprintk( ( KERN_WARNING MYNAM ": mptscsih_host_reset: "
+	dtmprintk( ( KERN_WARNING MYNAM ": mptscsih_host_reset: "
 		     "Status = %s\n",
 		     (status == SUCCESS) ? "SUCCESS" : "FAILED" ) );
 
@@ -3075,7 +3098,8 @@ mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd)
 			break;
 		}
 		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		mdelay(250);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ/4);
 	} while (--loop_count);
 
 	return status;
@@ -4716,13 +4740,30 @@ static void mptscsih_taskmgmt_timeout(unsigned long data)
 	/* Call the reset handler. Already had a TM request
 	 * timeout - so issue a diagnostic reset
 	 */
-	if (mpt_HardResetHandler(hd->ioc, NO_SLEEP) < 0) {
+	MPT_INIT_WORK(&mptscsih_rstTask, mptscsih_schedule_reset, (void *)hd);
+	SCHEDULE_TASK(&mptscsih_rstTask);
+	return;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*	mptscsih_schedule_reset - Call back for timeout on a
+ *	task management request.
+ *	@data: Pointer to MPT_SCSI_HOST recast as an unsigned long
+ *
+ */
+static void
+mptscsih_schedule_reset(void *arg)
+{
+        MPT_SCSI_HOST           *hd;
+        hd = (MPT_SCSI_HOST *) arg;
+
+	if (mpt_HardResetHandler(hd->ioc, CAN_SLEEP) < 0) {
 		printk((KERN_WARNING " Firmware Reload FAILED!!\n"));
 	} else {
 		/* Because we have reset the IOC, no TM requests can be
 		 * pending.  So let's make sure the tmPending flag is reset.
 		 */
-		nehprintk((KERN_WARNING MYNAM
+		dtmprintk((KERN_WARNING MYNAM
 			   ": %s: mptscsih_taskmgmt_timeout\n",
 			   hd->ioc->name));
 		hd->tmPending = 0;
@@ -6900,7 +6941,7 @@ static char setup_token[] __initdata =
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static int
-__init get_setup_token(char *p)
+get_setup_token(char *p)
 {
 	char *cur = setup_token;
 	char *pc;
@@ -6918,7 +6959,7 @@ __init get_setup_token(char *p)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static int
-__init mptscsih_setup(char *str)
+mptscsih_setup(char *str)
 {
 	char *cur = str;
 	char *pc, *pv;

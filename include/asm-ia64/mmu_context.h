@@ -95,12 +95,13 @@ delayed_tlb_flush (void)
 static inline mm_context_t
 get_mmu_context (struct mm_struct *mm)
 {
+	unsigned long flags;
 	mm_context_t context = mm->context;
 
 	if (context)
 		return context;
 
-	spin_lock(&ia64_ctx.lock);
+	spin_lock_irqsave(&ia64_ctx.lock, flags);
 	{
 		/* re-check, now that we've got the lock: */
 		context = mm->context;
@@ -110,7 +111,7 @@ get_mmu_context (struct mm_struct *mm)
 			mm->context = context = ia64_ctx.next++;
 		}
 	}
-	spin_unlock(&ia64_ctx.lock);
+	spin_unlock_irqrestore(&ia64_ctx.lock, flags);
 	return context;
 }
 

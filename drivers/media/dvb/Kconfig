@@ -45,5 +45,9 @@ comment "Supported FlexCopII (B2C2) Adapters"
 	depends on DVB_CORE && PCI
 source "drivers/media/dvb/b2c2/Kconfig"
 
+comment "Supported BT878 Adapters"
+	depends on DVB_CORE && PCI
+source "drivers/media/dvb/bt8xx/Kconfig"
+
 endmenu
 

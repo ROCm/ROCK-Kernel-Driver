@@ -276,6 +276,13 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
 					(unsigned long)(n),sizeof(*(ptr))))
 
+static inline __u32 cmpxchg4_locked(__u32 *ptr, __u32 old, __u32 new) 
+{
+	asm volatile("lock ; cmpxchgl %k1,%2" :
+		     "=r" (new) : "0" (old), "m" (*(__u32 *)ptr) : "memory");
+	return new; 
+}
+
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
@@ -314,7 +321,21 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define local_irq_disable() 	__asm__ __volatile__("cli": : :"memory")
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
-#define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
+
+/* Work around BIOS that don't have K8 Errata #93 fixed. */
+#define safe_halt()	      \
+	asm volatile("   sti\n"					\
+		     "1: hlt\n"						\
+		     "2:\n"							\
+		     ".section .fixup,\"ax\"\n"		\
+		     "3: call idle_warning\n"		\
+		     "   jmp 2b\n"					\
+		     ".previous\n"					\
+		     ".section __ex_table,\"a\"\n\t"	\
+		     ".align 8\n\t"					\
+		     ".quad 1b,3b\n"				\
+		     ".previous" ::: "memory")
+
 #define irqs_disabled()			\
 ({					\
 	unsigned long flags;		\

@@ -5312,11 +5312,13 @@
 		10b7 2000  3C998-T Dual Port 10/100/1000 PCI-X
 		10b7 3000  3C999-T Quad Port 10/100/1000 PCI-X
 		1166 1648  NetXtreme CIOB-E 1000Base-T
+	1649  NetXtreme BCM5704S Gigabit Ethernet
 	164d  NetXtreme BCM5702FE Gigabit Ethernet
 	1653  NetXtreme BCM5705 Gigabit Ethernet
 	1654  NetXtreme BCM5705 Gigabit Ethernet
 	165d  NetXtreme BCM5705M Gigabit Ethernet
 	165e  NetXtreme BCM5705M Gigabit Ethernet
+	166e  NetXtreme BCM5705F Gigabit Ethernet
 	1696  NetXtreme BCM5782 Gigabit Ethernet
 		14e4 000d  NetXtreme BCM5782 1000Base-T
 	169c  NetXtreme BCM5788 Gigabit Ethernet

@@ -1983,6 +1983,24 @@ int lock_may_write(struct inode *inode, loff_t start, unsigned long len)
 
 EXPORT_SYMBOL(lock_may_write);
 
+void steal_locks(fl_owner_t from)
+{
+	struct list_head *tmp;
+
+	if (from == current->files)
+		return;
+
+	lock_kernel();
+	list_for_each(tmp, &file_lock_list) {
+		struct file_lock *fl = list_entry(tmp, struct file_lock, fl_link);
+		if (fl->fl_owner == from)
+			fl->fl_owner = current->files;
+	}
+	unlock_kernel();
+}
+
+EXPORT_SYMBOL(steal_locks);
+
 static int __init filelock_init(void)
 {
 	filelock_cache = kmem_cache_create("file_lock_cache",

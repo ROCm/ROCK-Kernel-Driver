@@ -358,6 +358,15 @@ w83877f_wdt.c -- W83877F Computer
 
 	No bits set in GETSUPPORT
 
+w83627hf_wdt.c -- w83627hf watchdog
+
+	Timeout that defaults to 60 seconds, supports SETTIMEOUT.
+
+	Supports CONFIG_WATCHDOG_NOWAYOUT
+
+	GETSUPPORT returns WDIOF_KEEPALIVEPING and WDIOF_SETTIMEOUT.
+	The GETSTATUS call returns if the device is open or not.
+
 wdt.c -- ICS WDT500/501 ISA and
 wdt_pci.c -- ICS WDT500/501 PCI
 

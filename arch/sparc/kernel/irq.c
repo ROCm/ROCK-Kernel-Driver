@@ -102,7 +102,7 @@ struct irqaction *irq_action[NR_IRQS] = {
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction * action;
 	unsigned long flags;
 #ifdef CONFIG_SMP
@@ -114,7 +114,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		
 		return show_sun4d_interrupts(p, v);
 	}
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		local_irq_save(flags);
 	        action = *(i + irq_action);
 		if (!action) 

@@ -2,10 +2,6 @@
  * Handle the memory map.
  * The functions here do the job until bootmem takes over.
  * $Id: e820.c,v 1.4 2002/09/19 19:25:32 ak Exp $
-
- * AK: some of these functions are not used in 2.5 yet but they will be when
- * NUMA is completely merged.
-
  */
 #include <linux/config.h>
 #include <linux/kernel.h>

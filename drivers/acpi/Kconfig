@@ -251,12 +251,6 @@ config ACPI_SYSTEM
 	  This driver will enable your system to shut down using ACPI, and
 	  dump your ACPI DSDT table using /proc/acpi/dsdt.
 
-config ACPI_EFI
-	bool
-	depends on ACPI_INTERPRETER
-	depends on IA64
-	default y
-
 config ACPI_RELAXED_AML
 	bool "Relaxed AML"
 	depends on ACPI_INTERPRETER

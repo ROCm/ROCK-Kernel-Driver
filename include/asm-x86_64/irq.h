@@ -21,8 +21,23 @@
  * Since vectors 0x00-0x1f are used/reserved for the CPU,
  * the usable vector space is 0x20-0xff (224 vectors)
  */
+
+/*
+ * The maximum number of vectors supported by x86_64 processors
+ * is limited to 256. For processors other than x86_64, NR_VECTORS
+ * should be changed accordingly.
+ */
+#define NR_VECTORS 256
+
+#define FIRST_SYSTEM_VECTOR	0xef   /* duplicated in hw_irq.h */
+
+#ifdef CONFIG_PCI_USE_VECTOR
+#define NR_IRQS FIRST_SYSTEM_VECTOR
+#define NR_IRQ_VECTORS NR_IRQS
+#else
 #define NR_IRQS 224
 #define NR_IRQ_VECTORS NR_IRQS
+#endif
 
 static __inline__ int irq_canonicalize(int irq)
 {
@@ -32,6 +47,7 @@ static __inline__ int irq_canonicalize(int irq)
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
+extern int can_request_irq(unsigned int, unsigned long flags);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */

@@ -2678,7 +2678,7 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	return ret;
 }
 
-static void __devinit sv_remove(struct pci_dev *dev)
+static void __devexit sv_remove(struct pci_dev *dev)
 {
 	struct sv_state *s = pci_get_drvdata(dev);
 
@@ -2720,7 +2720,7 @@ static struct pci_driver sv_driver = {
        .name		= "sonicvibes",
        .id_table	= id_table,
        .probe		= sv_probe,
-       .remove		= sv_remove,
+       .remove		= __devexit_p(sv_remove),
 };
  
 static int __init init_sonicvibes(void)

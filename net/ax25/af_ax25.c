@@ -228,45 +228,26 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 	return NULL;
 }
 
-/*
- *	Look for any matching address - RAW sockets can bind to arbitrary names
- */
-struct sock *ax25_addr_match(ax25_address *addr)
+void ax25_send_to_raw(ax25_address *addr, struct sk_buff *skb, int proto)
 {
-	struct sock *sk = NULL;
 	ax25_cb *s;
+	struct sk_buff *copy;
 	struct hlist_node *node;
 
 	spin_lock_bh(&ax25_list_lock);
 	ax25_for_each(s, node, &ax25_list) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 &&
-		    s->sk->sk_type == SOCK_RAW) {
-			sk = s->sk;
-			lock_sock(sk);
-			break;
-		}
-	}
-
-	spin_unlock_bh(&ax25_list_lock);
-
-	return sk;
-}
-
-void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
-{
-	struct sk_buff *copy;
-	struct hlist_node *node;
-
-	sk_for_each_from(sk, node)
-		if (sk->sk_type == SOCK_RAW &&
-		    sk->sk_protocol == proto &&
-		    atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf) {
+		    s->sk->sk_type == SOCK_RAW &&
+		    s->sk->sk_protocol == proto &&
+		    s->ax25_dev->dev == skb->dev &&
+		    atomic_read(&s->sk->sk_rmem_alloc) <= s->sk->sk_rcvbuf) {
 			if ((copy = skb_clone(skb, GFP_ATOMIC)) == NULL)
-				return;
-
-			if (sock_queue_rcv_skb(sk, copy) != 0)
+				continue;
+			if (sock_queue_rcv_skb(s->sk, copy) != 0)
 				kfree_skb(copy);
 		}
+	}
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 /*
@@ -318,7 +299,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 				ax25_cb *sax25 = ax25_sk(skb->sk);
 
 				/* Queue the unaccepted socket for death */
-				sock_set_flag(skb->sk, SOCK_DEAD);
+				sock_orphan(skb->sk);
 
 				ax25_start_heartbeat(sax25);
 				sax25->state = AX25_STATE_0;
@@ -913,6 +894,7 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 	if (oax25->digipeat != NULL) {
 		if ((ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
 			sk_free(sk);
+			ax25_cb_put(ax25);
 			return NULL;
 		}
 
@@ -934,20 +916,25 @@ static int ax25_release(struct socket *sock)
 		return 0;
 
 	sock_hold(sk);
+	sock_orphan(sk);
 	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
 	if (sk->sk_type == SOCK_SEQPACKET) {
 		switch (ax25->state) {
 		case AX25_STATE_0:
+			release_sock(sk);
 			ax25_disconnect(ax25, 0);
+			lock_sock(sk);
 			ax25_destroy_socket(ax25);
 			break;
 
 		case AX25_STATE_1:
 		case AX25_STATE_2:
 			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+			release_sock(sk);
 			ax25_disconnect(ax25, 0);
+			lock_sock(sk);
 			ax25_destroy_socket(ax25);
 			break;
 
@@ -980,7 +967,6 @@ static int ax25_release(struct socket *sock)
 			sk->sk_state                = TCP_CLOSE;
 			sk->sk_shutdown            |= SEND_SHUTDOWN;
 			sk->sk_state_change(sk);
-			sock_set_flag(sk, SOCK_DEAD);
 			sock_set_flag(sk, SOCK_DESTROY);
 			break;
 
@@ -991,12 +977,10 @@ static int ax25_release(struct socket *sock)
 		sk->sk_state     = TCP_CLOSE;
 		sk->sk_shutdown |= SEND_SHUTDOWN;
 		sk->sk_state_change(sk);
-		sock_set_flag(sk, SOCK_DEAD);
 		ax25_destroy_socket(ax25);
 	}
 
 	sock->sk   = NULL;
-	sk->sk_socket = NULL;	/* Not used, but we should do this */
 	release_sock(sk);
 	sock_put(sk);
 
@@ -1334,11 +1318,13 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 
 		release_sock(sk);
 		current->state = TASK_INTERRUPTIBLE;
-		if (flags & O_NONBLOCK)
+		if (flags & O_NONBLOCK) {
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sk_sleep, &wait);
 			return -EWOULDBLOCK;
+		}
 		if (!signal_pending(tsk)) {
 			schedule();
-			current->state = TASK_RUNNING;
 			lock_sock(sk);
 			continue;
 		}
@@ -1633,16 +1619,16 @@ static int ax25_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (msg->msg_namelen != 0) {
 		struct sockaddr_ax25 *sax = (struct sockaddr_ax25 *)msg->msg_name;
 		ax25_digi digi;
-		ax25_address dest;
+		ax25_address src;
 
-		ax25_addr_parse(skb->mac.raw+1, skb->data-skb->mac.raw-1, NULL, &dest, &digi, NULL, NULL);
+		ax25_addr_parse(skb->mac.raw+1, skb->data-skb->mac.raw-1, &src, NULL, &digi, NULL, NULL);
 
 		sax->sax25_family = AF_AX25;
 		/* We set this correctly, even though we may not let the
 		   application know the digi calls further down (because it
 		   did NOT ask to know them).  This could get political... **/
 		sax->sax25_ndigis = digi.ndigi;
-		sax->sax25_call   = dest;
+		sax->sax25_call   = src;
 
 		if (sax->sax25_ndigis != 0) {
 			int ct;

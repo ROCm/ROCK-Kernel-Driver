@@ -5475,7 +5475,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	int this_cpu;
 	int ret;
 
-	this_cpu = smp_processor_id();
+	this_cpu = get_cpu();
 	min      = pfm_stats[this_cpu].pfm_ovfl_intr_cycles_min;
 	max      = pfm_stats[this_cpu].pfm_ovfl_intr_cycles_max;
 

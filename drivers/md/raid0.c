@@ -112,8 +112,18 @@ static int create_strip_zones (mddev_t *mddev)
 			goto abort;
 		}
 		zone->dev[j] = rdev1;
+
 		blk_queue_stack_limits(mddev->queue,
 				       rdev1->bdev->bd_disk->queue);
+		/* as we don't honour merge_bvec_fn, we must never risk
+		 * violating it, so limit ->max_sector to one PAGE, as
+		 * a one page request is never in violation.
+		 */
+
+		if (rdev1->bdev->bd_disk->queue->merge_bvec_fn &&
+		    mddev->queue->max_sectors > (PAGE_SIZE>>9))
+			mddev->queue->max_sectors = (PAGE_SIZE>>9);
+
 		if (!smallest || (rdev1->size <smallest->size))
 			smallest = rdev1;
 		cnt++;
@@ -300,6 +310,22 @@ static int raid0_run (mddev_t *mddev)
 		 */
 		conf->hash_spacing++;
 	}
+
+	/* calculate the max read-ahead size.
+	 * For read-ahead of large files to be effective, we need to
+	 * readahead at least a whole stripe. i.e. number of devices
+	 * multiplied by chunk size.
+	 * If an individual device has an ra_pages greater than the
+	 * chunk size, then we will not drive that device as hard as it
+	 * wants.  We consider this a configuration error: a larger
+	 * chunksize should be used in that case.
+	 */
+	{
+		int stripe = mddev->raid_disks * mddev->chunk_size / PAGE_CACHE_SIZE;
+		if (mddev->queue->backing_dev_info.ra_pages < stripe)
+			mddev->queue->backing_dev_info.ra_pages = stripe;
+	}
+
 
 	blk_queue_merge_bvec(mddev->queue, raid0_mergeable_bvec);
 	return 0;

@@ -33,7 +33,7 @@
  *
  * More state savers are welcome. Especially for the scsi layer...
  *
- * For TODOs,FIXMEs also look in Documentation/swsusp.txt
+ * For TODOs,FIXMEs also look in Documentation/power/swsusp.txt
  */
 
 #include <linux/module.h>

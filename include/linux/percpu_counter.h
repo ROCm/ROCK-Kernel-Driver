@@ -8,17 +8,14 @@
 #include <linux/spinlock.h>
 #include <linux/smp.h>
 #include <linux/threads.h>
+#include <linux/percpu.h>
 
 #ifdef CONFIG_SMP
-
-struct __percpu_counter {
-	long count;
-} ____cacheline_aligned;
 
 struct percpu_counter {
 	spinlock_t lock;
 	long count;
-	struct __percpu_counter counters[NR_CPUS];
+	long *counters;
 };
 
 #if NR_CPUS >= 16
@@ -29,12 +26,14 @@ struct percpu_counter {
 
 static inline void percpu_counter_init(struct percpu_counter *fbc)
 {
-	int i;
-
 	spin_lock_init(&fbc->lock);
 	fbc->count = 0;
-	for (i = 0; i < NR_CPUS; i++)
-		fbc->counters[i].count = 0;
+	fbc->counters = alloc_percpu(long);
+}
+
+static inline void percpu_counter_destroy(struct percpu_counter *fbc)
+{
+	free_percpu(fbc->counters);
 }
 
 void percpu_counter_mod(struct percpu_counter *fbc, long amount);
@@ -67,6 +66,10 @@ struct percpu_counter {
 static inline void percpu_counter_init(struct percpu_counter *fbc)
 {
 	fbc->count = 0;
+}
+
+static inline void percpu_counter_destroy(struct percpu_counter *fbc)
+{
 }
 
 static inline void

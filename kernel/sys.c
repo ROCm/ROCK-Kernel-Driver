@@ -1323,8 +1323,6 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
  * either stopped or zombied.  In the zombied case the task won't get
  * reaped till shortly after the call to getrusage(), in both cases the
  * task being examined is in a frozen state so the counters won't change.
- *
- * FIXME! Get the fault counts properly!
  */
 int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 {

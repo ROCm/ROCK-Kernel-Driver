@@ -779,6 +779,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 {
 	char * name;
 	int i, ch, retval;
+	struct files_struct *files;
 
 	/*
 	 * Make sure we have a private signal table and that
@@ -789,15 +790,26 @@ int flush_old_exec(struct linux_binprm * bprm)
 		goto out;
 
 	/*
+	 * Make sure we have private file handles. Ask the
+	 * fork helper to do the work for us and the exit
+	 * helper to do the cleanup of the old one.
+	 */
+	files = current->files;		/* refcounted so safe to hold */
+	retval = unshare_files();
+	if (retval)
+		goto out;
+	/*
 	 * Release all of the old mmap stuff
 	 */
 	retval = exec_mmap(bprm->mm);
 	if (retval)
-		goto out;
+		goto mmap_failed;
 
 	bprm->mm = NULL;		/* We're using it now */
 
 	/* This is the point of no return */
+	steal_locks(files);
+	put_files_struct(files);
 
 	current->sas_ss_sp = current->sas_ss_size = 0;
 
@@ -830,6 +842,9 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	return 0;
 
+mmap_failed:
+	put_files_struct(current->files);
+	current->files = files;
 out:
 	return retval;
 }
@@ -1070,6 +1085,7 @@ int do_execve(char * filename,
 	struct linux_binprm bprm;
 	struct file *file;
 	int retval;
+	int i;
 
 	sched_balance_exec();
 
@@ -1138,7 +1154,11 @@ int do_execve(char * filename,
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	free_arg_pages(&bprm);
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
 
 	if (bprm.security)
 		security_bprm_free(&bprm);

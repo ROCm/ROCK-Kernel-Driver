@@ -74,7 +74,7 @@ config CPU_FREQ_24_API
 	help
 	  This enables the /proc/sys/cpu/ sysctl interface for controlling
 	  the CPUFreq,"userspace" governor. This is the same interface
-	  as known from the.4.-kernel patches for CPUFreq, and offers
+	  as known from the 2.4.-kernel patches for CPUFreq, and offers
 	  the same functionality as long as "userspace" is the
 	  selected governor for the specified CPU.
 	

@@ -36,6 +36,7 @@ static void delay_none(unsigned long loops)
 
 /* tsc timer_opts struct */
 struct timer_opts timer_none = {
+	.name = 	"none",
 	.init =		init_none, 
 	.mark_offset =	mark_offset_none, 
 	.get_offset =	get_offset_none,

@@ -152,6 +152,19 @@ static int __init idle_setup (char *str)
 
 __setup("idle=", idle_setup);
 
+void idle_warning(void) 
+{ 
+	static int warned;
+	if (warned)
+		return; 
+	warned = 1;
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) 
+		BUG();
+	printk(KERN_ERR "******* Your BIOS seems to not contain a fix for K8 errata #93\n"); 
+	printk(KERN_ERR "******* Working around it, but it will cost you a lot of power\n");
+	printk(KERN_ERR "******* Please consider a BIOS update.\n");
+	printk(KERN_ERR "******* Disabling USB legacy in the BIOS may also help.\n");
+} 
 
 /* Prints also some state that isn't saved in the pt_regs */ 
 void __show_regs(struct pt_regs * regs)

@@ -8,7 +8,7 @@
 #define R14 8
 #define R13 16
 #define R12 24
-#define RBP 36
+#define RBP 32
 #define RBX 40
 /* arguments: interrupts/non tracing syscalls only save upto here*/
 #define R11 48

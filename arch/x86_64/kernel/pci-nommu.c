@@ -4,6 +4,8 @@
 #include <linux/string.h>
 #include <asm/proto.h>
 
+int iommu_merge = 0;
+
 /* 
  * Dummy IO MMU functions
  */

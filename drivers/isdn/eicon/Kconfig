@@ -13,7 +13,7 @@ config ISDN_DRV_EICON
 choice
 	prompt "Eicon active card support"
 	optional
-	depends on ISDN_DRV_EICON && ISDN
+	depends on ISDN_DRV_EICON && ISDN && m
 
 config ISDN_DRV_EICON_DIVAS
 	tristate "Eicon driver"

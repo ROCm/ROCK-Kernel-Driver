@@ -59,7 +59,7 @@ static int rtc32_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
 		return ret; 
 
 	case RTC_IRQP_SET32: 
-		cmd = RTC_EPOCH_SET; 
+		cmd = RTC_IRQP_SET; 
 		break; 
 
 	case RTC_EPOCH_READ32:

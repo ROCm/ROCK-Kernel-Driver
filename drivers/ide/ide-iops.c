@@ -647,6 +647,15 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, u8 good, u8 b
 		timeout += jiffies;
 		while ((stat = hwif->INB(IDE_STATUS_REG)) & BUSY_STAT) {
 			if (time_after(jiffies, timeout)) {
+				/*
+				 * One last read after the timeout in case
+				 * heavy interrupt load made us not make any
+				 * progress during the timeout..
+				 */
+				stat = hwif->INB(IDE_STATUS_REG);
+				if (!(stat & BUSY_STAT))
+					break;
+
 				local_irq_restore(flags);
 				*startstop = DRIVER(drive)->error(drive, "status timeout", stat);
 				return 1;

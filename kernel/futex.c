@@ -246,7 +246,7 @@ static inline void get_key_refs(union futex_key *key)
  * Drop a reference to the resource addressed by a key.
  * The hash bucket spinlock must not be held.
  */
-static inline void drop_key_refs(union futex_key *key)
+static void drop_key_refs(union futex_key *key)
 {
 	if (key->both.ptr != 0) {
 		if (key->both.offset & 1)
@@ -260,7 +260,7 @@ static inline void drop_key_refs(union futex_key *key)
  * The hash bucket lock must be held when this is called.
  * Afterwards, the futex_q must not be accessed.
  */
-static inline void wake_futex(struct futex_q *q)
+static void wake_futex(struct futex_q *q)
 {
 	list_del_init(&q->list);
 	if (q->filp)
@@ -384,7 +384,7 @@ out:
  */
 
 /* The key must be already stored in q->key. */
-static inline void queue_me(struct futex_q *q, int fd, struct file *filp)
+static void queue_me(struct futex_q *q, int fd, struct file *filp)
 {
 	struct futex_hash_bucket *bh;
 

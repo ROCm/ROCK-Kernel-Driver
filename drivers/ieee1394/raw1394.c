@@ -128,7 +128,7 @@ static void free_pending_request(struct pending_request *req)
         } else if (req->free_data) {
                 kfree(req->data);
         }
-        free_hpsb_packet(req->packet);
+        hpsb_free_packet(req->packet);
         kfree(req);
 }
 
@@ -558,7 +558,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                                 lh = lh->next;
                         }
                         hi = list_entry(lh, struct host_info, list);
-                        hpsb_ref_host(hi->host); // XXX Need to handle failure case
+			get_device(&hi->host->device); // XXX Need to handle failure case
                         list_add_tail(&fi->list, &hi->file_info_list);
                         fi->host = hi->host;
                         fi->state = connected;
@@ -782,7 +782,7 @@ static int handle_async_request(struct file_info *fi,
 
 	packet->generation = req->req.generation;
 
-        if (!hpsb_send_packet(packet)) {
+        if (hpsb_send_packet(packet) < 0) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;
                 req->req.length = 0;
                 hpsb_free_tlabel(packet);
@@ -823,7 +823,7 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
 	/* Update the generation of the packet just before sending. */
 	packet->generation = req->req.generation;
 
-        if (!hpsb_send_packet(packet)) {
+        if (hpsb_send_packet(packet) < 0) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;
                 queue_complete_req(req);
         }
@@ -846,7 +846,7 @@ static int handle_async_send(struct file_info *fi, struct pending_request *req)
                 return sizeof(struct raw1394_request);
         } 
 
-        packet = alloc_hpsb_packet(req->req.length-header_length);
+        packet = hpsb_alloc_packet(req->req.length-header_length);
         req->packet = packet;
         if (!packet) return -ENOMEM;
 
@@ -885,7 +885,7 @@ static int handle_async_send(struct file_info *fi, struct pending_request *req)
         /* Update the generation of the packet just before sending. */
         packet->generation = req->req.generation;
 
-        if (!hpsb_send_packet(packet)) {
+        if (hpsb_send_packet(packet) < 0) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;
                 queue_complete_req(req);
         }
@@ -1797,6 +1797,106 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
         return sizeof(struct raw1394_request);
 }
 
+/* Copy data from ARM buffer(s) to user buffer. */
+static int arm_get_buf(struct file_info *fi, struct pending_request *req)
+{
+	struct arm_addr  *arm_addr = NULL;
+	unsigned long flags;
+	unsigned long offset;
+
+	struct list_head *entry;
+
+	DBGMSG("arm_get_buf "
+	       "addr(Offset): %04X %08X length: %u",
+	       (u32) ((req->req.address >> 32) & 0xFFFF),
+	       (u32) (req->req.address & 0xFFFFFFFF),
+	       (u32) req->req.length);
+
+	spin_lock_irqsave(&host_info_lock, flags);
+	entry = fi->addr_list.next;
+	while (entry != &(fi->addr_list)) {
+		arm_addr = list_entry(entry, struct arm_addr, addr_list);
+		if ((arm_addr->start <= req->req.address) &&
+		    (arm_addr->end > req->req.address)) {
+			if (req->req.address + req->req.length <= arm_addr->end) {
+				offset = req->req.address - arm_addr->start;
+
+				DBGMSG("arm_get_buf copy_to_user( %08X, %08X, %u )",
+				       (u32) req->req.recvb,
+				       (u32) (arm_addr->addr_space_buffer+offset),
+				       (u32) req->req.length);
+
+				if (copy_to_user(int2ptr(req->req.recvb), arm_addr->addr_space_buffer+offset, req->req.length)) {
+					spin_unlock_irqrestore(&host_info_lock, flags);
+					return (-EFAULT);
+				}
+
+				spin_unlock_irqrestore(&host_info_lock, flags);
+				free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+				return sizeof(struct raw1394_request);
+			} else {
+				DBGMSG("arm_get_buf request exceeded mapping");
+				spin_unlock_irqrestore(&host_info_lock, flags);
+				return (-EINVAL);
+			}
+		}
+		entry = entry->next;
+	}
+	spin_unlock_irqrestore(&host_info_lock, flags);
+	return (-EINVAL);
+}
+
+
+/* Copy data from user buffer to ARM buffer(s). */
+static int arm_set_buf(struct file_info *fi, struct pending_request *req)
+{
+	struct arm_addr  *arm_addr = NULL;
+	unsigned long flags;
+	unsigned long offset;
+
+	struct list_head *entry;
+
+	DBGMSG("arm_set_buf "
+	       "addr(Offset): %04X %08X length: %u",
+	       (u32) ((req->req.address >> 32) & 0xFFFF),
+	       (u32) (req->req.address & 0xFFFFFFFF),
+	       (u32) req->req.length);
+
+
+	spin_lock_irqsave(&host_info_lock, flags);
+	entry = fi->addr_list.next;
+	while (entry != &(fi->addr_list)) {
+		arm_addr = list_entry(entry, struct arm_addr, addr_list);
+		if ((arm_addr->start <= req->req.address) &&
+		    (arm_addr->end > req->req.address)) {
+			if (req->req.address + req->req.length <= arm_addr->end) {
+				offset = req->req.address - arm_addr->start;
+
+				DBGMSG("arm_set_buf copy_from_user( %08X, %08X, %u )",
+				       (u32) (arm_addr->addr_space_buffer+offset),
+				       (u32) req->req.sendb,
+				       (u32) req->req.length);
+
+				if (copy_from_user(arm_addr->addr_space_buffer+offset, int2ptr(req->req.sendb), req->req.length)) {
+					spin_unlock_irqrestore(&host_info_lock, flags);
+					return (-EFAULT);
+				}
+
+				spin_unlock_irqrestore(&host_info_lock, flags);
+				free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+				return sizeof(struct raw1394_request);
+			} else {
+				DBGMSG("arm_set_buf request exceeded mapping");
+				spin_unlock_irqrestore(&host_info_lock, flags);
+				return (-EINVAL);
+			}
+		}
+		entry = entry->next;
+	}
+	spin_unlock_irqrestore(&host_info_lock, flags);
+	return (-EINVAL);
+}
+
 static int reset_notification(struct file_info *fi, struct pending_request *req)
 {
         DBGMSG("reset_notification called - switch %s ",
@@ -1829,9 +1929,8 @@ static int write_phypacket(struct file_info *fi, struct pending_request *req)
         spin_unlock_irq(&fi->reqlists_lock);
         packet->generation = req->req.generation;
         retval = hpsb_send_packet(packet);
-        DBGMSG("write_phypacket send_packet called => retval: %d ",
-                retval);
-        if (! retval) {
+        DBGMSG("write_phypacket send_packet called => retval: %d ", retval);
+        if (retval < 0) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;
                 req->req.length = 0;
                 queue_complete_req(req);
@@ -1911,6 +2010,12 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
 
         case RAW1394_REQ_ARM_UNREGISTER:
                 return arm_unregister(fi, req);
+
+        case RAW1394_REQ_ARM_SET_BUF:
+                return arm_set_buf(fi, req);
+
+        case RAW1394_REQ_ARM_GET_BUF:
+                return arm_get_buf(fi, req);
 
         case RAW1394_REQ_RESET_NOTIFY:
                 return reset_notification(fi, req);
@@ -2137,6 +2242,7 @@ static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
 					    stat.config.data_buf_size,
 					    stat.config.buf_packets,
 					    stat.config.channel,
+ 					    stat.config.dma_mode,
 					    stat.config.irq_interval,
 					    rawiso_activity_cb);
 	if (!fi->iso_handle)
@@ -2489,7 +2595,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 list_del(&fi->list);
                 spin_unlock_irq(&host_info_lock);
 
-                hpsb_unref_host(fi->host);
+		put_device(&fi->host->device);
         }
 
         kfree(fi);
