@@ -25,8 +25,7 @@
 
     Chip	#vin	#fanin	#pwm	#temp	wchipid	vendid	i2c	ISA
     as99127f	7	3	1?	3	0x31	0x12c3	yes	no
-    as99127f rev.2 (type_name = 1299127f)	0x31	0x5ca3	yes	no
-    asb100 "bach" (type_name = as99127f)	0x31	0x0694	yes	no
+    as99127f rev.2 (type_name = as99127f)	0x31	0x5ca3	yes	no
     w83781d	7	3	0	3	0x10-1	0x5ca3	yes	yes
     w83627hf	9	3	2	3	0x21	0x5ca3	yes	yes(LPC)
     w83627thf	9	3	2	3	0x90	0x5ca3	no	yes(LPC)
@@ -1194,10 +1193,8 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		val2 = w83781d_read_value(new_client, W83781D_REG_CHIPMAN);
 		/* Check for Winbond or Asus ID if in bank 0 */
 		if ((!(val1 & 0x07)) &&
-		    (((!(val1 & 0x80)) && (val2 != 0xa3) && (val2 != 0xc3)
-		      && (val2 != 0x94))
-		     || ((val1 & 0x80) && (val2 != 0x5c) && (val2 != 0x12)
-			 && (val2 != 0x06)))) {
+		    (((!(val1 & 0x80)) && (val2 != 0xa3) && (val2 != 0xc3))
+		     || ((val1 & 0x80) && (val2 != 0x5c) && (val2 != 0x12)))) {
 			err = -ENODEV;
 			goto ERROR2;
 		}
@@ -1226,7 +1223,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		val2 = w83781d_read_value(new_client, W83781D_REG_CHIPMAN);
 		if (val2 == 0x5c)
 			vendid = winbond;
-		else if ((val2 == 0x12) || (val2 == 0x06))
+		else if (val2 == 0x12)
 			vendid = asus;
 		else {
 			err = -ENODEV;
