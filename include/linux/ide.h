@@ -530,6 +530,7 @@ typedef struct ide_drive_s {
 	byte		acoustic;	/* acoustic management */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
+	struct list_head list;
 } ide_drive_t;
 
 /*
@@ -917,6 +918,7 @@ typedef struct ide_driver_s {
 	int		(*reinit)(ide_drive_t *);
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
+	struct list_head drives;
 } ide_driver_t;
 
 #define DRIVER(drive)		((drive)->driver)

@@ -566,6 +566,7 @@ static ide_driver_t idescsi_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			NULL,
+	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
 int idescsi_init (void);

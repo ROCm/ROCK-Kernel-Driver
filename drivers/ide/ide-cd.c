@@ -3083,6 +3083,7 @@ static ide_driver_t ide_cdrom_driver = {
 	reinit:			ide_cdrom_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
+	drives:			LIST_HEAD_INIT(ide_cdrom_driver.drives),
 };
 
 static ide_module_t ide_cdrom_module = {

@@ -277,6 +277,7 @@ static void init_hwif_data (unsigned int index)
 		drive->name[2]			= 'a' + (index * MAX_DRIVES) + unit;
 		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
 		init_waitqueue_head(&drive->wqueue);
+		INIT_LIST_HEAD(&drive->list);
 	}
 }
 
@@ -2002,6 +2003,12 @@ void ide_unregister (unsigned int index)
 			goto abort;
 	}
 	hwif->present = 0;
+	spin_lock(&ata_drives_lock);
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		drive = &hwif->drives[unit];
+		list_del_init(&drive->list);
+	}
+	spin_unlock(&ata_drives_lock);
 	
 	/*
 	 * All clear?  Then blow away the buffer cache
@@ -3561,6 +3568,10 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	drive->driver = driver;
 	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_lock(&ata_drives_lock);
+	list_del(&drive->list);		/* will die */
+	list_add(&drive->list, &driver->drives);
+	spin_unlock(&ata_drives_lock);
 	if (drive->autotune != 2) {
 		if (!driver->supports_dma && HWIF(drive)->dmaproc != NULL)
 			(void) (HWIF(drive)->dmaproc(ide_dma_off_quietly, drive));
@@ -3575,6 +3586,11 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 #endif
 	return 0;
 }
+
+LIST_HEAD(ata_unused);
+spinlock_t ata_drives_lock = SPIN_LOCK_UNLOCKED;
+EXPORT_SYMBOL(ata_unused);	/* temporary export */
+EXPORT_SYMBOL(ata_drives_lock);	/* temporary export */
 
 int ide_unregister_subdriver (ide_drive_t *drive)
 {
@@ -3596,6 +3612,10 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	auto_remove_settings(drive);
 	drive->driver = NULL;
 	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_lock(&ata_drives_lock);
+	list_del(&drive->list);
+	list_add(&drive->list, &ata_unused);
+	spin_unlock(&ata_drives_lock);
 	return 0;
 }
 

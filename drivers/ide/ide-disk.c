@@ -1671,6 +1671,7 @@ static ide_driver_t idedisk_driver = {
 	reinit:			idedisk_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
+	drives:			LIST_HEAD_INIT(idedisk_driver.drives),
 };
 
 static ide_module_t idedisk_module = {

@@ -6344,6 +6344,7 @@ static ide_driver_t idetape_driver = {
 	reinit:			idetape_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
+	drives:			LIST_HEAD_INIT(idetape_driver.drives),
 };
 
 static ide_module_t idetape_module = {

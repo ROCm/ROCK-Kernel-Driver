@@ -2182,6 +2182,7 @@ static ide_driver_t idefloppy_driver = {
 	reinit:			idefloppy_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
+	drives:			LIST_HEAD_INIT(idefloppy_driver.drives),
 };
 
 static ide_module_t idefloppy_module = {
