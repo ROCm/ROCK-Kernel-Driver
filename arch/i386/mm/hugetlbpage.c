@@ -404,25 +404,10 @@ try_again:
 		goto freeinode;
 	}
 
-	spin_lock(&mm->page_table_lock);
-	do {
-		pte_t *pte = huge_pte_alloc(mm, addr);
-		if ((pte) && (pte_none(*pte))) {
-			idx = (addr - vma->vm_start) >> HPAGE_SHIFT;
-			page = find_get_page(mapping, idx);
-			if (page == NULL) {
-				page = alloc_hugetlb_page();
-				if (page == NULL)
-					goto out;
-				add_to_page_cache(page, mapping, idx);
-			}
-			set_huge_pte(mm, vma, page, pte,
-				     (vma->vm_flags & VM_WRITE));
-		} else
-			goto out;
-		addr += HPAGE_SIZE;
-	} while (addr < vma->vm_end);
-	retval = 0;
+	retval = hugetlb_prefault(mapping, vma);
+	if (retval)
+		goto out;
+
 	vma->vm_flags |= (VM_HUGETLB | VM_RESERVED);
 	vma->vm_ops = &hugetlb_vm_ops;
 	spin_unlock(&mm->page_table_lock);
@@ -455,6 +440,46 @@ freeinode:
 		 kfree(inode);
 	 }
 	 return retval;
+}
+
+int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = current->mm;
+	unsigned long addr;
+	int ret = 0;
+
+	BUG_ON(vma->vm_start & ~HPAGE_MASK);
+	BUG_ON(vma->vm_end & ~HPAGE_MASK);
+
+	spin_lock(&mm->page_table_lock);
+	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
+		unsigned long idx;
+		pte_t *pte = huge_pte_alloc(mm, addr);
+		struct page *page;
+
+		if (!pte) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		if (!pte_none(*pte))
+			continue;
+
+		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+		page = find_get_page(mapping, idx);
+		if (!page) {
+			page = alloc_hugetlb_page();
+			if (!page) {
+				ret = -ENOMEM;
+				goto out;
+			}
+			add_to_page_cache(page, mapping, idx);
+		}
+		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+	}
+out:
+	spin_unlock(&mm->page_table_lock);
+	return ret;
 }
 
 static int

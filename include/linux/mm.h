@@ -381,7 +381,7 @@ int __set_page_dirty_nobuffers(struct page *page);
 extern int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
 extern int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
 extern	int free_hugepages(struct vm_area_struct *);
-
+extern int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 #else
 #define is_vm_hugetlb_page(vma) (0)
 #define follow_hugetlb_page(mm, vma, pages, vmas, start, len, i) (0)
