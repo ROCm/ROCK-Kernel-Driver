@@ -18,7 +18,6 @@
 #include <linux/stringify.h>
 
 #include <asm/module.h>
-#include <asm/uaccess.h> /* For struct exception_table_entry */
 
 /* Not Yet Implemented */
 #define MODULE_AUTHOR(name)
@@ -51,6 +50,8 @@ extern int init_module(void);
 extern void cleanup_module(void);
 
 /* Archs provide a method of finding the correct exception table. */
+struct exception_table_entry;
+
 const struct exception_table_entry *
 search_extable(const struct exception_table_entry *first,
 	       const struct exception_table_entry *last,
@@ -113,15 +114,6 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 
 /* Given an address, look for it in the exception tables */
 const struct exception_table_entry *search_exception_tables(unsigned long add);
-
-struct exception_table
-{
-	struct list_head list;
-
-	unsigned int num_entries;
-	const struct exception_table_entry *entry;
-};
-
 
 #ifdef CONFIG_MODULES
 
@@ -197,8 +189,9 @@ struct module
 	unsigned int num_gpl_syms;
 	const unsigned long *gpl_crcs;
 
-	/* Exception tables */
-	struct exception_table extable;
+	/* Exception table */
+	unsigned int num_exentries;
+	const struct exception_table_entry *extable;
 
 	/* Startup function. */
 	int (*init)(void);

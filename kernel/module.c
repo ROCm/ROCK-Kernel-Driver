@@ -52,13 +52,12 @@
 #define symbol_is(literal, string)				\
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
 
-/* Protects extables and symbols lists */
+/* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
 /* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
 static LIST_HEAD(modules);
-static LIST_HEAD(extables);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -883,7 +882,6 @@ static void free_module(struct module *mod)
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
-	list_del(&mod->extable.list);
 	spin_unlock_irq(&modlist_lock);
 
 	/* Module unload stuff */
@@ -1268,14 +1266,9 @@ static struct module *load_module(void *umod,
 	}
 #endif
 
-	/* Set up exception table */
-	if (exindex) {
-		/* FIXME: Sort exception table. */
-		mod->extable.num_entries = (sechdrs[exindex].sh_size
-					    / sizeof(struct
-						     exception_table_entry));
-		mod->extable.entry = (void *)sechdrs[exindex].sh_addr;
-	}
+  	/* Set up exception table */
+	mod->num_exentries = sechdrs[exindex].sh_size / sizeof(*mod->extable);
+	mod->extable = (void *)sechdrs[exindex].sh_addr;
 
 	/* Now do relocations. */
 	for (i = 1; i < hdr->e_shnum; i++) {
@@ -1374,7 +1367,6 @@ sys_init_module(void *umod,
 	/* Now sew it into the lists.  They won't access us, since
            strong_try_module_get() will fail. */
 	spin_lock_irq(&modlist_lock);
-	list_add(&mod->extable.list, &extables);
 	list_add(&mod->list, &modules);
 	spin_unlock_irq(&modlist_lock);
 
@@ -1539,14 +1531,16 @@ const struct exception_table_entry *search_module_extables(unsigned long addr)
 {
 	unsigned long flags;
 	const struct exception_table_entry *e = NULL;
-	struct exception_table *i;
+	struct module *mod;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	list_for_each_entry(i, &extables, list) {
-		if (i->num_entries == 0)
+	list_for_each_entry(mod, &modules, list) {
+		if (mod->num_exentries == 0)
 			continue;
 				
-		e = search_extable(i->entry, i->entry+i->num_entries-1, addr);
+		e = search_extable(mod->extable,
+				   mod->extable + mod->num_exentries - 1,
+				   addr);
 		if (e)
 			break;
 	}
