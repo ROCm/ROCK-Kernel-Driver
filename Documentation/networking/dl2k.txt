@@ -1,7 +1,7 @@
 
     D-Link DL2000-based Gigabit Ethernet Adapter Installation
     for Linux
-    Jan 02, 2002
+    Jan 29, 2002
 
 Contents
 ========
@@ -199,8 +199,8 @@ media=media_type		- Specifies the media type the NIC operates at.
 				  6          	1000Mbps full duplex.
 
 				  By default, the NIC operates at autosense.
-				  Note that only 1000mbps_fd and 1000mbps_hd
-				  types are available for fiber adapter.
+				  1000mbps_fd and 1000mbps_hd types are only
+				  available for fiber adapter.
 
 vlan=[0|1]			- Specifies the VLAN ID. If vlan=0, the
 				  Virtual Local Area Network (VLAN) function is

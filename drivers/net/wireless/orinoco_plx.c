@@ -267,21 +267,28 @@ static void __devexit orinoco_plx_remove_one(struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 }
 
-
 static struct pci_device_id orinoco_plx_pci_id_table[] __devinitdata = {
-	{0x1638, 0x1100, PCI_ANY_ID, PCI_ANY_ID,},
+	{0x1385, 0x4100, PCI_ANY_ID, PCI_ANY_ID,},	/* Netgear MA301 */
+#if 0
+	{0x15e8, 0x0130, PCI_ANY_ID, PCI_ANY_ID,},	/* Correga */
+#endif
+	{0x1638, 0x1100, PCI_ANY_ID, PCI_ANY_ID,},	/* SMC EZConnect SMC2602W,
+							   Eumitcom PCI WL11000,
+							   Addtron AWA-100*/
+	{0x16ab, 0x1100, PCI_ANY_ID, PCI_ANY_ID,},	/* Global Sun Tech GL24110P */
+	{0x16ab, 0x1101, PCI_ANY_ID, PCI_ANY_ID,},	/* Reported working, but unknown */
+	{0x16ab, 0x1102, PCI_ANY_ID, PCI_ANY_ID,},	/* Linksys WDT11 */
+	{0x16ec, 0x3685, PCI_ANY_ID, PCI_ANY_ID,},	/* USR 2415 */
+	{0xec80, 0xec00, PCI_ANY_ID, PCI_ANY_ID,}, 	/* Belkin F5D6000 */
 	{0,},
 };
-
 MODULE_DEVICE_TABLE(pci, orinoco_plx_pci_id_table);
 
 static struct pci_driver orinoco_plx_driver = {
-	name:"orinoco_plx",
-	id_table:orinoco_plx_pci_id_table,
-	probe:orinoco_plx_init_one,
-	remove:__devexit_p(orinoco_plx_remove_one),
-	suspend:0,
-	resume:0
+	name:		"orinoco_plx",
+	id_table:	orinoco_plx_pci_id_table,
+	probe:		orinoco_plx_init_one,
+	remove:		__devexit_p(orinoco_plx_remove_one),
 };
 
 static int __init orinoco_plx_init(void)
