@@ -406,6 +406,7 @@ void esp6_destroy(struct xfrm_state *x)
 		kfree(esp->auth.work_icv);
 		esp->auth.work_icv = NULL;
 	}
+	kfree(esp);
 }
 
 int esp6_init_state(struct xfrm_state *x, void *args)

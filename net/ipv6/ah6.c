@@ -313,6 +313,7 @@ static void ah6_destroy(struct xfrm_state *x)
 		crypto_free_tfm(ahp->tfm);
 		ahp->tfm = NULL;
 	}
+	kfree(ahp);
 }
 
 static struct xfrm_type ah6_type =

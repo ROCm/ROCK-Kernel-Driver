@@ -452,6 +452,7 @@ void esp_destroy(struct xfrm_state *x)
 		kfree(esp->auth.work_icv);
 		esp->auth.work_icv = NULL;
 	}
+	kfree(esp);
 }
 
 int esp_init_state(struct xfrm_state *x, void *args)
