@@ -1207,6 +1207,10 @@ static int filemap_populate(struct vm_area_struct *vma,
 	struct page *page;
 	int err;
 
+	if (!nonblock)
+		do_page_cache_readahead(mapping, vma->vm_file,
+					pgoff, len >> PAGE_CACHE_SHIFT);
+
 repeat:
 	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	if (pgoff + (len >> PAGE_CACHE_SHIFT) > size)
