@@ -1085,6 +1085,8 @@ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
 		d->state = BT_CONNECTED;
 		d->state_change(d, 0);
 		rfcomm_dlc_unlock(d);
+
+		rfcomm_send_msc(s, 1, dlci, d->v24_sig);
 	} else {
 		rfcomm_send_dm(s, dlci);
 	}
