@@ -279,7 +279,8 @@ setup_memory(void *kernel_end)
 				       initrd_end,
 				       phys_to_virt(PFN_PHYS(max_low_pfn)));
 		} else {
-			reserve_bootmem_node(NODE_DATA(KVADDR_TO_NID(initrd_start)),
+			nid = NODE_DATA(kvaddr_to_nid(initrd_start));
+			reserve_bootmem_node(nid,
 					     virt_to_phys((void *)initrd_start),
 					     INITRD_SIZE);
 		}
@@ -349,8 +350,8 @@ void __init mem_init(void)
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
 	printk("Memory: %luk/%luk available (%luk kernel code, %luk reserved, "
-		"%luk data, %luk init)\n",
-	       nr_free_pages() << (PAGE_SHIFT-10),
+	       "%luk data, %luk init)\n",
+	       (unsigned long)nr_free_pages() << (PAGE_SHIFT-10),
 	       num_physpages << (PAGE_SHIFT-10),
 	       codesize >> 10,
 	       reservedpages << (PAGE_SHIFT-10),
