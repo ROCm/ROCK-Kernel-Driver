@@ -64,12 +64,14 @@ struct stinger {
  * Stinger. It updates the data accordingly.
  */
 
-static void stinger_process_packet(struct stinger *stinger)
+static void stinger_process_packet(struct stinger *stinger, struct pt_regs *regs)
 {
 	struct input_dev *dev = &stinger->dev;
 	unsigned char *data = stinger->data;
 
 	if (!stinger->idx) return;
+
+	input_regs(dev, regs);
 
 	input_report_key(dev, BTN_A,	  ((data[0] & 0x20) >> 5));
 	input_report_key(dev, BTN_B,	  ((data[0] & 0x10) >> 4));
@@ -96,7 +98,7 @@ static void stinger_process_packet(struct stinger *stinger)
  * packet processing routine.
  */
 
-static void stinger_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void stinger_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct stinger* stinger = serio->private;
 
@@ -106,7 +108,7 @@ static void stinger_interrupt(struct serio *serio, unsigned char data, unsigned 
 		stinger->data[stinger->idx++] = data;
 
 	if (stinger->idx == 4) {
-		stinger_process_packet(stinger);
+		stinger_process_packet(stinger, regs);
 		stinger->idx = 0;
 	}
 

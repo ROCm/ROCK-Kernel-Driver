@@ -45,53 +45,131 @@
 extern sctp_protocol_t sctp_proto;
 
 static ctl_table sctp_table[] = {
-	{ NET_SCTP_RTO_INITIAL, "rto_initial",
-	  &sctp_proto.rto_initial, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_RTO_MIN, "rto_min",
-	  &sctp_proto.rto_min, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_RTO_MAX, "rto_max",
-	  &sctp_proto.rto_max, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_VALID_COOKIE_LIFE, "valid_cookie_life",
-	  &sctp_proto.valid_cookie_life, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_MAX_BURST, "max_burst",
-	  &sctp_proto.max_burst, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ NET_SCTP_ASSOCIATION_MAX_RETRANS, "association_max_retrans",
-	  &sctp_proto.max_retrans_association, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ NET_SCTP_PATH_MAX_RETRANS, "path_max_retrans",
-	  &sctp_proto.max_retrans_path, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ NET_SCTP_MAX_INIT_RETRANSMITS, "max_init_retransmits",
-	  &sctp_proto.max_retrans_init, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ NET_SCTP_HB_INTERVAL, "hb_interval",
-	  &sctp_proto.hb_interval, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_PRESERVE_ENABLE, "cookie_preserve_enable",
-	  &sctp_proto.cookie_preserve_enable, sizeof(int), 0644, NULL,
-	  &proc_dointvec_jiffies, &sysctl_jiffies },
-	{ NET_SCTP_RTO_ALPHA, "rto_alpha_exp_divisor",
-	  &sctp_proto.rto_alpha, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ NET_SCTP_RTO_BETA, "rto_beta_exp_divisor",
-	  &sctp_proto.rto_beta, sizeof(int), 0644, NULL,
-	  &proc_dointvec },
-	{ 0 }
+	{
+		.ctl_name	= NET_SCTP_RTO_INITIAL,
+		.procname	= "rto_initial",
+		.data		= &sctp_proto.rto_initial,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_RTO_MIN,
+		.procname	= "rto_min",
+		.data		= &sctp_proto.rto_min,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_RTO_MAX,
+		.procname	= "rto_max",
+		.data		= &sctp_proto.rto_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_VALID_COOKIE_LIFE,
+		.procname	= "valid_cookie_life",
+		.data		= &sctp_proto.valid_cookie_life,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_MAX_BURST,
+		.procname	= "max_burst",
+		.data		= &sctp_proto.max_burst,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_ASSOCIATION_MAX_RETRANS,
+		.procname	= "association_max_retrans",
+		.data		= &sctp_proto.max_retrans_association,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_PATH_MAX_RETRANS,
+		.procname	= "path_max_retrans",
+		.data		= &sctp_proto.max_retrans_path,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_MAX_INIT_RETRANSMITS,
+		.procname	= "max_init_retransmits",
+		.data		= &sctp_proto.max_retrans_init,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_HB_INTERVAL,
+		.procname	= "hb_interval",
+		.data		= &sctp_proto.hb_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_PRESERVE_ENABLE,
+		.procname	= "cookie_preserve_enable",
+		.data		= &sctp_proto.cookie_preserve_enable,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
+	{
+		.ctl_name	= NET_SCTP_RTO_ALPHA,
+		.procname	= "rto_alpha_exp_divisor",
+		.data		= &sctp_proto.rto_alpha,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_SCTP_RTO_BETA,
+		.procname	= "rto_beta_exp_divisor",
+		.data		= &sctp_proto.rto_beta,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table sctp_net_table[] = {
-	{ NET_SCTP, "sctp", NULL, 0, 0555, sctp_table },
-	{ 0 }
+	{
+		.ctl_name	= NET_SCTP,
+		.procname	= "sctp",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= sctp_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table sctp_root_table[] = {
-	{ CTL_NET, "net", NULL, 0, 0555, sctp_net_table },
-	{ 0 }
+	{
+		.ctl_name	= CTL_NET,
+		.procname	= "net",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= sctp_net_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static struct ctl_table_header * sctp_sysctl_header;

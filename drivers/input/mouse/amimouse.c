@@ -63,6 +63,8 @@ static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 
 	potgor = custom.potgor;
 
+	input_regs(&amimouse_dev, fp);
+
 	input_report_rel(&amimouse_dev, REL_X, dx);
 	input_report_rel(&amimouse_dev, REL_Y, dy);
 

@@ -1870,7 +1870,7 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 				irlap_update_nr_received(self, info->nr);
 
 				irlap_wait_min_turn_around(self, &self->qos_tx);
-				irlap_send_rr_frame(self, CMD_FRAME);
+				irlap_send_rr_frame(self, RSP_FRAME);
 
 				irlap_start_wd_timer(self, self->wd_timeout);
 			}
@@ -2035,18 +2035,18 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_update_nr_received(self, info->nr);
 		if (self->remote_busy) {
 			irlap_wait_min_turn_around(self, &self->qos_tx);
-			irlap_send_rr_frame(self, CMD_FRAME);
+			irlap_send_rr_frame(self, RSP_FRAME);
 		} else
-			irlap_resend_rejected_frames(self, CMD_FRAME);
+			irlap_resend_rejected_frames(self, RSP_FRAME);
 		irlap_start_wd_timer(self, self->wd_timeout);
 		break;
 	case RECV_SREJ_CMD:
 		irlap_update_nr_received(self, info->nr);
 		if (self->remote_busy) {
 			irlap_wait_min_turn_around(self, &self->qos_tx);
-			irlap_send_rr_frame(self, CMD_FRAME);
+			irlap_send_rr_frame(self, RSP_FRAME);
 		} else
-			irlap_resend_rejected_frame(self, CMD_FRAME);
+			irlap_resend_rejected_frame(self, RSP_FRAME);
 		irlap_start_wd_timer(self, self->wd_timeout);
 		break;
 	case WD_TIMER_EXPIRED:

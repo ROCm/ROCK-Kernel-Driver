@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -62,7 +62,6 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for private helpers. */
-__u32 count_crc(__u8 *ptr, __u16  count);
 static void sctp_packet_reset(sctp_packet_t *packet);
 static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 					   sctp_chunk_t *chunk);
@@ -81,6 +80,7 @@ sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
 	packet->ecn_capable = ecn_capable;
 	packet->get_prepend_chunk = prepend_handler;
 	packet->has_cookie_echo = 0;
+	packet->ipfragok = 0;
 
 	/* We might need to call the prepend_handler right away.  */
 	if (packet_empty)
@@ -90,7 +90,7 @@ sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
 
 /* Initialize the packet structure. */
 sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
-				sctp_transport_t *transport,
+				struct sctp_transport *transport,
 				__u16 sport,
 				__u16 dport)
 {
@@ -102,6 +102,7 @@ sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
 	packet->ecn_capable = 0;
 	packet->get_prepend_chunk = NULL;
 	packet->has_cookie_echo = 0;
+	packet->ipfragok = 0;
 	packet->malloced = 0;
 	sctp_packet_reset(packet);
 	return packet;
@@ -193,6 +194,7 @@ sctp_xmit_t sctp_packet_append_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
 				 * transmit and rely on IP
 				 * fragmentation.
 				 */
+				packet->ipfragok = 1;
 				goto append;
 			}
 		} else { /* !packet_empty */
@@ -228,13 +230,13 @@ finish:
 }
 
 /* All packets are sent to the network through this function from
- * sctp_push_outqueue().
+ * sctp_outq_tail().
  *
  * The return value is a normal kernel error return value.
  */
 int sctp_packet_transmit(sctp_packet_t *packet)
 {
-	sctp_transport_t *transport = packet->transport;
+	struct sctp_transport *transport = packet->transport;
 	sctp_association_t *asoc = transport->asoc;
 	struct sctphdr *sh;
 	__u32 crc32;
@@ -358,21 +360,13 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 * Note: Adler-32 is no longer applicable, as has been replaced
 	 * by CRC32-C as described in <draft-ietf-tsvwg-sctpcsum-02.txt>.
 	 */
-	crc32 = count_crc((__u8 *)sh, nskb->len);
+	crc32 = sctp_start_cksum((__u8 *)sh, nskb->len);
+	crc32 = sctp_end_cksum(crc32);
 
 	/* 3) Put the resultant value into the checksum field in the
 	 *    common header, and leave the rest of the bits unchanged.
 	 */
 	sh->checksum = htonl(crc32);
-
-	/* FIXME:  Delete the rest of this switch statement once phase 2
-	 * of address selection (ipv6 support) drops in.
-	 */
-	switch (transport->ipaddr.sa.sa_family) {
-	case AF_INET6:
-		SCTP_V6(inet6_sk(sk)->daddr = transport->ipaddr.v6.sin6_addr;)
-		break;
-	};
 
 	/* IP layer ECN support
 	 * From RFC 2481
@@ -423,8 +417,10 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	}
 
 	dst = transport->dst;
-	if (!dst || dst->obsolete) {
+	/* The 'obsolete' field of dst is set to 2 when a dst is freed. */
+	if (!dst || (dst->obsolete > 1)) {
 		sctp_transport_route(transport, NULL, sctp_sk(sk));
+		sctp_assoc_sync_pmtu(asoc);
 	}
 
 	nskb->dst = dst_clone(transport->dst);
@@ -433,14 +429,22 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
-	(*transport->af_specific->queue_xmit)(nskb);
+	(*transport->af_specific->sctp_xmit)(nskb, transport, packet->ipfragok);
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
 no_route:
 	kfree_skb(nskb);
 	IP_INC_STATS_BH(IpOutNoRoutes);
-	err = -EHOSTUNREACH;
+
+	/* FIXME: Returning the 'err' will effect all the associations
+	 * associated with a socket, although only one of the paths of the
+	 * association is unreachable.
+	 * The real failure of a transport or association can be passed on
+	 * to the user via notifications. So setting this error may not be
+	 * required.
+	 */
+	 /* err = -EHOSTUNREACH; */
 	goto out;
 }
 
@@ -473,7 +477,7 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	size_t datasize, rwnd, inflight;
-	sctp_transport_t *transport = packet->transport;
+	struct sctp_transport *transport = packet->transport;
 	__u32 max_burst_bytes;
 
 	/* RFC 2960 6.1  Transmission of DATA Chunks

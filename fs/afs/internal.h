@@ -47,7 +47,7 @@ static inline void afs_discard_my_signals(void)
 		siginfo_t sinfo;
 
 		spin_lock_irq(&current->sighand->siglock);
-		dequeue_signal(&current->blocked,&sinfo);
+		dequeue_signal(current,&current->blocked,&sinfo);
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 }

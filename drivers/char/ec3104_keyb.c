@@ -376,8 +376,6 @@ static void ec3104_keyb_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct e5_struct *k = &ec3104_keyb;
 	u8 msr, lsr;
 
-	kbd_pt_regs = regs;
-
 	msr = ctrl_inb(EC3104_SER4_MSR);
 	
 	if ((msr & MSR_CTS) && !(k->last_msr & MSR_CTS)) {

@@ -3,33 +3,33 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001-2002 International Business Machines Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This file is part of the implementation of the add-IP extension,
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
- * 
- * The SCTP reference implementation  is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation  is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * the SCTP reference implementation  is distributed in the hope that it 
+ *
+ * the SCTP reference implementation  is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  *                 ************************
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to one of the following email
  * addresses:
- * 
+ *
  * La Monte H.P. Yarroll <piggy@acm.org>
  * Karl Knutson <karl@athena.chicago.il.us>
  * Randall Stewart <randall@stewart.chicago.il.us>
@@ -38,14 +38,14 @@
  * Xingang Guo <xingang.guo@intel.com>
  * Sridhar Samudrala <samudrala@us.ibm.com>
  * Daisy Chang <daisyc@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
- * 
+ *
  * There are still LOTS of bugs in this code... I always run on the motto
  * "it is a wonder any code ever works :)"
- * 
- * 
+ *
+ *
  */
 
 #ifndef __sctp_constants_h__
@@ -56,17 +56,10 @@
 #include <linux/ipv6.h> /* For ipv6hdr. */
 #include <net/sctp/user.h>
 
-/* What a hack!  Jiminy Cricket!  */
-enum { SCTP_MAX_STREAM = 10 };
-
-/* Define the amount of space to reserve for SCTP, IP, LL.
- * There is a little bit of waste that we are always allocating
- * for ipv6 headers, but this seems worth the simplicity.
- */
-
-#define SCTP_IP_OVERHEAD ((sizeof(struct sctphdr)\
-                          + sizeof(struct ipv6hdr)\
-                          + MAX_HEADER))
+/* Value used for stream negotiation. */
+enum { SCTP_MAX_STREAM = 0xffff };
+enum { SCTP_DEFAULT_OUTSTREAMS = 10 };
+enum { SCTP_DEFAULT_INSTREAMS = SCTP_MAX_STREAM };
 
 /* Define the amount of space to reserve for SCTP, IP, LL.
  * There is a little bit of waste that we are always allocating
@@ -105,57 +98,37 @@ typedef enum {
  */
 
 typedef enum {
-
 	SCTP_EVENT_TIMEOUT_NONE = 0,
 	SCTP_EVENT_TIMEOUT_T1_COOKIE,
 	SCTP_EVENT_TIMEOUT_T1_INIT,
 	SCTP_EVENT_TIMEOUT_T2_SHUTDOWN,
 	SCTP_EVENT_TIMEOUT_T3_RTX,
-	SCTP_EVENT_TIMEOUT_T4_RTO,
 	SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD,
 	SCTP_EVENT_TIMEOUT_HEARTBEAT,
 	SCTP_EVENT_TIMEOUT_SACK,
 	SCTP_EVENT_TIMEOUT_AUTOCLOSE,
-	SCTP_EVENT_TIMEOUT_PMTU_RAISE,
-
 } sctp_event_timeout_t;
 
-#define SCTP_EVENT_TIMEOUT_MAX		SCTP_EVENT_TIMEOUT_PMTU_RAISE
+#define SCTP_EVENT_TIMEOUT_MAX		SCTP_EVENT_TIMEOUT_AUTOCLOSE
 #define SCTP_NUM_TIMEOUT_TYPES		(SCTP_EVENT_TIMEOUT_MAX + 1)
 
 typedef enum {
-
 	SCTP_EVENT_NO_PENDING_TSN = 0,
-	SCTP_EVENT_ICMP_UNREACHFRAG,
-
 } sctp_event_other_t;
 
-#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_ICMP_UNREACHFRAG
+#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_NO_PENDING_TSN
 #define SCTP_NUM_OTHER_TYPES		(SCTP_EVENT_OTHER_MAX + 1)
 
 /* These are primitive requests from the ULP.  */
 typedef enum {
-
-	SCTP_PRIMITIVE_INITIALIZE = 0,
-	SCTP_PRIMITIVE_ASSOCIATE,
+	SCTP_PRIMITIVE_ASSOCIATE = 0,
 	SCTP_PRIMITIVE_SHUTDOWN,
 	SCTP_PRIMITIVE_ABORT,
 	SCTP_PRIMITIVE_SEND,
-	SCTP_PRIMITIVE_SETPRIMARY,
-	SCTP_PRIMITIVE_RECEIVE,
-	SCTP_PRIMITIVE_STATUS,
-	SCTP_PRIMITIVE_CHANGEHEARTBEAT,
 	SCTP_PRIMITIVE_REQUESTHEARTBEAT,
-	SCTP_PRIMITIVE_GETSRTTREPORT,
-	SCTP_PRIMITIVE_SETFAILURETHRESHOLD,
-	SCTP_PRIMITIVE_SETPROTOPARAMETERS,
-	SCTP_PRIMITIVE_RECEIVE_UNSENT,
-	SCTP_PRIMITIVE_RECEIVE_UNACKED,
-	SCTP_PRIMITIVE_DESTROY,
-
 } sctp_event_primitive_t;
 
-#define SCTP_EVENT_PRIMITIVE_MAX	SCTP_PRIMITIVE_DESTROY
+#define SCTP_EVENT_PRIMITIVE_MAX	SCTP_PRIMITIVE_REQUESTHEARTBEAT
 #define SCTP_NUM_PRIMITIVE_TYPES	(SCTP_EVENT_PRIMITIVE_MAX + 1)
 
 /* We define here a utility type for manipulating subtypes.
@@ -268,8 +241,13 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
 #define SCTP_ADDR_REACHABLE		2
 #define SCTP_ADDR_NOT_REACHABLE		1
 
+/* Maximum chunk length considering padding requirements. */
+enum { SCTP_MAX_CHUNK_LEN = ((1<<16) - sizeof(__u32)) };
 
-
+/* Encourage Cookie-Echo bundling by pre-fragmenting chunks a little
+ * harder (until reaching ESTABLISHED state).
+ */
+enum { SCTP_ARBITRARY_COOKIE_ECHO_LEN = 200 };
 
 /* Guess at how big to make the TSN mapping array.
  * We guarantee that we can handle at least this big a gap between the
@@ -289,7 +267,8 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
  * is enough room for 131 duplicate reports.  Round down to the
  * nearest power of 2.
  */
-#define SCTP_MAX_DUP_TSNS 128
+enum { SCTP_MIN_PMTU = 576 };
+enum { SCTP_MAX_DUP_TSNS = 128 };
 
 typedef enum {
 	SCTP_COUNTER_INIT_ERROR,
@@ -297,7 +276,6 @@ typedef enum {
 
 /* How many counters does an association need? */
 #define SCTP_NUMBER_COUNTERS	5
-
 
 /* Here we define the default timers.  */
 
@@ -316,10 +294,6 @@ typedef enum {
 /* recv timer def = 200ms (in usec) */
 #define SCTP_DEFAULT_TIMEOUT_SACK	((200 * HZ) / 1000)
 #define SCTP_DEFAULT_TIMEOUT_SACK_MAX	((500 * HZ) / 1000) /* 500 ms */
-
-/* How long do we wait before attempting to raise the PMTU?  */
-#define SCTP_DEFAULT_TIMEOUT_PMTU_RAISE (10 * 60 * HZ) /* 10 Minutes */
-#define SCTP_DEFAULT_TIMEOUT_PMTU_RAISE_MIN (10 * 60 * HZ) /* 10 Minutes */
 
 /* RTO.Initial              - 3  seconds
  * RTO.Min                  - 1  second
@@ -439,6 +413,13 @@ typedef enum {
 #define SCTP_ADDR6_PEERSUPP	0x00000004	/* IPv6 address is supported by
 						   peer */
 
+/* Reasons to retransmit. */
+typedef enum {
+	SCTP_RETRANSMIT_T3_RTX,
+	SCTP_RETRANSMIT_FAST_RTX,
+	SCTP_RETRANSMIT_PMTU_DISCOVERY,
+} sctp_retransmit_reason_t;
+
 /* Reasons to lower cwnd. */
 typedef enum {
 	SCTP_LOWER_CWND_T3_RTX,
@@ -448,4 +429,3 @@ typedef enum {
 } sctp_lower_cwnd_t;
 
 #endif /* __sctp_constants_h__ */
-

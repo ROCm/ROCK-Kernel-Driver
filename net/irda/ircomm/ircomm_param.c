@@ -442,7 +442,9 @@ static int ircomm_param_dte(void *instance, irda_param_t *param, int get)
 		param->pv.i = self->settings.dte;
 	else {
 		dte = (__u8) param->pv.i;
-		
+
+		self->settings.dce = 0;
+				
 		if (dte & IRCOMM_DELTA_DTR)
 			self->settings.dce |= (IRCOMM_DELTA_DSR|
 					      IRCOMM_DELTA_RI |

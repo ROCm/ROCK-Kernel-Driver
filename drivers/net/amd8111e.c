@@ -953,7 +953,7 @@ static char* amd8111e_read_regs(struct amd8111e_priv* lp)
      	reg_buff = kmalloc( AMD8111E_REG_DUMP_LEN,GFP_KERNEL);
 	if(NULL == reg_buff)
 		return NULL;
-    	for( i=0; i< AMD8111E_REG_DUMP_LEN;i+=4);
+    	for (i=0; i < AMD8111E_REG_DUMP_LEN; i+=4)
 		reg_buff[i]= readl(mmio + i);	
 	return reg_buff;
 }

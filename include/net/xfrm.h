@@ -8,6 +8,7 @@
 #include <linux/netdevice.h>
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
+#include <linux/in6.h>
 
 #include <net/dst.h>
 #include <net/route.h>
@@ -423,5 +424,24 @@ extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
+
+static inline int
+xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
+{
+      return  !memcmp(fl->fl6_dst, sel->daddr.a6, sizeof(struct in6_addr)) &&
+              !((fl->uli_u.ports.dport^sel->dport)&sel->dport_mask) &&
+              !((fl->uli_u.ports.sport^sel->sport)&sel->sport_mask) &&
+              (fl->proto == sel->proto || !sel->proto) &&
+              (fl->oif == sel->ifindex || !sel->ifindex) &&
+              !memcmp(fl->fl6_src, sel->saddr.a6, sizeof(struct in6_addr));
+}
+
+extern int xfrm6_register_type(struct xfrm_type *type);
+extern int xfrm6_unregister_type(struct xfrm_type *type);
+extern struct xfrm_type *xfrm6_get_type(u8 proto);
+
+extern struct xfrm_state *xfrm6_state_lookup(struct in6_addr *daddr, u32 spi, u8 proto);
+struct xfrm_state * xfrm6_find_acq(u8 mode, u16 reqid, u8 proto, struct in6_addr *daddr, struct in6_addr *saddr, int create);
+void xfrm6_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
 
 #endif	/* _NET_XFRM_H */

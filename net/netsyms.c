@@ -324,6 +324,11 @@ EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
 EXPORT_SYMBOL(xfrm_policy_byid);
 EXPORT_SYMBOL(xfrm_policy_list);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+EXPORT_SYMBOL(xfrm6_state_lookup);
+EXPORT_SYMBOL(xfrm6_find_acq);
+EXPORT_SYMBOL(xfrm6_alloc_spi);
+#endif
 
 EXPORT_SYMBOL_GPL(xfrm_probe_algs);
 EXPORT_SYMBOL_GPL(xfrm_count_auth_supported);

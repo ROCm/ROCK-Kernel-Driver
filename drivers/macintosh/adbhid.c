@@ -52,8 +52,6 @@ MODULE_AUTHOR("Franz Sirl <Franz.Sirl-kernel@lauterbach.com>");
 #define KEYB_LEDREG	2	/* register # for leds on ADB keyboard */
 #define MOUSE_DATAREG	0	/* reg# for movement/button codes from mouse */
 
-extern struct pt_regs *kbd_pt_regs;
-
 static int adb_message_handler(struct notifier_block *, unsigned long, void *);
 static struct notifier_block adbhid_adb_notifier = {
 	.notifier_call	= adb_message_handler,
@@ -136,14 +134,13 @@ adbhid_keyboard_input(unsigned char *data, int nb, struct pt_regs *regs, int apo
 	/* first check this is from register 0 */
 	if (nb != 3 || (data[0] & 3) != KEYB_KEYREG)
 		return;		/* ignore it */
-	kbd_pt_regs = regs;
-	adbhid_input_keycode(id, data[1], 0);
+	adbhid_input_keycode(id, data[1], 0, regs);
 	if (!(data[2] == 0xff || (data[2] == 0x7f && data[1] == 0x7f)))
-		adbhid_input_keycode(id, data[2], 0);
+		adbhid_input_keycode(id, data[2], 0, regs);
 }
 
 static void
-adbhid_input_keycode(int id, int keycode, int repeat)
+adbhid_input_keycode(int id, int keycode, int repeat, pt_regs *regs)
 {
 	int up_flag;
 
@@ -152,21 +149,24 @@ adbhid_input_keycode(int id, int keycode, int repeat)
 
 	switch (keycode) {
 	case 0x39: /* Generate down/up events for CapsLock everytime. */
+		input_regs(&adbhid[id]->input, regs);
 		input_report_key(&adbhid[id]->input, KEY_CAPSLOCK, 1);
 		input_report_key(&adbhid[id]->input, KEY_CAPSLOCK, 0);
+		input_sync(&adbhid[id]->input);
 		return;
 	case 0x3f: /* ignore Powerbook Fn key */
 		return;
 	}
 
-	if (adbhid[id]->keycode[keycode])
+	if (adbhid[id]->keycode[keycode]) {
+		input_regs(&adbhid[id]->input, regs);
 		input_report_key(&adbhid[id]->input,
 				 adbhid[id]->keycode[keycode], !up_flag);
-	else
+		input_sync(&adbhid[id]->input);
+	} else
 		printk(KERN_INFO "Unhandled ADB key (scancode %#02x) %s.\n", keycode,
 		       up_flag ? "released" : "pressed");
 
-	input_sync(&adbhid[id]->input);
 }
 
 static void
@@ -253,6 +253,8 @@ adbhid_mouse_input(unsigned char *data, int nb, struct pt_regs *regs, int autopo
                 break;
 	}
 
+	input_regs(&adbhid[id]->input, regs);
+
 	input_report_key(&adbhid[id]->input, BTN_LEFT,   !((data[1] >> 7) & 1));
 	input_report_key(&adbhid[id]->input, BTN_MIDDLE, !((data[2] >> 7) & 1));
 
@@ -276,6 +278,8 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 		printk(KERN_ERR "ADB HID on ID %d not yet registered\n", id);
 		return;
 	}
+
+	input_regs(&adbhid[id]->input, regs);
 
 	switch (adbhid[id]->original_handler_id) {
 	default:

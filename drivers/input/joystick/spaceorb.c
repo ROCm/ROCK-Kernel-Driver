@@ -74,7 +74,7 @@ static unsigned char *spaceorb_errors[] = { "EEPROM storing 0 failed", "Receive 
  * SpaceOrb.
  */
 
-static void spaceorb_process_packet(struct spaceorb *spaceorb)
+static void spaceorb_process_packet(struct spaceorb *spaceorb, struct pt_regs *regs)
 {
 	struct input_dev *dev = &spaceorb->dev;
 	unsigned char *data = spaceorb->data;
@@ -85,6 +85,8 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 	if (spaceorb->idx < 2) return;
 	for (i = 0; i < spaceorb->idx; i++) c ^= data[i];
 	if (c) return;
+
+	input_regs(dev, regs);
 
 	switch (data[0]) {
 
@@ -128,12 +130,12 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 	input_sync(dev);
 }
 
-static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct spaceorb* spaceorb = serio->private;
 
 	if (~data & 0x80) {
-		if (spaceorb->idx) spaceorb_process_packet(spaceorb);
+		if (spaceorb->idx) spaceorb_process_packet(spaceorb, regs);
 		spaceorb->idx = 0;
 	}
 	if (spaceorb->idx < SPACEORB_MAX_LENGTH)

@@ -6479,8 +6479,11 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 	}
 #endif
 
-	/* Remove this if it causes problems for some boards. */
-	tp->dma_rwctrl |= DMA_RWCTRL_USE_MEM_READ_MULT;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
+		/* Remove this if it causes problems for some boards. */
+		tp->dma_rwctrl |= DMA_RWCTRL_USE_MEM_READ_MULT;
+	}
 
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 

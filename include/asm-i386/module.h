@@ -46,6 +46,8 @@ struct mod_arch_specific
 #define MODULE_PROC_FAMILY "WINCHIP3D "
 #elif CONFIG_MCYRIXIII
 #define MODULE_PROC_FAMILY "CYRIXIII "
+#elif CONFIG_MVIAC3_2
+#define MODULE_PROC_FAMILY "VIAC3-2 "
 #else
 #error unknown processor family
 #endif

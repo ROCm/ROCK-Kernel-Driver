@@ -231,7 +231,7 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 			return (int)PTR_ERR(value);
 	}
 
-	error = ext3_xattr_set(handle, inode, name_index, "", value, size, 0);
+	error = ext3_xattr_set_handle(handle, inode, name_index, "", value, size, 0);
 
 	if (value)
 		kfree(value);

@@ -1679,23 +1679,6 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_times
 	return ret;
 }
 
-extern asmlinkage int sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset);
-
-asmlinkage int sys32_sigprocmask(int how, compat_old_sigset_t *set, compat_old_sigset_t *oset)
-{
-	old_sigset_t s;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-	
-	if (set && get_user (s, set)) return -EFAULT;
-	set_fs (KERNEL_DS);
-	ret = sys_sigprocmask(how, set ? &s : NULL, oset ? &s : NULL);
-	set_fs (old_fs);
-	if (ret) return ret;
-	if (oset && put_user (s, oset)) return -EFAULT;
-	return 0;
-}
-
 extern asmlinkage int sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize);
 
 asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset, compat_size_t sigsetsize)
@@ -1730,21 +1713,6 @@ asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset
 			return -EFAULT;
 	}
 	return 0;
-}
-
-extern asmlinkage int sys_sigpending(old_sigset_t *set);
-
-asmlinkage int sys32_sigpending(compat_old_sigset_t *set)
-{
-	old_sigset_t s;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-		
-	set_fs (KERNEL_DS);
-	ret = sys_sigpending(&s);
-	set_fs (old_fs);
-	if (put_user (s, set)) return -EFAULT;
-	return ret;
 }
 
 extern asmlinkage int sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
@@ -1813,7 +1781,7 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	}
 
 	spin_lock_irq(&current->sighand->siglock);
-	sig = dequeue_signal(&these, &info);
+	sig = dequeue_signal(current, &these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1833,7 +1801,7 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 			timeout = schedule_timeout(timeout);
 
 			spin_lock_irq(&current->sighand->siglock);
-			sig = dequeue_signal(&these, &info);
+			sig = dequeue_signal(current, &these, &info);
 			current->blocked = current->real_blocked;
 			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();

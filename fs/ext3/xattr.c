@@ -88,8 +88,9 @@
 # define ea_bdebug(f...)
 #endif
 
-static int ext3_xattr_set2(handle_t *, struct inode *, struct buffer_head *,
-			   struct ext3_xattr_header *);
+static int ext3_xattr_set_handle2(handle_t *, struct inode *,
+				  struct buffer_head *,
+				  struct ext3_xattr_header *);
 
 static int ext3_xattr_cache_insert(struct buffer_head *);
 static struct buffer_head *ext3_xattr_cache_find(struct inode *,
@@ -459,7 +460,7 @@ static void ext3_xattr_update_super_block(handle_t *handle,
 }
 
 /*
- * ext3_xattr_set()
+ * ext3_xattr_set_handle()
  *
  * Create, replace or remove an extended attribute for this inode. Buffer
  * is NULL to remove an existing extended attribute, and non-NULL to
@@ -471,8 +472,9 @@ static void ext3_xattr_update_super_block(handle_t *handle,
  * Returns 0, or a negative error number on failure.
  */
 int
-ext3_xattr_set(handle_t *handle, struct inode *inode, int name_index,
-	       const char *name, const void *value, size_t value_len, int flags)
+ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
+		      const char *name, const void *value, size_t value_len,
+		      int flags)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh = NULL;
@@ -673,7 +675,8 @@ bad_block:		ext3_error(sb, "ext3_xattr_set",
 			/* Remove this attribute. */
 			if (EXT3_XATTR_NEXT(ENTRY(header+1)) == last) {
 				/* This block is now empty. */
-				error = ext3_xattr_set2(handle, inode, bh,NULL);
+				error = ext3_xattr_set_handle2(handle, inode,
+							       bh, NULL);
 				goto cleanup;
 			} else {
 				/* Remove the old name. */
@@ -701,7 +704,7 @@ bad_block:		ext3_error(sb, "ext3_xattr_set",
 	}
 	ext3_xattr_rehash(header, here);
 
-	error = ext3_xattr_set2(handle, inode, bh, header);
+	error = ext3_xattr_set_handle2(handle, inode, bh, header);
 
 cleanup:
 	brelse(bh);
@@ -713,11 +716,12 @@ cleanup:
 }
 
 /*
- * Second half of ext3_xattr_set(): Update the file system.
+ * Second half of ext3_xattr_set_handle(): Update the file system.
  */
 static int
-ext3_xattr_set2(handle_t *handle, struct inode *inode,
-		struct buffer_head *old_bh, struct ext3_xattr_header *header)
+ext3_xattr_set_handle2(handle_t *handle, struct inode *inode,
+		       struct buffer_head *old_bh,
+		       struct ext3_xattr_header *header)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *new_bh = NULL;
@@ -827,6 +831,34 @@ getblk_failed:
 cleanup:
 	if (old_bh != new_bh)
 		brelse(new_bh);
+
+	return error;
+}
+
+/*
+ * ext3_xattr_set()
+ *
+ * Like ext3_xattr_set_handle, but start from an inode. This extended
+ * attribute modification is a filesystem transaction by itself.
+ *
+ * Returns 0, or a negative error number on failure.
+ */
+int
+ext3_xattr_set(struct inode *inode, int name_index, const char *name,
+	       const void *value, size_t value_len, int flags)
+{
+	handle_t *handle;
+	int error;
+
+	lock_kernel();
+	handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
+	if (IS_ERR(handle))
+		error = PTR_ERR(handle);
+	else
+		error = ext3_xattr_set_handle(handle, inode, name_index, name,
+					      value, value_len, flags);
+	ext3_journal_stop(handle, inode);
+	unlock_kernel();
 
 	return error;
 }

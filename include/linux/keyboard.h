@@ -9,6 +9,7 @@
 #define KG_ALT		3
 #define KG_ALTGR	1
 #define KG_SHIFTL	4
+#define KG_KANASHIFT	4
 #define KG_SHIFTR	5
 #define KG_CTRLL	6
 #define KG_CTRLR	7

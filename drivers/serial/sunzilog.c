@@ -303,7 +303,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 		}
 		kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
-		serio_interrupt(&up->serio, ch, 0);
+		serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 	} else if (ZS_IS_MOUSE(up)) {
 		int ret = suncore_mouse_baud_detection(ch, is_break);
@@ -317,7 +317,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 
 		case 0:
 #ifdef CONFIG_SERIO
-			serio_interrupt(&up->serio, ch, 0);
+			serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 			break;
 		};
@@ -1030,7 +1030,7 @@ static struct uart_driver sunzilog_reg = {
 	.owner		=	THIS_MODULE,
 	.driver_name	=	"ttyS",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name	=	"ttyS%d",
+	.dev_name	=	"tts/%d",
 #else
 	.dev_name	=	"ttyS%d",
 #endif
@@ -1484,7 +1484,7 @@ static void __init sunzilog_prepare(void)
 	/*
 	 * Temporary fix.
 	 */
-	for (channel = 0; channel < NUM_CHANNELS - 1; channel++)
+	for (channel = 0; channel < NUM_CHANNELS; channel++)
 		spin_lock_init(&sunzilog_port_table[channel].port.lock);
 
 	sunzilog_irq_chain = up = &sunzilog_port_table[0];

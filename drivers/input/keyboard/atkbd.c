@@ -86,8 +86,7 @@ static unsigned char atkbd_set3_keycode[512] = {
 #define ATKBD_CMD_SETLEDS	0x10ed
 #define ATKBD_CMD_GSCANSET	0x11f0
 #define ATKBD_CMD_SSCANSET	0x10f0
-#define ATKBD_CMD_GETID		0x01f2
-#define ATKBD_CMD_GETID2	0x0100
+#define ATKBD_CMD_GETID		0x02f2
 #define ATKBD_CMD_ENABLE	0x00f4
 #define ATKBD_CMD_RESET_DIS	0x00f5
 #define ATKBD_CMD_RESET_BAT	0x01ff
@@ -120,12 +119,12 @@ struct atkbd {
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
-	unsigned char oldset;
 	unsigned char release;
-	signed char ack;
+	volatile signed char ack;
 	unsigned char emul;
 	unsigned short id;
 	unsigned char write;
+	unsigned char resend;
 };
 
 /*
@@ -133,7 +132,7 @@ struct atkbd {
  * the keyboard into events.
  */
 
-static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct atkbd *atkbd = serio->private;
 	int code = data;
@@ -142,11 +141,15 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
 #endif
 
-	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && atkbd->write) {
+	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && !atkbd->resend && atkbd->write) {
 		printk("atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
+		atkbd->resend = 1;
 		return;
 	}
+	
+	if (!flags)
+		atkbd->resend = 0;
 
 	switch (code) {
 		case ATKBD_RET_ACK:
@@ -190,6 +193,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 				atkbd->set, code, serio->phys, atkbd->release ? "released" : "pressed");
 			break;
 		default:
+			input_regs(&atkbd->dev, regs);
 			input_report_key(&atkbd->dev, atkbd->keycode[code], !atkbd->release);
 			input_sync(&atkbd->dev);
 	}
@@ -227,12 +231,15 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 
 static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 {
-	int timeout = 50000; /* 500 msec */
+	int timeout = 500000; /* 500 msec */
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
 	int i;
 
 	atkbd->cmdcnt = receive;
+
+	if (command == ATKBD_CMD_RESET_BAT)
+		timeout = 2000000; /* 2 sec */
 	
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
@@ -242,14 +249,28 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 		if (atkbd_sendbyte(atkbd, param[i]))
 			return (atkbd->cmdcnt = 0) - 1;
 
-	while (atkbd->cmdcnt && timeout--) udelay(10);
+	while (atkbd->cmdcnt && timeout--) {
+
+		if (atkbd->cmdcnt == 1 && command == ATKBD_CMD_RESET_BAT)
+			timeout = 100000;
+
+		if (atkbd->cmdcnt == 1 && command == ATKBD_CMD_GETID &&
+		    atkbd->cmdbuf[1] != 0xab && atkbd->cmdbuf[1] != 0xac) {
+			atkbd->cmdcnt = 0;
+			break;
+		}
+	
+		udelay(1);
+	}
 
 	if (param)
 		for (i = 0; i < receive; i++)
 			param[i] = atkbd->cmdbuf[(receive - 1) - i];
 
-	if (atkbd->cmdcnt) 
-		return (atkbd->cmdcnt = 0) - 1;
+	if (atkbd->cmdcnt) {
+		atkbd->cmdcnt = 0;
+		return -1;
+	}
 
 	return 0;
 }
@@ -301,13 +322,6 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 static int atkbd_set_3(struct atkbd *atkbd)
 {
 	unsigned char param[2];
-
-/*
- * Remember original scancode set value, so that we can restore it on exit.
- */
-
-	if (atkbd_command(atkbd, &atkbd->oldset, ATKBD_CMD_GSCANSET))
-		atkbd->oldset = 2;
 
 /*
  * For known special keyboards we can go ahead and set the correct set.
@@ -376,8 +390,8 @@ static int atkbd_probe(struct atkbd *atkbd)
  */
 
 	if (atkbd_reset)
-		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
-			printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
+		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT)) 
+			printk(KERN_WARNING "atkbd.c: keyboard reset failed on %s\n", atkbd->serio->phys);
 
 /*
  * Then we check the keyboard ID. We should get 0xab83 under normal conditions.
@@ -401,10 +415,7 @@ static int atkbd_probe(struct atkbd *atkbd)
 
 	if (param[0] != 0xab && param[0] != 0xac)
 		return -1;
-	atkbd->id = param[0] << 8;
-	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID2))
-		return -1;
-	atkbd->id |= param[0];
+	atkbd->id = (param[0] << 8) | param[1];
 
 /*
  * Set the LEDs to a defined state.
@@ -442,7 +453,7 @@ static int atkbd_probe(struct atkbd *atkbd)
 static void atkbd_cleanup(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
-	atkbd_command(atkbd, &atkbd->oldset, ATKBD_CMD_SSCANSET);
+	atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT);
 }
 
 /*

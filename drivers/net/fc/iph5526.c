@@ -3769,7 +3769,7 @@ struct pci_dev *pdev = NULL;
 	for (i = 0; i <= MAX_FC_CARDS; i++) 
 		fc[i] = NULL;
 
-	for (i = 0; i < clone_list[i].vendor_id != 0; i++)
+	for (i = 0; clone_list[i].vendor_id != 0; i++)
 	while ((pdev = pci_find_device(clone_list[i].vendor_id, clone_list[i].device_id, pdev))) {
 		unsigned short pci_command;
 		if (pci_enable_device(pdev))

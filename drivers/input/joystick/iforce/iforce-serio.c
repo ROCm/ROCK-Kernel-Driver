@@ -78,7 +78,7 @@ static void iforce_serio_write_wakeup(struct serio *serio)
 	iforce_serial_xmit((struct iforce *)serio->private);
 }
 
-static void iforce_serio_irq(struct serio *serio, unsigned char data, unsigned int flags)
+static void iforce_serio_irq(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct iforce* iforce = serio->private;
 
@@ -115,7 +115,7 @@ static void iforce_serio_irq(struct serio *serio, unsigned char data, unsigned i
 	}
 
 	if (iforce->idx == iforce->len) {
-		iforce_process_packet(iforce, (iforce->id << 8) | iforce->idx, iforce->data);
+		iforce_process_packet(iforce, (iforce->id << 8) | iforce->idx, iforce->data, regs);
 		iforce->pkt = 0;
 		iforce->id  = 0;
 		iforce->len = 0;

@@ -130,6 +130,7 @@ static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	dy |= (buttons & 0xf) << 4;
 	buttons = ~buttons >> 5;
 
+	input_regs(&logibm_dev, regs);
 	input_report_rel(&logibm_dev, REL_X, dx);
 	input_report_rel(&logibm_dev, REL_Y, dy);
 	input_report_key(&logibm_dev, BTN_RIGHT,  buttons & 1);
