@@ -786,13 +786,13 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		/* Ok.  We will be able to collapse the packet. */
 		__skb_unlink(next_skb, next_skb->list);
 
+		memcpy(skb_put(skb, next_skb_size), next_skb->data, next_skb_size);
+
 		if (next_skb->ip_summed == CHECKSUM_HW)
 			skb->ip_summed = CHECKSUM_HW;
 
-		if (skb->ip_summed != CHECKSUM_HW) {
-			memcpy(skb_put(skb, next_skb_size), next_skb->data, next_skb_size);
+		if (skb->ip_summed != CHECKSUM_HW)
 			skb->csum = csum_block_add(skb->csum, next_skb->csum, skb_size);
-		}
 
 		/* Update sequence range on original skb. */
 		TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(next_skb)->end_seq;
