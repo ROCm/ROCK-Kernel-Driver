@@ -69,8 +69,11 @@ static void k2_sata_tf_load(struct ata_port *ap, struct ata_taskfile *tf)
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
 
-	writeb(tf->ctl, ioaddr->ctl_addr);
-
+	if (tf->ctl != ap->last_ctl) {
+		writeb(tf->ctl, ioaddr->ctl_addr);
+		ap->last_ctl = tf->ctl;
+		ata_wait_idle(ap);
+	}
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
 		writew(tf->feature | (((u16)tf->hob_feature) << 8), ioaddr->error_addr);
 		writew(tf->nsect | (((u16)tf->hob_nsect) << 8), ioaddr->nsect_addr);
@@ -311,13 +314,24 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 		rc = -ENODEV;
 		goto err_out_unmap;
 	}
+
+	/* Clear a magic bit in SCR1 according to Darwin, those help
+	 * some funky seagate drives (though so far, those were already
+	 * set by the firmware on the machines I had access to
+	 */
+	writel(readl(mmio_base + 0x80) & ~0x00040000, mmio_base + 0x80);
+
+	/* Clear SATA error & interrupts we don't use */
+	writel(0xffffffff, mmio_base + 0x44);
+	writel(0x0, mmio_base + 0x88);
+
 	probe_ent->sht = &k2_sata_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
-				ATA_FLAG_SRST | ATA_FLAG_MMIO;
+	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
+				ATA_FLAG_NO_LEGACY | ATA_FLAG_MMIO;
 	probe_ent->port_ops = &k2_sata_ops;
-       	probe_ent->n_ports = 2;
-       	probe_ent->irq = pdev->irq;
-       	probe_ent->irq_flags = SA_SHIRQ;
+	probe_ent->n_ports = 2;
+	probe_ent->irq = pdev->irq;
+	probe_ent->irq_flags = SA_SHIRQ;
 	probe_ent->mmio_base = mmio_base;
 
 	/*

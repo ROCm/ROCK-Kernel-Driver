@@ -310,6 +310,7 @@ struct ata_port {
 	struct ata_ioports	ioaddr;	/* ATA cmd/ctl/dma register blocks */
 
 	u8			ctl;	/* cache of ATA control register */
+	u8			last_ctl;	/* Cache last written value */
 	unsigned int		bus_state;
 	unsigned int		port_state;
 	unsigned int		pio_mask;
@@ -522,12 +523,12 @@ static inline u8 ata_irq_on(struct ata_port *ap)
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 
 	ap->ctl &= ~ATA_NIEN;
+	ap->last_ctl = ap->ctl;
 
 	if (ap->flags & ATA_FLAG_MMIO)
 		writeb(ap->ctl, ioaddr->ctl_addr);
 	else
 		outb(ap->ctl, ioaddr->ctl_addr);
-
 	return ata_wait_idle(ap);
 }
 

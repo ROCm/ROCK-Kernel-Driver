@@ -133,7 +133,11 @@ void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
 
-	outb(tf->ctl, ioaddr->ctl_addr);
+	if (tf->ctl != ap->last_ctl) {
+		outb(tf->ctl, ioaddr->ctl_addr);
+		ap->last_ctl = tf->ctl;
+		ata_wait_idle(ap);
+	}
 
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
 		outb(tf->hob_feature, ioaddr->error_addr);
@@ -187,7 +191,11 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
 
-	writeb(tf->ctl, ap->ioaddr.ctl_addr);
+	if (tf->ctl != ap->last_ctl) {
+		writeb(tf->ctl, ap->ioaddr.ctl_addr);
+		ap->last_ctl = tf->ctl;
+		ata_wait_idle(ap);
+	}
 
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
 		writeb(tf->hob_feature, (void *) ioaddr->error_addr);
@@ -1281,9 +1289,9 @@ static unsigned int ata_bus_softreset(struct ata_port *ap,
 	/* software reset.  causes dev0 to be selected */
 	if (ap->flags & ATA_FLAG_MMIO) {
 		writeb(ap->ctl, ioaddr->ctl_addr);
-		udelay(10);	/* FIXME: flush */
+		udelay(20);	/* FIXME: flush */
 		writeb(ap->ctl | ATA_SRST, ioaddr->ctl_addr);
-		udelay(10);	/* FIXME: flush */
+		udelay(20);	/* FIXME: flush */
 		writeb(ap->ctl, ioaddr->ctl_addr);
 	} else {
 		outb(ap->ctl, ioaddr->ctl_addr);
@@ -2755,6 +2763,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->cbl = ATA_CBL_NONE;
 	ap->device[0].flags = ATA_DFLAG_MASTER;
 	ap->active_tag = ATA_TAG_POISON;
+	ap->last_ctl = 0xFF;
 
 	/* ata_engine init */
 	ap->eng.flags = 0;
