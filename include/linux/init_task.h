@@ -109,6 +109,7 @@
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\
 	.journal_info	= NULL,						\
+	.map_base	= __TASK_UNMAPPED_BASE,				\
 	.io_wait	= NULL,						\
 }
 

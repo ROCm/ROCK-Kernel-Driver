@@ -454,7 +454,7 @@ struct task_struct {
 
 /* journalling filesystem info */
 	void *journal_info;
-
+	
 /* VM state */
 	struct reclaim_state *reclaim_state;
 
@@ -472,6 +472,9 @@ struct task_struct {
  * to a stack based synchronous wait) if its doing sync IO.
  */
 	wait_queue_t *io_wait;
+
+/* TASK_UNMAPPED_BASE */
+	unsigned long map_base;
 };
 
 static inline pid_t process_group(struct task_struct *tsk)
@@ -483,6 +486,12 @@ extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
 #define put_task_struct(tsk) \
 do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
+
+#ifndef __TASK_UNMAPPED_BASE
+#define __TASK_UNMAPPED_BASE 0UL
+#else
+#define __HAS_ARCH_PROC_MAPPED_BASE
+#endif
 
 /*
  * Per process flags
