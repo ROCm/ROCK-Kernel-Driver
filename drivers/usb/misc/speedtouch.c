@@ -214,23 +214,6 @@ static struct usb_driver udsl_usb_driver = {
 *
 ****************************************************************************/
 
-static struct atm_dev *udsl_atm_startdevice (struct udsl_instance_data *instance, struct atmdev_ops *devops)
-{
-	MOD_INC_USE_COUNT;
-	instance->atm_dev = atm_dev_register (udsl_driver_name, devops, -1, 0);
-	instance->atm_dev->dev_data = instance;
-	instance->atm_dev->ci_range.vpi_bits = ATM_CI_MAX;
-	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
-	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
-
-	skb_queue_head_init (&instance->recvqueue);
-
-	/* tmp init atm device, set to 128kbit */
-	instance->atm_dev->link_rate = 128 * 1000 / 424;
-
-	return instance->atm_dev;
-}
-
 static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 {
 	struct atm_vcc *walk;
@@ -254,7 +237,6 @@ static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 		wake_up (&walk->sleep);
 
 	instance->atm_dev = NULL;
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -842,7 +824,16 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	instance->usb_dev = dev;
 	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
-	udsl_atm_startdevice (instance, &udsl_atm_devops);
+	instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0);
+	instance->atm_dev->dev_data = instance;
+	instance->atm_dev->ci_range.vpi_bits = ATM_CI_MAX;
+	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
+	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
+
+	skb_queue_head_init (&instance->recvqueue);
+
+	/* tmp init atm device, set to 128kbit */
+	instance->atm_dev->link_rate = 128 * 1000 / 424;
 
 	/* set MAC address, it is stored in the serial number */
 	usb_string (instance->usb_dev, instance->usb_dev->descriptor.iSerialNumber, mac_str, 13);
