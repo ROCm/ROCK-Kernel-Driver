@@ -40,6 +40,7 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/inet_ecn.h>
+#include <net/dsfield.h>
 
 
 /*	Random Early Detection (RED) algorithm.
@@ -167,7 +168,7 @@ static int red_ecn_mark(struct sk_buff *skb)
 		IP_ECN_set_ce(skb->nh.iph);
 		return 1;
 	case __constant_htons(ETH_P_IPV6):
-		if (INET_ECN_is_not_ect(ip6_get_dsfield(skb->nh.ipv6h)))
+		if (INET_ECN_is_not_ect(ipv6_get_dsfield(skb->nh.ipv6h)))
 			return 0;
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 		return 1;

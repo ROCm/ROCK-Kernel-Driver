@@ -57,6 +57,7 @@
 #include <net/xfrm.h>
 #include <net/addrconf.h>
 #include <net/snmp.h>
+#include <net/dsfield.h>
 
 #include <asm/uaccess.h>
 
@@ -1646,7 +1647,7 @@ static int tcp_v6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 				    skb->len - th->doff*4);
 	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
 	TCP_SKB_CB(skb)->when = 0;
-	TCP_SKB_CB(skb)->flags = ip6_get_dsfield(skb->nh.ipv6h);
+	TCP_SKB_CB(skb)->flags = ipv6_get_dsfield(skb->nh.ipv6h);
 	TCP_SKB_CB(skb)->sacked = 0;
 
 	sk = __tcp_v6_lookup(&skb->nh.ipv6h->saddr, th->source,

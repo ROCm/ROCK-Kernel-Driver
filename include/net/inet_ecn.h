@@ -78,13 +78,11 @@ static inline void IP_ECN_clear(struct iphdr *iph)
 	iph->tos &= ~INET_ECN_MASK;
 }
 
-#define ip6_get_dsfield(iph) ((ntohs(*(u16*)(iph)) >> 4) & 0xFF)
-
 struct ipv6hdr;
 
 static inline void IP6_ECN_set_ce(struct ipv6hdr *iph)
 {
-	if (INET_ECN_is_not_ect(ip6_get_dsfield(iph)))
+	if (INET_ECN_is_not_ect(ipv6_get_dsfield(iph)))
 		return;
 	*(u32*)iph |= htonl(INET_ECN_CE << 20);
 }

@@ -50,6 +50,7 @@
 #include <net/ipip.h>
 #include <net/inet_ecn.h>
 #include <net/xfrm.h>
+#include <net/dsfield.h>
 
 /*
    This version of net/ipv6/sit.c is cloned of net/ipv4/ip_gre.c
@@ -566,7 +567,7 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		iph->frag_off	=	0;
 
 	iph->protocol		=	IPPROTO_IPV6;
-	iph->tos		=	INET_ECN_encapsulate(tos, ip6_get_dsfield(iph6));
+	iph->tos		=	INET_ECN_encapsulate(tos, ipv6_get_dsfield(iph6));
 	iph->daddr		=	rt->rt_dst;
 	iph->saddr		=	rt->rt_src;
 

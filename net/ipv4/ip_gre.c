@@ -36,6 +36,7 @@
 #include <net/ipip.h>
 #include <net/arp.h>
 #include <net/checksum.h>
+#include <net/dsfield.h>
 #include <net/inet_ecn.h>
 #include <net/xfrm.h>
 
@@ -547,7 +548,7 @@ ipgre_ecn_encapsulate(u8 tos, struct iphdr *old_iph, struct sk_buff *skb)
 	if (skb->protocol == htons(ETH_P_IP))
 		inner = old_iph->tos;
 	else if (skb->protocol == htons(ETH_P_IPV6))
-		inner = ip6_get_dsfield((struct ipv6hdr*)old_iph);
+		inner = ipv6_get_dsfield((struct ipv6hdr *)old_iph);
 	return INET_ECN_encapsulate(tos, inner);
 }
 
