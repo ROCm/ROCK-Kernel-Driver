@@ -85,7 +85,7 @@ extern int hplance_probe(struct net_device *dev);
 extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
 extern int tc515_probe(struct net_device *dev);
-extern int lance_probe(struct net_device *dev);
+extern struct net_device *lance_probe(int unit);
 extern int mace_probe(struct net_device *dev);
 extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
@@ -225,13 +225,13 @@ static struct devprobe isa_probes[] __initdata = {
 #if defined(CONFIG_NE2000) || defined(CONFIG_NE2K_CBUS)	/* ISA & PC-9800 CBUS (use ne2k-pci for PCI cards) */
 	{ne_probe, 0},
 #endif
-#ifdef CONFIG_LANCE		/* ISA/VLB (use pcnet32 for PCI cards) */
-	{lance_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_LANCE		/* ISA/VLB (use pcnet32 for PCI cards) */
+	{lance_probe, 0},
+#endif
 #ifdef CONFIG_SMC9194
 	{smc_init, 0},
 #endif
