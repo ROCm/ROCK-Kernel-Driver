@@ -195,8 +195,14 @@ struct hh_cache
 	int		hh_len;		/* length of header */
 	int		(*hh_output)(struct sk_buff *skb);
 	rwlock_t	hh_lock;
+
 	/* cached hardware header; allow for machine alignment needs.        */
-	unsigned long	hh_data[16/sizeof(unsigned long)];
+#define HH_DATA_MOD	16
+#define HH_DATA_OFF(__len) \
+	(HH_DATA_MOD - ((__len) & (HH_DATA_MOD - 1)))
+#define HH_DATA_ALIGN(__len) \
+	(((__len)+(HH_DATA_MOD-1))&~(HH_DATA_MOD - 1))
+	unsigned long	hh_data[HH_DATA_ALIGN(LL_MAX_HEADER)];
 };
 
 /* These flag bits are private to the generic network queueing

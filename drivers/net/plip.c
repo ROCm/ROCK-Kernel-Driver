@@ -1078,7 +1078,10 @@ int plip_hard_header_cache(struct neighbour *neigh,
 	
 	if ((ret = nl->orig_hard_header_cache(neigh, hh)) == 0)
 	{
-		struct ethhdr *eth = (struct ethhdr*)(((u8*)hh->hh_data) + 2);
+		struct ethhdr *eth;
+
+		eth = (struct ethhdr*)(((u8*)hh->hh_data) +
+				       HH_DATA_OFF(sizeof(*eth)));
 		plip_rewrite_address (neigh->dev, eth);
 	}
 	
