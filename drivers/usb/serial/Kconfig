@@ -150,11 +150,11 @@ config USB_SERIAL_VISOR
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SERIAL_IPAQ
-	tristate "USB Compaq iPAQ / HP Jornada / Casio EM500 Driver"
+	tristate "USB PocketPC PDA Driver"
 	depends on USB_SERIAL
 	help
 	  Say Y here if you want to connect to your Compaq iPAQ, HP Jornada
-	  548/568 or Casio EM500 running Windows CE 3.0 or PocketPC 2002
+	  or any other PDA running Windows CE 3.0 or PocketPC 2002
 	  using a USB cradle/cable. For information on using the driver,
 	  read <file:Documentation/usb/usb-serial.txt>.
 

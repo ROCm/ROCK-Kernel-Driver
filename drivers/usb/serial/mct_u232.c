@@ -304,40 +304,40 @@ static int mct_u232_startup (struct usb_serial *serial)
 	struct mct_u232_private *priv;
 
 	/* allocate the private data structure */
-	serial->port->private = kmalloc(sizeof(struct mct_u232_private),
-					GFP_KERNEL);
-	if (!serial->port->private)
+	priv = kmalloc(sizeof(struct mct_u232_private), GFP_KERNEL);
+	if (!priv)
 		return (-1); /* error */
-	priv = (struct mct_u232_private *)serial->port->private;
 	/* set initial values for control structures */
 	priv->control_state = 0;
 	priv->last_lsr = 0;
 	priv->last_msr = 0;
+	usb_set_serial_port_data(serial->port, priv);
 
 	init_waitqueue_head(&serial->port->write_wait);
-	
+
 	return (0);
 } /* mct_u232_startup */
 
 
 static void mct_u232_shutdown (struct usb_serial *serial)
 {
+	struct mct_u232_private *priv;
 	int i;
 	
 	dbg("%s", __FUNCTION__);
 
-	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
-		if (serial->port[i].private)
-			kfree(serial->port[i].private);
+		priv = usb_get_serial_port_data(&serial->port[i]);
+		if (priv)
+			kfree(priv);
 	}
 } /* mct_u232_shutdown */
 
 static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	int retval = 0;
 
 	dbg("%s port %d", __FUNCTION__, port->number);
@@ -375,7 +375,7 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 		struct usb_serial_port *rport;	
 		rport = &serial->port[1];
 		rport->tty = port->tty;
-		rport->private = port->private;
+		usb_set_serial_port_data(rport, usb_get_serial_port_data(port));
 		port->read_urb = rport->interrupt_in_urb;
 	}
 
@@ -518,7 +518,7 @@ static void mct_u232_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void mct_u232_read_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	struct usb_serial *serial = port->serial;
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
@@ -609,7 +609,7 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 				  struct termios *old_termios)
 {
 	struct usb_serial *serial = port->serial;
-	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	unsigned int iflag = port->tty->termios->c_iflag;
 	unsigned int old_iflag = old_termios->c_iflag;
 	unsigned int cflag = port->tty->termios->c_cflag;
@@ -725,7 +725,7 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 static void mct_u232_break_ctl( struct usb_serial_port *port, int break_state )
 {
 	struct usb_serial *serial = port->serial;
-	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	unsigned char lcr = priv->last_lcr;
 
 	dbg("%sstate=%d", __FUNCTION__, break_state);
@@ -741,7 +741,7 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 			   unsigned int cmd, unsigned long arg)
 {
 	struct usb_serial *serial = port->serial;
-	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
 	int mask;
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);

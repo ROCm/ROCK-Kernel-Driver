@@ -146,6 +146,11 @@
 #endif
 #include <linux/usb.h>
 
+#include <asm/io.h>
+#include <asm/scatterlist.h>
+#include <linux/mm.h>
+#include <linux/dma-mapping.h>
+
 
 /* minidrivers _could_ be individually configured */
 #define	CONFIG_USB_AN2720
@@ -2169,8 +2174,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	memcpy (net->dev_addr, node_id, sizeof node_id);
 
 	// point-to-point link ... we always use Ethernet headers 
-	// supports win32 interop and the bridge driver.
+	// supports win32 interop (some devices) and the bridge driver.
 	ether_setup (net);
+
+	// possible with some EHCI controllers
+	if (dma_supported (&udev->dev, 0xffffffffffffffffULL))
+		net->features |= NETIF_F_HIGHDMA;
 
 	net->change_mtu = usbnet_change_mtu;
 	net->get_stats = usbnet_get_stats;

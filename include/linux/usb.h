@@ -28,14 +28,6 @@ static __inline__ void wait_ms(unsigned int ms)
 		mdelay(ms);
 }
 
-/*
- * USB device number allocation bitmap. There's one bitmap
- * per USB tree.
- */
-struct usb_devmap {
-	unsigned long devicemap[128 / (8*sizeof(unsigned long))];
-};
-
 struct usb_device;
 
 /*-------------------------------------------------------------------------*/
@@ -119,11 +111,20 @@ struct usb_interface {
 	struct usb_driver *driver;	/* driver */
 	kdev_t kdev;			/* node this interface is bound to */
 	struct device dev;		/* interface specific device info */
-	void *private_data;
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 #define	interface_to_usbdev(intf) \
 	container_of(intf->dev.parent, struct usb_device, dev)
+
+static inline void *usb_get_intfdata (struct usb_interface *intf)
+{
+	return dev_get_drvdata (&intf->dev);
+}
+
+static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
+{
+	return dev_set_drvdata (&intf->dev, data);
+}
 
 /* USB_DT_CONFIG: Configuration descriptor information.
  *
@@ -159,10 +160,16 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 
 struct usb_operations;
 
+/* USB device number allocation bitmap */
+struct usb_devmap {
+	unsigned long devicemap[128 / (8*sizeof(unsigned long))];
+};
+
 /*
- * Allocated per bus we have
+ * Allocated per bus (tree of devices) we have:
  */
 struct usb_bus {
+	struct device *controller;	/* host/master side hardware */
 	int busnum;			/* Bus number (in order of reg) */
 	char *bus_name;			/* stable id (PCI slot_name etc) */
 

@@ -171,10 +171,9 @@ static int belkin_sa_startup (struct usb_serial *serial)
 	struct belkin_sa_private *priv;
 
 	/* allocate the private data structure */
-	serial->port->private = kmalloc(sizeof(struct belkin_sa_private), GFP_KERNEL);
-	if (!serial->port->private)
+	priv = kmalloc(sizeof(struct belkin_sa_private), GFP_KERNEL);
+	if (!priv)
 		return (-1); /* error */
-	priv = (struct belkin_sa_private *)serial->port->private;
 	/* set initial values for control structures */
 	priv->control_state = 0;
 	priv->last_lsr = 0;
@@ -184,6 +183,7 @@ static int belkin_sa_startup (struct usb_serial *serial)
 	info("bcdDevice: %04x, bfc: %d", dev->descriptor.bcdDevice, priv->bad_flow_control);
 
 	init_waitqueue_head(&serial->port->write_wait);
+	usb_set_serial_port_data(serial->port, priv);
 	
 	return (0);
 }
@@ -191,6 +191,7 @@ static int belkin_sa_startup (struct usb_serial *serial)
 
 static void belkin_sa_shutdown (struct usb_serial *serial)
 {
+	struct belkin_sa_private *priv;
 	int i;
 	
 	dbg ("%s", __FUNCTION__);
@@ -198,8 +199,9 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
-		if (serial->port[i].private)
-			kfree(serial->port[i].private);
+		priv = usb_get_serial_port_data(&serial->port[i]);
+		if (priv)
+			kfree(priv);
 	}
 }
 
@@ -286,7 +288,7 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	/* Handle known interrupt data */
 	/* ignore data[0] and data[1] */
 
-	priv = (struct belkin_sa_private *)port->private;
+	priv = usb_get_serial_port_data(port);
 	priv->last_msr = data[BELKIN_SA_MSR_INDEX];
 	
 	/* Record Control Line states */
@@ -344,7 +346,7 @@ exit:
 static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 {
 	struct usb_serial *serial = port->serial;
-	struct belkin_sa_private *priv = (struct belkin_sa_private *)port->private;
+	struct belkin_sa_private *priv = usb_get_serial_port_data(port);
 	unsigned int iflag;
 	unsigned int cflag;
 	unsigned int old_iflag = 0;
@@ -485,7 +487,7 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 {
 	struct usb_serial *serial = port->serial;
 	__u16 urb_value; /* Will hold the new flags */
-	struct belkin_sa_private *priv = (struct belkin_sa_private *)port->private;
+	struct belkin_sa_private *priv = usb_get_serial_port_data(port);
 	int  ret, mask;
 	
 	/* Based on code from acm.c and others */

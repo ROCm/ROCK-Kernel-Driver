@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (12/12/2002) ganesh
+ * 	Added support for practically all devices supported by ActiveSync
+ * 	on Windows. Thanks to Wes Cilldhaire <billybobjoehenrybob@hotmail.com>.
+ *
  * (26/11/2002) ganesh
  * 	Added insmod options to specify product and vendor id.
  * 	Use modprobe ipaq vendor=0xfoo product=0xbar
@@ -68,9 +72,9 @@
  * Version Information
  */
 
-#define DRIVER_VERSION "v0.4"
+#define DRIVER_VERSION "v0.5"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
-#define DRIVER_DESC "USB Compaq iPAQ, HP Jornada, Casio EM500 driver"
+#define DRIVER_DESC "USB PocketPC PDA driver"
 
 static int	product, vendor;
 
@@ -94,10 +98,36 @@ static void ipaq_destroy_lists(struct usb_serial_port *port);
 static struct usb_device_id ipaq_id_table [] = {
 	/* The first entry is a placeholder for the insmod-specified device */
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
+	{ USB_DEVICE(ASKEY_VENDOR_ID, ASKEY_PRODUCT_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0065_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0066_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0067_ID) },
+	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_2001_ID) },
+	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_EM500_ID) },
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
+	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_0032_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
-	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_EM500_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5216_ID) },
+	{ USB_DEVICE(LINKUP_VENDOR_ID, LINKUP_PRODUCT_ID) },
+	{ USB_DEVICE(MICROSOFT_VENDOR_ID, MICROSOFT_00CE_ID) },
+	{ USB_DEVICE(PORTATEC_VENDOR_ID, PORTATEC_PRODUCT_ID) },
+	{ USB_DEVICE(SAGEM_VENDOR_ID, SAGEM_WIRELESS_ID) },
+	{ USB_DEVICE(SOCKET_VENDOR_ID, SOCKET_PRODUCT_ID) },
+	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_PRODUCT_ID) },
+	{ USB_DEVICE(HTC_VENDOR_ID, HTC_PRODUCT_ID) },
+	{ USB_DEVICE(NEC_VENDOR_ID, NEC_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -114,7 +144,7 @@ static struct usb_driver ipaq_driver = {
 /* All of the device info needed for the Compaq iPAQ */
 struct usb_serial_device_type ipaq_device = {
 	.owner =		THIS_MODULE,
-	.name =			"Compaq iPAQ",
+	.name =			"PocketPC PDA",
 	.id_table =		ipaq_id_table,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		1,
@@ -156,7 +186,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		err("%s - Out of memory", __FUNCTION__);
 		return -ENOMEM;
 	}
-	port->private = (void *)priv;
+	usb_set_serial_port_data(port, priv);
 	priv->active = 0;
 	priv->queue_len = 0;
 	INIT_LIST_HEAD(&priv->queue);
@@ -251,7 +281,7 @@ error:
 static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial	*serial;
-	struct ipaq_private	*priv = port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	if (port_paranoia_check(port, __FUNCTION__)) {
 		return; 
@@ -271,7 +301,7 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	usb_unlink_urb(port->read_urb);
 	ipaq_destroy_lists(port);
 	kfree(priv);
-	port->private = NULL;
+	usb_set_serial_port_data(port, NULL);
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -355,7 +385,7 @@ static int ipaq_write(struct usb_serial_port *port, int from_user, const unsigne
 static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const unsigned char *buf,
 			   int count)
 {
-	struct ipaq_private	*priv = port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct ipaq_packet	*pkt = NULL;
 	int			result = 0;
 	unsigned long		flags;
@@ -406,7 +436,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 
 static void ipaq_write_gather(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct usb_serial	*serial = port->serial;
 	int			count, room;
 	struct ipaq_packet	*pkt;
@@ -448,7 +478,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port	*port = (struct usb_serial_port *)urb->context;
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	unsigned long		flags;
 	int			result;
 
@@ -480,7 +510,7 @@ static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 
 static int ipaq_write_room(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	dbg("%s - freelen %d", __FUNCTION__, priv->free_len);
 	return priv->free_len;
@@ -488,7 +518,7 @@ static int ipaq_write_room(struct usb_serial_port *port)
 
 static int ipaq_chars_in_buffer(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	dbg("%s - queuelen %d", __FUNCTION__, priv->queue_len);
 	return priv->queue_len;
@@ -496,7 +526,7 @@ static int ipaq_chars_in_buffer(struct usb_serial_port *port)
 
 static void ipaq_destroy_lists(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct list_head	*tmp;
 	struct ipaq_packet	*pkt;
 

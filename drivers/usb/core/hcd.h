@@ -145,26 +145,6 @@ struct usb_operations {
 			dma_addr_t *dma);
 	void (*buffer_free)(struct usb_bus *bus, size_t size,
 			void *addr, dma_addr_t dma);
-
-	int (*buffer_map) (struct usb_bus *bus,
-		void *addr, dma_addr_t *dma,
-		size_t size, int direction);
-	void (*buffer_dmasync) (struct usb_bus *bus,
-		dma_addr_t dma,
-		size_t size, int direction);
-	void (*buffer_unmap) (struct usb_bus *bus,
-		dma_addr_t dma,
-		size_t size, int direction);
-
-	int (*buffer_map_sg) (struct usb_bus *bus,
-		struct scatterlist *sg, int *n_hw_ents,
-		int nents, int direction);
-	void (*buffer_dmasync_sg) (struct usb_bus *bus,
-		struct scatterlist *sg,
-		int n_hw_ents, int direction);
-	void (*buffer_unmap_sg) (struct usb_bus *bus,
-		struct scatterlist *sg,
-		int n_hw_ents, int direction);
 };
 
 /* each driver provides one of these, and hardware init support */
@@ -247,23 +227,6 @@ void *hcd_buffer_alloc (struct usb_bus *bus, size_t size,
 	int mem_flags, dma_addr_t *dma);
 void hcd_buffer_free (struct usb_bus *bus, size_t size,
 	void *addr, dma_addr_t dma);
-
-int hcd_buffer_map (struct usb_bus *bus,
-	void *addr, dma_addr_t *dma,
-	size_t size, int direction);
-void hcd_buffer_dmasync (struct usb_bus *bus,
-	dma_addr_t dma,
-	size_t size, int direction);
-void hcd_buffer_unmap (struct usb_bus *bus,
-	dma_addr_t dma,
-	size_t size, int direction);
-int hcd_buffer_map_sg (struct usb_bus *bus, struct scatterlist *sg,
-		       int *n_hw_ents, int nents, int direction);
-void hcd_buffer_sync_sg (struct usb_bus *bus, struct scatterlist *sg,
-			 int n_hw_ents, int direction);
-
-void hcd_buffer_unmap_sg (struct usb_bus *bus, struct scatterlist *sg,
-			  int n_hw_ents, int direction);
 
 /* generic bus glue, needed for host controllers that don't use PCI */
 extern struct usb_operations usb_hcd_operations;

@@ -163,7 +163,7 @@ static int pl2303_startup (struct usb_serial *serial)
 		if (!priv)
 			return -ENOMEM;
 		memset (priv, 0x00, sizeof (struct pl2303_private));
-		serial->port[i].private = priv;
+		usb_set_serial_port_data(&serial->port[i], priv);
 	}
 	return 0;
 }
@@ -204,7 +204,7 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 	port->write_urb->dev = port->serial->dev;
 	result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 	if (result)
-		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
 	else
 		result = count;
 
@@ -216,24 +216,23 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 static void pl2303_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 {
 	struct usb_serial *serial = port->serial;
-	struct pl2303_private *priv;
+	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned int cflag;
 	unsigned char *buf;
 	int baud;
 	int i;
 
-	dbg("%s -  port %d, initialized = %d", __FUNCTION__, port->number, 
-	     ((struct pl2303_private *) port->private)->termios_initialized);
+	dbg("%s -  port %d, initialized = %d", __FUNCTION__, port->number, priv->termios_initialized);
 
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg("%s - no tty structures", __FUNCTION__);
 		return;
 	}
 
-	if (!(((struct pl2303_private *) port->private)->termios_initialized)) {
+	if (!priv->termios_initialized) {
 		*(port->tty->termios) = tty_std_termios;
 		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-		((struct pl2303_private *) port->private)->termios_initialized = 1;
+		priv->termios_initialized = 1;
 	}
 	cflag = port->tty->termios->c_cflag;
 	/* check that they really want us to change something */
@@ -247,7 +246,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 
 	buf = kmalloc (7, GFP_KERNEL);
 	if (!buf) {
-		err("%s - out of memory.", __FUNCTION__);
+		dev_err(port->dev, "%s - out of memory.\n", __FUNCTION__);
 		return;
 	}
 	memset (buf, 0x00, 0x07);
@@ -295,7 +294,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 		case B230400:	baud = 230400;	break;
 		case B460800:	baud = 460800;	break;
 		default:
-			err ("pl2303 driver does not support the baudrate requested (fix it)");
+			dev_err(port->dev, "pl2303 driver does not support the baudrate requested (fix it)\n");
 			break;
 	}
 	dbg("%s - baud = %d", __FUNCTION__, baud);
@@ -341,7 +340,6 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	dbg ("0x21:0x20:0:0  %d", i);
 
 	if (cflag && CBAUD) {
-		priv = port->private;
 		if ((cflag && CBAUD) == B0)
 			priv->line_control &= ~(CONTROL_DTR | CONTROL_RTS);
 		else
@@ -413,7 +411,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	port->read_urb->dev = serial->dev;
 	result = usb_submit_urb (port->read_urb, GFP_KERNEL);
 	if (result) {
-		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 		pl2303_close (port, NULL);
 		return -EPROTO;
 	}
@@ -422,7 +420,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	port->interrupt_in_urb->dev = serial->dev;
 	result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
 	if (result) {
-		err("%s - failed submitting interrupt urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting interrupt urb, error %d\n", __FUNCTION__, result);
 		pl2303_close (port, NULL);
 		return -EPROTO;
 	}
@@ -450,7 +448,7 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 			c_cflag = port->tty->termios->c_cflag;
 			if (c_cflag & HUPCL) {
 				/* drop DTR and RTS */
-				priv = port->private;
+				priv = usb_get_serial_port_data(port);
 				priv->line_control = 0;
 				set_control_lines (port->serial->dev,
 						   priv->line_control);
@@ -481,7 +479,7 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 
 static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsigned int *value)
 {
-	struct pl2303_private *priv = port->private;
+	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned int arg;
 
 	if (copy_from_user(&arg, value, sizeof(int)))
@@ -516,7 +514,7 @@ static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsig
 
 static int get_modem_info (struct usb_serial_port *port, unsigned int *value)
 {
-	struct pl2303_private *priv = port->private;
+	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned int mcr = priv->line_control;
 	unsigned int result;
 
@@ -583,8 +581,10 @@ static void pl2303_shutdown (struct usb_serial *serial)
 
 	dbg("%s", __FUNCTION__);
 
-	for (i = 0; i < serial->num_ports; ++i)
-		kfree (serial->port[i].private);
+	for (i = 0; i < serial->num_ports; ++i) {
+		kfree (usb_get_serial_port_data(&serial->port[i]));
+		usb_set_serial_port_data(&serial->port[i], NULL);
+	}		
 }
 
 
@@ -621,8 +621,8 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 exit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
-		err ("%s - usb_submit_urb failed with result %d",
-		     __FUNCTION__, status);
+		dev_err(urb->dev->dev, "%s - usb_submit_urb failed with result %d\n",
+			__FUNCTION__, status);
 }
 
 
@@ -658,7 +658,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			urb->dev = serial->dev;
 			result = usb_submit_urb(urb, GFP_ATOMIC);
 			if (result)
-				err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
+				dev_err(urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 			return;
 		}
 		dbg("%s - unable to handle the error, exiting.", __FUNCTION__);
@@ -683,7 +683,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		urb->dev = serial->dev;
 		result = usb_submit_urb(urb, GFP_ATOMIC);
 		if (result)
-			err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
+			dev_err(urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 	}
 
 	return;
@@ -712,7 +712,7 @@ static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		port->write_urb->dev = port->serial->dev;
 		result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 		if (result)
-			err("%s - failed resubmitting write urb, error %d", __FUNCTION__, result);
+			dev_err(urb->dev->dev, "%s - failed resubmitting write urb, error %d\n", __FUNCTION__, result);
 
 		return;
 	}
