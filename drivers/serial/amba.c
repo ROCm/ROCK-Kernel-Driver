@@ -706,11 +706,7 @@ void __init ambauart_console_init(void)
 static struct uart_driver amba_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyAM",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttyAM%d",
-#else
-	.dev_name		= "ttyAM",
-#endif
 	.major			= SERIAL_AMBA_MAJOR,
 	.minor			= SERIAL_AMBA_MINOR,
 	.nr			= UART_NR,

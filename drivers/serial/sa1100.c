@@ -827,11 +827,7 @@ void __init sa1100_rs_console_init(void)
 static struct uart_driver sa1100_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttySA",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttySA%d",
-#else
-	.dev_name		= "ttySA",
-#endif
 	.major			= SERIAL_SA1100_MAJOR,
 	.minor			= MINOR_START,
 	.nr			= NR_PORTS,

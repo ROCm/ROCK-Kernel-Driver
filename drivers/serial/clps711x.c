@@ -50,14 +50,12 @@
 #define UART_NR		2
 
 #ifndef CONFIG_SERIAL_CLPS711X_OLD_NAME
-#define SERIAL_CLPS711X_NAME	"ttyCL"
 #define SERIAL_CLPS711X_MAJOR	204
 #define SERIAL_CLPS711X_MINOR	40
 #define SERIAL_CLPS711X_NR	UART_NR
 
 #else
 #warning The old names/device number for this driver if compatabity is needed
-#define SERIAL_CLPS711X_NAME    "ttyAM"
 #define SERIAL_CLPS711X_MAJOR   204
 #define SERIAL_CLPS711X_MINOR   16
 #define SERIAL_CLPS711X_NR      UART_NR
@@ -545,7 +543,7 @@ static int __init clps711xuart_console_setup(struct console *co, char *options)
 }
 
 static struct console clps711x_console = {
-	.name		= SERIAL_CLPS711X_NAME,
+	.name		= "ttyCL",
 	.write		= clps711xuart_console_write,
 	.device		= clps711xuart_console_device,
 	.setup		= clps711xuart_console_setup,
@@ -565,12 +563,7 @@ void __init clps711xuart_console_init(void)
 
 static struct uart_driver clps711x_reg = {
 	.driver_name		= "ttyCL",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name		= SERIAL_CLPS711X_NAME,
-#else
-	.dev_name		= SERIAL_CLPS711X_NAME,
-#endif
-
+	.dev_name		= "ttyCL%d",
 	.major			= SERIAL_CLPS711X_MAJOR,
 	.minor			= SERIAL_CLPS711X_MINOR,
 	.nr			= UART_NR,

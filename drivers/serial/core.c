@@ -1981,7 +1981,8 @@ static int uart_pm(struct pm_dev *dev, pm_request_t rqst, void *data)
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
-	printk("%s%d at ", drv->dev_name, port->line);
+	printk(drv->dev_name, port->line);
+	printk(" at ");
 	switch (port->iotype) {
 	case UPIO_PORT:
 		printk("I/O 0x%x", port->iobase);
@@ -2439,8 +2440,9 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	struct uart_state *state;
 
 	if (line < 0 || line >= drv->nr) {
-		printk(KERN_ERR "Attempt to unregister %s%d\n",
-			drv->dev_name, line);
+		printk(KERN_ERR "Attempt to unregister ");
+		printk(drv->dev_name, line);
+		printk("\n");
 		return;
 	}
 

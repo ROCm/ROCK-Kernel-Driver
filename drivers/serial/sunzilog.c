@@ -1003,7 +1003,7 @@ static struct uart_driver sunzilog_reg = {
 #ifdef CONFIG_DEVFS_FS
 	.dev_name	=	"ttyS%d",
 #else
-	.dev_name	=	"ttyS",
+	.dev_name	=	"ttyS%d",
 #endif
 	.major		=	TTY_MAJOR,
 };

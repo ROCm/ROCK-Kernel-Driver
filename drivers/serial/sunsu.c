@@ -1262,7 +1262,7 @@ static struct uart_driver sunsu_reg = {
 #ifdef CONFIG_DEVFS_FS
 	.dev_name		= "tts/%d",
 #else
-	.dev_name		= "ttyS",
+	.dev_name		= "ttyS%d",
 #endif
 	.major			= TTY_MAJOR,
 };

@@ -485,11 +485,7 @@ void __init rs285_console_init(void)
 static struct uart_driver serial21285_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyFB",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttyFB%d",
-#else
-	.dev_name		= "ttyFB",
-#endif
 	.major			= SERIAL_21285_MAJOR,
 	.minor			= SERIAL_21285_MINOR,
 	.nr			= 1,
