@@ -652,12 +652,13 @@ cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	return err ? err :  count;
 }
 
+static char write_buf[8192]; /* protected by queue_io_sem */
+
 static ssize_t
 cache_write(struct file *filp, const char *buf, size_t count,
 	    loff_t *ppos)
 {
 	int err;
-	char *page;
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
 
 	if (ppos != &filp->f_pos)
@@ -665,31 +666,22 @@ cache_write(struct file *filp, const char *buf, size_t count,
 
 	if (count == 0)
 		return 0;
-	if (count > PAGE_SIZE)
+	if (count >= sizeof(write_buf))
 		return -EINVAL;
 
 	down(&queue_io_sem);
 
-	page = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (page == NULL) {
+	if (copy_from_user(write_buf, buf, count)) {
 		up(&queue_io_sem);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(page, buf, count)) {
-		up(&queue_io_sem);
-		kfree(page);
 		return -EFAULT;
 	}
-	if (count < PAGE_SIZE)
-		page[count] = '\0';
+	write_buf[count] = '\0';
 	if (cd->cache_parse)
-		err = cd->cache_parse(cd, page, count);
+		err = cd->cache_parse(cd, write_buf, count);
 	else
 		err = -EINVAL;
 
 	up(&queue_io_sem);
-	kfree(page);
 	return err ? err : count;
 }
 
