@@ -16,12 +16,16 @@
 
 static inline pte_t *lookup_address(unsigned long address) 
 { 
-	pgd_t *pgd = pgd_offset_k(address); 
+	pgd_t *pgd = pgd_offset_k(address);
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	if (!pgd || !pgd_present(*pgd))
+	if (pgd_none(*pgd))
+		return NULL;
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
 		return NULL; 
-	pmd = pmd_offset(pgd, address); 	       
+	pmd = pmd_offset(pud, address);
 	if (!pmd_present(*pmd))
 		return NULL; 
 	if (pmd_large(*pmd))
@@ -98,16 +102,20 @@ static inline void save_page(unsigned long address, struct page *fpage)
  */
 static void revert_page(unsigned long address, pgprot_t ref_prot)
 {
-       pgd_t *pgd;
-       pmd_t *pmd; 
-       pte_t large_pte; 
-       
-       pgd = pgd_offset_k(address); 
-       pmd = pmd_offset(pgd, address);
-       BUG_ON(pmd_val(*pmd) & _PAGE_PSE); 
-       pgprot_val(ref_prot) |= _PAGE_PSE;
-       large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, ref_prot);
-       set_pte((pte_t *)pmd, large_pte);
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t large_pte;
+
+	pgd = pgd_offset_k(address);
+	BUG_ON(pgd_none(*pgd));
+	pud = pud_offset(pgd,address);
+	BUG_ON(pud_none(*pud));
+	pmd = pmd_offset(pud, address);
+	BUG_ON(pmd_val(*pmd) & _PAGE_PSE);
+	pgprot_val(ref_prot) |= _PAGE_PSE;
+	large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, ref_prot);
+	set_pte((pte_t *)pmd, large_pte);
 }      
 
 static int

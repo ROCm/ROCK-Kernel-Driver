@@ -40,23 +40,30 @@ static int use_sysenter = -1;
  */
 int __map_syscall32(struct mm_struct *mm, unsigned long address)
 { 
+	pgd_t *pgd;
+	pgd_t *pud;
 	pte_t *pte;
 	pmd_t *pmd;
-	int err = 0;
+	int err = -ENOMEM;
 
 	spin_lock(&mm->page_table_lock); 
-	pmd = pmd_alloc(mm, pgd_offset(mm, address), address); 
-	if (pmd && (pte = pte_alloc_map(mm, pmd, address)) != NULL) { 
-		if (pte_none(*pte)) { 
-			set_pte(pte, 
-				mk_pte(virt_to_page(syscall32_page), 
-				       PAGE_KERNEL_VSYSCALL)); 
+ 	pgd = pgd_offset(mm, address);
+ 	pud = pud_alloc(mm, pgd, address);
+ 	if (pud) {
+ 		pmd = pmd_alloc(mm, pud, address);
+ 		if (pmd && (pte = pte_alloc_map(mm, pmd, address)) != NULL) {
+ 			if (pte_none(*pte)) {
+ 				set_pte(pte,
+ 					mk_pte(virt_to_page(syscall32_page),
+ 					       PAGE_KERNEL_VSYSCALL));
+ 			}
+ 			/* Flush only the local CPU. Other CPUs taking a fault
+ 			   will just end up here again
+			   This probably not needed and just paranoia. */
+ 			__flush_tlb_one(address);
+ 			err = 0;
 		}
-		/* Flush only the local CPU. Other CPUs taking a fault
-		   will just end up here again */
-		__flush_tlb_one(address); 
-	} else
-		err = -ENOMEM; 
+	}
 	spin_unlock(&mm->page_table_lock);
 	return err;
 }
