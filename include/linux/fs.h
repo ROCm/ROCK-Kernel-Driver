@@ -289,7 +289,6 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
-#include <linux/romfs_fs_i.h>
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -453,8 +452,6 @@ struct inode {
 	unsigned int		i_attr_flags;
 	__u32			i_generation;
 	union {
-		/* struct umsdos_inode_info	umsdos_i; */
-		struct romfs_inode_info		romfs_i;
 		void				*generic_ip;
 	} u;
 };

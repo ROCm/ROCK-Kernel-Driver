@@ -76,6 +76,17 @@
 
 #include <asm/uaccess.h>
 
+struct romfs_inode_info {
+	unsigned long i_metasize;	/* size of non-data area */
+	unsigned long i_dataoffset;	/* from the start of fs */
+	struct inode vfs_inode;
+};
+
+static inline struct romfs_inode_info *ROMFS_I(struct inode *inode)
+{
+	return list_entry(inode, struct romfs_inode_info, vfs_inode);
+}
+
 static __s32
 romfs_checksum(void *data, int size)
 {
@@ -407,7 +418,7 @@ romfs_readpage(struct file *file, struct page * page)
 	if (offset < inode->i_size) {
 		avail = inode->i_size-offset;
 		readlen = min_t(unsigned long, avail, PAGE_SIZE);
-		if (romfs_copyfrom(inode, buf, inode->u.romfs_i.i_dataoffset+offset, readlen) == readlen) {
+		if (romfs_copyfrom(inode, buf, ROMFS_I(inode)->i_dataoffset+offset, readlen) == readlen) {
 			if (readlen < PAGE_SIZE) {
 				memset(buf + readlen,0,PAGE_SIZE-readlen);
 			}
@@ -488,15 +499,15 @@ romfs_read_inode(struct inode *i)
         else
                 ino = 0;
 
-        i->u.romfs_i.i_metasize = ino;
-        i->u.romfs_i.i_dataoffset = ino+(i->i_ino&ROMFH_MASK);
+        ROMFS_I(i)->i_metasize = ino;
+        ROMFS_I(i)->i_dataoffset = ino+(i->i_ino&ROMFH_MASK);
 
         /* Compute permissions */
         ino = romfs_modemap[nextfh & ROMFH_TYPE];
 	/* only "normal" files have ops */
 	switch (nextfh & ROMFH_TYPE) {
 		case 1:
-			i->i_size = i->u.romfs_i.i_metasize;
+			i->i_size = ROMFS_I(i)->i_metasize;
 			i->i_op = &romfs_dir_inode_operations;
 			i->i_fop = &romfs_dir_operations;
 			if (nextfh & ROMFH_EXEC)
