@@ -137,7 +137,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.29-k3";
+char e100_driver_version[]="2.1.29-k4";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -189,7 +189,7 @@ void e100_set_speed_duplex(struct e100_private *);
 char *e100_get_brand_msg(struct e100_private *);
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
-static void e100_tco_walkaround(struct e100_private *);
+static void e100_tco_workaround(struct e100_private *);
 static unsigned char e100_alloc_space(struct e100_private *);
 static void e100_dealloc_space(struct e100_private *);
 static int e100_alloc_tcb_pool(struct e100_private *);
@@ -1284,7 +1284,7 @@ e100_sw_init(struct e100_private *bdp)
 }
 
 static void __devinit
-e100_tco_walkaround(struct e100_private *bdp)
+e100_tco_workaround(struct e100_private *bdp)
 {
 	int i;
 
@@ -1297,26 +1297,26 @@ e100_tco_walkaround(struct e100_private *bdp)
 
 	/* Wait 20 msec for reset to take effect */
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 50);
+	schedule_timeout(HZ / 50 + 1);
 
 	/* disable interrupts since they are enabled */
 	/* after device reset                        */
 	e100_disable_clear_intr(bdp);
 
 	/* Wait for command to be cleared up to 1 sec */
-	for (i=0; i<1000; i++) {
+	for (i=0; i<100; i++) {
 		if (!readb(&bdp->scb->scb_cmd_low))
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 1000);
+		schedule_timeout(HZ / 100 + 1);
 	}
 
 	/* Wait for TCO request bit in PMDR register to be clear */
-	for (i=0; i<500; i++) {
+	for (i=0; i<50; i++) {
 		if (!(readb(&bdp->scb->scb_ext.d101m_scb.scb_pmdr) & BIT_1))
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 1000);
+		schedule_timeout(HZ / 100 + 1);
 	}
 }
 
@@ -1341,9 +1341,9 @@ e100_hw_init(struct e100_private *bdp)
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
-	/* Only 82559 or above needs TCO walkaround */
+	/* Only 82559 or above needs TCO workaround */
 	if (bdp->rev_id >= D101MA_REV_ID)
-		e100_tco_walkaround(bdp);
+		e100_tco_workaround(bdp);
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
