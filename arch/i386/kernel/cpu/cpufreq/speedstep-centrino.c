@@ -363,6 +363,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned freq;
 	unsigned l, h;
+	int ret;
 
 	if (policy->cpu != 0)
 		return -ENODEV;
@@ -398,13 +399,21 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	dprintk(KERN_INFO PFX "centrino_cpu_init: policy=%d cur=%dkHz\n",
 		policy->policy, policy->cur);
 	
-	return cpufreq_frequency_table_cpuinfo(policy, centrino_model->op_points);
+	ret = cpufreq_frequency_table_cpuinfo(policy, centrino_model->op_points);
+	if (ret)
+		return (ret);
+
+	cpufreq_frequency_table_get_attr(centrino_model->op_points, policy->cpu);
+
+	return 0;
 }
 
 static int centrino_cpu_exit(struct cpufreq_policy *policy)
 {
 	if (!centrino_model)
 		return -ENODEV;
+
+	cpufreq_frequency_table_put_attr(policy->cpu);
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
 	if (!centrino_model->model_name) {
@@ -492,6 +501,11 @@ static int centrino_target (struct cpufreq_policy *policy,
 	return 0;
 }
 
+static struct freq_attr* centrino_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
 static struct cpufreq_driver centrino_driver = {
 	.name		= "centrino", /* should be speedstep-centrino, 
 					 but there's a 16 char limit */
@@ -499,6 +513,7 @@ static struct cpufreq_driver centrino_driver = {
 	.exit		= centrino_cpu_exit,
 	.verify 	= centrino_verify,
 	.target 	= centrino_target,
+	.attr           = centrino_attr,
 	.owner		= THIS_MODULE,
 };
 
