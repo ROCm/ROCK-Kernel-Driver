@@ -239,9 +239,10 @@ do_more:
 		BUFFER_TRACE(bitmap_bh, "clear bit");
 		if (!ext3_clear_bit_atomic(sb_bgl_lock(sbi, block_group),
 						bit + i, bitmap_bh->b_data)) {
-			ext3_error (sb, __FUNCTION__,
-				      "bit already cleared for block %lu", 
-				      block + i);
+			jbd_unlock_bh_state(bitmap_bh);
+			ext3_error(sb, __FUNCTION__,
+				"bit already cleared for block %lu", block + i);
+			jbd_lock_bh_state(bitmap_bh);
 			BUFFER_TRACE(bitmap_bh, "bit already cleared");
 		} else {
 			dquot_freed_blocks++;
