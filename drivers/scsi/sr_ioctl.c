@@ -160,13 +160,11 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 			if (!cgc->quiet)
 				printk(KERN_ERR "%s: CDROM (ioctl) reports ILLEGAL "
 				       "REQUEST.\n", cd->cdi.name);
+			err = -EIO;
 			if (SRpnt->sr_sense_buffer[12] == 0x20 &&
-			    SRpnt->sr_sense_buffer[13] == 0x00) {
+			    SRpnt->sr_sense_buffer[13] == 0x00)
 				/* sense: Invalid command operation code */
 				err = -EDRIVE_CANT_DO_THIS;
-			} else {
-				err = -EINVAL;
-			}
 #ifdef DEBUG
 			print_command(cgc->cmd);
 			print_req_sense("sr", SRpnt);

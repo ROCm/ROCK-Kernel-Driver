@@ -101,6 +101,7 @@ struct bio {
 #define BIO_EOF		2	/* out-out-bounds error */
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
+#define BIO_BOUNCED	5	/* bio is a bounce bio */
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
@@ -201,7 +202,7 @@ struct bio {
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
-extern int bio_endio(struct bio *, unsigned int, int);
+extern void bio_endio(struct bio *, unsigned int, int);
 struct request_queue;
 extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);

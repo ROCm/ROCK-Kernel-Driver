@@ -417,12 +417,12 @@ dio_bio_add_page(struct dio *dio, struct page *page,
 
 	/* Take a ref against the page each time it is placed into a BIO */
 	page_cache_get(page);
-	if (bio_add_page(dio->bio, page, bv_len, bv_offset)) {
+	if (bio_add_page(dio->bio, page, bv_len, bv_offset) < bv_len) {
 		dio_bio_submit(dio);
 		ret = dio_new_bio(dio, blkno);
 		if (ret == 0) {
 			ret = bio_add_page(dio->bio, page, bv_len, bv_offset);
-			BUG_ON(ret != 0);
+			BUG_ON(ret < bv_len);
 		} else {
 			/* The page didn't make it into a BIO */
 			page_cache_release(page);
