@@ -1038,7 +1038,7 @@ static int snd_pcm_resume(snd_pcm_substream_t *substream)
 
 	snd_power_lock(card);
 	if ((res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) >= 0)
-		return snd_pcm_action_lock_irq(&snd_pcm_action_resume, substream, 0, 0);
+		res = snd_pcm_action_lock_irq(&snd_pcm_action_resume, substream, 0, 0);
 	snd_power_unlock(card);
 	return res;
 }
