@@ -825,8 +825,9 @@ static unsigned int snd_opti93x_get_count(unsigned char format,
 	return (format & OPTi93X_STEREO) ? (size >> 1) : size;
 }
 
-unsigned int rates[] = {  5512,  6615,  8000,  9600, 11025, 16000, 18900,
-			 22050, 27428, 32000, 33075, 37800, 44100, 48000 };
+static unsigned int rates[] = {  5512,  6615,  8000,  9600, 11025, 16000, 
+				18900, 22050, 27428, 32000, 33075, 37800,
+				44100, 48000 };
 #define RATES sizeof(rates) / sizeof(rates[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
@@ -835,8 +836,9 @@ static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
 	.mask = 0,
 };
 
-unsigned char bits[] = {  0x01,  0x0f,  0x00,  0x0e,  0x03,  0x02,  0x05,
-			  0x07,  0x04,  0x06,  0x0d,  0x09,  0x0b,  0x0c};
+static unsigned char bits[] = {  0x01,  0x0f,  0x00,  0x0e,  0x03,  0x02,
+				 0x05,  0x07,  0x04,  0x06,  0x0d,  0x09,
+				 0x0b,  0x0c};
 
 static unsigned char snd_opti93x_get_freq(unsigned int rate)
 {
