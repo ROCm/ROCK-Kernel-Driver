@@ -726,6 +726,16 @@ config FB_NEOMAGIC
 	  To compile this driver as a module, choose M here: the
 	  module will be called neofb.
 
+config FB_KYRO
+	tristate "IMG Kyro support"
+	depends on FB && PCI
+	help
+	  Say Y here if you have a STG4000 / Kyro / PowerVR 3 based
+	  graphics board.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kyrofb.
+
 config FB_3DFX
 	tristate "3Dfx Banshee/Voodoo3 display support"
 	depends on FB && PCI
