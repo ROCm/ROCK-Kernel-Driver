@@ -41,8 +41,6 @@
 #define _COMPONENT		ACPI_PCI_COMPONENT
 ACPI_MODULE_NAME		("pci_irq")
 
-#define PREFIX			"PCI: "
-
 struct acpi_prt_list		acpi_prt;
 
 #ifdef CONFIG_X86

@@ -32,116 +32,17 @@
 
 #define ACPI_MAX_STRING			80
 
-
-/* --------------------------------------------------------------------------
-                                    ACPI Bus
-   -------------------------------------------------------------------------- */
-
 #define ACPI_BUS_COMPONENT		0x00010000
-#define ACPI_BUS_CLASS			"system_bus"
-#define ACPI_BUS_HID			"ACPI_BUS"
-#define ACPI_BUS_DRIVER_NAME		"ACPI Bus Driver"
-#define ACPI_BUS_DEVICE_NAME		"System Bus"
+#define ACPI_SYSTEM_COMPONENT		0x02000000
 
+/* _HID definitions */
 
-/* --------------------------------------------------------------------------
-                                  AC Adapter
-   -------------------------------------------------------------------------- */
-
-#define ACPI_AC_COMPONENT		0x00020000
-#define ACPI_AC_CLASS			"ac_adapter"
-#define ACPI_AC_HID 			"ACPI0003"
-#define ACPI_AC_DRIVER_NAME		"ACPI AC Adapter Driver"
-#define ACPI_AC_DEVICE_NAME		"AC Adapter"
-#define ACPI_AC_FILE_STATE		"state"
-#define ACPI_AC_NOTIFY_STATUS		0x80
-#define ACPI_AC_STATUS_OFFLINE		0x00
-#define ACPI_AC_STATUS_ONLINE		0x01
-#define ACPI_AC_STATUS_UNKNOWN		0xFF
-
-
-/* --------------------------------------------------------------------------
-                                     Battery
-   -------------------------------------------------------------------------- */
-
-#define ACPI_BATTERY_COMPONENT		0x00040000
-#define ACPI_BATTERY_CLASS		"battery"
-#define ACPI_BATTERY_HID		"PNP0C0A"
-#define ACPI_BATTERY_DRIVER_NAME	"ACPI Battery Driver"
-#define ACPI_BATTERY_DEVICE_NAME	"Battery"
-#define ACPI_BATTERY_FILE_INFO		"info"
-#define ACPI_BATTERY_FILE_STATUS	"state"
-#define ACPI_BATTERY_FILE_ALARM		"alarm"
-#define ACPI_BATTERY_NOTIFY_STATUS	0x80
-#define ACPI_BATTERY_NOTIFY_INFO	0x81
-#define ACPI_BATTERY_UNITS_WATTS	"mW"
-#define ACPI_BATTERY_UNITS_AMPS		"mA"
-
-
-/* --------------------------------------------------------------------------
-                                      Button
-   -------------------------------------------------------------------------- */
-
-#define ACPI_BUTTON_COMPONENT		0x00080000
-#define ACPI_BUTTON_DRIVER_NAME		"ACPI Button Driver"
-#define ACPI_BUTTON_CLASS		"button"
-#define ACPI_BUTTON_FILE_INFO		"info"
-#define ACPI_BUTTON_TYPE_UNKNOWN	0x00
-#define ACPI_BUTTON_NOTIFY_STATUS	0x80
-
-#define ACPI_BUTTON_SUBCLASS_POWER	"power"
-#define ACPI_BUTTON_HID_POWER		"PNP0C0C"	
+#define ACPI_POWER_HID			"ACPI_PWR"
+#define ACPI_PROCESSOR_HID		"ACPI_CPU"
+#define ACPI_SYSTEM_HID			"ACPI_SYS"
+#define ACPI_THERMAL_HID		"ACPI_THM"
 #define ACPI_BUTTON_HID_POWERF		"ACPI_FPB"
-#define ACPI_BUTTON_DEVICE_NAME_POWER	"Power Button (CM)"
-#define ACPI_BUTTON_DEVICE_NAME_POWERF	"Power Button (FF)"
-#define ACPI_BUTTON_TYPE_POWER		0x01
-#define ACPI_BUTTON_TYPE_POWERF		0x02
-
-#define ACPI_BUTTON_SUBCLASS_SLEEP	"sleep"
-#define ACPI_BUTTON_HID_SLEEP		"PNP0C0E"
 #define ACPI_BUTTON_HID_SLEEPF		"ACPI_FSB"
-#define ACPI_BUTTON_DEVICE_NAME_SLEEP	"Sleep Button (CM)"
-#define ACPI_BUTTON_DEVICE_NAME_SLEEPF	"Sleep Button (FF)"
-#define ACPI_BUTTON_TYPE_SLEEP		0x03
-#define ACPI_BUTTON_TYPE_SLEEPF		0x04
-
-#define ACPI_BUTTON_SUBCLASS_LID	"lid"
-#define ACPI_BUTTON_HID_LID		"PNP0C0D"
-#define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
-#define ACPI_BUTTON_TYPE_LID		0x05
-
-
-/* --------------------------------------------------------------------------
-                                Embedded Controller
-   -------------------------------------------------------------------------- */
-
-#define ACPI_EC_COMPONENT		0x00100000
-#define ACPI_EC_CLASS			"embedded_controller"
-#define ACPI_EC_HID			"PNP0C09"
-#define ACPI_EC_DRIVER_NAME		"ACPI Embedded Controller Driver"
-#define ACPI_EC_DEVICE_NAME		"Embedded Controller"
-#define ACPI_EC_FILE_INFO		"info"
-
-#ifdef CONFIG_ACPI_EC
-
-int acpi_ec_ecdt_probe (void);
-int acpi_ec_init (void);
-void acpi_ec_exit (void);
-
-#endif
-
-
-/* --------------------------------------------------------------------------
-                                       Fan
-   -------------------------------------------------------------------------- */
-
-#define ACPI_FAN_COMPONENT		0x00200000
-#define ACPI_FAN_CLASS			"fan"
-#define ACPI_FAN_HID			"PNP0C0B"
-#define ACPI_FAN_DRIVER_NAME		"ACPI Fan Driver"
-#define ACPI_FAN_DEVICE_NAME		"Fan"
-#define ACPI_FAN_FILE_STATE		"state"
-#define ACPI_FAN_NOTIFY_STATUS		0x80
 
 
 /* --------------------------------------------------------------------------
@@ -154,28 +55,12 @@ void acpi_ec_exit (void);
 
 /* ACPI PCI Root Bridge (pci_root.c) */
 
-#define ACPI_PCI_ROOT_CLASS		"pci_bridge"
-#define ACPI_PCI_ROOT_HID		"PNP0A03"
-#define ACPI_PCI_ROOT_DRIVER_NAME	"ACPI PCI Root Bridge Driver"
-#define ACPI_PCI_ROOT_DEVICE_NAME	"PCI Root Bridge"
-
-int acpi_pci_root_init (void);
-void acpi_pci_root_exit (void);
 void acpi_pci_get_translations (acpi_pci_id* id, u64* mem_tra, u64* io_tra);
 
 /* ACPI PCI Interrupt Link (pci_link.c) */
 
-#define ACPI_PCI_LINK_CLASS		"pci_irq_routing"
-#define ACPI_PCI_LINK_HID		"PNP0C0F"
-#define ACPI_PCI_LINK_DRIVER_NAME	"ACPI PCI Interrupt Link Driver"
-#define ACPI_PCI_LINK_DEVICE_NAME	"PCI Interrupt Link"
-#define ACPI_PCI_LINK_FILE_INFO		"info"
-#define ACPI_PCI_LINK_FILE_STATUS	"state"
-
 int acpi_pci_link_check (void);
 int acpi_pci_link_get_irq (acpi_handle handle, int index);
-int acpi_pci_link_init (void);
-void acpi_pci_link_exit (void);
 
 /* ACPI PCI Interrupt Routing (pci_irq.c) */
 
@@ -195,98 +80,29 @@ int acpi_pci_bind_root (struct acpi_device *device, acpi_pci_id *id, struct pci_
                                   Power Resource
    -------------------------------------------------------------------------- */
 
-#define ACPI_POWER_COMPONENT		0x00800000
-#define ACPI_POWER_CLASS		"power_resource"
-#define ACPI_POWER_HID			"ACPI_PWR"
-#define ACPI_POWER_DRIVER_NAME		"ACPI Power Resource Driver"
-#define ACPI_POWER_DEVICE_NAME		"Power Resource"
-#define ACPI_POWER_FILE_INFO		"info"
-#define ACPI_POWER_FILE_STATUS		"state"
-#define ACPI_POWER_RESOURCE_STATE_OFF	0x00
-#define ACPI_POWER_RESOURCE_STATE_ON	0x01
-#define ACPI_POWER_RESOURCE_STATE_UNKNOWN 0xFF
-
 #ifdef CONFIG_ACPI_POWER
 
 int acpi_power_get_inferred_state (struct acpi_device *device);
 int acpi_power_transition (struct acpi_device *device, int state);
-int acpi_power_init (void);
-void acpi_power_exit (void);
-
 #endif
 
+
+/* --------------------------------------------------------------------------
+                                  Embedded Controller
+   -------------------------------------------------------------------------- */
+#ifdef CONFIG_ACPI_EC
+int acpi_ec_ecdt_probe (void);
+#endif
 
 /* --------------------------------------------------------------------------
                                     Processor
    -------------------------------------------------------------------------- */
 
-#define ACPI_PROCESSOR_COMPONENT	0x01000000
-#define ACPI_PROCESSOR_CLASS		"processor"
-#define ACPI_PROCESSOR_HID		"ACPI_CPU"
-#define ACPI_PROCESSOR_DRIVER_NAME	"ACPI Processor Driver"
-#define ACPI_PROCESSOR_DEVICE_NAME	"Processor"
-#define ACPI_PROCESSOR_FILE_INFO	"info"
-#define ACPI_PROCESSOR_FILE_POWER	"power"
-#define ACPI_PROCESSOR_FILE_PERFORMANCE	"performance"
-#define ACPI_PROCESSOR_FILE_THROTTLING	"throttling"
-#define ACPI_PROCESSOR_FILE_LIMIT	"limit"
-#define ACPI_PROCESSOR_NOTIFY_PERFORMANCE 0x80
-#define ACPI_PROCESSOR_NOTIFY_POWER	0x81
 #define ACPI_PROCESSOR_LIMIT_NONE	0x00
 #define ACPI_PROCESSOR_LIMIT_INCREMENT	0x01
 #define ACPI_PROCESSOR_LIMIT_DECREMENT	0x02
 
 int acpi_processor_set_thermal_limit(acpi_handle handle, int type);
-
-
-/* --------------------------------------------------------------------------
-                                     System
-   -------------------------------------------------------------------------- */
-
-#define ACPI_SYSTEM_COMPONENT		0x02000000
-#define ACPI_SYSTEM_CLASS		"system"
-#define ACPI_SYSTEM_HID			"ACPI_SYS"
-#define ACPI_SYSTEM_DRIVER_NAME		"ACPI System Driver"
-#define ACPI_SYSTEM_DEVICE_NAME		"System"
-#define ACPI_SYSTEM_FILE_INFO		"info"
-#define ACPI_SYSTEM_FILE_EVENT		"event"
-#define ACPI_SYSTEM_FILE_ALARM		"alarm"
-#define ACPI_SYSTEM_FILE_DSDT		"dsdt"
-#define ACPI_SYSTEM_FILE_FADT		"fadt"
-#define ACPI_SYSTEM_FILE_SLEEP		"sleep"
-#define ACPI_SYSTEM_FILE_DEBUG_LAYER	"debug_layer"
-#define ACPI_SYSTEM_FILE_DEBUG_LEVEL	"debug_level"
-
-#ifdef CONFIG_ACPI_SYSTEM
-
-int acpi_system_init (void);
-void acpi_system_exit (void);
-
-#endif
-
-
-/* --------------------------------------------------------------------------
-                                 Thermal Zone
-   -------------------------------------------------------------------------- */
-
-#define ACPI_THERMAL_COMPONENT		0x04000000
-#define ACPI_THERMAL_CLASS		"thermal_zone"
-#define ACPI_THERMAL_HID		"ACPI_THM"
-#define ACPI_THERMAL_DRIVER_NAME	"ACPI Thermal Zone Driver"
-#define ACPI_THERMAL_DEVICE_NAME	"Thermal Zone"
-#define ACPI_THERMAL_FILE_STATE		"state"
-#define ACPI_THERMAL_FILE_TEMPERATURE	"temperature"
-#define ACPI_THERMAL_FILE_TRIP_POINTS	"trip_points"
-#define ACPI_THERMAL_FILE_COOLING_MODE	"cooling_mode"
-#define ACPI_THERMAL_FILE_POLLING_FREQ	"polling_frequency"
-#define ACPI_THERMAL_NOTIFY_TEMPERATURE	0x80
-#define ACPI_THERMAL_NOTIFY_THRESHOLDS	0x81
-#define ACPI_THERMAL_NOTIFY_DEVICES	0x82
-#define ACPI_THERMAL_NOTIFY_CRITICAL	0xF0
-#define ACPI_THERMAL_NOTIFY_HOT		0xF1
-#define ACPI_THERMAL_MODE_ACTIVE	0x00
-#define ACPI_THERMAL_MODE_PASSIVE	0x01
-#define ACPI_THERMAL_PATH_POWEROFF	"/sbin/poweroff"
 
 
 /* --------------------------------------------------------------------------

@@ -45,8 +45,12 @@
 #define _COMPONENT		ACPI_PCI_COMPONENT
 ACPI_MODULE_NAME		("pci_link")
 
-#define PREFIX			"ACPI: "
-
+#define ACPI_PCI_LINK_CLASS		"pci_irq_routing"
+#define ACPI_PCI_LINK_HID		"PNP0C0F"
+#define ACPI_PCI_LINK_DRIVER_NAME	"ACPI PCI Interrupt Link Driver"
+#define ACPI_PCI_LINK_DEVICE_NAME	"PCI Interrupt Link"
+#define ACPI_PCI_LINK_FILE_INFO		"info"
+#define ACPI_PCI_LINK_FILE_STATUS	"state"
 
 #define ACPI_PCI_LINK_MAX_POSSIBLE 16
 
@@ -570,10 +574,12 @@ acpi_pci_link_remove (
 }
 
 
-int __init
-acpi_pci_link_init (void)
+static int __init acpi_pci_link_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_link_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	acpi_link.count = 0;
 	INIT_LIST_HEAD(&acpi_link.entries);
@@ -583,3 +589,5 @@ acpi_pci_link_init (void)
 
 	return_VALUE(0);
 }
+
+subsys_initcall(acpi_pci_link_init);

@@ -38,7 +38,12 @@
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
 
-#define PREFIX			"ACPI: "
+#define ACPI_EC_COMPONENT		0x00100000
+#define ACPI_EC_CLASS			"embedded_controller"
+#define ACPI_EC_HID			"PNP0C09"
+#define ACPI_EC_DRIVER_NAME		"ACPI Embedded Controller Driver"
+#define ACPI_EC_DEVICE_NAME		"Embedded Controller"
+#define ACPI_EC_FILE_INFO		"info"
 
 
 #define ACPI_EC_FLAG_OBF	0x01	/* Output buffer full */
@@ -784,23 +789,23 @@ error:
 }
 
 
-int __init
-acpi_ec_init (void)
+static int __init acpi_ec_init (void)
 {
 	int			result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_init");
 
-	result = acpi_bus_register_driver(&acpi_ec_driver);
-	if (result < 0) {
-		remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
-	}
+	if (acpi_disabled)
+		return_VALUE(0);
 
-	return_VALUE(0);
+	/* Now register the driver for the EC */
+	result = acpi_bus_register_driver(&acpi_ec_driver);
+	return_VALUE(result);
 }
 
-void __exit
+subsys_initcall(acpi_ec_init);
+
+static void __exit
 acpi_ec_ecdt_exit (void)
 {
 	if (!ec_ecdt)
@@ -814,7 +819,7 @@ acpi_ec_ecdt_exit (void)
 	kfree(ec_ecdt);
 }
 
-void __exit
+static void __exit
 acpi_ec_exit (void)
 {
 	int			result = 0;

@@ -36,8 +36,15 @@
 #define _COMPONENT		ACPI_POWER_COMPONENT
 ACPI_MODULE_NAME		("acpi_power")
 
-#define PREFIX			"ACPI: "
-
+#define ACPI_POWER_COMPONENT		0x00800000
+#define ACPI_POWER_CLASS		"power_resource"
+#define ACPI_POWER_DRIVER_NAME		"ACPI Power Resource Driver"
+#define ACPI_POWER_DEVICE_NAME		"Power Resource"
+#define ACPI_POWER_FILE_INFO		"info"
+#define ACPI_POWER_FILE_STATUS		"state"
+#define ACPI_POWER_RESOURCE_STATE_OFF	0x00
+#define ACPI_POWER_RESOURCE_STATE_ON	0x01
+#define ACPI_POWER_RESOURCE_STATE_UNKNOWN 0xFF
 
 int acpi_power_add (struct acpi_device *device);
 int acpi_power_remove (struct acpi_device *device, int type);
@@ -573,12 +580,14 @@ acpi_power_remove (
 }
 
 
-int __init
-acpi_power_init (void)
+static int __init acpi_power_init (void)
 {
 	int			result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_power_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	INIT_LIST_HEAD(&acpi_power_resource_list);
 
@@ -591,19 +600,5 @@ acpi_power_init (void)
 	return_VALUE(0);
 }
 
+subsys_initcall(acpi_power_init);
 
-void __exit
-acpi_power_exit (void)
-{
-	int			result = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_power_exit");
-
-	/* TBD: Empty acpi_power_resource_list */
-
-	result = acpi_bus_unregister_driver(&acpi_power_driver);
-	if (!result)
-		remove_proc_entry(ACPI_POWER_CLASS, acpi_root_dir);
-
-	return_VOID;
-}
