@@ -88,7 +88,6 @@ MODULE_DEVICE_TABLE(usb, rtl8150_table);
 struct rtl8150 {
 	unsigned long flags;
 	struct usb_device *udev;
-	struct semaphore sem;
 	struct tasklet_struct tl;
 	struct net_device_stats stats;
 	struct net_device *netdev;
@@ -638,8 +637,6 @@ static int rtl8150_open(struct net_device *netdev)
 	if (!dev->rx_skb)
 		return -ENOMEM;
 
-	down(&dev->sem);
-
 	set_registers(dev, IDR, 6, netdev->dev_addr);
 	
 	usb_fill_bulk_urb(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
@@ -653,7 +650,6 @@ static int rtl8150_open(struct net_device *netdev)
 		warn("%s: intr_urb submit failed: %d", __FUNCTION__, res);
 	netif_start_queue(netdev);
 	enable_net_traffic(dev);
-	up(&dev->sem);
 
 	return res;
 }
@@ -667,12 +663,10 @@ static int rtl8150_close(struct net_device *netdev)
 	if (!dev)
 		return -ENODEV;
 
-	down(&dev->sem);
 	netif_stop_queue(netdev);
 	if (!test_bit(RTL8150_UNPLUG, &dev->flags))
 		disable_net_traffic(dev);
 	unlink_all_urbs(dev);
-	up(&dev->sem);
 
 	return res;
 }
@@ -760,7 +754,6 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 	data = (u16 *) & rq->ifr_data;
 	res = 0;
 
-	down(&dev->sem);
 	switch (cmd) {
 	case SIOCETHTOOL:
 		res = rtl8150_ethtool_ioctl(netdev, rq->ifr_data);
@@ -771,16 +764,13 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 		read_mii_word(dev, dev->phy, (data[1] & 0x1f), &data[3]);
 		break;
 	case SIOCDEVPRIVATE + 2:
-		if (!capable(CAP_NET_ADMIN)) {
-			up(&dev->sem);
+		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		}
 		write_mii_word(dev, dev->phy, (data[1] & 0x1f), data[2]);
 		break;
 	default:
 		res = -EOPNOTSUPP;
 	}
-	up(&dev->sem);
 	return res;
 }
 
@@ -798,18 +788,16 @@ static int rtl8150_probe(struct usb_interface *intf,
 	} else
 		memset(dev, 0, sizeof(rtl8150_t));
 
-	netdev = init_etherdev(NULL, 0);
+	netdev = alloc_etherdev(0);
 	if (!netdev) {
 		kfree(dev);
 		err("Oh boy, out of memory again?!?");
 		return -ENOMEM;
 	}
 
-	init_MUTEX(&dev->sem);
 	tasklet_init(&dev->tl, rx_fixup, (unsigned long)dev);
 	spin_lock_init(&dev->rx_pool_lock);
 	
-	down(&dev->sem);
 	dev->udev = udev;
 	dev->netdev = netdev;
 	SET_MODULE_OWNER(netdev);
@@ -828,23 +816,30 @@ static int rtl8150_probe(struct usb_interface *intf,
 
 	if (!alloc_all_urbs(dev)) {
 		err("out of memory");
-		goto err;
+		goto out;
 	}
 	if (!rtl8150_reset(dev)) {
 		err("couldn't reset the device");
-		free_all_urbs(dev);
-		goto err;
+		goto out1;
 	}
 	fill_skb_pool(dev);
 	set_ethernet_addr(dev);
 	info("%s: rtl8150 is detected", netdev->name);
 	
-	up(&dev->sem);
 	usb_set_intfdata(intf, dev);
+
+	if (register_netdev(netdev) != 0) {
+		err("couldn't register the device");
+		goto out2;
+	}
 	return 0;
-err:
-	unregister_netdev(dev->netdev);
-	up(&dev->sem);
+
+out2:
+	usb_set_intfdata(intf, NULL);
+	free_skb_pool(dev);
+out1:
+	free_all_urbs(dev);
+out:
 	kfree(netdev);
 	kfree(dev);
 	return -EIO;
@@ -865,8 +860,6 @@ static void rtl8150_disconnect(struct usb_interface *intf)
 			dev_kfree_skb(dev->rx_skb);
 		kfree(dev->netdev);
 		kfree(dev);
-		dev->netdev = NULL;
-		dev = NULL;
 	}
 }
 
