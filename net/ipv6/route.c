@@ -583,15 +583,14 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 	if (unlikely(rt == NULL))
 		goto out;
 
-	if (dev)
-		dev_hold(dev);
+	dev_hold(dev);
 	if (neigh)
 		neigh_hold(neigh);
 	else
 		neigh = ndisc_get_neigh(dev, addr);
 
 	rt->rt6i_dev	  = dev;
-	rt->rt6i_idev     = dev ? in6_dev_get(dev) : NULL;
+	rt->rt6i_idev     = in6_dev_get(dev);
 	rt->rt6i_nexthop  = neigh;
 	rt->rt6i_expires  = 0;
 	rt->rt6i_flags    = RTF_LOCAL;
