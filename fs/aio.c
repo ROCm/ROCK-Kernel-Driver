@@ -918,6 +918,13 @@ int aio_complete(struct kiocb *iocb, long res, long res2)
 	if (iocb->ki_run_list.prev && !list_empty(&iocb->ki_run_list))
 		list_del_init(&iocb->ki_run_list);
 
+	/*
+	 * cancelled requests don't get events, userland was given one
+	 * when the event got cancelled.
+	 */ 
+	if (kiocbIsCancelled(iocb))
+		goto put_rq;
+
 	ring = kmap_atomic(info->ring_pages[0], KM_IRQ1);
 
 	tail = info->tail;
@@ -950,7 +957,7 @@ int aio_complete(struct kiocb *iocb, long res, long res2)
 		iocb->ki_retried,
 		iocb->ki_nbytes - iocb->ki_left, iocb->ki_nbytes,
 		iocb->ki_kicked, iocb->ki_queued, aio_run, aio_wakeups);
-
+put_rq:
 	/* everything turned out well, dispose of the aiocb. */
 	ret = __aio_put_req(ctx, iocb);
 
