@@ -2756,10 +2756,27 @@ static void cmsg32_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_up
 		__get_user(kcmsg32->cmsg_type, &ucmsg->cmsg_type);
 
 		clen64 = kcmsg32->cmsg_len;
-		copy_from_user(CMSG32_DATA(kcmsg32), CMSG_DATA(ucmsg),
-			       clen64 - CMSG_ALIGN(sizeof(*ucmsg)));
-		clen32 = ((clen64 - CMSG_ALIGN(sizeof(*ucmsg))) +
-			  CMSG32_ALIGN(sizeof(struct cmsghdr32)));
+		if (kcmsg32->cmsg_level == SOL_SOCKET &&
+		    kcmsg32->cmsg_type == SO_TIMESTAMP) {
+			struct timeval tv;
+			struct compat_timeval *tv32;
+
+			if (clen64 != CMSG_LEN(sizeof(struct timeval))) {
+				kfree(workbuf);
+				goto fail;
+			}
+			copy_from_user(&tv, CMSG_DATA(ucmsg), sizeof(tv));
+			tv32 = (struct compat_timeval *) CMSG32_DATA(kcmsg32);
+			tv32->tv_sec = tv.tv_sec;
+			tv32->tv_usec = tv.tv_usec;
+			clen32 = sizeof(*tv32) +
+				CMSG32_ALIGN(sizeof(struct cmsghdr32));
+		} else {
+			copy_from_user(CMSG32_DATA(kcmsg32), CMSG_DATA(ucmsg),
+				       clen64 - CMSG_ALIGN(sizeof(*ucmsg)));
+			clen32 = ((clen64 - CMSG_ALIGN(sizeof(*ucmsg))) +
+				  CMSG32_ALIGN(sizeof(struct cmsghdr32)));
+		}
 		kcmsg32->cmsg_len = clen32;
 
 		switch (kcmsg32->cmsg_type) {
