@@ -291,7 +291,7 @@ extern void blk_plug_device(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern int block_ioctl(kdev_t, unsigned int, unsigned long);
+extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
 extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
 
 /*
