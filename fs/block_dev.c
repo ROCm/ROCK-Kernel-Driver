@@ -619,13 +619,20 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	}
 	if (bdev->bd_contains == bdev) {
 		struct gendisk *g = get_gendisk(dev);
+
+		if (!bdev->bd_queue) {
+			struct blk_dev_struct *p = blk_dev + major(dev);
+			bdev->bd_queue = &p->request_queue;
+			if (p->queue)
+				bdev->bd_queue =  p->queue(dev);
+		}
+
 		if (bdev->bd_op->open) {
 			ret = bdev->bd_op->open(inode, file);
 			if (ret)
 				goto out2;
 		}
 		if (!bdev->bd_openers) {
-			struct blk_dev_struct *p = blk_dev + major(dev);
 			struct backing_dev_info *bdi;
 			sector_t sect = 0;
 
@@ -636,10 +643,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 				sect = p->nr_sects;
 			} else if (blk_size[major(dev)])
 				sect = blk_size[major(dev)][minor(dev)] << 1;
-			if (p->queue)
-				bdev->bd_queue =  p->queue(dev);
-			else
-				bdev->bd_queue = &p->request_queue;
 			bd_set_size(bdev, (loff_t)sect << 9);
 			bdi = blk_get_backing_dev_info(bdev);
 			if (bdi == NULL)
