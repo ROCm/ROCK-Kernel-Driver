@@ -5,9 +5,9 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:	0.5.1
+ * Version:	0.5.2
  *
- * Author:	Michal Ostrowski <mostrows@styx.uwaterloo.ca>
+ * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  *
  * 051000 :	Initialization cleanup
  *
@@ -56,8 +56,8 @@ int register_pppox_proto(int proto_num, struct pppox_proto *pp)
 void unregister_pppox_proto(int proto_num)
 {
 	if (proto_num >= 0 && proto_num <= PX_MAX_PROTO) {
-	    proto[proto_num] = NULL;
-	    MOD_DEC_USE_COUNT;
+		proto[proto_num] = NULL;
+		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -65,9 +65,9 @@ void pppox_unbind_sock(struct sock *sk)
 {
 	/* Clear connection to ppp device, if attached. */
 
-	if (sk->state & PPPOX_BOUND) {
+	if (sk->state & (PPPOX_BOUND|PPPOX_ZOMBIE)) {
 		ppp_unregister_channel(&pppox_sk(sk)->chan);
-		sk->state &= ~PPPOX_BOUND;
+		sk->state = PPPOX_DEAD;
 	}
 }
 
@@ -75,7 +75,7 @@ EXPORT_SYMBOL(register_pppox_proto);
 EXPORT_SYMBOL(unregister_pppox_proto);
 EXPORT_SYMBOL(pppox_unbind_sock);
 
-static int pppox_ioctl(struct socket* sock, unsigned int cmd,
+static int pppox_ioctl(struct socket* sock, unsigned int cmd, 
 		       unsigned long arg)
 {
 	struct sock *sk = sock->sk;
@@ -117,10 +117,10 @@ static int pppox_create(struct socket *sock, int protocol)
 	int err = 0;
 
 	if (protocol < 0 || protocol > PX_MAX_PROTO)
-	    return -EPROTOTYPE;
+		return -EPROTOTYPE;
 
 	if (proto[protocol] == NULL)
-	    return -EPROTONOSUPPORT;
+		return -EPROTONOSUPPORT;
 
 	err = (*proto[protocol]->create)(sock);
 
