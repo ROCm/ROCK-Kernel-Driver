@@ -901,5 +901,6 @@ ENTRY(sys_call_table)
 	.long sys_mq_getsetattr
 	.long sys_ni_syscall		/* reserved for kexec */
 	.long sys_waitid
+	.long sys_setaltroot
 
 syscall_table_size=(.-sys_call_table)
