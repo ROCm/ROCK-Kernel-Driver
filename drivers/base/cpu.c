@@ -50,7 +50,7 @@ int __init cpu_dev_init(void)
 {
 	int error;
 	if (!(error = devclass_register(&cpu_devclass)))
-		if (error = driver_register(&cpu_driver))
+		if ((error = driver_register(&cpu_driver)))
 			devclass_unregister(&cpu_devclass);
 	return error;
 }
