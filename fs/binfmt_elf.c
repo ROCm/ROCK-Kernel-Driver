@@ -1260,6 +1260,9 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	elf_core_copy_regs(&prstatus->pr_reg, regs);
 	
 	segs = current->mm->map_count;
+#ifdef ELF_CORE_EXTRA_PHDRS
+	segs += ELF_CORE_EXTRA_PHDRS;
+#endif
 
 	/* Set up header */
 	fill_elf_header(elf, segs+1);	/* including notes section */
@@ -1340,6 +1343,10 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 		DUMP_WRITE(&phdr, sizeof(phdr));
 	}
 
+#ifdef ELF_CORE_WRITE_EXTRA_PHDRS
+	ELF_CORE_WRITE_EXTRA_PHDRS;
+#endif
+
  	/* write out the notes section */
 	for (i = 0; i < numnote; i++)
 		if (!writenote(notes + i, file))
@@ -1384,6 +1391,10 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 			}
 		}
 	}
+
+#ifdef ELF_CORE_WRITE_EXTRA_DATA
+	ELF_CORE_WRITE_EXTRA_DATA;
+#endif
 
 	if ((off_t) file->f_pos != offset) {
 		/* Sanity check */
