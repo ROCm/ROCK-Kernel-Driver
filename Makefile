@@ -177,18 +177,14 @@ ifdef CONFIG_MODULES
 EXPORT_FLAGS := -DEXPORT_SYMTAB
 endif
 
-INIT		=init/init.o
-CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
-NETWORKS	=net/network.o
-
-LIBS		=$(TOPDIR)/lib/lib.a
-SUBDIRS		=init kernel lib drivers mm fs net ipc sound
-
-DRIVERS-y 	= drivers/built-in.o
-DRIVERS-$(CONFIG_SOUND) += sound/sound.o
-
-DRIVERS := $(DRIVERS-y)
-
+# Link components for vmlinux
+# ---------------------------------------------------------------------------
+SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+INIT		:= init/init.o
+CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
+LIBS		:= lib/lib.a
+DRIVERS		:= drivers/built-in.o sound/sound.o
+NETWORKS	:= net/network.o
 
 include arch/$(ARCH)/Makefile
 
