@@ -325,9 +325,13 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * bit at the same time.
  */
 #define update_mmu_cache(vma,address,pte) do { } while (0)
-#define ptep_update_dirty_accessed(__ptep, __entry, __dirty)	\
-	do {							\
-		if (__dirty) set_pte(__ptep, __entry);		\
+#define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	do {								  \
+		if (__dirty) {						  \
+			(__ptep)->pte_low = (__entry).pte_low;	  	  \
+			flush_tlb_page(__vma, __address);		  \
+		}							  \
 	} while (0)
 
 /* Encode and de-code a swap entry */
