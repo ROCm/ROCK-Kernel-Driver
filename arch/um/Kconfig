@@ -30,19 +30,7 @@ config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
-config LOG_BUF_SHIFT
-	int
-	default 14
-
-menu "Code maturity level options"
-
-config EXPERIMENTAL
-	bool "Prompt for development and/or incomplete code/drivers"
-
-endmenu
-
-
-menu "General Setup"
+menu "UML-specific options"
 
 config MODE_TT
 	bool "Tracing thread support"
@@ -77,15 +65,6 @@ config MODE_SKAS
 
 config NET
 	bool "Networking support"
-
-config SYSVIPC
-	bool "System V IPC"
-
-config BSD_PROCESS_ACCT
-	bool "BSD Process Accounting"
-
-config SYSCTL
-	bool "Sysctl support"
 
 config BINFMT_AOUT
 	tristate "Kernel support for a.out binaries"
@@ -193,19 +172,7 @@ config HIGHMEM
 
 endmenu
 
-
-menu "Loadable module support"
-
-config MODULES
-	bool "Enable loadable module support"
-
-# MODVERSIONS does not yet work in this architecture
-#   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
-config KMOD
-	bool "Kernel module loader"
-	depends on MODULES
-
-endmenu
+source "init/Kconfig"
 
 source "arch/um/Kconfig_char"
 

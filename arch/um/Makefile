@@ -100,10 +100,12 @@ CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
 STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
 
-AFLAGS_$(LD_SCRIPT-y:.s=).o = -U$(SUBARCH) \
+AFLAGS_vmlinux.lds.o = -U$(SUBARCH) \
 	-DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
 	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
-	-DKERNEL_STACK_SIZE=$(STACK_SIZE) -P -C -Uum
+	-DKERNEL_STACK_SIZE=$(STACK_SIZE)
+
+AFLAGS_$(LD_SCRIPT-y:.s=).o = $(AFLAGS_vmlinux.lds.o) -P -C -Uum
 
 LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
 
