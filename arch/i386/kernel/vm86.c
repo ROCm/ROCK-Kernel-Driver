@@ -177,8 +177,9 @@ out:
 static int do_vm86_irq_handling(int subfunction, int irqnumber);
 static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk);
 
-asmlinkage int sys_vm86old(struct vm86_struct __user * v86)
+asmlinkage int sys_vm86old(struct pt_regs regs)
 {
+	struct vm86_struct __user *v86 = (struct vm86_struct __user *)regs.ebx;
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
 					 * This remains on the stack until we
@@ -197,7 +198,7 @@ asmlinkage int sys_vm86old(struct vm86_struct __user * v86)
 	if (tmp)
 		goto out;
 	memset(&info.vm86plus, 0, (int)&info.regs32 - (int)&info.vm86plus);
-	info.regs32 = (struct pt_regs *) &v86;
+	info.regs32 = &regs;
 	tsk->thread.vm86_info = v86;
 	do_sys_vm86(&info, tsk);
 	ret = 0;	/* we never return here */
@@ -206,7 +207,7 @@ out:
 }
 
 
-asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct __user * v86)
+asmlinkage int sys_vm86(struct pt_regs regs)
 {
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
@@ -215,14 +216,15 @@ asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct __user
 					 */
 	struct task_struct *tsk;
 	int tmp, ret;
+	struct vm86plus_struct __user *v86;
 
 	tsk = current;
-	switch (subfunction) {
+	switch (regs.ebx) {
 		case VM86_REQUEST_IRQ:
 		case VM86_FREE_IRQ:
 		case VM86_GET_IRQ_BITS:
 		case VM86_GET_AND_RESET_IRQ:
-			ret = do_vm86_irq_handling(subfunction,(int)v86);
+			ret = do_vm86_irq_handling(regs.ebx, (int)regs.ecx);
 			goto out;
 		case VM86_PLUS_INSTALL_CHECK:
 			/* NOTE: on old vm86 stuff this will return the error
@@ -238,13 +240,14 @@ asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct __user
 	ret = -EPERM;
 	if (tsk->thread.saved_esp0)
 		goto out;
+	v86 = (struct vm86plus_struct __user *)regs.ecx;
 	tmp  = copy_from_user(&info, v86, VM86_REGS_SIZE1);
 	tmp += copy_from_user(&info.regs.VM86_REGS_PART2, &v86->regs.VM86_REGS_PART2,
 		(long)&info.regs32 - (long)&info.regs.VM86_REGS_PART2);
 	ret = -EFAULT;
 	if (tmp)
 		goto out;
-	info.regs32 = (struct pt_regs *) &subfunction;
+	info.regs32 = &regs;
 	info.vm86plus.is_vm86pus = 1;
 	tsk->thread.vm86_info = (struct vm86_struct __user *)v86;
 	do_sys_vm86(&info, tsk);
@@ -485,9 +488,10 @@ static inline int is_revectored(int nr, struct revectored_struct * bitmap)
  * in userspace is always better than an Oops anyway.) [KD]
  */
 static void do_int(struct kernel_vm86_regs *regs, int i,
-    unsigned char * ssp, unsigned short sp)
+    unsigned char __user * ssp, unsigned short sp)
 {
-	unsigned long *intr_ptr, segoffs;
+	unsigned long __user *intr_ptr;
+	unsigned long segoffs;
 
 	if (regs->cs == BIOSSEG)
 		goto cannot_handle;
@@ -495,7 +499,7 @@ static void do_int(struct kernel_vm86_regs *regs, int i,
 		goto cannot_handle;
 	if (i==0x21 && is_revectored(AH(regs),&KVM86->int21_revectored))
 		goto cannot_handle;
-	intr_ptr = (unsigned long *) (i << 2);
+	intr_ptr = (unsigned long __user *) (i << 2);
 	if (get_user(segoffs, intr_ptr))
 		goto cannot_handle;
 	if ((segoffs >> 16) == BIOSSEG)
@@ -520,7 +524,7 @@ int handle_vm86_trap(struct kernel_vm86_regs * regs, long error_code, int trapno
 	if (VMPI.is_vm86pus) {
 		if ( (trapno==3) || (trapno==1) )
 			return_to_32bit(regs, VM86_TRAP + (trapno << 8));
-		do_int(regs, trapno, (unsigned char *) (regs->ss << 4), SP(regs));
+		do_int(regs, trapno, (unsigned char __user *) (regs->ss << 4), SP(regs));
 		return 0;
 	}
 	if (trapno !=1)
@@ -540,7 +544,9 @@ int handle_vm86_trap(struct kernel_vm86_regs * regs, long error_code, int trapno
 
 void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 {
-	unsigned char *csp, *ssp, opcode;
+	unsigned char opcode;
+	unsigned char __user *csp;
+	unsigned char __user *ssp;
 	unsigned short ip, sp;
 	int data32, pref_done;
 
@@ -552,8 +558,8 @@ void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 		return_to_32bit(regs, VM86_PICRETURN); \
 	return; } while (0)
 
-	csp = (unsigned char *) (regs->cs << 4);
-	ssp = (unsigned char *) (regs->ss << 4);
+	csp = (unsigned char __user *) (regs->cs << 4);
+	ssp = (unsigned char __user *) (regs->ss << 4);
 	sp = SP(regs);
 	ip = IP(regs);
 
