@@ -550,7 +550,7 @@ int filemap_fdatasync(struct address_space * mapping)
 	spin_lock(&pagecache_lock);
 
         while (!list_empty(&mapping->dirty_pages)) {
-		struct page *page = list_entry(mapping->dirty_pages.next, struct page, list);
+		struct page *page = list_entry(mapping->dirty_pages.prev, struct page, list);
 
 		list_del(&page->list);
 		list_add(&page->list, &mapping->locked_pages);
