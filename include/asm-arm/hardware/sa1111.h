@@ -529,120 +529,31 @@
  *
  */
 
-#define _KBD( x )   _SA1111( 0x0A00 )
-#define _MSE( x )   _SA1111( 0x0C00 )
+#define SA1111_KBD		0x0a00
+#define SA1111_MSE		0x0c00
 
-#define _KBDCR	    _SA1111( 0x0A00 )
-#define _KBDSTAT    _SA1111( 0x0A04 )
-#define _KBDDATA    _SA1111( 0x0A08 )
-#define _KBDCLKDIV  _SA1111( 0x0A0C )
-#define _KBDPRECNT  _SA1111( 0x0A10 )
-#define _MSECR	    _SA1111( 0x0C00 )
-#define _MSESTAT    _SA1111( 0x0C04 )
-#define _MSEDATA    _SA1111( 0x0C08 )
-#define _MSECLKDIV  _SA1111( 0x0C0C )
-#define _MSEPRECNT  _SA1111( 0x0C10 )
+/*
+ * These are offsets from the above bases.
+ */
+#define SA1111_PS2CR		0x0000
+#define SA1111_PS2STAT		0x0004
+#define SA1111_PS2DATA		0x0008
+#define SA1111_PS2CLKDIV	0x000c
+#define SA1111_PS2PRECNT	0x0010
 
-#if ( LANGUAGE == C )
+#define PS2CR_ENA		0x08
+#define PS2CR_FKD		0x02
+#define PS2CR_FKC		0x01
 
-#define KBDCR		__CCREG(0x0a00)
-#define KBDSTAT		__CCREG(0x0a04)
-#define KBDDATA		__CCREG(0x0a08)
-#define KBDCLKDIV	__CCREG(0x0a0c)
-#define KBDPRECNT	__CCREG(0x0a10)
-#define MSECR		__CCREG(0x0c00)
-#define MSESTAT		__CCREG(0x0c04)
-#define MSEDATA		__CCREG(0x0c08)
-#define MSECLKDIV	__CCREG(0x0c0c)
-#define MSEPRECNT	__CCREG(0x0c10)
-
-#define KBDCR_ENA        0x08
-#define KBDCR_FKD        0x02
-#define KBDCR_FKC        0x01
-
-#define KBDSTAT_TXE      0x80
-#define KBDSTAT_TXB      0x40
-#define KBDSTAT_RXF      0x20
-#define KBDSTAT_RXB      0x10
-#define KBDSTAT_ENA      0x08
-#define KBDSTAT_RXP      0x04
-#define KBDSTAT_KBD      0x02
-#define KBDSTAT_KBC      0x01
-
-#define KBDCLKDIV_DivVal     Fld(4,0)
-
-#define MSECR_ENA        0x08
-#define MSECR_FKD        0x02
-#define MSECR_FKC        0x01
-
-#define MSESTAT_TXE      0x80
-#define MSESTAT_TXB      0x40
-#define MSESTAT_RXF      0x20
-#define MSESTAT_RXB      0x10
-#define MSESTAT_ENA      0x08
-#define MSESTAT_RXP      0x04
-#define MSESTAT_MSD      0x02
-#define MSESTAT_MSC      0x01
-
-#define MSECLKDIV_DivVal     Fld(4,0)
-
-#define KBDTEST1_CD      0x80
-#define KBDTEST1_RC1         0x40
-#define KBDTEST1_MC      0x20
-#define KBDTEST1_C       Fld(2,3)
-#define KBDTEST1_T2      0x40
-#define KBDTEST1_T1      0x20
-#define KBDTEST1_T0      0x10
-#define KBDTEST2_TICBnRES    0x08
-#define KBDTEST2_RKC         0x04
-#define KBDTEST2_RKD         0x02
-#define KBDTEST2_SEL         0x01
-#define KBDTEST3_ms_16       0x80
-#define KBDTEST3_us_64       0x40
-#define KBDTEST3_us_16       0x20
-#define KBDTEST3_DIV8        0x10
-#define KBDTEST3_DIn         0x08
-#define KBDTEST3_CIn         0x04
-#define KBDTEST3_KD      0x02
-#define KBDTEST3_KC      0x01
-#define KBDTEST4_BC12        0x80
-#define KBDTEST4_BC11        0x40
-#define KBDTEST4_TRES        0x20
-#define KBDTEST4_CLKOE       0x10
-#define KBDTEST4_CRES        0x08
-#define KBDTEST4_RXB         0x04
-#define KBDTEST4_TXB         0x02
-#define KBDTEST4_SRX         0x01
-
-#define MSETEST1_CD      0x80
-#define MSETEST1_RC1         0x40
-#define MSETEST1_MC      0x20
-#define MSETEST1_C       Fld(2,3)
-#define MSETEST1_T2      0x40
-#define MSETEST1_T1      0x20
-#define MSETEST1_T0      0x10
-#define MSETEST2_TICBnRES    0x08
-#define MSETEST2_RKC         0x04
-#define MSETEST2_RKD         0x02
-#define MSETEST2_SEL         0x01
-#define MSETEST3_ms_16       0x80
-#define MSETEST3_us_64       0x40
-#define MSETEST3_us_16       0x20
-#define MSETEST3_DIV8        0x10
-#define MSETEST3_DIn         0x08
-#define MSETEST3_CIn         0x04
-#define MSETEST3_KD      0x02
-#define MSETEST3_KC      0x01
-#define MSETEST4_BC12        0x80
-#define MSETEST4_BC11        0x40
-#define MSETEST4_TRES        0x20
-#define MSETEST4_CLKOE       0x10
-#define MSETEST4_CRES        0x08
-#define MSETEST4_RXB         0x04
-#define MSETEST4_TXB         0x02
-#define MSETEST4_SRX         0x01
-
-#endif  /* LANGUAGE == C */
+#define PS2STAT_STP		0x0100
+#define PS2STAT_TXE		0x0080
+#define PS2STAT_TXB		0x0040
+#define PS2STAT_RXF		0x0020
+#define PS2STAT_RXB		0x0010
+#define PS2STAT_ENA		0x0008
+#define PS2STAT_RXP		0x0004
+#define PS2STAT_KBD		0x0002
+#define PS2STAT_KBC		0x0001
 
 /*
  * PCMCIA Interface
