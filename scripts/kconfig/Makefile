@@ -2,40 +2,43 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-.PHONY: oldconfig xconfig gconfig menuconfig config
+.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig
 
-xconfig: scripts/kconfig/qconf
-	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
+xconfig: $(obj)/qconf
+	$< arch/$(ARCH)/Kconfig
 
-gconfig: scripts/kconfig/gconf
-	./scripts/kconfig/gconf arch/$(ARCH)/Kconfig
+gconfig: $(obj)/gconf
+	./$<  arch/$(ARCH)/Kconfig
 
-menuconfig: scripts/kconfig/mconf
+menuconfig: $(obj)/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
-	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
+	$< arch/$(ARCH)/Kconfig
 
-config: scripts/kconfig/conf
-	./scripts/kconfig/conf arch/$(ARCH)/Kconfig
+config: $(obj)/conf
+	$< arch/$(ARCH)/Kconfig
 
-oldconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -o arch/$(ARCH)/Kconfig
+oldconfig: $(obj)/conf
+	$< -o arch/$(ARCH)/Kconfig
+
+silentoldconfig: $(obj)/conf
+	$< -s arch/$(ARCH)/Kconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -r arch/$(ARCH)/Kconfig
+randconfig: $(obj)/conf
+	$< -r arch/$(ARCH)/Kconfig
 
-allyesconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -y arch/$(ARCH)/Kconfig
+allyesconfig: $(obj)/conf
+	$< -y arch/$(ARCH)/Kconfig
 
-allnoconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -n arch/$(ARCH)/Kconfig
+allnoconfig: $(obj)/conf
+	$< -n arch/$(ARCH)/Kconfig
 
-allmodconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -m arch/$(ARCH)/Kconfig
+allmodconfig: $(obj)/conf
+	$< -m arch/$(ARCH)/Kconfig
 
-defconfig: scripts/kconfig/conf
-	./scripts/kconfig/conf -d arch/$(ARCH)/Kconfig
+defconfig: $(obj)/conf
+	$< -d arch/$(ARCH)/Kconfig
 
 # Help text used by make help
 help:
