@@ -55,7 +55,6 @@
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
-#include <asm/softirq.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 
