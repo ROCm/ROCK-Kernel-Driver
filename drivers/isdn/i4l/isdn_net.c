@@ -203,6 +203,8 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
 
+static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
+
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
  /*
@@ -468,169 +470,14 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 {
 	isdn_net_dev *p = isdn_slot_st_netdev(idx);
 	isdn_net_local *lp;
-#ifdef CONFIG_ISDN_X25
-	struct concap_proto *cprot;
-	struct concap_proto_ops *pops;
-#endif
 	int cmd = c->command;
 
 	if (!p)
 		return 0;
 
 	lp = p->local;
-#ifdef CONFIG_ISDN_X25
-	cprot = lp -> netdev -> cprot;
-	pops = cprot ? cprot -> pops : 0;
-#endif
 
-	switch (lp->dialstate) {
-	case ST_0:
-		switch (cmd) {
-		case ISDN_STAT_BSENT:
-			/* A packet has successfully been sent out */
-			if (lp->flags & ISDN_NET_CONNECTED) {
-				isdn_net_dec_frame_cnt(lp);
-				lp->stats.tx_packets++;
-				lp->stats.tx_bytes += c->parm.length;
-				return 1;
-			}
-			break;
-		case ISDN_STAT_DHUP:
-			/* Either D-Channel-hangup or error during dialout */
-#ifdef CONFIG_ISDN_X25 // FIXME handle != ST_0?
-			/* If we are not connencted then dialing had
-			   failed. If there are generic encap protocol
-			   receiver routines signal the closure of
-			   the link*/
-			
-			if (!(lp->flags & ISDN_NET_CONNECTED)
-			    && pops && pops->disconn_ind)
-				pops -> disconn_ind(cprot);
-#endif /* CONFIG_ISDN_X25 */
-			if (lp->flags & ISDN_NET_CONNECTED) {
-				if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
-					isdn_net_ciscohdlck_disconnected(lp);
-#ifdef CONFIG_ISDN_PPP
-				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-					isdn_ppp_free(lp);
-#endif
-				isdn_net_lp_disconnected(lp);
-				isdn_slot_all_eaz(lp->isdn_slot);
-				printk(KERN_INFO "%s: remote hangup\n", lp->name);
-				printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
-				       lp->charge);
-				isdn_net_unbind_channel(lp);
-				return 1;
-			}
-			break;
-#ifdef CONFIG_ISDN_X25 // FIXME handle != ST_0?
-		case ISDN_STAT_BHUP:
-			/* B-Channel-hangup */
-			/* try if there are generic encap protocol
-			   receiver routines and signal the closure of
-			   the link */
-			if( pops  &&  pops -> disconn_ind ){
-				pops -> disconn_ind(cprot);
-				return 1;
-			}
-			break;
-#endif /* CONFIG_ISDN_X25 */
-		case ISDN_STAT_CINF:
-			/* Charge-info from TelCo. Calculate interval between
-			 * charge-infos and set timestamp for last info for
-			 * usage by isdn_net_autohup()
-			 */
-			lp->charge++;
-			if (lp->hupflags & ISDN_HAVECHARGE) {
-				lp->hupflags &= ~ISDN_WAITCHARGE;
-				lp->chargeint = jiffies - lp->chargetime - (2 * HZ);
-			}
-			if (lp->hupflags & ISDN_WAITCHARGE)
-				lp->hupflags |= ISDN_HAVECHARGE;
-			lp->chargetime = jiffies;
-			printk(KERN_DEBUG "isdn_net: Got CINF chargetime of %s now %lu\n",
-			       lp->name, lp->chargetime);
-			return 1;
-		}
-		break;
-	case ST_4:
-		switch (cmd) {
-		case ISDN_STAT_NODCH:
-			/* No D-Channel avail. */
-			lp->dialstate = ST_3;
-			return 1;
-		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_5;
-			return 1;
-		}
-		break;
-	case ST_5:
-		switch (cmd) {
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_usage(idx, isdn_slot_usage(idx) | ISDN_USAGE_OUTGOING);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_6:
-		switch (cmd) {
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_usage(idx, isdn_slot_usage(idx) | ISDN_USAGE_OUTGOING);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_7:
-		switch (cmd) {
-		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_8;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(idx, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_8:
-		switch (cmd) {
-		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_9;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(idx, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_9:
-		switch (cmd) {
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(idx, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_10:
-		switch (cmd) {
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(idx, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_12:
-		switch (cmd) {
-		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_5;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(idx, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	}
-	return 0;
+	return isdn_net_handle_event(lp, cmd, c);
 }
 
 /* Initiate dialout. Set phone-number-pointer to first number
@@ -751,17 +598,91 @@ do_dialout(isdn_net_local *lp)
 	return 1;
 }
 
-/* returns 1 if timer callback is needed */
+/* For EV_NET_DIAL, returns 1 if timer callback is needed 
+ * For ISDN_STAT_*, returns 1 if event was for us 
+ */
 static int
 isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 {
+#ifdef CONFIG_ISDN_X25
+	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+#endif
 	isdn_net_dev *p = lp->netdev;
+	isdn_ctrl *c = arg;
 	isdn_ctrl cmd;
 
 	dbg_net_dial("%s: dialstate=%d\n", lp->name, lp->dialstate);
 
 	switch (lp->dialstate) {
 	case ST_0:
+		switch (pr) {
+		case ISDN_STAT_BSENT:
+			/* A packet has successfully been sent out */
+			if (lp->flags & ISDN_NET_CONNECTED) {
+				isdn_net_dec_frame_cnt(lp);
+				lp->stats.tx_packets++;
+				lp->stats.tx_bytes += c->parm.length;
+				return 1;
+			}
+			break;
+		case ISDN_STAT_DHUP:
+			/* Either D-Channel-hangup or error during dialout */
+#ifdef CONFIG_ISDN_X25 // FIXME handle != ST_0?
+			/* If we are not connencted then dialing had
+			   failed. If there are generic encap protocol
+			   receiver routines signal the closure of
+			   the link*/
+			
+			if (!(lp->flags & ISDN_NET_CONNECTED)
+			    && pops && pops->disconn_ind)
+				pops -> disconn_ind(cprot);
+#endif /* CONFIG_ISDN_X25 */
+			if (lp->flags & ISDN_NET_CONNECTED) {
+				if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
+					isdn_net_ciscohdlck_disconnected(lp);
+#ifdef CONFIG_ISDN_PPP
+				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
+					isdn_ppp_free(lp);
+#endif
+				isdn_net_lp_disconnected(lp);
+				isdn_slot_all_eaz(lp->isdn_slot);
+				printk(KERN_INFO "%s: remote hangup\n", lp->name);
+				printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
+				       lp->charge);
+				isdn_net_unbind_channel(lp);
+				return 1;
+			}
+			break;
+#ifdef CONFIG_ISDN_X25 // FIXME handle != ST_0?
+		case ISDN_STAT_BHUP:
+			/* B-Channel-hangup */
+			/* try if there are generic encap protocol
+			   receiver routines and signal the closure of
+			   the link */
+			if( pops  &&  pops -> disconn_ind ){
+				pops -> disconn_ind(cprot);
+				return 1;
+			}
+			break;
+#endif /* CONFIG_ISDN_X25 */
+		case ISDN_STAT_CINF:
+			/* Charge-info from TelCo. Calculate interval between
+			 * charge-infos and set timestamp for last info for
+			 * usage by isdn_net_autohup()
+			 */
+			lp->charge++;
+			if (lp->hupflags & ISDN_HAVECHARGE) {
+				lp->hupflags &= ~ISDN_WAITCHARGE;
+				lp->chargeint = jiffies - lp->chargetime - (2 * HZ);
+			}
+			if (lp->hupflags & ISDN_WAITCHARGE)
+				lp->hupflags |= ISDN_HAVECHARGE;
+			lp->chargetime = jiffies;
+			printk(KERN_DEBUG "isdn_net: Got CINF chargetime of %s now %lu\n",
+			       lp->name, lp->chargetime);
+			return 1;
+		}
 		break;
 	case ST_1:
 		switch (pr) {
@@ -798,6 +719,13 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
 				lp->dialstate = ST_3;
 			return 1;
+		case ISDN_STAT_NODCH:
+			/* No D-Channel avail. */
+			lp->dialstate = ST_3;
+			return 1;
+		case ISDN_STAT_DCONN:
+			lp->dialstate = ST_5;
+			return 1;
 		}
 		break;
 	case ST_5:
@@ -807,6 +735,10 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			lp->dtimer = 0;
 			lp->dialstate = ST_6;
 			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
+			isdn_net_connected(lp);
 			return 1;
 		}
 		break;
@@ -819,6 +751,10 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			dbg_net_dial("dialtimer2: %d\n", lp->dtimer);
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
 				lp->dialstate = ST_3;
+			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
+			isdn_net_connected(lp);
 			return 1;
 		}
 		break;
@@ -840,6 +776,24 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 				return 1;
 			}
 			break;
+		case ISDN_STAT_DCONN:
+			lp->dialstate = ST_8;
+			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_net_connected(lp);
+			return 1;
+		}
+		break;
+	case ST_8:
+		switch (pr) {
+		case ISDN_STAT_DCONN:
+			lp->dialstate = ST_9;
+			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_net_connected(lp);
+			return 1;
 		}
 		break;
 	case ST_9:
@@ -850,9 +804,12 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			lp->dtimer = 0;
 			lp->dialstate = ST_10;
 			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_net_connected(lp);
+			return 1;
 		}
 		break;
-	case ST_8:
 	case ST_10:
 		switch (pr) {
 		case EV_NET_DIAL:
@@ -863,6 +820,10 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			else
 				return 1;
 			break;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_net_connected(lp);
+			return 1;
 		}
 		break;
 	case ST_11:
@@ -887,6 +848,13 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 				isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 				isdn_slot_all_eaz(lp->isdn_slot);
 			}
+			return 1;
+		case ISDN_STAT_DCONN:
+			lp->dialstate = ST_5;
+			return 1;
+		case ISDN_STAT_BCONN:
+			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_net_connected(lp);
 			return 1;
 		}
 		break;
