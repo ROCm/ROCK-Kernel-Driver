@@ -99,12 +99,12 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
  * operation and are ready to return a success/failure code to the buffer
  * cache layer.
  */
-static void multipath_end_bh_io (struct multipath_bh *mp_bh, int uptodate)
+static void multipath_end_bh_io (struct multipath_bh *mp_bh, int err)
 {
 	struct bio *bio = mp_bh->master_bio;
 	multipath_conf_t *conf = mddev_to_conf(mp_bh->mddev);
 
-	bio_endio(bio, bio->bi_size, uptodate ? 0 : -EIO);
+	bio_endio(bio, bio->bi_size, err);
 	mempool_free(mp_bh, conf->pool);
 }
 
@@ -119,7 +119,7 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		return 1;
 
 	if (uptodate)
-		multipath_end_bh_io(mp_bh, uptodate);
+		multipath_end_bh_io(mp_bh, 0);
 	else if (!bio_rw_ahead(bio)) {
 		/*
 		 * oops, IO error:
@@ -131,7 +131,7 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		       (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	} else
-		multipath_end_bh_io(mp_bh, 0);
+		multipath_end_bh_io(mp_bh, error);
 	rdev_dec_pending(rdev, conf->mddev);
 	return 0;
 }
@@ -402,7 +402,7 @@ static void multipathd (mddev_t *mddev)
 				" error for block %llu\n",
 				bdevname(bio->bi_bdev,b),
 				(unsigned long long)bio->bi_sector);
-			multipath_end_bh_io(mp_bh, 0);
+			multipath_end_bh_io(mp_bh, -EIO);
 		} else {
 			printk(KERN_ERR "multipath: %s: redirecting sector %llu"
 				" to another IO path\n",
