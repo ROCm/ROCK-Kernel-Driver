@@ -123,9 +123,11 @@ static int show_map(struct seq_file *m, void *v)
 		if (len < 1)
 			len = 1;
 		seq_printf(m, "%*c", len, ' ');
+#ifdef AT_SYSINFO_EHDR
 		if (map == gate_map())
 			seq_printf (m, "%s", gate_dso_path);
 		else
+#endif
 			seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
 	}
 	seq_putc(m, '\n');
