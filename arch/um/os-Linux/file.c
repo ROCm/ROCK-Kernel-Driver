@@ -171,7 +171,8 @@ int os_pipe(int *fds, int stream, int close_on_exec)
 	int err, type = stream ? SOCK_STREAM : SOCK_DGRAM;
 
 	err = socketpair(AF_UNIX, type, 0, fds);
-	if(err) return(-errno);
+	if(err) 
+		return(-errno);
 
 	if(!close_on_exec)
 		return(0);
