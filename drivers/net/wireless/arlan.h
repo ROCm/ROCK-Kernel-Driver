@@ -337,10 +337,7 @@ struct arlan_private {
       struct net_device_stats stats;
       struct arlan_shmem * card;
       struct arlan_shmem * conf;
-      struct TxParam txParam;      
-      int multicastLength;
-      char  multicastList[ARLAN_MAX_MULTICAST_ADDRS][6];
-      int promiscModeEnabled;
+
       struct arlan_conf_stru * Conf;	     
       int	bad;
       int 	reset;
@@ -353,16 +350,13 @@ struct arlan_private {
       int registrationLostCount;
       int reRegisterExp;
       int irq_test_done;
-      int last_command_was_rx;
+
       struct TxParam txRing[TX_RING_SIZE];
       char reTransmitBuff[0x800];
       volatile int txLast;
-      volatile int txNew;
       volatile char ReTransmitRequested;
       volatile unsigned long tx_done_delayed;
       volatile long long registrationLastSeen;
-      volatile char under_command;
-      volatile char under_toggle;
       volatile long long tx_last_sent;
       volatile long long tx_last_cleared;
       volatile int 	retransmissions;
@@ -477,13 +471,11 @@ struct arlan_private {
 #define arlan_interrupt_lancpu(dev) {\
    int cr;   \
    \
-   priv->under_toggle++;   \
    cr = readControlRegister(dev);\
    if (cr & ARLAN_CHANNEL_ATTENTION){ \
       writeControlRegister(dev, (cr & ~ARLAN_CHANNEL_ATTENTION));\
    }else  \
       writeControlRegister(dev, (cr | ARLAN_CHANNEL_ATTENTION));\
-   priv->under_toggle=0;     \
 }
 
 #define clearChannelAttention(dev){ \

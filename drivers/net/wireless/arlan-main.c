@@ -411,7 +411,6 @@ int arlan_command(struct net_device *dev, int command_p)
 				WRITESHMB(arlan->commandByte, ARLAN_COM_TX_ENABLE | ARLAN_COM_INT);
 				memcpy_toio((void *) arlan->commandParameter, &TXLAST(dev), 14);
 //				for ( i=1 ; i < 15 ; i++) printk("%02x:",READSHMB(arlan->commandParameter[i]));
-				priv->last_command_was_rx = 0;
 				priv->tx_last_sent = jiffies;
 				arlan_interrupt_lancpu(dev);
 				priv->last_tx_time = arlan_time();
@@ -765,7 +764,6 @@ static int arlan_hw_tx(struct net_device *dev, char *buf, int length)
 
 	arlan_command(dev, ARLAN_COMMAND_TX);
 
-	priv->last_command_was_rx = 0;
 	priv->tx_last_sent = jiffies;
 
 	IFDEBUG(ARLAN_DEBUG_TX_CHAIN) printk("%s TX Qued %d bytes \n", dev->name, length);
@@ -1233,7 +1231,6 @@ static int arlan_open(struct net_device *dev)
 	priv->rx_command_given = 0;
 	
 	priv->reRegisterExp = 1;
-	priv->last_command_was_rx = 0;
 	priv->tx_last_sent = jiffies - 1;
 	priv->tx_last_cleared = jiffies;
 	priv->Conf->writeEEPROM = 0;
@@ -1680,7 +1677,6 @@ static void arlan_process_interrupt(struct net_device *dev)
 
 		if (rxStatus == 0 && txStatus == 0)
 		{
-			priv->last_command_was_rx = 0;
 			if (priv->irq_test_done)
 			{
 				if (!registrationBad(dev))
@@ -1707,7 +1703,6 @@ static void arlan_process_interrupt(struct net_device *dev)
 		}
 		if (rxStatus > 2 && rxStatus < 0xff)
 		{
-			priv->last_command_was_rx = 0;
 			WRITESHMB(arlan->rxStatus, 0x00);
 			printk(KERN_ERR "%s unknown rxStatus reason tx %d rx %d ",
 				dev->name, txStatus, rxStatus);
@@ -1715,7 +1710,6 @@ static void arlan_process_interrupt(struct net_device *dev)
 		}
 		if (rxStatus == 0xff)
 		{
-			priv->last_command_was_rx = 0;
 			WRITESHMB(arlan->rxStatus, 0x00);
 			arlan_command(dev, ARLAN_COMMAND_RX);
 			if (registrationBad(dev))
