@@ -48,29 +48,13 @@
    printk(KERN_DEBUG a)
  */
 
-static kmem_cache_t * fn_hash_kmem;
+static kmem_cache_t *fn_hash_kmem;
 
-/*
-   These bizarre types are just to force strict type checking.
-   When I reversed order of bytes and changed to natural mask lengths,
-   I forgot to make fixes in several places. Now I am lazy to return
-   it back.
- */
-
-typedef struct {
-	u32	datum;
-} fn_key_t;
-
-typedef struct {
-	u32	datum;
-} fn_hash_idx_t;
-
-struct fib_node
-{
+struct fib_node {
 	struct fib_node		*fn_next;
 	struct fib_info		*fn_info;
 #define FIB_INFO(f)	((f)->fn_info)
-	fn_key_t		fn_key;
+	u32			fn_key;
 	u8			fn_tos;
 	u8			fn_type;
 	u8			fn_scope;
@@ -82,8 +66,7 @@ struct fib_node
 
 static int fib_hash_zombies;
 
-struct fn_zone
-{
+struct fn_zone {
 	struct fn_zone	*fz_next;	/* Next not empty zone	*/
 	struct fib_node	**fz_hash;	/* Hash table pointer	*/
 	int		fz_nent;	/* Number of entries	*/
@@ -107,44 +90,39 @@ struct fn_hash
 	struct fn_zone	*fn_zone_list;
 };
 
-static __inline__ fn_hash_idx_t fn_hash(fn_key_t key, struct fn_zone *fz)
+static inline u32 fn_hash(u32 key, struct fn_zone *fz)
 {
-	u32 h = ntohl(key.datum)>>(32 - fz->fz_order);
+	u32 h = ntohl(key)>>(32 - fz->fz_order);
 	h ^= (h>>20);
 	h ^= (h>>10);
 	h ^= (h>>5);
 	h &= FZ_HASHMASK(fz);
-	return *(fn_hash_idx_t*)&h;
+	return h;
 }
 
-#define fz_key_0(key)		((key).datum = 0)
-#define fz_prefix(key,fz)	((key).datum)
-
-static __inline__ fn_key_t fz_key(u32 dst, struct fn_zone *fz)
+static inline u32 fz_key(u32 dst, struct fn_zone *fz)
 {
-	fn_key_t k;
-	k.datum = dst & FZ_MASK(fz);
-	return k;
+	return dst & FZ_MASK(fz);
 }
 
-static __inline__ struct fib_node ** fz_chain_p(fn_key_t key, struct fn_zone *fz)
+static inline struct fib_node ** fz_chain_p(u32 key, struct fn_zone *fz)
 {
-	return &fz->fz_hash[fn_hash(key, fz).datum];
+	return &fz->fz_hash[fn_hash(key, fz)];
 }
 
-static __inline__ struct fib_node * fz_chain(fn_key_t key, struct fn_zone *fz)
+static inline struct fib_node * fz_chain(u32 key, struct fn_zone *fz)
 {
-	return fz->fz_hash[fn_hash(key, fz).datum];
+	return fz->fz_hash[fn_hash(key, fz)];
 }
 
-static __inline__ int fn_key_eq(fn_key_t a, fn_key_t b)
+static inline int fn_key_eq(u32 a, u32 b)
 {
-	return a.datum == b.datum;
+	return a == b;
 }
 
-static __inline__ int fn_key_leq(fn_key_t a, fn_key_t b)
+static inline int fn_key_leq(u32 a, u32 b)
 {
-	return a.datum <= b.datum;
+	return a <= b;
 }
 
 static rwlock_t fib_hash_lock = RW_LOCK_UNLOCKED;
@@ -164,7 +142,7 @@ static struct fib_node **fz_hash_alloc(int divisor)
 }
 
 /* The fib hash lock must be held when this is called. */
-static __inline__ void fn_rebuild_zone(struct fn_zone *fz,
+static inline void fn_rebuild_zone(struct fn_zone *fz,
 				       struct fib_node **old_ht,
 				       int old_divisor)
 {
@@ -299,7 +277,7 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 	read_lock(&fib_hash_lock);
 	for (fz = t->fn_zone_list; fz; fz = fz->fz_next) {
 		struct fib_node *f;
-		fn_key_t k = fz_key(flp->fl4_dst, fz);
+		u32 k = fz_key(flp->fl4_dst, fz);
 
 		for (f = fz_chain(k, fz); f; f = f->fn_next) {
 			if (!fn_key_eq(k, f->fn_key)) {
@@ -467,7 +445,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 #ifdef CONFIG_IP_ROUTE_TOS
 	u8 tos = r->rtm_tos;
 #endif
-	fn_key_t key;
+	u32 key;
 	int err;
 
 FTprint("tb(%d)_insert: %d %08x/%d %d %08x\n", tb->tb_id, r->rtm_type, rta->rta_dst ?
@@ -479,7 +457,7 @@ rta->rta_prefsrc ? *(u32*)rta->rta_prefsrc : 0);
 	if (!fz && !(fz = fn_new_zone(table, z)))
 		return -ENOBUFS;
 
-	fz_key_0(key);
+	key = 0;
 	if (rta->rta_dst) {
 		u32 dst;
 		memcpy(&dst, rta->rta_dst, 4);
@@ -640,7 +618,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	struct fib_node **fp, **del_fp, *f;
 	int z = r->rtm_dst_len;
 	struct fn_zone *fz;
-	fn_key_t key;
+	u32 key;
 	int matched;
 #ifdef CONFIG_IP_ROUTE_TOS
 	u8 tos = r->rtm_tos;
@@ -653,7 +631,7 @@ FTprint("tb(%d)_delete: %d %08x/%d %d\n", tb->tb_id, r->rtm_type, rta->rta_dst ?
 	if ((fz  = table->fn_zones[z]) == NULL)
 		return -ESRCH;
 
-	fz_key_0(key);
+	key = 0;
 	if (rta->rta_dst) {
 		u32 dst;
 		memcpy(&dst, rta->rta_dst, 4);
@@ -725,7 +703,7 @@ FTprint("tb(%d)_delete: %d %08x/%d %d\n", tb->tb_id, r->rtm_type, rta->rta_dst ?
 	return -ESRCH;
 }
 
-static __inline__ int
+static inline int
 fn_flush_list(struct fib_node ** fp, int z, struct fn_hash *table)
 {
 	int found = 0;
@@ -767,7 +745,7 @@ static int fn_hash_flush(struct fib_table *tb)
 }
 
 
-static __inline__ int
+static inline int
 fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 		     struct fib_table *tb,
 		     struct fn_zone *fz,
@@ -792,7 +770,7 @@ fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 	return skb->len;
 }
 
-static __inline__ int
+static inline int
 fn_hash_dump_zone(struct sk_buff *skb, struct netlink_callback *cb,
 		   struct fib_table *tb,
 		   struct fn_zone *fz)
@@ -902,7 +880,7 @@ struct fib_iter_state {
 	struct fib_node *node;
 };
 
-static __inline__ struct fib_node *fib_get_first(struct seq_file *seq)
+static inline struct fib_node *fib_get_first(struct seq_file *seq)
 {
 	struct fib_iter_state* iter = seq->private;
 	struct fn_hash *table = (struct fn_hash *)ip_fib_main_table->tb_data;
@@ -933,7 +911,7 @@ out:
 	return iter->node;
 }
 
-static __inline__ struct fib_node *fib_get_next(struct seq_file *seq)
+static inline struct fib_node *fib_get_next(struct seq_file *seq)
 {
 	struct fib_iter_state* iter = seq->private;
 
@@ -1035,7 +1013,7 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 	f	= v;
 	fi	= FIB_INFO(f);
 	iter	= seq->private;
-	prefix	= fz_prefix(f->fn_key, iter->zone);
+	prefix	= f->fn_key;
 	mask	= FZ_MASK(iter->zone);
 	flags	= fib_flag_trans(f->fn_type, f->fn_state & FN_S_ZOMBIE,
 				 mask, fi);
