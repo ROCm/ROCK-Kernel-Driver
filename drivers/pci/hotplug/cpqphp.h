@@ -33,11 +33,7 @@
 #include <asm/io.h>		/* for read? and write? functions */
 #include <linux/delay.h>	/* for delays */
 
-#if !defined(CONFIG_HOTPLUG_PCI_COMPAQ_MODULE)
-	#define MY_NAME	"cpqphp.o"
-#else
-	#define MY_NAME	THIS_MODULE->name
-#endif
+#define MY_NAME	"cpqphp"
 
 #define dbg(fmt, arg...) do { if (cpqhp_debug) printk(KERN_DEBUG "%s: " fmt , MY_NAME , ## arg); } while (0)
 #define err(format, arg...) printk(KERN_ERR "%s: " format , MY_NAME , ## arg)

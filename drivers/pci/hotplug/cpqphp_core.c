@@ -31,6 +31,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
@@ -57,7 +58,7 @@ struct pci_func *cpqhp_slot_list[256];
 static void *smbios_table;
 static void *smbios_start;
 static void *cpqhp_rom_start;
-static u8 power_mode;
+static int power_mode;
 static int debug;
 
 #define DRIVER_VERSION	"0.9.7"
@@ -68,10 +69,10 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(power_mode, "b");
+module_param(power_mode, bool, 644);
 MODULE_PARM_DESC(power_mode, "Power mode enabled or not");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, 644);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
 #define CPQHPC_MODULE_MINOR 208
