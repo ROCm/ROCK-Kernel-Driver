@@ -15,7 +15,7 @@
 
 TFTPIMAGE		:= /tftpboot/zImage.prep
 ifeq ($(CONFIG_SMP),y)
-TFTPIMAGE		:= $(TFTPBOOT).smp
+TFTPIMAGE		:= $(TFTPIMAGE).smp
 endif
 
 boot-y				:= head.o misc.o
@@ -47,7 +47,7 @@ zImage.initrd: $(images)/zImage.initrd.prep
 
 $(images)/ramdisk.image.gz:
 	@echo '  MISSING $@'
-	@echo '          RAM disk image must be provided separatly'
+	@echo '          RAM disk image must be provided separately'
 	@/bin/false
 
 OBJCOPYFLAGS_image.o   := \
