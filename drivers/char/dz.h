@@ -161,9 +161,6 @@ struct dz_serial {
   wait_queue_head_t       open_wait;
   wait_queue_head_t       close_wait;
 
-  long                    session;             /* Session of opening process */
-  long                    pgrp;                /* pgrp of opening process */
-
   unsigned char           is_console;          /* flag indicating a serial console */
   unsigned char           is_initialized;
 };
