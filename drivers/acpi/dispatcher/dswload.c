@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -448,12 +448,6 @@ acpi_ds_load2_end_op (
 	if (op->common.aml_opcode == AML_SCOPE_OP) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 			"Ending scope Op=%p State=%p\n", op, walk_state));
-
-		if (op->named.name == ACPI_UINT16_MAX) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unnamed scope! Op=%p State=%p\n",
-				op, walk_state));
-			return (AE_OK);
-		}
 	}
 
 

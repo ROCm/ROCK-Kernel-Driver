@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -63,9 +63,9 @@ acpi_tb_find_table (
 
 	/* Validate string lengths */
 
-	if ((ACPI_STRLEN (signature)  > 4) ||
-		(ACPI_STRLEN (oem_id)     > 6) ||
-		(ACPI_STRLEN (oem_table_id) > 8)) {
+	if ((ACPI_STRLEN (signature)  > ACPI_NAME_SIZE) ||
+		(ACPI_STRLEN (oem_id)     > sizeof (table->oem_id)) ||
+		(ACPI_STRLEN (oem_table_id) > sizeof (table->oem_table_id))) {
 		return_ACPI_STATUS (AE_AML_STRING_LIMIT);
 	}
 
@@ -96,7 +96,7 @@ acpi_tb_find_table (
  * PARAMETERS:  Signature       - Any ACPI table signature
  *              Instance        - the non zero instance of the table, allows
  *                                support for multiple tables of the same type
- *              Flags           - 0: Physical/Virtual support
+ *              Flags           - Physical/Virtual support
  *              Ret_buffer      - pointer to a structure containing a buffer to
  *                                receive the table
  *
@@ -120,11 +120,10 @@ acpi_get_firmware_table (
 {
 	ACPI_POINTER            rsdp_address;
 	ACPI_POINTER            address;
-	acpi_table_header       *rsdt_ptr = NULL;
-	acpi_table_header       *table_ptr;
 	acpi_status             status;
-	ACPI_SIZE               rsdt_size = 0;
-	ACPI_SIZE               table_size;
+	acpi_table_header       header;
+	acpi_table_desc         table_info;
+	acpi_table_desc         rsdt_info;
 	u32                     table_count;
 	u32                     i;
 	u32                     j;
@@ -146,6 +145,8 @@ acpi_get_firmware_table (
 		(!table_pointer)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
+
+	rsdt_info.pointer = NULL;
 
 	if (!acpi_gbl_RSDP) {
 		/* Get the RSDP */
@@ -175,15 +176,13 @@ acpi_get_firmware_table (
 		if (ACPI_STRNCMP ((NATIVE_CHAR *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
 			/* Nope, BAD Signature */
 
-			status = AE_BAD_SIGNATURE;
-			goto cleanup;
+			return_ACPI_STATUS (AE_BAD_SIGNATURE);
 		}
 
 		if (acpi_tb_checksum (acpi_gbl_RSDP, ACPI_RSDP_CHECKSUM_LENGTH) != 0) {
 			/* Nope, BAD Checksum */
 
-			status = AE_BAD_CHECKSUM;
-			goto cleanup;
+			return_ACPI_STATUS (AE_BAD_CHECKSUM);
 		}
 	}
 
@@ -197,63 +196,65 @@ acpi_get_firmware_table (
 		ACPI_HIDWORD (address.pointer.value),
 		ACPI_LODWORD (address.pointer.value)));
 
-	status = acpi_tb_get_table_pointer (&address, flags, &rsdt_size, &rsdt_ptr);
+	/* Insert Processor_mode flags */
+
+	address.pointer_type |= flags;
+
+	status = acpi_tb_get_table (&address, &rsdt_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_tb_validate_rsdt (rsdt_ptr);
+	status = acpi_tb_validate_rsdt (rsdt_info.pointer);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
 
 	/* Get the number of table pointers within the RSDT */
 
-	table_count = acpi_tb_get_table_count (acpi_gbl_RSDP, rsdt_ptr);
+	table_count = acpi_tb_get_table_count (acpi_gbl_RSDP, rsdt_info.pointer);
 
+	address.pointer_type = acpi_gbl_table_flags | flags;
 
 	/*
 	 * Search the RSDT/XSDT for the correct instance of the
 	 * requested table
 	 */
 	for (i = 0, j = 0; i < table_count; i++) {
-		/* Get the next table pointer */
+		/* Get the next table pointer, handle RSDT vs. XSDT */
 
-		address.pointer_type = acpi_gbl_table_flags;
 		if (acpi_gbl_RSDP->revision < 2) {
-			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_ptr)->table_offset_entry[i];
+			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 		else {
 			address.pointer.value = ACPI_GET_ADDRESS (
-				((xsdt_descriptor *) rsdt_ptr)->table_offset_entry[i]);
+				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i]);
 		}
 
-		/* Get addressibility if necessary */
+		/* Get the table header */
 
-		status = acpi_tb_get_table_pointer (&address, flags, &table_size, &table_ptr);
+		status = acpi_tb_get_table_header (&address, &header);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
 
 		/* Compare table signatures and table instance */
 
-		if (!ACPI_STRNCMP ((char *) table_ptr, signature, ACPI_STRLEN (signature))) {
+		if (!ACPI_STRNCMP (header.signature, signature, ACPI_NAME_SIZE)) {
 			/* An instance of the table was found */
 
 			j++;
 			if (j >= instance) {
-				/* Found the correct instance */
+				/* Found the correct instance, get the entire table */
 
-				*table_pointer = table_ptr;
+				status = acpi_tb_get_table_body (&address, &header, &table_info);
+				if (ACPI_FAILURE (status)) {
+					goto cleanup;
+				}
+
+				*table_pointer = table_info.pointer;
 				goto cleanup;
 			}
-		}
-
-		/* Delete table mapping if using virtual addressing */
-
-		if ((table_size) &&
-			((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING)) {
-			acpi_os_unmap_memory (table_ptr, table_size);
 		}
 	}
 
@@ -263,9 +264,7 @@ acpi_get_firmware_table (
 
 
 cleanup:
-	if (rsdt_size) {
-		acpi_os_unmap_memory (rsdt_ptr, rsdt_size);
-	}
+	acpi_os_unmap_memory (rsdt_info.pointer, (ACPI_SIZE) rsdt_info.pointer->length);
 	return_ACPI_STATUS (status);
 }
 

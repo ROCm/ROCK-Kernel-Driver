@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 139 $
+ *              $Revision: 140 $
  *
  *****************************************************************************/
 
@@ -355,7 +355,7 @@ acpi_ex_opcode_1A_1T_1R (
 				goto cleanup;
 			}
 
-			/* Get the object reference and store it */
+			/* Get the object reference, store it, and remove our reference */
 
 			status = acpi_ex_get_object_reference (operand[0], &return_desc2, walk_state);
 			if (ACPI_FAILURE (status)) {
@@ -363,6 +363,7 @@ acpi_ex_opcode_1A_1T_1R (
 			}
 
 			status = acpi_ex_store (return_desc2, operand[1], walk_state);
+			acpi_ut_remove_reference (return_desc2);
 
 			/* The object exists in the namespace, return TRUE */
 
@@ -729,6 +730,15 @@ acpi_ex_opcode_1A_0T_1R (
 					 * Delete our reference to the input object and
 					 * point to the object just retrieved
 					 */
+					acpi_ut_remove_reference (operand[0]);
+					operand[0] = temp_desc;
+					break;
+
+				case AML_REF_OF_OP:
+
+					/* Get the object to which the reference refers */
+
+					temp_desc = operand[0]->reference.object;
 					acpi_ut_remove_reference (operand[0]);
 					operand[0] = temp_desc;
 					break;

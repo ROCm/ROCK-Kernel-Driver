@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 155 $
+ *              $Revision: 156 $
  *
  *****************************************************************************/
 
@@ -121,6 +121,13 @@ acpi_ex_dump_operand (
 			break;
 
 
+		case AML_REF_OF_OP:
+
+			acpi_os_printf ("Reference: (Ref_of) %p\n",
+					 obj_desc->reference.object);
+			break;
+
+
 		case AML_ARG_OP:
 
 			acpi_os_printf ("Reference: Arg%d",
@@ -157,9 +164,11 @@ acpi_ex_dump_operand (
 
 
 		case AML_INT_NAMEPATH_OP:
+
 			acpi_os_printf ("Reference.Node->Name %X\n",
 					 obj_desc->reference.node->name.integer);
 			break;
+
 
 		default:
 
