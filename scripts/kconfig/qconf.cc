@@ -961,34 +961,52 @@ void ConfigMainWindow::setHelp(QListViewItem* item)
 		if (showDebug) {
 			debug += "type: ";
 			debug += print_filter(sym_type_name(sym->type));
+			if (sym_is_choice(sym))
+				debug += " (choice)";
 			debug += "<br>";
+			if (sym->rev_dep.expr) {
+				debug += "reverse dep: ";
+				expr_print(sym->rev_dep.expr, expr_print_help, &debug, E_NONE);
+				debug += "<br>";
+			}
 			for (struct property *prop = sym->prop; prop; prop = prop->next) {
 				switch (prop->type) {
 				case P_PROMPT:
+				case P_MENU:
 					debug += "prompt: ";
 					debug += print_filter(prop->text);
 					debug += "<br>";
-					if (prop->visible.expr) {
-						debug += "&nbsp;&nbsp;dep: ";
-						expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
-						debug += "<br>";
-					}
 					break;
 				case P_DEFAULT:
 					debug += "default: ";
-					debug += print_filter(prop->def->name);
+					expr_print(prop->expr, expr_print_help, &debug, E_NONE);
 					debug += "<br>";
-					if (prop->visible.expr) {
-						debug += "&nbsp;&nbsp;dep: ";
-						expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
+					break;
+				case P_CHOICE:
+					if (sym_is_choice(sym)) {
+						debug += "choice: ";
+						expr_print(prop->expr, expr_print_help, &debug, E_NONE);
 						debug += "<br>";
 					}
 					break;
-				case P_CHOICE:
+				case P_SELECT:
+					debug += "select: ";
+					expr_print(prop->expr, expr_print_help, &debug, E_NONE);
+					debug += "<br>";
+					break;
+				case P_RANGE:
+					debug += "range: ";
+					expr_print(prop->expr, expr_print_help, &debug, E_NONE);
+					debug += "<br>";
 					break;
 				default:
 					debug += "unknown property: ";
 					debug += prop_get_type_name(prop->type);
+					debug += "<br>";
+				}
+				if (prop->visible.expr) {
+					debug += "&nbsp;&nbsp;&nbsp;&nbsp;dep: ";
+					expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
 					debug += "<br>";
 				}
 			}
@@ -1004,10 +1022,12 @@ void ConfigMainWindow::setHelp(QListViewItem* item)
 			if (menu->prompt->visible.expr) {
 				debug += "&nbsp;&nbsp;dep: ";
 				expr_print(menu->prompt->visible.expr, expr_print_help, &debug, E_NONE);
-				debug += "<br>";
+				debug += "<br><br>";
 			}
 		}
 	}
+	if (showDebug)
+		debug += QString().sprintf("defined at %s:%d<br><br>", menu->file->name, menu->lineno);
 	helpText->setText(head + debug + help);
 }
 
