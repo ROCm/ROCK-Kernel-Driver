@@ -267,8 +267,8 @@ void pdacf_tasklet(unsigned long private_data)
 	if (chip->pcm_substream == NULL || chip->pcm_substream->runtime == NULL || !snd_pcm_running(chip->pcm_substream))
 		return;
 
-	(unsigned int)rdp = inw(chip->port + PDAUDIOCF_REG_RDP);
-	(unsigned int)wdp = inw(chip->port + PDAUDIOCF_REG_WDP);
+	rdp = inw(chip->port + PDAUDIOCF_REG_RDP);
+	wdp = inw(chip->port + PDAUDIOCF_REG_WDP);
 	// printk("TASKLET: rdp = %x, wdp = %x\n", rdp, wdp);
 	size = wdp - rdp;
 	if (size < 0)
