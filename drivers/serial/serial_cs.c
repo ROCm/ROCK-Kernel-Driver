@@ -363,9 +363,10 @@ next_tuple(client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
 
 /*====================================================================*/
 
-static int simple_config(dev_link_t * link)
+static int simple_config(dev_link_t *link)
 {
 	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
+	static int size_table[2] = { 8, 16 };
 	client_handle_t handle = link->handle;
 	struct serial_info *info = link->priv;
 	tuple_t tuple;
@@ -374,6 +375,7 @@ static int simple_config(dev_link_t * link)
 	cistpl_cftable_entry_t *cf = &parse.cftable_entry;
 	config_info_t config;
 	int i, j, try;
+	int s;
 
 	/* If the card is already configured, look up the port and irq */
 	i = pcmcia_get_configuration_info(handle, &config);
@@ -399,29 +401,30 @@ static int simple_config(dev_link_t * link)
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
 	/* Two tries: without IO aliases, then with aliases */
-	for (try = 0; try < 2; try++) {
-		i = first_tuple(handle, &tuple, &parse);
-		while (i != CS_NO_MORE_ITEMS) {
-			if (i != CS_SUCCESS)
-				goto next_entry;
-			if (cf->vpp1.present & (1 << CISTPL_POWER_VNOM))
-				link->conf.Vpp1 = link->conf.Vpp2 =
-				    cf->vpp1.param[CISTPL_POWER_VNOM] / 10000;
-			if ((cf->io.nwin > 0) && (cf->io.win[0].len == 8) &&
-			    (cf->io.win[0].base != 0)) {
-				link->conf.ConfigIndex = cf->index;
-				link->io.BasePort1 = cf->io.win[0].base;
-				link->io.IOAddrLines = (try == 0) ?
-				    16 : cf->io.flags & CISTPL_IO_LINES_MASK;
-				i = pcmcia_request_io(link->handle, &link->io);
-				if (i == CS_SUCCESS)
-					goto found_port;
+	for (s = 0; s < 2; s++) {
+		for (try = 0; try < 2; try++) {
+			i = first_tuple(handle, &tuple, &parse);
+			while (i != CS_NO_MORE_ITEMS) {
+				if (i != CS_SUCCESS)
+					goto next_entry;
+				if (cf->vpp1.present & (1 << CISTPL_POWER_VNOM))
+					link->conf.Vpp1 = link->conf.Vpp2 =
+					    cf->vpp1.param[CISTPL_POWER_VNOM] / 10000;
+				if ((cf->io.nwin > 0) && (cf->io.win[0].len == size_table[s]) &&
+					    (cf->io.win[0].base != 0)) {
+					link->conf.ConfigIndex = cf->index;
+					link->io.BasePort1 = cf->io.win[0].base;
+					link->io.IOAddrLines = (try == 0) ?
+					    16 : cf->io.flags & CISTPL_IO_LINES_MASK;
+					i = pcmcia_request_io(link->handle, &link->io);
+					if (i == CS_SUCCESS)
+						goto found_port;
+				}
+next_entry:
+				i = next_tuple(handle, &tuple, &parse);
 			}
-		      next_entry:
-			i = next_tuple(handle, &tuple, &parse);
 		}
 	}
-
 	/* Second pass: try to find an entry that isn't picky about
 	   its base address, then try to grab any standard serial port
 	   address, and finally try to get any free port. */
