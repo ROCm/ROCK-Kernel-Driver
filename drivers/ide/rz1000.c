@@ -40,8 +40,7 @@ void __init ide_init_rz1000(struct ata_channel *hwif)	/* called from ide-pci.c *
 		printk("%s: disabled chipset read-ahead (buggy RZ1000/RZ1001)\n", hwif->name);
 	} else {
 		hwif->serialized = 1;
-		hwif->drives[0].no_unmask = 1;
-		hwif->drives[1].no_unmask = 1;
+		hwif->no_unmask = 1;
 		printk("%s: serialized, disabled unmasking (buggy RZ1000/RZ1001)\n", hwif->name);
 	}
 }

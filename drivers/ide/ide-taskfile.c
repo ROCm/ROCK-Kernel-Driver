@@ -156,7 +156,7 @@ void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount)
 		return;
 	}
 
-	io_32bit = drive->io_32bit;
+	io_32bit = drive->channel->io_32bit;
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -167,7 +167,7 @@ void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount)
 			ata_read_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow)
+		if (drive->channel->slow)
 			ata_read_slow(drive, buffer, wcount);
 		else
 #endif
@@ -187,7 +187,7 @@ void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
 		return;
 	}
 
-	io_32bit = drive->io_32bit;
+	io_32bit = drive->channel->io_32bit;
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -198,7 +198,7 @@ void ata_write(ide_drive_t *drive, void *buffer, unsigned int wcount)
 			ata_write_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow)
+		if (drive->channel->slow)
 			ata_write_slow(drive, buffer, wcount);
 		else
 #endif
@@ -976,6 +976,7 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 		if (argbuf == NULL)
 			return -ENOMEM;
 		memcpy(argbuf, vals, 4);
+		memset(argbuf + 4, 0, argsize - 4);
 	}
 
 	if (set_transfer(drive, &args)) {
@@ -986,14 +987,8 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 
 	/* Issue ATA command and wait for completion.
 	 */
-
-	/* FIXME: Do we really have to zero out the buffer?
-	 */
-	memset(argbuf, 4, SECTOR_WORDS * 4 * vals[3]);
 	ide_init_drive_cmd(&rq);
 	rq.buffer = argbuf;
-	memcpy(argbuf, vals, 4);
-
 	err = ide_do_drive_cmd(drive, &rq, ide_wait);
 
 	if (!err && xfer_rate) {

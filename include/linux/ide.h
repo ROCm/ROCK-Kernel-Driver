@@ -342,12 +342,10 @@ struct ata_device {
 	unsigned long PADAM_timeout;		/* max time to wait for irq */
 
 	special_t	special;	/* special action flags */
-	byte     keep_settings;		/* restore settings after drive reset */
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 using_tcq;		/* disk is using queued dma operations*/
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
-	byte     unmask;		/* flag: okay to unmask other irqs */
 	byte     dsc_overlap;		/* flag: DSC overlap */
 
 	unsigned waiting_for_dma: 1;	/* dma currently in progress */
@@ -358,7 +356,6 @@ struct ata_device {
 	unsigned noprobe	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
-	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	unsigned nobios		: 1;	/* flag: do not probe bios for drive */
 	unsigned revalidate	: 1;	/* request revalidation */
 	unsigned atapi_overlap	: 1;	/* flag: ATAPI overlap (not supported) */
@@ -387,13 +384,6 @@ struct ata_device {
 	unsigned long	capacity;	/* total number of sectors */
 	unsigned long long capacity48;	/* total number of sectors */
 	unsigned int	drive_data;	/* for use by tuneproc/selectproc as needed */
-
-	/* FIXME: Those are properties of a channel and not a drive!  Move them
-	 * later there.
-	 */
-	byte		slow;		/* flag: slow data port */
-	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
-	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
 
 	wait_queue_head_t wqueue;	/* used to wait for drive in open() */
 
@@ -523,6 +513,12 @@ struct ata_channel {
 	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
 	unsigned	highmem	   : 1; /* can do full 32-bit dma */
+	byte		slow;		/* flag: slow data port */
+	unsigned no_io_32bit	   : 1;	/* disallow enabling 32bit I/O */
+	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
+	unsigned no_unmask	   : 1;	/* disallow setting unmask bit */
+	byte		unmask;		/* flag: okay to unmask other irqs */
+
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif

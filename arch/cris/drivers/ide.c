@@ -280,7 +280,7 @@ init_e100_ide (void)
 		hwif->tuneproc = &tune_e100_ide;
 		hwif->dmaproc = &e100_dmaproc;
 		hwif->ata_read = e100_ide_input_data;
-		hwif->ata_write = e100_ide_input_data;
+		hwif->ata_write = e100_ide_output_data;
 		hwif->atapi_read = e100_atapi_read;
 		hwif->atapi_write = e100_atapi_write;
 	}
@@ -558,32 +558,6 @@ static void
 e100_ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	e100_atapi_write(drive, buffer, wcount << 2);
-}
-
-/*
- * The multiplexor for ide_xxxput_data and atapi calls
- */
-static void 
-e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
-	      void *buffer, unsigned int length)
-{
-	switch (func) {
-		case ideproc_ide_input_data:
-			e100_ide_input_data(drive, buffer, length);
-			break;
-		case ideproc_ide_output_data:
-			e100_ide_input_data(drive, buffer, length);
-			break;
-		case ideproc_atapi_read:
-			e100_atapi_read(drive, buffer, length);
-			break;
-		case ideproc_atapi_write:
-			e100_atapi_write(drive, buffer, length);
-			break;
-		default:
-			printk("e100_ideproc: unsupported func %d!\n", func);
-			break;
-	}
 }
 
 /* we only have one DMA channel on the chip for ATA, so we can keep these statically */
