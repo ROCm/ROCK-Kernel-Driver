@@ -123,7 +123,8 @@ get_chrfops(unsigned int major, unsigned int minor)
  *
  * Returns a -ve errno on failure.
  */
-int register_chrdev_region(unsigned int major, unsigned int baseminor,
+static struct char_device_struct *
+__register_chrdev_region(unsigned int major, unsigned int baseminor,
 			   int minorct, const char *name,
 			   struct file_operations *fops)
 {
@@ -133,7 +134,7 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	cd = kmalloc(sizeof(struct char_device_struct), GFP_KERNEL);
 	if (cd == NULL)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	write_lock_irq(&chrdevs_lock);
 
@@ -167,32 +168,23 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 	if (*cp && (*cp)->major == major &&
 	    (*cp)->baseminor < baseminor + minorct) {
 		ret = -EBUSY;
-	} else {
-		cd->next = *cp;
-		*cp = cd;
+		goto out;
 	}
+	cd->next = *cp;
+	*cp = cd;
+	write_unlock_irq(&chrdevs_lock);
+	return cd;
 out:
 	write_unlock_irq(&chrdevs_lock);
-	if (ret < 0)
-		kfree(cd);
-	return ret;
+	kfree(cd);
+	return ERR_PTR(ret);
 }
 
-int register_chrdev(unsigned int major, const char *name,
-		    struct file_operations *fops)
+static struct char_device_struct *
+__unregister_chrdev_region(unsigned major, unsigned baseminor, int minorct)
 {
-	return register_chrdev_region(major, 0, 256, name, fops);
-}
-
-/* todo: make void - error printk here */
-int unregister_chrdev_region(unsigned int major, unsigned int baseminor,
-			     int minorct, const char *name)
-{
-	struct char_device_struct *cd, **cp;
-	int ret = 0;
-	int i;
-
-	i = major_to_index(major);
+	struct char_device_struct *cd = NULL, **cp;
+	int i = major_to_index(major);
 
 	write_lock_irq(&chrdevs_lock);
 	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
@@ -200,21 +192,79 @@ int unregister_chrdev_region(unsigned int major, unsigned int baseminor,
 		    (*cp)->baseminor == baseminor &&
 		    (*cp)->minorct == minorct)
 			break;
-	if (!*cp || strcmp((*cp)->name, name))
-		ret = -EINVAL;
-	else {
+	if (*cp) {
 		cd = *cp;
 		*cp = cd->next;
-		kfree(cd);
 	}
 	write_unlock_irq(&chrdevs_lock);
+	return cd;
+}
 
-	return ret;
+int register_chrdev_region(dev_t from, unsigned count, char *name,
+			   struct file_operations *fops)
+{
+	struct char_device_struct *cd;
+	dev_t to = from + count;
+	dev_t n, next;
+
+	for (n = from; n < to; n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		if (next > to)
+			next = to;
+		cd = __register_chrdev_region(MAJOR(n), MINOR(n),
+			       next - n, name, fops);
+		if (IS_ERR(cd))
+			goto fail;
+	}
+	return 0;
+fail:
+	to = n;
+	for (n = from; n < to; n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		kfree(__unregister_chrdev_region(MAJOR(n), MINOR(n), next - n));
+	}
+	return PTR_ERR(cd);
+}
+
+int alloc_chrdev_region(dev_t *dev, unsigned count, char *name,
+			   struct file_operations *fops)
+{
+	struct char_device_struct *cd;
+	cd = __register_chrdev_region(0, 0, count, name, fops);
+	if (IS_ERR(cd))
+		return PTR_ERR(cd);
+	*dev = MKDEV(cd->major, cd->baseminor);
+	return 0;
+}
+
+int register_chrdev(unsigned int major, const char *name,
+		    struct file_operations *fops)
+{
+	struct char_device_struct *cd;
+
+	cd = __register_chrdev_region(major, 0, 256, name, fops);
+	if (IS_ERR(cd))
+		return PTR_ERR(cd);
+	return cd->major;
+}
+
+void unregister_chrdev_region(dev_t from, unsigned count)
+{
+	dev_t to = from + count;
+	dev_t n, next;
+
+	for (n = from; n < to; n = next) {
+		next = MKDEV(MAJOR(n)+1, 0);
+		if (next > to)
+			next = to;
+		kfree(__unregister_chrdev_region(MAJOR(n), MINOR(n), next - n));
+	}
 }
 
 int unregister_chrdev(unsigned int major, const char *name)
 {
-	return unregister_chrdev_region(major, 0, 256, name);
+	kfree(__unregister_chrdev_region(major, 0, 256));
+	return 0;
 }
 
 /*

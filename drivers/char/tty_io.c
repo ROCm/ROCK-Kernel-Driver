@@ -2242,53 +2242,6 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 EXPORT_SYMBOL(tty_register_device);
 EXPORT_SYMBOL(tty_unregister_device);
 
-/* that should be handled by register_chrdev_region() */
-static int get_range(struct tty_driver *driver)
-{
-	dev_t from = MKDEV(driver->major, driver->minor_start);
-	dev_t to = from + driver->num;
-	dev_t n, next;
-	int error = 0;
-
-	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
-		next = MKDEV(MAJOR(n)+1, 0);
-		error = register_chrdev_region(MAJOR(n), MINOR(n),
-			       next - n, driver->name, &tty_fops);
-		if (error)
-			goto fail;
-	}
-	if (n != to)
-		error = register_chrdev_region(MAJOR(n), MINOR(n),
-			       to - n, driver->name, &tty_fops);
-	if (!error)
-		return 0;
-fail:
-	to = n;
-	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
-		next = MKDEV(MAJOR(n)+1, 0);
-		unregister_chrdev_region(MAJOR(n), MINOR(n),
-			       next - n, driver->name);
-	}
-	return error;
-}
-
-/* that should be handled by unregister_chrdev_region() */
-static void put_range(struct tty_driver *driver)
-{
-	dev_t from = MKDEV(driver->major, driver->minor_start);
-	dev_t to = from + driver->num;
-	dev_t n, next;
-
-	for (n = from; MAJOR(n) < MAJOR(to); n = next) {
-		next = MKDEV(MAJOR(n)+1, 0);
-		unregister_chrdev_region(MAJOR(n), MINOR(n),
-			       next - n, driver->name);
-	}
-	if (n != to)
-		unregister_chrdev_region(MAJOR(n), MINOR(n),
-			       to - n, driver->name);
-}
-
 /*
  * Called by a tty driver to register itself.
  */
@@ -2296,17 +2249,22 @@ int tty_register_driver(struct tty_driver *driver)
 {
 	int error;
         int i;
+	dev_t dev;
 
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
 
 	if (!driver->major) {
-		error = register_chrdev_region(0, driver->minor_start,
-				       driver->num, driver->name, &tty_fops);
-		if (error > 0)
-			driver->major = error;
+		error = alloc_chrdev_region(&dev, driver->num,
+						(char*)driver->name, &tty_fops);
+		if (!error) {
+			driver->major = MAJOR(dev);
+			driver->minor_start = MINOR(dev);
+		}
 	} else {
-		error = get_range(driver);
+		dev = MKDEV(driver->major, driver->minor_start);
+		error = register_chrdev_region(dev, driver->num,
+						(char*)driver->name, &tty_fops);
 	}
 	if (error < 0)
 		return error;
@@ -2335,7 +2293,8 @@ int tty_unregister_driver(struct tty_driver *driver)
 	if (*driver->refcount)
 		return -EBUSY;
 
-	put_range(driver);
+	unregister_chrdev_region(MKDEV(driver->major, driver->minor_start),
+				driver->num);
 
 	list_del(&driver->tty_drivers);
 
@@ -2412,20 +2371,20 @@ postcore_initcall(tty_class_init);
  */
 void __init tty_init(void)
 {
-	if (register_chrdev_region(TTYAUX_MAJOR, 0, 1,
+	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1,
 				   "/dev/tty", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
 	tty_add_class_device ("tty", MKDEV(TTYAUX_MAJOR, 0), NULL);
 
-	if (register_chrdev_region(TTYAUX_MAJOR, 1, 1,
+	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1,
 				   "/dev/console", &tty_fops) < 0)
 		panic("Couldn't register /dev/console driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
 	tty_add_class_device ("console", MKDEV(TTYAUX_MAJOR, 1), NULL);
 
 #ifdef CONFIG_UNIX98_PTYS
-	if (register_chrdev_region(TTYAUX_MAJOR, 2, 1,
+	if (register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1,
 				   "/dev/ptmx", &tty_fops) < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 2), S_IFCHR|S_IRUGO|S_IWUGO, "ptmx");
@@ -2433,7 +2392,7 @@ void __init tty_init(void)
 #endif
 	
 #ifdef CONFIG_VT
-	if (register_chrdev_region(TTY_MAJOR, 0, 1,
+	if (register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1,
 				   "/dev/vc/0", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
 	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
