@@ -398,7 +398,7 @@ extern void firmware_unregister(struct subsystem *);
 #include <linux/evlog.h>
 #define dev_printk(level, dev, format, arg...)	\
     do { \
-	const char *name = (dev)->driver? (dev)->driver->name : "";
+	const char *name = (dev)->driver? (dev)->driver->name : ""; \
 	printk(level "%s %s: " format , name , (dev)->bus_id , ## arg); \
 	evl_printk((dev)->driver->name , 0, (level[1]-'0') , \
 	    "%s %s: " format , name , (dev)->bus_id , ## arg); \
