@@ -11,6 +11,7 @@
  *		
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <asm/uaccess.h>
 #include <linux/skbuff.h>
@@ -617,3 +618,6 @@ int ip_options_rcv_srr(struct sk_buff *skb)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(ip_options_compile);
+EXPORT_SYMBOL(ip_options_undo);

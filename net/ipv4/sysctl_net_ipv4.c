@@ -8,6 +8,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/sysctl.h>
 #include <linux/config.h>
 #include <net/snmp.h>
@@ -587,3 +588,5 @@ ctl_table ipv4_table[] = {
 };
 
 #endif /* CONFIG_SYSCTL */
+
+EXPORT_SYMBOL(ipv4_config);

@@ -18,6 +18,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
@@ -1055,3 +1056,10 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(ip_cmsg_recv);
+
+#ifdef CONFIG_IP_SCTP_MODULE
+EXPORT_SYMBOL(ip_getsockopt);
+EXPORT_SYMBOL(ip_setsockopt);
+#endif

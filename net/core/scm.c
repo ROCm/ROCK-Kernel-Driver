@@ -9,6 +9,7 @@
  *		2 of the License, or (at your option) any later version.
  */
 
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -282,3 +283,9 @@ struct scm_fp_list *scm_fp_dup(struct scm_fp_list *fpl)
 	}
 	return new_fpl;
 }
+
+EXPORT_SYMBOL(__scm_destroy);
+EXPORT_SYMBOL(__scm_send);
+EXPORT_SYMBOL(put_cmsg);
+EXPORT_SYMBOL(scm_detach_fds);
+EXPORT_SYMBOL(scm_fp_dup);

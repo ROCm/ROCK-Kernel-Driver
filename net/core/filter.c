@@ -424,3 +424,6 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 		sk_filter_release(sk, fp);
 	return err;
 }
+
+EXPORT_SYMBOL(sk_chk_filter);
+EXPORT_SYMBOL(sk_run_filter);

@@ -16,6 +16,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -605,3 +606,6 @@ void __init ip_fib_init(void)
 	register_inetaddr_notifier(&fib_inetaddr_notifier);
 }
 
+EXPORT_SYMBOL(inet_addr_type);
+EXPORT_SYMBOL(ip_dev_find);
+EXPORT_SYMBOL(ip_rt_ioctl);

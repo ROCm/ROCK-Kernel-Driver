@@ -467,3 +467,6 @@ int __init tc_filter_init(void)
 #endif
 	return 0;
 }
+
+EXPORT_SYMBOL(register_tcf_proto_ops);
+EXPORT_SYMBOL(unregister_tcf_proto_ops);

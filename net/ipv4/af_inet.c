@@ -74,6 +74,7 @@
 #include <linux/in.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/string.h>
@@ -1246,4 +1247,33 @@ int __init ipv4_proc_init(void)
 	return 0;
 }
 #endif /* CONFIG_PROC_FS */
+
 MODULE_ALIAS_NETPROTO(PF_INET);
+
+EXPORT_SYMBOL(inet_accept);
+EXPORT_SYMBOL(inet_bind);
+EXPORT_SYMBOL(inet_dgram_connect);
+EXPORT_SYMBOL(inet_dgram_ops);
+EXPORT_SYMBOL(inet_family_ops);
+EXPORT_SYMBOL(inet_getname);
+EXPORT_SYMBOL(inet_getsockopt);
+EXPORT_SYMBOL(inet_ioctl);
+EXPORT_SYMBOL(inet_listen);
+EXPORT_SYMBOL(inet_recvmsg);
+EXPORT_SYMBOL(inet_register_protosw);
+EXPORT_SYMBOL(inet_release);
+EXPORT_SYMBOL(inet_sendmsg);
+EXPORT_SYMBOL(inet_setsockopt);
+EXPORT_SYMBOL(inet_shutdown);
+EXPORT_SYMBOL(inet_sock_destruct);
+EXPORT_SYMBOL(inet_sock_release);
+EXPORT_SYMBOL(inet_stream_connect);
+EXPORT_SYMBOL(inet_stream_ops);
+EXPORT_SYMBOL(inet_unregister_protosw);
+EXPORT_SYMBOL(net_statistics);
+EXPORT_SYMBOL(tcp_protocol);
+EXPORT_SYMBOL(udp_protocol);
+
+#ifdef INET_REFCNT_DEBUG
+EXPORT_SYMBOL(inet_sock_nr);
+#endif

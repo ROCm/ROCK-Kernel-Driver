@@ -13,13 +13,15 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/jiffies.h>
-#include <linux/string.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/string.h>
+#include <linux/types.h>
+
+#include <asm/system.h>
+#include <asm/uaccess.h>
 
 static unsigned long net_rand_seed = 152L;
 
@@ -71,3 +73,7 @@ int net_ratelimit(void)
 	spin_unlock_irqrestore(&ratelimit_lock, flags);
 	return 0;
 }
+
+EXPORT_SYMBOL(net_random);
+EXPORT_SYMBOL(net_ratelimit);
+EXPORT_SYMBOL(net_srandom);

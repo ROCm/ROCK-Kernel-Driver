@@ -619,3 +619,6 @@ module_init(fasync_init)
 
 EXPORT_SYMBOL(f_setown);
 EXPORT_SYMBOL(f_delown);
+#ifdef CONFIG_NET
+EXPORT_SYMBOL(__kill_fasync);
+#endif
