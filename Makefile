@@ -107,6 +107,16 @@ endif # ifeq ($(KBUILD_SRC),)
 # We process the rest of the Makefile if this is the final invocation of make
 ifeq ($(skip-makefile),)
 
+# Make sure we're not wasting cpu-cycles doing locale handling, yet do make
+# sure error messages appear in the user-desired language
+ifdef LC_ALL
+	LANG := $(LC_ALL)
+	LC_ALL :=
+endif
+LC_COLLATE := C
+LC_CTYPE := C
+export LANG LC_ALL LC_COLLATE LC_CTYPE
+
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
 TOPDIR		:= $(srctree)
 # FIXME - TOPDIR is obsolete, use srctree/objtree
