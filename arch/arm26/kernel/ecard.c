@@ -42,9 +42,7 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
-#include <asm/irq.h>
 #include <asm/irqchip.h>
 #include <asm/tlbflush.h>
 
@@ -137,65 +135,23 @@ ecard_task_readbytes(struct ecard_request *req)
 	unsigned int len = req->length;
 	unsigned int off = req->address;
 
-	if (req->ec->slot_no == 8) {
-		/*
-		 * The card maintains an index which increments the address
-		 * into a 4096-byte page on each access.  We need to keep
-		 * track of the counter.
-		 */
-		static unsigned int index;
-		unsigned int page;
-
-		page = (off >> 12) * 4;
-		if (page > 256 * 4)
-			return;
-
-		off &= 4095;
-
-		/*
-		 * If we are reading offset 0, or our current index is
-		 * greater than the offset, reset the hardware index counter.
-		 */
-		if (off == 0 || index > off) {
-			*base_addr = 0;
-			index = 0;
-		}
-
-		/*
-		 * Increment the hardware index counter until we get to the
-		 * required offset.  The read bytes are discarded.
-		 */
-		while (index < off) {
-			unsigned char byte;
-			byte = base_addr[page];
-			index += 1;
-		}
-
+	if (!req->use_loader || !req->ec->loader) {
+		off *= 4;
 		while (len--) {
-			*buf++ = base_addr[page];
-			index += 1;
+			*buf++ = base_addr[off];
+			off += 4;
 		}
 	} else {
-
-		if (!req->use_loader || !req->ec->loader) {
-			off *= 4;
-			while (len--) {
-				*buf++ = base_addr[off];
-				off += 4;
-			}
-		} else {
-			while(len--) {
-				/*
-				 * The following is required by some
-				 * expansion card loader programs.
-				 */
-				*(unsigned long *)0x108 = 0;
-				*buf++ = ecard_loader_read(off++, base_addr,
-							   req->ec->loader);
-			}
+		while(len--) {
+			/*
+			 * The following is required by some
+			 * expansion card loader programs.
+			 */
+			*(unsigned long *)0x108 = 0;
+			*buf++ = ecard_loader_read(off++, base_addr,
+						   req->ec->loader);
 		}
 	}
-
 }
 
 static void ecard_do_request(struct ecard_request *req)
@@ -466,7 +422,7 @@ ecard_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	for (ec = cards; ec; ec = ec->next) {
 		int pending;
 
-		if (!ec->claimed || ec->irq == NO_IRQ || ec->slot_no == 8)
+		if (!ec->claimed || ec->irq == NO_IRQ)
 			continue;
 
 		if (ec->ops && ec->ops->irqpending)
@@ -494,22 +450,15 @@ unsigned int ecard_address(ecard_t *ec, card_type_t type, card_speed_t speed)
 	unsigned long address = 0;
 	int slot = ec->slot_no;
 
-	if (ec->slot_no == 8)
-		return 0;
-
 	ectcr &= ~(1 << slot);
 
 	switch (type) {
 	case ECARD_MEMC:
-		if (slot < 4)
-			address = IO_EC_MEMC_BASE + (slot << 12);
+		address = IO_EC_MEMC_BASE + (slot << 12);
 		break;
 
 	case ECARD_IOC:
-		if (slot < 4)
-			address = IO_EC_IOC_BASE + (slot << 12);
-		if (address)
-			address +=  speed << 17;
+		address = IO_EC_IOC_BASE + (slot << 12) + (speed << 17);
 		break;
 
 	default:
@@ -592,11 +541,9 @@ static void __init ecard_init_resources(struct expansion_card *ec)
 	unsigned int slot = ec->slot_no;
 	int i;
 
-	if (slot < 4) {
-		ec_set_resource(ec, ECARD_RES_MEMC,
-				PODSLOT_MEMC_BASE + (slot << 14),
-				PODSLOT_MEMC_SIZE, IORESOURCE_MEM);
-	}
+	ec_set_resource(ec, ECARD_RES_MEMC,
+			PODSLOT_MEMC_BASE + (slot << 14),
+			PODSLOT_MEMC_SIZE, IORESOURCE_MEM);
 
 	for (i = 0; i < ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
 		ec_set_resource(ec, i + ECARD_RES_IOCSLOW,
@@ -739,12 +686,10 @@ ecard_probe(int slot, card_type_t type)
 	/*
 	 * hook the interrupt handlers
 	 */
-	if (slot < 8) {
-		ec->irq = 32 + slot;
-		set_irq_chip(ec->irq, &ecard_chip);
-		set_irq_handler(ec->irq, do_level_IRQ);
-		set_irq_flags(ec->irq, IRQF_VALID);
-	}
+	ec->irq = 32 + slot;
+	set_irq_chip(ec->irq, &ecard_chip);
+	set_irq_handler(ec->irq, do_level_IRQ);
+	set_irq_flags(ec->irq, IRQF_VALID);
 
 	for (ecp = &cards; *ecp; ecp = &(*ecp)->next);
 
@@ -777,7 +722,7 @@ static int __init ecard_init(void)
 
 	printk("Probing expansion cards\n");
 
-	for (slot = 0; slot < 4; slot ++) {
+	for (slot = 0; slot < MAX_ECARDS; slot ++) {
 		ecard_probe(slot, ECARD_IOC);
 	}
 
