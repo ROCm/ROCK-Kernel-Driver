@@ -600,6 +600,7 @@ int sgiseeq_init(struct hpc3_regs* regs, int irq)
 {
 	struct net_device *dev;
 	struct sgiseeq_private *sp;
+	int err = -ENOMEM;
 	int i;
 	
 	sp = (struct sgiseeq_private *) get_zeroed_page(GFP_KERNEL);
@@ -609,19 +610,17 @@ int sgiseeq_init(struct hpc3_regs* regs, int irq)
 		return -ENOMEM;
 	}
 
-	dev = init_etherdev(NULL, 0);
+	dev = alloc_etherdev(0);
 	if (!dev) {
 		printk (KERN_ERR
 			"Seeq8003: Could not allocate memory for device.\n");
-		free_page((unsigned long) sp);
-		return -ENOMEM;
+		goto out;
 	}
 
 	if (request_irq(irq, sgiseeq_interrupt, 0, sgiseeqstr, dev)) {
-		printk(KERN_ERR "Seeq8003: Can't get irq %d\n", dev->irq);
-		free_page((unsigned long) sp);
-		unregister_netdev(dev);
-		return -EAGAIN;
+		printk(KERN_ERR "Seeq8003: Can't get irq %d\n", irq);
+		err = -EAGAIN;
+		goto out1;
 	}
 
 	printk(KERN_INFO "%s: SGI Seeq8003 ", dev->name);
@@ -636,6 +635,8 @@ int sgiseeq_init(struct hpc3_regs* regs, int irq)
 			i == 2 ? ' ' : ':');
 	}
 	printk("\n");
+
+	SET_MODULE_OWNER(dev);
 
 	dev->priv = sp;
 #ifdef DEBUG
@@ -677,12 +678,22 @@ int sgiseeq_init(struct hpc3_regs* regs, int irq)
 	dev->set_multicast_list   = sgiseeq_set_multicast;
 	dev->irq                  = irq;
 	dev->dma                  = 0;
-	ether_setup(dev);
+
+	err = register_netdev(dev);
+	if (err)
+		goto out2;
 
 	sp->next_module = root_sgiseeq_dev;
 	root_sgiseeq_dev = dev;
 
 	return 0;
+out2:
+	free_irq(dev->irq, dev);
+out1:
+	free_netdev(dev);
+out:
+	free_page((unsigned long) sp);
+	return err;
 }
 
 static int __init sgiseeq_probe(void)
@@ -701,9 +712,9 @@ static void __exit sgiseeq_exit(void)
 	while (dev) {
 		sp = (struct sgiseeq_private *) dev->priv;
 		next = sp->next_module;
+		unregister_netdev(dev);
 		free_irq(dev->irq, dev);
 		free_page((unsigned long) sp);
-		unregister_netdev(dev);
 		free_netdev(dev);
 		dev = next;
 	}
