@@ -36,11 +36,11 @@
 #include "dvb_frontend.h"
 #include "nxt6000.h"
 
-static int debug = 0;
-
 MODULE_DESCRIPTION("NxtWave NXT6000 DVB demodulator driver");
 MODULE_AUTHOR("Florian Schirmer");
 MODULE_LICENSE("GPL");
+
+static int debug = 0;
 MODULE_PARM(debug, "i");
 
 static struct dvb_frontend_info nxt6000_info = {
@@ -68,43 +68,38 @@ struct nxt6000_config {
 	u8 tuner_addr;
 	u8 tuner_type;
 	u8 clock_inversion;
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
 };
 
 #define TUNER_TYPE_ALP510	0
 #define TUNER_TYPE_SP5659	1
 #define TUNER_TYPE_SP5730	2
 
-#define FE2NXT(fe) ((struct nxt6000_config *)((fe)->data))
+// #define FE2NXT(fe) ((struct nxt6000_config *)((fe)->data))
 #define FREQ2DIV(freq) ((freq + 36166667) / 166667)
 
 #define dprintk if (debug) printk
 
-static int nxt6000_write(struct dvb_i2c_bus *i2c, u8 addr, u8 reg, u8 data)
+static int nxt6000_write(struct i2c_adapter *i2c, u8 addr, u8 reg, u8 data)
 {
-
 	u8 buf[] = {reg, data};
 	struct i2c_msg msg = {.addr = addr >> 1, .flags = 0, .buf = buf, .len = 2};
 	int ret;
 	
-	if ((ret = i2c->xfer(i2c, &msg, 1)) != 1)
+	if ((ret = i2c_transfer(i2c, &msg, 1)) != 1)
 		dprintk("nxt6000: nxt6000_write error (.addr = 0x%02X, reg: 0x%02X, data: 0x%02X, ret: %d)\n", addr, reg, data, ret);
 
 	return (ret != 1) ? -EFAULT : 0;
-	
 }
 
-static u8 nxt6000_writereg(struct dvb_frontend *fe, u8 reg, u8 data)
+static u8 nxt6000_writereg(struct nxt6000_config *nxt, u8 reg, u8 data)
 {
-
-	struct nxt6000_config *nxt = FE2NXT(fe);
-
-	return nxt6000_write(fe->i2c, nxt->demod_addr, reg, data);
-
+	return nxt6000_write(nxt->i2c, nxt->demod_addr, reg, data);
 }
 
-static u8 nxt6000_read(struct dvb_i2c_bus *i2c, u8 addr, u8 reg)
+static u8 nxt6000_read(struct i2c_adapter *i2c, u8 addr, u8 reg)
 {
-
 	int ret;
 	u8 b0[] = {reg};
 	u8 b1[] = {0};
@@ -113,58 +108,50 @@ static u8 nxt6000_read(struct dvb_i2c_bus *i2c, u8 addr, u8 reg)
 		{.addr = addr >> 1,.flags = I2C_M_RD,.buf = b1,.len = 1}
 	};
 
-	ret = i2c->xfer(i2c, msgs, 2);
+	ret = i2c_transfer(i2c, msgs, 2);
 	
 	if (ret != 2)
 		dprintk("nxt6000: nxt6000_read error (.addr = 0x%02X, reg: 0x%02X, ret: %d)\n", addr, reg, ret);
 	
 	return b1[0];
-
 }
 
-static u8 nxt6000_readreg(struct dvb_frontend *fe, u8 reg)
+static u8 nxt6000_readreg(struct nxt6000_config *nxt, u8 reg)
 {
-
-	struct nxt6000_config *nxt = FE2NXT(fe);
-
-	return nxt6000_read(fe->i2c, nxt->demod_addr, reg);
+	return nxt6000_read(nxt->i2c, nxt->demod_addr, reg);
 }
 
-static int pll_test(struct dvb_i2c_bus *i2c, u8 demod_addr, u8 tuner_addr)
+static int pll_test(struct i2c_adapter *i2c, u8 demod_addr, u8 tuner_addr)
 {
 	u8 buf [1];
 	struct i2c_msg msg = {.addr = tuner_addr >> 1,.flags = I2C_M_RD,.buf = buf,.len = 1 };
 	int ret;
 
 	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x01);	/* open i2c bus switch */
-	ret = i2c->xfer(i2c, &msg, 1);
+	ret = i2c_transfer(i2c, &msg, 1);
 	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x00);	/* close i2c bus switch */
 
 	return (ret != 1) ? -EFAULT : 0;
 }
 
-static int pll_write(struct dvb_i2c_bus *i2c, u8 demod_addr, u8 tuner_addr, u8 *buf, u8 len)
+static int pll_write(struct i2c_adapter *i2c, u8 demod_addr, u8 tuner_addr, u8 * buf, u8 len)
 {
-
 	struct i2c_msg msg = {.addr = tuner_addr >> 1, .flags = 0, .buf = buf, .len = len};
 	int ret;
 				
 	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x01);		/* open i2c bus switch */
-	ret = i2c->xfer(i2c, &msg, 1);
+	ret = i2c_transfer(i2c, &msg, 1);
 	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x00);		/* close i2c bus switch */
 										
 	if (ret != 1)
 		dprintk("nxt6000: pll_write error %d\n", ret);
 																
 	return (ret != 1) ? -EFAULT : 0;
-
 }
 
-static int sp5659_set_tv_freq(struct dvb_frontend *fe, u32 freq)
+static int sp5659_set_tv_freq(struct nxt6000_config *nxt, u32 freq)
 {
-
 	u8 buf[4];
-	struct nxt6000_config *nxt = FE2NXT(fe);
 
 	buf[0] = (FREQ2DIV(freq) >> 8) & 0x7F;
 	buf[1] = FREQ2DIV(freq) & 0xFF;
@@ -179,15 +166,12 @@ static int sp5659_set_tv_freq(struct dvb_frontend *fe, u32 freq)
 	else
 		return -EINVAL;
 
-	return pll_write(fe->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
-	
+	return pll_write(nxt->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
 }
 
-static int alp510_set_tv_freq(struct dvb_frontend *fe, u32 freq)
+static int alp510_set_tv_freq(struct nxt6000_config *nxt, u32 freq)
 {
-
 	u8 buf[4];
-	struct nxt6000_config *nxt = FE2NXT(fe);
 
 	buf[0] = (FREQ2DIV(freq) >> 8) & 0x7F;
 	buf[1] = FREQ2DIV(freq) & 0xFF;
@@ -217,15 +201,12 @@ static int alp510_set_tv_freq(struct dvb_frontend *fe, u32 freq)
 		return -EINVAL;
 #endif
 
-	return pll_write(fe->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
-	
+	return pll_write(nxt->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
 }
 
-static int sp5730_set_tv_freq(struct dvb_frontend *fe, u32 freq)
+static int sp5730_set_tv_freq(struct nxt6000_config *nxt, u32 freq)
 {
-
 	u8 buf[4];
-	struct nxt6000_config *nxt = FE2NXT(fe);
 
 	buf[0] = (FREQ2DIV(freq) >> 8) & 0x7F;
 	buf[1] = FREQ2DIV(freq) & 0xFF;
@@ -250,25 +231,21 @@ static int sp5730_set_tv_freq(struct dvb_frontend *fe, u32 freq)
 	else
 		return -EINVAL;
 
-	return pll_write(fe->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
-	
+	return pll_write(nxt->i2c, nxt->demod_addr, nxt->tuner_addr, buf, 4);
 }
 
-static void nxt6000_reset(struct dvb_frontend *fe)
+static void nxt6000_reset(struct nxt6000_config *fe)
 {
-
 	u8 val;
 
 	val = nxt6000_readreg(fe, OFDM_COR_CTL);
 	
 	nxt6000_writereg(fe, OFDM_COR_CTL, val & ~COREACT);
 	nxt6000_writereg(fe, OFDM_COR_CTL, val | COREACT);
-	
 }
 
-static int nxt6000_set_bandwidth(struct dvb_frontend *fe, fe_bandwidth_t bandwidth)
+static int nxt6000_set_bandwidth(struct nxt6000_config *fe, fe_bandwidth_t bandwidth)
 {
-
 	u16 nominal_rate;
 	int result;
 
@@ -302,12 +279,10 @@ static int nxt6000_set_bandwidth(struct dvb_frontend *fe, fe_bandwidth_t bandwid
 		return result;
 		
 	return nxt6000_writereg(fe, OFDM_TRL_NOMINALRATE_2, (nominal_rate >> 8) & 0xFF);
-		
 }
 
-static int nxt6000_set_guard_interval(struct dvb_frontend *fe, fe_guard_interval_t guard_interval)
+static int nxt6000_set_guard_interval(struct nxt6000_config *fe, fe_guard_interval_t guard_interval)
 {
-
 	switch(guard_interval) {
 	
 		case GUARD_INTERVAL_1_32:
@@ -328,16 +303,12 @@ static int nxt6000_set_guard_interval(struct dvb_frontend *fe, fe_guard_interval
 			return nxt6000_writereg(fe, OFDM_COR_MODEGUARD, 0x03 | (nxt6000_readreg(fe, OFDM_COR_MODEGUARD) & ~0x03));
 			
 		default:
-		
 			return -EINVAL;
-
 	}
-
 }
 
-static int nxt6000_set_inversion(struct dvb_frontend *fe, fe_spectral_inversion_t inversion)
+static int nxt6000_set_inversion(struct nxt6000_config *fe, fe_spectral_inversion_t inversion)
 {
-
 	switch(inversion) {
 	
 		case INVERSION_OFF:
@@ -353,12 +324,10 @@ static int nxt6000_set_inversion(struct dvb_frontend *fe, fe_spectral_inversion_
 			return -EINVAL;	
 	
 	}
-
 }
 
-static int nxt6000_set_transmission_mode(struct dvb_frontend *fe, fe_transmit_mode_t transmission_mode)
+static int nxt6000_set_transmission_mode(struct nxt6000_config *fe, fe_transmit_mode_t transmission_mode)
 {
-
 	int result;
 
 	switch(transmission_mode) {
@@ -383,14 +352,10 @@ static int nxt6000_set_transmission_mode(struct dvb_frontend *fe, fe_transmit_mo
 			return -EINVAL;
 	
 	}
-
 }
 
-static void nxt6000_setup(struct dvb_frontend *fe)
+static void nxt6000_setup(struct nxt6000_config *fe)
 {
-
-	struct nxt6000_config *nxt = FE2NXT(fe);
-
 	nxt6000_writereg(fe, RS_COR_SYNC_PARAM, SYNC_PARAM);
 	nxt6000_writereg(fe, BER_CTRL, /*(1 << 2) |*/ (0x01 << 1) | 0x01);
 	nxt6000_writereg(fe, VIT_COR_CTL, VIT_COR_RESYNC);
@@ -409,16 +374,15 @@ static void nxt6000_setup(struct dvb_frontend *fe)
 	nxt6000_writereg(fe, EN_DMD_RACQ, (1 << 7) | (3 << 4) | 2);
 	nxt6000_writereg(fe, DIAG_CONFIG, TB_SET);
 	
-	if (nxt->clock_inversion)
+	if (fe->clock_inversion)
 		nxt6000_writereg(fe, SUB_DIAG_MODE_SEL, CLKINVERSION);
 	else
 		nxt6000_writereg(fe, SUB_DIAG_MODE_SEL, 0);
 		
 	nxt6000_writereg(fe, TS_FORMAT, 0);
-
 }
 
-static void nxt6000_dump_status(struct dvb_frontend *fe)
+static void nxt6000_dump_status(struct nxt6000_config *fe)
 {
 	u8 val;
 
@@ -673,13 +637,12 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 	val = nxt6000_readreg(fe, RF_AGC_STATUS);
 
 	printk(" RF AGC LOCK: %d,", (val >> 4) & 0x01);
-
 	printk("\n");
-	
 }
 
-static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int nxt6000_ioctl(struct dvb_frontend *f, unsigned int cmd, void *arg)
 {
+	struct nxt6000_config *fe = (struct nxt6000_config *) f->data;
 
 	switch (cmd) {
 
@@ -769,17 +732,14 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 		case FE_SET_FRONTEND:
 		{
-			struct nxt6000_config *nxt = FE2NXT(fe);
 			struct dvb_frontend_parameters *param = (struct dvb_frontend_parameters *)arg;
 			int result;
 
-			switch(nxt->tuner_type) {
+			switch (fe->tuner_type) {
 			
 				case TUNER_TYPE_ALP510:
-
 					if ((result = alp510_set_tv_freq(fe, param->frequency)) < 0)
 						return result;
-						
 					break;
 
 				case TUNER_TYPE_SP5659:
@@ -826,42 +786,41 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 static u8 demod_addr_tbl[] = {0x14, 0x18, 0x24, 0x28};
 
-static int nxt6000_attach(struct dvb_i2c_bus *i2c, void **data)
-{
-	u8 addr_nr;
-	u8 fe_count = 0;
-	struct nxt6000_config *pnxt;
+static struct i2c_client client_template;
 
-	dprintk("nxt6000: attach\n");
+static int attach_adapter(struct i2c_adapter *adapter)
+{
+	struct i2c_client *client;
+	struct nxt6000_config *nxt;
+	u8 addr_nr;
+	int ret;
 	
-	pnxt = kmalloc(sizeof(demod_addr_tbl)*sizeof(struct nxt6000_config), GFP_KERNEL);
-	if (NULL == pnxt) {
-		dprintk("nxt6000: no memory for private data.\n");
+	if ((nxt = kmalloc(sizeof(struct nxt6000_config), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	}
-	*data = pnxt;
+
+	memset(nxt, 0, sizeof(*nxt));
+	nxt->i2c = adapter;
 
 	for (addr_nr = 0; addr_nr < sizeof(demod_addr_tbl); addr_nr++) {
-		struct nxt6000_config *nxt = &pnxt[addr_nr];
 	
-		if (nxt6000_read(i2c, demod_addr_tbl[addr_nr], OFDM_MSC_REV) != NXT6000ASICDEVICE)
+		if (nxt6000_read(adapter, demod_addr_tbl[addr_nr], OFDM_MSC_REV) != NXT6000ASICDEVICE)
 			continue;
 
-		if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC0) == 0) {
+		if (pll_test(adapter, demod_addr_tbl[addr_nr], 0xC0) == 0) {
 			nxt->tuner_addr = 0xC0;
 			nxt->tuner_type = TUNER_TYPE_ALP510;
 			nxt->clock_inversion = 1;
 	
 			dprintk("nxt6000: detected TI ALP510 tuner at 0x%02X\n", nxt->tuner_addr);
 		
-		} else if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC2) == 0) {
+		} else if (pll_test(adapter, demod_addr_tbl[addr_nr], 0xC2) == 0) {
 			nxt->tuner_addr = 0xC2;
 			nxt->tuner_type = TUNER_TYPE_SP5659;
 			nxt->clock_inversion = 0;
 
 			dprintk("nxt6000: detected MITEL SP5659 tuner at 0x%02X\n", nxt->tuner_addr);
 		
-		} else if (pll_test(i2c, demod_addr_tbl[addr_nr], 0xC0) == 0) {
+		} else if (pll_test(adapter, demod_addr_tbl[addr_nr], 0xC0) == 0) {
 			nxt->tuner_addr = 0xC0;
 			nxt->tuner_type = TUNER_TYPE_SP5730;
 			nxt->clock_inversion = 0;
@@ -872,48 +831,99 @@ static int nxt6000_attach(struct dvb_i2c_bus *i2c, void **data)
 			printk("nxt6000: unable to detect tuner\n");
 			continue;	
 		}
-		
-		nxt->demod_addr = demod_addr_tbl[addr_nr];
-	  
-		dprintk("nxt6000: attached at %d:%d\n", i2c->adapter->num, i2c->id);
-	
-		dvb_register_frontend(nxt6000_ioctl, i2c, (void *)nxt, &nxt6000_info);
-		
-		fe_count++;
 	}
 	
-	if (fe_count == 0) {
-		kfree(pnxt);
+	if (addr_nr == sizeof(demod_addr_tbl)) {
+		kfree(nxt);
 		return -ENODEV;
 	}
 	
+	nxt->demod_addr = demod_addr_tbl[addr_nr];
+
+	if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
+		kfree(nxt);
+		return -ENOMEM;
+}
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = demod_addr_tbl[addr_nr];
+	i2c_set_clientdata(client, (void *) nxt);
+
+	ret = i2c_attach_client(client);
+	if (ret)
+		goto out;
+
+	BUG_ON(!nxt->dvb);
+
+	ret = dvb_register_frontend(nxt6000_ioctl, nxt->dvb, nxt, &nxt6000_info, THIS_MODULE);
+	if (ret) {
+		i2c_detach_client(client);
+		goto out;
+	}
+
+	ret = 0;
+out:
+	kfree(client);
+	kfree(nxt);
+	return ret;
+}
+
+static int detach_client(struct i2c_client *client)
+{
+	struct nxt6000_config *state = (struct nxt6000_config *) i2c_get_clientdata(client);
+	dvb_unregister_frontend_new(nxt6000_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
 	return 0;
 }
 
-static void nxt6000_detach(struct dvb_i2c_bus *i2c, void *data)
+static int command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	struct nxt6000_config *pnxt = (struct nxt6000_config *)data;
-	dprintk("nxt6000: detach\n");
-	dvb_unregister_frontend(nxt6000_ioctl, i2c);
-	kfree(pnxt);
+	struct nxt6000_config *state = (struct nxt6000_config *) i2c_get_clientdata(client);
+
+	switch (cmd) {
+	case FE_REGISTER:{
+			state->dvb = (struct dvb_adapter *) arg;
+			break;
+		}
+	case FE_UNREGISTER:{
+			state->dvb = NULL;
+			break;
+		}
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
 }
+	
+static struct i2c_driver driver = {
+	.owner = THIS_MODULE,
+	.name = "nxt6000",
+	.id = I2C_DRIVERID_DVBFE_NXT6000,
+	.flags = I2C_DF_NOTIFY,
+	.attach_adapter = attach_adapter,
+	.detach_client = detach_client,
+	.command = command,
+};
+	
+static struct i2c_client client_template = {
+	I2C_DEVNAME("nxt6000"),
+	.flags = I2C_CLIENT_ALLOW_USE,
+	.driver = &driver,
+};
 
 static __init int nxt6000_init(void)
 {
-
-	dprintk("nxt6000: init\n");
-	
-	return dvb_register_i2c_device(THIS_MODULE, nxt6000_attach, nxt6000_detach);
-	
+	return i2c_add_driver(&driver);
 }
 
 static __exit void nxt6000_exit(void)
 {
-
-	dprintk("nxt6000: cleanup\n");
-
-	dvb_unregister_i2c_device(nxt6000_attach);
-
+	if (i2c_del_driver(&driver))
+		printk("nxt6000: driver deregistration failed\n");
 }
 
 module_init(nxt6000_init);
