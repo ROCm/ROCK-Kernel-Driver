@@ -227,8 +227,8 @@ static int io[MAX_CARDS+1]  = { 0x220, 0x228, 0x210, 0x218, 0, };
 /* NOTE: DMA is not autoprobed!!! */
 static int dma[MAX_CARDS+1] = { 1, 7, 1, 7, 1, 7, 1, 7, 0, };
 #else
-int io[MAX_CARDS+1]  = { 0, };
-int dma[MAX_CARDS+1] = { 0, };
+static int io[MAX_CARDS+1];
+static int dma[MAX_CARDS+1];
 #endif
 /* IRQ can be safely autoprobed */
 static int irq[MAX_CARDS+1] = { -1, -1, -1, -1, -1, -1, 0, };
