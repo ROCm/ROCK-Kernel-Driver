@@ -1170,17 +1170,19 @@ static int __devinit snd_vt1724_ac97_mixer(ice1712_t * ice)
 	int err;
 
 	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S)) {
-		ac97_bus_t bus, *pbus;
+		ac97_bus_t *pbus;
 		ac97_t ac97;
+		static ac97_bus_ops_t ops = {
+			.write = snd_vt1724_ac97_write,
+			.read = snd_vt1724_ac97_read,
+		};
+
 		/* cold reset */
 		outb(inb(ICEMT1724(ice, AC97_CMD)) | 0x80, ICEMT1724(ice, AC97_CMD));
 		mdelay(5); /* FIXME */
 		outb(inb(ICEMT1724(ice, AC97_CMD)) & ~0x80, ICEMT1724(ice, AC97_CMD));
 
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_vt1724_ac97_write;
-		bus.read = snd_vt1724_ac97_read;
-		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(ice->card, 0, &ops, NULL, &pbus)) < 0)
 			return err;
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = ice;

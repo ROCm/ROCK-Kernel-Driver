@@ -879,19 +879,16 @@ static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 {
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97, *x97;
 	int err;
 	unsigned int glob_sta = 0;
+	static ac97_bus_ops_t ops = {
+		.write = snd_intel8x0_codec_write,
+		.read = snd_intel8x0_codec_read,
+	};
 
 	chip->in_ac97_init = 1;
-	memset(&bus, 0, sizeof(bus));
-	bus.private_data = chip;
-	bus.private_free = snd_intel8x0_mixer_free_ac97_bus;
-	if (ac97_clock >= 8000 && ac97_clock <= 48000)
-		bus.clock = ac97_clock;
-	else
-		bus.clock = 48000;
 	
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
@@ -899,13 +896,15 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	ac97.scaps = AC97_SCAP_SKIP_AUDIO;
 
 	glob_sta = igetdword(chip, ICHREG(GLOB_STA));
-	bus.write = snd_intel8x0_codec_write;
-	bus.read = snd_intel8x0_codec_read;
-	bus.vra = 1;
 
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &pbus)) < 0)
 		goto __err;
+	pbus->private_free = snd_intel8x0_mixer_free_ac97_bus;
+	if (ac97_clock >= 8000 && ac97_clock <= 48000)
+		pbus->clock = ac97_clock;
+	pbus->vra = 1;
 	chip->ac97_bus = pbus;
+
 	ac97.pci = chip->pci;
 	ac97.num = glob_sta & ICH_SCR ? 1 : 0;
 	if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {

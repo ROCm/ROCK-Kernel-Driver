@@ -2029,15 +2029,16 @@ static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *r
 static int __devinit
 snd_es1968_mixer(es1968_t *chip)
 {
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_es1968_ac97_write,
+		.read = snd_es1968_ac97_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_es1968_ac97_write;
-	bus.read = snd_es1968_ac97_read;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 
 	memset(&ac97, 0, sizeof(ac97));

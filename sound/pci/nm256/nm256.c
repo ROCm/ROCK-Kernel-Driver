@@ -1185,9 +1185,14 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 static int __devinit
 snd_nm256_mixer(nm256_t *chip)
 {
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97;
 	int i, err;
+	static ac97_bus_ops_t ops = {
+		.reset = snd_nm256_ac97_reset,
+		.write = snd_nm256_ac97_write,
+		.read = snd_nm256_ac97_read,
+	};
 	/* looks like nm256 hangs up when unexpected registers are touched... */
 	static int mixer_regs[] = {
 		AC97_MASTER, AC97_HEADPHONE, AC97_MASTER_MONO,
@@ -1199,11 +1204,7 @@ snd_nm256_mixer(nm256_t *chip)
 		-1
 	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.reset = snd_nm256_ac97_reset;
-	bus.write = snd_nm256_ac97_write;
-	bus.read = snd_nm256_ac97_read;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 
 	memset(&ac97, 0, sizeof(ac97));

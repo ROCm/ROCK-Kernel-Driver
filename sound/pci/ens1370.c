@@ -1577,14 +1577,15 @@ static struct {
 static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 {
 	snd_card_t *card = ensoniq->card;
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97;
 	int err, idx;
+	static ac97_bus_ops_t ops = {
+		.write = snd_es1371_codec_write,
+		.read = snd_es1371_codec_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_es1371_codec_write;
-	bus.read = snd_es1371_codec_read;
-	if ((err = snd_ac97_bus(card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 
 	memset(&ac97, 0, sizeof(ac97));

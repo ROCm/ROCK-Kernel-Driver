@@ -369,6 +369,7 @@
  */
 
 typedef struct _snd_ac97_bus ac97_bus_t;
+typedef struct _snd_ac97_bus_ops ac97_bus_ops_t;
 typedef struct _snd_ac97 ac97_t;
 
 enum ac97_pcm_cfg {
@@ -405,13 +406,17 @@ struct snd_ac97_build_ops {
 	int (*build_post_spdif) (ac97_t *ac97);
 };
 
-struct _snd_ac97_bus {
-	/* -- lowlevel (hardware) driver specific -- */
+struct _snd_ac97_bus_ops {
 	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
 	void (*init) (ac97_t *ac97);
+};
+
+struct _snd_ac97_bus {
+	/* -- lowlevel (hardware) driver specific -- */
+	ac97_bus_ops_t *ops;
 	void *private_data;
 	void (*private_free) (ac97_bus_t *bus);
 	/* --- */
@@ -490,7 +495,7 @@ static inline int ac97_can_spdif(ac97_t * ac97)
 }
 
 /* functions */
-int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus); /* create new AC97 bus */
+int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops, void *private_data, ac97_bus_t **rbus); /* create new AC97 bus */
 int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);

@@ -1349,10 +1349,14 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
 
 static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 {
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97;
 	int i, err;
 	int codec_count;
+	static ac97_bus_ops_t ops = {
+		.write = snd_atiixp_ac97_write,
+		.read = snd_atiixp_ac97_read,
+	};
 	static unsigned int codec_skip[NUM_ATI_CODECS] = {
 		ATI_REG_ISR_CODEC0_NOT_READY,
 		ATI_REG_ISR_CODEC1_NOT_READY,
@@ -1362,13 +1366,9 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 	if (snd_atiixp_codec_detect(chip) < 0)
 		return -ENXIO;
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_atiixp_ac97_write;
-	bus.read = snd_atiixp_ac97_read;
-	bus.private_data = chip;
-	bus.clock = clock;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &pbus)) < 0)
 		return err;
+	pbus->clock = clock;
 	chip->ac97_bus = pbus;
 
 	codec_count = 0;

@@ -2393,25 +2393,24 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
-	ac97_bus_t bus;
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 	unsigned int idx;
+	static ac97_bus_ops_t ops = {
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+		.reset = snd_cs46xx_codec_reset,
+#endif
+		.write = snd_cs46xx_ac97_write,
+		.read = snd_cs46xx_ac97_read,
+	};
 
 	/* detect primary codec */
 	chip->nr_ac97_codecs = 0;
 	snd_printdd("snd_cs46xx: detecting primary codec\n");
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_cs46xx_ac97_write;
-	bus.read = snd_cs46xx_ac97_read;
-#ifdef CONFIG_SND_CS46XX_NEW_DSP
-	bus.reset = snd_cs46xx_codec_reset;
-#endif
-	bus.private_data = chip;
-	bus.private_free = snd_cs46xx_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(card, &bus, &chip->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(card, 0, &ops, chip, &chip->ac97_bus)) < 0)
 		return err;
+	chip->ac97_bus->private_free = snd_cs46xx_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;

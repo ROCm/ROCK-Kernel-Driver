@@ -275,9 +275,9 @@ void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value)
 	if ((ac97->id & 0xffffff00) == AC97_ID_ALC100) {
 		/* Fix H/W bug of ALC100/100P */
 		if (reg == AC97_MASTER || reg == AC97_HEADPHONE)
-			ac97->bus->write(ac97, AC97_RESET, 0);	/* reset audio codec */
+			ac97->bus->ops->write(ac97, AC97_RESET, 0);	/* reset audio codec */
 	}
-	ac97->bus->write(ac97, reg, value);
+	ac97->bus->ops->write(ac97, reg, value);
 }
 
 /**
@@ -295,14 +295,14 @@ unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return 0;
-	return ac97->bus->read(ac97, reg);
+	return ac97->bus->ops->read(ac97, reg);
 }
 
 /* read a register - return the cached value if already read */
 static inline unsigned short snd_ac97_read_cache(ac97_t *ac97, unsigned short reg)
 {
 	if (! test_bit(reg, ac97->reg_accessed)) {
-		ac97->regs[reg] = ac97->bus->read(ac97, reg);
+		ac97->regs[reg] = ac97->bus->ops->read(ac97, reg);
 		// set_bit(reg, ac97->reg_accessed);
 	}
 	return ac97->regs[reg];
@@ -325,7 +325,7 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	spin_lock(&ac97->reg_lock);
 	ac97->regs[reg] = value;
 	spin_unlock(&ac97->reg_lock);
-	ac97->bus->write(ac97, reg, value);
+	ac97->bus->ops->write(ac97, reg, value);
 	set_bit(reg, ac97->reg_accessed);
 }
 
@@ -352,7 +352,7 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 	if (change) {
 		ac97->regs[reg] = value;
 		spin_unlock(&ac97->reg_lock);
-		ac97->bus->write(ac97, reg, value);
+		ac97->bus->ops->write(ac97, reg, value);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	return change;
@@ -385,7 +385,7 @@ int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, 
 	if (change) {
 		ac97->regs[reg] = new;
 		spin_unlock(&ac97->reg_lock);
-		ac97->bus->write(ac97, reg, new);
+		ac97->bus->ops->write(ac97, reg, new);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	return change;
@@ -406,13 +406,13 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 		ac97->spec.ad18xx.pcmreg[codec] = new;
 		spin_unlock(&ac97->reg_lock);
 		/* select single codec */
-		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG,
+		ac97->bus->ops->write(ac97, AC97_AD_SERIAL_CFG,
 				 (cfg & ~0x7000) |
 				 ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 		/* update PCM bits */
-		ac97->bus->write(ac97, AC97_PCM, new);
+		ac97->bus->ops->write(ac97, AC97_PCM, new);
 		/* select all codecs */
-		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG,
+		ac97->bus->ops->write(ac97, AC97_AD_SERIAL_CFG,
 				 cfg | 0x7000);
 	} else
 		spin_unlock(&ac97->reg_lock);
@@ -1748,45 +1748,47 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 /**
  * snd_ac97_bus - create an AC97 bus component
  * @card: the card instance
- * @_bus: the template of AC97 bus, callbacks and
- *         the private data.
+ * @num: the bus number
+ * @ops: the bus callbacks table
+ * @private_data: private data pointer for the new instance
  * @rbus: the pointer to store the new AC97 bus instance.
  *
  * Creates an AC97 bus component.  An ac97_bus_t instance is newly
- * allocated and initialized from the template (_bus).
+ * allocated and initialized.
  *
- * The template must include the valid callbacks (at least read and
- * write), the bus number (num), and the private data (private_data).
- * The other callbacks, wait and reset, are not mandatory.
+ * The ops table must include valid callbacks (at least read and
+ * write).  The other callbacks, wait and reset, are not mandatory.
  * 
  * The clock is set to 48000.  If another clock is needed, set
- * bus->clock manually.
+ * (*rbus)->clock manually.
  *
  * The AC97 bus instance is registered as a low-level device, so you don't
  * have to release it manually.
  *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus)
+int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops,
+		 void *private_data, ac97_bus_t **rbus)
 {
 	int err;
 	ac97_bus_t *bus;
-	static snd_device_ops_t ops = {
+	static snd_device_ops_t dev_ops = {
 		.dev_free =	snd_ac97_bus_dev_free,
 	};
 
 	snd_assert(card != NULL, return -EINVAL);
-	snd_assert(_bus != NULL && rbus != NULL, return -EINVAL);
-	bus = kmalloc(sizeof(*bus), GFP_KERNEL);
+	snd_assert(rbus != NULL, return -EINVAL);
+	bus = kcalloc(1, sizeof(*bus), GFP_KERNEL);
 	if (bus == NULL)
 		return -ENOMEM;
-	*bus = *_bus;
 	bus->card = card;
-	if (bus->clock == 0)
-		bus->clock = 48000;
+	bus->num = num;
+	bus->ops = ops;
+	bus->private_data = private_data;
+	bus->clock = 48000;
 	spin_lock_init(&bus->bus_lock);
 	snd_ac97_bus_proc_init(bus);
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &ops)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &dev_ops)) < 0) {
 		snd_ac97_bus_free(bus);
 		return err;
 	}
@@ -1845,14 +1847,14 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_VENDOR_ID, &ac97->subsystem_vendor);
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_ID, &ac97->subsystem_device);
 	}
-	if (bus->reset) {
-		bus->reset(ac97);
+	if (bus->ops->reset) {
+		bus->ops->reset(ac97);
 		goto __access_ok;
 	}
 
 	snd_ac97_write(ac97, AC97_RESET, 0);	/* reset to defaults */
-	if (bus->wait)
-		bus->wait(ac97);
+	if (bus->ops->wait)
+		bus->ops->wait(ac97);
 	else {
 		udelay(50);
 		if (ac97->scaps & AC97_SCAP_SKIP_AUDIO)
@@ -1906,7 +1908,7 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		return -EACCES;
 	}
 
-	if (bus->reset) // FIXME: always skipping?
+	if (bus->ops->reset) // FIXME: always skipping?
 		goto __ready_ok;
 
 	/* FIXME: add powerdown control */
@@ -1993,8 +1995,8 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		ac97->scaps |= AC97_SCAP_CENTER_LFE_DAC;
 	}
 	/* additional initializations */
-	if (bus->init)
-		bus->init(ac97);
+	if (bus->ops->init)
+		bus->ops->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name, !ac97_is_audio(ac97));
 	snd_ac97_get_name(NULL, ac97->id, name, !ac97_is_audio(ac97));  // ac97->id might be changed in the special setup code
 	if (ac97_is_audio(ac97)) {
@@ -2107,8 +2109,8 @@ void snd_ac97_resume(ac97_t *ac97)
 {
 	int i, is_ad18xx, codec;
 
-	if (ac97->bus->reset) {
-		ac97->bus->reset(ac97);
+	if (ac97->bus->ops->reset) {
+		ac97->bus->ops->reset(ac97);
 		goto  __reset_ready;
 	}
 
@@ -2120,7 +2122,7 @@ void snd_ac97_resume(ac97_t *ac97)
 
 	snd_ac97_write(ac97, AC97_POWERDOWN, ac97->regs[AC97_POWERDOWN]);
 	if (ac97_is_audio(ac97)) {
-		ac97->bus->write(ac97, AC97_MASTER, 0x8101);
+		ac97->bus->ops->write(ac97, AC97_MASTER, 0x8101);
 		for (i = HZ/10; i >= 0; i--) {
 			if (snd_ac97_read(ac97, AC97_MASTER) == 0x8101)
 				break;
@@ -2128,7 +2130,7 @@ void snd_ac97_resume(ac97_t *ac97)
 			schedule_timeout(1);
 		}
 		/* FIXME: extra delay */
-		ac97->bus->write(ac97, AC97_MASTER, 0x8000);
+		ac97->bus->ops->write(ac97, AC97_MASTER, 0x8000);
 		if (snd_ac97_read(ac97, AC97_MASTER) != 0x8000) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/4);
@@ -2144,8 +2146,8 @@ void snd_ac97_resume(ac97_t *ac97)
 	}
 __reset_ready:
 
-	if (ac97->bus->init)
-		ac97->bus->init(ac97);
+	if (ac97->bus->ops->init)
+		ac97->bus->ops->init(ac97);
 
 	is_ad18xx = (ac97->flags & AC97_AD_MULTI);
 	if (is_ad18xx) {
@@ -2156,7 +2158,7 @@ __reset_ready:
 			/* select single codec */
 			snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
 					     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
-			ac97->bus->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
+			ac97->bus->ops->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
 		}
 		/* select all codecs */
 		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
@@ -2181,7 +2183,7 @@ __reset_ready:
 						snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
 								     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 						/* update PCM bits */
-						ac97->bus->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
+						ac97->bus->ops->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
 					}
 					/* select all codecs */
 					snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);

@@ -1511,15 +1511,20 @@ static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 {
-	int err;
+	int err, bus_num = 0;
 	ac97_t ac97;
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
+	static ac97_bus_ops_t con_ops = {
+		.write = snd_ice1712_ac97_write,
+		.read = snd_ice1712_ac97_read,
+	};
+	static ac97_bus_ops_t pro_ops = {
+		.write = snd_ice1712_pro_ac97_write,
+		.read = snd_ice1712_pro_ac97_read,
+	};
 
 	if (ice_has_con_ac97(ice)) {
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_ice1712_ac97_write;
-		bus.read = snd_ice1712_ac97_read;
-		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(ice->card, bus_num++, &con_ops, NULL, &pbus)) < 0)
 			return err;
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = ice;
@@ -1534,10 +1539,7 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	}
 
 	if (! (ice->eeprom.data[ICE_EEP1_ACLINK] & ICE1712_CFG_PRO_I2S)) {
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_ice1712_pro_ac97_write;
-		bus.read = snd_ice1712_pro_ac97_read;
-		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(ice->card, bus_num, &pro_ops, NULL, &pbus)) < 0)
 			return err;
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = ice;

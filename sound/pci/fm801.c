@@ -1185,18 +1185,17 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
-	ac97_bus_t bus;
 	ac97_t ac97;
 	unsigned int i;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_fm801_codec_write,
+		.read = snd_fm801_codec_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_fm801_codec_write;
-	bus.read = snd_fm801_codec_read;
-	bus.private_data = chip;
-	bus.private_free = snd_fm801_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &chip->ac97_bus)) < 0)
 		return err;
+	chip->ac97_bus->private_free = snd_fm801_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;

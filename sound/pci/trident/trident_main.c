@@ -2959,21 +2959,21 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 
 static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device)
 {
-	ac97_bus_t _bus;
 	ac97_t _ac97;
 	snd_card_t * card = trident->card;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_value_t *uctl;
 	int idx, err, retries = 2;
+	static ac97_bus_ops_t ops = {
+		.write = snd_trident_codec_write,
+		.read = snd_trident_codec_read,
+	};
 
 	uctl = kcalloc(1, sizeof(*uctl), GFP_KERNEL);
 	if (!uctl)
 		return -ENOMEM;
 
-	memset(&_bus, 0, sizeof(_bus));
-	_bus.write = snd_trident_codec_write;
-	_bus.read = snd_trident_codec_read;
-	if ((err = snd_ac97_bus(trident->card, &_bus, &trident->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(trident->card, 0, &ops, NULL, &trident->ac97_bus)) < 0)
 		goto __out;
 
 	memset(&_ac97, 0, sizeof(_ac97));

@@ -1582,19 +1582,18 @@ static struct ac97_quirk ac97_quirks[] = {
 
 static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 {
-	ac97_bus_t bus;
 	ac97_t ac97;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_via82xx_codec_write,
+		.read = snd_via82xx_codec_read,
+		.wait = snd_via82xx_codec_wait,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_via82xx_codec_write;
-	bus.read = snd_via82xx_codec_read;
-	bus.wait = snd_via82xx_codec_wait;
-	bus.private_data = chip;
-	bus.private_free = snd_via82xx_mixer_free_ac97_bus;
-	bus.clock = chip->ac97_clock;
-	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &chip->ac97_bus)) < 0)
 		return err;
+	chip->ac97_bus->private_free = snd_via82xx_mixer_free_ac97_bus;
+	chip->ac97_bus->clock = chip->ac97_clock;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;

@@ -3841,18 +3841,19 @@ struct _snd_pcm_runtime {
 
   static int snd_mychip_ac97(mychip_t *chip)
   {
-          ac97_bus_t bus, *pbus;
+          ac97_bus_t *bus;
           ac97_t ac97;
           int err;
+          static ac97_bus_ops_t ops = {
+                  .write = snd_mychip_ac97_write,
+                  .read = snd_mychip_ac97_read,
+          };
 
-          memset(&bus, 0, sizeof(bus));
-          bus.write = snd_mychip_ac97_write;
-          bus.read = snd_mychip_ac97_read;
-          if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+          if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &bus)) < 0)
                   return err;
           memset(&ac97, 0, sizeof(ac97));
           ac97.private_data = chip;
-          return snd_ac97_mixer(pbus, &ac97, &chip->ac97);
+          return snd_ac97_mixer(bus, &ac97, &chip->ac97);
   }
 
 ]]>
@@ -3865,18 +3866,18 @@ struct _snd_pcm_runtime {
       <title>Constructor</title>
       <para>
         For creating an ac97 instance, first call <function>snd_ac97_bus</function>
-      with <type>ac97_bus_t</type> record including callback functions.
+      with an <type>ac97_bus_ops_t</type> record with callback functions.
 
         <informalexample>
           <programlisting>
 <![CDATA[
-  ac97_bus_t bus, *pbus;
-  int err;
+  ac97_bus_t *bus;
+  static ac97_bus_ops_t ops = {
+        .write = snd_mychip_ac97_write,
+        .read = snd_mychip_ac97_read,
+  };
 
-  memset(&bus, 0, sizeof(bus));
-  bus.write = snd_mychip_ac97_write;
-  bus.read = snd_mychip_ac97_read;
-  snd_ac97_bus(card, &bus, &pbus);
+  snd_ac97_bus(card, 0, &ops, NULL, &pbus);
 ]]>
           </programlisting>
         </informalexample>
@@ -4075,7 +4076,7 @@ struct _snd_pcm_runtime {
       <para>
         On some chip, the clock of the codec isn't 48000 but using a
       PCI clock (to save a quartz!). In this case, change the field
-      ac97-&gt;clock to the corresponding
+      bus-&gt;clock to the corresponding
       value. For example, intel8x0 
       and es1968 drivers have the auto-measurement function of the
       clock. 

@@ -1133,17 +1133,16 @@ static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_cs4281_mixer(cs4281_t * chip)
 {
 	snd_card_t *card = chip->card;
-	ac97_bus_t bus;
 	ac97_t ac97;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_cs4281_ac97_write,
+		.read = snd_cs4281_ac97_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_cs4281_ac97_write;
-	bus.read = snd_cs4281_ac97_read;
-	bus.private_data = chip;
-	bus.private_free = snd_cs4281_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(card, &bus, &chip->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(card, 0, &ops, chip, &chip->ac97_bus)) < 0)
 		return err;
+	chip->ac97_bus->private_free = snd_cs4281_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;

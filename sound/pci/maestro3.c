@@ -1975,14 +1975,15 @@ static void snd_m3_ac97_reset(m3_t *chip)
 
 static int __devinit snd_m3_mixer(m3_t *chip)
 {
-	ac97_bus_t bus, *pbus;
+	ac97_bus_t *pbus;
 	ac97_t ac97;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_m3_ac97_write,
+		.read = snd_m3_ac97_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_m3_ac97_write;
-	bus.read = snd_m3_ac97_read;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 	
 	memset(&ac97, 0, sizeof(ac97));

@@ -1868,18 +1868,17 @@ static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ali_mixer(ali_t * codec)
 {
-	ac97_bus_t bus;
 	ac97_t ac97;
 	unsigned int idx;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_ali_codec_write,
+		.read = snd_ali_codec_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_ali_codec_write;
-	bus.read = snd_ali_codec_read;
-	bus.private_data = codec;
-	bus.private_free = snd_ali_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(codec->card, &bus, &codec->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(codec->card, 0, &ops, codec, &codec->ac97_bus)) < 0)
 		return err;
+	codec->ac97_bus->private_free = snd_ali_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = codec;
