@@ -177,7 +177,6 @@ static void __init pci_reorder_devs(void)
 	}
 }
 
-extern void rs_init(void);
 extern void clock_probe(void);
 extern void power_init(void);
 
@@ -194,7 +193,6 @@ static int __init pcibios_init(void)
 
 	isa_init();
 	ebus_init();
-	rs_init();
 	clock_probe();
 	power_init();
 

@@ -285,7 +285,6 @@ static void __init sbus_fixup_all_regs(struct sbus_dev *first_sdev)
 
 extern void register_proc_sparc_ioport(void);
 extern void firetruck_init(void);
-extern void rs_init(void);
 
 static int __init sbus_init(void)
 {
@@ -505,8 +504,6 @@ static int __init sbus_init(void)
 		sun4d_init_sbi_irq();
 	}
 	
-	rs_init();
-
 #ifdef __sparc_v9__
 	if (sparc_cpu_model == sun4u) {
 		firetruck_init();
