@@ -2745,8 +2745,8 @@ static void * usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
 
 static struct usb_device_id usb_audio_ids [] = {
-    { match_flags: (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
-      bInterfaceClass: USB_CLASS_AUDIO, bInterfaceSubClass: 1},
+    { .match_flags = (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
+      .bInterfaceClass = USB_CLASS_AUDIO, .bInterfaceSubClass = 1},
     { }						/* Terminating entry */
 };
 
