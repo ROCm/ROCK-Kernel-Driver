@@ -219,7 +219,7 @@ module_exit(alsa_card_cs46xx_exit)
 
 #ifndef MODULE
 
-/* format is: snd-cs46xx=enable,index,id */
+/* format is: snd-cs46xx=enable,index,id,mmap_valid,external_amp,thinkpad */
 
 static int __init alsa_card_cs46xx_setup(char *str)
 {
@@ -229,7 +229,10 @@ static int __init alsa_card_cs46xx_setup(char *str)
 		return 0;
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&mmap_valid[nr_dev]) == 2 &&
+	       get_option(&str,&external_amp[nr_dev]) == 2 &&
+	       get_option(&str,&thinkpad[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }
