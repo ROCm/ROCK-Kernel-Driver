@@ -28,12 +28,4 @@
 #define MOTO_RTC_CONTROLA       0x1FF8
 #define MOTO_RTC_CONTROLB       0x1FF9
 
-#ifndef BCD_TO_BIN
-#define BCD_TO_BIN(val) ((val)=((val)&15) + ((val)>>4)*10)
-#endif
-
-#ifndef BIN_TO_BCD
-#define BIN_TO_BCD(val) ((val)=(((val)/10)<<4) + (val)%10)
-#endif
-
 #endif /* _PPC64_NVRAM_H */

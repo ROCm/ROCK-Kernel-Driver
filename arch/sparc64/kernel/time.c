@@ -23,6 +23,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/delay.h>
 #include <linux/profile.h>
+#include <linux/bcd.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -329,14 +330,6 @@ static int __init has_low_battery(void)
 
 	return (data1 == data2);	/* Was the write blocked? */
 }
-
-#ifndef BCD_TO_BIN
-#define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
-#endif
-
-#ifndef BIN_TO_BCD
-#define BIN_TO_BCD(val) ((((val)/10)<<4) + (val)%10)
-#endif
 
 /* Probe for the real time clock chip. */
 static void __init set_system_time(void)

@@ -21,6 +21,7 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/bcd.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
 

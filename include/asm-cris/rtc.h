@@ -39,11 +39,6 @@
 #define RTC_INIT() (-1)
 #endif
 
-/* conversions to and from the stupid RTC internal format */
-
-#define BCD_TO_BIN(x) x = (((x & 0xf0) >> 3) * 5 + (x & 0xf))
-#define BIN_TO_BCD(x) x = (x % 10) | ((x / 10) << 4) 
-
 /*
  * The struct used to pass data via the following ioctl. Similar to the
  * struct tm in <time.h>, but it needs to be here so that the kernel 

@@ -37,6 +37,7 @@
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/bcd.h>
 
 #include <linux/blk.h>
 #include "scsi.h"
@@ -151,8 +152,6 @@ int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 /* This function gets called after a media change. Checks if the CD is
    multisession, asks for offset etc. */
 
-#define BCD_TO_BIN(x)    ((((int)x & 0xf0) >> 4)*10 + ((int)x & 0x0f))
-
 int sr_cd_check(struct cdrom_device_info *cdi)
 {
 	Scsi_CD *cd = cdi->handle;
@@ -223,9 +222,9 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 				no_multi = 1;
 				break;
 			}
-			min = BCD_TO_BIN(buffer[15]);
-			sec = BCD_TO_BIN(buffer[16]);
-			frame = BCD_TO_BIN(buffer[17]);
+			min = BCD2BIN(buffer[15]);
+			sec = BCD2BIN(buffer[16]);
+			frame = BCD2BIN(buffer[17]);
 			sector = min * CD_SECS * CD_FRAMES + sec * CD_FRAMES + frame;
 			break;
 		}
@@ -252,9 +251,9 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			}
 			if (rc != 0)
 				break;
-			min = BCD_TO_BIN(buffer[1]);
-			sec = BCD_TO_BIN(buffer[2]);
-			frame = BCD_TO_BIN(buffer[3]);
+			min = BCD2BIN(buffer[1]);
+			sec = BCD2BIN(buffer[2]);
+			frame = BCD2BIN(buffer[3]);
 			sector = min * CD_SECS * CD_FRAMES + sec * CD_FRAMES + frame;
 			if (sector)
 				sector -= CD_MSF_OFFSET;

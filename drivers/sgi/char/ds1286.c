@@ -36,6 +36,7 @@
 #include <linux/poll.h>
 #include <linux/rtc.h>
 #include <linux/spinlock.h>
+#include <linux/bcd.h>
 
 #include <asm/ds1286.h>
 #include <asm/io.h>

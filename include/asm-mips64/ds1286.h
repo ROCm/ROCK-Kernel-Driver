@@ -56,15 +56,4 @@
 #define RTC_IPSW		0x40
 #define RTC_TE			0x80
 
-/*
- * Conversion between binary and BCD.
- */
-#ifndef BCD_TO_BIN
-#define BCD_TO_BIN(val) ((val)=((val)&15) + ((val)>>4)*10)
-#endif
-
-#ifndef BIN_TO_BCD
-#define BIN_TO_BCD(val) ((val)=(((val)/10)<<4) + (val)%10)
-#endif
-
 #endif /* _ASM_DS1286_h */
