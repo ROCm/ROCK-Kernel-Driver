@@ -400,7 +400,8 @@ int netpoll_rx(struct sk_buff *skb)
 
 		if (np->rx_hook)
 			np->rx_hook(np, ntohs(uh->source),
-				    (char *)(uh+1), ulen-sizeof(uh)-4);
+				    (char *)(uh+1),
+				    ulen - sizeof(struct udphdr));
 
 		return 1;
 	}
