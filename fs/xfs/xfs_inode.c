@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -42,7 +42,7 @@ kmem_zone_t *xfs_chashlist_zone;
  * Used in xfs_itruncate().  This is the maximum number of extents
  * freed from a file in a single transaction.
  */
-#define XFS_ITRUNC_MAX_EXTENTS	2
+#define	XFS_ITRUNC_MAX_EXTENTS	2
 
 STATIC int xfs_iflush_int(xfs_inode_t *, xfs_buf_t *);
 STATIC int xfs_iformat_local(xfs_inode_t *, xfs_dinode_t *, int, int);
@@ -102,7 +102,7 @@ xfs_inobp_check(
 					i * mp->m_sb.sb_inodesize);
 		if (INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT))  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
-				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.	 About to pop an ASSERT.",
+				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.  About to pop an ASSERT.",
 				bp);
 			ASSERT(!INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT));
 		}
@@ -128,7 +128,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 
-	for (i = 0; i < j; i++)	 {
+	for (i = 0; i < j; i++)  {
 		dip = (xfs_dinode_t *) xfs_buf_offset(bp,
 						i * mp->m_sb.sb_inodesize);
 		if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT) != XFS_DINODE_MAGIC) {
@@ -205,13 +205,13 @@ xfs_inotobp(
 	    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
 		cmn_err(CE_WARN,
 	"xfs_inotobp: inode number (%d + %d) maps to a block outside the bounds "
-	"of the file system %s.	 Returning EINVAL.",
+	"of the file system %s.  Returning EINVAL.",
 			imap.im_blkno, imap.im_len,mp->m_fsname);
 		return XFS_ERROR(EINVAL);
 	}
 
 	/*
-	 * Read in the buffer.	If tp is NULL, xfs_trans_read_buf() will
+	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
 	 * default to just a read_buf() call.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
@@ -232,7 +232,7 @@ xfs_inotobp(
 		XFS_CORRUPTION_ERROR("xfs_inotobp", XFS_ERRLEVEL_LOW, mp, dip);
 		xfs_trans_brelse(tp, bp);
 		cmn_err(CE_WARN,
-	"xfs_inotobp: XFS_TEST_ERROR()	returned an "
+	"xfs_inotobp: XFS_TEST_ERROR()  returned an "
 	"error on %s.  Returning EFSCORRUPTED.",  mp->m_fsname);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -263,10 +263,10 @@ xfs_inotobp(
  * to determine the size and location of the buffer to read from disk.
  * If the inode has already been mapped to its buffer and read in once,
  * then use the mapping information stored in the inode rather than
- * calling xfs_imap().	This allows us to avoid the overhead of looking
+ * calling xfs_imap().  This allows us to avoid the overhead of looking
  * at the inode btree for small block file systems (see xfs_dilocate()).
  * We can tell whether the inode has been mapped in before by comparing
- * its disk block address to 0.	 Only uninitialized inodes will have
+ * its disk block address to 0.  Only uninitialized inodes will have
  * 0 for the disk block address.
  */
 int
@@ -337,7 +337,7 @@ xfs_itobp(
 	ASSERT(bno == 0 || bno == imap.im_blkno);
 
 	/*
-	 * Read in the buffer.	If tp is NULL, xfs_trans_read_buf() will
+	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
 	 * default to just a read_buf() call.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
@@ -403,8 +403,8 @@ xfs_itobp(
 
 /*
  * Move inode type and inode format specific information from the
- * on-disk inode to the in-core inode.	For fifos, devs, and sockets
- * this means set if_rdev to the proper value.	For files, directories,
+ * on-disk inode to the in-core inode.  For fifos, devs, and sockets
+ * this means set if_rdev to the proper value.  For files, directories,
  * and symlinks this means to bring in the in-line data or extent
  * pointers.  For a file in B-tree format, only the root is immediately
  * brought in-core.  The rest will be in-lined in if_extents when it
@@ -418,7 +418,7 @@ xfs_iformat(
 	xfs_attr_shortform_t	*atp;
 	int			size;
 	int			error;
-	xfs_fsize_t		di_size;
+	xfs_fsize_t             di_size;
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	error = 0;
@@ -752,10 +752,10 @@ xfs_iformat_btree(
  * xfs_xlate_dinode_core - translate an xfs_inode_core_t between ondisk
  * and native format
  *
- * buf	= on-disk representation
- * dip	= native representation
- * dir	= direction - +ve -> disk to native
- *		      -ve -> native to disk
+ * buf  = on-disk representation
+ * dip  = native representation
+ * dir  = direction - +ve -> disk to native
+ *                    -ve -> native to disk
  * arch = on-disk architecture
  */
 
@@ -763,8 +763,8 @@ void
 xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip,
     int dir, xfs_arch_t arch)
 {
-    xfs_dinode_core_t	*buf_core;
-    xfs_dinode_core_t	*mem_core;
+    xfs_dinode_core_t   *buf_core;
+    xfs_dinode_core_t   *mem_core;
 
     ASSERT(dir);
 
@@ -780,15 +780,15 @@ xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip,
 	return;
     }
 
-    INT_XLATE(buf_core->di_magic,	mem_core->di_magic,	   dir, arch);
-    INT_XLATE(buf_core->di_mode,	mem_core->di_mode,	   dir, arch);
-    INT_XLATE(buf_core->di_version,	mem_core->di_version,	   dir, arch);
-    INT_XLATE(buf_core->di_format,	mem_core->di_format,	   dir, arch);
-    INT_XLATE(buf_core->di_onlink,	mem_core->di_onlink,	   dir, arch);
-    INT_XLATE(buf_core->di_uid,		mem_core->di_uid,	   dir, arch);
-    INT_XLATE(buf_core->di_gid,		mem_core->di_gid,	   dir, arch);
-    INT_XLATE(buf_core->di_nlink,	mem_core->di_nlink,	   dir, arch);
-    INT_XLATE(buf_core->di_projid,	mem_core->di_projid,	   dir, arch);
+    INT_XLATE(buf_core->di_magic,       mem_core->di_magic,        dir, arch);
+    INT_XLATE(buf_core->di_mode,        mem_core->di_mode,         dir, arch);
+    INT_XLATE(buf_core->di_version,     mem_core->di_version,      dir, arch);
+    INT_XLATE(buf_core->di_format,      mem_core->di_format,       dir, arch);
+    INT_XLATE(buf_core->di_onlink,      mem_core->di_onlink,       dir, arch);
+    INT_XLATE(buf_core->di_uid,         mem_core->di_uid,          dir, arch);
+    INT_XLATE(buf_core->di_gid,         mem_core->di_gid,          dir, arch);
+    INT_XLATE(buf_core->di_nlink,       mem_core->di_nlink,        dir, arch);
+    INT_XLATE(buf_core->di_projid,      mem_core->di_projid,       dir, arch);
 
     if (dir>0) {
 	memcpy(mem_core->di_pad, buf_core->di_pad, sizeof(buf_core->di_pad));
@@ -805,18 +805,18 @@ xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip,
     INT_XLATE(buf_core->di_ctime.t_sec, mem_core->di_ctime.t_sec,  dir, arch);
     INT_XLATE(buf_core->di_ctime.t_nsec,mem_core->di_ctime.t_nsec, dir, arch);
 
-    INT_XLATE(buf_core->di_size,	mem_core->di_size,	   dir, arch);
-    INT_XLATE(buf_core->di_nblocks,	mem_core->di_nblocks,	   dir, arch);
-    INT_XLATE(buf_core->di_extsize,	mem_core->di_extsize,	   dir, arch);
+    INT_XLATE(buf_core->di_size,        mem_core->di_size,         dir, arch);
+    INT_XLATE(buf_core->di_nblocks,     mem_core->di_nblocks,      dir, arch);
+    INT_XLATE(buf_core->di_extsize,     mem_core->di_extsize,      dir, arch);
 
-    INT_XLATE(buf_core->di_nextents,	mem_core->di_nextents,	   dir, arch);
-    INT_XLATE(buf_core->di_anextents,	mem_core->di_anextents,	   dir, arch);
-    INT_XLATE(buf_core->di_forkoff,	mem_core->di_forkoff,	   dir, arch);
-    INT_XLATE(buf_core->di_aformat,	mem_core->di_aformat,	   dir, arch);
-    INT_XLATE(buf_core->di_dmevmask,	mem_core->di_dmevmask,	   dir, arch);
-    INT_XLATE(buf_core->di_dmstate,	mem_core->di_dmstate,	   dir, arch);
-    INT_XLATE(buf_core->di_flags,	mem_core->di_flags,	   dir, arch);
-    INT_XLATE(buf_core->di_gen,		mem_core->di_gen,	   dir, arch);
+    INT_XLATE(buf_core->di_nextents,    mem_core->di_nextents,     dir, arch);
+    INT_XLATE(buf_core->di_anextents,   mem_core->di_anextents,    dir, arch);
+    INT_XLATE(buf_core->di_forkoff,     mem_core->di_forkoff,      dir, arch);
+    INT_XLATE(buf_core->di_aformat,     mem_core->di_aformat,      dir, arch);
+    INT_XLATE(buf_core->di_dmevmask,    mem_core->di_dmevmask,     dir, arch);
+    INT_XLATE(buf_core->di_dmstate,     mem_core->di_dmstate,      dir, arch);
+    INT_XLATE(buf_core->di_flags,       mem_core->di_flags,        dir, arch);
+    INT_XLATE(buf_core->di_gen,         mem_core->di_gen,          dir, arch);
 
 }
 
@@ -851,7 +851,7 @@ xfs_iread(
 	 * Get pointer's to the on-disk inode and the buffer containing it.
 	 * If the inode number refers to a block outside the file system
 	 * then xfs_itobp() will return NULL.  In this case we should
-	 * return NULL as well.	 Set i_blkno to 0 so that xfs_itobp() will
+	 * return NULL as well.  Set i_blkno to 0 so that xfs_itobp() will
 	 * know that this is a new incore inode.
 	 */
 	error = xfs_itobp(mp, tp, ip, &dip, &bp, bno);
@@ -936,7 +936,7 @@ xfs_iread(
 		ip->i_d.di_mode = 0;
 		/*
 		 * Initialize the per-fork minima and maxima for a new
-		 * inode here.	xfs_iformat will do it for old inodes.
+		 * inode here.  xfs_iformat will do it for old inodes.
 		 */
 		ip->i_df.if_ext_max =
 			XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
@@ -945,10 +945,10 @@ xfs_iread(
 	/*
 	 * The inode format changed when we moved the link count and
 	 * made it 32 bits long.  If this is an old format inode,
-	 * convert it in memory to look like a new one.	 If it gets
+	 * convert it in memory to look like a new one.  If it gets
 	 * flushed to disk we will convert back before flushing or
-	 * logging it.	We zero out the new projid field and the old link
-	 * count field.	 We'll handle clearing the pad field (the remains
+	 * logging it.  We zero out the new projid field and the old link
+	 * count field.  We'll handle clearing the pad field (the remains
 	 * of the old uuid field) when we actually convert the inode to
 	 * the new format. We don't change the version number so that we
 	 * can distinguish this from a real new format inode.
@@ -963,7 +963,7 @@ xfs_iread(
 
 	/*
 	 * Mark the buffer containing the inode as something to keep
-	 * around for a while.	This helps to keep recently accessed
+	 * around for a while.  This helps to keep recently accessed
 	 * meta-data in-core longer.
 	 */
 	 XFS_BUF_SET_REF(bp, XFS_INO_REF);
@@ -974,7 +974,7 @@ xfs_iread(
 	 * in xfs_itobp() above.  If tp is NULL, this is just a normal
 	 * brelse().  If we're within a transaction, then xfs_trans_brelse()
 	 * will only release the buffer if it is not dirty within the
-	 * transaction.	 It will be OK to release the buffer in this case,
+	 * transaction.  It will be OK to release the buffer in this case,
 	 * because inodes on disk are never destroyed and we will be
 	 * locking the new in-core inode before putting it in the hash
 	 * table where other processes can find it.  Thus we don't have
@@ -1217,7 +1217,7 @@ xfs_isize_check(
 {
 	xfs_fileoff_t	map_first;
 	int		nimaps;
-	xfs_bmbt_irec_t imaps[2];
+	xfs_bmbt_irec_t	imaps[2];
 
 	if ((ip->i_d.di_mode & IFMT) != IFREG)
 		return;
@@ -1244,12 +1244,12 @@ xfs_isize_check(
 #endif	/* DEBUG */
 
 /*
- * Calculate the last possible buffered byte in a file.	 This must
+ * Calculate the last possible buffered byte in a file.  This must
  * include data that was buffered beyond the EOF by the write code.
  * This also needs to deal with overflowing the xfs_fsize_t type
  * which can happen for sizes near the limit.
  *
- * We also need to take into account any blocks beyond the EOF.	 It
+ * We also need to take into account any blocks beyond the EOF.  It
  * may be the case that they were buffered by a write which failed.
  * In that case the pages will still be in memory, but the inode size
  * will never have been updated.
@@ -1329,7 +1329,7 @@ xfs_itrunc_trace(
 		     (void*)0);
 }
 #else
-#define xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
+#define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif
 
 /*
@@ -1345,10 +1345,10 @@ xfs_itrunc_trace(
  * inode lock when we do so.
  *
  * The flags parameter can have either the value XFS_ITRUNC_DEFINITE
- * or XFS_ITRUNC_MAYBE.	 The XFS_ITRUNC_MAYBE value should be used
+ * or XFS_ITRUNC_MAYBE.  The XFS_ITRUNC_MAYBE value should be used
  * in the case that the caller is locking things out of order and
  * may not be able to call xfs_itruncate_finish() with the inode lock
- * held without dropping the I/O lock.	If the caller must drop the
+ * held without dropping the I/O lock.  If the caller must drop the
  * I/O lock before calling xfs_itruncate_finish(), then xfs_itruncate_start()
  * must be called again with all the same restrictions as the initial
  * call.
@@ -1438,11 +1438,11 @@ xfs_itruncate_start(
  * for it within the transaction.
  *
  * The fork parameter must be either xfs_attr_fork or xfs_data_fork,
- * and it indicates the fork which is to be truncated.	For the
+ * and it indicates the fork which is to be truncated.  For the
  * attribute fork we only support truncation to size 0.
  *
  * We use the sync parameter to indicate whether or not the first
- * transaction we perform might have to be synchronous.	 For the attr fork,
+ * transaction we perform might have to be synchronous.  For the attr fork,
  * it needs to be so if the unlink of the inode is not yet known to be
  * permanent in the log.  This keeps us from freeing and reusing the
  * blocks of the attribute fork before the unlink of the inode becomes
@@ -1480,7 +1480,7 @@ xfs_itruncate_finish(
 	xfs_trans_t	*ntp;
 	int		done;
 	int		committed;
-	xfs_bmap_free_t free_list;
+	xfs_bmap_free_t	free_list;
 	int		error;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
@@ -1509,7 +1509,7 @@ xfs_itruncate_finish(
 	 * The first thing we do is set the size to new_size permanently
 	 * on disk.  This way we don't have to worry about anyone ever
 	 * being able to look at the data being freed even in the face
-	 * of a crash.	What we're getting around here is the case where
+	 * of a crash.  What we're getting around here is the case where
 	 * we free a block, it is allocated to another file, it is written
 	 * to, and then we crash.  If the new data gets written to the
 	 * file but the log buffers containing the free and reallocation
@@ -1552,7 +1552,7 @@ xfs_itruncate_finish(
 	 *
 	 * For the attribute fork we allow the caller to tell us whether
 	 * the unlink of the inode that led to this call is yet permanent
-	 * in the on disk log.	If it is not and we will be freeing extents
+	 * in the on disk log.  If it is not and we will be freeing extents
 	 * in this inode then we make the first transaction synchronous
 	 * to make sure that the unlink is permanent by the time we free
 	 * the blocks.
@@ -1577,7 +1577,7 @@ xfs_itruncate_finish(
 	 * the end of the file (in a crash where the space is allocated
 	 * but the inode size is not yet updated), simply remove any
 	 * blocks which show up between the new EOF and the maximum
-	 * possible file size.	If the first block to be removed is
+	 * possible file size.  If the first block to be removed is
 	 * beyond the maximum file size (ie it is the same as last_block),
 	 * then there is nothing to do.
 	 */
@@ -1593,7 +1593,7 @@ xfs_itruncate_finish(
 		/*
 		 * Free up up to XFS_ITRUNC_MAX_EXTENTS.  xfs_bunmapi()
 		 * will tell us whether it freed the entire range or
-		 * not.	 If this is a synchronous mount (wsync),
+		 * not.  If this is a synchronous mount (wsync),
 		 * then we can tell bunmapi to keep all the
 		 * transactions asynchronous since the unlink
 		 * transaction that made this inode inactive has
@@ -1650,7 +1650,7 @@ xfs_itruncate_finish(
 				 * level code, because it always knows that
 				 * the inode is locked and held in the
 				 * transaction that returns to it whether
-				 * errors occur or not.	 We don't mark the
+				 * errors occur or not.  We don't mark the
 				 * inode dirty so that this transaction can
 				 * be easily aborted if possible.
 				 */
@@ -1845,7 +1845,7 @@ xfs_iunlink(
 	if (INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != NULLAGINO) {
 		/*
 		 * There is already another inode in the bucket we need
-		 * to add ourselves to.	 Add us at the front of the list.
+		 * to add ourselves to.  Add us at the front of the list.
 		 * Here we put the head pointer into our next pointer,
 		 * and then we fall through to point the head at us.
 		 */
@@ -1918,7 +1918,7 @@ xfs_iunlink_remove(
 				   XFS_FSS_TO_BB(mp, 1), 0, &agibp);
 	if (error) {
 		cmn_err(CE_WARN,
-			"xfs_iunlink_remove: xfs_trans_read_buf()  returned an error %d on %s.	Returning error.",
+			"xfs_iunlink_remove: xfs_trans_read_buf()  returned an error %d on %s.  Returning error.",
 			error, mp->m_fsname);
 		return error;
 	}
@@ -1935,7 +1935,7 @@ xfs_iunlink_remove(
 				     mp, agi);
 		xfs_trans_brelse(tp, agibp);
 		cmn_err(CE_WARN,
-			"xfs_iunlink_remove: XFS_TEST_ERROR()  returned an error on %s.	 Returning EFSCORRUPTED.",
+			"xfs_iunlink_remove: XFS_TEST_ERROR()  returned an error on %s.  Returning EFSCORRUPTED.",
 			 mp->m_fsname);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -1953,7 +1953,7 @@ xfs_iunlink_remove(
 		/*
 		 * We're at the head of the list.  Get the inode's
 		 * on-disk buffer to see if there is anyone after us
-		 * on the list.	 Only modify our next pointer if it
+		 * on the list.  Only modify our next pointer if it
 		 * is not already NULLAGINO.  This saves us the overhead
 		 * of dealing with the buffer when there is no need to
 		 * change it.
@@ -2008,7 +2008,7 @@ xfs_iunlink_remove(
 					    &last_ibp, &last_offset);
 			if (error) {
 				cmn_err(CE_WARN,
-			"xfs_iunlink_remove: xfs_inotobp()  returned an error %d on %s.	 Returning error.",
+			"xfs_iunlink_remove: xfs_inotobp()  returned an error %d on %s.  Returning error.",
 					error, mp->m_fsname);
 				return error;
 			}
@@ -2058,7 +2058,7 @@ xfs_iunlink_remove(
 /*
  * This is called to return an inode to the inode free list.
  * The inode should already be truncated to 0 length and have
- * no pages associated with it.	 This routine also assumes that
+ * no pages associated with it.  This routine also assumes that
  * the inode is already a part of the transaction.
  *
  * The on-disk copy of the inode will have been added to the list
@@ -2116,12 +2116,12 @@ xfs_ifree(
  * being added or deleted as indicated in rec_diff.  Move the records
  * and pointers in if_broot to fit the new size.  When shrinking this
  * will eliminate holes between the records and pointers created by
- * the caller.	When growing this will create holes to be filled in
+ * the caller.  When growing this will create holes to be filled in
  * by the caller.
  *
  * The caller must not request to add more records than would fit in
  * the on-disk inode root.  If the if_broot is currently NULL, then
- * if we adding records one will be allocated.	The caller must also
+ * if we adding records one will be allocated.  The caller must also
  * not request that the number of records go below zero, although
  * it can go to zero.
  *
@@ -2389,7 +2389,7 @@ xfs_idata_realloc(
 		 * Stuck with malloc/realloc.
 		 * For inline data, the underlying buffer must be
 		 * a multiple of 4 bytes in size so that it can be
-		 * logged and stay on word boundaries.	We enforce
+		 * logged and stay on word boundaries.  We enforce
 		 * that here.
 		 */
 		real_size = roundup(new_size, 4);
@@ -2476,7 +2476,7 @@ xfs_idestroy_fork(
 
 	/*
 	 * If the format is local, then we can't have an extents
-	 * array so just look for an inline data array.	 If we're
+	 * array so just look for an inline data array.  If we're
 	 * not local then we may or may not have an extents list,
 	 * so check and free it up if we do.
 	 */
@@ -2581,7 +2581,7 @@ xfs_ipin(
 
 /*
  * Decrement the pin count of the given inode, and wake up
- * anyone in xfs_iwait_unpin() if the count goes to 0.	The
+ * anyone in xfs_iwait_unpin() if the count goes to 0.  The
  * inode must have been previoulsy pinned with a call to xfs_ipin().
  */
 void
@@ -2867,7 +2867,7 @@ xfs_iflush(
 
 	/*
 	 * We can't flush the inode until it is unpinned, so
-	 * wait for it.	 We know noone new can pin it, because
+	 * wait for it.  We know noone new can pin it, because
 	 * we are holding the inode lock shared and you need
 	 * to hold it exclusively to pin the inode.
 	 */
@@ -2967,7 +2967,7 @@ xfs_iflush(
 	for (iq = ip->i_cnext; iq != ip; iq = iq->i_cnext) {
 		/*
 		 * Do an un-protected check to see if the inode is dirty and
-		 * is a candidate for flushing.	 These checks will be repeated
+		 * is a candidate for flushing.  These checks will be repeated
 		 * later after the appropriate locks are acquired.
 		 */
 		iip = iq->i_itemp;
@@ -3049,13 +3049,13 @@ corrupt_out:
 	return XFS_ERROR(EFSCORRUPTED);
 
 cluster_corrupt_out:
-	/* Corruption detected in the clustering loop.	Invalidate the
+	/* Corruption detected in the clustering loop.  Invalidate the
 	 * inode buffer and shut down the filesystem.
 	 */
 	mutex_spinunlock(&ch->ch_lock, s);
 
 	/*
-	 * Clean up the buffer.	 If it was B_DELWRI, just release it --
+	 * Clean up the buffer.  If it was B_DELWRI, just release it --
 	 * brelse can handle it with no problems.  If not, shut down the
 	 * filesystem before releasing the buffer.
 	 */
@@ -3135,7 +3135,7 @@ xfs_iflush_int(
 	 * so if we clear i_update_core after they set it we
 	 * are guaranteed to see their updates to the timestamps.
 	 * I believe that this depends on strongly ordered memory
-	 * semantics, but we have that.	 We use the SYNCHRONIZE
+	 * semantics, but we have that.  We use the SYNCHRONIZE
 	 * macro to make sure that the compiler does not reorder
 	 * the i_update_core access below the data copy below.
 	 */
@@ -3252,7 +3252,7 @@ xfs_iflush_int(
 	/*
 	 * We've recorded everything logged in the inode, so we'd
 	 * like to clear the ilf_fields bits so we don't log and
-	 * flush things unnecessarily.	However, we can't stop
+	 * flush things unnecessarily.  However, we can't stop
 	 * logging all this information until the data we've copied
 	 * into the disk buffer is written to disk.  If we did we might
 	 * overwrite the copy of the inode in the log with all the
@@ -3263,7 +3263,7 @@ xfs_iflush_int(
 	 * When logging the inode, these bits are moved back to the
 	 * ilf_fields field.  In the xfs_iflush_done() routine we
 	 * clear ili_last_fields, since we know that the information
-	 * those bits represent is permanently on disk.	 As long as
+	 * those bits represent is permanently on disk.  As long as
 	 * the flush completes before the inode is logged again, then
 	 * both ilf_fields and ili_last_fields will be cleared.
 	 *
@@ -3282,7 +3282,7 @@ xfs_iflush_int(
 		iip->ili_format.ilf_fields = 0;
 		iip->ili_logged = 1;
 
-		ASSERT(sizeof(xfs_lsn_t) == 8); /* don't lock if it shrinks */
+		ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't lock if it shrinks */
 		AIL_LOCK(mp,s);
 		iip->ili_flush_lsn = iip->ili_item.li_lsn;
 		AIL_UNLOCK(mp, s);
@@ -3395,7 +3395,7 @@ xfs_iflush_all(
 			 * nonexistent vnode.  We break from the loop
 			 * since we know that we modify
 			 * it by pulling ourselves from it in xfs_reclaim()
-			 * called via vn_purge() below.	 Set ip to the next
+			 * called via vn_purge() below.  Set ip to the next
 			 * entry in the list anyway so we'll know below
 			 * whether we reached the end or not.
 			 */
@@ -3493,7 +3493,7 @@ xfs_iaccess(
 
 /*
  * Return whether or not it is OK to swap to the given file in the
- * given range.	 Return 0 for OK and otherwise return the error.
+ * given range.  Return 0 for OK and otherwise return the error.
  *
  * It is only OK to swap to a file if it has no holes, and all
  * extents have been initialized.
@@ -3564,7 +3564,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 
 	/*
 	 * We're not supposed to change timestamps in readonly-mounted
-	 * filesystems.	 Throw it away if anyone asks us.
+	 * filesystems.  Throw it away if anyone asks us.
 	 */
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
 		return;

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -63,7 +63,7 @@ xfs_error_trap(int e)
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 
 int	xfs_etest[XFS_NUM_INJECT_ERROR];
-int64_t xfs_etest_fsid[XFS_NUM_INJECT_ERROR];
+int64_t	xfs_etest_fsid[XFS_NUM_INJECT_ERROR];
 char *	xfs_etest_fsname[XFS_NUM_INJECT_ERROR];
 
 void
@@ -276,7 +276,7 @@ xfs_hex_dump(void *p, int length)
 	__uint8_t *uip = (__uint8_t*)p;
 	int	i;
 	char	sbuf[128], *s;
-	
+
 	s = sbuf;
 	*s = '\0';
 	for (i=0; i<length; i++, uip++) {

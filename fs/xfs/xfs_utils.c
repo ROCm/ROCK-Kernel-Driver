@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -191,7 +191,7 @@ xfs_dir_ialloc(
 		/*
 		 * Normally, xfs_trans_commit releases all the locks.
 		 * We call bhold to hang on to the ialloc_context across
-		 * the commit.	Holding this buffer prevents any other
+		 * the commit.  Holding this buffer prevents any other
 		 * processes from doing any allocations in this
 		 * allocation group.
 		 */
@@ -371,9 +371,9 @@ xfs_bumplink(
 	    (ip->i_d.di_nlink > XFS_MAXLINK_1)) {
 		/*
 		 * The inode has increased its number of links beyond
-		 * what can fit in an old format inode.	 It now needs
+		 * what can fit in an old format inode.  It now needs
 		 * to be converted to a version 2 inode with a 32 bit
-		 * link count.	If this is the first inode in the file
+		 * link count.  If this is the first inode in the file
 		 * system to do this, then we need to bump the superblock
 		 * version number as well.
 		 */
@@ -385,7 +385,7 @@ xfs_bumplink(
 }
 
 /*
- * Try to truncate the given file to 0 length.	Currently called
+ * Try to truncate the given file to 0 length.  Currently called
  * only out of xfs_remove when it has to truncate a file to free
  * up space for the remove to proceed.
  */
@@ -428,7 +428,7 @@ xfs_truncate_file(
 	}
 
 	/*
-	 * Follow the normal truncate locking protocol.	 Since we
+	 * Follow the normal truncate locking protocol.  Since we
 	 * hold the inode in the transaction, we know that it's number
 	 * of references will stay constant.
 	 */

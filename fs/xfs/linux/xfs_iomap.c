@@ -265,7 +265,7 @@ xfs_iomap_write_direct(
 	maps = min(XFS_WRITE_IMAPS, *nmaps);
 	nimaps = maps;
 
-	isize = ip->i_d.di_size; 
+	isize = ip->i_d.di_size;
 	aeof = (offset + count) > isize;
 
 	if (io->io_new_size > isize)
@@ -628,7 +628,7 @@ xfs_iomap_write_allocate(
 		for (i = 0; i < nimaps; i++) {
 			if ((map->br_startoff >= imap[i].br_startoff) &&
 			    (map->br_startoff < (imap[i].br_startoff +
-					         imap[i].br_blockcount))) {
+						 imap[i].br_blockcount))) {
 				*map = imap[i];
 				*retmap = 1;
 				XFS_STATS_INC(xfsstats.xs_xstrat_quick);

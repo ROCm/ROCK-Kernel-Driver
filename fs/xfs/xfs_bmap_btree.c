@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -59,7 +59,7 @@ STATIC int xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
 STATIC void
 xfs_bmbt_trace_enter(
 	char		*func,
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	char		*s,
 	int		type,
 	int		line,
@@ -100,7 +100,7 @@ xfs_bmbt_trace_enter(
 STATIC void
 xfs_bmbt_trace_argbi(
 	char		*func,
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_buf_t	*b,
 	int		i,
 	int		line)
@@ -117,7 +117,7 @@ xfs_bmbt_trace_argbi(
 STATIC void
 xfs_bmbt_trace_argbii(
 	char		*func,
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_buf_t	*b,
 	int		i0,
 	int		i1,
@@ -155,7 +155,7 @@ xfs_bmbt_trace_argfffi(
 STATIC void
 xfs_bmbt_trace_argi(
 	char		*func,
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	int		i,
 	int		line)
 {
@@ -243,7 +243,7 @@ xfs_bmbt_trace_argik(
 STATIC void
 xfs_bmbt_trace_cursor(
 	char		*func,
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	char		*s,
 	int		line)
 {
@@ -260,21 +260,21 @@ xfs_bmbt_trace_cursor(
 		(cur->bc_ptrs[2] << 16) | cur->bc_ptrs[3]);
 }
 
-#define XFS_BMBT_TRACE_ARGBI(c,b,i)	\
+#define	XFS_BMBT_TRACE_ARGBI(c,b,i)	\
 	xfs_bmbt_trace_argbi(fname, c, b, i, __LINE__)
-#define XFS_BMBT_TRACE_ARGBII(c,b,i,j)	\
+#define	XFS_BMBT_TRACE_ARGBII(c,b,i,j)	\
 	xfs_bmbt_trace_argbii(fname, c, b, i, j, __LINE__)
-#define XFS_BMBT_TRACE_ARGFFFI(c,o,b,i,j)	\
+#define	XFS_BMBT_TRACE_ARGFFFI(c,o,b,i,j)	\
 	xfs_bmbt_trace_argfffi(fname, c, o, b, i, j, __LINE__)
-#define XFS_BMBT_TRACE_ARGI(c,i)	\
+#define	XFS_BMBT_TRACE_ARGI(c,i)	\
 	xfs_bmbt_trace_argi(fname, c, i, __LINE__)
-#define XFS_BMBT_TRACE_ARGIFK(c,i,f,k)	\
+#define	XFS_BMBT_TRACE_ARGIFK(c,i,f,k)	\
 	xfs_bmbt_trace_argifk(fname, c, i, f, k, __LINE__)
-#define XFS_BMBT_TRACE_ARGIFR(c,i,f,r)	\
+#define	XFS_BMBT_TRACE_ARGIFR(c,i,f,r)	\
 	xfs_bmbt_trace_argifr(fname, c, i, f, r, __LINE__)
-#define XFS_BMBT_TRACE_ARGIK(c,i,k)	\
+#define	XFS_BMBT_TRACE_ARGIK(c,i,k)	\
 	xfs_bmbt_trace_argik(fname, c, i, k, __LINE__)
-#define XFS_BMBT_TRACE_CURSOR(c,s)	\
+#define	XFS_BMBT_TRACE_CURSOR(c,s)	\
 	xfs_bmbt_trace_cursor(fname, c, s, __LINE__)
 static char	ARGS[] = "args";
 static char	ENTRY[] = "entry";
@@ -282,14 +282,14 @@ static char	ERROR[] = "error";
 #undef EXIT
 static char	EXIT[] = "exit";
 #else
-#define XFS_BMBT_TRACE_ARGBI(c,b,i)
-#define XFS_BMBT_TRACE_ARGBII(c,b,i,j)
-#define XFS_BMBT_TRACE_ARGFFFI(c,o,b,i,j)
-#define XFS_BMBT_TRACE_ARGI(c,i)
-#define XFS_BMBT_TRACE_ARGIFK(c,i,f,k)
-#define XFS_BMBT_TRACE_ARGIFR(c,i,f,r)
-#define XFS_BMBT_TRACE_ARGIK(c,i,k)
-#define XFS_BMBT_TRACE_CURSOR(c,s)
+#define	XFS_BMBT_TRACE_ARGBI(c,b,i)
+#define	XFS_BMBT_TRACE_ARGBII(c,b,i,j)
+#define	XFS_BMBT_TRACE_ARGFFFI(c,o,b,i,j)
+#define	XFS_BMBT_TRACE_ARGI(c,i)
+#define	XFS_BMBT_TRACE_ARGIFK(c,i,f,k)
+#define	XFS_BMBT_TRACE_ARGIFR(c,i,f,r)
+#define	XFS_BMBT_TRACE_ARGIK(c,i,k)
+#define	XFS_BMBT_TRACE_CURSOR(c,s)
 #endif	/* XFS_BMBT_TRACE */
 
 
@@ -1002,7 +1002,7 @@ xfs_bmbt_killroot(
  */
 STATIC void
 xfs_bmbt_log_keys(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_buf_t	*bp,
 	int		kfirst,
 	int		klast)
@@ -1041,7 +1041,7 @@ xfs_bmbt_log_keys(
  */
 STATIC void
 xfs_bmbt_log_ptrs(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_buf_t	*bp,
 	int		pfirst,
 	int		plast)
@@ -1818,7 +1818,7 @@ xfs_bmbt_decrement(
  */
 int					/* error */
 xfs_bmbt_delete(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	int		*stat)		/* success/failure */
 {
 	int		error;		/* error return value */
@@ -2048,7 +2048,7 @@ xfs_bmbt_disk_get_startoff(
 
 xfs_exntst_t
 xfs_bmbt_disk_get_state(
-	xfs_bmbt_rec_t	*r)
+	xfs_bmbt_rec_t  *r)
 {
 	int	ext_flag;
 
@@ -2148,7 +2148,7 @@ xfs_bmbt_increment(
  */
 int					/* error */
 xfs_bmbt_insert(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	int		*stat)		/* success/failure */
 {
 	int		error;		/* error return value */
@@ -2158,9 +2158,9 @@ xfs_bmbt_insert(
 	int		i;
 	int		level;
 	xfs_fsblock_t	nbno;
-	xfs_btree_cur_t *ncur;
+	xfs_btree_cur_t	*ncur;
 	xfs_bmbt_rec_t	nrec;
-	xfs_btree_cur_t *pcur;
+	xfs_btree_cur_t	*pcur;
 
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
 	level = 0;
@@ -2274,7 +2274,7 @@ xfs_bmbt_log_recs(
 
 int					/* error */
 xfs_bmbt_lookup_eq(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
 	xfs_filblks_t	len,
@@ -2288,7 +2288,7 @@ xfs_bmbt_lookup_eq(
 
 int					/* error */
 xfs_bmbt_lookup_ge(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
 	xfs_filblks_t	len,
@@ -2302,7 +2302,7 @@ xfs_bmbt_lookup_ge(
 
 int					/* error */
 xfs_bmbt_lookup_le(
-	xfs_btree_cur_t *cur,
+	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
 	xfs_filblks_t	len,
@@ -2434,7 +2434,7 @@ xfs_bmbt_newroot(
 void
 xfs_bmbt_set_all(
 	xfs_bmbt_rec_t	*r,
-	xfs_bmbt_irec_t *s)
+	xfs_bmbt_irec_t	*s)
 {
 	int	extent_flag;
 

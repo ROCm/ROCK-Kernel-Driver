@@ -13,7 +13,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -49,17 +49,17 @@ xfs_init(void)
 	extern kmem_zone_t	*xfs_efd_zone;
 	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_dabuf_zone;
-	extern mutex_t		xfs_uuidtabmon;
+	extern mutex_t	        xfs_uuidtabmon;
 #ifdef DEBUG_NOT
-	extern ktrace_t		*xfs_alloc_trace_buf;
-	extern ktrace_t		*xfs_bmap_trace_buf;
-	extern ktrace_t		*xfs_bmbt_trace_buf;
-	extern ktrace_t		*xfs_dir_trace_buf;
-	extern ktrace_t		*xfs_attr_trace_buf;
-	extern ktrace_t		*xfs_dir2_trace_buf;
+	extern ktrace_t	        *xfs_alloc_trace_buf;
+	extern ktrace_t	        *xfs_bmap_trace_buf;
+	extern ktrace_t	        *xfs_bmbt_trace_buf;
+	extern ktrace_t	        *xfs_dir_trace_buf;
+	extern ktrace_t	        *xfs_attr_trace_buf;
+	extern ktrace_t	        *xfs_dir2_trace_buf;
 #endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
-	extern lock_t		xfs_dabuf_global_lock;
+	extern lock_t	        xfs_dabuf_global_lock;
 #endif
 
 #ifdef XFS_DABUF_DEBUG
@@ -179,7 +179,7 @@ xfs_cleanup(void)
 
 /*
  * xfs_start_flags
- * 
+ *
  * This function fills in xfs_mount_t fields based on mount args.
  * Note: the superblock has _not_ yet been read in.
  */
@@ -204,7 +204,7 @@ xfs_start_flags(
 	if (ap->logbufs != 0 && ap->logbufs != -1 &&
 	    (ap->logbufs < XLOG_NUM_ICLOGS ||
 	     ap->logbufs > XLOG_MAX_ICLOGS)) {
-		cmn_err(CE_WARN, 
+		cmn_err(CE_WARN,
 			"XFS: invalid logbufs value: %d [not %d-%d]",
 			ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
 		return XFS_ERROR(EINVAL);
@@ -572,7 +572,7 @@ int
 xfs_unmount_flush(
 	xfs_mount_t	*mp,		/* Mount structure we are getting
 					   rid of. */
-	int		relocation)	/* Called from vfs relocation. */
+	int             relocation)	/* Called from vfs relocation. */
 {
 	xfs_inode_t	*rip = mp->m_rootip;
 	xfs_inode_t	*rbmip;
@@ -650,8 +650,8 @@ fscorrupt_out2:
  * xfs_root extracts the root vnode from a vfs.
  *
  * vfsp -- the vfs struct for the desired file system
- * vpp	-- address of the caller's vnode pointer which should be
- *	   set to the desired fs root vnode
+ * vpp  -- address of the caller's vnode pointer which should be
+ *         set to the desired fs root vnode
  */
 STATIC int
 xfs_root(
@@ -732,24 +732,24 @@ xfs_statvfs(
  * vfs_sync() so that items at the tail of the log are always moving out.
  *
  * Flags:
- *	SYNC_BDFLUSH - We're being called from vfs_sync() so we don't want
+ *      SYNC_BDFLUSH - We're being called from vfs_sync() so we don't want
  *		       to sleep if we can help it.  All we really need
  *		       to do is ensure that the log is synced at least
  *		       periodically.  We also push the inodes and
  *		       superblock if we can lock them without sleeping
  *			and they are not pinned.
- *	SYNC_ATTR    - We need to flush the inodes.  If SYNC_BDFLUSH is not
+ *      SYNC_ATTR    - We need to flush the inodes.  If SYNC_BDFLUSH is not
  *		       set, then we really want to lock each inode and flush
  *		       it.
- *	SYNC_WAIT    - All the flushes that take place in this call should
+ *      SYNC_WAIT    - All the flushes that take place in this call should
  *		       be synchronous.
- *	SYNC_DELWRI  - This tells us to push dirty pages associated with
- *		       inodes.	SYNC_WAIT and SYNC_BDFLUSH are used to
+ *      SYNC_DELWRI  - This tells us to push dirty pages associated with
+ *		       inodes.  SYNC_WAIT and SYNC_BDFLUSH are used to
  *		       determine if they should be flushed sync, async, or
  *		       delwri.
- *	SYNC_CLOSE   - This flag is passed when the system is being
+ *      SYNC_CLOSE   - This flag is passed when the system is being
  *		       unmounted.  We should sync and invalidate everthing.
- *	SYNC_FSDATA  - This indicates that the caller would like to make
+ *      SYNC_FSDATA  - This indicates that the caller would like to make
  *		       sure the superblock is safe on disk.  We can ensure
  *		       this by simply makeing sure the log gets flushed
  *		       if SYNC_BDFLUSH is set, and by actually writing it
@@ -773,23 +773,23 @@ xfs_sync(
  * xfs sync routine for internal use
  *
  * This routine supports all of the flags defined for the generic VFS_SYNC
- * interface as explained above under xys_sync.	 In the interests of not
+ * interface as explained above under xys_sync.  In the interests of not
  * changing interfaces within the 6.5 family, additional internallly-
  * required functions are specified within a separate xflags parameter,
  * only available by calling this routine.
  *
  * xflags:
- *	XFS_XSYNC_RELOC - Sync for relocation.	Don't try to get behavior
- *			  locks as this will cause you to hang.	 Not all
- *			  combinations of flags are necessarily supported
- *			  when this is specified.
+ *	XFS_XSYNC_RELOC - Sync for relocation.  Don't try to get behavior
+ *                        locks as this will cause you to hang.  Not all
+ *                        combinations of flags are necessarily supported
+ *                        when this is specified.
  */
 int
 xfs_syncsub(
 	xfs_mount_t	*mp,
 	int		flags,
-	int		xflags,
-	int		*bypassed)
+	int             xflags,
+	int             *bypassed)
 {
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
@@ -823,7 +823,7 @@ xfs_syncsub(
  * must be locked when this is called. After the call the list will no
  * longer be locked.
  */
-#define IPOINTER_INSERT(ip, mp) { \
+#define IPOINTER_INSERT(ip, mp)	{ \
 		ASSERT(ipointer_in == B_FALSE); \
 		ipointer->ip_mnext = ip->i_mnext; \
 		ipointer->ip_mprev = ip; \
@@ -840,7 +840,7 @@ xfs_syncsub(
  * the whole list. If we are the current head of the list then move the head
  * past us.
  */
-#define IPOINTER_REMOVE(ip, mp) { \
+#define IPOINTER_REMOVE(ip, mp)	{ \
 		ASSERT(ipointer_in == B_TRUE); \
 		if (ipointer->ip_mnext != (xfs_inode_t *)ipointer) { \
 			ip = ipointer->ip_mnext; \
@@ -974,7 +974,7 @@ xfs_syncsub(
 		 * then we can skip inodes for which it looks like
 		 * there is nothing to do.  Since we don't have the
 		 * inode locked this is racey, but these are periodic
-		 * calls so it doesn't matter.	For the others we want
+		 * calls so it doesn't matter.  For the others we want
 		 * to know for sure, so we at least try to lock them.
 		 */
 		if (flags & SYNC_BDFLUSH) {
@@ -1001,7 +1001,7 @@ xfs_syncsub(
 		 * lock in xfs_ireclaim() after the inode is pulled from
 		 * the mount list will sleep until we release it here.
 		 * This keeps the vnode from being freed while we reference
-		 * it.	It is also cheaper and simpler than actually doing
+		 * it.  It is also cheaper and simpler than actually doing
 		 * a vn_get() for every inode we touch here.
 		 */
 		if (xfs_ilock_nowait(ip, lock_flags) == 0) {
@@ -1065,7 +1065,7 @@ xfs_syncsub(
 			 *
 			 * We don't set the VREMAPPING bit in the vnode
 			 * here, because we don't hold the vnode lock
-			 * exclusively.	 It doesn't really matter, though,
+			 * exclusively.  It doesn't really matter, though,
 			 * because we only come here when we're shutting
 			 * down anyway.
 			 */
@@ -1280,7 +1280,7 @@ xfs_syncsub(
 			/*
 			 * If we had to take a reference on the vnode
 			 * above, then wait until after we've unlocked
-			 * the inode to release the reference.	This is
+			 * the inode to release the reference.  This is
 			 * because we can be already holding the inode
 			 * lock when VN_RELE() calls xfs_inactive().
 			 *

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -255,8 +255,8 @@ xfs_read_buf(
 	struct xfs_mount *mp,
 	xfs_buftarg_t	 *target,
 	xfs_daddr_t	 blkno,
-	int		 len,
-	uint		 flags,
+	int              len,
+	uint             flags,
 	xfs_buf_t	 **bpp)
 {
 	xfs_buf_t	 *bp;

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -44,8 +44,8 @@ ktrace_t	*xfs_alloc_trace_buf;
 
 #define XFS_ABSDIFF(a,b)	(((a) <= (b)) ? ((b) - (a)) : ((a) - (b)))
 
-#define XFSA_FIXUP_BNO_OK	1
-#define XFSA_FIXUP_CNT_OK	2
+#define	XFSA_FIXUP_BNO_OK	1
+#define	XFSA_FIXUP_CNT_OK	2
 
 int
 xfs_alloc_search_busy(xfs_trans_t *tp,
@@ -54,27 +54,27 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 		    xfs_extlen_t len);
 
 #if defined(XFS_ALLOC_TRACE)
-#define TRACE_ALLOC(s,a)	\
+#define	TRACE_ALLOC(s,a)	\
 	xfs_alloc_trace_alloc(fname, s, a, __LINE__)
-#define TRACE_FREE(s,a,b,x,f)	\
+#define	TRACE_FREE(s,a,b,x,f)	\
 	xfs_alloc_trace_free(fname, s, mp, a, b, x, f, __LINE__)
-#define TRACE_MODAGF(s,a,f)	\
+#define	TRACE_MODAGF(s,a,f)	\
 	xfs_alloc_trace_modagf(fname, s, mp, a, f, __LINE__)
-#define TRACE_BUSY(fname,s,ag,agb,l,sl,tp)	\
+#define	TRACE_BUSY(fname,s,ag,agb,l,sl,tp)	\
 	xfs_alloc_trace_busy(fname, s, mp, ag, agb, l, sl, tp, XFS_ALLOC_KTRACE_BUSY, __LINE__)
-#define TRACE_UNBUSY(fname,s,ag,sl,tp)	\
+#define	TRACE_UNBUSY(fname,s,ag,sl,tp)	\
 	xfs_alloc_trace_busy(fname, s, mp, ag, -1, -1, sl, tp, XFS_ALLOC_KTRACE_UNBUSY, __LINE__)
-#define TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)	\
+#define	TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)	\
 	xfs_alloc_trace_busy(fname, s, mp, ag, agb, l, sl, tp, XFS_ALLOC_KTRACE_BUSYSEARCH, __LINE__)
 
 
 #else
-#define TRACE_ALLOC(s,a)
-#define TRACE_FREE(s,a,b,x,f)
-#define TRACE_MODAGF(s,a,f)
-#define TRACE_BUSY(s,a,ag,agb,l,sl,tp)
-#define TRACE_UNBUSY(fname,s,ag,sl,tp)
-#define TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)
+#define	TRACE_ALLOC(s,a)
+#define	TRACE_FREE(s,a,b,x,f)
+#define	TRACE_MODAGF(s,a,f)
+#define	TRACE_BUSY(s,a,ag,agb,l,sl,tp)
+#define	TRACE_UNBUSY(fname,s,ag,sl,tp)
+#define	TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)
 #endif	/* XFS_ALLOC_TRACE */
 
 /*
@@ -189,7 +189,7 @@ xfs_alloc_compute_diff(
  */
 STATIC void
 xfs_alloc_fix_len(
-	xfs_alloc_arg_t *args)		/* allocation argument structure */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
 	xfs_extlen_t	k;
 	xfs_extlen_t	rlen;
@@ -223,7 +223,7 @@ xfs_alloc_fix_len(
  */
 STATIC int
 xfs_alloc_fix_minleft(
-	xfs_alloc_arg_t *args)		/* allocation argument structure */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
 	xfs_agf_t	*agf;		/* a.g. freelist header */
 	int		diff;		/* free space difference */
@@ -252,8 +252,8 @@ xfs_alloc_fix_minleft(
  */
 STATIC int				/* error code */
 xfs_alloc_fixup_trees(
-	xfs_btree_cur_t *cnt_cur,	/* cursor for by-size btree */
-	xfs_btree_cur_t *bno_cur,	/* cursor for by-block btree */
+	xfs_btree_cur_t	*cnt_cur,	/* cursor for by-size btree */
+	xfs_btree_cur_t	*bno_cur,	/* cursor for by-block btree */
 	xfs_agblock_t	fbno,		/* starting block of free extent */
 	xfs_extlen_t	flen,		/* length of free extent */
 	xfs_agblock_t	rbno,		/* starting block of returned extent */
@@ -423,7 +423,7 @@ STATIC void
 xfs_alloc_trace_alloc(
 	char		*name,		/* function tag string */
 	char		*str,		/* additional string */
-	xfs_alloc_arg_t *args,		/* allocation argument structure */
+	xfs_alloc_arg_t	*args,		/* allocation argument structure */
 	int		line)		/* source line number */
 {
 	ktrace_enter(xfs_alloc_trace_buf,
@@ -551,7 +551,7 @@ xfs_alloc_trace_busy(
  */
 STATIC int			/* error */
 xfs_alloc_ag_vextent(
-	xfs_alloc_arg_t *args)	/* argument structure for allocation */
+	xfs_alloc_arg_t	*args)	/* argument structure for allocation */
 {
 	int		error=0;
 #ifdef XFS_ALLOC_TRACE
@@ -631,10 +631,10 @@ xfs_alloc_ag_vextent(
  */
 STATIC int			/* error */
 xfs_alloc_ag_vextent_exact(
-	xfs_alloc_arg_t *args)	/* allocation argument structure */
+	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
-	xfs_btree_cur_t *bno_cur;/* by block-number btree cursor */
-	xfs_btree_cur_t *cnt_cur;/* by count btree cursor */
+	xfs_btree_cur_t	*bno_cur;/* by block-number btree cursor */
+	xfs_btree_cur_t	*cnt_cur;/* by count btree cursor */
 	xfs_agblock_t	end;	/* end of allocated extent */
 	int		error;
 	xfs_agblock_t	fbno;	/* start block of found extent */
@@ -644,8 +644,8 @@ xfs_alloc_ag_vextent_exact(
 	static char	fname[] = "xfs_alloc_ag_vextent_exact";
 #endif
 	int		i;	/* success/failure of operation */
-	xfs_agblock_t	maxend; /* end of maximal extent */
-	xfs_agblock_t	minend; /* end of minimal extent */
+	xfs_agblock_t	maxend;	/* end of maximal extent */
+	xfs_agblock_t	minend;	/* end of minimal extent */
 	xfs_extlen_t	rlen;	/* length of returned extent */
 
 	ASSERT(args->alignment == 1);
@@ -738,11 +738,11 @@ error0:
  */
 STATIC int				/* error */
 xfs_alloc_ag_vextent_near(
-	xfs_alloc_arg_t *args)		/* allocation argument structure */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
-	xfs_btree_cur_t *bno_cur_gt;	/* cursor for bno btree, right side */
-	xfs_btree_cur_t *bno_cur_lt;	/* cursor for bno btree, left side */
-	xfs_btree_cur_t *cnt_cur;	/* cursor for count btree */
+	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
+	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
+	xfs_btree_cur_t	*cnt_cur;	/* cursor for count btree */
 #ifdef XFS_ALLOC_TRACE
 	static char	fname[] = "xfs_alloc_ag_vextent_near";
 #endif
@@ -1277,10 +1277,10 @@ xfs_alloc_ag_vextent_near(
  */
 STATIC int				/* error */
 xfs_alloc_ag_vextent_size(
-	xfs_alloc_arg_t *args)		/* allocation argument structure */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
-	xfs_btree_cur_t *bno_cur;	/* cursor for bno btree */
-	xfs_btree_cur_t *cnt_cur;	/* cursor for cnt btree */
+	xfs_btree_cur_t	*bno_cur;	/* cursor for bno btree */
+	xfs_btree_cur_t	*cnt_cur;	/* cursor for cnt btree */
 	int		error;		/* error result */
 	xfs_agblock_t	fbno;		/* start of found freespace */
 	xfs_extlen_t	flen;		/* length of found freespace */
@@ -1433,10 +1433,10 @@ error0:
  */
 STATIC int			/* error */
 xfs_alloc_ag_vextent_small(
-	xfs_alloc_arg_t *args,	/* allocation argument structure */
-	xfs_btree_cur_t *ccur,	/* by-size cursor */
-	xfs_agblock_t	*fbnop, /* result block number */
-	xfs_extlen_t	*flenp, /* result length */
+	xfs_alloc_arg_t	*args,	/* allocation argument structure */
+	xfs_btree_cur_t	*ccur,	/* by-size cursor */
+	xfs_agblock_t	*fbnop,	/* result block number */
+	xfs_extlen_t	*flenp,	/* result length */
 	int		*stat)	/* status: 0-freelist, 1-normal/none */
 {
 	int		error;
@@ -1526,8 +1526,8 @@ xfs_free_ag_extent(
 	xfs_extlen_t	len,	/* length of extent */
 	int		isfl)	/* set if is freelist blocks - no sb acctg */
 {
-	xfs_btree_cur_t *bno_cur;	/* cursor for by-block btree */
-	xfs_btree_cur_t *cnt_cur;	/* cursor for by-size btree */
+	xfs_btree_cur_t	*bno_cur;	/* cursor for by-block btree */
+	xfs_btree_cur_t	*cnt_cur;	/* cursor for by-size btree */
 	int		error;		/* error return value */
 #ifdef XFS_ALLOC_TRACE
 	static char	fname[] = "xfs_free_ag_extent";
@@ -1775,7 +1775,7 @@ xfs_free_ag_extent(
 	 * used in xfs_bmap_finish, we can't allow block to be available
 	 * for reallocation and non-transaction writing (user data)
 	 * until we know that the transaction that moved it to the free
-	 * list is permanently on disk.	 We track the blocks by declaring
+	 * list is permanently on disk.  We track the blocks by declaring
 	 * these blocks as "busy"; the busy list is maintained on a per-ag
 	 * basis and each transaction records which entries should be removed
 	 * when the iclog commits to disk.  If a busy block is allocated,
@@ -1826,7 +1826,7 @@ xfs_alloc_compute_maxlevels(
  */
 STATIC int			/* error */
 xfs_alloc_fix_freelist(
-	xfs_alloc_arg_t *args,	/* allocation argument structure */
+	xfs_alloc_arg_t	*args,	/* allocation argument structure */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
 {
 	xfs_buf_t	*agbp;	/* agf buffer pointer */
@@ -1839,7 +1839,7 @@ xfs_alloc_fix_freelist(
 	xfs_mount_t	*mp;	/* file system mount point structure */
 	xfs_extlen_t	need;	/* total blocks needed in freelist */
 	xfs_perag_t	*pag;	/* per-ag information structure */
-	xfs_alloc_arg_t targs;	/* local allocation arguments */
+	xfs_alloc_arg_t	targs;	/* local allocation arguments */
 	xfs_trans_t	*tp;	/* transaction pointer */
 
 	mp = args->mp;
@@ -1959,8 +1959,8 @@ xfs_alloc_fix_freelist(
 		if ((error = xfs_alloc_ag_vextent(&targs)))
 			return error;
 		/*
-		 * Stop if we run out.	Won't happen if callers are obeying
-		 * the restrictions correctly.	Can happen for free calls
+		 * Stop if we run out.  Won't happen if callers are obeying
+		 * the restrictions correctly.  Can happen for free calls
 		 * on a completely full ag.
 		 */
 		if (targs.agbno == NULLAGBLOCK)
@@ -2035,7 +2035,7 @@ xfs_alloc_get_freelist(
 	 * As blocks are freed, they are added to the per-ag busy list
 	 * and remain there until the freeing transaction is committed to
 	 * disk.  Now that we have allocated blocks, this list must be
-	 * searched to see if a block is being reused.	If one is, then
+	 * searched to see if a block is being reused.  If one is, then
 	 * the freeing transaction must be pushed to disk NOW by forcing
 	 * to disk all iclogs up that transaction's LSN.
 	 */
@@ -2050,7 +2050,7 @@ void
 xfs_alloc_log_agf(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_buf_t	*bp,	/* buffer for a.g. freelist header */
-	int		fields) /* mask of fields to be logged (XFS_AGF_...) */
+	int		fields)	/* mask of fields to be logged (XFS_AGF_...) */
 {
 	int	first;		/* first byte offset */
 	int	last;		/* last byte offset */
@@ -2227,9 +2227,9 @@ xfs_alloc_read_agf(
  */
 int				/* error */
 xfs_alloc_vextent(
-	xfs_alloc_arg_t *args)	/* allocation argument structure */
+	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
-	xfs_agblock_t	agsize; /* allocation group size */
+	xfs_agblock_t	agsize;	/* allocation group size */
 	int		error;
 	int		flags;	/* XFS_ALLOC_FLAG_... locking flags */
 #ifdef XFS_ALLOC_TRACE
@@ -2238,7 +2238,7 @@ xfs_alloc_vextent(
 	xfs_extlen_t	minleft;/* minimum left value, temp copy */
 	xfs_mount_t	*mp;	/* mount structure pointer */
 	xfs_agnumber_t	sagno;	/* starting allocation group number */
-	xfs_alloctype_t type;	/* input allocation type */
+	xfs_alloctype_t	type;	/* input allocation type */
 	int		bump_rotor = 0;
 	int		no_min = 0;
 
@@ -2433,7 +2433,7 @@ xfs_free_extent(
 #ifdef DEBUG
 	xfs_agf_t	*agf;	/* a.g. freespace header */
 #endif
-	xfs_alloc_arg_t args;	/* allocation argument structure */
+	xfs_alloc_arg_t	args;	/* allocation argument structure */
 	int		error;
 
 	ASSERT(len != 0);
@@ -2464,7 +2464,7 @@ error0:
 /*
  * AG Busy list management
  * The busy list contains block ranges that have been freed but whose
- * transacations have not yet hit disk.	 If any block listed in a busy
+ * transacations have not yet hit disk.  If any block listed in a busy
  * list is reused, the transaction that freed it must be forced to disk
  * before continuing to use the block.
  *

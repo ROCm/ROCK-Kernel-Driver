@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -90,10 +90,10 @@ xfs_growfs_rt_alloc(
 	xfs_daddr_t	d;		/* disk block address */
 	int		error;		/* error return value */
 	xfs_fsblock_t	firstblock;	/* first block allocated in xaction */
-	xfs_bmap_free_t flist;		/* list of freed blocks */
+	xfs_bmap_free_t	flist;		/* list of freed blocks */
 	xfs_fsblock_t	fsbno;		/* filesystem block for bno */
 	xfs_inode_t	*ip;		/* pointer to incore inode */
-	xfs_bmbt_irec_t map;		/* block map output */
+	xfs_bmbt_irec_t	map;		/* block map output */
 	int		nmap;		/* number of block maps */
 	int		resblks;	/* space reservation */
 	xfs_trans_t	*tp;		/* transaction pointer */
@@ -303,7 +303,7 @@ xfs_rtallocate_extent_block(
 
 /*
  * Allocate an extent of length minlen<=len<=maxlen, starting at block
- * bno.	 If we don't get maxlen then use prod to trim the length, if given.
+ * bno.  If we don't get maxlen then use prod to trim the length, if given.
  * Returns error; returns starting block in *rtblock.
  * The lengths are all in rtextents.
  */
@@ -383,7 +383,7 @@ xfs_rtallocate_extent_exact(
 
 /*
  * Allocate an extent of length minlen<=len<=maxlen, starting as near
- * to bno as possible.	If we don't get maxlen then use prod to trim
+ * to bno as possible.  If we don't get maxlen then use prod to trim
  * the length, if given.  The lengths are all in rtextents.
  */
 STATIC int				/* error */
@@ -671,7 +671,7 @@ xfs_rtallocate_extent_size(
 			/*
 			 * Get the summary information for this level/block.
 			 */
-			error = xfs_rtget_summary(mp, tp, l, i, rbpp, rsb,
+			error =	xfs_rtget_summary(mp, tp, l, i, rbpp, rsb,
 						  &sum);
 			if (error) {
 				return error;
@@ -682,7 +682,7 @@ xfs_rtallocate_extent_size(
 			if (!sum)
 				continue;
 			/*
-			 * Try the allocation.	Make sure the specified
+			 * Try the allocation.  Make sure the specified
 			 * minlen/maxlen are in the possible range for
 			 * this summary level.
 			 */
@@ -1891,7 +1891,7 @@ xfs_rtmodify_summary(
 int
 xfs_growfs_rt(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_growfs_rt_t *in)		/* growfs rt input struct */
+	xfs_growfs_rt_t	*in)		/* growfs rt input struct */
 {
 	xfs_rtblock_t	bmbno;		/* bitmap block number */
 	xfs_buf_t	*bp;		/* temporary buffer */
@@ -2101,7 +2101,7 @@ error_exit:
 
 /*
  * Allocate an extent in the realtime subvolume, with the usual allocation
- * parameters.	The length units are all in realtime extents, as is the
+ * parameters.  The length units are all in realtime extents, as is the
  * result block number.
  */
 int					/* error */
@@ -2111,7 +2111,7 @@ xfs_rtallocate_extent(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	xfs_alloctype_t type,		/* allocation type XFS_ALLOCTYPE... */
+	xfs_alloctype_t	type,		/* allocation type XFS_ALLOCTYPE... */
 	int		wasdel,		/* was a delayed allocation extent */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -2154,7 +2154,7 @@ xfs_rtallocate_extent(
 	switch (type) {
 	case XFS_ALLOCTYPE_ANY_AG:
 		error = xfs_rtallocate_extent_size(mp, tp, minlen, maxlen, len,
-				&sumbp, &sb, prod, &r);
+				&sumbp,	&sb, prod, &r);
 		break;
 	case XFS_ALLOCTYPE_NEAR_BNO:
 		error = xfs_rtallocate_extent_near(mp, tp, bno, minlen, maxlen,

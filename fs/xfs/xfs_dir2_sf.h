@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DIR2_SF_H__
-#define __XFS_DIR2_SF_H__
+#define	__XFS_DIR2_SF_H__
 
 /*
  * Directory layout when stored internal to an inode.
@@ -50,18 +50,18 @@ struct xfs_trans;
 /*
  * Maximum size of a shortform directory.
  */
-#define XFS_DIR2_SF_MAX_SIZE	\
+#define	XFS_DIR2_SF_MAX_SIZE	\
 	(XFS_DINODE_MAX_SIZE - (uint)sizeof(xfs_dinode_core_t) - \
 	 (uint)sizeof(xfs_agino_t))
 
 /*
  * Inode number stored as 8 8-bit values.
  */
-typedef struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
+typedef	struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
 
-#define XFS_DIR2_SF_GET_INO8_ARCH(di,arch)	\
+#define	XFS_DIR2_SF_GET_INO8_ARCH(di,arch)	\
 	(xfs_ino_t)(DIRINO_GET_ARCH(&di,arch))
-#define XFS_DIR2_SF_GET_INO8(di)		\
+#define	XFS_DIR2_SF_GET_INO8(di)	        \
 	XFS_DIR2_SF_GET_INO8_ARCH(di,ARCH_NOCONVERT)
 
 /*
@@ -70,16 +70,16 @@ typedef struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
  * fit in 32 bits.
  */
 typedef struct { __uint8_t i[4]; } xfs_dir2_ino4_t;
-#define XFS_DIR2_SF_GET_INO4_ARCH(di,arch)	\
+#define	XFS_DIR2_SF_GET_INO4_ARCH(di,arch)	\
 	(xfs_ino_t)(DIRINO4_GET_ARCH(&di,arch))
-#define XFS_DIR2_SF_GET_INO4(di)		\
+#define	XFS_DIR2_SF_GET_INO4(di)	        \
 	XFS_DIR2_SF_GET_INO4_ARCH(di,ARCH_NOCONVERT)
 
 typedef union {
-	xfs_dir2_ino8_t i8;
-	xfs_dir2_ino4_t i4;
+	xfs_dir2_ino8_t	i8;
+	xfs_dir2_ino4_t	i4;
 } xfs_dir2_inou_t;
-#define XFS_DIR2_MAX_SHORT_INUM ((xfs_ino_t)0xffffffffULL)
+#define	XFS_DIR2_MAX_SHORT_INUM	((xfs_ino_t)0xffffffffULL)
 
 /*
  * Normalized offset (in a data block) of the entry, really xfs_dir2_data_off_t.
@@ -115,9 +115,9 @@ typedef struct xfs_dir2_sf {
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_HDR_SIZE)
 int xfs_dir2_sf_hdr_size(int i8count);
-#define XFS_DIR2_SF_HDR_SIZE(i8count)	xfs_dir2_sf_hdr_size(i8count)
+#define	XFS_DIR2_SF_HDR_SIZE(i8count)	xfs_dir2_sf_hdr_size(i8count)
 #else
-#define XFS_DIR2_SF_HDR_SIZE(i8count)	\
+#define	XFS_DIR2_SF_HDR_SIZE(i8count)	\
 	((uint)sizeof(xfs_dir2_sf_hdr_t) - \
 	 ((i8count) == 0) * \
 	 ((uint)sizeof(xfs_dir2_ino8_t) - (uint)sizeof(xfs_dir2_ino4_t)))
@@ -125,20 +125,20 @@ int xfs_dir2_sf_hdr_size(int i8count);
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_INUMBERP)
 xfs_dir2_inou_t *xfs_dir2_sf_inumberp(xfs_dir2_sf_entry_t *sfep);
-#define XFS_DIR2_SF_INUMBERP(sfep)	xfs_dir2_sf_inumberp(sfep)
+#define	XFS_DIR2_SF_INUMBERP(sfep)	xfs_dir2_sf_inumberp(sfep)
 #else
-#define XFS_DIR2_SF_INUMBERP(sfep)	\
+#define	XFS_DIR2_SF_INUMBERP(sfep)	\
 	((xfs_dir2_inou_t *)&(sfep)->name[(sfep)->namelen])
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_GET_INUMBER)
 xfs_intino_t xfs_dir2_sf_get_inumber_arch(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from,
 					    xfs_arch_t arch);
-#define XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
+#define	XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
 	xfs_dir2_sf_get_inumber_arch(sfp, from, arch)
 
 #else
-#define XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
+#define	XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
 	((sfp)->hdr.i8count == 0 ? \
 		(xfs_intino_t)XFS_DIR2_SF_GET_INO4_ARCH(*(from), arch) : \
 		(xfs_intino_t)XFS_DIR2_SF_GET_INO8_ARCH(*(from), arch))
@@ -147,10 +147,10 @@ xfs_intino_t xfs_dir2_sf_get_inumber_arch(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *f
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_INUMBER)
 void xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
 				     xfs_dir2_inou_t *to, xfs_arch_t arch);
-#define XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
+#define	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
 	xfs_dir2_sf_put_inumber_arch(sfp,from,to,arch)
 #else
-#define XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
+#define	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
 	if ((sfp)->hdr.i8count == 0) { \
 	    DIRINO4_COPY_ARCH(from,to,arch); \
 	} else { \
@@ -162,20 +162,20 @@ void xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
 xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset_arch(xfs_dir2_sf_entry_t *sfep,
 						    xfs_arch_t arch);
 xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep);
-#define XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
+#define	XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
 	xfs_dir2_sf_get_offset_arch(sfep,arch)
 #else
-#define XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
+#define	XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
 	INT_GET_UNALIGNED_16_ARCH(&(sfep)->offset.i,arch)
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
 void xfs_dir2_sf_put_offset_arch(xfs_dir2_sf_entry_t *sfep,
 				    xfs_dir2_data_aoff_t off, xfs_arch_t arch);
-#define XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch) \
+#define	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch) \
 	xfs_dir2_sf_put_offset_arch(sfep,off,arch)
 #else
-#define XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch)	\
+#define	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch)	\
 	INT_SET_UNALIGNED_16_ARCH(&(sfep)->offset.i,off,arch)
 #endif
 

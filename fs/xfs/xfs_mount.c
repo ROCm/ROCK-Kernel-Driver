@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -40,47 +40,47 @@ void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
 static struct {
     short offset;
-    short type;	    /* 0 = integer
-		     * 1 = binary / string (no translation)
-		     */
+    short type;     /* 0 = integer
+		* 1 = binary / string (no translation)
+		*/
 } xfs_sb_info[] = {
-    { offsetof(xfs_sb_t, sb_magicnum),	 0 },
-    { offsetof(xfs_sb_t, sb_blocksize),	 0 },
-    { offsetof(xfs_sb_t, sb_dblocks),	 0 },
-    { offsetof(xfs_sb_t, sb_rblocks),	 0 },
-    { offsetof(xfs_sb_t, sb_rextents),	 0 },
-    { offsetof(xfs_sb_t, sb_uuid),	 1 },
-    { offsetof(xfs_sb_t, sb_logstart),	 0 },
-    { offsetof(xfs_sb_t, sb_rootino),	 0 },
-    { offsetof(xfs_sb_t, sb_rbmino),	 0 },
-    { offsetof(xfs_sb_t, sb_rsumino),	 0 },
-    { offsetof(xfs_sb_t, sb_rextsize),	 0 },
-    { offsetof(xfs_sb_t, sb_agblocks),	 0 },
-    { offsetof(xfs_sb_t, sb_agcount),	 0 },
-    { offsetof(xfs_sb_t, sb_rbmblocks),	 0 },
-    { offsetof(xfs_sb_t, sb_logblocks),	 0 },
+    { offsetof(xfs_sb_t, sb_magicnum),   0 },
+    { offsetof(xfs_sb_t, sb_blocksize),  0 },
+    { offsetof(xfs_sb_t, sb_dblocks),    0 },
+    { offsetof(xfs_sb_t, sb_rblocks),    0 },
+    { offsetof(xfs_sb_t, sb_rextents),   0 },
+    { offsetof(xfs_sb_t, sb_uuid),       1 },
+    { offsetof(xfs_sb_t, sb_logstart),   0 },
+    { offsetof(xfs_sb_t, sb_rootino),    0 },
+    { offsetof(xfs_sb_t, sb_rbmino),     0 },
+    { offsetof(xfs_sb_t, sb_rsumino),    0 },
+    { offsetof(xfs_sb_t, sb_rextsize),   0 },
+    { offsetof(xfs_sb_t, sb_agblocks),   0 },
+    { offsetof(xfs_sb_t, sb_agcount),    0 },
+    { offsetof(xfs_sb_t, sb_rbmblocks),  0 },
+    { offsetof(xfs_sb_t, sb_logblocks),  0 },
     { offsetof(xfs_sb_t, sb_versionnum), 0 },
-    { offsetof(xfs_sb_t, sb_sectsize),	 0 },
-    { offsetof(xfs_sb_t, sb_inodesize),	 0 },
-    { offsetof(xfs_sb_t, sb_inopblock),	 0 },
-    { offsetof(xfs_sb_t, sb_fname[0]),	 1 },
-    { offsetof(xfs_sb_t, sb_blocklog),	 0 },
-    { offsetof(xfs_sb_t, sb_sectlog),	 0 },
-    { offsetof(xfs_sb_t, sb_inodelog),	 0 },
-    { offsetof(xfs_sb_t, sb_inopblog),	 0 },
-    { offsetof(xfs_sb_t, sb_agblklog),	 0 },
-    { offsetof(xfs_sb_t, sb_rextslog),	 0 },
+    { offsetof(xfs_sb_t, sb_sectsize),   0 },
+    { offsetof(xfs_sb_t, sb_inodesize),  0 },
+    { offsetof(xfs_sb_t, sb_inopblock),  0 },
+    { offsetof(xfs_sb_t, sb_fname[0]),   1 },
+    { offsetof(xfs_sb_t, sb_blocklog),   0 },
+    { offsetof(xfs_sb_t, sb_sectlog),    0 },
+    { offsetof(xfs_sb_t, sb_inodelog),   0 },
+    { offsetof(xfs_sb_t, sb_inopblog),   0 },
+    { offsetof(xfs_sb_t, sb_agblklog),   0 },
+    { offsetof(xfs_sb_t, sb_rextslog),   0 },
     { offsetof(xfs_sb_t, sb_inprogress), 0 },
-    { offsetof(xfs_sb_t, sb_imax_pct),	 0 },
-    { offsetof(xfs_sb_t, sb_icount),	 0 },
-    { offsetof(xfs_sb_t, sb_ifree),	 0 },
-    { offsetof(xfs_sb_t, sb_fdblocks),	 0 },
-    { offsetof(xfs_sb_t, sb_frextents),	 0 },
-    { offsetof(xfs_sb_t, sb_uquotino),	 0 },
-    { offsetof(xfs_sb_t, sb_gquotino),	 0 },
-    { offsetof(xfs_sb_t, sb_qflags),	 0 },
-    { offsetof(xfs_sb_t, sb_flags),	 0 },
-    { offsetof(xfs_sb_t, sb_shared_vn),	 0 },
+    { offsetof(xfs_sb_t, sb_imax_pct),   0 },
+    { offsetof(xfs_sb_t, sb_icount),     0 },
+    { offsetof(xfs_sb_t, sb_ifree),      0 },
+    { offsetof(xfs_sb_t, sb_fdblocks),   0 },
+    { offsetof(xfs_sb_t, sb_frextents),  0 },
+    { offsetof(xfs_sb_t, sb_uquotino),   0 },
+    { offsetof(xfs_sb_t, sb_gquotino),   0 },
+    { offsetof(xfs_sb_t, sb_qflags),     0 },
+    { offsetof(xfs_sb_t, sb_flags),      0 },
+    { offsetof(xfs_sb_t, sb_shared_vn),  0 },
     { offsetof(xfs_sb_t, sb_inoalignmt), 0 },
     { offsetof(xfs_sb_t, sb_unit),	 0 },
     { offsetof(xfs_sb_t, sb_width),	 0 },
@@ -341,12 +341,12 @@ xfs_initialize_perag(xfs_mount_t *mp, int agcount)
 /*
  * xfs_xlatesb
  *
- *     data	  - on disk version of sb
- *     sb	  - a superblock
- *     dir	  - conversion direction: <0 - convert sb to buf
- *					  >0 - convert buf to sb
- *     arch	  - architecture to read/write from/to buf
- *     fields	  - which fields to copy (bitmask)
+ *     data       - on disk version of sb
+ *     sb         - a superblock
+ *     dir        - conversion direction: <0 - convert sb to buf
+ *                                        >0 - convert buf to sb
+ *     arch       - architecture to read/write from/to buf
+ *     fields     - which fields to copy (bitmask)
  */
 void
 xfs_xlatesb(
@@ -589,7 +589,7 @@ int
 xfs_mountfs(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp,
-	dev_t 		dev, 
+	dev_t		dev,
 	int		mfsi_flags)
 {
 	xfs_buf_t	*bp;
@@ -694,14 +694,14 @@ xfs_mountfs(
 		icount = sbp->sb_dblocks * sbp->sb_imax_pct;
 		do_div(icount, 100);
 		do_div(icount, mp->m_ialloc_blks);
-		mp->m_maxicount = (icount * mp->m_ialloc_blks)	<<
+		mp->m_maxicount = (icount * mp->m_ialloc_blks)  <<
 				   sbp->sb_inopblog;
 	} else
 		mp->m_maxicount = 0;
 
 	/*
 	 * XFS uses the uuid from the superblock as the unique
-	 * identifier for fsid.	 We can not use the uuid from the volume
+	 * identifier for fsid.  We can not use the uuid from the volume
 	 * since a single partition filesystem is identical to a single
 	 * partition volume/filesystem.
 	 */
@@ -1088,7 +1088,7 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	xfs_mount_free(mp, 1);
 	return 0;
 }
- 
+
 void
 xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 {
@@ -1149,7 +1149,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 			xfs_ioerror_alert("xfs_unmountfs_writesb",
 					  mp, sbp, XFS_BUF_ADDR(sbp));
 		if (error && mp->m_mk_sharedro)
-			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.	 Filesystem may not be marked shared readonly");
+			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
 	xfs_buf_relse(sbp);
 	return (error);
@@ -1209,7 +1209,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
  */
 STATIC int
 xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
-			  int delta, int rsvd)
+			int delta, int rsvd)
 {
 	int		scounter;	/* short counter for 32 bit fields */
 	long long	lcounter;	/* long counter for 64 bit fields */
@@ -1366,8 +1366,8 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 
 /*
  * xfs_mod_incore_sb() is used to change a field in the in-core
- * superblock structure by the specified delta.	 This modification
- * is protected by the SB_LOCK.	 Just use the xfs_mod_incore_sb_unlocked()
+ * superblock structure by the specified delta.  This modification
+ * is protected by the SB_LOCK.  Just use the xfs_mod_incore_sb_unlocked()
  * routine to do the work.
  */
 int
@@ -1411,7 +1411,7 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 	msbp = &msb[0];
 	for (msbp = &msbp[0]; msbp < (msb + nmsb); msbp++) {
 		/*
-		 * Apply the delta at index n.	If it fails, break
+		 * Apply the delta at index n.  If it fails, break
 		 * from the loop so we'll fall into the undo loop
 		 * below.
 		 */
@@ -1424,7 +1424,7 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 
 	/*
 	 * If we didn't complete the loop above, then back out
-	 * any changes made to the superblock.	If you add code
+	 * any changes made to the superblock.  If you add code
 	 * between the loop above and here, make sure that you
 	 * preserve the value of status. Loop back until
 	 * we step below the beginning of the array.  Make sure

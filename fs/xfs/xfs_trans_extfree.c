@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -117,7 +117,7 @@ xfs_trans_get_efd(xfs_trans_t		*tp,
 
 /*
  * This routine is called to indicate that the described
- * extent is to be logged as having been freed.	 It should
+ * extent is to be logged as having been freed.  It should
  * be called once for each extent freed.
  */
 void
@@ -143,8 +143,3 @@ xfs_trans_log_efd_extent(xfs_trans_t		*tp,
 	extp->ext_len = ext_len;
 	efdp->efd_next_extent++;
 }
-
-
-
-
-

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DIR2_NODE_H__
-#define __XFS_DIR2_NODE_H__
+#define	__XFS_DIR2_NODE_H__
 
 /*
  * Directory version 2, btree node format structures
@@ -51,17 +51,17 @@ struct xfs_trans;
 /*
  * Offset of the freespace index.
  */
-#define XFS_DIR2_FREE_SPACE	2
-#define XFS_DIR2_FREE_OFFSET	(XFS_DIR2_FREE_SPACE * XFS_DIR2_SPACE_SIZE)
-#define XFS_DIR2_FREE_FIRSTDB(mp)	\
+#define	XFS_DIR2_FREE_SPACE	2
+#define	XFS_DIR2_FREE_OFFSET	(XFS_DIR2_FREE_SPACE * XFS_DIR2_SPACE_SIZE)
+#define	XFS_DIR2_FREE_FIRSTDB(mp)	\
 	XFS_DIR2_BYTE_TO_DB(mp, XFS_DIR2_FREE_OFFSET)
 
-#define XFS_DIR2_FREE_MAGIC	0x58443246	/* XD2F */
+#define	XFS_DIR2_FREE_MAGIC	0x58443246	/* XD2F */
 
 /*
  * Structures.
  */
-typedef struct xfs_dir2_free_hdr {
+typedef	struct xfs_dir2_free_hdr {
 	__uint32_t		magic;		/* XFS_DIR2_FREE_MAGIC */
 	__int32_t		firstdb;	/* db of first entry */
 	__int32_t		nvalid;		/* count of valid entries */
@@ -73,7 +73,7 @@ typedef struct xfs_dir2_free {
 	xfs_dir2_data_off_t	bests[1];	/* best free counts */
 						/* unused entries are -1 */
 } xfs_dir2_free_t;
-#define XFS_DIR2_MAX_FREE_BESTS(mp)	\
+#define	XFS_DIR2_MAX_FREE_BESTS(mp)	\
 	(((mp)->m_dirblksize - (uint)sizeof(xfs_dir2_free_hdr_t)) / \
 	 (uint)sizeof(xfs_dir2_data_off_t))
 
@@ -87,9 +87,9 @@ typedef struct xfs_dir2_free {
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_DB_TO_FDB)
 xfs_dir2_db_t
 xfs_dir2_db_to_fdb(struct xfs_mount *mp, xfs_dir2_db_t db);
-#define XFS_DIR2_DB_TO_FDB(mp,db)	xfs_dir2_db_to_fdb(mp, db)
+#define	XFS_DIR2_DB_TO_FDB(mp,db)	xfs_dir2_db_to_fdb(mp, db)
 #else
-#define XFS_DIR2_DB_TO_FDB(mp,db)	\
+#define	XFS_DIR2_DB_TO_FDB(mp,db)	\
 	(XFS_DIR2_FREE_FIRSTDB(mp) + (db) / XFS_DIR2_MAX_FREE_BESTS(mp))
 #endif
 
@@ -99,9 +99,9 @@ xfs_dir2_db_to_fdb(struct xfs_mount *mp, xfs_dir2_db_t db);
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_DB_TO_FDINDEX)
 int
 xfs_dir2_db_to_fdindex(struct xfs_mount *mp, xfs_dir2_db_t db);
-#define XFS_DIR2_DB_TO_FDINDEX(mp,db)	xfs_dir2_db_to_fdindex(mp, db)
+#define	XFS_DIR2_DB_TO_FDINDEX(mp,db)	xfs_dir2_db_to_fdindex(mp, db)
 #else
-#define XFS_DIR2_DB_TO_FDINDEX(mp,db)	((db) % XFS_DIR2_MAX_FREE_BESTS(mp))
+#define	XFS_DIR2_DB_TO_FDINDEX(mp,db)	((db) % XFS_DIR2_MAX_FREE_BESTS(mp))
 #endif
 
 /*

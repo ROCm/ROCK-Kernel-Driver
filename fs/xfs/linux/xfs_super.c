@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -330,7 +330,7 @@ xfs_revalidate_inode(
 	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
 	inode->i_nlink	= ip->i_d.di_nlink;
 	inode->i_uid	= ip->i_d.di_uid;
-	inode->i_gid 	= ip->i_d.di_gid;
+	inode->i_gid	= ip->i_d.di_gid;
 	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
 		inode->i_rdev = NODEV;
 	} else {
@@ -941,7 +941,7 @@ init_xfs_fs( void )
 	int			error;
 	struct sysinfo		si;
 	static char		message[] __initdata =
-		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with " 
+		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with "
 		XFS_BUILD_OPTIONS " enabled\n";
 
 	printk(message);

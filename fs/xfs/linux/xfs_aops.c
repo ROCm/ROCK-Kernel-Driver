@@ -583,7 +583,7 @@ cluster_write(
 /*
  * Calling this without startio set means we are being asked to make a dirty
  * page ready for freeing it's buffers.  When called with startio set then
- * we are coming from writepage. 
+ * we are coming from writepage.
  *
  * When called with startio set it is important that we write the WHOLE
  * page if possible.

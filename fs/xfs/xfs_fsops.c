@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -473,12 +473,12 @@ xfs_fs_counts(
 
 int
 xfs_reserve_blocks(
-	xfs_mount_t		*mp,
-	__uint64_t		*inval,
-	xfs_fsop_resblks_t	*outval)
+	xfs_mount_t             *mp,
+	__uint64_t              *inval,
+	xfs_fsop_resblks_t      *outval)
 {
-	__uint64_t		lcounter, delta;
-	__uint64_t		request;
+	__uint64_t              lcounter, delta;
+	__uint64_t              request;
 	unsigned long s;
 
 	/* If inval is null, report current values and return */

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -98,41 +98,41 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define dpoff(DD)	((DD) & (NDPP-1))
 
 #define NBBY		8		/* number of bits per byte */
-#define NBPC		PAGE_SIZE	/* Number of bytes per click */
-#define BPCSHIFT	PAGE_SHIFT	/* LOG2(NBPC) if exact */
+#define	NBPC		PAGE_SIZE	/* Number of bytes per click */
+#define	BPCSHIFT	PAGE_SHIFT	/* LOG2(NBPC) if exact */
 
 /*
  * Size of block device i/o is parameterized here.
  * Currently the system supports page-sized i/o.
  */
-#define BLKDEV_IOSHIFT		BPCSHIFT
-#define BLKDEV_IOSIZE		(1<<BLKDEV_IOSHIFT)
+#define	BLKDEV_IOSHIFT		BPCSHIFT
+#define	BLKDEV_IOSIZE		(1<<BLKDEV_IOSHIFT)
 /* number of BB's per block device block */
-#define BLKDEV_BB		BTOBB(BLKDEV_IOSIZE)
+#define	BLKDEV_BB		BTOBB(BLKDEV_IOSIZE)
 
 /* bytes to clicks */
-#define btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
-#define btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
-#define io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
-#define io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
+#define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define	btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
+#define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define	btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
+#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
+#define	io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
 
 /* off_t bytes to clicks */
-#define offtoc(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define offtoct(x)	((xfs_off_t)(x)>>BPCSHIFT)
+#define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define offtoct(x)      ((xfs_off_t)(x)>>BPCSHIFT)
 
 /* clicks to off_t bytes */
-#define ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
+#define	ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
 
 /* clicks to bytes */
-#define ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
-#define btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
-#define ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
-#define io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
+#define	ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
+#define btoct(x)        ((__psunsigned_t)(x)>>BPCSHIFT)
+#define	ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
+#define	io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
 
 /* bytes to clicks */
-#define btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
 
 #ifndef CELL_CAPABLE
 #define FSC_NOTIFY_NAME_CHANGED(vp)
@@ -143,7 +143,7 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #endif
 
 /* Note: EWRONGFS never visible outside the kernel */
-#define EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
+#define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
  * XXX EFSCORRUPTED needs a real value in errno.h. asm-i386/errno.h won't
@@ -156,14 +156,14 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
  *	3/ EUCLEAN ["Structure needs cleaning"]
  *	4/ Convert EFSCORRUPTED to EIO [just prior to return into userspace]
  */
-#define EFSCORRUPTED	990		/* Filesystem is corrupted */
+#define EFSCORRUPTED    990		/* Filesystem is corrupted */
 
 #define SYNCHRONIZE()	barrier()
 #define __return_address __builtin_return_address(0)
 
 /*
  * IRIX (BSD) quotactl makes use of separate commands for user/group,
- * whereas on Linux the syscall encodes this information into the cmd 
+ * whereas on Linux the syscall encodes this information into the cmd
  * field (see the QCMD macro in quota.h).  These macros help keep the
  * code portable - they are not visible from the syscall interface.
  */

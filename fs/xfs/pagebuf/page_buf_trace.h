@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -35,11 +35,11 @@
 
 #ifdef PB_DEFINE_TRACES
 #define PB_TRACE_START	typedef enum {
-#define PB_TRACE_REC(x) pb_trace_point_##x
+#define PB_TRACE_REC(x)	pb_trace_point_##x
 #define PB_TRACE_END	} pb_trace_var_t;
 #else
 #define PB_TRACE_START	static char	*event_names[] = {
-#define PB_TRACE_REC(x) #x
+#define PB_TRACE_REC(x)	#x
 #define PB_TRACE_END	};
 #endif
 
@@ -86,7 +86,7 @@ PB_TRACE_END
 extern void pb_trace_func(page_buf_t *, int, void *, void *);
 #ifdef PAGEBUF_TRACE
 # define PB_TRACE(pb, event, misc)		\
-	pb_trace_func(pb, event, (void *) misc, \
+	pb_trace_func(pb, event, (void *) misc,	\
 			(void *)__builtin_return_address(0))
 #else
 # define PB_TRACE(pb, event, misc)	do { } while (0)

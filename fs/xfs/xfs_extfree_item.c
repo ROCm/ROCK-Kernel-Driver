@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -213,7 +213,7 @@ xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
 /*
  * The EFI is logged only once and cannot be moved in the log, so
  * simply return the lsn at which it's been logged.  The canceled
- * flag is not paid any attention here.	 Checking for that is delayed
+ * flag is not paid any attention here.  Checking for that is delayed
  * until the EFI is unpinned.
  */
 /*ARGSUSED*/
@@ -225,8 +225,8 @@ xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 
 /*
  * This is called when the transaction logging the EFI is aborted.
- * Free up the EFI and return.	No need to clean up the slot for
- * the item in the transaction.	 That was done by the unpin code
+ * Free up the EFI and return.  No need to clean up the slot for
+ * the item in the transaction.  That was done by the unpin code
  * which is called prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
@@ -247,7 +247,7 @@ xfs_efi_item_abort(xfs_efi_log_item_t *efip)
 }
 
 /*
- * There isn't much you can do to push on an efi item.	It is simply
+ * There isn't much you can do to push on an efi item.  It is simply
  * stuck waiting for all of its corresponding efd items to be
  * committed to disk.
  */
@@ -327,7 +327,7 @@ xfs_efi_init(xfs_mount_t	*mp,
 
 /*
  * This is called by the efd item code below to release references to
- * the given efi item.	Each efd calls this with the number of
+ * the given efi item.  Each efd calls this with the number of
  * extents that it has logged, and when the sum of these reaches
  * the total number of extents logged by this efi item we can free
  * the efi item.
@@ -546,7 +546,7 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
  * The transaction of which this EFD is a part has been aborted.
  * Inform its companion EFI of this fact and then clean up after
  * ourselves.  No need to clean up the slot for the item in the
- * transaction.	 That was done by the unpin code which is called
+ * transaction.  That was done by the unpin code which is called
  * prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
@@ -575,7 +575,7 @@ xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
 }
 
 /*
- * There isn't much you can do to push on an efd item.	It is simply
+ * There isn't much you can do to push on an efd item.  It is simply
  * stuck waiting for the log to be flushed to disk.
  */
 /*ARGSUSED*/
@@ -627,7 +627,7 @@ struct xfs_item_ops xfs_efd_item_ops = {
  */
 xfs_efd_log_item_t *
 xfs_efd_init(xfs_mount_t	*mp,
-	     xfs_efi_log_item_t *efip,
+	     xfs_efi_log_item_t	*efip,
 	     uint		nextents)
 
 {

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -79,8 +79,8 @@ xfs_lock_for_rename(
 	xfs_inode_t	*dp2,	/* new (target) directory inode */
 	vname_t		*vname1,/* old entry name */
 	vname_t		*vname2,/* new entry name */
-	xfs_inode_t	**ipp1, /* inode of old entry */
-	xfs_inode_t	**ipp2, /* inode of new entry, if it
+	xfs_inode_t	**ipp1,	/* inode of old entry */
+	xfs_inode_t	**ipp2,	/* inode of new entry, if it
 				   already exists, NULL otherwise. */
 	xfs_inode_t	**i_tab,/* array of inode returned, sorted */
 	int		*num_inodes)  /* number of inodes in array */
@@ -138,11 +138,11 @@ xfs_lock_for_rename(
 	}
 
 	/*
-	 * i_tab contains a list of pointers to inodes.	 We initialize
+	 * i_tab contains a list of pointers to inodes.  We initialize
 	 * the table here & we'll sort it.  We will then use it to
 	 * order the acquisition of the inode locks.
 	 *
-	 * Note that the table may contain duplicates.	e.g., dp1 == dp2.
+	 * Note that the table may contain duplicates.  e.g., dp1 == dp2.
 	 */
 	i_tab[0] = dp1;
 	i_tab[1] = dp2;
@@ -230,7 +230,7 @@ xfs_rename(
 	int		src_is_directory;	/* src_name is a directory */
 	int		error;
 	xfs_bmap_free_t free_list;
-	xfs_fsblock_t	first_block;
+	xfs_fsblock_t   first_block;
 	int		cancel_flags;
 	int		committed;
 	xfs_inode_t	*inodes[4];
@@ -570,7 +570,7 @@ xfs_rename(
 	}
 
 	/*
-	 * Take refs. for vop_link_removed calls below.	 No need to worry
+	 * Take refs. for vop_link_removed calls below.  No need to worry
 	 * about directory refs. because the caller holds them.
 	 *
 	 * Do holds before the xfs_bmap_finish since it might rele them down

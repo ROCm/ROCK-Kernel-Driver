@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -168,7 +168,7 @@ xfs_find_handle(
 STATIC int
 xfs_vget_fsop_handlereq(
 	xfs_mount_t		*mp,
-	struct inode		*parinode,	/* parent inode pointer	   */
+	struct inode		*parinode,	/* parent inode pointer    */
 	int			cap,		/* capability level for op */
 	unsigned long		arg,		/* userspace data pointer  */
 	unsigned long		size,		/* size of expected struct */
@@ -362,10 +362,10 @@ xfs_readlink_by_handle(
 	aiov.iov_base	= hreq.ohandle;
 
 	auio.uio_iov	= &aiov;
-	auio.uio_iovcnt = 1;
+	auio.uio_iovcnt	= 1;
 	auio.uio_fmode	= FINVIS;
-	auio.uio_offset = 0;
-	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_offset	= 0;
+	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
 	VOP_READLINK(vp, &auio, NULL, error);
@@ -578,7 +578,7 @@ xfs_ioctl(
 	case XFS_IOC_FREESP64:
 	case XFS_IOC_RESVSP64:
 	case XFS_IOC_UNRESVSP64:
-		/* 
+		/*
 		 * Only allow the sys admin to reserve space unless
 		 * unwritten extents are enabled.
 		 */
@@ -986,7 +986,7 @@ xfs_ioc_xattr(
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
-	
+
 	default:
 		return -ENOTTY;
 

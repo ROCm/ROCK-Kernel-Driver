@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -50,7 +50,7 @@
  */
 STATIC int
 xfs_iozero(
-	struct inode		*ip,	/* inode 			*/
+	struct inode		*ip,	/* inode			*/
 	loff_t			pos,	/* offset in file		*/
 	size_t			count,	/* size of data to zero		*/
 	loff_t			end_size)	/* max file size to set */
@@ -280,7 +280,7 @@ xfs_zero_last_block(
 	int		zero_len;
 	int		isize_fsb_offset;
 	int		error = 0;
-	xfs_bmbt_irec_t imap;
+	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
 	size_t		lsize;
 
@@ -334,7 +334,7 @@ xfs_zero_last_block(
 
 /*
  * Zero any on disk space between the current EOF and the new,
- * larger EOF.	This handles the normal case of zeroing the remainder
+ * larger EOF.  This handles the normal case of zeroing the remainder
  * of the last block in the file and the unusual case of zeroing blocks
  * out beyond the size of the file.  This second case only happens
  * with fixed size extents and when the system crashes before the inode
@@ -362,7 +362,7 @@ xfs_zero_eof(
 	xfs_mount_t	*mp;
 	int		nimaps;
 	int		error = 0;
-	xfs_bmbt_irec_t imap;
+	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
 	size_t		lsize;
 
@@ -384,10 +384,10 @@ xfs_zero_eof(
 
 	/*
 	 * Calculate the range between the new size and the old
-	 * where blocks needing to be zeroed may exist.	 To get the
+	 * where blocks needing to be zeroed may exist.  To get the
 	 * block where the last byte in the file currently resides,
 	 * we need to subtract one from the size and truncate back
-	 * to a block boundary.	 We subtract 1 in case the size is
+	 * to a block boundary.  We subtract 1 in case the size is
 	 * exactly on a block boundary.
 	 */
 	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
@@ -435,7 +435,7 @@ xfs_zero_eof(
 
 		/*
 		 * There are blocks in the range requested.
-		 * Zero them a single write at a time.	We actually
+		 * Zero them a single write at a time.  We actually
 		 * don't zero the entire range returned if it is
 		 * too big and simply loop around to get the rest.
 		 * That is not the most efficient thing to do, but it
@@ -709,7 +709,7 @@ retry:
 			 * the fact that buffered writes lock out direct I/O
 			 * writes - the direct I/O write could have extended
 			 * the size nontransactionally, then finished before
-			 * we started.	xfs_write_file will think that the file
+			 * we started.  xfs_write_file will think that the file
 			 * didn't grow but the update isn't safe unless the
 			 * size change is logged.
 			 *
@@ -903,4 +903,3 @@ xfs_dev_is_read_only(xfs_mount_t *mp, char *message)
 
 	return 0;
 }
-

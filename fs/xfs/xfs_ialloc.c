@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -111,9 +111,9 @@ xfs_ialloc_ag_alloc(
 	int		*alloc)
 {
 	xfs_agi_t	*agi;		/* allocation group header */
-	xfs_alloc_arg_t args;		/* allocation argument structure */
+	xfs_alloc_arg_t	args;		/* allocation argument structure */
 	int		blks_per_cluster;  /* fs blocks per inode cluster */
-	xfs_btree_cur_t *cur;		/* inode btree cursor */
+	xfs_btree_cur_t	*cur;		/* inode btree cursor */
 	xfs_daddr_t	d;		/* disk addr of buffer */
 	int		error;
 	xfs_buf_t	*fbuf;		/* new free inodes' buffer */
@@ -129,7 +129,7 @@ xfs_ialloc_ag_alloc(
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	int		isaligned;	/* inode allocation at stripe unit */
 					/* boundary */
-	xfs_dinode_core_t dic;		/* a dinode_core to copy to new */
+	xfs_dinode_core_t dic;          /* a dinode_core to copy to new */
 					/* inodes */
 
 	args.tp = tp;
@@ -202,7 +202,7 @@ xfs_ialloc_ag_alloc(
 		else
 			args.alignment = 1;
 		if ((error = xfs_alloc_vextent(&args)))
-			 return error;
+			return error;
 	}
 
 	if (args.fsbno == NULLFSBLOCK) {
@@ -353,7 +353,7 @@ xfs_ialloc_next_ag(
 
 /*
  * Select an allocation group to look for a free inode in, based on the parent
- * inode and then mode.	 Return the allocation group buffer.
+ * inode and then mode.  Return the allocation group buffer.
  */
 STATIC xfs_buf_t *			/* allocation group buffer */
 xfs_ialloc_ag_select(
@@ -479,10 +479,10 @@ nextag:
  * The arguments IO_agbp and alloc_done are defined to work within
  * the constraint of one allocation per transaction.
  * xfs_dialloc() is designed to be called twice if it has to do an
- * allocation to make more free inodes.	 On the first call,
+ * allocation to make more free inodes.  On the first call,
  * IO_agbp should be set to NULL. If an inode is available,
  * i.e., xfs_dialloc() did not need to do an allocation, an inode
- * number is returned.	In this case, IO_agbp would be set to the
+ * number is returned.  In this case, IO_agbp would be set to the
  * current ag_buf and alloc_done set to false.
  * If an allocation needed to be done, xfs_dialloc would return
  * the current ag_buf in IO_agbp and set alloc_done to true.
@@ -493,7 +493,7 @@ nextag:
  * guaranteed to have a free inode available.
  *
  * Once we successfully pick an inode its number is returned and the
- * on-disk data structures are updated.	 The inode itself is not read
+ * on-disk data structures are updated.  The inode itself is not read
  * in, since doing so would break ordering constraints with xfs_reclaim.
  */
 int
@@ -511,7 +511,7 @@ xfs_dialloc(
 	xfs_buf_t	*agbp;		/* allocation group header's buffer */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
-	xfs_btree_cur_t *cur;		/* inode allocation btree cursor */
+	xfs_btree_cur_t	*cur;		/* inode allocation btree cursor */
 	int		error;		/* error return value */
 	int		i;		/* result code */
 	int		ialloced;	/* inode allocation status */
@@ -523,10 +523,10 @@ xfs_dialloc(
 	int		offset;		/* index of inode in chunk */
 	xfs_agino_t	pagino;		/* parent's a.g. relative inode # */
 	xfs_agnumber_t	pagno;		/* parent's allocation group number */
-	xfs_inobt_rec_t rec;		/* inode allocation record */
+	xfs_inobt_rec_t	rec;		/* inode allocation record */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
-	xfs_btree_cur_t *tcur;		/* temp cursor */
-	xfs_inobt_rec_t trec;		/* temp inode allocation record */
+	xfs_btree_cur_t	*tcur;		/* temp cursor */
+	xfs_inobt_rec_t	trec;		/* temp inode allocation record */
 
 
 	if (*IO_agbp == NULL) {
@@ -930,12 +930,12 @@ xfs_difree(
 	xfs_agino_t	agino;	/* inode number relative to allocation group */
 	xfs_agnumber_t	agno;	/* allocation group number */
 	xfs_agi_t	*agi;	/* allocation group header */
-	xfs_btree_cur_t *cur;	/* inode btree cursor */
+	xfs_btree_cur_t	*cur;	/* inode btree cursor */
 	int		error;	/* error return value */
 	int		i;	/* result code */
 	xfs_mount_t	*mp;	/* mount structure for filesystem */
 	int		off;	/* offset of inode in inode chunk */
-	xfs_inobt_rec_t rec;	/* btree record */
+	xfs_inobt_rec_t	rec;	/* btree record */
 
 	mp = tp->t_mountp;
 
@@ -951,7 +951,7 @@ xfs_difree(
 		return XFS_ERROR(EINVAL);
 	}
 	agino = XFS_INO_TO_AGINO(mp, inode);
-	if (inode != XFS_AGINO_TO_INO(mp, agno, agino))	 {
+	if (inode != XFS_AGINO_TO_INO(mp, agno, agino))  {
 		cmn_err(CE_WARN,
 			"xfs_difree: inode != XFS_AGINO_TO_INO() (%d != %d) on %s.  Returning EINVAL.",
 			inode, XFS_AGINO_TO_INO(mp, agno, agino), mp->m_fsname);
@@ -974,7 +974,7 @@ xfs_difree(
 	up_read(&mp->m_peraglock);
 	if (error) {
 		cmn_err(CE_WARN,
-			"xfs_difree: xfs_ialloc_read_agi() returned an error %d on %s.	Returning error.",
+			"xfs_difree: xfs_ialloc_read_agi() returned an error %d on %s.  Returning error.",
 			error, mp->m_fsname);
 		return error;
 	}
@@ -1010,7 +1010,7 @@ xfs_difree(
 	 */
 	if ((error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i))) {
 		cmn_err(CE_WARN,
-			"xfs_difree: xfs_inobt_lookup_le returned()  an error %d on %s.	 Returning error.",
+			"xfs_difree: xfs_inobt_lookup_le returned()  an error %d on %s.  Returning error.",
 			error, mp->m_fsname);
 		goto error0;
 	}
@@ -1036,7 +1036,7 @@ xfs_difree(
 	rec.ir_freecount++;
 	if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))) {
 		cmn_err(CE_WARN,
-			"xfs_difree: xfs_inobt_update()	 returned an error %d on %s.  Returning error.",
+			"xfs_difree: xfs_inobt_update()  returned an error %d on %s.  Returning error.",
 			error, mp->m_fsname);
 		goto error0;
 	}
@@ -1100,10 +1100,10 @@ xfs_dilocate(
 	__int32_t	chunk_cnt;	/* count of free inodes in chunk */
 	xfs_inofree_t	chunk_free;	/* mask of free inodes in chunk */
 	xfs_agblock_t	cluster_agbno;	/* first block in inode cluster */
-	xfs_btree_cur_t *cur;	/* inode btree cursor */
+	xfs_btree_cur_t	*cur;	/* inode btree cursor */
 	int		error;	/* error code */
 	int		i;	/* temp state */
-	int		offset; /* index of inode in its buffer */
+	int		offset;	/* index of inode in its buffer */
 	int		offset_agbno;	/* blks from chunk start to inode */
 
 	ASSERT(ino != NULLFSINO);

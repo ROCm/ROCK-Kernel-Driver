@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -46,7 +46,7 @@ extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
 
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
- * No other open action is required for regular files.	Devices are handled
+ * No other open action is required for regular files.  Devices are handled
  * through the specfs file system, pipes through fifofs.  Device and
  * fifo vnodes are "wrapped" by specfs and fifofs vnodes, respectively,
  * when a new vnode is first looked up or created.
@@ -607,10 +607,10 @@ xfs_setattr(
 	}
 
 	/*
-	 * Now we can make the changes.	 Before we join the inode
+	 * Now we can make the changes.  Before we join the inode
 	 * to the transaction, if XFS_AT_SIZE is set then take care of
 	 * the part of the truncation that must be done without the
-	 * inode lock.	This needs to be done before joining the inode
+	 * inode lock.  This needs to be done before joining the inode
 	 * to the transaction, because the inode cannot be unlocked
 	 * once it is a part of the transaction.
 	 */
@@ -917,14 +917,14 @@ xfs_readlink(
 	uio_t		*uiop,
 	cred_t		*credp)
 {
-	xfs_inode_t	*ip;
+	xfs_inode_t     *ip;
 	int		count;
 	xfs_off_t	offset;
 	int		pathlen;
 	vnode_t		*vp;
 	int		error = 0;
 	xfs_mount_t	*mp;
-	int		nmaps;
+	int             nmaps;
 	xfs_bmbt_irec_t mval[SYMLINK_MAPS];
 	xfs_daddr_t	d;
 	int		byte_cnt;
@@ -970,7 +970,7 @@ xfs_readlink(
 	}
 	else {
 		/*
-		 * Symlink not inline.	Call bmap to get it in.
+		 * Symlink not inline.  Call bmap to get it in.
 		 */
 		nmaps = SYMLINK_MAPS;
 
@@ -1051,7 +1051,7 @@ xfs_fsync(
 
 	syncall = error = error2 = 0;
 
-	if (stop == -1)	 {
+	if (stop == -1)  {
 		ASSERT(start >= 0);
 		if (start == 0)
 			syncall = 1;
@@ -1097,9 +1097,9 @@ xfs_fsync(
 	 * because it has to change some field in the inode core
 	 * (typically nextents or nblocks).  That assumption
 	 * implies that any transactions against an inode will
-	 * catch any non-transactional updates.	 If inode-altering
+	 * catch any non-transactional updates.  If inode-altering
 	 * transactions exist that violate this assumption, the
-	 * code breaks.	 Right now, it figures that if the involved
+	 * code breaks.  Right now, it figures that if the involved
 	 * update_* field is clear and the inode is unpinned, the
 	 * inode is clean.  Either it's been flushed or it's been
 	 * committed and the commit has hit the disk unpinning the inode.
@@ -1177,7 +1177,7 @@ xfs_fsync(
 
 #if 0
 /*
- * This is a utility routine for xfs_inactive.	It is called when a
+ * This is a utility routine for xfs_inactive.  It is called when a
  * transaction attempting to free up the disk space for a file encounters
  * an error.  It cancels the old transaction and starts up a new one
  * to be used to free up the inode.  It also sets the inode size and extent
@@ -1239,11 +1239,11 @@ xfs_inactive_free_eofblocks(
 	xfs_fileoff_t	last_fsb;
 	xfs_filblks_t	map_len;
 	int		nimaps;
-	xfs_bmbt_irec_t imap;
+	xfs_bmbt_irec_t	imap;
 
 	/*
 	 * Figure out if there are any blocks beyond the end
-	 * of the file.	 If not, then there is nothing to do.
+	 * of the file.  If not, then there is nothing to do.
 	 */
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)ip->i_d.di_size));
 	last_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
@@ -1335,10 +1335,10 @@ xfs_inactive_symlink_rmt(
 	int		done;
 	int		error;
 	xfs_fsblock_t	first_block;
-	xfs_bmap_free_t free_list;
+	xfs_bmap_free_t	free_list;
 	int		i;
 	xfs_mount_t	*mp;
-	xfs_bmbt_irec_t mval[SYMLINK_MAPS];
+	xfs_bmbt_irec_t	mval[SYMLINK_MAPS];
 	int		nmaps;
 	xfs_trans_t	*ntp;
 	int		size;
@@ -1350,7 +1350,7 @@ xfs_inactive_symlink_rmt(
 	/*
 	 * We're freeing a symlink that has some
 	 * blocks allocated to it.  Free the
-	 * blocks here.	 We know that we've got
+	 * blocks here.  We know that we've got
 	 * either 1 or 2 extents and that we can
 	 * free them all in one bunmapi call.
 	 */
@@ -1788,7 +1788,7 @@ xfs_inactive(
 	if (error) {
 		/*
 		 * If we fail to free the inode, shut down.  The cancel
-		 * might do that, we need to make sure.	 Otherwise the
+		 * might do that, we need to make sure.  Otherwise the
 		 * inode might be lost for a long time or forever.
 		 */
 		if (!XFS_FORCED_SHUTDOWN(mp)) {
@@ -1859,7 +1859,7 @@ xfs_lookup(
 }
 
 
-#define XFS_CREATE_NEW_MAXTRIES 10000
+#define	XFS_CREATE_NEW_MAXTRIES	10000
 
 /*
  * xfs_create (create a new file).
@@ -1875,11 +1875,11 @@ xfs_create(
 	char			*name = VNAME(dentry);
 	vnode_t			*dir_vp;
 	xfs_inode_t		*dp, *ip;
-	vnode_t			*vp=NULL;
+	vnode_t		        *vp=NULL;
 	xfs_trans_t		*tp;
-	xfs_mount_t		*mp;
+	xfs_mount_t	        *mp;
 	xfs_dev_t		rdev;
-	int			error;
+	int                     error;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
 	boolean_t		dp_joined_to_trans;
@@ -1940,7 +1940,7 @@ xfs_create(
 	resblks = XFS_CREATE_SPACE_RES(mp, namelen);
 	/*
 	 * Initially assume that the file does not exist and
-	 * reserve the resources for that case.	 If that is not
+	 * reserve the resources for that case.  If that is not
 	 * the case we'll drop the one we have and get a more
 	 * appropriate transaction later.
 	 */
@@ -2340,10 +2340,10 @@ again:
 }
 
 #ifdef	DEBUG
-#define REMOVE_DEBUG_TRACE(x)	{remove_which_error_return = (x);}
+#define	REMOVE_DEBUG_TRACE(x)	{remove_which_error_return = (x);}
 int remove_which_error_return = 0;
 #else /* ! DEBUG */
-#define REMOVE_DEBUG_TRACE(x)
+#define	REMOVE_DEBUG_TRACE(x)
 #endif	/* ! DEBUG */
 
 
@@ -2359,12 +2359,12 @@ xfs_remove(
 {
 	vnode_t			*dir_vp;
 	char			*name = VNAME(dentry);
-	xfs_inode_t		*dp, *ip;
-	xfs_trans_t		*tp = NULL;
+	xfs_inode_t             *dp, *ip;
+	xfs_trans_t             *tp = NULL;
 	xfs_mount_t		*mp;
-	int			error = 0;
-	xfs_bmap_free_t		free_list;
-	xfs_fsblock_t		first_block;
+	int                     error = 0;
+	xfs_bmap_free_t         free_list;
+	xfs_fsblock_t           first_block;
 	int			cancel_flags;
 	int			committed;
 	int			dm_di_mode = 0;
@@ -2567,7 +2567,7 @@ xfs_remove(
  error_rele:
 	/*
 	 * In this case make sure to not release the inode until after
-	 * the current transaction is aborted.	Releasing it beforehand
+	 * the current transaction is aborted.  Releasing it beforehand
 	 * can cause us to go to xfs_inactive and start a recursive
 	 * transaction which can easily deadlock with the current one.
 	 */
@@ -2597,8 +2597,8 @@ xfs_link(
 	xfs_mount_t		*mp;
 	xfs_inode_t		*ips[2];
 	int			error;
-	xfs_bmap_free_t		free_list;
-	xfs_fsblock_t		first_block;
+	xfs_bmap_free_t         free_list;
+	xfs_fsblock_t           first_block;
 	int			cancel_flags;
 	int			committed;
 	vnode_t			*target_dir_vp;
@@ -2765,7 +2765,7 @@ xfs_mkdir(
 	cred_t			*credp)
 {
 	char			*dir_name = VNAME(dentry);
-	xfs_inode_t		*dp;
+	xfs_inode_t             *dp;
 	xfs_inode_t		*cdp;	/* inode of created dir */
 	vnode_t			*cvp;	/* vnode of created dir */
 	xfs_trans_t		*tp;
@@ -2774,8 +2774,8 @@ xfs_mkdir(
 	int			cancel_flags;
 	int			error;
 	int			committed;
-	xfs_bmap_free_t		free_list;
-	xfs_fsblock_t		first_block;
+	xfs_bmap_free_t         free_list;
+	xfs_fsblock_t           first_block;
 	vnode_t			*dir_vp;
 	boolean_t		dp_joined_to_trans;
 	boolean_t		created = B_FALSE;
@@ -2869,7 +2869,7 @@ xfs_mkdir(
 	 * create the directory inode.
 	 */
 	rdev = (vap->va_mask & XFS_AT_RDEV) ? vap->va_rdev : 0;
-	error = xfs_dir_ialloc(&tp, dp, 
+	error = xfs_dir_ialloc(&tp, dp,
 			MAKEIMODE(vap->va_type,vap->va_mode), 2,
 			rdev, credp, prid, resblks > 0,
 		&cdp, NULL);
@@ -2998,13 +2998,13 @@ xfs_rmdir(
 	cred_t			*credp)
 {
 	char			*name = VNAME(dentry);
-	xfs_inode_t		*dp;
-	xfs_inode_t		*cdp;	/* child directory */
-	xfs_trans_t		*tp;
+	xfs_inode_t             *dp;
+	xfs_inode_t             *cdp;   /* child directory */
+	xfs_trans_t             *tp;
 	xfs_mount_t		*mp;
-	int			error;
-	xfs_bmap_free_t		free_list;
-	xfs_fsblock_t		first_block;
+	int                     error;
+	xfs_bmap_free_t         free_list;
+	xfs_fsblock_t           first_block;
 	int			cancel_flags;
 	int			committed;
 	vnode_t			*dir_vp;
@@ -3038,7 +3038,7 @@ xfs_rmdir(
 
 	/*
 	 * We need to get a reference to cdp before we get our log
-	 * reservation.	 The reason for this is that we cannot call
+	 * reservation.  The reason for this is that we cannot call
 	 * xfs_iget for an inode for which we do not have a reference
 	 * once we've acquired a log reservation.  This is because the
 	 * inode we are trying to get might be in xfs_inactive going
@@ -3112,7 +3112,7 @@ xfs_rmdir(
 	if (dp != cdp) {
 		/*
 		 * Only increment the parent directory vnode count if
-		 * we didn't bump it in looking up cdp.	 The only time
+		 * we didn't bump it in looking up cdp.  The only time
 		 * we don't bump it is when we're looking up ".".
 		 */
 		VN_HOLD(dir_vp);
@@ -3335,9 +3335,9 @@ xfs_symlink(
 	 * Check component lengths of the target path name.
 	 */
 	pathlen = strlen(target_path);
-	if (pathlen >= MAXPATHLEN)	/* total string too long */
+	if (pathlen >= MAXPATHLEN)      /* total string too long */
 		return XFS_ERROR(ENAMETOOLONG);
-	if (pathlen >= MAXNAMELEN) {	/* is any component too long? */
+	if (pathlen >= MAXNAMELEN) {    /* is any component too long? */
 		int len, total;
 		char *path;
 
@@ -3663,7 +3663,7 @@ xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
 {
-	xfs_inode_t	*ip;
+	xfs_inode_t     *ip;
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
@@ -3707,7 +3707,7 @@ xfs_inode_flush(
 
 	if (flags & FLUSH_LOG) {
 		xfs_inode_log_item_t *iip = ip->i_itemp;
- 
+
 		if (iip && iip->ili_last_lsn) {
 			xlog_t	*log = mp->m_log;
 			xfs_lsn_t	sync_lsn;
@@ -3782,7 +3782,7 @@ xfs_set_dmattrs (
 	u_int16_t	state,
 	cred_t		*credp)
 {
-	xfs_inode_t	*ip;
+	xfs_inode_t     *ip;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
@@ -3806,7 +3806,7 @@ xfs_set_dmattrs (
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 
 	ip->i_iocore.io_dmevmask = ip->i_d.di_dmevmask = evmask;
-	ip->i_iocore.io_dmstate	 = ip->i_d.di_dmstate  = state;
+	ip->i_iocore.io_dmstate  = ip->i_d.di_dmstate  = state;
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	IHOLD(ip);
@@ -3990,21 +3990,21 @@ xfs_finish_reclaim_all(xfs_mount_t *mp)
 				ip = ip->i_mnext;
 				continue;
 			}
-	
+
 			/*
 			 * It's up to our caller to purge the root
 			 * and quota vnodes later.
 			 */
 			vp = XFS_ITOV_NULL(ip);
-	
+
 			if (!vp) {
-				XFS_MOUNT_IUNLOCK(mp);	
+				XFS_MOUNT_IUNLOCK(mp);
 				xfs_finish_reclaim(ip, 0, XFS_IFLUSH_ASYNC);
 				purged = 1;
 				break;
 			}
 		} while (ip != mp->m_inodes);
-	
+
 		done = !purged;
 	}
 
@@ -4014,7 +4014,7 @@ xfs_finish_reclaim_all(xfs_mount_t *mp)
 
 /*
  * xfs_alloc_file_space()
- *	This routine allocates disk space for the given file.
+ *      This routine allocates disk space for the given file.
  *
  *	If alloc_type == 0, this request is for an ALLOCSP type
  *	request which will change the file size.  In this case, no
@@ -4027,8 +4027,8 @@ xfs_finish_reclaim_all(xfs_mount_t *mp)
  *	length.
  *
  * RETURNS:
- *	 0 on success
- *	errno on error
+ *       0 on success
+ *      errno on error
  *
  */
 int
@@ -4087,14 +4087,14 @@ xfs_alloc_file_space(
 	imapp = &imaps[0];
 	reccount = 1;
 	xfs_bmapi_flags = XFS_BMAPI_WRITE | (alloc_type ? XFS_BMAPI_PREALLOC : 0);
-	startoffset_fsb = XFS_B_TO_FSBT(mp, offset);
+	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
 	/*	Generate a DMAPI event if needed.	*/
 	if (alloc_type != 0 && offset < ip->i_d.di_size &&
 			(attr_flags&ATTR_DMI) == 0  &&
 			DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
-		xfs_off_t	    end_dmi_offset;
+		xfs_off_t           end_dmi_offset;
 
 		end_dmi_offset = offset+len;
 		if (end_dmi_offset > ip->i_d.di_size)
@@ -4297,14 +4297,14 @@ xfs_zero_remaining_bytes(
 
 /*
  * xfs_free_file_space()
- *	This routine frees disk space for the given file.
+ *      This routine frees disk space for the given file.
  *
  *	This routine is only called by xfs_change_file_space
  *	for an UNRESVSP type call.
  *
  * RETURNS:
- *	 0 on success
- *	errno on error
+ *       0 on success
+ *      errno on error
  *
  */
 STATIC int
@@ -4343,7 +4343,7 @@ xfs_free_file_space(
 	if (len <= 0)	/* if nothing being freed */
 		return error;
 	rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME);
-	startoffset_fsb = XFS_B_TO_FSB(mp, offset);
+	startoffset_fsb	= XFS_B_TO_FSB(mp, offset);
 	end_dmi_offset = offset + len;
 	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
 
@@ -4495,13 +4495,13 @@ xfs_free_file_space(
 
 /*
  * xfs_change_file_space()
- *	This routine allocates or frees disk space for the given file.
- *	The user specified parameters are checked for alignment and size
- *	limitations.
+ *      This routine allocates or frees disk space for the given file.
+ *      The user specified parameters are checked for alignment and size
+ *      limitations.
  *
  * RETURNS:
- *	 0 on success
- *	errno on error
+ *       0 on success
+ *      errno on error
  *
  */
 int

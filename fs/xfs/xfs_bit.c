@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -231,7 +231,7 @@ xfs_count_bits(uint *map, uint size, uint start_bit)
  * start_bit.  Size is the size of the bitmap in words.
  */
 int
-xfs_contig_bits(uint *map, uint size, uint start_bit)
+xfs_contig_bits(uint *map, uint	size, uint start_bit)
 {
 #if BITS_PER_LONG == 32
 	return find_next_zero_bit((unsigned long *)map,
@@ -263,7 +263,7 @@ xfs_contig_bits(uint *map, uint size, uint start_bit)
 
 /*
  * This takes the bit number to start looking from and
- * returns the next set bit from there.	 It returns -1
+ * returns the next set bit from there.  It returns -1
  * if there are no more bits set or the start bit is
  * beyond the end of the bitmap.
  *

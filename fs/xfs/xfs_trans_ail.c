@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -40,7 +40,7 @@ STATIC xfs_log_item_t * xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t *);
 #ifdef XFSDEBUG
 STATIC void xfs_ail_check(xfs_ail_entry_t *);
 #else
-#define xfs_ail_check(a)
+#define	xfs_ail_check(a)
 #endif /* XFSDEBUG */
 
 
@@ -95,7 +95,7 @@ xfs_trans_push_ail(
 	int			flush_log;
 	SPLDECL(s);
 
-#define XFS_TRANS_PUSH_AIL_RESTARTS	10
+#define	XFS_TRANS_PUSH_AIL_RESTARTS	10
 
 	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
@@ -111,7 +111,7 @@ xfs_trans_push_ail(
 
 	/*
 	 * While the item we are looking at is below the given threshold
-	 * try to flush it out.	 Make sure to limit the number of times
+	 * try to flush it out.  Make sure to limit the number of times
 	 * we allow xfs_trans_next_ail() to restart scanning from the
 	 * beginning of the list.  We'd like not to stop until we've at least
 	 * tried to push on everything in the AIL with an LSN less than
@@ -127,7 +127,7 @@ xfs_trans_push_ail(
 		 * If we can lock the item without sleeping, unlock
 		 * the AIL lock and flush the item.  Then re-grab the
 		 * AIL lock so we can look for the next item on the
-		 * AIL.	 Since we unlock the AIL while we flush the
+		 * AIL.  Since we unlock the AIL while we flush the
 		 * item, the next routine may start over again at the
 		 * the beginning of the list if anything has changed.
 		 * That is what the generation count is for.
@@ -262,17 +262,17 @@ xfs_trans_unlocked_item(
 
 /*
  * Update the position of the item in the AIL with the new
- * lsn.	 If it is not yet in the AIL, add it.  Otherwise, move
+ * lsn.  If it is not yet in the AIL, add it.  Otherwise, move
  * it to its new position by removing it and re-adding it.
  *
- * Wakeup anyone with an lsn less than the item's lsn.	If the item
+ * Wakeup anyone with an lsn less than the item's lsn.  If the item
  * we move in the AIL is the minimum one, update the tail lsn in the
  * log manager.
  *
  * Increment the AIL's generation count to indicate that the tree
  * has changed.
  *
- * This function must be called with the AIL lock held.	 The lock
+ * This function must be called with the AIL lock held.  The lock
  * is dropped before returning, so the caller must pass in the
  * cookie returned by AIL_LOCK.
  */
@@ -314,7 +314,7 @@ xfs_trans_update_ail(
 }	/* xfs_trans_update_ail */
 
 /*
- * Delete the given item from the AIL.	It must already be in
+ * Delete the given item from the AIL.  It must already be in
  * the AIL.
  *
  * Wakeup anyone with an lsn less than item's lsn.    If the item
@@ -325,7 +325,7 @@ xfs_trans_update_ail(
  * bump the AIL's generation count to indicate that the tree
  * has changed.
  *
- * This function must be called with the AIL lock held.	 The lock
+ * This function must be called with the AIL lock held.  The lock
  * is dropped before returning, so the caller must pass in the
  * cookie returned by AIL_LOCK.
  */
@@ -456,7 +456,7 @@ xfs_trans_ail_init(
  */
 STATIC void
 xfs_ail_insert(
-	xfs_ail_entry_t *base,
+	xfs_ail_entry_t	*base,
 	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
@@ -490,12 +490,12 @@ xfs_ail_insert(
 }
 
 /*
- * Delete the given item from the AIL.	Return a pointer to the item.
+ * Delete the given item from the AIL.  Return a pointer to the item.
  */
 /*ARGSUSED*/
 STATIC xfs_log_item_t *
 xfs_ail_delete(
-	xfs_ail_entry_t *base,
+	xfs_ail_entry_t	*base,
 	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
@@ -514,7 +514,7 @@ xfs_ail_delete(
  */
 STATIC xfs_log_item_t *
 xfs_ail_min(
-	xfs_ail_entry_t *base)
+	xfs_ail_entry_t	*base)
 /* ARGSUSED */
 {
 	register xfs_log_item_t *forw = base->ail_forw;
@@ -531,7 +531,7 @@ xfs_ail_min(
  */
 STATIC xfs_log_item_t *
 xfs_ail_next(
-	xfs_ail_entry_t *base,
+	xfs_ail_entry_t	*base,
 	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
@@ -583,6 +583,3 @@ xfs_ail_check(
 	ASSERT(base->ail_back == prev_lip);
 }
 #endif /* XFSDEBUG */
-
-
-

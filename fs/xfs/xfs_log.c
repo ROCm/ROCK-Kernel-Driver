@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -46,7 +46,7 @@
 STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
 STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xlog_in_core_t **, xfs_lsn_t *);
-STATIC xlog_t *	 xlog_alloc_log(xfs_mount_t	*mp,
+STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
 				xfs_daddr_t	blk_offset,
 				int		num_bblks);
@@ -77,7 +77,7 @@ STATIC void xlog_state_switch_iclogs(xlog_t		*log,
 				     int		eventual_size);
 STATIC int  xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
 STATIC int  xlog_state_sync_all(xlog_t *log, uint flags);
-STATIC void xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog);
+STATIC void xlog_state_want_sync(xlog_t	*log, xlog_in_core_t *iclog);
 
 /* local functions to manipulate grant head */
 STATIC int  xlog_grant_log_space(xlog_t		*log,
@@ -87,7 +87,7 @@ STATIC void xlog_grant_push_ail(xfs_mount_t	*mp,
 STATIC void xlog_regrant_reserve_log_space(xlog_t	 *log,
 					   xlog_ticket_t *ticket);
 STATIC int xlog_regrant_write_log_space(xlog_t		*log,
-					 xlog_ticket_t	*ticket);
+					 xlog_ticket_t  *ticket);
 STATIC void xlog_ungrant_log_space(xlog_t	 *log,
 				   xlog_ticket_t *ticket);
 
@@ -137,7 +137,7 @@ int xlog_error_mod = 33;
  */
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 int   xlog_debug = 1;
-dev_t xlog_devt	 = 0;
+dev_t xlog_devt  = 0;
 #endif
 
 #if defined(XFS_LOG_TRACE)
@@ -220,8 +220,8 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 }
 
 #else
-#define xlog_trace_loggrant(log,tic,string)
-#define xlog_trace_iclog(iclog,state)
+#define	xlog_trace_loggrant(log,tic,string)
+#define	xlog_trace_iclog(iclog,state)
 #endif /* XFS_LOG_TRACE */
 
 /*
@@ -251,7 +251,7 @@ xfs_log_done(xfs_mount_t	*mp,
 	     void		**iclog,
 	     uint		flags)
 {
-	xlog_t		*log	= mp->m_log;
+	xlog_t		*log    = mp->m_log;
 	xlog_ticket_t	*ticket = (xfs_log_ticket_t) xtic;
 	xfs_lsn_t	lsn	= 0;
 
@@ -306,7 +306,7 @@ xfs_log_done(xfs_mount_t	*mp,
  * Asynchronous forces are implemented by setting the WANT_SYNC
  * bit in the appropriate in-core log and then returning.
  *
- * Synchronous forces are implemented with a semaphore.	 All callers
+ * Synchronous forces are implemented with a semaphore.  All callers
  * to force a given lsn to disk will wait on a semaphore attached to the
  * specific in-core log.  When given in-core log finally completes its
  * write to disk, that thread will wake up all threads waiting on the
@@ -396,7 +396,7 @@ xfs_log_release_iclog(xfs_mount_t *mp,
 }
 
 /*
- * Initialize log manager data.	 This routine is intended to be called when
+ * Initialize log manager data.  This routine is intended to be called when
  * a system boots up.  It is not a per filesystem initialization.
  *
  * As you can see, we currently do nothing.
@@ -588,7 +588,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 #ifdef DEBUG
 	xlog_in_core_t	 *first_iclog;
 #endif
-	xfs_log_iovec_t	 reg[1];
+	xfs_log_iovec_t  reg[1];
 	xfs_log_ticket_t tic = 0;
 	xfs_lsn_t	 lsn;
 	int		 error;
@@ -717,8 +717,8 @@ xfs_log_unmount_dealloc(xfs_mount_t *mp)
 }
 
 /*
- * Write region vectors to log.	 The write happens using the space reservation
- * of the ticket (tic).	 It is not a requirement that all writes for a given
+ * Write region vectors to log.  The write happens using the space reservation
+ * of the ticket (tic).  It is not a requirement that all writes for a given
  * transaction occur with one call to xfs_log_write().
  */
 int
@@ -774,7 +774,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 
 	s = GRANT_LOCK(log);
 
-	/* Also an illegal lsn.	 1 implies that we aren't passing in a legal
+	/* Also an illegal lsn.  1 implies that we aren't passing in a legal
 	 * tail_lsn.
 	 */
 	if (tail_lsn != 1)
@@ -895,7 +895,7 @@ xlog_assign_tail_lsn(xfs_mount_t *mp)
  * is passed in the cycle/bytes formal parms.  In the special case where
  * the reserve head has wrapped passed the tail, this calculation is no
  * longer valid.  In this case, just return 0 which means there is no space
- * in the log.	This works for all places where this function is called
+ * in the log.  This works for all places where this function is called
  * with the reserve head.  Of course, if the write head were to ever
  * wrap the tail, we should blow up.  Rather than catch this case here,
  * we depend on other ASSERTions in other parts of the code.   XXXmiken
@@ -1030,8 +1030,8 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 /*
  * Return size of each in-core log record buffer.
  *
- * Low memory machines only get 2 16KB buffers.	 We don't want to waste
- * memory here.	 However, all other machines get at least 2 32KB buffers.
+ * Low memory machines only get 2 16KB buffers.  We don't want to waste
+ * memory here.  However, all other machines get at least 2 32KB buffers.
  * The number is hard coded because we don't care about the minimum
  * memory size, just 32MB systems.
  *
@@ -1177,7 +1177,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	log->l_mp	   = mp;
 	log->l_dev	   = log_dev;
-	log->l_logsize	   = BBTOB(num_bblks);
+	log->l_logsize     = BBTOB(num_bblks);
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
 	log->l_roundoff	   = 0;
@@ -1194,11 +1194,11 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
-	log->l_quotaoffs_flag = 0;	/* XFS_LI_QUOTAOFF logitems */
+	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
 
-	bp = log->l_xbuf   = XFS_getrbuf(0,mp); /* get my locked buffer */ /* mp needed for pagebuf/linux only */
+	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp needed for pagebuf/linux only */
 
 	XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
 	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
@@ -1278,13 +1278,13 @@ xlog_alloc_log(xfs_mount_t	*mp,
  * ticket.  Return the lsn of the commit record.
  */
 STATIC int
-xlog_commit_record(xfs_mount_t	*mp,
+xlog_commit_record(xfs_mount_t  *mp,
 		   xlog_ticket_t *ticket,
 		   xlog_in_core_t **iclog,
 		   xfs_lsn_t	*commitlsnp)
 {
 	int		error;
-	xfs_log_iovec_t reg[1];
+	xfs_log_iovec_t	reg[1];
 
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
@@ -1301,12 +1301,12 @@ xlog_commit_record(xfs_mount_t	*mp,
 /*
  * Push on the buffer cache code if we ever use more than 75% of the on-disk
  * log space.  This code pushes on the lsn which would supposedly free up
- * the 25% which we want to leave free.	 We may need to adopt a policy which
+ * the 25% which we want to leave free.  We may need to adopt a policy which
  * pushes on an lsn which is further along in the log once we reach the high
- * water mark.	In this manner, we would be creating a low water mark.
+ * water mark.  In this manner, we would be creating a low water mark.
  */
 void
-xlog_grant_push_ail(xfs_mount_t *mp,
+xlog_grant_push_ail(xfs_mount_t	*mp,
 		    int		need_bytes)
 {
     xlog_t	*log = mp->m_log;	/* pointer to the log */
@@ -1368,14 +1368,14 @@ xlog_grant_push_ail(xfs_mount_t *mp,
 /*
  * Flush out the in-core log (iclog) to the on-disk log in a synchronous or
  * asynchronous fashion.  Previously, we should have moved the current iclog
- * ptr in the log to point to the next available iclog.	 This allows further
+ * ptr in the log to point to the next available iclog.  This allows further
  * write to continue while this code syncs out an iclog ready to go.
  * Before an in-core log can be written out, the data section must be scanned
  * to save away the 1st word of each BBSIZE block into the header.  We replace
  * it with the current cycle count.  Each BBSIZE block is tagged with the
  * cycle count because there in an implicit assumption that drives will
  * guarantee that entire 512 byte blocks get written at once.  In other words,
- * we can't have part of a 512 byte block written and part not written.	 By
+ * we can't have part of a 512 byte block written and part not written.  By
  * tagging each block, we will know which blocks are valid when recovering
  * after an unclean shutdown.
  *
@@ -1386,7 +1386,7 @@ xlog_grant_push_ail(xfs_mount_t *mp,
  *
  * The entire log manager uses a logical block numbering scheme.  Only
  * log_sync (and then only bwrite()) know about the fact that the log may
- * not start with block zero on a given device.	 The log block start offset
+ * not start with block zero on a given device.  The log block start offset
  * is added immediately before calling bwrite().
  */
 
@@ -1432,7 +1432,7 @@ xlog_sync(xlog_t		*log,
 
 	log->l_roundoff += iclog->ic_roundoff;
 
-	xlog_pack_data(log, iclog);	  /* put cycle number in every block */
+	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 
 	/* real byte length */
 	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);
@@ -1510,7 +1510,7 @@ xlog_sync(xlog_t		*log,
 		/*
 		 * Bump the cycle numbers at the start of each block
 		 * since this part of the buffer is at the start of
-		 * a new cycle.	 Watch out for the header magic number
+		 * a new cycle.  Watch out for the header magic number
 		 * case, though.
 		 */
 		for (i=0; i<split; i += BBSIZE) {
@@ -1651,7 +1651,7 @@ xlog_state_finish_copy(xlog_t		*log,
  *	syncing routine.  When a single log_write region needs to span
  *	multiple in-core logs, the XLOG_CONTINUE_TRANS bit should be set
  *	on all log operation writes which don't contain the end of the
- *	region.	 The XLOG_END_TRANS bit is used for the in-core log
+ *	region.  The XLOG_END_TRANS bit is used for the in-core log
  *	operation which contains the end of the continued log_write region.
  * 3. When xlog_state_get_iclog_space() grabs the rest of the current iclog,
  *	we don't really know exactly how much space will be used.  As a result,
@@ -1744,7 +1744,7 @@ xlog_write(xfs_mount_t *	mp,
 		INT_SET(logop_head->oh_tid, ARCH_CONVERT, ticket->t_tid);
 		logop_head->oh_clientid = ticket->t_clientid;
 		INT_ZERO(logop_head->oh_len, ARCH_CONVERT);
-		logop_head->oh_flags	= XLOG_START_TRANS;
+		logop_head->oh_flags    = XLOG_START_TRANS;
 		INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
 		ticket->t_flags		&= ~XLOG_TIC_INITED;	/* clear bit */
 		firstwr = 1;			  /* increment log ops below */
@@ -1787,7 +1787,7 @@ xlog_write(xfs_mount_t *	mp,
 	     * need_copy is the amount we'd like to copy if everything could
 	     * fit in the current memcpy.
 	     */
-	    need_copy = reg[index].i_len - partial_copy_len;
+	    need_copy =	reg[index].i_len - partial_copy_len;
 
 	    copy_off = partial_copy_len;
 	    if (need_copy <= iclog->ic_size - log_offset) { /*complete write */
@@ -1866,9 +1866,9 @@ xlog_write(xfs_mount_t *	mp,
  *****************************************************************************
  */
 
-/* Clean iclogs starting from the head.	 This ordering must be
+/* Clean iclogs starting from the head.  This ordering must be
  * maintained, so an iclog doesn't become ACTIVE beyond one that
- * is SYNCING.	This is also required to maintain the notion that we use
+ * is SYNCING.  This is also required to maintain the notion that we use
  * a counting semaphore to hold off would be writers to the log when every
  * iclog is trying to sync to disk.
  *
@@ -1883,7 +1883,7 @@ xlog_state_clean_log(xlog_t *log)
 	iclog = log->l_iclog;
 	do {
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
-			iclog->ic_state = XLOG_STATE_ACTIVE;
+			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
 			iclog->ic_callback	= 0;   /* don't need to free */
 			/*
@@ -1956,7 +1956,7 @@ STATIC xfs_lsn_t
 xlog_get_lowest_lsn(
 	xlog_t		*log)
 {
-	xlog_in_core_t	*lsn_log;
+	xlog_in_core_t  *lsn_log;
 	xfs_lsn_t	lowest_lsn, lsn;
 
 	lsn_log = log->l_iclog;
@@ -2003,7 +2003,7 @@ xlog_state_do_callback(
 	do {
 		/*
 		 * Scan all iclogs starting with the one pointed to by the
-		 * log.	 Reset this starting point each time the log is
+		 * log.  Reset this starting point each time the log is
 		 * unlocked (during callbacks).
 		 *
 		 * Keep looping through iclogs until one full pass is made
@@ -2032,7 +2032,7 @@ xlog_state_do_callback(
 			 */
 			if (!(iclog->ic_state & XLOG_STATE_IOERROR)) {
 				/*
-				 * Can only perform callbacks in order.	 Since
+				 * Can only perform callbacks in order.  Since
 				 * this iclog is not in the DONE_SYNC/
 				 * DO_CALLBACK state, we skip the rest and
 				 * just try to clean up.  If we set our iclog
@@ -2159,7 +2159,7 @@ xlog_state_do_callback(
 			 *
 			 * SYNCING - i/o completion will go through logs
 			 * DONE_SYNC - interrupt thread should be waiting for
-			 *		LOG_LOCK
+			 *              LOG_LOCK
 			 * IOERROR - give up hope all ye who enter here
 			 */
 			if (iclog->ic_state == XLOG_STATE_SYNCING ||
@@ -2185,7 +2185,7 @@ xlog_state_do_callback(
  * Finish transitioning this iclog to the dirty state.
  *
  * Make sure that we completely execute this routine only when this is
- * the last call to the iclog.	There is a good chance that iclog flushes,
+ * the last call to the iclog.  There is a good chance that iclog flushes,
  * when we reach the end of the physical log, get turned into 2 separate
  * calls to bwrite.  Hence, one iclog flush could generate two calls to this
  * routine.  By using the reference count bwritecnt, we guarantee that only
@@ -2241,7 +2241,7 @@ xlog_state_done_syncing(
  * sleep.  The flush semaphore is set to the number of in-core buffers and
  * decremented around disk syncing.  Therefore, if all buffers are syncing,
  * this semaphore will cause new writes to sleep until a sync completes.
- * Otherwise, this code just does p() followed by v().	This approximates
+ * Otherwise, this code just does p() followed by v().  This approximates
  * a sleep/wakeup except we can't race.
  *
  * The in-core logs are used in a circular fashion. They are not used
@@ -2336,7 +2336,7 @@ restart:
 
 	/* Do we have enough room to write the full amount in the remainder
 	 * of this iclog?  Or must we continue a write on the next iclog and
-	 * mark this iclog as completely taken?	 In the case where we switch
+	 * mark this iclog as completely taken?  In the case where we switch
 	 * iclogs (to mark it taken), this particular iclog will release/sync
 	 * to disk in xlog_write().
 	 */
@@ -2654,8 +2654,8 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
  * Give back the space left from a reservation.
  *
  * All the information we need to make a correct determination of space left
- * is present.	For non-permanent reservations, things are quite easy.	The
- * count should have been decremented to zero.	We only need to deal with the
+ * is present.  For non-permanent reservations, things are quite easy.  The
+ * count should have been decremented to zero.  We only need to deal with the
  * space remaining in the current reservation part of the ticket.  If the
  * ticket contains a permanent reservation, there may be left over space which
  * needs to be released.  A count of N means that N-1 refills of the current
@@ -2722,7 +2722,7 @@ xlog_state_put_ticket(xlog_t	    *log,
  */
 int
 xlog_state_release_iclog(xlog_t		*log,
-			 xlog_in_core_t *iclog)
+			 xlog_in_core_t	*iclog)
 {
 	SPLDECL(s);
 	int		sync = 0;	/* do we sync? */
@@ -2770,7 +2770,7 @@ xlog_state_release_iclog(xlog_t		*log,
  * This routine will mark the current iclog in the ring as WANT_SYNC
  * and move the current iclog pointer to the next iclog in the ring.
  * When this routine is called from xlog_state_get_iclog_space(), the
- * exact size of the iclog has not yet been determined.	 All we know is
+ * exact size of the iclog has not yet been determined.  All we know is
  * that every data block.  We have run out of space in this log record.
  */
 STATIC void
@@ -2823,7 +2823,7 @@ xlog_state_switch_iclogs(xlog_t		*log,
  * implementation means this routine will *not* write out zero length LRs.
  *
  * Basically, we try and perform an intelligent scan of the in-core logs.
- * If we determine there is no flushable data, we just return.	There is no
+ * If we determine there is no flushable data, we just return.  There is no
  * flushable data if:
  *
  *	1. the current iclog is active and has no data; the previous iclog
@@ -2866,7 +2866,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 		 * If the head is dirty or (active and empty), then
 		 * we need to look at the previous iclog.  If the previous
 		 * iclog is active or dirty we are done.  There is nothing
-		 * to sync out.	 Otherwise, we attach ourselves to the
+		 * to sync out.  Otherwise, we attach ourselves to the
 		 * previous iclog and go to sleep.
 		 */
 		if (iclog->ic_state == XLOG_STATE_DIRTY ||
@@ -2901,7 +2901,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 					goto no_sleep;
 			} else {
 				/* Someone else is writing to this iclog.
-				 * Use its call to flush out the data.	However,
+				 * Use its call to flush out the data.  However,
 				 * the other thread may not force out this LR,
 				 * so we mark it WANT_SYNC.
 				 */
@@ -3101,7 +3101,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 
 	/*
 	 * The kmem_zalloc may sleep, so we shouldn't be holding the
-	 * global lock.	 XXXmiken: may want to use zone allocator.
+	 * global lock.  XXXmiken: may want to use zone allocator.
 	 */
 	buf = (xfs_caddr_t) kmem_zalloc(NBPP, 0);
 
@@ -3150,7 +3150,7 @@ xlog_ticket_put(xlog_t		*log,
 	sv_destroy(&ticket->t_sema);
 
 	/*
-	 * Don't think caching will make that much difference.	It's
+	 * Don't think caching will make that much difference.  It's
 	 * more important to make debug easier.
 	 */
 #if 0
@@ -3160,7 +3160,7 @@ xlog_ticket_put(xlog_t		*log,
 	/* no need to clear fields */
 #else
 	/* When we debug, it is easier if tickets are cycled */
-	ticket->t_next	   = 0;
+	ticket->t_next     = 0;
 	if (log->l_tail != 0) {
 		log->l_tail->t_next = ticket;
 	} else {
@@ -3196,7 +3196,7 @@ xlog_ticket_get(xlog_t		*log,
 		goto alloc;
 	}
 	tic		= log->l_freelist;
-	log->l_freelist = tic->t_next;
+	log->l_freelist	= tic->t_next;
 	if (log->l_freelist == NULL)
 		log->l_tail = NULL;
 	log->l_ticket_cnt--;
@@ -3204,7 +3204,7 @@ xlog_ticket_get(xlog_t		*log,
 
 	/*
 	 * Permanent reservations have up to 'cnt'-1 active log operations
-	 * in the log.	A unit in this case is the amount of space for one
+	 * in the log.  A unit in this case is the amount of space for one
 	 * of these log operations.  Normal reservations have a cnt of 1
 	 * and their unit amount is the total amount of space required.
 	 * The following line of code adds one log record header length
@@ -3212,7 +3212,7 @@ xlog_ticket_get(xlog_t		*log,
 	 * log record.
 	 *
 	 * One more XLOG_HEADER_SIZE is added to account for possible
-	 * round off errors when syncing a LR to disk.	The bytes are
+	 * round off errors when syncing a LR to disk.  The bytes are
 	 * subtracted if the thread using this ticket is the first writer
 	 * to a new LR.
 	 *
@@ -3251,8 +3251,8 @@ xlog_ticket_get(xlog_t		*log,
  * part of the log in case we trash the log structure.
  */
 void
-xlog_verify_dest_ptr(xlog_t	*log,
-		     __psint_t	ptr)
+xlog_verify_dest_ptr(xlog_t     *log,
+		     __psint_t  ptr)
 {
 	int i;
 	int good_ptr = 0;
@@ -3275,7 +3275,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 {
     xfs_buf_t	*bp;
     uint	cycle_no;
-    xfs_daddr_t i;
+    xfs_daddr_t	i;
 
     if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
 	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
@@ -3608,4 +3608,3 @@ xlog_iclogs_empty(xlog_t *log)
 	} while (iclog != log->l_iclog);
 	return(1);
 }
-

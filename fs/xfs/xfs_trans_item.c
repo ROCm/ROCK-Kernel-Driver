@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -140,7 +140,7 @@ xfs_trans_add_item(xfs_trans_t *tp, xfs_log_item_t *lip)
  * to the given slot.
  */
 void
-xfs_trans_free_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
+xfs_trans_free_item(xfs_trans_t	*tp, xfs_log_item_desc_t *lidp)
 {
 	uint			slot;
 	xfs_log_item_chunk_t	*licp;
@@ -158,7 +158,7 @@ xfs_trans_free_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
 	 * the chunk. First pull it from the chunk list and then
 	 * free it back to the heap.  We didn't bother with a doubly
 	 * linked list here because the lists should be very short
-	 * and this is not a performance path.	It's better to save
+	 * and this is not a performance path.  It's better to save
 	 * the memory of the extra pointer.
 	 *
 	 * Also decrement the transaction structure's count of free items
@@ -180,14 +180,14 @@ xfs_trans_free_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
  * This is called to find the descriptor corresponding to the given
  * log item.  It returns a pointer to the descriptor.
  * The log item MUST have a corresponding descriptor in the given
- * transaction.	 This routine does not return NULL, it panics.
+ * transaction.  This routine does not return NULL, it panics.
  *
  * The descriptor pointer is kept in the log item's li_desc field.
  * Just return it.
  */
 /*ARGSUSED*/
 xfs_log_item_desc_t *
-xfs_trans_find_item(xfs_trans_t *tp, xfs_log_item_t *lip)
+xfs_trans_find_item(xfs_trans_t	*tp, xfs_log_item_t *lip)
 {
 	ASSERT(lip->li_desc != NULL);
 
@@ -450,7 +450,7 @@ xfs_trans_unlock_chunk(
 
 /*
  * This is called to add the given busy item to the transaction's
- * list of busy items.	It must find a free busy item descriptor
+ * list of busy items.  It must find a free busy item descriptor
  * or allocate a new one and add the item to that descriptor.
  * The function returns a pointer to busy descriptor used to point
  * to the new busy entry.  The log busy entry will now point to its new

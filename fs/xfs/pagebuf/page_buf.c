@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -40,7 +40,7 @@
  *	cached pages for I/O.
  *
  *
- *	Written by Steve Lord, Jim Mostek, Russell Cattelan
+ *      Written by Steve Lord, Jim Mostek, Russell Cattelan
  *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
  *
  */
@@ -80,7 +80,7 @@ static	spinlock_t		pb_trace_lock = SPIN_LOCK_UNLOCKED;
 struct pagebuf_trace_buf	pb_trace;
 EXPORT_SYMBOL(pb_trace);
 EXPORT_SYMBOL(pb_trace_func);
-#define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
+#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
 void
 pb_trace_func(
@@ -129,7 +129,7 @@ STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
  * /proc/sys/vm/pagebuf
  */
 
-unsigned long pagebuf_min[P_PARAM] = {	HZ/2,	1*HZ, 0, 0 };
+unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ, 0, 0 };
 unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 1, 1 };
 
 pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
@@ -194,13 +194,13 @@ _bhash(
 
 STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
-STATIC	spinlock_t		as_lock = SPIN_LOCK_UNLOCKED;
+STATIC  spinlock_t              as_lock = SPIN_LOCK_UNLOCKED;
 typedef struct a_list {
 	void	*vm_addr;
 	struct a_list	*next;
 } a_list_t;
-STATIC	a_list_t	*as_free_head;
-STATIC	int		as_list_len;
+STATIC  a_list_t	*as_free_head;
+STATIC  int		as_list_len;
 
 
 /*
@@ -251,7 +251,7 @@ purge_addresses(void)
  *
  *	Buffers associated with inodes for which buffer locking
  *	is not enabled are not protected by semaphores, and are
- *	assumed to be exclusively owned by the caller.	There is
+ *	assumed to be exclusively owned by the caller.  There is
  *	spinlock in the buffer, for use by the caller when concurrent
  *	access is possible.
  */
@@ -549,7 +549,7 @@ mapit:
 		/* A single page buffer is always mappable */
 		if (page_count == 1) {
 			pb->pb_addr = (caddr_t)
-			    	page_address(pb->pb_pages[0]) + pb->pb_offset;
+				page_address(pb->pb_pages[0]) + pb->pb_offset;
 			pb->pb_flags |= PBF_MAPPED;
 		} else if (flags & PBF_MAPPED) {
 			if (as_list_len > 64)
@@ -701,8 +701,8 @@ found:
  *
  *	pagebuf_find returns a buffer matching the specified range of
  *	data for the specified target, if any of the relevant blocks
- *	are in memory.	The buffer may have unallocated holes, if
- *	some, but not all, of the blocks are in memory.	 Even where
+ *	are in memory.  The buffer may have unallocated holes, if
+ *	some, but not all, of the blocks are in memory.  Even where
  *	pages are present in the buffer, not all of every page may be
  *	valid.
  */
@@ -728,7 +728,7 @@ pagebuf_find(				/* find buffer for block	*/
  */
 page_buf_t *
 pagebuf_get(				/* allocate a buffer		*/
-	pb_target_t		*target,/* target for buffer 		*/
+	pb_target_t		*target,/* target for buffer		*/
 	loff_t			ioff,	/* starting offset of range	*/
 	size_t			isize,	/* length of range		*/
 	page_buf_flags_t	flags)	/* PBF_TRYLOCK			*/
@@ -846,7 +846,7 @@ mem_to_page(
 	void			*addr)
 {
 	if (((unsigned long)addr < VMALLOC_START) ||
-            ((unsigned long)addr >= VMALLOC_END)) {
+	    ((unsigned long)addr >= VMALLOC_END)) {
 		return virt_to_page(addr);
 	} else {
 		return vmalloc_to_page(addr);
@@ -1049,7 +1049,7 @@ pagebuf_rele(
  *	pagebuf_pin
  *
  *	pagebuf_pin locks all of the memory represented by a buffer in
- *	memory.	 Multiple calls to pagebuf_pin and pagebuf_unpin, for
+ *	memory.  Multiple calls to pagebuf_pin and pagebuf_unpin, for
  *	the same or different buffers affecting a given page, will
  *	properly count the number of outstanding "pin" requests.  The
  *	buffer may be released after the pagebuf_pin and a different
@@ -1095,7 +1095,7 @@ pagebuf_ispin(
  *	pagebuf_wait_unpin
  *
  *	pagebuf_wait_unpin waits until all of the memory associated
- *	with the buffer is not longer locked in memory.	 It returns
+ *	with the buffer is not longer locked in memory.  It returns
  *	immediately if none of the affected pages are locked.
  */
 static inline void
@@ -1776,7 +1776,7 @@ pagebuf_daemon_start(void)
 
 /*
  * pagebuf_daemon_stop
- * 
+ *
  * Note: do not mark as __exit, it is called from pagebuf_terminate.
  */
 STATIC void
@@ -1845,7 +1845,7 @@ STATIC ctl_table pagebuf_dir_table[] = {
 };
 
 STATIC ctl_table pagebuf_root_table[] = {
-	{CTL_VM, "vm",	NULL, 0, 0555, pagebuf_dir_table},
+	{CTL_VM, "vm",  NULL, 0, 0555, pagebuf_dir_table},
 	{0}
 };
 
@@ -1881,7 +1881,7 @@ pagebuf_readstats(
 
 	return len;
 }
-#endif	/* CONFIG_PROC_FS */
+#endif  /* CONFIG_PROC_FS */
 
 STATIC void
 pagebuf_shaker(void)
@@ -1935,8 +1935,8 @@ pagebuf_init(void)
 
 
 /*
- *	pagebuf_terminate. 
- * 
+ *	pagebuf_terminate.
+ *
  *	Note: do not mark as __exit, this is also called from the __init code.
  */
 void
@@ -1948,7 +1948,7 @@ pagebuf_terminate(void)
 	kmem_shake_deregister(pagebuf_shaker);
 
 	unregister_sysctl_table(pagebuf_table_header);
-#ifdef	CONFIG_PROC_FS
+#ifdef  CONFIG_PROC_FS
 	remove_proc_entry("fs/pagebuf/stat", NULL);
 	remove_proc_entry("fs/pagebuf", NULL);
 #endif

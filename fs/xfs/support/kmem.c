@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -162,7 +162,7 @@ void
 kmem_free(void *ptr, size_t size)
 {
 	if (((unsigned long)ptr < VMALLOC_START) ||
-            ((unsigned long)ptr >= VMALLOC_END)) {
+	    ((unsigned long)ptr >= VMALLOC_END)) {
 		kfree(ptr);
 	} else {
 		vfree(ptr);

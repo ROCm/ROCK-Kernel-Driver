@@ -69,11 +69,11 @@ xfs_qm_quotactl(
 	xfs_caddr_t	addr)
 {
 	xfs_mount_t	*mp;
-	int 		error;
+	int		error;
 	struct vfs	*vfsp;
 
 	vfsp = bhvtovfs(bdp);
-        mp = XFS_VFSTOM(vfsp);
+	mp = XFS_VFSTOM(vfsp);
 
 	if (addr == NULL && cmd != Q_SYNC)
 		return XFS_ERROR(EINVAL);
@@ -84,7 +84,7 @@ xfs_qm_quotactl(
 	 * The following commands are valid even when quotaoff.
 	 */
 	switch (cmd) {
-	      	/* 
+		/*
 		 * truncate quota files. quota must be off.
 		 */
 	      case Q_XQUOTARM:
@@ -92,7 +92,7 @@ xfs_qm_quotactl(
 			return XFS_ERROR(EINVAL);
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		return (xfs_qm_scall_trunc_qfiles(mp, 
+		return (xfs_qm_scall_trunc_qfiles(mp,
 			       xfs_qm_import_qtype_flags(*(uint *)addr)));
 		/*
 		 * Get quota status information.
@@ -116,7 +116,7 @@ xfs_qm_quotactl(
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
 		break;
-		
+
 	      default:
 		break;
 	}
@@ -133,11 +133,11 @@ xfs_qm_quotactl(
 					    B_FALSE);
 		break;
 
-		/* 
-		 * Defaults to XFS_GETUQUOTA. 
+		/*
+		 * Defaults to XFS_GETUQUOTA.
 		 */
 	      case Q_XGETQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER, 
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER,
 					(fs_disk_quota_t *)addr);
 		break;
 		/*
@@ -157,9 +157,9 @@ xfs_qm_quotactl(
 					     (fs_disk_quota_t *)addr);
 		break;
 
-	      		
+
 	      case Q_XGETGQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_GROUP, 
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_GROUP,
 					(fs_disk_quota_t *)addr);
 		break;
 
