@@ -169,6 +169,7 @@ module_exit(llc_exit);
 
 EXPORT_SYMBOL(llc_station_mac_sa);
 EXPORT_SYMBOL(llc_sap_list);
+EXPORT_SYMBOL(llc_sap_list_lock);
 EXPORT_SYMBOL(llc_sap_find);
 EXPORT_SYMBOL(llc_sap_open);
 EXPORT_SYMBOL(llc_sap_close);
