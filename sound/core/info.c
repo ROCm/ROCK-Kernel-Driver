@@ -25,10 +25,13 @@
 #include <linux/vmalloc.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
+#include <linux/utsname.h>
+#include <linux/config.h>
+
 #include <sound/core.h>
+#include <sound/version.h>
 #include <sound/minors.h>
 #include <sound/info.h>
-#include <sound/utsname.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <stdarg.h>
