@@ -15,7 +15,7 @@
  */
 
 
-#define VIA_VERSION	"1.9.1-ac3-2.5"
+#define VIA_VERSION	"1.9.1-ac4-2.5"
 
 
 #include <linux/config.h>
@@ -1237,7 +1237,6 @@ static int via_chan_set_stereo (struct via_info *card,
 		}
 	/* unknown */
 	default:
-		printk (KERN_WARNING PFX "unknown number of channels\n");
 		val = -EINVAL;
 		break;
 	}
@@ -3368,7 +3367,7 @@ static int via_dsp_release(struct inode *inode, struct file *file)
 
 	if (file->f_mode & FMODE_WRITE) {
 		rc = via_dsp_drain_playback (card, &card->ch_out, nonblock);
-		if (rc && rc != ERESTARTSYS)	/* Nobody needs to know about ^C */
+		if (rc && rc != -ERESTARTSYS)	/* Nobody needs to know about ^C */
 			printk (KERN_DEBUG "via_audio: ignoring drain playback error %d\n", rc);
 
 		via_chan_free (card, &card->ch_out);
