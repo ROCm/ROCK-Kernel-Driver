@@ -76,6 +76,9 @@ static int __init topology_init(void)
 		err = -ENOMEM;
 		goto out;
 	}
+	memset(sysfs_nodes, 0, sizeof(struct node) * numnodes);
+	memset(sysfs_memblks, 0, sizeof(struct memblk) * num_memblks);
+	memset(sysfs_cpus, 0, sizeof(struct cpu) * NR_CPUS);
 
 	for (i = 0; i < numnodes; i++)
 		if ((err = register_node(&sysfs_nodes[i], i, 0)))
