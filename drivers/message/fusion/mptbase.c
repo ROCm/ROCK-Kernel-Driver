@@ -155,7 +155,6 @@ static MPT_EVHANDLER		 MptEvHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 static MPT_RESETHANDLER		 MptResetHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 static struct mpt_pci_driver 	*MptDeviceDriverHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 
-static int	FusionInitCalled = 0;
 static int	mpt_base_index = -1;
 static int	last_drv_idx = -1;
 
@@ -600,22 +599,6 @@ mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass)
 	int i;
 
 	last_drv_idx = -1;
-
-#ifndef MODULE
-	/*
-	 *  Handle possibility of the mptscsih_detect() routine getting
-	 *  called *before* fusion_init!
-	 */
-	if (!FusionInitCalled) {
-		dprintk((KERN_INFO MYNAM ": Hmmm, calling fusion_init from mpt_register!\n"));
-		/*
-		 *  NOTE! We'll get recursion here, as fusion_init()
-		 *  calls mpt_register()!
-		 */
-		fusion_init();
-		FusionInitCalled++;
-	}
-#endif
 
 	/*
 	 *  Search for empty callback slot in this order: {N,...,7,6,5,...,1}
@@ -5903,11 +5886,6 @@ fusion_init(void)
 {
 	int i;
 	int r;
-
-	if (FusionInitCalled++) {
-		dprintk((KERN_INFO MYNAM ": INFO - Driver late-init entry point called\n"));
-		return 0;
-	}
 
 	show_mptmod_ver(my_NAME, my_VERSION);
 	printk(KERN_INFO COPYRIGHT "\n");
