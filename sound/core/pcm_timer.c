@@ -47,7 +47,7 @@ static unsigned long gcd(unsigned long a, unsigned long b)
 
 void snd_pcm_timer_resolution_change(snd_pcm_substream_t *substream)
 {
-	unsigned long rate, mult, fsize, l;
+	unsigned long rate, mult, fsize, l, post;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
         mult = 1000000000;
@@ -61,16 +61,17 @@ void snd_pcm_timer_resolution_change(snd_pcm_substream_t *substream)
 	l = gcd(rate, fsize);
 	rate /= l;
 	fsize /= l;
+	post = 1;
 	while ((mult * fsize) / fsize != mult) {
 		mult /= 2;
-		rate /= 2;
+		post *= 2;
 	}
 	if (rate == 0) {
 		snd_printk(KERN_ERR "pcm timer resolution out of range (rate = %u, period_size = %lu)\n", runtime->rate, runtime->period_size);
 		runtime->timer_resolution = -1;
 		return;
 	}
-	runtime->timer_resolution = mult * fsize / rate;
+	runtime->timer_resolution = (mult * fsize / rate) * post;
 }
 
 static unsigned long snd_pcm_timer_resolution(snd_timer_t * timer)
