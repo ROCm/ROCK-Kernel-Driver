@@ -464,6 +464,12 @@ static void velocity_init_cam_filter(struct velocity_info *vptr)
 	}
 }
 
+static inline void velocity_give_rx_desc(struct rx_desc *rd)
+{
+	*(u32 *)&rd->rdesc0 = 0;
+	rd->rdesc0.owner = cpu_to_le32(OWNED_BY_NIC);
+}
+
 /**
  *	velocity_rx_reset	-	handle a receive reset
  *	@vptr: velocity we are resetting
@@ -484,7 +490,7 @@ static void velocity_rx_reset(struct velocity_info *vptr)
 	 *	Init state, all RD entries belong to the NIC
 	 */
 	for (i = 0; i < vptr->options.numrx; ++i)
-		vptr->rd_ring[i].rdesc0.owner = cpu_to_le32(OWNED_BY_NIC);
+		velocity_give_rx_desc(vptr->rd_ring + i);
 
 	writew(vptr->options.numrx, &regs->RBRDU);
 	writel(vptr->rd_pool_dma, &regs->RDBaseLo);
@@ -1001,7 +1007,7 @@ static int velocity_init_rd_ring(struct velocity_info *vptr)
 			velocity_free_rd_ring(vptr);
 			goto out;
 		}
-		rd->rdesc0.owner = OWNED_BY_NIC;
+		velocity_give_rx_desc(rd);
 	}
 	vptr->rd_used = vptr->rd_curr = 0;
 out:
@@ -1198,8 +1204,7 @@ static int velocity_rx_srv(struct velocity_info *vptr, int status)
 				if (--rd_prev < 0)
 					rd_prev = vptr->options.numrx - 1;
 
-				rd = &(vptr->rd_ring[rd_prev]);
-				rd->rdesc0.owner = OWNED_BY_NIC;
+				velocity_give_rx_desc(vptr->rd_ring + rd_prev);
 			}
 			writew(4, &(regs->RBRDU));
 			vptr->rd_used -= 4;
