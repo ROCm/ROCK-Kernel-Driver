@@ -2482,7 +2482,7 @@ void ip_rt_multicast_event(struct in_device *in_dev)
 static int flush_delay;
 
 static int ipv4_sysctl_rtcache_flush(ctl_table *ctl, int write,
-					struct file *filp, void *buffer,
+					struct file *filp, void __user *buffer,
 					size_t *lenp)
 {
 	if (write) {
@@ -2494,15 +2494,19 @@ static int ipv4_sysctl_rtcache_flush(ctl_table *ctl, int write,
 	return -EINVAL;
 }
 
-static int ipv4_sysctl_rtcache_flush_strategy(ctl_table *table, int *name,
-						int nlen, void *oldval,
-						size_t *oldlenp, void *newval,
-						size_t newlen, void **context)
+static int ipv4_sysctl_rtcache_flush_strategy(ctl_table *table,
+						int __user *name,
+						int nlen,
+						void __user *oldval,
+						size_t __user *oldlenp,
+						void __user *newval,
+						size_t newlen,
+						void **context)
 {
 	int delay;
 	if (newlen != sizeof(int))
 		return -EINVAL;
-	if (get_user(delay, (int *)newval))
+	if (get_user(delay, (int __user *)newval))
 		return -EFAULT; 
 	rt_cache_flush(delay); 
 	return 0;

@@ -909,7 +909,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_model += ((tfms >> 16) & 0xF) << 4;
 		} 
 		if (c->x86_capability[0] & (1<<19)) 
-       		c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
+			c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
 	} else {
 		/* Have CPUID level 0 only - unheard of */
 		c->x86 = 4;
@@ -967,7 +967,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			display_cacheinfo(c);
 			break;
 	}
-	
+
 	select_idle_routine(c);
 	detect_ht(c); 
 		

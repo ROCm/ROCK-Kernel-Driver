@@ -474,23 +474,23 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch(cmd) 
 	{
 	case SIOCGSTAMP:
-		return sock_get_timestamp(sk, (struct timeval *)arg);
+		return sock_get_timestamp(sk, (struct timeval __user *)arg);
 
 	case SIOCADDRT:
 	case SIOCDELRT:
 	  
-		return(ipv6_route_ioctl(cmd,(void *)arg));
+		return(ipv6_route_ioctl(cmd,(void __user *)arg));
 
 	case SIOCSIFADDR:
-		return addrconf_add_ifaddr((void *) arg);
+		return addrconf_add_ifaddr((void __user *) arg);
 	case SIOCDIFADDR:
-		return addrconf_del_ifaddr((void *) arg);
+		return addrconf_del_ifaddr((void __user *) arg);
 	case SIOCSIFDSTADDR:
-		return addrconf_set_dstaddr((void *) arg);
+		return addrconf_set_dstaddr((void __user *) arg);
 	default:
 		if (!sk->sk_prot->ioctl ||
 		    (err = sk->sk_prot->ioctl(sk, cmd, arg)) == -ENOIOCTLCMD)
-			return(dev_ioctl(cmd,(void *) arg));		
+			return(dev_ioctl(cmd,(void __user *) arg));		
 		return err;
 	}
 	/*NOTREACHED*/

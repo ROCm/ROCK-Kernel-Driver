@@ -843,7 +843,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 		case SIOCGSTAMP:
-			err = sock_get_timestamp(sk, (struct timeval *)arg);
+			err = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 		case SIOCADDRT:
 		case SIOCDELRT:
@@ -853,7 +853,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCDARP:
 		case SIOCGARP:
 		case SIOCSARP:
-			err = arp_ioctl(cmd, (void *)arg);
+			err = arp_ioctl(cmd, (void __user *)arg);
 			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:
@@ -866,13 +866,13 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFPFLAGS:
 		case SIOCGIFPFLAGS:
 		case SIOCSIFFLAGS:
-			err = devinet_ioctl(cmd, (void *)arg);
+			err = devinet_ioctl(cmd, (void __user *)arg);
 			break;
 		default:
 			if (!sk->sk_prot->ioctl ||
 			    (err = sk->sk_prot->ioctl(sk, cmd, arg)) ==
 			    					-ENOIOCTLCMD)
-				err = dev_ioctl(cmd, (void *)arg);
+				err = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 	return err;

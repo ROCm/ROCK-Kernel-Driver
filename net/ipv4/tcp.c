@@ -530,7 +530,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		return -ENOIOCTLCMD;
 	};
 
-	return put_user(answ, (int *)arg);
+	return put_user(answ, (int __user *)arg);
 }
 
 
@@ -966,7 +966,7 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 #define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
 #define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
 
-static inline int tcp_copy_to_page(struct sock *sk, char *from,
+static inline int tcp_copy_to_page(struct sock *sk, char __user *from,
 				   struct sk_buff *skb, struct page *page,
 				   int off, int copy)
 {
@@ -991,7 +991,7 @@ static inline int tcp_copy_to_page(struct sock *sk, char *from,
 	return 0;
 }
 
-static inline int skb_add_data(struct sk_buff *skb, char *from, int copy)
+static inline int skb_add_data(struct sk_buff *skb, char __user *from, int copy)
 {
 	int err = 0;
 	unsigned int csum;
@@ -1065,7 +1065,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	while (--iovlen >= 0) {
 		int seglen = iov->iov_len;
-		unsigned char *from = iov->iov_base;
+		unsigned char __user *from = iov->iov_base;
 
 		iov++;
 

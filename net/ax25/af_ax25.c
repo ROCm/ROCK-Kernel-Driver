@@ -1694,7 +1694,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			res = sock_get_timestamp(sk, (struct timeval *)arg);
+			res = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 	 	}
 		res = -EINVAL;
@@ -1826,7 +1826,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		res = dev_ioctl(cmd, (void *)arg);
+		res = dev_ioctl(cmd, (void __user *)arg);
 		break;
 	}
 	release_sock(sk);

@@ -300,11 +300,11 @@ extern int ipv4_proc_init(void);
  * fed into the routing cache should use these handlers.
  */
 int ipv4_doint_and_flush(ctl_table *ctl, int write,
-			 struct file* filp, void *buffer,
+			 struct file* filp, void __user *buffer,
 			 size_t *lenp);
-int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
-				  void *oldval, size_t *oldlenp,
-				  void *newval, size_t newlen, 
+int ipv4_doint_and_flush_strategy(ctl_table *table, int __user *name, int nlen,
+				  void __user *oldval, size_t __user *oldlenp,
+				  void __user *newval, size_t newlen, 
 				  void **context);
 
 #endif	/* _IP_H */

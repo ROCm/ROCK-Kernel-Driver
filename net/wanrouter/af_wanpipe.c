@@ -1765,7 +1765,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	switch(cmd) 
 	{
 		case SIOCGSTAMP:
-			return sock_get_timestamp(sk, (struct timeval *)arg);
+			return sock_get_timestamp(sk, (struct timeval __user *)arg);
 
 		case SIOC_WANPIPE_CHECK_TX:
 
@@ -1832,7 +1832,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 #endif
 
 		default:
-			return dev_ioctl(cmd,(void *) arg);
+			return dev_ioctl(cmd,(void __user *) arg);
 	}
 	/*NOTREACHED*/
 }

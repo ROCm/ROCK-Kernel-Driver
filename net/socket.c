@@ -775,24 +775,24 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unlock_kernel();
 	sock = SOCKET_I(inode);
 	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
-		err = dev_ioctl(cmd, (void *)arg);
+		err = dev_ioctl(cmd, (void __user *)arg);
 	} else
 #ifdef WIRELESS_EXT
 	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
-		err = dev_ioctl(cmd, (void *)arg);
+		err = dev_ioctl(cmd, (void __user *)arg);
 	} else
 #endif	/* WIRELESS_EXT */
 	switch (cmd) {
 		case FIOSETOWN:
 		case SIOCSPGRP:
 			err = -EFAULT;
-			if (get_user(pid, (int *)arg))
+			if (get_user(pid, (int __user *)arg))
 				break;
 			err = f_setown(sock->file, pid, 1);
 			break;
 		case FIOGETOWN:
 		case SIOCGPGRP:
-			err = put_user(sock->file->f_owner.pid, (int *)arg);
+			err = put_user(sock->file->f_owner.pid, (int __user *)arg);
 			break;
 		case SIOCGIFBR:
 		case SIOCSIFBR:

@@ -124,13 +124,13 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 
 
 #ifndef __ASSEMBLY__
-#define VMALLOC_START    0xffffff0000000000
-#define VMALLOC_END      0xffffff7fffffffff
-#define MODULES_VADDR    0xffffffffa0000000
-#define MODULES_END      0xffffffffafffffff
+#define VMALLOC_START    0xffffff0000000000UL
+#define VMALLOC_END      0xffffff7fffffffffUL
+#define MODULES_VADDR    0xffffffffa0000000UL
+#define MODULES_END      0xffffffffafffffffUL
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)
 
-#define IOMAP_START      0xfffffe8000000000
+#define IOMAP_START      0xfffffe8000000000UL
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1
@@ -382,6 +382,20 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pte_unmap_nested(pte) /* NOP */ 
 
 #define update_mmu_cache(vma,address,pte) do { } while (0)
+
+/* We only update the dirty/accessed state if we set
+ * the dirty bit by hand in the kernel, since the hardware
+ * will do the accessed bit for us, and we don't want to
+ * race with other CPU's that might be updating the dirty
+ * bit at the same time. */
+#define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	do {								  \
+		if (__dirty) {						  \
+			set_pte(__ptep, __entry);			  \
+			flush_tlb_page(__vma, __address);		  \
+		}							  \
+	} while (0)
 
 /* Encode and de-code a swap entry */
 #define __swp_type(x)			(((x).val >> 1) & 0x3f)

@@ -1958,7 +1958,7 @@ static int dev_ifconf(char __user *arg)
 {
 	struct ifconf ifc;
 	struct net_device *dev;
-	char *pos;
+	char __user *pos;
 	int len;
 	int total;
 	int i;

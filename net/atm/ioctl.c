@@ -76,8 +76,8 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				goto done;
 			}
 		case SIOCGSTAMP: /* borrowed from IP */
-			error = sock_get_timestamp(vcc->sk, (struct timeval *)
-						   arg);
+			error = sock_get_timestamp(vcc->sk,
+					(struct timeval __user *) arg);
 			goto done;
 		case ATM_SETSC:
 			printk(KERN_WARNING "ATM_SETSC is obsolete\n");

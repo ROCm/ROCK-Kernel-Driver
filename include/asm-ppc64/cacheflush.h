@@ -40,7 +40,7 @@ extern void __flush_dcache_icache(void *page_va);
 
 static inline void flush_icache_range(unsigned long start, unsigned long stop)
 {
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE))
+	if (!(cur_cpu_spec->cpu_features & ASM_CONST(CPU_FTR_COHERENT_ICACHE)))
 		__flush_icache_range(start, stop);
 }
 

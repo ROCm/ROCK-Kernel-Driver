@@ -65,21 +65,26 @@ extern unsigned long vm_stack_flags, vm_stack_flags32;
 extern unsigned long vm_data_default_flags, vm_data_default_flags32;
 extern unsigned long vm_force_exec32;
 
+#define __START_KERNEL		0xffffffff80100000UL
+#define __START_KERNEL_map	0xffffffff80000000UL
+#define __PAGE_OFFSET           0x0000010000000000UL	/* 1 << 40 */
+
+#else
+#define __START_KERNEL		0xffffffff80100000
+#define __START_KERNEL_map	0xffffffff80000000
+#define __PAGE_OFFSET           0x0000010000000000	/* 1 << 40 */
 #endif /* !__ASSEMBLY__ */
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 /* See Documentation/x86_64/mm.txt for a description of the memory map. */
-#define __START_KERNEL		0xffffffff80100000
-#define __START_KERNEL_map	0xffffffff80000000
-#define __PAGE_OFFSET           0x0000010000000000	/* 1 << 40 */
 #define __PHYSICAL_MASK_SHIFT	40
 #define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
 #define __VIRTUAL_MASK_SHIFT	48
 #define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
-#define KERNEL_TEXT_SIZE  (40UL*1024*1024)
+#define KERNEL_TEXT_SIZE  (10UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 
 
 #ifndef __ASSEMBLY__

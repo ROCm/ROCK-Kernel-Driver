@@ -875,7 +875,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCINQ:
 		{
@@ -887,7 +887,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 			if (skb != NULL)
 				amount = skb->tail - skb->h.raw;
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:

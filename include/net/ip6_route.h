@@ -35,7 +35,7 @@ extern int			ip6_route_me_harder(struct sk_buff *skb);
 extern void			ip6_route_init(void);
 extern void			ip6_route_cleanup(void);
 
-extern int			ipv6_route_ioctl(unsigned int cmd, void *arg);
+extern int			ipv6_route_ioctl(unsigned int cmd, void __user *arg);
 
 extern int			ip6_route_add(struct in6_rtmsg *rtmsg,
 					      struct nlmsghdr *,
