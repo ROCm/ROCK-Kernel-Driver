@@ -57,10 +57,10 @@ asmlinkage int sys_tas(int *addr)
 	if (!access_ok(VERIFY_WRITE, addr, sizeof (int)))
 		return -EFAULT;
 
-	spin_lock(&tas_lock);
+	_raw_spin_lock(&tas_lock);
 	oldval = *addr;
 	*addr = 1;
-	spin_unlock(&tas_lock);
+	_raw_spin_unlock(&tas_lock);
 
 	return oldval;
 }
