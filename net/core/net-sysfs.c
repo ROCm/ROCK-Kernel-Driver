@@ -383,6 +383,21 @@ static struct class net_class = {
 #endif
 };
 
+void netdev_unregister_sysfs(struct net_device * net)
+{
+	struct class_device * class_dev = &(net->class_dev);
+
+	if (net->get_stats)
+		sysfs_remove_group(&class_dev->kobj, &netstat_group);
+
+#ifdef WIRELESS_EXT
+	if (net->get_wireless_stats)
+		sysfs_remove_group(&class_dev->kobj, &wireless_group);
+#endif
+	class_device_del(class_dev);
+
+}
+
 /* Create sysfs entries for network device. */
 int netdev_register_sysfs(struct net_device *net)
 {
@@ -411,9 +426,15 @@ int netdev_register_sysfs(struct net_device *net)
 #ifdef WIRELESS_EXT
 	if (net->get_wireless_stats &&
 	    (ret = sysfs_create_group(&class_dev->kobj, &wireless_group)))
-		goto out_unreg; 
-#endif
+		goto out_cleanup; 
+
 	return 0;
+out_cleanup:
+	if (net->get_stats)
+		sysfs_remove_group(&class_dev->kobj, &netstat_group);
+#else
+	return 0;
+#endif
 
 out_unreg:
 	printk(KERN_WARNING "%s: sysfs attribute registration failed %d\n",

@@ -179,6 +179,7 @@ int netdev_fastroute_obstacles;
 
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
+extern int netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -2819,7 +2820,7 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			class_device_del(&dev->class_dev);
+			netdev_unregister_sysfs(dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);
