@@ -19,10 +19,6 @@ OBJS		+= ll_char_wr.o font.o
 CFLAGS_misc.o	:= -DPARAMS_PHYS=$(PARAMS_PHYS)
 endif
 
-ifeq ($(CONFIG_ARCH_NETWINDER),y)
-OBJS		+= head-netwinder.o
-endif
-
 ifeq ($(CONFIG_ARCH_SHARK),y)
 OBJS		+= head-shark.o ofw-shark.o
 endif

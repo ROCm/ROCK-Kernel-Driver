@@ -354,6 +354,7 @@ static int erase_block(int nBlock)
 {
 	volatile unsigned int c1;
 	volatile unsigned char *pWritePtr;
+	unsigned long timeout;
 	int temp, temp1;
 
 	/*
@@ -406,9 +407,9 @@ static int erase_block(int nBlock)
 	/*
 	 * wait while erasing in process (up to 10 sec)
 	 */
-	temp = jiffies + 10 * HZ;
+	timeout = jiffies + 10 * HZ;
 	c1 = 0;
-	while (!(c1 & 0x80) && time_before(jiffies, temp)) {
+	while (!(c1 & 0x80) && time_before(jiffies, timeout)) {
 		flash_wait(HZ / 100);
 		/*
 		 * read any address
@@ -466,8 +467,8 @@ static int write_block(unsigned long p, const char *buf, int count)
 	unsigned char *pWritePtr;
 	unsigned int uAddress;
 	unsigned int offset;
-	unsigned int timeout;
-	unsigned int timeout1;
+	unsigned long timeout;
+	unsigned long timeout1;
 
 	/*
 	 * red LED == write

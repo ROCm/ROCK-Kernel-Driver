@@ -2521,19 +2521,19 @@ void acornscsi_intr(int irq, void *dev_id, struct pt_regs *regs)
  */
 int acornscsi_queuecmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
-    AS_Host *host = (AS_Host *)SCpnt->host->hostdata;
+    AS_Host *host = (AS_Host *)SCpnt->device->host->hostdata;
 
     if (!done) {
 	/* there should be some way of rejecting errors like this without panicing... */
 	panic("scsi%d: queuecommand called with NULL done function [cmd=%p]",
-		SCpnt->host->host_no, SCpnt);
+		host->host->host_no, SCpnt);
 	return -EINVAL;
     }
 
 #if (DEBUG & DEBUG_NO_WRITE)
     if (acornscsi_cmdtype(SCpnt->cmnd[0]) == CMD_WRITE && (NO_WRITE & (1 << SCpnt->device->id))) {
 	printk(KERN_CRIT "scsi%d.%c: WRITE attempted with NO_WRITE flag set\n",
-	    SCpnt->host->host_no, '0' + SCpnt->device->id);
+	    host->host->host_no, '0' + SCpnt->device->id);
 	SCpnt->result = DID_NO_CONNECT << 16;
 	done(SCpnt);
 	return 0;
@@ -2695,7 +2695,7 @@ acornscsi_do_abort(AS_Host *host, Scsi_Cmnd *SCpnt)
  */
 int acornscsi_abort(Scsi_Cmnd *SCpnt)
 {
-	AS_Host *host = (AS_Host *) SCpnt->host->hostdata;
+	AS_Host *host = (AS_Host *) SCpnt->device->host->hostdata;
 	int result;
 
 	host->stats.aborts += 1;
@@ -2782,7 +2782,7 @@ int acornscsi_abort(Scsi_Cmnd *SCpnt)
  */
 int acornscsi_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 {
-    AS_Host *host = (AS_Host *)SCpnt->host->hostdata;
+    AS_Host *host = (AS_Host *)SCpnt->device->host->hostdata;
     Scsi_Cmnd *SCptr;
     
     host->stats.resets += 1;
