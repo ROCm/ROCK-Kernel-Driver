@@ -1567,7 +1567,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 	struct atalk_route *rt;
 	int err;
 
-	if (flags & ~MSG_DONTWAIT)
+	if (flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (len > DDP_MAXSZ)

@@ -1021,7 +1021,7 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int n, size, qbit = 0;
 
-	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_zapped)

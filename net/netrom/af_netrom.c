@@ -1021,7 +1021,7 @@ static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int size;
 
-	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	lock_sock(sk);

@@ -274,8 +274,8 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	 *	Check the flags. 
 	 */
 
-	if (msg->msg_flags&~MSG_DONTWAIT) 
-		return(-EINVAL);
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT)) 
+		return -EINVAL;
 
 	/*
 	 *	Get and verify the address. 

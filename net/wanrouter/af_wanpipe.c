@@ -552,7 +552,7 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (sk->sk_state != WANSOCK_CONNECTED)
 		return -ENOTCONN;	
 
-	if (msg->msg_flags&~MSG_DONTWAIT) 
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT)) 
 		return(-EINVAL);
 
 	/* it was <=, now one can send

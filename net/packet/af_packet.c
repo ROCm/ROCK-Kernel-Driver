@@ -1037,7 +1037,7 @@ static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
 	int copied, err;
 
 	err = -EINVAL;
-	if (flags & ~(MSG_PEEK|MSG_DONTWAIT|MSG_TRUNC))
+	if (flags & ~(MSG_PEEK|MSG_DONTWAIT|MSG_TRUNC|MSG_CMSG_COMPAT))
 		goto out;
 
 #if 0

@@ -922,7 +922,7 @@ static int x25_sendmsg(struct kiocb *iocb, struct socket *sock,
 	size_t size;
 	int qbit = 0, rc = -EINVAL;
 
-	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_OOB | MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_OOB|MSG_EOR|MSG_CMSG_COMPAT))
 		goto out;
 
 	/* we currently don't support segmented records at the user interface */
