@@ -157,8 +157,8 @@ void __xfrm_state_destroy(struct xfrm_state *x)
 		kfree(x->ealg);
 	if (x->calg)
 		kfree(x->calg);
-	if (x->encap_alg)
-		kfree(x->encap_alg);
+	if (x->encap)
+		kfree(x->encap);
 	if (x->type)
 		xfrm_put_type(x->type);
 	kfree(x);

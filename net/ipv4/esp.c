@@ -85,8 +85,7 @@ int esp_output(struct sk_buff *skb)
 	*(u8*)(trailer->tail + clen-skb->len - 2) = (clen - skb->len)-2;
 	pskb_put(skb, trailer, clen - skb->len);
 
-	if (x->encap_alg)
-		encap = (struct xfrm_encap_tmpl *) (x->encap_alg->alg_key);
+	encap = x->encap;
 
 	iph = skb->nh.iph;
 	if (x->props.mode) {
@@ -285,7 +284,7 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 
 		/* ... check padding bits here. Silly. :-) */ 
 
-		if (x->encap_alg && decap && decap->decap_type) {
+		if (x->encap && decap && decap->decap_type) {
 			struct esp_encap_data *encap_data;
 			struct udphdr *uh = (struct udphdr *) (iph+1);
 
@@ -337,11 +336,11 @@ out:
 int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
   
-	if (x->encap_alg) {
+	if (x->encap) {
 		struct xfrm_encap_tmpl *encap;
 		struct esp_encap_data *decap_data;
 
-		encap = (struct xfrm_encap_tmpl *) (x->encap_alg->alg_key);
+		encap = x->encap;
 		decap_data = (struct esp_encap_data *)(decap->decap_data);
 
 		/* first, make sure that the decap type == the encap type */
@@ -517,9 +516,9 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	x->props.header_len = sizeof(struct ip_esp_hdr) + esp->conf.ivlen;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
-	if (x->encap_alg) {
-		struct xfrm_encap_tmpl *encap = (struct xfrm_encap_tmpl *)
-			(x->encap_alg->alg_key);
+	if (x->encap) {
+		struct xfrm_encap_tmpl *encap = x->encap;
+
 		if (encap->encap_type) {
 			switch (encap->encap_type) {
 			case UDP_ENCAP_ESPINUDP:

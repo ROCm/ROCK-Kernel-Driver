@@ -646,8 +646,8 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 			size += sizeof(struct sadb_key) + encrypt_key_size;
 		}
 	}
-	if (x->encap_alg)
-		natt = (struct xfrm_encap_tmpl *) (x->encap_alg->alg_key);
+	if (x->encap)
+		natt = x->encap;
 
 	if (natt && natt->encap_type) {
 		size += sizeof(struct sadb_x_nat_t_type);
@@ -1064,14 +1064,12 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	if (ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1]) {
 		struct sadb_x_nat_t_type* n_type;
 		struct xfrm_encap_tmpl *natt;
-		int obits = (sizeof *natt);
 
-		x->encap_alg = kmalloc(sizeof(*x->encap_alg) + obits, GFP_KERNEL);
-		if (!x->encap_alg)
+		x->encap = kmalloc(sizeof(*x->encap), GFP_KERNEL);
+		if (!x->encap)
 			goto out;
 
-		strcpy(x->encap_alg->alg_name, "NAT-T");
-		natt = (struct xfrm_encap_tmpl *) (x->encap_alg->alg_key);
+		natt = x->encap;
 		n_type = ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1];
 		natt->encap_type = n_type->sadb_x_nat_t_type_type;
 
@@ -1103,8 +1101,8 @@ out:
 		kfree(x->ealg);
 	if (x->calg)
 		kfree(x->calg);
-	if (x->encap_alg)
-		kfree(x->encap_alg);
+	if (x->encap)
+		kfree(x->encap);
 	kfree(x);
 	return ERR_PTR(-ENOBUFS);
 }
@@ -2561,10 +2559,10 @@ static int pfkey_send_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, 
 	if (!satype)
 		return -EINVAL;
 
-	if (!x->encap_alg)
+	if (!x->encap)
 		return -EINVAL;
 
-	natt = (struct xfrm_encap_tmpl *) (x->encap_alg->alg_key);
+	natt = x->encap;
 
 	/* Build an SADB_X_NAT_T_NEW_MAPPING message:
 	 *

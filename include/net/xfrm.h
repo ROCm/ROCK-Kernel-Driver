@@ -118,7 +118,9 @@ struct xfrm_state
 	struct xfrm_algo	*aalg;
 	struct xfrm_algo	*ealg;
 	struct xfrm_algo	*calg;
-	struct xfrm_algo	*encap_alg;
+
+	/* Data for encapsulator */
+	struct xfrm_encap_tmpl	*encap;
 
 	/* State for replay detection */
 	struct xfrm_replay_state replay;
