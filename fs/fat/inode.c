@@ -968,6 +968,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		/* all is as it should be */
 	} else if (media == 0xf8 && FAT_FIRST_ENT(sb, 0xfe) == first) {
 		/* bad, reported on pc9800 */
+	} else if (media == 0xf0 && FAT_FIRST_ENT(sb, 0xf8) == first) {
+		/* bad, reported with a MO disk on win95/me */
 	} else if (first == 0) {
 		/* bad, reported with a SmartMedia card */
 	} else {
