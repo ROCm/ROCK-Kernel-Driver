@@ -82,7 +82,6 @@
 #include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -124,12 +123,6 @@ struct linux_mib net_statistics[NR_CPUS * 2];
 atomic_t inet_sock_nr;
 #endif
 
-extern int raw_get_info(char *, char **, off_t, int);
-extern int snmp_get_info(char *, char **, off_t, int);
-extern int netstat_get_info(char *, char **, off_t, int);
-extern int afinet_get_info(char *, char **, off_t, int);
-extern int tcp_get_info(char *, char **, off_t, int);
-extern int udp_get_info(char *, char **, off_t, int);
 extern void ip_mc_drop_socket(struct sock *sk);
 
 #ifdef CONFIG_DLCI
@@ -1211,17 +1204,8 @@ static int __init inet_init(void)
 	ip_mr_init();
 #endif
 
-	/*
-	 *	Create all the /proc entries.
-	 */
-#ifdef CONFIG_PROC_FS
-	proc_net_create ("raw", 0, raw_get_info);
-	proc_net_create ("netstat", 0, netstat_get_info);
-	proc_net_create ("snmp", 0, snmp_get_info);
-	proc_net_create ("sockstat", 0, afinet_get_info);
-	proc_net_create ("tcp", 0, tcp_get_info);
-	proc_net_create ("udp", 0, udp_get_info);
-#endif		/* CONFIG_PROC_FS */
+	ipv4_proc_init();
 	return 0;
 }
+
 module_init(inet_init);
