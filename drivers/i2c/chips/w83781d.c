@@ -43,6 +43,7 @@
 #include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
 #include <asm/io.h>
+#include "lm75.h"
 
 /* RT Table support #defined so we can take it out if it gets bothersome */
 #define W83781D_RT			1
@@ -170,17 +171,14 @@ FAN_TO_REG(long rpm, int div)
 					((val) == 255 ? 0 : \
 							1350000 / ((val) * (div))))
 
-#define TEMP_TO_REG(val)		(SENSORS_LIMIT(((val / 10) < 0 ? (((val / 10) - 5) / 10) : \
-									 ((val / 10) + 5) / 10), 0, 255))
-#define TEMP_FROM_REG(val)		((((val ) > 0x80 ? (val) - 0x100 : (val)) * 10) * 10)
+#define TEMP_TO_REG(val)		(SENSORS_LIMIT(((val) < 0 ? (val)+0x100*1000 \
+						: (val)) / 1000, 0, 0xff))
+#define TEMP_FROM_REG(val)		(((val) & 0x80 ? (val)-0x100 : (val)) * 1000)
 
-#define TEMP_ADD_TO_REG(val)		(SENSORS_LIMIT(((((val / 10) + 2) / 5) << 7),\
-                                              0, 0xffff))
-#define TEMP_ADD_FROM_REG(val)		((((val) >> 7) * 5) * 10)
-
-#define AS99127_TEMP_ADD_TO_REG(val)	(SENSORS_LIMIT((((((val / 10) + 2)*4)/10) \
-                                               << 7), 0, 0xffff))
-#define AS99127_TEMP_ADD_FROM_REG(val)	(((((val) >> 7) * 10) / 4) * 10)
+#define AS99127_TEMP_ADD_TO_REG(val)	(SENSORS_LIMIT((((val) < 0 ? (val)+0x10000*250 \
+						: (val)) / 250) << 7, 0, 0xffff))
+#define AS99127_TEMP_ADD_FROM_REG(val)	((((val) & 0x8000 ? (val)-0x10000 : (val)) \
+						>> 7) * 250)
 
 #define ALARMS_FROM_REG(val)		(val)
 #define PWM_FROM_REG(val)		(val)
@@ -437,8 +435,8 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 			return sprintf(buf,"%ld\n", \
 				(long)AS99127_TEMP_ADD_FROM_REG(data->reg##_add[nr-2])); \
 		} else { \
-			return sprintf(buf,"%ld\n", \
-				(long)TEMP_ADD_FROM_REG(data->reg##_add[nr-2])); \
+			return sprintf(buf,"%d\n", \
+				LM75_TEMP_FROM_REG(data->reg##_add[nr-2])); \
 		} \
 	} else {	/* TEMP1 */ \
 		return sprintf(buf,"%ld\n", (long)TEMP_FROM_REG(data->reg)); \
@@ -453,15 +451,15 @@ static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t cou
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct w83781d_data *data = i2c_get_clientdata(client); \
-	u32 val; \
+	s32 val; \
 	 \
-	val = simple_strtoul(buf, NULL, 10); \
+	val = simple_strtol(buf, NULL, 10); \
 	 \
 	if (nr >= 2) {	/* TEMP2 and TEMP3 */ \
 		if (data->type == as99127f) \
 			data->temp_##reg##_add[nr-2] = AS99127_TEMP_ADD_TO_REG(val); \
 		else \
-			data->temp_##reg##_add[nr-2] = TEMP_ADD_TO_REG(val); \
+			data->temp_##reg##_add[nr-2] = LM75_TEMP_TO_REG(val); \
 		 \
 		w83781d_write_value(client, W83781D_REG_TEMP_##REG(nr), \
 				data->temp_##reg##_add[nr-2]); \
