@@ -51,22 +51,19 @@ static int ubd_open(struct inode * inode, struct file * filp);
 static int ubd_release(struct inode * inode, struct file * file);
 static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg);
-static int ubd_revalidate(kdev_t rdev);
+static int ubd_revalidate(struct gendisk *disk);
 
 #define MAX_DEV (8)
-#define MAX_MINOR (MAX_DEV << UBD_SHIFT)
-
-#define DEVICE_NR(n) (minor(n) >> UBD_SHIFT)
 
 static struct block_device_operations ubd_blops = {
-        .open =		ubd_open,
-        .release =	ubd_release,
-        .ioctl =	ubd_ioctl,
-        .revalidate =	ubd_revalidate,
+        .open		= ubd_open,
+        .release	= ubd_release,
+        .ioctl		= ubd_ioctl,
+        .revalidate_disk= ubd_revalidate,
 };
 
 /* Protected by the queue_lock */
-static request_queue_t *ubd_queue;
+static request_queue_t ubd_queue;
 
 /* Protected by ubd_lock */
 static int fake_major = 0;
@@ -347,30 +344,31 @@ int thread_fd = -1;
  */
 int intr_count = 0;
 
-static void ubd_finish(int error)
+static void ubd_finish(struct request *req, int error)
 {
 	int nsect;
 
 	if(error){
  		spin_lock(&ubd_io_lock);
-		end_request(CURRENT, 0);
+		end_request(req, 0);
  		spin_unlock(&ubd_io_lock);
 		return;
 	}
-	nsect = CURRENT->current_nr_sectors;
-	CURRENT->sector += nsect;
-	CURRENT->buffer += nsect << 9;
-	CURRENT->errors = 0;
-	CURRENT->nr_sectors -= nsect;
-	CURRENT->current_nr_sectors = 0;
+	nsect = req->current_nr_sectors;
+	req->sector += nsect;
+	req->buffer += nsect << 9;
+	req->errors = 0;
+	req->nr_sectors -= nsect;
+	req->current_nr_sectors = 0;
 	spin_lock(&ubd_io_lock);
-	end_request(CURRENT, 1);
+	end_request(req, 1);
 	spin_unlock(&ubd_io_lock);
 }
 
 static void ubd_handler(void)
 {
 	struct io_thread_req req;
+	struct request *rq = elv_next_request(&ubd_queue);
 	int n;
 
 	do_ubd = NULL;
@@ -380,18 +378,18 @@ static void ubd_handler(void)
 		printk(KERN_ERR "Pid %d - spurious interrupt in ubd_handler, "
 		       "errno = %d\n", os_getpid(), -n);
 		spin_lock(&ubd_io_lock);
-		end_request(CURRENT, 0);
+		end_request(rq, 0);
 		spin_unlock(&ubd_io_lock);
 		return;
 	}
         
-        if((req.offset != ((__u64) (CURRENT->sector)) << 9) ||
-	   (req.length != (CURRENT->current_nr_sectors) << 9))
+        if((req.offset != ((__u64) (rq->sector)) << 9) ||
+	   (req.length != (rq->current_nr_sectors) << 9))
 		panic("I/O op mismatch");
 	
-	ubd_finish(req.error);
+	ubd_finish(rq, req.error);
 	reactivate_fd(thread_fd, UBD_IRQ);	
-	do_ubd_request(ubd_queue);
+	do_ubd_request(&ubd_queue);
 }
 
 static void ubd_intr(int irq, void *dev, struct pt_regs *unused)
@@ -483,9 +481,13 @@ static int ubd_add(int n)
 			goto out_unregister;
 
  		ubd_dev[n].fake = fake;
+		fake_disk->private_data = &ubd_dev[n];
+		fake_disk->queue = &ubd_queue;
 		add_disk(fake_disk);
 	}
  
+	disk->private_data = &ubd_dev[n];
+	disk->queue = &ubd_queue;
 	add_disk(disk);
 	make_ide_entries(disk->disk_name);
 	return(0);
@@ -574,11 +576,6 @@ static int ubd_mc_init(void)
 
 __initcall(ubd_mc_init);
 
-static request_queue_t *ubd_get_queue(kdev_t device)
-{
-	return(ubd_queue);
-}
-
 int ubd_init(void)
 {
         int i;
@@ -588,9 +585,8 @@ int ubd_init(void)
 		printk(KERN_ERR "ubd: unable to get major %d\n", MAJOR_NR);
 		return -1;
 	}
-	ubd_queue = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	blk_init_queue(ubd_queue, do_ubd_request, &ubd_io_lock);
-	elevator_init(ubd_queue, &elevator_noop);
+	blk_init_queue(&ubd_queue, do_ubd_request, &ubd_io_lock);
+	elevator_init(&ubd_queue, &elevator_noop);
 	if(fake_major != 0){
 		char name[sizeof("ubd_nnn\0")];
 
@@ -601,7 +597,6 @@ int ubd_init(void)
 			       fake_major);
 			return -1;
 		}
-		blk_dev[fake_major].queue = ubd_get_queue;
 	}
 	for(i = 0; i < MAX_DEV; i++) 
 		ubd_add(i);
@@ -698,8 +693,8 @@ static int ubd_open_dev(struct ubd *dev)
 
 static int ubd_open(struct inode *inode, struct file *filp)
 {
-	int n = DEVICE_NR(inode->i_rdev);
-	struct ubd *dev = &ubd_dev[n];
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ubd *dev = disk->private_data;
 	int err;
 	if(dev->is_dir == 1)
 		goto out;
@@ -709,8 +704,8 @@ static int ubd_open(struct inode *inode, struct file *filp)
 
 		err = ubd_open_dev(dev);
 		if(err){
-			printk(KERN_ERR "ubd%d: Can't open \"%s\": "
-			       "errno = %d\n", n, dev->file, -err);
+			printk(KERN_ERR "%s: Can't open \"%s\": "
+			       "errno = %d\n", disk->disk_name, dev->file, -err);
 			goto out;
 		}
 	}
@@ -725,9 +720,10 @@ static int ubd_open(struct inode *inode, struct file *filp)
 
 static int ubd_release(struct inode * inode, struct file * file)
 {
-        int n = DEVICE_NR(inode->i_rdev);
-	if(--ubd_dev[n].count == 0)
-		ubd_close(&ubd_dev[n]);
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ubd *dev = disk->private_data;
+	if(dev->count == 0)
+		ubd_close(dev);
 	return(0);
 }
 
@@ -771,15 +767,13 @@ void cowify_req(struct io_thread_req *req, struct ubd *dev)
 
 static int prepare_request(struct request *req, struct io_thread_req *io_req)
 {
-	struct ubd *dev;
+	struct gendisk *disk = req->rq_disk;
+	struct ubd *dev = disk->private_data;
 	__u64 block;
-	int nsect, min, n;
+	int nsect;
 
-	if(req->rq_status == RQ_INACTIVE) return(1);
+	if (req->rq_status == RQ_INACTIVE) return(1);
 
-	min = minor(req->rq_dev);
-	n = min >> UBD_SHIFT;
-	dev = &ubd_dev[n];
 	if(dev->is_dir){
 		strcpy(req->buffer, "HOSTFS:");
 		strcat(req->buffer, dev->file);
@@ -790,7 +784,7 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	}
 
 	if((rq_data_dir(req) == WRITE) && !dev->openflags.w){
-		printk("Write attempted on readonly ubd device %d\n", n);
+		printk("Write attempted on readonly ubd device %s\n", disk->disk_name);
  		spin_lock(&ubd_io_lock);
 		end_request(req, 0);
  		spin_unlock(&ubd_io_lock);
@@ -829,7 +823,7 @@ static void do_ubd_request(request_queue_t *q)
 			err = prepare_request(req, &io_req);
 			if(!err){
 				do_io(&io_req);
-				ubd_finish(io_req.error);
+				ubd_finish(req, io_req.error);
 			}
 		}
 	}
@@ -852,21 +846,15 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg)
 {
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
+	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
+	int err;
  	struct ubd *dev;
-	int n, min, err;
 	struct hd_driveid ubd_id = {
 		.cyls =		0,
 		.heads =	128,
 		.sectors =	32,
 	};
 
-
-        if(!inode) return(-EINVAL);
-	min = minor(inode->i_rdev);
-	n = min >> UBD_SHIFT;
-	if(n > MAX_DEV)
-		return(-EINVAL);
-	dev = &ubd_dev[n];
 	switch (cmd) {
 	        struct hd_geometry g;
 		struct cdrom_volctrl volume;
@@ -880,7 +868,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 	case HDIO_SET_UNMASKINTR:
 		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if((arg > 1) || (min & ((1 << UBD_SHIFT) - 1)))
+		if((arg > 1) || inode->i_bdev->bd_contains != inode->i_bdev)
 			return(-EINVAL);
 		return(0);
 
@@ -900,7 +888,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 	case HDIO_SET_MULTCOUNT:
 		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if(min & ((1 << UBD_SHIFT) - 1))
+		if (inode->i_bdev->bd_contains != inode->i_bdev)
 			return(-EINVAL);
 		return(0);
 
@@ -925,14 +913,11 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	return(-EINVAL);
 }
 
-static int ubd_revalidate(kdev_t rdev)
+static int ubd_revalidate(struct gendisk *disk)
 {
 	__u64 size;
-	int n, err;
-	struct ubd *dev;
-
-	n = minor(rdev) >> UBD_SHIFT;
-	dev = &ubd_dev[n];
+	int err;
+	struct ubd *dev = disk->private_data;
 
 	err = 0;
 	spin_lock(&ubd_lock);
@@ -941,9 +926,7 @@ static int ubd_revalidate(kdev_t rdev)
 	
 	err = ubd_file_size(dev, &size);
 	if (!err) {
-		set_capacity(ubd_gendisk[n], size / 512);
-		if(fake_major != 0)
-			set_capacity(fake_gendisk[n], size / 512);
+		set_capacity(disk, size / 512);
 		dev->size = size;
 	}
  out:

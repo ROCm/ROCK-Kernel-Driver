@@ -114,7 +114,7 @@
 #include <linux/delay.h>
 
 #define MAJOR_NR	MFM_ACORN_MAJOR
-#define DEVICE_NR(device) (minor(device) >> 6)
+#define QUEUE (&mfm_queue)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -128,6 +128,8 @@
 #include <asm/hardware/ioc.h>
 
 static void (*do_mfm)(void) = NULL;
+static struct request_queue mfm_queue;
+static spinlock_t mfm_lock = SPIN_LOCK_UNLOCKED;
 /*
  * This sort of stuff should be in a header file shared with ide.c, hd.c, xd.c etc
  */
@@ -225,7 +227,7 @@ static void mfm_seek(void);
 static void mfm_rerequest(void);
 static void mfm_request(void);
 static void mfm_specify (void);
-static void issue_request(int dev, unsigned int block, unsigned int nsect,
+static void issue_request(unsigned int block, unsigned int nsect,
 			  struct request *req);
 
 static unsigned int mfm_addr;		/* Controller address */
@@ -739,7 +741,7 @@ static void request_done(int uptodate)
 			/* Yep - a partial access */
 
 			/* and issue the remainder */
-			issue_request(minor(CURRENT->rq_dev), PartFragRead_RestartBlock, PartFragRead_SectorsLeft, CURRENT);
+			issue_request(PartFragRead_RestartBlock, PartFragRead_SectorsLeft, CURRENT);
 			return;
 		}
 
@@ -794,30 +796,31 @@ static struct cont rw_cont =
  * Actually gets round to issuing the request - note everything at this
  * point is in 256 byte sectors not Linux 512 byte blocks
  */
-static void issue_request(int dev, unsigned int block, unsigned int nsect,
+static void issue_request(unsigned int block, unsigned int nsect,
 			  struct request *req)
 {
+	struct gendisk *disk = req->rq_disk;
+	struct mfm_info *p = disk->private_data;
 	int track, start_head, start_sector;
 	int sectors_to_next_cyl;
+	dev = p - mfm_info;
 
-	dev >>= 6;
-
-	track = block / mfm_info[dev].sectors;
-	start_sector = block % mfm_info[dev].sectors;
-	start_head = track % mfm_info[dev].heads;
+	track = block / p->sectors;
+	start_sector = block % p->sectors;
+	start_head = track % p->heads;
 
 	/* First get the number of whole tracks which are free before the next
 	   track */
-	sectors_to_next_cyl = (mfm_info[dev].heads - (start_head + 1)) * mfm_info[dev].sectors;
+	sectors_to_next_cyl = (p->heads - (start_head + 1)) * p->sectors;
 	/* Then add in the number of sectors left on this track */
-	sectors_to_next_cyl += (mfm_info[dev].sectors - start_sector);
+	sectors_to_next_cyl += (p->sectors - start_sector);
 
-	DBG("issue_request: mfm_info[dev].sectors=%d track=%d\n", mfm_info[dev].sectors, track);
+	DBG("issue_request: mfm_info[dev].sectors=%d track=%d\n", p->sectors, track);
 
 	raw_cmd.dev = dev;
 	raw_cmd.sector = start_sector;
 	raw_cmd.head = start_head;
-	raw_cmd.cylinder = track / mfm_info[dev].heads;
+	raw_cmd.cylinder = track / p->heads;
 	raw_cmd.cmdtype = CURRENT->cmd;
 	raw_cmd.cmdcode = CURRENT->cmd == WRITE ? CMD_WD : CMD_RD;
 	raw_cmd.cmddata[0] = dev + 1;	/* DAG: +1 to get US */
@@ -895,7 +898,7 @@ static void mfm_request(void)
 	Busy = 1;
 
 	while (1) {
-		unsigned int dev, block, nsect, unit;
+		unsigned int block, nsect;
 		struct gendisk *disk;
 
 		DBG("mfm_request: loop start\n");
@@ -912,16 +915,9 @@ static void mfm_request(void)
 
 		DBG("mfm_request:                 before arg extraction\n");
 
-		dev = minor(CURRENT->rq_dev);
-		unit = dev>>6;
+		disk = CURRENT->rq_disk;
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;
-#ifdef DEBUG
-		/*if (unit==1) */ console_printf("mfm_request:                                raw vals: dev=%d (block=512 bytes) block=%d nblocks=%d\n", dev, block, nsect);
-#endif
-		if (unit >= mfm_drives)
-			printk("mfm: bad disk number: %d\n", unit);
-		disk = mfm_gendisk[unit];
 		if (block >= get_capacity(disk) ||
 		    block+nsect > get_capacity(disk)) {
 			printk("%s: bad access: block=%d, count=%d, nr_sects=%ld\n",
@@ -951,7 +947,7 @@ static void mfm_request(void)
 			printk("mfm: continue 4\n");
 			continue;
 		}
-		issue_request(dev, block, nsect, CURRENT);
+		issue_request(block, nsect, CURRENT);
 
 		break;
 	}
@@ -1006,6 +1002,7 @@ static void mfm_geometry(int drive)
 {
 	struct mfm_info *p = mfm_info + drive;
 	struct gendisk *disk = mfm_gendisk[drive];
+	disk->private_data = p;
 	if (p->cylinders)
 		printk ("%s: %dMB CHS=%d/%d/%d LCC=%d RECOMP=%d\n",
 			disk->disk_name,
@@ -1166,21 +1163,18 @@ static int mfm_initdrives(void)
 
 static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long arg)
 {
+	struct mfm_info *p = inode->i_bdev->bd_disk->private_data;
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
-	int device = DEVICE_NR(minor(inode->i_rdev));
-	if (device >= mfm_drives)
-		return -EINVAL;
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	if (!arg)
 		return -EINVAL;
-	if (put_user (mfm_info[device].heads, &geo->heads))
+	if (put_user (p->heads, &geo->heads))
 		return -EFAULT;
-	if (put_user (mfm_info[device].sectors, &geo->sectors))
+	if (put_user (p->sectors, &geo->sectors))
 		return -EFAULT;
-	if (put_user (mfm_info[device].cylinders, &geo->cylinders))
+	if (put_user (p->cylinders, &geo->cylinders))
 		return -EFAULT;
-	start = get_start_sect(inode->i_bdev);
 	if (put_user (get_start_sect(inode->i_bdev), &geo->start))
 		return -EFAULT;
 	return 0;
@@ -1203,24 +1197,26 @@ void mfm_setup(char *str, int *ints)
 void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 			unsigned char heads, unsigned int secsize)
 {
-	int drive = MINOR(bdev->bd_dev) >> 6;
+	struct mfm_info *p = bdev->bd_disk->private_data;
+	int drive = p - mfm_info;
 	unsigned long disksize = bdev->bd_inode->i_size;
 
-	if (mfm_info[drive].cylinders == 1) {
-		mfm_info[drive].sectors = secsptrack;
-		mfm_info[drive].heads = heads;
-		mfm_info[drive].cylinders = discsize / (secsptrack * heads * secsize);
+	if (p->cylinders == 1) {
+		p->sectors = secsptrack;
+		p->heads = heads;
+		p->cylinders = discsize / (secsptrack * heads * secsize);
 
-		if ((heads < 1) || (mfm_info[drive].cylinders > 1024)) {
-			printk("mfm%c: Insane disc shape! Setting to 512/4/32\n",'a' + drive);
+		if ((heads < 1) || (p->cylinders > 1024)) {
+			printk("%s: Insane disc shape! Setting to 512/4/32\n",
+				bdev->bd_disk->disk_name);
 
 			/* These values are fairly arbitary, but are there so that if your
 			 * lucky you can pick apart your disc to find out what is going on -
 			 * I reckon these figures won't hurt MOST drives
 			 */
-			mfm_info[drive].sectors = 32;
-			mfm_info[drive].heads = 4;
-			mfm_info[drive].cylinders = 512;
+			p->sectors = 32;
+			p->heads = 4;
+			p->cylinders = 512;
 		}
 		if (raw_cmd.dev == drive)
 			mfm_specify ();
@@ -1317,7 +1313,7 @@ static int __init mfm_init (void)
 	hdc63463_irqpolladdress	= mfm_IRQPollLoc;
 	hdc63463_irqpollmask	= irqmask;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mfm_request);
+	blk_init_queue(&mfm_queue, do_mfm_request, &mfm_lock);
 
 	Busy = 0;
 	lastspecifieddrive = -1;
@@ -1349,6 +1345,7 @@ static int __init mfm_init (void)
 
 	for (i = 0; i < mfm_drives; i++) {
 		mfm_geometry(i);
+		mfm_gendisk[i]->queue = &mfm_queue;
 		add_disk(mfm_gendisk[i]);
 	}
 	return 0;
@@ -1357,7 +1354,7 @@ out4:
 	for (i = 0; i < mfm_drives; i++)
 		put_disk(mfm_gendisk[i]);
 out3:
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mfm_queue);
 	unregister_blkdev(MAJOR_NR, "mfm");
 out2:
 	release_region(mfm_addr, 10);
@@ -1380,7 +1377,7 @@ static void __exit mfm_exit(void)
 		del_gendisk(mfm_gendisk[i]);
 		put_disk(mfm_gendisk[i]);
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mfm_queue);
 	unregister_blkdev(MAJOR_NR, "mfm");
 	if (ecs)
 		ecard_release(ecs);

@@ -289,13 +289,13 @@ static ssize_t part_start_read(struct device *dev,
 			char *page, size_t count, loff_t off)
 {
 	struct hd_struct *p = dev->driver_data;
-	return off ? 0 : sprintf(page, "%llu\n",(u64)p->start_sect);
+	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->start_sect);
 }
 static ssize_t part_size_read(struct device *dev,
 			char *page, size_t count, loff_t off)
 {
 	struct hd_struct *p = dev->driver_data;
-	return off ? 0 : sprintf(page, "%llu\n",(u64)p->nr_sects);
+	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->nr_sects);
 }
 static struct device_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
@@ -375,7 +375,7 @@ static ssize_t disk_size_read(struct device *dev,
 			char *page, size_t count, loff_t off)
 {
 	struct gendisk *disk = dev->driver_data;
-	return off ? 0 : sprintf(page, "%llu\n",(u64)get_capacity(disk));
+	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
 }
 static struct device_attribute disk_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
@@ -511,8 +511,8 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	bdev->bd_invalidated = 0;
 	for (p = 1; p < disk->minors; p++)
 		delete_partition(disk, p);
-	if (bdev->bd_op->revalidate)
-		bdev->bd_op->revalidate(dev);
+	if (bdev->bd_op->revalidate_disk)
+		bdev->bd_op->revalidate_disk(disk);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return res;
 	for (p = 1; p < state->limit; p++) {

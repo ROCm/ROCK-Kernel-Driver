@@ -156,6 +156,7 @@
 #define FLOPPY_DMA 0
 #define DEVICE_NAME "floppy"
 #define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
+#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 
 /* Note: FD_MAX_UNITS could be redefined to 2 for the Atari (with
@@ -178,6 +179,8 @@
 #else
 #define DPRINT(a)
 #endif
+
+static struct request_queue floppy_queue;
 
 /* Disk types: DD */
 static struct archy_disk_type {
@@ -1140,14 +1143,11 @@ static void floppy_off(unsigned int nr)
    - but if it sees a disc change line go high (?) it flips to using
    it. Well  maybe I'll add that in the future (!?)
 */
-static int check_floppy_change(dev_t dev)
+static int check_floppy_change(struct gendisk *disk)
 {
-	unsigned int drive = (dev & 0x03);
+	struct archy_floppy_struct *p = disk->private_data;
+	unsigned int drive = p - unit;
 
-	if (major(dev) != MAJOR_NR) {
-		printk("floppy_changed: not a floppy\n");
-		return 0;
-	}
 	if (test_bit(drive, &fake_change)) {
 		/* simulated change (e.g. after formatting) */
 		return 1;
@@ -1156,7 +1156,7 @@ static int check_floppy_change(dev_t dev)
 		/* surely changed (the WP signal changed at least once) */
 		return 1;
 	}
-	if (unit[drive].wpstat) {
+	if (p->wpstat) {
 		/* WP is on -> could be changed: to be sure, buffers should be
 		   * invalidated...
 		 */
@@ -1165,9 +1165,10 @@ static int check_floppy_change(dev_t dev)
 	return 1; /* DAG - was 0 */
 }
 
-static int floppy_revalidate(dev_t dev)
+static int floppy_revalidate(struct gendisk *disk)
 {
-	int drive = dev & 3;
+	struct archy_floppy_struct *p = disk->private_data;
+	unsigned int drive = p - unit;
 
 	if (test_bit(drive, &changed_floppies) || test_bit(drive, &fake_change)
 	    || unit[drive].disktype == 0) {
@@ -1176,7 +1177,7 @@ static int floppy_revalidate(dev_t dev)
 #endif
 		clear_bit(drive, &fake_change);
 		clear_bit(drive, &changed_floppies);
-		unit[drive].disktype = 0;
+		p->disktype = 0;
 	}
 	return 0;
 }
@@ -1521,23 +1522,24 @@ static int floppy_release(struct inode *inode, struct file *filp)
 
 static struct block_device_operations floppy_fops =
 {
-	.open			= floppy_open,
-	.release		= floppy_release,
-	.ioctl			= fd_ioctl,
-	.check_media_change	= check_floppy_change,
-	.revalidate		= floppy_revalidate,
+	.open		= floppy_open,
+	.release	= floppy_release,
+	.ioctl		= fd_ioctl,
+	.media_changed	= check_floppy_change,
+	.revalidate_disk= floppy_revalidate,
 };
 
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = minor & 3;
-	if ((minor>> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
+	int drive = *part & 3;
+	if ((*part >> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
-	return disks[drive];
+	return get_disk(disks[drive]);
 }
 
 int fd1772_init(void)
 {
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	int i;
 
 	if (!machine_is_archimedes())
@@ -1580,16 +1582,19 @@ int fd1772_init(void)
 	   out of some special memory... */
 	DMABuffer = (char *) kmalloc(2048);	/* Copes with pretty large sectors */
 #endif
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
+	blk_init_queue(&floppy_queue, do_fd_request, &lock);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		disks[i]->major = MAJOR_NR;
 		disks[i]->first_minor = 0;
 		disks[i]->fops = &floppy_fops;
 		sprintf(disks[i]->disk_name, "fd%d", i);
+		disks[i]->private_data = &unit[i];
+		disks[i]->queue = &floppy_queue;
 		set_capacity(disks[i], MAX_DISK_SIZE * 2);
 	}
-	blk_set_probe(MAJOR_NR, floppy_find);
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	for (i = 0; i < FD_MAX_UNITS; i++)
 		add_disk(disks[i]);

@@ -119,14 +119,14 @@ extern void __xchg_called_with_bad_pointer(void);
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 #define tas(ptr) (xchg((ptr),1))
 
-static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
+static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	switch (size) {
 	case 4:
-		return (unsigned long )xchg_u32(ptr, x);
+		return (unsigned long) xchg_u32(ptr, x);
 #if 0	/* xchg_u64 doesn't exist on 32-bit PPC */
 	case 8:
-		return (unsigned long )xchg_u64(ptr, x);
+		return (unsigned long) xchg_u64(ptr, x);
 #endif /* 0 */
 	}
 	__xchg_called_with_bad_pointer();

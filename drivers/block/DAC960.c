@@ -75,18 +75,18 @@ static DAC960_Controller_T
   *DAC960_Controllers[DAC960_MaxControllers] =	{ NULL };
 
 
-static int DAC960_revalidate(kdev_t);
+static int DAC960_revalidate(struct gendisk *);
 /*
   DAC960_BlockDeviceOperations is the Block Device Operations structure for
   DAC960 Logical Disk Devices.
 */
 
 static struct block_device_operations DAC960_BlockDeviceOperations = {
-	owner:		THIS_MODULE,
-	open:		DAC960_Open,
-	release:	DAC960_Release,
-	ioctl:		DAC960_IOCTL,
-	revalidate:	DAC960_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= DAC960_Open,
+	.release	= DAC960_Release,
+	.ioctl		= DAC960_IOCTL,
+	.revalidate_disk= DAC960_revalidate,
 };
 
 
@@ -308,9 +308,9 @@ static inline void DAC960_DeallocateCommand(DAC960_Command_T *Command)
 
 static void DAC960_WaitForCommand(DAC960_Controller_T *Controller)
 {
-  spin_unlock_irq(Controller->RequestQueue->queue_lock);
+  spin_unlock_irq(Controller->RequestQueue.queue_lock);
   __wait_event(Controller->CommandWaitQueue, Controller->FreeCommands);
-  spin_lock_irq(Controller->RequestQueue->queue_lock);
+  spin_lock_irq(Controller->RequestQueue.queue_lock);
 }
 
 
@@ -1931,7 +1931,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
   RequestQueue_T *RequestQueue;
-  int MinorNumber;
   int n;
 
   /*
@@ -1947,7 +1946,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Initialize the I/O Request Queue.
   */
-  RequestQueue = BLK_DEFAULT_QUEUE(MajorNumber);
+  RequestQueue = &Controller->RequestQueue;
   Controller->queue_lock = SPIN_LOCK_UNLOCKED;
   blk_init_queue(RequestQueue, DAC960_RequestFunction, &Controller->queue_lock);
   RequestQueue->queuedata = Controller;
@@ -1956,7 +1955,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   blk_queue_max_phys_segments(RequestQueue, ~0);
   blk_queue_max_sectors(RequestQueue, Controller->MaxBlocksPerCommand);
 
-  Controller->RequestQueue = RequestQueue;
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
 	struct gendisk *disk = Controller->disks[n];
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
@@ -1989,7 +1987,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Remove the I/O Request Queue.
   */
-  blk_cleanup_queue(BLK_DEFAULT_QUEUE(MajorNumber));
+  blk_cleanup_queue(&Controller->RequestQueue);
 }
 
 static long disk_size(DAC960_Controller_T *Controller, int disk)
@@ -2019,12 +2017,16 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 		set_capacity(Controller->disks[disk], disk_size(Controller, disk));
 }
 
-static int DAC960_revalidate(kdev_t dev)
+static int DAC960_revalidate(struct gendisk *disk)
 {
-	int ctlr = DAC960_ControllerNumber(dev);
-	int disk = DAC960_LogicalDriveNumber(dev);
-	DAC960_Controller_T *p = DAC960_Controllers[ctlr];
-	set_capacity(p->disks[disk], disk_size(p, disk));
+	DAC960_Controller_T *p = disk->private_data;
+	int unit;
+	for (unit = 0; unit < DAC960_MaxLogicalDrives; unit++) {
+		if (p->disks[unit] == disk) {
+			set_capacity(disk, disk_size(p, unit));
+			return 0;
+		}
+	}
 	return 0;
 }
 
@@ -2093,6 +2095,7 @@ static boolean DAC960_ReportErrorStatus(DAC960_Controller_T *Controller,
 static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 {
   void (*InterruptHandler)(int, void *, Registers_T *) = NULL;
+  DAC960_Controller_T *Controller = NULL;
   DAC960_FirmwareType_T FirmwareType = 0;
   unsigned short VendorID = 0, DeviceID = 0;
   unsigned int MemoryWindowSize = 0;
@@ -2145,7 +2148,6 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
     }
   while ((PCI_Device = pci_find_device(VendorID, DeviceID, PCI_Device)) != NULL)
     {
-      DAC960_Controller_T *Controller = NULL;
       DAC960_IO_Address_T IO_Address = 0;
       DAC960_PCI_Address_T PCI_Address = 0;
       unsigned char Bus = PCI_Device->bus->number;
@@ -2155,6 +2157,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
       unsigned char ErrorStatus, Parameter0, Parameter1;
       unsigned int IRQ_Channel = PCI_Device->irq;
       void *BaseAddress;
+      Controller = NULL;
       if (pci_enable_device(PCI_Device) != 0) continue;
       switch (HardwareType)
 	{
@@ -2202,6 +2205,8 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 		Controller->disks[i] = alloc_disk(1<<DAC960_MaxPartitionsBits);
 		if (!Controller->disks[i])
 			goto Enomem;
+		Controller->disks[i]->private_data = Controller;
+		Controller->disks[i]->queue = &Controller->RequestQueue;
       }
       Controller->ControllerNumber = DAC960_ControllerCount;
       init_waitqueue_head(&Controller->CommandWaitQueue);
@@ -2831,7 +2836,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
 				     boolean WaitForCommand)
 {
-  RequestQueue_T *RequestQueue = Controller->RequestQueue;
+  RequestQueue_T *RequestQueue = &Controller->RequestQueue;
   ListHead_T *RequestQueueHead;
   IO_Request_T *Request;
   DAC960_Command_T *Command;
@@ -5225,7 +5230,6 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
     }
 }
 
-
 /*
   DAC960_Open is the Device Open Function for the DAC960 Driver.
 */
@@ -5265,9 +5269,8 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
       long size;
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
       size = disk_size(Controller, LogicalDriveNumber);
-      /* BROKEN, same as modular ide-floppy/ide-disk; same fix - ->probe() */
       set_capacity(Controller->disks[LogicalDriveNumber], size);
-      add_disk(Controller->disks[LogicalDriveNumber]);
+      Inode->i_bdev->bd_invalidated = 1;
     }
   if (!get_capacity(Controller->disks[LogicalDriveNumber]))
     return -ENXIO;
@@ -5314,7 +5317,6 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
   int LogicalDriveNumber = DAC960_LogicalDriveNumber(Inode->i_rdev);
   DiskGeometry_T Geometry, *UserGeometry;
   DAC960_Controller_T *Controller;
-  int res;
 
   if (File != NULL && (File->f_flags & O_NONBLOCK))
     return DAC960_UserIOCTL(Inode, File, Request, Argument);
@@ -5379,7 +5381,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 			    unsigned int Request, unsigned long Argument)
 {
-  int ErrorCode;
+  int ErrorCode = 0;
   if (!capable(CAP_SYS_ADMIN)) return -EACCES;
   switch (Request)
     {
@@ -5492,11 +5494,11 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
 						     [DCDB.TargetID])
 	      {
-		spin_unlock_irq(Controller->RequestQueue->queue_lock);
+		spin_unlock_irq(Controller->RequestQueue.queue_lock);
 		__wait_event(Controller->CommandWaitQueue,
 			     !Controller->V1.DirectCommandActive
 					     [DCDB.Channel][DCDB.TargetID]);
-		spin_lock_irq(Controller->RequestQueue->queue_lock);
+		spin_lock_irq(Controller->RequestQueue.queue_lock);
 	      }
 	    Controller->V1.DirectCommandActive[DCDB.Channel]
 					      [DCDB.TargetID] = true;

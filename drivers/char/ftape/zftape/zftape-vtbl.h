@@ -168,11 +168,11 @@ extern int   zft_fake_volume_headers   (eof_mark_union *eof_map,
 extern int   zft_weof                  (unsigned int count, zft_position *pos);
 extern void  zft_move_past_eof         (zft_position *pos);
 
-extern inline int   zft_tape_at_eod         (const zft_position *pos);
-extern inline int   zft_tape_at_lbot        (const zft_position *pos);
-extern inline void  zft_position_before_eof (zft_position *pos, 
+static inline int   zft_tape_at_eod         (const zft_position *pos);
+static inline int   zft_tape_at_lbot        (const zft_position *pos);
+static inline void  zft_position_before_eof (zft_position *pos, 
 					     const zft_volinfo *volume);
-extern inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
+static inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
 				      const zft_position *pos);
 
 /* this function decrements the zft_seg_pos counter if we are right
@@ -180,7 +180,7 @@ extern inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
  * need to position before the eof mark.  NOTE: zft_tape_pos is not
  * changed 
  */
-extern inline void zft_position_before_eof(zft_position *pos, 
+static inline void zft_position_before_eof(zft_position *pos, 
 					   const zft_volinfo *volume)
 { 
 	TRACE_FUN(ft_t_flow);
@@ -195,7 +195,7 @@ extern inline void zft_position_before_eof(zft_position *pos,
 /*  Mmmh. Is the position at the end of the last volume, that is right
  *  before the last EOF mark also logical an EOD condition?
  */
-extern inline int zft_tape_at_eod(const zft_position *pos)
+static inline int zft_tape_at_eod(const zft_position *pos)
 { 
 	TRACE_FUN(ft_t_any);
 
@@ -207,7 +207,7 @@ extern inline int zft_tape_at_eod(const zft_position *pos)
 	}
 }
 
-extern inline int zft_tape_at_lbot(const zft_position *pos)
+static inline int zft_tape_at_lbot(const zft_position *pos)
 {
 	if (zft_qic_mode) {
 		return (pos->seg_pos <= zft_first_vtbl->start_seg &&
@@ -220,7 +220,7 @@ extern inline int zft_tape_at_lbot(const zft_position *pos)
 
 /* This one checks for EOF.  return remaing space (may be negative) 
  */
-extern inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
+static inline __s64 zft_check_for_eof(const zft_volinfo *vtbl,
 				      const zft_position *pos)
 {     
 	return (__s64)(vtbl->size - pos->volume_pos);

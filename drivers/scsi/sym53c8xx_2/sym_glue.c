@@ -1793,16 +1793,12 @@ static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
 	hcb_p np = 0;
 	int retv;
 
-	for (host = first_host; host; host = host->next) {
-		if (host->hostt != first_host->hostt)
-			continue;
-		if (host->host_no == hostno) {
-			host_data = (struct host_data *) host->hostdata;
-			np = host_data->ncb;
-			break;
-		}
-	}
+	host = scsi_host_hn_get(hostno);
+	if (!host)
+		return -EINVAL;
 
+	host_data = (struct host_data *) host->hostdata;
+	np = host_data->ncb;
 	if (!np)
 		return -EINVAL;
 
@@ -1823,6 +1819,7 @@ static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
 #endif
 	}
 
+	scsi_host_put(host);
 	return retv;
 }
 #endif /* SYM_LINUX_PROC_INFO_SUPPORT */

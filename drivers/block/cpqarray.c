@@ -150,7 +150,7 @@ static inline void complete_command(cmdlist_t *cmd, int timeout);
 
 static void do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ida_timer(unsigned long tdata);
-static int ida_revalidate(kdev_t dev);
+static int ida_revalidate(struct gendisk *disk);
 static int revalidate_allvol(kdev_t dev);
 
 #ifdef CONFIG_PROC_FS
@@ -163,11 +163,11 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset,
 #endif
 
 static struct block_device_operations ida_fops  = {
-	owner:		THIS_MODULE,
-	open:		ida_open,
-	release:	ida_release,
-	ioctl:		ida_ioctl,
-	revalidate:	ida_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= ida_open,
+	.release	= ida_release,
+	.ioctl		= ida_ioctl,
+	.revalidate_disk= ida_revalidate,
 };
 
 
@@ -296,7 +296,7 @@ static void __exit cpqarray_exit(void)
 		iounmap(hba[i]->vaddr);
 		unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
 		del_timer(&hba[i]->timer);
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + i));
+		blk_cleanup_queue(&hba[i]->queue);
 		remove_proc_entry(hba[i]->devname, proc_array);
 		pci_free_consistent(hba[i]->pci_dev, 
 			NR_CMDS * sizeof(cmdlist_t), (hba[i]->cmd_pool), 
@@ -378,7 +378,7 @@ static int __init cpqarray_init(void)
 
 		ida_procinit(i);
 
-		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
+		q = &hba[i]->queue;
 		q->queuedata = hba[i];
 		spin_lock_init(&hba[i]->lock);
 		blk_init_queue(q, do_ida_request, &hba[i]->lock);
@@ -409,8 +409,10 @@ static int __init cpqarray_init(void)
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
 				continue;
-			(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->blk_size;
+			hba[i]->queue.hardsect_size = drv->blk_size;
 			set_capacity(disk, drv->nr_blks);
+			disk->queue = &hba[i]->queue;
+			disk->private_data = drv;
 			add_disk(disk);
 		}
 	}
@@ -1004,7 +1006,7 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	do_ida_request(BLK_DEFAULT_QUEUE(MAJOR_NR+h->ctlr));
+	do_ida_request(&h->queue);
 	spin_unlock_irqrestore(IDA_LOCK(h->ctlr), flags); 
 }
 
@@ -1446,8 +1448,10 @@ static int revalidate_allvol(kdev_t dev)
 		drv_info_t *drv = &hba[ctlr]->drv[i];
 		if (!drv->nr_blks)
 			continue;
-		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
+		hba[ctlr]->queue.hardsect_size = drv->blk_size;
 		set_capacity(disk, drv->nr_blks);
+		disk->queue = &hba[ctlr]->queue;
+		disk->private_data = drv;
 		add_disk(disk);
 	}
 
@@ -1455,12 +1459,10 @@ static int revalidate_allvol(kdev_t dev)
 	return 0;
 }
 
-static int ida_revalidate(kdev_t dev)
+static int ida_revalidate(struct gendisk *disk)
 {
-        int ctlr = major(dev) - MAJOR_NR;
-	int target = DEVICE_NR(dev);
-        struct gendisk *gdev = ida_gendisk[ctlr][target];
-	set_capacity(gdev, hba[ctlr]->drv[target].nr_blks);
+	drv_info_t *drv = disk->private_data;
+	set_capacity(disk, drv->nr_blks);
 	return 0;
 }
 

@@ -28,7 +28,7 @@
 #elif defined(CONFIG_BLK_DEV_IDE_MODULE)
 #include <linux/module.h>
 
-int (*ide_xlate_1024_hook)(kdev_t, int, int, const char *);
+int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
 EXPORT_SYMBOL(ide_xlate_1024_hook);
 #define ide_xlate_1024 ide_xlate_1024_hook
 #endif
