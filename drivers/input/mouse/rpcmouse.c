@@ -2,7 +2,7 @@
  *  Acorn RiscPC mouse driver for Linux/ARM
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
- *  Copyright (C) 1996-1998 Russell King
+ *  Copyright (C) 1996-2002 Russell King
  *
  */
 
@@ -34,7 +34,6 @@ MODULE_DESCRIPTION("Acorn RiscPC mouse driver");
 MODULE_LICENSE("GPL");
 
 static short rpcmouse_lastx, rpcmouse_lasty;
-static unsigned int rpcmouse_lastb;
 
 static struct input_dev rpcmouse_dev = {
 	.evbit	= { BIT(EV_KEY) | BIT(EV_REL) },
@@ -53,12 +52,11 @@ static struct input_dev rpcmouse_dev = {
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct input_dev *dev = dev_id;
-	short x, y, dx, dy;
-	unsigned int b;
+	short x, y, dx, dy, b;
 
 	x = (short) iomd_readl(IOMD_MOUSEX);
 	y = (short) iomd_readl(IOMD_MOUSEY);
-	b = (short) (__raw_readl(0xe0310000) >> 4) & 7;
+	b = (short) (__raw_readl(0xe0310000) ^ 0x70);
 
 	dx = x - rpcmouse_lastx;
 	dy = y - rpcmouse_lasty; 
@@ -66,21 +64,14 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	rpcmouse_lastx = x;
 	rpcmouse_lasty = y;
 
-	if (dx)
-		input_report_rel(dev, REL_X, dx);
-	if (dy)
-		input_report_rel(dev, REL_Y, -dy);
+	input_report_rel(dev, REL_X, dx);
+	input_report_rel(dev, REL_Y, -dy);
 
-	b = __raw_readl(0xe0310000) ^ 0x70;
-	if (b != rpcmouse_lastb) {
-		input_report_key(dev, BTN_LEFT,   b & 0x40);
-		input_report_key(dev, BTN_MIDDLE, b & 0x20);
-		input_report_key(dev, BTN_RIGHT,  b & 0x10);
-	}
-	if (b != rpcmouse_lastb || dx || dy)
-		input_sync(dev);
+	input_report_key(dev, BTN_LEFT,   b & 0x40);
+	input_report_key(dev, BTN_MIDDLE, b & 0x20);
+	input_report_key(dev, BTN_RIGHT,  b & 0x10);
 
-	rpcmouse_lastb = b;
+	input_sync(dev);
 }
 
 static int __init rpcmouse_init(void)

@@ -2,11 +2,7 @@
  * $Id: rpckbd.c,v 1.7 2001/09/25 10:12:07 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
- *
- *  Based on the work of:
- *	Russell King (thanks)
- *
- * Fixes by Russell King.
+ *  Copyright (c) 2002 Russell King
  */
 
 /*
@@ -44,7 +40,7 @@
 #include <asm/hardware/iomd.h>
 #include <asm/system.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik, Russell King");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
@@ -85,12 +81,12 @@ static int rpckbd_open(struct serio *port)
 	iomd_readb(IOMD_KARTRX);
 
 	if (request_irq(IRQ_KEYBOARDRX, rpckbd_rx, 0, "rpckbd", port) != 0) {
-		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard receive IRQ!\n");
+		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard receive IRQ\n");
 		return -EBUSY;
 	}
 
 	if (request_irq(IRQ_KEYBOARDTX, rpckbd_tx, 0, "rpckbd", port) != 0) {
-		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard transmit IRQ!\n");
+		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard transmit IRQ\n");
 		free_irq(IRQ_KEYBOARDRX, NULL);
 		return -EBUSY;
 	}
@@ -110,7 +106,7 @@ static struct serio rpckbd_port =
 	.open	= rpckbd_open,
 	.close	= rpckbd_close,
 	.write	= rpckbd_write,
-	.name 	= "RiscPC PS/2 kbd port",
+	.name	= "RiscPC PS/2 kbd port",
 	.phys	= "rpckbd/serio0",
 };
 
