@@ -38,6 +38,7 @@
 #include <linux/moduleparam.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
+#include <linux/efi.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -443,6 +444,10 @@ asmlinkage void __init start_kernel(void)
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
+#ifdef CONFIG_X86
+	if (efi_enabled)
+		efi_enter_virtual_mode();
+#endif
 	fork_init(num_physpages);
 	proc_caches_init();
 	buffer_init();

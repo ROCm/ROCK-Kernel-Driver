@@ -44,6 +44,7 @@
 #include <linux/module.h>
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
+#include <linux/efi.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -174,7 +175,10 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	/* gets recalled with irq locally disabled */
 	spin_lock(&rtc_lock);
-	retval = mach_set_rtc_mmss(nowtime);
+	if (efi_enabled)
+		retval = efi_set_rtc_mmss(nowtime);
+	else
+		retval = mach_set_rtc_mmss(nowtime);
 	spin_unlock(&rtc_lock);
 
 	return retval;
@@ -232,7 +236,13 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 			>= USEC_AFTER - ((unsigned) TICK_SIZE) / 2 &&
 	    (xtime.tv_nsec / 1000)
 			<= USEC_BEFORE + ((unsigned) TICK_SIZE) / 2) {
-		if (set_rtc_mmss(xtime.tv_sec) == 0)
+		/* horrible...FIXME */
+		if (efi_enabled) {
+	 		if (efi_set_rtc_mmss(xtime.tv_sec) == 0)
+				last_rtc_update = xtime.tv_sec;
+			else
+				last_rtc_update = xtime.tv_sec - 600;
+		} else if (set_rtc_mmss(xtime.tv_sec) == 0)
 			last_rtc_update = xtime.tv_sec;
 		else
 			last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
@@ -286,7 +296,10 @@ unsigned long get_cmos_time(void)
 
 	spin_lock(&rtc_lock);
 
-	retval = mach_get_cmos_time();
+	if (efi_enabled)
+		retval = efi_get_time();
+	else
+		retval = mach_get_cmos_time();
 
 	spin_unlock(&rtc_lock);
 
@@ -296,6 +309,7 @@ unsigned long get_cmos_time(void)
 static struct sysdev_class pit_sysclass = {
 	set_kset_name("pit"),
 };
+
 
 /* XXX this driverfs stuff should probably go elsewhere later -john */
 static struct sys_device device_i8253 = {
@@ -344,7 +358,6 @@ void __init time_init(void)
 		return;
 	}
 #endif
-
 	xtime.tv_sec = get_cmos_time();
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);

@@ -164,11 +164,6 @@ config ACPI
 	  The ACPI Sourceforge project may also be of interest:
 	  <http://sf.net/projects/acpi/>
 
-config ACPI_EFI
-	bool
-	depends on !IA64_HP_SIM
-	default y
-
 config ACPI_INTERPRETER
 	bool
 	depends on !IA64_HP_SIM
@@ -403,6 +398,11 @@ config IA64_SALINFO
 
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
+
+config EFI
+	bool
+	depends on !IA64_HP_SIM
+	default y
 
 config EFI_VARS
 	tristate "/proc/efi/vars support"
