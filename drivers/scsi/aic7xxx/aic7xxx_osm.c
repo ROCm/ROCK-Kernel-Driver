@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#163 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#164 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1297,7 +1297,7 @@ Scsi_Host_Template aic7xxx_driver_template = {
 	 */
 	.max_sectors		= 8192,
 #endif
-#if defined CONFIG_HIGHIO
+#if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
@@ -2337,6 +2337,14 @@ ahc_linux_dv_thread(void *data)
 	if (ahc_debug & AHC_SHOW_DV)
 		printf("Launching DV Thread\n");
 #endif
+
+	/*
+	 * Complete thread creation.
+	 */
+	lock_kernel();
+	daemonize();
+	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
+	unlock_kernel();
 
 	while (1) {
 		down(&ahc->platform_data->dv_sem);
@@ -4375,6 +4383,17 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 				memset(&cmd->sense_buffer[sense_size], 0,
 				       sizeof(cmd->sense_buffer) - sense_size);
 			cmd->result |= (DRIVER_SENSE << 24);
+#ifdef AHC_DEBUG
+			if (ahc_debug & AHC_SHOW_SENSE) {
+				int i;
+
+				printf("Copied %d bytes of sense data:",
+				       sense_size);
+				for (i = 0; i < sense_size; i++)
+					printf(" 0x%x", cmd->sense_buffer[i]);
+				printf("\n");
+			}
+#endif
 		}
 		break;
 	}

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#100 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#101 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -1339,7 +1339,7 @@ Scsi_Host_Template aic79xx_driver_template = {
 	 */
 	.max_sectors		= 8192,
 #endif
-#if defined CONFIG_HIGHIO
+#if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
@@ -2485,6 +2485,14 @@ ahd_linux_dv_thread(void *data)
 	if (ahd_debug & AHD_SHOW_DV)
 		printf("In DV Thread\n");
 #endif
+
+	/*
+	 * Complete thread creation.
+	 */
+	lock_kernel();
+	daemonize();
+	sprintf(current->comm, "ahd_dv_%d", ahd->unit);
+	unlock_kernel();
 
 	while (1) {
 		down(&ahd->platform_data->dv_sem);

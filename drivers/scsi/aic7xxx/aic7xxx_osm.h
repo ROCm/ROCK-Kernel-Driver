@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#111 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#112 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -65,6 +65,7 @@
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
+#include <linux/smp_lock.h>
 #include <linux/version.h>
 #ifndef AHC_MODVERSION_FILE
 #define __NO_VERSION__
