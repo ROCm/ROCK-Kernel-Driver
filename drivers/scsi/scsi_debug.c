@@ -169,6 +169,7 @@ static struct sdebug_queued_cmd queued_arr[SCSI_DEBUG_CANQUEUE];
 static Scsi_Host_Template sdebug_driver_template = {
 	.proc_info =		scsi_debug_proc_info,
 	.name =			"SCSI DEBUG",
+	.release =		scsi_debug_release,
 	.info =			scsi_debug_info,
 	.slave_alloc =		scsi_debug_slave_alloc,
 	.slave_configure =	scsi_debug_slave_configure,
