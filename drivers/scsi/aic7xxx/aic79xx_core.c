@@ -5493,9 +5493,9 @@ ahd_probe_scbs(struct ahd_softc *ahd) {
 static void
 ahd_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error) 
 {
-	bus_addr_t *baddr;
+	dma_addr_t *baddr;
 
-	baddr = (bus_addr_t *)arg;
+	baddr = (dma_addr_t *)arg;
 	*baddr = segs->ds_addr;
 }
 
@@ -5926,9 +5926,9 @@ ahd_alloc_scbs(struct ahd_softc *ahd)
 	struct map_node *sense_map;
 	uint8_t		*segs;
 	uint8_t		*sense_data;
-	bus_addr_t	 hscb_busaddr;
-	bus_addr_t	 sg_busaddr;
-	bus_addr_t	 sense_busaddr;
+	dma_addr_t	 hscb_busaddr;
+	dma_addr_t	 sg_busaddr;
+	dma_addr_t	 sense_busaddr;
 	int		 newcount;
 	int		 i;
 
@@ -6161,7 +6161,7 @@ ahd_init(struct ahd_softc *ahd)
 {
 	uint8_t		*base_vaddr;
 	uint8_t		*next_vaddr;
-	bus_addr_t	 next_baddr;
+	dma_addr_t	 next_baddr;
 	size_t		 driver_data_size;
 	int		 i;
 	int		 error;
@@ -6205,7 +6205,7 @@ ahd_init(struct ahd_softc *ahd)
 	if (ahd_dma_tag_create(ahd, ahd->parent_dmat, /*alignment*/1,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
 			       /*lowaddr*/ahd->flags & AHD_39BIT_ADDRESSING
-					? (bus_addr_t)0x7FFFFFFFFFULL
+					? (dma_addr_t)0x7FFFFFFFFFULL
 					: BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

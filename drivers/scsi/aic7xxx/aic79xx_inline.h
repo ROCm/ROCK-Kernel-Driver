@@ -231,7 +231,7 @@ ahd_unpause(struct ahd_softc *ahd)
 
 /*********************** Scatter Gather List Handling *************************/
 static __inline void	*ahd_sg_setup(struct ahd_softc *ahd, struct scb *scb,
-				      void *sgptr, bus_addr_t addr,
+				      void *sgptr, dma_addr_t addr,
 				      bus_size_t len, int last);
 static __inline void	 ahd_setup_scb_common(struct ahd_softc *ahd,
 					      struct scb *scb);
@@ -242,10 +242,10 @@ static __inline void	 ahd_setup_noxfer_scb(struct ahd_softc *ahd,
 
 static __inline void *
 ahd_sg_setup(struct ahd_softc *ahd, struct scb *scb,
-	     void *sgptr, bus_addr_t addr, bus_size_t len, int last)
+	     void *sgptr, dma_addr_t addr, bus_size_t len, int last)
 {
 	scb->sg_count++;
-	if (sizeof(bus_addr_t) > 4
+	if (sizeof(dma_addr_t) > 4
 	 && (ahd->flags & AHD_64BIT_ADDRESSING) != 0) {
 		struct ahd_dma64_seg *sg;
 
@@ -361,7 +361,7 @@ ahd_sg_size(struct ahd_softc *ahd)
 static __inline void *
 ahd_sg_bus_to_virt(struct ahd_softc *ahd, struct scb *scb, uint32_t sg_busaddr)
 {
-	bus_addr_t sg_offset;
+	dma_addr_t sg_offset;
 
 	/* sg_list_phys points to entry 1, not 0 */
 	sg_offset = sg_busaddr - (scb->sg_list_busaddr - ahd_sg_size(ahd));
@@ -371,7 +371,7 @@ ahd_sg_bus_to_virt(struct ahd_softc *ahd, struct scb *scb, uint32_t sg_busaddr)
 static __inline uint32_t
 ahd_sg_virt_to_bus(struct ahd_softc *ahd, struct scb *scb, void *sg)
 {
-	bus_addr_t sg_offset;
+	dma_addr_t sg_offset;
 
 	/* sg_list_phys points to entry 1, not 0 */
 	sg_offset = ((uint8_t *)sg - (uint8_t *)scb->sg_list)
