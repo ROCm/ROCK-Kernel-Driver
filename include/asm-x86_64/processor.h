@@ -456,4 +456,9 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
 
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_DOMAIN
+#define ARCH_HAS_SCHED_WAKE_IDLE
+#endif
+
 #endif /* __ASM_X86_64_PROCESSOR_H */
