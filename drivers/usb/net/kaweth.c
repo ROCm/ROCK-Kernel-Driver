@@ -246,7 +246,7 @@ struct kaweth_device
 	struct kaweth_ethernet_configuration configuration;
 
 	struct net_device_stats stats;
-} __attribute__ ((packed));
+};
 
 
 /****************************************************************
