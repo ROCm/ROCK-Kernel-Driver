@@ -622,12 +622,13 @@ void sym53c416_probe(void)
 	int ints[2];
 
 	ints[0] = 1;
-	for(; *base; base++)
-	{
-		if(!check_region(*base, IO_RANGE) && sym53c416_test(*base))
-		{
-			ints[1] = *base;
-			sym53c416_setup(NULL, ints);
+	for(; *base; base++) {
+		if (request_region(*base, IO_RANGE, ID)) {
+			if (sym53c416_test(*base)) {
+				ints[1] = *base;
+				sym53c416_setup(NULL, ints);
+			}
+			release_region(*base, IO_RANGE);
 		}
 	}
 }
@@ -702,44 +703,42 @@ int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 	sym53c416_probe();
 
 	/* Now we register and set up each host adapter found... */
-	for(count = 0, i = 0; i < host_index; i++)
-	{
-		if(!sym53c416_test(hosts[i].base))
+	for(count = 0, i = 0; i < host_index; i++) {
+		if (!request_region(hosts[i].base, IO_RANGE, ID))
+			continue;
+		if (!sym53c416_test(hosts[i].base)) {
 			printk(KERN_WARNING "No sym53c416 found at address 0x%03x\n", hosts[i].base);
-		else
-		{
-			if(hosts[i].irq == 0)
-			/* We don't have an irq yet, so we should probe for one */
-				if((hosts[i].irq = sym53c416_probeirq(hosts[i].base, hosts[i].scsi_id)) == 0)
-					printk(KERN_WARNING "IRQ autoprobing failed for sym53c416 at address 0x%03x\n", hosts[i].base);
-			if(hosts[i].irq && !check_region(hosts[i].base, IO_RANGE))
-			{
-				shpnt = scsi_register(tpnt, 0);
-				if(shpnt==NULL)
-					continue;
-				spin_lock_irqsave(&sym53c416_lock, flags);
-				/* Request for specified IRQ */
-				if(request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, shpnt))
-				{
-					spin_unlock_irqrestore(&sym53c416_lock, flags);
-					printk(KERN_ERR "sym53c416: Unable to assign IRQ %d\n", hosts[i].irq);
-					scsi_unregister(shpnt);
-				}
-				else
-				{
-					/* Inform the kernel of our IO range */
-					request_region(hosts[i].base, IO_RANGE, ID);
-					shpnt->unique_id = hosts[i].base;
-					shpnt->io_port = hosts[i].base;
-					shpnt->n_io_port = IO_RANGE;
-					shpnt->irq = hosts[i].irq;
-					shpnt->this_id = hosts[i].scsi_id;
-					sym53c416_init(hosts[i].base, hosts[i].scsi_id);
-					count++;
-					spin_unlock_irqrestore(&sym53c416_lock, flags);
-				}
-			}
+			goto fail_release_region;
 		}
+
+		/* We don't have an irq yet, so we should probe for one */
+		if (!hosts[i].irq)
+			hosts[i].irq = sym53c416_probeirq(hosts[i].base, hosts[i].scsi_id);
+		if (!hosts[i].irq)
+			goto fail_release_region;
+	
+		shpnt = scsi_register(tpnt, 0);
+		if (!shpnt)
+			goto fail_release_region;
+		/* Request for specified IRQ */
+		if (request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, shpnt))
+			goto fail_free_host;
+
+		spin_lock_irqsave(&sym53c416_lock, flags);
+		shpnt->unique_id = hosts[i].base;
+		shpnt->io_port = hosts[i].base;
+		shpnt->n_io_port = IO_RANGE;
+		shpnt->irq = hosts[i].irq;
+		shpnt->this_id = hosts[i].scsi_id;
+		sym53c416_init(hosts[i].base, hosts[i].scsi_id);
+		count++;
+		spin_unlock_irqrestore(&sym53c416_lock, flags);
+		continue;
+
+ fail_free_host:
+		scsi_unregister(shpnt);
+ fail_release_region:
+		release_region(hosts[i].base, IO_RANGE);
 	}
 	return count;
 }
