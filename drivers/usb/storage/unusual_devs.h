@@ -331,8 +331,10 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
  * Like the SIIG unit above, this unit needs an INQUIRY to ask for exactly
  * 36 bytes of data.  No more, no less. That is the only reason this entry
  * is needed.
- */
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
+ *
+ * ST818 slim drives (rev 0.02) don't need special care.
+*/
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
 		"EagleTec",
 		"External Hard Disk",
 		US_SC_SCSI, US_PR_BULK, NULL,
