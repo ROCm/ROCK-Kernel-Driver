@@ -1297,14 +1297,12 @@ Scsi_Host_Template aic7xxx_driver_template = {
 	 */
 	.max_sectors		= 8192,
 #endif
-#if defined CONFIG_HIGHIO
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
 	.single_sg_okay		= 1,
 #else
 	.highmem_io		= 1,
-#endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	.name			= "aic7xxx",
