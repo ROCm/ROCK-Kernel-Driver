@@ -37,6 +37,7 @@
  */
 #include <linux/config.h>
 #include <linux/efi.h>
+#include <linux/kernel.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
@@ -78,7 +79,6 @@
 #define BOOT_PARAM_ADDR 0x40000
 #define MAX(i,j)		((i) > (j) ? (i) : (j))
 #define MIN(i,j)		((i) < (j) ? (i) : (j))
-#define ABS(i)			((i) > 0   ? (i) : -(i))
 #define ALIGN8(p)		(((long)(p) +7) & ~7)
 
 #define FPROM_BUG()		do {while (1);} while (0)
@@ -670,7 +670,7 @@ sys_fw_init (const char *args, int arglen, int bsp)
 	for (i=0; i<=max_nasid; i++)
 		for (j=0; j<=max_nasid; j++)
 			if (nasid_present(i) && nasid_present(j))
-				*(cp+PROXIMITY_DOMAIN(i)*acpi_slit->localities+PROXIMITY_DOMAIN(j)) = 10 + MIN(254, 5*ABS(i-j));
+				*(cp+PROXIMITY_DOMAIN(i)*acpi_slit->localities+PROXIMITY_DOMAIN(j)) = 10 + MIN(254, 5*abs(i-j));
 
 	cp = acpi_slit->entry + acpi_slit->localities*acpi_slit->localities;
 	acpi_checksum(&acpi_slit->header, cp - (char*)acpi_slit);
