@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 by David Brownell
+ * Copyright (c) 2001-2002 by David Brownell
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -643,12 +643,19 @@ ehci_qh_make (
 		if (usb_pipecontrol (urb->pipe)) {
 			info1 |= 64 << 16;	/* usb2 fixed maxpacket */
 			info1 |= 1 << 14;	/* toggle from qtd */
+			info2 |= (EHCI_TUNE_MULT_HS << 30);
 		} else if (usb_pipebulk (urb->pipe)) {
 			info1 |= 512 << 16;	/* usb2 fixed maxpacket */
 			info2 |= (EHCI_TUNE_MULT_HS << 30);
-		} else
-			info1 |= usb_maxpacket (urb->dev, urb->pipe,
-						usb_pipeout (urb->pipe)) << 16;
+		} else {
+			u32	temp;
+			temp = usb_maxpacket (urb->dev, urb->pipe,
+						usb_pipeout (urb->pipe));
+			info1 |= (temp & 0x3ff) << 16;	/* maxpacket */
+			/* HS intr can be "high bandwidth" */
+			temp = 1 + ((temp >> 11) & 0x03);
+			info2 |= temp << 30;		/* mult */
+		}
 		break;
 	default:
 #ifdef DEBUG

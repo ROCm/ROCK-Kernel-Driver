@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 by David Brownell
+ * Copyright (c) 2001-2002 by David Brownell
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -49,7 +49,7 @@ struct ehci_hcd {			/* one per controller */
 	unsigned		i_thresh;	/* uframes HC might cache */
 
 	union ehci_shadow	*pshadow;	/* mirror hw periodic table */
-	int			next_frame;	/* scan periodic, start here */
+	int			next_uframe;	/* scan periodic, start here */
 	unsigned		periodic_urbs;	/* how many urbs scheduled? */
 
 	/* deferred work from IRQ, etc */
@@ -62,6 +62,7 @@ struct ehci_hcd {			/* one per controller */
 	struct usb_hcd		hcd;
 	struct ehci_caps	*caps;
 	struct ehci_regs	*regs;
+	u32			hcs_params;	/* cached register copy */
 
 	/* per-HC memory pools (could be per-PCI-bus, but ...) */
 	struct pci_pool		*qh_pool;	/* qh per active urb */
@@ -324,13 +325,14 @@ struct ehci_itd {
 	union ehci_shadow	itd_next;	/* ptr to periodic q entry */
 
 	struct urb		*urb;
-	unsigned		index;		/* in urb->iso_frame_desc */
 	struct list_head	itd_list;	/* list of urb frames' itds */
 	dma_addr_t		buf_dma;	/* frame's buffer address */
 
-	unsigned		uframe;		/* in periodic schedule */
-	u32			transaction [8]; /* copy of hw_transaction */
-
+	/* for now, only one hw_transaction per itd */
+	u32			transaction;
+	u16			index;		/* in urb->iso_frame_desc */
+	u16			uframe;		/* in periodic schedule */
+	u16			usecs;
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/

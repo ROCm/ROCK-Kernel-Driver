@@ -1722,12 +1722,12 @@ L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
 USB SERIAL KEYSPAN DRIVER
-P:	Hugh Blemings
-M:	hugh@misc.nu
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.kroah.com/linux/
 S:	Maintained
-W:	http://misc.nu/hugh/keyspan/
 
 USB SUBSYSTEM
 P:	Greg Kroah-Hartman
