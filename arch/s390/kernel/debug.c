@@ -208,8 +208,7 @@ static debug_info_t*  debug_info_alloc(char *name, int page_order,
 	rc->level       = DEBUG_DEFAULT_LEVEL;
 	rc->buf_size    = buf_size;
 	rc->entry_size  = sizeof(debug_entry_t) + buf_size;
-	strncpy(rc->name, name, MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1)));
-	rc->name[MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1))] = 0;
+	strlcpy(rc->name, name, sizeof(rc->name));
 	memset(rc->views, 0, DEBUG_MAX_VIEWS * sizeof(struct debug_view *));
 #ifdef CONFIG_PROC_FS
 	memset(rc->proc_entries, 0 ,DEBUG_MAX_VIEWS *

@@ -147,7 +147,7 @@ int q40_request_irq(unsigned int irq,
 	    irq_tab[irq].handler = handler;
 	    irq_tab[irq].flags   = flags;
 	    irq_tab[irq].dev_id  = dev_id;
-	    strncpy(irq_tab[irq].devname,devname,DEVNAME_SIZE);
+	    strlcpy(irq_tab[irq].devname,devname,sizeof(irq_tab[irq].devname));
 	    irq_tab[irq].state = 0;
 	    return 0;
 	  }

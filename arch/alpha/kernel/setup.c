@@ -501,10 +501,9 @@ setup_arch(char **cmdline_p)
 	   boot flags depending on the boot mode, we need some shorthand.
 	   This should do for installation.  */
 	if (strcmp(COMMAND_LINE, "INSTALL") == 0) {
-		strcpy(command_line, "root=/dev/fd0 load_ramdisk=1");
+		strlcpy(command_line, "root=/dev/fd0 load_ramdisk=1", sizeof command_line);
 	} else {
-		strncpy(command_line, COMMAND_LINE, sizeof command_line);
-		command_line[sizeof(command_line)-1] = 0;
+		strlcpy(command_line, COMMAND_LINE, sizeof command_line);
 	}
 	strcpy(saved_command_line, command_line);
 	*cmdline_p = command_line;

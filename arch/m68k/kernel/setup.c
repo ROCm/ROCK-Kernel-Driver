@@ -159,8 +159,7 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 		break;
 
 	    case BI_COMMAND_LINE:
-		strncpy(m68k_command_line, (const char *)data, CL_SIZE);
-		m68k_command_line[CL_SIZE-1] = '\0';
+		strlcpy(m68k_command_line, (const char *)data, sizeof(m68k_command_line));
 		break;
 
 	    default:
@@ -255,8 +254,7 @@ void __init setup_arch(char **cmdline_p)
 	for( p = *cmdline_p; p && *p; ) {
 	    i = 0;
 	    if (!strncmp( p, "debug=", 6 )) {
-		strncpy( m68k_debug_device, p+6, sizeof(m68k_debug_device)-1 );
-		m68k_debug_device[sizeof(m68k_debug_device)-1] = 0;
+		strlcpy( m68k_debug_device, p+6, sizeof(m68k_debug_device) );
 		if ((q = strchr( m68k_debug_device, ' ' ))) *q = 0;
 		i = 1;
 	    }

@@ -468,8 +468,7 @@ static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!dev)
 		return -ENODEV;
 
-	strncpy(ifr32.ifr_name, dev->name, sizeof(ifr32.ifr_name)-1);
-	ifr32.ifr_name[sizeof(ifr32.ifr_name)-1] = 0; 
+	strlcpy(ifr32.ifr_name, dev->name, sizeof(ifr32.ifr_name));
 	dev_put(dev);
 	
 	err = copy_to_user((struct ifreq32 *)arg, &ifr32, sizeof(struct ifreq32));

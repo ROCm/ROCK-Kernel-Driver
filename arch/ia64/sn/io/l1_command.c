@@ -718,8 +718,7 @@ int elsc_display_mesg(elsc_t *e, char *chr)
 
     for( i = 0; i < numlines; i++ )
     {
-	strncpy( line, chr, L1_DISPLAY_LINE_LENGTH );
-	line[L1_DISPLAY_LINE_LENGTH] = '\0';
+	strlcpy( line, chr, sizeof(line) );
 
 	/* generally we want to leave the first line of the L1 display
 	 * alone (so the L1 can manipulate it).  If you need to be able

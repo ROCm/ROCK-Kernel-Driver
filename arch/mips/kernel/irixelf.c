@@ -1175,7 +1175,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 
 		set_fs(KERNEL_DS);
 	}
-	strncpy(psinfo.pr_fname, current->comm, sizeof(psinfo.pr_fname));
+	strlcpy(psinfo.pr_fname, current->comm, sizeof(psinfo.pr_fname));
 
 	notes[2].name = "CORE";
 	notes[2].type = NT_TASKSTRUCT;
