@@ -78,9 +78,12 @@ xfs_fs_geometry(
 			(XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) ?
 				XFS_FSOP_GEOM_FLAGS_EXTFLG : 0) |
 			(XFS_SB_VERSION_HASDIRV2(&mp->m_sb) ?
-				XFS_FSOP_GEOM_FLAGS_DIRV2 : 0);
-		geo->logsectsize = mp->m_sb.sb_sectsize;	/* XXX */
-		geo->rtsectsize = mp->m_sb.sb_sectsize;		/* XXX */
+				XFS_FSOP_GEOM_FLAGS_DIRV2 : 0) |
+			(XFS_SB_VERSION_HASSECTOR(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_SECTOR : 0);
+		geo->logsectsize = XFS_SB_VERSION_HASSECTOR(&mp->m_sb) ?
+				mp->m_sb.sb_logsectsize : BBSIZE;
+		geo->rtsectsize = mp->m_sb.sb_blocksize;
 		geo->dirblocksize = mp->m_dirblksize;
 	}
 	if (new_version >= 4) {
@@ -105,9 +108,7 @@ xfs_growfs_data_private(
 	xfs_alloc_rec_t		*arec;
 	xfs_btree_sblock_t	*block;
 	xfs_buf_t		*bp;
-	int			bsize;
 	int			bucket;
-	xfs_daddr_t		disk_addr;
 	int			dpct;
 	int			error;
 	xfs_agnumber_t		nagcount;
@@ -117,7 +118,6 @@ xfs_growfs_data_private(
 	xfs_agnumber_t		oagcount;
 	int			pct;
 	xfs_sb_t		*sbp;
-	int			sectbb;
 	xfs_trans_t		*tp;
 
 	nb = in->newblocks;
@@ -125,8 +125,9 @@ xfs_growfs_data_private(
 	if (nb < mp->m_sb.sb_dblocks || pct < 0 || pct > 100)
 		return XFS_ERROR(EINVAL);
 	dpct = pct - mp->m_sb.sb_imax_pct;
-	error = xfs_read_buf(mp, mp->m_ddev_targp, XFS_FSB_TO_BB(mp, nb) - 1, 1,
-		0, &bp);
+	error = xfs_read_buf(mp, mp->m_ddev_targp,
+			XFS_FSB_TO_BB(mp, nb) - XFS_FSS_TO_BB(mp, 1),
+			XFS_FSS_TO_BB(mp, 1), 0, &bp);
 	if (error)
 		return error;
 	ASSERT(bp);
@@ -161,19 +162,15 @@ xfs_growfs_data_private(
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}
-	/* new ag's */
-	sectbb = BTOBB(mp->m_sb.sb_sectsize);
-	bsize = mp->m_sb.sb_blocksize;
 
 	nfree = 0;
 	for (agno = nagcount - 1; agno >= oagcount; agno--, new -= agsize) {
 		/*
 		 * AG freelist header block
 		 */
-		disk_addr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		bp = xfs_buf_get(mp->m_ddev_targp,
-				  disk_addr,
-				  sectbb, 0);
+				  XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR(mp)),
+				  XFS_FSS_TO_BB(mp, 1), 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		memset(agf, 0, mp->m_sb.sb_sectsize);
 		INT_SET(agf->agf_magicnum, ARCH_CONVERT, XFS_AGF_MAGIC);
@@ -186,12 +183,14 @@ xfs_growfs_data_private(
 		else
 			agsize = mp->m_sb.sb_agblocks;
 		INT_SET(agf->agf_length, ARCH_CONVERT, agsize);
-		INT_SET(agf->agf_roots[XFS_BTNUM_BNOi], ARCH_CONVERT, XFS_BNO_BLOCK(mp));
-		INT_SET(agf->agf_roots[XFS_BTNUM_CNTi], ARCH_CONVERT, XFS_CNT_BLOCK(mp));
+		INT_SET(agf->agf_roots[XFS_BTNUM_BNOi], ARCH_CONVERT,
+			XFS_BNO_BLOCK(mp));
+		INT_SET(agf->agf_roots[XFS_BTNUM_CNTi], ARCH_CONVERT,
+			XFS_CNT_BLOCK(mp));
 		INT_SET(agf->agf_levels[XFS_BTNUM_BNOi], ARCH_CONVERT, 1);
 		INT_SET(agf->agf_levels[XFS_BTNUM_CNTi], ARCH_CONVERT, 1);
 		INT_ZERO(agf->agf_flfirst, ARCH_CONVERT);
-		INT_SET(agf->agf_fllast, ARCH_CONVERT, XFS_AGFL_SIZE - 1);
+		INT_SET(agf->agf_fllast, ARCH_CONVERT, XFS_AGFL_SIZE(mp) - 1);
 		INT_ZERO(agf->agf_flcount, ARCH_CONVERT);
 		tmpsize = agsize - XFS_PREALLOC_BLOCKS(mp);
 		INT_SET(agf->agf_freeblks, ARCH_CONVERT, tmpsize);
@@ -203,10 +202,9 @@ xfs_growfs_data_private(
 		/*
 		 * AG inode header block
 		 */
-		disk_addr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		bp = xfs_buf_get(mp->m_ddev_targp,
-				  disk_addr,
-				  sectbb, 0);
+				  XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR(mp)),
+				  XFS_FSS_TO_BB(mp, 1), 0);
 		agi = XFS_BUF_TO_AGI(bp);
 		memset(agi, 0, mp->m_sb.sb_sectsize);
 		INT_SET(agi->agi_magicnum, ARCH_CONVERT, XFS_AGI_MAGIC);
@@ -220,7 +218,8 @@ xfs_growfs_data_private(
 		INT_SET(agi->agi_newino, ARCH_CONVERT, NULLAGINO);
 		INT_SET(agi->agi_dirino, ARCH_CONVERT, NULLAGINO);
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
-			INT_SET(agi->agi_unlinked[bucket], ARCH_CONVERT, NULLAGINO);
+			INT_SET(agi->agi_unlinked[bucket], ARCH_CONVERT,
+				NULLAGINO);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -228,21 +227,22 @@ xfs_growfs_data_private(
 		/*
 		 * BNO btree root block
 		 */
-		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			disk_addr,
-			BTOBB(bsize), 0);
+			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
+			BTOBB(mp->m_sb.sb_blocksize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		memset(block, 0, bsize);
+		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTB_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
 		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
-		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
-			mp->m_alloc_mxr[0]);
-		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
-		INT_SET(arec->ar_blockcount, ARCH_CONVERT, agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
+		arec = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_alloc,
+			block, 1, mp->m_alloc_mxr[0]);
+		INT_SET(arec->ar_startblock, ARCH_CONVERT,
+			XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_CONVERT,
+			agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -250,21 +250,22 @@ xfs_growfs_data_private(
 		/*
 		 * CNT btree root block
 		 */
-		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			disk_addr,
-			BTOBB(bsize), 0);
+			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
+			BTOBB(mp->m_sb.sb_blocksize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		memset(block, 0, bsize);
+		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTC_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
 		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
-		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
-			mp->m_alloc_mxr[0]);
-		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
-		INT_SET(arec->ar_blockcount, ARCH_CONVERT, agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
+		arec = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_alloc,
+			block, 1, mp->m_alloc_mxr[0]);
+		INT_SET(arec->ar_startblock, ARCH_CONVERT,
+			XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_CONVERT,
+			agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
 		nfree += INT_GET(arec->ar_blockcount, ARCH_CONVERT);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
@@ -273,12 +274,11 @@ xfs_growfs_data_private(
 		/*
 		 * INO btree root block
 		 */
-		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			disk_addr,
-			BTOBB(bsize), 0);
+			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
+			BTOBB(mp->m_sb.sb_blocksize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		memset(block, 0, bsize);
+		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_IBT_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_ZERO(block->bb_numrecs, ARCH_CONVERT);
@@ -304,8 +304,9 @@ xfs_growfs_data_private(
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
 		INT_MOD(agi->agi_length, ARCH_CONVERT, new);
-		ASSERT(nagcount == oagcount
-		       || INT_GET(agi->agi_length, ARCH_CONVERT) == mp->m_sb.sb_agblocks);
+		ASSERT(nagcount == oagcount ||
+		       INT_GET(agi->agi_length, ARCH_CONVERT) ==
+				mp->m_sb.sb_agblocks);
 		xfs_ialloc_log_agi(tp, bp, XFS_AGI_LENGTH);
 		/*
 		 * Change agf length.
@@ -323,7 +324,7 @@ xfs_growfs_data_private(
 		 * Free the new space.
 		 */
 		error = xfs_free_extent(tp, XFS_AGB_TO_FSB(mp, agno,
-				INT_GET(agf->agf_length, ARCH_CONVERT) - new), new);
+			INT_GET(agf->agf_length, ARCH_CONVERT) - new), new);
 		if (error) {
 			goto error0;
 		}
@@ -350,7 +351,7 @@ xfs_growfs_data_private(
 	for (agno = 1; agno < nagcount; agno++) {
 		error = xfs_read_buf(mp, mp->m_ddev_targp,
 				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
-				  sectbb, 0, &bp);
+				  XFS_FSS_TO_BB(mp, 1), 0, &bp);
 		if (error) {
 			xfs_fs_cmn_err(CE_WARN, mp,
 			"error %d reading secondary superblock for ag %d",
@@ -584,7 +585,6 @@ xfs_fs_freeze(
 
 	return 0;
 }
-
 
 int
 xfs_fs_thaw(

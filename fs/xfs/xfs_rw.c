@@ -116,16 +116,16 @@ xfs_do_force_shutdown(
 		return;
 
 	if (flags & XFS_CORRUPT_INCORE) {
-		cmn_err(CE_ALERT,
+		xfs_cmn_err(XFS_PTAG_SHUTDOWN_CORRUPT, CE_ALERT, mp,
     "Corruption of in-memory data detected.  Shutting down filesystem: %s",
 			mp->m_fsname);
 	} else if (!(flags & XFS_FORCE_UMOUNT)) {
 		if (logerror) {
-			cmn_err(CE_ALERT,
+			xfs_cmn_err(XFS_PTAG_SHUTDOWN_LOGERROR, CE_ALERT, mp,
 			"Log I/O Error Detected.  Shutting down filesystem: %s",
 				mp->m_fsname);
 		} else if (!(flags & XFS_SHUTDOWN_REMOTE_REQ)) {
-			cmn_err(CE_ALERT,
+			xfs_cmn_err(XFS_PTAG_SHUTDOWN_IOERROR, CE_ALERT, mp,
 				"I/O Error Detected.  Shutting down filesystem: %s",
 				mp->m_fsname);
 		}

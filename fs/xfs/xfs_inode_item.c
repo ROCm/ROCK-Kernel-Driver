@@ -454,7 +454,7 @@ xfs_inode_item_format(
 			/*
 			 * Need to endian flip before logging
 			 */
-			ext_buffer = kmem_alloc(ip->i_df.if_bytes,
+			ext_buffer = kmem_alloc(ip->i_afp->if_bytes,
 				KM_SLEEP);
 			iip->ili_aextents_buf = ext_buffer;
 			vecp->i_addr = (xfs_caddr_t)ext_buffer;

@@ -87,7 +87,7 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 {
 	DECLARE_WAITQUEUE( wait, current );
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
+	__set_current_state(TASK_UNINTERRUPTIBLE);
 
 	spin_lock(&q->lock);
 	if (rw) {
@@ -100,8 +100,6 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 	spin_unlock(lock);
 
 	schedule();
-
-	set_current_state(TASK_RUNNING);
 
 	spin_lock(&q->lock);
 	__remove_wait_queue(q, &wait);

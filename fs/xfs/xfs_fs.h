@@ -225,15 +225,16 @@ typedef struct xfs_fsop_resblks {
 
 #define XFS_FSOP_GEOM_VERSION	0
 
-#define XFS_FSOP_GEOM_FLAGS_ATTR	0x01	/* attributes in use	*/
-#define XFS_FSOP_GEOM_FLAGS_NLINK	0x02	/* 32-bit nlink values	*/
-#define XFS_FSOP_GEOM_FLAGS_QUOTA	0x04	/* quotas enabled	*/
-#define XFS_FSOP_GEOM_FLAGS_IALIGN	0x08	/* inode alignment	*/
-#define XFS_FSOP_GEOM_FLAGS_DALIGN	0x10	/* large data alignment */
-#define XFS_FSOP_GEOM_FLAGS_SHARED	0x20	/* read-only shared	*/
-#define XFS_FSOP_GEOM_FLAGS_EXTFLG	0x40	/* special extent flag	*/
-#define XFS_FSOP_GEOM_FLAGS_DIRV2	0x80	/* directory version 2	*/
-#define XFS_FSOP_GEOM_FLAGS_LOGV2      0x100	/* log format version 2 */
+#define XFS_FSOP_GEOM_FLAGS_ATTR	0x0001	/* attributes in use	*/
+#define XFS_FSOP_GEOM_FLAGS_NLINK	0x0002	/* 32-bit nlink values	*/
+#define XFS_FSOP_GEOM_FLAGS_QUOTA	0x0004	/* quotas enabled	*/
+#define XFS_FSOP_GEOM_FLAGS_IALIGN	0x0008	/* inode alignment	*/
+#define XFS_FSOP_GEOM_FLAGS_DALIGN	0x0010	/* large data alignment */
+#define XFS_FSOP_GEOM_FLAGS_SHARED	0x0020	/* read-only shared	*/
+#define XFS_FSOP_GEOM_FLAGS_EXTFLG	0x0040	/* special extent flag	*/
+#define XFS_FSOP_GEOM_FLAGS_DIRV2	0x0080	/* directory version 2	*/
+#define XFS_FSOP_GEOM_FLAGS_LOGV2	0x0100	/* log format version 2	*/
+#define XFS_FSOP_GEOM_FLAGS_SECTOR	0x0200	/* sector sizes >1BB	*/
 
 
 /*

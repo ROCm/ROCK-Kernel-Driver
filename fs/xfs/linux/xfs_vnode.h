@@ -682,8 +682,8 @@ extern void	vn_rele(struct vnode *);
 /*
  * Vnode spinlock manipulation.
  */
-#define VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
-#define VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
+#define VN_LOCK(vp)		mutex_spinlock(&(vp)->v_lock)
+#define VN_UNLOCK(vp, s)	mutex_spinunlock(&(vp)->v_lock, s)
 #define VN_FLAGSET(vp,b)	vn_flagset(vp,b)
 #define VN_FLAGCLR(vp,b)	vn_flagclr(vp,b)
 

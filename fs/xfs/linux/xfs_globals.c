@@ -37,7 +37,6 @@
 
 #include <xfs.h>
 
-uint64_t	xfs_panic_mask;		/* set to cause more panics */
 unsigned long	xfs_physmem;
 
 /*

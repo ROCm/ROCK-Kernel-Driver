@@ -101,7 +101,6 @@ map_buffer_at_offset(
 
 	ASSERT(!(mp->pbm_flags & PBMF_HOLE));
 	ASSERT(!(mp->pbm_flags & PBMF_DELAY));
-	ASSERT(!(mp->pbm_flags & PBMF_UNWRITTEN));
 	ASSERT(mp->pbm_bn != PAGE_BUF_DADDR_NULL);
 
 	delta = page->index;
@@ -348,15 +347,15 @@ cluster_write(
  * page ready for freeing it's buffers.  When called with startio set then
  * we are coming from writepage. 
  *
- * When called with startio e.g. from
- * write page it is important that we write WHOLE page if possible. The
- * bh->b_state's can not know of any of the blocks or which block for
- * that matter are dirty due to map writes, and therefore bh uptodate is
- * only vaild if the pagei itself isn't completely uptodate. Some layers
- * may clear the page dirty flag prior to calling write page under the
- * assumption the entire page will be written out, by not writing out the
- * whole page the page can be reused before all vaild dirty data is
- * written out. Note: in the case of a page that has been dirty'd by
+ * When called with startio set it is important that we write the WHOLE
+ * page if possible.
+ * The bh->b_state's cannot know if any of the blocks or which block for
+ * that matter are dirty due to mmap writes, and therefore bh uptodate is
+ * only vaild if the page itself isn't completely uptodate.  Some layers
+ * may clear the page dirty flag prior to calling write page, under the
+ * assumption the entire page will be written out; by not writing out the
+ * whole page the page can be reused before all valid dirty data is
+ * written out.  Note: in the case of a page that has been dirty'd by
  * mapwrite and but partially setup by block_prepare_write the
  * bh->b_states's will not agree and only ones setup by BPW/BCW will have
  * valid state, thus the whole page must be written out thing.
@@ -388,7 +387,7 @@ delalloc_convert(
 	end_offset = offset + PAGE_CACHE_SIZE;
 	if (end_offset > inode->i_size)
 		end_offset = inode->i_size;
-	
+
 	if (startio && !page_has_buffers(page))
 		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
 

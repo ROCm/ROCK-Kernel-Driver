@@ -1799,14 +1799,14 @@ xfs_iunlink(
 	mp = tp->t_mountp;
 
 	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
-	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR(mp));
 
 	/*
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agdaddr,
-				   1, 0, &agibp);
+				   XFS_FSS_TO_BB(mp, 1), 0, &agibp);
 	if (error) {
 		return error;
 	}
@@ -1898,15 +1898,15 @@ xfs_iunlink_remove(
 	mp = tp->t_mountp;
 
 	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
-	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR(mp));
 
 	/*
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agdaddr,
-				   1, 0, &agibp);
-	if (error != 0) {
+				   XFS_FSS_TO_BB(mp, 1), 0, &agibp);
+	if (error) {
 		cmn_err(CE_WARN,
 			"xfs_iunlink_remove: xfs_trans_read_buf()  returned an error %d on %s.	Returning error.",
 			error, mp->m_fsname);
