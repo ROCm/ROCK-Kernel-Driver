@@ -1642,7 +1642,7 @@ S:	Maintained
 
 SCSI TAPE DRIVER
 P:	Kai Mäkisara
-M:	Kai.Makisara@metla.fi
+M:	Kai.Makisara@kolumbus.fi
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
