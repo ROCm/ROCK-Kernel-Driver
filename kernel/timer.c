@@ -44,12 +44,10 @@
 #define TVR_MASK (TVR_SIZE - 1)
 
 typedef struct tvec_s {
-	int index;
 	struct list_head vec[TVN_SIZE];
 } tvec_t;
 
 typedef struct tvec_root_s {
-	int index;
 	struct list_head vec[TVR_SIZE];
 } tvec_root_t;
 
@@ -134,7 +132,7 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 		 * Can happen if you add a timer with expires == jiffies,
 		 * or you set a timer to go off in the past
 		 */
-		vec = base->tv1.vec + base->tv1.index;
+		vec = base->tv1.vec + (base->timer_jiffies & TVR_MASK);
 	} else if (idx <= 0xffffffffUL) {
 		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
 		vec = base->tv5.vec + i;
@@ -368,12 +366,12 @@ del_again:
 #endif
 
 
-static int cascade(tvec_base_t *base, tvec_t *tv)
+static int cascade(tvec_base_t *base, tvec_t *tv, int index)
 {
 	/* cascade all the timers from tv up one level */
 	struct list_head *head, *curr;
 
-	head = tv->vec + tv->index;
+	head = tv->vec + index;
 	curr = head->next;
 	/*
 	 * We are removing _all_ timers from the list, so we don't  have to
@@ -389,7 +387,7 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
 	}
 	INIT_LIST_HEAD(head);
 
-	return tv->index = (tv->index + 1) & TVN_MASK;
+	return index;
 }
 
 /***
@@ -399,6 +397,8 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
  * This function cascades all vectors and executes all expired timer
  * vectors.
  */
+#define INDEX(N) (base->timer_jiffies >> (TVR_BITS + N * TVN_BITS)) & TVN_MASK
+
 static inline void __run_timers(tvec_base_t *base)
 {
 	struct timer_list *timer;
@@ -407,18 +407,19 @@ static inline void __run_timers(tvec_base_t *base)
 	while (time_after_eq(jiffies, base->timer_jiffies)) {
 		LIST_HEAD(deferred_timers);
 		struct list_head *head;
-
+ 		int index = base->timer_jiffies & TVR_MASK;
+ 
 		/*
 		 * Cascade timers:
 		 */
-		if (!base->tv1.index &&
-			(cascade(base, &base->tv2) == 1) &&
-				(cascade(base, &base->tv3) == 1) &&
-					cascade(base, &base->tv4) == 1)
-			cascade(base, &base->tv5);
+		if (!index &&
+			(!cascade(base, &base->tv2, INDEX(0))) &&
+				(!cascade(base, &base->tv3, INDEX(1))) &&
+					!cascade(base, &base->tv4, INDEX(2)))
+			cascade(base, &base->tv5, INDEX(3));
 		base->run_timer_list_running = &deferred_timers;
 repeat:
-		head = base->tv1.vec + base->tv1.index;
+		head = base->tv1.vec + index;
 		if (!list_empty(head)) {
 			void (*fn)(unsigned long);
 			unsigned long data;
@@ -437,7 +438,6 @@ repeat:
 		}
 		base->run_timer_list_running = NULL;
 		++base->timer_jiffies; 
-		base->tv1.index = (base->tv1.index + 1) & TVR_MASK;
 		while (!list_empty(&deferred_timers)) {
 			timer = list_entry(deferred_timers.prev,
 						struct timer_list, entry);
@@ -1198,24 +1198,7 @@ static void __devinit init_timers_cpu(int cpu)
 	for (j = 0; j < TVR_SIZE; j++)
 		INIT_LIST_HEAD(base->tv1.vec + j);
 
-	base->timer_jiffies = INITIAL_JIFFIES;
-	/*
-	 * The tv indices are always larger by one compared to the
-	 * respective parts of timer_jiffies. If all lower indices are
-	 * zero at initialisation, this is achieved by an (otherwise
-	 * unneccessary) invocation of the timer cascade on the first
-	 * timer interrupt. If not, we need to take it into account
-	 * here:
-	 */
-	j  = (base->tv1.index = INITIAL_JIFFIES & TVR_MASK) !=0;
-	j |= (base->tv2.index = ((INITIAL_JIFFIES >> TVR_BITS) + j)
-	                        & TVN_MASK) !=0;
-	j |= (base->tv3.index = ((INITIAL_JIFFIES >> (TVR_BITS+TVN_BITS)) + j)
-	                        & TVN_MASK) !=0;
-	j |= (base->tv4.index = ((INITIAL_JIFFIES >> (TVR_BITS+2*TVN_BITS)) + j)
-	                        & TVN_MASK) !=0;
-	      base->tv5.index = ((INITIAL_JIFFIES >> (TVR_BITS+3*TVN_BITS)) + j)
-	                        & TVN_MASK;
+	base->timer_jiffies = jiffies;
 }
 	
 static int __devinit timer_cpu_notify(struct notifier_block *self, 
