@@ -951,6 +951,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		if (rc) {
 			if (rc == -ENOMEM) {
 				ibmphp_remove_bus (bus, func->busno);
+				kfree (amount_needed);
 				return rc;
 			}
 			retval = rc;
