@@ -345,8 +345,10 @@ affs_rmdir(struct inode *dir, struct dentry *dentry)
 	lock_kernel();
 
 	/* WTF??? */
-	if (!dentry->d_inode)
+	if (!dentry->d_inode) {
+		unlock_kernel();
 		return -ENOENT;
+	}
 
 	res = affs_remove_header(dentry);
 	unlock_kernel();
