@@ -4,6 +4,8 @@
  *  Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  *  Based upon code written by Linus Torvalds and others.
  */
+
+#warning "major untested changes to this file  --hch (2002/08/05)"
  
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -16,6 +18,7 @@ static struct vm_struct * modvmlist = NULL;
 void module_unmap (void * addr)
 {
 	struct vm_struct **p, *tmp;
+	int i;
 
 	if (!addr)
 		return;
@@ -23,21 +26,38 @@ void module_unmap (void * addr)
 		printk("Trying to unmap module with bad address (%p)\n", addr);
 		return;
 	}
+
 	for (p = &modvmlist ; (tmp = *p) ; p = &tmp->next) {
 		if (tmp->addr == addr) {
 			*p = tmp->next;
-			vmfree_area_pages(VMALLOC_VMADDR(tmp->addr), tmp->size);
-			kfree(tmp);
-			return;
 		}
 	}
 	printk("Trying to unmap nonexistent module vm area (%p)\n", addr);
+	return;
+
+found:
+
+	unmap_vm_area(tmp);
+	
+	for (i = 0; i < tmp->nr_pages; i++) {
+		if (unlikely(!tmp->pages[i]))
+			BUG();
+		__free_page(tmp->pages[i]);
+	}
+
+	kfree(tmp->pages);
+	kfree(tmp);
 }
+
 
 void * module_map (unsigned long size)
 {
-	void * addr;
 	struct vm_struct **p, *tmp, *area;
+	struct vm_struct *area;
+	struct page **pages;
+	void * addr;
+	unsigned int nr_pages, array_size, i;
+
 
 	size = PAGE_ALIGN(size);
 	if (!size || size > MODULES_LEN) return NULL;
@@ -55,11 +75,32 @@ void * module_map (unsigned long size)
 	area->size = size + PAGE_SIZE;
 	area->addr = addr;
 	area->next = *p;
+	area->pages = NULL;
+	area->nr_pages = 0;
+	area->phys_addr = 0;
 	*p = area;
 
-	if (vmalloc_area_pages(VMALLOC_VMADDR(addr), size, GFP_KERNEL, PAGE_KERNEL)) {
-		module_unmap(addr);
+	nr_pages = (size+PAGE_SIZE) >> PAGE_SHIFT;
+	array_size = (nr_pages * sizeof(struct page *));
+
+	area->nr_pages = nr_pages;
+	area->pages = pages = kmalloc(array_size, (gfp_mask & ~__GFP_HIGHMEM));
+	if (!area->pages)
 		return NULL;
+	memset(area->pages, 0, array_size);
+
+	for (i = 0; i < area->nr_pages; i++) {
+		area->pages[i] = alloc_page(gfp_mask);
+		if (unlikely(!area->pages[i]))
+			goto fail;
 	}
-	return addr;
+	
+	if (map_vm_area(area, prot, &pages))
+		goto fail;
+	return area->addr;
+
+fail:
+	vfree(area->addr);
+	return NULL;
+}
 }
