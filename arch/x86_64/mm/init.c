@@ -630,6 +630,6 @@ int in_gate_area(struct task_struct *task, unsigned long addr)
  */
 int in_gate_area_no_task(unsigned long addr)
 {
-	return ((addr >= VSYSCALL_START) && (addr < VSYSCALL_END) ||
-		(addr >= VSYSCALL32_BASE) && (addr < VSYSCALL32_END));
+	return (((addr >= VSYSCALL_START) && (addr < VSYSCALL_END)) ||
+		((addr >= VSYSCALL32_BASE) && (addr < VSYSCALL32_END)));
 }
