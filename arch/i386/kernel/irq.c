@@ -370,11 +370,12 @@ void __global_cli(void)
 
 void __global_sti(void)
 {
-	int cpu = smp_processor_id();
+	int cpu = get_cpu();
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
 	__sti();
+	put_cpu();
 }
 
 /*
