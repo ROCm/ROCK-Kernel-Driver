@@ -58,15 +58,12 @@
  *
  * FUNCTION:    acpi_ds_parse_method
  *
- * PARAMETERS:  obj_handle      - Node of the method
- *              Level           - Current nesting level
- *              Context         - Points to a method counter
- *              return_value    - Not used
+ * PARAMETERS:  obj_handle      - Method node
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Call the parser and parse the AML that is
- *              associated with the method.
+ * DESCRIPTION: Call the parser and parse the AML that is associated with the
+ *              method.
  *
  * MUTEX:       Assumes parser is locked
  *
@@ -191,8 +188,6 @@ acpi_ds_parse_method (
  *              increments the thread count, and waits at the method semaphore
  *              for clearance to execute.
  *
- * MUTEX:       Locks/unlocks parser.
- *
  ******************************************************************************/
 
 acpi_status
@@ -251,7 +246,8 @@ acpi_ds_begin_method_execution (
  *
  * FUNCTION:    acpi_ds_call_control_method
  *
- * PARAMETERS:  walk_state          - Current state of the walk
+ * PARAMETERS:  Thread              - Info for this thread
+ *              this_walk_state     - Current walk state
  *              Op                  - Current Op to be walked
  *
  * RETURN:      Status
@@ -401,12 +397,13 @@ cleanup:
  *
  * FUNCTION:    acpi_ds_restart_control_method
  *
- * PARAMETERS:  walk_state          - State of the method when it was preempted
- *              Op                  - Pointer to new current op
+ * PARAMETERS:  walk_state          - State for preempted method (caller)
+ *              return_desc         - Return value from the called method
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Restart a method that was preempted
+ * DESCRIPTION: Restart a method that was preempted by another (nested) method
+ *              invocation.  Handle the return value (if any) from the callee.
  *
  ******************************************************************************/
 
@@ -421,17 +418,35 @@ acpi_ds_restart_control_method (
 	ACPI_FUNCTION_TRACE_PTR ("ds_restart_control_method", walk_state);
 
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"****Restart [%4.4s] Op %p return_value_from_callee %p\n",
+		(char *) &walk_state->method_node->name, walk_state->method_call_op,
+		return_desc));
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"    return_from_this_method_used?=%X res_stack %p Walk %p\n",
+		walk_state->return_used,
+		walk_state->results, walk_state));
+
+	/* Did the called method return a value? */
+
 	if (return_desc) {
+		/* Are we actually going to use the return value? */
+
 		if (walk_state->return_used) {
-			/*
-			 * Get the return value (if any) from the previous method.
-			 * NULL if no return value
-			 */
+			/* Save the return value from the previous method */
+
 			status = acpi_ds_result_push (return_desc, walk_state);
 			if (ACPI_FAILURE (status)) {
 				acpi_ut_remove_reference (return_desc);
 				return_ACPI_STATUS (status);
 			}
+
+			/*
+			 * Save as THIS method's return value in case it is returned
+			 * immediately to yet another method
+			 */
+			walk_state->return_desc = return_desc;
 		}
 		else {
 			/*
@@ -441,11 +456,6 @@ acpi_ds_restart_control_method (
 			acpi_ut_remove_reference (return_desc);
 		}
 	}
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"Method=%p Return=%p return_used?=%X res_stack=%p State=%p\n",
-		walk_state->method_call_op, return_desc, walk_state->return_used,
-		walk_state->results, walk_state));
 
 	return_ACPI_STATUS (AE_OK);
 }

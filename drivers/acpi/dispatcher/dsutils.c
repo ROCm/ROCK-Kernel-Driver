@@ -60,11 +60,10 @@
  *
  * FUNCTION:    acpi_ds_is_result_used
  *
- * PARAMETERS:  Op
- *              result_obj
- *              walk_state
+ * PARAMETERS:  Op                  - Current Op
+ *              walk_state          - Current State
  *
- * RETURN:      Status
+ * RETURN:      TRUE if result is used, FALSE otherwise
  *
  * DESCRIPTION: Check if a result object will be used by the parent
  *
@@ -89,18 +88,39 @@ acpi_ds_is_result_used (
 	}
 
 	/*
-	 * If there is no parent, the result can't possibly be used!
-	 * (An executing method typically has no parent, since each
-	 * method is parsed separately)  However, a method that is
-	 * invoked from another method has a parent.
+	 * If there is no parent, we are executing at the method level.
+	 * An executing method typically has no parent, since each method
+	 * is parsed separately.
 	 */
 	if (!op->common.parent) {
+		/*
+		 * If this is the last statement in the method, we know it is not a
+		 * Return() operator (would not come here.) The following code is the
+		 * optional support for a so-called "implicit return". Some AML code
+		 * assumes that the last value of the method is "implicitly" returned
+		 * to the caller. Just save the last result as the return value.
+		 * NOTE: this is optional because the ASL language does not actually
+		 * support this behavior.
+		 */
+		if ((acpi_gbl_enable_interpeter_slack) &&
+			(walk_state->parser_state.aml >= walk_state->parser_state.aml_end)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+					"Result of [%s] will be implicitly returned\n",
+					acpi_ps_get_opcode_name (op->common.aml_opcode)));
+
+			/* Use the top of the result stack as the implicit return value */
+
+			walk_state->return_desc = walk_state->results->results.obj_desc[0];
+			return_VALUE (TRUE);
+		}
+
+		/* No parent, the return value cannot possibly be used */
+
 		return_VALUE (FALSE);
 	}
 
-	/*
-	 * Get info on the parent.  The root Op is AML_SCOPE
-	 */
+	/* Get info on the parent. The root_op is AML_SCOPE */
+
 	parent_info = acpi_ps_get_opcode_info (op->common.parent->common.aml_opcode);
 	if (parent_info->class == AML_CLASS_UNKNOWN) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown parent opcode. Op=%p\n", op));
@@ -204,9 +224,9 @@ result_not_used:
  *
  * FUNCTION:    acpi_ds_delete_result_if_not_used
  *
- * PARAMETERS:  Op
- *              result_obj
- *              walk_state
+ * PARAMETERS:  Op              - Current parse Op
+ *              result_obj      - Result of the operation
+ *              walk_state      - Current state
  *
  * RETURN:      Status
  *
@@ -338,8 +358,9 @@ acpi_ds_clear_operands (
  *
  * FUNCTION:    acpi_ds_create_operand
  *
- * PARAMETERS:  walk_state
- *              Arg
+ * PARAMETERS:  walk_state      - Current walk state
+ *              Arg             - Parse object for the argument
+ *              arg_index       - Which argument (zero based)
  *
  * RETURN:      Status
  *
