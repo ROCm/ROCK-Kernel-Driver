@@ -90,7 +90,9 @@ void ip_map_put(struct cache_head *item, struct cache_detail *cd)
 {
 	struct ip_map *im = container_of(item, struct ip_map,h);
 	if (cache_put(item, cd)) {
-		auth_domain_put(&im->m_client->h);
+		if (test_bit(CACHE_VALID, &item->flags) &&
+		    !test_bit(CACHE_NEGATIVE, &item->flags))
+			auth_domain_put(&im->m_client->h);
 		kfree(im);
 	}
 }

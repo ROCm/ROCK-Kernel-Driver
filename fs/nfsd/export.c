@@ -70,7 +70,8 @@ void expkey_put(struct cache_head *item, struct cache_detail *cd)
 {
 	if (cache_put(item, cd)) {
 		struct svc_expkey *key = container_of(item, struct svc_expkey, h);
-		if (key->ek_export)
+		if (test_bit(CACHE_VALID, &item->flags) &&
+		    !test_bit(CACHE_NEGATIVE, &item->flags))
 			exp_put(key->ek_export);
 		auth_domain_put(key->ek_client);
 		kfree(key);
