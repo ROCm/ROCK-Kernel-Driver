@@ -374,7 +374,7 @@ void __init ixp2000_init_irq(void)
 	/*
 	 * Enable PCI irq
 	 */
-	*(IXP2000_IRQ_ENABLE_SET) = (1 << IRQ_IXP2000_PCI);
+	ixp2000_reg_write(IXP2000_IRQ_ENABLE_SET, (1 << IRQ_IXP2000_PCI));
 	for (irq = IRQ_IXP2000_PCIA; irq <= IRQ_IXP2000_PCIB; irq++) {
 		set_irq_chip(irq, &ixp2000_pci_irq_chip);
 		set_irq_handler(irq, do_level_IRQ);
