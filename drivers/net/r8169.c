@@ -1610,11 +1610,26 @@ rtl8169_set_rx_mode(struct net_device *dev)
 	spin_unlock_irqrestore(&tp->lock, flags);
 }
 
+/**
+ *  rtl8169_get_stats - Get rtl8169 read/write statistics
+ *  @dev: The Ethernet Device to get statistics for
+ *
+ *  Get TX/RX statistics for rtl8169
+ */
 struct net_device_stats *
 rtl8169_get_stats(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
+	void *ioaddr = tp->mmio_addr;
+	unsigned long flags;
 
+	if (netif_running(dev)) {
+		spin_lock_irqsave(&tp->lock, flags);
+		tp->stats.rx_missed_errors += RTL_R32(RxMissed);
+		RTL_W32(RxMissed, 0);
+		spin_unlock_irqrestore(&tp->lock, flags);
+	}
+		
 	return &tp->stats;
 }
 
