@@ -140,13 +140,20 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	noprogress= 0;
 	while (target_dir->d_flags & DCACHE_DISCONNECTED && noprogress++ < 10) {
 		struct dentry *pd = target_dir;
-		read_lock(&dparent_lock);
-		while (!IS_ROOT(pd) &&
-		       (pd->d_parent->d_flags & DCACHE_DISCONNECTED))
-			pd = pd->d_parent;
 
 		dget(pd);
-		read_unlock(&dparent_lock);
+		spin_lock(&pd->d_lock);
+		while (!IS_ROOT(pd) &&
+				(pd->d_parent->d_flags&DCACHE_DISCONNECTED)) {
+			struct dentry *parent = pd->d_parent;
+
+			dget(parent);
+			spin_unlock(&pd->d_lock);
+			dput(pd);
+			pd = parent;
+			spin_lock(&pd->d_lock);
+		}
+		spin_unlock(&pd->d_lock);
 
 		if (!IS_ROOT(pd)) {
 			/* must have found a connected parent - great */
@@ -469,11 +476,12 @@ static int export_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 	fh[1] = inode->i_generation;
 	if (connectable && !S_ISDIR(inode->i_mode)) {
 		struct inode *parent;
-		read_lock(&dparent_lock);
+
+		spin_lock(&dentry->d_lock);
 		parent = dentry->d_parent->d_inode;
 		fh[2] = parent->i_ino;
 		fh[3] = parent->i_generation;
-		read_unlock(&dparent_lock);
+		spin_unlock(&dentry->d_lock);
 		len = 4;
 		type = 2;
 	}

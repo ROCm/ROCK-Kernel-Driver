@@ -148,10 +148,11 @@ struct bio {
  * permanent PIO fall back, user is probably better off disabling highmem
  * I/O completely on that queue (see ide-dma for example)
  */
-#define __bio_kmap(bio, idx) (kmap(bio_iovec_idx((bio), (idx))->bv_page) + bio_iovec_idx((bio), (idx))->bv_offset)
-#define bio_kmap(bio)	__bio_kmap((bio), (bio)->bi_idx)
-#define __bio_kunmap(bio, idx)	kunmap(bio_iovec_idx((bio), (idx))->bv_page)
-#define bio_kunmap(bio)		__bio_kunmap((bio), (bio)->bi_idx)
+#define __bio_kmap_atomic(bio, idx, kmtype)				\
+	(kmap_atomic(bio_iovec_idx((bio), (idx))->bv_page, kmtype) +	\
+		bio_iovec_idx((bio), (idx))->bv_offset)
+
+#define __bio_kunmap_atomic(addr, kmtype) kunmap_atomic(addr, kmtype)
 
 /*
  * merge helpers etc
@@ -238,7 +239,7 @@ extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
 	 * might not be a highmem page, but the preempt/irq count
 	 * balancing is a lot nicer this way
 	 */
-	local_save_flags(*flags);
+	local_irq_save(*flags);
 	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
 
 	if (addr & ~PAGE_MASK)

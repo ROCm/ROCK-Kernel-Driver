@@ -624,9 +624,9 @@ int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 	fh[1] = inode->i_generation;
 	fh[2] = MSDOS_I(inode)->i_location;
 	fh[3] = MSDOS_I(inode)->i_logstart;
-	read_lock(&dparent_lock);
+	spin_lock(&de->d_lock);
 	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
-	read_unlock(&dparent_lock);
+	spin_unlock(&de->d_lock);
 	return 3;
 }
 

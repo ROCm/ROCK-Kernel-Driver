@@ -1321,7 +1321,7 @@ int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_p
     if (maxlen < 5 || ! need_parent)
         return 3 ;
 
-    read_lock(&dparent_lock);
+    spin_lock(&dentry->d_lock);
     inode = dentry->d_parent->d_inode ;
     data[3] = inode->i_ino ;
     data[4] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
@@ -1330,7 +1330,7 @@ int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_p
 	    data[5] = inode->i_generation ;
 	    *lenp = 6 ;
     }
-    read_unlock(&dparent_lock);
+    spin_unlock(&dentry->d_lock);
     return *lenp ;
 }
 

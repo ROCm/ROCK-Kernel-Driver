@@ -232,7 +232,7 @@ int esp6_output(struct sk_buff *skb)
 
 	if (esp->auth.icv_full_len) {
 		esp->auth.icv(esp, skb, (u8*)esph-skb->data,
-			8+esp->conf.ivlen+clen, trailer->tail);
+			sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen+clen, trailer->tail);
 		pskb_put(skb, trailer, alen);
 	}
 
@@ -254,7 +254,7 @@ error_nolock:
 	return err;
 }
 
-int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
+int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	struct ipv6hdr *iph;
 	struct ipv6_esp_hdr *esph;
@@ -262,7 +262,7 @@ int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 	struct sk_buff *trailer;
 	int blksize = crypto_tfm_alg_blocksize(esp->conf.tfm);
 	int alen = esp->auth.icv_trunc_len;
-	int elen = skb->len - 8 - esp->conf.ivlen - alen;
+	int elen = skb->len - sizeof(struct ipv6_esp_hdr) - esp->conf.ivlen - alen;
 
 	int hdr_len = skb->h.raw - skb->nh.raw;
 	int nfrags;
@@ -319,7 +319,7 @@ int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 			if (!sg)
 				goto out;
 		}
-		skb_to_sgvec(skb, sg, 8+esp->conf.ivlen, elen);
+		skb_to_sgvec(skb, sg, sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen, elen);
 		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
@@ -338,8 +338,8 @@ int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 
 		ret_nexthdr = ((struct ipv6hdr*)tmp_hdr)->nexthdr = nexthdr[1];
 		pskb_trim(skb, skb->len - alen - padlen - 2);
-		skb->h.raw = skb_pull(skb, 8 + esp->conf.ivlen);
-		skb->nh.raw += 8 + esp->conf.ivlen;
+		skb->h.raw = skb_pull(skb, sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen);
+		skb->nh.raw += sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen;
 		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
 	}
 	kfree(tmp_hdr);
@@ -466,7 +466,7 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 		get_random_bytes(esp->conf.ivec, esp->conf.ivlen);
 	}
 	crypto_cipher_setkey(esp->conf.tfm, esp->conf.key, esp->conf.key_len);
-	x->props.header_len = 8 + esp->conf.ivlen;
+	x->props.header_len = sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct ipv6hdr);
 	x->data = esp;

@@ -54,18 +54,21 @@ tmpfs has the following uses:
 4) And probably a lot more I do not know about :-)
 
 
-tmpfs has a couple of mount options:
+tmpfs has three mount options for sizing:
 
-size:	   The limit of allocated bytes for this tmpfs instance. The 
+size:      The limit of allocated bytes for this tmpfs instance. The 
            default is half of your physical RAM without swap. If you
-	   oversize your tmpfs instances the machine will deadlock
-	   since the OOM handler will not be able to free that memory.
-nr_blocks: The same as size, but in blocks of PAGECACHE_SIZE.
+           oversize your tmpfs instances the machine will deadlock
+           since the OOM handler will not be able to free that memory.
+nr_blocks: The same as size, but in blocks of PAGE_CACHE_SIZE.
 nr_inodes: The maximum number of inodes for this instance. The default
            is half of the number of your physical RAM pages.
 
 These parameters accept a suffix k, m or g for kilo, mega and giga and
-can be changed on remount.
+can be changed on remount.  The size parameter also accepts a suffix %
+to limit this tmpfs instance to that percentage of your physical RAM:
+the default, when neither size nor nr_blocks is specified, is size=50%
+
 
 To specify the initial root directory you can use the following mount
 options:
@@ -83,15 +86,7 @@ will give you tmpfs instance on /mytmpfs which can allocate 10GB
 RAM/SWAP in 10240 inodes and it is only accessible by root.
 
 
-TODOs:
-
-1) give the size option a percent semantic: If you give a mount option
-   size=50% the tmpfs instance should be able to grow to 50 percent of
-   RAM + swap. So the instance should adapt automatically if you add
-   or remove swap space.
-2) Show the number of tmpfs RAM pages. (As shared?)
-
 Author:
    Christoph Rohland <cr@sap.com>, 1.12.01
 Updated:
-   Hugh Dickins <hugh@veritas.com>, 17 Oct 2002
+   Hugh Dickins <hugh@veritas.com>, 01 April 2003

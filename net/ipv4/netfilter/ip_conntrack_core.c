@@ -24,7 +24,6 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
-#include <linux/brlock.h>
 #include <net/checksum.h>
 #include <linux/stddef.h>
 #include <linux/sysctl.h>
@@ -1160,8 +1159,7 @@ void ip_conntrack_helper_unregister(struct ip_conntrack_helper *me)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	/* Someone could be still looking at the helper in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 }
 
 /* Refresh conntrack for this many jiffies. */
@@ -1401,8 +1399,7 @@ void ip_conntrack_cleanup(void)
 	/* This makes sure all current packets have passed through
            netfilter framework.  Roll on, two-stage module
            delete... */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
  
  i_see_dead_people:
 	ip_ct_selective_cleanup(kill_all, NULL);

@@ -20,7 +20,6 @@
 #include <linux/timer.h>
 #include <linux/skbuff.h>
 #include <linux/netfilter_ipv4.h>
-#include <linux/brlock.h>
 #include <net/checksum.h>
 #include <net/icmp.h>
 #include <net/ip.h>
@@ -545,8 +544,7 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	/* Someone could be still looking at the helper in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 
 	/* Find anything using it, and umm, kill them.  We can't turn
 	   them into normal connections: if we've adjusted SYNs, then

@@ -336,7 +336,7 @@ static void shaper_kick(struct shaper *shaper)
 		 
 		if(sh_debug)
 			printk("Clock = %ld, jiffies = %ld\n", SHAPERCB(skb)->shapeclock, jiffies);
-		if(time_before_eq(SHAPERCB(skb)->shapeclock - jiffies, SHAPER_BURST))
+		if(time_before_eq(SHAPERCB(skb)->shapeclock, jiffies + SHAPER_BURST))
 		{
 			/*
 			 *	Pull the frame and get interrupts back on.

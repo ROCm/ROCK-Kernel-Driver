@@ -33,6 +33,15 @@
 
 #define journal_oom_retry 1
 
+/*
+ * Define JBD_PARANIOD_IOFAIL to cause a kernel BUG() if ext3 finds
+ * certain classes of error which can occur due to failed IOs.  Under
+ * normal use we want ext3 to continue after such errors, because
+ * hardware _can_ fail, but for debugging purposes when running tests on
+ * known-good hardware we may want to trap these errors.
+ */
+#undef JBD_PARANOID_IOFAIL
+
 #ifdef CONFIG_JBD_DEBUG
 /*
  * Define JBD_EXPENSIVE_CHECKING to enable more expensive internal
@@ -256,6 +265,23 @@ void buffer_assertion_failure(struct buffer_head *bh);
 #else
 #define J_ASSERT(assert)	do { } while (0)
 #endif		/* JBD_ASSERTIONS */
+
+#if defined(JBD_PARANOID_IOFAIL)
+#define J_EXPECT(expr, why...)		J_ASSERT(expr)
+#define J_EXPECT_BH(bh, expr, why...)	J_ASSERT_BH(bh, expr)
+#define J_EXPECT_JH(jh, expr, why...)	J_ASSERT_JH(jh, expr)
+#else
+#define __journal_expect(expr, why...)					     \
+	do {								     \
+		if (!(expr)) {						     \
+			printk(KERN_ERR "EXT3-fs unexpected failure: %s;\n", # expr); \
+			printk(KERN_ERR ## why);			     \
+		}							     \
+	} while (0)
+#define J_EXPECT(expr, why...)		__journal_expect(expr, ## why)
+#define J_EXPECT_BH(bh, expr, why...)	__journal_expect(expr, ## why)
+#define J_EXPECT_JH(jh, expr, why...)	__journal_expect(expr, ## why)
+#endif
 
 enum jbd_state_bits {
 	BH_JBD			/* Has an attached ext3 journal_head */
@@ -788,6 +814,21 @@ extern void	journal_remove_journal_head(struct buffer_head *bh);
 extern void	__journal_remove_journal_head(struct buffer_head *bh);
 extern void	journal_unlock_journal_head(struct journal_head *jh);
 
+/*
+ * handle management
+ */
+extern kmem_cache_t *jbd_handle_cache;
+
+static inline handle_t *jbd_alloc_handle(int gfp_flags)
+{
+	return kmem_cache_alloc(jbd_handle_cache, gfp_flags);
+}
+
+static inline void jbd_free_handle(handle_t *handle)
+{
+	kmem_cache_free(jbd_handle_cache, handle);
+}
+
 /* Primary revoke support */
 #define JOURNAL_REVOKE_DEFAULT_HASH 256
 extern int	   journal_init_revoke(journal_t *, int);
@@ -814,7 +855,7 @@ extern void	   journal_brelse_array(struct buffer_head *b[], int n);
 
 extern int	log_space_left (journal_t *); /* Called with journal locked */
 extern tid_t	log_start_commit (journal_t *, transaction_t *);
-extern void	log_wait_commit (journal_t *, tid_t);
+extern int	log_wait_commit (journal_t *, tid_t);
 extern int	log_do_checkpoint (journal_t *, int);
 
 extern void	log_wait_for_space(journal_t *, int nblocks);

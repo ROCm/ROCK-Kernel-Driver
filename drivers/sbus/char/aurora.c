@@ -662,11 +662,8 @@ static void aurora_check_modem(struct Aurora_board const * bp, int chip)
 		if (sbus_readb(&bp->r[chip]->r[CD180_MSVR]) & MSVR_CD) 
 			wake_up_interruptible(&port->open_wait);
 		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (port->flags & ASYNC_CALLOUT_NOHUP))) {
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&port->tqueue_hangup) == 0)
-				MOD_DEC_USE_COUNT;
-		}
+			   (port->flags & ASYNC_CALLOUT_NOHUP))) 
+			schedule_task(&port->tqueue_hangup);
 	}
 	
 /* We don't have such things yet. My aurora board has DTR and RTS swapped, but that doesn't count in this driver. Let's hope
@@ -1212,11 +1209,8 @@ static int aurora_setup_port(struct Aurora_board *bp, struct Aurora_port *port)
 		clear_bit(TTY_IO_ERROR, &port->tty->flags);
 		
 #ifdef MODULE
-	if (port->count == 1) {
-		MOD_INC_USE_COUNT;
-		if((++bp->count) == 1)
+	if ((port->count == 1) && ((++bp->count) == 1))
 			bp->flags |= AURORA_BOARD_ACTIVE;
-	}
 #endif
 
 	port->xmit_cnt = port->xmit_head = port->xmit_tail = 0;
@@ -1297,7 +1291,6 @@ static void aurora_shutdown_port(struct Aurora_board *bp, struct Aurora_port *po
 		bp->count = 0;
 	}
 	
-	MOD_DEC_USE_COUNT;
 	if (!bp->count)
 		bp->flags &= ~AURORA_BOARD_ACTIVE;
 #endif
@@ -2210,7 +2203,6 @@ static void do_aurora_hangup(void *private_)
 		printk("do_aurora_hangup: end\n");
 #endif
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 static void aurora_hangup(struct tty_struct * tty)
@@ -2311,6 +2303,7 @@ static int aurora_init_drivers(void)
 /*	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));*/
 	memset(&aurora_driver, 0, sizeof(aurora_driver));
 	aurora_driver.magic = TTY_DRIVER_MAGIC;
+	aurora_driver.owner = THIS_MODULE;
 	aurora_driver.name = "ttyA";
 	aurora_driver.major = AURORA_MAJOR;
 	aurora_driver.num = AURORA_TNPORTS;

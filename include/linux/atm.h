@@ -236,15 +236,4 @@ struct atmif_sioc {
 };
 
 typedef unsigned short atm_backend_t;
-
-#ifdef __KERNEL__
-
-#include <linux/net.h>	/* struct net_proto */
-
-
-void atmpvc_proto_init(struct net_proto *pro);
-void atmsvc_proto_init(struct net_proto *pro);
-
-#endif /* __KERNEL__ */
-
 #endif

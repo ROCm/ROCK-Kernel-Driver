@@ -78,11 +78,13 @@ static void hangcheck_fire(unsigned long);
 static struct timer_list hangcheck_ticktock =
 		TIMER_INITIALIZER(hangcheck_fire, 0, 0);
 
+extern unsigned long long monotonic_clock(void);
+
 static void hangcheck_fire(unsigned long data)
 {
 	unsigned long long cur_tsc, tsc_diff;
 
-	cur_tsc = get_cycles();
+	cur_tsc = monotonic_clock();
 
 	if (cur_tsc > hangcheck_tsc)
 		tsc_diff = cur_tsc - hangcheck_tsc;
@@ -98,7 +100,7 @@ static void hangcheck_fire(unsigned long data)
 		}
 	}
 	mod_timer(&hangcheck_ticktock, jiffies + (hangcheck_tick*HZ));
-	hangcheck_tsc = get_cycles();
+	hangcheck_tsc = monotonic_clock();
 }
 
 
@@ -108,10 +110,10 @@ static int __init hangcheck_init(void)
 	       VERSION_STR, hangcheck_tick, hangcheck_margin);
 
 	hangcheck_tsc_margin = hangcheck_margin + hangcheck_tick;
-	hangcheck_tsc_margin *= HZ;
-	hangcheck_tsc_margin *= current_cpu_data.loops_per_jiffy;
+	hangcheck_tsc_margin *= 1000000000;
 
-	hangcheck_tsc = get_cycles();
+
+	hangcheck_tsc = monotonic_clock();
 	mod_timer(&hangcheck_ticktock, jiffies + (hangcheck_tick*HZ));
 
 	return 0;

@@ -2976,7 +2976,7 @@ static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb) {
            make it  aligned on a 48 byte boundary.  */
 	total_len = skb->len + sizeof(struct cpcs_trailer);  
 	total_len = ((total_len + 47) / 48) * 48;
-	IF_TX(printk("ia packet len:%d padding:%d\n", total_len, pad);)  
+	IF_TX(printk("ia packet len:%d padding:%d\n", total_len, total_len - skb->len);)  
  
 	/* Put the packet in a tx buffer */   
 	trailer = iadev->tx_buf[desc-1].cpcs;
