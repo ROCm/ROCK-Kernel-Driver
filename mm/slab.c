@@ -1303,9 +1303,6 @@ static void cache_init_objs (kmem_cache_t * cachep,
 
 static void kmem_flagcheck(kmem_cache_t *cachep, int flags)
 {
-	if (flags & __GFP_WAIT)
-		might_sleep();
-
 	if (flags & SLAB_DMA) {
 		if (!(cachep->gfpflags & GFP_DMA))
 			BUG();
@@ -1595,14 +1592,19 @@ must_grow:
 	return ac_entry(ac)[--ac->avail];
 }
 
-static inline void cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
+static inline void
+cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
 {
+	if (flags & __GFP_WAIT)
+		might_sleep();
 #if DEBUG
 	kmem_flagcheck(cachep, flags);
 #endif
 }
 
-static inline void *cache_alloc_debugcheck_after (kmem_cache_t *cachep, unsigned long flags, void *objp)
+static inline void *
+cache_alloc_debugcheck_after(kmem_cache_t *cachep,
+			unsigned long flags, void *objp)
 {
 #if DEBUG
 	if (!objp)	
