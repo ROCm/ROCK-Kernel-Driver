@@ -60,7 +60,7 @@
 #define WORDSWAP(a)	((((a)>>8)&0xff) | ((a)<<8))
 
 
-static const struct card_info {
+static struct card_info {
     zorro_id id;
     const char *name;
     unsigned int offset;
