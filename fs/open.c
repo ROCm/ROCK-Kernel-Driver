@@ -280,7 +280,7 @@ out:
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
+long do_utimes(char * filename, struct timeval * times)
 {
 	int error;
 	struct nameidata nd;
@@ -299,11 +299,7 @@ asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
 
 	/* Don't worry, the checks are done in inode_change_ok() */
 	newattrs.ia_valid = ATTR_CTIME | ATTR_MTIME | ATTR_ATIME;
-	if (utimes) {
-		struct timeval times[2];
-		error = -EFAULT;
-		if (copy_from_user(&times, utimes, sizeof(times)))
-			goto dput_and_out;
+	if (times) {
 		newattrs.ia_atime.tv_sec = times[0].tv_sec;
 		newattrs.ia_atime.tv_nsec = times[0].tv_usec * 1000;
 		newattrs.ia_mtime.tv_sec = times[1].tv_sec;
@@ -322,6 +318,16 @@ dput_and_out:
 out:
 	return error;
 }
+
+asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
+{
+	struct timeval times[2];
+
+	if (utimes && copy_from_user(&times, utimes, sizeof(times)))
+		return -EFAULT;
+	return do_utimes(filename, utimes ? times : NULL);
+}
+
 
 /*
  * access() needs to use the real uid/gid, not the effective uid/gid.
