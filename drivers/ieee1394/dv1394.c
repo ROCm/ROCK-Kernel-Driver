@@ -2609,7 +2609,6 @@ static void __exit dv1394_exit_module(void)
 	hpsb_unregister_protocol(&dv1394_driver);
 
 	hpsb_unregister_highlevel(&dv1394_highlevel);
-	cdev_unmap(IEEE1394_DV1394_DEV, 16);
 	cdev_del(&dv1394_cdev);
 	devfs_remove("ieee1394/dv");
 }

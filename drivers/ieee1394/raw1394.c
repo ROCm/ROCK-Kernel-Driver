@@ -2682,7 +2682,6 @@ static int __init init_raw1394(void)
 static void __exit cleanup_raw1394(void)
 {
 	hpsb_unregister_protocol(&raw1394_driver);
-	cdev_unmap(IEEE1394_RAW1394_DEV, 1);
 	cdev_del(&raw1394_cdev);
         devfs_remove(RAW1394_DEVICE_NAME);
         hpsb_unregister_highlevel(&raw1394_highlevel);

@@ -20,6 +20,10 @@ Part I - pci_ and dma_ Equivalent API
 To get the pci_ API, you must #include <linux/pci.h>
 To get the dma_ API, you must #include <linux/dma-mapping.h>
 
+
+Part Ia - Using large dma-coherent buffers
+------------------------------------------
+
 void *
 dma_alloc_coherent(struct device *dev, size_t size,
 			     dma_addr_t *dma_handle, int flag)
@@ -42,6 +46,7 @@ address space) or NULL if the allocation failed.
 Note: consistent memory can be expensive on some platforms, and the
 minimum allocation length may be as big as a page, so you should
 consolidate your requests for consistent memory as much as possible.
+The simplest way to do that is to use the dma_pool calls (see below).
 
 The flag parameter (dma_alloc_coherent only) allows the caller to
 specify the GFP_ flags (see kmalloc) for the allocation (the
@@ -60,6 +65,77 @@ Free the region of consistent memory you previously allocated.  dev,
 size and dma_handle must all be the same as those passed into the
 consistent allocate.  cpu_addr must be the virtual address returned by
 the consistent allocate
+
+
+Part Ib - Using small dma-coherent buffers
+------------------------------------------
+
+To get this part of the dma_ API, you must #include <linux/dmapool.h>
+
+Many drivers need lots of small dma-coherent memory regions for DMA
+descriptors or I/O buffers.  Rather than allocating in units of a page
+or more using dma_alloc_coherent(), you can use DMA pools.  These work
+much like a kmem_cache_t, except that they use the dma-coherent allocator
+not __get_free_pages().  Also, they understand common hardware constraints
+for alignment, like queue heads needing to be aligned on N byte boundaries.
+
+
+	struct dma_pool *
+	dma_pool_create(const char *name, struct device *dev,
+			size_t size, size_t align, size_t alloc);
+
+	struct pci_pool *
+	pci_pool_create(const char *name, struct pci_device *dev,
+			size_t size, size_t align, size_t alloc);
+
+The pool create() routines initialize a pool of dma-coherent buffers
+for use with a given device.  It must be called in a context which
+can sleep.
+
+The "name" is for diagnostics (like a kmem_cache_t name); dev and size
+are like what you'd pass to dma_alloc_coherent().  The device's hardware
+alignment requirement for this type of data is "align" (which is expressed
+in bytes, and must be a power of two).  If your device has no boundary
+crossing restrictions, pass 0 for alloc; passing 4096 says memory allocated
+from this pool must not cross 4KByte boundaries.
+
+
+	void *dma_pool_alloc(struct dma_pool *pool, int gfp_flags,
+			dma_addr_t *dma_handle);
+
+	void *pci_pool_alloc(struct pci_pool *pool, int gfp_flags,
+			dma_addr_t *dma_handle);
+
+This allocates memory from the pool; the returned memory will meet the size
+and alignment requirements specified at creation time.  Pass GFP_ATOMIC to
+prevent blocking, or if it's permitted (not in_interrupt, not holding SMP locks)
+pass GFP_KERNEL to allow blocking.  Like dma_alloc_coherent(), this returns
+two values:  an address usable by the cpu, and the dma address usable by the
+pool's device.
+
+
+	void dma_pool_free(struct dma_pool *pool, void *vaddr,
+			dma_addr_t addr);
+
+	void pci_pool_free(struct pci_pool *pool, void *vaddr,
+			dma_addr_t addr);
+
+This puts memory back into the pool.  The pool is what was passed to
+the the pool allocation routine; the cpu and dma addresses are what
+were returned when that routine allocated the memory being freed.
+
+
+	void dma_pool_destroy(struct dma_pool *pool);
+
+	void pci_pool_destroy(struct pci_pool *pool);
+
+The pool destroy() routines free the resources of the pool.  They must be
+called in a context which can sleep.  Make sure you've freed all allocated
+memory back to the pool before you destroy it.
+
+
+Part Ic - DMA addressing limitations
+------------------------------------
 
 int
 dma_supported(struct device *dev, u64 mask)
@@ -85,6 +161,10 @@ Checks to see if the mask is possible and updates the device
 parameters if it is.
 
 Returns: 1 if successful and 0 if not
+
+
+Part Id - Streaming DMA mappings
+--------------------------------
 
 dma_addr_t
 dma_map_single(struct device *dev, void *cpu_addr, size_t size,
@@ -253,6 +333,7 @@ Notes:  You must do this:
   DMA_BIDIRECTIONAL
 
 See also dma_map_single().
+
 
 Part II - Advanced dma_ usage
 -----------------------------

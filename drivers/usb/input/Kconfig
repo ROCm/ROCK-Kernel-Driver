@@ -41,9 +41,11 @@ config HID_FF
 	bool "Force feedback support (EXPERIMENTAL)"
 	depends on USB_HIDINPUT && EXPERIMENTAL
 	help
-	  Say Y here is you want force feedback support for a few HID devices. See
-	  below for a list of supported devices.
-	  See Documentation/input/ff.txt for a description of the force feedback API.
+	  Say Y here is you want force feedback support for a few HID devices.
+	  See below for a list of supported devices.
+
+	  See <file:Documentation/input/ff.txt> for a description of the force
+	  feedback API.
 
 	  If unsure, say N.
 
@@ -171,7 +173,8 @@ config USB_POWERMATE
 	  rotation.  The dial also acts as a pushbutton.  The base contains an LED
 	  which can be instructed to pulse or to switch to a particular intensity.
 
-	  You can download userspace tools from http://sowerbutts.com/powermate/
+	  You can download userspace tools from
+	  <http://sowerbutts.com/powermate/>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called powermate.
@@ -185,7 +188,7 @@ config USB_XPAD
 	  and/or "Event interface support" (CONFIG_INPUT_EVDEV) as well.
 
 	  For information about how to connect the X-Box pad to USB, see
-	  Documentation/input/xpad.txt.
+	  <file:Documentation/input/xpad.txt>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xpad.

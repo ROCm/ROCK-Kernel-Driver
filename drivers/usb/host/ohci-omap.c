@@ -134,7 +134,7 @@ static int omap_ohci_clock_power(int on)
 			writel(readl(ULPD_SOFT_REQ_REG) | SOFT_USB_REQ,
 				ULPD_SOFT_REQ_REG);
 
-			outl(inl(ULPD_STATUS_REQ_REG) | USB_HOST_DPLL_REQ,
+			writel(readl(ULPD_STATUS_REQ_REG) | USB_HOST_DPLL_REQ,
 			     ULPD_STATUS_REQ_REG);
 		}
 
@@ -248,7 +248,7 @@ static int omap_1610_usb_init(int mode)
 	val |= (1 << 2); /* Disable pulldown on integrated transceiver DM */
 	val |= (1 << 1); /* Disable pulldown on integraded transceiver DP */
 
-	outl(val, USB_TRANSCEIVER_CTRL);
+	writel(val, USB_TRANSCEIVER_CTRL);
 
 	/* Set the USB0_TRX_MODE */
 	val = 0;
@@ -256,7 +256,7 @@ static int omap_1610_usb_init(int mode)
 	val &= ~DEV_IDLE_EN;
 	val &= ~(7 << 16);	/* Clear USB0_TRX_MODE */
 	val |= (3 << 16);	/* 0 or 3, 6-wire DAT/SE0, TRM p 15-159 */
-	outl(val, OTG_SYSCON_1);
+	writel(val, OTG_SYSCON_1);
 
 	/* 
 	 * Control via OTG, see TRM p 15-163
@@ -275,10 +275,10 @@ static int omap_1610_usb_init(int mode)
 	val |= (4 << 16);	/* Must be 4 */
 	val |= USBX_SYNCHRO;	/* Must be set */
 	val |= SRP_VBUS;
-	outl(val, OTG_SYSCON_2);
+	writel(val, OTG_SYSCON_2);
 
 	/* Enable OTG idle */
-	//outl(inl(OTG_SYSCON_1) | OTG_IDLE_EN, OTG_SYSCON_1);
+	//writel(readl(OTG_SYSCON_1) | OTG_IDLE_EN, OTG_SYSCON_1);
 
 	return 0;
 }
@@ -631,7 +631,7 @@ static struct omap_dev ohci_hcd_omap_device = {
 		.end	= OMAP_OHCI_BASE + OMAP_OHCI_SIZE,
 	},
 	.irq = {
-		INT_OHCI,
+		INT_USB_HHC_1,
 	},
 };
 

@@ -333,7 +333,7 @@ static size_t parport_uss720_epp_read_data(struct parport *pp, void *buf, size_t
 	for (; got < length; got++) {
 		if (get_1284_register(pp, 4, (char *)buf))
 			break;
-		((char*)buf)++;
+		buf++;
 		if (priv->reg[0] & 0x01) {
 			clear_epp_timeout(pp);
 			break;
@@ -392,7 +392,7 @@ static size_t parport_uss720_epp_read_addr(struct parport *pp, void *buf, size_t
 	for (; got < length; got++) {
 		if (get_1284_register(pp, 3, (char *)buf))
 			break;
-		((char*)buf)++;
+		buf++;
 		if (priv->reg[0] & 0x01) {
 			clear_epp_timeout(pp);
 			break;
@@ -412,7 +412,7 @@ static size_t parport_uss720_epp_write_addr(struct parport *pp, const void *buf,
 	for (; written < length; written++) {
 		if (set_1284_register(pp, 3, *(char *)buf))
 			break;
-		((char*)buf)++;
+		buf++;
 		if (get_1284_register(pp, 1, NULL))
 			break;
 		if (priv->reg[0] & 0x01) {
@@ -469,7 +469,7 @@ static size_t parport_uss720_ecp_write_addr(struct parport *pp, const void *buff
 	for (; written < len; written++) {
 		if (set_1284_register(pp, 5, *(char *)buffer))
 			break;
-		((char*)buffer)++;
+		buffer++;
 	}
 	change_mode(pp, ECR_PS2);
 	return written;

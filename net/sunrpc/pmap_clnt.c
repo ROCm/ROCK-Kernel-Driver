@@ -41,7 +41,7 @@ static spinlock_t		pmap_lock = SPIN_LOCK_UNLOCKED;
 void
 rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 {
-	struct rpc_portmap *map = &clnt->cl_pmap;
+	struct rpc_portmap *map = clnt->cl_pmap;
 	struct sockaddr_in *sap = &clnt->cl_xprt->addr;
 	struct rpc_message msg = {
 		.rpc_proc	= &pmap_procedures[PMAP_GETPORT],
@@ -57,12 +57,12 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 			map->pm_prog, map->pm_vers, map->pm_prot);
 
 	spin_lock(&pmap_lock);
-	if (clnt->cl_binding) {
-		rpc_sleep_on(&clnt->cl_bindwait, task, NULL, 0);
+	if (map->pm_binding) {
+		rpc_sleep_on(&map->pm_bindwait, task, NULL, 0);
 		spin_unlock(&pmap_lock);
 		return;
 	}
-	clnt->cl_binding = 1;
+	map->pm_binding = 1;
 	spin_unlock(&pmap_lock);
 
 	task->tk_status = -EACCES; /* why set this? returns -EIO below */
@@ -85,8 +85,8 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 
 bailout:
 	spin_lock(&pmap_lock);
-	clnt->cl_binding = 0;
-	rpc_wake_up(&clnt->cl_bindwait);
+	map->pm_binding = 0;
+	rpc_wake_up(&map->pm_bindwait);
 	spin_unlock(&pmap_lock);
 	task->tk_status = -EIO;
 	task->tk_action = NULL;
@@ -129,6 +129,7 @@ static void
 pmap_getport_done(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
+	struct rpc_portmap *map = clnt->cl_pmap;
 
 	dprintk("RPC: %4d pmap_getport_done(status %d, port %d)\n",
 			task->tk_pid, task->tk_status, clnt->cl_port);
@@ -145,8 +146,8 @@ pmap_getport_done(struct rpc_task *task)
 		clnt->cl_xprt->addr.sin_port = clnt->cl_port;
 	}
 	spin_lock(&pmap_lock);
-	clnt->cl_binding = 0;
-	rpc_wake_up(&clnt->cl_bindwait);
+	map->pm_binding = 0;
+	rpc_wake_up(&map->pm_bindwait);
 	spin_unlock(&pmap_lock);
 }
 

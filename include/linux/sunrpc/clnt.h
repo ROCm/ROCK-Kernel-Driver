@@ -26,6 +26,8 @@ struct rpc_portmap {
 	__u32			pm_vers;
 	__u32			pm_prot;
 	__u16			pm_port;
+	unsigned char		pm_binding : 1;	/* doing a getport() */
+	struct rpc_wait_queue	pm_bindwait;	/* waiting on getport() */
 };
 
 struct rpc_inode;
@@ -34,6 +36,7 @@ struct rpc_inode;
  * The high-level client handle
  */
 struct rpc_clnt {
+	atomic_t		cl_count;	/* Number of clones */
 	atomic_t		cl_users;	/* number of references */
 	struct rpc_xprt *	cl_xprt;	/* transport */
 	struct rpc_procinfo *	cl_procinfo;	/* procedure info */
@@ -48,26 +51,27 @@ struct rpc_clnt {
 				cl_intr     : 1,/* interruptible */
 				cl_chatty   : 1,/* be verbose */
 				cl_autobind : 1,/* use getport() */
-				cl_binding  : 1,/* doing a getport() */
 				cl_droppriv : 1,/* enable NFS suid hack */
 				cl_oneshot  : 1,/* dispose after use */
 				cl_dead     : 1;/* abandoned */
 
-	struct rpc_rtt		cl_rtt;		/* RTO estimator data */
-
-	struct rpc_portmap	cl_pmap;	/* port mapping */
-	struct rpc_wait_queue	cl_bindwait;	/* waiting on getport() */
+	struct rpc_rtt *	cl_rtt;		/* RTO estimator data */
+	struct rpc_portmap *	cl_pmap;	/* port mapping */
 
 	int			cl_nodelen;	/* nodename length */
 	char 			cl_nodename[UNX_MAXNODENAME];
 	char			cl_pathname[30];/* Path in rpc_pipe_fs */
 	struct dentry *		cl_dentry;	/* inode */
+	struct rpc_clnt *	cl_parent;	/* Points to parent of clones */
+	struct rpc_rtt		cl_rtt_default;
+	struct rpc_portmap	cl_pmap_default;
+	char			cl_inline_name[32];
 };
 #define cl_timeout		cl_xprt->timeout
-#define cl_prog			cl_pmap.pm_prog
-#define cl_vers			cl_pmap.pm_vers
-#define cl_port			cl_pmap.pm_port
-#define cl_prot			cl_pmap.pm_prot
+#define cl_prog			cl_pmap->pm_prog
+#define cl_vers			cl_pmap->pm_vers
+#define cl_port			cl_pmap->pm_port
+#define cl_prot			cl_pmap->pm_prot
 
 /*
  * General RPC program info
@@ -108,6 +112,7 @@ struct rpc_procinfo {
 struct rpc_clnt *rpc_create_client(struct rpc_xprt *xprt, char *servname,
 				struct rpc_program *info,
 				u32 version, rpc_authflavor_t authflavor);
+struct rpc_clnt *rpc_clone_client(struct rpc_clnt *);
 int		rpc_shutdown_client(struct rpc_clnt *);
 int		rpc_destroy_client(struct rpc_clnt *);
 void		rpc_release_client(struct rpc_clnt *);

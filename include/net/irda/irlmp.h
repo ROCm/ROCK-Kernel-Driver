@@ -237,7 +237,7 @@ int  irlmp_udata_request(struct lsap_cb *, struct sk_buff *);
 void irlmp_udata_indication(struct lsap_cb *, struct sk_buff *);
 
 #ifdef CONFIG_IRDA_ULTRA
-int  irlmp_connless_data_request(struct lsap_cb *, struct sk_buff *);
+int  irlmp_connless_data_request(struct lsap_cb *, struct sk_buff *, __u8);
 void irlmp_connless_data_indication(struct lsap_cb *, struct sk_buff *);
 #endif /* CONFIG_IRDA_ULTRA */
 

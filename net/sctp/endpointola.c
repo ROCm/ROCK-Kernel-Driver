@@ -147,10 +147,6 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] =
 		sp->autoclose * HZ;
 
-	/* Set up the default send/receive buffer space.  */
-	sk->sk_rcvbuf = sctp_rmem;
-	sk->sk_sndbuf = sctp_wmem;
-
 	/* Use SCTP specific send buffer space queues.  */
 	sk->sk_write_space = sctp_write_space;
 	sk->sk_use_write_queue = 1;

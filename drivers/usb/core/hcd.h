@@ -163,7 +163,7 @@ struct hc_driver {
 	const char	*description;	/* "ehci-hcd" etc */
 
 	/* irq handler */
-	void	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
+	irqreturn_t	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
 
 	int	flags;
 #define	HCD_MEMORY	0x0001		/* HC regs use memory (else I/O) */
@@ -241,7 +241,9 @@ extern void usb_hc_died (struct usb_hcd *hcd);
 /* -------------------------------------------------------------------------- */
 
 /* Enumeration is only for the hub driver, or HCD virtual root hubs */
-extern int usb_new_device(struct usb_device *dev, struct device *parent);
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
+					struct usb_bus *, unsigned port);
+extern int usb_new_device(struct usb_device *dev);
 extern void usb_choose_address(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
 

@@ -332,8 +332,8 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto out_region;
 	}
 
-	host = scsi_register(&powertecscsi_template,
-			     sizeof (struct powertec_info));
+	host = scsi_host_alloc(&powertecscsi_template,
+			       sizeof (struct powertec_info));
 	if (!host) {
 		ret = -ENOMEM;
 		goto out_unmap;
@@ -407,7 +407,7 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 
  out_free:
 	device_remove_file(&ec->dev, &dev_attr_bus_term);
-	scsi_unregister(host);
+	scsi_host_put(host);
 
  out_unmap:
 	iounmap(base);
@@ -442,7 +442,7 @@ static void __devexit powertecscsi_remove(struct expansion_card *ec)
 	release_mem_region(resbase, reslen);
 
 	fas216_release(host);
-	scsi_unregister(host);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id powertecscsi_cids[] = {

@@ -283,4 +283,10 @@ static inline int irlap_is_primary(struct irlap_cb *self)
 	return(ret);
 }
 
+/* Clear a pending IrLAP disconnect. - Jean II */
+static inline void irlap_clear_disconnect(struct irlap_cb *self)
+{
+	self->disconnect_pending = FALSE;
+}
+
 #endif

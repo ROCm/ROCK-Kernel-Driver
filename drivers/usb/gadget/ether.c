@@ -19,7 +19,7 @@
  */
 
 
-#define DEBUG 1
+// #define DEBUG 1
 // #define VERBOSE
 
 #include <linux/config.h>
@@ -885,8 +885,11 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 #ifndef	DEV_CONFIG_CDC
 	if (result == 0) {
 		netif_carrier_on (dev->net);
-		if (netif_running (dev->net))
+		if (netif_running (dev->net)) {
+			spin_unlock (&dev->lock);
 			eth_start (dev, GFP_ATOMIC);
+			spin_lock (&dev->lock);
+		}
 	} else {
 		(void) usb_ep_disable (dev->in_ep);
 		dev->in_ep = 0;
@@ -1246,8 +1249,11 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 #ifdef	EP_STATUS_NUM
 				issue_start_status (dev);
 #endif
-				if (netif_running (dev->net))
+				if (netif_running (dev->net)) {
+					spin_unlock (&dev->lock);
 					eth_start (dev, GFP_ATOMIC);
+					spin_lock (&dev->lock);
+				}
 			} else {
 				netif_stop_queue (dev->net);
 				netif_carrier_off (dev->net);
@@ -1414,16 +1420,14 @@ static int
 rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 {
 	struct sk_buff		*skb;
-	int			retval = 0;
+	int			retval = -ENOMEM;
 	size_t			size;
 
 	size = (sizeof (struct ethhdr) + dev->net->mtu + RX_EXTRA);
 
 	if ((skb = alloc_skb (size, gfp_flags)) == 0) {
 		DEBUG (dev, "no rx skb\n");
-		defer_kevent (dev, WORK_RX_MEMORY);
-		list_add (&req->list, &dev->rx_reqs);
-		return -ENOMEM;
+		goto enomem;
 	}
 
 	req->buf = skb->data;
@@ -1433,11 +1437,14 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 
 	retval = usb_ep_queue (dev->out_ep, req, gfp_flags);
 	if (retval == -ENOMEM)
+enomem:
 		defer_kevent (dev, WORK_RX_MEMORY);
 	if (retval) {
 		DEBUG (dev, "rx submit --> %d\n", retval);
 		dev_kfree_skb_any (skb);
+		spin_lock (&dev->lock);
 		list_add (&req->list, &dev->rx_reqs);
+		spin_unlock (&dev->lock);
 	}
 	return retval;
 }
@@ -1502,6 +1509,7 @@ quiesce:
 		dev_kfree_skb_any (skb);
 	if (!netif_running (dev->net)) {
 clean:
+		/* nobody reading rx_reqs, so no dev->lock */
 		list_add (&req->list, &dev->rx_reqs);
 		req = 0;
 	}
@@ -1568,19 +1576,26 @@ fail:
 static void rx_fill (struct eth_dev *dev, int gfp_flags)
 {
 	struct usb_request	*req;
+	unsigned long		flags;
 
 	clear_bit (WORK_RX_MEMORY, &dev->todo);
 
 	/* fill unused rxq slots with some skb */
+	spin_lock_irqsave (&dev->lock, flags);
 	while (!list_empty (&dev->rx_reqs)) {
 		req = container_of (dev->rx_reqs.next,
 				struct usb_request, list);
 		list_del_init (&req->list);
+		spin_unlock_irqrestore (&dev->lock, flags);
+
 		if (rx_submit (dev, req, gfp_flags) < 0) {
 			defer_kevent (dev, WORK_RX_MEMORY);
 			return;
 		}
+
+		spin_lock_irqsave (&dev->lock, flags);
 	}
+	spin_unlock_irqrestore (&dev->lock, flags);
 }
 
 static void eth_work (void *_dev)
@@ -1616,7 +1631,9 @@ static void tx_complete (struct usb_ep *ep, struct usb_request *req)
 	}
 	dev->stats.tx_packets++;
 
+	spin_lock (&dev->lock);
 	list_add (&req->list, &dev->tx_reqs);
+	spin_unlock (&dev->lock);
 	dev_kfree_skb_any (skb);
 
 	atomic_dec (&dev->tx_qlen);
@@ -1630,11 +1647,14 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	int			length = skb->len;
 	int			retval;
 	struct usb_request	*req = 0;
+	unsigned long		flags;
 
+	spin_lock_irqsave (&dev->lock, flags);
 	req = container_of (dev->tx_reqs.next, struct usb_request, list);
 	list_del (&req->list);
 	if (list_empty (&dev->tx_reqs))
 		netif_stop_queue (net);
+	spin_unlock_irqrestore (&dev->lock, flags);
 
 	/* no buffer copies needed, unless the network stack did it
 	 * or the hardware can't use skb buffers.
@@ -1675,9 +1695,11 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	if (retval) {
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any (skb);
+		spin_lock_irqsave (&dev->lock, flags);
 		if (list_empty (&dev->tx_reqs))
 			netif_start_queue (net);
 		list_add (&req->list, &dev->tx_reqs);
+		spin_unlock_irqrestore (&dev->lock, flags);
 	}
 	return 0;
 }

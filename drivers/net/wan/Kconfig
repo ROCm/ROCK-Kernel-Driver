@@ -382,7 +382,7 @@ config PC300
 
 config PC300_MLPPP
 	bool "Cyclades-PC300 MLPPP support"
-	depends on PC300 && PPP_MULTILINK && PPP_SYNC_TTY && HDLC_PPP && BROKEN
+	depends on PC300 && PPP_MULTILINK && PPP_SYNC_TTY && HDLC_PPP
 	help
 	  Say 'Y' to this option if you are planning to use Multilink PPP over the
 	  PC300 synchronous communication boards.
