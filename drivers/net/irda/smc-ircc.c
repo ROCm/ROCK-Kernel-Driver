@@ -469,7 +469,7 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 		"firport 0x%03x, sirport 0x%03x dma=%d, irq=%d\n",
 		chip & 0x0f, version, fir_base, sir_base, dma, irq);
 
-	if (dev_count>DIM(dev_self)) {
+	if (dev_count >= DIM(dev_self)) {
 	        IRDA_DEBUG(0, 
 			   "%s(), to many devices!\n", __FUNCTION__ );
 		return -ENOMEM;

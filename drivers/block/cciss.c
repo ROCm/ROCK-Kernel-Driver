@@ -345,7 +345,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	printk(KERN_DEBUG "cciss_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
 #endif /* CCISS_DEBUG */ 
 
-	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
+	if (ctlr >= MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 	/*
 	 * Root is allowed to open raw volume zero even if its not configured

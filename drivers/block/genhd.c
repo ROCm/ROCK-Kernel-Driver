@@ -74,7 +74,7 @@ void blk_unregister_region(dev_t dev, unsigned long range)
 	down_write(&block_subsys.rwsem);
 	for (s = &probes[index]; *s; s = &(*s)->next) {
 		struct blk_probe *p = *s;
-		if (p->dev == dev || p->range == range) {
+		if (p->dev == dev && p->range == range) {
 			*s = p->next;
 			kfree(p);
 			break;

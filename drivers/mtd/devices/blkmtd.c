@@ -303,12 +303,7 @@ static int write_queue_task(void *data)
 
   DECLARE_WAITQUEUE(wait, tsk);
   DEBUG(1, "blkmtd: writetask: starting (pid = %d)\n", tsk->pid);
-  daemonize();
-  strcpy(tsk->comm, "blkmtdd");
-  spin_lock_irq(&tsk->sighand->siglock);
-  sigfillset(&tsk->blocked);
-  recalc_sigpending();
-  spin_unlock_irq(&tsk->sighand->siglock);
+  daemonize("blkmtdd");
 
   if(alloc_kiovec(1, &iobuf)) {
     printk("blkmtd: write_queue_task cant allocate kiobuf\n");

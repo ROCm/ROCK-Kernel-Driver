@@ -907,6 +907,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	p = find_task_by_pid(pid);
 	if (!p)
 		goto out;
+
 	err = -EINVAL;
 	if (!thread_group_leader(p))
 		goto out;
@@ -918,11 +919,16 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 		err = -EACCES;
 		if (p->did_exec)
 			goto out;
-	} else if (p != current)
-		goto out;
+	} else {
+		err = -ESRCH;
+		if (p != current)
+			goto out;
+	}
+
 	err = -EPERM;
 	if (p->leader)
 		goto out;
+
 	if (pgid != pid) {
 		struct task_struct *p;
 		struct pid *pid;

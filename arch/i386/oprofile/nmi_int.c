@@ -214,12 +214,62 @@ struct oprofile_operations nmi_ops = {
 	.stop		= nmi_stop
 };
  
+
+#if !defined(CONFIG_X86_64)
+
+static int __init p4_init(void)
+{
+	__u8 cpu_model = current_cpu_data.x86_model;
+
+	if (cpu_model > 3)
+		return 0;
+
+#ifndef CONFIG_SMP
+	nmi_ops.cpu_type = "i386/p4";
+	model = &op_p4_spec;
+	return 1;
+#else
+	switch (smp_num_siblings) {
+		case 1:
+			nmi_ops.cpu_type = "i386/p4";
+			model = &op_p4_spec;
+			return 1;
+
+		case 2:
+			nmi_ops.cpu_type = "i386/p4-ht";
+			model = &op_p4_ht2_spec;
+			return 1;
+	}
+#endif
+
+	printk(KERN_INFO "oprofile: P4 HyperThreading detected with > 2 threads\n");
+	printk(KERN_INFO "oprofile: Reverting to timer mode.\n");
+	return 0;
+}
+
+
+static int __init ppro_init(void)
+{
+	__u8 cpu_model = current_cpu_data.x86_model;
+
+	if (cpu_model > 5) {
+		nmi_ops.cpu_type = "i386/piii";
+	} else if (cpu_model > 2) {
+		nmi_ops.cpu_type = "i386/pii";
+	} else {
+		nmi_ops.cpu_type = "i386/ppro";
+	}
+
+	model = &op_ppro_spec;
+	return 1;
+}
+
+#endif /* !CONFIG_X86_64 */
  
-int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
+int __init nmi_init(struct oprofile_operations ** ops)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;
-	__u8 cpu_model = current_cpu_data.x86_model;
  
 	if (!cpu_has_apic)
 		return 0;
@@ -230,26 +280,29 @@ int __init nmi_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
 			if (family < 6)
 				return 0;
 			model = &op_athlon_spec;
-			*cpu = OPROFILE_CPU_ATHLON;
+			nmi_ops.cpu_type = "i386/athlon";
 			break;
  
-#ifndef CONFIG_X86_64
+#if !defined(CONFIG_X86_64)
 		case X86_VENDOR_INTEL:
-			/* Less than a P6-class processor */
-			if (family != 6)
-				return 0;
-	 
-			if (cpu_model > 5) {
-				*cpu = OPROFILE_CPU_PIII;
-			} else if (cpu_model > 2) {
-				*cpu = OPROFILE_CPU_PII;
-			} else {
-				*cpu = OPROFILE_CPU_PPRO;
+			switch (family) {
+				/* Pentium IV */
+				case 0xf:
+					if (!p4_init())
+						return 0;
+					break;
+
+				/* A P6-class processor */
+				case 6:
+					if (!ppro_init())
+						return 0;
+					break;
+
+				default:
+					return 0;
 			}
- 
-			model = &op_ppro_spec;
 			break;
-#endif
+#endif /* !CONFIG_X86_64 */
 
 		default:
 			return 0;

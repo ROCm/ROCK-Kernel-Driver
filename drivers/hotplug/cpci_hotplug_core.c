@@ -622,8 +622,7 @@ event_thread(void *data)
 	struct list_head *tmp;
 
 	lock_kernel();
-	daemonize();
-	strcpy(current->comm, "cpci_hp_eventd");
+	daemonize("cpci_hp_eventd");
 	unlock_kernel();
 
 	dbg("%s - event thread started", __FUNCTION__);
@@ -682,8 +681,7 @@ poll_thread(void *data)
 	struct list_head *tmp;
 
 	lock_kernel();
-	daemonize();
-	strcpy(current->comm, "cpci_hp_polld");
+	daemonize("cpci_hp_polld");
 	unlock_kernel();
 
 	while(1) {

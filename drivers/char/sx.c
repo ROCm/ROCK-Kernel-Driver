@@ -1689,7 +1689,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 	switch (cmd) {
 	case SXIO_SET_BOARD:
 		sx_dprintk (SX_DEBUG_FIRMWARE, "set board to %ld\n", arg);
-		if (arg > SX_NBOARDS) return -EIO;
+		if (arg >= SX_NBOARDS) return -EIO;
 		sx_dprintk (SX_DEBUG_FIRMWARE, "not out of range\n");
 		if (!(boards[arg].flags	& SX_BOARD_PRESENT)) return -EIO;
 		sx_dprintk (SX_DEBUG_FIRMWARE, ".. and present!\n");

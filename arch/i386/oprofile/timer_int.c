@@ -20,8 +20,9 @@ static int timer_notify(struct notifier_block * self, unsigned long val, void * 
 {
 	struct pt_regs * regs = (struct pt_regs *)data;
 	int cpu = smp_processor_id();
+	unsigned long eip = instruction_pointer(regs);
  
-	oprofile_add_sample(instruction_pointer(regs), 0, cpu);
+	oprofile_add_sample(eip, !user_mode(regs), 0, cpu);
 	return 0;
 }
  
@@ -45,13 +46,13 @@ static void timer_stop(void)
 
 static struct oprofile_operations timer_ops = {
 	.start	= timer_start,
-	.stop	= timer_stop
+	.stop	= timer_stop,
+	.cpu_type = "timer"
 };
 
  
-void __init timer_init(struct oprofile_operations ** ops, enum oprofile_cpu * cpu)
+void __init timer_init(struct oprofile_operations ** ops)
 {
 	*ops = &timer_ops;
-	*cpu = OPROFILE_CPU_TIMER;
 	printk(KERN_INFO "oprofile: using timer interrupt.\n");
 }

@@ -256,8 +256,13 @@ static void flush_sigqueue(struct sigpending *queue)
 void
 flush_signals(struct task_struct *t)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&t->sighand->siglock, flags);
 	clear_tsk_thread_flag(t,TIF_SIGPENDING);
 	flush_sigqueue(&t->pending);
+	flush_sigqueue(&t->signal->shared_pending);
+	spin_unlock_irqrestore(&t->sighand->siglock, flags);
 }
 
 /*
@@ -619,6 +624,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
 		t = p;
 		do {
+			unsigned int state;
 			rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
 			
 			/*
@@ -635,9 +641,12 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * Wake up the stopped thread _after_ setting
 			 * TIF_SIGPENDING
 			 */
-			if (!sigismember(&t->blocked, SIGCONT))
+			state = TASK_STOPPED;
+			if (!sigismember(&t->blocked, SIGCONT)) {
 				set_tsk_thread_flag(t, TIF_SIGPENDING);
-			wake_up_state(t, TASK_STOPPED);
+				state |= TASK_INTERRUPTIBLE;
+			}
+			wake_up_state(t, state);
 
 			t = next_thread(t);
 		} while (t != p);
@@ -1577,7 +1586,6 @@ long do_no_restart_syscall(struct restart_block *param)
 {
 	return -EINTR;
 }
-
 
 /*
  * We don't need to get the kernel lock - this is all local to this

@@ -928,10 +928,8 @@ int kswapd(void *p)
 	struct task_struct *tsk = current;
 	DEFINE_WAIT(wait);
 
-	daemonize();
+	daemonize("kswapd%d", pgdat->node_id);
 	set_cpus_allowed(tsk, node_to_cpumask(pgdat->node_id));
-	sprintf(tsk->comm, "kswapd%d", pgdat->node_id);
-	sigfillset(&tsk->blocked);
 	
 	/*
 	 * Tell the memory management that we're a "memory allocator",

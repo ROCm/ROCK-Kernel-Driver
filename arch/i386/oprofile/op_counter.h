@@ -10,7 +10,7 @@
 #ifndef OP_COUNTER_H
 #define OP_COUNTER_H
  
-#define OP_MAX_COUNTER 4
+#define OP_MAX_COUNTER 8
  
 /* Per-perfctr configuration as set via
  * oprofilefs.

@@ -211,9 +211,7 @@ static int rtasd(void *unused)
 
 	DEBUG("will sleep for %d jiffies\n", (HZ*60/rtas_event_scan_rate) / 2);
 
-	daemonize();
-	sigfillset(&current->blocked);
-	sprintf(current->comm, "rtasd");
+	daemonize("rtasd");
 
 #if 0
 	/* Rusty unreal time task */

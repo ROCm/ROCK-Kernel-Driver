@@ -755,9 +755,7 @@ static int msp3400c_thread(void *data)
 	lock_kernel();
 #endif
 	
-	daemonize();
-	sigfillset(&current->blocked);
-	strcpy(current->comm,"msp3400");
+	daemonize("msp3400");
 
 	msp->thread = current;
 
@@ -1011,9 +1009,7 @@ static int msp3410d_thread(void *data)
 	lock_kernel();
 #endif
     
-	daemonize();
-	sigfillset(&current->blocked);
-	strcpy(current->comm,"msp3410 [auto]");
+	daemonize("msp3410 [auto]");
 
 	msp->thread = current;
 
