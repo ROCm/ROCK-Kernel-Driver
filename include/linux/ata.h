@@ -102,16 +102,6 @@ enum {
 	ATA_REG_DEVSEL		= ATA_REG_DEVICE,
 	ATA_REG_IRQ		= ATA_REG_NSECT,
 
-	/* ATA taskfile protocols */
-	ATA_PROT_UNKNOWN	= 0,
-	ATA_PROT_NODATA		= 1,
-	ATA_PROT_PIO_READ	= 2,
-	ATA_PROT_PIO_WRITE	= 3,
-	ATA_PROT_DMA_READ	= 4,
-	ATA_PROT_DMA_WRITE	= 5,
-	ATA_PROT_ATAPI		= 6,
-	ATA_PROT_ATAPI_DMA	= 7,
-
 	/* ATA device commands */
 	ATA_CMD_EDD		= 0x90,	/* execute device diagnostic */
 	ATA_CMD_ID_ATA		= 0xEC,
@@ -156,13 +146,54 @@ enum {
 	SCR_CONTROL		= 2,
 	SCR_ACTIVE		= 3,
 	SCR_NOTIFICATION	= 4,
+
+	/* struct ata_taskfile flags */
+	ATA_TFLAG_LBA48		= (1 << 0), /* enable 48-bit LBA and "HOB" */
+	ATA_TFLAG_ISADDR	= (1 << 1), /* enable r/w to nsect/lba regs */
+	ATA_TFLAG_DEVICE	= (1 << 2), /* enable r/w to device reg */
+	ATA_TFLAG_WRITE		= (1 << 3), /* data dir: host->dev==1 (write) */
+};
+
+enum ata_tf_protocols {
+	/* ATA taskfile protocols */
+	ATA_PROT_UNKNOWN,	/* unknown/invalid */
+	ATA_PROT_NODATA,	/* no data */
+	ATA_PROT_PIO,		/* PIO single sector */
+	ATA_PROT_PIO_MULT,	/* PIO multiple sector */
+	ATA_PROT_DMA,		/* DMA */
+	ATA_PROT_ATAPI,		/* packet command */
+	ATA_PROT_ATAPI_DMA,	/* packet command with special DMA sauce */
 };
 
 /* core structures */
+
 struct ata_prd {
 	u32			addr;
 	u32			flags_len;
 } __attribute__((packed));
+
+struct ata_taskfile {
+	unsigned long		flags;		/* ATA_TFLAG_xxx */
+	u8			protocol;	/* ATA_PROT_xxx */
+
+	u8			ctl;		/* control reg */
+
+	u8			hob_feature;	/* additional data */
+	u8			hob_nsect;	/* to support LBA48 */
+	u8			hob_lbal;
+	u8			hob_lbam;
+	u8			hob_lbah;
+
+	u8			feature;
+	u8			nsect;
+	u8			lbal;
+	u8			lbam;
+	u8			lbah;
+
+	u8			device;
+
+	u8			command;	/* IO operation */
+};
 
 #define ata_id_is_ata(dev)	(((dev)->id[0] & (1 << 15)) == 0)
 #define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
