@@ -1411,9 +1411,13 @@ xlog_sync(xlog_t		*log,
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 
 	/* real byte length */
-	INT_SET(iclog->ic_header.h_len, 
-		ARCH_CONVERT,
-		iclog->ic_offset + iclog->ic_roundoff);
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+		INT_SET(iclog->ic_header.h_len, 
+			ARCH_CONVERT,
+			iclog->ic_offset + iclog->ic_roundoff);
+	} else {
+		INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);
+	}
 
 	/* put ops count in correct order */
 	ops = iclog->ic_header.h_num_logops;
