@@ -141,7 +141,7 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
-		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
  * The device needs the flags only.
