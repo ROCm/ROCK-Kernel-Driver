@@ -610,7 +610,10 @@ static void free_module(struct module *mod);
 #ifdef CONFIG_MODULE_FORCE_UNLOAD
 static inline int try_force(unsigned int flags)
 {
-	return (flags & O_TRUNC);
+	int ret = (flags & O_TRUNC);
+	if (ret)
+		tainted |= TAINT_FORCED_MODULE;
+	return ret;
 }
 #else
 static inline int try_force(unsigned int flags)
