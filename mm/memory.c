@@ -1001,8 +1001,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 {
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
-	struct pte_chain *pte_chain = NULL;
-	int ret;
+	struct pte_chain *pte_chain;
 
 	if (unlikely(!pfn_valid(pfn))) {
 		/*
@@ -1013,7 +1012,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		pte_unmap(page_table);
 		printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n",
 				address);
-		goto oom;
+		spin_unlock(&mm->page_table_lock);
+		return VM_FAULT_OOM;
 	}
 	old_page = pfn_to_page(pfn);
 
@@ -1025,8 +1025,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			establish_pte(vma, address, page_table,
 				pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
 			pte_unmap(page_table);
-			ret = VM_FAULT_MINOR;
-			goto out;
+			spin_unlock(&mm->page_table_lock);
+			return VM_FAULT_MINOR;
 		}
 	}
 	pte_unmap(page_table);
@@ -1039,10 +1039,10 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	if (!pte_chain)
-		goto no_mem;
+		goto no_pte_chain;
 	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
-		goto no_mem;
+		goto no_new_page;
 	copy_cow_page(old_page,new_page,address);
 
 	/*
@@ -1064,17 +1064,15 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	pte_unmap(page_table);
 	page_cache_release(new_page);
 	page_cache_release(old_page);
-	ret = VM_FAULT_MINOR;
-	goto out;
-
-no_mem:
-	page_cache_release(old_page);
-oom:
-	ret = VM_FAULT_OOM;
-out:
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
-	return ret;
+	return VM_FAULT_MINOR;
+
+no_new_page:
+	pte_chain_free(pte_chain);
+no_pte_chain:
+	page_cache_release(old_page);
+	return VM_FAULT_OOM;
 }
 
 /*
