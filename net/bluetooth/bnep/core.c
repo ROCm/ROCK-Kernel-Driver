@@ -128,18 +128,17 @@ static int bnep_send_rsp(struct bnep_session *s, u8 ctrl, u16 resp)
 	return bnep_send(s, &rsp, sizeof(rsp));
 }
 
-static int bnep_ctrl_set_netfilter(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_ctrl_set_netfilter(struct bnep_session *s, u16 *data, int len)
 {
-	u16 *data;
 	int n;
-	
-	data = (void *) skb->data;
-	if (!skb_pull(skb, 2))
-		return -EILSEQ;
-	n = ntohs(get_unaligned(data));
 
-	data = (void *) skb->data;
-	if (!skb_pull(skb, n))
+	if (len < 2)
+		return -EILSEQ;
+
+	n = ntohs(get_unaligned(data));
+	data++; len -= 2;
+
+	if (len < n)
 		return -EILSEQ;
 
 	BT_DBG("filter len %d", n);
@@ -170,18 +169,17 @@ static int bnep_ctrl_set_netfilter(struct bnep_session *s, struct sk_buff *skb)
 	return 0;
 }
 
-static int bnep_ctrl_set_mcfilter(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_ctrl_set_mcfilter(struct bnep_session *s, u8 *data, int len)
 {
-	u8 *data;
 	int n;
-	
-	data = (void *) skb->data;
-	if (!skb_pull(skb, 2))
-		return -EILSEQ;
-	n = ntohs(get_unaligned((u16 *) data));
 
-	data = (void *) skb->data;
-	if (!skb_pull(skb, n))
+	if (len < 2)
+		return -EILSEQ;
+
+	n = ntohs(get_unaligned((u16 *) data)); 
+	data += 2; len -= 2;
+
+	if (len < n)
 		return -EILSEQ;
 
 	BT_DBG("filter len %d", n);
@@ -225,12 +223,13 @@ static int bnep_ctrl_set_mcfilter(struct bnep_session *s, struct sk_buff *skb)
 	return 0;
 }
 
-static int bnep_rx_control(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_rx_control(struct bnep_session *s, void *data, int len)
 {
+	u8  cmd = *(u8 *)data;
 	int err = 0;
-	u8 cmd = *(u8 *) skb->data;
-	skb_pull(skb, 1);
-	
+
+	data++; len--;
+
 	switch (cmd) {
 	case BNEP_CMD_NOT_UNDERSTOOD:
 	case BNEP_SETUP_CONN_REQ:
@@ -239,13 +238,13 @@ static int bnep_rx_control(struct bnep_session *s, struct sk_buff *skb)
 	case BNEP_FILTER_MULTI_ADDR_RSP:
 		/* Ignore these for now */
 		break;
-		
+
 	case BNEP_FILTER_NET_TYPE_SET:
-		err = bnep_ctrl_set_netfilter(s, skb);
+		err = bnep_ctrl_set_netfilter(s, data, len);
 		break;
 
 	case BNEP_FILTER_MULTI_ADDR_SET:
-		err = bnep_ctrl_set_mcfilter(s, skb);
+		err = bnep_ctrl_set_mcfilter(s, data, len);
 		break;
 
 	default: {
@@ -274,16 +273,19 @@ static int bnep_rx_extension(struct bnep_session *s, struct sk_buff *skb)
 		}
 
 		BT_DBG("type 0x%x len %d", h->type, h->len);
-		
+	
 		switch (h->type & BNEP_TYPE_MASK) {
 		case BNEP_EXT_CONTROL:
-			err = bnep_rx_control(s, skb);
+			bnep_rx_control(s, skb->data, skb->len);
 			break;
 
 		default:
-			/* Unknown extension */
-			if (!skb_pull(skb, h->len))
-				err = -EILSEQ;
+			/* Unknown extension, skip it. */
+			break;
+		}
+
+		if (!skb_pull(skb, h->len)) {
+			err = -EILSEQ;
 			break;
 		}
 	} while (!err && (h->type & BNEP_EXT_HEADER));
@@ -315,7 +317,7 @@ static inline int bnep_rx_frame(struct bnep_session *s, struct sk_buff *skb)
 		goto badframe;
 	
 	if ((type & BNEP_TYPE_MASK) == BNEP_CONTROL) {
-		bnep_rx_control(s, skb);
+		bnep_rx_control(s, skb->data, skb->len);
 		kfree_skb(skb);
 		return 0;
 	}
@@ -529,7 +531,7 @@ static int bnep_session(void *arg)
 	return 0;
 }
 
-int bnep_add_connection(struct bnep_conadd_req *req, struct socket *sock)
+int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 {
 	struct net_device *dev;
 	struct bnep_session *s, *ss;
@@ -620,7 +622,7 @@ failed:
 	return err;
 }
 
-int bnep_del_connection(struct bnep_condel_req *req)
+int bnep_del_connection(struct bnep_conndel_req *req)
 {
 	struct bnep_session *s;
 	int  err = 0;
@@ -645,7 +647,7 @@ int bnep_del_connection(struct bnep_condel_req *req)
 	return err;
 }
 
-static void __bnep_copy_ci(struct bnep_coninfo *ci, struct bnep_session *s)
+static void __bnep_copy_ci(struct bnep_conninfo *ci, struct bnep_session *s)
 {
 	memcpy(ci->dst, s->eh.h_source, ETH_ALEN);
 	strcpy(ci->device, s->dev.name);
@@ -654,7 +656,7 @@ static void __bnep_copy_ci(struct bnep_coninfo *ci, struct bnep_session *s)
 	ci->role  = s->role;
 }
 
-int bnep_get_conlist(struct bnep_conlist_req *req)
+int bnep_get_connlist(struct bnep_connlist_req *req)
 {
 	struct list_head *p;
 	int err = 0, n = 0;
@@ -663,7 +665,7 @@ int bnep_get_conlist(struct bnep_conlist_req *req)
 
 	list_for_each(p, &bnep_session_list) {
 		struct bnep_session *s;
-		struct bnep_coninfo ci;
+		struct bnep_conninfo ci;
 
 		s = list_entry(p, struct bnep_session, list);
 
@@ -685,7 +687,7 @@ int bnep_get_conlist(struct bnep_conlist_req *req)
 	return err;
 }
 
-int bnep_get_coninfo(struct bnep_coninfo *ci)
+int bnep_get_conninfo(struct bnep_conninfo *ci)
 {
 	struct bnep_session *s;
 	int err = 0;
