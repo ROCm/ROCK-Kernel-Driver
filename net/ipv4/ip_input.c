@@ -201,7 +201,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 #ifdef CONFIG_NETFILTER_DEBUG
 	nf_debug_ip_local_deliver(skb);
-	skb->nf_debug =3D 0;
+	skb->nf_debug = 0;
 #endif /*CONFIG_NETFILTER_DEBUG*/
 
 	__skb_pull(skb, ihl);
