@@ -326,7 +326,6 @@ void __ipxitf_down(struct ipx_interface *intrfc)
 	if (intrfc->if_dev)
 		dev_put(intrfc->if_dev);
 	kfree(intrfc);
-	module_put(THIS_MODULE);
 }
 
 void ipxitf_down(struct ipx_interface *intrfc)
@@ -356,6 +355,17 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 	spin_unlock_bh(&ipx_interfaces_lock);
 out:
 	return NOTIFY_DONE;
+}
+
+
+static __exit void ipxitf_cleanup(void)
+{
+	struct ipx_interface *i, *tmp;
+
+	spin_lock_bh(&ipx_interfaces_lock);
+	list_for_each_entry_safe(i, tmp, &ipx_interfaces, node) 
+		__ipxitf_put(i);
+	spin_unlock_bh(&ipx_interfaces_lock);
 }
 
 static void ipxitf_def_skb_handler(struct sock *sock, struct sk_buff *skb)
@@ -888,7 +898,6 @@ static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 		INIT_HLIST_HEAD(&intrfc->if_sklist);
 		atomic_set(&intrfc->refcnt, 1);
 		spin_lock_init(&intrfc->if_sklist_lock);
-		__module_get(THIS_MODULE);
 	}
 
 	return intrfc;
@@ -1979,20 +1988,12 @@ static int __init ipx_init(void)
 
 static void __exit ipx_proto_finito(void)
 {
-	/*
-	 * No need to worry about having anything on the ipx_interfaces list,
-	 * when a interface is created we increment the module usage count, so
-	 * the module will only be unloaded when there are no more interfaces
-	 */
-	if (unlikely(!list_empty(&ipx_interfaces)))
-		BUG();
-	if (unlikely(!list_empty(&ipx_routes)))
-		BUG();
-
 	ipx_proc_exit();
 	ipx_unregister_sysctl();
 
 	unregister_netdevice_notifier(&ipx_dev_notifier);
+
+	ipxitf_cleanup();
 
 	unregister_snap_client(pSNAP_datalink);
 	pSNAP_datalink = NULL;
