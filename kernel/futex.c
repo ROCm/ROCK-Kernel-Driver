@@ -35,12 +35,7 @@
 #include <linux/time.h>
 #include <asm/uaccess.h>
 
-/* These mutexes are a very simple counter: the winner is the one who
-   decrements from 1 to 0.  The counter starts at 1 when the lock is
-   free.  A value other than 0 or 1 means someone may be sleeping.
-   This is simple enough to work on all architectures, but has the
-   problem that if we never "up" the semaphore it could eventually
-   wrap around. */
+/* Simple "sleep if unchanged" interface. */
 
 /* FIXME: This may be way too small. --RR */
 #define FUTEX_HASHBITS 6
