@@ -546,6 +546,19 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
 #endif
 
 /*
+ * early nForce2 reference BIOS shipped with a
+ * bogus ACPI IRQ0 -> pin2 interrupt override -- ignore it
+ */
+static __init int ignore_timer_override(struct dmi_blacklist *d)
+{
+	extern int acpi_skip_timer_override;
+	printk(KERN_NOTICE "%s detected: BIOS IRQ0 pin2 override"
+		" will be ignored\n", d->ident); 	
+
+	acpi_skip_timer_override = 1;
+	return 0;
+}
+/*
  *	Process the DMI blacklists
  */
  
@@ -950,6 +963,49 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_PRODUCT_NAME, "eserver xSeries 440"),
 			NO_MATCH, NO_MATCH }},
+
+	/*
+	 * Systems with nForce2 BIOS timer override bug
+	 * nVidia claims all nForce have timer on pin0,
+	 * and applying this workaround is a NOP on fixed BIOS,
+	 * so prospects are good for replacing these entries
+	 * with something to key of chipset PCI-ID.
+	 */
+	{ ignore_timer_override, "Abit NF7-S v2", {
+			MATCH(DMI_BOARD_VENDOR, "http://www.abit.com.tw/"),
+			MATCH(DMI_BOARD_NAME, "NF7-S/NF7,NF7-V (nVidia-nForce2)"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "03/24/2004") }},
+
+	{ ignore_timer_override, "Asus A7N8X v2", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "A7N8X2.0"),
+			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X2.0 Deluxe ACPI BIOS Rev 1007"),
+			MATCH(DMI_BIOS_DATE, "10/06/2003") }},
+
+	{ ignore_timer_override, "Asus A7N8X-X", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "A7N8X-X"),
+			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X-X ACPI BIOS Rev 1009"),
+			MATCH(DMI_BIOS_DATE, "2/3/2004") }},
+
+	{ ignore_timer_override, "MSI K7N2-Delta", {
+			MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
+			MATCH(DMI_BOARD_NAME, "MS-6570"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "03/29/2004") }},
+
+	{ ignore_timer_override, "Shuttle SN41G2", {
+			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
+			MATCH(DMI_BOARD_NAME, "FN41"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "01/14/2004") }},
+
+	{ ignore_timer_override, "Shuttle AN35N", {
+			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
+			MATCH(DMI_BOARD_NAME, "AN35"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "12/05/2003") }},
 #endif	// CONFIG_ACPI_BOOT
 
 #ifdef	CONFIG_ACPI_PCI

@@ -123,6 +123,10 @@ running once the system is up.
 
 	acpi_serialize	[HW,ACPI] force serialization of AML methods
 
+	acpi_skip_timer_override [HW,ACPI]
+			Recognize and ignore IRQ0/pin2 Interrupt Override.
+			For broken nForce2 BIOS resulting in XT-PIC timer.
+
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
 			See also Documentation/sound/oss/AD1816.
