@@ -58,6 +58,7 @@ struct smb_vol {
 	char *domainname;
 	char *UNC;
 	char *UNCip;
+	char *in6_addr;  /* ipv6 address as human readable form of in6_addr */
 	char *iocharset;  /* local code page for mapping to and from Unicode */
 	char source_rfc1001_name[16]; /* netbios name of client */
 	uid_t linux_uid;
@@ -802,6 +803,15 @@ cifs_parse_mount_options(char *options, const char *devname,struct smb_vol *vol)
 			vol->direct_io = 1;
 		} else if (strnicmp(data, "forcedirectio",13) == 0) {
 			vol->direct_io = 1;
+		} else if (strnicmp(data, "in6_addr",8) == 0) {
+			if (!value || !*value) {
+				vol->in6_addr = NULL;
+			} else if (strnlen(value, 49) == 48) {
+				vol->in6_addr = value;
+			} else {
+				printk(KERN_WARNING "CIFS: ip v6 address not 48 characters long\n");
+				return 1;
+			}
 		} else if (strnicmp(data, "noac", 4) == 0) {
 			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
