@@ -27,7 +27,6 @@
 /*
     Supports the Via VT82C686A, VT82C686B south bridges.
     Reports all as a 686A.
-    See doc/chips/via686a for details.
     Warning - only supports a single device.
 */
 
