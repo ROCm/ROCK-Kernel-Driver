@@ -190,7 +190,7 @@ static int __init init_scx200_docflash(void)
 	mymtd = do_map_probe(flashtype, &scx200_docflash_map);
 	if (!mymtd) {
 		printk(KERN_ERR NAME ": unable to detect flash\n");
-		iounmap((void *)scx200_docflash_map.virt);
+		iounmap(scx200_docflash_map.virt);
 		release_resource(&docmem);
 		return -ENXIO;
 	}
@@ -221,7 +221,7 @@ static void __exit cleanup_scx200_docflash(void)
 		map_destroy(mymtd);
 	}
 	if (scx200_docflash_map.virt) {
-		iounmap((void *)scx200_docflash_map.virt);
+		iounmap(scx200_docflash_map.virt);
 		release_resource(&docmem);
 	}
 }

@@ -92,7 +92,7 @@ static u8 evbuffer_init;
 static u8 evbuffer_length;
 static u8 evbuffer[1024];
 
-static void *compaq_int15_entry_point;
+static void __iomem *compaq_int15_entry_point;
 
 static spinlock_t int15_lock;		/* lock for ordering int15_bios_call() */
 

@@ -110,7 +110,7 @@ struct bw2_regs {
 
 struct bw2_par {
 	spinlock_t		lock;
-	struct bw2_regs		*regs;
+	struct bw2_regs		__iomem *regs;
 
 	u32			flags;
 #define BW2_FLAG_BLANKED	0x00000001
@@ -131,7 +131,7 @@ static int
 bw2_blank(int blank, struct fb_info *info)
 {
 	struct bw2_par *par = (struct bw2_par *) info->par;
-	struct bw2_regs *regs = par->regs;
+	struct bw2_regs __iomem *regs = par->regs;
 	unsigned long flags;
 	u8 val;
 
@@ -281,7 +281,7 @@ static void bw2_do_default_mode(struct bw2_par *par, struct fb_info *info,
 		prom_halt();
 	}
 	for ( ; *p; p += 2) {
-		u8 *regp = &((u8 *)par->regs)[p[0]];
+		u8 __iomem *regp = &((u8 __iomem *)par->regs)[p[0]];
 		sbus_writeb(p[1], regp);
 	}
 }
@@ -342,8 +342,7 @@ static void bw2_init_one(struct sbus_dev *sdev)
 	all->info.var.red.offset = all->info.var.green.offset =
 		all->info.var.blue.offset = 0;
 
-	all->par.regs = (struct bw2_regs *)
-		sbus_ioremap(resp, BWTWO_REGISTER_OFFSET,
+	all->par.regs = sbus_ioremap(resp, BWTWO_REGISTER_OFFSET,
 			     sizeof(struct bw2_regs), "bw2 regs");
 
 	if (sdev && !prom_getbool(sdev->prom_node, "width"))
@@ -355,11 +354,11 @@ static void bw2_init_one(struct sbus_dev *sdev)
 	all->info.fbops = &bw2_ops;
 #if defined(CONFIG_SPARC32)
 	if (sdev)
-		all->info.screen_base = (char *)
+		all->info.screen_base = (char __iomem *)
 			prom_getintdefault(sdev->prom_node, "address", 0);
 #endif
 	if (!all->info.screen_base)
-		all->info.screen_base = (char *)
+		all->info.screen_base =
 			sbus_ioremap(resp, 0, all->par.fbsize, "bw2 ram");
 	all->info.par = &all->par;
 

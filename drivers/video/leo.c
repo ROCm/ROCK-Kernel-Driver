@@ -180,11 +180,11 @@ struct leo_ld_gbl {
 
 struct leo_par {
 	spinlock_t		lock;
-	struct leo_lx_krn	*lx_krn;
-	struct leo_lc_ss0_usr	*lc_ss0_usr;
-	struct leo_ld_ss0	*ld_ss0;
-	struct leo_ld_ss1	*ld_ss1;
-	struct leo_cursor	*cursor;
+	struct leo_lx_krn	__iomem *lx_krn;
+	struct leo_lc_ss0_usr	__iomem *lc_ss0_usr;
+	struct leo_ld_ss0	__iomem *ld_ss0;
+	struct leo_ld_ss1	__iomem *ld_ss1;
+	struct leo_cursor	__iomem *cursor;
 	u32			extent;
 	u32			clut_data[256];
 
@@ -198,7 +198,7 @@ struct leo_par {
 	struct list_head	list;
 };
 
-static void leo_wait(struct leo_lx_krn *lx_krn)
+static void leo_wait(struct leo_lx_krn __iomem *lx_krn)
 {
 	int i;
 	
@@ -223,7 +223,7 @@ static int leo_setcolreg(unsigned regno,
 			 unsigned transp, struct fb_info *info)
 {
 	struct leo_par *par = (struct leo_par *) info->par;
-        struct leo_lx_krn *lx_krn = par->lx_krn;
+        struct leo_lx_krn __iomem *lx_krn = par->lx_krn;
 	unsigned long flags;
 	u32 val;
 	int i;
@@ -263,7 +263,7 @@ static int leo_setcolreg(unsigned regno,
 static int leo_blank(int blank, struct fb_info *info)
 {
 	struct leo_par *par = (struct leo_par *) info->par;
-	struct leo_lx_krn *lx_krn = par->lx_krn;
+	struct leo_lx_krn __iomem *lx_krn = par->lx_krn;
 	unsigned long flags;
 	u32 val;
 
@@ -403,7 +403,7 @@ leo_init_fix(struct fb_info *info)
 static void leo_wid_put(struct fb_info *info, struct fb_wid_list *wl)
 {
 	struct leo_par *par = (struct leo_par *) info->par;
-	struct leo_lx_krn *lx_krn = par->lx_krn;
+	struct leo_lx_krn __iomem *lx_krn = par->lx_krn;
 	struct fb_wid_item *wi;
 	unsigned long flags;
 	u32 val;
@@ -465,7 +465,7 @@ static void leo_init_wids(struct fb_info *info)
 static void leo_switch_from_graph(struct fb_info *info)
 {
 	struct leo_par *par = (struct leo_par *) info->par;
-	struct leo_ld *ss = (struct leo_ld *) par->ld_ss0;
+	struct leo_ld __iomem *ss = (struct leo_ld __iomem *) par->ld_ss0;
 	unsigned long flags;
 	u32 val;
 
@@ -564,27 +564,27 @@ static void leo_init_one(struct sbus_dev *sdev)
 	all->par.fbsize = PAGE_ALIGN(linebytes * all->info.var.yres);
 
 #ifdef CONFIG_SPARC32
-	all->info.screen_base = (char *)
+	all->info.screen_base = (char __iomem *)
 		prom_getintdefault(sdev->prom_node, "address", 0);
 #endif
 	if (!all->info.screen_base)
-		all->info.screen_base = (char *)
+		all->info.screen_base = 
 			sbus_ioremap(&sdev->resource[0], LEO_OFF_SS0,
 				     0x800000, "leo ram");
 
-	all->par.lc_ss0_usr = (struct leo_lc_ss0_usr *)
+	all->par.lc_ss0_usr =
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LC_SS0_USR,
 			     0x1000, "leolc ss0usr");
-	all->par.ld_ss0 = (struct leo_ld_ss0 *)
+	all->par.ld_ss0 =
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LD_SS0,
 			     0x1000, "leold ss0");
-	all->par.ld_ss1 = (struct leo_ld_ss1 *)
+	all->par.ld_ss1 =
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LD_SS1,
 			     0x1000, "leold ss1");
-	all->par.lx_krn = (struct leo_lx_krn *)
+	all->par.lx_krn =
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LX_KRN,
 			     0x1000, "leolx krn");
-	all->par.cursor = (struct leo_cursor *)
+	all->par.cursor =
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LX_CURSOR,
 			     sizeof(struct leo_cursor), "leolx cursor");
 

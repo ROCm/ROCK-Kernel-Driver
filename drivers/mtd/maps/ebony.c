@@ -64,7 +64,7 @@ static struct mtd_partition ebony_large_partitions[] = {
 int __init init_ebony(void)
 {
 	u8 fpga0_reg;
-	u8 *fpga0_adr;
+	u8 __iomem *fpga0_adr;
 	unsigned long long small_flash_base, large_flash_base;
 
 	fpga0_adr = ioremap64(EBONY_FPGA_ADDR, 16);
@@ -114,8 +114,7 @@ int __init init_ebony(void)
 	}
 
 	ebony_large_map.phys = large_flash_base;
-	ebony_large_map.virt =
-		(unsigned long)ioremap64(large_flash_base,
+	ebony_large_map.virt = ioremap64(large_flash_base,
 					 ebony_large_map.size);
 
 	if (!ebony_large_map.virt) {
@@ -146,13 +145,13 @@ static void __exit cleanup_ebony(void)
 	}
 
 	if (ebony_small_map.virt) {
-		iounmap((void *)ebony_small_map.virt);
-		ebony_small_map.virt = 0;
+		iounmap(ebony_small_map.virt);
+		ebony_small_map.virt = NULL;
 	}
 
 	if (ebony_large_map.virt) {
-		iounmap((void *)ebony_large_map.virt);
-		ebony_large_map.virt = 0;
+		iounmap(ebony_large_map.virt);
+		ebony_large_map.virt = NULL;
 	}
 }
 

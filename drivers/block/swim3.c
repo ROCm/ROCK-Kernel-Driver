@@ -866,7 +866,7 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 		err = fd_eject(fs);
 		return err;
 	case FDGETPRM:
-	        if (copy_to_user((void *) param, (void *)&floppy_type,
+	        if (copy_to_user((void __user *) param, &floppy_type,
 				 sizeof(struct floppy_struct)))
 			return -EFAULT;
 		return 0;

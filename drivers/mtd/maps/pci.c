@@ -33,7 +33,7 @@ struct mtd_pci_info {
 
 struct map_pci_info {
 	struct map_info map;
-	void *base;
+	void __iomem *base;
 	void (*exit)(struct pci_dev *dev, struct map_pci_info *map);
 	unsigned long (*translate)(struct map_pci_info *map, unsigned long ofs);
 	struct pci_dev *dev;
@@ -143,7 +143,7 @@ static void
 intel_iq80310_exit(struct pci_dev *dev, struct map_pci_info *map)
 {
 	if (map->base)
-		iounmap((void *)map->base);
+		iounmap(map->base);
 	pci_write_config_dword(dev, 0x44, map->map.map_priv_2);
 }
 
@@ -236,7 +236,7 @@ intel_dc21285_exit(struct pci_dev *dev, struct map_pci_info *map)
 	u32 val;
 
 	if (map->base)
-		iounmap((void *)map->base);
+		iounmap(map->base);
 
 	/*
 	 * We need to undo the PCI BAR2/PCI ROM BAR address alteration.
