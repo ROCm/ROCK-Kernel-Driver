@@ -1224,6 +1224,12 @@ static devfs_handle_t _devfs_walk_path (struct devfs_entry *dir,
     {
 	struct devfs_entry *de, *link;
 
+	if (!S_ISDIR (dir->mode))
+	{
+	    devfs_put (dir);
+	    return NULL;
+	}
+
 	if ( ( de = _devfs_descend (dir, name, namelen, &next_pos) ) == NULL )
 	{
 	    devfs_put (dir);
