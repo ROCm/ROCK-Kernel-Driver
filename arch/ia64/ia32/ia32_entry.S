@@ -439,8 +439,8 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 compat_sys_futex	/* 240 */
-	data8 compat_sys_setaffinity
-	data8 compat_sys_getaffinity
+	data8 compat_sys_sched_setaffinity
+	data8 compat_sys_sched_getaffinity
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall	/* 245 */
