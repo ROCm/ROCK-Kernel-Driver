@@ -935,7 +935,7 @@ MODULE_PARM_DESC(watchdog, "3c59x transmit timeout in milliseconds");
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void poll_vortex(struct net_device *dev)
 {
-	struct vortex_private *vp = (struct vortex_private *)dev->priv;
+	struct vortex_private *vp = netdev_priv(dev);
 	unsigned long flags;
 	local_save_flags(flags);
 	local_irq_disable();
@@ -2990,7 +2990,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static void set_8021q_mode(struct net_device *dev, int enable)
 {
-	struct vortex_private *vp = (struct vortex_private *)dev->priv;
+	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int old_window = inw(ioaddr + EL3_CMD);
 	int mac_ctrl;
