@@ -224,7 +224,7 @@ static int stop_ptraced_child(int pid, void *stack, int exitcode, int mustpanic)
 	return ret;
 }
 
-static int force_sysemu_disabled = 1;
+static int force_sysemu_disabled = 0;
 
 static int __init nosysemu_cmd_param(char *str, int* add)
 {
@@ -261,6 +261,7 @@ static void __init check_sysemu(void)
 		return;
 	}
 
+	printk("Checking syscall emulation patch for ptrace...");
 	sysemu_supported = 0;
 	pid = start_ptraced_child(&stack);
 
