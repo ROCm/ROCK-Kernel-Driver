@@ -48,6 +48,9 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 
 int __init cpu_dev_init(void)
 {
-	devclass_register(&cpu_devclass);
-	return driver_register(&cpu_driver);
+	int error;
+	if (!(error = devclass_register(&cpu_devclass)))
+		if (error = driver_register(&cpu_driver))
+			devclass_unregister(&cpu_devclass);
+	return error;
 }
