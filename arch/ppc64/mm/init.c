@@ -696,6 +696,8 @@ void __init mem_init(void)
  */
 void flush_dcache_page(struct page *page)
 {
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &page->flags))
 		clear_bit(PG_arch_1, &page->flags);
@@ -705,6 +707,8 @@ void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 	/*
 	 * We shouldnt have to do this, but some versions of glibc
 	 * require it (ld.so assumes zero filled pages are icache clean)
@@ -735,6 +739,9 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 	if (!vma->vm_file && ((vma->vm_flags & VM_EXEC) == 0))
 		return;
 #endif
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+		return;
 
 	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &pg->flags))
@@ -768,7 +775,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	cpumask_t tmp;
 
 	/* handle i-cache coherency */
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE) &&
+	    !(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);

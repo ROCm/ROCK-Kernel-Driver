@@ -21,6 +21,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/pci.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -30,13 +31,13 @@
 #include <asm/mmu_context.h>
 #include <asm/ppcdebug.h>
 #include <asm/iommu.h>
-#include <linux/pci.h>
 #include <asm/naca.h>
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/abs_addr.h>
+#include <asm/cputable.h>
 
 /* in pSeries_hvCall.S */
 EXPORT_SYMBOL(plpar_hcall);
@@ -146,7 +147,7 @@ static void tce_build_pSeriesLP(struct iommu_table *tbl, long tcenum, long npage
 				   (u64)tcenum << 12, 
 				   tce.te_word );
 		
-		if(rc && printk_ratelimit()) {
+		if (rc && printk_ratelimit()) {
 			printk("tce_build_pSeriesLP: plpar_tce_put failed. rc=%ld\n", rc);
 			printk("\tindex   = 0x%lx\n", (u64)tbl->it_index);
 			printk("\ttcenum  = 0x%lx\n", (u64)tcenum);
@@ -559,12 +560,14 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 	unsigned long flags;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
-	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
 
 	for (i = 0; i < number; i++)
 		flush_hash_page(context, batch->addr[i], batch->pte[i], local);
 
-	spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
 }
 
 void pSeries_lpar_mm_init(void)

@@ -126,10 +126,12 @@ _GLOBAL(__hash_page)
 	 * code rather than call a C function...) 
 	 */
 BEGIN_FTR_SECTION
+BEGIN_FTR_SECTION
 	mr	r4,r30
 	mr	r5,r7
 	bl	.hash_page_do_lazy_icache
 END_FTR_SECTION_IFSET(CPU_FTR_NOEXECUTE)
+END_FTR_SECTION_IFCLR(CPU_FTR_COHERENT_ICACHE)
 
 	/* At this point, r3 contains new PP bits, save them in
 	 * place of "access" in the param area (sic)
