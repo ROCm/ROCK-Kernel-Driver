@@ -11,6 +11,9 @@
 #include <linux/tty.h>
 #include <linux/fb.h>
 #include <linux/module.h>
+#ifdef CONFIG_PCI
+#include <linux/pci.h>
+#endif
 
 /* 
  * EDID parser
@@ -19,37 +22,37 @@
  * John Fremlin <vii@users.sourceforge.net> and Ani Joshi <ajoshi@unixbox.com>
  */
 
-#define EDID_LENGTH                             0x80
-#define EDID_HEADER                             0x00
-#define EDID_HEADER_END                         0x07
+#define EDID_LENGTH				0x80
+#define EDID_HEADER				0x00
+#define EDID_HEADER_END				0x07
 
-#define ID_MANUFACTURER_NAME                    0x08
-#define ID_MANUFACTURER_NAME_END                0x09
-#define ID_MODEL                                0x0a
+#define ID_MANUFACTURER_NAME			0x08
+#define ID_MANUFACTURER_NAME_END		0x09
+#define ID_MODEL				0x0a
 
-#define ID_SERIAL_NUMBER                        0x0c
+#define ID_SERIAL_NUMBER			0x0c
 
-#define MANUFACTURE_WEEK                        0x10
-#define MANUFACTURE_YEAR                        0x11
+#define MANUFACTURE_WEEK			0x10
+#define MANUFACTURE_YEAR			0x11
 
-#define EDID_STRUCT_VERSION                     0x12
-#define EDID_STRUCT_REVISION                    0x13
+#define EDID_STRUCT_VERSION			0x12
+#define EDID_STRUCT_REVISION			0x13
 
-#define DPMS_FLAGS                              0x18
-#define ESTABLISHED_TIMING_1                    0x23
-#define ESTABLISHED_TIMING_2                    0x24
-#define MANUFACTURERS_TIMINGS                   0x25
+#define DPMS_FLAGS				0x18
+#define ESTABLISHED_TIMING_1			0x23
+#define ESTABLISHED_TIMING_2			0x24
+#define MANUFACTURERS_TIMINGS			0x25
 
-#define DETAILED_TIMING_DESCRIPTIONS_START      0x36
-#define DETAILED_TIMING_DESCRIPTION_SIZE        18
-#define NO_DETAILED_TIMING_DESCRIPTIONS         4
+#define DETAILED_TIMING_DESCRIPTIONS_START	0x36
+#define DETAILED_TIMING_DESCRIPTION_SIZE	18
+#define NO_DETAILED_TIMING_DESCRIPTIONS		4
 
-#define DETAILED_TIMING_DESCRIPTION_1           0x36
-#define DETAILED_TIMING_DESCRIPTION_2           0x48
-#define DETAILED_TIMING_DESCRIPTION_3           0x5a
-#define DETAILED_TIMING_DESCRIPTION_4           0x6c
+#define DETAILED_TIMING_DESCRIPTION_1		0x36
+#define DETAILED_TIMING_DESCRIPTION_2		0x48
+#define DETAILED_TIMING_DESCRIPTION_3		0x5a
+#define DETAILED_TIMING_DESCRIPTION_4		0x6c
 
-#define DESCRIPTOR_DATA                         5
+#define DESCRIPTOR_DATA				5
 
 #define UPPER_NIBBLE( x ) \
         (((128|64|32|16) & (x)) >> 4)
@@ -65,7 +68,7 @@
 
 #define PIXEL_CLOCK_LO     (unsigned)block[ 0 ]
 #define PIXEL_CLOCK_HI     (unsigned)block[ 1 ]
-#define PIXEL_CLOCK        (COMBINE_HI_8LO( PIXEL_CLOCK_HI,PIXEL_CLOCK_LO )*1000
+#define PIXEL_CLOCK	   (COMBINE_HI_8LO( PIXEL_CLOCK_HI,PIXEL_CLOCK_LO )*1000)
 #define H_ACTIVE_LO        (unsigned)block[ 2 ]
 #define H_BLANKING_LO      (unsigned)block[ 3 ]
 #define H_ACTIVE_HI        UPPER_NIBBLE( (unsigned)block[ 4 ] )
@@ -223,8 +226,8 @@ static void parse_timing_block(unsigned char *block,
 
 int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
 {
+	unsigned char *block, *vendor, *monitor = NULL;
 	int i;
-	unsigned char *block, *vendor, *monitor;
 
 	if (!(edid_checksum(edid)))
 		return 0;
@@ -257,10 +260,12 @@ int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var)
 	return 1;
 }
 
+#ifdef CONFIG_PCI
 char *get_EDID(struct pci_dev *pdev)
 {
 #ifdef CONFIG_ALL_PPC
-	static char *propnames[] = { "DFP,EDID", "LCD,EDID", "EDID", "EDID1", NULL };
+	static char *propnames[] =
+	    { "DFP,EDID", "LCD,EDID", "EDID", "EDID1", NULL };
 	unsigned char *pedid = NULL;
 	struct device_node *dp;
 	int i;
@@ -268,7 +273,10 @@ char *get_EDID(struct pci_dev *pdev)
 	dp = pci_device_to_OF_node(pdev);
 	while (dp != NULL) {
 		for (i = 0; propnames[i] != NULL; ++i) {
-			pedid = (unsigned char *) get_property(dp, propnames[i], NULL);
+			pedid =
+			    (unsigned char *) get_property(dp,
+							   propnames[i],
+							   NULL);
 			if (pedid != NULL)
 				return pedid;
 		}
@@ -278,7 +286,10 @@ char *get_EDID(struct pci_dev *pdev)
 #else
 	return NULL;
 #endif
-} 
+}
+#endif
 
 EXPORT_SYMBOL(parse_edid);
+#ifdef CONFIG_PCI
 EXPORT_SYMBOL(get_EDID);
+#endif

@@ -41,9 +41,6 @@
 #include <linux/pci.h>
 #include <linux/pci_ids.h>
 #include <linux/resource.h>
-#include <linux/selection.h>
-#include <linux/console.h>
-#include <linux/vt_kern.h>
 #include <linux/unistd.h>
 
 #include <asm/io.h>

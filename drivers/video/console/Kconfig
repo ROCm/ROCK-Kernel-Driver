@@ -66,8 +66,9 @@ config SGI_NEWPORT_CONSOLE
 
 #  bool 'IODC console' CONFIG_IODC_CONSOLE
 config STI_CONSOLE
-        bool "STI console"
+        bool "STI text console"
         depends on PARISC
+        default y
 	help
           The STI console is the builtin display/keyboard on HP-PARISC
           machines.  Say Y here to build support for it into your kernel.
