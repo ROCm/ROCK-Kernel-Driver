@@ -808,7 +808,7 @@ config BINFMT_MISC
 	  programs that need an interpreter to run like Java, Python or
 	  Emacs-Lisp.  It's also useful if you often run DOS executables under
 	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>).  Once you have
+	  <http://www.tldp.org/docs.html#howto>).  Once you have
 	  registered such a binary class with the kernel, you can start one of
 	  those programs simply by typing in its name at a shell prompt; Linux
 	  will automatically feed it to the correct interpreter.
@@ -1444,7 +1444,7 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
 	  <file:Documentation/sound/README.OSS> contains some slightly

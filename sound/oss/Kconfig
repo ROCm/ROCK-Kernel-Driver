@@ -872,7 +872,7 @@ config SOUND_AWE32_SYNTH
 	  Say Y here if you have a Sound Blaster SB32, AWE32-PnP, SB AWE64 or
 	  similar sound card. See <file:Documentation/sound/oss/README.awe>,
 	  <file:Documentation/sound/oss/AWE32> and the Soundblaster-AWE
-	  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>
+	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>
 	  for more info.
 
 config SOUND_WAVEFRONT

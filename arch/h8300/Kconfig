@@ -181,7 +181,7 @@ config NETDEVICES
 	  telephone line with a modem either via UUCP (UUCP is a protocol to
 	  forward mail and news between unix hosts over telephone lines; read
 	  the UUCP-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  <http://www.tldp.org/docs.html#howto>) or dialing up a shell
 	  account or a BBS, even using term (term is a program which gives you
 	  almost full Internet connectivity if you have a regular dial up
 	  shell account on some Internet connected Unix computer. Read
@@ -201,7 +201,7 @@ config NETDEVICES
 
 	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
 	  Olaf Kirch's excellent and free book "Network Administrator's
-	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  Guide", to be found in <http://www.tldp.org/docs.html#guide>. If
 	  unsure, say Y.
 
 endmenu

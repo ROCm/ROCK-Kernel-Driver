@@ -26,7 +26,7 @@ config EXT2_FS
 	  by about 44 KB.
 
 	  The Ext2fs-Undeletion mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, gives information about
+	  <http://www.tldp.org/docs.html#howto>, gives information about
 	  how to retrieve deleted files on ext2fs file systems.
 
 	  To change the behavior of ext2 file systems, you can use the tune2fs
@@ -386,7 +386,7 @@ config QUOTA
 	  in order to use quota support (you can download sources from
 	  <http://www.sf.net/projects/linuxquota/>). For further details, read
 	  the Quota mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. Probably the quota
+	  <http://www.tldp.org/docs.html#howto>. Probably the quota
 	  support is only useful for multi user systems. If unsure, say N.
 
 config QFMT_V1
@@ -469,7 +469,7 @@ config ISO9660_FS
 	  driver.  If you have a CD-ROM drive and want to do more with it than
 	  just listen to audio CDs and watch its LEDs, say Y (and read
 	  <file:Documentation/filesystems/isofs.txt> and the CD-ROM-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>), thereby
+	  available from <http://www.tldp.org/docs.html#howto>), thereby
 	  enlarging your kernel by about 27 KB; otherwise say N.
 
 	  If you want to compile this as a module ( = code which can be
@@ -576,7 +576,7 @@ config MSDOS_FS
 	  they are compressed; to access compressed MSDOS partitions under
 	  Linux, you can either use the DOS emulator DOSEMU, described in the
 	  DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, or try dmsdosfs in
+	  <http://www.tldp.org/docs.html#howto>, or try dmsdosfs in
 	  <ftp://ibiblio.org/pub/Linux/system/filesystems/dosfs/>. If you
 	  intend to use dosemu with a non-compressed MSDOS partition, say Y
 	  here) and MSDOS floppies. This means that file access becomes
@@ -1233,7 +1233,7 @@ config NFS_FS
 	  programs nfsd and mountd (but does not need to have NFS file system
 	  support enabled in its kernel). NFS is explained in the Network
 	  Administrator's Guide, available from
-	  <http://www.linuxdoc.org/docs.html#guide>, on its man page: "man
+	  <http://www.tldp.org/docs.html#guide>, on its man page: "man
 	  nfs", and in the NFS-HOWTO.
 
 	  A superior but less widely used alternative to NFS is provided by
@@ -1298,7 +1298,7 @@ config NFSD
 	  as well.
 
 	  Please read the NFS-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  The NFS server is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1398,7 +1398,7 @@ config SMB_FS
 	  works only if the Windows machines use TCP/IP as the underlying
 	  transport protocol, and not NetBEUI.  For details, read
 	  <file:Documentation/filesystems/smbfs.txt> and the SMB-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>.
+	  available from <http://www.tldp.org/docs.html#howto>.
 
 	  Note: if you just want your box to act as an SMB *server* and make
 	  files and printing services available to Windows clients (which need
@@ -1475,7 +1475,7 @@ config NCP_FS
 	  to mount NetWare file server volumes and to access them just like
 	  any other Unix directory.  For details, please read the file
 	  <file:Documentation/filesystems/ncpfs.txt> in the kernel source and
-	  the IPX-HOWTO from <http://www.linuxdoc.org/docs.html#howto>.
+	  the IPX-HOWTO from <http://www.tldp.org/docs.html#howto>.
 
 	  You do not have to say Y here if you want your Linux box to act as a
 	  file *server* for Novell NetWare clients.
