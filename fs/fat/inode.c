@@ -201,38 +201,54 @@ void fat_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
+static int simple_getbool(char *s, int *setval)
+{
+	if (s) {
+		if (!strcmp(s,"1") || !strcmp(s,"yes") || !strcmp(s,"true"))
+			*setval = 1;
+		else if (!strcmp(s,"0") || !strcmp(s,"no") || !strcmp(s,"false"))
+			*setval = 0;
+		else
+			return 0;
+	} else
+		*setval = 1;
+	return 1;
+}
 
-static int parse_options(char *options, int *debug,
+static int parse_options(char *options, int is_vfat, int *debug,
 			 struct fat_mount_options *opts,
 			 char *cvf_format, char *cvf_options)
 {
-	char *this_char,*value,save,*savep;
-	char *p;
-	int ret = 1, len;
+	char *this_char, *value, *p;
+	int ret = 1, val, len;
 
-	opts->name_check = 'n';
-	opts->conversion = 'b';
+	opts->isvfat = is_vfat;
+
 	opts->fs_uid = current->uid;
 	opts->fs_gid = current->gid;
 	opts->fs_umask = current->fs->umask;
-	opts->quiet = opts->sys_immutable = opts->dotsOK = opts->showexec = 0;
 	opts->codepage = 0;
-	opts->nocase = 0;
-	opts->shortname = 0;
-	opts->utf8 = 0;
 	opts->iocharset = NULL;
+	if (is_vfat)
+		opts->shortname = VFAT_SFN_DISPLAY_LOWER|VFAT_SFN_CREATE_WIN95;
+	else
+		opts->shortname = 0;
+	opts->name_check = 'n';
+	opts->conversion = 'b';
+	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
+	opts->utf8 = opts->unicode_xlate = opts->posixfs = 0;
+	opts->numtail = 1;
+	opts->nocase = 0;
 	*debug = 0;
 
 	if (!options)
 		goto out;
-	save = 0;
-	savep = NULL;
 	while ((this_char = strsep(&options,",")) != NULL) {
-		if ((value = strchr(this_char,'=')) != NULL) {
-			save = *value;
-			savep = value;
+		if (!*this_char)
+			continue;
+		if ((value = strchr(this_char,'=')) != NULL)
 			*value++ = 0;
-		}
+
 		if (!strcmp(this_char,"check") && value) {
 			if (value[0] && !value[1] && strchr("rns",*value))
 				opts->name_check = *value;
@@ -255,22 +271,17 @@ static int parse_options(char *options, int *debug,
 				opts->conversion = 'a';
 			else ret = 0;
 		}
-		else if (!strcmp(this_char,"dots")) {
-			opts->dotsOK = 1;
-		}
 		else if (!strcmp(this_char,"nocase")) {
-			opts->nocase = 1;
-		}
-		else if (!strcmp(this_char,"nodots")) {
-			opts->dotsOK = 0;
+			if (!is_vfat)
+				opts->nocase = 1;
+			else {
+				/* for backward compatible */
+				opts->shortname = VFAT_SFN_DISPLAY_WIN95
+					| VFAT_SFN_CREATE_WIN95;
+			}
 		}
 		else if (!strcmp(this_char,"showexec")) {
 			opts->showexec = 1;
-		}
-		else if (!strcmp(this_char,"dotsOK") && value) {
-			if (!strcmp(value,"yes")) opts->dotsOK = 1;
-			else if (!strcmp(value,"no")) opts->dotsOK = 0;
-			else ret = 0;
 		}
 		else if (!strcmp(this_char,"uid")) {
 			if (!value || !*value) ret = 0;
@@ -317,7 +328,32 @@ static int parse_options(char *options, int *debug,
 			opts->codepage = simple_strtoul(value,&value,0);
 			if (*value) ret = 0;
 		}
-		else if (!strcmp(this_char,"iocharset") && value) {
+		else if (!strcmp(this_char,"cvf_format")) {
+			if (!value)
+				return 0;
+			strncpy(cvf_format,value,20);
+		}
+		else if (!strcmp(this_char,"cvf_options")) {
+			if (!value)
+				return 0;
+			strncpy(cvf_options,value,100);
+		}
+
+		/* msdos specific */
+		else if (!is_vfat && !strcmp(this_char,"dots")) {
+			opts->dotsOK = 1;
+		}
+		else if (!is_vfat && !strcmp(this_char,"nodots")) {
+			opts->dotsOK = 0;
+		}
+		else if (!is_vfat && !strcmp(this_char,"dotsOK") && value) {
+			if (!strcmp(value,"yes")) opts->dotsOK = 1;
+			else if (!strcmp(value,"no")) opts->dotsOK = 0;
+			else ret = 0;
+		}
+
+		/* vfat specific */
+		else if (is_vfat && !strcmp(this_char,"iocharset") && value) {
 			p = value;
 			while (*value && *value != ',')
 				value++;
@@ -338,23 +374,54 @@ static int parse_options(char *options, int *debug,
 					ret = 0;
 			}
 		}
-		else if (!strcmp(this_char,"cvf_format")) {
-			if (!value)
-				return 0;
-			strncpy(cvf_format,value,20);
+		else if (is_vfat && !strcmp(this_char,"utf8")) {
+			ret = simple_getbool(value, &val);
+			if (ret) opts->utf8 = val;
 		}
-		else if (!strcmp(this_char,"cvf_options")) {
-			if (!value)
-				return 0;
-			strncpy(cvf_options,value,100);
+		else if (is_vfat && !strcmp(this_char,"uni_xlate")) {
+			ret = simple_getbool(value, &val);
+			if (ret) opts->unicode_xlate = val;
+		}
+		else if (is_vfat && !strcmp(this_char,"posix")) {
+			ret = simple_getbool(value, &val);
+			if (ret) opts->posixfs = val;
+		}
+		else if (is_vfat && !strcmp(this_char,"nonumtail")) {
+			ret = simple_getbool(value, &val);
+			if (ret) {
+				opts->numtail = !val;
+			}
+		}
+		else if (is_vfat && !strcmp(this_char, "shortname")) {
+			if (!strcmp(value, "lower"))
+				opts->shortname = VFAT_SFN_DISPLAY_LOWER
+						| VFAT_SFN_CREATE_WIN95;
+			else if (!strcmp(value, "win95"))
+				opts->shortname = VFAT_SFN_DISPLAY_WIN95
+						| VFAT_SFN_CREATE_WIN95;
+			else if (!strcmp(value, "winnt"))
+				opts->shortname = VFAT_SFN_DISPLAY_WINNT
+						| VFAT_SFN_CREATE_WINNT;
+			else if (!strcmp(value, "mixed"))
+				opts->shortname = VFAT_SFN_DISPLAY_WINNT
+						| VFAT_SFN_CREATE_WIN95;
+			else
+				ret = 0;
+		} else {
+			printk("FAT: Unrecognized mount option %s\n",
+			       this_char);
+			ret = 0;
 		}
 
-		if (options) *(options-1) = ',';
-		if (value) *savep = save;
 		if (ret == 0)
 			break;
 	}
 out:
+	if (opts->posixfs)
+		opts->name_check = 's';
+	if (opts->unicode_xlate)
+		opts->utf8 = 0;
+	
 	return ret;
 }
 
@@ -658,12 +725,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
 	sb->s_export_op = &fat_export_ops;
-	sbi->options.isvfat = isvfat;
 	sbi->dir_ops = fs_dir_inode_ops;
 	sbi->cvf_format = &default_cvf;
 
 	error = -EINVAL;
-	if (!parse_options((char *)data, &debug, &sbi->options,
+	if (!parse_options((char *)data, isvfat, &debug, &sbi->options,
 			   cvf_format, cvf_options))
 		goto out_fail;
 

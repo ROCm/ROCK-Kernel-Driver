@@ -80,93 +80,6 @@ static int vfat_revalidate(struct dentry *dentry, int flags)
 	return 0;
 }
 
-static int simple_getbool(char *s, int *setval)
-{
-	if (s) {
-		if (!strcmp(s,"1") || !strcmp(s,"yes") || !strcmp(s,"true")) {
-			*setval = 1;
-		} else if (!strcmp(s,"0") || !strcmp(s,"no") || !strcmp(s,"false")) {
-			*setval = 0;
-		} else {
-			return 0;
-		}
-	} else {
-		*setval = 1;
-	}
-	return 1;
-}
-
-static int parse_options(char *options,	struct fat_mount_options *opts)
-{
-	char *this_char,*value,save,*savep;
-	int ret, val;
-
-	opts->unicode_xlate = opts->posixfs = 0;
-	opts->numtail = 1;
-	opts->utf8 = 0;
-	opts->shortname = VFAT_SFN_DISPLAY_LOWER | VFAT_SFN_CREATE_WIN95;
-	/* for backward compatible */
-	if (opts->nocase) {
-		opts->nocase = 0;
-		opts->shortname = VFAT_SFN_DISPLAY_WIN95
-		  		| VFAT_SFN_CREATE_WIN95;
-	}
-
-	if (!options) return 1;
-	save = 0;
-	savep = NULL;
-	ret = 1;
-	while ((this_char = strsep(&options,",")) != NULL) {
-		if ((value = strchr(this_char,'=')) != NULL) {
-			save = *value;
-			savep = value;
-			*value++ = 0;
-		}
-		if (!strcmp(this_char,"utf8")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->utf8 = val;
-		} else if (!strcmp(this_char,"uni_xlate")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->unicode_xlate = val;
-		} else if (!strcmp(this_char,"posix")) {
-			ret = simple_getbool(value, &val);
-			if (ret) opts->posixfs = val;
-		} else if (!strcmp(this_char,"nonumtail")) {
-			ret = simple_getbool(value, &val);
-			if (ret) {
-				opts->numtail = !val;
-			}
-		} else if (!strcmp(this_char, "shortname")) {
-			if (!strcmp(value, "lower"))
-				opts->shortname = VFAT_SFN_DISPLAY_LOWER
-						| VFAT_SFN_CREATE_WIN95;
-			else if (!strcmp(value, "win95"))
-				opts->shortname = VFAT_SFN_DISPLAY_WIN95
-						| VFAT_SFN_CREATE_WIN95;
-			else if (!strcmp(value, "winnt"))
-				opts->shortname = VFAT_SFN_DISPLAY_WINNT
-						| VFAT_SFN_CREATE_WINNT;
-			else if (!strcmp(value, "mixed"))
-				opts->shortname = VFAT_SFN_DISPLAY_WINNT
-						| VFAT_SFN_CREATE_WIN95;
-			else
-				ret = 0;
-		}
-		if (options)
-			*(options-1) = ',';
-		if (value) {
-			*savep = save;
-		}
-		if (ret == 0) {
-			return 0;
-		}
-	}
-	if (opts->unicode_xlate) {
-		opts->utf8 = 0;
-	}
-	return 1;
-}
-
 static inline unsigned char
 vfat_tolower(struct nls_table *t, unsigned char c)
 {
@@ -1281,24 +1194,15 @@ struct inode_operations vfat_dir_inode_operations = {
 int vfat_fill_super(struct super_block *sb, void *data, int silent)
 {
 	int res;
-	struct msdos_sb_info *sbi;
-  
+
 	res = fat_fill_super(sb, data, silent, &vfat_dir_inode_operations, 1);
 	if (res)
 		return res;
 
-	sbi = MSDOS_SB(sb);
-
-	if (parse_options((char *) data, &(sbi->options))) {
-		sbi->options.dotsOK = 0;
-		if (sbi->options.posixfs) {
-			sbi->options.name_check = 's';
-		}
-	}
-	if (sbi->options.name_check != 's') {
+	if (MSDOS_SB(sb)->options.name_check != 's')
 		sb->s_root->d_op = &vfat_dentry_ops[0];
-	} else {
+	else
 		sb->s_root->d_op = &vfat_dentry_ops[2];
-	}
+
 	return 0;
 }
