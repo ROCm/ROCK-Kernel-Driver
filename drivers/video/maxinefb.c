@@ -23,7 +23,6 @@
  *
  */
 
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -42,47 +41,36 @@
 /* whether are really running on a maxine, KM                       */
 #include <asm/bootinfo.h>
 
-#include <video/fbcon-mfb.h>
-#include <video/fbcon-cfb2.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
-
 #define arraysize(x)    (sizeof(x)/sizeof(*(x)))
 
 static struct display disp;
 static struct fb_info fb_info;
 
-unsigned long fb_start, fb_size = 1024 * 768, fb_line_length = 1024;
 unsigned long fb_regs;
 unsigned char fb_bitmask;
 
 static struct fb_var_screeninfo maxinefb_defined = {
-	0, 0, 0, 0,		/* W,H, W, H (virtual) load xres,xres_virtual */
-	0, 0,			/* virtual -> visible no offset */
-	0,			/* depth -> load bits_per_pixel */
-	0,			/* greyscale ? */
-	{0, 0, 0},		/* R */
-	{0, 0, 0},		/* G */
-	{0, 0, 0},		/* B */
-	{0, 0, 0},		/* transparency */
-	0,			/* standard pixel format */
-	FB_ACTIVATE_NOW,
-	274, 195,		/* 14" monitor */
-	FB_ACCEL_NONE,
-	0L, 0L, 0L, 0L, 0L,
-	0L, 0L, 0,		/* No sync info */
-	FB_VMODE_NONINTERLACED,
-	{0, 0, 0, 0, 0, 0}
+	xres:		1024,
+	yres:		768,
+	xres_virtual:	1024,
+	yres_virtual:	768,
+	bits_per_pixel:	8,
+	activate:	FB_ACTIVATE_NOW,
+	height:		-1,
+	width:		-1,
+	vmode:		FB_VMODE_NONINTERLACED,
 };
 
-struct maxinefb_par {
-};
-
-struct maxinefb_par current_par;
+static struct fb_fix_screeninfo maxinefb_fix = {
+	id:		"Maxine onboard graphics 1024x768x8",
+	smem_len:	(1024*768),
+	type:		FB_TYPE_PACKED_PIXELS,
+	visual:		FB_VISUAL_PSEUDOCOLOR,
+	line_length:	1024,
+}
 
 /* Reference to machine type set in arch/mips/dec/prom/identify.c, KM */
 extern unsigned long mips_machtype;
-
 
 /* Handle the funny Inmos RamDAC/video controller ... */
 
@@ -109,212 +97,42 @@ unsigned int maxinefb_ims332_read_register(int regno)
 	return (j & 0xffff) | ((k & 0xff00) << 8);
 }
 
-
-static void maxinefb_encode_var(struct fb_var_screeninfo *var,
-				struct maxinefb_par *par)
-{
-	int i = 0;
-	var->xres = 1024;
-	var->yres = 768;
-	var->xres_virtual = 1024;
-	var->yres_virtual = 768;
-	var->xoffset = 0;
-	var->yoffset = 0;
-	var->bits_per_pixel = 8;
-	var->grayscale = 0;
-	var->transp.offset = 0;
-	var->transp.length = 0;
-	var->transp.msb_right = 0;
-	var->nonstd = 0;
-	var->activate = 1;
-	var->height = -1;
-	var->width = -1;
-	var->vmode = FB_VMODE_NONINTERLACED;
-	var->pixclock = 0;
-	var->sync = 0;
-	var->left_margin = 0;
-	var->right_margin = 0;
-	var->upper_margin = 0;
-	var->lower_margin = 0;
-	var->hsync_len = 0;
-	var->vsync_len = 0;
-	for (i = 0; i < arraysize(var->reserved); i++)
-		var->reserved[i] = 0;
-}
-
-static void maxinefb_get_par(struct maxinefb_par *par)
-{
-	*par = current_par;
-}
-
-static int maxinefb_fb_update_var(int con, struct fb_info *info)
-{
-	return 0;
-}
-
-static int maxinefb_do_fb_set_var(struct fb_var_screeninfo *var,
-				  int isactive)
-{
-	struct maxinefb_par par;
-
-	maxinefb_get_par(&par);
-	maxinefb_encode_var(var, &par);
-	return 0;
-}
-
-
-/* Get the palette */
-
-static int maxinefb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
-{
-	unsigned int i;
-	unsigned long hw_colorvalue = 0;	/* raw color value from the register */
-	unsigned int length;
-
-	if (((cmap->start) + (cmap->len)) >= 256) {
-		length = 256 - (cmap->start);
-	} else {
-		length = cmap->len;
-	}
-	for (i = 0; i < length; i++) {
-		hw_colorvalue =
-		    maxinefb_ims332_read_register(IMS332_REG_COLOR_PALETTE
-						  + cmap->start + i);
-		(cmap->red[i]) = ((hw_colorvalue & 0x0000ff));
-		(cmap->green[i]) = ((hw_colorvalue & 0x00ff00) >> 8);
-		(cmap->blue[i]) = ((hw_colorvalue & 0xff0000) >> 16);
-
-	}
-	return 0;
-}
-
-
 /* Set the palette */
-
-static int maxinefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
+static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp, struct fb_info *info)
 {
-	unsigned int i;
-	unsigned long hw_colorvalue;	/* value to be written into the palette reg. */
-	unsigned short cmap_red;
-	unsigned short cmap_green;
-	unsigned short cmap_blue;
-	unsigned int length;
+	/* value to be written into the palette reg. */
+	unsigned long hw_colorvalue = 0;
 
-	hw_colorvalue = 0;
-	if (((cmap->start) + (cmap->len)) >= 256) {
-		length = 256 - (cmap->start);
-	} else {
-		length = cmap->len;
-	}
+	red   >>= 8;	/* The cmap fields are 16 bits    */
+	green >>= 8;	/* wide, but the harware colormap */
+	blue  >>= 8;	/* registers are only 8 bits wide */
 
-	for (i = 0; i < length; i++) {
-		cmap_red = ((cmap->red[i]) >> 8);	/* The cmap fields are 16 bits    */
-		cmap_green = ((cmap->green[i]) >> 8);	/* wide, but the harware colormap */
-		cmap_blue = ((cmap->blue[i]) >> 8);	/* registers are only 8 bits wide */
-
-		hw_colorvalue =
-		    (cmap_blue << 16) + (cmap_green << 8) + (cmap_red);
-		maxinefb_ims332_write_register(IMS332_REG_COLOR_PALETTE +
-					       cmap->start + i,
-					       hw_colorvalue);
-	}
+	hw_colorvalue =
+	    (blue << 16) + (green << 8) + (red);
+	maxinefb_ims332_write_register(IMS332_REG_COLOR_PALETTE +
+				       regno,
+				       hw_colorvalue);
 	return 0;
-}
-
-static int maxinefb_get_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *info)
-{
-	struct maxinefb_par par;
-	if (con == -1) {
-		maxinefb_get_par(&par);
-		maxinefb_encode_var(var, &par);
-	} else
-		*var = fb_display[con].var;
-	return 0;
-}
-
-
-static int maxinefb_set_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *info)
-{
-	int err;
-
-	if ((err = maxinefb_do_fb_set_var(var, 1)))
-		return err;
-	return 0;
-}
-static void maxinefb_encode_fix(struct fb_fix_screeninfo *fix,
-				struct maxinefb_par *par)
-{
-	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
-	strcpy(fix->id, "maxinefb");
-	/* fix->id is a char[16], so a maximum of 15 characters, KM */
-
-	fix->smem_start = (char *) fb_start;	/* display memory base address, KM */
-	fix->smem_len = fb_size;
-	fix->type = FB_TYPE_PACKED_PIXELS;
-	fix->visual = FB_VISUAL_PSEUDOCOLOR;
-	fix->xpanstep = 0;
-	fix->ypanstep = 0;
-	fix->ywrapstep = 0;
-	fix->line_length = fb_line_length;
-}
-
-static int maxinefb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			    struct fb_info *info)
-{
-	struct maxinefb_par par;
-	maxinefb_get_par(&par);
-	maxinefb_encode_fix(fix, &par);
-	return 0;
-}
-
-static int maxinefb_switch(int con, struct fb_info *info)
-{
-	maxinefb_do_fb_set_var(&fb_display[con].var, 1);
-	info->currcon = con;
-	return 0;
-}
-
-static void maxinefb_set_disp(int con)
-{
-	struct fb_fix_screeninfo fix;
-	struct display *display;
-
-	if (con >= 0)
-		display = &fb_display[con];
-	else
-		display = &disp;	/* used during initialization */
-
-	maxinefb_get_fix(&fix, con, 0);
-
-	display->visual = fix.visual;
-	display->type = fix.type;
-	display->type_aux = fix.type_aux;
-	display->ypanstep = fix.ypanstep;
-	display->ywrapstep = fix.ywrapstep;
-	display->line_length = fix.line_length;
-	display->next_line = fix.line_length;
-	display->can_soft_blank = 0;
-	display->inverse = 0;
-
-	display->dispsw = &fbcon_cfb8;
 }
 
 static struct fb_ops maxinefb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	maxinefb_get_fix,
-	fb_get_var:	maxinefb_get_var,
-	fb_set_var:	maxinefb_set_var,
-	fb_get_cmap:	maxinefb_get_cmap,
-	fb_set_cmap:	maxinefb_set_cmap,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
+	fb_set_var:	gen_set_var,
+	fb_get_cmap:	gen_get_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	maxinefb_setcolreg,	
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,		
 };
 
 int __init maxinefb_init(void)
 {
 	volatile unsigned char *fboff;
+	unsigned long fb_start;
 	int i;
 
 	/* Validate we're on the proper machine type */
@@ -332,6 +150,8 @@ int __init maxinefb_init(void)
 	for (fboff = fb_start; fboff < fb_start + 0x1ffff; fboff++)
 		*fboff = 0x0;
 
+	maxinefb_fix.smem_start = fb_start;
+	
 	/* erase hardware cursor */
 	for (i = 0; i < 512; i++) {
 		maxinefb_ims332_write_register(IMS332_REG_CURSOR_RAM + i,
@@ -344,34 +164,25 @@ int __init maxinefb_init(void)
 		 */
 	}
 
-	/* Fill in the available video resolution */
-	maxinefb_defined.xres = 1024;
-	maxinefb_defined.yres = 768;
-	maxinefb_defined.xres_virtual = 1024;
-	maxinefb_defined.yres_virtual = 768;
-	maxinefb_defined.bits_per_pixel = 8;
-
 	/* Let there be consoles... */
 
 	strcpy(fb_info.modename, "Maxine onboard graphics 1024x768x8");
-	/* fb_info.modename: maximum of 39 characters + trailing nullbyte, KM */
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
-	fb_info.screen_base = (char *) fb_start;
+	fb_info.screen_base = (char *) maxinefb_fix.smem_start;
+	fb_info.var = maxinefb_defined;
+	fb_info.fix = maxinefb_fix;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
-	fb_info.switch_con = &maxinefb_switch;
-	fb_info.updatevar = &maxinefb_fb_update_var;
+	fb_info.switch_con = gen_switch;
+	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
-	maxinefb_do_fb_set_var(&maxinefb_defined, 1);
 
-	maxinefb_get_var(&disp.var, -1, &fb_info);
-	maxinefb_set_disp(-1);
+	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0)
 		return 1;
-
 	return 0;
 }
 

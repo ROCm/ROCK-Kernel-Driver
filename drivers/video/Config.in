@@ -274,8 +274,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_RADEON" = "y" -o \
 	   "$CONFIG_FB_SGIVW" = "y" -o "$CONFIG_FB_CYBER2000" = "y" -o \
 	   "$CONFIG_FB_SA1100" = "y" -o "$CONFIG_FB_SIS" = "y" -o \
-	   "$CONFIG_FB_PMAG_BA" = "y" -o "$CONFIG_FB_PMAGB_B" = "y" -o \
-	   "$CONFIG_FB_MAXINE" = "y" ]; then 
+	   "$CONFIG_FB_PMAG_BA" = "y" -o "$CONFIG_FB_PMAGB_B" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB8 y
       else
 	 if [ "$CONFIG_FB_ACORN" = "m" -o "$CONFIG_FB_ATARI" = "m" -o \
@@ -293,8 +292,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_TX3912" = "m" -o \
 	      "$CONFIG_FB_SGIVW" = "m" -o "$CONFIG_FB_CYBER2000" = "m" -o \
 	      "$CONFIG_FB_PMAG_BA" = "m" -o "$CONFIG_FB_PMAGB_B" = "m" -o \
-	      "$CONFIG_FB_MAXINE" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
-	      "$CONFIG_FB_SA1100" = "m" ]; then 
+	      "$CONFIG_FB_SA1100" = "m" -o "$CONFIG_FB_RADEON" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB8 m
 	 fi
       fi
@@ -372,7 +370,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_HP300" = "y" -o "$CONFIG_FB_Q40" = "y" -o \
 	   "$CONFIG_FB_ANAKIN" = "y" -o "$CONFIG_FB_G364" = "y" -o \
 	   "$CONFIG_FB_VIRTUAL" = "y" -o "$CONFIG_FB_CLPS711X" = "y" -o \
-	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_APOLLO" = "y" ]; then
+	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_APOLLO" = "y" -o
+	   "$CONFIG_FB_MAXINE" = "y" ]; then
 	 define_tristate CONFIG_FBCON_ACCEL y
       else
 	 if [ "$CONFIG_FB_NEOMAGIC" = "m" -o "$CONFIG_FB_HIT" = "m" -o \
