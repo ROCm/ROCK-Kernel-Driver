@@ -454,7 +454,7 @@ static int dlci_del(struct dlci_add *dlci)
 	return(err);
 }
 
-static int dlci_ioctl(unsigned int cmd, void *arg)
+static int dlci_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct dlci_add add;
 	int err;

@@ -751,9 +751,9 @@ void vlan_ioctl_set(int (*hook)(void __user *))
 EXPORT_SYMBOL(vlan_ioctl_set);
 
 static DECLARE_MUTEX(dlci_ioctl_mutex);
-static int (*dlci_ioctl_hook)(unsigned int, void *);
+static int (*dlci_ioctl_hook)(unsigned int, void __user *);
 
-void dlci_ioctl_set(int (*hook)(unsigned int, void *))
+void dlci_ioctl_set(int (*hook)(unsigned int, void __user *))
 {
 	down(&dlci_ioctl_mutex);
 	dlci_ioctl_hook = hook;
@@ -832,7 +832,7 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			if (dlci_ioctl_hook) {
 				down(&dlci_ioctl_mutex);
-				err = dlci_ioctl_hook(cmd, (void *)arg);
+				err = dlci_ioctl_hook(cmd, argp);
 				up(&dlci_ioctl_mutex);
 			}
 			break;
