@@ -22,6 +22,7 @@ config IPV6_PRIVACY
 config INET6_AH
 	tristate "IPv6: AH transformation"
 	depends on IPV6
+	select XFRM
 	select CRYPTO
 	select CRYPTO_HMAC
 	select CRYPTO_MD5
@@ -34,6 +35,7 @@ config INET6_AH
 config INET6_ESP
 	tristate "IPv6: ESP transformation"
 	depends on IPV6
+	select XFRM
 	select CRYPTO
 	select CRYPTO_HMAC
 	select CRYPTO_MD5
@@ -47,6 +49,7 @@ config INET6_ESP
 config INET6_IPCOMP
 	tristate "IPv6: IPComp transformation"
 	depends on IPV6
+	select XFRM
 	select CRYPTO
 	select CRYPTO_DEFLATE
 	---help---

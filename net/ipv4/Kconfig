@@ -187,6 +187,7 @@ config IP_PNP_RARP
 config NET_IPIP
 	tristate "IP: tunneling"
 	depends on INET
+	select XFRM
 	---help---
 	  Tunneling means encapsulating data of one protocol type within
 	  another protocol and sending it over a channel that understands the
@@ -205,6 +206,7 @@ config NET_IPIP
 config NET_IPGRE
 	tristate "IP: GRE tunnels over IP"
 	depends on INET
+	select XFRM
 	help
 	  Tunneling means encapsulating data of one protocol type within
 	  another protocol and sending it over a channel that understands the
@@ -343,6 +345,7 @@ config SYN_COOKIES
 
 config INET_AH
 	tristate "IP: AH transformation"
+	select XFRM
 	select CRYPTO
 	select CRYPTO_HMAC
 	select CRYPTO_MD5
@@ -354,6 +357,7 @@ config INET_AH
 
 config INET_ESP
 	tristate "IP: ESP transformation"
+	select XFRM
 	select CRYPTO
 	select CRYPTO_HMAC
 	select CRYPTO_MD5
@@ -366,6 +370,7 @@ config INET_ESP
 
 config INET_IPCOMP
 	tristate "IP: IPComp transformation"
+	select XFRM
 	select CRYPTO
 	select CRYPTO_DEFLATE
 	---help---
