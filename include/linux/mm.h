@@ -540,7 +540,7 @@ static inline int can_do_mlock(void)
 {
 	if (capable(CAP_IPC_LOCK))
 		return 1;
-	if (current->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
+	if (current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
 		return 1;
 	return 0;
 }

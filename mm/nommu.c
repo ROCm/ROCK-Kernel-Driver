@@ -57,7 +57,7 @@ int vmtruncate(struct inode *inode, loff_t offset)
 	goto out_truncate;
 
 do_expand:
-	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	limit = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
 	if (limit != RLIM_INFINITY && offset > limit)
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)

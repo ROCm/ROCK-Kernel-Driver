@@ -488,11 +488,11 @@ static void do_acct_process(long exitcode, struct file *file)
 	/*
  	 * Accounting records are not subject to resource limits.
  	 */
-	flim = current->rlim[RLIMIT_FSIZE].rlim_cur;
-	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
+	flim = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
+	current->signal->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 	file->f_op->write(file, (char *)&ac,
 			       sizeof(acct_t), &file->f_pos);
-	current->rlim[RLIMIT_FSIZE].rlim_cur = flim;
+	current->signal->rlim[RLIMIT_FSIZE].rlim_cur = flim;
 	set_fs(fs);
 }
 

@@ -269,7 +269,7 @@ static struct sigqueue *__sigqueue_alloc(void)
 	struct sigqueue *q = NULL;
 
 	if (atomic_read(&current->user->sigpending) <
-			current->rlim[RLIMIT_SIGPENDING].rlim_cur)
+			current->signal->rlim[RLIMIT_SIGPENDING].rlim_cur)
 		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
 	if (q) {
 		INIT_LIST_HEAD(&q->list);
@@ -764,7 +764,7 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	   pass on the info struct.  */
 
 	if (atomic_read(&t->user->sigpending) <
-			t->rlim[RLIMIT_SIGPENDING].rlim_cur)
+			t->signal->rlim[RLIMIT_SIGPENDING].rlim_cur)
 		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
 
 	if (q) {

@@ -313,6 +313,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	struct mm_struct *mm;
 	unsigned long long start_time;
 	unsigned long cmin_flt = 0, cmaj_flt = 0, cutime = 0, cstime = 0;
+	unsigned long rsslim = 0;
 	char tcomm[sizeof(task->comm)];
 
 	state = *get_task_state(task);
@@ -347,6 +348,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		cmaj_flt = task->signal->cmaj_flt;
 		cutime = task->signal->cutime;
 		cstime = task->signal->cstime;
+		rsslim = task->signal->rlim[RLIMIT_RSS].rlim_cur;
 	}
 	read_unlock(&tasklist_lock);
 
@@ -393,7 +395,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		start_time,
 		vsize,
 		mm ? mm->rss : 0, /* you might want to shift this left 3 */
-		task->rlim[RLIMIT_RSS].rlim_cur,
+	        rsslim,
 		mm ? mm->start_code : 0,
 		mm ? mm->end_code : 0,
 		mm ? mm->start_stack : 0,

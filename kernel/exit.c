@@ -237,7 +237,8 @@ void reparent_to_init(void)
 	/* rt_priority? */
 	/* signals? */
 	security_task_reparent_to_init(current);
-	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
+	memcpy(current->signal->rlim, init_task.signal->rlim,
+	       sizeof(current->signal->rlim));
 	atomic_inc(&(INIT_USER->__count));
 	switch_uid(INIT_USER);
 
@@ -761,7 +762,6 @@ static void exit_notify(struct task_struct *tsk)
 	 */
 	tsk->it_virt_value = 0;
 	tsk->it_prof_value = 0;
-	tsk->rlim[RLIMIT_CPU].rlim_cur = RLIM_INFINITY;
 
 	write_unlock_irq(&tasklist_lock);
 

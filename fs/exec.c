@@ -377,7 +377,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	bprm->p = PAGE_SIZE * i - offset;
 
 	/* Limit stack size to 1GB */
-	stack_base = current->rlim[RLIMIT_STACK].rlim_max;
+	stack_base = current->signal->rlim[RLIMIT_STACK].rlim_max;
 	if (stack_base > (1 << 30))
 		stack_base = 1 << 30;
 	stack_base = PAGE_ALIGN(STACK_TOP - stack_base);
@@ -1393,7 +1393,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	current->signal->group_exit_code = exit_code;
 	coredump_wait(mm);
 
-	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
+	if (current->signal->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail_unlock;
 
 	/*

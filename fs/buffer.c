@@ -2232,7 +2232,7 @@ int generic_cont_expand(struct inode *inode, loff_t size)
 	int err;
 
 	err = -EFBIG;
-        limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+        limit = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
 	if (limit != RLIM_INFINITY && size > (loff_t)limit) {
 		send_sig(SIGXFSZ, current, 0);
 		goto out;

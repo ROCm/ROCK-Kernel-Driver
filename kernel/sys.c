@@ -649,7 +649,7 @@ static int set_user(uid_t new_ruid, int dumpclear)
 		return -EAGAIN;
 
 	if (atomic_read(&new_user->processes) >=
-				current->rlim[RLIMIT_NPROC].rlim_cur &&
+				current->signal->rlim[RLIMIT_NPROC].rlim_cur &&
 			new_user != &root_user) {
 		free_uid(new_user);
 		return -EAGAIN;
@@ -1496,9 +1496,13 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
-	else
-		return copy_to_user(rlim, current->rlim + resource, sizeof(*rlim))
-			? -EFAULT : 0;
+	else {
+		struct rlimit value;
+		task_lock(current->group_leader);
+		value = current->signal->rlim[resource];
+		task_unlock(current->group_leader);
+		return copy_to_user(rlim, &value, sizeof(*rlim)) ? -EFAULT : 0;
+	}
 }
 
 #ifdef __ARCH_WANT_SYS_OLD_GETRLIMIT
@@ -1513,7 +1517,9 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *r
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
 
-	memcpy(&x, current->rlim + resource, sizeof(*rlim));
+	task_lock(current->group_leader);
+	x = current->signal->rlim[resource];
+	task_unlock(current->group_leader);
 	if(x.rlim_cur > 0x7FFFFFFF)
 		x.rlim_cur = 0x7FFFFFFF;
 	if(x.rlim_max > 0x7FFFFFFF)
@@ -1534,21 +1540,20 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 		return -EFAULT;
        if (new_rlim.rlim_cur > new_rlim.rlim_max)
                return -EINVAL;
-	old_rlim = current->rlim + resource;
-	if (((new_rlim.rlim_cur > old_rlim->rlim_max) ||
-	     (new_rlim.rlim_max > old_rlim->rlim_max)) &&
+	old_rlim = current->signal->rlim + resource;
+	if ((new_rlim.rlim_max > old_rlim->rlim_max) &&
 	    !capable(CAP_SYS_RESOURCE))
 		return -EPERM;
-	if (resource == RLIMIT_NOFILE) {
-		if (new_rlim.rlim_cur > NR_OPEN || new_rlim.rlim_max > NR_OPEN)
+	if (resource == RLIMIT_NOFILE && new_rlim.rlim_max > NR_OPEN)
 			return -EPERM;
-	}
 
 	retval = security_task_setrlimit(resource, &new_rlim);
 	if (retval)
 		return retval;
 
+	task_lock(current->group_leader);
 	*old_rlim = new_rlim;
+	task_unlock(current->group_leader);
 	return 0;
 }
 

@@ -145,7 +145,7 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode,
 			spin_lock(&mq_lock);
 			if (u->mq_bytes + mq_bytes < u->mq_bytes ||
 		 	    u->mq_bytes + mq_bytes >
-			    p->rlim[RLIMIT_MSGQUEUE].rlim_cur) {
+			    p->signal->rlim[RLIMIT_MSGQUEUE].rlim_cur) {
 				spin_unlock(&mq_lock);
 				goto out_inode;
 			}

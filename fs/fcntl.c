@@ -86,7 +86,7 @@ static int locate_fd(struct files_struct *files,
 	int error;
 
 	error = -EINVAL;
-	if (orig_start >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (orig_start >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
 repeat:
@@ -105,7 +105,7 @@ repeat:
 	}
 	
 	error = -EMFILE;
-	if (newfd >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (newfd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
 	error = expand_files(files, newfd);
@@ -161,7 +161,7 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 	if (newfd == oldfd)
 		goto out_unlock;
 	err = -EBADF;
-	if (newfd >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (newfd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out_unlock;
 	get_file(file);			/* We are now finished with oldfd */
 
