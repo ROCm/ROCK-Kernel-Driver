@@ -578,6 +578,9 @@ nfs3svc_decode_readdirplusargs(struct svc_rqst *rqstp, u32 *p,
 	args->dircount = ntohl(*p++);
 	args->count    = ntohl(*p++);
 
+	if (args->count > PAGE_SIZE)
+		args->count = PAGE_SIZE;
+
 	svc_take_page(rqstp);
 	args->buffer = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
 
