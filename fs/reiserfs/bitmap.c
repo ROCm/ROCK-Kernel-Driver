@@ -258,7 +258,12 @@ static inline int block_group_used(struct super_block *s, u32 id) {
 u32 reiserfs_choose_packing(struct inode *dir) {
     u32 packing;
     if (TEST_OPTION(packing_groups, dir->i_sb)) {
-	if (block_group_used(dir->i_sb,le32_to_cpu(INODE_PKEY(dir)->k_dir_id)))
+	u32 parent_dir = le32_to_cpu(INODE_PKEY(dir)->k_dir_id);
+	/*
+	 * some versions of reiserfsck expect packing locality 1 to be
+	 * special
+	 */
+	if (parent_dir == 1 || block_group_used(dir->i_sb,parent_dir))
             packing = INODE_PKEY(dir)->k_objectid;
         else
             packing = INODE_PKEY(dir)->k_dir_id;
