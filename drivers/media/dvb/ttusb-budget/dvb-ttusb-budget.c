@@ -24,6 +24,8 @@
 #include "dmxdev.h"
 #include "dvb_demux.h"
 #include "dvb_net.h"
+#include "cx22700.h"
+#include "tda1004x.h"
 
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
@@ -132,6 +134,8 @@ struct ttusb {
 #if 0
 	devfs_handle_t stc_devfs_handle;
 #endif
+
+	struct dvb_frontend* fe;
 };
 
 /* ugly workaround ... don't know why it's neccessary to read */
@@ -461,9 +465,10 @@ static int ttusb_init_controller(struct ttusb *ttusb)
 }
 
 #ifdef TTUSB_DISEQC
-static int ttusb_send_diseqc(struct ttusb *ttusb,
+static int ttusb_send_diseqc(struct dvb_frontend* fe,
 		      const struct dvb_diseqc_master_cmd *cmd)
 {
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
 	u8 b[12] = { 0xaa, ++ttusb->c, 0x18 };
 
 	int err;
@@ -484,6 +489,7 @@ static int ttusb_send_diseqc(struct ttusb *ttusb,
 }
 #endif
 
+#if 0
 static int ttusb_update_lnb(struct ttusb *ttusb)
 {
 	u8 b[] = { 0xaa, ++ttusb->c, 0x16, 5, /*power: */ 1,
@@ -501,41 +507,25 @@ static int ttusb_update_lnb(struct ttusb *ttusb)
 	return err;
 }
 
-static int ttusb_set_voltage(struct ttusb *ttusb, fe_sec_voltage_t voltage)
+static int ttusb_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage)
 {
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+
 	ttusb->voltage = voltage;
 	return ttusb_update_lnb(ttusb);
 }
 
 #ifdef TTUSB_TONE
-static int ttusb_set_tone(struct ttusb *ttusb, fe_sec_tone_mode_t tone)
+static int ttusb_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 {
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+
 	ttusb->tone = tone;
 	return ttusb_update_lnb(ttusb);
 }
 #endif
-
-static int ttusb_lnb_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
-{
-	struct ttusb *ttusb = fe->before_after_data;
-
-	switch (cmd) {
-	case FE_SET_VOLTAGE:
-		return ttusb_set_voltage(ttusb, (fe_sec_voltage_t) arg);
-#ifdef TTUSB_TONE
-	case FE_SET_TONE:
-		return ttusb_set_tone(ttusb, (fe_sec_tone_mode_t) arg);
 #endif
-#ifdef TTUSB_DISEQC
-	case FE_DISEQC_SEND_MASTER_CMD:
-		return ttusb_send_diseqc(ttusb,
-					 (struct dvb_diseqc_master_cmd *)
-					 arg);
-#endif
-	default:
-		return -EOPNOTSUPP;
-	};
-}
+
 
 #if 0
 static void ttusb_set_led_freq(struct ttusb *ttusb, u8 freq)
@@ -560,7 +550,7 @@ static void ttusb_handle_sec_data(struct ttusb_channel *channel,
 				  const u8 * data, int len);
 #endif
 
-int numpkt = 0, lastj, numts, numstuff, numsec, numinvalid;
+static int numpkt = 0, lastj, numts, numstuff, numsec, numinvalid;
 
 static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 			   int len)
@@ -1071,10 +1061,175 @@ static struct file_operations stc_fops = {
 };
 #endif
 
-u32 functionality(struct i2c_adapter *adapter)
+static u32 functionality(struct i2c_adapter *adapter)
 {
 	return I2C_FUNC_I2C;
 }
+
+
+
+static int alps_tdmb7_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+{
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+	u8 data[4];
+	struct i2c_msg msg = {.addr=0x61, .flags=0, .buf=data, .len=sizeof(data) };
+	u32 div;
+
+	div = (params->frequency + 36166667) / 166667;
+
+	data[0] = (div >> 8) & 0x7f;
+	data[1] = div & 0xff;
+	data[2] = ((div >> 10) & 0x60) | 0x85;
+	data[3] = params->frequency < 592000000 ? 0x40 : 0x80;
+
+	if (i2c_transfer(&ttusb->i2c_adap, &msg, 1) != 1) return -EIO;
+	return 0;
+}
+
+struct cx22700_config alps_tdmb7_config = {
+	.demod_address = 0x43,
+	.pll_set = alps_tdmb7_pll_set,
+};
+
+
+
+
+
+static int philips_tdm1316l_pll_init(struct dvb_frontend* fe)
+{
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+	static u8 td1316_init[] = { 0x0b, 0xf5, 0x85, 0xab };
+	static u8 disable_mc44BC374c[] = { 0x1d, 0x74, 0xa0, 0x68 };
+	struct i2c_msg tuner_msg = { .addr=0x60, .flags=0, .buf=td1316_init, .len=sizeof(td1316_init) };
+
+	// setup PLL configuration
+	if (i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1) != 1) return -EIO;
+	msleep(1);
+
+	// disable the mc44BC374c (do not check for errors)
+	tuner_msg.addr = 0x65;
+	tuner_msg.buf = disable_mc44BC374c;
+	tuner_msg.len = sizeof(disable_mc44BC374c);
+	if (i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1) != 1) {
+		i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1);
+	}
+
+	return 0;
+}
+
+static int philips_tdm1316l_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+{
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+	u8 tuner_buf[4];
+	struct i2c_msg tuner_msg = {.addr=0x60, .flags=0, .buf=tuner_buf, .len=sizeof(tuner_buf) };
+	int tuner_frequency = 0;
+	u8 band, cp, filter;
+
+	// determine charge pump
+	tuner_frequency = params->frequency + 36130000;
+	if (tuner_frequency < 87000000) return -EINVAL;
+	else if (tuner_frequency < 130000000) cp = 3;
+	else if (tuner_frequency < 160000000) cp = 5;
+	else if (tuner_frequency < 200000000) cp = 6;
+	else if (tuner_frequency < 290000000) cp = 3;
+	else if (tuner_frequency < 420000000) cp = 5;
+	else if (tuner_frequency < 480000000) cp = 6;
+	else if (tuner_frequency < 620000000) cp = 3;
+	else if (tuner_frequency < 830000000) cp = 5;
+	else if (tuner_frequency < 895000000) cp = 7;
+	else return -EINVAL;
+
+	// determine band
+	if (params->frequency < 49000000) return -EINVAL;
+	else if (params->frequency < 159000000) band = 1;
+	else if (params->frequency < 444000000) band = 2;
+	else if (params->frequency < 861000000) band = 4;
+	else return -EINVAL;
+
+	// setup PLL filter
+	switch (params->u.ofdm.bandwidth) {
+	case BANDWIDTH_6_MHZ:
+		tda1004x_write_byte(fe, 0x0C, 0);
+		filter = 0;
+		break;
+
+	case BANDWIDTH_7_MHZ:
+		tda1004x_write_byte(fe, 0x0C, 0);
+		filter = 0;
+		break;
+
+	case BANDWIDTH_8_MHZ:
+		tda1004x_write_byte(fe, 0x0C, 0xFF);
+		filter = 1;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	// calculate divisor
+	// ((36130000+((1000000/6)/2)) + Finput)/(1000000/6)
+	tuner_frequency = (((params->frequency / 1000) * 6) + 217280) / 1000;
+
+	// setup tuner buffer
+	tuner_buf[0] = tuner_frequency >> 8;
+	tuner_buf[1] = tuner_frequency & 0xff;
+	tuner_buf[2] = 0xca;
+	tuner_buf[3] = (cp << 5) | (filter << 3) | band;
+
+	if (i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1) != 1) return -EIO;
+
+	msleep(1);
+	return 0;
+}
+
+static int philips_tdm1316l_request_firmware(struct dvb_frontend* fe, const struct firmware **fw, char* name)
+{
+	struct ttusb* ttusb = (struct ttusb*) fe->dvb->priv;
+
+	return request_firmware(fw, name, &ttusb->dev->dev);
+}
+
+struct tda1004x_config philips_tdm1316l_config = {
+
+	.demod_address = 0x8,
+	.invert = 1,
+	.pll_init = philips_tdm1316l_pll_init,
+	.pll_set = philips_tdm1316l_pll_set,
+	.request_firmware = philips_tdm1316l_request_firmware,
+};
+
+
+
+static void frontend_init(struct ttusb* ttusb)
+{
+	switch(ttusb->dev->descriptor.idProduct) {
+	case 0x1005: // Hauppauge/TT Nova-USB-t budget (tda10046/Philips td1316(tda6651tt) OR cx22700/ALPS TDMB7(??))
+		// try the ALPS TDMB7 first
+		ttusb->fe = cx22700_attach(&alps_tdmb7_config, &ttusb->i2c_adap);
+		if (ttusb->fe != NULL) break;
+
+		// Philips td1316
+		ttusb->fe = tda10046_attach(&philips_tdm1316l_config, &ttusb->i2c_adap);
+		if (ttusb->fe != NULL) break;
+		break;
+	}
+
+	if (ttusb->fe == NULL) {
+		printk("dvb-ttusb-budget: A frontend driver was not found for device %04x/%04x\n",
+		       ttusb->dev->descriptor.idVendor,
+		       ttusb->dev->descriptor.idProduct);
+	} else {
+		if (dvb_register_frontend(ttusb->adapter, ttusb->fe)) {
+			printk("dvb-ttusb-budget: Frontend registration failed!\n");
+			if (ttusb->fe->ops->release)
+				ttusb->fe->ops->release(ttusb->fe);
+			ttusb->fe = NULL;
+		}
+	}
+}
+
+
 
 static struct i2c_algorithm ttusb_dec_algo = {
 	.name		= "ttusb dec i2c algorithm",
@@ -1082,26 +1237,6 @@ static struct i2c_algorithm ttusb_dec_algo = {
 	.master_xfer	= master_xfer,
 	.functionality	= functionality,
 };
-
-static int client_register(struct i2c_client *client)
-{
-	struct ttusb *ttusb = (struct ttusb*)i2c_get_adapdata(client->adapter);
-
-	if (client->driver->command)
-		return client->driver->command(client, FE_REGISTER, ttusb->adapter);
-
-	return 0;
-}
-
-static int client_unregister(struct i2c_client *client)
-{
-	struct ttusb *ttusb = (struct ttusb*)i2c_get_adapdata(client->adapter);
-
-	if (client->driver->command)
-		return client->driver->command(client, FE_UNREGISTER, ttusb->adapter);
-
-	return 0;
-}
 
 static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
@@ -1140,6 +1275,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	up(&ttusb->sem);
 
 	dvb_register_adapter(&ttusb->adapter, "Technotrend/Hauppauge Nova-USB", THIS_MODULE);
+	ttusb->adapter->priv = ttusb;
 
 	/* i2c */
 	memset(&ttusb->i2c_adap, 0, sizeof(struct i2c_adapter));
@@ -1155,17 +1291,12 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	ttusb->i2c_adap.algo              = &ttusb_dec_algo;
 	ttusb->i2c_adap.algo_data         = NULL;
 	ttusb->i2c_adap.id                = I2C_ALGO_BIT;
-	ttusb->i2c_adap.client_register   = client_register;
-	ttusb->i2c_adap.client_unregister = client_unregister;
 
 	result = i2c_add_adapter(&ttusb->i2c_adap);
 	if (result) {
 		dvb_unregister_adapter (ttusb->adapter);
 		return result;
 	}
-
-	dvb_add_frontend_ioctls(ttusb->adapter, ttusb_lnb_ioctl, NULL,
-				ttusb);
 
 	memset(&ttusb->dvb_demux, 0, sizeof(ttusb->dvb_demux));
 
@@ -1218,8 +1349,9 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 			   S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
 			   | S_IROTH | S_IWOTH, &stc_fops, ttusb);
 #endif
-
 	usb_set_intfdata(intf, (void *) ttusb);
+
+	frontend_init(ttusb);
 
 	return 0;
 }
@@ -1238,7 +1370,7 @@ static void ttusb_disconnect(struct usb_interface *intf)
 	dvb_net_release(&ttusb->dvbnet);
 	dvb_dmxdev_release(&ttusb->dmxdev);
 	dvb_dmx_release(&ttusb->dvb_demux);
-
+	if (ttusb->fe != NULL) dvb_unregister_frontend(ttusb->fe);
 	i2c_del_adapter(&ttusb->i2c_adap);
 	dvb_unregister_adapter(ttusb->adapter);
 
@@ -1250,8 +1382,8 @@ static void ttusb_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_device_id ttusb_table[] = {
-	{USB_DEVICE(0xb48, 0x1003)},
-	{USB_DEVICE(0xb48, 0x1004)},	/* to be confirmed ????  */
+/*	{USB_DEVICE(0xb48, 0x1003)},UNDEFINED HARDWARE - mail linuxtv.org list */
+/*	{USB_DEVICE(0xb48, 0x1004)},UNDEFINED HARDWARE - mail linuxtv.org list*/	/* to be confirmed ????  */
 	{USB_DEVICE(0xb48, 0x1005)},
 	{}
 };
