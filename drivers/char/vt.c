@@ -3062,13 +3062,13 @@ unsigned short *screen_pos(int currcons, int w_offset, int viewed)
 	return screenpos(currcons, 2 * w_offset, viewed);
 }
 
-void getconsxy(int currcons, char *p)
+void getconsxy(int currcons, unsigned char *p)
 {
 	p[0] = x;
 	p[1] = y;
 }
 
-void putconsxy(int currcons, char *p)
+void putconsxy(int currcons, unsigned char *p)
 {
 	gotoxy(currcons, p[0], p[1]);
 	set_cursor(currcons);
