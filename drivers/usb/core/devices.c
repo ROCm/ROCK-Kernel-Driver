@@ -238,7 +238,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 
 	if (start > end)
 		return start;
-	lock_kernel(); /* driver might be unloaded */
+	down_read(&usb_bus_type.subsys.rwsem);
 	start += sprintf(start, format_iface,
 			 desc->bInterfaceNumber,
 			 desc->bAlternateSetting,
@@ -248,7 +248,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 			 desc->bInterfaceSubClass,
 			 desc->bInterfaceProtocol,
 			 iface->driver ? iface->driver->name : "(none)");
-	unlock_kernel();
+	up_read(&usb_bus_type.subsys.rwsem);
 	return start;
 }
 

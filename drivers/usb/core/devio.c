@@ -374,13 +374,15 @@ static int claimintf(struct dev_state *ps, unsigned int intf)
 		return 0;
 	iface = dev->actconfig->interface[intf];
 	err = -EBUSY;
-	lock_kernel();
+
+	/* lock against other changes to driver bindings */
+	down_write(&usb_bus_type.subsys.rwsem);
 	if (!usb_interface_claimed(iface)) {
 		usb_driver_claim_interface(&usbdevfs_driver, iface, ps);
 		set_bit(intf, &ps->ifclaimed);
 		err = 0;
 	}
-	unlock_kernel();
+	up_write(&usb_bus_type.subsys.rwsem);
 	return err;
 }
 
@@ -395,11 +397,14 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 	err = -EINVAL;
 	dev = ps->dev;
 	down(&dev->serialize);
+	/* lock against other changes to driver bindings */
+	down_write(&usb_bus_type.subsys.rwsem);
 	if (test_and_clear_bit(intf, &ps->ifclaimed)) {
 		iface = dev->actconfig->interface[intf];
 		usb_driver_release_interface(&usbdevfs_driver, iface);
 		err = 0;
 	}
+	up_write(&usb_bus_type.subsys.rwsem);
 	up(&dev->serialize);
 	return err;
 }
