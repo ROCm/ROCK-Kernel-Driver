@@ -80,7 +80,13 @@ static struct ccw_driver dasd_eckd_driver; /* see below */
 static int
 dasd_eckd_probe (struct ccw_device *cdev)
 {
-	return dasd_generic_probe (cdev, &dasd_eckd_discipline);
+	int ret;
+
+	ret = dasd_generic_probe (cdev, &dasd_eckd_discipline);
+	if (ret)
+		return ret;
+	ccw_device_set_options(cdev, CCWDEV_DO_PATHGROUP);
+	return 0;
 }
 
 static int

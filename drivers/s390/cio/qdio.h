@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.16 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.17 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -21,7 +21,15 @@
 #define QDIO_TIMER_POLL_VALUE 1
 #define IQDIO_TIMER_POLL_VALUE 1
 
-#define IQDIO_FILL_LEVEL_TO_POLL (QDIO_MAX_BUFFERS_PER_Q*4/3)
+/*
+ * unfortunately this can't be (QDIO_MAX_BUFFERS_PER_Q*4/3) or so -- as
+ * we never know, whether we'll get initiative again, e.g. to give the
+ * transmit skb's back to the stack, however the stack may be waiting for
+ * them... therefore we define 4 as threshold to start polling (which
+ * will stop as soon as the asynchronous queue catches up)
+ * btw, this only applies to the asynchronous HiperSockets queue
+ */
+#define IQDIO_FILL_LEVEL_TO_POLL 4
 
 #define IQDIO_THININT_ISC 3
 #define IQDIO_DELAY_TARGET 0

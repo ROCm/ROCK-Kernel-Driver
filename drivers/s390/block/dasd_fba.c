@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.29 $
+ * $Revision: 1.30 $
  */
 
 #include <linux/config.h>
@@ -57,7 +57,13 @@ static struct ccw_driver dasd_fba_driver; /* see below */
 static int
 dasd_fba_probe(struct ccw_device *cdev)
 {
-	return  dasd_generic_probe (cdev, &dasd_fba_discipline);
+	int ret;
+
+	ret = dasd_generic_probe (cdev, &dasd_fba_discipline);
+	if (ret)
+		return ret;
+	ccw_device_set_options(cdev, CCWDEV_DO_PATHGROUP);
+	return 0;
 }
 
 static int

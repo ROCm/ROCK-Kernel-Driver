@@ -84,7 +84,6 @@ ccw_device_sense_pgid_start(struct ccw_device *cdev)
 	cdev->private->state = DEV_STATE_SENSE_PGID;
 	cdev->private->imask = 0x80;
 	cdev->private->iretry = 5;
-	cdev->private->flags.pgid_supp = 0;
 	memset (&cdev->private->pgid, 0, sizeof (struct pgid));
 	ret = __ccw_device_sense_pgid_start(cdev);
 	if (ret)
@@ -165,14 +164,13 @@ ccw_device_sense_pgid_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	switch (__ccw_device_check_sense_pgid(cdev)) {
 	/* 0, -ETIME, -EOPNOTSUPP, -EAGAIN, -EACCES or -EUSERS */
 	case 0:			/* Sense Path Group ID successful. */
-		cdev->private->flags.pgid_supp = 1;
 		opm = sch->schib.pmcw.pim &
 			sch->schib.pmcw.pam &
 			sch->schib.pmcw.pom;
 		for (i=0;i<8;i++) {
 			if (opm == (0x80 << i)) {
 				/* Don't group single path devices. */
-				cdev->private->flags.pgid_supp = 0;
+				cdev->private->options.pgroup = 0;
 				break;
 			}
 		}
@@ -181,7 +179,7 @@ ccw_device_sense_pgid_irq(struct ccw_device *cdev, enum dev_event dev_event)
 			       sizeof(struct pgid));
 		/* fall through. */
 	case -EOPNOTSUPP:	/* Sense Path Group ID not supported */
-		ccw_device_sense_pgid_done(cdev, 0);
+		ccw_device_sense_pgid_done(cdev, -EOPNOTSUPP);
 		break;
 	case -ETIME:		/* Sense path group id stopped by timeout. */
 		ccw_device_sense_pgid_done(cdev, -ETIME);
