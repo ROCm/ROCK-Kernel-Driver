@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-i386/edd.h
+ * linux/include/linux/edd.h
  *  Copyright (C) 2002, 2003 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
  *
@@ -9,11 +9,11 @@
  * available at http://www.t13.org/docs2002/d1572r0.pdf.  It is
  * very similar to D1484 Revision 3 http://www.t13.org/docs2002/d1484r3.pdf
  *
- * In a nutshell, arch/i386/boot/setup.S populates a scratch table
+ * In a nutshell, arch/{i386,x86_64}/boot/setup.S populates a scratch table
  * in the empty_zero_block that contains a list of BIOS-enumerated
  * boot devices.
- * In arch/i386/kernel/setup.c, this information is
- * transferred into the edd structure, and in arch/i386/kernel/edd.c, that
+ * In arch/{i386,x86_64}/kernel/setup.c, this information is
+ * transferred into the edd structure, and in drivers/firmware/edd.c, that
  * information is used to identify BIOS boot disk.  The code in setup.S
  * is very sensitive to the size of these structures.
  *
@@ -27,8 +27,8 @@
  * GNU General Public License for more details.
  *
  */
-#ifndef _ASM_I386_EDD_H
-#define _ASM_I386_EDD_H
+#ifndef _LINUX_EDD_H
+#define _LINUX_EDD_H
 
 #define EDDNR 0x1e9		/* addr of number of edd_info structs at EDDBUF
 				   in empty_zero_block - treat this as 1 byte  */
@@ -175,6 +175,7 @@ struct edd_info {
 extern struct edd_info edd[EDDMAXNR];
 extern unsigned char eddnr;
 extern unsigned int edd_disk80_sig;
+
 #endif				/*!__ASSEMBLY__ */
 
-#endif				/* _ASM_I386_EDD_H */
+#endif				/* _LINUX_EDD_H */

@@ -38,10 +38,10 @@
 #include <linux/module.h>
 #include <linux/efi.h>
 #include <linux/init.h>
+#include <linux/edd.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
-#include <asm/edd.h>
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
