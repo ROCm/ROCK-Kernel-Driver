@@ -463,6 +463,7 @@ adv7175_detect_client (struct i2c_adapter *adapter,
 		dname = adv7176_name;
 	} else {
 		/* We should never get here!!! */
+		kfree(client);
 		return 0;
 	}
 	snprintf(I2C_NAME(client), sizeof(I2C_NAME(client)) - 1,
@@ -470,6 +471,7 @@ adv7175_detect_client (struct i2c_adapter *adapter,
 
 	encoder = kmalloc(sizeof(struct adv7175), GFP_KERNEL);
 	if (encoder == NULL) {
+		kfree(client);
 		return -ENOMEM;
 	}
 	memset(encoder, 0, sizeof(struct adv7175));

@@ -995,6 +995,8 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 				KERN_ERR
 				"%s_attach: init error %d at stage %d, leaving attach.\n",
 				I2C_NAME(client), i, err[i]);
+			kfree(decoder);
+			kfree(client);
 			return 0;
 		}
 	}
@@ -1022,6 +1024,8 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 				KERN_ERR
 				"%s_attach: init error %d at stage %d, leaving attach.\n",
 				I2C_NAME(client), i, err[i]);
+			kfree(decoder);
+			kfree(client);
 			return 0;
 		}
 	}
@@ -1068,6 +1072,8 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 				KERN_ERR
 				"%s_attach: init error %d at stage %d, leaving attach.\n",
 				I2C_NAME(client), i, err[i]);
+			kfree(decoder);
+			kfree(client);
 			return 0;
 		}
 	}
@@ -1107,6 +1113,8 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 				KERN_ERR
 				"%s_attach: init error %d at stage %d, leaving attach.\n",
 				I2C_NAME(client), i, err[i]);
+			kfree(decoder);
+			kfree(client);
 			return 0;
 		}
 	}
@@ -1127,6 +1135,8 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 				KERN_ERR
 				"%s_attach: init error %d at stage %d, leaving attach.\n",
 				I2C_NAME(client), i, err[i]);
+			kfree(decoder);
+			kfree(client);
 			return 0;
 		}
 	}

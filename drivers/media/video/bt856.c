@@ -341,6 +341,7 @@ bt856_detect_client (struct i2c_adapter *adapter,
 
 	encoder = kmalloc(sizeof(struct bt856), GFP_KERNEL);
 	if (encoder == NULL) {
+		kfree(client);
 		return -ENOMEM;
 	}
 	memset(encoder, 0, sizeof(struct bt856));

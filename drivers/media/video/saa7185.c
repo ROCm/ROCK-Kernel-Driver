@@ -434,6 +434,7 @@ saa7185_detect_client (struct i2c_adapter *adapter,
 
 	encoder = kmalloc(sizeof(struct saa7185), GFP_KERNEL);
 	if (encoder == NULL) {
+		kfree(client);
 		return -ENOMEM;
 	}
 	memset(encoder, 0, sizeof(struct saa7185));
