@@ -314,3 +314,4 @@ EXPORT_SYMBOL(rtas_token);
 EXPORT_SYMBOL(rtas_call);
 EXPORT_SYMBOL(rtas_data_buf);
 EXPORT_SYMBOL(rtas_data_buf_lock);
+EXPORT_SYMBOL(rtas_extended_busy_delay_time);
