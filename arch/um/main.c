@@ -17,6 +17,8 @@
 #include "mem_user.h"
 #include "user.h"
 #include "init.h"
+#include "mode.h"
+#include "choose-mode.h"
 
 /* Set in set_stklim, which is called from main and __wrap_malloc.  
  * __wrap_malloc only calls it if main hasn't started.
@@ -97,9 +99,6 @@ int main(int argc, char **argv, char **envp)
 			new_argv[i] = argv[i - 1];
 		new_argv[argc + 1] = NULL;
 		
-#ifdef PROFILING
-		disable_profile_timer();
-#endif
 		execvp(new_argv[0], new_argv);
 		perror("execing with extended args");
 		exit(1);
@@ -108,7 +107,6 @@ int main(int argc, char **argv, char **envp)
 	linux_prog = argv[0];
 
 	set_stklim();
-	set_task_sizes(0);
 
 	if((new_argv = malloc((argc + 1) * sizeof(char *))) == NULL){
 		perror("Mallocing argv");
@@ -136,60 +134,14 @@ int main(int argc, char **argv, char **envp)
 	return(uml_exitcode);
 }
 
-/* Changed in  __wrap___monstartup and __wrap_malloc very early */
-static int allocating_monbuf = 0;
-
-#ifdef PROFILING
-extern void __real___monstartup (unsigned long, unsigned long);
-
-void __wrap___monstartup (unsigned long lowpc, unsigned long highpc)
-{
-	allocating_monbuf = 1;
-	__real___monstartup(lowpc, highpc);
-	allocating_monbuf = 0;
-	get_profile_timer();
-}
-#endif
+#define CAN_KMALLOC() \
+ 	(kmalloc_ok && CHOOSE_MODE((getpid() != tracing_pid), 1))
 
 extern void *__real_malloc(int);
-extern unsigned long host_task_size;
-
-/* Set in __wrap_malloc early */
-static void *gmon_buf = NULL;
 
 void *__wrap_malloc(int size)
 {
-	if(allocating_monbuf){
-		unsigned long start, end;
-		int fd;
-
-		/* Turn this off now in case create_mem_file tries allocating
-		 * memory
-		 */
-		allocating_monbuf = 0;
-		fd = create_mem_file(size);
-
-		/* Calculate this here because linux_main hasn't run yet
-		 * and host_task_size figures in STACK_TOP, which figures
-		 * in kmem_end.
-		 */
-		set_task_sizes(0);
-
-		/* Same with stacksizelim */
-		set_stklim();
-
-		end = get_kmem_end();
-		start = (end - size) & PAGE_MASK;
-		gmon_buf = mmap((void *) start, size, PROT_READ | PROT_WRITE,
-			    MAP_SHARED | MAP_FIXED, fd, 0);
-		if(gmon_buf != (void *) start){
-			perror("Creating gprof buffer");
-			exit(1);
-		}
-		set_kmem_end(start);
-		return(gmon_buf);
-	}
-	if(kmalloc_ok) return(um_kmalloc(size));
+ 	if(CAN_KMALLOC()) return(um_kmalloc(size));
 	else return(__real_malloc(size));
 }
 
@@ -206,11 +158,7 @@ extern void __real_free(void *);
 
 void __wrap_free(void *ptr)
 {
-	/* Could maybe unmap the gmon buffer, but we're just about to
-	 * exit anyway
-	 */
-	if(ptr == gmon_buf) return;
-	if(kmalloc_ok) kfree(ptr);
+ 	if(CAN_KMALLOC()) kfree(ptr);
 	else __real_free(ptr);
 }
 

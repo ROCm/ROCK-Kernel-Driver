@@ -1,44 +1,78 @@
 /* 
- * Copyright (C) 2000 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
 #ifndef __SYSDEP_I386_PTRACE_H
 #define __SYSDEP_I386_PTRACE_H
 
-#include "sysdep/sc.h"
+#include "uml-config.h"
+#include "ptrace-tt.h"
+#include "ptrace-skas.h"
+#include "choose-mode.h"
 
 struct uml_pt_regs {
 	unsigned long args[6];
 	long syscall;
 	int is_user;
-	void *sc;
+	union {
+#ifdef CONFIG_MODE_TT
+		void *tt;
+#endif
+#ifdef CONFIG_MODE_SKAS
+		struct {
+			unsigned long regs[HOST_FRAME_SIZE];
+			unsigned long fp[HOST_FP_SIZE];
+			unsigned long xfp[HOST_XFP_SIZE];
+			unsigned long fault_addr;
+			unsigned long fault_type;
+			unsigned long trap_type;
+		} skas;
+#endif
+	} mode;
 };
 
 #define EMPTY_UML_PT_REGS { \
 	syscall : 	-1, \
 	args : 		{ [0 ... 5] = 0 }, \
-	is_user :	0, \
-	sc : 		NULL }
+	is_user :	0 }
 
-#define UPT_IP(regs) SC_IP((regs)->sc)
-#define UPT_SP(regs) SC_SP((regs)->sc)
-#define UPT_EFLAGS(regs) SC_EFLAGS((regs)->sc)
-#define UPT_EAX(regs) SC_EAX((regs)->sc)
-#define UPT_EBX(regs) SC_EBX((regs)->sc)
-#define UPT_ECX(regs) SC_ECX((regs)->sc)
-#define UPT_EDX(regs) SC_EDX((regs)->sc)
-#define UPT_ESI(regs) SC_ESI((regs)->sc)
-#define UPT_EDI(regs) SC_EDI((regs)->sc)
-#define UPT_EBP(regs) SC_EBP((regs)->sc)
-#define UPT_ORIG_EAX(regs) ((regs)->syscall)
-#define UPT_CS(regs) SC_CS((regs)->sc)
-#define UPT_SS(regs) SC_SS((regs)->sc)
-#define UPT_DS(regs) SC_DS((regs)->sc)
-#define UPT_ES(regs) SC_ES((regs)->sc)
-#define UPT_FS(regs) SC_FS((regs)->sc)
-#define UPT_GS(regs) SC_GS((regs)->sc)
-#define UPT_SC(regs) ((regs)->sc)
+extern int mode_tt;
+
+#define UPT_IP(r) \
+	CHOOSE_MODE(SC_IP((r)->mode.tt), REGS_IP((r)->mode.skas.regs))
+#define UPT_SP(r) \
+	CHOOSE_MODE(SC_SP((r)->mode.tt), REGS_SP((r)->mode.skas.regs))
+#define UPT_EFLAGS(r) \
+	CHOOSE_MODE(SC_EFLAGS((r)->mode.tt), REGS_EFLAGS((r)->mode.skas.regs))
+#define UPT_EAX(r) \
+	CHOOSE_MODE(SC_EAX((r)->mode.tt), REGS_EAX((r)->mode.skas.regs))
+#define UPT_EBX(r) \
+	CHOOSE_MODE(SC_EBX((r)->mode.tt), REGS_EBX((r)->mode.skas.regs))
+#define UPT_ECX(r) \
+	CHOOSE_MODE(SC_ECX((r)->mode.tt), REGS_ECX((r)->mode.skas.regs))
+#define UPT_EDX(r) \
+	CHOOSE_MODE(SC_EDX((r)->mode.tt), REGS_EDX((r)->mode.skas.regs))
+#define UPT_ESI(r) \
+	CHOOSE_MODE(SC_ESI((r)->mode.tt), REGS_ESI((r)->mode.skas.regs))
+#define UPT_EDI(r) \
+	CHOOSE_MODE(SC_EDI((r)->mode.tt), REGS_EDI((r)->mode.skas.regs))
+#define UPT_EBP(r) \
+	CHOOSE_MODE(SC_EBP((r)->mode.tt), REGS_EBP((r)->mode.skas.regs))
+#define UPT_ORIG_EAX(r) ((r)->syscall)
+#define UPT_CS(r) \
+	CHOOSE_MODE(SC_CS((r)->mode.tt), REGS_CS((r)->mode.skas.regs))
+#define UPT_SS(r) \
+	CHOOSE_MODE(SC_SS((r)->mode.tt), REGS_SS((r)->mode.skas.regs))
+#define UPT_DS(r) \
+	CHOOSE_MODE(SC_DS((r)->mode.tt), REGS_DS((r)->mode.skas.regs))
+#define UPT_ES(r) \
+	CHOOSE_MODE(SC_ES((r)->mode.tt), REGS_ES((r)->mode.skas.regs))
+#define UPT_FS(r) \
+	CHOOSE_MODE(SC_FS((r)->mode.tt), REGS_FS((r)->mode.skas.regs))
+#define UPT_GS(r) \
+	CHOOSE_MODE(SC_GS((r)->mode.tt), REGS_GS((r)->mode.skas.regs))
+#define UPT_SC(r) ((r)->mode.tt)
 
 #define UPT_REG(regs, reg) \
 	({	unsigned long val; \
@@ -94,12 +128,29 @@ struct uml_pt_regs {
 		} \
 	} while (0)
 
-#define UPT_SET_SYSCALL_RETURN(regs, res) \
-	SC_SET_SYSCALL_RETURN((regs)->sc, (res))
-#define UPT_RESTART_SYSCALL(regs) SC_RESTART_SYSCALL((regs)->sc)
-#define UPT_ORIG_SYSCALL(regs) UPT_EAX(regs)
-#define UPT_SYSCALL_NR(regs) ((regs)->syscall)
-#define UPT_SYSCALL_RET(regs) UPT_EAX(regs)
+#define UPT_SET_SYSCALL_RETURN(r, res) \
+	CHOOSE_MODE(SC_SET_SYSCALL_RETURN((r)->mode.tt, (res)), \
+                    REGS_SET_SYSCALL_RETURN((r)->mode.skas.regs, (res)))
+
+#define UPT_RESTART_SYSCALL(r) \
+	CHOOSE_MODE(SC_RESTART_SYSCALL((r)->mode.tt), \
+		    REGS_RESTART_SYSCALL((r)->mode.skas.regs))
+
+#define UPT_ORIG_SYSCALL(r) UPT_EAX(r)
+#define UPT_SYSCALL_NR(r) ((r)->syscall)
+#define UPT_SYSCALL_RET(r) UPT_EAX(r)
+
+#define UPT_SEGV_IS_FIXABLE(r) \
+	CHOOSE_MODE(SC_SEGV_IS_FIXABLE(r->mode.tt), \
+		    REGS_SEGV_IS_FIXABLE(&r->mode.skas))
+
+#define UPT_FAULT_ADDR(r) \
+	CHOOSE_MODE(SC_FAULT_ADDR(r->mode.tt), \
+		    REGS_FAULT_ADDR(&r->mode.skas))
+
+#define UPT_FAULT_WRITE(r) \
+	CHOOSE_MODE(SC_FAULT_WRITE(r->mode.tt), \
+		    REGS_FAULT_WRITE(&r->mode.skas))
 
 #endif
 

@@ -23,22 +23,21 @@ void timer(void)
 	gettimeofday(&xtime, NULL);
 }
 
-static void set_interval(int timer_type)
+void set_interval(int timer_type)
 {
-	struct itimerval interval;
+	int usec = 1000000/hz();
+	struct itimerval interval = ((struct itimerval) { { 0, usec },
+							  { 0, usec } });
 
-	interval.it_interval.tv_sec = 0;
-	interval.it_interval.tv_usec = 1000000/hz();
-	interval.it_value.tv_sec = 0;
-	interval.it_value.tv_usec = 1000000/hz();
 	if(setitimer(timer_type, &interval, NULL) == -1)
 		panic("setitimer failed - errno = %d\n", errno);
 }
 
 void enable_timer(void)
 {
-	struct itimerval enable = ((struct itimerval) { { 0, 1000000/hz() },
-							{ 0, 1000000/hz() }});
+	int usec = 1000000/hz();
+	struct itimerval enable = ((struct itimerval) { { 0, usec },
+							{ 0, usec }});
 	if(setitimer(ITIMER_VIRTUAL, &enable, NULL))
 		printk("enable_timer - setitimer failed, errno = %d\n",
 		       errno);
@@ -74,13 +73,6 @@ void idle_timer(void)
 	set_handler(SIGALRM, (__sighandler_t) alarm_handler, 
 		    SA_RESTART, SIGUSR1, SIGIO, SIGWINCH, SIGVTALRM, -1);
 	set_interval(ITIMER_REAL);
-}
-
-void user_time_init(void)
-{
-	if(signal(SIGVTALRM, (__sighandler_t) alarm_handler) == SIG_ERR)
-		panic("Couldn't set SIGVTALRM handler");
-	set_interval(ITIMER_VIRTUAL);
 }
 
 void time_init(void)
