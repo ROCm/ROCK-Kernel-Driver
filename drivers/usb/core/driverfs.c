@@ -99,6 +99,34 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 }
 static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
 
+static ssize_t
+show_speed (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_device *udev;
+	char *speed;
+
+	if (off)
+		return 0;
+	udev = to_usb_device (dev);
+
+	switch (udev->speed) {
+	case USB_SPEED_LOW:
+		speed = "1.5";
+		break;
+	case USB_SPEED_UNKNOWN:
+	case USB_SPEED_FULL:
+		speed = "12";
+		break;
+	case USB_SPEED_HIGH:
+		speed = "480";
+		break;
+	default:
+		speed = "unknown";
+	}
+	return sprintf (buf, "%s\n", speed);
+}
+static DEVICE_ATTR(speed, S_IRUGO, show_speed, NULL);
+
 /* Descriptor fields */
 #define usb_descriptor_attr(field, format_string)			\
 static ssize_t								\
@@ -136,6 +164,7 @@ void usb_create_driverfs_dev_files (struct usb_device *udev)
 	device_create_file (dev, &dev_attr_bDeviceClass);
 	device_create_file (dev, &dev_attr_bDeviceSubClass);
 	device_create_file (dev, &dev_attr_bDeviceProtocol);
+	device_create_file (dev, &dev_attr_speed);
 
 	if (udev->descriptor.iManufacturer)
 		device_create_file (dev, &dev_attr_manufacturer);

@@ -558,14 +558,6 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	 */
 	envp [i++] = scratch;
 	length += snprintf (scratch, buffer_size - length,
-			    "%s", "DEVFS=/proc/bus/usb");
-	if ((buffer_size - length <= 0) || (i >= num_envp))
-		return -ENOMEM;
-	++length;
-	scratch += length;
-
-	envp [i++] = scratch;
-	length += snprintf (scratch, buffer_size - length,
 			    "DEVICE=/proc/bus/usb/%03d/%03d",
 			    usb_dev->bus->busnum, usb_dev->devnum);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
