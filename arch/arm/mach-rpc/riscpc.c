@@ -15,6 +15,7 @@
 #include <linux/pm.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 
 #include <asm/elf.h>
 #include <asm/io.h>
@@ -83,6 +84,64 @@ static void __init rpc_map_io(void)
 	 */
 	elf_hwcap &= ~HWCAP_HALF;
 }
+
+static struct resource acornfb_resources[] = {
+	{	/* VIDC */
+		.start		= 0x03400000,
+		.end		= 0x035fffff,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= IRQ_VSYNCPULSE,
+		.end		= IRQ_VSYNCPULSE,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device acornfb_device = {
+	.name			= "acornfb",
+	.id			= -1,
+	.dev			= {
+		.coherent_dma_mask = 0xffffffff,
+	},
+	.num_resources		= ARRAY_SIZE(acornfb_resources),
+	.resource		= acornfb_resources,
+};
+
+static struct resource iomd_resources[] = {
+	{
+		.start		= 0x03200000,
+		.end		= 0x0320ffff,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device iomd_device = {
+	.name			= "iomd",
+	.id			= -1,
+	.num_resources		= ARRAY_SIZE(iomd_resources),
+	.resource		= iomd_resources,
+};
+
+static struct platform_device kbd_device = {
+	.name			= "kart",
+	.id			= -1,
+	.dev			= {
+		.parent 	= &iomd_device.dev,
+	},
+};
+
+static struct platform_device *devs[] __initdata = {
+	&iomd_device,
+	&kbd_device,
+	&acornfb_device,
+};
+
+static int __init rpc_init(void)
+{
+	return platform_add_devices(devs, ARRAY_SIZE(devs));
+}
+
+arch_initcall(rpc_init);
 
 extern struct sys_timer ioc_timer;
 
