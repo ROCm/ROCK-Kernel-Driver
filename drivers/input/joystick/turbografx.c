@@ -179,10 +179,10 @@ static struct tgfx __init *tgfx_probe(int *config)
 
 			tgfx->dev[i].name = tgfx_name;
 			tgfx->dev[i].phys = tgfx->phys[i];
-			tgfx->dev[i].idbus = BUS_PARPORT;
-			tgfx->dev[i].idvendor = 0x0003;
-			tgfx->dev[i].idproduct = config[i+1];
-			tgfx->dev[i].idversion = 0x0100;
+			tgfx->dev[i].id.bustype = BUS_PARPORT;
+			tgfx->dev[i].id.vendor = 0x0003;
+			tgfx->dev[i].id.product = config[i+1];
+			tgfx->dev[i].id.version = 0x0100;
 
 			tgfx->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			tgfx->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

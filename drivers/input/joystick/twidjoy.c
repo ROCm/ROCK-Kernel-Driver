@@ -198,10 +198,10 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 
 	twidjoy->dev.name = twidjoy_name;
 	twidjoy->dev.phys = twidjoy->phys;
-	twidjoy->dev.idbus = BUS_RS232;
-	twidjoy->dev.idvendor = SERIO_TWIDJOY;
-	twidjoy->dev.idproduct = 0x0001;
-	twidjoy->dev.idversion = 0x0100;
+	twidjoy->dev.id.bustype = BUS_RS232;
+	twidjoy->dev.id.vendor = SERIO_TWIDJOY;
+	twidjoy->dev.id.product = 0x0001;
+	twidjoy->dev.id.version = 0x0100;
 
 	twidjoy->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
 

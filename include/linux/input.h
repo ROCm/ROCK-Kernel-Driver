@@ -56,8 +56,15 @@ struct input_event {
  * IOCTLs (0x00 - 0x7f)
  */
 
+struct input_devinfo {
+	uint16_t bustype;
+	uint16_t vendor;
+	uint16_t product;
+	uint16_t version;
+};
+
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
-#define EVIOCGID		_IOR('E', 0x02, short[4])		/* get device ID */
+#define EVIOCGID		_IOR('E', 0x02, struct input_devinfo)	/* get device ID */
 #define EVIOCGREP		_IOR('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCSREP		_IOW('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
@@ -742,10 +749,7 @@ struct input_dev {
 	char *name;
 	char *phys;
 	char *uniq;
-	unsigned short idbus;
-	unsigned short idvendor;
-	unsigned short idproduct;
-	unsigned short idversion;
+	struct input_devinfo id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];
@@ -818,10 +822,7 @@ struct input_device_id {
 
 	unsigned long flags;
 
-	unsigned short idbus;
-	unsigned short idvendor;
-	unsigned short idproduct;
-	unsigned short idversion;
+	struct input_devinfo id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];

@@ -134,10 +134,10 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 	gunze->dev.private = gunze;
 	gunze->dev.name = gunze_name;
 	gunze->dev.phys = gunze->phys;
-	gunze->dev.idbus = BUS_RS232;
-	gunze->dev.idvendor = SERIO_GUNZE;
-	gunze->dev.idproduct = 0x0051;
-	gunze->dev.idversion = 0x0100;
+	gunze->dev.id.bustype = BUS_RS232;
+	gunze->dev.id.vendor = SERIO_GUNZE;
+	gunze->dev.id.product = 0x0051;
+	gunze->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
 		kfree(gunze);

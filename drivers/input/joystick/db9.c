@@ -351,10 +351,10 @@ static struct db9 __init *db9_probe(int *config)
 
 		db9->dev[i].name = db9_name[db9->mode];
 		db9->dev[i].phys = db9->phys[i];
-		db9->dev[i].idbus = BUS_PARPORT;
-		db9->dev[i].idvendor = 0x0002;
-		db9->dev[i].idproduct = config[1];
-		db9->dev[i].idversion = 0x0100;
+		db9->dev[i].id.bustype = BUS_PARPORT;
+		db9->dev[i].id.vendor = 0x0002;
+		db9->dev[i].id.product = config[1];
+		db9->dev[i].id.version = 0x0100;
 
 		db9->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 		db9->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

@@ -162,10 +162,10 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 
 	strncpy(dev->name, user_dev.name, size);
 	dev->name[size] = '\0';
-	dev->idbus 	= user_dev.idbus;
-	dev->idvendor 	= user_dev.idvendor;
-	dev->idproduct 	= user_dev.idproduct;
-	dev->idversion 	= user_dev.idversion;
+	dev->id.bustype	= user_dev.id.bustype;
+	dev->id.vendor	= user_dev.id.vendor;
+	dev->id.product	= user_dev.id.product;
+	dev->id.version	= user_dev.id.version;
 	dev->ff_effects_max = user_dev.ff_effects_max;
 
 	size = sizeof(unsigned long) * NBITS(ABS_MAX + 1);

@@ -222,10 +222,10 @@ static void guillemot_connect(struct gameport *gameport, struct gameport_dev *de
 
 	guillemot->dev.name = guillemot_type[i].name;
 	guillemot->dev.phys = guillemot->phys;
-	guillemot->dev.idbus = BUS_GAMEPORT;
-	guillemot->dev.idvendor = GAMEPORT_ID_VENDOR_GUILLEMOT;
-	guillemot->dev.idproduct = guillemot_type[i].id;
-	guillemot->dev.idversion = (int)data[14] << 8 | data[15];
+	guillemot->dev.id.bustype = BUS_GAMEPORT;
+	guillemot->dev.id.vendor = GAMEPORT_ID_VENDOR_GUILLEMOT;
+	guillemot->dev.id.product = guillemot_type[i].id;
+	guillemot->dev.id.version = (int)data[14] << 8 | data[15];
 
 	guillemot->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 

@@ -336,10 +336,10 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 		a3d->adc.name = a3d_names[a3d->mode];
 		a3d->adc.phys = a3d->adcphys;
-		a3d->adc.idbus = BUS_GAMEPORT;
-		a3d->adc.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
-		a3d->adc.idproduct = a3d->mode;
-		a3d->adc.idversion = 0x0100;
+		a3d->adc.id.bustype = BUS_GAMEPORT;
+		a3d->adc.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
+		a3d->adc.id.product = a3d->mode;
+		a3d->adc.id.version = 0x0100;
 
 		a3d_read(a3d, data);
 
@@ -353,10 +353,10 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	a3d->dev.name = a3d_names[a3d->mode];
 	a3d->dev.phys = a3d->phys;
-	a3d->dev.idbus = BUS_GAMEPORT;
-	a3d->dev.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
-	a3d->dev.idproduct = a3d->mode;
-	a3d->dev.idversion = 0x0100;
+	a3d->dev.id.bustype = BUS_GAMEPORT;
+	a3d->dev.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
+	a3d->dev.id.product = a3d->mode;
+	a3d->dev.id.version = 0x0100;
 
 	input_register_device(&a3d->dev);
 	printk(KERN_INFO "input: %s on %s\n", a3d_names[a3d->mode], a3d->phys);

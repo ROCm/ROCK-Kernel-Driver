@@ -277,10 +277,10 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 	aiptek->dev.close = aiptek_close;
 
 	aiptek->dev.name = aiptek->features->name;
-	aiptek->dev.idbus = BUS_USB;
-	aiptek->dev.idvendor = dev->descriptor.idVendor;
-	aiptek->dev.idproduct = dev->descriptor.idProduct;
-	aiptek->dev.idversion = dev->descriptor.bcdDevice;
+	aiptek->dev.id.bustype = BUS_USB;
+	aiptek->dev.id.vendor = dev->descriptor.idVendor;
+	aiptek->dev.id.product = dev->descriptor.idProduct;
+	aiptek->dev.id.version = dev->descriptor.bcdDevice;
 	aiptek->usbdev = dev;
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;

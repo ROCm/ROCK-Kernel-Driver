@@ -134,10 +134,10 @@ static int __init amijoy_init(void)
 
 			amijoy->dev[i].name = amijoy_name;
 			amijoy->dev[i].phys = amijoy_phys[i];
-			amijoy->dev[i].idbus = BUS_AMIGA;
-			amijoy->dev[i].idvendor = 0x0001;
-			amijoy->dev[i].idproduct = 0x0003;
-			amijoy->dev[i].version = 0x0100;
+			amijoy->dev[i].id.bustype = BUS_AMIGA;
+			amijoy->dev[i].id.vendor = 0x0001;
+			amijoy->dev[i].id.product = 0x0003;
+			amijoy->dev[i].id.version = 0x0100;
 
 			amijoy_dev[i].private = amijoy_used + i;
 

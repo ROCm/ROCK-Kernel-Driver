@@ -291,9 +291,9 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 
 	port->name = name;
 	port->phys = phys;
-	port->idbus = BUS_PCI;
-	port->idvendor = pdev->vendor;
-	port->idproduct = pdev->device;
+	port->id.bustype = BUS_PCI;
+	port->id.vendor = pdev->vendor;
+	port->id.product = pdev->device;
 
 	cs461x_pokeBA0(BA0_JSIO, 0xFF); // ?
 	cs461x_pokeBA0(BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);

@@ -152,10 +152,10 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 
 	stinger->dev.name = stinger_name;
 	stinger->dev.phys = stinger->phys;
-	stinger->dev.idbus = BUS_RS232;
-	stinger->dev.idvendor = SERIO_STINGER;
-	stinger->dev.idproduct = 0x0001;
-	stinger->dev.idversion = 0x0100;
+	stinger->dev.id.bustype = BUS_RS232;
+	stinger->dev.id.vendor = SERIO_STINGER;
+	stinger->dev.id.product = 0x0001;
+	stinger->dev.id.version = 0x0100;
 
 	for (i = 0; i < 2; i++) {
 		stinger->dev.absmax[ABS_X+i] =  64;	

@@ -156,10 +156,10 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	warrior->dev.name = warrior_name;
 	warrior->dev.phys = warrior->phys;
-	warrior->dev.idbus = BUS_RS232;
-	warrior->dev.idvendor = SERIO_WARRIOR;
-	warrior->dev.idproduct = 0x0001;
-	warrior->dev.idversion = 0x0100;
+	warrior->dev.id.bustype = BUS_RS232;
+	warrior->dev.id.vendor = SERIO_WARRIOR;
+	warrior->dev.id.product = 0x0001;
+	warrior->dev.id.version = 0x0100;
 
 	for (i = 0; i < 2; i++) {
 		warrior->dev.absmax[ABS_X+i] = -64;	

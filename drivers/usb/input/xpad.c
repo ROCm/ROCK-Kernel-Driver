@@ -227,10 +227,10 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	
 	xpad->udev = udev;
 	
-	xpad->dev.idbus = BUS_USB;
-	xpad->dev.idvendor = udev->descriptor.idVendor;
-	xpad->dev.idproduct = udev->descriptor.idProduct;
-	xpad->dev.idversion = udev->descriptor.bcdDevice;
+	xpad->dev.id.bustype = BUS_USB;
+	xpad->dev.id.vendor = udev->descriptor.idVendor;
+	xpad->dev.id.product = udev->descriptor.idProduct;
+	xpad->dev.id.version = udev->descriptor.bcdDevice;
 	xpad->dev.private = xpad;
 	xpad->dev.name = xpad_device[i].name;
 	xpad->dev.phys = xpad->phys;

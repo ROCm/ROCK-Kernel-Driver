@@ -129,9 +129,9 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 
 	vortex->gameport.name = dev->name;
 	vortex->gameport.phys = vortex->phys;
-	vortex->gameport.idbus = BUS_PCI;
-	vortex->gameport.idvendor = dev->vendor;
-	vortex->gameport.idproduct = dev->device;
+	vortex->gameport.id.bustype = BUS_PCI;
+	vortex->gameport.id.vendor = dev->vendor;
+	vortex->gameport.id.product = dev->device;
 
 	for (i = 0; i < 6; i++)
 		if (~pci_resource_flags(dev, i) & IORESOURCE_IO)

@@ -199,10 +199,10 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 			cobra->dev[i].name = cobra_name;
 			cobra->dev[i].phys = cobra->phys[i];
-			cobra->dev[i].idbus = BUS_GAMEPORT;
-			cobra->dev[i].idvendor = GAMEPORT_ID_VENDOR_CREATIVE;
-			cobra->dev[i].idproduct = 0x0008;
-			cobra->dev[i].idversion = 0x0100;
+			cobra->dev[i].id.bustype = BUS_GAMEPORT;
+			cobra->dev[i].id.vendor = GAMEPORT_ID_VENDOR_CREATIVE;
+			cobra->dev[i].id.product = 0x0008;
+			cobra->dev[i].id.version = 0x0100;
 		
 			cobra->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			cobra->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

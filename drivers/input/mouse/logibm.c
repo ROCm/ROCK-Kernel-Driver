@@ -105,10 +105,6 @@ static struct input_dev logibm_dev = {
 	close:		logibm_close,
 	name:		"Logitech bus mouse",
 	phys:		"isa023c/input0",
-	idbus:		BUS_ISA,
-	idvendor:	0x0003,
-	idproduct:	0x0001,
-	idversion:	0x0100,
 };
 
 static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -166,6 +162,10 @@ static int __init logibm_init(void)
 	outb(LOGIBM_DISABLE_IRQ, LOGIBM_CONTROL_PORT);
 
 	input_register_device(&logibm_dev);
+	logibm_dev.id.bustype	= BUS_ISA;
+	logibm_dev.id.vendor	= 0x0003;
+	logibm_dev.id.product	= 0x0001;
+	logibm_dev.id.version	= 0x0100;
 
 	printk(KERN_INFO "input: Logitech bus mouse at %#x irq %d\n", LOGIBM_BASE, logibm_irq);
 

@@ -110,10 +110,10 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	nkbd->dev.name = nkbd_name;
 	nkbd->dev.phys = nkbd->phys;
-	nkbd->dev.idbus = BUS_RS232;
-	nkbd->dev.idvendor = SERIO_NEWTON;
-	nkbd->dev.idproduct = 0x0001;
-	nkbd->dev.idversion = 0x0100;
+	nkbd->dev.id.bustype = BUS_RS232;
+	nkbd->dev.id.vendor = SERIO_NEWTON;
+	nkbd->dev.id.product = 0x0001;
+	nkbd->dev.id.version = 0x0100;
 
 	input_register_device(&nkbd->dev);
 

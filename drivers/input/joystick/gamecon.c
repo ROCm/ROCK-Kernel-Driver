@@ -593,10 +593,10 @@ static struct gc __init *gc_probe(int *config)
 		
                 gc->dev[i].name = gc_names[config[i + 1]];
 		gc->dev[i].phys = gc->phys[i];
-                gc->dev[i].idbus = BUS_PARPORT;
-                gc->dev[i].idvendor = 0x0001;
-                gc->dev[i].idproduct = config[i + 1];
-                gc->dev[i].idversion = 0x0100;
+                gc->dev[i].id.bustype = BUS_PARPORT;
+                gc->dev[i].id.vendor = 0x0001;
+                gc->dev[i].id.product = config[i + 1];
+                gc->dev[i].id.version = 0x0100;
 	}
 
 	parport_release(gc->pd);

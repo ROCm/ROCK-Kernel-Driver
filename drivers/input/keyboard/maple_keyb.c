@@ -132,7 +132,7 @@ static int dc_kbd_connect(struct maple_device *dev)
 	kbd->dev.event = NULL;
 
 	kbd->dev.name = dev->product_name;
-	kbd->dev.idbus = BUS_MAPLE;
+	kbd->dev.id.bustype = BUS_MAPLE;
 	
 	input_register_device(&kbd->dev);
 

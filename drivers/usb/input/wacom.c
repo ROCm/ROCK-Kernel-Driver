@@ -400,10 +400,10 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	wacom->dev.name = wacom->features->name;
 	wacom->dev.phys = wacom->phys;
-	wacom->dev.idbus = BUS_USB;
-	wacom->dev.idvendor = dev->descriptor.idVendor;
-	wacom->dev.idproduct = dev->descriptor.idProduct;
-	wacom->dev.idversion = dev->descriptor.bcdDevice;
+	wacom->dev.id.bustype = BUS_USB;
+	wacom->dev.id.vendor = dev->descriptor.idVendor;
+	wacom->dev.id.product = dev->descriptor.idProduct;
+	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->usbdev = dev;
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;

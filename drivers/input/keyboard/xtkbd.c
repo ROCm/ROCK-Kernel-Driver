@@ -118,10 +118,10 @@ void xtkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	xtkbd->dev.name = xtkbd_name;
 	xtkbd->dev.phys = xtkbd->phys;
-	xtkbd->dev.idbus = BUS_XTKBD;
-	xtkbd->dev.idvendor = 0x0001;
-	xtkbd->dev.idproduct = 0x0001;
-	xtkbd->dev.idversion = 0x0100;
+	xtkbd->dev.id.bustype = BUS_XTKBD;
+	xtkbd->dev.id.vendor = 0x0001;
+	xtkbd->dev.id.product = 0x0001;
+	xtkbd->dev.id.version = 0x0100;
 
 	input_register_device(&xtkbd->dev);
 

@@ -496,10 +496,10 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	atkbd->dev.name = atkbd->name;
 	atkbd->dev.phys = atkbd->phys;
-	atkbd->dev.idbus = BUS_I8042;
-	atkbd->dev.idvendor = 0x0001;
-	atkbd->dev.idproduct = atkbd->set;
-	atkbd->dev.idversion = atkbd->id;
+	atkbd->dev.id.bustype = BUS_I8042;
+	atkbd->dev.id.vendor = 0x0001;
+	atkbd->dev.id.product = atkbd->set;
+	atkbd->dev.id.version = atkbd->id;
 
 	for (i = 0; i < 512; i++)
 		if (atkbd->keycode[i] && atkbd->keycode[i] <= 250)

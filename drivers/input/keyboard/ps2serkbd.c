@@ -246,10 +246,10 @@ static void ps2serkbd_connect(struct serio *serio, struct serio_dev *dev)
 
     ps2serkbd->dev.name = ps2serkbd->name;
     ps2serkbd->dev.phys = ps2serkbd->phys;
-    ps2serkbd->dev.idbus = BUS_RS232; 
-    ps2serkbd->dev.idvendor = SERIO_PS2SER;
-    ps2serkbd->dev.idproduct = ps2serkbd->set;
-    ps2serkbd->dev.idversion = ps2serkbd->id;
+    ps2serkbd->dev.id.bustype = BUS_RS232; 
+    ps2serkbd->dev.id.vendor = SERIO_PS2SER;
+    ps2serkbd->dev.id.product = ps2serkbd->set;
+    ps2serkbd->dev.id.version = ps2serkbd->id;
 
     for (i = 0; i < 512; i++)
         if (ps2serkbd->keycode[i] && ps2serkbd->keycode[i] <= 250)

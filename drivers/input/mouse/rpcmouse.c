@@ -40,10 +40,6 @@ static struct input_dev rpcmouse_dev = {
 	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
 	name:		"Acorn RiscPC Mouse",
 	phys:		"rpcmouse/input0",
-	idbus:		BUS_HOST,
-	idvendor:	0x0005,
-	idproduct:	0x0001,
-	idversion:	0x0100,
 };
 
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
@@ -79,6 +75,11 @@ static int __init rpcmouse_init(void)
 	}
 
 	input_register_device(&rpcmouse_dev);
+	rpcmouse.id.bustype	=BUS_HOST,
+	rpcmouse.id.vendor	=0x0005,
+	rpcmouse.id.product	=0x0001,
+	rpcmouse.id.version	=0x0100,
+
 	printk(KERN_INFO "input: Acorn RiscPC mouse irq %d", IRQ_VSYNCPULSE);
 
 	return 0;
