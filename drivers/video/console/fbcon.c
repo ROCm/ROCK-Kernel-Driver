@@ -81,10 +81,6 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#ifdef CONFIG_AMIGA
-#include <asm/amigahw.h>
-#include <asm/amigaints.h>
-#endif				/* CONFIG_AMIGA */
 #ifdef CONFIG_ATARI
 #include <asm/atariints.h>
 #endif
@@ -137,7 +133,6 @@ static int fbcon_set_origin(struct vc_data *);
 
 /* # VBL ints between cursor state changes */
 #define ARM_CURSOR_BLINK_RATE		(10)
-#define AMIGA_CURSOR_BLINK_RATE		(20)
 #define ATARI_CURSOR_BLINK_RATE		(42)
 #define MAC_CURSOR_BLINK_RATE		(32)
 #define DEFAULT_CURSOR_BLINK_RATE	(20)
@@ -585,13 +580,6 @@ static const char *fbcon_startup(void)
 
 	info->display_fg = vc;
 	
-#ifdef CONFIG_AMIGA
-	if (MACH_IS_AMIGA) {
-		cursor_blink_rate = AMIGA_CURSOR_BLINK_RATE;
-		irqres = request_irq(IRQ_AMIGA_VERTB, fb_vbl_handler, 0,
-				     "framebuffer vbl", info);
-	}
-#endif				/* CONFIG_AMIGA */
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI) {
 		cursor_blink_rate = ATARI_CURSOR_BLINK_RATE;
