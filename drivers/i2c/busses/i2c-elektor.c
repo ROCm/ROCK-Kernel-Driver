@@ -180,11 +180,10 @@ static int __init i2c_pcfisa_init(void)
 	/* check to see we have memory mapped PCF8584 connected to the 
 	Cypress cy82c693 PCI-ISA bridge as on UP2000 board */
 	if (base == 0) {
+		struct pci_dev *cy693_dev;
 		
-		struct pci_dev *cy693_dev =
-                    pci_find_device(PCI_VENDOR_ID_CONTAQ, 
-		                    PCI_DEVICE_ID_CONTAQ_82C693, NULL);
-
+		cy693_dev = pci_get_device(PCI_VENDOR_ID_CONTAQ, 
+					   PCI_DEVICE_ID_CONTAQ_82C693, NULL);
 		if (cy693_dev) {
 			char config;
 			/* yeap, we've found cypress, let's check config */
@@ -215,6 +214,7 @@ static int __init i2c_pcfisa_init(void)
 					printk(KERN_INFO "i2c-elektor: found API UP2000 like board, will probe PCF8584 later.\n");
 				}
 			}
+			pci_dev_put(cy693_dev);
 		}
 	}
 #endif
