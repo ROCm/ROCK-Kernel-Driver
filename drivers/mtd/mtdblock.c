@@ -394,8 +394,8 @@ static void handle_mtdblock_request(void)
 
 	while (!blk_queue_empty(&mtd_queue)) {
 		struct request *req = elv_next_request(&mtd_queue);
-		spin_unlock_irq(mtd_queue.queue_lock);
 		struct mtdblk_dev **p = req->rq_disk->private_data;
+		spin_unlock_irq(mtd_queue.queue_lock);
 		mtdblk = *p;
 		res = 0;
 
