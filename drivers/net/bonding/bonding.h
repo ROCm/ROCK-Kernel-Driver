@@ -9,7 +9,7 @@
  *
  *	This software may be used and distributed according to the terms
  *	of the GNU Public License, incorporated herein by reference.
- * 
+ *
  *
  * 2003/03/18 - Amir Noam <amir.noam at intel dot com>,
  *		Tsippy Mendelson <tsippy.mendelson at intel dot com> and
@@ -23,7 +23,7 @@
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Added support for Transmit load balancing mode.
  */
- 
+
 #ifndef _LINUX_BONDING_H
 #define _LINUX_BONDING_H
 
@@ -52,7 +52,7 @@
 
 /*
  * Checks whether bond is ready for transmit.
- * 
+ *
  * Caller must hold bond->lock
  */
 #define BOND_IS_OK(bond)			     \

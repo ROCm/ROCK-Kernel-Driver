@@ -1060,7 +1060,7 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
  *
  * For each slave, this function sets the interface to the new address and then
  * changes its dev_addr field to its previous value.
- * 
+ *
  * Unwinding assumes bond's mac address has not yet changed.
  */
 static int alb_set_mac_address(struct bonding *bond, void *addr)

@@ -1,7 +1,7 @@
 /*
  * Bond several ethernet interfaces into a Cisco, running 'Etherchannel'.
  *
- * 
+ *
  * Portions are (c) Copyright 1995 Simon "Guru Aleph-Null" Janes
  * NCM: Network and Communications Management, Inc.
  *
@@ -10,11 +10,11 @@
  *
  *	This software may be used and distributed according to the terms
  *	of the GNU Public License, incorporated herein by reference.
- * 
+ *
  * 2003/03/18 - Amir Noam <amir.noam at intel dot com>
  *	- Added support for getting slave's speed and duplex via ethtool.
  *	  Needed for 802.3ad and other future modes.
- * 
+ *
  * 2003/03/18 - Tsippy Mendelson <tsippy.mendelson at intel dot com> and
  *		Shmulik Hen <shmulik.hen at intel dot com>
  *	- Enable support of modes that need to use the unique mac address of
