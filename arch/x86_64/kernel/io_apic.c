@@ -176,14 +176,79 @@ static void clear_IO_APIC (void)
 int pirq_entries [MAX_PIRQS];
 int pirqs_enabled;
 int skip_ioapic_setup;
+int ioapic_force;
 
-static int __init ioapic_setup(char *str)
+/* dummy parsing: see setup.c */
+
+static int __init disable_ioapic_setup(char *str)
 {
 	skip_ioapic_setup = 1;
 	return 1;
 }
 
-__setup("noapic", ioapic_setup);
+static int __init enable_ioapic_setup(char *str)
+{
+	ioapic_force = 1;
+	skip_ioapic_setup = 0;
+	return 1;
+}
+
+__setup("noapic", disable_ioapic_setup);
+__setup("apic", enable_ioapic_setup);
+
+#ifndef CONFIG_SMP
+#include <asm/pci-direct.h>
+#include <linux/pci_ids.h>
+#include <linux/pci.h>
+
+/* Temporary Hack. Nvidia and VIA boards currently only work with IO-APIC
+   off. Check for an Nvidia or VIA PCI bridge and turn it off.
+   Use pci direct infrastructure because this runs before the PCI subsystem. 
+
+   Can be overwritten with "apic" */
+void __init check_ioapic(void) 
+{ 
+	int num,slot,func; 
+	if (ioapic_force) 
+		return; 
+
+	/* Poor man's PCI discovery */
+	for (num = 0; num < 32; num++) { 
+		for (slot = 0; slot < 32; slot++) { 
+			for (func = 0; func < 8; func++) { 
+				u32 class;
+				u32 vendor;
+				class = read_pci_config(num,slot,func,
+							PCI_CLASS_REVISION);
+				if (class == 0xffffffff)
+					break; 
+
+		       		if ((class >> 16) != PCI_CLASS_BRIDGE_PCI)
+					continue; 
+
+				vendor = read_pci_config(num, slot, func, 
+							 PCI_VENDOR_ID);
+				vendor &= 0xffff;
+				switch (vendor) { 
+				case PCI_VENDOR_ID_NVIDIA: 
+				case PCI_VENDOR_ID_VIA:
+					printk(KERN_INFO 
+     "PCI bridge %02x:%02x from %x found. Setting \"noapic\". Overwrite with \"apic\"\n",
+					       num,slot,vendor); 
+					skip_ioapic_setup = 1;
+					return;
+				} 
+
+				/* No multi-function device? */
+				u8 type = read_pci_config_byte(num,slot,func,
+							       PCI_HEADER_TYPE);
+				if (!(type & 0x80))
+					break;
+			} 
+		}
+	}
+} 
+#endif
 
 static int __init ioapic_pirq_setup(char *str)
 {

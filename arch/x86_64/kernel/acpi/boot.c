@@ -46,10 +46,8 @@
 #include <asm/proto.h>
 #include <asm/tlbflush.h>
 
-extern int acpi_disabled;
 int acpi_lapic = 0;
 int acpi_ioapic = 0;
-extern int disable_apic;
 
 #define PREFIX			"ACPI: "
 
@@ -316,7 +314,7 @@ acpi_boot_init (void)
 {
 	int			result = 0;
 
-	if (acpi_disabled)
+	if (acpi_disabled && !acpi_ht)
 		return 1;
 
 	/*
@@ -339,9 +337,10 @@ acpi_boot_init (void)
 		return result;
 	}
 
-	extern int disable_apic;
-	if (disable_apic)
+	if (disable_apic) { 
+		printk(KERN_INFO PREFIX "Skipping MADT probe because local APIC is disabled\n");
 		return 0;
+	}
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -423,7 +422,7 @@ acpi_boot_init (void)
 	/*
 	 * if "noapic" boot option, don't look for IO-APICs
 	 */
-	if (disable_apic) {
+	if (skip_ioapic_setup) {
 		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
 		       "due to 'noapic' option.\n");
 		return 1;
