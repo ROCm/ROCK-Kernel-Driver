@@ -49,11 +49,6 @@ extern void die_if_kernel(char *, struct pt_regs *, long);
 void bad_page_fault(struct pt_regs *, unsigned long);
 void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
 
-#ifdef CONFIG_PPCDBG
-extern unsigned long get_srr0(void);
-extern unsigned long get_srr1(void);
-#endif
-
 /*
  * For 600- and 800-family processors, the error_code parameter is DSISR
  * for a data fault, SRR1 for an instruction fault.
@@ -66,9 +61,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
 	unsigned long is_write = error_code & 0x02000000;
-	unsigned long mm_fault_return;
 
-	PPCDBG(PPCDBG_MM, "Entering do_page_fault: addr = 0x%16.16lx, error_code = %lx\n\tregs_trap = %lx, srr0 = %lx, srr1 = %lx\n", address, error_code, regs->trap, get_srr0(), get_srr1());
 	/*
 	 * Fortunately the bit assignments in SRR1 for an instruction
 	 * fault and DSISR for a data fault are mostly the same for the
@@ -98,23 +91,16 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
-	PPCDBG(PPCDBG_MM, "\tdo_page_fault: vma = 0x%16.16lx\n", vma);
-	if (!vma) {
-	        PPCDBG(PPCDBG_MM, "\tdo_page_fault: !vma\n");
+	if (!vma)
 		goto bad_area;
-	}
-	PPCDBG(PPCDBG_MM, "\tdo_page_fault: vma->vm_start = 0x%16.16lx, vma->vm_flags = 0x%16.16lx\n", vma->vm_start, vma->vm_flags);
+
 	if (vma->vm_start <= address) {
 		goto good_area;
 	}
-	if (!(vma->vm_flags & VM_GROWSDOWN)) {
-		PPCDBG(PPCDBG_MM, "\tdo_page_fault: vma->vm_flags = %lx, %lx\n", vma->vm_flags, VM_GROWSDOWN);
+	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
-	}
-	if (expand_stack(vma, address)) {
-		PPCDBG(PPCDBG_MM, "\tdo_page_fault: expand_stack\n");
+	if (expand_stack(vma, address))
 		goto bad_area;
-	}
 
 good_area:
 	code = SEGV_ACCERR;
@@ -132,16 +118,14 @@ good_area:
 			goto bad_area;
 	}
 
+ survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	PPCDBG(PPCDBG_MM, "\tdo_page_fault: calling handle_mm_fault\n");
-        mm_fault_return = handle_mm_fault(mm, vma, address, is_write);
-	PPCDBG(PPCDBG_MM, "\tdo_page_fault: handle_mm_fault = 0x%lx\n", 
-	       mm_fault_return);
-        switch(mm_fault_return) {
+        switch (handle_mm_fault(mm, vma, address, is_write)) {
+
         case 1:
                 current->min_flt++;
                 break;
@@ -166,7 +150,6 @@ bad_area:
 		info.si_errno = 0;
 		info.si_code = code;
 		info.si_addr = (void *) address;
-		PPCDBG(PPCDBG_SIGNAL, "Bad addr in user: 0x%lx\n", address);
 #ifdef CONFIG_XMON
 	        ifppcdebug(PPCDBG_SIGNALXMON)
         	    PPCDBG_ENTER_DEBUGGER_REGS(regs);
@@ -185,6 +168,11 @@ bad_area:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (current->pid == 1) {
+		yield();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
