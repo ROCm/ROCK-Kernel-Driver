@@ -476,7 +476,7 @@ struct uhci_proc {
 
 static int uhci_proc_open(struct inode *inode, struct file *file)
 {
-	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(inode);
 	struct uhci *uhci = dp->data;
 	struct uhci_proc *up;
 	unsigned long flags;

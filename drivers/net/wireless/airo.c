@@ -2280,7 +2280,7 @@ static ssize_t proc_write( struct file *file,
 
 static int proc_status_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *apriv = (struct airo_info *)dev->priv;
 	CapabilityRid cap_rid;
@@ -2288,8 +2288,6 @@ static int proc_status_open( struct inode *inode, struct file *file ) {
 	int i;
 
 	MOD_INC_USE_COUNT;
-
-	dp = inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -2364,16 +2362,13 @@ static int proc_stats_rid_open( struct inode *inode,
 				struct file *file,
 				u16 rid ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *apriv = (struct airo_info *)dev->priv;
 	StatsRid stats;
 	int i, j;
 	int *vals = stats.vals;
 	MOD_INC_USE_COUNT;
-
-
-	dp = inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -2433,7 +2428,7 @@ static void checkThrottle(ConfigRid *config) {
 
 static void proc_config_on_close( struct inode *inode, struct file *file ) {
 	struct proc_data *data = file->private_data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	ConfigRid config;
@@ -2442,7 +2437,6 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 	int need_reset = 0;
 
 	if ( !data->writelen ) return;
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	disable_MAC(ai);
 	readConfigRid(ai, &config);
@@ -2629,15 +2623,13 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 
 static int proc_config_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	ConfigRid config;
 	int i;
 
 	MOD_INC_USE_COUNT;
-
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -2723,7 +2715,7 @@ static int proc_config_open( struct inode *inode, struct file *file ) {
 
 static void proc_SSID_on_close( struct inode *inode, struct file *file ) {
 	struct proc_data *data = (struct proc_data *)file->private_data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	SsidRid SSID_rid;
@@ -2759,7 +2751,7 @@ inline static u8 hexVal(char c) {
 
 static void proc_APList_on_close( struct inode *inode, struct file *file ) {
 	struct proc_data *data = (struct proc_data *)file->private_data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	APListRid APList_rid;
@@ -2852,7 +2844,7 @@ static int set_wep_key(struct airo_info *ai, u16 index,
 
 static void proc_wepkey_on_close( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	int i;
@@ -2862,7 +2854,6 @@ static void proc_wepkey_on_close( struct inode *inode, struct file *file ) {
 
 	memset(key, 0, sizeof(key));
 
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 	data = (struct proc_data *)file->private_data;
 	if ( !data->writelen ) return;
 
@@ -2894,7 +2885,7 @@ static void proc_wepkey_on_close( struct inode *inode, struct file *file ) {
 
 static int proc_wepkey_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	char *ptr;
@@ -2904,8 +2895,6 @@ static int proc_wepkey_open( struct inode *inode, struct file *file ) {
 	int rc;
 
 	MOD_INC_USE_COUNT;
-
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -2948,7 +2937,7 @@ static int proc_wepkey_open( struct inode *inode, struct file *file ) {
 
 static int proc_SSID_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	int i;
@@ -2956,8 +2945,6 @@ static int proc_SSID_open( struct inode *inode, struct file *file ) {
 	SsidRid SSID_rid;
 
 	MOD_INC_USE_COUNT;
-
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -2996,7 +2983,7 @@ static int proc_SSID_open( struct inode *inode, struct file *file ) {
 
 static int proc_APList_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	int i;
@@ -3004,8 +2991,6 @@ static int proc_APList_open( struct inode *inode, struct file *file ) {
 	APListRid APList_rid;
 
 	MOD_INC_USE_COUNT;
-
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -3048,7 +3033,7 @@ static int proc_APList_open( struct inode *inode, struct file *file ) {
 
 static int proc_BSSList_open( struct inode *inode, struct file *file ) {
 	struct proc_data *data;
-	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	char *ptr;
@@ -3058,8 +3043,6 @@ static int proc_BSSList_open( struct inode *inode, struct file *file ) {
 	int doLoseSync = -1;
 
 	MOD_INC_USE_COUNT;
-
-	dp = (struct proc_dir_entry *) inode->u.generic_ip;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;

@@ -25,9 +25,13 @@ struct proc_dir_entry *proc_sys_root;
 
 static DECLARE_FSTYPE(proc_fs_type, "proc", proc_read_super, FS_SINGLE);
 
+extern int __init proc_init_inodecache(void);
 void __init proc_root_init(void)
 {
-	int err = register_filesystem(&proc_fs_type);
+	int err = proc_init_inodecache();
+	if (err)
+		return;
+	err = register_filesystem(&proc_fs_type);
 	if (err)
 		return;
 	proc_mnt = kern_mount(&proc_fs_type);

@@ -45,7 +45,7 @@ static ssize_t
 proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = ino->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(ino);
 	struct pci_dev *dev = dp->data;
 	unsigned int pos = *ppos;
 	unsigned int cnt, size;
@@ -127,7 +127,7 @@ static ssize_t
 proc_bus_pci_write(struct file *file, const char *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = ino->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(ino);
 	struct pci_dev *dev = dp->data;
 	int pos = *ppos;
 	int cnt;
@@ -199,7 +199,7 @@ struct pci_filp_private {
 
 static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(inode);
 	struct pci_dev *dev = dp->data;
 #ifdef HAVE_PCI_MMAP
 	struct pci_filp_private *fpriv = file->private_data;
@@ -241,7 +241,7 @@ static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned i
 static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	const struct proc_dir_entry *dp = PDE(inode);
 	struct pci_dev *dev = dp->data;
 	struct pci_filp_private *fpriv = file->private_data;
 	int ret;

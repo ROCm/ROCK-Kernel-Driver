@@ -677,7 +677,7 @@ static ssize_t do_rw_proc(int write, struct file * file, char * buf,
 	size_t res;
 	ssize_t error;
 	
-	de = (struct proc_dir_entry*) file->f_dentry->d_inode->u.generic_ip;
+	de = PDE(file->f_dentry->d_inode);
 	if (!de || !de->data)
 		return -ENOTDIR;
 	table = (struct ctl_table *) de->data;

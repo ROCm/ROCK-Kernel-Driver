@@ -5618,7 +5618,7 @@ ov511_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	void *arg = (void *) ularg;
 	int rc;
 
-	pde = (struct proc_dir_entry *) inode->u.generic_ip;
+	pde = PDE(inode);
 	if (!pde)
 		return -ENOENT;
 
