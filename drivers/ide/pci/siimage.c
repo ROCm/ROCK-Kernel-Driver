@@ -35,13 +35,13 @@
 #include "siimage.h"
 
 #if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
 #include <linux/proc_fs.h>
 
 static u8 siimage_proc = 0;
 #define SIIMAGE_MAX_DEVS		16
 static struct pci_dev *siimage_devs[SIIMAGE_MAX_DEVS];
 static int n_siimage_devs;
+#endif /* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 /**
  *	pdev_is_sata		-	check if device is SATA
@@ -120,7 +120,8 @@ static inline unsigned long siimage_seldev(ide_drive_t *drive, int r)
 	base |= drive->select.b.unit << drive->select.b.unit;
 	return base;
 }
-	
+
+#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
 /**
  *	print_siimage_get_info	-	print minimal proc information
  *	@buf: buffer to write into (kernel space)
