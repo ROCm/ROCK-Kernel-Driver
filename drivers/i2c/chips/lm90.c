@@ -337,7 +337,6 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 				LM90_REG_R_CONFIG2) & 0xF8) == 0x00
 			   && reg_convrate <= 0x09))) {
 				kind = lm90;
-				name = "lm90";
 			}
 		}
 		else if (man_id == 0x41) { /* Analog Devices */
@@ -345,7 +344,6 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 			 && (kind == 0 /* skip detection */
 			  || (reg_config1 & 0x3F) == 0x00)) {
 				kind = adm1032;
-				name = "adm1032";
 			}
 		}
 
@@ -355,6 +353,12 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 			    "chip_id=0x%02X).\n", man_id, chip_id);
 			goto exit_free;
 		}
+	}
+
+	if (kind == lm90) {
+		name = "lm90";
+	} else if (kind == adm1032) {
+		name = "adm1032";
 	}
 
 	/* We can fill in the remaining client fields */

@@ -159,7 +159,6 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct w83l785ts_data *data;
 	int err = 0;
-	const char *name = "";
 
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
@@ -220,7 +219,6 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 		if (man_id == 0x5CA3) { /* Winbond */
 			if (chip_id == 0x70) { /* W83L785TS-S */
 				kind = w83l785ts;			
-				name = "w83l785ts";
 			}
 		}
 	
@@ -233,7 +231,7 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* We can fill in the remaining client fields. */
-	strlcpy(new_client->name, name, I2C_NAME_SIZE);
+	strlcpy(new_client->name, "w83l785ts", I2C_NAME_SIZE);
 	new_client->id = w83l785ts_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);

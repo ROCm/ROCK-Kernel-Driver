@@ -284,7 +284,6 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 		if (man_id == 0x01) { /* National Semiconductor */
 			if (chip_id == 0x03) {
 				kind = lm83;
-				name = "lm83";
 			}
 		}
 
@@ -294,6 +293,10 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 			    "chip_id=0x%02X).\n", man_id, chip_id);
 			goto exit_free;
 		}
+	}
+
+	if (kind == lm83) {
+		name = "lm83";
 	}
 
 	/* We can fill in the remaining client fields */

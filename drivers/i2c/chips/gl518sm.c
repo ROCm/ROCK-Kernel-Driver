@@ -345,7 +345,6 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct gl518_data *data;
 	int err = 0;
-	const char *name = "";
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA |
 				     I2C_FUNC_SMBUS_WORD_DATA))
@@ -385,10 +384,8 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 		i = gl518_read_value(new_client, GL518_REG_REVISION);
 		if (i == 0x00) {
 			kind = gl518sm_r00;
-			name = "gl518sm";
 		} else if (i == 0x80) {
 			kind = gl518sm_r80;
-			name = "gl518sm";
 		} else {
 			if (kind <= 0)
 				dev_info(&adapter->dev,
@@ -400,7 +397,7 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields */
-	strlcpy(new_client->name, name, I2C_NAME_SIZE);
+	strlcpy(new_client->name, "gl518sm", I2C_NAME_SIZE);
 	new_client->id = gl518_id++;
 	data->type = kind;
 	data->valid = 0;
