@@ -108,7 +108,7 @@ $(BOOT_TARGETS): vmlinux
 
 %_config: arch/ppc/configs/%_defconfig
 	rm -f .config arch/ppc/defconfig
-	cp -f arch/ppc/configs/$(@:config=defconfig) arch/ppc/defconfig
+	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
 	rm -f arch/ppc/kernel/{mk_defs,asm-offsets.h,find_name}

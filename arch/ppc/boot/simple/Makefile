@@ -122,22 +122,22 @@ endif
 OBJCOPY_ARGS			:= -O elf32-powerpc
 
 # head.o and ../common/relocate.o must be at the start.
-obj-y				:= head.o ../common/relocate.o $(HEADHELP) \
+boot-y				:= head.o ../common/relocate.o $(HEADHELP) \
 				$(MISC) ../common/misc-common.o \
 				../common/string.o ../common/util.o
-obj-$(CONFIG_4xx)		+= embed_config.o
-obj-$(CONFIG_8xx)		+= embed_config.o
-obj-$(CONFIG_8260)		+= embed_config.o
-obj-$(CONFIG_BSEIP)		+= iic.o
-obj-$(CONFIG_MBX)		+= iic.o pci.o qspan_pci.o
-obj-$(CONFIG_RPXCLASSIC)	+= iic.o pci.o qspan_pci.o
-obj-$(CONFIG_RPXLITE)		+= iic.o
+boot-$(CONFIG_4xx)		+= embed_config.o
+boot-$(CONFIG_8xx)		+= embed_config.o
+boot-$(CONFIG_8260)		+= embed_config.o
+boot-$(CONFIG_BSEIP)		+= iic.o
+boot-$(CONFIG_MBX)		+= iic.o pci.o qspan_pci.o
+boot-$(CONFIG_RPXCLASSIC)	+= iic.o pci.o qspan_pci.o
+boot-$(CONFIG_RPXLITE)		+= iic.o
 # Different boards need different serial implementations.
 ifeq ($(CONFIG_SERIAL_CONSOLE),y)
-obj-$(CONFIG_8xx)		+= m8xx_tty.o
-obj-$(CONFIG_8260)		+= m8260_tty.o
-obj-$(CONFIG_GT64260_CONSOLE)   += gt64260_tty.o
-obj-$(CONFIG_SERIAL)		+= ../common/ns16550.o
+boot-$(CONFIG_8xx)		+= m8xx_tty.o
+boot-$(CONFIG_8260)		+= m8260_tty.o
+boot-$(CONFIG_GT64260_CONSOLE)   += gt64260_tty.o
+boot-$(CONFIG_SERIAL)		+= ../common/ns16550.o
 endif
 
 LIBS				:= ../lib/zlib.a
@@ -147,16 +147,16 @@ MKBUGBOOT			:= ../utils/mkbugboot
 MKPREP				:= ../utils/mkprep
 MKTREE				:= ../utils/mktree
 
-zvmlinux: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o
+zvmlinux: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
 		--add-section=.image=../images/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
 		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(obj-y) image.o $(LIBS)
+	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr \
 		-R .ramdisk -R .sysmap
 
-zvmlinux.initrd: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz \
+zvmlinux.initrd: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz \
 		../common/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
 		--add-section=.ramdisk=../images/ramdisk.image.gz \
@@ -164,7 +164,7 @@ zvmlinux.initrd: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz \
 		--add-section=.image=../images/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
 		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(obj-y) image.o $(LIBS)
+	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr \
 		-R .sysmap
 

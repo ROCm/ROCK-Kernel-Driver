@@ -21,14 +21,14 @@ TFTPIMAGE			= $(TFTPBOOT).smp
 endif
 
 LD_ARGS				= -T ../ld.script -Ttext 0x00800000 -Bstatic
-obj-y				:= head.o ../simple/legacy.o misc.o of1275.o \
+boot-y				:= head.o ../simple/legacy.o misc.o of1275.o \
 					../common/util.o ../common/string.o \
 					../common/misc-common.o
 OBJCOPY_ARGS			= -O elf32-powerpc
 LIBS 				= ../lib/zlib.a
 
-obj-$(CONFIG_SERIAL_CONSOLE)	+= ../common/ns16550.o
-obj-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
+boot-$(CONFIG_SERIAL_CONSOLE)	+= ../common/ns16550.o
+boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
 # Tools
 MKPREP				:= ../utils/mkprep
@@ -40,18 +40,18 @@ CFLAGS_kbd.o			+= -I$(TOPDIR)/drivers/char
 
 all: zImage
 
-zImage: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o \
+zImage: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o \
 		$(MKPREP)
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=.image=../images/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
 		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(obj-y) image.o $(LIBS)
+	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr
 	$(MKPREP) -pbp $@ ../images/$@.prep
 	rm -f $@
 
-zImage.initrd: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz $(MKPREP) \
+zImage.initrd: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz $(MKPREP) \
 		../common/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=.ramdisk=../images/ramdisk.image.gz \
@@ -59,7 +59,7 @@ zImage.initrd: $(obj-y) $(LIBS) ../ld.script ../images/vmlinux.gz $(MKPREP) \
 		--add-section=.image=../images/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
 		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(obj-y) image.o $(LIBS)
+	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr
 	$(MKPREP) -pbp $@ ../images/$@.prep
 	rm -f $@
