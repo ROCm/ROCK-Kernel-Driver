@@ -581,6 +581,14 @@ UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
 		US_FL_MODE_XLATE ),
 #endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+/* SM part - aeb <Andries.Brouwer@cwi.nl> */
+UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
+		"Datafab Systems, Inc.",
+		"USB to CF + SM Combo (LC1)",
+		US_SC_SCSI, US_PR_SDDR55, NULL,
+		US_FL_SINGLE_LUN ),
+#endif
 
 /* Datafab KECF-USB / Sagatek DCS-CF / Simpletech Flashlink UCF-100
  * Only revision 1.13 tested (same for all of the above devices,
@@ -678,13 +686,6 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		0 ),
 #endif
 
-/* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
-UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
-		"USB",
-		"Solid state disk",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
 /* Submitted by Joris Struyve <joris@struyve.be> */
 UNUSUAL_DEV( 0x0d96, 0x410a, 0x0001, 0xffff,
 		"Medion",
@@ -701,6 +702,13 @@ UNUSUAL_DEV(  0x0d96, 0x5200, 0x0001, 0x0200,
 		"Jenoptik",
 		"JD 5200 z3",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+
+/* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
+UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
+		"USB",
+		"Solid state disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 		
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
