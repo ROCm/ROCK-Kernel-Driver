@@ -334,17 +334,6 @@ static __init int swab_apm_power_in_minutes(struct dmi_blacklist *d)
 }
 
 /*
- * ASUS K7V-RM has broken ACPI table defining sleep modes
- */
-
-static __init int broken_acpi_Sx(struct dmi_blacklist *d)
-{
-	printk(KERN_WARNING "Detected ASUS mainboard with broken ACPI sleep table\n");
-	dmi_broken |= BROKEN_ACPI_Sx;
-	return 0;
-}
-
-/*
  * Toshiba keyboard likes to repeat keys when they are not repeated.
  */
 
@@ -698,12 +687,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ local_apic_kills_bios, "ASUS L3C", {
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
 			MATCH(DMI_BOARD_NAME, "P4_L3C"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ broken_acpi_Sx, "ASUS K7V-RM", {		/* Bad ACPI Sx table */
-			MATCH(DMI_BIOS_VERSION,"ASUS K7V-RM ACPI BIOS Revision 1003A"),
-			MATCH(DMI_BOARD_NAME, "<K7V-RM>"),
 			NO_MATCH, NO_MATCH
 			} },
 
