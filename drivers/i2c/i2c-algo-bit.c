@@ -21,7 +21,7 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-algo-bit.c,v 1.34 2001/11/19 18:45:02 mds Exp $ */
+/* $Id: i2c-algo-bit.c,v 1.37 2002/07/08 00:41:49 mds Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -143,7 +143,7 @@ static void i2c_repstart(struct i2c_algo_bit_data *adap)
 	/* scl, sda may not be high */
 	DEBPROTO(printk(" Sr "));
 	setsda(adap,1);
-	setscl(adap,1);
+	sclhi(adap);
 	udelay(adap->udelay);
 	
 	sdalo(adap);
