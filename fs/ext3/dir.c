@@ -439,7 +439,7 @@ static int ext3_dx_readdir(struct file * filp,
 		filp->private_data = info;
 	}
 
-	if (filp->f_pos == -1)
+	if (filp->f_pos == EXT3_HTREE_EOF)
 		return 0;	/* EOF */
 
 	/* Some one has messed with f_pos; reset the world */
@@ -479,7 +479,7 @@ static int ext3_dx_readdir(struct file * filp,
 			if (ret < 0)
 				return ret;
 			if (ret == 0) {
-				filp->f_pos = -1;
+				filp->f_pos = EXT3_HTREE_EOF;
 				break;
 			}
 			info->curr_node = rb_first(&info->root);
@@ -494,7 +494,7 @@ static int ext3_dx_readdir(struct file * filp,
 		info->curr_node = rb_next(info->curr_node);
 		if (!info->curr_node) {
 			if (info->next_hash == ~0) {
-				filp->f_pos = -1;
+				filp->f_pos = EXT3_HTREE_EOF;
 				break;
 			}
 			info->curr_hash = info->next_hash;
