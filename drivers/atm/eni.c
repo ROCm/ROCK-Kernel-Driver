@@ -1100,9 +1100,9 @@ static enum enq_res do_tx(struct sk_buff *skb)
 	dma_rd = eni_in(MID_DMA_RD_TX);
 	dma_size = 3; /* JK for descriptor and final fill, plus final size
 			 mis-alignment fix */
-DPRINTK("iovcnt = %d\n",ATM_SKB(skb)->iovcnt);
-	if (!ATM_SKB(skb)->iovcnt) dma_size += 5;
-	else dma_size += 5*ATM_SKB(skb)->iovcnt;
+DPRINTK("iovcnt = %d\n",skb_shinfo(skb)->nr_frags);
+	if (!skb_shinfo(skb)->nr_frags) dma_size += 5;
+	else dma_size += 5*(skb_shinfo(skb)->nr_frags+1);
 	if (dma_size > TX_DMA_BUF) {
 		printk(KERN_CRIT DEV_LABEL "(itf %d): needs %d DMA entries "
 		    "(got only %d)\n",vcc->dev->number,dma_size,TX_DMA_BUF);
@@ -1123,15 +1123,20 @@ DPRINTK("iovcnt = %d\n",ATM_SKB(skb)->iovcnt);
 	     MID_DMA_COUNT_SHIFT) | (tx->index << MID_DMA_CHAN_SHIFT) |
 	     MID_DT_JK;
 	j++;
-	if (!ATM_SKB(skb)->iovcnt)
+	if (!skb_shinfo(skb)->nr_frags)
 		if (aal5) put_dma(tx->index,eni_dev->dma,&j,paddr,skb->len);
 		else put_dma(tx->index,eni_dev->dma,&j,paddr+4,skb->len-4);
 	else {
 DPRINTK("doing direct send\n"); /* @@@ well, this doesn't work anyway */
-		for (i = 0; i < ATM_SKB(skb)->iovcnt; i++)
-			put_dma(tx->index,eni_dev->dma,&j,(unsigned long)
-			    ((struct iovec *) skb->data)[i].iov_base,
-			    ((struct iovec *) skb->data)[i].iov_len);
+		for (i = -1; i < skb_shinfo(skb)->nr_frags; i++)
+			if (i == -1)
+				put_dma(tx->index,eni_dev->dma,&j,(unsigned long)
+				    skb->data,
+				    skb->len - skb->data_len);
+			else
+				put_dma(tx->index,eni_dev->dma,&j,(unsigned long)
+				    skb_shinfo(skb)->frags[i].page + skb_shinfo(skb)->frags[i].page_offset,
+				    skb_shinfo(skb)->frags[i].size);
 	}
 	if (skb->len & 3)
 		put_dma(tx->index,eni_dev->dma,&j,zeroes,4-(skb->len & 3));

@@ -223,6 +223,7 @@ void clip_push(struct atm_vcc *vcc,struct sk_buff *skb)
 	clip_vcc->last_use = jiffies;
 	PRIV(skb->dev)->stats.rx_packets++;
 	PRIV(skb->dev)->stats.rx_bytes += skb->len;
+	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
 	netif_rx(skb);
 }
 
@@ -432,7 +433,6 @@ static int clip_start_xmit(struct sk_buff *skb,struct net_device *dev)
 		((u16 *) here)[3] = skb->protocol;
 	}
 	atomic_add(skb->truesize,&vcc->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0;
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	entry->vccs->last_use = jiffies;
 	DPRINTK("atm_skb(%p)->vcc(%p)->dev(%p)\n",skb,vcc,vcc->dev);

@@ -355,10 +355,18 @@ struct he_dev {
 	struct he_dev *next;
 };
 
+struct he_iovec
+{
+	u32 iov_base;
+	u32 iov_len;
+};
+
+#define HE_MAXIOV 20
+
 struct he_vcc
 {
-	struct iovec iov_head[32];
-	struct iovec *iov_tail;
+	struct he_iovec iov_head[HE_MAXIOV];
+	struct he_iovec *iov_tail;
 	int pdu_len;
 
 	int rc_index;
