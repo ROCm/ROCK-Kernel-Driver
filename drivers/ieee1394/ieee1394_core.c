@@ -1009,7 +1009,6 @@ static int __init ieee1394_init(void)
 
 	bus_register(&ieee1394_bus_type);
 
-	init_hpsb_highlevel();
 	init_csr();
 
 	if (!disable_nodemgr)

@@ -10,6 +10,8 @@ struct hpsb_address_serve {
 
         struct hpsb_address_ops *op;
 
+	struct hpsb_host *host;
+
         /* first address handled and first address behind, quadlet aligned */
         u64 start, end;
 };
@@ -137,10 +139,11 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl);
  * It returns true for successful allocation.  There is no unregister function,
  * all address spaces are deallocated together with the hpsb_highlevel.
  */
-int hpsb_register_addrspace(struct hpsb_highlevel *hl,
+int hpsb_register_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
                             struct hpsb_address_ops *ops, u64 start, u64 end);
 
-int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start);
+int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
+                              u64 start);
 
 /*
  * Enable or disable receving a certain isochronous channel through the
@@ -179,6 +182,6 @@ int hpsb_set_hostinfo(struct hpsb_highlevel *hl, struct hpsb_host *host, void *d
 struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long key);
 
 /* Initialize the highlevel system */
-void init_hpsb_highlevel(void);
+void init_hpsb_highlevel(struct hpsb_host *host);
 
 #endif /* IEEE1394_HIGHLEVEL_H */

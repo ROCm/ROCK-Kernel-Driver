@@ -1696,7 +1696,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         }
-        retval = hpsb_register_addrspace(&raw1394_highlevel, &arm_ops, req->req.address,
+        retval = hpsb_register_addrspace(&raw1394_highlevel, fi->host, &arm_ops, req->req.address,
                 req->req.address + req->req.length);
         if (retval) {
                /* INSERT ENTRY */
@@ -1783,7 +1783,7 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         } 
-        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
+        retval = hpsb_unregister_addrspace(&raw1394_highlevel, fi->host, addr->start);
         if (!retval) {
                 printk(KERN_ERR "raw1394: arm_Unregister failed -> EINVAL\n");
                 spin_unlock_irqrestore(&host_info_lock, flags);
@@ -2551,7 +2551,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 }
                 if (!another_host) {
                         DBGMSG("raw1394_release: call hpsb_arm_unregister");
-                        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
+                        retval = hpsb_unregister_addrspace(&raw1394_highlevel, fi->host, addr->start);
                         if (!retval) {
                                 ++fail;
                                 printk(KERN_ERR "raw1394_release arm_Unregister failed\n");

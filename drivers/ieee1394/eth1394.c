@@ -168,6 +168,26 @@ static void ether1394_iso(struct hpsb_iso *iso);
 static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr);
 
+static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
+			   quadlet_t *data, u64 addr, size_t len, u16 flags);
+static void ether1394_add_host (struct hpsb_host *host);
+static void ether1394_remove_host (struct hpsb_host *host);
+static void ether1394_host_reset (struct hpsb_host *host);
+
+/* Function for incoming 1394 packets */
+static struct hpsb_address_ops addr_ops = {
+	.write =	ether1394_write,
+};
+
+/* Ieee1394 highlevel driver functions */
+static struct hpsb_highlevel eth1394_highlevel = {
+	.name =		driver_name,
+	.add_host =	ether1394_add_host,
+	.remove_host =	ether1394_remove_host,
+	.host_reset =	ether1394_host_reset,
+};
+
+
 static void eth1394_iso_shutdown(struct eth1394_priv *priv)
 {
 	priv->bc_state = ETHER1394_BC_CLOSED;
@@ -419,6 +439,10 @@ static void ether1394_add_host (struct hpsb_host *host)
 	struct net_device *dev = NULL;
 	struct eth1394_priv *priv;
 	static int version_printed = 0;
+
+	hpsb_register_addrspace(&eth1394_highlevel, host, &addr_ops,
+				ETHER1394_REGION_ADDR,
+				ETHER1394_REGION_ADDR_END);
 
 	if (version_printed++ == 0)
 		ETH1394_PRINT_G (KERN_INFO, "%s\n", version);
@@ -1619,18 +1643,6 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	return 0;
 }
 
-/* Function for incoming 1394 packets */
-static struct hpsb_address_ops addr_ops = {
-	.write =	ether1394_write,
-};
-
-/* Ieee1394 highlevel driver functions */
-static struct hpsb_highlevel eth1394_highlevel = {
-	.name =		driver_name,
-	.add_host =	ether1394_add_host,
-	.remove_host =	ether1394_remove_host,
-	.host_reset =	ether1394_host_reset,
-};
 
 static int __init ether1394_init_module (void)
 {
@@ -1639,9 +1651,6 @@ static int __init ether1394_init_module (void)
 
 	/* Register ourselves as a highlevel driver */
 	hpsb_register_highlevel(&eth1394_highlevel);
-
-	hpsb_register_addrspace(&eth1394_highlevel, &addr_ops, ETHER1394_REGION_ADDR,
-				 ETHER1394_REGION_ADDR_END);
 
 	return 0;
 }
