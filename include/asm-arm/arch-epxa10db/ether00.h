@@ -55,7 +55,7 @@ typedef struct buf_desc
 #define ETHER_ARC_SIZE         (21)
 
 /*
-*	Regsiter definitions and masks
+*	Register definitions and masks
 */
 #define ETHER_DMA_CTL(base)							(ETHER00_TYPE (base + 0x100))
 #define ETHER_DMA_CTL_DMBURST_OFST				(2)

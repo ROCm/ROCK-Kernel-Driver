@@ -13,7 +13,7 @@
  *
  * Since this file should be linked before any other machine specific file,
  * the __initcall() here will be executed first.  This serves as default
- * initialization stuff for PXA machines which can be overriden later if
+ * initialization stuff for PXA machines which can be overridden later if
  * need be.
  */
 #include <linux/config.h>

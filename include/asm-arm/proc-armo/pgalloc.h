@@ -37,7 +37,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 
 /*
  * We use the old 2.5.5-rmk1 hack for this.
- * This is not truely correct, but should be functional.
+ * This is not truly correct, but should be functional.
  */
 #define pte_alloc_one(mm,addr)	((struct page *)pte_alloc_one_kernel(mm,addr))
 #define pte_free(pte)		pte_free_kernel((pte_t *)pte)

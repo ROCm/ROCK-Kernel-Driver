@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-iop3xx/mm.c
  *
- * Low level memory intialization for IOP321 based systems
+ * Low level memory initialization for IOP321 based systems
  *
  * Author: Rory Bolt <rorybolt@pacbell.net>
  * Copyright (C) 2002 Rory Bolt

@@ -182,7 +182,7 @@ dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
  * @dir: DMA transfer direction
  *
  * Map a set of buffers described by scatterlist in streaming
- * mode for DMA.  This is the scather-gather version of the
+ * mode for DMA.  This is the scatter-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
  * elements are each tagged with the appropriate dma address
  * and length.  They are obtained via sg_dma_{address,length}(SG).
