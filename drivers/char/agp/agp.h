@@ -172,6 +172,12 @@ struct agp_bridge_data {
 #ifndef PCI_DEVICE_ID_INTEL_810_0
 #define PCI_DEVICE_ID_INTEL_810_0       0x7120
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_845_G_0
+#define PCI_DEVICE_ID_INTEL_845_G_0	0x2560
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_845_G_1
+#define PCI_DEVICE_ID_INTEL_845_G_1     0x2562
+#endif
 #ifndef PCI_DEVICE_ID_INTEL_830_M_0
 #define PCI_DEVICE_ID_INTEL_830_M_0	0x3575
 #endif
