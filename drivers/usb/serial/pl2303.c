@@ -285,12 +285,6 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	     buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
 
-	i = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
-			     VENDOR_WRITE_REQUEST, VENDOR_WRITE_REQUEST_TYPE,
-			     0, 1, NULL, 0, 100);
-
-	dbg ("0x40:1:0:1  %d", i);
-
 	if (cflag & CSIZE) {
 		switch (cflag & CSIZE) {
 			case CS5:	buf[6] = 5;	break;
@@ -428,9 +422,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0, 1);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 1, 0xc0);
-	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 4);
 
 	/* Setup termios */
 	if (port->tty) {
