@@ -40,7 +40,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/vector.h>
-#include <asm/sn/arc/hinv.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/kldir.h>
@@ -514,7 +513,7 @@ typedef struct klinfo_s {                  /* Generic info */
 	nasid_t		nasid;            /* node number - from parent */
 	char		pad1;		  /* pad out structure. */
 	char		pad2;		  /* pad out structure. */
-	COMPONENT	*arcs_compt;      /* ptr to the arcs struct for ease*/
+	void		*data;
         klconf_off_t	errinfo;          /* component specific errors */
         unsigned short  pad3;             /* pci fields have moved over to */
         unsigned short  pad4;             /* klbri_t */
@@ -633,7 +632,7 @@ typedef struct klcpu_s {                          /* CPU */
 
 typedef struct klhub_s {			/* HUB */
 	klinfo_t 	hub_info;
-	uint 		hub_flags;		/* PCFG_HUB_xxx flags */
+	unsigned int 	hub_flags;		/* PCFG_HUB_xxx flags */
 #define MAX_NI_PORTS                    2
 	klport_t	hub_port[MAX_NI_PORTS + 1];/* hub is connected to this */
 	nic_t		hub_box_nic;		/* nic of containing box */
@@ -645,7 +644,7 @@ typedef struct klhub_s {			/* HUB */
 
 typedef struct klhub_uart_s {			/* HUB */
 	klinfo_t 	hubuart_info;
-	uint 		hubuart_flags;		/* PCFG_HUB_xxx flags */
+	unsigned int 	hubuart_flags;		/* PCFG_HUB_xxx flags */
 	nic_t		hubuart_box_nic;	/* nic of containing box */
 	unsigned long	pad;
 } klhub_uart_t ;
@@ -752,7 +751,7 @@ typedef struct klvmed_s {                          /* VME DEVICE - VME BOARD */
 /* XXX - Don't we need the number of ports here?!? */
 typedef struct klrou_s {                          /* ROUTER */
 	klinfo_t 	rou_info ;
-	uint		rou_flags ;           /* PCFG_ROUTER_xxx flags */
+	unsigned int	rou_flags ;           /* PCFG_ROUTER_xxx flags */
 	nic_t		rou_box_nic ;         /* nic of the containing module */
     	klport_t 	rou_port[MAX_ROUTER_PORTS + 1] ; /* array index 1 to 6 */
 	klconf_off_t	rou_mfg_nic ;     /* MFG NIC string */
@@ -776,10 +775,10 @@ typedef struct klgfx_s {		/* GRAPHICS Device */
 	klinfo_t 	gfx_info;
 	klconf_off_t    old_gndevs;	/* for compatibility with older proms */
 	klconf_off_t    old_gdoff0;	/* for compatibility with older proms */
-	uint		cookie;		/* for compatibility with older proms */
-	uint		moduleslot;
+	unsigned int	cookie;		/* for compatibility with older proms */
+	unsigned int	moduleslot;
 	struct klgfx_s	*gfx_next_pipe;
-	graphics_t	gfx_specific;
+	u64		*gfx_specific;
 	klconf_off_t    pad0;		/* for compatibility with older proms */
 	klconf_off_t    gfx_mfg_nic;
 	unsigned long	pad;
@@ -813,7 +812,7 @@ typedef struct klgsn_s {                     /* GSN board */
 
 typedef struct klscsi_s {                          /* SCSI Bus */
 	klinfo_t 	scsi_info ;
-    	scsi_t       	scsi_specific   ; 
+    	u64       	*scsi_specific   ; 
 	unsigned char 	scsi_numdevs ;
 	klconf_off_t	scsi_devinfo[MAX_SCSI_DEVS] ; 
 	unsigned long	pad;
@@ -821,8 +820,8 @@ typedef struct klscsi_s {                          /* SCSI Bus */
 
 typedef struct klscctl_s {                          /* SCSI Controller */
 	klinfo_t 	scsi_info ;
-	uint		type;
-	uint		scsi_buscnt;                        /* # busses this cntlr */
+	unsigned int	type;
+	unsigned int	scsi_buscnt;                        /* # busses this cntlr */
 	void		*scsi_bus[2];                       /* Pointer to 2 klscsi_t's */
 	unsigned long	pad;
 } klscctl_t ;
@@ -889,16 +888,11 @@ typedef union klcomp_s {
 	klmembnk_t 	kc_mem;
 	klxbow_t  	kc_xbow;
 	klbri_t		kc_bri;
-	klioc3_t	kc_ioc3;
-	klvmeb_t	kc_vmeb;
-	klvmed_t	kc_vmed;
 	klrou_t		kc_rou;
 	klgfx_t		kc_gfx;
 	klscsi_t	kc_scsi;
 	klscctl_t	kc_scsi_ctl;
 	klscdev_t	kc_scsi_dev;
-	klfddi_t	kc_fddi;
-	klmio_t		kc_mio;
 	klmod_serial_num_t kc_snum ;
 	klusb_t		kc_usb;
 } klcomp_t;
@@ -906,7 +900,6 @@ typedef union klcomp_s {
 typedef union kldev_s {      /* for device structure allocation */
 	klscdev_t	kc_scsi_dev ;
 	klttydev_t	kc_tty_dev ;
-	klenetdev_t	kc_enet_dev ;
 	klkbddev_t 	kc_kbd_dev ;
 } kldev_t ;
 
