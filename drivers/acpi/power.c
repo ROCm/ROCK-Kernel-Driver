@@ -217,7 +217,7 @@ acpi_power_on (
 
 
 static int
-acpi_power_off (
+acpi_power_off_device (
 	acpi_handle		handle)
 {
 	int			result = 0;
@@ -225,7 +225,7 @@ acpi_power_off (
 	struct acpi_device	*device = NULL;
 	struct acpi_power_resource *resource = NULL;
 
-	ACPI_FUNCTION_TRACE("acpi_power_off");
+	ACPI_FUNCTION_TRACE("acpi_power_off_device");
 
 	result = acpi_power_get_context(handle, &resource);
 	if (result)
@@ -358,7 +358,7 @@ acpi_power_transition (
 	 * Then we dereference all power resources used in the current list.
 	 */
 	for (i=0; i<cl->count; i++) {
-		result = acpi_power_off(cl->handles[i]);
+		result = acpi_power_off_device(cl->handles[i]);
 		if (result)
 			goto end;
 	}

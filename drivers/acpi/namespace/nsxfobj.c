@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfobj - Public interfaces to the ACPI subsystem
  *                         ACPI Object oriented interfaces
- *              $Revision: 113 $
+ *              $Revision: 114 $
  *
  ******************************************************************************/
 
@@ -188,7 +188,7 @@ acpi_get_next_object (
 
 	/* Parameter validation */
 
-	if (type > ACPI_TYPE_MAX) {
+	if (type > ACPI_TYPE_EXTERNAL_MAX) {
 		return (AE_BAD_PARAMETER);
 	}
 

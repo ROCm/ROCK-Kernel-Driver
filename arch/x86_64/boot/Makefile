@@ -46,7 +46,7 @@ $(obj)/bzImage: IMAGE_OFFSET := 0x100000
 $(obj)/bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
 $(obj)/bzImage: BUILDFLAGS   := -b
 
-quiet_cmd_image = BUILD   $(echo_target)
+quiet_cmd_image = BUILD   $@
 cmd_image = $(obj)/tools/build $(BUILDFLAGS) $(obj)/bootsect $(obj)/setup \
 	    $(obj)/vmlinux.bin $(ROOT_DEV) > $@
 

@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 82 $
+ *              $Revision: 83 $
  *
  *****************************************************************************/
 
@@ -1021,7 +1021,7 @@ acpi_ds_exec_end_control_op (
 			 * Allow references created by the Index operator to return unchanged.
 			 */
 			if ((ACPI_GET_DESCRIPTOR_TYPE (walk_state->results->results.obj_desc[0]) == ACPI_DESC_TYPE_OPERAND) &&
-				(ACPI_GET_OBJECT_TYPE (walk_state->results->results.obj_desc [0]) == INTERNAL_TYPE_REFERENCE) &&
+				(ACPI_GET_OBJECT_TYPE (walk_state->results->results.obj_desc [0]) == ACPI_TYPE_LOCAL_REFERENCE) &&
 				((walk_state->results->results.obj_desc [0])->reference.opcode != AML_INDEX_OP)) {
 				status = acpi_ex_resolve_to_value (&walk_state->results->results.obj_desc [0], walk_state);
 				if (ACPI_FAILURE (status)) {

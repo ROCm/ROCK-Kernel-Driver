@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  ******************************************************************************/
 
@@ -603,7 +603,7 @@ acpi_ds_store_object_to_local (
 			 * If we have a valid reference object that came from Ref_of(), do the
 			 * indirect store
 			 */
-			if ((current_obj_desc->common.type == INTERNAL_TYPE_REFERENCE) &&
+			if ((current_obj_desc->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(current_obj_desc->reference.opcode == AML_REF_OF_OP)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 					"Arg (%p) is an Obj_ref(Node), storing in node %p\n",

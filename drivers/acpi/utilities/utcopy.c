@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 104 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -113,7 +113,7 @@ acpi_ut_copy_isimple_to_esimple (
 		break;
 
 
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		/*
 		 * This is an object reference.  Attempt to dereference it.

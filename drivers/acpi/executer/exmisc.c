@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 109 $
+ *              $Revision: 110 $
  *
  *****************************************************************************/
 
@@ -67,7 +67,7 @@ acpi_ex_get_object_reference (
 	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
 	case ACPI_DESC_TYPE_OPERAND:
 
-		if (ACPI_GET_OBJECT_TYPE (obj_desc) != INTERNAL_TYPE_REFERENCE) {
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_LOCAL_REFERENCE) {
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -111,7 +111,7 @@ acpi_ex_get_object_reference (
 
 	/* Create a new reference object */
 
-	reference_obj = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
+	reference_obj = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_REFERENCE);
 	if (!reference_obj) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
