@@ -295,8 +295,6 @@ struct oprofile_operations nmi_ops = {
 };
  
 
-#if !defined(CONFIG_X86_64)
-
 static int __init p4_init(void)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
@@ -347,9 +345,6 @@ static int __init ppro_init(void)
 	return 1;
 }
 
-#endif /* !CONFIG_X86_64 */
- 
-
 /* in order to get driverfs right */
 static int using_nmi;
 
@@ -381,7 +376,6 @@ int __init nmi_init(struct oprofile_operations ** ops)
 			}
 			break;
  
-#if !defined(CONFIG_X86_64)
 		case X86_VENDOR_INTEL:
 			switch (family) {
 				/* Pentium IV */
@@ -400,7 +394,6 @@ int __init nmi_init(struct oprofile_operations ** ops)
 					return -ENODEV;
 			}
 			break;
-#endif /* !CONFIG_X86_64 */
 
 		default:
 			return -ENODEV;
