@@ -34,8 +34,9 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 static void kmlreint_pre_secure(struct kml_rec *rec, struct file *dir,
                                 struct run_ctxt *saved)

@@ -50,9 +50,9 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
 #include <linux/fsfilter.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 /*
  * these are initialized in super.c
  */

@@ -46,7 +46,7 @@
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
 
-#include <linux/intermezzo_fs.h>
+#include "intermezzo_fs.h"
 
 kmem_cache_t * presto_dentry_slab;
 

@@ -45,8 +45,8 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 static inline void presto_relock_sem(struct inode *dir) 
 {

@@ -40,8 +40,8 @@
 #include /usr/src/obd/include/linux/obdfs.h
 #endif
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #ifdef CONFIG_OBDFS_FS
 

@@ -27,8 +27,8 @@
 #ifndef __INTERMEZZO_FS_H_
 #define __INTERMEZZO_FS_H_ 1
 
-#include <linux/intermezzo_lib.h>
-#include <linux/intermezzo_idl.h>
+#include "intermezzo_lib.h"
+#include "intermezzo_idl.h"
 
 
 #ifdef __KERNEL__

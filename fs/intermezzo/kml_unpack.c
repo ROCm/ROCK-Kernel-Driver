@@ -56,9 +56,9 @@
 #  include <glib.h>
 #endif
 
-#include <linux/intermezzo_lib.h>
-#include <linux/intermezzo_idl.h>
-#include <linux/intermezzo_fs.h>
+#include "intermezzo_lib.h"
+#include "intermezzo_idl.h"
+#include "intermezzo_fs.h"
 
 int kml_unpack_version(struct presto_version **ver, char **buf, char *end) 
 {

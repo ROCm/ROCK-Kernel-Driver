@@ -38,8 +38,9 @@
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 struct presto_reservation_data {
         unsigned int ri_recno;

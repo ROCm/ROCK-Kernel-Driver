@@ -37,8 +37,8 @@
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 int presto_walk(const char *name, struct nameidata *nd)
 {

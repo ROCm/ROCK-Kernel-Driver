@@ -39,9 +39,8 @@
 #include <linux/utsname.h>
 #include <linux/blk.h>
 
-
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 /* /proc entries */
 

@@ -36,9 +36,9 @@
 #ifdef CONFIG_FS_XFS
 #include <linux/xfs_fs.h>
 #endif
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
-#include <linux/intermezzo_journal.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
+#include "intermezzo_journal.h"
 
 #if 0
 

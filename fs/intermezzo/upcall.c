@@ -45,11 +45,11 @@
 #include <linux/vmalloc.h>
 #include <asm/segment.h>
 
-#include <linux/intermezzo_lib.h>
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_lib.h"
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
-#include <linux/intermezzo_idl.h>
+#include "intermezzo_idl.h"
 
 /*
   At present:
