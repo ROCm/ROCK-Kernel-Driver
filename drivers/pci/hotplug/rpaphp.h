@@ -85,6 +85,7 @@ struct rpaphp_pci_func {
  * struct slot - slot information for each *physical* slot
  */
 struct slot {
+	struct list_head rpaphp_slot_list;
 	int state;
 	u32 index;
 	u32 type;
@@ -92,6 +93,7 @@ struct slot {
 	char *name;
 	char *location;
 	u8 removable;
+	u8 dev_type;		/* VIO or PCI */
 	struct device_node *dn;	/* slot's device_node in OFDT */
 				/* dn has phb info */
 	struct pci_dev *bridge;	/* slot's pci_dev in pci_devices */
@@ -99,9 +101,7 @@ struct slot {
 		struct list_head pci_funcs; /* pci_devs in PCI slot */ 
 		struct vio_dev *vio_dev; /* vio_dev in VIO slot */
 	} dev;
-	u8 dev_type;		/* VIO or PCI */
 	struct hotplug_slot *hotplug_slot;
-	struct list_head rpaphp_slot_list;
 };
 
 extern struct hotplug_slot_ops rpaphp_hotplug_slot_ops;
