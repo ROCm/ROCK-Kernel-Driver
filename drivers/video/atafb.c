@@ -2623,15 +2623,15 @@ atafb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops atafb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	atafb_get_fix,
-	fb_get_var:	atafb_get_var,
-	fb_set_var:	atafb_set_var,
-	fb_get_cmap:	atafb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_pan_display:	atafb_pan_display,
-	fb_blank:	atafb_blank,
-	fb_ioctl:	atafb_ioctl,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	atafb_get_fix,
+	.fb_get_var =	atafb_get_var,
+	.fb_set_var =	atafb_set_var,
+	.fb_get_cmap =	atafb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_pan_display =atafb_pan_display,
+	.fb_blank =	atafb_blank,
+	.fb_ioctl =	atafb_ioctl,
 };
 
 static void

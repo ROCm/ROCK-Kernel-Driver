@@ -324,14 +324,14 @@ fbcon_sti_clear_margins(struct vc_data *conp,
      */
 
 struct display_switch fbcon_sti = {
-	setup:		fbcon_sti_setup, 
-	bmove:		fbcon_sti_bmove, 
-	clear:		fbcon_sti_clear,
-	putc:		fbcon_sti_putc, 
-	putcs:		fbcon_sti_putcs, 
-	revc:		fbcon_sti_revc,
-	clear_margins:	fbcon_sti_clear_margins,
-	fontwidthmask:	FONTWIDTH(8)
+	.setup =	fbcon_sti_setup, 
+	.bmove =	fbcon_sti_bmove, 
+	.clear =	fbcon_sti_clear,
+	.putc =		fbcon_sti_putc, 
+	.putcs =	fbcon_sti_putcs, 
+	.revc =		fbcon_sti_revc,
+	.clear_margins =fbcon_sti_clear_margins,
+	.fontwidthmask =FONTWIDTH(8)
 };
 
 MODULE_LICENSE("GPL");

@@ -156,14 +156,14 @@ static void valkyrie_par_to_fix(struct fb_par_valkyrie *par, struct fb_fix_scree
 static void valkyrie_init_fix(struct fb_fix_screeninfo *fix, struct fb_info_valkyrie *p);
 
 static struct fb_ops valkyriefb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	valkyrie_get_fix,
-	fb_get_var:	valkyrie_get_var,
-	fb_set_var:	valkyrie_set_var,
-	fb_get_cmap:	valkyrie_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	valkyriefb_setcolreg,
-	fb_blank:	valkyriefb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	valkyrie_get_fix,
+	.fb_get_var =	valkyrie_get_var,
+	.fb_set_var =	valkyrie_set_var,
+	.fb_get_cmap =	valkyrie_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	valkyriefb_setcolreg,
+	.fb_blank =	valkyriefb_blank,
 };
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,

@@ -1386,20 +1386,18 @@ neo2200fb_imageblit(struct fb_info *info, struct fb_image *image)
 }
 
 static struct fb_ops neofb_ops = {
-	owner:		THIS_MODULE,
-	fb_check_var:	neofb_check_var,
-	fb_set_par:	neofb_set_par,
-	fb_set_var:	gen_set_var,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	neofb_setcolreg,
-	fb_pan_display:	neofb_pan_display,
-	fb_blank:	neofb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_check_var	= neofb_check_var,
+	.fb_set_par	= neofb_set_par,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= neofb_setcolreg,
+	.fb_pan_display	= neofb_pan_display,
+	.fb_blank	= neofb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1988,10 +1986,10 @@ static struct pci_device_id neofb_devices[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, neofb_devices);
 
 static struct pci_driver neofb_driver = {
-	name:		"neofb",
-	id_table:	neofb_devices,
-	probe:		neofb_probe,
-	remove:		__devexit_p(neofb_remove)
+	.name =		"neofb",
+	.id_table =	neofb_devices,
+	.probe =	neofb_probe,
+	.remove =	__devexit_p(neofb_remove)
 };
 
 /* **************************** init-time only **************************** */

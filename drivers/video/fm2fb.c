@@ -136,12 +136,12 @@ static u32 pseudo_palette[17];
 static struct display display;
 
 static struct fb_fix_screeninfo fb_fix __initdata = {
-	smem_len:	FRAMEMASTER_REG,
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_TRUECOLOR,
-	line_length:	(768 << 2),
-	mmio_len:	(8),
-	accel:		FB_ACCEL_NONE,
+	.smem_len =	FRAMEMASTER_REG,
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_TRUECOLOR,
+	.line_length =	(768 << 2),
+	.mmio_len =	(8),
+	.accel =	FB_ACCEL_NONE,
 };
 
 static int fm2fb_mode __initdata = -1;
@@ -175,17 +175,15 @@ static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static int fm2fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops fm2fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	fm2fb_setcolreg,
-	fb_blank:	fm2fb_blank,	
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= fm2fb_setcolreg,
+	.fb_blank	= fm2fb_blank,	
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
     /*

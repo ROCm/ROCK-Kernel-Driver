@@ -28,6 +28,14 @@
 #include <asm/io.h>
 #include <video/fbcon.h>
 
+#if BITS_PER_LONG == 32
+#define FB_READ		fb_readl
+#define FB_WRITE	fb_writel
+#else
+#define FB_READ		fb_readq
+#define FB_WRITE	fb_writeq
+#endif
+
 void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 {
 	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx, old_dy;
@@ -137,19 +145,19 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					dst = (unsigned long *) dst1;
 					src = (unsigned long *) src1;
 
-					last = (fb_readl(src) & start_mask);
+					last = (FB_READ(src) & start_mask);
 
 					if (shift > 0)
-						fb_writel(fb_readl(dst) | (last >> shift_right), dst);
+						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
 					for (j = 0; j < n; j++) {
 						dst++;
-						tmp = fb_readl(src);
+						tmp = FB_READ(src);
 						src++;
-						fb_writel((last << shift_left) | (tmp >> shift_right), dst);
+						FB_WRITE((last << shift_left) | (tmp >> shift_right), dst);
 						last = tmp;
 						src++;
 					}
-					fb_writel(fb_readl(dst) | (last << shift_left), dst);
+					FB_WRITE(FB_READ(dst) | (last << shift_left), dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -161,19 +169,19 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					dst = (unsigned long *) dst1;
 					src = (unsigned long *) src1;
 
-					last = (fb_readl(src) & end_mask);
+					last = (FB_READ(src) & end_mask);
 
 					if (shift < 0)
-						fb_writel(fb_readl(dst) | (last >> shift_right), dst);
+						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
 					for (j = 0; j < n; j++) {
 						dst--;
-						tmp = fb_readl(src);
+						tmp = FB_READ(src);
 						src--;
-						fb_writel((tmp << shift_left) | (last >> shift_right), dst);
+						FB_WRITE((tmp << shift_left) | (last >> shift_right), dst);
 						last = tmp;
 						src--;
 					}
-					fb_writel(fb_readl(dst) | (last >> shift_right), dst);
+					FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -187,16 +195,16 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					src = (unsigned long *) (src1 - start_index);
 
 					if (start_mask)
-						fb_writel(fb_readl(src) | start_mask, dst);
+						FB_WRITE(FB_READ(src) | start_mask, dst);
 
 					for (j = 0; j < n; j++) {
-						fb_writel(fb_readl(src), dst);
+						FB_WRITE(FB_READ(src), dst);
 						dst++;
 						src++;
 					}
 
 					if (end_mask)
-						fb_writel(fb_readl(src) | end_mask, dst);
+						FB_WRITE(FB_READ(src) | end_mask, dst);
 					src1 += lineincr;
 					dst1 += lineincr;
 				} while (--height);
@@ -207,9 +215,9 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 					src = (unsigned long *) src1;
 
 					if (start_mask)
-						fb_writel(fb_readl(src) | start_mask, dst);
+						FB_WRITE(FB_READ(src) | start_mask, dst);
 					for (j = 0; j < n; j++) {
-						fb_writel(fb_readl(src), dst);
+						FB_WRITE(FB_READ(src), dst);
 						dst--;
 						src--;
 					}
