@@ -88,31 +88,15 @@ int
 dasd_ioctl(struct inode *inp, struct file *filp,
 	   unsigned int no, unsigned long data)
 {
-	dasd_devmap_t *devmap;
-	dasd_device_t *device;
+	struct block_device *bdev = inp->i_bdev;
+	dasd_device_t *device = bdev->bd_disk->private_data;
 	dasd_ioctl_list_t *ioctl;
-	struct block_device *bdev;
 	struct list_head *l;
 	const char *dir;
 	int rc;
 
-	if ((!inp) || kdev_none(inp->i_rdev))
-		return -EINVAL;
 	if ((_IOC_DIR(no) != _IOC_NONE) && (data == 0)) {
 		PRINT_DEBUG("empty data ptr");
-		return -EINVAL;
-	}
-	bdev = bdget(kdev_t_to_nr(inp->i_rdev));
-	if (!bdev)
-		return -EINVAL;
-
-	devmap = dasd_devmap_from_bdev(bdev);
-	device = (devmap != NULL) ?
-		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
-	if (IS_ERR(device)) {
-		MESSAGE(KERN_WARNING,
-			"No device registered as device %s", bdevname(bdev));
-		bdput(bdev);
 		return -EINVAL;
 	}
 	dir = _IOC_DIR (no) == _IOC_NONE ? "0" :
@@ -134,8 +118,6 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 				__MOD_DEC_USE_COUNT(ioctl->owner);
 			} else
 				rc = ioctl->handler(bdev, no, data);
-			dasd_put_device(devmap);
-			bdput(bdev);
 			return rc;
 		}
 	}
@@ -143,8 +125,6 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 	DBF_DEV_EVENT(DBF_INFO, device,
 		      "unknown ioctl 0x%08x=%s'0x%x'%d(%d) data %8lx", no,
 		      dir, _IOC_TYPE(no), _IOC_NR(no), _IOC_SIZE(no), data);
-	dasd_put_device(devmap);
-	bdput(bdev);
 	return -ENOTTY;
 }
 

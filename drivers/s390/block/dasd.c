@@ -337,11 +337,6 @@ dasd_state_known_to_new(dasd_device_t * device)
 	/* Forget the discipline information. */
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
-
-	/* Forget the block device */
-	bdev = bdget(MKDEV(device->gdp->major, device->gdp->first_minor));
-	bdput(bdev);
-	bdput(bdev);
 }
 
 /*
