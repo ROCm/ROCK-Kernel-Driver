@@ -310,7 +310,7 @@ probe_unmapped_cluster(
 	struct buffer_head	*bh,
 	struct buffer_head	*head)
 {
-	unsigned long		tindex, tlast, tloop;
+	unsigned long		tindex, tlast, tloff;
 	unsigned int		len, total = 0;
 	struct address_space	*mapping = inode->i_mapping;
 
@@ -327,20 +327,17 @@ probe_unmapped_cluster(
 	if (bh == head) {
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 		/* Prune this back to avoid pathological behavior */
-		tloop = min(tlast, startpage->index + 64);
-		for (tindex = startpage->index + 1; tindex < tloop; tindex++) {
+		tloff = min(tlast, startpage->index + 64);
+		for (tindex = startpage->index + 1; tindex < tloff; tindex++) {
 			len = probe_unmapped_page(mapping, tindex,
 							PAGE_CACHE_SIZE);
 			if (!len)
 				return total;
 			total += len;
 		}
-		if (tindex == tlast) {
-			unsigned offset = i_size_read(inode) & (PAGE_CACHE_SIZE - 1);
-			if (offset) {
-				total += probe_unmapped_page(mapping,
-							tindex, offset);
-			}
+		if (tindex == tlast &&
+		    (tloff = i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
+			total += probe_unmapped_page(mapping, tindex, tloff);
 		}
 	}
 	return total;
@@ -457,14 +454,14 @@ map_unwritten(
 	 */
 	if (bh == head) {
 		struct address_space	*mapping = inode->i_mapping;
-		unsigned long		tindex, tloop, tlast, bs;
+		unsigned long		tindex, tloff, tlast, bs;
 		struct page		*page;
 
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
-		tloop = min(tlast, start_page->index + pb->pb_page_count - 1);
-		for (tindex = start_page->index + 1; tindex < tloop; tindex++) {
+		tloff = min(tlast, start_page->index + pb->pb_page_count - 1);
+		for (tindex = start_page->index + 1; tindex < tloff; tindex++) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
-					PAGE_CACHE_SIZE, &bs);
+							PAGE_CACHE_SIZE, &bs);
 			if (!page)
 				break;
 			nblocks += bs;
@@ -472,9 +469,10 @@ map_unwritten(
 			convert_page(inode, page, mp, pb, 1, all_bh);
 		}
 
-		if ((tindex == tlast) && (i_size_read(inode) & ~PAGE_CACHE_MASK)) {
+		if (tindex == tlast &&
+		    (tloff = (i_size_read(inode) & (PAGE_CACHE_SIZE - 1)))) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
-					i_size_read(inode) & ~PAGE_CACHE_MASK, &bs);
+							tloff, &bs);
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
