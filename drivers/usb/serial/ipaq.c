@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (12/12/2002) ganesh
+ * 	Added support for practically all devices supported by ActiveSync
+ * 	on Windows. Thanks to Wes Cilldhaire <billybobjoehenrybob@hotmail.com>.
+ *
  * (26/11/2002) ganesh
  * 	Added insmod options to specify product and vendor id.
  * 	Use modprobe ipaq vendor=0xfoo product=0xbar
@@ -68,9 +72,9 @@
  * Version Information
  */
 
-#define DRIVER_VERSION "v0.4"
+#define DRIVER_VERSION "v0.5"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
-#define DRIVER_DESC "USB Compaq iPAQ, HP Jornada, Casio EM500 driver"
+#define DRIVER_DESC "USB PocketPC PDA driver"
 
 static int	product, vendor;
 
@@ -94,10 +98,36 @@ static void ipaq_destroy_lists(struct usb_serial_port *port);
 static struct usb_device_id ipaq_id_table [] = {
 	/* The first entry is a placeholder for the insmod-specified device */
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
+	{ USB_DEVICE(ASKEY_VENDOR_ID, ASKEY_PRODUCT_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0065_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0066_ID) },
+	{ USB_DEVICE(BCOM_VENDOR_ID, BCOM_0067_ID) },
+	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_2001_ID) },
+	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_EM500_ID) },
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
+	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_0032_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
-	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_EM500_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_2216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_3216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_4216_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5016_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5116_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_5216_ID) },
+	{ USB_DEVICE(LINKUP_VENDOR_ID, LINKUP_PRODUCT_ID) },
+	{ USB_DEVICE(MICROSOFT_VENDOR_ID, MICROSOFT_00CE_ID) },
+	{ USB_DEVICE(PORTATEC_VENDOR_ID, PORTATEC_PRODUCT_ID) },
+	{ USB_DEVICE(SAGEM_VENDOR_ID, SAGEM_WIRELESS_ID) },
+	{ USB_DEVICE(SOCKET_VENDOR_ID, SOCKET_PRODUCT_ID) },
+	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_PRODUCT_ID) },
+	{ USB_DEVICE(HTC_VENDOR_ID, HTC_PRODUCT_ID) },
+	{ USB_DEVICE(NEC_VENDOR_ID, NEC_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -114,7 +144,7 @@ static struct usb_driver ipaq_driver = {
 /* All of the device info needed for the Compaq iPAQ */
 struct usb_serial_device_type ipaq_device = {
 	.owner =		THIS_MODULE,
-	.name =			"Compaq iPAQ",
+	.name =			"PocketPC PDA",
 	.id_table =		ipaq_id_table,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		1,
