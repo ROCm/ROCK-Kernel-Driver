@@ -106,12 +106,12 @@ void config_BSP(char *command, int len)
 {
   unsigned char *p;
 
-  printk("\n68EZ328 DragonBallEZ support (C) 1999 Rt-Control, Inc\n");
+  printk(KERN_INFO "\n68EZ328 DragonBallEZ support (C) 1999 Rt-Control, Inc\n");
 
 #ifdef CONFIG_UCSIMM
-  printk("uCsimm serial string [%s]\n",getserialnum());
+  printk(KERN_INFO "uCsimm serial string [%s]\n",getserialnum());
   p = cs8900a_hwaddr = gethwaddr(0);
-  printk("uCsimm hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+  printk(KERN_INFO "uCsimm hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
          p[0], p[1], p[2], p[3], p[4], p[5]);
 
   p = getbenv("APPEND");
