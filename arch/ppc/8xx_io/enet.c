@@ -644,8 +644,7 @@ static int __init scc_enet_init(void)
 	struct net_device *dev;
 	struct scc_enet_private *cep;
 	int i, j, k, err;
-	void *dp_mem;
-	unsigned int dp_addr;
+	uint dp_offset;
 	unsigned char	*eap, *ba;
 	dma_addr_t	mem_addr;
 	bd_t		*bd;
@@ -740,15 +739,13 @@ static int __init scc_enet_init(void)
 	 * These are relative offsets in the DP ram address space.
 	 * Initialize base addresses for the buffer descriptors.
 	 */
-	dp_mem = m8xx_cpm_dpalloc(sizeof(cbd_t) * RX_RING_SIZE);
-	dp_addr = m8xx_cpm_dpram_offset(dp_mem);
-	ep->sen_genscc.scc_rbase = dp_mem;
-	cep->rx_bd_base = (cbd_t *)&cp->cp_dpmem[dp_addr];
+	dp_offset = cpm_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
+	ep->sen_genscc.scc_rbase = dp_offset;
+	cep->rx_bd_base = cpm_dpram_addr(dp_offset);
 
-	dp_mem = m8xx_cpm_dpalloc(sizeof(cbd_t) * TX_RING_SIZE);
-	dp_addr = m8xx_cpm_dpram_offset(dp_mem);
-	ep->sen_genscc.scc_tbase = dp_mem;
-	cep->tx_bd_base = (cbd_t *)&cp->cp_dpmem[dp_addr];
+	dp_offset = cpm_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
+	ep->sen_genscc.scc_tbase = dp_offset;
+	cep->tx_bd_base = cpm_dpram_addr(dp_offset);
 
 	cep->dirty_tx = cep->cur_tx = cep->tx_bd_base;
 	cep->cur_rx = cep->rx_bd_base;

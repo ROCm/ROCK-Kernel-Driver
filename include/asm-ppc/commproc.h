@@ -62,18 +62,23 @@
 #define CPM_DATAONLY_SIZE	((uint)0x0700)
 #define CPM_DP_NOSPACE		((uint)0x7fffffff)
 
+static inline long IS_DPERR(const uint offset)
+{
+	return (uint)offset > (uint)-1000L;
+}
+
 /* Export the base address of the communication processor registers
  * and dual port ram.
  */
 extern	cpm8xx_t	*cpmp;		/* Pointer to comm processor */
-extern void *m8xx_cpm_dpalloc(int size);
-extern int m8xx_cpm_dpfree(void *addr);
-extern void *m8xx_cpm_dpalloc_fixed(void *addr, int size);
-extern void m8xx_cpm_dpdump(void);
-extern int m8xx_cpm_dpram_offset(void *addr);
-extern void *m8xx_cpm_dpram_addr(int offset);
+extern uint cpm_dpalloc(uint size, uint align);
+extern int cpm_dpfree(uint offset);
+extern uint cpm_dpalloc_fixed(uint offset, uint size, uint align);
+extern void cpm_dpdump(void);
+extern void *cpm_dpram_addr(uint offset);
+extern void cpm_setbrg(uint brg, uint rate);
+
 uint		m8xx_cpm_hostalloc(uint size);
-void		m8xx_cpm_setbrg(uint brg, uint rate);
 
 /* Buffer descriptors used by many of the CPM protocols.
 */

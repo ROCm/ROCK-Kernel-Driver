@@ -2463,7 +2463,7 @@ static long long sound_lseek(struct file *file, long long offset, int orig)
 int __init tdm8xx_sound_init(void)
 {
 	int i, has_sound;
-	uint			dp_addr, dp_mem;
+	uint			dp_offset;
 	volatile uint		*sirp;
 	volatile cbd_t		*bdp;
 	volatile cpm8xx_t	*cp;
@@ -2525,15 +2525,14 @@ int __init tdm8xx_sound_init(void)
 	/* We need to allocate a transmit and receive buffer
 	 * descriptors from dual port ram.
 	 */
-	dp_mem = m8xx_cpm_dpalloc(sizeof(cbd_t) * numReadBufs);
-	dp_addr = m8xx_cpm_dpram_offset(dp_mem);
+	dp_addr = cpm_dpalloc(sizeof(cbd_t) * numReadBufs, 8);
 
 	/* Set the physical address of the host memory
 	 * buffers in the buffer descriptors, and the
 	 * virtual address for us to work with.
 	 */
 	bdp = (cbd_t *)&cp->cp_dpmem[dp_addr];
-	up->smc_rbase = dp_mem;
+	up->smc_rbase = dp_offset;
 	rx_cur = rx_base = (cbd_t *)bdp;
 
 	for (i=0; i<(numReadBufs-1); i++) {
@@ -2548,11 +2547,10 @@ int __init tdm8xx_sound_init(void)
 
 	/* Now, do the same for the transmit buffers.
 	*/
-	dp_mem = m8xx_cpm_dpalloc(sizeof(cbd_t) * numBufs);
-	dp_addr = m8xx_cpm_dpram_offset(dp_mem);
+	dp_offset = cpm_dpalloc(sizeof(cbd_t) * numBufs, 8);
 
 	bdp = (cbd_t *)&cp->cp_dpmem[dp_addr];
-	up->smc_tbase = dp_mem;
+	up->smc_tbase = dp_offset;
 	tx_cur = tx_base = (cbd_t *)bdp;
 
 	for (i=0; i<(numBufs-1); i++) {
