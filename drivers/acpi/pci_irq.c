@@ -346,9 +346,13 @@ acpi_pci_irq_enable (
 	 */
 	if (!irq) {
 		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), dev->slot_name);
-		if (dev->irq) 
+		/* Interrupt Line values above 0xF are forbidden */
+		if (dev->irq && dev->irq >= 0xF) {
 			printk(" - using IRQ %d\n", dev->irq);
-		return_VALUE(dev->irq);
+			return_VALUE(dev->irq);
+		}
+		else
+			return_VALUE(0);
  	}
 
 	dev->irq = irq;
