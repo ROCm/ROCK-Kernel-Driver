@@ -39,6 +39,7 @@ void initrd_init(void);
  */
 
 extern int end_that_request_first(struct request *, int, int);
+extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
 struct request *elv_next_request(request_queue_t *q);
 

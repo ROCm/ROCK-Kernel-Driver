@@ -1958,6 +1958,9 @@ inline void blk_recalc_rq_segments(struct request *rq)
 	struct bio *bio;
 	int nr_phys_segs, nr_hw_segs;
 
+	if (!rq->bio)
+		return;
+
 	rq->buffer = bio_data(rq->bio);
 
 	nr_phys_segs = nr_hw_segs = 0;
@@ -1975,7 +1978,7 @@ inline void blk_recalc_rq_segments(struct request *rq)
 
 inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
-	if (rq->bio) {
+	if (blk_fs_request(rq)) {
 		rq->hard_sector += nsect;
 		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
 		rq->sector = rq->hard_sector;
@@ -1994,27 +1997,19 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 	}
 }
 
-/**
- * end_that_request_first - end I/O on one buffer.
- * @req:      the request being processed
- * @uptodate: 0 for I/O error
- * @nr_sectors: number of sectors to end I/O on
- *
- * Description:
- *     Ends I/O on a number of sectors attached to @req, and sets it up
- *     for the next range of segments (if any) in the cluster.
- *
- * Return:
- *     0 - we are done with this request, call end_that_request_last()
- *     1 - still buffers pending for this request
- **/
-
-int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
+static int __end_that_request_first(struct request *req, int uptodate,
+				    int nr_bytes)
 {
-	int total_nsect = 0, error = 0;
+	int total_bytes, bio_nbytes, error = 0, next_idx = 0;
 	struct bio *bio;
 
-	req->errors = 0;
+	/*
+	 * for a REQ_BLOCK_PC request, we want to carry any eventual
+	 * sense key with us all the way through
+	 */
+	if (!blk_pc_request(req))
+		req->errors = 0;
+
 	if (!uptodate) {
 		error = -EIO;
 		if (!(req->flags & REQ_QUIET))
@@ -2023,56 +2018,56 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 				(unsigned long long)req->sector);
 	}
 
+	total_bytes = bio_nbytes = 0;
 	while ((bio = req->bio)) {
-		int new_bio = 0, nsect;
+		int nbytes;
 
-		if (unlikely(bio->bi_idx >= bio->bi_vcnt)) {
-			printk("%s: bio idx %d >= vcnt %d\n", __FUNCTION__,
-						bio->bi_idx, bio->bi_vcnt);
-			break;
-		}
-
-		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
-
-		/*
-		 * not a complete bvec done
-		 */
-		nsect = bio_iovec(bio)->bv_len >> 9;
-		if (unlikely(nsect > nr_sectors)) {
-			int partial = nr_sectors << 9;
-
-			bio_iovec(bio)->bv_offset += partial;
-			bio_iovec(bio)->bv_len -= partial;
-			bio_endio(bio, partial, error);
-			total_nsect += nr_sectors;
-			break;
-		}
-
-		/*
-		 * we are ending the last part of the bio, advance req pointer
-		 */
-		if ((nsect << 9) >= bio->bi_size) {
+		if (nr_bytes >= bio->bi_size) {
 			req->bio = bio->bi_next;
-			new_bio = 1;
+			nbytes = bio->bi_size;
+			bio_endio(bio, nbytes, error);
+			next_idx = 0;
+			bio_nbytes = 0;
+		} else {
+			int idx = bio->bi_idx + next_idx;
+
+			if (unlikely(bio->bi_idx >= bio->bi_vcnt)) {
+				blk_dump_rq_flags(req, "__end_that");
+				printk("%s: bio idx %d >= vcnt %d\n",
+						__FUNCTION__,
+						bio->bi_idx, bio->bi_vcnt);
+				break;
+			}
+
+			nbytes = bio_iovec_idx(bio, idx)->bv_len;
+			BIO_BUG_ON(nbytes > bio->bi_size);
+
+			/*
+			 * not a complete bvec done
+			 */
+			if (unlikely(nbytes > nr_bytes)) {
+				bio_iovec(bio)->bv_offset += nr_bytes;
+				bio_iovec(bio)->bv_len -= nr_bytes;
+				bio_nbytes += nr_bytes;
+				total_bytes += nr_bytes;
+				break;
+			}
+
+			/*
+			 * advance to the next vector
+			 */
+			next_idx++;
+			bio_nbytes += nbytes;
 		}
 
-		bio_endio(bio, nsect << 9, error);
-
-		total_nsect += nsect;
-		nr_sectors -= nsect;
-
-		/*
-		 * if we didn't advance the req->bio pointer, advance bi_idx
-		 * to indicate we are now on the next bio_vec
-		 */
-		if (!new_bio)
-			bio->bi_idx++;
+		total_bytes += nbytes;
+		nr_bytes -= nbytes;
 
 		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
-			if (unlikely(nr_sectors <= 0))
+			if (unlikely(nr_bytes <= 0))
 				break;
 		}
 	}
@@ -2086,17 +2081,64 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	/*
 	 * if the request wasn't completed, update state
 	 */
-	blk_recalc_rq_sectors(req, total_nsect);
+	if (bio_nbytes) {
+		bio_endio(bio, bio_nbytes, error);
+		req->bio->bi_idx += next_idx;
+	}
+
+	blk_recalc_rq_sectors(req, total_bytes >> 9);
 	blk_recalc_rq_segments(req);
 	return 1;
 }
 
+/**
+ * end_that_request_first - end I/O on a request
+ * @req:      the request being processed
+ * @uptodate: 0 for I/O error
+ * @nr_sectors: number of sectors to end I/O on
+ *
+ * Description:
+ *     Ends I/O on a number of sectors attached to @req, and sets it up
+ *     for the next range of segments (if any) in the cluster.
+ *
+ * Return:
+ *     0 - we are done with this request, call end_that_request_last()
+ *     1 - still buffers pending for this request
+ **/
+int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
+{
+	return __end_that_request_first(req, uptodate, nr_sectors << 9);
+}
+
+/**
+ * end_that_request_chunk - end I/O on a request
+ * @req:      the request being processed
+ * @uptodate: 0 for I/O error
+ * @nr_bytes: number of bytes to complete
+ *
+ * Description:
+ *     Ends I/O on a number of bytes attached to @req, and sets it up
+ *     for the next range of segments (if any). Like end_that_request_first(),
+ *     but deals with bytes instead of sectors.
+ *
+ * Return:
+ *     0 - we are done with this request, call end_that_request_last()
+ *     1 - still buffers pending for this request
+ **/
+int end_that_request_chunk(struct request *req, int uptodate, int nr_bytes)
+{
+	return __end_that_request_first(req, uptodate, nr_bytes);
+}
+
+/*
+ * queue lock must be held
+ */
 void end_that_request_last(struct request *req)
 {
 	if (req->waiting)
 		complete(req->waiting);
 
-	__blk_put_request(req);
+	__blk_put_request(req->q, req);
 }
 
 int __init blk_dev_init(void)
@@ -2142,6 +2184,7 @@ int __init blk_dev_init(void)
 };
 
 EXPORT_SYMBOL(end_that_request_first);
+EXPORT_SYMBOL(end_that_request_chunk);
 EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(blk_init_queue);
 EXPORT_SYMBOL(bdev_get_queue);
