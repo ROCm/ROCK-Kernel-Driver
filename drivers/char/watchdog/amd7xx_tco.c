@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
@@ -59,8 +60,17 @@ static struct semaphore open_sem;
 static spinlock_t amdtco_lock;	/* only for device access */
 static char expect_close;
 
-MODULE_PARM(timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "range is 0-38 seconds, default is 38");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+module_param(nowayout, int, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 static inline u8 seconds_to_ticks(int seconds)
 {
@@ -243,19 +253,19 @@ static ssize_t amdtco_fop_write(struct file *file, const char *data, size_t len,
 		return -ESPIPE;
 
 	if (len) {
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		size_t i;
-		char c;
-		expect_close = 0;
+		if (!nowayout)
+			size_t i;
+			char c;
+			expect_close = 0;
 
-		for (i = 0; i != len; i++) {
-			if (get_user(c, data + i))
-				return -EFAULT;
+			for (i = 0; i != len; i++) {
+				if (get_user(c, data + i))
+					return -EFAULT;
 
-			if (c == 'V')
-				expect_close = 42;
+				if (c == 'V')
+					expect_close = 42;
+			}
 		}
-#endif
 		amdtco_ping();
 	}
 
