@@ -48,7 +48,6 @@ extern void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function);
 
 extern unsigned int s3c2410_gpio_getcfg(unsigned int pin);
 
-
 /* s3c2410_gpio_getirq
  *
  * turn the given pin number into the corresponding IRQ number
@@ -59,6 +58,22 @@ extern unsigned int s3c2410_gpio_getcfg(unsigned int pin);
 */
 
 extern int s3c2410_gpio_getirq(unsigned int pin);
+
+/* s3c2410_gpio_irqfilter
+ *
+ * set the irq filtering on the given pin
+ *
+ * on = 0 => disable filtering
+ *      1 => enable filtering
+ *
+ * config = S3C2410_EINTFLT_PCLK or S3C2410_EINTFLT_EXTCLK orred with
+ *          width of filter (0 through 63)
+ *
+ *
+*/
+
+extern int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
+				  unsigned int config);
 
 /* s3c2410_gpio_pullup
  *
