@@ -168,8 +168,8 @@ asmlinkage void IRQ_NAME(n);						   \
 /* Dummy function to allow asm with operands.  */			   \
 void atari_slow_irq_##n##_dummy (void) {				   \
 __asm__ (__ALIGN_STR "\n"						   \
-SYMBOL_NAME_STR(atari_slow_irq_) #n "_handler:\t"			   \
-"	addql	#1,"SYMBOL_NAME_STR(irq_stat)"+8\n" /* local_irq_count */  \
+"atari_slow_irq_" #n "_handler:\t"					   \
+"	addql	#1,irq_stat+8\n" /* local_irq_count */			   \
 	SAVE_ALL_INT "\n"						   \
 	GET_CURRENT(%%d0) "\n"						   \
 "	andb	#~(1<<(%c3&7)),%a4:w\n"	/* mask this interrupt */	   \
@@ -190,7 +190,7 @@ SYMBOL_NAME_STR(atari_slow_irq_) #n "_handler:\t"			   \
 "	orw	#0x0600,%%sr\n"						   \
 "	andw	#0xfeff,%%sr\n"		/* set IPL = 6 again */		   \
 "	orb 	#(1<<(%c3&7)),%a4:w\n"	/* now unmask the int again */	   \
-"	jbra	"SYMBOL_NAME_STR(ret_from_interrupt)"\n"		   \
+"	jbra	ret_from_interrupt\n"					   \
 	 : : "i" (&kstat.irqs[0][n+8]), "i" (&irq_handler[n+8]),	   \
 	     "n" (PT_OFF_SR), "n" (n),					   \
 	     "i" (n & 8 ? (n & 16 ? &tt_mfp.int_mk_a : &mfp.int_mk_a)	   \
@@ -272,10 +272,10 @@ asmlinkage void atari_prio_irq_handler( void );
 /* Dummy function to allow asm with operands.  */
 void atari_fast_prio_irq_dummy (void) {
 __asm__ (__ALIGN_STR "\n"
-SYMBOL_NAME_STR(atari_fast_irq_handler) ":
+"atari_fast_irq_handler:
 	orw 	#0x700,%%sr		/* disable all interrupts */
-"SYMBOL_NAME_STR(atari_prio_irq_handler) ":\t
-	addql	#1,"SYMBOL_NAME_STR(irq_stat)"+8\n" /* local_irq_count */
+atari_prio_irq_handler:\t
+	addql	#1,irq_stat+8\n" /* local_irq_count */
 	SAVE_ALL_INT "\n"
 	GET_CURRENT(%%d0) "
 	/* get vector number from stack frame and convert to source */
@@ -285,7 +285,7 @@ SYMBOL_NAME_STR(atari_fast_irq_handler) ":
 	addw	#(0x40-8-0x18),%%d0
 1:	lea	%a0,%%a0
 	addql	#1,%%a0@(%%d0:l:4)
-	lea	"SYMBOL_NAME_STR(irq_handler)",%%a0
+	lea	irq_handler,%%a0
 	lea	%%a0@(%%d0:l:8),%%a0
 	pea 	%%sp@			/* push frame address */
 	movel	%%a0@(4),%%sp@-		/* push handler data */
@@ -294,7 +294,7 @@ SYMBOL_NAME_STR(atari_fast_irq_handler) ":
 	jsr	%%a0@			/* and call the handler */
 	addql	#8,%%sp
 	addql	#4,%%sp
-	jbra	"SYMBOL_NAME_STR(ret_from_interrupt)
+	jbra	ret_from_interrupt"
 	 : : "i" (&kstat.irqs[0]), "n" (PT_OFF_FORMATVEC)
 );
 }
@@ -306,7 +306,7 @@ SYMBOL_NAME_STR(atari_fast_irq_handler) ":
 asmlinkage void falcon_hblhandler(void);
 asm(".text\n"
 __ALIGN_STR "\n"
-SYMBOL_NAME_STR(falcon_hblhandler) ":
+"falcon_hblhandler:
 	orw	#0x200,%sp@	/* set saved ipl to 2 */
 	rte");
 

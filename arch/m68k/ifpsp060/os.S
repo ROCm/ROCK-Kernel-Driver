@@ -358,7 +358,7 @@ copyinae:
 |
 	.global		_060_real_trace
 _060_real_trace:
-	bral	SYMBOL_NAME(trap)
+	bral	trap
 
 |
 | _060_real_access():
@@ -374,7 +374,7 @@ _060_real_trace:
 |
 	.global		_060_real_access
 _060_real_access:
-	bral	SYMBOL_NAME(buserr)
+	bral	buserr
 
 
 
