@@ -14,6 +14,7 @@
 #define ARM_ASM_SA1100_APM_H
 
 #include <linux/config.h>
+#include <linux/apm_bios.h>
 
 /*
  * This structure gets filled in by the machine specific 'get_power_status'
@@ -56,5 +57,9 @@ struct apm_power_info {
  */
 extern void (*apm_get_power_status)(struct apm_power_info *);
 
+/*
+ * Queue an event (APM_SYS_SUSPEND or APM_CRITICAL_SUSPEND)
+ */
+void apm_queue_event(apm_event_t event);
 
 #endif

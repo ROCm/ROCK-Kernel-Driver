@@ -91,10 +91,15 @@ static DECLARE_RWSEM(user_list_lock);
 static LIST_HEAD(apm_user_list);
 
 /*
- * The kapmd info.
+ * kapmd info.  kapmd provides us a process context to handle
+ * "APM" events within - specifically necessary if we're going
+ * to be suspending the system.
  */
-static struct task_struct *kapmd;
+static DECLARE_WAIT_QUEUE_HEAD(kapmd_wait);
 static DECLARE_COMPLETION(kapmd_exit);
+static spinlock_t kapmd_queue_lock = SPIN_LOCK_UNLOCKED;
+static struct apm_queue kapmd_queue;
+
 
 static const char driver_version[] = "1.13";	/* no spaces */
 
@@ -454,34 +459,53 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 }
 #endif
 
-#if 0
-static int kapmd(void *startup)
+static int kapmd(void *arg)
 {
-	struct task_struct *tsk = current;
-
-	daemonize();
-	strcpy(tsk->comm, "kapmd");
-	kapmd = tsk;
-
-	spin_lock_irq(&tsk->sigmask_lock);
-	siginitsetinv(&tsk->blocked, sigmask(SIGQUIT));
-	recalc_sigpending(tsk);
-	spin_unlock_irq(&tsk->sigmask_lock);
-
-	complete((struct completion *)startup);
+	daemonize("kapmd");
+	current->flags |= PF_NOFREEZE;
 
 	do {
-		set_task_state(tsk, TASK_INTERRUPTIBLE);
-		schedule();
-	} while (!signal_pending(tsk));
+		apm_event_t event;
+
+		wait_event_interruptible(kapmd_wait,
+				!queue_empty(&kapmd_queue) || !pm_active);
+
+		if (!pm_active)
+			break;
+
+		spin_lock_irq(&kapmd_queue_lock);
+		event = 0;
+		if (!queue_empty(&kapmd_queue))
+			event = queue_get_event(&kapmd_queue);
+		spin_unlock_irq(&kapmd_queue_lock);
+
+		switch (event) {
+		case 0:
+			break;
+
+		case APM_LOW_BATTERY:
+		case APM_POWER_STATUS_CHANGE:
+			queue_event(event, NULL);
+			break;
+
+		case APM_USER_SUSPEND:
+		case APM_SYS_SUSPEND:
+			queue_event(event, NULL);
+			if (suspends_pending == 0)
+				apm_suspend();
+			break;
+
+		case APM_CRITICAL_SUSPEND:
+			apm_suspend();
+			break;
+		}
+	} while (1);
 
 	complete_and_exit(&kapmd_exit, 0);
 }
-#endif
 
 static int __init apm_init(void)
 {
-//	struct completion startup = COMPLETION_INITIALIZER(startup);
 	int ret;
 
 	if (apm_disabled) {
@@ -494,12 +518,13 @@ static int __init apm_init(void)
 		return -EINVAL;
 	}
 
-//	ret = kernel_thread(kapmd, &startup, CLONE_FS | CLONE_FILES);
-//	if (ret)
-//		return ret;
-//	wait_for_completion(&startup);
-
 	pm_active = 1;
+
+	ret = kernel_thread(kapmd, NULL, CLONE_KERNEL);
+	if (ret < 0) {
+		pm_active = 0;
+		return ret;
+	}
 
 #ifdef CONFIG_PROC_FS
 	create_proc_info_entry("apm", 0, NULL, apm_get_info);
@@ -507,9 +532,10 @@ static int __init apm_init(void)
 
 	ret = misc_register(&apm_device);
 	if (ret != 0) {
-		pm_active = 0;
 		remove_proc_entry("apm", NULL);
-		send_sig(SIGQUIT, kapmd, 1);
+
+		pm_active = 0;
+		wake_up(&kapmd_wait);
 		wait_for_completion(&kapmd_exit);
 	}
 
@@ -520,9 +546,10 @@ static void __exit apm_exit(void)
 {
 	misc_deregister(&apm_device);
 	remove_proc_entry("apm", NULL);
+
 	pm_active = 0;
-//	send_sig(SIGQUIT, kapmd, 1);
-//	wait_for_completion(&kapmd_exit);
+	wake_up(&kapmd_wait);
+	wait_for_completion(&kapmd_exit);
 }
 
 module_init(apm_init);
@@ -549,3 +576,27 @@ static int __init apm_setup(char *str)
 
 __setup("apm=", apm_setup);
 #endif
+
+/**
+ * apm_queue_event - queue an APM event for kapmd
+ * @event: APM event
+ *
+ * Queue an APM event for kapmd to process and ultimately take the
+ * appropriate action.  Only a subset of events are handled:
+ *   %APM_LOW_BATTERY
+ *   %APM_POWER_STATUS_CHANGE
+ *   %APM_USER_SUSPEND
+ *   %APM_SYS_SUSPEND
+ *   %APM_CRITICAL_SUSPEND
+ */
+void apm_queue_event(apm_event_t event)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&kapmd_queue_lock, flags);
+	queue_add_event(&kapmd_queue, event);
+	spin_unlock_irqrestore(&kapmd_queue_lock, flags);
+
+	wake_up_interruptible(&kapmd_wait);
+}
+EXPORT_SYMBOL(apm_queue_event);
