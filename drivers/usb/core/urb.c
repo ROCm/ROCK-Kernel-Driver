@@ -383,7 +383,7 @@ int usb_unlink_urb(struct urb *urb)
 {
 	/* FIXME
 	 * We should not care about the state here, but the host controllers
-	 * die a horrible death if we submit a urb for a device that has been
+	 * die a horrible death if we unlink a urb for a device that has been
 	 * physically removed.
 	 */
 	if (urb &&
