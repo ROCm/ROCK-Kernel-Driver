@@ -827,7 +827,7 @@ static void keyspan_pda_shutdown (struct usb_serial *serial)
 static struct usb_serial_device_type keyspan_pda_fake_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Keyspan PDA - (prerenumeration)",
-	.short_name =		"kyspn_pda_nofirm",
+	.short_name =		"keyspan_pda_pre",
 	.id_table =		id_table_fake,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		NUM_DONT_CARE,
@@ -841,7 +841,7 @@ static struct usb_serial_device_type keyspan_pda_fake_device = {
 static struct usb_serial_device_type xircom_pgs_fake_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Xircom / Entregra PGS - (prerenumeration)",
-	.short_name =		"xircom_nofirm",
+	.short_name =		"xircom_no_firm",
 	.id_table =		id_table_fake_xircom,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		NUM_DONT_CARE,
