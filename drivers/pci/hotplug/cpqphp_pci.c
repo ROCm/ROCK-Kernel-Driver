@@ -1369,7 +1369,7 @@ int cpqhp_find_available_resources (struct controller *ctrl, void *rom_start)
 		// The second condition is to ignore bus numbers on
 		// populated slots that don't have PCI-PCI bridges
 		if (secondary_bus && (secondary_bus != primary_bus)) {
-			bus_node = kmalloc(sizeof(*bus_mode), GFP_KERNEL);
+			bus_node = kmalloc(sizeof(*bus_node), GFP_KERNEL);
 			if (!bus_node)
 				return -ENOMEM;
 

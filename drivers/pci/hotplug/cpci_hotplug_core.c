@@ -94,10 +94,6 @@ slot_paranoia_check(struct slot *slot, const char *function)
 		dbg("%s - slot == NULL", function);
 		return -1;
 	}
-	if(slot->magic != SLOT_MAGIC) {
-		dbg("%s - bad magic number for slot", function);
-		return -1;
-	}
 	if(!slot->hotplug_slot) {
 		dbg("%s - slot->hotplug_slot == NULL!", function);
 		return -1;
