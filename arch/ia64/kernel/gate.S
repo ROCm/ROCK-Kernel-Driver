@@ -66,6 +66,7 @@ GLOBAL_ENTRY(syscall_via_epc)
 
 	mov r10=-1
 	mov r8=ENOSYS
+	MCKINLEY_E7_WORKAROUND
 	br.ret.sptk.many b6
 END(syscall_via_epc)
 
@@ -88,6 +89,7 @@ GLOBAL_ENTRY(fsys_fallback_syscall)
 	 */
 	movl r2=(syscall_via_break - .start_gate) + GATE_ADDR
 	;;
+	MCKINLEY_E7_WORKAROUND
 	mov b7=r2
 	br.ret.sptk.many b7
 END(fsys_fallback_syscall)

@@ -331,7 +331,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 		return;
 	}
 
-	if (!user_stack(regs)) {
+	if (!user_stack(current, regs)) {
 		DPRINT("ignoring kernel write to r%lu; register isn't on the kernel RBS!", r1);
 		return;
 	}
@@ -402,7 +402,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 		return;
 	}
 
-	if (!user_stack(regs)) {
+	if (!user_stack(current, regs)) {
 		DPRINT("ignoring kernel read of r%lu; register isn't on the RBS!", r1);
 		goto fail;
 	}

@@ -6,6 +6,8 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <linux/config.h>
+
 #define ENTRY(name)				\
 	.align 32;				\
 	.proc name;				\
@@ -55,6 +57,15 @@ name:
 # define EXCLR(y,x...)					\
 	.xdata4 "__ex_table", @gprel(99f), @gprel(y)+4;	\
   99:	x
+#endif
+
+#ifdef CONFIG_MCKINLEY
+/* workaround for Itanium 2 Errata 7: */
+# define MCKINLEY_E7_WORKAROUND			\
+	br.call.sptk.many b7=1f;;		\
+1:
+#else
+# define MCKINLEY_E7_WORKAROUND
 #endif
 
 #endif /* _ASM_IA64_ASMMACRO_H */

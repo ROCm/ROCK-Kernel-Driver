@@ -13,6 +13,7 @@
 ENTRY(fsys_ni_syscall)
 	mov r8=ENOSYS
 	mov r10=-1
+	MCKINLEY_E7_WORKAROUND
 	br.ret.sptk.many b6
 END(fsys_ni_syscall)
 
@@ -27,6 +28,7 @@ ENTRY(fsys_getpid)
 	;;
 	cmp.ne p8,p0=0,r9
 (p8)	br.spnt.many fsys_fallback_syscall
+	MCKINLEY_E7_WORKAROUND
 	br.ret.sptk.many b6
 END(fsys_getpid)
 
