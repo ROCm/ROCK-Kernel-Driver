@@ -1996,24 +1996,31 @@ static irqreturn_t lanai_int(int irq, void *devid, struct pt_regs *regs)
 {
 	struct lanai_dev *lanai = (struct lanai_dev *) devid;
 	u32 reason;
-	int handled = 0;
 
 	(void) irq; (void) regs;	/* unused variables */
+
 #ifdef USE_POWERDOWN
-	if (unlikely(lanai->conf1 & CONFIG1_POWERDOWN)) {
-		lanai->conf1 &= ~CONFIG1_POWERDOWN;
-		conf1_write(lanai);
-		printk(KERN_WARNING DEV_LABEL "(itf %d): Got interrupt "
-		    "0x%08X while in POWERDOWN, powering up\n", lanai->number,
-		    (unsigned int) intr_pending(lanai));
-		conf2_write(lanai);
-	}
+	/*
+	 * If we're powered down we shouldn't be generating any interrupts -
+	 * so assume that this is a shared interrupt line and it's for someone
+	 * else
+	 */
+	if (unlikely(lanai->conf1 & CONFIG1_POWERDOWN))
+		return IRQ_NONE;
 #endif
-	while ((reason = intr_pending(lanai)) != 0) {
-		handled = 1;
+
+	reason = intr_pending(lanai);
+	if (reason == 0)
+		return IRQ_NONE;	/* Must be for someone else */
+
+	do {
+		if (unlikely(reason == 0xFFFFFFFF))
+			break;		/* Maybe we've been unplugged? */
 		lanai_int_1(lanai, reason);
-	}
-	return IRQ_RETVAL(handled);
+		reason = intr_pending(lanai);
+	} while (reason != 0);
+
+	return IRQ_HANDLED;
 }
 
 /* TODO - it would be nice if we could use the "delayed interrupt" system
