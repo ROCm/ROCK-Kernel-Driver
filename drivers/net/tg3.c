@@ -2032,7 +2032,11 @@ static void tg3_tx(struct tg3 *tp)
 		int i;
 
 		if (unlikely(skb == NULL))
+#ifdef CONFIG_IA64_SGI_SN2
+			break;
+#else
 			BUG();
+#endif
 
 		pci_unmap_single(tp->pdev,
 				 pci_unmap_addr(ri, mapping),
@@ -6912,12 +6916,19 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	udelay(50);
 	tg3_nvram_init(tp);
 
+#ifdef CONFIG_IA64_SGI_SN2
+	/* Always use host TXDs, it performs better in particular
+	 * with multi-frag packets.
+	 */
+	tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+#else
 	/* Determine if TX descriptors will reside in
 	 * main memory or in the chip SRAM.
 	 */
 	if ((tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG) != 0 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+#endif
 
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
