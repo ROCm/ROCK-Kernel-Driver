@@ -80,7 +80,7 @@ fill_fixup:
 	 * since we must preserve %l5 and %l6, see comment above.
 	 */
 	call		do_sparc64_fault
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	ba,pt		%xcc, rtrap
 	 nop						! yes, nop is correct
 
@@ -158,7 +158,7 @@ window_scheisse_from_user_common:
 	ba,pt		%xcc, etrap
 	 rd		%pc, %g7
 	call		do_sparc64_fault
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	ba,a,pt		%xcc, rtrap_clr_l6
 
 	.globl		winfix_mna, fill_fixup_mna, spill_fixup_mna
@@ -197,7 +197,7 @@ fill_fixup_mna:
 	mov		%o7, %g6			! Get current back.
 	ldx		[%g6 + TI_TASK], %g4		! Finish it.
 	call		mem_address_unaligned
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 
 	b,pt		%xcc, rtrap
 	 nop						! yes, the nop is correct
@@ -258,7 +258,7 @@ window_mna_from_user_common:
 	mov		%l4, %o2
 	mov		%l5, %o1
 	call		mem_address_unaligned
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	ba,pt		%xcc, rtrap
 	 clr		%l6
 	
@@ -303,7 +303,7 @@ fill_fixup_dax:
 	mov		%o7, %g6			! Get current back.
 	ldx		[%g6 + TI_TASK], %g4		! Finish it.
 	call		data_access_exception
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 
 	b,pt		%xcc, rtrap
 	 nop						! yes, the nop is correct
@@ -364,7 +364,7 @@ window_dax_from_user_common:
 	mov		%l4, %o1
 	mov		%l5, %o2
 	call		data_access_exception
-	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	 add		%sp, PTREGS_OFF, %o0
 	ba,pt		%xcc, rtrap
 	 clr		%l6
 	
