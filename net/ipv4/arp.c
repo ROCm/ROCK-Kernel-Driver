@@ -71,6 +71,7 @@
  *					arp_xmit so intermediate drivers like
  *					bonding can change the skb before
  *					sending (e.g. insert 8021q tag).
+ *		Harald Welte	:	convert to make use of jenkins hash
  */
 
 #include <linux/module.h>
@@ -97,6 +98,7 @@
 #include <linux/init.h>
 #include <linux/net.h>
 #include <linux/rcupdate.h>
+#include <linux/jhash.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -223,15 +225,7 @@ int arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir)
 
 static u32 arp_hash(const void *pkey, const struct net_device *dev)
 {
-	u32 hash_val;
-
-	hash_val = *(u32*)pkey;
-	hash_val ^= (hash_val>>16);
-	hash_val ^= hash_val>>8;
-	hash_val ^= hash_val>>3;
-	hash_val = (hash_val^dev->ifindex);
-
-	return hash_val;
+	return jhash_2words(*(u32 *)pkey, dev->ifindex, arp_tbl.hash_rnd);
 }
 
 static int arp_constructor(struct neighbour *neigh)

@@ -29,6 +29,7 @@
 #include <net/dst.h>
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
+#include <linux/random.h>
 
 #define NEIGH_DEBUG 1
 
@@ -1316,6 +1317,8 @@ void neigh_table_init(struct neigh_table *tbl)
 		panic("cannot allocate neighbour cache hashes");
 
 	memset(tbl->phash_buckets, 0, phsize);
+
+	get_random_bytes(&tbl->hash_rnd, sizeof(tbl->hash_rnd));
 
 	tbl->lock	       = RW_LOCK_UNLOCKED;
 	init_timer(&tbl->gc_timer);

@@ -27,6 +27,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/rcupdate.h>
+#include <linux/jhash.h>
 #include <net/route.h> /* for struct rtable and routing */
 #include <net/icmp.h> /* icmp_send */
 #include <asm/param.h> /* for HZ */
@@ -328,15 +329,7 @@ static int clip_constructor(struct neighbour *neigh)
 
 static u32 clip_hash(const void *pkey, const struct net_device *dev)
 {
-	u32 hash_val;
-
-	hash_val = *(u32*)pkey;
-	hash_val ^= (hash_val>>16);
-	hash_val ^= hash_val>>8;
-	hash_val ^= hash_val>>3;
-	hash_val = (hash_val^dev->ifindex);
-
-	return hash_val;
+	return jhash_2words(*(u32 *)pkey, dev->ifindex, clip_tbl.hash_rnd);
 }
 
 static struct neigh_table clip_tbl = {

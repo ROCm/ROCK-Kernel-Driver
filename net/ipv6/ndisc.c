@@ -66,6 +66,7 @@
 #include <linux/if_arp.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
+#include <linux/jhash.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -270,15 +271,14 @@ int ndisc_mc_map(struct in6_addr *addr, char *buf, struct net_device *dev, int d
 
 static u32 ndisc_hash(const void *pkey, const struct net_device *dev)
 {
-	u32 hash_val;
+	const u32 *p32 = pkey;
+	u32 addr_hash, i;
 
-	hash_val = *(u32*)(pkey + sizeof(struct in6_addr) - 4);
-	hash_val ^= (hash_val>>16);
-	hash_val ^= hash_val>>8;
-	hash_val ^= hash_val>>3;
-	hash_val = (hash_val^dev->ifindex);
+	addr_hash = 0;
+	for (i = 0; i < (sizeof(struct in6_addr) / sizeof(u32)); i++)
+		addr_hash ^= *p32++;
 
-	return hash_val;
+	return jhash_2words(addr_hash, dev->ifindex, nd_tbl.hash_rnd);
 }
 
 static int ndisc_constructor(struct neighbour *neigh)

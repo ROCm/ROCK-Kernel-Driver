@@ -36,6 +36,7 @@
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 #include <linux/rcupdate.h>
+#include <linux/jhash.h>
 #include <asm/atomic.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
@@ -122,13 +123,7 @@ struct neigh_table dn_neigh_table = {
 
 static u32 dn_neigh_hash(const void *pkey, const struct net_device *dev)
 {
-	u32 hash_val;
-
-	hash_val = *(dn_address *)pkey;
-	hash_val ^= (hash_val >> 10);
-	hash_val ^= (hash_val >> 3);
-
-	return hash_val;
+	return jhash_2words(*(dn_address *)pkey, 0, dn_neigh_table.hash_rnd);
 }
 
 static int dn_neigh_construct(struct neighbour *neigh)
