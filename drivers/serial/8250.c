@@ -12,7 +12,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- *  $Id: 8250.c,v 1.83 2002/07/21 23:08:22 rmk Exp $
+ *  $Id: 8250.c,v 1.84 2002/07/22 15:27:32 rmk Exp $
  *
  * A note about mapbase / membase
  *
@@ -690,7 +690,7 @@ static void autoconfig_irq(struct uart_8250_port *up)
 	up->port.irq = (irq > 0) ? irq : 0;
 }
 
-static void __serial8250_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void serial8250_stop_tx(struct uart_port *port, unsigned int tty_stop)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 
@@ -702,16 +702,6 @@ static void __serial8250_stop_tx(struct uart_port *port, unsigned int tty_stop)
 		up->acr |= UART_ACR_TXDIS;
 		serial_icr_write(up, UART_ACR, up->acr);
 	}
-}
-
-static void serial8250_stop_tx(struct uart_port *port, unsigned int tty_stop)
-{
-	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned long flags;
-
-	spin_lock_irqsave(&up->port.lock, flags);
-	__serial8250_stop_tx(port, tty_stop);
-	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static void serial8250_start_tx(struct uart_port *port, unsigned int tty_start)
@@ -852,7 +842,7 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(&up->port)) {
-		__serial8250_stop_tx(&up->port, 0);
+		serial8250_stop_tx(&up->port, 0);
 		return;
 	}
 
@@ -871,7 +861,7 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 	DEBUG_INTR("THRE...");
 
 	if (uart_circ_empty(xmit))
-		__serial8250_stop_tx(&up->port, 0);
+		serial8250_stop_tx(&up->port, 0);
 }
 
 static _INLINE_ void check_modem_status(struct uart_8250_port *up)
@@ -1965,7 +1955,7 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.83 $ "
+	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.84 $ "
 		"IRQ sharing %sabled\n", share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -1997,7 +1987,7 @@ EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_get_irq_map);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.83 $");
+MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.84 $");
 
 MODULE_PARM(share_irqs, "i");
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"

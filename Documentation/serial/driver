@@ -3,7 +3,7 @@
 			--------------------
 
 
-   $Id: driver,v 1.9 2002/07/06 16:51:43 rmk Exp $
+   $Id: driver,v 1.10 2002/07/22 15:27:30 rmk Exp $
 
 
 This document is meant as a brief overview of some aspects of the new serial
@@ -119,7 +119,7 @@ hardware.
 	tty_stop: 1 if this call is due to the TTY layer issuing a
 	          TTY stop to the driver (equiv to rs_stop).
 
-	Locking: none.
+	Locking: port->lock taken.
 	Interrupts: caller dependent.
 	This call must not sleep
 

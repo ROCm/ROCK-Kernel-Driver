@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: core.c,v 1.90 2002/07/21 21:32:30 rmk Exp $
+ *  $Id: core.c,v 1.91 2002/07/22 15:27:32 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -93,18 +93,24 @@ static void uart_stop(struct tty_struct *tty)
 {
 	struct uart_info *info = tty->driver_data;
 	struct uart_port *port = info->port;
+	unsigned long flags;
 
+	spin_lock_irqsave(&port->lock, flags);
 	port->ops->stop_tx(port, 1);
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void __uart_start(struct tty_struct *tty)
 {
 	struct uart_info *info = tty->driver_data;
 	struct uart_port *port = info->port;
+	unsigned long flags;
 
+	spin_lock_irqsave(&port->lock, flags);
 	if (!uart_circ_empty(&info->xmit) && info->xmit.buf &&
 	    !tty->stopped && !tty->hw_stopped)
 		port->ops->start_tx(port, 1);
+	spin_unlock_irqrestore(&port->flags, flags);
 }
 
 static void uart_start(struct tty_struct *tty)
@@ -554,13 +560,17 @@ static void uart_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct uart_info *info = tty->driver_data;
 	struct uart_port *port = info->port;
+	unsigned long flags;
 
 	if (port->ops->send_xchar)
 		port->ops->send_xchar(port, ch);
 	else {
 		port->x_char = ch;
-		if (ch)
+		if (ch) {
+			spin_lock_irqsave(&port->lock, flags);
 			port->ops->start_tx(port, 0);
+			spin_unlock_irqrestore(&port->lock, flags);
+		}
 	}
 }
 
@@ -1935,8 +1945,8 @@ static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstat
 			port->cons->flags &= ~CON_ENABLED;
 
 		if (running) {
-			ops->stop_tx(port, 0);
 			spin_lock_irq(&port->lock);
+			ops->stop_tx(port, 0);
 			ops->set_mctrl(port, 0);
 			spin_unlock_irq(&port->lock);
 			ops->stop_rx(port);
