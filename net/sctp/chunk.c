@@ -77,8 +77,8 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 	struct sctp_chunk *chunk;
 	struct sctp_opt *sp;
 	struct sctp_ulpevent *ev;
-	struct sctp_association *asoc;
-	int error, notify;
+	struct sctp_association *asoc = NULL;
+	int error = 0, notify;
 
 	/* If we failed, we may need to notify. */
 	notify = msg->send_failed ? -1 : 0;
