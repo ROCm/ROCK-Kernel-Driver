@@ -56,7 +56,7 @@
 #ifdef CONFIG_AMIGA
 #include <asm/amigahw.h>
 #endif
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PREP
 #include <asm/processor.h>
 #define isPReP (_machine == _MACH_prep)
 #else
@@ -2395,7 +2395,7 @@ static void fbcon_clgen32_clear (struct vc_data *conp, struct display *p,
 
 
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PREP
 #define PREP_VIDEO_BASE ((volatile unsigned long) 0xC0000000)
 #define PREP_IO_BASE    ((volatile unsigned char *) 0x80000000)
 static void __init get_prep_addrs (unsigned long *display, unsigned long *registers)
@@ -2408,7 +2408,7 @@ static void __init get_prep_addrs (unsigned long *display, unsigned long *regist
 	DPRINTK ("EXIT\n");
 }
 
-#endif				/* CONFIG_ALL_PPC */
+#endif				/* CONFIG_PPC_PREP */
 
 
 
@@ -2543,7 +2543,7 @@ static int __init clgen_pci_setup (struct clgenfb_info *info,
 		pcibios_write_config_dword (0, pdev->devfn, PCI_BASE_ADDRESS_0,
 			0x00000000);
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PREP
 		get_prep_addrs (&board_addr, &info->fbregs_phys);
 #endif
 	} else {

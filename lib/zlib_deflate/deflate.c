@@ -63,22 +63,22 @@ typedef enum {
     finish_done     /* finish done, accept no more input or output */
 } block_state;
 
-typedef block_state (*compress_func) OF((deflate_state *s, int flush));
+typedef block_state (*compress_func) (deflate_state *s, int flush);
 /* Compression function. Returns the block state after the call. */
 
-local void fill_window    OF((deflate_state *s));
-local block_state deflate_stored OF((deflate_state *s, int flush));
-local block_state deflate_fast   OF((deflate_state *s, int flush));
-local block_state deflate_slow   OF((deflate_state *s, int flush));
-local void lm_init        OF((deflate_state *s));
-local void putShortMSB    OF((deflate_state *s, uInt b));
-local void flush_pending  OF((z_streamp strm));
-local int read_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
-local uInt longest_match  OF((deflate_state *s, IPos cur_match));
+local void fill_window    (deflate_state *s);
+local block_state deflate_stored (deflate_state *s, int flush);
+local block_state deflate_fast   (deflate_state *s, int flush);
+local block_state deflate_slow   (deflate_state *s, int flush);
+local void lm_init        (deflate_state *s);
+local void putShortMSB    (deflate_state *s, uInt b);
+local void flush_pending  (z_streamp strm);
+local int read_buf        (z_streamp strm, Byte *buf, unsigned size);
+local uInt longest_match  (deflate_state *s, IPos cur_match);
 
 #ifdef DEBUG_ZLIB
-local  void check_match OF((deflate_state *s, IPos start, IPos match,
-                            int length));
+local  void check_match (deflate_state *s, IPos start, IPos match,
+                         int length);
 #endif
 
 /* ===========================================================================
@@ -161,7 +161,7 @@ local const config configuration_table[10] = {
  */
 #define CLEAR_HASH(s) \
     s->head[s->hash_size-1] = NIL; \
-    memset((charf *)s->head, 0, (unsigned)(s->hash_size-1)*sizeof(*s->head));
+    memset((char *)s->head, 0, (unsigned)(s->hash_size-1)*sizeof(*s->head));
 
 /* ========================================================================= */
 int zlib_deflateInit_(
@@ -194,7 +194,7 @@ int zlib_deflateInit2_(
     static char* my_version = ZLIB_VERSION;
     deflate_workspace *mem;
 
-    ushf *overlay;
+    ush *overlay;
     /* We overlay pending_buf and d_buf+l_buf. This works since the average
      * output size for (length,distance) codes is <= 24 bits.
      */
@@ -221,7 +221,7 @@ int zlib_deflateInit2_(
         return Z_STREAM_ERROR;
     }
     s = (deflate_state *) &(mem->deflate_memory);
-    strm->state = (struct internal_state FAR *)s;
+    strm->state = (struct internal_state *)s;
     s->strm = strm;
 
     s->noheader = noheader;
@@ -234,14 +234,14 @@ int zlib_deflateInit2_(
     s->hash_mask = s->hash_size - 1;
     s->hash_shift =  ((s->hash_bits+MIN_MATCH-1)/MIN_MATCH);
 
-    s->window = (Bytef *) mem->window_memory;
-    s->prev   = (Posf *)  mem->prev_memory;
-    s->head   = (Posf *)  mem->head_memory;
+    s->window = (Byte *) mem->window_memory;
+    s->prev   = (Pos *)  mem->prev_memory;
+    s->head   = (Pos *)  mem->head_memory;
 
     s->lit_bufsize = 1 << (memLevel + 6); /* 16K elements by default */
 
-    overlay = (ushf *) mem->overlay_memory;
-    s->pending_buf = (uchf *) overlay;
+    overlay = (ush *) mem->overlay_memory;
+    s->pending_buf = (uch *) overlay;
     s->pending_buf_size = (ulg)s->lit_bufsize * (sizeof(ush)+2L);
 
     s->d_buf = overlay + s->lit_bufsize/sizeof(ush);
@@ -257,7 +257,7 @@ int zlib_deflateInit2_(
 /* ========================================================================= */
 int zlib_deflateSetDictionary(
 	z_streamp strm,
-	const Bytef *dictionary,
+	const Byte *dictionary,
 	uInt  dictLength
 )
 {
@@ -281,7 +281,7 @@ int zlib_deflateSetDictionary(
 	dictionary += dictLength - length; /* use the tail of the dictionary */
 #endif
     }
-    memcpy((charf *)s->window, dictionary, length);
+    memcpy((char *)s->window, dictionary, length);
     s->strstart = length;
     s->block_start = (long)length;
 
@@ -580,7 +580,7 @@ int zlib_deflateCopy (
 #else
     deflate_state *ds;
     deflate_state *ss;
-    ushf *overlay;
+    ush *overlay;
     deflate_workspace *mem;
 
 
@@ -596,15 +596,15 @@ int zlib_deflateCopy (
 
     ds = &(mem->deflate_memory);
 
-    dest->state = (struct internal_state FAR *) ds;
+    dest->state = (struct internal_state *) ds;
     *ds = *ss;
     ds->strm = dest;
 
-    ds->window = (Bytef *) mem->window_memory;
-    ds->prev   = (Posf *)  mem->prev_memory;
-    ds->head   = (Posf *)  mem->head_memory;
-    overlay = (ushf *) mem->overlay_memory;
-    ds->pending_buf = (uchf *) overlay;
+    ds->window = (Byte *) mem->window_memory;
+    ds->prev   = (Pos *)  mem->prev_memory;
+    ds->head   = (Pos *)  mem->head_memory;
+    overlay = (ush *) mem->overlay_memory;
+    ds->pending_buf = (uch *) overlay;
 
     memcpy(ds->window, ss->window, ds->w_size * 2 * sizeof(Byte));
     memcpy(ds->prev, ss->prev, ds->w_size * sizeof(Pos));
@@ -632,7 +632,7 @@ int zlib_deflateCopy (
  */
 local int read_buf(
 	z_streamp strm,
-	Bytef *buf,
+	Byte *buf,
 	unsigned size
 )
 {
@@ -695,8 +695,8 @@ local uInt longest_match(s, cur_match)
     IPos cur_match;                             /* current match */
 {
     unsigned chain_length = s->max_chain_length;/* max hash chain length */
-    register Bytef *scan = s->window + s->strstart; /* current string */
-    register Bytef *match;                       /* matched string */
+    register Byte *scan = s->window + s->strstart; /* current string */
+    register Byte *match;                       /* matched string */
     register int len;                           /* length of current match */
     int best_len = s->prev_length;              /* best match length so far */
     int nice_match = s->nice_match;             /* stop if match long enough */
@@ -705,18 +705,18 @@ local uInt longest_match(s, cur_match)
     /* Stop when cur_match becomes <= limit. To simplify the code,
      * we prevent matches with the string of window index 0.
      */
-    Posf *prev = s->prev;
+    Pos *prev = s->prev;
     uInt wmask = s->w_mask;
 
 #ifdef UNALIGNED_OK
     /* Compare two bytes at a time. Note: this is not always beneficial.
      * Try with and without -DUNALIGNED_OK to check.
      */
-    register Bytef *strend = s->window + s->strstart + MAX_MATCH - 1;
-    register ush scan_start = *(ushf*)scan;
-    register ush scan_end   = *(ushf*)(scan+best_len-1);
+    register Byte *strend = s->window + s->strstart + MAX_MATCH - 1;
+    register ush scan_start = *(ush*)scan;
+    register ush scan_end   = *(ush*)(scan+best_len-1);
 #else
-    register Bytef *strend = s->window + s->strstart + MAX_MATCH;
+    register Byte *strend = s->window + s->strstart + MAX_MATCH;
     register Byte scan_end1  = scan[best_len-1];
     register Byte scan_end   = scan[best_len];
 #endif
@@ -748,8 +748,8 @@ local uInt longest_match(s, cur_match)
         /* This code assumes sizeof(unsigned short) == 2. Do not use
          * UNALIGNED_OK if your compiler uses a different size.
          */
-        if (*(ushf*)(match+best_len-1) != scan_end ||
-            *(ushf*)match != scan_start) continue;
+        if (*(ush*)(match+best_len-1) != scan_end ||
+            *(ush*)match != scan_start) continue;
 
         /* It is not necessary to compare scan[2] and match[2] since they are
          * always equal when the other bytes match, given that the hash keys
@@ -763,10 +763,10 @@ local uInt longest_match(s, cur_match)
         Assert(scan[2] == match[2], "scan[2]?");
         scan++, match++;
         do {
-        } while (*(ushf*)(scan+=2) == *(ushf*)(match+=2) &&
-                 *(ushf*)(scan+=2) == *(ushf*)(match+=2) &&
-                 *(ushf*)(scan+=2) == *(ushf*)(match+=2) &&
-                 *(ushf*)(scan+=2) == *(ushf*)(match+=2) &&
+        } while (*(ush*)(scan+=2) == *(ush*)(match+=2) &&
+                 *(ush*)(scan+=2) == *(ush*)(match+=2) &&
+                 *(ush*)(scan+=2) == *(ush*)(match+=2) &&
+                 *(ush*)(scan+=2) == *(ush*)(match+=2) &&
                  scan < strend);
         /* The funny "do {}" generates better code on most compilers */
 
@@ -815,7 +815,7 @@ local uInt longest_match(s, cur_match)
             best_len = len;
             if (len >= nice_match) break;
 #ifdef UNALIGNED_OK
-            scan_end = *(ushf*)(scan+best_len-1);
+            scan_end = *(ush*)(scan+best_len-1);
 #else
             scan_end1  = scan[best_len-1];
             scan_end   = scan[best_len];
@@ -838,8 +838,8 @@ local void check_match(s, start, match, length)
     int length;
 {
     /* check that the match is indeed a match */
-    if (memcmp((charf *)s->window + match,
-                (charf *)s->window + start, length) != EQUAL) {
+    if (memcmp((char *)s->window + match,
+                (char *)s->window + start, length) != EQUAL) {
         fprintf(stderr, " start %u, match %u, length %d\n",
 		start, match, length);
         do {
@@ -870,7 +870,7 @@ local void fill_window(s)
     deflate_state *s;
 {
     register unsigned n, m;
-    register Posf *p;
+    register Pos *p;
     unsigned more;    /* Amount of free space at the end of the window. */
     uInt wsize = s->w_size;
 
@@ -892,7 +892,7 @@ local void fill_window(s)
          */
         } else if (s->strstart >= wsize+MAX_DIST(s)) {
 
-            memcpy((charf *)s->window, (charf *)s->window+wsize,
+            memcpy((char *)s->window, (char *)s->window+wsize,
                    (unsigned)wsize);
             s->match_start -= wsize;
             s->strstart    -= wsize; /* we now have strstart >= MAX_DIST */
@@ -961,8 +961,8 @@ local void fill_window(s)
  */
 #define FLUSH_BLOCK_ONLY(s, eof) { \
    zlib_tr_flush_block(s, (s->block_start >= 0L ? \
-                   (charf *)&s->window[(unsigned)s->block_start] : \
-                   (charf *)Z_NULL), \
+                   (char *)&s->window[(unsigned)s->block_start] : \
+                   (char *)Z_NULL), \
 		(ulg)((long)s->strstart - s->block_start), \
 		(eof)); \
    s->block_start = s->strstart; \
@@ -1252,7 +1252,7 @@ local block_state deflate_slow(s, flush)
     return flush == Z_FINISH ? finish_done : block_done;
 }
 
-ZEXTERN int ZEXPORT zlib_deflate_workspacesize ()
+extern int zlib_deflate_workspacesize ()
 {
     return sizeof(deflate_workspace);
 }

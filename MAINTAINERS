@@ -1531,6 +1531,12 @@ L:	reiserfs-list@namesys.com
 W:	http://www.namesys.com
 S:	Supported
 
+ROCKETPORT DRIVER
+P:	Comtrol Corp.
+M:	support@comtrol.com
+W:	http://www.comtrol.com
+S:	Maintained
+
 ROSE NETWORK LAYER
 P:	Ralf Baechle
 M:	ralf@linux-mips.org

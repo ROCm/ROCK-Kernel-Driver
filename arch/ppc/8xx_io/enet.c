@@ -643,7 +643,7 @@ int __init scc_enet_init(void)
 {
 	struct net_device *dev;
 	struct scc_enet_private *cep;
-	int i, j, k;
+	int i, j, k, err;
 	unsigned char	*eap, *ba;
 	dma_addr_t	mem_addr;
 	bd_t		*bd;
@@ -659,18 +659,12 @@ int __init scc_enet_init(void)
 
 	bd = (bd_t *)__res;
 
-	/* Allocate some private information.
-	*/
-	cep = (struct scc_enet_private *)kmalloc(sizeof(*cep), GFP_KERNEL);
-	if (cep == NULL)
+	dev = alloc_etherdev(sizeof(*cep));
+	if (!dev)
 		return -ENOMEM;
 
-	__clear_user(cep,sizeof(*cep));
+	cep = dev->priv;
 	spin_lock_init(&cep->lock);
-
-	/* Create an Ethernet device instance.
-	*/
-	dev = init_etherdev(0, 0);
 
 	/* Get pointer to SCC area in parameter RAM.
 	*/
@@ -841,6 +835,7 @@ int __init scc_enet_init(void)
 		/* Allocate a page.
 		*/
 		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
+		/* BUG: no check for failure */
 
 		/* Initialize the BD for every fragment in the page.
 		*/
@@ -939,7 +934,6 @@ int __init scc_enet_init(void)
 #endif
 
 	dev->base_addr = (unsigned long)ep;
-	dev->priv = cep;
 #if 0
 	dev->name = "CPM_ENET";
 #endif
@@ -952,6 +946,12 @@ int __init scc_enet_init(void)
 	dev->stop = scc_enet_close;
 	dev->get_stats = scc_enet_get_stats;
 	dev->set_multicast_list = set_multicast_list;
+
+	err = register_netdev(dev);
+	if (err) {
+		kfree(dev);
+		return err;
+	}
 
 	/* And last, enable the transmit and receive processing.
 	*/

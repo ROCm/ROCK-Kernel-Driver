@@ -1606,7 +1606,7 @@ static int __init riva_set_fbinfo(struct fb_info *info)
 	return 0;
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 static int riva_get_EDID_OF(struct riva_par *par, struct pci_dev *pd)
 {
 	struct device_node *dp;
@@ -1621,7 +1621,7 @@ static int riva_get_EDID_OF(struct riva_par *par, struct pci_dev *pd)
 	} else
 		return 0;
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_OF */
 
 static int riva_dfp_parse_EDID(struct riva_par *par)
 {
@@ -1699,7 +1699,7 @@ static void riva_update_default_var(struct fb_info *info)
 
 static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	if (!riva_get_EDID_OF(info, pdev))
 		printk("rivafb: could not retrieve EDID from OF\n");
 #else

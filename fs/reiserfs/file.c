@@ -736,6 +736,7 @@ int reiserfs_prepare_file_region_for_write(
     struct buffer_head *itembuf=NULL; // Buffer head that contains items that we are going to deal with
     INITIALIZE_PATH(path); // path to item, that we are going to deal with.
     __u32 * item=0; // pointer to item we are going to deal with
+    int item_pos=-1; /* Position in indirect item */
 
 
     if ( num_pages < 1 ) {
@@ -807,7 +808,6 @@ int reiserfs_prepare_file_region_for_write(
 
     reiserfs_write_lock(inode->i_sb); // We need that for at least search_by_key()
     for ( i = 0; i < num_pages ; i++ ) { 
-	int item_pos=-1; /* Position in indirect item */
 
 	head = page_buffers(prepared_pages[i]);
 	/* For each buffer in the page */

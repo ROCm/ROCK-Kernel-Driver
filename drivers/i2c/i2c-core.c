@@ -124,7 +124,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 
 int i2c_del_adapter(struct i2c_adapter *adap)
 {
-	struct list_head  *item;
+	struct list_head  *item, *_n;
 	struct i2c_driver *driver;
 	struct i2c_client *client;
 	int res = 0;
@@ -144,7 +144,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 
 	/* detach any active clients. This must be done first, because
 	 * it can fail; in which case we give upp. */
-	list_for_each(item,&adap->clients) {
+	list_for_each_safe(item, _n, &adap->clients) {
 		client = list_entry(item, struct i2c_client, list);
 
 		/* detaching devices is unconditional of the set notify
@@ -215,8 +215,7 @@ int i2c_add_driver(struct i2c_driver *driver)
 
 int i2c_del_driver(struct i2c_driver *driver)
 {
-	struct list_head   *item1;
-	struct list_head   *item2;
+	struct list_head   *item1, *item2, *_n;
 	struct i2c_client  *client;
 	struct i2c_adapter *adap;
 	
@@ -245,7 +244,7 @@ int i2c_del_driver(struct i2c_driver *driver)
 				goto out_unlock;
 			}
 		} else {
-			list_for_each(item2,&adap->clients) {
+			list_for_each_safe(item2, _n, &adap->clients) {
 				client = list_entry(item2, struct i2c_client, list);
 				if (client->driver != driver)
 					continue;

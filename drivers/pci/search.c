@@ -118,6 +118,34 @@ pci_find_device(unsigned int vendor, unsigned int device, const struct pci_dev *
 
 
 /**
+ * pci_find_device_reverse - begin or continue searching for a PCI device by vendor/device id
+ * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
+ * @device: PCI device id to match, or %PCI_ANY_ID to match all device ids
+ * @from: Previous PCI device found in search, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI devices in the reverse order of pci_find_device().
+ * If a PCI device is found with a matching @vendor and @device, a pointer to
+ * its device structure is returned.  Otherwise, %NULL is returned.
+ * A new search is initiated by passing %NULL to the @from argument.
+ * Otherwise if @from is not %NULL, searches continue from previous device on the global list.
+ */
+struct pci_dev *
+pci_find_device_reverse(unsigned int vendor, unsigned int device, const struct pci_dev *from)
+{
+	struct list_head *n = from ? from->global_list.prev : pci_devices.prev;
+
+	while (n != &pci_devices) {
+		struct pci_dev *dev = pci_dev_g(n);
+		if ((vendor == PCI_ANY_ID || dev->vendor == vendor) &&
+		    (device == PCI_ANY_ID || dev->device == device))
+			return dev;
+		n = n->prev;
+	}
+	return NULL;
+}
+
+
+/**
  * pci_find_class - begin or continue searching for a PCI device by class
  * @class: search for a PCI device with this class designation
  * @from: Previous PCI device found in search, or %NULL for new search.
@@ -143,8 +171,20 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	return NULL;
 }
 
+/**
+ * pci_present - determine if there are any pci devices on this system
+ *
+ * Returns 0 if no pci devices are present, 1 if pci devices are present.
+ */
+int pci_present(void)
+{
+	return !list_empty(&pci_devices);
+}
+
 EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
+EXPORT_SYMBOL(pci_find_device_reverse);
 EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
+EXPORT_SYMBOL(pci_present);

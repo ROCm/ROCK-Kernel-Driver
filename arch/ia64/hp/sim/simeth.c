@@ -191,7 +191,7 @@ simeth_probe1(void)
 	unsigned char mac_addr[ETH_ALEN];
 	struct simeth_local *local;
 	struct net_device *dev;
-	int fd, i;
+	int fd, i, err;
 
 	/*
 	 * XXX Fix me
@@ -207,21 +207,11 @@ simeth_probe1(void)
 	if (fd == -1)
 		return -ENODEV;
 
-	dev = init_etherdev(NULL, sizeof(struct simeth_local));
+	dev = alloc_etherdev(sizeof(struct simeth_local));
 	if (!dev)
 		return -ENOMEM;
 
 	memcpy(dev->dev_addr, mac_addr, sizeof(mac_addr));
-
-	dev->irq = ia64_alloc_vector();
-
-	/*
-	 * attach the interrupt in the simulator, this does enable interrupts
-	 * until a netdev_attach() is called
-	 */
-	netdev_connect(dev->irq);
-
-	memset(dev->priv, 0, sizeof(struct simeth_local));
 
 	local = dev->priv;
 	local->simfd = fd; /* keep track of underlying file descriptor */
@@ -232,8 +222,19 @@ simeth_probe1(void)
 	dev->get_stats		= simeth_get_stats;
 	dev->set_multicast_list = set_multicast_list; /* no yet used */
 
-	/* Fill in the fields of the device structure with ethernet-generic values. */
-	ether_setup(dev);
+	err = register_netdev(dev);
+	if (dev) {
+		kfree(dev);
+		return err;
+	}
+
+	dev->irq = ia64_alloc_vector();
+
+	/*
+	 * attach the interrupt in the simulator, this does enable interrupts
+	 * until a netdev_attach() is called
+	 */
+	netdev_connect(dev->irq);
 
 	printk(KERN_INFO "%s: hosteth=%s simfd=%d, HwAddr",
 	       dev->name, simeth_device, local->simfd);
@@ -242,7 +243,7 @@ simeth_probe1(void)
 	}
 	printk(", IRQ %d\n", dev->irq);
 
-		return 0;
+	return 0;
 }
 
 /*

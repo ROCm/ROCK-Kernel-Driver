@@ -2093,16 +2093,23 @@ static void tty_unregister_devfs(struct tty_driver *driver, int index)
 # define tty_unregister_devfs(driver, index)	do { } while (0)
 #endif /* CONFIG_DEVFS_FS */
 
-static struct class tty_class = {
-	.name	= "tty",
-};
-
 struct tty_dev {
 	struct list_head node;
 	dev_t dev;
 	struct class_device class_dev;
 };
 #define to_tty_dev(d) container_of(d, struct tty_dev, class_dev)
+
+static void release_tty_dev(struct class_device *class_dev)
+{
+	struct tty_dev *tty_dev = to_tty_dev(class_dev);
+	kfree(tty_dev);
+}
+
+static struct class tty_class = {
+	.name		= "tty",
+	.release	= &release_tty_dev,
+};
 
 static LIST_HEAD(tty_dev_list);
 static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
@@ -2167,7 +2174,6 @@ void tty_remove_class_device(dev_t dev)
 		list_del(&tty_dev->node);
 		spin_unlock(&tty_dev_list_lock);
 		class_device_unregister(&tty_dev->class_dev);
-		kfree(tty_dev);
 	} else {
 		spin_unlock(&tty_dev_list_lock);
 	}

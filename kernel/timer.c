@@ -1226,47 +1226,36 @@ void __init init_timers(void)
 }
 
 #ifdef CONFIG_TIME_INTERPOLATION
-
 volatile unsigned long last_nsec_offset;
-
-struct time_interpolator *time_interpolator;
-
 #ifndef __HAVE_ARCH_CMPXCHG
 spinlock_t last_nsec_offset_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
-static struct {
-	spinlock_t lock;		/* lock protecting list */
-	struct time_interpolator *list;	/* list of registered interpolators */
-} ti_global = {
-	.lock = SPIN_LOCK_UNLOCKED
-};
+struct time_interpolator *time_interpolator;
+struct time_interpolator *time_interpolator_list;
+spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
 
 static inline int
 is_better_time_interpolator(struct time_interpolator *new)
 {
 	if (!time_interpolator)
 		return 1;
-	return new->frequency > 2*time_interpolator->frequency
-		|| (unsigned long) new->drift < (unsigned long) time_interpolator->drift;
+	return new->frequency > 2*time_interpolator->frequency ||
+	    (unsigned long)new->drift < (unsigned long)time_interpolator->drift;
 }
 
 void
 register_time_interpolator(struct time_interpolator *ti)
 {
-	spin_lock(&ti_global.lock);
-	{
-		write_seqlock_irq(&xtime_lock);
-		{
-			if (is_better_time_interpolator(ti))
-				time_interpolator = ti;
-		}
-		write_sequnlock_irq(&xtime_lock);
+	spin_lock(&time_interpolator_lock);
+	write_seqlock_irq(&xtime_lock);
+	if (is_better_time_interpolator(ti))
+		time_interpolator = ti;
+	write_sequnlock_irq(&xtime_lock);
 
-		ti->next = ti_global.list;
-		ti_global.list = ti;
-	}
-	spin_unlock(&ti_global.lock);
+	ti->next = time_interpolator_list;
+	time_interpolator_list = ti;
+	spin_unlock(&time_interpolator_lock);
 }
 
 void
@@ -1274,30 +1263,26 @@ unregister_time_interpolator(struct time_interpolator *ti)
 {
 	struct time_interpolator *curr, **prev;
 
-	spin_lock(&ti_global.lock);
-	{
-		prev = &ti_global.list;
-		for (curr = *prev; curr; curr = curr->next) {
-			if (curr == ti) {
-				*prev = curr->next;
-				break;
-			}
-			prev = &curr->next;
+	spin_lock(&time_interpolator_lock);
+	prev = &time_interpolator_list;
+	for (curr = *prev; curr; curr = curr->next) {
+		if (curr == ti) {
+			*prev = curr->next;
+			break;
 		}
-		write_seqlock_irq(&xtime_lock);
-		{
-			if (ti == time_interpolator) {
-				/* we lost the best time-interpolator: */
-				time_interpolator = NULL;
-				/* find the next-best interpolator */
-				for (curr = ti_global.list; curr; curr = curr->next)
-					if (is_better_time_interpolator(curr))
-						time_interpolator = curr;
-			}
-		}
-		write_sequnlock_irq(&xtime_lock);
+		prev = &curr->next;
 	}
-	spin_unlock(&ti_global.lock);
-}
 
+	write_seqlock_irq(&xtime_lock);
+	if (ti == time_interpolator) {
+		/* we lost the best time-interpolator: */
+		time_interpolator = NULL;
+		/* find the next-best interpolator */
+		for (curr = time_interpolator_list; curr; curr = curr->next)
+			if (is_better_time_interpolator(curr))
+				time_interpolator = curr;
+	}
+	write_sequnlock_irq(&xtime_lock);
+	spin_unlock(&time_interpolator_lock);
+}
 #endif /* CONFIG_TIME_INTERPOLATION */

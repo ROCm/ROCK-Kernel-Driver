@@ -431,7 +431,6 @@ extern void blk_queue_max_hw_segments(request_queue_t *, unsigned short);
 extern void blk_queue_max_segment_size(request_queue_t *, unsigned int);
 extern void blk_queue_hardsect_size(request_queue_t *, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *, unsigned long);
-extern void blk_queue_assign_lock(request_queue_t *, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *, prep_rq_fn *pfn);
 extern void blk_queue_merge_bvec(request_queue_t *, merge_bvec_fn *);
 extern void blk_queue_dma_alignment(request_queue_t *, int);

@@ -286,10 +286,14 @@ static int conf_choice(struct menu *menu)
 			break;
 		}
 	} else {
-		sym->user = sym->curr;
-		if (sym->curr.tri == mod) {
+		switch (sym_get_tristate_value(sym)) {
+		case no:
+			return 1;
+		case mod:
 			printf("%*s%s\n", indent - 1, "", menu_get_prompt(menu));
 			return 0;
+		case yes:
+			break;
 		}
 	}
 

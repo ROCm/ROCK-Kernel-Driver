@@ -14,6 +14,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/slab.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 

@@ -77,7 +77,7 @@ extern unsigned long pci_dram_offset;
 #define insl(port, buf, nl)	_insl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 #define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 /*
  * On powermacs, we will get a machine check exception if we
  * try to read data from a non-existent I/O port.  Because the
@@ -149,7 +149,7 @@ __do_out_asm(outl, "stwbrx")
 #define inl(port)		in_be32((u32 *)((port)+_IO_BASE))
 #define outl(val, port)		out_be32((u32 *)((port)+_IO_BASE), (val))
 
-#else /* not APUS or ALL_PPC */
+#else /* not APUS or PMAC */
 #define inb(port)		in_8((u8 *)((port)+_IO_BASE))
 #define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
 #define inw(port)		in_le16((u16 *)((port)+_IO_BASE))

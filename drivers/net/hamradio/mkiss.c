@@ -329,6 +329,12 @@ static void ax_bump(struct ax_disp *ax)
 				return;
 			}
 			ax->rcount -= 2;
+                        /* dl9sau bugfix: the trailling two bytes flexnet crc
+                         * will not be passed to the kernel. thus we have
+                         * to correct the kissparm signature, because it
+                         * indicates a crc but there's none
+			 */
+                        *ax->rbuff &= ~0x20;
 		}
  	}
 

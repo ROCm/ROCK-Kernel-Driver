@@ -1184,7 +1184,7 @@ mpt_pci_scan(void)
 		 * Do some kind of look ahead here...
 		 */
 		if (pdev->devfn & 1) {
-			pdev2 = pci_peek_next_dev(pdev);
+			pdev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev);
 			if (pdev2 && (pdev2->vendor == 0x1000) &&
 			    (PCI_SLOT(pdev2->devfn) == PCI_SLOT(pdev->devfn)) &&
 			    (pdev2->device == pdev->device) &&
