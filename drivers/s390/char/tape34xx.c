@@ -1343,8 +1343,9 @@ ccw_req_t * tape34xx_bread (struct request *req,tape_info_t* ti,int tapeblock_ma
 	ccw_req_t *cqr;
 	ccw1_t *ccw;
 	__u8 *data;
-	unsigned bsize = blksize_size[tapeblock_major][ti->blk_minor];
-	int s2b = bsize/hardsect_size[tapeblock_major][ti->blk_minor];
+	kdev_t dev = mk_kdev(tapeblock_major, ti->blk_minor);
+	unsigned bsize = block_size(dev);
+	int s2b = bsize/get_hardsect_size(dev);
 	int realcount;
 	int size,bhct = 0;
 	struct buffer_head* bh;
