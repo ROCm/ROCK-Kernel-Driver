@@ -310,9 +310,12 @@ affs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	pr_debug("AFFS: mkdir(%lu,\"%.*s\",0%o)\n",dir->i_ino,
 		 (int)dentry->d_name.len,dentry->d_name.name,mode);
 
+	lock_kernel();
 	inode = affs_new_inode(dir);
-	if (!inode)
+	if (!inode) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	inode->i_mode = S_IFDIR | mode;
 	mode_to_prot(inode);
@@ -325,8 +328,10 @@ affs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		inode->i_nlink = 0;
 		mark_inode_dirty(inode);
 		iput(inode);
+		unlock_kernel();
 		return error;
 	}
+	unlock_kernel();
 	return 0;
 }
 

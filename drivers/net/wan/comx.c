@@ -794,6 +794,7 @@ static int comx_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	}
 	memset(dev, 0, sizeof(struct net_device));
 
+	lock_kernel();
 	if ((new_dir = create_proc_entry(dentry->d_name.name, mode | S_IFDIR, 
 		comx_root_dir)) == NULL) {
 		goto cleanup_dev;
@@ -853,6 +854,7 @@ static int comx_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	ch->lineup_delay = DEFAULT_LINEUP_DELAY;
 
 	MOD_INC_USE_COUNT;
+	unlock_kernel();
 	return 0;
 cleanup_if_ptr:
 	kfree(ch->if_ptr);
@@ -872,6 +874,7 @@ cleanup_new_dir:
 	remove_proc_entry(dentry->d_name.name, comx_root_dir);
 cleanup_dev:
 	kfree(dev);
+	unlock_kernel();
 	return ret;
 }
 

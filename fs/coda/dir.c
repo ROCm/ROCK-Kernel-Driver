@@ -313,10 +313,13 @@ static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 	int error;
 	struct ViceFid newfid;
 
+	lock_kernel();
 	coda_vfs_stat.mkdir++;
 
-	if (coda_isroot(dir) && coda_iscontrol(name, len))
+	if (coda_isroot(dir) && coda_iscontrol(name, len)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
 	CDEBUG(D_INODE, "mkdir %s (len %d) in %s, mode %o.\n", 
 	       name, len, coda_i2s(dir), mode);
@@ -329,6 +332,7 @@ static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 	        CDEBUG(D_INODE, "mkdir error: %s result %d\n", 
 		       coda_f2s(&newfid), error); 
 		d_drop(de);
+		unlock_kernel();
                 return error;
         }
          
@@ -338,11 +342,13 @@ static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 	error = coda_cnode_make(&inode, &newfid, dir->i_sb);
 	if ( error ) {
 		d_drop(de);
+		unlock_kernel();
 		return error;
 	}
 	
 	/* invalidate the directory cnode's attributes */
 	coda_dir_changed(dir, 1);
+	unlock_kernel();
 	d_instantiate(de, inode);
         return 0;
 }

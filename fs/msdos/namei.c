@@ -361,10 +361,13 @@ int msdos_mkdir(struct inode *dir,struct dentry *dentry,int mode)
 	char msdos_name[MSDOS_NAME];
 	int ino;
 
+	lock_kernel();
 	res = msdos_format_name(dentry->d_name.name,dentry->d_name.len,
 				msdos_name, &MSDOS_SB(sb)->options);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 	is_hid = (dentry->d_name.name[0]=='.') && (msdos_name[0]!='.');
 	/* foo vs .foo situation */
 	if (fat_scan(dir,msdos_name,&bh,&de,&ino) >= 0)
@@ -392,6 +395,7 @@ int msdos_mkdir(struct inode *dir,struct dentry *dentry,int mode)
 	res = 0;
 
 out_unlock:
+	unlock_kernel();
 	return res;
 
 mkdir_error:

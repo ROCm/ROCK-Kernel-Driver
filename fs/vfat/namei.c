@@ -1140,9 +1140,12 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 	struct msdos_dir_entry *de;
 	int res;
 
+	lock_kernel();
 	res = vfat_add_entry(dir, &dentry->d_name, 1, &sinfo, &bh, &de);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 	inode = fat_build_inode(sb, de, sinfo.ino, &res);
 	if (!inode)
 		goto out;
@@ -1159,6 +1162,7 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 	d_instantiate(dentry,inode);
 out:
 	fat_brelse(sb, bh);
+	unlock_kernel();
 	return res;
 
 mkdir_failed:
@@ -1171,6 +1175,7 @@ mkdir_failed:
 	vfat_remove_entry(dir,&sinfo,bh,de);
 	iput(inode);
 	dir->i_nlink--;
+	unlock_kernel();
 	return res;
 }
  

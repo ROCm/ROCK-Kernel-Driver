@@ -1325,9 +1325,7 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	DQUOT_INIT(dir);
 	mode &= (S_IRWXUGO|S_ISVTX);
-	lock_kernel();
 	error = dir->i_op->mkdir(dir, dentry, mode);
-	unlock_kernel();
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

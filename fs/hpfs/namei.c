@@ -25,6 +25,7 @@ int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct hpfs_dirent dee;
 	int err;
 	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
+	lock_kernel();
 	if (!(fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh))) goto bail;
 	if (!(dnode = hpfs_alloc_dnode(dir->i_sb, fno, &dno, &qbh0, 1))) goto bail1;
 	memset(&dee, 0, sizeof dee);
@@ -43,6 +44,7 @@ int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		hpfs_free_sectors(dir->i_sb, fno, 1);
 		hpfs_free_dnode(dir->i_sb, dno);
 		hpfs_unlock_inode(dir);
+		unlock_kernel();
 		return -EEXIST;
 	}
 	fnode->len = len;
@@ -85,15 +87,17 @@ int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	}
 	hpfs_unlock_iget(dir->i_sb);
 	hpfs_unlock_inode(dir);
+	unlock_kernel();
 	return 0;
-	bail2:
+bail2:
 	hpfs_brelse4(&qbh0);
 	hpfs_free_dnode(dir->i_sb, dno);
 	hpfs_unlock_inode(dir);
-	bail1:
+bail1:
 	brelse(bh);
 	hpfs_free_sectors(dir->i_sb, fno, 1);
-	bail:
+bail:
+	unlock_kernel();
 	return -ENOSPC;
 }
 

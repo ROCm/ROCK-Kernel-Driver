@@ -723,6 +723,7 @@ static int udf_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	int err;
 	struct FileIdentDesc cfi, *fi;
 
+	lock_kernel();
 	err = -EMLINK;
 	if (dir->i_nlink >= (256<<sizeof(dir->i_nlink))-1)
 		goto out;
@@ -775,6 +776,7 @@ static int udf_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	udf_release_data(fibh.sbh);
 	err = 0;
 out:
+	unlock_kernel();
 	return err;
 }
 

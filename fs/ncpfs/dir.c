@@ -883,6 +883,7 @@ static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	DPRINTK("ncp_mkdir: making %s/%s\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name);
 	error = -EIO;
+	lock_kernel();
 	if (!ncp_conn_valid(server))
 		goto out;
 
@@ -900,6 +901,7 @@ static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		error = ncp_instantiate(dir, dentry, &finfo);
 	}
 out:
+	unlock_kernel();
 	return error;
 }
 

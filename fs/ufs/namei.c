@@ -188,6 +188,7 @@ static int ufs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	if (dir->i_nlink >= UFS_LINK_MAX)
 		goto out;
 
+	lock_kernel();
 	ufs_inc_count(dir);
 
 	inode = ufs_new_inode(dir, S_IFDIR|mode);
@@ -207,6 +208,7 @@ static int ufs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	err = ufs_add_link(dentry, inode);
 	if (err)
 		goto out_fail;
+	unlock_kernel();
 
 	d_instantiate(dentry, inode);
 out:
@@ -218,6 +220,7 @@ out_fail:
 	iput (inode);
 out_dir:
 	ufs_dec_count(dir);
+	unlock_kernel();
 	goto out;
 }
 

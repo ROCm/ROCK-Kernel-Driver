@@ -399,26 +399,35 @@ static int autofs_root_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct autofs_dir_ent *ent;
 	ino_t ino;
 
-	if ( !autofs_oz_mode(sbi) )
+	lock_kernel();
+	if ( !autofs_oz_mode(sbi) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	ent = autofs_hash_lookup(dh, &dentry->d_name);
-	if ( ent )
+	if ( ent ) {
+		unlock_kernel();
 		return -EEXIST;
+	}
 
 	if ( sbi->next_dir_ino < AUTOFS_FIRST_DIR_INO ) {
 		printk("autofs: Out of inode numbers -- what the heck did you do??\n");
+		unlock_kernel();
 		return -ENOSPC;
 	}
 	ino = sbi->next_dir_ino++;
 
 	ent = kmalloc(sizeof(struct autofs_dir_ent), GFP_KERNEL);
-	if ( !ent )
+	if ( !ent ) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	ent->name = kmalloc(dentry->d_name.len+1, GFP_KERNEL);
 	if ( !ent->name ) {
 		kfree(ent);
+		unlock_kernel();
 		return -ENOSPC;
 	}
 
@@ -430,6 +439,7 @@ static int autofs_root_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	dir->i_nlink++;
 	d_instantiate(dentry, iget(dir->i_sb,ino));
+	unlock_kernel();
 
 	return 0;
 }

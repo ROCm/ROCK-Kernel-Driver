@@ -520,9 +520,12 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	if (dir->i_nlink >= EXT3_LINK_MAX)
 		return -EMLINK;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -575,6 +578,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	d_instantiate(dentry, inode);
 out_stop:
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	return err;
 
 out_no_entry:

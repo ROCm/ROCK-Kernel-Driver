@@ -504,11 +504,13 @@ smb_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int error;
 
+	lock_kernel();
 	smb_invalid_dir_cache(dir);
 	error = smb_proc_mkdir(dentry);
 	if (!error) {
 		error = smb_instantiate(dentry, 0, 0);
 	}
+	unlock_kernel();
 	return error;
 }
 

@@ -295,11 +295,13 @@ static int dbl_mkdir(struct inode * parent, struct dentry *dentry,
 {
 	int error;
 
+	lock_kernel();
 	if (is_hdr(parent, dentry->d_name.name, dentry->d_name.len)) {
 		error = -EEXIST;
 	} else {
 		error = hfs_mkdir(parent, dentry, mode);
 	}
+	unlock_kernel();
 	return error;
 }
 

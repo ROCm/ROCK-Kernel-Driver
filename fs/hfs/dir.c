@@ -217,26 +217,33 @@ int hfs_create(struct inode * dir, struct dentry *dentry, int mode)
  */
 int hfs_mkdir(struct inode * parent, struct dentry *dentry, int mode)
 {
-	struct hfs_cat_entry *entry = HFS_I(parent)->entry;
+	struct hfs_cat_entry *entry;
 	struct hfs_cat_entry *new;
 	struct hfs_cat_key key;
 	struct inode *inode;
 	int error;
 
+	lock_kernel();
+	entry = HFS_I(parent)->entry;
 	/* build the key, checking against reserved names */
 	if (build_key(&key, parent, dentry->d_name.name, 
-		      dentry->d_name.len)) 
+		      dentry->d_name.len)) {
+		unlock_kernel();
 		return -EEXIST;
+	}
 
 	/* try to create the directory */
-	if ((error = hfs_cat_mkdir(entry, &key, &new)))
+	if ((error = hfs_cat_mkdir(entry, &key, &new))) {
+		unlock_kernel();
 		return error;
+	}
 
 	/* back out if we run into trouble */
 	new->count++; /* hfs_iget eats one */
 	if (!(inode = hfs_iget(new, HFS_I(parent)->file_type, dentry))) {
 		hfs_cat_delete(entry, new, 1);
 		hfs_cat_put(new);
+		unlock_kernel();
 		return -EIO;
 	}
 
@@ -244,6 +251,7 @@ int hfs_mkdir(struct inode * parent, struct dentry *dentry, int mode)
 	update_dirs_plus(entry, 1);
 	mark_inode_dirty(inode);
 	d_instantiate(dentry, inode);
+	unlock_kernel();
 	return 0;
 }
 

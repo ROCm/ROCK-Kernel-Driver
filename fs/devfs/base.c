@@ -3098,26 +3098,38 @@ static int devfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
     struct inode *inode;
 
     mode = (mode & ~S_IFMT) | S_IFDIR;  /*  VFS doesn't pass S_IFMT part  */
+    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
-    if (parent == NULL) return -ENOENT;
+    if (parent == NULL) {
+	unlock_kernel();
+	return -ENOENT;
+    }
     de = _devfs_alloc_entry (dentry->d_name.name, dentry->d_name.len, mode);
-    if (!de) return -ENOMEM;
+    if (!de) {
+	unlock_kernel();
+	return -ENOMEM;
+    }
     de->vfs_deletable = TRUE;
-    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 )
+    if ( ( err = _devfs_append_entry (parent, de, FALSE, NULL) ) != 0 ) {
+	unlock_kernel();
 	return err;
+    }
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
     de->inode.mtime = CURRENT_TIME;
     de->inode.ctime = CURRENT_TIME;
-    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL )
+    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL ) {
+	unlock_kernel();
 	return -ENOMEM;
+    }
     DPRINTK (DEBUG_DISABLED, "(%s): new VFS inode(%u): %p  dentry: %p\n",
 	     dentry->d_name.name, de->inode.ino, inode, dentry);
     d_instantiate (dentry, inode);
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CREATE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
+    unlock_kernel();
     return 0;
 }   /*  End Function devfs_mkdir  */
 

@@ -807,11 +807,13 @@ jffs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		kfree(_name);
 	});
 
+	lock_kernel();
 	dir_f = (struct jffs_file *)dir->u.generic_ip;
 
 	ASSERT(if (!dir_f) {
 		printk(KERN_ERR "jffs_mkdir(): No reference to a "
 		       "jffs_file struct in inode.\n");
+		unlock_kernel();
 		return -EIO;
 	});
 
@@ -885,6 +887,7 @@ jffs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 jffs_mkdir_end:
 	D3(printk (KERN_NOTICE "mkdir(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return result;
 } /* jffs_mkdir()  */
 

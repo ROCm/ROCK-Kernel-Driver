@@ -665,9 +665,12 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 
 	mode |= S_IFDIR;
 
+	lock_kernel();
 	ri = jffs2_alloc_raw_inode();
-	if (!ri)
+	if (!ri) {
+		unlock_kernel();
 		return -ENOMEM;
+	}
 	
 	c = JFFS2_SB_INFO(dir_i->i_sb);
 
@@ -679,6 +682,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 
 	if (ret) {
 		jffs2_free_raw_inode(ri);
+		unlock_kernel();
 		return ret;
 	}
 
@@ -687,6 +691,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	if (IS_ERR(inode)) {
 		jffs2_free_raw_inode(ri);
 		jffs2_complete_reservation(c);
+		unlock_kernel();
 		return PTR_ERR(inode);
 	}
 
@@ -707,6 +712,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		up(&f->sem);
 		jffs2_complete_reservation(c);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return PTR_ERR(fn);
 	}
 	/* No data here. Only a metadata node, which will be 
@@ -727,6 +733,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		if (ret) {
 			/* Eep. */
 			jffs2_clear_inode(inode);
+			unlock_kernel();
 			return ret;
 		}
 	}
@@ -736,6 +743,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		/* Argh. Now we treat it like a normal delete */
 		jffs2_complete_reservation(c);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return -ENOMEM;
 	}
 
@@ -766,6 +774,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		   as if it were the final unlink() */
 		up(&dir_f->sem);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return PTR_ERR(fd);
 	}
 
@@ -775,6 +784,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	up(&dir_f->sem);
 
 	d_instantiate(dentry, inode);
+	unlock_kernel();
 	return 0;
 }
 

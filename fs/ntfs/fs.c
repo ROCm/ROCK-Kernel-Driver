@@ -642,6 +642,7 @@ static int _linux_ntfs_mkdir(struct inode *dir, struct dentry* d, int mode)
 	ntfs_inode *ino;
 	ntfs_attribute *si;
 
+	lock_kernel();
 	ntfs_debug (DEBUG_DIR1, "mkdir %s in %x\n", d->d_name.name, dir->i_ino);
 	error = -ENAMETOOLONG;
 	if (d->d_name.len > /* FIXME: */ 255)
@@ -682,6 +683,7 @@ static int _linux_ntfs_mkdir(struct inode *dir, struct dentry* d, int mode)
 	error = 0;
  out:
  	ntfs_debug (DEBUG_DIR1, "mkdir returns %d\n", error);
+	unlock_kernel();
 	return error;
 }
 #endif

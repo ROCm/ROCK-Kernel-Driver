@@ -698,6 +698,7 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	attr.ia_valid = ATTR_MODE;
 	attr.ia_mode = mode | S_IFDIR;
 
+	lock_kernel();
 #if 0
 	/*
 	 * Always drop the dentry, we can't always depend on
@@ -714,6 +715,7 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	if (error || fhandle.size == 0)
 		d_drop(dentry);
+	unlock_kernel();
 	return error;
 }
 

@@ -431,15 +431,20 @@ static int autofs4_dir_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	struct inode *inode;
 
-	if ( !autofs4_oz_mode(sbi) )
+	lock_kernel();
+	if ( !autofs4_oz_mode(sbi) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	DPRINTK(("autofs_dir_mkdir: dentry %p, creating %.*s\n",
 		 dentry, dentry->d_name.len, dentry->d_name.name));
 
 	ino = autofs4_init_ino(ino, sbi, S_IFDIR | 0555);
-	if (ino == NULL)
+	if (ino == NULL) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	inode = autofs4_get_inode(dir->i_sb, ino);
 	d_instantiate(dentry, inode);
@@ -455,6 +460,7 @@ static int autofs4_dir_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	dir->i_nlink++;
 	dir->i_mtime = CURRENT_TIME;
 
+	unlock_kernel();
 	return 0;
 }
 
