@@ -905,9 +905,7 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 		goto err_free_dev2;
 	}
 	memset(ppriv, 0, sizeof(struct dscc4_pci_priv));
-	ret = dscc4_set_quartz(root, quartz);
-	if (ret < 0)
-		goto err_free_priv;
+
 	ppriv->root = root;
 	spin_lock_init(&ppriv->lock);
 
@@ -951,6 +949,11 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 			goto err_unregister;
 	        }
 	}
+
+	ret = dscc4_set_quartz(root, quartz);
+	if (ret < 0)
+		goto err_unregister;
+
 	pci_set_drvdata(pdev, ppriv);
 	return ret;
 
@@ -959,7 +962,6 @@ err_unregister:
 		dscc4_release_ring(root + i);
 		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 	}
-err_free_priv:
 	kfree(ppriv);
 err_free_dev2:
 	for (i = 0; i < dev_per_card; i++)
