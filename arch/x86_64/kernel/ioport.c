@@ -61,7 +61,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	 * do it in the per-thread copy and in the TSS ...
 	 */
 	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);
-	tss = init_tss + get_cpu();
+	tss = &per_cpu(init_tss, get_cpu());
 	if (tss->io_bitmap_base == IO_BITMAP_OFFSET) { /* already active? */
 		set_bitmap(tss->io_bitmap, from, num, !turn_on);
 	} else {

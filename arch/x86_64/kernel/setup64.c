@@ -237,7 +237,7 @@ void __init cpu_init (void)
 #else
 	int cpu = smp_processor_id();
 #endif
-	struct tss_struct * t = &init_tss[cpu];
+	struct tss_struct *t = &per_cpu(init_tss, cpu);
 	unsigned long v; 
 	char *estacks = NULL; 
 	struct task_struct *me;
