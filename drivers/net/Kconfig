@@ -1850,7 +1850,7 @@ config SGISEEQ
 	  used in many Silicon Graphics machines.
 
 config DECLANCE
-	bool "DEC LANCE ethernet controller support"
+	tristate "DEC LANCE ethernet controller support"
 	depends on NET_ETHERNET && DECSTATION
 	help
 	  This driver is for the series of Ethernet controllers produced by
