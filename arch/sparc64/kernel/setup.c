@@ -151,7 +151,7 @@ int prom_callback(long *args)
 			pmd_t *pmdp;
 			pte_t *ptep;
 
-			for_each_task(p) {
+			for_each_process(p) {
 				mm = p->mm;
 				if (CTX_HWBITS(mm->context) == ctx)
 					break;
