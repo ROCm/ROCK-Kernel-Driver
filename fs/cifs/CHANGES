@@ -1,7 +1,8 @@
 Version 1.19
 ------------
 Fix /proc/fs/cifs/Stats and DebugData display to handle larger
-amounts of return data.
+amounts of return data. Properly limit requests to MAX_REQ (50
+is the usual maximum active multiplex SMB/CIFS requests per server).
 
 
 Version 1.18

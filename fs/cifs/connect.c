@@ -175,7 +175,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			if(server->tcpStatus != CifsExiting)
 				server->tcpStatus = CifsGood;
 			spin_unlock(&GlobalMid_Lock);
-			atomic_set(&server->inFlight,0);
+	/*		atomic_set(&server->inFlight,0);*/
 			wake_up(&server->response_q);
 		}
 	}
