@@ -24,16 +24,11 @@ EXPORT_SYMBOL(dvbdmx_connect_frontend);
 EXPORT_SYMBOL(dvbdmx_disconnect_frontend);
 
 EXPORT_SYMBOL(dvb_register_frontend);
-EXPORT_SYMBOL(dvb_unregister_frontend);
+EXPORT_SYMBOL(dvb_unregister_frontend_new);
 EXPORT_SYMBOL(dvb_add_frontend_ioctls);
 EXPORT_SYMBOL(dvb_remove_frontend_ioctls);
 EXPORT_SYMBOL(dvb_add_frontend_notifier);
 EXPORT_SYMBOL(dvb_remove_frontend_notifier);
-
-EXPORT_SYMBOL(dvb_register_i2c_bus);
-EXPORT_SYMBOL(dvb_unregister_i2c_bus);
-EXPORT_SYMBOL(dvb_register_i2c_device);
-EXPORT_SYMBOL(dvb_unregister_i2c_device);
 
 EXPORT_SYMBOL(dvb_net_init);
 EXPORT_SYMBOL(dvb_net_release);

@@ -31,14 +31,29 @@
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/errno.h>
+#include <linux/delay.h>
 
 #include <linux/dvb/frontend.h>
 
-#include "dvb_i2c.h"
 #include "dvbdev.h"
 
-
-
+/* FIXME: Move to i2c-id.h */
+#define I2C_DRIVERID_DVBFE_ALPS_TDLB7	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_ALPS_TDMB7	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_AT76C651	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_CX24110	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_DST		I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_DUMMY	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_L64781	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_MT312	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_MT352	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_NXT6000	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_SP887X	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_STV0299	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_TDA1004X	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_TDA8083	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_VES1820	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_VES1X93	I2C_DRIVERID_EXP2
 
 /**
  *   when before_ioctl is registered and returns value 0, ioctl and after_ioctl
@@ -50,7 +65,7 @@ struct dvb_frontend {
 	int (*ioctl) (struct dvb_frontend *frontend, unsigned int cmd, void *arg);
 	int (*after_ioctl) (struct dvb_frontend *frontend, unsigned int cmd, void *arg);
 	void (*notifier_callback) (fe_status_t s, void *data);
-	struct dvb_i2c_bus *i2c;
+	struct dvb_adapter *dvb_adapter;
 	void *before_after_data;   /*  can be used by hardware module... */
 	void *notifier_data;       /*  can be used by hardware module... */
 	void *data;                /*  can be used by hardware module... */
@@ -75,19 +90,21 @@ struct dvb_frontend_tune_settings {
 #define FE_SLEEP              _IO('v', 80)
 #define FE_INIT               _IO('v', 81)
 #define FE_GET_TUNE_SETTINGS  _IOWR('v', 83, struct dvb_frontend_tune_settings)
-
+#define FE_REGISTER	      _IO  ('v', 84)
+#define FE_UNREGISTER	      _IO  ('v', 85)
 
 extern int
 dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 				     unsigned int cmd, void *arg),
-		       struct dvb_i2c_bus *i2c,
+		       struct dvb_adapter *dvb_adapter,
 		       void *data,
-		       struct dvb_frontend_info *info);
+		       struct dvb_frontend_info *info,
+		       struct module *module);
 
 extern int
-dvb_unregister_frontend (int (*ioctl) (struct dvb_frontend *frontend,
+dvb_unregister_frontend_new (int (*ioctl) (struct dvb_frontend *frontend,
 				       unsigned int cmd, void *arg),
-			 struct dvb_i2c_bus *i2c);
+			 struct dvb_adapter *dvb_adapter);
 
 
 /**
