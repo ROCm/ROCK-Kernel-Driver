@@ -14,23 +14,17 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/err.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/concat.h>
 
-#include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/io.h>
 #include <asm/sizes.h>
 #include <asm/mach/flash.h>
-
-#include <asm/arch/h3600.h>
-
-#ifndef CONFIG_ARCH_SA1100
-#error This is for SA1100 architecture only
-#endif
 
 #if 0
 /*
@@ -133,21 +127,17 @@ static void jornada56x_set_vpp(int vpp)
 #endif
 
 struct sa_subdev_info {
-	unsigned long base;
-	unsigned long size;
 	char name[16];
 	struct map_info map;
 	struct mtd_info *mtd;
 	struct flash_platform_data *data;
 };
 
-#define NR_SUBMTD 4
-
 struct sa_info {
 	struct mtd_partition	*parts;
 	struct mtd_info		*mtd;
 	int			num_subdev;
-	struct sa_subdev_info	subdev[NR_SUBMTD];
+	struct sa_subdev_info	subdev[0];
 };
 
 static void sa1100_set_vpp(struct map_info *map, int on)
@@ -162,17 +152,17 @@ static void sa1100_destroy_subdev(struct sa_subdev_info *subdev)
 		map_destroy(subdev->mtd);
 	if (subdev->map.virt)
 		iounmap(subdev->map.virt);
-	release_mem_region(subdev->base, subdev->size);
+	release_mem_region(subdev->map.phys, subdev->map.size);
 }
 
-static int sa1100_probe_subdev(struct sa_subdev_info *subdev)
+static int sa1100_probe_subdev(struct sa_subdev_info *subdev, struct resource *res)
 {
 	unsigned long phys;
 	unsigned int size;
 	int ret;
 
-	phys = subdev->base;
-	size = subdev->size;
+	phys = res->start;
+	size = res->end - phys + 1;
 
 	/*
 	 * Retrieve the bankwidth from the MSC registers.
@@ -251,31 +241,58 @@ static void sa1100_destroy(struct sa_info *info)
 
 	for (i = info->num_subdev - 1; i >= 0; i--)
 		sa1100_destroy_subdev(&info->subdev[i]);
+	kfree(info);
 }
 
-static int __init
-sa1100_setup_mtd(struct sa_info *info, int nr, struct flash_platform_data *flash)
+static struct sa_info *__init
+sa1100_setup_mtd(struct platform_device *pdev, struct flash_platform_data *flash)
 {
-	struct mtd_info *cdev[nr];
-	int i, ret = 0;
+	struct sa_info *info;
+	int nr, size, i, ret = 0;
+
+	/*
+	 * Count number of devices.
+	 */
+	for (nr = 0; ; nr++)
+		if (!platform_get_resource(pdev, IORESOURCE_MEM, nr))
+			break;
+
+	if (nr == 0) {
+		ret = -ENODEV;
+		goto out;
+	}
+
+	size = sizeof(struct sa_info) + sizeof(struct sa_subdev_info) * nr;
+
+	/*
+	 * Allocate the map_info structs in one go.
+	 */
+	info = kmalloc(size, GFP_KERNEL);
+	if (!info) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	memset(info, 0, size);
 
 	/*
 	 * Claim and then map the memory regions.
 	 */
 	for (i = 0; i < nr; i++) {
 		struct sa_subdev_info *subdev = &info->subdev[i];
-		if (subdev->base == (unsigned long)-1)
+		struct resource *res;
+
+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+		if (!res)
 			break;
 
 		subdev->map.name = subdev->name;
 		sprintf(subdev->name, "sa1100-%d", i);
 		subdev->data = flash;
 
-		ret = sa1100_probe_subdev(subdev);
+		ret = sa1100_probe_subdev(subdev, res);
 		if (ret)
 			break;
-
-		cdev[i] = subdev->mtd;
 	}
 
 	info->num_subdev = i;
@@ -296,10 +313,14 @@ sa1100_setup_mtd(struct sa_info *info, int nr, struct flash_platform_data *flash
 		info->mtd = info->subdev[0].mtd;
 		ret = 0;
 	} else if (info->num_subdev > 1) {
+#ifdef CONFIG_MTD_CONCAT
+		struct mtd_info *cdev[nr];
 		/*
 		 * We detected multiple devices.  Concatenate them together.
 		 */
-#ifdef CONFIG_MTD_CONCAT
+		for (i = 0; i < info->num_subdev; i++)
+			cdev[i] = info->subdev[i].mtd;
+
 		info->mtd = mtd_concat_create(cdev, info->num_subdev,
 					      "sa1100");
 		if (info->mtd == NULL)
@@ -312,167 +333,15 @@ sa1100_setup_mtd(struct sa_info *info, int nr, struct flash_platform_data *flash
 	}
 
 	if (ret == 0)
-		return 0;
+		return info;
 
  err:
 	sa1100_destroy(info);
-	return ret;
-}
-
-static int __init sa1100_locate_flash(struct sa_info *info)
-{
-	int i, nr = -ENODEV;
-
-	if (machine_is_adsbitsy()) {
-		info->subdev[0].base = SA1100_CS1_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_assabet()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		info->subdev[1].base = SA1100_CS1_PHYS; /* neponset */
-		info->subdev[1].size = SZ_32M;
-		nr = 2;
-	}
-	if (machine_is_badge4()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_64M;
-		nr = 1;
-	}
-	if (machine_is_cerf()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_consus()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_flexanet()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_freebird()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_frodo()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_graphicsclient()) {
-		info->subdev[0].base = SA1100_CS1_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_graphicsmaster()) {
-		info->subdev[0].base = SA1100_CS1_PHYS;
-		info->subdev[0].size = SZ_16M;
-		nr = 1;
-	}
-	if (machine_is_h3xxx()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_huw_webpanel()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_16M;
-		nr = 1;
-	}
-	if (machine_is_itsy()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_jornada56x()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_jornada720()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_nanoengine()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[1].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_pangolin()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_64M;
-		nr = 1;
-	}
-	if (machine_is_pfs168()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_pleb()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_4M;
-		info->subdev[1].base = SA1100_CS1_PHYS;
-		info->subdev[1].size = SZ_4M;
-		nr = 2;
-	}
-	if (machine_is_pt_system3()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_16M;
-		nr = 1;
-	}
-	if (machine_is_shannon()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_4M;
-		nr = 1;
-	}
-	if (machine_is_sherman()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_simpad()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_16M;
-		info->subdev[1].base = SA1100_CS1_PHYS;
-		info->subdev[1].size = SZ_16M;
-		nr = 2;
-	}
-	if (machine_is_stork()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_32M;
-		nr = 1;
-	}
-	if (machine_is_trizeps()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_16M;
-		nr = 1;
-	}
-	if (machine_is_victor()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_2M;
-		nr = 1;
-	}
-	if (machine_is_yopy()) {
-		info->subdev[0].base = SA1100_CS0_PHYS;
-		info->subdev[0].size = SZ_64M;
-		info->subdev[1].base = SA1100_CS1_PHYS;
-		info->subdev[1].size = SZ_64M;
-		nr = 2;
-	}
-
-	return nr;
+ out:
+	return ERR_PTR(ret);
 }
 
 static const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
-
-static struct sa_info sa_info;
 
 static int __init sa1100_mtd_probe(struct device *dev)
 {
@@ -480,20 +349,17 @@ static int __init sa1100_mtd_probe(struct device *dev)
 	struct flash_platform_data *flash = pdev->dev.platform_data;
 	struct mtd_partition *parts;
 	const char *part_type = NULL;
-	struct sa_info *info = &sa_info;
+	struct sa_info *info;
 	int err, nr_parts = 0;
-	int nr;
 
 	if (!flash)
 		return -ENODEV;
 
-	nr = sa1100_locate_flash(info);
-	if (nr < 0)
-		return nr;
-
-	err = sa1100_setup_mtd(info, nr, flash);
-	if (err != 0)
+	info = sa1100_setup_mtd(pdev, flash);
+	if (IS_ERR(info)) {
+		err = PTR_ERR(info);
 		goto out;
+	}
 
 	/*
 	 * Partition selection stuff.
