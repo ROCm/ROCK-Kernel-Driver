@@ -17,6 +17,7 @@ config MOUSE_PS2
 	depends on INPUT && INPUT_MOUSE
 	select SERIO
 	select SERIO_I8042 if PC
+	select SERIO_GSCPS2 if GSC
 	---help---
 	  Say Y here if you have a PS/2 mouse connected to your system. This
 	  includes the standard 2 or 3-button PS/2 mouse, as well as PS/2
@@ -116,6 +117,19 @@ config MOUSE_RISCPC
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called rpcmouse.
+
+config MOUSE_VSXXXAA
+	tristate "DEC VSXXX-AA/GA mouse and tablet"
+	depends on INPUT && INPUT_MOUSE
+	select SERIO
+	help
+	  Say Y (or M) if you want to use a DEC VSXXX-AA (hockey
+	  puck) or a VSXXX-GA (rectangular) mouse. Theses mice are
+	  typically used on DECstations or VAXstations, but can also
+	  be used on any box capable of RS232 (with some adaptor
+	  described in the source file). This driver should, in theory,
+	  also work with the digitizer DEC produced, but it isn't tested
+	  with that (I don't have the hardware yet).
 
 config MOUSE_PC9800
 	tristate "NEC PC-9800 busmouse"

@@ -47,6 +47,12 @@ unsigned int psmouse_resetafter;
 module_param_named(resetafter, psmouse_resetafter, uint, 0);
 MODULE_PARM_DESC(resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 
+__obsolete_setup("psmouse_noext");
+__obsolete_setup("psmouse_resolution=");
+__obsolete_setup("psmouse_smartscroll=");
+__obsolete_setup("psmouse_resetafter=");
+__obsolete_setup("psmouse_rate=");
+
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
@@ -163,14 +169,14 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 	}
-	
+
 	psmouse->last = jiffies;
 	psmouse->packet[psmouse->pktcnt++] = data;
 
 	if (psmouse->packet[0] == PSMOUSE_RET_BAT) {
 		if (psmouse->pktcnt == 1)
 			goto out;
-		
+
 		if (psmouse->pktcnt == 2) {
 			if (psmouse->packet[1] == PSMOUSE_RET_ID) {
 				psmouse->state = PSMOUSE_IGNORE;
@@ -258,7 +264,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 			return (psmouse->cmdcnt = 0) - 1;
 
 	while (psmouse->cmdcnt && timeout--) {
-	
+
 		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
 				timeout > 100000) /* do not run in a endless loop */
 			timeout = 100000; /* 1 sec */
@@ -442,7 +448,7 @@ static int psmouse_probe(struct psmouse *psmouse)
  */
 
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
-		return -1;
+		printk(KERN_WARNING "psmouse.c: Failed to reset mouse on %s\n", psmouse->serio->phys);
 
 /*
  * And here we try to determine if it has any extensions over the
@@ -497,7 +503,7 @@ static void psmouse_set_rate(struct psmouse *psmouse)
 static void psmouse_initialize(struct psmouse *psmouse)
 {
 	unsigned char param[2];
-	
+
 /*
  * We set the mouse report rate, resolution and scaling.
  */
@@ -571,7 +577,7 @@ static void psmouse_disconnect(struct serio *serio)
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
-	
+
 	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
 	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
 		return;
@@ -603,7 +609,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		serio->private = NULL;
 		return;
 	}
-	
+
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
 	sprintf(psmouse->phys, "%s/input0",
@@ -617,7 +623,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.id.version = psmouse->model;
 
 	input_register_device(&psmouse->dev);
-	
+
 	printk(KERN_INFO "input: %s on %s\n", psmouse->devname, serio->phys);
 
 	psmouse_initialize(psmouse);
@@ -637,12 +643,14 @@ static int psmouse_reconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
 	struct serio_dev *dev = serio->dev;
-	int old_type = psmouse->type;
+	int old_type;
 
-	if (!dev) {
+	if (!dev || !psmouse) {
 		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
+
+	old_type = psmouse->type;
 
 	psmouse->state = PSMOUSE_NEW_DEVICE;
 	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;

@@ -435,6 +435,8 @@ int synaptics_init(struct psmouse *psmouse)
 		goto init_fail;
 	}
 
+	priv->pkt_type = SYN_MODEL_NEWABS(priv->model_id) ? SYN_NEWABS : SYN_OLDABS;
+
 	if (SYN_CAP_EXTENDED(priv->capabilities) && SYN_CAP_PASS_THROUGH(priv->capabilities))
        		synaptics_pt_create(psmouse);
 
@@ -602,19 +604,42 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	input_sync(dev);
 }
 
-static int synaptics_validate_byte(struct psmouse *psmouse)
+static int synaptics_validate_byte(unsigned char packet[], int idx, unsigned char pkt_type)
 {
-	static unsigned char newabs_mask[] = { 0xC0, 0x00, 0x00, 0xC0, 0x00 };
-	static unsigned char newabs_rslt[] = { 0x80, 0x00, 0x00, 0xC0, 0x00 };
-	static unsigned char oldabs_mask[] = { 0xC0, 0x60, 0x00, 0xC0, 0x60 };
-	static unsigned char oldabs_rslt[] = { 0xC0, 0x00, 0x00, 0x80, 0x00 };
-	struct synaptics_data *priv = psmouse->private;
-	int idx = psmouse->pktcnt - 1;
+	static unsigned char newabs_mask[]	= { 0xC8, 0x00, 0x00, 0xC8, 0x00 };
+	static unsigned char newabs_rel_mask[]	= { 0xC0, 0x00, 0x00, 0xC0, 0x00 };
+	static unsigned char newabs_rslt[]	= { 0x80, 0x00, 0x00, 0xC0, 0x00 };
+	static unsigned char oldabs_mask[]	= { 0xC0, 0x60, 0x00, 0xC0, 0x60 };
+	static unsigned char oldabs_rslt[]	= { 0xC0, 0x00, 0x00, 0x80, 0x00 };
 
-	if (SYN_MODEL_NEWABS(priv->model_id))
-		return (psmouse->packet[idx] & newabs_mask[idx]) == newabs_rslt[idx];
-	else
-		return (psmouse->packet[idx] & oldabs_mask[idx]) == oldabs_rslt[idx];
+	switch (pkt_type) {
+		case SYN_NEWABS:
+		case SYN_NEWABS_RELAXED:
+			return (packet[idx] & newabs_rel_mask[idx]) == newabs_rslt[idx];
+
+		case SYN_NEWABS_STRICT:
+			return (packet[idx] & newabs_mask[idx]) == newabs_rslt[idx];
+
+		case SYN_OLDABS:
+			return (packet[idx] & oldabs_mask[idx]) == oldabs_rslt[idx];
+
+		default:
+			printk(KERN_ERR "synaptics: unknown packet type %d\n", pkt_type);
+			return 0;
+	}
+}
+
+static unsigned char synaptics_detect_pkt_type(struct psmouse *psmouse)
+{
+	int i;
+
+	for (i = 0; i < 5; i++)
+		if (!synaptics_validate_byte(psmouse->packet, i, SYN_NEWABS_STRICT)) {
+			printk(KERN_INFO "synaptics: using relaxed packet validation\n");
+			return SYN_NEWABS_RELAXED;
+		}
+
+	return SYN_NEWABS_STRICT;
 }
 
 void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
@@ -630,13 +655,17 @@ void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 			printk(KERN_NOTICE "Synaptics driver resynced.\n");
 		}
 
+		if (unlikely(priv->pkt_type == SYN_NEWABS))
+			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
+
 		if (psmouse->ptport && psmouse->ptport->serio.dev && synaptics_is_pt_packet(psmouse->packet))
 			synaptics_pass_pt_packet(&psmouse->ptport->serio, psmouse->packet);
 		else
 			synaptics_process_packet(psmouse);
 		psmouse->pktcnt = 0;
 
-	} else if (psmouse->pktcnt && !synaptics_validate_byte(psmouse)) {
+	} else if (psmouse->pktcnt &&
+		   !synaptics_validate_byte(psmouse->packet, psmouse->pktcnt - 1, priv->pkt_type)) {
 		printk(KERN_WARNING "Synaptics driver lost sync at byte %d\n", psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 		if (++priv->out_of_sync == psmouse_resetafter) {

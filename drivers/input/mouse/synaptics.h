@@ -70,6 +70,12 @@ extern int synaptics_init(struct psmouse *psmouse);
 #define SYN_PS_SET_MODE2		0x14
 #define SYN_PS_CLIENT_CMD		0x28
 
+/* synaptics packet types */
+#define SYN_NEWABS			0
+#define SYN_NEWABS_STRICT		1
+#define SYN_NEWABS_RELAXED		2
+#define SYN_OLDABS			3
+
 /*
  * A structure to describe the state of the touchpad hardware (buttons and pad)
  */
@@ -103,6 +109,7 @@ struct synaptics_data {
 	/* Data for normal processing */
 	unsigned int out_of_sync;		/* # of packets out of sync */
 	int old_w;				/* Previous w value */
+	unsigned char pkt_type;			/* packet type - old, new, etc */
 };
 
 #endif /* _SYNAPTICS_H */

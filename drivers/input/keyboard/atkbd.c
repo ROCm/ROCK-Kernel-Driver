@@ -30,27 +30,35 @@
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
-MODULE_PARM(atkbd_set, "1i");
-MODULE_PARM(atkbd_reset, "1i");
-MODULE_PARM(atkbd_softrepeat, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
 module_param_named(set, atkbd_set, int, 0);
-MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3, 4)");
+MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3 = PS/2 native)");
+
 #if defined(__i386__) || defined(__x86_64__) || defined(__hppa__)
 static int atkbd_reset;
 #else
 static int atkbd_reset = 1;
 #endif
-static int atkbd_softrepeat;
-
 module_param_named(reset, atkbd_reset, bool, 0);
 MODULE_PARM_DESC(reset, "Reset keyboard during initialization");
 
 static int atkbd_softrepeat;
 module_param_named(softrepeat, atkbd_softrepeat, bool, 0);
 MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
+
+static int atkbd_scroll;
+module_param_named(scroll, atkbd_scroll, bool, 0);
+MODULE_PARM_DESC(scroll, "Enable scroll-wheel on MS Office and similar keyboards");
+
+static int atkbd_extra;
+module_param_named(extra, atkbd_extra, bool, 0);
+MODULE_PARM_DESC(extra, "Enable extra LEDs and keys on IBM RapidAcces, EzKey and similar keyboards");
+
+__obsolete_setup("atkbd_set=");
+__obsolete_setup("atkbd_reset");
+__obsolete_setup("atkbd_softrepeat=");
 
 /*
  * Scancode to keycode tables. These are just the default setting, and
@@ -127,11 +135,11 @@ static unsigned char atkbd_unxlate_table[128] = {
 #define ATKBD_CMD_EX_SETLEDS	0x20eb
 #define ATKBD_CMD_OK_GETID	0x02e8
 
+
 #define ATKBD_RET_ACK		0xfa
 #define ATKBD_RET_NAK		0xfe
 #define ATKBD_RET_BAT		0xaa
 #define ATKBD_RET_EMUL0		0xe0
-#define ATKBD_RET_EMULX		0x80
 #define ATKBD_RET_EMUL1		0xe1
 #define ATKBD_RET_RELEASE	0xf0
 #define ATKBD_RET_HANGUEL	0xf1
@@ -140,6 +148,22 @@ static unsigned char atkbd_unxlate_table[128] = {
 
 #define ATKBD_KEY_UNKNOWN	  0
 #define ATKBD_KEY_NULL		255
+
+#define ATKBD_SCR_1		254
+#define ATKBD_SCR_2		253
+#define ATKBD_SCR_4		252
+#define ATKBD_SCR_8		251
+#define ATKBD_SCR_CLICK		250
+
+#define ATKBD_SPECIAL		250
+
+static unsigned char atkbd_scroll_keys[5][2] = {
+	{ ATKBD_SCR_1,     0x45 },
+	{ ATKBD_SCR_2,     0x29 },
+	{ ATKBD_SCR_4,     0x36 },
+	{ ATKBD_SCR_8,     0x27 },
+	{ ATKBD_SCR_CLICK, 0x60 },
+};
 
 /*
  * The atkbd control structure
@@ -155,6 +179,7 @@ struct atkbd {
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
+	unsigned char extra;
 	unsigned char release;
 	int lastkey;
 	volatile signed char ack;
@@ -189,6 +214,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 {
 	struct atkbd *atkbd = serio->private;
 	unsigned int code = data;
+	int scroll = 0, click = -1;
 	int value;
 
 #ifdef ATKBD_DEBUG
@@ -202,7 +228,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->resend = 1;
 		goto out;
 	}
-	
+
 	if (!flags && data == ATKBD_RET_ACK)
 		atkbd->resend = 0;
 #endif
@@ -276,13 +302,28 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_KEY_UNKNOWN:
 			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x on %s).\n",
 				atkbd->release ? "released" : "pressed",
-				atkbd->translated ? "translated" : "raw", 
+				atkbd->translated ? "translated" : "raw",
 				atkbd->set, code, serio->phys);
 			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
 				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
 					" hardware directly.\n");
 			else
 				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
+			break;
+		case ATKBD_SCR_1:
+			scroll = 1 - atkbd->release * 2;
+			break;
+		case ATKBD_SCR_2:
+			scroll = 2 - atkbd->release * 4;
+			break;
+		case ATKBD_SCR_4:
+			scroll = 4 - atkbd->release * 8;
+			break;
+		case ATKBD_SCR_8:
+			scroll = 8 - atkbd->release * 16;
+			break;
+		case ATKBD_SCR_CLICK:
+			click = !atkbd->release;
 			break;
 		default:
 			value = atkbd->release ? 0 :
@@ -303,6 +344,13 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 			}
 
 			atkbd_report_key(&atkbd->dev, regs, atkbd->keycode[code], value);
+	}
+
+	if (scroll || click != -1) {
+		input_regs(&atkbd->dev, regs);
+		input_report_key(&atkbd->dev, BTN_MIDDLE, click);
+		input_report_rel(&atkbd->dev, REL_WHEEL, scroll);
+		input_sync(&atkbd->dev);
 	}
 
 	atkbd->release = 0;
@@ -353,7 +401,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 	if (receive && param)
 		for (i = 0; i < receive; i++)
 			atkbd->cmdbuf[(receive - 1) - i] = param[i];
-	
+
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
 			return (atkbd->cmdcnt = 0) - 1;
@@ -373,7 +421,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 			atkbd->cmdcnt = 0;
 			break;
 		}
-	
+
 		udelay(1);
 	}
 
@@ -420,7 +468,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 			         | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
 		        atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS);
 
-			if (atkbd->set == 4) {
+			if (atkbd->extra) {
 				param[0] = 0;
 				param[1] = (test_bit(LED_COMPOSE, dev->led) ? 0x01 : 0)
 					 | (test_bit(LED_SLEEP,   dev->led) ? 0x02 : 0)
@@ -466,7 +514,7 @@ static int atkbd_probe(struct atkbd *atkbd)
  */
 
 	if (atkbd_reset)
-		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT)) 
+		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
 			printk(KERN_WARNING "atkbd.c: keyboard reset failed on %s\n", atkbd->serio->phys);
 
 /*
@@ -529,20 +577,21 @@ static int atkbd_set_3(struct atkbd *atkbd)
 		return 3;
 	}
 
-	if (atkbd_set != 2) 
-		if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
-			atkbd->id = param[0] << 8 | param[1];
+	if (atkbd_extra) {
+		param[0] = 0x71;
+		if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE)) {
+			atkbd->extra = 1;
 			return 2;
 		}
-
-	if (atkbd_set == 4) {
-		param[0] = 0x71;
-		if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE))
-			return 4;
 	}
 
-	if (atkbd_set != 3) 
+	if (atkbd_set != 3)
 		return 2;
+
+	if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
+		atkbd->id = param[0] << 8 | param[1];
+		return 2;
+	}
 
 	param[0] = 3;
 	if (atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET))
@@ -637,7 +686,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	switch (serio->type & SERIO_TYPE) {
 
-		case SERIO_8042_XL: 
+		case SERIO_8042_XL:
 			atkbd->translated = 1;
 		case SERIO_8042:
 			if (serio->write)
@@ -650,7 +699,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 			kfree(atkbd);
 			return;
 	}
-			
+
 	if (atkbd->write) {
 		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
@@ -687,7 +736,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 			kfree(atkbd);
 			return;
 		}
-		
+
 		atkbd->set = atkbd_set_3(atkbd);
 		atkbd_enable(atkbd);
 
@@ -696,24 +745,32 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->id = 0xab00;
 	}
 
-	if (atkbd->set == 4) {
+	if (atkbd->extra) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
-		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
+		sprintf(atkbd->name, "AT Set 2 Extra keyboard");
 	} else
 		sprintf(atkbd->name, "AT %s Set %d keyboard",
 			atkbd->translated ? "Translated" : "Raw", atkbd->set);
 
 	sprintf(atkbd->phys, "%s/input0", serio->phys);
 
+	if (atkbd_scroll) {
+		for (i = 0; i < 5; i++)
+			atkbd_set2_keycode[atkbd_scroll_keys[i][1]] = atkbd_scroll_keys[i][0];
+		atkbd->dev.evbit[0] |= BIT(EV_REL);
+		atkbd->dev.relbit[0] = BIT(REL_WHEEL);
+		set_bit(BTN_MIDDLE, atkbd->dev.keybit);
+	}
+
 	if (atkbd->translated) {
 		for (i = 0; i < 128; i++) {
 			atkbd->keycode[i] = atkbd_set2_keycode[atkbd_unxlate_table[i]];
 			atkbd->keycode[i | 0x80] = atkbd_set2_keycode[atkbd_unxlate_table[i] | 0x80];
 		}
-	} else if (atkbd->set == 2) {
-		memcpy(atkbd->keycode, atkbd_set2_keycode, sizeof(atkbd->keycode));
-	} else {
+	} else if (atkbd->set == 3) {
 		memcpy(atkbd->keycode, atkbd_set3_keycode, sizeof(atkbd->keycode));
+	} else {
+		memcpy(atkbd->keycode, atkbd_set2_keycode, sizeof(atkbd->keycode));
 	}
 
 	atkbd->dev.name = atkbd->name;
@@ -724,7 +781,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	atkbd->dev.id.version = atkbd->id;
 
 	for (i = 0; i < 512; i++)
-		if (atkbd->keycode[i] && atkbd->keycode[i] < 255)
+		if (atkbd->keycode[i] && atkbd->keycode[i] < ATKBD_SPECIAL)
 			set_bit(atkbd->keycode[i], atkbd->dev.keybit);
 
 	input_register_device(&atkbd->dev);
@@ -741,45 +798,28 @@ static int atkbd_reconnect(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
 	struct serio_dev *dev = serio->dev;
-	int i;
+	unsigned char param[1];
 
-        if (!dev) {
-                printk(KERN_DEBUG "atkbd: reconnect request, but serio is disconnected, ignoring...\n");
-                return -1;
-        }
+	if (!dev) {
+		printk(KERN_DEBUG "atkbd: reconnect request, but serio is disconnected, ignoring...\n");
+		return -1;
+	}
 
 	if (atkbd->write) {
+		param[0] = (test_bit(LED_SCROLLL, atkbd->dev.led) ? 1 : 0)
+		         | (test_bit(LED_NUML,    atkbd->dev.led) ? 2 : 0)
+ 		         | (test_bit(LED_CAPSL,   atkbd->dev.led) ? 4 : 0);
+		
 		if (atkbd_probe(atkbd))
 			return -1;
-
-		atkbd->set = atkbd_set_3(atkbd);
+		if (atkbd->set != atkbd_set_3(atkbd))
+			return -1;
+		
 		atkbd_enable(atkbd);
-	} else {
-		atkbd->set = 2;
-		atkbd->id = 0xab00;
+
+		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
+			return -1;
 	}
-
-	/*
-	 * Here we probably should check if the keyboard has the same set that
-         * it had before and bail out if it's different. But this will most likely
-         * cause new keyboard device be created... and for the user it will look
-         * like keyboard is lost
-	 */
-
-	if (atkbd->translated) {
-		for (i = 0; i < 128; i++) {
-			atkbd->keycode[i] = atkbd_set2_keycode[atkbd_unxlate_table[i]];
-			atkbd->keycode[i | 0x80] = atkbd_set2_keycode[atkbd_unxlate_table[i] | 0x80];
-		}
-	} else if (atkbd->set == 2) {
-		memcpy(atkbd->keycode, atkbd_set2_keycode, sizeof(atkbd->keycode));
-	} else {
-		memcpy(atkbd->keycode, atkbd_set3_keycode, sizeof(atkbd->keycode));
-	}
-
-	for (i = 0; i < 512; i++)
-		if (atkbd->keycode[i] && atkbd->keycode[i] < 255)
-			set_bit(atkbd->keycode[i], atkbd->dev.keybit);
 
 	return 0;
 }
