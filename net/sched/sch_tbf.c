@@ -434,8 +434,7 @@ static int tbf_dump_class(struct Qdisc *sch, unsigned long cl,
 	if (cl != 1) 	/* only one class */ 
 		return -ENOENT;
     
-	tcm->tcm_parent = TC_H_ROOT;
-	tcm->tcm_handle = 1;
+	tcm->tcm_handle |= TC_H_MIN(1);
 	tcm->tcm_info = q->qdisc->handle;
 
 	return 0;
@@ -486,11 +485,9 @@ static int tbf_delete(struct Qdisc *sch, unsigned long arg)
 
 static void tbf_walk(struct Qdisc *sch, struct qdisc_walker *walker)
 {
-	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
-
 	if (!walker->stop) {
-		if (walker->count >= walker->skip) 
-			if (walker->fn(sch, (unsigned long)q, walker) < 0) { 
+		if (walker->count >= walker->skip)
+			if (walker->fn(sch, 1, walker) < 0) {
 				walker->stop = 1;
 				return;
 			}
