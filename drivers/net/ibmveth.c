@@ -260,6 +260,15 @@ static inline int ibmveth_is_replenishing_needed(struct ibmveth_adapter *adapter
 		(atomic_read(&adapter->rx_buff_pool[2].available) < adapter->rx_buff_pool[2].threshold));
 }
 
+/* kick the replenish tasklet if we need replenishing and it isn't already running */
+static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter *adapter)
+{
+	if(ibmveth_is_replenishing_needed(adapter) &&
+	   (atomic_dec_if_positive(&adapter->not_replenishing) == 0)) {
+		schedule_work(&adapter->replenish_task);
+	}
+}
+
 /* replenish tasklet routine */
 static void ibmveth_replenish_task(struct ibmveth_adapter *adapter) 
 {
@@ -274,15 +283,6 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	atomic_inc(&adapter->not_replenishing);
 
 	ibmveth_schedule_replenishing(adapter);
-}
-
-/* kick the replenish tasklet if we need replenishing and it isn't already running */
-static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter *adapter)
-{
-	if(ibmveth_is_replenishing_needed(adapter) && 
-	   (atomic_dec_if_positive(&adapter->not_replenishing) == 0)) {	
-		schedule_work(&adapter->replenish_task);
-	}
 }
 
 /* empty and free ana buffer pool - also used to do cleanup in error paths */
