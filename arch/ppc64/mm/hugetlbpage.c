@@ -190,6 +190,9 @@ static hugepte_t *hugepte_offset(struct mm_struct *mm, unsigned long addr)
 	BUG_ON(!in_hugepage_area(mm->context, addr));
 
 	pgd = pgd_offset(mm, addr);
+	if (pgd_none(*pgd))
+		return NULL;
+
 	pmd = pmd_offset(pgd, addr);
 
 	/* We shouldn't find a (normal) PTE page pointer here */
