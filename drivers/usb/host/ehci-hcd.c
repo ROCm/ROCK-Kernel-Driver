@@ -632,7 +632,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
 	while (time_before (jiffies, ehci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub);
@@ -654,7 +654,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	// maybe restore (PCI) FLADJ
 
 	while (time_before (jiffies, ehci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	retval = usb_resume_device (hcd->self.root_hub);
