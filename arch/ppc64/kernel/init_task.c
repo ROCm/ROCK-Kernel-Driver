@@ -4,6 +4,7 @@
 #include <linux/init.h>
 #include <linux/init_task.h>
 #include <linux/fs.h>
+#include <linux/mqueue.h>
 #include <asm/uaccess.h>
 
 static struct fs_struct init_fs = INIT_FS;

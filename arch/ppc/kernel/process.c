@@ -35,6 +35,7 @@
 #include <linux/init_task.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/mqueue.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

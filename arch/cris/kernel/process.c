@@ -112,6 +112,7 @@
 #include <linux/fs.h>
 #include <linux/user.h>
 #include <linux/elfcore.h>
+#include <linux/mqueue.h>
 
 //#define DEBUG
 
