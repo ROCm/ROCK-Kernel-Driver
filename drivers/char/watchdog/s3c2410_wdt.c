@@ -93,13 +93,13 @@ typedef enum close_state {
 	CLOSE_STATE_ALLOW=0x4021
 } close_state_t;
 
-static struct semaphore open_lock;
-static struct resource *wdt_mem;
-static struct resource *wdt_irq;
-static struct clk      *wdt_clock;
-static unsigned long    wdt_base;
-static unsigned int     wdt_count;
-static close_state_t    allow_close;
+static struct semaphore	 open_lock;
+static struct resource	*wdt_mem;
+static struct resource	*wdt_irq;
+static struct clk	*wdt_clock;
+static void __iomem	*wdt_base;
+static unsigned int	 wdt_count;
+static close_state_t	 allow_close;
 
 static unsigned int tmr_count;
 
@@ -370,6 +370,7 @@ static int s3c2410wdt_probe(struct device *dev)
 	struct resource *res;
 	int started = 0;
 	int ret;
+	int size;
 
 	pr_debug("%s: probe=%p, device=%p\n", __FUNCTION__, pdev, dev);
 
@@ -381,12 +382,14 @@ static int s3c2410wdt_probe(struct device *dev)
 		return -ENOENT;
 	}
 
-	if (!request_mem_region(res->start, res->end-res->start, pdev->name)) {
+	size = (res->end-res->start)+1;
+	wdt_mem = request_mem_region(res->start, size, pdev->name);
+	if (wdt_mem == NULL) {
 		printk(KERN_INFO PFX "failed to get memory region\n");
 		return -ENOENT;
 	}
 
-	wdt_base = (unsigned long)ioremap(res->start, res->end - res->start);
+	wdt_base = ioremap(res->start, size);
 	if (wdt_base == 0) {
 		printk(KERN_INFO PFX "failed to ioremap() region\n");
 		return -EINVAL;
@@ -454,8 +457,8 @@ static int s3c2410wdt_probe(struct device *dev)
 static int s3c2410wdt_remove(struct device *dev)
 {
 	if (wdt_mem != NULL) {
-		release_mem_region(wdt_mem->start,
-				   wdt_mem->end - wdt_mem->start);
+		release_resource(wdt_mem);
+		kfree(wdt_mem);
 		wdt_mem = NULL;
 	}
 
