@@ -1482,7 +1482,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 **
 */
 
-static int idefloppy_get_format_capacities(ide_drive_t *drive, int *arg)
+static int idefloppy_get_format_capacities(ide_drive_t *drive, int __user *arg)
 {
         idefloppy_pc_t pc;
 	idefloppy_capacity_header_t *header;
@@ -1490,7 +1490,7 @@ static int idefloppy_get_format_capacities(ide_drive_t *drive, int *arg)
 	int i, descriptors, blocks, length;
 	int u_array_size;
 	int u_index;
-	int *argp;
+	int __user *argp;
 
 	if (get_user(u_array_size, arg))
 		return (-EFAULT);
@@ -1558,7 +1558,7 @@ static int idefloppy_get_format_capacities(ide_drive_t *drive, int *arg)
 **        0x01 - verify media after format.
 */
 
-static int idefloppy_begin_format(ide_drive_t *drive, int *arg)
+static int idefloppy_begin_format(ide_drive_t *drive, int __user *arg)
 {
 	int blocks;
 	int length;
@@ -1591,7 +1591,7 @@ static int idefloppy_begin_format(ide_drive_t *drive, int *arg)
 ** the dsc bit, and return either 0 or 65536.
 */
 
-static int idefloppy_get_format_progress(ide_drive_t *drive, int *arg)
+static int idefloppy_get_format_progress(ide_drive_t *drive, int __user *arg)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_pc_t pc;
@@ -1945,6 +1945,7 @@ static int idefloppy_ioctl(struct inode *inode, struct file *file,
 	struct block_device *bdev = inode->i_bdev;
 	ide_drive_t *drive = bdev->bd_disk->private_data;
 	idefloppy_floppy_t *floppy = drive->driver_data;
+	void __user *argp = (void __user *)arg;
 	int err = generic_ide_ioctl(bdev, cmd, arg);
 	int prevent = (arg) ? 1 : 0;
 	idefloppy_pc_t pc;
@@ -1972,7 +1973,7 @@ static int idefloppy_ioctl(struct inode *inode, struct file *file,
 	case IDEFLOPPY_IOCTL_FORMAT_SUPPORTED:
 		return 0;
 	case IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY:
-		return idefloppy_get_format_capacities(drive, (int *)arg);
+		return idefloppy_get_format_capacities(drive, argp);
 	case IDEFLOPPY_IOCTL_FORMAT_START:
 
 		if (!(file->f_mode & 2))
@@ -1988,7 +1989,7 @@ static int idefloppy_ioctl(struct inode *inode, struct file *file,
 
 		set_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
 
-		err = idefloppy_begin_format(drive, (int *)arg);
+		err = idefloppy_begin_format(drive, argp);
 		if (err)
 			clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
 		return err;
@@ -1999,7 +2000,7 @@ static int idefloppy_ioctl(struct inode *inode, struct file *file,
 		** format progress reporting.
 		*/
 	case IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS:
-		return idefloppy_get_format_progress(drive, (int *)arg);
+		return idefloppy_get_format_progress(drive, argp);
 	}
  	return -EINVAL;
 }
