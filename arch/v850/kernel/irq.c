@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/irq.c -- High-level interrupt handling
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *  Copyright (C) 1994-2000  Ralf Baechle
  *  Copyright (C) 1992  Linus Torvalds
  *
@@ -713,3 +713,9 @@ init_irq_handlers (int base_irq, int num, int interval,
 		base_irq += interval;
 	}
 }
+
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_SYSCTL)
+void init_irq_proc(void)
+{
+}
+#endif /* CONFIG_PROC_FS && CONFIG_SYSCTL */
