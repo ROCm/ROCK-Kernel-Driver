@@ -88,7 +88,7 @@ static void		ip6_dst_ifdown(struct dst_entry *, int how);
 static int		 ip6_dst_gc(void);
 
 static int		ip6_pkt_discard(struct sk_buff *skb);
-static int		ip6_pkt_discard_out(struct sk_buff **pskb);
+static int		ip6_pkt_discard_out(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
 static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 
@@ -638,7 +638,7 @@ static inline unsigned int ipv6_advmss(unsigned int mtu)
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
 				  struct in6_addr *addr,
-				  int (*output)(struct sk_buff **))
+				  int (*output)(struct sk_buff *))
 {
 	struct rt6_info *rt;
 	struct inet6_dev *idev = in6_dev_get(dev);
@@ -1356,11 +1356,10 @@ int ip6_pkt_discard(struct sk_buff *skb)
 	return 0;
 }
 
-int ip6_pkt_discard_out(struct sk_buff **pskb)
+int ip6_pkt_discard_out(struct sk_buff *skb)
 {
-	(*pskb)->dev = (*pskb)->dst->dev;
-	BUG_ON(!(*pskb)->dev);
-	return ip6_pkt_discard(*pskb);
+	skb->dev = skb->dst->dev;
+	return ip6_pkt_discard(skb);
 }
 
 /*

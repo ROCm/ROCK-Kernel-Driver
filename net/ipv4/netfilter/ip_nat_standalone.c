@@ -86,7 +86,7 @@ ip_nat_fn(unsigned int hooknum,
 
 	/* If we had a hardware checksum before, it's now invalid */
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
-		if (skb_checksum_help(pskb, (out == NULL)))
+		if (skb_checksum_help(*pskb, (out == NULL)))
 			return NF_DROP;
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
