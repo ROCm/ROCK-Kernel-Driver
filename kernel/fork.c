@@ -161,7 +161,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 
 static int get_pid(unsigned long flags)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	int pid;
 
 	if (flags & CLONE_IDLETASK)
@@ -178,7 +178,7 @@ inside:
 		next_safe = pid_max;
 		read_lock(&tasklist_lock);
 	repeat:
-		for_each_task(p) {
+		do_each_thread(g, p) {
 			if (p->pid == last_pid	||
 			   p->pgrp == last_pid	||
 			   p->session == last_pid) {
@@ -195,7 +195,8 @@ inside:
 				next_safe = p->pgrp;
 			if (p->session > last_pid && next_safe > p->session)
 				next_safe = p->session;
-		}
+		} while_each_thread(g, p);
+
 		read_unlock(&tasklist_lock);
 	}
 	pid = last_pid;

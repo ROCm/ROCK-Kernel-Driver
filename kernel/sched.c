@@ -1838,7 +1838,7 @@ char * render_sigset_t(sigset_t *set, char *buffer)
 
 void show_state(void)
 {
-	task_t *p;
+	task_t *g, *p;
 
 #if (BITS_PER_LONG == 32)
 	printk("\n"
@@ -1850,14 +1850,15 @@ void show_state(void)
 	printk("  task                 PC        stack   pid father child younger older\n");
 #endif
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		/*
 		 * reset the NMI-timeout, listing all files on a slow
 		 * console might take alot of time:
 		 */
 		touch_nmi_watchdog();
 		show_task(p);
-	}
+	} while_each_thread(g, p);
+
 	read_unlock(&tasklist_lock);
 }
 

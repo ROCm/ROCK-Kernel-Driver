@@ -938,8 +938,8 @@ int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 		struct task_struct *p;
 
 		retval = -ESRCH;
-		for_each_task(p) {
-			if (p->pgrp == pgrp && thread_group_leader(p)) {
+		for_each_process(p) {
+			if (p->pgrp == pgrp) {
 				int err = send_sig_info(sig, info, p);
 				if (retval)
 					retval = err;
@@ -976,7 +976,7 @@ kill_sl_info(int sig, struct siginfo *info, pid_t sess)
 
 		retval = -ESRCH;
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
+		for_each_process(p) {
 			if (p->leader && p->session == sess) {
 				int err = send_sig_info(sig, info, p);
 				if (retval)
@@ -1020,8 +1020,8 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
 		struct task_struct * p;
 
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
-			if (p->pid > 1 && p != current && thread_group_leader(p)) {
+		for_each_process(p) {
+			if (p->pid > 1 && p != current) {
 				int err = send_sig_info(sig, info, p);
 				++count;
 				if (err != -EPERM)

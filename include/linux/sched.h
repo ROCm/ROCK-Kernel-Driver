@@ -760,14 +760,16 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 #define remove_parent(p)	list_del_init(&(p)->sibling)
 #define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
 
-#define REMOVE_LINKS(p) do {				\
-	list_del_init(&(p)->tasks);			\
-	remove_parent(p);				\
+#define REMOVE_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_del_init(&(p)->tasks);			\
+	remove_parent(p);					\
 	} while (0)
 
-#define SET_LINKS(p) do {				\
-	list_add_tail(&(p)->tasks,&init_task.tasks);	\
-	add_parent(p, (p)->parent);			\
+#define SET_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_add_tail(&(p)->tasks,&init_task.tasks);	\
+	add_parent(p, (p)->parent);				\
 	} while (0)
 
 static inline struct task_struct *eldest_child(struct task_struct *p)
@@ -797,11 +799,18 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
 #define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
 
-#define for_each_task(p) \
+#define for_each_process(p) \
 	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-#define for_each_thread(task) \
-	for (task = next_thread(current) ; task != current ; task = next_thread(task))
+/*
+ * Careful: do_each_thread/while_each_thread is a double loop so
+ *          'break' will not work as expected - use goto instead.
+ */
+#define do_each_thread(g, t) \
+	for (g = t = &init_task ; (g = t = next_task(g)) != &init_task ; ) do
+
+#define while_each_thread(g, t) \
+	while ((t = next_thread(t)) != g)
 
 static inline task_t *next_thread(task_t *p)
 {

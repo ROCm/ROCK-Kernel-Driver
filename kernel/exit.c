@@ -115,7 +115,7 @@ int session_of_pgrp(int pgrp)
 
 	fallback = -1;
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	for_each_process(p) {
  		if (p->session <= 0)
  			continue;
 		if (p->pgrp == pgrp) {
@@ -141,7 +141,7 @@ static int __will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_ta
 {
 	struct task_struct *p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if ((p == ignored_task) || (p->pgrp != pgrp) ||
 		    (p->state == TASK_ZOMBIE) ||
 		    (p->parent->pid == 1))
@@ -175,7 +175,7 @@ static inline int __has_stopped_jobs(int pgrp)
 	int retval = 0;
 	struct task_struct * p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if (p->pgrp != pgrp)
 			continue;
 		if (p->state != TASK_STOPPED)
