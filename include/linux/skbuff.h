@@ -764,10 +764,10 @@ static inline struct sk_buff *__skb_dequeue_tail(struct sk_buff_head *list)
 }
 
 /**
- *	skb_dequeue - remove from the head of the queue
+ *	skb_dequeue_tail - remove from the tail of the queue
  *	@list: list to dequeue from
  *
- *	Remove the head of the list. The list lock is taken so the function
+ *	Remove the tail of the list. The list lock is taken so the function
  *	may be used safely with other locking list functions. The tail item is
  *	returned or %NULL if the list is empty.
  */
