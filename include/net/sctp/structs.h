@@ -1706,8 +1706,8 @@ __u32 sctp_association_get_next_tsn(struct sctp_association *);
 __u32 sctp_association_get_tsn_block(struct sctp_association *, int);
 
 void sctp_assoc_sync_pmtu(struct sctp_association *);
-void sctp_assoc_rwnd_increase(struct sctp_association *, int);
-void sctp_assoc_rwnd_decrease(struct sctp_association *, int);
+void sctp_assoc_rwnd_increase(struct sctp_association *, unsigned);
+void sctp_assoc_rwnd_decrease(struct sctp_association *, unsigned);
 void sctp_assoc_set_primary(struct sctp_association *,
 			    struct sctp_transport *);
 int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *, int);

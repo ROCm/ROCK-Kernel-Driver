@@ -1356,7 +1356,7 @@ struct sctp_association *sctp_unpack_cookie(
 	int headersize, bodysize, fixed_size;
 	__u8 digest[SCTP_SIGNATURE_SIZE];
 	struct scatterlist sg;
-	unsigned int keylen;
+	unsigned int keylen, len;
 	char *key;
 	sctp_scope_t scope;
 	struct sk_buff *skb = chunk->skb;
@@ -1369,8 +1369,8 @@ struct sctp_association *sctp_unpack_cookie(
 	 * There must be enough room for our cookie and our peer's
 	 * INIT chunk.
 	 */
-	if (ntohs(chunk->chunk_hdr->length) <
-	    (fixed_size + sizeof(sctp_chunkhdr_t)))
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len < fixed_size + sizeof(struct sctp_chunkhdr))
 		goto malformed;
 
 	/* Verify that the cookie has been padded out. */
@@ -1454,7 +1454,7 @@ no_hmac:
 	retval->peer.port = ntohs(chunk->sctp_hdr->source);
 
 	/* Populate the association from the cookie.  */
-	retval->c = *bear_cookie;
+	memcpy(&retval->c, bear_cookie, sizeof(*bear_cookie));
 
 	if (sctp_assoc_set_bind_addr_from_cookie(retval, bear_cookie,
 						 GFP_ATOMIC) < 0) {

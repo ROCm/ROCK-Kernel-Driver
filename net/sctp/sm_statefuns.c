@@ -1948,22 +1948,23 @@ sctp_disposition_t sctp_sf_do_9_1_abort(const struct sctp_endpoint *ep,
 					sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
+	unsigned len;
 	__u16 error = SCTP_ERROR_NO_ERROR;
 
 	if (!sctp_vtag_verify_either(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
-	if (chunk && (ntohs(chunk->chunk_hdr->length) >=
-			(sizeof(struct sctp_chunkhdr) +
-			sizeof(struct sctp_errhdr))))
+	/* Check that chunk header looks valid.  */
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len >= sizeof(struct sctp_chunkhdr) + sizeof(struct sctp_errhdr))
 		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+
 
  	/* ASSOC_FAILED will DELETE_TCB. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_U32(error));
 	SCTP_INC_STATS(SctpAborteds);
 	SCTP_DEC_STATS(SctpCurrEstab);
 
-	/* BUG?  This does not look complete... */
 	return SCTP_DISPOSITION_ABORT;
 }
 
@@ -1979,6 +1980,7 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 				     sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
+	unsigned len;
 	__u16 error = SCTP_ERROR_NO_ERROR;
 
 	if (!sctp_vtag_verify_either(chunk, asoc))
@@ -1990,9 +1992,9 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
 
-	if (chunk && (ntohs(chunk->chunk_hdr->length) >=
-			(sizeof(struct sctp_chunkhdr) +
-			sizeof(struct sctp_errhdr))))
+	/* Check that chunk header looks valid.  */
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len >= sizeof(struct sctp_chunkhdr) + sizeof(struct sctp_errhdr))
 		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
 
 	/* CMD_INIT_FAILED will DELETE_TCB. */
