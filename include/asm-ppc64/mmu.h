@@ -28,14 +28,6 @@ typedef unsigned long mm_context_t;
 #endif
 
 /*
- * Define the size of the cache used for segment table entries.  The first
- * entry is used as a cache pointer, therefore the actual number of entries
- * stored is one less than defined here.  Do not change this value without
- * considering the impact it will have on the layout of the paca in paca.h.
- */
-#define STAB_CACHE_SIZE 16
-
-/*
  * Hardware Segment Lookaside Buffer Entry
  * This structure has been padded out to two 64b doublewords (actual SLBE's are
  * 94 bits).  This padding facilites use by the segment management

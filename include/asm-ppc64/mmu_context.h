@@ -139,6 +139,7 @@ destroy_context(struct mm_struct *mm)
 }
 
 extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
+extern void flush_slb(struct task_struct *tsk, struct mm_struct *mm);
 
 /*
  * switch_mm is the entry point called from the architecture independent
@@ -154,7 +155,15 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
  END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	 : : );
 #endif /* CONFIG_ALTIVEC */
-	flush_stab(tsk, next);
+
+	/* No need to flush userspace segments if the mm doesnt change */
+	if (prev == next)
+		return;
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
+		flush_slb(tsk, next);
+	else
+		flush_stab(tsk, next);
 	cpu_set(smp_processor_id(), next->cpu_vm_mask);
 }
 
