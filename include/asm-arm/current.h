@@ -3,7 +3,7 @@
 
 #include <linux/thread_info.h>
 
-static inline struct task_struct *get_current(void) __attribute__ (( __const__ ));
+static inline struct task_struct *get_current(void) __attribute_const__;
 
 static inline struct task_struct *get_current(void)
 {

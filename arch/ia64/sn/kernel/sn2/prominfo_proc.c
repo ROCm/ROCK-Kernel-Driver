@@ -14,6 +14,7 @@
 #include <linux/proc_fs.h>
 #include <asm/system.h>
 #include <asm/io.h>
+#include <asm/sn/sn2/addrs.h>
 #include <asm/sn/simulator.h>
 
 /* to lookup nasids */

@@ -14,8 +14,6 @@
 
 #include <asm/sn/types.h>
 #include <asm/uaccess.h>		/* for copy_??_user */
-#include <linux/mm.h>
-#include <linux/fs.h>
 #include <asm/sn/hwgfs.h>
 
 typedef hwgfs_handle_t vertex_hdl_t;
@@ -44,6 +42,21 @@ typedef enum graph_error_e {
 #define CPU_NONE		(-1)
 #define GRAPH_VERTEX_NONE ((vertex_hdl_t)-1)
 
+/*
+ * Defines for individual WARs. Each is a bitmask of applicable
+ * part revision numbers. (1 << 1) == rev A, (1 << 2) == rev B,
+ * (3 << 1) == (rev A or rev B), etc
+ */
+#define PV854697 (~0)     /* PIC: write 64bit regs as 64bits. permanent */
+#define PV854827 (~0UL)   /* PIC: fake widget 0xf presence bit. permanent */
+#define PV855271 (1 << 1) /* PIC: use virt chan iff 64-bit device. */
+#define PV878674 (~0)     /* PIC: Dont allow 64bit PIOs.  permanent */
+#define PV855272 (1 << 1) /* PIC: runaway interrupt WAR */
+#define PV856155 (1 << 1) /* PIC: arbitration WAR */
+#define PV856864 (1 << 1) /* PIC: lower timeout to free TNUMs quicker */
+#define PV856866 (1 << 1) /* PIC: avoid rrb's 0/1/8/9. */
+#define PV862253 (1 << 1) /* PIC: don't enable write req RAM parity checking */
+#define PV867308 (3 << 1) /* PIC: make LLP error interrupts FATAL for PIC */
 
 /*
  * No code is complete without an Assertion macro

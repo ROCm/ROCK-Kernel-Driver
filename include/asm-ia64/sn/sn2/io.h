@@ -27,6 +27,10 @@ extern void sn_dma_flush(unsigned long);
 #define __sn_readw ___sn_readw
 #define __sn_readl ___sn_readl
 #define __sn_readq ___sn_readq
+#define __sn_readb_relaxed ___sn_readb_relaxed
+#define __sn_readw_relaxed ___sn_readw_relaxed
+#define __sn_readl_relaxed ___sn_readl_relaxed
+#define __sn_readq_relaxed ___sn_readq_relaxed
 
 /*
  * The following routines are SN Platform specific, called when
@@ -208,25 +212,25 @@ sn_inl_fast (unsigned long port)
 }
 
 static inline unsigned char
-sn_readb_fast (void *addr)
+___sn_readb_relaxed (void *addr)
 {
 	return *(volatile unsigned char *)addr;
 }
 
 static inline unsigned short
-sn_readw_fast (void *addr)
+___sn_readw_relaxed (void *addr)
 {
 	return *(volatile unsigned short *)addr;
 }
 
 static inline unsigned int
-sn_readl_fast (void *addr)
+___sn_readl_relaxed (void *addr)
 {
 	return *(volatile unsigned int *) addr;
 }
 
 static inline unsigned long
-sn_readq_fast (void *addr)
+___sn_readq_relaxed (void *addr)
 {
 	return *(volatile unsigned long *) addr;
 }

@@ -311,10 +311,10 @@ void touch_nmi_watchdog (void)
 
 void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 {
+	int sum, cpu = safe_smp_processor_id();
+
 	if (nmi_watchdog_disabled)
 		return;
-
-	int sum, cpu = safe_smp_processor_id();
 
 	sum = read_pda(apic_timer_irqs);
 	if (last_irq_sums[cpu] == sum) {

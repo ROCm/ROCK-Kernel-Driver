@@ -1368,7 +1368,7 @@ static void zatm_close(struct atm_vcc *vcc)
         DPRINTK("zatm_close: done waiting\n");
         /* deallocate memory */
         kfree(ZATM_VCC(vcc));
-        ZATM_VCC(vcc) = NULL;
+	vcc->dev_data = NULL;
 	clear_bit(ATM_VF_ADDR,&vcc->flags);
 }
 
@@ -1383,7 +1383,8 @@ static int zatm_open(struct atm_vcc *vcc)
 
 	DPRINTK(">zatm_open\n");
 	zatm_dev = ZATM_DEV(vcc->dev);
-	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags)) ZATM_VCC(vcc) = NULL;
+	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags))
+		vcc->dev_data = NULL;
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR,&vcc->flags);
 	if (vcc->qos.aal != ATM_AAL5) return -EINVAL; /* @@@ AAL0 */
@@ -1395,7 +1396,7 @@ static int zatm_open(struct atm_vcc *vcc)
 			clear_bit(ATM_VF_ADDR,&vcc->flags);
 			return -ENOMEM;
 		}
-		ZATM_VCC(vcc) = zatm_vcc;
+		vcc->dev_data = zatm_vcc;
 		ZATM_VCC(vcc)->tx_chan = 0; /* for zatm_close after open_rx */
 		if ((error = open_rx_first(vcc))) {
 	                zatm_close(vcc);
@@ -1597,7 +1598,7 @@ static int __init zatm_module_init(void)
 			dev = atm_dev_register(DEV_LABEL,&ops,-1,NULL);
 			if (!dev) break;
 			zatm_dev->pci_dev = pci_dev;
-			ZATM_DEV(dev) = zatm_dev;
+			dev->dev_data = zatm_dev;
 			zatm_dev->copper = type;
 			if (zatm_init(dev) || zatm_start(dev)) {
 				atm_dev_deregister(dev);

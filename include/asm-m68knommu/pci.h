@@ -11,6 +11,8 @@
 #define PCIBIOS_MIN_IO		0x100
 #define PCIBIOS_MIN_MEM		0x00010000
 
+#define pcibios_scan_all_fns(a, b)	0
+
 /*
  * Return whether the given PCI device DMA address mask can
  * be supported properly.  For example, if your device can

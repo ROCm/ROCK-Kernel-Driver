@@ -315,7 +315,10 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 			S_IFBLK|S_IRUSR|S_IWUSR,
 			"%s/part%d", disk->devfs_name, part);
 
-	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
+	if (isdigit(disk->kobj.name[strlen(disk->kobj.name)-1]))
+		snprintf(p->kobj.name,KOBJ_NAME_LEN,"%sp%d",disk->kobj.name,part);
+	else
+		snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
 	p->kobj.ktype = &ktype_part;
 	kobject_register(&p->kobj);

@@ -75,9 +75,8 @@ extern plat_pg_data_t *plat_node_data[];
 		(((unsigned long)ADDR_TO_MAPBASE((kaddr)) - PAGE_OFFSET) / \
 		sizeof(struct page))))
 
-#define kern_addr_valid(addr)	((KVADDR_TO_NID((unsigned long)addr) > \
-	-1) ? 0 : (test_bit(LOCAL_MAP_NR((addr)), \
-	NODE_DATA(KVADDR_TO_NID((unsigned long)addr))->valid_addr_bitmap)))
+/* XXX: FIXME -- wli */
+#define kern_addr_valid(addr)	(0)
 
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page) \

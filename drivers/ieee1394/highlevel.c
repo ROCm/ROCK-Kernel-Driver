@@ -521,7 +521,7 @@ int highlevel_read(struct hpsb_host *host, int nodeid, void *data,
                                 rcode = RCODE_TYPE_ERROR;
                         }
 
-			(u8 *)data += partlength;
+			data += partlength;
                         length -= partlength;
                         addr += partlength;
 
@@ -567,7 +567,7 @@ int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
                                 rcode = RCODE_TYPE_ERROR;
                         }
 
-			(u8 *)data += partlength;
+			data += partlength;
                         length -= partlength;
                         addr += partlength;
 

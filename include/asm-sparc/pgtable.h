@@ -80,7 +80,7 @@ BTFIXUPDEF_SIMM13(pmd_shift)
 BTFIXUPDEF_SETHI(pmd_size)
 BTFIXUPDEF_SETHI(pmd_mask)
 
-extern unsigned int pmd_align(unsigned int addr) __attribute__((const));
+extern unsigned int pmd_align(unsigned int addr) __attribute_const__;
 extern __inline__ unsigned int pmd_align(unsigned int addr)
 {
 	return ((addr + ~BTFIXUP_SETHI(pmd_mask)) & BTFIXUP_SETHI(pmd_mask));
@@ -90,7 +90,7 @@ BTFIXUPDEF_SIMM13(pgdir_shift)
 BTFIXUPDEF_SETHI(pgdir_size)
 BTFIXUPDEF_SETHI(pgdir_mask)
 
-extern unsigned int pgdir_align(unsigned int addr) __attribute__((const));
+extern unsigned int pgdir_align(unsigned int addr) __attribute_const__;
 extern __inline__ unsigned int pgdir_align(unsigned int addr)
 {
 	return ((addr + ~BTFIXUP_SETHI(pgdir_mask)) & BTFIXUP_SETHI(pgdir_mask));
@@ -248,19 +248,19 @@ BTFIXUPDEF_HALF(pte_writei)
 BTFIXUPDEF_HALF(pte_dirtyi)
 BTFIXUPDEF_HALF(pte_youngi)
 
-extern int pte_write(pte_t pte) __attribute__((const));
+extern int pte_write(pte_t pte) __attribute_const__;
 extern __inline__ int pte_write(pte_t pte)
 {
 	return pte_val(pte) & BTFIXUP_HALF(pte_writei);
 }
 
-extern int pte_dirty(pte_t pte) __attribute__((const));
+extern int pte_dirty(pte_t pte) __attribute_const__;
 extern __inline__ int pte_dirty(pte_t pte)
 {
 	return pte_val(pte) & BTFIXUP_HALF(pte_dirtyi);
 }
 
-extern int pte_young(pte_t pte) __attribute__((const));
+extern int pte_young(pte_t pte) __attribute_const__;
 extern __inline__ int pte_young(pte_t pte)
 {
 	return pte_val(pte) & BTFIXUP_HALF(pte_youngi);
@@ -271,7 +271,7 @@ extern __inline__ int pte_young(pte_t pte)
  */
 BTFIXUPDEF_HALF(pte_filei)
 
-extern int pte_file(pte_t pte) __attribute__((const));
+extern int pte_file(pte_t pte) __attribute_const__;
 extern __inline__ int pte_file(pte_t pte)
 {
 	return pte_val(pte) & BTFIXUP_HALF(pte_filei);
@@ -283,19 +283,19 @@ BTFIXUPDEF_HALF(pte_wrprotecti)
 BTFIXUPDEF_HALF(pte_mkcleani)
 BTFIXUPDEF_HALF(pte_mkoldi)
 
-extern pte_t pte_wrprotect(pte_t pte) __attribute__((const));
+extern pte_t pte_wrprotect(pte_t pte) __attribute_const__;
 extern __inline__ pte_t pte_wrprotect(pte_t pte)
 {
 	return __pte(pte_val(pte) & ~BTFIXUP_HALF(pte_wrprotecti));
 }
 
-extern pte_t pte_mkclean(pte_t pte) __attribute__((const));
+extern pte_t pte_mkclean(pte_t pte) __attribute_const__;
 extern __inline__ pte_t pte_mkclean(pte_t pte)
 {
 	return __pte(pte_val(pte) & ~BTFIXUP_HALF(pte_mkcleani));
 }
 
-extern pte_t pte_mkold(pte_t pte) __attribute__((const));
+extern pte_t pte_mkold(pte_t pte) __attribute_const__;
 extern __inline__ pte_t pte_mkold(pte_t pte)
 {
 	return __pte(pte_val(pte) & ~BTFIXUP_HALF(pte_mkoldi));
@@ -332,7 +332,7 @@ BTFIXUPDEF_CALL_CONST(pte_t, mk_pte_io, unsigned long, pgprot_t, int)
 
 BTFIXUPDEF_INT(pte_modify_mask)
 
-extern pte_t pte_modify(pte_t pte, pgprot_t newprot) __attribute__((const));
+extern pte_t pte_modify(pte_t pte, pgprot_t newprot) __attribute_const__;
 extern __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	return __pte((pte_val(pte) & BTFIXUP_INT(pte_modify_mask)) |

@@ -35,7 +35,6 @@
 #include <asm/tlbflush.h>
 
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
-DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -1080,7 +1079,6 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	int i, j, k, node, local_node;
 
 	local_node = pgdat->node_id;
-	printk("Building zonelist for node : %d\n", local_node);
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		struct zonelist *zonelist;
 
@@ -1118,6 +1116,7 @@ void __init build_all_zonelists(void)
 
 	for(i = 0 ; i < numnodes ; i++)
 		build_zonelists(NODE_DATA(i));
+	printk("Built %i zonelists\n", numnodes);
 }
 
 /*
@@ -1182,24 +1181,6 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
 	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
-/*
- * Get space for the valid bitmap.
- */
-static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
-		unsigned long *zones_size)
-{
-	unsigned long size = 0;
-	int i;
-
-	for (i = 0; i < MAX_NR_ZONES; i++)
-		size += zones_size[i];
-	size = LONG_ALIGN((size + 7) >> 3);
-	if (size) {
-		pgdat->valid_addr_bitmap = 
-			(unsigned long *)alloc_bootmem_node(pgdat, size);
-		memset(pgdat->valid_addr_bitmap, 0, size);
-	}
-}
 
 /*
  * Initially all pages are reserved - free ones are freed
@@ -1392,9 +1373,6 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
-	memblk_set_online(node_to_memblk(nid));
-
-	calculate_zone_bitmap(pgdat, zones_size);
 }
 
 #ifndef CONFIG_DISCONTIGMEM

@@ -255,7 +255,7 @@ static int hexium_probe(struct saa7146_dev *dev)
 	if (0x17c8 == dev->pci->subsystem_vendor && 0x0101 == dev->pci->subsystem_device) {
 		printk("hexium_orion: device is a Hexium Orion w/ 1 SVHS + 3 BNC inputs.\n");
 		/* we store the pointer in our private data field */
-		(struct hexium *) dev->ext_priv = hexium;
+		dev->ext_priv = hexium;
 		hexium->type = HEXIUM_ORION_1SVHS_3BNC;
 		return 0;
 	}
@@ -263,7 +263,7 @@ static int hexium_probe(struct saa7146_dev *dev)
 	if (0x17c8 == dev->pci->subsystem_vendor && 0x2101 == dev->pci->subsystem_device) {
 		printk("hexium_orion: device is a Hexium Orion w/ 4 BNC inputs.\n");
 		/* we store the pointer in our private data field */
-		(struct hexium *) dev->ext_priv = hexium;
+		dev->ext_priv = hexium;
 		hexium->type = HEXIUM_ORION_4BNC;
 		return 0;
 	}
@@ -273,7 +273,7 @@ static int hexium_probe(struct saa7146_dev *dev)
 	if (0 == (err = i2c_smbus_xfer(&hexium->i2c_adapter, 0x4e, 0, I2C_SMBUS_READ, 0x00, I2C_SMBUS_BYTE_DATA, &data))) {
 		printk("hexium_orion: device is a Hexium HV-PCI6/Orion (old).\n");
 		/* we store the pointer in our private data field */
-		(struct hexium *) dev->ext_priv = hexium;
+		dev->ext_priv = hexium;
 		hexium->type = HEXIUM_HV_PCI6_ORION;
 		return 0;
 	}

@@ -12,7 +12,7 @@
  * xbow.h - header file for crossbow chip and xbow section of xbridge
  */
 
-#include <linux/config.h>
+#include <asm/types.h>
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xswitch.h>
@@ -54,12 +54,6 @@
 
 #ifndef __ASSEMBLY__
 typedef uint32_t      xbowreg_t;
-
-#define XBOWCONST	(xbowreg_t)
-
-/* Generic xbow register, given base and offset */
-#define XBOW_REG_PTR(base, offset) ((volatile xbowreg_t*) \
-	((__psunsigned_t)(base) + (__psunsigned_t)(offset)))
 
 /* Register set for each xbow link */
 typedef volatile struct xb_linkregs_s {
@@ -224,14 +218,6 @@ typedef struct xbow_cfg_s {
 /*              of the widget0 address space (before 0xf4) */
 #define	XBOW_WID_UNDEF		0xe4
 
-/* pointer to link arbitration register, given xbow base, dst and src widget id */
-#define XBOW_PRIO_ARBREG_PTR(base, dst_wid, src_wid) \
-	XBOW_REG_PTR(XBOW_PRIO_LINKREGS_PTR(base, dst_wid), XBOW_ARB_OFF(src_wid))
-
-/* pointer to link registers base, given xbow base and destination widget id */
-#define XBOW_PRIO_LINKREGS_PTR(base, dst_wid) (xb_linkregs_t*) \
-	XBOW_REG_PTR(base, XB_LINK_REG_BASE(dst_wid))
-
 /* xbow link register set base, legal value for x is 0x8..0xf */
 #define	XB_LINK_BASE		0x100
 #define	XB_LINK_OFFSET		0x40
@@ -356,9 +342,6 @@ typedef struct xbow_cfg_s {
                         XWIDGET_MFG_NUM(wid) == XXBOW_WIDGET_MFGR_NUM)
 
 #define XBOW_WAR_ENABLED(pv, widid) ((1 << XWIDGET_REV_NUM(widid)) & pv)
-#define PV854827 (~0)     /* PIC: fake widget 0xf presence bit. permanent */
-#define PV863579 (1 << 1) /* PIC: PIO to PIC register */
-
 
 #ifndef __ASSEMBLY__
 /*

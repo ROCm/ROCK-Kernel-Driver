@@ -962,11 +962,15 @@ config SCx200_GPIO
 	  If compiled as a module, it will be called scx200_gpio.
 
 config RAW_DRIVER
-	tristate "RAW driver (/dev/raw/rawN)"
+	tristate "RAW driver (/dev/raw/rawN) (OBSOLETE)"
 	help
 	  The raw driver permits block devices to be bound to /dev/raw/rawN. 
 	  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
 	  See the raw(8) manpage for more details.
+
+          The raw driver is deprecated and may be removed from 2.7
+          kernels.  Applications should simply open the device (eg /dev/hda1)
+          with the O_DIRECT flag.
 
 config MAX_RAW_DEVS
 	int "Maximum number of RAW devices to support (1-8192)"

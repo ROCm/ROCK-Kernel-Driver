@@ -419,14 +419,14 @@ void call_pernode_memory(unsigned long start, unsigned long len, void *arg)
 
 	func = arg;
 
-	if (!num_memblks) {
-		/* No SRAT table, to assume one node (node 0) */
+	if (!num_node_memblks) {
+		/* No SRAT table, so assume one node (node 0) */
 		if (start < end)
 			(*func)(start, len, 0);
 		return;
 	}
 
-	for (i = 0; i < num_memblks; i++) {
+	for (i = 0; i < num_node_memblks; i++) {
 		rs = max(start, node_memblk[i].start_paddr);
 		re = min(end, node_memblk[i].start_paddr +
 			 node_memblk[i].size);

@@ -819,6 +819,7 @@ void wake_up_forked_process(task_t * p)
 void sched_exit(task_t * p)
 {
 	unsigned long flags;
+	runqueue_t *rq;
 
 	local_irq_save(flags);
 	if (p->first_time_slice) {
@@ -831,10 +832,12 @@ void sched_exit(task_t * p)
 	 * If the child was a (relative-) CPU hog then decrease
 	 * the sleep_avg of the parent as well.
 	 */
+	rq = task_rq_lock(p->parent, &flags);
 	if (p->sleep_avg < p->parent->sleep_avg)
 		p->parent->sleep_avg = p->parent->sleep_avg /
 		(EXIT_WEIGHT + 1) * EXIT_WEIGHT + p->sleep_avg /
 		(EXIT_WEIGHT + 1);
+	task_rq_unlock(rq, &flags);
 }
 
 /**

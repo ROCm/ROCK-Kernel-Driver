@@ -2112,6 +2112,7 @@ static int fd_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 		case FDDEFPRM32:
 		case FDGETPRM32:
 		{
+			compat_uptr_t name;
 			struct floppy_struct32 *uf;
 			struct floppy_struct *f;
 
@@ -2130,7 +2131,8 @@ static int fd_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 			err |= __get_user(f->rate, &uf->rate);
 			err |= __get_user(f->spec1, &uf->spec1);
 			err |= __get_user(f->fmt_gap, &uf->fmt_gap);
-			err |= __get_user((u64)f->name, &uf->name);
+			err |= __get_user(name, &uf->name);
+			f->name = compat_ptr(name);
 			if (err) {
 				err = -EFAULT;
 				goto out;

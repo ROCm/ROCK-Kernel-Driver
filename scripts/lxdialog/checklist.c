@@ -138,9 +138,11 @@ dialog_checklist (const char *title, const char *prompt, int height, int width,
     /* Initializes status */
     for (i = 0; i < item_no; i++) {
 	status[i] = !strcasecmp (items[i * 3 + 2], "on");
-	if (!choice && status[i])
-            choice = i;
+	if ((!choice && status[i]) || !strcasecmp (items[i * 3 + 2], "selected"))
+            choice = i + 1;
     }
+    if (choice)
+	    choice--;
 
     max_choice = MIN (list_height, item_no);
 
@@ -302,6 +304,7 @@ dialog_checklist (const char *title, const char *prompt, int height, int width,
 	case 'H':
 	case 'h':
 	case '?':
+	    fprintf (stderr, "%s", items[(scroll + choice) * 3]);
 	    delwin (dialog);
 	    free (status);
 	    return 1;
@@ -347,7 +350,8 @@ dialog_checklist (const char *title, const char *prompt, int height, int width,
 
 		    }
 		}
-            }
+            } else
+		fprintf (stderr, "%s", items[(scroll + choice) * 3]);
 	    delwin (dialog);
 	    free (status);
 	    return button;

@@ -517,11 +517,12 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed;
 	}
 	if (!(sbi->s_mount_opt & UFS_MOUNT_UFSTYPE)) {
-		printk("You didn't specify the type of your ufs filesystem\n\n"
-		"mount -t ufs -o ufstype="
-		"sun|sunx86|44bsd|old|hp|nextstep|netxstep-cd|openstep ...\n\n"
-		">>>WARNING<<< Wrong ufstype may corrupt your filesystem, "
-		"default is ufstype=old\n");
+		if (!silent)
+			printk("You didn't specify the type of your ufs filesystem\n\n"
+			"mount -t ufs -o ufstype="
+			"sun|sunx86|44bsd|old|hp|nextstep|netxstep-cd|openstep ...\n\n"
+			">>>WARNING<<< Wrong ufstype may corrupt your filesystem, "
+			"default is ufstype=old\n");
 		ufs_set_opt (sbi->s_mount_opt, UFSTYPE_OLD);
 	}
 
@@ -576,7 +577,8 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		uspi->s_sbbase = 0;
 		flags |= UFS_DE_OLD | UFS_UID_OLD | UFS_ST_OLD | UFS_CG_OLD;
 		if (!(sb->s_flags & MS_RDONLY)) {
-			printk(KERN_INFO "ufstype=old is supported read-only\n"); 
+			if (!silent)
+				printk(KERN_INFO "ufstype=old is supported read-only\n");
 			sb->s_flags |= MS_RDONLY;
 		}
 		break;
@@ -590,7 +592,8 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		uspi->s_sbbase = 0;
 		flags |= UFS_DE_OLD | UFS_UID_OLD | UFS_ST_OLD | UFS_CG_OLD;
 		if (!(sb->s_flags & MS_RDONLY)) {
-			printk(KERN_INFO "ufstype=nextstep is supported read-only\n");
+			if (!silent)
+				printk(KERN_INFO "ufstype=nextstep is supported read-only\n");
 			sb->s_flags |= MS_RDONLY;
 		}
 		break;
@@ -604,7 +607,8 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		uspi->s_sbbase = 0;
 		flags |= UFS_DE_OLD | UFS_UID_OLD | UFS_ST_OLD | UFS_CG_OLD;
 		if (!(sb->s_flags & MS_RDONLY)) {
-			printk(KERN_INFO "ufstype=nextstep-cd is supported read-only\n");
+			if (!silent)
+				printk(KERN_INFO "ufstype=nextstep-cd is supported read-only\n");
 			sb->s_flags |= MS_RDONLY;
 		}
 		break;
@@ -618,7 +622,8 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		uspi->s_sbbase = 0;
 		flags |= UFS_DE_44BSD | UFS_UID_44BSD | UFS_ST_44BSD | UFS_CG_44BSD;
 		if (!(sb->s_flags & MS_RDONLY)) {
-			printk(KERN_INFO "ufstype=openstep is supported read-only\n");
+			if (!silent)
+				printk(KERN_INFO "ufstype=openstep is supported read-only\n");
 			sb->s_flags |= MS_RDONLY;
 		}
 		break;
@@ -632,12 +637,14 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 		uspi->s_sbbase = 0;
 		flags |= UFS_DE_OLD | UFS_UID_OLD | UFS_ST_OLD | UFS_CG_OLD;
 		if (!(sb->s_flags & MS_RDONLY)) {
-			printk(KERN_INFO "ufstype=hp is supported read-only\n");
+			if (!silent)
+				printk(KERN_INFO "ufstype=hp is supported read-only\n");
 			sb->s_flags |= MS_RDONLY;
  		}
  		break;
 	default:
-		printk("unknown ufstype\n");
+		if (!silent)
+			printk("unknown ufstype\n");
 		goto failed;
 	}
 	
@@ -687,7 +694,8 @@ again:
 		uspi->s_sbbase += 8;
 		goto again;
 	}
-	printk("ufs_read_super: bad magic number\n");
+	if (!silent)
+		printk("ufs_read_super: bad magic number\n");
 	goto failed;
 
 magic_found:

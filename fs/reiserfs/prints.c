@@ -110,7 +110,7 @@ static void sprintf_de_head( char *buf, struct reiserfs_de_head *deh )
 static void sprintf_item_head (char * buf, struct item_head * ih)
 {
     if (ih) {
-	sprintf (buf, "%s", (ih_version (ih) == KEY_FORMAT_3_6) ? "*3.6* " : "*3.5*");
+	strcpy (buf, (ih_version (ih) == KEY_FORMAT_3_6) ? "*3.6* " : "*3.5*");
 	sprintf_le_key (buf + strlen (buf), &(ih->ih_key));
 	sprintf (buf + strlen (buf), ", item_len %d, item_location %d, "
 		 "free_space(entry_count) %d",

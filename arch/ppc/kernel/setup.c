@@ -48,11 +48,6 @@ extern void identify_cpu(unsigned long offset, unsigned long cpu);
 extern void do_cpu_ftr_fixups(unsigned long offset);
 extern void reloc_got2(unsigned long offset);
 
-
-#ifdef CONFIG_KGDB
-extern void kgdb_map_scc(void);
-#endif
-
 extern void ppc6xx_idle(void);
 extern void power4_idle(void);
 
@@ -632,7 +627,8 @@ void __init setup_arch(char **cmdline_p)
 	if ( ppc_md.progress ) ppc_md.progress("setup_arch: enter", 0x3eab);
 
 #if defined(CONFIG_KGDB)
-	kgdb_map_scc();
+	if (ppc_md.kgdb_map_scc)
+		ppc_md.kgdb_map_scc();
 	set_debug_traps();
 	if (strstr(cmd_line, "gdb")) {
 		if (ppc_md.progress)

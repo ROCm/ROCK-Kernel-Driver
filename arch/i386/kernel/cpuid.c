@@ -1,4 +1,3 @@
-#ident "$Id$"
 /* ----------------------------------------------------------------------- *
  *   
  *   Copyright 2000 H. Peter Anvin - All Rights Reserved

@@ -721,3 +721,29 @@ pci_find_hose_for_OF_device(struct device_node *node)
 	}
 	return NULL;
 }
+
+/*
+ * ppc64 can have multifunction devices that do not respond to function 0.
+ * In this case we must scan all functions.
+ */
+int
+pcibios_scan_all_fns(struct pci_bus *bus, int devfn)
+{
+       struct device_node *busdn, *dn;
+
+       if (bus->self)
+               busdn = pci_device_to_OF_node(bus->self);
+       else
+               busdn = bus->sysdata;   /* must be a phb */
+
+       /*
+        * Check to see if there is any of the 8 functions are in the
+        * device tree.  If they are then we need to scan all the
+        * functions of this slot.
+        */
+       for (dn = busdn->child; dn; dn = dn->sibling)
+               if ((dn->devfn >> 3) == (devfn >> 3))
+                       return 1;
+
+       return 0;
+}

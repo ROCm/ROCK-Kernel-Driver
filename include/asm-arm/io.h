@@ -149,6 +149,9 @@ extern void _memset_io(unsigned long, int, size_t);
 #define readb(c) ({ unsigned int __v = __raw_readb(__mem_pci(c)); __v; })
 #define readw(c) ({ unsigned int __v = le16_to_cpu(__raw_readw(__mem_pci(c))); __v; })
 #define readl(c) ({ unsigned int __v = le32_to_cpu(__raw_readl(__mem_pci(c))); __v; })
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
 
 #define readsb(p,d,l)		__raw_readsb((unsigned int)__mem_pci(p),d,l)
 #define readsw(p,d,l)		__raw_readsw((unsigned int)__mem_pci(p),d,l)

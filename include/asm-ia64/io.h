@@ -125,6 +125,10 @@ __ia64_mk_io_addr (unsigned long port)
 #define __ia64_readw	___ia64_readw
 #define __ia64_readl	___ia64_readl
 #define __ia64_readq	___ia64_readq
+#define __ia64_readb_relaxed	___ia64_readb
+#define __ia64_readw_relaxed	___ia64_readw
+#define __ia64_readl_relaxed	___ia64_readl
+#define __ia64_readq_relaxed	___ia64_readq
 #define __ia64_writeb	___ia64_writeb
 #define __ia64_writew	___ia64_writew
 #define __ia64_writel	___ia64_writel
@@ -337,15 +341,27 @@ __writeq (unsigned long val, void *addr)
 #define __readw		platform_readw
 #define __readl		platform_readl
 #define __readq		platform_readq
+#define __readb_relaxed	platform_readb_relaxed
+#define __readw_relaxed	platform_readw_relaxed
+#define __readl_relaxed	platform_readl_relaxed
+#define __readq_relaxed	platform_readq_relaxed
 
 #define readb(a)	__readb((void *)(a))
 #define readw(a)	__readw((void *)(a))
 #define readl(a)	__readl((void *)(a))
 #define readq(a)	__readq((void *)(a))
+#define readb_relaxed(a)	__readb_relaxed((void *)(a))
+#define readw_relaxed(a)	__readw_relaxed((void *)(a))
+#define readl_relaxed(a)	__readl_relaxed((void *)(a))
+#define readq_relaxed(a)	__readq_relaxed((void *)(a))
 #define __raw_readb	readb
 #define __raw_readw	readw
 #define __raw_readl	readl
 #define __raw_readq	readq
+#define __raw_readb_relaxed	readb_relaxed
+#define __raw_readw_relaxed	readw_relaxed
+#define __raw_readl_relaxed	readl_relaxed
+#define __raw_readq_relaxed	readq_relaxed
 #define writeb(v,a)	__writeb((v), (void *) (a))
 #define writew(v,a)	__writew((v), (void *) (a))
 #define writel(v,a)	__writel((v), (void *) (a))

@@ -11,8 +11,17 @@
 #define _PPC_KGDB_H
 
 #ifndef __ASSEMBLY__
-/* To initialize the serial, first thing called */
+
+/* Things specific to the gen550 backend. */
+struct uart_port;
+
+extern void gen550_progress(char *, unsigned short);
+extern void gen550_kgdb_map_scc(void);
+extern void gen550_init(int, struct uart_port *);
+
+/* Things specific to the pmac backend. */
 extern void zs_kgdb_hook(int tty_num);
+
 /* To init the kgdb engine. (called by serial hook)*/
 extern void set_debug_traps(void);
 

@@ -31,10 +31,6 @@
 #define MAX_PCI_XWIDGET 256
 #define MAX_ATE_MAPS 1024
 
-#define SET_PCIA64(dev) \
-	(((struct sn_device_sysdata *)((dev)->sysdata))->isa64) = 1
-#define IS_PCIA64(dev)	(((dev)->dma_mask == 0xffffffffffffffffUL) || \
-		(((struct sn_device_sysdata *)((dev)->sysdata))->isa64))
 #define IS_PCI32G(dev)	((dev)->dma_mask >= 0xffffffff)
 #define IS_PCI32L(dev)	((dev)->dma_mask < 0xffffffff)
 
@@ -50,9 +46,6 @@ struct sn_widget_sysdata {
 
 struct sn_device_sysdata {
         vertex_hdl_t  vhdl;
-	int		isa64;
-	volatile unsigned int *dma_buf_sync;
-	volatile unsigned int *xbow_buf_sync;
 	pciio_provider_t	*pci_provider;
 };
 

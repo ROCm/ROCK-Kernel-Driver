@@ -27,7 +27,7 @@ static u32 i810fb_rop[] = {
         par->cur_tail &= RING_SIZE_MASK;                     \
 }                                                                      
 
-extern inline void flush_cache(void);
+extern void flush_cache(void);
 
 /************************************************************/
 

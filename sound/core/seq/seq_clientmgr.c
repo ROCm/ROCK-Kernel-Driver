@@ -328,7 +328,7 @@ static int snd_seq_open(struct inode *inode, struct file *file)
 	up(&register_mutex);
 
 	c = client->number;
-	(user_client_t *) file->private_data = client;
+	file->private_data = client;
 
 	/* fill client data */
 	user->file = file;

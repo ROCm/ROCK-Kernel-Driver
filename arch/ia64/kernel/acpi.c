@@ -409,7 +409,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	pxm_bit_set(pxm);
 
 	/* Insertion sort based on base address */
-	pend = &node_memblk[num_memblks];
+	pend = &node_memblk[num_node_memblks];
 	for (p = &node_memblk[0]; p < pend; p++) {
 		if (paddr < p->start_paddr)
 			break;
@@ -421,7 +421,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	p->start_paddr = paddr;
 	p->size = size;
 	p->nid = pxm;
-	num_memblks++;
+	num_node_memblks++;
 }
 
 void __init
@@ -448,7 +448,7 @@ acpi_numa_arch_fixup (void)
 	}
 
 	/* set logical node id in memory chunk structure */
-	for (i = 0; i < num_memblks; i++)
+	for (i = 0; i < num_node_memblks; i++)
 		node_memblk[i].nid = pxm_to_nid_map[node_memblk[i].nid];
 
 	/* assign memory bank numbers for each chunk on each node */
@@ -456,7 +456,7 @@ acpi_numa_arch_fixup (void)
 		int bank;
 
 		bank = 0;
-		for (j = 0; j < num_memblks; j++)
+		for (j = 0; j < num_node_memblks; j++)
 			if (node_memblk[j].nid == i)
 				node_memblk[j].bank = bank++;
 	}
@@ -466,7 +466,7 @@ acpi_numa_arch_fixup (void)
 		node_cpuid[i].nid = pxm_to_nid_map[node_cpuid[i].nid];
 
 	printk(KERN_INFO "Number of logical nodes in system = %d\n", numnodes);
-	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_memblks);
+	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_node_memblks);
 
 	if (!slit_table) return;
 	memset(numa_slit, -1, sizeof(numa_slit));

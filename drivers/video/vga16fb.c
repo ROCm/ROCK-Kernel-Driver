@@ -1373,8 +1373,10 @@ int __init vga16fb_init(void)
 	i = (vga16fb_defined.bits_per_pixel == 8) ? 256 : 16;
 	fb_alloc_cmap(&vga16fb.cmap, i, 0);
 
-	if (vga16fb_check_var(&vga16fb.var, &vga16fb))
+	if (vga16fb_check_var(&vga16fb.var, &vga16fb)) {
+		iounmap(vga16fb.screen_base);
 		return -EINVAL;
+	}
 
 	vga16fb_update_fix(&vga16fb);
 

@@ -496,6 +496,7 @@ struct cdrom_generic_command
 #define GPCMD_GET_MEDIA_STATUS		    0xda
 
 /* Mode page codes for mode sense/set */
+#define GPMODE_VENDOR_PAGE		0x00
 #define GPMODE_R_W_ERROR_PAGE		0x01
 #define GPMODE_WRITE_PARMS_PAGE		0x05
 #define GPMODE_AUDIO_CTL_PAGE		0x0e

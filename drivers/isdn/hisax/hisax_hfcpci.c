@@ -23,7 +23,7 @@
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <asm/delay.h>
+#include <linux/delay.h>
 #include "hisax_hfcpci.h"
 
 // debugging cruft

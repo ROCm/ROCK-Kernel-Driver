@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_fshead.c,v 1.20 2002/01/02 22:02:12 hch Exp hch $"
-
 /*
  * Veritas filesystem driver - fileset header routines.
  */

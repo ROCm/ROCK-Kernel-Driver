@@ -33,24 +33,125 @@ typedef struct pcibr_intr_list_s *pcibr_intr_list_t;
 typedef struct pcibr_intr_wrap_s *pcibr_intr_wrap_t;
 typedef struct pcibr_intr_cbuf_s *pcibr_intr_cbuf_t;
 
-typedef volatile unsigned *cfg_p;
+typedef volatile unsigned int *cfg_p;
 typedef volatile bridgereg_t *reg_p;
 
 /*
  * extern functions
  */
-cfg_p pcibr_slot_config_addr(bridge_t *, pciio_slot_t, int);
-cfg_p pcibr_func_config_addr(bridge_t *, pciio_bus_t bus, pciio_slot_t, pciio_function_t, int);
-unsigned pcibr_slot_config_get(bridge_t *, pciio_slot_t, int);
-unsigned pcibr_func_config_get(bridge_t *, pciio_slot_t, pciio_function_t, int);
-extern void pcireg_intr_enable_bit_clr(void *, uint64_t);
-extern void pcireg_intr_enable_bit_set(void *, uint64_t);
-extern void pcireg_intr_addr_addr_set(void *, int, uint64_t);
-extern void pcireg_force_intr_set(void *, int);
+cfg_p pcibr_slot_config_addr(pcibr_soft_t, pciio_slot_t, int);
+cfg_p pcibr_func_config_addr(pcibr_soft_t, pciio_bus_t bus, pciio_slot_t, pciio_function_t, int);
 void pcibr_debug(uint32_t, vertex_hdl_t, char *, ...);
-void pcibr_slot_config_set(bridge_t *, pciio_slot_t, int, unsigned);
-void pcibr_func_config_set(bridge_t *, pciio_slot_t, pciio_function_t, int, 
-								unsigned);
+void pcibr_func_config_set(pcibr_soft_t, pciio_slot_t, pciio_function_t, int, unsigned);
+/*
+ * pcireg_ externs
+ */
+
+extern uint64_t		pcireg_id_get(pcibr_soft_t);
+extern uint64_t		pcireg_bridge_id_get(void *);
+extern uint64_t		pcireg_bus_err_get(pcibr_soft_t);
+extern uint64_t		pcireg_control_get(pcibr_soft_t);
+extern uint64_t		pcireg_bridge_control_get(void *);
+extern void		pcireg_control_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_control_bit_clr(pcibr_soft_t, uint64_t);
+extern void		pcireg_control_bit_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_req_timeout_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_dst_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_dst_target_id_get(pcibr_soft_t);
+extern void		pcireg_intr_dst_target_id_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_dst_addr_get(pcibr_soft_t);
+extern void		pcireg_intr_dst_addr_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_cmdword_err_get(pcibr_soft_t);
+extern uint64_t		pcireg_llp_cfg_get(pcibr_soft_t);
+extern void		pcireg_llp_cfg_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_tflush_get(pcibr_soft_t);
+extern uint64_t		pcireg_linkside_err_get(pcibr_soft_t);
+extern uint64_t		pcireg_resp_err_get(pcibr_soft_t);
+extern uint64_t		pcireg_resp_err_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_resp_err_buf_get(pcibr_soft_t);
+extern uint64_t		pcireg_resp_err_dev_get(pcibr_soft_t);
+extern uint64_t		pcireg_linkside_err_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_dirmap_get(pcibr_soft_t);
+extern void		pcireg_dirmap_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_dirmap_wid_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_dirmap_diroff_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_dirmap_add512_set(pcibr_soft_t);
+extern void		pcireg_dirmap_add512_clr(pcibr_soft_t);
+extern uint64_t		pcireg_map_fault_get(pcibr_soft_t);
+extern uint64_t		pcireg_arbitration_get(pcibr_soft_t);
+extern void		pcireg_arbitration_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_arbitration_bit_clr(pcibr_soft_t, uint64_t);
+extern void		pcireg_arbitration_bit_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_parity_err_get(pcibr_soft_t);
+extern uint64_t		pcireg_type1_cntr_get(pcibr_soft_t);
+extern void		pcireg_type1_cntr_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_timeout_get(pcibr_soft_t);
+extern void		pcireg_timeout_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_timeout_bit_clr(pcibr_soft_t, uint64_t);
+extern void		pcireg_timeout_bit_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_pci_bus_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pci_bus_addr_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_intr_status_get(pcibr_soft_t);
+extern uint64_t		pcireg_intr_enable_get(pcibr_soft_t);
+extern void		pcireg_intr_enable_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_enable_bit_clr(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_enable_bit_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_reset_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_reset_bit_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_mode_get(pcibr_soft_t);
+extern void		pcireg_intr_mode_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_mode_bit_clr(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_device_get(pcibr_soft_t);
+extern void		pcireg_intr_device_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_intr_device_bit_set(pcibr_soft_t, uint64_t);
+extern void		pcireg_bridge_intr_device_bit_set(void *, uint64_t);
+extern void		pcireg_intr_device_bit_clr(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_host_err_get(pcibr_soft_t);
+extern void		pcireg_intr_host_err_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_intr_addr_get(pcibr_soft_t, int);
+extern void		pcireg_intr_addr_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_bridge_intr_addr_set(void *, int, uint64_t);
+extern void *		pcireg_intr_addr_addr(pcibr_soft_t, int);
+extern void		pcireg_intr_addr_vect_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_bridge_intr_addr_vect_set(void *, int, uint64_t);
+extern uint64_t		pcireg_intr_addr_addr_get(pcibr_soft_t, int);
+extern void		pcireg_intr_addr_addr_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_bridge_intr_addr_addr_set(void *, int, uint64_t);
+extern uint64_t		pcireg_intr_view_get(pcibr_soft_t);
+extern uint64_t		pcireg_intr_multiple_get(pcibr_soft_t);
+extern void		pcireg_force_always_set(pcibr_soft_t, int);
+extern void *		pcireg_bridge_force_always_addr_get(void *, int);
+extern void *		pcireg_force_always_addr_get(pcibr_soft_t, int);
+extern void		pcireg_force_intr_set(pcibr_soft_t, int);
+extern uint64_t		pcireg_device_get(pcibr_soft_t, int);
+extern void		pcireg_device_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_device_bit_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_device_bit_clr(pcibr_soft_t, int, uint64_t);
+extern uint64_t		pcireg_rrb_get(pcibr_soft_t, int);
+extern void		pcireg_rrb_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_rrb_bit_set(pcibr_soft_t, int, uint64_t);
+extern void		pcireg_rrb_bit_clr(pcibr_soft_t, int, uint64_t);
+extern uint64_t		pcireg_rrb_status_get(pcibr_soft_t);
+extern void		pcireg_rrb_clear_set(pcibr_soft_t, uint64_t);
+extern uint64_t		pcireg_wrb_flush_get(pcibr_soft_t, int);
+extern uint64_t		pcireg_pcix_bus_err_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_bus_err_attr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_bus_err_data_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_req_err_attr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_req_err_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_pio_split_addr_get(pcibr_soft_t);
+extern uint64_t		pcireg_pcix_pio_split_attr_get(pcibr_soft_t);
+extern cfg_p		pcireg_type1_cfg_addr(pcibr_soft_t, pciio_function_t,
+					      int);
+extern cfg_p		pcireg_type0_cfg_addr(pcibr_soft_t, pciio_slot_t,
+					      pciio_function_t, int);
+extern bridge_ate_t	pcireg_int_ate_get(pcibr_soft_t, int);
+extern void		pcireg_int_ate_set(pcibr_soft_t, int, bridge_ate_t);
+extern bridge_ate_p	pcireg_int_ate_addr(pcibr_soft_t, int);
+
+extern uint64_t		pcireg_speed_get(pcibr_soft_t);
+extern uint64_t		pcireg_mode_get(pcibr_soft_t);
+
 /*
  * PCIBR_DEBUG() macro and debug bitmask defines
  */
@@ -117,7 +218,7 @@ struct pcibr_piomap_s {
     xtalk_piomap_t          bp_xtalk_pio;	/* corresponding xtalk resource */
     pcibr_piomap_t	    bp_next;	/* Next piomap on the list */
     pcibr_soft_t	    bp_soft;	/* backpointer to bridge soft data */
-    atomic_t		    bp_toc[1];	/* PCI timeout counter */
+    atomic_t		    bp_toc;	/* PCI timeout counter */
 
 };
 
@@ -143,6 +244,7 @@ struct pcibr_dmamap_s {
     bridge_ate_t            bd_ate_proto;	/* prototype ATE (for xioaddr=0) */
     bridge_ate_t            bd_ate_prime;	/* value of 1st ATE written */
     dma_addr_t		    bd_dma_addr;	/* Linux dma handle */
+    struct resource	    resource;
 };
 
 #define	IBUFSIZE	5		/* size of circular buffer (holds 4) */
@@ -171,7 +273,7 @@ struct pcibr_intr_s {
 #define bi_mustruncpu	bi_pi.pi_mustruncpu /* Where we must run. */
 #define bi_irq		bi_pi.pi_irq	/* IRQ assigned. */
 #define bi_cpu		bi_pi.pi_cpu	/* cpu assigned. */
-    unsigned                bi_ibits;	/* which Bridge interrupt bit(s) */
+    unsigned int                bi_ibits;	/* which Bridge interrupt bit(s) */
     pcibr_soft_t            bi_soft;	/* shortcut to soft info */
     struct pcibr_intr_cbuf_s bi_ibuf;	/* circular buffer of wrap ptrs */
     unsigned		bi_last_intr;	/* For Shub lb lost intr. bug */
@@ -245,7 +347,8 @@ struct pcibr_info_s {
 struct pcibr_intr_list_s {
     pcibr_intr_list_t       il_next;
     pcibr_intr_t            il_intr;
-    volatile bridgereg_t   *il_wrbf;	/* ptr to b_wr_req_buf[] */
+    pcibr_soft_t	    il_soft;
+    pciio_slot_t	    il_slot;
 };
 
 /* =====================================================================
@@ -271,7 +374,7 @@ struct pcibr_intr_wrap_s {
  * To reduce the size of the internal resource mapping structures, do
  * not use the entire PCI bus I/O address space
  */ 
-#define PCIBR_BUS_IO_BASE      0x100000
+#define PCIBR_BUS_IO_BASE      0x200000
 #define PCIBR_BUS_IO_MAX       0x0FFFFFFF
 #define PCIBR_BUS_IO_PAGE      0x100000
 
@@ -284,8 +387,6 @@ struct pcibr_intr_wrap_s {
 #define PCIBR_BUS_MEM_PAGE     0x100000
 
 /* defines for pcibr_soft_s->bs_bridge_type */
-#define PCIBR_BRIDGETYPE_BRIDGE		0
-#define PCIBR_BRIDGETYPE_XBRIDGE	1
 #define PCIBR_BRIDGETYPE_PIC		2
 #define IS_PIC_BUSNUM_SOFT(ps, bus)	((ps)->bs_busnum == (bus))
 
@@ -294,25 +395,6 @@ struct pcibr_intr_wrap_s {
  */
 #define PCIBR_WAR_ENABLED(pv, pcibr_soft) \
 	((1 << XWIDGET_PART_REV_NUM_REV(pcibr_soft->bs_rev_num)) & pv)
-/*
- * Defines for individual WARs. Each is a bitmask of applicable
- * part revision numbers. (1 << 1) == rev A, (1 << 2) == rev B,
- * (3 << 1) == (rev A or rev B), etc
- */
-#define PV854697 (~0)     /* PIC: write 64bit regs as 64bits. permanent */
-#define PV854827 (~0)     /* PIC: fake widget 0xf presence bit. permanent */
-#define PV855271 (1 << 1) /* PIC: use virt chan iff 64-bit device. */
-#define PV878674 (~0)     /* PIC: Dont allow 64bit PIOs.  permanent */
-#define PV855272 (1 << 1) /* PIC: runaway interrupt WAR */
-#define PV856155 (1 << 1) /* PIC: arbitration WAR */
-#define PV856864 (1 << 1) /* PIC: lower timeout to free TNUMs quicker */
-#define PV856866 (1 << 1) /* PIC: avoid rrb's 0/1/8/9. */
-#define PV862253 (1 << 1) /* PIC: don't enable write req RAM parity checking */
-#define PV867308 (3 << 1) /* PIC: make LLP error interrupts FATAL for PIC */
-
-/* Bridgetype macros given a pcibr_soft structure */
-#define IS_PIC_SOFT(ps)     (ps->bs_bridge_type == PCIBR_BRIDGETYPE_PIC)
-
 
 /* defines for pcibr_soft_s->bs_bridge_mode */
 #define PCIBR_BRIDGEMODE_PCI_33		0x0
@@ -349,14 +431,16 @@ struct pcibr_soft_s {
     vertex_hdl_t          bs_conn;		/* xtalk connection point */
     vertex_hdl_t          bs_vhdl;		/* vertex owned by pcibr */
     uint64_t                bs_int_enable;	/* Mask of enabled intrs */
-    bridge_t               *bs_base;		/* PIO pointer to Bridge chip */
+    void               *bs_base;		/* PIO pointer to Bridge chip */
     char                   *bs_name;		/* hw graph name */
+    char		    bs_asic_name[16];	/* ASIC name */
     xwidgetnum_t            bs_xid;		/* Bridge's xtalk ID number */
     vertex_hdl_t          bs_master;		/* xtalk master vertex */
     xwidgetnum_t            bs_mxid;		/* master's xtalk ID number */
     pciio_slot_t            bs_first_slot;      /* first existing slot */
     pciio_slot_t            bs_last_slot;       /* last existing slot */
     pciio_slot_t            bs_last_reset;      /* last slot to reset */
+    uint32_t		    bs_unused_slot;	/* unavailable slots bitmask */
     pciio_slot_t	    bs_min_slot;	/* lowest possible slot */
     pciio_slot_t	    bs_max_slot;	/* highest possible slot */
     pcibr_soft_t	    bs_peers_soft;	/* PICs other bus's soft */
@@ -377,7 +461,7 @@ struct pcibr_soft_s {
     /* bs_dma_flags are the forced dma flags used on all DMAs. Used for
      * working around ASIC rev issues and protocol specific requirements
      */
-    unsigned                bs_dma_flags;	/* forced DMA flags */
+    unsigned int            bs_dma_flags;	/* forced DMA flags */
 
     nasid_t		    bs_nasid;		/* nasid this bus is on */
     moduleid_t		    bs_moduleid;	/* io brick moduleid */
@@ -474,14 +558,6 @@ struct pcibr_soft_s {
 	unsigned		bss_d64_flags;
 	iopaddr_t		bss_d32_base;
 	unsigned		bss_d32_flags;
-
-	/* Shadow information used for implementing
-	 * Bridge Hardware WAR #484930
-	 */
-	atomic_t		bss_ext_ates_active;
-        volatile unsigned      *bss_cmd_pointer;
-	unsigned		bss_cmd_shadow;
-
     } bs_slot[8];
 
     pcibr_intr_bits_f	       *bs_intr_bits;
@@ -634,8 +710,8 @@ struct pcibr_soft_s {
 struct pcibr_hints_s {
     /* ph_host_slot is actually +1 so "0" means "no host" */
     pciio_slot_t            ph_host_slot[8];	/* REQ/GNT/INT in use by ... */
-    unsigned                ph_rrb_fixed;	/* do not change RRB allocations */
-    unsigned                ph_hands_off;	/* prevent further pcibr operations */
+    unsigned int            ph_rrb_fixed;	/* do not change RRB allocations */
+    unsigned int            ph_hands_off;	/* prevent further pcibr operations */
     rrb_alloc_funct_t       rrb_alloc_funct;	/* do dynamic rrb allocation */
     pcibr_intr_bits_f	   *ph_intr_bits;	/* map PCI INT[ABCD] to Bridge Int(n) */
 };
