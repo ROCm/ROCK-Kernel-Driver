@@ -107,6 +107,8 @@ static XD_SIGNATURE xd_sigs[] __initdata = {
 	{ 0x0010,"ST11 BIOS v1.7",xd_seagate_init_controller,xd_seagate_init_drive," Seagate ST11R" }, /* Alan Hourihane, alanh@fairlite.demon.co.uk */
 	{ 0x1000,"(c)Copyright 1987 SMS",xd_omti_init_controller,xd_omti_init_drive,"n OMTI 5520" }, /* Dirk Melchers, dirk@merlin.nbg.sub.org */
 	{ 0x0006,"COPYRIGHT XEBEC (C) 1984",xd_xebec_init_controller,xd_xebec_init_drive," XEBEC" }, /* Andrzej Krzysztofowicz, ankry@mif.pg.gda.pl */
+	{ 0x0008,"(C) Copyright 1984 Western Digital Corp", xd_wd_init_controller, xd_wd_init_drive," Western Dig. 1002s-wx2" },
+	{ 0x0008,"(C) Copyright 1986 Western Digital Corporation", xd_wd_init_controller, xd_wd_init_drive," 1986 Western Digital" }, /* jfree@sovereign.org */
 };
 
 static unsigned int xd_bases[] __initdata =
