@@ -413,7 +413,7 @@ static void handle_mtdblock_request(void)
 	for (;;) {
 		INIT_REQUEST;
 		req = CURRENT;
-		spin_unlock_irq(&QUEUE->queue_lock);
+		spin_unlock_irq(QUEUE->queue_lock);
 		mtdblk = mtdblks[minor(req->rq_dev)];
 		res = 0;
 
@@ -457,7 +457,7 @@ static void handle_mtdblock_request(void)
 		}
 
 end_req:
-		spin_lock_irq(&QUEUE->queue_lock);
+		spin_lock_irq(QUEUE->queue_lock);
 		if (!end_that_request_first(req, res, req->hard_cur_sectors)) {
 			blkdev_dequeue_request(req);
 			end_that_request_last(req);
@@ -487,16 +487,16 @@ int mtdblock_thread(void *dummy)
 	while (!leaving) {
 		add_wait_queue(&thr_wq, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
-		spin_lock_irq(&QUEUE->queue_lock);
+		spin_lock_irq(QUEUE->queue_lock);
 		if (QUEUE_EMPTY || QUEUE_PLUGGED) {
-			spin_unlock_irq(&QUEUE->queue_lock);
+			spin_unlock_irq(QUEUE->queue_lock);
 			schedule();
 			remove_wait_queue(&thr_wq, &wait); 
 		} else {
 			remove_wait_queue(&thr_wq, &wait); 
 			set_current_state(TASK_RUNNING);
 			handle_mtdblock_request();
-			spin_unlock_irq(&QUEUE->queue_lock);
+			spin_unlock_irq(QUEUE->queue_lock);
 		}
 	}
 
@@ -541,7 +541,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 			return -EACCES;
 #endif
 		fsync_bdev(inode->i_bdev);
-		invalidate_bdev(inode->b_rdev, 0);
+		invalidate_bdev(inode->i_bdev, 0);
 		down(&mtdblk->cache_sem);
 		write_cached_data(mtdblk);
 		up(&mtdblk->cache_sem);

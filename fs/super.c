@@ -184,7 +184,7 @@ static void remove_super(struct super_block *s)
 	up_write(&s->s_umount);
 }
 
-static void generic_shutdown_super(struct super_block *sb)
+void generic_shutdown_super(struct super_block *sb)
 {
 	struct dentry *root = sb->s_root;
 	struct super_operations *sop = sb->s_op;

@@ -149,15 +149,12 @@ typedef struct page {
 	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	unsigned long index;		/* Our offset within mapping. */
-	struct page *next_hash;		/* Next page sharing our hash bucket in
-					   the pagecache hash table. */
 	atomic_t count;			/* Usage count, see below. */
 	unsigned long flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
-	struct page **pprev_hash;	/* Complement to *next_hash. */
-	struct buffer_head * buffers;	/* Buffer maps us to a disk block. */
+	unsigned long private;		/* fs-private opaque data */
 
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
@@ -180,7 +177,7 @@ typedef struct page {
  *
  * What counts for a page usage:
  * - cache mapping   (page->mapping)
- * - disk mapping    (page->buffers)
+ * - private data    (page->private)
  * - page mapped in a task's page tables, each mapping
  *   is counted separately
  *
@@ -223,22 +220,23 @@ typedef struct page {
  * page->mapping is the pointer to the inode, and page->index is the
  * file offset of the page, in units of PAGE_CACHE_SIZE.
  *
- * A page may have buffers allocated to it. In this case,
- * page->buffers is a circular list of these buffer heads. Else,
- * page->buffers == NULL.
+ * A page contains an opaque `private' member, which belongs to the
+ * page's address_space.  Usually, this is the address of a circular
+ * list of the page's disk buffers.
  *
+ * The PG_private bitflag is set if page->private contains a valid
+ * value.
  * For pages belonging to inodes, the page->count is the number of
- * attaches, plus 1 if buffers are allocated to the page, plus one
- * for the page cache itself.
+ * attaches, plus 1 if `private' contains something, plus one for
+ * the page cache itself.
  *
  * All pages belonging to an inode are in these doubly linked lists:
  * mapping->clean_pages, mapping->dirty_pages and mapping->locked_pages;
  * using the page->list list_head. These fields are also used for
  * freelist managemet (when page->count==0).
  *
- * There is also a hash table mapping (mapping,index) to the page
- * in memory if present. The lists for this hash table use the fields
- * page->next_hash and page->pprev_hash.
+ * There is also a per-mapping radix tree mapping index to the page
+ * in memory if present. The tree is rooted at mapping->root.  
  *
  * All process pages can do I/O:
  * - inode pages may need to be read from disk,
@@ -294,6 +292,8 @@ typedef struct page {
 #define PG_reserved		14
 #define PG_launder		15	/* written out by VM pressure.. */
 
+#define PG_private		16	/* Has something at ->private */
+
 /* Make it prettier to test the above... */
 #define UnlockPage(page)	unlock_page(page)
 #define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
@@ -310,6 +310,9 @@ typedef struct page {
 #define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
 #define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
 #define __SetPageReserved(page)	__set_bit(PG_reserved, &(page)->flags)
+#define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
+#define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)
+#define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
 
 /*
  * The zone field is never updated after free_area_init_core()
@@ -470,7 +473,7 @@ extern struct address_space swapper_space;
 
 static inline int is_page_cache_freeable(struct page * page)
 {
-	return page_count(page) - !!page->buffers == 1;
+	return page_count(page) - !!PagePrivate(page) == 1;
 }
 
 extern int can_share_swap_page(struct page *);
@@ -535,6 +538,13 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
+/* readahead.c */
+void do_page_cache_readahead(struct file *file,
+			unsigned long offset, unsigned long nr_to_read);
+void page_cache_readahead(struct file *file, unsigned long offset);
+void page_cache_readaround(struct file *file, unsigned long offset);
+void handle_ra_thrashing(struct file *file);
+
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */
 static inline int expand_stack(struct vm_area_struct * vma, unsigned long address)
@@ -578,6 +588,9 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 }
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
+
+extern int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
+extern int pdflush_flush(unsigned long nr_pages);
 
 extern struct page * vmalloc_to_page(void *addr);
 

@@ -1661,10 +1661,11 @@ int journal_try_to_free_buffers(journal_t *journal,
 	struct buffer_head *tmp;
 	int locked_or_dirty = 0;
 	int call_ttfb = 1;
+	int ret;
 
 	J_ASSERT(PageLocked(page));
 
-	bh = page->buffers;
+	bh = page_buffers(page);
 	tmp = bh;
 	spin_lock(&journal_datalist_lock);
 	do {
@@ -1688,7 +1689,10 @@ int journal_try_to_free_buffers(journal_t *journal,
 	 */
 	call_ttfb = 1;
 out:
-	return call_ttfb;
+	ret = 0;
+	if (call_ttfb)
+		ret = try_to_free_buffers(page, gfp_mask);
+	return ret;
 }
 
 /*
@@ -1881,7 +1885,7 @@ int journal_flushpage(journal_t *journal,
 		
 	if (!PageLocked(page))
 		BUG();
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		return 1;
 
 	/* We will potentially be playing with lists other than just the
@@ -1889,7 +1893,7 @@ int journal_flushpage(journal_t *journal,
 	 * cautious in our locking. */
 	lock_journal(journal);
 
-	head = bh = page->buffers;
+	head = bh = page_buffers(page);
 	do {
 		unsigned int next_off = curr_off + bh->b_size;
 		next = bh->b_this_page;
@@ -1911,7 +1915,7 @@ int journal_flushpage(journal_t *journal,
 	if (!offset) {
 		if (!may_free || !try_to_free_buffers(page, 0))
 			return 0;
-		J_ASSERT(page->buffers == NULL);
+		J_ASSERT(!page_has_buffers(page));
 	}
 	return 1;
 }

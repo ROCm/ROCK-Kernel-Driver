@@ -21,6 +21,7 @@
 #include <linux/cache.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
+#include <linux/radix-tree.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -172,12 +173,10 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define BLKRRPART  _IO(0x12,95)	/* re-read partition table */
 #define BLKGETSIZE _IO(0x12,96)	/* return device size /512 (long *arg) */
 #define BLKFLSBUF  _IO(0x12,97)	/* flush buffer cache */
-#if 0				/* Obsolete, these don't do anything. */
 #define BLKRASET   _IO(0x12,98)	/* set read ahead for block device */
 #define BLKRAGET   _IO(0x12,99)	/* get current read ahead setting */
 #define BLKFRASET  _IO(0x12,100)/* set filesystem (mm/filemap.c) read-ahead */
 #define BLKFRAGET  _IO(0x12,101)/* get filesystem (mm/filemap.c) read-ahead */
-#endif
 #define BLKSECTSET _IO(0x12,102)/* set max sectors per request (ll_rw_blk.c) */
 #define BLKSECTGET _IO(0x12,103)/* get max sectors per request (ll_rw_blk.c) */
 #define BLKSSZGET  _IO(0x12,104)/* get block device sector size */
@@ -286,6 +285,24 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
 
+/* If we *know* page->private refers to buffer_heads */
+#define page_buffers(page)					\
+	({							\
+		if (!PagePrivate(page))				\
+			BUG();					\
+		((struct buffer_head *)(page)->private);	\
+	})
+#define page_has_buffers(page)	PagePrivate(page)
+#define set_page_buffers(page, buffers)				\
+	do {							\
+		SetPagePrivate(page);				\
+		page->private = (unsigned long)buffers;		\
+	} while (0)
+#define clear_page_buffers(page)				\
+	do {							\
+		ClearPagePrivate(page);				\
+		page->private = 0;				\
+	} while (0)
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
@@ -370,6 +387,8 @@ struct address_space_operations {
 };
 
 struct address_space {
+	struct radix_tree_root	page_tree;	/* radix tree of all pages */
+	rwlock_t		page_lock;	/* and rwlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	dirty_pages;	/* list of dirty pages */
 	struct list_head	locked_pages;	/* list of locked pages */
@@ -484,6 +503,18 @@ struct fown_struct {
 	int signum;		/* posix.1b rt signal to be delivered on IO */
 };
 
+/*
+ * Track a single file's readahead state
+ */
+struct file_ra_state {
+	unsigned long start;		/* Current window */
+	unsigned long size;
+	unsigned long next_size;	/* Next window size */
+	unsigned long prev_page;	/* Cache last read() position */
+	unsigned long ahead_start;	/* Ahead window */
+	unsigned long ahead_size;
+};
+
 struct file {
 	struct list_head	f_list;
 	struct dentry		*f_dentry;
@@ -493,10 +524,10 @@ struct file {
 	unsigned int 		f_flags;
 	mode_t			f_mode;
 	loff_t			f_pos;
-	unsigned long 		f_reada, f_ramax, f_raend, f_ralen, f_rawin;
 	struct fown_struct	f_owner;
 	unsigned int		f_uid, f_gid;
 	int			f_error;
+	struct file_ra_state	f_ra;
 
 	unsigned long		f_version;
 
@@ -925,6 +956,7 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
+void generic_shutdown_super(struct super_block *sb);
 void kill_block_super(struct super_block *sb);
 void kill_anon_super(struct super_block *sb);
 void kill_litter_super(struct super_block *sb);

@@ -1884,7 +1884,6 @@ static struct file *presto_filp_dopen(struct dentry *dentry, int flags)
 
         f->f_dentry = dentry;
         f->f_pos = 0;
-        f->f_reada = 0;
         f->f_op = NULL;
         if (inode->i_op)
                 /* XXX should we set to presto ops, or leave at cache ops? */

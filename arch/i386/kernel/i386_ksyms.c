@@ -145,6 +145,10 @@ EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(flush_tlb_page);
 #endif
 
+#ifdef CONFIG_X86_IO_APIC
+EXPORT_SYMBOL(IO_APIC_get_PCI_irq_vector);
+#endif
+
 #ifdef CONFIG_MCA
 EXPORT_SYMBOL(machine_id);
 #endif

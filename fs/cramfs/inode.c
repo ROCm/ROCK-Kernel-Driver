@@ -134,7 +134,7 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 		return read_buffers[i] + blk_offset;
 	}
 
-	devsize = blkdev_size_in_bytes(sb->s_dev) >> 12;
+	devsize = sb->s_bdev->bd_inode->i_size >> 12;
 	if (!devsize)
 		devsize = ~0UL;
 

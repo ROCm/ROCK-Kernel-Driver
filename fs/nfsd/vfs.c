@@ -67,11 +67,7 @@ struct raparms {
 	unsigned int		p_count;
 	ino_t			p_ino;
 	kdev_t			p_dev;
-	unsigned long		p_reada,
-				p_ramax,
-				p_raend,
-				p_ralen,
-				p_rawin;
+	struct file_ra_state	p_ra;
 };
 
 static struct raparms *		raparml;
@@ -564,11 +560,7 @@ nfsd_get_raparms(kdev_t dev, ino_t ino)
 	ra = *frap;
 	ra->p_dev = dev;
 	ra->p_ino = ino;
-	ra->p_reada = 0;
-	ra->p_ramax = 0;
-	ra->p_raend = 0;
-	ra->p_ralen = 0;
-	ra->p_rawin = 0;
+	memset(&ra->p_ra, 0, sizeof(ra->p_ra));
 found:
 	if (rap != &raparm_cache) {
 		*rap = ra->p_next;
@@ -611,31 +603,18 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	/* Get readahead parameters */
 	ra = nfsd_get_raparms(inode->i_dev, inode->i_ino);
-	if (ra) {
-		file.f_reada = ra->p_reada;
-		file.f_ramax = ra->p_ramax;
-		file.f_raend = ra->p_raend;
-		file.f_ralen = ra->p_ralen;
-		file.f_rawin = ra->p_rawin;
-	}
+	if (ra)
+		file.f_ra = ra->p_ra;
 	file.f_pos = offset;
 
-	oldfs = get_fs(); set_fs(KERNEL_DS);
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 	err = file.f_op->read(&file, buf, *count, &file.f_pos);
 	set_fs(oldfs);
 
 	/* Write back readahead params */
-	if (ra != NULL) {
-		dprintk("nfsd: raparms %ld %ld %ld %ld %ld\n",
-			file.f_reada, file.f_ramax, file.f_raend,
-			file.f_ralen, file.f_rawin);
-		ra->p_reada = file.f_reada;
-		ra->p_ramax = file.f_ramax;
-		ra->p_raend = file.f_raend;
-		ra->p_ralen = file.f_ralen;
-		ra->p_rawin = file.f_rawin;
-		ra->p_count -= 1;
-	}
+	if (ra)
+		ra->p_ra = file.f_ra;
 
 	if (err >= 0) {
 		nfsdstats.io_read += err;

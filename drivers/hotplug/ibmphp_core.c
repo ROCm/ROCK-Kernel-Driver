@@ -56,7 +56,7 @@ MODULE_LICENSE ("GPL");
 MODULE_DESCRIPTION (DRIVER_DESC);
 
 static int *ops[MAX_OPS + 1];
-static struct pci_ops *ibmphp_pci_root_ops;
+struct pci_ops *ibmphp_pci_root_ops;
 static int max_slots;
 
 static int irqs[16];    /* PIC mode IRQ's we're using so far (in case MPS tables don't provide default info for empty slots */

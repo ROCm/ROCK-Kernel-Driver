@@ -635,7 +635,6 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;
-	f->f_reada = 0;
 	f->f_op = fops_get(inode->i_fop);
 	file_move(f, &inode->i_sb->s_files);
 
@@ -686,7 +685,7 @@ int get_unused_fd(void)
 	write_lock(&files->file_lock);
 
 repeat:
- 	fd = find_next_zero_bit(files->open_fds, 
+ 	fd = find_next_zero_bit(files->open_fds->fds_bits, 
 				files->max_fdset, 
 				files->next_fd);
 
