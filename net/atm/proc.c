@@ -334,7 +334,9 @@ static int atm_devices_info(loff_t pos,char *buf)
 
 static int atm_pvc_info(loff_t pos,char *buf)
 {
-	struct sock *s;
+	unsigned long flags;
+	struct atm_dev *dev;
+	struct list_head *p;
 	struct atm_vcc *vcc;
 	int left, clip_info = 0;
 
@@ -347,20 +349,25 @@ static int atm_pvc_info(loff_t pos,char *buf)
 	if (try_atm_clip_ops())
 		clip_info = 1;
 #endif
-	read_lock(&vcc_sklist_lock);
-	for(s = vcc_sklist; s; s = s->sk_next) {
-		vcc = atm_sk(s);
-		if (vcc->sk->sk_family == PF_ATMPVC && vcc->dev && !left--) {
-			pvc_info(vcc,buf,clip_info);
-			read_unlock(&vcc_sklist_lock);
+	spin_lock(&atm_dev_lock);
+	list_for_each(p, &atm_devs) {
+		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
+		for (vcc = dev->vccs; vcc; vcc = vcc->next)
+			if (vcc->sk->sk_family == PF_ATMPVC &&
+			    vcc->dev && !left--) {
+				pvc_info(vcc,buf,clip_info);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-			if (clip_info)
-				module_put(atm_clip_ops->owner);
+				if (clip_info)
+					module_put(atm_clip_ops->owner);
 #endif
-			return strlen(buf);
-		}
+				return strlen(buf);
+			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock(&atm_dev_lock);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 	if (clip_info)
 		module_put(atm_clip_ops->owner);
@@ -371,8 +378,10 @@ static int atm_pvc_info(loff_t pos,char *buf)
 
 static int atm_vc_info(loff_t pos,char *buf)
 {
+	unsigned long flags;
+	struct atm_dev *dev;
+	struct list_head *p;
 	struct atm_vcc *vcc;
-	struct sock *s;
 	int left;
 
 	if (!pos)
@@ -380,16 +389,20 @@ static int atm_vc_info(loff_t pos,char *buf)
 		    "Address"," Itf VPI VCI   Fam Flags Reply Send buffer"
 		    "     Recv buffer\n");
 	left = pos-1;
-	read_lock(&vcc_sklist_lock);
-	for(s = vcc_sklist; s; s = s->sk_next) {
-		vcc = atm_sk(s);
-		if (!left--) {
-			vc_info(vcc,buf);
-			read_unlock(&vcc_sklist_lock);
-			return strlen(buf);
-		}
+	spin_lock(&atm_dev_lock);
+	list_for_each(p, &atm_devs) {
+		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
+		for (vcc = dev->vccs; vcc; vcc = vcc->next)
+			if (!left--) {
+				vc_info(vcc,buf);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
+				return strlen(buf);
+			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock(&atm_dev_lock);
 
 	return 0;
 }
@@ -397,23 +410,29 @@ static int atm_vc_info(loff_t pos,char *buf)
 
 static int atm_svc_info(loff_t pos,char *buf)
 {
-	struct sock *s;
+	unsigned long flags;
+	struct atm_dev *dev;
+	struct list_head *p;
 	struct atm_vcc *vcc;
 	int left;
 
 	if (!pos)
 		return sprintf(buf,"Itf VPI VCI           State      Remote\n");
 	left = pos-1;
-	read_lock(&vcc_sklist_lock);
-	for(s = vcc_sklist; s; s = s->sk_next) {
-		vcc = atm_sk(s);
-		if (vcc->sk->sk_family == PF_ATMSVC && !left--) {
-			svc_info(vcc,buf);
-			read_unlock(&vcc_sklist_lock);
-			return strlen(buf);
-		}
+	spin_lock(&atm_dev_lock);
+	list_for_each(p, &atm_devs) {
+		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
+		for (vcc = dev->vccs; vcc; vcc = vcc->next)
+			if (vcc->sk->sk_family == PF_ATMSVC && !left--) {
+				svc_info(vcc,buf);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
+				return strlen(buf);
+			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock(&atm_dev_lock);
 
 	return 0;
 }

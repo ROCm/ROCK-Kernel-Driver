@@ -1069,22 +1069,18 @@ fore200e_supply(struct fore200e* fore200e)
 static struct atm_vcc* 
 fore200e_find_vcc(struct fore200e* fore200e, struct rpd* rpd)
 {
-    struct sock *s;
+    unsigned long flags;
     struct atm_vcc* vcc;
 
-    read_lock(&vcc_sklist_lock);
-    for(s = vcc_sklist; s; s = s->sk_next) {
-	vcc = atm_sk(s);
-	if (vcc->dev != fore200e->atm_dev)
-		continue;
-	if (vcc->vpi == rpd->atm_header.vpi && vcc->vci == rpd->atm_header.vci) {
-            read_unlock(&vcc_sklist_lock);
-	    return vcc;
-	}
-    }
-    read_unlock(&vcc_sklist_lock);
+    spin_lock_irqsave(&fore200e->atm_dev->lock, flags);
+    for (vcc = fore200e->atm_dev->vccs; vcc; vcc = vcc->next) {
 
-    return NULL;
+	if (vcc->vpi == rpd->atm_header.vpi && vcc->vci == rpd->atm_header.vci)
+	    break;
+    }
+    spin_unlock_irqrestore(&fore200e->atm_dev->lock, flags);
+    
+    return vcc;
 }
 
 
@@ -1354,23 +1350,20 @@ fore200e_activate_vcin(struct fore200e* fore200e, int activate, struct atm_vcc* 
 static int
 fore200e_walk_vccs(struct atm_vcc *vcc, short *vpi, int *vci)
 {
+    unsigned long flags;
     struct atm_vcc* walk;
-    struct sock *s;
 
     /* find a free VPI */
 
-    read_lock(&vcc_sklist_lock);
+    spin_lock_irqsave(&vcc->dev->lock, flags);
 
     if (*vpi == ATM_VPI_ANY) {
 
-	for (*vpi = 0, s = vcc_sklist; s; s = s->sk_next) {
-	    walk = atm_sk(s);
-	    if (walk->dev != vcc->dev)
-		continue;
+	for (*vpi = 0, walk = vcc->dev->vccs; walk; walk = walk->next) {
 
 	    if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
 		(*vpi)++;
-		s = vcc_sklist;
+		walk = vcc->dev->vccs;
 	    }
 	}
     }
@@ -1378,19 +1371,16 @@ fore200e_walk_vccs(struct atm_vcc *vcc, short *vpi, int *vci)
     /* find a free VCI */
     if (*vci == ATM_VCI_ANY) {
 	
-	for (*vci = ATM_NOT_RSV_VCI, s = vcc_sklist; s; s = s->sk_next) {
-	    walk = atm_sk(s);
-	    if (walk->dev != vcc->dev)
-		continue;
+	for (*vci = ATM_NOT_RSV_VCI, walk = vcc->dev->vccs; walk; walk = walk->next) {
 
 	    if ((walk->vpi = *vpi) && (walk->vci == *vci)) {
 		*vci = walk->vci + 1;
-		s = vcc_sklist;
+		walk = vcc->dev->vccs;
 	    }
 	}
     }
 
-    read_unlock(&vcc_sklist_lock);
+    spin_unlock_irqrestore(&vcc->dev->lock, flags);
 
     return 0;
 }
@@ -2652,7 +2642,7 @@ fore200e_module_cleanup(void)
 static int
 fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 {
-    struct sock *s;
+    unsigned long flags;
     struct fore200e* fore200e  = FORE200E_DEV(dev);
     int              len, left = *pos;
 
@@ -2899,12 +2889,8 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 	len = sprintf(page,"\n"    
 		      " VCCs:\n  address\tVPI.VCI:AAL\t(min/max tx PDU size) (min/max rx PDU size)\n");
 	
-	read_lock(&vcc_sklist_lock);
-	for (s = vcc_sklist; s; s = s->sk_next) {
-	    vcc = atm_sk(s);
-
-	    if (vcc->dev != fore200e->atm_dev)
-		    continue;
+	spin_lock_irqsave(&fore200e->atm_dev->lock, flags);
+	for (vcc = fore200e->atm_dev->vccs; vcc; vcc = vcc->next) {
 
 	    fore200e_vcc = FORE200E_VCC(vcc);
 	    
@@ -2918,7 +2904,7 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 			   fore200e_vcc->rx_max_pdu
 		);
 	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock_irqrestore(&fore200e->atm_dev->lock, flags);
 
 	return len;
     }

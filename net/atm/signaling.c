@@ -200,21 +200,26 @@ void sigd_enq(struct atm_vcc *vcc,enum atmsvc_msg_type type,
 }
 
 
-static void purge_vcc(struct atm_vcc *vcc)
+static void purge_vccs(struct atm_vcc *vcc)
 {
-	if (vcc->sk->sk_family == PF_ATMSVC &&
-	    !test_bit(ATM_VF_META,&vcc->flags)) {
-		set_bit(ATM_VF_RELEASED,&vcc->flags);
-		vcc->reply = -EUNATCH;
-		vcc->sk->sk_err = EUNATCH;
-		wake_up(&vcc->sleep);
+	while (vcc) {
+		if (vcc->sk->sk_family == PF_ATMSVC &&
+		    !test_bit(ATM_VF_META,&vcc->flags)) {
+			set_bit(ATM_VF_RELEASED,&vcc->flags);
+			vcc->reply = -EUNATCH;
+			vcc->sk->sk_err = EUNATCH;
+			wake_up(&vcc->sleep);
+		}
+		vcc = vcc->next;
 	}
 }
 
 
 static void sigd_close(struct atm_vcc *vcc)
 {
-	struct sock *s;
+	unsigned long flags;
+	struct atm_dev *dev;
+	struct list_head *p;
 
 	DPRINTK("sigd_close\n");
 	sigd = NULL;
@@ -222,14 +227,14 @@ static void sigd_close(struct atm_vcc *vcc)
 		printk(KERN_ERR "sigd_close: closing with requests pending\n");
 	skb_queue_purge(&vcc->sk->sk_receive_queue);
 
-	read_lock(&vcc_sklist_lock);
-	for(s = vcc_sklist; s; s = s->sk_next) {
-		struct atm_vcc *vcc = atm_sk(s);
-
-		if (vcc->dev)
-			purge_vcc(vcc);
+	spin_lock(&atm_dev_lock);
+	list_for_each(p, &atm_devs) {
+		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
+		purge_vccs(dev->vccs);
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock(&atm_dev_lock);
 }
 
 
@@ -252,8 +257,7 @@ int sigd_attach(struct atm_vcc *vcc)
 	if (sigd) return -EADDRINUSE;
 	DPRINTK("sigd_attach\n");
 	sigd = vcc;
-	vcc->dev = &sigd_dev;
-	vcc_insert_socket(vcc->sk);
+	bind_vcc(vcc,&sigd_dev);
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
 	wake_up(&sigd_sleep);

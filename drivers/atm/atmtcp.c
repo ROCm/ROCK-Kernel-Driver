@@ -153,9 +153,9 @@ static void atmtcp_v_close(struct atm_vcc *vcc)
 
 static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 {
+	unsigned long flags;
 	struct atm_cirange ci;
 	struct atm_vcc *vcc;
-	struct sock *s;
 
 	if (cmd != ATM_SETCIRANGE) return -ENOIOCTLCMD;
 	if (copy_from_user(&ci,(void *) arg,sizeof(ci))) return -EFAULT;
@@ -163,18 +163,14 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	if (ci.vci_bits == ATM_CI_MAX) ci.vci_bits = MAX_VCI_BITS;
 	if (ci.vpi_bits > MAX_VPI_BITS || ci.vpi_bits < 0 ||
 	    ci.vci_bits > MAX_VCI_BITS || ci.vci_bits < 0) return -EINVAL;
-	read_lock(&vcc_sklist_lock);
-	for (s = vcc_sklist; s; s = s->sk_next) {
-		vcc = atm_sk(s);
-		if (vcc->dev != dev)
-			continue;
+	spin_lock_irqsave(&dev->lock, flags);
+	for (vcc = dev->vccs; vcc; vcc = vcc->next)
 		if ((vcc->vpi >> ci.vpi_bits) ||
 		    (vcc->vci >> ci.vci_bits)) {
-			read_unlock(&vcc_sklist_lock);
+			spin_unlock_irqrestore(&dev->lock, flags);
 			return -EBUSY;
 		}
-	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock_irqrestore(&dev->lock, flags);
 	dev->ci_range = ci;
 	return 0;
 }
@@ -237,9 +233,9 @@ static int atmtcp_v_proc(struct atm_dev *dev,loff_t *pos,char *page)
 
 static void atmtcp_c_close(struct atm_vcc *vcc)
 {
+	unsigned long flags;
 	struct atm_dev *atmtcp_dev;
 	struct atmtcp_dev_data *dev_data;
-	struct sock *s;
 	struct atm_vcc *walk;
 
 	atmtcp_dev = (struct atm_dev *) vcc->dev_data;
@@ -250,23 +246,19 @@ static void atmtcp_c_close(struct atm_vcc *vcc)
 	kfree(dev_data);
 	shutdown_atm_dev(atmtcp_dev);
 	vcc->dev_data = NULL;
-	read_lock(&vcc_sklist_lock);
-	for (s = vcc_sklist; s; s = s->sk_next) {
-		walk = atm_sk(s);
-		if (walk->dev != atmtcp_dev)
-			continue;
+	spin_lock_irqsave(&atmtcp_dev->lock, flags);
+	for (walk = atmtcp_dev->vccs; walk; walk = walk->next)
 		wake_up(&walk->sleep);
-	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock_irqrestore(&atmtcp_dev->lock, flags);
 }
 
 
 static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct atmtcp_hdr *hdr;
-	struct sock *s;
-	struct atm_vcc *out_vcc = NULL;
+	struct atm_vcc *out_vcc;
 	struct sk_buff *new_skb;
 	int result = 0;
 
@@ -278,17 +270,13 @@ static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		    (struct atmtcp_control *) skb->data);
 		goto done;
 	}
-	read_lock(&vcc_sklist_lock);
-	for (s = vcc_sklist; s; s = s->sk_next) {
-		out_vcc = atm_sk(s);
-		if (out_vcc->dev != dev)
-			continue;
+	spin_lock_irqsave(&dev->lock, flags);
+	for (out_vcc = dev->vccs; out_vcc; out_vcc = out_vcc->next)
 		if (out_vcc->vpi == ntohs(hdr->vpi) &&
 		    out_vcc->vci == ntohs(hdr->vci) &&
 		    out_vcc->qos.rxtp.traffic_class != ATM_NONE)
 			break;
-	}
-	read_unlock(&vcc_sklist_lock);
+	spin_unlock_irqrestore(&dev->lock, flags);
 	if (!out_vcc) {
 		atomic_inc(&vcc->stats->tx_err);
 		goto done;
@@ -378,7 +366,7 @@ int atmtcp_attach(struct atm_vcc *vcc,int itf)
 	if (itf != -1) dev = atm_dev_lookup(itf);
 	if (dev) {
 		if (dev->ops != &atmtcp_v_dev_ops) {
-			atm_dev_put(dev);
+			atm_dev_release(dev);
 			return -EMEDIUMTYPE;
 		}
 		if (PRIV(dev)->vcc) return -EBUSY;
@@ -390,8 +378,7 @@ int atmtcp_attach(struct atm_vcc *vcc,int itf)
 		if (error) return error;
 	}
 	PRIV(dev)->vcc = vcc;
-	vcc->dev = &atmtcp_control_dev;
-	vcc_insert_socket(vcc->sk);
+	bind_vcc(vcc,&atmtcp_control_dev);
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
 	vcc->dev_data = dev;
@@ -415,7 +402,7 @@ int atmtcp_remove_persistent(int itf)
 	dev = atm_dev_lookup(itf);
 	if (!dev) return -ENODEV;
 	if (dev->ops != &atmtcp_v_dev_ops) {
-		atm_dev_put(dev);
+		atm_dev_release(dev);
 		return -EMEDIUMTYPE;
 	}
 	dev_data = PRIV(dev);
@@ -423,7 +410,7 @@ int atmtcp_remove_persistent(int itf)
 	dev_data->persist = 0;
 	if (PRIV(dev)->vcc) return 0;
 	kfree(dev_data);
-	atm_dev_put(dev);
+	atm_dev_release(dev);
 	shutdown_atm_dev(dev);
 	return 0;
 }

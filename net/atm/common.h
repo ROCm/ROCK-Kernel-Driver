@@ -10,8 +10,8 @@
 #include <linux/poll.h> /* for poll_table */
 
 
-int vcc_create(struct socket *sock, int protocol, int family);
-int vcc_release(struct socket *sock);
+int atm_create(struct socket *sock,int protocol,int family);
+int atm_release(struct socket *sock);
 int vcc_connect(struct socket *sock, int itf, short vpi, int vci);
 int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		int size, int flags);
@@ -24,6 +24,7 @@ int vcc_setsockopt(struct socket *sock, int level, int optname, char *optval,
 int vcc_getsockopt(struct socket *sock, int level, int optname, char *optval,
 		   int *optlen);
 
+void atm_release_vcc_sk(struct sock *sk,int free_sk);
 void atm_shutdown_dev(struct atm_dev *dev);
 
 int atmpvc_init(void);

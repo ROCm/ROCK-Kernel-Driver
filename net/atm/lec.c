@@ -48,7 +48,7 @@ extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 
 #include "lec.h"
 #include "lec_arpc.h"
-#include "resources.h"
+#include "resources.h"  /* for bind_vcc() */
 
 #if 0
 #define DPRINTK printk
@@ -810,8 +810,7 @@ lecd_attach(struct atm_vcc *vcc, int arg)
         lec_arp_init(priv);
 	priv->itfnum = i;  /* LANE2 addition */
         priv->lecd = vcc;
-        vcc->dev = &lecatm_dev;
-        vcc_insert_socket(vcc->sk);
+        bind_vcc(vcc, &lecatm_dev);
         
         vcc->proto_data = dev_lec[i];
 	set_bit(ATM_VF_META,&vcc->flags);
