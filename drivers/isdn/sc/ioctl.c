@@ -55,8 +55,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the SRec from user space
 		 */
-		if ((err = copy_from_user(srec, (char *) data->dataptr, sizeof(srec))))
-			return err;
+		if (copy_from_user(srec, (char *) data->dataptr, sizeof(srec)))
+			return -EFAULT;
 
 		status = send_and_receive(card, CMPID, cmReqType2, cmReqClass0, cmReqLoadProc,
 				0, sizeof(srec), srec, &rcvmsg, SAR_TIMEOUT);
@@ -96,8 +96,9 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the switch type from user space
 		 */
-		if ((err = copy_from_user(&switchtype, (char *) data->dataptr, sizeof(char))))
-			return err;
+		if (copy_from_user(&switchtype, (char *)data->dataptr,
+				   sizeof(char)))
+			return -EFAULT;
 
 		pr_debug("%s: SCIOCSETSWITCH: setting switch type to %d\n", adapter[card]->devicename,
 			switchtype);
@@ -141,8 +142,9 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if ((err = copy_to_user((char *) data->dataptr, &switchtype, sizeof(char))))
-			return err;
+		if (copy_to_user((char *)data->dataptr, &switchtype,
+				 sizeof(char)))
+			return -EFAULT;
 
 		return 0;
 	}
@@ -173,8 +175,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if ((err = copy_to_user((char *) data->dataptr, spid, sizeof(spid))))
-			return err;
+		if (copy_to_user((char *)data->dataptr, spid, sizeof(spid)))
+			return -EFAULT;
 
 		return 0;
 	}	
@@ -190,8 +192,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the spid from user space
 		 */
-		if ((err = copy_from_user(spid, (char *) data->dataptr, sizeof(spid))))
-			return err;
+		if (copy_from_user(spid, (char *) data->dataptr, sizeof(spid)))
+			return -EFAULT;
 
 		pr_debug("%s: SCIOCSETSPID: setting channel %d spid to %s\n", 
 			adapter[card]->devicename, data->channel, spid);
@@ -237,8 +239,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the dn and send to user space
 		 */
-		if ((err = copy_to_user((char *) data->dataptr, dn, sizeof(dn))))
-			return err;
+		if (copy_to_user((char *)data->dataptr, dn, sizeof(dn)))
+			return -EFAULT;
 
 		return 0;
 	}	
@@ -254,8 +256,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Get the spid from user space
 		 */
-		if ((err = copy_from_user(dn, (char *) data->dataptr, sizeof(dn))))
-			return err;
+		if (copy_from_user(dn, (char *)data->dataptr, sizeof(dn)))
+			return -EFAULT;
 
 		pr_debug("%s: SCIOCSETDN: setting channel %d dn to %s\n", 
 			adapter[card]->devicename, data->channel, dn);
@@ -290,8 +292,9 @@ int sc_ioctl(int card, scs_ioctl *data)
 		pr_debug("%s: SCIOSTAT: ioctl received\n", adapter[card]->devicename);
 		GetStatus(card, &bi);
 		
-		if ((err = copy_to_user((boardInfo *) data->dataptr, &bi, sizeof(boardInfo))))
-			return err;
+		if (copy_to_user((boardInfo *)data->dataptr, &bi,
+				 sizeof(boardInfo)))
+			return -EFAULT;
 
 		return 0;
 	}
@@ -324,8 +327,8 @@ int sc_ioctl(int card, scs_ioctl *data)
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if ((err = copy_to_user((char *) data->dataptr, &speed, sizeof(char))))
-			return err;
+		if (copy_to_user((char *) data->dataptr, &speed, sizeof(char)))
+			return -EFAULT;
 
 		return 0;
 	}
