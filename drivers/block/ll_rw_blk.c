@@ -1016,7 +1016,13 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 void blk_plug_device(request_queue_t *q)
 {
 	WARN_ON(!irqs_disabled());
-	if (!blk_queue_plugged(q)) {
+
+	/*
+	 * don't plug a stopped queue, it must be paired with blk_start_queue()
+	 * which will restart the queueing
+	 */
+	if (!blk_queue_plugged(q)
+	    && !test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
 		mod_timer(&q->unplug_timer, jiffies + q->unplug_delay);
