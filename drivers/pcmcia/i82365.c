@@ -164,8 +164,6 @@ struct i82365_socket {
     ioaddr_t		ioaddr;
     u_short		psock;
     u_char		cs_irq, intr;
-    void		(*handler)(void *info, u_int events);
-    void		*info;
     union {
 	cirrus_state_t		cirrus;
 	vg46x_state_t		vg46x;
@@ -863,35 +861,6 @@ static void __init isa_probe(void)
 
 /*====================================================================*/
 
-static u_int pending_events[8];
-static spinlock_t pending_event_lock = SPIN_LOCK_UNLOCKED;
-
-static void pcic_bh(void *dummy)
-{
-	u_int events;
-	int i;
-
-	for (i=0; i < sockets; i++) {
-		spin_lock_irq(&pending_event_lock);
-		events = pending_events[i];
-		pending_events[i] = 0;
-		spin_unlock_irq(&pending_event_lock);
-		/* 
-		SS_DETECT events need a small delay here. The reason for this is that 
-		the "is there a card" electronics need time to see the card after the
-		"we have a card coming in" electronics have seen it. 
-		*/
-		if (events & SS_DETECT) 
-			mdelay(4);
-		if (socket[i].handler)
-			socket[i].handler(socket[i].info, events);
-	}
-}
-
-static DECLARE_WORK(pcic_task, pcic_bh, NULL);
-
-static unsigned long last_detect_jiffies;
-
 static irqreturn_t pcic_interrupt(int irq, void *dev,
 				    struct pt_regs *regs)
 {
@@ -911,26 +880,12 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 	    handled = 1;
 	    ISA_LOCK(i, flags);
 	    csc = i365_get(i, I365_CSC);
-	    if ((csc == 0) || (!socket[i].handler) ||
-		(i365_get(i, I365_IDENT) & 0x70)) {
+	    if ((csc == 0) || (i365_get(i, I365_IDENT) & 0x70)) {
 		ISA_UNLOCK(i, flags);
 		continue;
 	    }
 	    events = (csc & I365_CSC_DETECT) ? SS_DETECT : 0;
-	    
-	    
-	    /* Several sockets will send multiple "new card detected"
-	       events in rapid succession. However, the rest of the pcmcia expects 
-	       only one such event. We just ignore these events by having a
-               timeout */
 
-	    if (events) {
-	    	if ((jiffies - last_detect_jiffies)<(HZ/20)) 
-	    		events = 0;
-	    	last_detect_jiffies = jiffies;
-	    	
-	    }
-	
 	    if (i365_get(i, I365_INTCTL) & I365_PC_IOCARD)
 		events |= (csc & I365_CSC_STSCHG) ? SS_STSCHG : 0;
 	    else {
@@ -941,12 +896,9 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 	    ISA_UNLOCK(i, flags);
 	    DEBUG(2, "i82365: socket %d event 0x%02x\n", i, events);
 
-	    if (events) {
-		    spin_lock(&pending_event_lock);
-		    pending_events[i] |= events;
-		    spin_unlock(&pending_event_lock);
-		    schedule_work(&pcic_task);
-	    }
+	    if (events)
+		pcmcia_parse_events(&socket[i].socket, events);
+
 	    active |= events;
 	}
 	if (!active) break;
@@ -965,16 +917,6 @@ static void pcic_interrupt_wrapper(u_long data)
     poll_timer.expires = jiffies + poll_interval;
     add_timer(&poll_timer);
 }
-
-/*====================================================================*/
-
-static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
-{
-    unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
-    socket[sock].handler = handler;
-    socket[sock].info = info;
-    return 0;
-} /* pcic_register_callback */
 
 /*====================================================================*/
 
@@ -1400,10 +1342,8 @@ static int pcic_suspend(struct pcmcia_socket *sock)
 }
 
 static struct pccard_operations pcic_operations = {
-	.owner			= THIS_MODULE,
 	.init			= pcic_init,
 	.suspend		= pcic_suspend,
-	.register_callback	= pcic_register_callback,
 	.get_status		= pcic_get_status,
 	.get_socket		= pcic_get_socket,
 	.set_socket		= pcic_set_socket,
@@ -1464,6 +1404,7 @@ static int __init init_i82365(void)
     for (i = 0; i < sockets; i++) {
 	    socket[i].socket.dev.dev = &i82365_device.dev;
 	    socket[i].socket.ss_entry = &pcic_operations;
+	    socket[i].socket.owner = THIS_MODULE;
 	    socket[i].number = i;
 	    ret = pcmcia_register_socket(&socket[i].socket);	    
 	    if (ret && i--) {

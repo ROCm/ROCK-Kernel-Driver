@@ -231,18 +231,6 @@ static const lookup_t service_table[] = {
 
 ======================================================================*/
 
-static int register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
-{
-	int error;
-
-	if (handler && !try_module_get(s->ss_entry->owner))
-		return -ENODEV;
-	error = s->ss_entry->register_callback(s, handler, info);
-	if (!handler)
-		module_put(s->ss_entry->owner);
-	return error;
-}
-
 static int get_socket_status(struct pcmcia_socket *s, int *val)
 {
 	return s->ss_entry->get_status(s, val);
@@ -363,6 +351,7 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 
 	wait_for_completion(&socket->thread_done);
 	BUG_ON(!socket->thread);
+	pcmcia_parse_events(socket, SS_DETECT);
 
 	return 0;
 }
@@ -723,6 +712,9 @@ static int socket_insert(struct pcmcia_socket *skt)
 {
 	int ret;
 
+	if (!try_module_get(skt->owner))
+		return CS_NO_CARD;
+
 	ret = socket_setup(skt, setup_delay);
 	if (ret == CS_SUCCESS) {
 #ifdef CONFIG_CARDBUS
@@ -733,8 +725,10 @@ static int socket_insert(struct pcmcia_socket *skt)
 #endif
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 		skt->socket.flags &= ~SS_DEBOUNCED;
-	} else
+	} else {
 		socket_shutdown(skt);
+		module_put(skt->owner);
+	}
 
 	return ret;
 }
@@ -778,12 +772,53 @@ static int socket_resume(struct pcmcia_socket *skt)
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
 		skt->socket.flags &= ~SS_DEBOUNCED;
-	} else
+	} else {
+		unsigned int old_state = skt->state;
 		socket_shutdown(skt);
+		if (old_state & SOCKET_PRESENT)
+			module_put(skt->owner);
+	}
 
 	skt->state &= ~SOCKET_SUSPEND;
 
 	return CS_SUCCESS;
+}
+
+static void socket_remove(struct pcmcia_socket *skt)
+{
+	socket_shutdown(skt);
+	module_put(skt->owner);
+}
+
+/*
+ * Process a socket card detect status change.
+ *
+ * If we don't have a card already present, delay the detect event for
+ * about 20ms (to be on the safe side) before reading the socket status.
+ *
+ * Some i82365-based systems send multiple SS_DETECT events during card
+ * insertion, and the "card present" status bit seems to bounce.  This
+ * will probably be true with GPIO-based card detection systems after
+ * the product has aged.
+ */
+static void socket_detect_change(struct pcmcia_socket *skt)
+{
+	if (!(skt->state & SOCKET_SUSPEND)) {
+		int status;
+
+		if (!(skt->state & SOCKET_PRESENT)) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(cs_to_timeout(2));
+		}
+
+		get_socket_status(skt, &status);
+		if ((skt->state & SOCKET_PRESENT) &&
+		     !(status & SS_DETECT))
+			socket_remove(skt);
+		if (!(skt->state & SOCKET_PRESENT) &&
+		    (status & SS_DETECT))
+			socket_insert(skt);
+	}
 }
 
 static int pccardd(void *__skt)
@@ -809,17 +844,8 @@ static int pccardd(void *__skt)
 
 		if (events) {
 			down(&skt->skt_sem);
-			if (events & SS_DETECT && !(skt->state & SOCKET_SUSPEND)) {
-				int status;
-
-				get_socket_status(skt, &status);
-				if ((skt->state & SOCKET_PRESENT) &&
-				     !(status & SS_DETECT))
-					socket_shutdown(skt);
-				if (!(skt->state & SOCKET_PRESENT) &&
-				    (status & SS_DETECT))
-					socket_insert(skt);
-			}
+			if (events & SS_DETECT)
+				socket_detect_change(skt);
 			if (events & SS_BATDEAD)
 				send_event(skt, CS_EVENT_BATTERY_DEAD, CS_EVENT_PRI_LOW);
 			if (events & SS_BATWARN)
@@ -839,21 +865,17 @@ static int pccardd(void *__skt)
 	}
 	remove_wait_queue(&skt->thread_wait, &wait);
 
-	socket_shutdown(skt);
-
 	complete_and_exit(&skt->thread_done, 0);
 }
 
-static void parse_events(void *info, u_int events)
+void pcmcia_parse_events(struct pcmcia_socket *s, u_int events)
 {
-	struct pcmcia_socket *s = info;
-
 	spin_lock(&s->thread_lock);
 	s->thread_events |= events;
 	spin_unlock(&s->thread_lock);
 
 	wake_up(&s->thread_wait);
-} /* parse_events */
+} /* pcmcia_parse_events */
 
 
 /*======================================================================
@@ -1114,9 +1136,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	handle->event_handler = NULL;
     }
 
-    if (--s->real_clients == 0)
-        register_callback(s, NULL, NULL);
-    
     return CS_SUCCESS;
 } /* deregister_client */
 
@@ -1530,11 +1549,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     up_read(&pcmcia_socket_list_rwsem);
     if (client == NULL)
 	return CS_OUT_OF_RESOURCE;
-
-    if (++s->real_clients == 1) {
-	register_callback(s, &parse_events, s);
-	parse_events(s, SS_DETECT);
-    }
 
     *handle = client;
     client->state &= ~CLIENT_UNBOUND;
@@ -2213,7 +2227,7 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
 		if (ret != 0)
 			break;
 
-		socket_shutdown(skt);
+		socket_remove(skt);
 		ret = CS_SUCCESS;
 	} while (0);
 	up(&skt->skt_sem);
@@ -2504,6 +2518,7 @@ EXPORT_SYMBOL(pcmcia_write_memory);
 EXPORT_SYMBOL(dead_socket);
 EXPORT_SYMBOL(CardServices);
 EXPORT_SYMBOL(MTDHelperEntry);
+EXPORT_SYMBOL(pcmcia_parse_events);
 
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
