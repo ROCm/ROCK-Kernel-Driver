@@ -1642,22 +1642,33 @@ struct file_compression_info {
 
 /* POSIX ACL set/query path info structures */
 #define CIFS_ACL_VERSION 1
-struct cifs_posix_acl {
-	/* BB fixme add here */
+struct cifs_posix_ace { /* access control entry (ACE) */
+	__u8  cifs_e_tag;
+	__u8  cifs_e_perm;
+	__u64 cifs_uid; /* or gid */
+}; 
+
+struct cifs_posix_acl { /* access conrol list  (ACL) */
+	__le16	version;
+	__le16	access_entry_count;  /* access ACL - count of entries */
+	__le16	default_entry_count; /* default ACL - count of entries */
+	struct cifs_posix_ace ace_array[1];
+	/* followed by
+	struct cifs_posix_ace default_ace_arraay[] */
 };  /* level 0x204 */
 
-/* types of access control entries */
-#define CIFS_POSIX_ACL_USER_OBJ	 0x01
-#define CIFS_POSIX_ACL_USER	 0x02
+/* types of access control entries already defined in posix_acl.h */
+/* #define CIFS_POSIX_ACL_USER_OBJ	 0x01
+#define CIFS_POSIX_ACL_USER      0x02
 #define CIFS_POSIX_ACL_GROUP_OBJ 0x04
-#define CIFS_POSIX_ACL_GROUP	 0x08
-#define CIFS_POSIX_ACL_MASK	 0x10
-#define CIFS_POSIX_ACL_OTHER	 0x20
+#define CIFS_POSIX_ACL_GROUP     0x08
+#define CIFS_POSIX_ACL_MASK      0x10
+#define CIFS_POSIX_ACL_OTHER     0x20 */
 
 /* types of perms */
-#define CIFS_POSIX_ACL_EXECUTE   0x01
+/* #define CIFS_POSIX_ACL_EXECUTE   0x01
 #define CIFS_POSIX_ACL_WRITE     0x02
-#define CIFS_POSIX_ACL_READ	 0x04
+#define CIFS_POSIX_ACL_READ	     0x04 */
 
 /* end of POSIX ACL definitions */
 

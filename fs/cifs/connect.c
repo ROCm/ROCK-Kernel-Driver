@@ -69,6 +69,7 @@ struct smb_vol {
 	unsigned intr:1;
 	unsigned setuids:1;
 	unsigned noperm:1;
+	unsigned no_psx_acl:1; /* set if posix acl support should be disabled */
 	unsigned server_ino:1; /* use inode numbers from server ie UniqueId */
 	unsigned int rsize;
 	unsigned int wsize;
@@ -787,6 +788,10 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->server_ino = 1;
 		} else if (strnicmp(data, "noserverino",9) == 0) {
 			vol->server_ino = 0;
+		} else if (strnicmp(data, "acl",3) == 0) {
+			vol->no_psx_acl = 0;
+		} else if (strnicmp(data, "noacl",5) == 0) {
+			vol->no_psx_acl = 1;
 		} else if (strnicmp(data, "noac", 4) == 0) {
 			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
@@ -1491,8 +1496,16 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		/* do not care if following two calls succeed - informational only */
 		CIFSSMBQFSDeviceInfo(xid, tcon, cifs_sb->local_nls);
 		CIFSSMBQFSAttributeInfo(xid, tcon, cifs_sb->local_nls);
-		if (tcon->ses->capabilities & CAP_UNIX)
-			CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls);
+		if (tcon->ses->capabilities & CAP_UNIX) {
+			if(!CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls)) {
+				if(!volume_info.no_psx_acl) {
+					if(CIFS_UNIX_POSIX_ACL_CAP & 
+					   le64_to_cpu(tcon->fsUnixInfo.Capability))
+						cFYI(1,("server negotiated posix acl support"));
+						sb->s_flags |= MS_POSIXACL;
+				}
+			}
+		}
 	}
 
 	/* volume_info.password is freed above when existing session found
