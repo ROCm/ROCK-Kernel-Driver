@@ -44,7 +44,7 @@ MODULE_DESCRIPTION("Promise SATA SX8 (carmel) block driver");
 #undef CARM_NDEBUG
 
 #define DRV_NAME "carmel"
-#define DRV_VERSION "0.7"
+#define DRV_VERSION "0.8"
 #define PFX DRV_NAME ": "
 
 #define NEXT_RESP(idx)	((idx + 1) % RMSG_Q_LEN)
@@ -173,10 +173,11 @@ enum {
 	FW_VER_ZCR		= (1 << 0), /* zero channel RAID (whatever that is) */
 
 	/* carm_host flags */
-	FL_DAC			= (1 << 0),
 	FL_NON_RAID		= FW_VER_NON_RAID,
 	FL_4PORT		= FW_VER_4PORT,
 	FL_FW_VER_MASK		= (FW_VER_NON_RAID | FW_VER_4PORT),
+	FL_DAC			= (1 << 16),
+	FL_DYN_MAJOR		= (1 << 17),
 };
 
 enum scatter_gather_types {
@@ -244,7 +245,11 @@ struct carm_host {
 	void				*mmio;
 	void				*shm;
 	dma_addr_t			shm_dma;
+
 	int				major;
+	int				id;
+	char				name[32];
+
 	spinlock_t			lock;
 	struct pci_dev			*pdev;
 	unsigned int			state;
@@ -401,6 +406,7 @@ static struct block_device_operations carm_bd_ops = {
 };
 
 static unsigned int carm_host_id;
+static unsigned long carm_major_alloc;
 
 
 
@@ -1507,8 +1513,8 @@ static int carm_init_disks(struct carm_host *host)
 		}
 
 		port->disk = disk;
-		sprintf(disk->disk_name, DRV_NAME "%u_%u", carm_host_id, i);
-		sprintf(disk->devfs_name, DRV_NAME "/%u_%u", carm_host_id, i);
+		sprintf(disk->disk_name, DRV_NAME "%u_%u", host->id, i);
+		sprintf(disk->devfs_name, DRV_NAME "/%u_%u", host->id, i);
 		disk->major = host->major;
 		disk->first_minor = i * CARM_MINORS_PER_MAJOR;
 		disk->fops = &carm_bd_ops;
@@ -1651,10 +1657,24 @@ static int carm_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	host->oob_q = q;
 	q->queuedata = host;
 
-	rc = register_blkdev(0, DRV_NAME);
+	/*
+	 * Figure out which major to use: 160, 161, or dynamic
+	 */
+	if (!test_and_set_bit(0, &carm_major_alloc))
+		host->major = 160;
+	else if (!test_and_set_bit(1, &carm_major_alloc))
+		host->major = 161;
+	else
+		host->flags |= FL_DYN_MAJOR;
+
+	host->id = carm_host_id;
+	sprintf(host->name, DRV_NAME "%d", carm_host_id);
+
+	rc = register_blkdev(host->major, host->name);
 	if (rc < 0)
-		goto err_out_free_oob;
-	host->major = rc;
+		goto err_out_free_majors;
+	if (host->flags & FL_DYN_MAJOR)
+		host->major = rc;
 
 	devfs_mk_dir(DRV_NAME);
 
@@ -1678,11 +1698,10 @@ static int carm_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	DPRINTK("waiting for probe_sem\n");
 	down(&host->probe_sem);
 
-	/* TODO: wait for probing to end */
+	printk(KERN_INFO "%s: pci %s, ports %d, io %lx, irq %u, major %d\n",
+	       host->name, pci_name(pdev), (int) CARM_MAX_PORTS,
+	       pci_resource_start(pdev, 0), pdev->irq, host->major);
 
-	printk(KERN_ERR DRV_NAME "(%s): registered host, %d ports, mmio %lx\n",
-	       pci_name(pdev), (int) CARM_MAX_PORTS,
-	       pci_resource_start(pdev, 0));
 	carm_host_id++;
 	pci_set_drvdata(pdev, host);
 	return 0;
@@ -1691,8 +1710,12 @@ err_out_free_irq:
 	free_irq(pdev->irq, host);
 err_out_blkdev_disks:
 	carm_free_disks(host);
-	unregister_blkdev(host->major, DRV_NAME);
-err_out_free_oob:
+	unregister_blkdev(host->major, host->name);
+err_out_free_majors:
+	if (host->major == 160)
+		clear_bit(0, &carm_major_alloc);
+	else if (host->major == 161)
+		clear_bit(1, &carm_major_alloc);
 	blk_cleanup_queue(host->oob_q);
 err_out_pci_free:
 	pci_free_consistent(pdev, CARM_SHM_SIZE, host->shm, host->shm_dma);
@@ -1720,13 +1743,18 @@ static void carm_remove_one (struct pci_dev *pdev)
 	free_irq(pdev->irq, host);
 	carm_free_disks(host);
 	devfs_remove(DRV_NAME);
-	unregister_blkdev(host->major, DRV_NAME);
+	unregister_blkdev(host->major, host->name);
+	if (host->major == 160)
+		clear_bit(0, &carm_major_alloc);
+	else if (host->major == 161)
+		clear_bit(1, &carm_major_alloc);
 	blk_cleanup_queue(host->oob_q);
 	pci_free_consistent(pdev, CARM_SHM_SIZE, host->shm, host->shm_dma);
 	iounmap(host->mmio);
 	kfree(host);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
+	pci_set_drvdata(pdev, NULL);
 }
 
 static int __init carm_init(void)

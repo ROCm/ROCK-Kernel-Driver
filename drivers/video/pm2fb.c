@@ -434,14 +434,14 @@ static void reset_config(struct pm2fb_par* p)
 	pm2_RDAC_WR(p, PM2I_RD_BLUE_KEY, 0);
 }
 
-static void set_aperture(struct pm2fb_par* p)
+static void set_aperture(struct pm2fb_par* p, u32 depth)
 {
 	WAIT_FIFO(p, 4);
 #ifdef __LITTLE_ENDIAN
 	pm2_WR(p, PM2R_APERTURE_ONE, 0);
 	pm2_WR(p, PM2R_APERTURE_TWO, 0);
 #else
-	switch (p->depth) {
+	switch (depth) {
 	case 8:
 	case 24:
 		pm2_WR(p, PM2R_APERTURE_ONE, 0);
@@ -744,7 +744,7 @@ static int pm2fb_set_par(struct fb_info *info)
 		pm2_WR(par, PM2VR_RD_INDEX_HIGH, 0);
 	}
     
-	set_aperture(par);
+	set_aperture(par, depth);
     
 	DEFRW();
 	WAIT_FIFO(par, 19);
