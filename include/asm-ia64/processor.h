@@ -346,7 +346,8 @@ struct task_struct;
 	.cache_hot_time		= (10*1000000),		\
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC	\
+	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_EXEC	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 10,			\

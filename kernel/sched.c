@@ -297,12 +297,13 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
 #ifdef CONFIG_SMP
 #define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
 
-#define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
-#define SD_BALANCE_EXEC		2	/* Balance on exec */
-#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
+#define SD_LOAD_BALANCE		1	/* Do load balancing on this domain. */
+#define SD_BALANCE_NEWIDLE	2	/* Balance when about to become idle */
+#define SD_BALANCE_EXEC		4	/* Balance on exec */
+#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -2291,8 +2292,12 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 	this_rq->cpu_load = (old_load + this_load) / 2;
 
 	for_each_domain(this_cpu, sd) {
-		unsigned long interval = sd->balance_interval;
+		unsigned long interval;
 
+		if (!(sd->flags & SD_LOAD_BALANCE))
+			continue;
+
+		interval = sd->balance_interval;
 		if (idle != IDLE)
 			interval *= sd->busy_factor;
 
@@ -4337,16 +4342,8 @@ static int __devinit cpu_to_node_group(int cpu)
 }
 #endif
 
-/* Groups for isolated scheduling domains */
-static struct sched_group sched_group_isolated[NR_CPUS];
-
 /* cpus with isolated domains */
-cpumask_t __devinitdata cpu_isolated_map = CPU_MASK_NONE;
-
-static int __devinit cpu_to_isolated_group(int cpu)
-{
-	return cpu;
-}
+static cpumask_t __devinitdata cpu_isolated_map = CPU_MASK_NONE;
 
 /* Setup the mask of cpus configured for isolated domains */
 static int __init isolated_cpu_setup(char *str)
@@ -4414,9 +4411,6 @@ static void __devinit arch_init_sched_domains(void)
 {
 	int i;
 	cpumask_t cpu_default_map;
-	cpumask_t cpu_isolated_online_map;
-
-	cpus_and(cpu_isolated_online_map, cpu_isolated_map, cpu_online_map);
 
 	/*
 	 * Setup mask for cpus without special case scheduling requirements.
@@ -4426,35 +4420,15 @@ static void __devinit arch_init_sched_domains(void)
 	cpus_complement(cpu_default_map, cpu_isolated_map);
 	cpus_and(cpu_default_map, cpu_default_map, cpu_online_map);
 
-	/* Set up domains */
-	for_each_online_cpu(i) {
+	/*
+	 * Set up domains. Isolated domains just stay on the dummy domain.
+	 */
+	for_each_cpu_mask(i, cpu_default_map) {
 		int group;
 		struct sched_domain *sd = NULL, *p;
 		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
 
 		cpus_and(nodemask, nodemask, cpu_default_map);
-
-		/*
-		 * Set up isolated domains.
-		 * Unlike those of other cpus, the domains and groups are
-		 * single level, and span a single cpu.
-		 */
-		if (cpu_isset(i, cpu_isolated_online_map)) {
-#ifdef CONFIG_SCHED_SMT
-			sd = &per_cpu(cpu_domains, i);
-#else
-			sd = &per_cpu(phys_domains, i);
-#endif
-			group = cpu_to_isolated_group(i);
-			*sd = SD_CPU_INIT;
-			cpu_set(i, sd->span);
-			sd->balance_interval = INT_MAX;	/* Don't balance */
-			sd->flags = 0;			/* Avoid WAKE_ */
-			sd->groups = &sched_group_isolated[group];
-			printk(KERN_INFO "Setting up cpu %d isolated.\n", i);
-			/* Single level, so continue with next cpu */
-			continue;
-		}
 
 #ifdef CONFIG_NUMA
 		sd = &per_cpu(node_domains, i);
@@ -4498,13 +4472,6 @@ static void __devinit arch_init_sched_domains(void)
 						&cpu_to_cpu_group);
 	}
 #endif
-
-	/* Set up isolated groups */
-	for_each_cpu_mask(i, cpu_isolated_online_map) {
-		cpumask_t mask = cpumask_of_cpu(i);
-		init_sched_build_groups(sched_group_isolated, mask,
-						&cpu_to_isolated_group);
-	}
 
 	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
@@ -4647,9 +4614,12 @@ void sched_domain_debug(void)
 #endif
 
 #ifdef CONFIG_SMP
-/* Initial dummy domain for early boot and for hotplug cpu */
-static __devinitdata struct sched_domain sched_domain_dummy;
-static __devinitdata struct sched_group sched_group_dummy;
+/*
+ * Initial dummy domain for early boot and for hotplug cpu. Being static,
+ * it is initialized to zero, so all balancing flags are cleared which is
+ * what we want.
+ */
+static struct sched_domain sched_domain_dummy;
 #endif
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -4720,22 +4690,6 @@ void __init sched_init(void)
 {
 	runqueue_t *rq;
 	int i, j, k;
-
-#ifdef CONFIG_SMP
-	/* Set up an initial dummy domain for early boot */
-
-	memset(&sched_domain_dummy, 0, sizeof(struct sched_domain));
-	sched_domain_dummy.span = CPU_MASK_ALL;
-	sched_domain_dummy.groups = &sched_group_dummy;
-	sched_domain_dummy.last_balance = jiffies;
-	sched_domain_dummy.balance_interval = INT_MAX; /* Don't balance */
-	sched_domain_dummy.busy_factor = 1;
-
-	memset(&sched_group_dummy, 0, sizeof(struct sched_group));
-	sched_group_dummy.cpumask = CPU_MASK_ALL;
-	sched_group_dummy.next = &sched_group_dummy;
-	sched_group_dummy.cpu_power = SCHED_LOAD_SCALE;
-#endif
 
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
