@@ -2160,9 +2160,7 @@ pfm_alloc_fd(struct file **cfile)
 
 	DPRINT(("new inode ino=%ld @%p\n", inode->i_ino, inode));
 
-	inode->i_sb   = pfmfs_mnt->mnt_sb;
 	inode->i_mode = S_IFCHR|S_IRUGO;
-	inode->i_sock = 0;
 	inode->i_uid  = current->fsuid;
 	inode->i_gid  = current->fsgid;
 
