@@ -498,6 +498,8 @@ pcibios_init(void)
 
 }
 
+subsys_initcall(pcibios_init);
+
 int __init
 pcibios_assign_all_busses(void)
 {

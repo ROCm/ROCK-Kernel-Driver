@@ -117,7 +117,6 @@ void show_regs(struct pt_regs * regs)
 	       regs->msr&MSR_DR ? 1 : 0);
 	printk("TASK = %p[%d] '%s' ",
 	       current, current->pid, current->comm);
-	printk("Last syscall: %ld ", current->thread.last_syscall);
 	printk("\nlast math %p ", last_task_used_math);
 	
 #ifdef CONFIG_SMP
@@ -222,8 +221,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	}
 	memcpy(&p->thread.fpr, &current->thread.fpr, sizeof(p->thread.fpr));
 	p->thread.fpscr = current->thread.fpscr;
-
-	p->thread.last_syscall = -1;
 
 	return 0;
 }

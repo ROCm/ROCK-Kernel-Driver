@@ -38,16 +38,11 @@
 
 #include <asm/ppcdebug.h>
 
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-extern void (*debugger)(struct pt_regs *);
-extern void (*debugger_fault_handler)(struct pt_regs *);
-extern int (*debugger_dabr_match)(struct pt_regs *);
+#ifdef CONFIG_DEBUG_KERNEL
 int debugger_kernel_faults = 1;
 #endif
 
-extern void die_if_kernel(char *, struct pt_regs *, long);
-void bad_page_fault(struct pt_regs *, unsigned long);
-void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
+void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /*
  * For 600- and 800-family processors, the error_code parameter is DSISR
@@ -71,7 +66,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	if (regs->trap == 0x400)
 		error_code &= 0x48200000;
 
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler && (regs->trap == 0x300 ||
 				regs->trap == 0x380)) {
 		debugger_fault_handler(regs);
@@ -83,10 +78,10 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 		if (debugger_dabr_match(regs))
 			return;
 	}
-#endif /* CONFIG_XMON || CONFIG_KGDB */
+#endif
 
 	if (in_interrupt() || mm == NULL) {
-		bad_page_fault(regs, address);
+		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}
 	down_read(&mm->mmap_sem);
@@ -104,7 +99,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 
 good_area:
 	code = SEGV_ACCERR;
-	
+
 	/* a write */
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
@@ -124,18 +119,18 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-        switch (handle_mm_fault(mm, vma, address, is_write)) {
+	switch (handle_mm_fault(mm, vma, address, is_write)) {
 
-        case 1:
-                current->min_flt++;
-                break;
-        case 2:
-                current->maj_flt++;
-                break;
-        case 0:
-                goto do_sigbus;
-        default:
-                goto out_of_memory;
+	case 1:
+		current->min_flt++;
+		break;
+	case 2:
+		current->maj_flt++;
+		break;
+	case 0:
+		goto do_sigbus;
+	default:
+		goto out_of_memory;
 	}
 
 	up_read(&mm->mmap_sem);
@@ -143,7 +138,7 @@ good_area:
 
 bad_area:
 	up_read(&mm->mmap_sem);
-	
+
 	/* User mode accesses cause a SIGSEGV */
 	if (user_mode(regs)) {
 		info.si_signo = SIGSEGV;
@@ -151,15 +146,15 @@ bad_area:
 		info.si_code = code;
 		info.si_addr = (void *) address;
 #ifdef CONFIG_XMON
-	        ifppcdebug(PPCDBG_SIGNALXMON)
-        	    PPCDBG_ENTER_DEBUGGER_REGS(regs);
+		ifppcdebug(PPCDBG_SIGNALXMON)
+			PPCDBG_ENTER_DEBUGGER_REGS(regs);
 #endif
 
 		force_sig_info(SIGSEGV, &info, current);
 		return;
 	}
 
-	bad_page_fault(regs, address);
+	bad_page_fault(regs, address, SIGSEGV);
 	return;
 
 /*
@@ -176,7 +171,7 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	bad_page_fault(regs, address);
+	bad_page_fault(regs, address, SIGKILL);
 	return;
 
 do_sigbus:
@@ -187,7 +182,7 @@ do_sigbus:
 	info.si_addr = (void *)address;
 	force_sig_info (SIGBUS, &info, current);
 	if (!user_mode(regs))
-		bad_page_fault(regs, address);
+		bad_page_fault(regs, address, SIGBUS);
 }
 
 /*
@@ -196,8 +191,10 @@ do_sigbus:
  * in traps.c.
  */
 void
-bad_page_fault(struct pt_regs *regs, unsigned long address)
+bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
+	extern void die(const char *, struct pt_regs *, long);
+
 	unsigned long fixup;
 
 	/* Are we prepared to handle this fault?  */
@@ -207,13 +204,9 @@ bad_page_fault(struct pt_regs *regs, unsigned long address)
 	}
 
 	/* kernel has accessed a bad area */
-	show_regs(regs);
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_kernel_faults)
 		debugger(regs);
 #endif
-	print_backtrace( (unsigned long *)regs->gpr[1] );
-	panic("kernel access of bad area pc %lx lr %lx address %lX tsk %s/%d",
-	      regs->nip,regs->link,address,current->comm,current->pid);
+	die("Kernel access of bad area", regs, sig);
 }
-
