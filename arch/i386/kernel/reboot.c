@@ -206,7 +206,7 @@ void machine_real_restart(unsigned char *code, int length)
 	/*
 	 * Use `swapper_pg_dir' as our page directory.
 	 */
-	asm volatile("movl %0,%%cr3": :"r" (__pa(swapper_pg_dir)));
+	load_cr3(swapper_pg_dir);
 
 	/* Write 0x1234 to absolute memory location 0x472.  The BIOS reads
 	   this on booting to tell it to "Bypass memory test (also warm
