@@ -391,32 +391,6 @@ CONFIG_USB_MDC800
   The module will be called mdc800.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_USB_STORAGE
-  Say Y here if you want to connect USB mass storage devices to your
-  computer's USB port.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-storage.o. If you want to compile it
-  as a module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE_DEBUG
-  Say Y here in order to have the USB Mass Storage code generate
-  verbose debugging messages.
-
-CONFIG_USB_STORAGE_ISD200
-  Say Y here if you want to use USB Mass Store devices based
-  on the In-Systems Design ISD-200 USB/ATA bridge.
-
-  Some of the products that use this chip are:
-
-    - Archos Jukebox 6000
-    - ISD SmartCable for Storage
-    - Taiwan Skymaster CD530U/DEL-0241 IDE bridge
-    - Sony CRX10U CD-R/RW drive
-    - CyQ've CQ8060A CDRW drive
-    - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
-
 CONFIG_USB_USS720
   This driver is for USB parallel port adapters that use the Lucent
   Technologies USS-720 chip. These cables are plugged into your USB
@@ -521,19 +495,6 @@ CONFIG_USB_USBNET
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbnet.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE_FREECOM
-  Support for the Freecom USB to IDE/ATAPI adaptor.
-  Freecom has a web page at <http://www.freecom.de/>.
-
-CONFIG_USB_STORAGE_DPCM
-  Say Y here to support the Microtech ZiO! CompactFlash/SmartMedia
-  reader, details at <http://www.microtechint.com/zio/index.html>.
-  This driver treats the flash card as a removable storage device.
-
-CONFIG_USB_STORAGE_SDDR09
-  Say Y here to include additional code to support the Sandisk SDDR-09
-  SmartMedia reader in the USB Mass Storage driver.
 
 CONFIG_USB_RIO500
   Say Y here if you want to connect a USB Rio500 mp3 player to your
