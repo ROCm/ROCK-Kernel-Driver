@@ -452,8 +452,6 @@ static int __init init_tcic(void)
 	sockets++;
     }
 
-    platform_device_register(&tcic_device);
-
     switch (socket_table[0].id) {
     case TCIC_ID_DB86082:
 	printk("DB86082"); break;
@@ -526,6 +524,8 @@ static int __init init_tcic(void)
 
     tcic_data.nsock = sockets;
     tcic_device.dev.class_data = &tcic_data;
+
+    platform_device_register(&tcic_device);
 
     return 0;
     
