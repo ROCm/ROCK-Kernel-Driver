@@ -6,7 +6,7 @@ menu "ACPI (Advanced Configuration and Power Interface) Support"
 
 config ACPI_HT
 	bool "ACPI Processor Enumeration for HT"
-	depends on (X86 && X86_LOCAL_APIC)
+	depends on MPENTIUM4
 	default y
 	---help---
 	  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
@@ -30,7 +30,7 @@ config ACPI
 	bool "Full ACPI Support"
 	depends on !X86_VISWS
 	depends on !IA64_HP_SIM
-	depends on IA64 || (X86 && ACPI_HT)
+	depends on IA64 || (X86 || ACPI_HT)
 	default y
 	---help---
 	  Advanced Configuration and Power Interface (ACPI) support for 
