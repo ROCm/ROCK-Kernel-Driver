@@ -464,7 +464,7 @@ static void velocity_init_cam_filter(struct velocity_info *vptr)
 {
 	struct mac_regs * regs = vptr->mac_regs;
 
-	/* T urn on MCFG_PQEN, turn off MCFG_RTGOPT */
+	/* Turn on MCFG_PQEN, turn off MCFG_RTGOPT */
 	WORD_REG_BITS_SET(MCFG_PQEN, MCFG_RTGOPT, &regs->MCFG);
 	WORD_REG_BITS_ON(MCFG_VIDFR, &regs->MCFG);
 
@@ -587,7 +587,7 @@ static void velocity_init_registers(struct velocity_info *vptr,
 
 		writeb(WOLCFG_SAM | WOLCFG_SAB, &regs->WOLCFGSet);
 		/*
-		 *	Bback off algorithm use original IEEE standard
+		 *	Back off algorithm use original IEEE standard
 		 */
 		BYTE_REG_BITS_SET(CFGB_OFSET, (CFGB_CRANDOM | CFGB_CAP | CFGB_MBA | CFGB_BAKOPT), &regs->CFGB);
 
@@ -1091,7 +1091,7 @@ out:
 }
 
 /**
- *	velocity_free_rd_ring	-	set up receive ring
+ *	velocity_free_rd_ring	-	free receive ring
  *	@vptr: velocity to clean up
  *
  *	Free the receive buffers for each ring slot and any

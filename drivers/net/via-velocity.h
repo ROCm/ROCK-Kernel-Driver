@@ -1319,7 +1319,7 @@ static inline void mac_set_cam_mask(struct mac_regs * regs, u8 * mask, enum velo
 	/* disable CAMEN */
 	writeb(0, &regs->CAMADDR);
 
-	/* Select CAM mask */
+	/* Select mar */
 	BYTE_REG_BITS_SET(CAMCR_PS_MAR, CAMCR_PS1 | CAMCR_PS0, &regs->CAMCR);
 }
 
@@ -1360,7 +1360,7 @@ static inline void mac_set_cam(struct mac_regs * regs, int idx, u8 *addr, enum v
 
 	writeb(0, &regs->CAMADDR);
 
-	/* Select CAM mask */
+	/* Select mar */
 	BYTE_REG_BITS_SET(CAMCR_PS_MAR, CAMCR_PS1 | CAMCR_PS0, &regs->CAMCR);
 }
 
@@ -1401,7 +1401,7 @@ static inline void mac_get_cam(struct mac_regs * regs, int idx, u8 *addr, enum v
 
 	writeb(0, &regs->CAMADDR);
 
-	/* Select CAM mask */
+	/* Select mar */
 	BYTE_REG_BITS_SET(CAMCR_PS_MAR, CAMCR_PS1 | CAMCR_PS0, &regs->CAMCR);
 }
 
