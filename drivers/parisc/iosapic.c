@@ -169,11 +169,13 @@
 
 #include <asm/byteorder.h>	/* get in-line asm for swab */
 #include <asm/pdc.h>
-#include <asm/pdcpat.h>
 #include <asm/page.h>
 #include <asm/segment.h>
 #include <asm/system.h>
-#include <asm/gsc.h>		/* gsc_read/write functions */
+#include <asm/io.h>		/* gsc_read/write functions */
+#ifdef CONFIG_SUPERIO
+#include <asm/superio.h>
+#endif
 
 #include <asm/iosapic.h>
 #include "./iosapic_private.h"
@@ -181,7 +183,6 @@
 #define MODULE_NAME "iosapic"
 
 /* "local" compile flags */
-#undef IOSAPIC_CALLBACK
 #undef PCI_BRIDGE_FUNCS
 #undef DEBUG_IOSAPIC
 #undef DEBUG_IOSAPIC_IRT
@@ -210,6 +211,7 @@ assert_failed (char *a, char *f, int l)
 #else /* DEBUG_IOSAPIC */
 
 #define DBG(x...)
+#undef	ASSERT
 #define ASSERT(EX)
 
 #endif /* DEBUG_IOSAPIC */
@@ -282,28 +284,6 @@ assert_failed (char *a, char *f, int l)
 
 #define	IOSAPIC_EOI(eoi_addr, eoi_data) gsc_writel(eoi_data, eoi_addr)
 
-#if IOSAPIC_CALLBACK
-/*
-** Shouldn't use callback since SAPIC doesn't have an officially assigned
-** H or S version numbers. Slight long term risk the number chosen would
-** collide with something else.
-** But benefit is cleaner lba/sapic interface.
-** Might be worth it but for just use direct calls for now.
-**
-** Entry below is copied from lba driver.
-** Only thing different is hw_type.
-*/
-static struct pa_iodc_driver iosapic_driver_for[] = {
-	{HPHW_OTHER, 0x782, 0, 0x0000A, 0, 0x00,
-	DRIVER_CHECK_HWTYPE + DRIVER_CHECK_HVERSION + DRIVER_CHECK_SVERSION,
-	"I/O Sapic", "",(void *) iosapic_callback},     
-	{0,0,0,0,0,0,
-	0,
-	(char *) NULL,(char *) NULL,(void *) NULL}                     
-};
-#endif /* IOSAPIO_CALLBACK */
-
-
 static struct iosapic_info *iosapic_list;
 static spinlock_t iosapic_lock;
 static int iosapic_count;
@@ -350,25 +330,22 @@ static size_t irt_num_entry;
 static int __init /* return number of entries as success/fail flag */
 iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 {
-	struct pdc_pat_io_num pdc_io_num; /* PAT PDC return block */
 	long status;              /* PDC return value status */
-	struct irt_entry *table = NULL;  /* start of interrupt routing tbl */
+	struct irt_entry *table;  /* start of interrupt routing tbl */
 	unsigned long num_entries = 0UL;
 
 	ASSERT(NULL != irt);
-	/* FIXME ASSERT(((&pdc_io_num) & (0x3f)) == 0);  enforce 32-byte alignment */
 
-	/* Try PAT_PDC to get interrupt routing table size */
-	DBG(KERN_DEBUG "calling get_irt_size\n");
-	status = pdc_pat_get_irt_size( &pdc_io_num, cell_num);
-	DBG(KERN_DEBUG "get_irt_size: %ld\n", status);
+	if (is_pdc_pat()) {
 
-	switch(status) {
+		/* Use pat pdc routine to get interrupt routing table size */
+		DBG("calling get_irt_size (cell %ld)\n", cell_num);
+		status = pdc_pat_get_irt_size(&num_entries, cell_num);
+		DBG("get_irt_size: %ld\n", status);
 
-	case PDC_RET_OK:	/* PAT box. Proceed to get the IRT */
+		ASSERT(status == PDC_OK);
 
 		/* save the number of entries in the table */
-		num_entries = pdc_io_num.num;
 		ASSERT(0UL != num_entries);
 
 		/*
@@ -384,30 +361,27 @@ iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 		}
 
 		/* get PCI INT routing table */
-		status = pdc_pat_get_irt( (void *) table, cell_num);
-		DBG(KERN_DEBUG "pdc_pat_get_irt: %ld\n", status);
-		ASSERT(status == PDC_RET_OK);
-		break;
-
-	case PDC_RET_NE_PROC: /* Not a PAT platform. Try PDC_PCI extensions */
+		status = pdc_pat_get_irt(table, cell_num);
+		DBG("pdc_pat_get_irt: %ld\n", status);
+		ASSERT(status == PDC_OK);
+	} else {
 		/*
-		** C3000/J5000 (and similar) platforms with "legacy" PDC
-		** will return exactly one IRT.
+		** C3000/J5000 (and similar) platforms with Sprockets PDC
+		** will return exactly one IRT for all iosapics.
 		** So if we have one, don't need to get it again.
 		*/
 		if (NULL != irt_cell)
-			break;
+			return 0;
 
-		status = pdc_pci_irt_size( (void *)&pdc_io_num,
-				/* elroy HPA (really a NOP) */ 0);
-		DBG(KERN_WARNING "pdc_pci_irt_size: %ld\n", status);
+		/* Should be using the Elroy's HPA, but it's ignored anyway */
+		status = pdc_pci_irt_size(&num_entries, 0);
+		DBG("pdc_pci_irt_size: %ld\n", status);
 
-		if (PDC_RET_OK != status) {
+		if (PDC_OK != status) {
 			/* Not a "legacy" system with I/O SAPIC either */
 			return 0;
 		}
 
-		num_entries = pdc_io_num.num;
 		ASSERT(0UL != num_entries);
 
 		table = IOSAPIC_KALLOC(struct irt_entry, num_entries);
@@ -416,36 +390,27 @@ iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 			return 0;
 		}
 
-		status = pdc_pci_irt( (void *) &pdc_io_num,
-				(void *) NULL, /* Elroy HPA - not used */
-				(void *) table);
-
-		ASSERT(PDC_RET_OK == status);
-		break;
-
-	default:
-		printk(KERN_WARNING MODULE_NAME ": PDC_PAT_IO call failed with %ld\n", status);
-		break;
+		/* HPA ignored by this call too. */
+		status = pdc_pci_irt(num_entries, 0, table);
+		ASSERT(PDC_OK == status);
 	}
 
 	/* return interrupt table address */
 	*irt = table;
 
-
 #ifdef DEBUG_IOSAPIC_IRT
-	{
+{
 	struct irt_entry *p = table;
 	int i;
 
-	printk(MODULE_NAME " Interrupt Routing Table (cell %ld)\n", cell_num);
-	printk(MODULE_NAME " start = 0x%p num_entries %ld entry_size %d\n",
+	printk(KERN_DEBUG MODULE_NAME " Interrupt Routing Table (cell %ld)\n", cell_num);
+	printk(KERN_DEBUG MODULE_NAME " start = 0x%p num_entries %ld entry_size %d\n",
 		table,
 		num_entries,
 		(int) sizeof(struct irt_entry));
 
-	for (i = 0 ; i < num_entries ; i++, p++)
-	{
-		printk(MODULE_NAME " %02x %02x %02x %02x %02x %02x %02x %02x %08x%08x\n",
+	for (i = 0 ; i < num_entries ; i++, p++) {
+		printk(KERN_DEBUG MODULE_NAME " %02x %02x %02x %02x %02x %02x %02x %02x %08x%08x\n",
 		p->entry_type, p->entry_length, p->interrupt_type,
 		p->polarity_trigger, p->src_bus_irq_devno, p->src_bus_id,
 		p->src_seg_id, p->dest_iosapic_intin,
@@ -453,7 +418,7 @@ iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 		((u32 *) p)[3]
 		);
 	}
-	}
+}
 #endif /* DEBUG_IOSAPIC_IRT */
 
 	return num_entries;
@@ -464,6 +429,8 @@ iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 void __init
 iosapic_init(void)
 {
+	unsigned long cell = 0;
+
 	/* init global data */
 	iosapic_lock = SPIN_LOCK_UNLOCKED;
         iosapic_list = (struct iosapic_info *) NULL;
@@ -471,22 +438,24 @@ iosapic_init(void)
 
 	DBG("iosapic_init()\n");
 
+#ifdef __LP64__
+	if (is_pdc_pat()) {
+		int status;
+		struct pdc_pat_cell_num cell_info;
+
+		status = pdc_pat_cell_get_number(&cell_info);
+		if (status == PDC_OK) {
+			cell = cell_info.cell_num;
+		}
+	}
+#endif
+
 	/*
 	**  get IRT for this cell.
 	*/
-	irt_num_entry =  iosapic_load_irt(0L, &irt_cell);
+	irt_num_entry =  iosapic_load_irt(cell, &irt_cell);
 	if (0 == irt_num_entry)
 		irt_cell = NULL;	/* old PDC w/o iosapic */
-
-#ifdef IOSAPIC_CALLBACK
-	/*
-	** When new I/O SAPICs are discovered, this callback
-	** will get invoked. Implies lba driver will register
-	** I/O Sapic as a device it "discovered" with faked
-	** IODC data.
-	*/
-	register_driver(iosapic_driver_for);
-#endif /* IOSAPIC_CALLBACK */
 }
 
 
@@ -546,7 +515,7 @@ irt_find_irqline(struct iosapic_info *isi, u8 slot, u8 intr_pin)
 		return i;
 	}
 
-	printk(KERN_WARNING MODULE_NAME ": 0x%p : no IRT entry for slot %d, pin %d\n",
+	printk(KERN_WARNING MODULE_NAME ": 0x%lx : no IRT entry for slot %d, pin %d\n",
 			isi->isi_hpa, slot, intr_pin);
 	return NULL;
 }
@@ -571,21 +540,18 @@ iosapic_xlate_pin(struct iosapic_info *isi, struct pci_dev *pcidev)
 {
 	u8 intr_pin, intr_slot;
 
-	(void) pci_read_config_byte(pcidev, PCI_INTERRUPT_PIN, &intr_pin);
+	pci_read_config_byte(pcidev, PCI_INTERRUPT_PIN, &intr_pin);
 
-	DBG_IRT("iosapic_xlate_pin() SLOT %d pin %d\n", PCI_SLOT(pcidev->devfn), intr_pin);
+	DBG_IRT("iosapic_xlate_pin() SLOT %d pin %d\n",
+		PCI_SLOT(pcidev->devfn), intr_pin);
 
-	if (0 == intr_pin)
-	{
-		/*
-		** The device does NOT support/use IRQ lines.
-		*/
+	if (0 == intr_pin) {
+		/* The device does NOT support/use IRQ lines.  */
 		return NULL;
 	}
 
 	/* Check if pcidev behind a PPB */
-	if (NULL != pcidev->bus->self)
-	{
+	if (NULL != pcidev->bus->self) {
 		/* Convert pcidev INTR_PIN into something we
 		** can lookup in the IRT.
 		*/
@@ -600,7 +566,7 @@ iosapic_xlate_pin(struct iosapic_info *isi, struct pci_dev *pcidev)
 		** or by some ambitous soul who wants to watch TV.
 		*/
 		if (pci_bridge_funcs->xlate_intr_line) {
-			intr_pin = (*pci_bridge_funcs->xlate_intr_line)(pcidev);
+			intr_pin = pci_bridge_funcs->xlate_intr_line(pcidev);
 		}
 #else	/* PCI_BRIDGE_FUNCS */
 		struct pci_bus *p = pcidev->bus;
@@ -646,8 +612,8 @@ iosapic_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	extern void do_irq(struct irqaction *a, int i, struct pt_regs *p);
 	int irq_num = vi->vi_ios->isi_region->data.irqbase + vi->vi_irqline;
 
-	DBG("iosapic_interrupt(): irq %d line %d eoi %p\n", irq, vi->vi_irqline,
-				vi->vi_eoi_addr);
+	DBG("iosapic_interrupt(): irq %d line %d eoi %p\n",
+		irq, vi->vi_irqline, vi->vi_eoi_addr);
 
 /* FIXME: Need to mask/unmask? processor IRQ is already masked... */
 	do_irq(&vi->vi_ios->isi_region->action[vi->vi_irqline], irq_num, regs);
@@ -668,11 +634,38 @@ iosapic_fixup_irq(void *isi_obj, struct pci_dev *pcidev)
 	struct vector_info *vi;
 	int isi_line;	/* line used by device */
 	int tmp;
+	int return_irq;
+#ifdef CONFIG_SUPERIO
+	int superio_irq = -1;
+#endif
 
 	if (NULL == isi) {
-		printk(KERN_WARNING MODULE_NAME ": 0x%p hpa not registered\n", isi->isi_hpa);
+		printk(KERN_WARNING MODULE_NAME ": hpa not registered for %s\n",
+			pcidev->name);
 		return(-1);
 	}
+
+#ifdef CONFIG_SUPERIO
+	if (is_superio_device(pcidev)) {
+		superio_irq = superio_fixup_irq(pcidev);
+		if (superio_irq == -1)
+		    return(-1);
+
+		if (PCI_FUNC(pcidev->devfn) != SUPERIO_USB_FN) {
+
+			/*
+			 * SuperIO USB controller has an irt entry.
+			 * Only let the USB controller hookup the rest
+			 * of the interrupt routing when it comes through.
+			 * Note that interrupts for all three functions
+			 * actually come through the PIC's on function 1!
+			 */
+
+			pcidev->irq = superio_irq;
+			return superio_irq;
+		}
+	}
+#endif /* CONFIG_SUPERIO */
 
 	/* lookup IRT entry for isi/slot/pin set */
 	irte = iosapic_xlate_pin(isi, pcidev);
@@ -714,22 +707,31 @@ iosapic_fixup_irq(void *isi_obj, struct pci_dev *pcidev)
 	vi->vi_txn_data = txn_alloc_data(vi->vi_txn_irq, 8);
         ASSERT(vi->vi_txn_data < 256);  /* matches 8 above */
 
-	tmp = request_irq(vi->vi_txn_irq, iosapic_interrupt, 0, "iosapic", vi);
+	tmp = request_irq(vi->vi_txn_irq, iosapic_interrupt, 0,
+						vi->vi_name, vi);
 	ASSERT(tmp == 0);
 
-	vi->vi_eoi_addr = ((void *) isi->isi_hpa) + IOSAPIC_REG_EOI;
+	vi->vi_eoi_addr = (u32 *) (isi->isi_hpa + IOSAPIC_REG_EOI);
 	vi->vi_eoi_data = cpu_to_le32(vi->vi_irqline);
 
 	ASSERT(NULL != isi->isi_region);
-	/*
-	** pcidev->irq still needs to be virtualized.
-	*/
-	pcidev->irq = isi->isi_region->data.irqbase + isi_line;
+	/* pcidev->irq still needs to be virtualized.  */
 
-	DBG_IRT("iosapic_fixup_irq() %d:%d %x %x line %d irq %d\n", PCI_SLOT(pcidev->devfn),
-	PCI_FUNC(pcidev->devfn), pcidev->vendor, pcidev->device, isi_line, pcidev->irq);
+	return_irq = isi->isi_region->data.irqbase + isi_line;
 
-	return(pcidev->irq);
+#ifdef CONFIG_SUPERIO
+	if (superio_irq != -1) {
+		superio_inform_irq(return_irq);
+		return_irq = superio_irq;
+	}
+#endif
+	pcidev->irq = return_irq;
+
+	DBG_IRT("iosapic_fixup_irq() %d:%d %x %x line %d irq %d\n",
+		PCI_SLOT(pcidev->devfn),
+	PCI_FUNC(pcidev->devfn), pcidev->vendor, pcidev->device, isi_line, return_irq);
+
+	return return_irq;
 }
 
 
@@ -755,7 +757,7 @@ iosapic_wr_irt_entry(struct vector_info *vi, u32 dp0, u32 dp1)
 	struct iosapic_info *isp = vi->vi_ios;
 
 	ASSERT(NULL != isp);
-	ASSERT(NULL != isp->isi_hpa);
+	ASSERT(0 != isp->isi_hpa);
 	DBG_IRT("iosapic_wr_irt_entry(): irq %d hpa %p WINDOW %p  0x%x 0x%x\n",
 		vi->vi_irqline,
 		isp->isi_hpa, isp->isi_hpa+IOSAPIC_REG_WINDOW,
@@ -807,16 +809,13 @@ iosapic_set_irt_data( struct vector_info *vi, u32 *dp0, u32 *dp1)
 	** Extracting id_eid isn't a real clean way of getting it.
 	** But the encoding is the same for both PA and IA64 platforms.
 	*/
-#ifdef __LP64__
-	if (pdc_pat) {
+	if (is_pdc_pat()) {
 		/*
 		** PAT PDC just hands it to us "right".
 		** vi_txn_addr comes from cpu_data[x].txn_addr.
 		*/
 		*dp1 = (u32) (vi->vi_txn_addr);
-	} else
-#endif
-	{
+	} else {
 		/* 
 		** eg if base_addr == 0xfffa0000),
 		**    we want to get 0xa0ff0000.
@@ -886,7 +885,6 @@ iosapic_enable_irq(void *dev, int irq)
 
 	/* data is initialized by fixup_irq */
 	ASSERT(0 < vi->vi_txn_irq);
-	ASSERT(0UL != vi->vi_txn_addr);
 	ASSERT(0UL != vi->vi_txn_data);
 
 	iosapic_set_irt_data(vi, &d0, &d1);
@@ -895,10 +893,10 @@ iosapic_enable_irq(void *dev, int irq)
 
 #ifdef DEBUG_IOSAPIC_IRT
 {
-u32 *t = (u32 *) ((ulong) vi->vi_eoi_addr & ~0xffUL);
-printk("iosapic_enable_irq(): regs %p", vi->vi_eoi_addr);
-while (t < vi->vi_eoi_addr) printk(" %x", READ_U32(t++));
-printk("\n");
+	u32 *t = (u32 *) ((ulong) vi->vi_eoi_addr & ~0xffUL);
+	printk("iosapic_enable_irq(): regs %p", vi->vi_eoi_addr);
+	while (t < vi->vi_eoi_addr) printk(" %x", READ_U32(t++));
+	printk("\n");
 }
 
 printk("iosapic_enable_irq(): sel ");
@@ -943,10 +941,10 @@ iosapic_unmask_irq(void *dev, int irq)
 
 
 static struct irq_region_ops iosapic_irq_ops = {
-	iosapic_disable_irq,
-	iosapic_enable_irq,
-	iosapic_mask_irq,
-	iosapic_unmask_irq
+	disable_irq:	iosapic_disable_irq,
+	enable_irq:	iosapic_enable_irq,
+	mask_irq:	iosapic_mask_irq,
+	unmask_irq:	iosapic_unmask_irq
 };
 
 
@@ -967,15 +965,9 @@ iosapic_rd_version(struct iosapic_info *isi)
 }
 
 
-#ifndef IOSAPIC_CALLBACK
-/*
-** iosapic_register() is the alternative to iosapic_driver_for().
-** (Only one or the other should be implemented.)
-*/
-
 /*
 ** iosapic_register() is called by "drivers" with an integrated I/O SAPIC.
-** Caller must be certain they have an I/O SAPIC and know it's MMIO address.
+** Caller must be certain they have an I/O SAPIC and know its MMIO address.
 **
 **	o allocate iosapic_info and add it to the list
 **	o read iosapic version and squirrel that away
@@ -984,7 +976,7 @@ iosapic_rd_version(struct iosapic_info *isi)
 **	o allocate isi_region (registers region handlers)
 */
 void *
-iosapic_register(void *hpa)
+iosapic_register(unsigned long hpa)
 {
 	struct iosapic_info *isi = NULL;
 	struct irt_entry *irte = irt_cell;
@@ -1021,7 +1013,7 @@ iosapic_register(void *hpa)
 
 	memset(isi, 0, sizeof(struct iosapic_info));
 
-	isi->isi_hpa         = (unsigned char *) hpa;
+	isi->isi_hpa         = hpa;
 	isi->isi_version     = iosapic_rd_version(isi);
 	isi->isi_num_vectors = IOSAPIC_IRDT_MAX_ENTRY(isi->isi_version) + 1;
 
@@ -1034,6 +1026,7 @@ iosapic_register(void *hpa)
 	}
 
 	memset(vip, 0, sizeof(struct vector_info) * isi->isi_num_vectors);
+	sprintf(isi->isi_name, "IO-SAPIC%02d", iosapic_count++);
 
 	/*
 	** Initialize vector array
@@ -1041,17 +1034,16 @@ iosapic_register(void *hpa)
 	for (cnt=0; cnt < isi->isi_num_vectors; cnt++, vip++) {
 		vip->vi_irqline = (unsigned char) cnt;
 		vip->vi_ios = isi;
+		sprintf(vip->vi_name, "%s-L%d", isi->isi_name, cnt);
 	}
 
 	isi->isi_region = alloc_irq_region(isi->isi_num_vectors,
-				&iosapic_irq_ops, IRQ_REG_DIS|IRQ_REG_MASK,
-				"I/O Sapic", (void *) isi->isi_vector);
+				&iosapic_irq_ops, isi->isi_name,
+				(void *) isi->isi_vector);
 
 	ASSERT(NULL != isi->isi_region);
 	return ((void *) isi);
 }
-#endif /* !IOSAPIC_CALLBACK */
-
 
 
 #ifdef DEBUG_IOSAPIC
@@ -1092,8 +1084,8 @@ iosapic_prt_isi(struct iosapic_info *isi)
 {
 	ASSERT(NULL != isi);
 	printk(KERN_DEBUG MODULE_NAME ": io_sapic_info at %p\n", isi);
-	printk(KERN_DEBUG "\t\tisi_hpa: %p\n", isi->isi_hpa);
-	printk(KERN_DEBUG "\t\tisi_satus:     %x\n", isi->isi_status);
+	printk(KERN_DEBUG "\t\tisi_hpa:       %lx\n", isi->isi_hpa);
+	printk(KERN_DEBUG "\t\tisi_status:     %x\n", isi->isi_status);
 	printk(KERN_DEBUG "\t\tisi_version:   %x\n", isi->isi_version);
 	printk(KERN_DEBUG "\t\tisi_vector:    %p\n", isi->isi_vector);
 }

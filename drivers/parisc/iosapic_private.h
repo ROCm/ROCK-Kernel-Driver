@@ -111,22 +111,25 @@ struct vector_info {
 	struct irt_entry *vi_irte;      /* IRT entry */
 	u32	*vi_eoi_addr;	/* precalculate EOI reg address */
 	u32	vi_eoi_data;	/* IA64: ?       PA: swapped txn_data */
-	u8	vi_status;	/* status/flags */
-	u8	vi_irqline;	/* INTINn(IRQ) */
 	int	vi_txn_irq;	/* virtual IRQ number for processor */
 	ulong	vi_txn_addr;    /* IA64: id_eid  PA: partial HPA */
 	ulong	vi_txn_data;    /* IA64: vector  PA: EIR bit */
+	u8	vi_status;	/* status/flags */
+	u8	vi_irqline;	/* INTINn(IRQ) */
+	char	vi_name[32];    /* user visible identity */
 };
 
 
 struct iosapic_info {
 	struct iosapic_info  *isi_next;      /* list of I/O SAPIC          */
-	volatile void        *isi_hpa;       /* physical base address      */
+	unsigned long	     isi_hpa;	     /* physical base address */
 	struct irq_region    *isi_region;    /* each I/O SAPIC is one region */
 	struct vector_info   *isi_vector;    /* IRdT (IRQ line) array  */
 	int                  isi_num_vectors; /* size of IRdT array */
 	int                  isi_status;     /* status/flags               */
 	unsigned int         isi_version;    /* DEBUG: data fr version reg */
+	/* round up to next cacheline */
+	char                 isi_name[20]; /* identify region for users */
 };
 
 
