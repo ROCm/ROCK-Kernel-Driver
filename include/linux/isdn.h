@@ -14,9 +14,7 @@
 #define __ISDN_H__
 
 #include <linux/ioctl.h>
-
-// FIXME!!!
-#include <../drivers/isdn/i4l/isdn_fsm.h>
+#include <linux/isdn/fsm.h>
 
 #ifdef CONFIG_COBALT_MICRO_SERVER
 /* Save memory */

@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include "isdn_fsm.h"
+#include <linux/isdn/fsm.h>
 
 int
 fsm_new(struct fsm *fsm)
