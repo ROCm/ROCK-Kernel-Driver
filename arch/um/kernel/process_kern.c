@@ -318,8 +318,10 @@ void finish_fork_handler(int sig)
 {
 	current->thread.regs.regs.sc = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.switch_pipe[0]);
-	
+
+#ifdef CONFIG_SMP	
 	schedule_tail(NULL);
+#endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
 	force_flush_all();
