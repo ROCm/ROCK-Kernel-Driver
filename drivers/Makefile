@@ -51,3 +51,4 @@ obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
 obj-y				+= firmware/
 obj-$(CONFIG_CRASH_DUMP)	+= dump/
+obj-$(CONFIG_DPROBES)		+= dprobes/

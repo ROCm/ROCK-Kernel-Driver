@@ -22,6 +22,10 @@ obj-$(CONFIG_IKCONFIG) += configs.o
 obj-$(CONFIG_IKCONFIG_PROC) += configs.o
 obj-$(CONFIG_STOP_MACHINE) += stop_machine.o
 obj-$(CONFIG_EVLOG) += evlbuf.o evlapi.o evlposix.o
+obj-$(CONFIG_HOOK) += hook.o
+obj-$(CONFIG_TRIGEVENT_HOOKS) += trigevent_hooks.o
+obj-$(CONFIG_LTT) += ltt/
+obj-$(CONFIG_KPROBES) += kprobes.o
 
 ifneq ($(CONFIG_IA64),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is

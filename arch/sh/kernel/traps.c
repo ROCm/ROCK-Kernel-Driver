@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -67,7 +68,9 @@ asmlinkage void do_##name(unsigned long r4, unsigned long r5,		\
 	tsk->thread.error_code = error_code;				\
 	tsk->thread.trap_no = trapnr;					\
         CHK_REMOTE_DEBUG(&regs);					\
+	TRIG_EVENT(trap_entry_hook, trapnr, regs.pc); 			\
 	force_sig(signr, tsk);						\
+	TRIG_EVENT(trap_exit_hook); 					\	
 	die_if_no_fixup(str,&regs,error_code);				\
 }
 
@@ -500,6 +503,8 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 
 	asm volatile("stc       r2_bank,%0": "=r" (error_code));
 
+	TRIG_EVENT(trap_entry_hook, error_code >> 5, regs->pc);
+
 	oldfs = get_fs();
 
 	if (user_mode(regs)) {
@@ -523,8 +528,10 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 		tmp = handle_unaligned_access(instruction, regs);
 		set_fs(oldfs);
 
-		if (tmp==0)
-			return; /* sorted */
+		if (tmp==0) {
+			TRIG_EVENT(trap_exit_hook);
+ 			return; /* sorted */
+		}
 
 	uspace_segv:
 		printk(KERN_NOTICE "Killing process \"%s\" due to unaligned access\n", current->comm);
@@ -545,6 +552,7 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 		handle_unaligned_access(instruction, regs);
 		set_fs(oldfs);
 	}
+	TRIG_EVENT(trap_exit_hook);
 }
 
 #ifdef CONFIG_SH_DSP
@@ -710,5 +718,76 @@ void dump_stack(void)
 {
 	show_stack(NULL, NULL);
 }
+/* Trace related code */
+#if (CONFIG_TRACE)
+asmlinkage void trace_real_syscall_entry(struct pt_regs *regs)
+{
+	int use_depth;
+	int use_bounds;
+	int depth = 0;
+	int seek_depth;
+	unsigned long lower_bound;
+	unsigned long upper_bound;
+	unsigned long addr;
+	unsigned long *stack;
+	trace_syscall_entry trace_syscall_event;
+
+	/* Set the syscall ID */
+	trace_syscall_event.syscall_id = (uint8_t) regs->regs[REG_REG0 + 3];
+
+	/* Set the address in any case */
+	trace_syscall_event.address = regs->pc;
+
+	/* Are we in the kernel (This is a kernel thread)? */
+	if (!user_mode(regs))
+		/* Don't go digining anywhere */
+		goto trace_syscall_end;
+
+	/* Get the trace configuration */
+	if (ltt_get_trace_config(&use_depth,
+				 &use_bounds,
+				 &seek_depth,
+				 (void *) &lower_bound,
+				 (void *) &upper_bound) < 0)
+		goto trace_syscall_end;
+
+	/* Do we have to search for an eip address range */
+	if ((use_depth == 1) || (use_bounds == 1)) {
+		/* Start at the top of the stack (bottom address since stacks grow downward) */
+		stack = (unsigned long *) regs->regs[REG_REG15];
+
+		/* Keep on going until we reach the end of the process' stack limit (wherever it may be) */
+		while (!get_user(addr, stack)) {
+			/* Does this LOOK LIKE an address in the program */
+			/* TODO: does this work with shared libraries?? - Greg Banks */
+			if ((addr > current->mm->start_code) && (addr < current->mm->end_code)) {
+				/* Does this address fit the description */
+				if (((use_depth == 1) && (depth == seek_depth))
+				    || ((use_bounds == 1) && (addr > lower_bound)
+					&& (addr < upper_bound))) {
+					/* Set the address */
+					trace_syscall_event.address = addr;
+
+					/* We're done */
+					goto trace_syscall_end;
+				} else
+					/* We're one depth more */
+					depth++;
+			}
+			/* Go on to the next address */
+			stack++;
+		}
+	}
+trace_syscall_end:
+	/* Trace the event */
+	ltt_log_event(TRACE_EV_SYSCALL_ENTRY, &trace_syscall_event);
+}
+
+asmlinkage void trace_real_syscall_exit(void)
+{
+	ltt_log_event(TRACE_EV_SYSCALL_EXIT, NULL);
+}
+
+#endif				/* (CONFIG_LTT) */
 
 EXPORT_SYMBOL(dump_stack);

@@ -90,6 +90,12 @@ struct e1000_adapter;
 
 #define E1000_ERR(args...) printk(KERN_ERR "e1000: " args)
 
+#define PFX "e1000: "
+#define DPRINTK(nlevel, klevel, fmt, args...) \
+	(void)((NETIF_MSG_##nlevel & adapter->msg_enable) && \
+	printk(KERN_##klevel PFX "%s: %s: " fmt, adapter->netdev->name, \
+		__FUNCTION__ , ## args))
+
 #define E1000_MAX_INTR 10
 
 /* How many descriptors for TX and RX ? */
@@ -246,5 +252,6 @@ struct e1000_adapter {
 
 
 	uint32_t pci_state[16];
+	int msg_enable;
 };
 #endif /* _E1000_H_ */

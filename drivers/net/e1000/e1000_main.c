@@ -27,6 +27,7 @@
 *******************************************************************************/
 
 #include "e1000.h"
+#include <linux/moduleparam.h>
 
 /* Change Log
  *
@@ -213,6 +214,10 @@ static struct pci_driver e1000_driver = {
 #endif
 };
 
+static int debug = 3;
+module_param(debug, int, 0);
+MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
+
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("GPL");
@@ -387,7 +392,8 @@ e1000_probe(struct pci_dev *pdev,
 		pci_using_dac = 1;
 	} else {
 		if((err = pci_set_dma_mask(pdev, PCI_DMA_32BIT))) {
-			E1000_ERR("No usable DMA configuration, aborting\n");
+			dev_err(&pdev->dev,
+				"No usable DMA configuration, aborting\n");
 			return err;
 		}
 		pci_using_dac = 0;
@@ -412,6 +418,7 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
 	adapter->hw.back = adapter;
+	adapter->msg_enable = (1 << debug) - 1;
 
 	mmio_start = pci_resource_start(pdev, BAR_0);
 	mmio_len = pci_resource_len(pdev, BAR_0);
@@ -495,7 +502,7 @@ e1000_probe(struct pci_dev *pdev,
 	/* make sure the EEPROM is good */
 
 	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0) {
-		printk(KERN_ERR "The EEPROM Checksum Is Not Valid\n");
+		DPRINTK(PROBE, ERR, "The EEPROM Checksum Is Not Valid\n");
 		err = -EIO;
 		goto err_eeprom;
 	}
@@ -537,8 +544,7 @@ e1000_probe(struct pci_dev *pdev,
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	printk(KERN_INFO "%s: Intel(R) PRO/1000 Network Connection\n",
-	       netdev->name);
+	DPRINTK(PROBE, INFO, "Intel(R) PRO/1000 Network Connection\n");
 	e1000_check_options(adapter);
 
 	/* Initial Wake on LAN setting
@@ -657,7 +663,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	/* identify the MAC */
 
 	if (e1000_set_mac_type(hw)) {
-		E1000_ERR("Unknown MAC Type\n");
+		DPRINTK(PROBE, ERR, "Unknown MAC Type\n");
 		return -EIO;
 	}
 
@@ -1384,9 +1390,8 @@ e1000_watchdog(unsigned long data)
 			                           &adapter->link_speed,
 			                           &adapter->link_duplex);
 
-			printk(KERN_INFO
-			       "e1000: %s NIC Link is Up %d Mbps %s\n",
-			       netdev->name, adapter->link_speed,
+			DPRINTK(LINK, INFO, "NIC Link is Up %d Mbps %s\n",
+			       adapter->link_speed,
 			       adapter->link_duplex == FULL_DUPLEX ?
 			       "Full Duplex" : "Half Duplex");
 
@@ -1399,9 +1404,7 @@ e1000_watchdog(unsigned long data)
 		if(netif_carrier_ok(netdev)) {
 			adapter->link_speed = 0;
 			adapter->link_duplex = 0;
-			printk(KERN_INFO
-			       "e1000: %s NIC Link is Down\n",
-			       netdev->name);
+			DPRINTK(LINK, INFO, "NIC Link is Down\n");
 			netif_carrier_off(netdev);
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
@@ -1896,7 +1899,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 
 	if((max_frame < MINIMUM_ETHERNET_FRAME_SIZE) ||
 	   (max_frame > MAX_JUMBO_FRAME_SIZE)) {
-		E1000_ERR("Invalid MTU setting\n");
+		DPRINTK(PROBE, ERR, "Invalid MTU setting\n");
 		return -EINVAL;
 	}
 
@@ -1904,7 +1907,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(adapter->hw.mac_type < e1000_82543) {
-		E1000_ERR("Jumbo Frames not supported on 82542\n");
+		DPRINTK(PROBE, ERR, "Jumbo Frames not supported on 82542\n");
 		return -EINVAL;
 
 	} else if(max_frame <= E1000_RXBUFFER_4096) {
@@ -2289,7 +2292,8 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 			/* All receives must fit into a single buffer */
 
-			E1000_DBG("Receive packet consumed multiple buffers\n");
+			E1000_DBG("%s: Receive packet consumed multiple buffers\n",
+				netdev->name);
 
 			dev_kfree_skb_irq(skb);
 			rx_desc->status = 0;

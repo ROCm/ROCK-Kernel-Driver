@@ -19,6 +19,8 @@
 #include <linux/buffer_head.h>	/* for block_sync_page() */
 #include <linux/mpage.h>
 #include <linux/writeback.h>
+#include <linux/trigevent_hooks.h>
+
 #include <asm/pgtable.h>
 
 static struct bio *
@@ -103,6 +105,9 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		ret = -ENOMEM;
 		goto out;
 	}
+
+	TRIG_EVENT(mm_swap_out_hook, page);
+
 	inc_page_state(pswpout);
 	set_page_writeback(page);
 	unlock_page(page);

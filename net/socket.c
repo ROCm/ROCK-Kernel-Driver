@@ -81,6 +81,7 @@
 #include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <linux/kmod.h>
+#include <linux/trigevent_hooks.h>
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
@@ -549,6 +550,9 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	int ret;
 
 	init_sync_kiocb(&iocb, NULL);
+
+	TRIG_EVENT(sk_send_hook, sock->type, size);
+
 	ret = __sock_sendmsg(&iocb, sock, msg, size);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
@@ -582,6 +586,9 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 	int ret;
 
         init_sync_kiocb(&iocb, NULL);
+
+	TRIG_EVENT(sk_receive_hook, sock->type, size);
+
 	ret = __sock_recvmsg(&iocb, sock, msg, size, flags);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
@@ -1099,6 +1106,8 @@ asmlinkage long sys_socket(int family, int type, int protocol)
 	retval = sock_map_fd(sock);
 	if (retval < 0)
 		goto out_release;
+
+	TRIG_EVENT(sk_create_hook, retval, type);
 
 out:
 	/* It may be already another descriptor 8) Not kernel problem. */
@@ -1817,6 +1826,8 @@ asmlinkage long sys_socketcall(int call, unsigned long __user *args)
 		
 	a0=a[0];
 	a1=a[1];
+
+	TRIG_EVENT(sk_call_hook, call, a0);
 	
 	switch(call) 
 	{

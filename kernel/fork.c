@@ -33,6 +33,8 @@
 #include <linux/mount.h>
 #include <linux/objrmap.h>
 
+#include <linux/trigevent_hooks.h>
+
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -1180,6 +1182,9 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
+		/* Trace the event  */
+		TRIG_EVENT(fork_hook, clone_flags, p, pid);
+
 		if (!(clone_flags & CLONE_STOPPED))
 			wake_up_forked_process(p);	/* do this last */
 		else
@@ -1261,3 +1266,7 @@ void __init proc_caches_init(void)
 	if(!mm_cachep)
 		panic("vma_init: Cannot alloc mm_struct SLAB cache");
 }
+#ifdef CONFIG_DPROBES_MODULE
+EXPORT_SYMBOL(mmput);
+#endif
+

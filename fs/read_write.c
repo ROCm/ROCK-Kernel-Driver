@@ -13,6 +13,7 @@
 #include <linux/dnotify.h>
 #include <linux/security.h>
 #include <linux/module.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 
@@ -140,6 +141,7 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
 	}
 	fput_light(file, fput_needed);
+	TRIG_EVENT(lseek_hook, fd, offset);
 bad:
 	return retval;
 }
@@ -166,6 +168,8 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 
 	offset = llseek(file, ((loff_t) offset_high << 32) | offset_low,
 			origin);
+
+	TRIG_EVENT(llseek_hook, fd, offset);
 
 	retval = (int)offset;
 	if (offset >= 0) {
@@ -276,6 +280,7 @@ asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(read_hook, fd, count);
 		ret = vfs_read(file, buf, count, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
@@ -292,6 +297,7 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t co
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(write_hook, fd, count);
 		ret = vfs_write(file, buf, count, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
@@ -311,6 +317,7 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(read_hook, fd, count);
 		ret = vfs_read(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
@@ -330,6 +337,7 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(write_hook, fd, count);
 		ret = vfs_write(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
@@ -514,6 +522,7 @@ sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(read_hook, fd, vlen);
 		ret = vfs_readv(file, vec, vlen, &file->f_pos);
 		fput_light(file, fput_needed);
 	}
@@ -530,6 +539,7 @@ sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
+		TRIG_EVENT(write_hook, fd, vlen);
 		ret = vfs_writev(file, vec, vlen, &file->f_pos);
 		fput_light(file, fput_needed);
 	}

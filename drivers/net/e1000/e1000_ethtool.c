@@ -1738,6 +1738,20 @@ err_geeprom_ioctl:
 		return 0;
 	}
 #endif
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = adapter->msg_enable;
+		if (copy_to_user(addr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, addr, sizeof(edata)))
+			return -EFAULT;
+		adapter->msg_enable = edata.data;
+		return 0;
+	}
 	default:
 		return -EOPNOTSUPP;
 	}

@@ -39,6 +39,7 @@ const struct exception_table_entry *search_exception_tables(unsigned long addr)
 		e = search_module_extables(addr);
 	return e;
 }
+EXPORT_SYMBOL(search_exception_tables);
 
 int kernel_text_address(unsigned long addr)
 {

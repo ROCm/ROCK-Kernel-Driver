@@ -5,6 +5,7 @@
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Hartmut Penner (hp@de.ibm.com)
  *               Ulrich Weigand (uweigand@de.ibm.com)
+ *  Portions added by T. Halloran: (C) Copyright 2002 IBM Poughkeepsie, IBM Corporation
  *
  *  Derived from "arch/i386/mm/fault.c"
  *    Copyright (C) 1995  Linus Torvalds
@@ -25,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/module.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -166,6 +168,8 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 	int user_address;
 	const struct exception_table_entry *fixup;
 	int si_code = SEGV_MAPERR;
+        trapid_t ltt_interruption_code;                 
+        char * ic_ptr = (char *) &ltt_interruption_code; 
 
         tsk = current;
         mm = tsk->mm;
@@ -213,6 +217,9 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 	 */
 	local_irq_enable();
 
+        memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
+        memcpy(ic_ptr+4,&error_code,sizeof(error_code));
+        TRIG_EVENT(trap_entry_hook, ltt_interruption_code,(regs->psw.addr & PSW_ADDR_MASK));
         down_read(&mm->mmap_sem);
 
         vma = find_vma(mm, address);
@@ -261,6 +268,7 @@ survive:
 	}
 
         up_read(&mm->mmap_sem);
+        TRIG_EVENT(trap_exit_hook);
         return;
 
 /*
@@ -275,6 +283,7 @@ bad_area:
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
 		force_sigsegv(regs, error_code, si_code, address);
+                TRIG_EVENT(trap_exit_hook);
                 return;
 	}
 
@@ -283,6 +292,7 @@ no_context:
 	fixup = search_exception_tables(regs->psw.addr & __FIXUP_MASK);
 	if (fixup) {
 		regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE;
+		TRIG_EVENT(trap_exit_hook);
                 return;
         }
 
@@ -330,6 +340,8 @@ do_sigbus:
 	/* Kernel mode? Handle exceptions or die */
 	if (!(regs->psw.mask & PSW_MASK_PSTATE))
 		goto no_context;
+
+	TRIG_EVENT(trap_exit_hook);
 }
 
 void do_protection_exception(struct pt_regs *regs, unsigned long error_code)

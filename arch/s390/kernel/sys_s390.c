@@ -28,6 +28,7 @@
 #ifdef CONFIG_ARCH_S390X
 #include <linux/personality.h>
 #endif /* CONFIG_ARCH_S390X */
+#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -187,6 +188,8 @@ asmlinkage __SYS_RETTYPE sys_ipc (uint call, int first, int second,
 {
         struct ipc_kludge tmp;
 	int ret;
+
+        TRIG_EVENT(ipc_call_hook, call, first);
 
         switch (call) {
         case SEMOP:

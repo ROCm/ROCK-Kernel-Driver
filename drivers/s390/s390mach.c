@@ -6,12 +6,14 @@
  *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Ingo Adlung (adlung@de.ibm.com)
  *		 Martin Schwidefsky (schwidefsky@de.ibm.com)
+ *  Portions added by T. Halloran: (C) Copyright 2002 IBM Poughkeepsie, IBM Corporation
  */
 
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/lowcore.h>
 
@@ -142,8 +144,18 @@ void
 s390_do_machine_check(void)
 {
 	struct mci *mci;
+	trapid_t ltt_interruption_code;
+	uint32_t ltt_old_psw;
 
 	mci = (struct mci *) &S390_lowcore.mcck_interruption_code;
+	memcpy( &ltt_interruption_code,
+		&S390_lowcore.mcck_interruption_code,
+		sizeof(__u64));
+	memcpy( &ltt_old_psw,
+		&S390_lowcore.mcck_old_psw,
+		sizeof(uint32_t));
+	ltt_old_psw &=  PSW_ADDR_MASK;
+	TRIG_EVENT(trap_entry_hook, ltt_interruption_code,ltt_old_psw);
 
 	if (mci->sd)		/* system damage */
 		s390_handle_damage("received system damage machine check\n");

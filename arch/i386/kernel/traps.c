@@ -27,6 +27,8 @@
 #include <linux/ptrace.h>
 #include <linux/version.h>
 #include <linux/dump.h>
+#include <linux/trigevent_hooks.h>
+#include <linux/kprobes.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -47,6 +49,7 @@
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/debugreg.h>
+#include <asm/kwatch.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/nmi.h>
@@ -327,6 +330,8 @@ static inline unsigned long get_cr2(void)
 static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
+	TRIG_EVENT(trap_entry_hook, trapnr, regs->eip);
+
 	if (regs->eflags & VM_MASK) {
 		if (vm86)
 			goto vm86_trap;
@@ -344,20 +349,24 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			force_sig_info(signr, info, tsk);
 		else
 			force_sig(signr, tsk);
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	kernel_trap: {
 		if (!fixup_exception(regs))
 			die(str, regs, error_code);
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	vm86_trap: {
 		int ret = handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, trapnr);
 		if (ret) goto trap_signal;
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
+	TRIG_EVENT(trap_exit_hook);
 }
 
 #define DO_ERROR(trapnr, signr, str, name) \
@@ -395,9 +404,6 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
-#ifndef	CONFIG_KDB
-DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
-#endif	/* !CONFIG_KDB */
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
@@ -414,18 +420,25 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
  
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
+	
+	if (kprobe_running() && kprobe_fault_handler(regs, 13))
+		return;
 
 	if (!(regs->xcs & 3))
 		goto gp_in_kernel;
 
 	current->thread.error_code = error_code;
 	current->thread.trap_no = 13;
+	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	force_sig(SIGSEGV, current);
+	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_vm86:
 	local_irq_enable();
+	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	handle_vm86_fault((struct kernel_vm86_regs *) regs, error_code);
+	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_kernel:
@@ -535,6 +548,10 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
 	int cpu;
 
+#ifndef CONFIG_X86_LOCAL_APIC /* On an machine with APIC enabled NMIs are used to implement a
+				watchdog and will hang the machine if traced. */
+	TRIG_EVENT(trap_entry_hook, 2, regs->eip);
+#endif
 	nmi_enter();
 
 	cpu = smp_processor_id();
@@ -544,6 +561,7 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 		default_do_nmi(regs);
 
 	nmi_exit();
+	TRIG_EVENT(trap_exit_hook);
 }
 
 void set_nmi_callback(nmi_callback_t callback)
@@ -554,6 +572,21 @@ void set_nmi_callback(nmi_callback_t callback)
 void unset_nmi_callback(void)
 {
 	nmi_callback = dummy_nmi_callback;
+}
+
+asmlinkage int do_int3(struct pt_regs *regs, long error_code)
+{
+	if (kprobe_handler(regs))
+		return 1;
+#ifdef CONFIG_KDB
+	if (kdb(KDB_REASON_BREAK, error_code, regs))
+		return 0;
+#endif
+	/* This is an interrupt gate, because kprobes wants interrupts
+           disabled.  Normal trap handlers don't. */
+	restore_interrupts(regs);
+	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
+	return 0;
 }
 
 /*
@@ -578,13 +611,19 @@ void unset_nmi_callback(void)
  * find every occurrence of the TF bit that could be saved away even
  * by user code)
  */
-asmlinkage void do_debug(struct pt_regs * regs, long error_code)
+asmlinkage int do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
 
+	if (post_kprobe_handler(regs))
+		return 1;
+
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+
+	if (kwatch_handler(condition, regs))
+		return 1;
 
 #ifdef	CONFIG_KDB
 	if (kdb(KDB_REASON_DEBUG, error_code, regs))
@@ -636,37 +675,29 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	 */
 	info.si_addr = ((regs->xcs & 3) == 0) ? (void *)tsk->thread.eip : 
 	                                        (void *)regs->eip;
+        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
 	force_sig_info(SIGTRAP, &info, tsk);
+        TRIG_EVENT(trap_exit_hook);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
 	 */
 clear_dr7:
-	__asm__("movl %0,%%db7"
-		: /* no output */
-		: "r" (0));
-	return;
+	load_process_dr7(0);
+	return 0;
 
 debug_vm86:
+        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
 	handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, 1);
-	return;
+        TRIG_EVENT(trap_exit_hook);
+	return 0;
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 clear_TF:
 	regs->eflags &= ~TF_MASK;
-	return;
+	return 0;
 }
-
-#ifdef	CONFIG_KDB
-asmlinkage void do_int3(struct pt_regs * regs, long error_code)
-{
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-}
-#endif	/* CONFIG_KDB */
-
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
@@ -810,10 +841,12 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
 					  long error_code)
 {
+        TRIG_EVENT(trap_entry_hook, 16, regs->eip);
 #if 0
 	/* No need to warn about this any longer. */
 	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
 #endif
+        TRIG_EVENT(trap_exit_hook);	
 }
 
 /*
@@ -831,6 +864,8 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = thread->task;
 
+	if (kprobe_running() && kprobe_fault_handler(&regs, 7))
+		return;
 	clts();		/* Allow maths ops (or we recurse) */
 	if (!tsk->used_math)
 		init_fpu(tsk);
@@ -844,8 +879,10 @@ asmlinkage void math_emulate(long arg)
 {
 	printk("math-emulation not enabled and no coprocessor found.\n");
 	printk("killing %s.\n",current->comm);
+        TRIG_EVENT(trap_entry_hook, 7, 0);
 	force_sig(SIGFPE,current);
 	schedule();
+        TRIG_EVENT(trap_exit_hook);
 }
 
 #endif /* CONFIG_MATH_EMULATION */
@@ -925,7 +962,7 @@ void __init trap_init(void)
 	set_trap_gate(0,&divide_error);
 	set_intr_gate(1,&debug);
 	set_intr_gate(2,&nmi);
-	set_system_gate(3,&int3);	/* int3-5 can be called from all */
+	_set_gate(idt_table+3,14,3,&int3,__KERNEL_CS); /* int3-5 can be called from all */
 	set_system_gate(4,&overflow);
 	set_system_gate(5,&bounds);
 	set_trap_gate(6,&invalid_op);

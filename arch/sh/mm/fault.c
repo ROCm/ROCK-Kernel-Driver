@@ -21,6 +21,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -53,6 +54,14 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 
 	tsk = current;
 	mm = tsk->mm;
+
+#if (CONFIG_TRIGEVENT_HOOKS)
+	{
+		unsigned long trapnr;
+		asm volatile("stc       r2_bank,%0": "=r" (trapnr));
+		TRIG_EVENT(trap_entry_hook, trapnr >> 5, regs->pc);  /* trap 4,5 or 6 */
+	}
+#endif
 
 	/*
 	 * If we're in an interrupt or have no user
@@ -107,6 +116,7 @@ survive:
 	}
 
 	up_read(&mm->mmap_sem);
+	TRIG_EVENT(trap_exit_hook);
 	return;
 
 /*
@@ -120,14 +130,16 @@ bad_area:
 		tsk->thread.address = address;
 		tsk->thread.error_code = writeaccess;
 		force_sig(SIGSEGV, tsk);
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	if (fixup_exception(regs))
+	if (fixup_exception(regs)) {
+		TRIG_EVENT(trap_exit_hook);
 		return;
-
+	}
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
@@ -186,6 +198,8 @@ do_sigbus:
 	/* Kernel mode? Handle exceptions or die */
 	if (!user_mode(regs))
 		goto no_context;
+
+	TRIG_EVENT(trap_exit_hook);
 }
 
 /*

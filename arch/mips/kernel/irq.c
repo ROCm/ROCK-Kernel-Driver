@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/atomic.h>
 #include <asm/system.h>
@@ -352,6 +353,8 @@ asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs)
 	struct irqaction * action;
 	unsigned int status;
 
+	TRIG_EVENT(irq_entry_hook, irq, regs, !user_mode(regs));
+
 	irq_enter();
 	kstat_this_cpu.irqs[irq]++;
 	spin_lock(&desc->lock);
@@ -417,6 +420,8 @@ out:
 	spin_unlock(&desc->lock);
 
 	irq_exit();
+
+	TRIG_EVENT(irq_exit_hook, irq, regs);
 
 	return 1;
 }

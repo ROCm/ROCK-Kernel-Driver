@@ -31,6 +31,7 @@
 #include <linux/time.h>
 #include <linux/jiffies.h>
 #include <linux/cpu.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/div64.h>
@@ -870,8 +871,9 @@ EXPORT_SYMBOL(xtime_lock);
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
-	tvec_base_t *base = &__get_cpu_var(tvec_bases);
+	TRIG_EVENT(kernel_timer_hook, NULL);
 
+	tvec_base_t *base = &__get_cpu_var(tvec_bases);
 	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);
 }
@@ -912,6 +914,7 @@ void do_timer(struct pt_regs *regs)
 #ifndef CONFIG_SMP
 	/* SMP process accounting uses the local APIC timer */
 
+	TRIG_EVENT(timer_hook, regs);
 	update_process_times(user_mode(regs));
 #endif
 	update_times();
@@ -1035,6 +1038,7 @@ asmlinkage long sys_getegid(void)
 
 static void process_timeout(unsigned long __data)
 {
+	TRIG_EVENT(timer_expired_hook, (task_t *)__data);
 	wake_up_process((task_t *)__data);
 }
 
@@ -1098,6 +1102,8 @@ fastcall signed long schedule_timeout(signed long timeout)
 			goto out;
 		}
 	}
+
+	TRIG_EVENT(settimeout_hook, timeout);
 
 	expire = timeout + jiffies;
 
