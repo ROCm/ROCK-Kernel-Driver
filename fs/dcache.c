@@ -1085,9 +1085,9 @@ void d_move(struct dentry * dentry, struct dentry * target)
  *
  * "buflen" should be %PAGE_SIZE or more. Caller holds the dcache_lock.
  */
-char * __d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
-		struct dentry *root, struct vfsmount *rootmnt,
-		char *buffer, int buflen)
+static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
+			struct dentry *root, struct vfsmount *rootmnt,
+			char *buffer, int buflen)
 {
 	char * end = buffer+buflen;
 	char * retval;
@@ -1138,6 +1138,25 @@ global_root:
 		memcpy(retval, dentry->d_name.name, namelen);
 	}
 	return retval;
+}
+
+/* write full pathname into buffer and return start of pathname */
+char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
+				char *buf, int buflen)
+{
+	char *res;
+	struct vfsmount *rootmnt;
+	struct dentry *root;
+	read_lock(&current->fs->lock);
+	rootmnt = mntget(current->fs->rootmnt);
+	root = dget(current->fs->root);
+	read_unlock(&current->fs->lock);
+	spin_lock(&dcache_lock);
+	res = __d_path(dentry, vfsmnt, root, rootmnt, buf, buflen);
+	spin_unlock(&dcache_lock);
+	dput(root);
+	mntput(rootmnt);
+	return res;
 }
 
 /*
