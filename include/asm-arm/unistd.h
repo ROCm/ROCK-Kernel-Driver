@@ -403,24 +403,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 struct rusage;
 asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru);
 
-static inline long idle(void)
-{
-	extern long sys_idle(void);
-	return sys_idle();
-}
-
-static inline long pause(void)
-{
-	extern long sys_pause(void);
-	return sys_pause();
-}
-
-static inline long sync(void)
-{
-	extern long sys_sync(void);
-	return sys_sync();
-}
-
 static inline pid_t setsid(void)
 {
 	extern long sys_setsid(void);
@@ -472,17 +454,6 @@ static inline long _exit(int exitcode)
 static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
 {
 	return sys_wait4((int)pid, wait_stat, options, NULL);
-}
-
-static inline long delete_module(const char *name)
-{
-	extern long sys_delete_module(const char *name);
-	return sys_delete_module(name);
-}
-
-static inline pid_t wait(int * wait_stat)
-{
-	return sys_wait4(-1, wait_stat, 0, NULL);
 }
 
 /*
