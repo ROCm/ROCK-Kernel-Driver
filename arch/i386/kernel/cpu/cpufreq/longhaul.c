@@ -107,13 +107,17 @@ static void do_powersaver(int version)
 	longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
 	longhaul.bits.EnableSoftBusRatio = 1;
 	longhaul.bits.RevisionKey = 0;
+	local_irq_disable();
 	wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
+	local_irq_enable();
 	__hlt();
 
 	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 	longhaul.bits.EnableSoftBusRatio = 0;
 	longhaul.bits.RevisionKey = version;
+	local_irq_disable();
 	wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+	local_irq_enable();
 }
 
 /**
@@ -160,14 +164,18 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 		/* Enable software clock multiplier */
 		bcr2.bits.ESOFTBF = 1;
 		bcr2.bits.CLOCKMUL = clock_ratio_index;
+		local_irq_disable();
 		wrmsrl (MSR_VIA_BCR2, bcr2.val);
+		local_irq_enable();
 
 		__hlt();
 
 		/* Disable software clock multiplier */
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		bcr2.bits.ESOFTBF = 0;
+		local_irq_disable();
 		wrmsrl (MSR_VIA_BCR2, bcr2.val);
+		local_irq_enable();
 		break;
 
 	/*
