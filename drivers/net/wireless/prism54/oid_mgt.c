@@ -454,7 +454,7 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 			islpci_mgt_release(response);
 		}
 		if (ret || response_op == PIMFOR_OP_ERROR)
-		        ret = -EIO;
+			ret = -EIO;
 	} else if (!cache)
 		ret = -EIO;
 
@@ -479,7 +479,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 	int ret = -EIO;
 	int reslen = 0;
 	struct islpci_mgmtframe *response = NULL;
-	
+
 	int dlen;
 	void *cache, *_res = NULL;
 	u32 oid;
@@ -504,7 +504,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 		ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,
 					     oid, data, dlen, &response);
 		if (ret || !response ||
-			response->header->operation == PIMFOR_OP_ERROR) {
+		    response->header->operation == PIMFOR_OP_ERROR) {
 			if (response)
 				islpci_mgt_release(response);
 			ret = -EIO;
@@ -541,7 +541,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 		       "mgt_get_request(0x%x): received data length was bigger "
 		       "than expected (%d > %d). Memory is probably corrupted...",
 		       oid, reslen, isl_oid[n].size);
-	
+
 	return ret;
 }
 
@@ -561,11 +561,11 @@ mgt_commit_list(islpci_private *priv, enum oid_num_t *l, int n)
 		while (j <= t->range) {
 			response = NULL;
 			ret |= islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET,
-			                              oid, data, t->size,
+						      oid, data, t->size,
 						      &response);
 			if (response) {
 				ret |= (response->header->operation ==
-				        PIMFOR_OP_ERROR);
+					PIMFOR_OP_ERROR);
 				islpci_mgt_release(response);
 			}
 			j++;
@@ -669,7 +669,7 @@ mgt_commit(islpci_private *priv)
 		/* some request have failed. The device might be in an
 		   incoherent state. We should reset it ! */
 		printk(KERN_DEBUG "%s: mgt_commit has failed. Restart the "
-                "device \n", priv->ndev->name);
+		       "device \n", priv->ndev->name);
 	}
 }
 

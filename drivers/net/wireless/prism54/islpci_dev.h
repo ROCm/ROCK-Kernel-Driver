@@ -173,7 +173,7 @@ typedef struct {
 	islpci_state_t state;
 	int state_off;		/* enumeration of off-state, if 0 then
 				 * we're not in any off-state */
-	
+
 	/* WPA stuff */
 	int wpa; /* WPA mode enabled */
 	struct list_head bss_wpa_list;

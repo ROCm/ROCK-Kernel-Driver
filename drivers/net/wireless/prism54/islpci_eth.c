@@ -208,7 +208,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	priv->data_low_tx[index] = skb;
 	/* set the proper fragment start address and size information */
 	fragment->size = cpu_to_le16(frame_size);
-	fragment->flags = cpu_to_le16(0);  /* set to 1 if more fragments */
+	fragment->flags = cpu_to_le16(0);	/* set to 1 if more fragments */
 	fragment->address = cpu_to_le32(pci_map_address);
 	curr_frag++;
 
@@ -218,7 +218,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	cb->driver_curr_frag[ISL38XX_CB_TX_DATA_LQ] = cpu_to_le32(curr_frag);
 
 	if (curr_frag - priv->free_data_tx + ISL38XX_MIN_QTHRESHOLD
-	                                           > ISL38XX_CB_TX_QSIZE) {
+	    > ISL38XX_CB_TX_QSIZE) {
 		/* stop sends from upper layers */
 		netif_stop_queue(ndev);
 
@@ -239,7 +239,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 
 	return 0;
 
- drop_free:
+      drop_free:
 	/* free the skbuf structure before aborting */
 	dev_kfree_skb(skb);
 	skb = NULL;
@@ -287,7 +287,7 @@ islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
 		    (struct avs_80211_1_header *) skb_push(*skb,
 							   sizeof (struct
 								   avs_80211_1_header));
-
+		
 		avs->version = cpu_to_be32(P80211CAPTURE_VERSION);
 		avs->length = cpu_to_be32(sizeof (struct avs_80211_1_header));
 		avs->mactime = cpu_to_be64(le64_to_cpu(clock));
@@ -487,10 +487,10 @@ islpci_eth_receive(islpci_private *priv)
 void
 islpci_do_reset_and_wake(void *data)
 {
-       islpci_private *priv = (islpci_private *) data;
-       islpci_reset(priv, 1);
-       netif_wake_queue(priv->ndev);
-       priv->reset_task_pending = 0;
+	islpci_private *priv = (islpci_private *) data;
+	islpci_reset(priv, 1);
+	netif_wake_queue(priv->ndev);
+	priv->reset_task_pending = 0;
 }
 
 void

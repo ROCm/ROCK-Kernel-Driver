@@ -166,7 +166,7 @@ prism54_mib_init(islpci_private *priv)
 	 * for it save old values */
 	if (init_mode > IW_MODE_MONITOR || init_mode < IW_MODE_AUTO) {
 		printk(KERN_DEBUG "%s(): You passed a non-valid init_mode. "
-				"Using default mode\n", __FUNCTION__);
+		       "Using default mode\n", __FUNCTION__);
 		init_mode = CARD_DEFAULT_IW_MODE;
 	}
 	/* This sets all of the mode-dependent values */
@@ -518,9 +518,7 @@ prism54_get_range(struct net_device *ndev, struct iw_request_info *info,
 		i++;
 		data++;
 	}
-
 	range->num_bitrates = i;
-
 	kfree(r.ptr);
 
 	return rvalue;
@@ -559,7 +557,6 @@ prism54_get_wap(struct net_device *ndev, struct iw_request_info *info,
 	int rvalue;
 
 	rvalue = mgt_get_request(priv, DOT11_OID_BSSID, 0, NULL, &r);
-
 	memcpy(awrq->sa_data, r.ptr, 6);
 	awrq->sa_family = ARPHRD_ETHER;
 	kfree(r.ptr);
@@ -669,7 +666,6 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 			kfree(buf);
 		}
 	}
-
 	return current_ev;
 }
 
@@ -731,7 +727,7 @@ prism54_set_essid(struct net_device *ndev, struct iw_request_info *info,
 		memcpy(essid.octets, extra, dwrq->length);
 	} else
 		essid.length = 0;
-	
+
 	if (priv->iw_mode != IW_MODE_MONITOR)
 		return mgt_set_request(priv, DOT11_OID_SSID, 0, &essid);
 
@@ -817,21 +813,21 @@ prism54_set_rate(struct net_device *ndev,
 	char *data;
 	int ret, i;
 	union oid_res_t r;
-	
+
 	if (vwrq->value == -1) {
 		/* auto mode. No limit. */
 		profile = 1;
 		return mgt_set_request(priv, DOT11_OID_PROFILES, 0, &profile);
 	}
-	
+
 	if ((ret =
 	     mgt_get_request(priv, DOT11_OID_SUPPORTEDRATES, 0, NULL, &r)))
 		return ret;
-		
+
 	rate = (u32) (vwrq->value / 500000);
 	data = r.ptr;
 	i = 0;
-	
+
 	while (data[i]) {
 		if (rate && (data[i] == rate)) {
 			break;
@@ -842,14 +838,14 @@ prism54_set_rate(struct net_device *ndev,
 		data[i] |= 0x80;
 		i++;
 	}
-		
+
 	if (!data[i]) {
 		return -EINVAL;
 	}
-	
+
 	data[i] |= 0x80;
 	data[i + 1] = 0;
-	
+
 	/* Now, check if we want a fixed or auto value */
 	if (vwrq->fixed) {
 		data[0] = data[i];
@@ -864,14 +860,14 @@ prism54_set_rate(struct net_device *ndev,
 		i++;
 	}
 	printk("0\n");
-*/	
+*/
 	profile = -1;
 	ret = mgt_set_request(priv, DOT11_OID_PROFILES, 0, &profile);
 	ret |= mgt_set_request(priv, DOT11_OID_EXTENDEDRATES, 0, data);
 	ret |= mgt_set_request(priv, DOT11_OID_RATES, 0, data);
-	
+
 	kfree(r.ptr);
-	
+
 	return ret;
 }
 
@@ -897,7 +893,7 @@ prism54_get_rate(struct net_device *ndev,
 	data = r.ptr;
 	vwrq->fixed = (data[0] != 0) && (data[1] == 0);
 	kfree(r.ptr);
-	
+
 	return 0;
 }
 
@@ -994,7 +990,6 @@ prism54_set_retry(struct net_device *ndev, struct iw_request_info *info,
 		rvalue |=
 		    mgt_set_request(priv, DOT11_OID_MAXTXLIFETIME, 0,
 				    &lifetime);
-
 	return rvalue;
 }
 
@@ -1090,8 +1085,7 @@ prism54_set_encode(struct net_device *ndev, struct iw_request_info *info,
 			}
 		}
 	}
-
-	/* now read the flags     */
+	/* now read the flags */
 	if (dwrq->flags & IW_ENCODE_DISABLED) {
 		/* Encoding disabled, 
 		 * authen = DOT11_AUTH_OS;
@@ -1240,7 +1234,7 @@ prism54_get_oid(struct net_device *ndev, struct iw_request_info *info,
 
 static int
 prism54_set_u32(struct net_device *ndev, struct iw_request_info *info,
-		   __u32 * uwrq, char *extra)
+		__u32 * uwrq, char *extra)
 {
 	u32 oid = uwrq[0], u = uwrq[1];
 
@@ -1858,7 +1852,7 @@ prism54_process_trap(void *data)
 	enum oid_num_t n = mgt_oidtonum(frame->header->oid);
 
 	if (n != OID_NUM_LAST)
-	prism54_process_trap_helper(netdev_priv(ndev), n, frame->data);
+		prism54_process_trap_helper(netdev_priv(ndev), n, frame->data);
 	islpci_mgt_release(frame);
 }
 
@@ -1935,7 +1929,7 @@ prism54_debug_oid(struct net_device *ndev, struct iw_request_info *info,
 		  __u32 * uwrq, char *extra)
 {
 	islpci_private *priv = netdev_priv(ndev);
-	
+
 	priv->priv_oid = *uwrq;
 	printk("%s: oid 0x%08X\n", ndev->name, *uwrq);
 
@@ -1944,15 +1938,15 @@ prism54_debug_oid(struct net_device *ndev, struct iw_request_info *info,
 
 int
 prism54_debug_get_oid(struct net_device *ndev, struct iw_request_info *info,
-		struct iw_point *data, char *extra)
+		      struct iw_point *data, char *extra)
 {
 	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_mgmtframe *response = NULL;
 	int ret = -EIO, response_op = PIMFOR_OP_ERROR;
-	
+
 	printk("%s: get_oid 0x%08X\n", ndev->name, priv->priv_oid);
 	data->length = 0;
-	
+
 	if (islpci_get_state(priv) >= PRV_STATE_INIT) {
 		ret =
 		    islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,
@@ -1976,21 +1970,21 @@ prism54_debug_get_oid(struct net_device *ndev, struct iw_request_info *info,
 			printk("%s: len: %i\n", ndev->name, data->length);
 		}
 	}
-	
+
 	return ret;
 }
 
 int
 prism54_debug_set_oid(struct net_device *ndev, struct iw_request_info *info,
-		struct iw_point *data, char *extra)
+		      struct iw_point *data, char *extra)
 {
 	islpci_private *priv = netdev_priv(ndev);
 	struct islpci_mgmtframe *response = NULL;
 	int ret = 0, response_op = PIMFOR_OP_ERROR;
-	
+
 	printk("%s: set_oid 0x%08X\tlen: %d\n", ndev->name, priv->priv_oid,
 	       data->length);
-	
+
 	if (islpci_get_state(priv) >= PRV_STATE_INIT) {
 		ret =
 		    islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET,
@@ -2005,10 +1999,10 @@ prism54_debug_set_oid(struct net_device *ndev, struct iw_request_info *info,
 		}
 		if (ret || response_op == PIMFOR_OP_ERROR) {
 			printk("%s: EIO\n", ndev->name);
-		        ret = -EIO;
+			ret = -EIO;
 		}
 	}
-	
+
 	return (ret ? ret : -EINPROGRESS);
 }
 
@@ -2107,7 +2101,7 @@ static const iw_handler prism54_handler[] = {
 #define PRISM54_DBG_GET_OID	SIOCIWFIRSTPRIV+15
 #define PRISM54_DBG_SET_OID	SIOCIWFIRSTPRIV+16
 
-#define PRISM54_GET_OID	   SIOCIWFIRSTPRIV+17
+#define PRISM54_GET_OID		SIOCIWFIRSTPRIV+17
 #define PRISM54_SET_OID_U32	SIOCIWFIRSTPRIV+18
 #define	PRISM54_SET_OID_STR	SIOCIWFIRSTPRIV+20
 #define	PRISM54_SET_OID_ADDR	SIOCIWFIRSTPRIV+22
@@ -2179,7 +2173,7 @@ static const struct iw_priv_args prism54_private_args[] = {
 	IWPRIV_U32(DOT11_OID_AUTHENABLE, "authenable"),
 	IWPRIV_U32(DOT11_OID_PRIVACYINVOKED, "privinvok"),
 	IWPRIV_U32(DOT11_OID_EXUNENCRYPTED, "exunencrypt"),
-	
+
 	IWPRIV_U32(DOT11_OID_REKEYTHRESHOLD, "rekeythresh"),
 
 	IWPRIV_U32(DOT11_OID_MAXTXLIFETIME, "maxtxlife"),

@@ -85,7 +85,7 @@ pimfor_decode_header(void *data, int len)
 {
 	pimfor_header_t *h = data;
 
-        while ((void *) h < data + len) {
+	while ((void *) h < data + len) {
 		if (h->flags & PIMFOR_FLAG_LITTLE_ENDIAN) {
 			le32_to_cpus(&h->oid);
 			le32_to_cpus(&h->length);
@@ -107,8 +107,8 @@ int
 islpci_mgmt_rx_fill(struct net_device *ndev)
 {
 	islpci_private *priv = netdev_priv(ndev);
-	isl38xx_control_block *cb =    /* volatile not needed */
-		(isl38xx_control_block *) priv->control_block;
+	isl38xx_control_block *cb =	/* volatile not needed */
+	    (isl38xx_control_block *) priv->control_block;
 	u32 curr = le32_to_cpu(cb->driver_curr_frag[ISL38XX_CB_RX_MGMTQ]);
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
@@ -140,15 +140,15 @@ islpci_mgmt_rx_fill(struct net_device *ndev)
 			}
 		}
 
-                /* be safe: always reset control block information */
+		/* be safe: always reset control block information */
 		frag->size = cpu_to_le16(MGMT_FRAME_SIZE);
 		frag->flags = 0;
 		frag->address = cpu_to_le32(buf->pci_addr);
 		curr++;
 
-                /* The fragment address in the control block must have
-                 * been written before announcing the frame buffer to
-                 * device */
+		/* The fragment address in the control block must have
+		 * been written before announcing the frame buffer to
+		 * device */
 		wmb();
 		cb->driver_curr_frag[ISL38XX_CB_RX_MGMTQ] = cpu_to_le32(curr);
 	}
@@ -168,7 +168,7 @@ islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 {
 	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =
-		(isl38xx_control_block *) priv->control_block;
+	    (isl38xx_control_block *) priv->control_block;
 	void *p;
 	int err = -EINVAL;
 	unsigned long flags;
@@ -242,7 +242,7 @@ islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 	priv->mgmt_tx[index] = buf;
 	frag = &cb->tx_data_mgmt[index];
 	frag->size = cpu_to_le16(frag_len);
-	frag->flags = 0;   /* for any other than the last fragment, set to 1 */
+	frag->flags = 0;	/* for any other than the last fragment, set to 1 */
 	frag->address = cpu_to_le32(buf.pci_addr);
 
 	/* The fragment address in the control block must have
@@ -256,11 +256,11 @@ islpci_mgt_transmit(struct net_device *ndev, int operation, unsigned long oid,
 	islpci_trigger(priv);
 	return 0;
 
- error_unlock:
+      error_unlock:
 	spin_unlock_irqrestore(&priv->slock, flags);
- error_free:
+      error_free:
 	kfree(buf.mem);
- error:
+      error:
 	return err;
 }
 
@@ -274,16 +274,16 @@ islpci_mgt_receive(struct net_device *ndev)
 {
 	islpci_private *priv = netdev_priv(ndev);
 	isl38xx_control_block *cb =
-		(isl38xx_control_block *) priv->control_block;
+	    (isl38xx_control_block *) priv->control_block;
 	u32 curr_frag;
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
 	DEBUG(SHOW_FUNCTION_CALLS, "islpci_mgt_receive \n");
 #endif
 
-        /* Only once per interrupt, determine fragment range to
-         * process.  This avoids an endless loop (i.e. lockup) if
-         * frames come in faster than we can process them. */
+	/* Only once per interrupt, determine fragment range to
+	 * process.  This avoids an endless loop (i.e. lockup) if
+	 * frames come in faster than we can process them. */
 	curr_frag = le32_to_cpu(cb->device_curr_frag[ISL38XX_CB_RX_MGMTQ]);
 	barrier();
 
@@ -294,29 +294,29 @@ islpci_mgt_receive(struct net_device *ndev)
 		u16 frag_len;
 		int size;
 		struct islpci_mgmtframe *frame;
-              
-                /* I have no idea (and no documentation) if flags != 0
-                 * is possible.  Drop the frame, reuse the buffer. */
+
+		/* I have no idea (and no documentation) if flags != 0
+		 * is possible.  Drop the frame, reuse the buffer. */
 		if (le16_to_cpu(cb->rx_data_mgmt[index].flags) != 0) {
-                        printk(KERN_WARNING "%s: unknown flags 0x%04x\n",
-                               ndev->name,
-                               le16_to_cpu(cb->rx_data_mgmt[index].flags));
-                        continue;
-                }
+			printk(KERN_WARNING "%s: unknown flags 0x%04x\n",
+			       ndev->name,
+			       le16_to_cpu(cb->rx_data_mgmt[index].flags));
+			continue;
+		}
 
 		/* The device only returns the size of the header(s) here. */
 		frag_len = le16_to_cpu(cb->rx_data_mgmt[index].size);
 
 		/*
-                 * We appear to have no way to tell the device the
-                 * size of a receive buffer.  Thus, if this check
-                 * triggers, we likely have kernel heap corruption. */
-                if (frag_len > MGMT_FRAME_SIZE) {
+		 * We appear to have no way to tell the device the
+		 * size of a receive buffer.  Thus, if this check
+		 * triggers, we likely have kernel heap corruption. */
+		if (frag_len > MGMT_FRAME_SIZE) {
 			printk(KERN_WARNING
 				"%s: Bogus packet size of %d (%#x).\n",
 				ndev->name, frag_len, frag_len);
-                        frag_len = MGMT_FRAME_SIZE;
-                }
+			frag_len = MGMT_FRAME_SIZE;
+		}
 
 		/* Ensure the results of device DMA are visible to the CPU. */
 		pci_dma_sync_single(priv->pdev, buf->pci_addr,
@@ -338,7 +338,7 @@ islpci_mgt_receive(struct net_device *ndev)
 #if VERBOSE > SHOW_ERROR_MESSAGES
 		DEBUG(SHOW_PIMFOR_FRAMES,
 		      "PIMFOR: op %i, oid 0x%08x, device %i, flags 0x%x length 0x%x \n",
-		      header->operation, header->oid, header->device_id, 
+		      header->operation, header->oid, header->device_id,
 		      header->flags, header->length);
 
 		/* display the buffer contents for debugging */
@@ -363,7 +363,7 @@ islpci_mgt_receive(struct net_device *ndev)
 			printk(KERN_WARNING
 			       "%s: Out of memory, cannot handle oid 0x%08x\n",
 			       ndev->name, header->oid);
-			continue;        
+			continue;
 		}
 		frame->ndev = ndev;
 		memcpy(&frame->buf, header, size);
@@ -383,7 +383,7 @@ islpci_mgt_receive(struct net_device *ndev)
 			       header->oid, header->device_id, header->flags,
 			       header->length);
 #endif
-                      
+
 			/* Create work to handle trap out of interrupt
 			 * context. */
 			INIT_WORK(&frame->ws, prism54_process_trap, frame);
@@ -416,19 +416,19 @@ void
 islpci_mgt_cleanup_transmit(struct net_device *ndev)
 {
 	islpci_private *priv = netdev_priv(ndev);
-	isl38xx_control_block *cb =    /* volatile not needed */
-		(isl38xx_control_block *) priv->control_block;
+	isl38xx_control_block *cb =	/* volatile not needed */
+	    (isl38xx_control_block *) priv->control_block;
 	u32 curr_frag;
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
-        DEBUG(SHOW_FUNCTION_CALLS, "islpci_mgt_cleanup_transmit\n");
+	DEBUG(SHOW_FUNCTION_CALLS, "islpci_mgt_cleanup_transmit\n");
 #endif
 
 	/* Only once per cleanup, determine fragment range to
 	 * process.  This avoids an endless loop (i.e. lockup) if
 	 * the device became confused, incrementing device_curr_frag
 	 * rapidly. */
-	curr_frag = le32_to_cpu(cb->device_curr_frag[ISL38XX_CB_TX_MGMTQ]); 
+	curr_frag = le32_to_cpu(cb->device_curr_frag[ISL38XX_CB_TX_MGMTQ]);
 	barrier();
 
 	for (; priv->index_mgmt_tx < curr_frag; priv->index_mgmt_tx++) {
@@ -475,9 +475,9 @@ islpci_mgt_transaction(struct net_device *ndev,
 		frame = xchg(&priv->mgmt_received, NULL);
 		if (frame) {
 			if (frame->header->oid == oid) {
-			*recvframe = frame;
-			err = 0;
-			goto out;
+				*recvframe = frame;
+				err = 0;
+				goto out;
 			} else {
 				printk(KERN_DEBUG
 				       "%s: expecting oid 0x%x, received 0x%x.\n",
@@ -485,13 +485,13 @@ islpci_mgt_transaction(struct net_device *ndev,
 				       frame->header->oid);
 				kfree(frame);
 				frame = NULL;
-		}
+			}
 		}
 		if (timeleft == 0) {
 			printk(KERN_DEBUG
 				"%s: timeout waiting for mgmt response %lu, "
 				"triggering device\n",
-			       ndev->name, timeout_left);
+				ndev->name, timeout_left);
 			islpci_trigger(priv);
 		}
 		timeout_left += timeleft - wait_cycle_jiffies;
