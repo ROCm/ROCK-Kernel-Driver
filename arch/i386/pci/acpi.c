@@ -37,21 +37,12 @@ static int __init pci_acpi_init(void)
 		 * also do it here in case there are still broken drivers that
 		 * don't use pci_enable_device().
 		 */
-		printk(KERN_INFO "** Routing PCI interrupts for all devices because \"pci=routeirq\"\n");
-		printk(KERN_INFO "** was specified.  If this was required to make a driver work,\n");
-		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
-		printk(KERN_INFO "** so I can fix the driver.\n");
+		printk(KERN_INFO "PCI: Routing PCI interrupts for all devices because \"pci=routeirq\" specified\n");
 		while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 			acpi_pci_irq_enable(dev);
-	} else {
-		printk(KERN_INFO "** PCI interrupts are no longer routed automatically.  If this\n");
-		printk(KERN_INFO "** causes a device to stop working, it is probably because the\n");
-		printk(KERN_INFO "** driver failed to call pci_enable_device().  As a temporary\n");
-		printk(KERN_INFO "** workaround, the \"pci=routeirq\" argument restores the old\n");
-		printk(KERN_INFO "** behavior.  If this argument makes the device work again,\n");
-		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
-		printk(KERN_INFO "** so I can fix the driver.\n");
-	}
+	} else
+		printk(KERN_INFO "PCI: If a device doesn't work, try \"pci=routeirq\".  If it helps, post a report\n");
+
 #ifdef CONFIG_X86_IO_APIC
 	if (acpi_ioapic)
 		print_IO_APIC();

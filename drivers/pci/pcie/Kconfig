@@ -3,7 +3,6 @@
 #
 config PCIEPORTBUS
 	bool "PCI Express support"
-	depends on PCI_GOMMCONFIG || PCI_GOANY
 	default n
 
 	---help---

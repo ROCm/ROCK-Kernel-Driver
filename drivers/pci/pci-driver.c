@@ -115,7 +115,6 @@ static DRIVER_ATTR(new_id, S_IWUSR, NULL, store_new_id);
 static inline void
 pci_init_dynids(struct pci_dynids *dynids)
 {
-	memset(dynids, 0, sizeof(*dynids));
 	spin_lock_init(&dynids->lock);
 	INIT_LIST_HEAD(&dynids->list);
 }

@@ -17,12 +17,13 @@ u32 pci_mmcfg_base_addr;
 /* Static virtual mapping of the MMCONFIG aperture */
 char *pci_mmcfg_virt;
 
-static inline char *pci_dev_base(int bus, int devfn)
+static inline char *pci_dev_base(unsigned int bus, unsigned int devfn)
 {
 	return pci_mmcfg_virt + ((bus << 20) | (devfn << 12));
 }
 
-static int pci_mmcfg_read(int seg, int bus, int devfn, int reg, int len, u32 *value)
+static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+			  unsigned int devfn, int reg, int len, u32 *value)
 {
 	char *addr = pci_dev_base(bus, devfn); 
 
@@ -44,7 +45,8 @@ static int pci_mmcfg_read(int seg, int bus, int devfn, int reg, int len, u32 *va
 	return 0;
 }
 
-static int pci_mmcfg_write(int seg, int bus, int devfn, int reg, int len, u32 value)
+static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+			   unsigned int devfn, int reg, int len, u32 value)
 {
 	char *addr = pci_dev_base(bus,devfn);
 

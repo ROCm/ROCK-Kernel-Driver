@@ -99,10 +99,10 @@ where all fields are passed in as hexadecimal values (no leading 0x).
 Users need pass only as many fields as necessary; vendor, device,
 subvendor, and subdevice fields default to PCI_ANY_ID (FFFFFFFF),
 class and classmask fields default to 0, and driver_data defaults to
-0UL.  Device drivers must call
-   pci_dynids_set_use_driver_data(pci_driver *, 1)
-in order for the driver_data field to get passed to the driver.
-Otherwise, only a 0 is passed in that field.
+0UL.  Device drivers must initialize use_driver_data in the dynids struct
+in their pci_driver struct prior to calling pci_register_driver in order
+for the driver_data field to get passed to the driver. Otherwise, only a
+0 is passed in that field.
 
 When the driver exits, it just calls pci_unregister_driver() and the PCI layer
 automatically calls the remove hook for all devices handled by the driver.

@@ -13,7 +13,8 @@
 #define PCI_CONF1_ADDRESS(bus, devfn, reg) \
 	(0x80000000 | (bus << 16) | (devfn << 8) | (reg & ~3))
 
-static int pci_conf1_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
+static int pci_conf1_read(unsigned int seg, unsigned int bus,
+			  unsigned int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
@@ -41,7 +42,8 @@ static int pci_conf1_read (int seg, int bus, int devfn, int reg, int len, u32 *v
 	return 0;
 }
 
-static int pci_conf1_write (int seg, int bus, int devfn, int reg, int len, u32 value)
+static int pci_conf1_write(unsigned int seg, unsigned int bus,
+			   unsigned int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
@@ -83,7 +85,8 @@ struct pci_raw_ops pci_direct_conf1 = {
 
 #define PCI_CONF2_ADDRESS(dev, reg)	(u16)(0xC000 | (dev << 8) | reg)
 
-static int pci_conf2_read(int seg, int bus, int devfn, int reg, int len, u32 *value)
+static int pci_conf2_read(unsigned int seg, unsigned int bus,
+			  unsigned int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 	int dev, fn;
@@ -121,7 +124,8 @@ static int pci_conf2_read(int seg, int bus, int devfn, int reg, int len, u32 *va
 	return 0;
 }
 
-static int pci_conf2_write (int seg, int bus, int devfn, int reg, int len, u32 value)
+static int pci_conf2_write(unsigned int seg, unsigned int bus,
+			   unsigned int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 	int dev, fn;

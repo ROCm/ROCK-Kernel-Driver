@@ -90,7 +90,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 		new & ~PCI_REGION_FLAG_MASK));
 }
 
-int __init
+int __devinit
 pci_claim_resource(struct pci_dev *dev, int resource)
 {
 	struct resource *res = &dev->resource[resource];

@@ -34,7 +34,8 @@ static inline void pci_exp_set_dev_base(int bus, int devfn)
 	}
 }
 
-static int pci_mmcfg_read(int seg, int bus, int devfn, int reg, int len, u32 *value)
+static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+			  unsigned int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
@@ -62,7 +63,8 @@ static int pci_mmcfg_read(int seg, int bus, int devfn, int reg, int len, u32 *va
 	return 0;
 }
 
-static int pci_mmcfg_write(int seg, int bus, int devfn, int reg, int len, u32 value)
+static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+			   unsigned int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
