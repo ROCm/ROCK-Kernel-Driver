@@ -6,10 +6,6 @@
  *
  * This file is part of the SCTP kernel reference Implementation
  *
- * This file is part of the implementation of the add-IP extension,
- * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
- * for the SCTP kernel reference Implementation.
- *
  * These are definitions needed by the state machine.
  *
  * The SCTP reference implementation is free software;
@@ -49,7 +45,6 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-
 
 #include <linux/types.h>
 #include <linux/compiler.h>
@@ -269,11 +264,6 @@ struct sctp_chunk *sctp_make_op_error(const struct sctp_association *,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(struct sctp_chunk *);
 void sctp_chunk_assign_ssn(struct sctp_chunk *);
-int sctp_datachunks_from_user(struct sctp_association *,
-			      const struct sctp_sndrcvinfo *,
-			      struct msghdr *, int len,
-			      struct sk_buff_head *);
-
 
 /* Prototypes for statetable processing. */
 

@@ -160,7 +160,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 			if (ev)
 				sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
 
-			sctp_free_chunk(chunk);
+			sctp_chunk_free(chunk);
 		}
 	}
 
@@ -169,7 +169,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any chunks in the retransmit queue. */
@@ -177,7 +177,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		list_del(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any leftover data chunks. */
@@ -190,14 +190,14 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		if (ev)
 			sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
 
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 	}
 
 	q->error = 0;
 
 	/* Throw away any leftover control chunks. */
 	while ((chunk = (struct sctp_chunk *) skb_dequeue(&q->control)))
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 }
 
 /* Free the outqueue structure and any related pending chunks.  */
@@ -653,6 +653,7 @@ struct sctp_chunk *sctp_fragment_chunk(struct sctp_chunk *chunk,
 
 	if (!first_frag)
 		goto err;
+	sctp_datamsg_assign(chunk->msg, first_frag);
 	first_frag->has_ssn = 1;
 	/* All the fragments are added to the frag_list of the first chunk. */
 	frag_list = &first_frag->frag_list;
@@ -667,6 +668,7 @@ struct sctp_chunk *sctp_fragment_chunk(struct sctp_chunk *chunk,
 					  ssn);
 		if (!frag)
 			goto err;
+		sctp_datamsg_assign(chunk->msg, frag);
 		frag->has_ssn = 1;
 		/* Add the middle fragment to the first fragment's
 		 * frag_list.
@@ -687,13 +689,14 @@ struct sctp_chunk *sctp_fragment_chunk(struct sctp_chunk *chunk,
 				  flags, ssn);
 	if (!frag)
 		goto err;
+	sctp_datamsg_assign(chunk->msg, frag);
 	frag->has_ssn = 1;
 
 	/* Add the last fragment to the first fragment's frag_list. */
 	list_add_tail(&frag->frag_list, frag_list);
 
 	/* Free the original chunk. */
-	sctp_free_chunk(chunk);
+	sctp_chunk_free(chunk);
 
 	return first_frag;
 
@@ -706,11 +709,10 @@ err:
 		flist = &first_frag->frag_list;
 		while (NULL != (lfrag = sctp_list_dequeue(flist))) {
 			frag = list_entry(lfrag, struct sctp_chunk, frag_list);
-			sctp_free_chunk(frag);
+			sctp_chunk_free(frag);
 		}
-
 		/* Free the first fragment. */
-		sctp_free_chunk(first_frag);
+		sctp_chunk_free(first_frag);
 	}
 
 	return NULL;
@@ -917,7 +919,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					sctp_ulpq_tail_event(&asoc->ulpq, ev);
 
 				/* Free the chunk. */
-				sctp_free_chunk(chunk);
+				sctp_chunk_free(chunk);
 				continue;
 			}
 
@@ -994,7 +996,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					 * memory condition. Free the original
 					 * chunk and return ENOMEM.
 					 */
-					sctp_free_chunk(chunk);
+					sctp_chunk_free(chunk);
 					error = -ENOMEM;
 					return error;
 				}
@@ -1201,7 +1203,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 		if (TSN_lte(tsn, ctsn)) {
 			lchunk = lchunk->prev;
-			sctp_free_chunk(tchunk);
+			sctp_chunk_free(tchunk);
 		}
 	}
 
@@ -1300,7 +1302,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 	/* The while loop will skip empty transmitted queues. */
 	while (NULL != (lchunk = sctp_list_dequeue(transmitted_queue))) {
-		tchunk = list_entry(lchunk, struct sctp_chunk, 
+		tchunk = list_entry(lchunk, struct sctp_chunk,
 				    transmitted_list);
 
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
@@ -1531,8 +1533,8 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 			 * receiver's advertised window is zero, and there is
 			 * only one data chunk in flight to the receiver.
 			 */
-			if ((0 == q->asoc->peer.rwnd) &&
-			    (!list_empty(&tlist)) &&
+			if (!q->asoc->peer.rwnd &&
+			    !list_empty(&tlist) &&
 			    (sack_ctsn+2 == q->asoc->next_tsn)) {
 				SCTP_DEBUG_PRINTK("%s: SACK received for zero "
 						  "window probe: %u\n",

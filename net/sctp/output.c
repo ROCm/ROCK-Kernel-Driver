@@ -114,7 +114,7 @@ void sctp_packet_free(struct sctp_packet *packet)
 	struct sctp_chunk *chunk;
 
         while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)))
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 
 	if (packet->malloced)
 		kfree(packet);
@@ -374,6 +374,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 					chunk->rtt_in_progress = 1;
 					tp->rto_pending = 1;
 				}
+				sctp_datamsg_track(chunk);
 			} else
 				chunk->resent = 1;
 
@@ -406,7 +407,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		 * acknowledged or have failed.
 		 */
 		if (!sctp_chunk_is_data(chunk))
-			sctp_free_chunk(chunk);
+    			sctp_chunk_free(chunk);
 	}
 
 	/* Perform final transformation on checksum. */

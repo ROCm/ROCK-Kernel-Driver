@@ -232,7 +232,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 					ntohs(err_chunk->chunk_hdr->length) -
 					sizeof(sctp_chunkhdr_t));
 
-			sctp_free_chunk(err_chunk);
+			sctp_chunk_free(err_chunk);
 
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
@@ -303,7 +303,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 		 * parameter type.
 		 */
 		sctp_addto_chunk(repl, len, unk_param);
-		sctp_free_chunk(err_chunk);
+		sctp_chunk_free(err_chunk);
 	}
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(repl));
@@ -320,7 +320,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 
 nomem_ack:
 	if (err_chunk)
-		sctp_free_chunk(err_chunk);
+		sctp_chunk_free(err_chunk);
 nomem_init:
 	sctp_association_free(new_asoc);
 nomem:
@@ -416,7 +416,7 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 					ntohs(err_chunk->chunk_hdr->length) -
 					sizeof(sctp_chunkhdr_t));
 
-			sctp_free_chunk(err_chunk);
+			sctp_chunk_free(err_chunk);
 
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
@@ -623,7 +623,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const struct sctp_endpoint *ep,
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem_ev:
-	sctp_free_chunk(repl);
+	sctp_chunk_free(repl);
 nomem_repl:
 nomem_init:
 	sctp_association_free(new_asoc);
@@ -1238,7 +1238,7 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 		 * parameter type.
 		 */
 		sctp_addto_chunk(repl, len, unk_param);
-		sctp_free_chunk(err_chunk);
+		sctp_chunk_free(err_chunk);
 	}
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_ASOC, SCTP_ASOC(new_asoc));
@@ -1254,7 +1254,7 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 
 cleanup:
 	if (err_chunk)
-		sctp_free_chunk(err_chunk);
+		sctp_chunk_free(err_chunk);
 	return retval;
 nomem:
 	retval = SCTP_DISPOSITION_NOMEM;
@@ -1429,7 +1429,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const struct sctp_endpoint *ep,
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem_ev:
-	sctp_free_chunk(repl);
+	sctp_chunk_free(repl);
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -1492,7 +1492,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const struct sctp_endpoint *ep,
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem_ev:
-	sctp_free_chunk(repl);
+	sctp_chunk_free(repl);
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -4540,6 +4540,6 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 					SCTP_PACKET(packet));
 			SCTP_INC_STATS(SctpOutCtrlChunks);
 		} else
-			sctp_free_chunk (err_chunk);
+			sctp_chunk_free (err_chunk);
 	}
 }

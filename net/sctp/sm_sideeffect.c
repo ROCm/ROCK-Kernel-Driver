@@ -910,7 +910,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			new_obj = sctp_make_cookie_echo(asoc, chunk);
 			if (!new_obj) {
 				if (cmd->obj.ptr)
-					sctp_free_chunk(cmd->obj.ptr);
+					sctp_chunk_free(cmd->obj.ptr);
 				goto nomem;
 			}
 			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,

@@ -79,13 +79,13 @@ void sctp_inq_free(struct sctp_inq *queue)
 
 	/* Empty the queue.  */
 	while ((chunk = (struct sctp_chunk *) skb_dequeue(&queue->in)))
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 
 	/* If there is a packet which is currently being worked on,
 	 * free it as well.
 	 */
 	if (queue->in_progress)
-		sctp_free_chunk(queue->in_progress);
+		sctp_chunk_free(queue->in_progress);
 
 	if (queue->malloced) {
 		/* Dump the master memory segment.  */
@@ -130,7 +130,7 @@ struct sctp_chunk *sctp_inq_pop(struct sctp_inq *queue)
 		if (chunk->singleton ||
 		    chunk->end_of_packet ||
 		    chunk->pdiscard) {
-			sctp_free_chunk(chunk);
+			sctp_chunk_free(chunk);
 			chunk = queue->in_progress = NULL;
 		} else {
 			/* Nothing to do. Next chunk in the packet, please. */

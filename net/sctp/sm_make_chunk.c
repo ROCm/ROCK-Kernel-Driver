@@ -505,7 +505,7 @@ struct sctp_chunk *sctp_make_datafrag_empty(struct sctp_association *asoc,
 				       int data_len, __u8 flags, __u16 ssn)
 {
 	struct sctp_chunk *retval;
-	sctp_datahdr_t dp;
+	struct sctp_datahdr dp;
 	int chunk_len;
 
 	/* We assign the TSN as LATE as possible, not here when
@@ -519,7 +519,7 @@ struct sctp_chunk *sctp_make_datafrag_empty(struct sctp_association *asoc,
 	if (sinfo->sinfo_flags & MSG_UNORDERED) {
 		flags |= SCTP_DATA_UNORDERED;
 		dp.ssn = 0;
-	} else 
+	} else
 		dp.ssn = htons(ssn);
 
 	chunk_len = sizeof(dp) + data_len;
@@ -857,7 +857,7 @@ struct sctp_chunk *sctp_make_abort_user(const struct sctp_association *asoc,
 err_copy:
 	kfree(payload);
 err_payload:
-	sctp_free_chunk(retval);
+	sctp_chunk_free(retval);
 	retval = NULL;
 err_chunk:
 	return retval;
@@ -1003,10 +1003,17 @@ struct sctp_chunk *sctp_chunkify(struct sk_buff *skb,
 	retval->tsn_gap_acked = 0;
 	retval->fast_retransmit = 0;
 
+	/* If this is a fragmented message, track all fragments
+	 * of the message (for SEND_FAILED).
+	 */
+	retval->msg = NULL;
+
 	/* Polish the bead hole.  */
 	INIT_LIST_HEAD(&retval->transmitted_list);
 	INIT_LIST_HEAD(&retval->frag_list);
 	SCTP_DBG_OBJCNT_INC(chunk);
+	atomic_set(&retval->refcnt, 1);
+
 
 nodata:
 	return retval;
@@ -1074,12 +1081,10 @@ nodata:
 	return NULL;
 }
 
+
 /* Release the memory occupied by a chunk.  */
-void sctp_free_chunk(struct sctp_chunk *chunk)
+static void sctp_chunk_destroy(struct sctp_chunk *chunk)
 {
-	/* Make sure that we are not on any list.  */
-	skb_unlink((struct sk_buff *) chunk);
-	list_del(&chunk->transmitted_list);
 
 	/* Free the chunk skb data and the SCTP_chunk stub itself. */
 	dev_kfree_skb(chunk->skb);
@@ -1088,6 +1093,32 @@ void sctp_free_chunk(struct sctp_chunk *chunk)
 	SCTP_DBG_OBJCNT_DEC(chunk);
 }
 
+/* Possibly, free the chunk.  */
+void sctp_chunk_free(struct sctp_chunk *chunk)
+{
+	/* Make sure that we are not on any list.  */
+	skb_unlink((struct sk_buff *) chunk);
+	list_del(&chunk->transmitted_list);
+
+	/* Release our reference on the message tracker. */
+	if (chunk->msg)
+		sctp_datamsg_put(chunk->msg);
+
+	sctp_chunk_put(chunk);
+}
+
+/* Grab a reference to the chunk. */
+void sctp_chunk_hold(struct sctp_chunk *ch)
+{
+	atomic_inc(&ch->refcnt);
+}
+
+/* Release a reference to the chunk. */
+void sctp_chunk_put(struct sctp_chunk *ch)
+{
+	if (atomic_dec_and_test(&ch->refcnt))
+		sctp_chunk_destroy(ch);
+}
 
 /* Append bytes to the end of a chunk.  Will panic if chunk is not big
  * enough.
@@ -1116,8 +1147,8 @@ void *sctp_addto_chunk(struct sctp_chunk *chunk, int len, const void *data)
  * chunk is not big enough.
  * Returns a kernel err value.
  */
-static int sctp_user_addto_chunk(struct sctp_chunk *chunk, int off, int len,
-				 struct iovec *data)
+int sctp_user_addto_chunk(struct sctp_chunk *chunk, int off, int len,
+			  struct iovec *data)
 {
 	__u8 *target;
 	int err = 0;
@@ -1134,126 +1165,6 @@ static int sctp_user_addto_chunk(struct sctp_chunk *chunk, int off, int len,
 		htons(ntohs(chunk->chunk_hdr->length) + len);
 	chunk->chunk_end = chunk->skb->tail;
 
-out:
-	return err;
-}
-
-/* A data chunk can have a maximum payload of (2^16 - 20).  Break
- * down any such message into smaller chunks.  Opportunistically, fragment
- * the chunks down to the current MTU constraints.  We may get refragmented
- * later if the PMTU changes, but it is _much better_ to fragment immediately
- * with a reasonable guess than always doing our fragmentation on the
- * soft-interrupt.
- */
-int sctp_datachunks_from_user(struct sctp_association *asoc,
-			      const struct sctp_sndrcvinfo *sinfo,
-			      struct msghdr *msg, int msg_len,
-			      struct sk_buff_head *chunks)
-{
-	int max, whole, i, offset, over, err;
-	int len, first_len;
-	struct sctp_chunk *chunk;
-	__u8 frag;
-
-	/* What is a reasonable fragmentation point right now? */
-	max = asoc->pmtu;
-	if (max < SCTP_MIN_PMTU)
-		max = SCTP_MIN_PMTU;
-	max -= SCTP_IP_OVERHEAD;
-
-	/* Make sure not beyond maximum chunk size. */
-	if (max > SCTP_MAX_CHUNK_LEN)
-		max = SCTP_MAX_CHUNK_LEN;
-
-	/* Subtract out the overhead of a data chunk header. */
-	max -= sizeof(struct sctp_data_chunk);
-
-	whole = 0;
-	first_len = max;
-
-	/* Encourage Cookie-ECHO bundling. */
-	if (asoc->state < SCTP_STATE_COOKIE_ECHOED) {
-		whole = msg_len / (max - SCTP_ARBITRARY_COOKIE_ECHO_LEN);
-
-		/* Account for the DATA to be bundled with the COOKIE-ECHO. */
-		if (whole) {
-			first_len = max - SCTP_ARBITRARY_COOKIE_ECHO_LEN;
-			msg_len -= first_len;
-			whole = 1;
-		}
-	}
-
-	/* How many full sized?  How many bytes leftover? */
-	whole += msg_len / max;
-	over = msg_len % max;
-	offset = 0;
-
-	if (whole && over)
-		SCTP_INC_STATS_USER(SctpFragUsrMsgs);
-
-	/* Create chunks for all the full sized DATA chunks. */
-	for (i=0, len=first_len; i < whole; i++) {
-		frag = SCTP_DATA_MIDDLE_FRAG;
-
-		if (0 == i)
-			frag |= SCTP_DATA_FIRST_FRAG;
-
-		if ((i == (whole - 1)) && !over)
-			frag |= SCTP_DATA_LAST_FRAG;
-
-		chunk = sctp_make_datafrag_empty(asoc, sinfo, len, frag, 0);
-
-		if (!chunk)
-			goto nomem;
-		err = sctp_user_addto_chunk(chunk, offset, len, msg->msg_iov);
-		if (err < 0)
-			goto errout;
-
-		offset += len;
-
-		/* Put the chunk->skb back into the form expected by send.  */
-		__skb_pull(chunk->skb, (__u8 *)chunk->chunk_hdr
-			   - (__u8 *)chunk->skb->data);
-
-		__skb_queue_tail(chunks, (struct sk_buff *)chunk);
-
-		/* The first chunk, the first chunk was likely short
-		 * to allow bundling, so reset to full size.
-		 */
-		if (0 == i)
-			len = max;
-	}
-
-	/* .. now the leftover bytes. */
-	if (over) {
-		if (!whole)
-			frag = SCTP_DATA_NOT_FRAG;
-		else
-			frag = SCTP_DATA_LAST_FRAG;
-
-		chunk = sctp_make_datafrag_empty(asoc, sinfo, over, frag, 0);
-
-		if (!chunk)
-			goto nomem;
-
-		err = sctp_user_addto_chunk(chunk, offset, over, msg->msg_iov);
-
-		/* Put the chunk->skb back into the form expected by send.  */
-		__skb_pull(chunk->skb, (__u8 *)chunk->chunk_hdr
-			   - (__u8 *)chunk->skb->data);
-		if (err < 0)
-			goto errout;
-
-		__skb_queue_tail(chunks, (struct sk_buff *)chunk);
-	}
-	err = 0;
-	goto out;
-
-nomem:
-	err = -ENOMEM;
-errout:
-	while ((chunk = (struct sctp_chunk *)__skb_dequeue(chunks)))
-		sctp_free_chunk(chunk);
 out:
 	return err;
 }

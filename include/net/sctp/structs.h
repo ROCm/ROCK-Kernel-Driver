@@ -70,7 +70,6 @@ union sctp_addr {
 	struct sockaddr sa;
 };
 
-
 /* Forward declarations for data structures. */
 struct sctp_protocol;
 struct sctp_endpoint;
@@ -448,6 +447,29 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
 	return stream->ssn[id]++;
 }
 
+/* Structure to track chunk fragments that have been acked, but peer
+ * fragments of the same message have not.  
+ */
+struct sctp_datamsg {
+	/* Chunks waiting to be submitted to lower layer. */
+	struct list_head chunks;
+	/* Chunks that have been transmitted. */
+	struct list_head track;
+	/* Reference counting. */
+	atomic_t refcnt;
+	/* Have the SEND_FAILED notifications been done. */
+	__u8 notify_done;
+};
+
+struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *,
+					    struct sctp_sndrcvinfo *,
+					    struct msghdr *, int len);
+struct sctp_datamsg *sctp_datamsg_new(int gfp);
+void sctp_datamsg_put(struct sctp_datamsg *);
+void sctp_datamsg_hold(struct sctp_datamsg *);
+void sctp_datamsg_free(struct sctp_datamsg *);
+void sctp_datamsg_track(struct sctp_chunk *);
+void sctp_datamsg_assign(struct sctp_datamsg *, struct sctp_chunk *);
 
 /* RFC2960 1.4 Key Terms
  *
@@ -465,6 +487,7 @@ struct sctp_chunk {
 	struct sctp_chunk *next;
 	struct sctp_chunk *prev;
 	struct sk_buff_head *list;
+	atomic_t refcnt;
 
 	/* This is our link to the per-transport transmitted list.  */
 	struct list_head transmitted_list;
@@ -536,6 +559,9 @@ struct sctp_chunk {
 	/* Destination address for this chunk. */
 	union sctp_addr dest;
 
+	/* For outbound message, track all fragments for SEND_FAILED. */
+	struct sctp_datamsg *msg;
+
 	/* For an inbound chunk, this tells us where it came from.
 	 * For an outbound chunk, it tells us where we'd like it to
 	 * go.  It is NULL if we have no preference.
@@ -543,9 +569,13 @@ struct sctp_chunk {
 	struct sctp_transport *transport;
 };
 
+void sctp_chunk_hold(struct sctp_chunk *);
+void sctp_chunk_put(struct sctp_chunk *);
+int sctp_user_addto_chunk(struct sctp_chunk *chunk, int off, int len,
+			  struct iovec *data);
 struct sctp_chunk *sctp_make_chunk(const struct sctp_association *, __u8 type,
 				   __u8 flags, int size);
-void sctp_free_chunk(struct sctp_chunk *);
+void sctp_chunk_free(struct sctp_chunk *);
 void  *sctp_addto_chunk(struct sctp_chunk *, int len, const void *data);
 struct sctp_chunk *sctp_chunkify(struct sk_buff *, 
 				 const struct sctp_association *,

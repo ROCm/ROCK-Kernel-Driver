@@ -749,7 +749,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct sctp_opt *sp;
 	struct sctp_endpoint *ep;
 	struct sctp_association *new_asoc=NULL, *asoc=NULL;
-	struct sctp_transport *transport;
+	struct sctp_transport *transport, *chunk_tp;
 	struct sctp_chunk *chunk = NULL;
 	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
@@ -762,7 +762,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_scope_t scope;
 	long timeo;
 	__u16 sinfo_flags = 0;
-	struct sk_buff_head chunks;
+	struct sctp_datamsg *datamsg;
+	struct list_head *pos, *temp;
 
 	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
 			  sk, msg, msg_len);
@@ -828,11 +829,19 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		goto out_nounlock;
 	}
 
-	sctp_lock_sock(sk);
+	/* If MSG_ADDR_OVER is set, there must be an address
+	 * specified in msg_name.
+	 */
+	if ((sinfo_flags & MSG_ADDR_OVER) && (!msg->msg_name)) {
+		err = -EINVAL;
+		goto out_nounlock;
+	}
 
 	transport = NULL;
 
 	SCTP_DEBUG_PRINTK("About to look up association.\n");
+
+	sctp_lock_sock(sk);
 
 	/* If a msg_name has been specified, assume this is to be used.  */
 	if (msg_name) {
@@ -1005,11 +1014,25 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			goto out_free;
 	}
 
+	/* This flag, in the UDP model, requests the SCTP stack to
+	 * override the primary destination address with the
+	 * address found with the sendto/sendmsg call.
+	 */
+	if (sinfo_flags & MSG_ADDR_OVER) {
+		chunk_tp = sctp_assoc_lookup_paddr(asoc, &to);
+		if (!chunk_tp) {
+			err = -EINVAL;
+			goto out_free;
+		}
+	} else
+		chunk_tp = NULL;
+
 	/* Break the message into multiple chunks of maximum size. */
-	skb_queue_head_init(&chunks);
-	err = sctp_datachunks_from_user(asoc, sinfo, msg, msg_len, &chunks);
-	if (err)
+	datamsg = sctp_datamsg_from_user(asoc, sinfo, msg, msg_len);
+	if (!datamsg) {
+		err = -ENOMEM;
 		goto out_free;
+	}
 
 	/* Auto-connect, if we aren't connected already. */
 	if (SCTP_STATE_CLOSED == asoc->state) {
@@ -1020,31 +1043,20 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 
 	/* Now send the (possibly) fragmented message. */
-	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&chunks))) {
-
+	list_for_each_safe(pos, temp, &datamsg->chunks) {
+		chunk = list_entry(pos, struct sctp_chunk, frag_list);
+		list_del_init(pos);
+		
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
-
-		/* This flag, in the UDP model, requests the SCTP stack to
-		 * override the primary destination address with the
-		 * address found with the sendto/sendmsg call.
-		 */
-		if (sinfo_flags & MSG_ADDR_OVER) {
-			if (!msg->msg_name) {
-				err = -EINVAL;
-				goto out_free;
-			}
-			chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
-			if (!chunk->transport) {
-				err = -EINVAL;
-				goto out_free;
-			}
-		}
+		
+		chunk->transport = chunk_tp;
 
 		/* Send it to the lower layers.  */
 		sctp_primitive_SEND(asoc, chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
 	}
+	sctp_datamsg_free(datamsg);
 
 	if (!err) {
 		err = msg_len;
@@ -1060,8 +1072,9 @@ out_free:
 		sctp_association_free(asoc);
 
 out_free_chunk:
+	/* The datamsg struct will auto-destruct via ref counting. */
 	if (chunk)
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 
 out_unlock:
 	sctp_release_sock(sk);
