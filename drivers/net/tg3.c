@@ -2172,7 +2172,7 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 					else
 						val |= 0x4010880;
 
-					tw32_f(MAC_SERDES_CFG, serdes_cfg);
+					tw32_f(MAC_SERDES_CFG, val);
 				}
 
 				tw32_f(SG_DIG_CTRL, 0x01388400);
