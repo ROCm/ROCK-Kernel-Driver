@@ -164,37 +164,6 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset+0x80);
-}
-
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset+0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	readfifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, 
@@ -227,75 +196,65 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static u8
-mem_ipac_dc_read(struct IsdnCardState *cs, u8 offset)
+static inline u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return memreadreg(cs->hw.diva.cfg_reg, offset+0x80);
+	return readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset);
 }
 
-static void
-mem_ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
+static inline void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	memwritereg(cs->hw.diva.cfg_reg, offset|0x80, value);
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, value);
 }
 
-static void
-mem_ipac_dc_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	readfifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, data, size);
+}
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
+
+static inline u8
+mem_ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return memreadreg(cs->hw.diva.cfg_reg, offset);
+}
+
+static inline void
+mem_ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	memwritereg(cs->hw.diva.cfg_reg, offset, value);
+}
+
+static inline void
+mem_ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
 {
 	while(size--)
-		*data++ = memreadreg(cs->hw.diva.cfg_reg, 0x80);
+		*data++ = memreadreg(cs->hw.diva.cfg_reg, offset);
 }
 
-static void
-mem_ipac_dc_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
+static inline void
+mem_ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
 {
 	while(size--)
-		memwritereg(cs->hw.diva.cfg_reg, 0x80, *data++);
+		memwritereg(cs->hw.diva.cfg_reg, offset, *data++);
 }
 
-static struct dc_hw_ops mem_ipac_dc_ops = {
-	.read_reg   = mem_ipac_dc_read,
-	.write_reg  = mem_ipac_dc_write,
-	.read_fifo  = mem_ipac_dc_read_fifo,
-	.write_fifo = mem_ipac_dc_write_fifo,
-};
+/* This will generate mem_ipac_dc_ops and mem_ipac_bc_ops using the functions
+ * above */
 
-static u8
-mem_hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
-{
-	return memreadreg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0));
-}
-
-static void
-mem_hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
-{
-	memwritereg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0), value);
-}
-
-static void
-mem_hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-		*data++ = memreadreg(cs->hw.diva.cfg_reg, hscx ? 0x40 : 0);
-}
-
-static void
-mem_hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-		memwritereg(cs->hw.diva.cfg_reg, hscx ? 0x40 : 0, *data++);
-}
-
-static struct bc_hw_ops mem_hscx_ops = {
-	.read_reg   = mem_hscx_read,
-	.write_reg  = mem_hscx_write,
-	.read_fifo  = mem_hscx_read_fifo,
-	.write_fifo = mem_hscx_write_fifo,
-};
+BUILD_IPAC_OPS(mem_ipac);
 
 /* IO-Functions for IPACX type cards */
 static u8
@@ -374,18 +333,6 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "Diva: IRQ LOOP\n");
 }
 
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
-{
-	return ipac_dc_read(cs, offset - 0x80);
-}
-
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	ipac_dc_write(cs, offset - 0x80, value);
-}
-
 static void
 diva_ipac_isa_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -434,18 +381,6 @@ Start_IPACISA:
 	ipac_write(cs, IPAC_MASK, 0xC0);
 }
 
-static u8
-mem_ipac_read(struct IsdnCardState *cs, u8 offset)
-{
-	return mem_ipac_dc_read(cs, offset - 0x80);
-}
-
-static void
-mem_ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	mem_ipac_dc_write(cs, offset - 0x80, value);
-}
-
 static void
 diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -462,7 +397,7 @@ Start_IPACPCI:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = mem_hscx_read(cs, 1, HSCX_ISTA);
+		val = mem_ipac_bc_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -962,14 +897,14 @@ ready:
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		diva_ipac_isa_reset(cs);
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &hscx_ops;
+		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &diva_ipac_isa_ops;
 		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
 		diva_ipac_pci_reset(cs);
 		cs->dc_hw_ops = &mem_ipac_dc_ops;
-		cs->bc_hw_ops = &mem_hscx_ops;
+		cs->bc_hw_ops = &mem_ipac_bc_ops;
 		cs->card_ops = &diva_ipac_pci_ops;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);

@@ -42,7 +42,7 @@ static const char *sct_quadro_subtypes[] =
 #define wordin(addr) inw(addr)
 
 static inline u8
-readreg(struct IsdnCardState *cs, u8 off)
+ipac_read(struct IsdnCardState *cs, u8 off)
 {
 	u8 ret;
 	unsigned long flags;
@@ -51,13 +51,14 @@ readreg(struct IsdnCardState *cs, u8 off)
 	wordout(cs->hw.ax.base, off);
 	ret = wordin(cs->hw.ax.data_adr) & 0xFF;
 	spin_unlock_irqrestore(&bkm_a8_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void
-writereg(struct IsdnCardState *cs, u8 off, u8 data)
+ipac_write(struct IsdnCardState *cs, u8 off, u8 data)
 {
 	unsigned long flags;
+
 	spin_lock_irqsave(&bkm_a8_lock, flags);
 	wordout(cs->hw.ax.base, off);
 	wordout(cs->hw.ax.data_adr, data);
@@ -65,7 +66,7 @@ writereg(struct IsdnCardState *cs, u8 off, u8 data)
 }
 
 static inline void
-readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
+ipac_readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 {
 	int i;
 
@@ -75,7 +76,7 @@ readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 }
 
 static inline void
-writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
+ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 {
 	int i;
 
@@ -84,86 +85,17 @@ writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 		wordout(cs->hw.ax.data_adr, data[i]);
 }
 
-static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs, offset + 0x80);
-}
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
 
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs, offset + 0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	readfifo(cs, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	writefifo(cs, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
-hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
-{
-	return readreg(cs, offset + (hscx ? 0x40 : 0));
-}
-
-static void
-hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
-{
-	writereg(cs, offset + (hscx ? 0x40 : 0), value);
-}
-
-static void
-hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
-{
-	readfifo(cs, hscx ? 0x40 : 0, data, size);
-}
-
-static void
-hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
-{
-	writefifo(cs, hscx ? 0x40 : 0, data, size);
-}
-
-static struct bc_hw_ops hscx_ops = {
-	.read_reg   = hscx_read,
-	.write_reg  = hscx_write,
-	.read_fifo  = hscx_read_fifo,
-	.write_fifo = hscx_write_fifo,
-};
-
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
-{
-	return ipac_dc_read(cs, offset - 0x80);
-}
-
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	ipac_dc_write(cs, offset - 0x80, value);
-}
-
+BUILD_IPAC_OPS(ipac);
+  
 /* Set the specific ipac to active */
 static void
 set_ipac_active(struct IsdnCardState *cs, u_int active)
 {
 	/* set irq mask */
-	writereg(cs, IPAC_MASK, active ? 0xc0 : 0xff);
+	ipac_write(cs, IPAC_MASK, active ? 0xc0 : 0xff);
 }
 
 static void
@@ -180,7 +112,7 @@ bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = hscx_read(cs, 1, HSCX_ISTA);
+		val = ipac_bc_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -438,7 +370,7 @@ setup_sct_quadro(struct IsdnCard *card)
 			break;
 	}	
 	cs->hw.ax.data_adr = cs->hw.ax.base + 4;
-	writereg(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xFF);
 
 	printk(KERN_INFO "HiSax: %s (%s) configured at 0x%.4lX, 0x%.4lX, 0x%.4lX and IRQ %d\n",
 	       CardType[card->typ],
@@ -451,14 +383,14 @@ setup_sct_quadro(struct IsdnCard *card)
 	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 
 	cs->dc_hw_ops = &ipac_dc_ops;
-	cs->bc_hw_ops = &hscx_ops;
+	cs->bc_hw_ops = &ipac_bc_ops;
 	cs->cardmsg = &BKM_card_msg;
 	cs->card_ops = &bkm_a8_ops;
 
 	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
 		CardType[card->typ],
 		sct_quadro_subtypes[cs->subtyp],
-		readreg(cs, IPAC_ID));
+		ipac_read(cs, IPAC_ID));
 	return (1);
 #else
 	printk(KERN_ERR "HiSax: bkm_a8 only supported on PCI Systems\n");

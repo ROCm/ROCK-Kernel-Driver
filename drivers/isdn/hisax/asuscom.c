@@ -114,37 +114,6 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs, cs->hw.asus.isac, offset+0x80);
-}
-
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs, cs->hw.asus.isac, offset+0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	readfifo(cs, cs->hw.asus.isac, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	writefifo(cs, cs->hw.asus.isac, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0));
@@ -175,17 +144,49 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
+static inline u8
+ipac_read(struct IsdnCardState *cs, u8 off)
 {
-	return ipac_dc_read(cs, offset - 0x80);
+	u8 ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&asuscom_lock, flags);
+	byteout(cs->hw.asus.adr, off);
+	ret = bytein(cs->hw.asus.isac);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
+	return ret;
 }
 
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+static inline void
+ipac_write(struct IsdnCardState *cs, u8 off, u8 data)
 {
-	ipac_dc_write(cs, offset - 0x80, value);
+	unsigned long flags;
+
+	spin_lock_irqsave(&asuscom_lock, flags);
+	byteout(cs->hw.asus.adr, off);
+	byteout(cs->hw.asus.isac, data);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
+
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.asus.adr, off);
+	insb(cs->hw.asus.isac, data, size);
+}
+
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.asus.adr, off);
+	outsb(cs->hw.asus.isac, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
 
 static void
 asuscom_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
@@ -381,7 +382,6 @@ setup_asuscom(struct IsdnCard *card)
 	}
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Asus_card_msg;
 	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
@@ -392,6 +392,7 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
+		cs->bc_hw_ops = &ipac_bc_ops;
 		printk(KERN_INFO "Asus: IPAC version %x\n", val);
 	} else {
 		cs->subtyp = ASUS_ISACHSCX;
@@ -402,6 +403,7 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
 		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
 		cs->dc_hw_ops = &isac_ops;
+		cs->bc_hw_ops = &hscx_ops;
 		ISACVersion(cs, "ISDNLink:");
 		if (HscxVersion(cs, "ISDNLink:")) {
 			printk(KERN_WARNING

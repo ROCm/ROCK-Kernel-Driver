@@ -69,45 +69,6 @@ write_fifo(unsigned int adr, u8 * data, int size)
 	outsb(adr, data, size);
 }
 
-static inline u8
-readreg_ipac(struct IsdnCardState *cs, u_short off)
-{
-	register u8 ret;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(cs->hw.gazel.ipac, off);
-	ret = bytein(cs->hw.gazel.ipac + 4);
-	spin_unlock_irqrestore(&gazel_lock, flags);
-	return ret;
-}
-
-static inline void
-writereg_ipac(struct IsdnCardState *cs, u_short off, u8 data)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(cs->hw.gazel.ipac, off);
-	byteout(cs->hw.gazel.ipac + 4, data);
-	spin_unlock_irqrestore(&gazel_lock, flags);
-}
-
-
-static inline void
-read_fifo_ipac(struct IsdnCardState *cs, u_short off, u8 * data, int size)
-{
-	byteout(cs->hw.gazel.ipac, off);
-	insb(cs->hw.gazel.ipac + 4, data, size);
-}
-
-static void
-write_fifo_ipac(struct IsdnCardState *cs, u_short off, u8 * data, int size)
-{
-	byteout(cs->hw.gazel.ipac, off);
-	outsb(cs->hw.gazel.ipac + 4, data, size);
-}
-
 static u8
 isac_read(struct IsdnCardState *cs, u8 offset)
 {
@@ -118,9 +79,6 @@ isac_read(struct IsdnCardState *cs, u8 offset)
 			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
 		case R685:
 			return (readreg(cs->hw.gazel.isac, off2));
-		case R753:
-		case R742:
-			return (readreg_ipac(cs, 0x80 + off2));
 	}
 	return 0;
 }
@@ -136,10 +94,6 @@ isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 		case R685:
 			writereg(cs->hw.gazel.isac, off2, value);
 			break;
-		case R753:
-		case R742:
-			writereg_ipac(cs, 0x80 + off2, value);
-			break;
 	}
 }
 
@@ -151,10 +105,6 @@ isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 		case R685:
 			read_fifo(cs->hw.gazel.isacfifo, data, size);
 			break;
-		case R753:
-		case R742:
-			read_fifo_ipac(cs, 0x80, data, size);
-			break;
 	}
 }
 
@@ -165,10 +115,6 @@ isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 		case R647:
 		case R685:
 			write_fifo(cs->hw.gazel.isacfifo, data, size);
-			break;
-		case R753:
-		case R742:
-			write_fifo_ipac(cs, 0x80, data, size);
 			break;
 	}
 }
@@ -190,9 +136,6 @@ hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
 		case R685:
 			return readreg(cs->hw.gazel.hscx[hscx], off2);
-		case R753:
-		case R742:
-			return readreg_ipac(cs, hscx * 0x40 + off2);
 	}
 	return 0;
 }
@@ -208,10 +151,6 @@ hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 		case R685:
 			writereg(cs->hw.gazel.hscx[hscx], off2, value);
 			break;
-		case R753:
-		case R742:
-			writereg_ipac(cs, hscx * 0x40 + off2, value);
-			break;
 	}
 }
 
@@ -222,10 +161,6 @@ hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 		case R647:
 		case R685:
 			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-			break;
-		case R753:
-		case R742:
-			read_fifo_ipac(cs, hscx * 0x40, data, size);
 			break;
 	}
 }
@@ -238,10 +173,6 @@ hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 		case R685:
 			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
 			break;
-		case R753:
-		case R742:
-			write_fifo_ipac(cs, hscx * 0x40, data, size);
-			break;
 	}
 }
 
@@ -252,17 +183,49 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
+static inline u8
+ipac_read(struct IsdnCardState *cs, u_short off)
 {
-	return isac_read(cs, offset - 0x80);
+	register u8 ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gazel_lock, flags);
+	byteout(cs->hw.gazel.ipac, off);
+	ret = bytein(cs->hw.gazel.ipac + 4);
+	spin_unlock_irqrestore(&gazel_lock, flags);
+	return ret;
 }
 
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+static inline void
+ipac_write(struct IsdnCardState *cs, u_short off, u8 data)
 {
-	isac_write(cs, offset - 0x80, value);
+	unsigned long flags;
+
+	spin_lock_irqsave(&gazel_lock, flags);
+	byteout(cs->hw.gazel.ipac, off);
+	byteout(cs->hw.gazel.ipac + 4, data);
+	spin_unlock_irqrestore(&gazel_lock, flags);
 }
+
+
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.gazel.ipac, off);
+	insb(cs->hw.gazel.ipac + 4, data, size);
+}
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.gazel.ipac, off);
+	outsb(cs->hw.gazel.ipac + 4, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
 
 #define MAXCOUNT 5
   
@@ -382,28 +345,28 @@ gazel_ipac_reset(struct IsdnCardState *cs)
 			plxcntrl = inl(addr + PLX_CNTRL);
 		plxcntrl |= (RESET_9050 + RESET_GAZEL);
 		outl(plxcntrl, addr + PLX_CNTRL);
-		writereg_ipac(cs, IPAC_POTA2, 0x20);
+		ipac_write(cs, IPAC_POTA2, 0x20);
 		HZDELAY(4);
 		plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
 		outl(plxcntrl, addr + PLX_CNTRL);
 		HZDELAY(10);
-		writereg_ipac(cs, IPAC_POTA2, 0x00);
-		writereg_ipac(cs, IPAC_ACFG, 0xff);
-		writereg_ipac(cs, IPAC_AOE, 0x0);
-		writereg_ipac(cs, IPAC_MASK, 0xff);
-		writereg_ipac(cs, IPAC_CONF, 0x1);
+		ipac_write(cs, IPAC_POTA2, 0x00);
+		ipac_write(cs, IPAC_ACFG, 0xff);
+		ipac_write(cs, IPAC_AOE, 0x0);
+		ipac_write(cs, IPAC_MASK, 0xff);
+		ipac_write(cs, IPAC_CONF, 0x1);
 		outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
-		writereg_ipac(cs, IPAC_MASK, 0xc0);
+		ipac_write(cs, IPAC_MASK, 0xc0);
 		break;
 	case R742:
-		writereg_ipac(cs, IPAC_POTA2, 0x20);
+		ipac_write(cs, IPAC_POTA2, 0x20);
 		HZDELAY(4);
-		writereg_ipac(cs, IPAC_POTA2, 0x00);
-		writereg_ipac(cs, IPAC_ACFG, 0xff);
-		writereg_ipac(cs, IPAC_AOE, 0x0);
-		writereg_ipac(cs, IPAC_MASK, 0xff);
-		writereg_ipac(cs, IPAC_CONF, 0x1);
-		writereg_ipac(cs, IPAC_MASK, 0xc0);
+		ipac_write(cs, IPAC_POTA2, 0x00);
+		ipac_write(cs, IPAC_ACFG, 0xff);
+		ipac_write(cs, IPAC_AOE, 0x0);
+		ipac_write(cs, IPAC_MASK, 0xff);
+		ipac_write(cs, IPAC_CONF, 0x1);
+		ipac_write(cs, IPAC_MASK, 0xc0);
 		break;
 	}
 	return 0;
@@ -508,7 +471,7 @@ setup_gazelisa(struct IsdnCard *card, struct IsdnCardState *cs)
 	// R647 returns FF if not present or not started
 	// eventually needs improvment
 	cs->hw.gazel.ipac = card->para[1];
-	if (readreg_ipac(cs, IPAC_ID) == 1)
+	if (ipac_read(cs, IPAC_ID) == 1)
 		cs->subtyp = R742;
 	else
 		cs->subtyp = R647;
@@ -677,13 +640,13 @@ setup_gazel(struct IsdnCard *card)
 	if (reserve_regions(card, cs)) {
 		return (0);
 	}
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Gazel_card_msg;
 
 	switch (cs->subtyp) {
 		case R647:
 		case R685:
+			cs->dc_hw_ops = &isac_ops;
+			cs->bc_hw_ops = &hscx_ops;
 			gazel_reset(cs);
 			cs->card_ops = &gazel_ops;
 			ISACVersion(cs, "Gazel:");
@@ -696,9 +659,11 @@ setup_gazel(struct IsdnCard *card)
 			break;
 		case R742:
 		case R753:
+			cs->dc_hw_ops = &ipac_dc_ops;
+			cs->bc_hw_ops = &ipac_bc_ops;
 			gazel_ipac_reset(cs);
 			cs->card_ops = &gazel_ipac_ops;
-			val = readreg_ipac(cs, IPAC_ID);
+			val = ipac_read(cs, IPAC_ID);
 			printk(KERN_INFO "Gazel: IPAC version %x\n", val);
 			break;
 	}

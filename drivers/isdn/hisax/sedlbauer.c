@@ -189,37 +189,6 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs, cs->hw.sedl.isac, offset+0x80);
-}
-
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs, cs->hw.sedl.isac, offset+0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	readfifo(cs, cs->hw.sedl.isac, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	writefifo(cs, cs->hw.sedl.isac, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0));
@@ -249,6 +218,36 @@ static struct bc_hw_ops hscx_ops = {
 	.read_fifo  = hscx_read_fifo,
 	.write_fifo = hscx_write_fifo,
 };
+
+static inline u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return readreg(cs, cs->hw.sedl.isac, offset);
+}
+
+static inline void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	writereg(cs, cs->hw.sedl.isac, offset, value);
+}
+
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	readfifo(cs, cs->hw.sedl.isac, offset, data, size);
+}
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.sedl.isac, offset, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
+
 
 /* ISAR access routines
  * mode = 0 access with IRQ on
@@ -297,18 +296,6 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		return;
 	}
 	hscxisac_irq(intno, dev_id, regs);
-}
-
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
-{
-	return ipac_dc_read(cs, offset - 0x80);
-}
-
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	ipac_dc_write(cs, offset - 0x80, value);
 }
 
 static void
@@ -713,7 +700,6 @@ ready:
 	       cs->hw.sedl.cfg_reg + bytecnt,
 	       cs->irq);
 
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sedl_card_msg;
 
 /*
@@ -760,6 +746,7 @@ ready:
 		}
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
+		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &sedlbauer_ipac_ops;
 
 		val = readreg(cs, cs->hw.sedl.isac, IPAC_ID);
@@ -817,6 +804,7 @@ ready:
 				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_OFF;
 			}
 			cs->card_ops = &sedlbauer_ops;
+			cs->bc_hw_ops = &hscx_ops;
 			ISACVersion(cs, "Sedlbauer:");
 		
 			if (HscxVersion(cs, "Sedlbauer:")) {

@@ -27,3 +27,71 @@
 #define IPAC_PCFG	0xCA
 #define IPAC_SCFG	0xCB
 #define IPAC_TIMR2	0xCC
+
+/* Macro to build the needed D- and B-Channel access routines given
+ * access functions for the IPAC */
+
+#define BUILD_IPAC_OPS(ipac)                                                  \
+                                                                              \
+static u8                                                                     \
+ipac ## _dc_read(struct IsdnCardState *cs, u8 offset)                         \
+{                                                                             \
+	return ipac ## _read(cs, offset+0x80);                                \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _dc_write(struct IsdnCardState *cs, u8 offset, u8 value)              \
+{                                                                             \
+	ipac ## _write(cs, offset+0x80, value);                               \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)          \
+{                                                                             \
+	ipac ## _readfifo(cs, 0x80, data, size);                              \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)         \
+{                                                                             \
+	ipac ## _writefifo(cs, 0x80, data, size);                             \
+}                                                                             \
+                                                                              \
+static struct dc_hw_ops ipac ## _dc_ops = {                                   \
+	.read_reg   = ipac ## _dc_read,                                       \
+	.write_reg  = ipac ## _dc_write,                                      \
+	.read_fifo  = ipac ## _dc_read_fifo,                                  \
+	.write_fifo = ipac ## _dc_write_fifo,                                 \
+};                                                                            \
+                                                                              \
+static u8                                                                     \
+ipac ## _bc_read(struct IsdnCardState *cs, int hscx, u8 offset)               \
+{                                                                             \
+	return ipac ## _read(cs, offset + (hscx ? 0x40 : 0));                 \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _bc_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)    \
+{                                                                             \
+	ipac ## _write(cs, offset + (hscx ? 0x40 : 0), value);                \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _bc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size) \
+{                                                                             \
+	ipac ## _readfifo(cs, hscx ? 0x40 : 0, data, size);                   \
+}                                                                             \
+                                                                              \
+static void                                                                   \
+ipac ## _bc_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)\
+{                                                                             \
+	ipac ## _writefifo(cs, hscx ? 0x40 : 0, data, size);                  \
+}                                                                             \
+                                                                              \
+static struct bc_hw_ops ipac ## _bc_ops = {                                   \
+	.read_reg   = ipac ## _bc_read,                                       \
+	.write_reg  = ipac ## _bc_write,                                      \
+	.read_fifo  = ipac ## _bc_read_fifo,                                  \
+	.write_fifo = ipac ## _bc_write_fifo,                                 \
+}
+

@@ -212,37 +212,6 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs, cs->hw.elsa.isac, offset+0x80);
-}
-
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs, cs->hw.elsa.isac, offset+0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	readfifo(cs, cs->hw.elsa.isac, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	writefifo(cs, cs->hw.elsa.isac, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0));
@@ -272,6 +241,35 @@ static struct bc_hw_ops hscx_ops = {
 	.read_fifo  = hscx_read_fifo,
 	.write_fifo = hscx_write_fifo,
 };
+
+static inline u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return readreg(cs, cs->hw.elsa.isac, offset);
+}
+
+static inline void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	writereg(cs, cs->hw.elsa.isac, offset, value);
+}
+
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	readfifo(cs, cs->hw.elsa.isac, offset, data, size);
+}
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.elsa.isac, offset, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
 
 static inline u8
 readitac(struct IsdnCardState *cs, u8 off)
@@ -354,18 +352,6 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 #endif
 	if (cs->hw.elsa.trig)
 		byteout(cs->hw.elsa.trig, 0x00);
-}
-
-static u8
-ipac_read(struct IsdnCardState *cs, u8 offset)
-{
-	return ipac_dc_read(cs, offset - 0x80);
-}
-
-static void
-ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	ipac_dc_write(cs, offset - 0x80, value);
 }
 
 static void
@@ -1168,16 +1154,17 @@ setup_elsa(struct IsdnCard *card)
 		}
 		printk(KERN_INFO "Elsa: timer OK; resetting card\n");
 	}
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Elsa_card_msg;
 	elsa_reset(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
 		cs->dc_hw_ops = &ipac_dc_ops;
+		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &elsa_ipac_ops;
 		val = readreg(cs, cs->hw.elsa.isac, IPAC_ID);
 		printk(KERN_INFO "Elsa: IPAC version %x\n", val);
 	} else {
 		cs->dc_hw_ops = &isac_ops;
+		cs->bc_hw_ops = &hscx_ops;
 		cs->card_ops = &elsa_ops;
 		ISACVersion(cs, "Elsa:");
 		if (HscxVersion(cs, "Elsa:")) {
