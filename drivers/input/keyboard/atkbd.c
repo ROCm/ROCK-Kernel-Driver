@@ -333,6 +333,10 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 
 	if (command == ATKBD_CMD_RESET_BAT)
 		timeout = 2000000; /* 2 sec */
+
+	if (receive && param)
+		for (i = 0; i < receive; i++)
+			atkbd->cmdbuf[(receive - 1) - i] = param[i];
 	
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
@@ -385,7 +389,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 		 133, 149, 167, 182, 200, 217, 232, 250, 270, 303, 333, 370, 400, 435, 470, 500 };
 	const short delay[4] =
 		{ 250, 500, 750, 1000 };
-	char param[2];
+	unsigned char param[2];
 	int i, j;
 
 	if (!atkbd->write)
@@ -395,9 +399,9 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 
 		case EV_LED:
 
-			*param = (test_bit(LED_SCROLLL, dev->led) ? 1 : 0)
-			       | (test_bit(LED_NUML,    dev->led) ? 2 : 0)
-			       | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
+			param[0] = (test_bit(LED_SCROLLL, dev->led) ? 1 : 0)
+			         | (test_bit(LED_NUML,    dev->led) ? 2 : 0)
+			         | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
 		        atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS);
 
 			if (atkbd->set == 4) {
@@ -456,6 +460,7 @@ static int atkbd_probe(struct atkbd *atkbd)
  * should make sure we don't try to set the LEDs on it.
  */
 
+	param[0] = param[1] = 0xa5;	/* initialize with invalid values */
 	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID)) {
 
 /*
@@ -662,6 +667,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 		if (atkbd_probe(atkbd)) {
 			serio_close(serio);
+			serio->private = NULL;
 			kfree(atkbd);
 			return;
 		}
