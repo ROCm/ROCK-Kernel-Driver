@@ -31,8 +31,8 @@
 #include <linux/config.h>
 #include <linux/param.h>
 #include <linux/types.h>
+#include <linux/rwsem.h>
 #include <asm/semaphore.h>
-#include <asm/rwsem.h>
 
 #include <media/ovcamchip.h>
 
