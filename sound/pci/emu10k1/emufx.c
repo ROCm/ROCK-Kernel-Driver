@@ -1945,7 +1945,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 		/* Line LiveDrive Playback Volume */
 		for (z = 0; z < 2; z++)
 			VOLUME_ADDIN(icode, &ptr, playback + z, EXTIN_LINE2_L + z, gpr + z);
-		snd_emu10k1_init_stereo_control(controls + i++, "Line LiveDrive Playback Volume", gpr, 0);
+		snd_emu10k1_init_stereo_control(controls + i++, "Line2 LiveDrive Playback Volume", gpr, 0);
 		controls[i-1].id.index = 1;
 		gpr += 2;
 	
@@ -1954,8 +1954,8 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 			SWITCH_IN(icode, &ptr, tmp + 0, EXTIN_LINE2_L + z, gpr + 2 + z);
 			VOLUME_ADD(icode, &ptr, capture + z, tmp + 0, gpr + z);
 		}
-		snd_emu10k1_init_stereo_control(controls + i++, "Line LiveDrive Capture Volume", gpr, 0);
-		snd_emu10k1_init_stereo_onoff_control(controls + i++, "Line LiveDrive Capture Switch", gpr + 2, 0);
+		snd_emu10k1_init_stereo_control(controls + i++, "Line2 LiveDrive Capture Volume", gpr, 0);
+		snd_emu10k1_init_stereo_onoff_control(controls + i++, "Line2 LiveDrive Capture Switch", gpr + 2, 0);
 		controls[i-1].id.index = 1;
 		gpr += 4;
 	}
