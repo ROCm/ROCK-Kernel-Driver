@@ -548,12 +548,12 @@ static inline void alloc_resource(struct pci_dev *dev, int idx)
 static void __init
 pcibios_allocate_resources(int pass)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int idx, disabled;
 	u16 command;
 	struct resource *r;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
 		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
@@ -586,11 +586,11 @@ pcibios_allocate_resources(int pass)
 static void __init
 pcibios_assign_resources(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int idx;
 	struct resource *r;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		int class = dev->class >> 8;
 
 		/* Don't touch classless devices and host bridges */
@@ -881,7 +881,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 {
 	unsigned int *reg;
 	struct pci_controller* hose;
-	struct pci_dev* dev;
+	struct pci_dev* dev = NULL;
 		
 	if (!have_of)
 		return -ENODEV;
@@ -905,7 +905,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	 */
 	if (!pci_to_OF_bus_map)
 		return 0;
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (pci_to_OF_bus_map[dev->bus->number] != *bus)
 			continue;
 		if (dev->devfn != *devfn)
