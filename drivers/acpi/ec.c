@@ -793,6 +793,8 @@ static int __init acpi_ec_init (void)
 
 subsys_initcall(acpi_ec_init);
 
+/* EC driver currently not unloadable */
+#if 0
 static void __exit
 acpi_ec_ecdt_exit (void)
 {
@@ -820,4 +822,5 @@ acpi_ec_exit (void)
 
 	return_VOID;
 }
+#endif /* 0 */
 
