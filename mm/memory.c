@@ -1742,6 +1742,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
+	cond_resched();
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
 
 	/* no page was available -- either SIGBUS or OOM */

@@ -361,6 +361,8 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 		int may_enter_fs;
 		int referenced;
 
+		cond_resched();
+
 		page = lru_to_page(page_list);
 		list_del(&page->lru);
 
@@ -710,6 +712,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		reclaim_mapped = 1;
 
 	while (!list_empty(&l_hold)) {
+		cond_resched();
 		page = lru_to_page(&l_hold);
 		list_del(&page->lru);
 		if (page_mapped(page)) {

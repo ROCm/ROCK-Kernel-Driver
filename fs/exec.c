@@ -186,6 +186,7 @@ static int count(char __user * __user * argv, int max)
 			argv++;
 			if(++i > max)
 				return -E2BIG;
+			cond_resched();
 		}
 	}
 	return i;

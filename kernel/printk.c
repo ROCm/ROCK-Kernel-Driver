@@ -284,6 +284,7 @@ int do_syslog(int type, char __user * buf, int len)
 			error = __put_user(c,buf);
 			buf++;
 			i++;
+			cond_resched();
 			spin_lock_irq(&logbuf_lock);
 		}
 		spin_unlock_irq(&logbuf_lock);
@@ -325,6 +326,7 @@ int do_syslog(int type, char __user * buf, int len)
 			c = LOG_BUF(j);
 			spin_unlock_irq(&logbuf_lock);
 			error = __put_user(c,&buf[count-1-i]);
+			cond_resched();
 			spin_lock_irq(&logbuf_lock);
 		}
 		spin_unlock_irq(&logbuf_lock);
@@ -340,6 +342,7 @@ int do_syslog(int type, char __user * buf, int len)
 					error = -EFAULT;
 					break;
 				}
+				cond_resched();
 			}
 		}
 		break;
