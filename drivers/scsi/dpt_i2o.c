@@ -592,7 +592,7 @@ static int adpt_proc_info(struct Scsi_Host *host, char *buffer, char **start, of
 				unit = d->pI2o_dev->lct_data.tid;
 				len += sprintf(buffer+len, "\tTID=%d, (Channel=%d, Target=%d, Lun=%d)  (%s)\n\n",
 					       unit, (int)d->scsi_channel, (int)d->scsi_id, (int)d->scsi_lun,
-					       d->pScsi_dev->online? "online":"offline"); 
+					       scsi_device_online(d->pScsi_dev)? "online":"offline"); 
 				pos = begin + len;
 
 				/* CHECKPOINT */
@@ -2436,11 +2436,11 @@ static s32 adpt_i2o_reparse_lct(adpt_hba* pHba)
 			// We found an old device - check it
 			while(pDev) {
 				if(pDev->scsi_lun == scsi_lun) {
-					if(pDev->pScsi_dev->online == FALSE) {
+					if(!scsi_device_online(pDev->pScsi_dev)) {
 						printk(KERN_WARNING"%s: Setting device (%d,%d,%d) back online\n",
 								pHba->name,bus_no,scsi_id,scsi_lun);
 						if (pDev->pScsi_dev) {
-							pDev->pScsi_dev->online = TRUE;
+							scsi_device_set_state(pDev->pScsi_dev, SDEV_RUNNING);
 						}
 					}
 					d = pDev->pI2o_dev;
@@ -2471,7 +2471,7 @@ static s32 adpt_i2o_reparse_lct(adpt_hba* pHba)
 			pDev->state = DPTI_DEV_OFFLINE;
 			printk(KERN_WARNING"%s: Device (%d,%d,%d) offline\n",pHba->name,pDev->scsi_channel,pDev->scsi_id,pDev->scsi_lun);
 			if (pDev->pScsi_dev) {
-				pDev->pScsi_dev->online = FALSE;
+				scsi_device_set_state(pDev->pScsi_dev, SDEV_OFFLINE);
 			}
 		}
 	}

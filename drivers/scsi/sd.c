@@ -245,7 +245,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	SCSI_LOG_HLQUEUE(1, printk("sd_init_command: disk=%s, block=%llu, "
 			    "count=%d\n", disk->disk_name, (unsigned long long)block, this_count));
 
-	if (!sdp || !sdp->online ||
+	if (!sdp || !scsi_device_online(sdp) ||
  	    block + SCpnt->request->nr_sectors > get_capacity(disk)) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				 SCpnt->request->nr_sectors));
@@ -452,7 +452,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * open actually succeeded.
 	 */
 	retval = -ENXIO;
-	if (!sdev->online)
+	if (!scsi_device_online(sdev))
 		goto error_out;
 
 	if (!sdkp->openers++ && sdev->removable) {
@@ -619,7 +619,7 @@ static int sd_media_changed(struct gendisk *disk)
 	 * can deal with it then.  It is only because of unrecoverable errors
 	 * that we would ever take a device offline in the first place.
 	 */
-	if (!sdp->online)
+	if (!scsi_device_online(sdp))
 		goto not_present;
 
 	/*
@@ -1254,7 +1254,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	 * If the device is offline, don't try and read capacity or any
 	 * of the other niceties.
 	 */
-	if (!sdp->online)
+	if (!scsi_device_online(sdp))
 		goto out;
 
 	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
@@ -1474,7 +1474,7 @@ static void sd_shutdown(struct device *dev)
 	if (!sdkp)
                return;         /* this can happen */
 
-	if (!sdp->online || !sdkp->WCE)
+	if (!scsi_device_online(sdp) || !sdkp->WCE)
 		return;
 
 	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: ",

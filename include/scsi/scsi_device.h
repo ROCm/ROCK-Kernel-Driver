@@ -12,7 +12,9 @@ struct scsi_mode_data;
 
 
 /*
- * sdev state
+ * sdev state: If you alter this, you also need to alter scsi_sysfs.c
+ * (for the ascii descriptions) and the state model enforcer:
+ * scsi_lib:scsi_device_set_state().
  */
 enum scsi_device_state {
 	SDEV_CREATED = 1,	/* device created but not added to sysfs
@@ -26,6 +28,8 @@ enum scsi_device_state {
 	SDEV_QUIESCE,		/* Device quiescent.  No block commands
 				 * will be accepted, only specials (which
 				 * originate in the mid-layer) */
+	SDEV_OFFLINE,		/* Device offlined (by error handling or
+				 * user request */
 };
 
 struct scsi_device {
@@ -66,8 +70,6 @@ struct scsi_device {
 	char * rev;		/* ... "nullnullnullnull" before scan */
 	unsigned char current_tag;	/* current tag */
 	struct scsi_target      *sdev_target;   /* used only for single_lun */
-
-	unsigned online:1;
 
 	unsigned writeable:1;
 	unsigned removable:1;
@@ -177,4 +179,9 @@ extern int scsi_device_set_state(struct scsi_device *sdev,
 				 enum scsi_device_state state);
 extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
+extern const char *scsi_device_state_name(enum scsi_device_state);
+static int inline scsi_device_online(struct scsi_device *sdev)
+{
+	return sdev->sdev_state != SDEV_OFFLINE;
+}
 #endif /* _SCSI_SCSI_DEVICE_H */
