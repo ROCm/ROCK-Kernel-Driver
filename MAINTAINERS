@@ -1548,6 +1548,14 @@ M:	kaber@coreworks.de
 L:	netdev@oss.sgi.com
 S:	Maintained
 
+IPVS
+P:	Wensong Zhang
+M:	wensong@linux-vs.org
+P:	Julian Anastasov
+M:	ja@ssi.bg
+L:	lvs-users@linuxvirtualserver.org
+S:	Maintained
+
 NFS CLIENT
 P:	Trond Myklebust
 M:	trond.myklebust@fys.uio.no
