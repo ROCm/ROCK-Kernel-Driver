@@ -467,10 +467,10 @@ again:
 		up(&nlm_host_sema);
 
 		new = (struct nsm_handle *) kmalloc(sizeof(*new) + hlen, GFP_KERNEL);
-		if (new == NULL)
-			return NULL;
 
 		down(&nlm_host_sema);
+		if (new == NULL)
+			return NULL;
 		goto again;
 	}
 
