@@ -833,6 +833,17 @@ release_all_files(void)
 	}
 }
 
+/* should use a slab cache */
+void
+nfs4_free_stateowner(struct kref *kref)
+{
+	struct nfs4_stateowner *sop =
+		container_of(kref, struct nfs4_stateowner, so_ref);
+	kfree(sop->so_owner.data);
+	kfree(sop);
+	free_sowner++;
+}
+
 static inline struct nfs4_stateowner *
 alloc_stateowner(struct xdr_netobj *owner)
 {
@@ -842,22 +853,12 @@ alloc_stateowner(struct xdr_netobj *owner)
 		if ((sop->so_owner.data = kmalloc(owner->len, GFP_KERNEL))) {
 			memcpy(sop->so_owner.data, owner->data, owner->len);
 			sop->so_owner.len = owner->len;
+			kref_init(&sop->so_ref);
 			return sop;
 		} 
 		kfree(sop);
 	}
 	return NULL;
-}
-
-/* should use a slab cache */
-static void
-free_stateowner(struct nfs4_stateowner *sop) {
-	if (sop) {
-		kfree(sop->so_owner.data);
-		kfree(sop);
-		sop = NULL;
-		free_sowner++;
-	}
 }
 
 static struct nfs4_stateowner *
@@ -932,7 +933,7 @@ release_stateowner(struct nfs4_stateowner *sop)
 {
 	unhash_stateowner(sop);
 	list_del(&sop->so_close_lru);
-	free_stateowner(sop);
+	nfs4_put_stateowner(sop);
 }
 
 static inline void
@@ -1460,7 +1461,7 @@ nfs4_laundromat(void)
 		dprintk("NFSD: purging unused open stateowner (so_id %d)\n",
 			sop->so_id);
 		list_del(&sop->so_close_lru);
-		free_stateowner(sop);
+		nfs4_put_stateowner(sop);
 	}
 	if (clientid_val < NFSD_LAUNDROMAT_MINTIMEOUT)
 		clientid_val = NFSD_LAUNDROMAT_MINTIMEOUT;
