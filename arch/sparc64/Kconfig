@@ -813,7 +813,7 @@ config DEBUG_SPINLOCK
 # the generic version in that case.
 config HAVE_DEC_LOCK
 	bool
-	depends on !DEBUG_SPINLOCK
+	depends on SMP && !DEBUG_SPINLOCK
 	default y
 
 config DEBUG_SPINLOCK_SLEEP
