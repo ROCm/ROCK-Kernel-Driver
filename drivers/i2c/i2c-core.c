@@ -458,73 +458,6 @@ static void i2c_dec_use_client(struct i2c_client *client)
 	module_put(client->adapter->owner);
 }
 
-struct i2c_client *i2c_get_client(int driver_id, int adapter_id, 
-					struct i2c_client *prev)
-{
-	int i,j;
-	
-	/* Will iterate through the list of clients in each adapter of adapters-list
-	   in search for a client that matches the search criteria. driver_id or 
-	   adapter_id are ignored if set to 0. If both are ignored this returns 
-	   first client found. */
-	
-	i = j = 0;  
-	
-	/* set starting point */ 
-	if(prev)
-	{
-		if(!(prev->adapter))
-			return (struct i2c_client *) -EINVAL;
-		
-		for(j=0; j < I2C_ADAP_MAX; j++)
-			if(prev->adapter == adapters[j])
-				break;
-		
-		/* invalid starting point? */
-		if (I2C_ADAP_MAX == j) {
-			printk(KERN_WARNING " i2c-core.o: get_client adapter for client:[%s] not found\n",
-				prev->name);
-			return (struct i2c_client *) -ENODEV;
-		}	
-		
-		for(i=0; i < I2C_CLIENT_MAX; i++)
-			if(prev == adapters[j]->clients[i])
-				break;
-		
-		/* invalid starting point? */
-		if (I2C_CLIENT_MAX == i) {
-			printk(KERN_WARNING " i2c-core.o: get_client client:[%s] not found\n",
-				prev->name);
-			return (struct i2c_client *) -ENODEV;
-		}	
-		
-		i++; /* start from one after prev */
-	}
-	
-	for(; j < I2C_ADAP_MAX; j++)
-	{
-		if(!adapters[j])
-			continue;
-			
-		if(adapter_id && (adapters[j]->id != adapter_id))
-			continue;
-		
-		for(; i < I2C_CLIENT_MAX; i++)
-		{
-			if(!adapters[j]->clients[i])
-				continue;
-				
-			if(driver_id && (adapters[j]->clients[i]->driver->id != driver_id))
-				continue;
-			if(adapters[j]->clients[i]->flags & I2C_CLIENT_ALLOW_USE)	
-				return adapters[j]->clients[i];
-		}
-		i = 0;
-	}
-
-	return 0;
-}
-
 int i2c_use_client(struct i2c_client *client)
 {
 	if (!i2c_inc_use_client(client))
@@ -1414,11 +1347,9 @@ EXPORT_SYMBOL(i2c_add_driver);
 EXPORT_SYMBOL(i2c_del_driver);
 EXPORT_SYMBOL(i2c_attach_client);
 EXPORT_SYMBOL(i2c_detach_client);
-EXPORT_SYMBOL(i2c_get_client);
 EXPORT_SYMBOL(i2c_use_client);
 EXPORT_SYMBOL(i2c_release_client);
 EXPORT_SYMBOL(i2c_check_addr);
-
 
 EXPORT_SYMBOL(i2c_master_send);
 EXPORT_SYMBOL(i2c_master_recv);
