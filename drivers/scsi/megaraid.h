@@ -1054,7 +1054,6 @@ static int megadev_ioctl (struct inode *, struct file *, unsigned int,
 		unsigned long);
 static int mega_m_to_n(void *, nitioctl_t *);
 static int mega_n_to_m(void *, megacmd_t *);
-static int megadev_close (struct inode *, struct file *);
 
 static int mega_init_scb (adapter_t *);
 

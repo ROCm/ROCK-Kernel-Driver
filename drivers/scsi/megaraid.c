@@ -88,9 +88,9 @@ static struct mega_hbas mega_hbas[MAX_CONTROLLERS];
  * The File Operations structure for the serial/ioctl interface of the driver
  */
 static struct file_operations megadev_fops = {
+	.owner		= THIS_MODULE,
 	.ioctl		= megadev_ioctl,
 	.open		= megadev_open,
-	.release	= megadev_close,
 };
 
 /*
@@ -4040,9 +4040,6 @@ megadev_open (struct inode *inode, struct file *filep)
 	 */
 	if( !capable(CAP_SYS_ADMIN) ) return -EACCES;
 
-	if (!try_module_get(THIS_MODULE)) {
-		return -ENXIO;
-	}
 	return 0;
 }
 
@@ -4636,14 +4633,6 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 		}
 	}
 
-	return 0;
-}
-
-
-static int
-megadev_close (struct inode *inode, struct file *filep)
-{
-	module_put(THIS_MODULE);
 	return 0;
 }
 
