@@ -221,7 +221,8 @@ exception_marker:
 	mtspr	SRR0,r12;						\
 	mfspr	r12,SRR1;		/* and SRR1 */			\
 	mtspr	SRR1,r10;						\
-	rfid
+	rfid;								\
+	b	.	/* prevent speculative execution */
 
 /*
  * This is the start of the interrupt handlers for iSeries
@@ -453,6 +454,7 @@ DataAccessSLB_Pseries:
 	mtspr	SRR1,r10
 	mfspr	r3,DAR
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0x400, InstructionAccess)
 
@@ -479,6 +481,7 @@ InstructionAccessSLB_Pseries:
 	mtspr	SRR1,r10
 	mr	r3,r11			/* SRR0 is faulting address */
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_PSERIES(0x600, Alignment)
@@ -503,6 +506,7 @@ SystemCall_Pseries:
 	mfspr	r12,SRR1
 	mtspr	SRR1,r10
 	rfid
+	b	.	/* prevent speculative execution */
 
 	STD_EXCEPTION_PSERIES(0xd00, SingleStep)
 	STD_EXCEPTION_PSERIES(0xe00, Trap_0e)
@@ -727,6 +731,7 @@ HardwareInterrupt_Iseries_masked:
 	ld	r12,PACA_EXGEN+EX_R12(r13)
 	ld	r13,PACA_EXGEN+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 #endif
 
 /*
@@ -867,6 +872,7 @@ fast_exception_return:
 	REST_4GPRS(10, r1)
 	ld	r1,GPR1(r1)
 	rfid
+	b	.	/* prevent speculative execution */
 
 unrecov_fer:
 	bl	.save_nvgprs
@@ -1146,6 +1152,7 @@ _GLOBAL(do_stab_bolted)
 	ld	r12,PACA_EXSLB+EX_R12(r13)
 	ld	r13,PACA_EXSLB+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 
 /*
  * r13 points to the PACA, r9 contains the saved CR,
@@ -1190,6 +1197,7 @@ _GLOBAL(do_slb_miss)
 	ld	r12,PACA_EXSLB+EX_R12(r13)
 	ld	r13,PACA_EXSLB+EX_R13(r13)
 	rfid
+	b	.	/* prevent speculative execution */
 
 unrecov_slb:
 	EXCEPTION_PROLOG_COMMON(0x4100, PACA_EXSLB)
@@ -1295,6 +1303,7 @@ _STATIC(mmu_off)
 	mtspr	SRR1,r3
 	sync
 	rfid
+	b	.	/* prevent speculative execution */
 _GLOBAL(__start_initialization_pSeries)
 	mr	r31,r3			/* save parameters */
 	mr	r30,r4
@@ -1777,6 +1786,7 @@ _GLOBAL(__secondary_start)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+	b	.	/* prevent speculative execution */
 
 /* 
  * Running with relocation on at this point.  All we want to do is
@@ -1940,6 +1950,7 @@ _STATIC(start_here_pSeries)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+	b	.	/* prevent speculative execution */
 #endif /* CONFIG_PPC_PSERIES */
 	
 	/* This is where all platforms converge execution */
