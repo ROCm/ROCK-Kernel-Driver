@@ -36,6 +36,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/jiffies.h>
+#include <linux/times.h>
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/in6.h>
@@ -2158,7 +2159,8 @@ static int igmp6_mc_seq_show(struct seq_file *seq, void *v)
 		   state->dev->ifindex, state->dev->name,
 		   NIP6(im->mca_addr),
 		   im->mca_users, im->mca_flags,
-		   (im->mca_flags&MAF_TIMER_RUNNING) ? im->mca_timer.expires-jiffies : 0);
+		   (im->mca_flags&MAF_TIMER_RUNNING) ?
+		   jiffies_to_clock_t(im->mca_timer.expires-jiffies) : 0);
 	return 0;
 }
 
