@@ -74,96 +74,6 @@ struct i2o_cfg_info {
 static struct i2o_cfg_info *open_files = NULL;
 static ulong i2o_cfg_info_id = 0;
 
-#if 0
-/*
- *	This is the callback for any message we have posted. The message itself
- *	will be returned to the message pool when we return from the IRQ
- *
- *	This runs in irq context so be short and sweet.
- */
-static void i2o_cfg_reply(struct i2o_handler *h, struct i2o_controller *c,
-			  struct i2o_message *m)
-{
-	u32 *msg = (u32 *) m;
-
-	if (msg[0] & MSG_FAIL) {
-		u32 *preserved_msg = (u32 *) (c->msg_virt + msg[7]);
-
-		printk(KERN_ERR "i2o_config: IOP failed to process the msg.\n");
-
-		/* Release the preserved msg frame by resubmitting it as a NOP */
-
-		preserved_msg[0] = THREE_WORD_MSG_SIZE | SGL_OFFSET_0;
-		preserved_msg[1] = I2O_CMD_UTIL_NOP << 24 | HOST_TID << 12 | 0;
-		preserved_msg[2] = 0;
-		i2o_post_message(c, msg[7]);
-	}
-
-	if (msg[4] >> 24)	// ReqStatus != SUCCESS
-		i2o_report_status(KERN_INFO, "i2o_config", msg);
-
-	if (m->function == I2O_CMD_UTIL_EVT_REGISTER) {
-		struct i2o_cfg_info *inf;
-
-		for (inf = open_files; inf; inf = inf->next)
-			if (inf->q_id == i2o_cntxt_list_get(c, msg[3]))
-				break;
-
-		//
-		// If this is the case, it means that we're getting
-		// events for a file descriptor that's been close()'d
-		// w/o the user unregistering for events first.
-		// The code currently assumes that the user will
-		// take care of unregistering for events before closing
-		// a file.
-		//
-		// TODO:
-		// Should we track event registartion and deregister
-		// for events when a file is close()'d so this doesn't
-		// happen? That would get rid of the search through
-		// the linked list since file->private_data could point
-		// directly to the i2o_config_info data structure...but
-		// it would mean having all sorts of tables to track
-		// what each file is registered for...I think the
-		// current method is simpler. - DS
-		//
-		if (!inf)
-			return;
-
-		inf->event_q[inf->q_in].id.iop = c->unit;
-		inf->event_q[inf->q_in].id.tid = m->target_tid;
-		inf->event_q[inf->q_in].id.evt_mask = msg[4];
-
-		//
-		// Data size = msg size - reply header
-		//
-		inf->event_q[inf->q_in].data_size = (m->size - 5) * 4;
-		if (inf->event_q[inf->q_in].data_size)
-			memcpy(inf->event_q[inf->q_in].evt_data,
-			       (unsigned char *)(msg + 5),
-			       inf->event_q[inf->q_in].data_size);
-
-		spin_lock(&i2o_config_lock);
-		MODINC(inf->q_in, I2O_EVT_Q_LEN);
-		if (inf->q_len == I2O_EVT_Q_LEN) {
-			MODINC(inf->q_out, I2O_EVT_Q_LEN);
-			inf->q_lost++;
-		} else {
-			// Keep I2OEVTGET on another CPU from touching this
-			inf->q_len++;
-		}
-		spin_unlock(&i2o_config_lock);
-
-//              printk(KERN_INFO "File %p w/id %d has %d events\n",
-//                      inf->fp, inf->q_id, inf->q_len);
-
-		kill_fasync(&inf->fasync, SIGIO, POLL_IN);
-	}
-
-	return;
-}
-#endif
-
 /*
  *	Each of these describes an i2o message handler. They are
  *	multiplexed by the i2o_core code
@@ -388,7 +298,7 @@ static int i2o_cfg_swdl(unsigned long arg)
 	writel(0xD0000000 | fragsize, &msg->body[3]);
 	writel(buffer.phys, &msg->body[4]);
 
-//      printk("i2o_config: swdl frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
+//      printk(KERN_INFO "i2o_config: swdl frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
 	status = i2o_msg_post_wait_mem(c, m, 60, &buffer);
 
 	if (status != -ETIMEDOUT)
@@ -461,7 +371,7 @@ static int i2o_cfg_swul(unsigned long arg)
 	writel(0xD0000000 | fragsize, &msg->body[3]);
 	writel(buffer.phys, &msg->body[4]);
 
-//      printk("i2o_config: swul frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
+//      printk(KERN_INFO "i2o_config: swul frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
 	status = i2o_msg_post_wait_mem(c, m, 60, &buffer);
 
 	if (status != I2O_POST_WAIT_OK) {

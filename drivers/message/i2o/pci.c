@@ -138,13 +138,13 @@ static int __devinit i2o_pci_alloc(struct i2o_controller *c)
 				 * If we know what card it is, set the size
 				 * correctly. Code is taken from dpt_i2o.c
 				 */
-				if(pdev->device == 0xa501) {
-					if(pdev->subsystem_device >= 0xc032 &&
-					   pdev->subsystem_device <= 0xc03b) {
-						if(c->base.len > 0x400000)
+				if (pdev->device == 0xa501) {
+					if (pdev->subsystem_device >= 0xc032 &&
+					    pdev->subsystem_device <= 0xc03b) {
+						if (c->base.len > 0x400000)
 							c->base.len = 0x400000;
 					} else {
-						if(c->base.len > 0x100000)
+						if (c->base.len > 0x100000)
 							c->base.len = 0x100000;
 					}
 				}

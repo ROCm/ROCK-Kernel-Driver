@@ -117,7 +117,7 @@ u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message **msg,
  *
  *	Returns context id > 0 on success or 0 on failure.
  */
-u32 i2o_cntxt_list_add(struct i2o_controller *c, void *ptr)
+u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	unsigned long flags;
@@ -162,7 +162,7 @@ u32 i2o_cntxt_list_add(struct i2o_controller *c, void *ptr)
  *
  *	Returns context id on succes or 0 on failure.
  */
-u32 i2o_cntxt_list_remove(struct i2o_controller *c, void *ptr)
+u32 i2o_cntxt_list_remove(struct i2o_controller * c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	u32 context = 0;
@@ -691,10 +691,11 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		res->flags = IORESOURCE_MEM;
 		res->start = 0;
 		res->end = 0;
-		printk("%s: requires private memory resources.\n", c->name);
+		printk(KERN_INFO "%s: requires private memory resources.\n",
+		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk("Can't find parent resource!\n");
+			printk(KERN_WARNING "Can't find parent resource!\n");
 		if (root && allocate_resource(root, res, sb->desired_mem_size, sb->desired_mem_size, sb->desired_mem_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->mem_alloc = 1;
@@ -712,10 +713,11 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		res->flags = IORESOURCE_IO;
 		res->start = 0;
 		res->end = 0;
-		printk("%s: requires private memory resources.\n", c->name);
+		printk(KERN_INFO "%s: requires private memory resources.\n",
+		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk("Can't find parent resource!\n");
+			printk(KERN_WARNING "Can't find parent resource!\n");
 		if (root && allocate_resource(root, res, sb->desired_io_size, sb->desired_io_size, sb->desired_io_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->io_alloc = 1;
