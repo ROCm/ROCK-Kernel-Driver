@@ -127,6 +127,7 @@ struct pppox_opt {
 	union {
 		struct pppoe_opt pppoe;
 	} proto;
+	unsigned short		num;
 };
 #define pppoe_dev	proto.pppoe.dev
 #define pppoe_pa	proto.pppoe.pa

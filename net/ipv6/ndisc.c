@@ -84,58 +84,63 @@ static int pndisc_constructor(struct pneigh_entry *n);
 static void pndisc_destructor(struct pneigh_entry *n);
 static void pndisc_redo(struct sk_buff *skb);
 
-static struct neigh_ops ndisc_generic_ops =
-{
-	AF_INET6,
-	NULL,
-	ndisc_solicit,
-	ndisc_error_report,
-	neigh_resolve_output,
-	neigh_connected_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops ndisc_generic_ops = {
+	family:			AF_INET6,
+	solicit:		ndisc_solicit,
+	error_report:		ndisc_error_report,
+	output:			neigh_resolve_output,
+	connected_output:	neigh_connected_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-static struct neigh_ops ndisc_hh_ops =
-{
-	AF_INET6,
-	NULL,
-	ndisc_solicit,
-	ndisc_error_report,
-	neigh_resolve_output,
-	neigh_resolve_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops ndisc_hh_ops = {
+	family:			AF_INET6,
+	solicit:		ndisc_solicit,
+	error_report:		ndisc_error_report,
+	output:			neigh_resolve_output,
+	connected_output:	neigh_resolve_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
 
-static struct neigh_ops ndisc_direct_ops =
-{
-	AF_INET6,
-	NULL,
-	NULL,
-	NULL,
-	dev_queue_xmit,
-	dev_queue_xmit,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops ndisc_direct_ops = {
+	family:			AF_INET6,
+	output:			dev_queue_xmit,
+	connected_output:	dev_queue_xmit,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-struct neigh_table nd_tbl =
-{
-	NULL,
-	AF_INET6,
-	sizeof(struct neighbour) + sizeof(struct in6_addr),
-	sizeof(struct in6_addr),
-	ndisc_hash,
-	ndisc_constructor,
-	pndisc_constructor,
-	pndisc_destructor,
-	pndisc_redo,
-	"ndisc_cache",
-        { NULL, NULL, &nd_tbl, 0, NULL, NULL,
-		  30*HZ, 1*HZ, 60*HZ, 30*HZ, 5*HZ, 3, 3, 0, 3, 1*HZ, (8*HZ)/10, 64, 0 },
-	30*HZ, 128, 512, 1024,
+struct neigh_table nd_tbl = {
+	family:		AF_INET6,
+	entry_size:	sizeof(struct neighbour) + sizeof(struct in6_addr),
+	key_len:	sizeof(struct in6_addr),
+	hash:		ndisc_hash,
+	constructor:	ndisc_constructor,
+	pconstructor:	pndisc_constructor,
+	pdestructor:	pndisc_destructor,
+	proxy_redo:	pndisc_redo,
+	id:		"ndisc_cache",
+	parms: {
+		tbl:			&nd_tbl,
+		base_reachable_time:	30 * HZ,
+		retrans_time:		 1 * HZ,
+		gc_staletime:		60 * HZ,
+		reachable_time:		30 * HZ,
+		delay_probe_time:	 5 * HZ,
+		queue_len:		 3,
+		ucast_probes:		 3,
+		mcast_probes:		 3,
+		anycast_delay:		 1 * HZ,
+		proxy_delay:		(8 * HZ) / 10,
+		proxy_qlen:		64,
+	},
+	gc_interval:	  30 * HZ,
+	gc_thresh1:	 128,
+	gc_thresh2:	 512,
+	gc_thresh3:	1024,
 };
 
 #define NDISC_OPT_SPACE(len) (((len)+2+7)&~7)

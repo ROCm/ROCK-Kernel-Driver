@@ -83,28 +83,22 @@ do {	spin_lock_init(&((__sk)->lock.slock)); \
 } while(0);
 
 struct sock {
-	/* Socket demultiplex comparisons on incoming packets. */
-	__u32			daddr;		/* Foreign IPv4 addr			*/
-	__u32			rcv_saddr;	/* Bound local IPv4 addr		*/
-	__u16			dport;		/* Destination port			*/
-	unsigned short		num;		/* Local port				*/
-	int			bound_dev_if;	/* Bound device index if != 0		*/
-
+	/* Begin of struct sock/struct tcp_tw_bucket shared layout */
+	volatile unsigned char	state,		/* Connection state */
+				zapped;		/* ax25 & ipx means !linked */
+	unsigned char		reuse;		/* SO_REUSEADDR setting */
+	unsigned char		shutdown;
+	int			bound_dev_if;	/* Bound device index if != 0 */
 	/* Main hash linkage for various protocol lookup tables. */
 	struct sock		*next;
 	struct sock		**pprev;
 	struct sock		*bind_next;
 	struct sock		**bind_pprev;
-
-	volatile unsigned char	state,		/* Connection state			*/
-				zapped;		/* In ax25 & ipx means not linked	*/
-	__u16			sport;		/* Source port				*/
-
-	unsigned short		family;		/* Address family			*/
-	unsigned char		reuse;		/* SO_REUSEADDR setting			*/
-	unsigned char		shutdown;
 	atomic_t		refcnt;		/* Reference count			*/
-
+	unsigned short		family;		/* Address family */
+	/* End of struct sock/struct tcp_tw_bucket shared layout */
+	unsigned char		use_write_queue;
+	unsigned char		userlocks;
 	socket_lock_t		lock;		/* Synchronizer...			*/
 	int			rcvbuf;		/* Size of receive buffer in bytes	*/
 
@@ -118,7 +112,6 @@ struct sock {
 	atomic_t		omem_alloc;	/* "o" is "option" or "other" */
 	int			wmem_queued;	/* Persistent queue size */
 	int			forward_alloc;	/* Space allocated forward. */
-	__u32			saddr;		/* Sending source			*/
 	unsigned int		allocation;	/* Allocation mode			*/
 	int			sndbuf;		/* Size of send buffer in bytes		*/
 	struct sock		*prev;
@@ -137,9 +130,7 @@ struct sock {
 				bsdism;
 	unsigned char		debug;
 	unsigned char		rcvtstamp;
-	unsigned char		use_write_queue;
-	unsigned char		userlocks;
-	/* Hole of 3 bytes. Try to pack. */
+	/* Hole of 1 byte. Try to pack. */
 	int			route_caps;
 	int			proc;
 	unsigned long	        lingertime;

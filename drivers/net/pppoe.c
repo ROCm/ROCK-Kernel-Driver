@@ -635,7 +635,7 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		sk->state = PPPOX_CONNECTED;
 	}
 
-	sk->num = sp->sa_addr.pppoe.sid;
+	po->num = sp->sa_addr.pppoe.sid;
 
  end:
 	release_sock(sk);
@@ -788,7 +788,7 @@ int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
 	hdr.ver = 1;
 	hdr.type = 1;
 	hdr.code = 0;
-	hdr.sid = sk->num;
+	hdr.sid = po->num;
 
 	lock_sock(sk);
 
@@ -862,7 +862,7 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	hdr.ver	= 1;
 	hdr.type = 1;
 	hdr.code = 0;
-	hdr.sid	= sk->num;
+	hdr.sid	= po->num;
 	hdr.length = htons(skb->len);
 
 	if (!dev)

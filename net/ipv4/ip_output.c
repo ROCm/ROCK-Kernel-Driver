@@ -360,7 +360,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 		u32 daddr;
 
 		/* Use correct destination address if we have options. */
-		daddr = sk->daddr;
+		daddr = inet->daddr;
 		if(opt && opt->srr)
 			daddr = opt->faddr;
 
@@ -368,7 +368,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 		 * keep trying until route appears or the connection times itself
 		 * out.
 		 */
-		if (ip_route_output(&rt, daddr, sk->saddr,
+		if (ip_route_output(&rt, daddr, inet->saddr,
 				    RT_CONN_FLAGS(sk),
 				    sk->bound_dev_if))
 			goto no_route;
@@ -395,7 +395,7 @@ packet_routed:
 
 	if(opt && opt->optlen) {
 		iph->ihl += opt->optlen >> 2;
-		ip_options_build(skb, opt, sk->daddr, rt, 0);
+		ip_options_build(skb, opt, inet->daddr, rt, 0);
 	}
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
@@ -471,7 +471,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	}
 
 	if (length + fragheaderlen > 0xFFFF) {
-		ip_local_error(sk, EMSGSIZE, rt->rt_dst, sk->dport, mtu);
+		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu);
 		return -EMSGSIZE;
 	}
 
@@ -503,7 +503,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	 */
 
 	if (offset > 0 && inet->pmtudisc == IP_PMTUDISC_DO) { 
-		ip_local_error(sk, EMSGSIZE, rt->rt_dst, sk->dport, mtu);
+		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu);
  		return -EMSGSIZE;
 	}
 	if (flags&MSG_PROBE)
@@ -659,7 +659,8 @@ int ip_build_xmit(struct sock *sk,
 			return ip_build_xmit_slow(sk,getfrag,frag,length,ipc,rt,flags); 
 	} else {
 		if (length > rt->u.dst.dev->mtu) {
-			ip_local_error(sk, EMSGSIZE, rt->rt_dst, sk->dport, rt->u.dst.dev->mtu);
+			ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport,
+				       rt->u.dst.dev->mtu);
 			return -EMSGSIZE;
 		}
 	}

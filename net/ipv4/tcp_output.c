@@ -188,6 +188,7 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	if(skb != NULL) {
+		struct inet_opt *inet = inet_sk(sk);
 		struct tcp_opt *tp = tcp_sk(sk);
 		struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
 		int tcp_header_size = tp->tcp_header_len;
@@ -227,8 +228,8 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 		skb_set_owner_w(skb, sk);
 
 		/* Build TCP header and checksum it. */
-		th->source		= sk->sport;
-		th->dest		= sk->dport;
+		th->source		= inet->sport;
+		th->dest		= inet->dport;
 		th->seq			= htonl(tcb->seq);
 		th->ack_seq		= htonl(tp->rcv_nxt);
 		*(((__u16 *)th) + 6)	= htons(((tcp_header_size >> 2) << 12) | tcb->flags);
@@ -1120,7 +1121,7 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	th->syn = 1;
 	th->ack = 1;
 	TCP_ECN_make_synack(req, th);
-	th->source = sk->sport;
+	th->source = inet_sk(sk)->sport;
 	th->dest = req->rmt_port;
 	TCP_SKB_CB(skb)->seq = req->snt_isn;
 	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;

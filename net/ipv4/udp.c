@@ -108,6 +108,8 @@ int udp_port_rover;
 
 static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 {
+	struct inet_opt *inet = inet_sk(sk);
+
 	write_lock_bh(&udp_hash_lock);
 	if (snum == 0) {
 		int best_size_so_far, best, result, i;
@@ -118,11 +120,11 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 		best_size_so_far = 32767;
 		best = result = udp_port_rover;
 		for (i = 0; i < UDP_HTABLE_SIZE; i++, result++) {
-			struct sock *sk;
+			struct sock *sk2;
 			int size;
 
-			sk = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
-			if (!sk) {
+			sk2 = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
+			if (!sk2) {
 				if (result > sysctl_local_port_range[1])
 					result = sysctl_local_port_range[0] +
 						((result - sysctl_local_port_range[0]) &
@@ -133,7 +135,7 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 			do {
 				if (++size >= best_size_so_far)
 					goto next;
-			} while ((sk = sk->next) != NULL);
+			} while ((sk2 = sk2->next) != NULL);
 			best_size_so_far = size;
 			best = result;
 		next:;
@@ -157,17 +159,19 @@ gotit:
 		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		     sk2 != NULL;
 		     sk2 = sk2->next) {
-			if (sk2->num == snum &&
+			struct inet_opt *inet2 = inet_sk(sk2);
+
+			if (inet2->num == snum &&
 			    sk2 != sk &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
-			    (!sk2->rcv_saddr ||
-			     !sk->rcv_saddr ||
-			     sk2->rcv_saddr == sk->rcv_saddr) &&
+			    (!inet2->rcv_saddr ||
+			     !inet->rcv_saddr ||
+			     inet2->rcv_saddr == inet->rcv_saddr) &&
 			    (!sk2->reuse || !sk->reuse))
 				goto fail;
 		}
 	}
-	sk->num = snum;
+	inet->num = snum;
 	if (sk->pprev == NULL) {
 		struct sock **skp = &udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		if ((sk->next = *skp) != NULL)
@@ -198,7 +202,7 @@ static void udp_v4_unhash(struct sock *sk)
 			sk->next->pprev = sk->pprev;
 		*sk->pprev = sk->next;
 		sk->pprev = NULL;
-		sk->num = 0;
+		inet_sk(sk)->num = 0;
 		sock_prot_dec_use(sk->prot);
 		__sock_put(sk);
 	}
@@ -215,20 +219,22 @@ struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, i
 	int badness = -1;
 
 	for(sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk != NULL; sk = sk->next) {
-		if(sk->num == hnum) {
+		struct inet_opt *inet = inet_sk(sk);
+
+		if (inet->num == hnum) {
 			int score = 0;
-			if(sk->rcv_saddr) {
-				if(sk->rcv_saddr != daddr)
+			if (inet->rcv_saddr) {
+				if (inet->rcv_saddr != daddr)
 					continue;
 				score++;
 			}
-			if(sk->daddr) {
-				if(sk->daddr != saddr)
+			if (inet->daddr) {
+				if (inet->daddr != saddr)
 					continue;
 				score++;
 			}
-			if(sk->dport) {
-				if(sk->dport != sport)
+			if (inet->dport) {
+				if (inet->dport != sport)
 					continue;
 				score++;
 			}
@@ -269,10 +275,12 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 	struct sock *s = sk;
 	unsigned short hnum = ntohs(loc_port);
 	for(; s; s = s->next) {
-		if ((s->num != hnum)					||
-		    (s->daddr && s->daddr!=rmt_addr)			||
-		    (s->dport != rmt_port && s->dport != 0)			||
-		    (s->rcv_saddr  && s->rcv_saddr != loc_addr)		||
+		struct inet_opt *inet = inet_sk(s);
+
+		if (inet->num != hnum					||
+		    (inet->daddr && inet->daddr != rmt_addr)		||
+		    (inet->dport != rmt_port && inet->dport)		||
+		    (inet->rcv_saddr && inet->rcv_saddr != loc_addr)	||
 		    (s->bound_dev_if && s->bound_dev_if != dif))
 			continue;
 		break;
@@ -469,15 +477,15 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 	} else {
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
-		ufh.daddr = sk->daddr;
-		ufh.uh.dest = sk->dport;
+		ufh.daddr   = inet->daddr;
+		ufh.uh.dest = inet->dport;
 		/* Open fast path for connected socket.
 		   Route will not be used, if at least one option is set.
 		 */
 		connected = 1;
   	}
-	ipc.addr = sk->saddr;
-	ufh.uh.source = sk->sport;
+	ipc.addr = inet->saddr;
+	ufh.uh.source = inet->sport;
 
 	ipc.opt = NULL;
 	ipc.oif = sk->bound_dev_if;
@@ -728,7 +736,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	sk_dst_reset(sk);
 
-	err = ip_route_connect(&rt, usin->sin_addr.s_addr, sk->saddr,
+	err = ip_route_connect(&rt, usin->sin_addr.s_addr, inet->saddr,
 			       RT_CONN_FLAGS(sk), sk->bound_dev_if);
 	if (err)
 		return err;
@@ -736,12 +744,12 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		ip_rt_put(rt);
 		return -EACCES;
 	}
-  	if(!sk->saddr)
-	  	sk->saddr = rt->rt_src;		/* Update source address */
-	if(!sk->rcv_saddr)
-		sk->rcv_saddr = rt->rt_src;
-	sk->daddr = rt->rt_dst;
-	sk->dport = usin->sin_port;
+  	if (!inet->saddr)
+	  	inet->saddr = rt->rt_src;	/* Update source address */
+	if (!inet->rcv_saddr)
+		inet->rcv_saddr = rt->rt_src;
+	inet->daddr = rt->rt_dst;
+	inet->dport = usin->sin_port;
 	sk->state = TCP_ESTABLISHED;
 	inet->id = jiffies;
 
@@ -751,17 +759,17 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 int udp_disconnect(struct sock *sk, int flags)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	/*
 	 *	1003.1g - break association.
 	 */
 	 
 	sk->state = TCP_CLOSE;
-	sk->daddr = 0;
-	sk->dport = 0;
+	inet->daddr = 0;
+	inet->dport = 0;
 	sk->bound_dev_if = 0;
 	if (!(sk->userlocks&SOCK_BINDADDR_LOCK)) {
-		sk->rcv_saddr = 0;
-		sk->saddr = 0;
+		inet->rcv_saddr = inet->saddr = 0;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 		if (sk->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
@@ -773,7 +781,7 @@ int udp_disconnect(struct sock *sk, int flags)
 	}
 	if (!(sk->userlocks&SOCK_BINDPORT_LOCK)) {
 		sk->prot->unhash(sk);
-		sk->sport = 0;
+		inet->sport = 0;
 	}
 	sk_dst_reset(sk);
 	return 0;
@@ -962,13 +970,14 @@ csum_error:
 
 static void get_udp_sock(struct sock *sp, char *tmpbuf, int i)
 {
+	struct inet_opt *inet = inet_sk(sp);
 	unsigned int dest, src;
 	__u16 destp, srcp;
 
-	dest  = sp->daddr;
-	src   = sp->rcv_saddr;
-	destp = ntohs(sp->dport);
-	srcp  = ntohs(sp->sport);
+	dest  = inet->daddr;
+	src   = inet->rcv_saddr;
+	destp = ntohs(inet->dport);
+	srcp  = ntohs(inet->sport);
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
 		i, src, srcp, dest, destp, sp->state, 

@@ -70,7 +70,8 @@ rwlock_t raw_v4_lock = RW_LOCK_UNLOCKED;
 
 static void raw_v4_hash(struct sock *sk)
 {
-	struct sock **skp = &raw_v4_htable[sk->num & (RAWV4_HTABLE_SIZE - 1)];
+	struct sock **skp = &raw_v4_htable[inet_sk(sk)->num &
+					   (RAWV4_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v4_lock);
 	if ((sk->next = *skp) != NULL)
@@ -103,9 +104,11 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
 	struct sock *s = sk;
 
 	for (s = sk; s; s = s->next) {
-		if (s->num == num 				&&
-		    !(s->daddr && s->daddr != raddr) 		&&
-		    !(s->rcv_saddr && s->rcv_saddr != laddr)	&&
+		struct inet_opt *inet = inet_sk(s);
+
+		if (inet->num == num 					&&
+		    !(inet->daddr && inet->daddr != raddr) 		&&
+		    !(inet->rcv_saddr && inet->rcv_saddr != laddr)	&&
 		    !(s->bound_dev_if && s->bound_dev_if != dif))
 			break; /* gotcha */
 	}
@@ -364,10 +367,10 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		err = -EINVAL;
 		if (sk->state != TCP_ESTABLISHED) 
 			goto out;
-		daddr = sk->daddr;
+		daddr = inet->daddr;
 	}
 
-	ipc.addr = sk->saddr;
+	ipc.addr = inet->saddr;
 	ipc.opt = NULL;
 	ipc.oif = sk->bound_dev_if;
 
@@ -458,6 +461,7 @@ static void raw_close(struct sock *sk, long timeout)
 /* This gets rid of all the nasties in af_inet. -DaveM */
 static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct sockaddr_in *addr = (struct sockaddr_in *) uaddr;
 	int ret = -EINVAL;
 	int chk_addr_ret;
@@ -469,9 +473,9 @@ static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (addr->sin_addr.s_addr && chk_addr_ret != RTN_LOCAL &&
 	    chk_addr_ret != RTN_MULTICAST && chk_addr_ret != RTN_BROADCAST)
 		goto out;
-	sk->rcv_saddr = sk->saddr = addr->sin_addr.s_addr;
+	inet->rcv_saddr = inet->saddr = addr->sin_addr.s_addr;
 	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
-		sk->saddr = 0;  /* Use device */
+		inet->saddr = 0;  /* Use device */
 	sk_dst_reset(sk);
 	ret = 0;
 out:	return ret;
@@ -534,7 +538,7 @@ out:	return err ? : copied;
 static int raw_init(struct sock *sk)
 {
 	struct raw_opt *tp = raw4_sk(sk);
-	if (sk->num == IPPROTO_ICMP)
+	if (inet_sk(sk)->num == IPPROTO_ICMP)
 		memset(&tp->filter, 0, sizeof(tp->filter));
 	return 0;
 }
@@ -574,7 +578,7 @@ static int raw_setsockopt(struct sock *sk, int level, int optname,
 		return ip_setsockopt(sk, level, optname, optval, optlen);
 
 	if (optname == ICMP_FILTER) {
-		if (sk->num != IPPROTO_ICMP)
+		if (inet_sk(sk)->num != IPPROTO_ICMP)
 			return -EOPNOTSUPP;
 		else
 			return raw_seticmpfilter(sk, optval, optlen);
@@ -589,7 +593,7 @@ static int raw_getsockopt(struct sock *sk, int level, int optname,
 		return ip_getsockopt(sk, level, optname, optval, optlen);
 
 	if (optname == ICMP_FILTER) {
-		if (sk->num != IPPROTO_ICMP)
+		if (inet_sk(sk)->num != IPPROTO_ICMP)
 			return -EOPNOTSUPP;
 		else
 			return raw_geticmpfilter(sk, optval, optlen);
@@ -627,10 +631,11 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 static void get_raw_sock(struct sock *sp, char *tmpbuf, int i)
 {
-	unsigned int dest = sp->daddr,
-		     src = sp->rcv_saddr;
+	struct inet_opt *inet = inet_sk(sp);
+	unsigned int dest = inet->daddr,
+		     src = inet->rcv_saddr;
 	__u16 destp = 0,
-	      srcp  = sp->num;
+	      srcp  = inet->num;
 
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
