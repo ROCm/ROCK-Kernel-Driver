@@ -9,7 +9,7 @@
   #define __kernel
 #endif
 
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
+#if !defined(__ASSEMBLY__) && ((__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1))
 #define inline		__inline__ __attribute__((always_inline))
 #define __inline__	__inline__ __attribute__((always_inline))
 #define __inline	__inline__ __attribute__((always_inline))

@@ -248,7 +248,6 @@
 #define __NR_sys_clock_nanosleep	1256
 #define __NR_sys_fstatfs64		1257
 #define __NR_sys_statfs64		1258
-#define __NR_fadvises64_64		1259
 
 #ifdef __KERNEL__
 
