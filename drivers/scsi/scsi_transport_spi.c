@@ -394,6 +394,7 @@ spi_dv_retrain(struct scsi_request *sreq, u8 *buffer, u8 *ptr,
 
 
 	for (;;) {
+		int newperiod;
 		if (compare_fn(sreq, buffer, ptr, DV_LOOPS))
 			/* Successful DV */
 			break;
@@ -401,7 +402,8 @@ spi_dv_retrain(struct scsi_request *sreq, u8 *buffer, u8 *ptr,
 		/* OK, retrain, fallback */
 		if (i->f->get_period)
 			i->f->get_period(sdev);
-		period = spi_period(sdev);
+		newperiod = spi_period(sdev);
+		period = newperiod > period ? newperiod : period;
 		if (period < 0x0d)
 			period++;
 		else
