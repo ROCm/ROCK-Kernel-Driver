@@ -22,3 +22,29 @@ static inline void do_timer_interrupt_hook(struct pt_regs *regs)
 		smp_local_timer_interrupt(regs);
 #endif
 }
+
+static inline int do_timer_overflow(int count)
+{
+	int i;
+
+	spin_lock(&i8259A_lock);
+	/*
+	 * This is tricky when I/O APICs are used;
+	 * see do_timer_interrupt().
+	 */
+	i = inb(0x20);
+	spin_unlock(&i8259A_lock);
+	
+	/* assumption about timer being IRQ0 */
+	if (i & 0x01) {
+		/*
+		 * We cannot detect lost timer interrupts ... 
+		 * well, that's why we call them lost, don't we? :)
+		 * [hmm, on the Pentium and Alpha we can ... sort of]
+		 */
+		count -= LATCH;
+	} else {
+		printk("do_slow_gettimeoffset(): hardware timer problem?\n");
+	}
+	return count;
+}

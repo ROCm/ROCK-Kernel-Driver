@@ -52,6 +52,7 @@
 #include <linux/ioport.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
+#include <asm/arch_hooks.h>
 
 /* This structure holds MCA information. Each (plug-in) adapter has
  * eight POS registers. Then the machine may have integrated video and

@@ -56,6 +56,9 @@
 #include <linux/config.h>
 
 #include <asm/arch_hooks.h>
+
+extern spinlock_t i8259A_lock;
+
 #include "do_timer.h"
 
 /*
@@ -116,8 +119,6 @@ static inline unsigned long do_fast_gettimeoffset(void)
 
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
-
-extern spinlock_t i8259A_lock;
 
 #ifndef CONFIG_X86_TSC
 
@@ -199,47 +200,11 @@ static unsigned long do_slow_gettimeoffset(void)
 	 *     (see c't 95/10 page 335 for Neptun bug.)
 	 */
 
-/* you can safely undefine this if you don't have the Neptune chipset */
-
-#define BUGGY_NEPTUN_TIMER
 
 	if( jiffies_t == jiffies_p ) {
 		if( count > count_p ) {
 			/* the nutcase */
-
-			int i;
-
-			spin_lock(&i8259A_lock);
-			/*
-			 * This is tricky when I/O APICs are used;
-			 * see do_timer_interrupt().
-			 */
-			i = inb(0x20);
-			spin_unlock(&i8259A_lock);
-
-			/* assumption about timer being IRQ0 */
-			if (i & 0x01) {
-				/*
-				 * We cannot detect lost timer interrupts ... 
-				 * well, that's why we call them lost, don't we? :)
-				 * [hmm, on the Pentium and Alpha we can ... sort of]
-				 */
-				count -= LATCH;
-			} else {
-#ifdef BUGGY_NEPTUN_TIMER
-				/*
-				 * for the Neptun bug we know that the 'latch'
-				 * command doesnt latch the high and low value
-				 * of the counter atomically. Thus we have to 
-				 * substract 256 from the counter 
-				 * ... funny, isnt it? :)
-				 */
-
-				count -= 256;
-#else
-				printk("do_slow_gettimeoffset(): hardware timer problem?\n");
-#endif
-			}
+			count = do_timer_overflow(count);
 		}
 	} else
 		jiffies_p = jiffies_t;

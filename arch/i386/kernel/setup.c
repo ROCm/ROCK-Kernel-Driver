@@ -852,7 +852,7 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem(PAGE_SIZE, PAGE_SIZE);
 #endif
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
 	 */
