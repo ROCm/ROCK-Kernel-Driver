@@ -124,8 +124,8 @@ struct exception_table_entry
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0)	\
-		: "cc" );					\
+		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0),\
+		  "m" (x) : "cc" );				\
 })
 
 #else /* __s390x__ */
@@ -418,11 +418,10 @@ extern long __copy_in_user_asm(const void *from, long n, void *to);
 static inline long
 __strncpy_from_user(char *dst, const char *src, long count)
 {
-        int len;
+        int len = 0;
         __asm__ __volatile__ (
-		"   slr   %0,%0\n"
-		"   lr    2,%1\n"
-                "   lr    4,%2\n"
+		"   lr    2,%2\n"
+                "   lr    4,%3\n"
                 "   slr   3,3\n"
                 "   sacf  512\n"
 		"0: ic	  3,0(%0,4)\n"
@@ -430,11 +429,11 @@ __strncpy_from_user(char *dst, const char *src, long count)
 		"   ltr	  3,3\n"
 		"   jz	  2f\n"
 		"   ahi	  %0,1\n"
-		"   clr	  %0,%3\n"
+		"   clr	  %0,%4\n"
 		"   jl	  0b\n"
 		"2: sacf  0\n"
 		".section .fixup,\"ax\"\n"
-		"3: lhi	  %0,%h4\n"
+		"3: lhi	  %0,%h5\n"
 		"   basr  3,0\n"
 		"   l	  3,4f-.(3)\n"
 		"   br	  3\n"
@@ -445,7 +444,7 @@ __strncpy_from_user(char *dst, const char *src, long count)
 		"   .long  0b,3b\n"
 		"   .long  1b,3b\n"
 		".previous"
-		: "=&a" (len)
+		: "+&a" (len), "=m" (*dst)
 		: "a" (dst), "d" (src), "d" (count), "K" (-EFAULT)
 		: "2", "3", "4", "memory", "cc" );
 	return len;
@@ -456,11 +455,10 @@ __strncpy_from_user(char *dst, const char *src, long count)
 static inline long
 __strncpy_from_user(char *dst, const char *src, long count)
 {
-	long len;
+	long len = 0;
 	__asm__ __volatile__ (
-		"   slgr  %0,%0\n"
-		"   lgr	  2,%1\n"
-		"   lgr	  4,%2\n"
+		"   lgr	  2,%2\n"
+		"   lgr	  4,%3\n"
 		"   slr	  3,3\n"
 		"   sacf  512\n"
 		"0: ic	  3,0(%0,4)\n"
@@ -468,11 +466,11 @@ __strncpy_from_user(char *dst, const char *src, long count)
 		"   ltr	  3,3\n"
 		"   jz	  2f\n"
 		"   aghi  %0,1\n"
-		"   cgr	  %0,%3\n"
+		"   cgr	  %0,%4\n"
 		"   jl	  0b\n"
 		"2: sacf  0\n"
 		".section .fixup,\"ax\"\n"
-		"3: lghi  %0,%h4\n"
+		"3: lghi  %0,%h5\n"
 		"   jg	  2b\n"	 
 		".previous\n"
 		".section __ex_table,\"a\"\n"
@@ -480,7 +478,7 @@ __strncpy_from_user(char *dst, const char *src, long count)
 		"   .quad  0b,3b\n"
 		"   .quad  1b,3b\n"
 		".previous"
-		: "=&a" (len)
+		: "+&a" (len), "=m" (*dst)
 		: "a"  (dst), "d" (src), "d" (count), "K" (-EFAULT)
 		: "cc", "2" ,"3", "4" );
 	return len;

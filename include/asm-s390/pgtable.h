@@ -553,11 +553,13 @@ ptep_clear_flush(struct vm_area_struct *vma,
 	if (!(pte_val(pte) & _PAGE_INVALID)) {
 		/* S390 has 1mb segments, we are emulating 4MB segments */
 		pte_t *pto = (pte_t *) (((unsigned long) ptep) & 0x7ffffc00);
-		__asm__ __volatile__ ("ipte %0,%1" : : "a" (pto), "a" (address));
+		asm volatile ("ipte %0,%1"
+			      : : "a" (pto), "a" (address), "m" (*pto));
 	}
 #else /* __s390x__ */
 	if (!(pte_val(pte) & _PAGE_INVALID)) 
-		__asm__ __volatile__ ("ipte %0,%1" : : "a" (ptep), "a" (address));
+		asm volatile ("ipte %0,%1"
+			      : : "a" (ptep), "a" (address), "m" (*ptep));
 #endif /* __s390x__ */
 	pte_clear(ptep);
 	return pte;

@@ -35,8 +35,10 @@ typedef struct {
                              "   cs    %0,%1,0(%3)\n"			\
                              "   jl    0b"				\
                              : "=&d" (old_val), "=&d" (new_val),	\
-			       "+m" (((atomic_t *)(ptr))->counter)	\
-			     : "a" (ptr), "d" (op_val) : "cc" );	\
+			       "=m" (((atomic_t *)(ptr))->counter)	\
+			     : "a" (ptr), "d" (op_val),			\
+			       "m" (((atomic_t *)(ptr))->counter)	\
+			     : "cc" );					\
 	new_val;							\
 })
 #define atomic_read(v)          ((v)->counter)

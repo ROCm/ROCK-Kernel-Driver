@@ -560,7 +560,8 @@ find_first_zero_bit(unsigned long * addr, unsigned int size)
                 "   alr  %0,%2\n"
                 "4:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) : "cc" );
+                : "a" (size), "a" (addr), "a" (&_zb_findmap),
+		  "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -599,7 +600,8 @@ find_first_bit(unsigned long * addr, unsigned int size)
                 "   alr  %0,%2\n"
                 "4:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (addr), "a" (&_sb_findmap), "m" (*addr) : "cc" );
+                : "a" (size), "a" (addr), "a" (&_sb_findmap),
+		  "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -687,12 +689,9 @@ find_next_bit (unsigned long * addr, int size, int offset)
  */
 static inline unsigned long ffz(unsigned long word)
 {
-	unsigned long reg;
-        int result;
+        int result = 0;
 
-        __asm__("   slr  %0,%0\n"
-                "   lhi  %2,0xff\n"
-                "   tml  %1,0xffff\n"
+        __asm__("   tml  %1,0xffff\n"
                 "   jno  0f\n"
                 "   ahi  %0,16\n"
                 "   srl  %1,16\n"
@@ -703,8 +702,8 @@ static inline unsigned long ffz(unsigned long word)
                 "1: nr   %1,%2\n"
                 "   ic   %1,0(%1,%3)\n"
                 "   alr  %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_zb_findmap) : "cc" );
+                : "+&d" (result), "+a" (word)
+                : "d" (0xff), "a" (&_zb_findmap) : "cc" );
         return result;
 }
 
@@ -714,11 +713,9 @@ static inline unsigned long ffz(unsigned long word)
  */
 static inline unsigned long __ffs (unsigned long word)
 {
-	unsigned long reg, result;
+	unsigned long result = 0;
 
-        __asm__("   slr  %0,%0\n"
-                "   lhi  %2,0xff\n"
-                "   tml  %1,0xffff\n"
+        __asm__("   tml  %1,0xffff\n"
                 "   jnz  0f\n"
                 "   ahi  %0,16\n"
                 "   srl  %1,16\n"
@@ -729,8 +726,8 @@ static inline unsigned long __ffs (unsigned long word)
                 "1: nr   %1,%2\n"
                 "   ic   %1,0(%1,%3)\n"
                 "   alr  %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_sb_findmap) : "cc" );
+                : "+&d" (result), "+a" (word)
+                : "d" (0xff), "a" (&_sb_findmap) : "cc" );
         return result;
 }
 
@@ -777,8 +774,8 @@ find_first_zero_bit(unsigned long * addr, unsigned long size)
                 "   algr  %0,%2\n"
                 "5:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
-		: "cc" );
+		: "a" (size), "a" (addr), "a" (&_zb_findmap),
+		  "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -820,8 +817,8 @@ find_first_bit(unsigned long * addr, unsigned long size)
                 "   algr  %0,%2\n"
                 "5:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (addr), "a" (&_sb_findmap), "m" (*addr) 
-		: "cc" );
+		: "a" (size), "a" (addr), "a" (&_sb_findmap),
+		  "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -949,15 +946,13 @@ static inline unsigned long ffz(unsigned long word)
  */
 static inline unsigned long __ffs (unsigned long word)
 {
-        unsigned long reg, result;
+        unsigned long result = 0;
 
-        __asm__("   slgr %0,%0\n"
-                "   ltr  %1,%1\n"
+        __asm__("   ltr  %1,%1\n"
                 "   jnz  0f\n"
                 "   aghi %0,32\n"
                 "   srlg %1,%1,32\n"
-                "0: lghi %2,0xff\n"
-                "   tmll %1,0xffff\n"
+                "0: tmll %1,0xffff\n"
                 "   jnz  1f\n"
                 "   aghi %0,16\n"
                 "   srlg %1,%1,16\n"
@@ -968,8 +963,8 @@ static inline unsigned long __ffs (unsigned long word)
                 "2: ngr  %1,%2\n"
                 "   ic   %1,0(%1,%3)\n"
                 "   algr %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_sb_findmap) : "cc" );
+                : "+&d" (result), "+a" (word)
+                : "d" (0xff), "a" (&_sb_findmap) : "cc" );
         return result;
 }
 
@@ -1100,8 +1095,7 @@ static inline int
 ext2_find_first_zero_bit(void *vaddr, unsigned int size)
 {
 	unsigned long cmp, count;
-	unsigned long *addr = vaddr;
-        unsigned int res;
+        unsigned int res = 0;
 
         if (!size)
                 return 0;
@@ -1109,7 +1103,6 @@ ext2_find_first_zero_bit(void *vaddr, unsigned int size)
                 "   lr   %2,%3\n"
                 "   ahi  %2,31\n"
                 "   srl  %2,5\n"
-                "   slr  %0,%0\n"
                 "0: cl   %1,0(%0,%4)\n"
                 "   jne  1f\n"
                 "   ahi  %0,4\n"
@@ -1132,9 +1125,9 @@ ext2_find_first_zero_bit(void *vaddr, unsigned int size)
                 "   ic   %2,0(%2,%5)\n"
                 "   alr  %0,%2\n"
                 "4:"
-                : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
-		: "cc" );
+                : "+&a" (res), "=&d" (cmp), "=&a" (count)
+                : "a" (size), "a" (vaddr), "a" (&_zb_findmap),
+		  "m" (*(char *) vaddr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -1143,7 +1136,7 @@ ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
 {
         unsigned long *addr = vaddr;
         unsigned long *p = addr + (offset >> 5);
-        unsigned long word, reg;
+        unsigned long word;
         unsigned int bit = offset & 31UL, res;
 
         if (offset >= size)
@@ -1158,8 +1151,7 @@ ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
 		word >>= bit;
                 res = bit;
                 /* Look for zero in first longword */
-                __asm__("   lhi  %2,0xff\n"
-                        "   tml  %1,0xffff\n"
+                __asm__("   tml  %1,0xffff\n"
                 	"   jno  0f\n"
                 	"   ahi  %0,16\n"
                 	"   srl  %1,16\n"
@@ -1170,8 +1162,8 @@ ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
                 	"1: nr   %1,%2\n"
                 	"   ic   %1,0(%1,%3)\n"
                 	"   alr  %0,%1"
-                	: "+&d" (res), "+&a" (word), "=&d" (reg)
-                  	: "a" (&_zb_findmap) : "cc" );
+                	: "+&d" (res), "+&a" (word)
+                  	: "d" (0xff), "a" (&_zb_findmap) : "cc" );
                 if (res < 32)
 			return (p - addr)*32 + res;
                 p++;
@@ -1186,8 +1178,8 @@ ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
 static inline unsigned long
 ext2_find_first_zero_bit(void *vaddr, unsigned long size)
 {
-        unsigned long res, cmp, count;
-	unsigned long *addr = vaddr;
+        unsigned long cmp, count;
+        unsigned long res = 0;
 
         if (!size)
                 return 0;
@@ -1195,7 +1187,6 @@ ext2_find_first_zero_bit(void *vaddr, unsigned long size)
                 "   lgr   %2,%3\n"
                 "   aghi  %2,63\n"
                 "   srlg  %2,%2,6\n"
-                "   slgr  %0,%0\n"
                 "0: clg   %1,0(%0,%4)\n"
                 "   jne   1f\n"
                 "   aghi  %0,8\n"
@@ -1221,9 +1212,9 @@ ext2_find_first_zero_bit(void *vaddr, unsigned long size)
                 "   ic    %2,0(%2,%5)\n"
                 "   algr  %0,%2\n"
                 "5:"
-                : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
-		: "cc" );
+                : "+&a" (res), "=&d" (cmp), "=&a" (count)
+		: "a" (size), "a" (vaddr), "a" (&_zb_findmap),
+		  "m" (*(char *) vaddr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -1279,11 +1270,16 @@ ext2_find_next_zero_bit(void *vaddr, unsigned long size, unsigned long offset)
 
 /* Bitmap functions for the minix filesystem.  */
 /* FIXME !!! */
-#define minix_test_and_set_bit(nr,addr) test_and_set_bit(nr,addr)
-#define minix_set_bit(nr,addr) set_bit(nr,addr)
-#define minix_test_and_clear_bit(nr,addr) test_and_clear_bit(nr,addr)
-#define minix_test_bit(nr,addr) test_bit(nr,addr)
-#define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
+#define minix_test_and_set_bit(nr,addr) \
+	test_and_set_bit(nr,(unsigned long *)addr)
+#define minix_set_bit(nr,addr) \
+	set_bit(nr,(unsigned long *)addr)
+#define minix_test_and_clear_bit(nr,addr) \
+	test_and_clear_bit(nr,(unsigned long *)addr)
+#define minix_test_bit(nr,addr) \
+	test_bit(nr,(unsigned long *)addr)
+#define minix_find_first_zero_bit(addr,size) \
+	find_first_zero_bit(addr,size)
 
 #endif /* __KERNEL__ */
 

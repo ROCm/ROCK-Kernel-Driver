@@ -32,28 +32,28 @@ extern struct task_struct *__switch_to(void *, void *);
 static inline void save_fp_regs(s390_fp_regs *fpregs)
 {
 	asm volatile (
-		"   std   0,8(%0)\n"
-		"   std   2,24(%0)\n"
-		"   std   4,40(%0)\n"
-		"   std   6,56(%0)"
-		: : "a" (fpregs) : "memory" );
+		"   std   0,8(%1)\n"
+		"   std   2,24(%1)\n"
+		"   std   4,40(%1)\n"
+		"   std   6,56(%1)"
+		: "=m" (*fpregs) : "a" (fpregs) : "memory" );
 	if (!MACHINE_HAS_IEEE)
 		return;
 	asm volatile(
-		"   stfpc 0(%0)\n"
-		"   std   1,16(%0)\n"
-		"   std   3,32(%0)\n"
-		"   std   5,48(%0)\n"
-		"   std   7,64(%0)\n"
-		"   std   8,72(%0)\n"
-		"   std   9,80(%0)\n"
-		"   std   10,88(%0)\n"
-		"   std   11,96(%0)\n"
-		"   std   12,104(%0)\n"
-		"   std   13,112(%0)\n"
-		"   std   14,120(%0)\n"
-		"   std   15,128(%0)\n"
-		: : "a" (fpregs) : "memory" );
+		"   stfpc 0(%1)\n"
+		"   std   1,16(%1)\n"
+		"   std   3,32(%1)\n"
+		"   std   5,48(%1)\n"
+		"   std   7,64(%1)\n"
+		"   std   8,72(%1)\n"
+		"   std   9,80(%1)\n"
+		"   std   10,88(%1)\n"
+		"   std   11,96(%1)\n"
+		"   std   12,104(%1)\n"
+		"   std   13,112(%1)\n"
+		"   std   14,120(%1)\n"
+		"   std   15,128(%1)\n"
+		: "=m" (*fpregs) : "a" (fpregs) : "memory" );
 }
 
 static inline void restore_fp_regs(s390_fp_regs *fpregs)
@@ -63,7 +63,7 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 		"   ld    2,24(%0)\n"
 		"   ld    4,40(%0)\n"
 		"   ld    6,56(%0)"
-		: : "a" (fpregs));
+		: : "a" (fpregs), "m" (*fpregs) );
 	if (!MACHINE_HAS_IEEE)
 		return;
 	asm volatile(
@@ -80,7 +80,7 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 		"   ld    13,112(%0)\n"
 		"   ld    14,120(%0)\n"
 		"   ld    15,128(%0)\n"
-		: : "a" (fpregs));
+		: : "a" (fpregs), "m" (*fpregs) );
 }
 
 #define switch_to(prev,next,last) do {					     \
@@ -107,15 +107,15 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 		shift = (3 ^ (addr & 3)) << 3;
 		addr ^= addr & 3;
 		asm volatile(
-			"    l   %0,0(%3)\n"
+			"    l   %0,0(%4)\n"
 			"0:  lr  0,%0\n"
-			"    nr  0,%2\n"
-			"    or  0,%1\n"
-			"    cs  %0,0,0(%3)\n"
+			"    nr  0,%3\n"
+			"    or  0,%2\n"
+			"    cs  %0,0,0(%4)\n"
 			"    jl  0b\n"
-			: "=&d" (old)
-			: "d" (x << shift), "d" (~(255 << shift)), "a" (addr)
-			: "memory", "cc", "0" );
+			: "=&d" (old), "=m" (*(int *) addr)
+			: "d" (x << shift), "d" (~(255 << shift)), "a" (addr),
+			  "m" (*(int *) addr) : "cc", "0" );
 		x = old >> shift;
 		break;
 	case 2:
@@ -123,33 +123,35 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 		shift = (2 ^ (addr & 2)) << 3;
 		addr ^= addr & 2;
 		asm volatile(
-			"    l   %0,0(%3)\n"
+			"    l   %0,0(%4)\n"
 			"0:  lr  0,%0\n"
-			"    nr  0,%2\n"
-			"    or  0,%1\n"
-			"    cs  %0,0,0(%3)\n"
+			"    nr  0,%3\n"
+			"    or  0,%2\n"
+			"    cs  %0,0,0(%4)\n"
 			"    jl  0b\n"
-			: "=&d" (old) 
-			: "d" (x << shift), "d" (~(65535 << shift)), "a" (addr)
-			: "memory", "cc", "0" );
+			: "=&d" (old), "=m" (*(int *) addr) 
+			: "d" (x << shift), "d" (~(65535 << shift)), "a" (addr),
+			  "m" (*(int *) addr) : "cc", "0" );
 		x = old >> shift;
 		break;
 	case 4:
 		asm volatile (
-			"    l   %0,0(%2)\n"
-			"0:  cs  %0,%1,0(%2)\n"
+			"    l   %0,0(%3)\n"
+			"0:  cs  %0,%2,0(%3)\n"
 			"    jl  0b\n"
-			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "=&d" (old), "=m" (*(int *) ptr)
+			: "d" (x), "a" (ptr), "m" (*(int *) ptr)
 			: "memory", "cc", "0" );
 		x = old;
 		break;
 #ifdef __s390x__
 	case 8:
 		asm volatile (
-			"    lg  %0,0(%2)\n"
-			"0:  csg %0,%1,0(%2)\n"
+			"    lg  %0,0(%3)\n"
+			"0:  csg %0,%2,0(%3)\n"
 			"    jl  0b\n"
-			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "=&d" (old), "=m" (*(long *) ptr)
+			: "d" (x), "a" (ptr), "m" (*(long *) ptr)
 			: "memory", "cc", "0" );
 		x = old;
 		break;
@@ -182,55 +184,57 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		shift = (3 ^ (addr & 3)) << 3;
 		addr ^= addr & 3;
 		asm volatile(
-			"    l   %0,0(%4)\n"
-			"0:  nr  %0,%5\n"
+			"    l   %0,0(%5)\n"
+			"0:  nr  %0,%6\n"
                         "    lr  %1,%0\n"
-			"    or  %0,%2\n"
-			"    or  %1,%3\n"
-			"    cs  %0,%1,0(%4)\n"
+			"    or  %0,%3\n"
+			"    or  %1,%4\n"
+			"    cs  %0,%1,0(%5)\n"
 			"    jnl 1f\n"
 			"    xr  %1,%0\n"
-			"    nr  %1,%5\n"
+			"    nr  %1,%6\n"
 			"    jnz 0b\n"
 			"1:"
-			: "=&d" (prev), "=&d" (tmp)
+			: "=&d" (prev), "=&d" (tmp), "=m" (*(int *) addr)
 			: "d" (old << shift), "d" (new << shift), "a" (ptr),
-			  "d" (~(255 << shift))
-			: "memory", "cc" );
+			  "d" (~(255 << shift)), "m" (*(int *) addr)
+			: "cc" );
 		return prev >> shift;
 	case 2:
 		addr = (unsigned long) ptr;
 		shift = (2 ^ (addr & 2)) << 3;
 		addr ^= addr & 2;
 		asm volatile(
-			"    l   %0,0(%4)\n"
-			"0:  nr  %0,%5\n"
+			"    l   %0,0(%5)\n"
+			"0:  nr  %0,%6\n"
                         "    lr  %1,%0\n"
-			"    or  %0,%2\n"
-			"    or  %1,%3\n"
-			"    cs  %0,%1,0(%4)\n"
+			"    or  %0,%3\n"
+			"    or  %1,%4\n"
+			"    cs  %0,%1,0(%5)\n"
 			"    jnl 1f\n"
 			"    xr  %1,%0\n"
-			"    nr  %1,%5\n"
+			"    nr  %1,%6\n"
 			"    jnz 0b\n"
 			"1:"
-			: "=&d" (prev), "=&d" (tmp)
+			: "=&d" (prev), "=&d" (tmp), "=m" (*(int *) addr)
 			: "d" (old << shift), "d" (new << shift), "a" (ptr),
-			  "d" (~(65535 << shift))
-			: "memory", "cc" );
+			  "d" (~(65535 << shift)), "m" (*(int *) addr)
+			: "cc" );
 		return prev >> shift;
 	case 4:
 		asm volatile (
-			"    cs  %0,%2,0(%3)\n"
-			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
-			: "memory", "cc" );
+			"    cs  %0,%3,0(%4)\n"
+			: "=&d" (prev), "=m" (*(int *) ptr)
+			: "0" (old), "d" (new), "a" (ptr), "m" (*(int *) ptr)
+			: "cc" );
 		return prev;
 #ifdef __s390x__
 	case 8:
 		asm volatile (
-			"    csg %0,%2,0(%3)\n"
-			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
-			: "memory", "cc" );
+			"    csg %0,%3,0(%4)\n"
+			: "=&d" (prev), "=m" (*(long *) ptr)
+			: "0" (old), "d" (new), "a" (ptr), "m" (*(long *) ptr)
+			: "cc" );
 		return prev;
 #endif /* __s390x__ */
         }
@@ -282,7 +286,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
         __asm__ __volatile__("stosm 0(%1),0" : "=m" (x) : "a" (&x) )
 
 #define local_irq_restore(x) \
-        __asm__ __volatile__("ssm   0(%0)" : : "a" (&x) : "memory")
+        __asm__ __volatile__("ssm   0(%1)" : : "m" (x), "a" (&x) )
 
 #define irqs_disabled()			\
 ({					\
@@ -294,14 +298,15 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 #ifdef __s390x__
 
 #define __load_psw(psw) \
-        __asm__ __volatile__("lpswe 0(%0)" : : "a" (&psw) : "cc" );
+        __asm__ __volatile__("lpswe 0(%0)" : : "a" (&psw), "m" (psw) : "cc" );
 
 #define __ctl_load(array, low, high) ({ \
 	__asm__ __volatile__ ( \
 		"   bras  1,0f\n" \
                 "   lctlg 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)), \
+		    "m" (*(&array)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
@@ -309,7 +314,8 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
 		"   stctg 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: "=m" (*(&array)) \
+		: "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
@@ -356,7 +362,8 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
                 "   lctl 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)), \
+		    "m" (*(&array)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
@@ -364,7 +371,8 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
 		"   stctl 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
+		: "=m" (*(&array)) \
+		: "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \

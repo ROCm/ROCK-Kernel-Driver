@@ -35,7 +35,7 @@ codepage_convert(const __u8 *codepage, volatile __u8 * addr, unsigned long nr)
 		"   jnm  0b\n"
 		"   ex   %1,0(1)"
                 : "+&a" (addr), "+&a" (nr)
-                : "a" (codepage) : "cc", "memory", "1" );
+                : "a" (codepage), "m" (*addr) : "cc", "memory", "1" );
 }
 
 #define ASCEBC(addr,nr) codepage_convert(_ascebc, addr, nr)
