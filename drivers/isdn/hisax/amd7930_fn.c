@@ -63,19 +63,42 @@
 
 static void Amd7930_new_ph(struct IsdnCardState *cs);
 
+static inline u8
+HIBYTE(u16 w)
+{
+	return (w >> 8) & 0xff;
+}
 
-void /* macro wWordAMD */
-WriteWordAmd7930(struct IsdnCardState *cs, BYTE reg, WORD val)
+static inline u8
+LOBYTE(u16 w)
+{
+	return w & 0xff;
+}
+
+static inline u8
+rByteAMD(struct IsdnCardState *cs, u8 reg)
+{
+	return cs->readisac(cs, reg);
+}
+
+static inline void
+wByteAMD(struct IsdnCardState *cs, u8 reg, u8 val)
+{
+	cs->writeisac(cs, reg, val);
+}
+
+static void
+wWordAMD(struct IsdnCardState *cs, u8 reg, u16 val)
 {
         wByteAMD(cs, 0x00, reg);
         wByteAMD(cs, 0x01, LOBYTE(val));
         wByteAMD(cs, 0x01, HIBYTE(val));
 }
 
-WORD /* macro rWordAMD */
-ReadWordAmd7930(struct IsdnCardState *cs, BYTE reg)
+static u16
+rWordAMD(struct IsdnCardState *cs, u8 reg)
 {
-        WORD res;
+        u16 res;
         /* direct access register */
         if(reg < 8) {
         	res = rByteAMD(cs, reg);
@@ -90,6 +113,17 @@ ReadWordAmd7930(struct IsdnCardState *cs, BYTE reg)
 	return (res);
 }
 
+static inline void
+AmdIrqOff(struct IsdnCardState *cs)
+{
+	cs->dc.amd7930.setIrqMask(cs, 0);
+}
+
+static inline void
+AmdIrqOn(struct IsdnCardState *cs)
+{
+	cs->dc.amd7930.setIrqMask(cs, 1);
+}
 
 static void
 Amd7930_ph_command(struct IsdnCardState *cs, u_char command, char *s)
@@ -103,7 +137,7 @@ Amd7930_ph_command(struct IsdnCardState *cs, u_char command, char *s)
 
 
 
-static BYTE i430States[] = {
+static u8 i430States[] = {
 // to   reset  F3    F4    F5    F6    F7    F8    AR     from
         0x01, 0x02, 0x00, 0x00, 0x00, 0x07, 0x05, 0x00,   // init
         0x01, 0x02, 0x00, 0x00, 0x00, 0x07, 0x05, 0x00,   // reset
@@ -117,14 +151,14 @@ static BYTE i430States[] = {
 
 
 /*                    Row     init    -   reset  F3    F4    F5    F6    F7    F8    AR */
-static BYTE stateHelper[] = { 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+static u8 stateHelper[] = { 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 
 
 
 
 static void
 Amd7930_get_state(struct IsdnCardState *cs) {
-        BYTE lsr = rByteAMD(cs, 0xA1);
+        u8 lsr = rByteAMD(cs, 0xA1);
         cs->dc.amd7930.ph_state = (lsr & 0x7) + 2;
         Amd7930_new_ph(cs);
 }
@@ -252,8 +286,8 @@ static void
 Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 {
 
-        BYTE stat, der;
-	BYTE *ptr;
+        u8 stat, der;
+	u8 *ptr;
 	struct sk_buff *skb;
 
 
@@ -326,9 +360,9 @@ static void
 Amd7930_fill_Dfifo(struct IsdnCardState *cs)
 {
 
-        WORD dtcrr, dtcrw, len, count;
-        BYTE txstat, dmr3;
-        BYTE *ptr, *deb_ptr;
+        u16 dtcrr, dtcrw, len, count;
+        u8 txstat, dmr3;
+        u8 *ptr, *deb_ptr;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "Amd7930: fill_Dfifo");
@@ -394,10 +428,10 @@ Amd7930_fill_Dfifo(struct IsdnCardState *cs)
 }
 
 
-void Amd7930_interrupt(struct IsdnCardState *cs, BYTE irflags)
+void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 {
-	BYTE dsr1, dsr2, lsr;
-        WORD der;
+	u8 dsr1, dsr2, lsr;
+        u16 der;
 
  while (irflags)
  {
@@ -661,8 +695,8 @@ static void
 dbusy_timer_handler(struct IsdnCardState *cs)
 {
 	struct PStack *stptr;
-        WORD dtcr, der;
-        BYTE dsr1, dsr2;
+        u16 dtcr, der;
+        u8 dsr1, dsr2;
 
 
         if (cs->debug & L1_DEB_ISAC)
@@ -711,13 +745,45 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	}
 }
 
+static u16 initAMD[] = {
+	0x0100,
+
+	0x00A5, 3, 0x01, 0x40, 0x58,				// LPR, LMR1, LMR2
+	0x0086, 1, 0x0B,					// DMR1 (D-Buffer TH-Interrupts on)
+	0x0087, 1, 0xFF,					// DMR2
+	0x0092, 1, 0x03,					// EFCR (extended mode d-channel-fifo on)
+	0x0090, 4, 0xFE, 0xFF, 0x02, 0x0F,			// FRAR4, SRAR4, DMR3, DMR4 (address recognition )
+	0x0084, 2, 0x80, 0x00,					// DRLR
+	0x00C0, 1, 0x47,					// PPCR1
+	0x00C8, 1, 0x01,					// PPCR2
+
+	0x0102,
+	0x0107,
+	0x01A1, 1,
+	0x0121, 1,
+	0x0189, 2,
+
+	0x0045, 4, 0x61, 0x72, 0x00, 0x00,			// MCR1, MCR2, MCR3, MCR4
+	0x0063, 2, 0x08, 0x08,					// GX
+	0x0064, 2, 0x08, 0x08,					// GR
+	0x0065, 2, 0x99, 0x00,					// GER
+	0x0066, 2, 0x7C, 0x8B,					// STG
+	0x0067, 2, 0x00, 0x00,					// FTGR1, FTGR2
+	0x0068, 2, 0x20, 0x20,					// ATGR1, ATGR2
+	0x0069, 1, 0x4F,					// MMR1
+	0x006A, 1, 0x00,					// MMR2
+	0x006C, 1, 0x40,					// MMR3
+	0x0021, 1, 0x02,					// INIT
+	0x00A3, 1, 0x40,					// LMR1
+
+	0xFFFF};
 
 
 void __devinit
 Amd7930_init(struct IsdnCardState *cs)
 {
-    WORD *ptr;
-    BYTE cmd, cnt;
+    u16 *ptr;
+    u8 cmd, cnt;
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "Amd7930: initamd called");
