@@ -3,7 +3,7 @@
 
 /*
  * Copyright (C) 2000-2001 Hewlett-Packard Co
- * Copyright (C) 2000-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #define ENTRY(name)				\

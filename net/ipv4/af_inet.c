@@ -270,14 +270,15 @@ int inet_getsockopt(struct socket *sock, int level, int optname,
 
 static int inet_autobind(struct sock *sk)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	/* We may need to bind the socket. */
 	lock_sock(sk);
-	if (sk->num == 0) {
+	if (!inet->num) {
 		if (sk->prot->get_port(sk, 0) != 0) {
 			release_sock(sk);
 			return -EAGAIN;
 		}
-		sk->sport = htons(sk->num);
+		inet->sport = htons(inet->num);
 	}
 	release_sock(sk);
 	return 0;
@@ -397,7 +398,7 @@ static int inet_create(struct socket *sock, int protocol)
 	inet = inet_sk(sk);
 
 	if (SOCK_RAW == sock->type) {
-		sk->num = protocol;
+		inet->num = protocol;
 		if (IPPROTO_RAW == protocol)
 			inet->hdrincl = 1;
 	}
@@ -430,13 +431,13 @@ static int inet_create(struct socket *sock, int protocol)
 	atomic_inc(&inet_sock_nr);
 #endif
 
-	if (sk->num) {
+	if (inet->num) {
 		/* It assumes that any protocol which allows
 		 * the user to assign a number at socket
 		 * creation time automatically
 		 * shares.
 		 */
-		sk->sport = htons(sk->num);
+		inet->sport = htons(inet->num);
 
 		/* Add to protocol hash chains. */
 		sk->prot->hash(sk);
@@ -551,28 +552,27 @@ static int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	/* Check these errors (active socket, double bind). */
 	err = -EINVAL;
-	if ((sk->state != TCP_CLOSE)			||
-	    (sk->num != 0))
+	if (sk->state != TCP_CLOSE || inet->num)
 		goto out;
 
-	sk->rcv_saddr = sk->saddr = addr->sin_addr.s_addr;
+	inet->rcv_saddr = inet->saddr = addr->sin_addr.s_addr;
 	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
-		sk->saddr = 0;  /* Use device */
+		inet->saddr = 0;  /* Use device */
 
 	/* Make sure we are allowed to bind here. */
 	if (sk->prot->get_port(sk, snum) != 0) {
-		sk->saddr = sk->rcv_saddr = 0;
+		inet->saddr = inet->rcv_saddr = 0;
 		err = -EADDRINUSE;
 		goto out;
 	}
 
-	if (sk->rcv_saddr)
+	if (inet->rcv_saddr)
 		sk->userlocks |= SOCK_BINDADDR_LOCK;
 	if (snum)
 		sk->userlocks |= SOCK_BINDPORT_LOCK;
-	sk->sport = htons(sk->num);
-	sk->daddr = 0;
-	sk->dport = 0;
+	inet->sport = htons(inet->num);
+	inet->daddr = 0;
+	inet->dport = 0;
 	sk_dst_reset(sk);
 	err = 0;
 out:
@@ -588,7 +588,7 @@ int inet_dgram_connect(struct socket *sock, struct sockaddr * uaddr,
 	if (uaddr->sa_family == AF_UNSPEC)
 		return sk->prot->disconnect(sk, flags);
 
-	if (sk->num==0 && inet_autobind(sk) != 0)
+	if (!inet_sk(sk)->num && inet_autobind(sk))
 		return -EAGAIN;
 	return sk->prot->connect(sk, (struct sockaddr *)uaddr, addr_len);
 }
@@ -627,6 +627,7 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 			int addr_len, int flags)
 {
 	struct sock *sk=sock->sk;
+	struct inet_opt *inet = inet_sk(sk);
 	int err;
 	long timeo;
 
@@ -655,10 +656,10 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 			goto out;
 
 		err = -EAGAIN;
-		if (sk->num == 0) {
+		if (!inet->num) {
 			if (sk->prot->get_port(sk, 0) != 0)
 				goto out;
-			sk->sport = htons(sk->num);
+			inet->sport = htons(inet->num);
 		}
 
 		err = sk->prot->connect(sk, uaddr, addr_len);
@@ -748,21 +749,22 @@ static int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 		 int *uaddr_len, int peer)
 {
 	struct sock *sk		= sock->sk;
+	struct inet_opt *inet	= inet_sk(sk);
 	struct sockaddr_in *sin	= (struct sockaddr_in *)uaddr;
   
 	sin->sin_family = AF_INET;
 	if (peer) {
-		if (!sk->dport)
+		if (!inet->dport)
 			return -ENOTCONN;
 		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
 			return -ENOTCONN;
-		sin->sin_port = sk->dport;
-		sin->sin_addr.s_addr = sk->daddr;
+		sin->sin_port = inet->dport;
+		sin->sin_addr.s_addr = inet->daddr;
 	} else {
-		__u32 addr = sk->rcv_saddr;
+		__u32 addr = inet->rcv_saddr;
 		if (!addr)
-			addr = sk->saddr;
-		sin->sin_port = sk->sport;
+			addr = inet->saddr;
+		sin->sin_port = inet->sport;
 		sin->sin_addr.s_addr = addr;
 	}
 	*uaddr_len = sizeof(*sin);
@@ -792,7 +794,7 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 	struct sock *sk = sock->sk;
 
 	/* We may need to bind the socket. */
-	if (sk->num==0 && inet_autobind(sk) != 0)
+	if (!inet_sk(sk)->num && inet_autobind(sk))
 		return -EAGAIN;
 
 	return sk->prot->sendmsg(sk, msg, size);

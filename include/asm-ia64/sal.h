@@ -8,11 +8,14 @@
  * Abstraction Layer".
  *
  * Copyright (C) 2001 Intel
+ * Copyright (C) 2002 Jenna Hall <jenna.s.hall@intel.com>
  * Copyright (C) 2001 Fred Lewis <frederick.v.lewis@intel.com>
  * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
  * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Srinivasa Prasad Thirumalachar <sprasad@sprasad.engr.sgi.com>
  *
+ * 02/01/04 J. Hall Updated Error Record Structures to conform to July 2001
+ *		    revision of the SAL spec.
  * 01/01/03 fvlewis Updated Error Record Structures to conform with Nov. 2000
  *                  revision of the SAL spec.
  * 99/09/29 davidm	Updated for SAL 2.6.
@@ -149,6 +152,7 @@ typedef struct ia64_sal_desc_memory {
 #define IA64_SAL_PLATFORM_FEATURE_BUS_LOCK		(1 << 0)
 #define IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT	(1 << 1)
 #define IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT	(1 << 2)
+#define IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT	 	(1 << 3)
 
 typedef struct ia64_sal_desc_platform_feature {
 	u8 type;
@@ -226,6 +230,10 @@ enum {
 	SAL_VECTOR_OS_INIT		= 1,
 	SAL_VECTOR_OS_BOOT_RENDEZ	= 2
 };
+
+/* Encodings for mca_opt parameter sent to SAL_MC_SET_PARAMS */
+#define	SAL_MC_PARAM_RZ_ALWAYS		0x1
+#define	SAL_MC_PARAM_BINIT_ESCALATE	0x10
 
 /*
 ** Definition of the SAL Error Log from the SAL spec
@@ -515,12 +523,12 @@ typedef struct sal_log_pci_comp_err_info
     {
         u16 vendor_id;
         u16 device_id;
-        u16 class_code;
+	u8  class_code[3];
         u8  func_num;
         u8  dev_num;
         u8  bus_num;
         u8  seg_num;
-        u8  reserved[6];
+        u8  reserved[5];
     }               comp_info;
     u32             num_mem_regs;
     u32             num_io_regs;
@@ -775,5 +783,7 @@ ia64_sal_update_pal (u64 param_buf, u64 scratch_buf, u64 scratch_buf_size,
 		*scratch_buf_size_needed = isrv.v1;
 	return isrv.status;
 }
+
+extern unsigned long sal_platform_features;
 
 #endif /* _ASM_IA64_PAL_H */

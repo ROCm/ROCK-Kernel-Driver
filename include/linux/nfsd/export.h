@@ -39,7 +39,8 @@
 #define NFSEXP_NOSUBTREECHECK	0x0400
 #define	NFSEXP_NOAUTHNLM	0x0800		/* Don't authenticate NLM requests - just trust */
 #define NFSEXP_MSNFS		0x1000	/* do silly things that MS clients expect */
-#define NFSEXP_ALLFLAGS		0x1FFF
+#define NFSEXP_FSID		0x2000
+#define NFSEXP_ALLFLAGS		0x3FFF
 
 
 #ifdef __KERNEL__
@@ -55,11 +56,13 @@ struct svc_client {
 	struct in_addr		cl_addr[NFSCLNT_ADDRMAX];
 	struct svc_uidmap *	cl_umap;
 	struct list_head	cl_export[NFSCLNT_EXPMAX];
+	struct list_head	cl_expfsid[NFSCLNT_EXPMAX];
 	struct list_head	cl_list;
 };
 
 struct svc_export {
 	struct list_head	ex_hash;
+	struct list_head	ex_fsid_hash;
 	struct list_head	ex_list;
 	char			ex_path[NFS_MAXPATHLEN+1];
 	struct svc_export *	ex_parent;
@@ -71,6 +74,7 @@ struct svc_export {
 	ino_t			ex_ino;
 	uid_t			ex_anon_uid;
 	gid_t			ex_anon_gid;
+	int			ex_fsid;
 };
 
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
@@ -91,6 +95,7 @@ void			exp_readunlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
 struct svc_export *	exp_get(struct svc_client *clp, kdev_t dev, ino_t ino);
+struct svc_export *	exp_get_fsid(struct svc_client *clp, int fsid);
 struct svc_export *	exp_get_by_name(struct svc_client *clp,
 					struct vfsmount *mnt,
 					struct dentry *dentry);

@@ -72,12 +72,28 @@ int acct_parm[3] = {4, 2, 30};
 /*
  * External references and all of the globals.
  */
-
-static volatile int acct_active;
-static volatile int acct_needcheck;
-static struct file *acct_file;
-static struct timer_list acct_timer;
 static void do_acct_process(long, struct file *);
+
+/*
+ * This structure is used so that all the data protected by lock
+ * can be placed in the same cache line as the lock.  This primes
+ * the cache line to have the data after getting the lock.
+ */
+struct acct_glbs {
+	spinlock_t		lock;
+	volatile int		active;
+	volatile int		needcheck;
+	struct file		*file;
+	struct timer_list	timer;
+};
+
+static struct acct_glbs acct_globals __cacheline_aligned = {SPIN_LOCK_UNLOCKED};
+
+#define	acct_lock	acct_globals.lock
+#define	acct_active	acct_globals.active
+#define	acct_needcheck	acct_globals.needcheck
+#define	acct_file	acct_globals.file
+#define	acct_timer	acct_globals.timer
 
 /*
  * Called whenever the timer says to check the free space.
@@ -96,11 +112,11 @@ static int check_free_space(struct file *file)
 	int res;
 	int act;
 
-	lock_kernel();
+	spin_lock(&acct_lock);
 	res = acct_active;
 	if (!file || !acct_needcheck)
 		goto out;
-	unlock_kernel();
+	spin_unlock(&acct_lock);
 
 	/* May block */
 	if (vfs_statfs(file->f_dentry->d_inode->i_sb, &sbuf))
@@ -117,7 +133,7 @@ static int check_free_space(struct file *file)
 	 * If some joker switched acct_file under us we'ld better be
 	 * silent and _not_ touch anything.
 	 */
-	lock_kernel();
+	spin_lock(&acct_lock);
 	if (file != acct_file) {
 		if (act)
 			res = act>0;
@@ -142,21 +158,25 @@ static int check_free_space(struct file *file)
 	add_timer(&acct_timer);
 	res = acct_active;
 out:
-	unlock_kernel();
+	spin_unlock(&acct_lock);
 	return res;
 }
 
 /*
- *  sys_acct() is the only system call needed to implement process
- *  accounting. It takes the name of the file where accounting records
- *  should be written. If the filename is NULL, accounting will be
- *  shutdown.
+ *  acct_common() is the main routine that implements process accounting.
+ *  It takes the name of the file where accounting records should be
+ *  written. If the filename is NULL, accounting will be shutdown.
  */
-asmlinkage long sys_acct(const char *name)
+long acct_common(const char *name, int locked)
 {
 	struct file *file = NULL, *old_acct = NULL;
 	char *tmp;
 	int error;
+
+	/*
+	 * Should only have locked set when name is NULL (enforce this).
+	 */
+	BUG_ON(locked && name);
 
 	if (!capable(CAP_SYS_PACCT))
 		return -EPERM;
@@ -183,7 +203,8 @@ asmlinkage long sys_acct(const char *name)
 	}
 
 	error = 0;
-	lock_kernel();
+	if (!locked)
+		spin_lock(&acct_lock);
 	if (acct_file) {
 		old_acct = acct_file;
 		del_timer(&acct_timer);
@@ -201,7 +222,7 @@ asmlinkage long sys_acct(const char *name)
 		acct_timer.expires = jiffies + ACCT_TIMEOUT*HZ;
 		add_timer(&acct_timer);
 	}
-	unlock_kernel();
+	spin_unlock(&acct_lock);
 	if (old_acct) {
 		do_acct_process(0,old_acct);
 		filp_close(old_acct, NULL);
@@ -213,12 +234,25 @@ out_err:
 	goto out;
 }
 
+/*
+ *  sys_acct() is the only system call needed to implement process
+ *  accounting. It takes the name of the file where accounting records
+ *  should be written. If the filename is NULL, accounting will be
+ *  shutdown.
+ */
+asmlinkage long sys_acct(const char *name)
+{
+	return (acct_common(name, 0));
+}
+
 void acct_auto_close(struct super_block *sb)
 {
-	lock_kernel();
-	if (acct_file && acct_file->f_dentry->d_inode->i_sb == sb)
-		sys_acct(NULL);
-	unlock_kernel();
+	spin_lock(&acct_lock);
+	if (acct_file && acct_file->f_dentry->d_inode->i_sb == sb) {
+		(void) acct_common(NULL, 1);
+	} else {
+		spin_unlock(&acct_lock);
+	}
 }
 
 /*
@@ -277,6 +311,7 @@ static void do_acct_process(long exitcode, struct file *file)
 	struct acct ac;
 	mm_segment_t fs;
 	unsigned long vsize;
+	unsigned long flim;
 
 	/*
 	 * First check to see if there is enough free_space to continue
@@ -338,8 +373,14 @@ static void do_acct_process(long exitcode, struct file *file)
          */
 	fs = get_fs();
 	set_fs(KERNEL_DS);
+	/*
+ 	 * Accounting records are not subject to resource limits.
+ 	 */
+	flim = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 	file->f_op->write(file, (char *)&ac,
 			       sizeof(struct acct), &file->f_pos);
+	current->rlim[RLIMIT_FSIZE].rlim_cur = flim;
 	set_fs(fs);
 }
 
@@ -349,15 +390,15 @@ static void do_acct_process(long exitcode, struct file *file)
 int acct_process(long exitcode)
 {
 	struct file *file = NULL;
-	lock_kernel();
+	spin_lock(&acct_lock);
 	if (acct_file) {
 		file = acct_file;
 		get_file(file);
-		unlock_kernel();
-		do_acct_process(exitcode, acct_file);
+		spin_unlock(&acct_lock);
+		do_acct_process(exitcode, file);
 		fput(file);
 	} else
-		unlock_kernel();
+		spin_unlock(&acct_lock);
 	return 0;
 }
 

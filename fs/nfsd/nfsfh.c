@@ -547,11 +547,13 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	dprintk("nfsd: fh_verify(%s)\n", SVCFH_fmt(fhp));
 
 	if (!fhp->fh_dentry) {
-		kdev_t xdev;
-		ino_t xino;
+		kdev_t xdev = NODEV;
+		ino_t xino = 0;
 		__u32 *datap=NULL;
 		int data_left = fh->fh_size/4;
 		int nfsdev;
+		int fsid = 0;
+
 		error = nfserr_stale;
 		if (rqstp->rq_vers == 3)
 			error = nfserr_badhandle;
@@ -571,6 +573,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				xdev = mk_kdev(nfsdev>>16, nfsdev&0xFFFF);
 				xino = *datap++;
 				break;
+			case 1:
+				if ((data_left-=1)<0) goto out;
+				fsid = *datap++;
+				break;
 			default:
 				goto out;
 			}
@@ -586,7 +592,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		 * Look up the export entry.
 		 */
 		error = nfserr_stale; 
-		exp = exp_get(rqstp->rq_client, xdev, xino);
+		if (fh->fh_version == 1 && fh->fh_fsid_type == 1)
+			exp = exp_get_fsid(rqstp->rq_client, fsid);
+		else
+			exp = exp_get(rqstp->rq_client, xdev, xino);
 
 		if (!exp) {
 			/* export entry revoked */
@@ -838,12 +847,20 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 	} else {
 		fhp->fh_handle.fh_version = 1;
 		fhp->fh_handle.fh_auth_type = 0;
-		fhp->fh_handle.fh_fsid_type = 0;
 		datap = fhp->fh_handle.fh_auth+0;
-		/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-		*datap++ = htonl((major(exp->ex_dev)<<16)| minor(exp->ex_dev));
-		*datap++ = ino_t_to_u32(exp->ex_ino);
-		fhp->fh_handle.fh_size = 3*4;
+		if ((exp->ex_flags & NFSEXP_FSID) &&
+		    (!ref_fh || ref_fh->fh_handle.fh_fsid_type == 1)) {
+			fhp->fh_handle.fh_fsid_type = 1;
+			/* fsid_type 1 == 4 bytes filesystem id */
+			*datap++ = exp->ex_fsid;
+			fhp->fh_handle.fh_size = 2*4;
+		} else {
+			fhp->fh_handle.fh_fsid_type = 0;
+			/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
+			*datap++ = htonl((major(exp->ex_dev)<<16)| minor(exp->ex_dev));
+			*datap++ = ino_t_to_u32(exp->ex_ino);
+			fhp->fh_handle.fh_size = 3*4;
+		}
 		if (inode) {
 			int size = fhp->fh_maxsize/4 - 3;
 			fhp->fh_handle.fh_fileid_type =

@@ -1,7 +1,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 /*
- * Function: armv4t_late_abort
+ * Function: v4t_late_abort
  *
  * Params  : r2 = address of aborted instruction
  *         : r3 = saved SPSR
@@ -17,7 +17,7 @@
  * abort here if the I-TLB and D-TLB aren't seeing the same
  * picture.  Unfortunately, this does happen.  We live with it.
  */
-ENTRY(armv4t_late_abort)
+ENTRY(v4t_late_abort)
 	tst	r3, #PSR_T_BIT			@ check for thumb mode
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR

@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -17,11 +16,9 @@
 #include "asm/sn/ioerror_handling.h"
 #include <asm/sn/xtalk/xbow.h>
 
-#ifdef BRINGUP
 /* these get called directly in cdl_add_connpt in fops bypass hack */
 extern int pcibr_attach(devfs_handle_t);
 extern int xbow_attach(devfs_handle_t);
-#endif /* BRINGUP */
 
 /*
  *    cdl: Connection and Driver List
@@ -37,8 +34,6 @@ struct cdl {
     int		mfg_num;
     int (*attach) (devfs_handle_t);
 } dummy_reg;
-
-typedef struct cdl     *cdl_p;
 
 #define MAX_SGI_IO_INFRA_DRVR 4
 struct cdl sgi_infrastructure_drivers[MAX_SGI_IO_INFRA_DRVR] =

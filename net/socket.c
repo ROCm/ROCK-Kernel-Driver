@@ -359,6 +359,7 @@ static struct vfsmount *sock_mnt;
 static struct file_system_type sock_fs_type = {
 	name:		"sockfs",
 	get_sb:		sockfs_get_sb,
+	kill_sb:	kill_anon_super,
 	fs_flags:	FS_NOMOUNT,
 };
 static int sockfs_delete_dentry(struct dentry *dentry)

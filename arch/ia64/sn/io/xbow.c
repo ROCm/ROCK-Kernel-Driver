@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -19,6 +18,7 @@
 #include <asm/sn/hack.h>
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/xtalk/xtalk_private.h>
+#include <asm/sn/simulator.h>
 
 /* #define DEBUG		1 */
 /* #define XBOW_DEBUG	1 */
@@ -102,7 +102,6 @@ devfs_handle_t            xbow_widget_lookup(devfs_handle_t, int);
 #ifdef LATER
 static void             xbow_setwidint(xtalk_intr_t);
 static void             xbow_errintr_handler(intr_arg_t);
-static error_handler_f  xbow_error_handler;
 #endif
 void                    xbow_intr_preset(void *, int, xwidgetnum_t, iopaddr_t, xtalk_intr_vector_t);
 
@@ -281,7 +280,7 @@ xbow_attach(devfs_handle_t conn)
                         /* &hcl_fops */ (void *)&vhdl, NULL);
     if (!vhdl) {
         printk(KERN_WARNING "xbow_attach: Unable to create char device for xbow conn %p\n",
-                conn);
+                (void *)conn);
     }
 
     /*
@@ -306,7 +305,7 @@ xbow_attach(devfs_handle_t conn)
 
     /*
      * get the name of this xbow vertex and keep the info.
-     * This is needed during errors and interrupts, but as
+     * This is needed during errors and interupts, but as
      * long as we have it, we can use it elsewhere.
      */
     s = dev_to_name(vhdl, devnm, MAXDEVNAME);
@@ -371,36 +370,9 @@ xbow_attach(devfs_handle_t conn)
     }
 
     /*
-     * attach the crossbow error interrupt.
-     */
-#ifdef LATER
-    dev_desc = device_desc_dup(vhdl);
-    device_desc_flags_set(dev_desc,
-			  device_desc_flags_get(dev_desc) | D_INTR_ISERR);
-    device_desc_intr_name_set(dev_desc, "Crossbow error");
-
-    intr_hdl = xtalk_intr_alloc(conn, dev_desc, vhdl);
-    ASSERT(intr_hdl != NULL);
-
-    xtalk_intr_connect(intr_hdl,
-		       (intr_func_t) xbow_errintr_handler,
-		       (intr_arg_t) soft,
-		       (xtalk_intr_setfunc_t) xbow_setwidint,
-		       (void *) xbow,
-		       (void *) 0);
-    device_desc_free(dev_desc);
-
-    xwidget_error_register(conn, xbow_error_handler, soft);
-
-#else
-    FIXME("xbow_attach: Fixme: we bypassed attaching xbow error interrupt.\n");
-#endif /* LATER */
-
-    /*
      * Enable xbow error interrupts
      */
-    xbow->xb_wid_control = (XB_WID_CTRL_REG_ACC_IE |
-			    XB_WID_CTRL_XTALK_IE);
+    xbow->xb_wid_control = (XB_WID_CTRL_REG_ACC_IE | XB_WID_CTRL_XTALK_IE);
 
     /*
      * take a census of the widgets present,
@@ -918,460 +890,6 @@ xbow_xmit_retry_error(xbow_soft_t soft,
     return 1;
 }
 
-/*
- * xbow_errintr_handler will be called if the xbow
- * sends an interrupt request to report an error.
- */
-
-#ifdef LATER
-static void
-xbow_errintr_handler(intr_arg_t arg)
-{
-    ioerror_t               ioe[1];
-    xbow_soft_t             soft = (xbow_soft_t) arg;
-    xbow_t                 *xbow = soft->base;
-    xbowreg_t               wid_control;
-    xbowreg_t               wid_stat;
-    xbowreg_t               wid_err_cmdword;
-    xbowreg_t               wid_err_upper;
-    xbowreg_t               wid_err_lower;
-    w_err_cmd_word_u        wid_err;
-    uint64_t                 wid_err_addr;
-
-    int                     fatal = 0;
-    int                     dump_ioe = 0;
-
-    wid_control = xbow->xb_wid_control;
-    wid_stat = xbow->xb_wid_stat_clr;
-    wid_err_cmdword = xbow->xb_wid_err_cmdword;
-    wid_err_upper = xbow->xb_wid_err_upper;
-    wid_err_lower = xbow->xb_wid_err_lower;
-    xbow->xb_wid_err_cmdword = 0;
-
-    wid_err_addr =
-	wid_err_lower
-	| (((iopaddr_t) wid_err_upper
-	    & WIDGET_ERR_UPPER_ADDR_ONLY)
-	   << 32);
-
-    if (wid_stat & XB_WID_STAT_LINK_INTR_MASK) {
-	int                     port;
-
-	wid_err.r = wid_err_cmdword;
-
-	for (port = MAX_PORT_NUM - MAX_XBOW_PORTS;
-	     port < MAX_PORT_NUM; port++) {
-	    if (wid_stat & XB_WID_STAT_LINK_INTR(port)) {
-		xb_linkregs_t          *link = &(xbow->xb_link(port));
-		xbowreg_t               link_control = link->link_control;
-		xbowreg_t               link_status = link->link_status_clr;
-		xbowreg_t               link_aux_status = link->link_aux_status;
-		xbowreg_t               link_pend;
-
-		link_pend = link_status & link_control &
-		    (XB_STAT_ILLEGAL_DST_ERR
-		     | XB_STAT_OALLOC_IBUF_ERR
-		     | XB_STAT_RCV_CNT_OFLOW_ERR
-		     | XB_STAT_XMT_CNT_OFLOW_ERR
-		     | XB_STAT_XMT_MAX_RTRY_ERR
-		     | XB_STAT_RCV_ERR
-		     | XB_STAT_XMT_RTRY_ERR
-		     | XB_STAT_MAXREQ_TOUT_ERR
-		     | XB_STAT_SRC_TOUT_ERR
-		    );
-
-		if (link_pend & XB_STAT_ILLEGAL_DST_ERR) {
-		    if (wid_err.f.sidn == port) {
-			IOERROR_INIT(ioe);
-			IOERROR_SETVALUE(ioe, widgetnum, port);
-			IOERROR_SETVALUE(ioe, xtalkaddr, wid_err_addr);
-			if (IOERROR_HANDLED ==
-			    xbow_error_handler(soft,
-					       IOECODE_DMA,
-					       MODE_DEVERROR,
-					       ioe)) {
-			    link_pend &= ~XB_STAT_ILLEGAL_DST_ERR;
-			} else {
-			    dump_ioe++;
-			}
-		    }
-		}
-		/* Xbow/Bridge WAR:
-		 * if the bridge signals an LLP Transmitter Retry,
-		 * rewrite its control register.
-		 * If someone else triggers this interrupt,
-		 * ignore (and disable) the interrupt.
-		 */
-		if (link_pend & XB_STAT_XMT_RTRY_ERR) {
-		    if (!xbow_xmit_retry_error(soft, port)) {
-			link_control &= ~XB_CTRL_XMT_RTRY_IE;
-			link->link_control = link_control;
-			link->link_control;	/* stall until written */
-		    }
-		    link_pend &= ~XB_STAT_XMT_RTRY_ERR;
-		}
-		if (link_pend) {
-		    devfs_handle_t	xwidget_vhdl;
-		    char		*xwidget_name;
-		    
-		    /* Get the widget name corresponding to the current
-		     * xbow link.
-		     */
-		    xwidget_vhdl = xbow_widget_lookup(soft->busv,port);
-		    xwidget_name = xwidget_name_get(xwidget_vhdl);
-
-#ifdef	LATER
-		    printk("%s port %X[%s] XIO Bus Error",
-			    soft->name, port, xwidget_name);
-		    if (link_status & XB_STAT_MULTI_ERR)
-			XEM_ADD_STR("\tMultiple Errors\n");
-		    if (link_status & XB_STAT_ILLEGAL_DST_ERR)
-			XEM_ADD_STR("\tInvalid Packet Destination\n");
-		    if (link_status & XB_STAT_OALLOC_IBUF_ERR)
-			XEM_ADD_STR("\tInput Overallocation Error\n");
-		    if (link_status & XB_STAT_RCV_CNT_OFLOW_ERR)
-			XEM_ADD_STR("\tLLP receive error counter overflow\n");
-		    if (link_status & XB_STAT_XMT_CNT_OFLOW_ERR)
-			XEM_ADD_STR("\tLLP transmit retry counter overflow\n");
-		    if (link_status & XB_STAT_XMT_MAX_RTRY_ERR)
-			XEM_ADD_STR("\tLLP Max Transmitter Retry\n");
-		    if (link_status & XB_STAT_RCV_ERR)
-			XEM_ADD_STR("\tLLP Receiver error\n");
-		    if (link_status & XB_STAT_XMT_RTRY_ERR)
-			XEM_ADD_STR("\tLLP Transmitter Retry\n");
-		    if (link_status & XB_STAT_MAXREQ_TOUT_ERR)
-			XEM_ADD_STR("\tMaximum Request Timeout\n");
-		    if (link_status & XB_STAT_SRC_TOUT_ERR)
-			XEM_ADD_STR("\tSource Timeout Error\n");
-#endif	/* LATER */
-		    {
-			int                     other_port;
-
-			for (other_port = 8; other_port < 16; ++other_port) {
-			    if (link_aux_status & (1 << other_port)) {
-				/* XXX- need to go to "other_port"
-				 * and clean up after the timeout?
-				 */
-				XEM_ADD_VAR(other_port);
-			    }
-			}
-		    }
-
-#if !DEBUG
-		    if (kdebug) {
-#endif
-			XEM_ADD_VAR(link_control);
-			XEM_ADD_VAR(link_status);
-			XEM_ADD_VAR(link_aux_status);
-
-			if (dump_ioe) {
-			    XEM_ADD_IOE();
-			    dump_ioe = 0;
-			}
-#if !DEBUG
-		    }
-#endif
-		    fatal++;
-		}
-	    }
-	}
-    }
-    if (wid_stat & wid_control & XB_WID_STAT_WIDGET0_INTR) {
-	/* we have a "widget zero" problem */
-
-	if (wid_stat & (XB_WID_STAT_MULTI_ERR
-			| XB_WID_STAT_XTALK_ERR
-			| XB_WID_STAT_REG_ACC_ERR)) {
-
-	    printk("%s Port 0 XIO Bus Error",
-		    soft->name);
-	    if (wid_stat & XB_WID_STAT_MULTI_ERR)
-		XEM_ADD_STR("\tMultiple Error\n");
-	    if (wid_stat & XB_WID_STAT_XTALK_ERR)
-		XEM_ADD_STR("\tXIO Error\n");
-	    if (wid_stat & XB_WID_STAT_REG_ACC_ERR)
-		XEM_ADD_STR("\tRegister Access Error\n");
-
-	    fatal++;
-	}
-    }
-    if (fatal) {
-	XEM_ADD_VAR(wid_stat);
-	XEM_ADD_VAR(wid_control);
-	XEM_ADD_VAR(wid_err_cmdword);
-	XEM_ADD_VAR(wid_err_upper);
-	XEM_ADD_VAR(wid_err_lower);
-	XEM_ADD_VAR(wid_err_addr);
-	PRINT_PANIC("XIO Bus Error");
-    }
-}
-#endif	/* LATER */
-
-/*
- * XBOW ERROR Handling routines.
- * These get invoked as part of walking down the error handling path
- * from hub/heart towards the I/O device that caused the error.
- */
-
-/*
- * xbow_error_handler
- *      XBow error handling dispatch routine.
- *      This is the primary interface used by external world to invoke
- *      in case of an error related to a xbow.
- *      Only functionality in this layer is to identify the widget handle
- *      given the widgetnum. Otherwise, xbow does not gathers any error
- *      data.
- */
-
-#ifdef LATER
-static int
-xbow_error_handler(
-		      void *einfo,
-		      int error_code,
-		      ioerror_mode_t mode,
-		      ioerror_t *ioerror)
-{
-    int                     retval = IOERROR_WIDGETLEVEL;
-
-    xbow_soft_t             soft = (xbow_soft_t) einfo;
-    int                     port;
-    devfs_handle_t            conn;
-    devfs_handle_t            busv;
-
-    xbow_t                 *xbow = soft->base;
-    xbowreg_t               wid_stat;
-    xbowreg_t               wid_err_cmdword;
-    xbowreg_t               wid_err_upper;
-    xbowreg_t               wid_err_lower;
-    uint64_t                 wid_err_addr;
-
-    xb_linkregs_t          *link;
-    xbowreg_t               link_control;
-    xbowreg_t               link_status;
-    xbowreg_t               link_aux_status;
-
-    ASSERT(soft != 0);
-    busv = soft->busv;
-
-#if DEBUG && ERROR_DEBUG
-    printk("%s: xbow_error_handler\n", soft->name, busv);
-#endif
-
-    port = IOERROR_GETVALUE(ioerror, widgetnum);
-
-    if (port == 0) {
-	/* error during access to xbow:
-	 * do NOT attempt to access xbow regs.
-	 */
-	if (mode == MODE_DEVPROBE)
-	    return IOERROR_HANDLED;
-
-	if (error_code & IOECODE_DMA) {
-	    PRINT_ALERT("DMA error blamed on Crossbow at %s\n"
-		    "\tbut Crosbow never initiates DMA!",
-		    soft->name);
-	}
-	if (error_code & IOECODE_PIO) {
-	    PRINT_ALERt("PIO Error on XIO Bus %s\n"
-		    "\tattempting to access XIO controller\n"
-		    "\twith offset 0x%X",
-		    soft->name,
-		    IOERROR_GETVALUE(ioerror, xtalkaddr));
-	}
-	/* caller will dump contents of ioerror
-	 * in DEBUG and kdebug kernels.
-	 */
-
-	return retval;
-    }
-    /*
-     * error not on port zero:
-     * safe to read xbow registers.
-     */
-    wid_stat = xbow->xb_wid_stat;
-    wid_err_cmdword = xbow->xb_wid_err_cmdword;
-    wid_err_upper = xbow->xb_wid_err_upper;
-    wid_err_lower = xbow->xb_wid_err_lower;
-
-    wid_err_addr =
-	wid_err_lower
-	| (((iopaddr_t) wid_err_upper
-	    & WIDGET_ERR_UPPER_ADDR_ONLY)
-	   << 32);
-
-    if ((port < BASE_XBOW_PORT) ||
-	(port >= MAX_PORT_NUM)) {
-
-	if (mode == MODE_DEVPROBE)
-	    return IOERROR_HANDLED;
-
-	if (error_code & IOECODE_DMA) {
-	    PRINT_ALERT("DMA error blamed on XIO port at %s/%d\n"
-		    "\tbut Crossbow does not support that port",
-		    soft->name, port);
-	}
-	if (error_code & IOECODE_PIO) {
-	    PRINT_ALERT("PIO Error on XIO Bus %s\n"
-		    "\tattempting to access XIO port %d\n"
-		    "\t(which Crossbow does not support)"
-		    "\twith offset 0x%X",
-		    soft->name, port,
-		    IOERROR_GETVALUE(ioerror, xtalkaddr));
-	}
-#if !DEBUG
-	if (kdebug) {
-#endif
-	    XEM_ADD_STR("Raw status values for Crossbow:\n");
-	    XEM_ADD_VAR(wid_stat);
-	    XEM_ADD_VAR(wid_err_cmdword);
-	    XEM_ADD_VAR(wid_err_upper);
-	    XEM_ADD_VAR(wid_err_lower);
-	    XEM_ADD_VAR(wid_err_addr);
-#if !DEBUG
-	}
-#endif
-
-	/* caller will dump contents of ioerror
-	 * in DEBUG and kdebug kernels.
-	 */
-
-	return retval;
-    }
-    /* access to valid port:
-     * ok to check port status.
-     */
-
-    link = &(xbow->xb_link(port));
-    link_control = link->link_control;
-    link_status = link->link_status;
-    link_aux_status = link->link_aux_status;
-
-    /* Check that there is something present
-     * in that XIO port.
-     */
-    if (!(link_aux_status & XB_AUX_STAT_PRESENT)) {
-	/* nobody connected. */
-	if (mode == MODE_DEVPROBE)
-	    return IOERROR_HANDLED;
-
-	if (error_code & IOECODE_DMA) {
-	    PRINT_ALERT("DMA error blamed on XIO port at %s/%d\n"
-		    "\tbut there is no device connected there.",
-		    soft->name, port);
-	}
-	if (error_code & IOECODE_PIO) {
-	    PRINT_ALERT("PIO Error on XIO Bus %s\n"
-		    "\tattempting to access XIO port %d\n"
-		    "\t(which has no device connected)"
-		    "\twith offset 0x%X",
-		    soft->name, port,
-		    IOERROR_GETVALUE(ioerror, xtalkaddr));
-	}
-#if !DEBUG
-	if (kdebug) {
-#endif
-	    XEM_ADD_STR("Raw status values for Crossbow:\n");
-	    XEM_ADD_VAR(wid_stat);
-	    XEM_ADD_VAR(wid_err_cmdword);
-	    XEM_ADD_VAR(wid_err_upper);
-	    XEM_ADD_VAR(wid_err_lower);
-	    XEM_ADD_VAR(wid_err_addr);
-	    XEM_ADD_VAR(port);
-	    XEM_ADD_VAR(link_control);
-	    XEM_ADD_VAR(link_status);
-	    XEM_ADD_VAR(link_aux_status);
-#if !DEBUG
-	}
-#endif
-	return retval;
-
-    }
-    /* Check that the link is alive.
-     */
-    if (!(link_status & XB_STAT_LINKALIVE)) {
-	/* nobody connected. */
-	if (mode == MODE_DEVPROBE)
-	    return IOERROR_HANDLED;
-
-	PRINT_ALERT("%s%sError on XIO Bus %s port %d",
-		(error_code & IOECODE_DMA) ? "DMA " : "",
-		(error_code & IOECODE_PIO) ? "PIO " : "",
-		soft->name, port);
-
-	if ((error_code & IOECODE_PIO) &&
-	    (IOERROR_FIELDVALID(ioerror, xtalkaddr))) {
-	    printk("\tAccess attempted to offset 0x%X\n",
-		    IOERROR_GETVALUE(ioerror, xtalkaddr));
-	}
-	if (link_aux_status & XB_AUX_LINKFAIL_RST_BAD)
-	    XEM_ADD_STR("\tLink never came out of reset\n");
-	else
-	    XEM_ADD_STR("\tLink failed while transferring data\n");
-
-    }
-    /* get the connection point for the widget
-     * involved in this error; if it exists and
-     * is not our connectpoint, cycle back through
-     * xtalk_error_handler to deliver control to
-     * the proper handler (or to report a generic
-     * crosstalk error).
-     *
-     * If the downstream handler won't handle
-     * the problem, we let our upstream caller
-     * deal with it, after (in DEBUG and kdebug
-     * kernels) dumping the xbow state for this
-     * port.
-     */
-    conn = xbow_widget_lookup(busv, port);
-    if ((conn != GRAPH_VERTEX_NONE) &&
-	(conn != soft->conn)) {
-	retval = xtalk_error_handler(conn, error_code, mode, ioerror);
-	if (retval == IOERROR_HANDLED)
-	    return IOERROR_HANDLED;
-    }
-    if (mode == MODE_DEVPROBE)
-	return IOERROR_HANDLED;
-
-    if (retval == IOERROR_UNHANDLED) {
-	retval = IOERROR_PANIC;
-
-	PRINT_ALERT("%s%sError on XIO Bus %s port %d",
-		(error_code & IOECODE_DMA) ? "DMA " : "",
-		(error_code & IOECODE_PIO) ? "PIO " : "",
-		soft->name, port);
-
-	if ((error_code & IOECODE_PIO) &&
-	    (IOERROR_FIELDVALID(ioerror, xtalkaddr))) {
-	    printk("\tAccess attempted to offset 0x%X\n",
-		    IOERROR_GETVALUE(ioerror, xtalkaddr));
-	}
-    }
-
-#if !DEBUG
-    if (kdebug) {
-#endif
-	XEM_ADD_STR("Raw status values for Crossbow:\n");
-	XEM_ADD_VAR(wid_stat);
-	XEM_ADD_VAR(wid_err_cmdword);
-	XEM_ADD_VAR(wid_err_upper);
-	XEM_ADD_VAR(wid_err_lower);
-	XEM_ADD_VAR(wid_err_addr);
-	XEM_ADD_VAR(port);
-	XEM_ADD_VAR(link_control);
-	XEM_ADD_VAR(link_status);
-	XEM_ADD_VAR(link_aux_status);
-#if !DEBUG
-    }
-#endif
-    /* caller will dump raw ioerror data
-     * in DEBUG and kdebug kernels.
-     */
-
-    return retval;
-}
-
-#endif	/* LATER */
-
 void
 xbow_update_perf_counters(devfs_handle_t vhdl)
 {
@@ -1520,7 +1038,7 @@ xbow_update_llp_status(devfs_handle_t vhdl)
 
 	if (lnk_sts.linkstatus & ~(XB_STAT_RCV_ERR | XB_STAT_XMT_RTRY_ERR | XB_STAT_LINKALIVE)) {
 #ifdef	LATER
-	    PRINT_WARNING("link %d[%s]: bad status 0x%x\n",
+	    printk(KERN_WARNING  "link %d[%s]: bad status 0x%x\n",
 		    link, xwidget_name, lnk_sts.linkstatus);
 #endif
 	}

@@ -1043,6 +1043,7 @@ static struct file_system_type openprom_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"openpromfs",
 	get_sb:		openprom_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 static int __init init_openprom_fs(void)

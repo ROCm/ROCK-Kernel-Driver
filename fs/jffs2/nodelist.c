@@ -31,14 +31,14 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodelist.c,v 1.30.2.3 2002/02/23 14:04:44 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.42 2002/03/11 11:17:29 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
-#include <linux/jffs2.h>
 #include <linux/fs.h>
 #include <linux/mtd/mtd.h>
+#include <linux/interrupt.h>
 #include "nodelist.h"
 
 void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new, struct jffs2_full_dirent **list)
@@ -89,13 +89,37 @@ void jffs2_add_tn_to_list(struct jffs2_tmp_dnode_info *tn, struct jffs2_tmp_dnod
         *prev = tn;
 }
 
+static void jffs2_free_tmp_dnode_info_list(struct jffs2_tmp_dnode_info *tn)
+{
+	struct jffs2_tmp_dnode_info *next;
+
+	while (tn) {
+		next = tn;
+		tn = tn->next;
+		jffs2_free_full_dnode(next->fn);
+		jffs2_free_tmp_dnode_info(next);
+	}
+}
+
+static void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd)
+{
+	struct jffs2_full_dirent *next;
+
+	while (fd) {
+		next = fd->next;
+		jffs2_free_full_dirent(fd);
+		fd = next;
+	}
+}
+
+
 /* Get tmp_dnode_info and full_dirent for all non-obsolete nodes associated
    with this ino, returning the former in order of version */
 
 int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode_info *f,
 			  struct jffs2_tmp_dnode_info **tnp, struct jffs2_full_dirent **fdp,
-			  __u32 *highest_version, __u32 *latest_mctime,
-			  __u32 *mctime_ver)
+			  uint32_t *highest_version, uint32_t *latest_mctime,
+			  uint32_t *mctime_ver)
 {
 	struct jffs2_raw_node_ref *ref = f->inocache->nodes;
 	struct jffs2_tmp_dnode_info *tn, *ret_tn = NULL;
@@ -111,6 +135,9 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 	if (!f->inocache->nodes) {
 		printk(KERN_WARNING "Eep. no nodes for ino #%lu\n", ino);
 	}
+
+	spin_lock_bh(&c->erase_completion_lock);
+
 	for (ref = f->inocache->nodes; ref && ref->next_in_ino; ref = ref->next_in_ino) {
 		/* Work out whether it's a data node or a dirent node */
 		if (ref->flash_offset & 1) {
@@ -118,7 +145,12 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			D1(printk(KERN_DEBUG "node at 0x%08x is obsoleted. Ignoring.\n", ref->flash_offset &~3));
 			continue;
 		}
-		err = c->mtd->read(c->mtd, (ref->flash_offset & ~3), min(ref->totlen, sizeof(node)), &retlen, (void *)&node);
+		/* We can hold a pointer to a non-obsolete node without the spinlock,
+		   but _obsolete_ nodes may disappear at any time, if the block
+		   they're in gets erased */
+		spin_unlock_bh(&c->erase_completion_lock);
+
+		err = jffs2_flash_read(c, (ref->flash_offset & ~3), min(ref->totlen, sizeof(node)), &retlen, (void *)&node);
 		if (err) {
 			printk(KERN_WARNING "error %d reading node at 0x%08x in get_inode_nodes()\n", err, (ref->flash_offset) & ~3);
 			goto free_out;
@@ -143,8 +175,10 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			if (node.d.version > *highest_version)
 				*highest_version = node.d.version;
 			if (ref->flash_offset & 1) {
-				/* Obsoleted */
-				continue;
+				/* Obsoleted. This cannot happen, surely? dwmw2 20020308 */
+				printk(KERN_ERR "Dirent node at 0x%08x became obsolete while we weren't looking\n",
+				       ref->flash_offset & ~3);
+				BUG();
 			}
 			fd = jffs2_alloc_full_dirent(node.d.nsize+1);
 			if (!fd) {
@@ -167,7 +201,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			   dirent we've already read from the flash
 			*/
 			if (retlen > sizeof(struct jffs2_raw_dirent))
-				memcpy(&fd->name[0], &node.d.name[0], min((__u32)node.d.nsize, (retlen-sizeof(struct jffs2_raw_dirent))));
+				memcpy(&fd->name[0], &node.d.name[0], min((uint32_t)node.d.nsize, (retlen-sizeof(struct jffs2_raw_dirent))));
 				
 			/* Do we need to copy any more of the name directly
 			   from the flash?
@@ -175,7 +209,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			if (node.d.nsize + sizeof(struct jffs2_raw_dirent) > retlen) {
 				int already = retlen - sizeof(struct jffs2_raw_dirent);
 					
-				err = c->mtd->read(c->mtd, (ref->flash_offset & ~3) + retlen, 
+				err = jffs2_flash_read(c, (ref->flash_offset & ~3) + retlen, 
 						   node.d.nsize - already, &retlen, &fd->name[already]);
 				if (!err && retlen != node.d.nsize - already)
 					err = -EIO;
@@ -207,9 +241,10 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			D1(printk(KERN_DEBUG "version %d, highest_version now %d\n", node.d.version, *highest_version));
 
 			if (ref->flash_offset & 1) {
-				D1(printk(KERN_DEBUG "obsoleted\n"));
-				/* Obsoleted */
-				continue;
+				/* Obsoleted. This cannot happen, surely? dwmw2 20020308 */
+				printk(KERN_ERR "Inode node at 0x%08x became obsolete while we weren't looking\n",
+				       ref->flash_offset & ~3);
+				BUG();
 			}
 			tn = jffs2_alloc_tmp_dnode_info();
 			if (!tn) {
@@ -254,7 +289,10 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 				break;
 			}
 		}
+		spin_lock_bh(&c->erase_completion_lock);
+
 	}
+	spin_unlock_bh(&c->erase_completion_lock);
 	*tnp = ret_tn;
 	*fdp = ret_fd;
 
@@ -272,15 +310,19 @@ struct jffs2_inode_cache *jffs2_get_ino_cache(struct jffs2_sb_info *c, int ino)
 
 	D2(printk(KERN_DEBUG "jffs2_get_ino_cache(): ino %u\n", ino));
 	spin_lock (&c->inocache_lock);
-	ret = c->inocache_list[ino % INOCACHE_HASHSIZE];
-	while (ret && ret->ino < ino) {
-		ret = ret->next;
+
+	if (c->inocache_last && c->inocache_last->ino == ino) {
+		ret = c->inocache_last;
+	} else {
+		ret = c->inocache_list[ino % INOCACHE_HASHSIZE];
+		while (ret && ret->ino < ino) {
+			ret = ret->next;
+		}
+
+		if (ret && ret->ino != ino)
+			ret = NULL;
 	}
-
 	spin_unlock(&c->inocache_lock);
-
-	if (ret && ret->ino != ino)
-		ret = NULL;
 
 	D2(printk(KERN_DEBUG "jffs2_get_ino_cache found %p for ino %u\n", ret, ino));
 	return ret;
@@ -299,6 +341,9 @@ void jffs2_add_ino_cache (struct jffs2_sb_info *c, struct jffs2_inode_cache *new
 	}
 	new->next = *prev;
 	*prev = new;
+
+	c->inocache_last = new;
+
 	spin_unlock(&c->inocache_lock);
 }
 
@@ -316,6 +361,9 @@ void jffs2_del_ino_cache(struct jffs2_sb_info *c, struct jffs2_inode_cache *old)
 	if ((*prev) == old) {
 		*prev = old->next;
 	}
+	if (c->inocache_last == old)
+		c->inocache_last = NULL;
+
 	spin_unlock(&c->inocache_lock);
 }
 
@@ -334,6 +382,7 @@ void jffs2_free_ino_caches(struct jffs2_sb_info *c)
 		}
 		c->inocache_list[i] = NULL;
 	}
+	c->inocache_last = NULL;
 }
 
 void jffs2_free_raw_node_refs(struct jffs2_sb_info *c)

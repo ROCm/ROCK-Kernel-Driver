@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: symlink.c,v 1.5.2.1 2002/01/15 10:39:06 dwmw2 Exp $
+ * $Id: symlink.c,v 1.9 2002/01/10 09:29:53 dwmw2 Exp $
  *
  */
 
@@ -39,7 +39,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
-#include <linux/jffs2.h>
 #include "nodelist.h"
 
 int jffs2_readlink(struct dentry *dentry, char *buffer, int buflen);
@@ -52,40 +51,12 @@ struct inode_operations jffs2_symlink_inode_operations =
 	setattr:	jffs2_setattr
 };
 
-static char *jffs2_getlink(struct dentry *dentry)
-{
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(dentry->d_inode);
-	char *buf;
-	int ret;
-
-	down(&f->sem);
-	if (!f->metadata) {
-		up(&f->sem);
-		printk(KERN_NOTICE "No metadata for symlink inode #%lu\n", dentry->d_inode->i_ino);
-		return ERR_PTR(-EINVAL);
-	}
-	buf = kmalloc(f->metadata->size+1, GFP_USER);
-	if (!buf) {
-		up(&f->sem);
-		return ERR_PTR(-ENOMEM);
-	}
-	buf[f->metadata->size]=0;
-
-	ret = jffs2_read_dnode(JFFS2_SB_INFO(dentry->d_inode->i_sb), f->metadata, buf, 0, f->metadata->size);
-	up(&f->sem);
-	if (ret) {
-		kfree(buf);
-		return ERR_PTR(ret);
-	}
-	return buf;
-
-}
 int jffs2_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
 	unsigned char *kbuf;
 	int ret;
 
-	kbuf = jffs2_getlink(dentry);
+	kbuf = jffs2_getlink(JFFS2_SB_INFO(dentry->d_inode->i_sb), JFFS2_INODE_INFO(dentry->d_inode));
 	if (IS_ERR(kbuf))
 		return PTR_ERR(kbuf);
 
@@ -99,7 +70,7 @@ int jffs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 	unsigned char *buf;
 	int ret;
 
-	buf = jffs2_getlink(dentry);
+	buf = jffs2_getlink(JFFS2_SB_INFO(dentry->d_inode->i_sb), JFFS2_INODE_INFO(dentry->d_inode));
 
 	if (IS_ERR(buf))
 		return PTR_ERR(buf);

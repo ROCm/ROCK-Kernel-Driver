@@ -1,10 +1,11 @@
 #ifndef _ASM_IA64_PCI_H
 #define _ASM_IA64_PCI_H
 
+#include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/types.h>
-#include <linux/spinlock.h>
 
 #include <asm/io.h>
 #include <asm/scatterlist.h>
@@ -20,6 +21,13 @@
 #define PCIBIOS_MIN_MEM		0x10000000
 
 struct pci_dev;
+
+/*
+ * The PCI address space does equal the physical memory address space.
+ * The networking and block device layers use this boolean for bounce
+ * buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS	(1)
 
 static inline void
 pcibios_set_master (struct pci_dev *dev)
@@ -79,7 +87,7 @@ pci_dma_supported (struct pci_dev *hwdev, u64 mask)
 /* The ia64 platform always supports 64-bit addressing. */
 #define pci_dac_dma_supported(pci_dev, mask)	(1)
 
-#define pci_dac_page_to_dma(dev,pg,off,dir)	((dma64_addr_t) page_to_bus(pg) + (off))
+#define pci_dac_page_to_dma(dev,pg,off,dir)	((dma_addr_t) page_to_bus(pg) + (off))
 #define pci_dac_dma_to_page(dev,dma_addr)	(virt_to_page(bus_to_virt(dma_addr)))
 #define pci_dac_dma_to_offset(dev,dma_addr)	((dma_addr) & ~PAGE_MASK)
 #define pci_dac_dma_sync_single(dev,dma_addr,len,dir)	do { /* nothing */ } while (0)

@@ -554,7 +554,7 @@ static int econet_create(struct socket *sock, int protocol)
 	memset(eo, 0, sizeof(*eo));
 	sk->zapped=0;
 	sk->family = PF_ECONET;
-	sk->num = protocol;
+	eo->num = protocol;
 
 	sklist_insert_socket(&econet_sklist, sk);
 	return(0);

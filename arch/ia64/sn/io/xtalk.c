@@ -4,24 +4,22 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
+#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/hcl_util.h>
-
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/xtalk/xswitch.h>
 #include <asm/sn/xtalk/xwidget.h>
-
 #include <asm/sn/xtalk/xtalk_private.h>
 
 /*
@@ -41,7 +39,6 @@ char                    widget_info_fingerprint[] = "widget_info";
 
 cdl_p                   xtalk_registry = NULL;
 
-#include <asm/sn/agent.h>
 #define	DEV_FUNC(dev,func)	hub_##func
 #define	CAST_PIOMAP(x)		((hub_piomap_t)(x))
 #define	CAST_DMAMAP(x)		((hub_dmamap_t)(x))
@@ -72,7 +69,7 @@ void			xtalk_dmalist_drain(devfs_handle_t, alenlist_t);
 xtalk_intr_t            xtalk_intr_alloc(devfs_handle_t, device_desc_t, devfs_handle_t);
 xtalk_intr_t            xtalk_intr_alloc_nothd(devfs_handle_t, device_desc_t, devfs_handle_t);
 void                    xtalk_intr_free(xtalk_intr_t);
-int                     xtalk_intr_connect(xtalk_intr_t, intr_func_t, intr_arg_t, xtalk_intr_setfunc_t, void *, void *);
+int                     xtalk_intr_connect(xtalk_intr_t, xtalk_intr_setfunc_t, void *);
 void                    xtalk_intr_disconnect(xtalk_intr_t);
 devfs_handle_t            xtalk_intr_cpu_get(xtalk_intr_t);
 int                     xtalk_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
@@ -113,8 +110,6 @@ int                     xwidget_register(xwidget_hwid_t, devfs_handle_t,
 					 xwidgetnum_t, devfs_handle_t, 
 					 xwidgetnum_t, async_attach_t);
 int			xwidget_unregister(devfs_handle_t);
-void                    xwidget_error_register(devfs_handle_t, error_handler_f *,
-					       error_handler_arg_t);
 void                    xwidget_reset(devfs_handle_t);
 char			*xwidget_name_get(devfs_handle_t);
 #if !defined(DEV_FUNC)
@@ -472,14 +467,11 @@ xtalk_intr_free(xtalk_intr_t intr_hdl)
  */
 int
 xtalk_intr_connect(xtalk_intr_t intr_hdl,	/* xtalk intr resource handle */
-		   intr_func_t intr_func,	/* xtalk intr handler */
-		   intr_arg_t intr_arg,		/* arg to intr handler */
 		   xtalk_intr_setfunc_t setfunc,	/* func to set intr hw */
-		   void *setfunc_arg,	/* arg to setfunc */
-		   void *thread)
-{				/* intr thread to use */
+		   void *setfunc_arg)	/* arg to setfunc */
+{
     return INTR_FUNC(intr_hdl, intr_connect)
-	(CAST_INTR(intr_hdl), intr_func, intr_arg, setfunc, setfunc_arg, thread);
+	(CAST_INTR(intr_hdl), setfunc, setfunc_arg);
 }
 
 
@@ -503,85 +495,6 @@ xtalk_intr_cpu_get(xtalk_intr_t intr_hdl)
 {
     return INTR_FUNC(intr_hdl, intr_cpu_get)
 	(CAST_INTR(intr_hdl));
-}
-
-
-/*
- * =====================================================================
- *                      ERROR MANAGEMENT
- */
-
-/*
- * xtalk_error_handler:
- * pass this error on to the handler registered
- * at the specified xtalk connecdtion point,
- * or complain about it here if there is no handler.
- *
- * This routine plays two roles during error delivery
- * to most widgets: first, the external agent (heart,
- * hub, or whatever) calls in with the error and the
- * connect point representing the crosstalk switch,
- * or whatever crosstalk device is directly connected
- * to the agent.
- *
- * If there is a switch, it will generally look at the
- * widget number stashed in the ioerror structure; and,
- * if the error came from some widget other than the
- * switch, it will call back into xtalk_error_handler
- * with the connection point of the offending port.
- */
-int
-xtalk_error_handler(
-		       devfs_handle_t xconn,
-		       int error_code,
-		       ioerror_mode_t mode,
-		       ioerror_t *ioerror)
-{
-    xwidget_info_t          xwidget_info;
-
-#if DEBUG && ERROR_DEBUG
-#ifdef SUPPORT_PRINTING_V_FORMAT
-    printk("%v: xtalk_error_handler\n", xconn);
-#else
-    printk("%x: xtalk_error_handler\n", xconn);
-#endif
-#endif
-
-    xwidget_info = xwidget_info_get(xconn);
-    /* Make sure that xwidget_info is a valid pointer before derefencing it.
-     * We could come in here during very early initialization. 
-     */
-    if (xwidget_info && xwidget_info->w_efunc)
-	return xwidget_info->w_efunc
-	    (xwidget_info->w_einfo,
-	     error_code, mode, ioerror);
-    /*
-     * no error handler registered for
-     * the offending port. it's not clear
-     * what needs to be done, but reporting
-     * it would be a good thing, unless it
-     * is a mode that requires nothing.
-     */
-    if ((mode == MODE_DEVPROBE) || (mode == MODE_DEVUSERERROR) ||
-	(mode == MODE_DEVREENABLE))
-	return IOERROR_HANDLED;
-
-#ifdef	LATER
-#ifdef SUPPORT_PRINTING_V_FORMAT
-    PRINT_WARNING("Xbow at %v encountered Fatal error", xconn);
-#else
-    PRINT_WARNING("Xbow at %x encountered Fatal error", xconn);
-#endif
-#endif	/* LATER */
-    ioerror_dump("xtalk", error_code, mode, ioerror);
-
-    return IOERROR_UNHANDLED;
-}
-
-int
-xtalk_error_devenable(devfs_handle_t xconn_vhdl, int devnum, int error_code)
-{
-    return DEV_FUNC(xconn_vhdl, error_devenable) (xconn_vhdl, devnum, error_code);
 }
 
 
@@ -977,7 +890,7 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
     widget_info->w_einfo = 0;
     /*
      * get the name of this xwidget vertex and keep the info.
-     * This is needed during errors and interrupts, but as
+     * This is needed during errors and interupts, but as
      * long as we have it, we can use it elsewhere.
      */
     s = dev_to_name(widget,devnm,MAXDEVNAME);
@@ -1036,19 +949,6 @@ xwidget_unregister(devfs_handle_t widget)
     DEL(widget_info);
     
     return(0);
-}
-
-void
-xwidget_error_register(devfs_handle_t xwidget,
-		       error_handler_f *efunc,
-		       error_handler_arg_t einfo)
-{
-    xwidget_info_t          xwidget_info;
-
-    xwidget_info = xwidget_info_get(xwidget);
-    ASSERT(xwidget_info != NULL);
-    xwidget_info->w_efunc = efunc;
-    xwidget_info->w_einfo = einfo;
 }
 
 /*
@@ -1120,17 +1020,5 @@ xtalk_device_shutdown(devfs_handle_t xbus_vhdl, xwidgetnum_t widget)
 
 	xwidget_unregister(widget_vhdl);
 	
-	return(0);
-}
-/*
- * xtalk_device_inquiry
- *	Find out hardware information about the xtalk widget.
- */
-int
-xtalk_device_inquiry(devfs_handle_t xbus_vhdl, xwidgetnum_t widget)
-{
-
-	extern void hub_device_inquiry(devfs_handle_t, xwidgetnum_t);
-	hub_device_inquiry(xbus_vhdl, widget);
 	return(0);
 }

@@ -16,6 +16,7 @@
 #include <linux/config.h>
 #include "entry-header.S"
 #include <asm/thread_info.h>
+#include <asm/glue.h>
 
 
 #ifdef IOC_BASE
@@ -681,12 +682,12 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 /*
  * This routine must not corrupt r9
  */
-#ifdef MULTI_CPU
+#ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
 		ldr	pc, [r4]			@ call processor specific code
 #else
-		bl	cpu_data_abort
+		bl	CPU_ABORT_HANDLER
 #endif
 		msr	cpsr_c, r9
 		mov	r2, sp
@@ -799,7 +800,7 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 .LCirq:		.word	__temp_irq
 .LCund:		.word	__temp_und
 .LCabt:		.word	__temp_abt
-#ifdef MULTI_CPU
+#ifdef MULTI_ABORT
 .LCprocfns:	.word	SYMBOL_NAME(processor)
 #endif
 .LCfp:		.word	SYMBOL_NAME(fp_enter)
@@ -823,12 +824,12 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		alignment_trap r7, r7, __temp_abt
 		zero_fp
 		mov	r0, r2				@ remove once everyones in sync
-#ifdef MULTI_CPU
+#ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r0, r3 to
 		mov	lr, pc				@ processor code
 		ldr	pc, [r4]			@ call processor specific code
 #else
-		bl	cpu_data_abort
+		bl	CPU_ABORT_HANDLER
 #endif
 		set_cpsr_c r2, #MODE_SVC		@ Enable interrupts
 		mov	r2, sp

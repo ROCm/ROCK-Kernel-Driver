@@ -4,11 +4,13 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997,2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  */
 #ifndef _ASM_SN_XTALK_XBOW_INFO_H
 #define _ASM_SN_XTALK_XBOW_INFO_H
+
+#include <linux/types.h>
+#include <linux/devfs_fs_kernel.h>
 
 #define XBOW_PERF_MODES	       0x03
 #define XBOW_PERF_COUNTERS     0x02

@@ -776,7 +776,7 @@ static inline void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *reg
 		unsigned long address = ((unsigned long)&(sf->insns[0]));
 		pgd_t *pgdp = pgd_offset(current->mm, address);
 		pmd_t *pmdp = pmd_offset(pgdp, address);
-		pte_t *ptep = pte_offset(pmdp, address);
+		pte_t *ptep;
 
 		regs->u_regs[UREG_I7] = (unsigned long) (&(sf->insns[0]) - 2);
 	
@@ -785,6 +785,8 @@ static inline void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *reg
 		if (err)
 			goto sigsegv;
 
+		preempt_disable();
+		ptep = pte_offset_map(pmdp, address);
 		if (pte_present(*ptep)) {
 			unsigned long page = (unsigned long) page_address(pte_page(*ptep));
 
@@ -794,6 +796,8 @@ static inline void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *reg
 			: : "r" (page), "r" (address & (PAGE_SIZE - 1))
 			: "memory");
 		}
+		pte_unmap(ptep);
+		preempt_enable();
 	}
 	return;
 
@@ -1225,7 +1229,7 @@ static inline void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs
 		unsigned long address = ((unsigned long)&(sf->insns[0]));
 		pgd_t *pgdp = pgd_offset(current->mm, address);
 		pmd_t *pmdp = pmd_offset(pgdp, address);
-		pte_t *ptep = pte_offset(pmdp, address);
+		pte_t *ptep;
 
 		regs->u_regs[UREG_I7] = (unsigned long) (&(sf->insns[0]) - 2);
 	
@@ -1237,6 +1241,8 @@ static inline void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs
 		if (err)
 			goto sigsegv;
 
+		preempt_disable();
+		ptep = pte_offset_map(pmdp, address);
 		if (pte_present(*ptep)) {
 			unsigned long page = (unsigned long) page_address(pte_page(*ptep));
 
@@ -1246,6 +1252,8 @@ static inline void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs
 			: : "r" (page), "r" (address & (PAGE_SIZE - 1))
 			: "memory");
 		}
+		pte_unmap(ptep);
+		preempt_enable();
 	}
 	return;
 
@@ -1379,9 +1387,11 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			current->exit_code = signr;
+			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
+			preempt_enable();
 			if (!(signr = current->exit_code))
 				continue;
 			current->exit_code = 0;
@@ -1432,17 +1442,20 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 				if (is_orphaned_pgrp(current->pgrp))
 					continue;
 
-			case SIGSTOP:
-				if (current->ptrace & PT_PTRACED)
-					continue;
-				current->state = TASK_STOPPED;
+			case SIGSTOP: {
+				struct signal_struct *sig;
+
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags &
+				sig = current->p_pptr->sig;
+				preempt_disable();
+				current->state = TASK_STOPPED;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
 				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
+				preempt_enable();
 				continue;
-
+			}
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
 			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:

@@ -1161,7 +1161,8 @@ if (svsk->sk_sk == NULL)
 
 	/* Register socket with portmapper */
 	if (*errp >= 0 && pmap_register)
-		*errp = svc_register(serv, inet->protocol, ntohs(inet->sport));
+		*errp = svc_register(serv, inet->protocol,
+				     ntohs(inet_sk(inet)->sport));
 
 	if (*errp < 0) {
 		inet->user_data = NULL;

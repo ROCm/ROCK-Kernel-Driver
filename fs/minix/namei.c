@@ -38,7 +38,7 @@ static int minix_hash(struct dentry *dentry, struct qstr *qstr)
 	int i;
 	const unsigned char *name;
 
-	i = dentry->d_inode->i_sb->u.minix_sb.s_namelen;
+	i = minix_sb(dentry->d_inode->i_sb)->s_namelen;
 	if (i >= qstr->len)
 		return 0;
 	/* Truncate the name in place, avoids having to define a compare
@@ -63,7 +63,7 @@ static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry)
 
 	dentry->d_op = dir->i_sb->s_root->d_op;
 
-	if (dentry->d_name.len > dir->i_sb->u.minix_sb.s_namelen)
+	if (dentry->d_name.len > minix_sb(dir->i_sb)->s_namelen)
 		return ERR_PTR(-ENAMETOOLONG);
 
 	ino = minix_inode_by_name(dentry);
@@ -131,7 +131,7 @@ static int minix_link(struct dentry * old_dentry, struct inode * dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	if (inode->i_nlink >= inode->i_sb->u.minix_sb.s_link_max)
+	if (inode->i_nlink >= minix_sb(inode->i_sb)->s_link_max)
 		return -EMLINK;
 
 	inode->i_ctime = CURRENT_TIME;
@@ -145,7 +145,7 @@ static int minix_mkdir(struct inode * dir, struct dentry *dentry, int mode)
 	struct inode * inode;
 	int err = -EMLINK;
 
-	if (dir->i_nlink >= dir->i_sb->u.minix_sb.s_link_max)
+	if (dir->i_nlink >= minix_sb(dir->i_sb)->s_link_max)
 		goto out;
 
 	inc_count(dir);
@@ -221,7 +221,7 @@ static int minix_rmdir(struct inode * dir, struct dentry *dentry)
 static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 			   struct inode * new_dir, struct dentry *new_dentry)
 {
-	struct minix_sb_info * info = &old_dir->i_sb->u.minix_sb;
+	struct minix_sb_info * info = minix_sb(old_dir->i_sb);
 	struct inode * old_inode = old_dentry->d_inode;
 	struct inode * new_inode = new_dentry->d_inode;
 	struct page * dir_page = NULL;

@@ -4,13 +4,15 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  */
 #ifndef _ASM_SN_XTALK_XTALK_PRIVATE_H
 #define _ASM_SN_XTALK_XTALK_PRIVATE_H
 
 #include <asm/sn/ioerror.h>        /* for error function and arg types */
+#include <linux/devfs_fs_kernel.h>
+#include <asm/sn/xtalk/xwidget.h>
+#include <asm/sn/xtalk/xtalk.h>
 
 /*
  * xtalk_private.h -- private definitions for xtalk

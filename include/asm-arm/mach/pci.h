@@ -19,12 +19,6 @@ struct hw_pci {
 	/* Setup bus resources */
 	void		(*setup_resources)(struct resource **);
 
-	/*
-	 * This is the offset of PCI memory base registers
-	 * to physical memory.
-	 */
-	unsigned long	mem_offset;
-
 	/* IRQ swizzle */
 	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
 

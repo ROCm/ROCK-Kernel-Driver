@@ -371,6 +371,7 @@ static struct file_system_type bfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"bfs",
 	get_sb:		bfs_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

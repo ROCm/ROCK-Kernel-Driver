@@ -4,26 +4,24 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/agent.h>
+#include <asm/sn/io.h>
+#include <asm/sn/sn_cpuid.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_private.h>
-#include <asm/sn/synergy.h>
+#include <asm/sn/pci/pciba.h>
 #include <linux/smp.h>
 
 extern void mlreset(int );
 extern int init_hcl(void);
 extern void klgraph_hack_init(void);
-extern void per_hub_init(cnodeid_t);
 extern void hubspc_init(void);
-extern void pciba_init(void);
 extern void pciio_init(void);
 extern void pcibr_init(void);
 extern void xtalk_init(void);
@@ -33,23 +31,21 @@ extern void pciiox_init(void);
 extern void usrpci_init(void);
 extern void ioc3_init(void);
 extern void initialize_io(void);
-extern void init_platform_nodepda(nodepda_t *, cnodeid_t );
+#if defined(CONFIG_IA64_SGI_SN1)
 extern void intr_clear_all(nasid_t);
+#endif
 extern void klhwg_add_all_modules(devfs_handle_t);
 extern void klhwg_add_all_nodes(devfs_handle_t);
 
 void sn_mp_setup(void);
 extern devfs_handle_t hwgraph_root;
 extern void io_module_init(void);
-extern cnodeid_t nasid_to_compact_node[];
 extern void pci_bus_cvlink_init(void);
 extern void temp_hack(void);
-extern void init_platform_pda(cpuid_t cpu);
 
 extern int pci_bus_to_hcl_cvlink(void);
-extern synergy_da_t	*Synergy_da_indr[];
 
-#define DEBUG_IO_INIT
+/* #define DEBUG_IO_INIT */
 #ifdef DEBUG_IO_INIT
 #define DBG(x...) printk(x)
 #else
@@ -57,20 +53,73 @@ extern synergy_da_t	*Synergy_da_indr[];
 #endif /* DEBUG_IO_INIT */
 
 /*
- * kern/ml/csu.s calls mlsetup
- *   mlsetup calls mlreset(master) - kern/os/startup.c
- *   j main
+ * per_hub_init
  *
- 
- * SN/slave.s start_slave_loop calls slave_entry
- * SN/slave.s slave_entry calls slave_loop
- * SN/slave.s slave_loop calls bootstrap
- * bootstrap in SN1/SN1asm.s calls cboot
- * cboot calls mlreset(slave) - ml/SN/mp.c
- *
- * sgi_io_infrastructure_init() gets called right before pci_init() 
- * in Linux mainline.  This routine actually mirrors the IO Infrastructure 
- * call sequence in IRIX, ofcourse, nicely modified for Linux.
+ * 	This code is executed once for each Hub chip.
+ */
+static void
+per_hub_init(cnodeid_t cnode)
+{
+	nasid_t		nasid;
+	nodepda_t	*npdap;
+	ii_icmr_u_t	ii_icmr;
+	ii_ibcr_u_t	ii_ibcr;
+
+	nasid = COMPACT_TO_NASID_NODEID(cnode);
+
+	ASSERT(nasid != INVALID_NASID);
+	ASSERT(NASID_TO_COMPACT_NODEID(nasid) == cnode);
+
+	npdap = NODEPDA(cnode);
+
+#if defined(CONFIG_IA64_SGI_SN1)
+	/* initialize per-node synergy perf instrumentation */
+	npdap->synergy_perf_enabled = 0; /* off by default */
+	npdap->synergy_perf_lock = SPIN_LOCK_UNLOCKED;
+	npdap->synergy_perf_freq = SYNERGY_PERF_FREQ_DEFAULT;
+	npdap->synergy_inactive_intervals = 0;
+	npdap->synergy_active_intervals = 0;
+	npdap->synergy_perf_data = NULL;
+	npdap->synergy_perf_first = NULL;
+#endif /* CONFIG_IA64_SGI_SN1 */
+
+
+	/*
+	 * Set the total number of CRBs that can be used.
+	 */
+	ii_icmr.ii_icmr_regval= 0x0;
+	ii_icmr.ii_icmr_fld_s.i_c_cnt = 0xF;
+	REMOTE_HUB_S(nasid, IIO_ICMR, ii_icmr.ii_icmr_regval);
+
+	/*
+	 * Set the number of CRBs that both of the BTEs combined
+	 * can use minus 1.
+	 */
+	ii_ibcr.ii_ibcr_regval= 0x0;
+	ii_ibcr.ii_ibcr_fld_s.i_count = 0x8;
+	REMOTE_HUB_S(nasid, IIO_IBCR, ii_ibcr.ii_ibcr_regval);
+
+	/*
+	 * Set CRB timeout to be 10ms.
+	 */
+	REMOTE_HUB_S(nasid, IIO_ICTP, 0x1000 );
+	REMOTE_HUB_S(nasid, IIO_ICTO, 0xff);
+
+
+#if defined(CONFIG_IA64_SGI_SN1)
+	/* Reserve all of the hardwired interrupt levels. */
+	intr_reserve_hardwired(cnode);
+#endif
+
+	/* Initialize error interrupts for this hub. */
+	hub_error_init(cnode);
+}
+
+/*
+ * This routine is responsible for the setup of all the IRIX hwgraph style
+ * stuff that's been pulled into linux.  It's called by sn1_pci_find_bios which
+ * is called just before the generic Linux PCI layer does its probing (by 
+ * platform_pci_fixup aka sn1_pci_fixup).
  *
  * It is very IMPORTANT that this call is only made by the Master CPU!
  *
@@ -80,7 +129,6 @@ void
 sgi_master_io_infr_init(void)
 {
 	int cnode;
-	extern int maxnodes;
 
 	/*
 	 * Do any early init stuff .. einit_tbl[] etc.
@@ -94,11 +142,15 @@ sgi_master_io_infr_init(void)
 	DBG("--> sgi_master_io_infr_init: calling pci_bus_cvlink_init().\n");
 	pci_bus_cvlink_init();
 
+#ifdef BRINGUP
+#ifdef CONFIG_IA64_SGI_SN1
 	/*
 	 * Hack to provide statically initialzed klgraph entries.
 	 */
 	DBG("--> sgi_master_io_infr_init: calling klgraph_hack_init()\n");
 	klgraph_hack_init();
+#endif /* CONFIG_IA64_SGI_SN1 */
+#endif /* BRINGUP */
 
 	/*
 	 * This is the Master CPU.  Emulate mlsetup and main.c in Irix.
@@ -117,7 +169,7 @@ sgi_master_io_infr_init(void)
 	sn_mp_setup();
 
 	DBG("--> sgi_master_io_infr_init: calling per_hub_init(0).\n");
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for (cnode = 0; cnode < numnodes; cnode++) {
 		per_hub_init(cnode);
 	}
 
@@ -132,9 +184,6 @@ sgi_master_io_infr_init(void)
 
 	DBG("--> sgi_master_io_infr_init: calling hubspc_init()\n");
 	hubspc_init();
-
-	DBG("--> sgi_master_io_infr_init: calling pciba_init()\n");
-	pciba_init();
 
 	DBG("--> sgi_master_io_infr_init: calling pciio_init()\n");
 	pciio_init();
@@ -172,6 +221,11 @@ sgi_master_io_infr_init(void)
 	DBG("--> sgi_master_io_infr_init: Setting up SGI IO Links for Linux PCI\n");
 	pci_bus_to_hcl_cvlink();
 
+#ifdef CONFIG_PCIBA
+	DBG("--> sgi_master_io_infr_init: calling pciba_init()\n");
+	pciba_init();
+#endif
+
 	DBG("--> Leave sgi_master_io_infr_init: DONE setting up SGI Links for PCI\n");
 }
 
@@ -199,76 +253,15 @@ void
 sn_mp_setup(void)
 {
 	cnodeid_t	cnode;
-	extern int	maxnodes;
 	cpuid_t		cpu;
 
-	DBG("sn_mp_setup: Entered.\n");
-	/*
-	 * NODEPDA(x) Macro depends on nodepda
-	 * subnodepda is also statically set to calias space which we 
-	 * do not currently support yet .. just a hack for now.
-	 */
-#ifdef NUMA_BASE
-        maxnodes = numnodes;
-	DBG("sn_mp_setup(): maxnodes= %d  numnodes= %d\n", maxnodes,numnodes);
-        printk("sn_mp_setup(): Allocating backing store for *Nodepdaindr[%2d] \n",
-                maxnodes);
-
-        /*
-         * Initialize Nodpdaindr and per-node nodepdaindr array
-         */
-        *Nodepdaindr = (nodepda_t *) kmalloc(sizeof(nodepda_t *)*numnodes, GFP_KERNEL);
-        for (cnode=0; cnode<maxnodes; cnode++) {
-            Nodepdaindr[cnode] = (nodepda_t *) kmalloc(sizeof(struct nodepda_s),
-                                                                GFP_KERNEL);
-	    Synergy_da_indr[cnode * 2] = (synergy_da_t *) kmalloc(
-		sizeof(synergy_da_t), GFP_KERNEL);
-	    Synergy_da_indr[(cnode * 2) + 1] = (synergy_da_t *) kmalloc(
-		sizeof(synergy_da_t), GFP_KERNEL);
-            Nodepdaindr[cnode]->pernode_pdaindr = Nodepdaindr;
-            subnodepda = &Nodepdaindr[cnode]->snpda[cnode];
-        }
-        nodepda = Nodepdaindr[0];
-#else
-        Nodepdaindr = (nodepda_t *) kmalloc(sizeof(struct nodepda_s), GFP_KERNEL);
-        nodepda = Nodepdaindr[0];
-        subnodepda = &Nodepdaindr[0]->snpda[0];
-
-#endif /* NUMA_BASE */
-
-	/*
-	 * Before we let the other processors run, set up the platform specific
-	 * stuff in the nodepda.
-	 *
-	 * ???? maxnodes set in mlreset .. who sets it now ????
-	 * ???? cpu_node_probe() called in mlreset to set up the following:
-	 *      compact_to_nasid_node[] - cnode id gives nasid
-	 *      nasid_to_compact_node[] - nasid gives cnode id
-	 *
-	 *	do_cpumask() sets the following:
-	 *      cpuid_to_compact_node[] - cpuid gives cnode id
-	 *
-	 *      nasid comes from gdap->g_nasidtable[]
-	 *      ml/SN/promif.c
-	 */
-
-#ifdef CONFIG_IA64_SGI_SN1
 	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
 		/* Skip holes in CPU space */
 		if (cpu_enabled(cpu)) {
 			init_platform_pda(cpu);
 		}
 	}
-#endif
-	for (cnode = 0; cnode < maxnodes; cnode++) {
-		/*
-		 * Set up platform-dependent nodepda fields.
-		 * The following routine actually sets up the hubinfo struct
-		 * in nodepda.
-		 */
-		DBG("sn_mp_io_setup: calling init_platform_nodepda(%2d)\n",cnode);
-		init_platform_nodepda(Nodepdaindr[cnode], cnode);
-	}
+
 	/*
 	 * Initialize platform-dependent vertices in the hwgraph:
 	 *	module
@@ -290,24 +283,26 @@ sn_mp_setup(void)
 	klhwg_add_all_nodes(hwgraph_root);
 
 
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for (cnode = 0; cnode < numnodes; cnode++) {
 
 		/*
 		 * This routine clears the Hub's Interrupt registers.
 		 */
-#ifdef CONFIG_IA64_SGI_SN1
 		/*
 		 * We need to move this intr_clear_all() routine 
 		 * from SN/intr.c to a more appropriate file.
 		 * Talk to Al Mayer.
 		 */
+#if defined(CONFIG_IA64_SGI_SN1)
                 intr_clear_all(COMPACT_TO_NASID_NODEID(cnode));
+#endif
 		/* now init the hub */
 	//	per_hub_init(cnode);
-#endif
+
 	}
 
-#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+#if defined(CONFIG_IA64_SGI_SN1)
 	synergy_perf_init();
-#endif /* CONFIG_IA64_SGI_SYNERGY_PERF */
+#endif
+
 }

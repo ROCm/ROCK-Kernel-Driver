@@ -2,6 +2,9 @@
  *  Emulation of the "brl" instruction for IA64 processors that
  *  don't support it in hardware.
  *  Author: Stephan Zeisset, Intel Corp. <Stephan.Zeisset@intel.com>
+ *
+ *    02/22/02	D. Mosberger	Clear si_flgs, si_isr, and si_imm to avoid
+ *				leaking kernel bits.
  */
 
 #include <linux/kernel.h>
@@ -195,6 +198,9 @@ ia64_emulate_brl (struct pt_regs *regs, unsigned long ar_ec)
 		printk("Woah! Unimplemented Instruction Address Trap!\n");
 		siginfo.si_signo = SIGILL;
 		siginfo.si_errno = 0;
+		siginfo.si_flags = 0;
+		siginfo.si_isr = 0;
+		siginfo.si_imm = 0;
 		siginfo.si_code = ILL_BADIADDR;
 		force_sig_info(SIGILL, &siginfo, current);
 	} else if (ia64_psr(regs)->tb) {
@@ -205,6 +211,10 @@ ia64_emulate_brl (struct pt_regs *regs, unsigned long ar_ec)
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_code = TRAP_BRANCH;
+		siginfo.si_flags = 0;
+		siginfo.si_isr = 0;
+		siginfo.si_addr = 0;
+		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 	} else if (ia64_psr(regs)->ss) {
 		/*
@@ -214,6 +224,10 @@ ia64_emulate_brl (struct pt_regs *regs, unsigned long ar_ec)
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_code = TRAP_TRACE;
+		siginfo.si_flags = 0;
+		siginfo.si_isr = 0;
+		siginfo.si_addr = 0;
+		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 	}
 	return rv;

@@ -2508,6 +2508,11 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	if (!CDROM_CONFIG_FLAGS (drive)->close_tray)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 
+	/* FIXME: I'm less that sure that this is the proper thing to do, since
+	 * ware already adding the devices to devfs int ide.c upon device
+	 * registration.
+	 */
+
 	devinfo->de = devfs_register(drive->de, "cd", DEVFS_FL_DEFAULT,
 				     HWIF(drive)->major, minor,
 				     S_IFBLK | S_IRUGO | S_IWUGO,

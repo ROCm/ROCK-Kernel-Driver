@@ -32,7 +32,7 @@
  * page.  We rely on the mini-cache being smaller than one page, so we'll
  * cycle through the complete cache anyway.
  */
-ENTRY(armv5te_copy_user_page)
+ENTRY(v5te_mc_copy_user_page)
 	stmfd	sp!, {r4, r5, lr}
 	mov	r5, r0
 	mov	r0, r1
@@ -62,7 +62,7 @@ ENTRY(armv5te_copy_user_page)
  *  r0 = destination
  *  r1 = virtual user address of ultimate destination page
  */
-ENTRY(armv5te_clear_user_page)
+ENTRY(v5te_mc_clear_user_page)
 	str	lr, [sp, #-4]!
 	mov	r1, #PAGE_SZ/32
 	mov	r2, #0
@@ -77,3 +77,9 @@ ENTRY(armv5te_clear_user_page)
 	subs	r1, r1, #1
 	bne	1b
 	ldr	pc, [sp], #4
+
+	.section ".text.init", #alloc, #execinstr
+
+ENTRY(v5te_mc_user_fns)
+	.long	v5te_mc_clear_user_page
+	.long	v5te_mc_copy_user_page

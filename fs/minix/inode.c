@@ -36,7 +36,7 @@ static void minix_delete_inode(struct inode *inode)
 
 static void minix_commit_super(struct super_block * sb)
 {
-	mark_buffer_dirty(sb->u.minix_sb.s_sbh);
+	mark_buffer_dirty(minix_sb(sb)->s_sbh);
 	sb->s_dirt = 0;
 }
 
@@ -45,7 +45,7 @@ static void minix_write_super(struct super_block * sb)
 	struct minix_super_block * ms;
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		ms = sb->u.minix_sb.s_ms;
+		ms = minix_sb(sb)->s_ms;
 
 		if (ms->s_state & MINIX_VALID_FS)
 			ms->s_state &= ~MINIX_VALID_FS;
@@ -58,17 +58,20 @@ static void minix_write_super(struct super_block * sb)
 static void minix_put_super(struct super_block *sb)
 {
 	int i;
+	struct minix_sb_info *sbi = minix_sb(sb);
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		sb->u.minix_sb.s_ms->s_state = sb->u.minix_sb.s_mount_state;
-		mark_buffer_dirty(sb->u.minix_sb.s_sbh);
+		sbi->s_ms->s_state = sbi->s_mount_state;
+		mark_buffer_dirty(sbi->s_sbh);
 	}
-	for (i = 0; i < sb->u.minix_sb.s_imap_blocks; i++)
-		brelse(sb->u.minix_sb.s_imap[i]);
-	for (i = 0; i < sb->u.minix_sb.s_zmap_blocks; i++)
-		brelse(sb->u.minix_sb.s_zmap[i]);
-	brelse (sb->u.minix_sb.s_sbh);
-	kfree(sb->u.minix_sb.s_imap);
+	for (i = 0; i < sbi->s_imap_blocks; i++)
+		brelse(sbi->s_imap[i]);
+	for (i = 0; i < sbi->s_zmap_blocks; i++)
+		brelse(sbi->s_zmap[i]);
+	brelse (sbi->s_sbh);
+	kfree(sbi->s_imap);
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 
 	return;
 }
@@ -129,32 +132,33 @@ static struct super_operations minix_sops = {
 
 static int minix_remount (struct super_block * sb, int * flags, char * data)
 {
+	struct minix_sb_info * sbi = minix_sb(sb);
 	struct minix_super_block * ms;
 
-	ms = sb->u.minix_sb.s_ms;
+	ms = sbi->s_ms;
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 	if (*flags & MS_RDONLY) {
 		if (ms->s_state & MINIX_VALID_FS ||
-		    !(sb->u.minix_sb.s_mount_state & MINIX_VALID_FS))
+		    !(sbi->s_mount_state & MINIX_VALID_FS))
 			return 0;
 		/* Mounting a rw partition read-only. */
-		ms->s_state = sb->u.minix_sb.s_mount_state;
-		mark_buffer_dirty(sb->u.minix_sb.s_sbh);
+		ms->s_state = sbi->s_mount_state;
+		mark_buffer_dirty(sbi->s_sbh);
 		sb->s_dirt = 1;
 		minix_commit_super(sb);
 	}
 	else {
 	  	/* Mount a partition which is read-only, read-write. */
-		sb->u.minix_sb.s_mount_state = ms->s_state;
+		sbi->s_mount_state = ms->s_state;
 		ms->s_state &= ~MINIX_VALID_FS;
-		mark_buffer_dirty(sb->u.minix_sb.s_sbh);
+		mark_buffer_dirty(sbi->s_sbh);
 		sb->s_dirt = 1;
 
-		if (!(sb->u.minix_sb.s_mount_state & MINIX_VALID_FS))
+		if (!(sbi->s_mount_state & MINIX_VALID_FS))
 			printk ("MINIX-fs warning: remounting unchecked fs, "
 				"running fsck is recommended.\n");
-		else if ((sb->u.minix_sb.s_mount_state & MINIX_ERROR_FS))
+		else if ((sbi->s_mount_state & MINIX_ERROR_FS))
 			printk ("MINIX-fs warning: remounting fs with errors, "
 				"running fsck is recommended.\n");
 	}
@@ -168,7 +172,12 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	struct minix_super_block *ms;
 	int i, block;
 	struct inode *root_inode;
-	struct minix_sb_info *sbi = &s->u.minix_sb;
+	struct minix_sb_info *sbi;
+
+	sbi = kmalloc(sizeof(struct minix_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	s->u.generic_sbp = sbi;
 
 	/* N.B. These should be compile-time tests.
 	   Unfortunately that is impossible. */
@@ -311,19 +320,22 @@ out_bad_hblock:
 out_bad_sb:
 	printk("MINIX-fs: unable to read superblock\n");
  out:
+	s->u.generic_sbp = NULL;
+	kfree(sbi);
 	return -EINVAL;
 }
 
 static int minix_statfs(struct super_block *sb, struct statfs *buf)
 {
+	struct minix_sb_info *sbi = minix_sb(sb);
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sb->s_blocksize;
-	buf->f_blocks = (sb->u.minix_sb.s_nzones - sb->u.minix_sb.s_firstdatazone) << sb->u.minix_sb.s_log_zone_size;
+	buf->f_blocks = (sbi->s_nzones - sbi->s_firstdatazone) << sbi->s_log_zone_size;
 	buf->f_bfree = minix_count_free_blocks(sb);
 	buf->f_bavail = buf->f_bfree;
-	buf->f_files = sb->u.minix_sb.s_ninodes;
+	buf->f_files = sbi->s_ninodes;
 	buf->f_ffree = minix_count_free_inodes(sb);
-	buf->f_namelen = sb->u.minix_sb.s_namelen;
+	buf->f_namelen = sbi->s_namelen;
 	return 0;
 }
 
@@ -567,6 +579,7 @@ static struct file_system_type minix_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"minix",
 	get_sb:		minix_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

@@ -33,6 +33,7 @@ static struct super_block *proc_get_sb(struct file_system_type *fs_type,
 static struct file_system_type proc_fs_type = {
 	name:		"proc",
 	get_sb:		proc_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 extern int __init proc_init_inodecache(void);

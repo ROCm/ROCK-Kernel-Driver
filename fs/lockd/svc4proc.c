@@ -447,11 +447,13 @@ nlm4svc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 	if (nlmsvc_ops != NULL) {
 		struct svc_client	*clnt;
 		saddr.sin_addr.s_addr = argp->addr;
+		nlmsvc_ops->exp_readlock();
 		if ((clnt = nlmsvc_ops->exp_getclient(&saddr)) != NULL 
 		 && (host = nlm_lookup_host(clnt, &saddr, 0, 0)) != NULL) {
 			nlmsvc_free_host_resources(host);
 		}
 		nlm_release_host(host);
+		nlmsvc_ops->exp_unlock();
 	}
 
 	return rpc_success;

@@ -21,7 +21,7 @@
 #include <linux/slab.h>
 #include <asm/semaphore.h>
 #include <asm/io.h>
-#include "../../sound/aci.h"
+#include "../../../sound/oss/aci.h"
 #include "miropcm20-rds-core.h"
 
 #define DEBUG 0

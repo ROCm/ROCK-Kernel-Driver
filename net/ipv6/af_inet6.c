@@ -200,7 +200,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	inet = inet_sk(sk);
 
 	if (SOCK_RAW == sock->type) {
-		sk->num = protocol;
+		inet->num = protocol;
 		if (IPPROTO_RAW == protocol)
 			inet->hdrincl = 1;
 	}
@@ -241,12 +241,12 @@ static int inet6_create(struct socket *sock, int protocol)
 #endif
 	MOD_INC_USE_COUNT;
 
-	if (sk->num) {
+	if (inet->num) {
 		/* It assumes that any protocol which allows
 		 * the user to assign a number at socket
 		 * creation time automatically shares.
 		 */
-		sk->sport = ntohs(sk->num);
+		inet->sport = ntohs(inet->num);
 		sk->prot->hash(sk);
 	}
 	if (sk->prot->init) {
@@ -278,6 +278,7 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6 *addr=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	__u32 v4addr = 0;
 	unsigned short snum;
@@ -318,8 +319,7 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	lock_sock(sk);
 
 	/* Check these errors (active socket, double bind). */
-	if ((sk->state != TCP_CLOSE)			||
-	    (sk->num != 0)) {
+	if (sk->state != TCP_CLOSE || inet->num) {
 		release_sock(sk);
 		return -EINVAL;
 	}
@@ -340,8 +340,8 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		}
 	}
 
-	sk->rcv_saddr = v4addr;
-	sk->saddr = v4addr;
+	inet->rcv_saddr = v4addr;
+	inet->saddr = v4addr;
 
 	ipv6_addr_copy(&np->rcv_saddr, &addr->sin6_addr);
 		
@@ -350,8 +350,7 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	/* Make sure we are allowed to bind here. */
 	if (sk->prot->get_port(sk, snum) != 0) {
-		sk->rcv_saddr = 0;
-		sk->saddr = 0;
+		inet->rcv_saddr = inet->saddr = 0;
 		memset(&np->rcv_saddr, 0, sizeof(struct in6_addr));
 		memset(&np->saddr, 0, sizeof(struct in6_addr));
 
@@ -363,9 +362,9 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		sk->userlocks |= SOCK_BINDADDR_LOCK;
 	if (snum)
 		sk->userlocks |= SOCK_BINDPORT_LOCK;
-	sk->sport = ntohs(sk->num);
-	sk->dport = 0;
-	sk->daddr = 0;
+	inet->sport = ntohs(inet->num);
+	inet->dport = 0;
+	inet->daddr = 0;
 	release_sock(sk);
 
 	return 0;
@@ -421,17 +420,18 @@ static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sockaddr_in6 *sin=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
   
 	sin->sin6_family = AF_INET6;
 	sin->sin6_flowinfo = 0;
 	sin->sin6_scope_id = 0;
 	if (peer) {
-		if (!sk->dport)
+		if (!inet->dport)
 			return -ENOTCONN;
 		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
 			return -ENOTCONN;
-		sin->sin6_port = sk->dport;
+		sin->sin6_port = inet->dport;
 		memcpy(&sin->sin6_addr, &np->daddr, sizeof(struct in6_addr));
 		if (np->sndflow)
 			sin->sin6_flowinfo = np->flow_label;
@@ -443,7 +443,7 @@ static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 			memcpy(&sin->sin6_addr, &np->rcv_saddr,
 			       sizeof(struct in6_addr));
 
-		sin->sin6_port = sk->sport;
+		sin->sin6_port = inet->sport;
 	}
 	if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL)
 		sin->sin6_scope_id = sk->bound_dev_if;
@@ -675,6 +675,11 @@ static int __init inet6_init(void)
 	 */
 	inet6_register_protosw(&rawv6_protosw);
 
+	/* Register the family here so that the init calls below will
+	 * be able to create sockets. (?? is this dangerous ??)
+	 */
+	(void) sock_register(&inet6_family_ops);
+	
 	/*
 	 *	ipngwg API draft makes clear that the correct semantics
 	 *	for TCP and UDP is to consider one TCP and UDP instance
@@ -719,9 +724,6 @@ static int __init inet6_init(void)
 	udpv6_init();
 	tcpv6_init();
 
-	/* Now the userspace is allowed to create INET6 sockets. */
-	(void) sock_register(&inet6_family_ops);
-	
 	return 0;
 
 #ifdef CONFIG_PROC_FS

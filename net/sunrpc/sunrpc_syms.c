@@ -77,6 +77,7 @@ EXPORT_SYMBOL(svc_process);
 EXPORT_SYMBOL(svc_recv);
 EXPORT_SYMBOL(svc_wake_up);
 EXPORT_SYMBOL(svc_makesock);
+EXPORT_SYMBOL(svc_reserve);
 
 /* RPC statistics */
 #ifdef CONFIG_PROC_FS

@@ -92,7 +92,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 			   * FS_NO_DCACHE is not set.
 			   */
 #define FS_NOMOUNT	16 /* Never mount from userland */
-#define FS_LITTER	32 /* Keeps the tree in dcache */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up
 				  */
@@ -291,7 +290,6 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
 #include <linux/romfs_fs_i.h>
-#include <linux/cramfs_fs_sb.h>
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -650,7 +648,6 @@ struct quota_mount_options
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
 
-#include <linux/minix_fs_sb.h>
 #include <linux/ext2_fs_sb.h>
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
@@ -671,7 +668,6 @@ struct quota_mount_options
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
 #include <linux/ncp_fs_sb.h>
-#include <linux/cramfs_fs_sb.h>
 #include <linux/jffs2_fs_sb.h>
 
 extern struct list_head super_blocks;
@@ -708,7 +704,6 @@ struct super_block {
 	char s_id[32];				/* Informational name */
 
 	union {
-		struct minix_sb_info	minix_sb;
 		struct ext2_sb_info	ext2_sb;
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
@@ -731,7 +726,6 @@ struct super_block {
 		struct udf_sb_info	udf_sb;
 		struct ncp_sb_info	ncpfs_sb;
 		struct jffs2_sb_info	jffs2_sb;
-		struct cramfs_sb_info	cramfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*
@@ -944,6 +938,7 @@ struct file_system_type {
 	const char *name;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
+	void (*kill_sb) (struct super_block *);
 	struct module *owner;
 	struct file_system_type * next;
 	struct list_head fs_supers;
@@ -958,6 +953,10 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
+void kill_block_super(struct super_block *sb);
+void kill_anon_super(struct super_block *sb);
+void kill_litter_super(struct super_block *sb);
+void deactivate_super(struct super_block *sb);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \

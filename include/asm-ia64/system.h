@@ -7,8 +7,8 @@
  * on information published in the Processor Abstraction Layer
  * and the System Abstraction Layer manual.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  */
@@ -232,7 +232,7 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 		_tmp = __bad_increment_for_ia64_fetch_and_add();		\
 		break;								\
 	}									\
-	(__typeof__(*v)) (_tmp + (i));	/* return new value */			\
+	(__typeof__(*(v))) (_tmp + (i));	/* return new value */		\
 })
 
 /*
@@ -373,19 +373,27 @@ extern long __cmpxchg_called_with_bad_pointer(void);
  * newly created thread returns directly to
  * ia64_ret_from_syscall_clear_r8.
  */
-extern struct task_struct *ia64_switch_to (void *next_task);
+extern void ia64_switch_to (void *next_task);
+
+struct task_struct;
 
 extern void ia64_save_extra (struct task_struct *task);
 extern void ia64_load_extra (struct task_struct *task);
 
-#define __switch_to(prev,next,last) do {						\
+#if defined(CONFIG_SMP) && defined(CONFIG_PERFMON)
+# define PERFMON_IS_SYSWIDE() (local_cpu_data->pfm_syst_wide != 0)
+#else
+# define PERFMON_IS_SYSWIDE() (0)
+#endif
+
+#define __switch_to(prev,next) do {							\
 	if (((prev)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
-	    || IS_IA32_PROCESS(ia64_task_regs(prev)))					\
+	    || IS_IA32_PROCESS(ia64_task_regs(prev)) || PERFMON_IS_SYSWIDE())		\
 		ia64_save_extra(prev);							\
 	if (((next)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
-	    || IS_IA32_PROCESS(ia64_task_regs(next)))					\
+	    || IS_IA32_PROCESS(ia64_task_regs(next)) || PERFMON_IS_SYSWIDE())		\
 		ia64_load_extra(next);							\
-	(last) = ia64_switch_to((next));						\
+	ia64_switch_to((next));								\
 } while (0)
 
 #ifdef CONFIG_SMP
@@ -396,19 +404,19 @@ extern void ia64_load_extra (struct task_struct *task);
    * task->thread.fph, avoiding the complication of having to fetch
    * the latest fph state from another CPU.
    */
-# define switch_to(prev,next,last) do {						\
+# define switch_to(prev,next) do {						\
 	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
 		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
 		__ia64_save_fpu((prev)->thread.fph);				\
 	}									\
 	ia64_psr(ia64_task_regs(prev))->dfh = 1;				\
-	__switch_to(prev,next,last);						\
+	__switch_to(prev,next);							\
   } while (0)
 #else
-# define switch_to(prev,next,last) do {						\
+# define switch_to(prev,next) do {						\
 	ia64_psr(ia64_task_regs(next))->dfh = (ia64_get_fpu_owner() != (next));	\
-	__switch_to(prev,next,last);						\
+	__switch_to(prev,next);							\
 } while (0)
 #endif
 

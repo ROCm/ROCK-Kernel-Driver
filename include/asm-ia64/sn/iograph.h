@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_IOGRAPH_H
-#define _ASM_SN_IOGRAPH_H
+#ifndef _ASM_IA64_SN_IOGRAPH_H
+#define _ASM_IA64_SN_IOGRAPH_H
 
 /*
  * During initialization, platform-dependent kernel code establishes some
@@ -68,6 +67,7 @@
 #define EDGE_LBL_HPC			"hpc"
 #define EDGE_LBL_GFX			"gfx"
 #define EDGE_LBL_HUB			"hub"		/* For SN0 */
+#define EDGE_LBL_SYNERGY		"synergy"	/* For SNIA only */
 #define EDGE_LBL_IBUS			"ibus"		/* For EVEREST */
 #define EDGE_LBL_INTERCONNECT		"link"
 #define EDGE_LBL_IO			"io"
@@ -216,4 +216,4 @@ struct io_brick_map_s {
 };
 
 
-#endif /* _ASM_SN_IOGRAPH_H */
+#endif /* _ASM_IA64_SN_IOGRAPH_H */

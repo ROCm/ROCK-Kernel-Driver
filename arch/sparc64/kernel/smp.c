@@ -594,11 +594,12 @@ out_timeout:
 	return 0;
 }
 
-void smp_call_function_client(void)
+void smp_call_function_client(int irq, struct pt_regs *regs)
 {
 	void (*func) (void *info) = call_data->func;
 	void *info = call_data->info;
 
+	clear_softint(1 << irq);
 	if (call_data->wait) {
 		/* let initiator proceed only after completion */
 		func(info);
@@ -720,6 +721,12 @@ void smp_receive_signal(int cpu)
 				cheetah_xcall_deliver(data0, 0, 0, mask);
 		}
 	}
+}
+
+void smp_receive_signal_client(int irq, struct pt_regs *regs)
+{
+	/* Just return, rtrap takes care of the rest. */
+	clear_softint(1 << irq);
 }
 
 void smp_report_regs(void)
@@ -885,48 +892,6 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 	}
 }
 
-/* Process migration IPIs. */
-
-extern unsigned long xcall_migrate_task;
-
-static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
-static task_t *new_task;
-
-void smp_migrate_task(int cpu, task_t *p)
-{
-	unsigned long mask = 1UL << cpu;
-
-	if (cpu == smp_processor_id())
-		return;
-
-	if (smp_processors_ready && (cpu_present_map & mask) != 0) {
-		u64 data0 = (((u64)&xcall_migrate_task) & 0xffffffff);
-
-		_raw_spin_lock(&migration_lock);
-		new_task = p;
-
-		if (tlb_type == spitfire)
-			spitfire_xcall_deliver(data0, 0, 0, mask);
-		else
-			cheetah_xcall_deliver(data0, 0, 0, mask);
-	}
-}
-
-/* Called at PIL level 1. */
-asmlinkage void smp_task_migration_interrupt(int irq, struct pt_regs *regs)
-{
-	task_t *p;
-
-	if (irq != PIL_MIGRATE)
-		BUG();
-
-	clear_softint(1 << irq);
-
-	p = new_task;
-	_raw_spin_unlock(&migration_lock);
-	sched_task_migrated(p);
-}
-
 /* CPU capture. */
 /* #define CAPTURE_DEBUG */
 extern unsigned long xcall_capture;
@@ -982,9 +947,13 @@ void smp_release(void)
 extern void prom_world(int);
 extern void save_alternate_globals(unsigned long *);
 extern void restore_alternate_globals(unsigned long *);
-void smp_penguin_jailcell(void)
+void smp_penguin_jailcell(int irq, struct pt_regs *regs)
 {
 	unsigned long global_save[24];
+
+	clear_softint(1 << irq);
+
+	preempt_disable();
 
 	__asm__ __volatile__("flushw");
 	save_alternate_globals(global_save);
@@ -996,6 +965,8 @@ void smp_penguin_jailcell(void)
 	restore_alternate_globals(global_save);
 	atomic_dec(&smp_capture_registry);
 	prom_world(0);
+
+	preempt_enable();
 }
 
 extern unsigned long xcall_promstop;

@@ -1,31 +1,24 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_MODULE_H
-#define _ASM_SN_MODULE_H
+#ifndef _ASM_IA64_SN_MODULE_H
+#define _ASM_IA64_SN_MODULE_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#include <linux/config.h>
 
 #include <asm/sn/systeminfo.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#ifdef BRINGUP /* max. number of modules?  Should be about 300.*/
-#define MODULE_MAX			56
-#endif /* BRINGUP */
+#define MODULE_MAX			128
 #define MODULE_MAX_NODES		1
-#endif /* CONFIG_SGI_IP35 */
 #define MODULE_HIST_CNT			16
 #define MAX_MODULE_LEN			16
 
@@ -38,8 +31,6 @@ extern "C" {
 #define MODULE_FORMAT_BRIEF	1
 #define MODULE_FORMAT_LONG	2
 
-
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 
 /*
  *	Module id format
@@ -134,17 +125,6 @@ extern char brick_types[];
 				 ((_m2)&(MODULE_RACK_MASK|MODULE_BPOS_MASK)))
 #define MODULE_MATCH(_m1, _m2)	(MODULE_CMP((_m1),(_m2)) == 0)
 
-#else
-
-/*
- * Some code that uses this macro will not be conditionally compiled.
- */
-#define MODULE_GET_BTCHAR(_m)	('?')
-#define MODULE_CMP(_m1, _m2)	((_m1) - (_m2))
-#define MODULE_MATCH(_m1, _m2)	(MODULE_CMP((_m1),(_m2)) == 0)
-
-#endif /* CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 */
-
 typedef struct module_s module_t;
 
 struct module_s {
@@ -205,4 +185,4 @@ extern int		parse_module_id(char *buffer);
 }
 #endif
 
-#endif /* _ASM_SN_MODULE_H */
+#endif /* _ASM_IA64_SN_MODULE_H */

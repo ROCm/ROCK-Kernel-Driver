@@ -15,6 +15,7 @@
 #include <asm/proc-fns.h>
 
 struct cpu_tlb_fns;
+struct cpu_user_fns;
 struct processor;
 
 struct proc_info_item {
@@ -32,21 +33,22 @@ struct proc_info_item {
  *  arch/arm/mm/proc-*.S and arch/arm/kernel/head-armv.S
  */
 struct proc_info_list {
-	unsigned int	 cpu_val;
-	unsigned int	 cpu_mask;
-	unsigned long	 __cpu_mmu_flags;	/* used by head-armv.S */
-	unsigned long	 __cpu_flush;		/* used by head-armv.S */
-	const char	 *arch_name;
-	const char	 *elf_name;
-	unsigned int	 elf_hwcap;
-	struct proc_info_item *info;
-	struct processor *proc;
-	struct cpu_tlb_fns *tlb;
+	unsigned int		cpu_val;
+	unsigned int		cpu_mask;
+	unsigned long		__cpu_mmu_flags;	/* used by head-armv.S */
+	unsigned long		__cpu_flush;		/* used by head-armv.S */
+	const char		*arch_name;
+	const char		*elf_name;
+	unsigned int		elf_hwcap;
+	struct proc_info_item	*info;
+	struct processor	*proc;
+	struct cpu_tlb_fns	*tlb;
+	struct cpu_user_fns	*user;
 };
 
 #endif	/* __ASSEMBLY__ */
 
-#define PROC_INFO_SZ	40
+#define PROC_INFO_SZ	44
 
 #define HWCAP_SWP	 1
 #define HWCAP_HALF	 2

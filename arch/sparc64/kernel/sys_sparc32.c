@@ -50,6 +50,7 @@
 #include <linux/icmpv6.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
+#include <linux/dnotify.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -1067,16 +1068,20 @@ static long do_readv_writev32(int type, struct file *file,
 	/* First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
+	retval = 0;
 	if (!count)
-		return 0;
+		goto out_nofree;
+	retval = -EFAULT;
 	if (verify_area(VERIFY_READ, vector, sizeof(struct iovec32)*count))
-		return -EFAULT;
+		goto out_nofree;
+	retval = -EINVAL;
 	if (count > UIO_MAXIOV)
-		return -EINVAL;
+		goto out_nofree;
 	if (count > UIO_FASTIOV) {
+		retval = -ENOMEM;
 		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
-			return -ENOMEM;
+			goto out_nofree;
 	}
 
 	tot_len = 0;
@@ -1136,6 +1141,11 @@ static long do_readv_writev32(int type, struct file *file,
 out:
 	if (iov != iovstack)
 		kfree(iov);
+out_nofree:
+	/* VERIFY_WRITE actually means a read, as we write to user space */
+	if ((retval + (type == VERIFY_WRITE)) > 0)
+		dnotify_parent(file->f_dentry,
+			(type == VERIFY_WRITE) ? DN_MODIFY : DN_ACCESS);
 
 	return retval;
 }
@@ -3950,6 +3960,27 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, __kernel_off_t32 *offset, s
 	set_fs(old_fs);
 	
 	if (offset && put_user(of, offset))
+		return -EFAULT;
+		
+	return ret;
+}
+
+extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
+
+asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset, s32 count)
+{
+	mm_segment_t old_fs = get_fs();
+	int ret;
+	loff_t lof;
+	
+	if (offset && get_user(lof, offset))
+		return -EFAULT;
+		
+	set_fs(KERNEL_DS);
+	ret = sys_sendfile64(out_fd, in_fd, offset ? &lof : NULL, count);
+	set_fs(old_fs);
+	
+	if (offset && put_user(lof, offset))
 		return -EFAULT;
 		
 	return ret;

@@ -561,6 +561,10 @@ CONFIG_NFSD_V3
   If you would like to include the NFSv3 server as well as the NFSv2
   server, say Y here.  If unsure, say Y.
 
+CONFIG_NFSD_TCP
+  Enable NFS service over TCP connections.  This the officially
+  still experimental, but seems to work well.
+
 CONFIG_HPFS_FS
   OS/2 is IBM's operating system for PC's, the same as Warp, and HPFS
   is the file system used for organizing files on OS/2 hard disk

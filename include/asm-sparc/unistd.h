@@ -155,7 +155,7 @@
 #define __NR_rmdir              137 /* Common                                      */
 #define __NR_utimes             138 /* SunOS Specific                              */
 #define __NR_stat64		139 /* Linux sparc32 Specific			   */
-/* #define __NR_adjtime         140    SunOS Specific                              */
+#define __NR_sendfile64         140 /* adjtime under SunOS                         */
 #define __NR_getpeername        141 /* Common                                      */
 /* #define __NR_gethostid       142    SunOS Specific                              */
 #define __NR_gettid             143 /* ENOSYS under SunOS                          */

@@ -180,6 +180,7 @@ struct packet_opt
 	spinlock_t		bind_lock;
 	char			running;	/* prot_hook is attached*/
 	int			ifindex;	/* bound device		*/
+	unsigned short		num;
 	struct tpacket_stats	stats;
 #ifdef CONFIG_PACKET_MULTICAST
 	struct packet_mclist	*mclist;
@@ -678,8 +679,10 @@ static int packet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	 */
 	 
 	if (saddr == NULL) {
-		ifindex	= pkt_sk(sk)->ifindex;
-		proto	= sk->num;
+		struct packet_opt *po = pkt_sk(sk);
+
+		ifindex	= po->ifindex;
+		proto	= po->num;
 		addr	= NULL;
 	} else {
 		err = -EINVAL;
@@ -839,7 +842,7 @@ static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 		po->running = 0;
 	}
 
-	sk->num = protocol;
+	po->num = protocol;
 	po->prot_hook.type = protocol;
 	po->prot_hook.dev = dev;
 
@@ -894,7 +897,7 @@ static int packet_bind_spkt(struct socket *sock, struct sockaddr *uaddr, int add
 
 	dev = dev_get_by_name(name);
 	if (dev) {
-		err = packet_do_bind(sk, dev, sk->num);
+		err = packet_do_bind(sk, dev, pkt_sk(sk)->num);
 		dev_put(dev);
 	}
 	return err;
@@ -924,7 +927,7 @@ static int packet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 		if (dev == NULL)
 			goto out;
 	}
-	err = packet_do_bind(sk, dev, sll->sll_protocol ? : sk->num);
+	err = packet_do_bind(sk, dev, sll->sll_protocol ? : pkt_sk(sk)->num);
 	if (dev)
 		dev_put(dev);
 
@@ -972,7 +975,7 @@ static int packet_create(struct socket *sock, int protocol)
 		goto out_free;
 	memset(po, 0, sizeof(*po));
 	sk->family = PF_PACKET;
-	sk->num = protocol;
+	po->num = protocol;
 
 	sk->destruct = packet_sock_destruct;
 	atomic_inc(&packet_socks_nr);
@@ -1131,7 +1134,7 @@ static int packet_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	sll->sll_family = AF_PACKET;
 	sll->sll_ifindex = po->ifindex;
-	sll->sll_protocol = sk->num;
+	sll->sll_protocol = po->num;
 	dev = dev_get_by_index(po->ifindex);
 	if (dev) {
 		sll->sll_hatype = dev->type;
@@ -1410,7 +1413,8 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 			break;
 		case NETDEV_UP:
 			spin_lock(&po->bind_lock);
-			if (dev->ifindex == po->ifindex && sk->num && po->running==0) {
+			if (dev->ifindex == po->ifindex && po->num &&
+			    !po->running) {
 				dev_add_pack(&po->prot_hook);
 				sock_hold(sk);
 				po->running = 1;
@@ -1861,7 +1865,7 @@ static int packet_read_proc(char *buffer, char **start, off_t offset,
 			     s,
 			     atomic_read(&s->refcnt),
 			     s->type,
-			     ntohs(s->num),
+			     ntohs(po->num),
 			     po->ifindex,
 			     po->running,
 			     atomic_read(&s->rmem_alloc),

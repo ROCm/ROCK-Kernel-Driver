@@ -193,7 +193,7 @@ int ip_ra_control(struct sock *sk, unsigned char on, void (*destructor)(struct s
 {
 	struct ip_ra_chain *ra, *new_ra, **rap;
 
-	if (sk->type != SOCK_RAW || sk->num == IPPROTO_RAW)
+	if (sk->type != SOCK_RAW || inet_sk(sk)->num == IPPROTO_RAW)
 		return -EINVAL;
 
 	new_ra = on ? kmalloc(sizeof(*new_ra), GFP_KERNEL) : NULL;
@@ -435,7 +435,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 				if (sk->family == PF_INET ||
 				    (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
-				     && sk->daddr != LOOPBACK4_IPV6)) {
+				     && inet->daddr != LOOPBACK4_IPV6)) {
 #endif
 					if (opt)
 						tp->ext_header_len = opt->optlen;
@@ -771,8 +771,8 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 			if (inet->cmsg_flags & IP_CMSG_PKTINFO) {
 				struct in_pktinfo info;
 
-				info.ipi_addr.s_addr = sk->rcv_saddr;
-				info.ipi_spec_dst.s_addr = sk->rcv_saddr;
+				info.ipi_addr.s_addr = inet->rcv_saddr;
+				info.ipi_spec_dst.s_addr = inet->rcv_saddr;
 				info.ipi_ifindex = inet->mc_index;
 				put_cmsg(&msg, SOL_IP, IP_PKTINFO, sizeof(info), &info);
 			}

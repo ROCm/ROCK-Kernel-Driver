@@ -234,11 +234,8 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	iph->tos=tos;
 	iph->tot_len = htons(length);
 
-	/* This abbreviates icmp->send->ip_build_xmit->ip_dont_fragment */
-	if (!ipv4_config.no_pmtu_disc
-	    && !(rt->u.dst.mxlock&(1<<RTAX_MTU)))
-		iph->frag_off = htons(IP_DF);
-	else iph->frag_off = 0;
+	/* PMTU discovery never applies to ICMP packets. */
+	iph->frag_off = 0;
 
 	iph->ttl = MAXTTL;
 	ip_select_ident(iph, &rt->u.dst, NULL);

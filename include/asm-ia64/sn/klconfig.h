@@ -6,11 +6,11 @@
  *
  * Derived from IRIX <sys/SN/klconfig.h>.
  *
- * Copyright (C) 1992 - 1997, 1999 Silicon Graphics, Inc.
+ * Copyright (C) 1992-1997,1999,2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (C) 1999 by Ralf Baechle
  */
-#ifndef	_ASM_SN_KLCONFIG_H
-#define	_ASM_SN_KLCONFIG_H
+#ifndef _ASM_IA64_SN_KLCONFIG_H
+#define _ASM_IA64_SN_KLCONFIG_H
 
 #include <linux/config.h>
 
@@ -38,20 +38,22 @@
 #include <asm/sn/types.h>
 #include <asm/sn/slotnum.h>
 #include <asm/sn/router.h>
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sgi.h>
-#include <asm/sn/sn1/addrs.h>
+#include <asm/sn/addrs.h>
 #include <asm/sn/vector.h>
-#include <asm/sn/agent.h>
-// #include <sys/graph.h>
-// #include <asm/sn/arc/types.h>
 #include <asm/sn/arc/hinv.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/kldir.h>
 #include <asm/sn/sn_fru.h>
 
-#endif  /* CONFIG_SGI_IP35 ... */
+#ifdef CONFIG_IA64_SGI_SN1
+#include <asm/sn/sn1/hubmd_next.h>
+#endif
+
+#ifdef CONFIG_IA64_SGI_SN2
+#include <asm/sn/sn2/shub_md.h>
+#endif
 
 #define KLCFGINFO_MAGIC	0xbeedbabe
 
@@ -59,19 +61,11 @@ typedef s32 klconf_off_t;
 
 #define	MAX_MODULE_ID		255
 #define SIZE_PAD		4096 /* 4k padding for structures */
-#if (defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)) && defined(BRINGUP) /* MAX_SLOTS_PER_NODE??? */
 /* 
  * 1 NODE brick, 3 Router bricks (1 local, 1 meta, 1 repeater),
  * 6 XIO Widgets, 1 Xbow, 1 gfx
  */
 #define MAX_SLOTS_PER_NODE	(1 + 3 + 6 + 1 + 1) 
-#else
-/* 
- * 1 NODE brd, 2 Router brd (1 8p, 1 meta), 6 Widgets, 
- * 2 Midplanes assuming no pci card cages 
- */
-#define MAX_SLOTS_PER_NODE	(1 + 2 + 6 + 2) 
-#endif
 
 /* XXX if each node is guranteed to have some memory */
 
@@ -349,7 +343,7 @@ typedef struct kl_config_hdr {
 #define KLCLASS(_x) ((_x) & KLCLASS_MASK)
 
 /*
- * IP27 board types
+ * board types
  */
 
 #define KLTYPE_MASK	0x0f
@@ -357,11 +351,7 @@ typedef struct kl_config_hdr {
 #define KLTYPE_EMPTY	0x00
 
 #define KLTYPE_WEIRDCPU (KLCLASS_CPU | 0x0)
-#define KLTYPE_IP27	(KLCLASS_CPU | 0x1) /* 2 CPUs(R10K) per board */
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#define KLTYPE_IP35	KLTYPE_IP27
-#define KLTYPE_IP37	KLTYPE_IP35
-#endif
+#define KLTYPE_SNIA	(KLCLASS_CPU | 0x1)
 
 #define KLTYPE_WEIRDIO	(KLCLASS_IO  | 0x0)
 #define KLTYPE_BASEIO	(KLCLASS_IO  | 0x1) /* IOC3, SuperIO, Bridge, SCSI */
@@ -949,7 +939,6 @@ extern lboard_t *get_board_name(nasid_t nasid, moduleid_t mod, slotid_t slot, ch
 extern int	config_find_nic_router(nasid_t, nic_t, lboard_t **, klrou_t**);
 extern int	config_find_nic_hub(nasid_t, nic_t, lboard_t **, klhub_t**);
 extern int	config_find_xbow(nasid_t, lboard_t **, klxbow_t**);
-extern klcpu_t *get_cpuinfo(cpuid_t cpu);
 extern int 	update_klcfg_cpuinfo(nasid_t, int);
 extern void 	board_to_path(lboard_t *brd, char *path);
 extern moduleid_t get_module_id(nasid_t nasid);
@@ -963,4 +952,4 @@ extern int	is_master_baseio(nasid_t,moduleid_t,slotid_t);
 extern nasid_t	get_actual_nasid(lboard_t *brd) ;
 extern net_vec_t klcfg_discover_route(lboard_t *, lboard_t *, int);
 
-#endif /* _ASM_SN_KLCONFIG_H */
+#endif /* _ASM_IA64_SN_KLCONFIG_H */

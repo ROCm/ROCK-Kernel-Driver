@@ -88,10 +88,10 @@
 typedef s64				pal_status_t;
 
 #define PAL_STATUS_SUCCESS		0	/* No error */
-#define PAL_STATUS_UNIMPLEMENTED	-1	/* Unimplemented procedure */
-#define PAL_STATUS_EINVAL		-2	/* Invalid argument */
-#define PAL_STATUS_ERROR		-3	/* Error */
-#define PAL_STATUS_CACHE_INIT_FAIL	-4	/* Could not initialize the
+#define PAL_STATUS_UNIMPLEMENTED	(-1)	/* Unimplemented procedure */
+#define PAL_STATUS_EINVAL		(-2)	/* Invalid argument */
+#define PAL_STATUS_ERROR		(-3)	/* Error */
+#define PAL_STATUS_CACHE_INIT_FAIL	(-4)	/* Could not initialize the
 						 * specified level and type of
 						 * cache without sideeffects
 						 * and "restrict" was 1

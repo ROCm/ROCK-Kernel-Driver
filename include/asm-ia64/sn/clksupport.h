@@ -4,61 +4,60 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Jack Steiner (steiner@sgi.com)
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
-
-#ifndef  _ASM_KSYS_CLKSUPPORT_H
-#define _ASM_KSYS_CLKSUPPORT_H
-
-/* #include <sys/mips_addrspace.h> */
-
-#if SN
-#include <asm/sn/agent.h>
-#include <asm/sn/intr_public.h>
-typedef hubreg_t clkreg_t;
-extern nasid_t master_nasid;
-
-#define GET_LOCAL_RTC		(clkreg_t)LOCAL_HUB_L(PI_RT_COUNT)
-#define DISABLE_TMO_INTR()	if  (cpuid_to_localslice(cpuid())) \
-					REMOTE_HUB_PI_S(get_nasid(),\
-						cputosubnode(cpuid()),\
-						PI_RT_COMPARE_B, 0); \
-				else \
-					REMOTE_HUB_PI_S(get_nasid(),\
-						cputosubnode(cpuid()),\
-						PI_RT_COMPARE_A, 0);
-
-/* This is a hack; we really need to figure these values out dynamically */
-/* 
- * Since 800 ns works very well with various HUB frequencies, such as
- * 360, 380, 390 and 400 MHZ, we use 800 ns rtc cycle time.
- */
-#define NSEC_PER_CYCLE		800
-#define CYCLE_PER_SEC		(NSEC_PER_SEC/NSEC_PER_CYCLE)
 /*
- * Number of cycles per profiling intr 
+ * This file contains definitions for accessing a platform supported high resolution
+ * clock. The clock is monitonically increasing and can be accessed from any node
+ * in the system. The clock is synchronized across nodes - all nodes see the
+ * same value.
+ * 
+ *	RTC_COUNTER_ADDR - contains the address of the counter 
+ *
+ *	GET_RTC_COUNTER() - macro to read the value of the clock
+ *
+ *	RTC_CYCLES_PER_SEC - clock frequency in ticks per second	
+ *
  */
-#define CLK_FCLOCK_FAST_FREQ	1250
-#define CLK_FCLOCK_SLOW_FREQ	0
-/* The is the address that the user will use to mmap the cycle counter */
-#define CLK_CYCLE_ADDRESS_FOR_USER LOCAL_HUB_ADDR(PI_RT_COUNT)
 
-#elif IP30
-#include <sys/cpu.h>
-typedef heartreg_t clkreg_t;
-#define NSEC_PER_CYCLE		80
-#define CYCLE_PER_SEC		(NSEC_PER_SEC/NSEC_PER_CYCLE)
-#define GET_LOCAL_RTC	*((volatile clkreg_t *)PHYS_TO_COMPATK1(HEART_COUNT))
-#define DISABLE_TMO_INTR()
-#define CLK_CYCLE_ADDRESS_FOR_USER PHYS_TO_K1(HEART_COUNT)
-#define CLK_FCLOCK_SLOW_FREQ (CYCLE_PER_SEC / HZ)
+#ifndef _ASM_IA64_SN_CLKSUPPORT_H
+#define _ASM_IA64_SN_CLKSUPPORT_H
+
+#include <linux/config.h>
+#include <asm/sn/arch.h>
+#include <asm/sn/addrs.h>
+
+typedef long clkreg_t;
+extern long sn_rtc_cycles_per_second;
+
+
+#if defined(CONFIG_IA64_SGI_SN1)
+#include <asm/sn/sn1/bedrock.h>
+#include <asm/sn/sn1/hubpi_next.h>
+/* clocks are not synchronized yet on SN1  - used node 0 (problem if no NASID 0) */
+#define RTC_COUNTER_ADDR	((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COUNTER))
+#define RTC_COMPARE_A_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COMPARE_A))
+#define RTC_COMPARE_B_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COMPARE_B))
+#define RTC_INT_PENDING_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_PEND_A))
+#define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_PEND_B))
+#define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_EN_A))
+#define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_EN_B))
+#else
+#include <asm/sn/sn2/shub_mmr.h>
+#define RTC_COUNTER_ADDR	((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_COMPARE_A_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_COMPARE_B_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_INT_PENDING_A_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
+#define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #endif
 
-/* Prototypes */
-extern void init_timebase(void);
-extern void fastick_maint(struct eframe_s *);
-extern int audioclock;
-extern int prfclk_enabled_cnt;
-#endif  /* _ASM_KSYS_CLKSUPPORT_H */
+
+#define GET_RTC_COUNTER()	(*RTC_COUNTER_ADDR)
+#define rtc_time()		GET_RTC_COUNTER()
+
+#define RTC_CYCLES_PER_SEC	sn_rtc_cycles_per_second
+
+#endif /* _ASM_IA64_SN_CLKSUPPORT_H */

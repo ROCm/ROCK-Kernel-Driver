@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armv/pgtable.h
  *
- *  Copyright (C) 1995-2001 Russell King
+ *  Copyright (C) 1995-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,17 @@
 #define __ASM_PROC_PGTABLE_H
 
 /*
- * entries per page directory level: they are two-level, so
- * we don't really have any PMD directory.
+ * We pull a couple of tricks here:
+ *  1. We wrap the PMD into the PGD.
+ *  2. We lie about the size of the PTE and PGD.
+ * Even though we have 256 PTE entries and 4096 PGD entries, we tell
+ * Linux that we actually have 512 PTE entries and 2048 PGD entries.
+ * Each "Linux" PGD entry is made up of two hardware PGD entries, and
+ * each PTE table is actually two hardware PTE tables.
  */
-#define PTRS_PER_PTE		256
+#define PTRS_PER_PTE		512
 #define PTRS_PER_PMD		1
-#define PTRS_PER_PGD		4096
+#define PTRS_PER_PGD		2048
 
 /*
  * Hardware page table definitions.
@@ -109,32 +114,29 @@
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
 #define set_pmd(pmdp,pmd)	cpu_set_pmd(pmdp, pmd)
 
-static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
+static inline void pmd_clear(pmd_t *pmdp)
 {
-	unsigned long pte_ptr = (unsigned long)ptep;
-	pmd_t pmd;
-
-	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
-
-	/*
-	 * The pmd must be loaded with the physical
-	 * address of the PTE table
-	 */
-	pmd_val(pmd) = __virt_to_phys(pte_ptr) | prot;
-
-	return pmd;
+	set_pmd(pmdp, __pmd(0));
+	set_pmd(pmdp + 1, __pmd(0));
 }
 
-static inline unsigned long __pmd_page(pmd_t pmd)
+static inline pte_t *pmd_page_kernel(pmd_t pmd)
 {
 	unsigned long ptr;
 
 	ptr = pmd_val(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
-
 	ptr += PTRS_PER_PTE * sizeof(void *);
 
-	return __phys_to_virt(ptr);
+	return __va(ptr);
 }
+
+#define pmd_page(pmd) virt_to_page(__va(pmd_val(pmd)))
+
+#define pte_offset_kernel(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_offset_map(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_offset_map_nested(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 #define set_pte(ptep, pte)	cpu_set_pte(ptep,pte)
 
@@ -182,6 +184,8 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
  * Mark the prot value as uncacheable and unbufferable.
  */
 #define pgprot_noncached(prot)	__pgprot(pgprot_val(prot) & ~(L_PTE_CACHEABLE | L_PTE_BUFFERABLE))
+
+#define pgtable_cache_init() do { } while (0)
 
 #endif /* __ASSEMBLY__ */
 

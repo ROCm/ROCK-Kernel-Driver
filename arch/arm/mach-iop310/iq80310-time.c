@@ -47,23 +47,44 @@ static u_long iq80310_read_timer (void)
 	u_long b0, b1, b2, b3, val;
 
 	b0 = *la0; b1 = *la1; b2 = *la2; b3 = *la3;
-	b0 = (((b0 & 0x20) >> 1) | (b0 & 0x1f));
-	b1 = (((b1 & 0x20) >> 1) | (b1 & 0x1f));
-	b2 = (((b2 & 0x20) >> 1) | (b2 & 0x1f));
+	b0 = (((b0 & 0x40) >> 1) | (b0 & 0x1f));
+	b1 = (((b1 & 0x40) >> 1) | (b1 & 0x1f));
+	b2 = (((b2 & 0x40) >> 1) | (b2 & 0x1f));
 	b3 = (b3 & 0x0f);
 	val = ((b0 << 0) | (b1 << 6) | (b2 << 12) | (b3 << 18));
 	return val;
 }
 
-/* IRQs are disabled before entering here from do_gettimeofday() */
+/*
+ * IRQs are disabled before entering here from do_gettimeofday().
+ * Note that the counter may wrap.  When it does, 'elapsed' will
+ * be small, but we will have a pending interrupt.
+ */
 static unsigned long iq80310_gettimeoffset (void)
 {
-	unsigned long elapsed, usec;
+	unsigned long elapsed, usec, tmp1;
+	unsigned int stat1, stat2;
 
-	/* We need elapsed timer ticks since last interrupt */
+	stat1 = *(volatile u8 *)IQ80310_INT_STAT;
 	elapsed = iq80310_read_timer();
+	stat2 = *(volatile u8 *)IQ80310_INT_STAT;
 
-	/* Now convert them to usec */
+	/*
+	 * If an interrupt was pending before we read the timer,
+	 * we've already wrapped.  Factor this into the time.
+	 * If an interrupt was pending after we read the timer,
+	 * it may have wrapped between checking the interrupt
+	 * status and reading the timer.  Re-read the timer to
+	 * be sure its value is after the wrap.
+	 */
+	if (stat1 & 1)
+		elapsed += LATCH;
+	else if (stat2 & 1)
+		elapsed = LATCH + iq80310_read_timer();
+
+	/*
+	 * Now convert them to usec.
+	 */
 	usec = (unsigned long)(elapsed*tick)/LATCH;
 
 	return usec;
@@ -92,9 +113,7 @@ static void iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 *
 	 * -DS
 	 */
-	irq_exit(smp_processor_id(), irq);
 	do_timer(regs);
-	irq_enter(smp_processor_id(), irq);
 }
 
 extern unsigned long (*gettimeoffset)(void);
@@ -116,4 +135,3 @@ void __init time_init(void)
 	*timer_en |= 2;
 	*timer_en |= 1;
 }
-

@@ -588,4 +588,11 @@ EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(net_call_rx_atomic);
 EXPORT_SYMBOL(softnet_data);
 
+#if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
+/* Don't include the whole header mess for a single function */
+union iwreq_data;
+extern void wireless_send_event(struct net_device *dev, unsigned int cmd, union iwreq_data *wrqu, char *extra);
+EXPORT_SYMBOL(wireless_send_event);
+#endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
+
 #endif  /* CONFIG_NET */

@@ -50,7 +50,8 @@ rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
 
 static void raw_v6_hash(struct sock *sk)
 {
-	struct sock **skp = &raw_v6_htable[sk->num & (RAWV6_HTABLE_SIZE - 1)];
+	struct sock **skp = &raw_v6_htable[inet_sk(sk)->num &
+					   (RAWV6_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v6_lock);
 	if ((sk->next = *skp) != NULL)
@@ -85,7 +86,7 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 	int addr_type = ipv6_addr_type(loc_addr);
 
 	for(s = sk; s; s = s->next) {
-		if(s->num == num) {
+		if (inet_sk(s)->num == num) {
 			struct ipv6_pinfo *np = inet6_sk(s);
 
 			if (!ipv6_addr_any(&np->daddr) &&
@@ -186,6 +187,7 @@ out:
 /* This cleans up af_inet6 a bit. -DaveM */
 static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) uaddr;
 	__u32 v4addr = 0;
@@ -233,8 +235,7 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		}
 	}
 
-	sk->rcv_saddr = v4addr;
-	sk->saddr = v4addr;
+	inet->rcv_saddr = inet->saddr = v4addr;
 	ipv6_addr_copy(&np->rcv_saddr, &addr->sin6_addr);
 	if (!(addr_type & IPV6_ADDR_MULTICAST))
 		ipv6_addr_copy(&np->saddr, &addr->sin6_addr);
@@ -439,6 +440,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
@@ -478,7 +480,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		proto = ntohs(sin6->sin6_port);
 
 		if (!proto)
-			proto = sk->num;
+			proto = inet->num;
 
 		if (proto > 255)
 			return(-EINVAL);
@@ -507,7 +509,7 @@ static int rawv6_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		if (sk->state != TCP_ESTABLISHED) 
 			return(-EINVAL);
 		
-		proto = sk->num;
+		proto = inet->num;
 		daddr = &np->daddr;
 		fl.fl6_flowlabel = np->flow_label;
 	}
@@ -635,7 +637,7 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 			break;
 
 		case SOL_ICMPV6:
-			if (sk->num != IPPROTO_ICMPV6)
+			if (inet_sk(sk)->num != IPPROTO_ICMPV6)
 				return -EOPNOTSUPP;
 			return rawv6_seticmpfilter(sk, level, optname, optval,
 						   optlen);
@@ -678,7 +680,7 @@ static int rawv6_getsockopt(struct sock *sk, int level, int optname,
 			break;
 
 		case SOL_ICMPV6:
-			if (sk->num != IPPROTO_ICMPV6)
+			if (inet_sk(sk)->num != IPPROTO_ICMPV6)
 				return -EOPNOTSUPP;
 			return rawv6_geticmpfilter(sk, level, optname, optval,
 						   optlen);
@@ -741,7 +743,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 static void rawv6_close(struct sock *sk, long timeout)
 {
-	if (sk->num == IPPROTO_RAW)
+	if (inet_sk(sk)->num == IPPROTO_RAW)
 		ip6_ra_control(sk, -1, NULL);
 
 	inet_sock_release(sk);
@@ -764,10 +766,10 @@ static void get_raw6_sock(struct sock *sp, char *tmpbuf, int i)
 	dest  = &np->daddr;
 	src   = &np->rcv_saddr;
 	destp = 0;
-	srcp  = sp->num;
+	srcp  = inet_sk(sp)->num;
 	sprintf(tmpbuf,
 		"%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
+		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
 		i,
 		src->s6_addr32[0], src->s6_addr32[1],
 		src->s6_addr32[2], src->s6_addr32[3], srcp,

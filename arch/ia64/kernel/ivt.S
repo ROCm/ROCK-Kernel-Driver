@@ -43,6 +43,7 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
+#include <asm/thread_info.h>
 #include <asm/unistd.h>
 
 #if 1
@@ -275,6 +276,7 @@ ENTRY(alt_itlb_miss)
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
+	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r31=pr
 	;;
 #ifdef CONFIG_DISABLE_VHPT
@@ -289,12 +291,12 @@ ENTRY(alt_itlb_miss)
 (p8)	br.cond.dptk itlb_fault
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
+	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
 	shr.u r18=r16,57	// move address bit 61 to bit 4
-	dep r19=0,r16,IA64_MAX_PHYS_BITS,(64-IA64_MAX_PHYS_BITS)	// clear ed & reserved bits
 	;;
 	andcm r18=0x10,r18	// bit 4=~address-bit(61)
 	cmp.ne p8,p0=r0,r23	// psr.cpl != 0?
-	dep r19=r17,r19,0,12	// insert PTE control bits into r19
+	or r19=r17,r19		// insert PTE control bits into r19
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
 (p8)	br.cond.spnt page_fault
@@ -312,6 +314,7 @@ ENTRY(alt_dtlb_miss)
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
+	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r21=cr.ipsr
 	mov r31=pr
 	;;
@@ -328,15 +331,15 @@ ENTRY(alt_dtlb_miss)
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
+	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
 	shr.u r18=r16,57	// move address bit 61 to bit 4
-	dep r19=0,r16,IA64_MAX_PHYS_BITS,(64-IA64_MAX_PHYS_BITS) // clear ed & reserved bits
 	;;
 	andcm r18=0x10,r18	// bit 4=~address-bit(61)
 	cmp.ne p8,p0=r0,r23
 (p8)	br.cond.spnt page_fault
 
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1
-	dep r19=r17,r19,0,12	// insert PTE control bits into r19
+	or r19=r19,r17		// insert PTE control bits into r19
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
 (p6)	mov cr.ipsr=r21
@@ -654,16 +657,16 @@ ENTRY(break_fault)
 	ld8 r16=[r16]				// load address of syscall entry point
 	mov rp=r15				// set the real return addr
 	;;
-	ld8 r2=[r2]				// r2 = current->ptrace
 	mov b6=r16
 
 	// arrange things so we skip over break instruction when returning:
 
 	adds r16=16,sp				// get pointer to cr_ipsr
 	adds r17=24,sp				// get pointer to cr_iip
+	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld8 r18=[r16]				// fetch cr_ipsr
-	tbit.z p8,p0=r2,PT_TRACESYS_BIT		// (current->ptrace & PF_TRACESYS) == 0?
+	ld4 r2=[r2]				// r2 = current_thread_info()->flags
 	;;
 	ld8 r19=[r17]				// fetch cr_iip
 	extr.u r20=r18,41,2			// extract ei field
@@ -676,6 +679,7 @@ ENTRY(break_fault)
 	;;
 (p6)	st8 [r17]=r19				// store new cr.iip if cr.isr.ei wrapped around
 	dep r18=r20,r18,41,2			// insert new ei into cr.isr
+	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
 	;;
 	st8 [r16]=r18				// store new value for cr.isr
 
@@ -855,16 +859,16 @@ ENTRY(dispatch_to_ia32_handler)
 	ld4 out5=[r14],8	// r13 == ebp
 	;;
 	ld4 out3=[r14],8	// r14 == esi
-	adds r2=IA64_TASK_PTRACE_OFFSET,r13	// r2 = &current->ptrace
+	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld4 out4=[r14]		// r15 == edi
 	movl r16=ia32_syscall_table
 	;;
 (p6)    shladd r16=r8,3,r16	// force ni_syscall if not valid syscall number
-	ld8 r2=[r2]		// r2 = current->ptrace
+	ld4 r2=[r2]		// r2 = current_thread_info()->flags
 	;;
 	ld8 r16=[r16]
-	tbit.z p8,p0=r2,PT_TRACESYS_BIT	// (current->ptrace & PT_TRACESYS) == 0?
+	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
 	;;
 	mov b6=r16
 	movl r15=ia32_ret_from_syscall

@@ -119,6 +119,7 @@ if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
 source drivers/mtd/Config.in
 source drivers/pnp/Config.in
 source drivers/block/Config.in
+source drivers/ieee1394/Config.in
 source drivers/message/i2o/Config.in
 source drivers/md/Config.in
 
@@ -230,7 +231,7 @@ if [ "$CONFIG_IA64_HP_SIM" != "n" -o "$CONFIG_IA64_GENERIC" != "n" ]; then
   mainmenu_option next_comment
   comment 'Simulated drivers'
 
-  tristate 'Simulated Ethernet ' CONFIG_SIMETH
+  bool 'Simulated Ethernet ' CONFIG_SIMETH
   bool 'Simulated serial driver support' CONFIG_SIM_SERIAL
   if [ "$CONFIG_SCSI" != "n" ]; then
     bool 'Simulated SCSI disk' CONFIG_SCSI_SIM
@@ -252,13 +253,20 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Disable VHPT' CONFIG_DISABLE_VHPT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
 
-# early printk is currently broken for SMP: the secondary processors get stuck...
-#   bool '  Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
-
+   bool '  Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG
    bool '  Turn on irq debug checks (slow!)' CONFIG_IA64_DEBUG_IRQ
+   bool '  Built-in Kernel Debugger support' CONFIG_KDB
+   dep_tristate '    KDB modules' CONFIG_KDB_MODULES $CONFIG_KDB
+   if [ "$CONFIG_KDB" = "y" ]; then
+      bool '    KDB off by default' CONFIG_KDB_OFF
+      comment '  Load all symbols for debugging is required for KDB'
+      define_bool CONFIG_KALLSYMS y
+   else
+      bool '  Load all symbols for debugging' CONFIG_KALLSYMS
+   fi
 fi
 
 endmenu

@@ -30,7 +30,6 @@
  */
 #define pgd_quicklist		(local_cpu_data->pgd_quick)
 #define pmd_quicklist		(local_cpu_data->pmd_quick)
-#define pte_quicklist		(local_cpu_data->pte_quick)
 #define pgtable_cache_size	(local_cpu_data->pgtable_cache_sz)
 
 static inline pgd_t*
@@ -108,27 +107,29 @@ pmd_free (pmd_t *pmd)
 }
 
 static inline void
-pmd_populate (struct mm_struct *mm, pmd_t *pmd_entry, pte_t *pte)
+pmd_populate (struct mm_struct *mm, pmd_t *pmd_entry, struct page *pte)
+{
+	pmd_val(*pmd_entry) = page_to_phys(pte);
+}
+
+static inline void
+pmd_populate_kernel (struct mm_struct *mm, pmd_t *pmd_entry, pte_t *pte)
 {
 	pmd_val(*pmd_entry) = __pa(pte);
 }
 
-static inline pte_t*
-pte_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
+static inline struct page *
+pte_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	unsigned long *ret = (unsigned long *)pte_quicklist;
+	struct page *pte = alloc_pages(GFP_KERNEL, 0);
 
-	if (__builtin_expect(ret != NULL, 1)) {
-		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = 0;
-		--pgtable_cache_size;
-	}
-	return (pte_t *)ret;
+	if (__builtin_expect(pte != NULL, 1))
+		clear_page(page_address(pte));
+	return pte;
 }
 
-
-static inline pte_t*
-pte_alloc_one (struct mm_struct *mm, unsigned long addr)
+static inline pte_t *
+pte_alloc_one_kernel (struct mm_struct *mm, unsigned long addr)
 {
 	pte_t *pte = (pte_t *) __get_free_page(GFP_KERNEL);
 
@@ -138,14 +139,43 @@ pte_alloc_one (struct mm_struct *mm, unsigned long addr)
 }
 
 static inline void
-pte_free (pte_t *pte)
+pte_free (struct page *pte)
 {
-	*(unsigned long *)pte = (unsigned long) pte_quicklist;
-	pte_quicklist = (unsigned long *) pte;
-	++pgtable_cache_size;
+	__free_page(pte);
+}
+
+static inline void
+pte_free_kernel (pte_t *pte)
+{
+	free_page((unsigned long) pte);
 }
 
 extern int do_check_pgt_cache (int, int);
+
+/*
+ * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
+ * information.  However, we use this macro to take care of any (delayed) i-cache flushing
+ * that may be necessary.
+ */
+static inline void
+update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
+{
+	unsigned long addr;
+	struct page *page;
+
+	if (!pte_exec(pte))
+		return;				/* not an executable page... */
+
+	page = pte_page(pte);
+	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
+	addr = (unsigned long) page_address(page);
+
+	if (test_bit(PG_arch_1, &page->flags))
+		return;				/* i-cache is already coherent with d-cache */
+
+	flush_icache_range(addr, addr + PAGE_SIZE);
+	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
+}
 
 /*
  * Now for some TLB flushing routines.  This is the kind of stuff that
@@ -210,65 +240,6 @@ flush_tlb_pgtables (struct mm_struct *mm, unsigned long start, unsigned long end
 		printk("flush_tlb_pgtables: can't flush across regions!!\n");
 	vma.vm_mm = mm;
 	flush_tlb_range(&vma, ia64_thash(start), ia64_thash(end));
-}
-
-/*
- * Now for some cache flushing routines.  This is the kind of stuff
- * that can be very expensive, so try to avoid them whenever possible.
- */
-
-/* Caches aren't brain-dead on the IA-64. */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_page_to_ram(page)			do { } while (0)
-
-extern void flush_icache_range (unsigned long start, unsigned long end);
-
-static inline void
-flush_dcache_page (struct page *page)
-{
-	clear_bit(PG_arch_1, &page->flags);
-}
-
-static inline void
-clear_user_page (void *addr, unsigned long vaddr, struct page *page)
-{
-	clear_page(addr);
-	flush_dcache_page(page);
-}
-
-static inline void
-copy_user_page (void *to, void *from, unsigned long vaddr, struct page *page)
-{
-	copy_page(to, from);
-	flush_dcache_page(page);
-}
-
-/*
- * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
- * information.  However, we use this macro to take care of any (delayed) i-cache flushing
- * that may be necessary.
- */
-static inline void
-update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
-{
-	unsigned long addr;
-	struct page *page;
-
-	if (!pte_exec(pte))
-		return;				/* not an executable page... */
-
-	page = pte_page(pte);
-	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
-	addr = (unsigned long) page_address(page);
-
-	if (test_bit(PG_arch_1, &page->flags))
-		return;				/* i-cache is already coherent with d-cache */
-
-	flush_icache_range(addr, addr + PAGE_SIZE);
-	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
 }
 
 #endif /* _ASM_IA64_PGALLOC_H */

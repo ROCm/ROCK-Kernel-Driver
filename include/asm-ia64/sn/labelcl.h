@@ -4,15 +4,16 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_LABELCL_H
-#define _ASM_SN_LABELCL_H
+#ifndef _ASM_IA64_SN_LABELCL_H
+#define _ASM_IA64_SN_LABELCL_H
+
+#include <asm/sn/hcl.h>
 
 #define LABELCL_MAGIC 0x4857434c	/* 'HWLC' */
 #define LABEL_LENGTH_MAX 256		/* Includes NULL char */
-#define INFO_DESC_PRIVATE -1      	/* default */
+#define INFO_DESC_PRIVATE (-1)      	/* default */
 #define INFO_DESC_EXPORT  0       	/* export info itself */
 
 /*
@@ -90,4 +91,4 @@ extern int labelcl_info_connectpt_set(struct devfs_entry *, struct devfs_entry *
 extern int labelcl_info_get_IDX(struct devfs_entry *, int, arbitrary_info_t *);
 extern struct devfs_entry *device_info_connectpt_get(struct devfs_entry *);
 
-#endif /* _ASM_SN_LABELCL_H */
+#endif /* _ASM_IA64_SN_LABELCL_H */

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,14 +31,13 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: jffs2.h,v 1.19 2001/10/09 13:20:23 dwmw2 Exp $
+ * $Id: jffs2.h,v 1.23 2002/02/21 17:03:45 dwmw2 Exp $
  *
  */
 
 #ifndef __LINUX_JFFS2_H__
 #define __LINUX_JFFS2_H__
 
-#include <asm/types.h>
 #define JFFS2_SUPER_MAGIC 0x72b6
 
 /* Values we may expect to find in the 'magic' field */
@@ -78,16 +77,12 @@
 #define JFFS2_NODETYPE_DIRENT (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 1)
 #define JFFS2_NODETYPE_INODE (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 2)
 #define JFFS2_NODETYPE_CLEANMARKER (JFFS2_FEATURE_RWCOMPAT_DELETE | JFFS2_NODE_ACCURATE | 3)
+#define JFFS2_NODETYPE_PADDING (JFFS2_FEATURE_RWCOMPAT_DELETE | JFFS2_NODE_ACCURATE | 4)
 
 // Maybe later...
 //#define JFFS2_NODETYPE_CHECKPOINT (JFFS2_FEATURE_RWCOMPAT_DELETE | JFFS2_NODE_ACCURATE | 3)
 //#define JFFS2_NODETYPE_OPTIONS (JFFS2_FEATURE_RWCOMPAT_COPY | JFFS2_NODE_ACCURATE | 4)
 
-/* Same as the non_ECC versions, but with extra space for real 
- * ECC instead of just the checksum. For use on NAND flash 
- */
-//#define JFFS2_NODETYPE_DIRENT_ECC (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 5)
-//#define JFFS2_NODETYPE_INODE_ECC (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 6)
 
 #define JFFS2_INO_FLAG_PREREAD	  1	/* Do read_inode() for this one at 
 					   mount time, don't wait for it to 
@@ -99,28 +94,28 @@
 struct jffs2_unknown_node
 {
 	/* All start like this */
-	__u16 magic;
-	__u16 nodetype;
-	__u32 totlen; /* So we can skip over nodes we don't grok */
-	__u32 hdr_crc;
+	uint16_t magic;
+	uint16_t nodetype;
+	uint32_t totlen; /* So we can skip over nodes we don't grok */
+	uint32_t hdr_crc;
 } __attribute__((packed));
 
 struct jffs2_raw_dirent
 {
-	__u16 magic;
-	__u16 nodetype;	/* == JFFS_NODETYPE_DIRENT */
-	__u32 totlen;
-	__u32 hdr_crc;
-	__u32 pino;
-	__u32 version;
-	__u32 ino; /* == zero for unlink */
-	__u32 mctime;
-	__u8 nsize;
-	__u8 type;
-	__u8 unused[2];
-	__u32 node_crc;
-	__u32 name_crc;
-	__u8 name[0];
+	uint16_t magic;
+	uint16_t nodetype;	/* == JFFS_NODETYPE_DIRENT */
+	uint32_t totlen;
+	uint32_t hdr_crc;
+	uint32_t pino;
+	uint32_t version;
+	uint32_t ino; /* == zero for unlink */
+	uint32_t mctime;
+	uint8_t nsize;
+	uint8_t type;
+	uint8_t unused[2];
+	uint32_t node_crc;
+	uint32_t name_crc;
+	uint8_t name[0];
 } __attribute__((packed));
 
 /* The JFFS2 raw inode structure: Used for storage on physical media.  */
@@ -131,28 +126,28 @@ struct jffs2_raw_dirent
 */
 struct jffs2_raw_inode
 {
-	__u16 magic;      /* A constant magic number.  */
-	__u16 nodetype;   /* == JFFS_NODETYPE_INODE */
-	__u32 totlen;     /* Total length of this node (inc data, etc.) */
-	__u32 hdr_crc;
-	__u32 ino;        /* Inode number.  */
-	__u32 version;    /* Version number.  */
-	__u32 mode;       /* The file's type or mode.  */
-	__u16 uid;        /* The file's owner.  */
-	__u16 gid;        /* The file's group.  */
-	__u32 isize;      /* Total resultant size of this inode (used for truncations)  */
-	__u32 atime;      /* Last access time.  */
-	__u32 mtime;      /* Last modification time.  */
-	__u32 ctime;      /* Change time.  */
-	__u32 offset;     /* Where to begin to write.  */
-	__u32 csize;      /* (Compressed) data size */
-	__u32 dsize;	  /* Size of the node's data. (after decompression) */
-	__u8 compr;       /* Compression algorithm used */
-	__u8 usercompr;	  /* Compression algorithm requested by the user */
-	__u16 flags;	  /* See JFFS2_INO_FLAG_* */
-	__u32 data_crc;   /* CRC for the (compressed) data.  */
-	__u32 node_crc;   /* CRC for the raw inode (excluding data)  */
-//	__u8 data[dsize];
+	uint16_t magic;      /* A constant magic number.  */
+	uint16_t nodetype;   /* == JFFS_NODETYPE_INODE */
+	uint32_t totlen;     /* Total length of this node (inc data, etc.) */
+	uint32_t hdr_crc;
+	uint32_t ino;        /* Inode number.  */
+	uint32_t version;    /* Version number.  */
+	uint32_t mode;       /* The file's type or mode.  */
+	uint16_t uid;        /* The file's owner.  */
+	uint16_t gid;        /* The file's group.  */
+	uint32_t isize;      /* Total resultant size of this inode (used for truncations)  */
+	uint32_t atime;      /* Last access time.  */
+	uint32_t mtime;      /* Last modification time.  */
+	uint32_t ctime;      /* Change time.  */
+	uint32_t offset;     /* Where to begin to write.  */
+	uint32_t csize;      /* (Compressed) data size */
+	uint32_t dsize;	     /* Size of the node's data. (after decompression) */
+	uint8_t compr;       /* Compression algorithm used */
+	uint8_t usercompr;   /* Compression algorithm requested by the user */
+	uint16_t flags;	     /* See JFFS2_INO_FLAG_* */
+	uint32_t data_crc;   /* CRC for the (compressed) data.  */
+	uint32_t node_crc;   /* CRC for the raw inode (excluding data)  */
+//	uint8_t data[dsize];
 } __attribute__((packed));
 
 union jffs2_node_union {

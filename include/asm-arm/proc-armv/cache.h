@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armv/cache.h
  *
- *  Copyright (C) 1999-2001 Russell King
+ *  Copyright (C) 1999-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -134,7 +134,8 @@ static __inline__ void flush_page_to_ram(struct page *page)
 #define clean_dcache_range(_s,_e)	cpu_dcache_clean_range((_s),(_e))
 #define flush_dcache_range(_s,_e)	cpu_cache_clean_invalidate_range((_s),(_e),0)
 
-#define mapping_mapped(map)	((map)->i_mmap || (map)->i_mmap_shared)
+#define mapping_mapped(map)	(!list_empty(&(map)->i_mmap) || \
+				 !list_empty(&(map)->i_mmap_shared))
 
 /*
  * flush_dcache_page is used when the kernel has written to the page
@@ -204,7 +205,7 @@ static inline void flush_icache_page(struct vm_area_struct *vma, struct page *pa
  *	TLB Management
  *	==============
  *
- *	The arch/arm/mm/tlb-*.S files implement this methods.
+ *	The arch/arm/mm/tlb-*.S files implement these methods.
  *
  *	The TLB specific code is expected to perform whatever tests it
  *	needs to determine if it should invalidate the TLB for each

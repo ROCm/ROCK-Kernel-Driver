@@ -18,7 +18,4 @@
 #define MY_PORT_ADDRESS(port,cardaddress) \
 	((cardaddress) + (port) * 8)
 
-#define INIT serial_card_dualsp_init
-#define EXIT serial_card_dualsp_exit
-
 #include "serial-card.c"

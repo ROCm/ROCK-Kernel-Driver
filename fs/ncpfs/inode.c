@@ -744,6 +744,7 @@ static struct file_system_type ncp_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"ncpfs",
 	get_sb:		ncp_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 static int __init init_ncp_fs(void)

@@ -1,21 +1,17 @@
-
-/* $Id: io.h,v 1.2 2000/02/02 16:35:57 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 2000 Ralf Baechle
- * Copyright (C) 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2000-2001 Silicon Graphics, Inc.
  */
-#ifndef _ASM_SN_IO_H
-#define _ASM_SN_IO_H
+#ifndef _ASM_IA64_SN_IO_H
+#define _ASM_IA64_SN_IO_H
 
 #include <linux/config.h>
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#include <asm/sn/sn1/addrs.h>
-#endif
+#include <asm/sn/addrs.h>
 
 /* Because we only have PCI I/O ports.  */
 #define IIO_ITTE_BASE	0x400160	/* base of translation table entries */
@@ -51,17 +47,35 @@
 #define IIO_ITTE_GET(nasid, bigwin) REMOTE_HUB_ADDR((nasid), IIO_ITTE(bigwin))
 
 /*
- * Macro which takes the widget number, and returns the 
+ * Macro which takes the widget number, and returns the
  * IO PRB address of that widget.
- * value _x is expected to be a widget number in the range 
+ * value _x is expected to be a widget number in the range
  * 0, 8 - 0xF
  */
 #define	IIO_IOPRB(_x)	(IIO_IOPRB_0 + ( ( (_x) < HUB_WIDGET_ID_MIN ? \
 			(_x) : \
 			(_x) - (HUB_WIDGET_ID_MIN-1)) << 3) )
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined(CONFIG_IA64_SGI_SN1)
+#include <asm/sn/sn1/bedrock.h>
 #include <asm/sn/sn1/hubio.h>
+#include <asm/sn/sn1/hubio_next.h>
+#include <asm/sn/sn1/hubmd.h>
+#include <asm/sn/sn1/hubmd_next.h>
+#include <asm/sn/sn1/hubpi.h>
+#include <asm/sn/sn1/hubpi_next.h>
+#include <asm/sn/sn1/hublb.h>
+#include <asm/sn/sn1/hublb_next.h>
+#include <asm/sn/sn1/hubni.h>
+#include <asm/sn/sn1/hubni_next.h>
+#include <asm/sn/sn1/hubxb.h>
+#include <asm/sn/sn1/hubxb_next.h>
+#include <asm/sn/sn1/hubstat.h>
+#include <asm/sn/sn1/hubdev.h>
+#include <asm/sn/sn1/synergy.h>
+#elif defined(CONFIG_IA64_SGI_SN2)
+#include <asm/sn/sn2/shub.h>
+#include <asm/sn/sn2/shubio.h>
 #endif
 
-#endif /* _ASM_SN_IO_H */
+#endif /* _ASM_IA64_SN_IO_H */

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000 Silicon Graphics, Inc.  All rights reserved
+ * Copyright (C) 2000-2001 Silicon Graphics, Inc.  All rights reserved
  *
  * This implemenation of synchronization variables is heavily based on
  * one done by Steve Lord <lord@sgi.com>
@@ -11,8 +11,8 @@
  * Paul Cassella <pwc@sgi.com>
  */
 
-#ifndef SV_H
-#define SV_H
+#ifndef _ASM_IA64_SN_SV_H
+#define _ASM_IA64_SN_SV_H
 
 #include <linux/spinlock.h>
 #include <asm/semaphore.h>
@@ -150,4 +150,4 @@ void sv_destroy(sv_t *sv);
 #undef _SV_ASSERT
 #endif
 
-#endif
+#endif /* _ASM_IA64_SN_SV_H */

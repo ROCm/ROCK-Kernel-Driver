@@ -13,6 +13,7 @@ struct dnotify_struct {
 						   see linux/fcntl.h */
 	int			dn_fd;
 	struct file *		dn_filp;
+	fl_owner_t		dn_owner;
 };
 
 #define DNOTIFY_MAGIC	0x444E4F54

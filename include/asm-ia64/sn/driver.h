@@ -4,11 +4,13 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_DRIVER_H
-#define _ASM_SN_DRIVER_H
+#ifndef _ASM_IA64_SN_DRIVER_H
+#define _ASM_IA64_SN_DRIVER_H
+
+#include <linux/devfs_fs_kernel.h>
+#include <asm/types.h>
 
 /*
 ** Interface for device driver handle management.
@@ -18,133 +20,77 @@
 */
 
 typedef struct device_driver_s *device_driver_t;
-#define DEVICE_DRIVER_NONE (device_driver_t)NULL
 
 /* == Driver thread priority support == */
 typedef int ilvl_t;
-/* default driver thread priority level */
-#define DRIVER_THREAD_PRI_DEFAULT	(ilvl_t)230
-/* invalid driver thread priority level */
-#define DRIVER_THREAD_PRI_INVALID	(ilvl_t)-1
 
-/* Associate a thread priority with a driver */
-extern int device_driver_thread_pri_set(device_driver_t driver,
-					ilvl_t pri);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* Get the thread priority associated with the driver */
-extern ilvl_t device_driver_thread_pri_get(device_driver_t driver);
+struct eframe_s;
+struct piomap;
+struct dmamap;
 
-/* Get the thread priority for a driver from the sysgen paramters */
-extern ilvl_t device_driver_sysgen_thread_pri_get(char *driver_prefix);
+typedef __psunsigned_t iobush_t;
 
-/* Initialize device driver functions. */
-extern void device_driver_init(void);
+/* interrupt function */
+typedef void	       *intr_arg_t;
+typedef void		intr_func_f(intr_arg_t);
+typedef intr_func_f    *intr_func_t;
 
+#define	INTR_ARG(n)	((intr_arg_t)(__psunsigned_t)(n))
 
-/* Allocate a driver handle */
-extern device_driver_t device_driver_alloc(char *prefix);
+/* system interrupt resource handle -- returned from intr_alloc */
+typedef struct intr_s *intr_t;
+#define INTR_HANDLE_NONE ((intr_t)0)
 
-
-/* Free a driver handle */
-extern void device_driver_free(device_driver_t driver);
-
-
-/* Given a device driver prefix, return a handle to the driver. */
-extern device_driver_t device_driver_get(char *prefix);
-
-/* Given a device, return a handle to the driver. */
-extern device_driver_t device_driver_getbydev(devfs_handle_t device);
-
-struct cdevsw;
-struct bdevsw;
-
-/* Associate a driver with bdevsw/cdevsw pointers. */
-extern int
-device_driver_devsw_put(device_driver_t driver,
-			struct bdevsw *my_bdevsw,
-			struct cdevsw *my_cdevsw);
-
-
-/* Given a driver, return the corresponding bdevsw and cdevsw pointers. */
-extern void
-device_driver_devsw_get(	device_driver_t driver, 
-				struct bdevsw **bdevswp,
-				struct cdevsw **cdevswp);
-
-/* Given a driver, return its name (prefix). */
-extern void device_driver_name_get(device_driver_t driver, char *buffer, int length);
+/*
+ * restore interrupt level value, returned from intr_block_level
+ * for use with intr_unblock_level.
+ */
+typedef void *rlvl_t;
 
 
 /* 
- * A descriptor for every static device driver in the system.
- * lboot creates a table of these and places in in master.c.
- * device_driver_init runs through this table during initialization
- * in order to "register" every static device driver.
+ * A basic, platform-independent description of I/O requirements for
+ * a device. This structure is usually formed by lboot based on information 
+ * in configuration files.  It contains information about PIO, DMA, and
+ * interrupt requirements for a specific instance of a device.
+ *
+ * The pio description is currently unused.
+ *
+ * The dma description describes bandwidth characteristics and bandwidth
+ * allocation requirements. (TBD)
+ *
+ * The Interrupt information describes the priority of interrupt, desired 
+ * destination, policy (TBD), whether this is an error interrupt, etc.  
+ * For now, interrupts are targeted to specific CPUs.
  */
-typedef struct static_device_driver_desc_s {
-	char 		*sdd_prefix;
-	struct bdevsw 	*sdd_bdevsw;
-	struct cdevsw 	*sdd_cdevsw;
-} *static_device_driver_desc_t;
 
-extern struct static_device_driver_desc_s static_device_driver_table[];
-extern int static_devsw_count;
+typedef struct device_desc_s {
+	/* pio description (currently none) */
 
+	/* dma description */
+	/* TBD: allocated badwidth requirements */
 
-/*====== administration support ========== */
-/* structure of each entry in the table created by lboot for
- * device / driver administration
-*/
-typedef struct dev_admin_info_s {
-	char	*dai_name;		/* name of the device or driver
-					 * prefix 
-					 */
-	char	*dai_param_name;	/* device or driver parameter name */
-	char	*dai_param_val;		/* value of the parameter */
-} dev_admin_info_t;
+	/* interrupt description */
+	devfs_handle_t	intr_target;	/* Hardware locator string */
+	int 		intr_policy;	/* TBD */
+	ilvl_t		intr_swlevel;	/* software level for blocking intr */
+	char		*intr_name;	/* name of interrupt, if any */
 
+	int		flags;
+} *device_desc_t;
 
-/* Update all the administrative hints associated with the device */
-extern void 	device_admin_info_update(devfs_handle_t	dev_vhdl);
+/* flag values */
+#define	D_INTR_ISERR	0x1		/* interrupt is for error handling */
+#define D_IS_ASSOC	0x2		/* descriptor is associated with a dev */
+#define D_INTR_NOTHREAD	0x4		/* Interrupt handler isn't threaded. */
 
-/* Update all the administrative hints associated with the device driver */
-extern void	device_driver_admin_info_update(device_driver_t	driver);
-
-/* Get a particular administrative hint associated with a device */
-extern char 	*device_admin_info_get(devfs_handle_t	dev_vhdl,
-				       char		*info_lbl);
-
-/* Associate a particular administrative hint for a device */
-extern int	device_admin_info_set(devfs_handle_t	dev_vhdl,
-				      char		*info_lbl,
-				      char		*info_val);
-
-/* Get a particular administrative hint associated with a device driver*/
-extern char 	*device_driver_admin_info_get(char	*driver_prefix,	
-					      char	*info_name);
-
-/* Associate a particular administrative hint for a device driver*/
-extern int	device_driver_admin_info_set(char	*driver_prefix,
-					     char	*driver_info_lbl,
-					     char	*driver_info_val);
-
-/* Initialize the extended device administrative hint table */
-extern void	device_admin_table_init(void);
-
-/* Add a hint corresponding to a device to the extended device administrative
- * hint table.
- */
-extern void	device_admin_table_update(char *dev_name,
-					  char *param_name,
-					  char *param_val);
-
-/* Initialize the extended device driver administrative hint table */
-extern void	device_driver_admin_table_init(void);
-
-/* Add a hint corresponding to a device to the extended device driver 
- * administrative hint table.
- */
-extern void	device_driver_admin_table_update(char *drv_prefix,
-						 char *param_name,
-						 char *param_val);	
-#endif /* _ASM_SN_DRIVER_H */
+#define INTR_SWLEVEL_NOTHREAD_DEFAULT 	0	/* Default
+						 * Interrupt level in case of
+						 * non-threaded interrupt 
+						 * handlers
+						 */
+#endif /* _ASM_IA64_SN_DRIVER_H */

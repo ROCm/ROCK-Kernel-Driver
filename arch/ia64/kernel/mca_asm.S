@@ -7,6 +7,12 @@
 // 00/03/29 cfleck Added code to save INIT handoff state in pt_regs format, switch to temp
 //		   kstack, switch modes, jump to C INIT handler
 //
+// 02/01/04 J.Hall <jenna.s.hall@intel.com>
+//		   Before entering virtual mode code:
+//		   1. Check for TLB CPU error
+//		   2. Restore current thread pointer to kr6
+//		   3. Move stack ptr 16 bytes to conform to C calling convention
+//
 #include <linux/config.h>
 
 #include <asm/asmmacro.h>
@@ -21,10 +27,21 @@
  */
 #define	MINSTATE_PHYS	/* Make sure stack access is physical for MINSTATE */
 
+/*
+ * Needed for ia64_sal call
+ */
+#define SAL_GET_STATE_INFO      0x01000001
+
+/*
+ * Needed for return context to SAL
+ */
+#define IA64_MCA_SAME_CONTEXT	0x0
+#define IA64_MCA_COLD_BOOT	-2
+
 #include "minstate.h"
 
 /*
- *  SAL_TO_OS_MCA_HANDOFF_STATE (SAL 3.0 spec)
+ * SAL_TO_OS_MCA_HANDOFF_STATE (SAL 3.0 spec)
  *		1. GR1 = OS GP
  *		2. GR8 = PAL_PROC physical address
  *		3. GR9 = SAL_PROC physical address
@@ -40,26 +57,34 @@
 	st8	[_tmp]=r9,0x08;;			\
 	st8	[_tmp]=r10,0x08;;			\
 	st8	[_tmp]=r11,0x08;;			\
-	st8	[_tmp]=r12,0x08;;
+	st8	[_tmp]=r12,0x08
 
 /*
- *  OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
- *      1. GR8 = OS_MCA return status
+ * OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
+ * (p6) is executed if we never entered virtual mode (TLB error)
+ * (p7) is executed if we entered virtual mode as expected (normal case)
+ *	1. GR8 = OS_MCA return status
  *	2. GR9 = SAL GP (physical)
- *      3. GR10 = 0/1 returning same/new context
- *      4. GR22 = New min state save area pointer
- *      returns ptr to SAL rtn save loc in _tmp
+ *	3. GR10 = 0/1 returning same/new context
+ *	4. GR22 = New min state save area pointer
+ *	returns ptr to SAL rtn save loc in _tmp
  */
-#define OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(_tmp)				\
-	movl	_tmp=ia64_os_to_sal_handoff_state;;				\
-	DATA_VA_TO_PA(_tmp);;							\
-	ld8	r8=[_tmp],0x08;;						\
-	ld8	r9=[_tmp],0x08;;						\
-	ld8     r10=[_tmp],0x08;;						\
-	ld8     r22=[_tmp],0x08;;						\
-	movl    _tmp=ia64_sal_to_os_handoff_state;;				\
-	DATA_VA_TO_PA(_tmp);;							\
-	add     _tmp=0x28,_tmp;;            // point to SAL rtn save location
+#define OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(_tmp)	\
+(p6)	movl	_tmp=ia64_sal_to_os_handoff_state;;	\
+(p7)	movl	_tmp=ia64_os_to_sal_handoff_state;;	\
+	DATA_VA_TO_PA(_tmp);;				\
+(p6)	movl	r8=IA64_MCA_COLD_BOOT;			\
+(p6)	movl	r10=IA64_MCA_SAME_CONTEXT;		\
+(p6)	add     _tmp=0x18,_tmp;;			\
+(p6)	ld8	r9=[_tmp],0x10;				\
+(p6)	movl	r22=ia64_mca_min_state_save_info;;	\
+(p7)	ld8	r8=[_tmp],0x08;;			\
+(p7)	ld8	r9=[_tmp],0x08;;			\
+(p7)	ld8     r10=[_tmp],0x08;;			\
+(p7)	ld8     r22=[_tmp],0x08;;			\
+	DATA_VA_TO_PA(r22)
+	// now _tmp is pointing to SAL rtn save location
+
 
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
@@ -70,6 +95,9 @@
 	.global	ia64_mca_stackframe
 	.global	ia64_mca_bspstore
 	.global ia64_init_stack
+	.global ia64_mca_sal_data_area
+	.global ia64_tlb_functional
+	.global ia64_mca_min_state_save_info
 
 	.text
 	.align 16
@@ -90,26 +118,34 @@ ia64_os_mca_dispatch:
 	//	  for ia64_mca_sal_to_os_state_t has been
 	//	  defined in include/asm/mca.h
 	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
+	;;
 
 	// LOG PROCESSOR STATE INFO FROM HERE ON..
-	;;
 begin_os_mca_dump:
 	br	ia64_os_mca_proc_state_dump;;
 
 ia64_os_mca_done_dump:
 
 	// Setup new stack frame for OS_MCA handling
-	movl    r2=ia64_mca_bspstore;;      // local bspstore area location in r2
+	movl	r2=ia64_mca_bspstore;;	// local bspstore area location in r2
 	DATA_VA_TO_PA(r2);;
-	movl    r3=ia64_mca_stackframe;;    // save stack frame to memory in r3
+	movl	r3=ia64_mca_stackframe;; // save stack frame to memory in r3
 	DATA_VA_TO_PA(r3);;
-	rse_switch_context(r6,r3,r2);;                  // RSC management in this new context
-	movl        r12=ia64_mca_stack;;
-	mov     r2=8*1024;;                 // stack size must be same as c array
-	add     r12=r2,r12;;                // stack base @ bottom of array
+	rse_switch_context(r6,r3,r2);;	// RSC management in this new context
+	movl	r12=ia64_mca_stack
+	mov	r2=8*1024;;		// stack size must be same as C array
+	add	r12=r2,r12;;		// stack base @ bottom of array
+	adds	r12=-16,r12;;		// allow 16 bytes of scratch
+					// (C calling convention)
 	DATA_VA_TO_PA(r12);;
 
-	// Enter virtual mode from physical mode
+	// Check to see if the MCA resulted from a TLB error
+begin_tlb_error_check:
+        br      ia64_os_mca_tlb_error_check;;
+
+done_tlb_error_check:
+
+        // If TLB is functional, enter virtual mode from physical mode
 	VIRTUAL_MODE_ENTER(r2, r3, ia64_os_mca_virtual_begin, r4)
 ia64_os_mca_virtual_begin:
 
@@ -130,25 +166,28 @@ ia64_os_mca_virtual_end:
 #endif	/* #if defined(MCA_TEST) */
 
 	// restore the original stack frame here
-	movl    r2=ia64_mca_stackframe               // restore stack frame from memory at r2
+	movl    r2=ia64_mca_stackframe	// restore stack frame from memory at r2
 	;;
 	DATA_VA_TO_PA(r2)
 	movl    r4=IA64_PSR_MC
 	;;
-	rse_return_context(r4,r3,r2)                 // switch from interrupt context for RSE
+	rse_return_context(r4,r3,r2)	// switch from interrupt context for RSE
 
 	// let us restore all the registers from our PSI structure
-	mov		r8=gp
+	mov	r8=gp
 	;;
 begin_os_mca_restore:
 	br	ia64_os_mca_proc_state_restore;;
 
 ia64_os_mca_done_restore:
-	;;
+	movl	r3=ia64_tlb_functional;;
+	DATA_VA_TO_PA(r3);;
+	ld8	r3=[r3];;
+	cmp.eq	p6,p7=r0,r3;;
+	OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(r2);;
 	// branch back to SALE_CHECK
-	OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(r2)
 	ld8		r3=[r2];;
-	mov		b0=r3;;			      // SAL_CHECK return address
+	mov		b0=r3;;		// SAL_CHECK return address
 	br		b0
 	;;
 ia64_os_mca_dispatch_end:
@@ -405,7 +444,7 @@ ia64_os_mca_proc_state_restore:
 	movl		r2=ia64_mca_proc_state_dump	// Convert virtual address
 	;;						// of OS state dump area
 	DATA_VA_TO_PA(r2)				// to physical address
-	;;
+
 restore_GRs:                                    // restore bank-1 GRs 16-31
 	bsw.1;;
 	add		r3=16*8,r2;;                // to get to NaT of GR 16-31
@@ -621,6 +660,80 @@ end_os_mca_restore:
 
 //EndStub//////////////////////////////////////////////////////////////////////
 
+//++
+// Name:
+//	ia64_os_mca_tlb_error_check()
+//
+// Stub Description:
+//
+//	This stub checks to see if the MCA resulted from a TLB error
+//
+//--
+
+ia64_os_mca_tlb_error_check:
+
+	// Retrieve sal data structure for uncorrected MCA
+
+	// Make the ia64_sal_get_state_info() call
+	movl	r4=ia64_mca_sal_data_area;;
+	movl	r7=ia64_sal;;
+	mov	r6=r1			// save gp
+	DATA_VA_TO_PA(r4)		// convert to physical address
+	DATA_VA_TO_PA(r7);;		// convert to physical address
+	ld8	r7=[r7]			// get addr of pdesc from ia64_sal
+	movl	r3=SAL_GET_STATE_INFO;;
+	DATA_VA_TO_PA(r7);;		// convert to physical address
+	ld8	r8=[r7],8;;		// get pdesc function pointer
+	DATA_VA_TO_PA(r8)		// convert to physical address
+	ld8	r1=[r7];;		// set new (ia64_sal) gp
+	DATA_VA_TO_PA(r1)		// convert to physical address
+	mov	b6=r8
+
+	alloc	r5=ar.pfs,8,0,8,0;;	// allocate stack frame for SAL call
+	mov	out0=r3			// which SAL proc to call
+	mov	out1=r0			// error type == MCA
+	mov	out2=r0			// null arg
+	mov	out3=r4			// data copy area
+	mov	out4=r0			// null arg
+	mov	out5=r0			// null arg
+	mov	out6=r0			// null arg
+	mov	out7=r0;;		// null arg
+
+	br.call.sptk.few	b0=b6;;
+
+	mov	r1=r6			// restore gp
+	mov	ar.pfs=r5;;		// restore ar.pfs
+
+	movl	r6=ia64_tlb_functional;;
+	DATA_VA_TO_PA(r6)		// needed later
+
+	cmp.eq	p6,p7=r0,r8;;		// check SAL call return address
+(p7)	st8	[r6]=r0			// clear tlb_functional flag
+(p7)    br	tlb_failure		// error; return to SAL
+
+	// examine processor error log for type of error
+	add	r4=40+24,r4;;		// parse past record header (length=40)
+					// and section header (length=24)
+	ld4	r4=[r4]			// get valid field of processor log
+	mov	r5=0xf00;;
+	and	r5=r4,r5;;		// read bits 8-11 of valid field
+					// to determine if we have a TLB error
+	movl	r3=0x1
+	cmp.eq	p6,p7=r0,r5;;
+	// if no TLB failure, set tlb_functional flag
+(p6)	st8	[r6]=r3
+	// else clear flag
+(p7)	st8	[r6]=r0
+
+	// if no TLB failure, continue with normal virtual mode logging
+(p6)    br	done_tlb_error_check
+	// else no point in entering virtual mode for logging
+tlb_failure:
+	br      ia64_os_mca_virtual_end
+
+//EndStub//////////////////////////////////////////////////////////////////////
+
+
 // ok, the issue here is that we need to save state information so
 // it can be useable by the kernel debugger and show regs routines.
 // In order to do this, our best bet is save the current state (plus
@@ -633,7 +746,7 @@ end_os_mca_restore:
 // This has been defined for registration purposes with SAL
 // as a part of ia64_mca_init.
 //
-// When we get here, the follow registers have been
+// When we get here, the following registers have been
 // set by the SAL for our use
 //
 //		1. GR1 = OS INIT GP
@@ -649,42 +762,10 @@ end_os_mca_restore:
 
 
 GLOBAL_ENTRY(ia64_monarch_init_handler)
-#if defined(CONFIG_SMP) && defined(SAL_MPINIT_WORKAROUND)
-	//
-	// work around SAL bug that sends all processors to monarch entry
-	//
-	mov	r17=cr.lid
-	// XXX fix me: this is wrong: hard_smp_processor_id() is a pair of lid/eid
-	movl	r18=ia64_cpu_to_sapicid
-	;;
-	dep	r18=0,r18,61,3		// convert to physical address
-	;;
-	shr.u	r17=r17,16
-	ld4	r18=[r18]		// get the BSP ID
-	;;
-	dep	r17=0,r17,16,48
-	;;
-	cmp4.ne	p6,p0=r17,r18		// Am I the BSP ?
-(p6)	br.cond.spnt slave_init_spin_me
-	;;
-#endif
 
-
-//
-// ok, the first thing we do is stash the information
-// the SAL passed to os
-//
-_tmp = r2
-	movl	_tmp=ia64_sal_to_os_handoff_state
+	// stash the information the SAL passed to os
+	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
 	;;
-	dep	_tmp=0,_tmp, 61, 3	// get physical address
-	;;
-	st8	[_tmp]=r1,0x08;;
-	st8	[_tmp]=r8,0x08;;
-	st8	[_tmp]=r9,0x08;;
-	st8	[_tmp]=r10,0x08;;
-	st8	[_tmp]=r11,0x08;;
-	st8	[_tmp]=r12,0x08;;
 
 // now we want to save information so we can dump registers
 	SAVE_MIN_WITH_COVER
@@ -695,12 +776,10 @@ _tmp = r2
 	;;
 	SAVE_REST
 
-// ok, enough should be saved at this point to be dangerous, and  supply
+// ok, enough should be saved at this point to be dangerous, and supply
 // information for a dump
 // We need to switch to Virtual mode before hitting the C functions.
-//
-//
-//
+
 	movl	r2=IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN
 	mov	r3=psr	// get the current psr, minimum enabled at this point
 	;;
@@ -708,8 +787,8 @@ _tmp = r2
 	;;
 	movl	r3=IVirtual_Switch
 	;;
-	mov	cr.iip=r3		// short return to set the appropriate bits
-	mov	cr.ipsr=r2		// need to do an rfi to set appropriate bits
+	mov	cr.iip=r3	// short return to set the appropriate bits
+	mov	cr.ipsr=r2	// need to do an rfi to set appropriate bits
 	;;
 	rfi
 	;;
@@ -717,7 +796,7 @@ IVirtual_Switch:
 	//
 	// We should now be running virtual
 	//
-	// Lets call the C handler to get the rest of the state info
+	// Let's call the C handler to get the rest of the state info
 	//
 	alloc r14=ar.pfs,0,0,1,0		// now it's safe (must be first in insn group!)
 	;;					//

@@ -6,16 +6,17 @@
  *
  * Derived from IRIX <sys/SN/gda.h>.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  *
  * gda.h -- Contains the data structure for the global data area,
  * 	The GDA contains information communicated between the
  *	PROM, SYMMON, and the kernel. 
  */
-#ifndef _ASM_SN_GDA_H
-#define _ASM_SN_GDA_H
+#ifndef _ASM_IA64_SN_GDA_H
+#define _ASM_IA64_SN_GDA_H
 
 #include <asm/sn/addrs.h>
+#include <asm/sn/sn_cpuid.h>
 
 #define GDA_MAGIC	0x58464552
 
@@ -42,7 +43,7 @@
 #define G_PARTIDOFF	40
 #define G_TABLEOFF	128
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef struct gda {
 	u32	g_magic;	/* GDA magic number */
@@ -68,7 +69,7 @@ typedef struct gda {
 
 #define GDA ((gda_t*) GDA_ADDR(get_nasid()))
 
-#endif /* __LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 /*
  * Define:	PART_GDA_VERSION
  * Purpose:	Define the minimum version of the GDA required, lower 
@@ -105,4 +106,4 @@ typedef struct gda {
 #define PROMOP_BIST1		0x0800		/* keep track of which BIST ran */
 #define PROMOP_BIST2		0x1000		/* keep track of which BIST ran */
 
-#endif /* _ASM_SN_GDA_H */
+#endif /* _ASM_IA64_SN_GDA_H */

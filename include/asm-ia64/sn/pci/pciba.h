@@ -1,24 +1,33 @@
-/* $Id$
+/* 
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License.  See the file "COPYING" in the main directory of
+ * this archive for more details.
  *
- * This file is subject to the terms and conditions of the GNU General Public
- * License.  See the file "COPYING" in the main directory of this archive
- * for more details.
+ * Copyright (C) 1997, 2001 Silicon Graphics, Inc. All rights reserved.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
  */
+
 #ifndef _ASM_SN_PCI_PCIBA_H
 #define _ASM_SN_PCI_PCIBA_H
 
-/*
- * These are all the HACKS from ioccom.h ..
- */
-#define IOCPARM_MASK    0xff            /* parameters must be < 256 bytes */
-#define IOC_VOID        0x20000000      /* no parameters */
+#include <linux/ioctl.h>
+#include <linux/types.h>
+#include <linux/pci.h>
 
-/*
- * The above needs to be modified and follow LINUX ...
- */
+/* for application compatibility with IRIX (why do I bother?) */
+
+#ifndef __KERNEL__
+typedef u_int8_t uint8_t;
+typedef u_int16_t uint16_t;
+typedef u_int32_t uint32_t;
+#endif
+
+#define PCI_CFG_VENDOR_ID	PCI_VENDOR_ID
+#define PCI_CFG_COMMAND		PCI_COMMAND
+#define PCI_CFG_REV_ID		PCI_REVISION_ID
+#define PCI_CFG_HEADER_TYPE	PCI_HEADER_TYPE
+#define PCI_CFG_BASE_ADDR(n)	PCI_BASE_ADDRESS_##n
+
 
 /* /hw/.../pci/[slot]/config accepts ioctls to read
  * and write specific registers as follows:
@@ -69,18 +78,11 @@
 /* PCIIOCGETBASE(n): arg is ptr to a 32-bit int,
  * which will get the value of the BASE<n> register.
  */
+
+/* FIXME chadt: this doesn't tell me whether or not this will work
+   with non-constant 'n.'  */
 #define	PCIIOCGETBASE(n)	PCIIOCCFGRD(uint32_t,PCI_CFG_BASE_ADDR(n))
 
-/* /hw/.../pci/[slot]/intr accepts an ioctl to
- * set up user level interrupt handling as follows:
- *
- * "n" is a bitmap of which of the four PCI interrupt
- * lines are of interest, using PCIIO_INTR_LINE_[ABCD].
- */
-#define	PCIIOCSETULI(n)		_IOWR(1,n,struct uliargs)
-#if _KERNEL
-#define PCIIOCSETULI32(n)	_IOWR(1,n,struct uliargs32)
-#endif
 
 /* /hw/.../pci/[slot]/dma accepts ioctls to allocate
  * and free physical memory for use in user-triggered
@@ -93,11 +95,20 @@
  * both the size of the request and the flag values
  * to be used in setting up the DMA.
  *
+
+FIXME chadt: gonna have to revisit this: what flags would an IRIXer like to
+ have available?
+
  * Any flags normally useful in pciio_dmamap
- * or pciio_dmatrans function calls can6 be used here.
- */
+ * or pciio_dmatrans function calls can6 be used here.  */
 #define	PCIIOCDMAALLOC_REQUEST_PACK(flags,size)		\
 	((((uint64_t)(flags))<<32)|			\
 	 (((uint64_t)(size))&0xFFFFFFFF))
+
+
+#ifdef __KERNEL__
+extern int pciba_init(void);
+#endif
+
 
 #endif	/* _ASM_SN_PCI_PCIBA_H */
