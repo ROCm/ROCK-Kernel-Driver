@@ -96,12 +96,7 @@ unsigned long scsi_pid;
 Scsi_Cmnd *last_cmnd;
 static unsigned long serial_number;
 
-struct softscsi_data {
-	Scsi_Cmnd *head;
-	Scsi_Cmnd *tail;
-};
-
-static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
+static struct list_head done_q[NR_CPUS] __cacheline_aligned;
 
 /*
  * List of all highlevel drivers.
@@ -637,79 +632,60 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 }
 
 /**
- * scsi_done - Mark this command as done
- * @SCpnt: The SCSI Command which we think we've completed.
+ * scsi_done - Enqueue the finished SCSI command into the done queue.
+ * @cmd: The SCSI Command for which a low-level device driver (LLDD) gives
+ * ownership back to SCSI Core -- i.e. the LLDD has finished with it.
  *
- * This function is the mid-level interrupt routine, which decides how
- * to handle error conditions.  Each invocation of this function must
- * do one and *only* one of the following:
+ * This function is the mid-level's (SCSI Core) interrupt routine, which
+ * regains ownership of the SCSI command (de facto) from a LLDD, and enqueues
+ * the command to the done queue for further processing.
  *
- *      1) Insert command in BH queue.
- *      2) Activate error handler for host.
+ * This is the producer of the done queue who enqueues at the tail.
  *
- * There is no longer a problem with stack overflow.  Interrupts queue
- * Scsi_Cmnd on a per-CPU queue and the softirq handler removes them
- * from the queue one at a time.
- *
- * This function is sometimes called from interrupt context, but sometimes
- * from task context.
+ * This function is interrupt context safe.
  */
-void scsi_done(Scsi_Cmnd * SCpnt)
+void scsi_done(struct scsi_cmnd *cmd)
 {
+	int cpu;
 	unsigned long flags;
-	int cpu, tstatus;
-	struct softscsi_data *queue;
+	struct list_head *pdone_q;
 
 	/*
 	 * We don't have to worry about this one timing out any more.
-	 */
-	tstatus = scsi_delete_timer(SCpnt);
-
-	/*
-	 * If we are unable to remove the timer, it means that the command
-	 * has already timed out.  In this case, we have no choice but to
+	 * If we are unable to remove the timer, then the command
+	 * has already timed out.  In which case, we have no choice but to
 	 * let the timeout function run, as we have no idea where in fact
 	 * that function could really be.  It might be on another processor,
 	 * etc, etc.
 	 */
-	if (!tstatus) {
+	if (!scsi_delete_timer(cmd))
 		return;
-	}
 
 	/* Set the serial numbers back to zero */
-	SCpnt->serial_number = 0;
-	SCpnt->serial_number_at_timeout = 0;
-	SCpnt->state = SCSI_STATE_BHQUEUE;
-	SCpnt->owner = SCSI_OWNER_BH_HANDLER;
-	SCpnt->bh_next = NULL;
+	cmd->serial_number = 0;
+	cmd->serial_number_at_timeout = 0;
+	cmd->state = SCSI_STATE_BHQUEUE;
+	cmd->owner = SCSI_OWNER_BH_HANDLER;
 
 	/*
-	 * Next, put this command in the softirq queue.
-	 *
-	 * This is a per-CPU queue, so we just disable local interrupts
+	 * Next, enqueue the command into the done queue.
+	 * It is a per-CPU queue, so we just disable local interrupts
 	 * and need no spinlock.
 	 */
-
 	local_irq_save(flags);
 
 	cpu = smp_processor_id();
-	queue = &softscsi_data[cpu];
-
-	if (!queue->head) {
-		queue->head = SCpnt;
-		queue->tail = SCpnt;
-	} else {
-		queue->tail->bh_next = SCpnt;
-		queue->tail = SCpnt;
-	}
-
+	pdone_q = &done_q[cpu];
+	list_add_tail(&cmd->eh_entry, pdone_q);
 	cpu_raise_softirq(cpu, SCSI_SOFTIRQ);
 
 	local_irq_restore(flags);
 }
 
 /**
- * scsi_softirq - Perform post-interrupt handling for completed commands
+ * scsi_softirq - Perform post-interrupt processing of finished SCSI commands.
+ *
+ * This is the consumer of the done queue.
  *
  * This is called with all interrupts enabled.  This should reduce
  * interrupt latency, stack depth, and reentrancy of the low-level
@@ -717,88 +693,92 @@ void scsi_done(Scsi_Cmnd * SCpnt)
  */
 static void scsi_softirq(struct softirq_action *h)
 {
-	int cpu = smp_processor_id();
-	struct softscsi_data *queue = &softscsi_data[cpu];
+	LIST_HEAD(local_q);
 
-	while (queue->head) {
-		Scsi_Cmnd *SCpnt, *SCnext;
+	local_irq_disable();
+	list_splice_init(&done_q[smp_processor_id()], &local_q);
+	local_irq_enable();
 
-		local_irq_disable();
-		SCpnt = queue->head;
-		queue->head = NULL;
-		local_irq_enable();
+	while (!list_empty(&local_q)) {
+		struct scsi_cmnd *cmd = list_entry(local_q.next,
+						   struct scsi_cmnd, eh_entry);
+		list_del_init(&cmd->eh_entry);
 
-		for (; SCpnt; SCpnt = SCnext) {
-			SCnext = SCpnt->bh_next;
+		switch (scsi_decide_disposition(cmd)) {
+		case SUCCESS:
+			/*
+			 * Add to BH queue.
+			 */
+			SCSI_LOG_MLCOMPLETE(3,
+					    printk("Command finished %d %d "
+						   "0x%x\n",
+					   cmd->device->host->host_busy,
+					   cmd->device->host->host_failed,
+						   cmd->result));
 
-			switch (scsi_decide_disposition(SCpnt)) {
-			case SUCCESS:
+			scsi_finish_command(cmd);
+			break;
+		case NEEDS_RETRY:
+			/*
+			 * We only come in here if we want to retry a
+			 * command.  The test to see whether the
+			 * command should be retried should be keeping
+			 * track of the number of tries, so we don't
+			 * end up looping, of course.
+			 */
+			SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry "
+						      "%d %d 0x%x\n",
+					      cmd->device->host->host_busy,
+					      cmd->device->host->host_failed,
+						      cmd->result));
+
+			scsi_retry_command(cmd);
+			break;
+		case ADD_TO_MLQUEUE:
+			/* 
+			 * This typically happens for a QUEUE_FULL
+			 * message - typically only when the queue
+			 * depth is only approximate for a given
+			 * device.  Adding a command to the queue for
+			 * the device will prevent further commands
+			 * from being sent to the device, so we
+			 * shouldn't end up with tons of things being
+			 * sent down that shouldn't be.
+			 */
+			SCSI_LOG_MLCOMPLETE(3, printk("Command rejected as "
+						      "device queue full, "
+						      "put on ml queue %p\n",
+						      cmd));
+			scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
+			break;
+		default:
+			/*
+			 * Here we have a fatal error of some sort.
+			 * Turn it over to the error handler.
+			 */
+			SCSI_LOG_MLCOMPLETE(3,
+					    printk("Command failed %p %x "
+						   "busy=%d failed=%d\n",
+						   cmd, cmd->result,
+					   cmd->device->host->host_busy,
+					   cmd->device->host->host_failed));
+
+			/*
+			 * Dump the sense information too.
+			 */
+			if ((status_byte(cmd->result)&CHECK_CONDITION) != 0) {
+				SCSI_LOG_MLCOMPLETE(3, print_sense("bh", cmd));
+			}
+
+			if (!scsi_eh_scmd_add(cmd, 0)) {
 				/*
-				 * Add to BH queue.
+				 * We only get here if the error
+				 * recovery thread has died.
 				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command finished %d %d 0x%x\n", SCpnt->device->host->host_busy,
-						SCpnt->device->host->host_failed,
-							 SCpnt->result));
-
-				scsi_finish_command(SCpnt);
-				break;
-			case NEEDS_RETRY:
-				/*
-				 * We only come in here if we want to retry a
-				 * command.  The test to see whether the
-				 * command should be retried should be keeping
-				 * track of the number of tries, so we don't
-				 * end up looping, of course.
-				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry %d %d 0x%x\n", SCpnt->device->host->host_busy,
-				SCpnt->device->host->host_failed, SCpnt->result));
-
-				scsi_retry_command(SCpnt);
-				break;
-			case ADD_TO_MLQUEUE:
-				/* 
-				 * This typically happens for a QUEUE_FULL
-				 * message - typically only when the queue
-				 * depth is only approximate for a given
-				 * device.  Adding a command to the queue for
-				 * the device will prevent further commands
-				 * from being sent to the device, so we
-				 * shouldn't end up with tons of things being
-				 * sent down that shouldn't be.
-				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command rejected as device queue full, put on ml queue %p\n",
-                                                              SCpnt));
-				scsi_queue_insert(SCpnt, SCSI_MLQUEUE_DEVICE_BUSY);
-				break;
-			default:
-				/*
-				 * Here we have a fatal error of some sort.
-				 * Turn it over to the error handler.
-				 */
-				SCSI_LOG_MLCOMPLETE(3,
-					printk("Command failed %p %x busy=%d failed=%d\n",
-						SCpnt, SCpnt->result,
-						SCpnt->device->host->host_busy,
-						SCpnt->device->host->host_failed));
-
-				/*
-				 * Dump the sense information too.
-				 */
-				if ((status_byte(SCpnt->result) & CHECK_CONDITION) != 0) {
-					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
-				}
-
-				if (!scsi_eh_scmd_add(SCpnt, 0))
-				{
-					/*
-					 * We only get here if the error
-					 * recovery thread has died.
-					 */
-					scsi_finish_command(SCpnt);
-				}
-			}	/* switch */
-		}		/* for(; SCpnt...) */
-	}			/* while(queue->head) */
+				scsi_finish_command(cmd);
+			}
+		}
+	}
 }
 
 /*
@@ -1481,7 +1461,7 @@ __setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
 
 static int __init init_scsi(void)
 {
-	int error;
+	int error, i;
 
 	error = scsi_init_queue();
 	if (error)
@@ -1495,6 +1475,9 @@ static int __init init_scsi(void)
 	error = scsi_sysfs_register();
 	if (error)
 		goto cleanup_devlist;
+
+	for (i = 0; i < NR_CPUS; i++)
+		INIT_LIST_HEAD(&done_q[i]);
 
 	scsi_host_init();
 	devfs_mk_dir(NULL, "scsi", NULL);
