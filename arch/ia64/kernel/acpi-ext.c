@@ -84,7 +84,6 @@ hp_acpi_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
 	acpi_status status;
 	u8 *data;
 	u32 length;
-	int i;
 
 	status = acpi_find_vendor_resource(obj, &hp_ccsr_descriptor, &data, &length);
 

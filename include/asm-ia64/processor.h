@@ -17,7 +17,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
-#include <asm/types.h>
+#include <asm/ustack.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -87,9 +87,9 @@
 #include <linux/cache.h>
 #include <linux/compiler.h>
 #include <linux/threads.h>
+#include <linux/types.h>
 
 #include <asm/fpu.h>
-#include <asm/offsets.h>
 #include <asm/page.h>
 #include <asm/percpu.h>
 #include <asm/rse.h>
@@ -236,6 +236,7 @@ struct thread_struct {
 	__u64 ksp;			/* kernel stack pointer */
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
+	__u64 rbs_bot;			/* the base address for the RBS */
 	int last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -244,8 +245,6 @@ struct thread_struct {
 	__u64 fcr;			/* IA32 floating pt control reg */
 	__u64 fir;			/* IA32 fp except. instr. reg */
 	__u64 fdr;			/* IA32 fp except. data reg */
-	__u64 csd;			/* IA32 code selector descriptor */
-	__u64 ssd;			/* IA32 stack selector descriptor */
 	__u64 old_k1;			/* old value of ar.k1 */
 	__u64 old_iob;			/* old IOBase value */
 # define INIT_THREAD_IA32	.eflag =	0,			\
@@ -253,28 +252,20 @@ struct thread_struct {
 				.fcr =		0x17800000037fULL,	\
 				.fir =		0,			\
 				.fdr =		0,			\
-				.csd =		0,			\
-				.ssd =		0,			\
 				.old_k1 =	0,			\
 				.old_iob =	0,
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
 #ifdef CONFIG_PERFMON
-	__u64 pmc[IA64_NUM_PMC_REGS];
-	__u64 pmd[IA64_NUM_PMD_REGS];
-	unsigned long pfm_ovfl_block_reset;/* non-zero if we need to block or reset regs on ovfl */
-	void *pfm_context;		/* pointer to detailed PMU context */
-	atomic_t pfm_notifiers_check;	/* when >0, will cleanup ctx_notify_task in tasklist */
-	atomic_t pfm_owners_check;	/* when >0, will cleanup ctx_owner in tasklist */
-	void *pfm_smpl_buf_list;	/* list of sampling buffers to vfree */
-# define INIT_THREAD_PM		.pmc =			{0, },	\
-				.pmd =			{0, },	\
-				.pfm_ovfl_block_reset =	0,	\
-				.pfm_context =		NULL,	\
-				.pfm_notifiers_check =	{ 0 },	\
-				.pfm_owners_check =	{ 0 },	\
-				.pfm_smpl_buf_list =	NULL,
+	__u64 pmcs[IA64_NUM_PMC_REGS];
+	__u64 pmds[IA64_NUM_PMD_REGS];
+	void *pfm_context;		     /* pointer to detailed PMU context */
+	unsigned long pfm_needs_checking;    /* when >0, pending perfmon work on kernel exit */
+# define INIT_THREAD_PM		.pmcs =			{0UL, },  \
+				.pmds =			{0UL, },  \
+				.pfm_context =		NULL,     \
+				.pfm_needs_checking =	0UL,
 #else
 # define INIT_THREAD_PM
 #endif
@@ -288,8 +279,9 @@ struct thread_struct {
 	.on_ustack =	0,			\
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
+	.rbs_bot =	DEFAULT_USER_STACK_SIZE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\
-	.last_fph_cpu =  0,			\
+	.last_fph_cpu =  -1,			\
 	INIT_THREAD_IA32			\
 	INIT_THREAD_PM				\
 	.dbr =		{0, },			\
@@ -304,36 +296,18 @@ struct thread_struct {
 	regs->cr_iip = new_ip;									\
 	regs->ar_rsc = 0xf;		/* eager mode, privilege level 3 */			\
 	regs->ar_rnat = 0;									\
-	regs->ar_bspstore = IA64_RBS_BOT;							\
+	regs->ar_bspstore = current->thread.rbs_bot;						\
 	regs->ar_fpsr = FPSR_DEFAULT;								\
 	regs->loadrs = 0;									\
 	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\
 	regs->r12 = new_sp - 16;	/* allocate 16 byte scratch area */			\
-	if (unlikely(!current->mm->dumpable)) {					\
+	if (unlikely(!current->mm->dumpable)) {							\
 		/*										\
 		 * Zap scratch regs to avoid leaking bits between processes with different	\
 		 * uid/privileges.								\
 		 */										\
-		regs->ar_pfs = 0;								\
-		regs->pr = 0;									\
-		/*										\
-		 * XXX fix me: everything below can go away once we stop preserving scratch	\
-		 * regs on a system call.							\
-		 */										\
-		regs->b6 = 0;									\
-		regs->r1 = 0; regs->r2 = 0; regs->r3 = 0;					\
-		regs->r13 = 0; regs->r14 = 0; regs->r15 = 0;					\
-		regs->r9  = 0; regs->r11 = 0;							\
-		regs->r16 = 0; regs->r17 = 0; regs->r18 = 0; regs->r19 = 0;			\
-		regs->r20 = 0; regs->r21 = 0; regs->r22 = 0; regs->r23 = 0;			\
-		regs->r24 = 0; regs->r25 = 0; regs->r26 = 0; regs->r27 = 0;			\
-		regs->r28 = 0; regs->r29 = 0; regs->r30 = 0; regs->r31 = 0;			\
-		regs->ar_ccv = 0;								\
-		regs->b0 = 0; regs->b7 = 0;							\
-		regs->f6.u.bits[0] = 0; regs->f6.u.bits[1] = 0;					\
-		regs->f7.u.bits[0] = 0; regs->f7.u.bits[1] = 0;					\
-		regs->f8.u.bits[0] = 0; regs->f8.u.bits[1] = 0;					\
-		regs->f9.u.bits[0] = 0; regs->f9.u.bits[1] = 0;					\
+		regs->ar_pfs = 0; regs->b0 = 0; regs->pr = 0;					\
+		regs->r1 = 0; regs->r9  = 0; regs->r11 = 0; regs->r13 = 0; regs->r15 = 0;	\
 	}											\
 } while (0)
 
@@ -346,11 +320,7 @@ struct task_struct;
  * parent of DEAD_TASK has collected the exist status of the task via
  * wait().
  */
-#ifdef CONFIG_PERFMON
-  extern void release_thread (struct task_struct *task);
-#else
-# define release_thread(dead_task)
-#endif
+#define release_thread(dead_task)
 
 /* Prepare to copy thread state - unlazy all lazy status */
 #define prepare_to_copy(tsk)	do { } while (0)
@@ -369,7 +339,7 @@ struct task_struct;
  * do_basic_setup() and the timing is such that free_initmem() has
  * been called already.
  */
-extern int kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
+extern pid_t kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
 
 /* Get wait channel for task P.  */
 extern unsigned long get_wchan (struct task_struct *p);
@@ -417,17 +387,28 @@ ia64_set_kr (unsigned long regnum, unsigned long r)
 	}
 }
 
-static inline struct task_struct *
-ia64_get_fpu_owner (void)
-{
-	return (struct task_struct *) ia64_get_kr(IA64_KR_FPU_OWNER);
-}
+/*
+ * The following three macros can't be inline functions because we don't have struct
+ * task_struct at this point.
+ */
 
-static inline void
-ia64_set_fpu_owner (struct task_struct *t)
-{
-	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) t);
-}
+/* Return TRUE if task T owns the fph partition of the CPU we're running on. */
+#define ia64_is_local_fpu_owner(t)								\
+({												\
+	struct task_struct *__ia64_islfo_task = (t);						\
+	(__ia64_islfo_task->thread.last_fph_cpu == smp_processor_id()				\
+	 && __ia64_islfo_task == (struct task_struct *) ia64_get_kr(IA64_KR_FPU_OWNER));	\
+})
+
+/* Mark task T as owning the fph partition of the CPU we're running on. */
+#define ia64_set_local_fpu_owner(t) do {						\
+	struct task_struct *__ia64_slfo_task = (t);					\
+	__ia64_slfo_task->thread.last_fph_cpu = smp_processor_id();			\
+	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) __ia64_slfo_task);		\
+} while (0)
+
+/* Mark the fph partition of task T as being invalid on all CPUs.  */
+#define ia64_drop_fpu(t)	((t)->thread.last_fph_cpu = -1)
 
 extern void __ia64_init_fpu (void);
 extern void __ia64_save_fpu (struct ia64_fpreg *fph);
@@ -636,8 +617,13 @@ ia64_set_lrr0 (unsigned long val)
 	asm volatile ("mov cr.lrr0=%0;; srlz.d" :: "r"(val) : "memory");
 }
 
-#define cpu_relax()	barrier()
+static inline void
+ia64_hint_pause (void)
+{
+	asm volatile ("hint @pause" ::: "memory");
+}
 
+#define cpu_relax()	ia64_hint_pause()
 
 static inline void
 ia64_set_lrr1 (unsigned long val)
@@ -916,6 +902,18 @@ ia64_tpa (__u64 addr)
 	__u64 result;
 	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
 	return result;
+}
+
+/*
+ * Take a mapped kernel address and return the equivalent address
+ * in the region 7 identity mapped virtual area.
+ */
+static inline void *
+ia64_imva (void *addr)
+{
+	void *result;
+	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
+	return __va(result);
 }
 
 #define ARCH_HAS_PREFETCH

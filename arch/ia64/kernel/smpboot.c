@@ -449,7 +449,7 @@ smp_build_cpu_map (void)
 
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
-		if (sapicid == -1 || sapicid == boot_cpu_id)
+		if (sapicid == boot_cpu_id)
 			continue;
 		phys_cpu_present_map |= (1 << cpu);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
@@ -598,7 +598,7 @@ init_smp_config(void)
 	/* Tell SAL where to drop the AP's.  */
 	ap_startup = (struct fptr *) start_ap;
 	sal_ret = ia64_sal_set_vectors(SAL_VECTOR_OS_BOOT_RENDEZ,
-				       __pa(ap_startup->fp), __pa(ap_startup->gp), 0, 0, 0, 0);
+				       ia64_tpa(ap_startup->fp), ia64_tpa(ap_startup->gp), 0, 0, 0, 0);
 	if (sal_ret < 0)
 		printk(KERN_ERR "SMP: Can't set SAL AP Boot Rendezvous: %s\n",
 		       ia64_sal_strerror(sal_ret));

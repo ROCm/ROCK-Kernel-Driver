@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc.  All rights reserved
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This implemenation of synchronization variables is heavily based on
  * one done by Steve Lord <lord@sgi.com>

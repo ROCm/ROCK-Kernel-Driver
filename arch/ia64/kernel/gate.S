@@ -6,20 +6,47 @@
  * 	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <linux/config.h>
+
 #include <asm/asmmacro.h>
+#include <asm/errno.h>
 #include <asm/offsets.h>
 #include <asm/sigcontext.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
-#include <asm/page.h>
 
-	.section .text.gate, "ax"
-.start_gate:
+/*
+ * We can't easily refer to symbols inside the kernel.  To avoid full runtime relocation,
+ * complications with the linker (which likes to create PLT stubs for branches
+ * to targets outside the shared object) and to avoid multi-phase kernel builds, we
+ * simply create minimalistic "patch lists" in special ELF sections.
+ */
+	.section ".data.patch.fsyscall_table", "a"
+	.previous
+#define LOAD_FSYSCALL_TABLE(reg)			\
+[1:]	movl reg=0;					\
+	.xdata4 ".data.patch.fsyscall_table", 1b-.
 
+	.section ".data.patch.brl_fsys_bubble_down", "a"
+	.previous
+#define BRL_COND_FSYS_BUBBLE_DOWN(pr)			\
+[1:](pr)brl.cond.sptk 0;				\
+	.xdata4 ".data.patch.brl_fsys_bubble_down", 1b-.
 
-#ifdef CONFIG_FSYS
-
-#include <asm/errno.h>
+GLOBAL_ENTRY(__kernel_syscall_via_break)
+	.prologue
+	.altrp b6
+	.body
+	/*
+	 * Note: for (fast) syscall restart to work, the break instruction must be
+	 *	 the first one in the bundle addressed by syscall_via_break.
+	 */
+{ .mib
+	break 0x100000
+	nop.i 0
+	br.ret.sptk.many b6
+}
+END(__kernel_syscall_via_break)
 
 /*
  * On entry:
@@ -34,7 +61,8 @@
  *	all other "scratch" registers:	undefined
  *	all "preserved" registers:	same as on entry
  */
-GLOBAL_ENTRY(syscall_via_epc)
+
+GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	.prologue
 	.altrp b6
 	.body
@@ -49,52 +77,50 @@ GLOBAL_ENTRY(syscall_via_epc)
 	epc
 }
 	;;
-	rsm psr.be
-	movl r18=fsyscall_table
+	rsm psr.be // note: on McKinley "rsm psr.be/srlz.d" is slightly faster than "rum psr.be"
+	LOAD_FSYSCALL_TABLE(r14)
 
-	mov r16=IA64_KR(CURRENT)
-	mov r19=255
+	mov r16=IA64_KR(CURRENT)		// 12 cycle read latency
+	mov r19=NR_syscalls-1
 	;;
-	shladd r18=r17,3,r18
-	cmp.geu p6,p0=r19,r17			// (syscall > 0 && syscall <= 1024+255)?
+	shladd r18=r17,3,r14
+
+	srlz.d
+	cmp.ne p8,p0=r0,r0			// p8 <- FALSE
+	/* Note: if r17 is a NaT, p6 will be set to zero.  */
+	cmp.geu p6,p7=r19,r17			// (syscall > 0 && syscall < 1024+NR_syscalls)?
 	;;
-	srlz.d					// ensure little-endian byteorder is in effect
 (p6)	ld8 r18=[r18]
+	mov r29=psr				// read psr (12 cyc load latency)
+	add r14=-8,r14				// r14 <- addr of fsys_bubble_down entry
 	;;
 (p6)	mov b7=r18
+(p6)	tbit.z p8,p0=r18,0
+(p8)	br.dptk.many b7
+
+	mov r27=ar.rsc
+	mov r21=ar.fpsr
+	mov r26=ar.pfs
+/*
+ * brl.cond doesn't work as intended because the linker would convert this branch
+ * into a branch to a PLT.  Perhaps there will be a way to avoid this with some
+ * future version of the linker.  In the meantime, we just use an indirect branch
+ * instead.
+ */
+#ifdef CONFIG_ITANIUM
+(p6)	ld8 r14=[r14]				// r14 <- fsys_bubble_down
+	;;
+(p6)	mov b7=r14
 (p6)	br.sptk.many b7
+#else
+	BRL_COND_FSYS_BUBBLE_DOWN(p6)
+#endif
 
 	mov r10=-1
 	mov r8=ENOSYS
 	MCKINLEY_E9_WORKAROUND
 	br.ret.sptk.many b6
-END(syscall_via_epc)
-
-GLOBAL_ENTRY(syscall_via_break)
-	.prologue
-	.altrp b6
-	.body
-	break 0x100000
-	br.ret.sptk.many b6
-END(syscall_via_break)
-
-GLOBAL_ENTRY(fsys_fallback_syscall)
-	/*
-	 * It would be better/fsyser to do the SAVE_MIN magic directly here, but for now
-	 * we simply fall back on doing a system-call via break.  Good enough
-	 * to get started.  (Note: we have to do this through the gate page again, since
-	 * the br.ret will switch us back to user-level privilege.)
-	 *
-	 * XXX Move this back to fsys.S after changing it over to avoid break 0x100000.
-	 */
-	movl r2=(syscall_via_break - .start_gate) + GATE_ADDR
-	;;
-	MCKINLEY_E9_WORKAROUND
-	mov b7=r2
-	br.ret.sptk.many b7
-END(fsys_fallback_syscall)
-
-#endif /* CONFIG_FSYS */
+END(__kernel_syscall_via_epc)
 
 #	define ARG0_OFF		(16 + IA64_SIGFRAME_ARG0_OFFSET)
 #	define ARG1_OFF		(16 + IA64_SIGFRAME_ARG1_OFFSET)
@@ -153,7 +179,7 @@ END(fsys_fallback_syscall)
 	.savesp ar.pfs, CFM_OFF+SIGCONTEXT_OFF;							\
 	.vframesp SP_OFF+SIGCONTEXT_OFF
 
-GLOBAL_ENTRY(ia64_sigtramp)
+GLOBAL_ENTRY(__kernel_sigtramp)
 	// describe the state that is active when we get here:
 	.prologue
 	SIGTRAMP_SAVES
@@ -335,4 +361,4 @@ restore_rbs:
 	mov ar.rsc=0xf				// (will be restored later on from sc_ar_rsc)
 	// invala not necessary as that will happen when returning to user-mode
 	br.cond.sptk back_from_restore_rbs
-END(ia64_sigtramp)
+END(__kernel_sigtramp)

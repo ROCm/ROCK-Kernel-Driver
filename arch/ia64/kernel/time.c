@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/efi.h>
+#include <linux/timex.h>
 
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
@@ -25,9 +26,10 @@
 #include <asm/system.h>
 
 extern unsigned long wall_jiffies;
-extern unsigned long last_nsec_offset;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+#define TIME_KEEPER_ID	0	/* smp_processor_id() of time-keeper */
 
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
@@ -59,19 +61,32 @@ do_profile (unsigned long ip)
 	atomic_inc((atomic_t *) &prof_buffer[ip]);
 }
 
+static void
+itc_reset (void)
+{
+}
+
+/*
+ * Adjust for the fact that xtime has been advanced by delta_nsec (may be negative and/or
+ * larger than NSEC_PER_SEC.
+ */
+static void
+itc_update (long delta_nsec)
+{
+}
+
 /*
  * Return the number of nano-seconds that elapsed since the last update to jiffy.  The
  * xtime_lock must be at least read-locked when calling this routine.
  */
-static inline unsigned long
-gettimeoffset (void)
+unsigned long
+itc_get_offset (void)
 {
 	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
 	unsigned long now, last_tick;
-#	define time_keeper_id	0	/* smp_processor_id() of time-keeper */
 
-	last_tick = (cpu_data(time_keeper_id)->itm_next
-		     - (lost + 1)*cpu_data(time_keeper_id)->itm_delta);
+	last_tick = (cpu_data(TIME_KEEPER_ID)->itm_next
+		     - (lost + 1)*cpu_data(TIME_KEEPER_ID)->itm_delta);
 
 	now = ia64_get_itc();
 	if (unlikely((long) (now - last_tick) < 0)) {
@@ -82,6 +97,12 @@ gettimeoffset (void)
 	elapsed_cycles = now - last_tick;
 	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
 }
+
+static struct time_interpolator itc_interpolator = {
+	.get_offset =	itc_get_offset,
+	.update =	itc_update,
+	.reset =	itc_reset
+};
 
 static inline void
 set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)
@@ -112,7 +133,7 @@ do_settimeofday (struct timeval *tv)
 		 * Discover what correction gettimeofday would have done, and then undo
 		 * it!
 		 */
-		nsec -= gettimeoffset();
+		nsec -= time_interpolator_get_offset();
 
 		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
@@ -124,6 +145,7 @@ do_settimeofday (struct timeval *tv)
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
+		time_interpolator_reset();
 	}
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
@@ -138,7 +160,7 @@ do_gettimeofday (struct timeval *tv)
 		seq = read_seqbegin(&xtime_lock);
 		{
 			old = last_nsec_offset;
-			offset = gettimeoffset();
+			offset = time_interpolator_get_offset();
 			sec = xtime.tv_sec;
 			nsec = xtime.tv_nsec;
 		}
@@ -214,7 +236,7 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #endif
 		new_itm += local_cpu_data->itm_delta;
 
-		if (smp_processor_id() == 0) {
+		if (smp_processor_id() == TIME_KEEPER_ID) {
 			/*
 			 * Here we are in the timer irq handler. We have irqs locally
 			 * disabled, but we don't know if the timer_bh is running on
@@ -276,16 +298,17 @@ ia64_cpu_local_tick (void)
 void __init
 ia64_init_itm (void)
 {
-	unsigned long platform_base_freq, itc_freq, drift;
+	unsigned long platform_base_freq, itc_freq;
 	struct pal_freq_ratio itc_ratio, proc_ratio;
-	long status;
+	long status, platform_base_drift, itc_drift;
 
 	/*
 	 * According to SAL v2.6, we need to use a SAL call to determine the platform base
 	 * frequency and then a PAL call to determine the frequency ratio between the ITC
 	 * and the base frequency.
 	 */
-	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM, &platform_base_freq, &drift);
+	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM,
+				    &platform_base_freq, &platform_base_drift);
 	if (status != 0) {
 		printk(KERN_ERR "SAL_FREQ_BASE_PLATFORM failed: %s\n", ia64_sal_strerror(status));
 	} else {
@@ -298,6 +321,7 @@ ia64_init_itm (void)
 		printk(KERN_ERR
 		       "SAL/PAL failed to obtain frequency info---inventing reasonable values\n");
 		platform_base_freq = 100000000;
+		platform_base_drift = -1;	/* no drift info */
 		itc_ratio.num = 3;
 		itc_ratio.den = 1;
 	}
@@ -305,6 +329,7 @@ ia64_init_itm (void)
 		printk(KERN_ERR "Platform base frequency %lu bogus---resetting to 75MHz!\n",
 		       platform_base_freq);
 		platform_base_freq = 75000000;
+		platform_base_drift = -1;
 	}
 	if (!proc_ratio.den)
 		proc_ratio.den = 1;	/* avoid division by zero */
@@ -312,17 +337,29 @@ ia64_init_itm (void)
 		itc_ratio.den = 1;	/* avoid division by zero */
 
 	itc_freq = (platform_base_freq*itc_ratio.num)/itc_ratio.den;
+	if (platform_base_drift != -1)
+		itc_drift = platform_base_drift*itc_ratio.num/itc_ratio.den;
+	else
+		itc_drift = -1;
+
 	local_cpu_data->itm_delta = (itc_freq + HZ/2) / HZ;
 	printk(KERN_INFO "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, "
-	       "ITC freq=%lu.%03luMHz\n", smp_processor_id(),
+	       "ITC freq=%lu.%03luMHz+/-%ldppm\n", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
-	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000);
+	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000,
+	       itc_drift);
 
 	local_cpu_data->proc_freq = (platform_base_freq*proc_ratio.num)/proc_ratio.den;
 	local_cpu_data->itc_freq = itc_freq;
 	local_cpu_data->cyc_per_usec = (itc_freq + USEC_PER_SEC/2) / USEC_PER_SEC;
 	local_cpu_data->nsec_per_cyc = ((NSEC_PER_SEC<<IA64_NSEC_PER_CYC_SHIFT)
 					+ itc_freq/2)/itc_freq;
+
+	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
+		itc_interpolator.frequency = local_cpu_data->itc_freq;
+		itc_interpolator.drift = itc_drift;
+		register_time_interpolator(&itc_interpolator);
+	}
 
 	/* Setup the CPU local timer tick */
 	ia64_cpu_local_tick();

@@ -2,7 +2,7 @@
 #define _ASM_IA64_TIMEX_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*

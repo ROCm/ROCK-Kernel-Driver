@@ -413,4 +413,17 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
 
 # endif /* __KERNEL__ */
 
+/*
+ * It makes no sense at all to have this BIO_VMERGE_BOUNDARY macro here.  Should be
+ * replaced by dma_merge_mask() or something of that sort.  Note: the only way
+ * BIO_VMERGE_BOUNDARY is used is to mask off bits.  Effectively, our definition gets
+ * expanded into:
+ *
+ *	addr & ((ia64_max_iommu_merge_mask + 1) - 1) == (addr & ia64_max_iommu_vmerge_mask)
+ *
+ * which is precisely what we want.
+ */
+extern unsigned long ia64_max_iommu_merge_mask;
+#define BIO_VMERGE_BOUNDARY	(ia64_max_iommu_merge_mask + 1)
+
 #endif /* _ASM_IA64_IO_H */
