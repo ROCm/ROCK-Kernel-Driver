@@ -629,6 +629,7 @@ static void request_events(void *send_info)
 	atomic_set(&kcs_info->req_events, 1);
 }
 
+#if 0
 static int new_user(void *send_info)
 {
 	if (!try_module_get(THIS_MODULE))
@@ -640,6 +641,7 @@ static void user_left(void *send_info)
 {
 	module_put(THIS_MODULE);
 }
+#endif
 
 static int initialized = 0;
 
@@ -740,7 +742,7 @@ static void kcs_timeout(unsigned long data)
 	spin_unlock_irqrestore(&(kcs_info->kcs_lock), flags);
 }
 
-static void kcs_irq_handler(int irq, void *data, struct pt_regs *regs)
+static irqreturn_t kcs_irq_handler(int irq, void *data, struct pt_regs *regs)
 {
 	struct kcs_info *kcs_info = (struct kcs_info *) data;
 	unsigned long   flags;
@@ -759,6 +761,7 @@ static void kcs_irq_handler(int irq, void *data, struct pt_regs *regs)
 	kcs_event_handler(kcs_info, 0);
  out:
 	spin_unlock_irqrestore(&(kcs_info->kcs_lock), flags);
+	return IRQ_HANDLED;
 }
 
 static struct ipmi_smi_handlers handlers =
