@@ -621,7 +621,6 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned long flags;
 	unsigned int c_cflag;
-	int result;
 	int bps;
 	long timeout;
 	wait_queue_t wait;						\
@@ -666,23 +665,9 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 
 	/* shutdown our urbs */
 	dbg("%s - shutting down urbs", __FUNCTION__);
-	result = usb_unlink_urb (port->write_urb);
-	if (result)
-		dbg("%s - usb_unlink_urb (write_urb)"
-		    " failed with reason: %d", __FUNCTION__,
-		     result);
-
-	result = usb_unlink_urb (port->read_urb);
-	if (result)
-		dbg("%s - usb_unlink_urb (read_urb) "
-		    "failed with reason: %d", __FUNCTION__,
-		     result);
-
-	result = usb_unlink_urb (port->interrupt_in_urb);
-	if (result)
-		dbg("%s - usb_unlink_urb (interrupt_in_urb)"
-		    " failed with reason: %d", __FUNCTION__,
-		     result);
+	usb_kill_urb(port->write_urb);
+	usb_kill_urb(port->read_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 
 	if (port->tty) {
 		c_cflag = port->tty->termios->c_cflag;
