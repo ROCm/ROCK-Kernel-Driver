@@ -314,13 +314,13 @@ static u16 phy_read_1bit(unsigned long);
 static u8 dmfe_sense_speed(struct dmfe_board_info *);
 static void dmfe_process_mode(struct dmfe_board_info *);
 static void dmfe_timer(unsigned long);
+static inline u32 cal_CRC(unsigned char *, unsigned int, u8);
 static void dmfe_rx_packet(struct DEVICE *, struct dmfe_board_info *);
 static void dmfe_free_tx_pkt(struct DEVICE *, struct dmfe_board_info *);
 static void dmfe_reuse_skb(struct dmfe_board_info *, struct sk_buff *);
 static void dmfe_dynamic_reset(struct DEVICE *);
 static void dmfe_free_rxbuffer(struct dmfe_board_info *);
 static void dmfe_init_dm910x(struct DEVICE *);
-static inline u32 cal_CRC(unsigned char *, unsigned int, u8);
 static void dmfe_parse_srom(struct dmfe_board_info *);
 static void dmfe_program_DM9801(struct dmfe_board_info *, int);
 static void dmfe_program_DM9802(struct dmfe_board_info *);
@@ -881,6 +881,20 @@ static void dmfe_free_tx_pkt(struct DEVICE *dev, struct dmfe_board_info * db)
 	/* Resource available check */
 	if ( db->tx_queue_cnt < TX_WAKE_DESC_CNT )
 		netif_wake_queue(dev);	/* Active upper layer, send again */
+}
+
+
+/*
+ *	Calculate the CRC valude of the Rx packet
+ *	flag = 	1 : return the reverse CRC (for the received packet CRC)
+ *		0 : return the normal CRC (for Hash Table index)
+ */
+
+static inline u32 cal_CRC(unsigned char * Data, unsigned int Len, u8 flag)
+{
+	u32 crc = crc32(~0, Data, Len);
+	if (flag) crc = ~crc;
+	return crc;
 }
 
 
@@ -1770,20 +1784,6 @@ static u16 phy_read_1bit(unsigned long ioaddr)
 	udelay(1);
 
 	return phy_data;
-}
-
-
-/*
- *	Calculate the CRC valude of the Rx packet
- *	flag = 	1 : return the reverse CRC (for the received packet CRC)
- *		0 : return the normal CRC (for Hash Table index)
- */
-
-static inline u32 cal_CRC(unsigned char * Data, unsigned int Len, u8 flag)
-{
-	u32 crc = crc32(~0, Data, Len);
-	if (flag) crc = ~crc;
-	return crc;
 }
 
 
