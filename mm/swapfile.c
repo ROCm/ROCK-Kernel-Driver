@@ -1088,7 +1088,7 @@ bad_swap_2:
 	swap_list_unlock();
 	if (swap_map)
 		vfree(swap_map);
-	if (swap_file)
+	if (swap_file && !IS_ERR(swap_file))
 		filp_close(swap_file, NULL);
 out:
 	if (swap_header)

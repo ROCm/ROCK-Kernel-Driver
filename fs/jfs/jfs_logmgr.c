@@ -1386,6 +1386,35 @@ int lmLogClose(struct super_block *sb, log_t * log)
 
 
 /*
+ * NAME:	lmLogWait()
+ *
+ * FUNCTION:	wait for all outstanding log records to be written to disk
+ */
+void lmLogWait(log_t *log)
+{
+	int i;
+
+	jFYI(1, ("lmLogWait: log:0x%p\n", log));
+
+	if (log->cqueue.head || !list_empty(&log->synclist)) {
+		/*
+		 * If there was very recent activity, we may need to wait
+		 * for the lazycommit thread to catch up
+		 */
+
+		for (i = 0; i < 800; i++) {	/* Too much? */
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout(HZ / 4);
+			if ((log->cqueue.head == NULL) &&
+			    list_empty(&log->synclist))
+				break;
+		}
+	}
+	assert(log->cqueue.head == NULL);
+	assert(list_empty(&log->synclist));
+}
+
+/*
  * NAME:	lmLogShutdown()
  *
  * FUNCTION:	log shutdown at last LogClose().
@@ -1411,23 +1440,7 @@ static int lmLogShutdown(log_t * log)
 
 	jFYI(1, ("lmLogShutdown: log:0x%p\n", log));
 
-	if (log->cqueue.head || !list_empty(&log->synclist)) {
-		/*
-		 * If there was very recent activity, we may need to wait
-		 * for the lazycommit thread to catch up
-		 */
-		int i;
-
-		for (i = 0; i < 800; i++) {	/* Too much? */
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ / 4);
-			if ((log->cqueue.head == NULL) &&
-			    list_empty(&log->synclist))
-				break;
-		}
-	}
-	assert(log->cqueue.head == NULL);
-	assert(list_empty(&log->synclist));
+	lmLogWait(log);
 
 	/*
 	 * We need to make sure all of the "written" metapages
