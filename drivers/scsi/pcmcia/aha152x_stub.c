@@ -98,9 +98,8 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 typedef struct scsi_info_t {
     dev_link_t		link;
+    dev_node_t		node;
     struct Scsi_Host	*host;
-    int			ndev;
-    dev_node_t		node[8];
 } scsi_info_t;
 
 static void aha152x_release_cs(u_long arg);
@@ -227,8 +226,6 @@ static void aha152x_config_cs(dev_link_t *link)
     cisparse_t parse;
     int i, last_ret, last_fn;
     u_char tuple_data[64];
-    struct scsi_device *dev;
-    dev_node_t *node, **tail;
     struct Scsi_Host *host;
     
     DEBUG(0, "aha152x_config(0x%p)\n", link);
@@ -285,9 +282,6 @@ static void aha152x_config_cs(dev_link_t *link)
     if (ext_trans)
         s.ext_trans = ext_trans;
 
-    tail = &link->dev;
-    info->ndev = 0;
-
     host = aha152x_probe_one(&s);
     if (host == NULL) {
 	printk(KERN_INFO "aha152x_cs: no SCSI devices found\n");
@@ -296,39 +290,10 @@ static void aha152x_config_cs(dev_link_t *link)
 
     scsi_add_host(host, NULL);
 
-    list_for_each_entry(dev, &host->my_devices, siblings) {
-	    u_long arg[2], id;
-	    kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
-	    id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +
-		((arg[0]>>8)&0xf00) + ((arg[0]>>12)&0xf000);
-	    node = &info->node[info->ndev];
-	    node->minor = 0;
-	    switch (dev->type) {
-	    case TYPE_TAPE:
-		node->major = SCSI_TAPE_MAJOR;
-		sprintf(node->dev_name, "st#%04lx", id);
-		break;
-	    case TYPE_DISK:
-	    case TYPE_MOD:
-		node->major = SCSI_DISK0_MAJOR;
-		sprintf(node->dev_name, "sd#%04lx", id);
-		break;
-	    case TYPE_ROM:
-	    case TYPE_WORM:
-		node->major = SCSI_CDROM_MAJOR;
-		sprintf(node->dev_name, "sr#%04lx", id);
-		break;
-	    default:
-		node->major = SCSI_GENERIC_MAJOR;
-		sprintf(node->dev_name, "sg#%04lx", id);
-		break;
-	    }
-	    *tail = node; tail = &node->next;
-	    info->ndev++;
-	    info->host = dev->host;
-    }
+    sprintf(info->node.dev_name, "scsi%d", host->host_no);
+    link->dev = &info->node;
+    info->host = host;
 
-    *tail = NULL;
     link->state &= ~DEV_CONFIG_PENDING;
     return;
     
