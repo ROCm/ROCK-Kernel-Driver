@@ -280,6 +280,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 				param[1] = (test_bit(LED_COMPOSE, dev->led) ? 0x01 : 0)
 					 | (test_bit(LED_SLEEP,   dev->led) ? 0x02 : 0)
 					 | (test_bit(LED_SUSPEND, dev->led) ? 0x04 : 0)
+				         | (test_bit(LED_MISC,    dev->led) ? 0x10 : 0);
 				         | (test_bit(LED_MUTE,    dev->led) ? 0x20 : 0);
 				atkbd_command(atkbd, param, ATKBD_CMD_EX_SETLEDS);
 			}
@@ -309,8 +310,8 @@ static int atkbd_set_3(struct atkbd *atkbd)
 
 /*
  * For known special keyboards we can go ahead and set the correct set.
- * We check for NCD PS/2 Sun, NorthGate OmniKey 101 and IBM RapidAccess
- * keyboards.
+ * We check for NCD PS/2 Sun, NorthGate OmniKey 101 and
+ * IBM RapidAccess / IBM EzButton / Chicony KBP-8993 keyboards.
  */
 
 	if (atkbd->id == 0xaca1) {
@@ -319,14 +320,17 @@ static int atkbd_set_3(struct atkbd *atkbd)
 		return 3;
 	}
 
-	if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
-		atkbd->id = param[0] << 8 | param[1];
-		return 2;
-	}
+	if (atkbd_set != 2) 
+		if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
+			atkbd->id = param[0] << 8 | param[1];
+			return 2;
+		}
 
-	param[0] = 0x71;
-	if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE))
-		return 4;
+	if (atkbd_set == 4) {
+		param[0] = 0x71;
+		if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE))
+			return 4;
+	}
 
 /*
  * Try to set the set we want.
@@ -505,7 +509,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
 	if (atkbd->set == 4) {
-		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE);
+		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
 		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
 	} else
 		sprintf(atkbd->name, "AT Set %d keyboard", atkbd->set);
