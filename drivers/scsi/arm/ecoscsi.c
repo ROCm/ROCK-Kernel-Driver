@@ -27,7 +27,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -205,7 +205,8 @@ static int __init ecoscsi_init(void)
 	NCR5380_print_options(host);
 	printk("\n");
 
-	scsi_add_host(host, NULL);
+	scsi_add_host(host, NULL); /* XXX handle failure */
+	scsi_scan_host(host);
 	return 0;
 
 release_reg:

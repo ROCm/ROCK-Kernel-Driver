@@ -30,7 +30,6 @@
  * $Id$
  */
 
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/version.h>

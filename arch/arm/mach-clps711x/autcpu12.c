@@ -21,7 +21,6 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/mm.h>
 
 #include <asm/hardware.h>

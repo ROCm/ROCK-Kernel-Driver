@@ -37,7 +37,6 @@
 #define MAJOR_NR    Z2RAM_MAJOR
 #define do_z2_request do_stram_request
 #define DEVICE_NR(device) (minor(device))
-#include <linux/blk.h>
 #endif
 
 #undef DEBUG

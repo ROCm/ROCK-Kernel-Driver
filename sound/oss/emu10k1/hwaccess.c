@@ -160,6 +160,24 @@ void emu10k1_writefn0(struct emu10k1_card *card, u32 reg, u32 data)
 	return;
 }
 
+void emu10k1_writefn0_2(struct emu10k1_card *card, u32 reg, u32 data, int size)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&card->lock, flags);
+
+	if (size == 32)
+		outl(data, card->iobase + (reg & 0x1F));
+	else if (size == 16)
+		outw(data, card->iobase + (reg & 0x1F));
+	else
+		outb(data, card->iobase + (reg & 0x1F));
+
+	spin_unlock_irqrestore(&card->lock, flags);
+
+	return;
+}
+
 u32 emu10k1_readfn0(struct emu10k1_card * card, u32 reg)
 {
 	u32 val;
@@ -200,12 +218,13 @@ void emu10k1_timer_set(struct emu10k1_card * card, u16 data)
 * write/read Emu10k1 pointer-offset register set, accessed through      *
 *  the PTR and DATA registers                                           *
 *************************************************************************/
+#define A_PTR_ADDRESS_MASK 0x0fff0000
 void sblive_writeptr(struct emu10k1_card *card, u32 reg, u32 channel, u32 data)
 {
 	u32 regptr;
 	unsigned long flags;
 
-	regptr = ((reg << 16) & PTR_ADDRESS_MASK) | (channel & PTR_CHANNELNUM_MASK);
+	regptr = ((reg << 16) & A_PTR_ADDRESS_MASK) | (channel & PTR_CHANNELNUM_MASK);
 
 	if (reg & 0xff000000) {
 		u32 mask;
@@ -242,7 +261,7 @@ void sblive_writeptr_tag(struct emu10k1_card *card, u32 channel, ...)
 	spin_lock_irqsave(&card->lock, flags);
 	while ((reg = va_arg(args, u32)) != TAGLIST_END) {
 		u32 data = va_arg(args, u32);
-		u32 regptr = (((reg << 16) & PTR_ADDRESS_MASK)
+		u32 regptr = (((reg << 16) & A_PTR_ADDRESS_MASK)
 			      | (channel & PTR_CHANNELNUM_MASK));
 		outl(regptr, card->iobase + PTR);
 		if (reg & 0xff000000) {
@@ -267,7 +286,7 @@ u32 sblive_readptr(struct emu10k1_card * card, u32 reg, u32 channel)
 	u32 regptr, val;
 	unsigned long flags;
 
-	regptr = ((reg << 16) & PTR_ADDRESS_MASK) | (channel & PTR_CHANNELNUM_MASK);
+	regptr = ((reg << 16) & A_PTR_ADDRESS_MASK) | (channel & PTR_CHANNELNUM_MASK);
 
 	if (reg & 0xff000000) {
 		u32 mask;
@@ -389,7 +408,7 @@ void emu10k1_ac97_write(struct ac97_codec *codec, u8 reg, u16 value)
 
 	outb(reg, card->iobase + AC97ADDRESS);
 	outw(value, card->iobase + AC97DATA);
-
+	outb( AC97_EXTENDED_ID, card->iobase + AC97ADDRESS); 
 	spin_unlock_irqrestore(&card->lock, flags);
 }
 
@@ -402,15 +421,23 @@ int emu10k1_mpu_write_data(struct emu10k1_card *card, u8 data)
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&card->lock, flags);
+	if (card->is_audigy) {
+		if ((sblive_readptr(card, A_MUSTAT,0) & MUSTAT_ORDYN) == 0) {
+			sblive_writeptr(card, A_MUDATA, 0, data);
+			ret = 0;
+		} else
+			ret = -1;
+	} else {
+		spin_lock_irqsave(&card->lock, flags);
 
-	if ((inb(card->iobase + MUSTAT) & MUSTAT_ORDYN) == 0) {
-		outb(data, card->iobase + MUDATA);
-		ret = 0;
-	} else
-		ret = -1;
+		if ((inb(card->iobase + MUSTAT) & MUSTAT_ORDYN) == 0) {
+			outb(data, card->iobase + MUDATA);
+			ret = 0;
+		} else
+			ret = -1;
 
-	spin_unlock_irqrestore(&card->lock, flags);
+		spin_unlock_irqrestore(&card->lock, flags);
+	}
 
 	return ret;
 }
@@ -420,15 +447,23 @@ int emu10k1_mpu_read_data(struct emu10k1_card *card, u8 * data)
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&card->lock, flags);
+	if (card->is_audigy) {
+		if ((sblive_readptr(card, A_MUSTAT,0) & MUSTAT_IRDYN) == 0) {
+			*data = sblive_readptr(card, A_MUDATA,0);
+			ret = 0;
+		} else
+			ret = -1;
+	} else {
+		spin_lock_irqsave(&card->lock, flags);
 
-	if ((inb(card->iobase + MUSTAT) & MUSTAT_IRDYN) == 0) {
-		*data = inb(card->iobase + MUDATA);
-		ret = 0;
-	} else
-		ret = -1;
+		if ((inb(card->iobase + MUSTAT) & MUSTAT_IRDYN) == 0) {
+			*data = inb(card->iobase + MUDATA);
+			ret = 0;
+		} else
+			ret = -1;
 
-	spin_unlock_irqrestore(&card->lock, flags);
+		spin_unlock_irqrestore(&card->lock, flags);
+	}
 
 	return ret;
 }
@@ -439,37 +474,54 @@ int emu10k1_mpu_reset(struct emu10k1_card *card)
 	unsigned long flags;
 
 	DPF(2, "emu10k1_mpu_reset()\n");
+	if (card->is_audigy) {
+		if (card->mpuacqcount == 0) {
+			sblive_writeptr(card, A_MUCMD, 0, MUCMD_RESET);
+			sblive_wcwait(card, 8);
+			sblive_writeptr(card, A_MUCMD, 0, MUCMD_RESET);
+			sblive_wcwait(card, 8);
+			sblive_writeptr(card, A_MUCMD, 0, MUCMD_ENTERUARTMODE);
+			sblive_wcwait(card, 8);
+			status = sblive_readptr(card, A_MUDATA, 0);
+			if (status == 0xfe)
+				return 0;
+			else
+				return -1;
+		}
 
-	if (card->mpuacqcount == 0) {
-		spin_lock_irqsave(&card->lock, flags);
-		outb(MUCMD_RESET, card->iobase + MUCMD);
-		spin_unlock_irqrestore(&card->lock, flags);
+		return 0;
+	} else {
+		if (card->mpuacqcount == 0) {
+			spin_lock_irqsave(&card->lock, flags);
+			outb(MUCMD_RESET, card->iobase + MUCMD);
+			spin_unlock_irqrestore(&card->lock, flags);
 
-		sblive_wcwait(card, 8);
+			sblive_wcwait(card, 8);
 
-		spin_lock_irqsave(&card->lock, flags);
-		outb(MUCMD_RESET, card->iobase + MUCMD);
-		spin_unlock_irqrestore(&card->lock, flags);
+			spin_lock_irqsave(&card->lock, flags);
+			outb(MUCMD_RESET, card->iobase + MUCMD);
+			spin_unlock_irqrestore(&card->lock, flags);
 
-		sblive_wcwait(card, 8);
+			sblive_wcwait(card, 8);
 
-		spin_lock_irqsave(&card->lock, flags);
-		outb(MUCMD_ENTERUARTMODE, card->iobase + MUCMD);
-		spin_unlock_irqrestore(&card->lock, flags);
+			spin_lock_irqsave(&card->lock, flags);
+			outb(MUCMD_ENTERUARTMODE, card->iobase + MUCMD);
+			spin_unlock_irqrestore(&card->lock, flags);
 
-		sblive_wcwait(card, 8);
+			sblive_wcwait(card, 8);
 
-		spin_lock_irqsave(&card->lock, flags);
-		status = inb(card->iobase + MUDATA);
-		spin_unlock_irqrestore(&card->lock, flags);
+			spin_lock_irqsave(&card->lock, flags);
+			status = inb(card->iobase + MUDATA);
+			spin_unlock_irqrestore(&card->lock, flags);
 
-		if (status == 0xfe)
-			return 0;
-		else
-			return -1;
+			if (status == 0xfe)
+				return 0;
+			else
+				return -1;
+		}
+
+		return 0;
 	}
-
-	return 0;
 }
 
 int emu10k1_mpu_acquire(struct emu10k1_card *card)

@@ -19,7 +19,7 @@
  *  22-10-2000  SH		Updated for new registering scheme.
  */
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioport.h>

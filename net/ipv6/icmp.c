@@ -415,8 +415,7 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	saddr = &skb->nh.ipv6h->daddr;
 
-	if (ipv6_addr_type(saddr) & IPV6_ADDR_MULTICAST ||
-	    ipv6_chk_acast_addr(0, saddr)) 
+	if (!ipv6_unicast_destination(skb))
 		saddr = NULL;
 
 	memcpy(&tmp_hdr, icmph, sizeof(tmp_hdr));

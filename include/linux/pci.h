@@ -456,10 +456,10 @@ struct pci_bus {
 	void		*sysdata;	/* hook for sys-specific extension */
 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
 
-	unsigned int	number;		/* bus number */
-	unsigned int	primary;	/* number of primary bridge */
-	unsigned int	secondary;	/* number of secondary bridge */
-	unsigned int	subordinate;	/* max number of subordinate buses */
+	unsigned char	number;		/* bus number */
+	unsigned char	primary;	/* number of primary bridge */
+	unsigned char	secondary;	/* number of secondary bridge */
+	unsigned char	subordinate;	/* max number of subordinate buses */
 
 	char		name[48];
 
@@ -715,7 +715,6 @@ static inline int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask) { return -
 static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUSY;}
 static inline int pci_register_driver(struct pci_driver *drv) { return 0;}
 static inline void pci_unregister_driver(struct pci_driver *drv) { }
-static inline int scsi_to_pci_dma_dir(unsigned char scsi_dir) { return scsi_dir; }
 static inline int pci_find_capability (struct pci_dev *dev, int cap) {return 0; }
 static inline const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev) { return NULL; }
 

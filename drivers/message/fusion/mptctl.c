@@ -88,7 +88,6 @@
 
 #include <linux/kdev_t.h>	/* needed for access to Scsi_Host struct */
 #include <linux/blkdev.h>
-#include <linux/blk.h>          /* for io_request_lock (spinlock) decl */
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 

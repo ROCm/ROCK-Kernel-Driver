@@ -233,11 +233,10 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
-#include <linux/blk.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
 #include "hosts.h"

@@ -52,7 +52,6 @@
 #include <linux/genhd.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/blk.h>
 #include <linux/swap.h>
 #include <linux/pm.h>
 #include <linux/device.h>

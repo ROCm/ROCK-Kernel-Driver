@@ -32,7 +32,7 @@
 
 #include <linux/mm.h>
 #include <linux/fs.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <linux/delay.h>

@@ -958,6 +958,8 @@ static int storage_probe(struct usb_interface *intf,
 		goto BadDevice;
 	}
 
+	scsi_scan_host(us->host);
+
 	printk(KERN_DEBUG 
 	       "WARNING: USB Mass Storage data integrity not assured\n");
 	printk(KERN_DEBUG 

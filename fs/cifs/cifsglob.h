@@ -155,7 +155,8 @@ struct cifsSesInfo {
 	char *serverOS;		/* name of operating system underlying the server */
 	char *serverNOS;	/* name of network operating system that the server is running */
 	char *serverDomain;	/* security realm of server */
-	int Suid;		/* needed for user level security */
+	int Suid;		/* remote smb uid  */
+	uid_t linux_uid;        /* local Linux uid */
 	int capabilities;
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
 	char userName[MAX_USERNAME_SIZE + 1];

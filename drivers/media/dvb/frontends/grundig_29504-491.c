@@ -179,10 +179,7 @@ static fe_code_rate_t tda8083_get_fec (struct dvb_i2c_bus *i2c)
 	static fe_code_rate_t fec_tab [] = { FEC_8_9, FEC_1_2, FEC_2_3, FEC_3_4,
 				       FEC_4_5, FEC_5_6, FEC_6_7, FEC_7_8 };
 
-	index = tda8083_readreg (i2c, 0x0e) & 0x3;
-
-	if (index > 7)
-		return FEC_NONE;
+	index = tda8083_readreg(i2c, 0x0e) & 0x07;
 
 	return fec_tab [index];
 }

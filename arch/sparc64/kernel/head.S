@@ -66,7 +66,7 @@ sparc_ramdisk_image:
 sparc_ramdisk_size:
         .word   0
         .xword  reboot_command
-	.xword	bootstr_len
+	.xword	bootstr_info
 	.word	_end
 
 	/* We must be careful, 32-bit OpenBOOT will get confused if it
@@ -740,8 +740,9 @@ swapper_pg_dir:
 
 	.data
 	.align	8
-	.globl	prom_tba
+	.globl	prom_tba, tlb_type
 prom_tba:	.xword	0
+tlb_type:	.word	0	/* Must NOT end up in BSS */
 	.section	".fixup",#alloc,#execinstr
 	.globl	__ret_efault
 __ret_efault:

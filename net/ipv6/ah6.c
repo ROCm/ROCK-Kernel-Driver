@@ -19,7 +19,7 @@
  *
  *	Mitsuru KANDA @USAGI       : IPv6 Support 
  * 	Kazunori MIYAZAWA @USAGI   :
- * 	Kunihiro Ishiguro          :
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 	
  * 	This file is derived from net/ipv4/ah.c.
  */
@@ -364,7 +364,7 @@ void ah6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	if (!x)
 		return;
 
-	printk(KERN_DEBUG "pmtu discvovery on SA AH/%08x/"
+	printk(KERN_DEBUG "pmtu discovery on SA AH/%08x/"
 			"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
 	       ntohl(ah->spi), NIP6(iph->daddr));
 

@@ -79,7 +79,6 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/irq.h>
-#include <linux/blk.h>
 
 #undef DEBUG /* print _LOTS_ of infos */
 

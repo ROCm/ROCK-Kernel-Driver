@@ -86,7 +86,6 @@ static inline int jumpshot_bulk_write(struct us_data *us,
 
 static int jumpshot_get_status(struct us_data  *us)
 {
-	unsigned char reply;
 	int rc;
 
 	if (!us)
@@ -94,14 +93,14 @@ static int jumpshot_get_status(struct us_data  *us)
 
 	// send the setup
 	rc = usb_stor_ctrl_transfer(us, us->recv_ctrl_pipe,
-				   0, 0xA0, 0, 7, &reply, 1);
+				   0, 0xA0, 0, 7, us->iobuf, 1);
 
 	if (rc != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
 
-	if (reply != 0x50) {
+	if (us->iobuf[0] != 0x50) {
 		US_DEBUGP("jumpshot_get_status:  0x%2x\n",
-			  (unsigned short) (reply));
+			  us->iobuf[0]);
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
@@ -115,7 +114,7 @@ static int jumpshot_read_data(struct us_data *us,
 			      unsigned char *dest, 
 			      int use_sg)
 {
-	unsigned char command[] = { 0, 0, 0, 0, 0, 0xe0, 0x20 };
+	unsigned char *command = us->iobuf;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char  thistime;
@@ -154,7 +153,8 @@ static int jumpshot_read_data(struct us_data *us,
 		command[3] = (sector >>  8) & 0xFF;
 		command[4] = (sector >> 16) & 0xFF;
 
-		command[5] |= (sector >> 24) & 0x0F;
+		command[5] = 0xE0 | ((sector >> 24) & 0x0F);
+		command[6] = 0x20;
 
 		// send the setup + command
 		result = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
@@ -199,7 +199,7 @@ static int jumpshot_write_data(struct us_data *us,
 			       unsigned char *src, 
 			       int use_sg)
 {
-	unsigned char command[7] = { 0, 0, 0, 0, 0, 0xE0, 0x30 };
+	unsigned char *command = us->iobuf;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char  thistime;
@@ -240,7 +240,8 @@ static int jumpshot_write_data(struct us_data *us,
 		command[3] = (sector >>  8) & 0xFF;
 		command[4] = (sector >> 16) & 0xFF;
 
-		command[5] |= (sector >> 24) & 0x0F;
+		command[5] = 0xE0 | ((sector >> 24) & 0x0F);
+		command[6] = 0x30;
 
 		// send the setup + command
 		result = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
@@ -291,11 +292,17 @@ static int jumpshot_write_data(struct us_data *us,
 static int jumpshot_id_device(struct us_data *us,
 			      struct jumpshot_info *info)
 {
-	unsigned char command[2] = { 0xe0, 0xec };
-	unsigned char reply[512];
+	unsigned char *command = us->iobuf;
+	unsigned char *reply;
 	int 	 rc;
 
 	if (!us || !info)
+		return USB_STOR_TRANSPORT_ERROR;
+
+	command[0] = 0xE0;
+	command[1] = 0xEC;
+	reply = kmalloc(512, GFP_NOIO);
+	if (!reply)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	// send the setup
@@ -305,20 +312,27 @@ static int jumpshot_id_device(struct us_data *us,
 	if (rc != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("jumpshot_id_device:  Gah! "
 			  "send_control for read_capacity failed\n");
-		return rc;
+		rc = USB_STOR_TRANSPORT_ERROR;
+		goto leave;
 	}
 
 	// read the reply
 	rc = jumpshot_bulk_read(us, reply, sizeof(reply));
-	if (rc != USB_STOR_XFER_GOOD)
-		return USB_STOR_TRANSPORT_ERROR;
+	if (rc != USB_STOR_XFER_GOOD) {
+		rc = USB_STOR_TRANSPORT_ERROR;
+		goto leave;
+	}
 
 	info->sectors = ((u32)(reply[117]) << 24) |
 			((u32)(reply[116]) << 16) |
 			((u32)(reply[115]) <<  8) |
 			((u32)(reply[114])      );
 
-	return USB_STOR_TRANSPORT_GOOD;
+	rc = USB_STOR_TRANSPORT_GOOD;
+
+ leave:
+	kfree(reply);
+	return rc;
 }
 
 static int jumpshot_handle_mode_sense(struct us_data *us,

@@ -89,8 +89,6 @@ struct saa7146_extension
 #define SAA7146_USE_I2C_IRQ	0x1
 	int	flags;
 	
-	struct saa7146_ext_vv	*ext_vv_data;
-	
 	/* pairs of subvendor and subdevice ids for
 	   supported devices, last entry 0xffff, 0xfff */
 	struct module *module;
@@ -134,6 +132,7 @@ struct saa7146_dev
 	/* extension handling */
 	struct saa7146_extension	*ext;		/* indicates if handled by extension */
 	void				*ext_priv;	/* pointer for extension private use (most likely some private data) */
+	struct saa7146_ext_vv		*ext_vv_data;
 
 	/* per device video/vbi informations (if available) */
 	struct saa7146_vv	*vv_data;

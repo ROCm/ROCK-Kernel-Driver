@@ -9,7 +9,7 @@
 #include <linux/smp_lock.h>
 #include <linux/usb.h>
 #include <asm/atomic.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 
@@ -109,7 +109,8 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 		goto out_unlink_controlurb;
 
 	new->host->hostdata[0] = (unsigned long)new;
-	scsi_add_host(new->host, &intf->dev);
+	scsi_add_host(new->host, &intf->dev); /* XXX handle failure */
+	scsi_scan_host(new->host);
 
 	new->sense_command[0] = REQUEST_SENSE;
 	new->sense_command[4] = HPUSBSCSI_SENSE_LENGTH;
@@ -306,7 +307,10 @@ DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
 	if(unlikely(u->status < 0)) {
                 if (likely(hpusbscsi->state != HP_STATE_FREE))
                         handle_usb_error(hpusbscsi);
-		return;
+		if (u->status == -ECONNRESET || u->status == -ENOENT || u->status == -ESHUTDOWN)
+			return;
+		else
+			goto resub;
 	}
 
 	scsi_state = hpusbscsi->scsi_state_byte;
@@ -348,6 +352,8 @@ DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
 	TRACE_STATE;
 		break;
 	}
+resub:
+	usb_submit_urb(u, GFP_ATOMIC);
 }
 
 static void simple_command_callback(struct urb *u, struct pt_regs *regs)
@@ -427,7 +433,7 @@ static void simple_done (struct urb *u, struct pt_regs *regs)
 				hpusbscsi->state = HP_STATE_WAIT;
 			} else {
 				issue_request_sense(hpusbscsi);
-			}			
+			}
 		}
 	} else {
 		if (likely(hpusbscsi->scallback != NULL))

@@ -14,7 +14,7 @@
 
 #define QETH_NAME " qeth"
 
-#define VERSION_QETH_H "$Revision: 1.47 $"
+#define VERSION_QETH_H "$Revision: 1.49 $"
 
 /******************** CONFIG STUFF ***********************/
 //#define QETH_DBF_LIKE_HELL
@@ -938,6 +938,8 @@ struct qeth_card {	/* pointed to by dev->priv */
 	__u32 ipa6_enabled;
 	__u32 adp_supported;
 
+	__u32 csum_enable_mask;
+
 	atomic_t startlan_attempts;
 	atomic_t enable_routing_attempts4;
 	atomic_t rt4fld;
@@ -1021,7 +1023,7 @@ qeth_get_arphrd_type(int cardtype, int linktype)
 		case QETH_MPC_LINK_TYPE_LANE_TR:
 			/* fallthrough */
 		case QETH_MPC_LINK_TYPE_HSTR:
-			return ARPHRD_IEEE802;
+			return ARPHRD_IEEE802_TR;
 		default:
 			return ARPHRD_ETHER;
 		}

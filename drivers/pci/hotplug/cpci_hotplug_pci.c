@@ -448,7 +448,7 @@ static int cpci_configure_bridge(struct pci_bus* bus, struct pci_dev* dev)
 }
 
 static int configure_visit_pci_dev(struct pci_dev_wrapped *wrapped_dev,
-			struct pci_bus_wrapped *wrapped_bus)
+				   struct pci_bus_wrapped *wrapped_bus)
 {
 	int rc;
 	struct pci_dev *dev = wrapped_dev->dev;
@@ -461,8 +461,8 @@ static int configure_visit_pci_dev(struct pci_dev_wrapped *wrapped_dev,
 	 * We need to fix up the hotplug representation with the Linux
 	 * representation.
 	 */
-	slot = cpci_find_slot(dev->bus, dev->devfn);
-	if(slot) {
+	if(wrapped_dev->data) {
+		slot = (struct slot*) wrapped_dev->data;
 		slot->dev = dev;
 	}
 
@@ -494,9 +494,7 @@ static int unconfigure_visit_pci_dev_phase2(struct pci_dev_wrapped *wrapped_dev,
 		return -ENODEV;
 
 	/* Remove the Linux representation */
-	if(pci_remove_device_safe(dev) == 0) {
-		kfree(dev);
-	} else {
+	if(pci_remove_device_safe(dev)) {
 		err("Could not remove device\n");
 		return -1;
 	}
@@ -504,8 +502,8 @@ static int unconfigure_visit_pci_dev_phase2(struct pci_dev_wrapped *wrapped_dev,
 	/*
 	 * Now remove the hotplug representation.
 	 */
-	slot = cpci_find_slot(dev->bus, dev->devfn);
-	if(slot) {
+	if(wrapped_dev->data) {
+		slot = (struct slot*) wrapped_dev->data;
 		slot->dev = NULL;
 	} else {
 		dbg("No hotplug representation for %02x:%02x.%x",
@@ -574,13 +572,18 @@ int cpci_configure_slot(struct slot* slot)
 
 	/* Still NULL? Well then scan for it! */
 	if(slot->dev == NULL) {
+		int n;
 		dbg("pci_dev still null");
 
 		/*
 		 * This will generate pci_dev structures for all functions, but
 		 * we will only call this case when lookup fails.
 		 */
-		slot->dev = pci_scan_slot(slot->bus, slot->devfn);
+		n = pci_scan_slot(slot->bus, slot->devfn);
+		dbg("%s: pci_scan_slot returned %d", __FUNCTION__, n);
+		if(n > 0)
+			pci_bus_add_devices(slot->bus);
+		slot->dev = pci_find_slot(slot->bus->number, slot->devfn);
 		if(slot->dev == NULL) {
 			err("Could not find PCI device for slot %02x", slot->number);
 			return 0;
@@ -603,6 +606,10 @@ int cpci_configure_slot(struct slot* slot)
 				continue;
 			wrapped_dev.dev = dev;
 			wrapped_bus.bus = slot->dev->bus;
+			if(i)
+				wrapped_dev.data = NULL;
+			else
+				wrapped_dev.data = (void*) slot;
 			rc = pci_visit_dev(&configure_functions, &wrapped_dev, &wrapped_bus);
 		}
 	}
@@ -635,9 +642,14 @@ int cpci_unconfigure_slot(struct slot* slot)
 		if(dev) {
 			wrapped_dev.dev = dev;
 			wrapped_bus.bus = dev->bus;
+ 			if(i)
+ 				wrapped_dev.data = NULL;
+ 			else
+ 				wrapped_dev.data = (void*) slot;
 			dbg("%s - unconfigure phase 2", __FUNCTION__);
 			rc = pci_visit_dev(&unconfigure_functions_phase2,
-					   &wrapped_dev, &wrapped_bus);
+					   &wrapped_dev,
+					   &wrapped_bus);
 			if(rc)
 				break;
 		}

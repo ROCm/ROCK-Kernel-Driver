@@ -29,7 +29,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -464,8 +464,7 @@ static void scsi_set_name(struct scsi_device *sdev, char *inq_result)
 	while (i >= 0 && type[i] == ' ')
 		type[i--] = '\0';
 
-	snprintf(sdev->sdev_driverfs_dev.name, DEVICE_NAME_SIZE, "SCSI %s",
-		 type);
+	snprintf(sdev->sdev_gendev.name, DEVICE_NAME_SIZE, "SCSI %s", type);
 }
 
 /**

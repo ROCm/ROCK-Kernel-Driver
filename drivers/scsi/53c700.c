@@ -131,7 +131,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/byteorder.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 
@@ -172,7 +172,7 @@ STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
 STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
 STATIC void NCR_700_slave_destroy(Scsi_Device *SDpnt);
 
-static struct device_attribute **NCR_700_dev_attrs = NULL;
+STATIC struct device_attribute *NCR_700_dev_attrs[];
 
 static char *NCR_700_phase[] = {
 	"",
@@ -2027,25 +2027,12 @@ static struct device_attribute NCR_700_active_tags_attr = {
 	.show = NCR_700_show_active_tags,
 };
 
-STATIC int __init
-NCR_700_init(void)
-{
-	scsi_sysfs_modify_sdev_attribute(&NCR_700_dev_attrs,
-					 &NCR_700_queue_depth_attr);
-	scsi_sysfs_modify_sdev_attribute(&NCR_700_dev_attrs,
-					 &NCR_700_active_tags_attr);
-	return 0;
-}
-
-/* NULL exit routine to keep modutils happy */
-STATIC void __exit
-NCR_700_exit(void)
-{
-}
+STATIC struct device_attribute *NCR_700_dev_attrs[] = {
+	&NCR_700_queue_depth_attr,
+	&NCR_700_active_tags_attr,
+	NULL,
+};
 
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
-
-module_init(NCR_700_init);
-module_exit(NCR_700_exit);

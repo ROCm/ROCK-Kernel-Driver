@@ -1288,12 +1288,6 @@ extern ide_devices_t   *idescsi;
 #endif
 extern int noautodma;
 
-/*
- * We need blk.h, but we replace its end_request by our own version.
- */
-#define IDE_DRIVER		/* Toggle some magic bits in blk.h */
-#include <linux/blk.h>
-
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);
 
 /*

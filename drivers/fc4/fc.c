@@ -33,7 +33,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <linux/blk.h>
 
 #include <asm/pgtable.h>
 #include <asm/irq.h>

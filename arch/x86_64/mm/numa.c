@@ -8,7 +8,6 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
-#include <linux/blk.h>
 #include <linux/ctype.h>
 #include <asm/e820.h>
 #include <asm/proto.h>

@@ -78,7 +78,6 @@ __ip_vs_get_out_rt(struct ip_vs_conn *cp, u32 rtos)
 						.daddr = dest->addr,
 						.saddr = 0,
 						.tos = rtos, } },
-				.proto = cp->protocol,
 			};
 
 			if (ip_route_output_key(&rt, &fl)) {
@@ -102,7 +101,6 @@ __ip_vs_get_out_rt(struct ip_vs_conn *cp, u32 rtos)
 					.daddr = dest->addr,
 					.saddr = 0,
 					.tos = rtos, } },
-			.proto = cp->protocol,
 		};
 
 		if (ip_route_output_key(&rt, &fl)) {

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.73 $
+ *   $Revision: 1.74 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -206,6 +206,7 @@ chsc_get_sch_descriptions(void)
 	if (!page)
 		return -ENOMEM;
 
+	err = 0;
 	for (irq = 0; irq <= highest_subchannel; irq++) {
 		/*
 		 * retrieve information for each sch
@@ -222,13 +223,14 @@ chsc_get_sch_descriptions(void)
 				       "not work\n", err);
 				cio_chsc_err_msg = 1;
 			}
-			return err;
+			goto out;
 		}
 		clear_page(page);
 	}
 	cio_chsc_desc_avail = 1;
+out:
 	free_page((unsigned long)page);
-	return 0;
+	return err;
 }
 
 __initcall(chsc_get_sch_descriptions);
@@ -428,7 +430,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 			ret = css_probe_device(irq);
 			if (ret == -ENXIO)
 				/* We're through */
-				return;
+				break;
 			continue;
 		}
 	

@@ -20,7 +20,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -59,10 +58,15 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
 
-	ret = -EINVAL;
+	ret = -ENOSYS;
 	switch (call) {
 	case SEMOP:
-		ret = sys_semop (first, (struct sembuf __user *)ptr, second);
+		ret = sys_semtimedop (first, (struct sembuf __user *)ptr,
+				      second, NULL);
+		break;
+	case SEMTIMEDOP:
+		ret = sys_semtimedop (first, (struct sembuf __user *)ptr,
+				      second, (const struct timespec *) fifth);
 		break;
 	case SEMGET:
 		ret = sys_semget (first, second, third);
@@ -258,6 +262,4 @@ int sys_olduname(struct oldold_utsname __user * name)
 	return error;
 }
 
-cond_syscall(sys_pciconfig_read);
-cond_syscall(sys_pciconfig_write);
 cond_syscall(sys_pciconfig_iobase);

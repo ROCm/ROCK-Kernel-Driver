@@ -38,12 +38,8 @@
 #include <linux/smp_lock.h>
 #include <linux/genhd.h>
 
-/*
- * <linux/blk.h> is controlled from the outside with these definitions.
- */
 #define MAJOR_NR	JSFD_MAJOR
 
-#include <linux/blk.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>

@@ -28,9 +28,6 @@
 #include <linux/a.out.h>
 #include <linux/tty.h>
 #include <linux/bootmem.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
 #include <linux/major.h>
 #include <linux/kdev_t.h>
 #include <linux/root_dev.h>

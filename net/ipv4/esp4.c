@@ -425,7 +425,7 @@ void esp4_err(struct sk_buff *skb, u32 info)
 	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, esph->spi, IPPROTO_ESP, AF_INET);
 	if (!x)
 		return;
-	printk(KERN_DEBUG "pmtu discvovery on SA ESP/%08x/%08x\n",
+	printk(KERN_DEBUG "pmtu discovery on SA ESP/%08x/%08x\n",
 	       ntohl(esph->spi), ntohl(iph->daddr));
 	xfrm_state_put(x);
 }

@@ -68,7 +68,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 
 	if ((new ^ check) & mask) {
 		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resno,
+		       "%s/%d (%08x != %08x)\n", pci_name(dev), resno,
 		       new, check);
 	}
 
@@ -80,7 +80,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 		if (check != new) {
 			printk(KERN_ERR "PCI: Error updating region "
 			       "%s/%d (high %08x != %08x)\n",
-			       dev->slot_name, resno, new, check);
+			       pci_name(dev), resno, new, check);
 		}
 	}
 }
@@ -101,7 +101,7 @@ pci_claim_resource(struct pci_dev *dev, int resource)
 		printk(KERN_ERR "PCI: %s region %d of %s %s [%lx:%lx]\n",
 		       root ? "Address space collision on" :
 			      "No parent found for",
-		       resource, dtype, dev->slot_name, res->start, res->end);
+		       resource, dtype, pci_name(dev), res->start, res->end);
 	}
 
 	return err;
@@ -139,7 +139,7 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 
 	if (ret) {
 		printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
-		       resno, res->start, res->end, dev->slot_name);
+		       resno, res->start, res->end, pci_name(dev));
 	} else if (resno < PCI_BRIDGE_RESOURCES) {
 		pci_update_resource(dev, res, resno);
 	}

@@ -10,12 +10,10 @@
 #define BUFFER_TIMEOUT     (HZ/2)  /* 0.5 seconds */
 
 #define WRITE_RPS0(x) do { \
-	static int count = 0;	\
 	dev->d_rps0.cpu_addr[ count++ ] = cpu_to_le32(x); \
 	} while (0);
 
 #define WRITE_RPS1(x) do { \
-	static int count = 0;	\
 	dev->d_rps1.cpu_addr[ count++ ] = cpu_to_le32(x); \
 	} while (0);
 
@@ -41,13 +39,13 @@ struct saa7146_standard
 	char          *name;
 	v4l2_std_id   id;
 
-	int v_offset;
-	int v_field;
-	int v_calc;
+	int v_offset;	/* number of lines of vertical offset before processing */
+	int v_field;	/* number of lines in a field for HPS to process */
+	int v_calc;	/* number of vertical active lines */
 	
-	int h_offset;
-	int h_pixels;
-	int h_calc;
+	int h_offset;	/* horizontal offset of processing window */
+	int h_pixels;	/* number of horizontal pixels to process */
+	int h_calc;	/* number of horizontal active pixels */
 	
 	int v_max_out;
 	int h_max_out;
@@ -122,6 +120,7 @@ struct saa7146_vv
 	/* video capture */
 	struct saa7146_dmaqueue		video_q;
 	struct saa7146_fh		*streaming;
+	enum v4l2_field			last_field;
 
 	/* common: fixme? shouldn't this be in saa7146_fh?
 	   (this leads to a more complicated question: shall the driver
@@ -166,7 +165,7 @@ struct saa7146_ext_vv
 	int (*std_callback)(struct saa7146_dev*, struct saa7146_standard *);
 		
 	struct saa7146_extension_ioctls *ioctls;
-	int (*ioctl)(struct saa7146_dev*, unsigned int cmd, void *arg);
+	int (*ioctl)(struct saa7146_fh*, unsigned int cmd, void *arg);
 };
 
 struct saa7146_use_ops  {
@@ -188,7 +187,7 @@ int saa7146_buffer_queue(struct saa7146_dev *dev, struct saa7146_dmaqueue *q, st
 void saa7146_buffer_timeout(unsigned long data);
 void saa7146_dma_free(struct saa7146_dev *dev,struct saa7146_buf *buf);
 
-int saa7146_vv_init(struct saa7146_dev* dev);
+int saa7146_vv_init(struct saa7146_dev* dev, struct saa7146_ext_vv *ext_vv);
 int saa7146_vv_release(struct saa7146_dev* dev);
 
 
@@ -201,6 +200,8 @@ void saa7146_set_gpio(struct saa7146_dev *saa, u8 pin, u8 data);
 
 /* from saa7146_video.c */
 extern struct saa7146_use_ops saa7146_video_uops;
+int saa7146_start_preview(struct saa7146_fh *fh);
+int saa7146_stop_preview(struct saa7146_fh *fh);
 
 /* from saa7146_vbi.c */
 extern struct saa7146_use_ops saa7146_vbi_uops;
@@ -214,35 +215,6 @@ extern struct saa7146_use_ops saa7146_vbi_uops;
 /* sync inputs */
 #define SAA7146_HPS_SYNC_PORT_A		0x00
 #define SAA7146_HPS_SYNC_PORT_B		0x01
-
-/* number of vertical active lines */
-#define V_ACTIVE_LINES_PAL	576
-#define V_ACTIVE_LINES_NTSC	480
-#define V_ACTIVE_LINES_SECAM	576
-
-/* number of lines in a field for HPS to process */
-#define V_FIELD_PAL	288
-#define V_FIELD_NTSC	240
-#define V_FIELD_SECAM	288
-
-/* number of lines of vertical offset before processing */
-#define V_OFFSET_PAL	0x17
-#define V_OFFSET_NTSC	0x16
-#define V_OFFSET_SECAM	0x14
-
-/* number of horizontal pixels to process */
-#define H_PIXELS_PAL	680
-#define H_PIXELS_NTSC	708
-#define H_PIXELS_SECAM	720
-
-/* horizontal offset of processing window */
-#define H_OFFSET_PAL	0x14
-#define H_OFFSET_NTSC	0x06
-#define H_OFFSET_SECAM	0x14
-
-#define SAA7146_PAL_VALUES 	V_OFFSET_PAL, V_FIELD_PAL, V_ACTIVE_LINES_PAL, H_OFFSET_PAL, H_PIXELS_PAL, H_PIXELS_PAL+1, V_ACTIVE_LINES_PAL, 768
-#define SAA7146_NTSC_VALUES	V_OFFSET_NTSC, V_FIELD_NTSC, V_ACTIVE_LINES_NTSC, H_OFFSET_NTSC, H_PIXELS_NTSC, H_PIXELS_NTSC+1, V_ACTIVE_LINES_NTSC, 640
-#define SAA7146_SECAM_VALUES	V_OFFSET_SECAM, V_FIELD_SECAM, V_ACTIVE_LINES_SECAM, H_OFFSET_SECAM, H_PIXELS_SECAM, H_PIXELS_SECAM+1, V_ACTIVE_LINES_SECAM, 768
 
 /* some memory sizes */
 #define SAA7146_CLIPPING_MEM	(14*PAGE_SIZE)

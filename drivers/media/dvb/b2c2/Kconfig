@@ -1,0 +1,8 @@
+config DVB_B2C2_SKYSTAR
+	tristate "Technisat Skystar2 PCI"
+	depends on DVB_CORE
+	help
+	  Support for the Skystar2 PCI DVB card by Technisat, which
+	  is equipped with the FlexCopII chipset by B2C2.
+
+	  Say Y if you own such a device and want to use it.

@@ -106,10 +106,21 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 			// fixme: fix this for vflip != 0
 
 			saa7146_write(dev, PROT_ADDR1, 0);
+			saa7146_write(dev, MC2, (MASK_02|MASK_18));		
+
 			/* write the address of the rps-program */
 			saa7146_write(dev, RPS_ADDR0, dev->d_rps0.dma_handle);
 			/* turn on rps */
 			saa7146_write(dev, MC1, (MASK_12 | MASK_28));
+				
+/*
+			printk("vdma%d.base_even:     0x%08x\n", 1,saa7146_read(dev,BASE_EVEN1));
+			printk("vdma%d.base_odd:      0x%08x\n", 1,saa7146_read(dev,BASE_ODD1));
+			printk("vdma%d.prot_addr:     0x%08x\n", 1,saa7146_read(dev,PROT_ADDR1));
+			printk("vdma%d.base_page:     0x%08x\n", 1,saa7146_read(dev,BASE_PAGE1));
+			printk("vdma%d.pitch:         0x%08x\n", 1,saa7146_read(dev,PITCH1));
+			printk("vdma%d.num_line_byte: 0x%08x\n", 1,saa7146_read(dev,NUM_LINE_BYTE1));
+*/
 		}
 		del_timer(&q->timeout);
 	}
@@ -374,7 +385,7 @@ static struct video_device device_template =
 	.minor		= -1,
 };
 
-int saa7146_vv_init(struct saa7146_dev* dev)
+int saa7146_vv_init(struct saa7146_dev* dev, struct saa7146_ext_vv *ext_vv)
 {
 	struct saa7146_vv *vv = kmalloc (sizeof(struct saa7146_vv),GFP_KERNEL);
 	if( NULL == vv ) {
@@ -384,6 +395,11 @@ int saa7146_vv_init(struct saa7146_dev* dev)
 	memset(vv, 0x0, sizeof(*vv));
 
 	DEB_EE(("dev:%p\n",dev));
+	
+	/* save per-device extension data (one extension can
+	   handle different devices that might need different
+	   configuration data) */
+	dev->ext_vv_data = ext_vv;
 	
 	vv->video_minor = -1;
 	vv->vbi_minor = -1;
@@ -474,13 +490,6 @@ static void __exit saa7146_vv_cleanup_module(void)
 
 module_init(saa7146_vv_init_module);
 module_exit(saa7146_vv_cleanup_module);
-
-EXPORT_SYMBOL_GPL(saa7146_set_hps_source_and_sync);
-EXPORT_SYMBOL_GPL(saa7146_register_device);
-EXPORT_SYMBOL_GPL(saa7146_unregister_device);
-
-EXPORT_SYMBOL_GPL(saa7146_vv_init);
-EXPORT_SYMBOL_GPL(saa7146_vv_release);
 
 MODULE_AUTHOR("Michael Hunold <michael@mihu.de>");
 MODULE_DESCRIPTION("video4linux driver for saa7146-based hardware");

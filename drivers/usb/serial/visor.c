@@ -509,18 +509,17 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
+	/* free up the transfer buffer, as usb_free_urb() does not do this */
+	kfree (urb->transfer_buffer);
+
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
 	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (urb->status) {
-		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
-		return;
-	}
-
-	/* free up the transfer buffer, as usb_free_urb() does not do this */
-	kfree (urb->transfer_buffer);
+	if (urb->status)
+		dbg("%s - nonzero write bulk status received: %d",
+		    __FUNCTION__, urb->status);
 
 	schedule_work(&port->work);
 }

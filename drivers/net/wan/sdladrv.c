@@ -160,10 +160,6 @@
 
 /****** Function Prototypes *************************************************/
 
-/* Module entry points. These are called by the OS and must be public. */
-int init_module (void);
-void cleanup_module (void);
-
 /* Hardware-specific functions */
 static int sdla_detect	(sdlahw_t* hw);
 static int sdla_autodpm	(sdlahw_t* hw);
@@ -325,11 +321,7 @@ static int pci_slot_ar[MAX_S514_CARDS];
  * Context:	process
  */
 
-#ifdef MODULE
-int init_module (void)
-#else
 int sdladrv_init(void)
-#endif
 {
 	int i=0;
 
@@ -354,9 +346,12 @@ int sdladrv_init(void)
  * Module 'remove' entry point.
  * o release all remaining system resources
  */
-void cleanup_module (void)
+static void sdladrv_cleanup(void)
 {
 }
+
+module_init(sdladrv_init);
+module_cleanup(sdladrv_cleanup);
 #endif
 
 /******* Kernel APIs ********************************************************/

@@ -105,7 +105,7 @@
 #include <asm/io.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "g_NCR5380.h"

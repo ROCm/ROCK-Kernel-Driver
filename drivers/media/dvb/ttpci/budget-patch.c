@@ -165,6 +165,7 @@ static int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_exte
 {
         struct budget_patch *budget;
         int err;
+	int count = 0;
 
         if (!(budget = kmalloc (sizeof(struct budget_patch), GFP_KERNEL)))
                 return -ENOMEM;
@@ -263,7 +264,6 @@ static void __exit budget_patch_exit(void)
 static struct saa7146_extension budget_extension = {
         .name           = "budget_patch dvb\0",
         .flags          = 0,
-        .ext_vv_data    = NULL,
         
         .module         = THIS_MODULE,
         .pci_tbl        = pci_tbl,

@@ -153,7 +153,8 @@ enum av7110_osd_command {
 	BlitBmp,
 	ReleaseBmp,
 	SetWTrans,
-	SetWNoTrans
+        SetWNoTrans,
+        Set_Palette
 };
 
 enum av7110_pid_command { 
@@ -405,6 +406,11 @@ struct av7110 {
 	struct dvb_i2c_bus	*i2c_bus;	
 	char			*card_name;
 
+	/* support for analog module of dvb-c */
+	int			has_analog_tuner;
+	int			current_input;
+	u32			current_freq;
+				
 	struct tasklet_struct   debi_tasklet;
 	struct tasklet_struct   gpio_tasklet;
 
@@ -571,6 +577,9 @@ struct av7110 {
 
 #define DATA_BUFF2_BASE	(DATA_BUFF1_BASE+DATA_BUFF1_SIZE)
 #define DATA_BUFF2_SIZE	0x0800
+
+#define DATA_BUFF3_BASE (DATA_BUFF2_BASE+DATA_BUFF2_SIZE)
+#define DATA_BUFF3_SIZE 0x0400
 
 #define Reserved	(DPRAM_BASE + 0x1E00)
 #define Reserved_SIZE	0x1C0

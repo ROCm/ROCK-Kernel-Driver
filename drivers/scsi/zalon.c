@@ -7,7 +7,7 @@
 #include <linux/types.h>
 #include <linux/stat.h>
 #include <linux/mm.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/config.h>
@@ -85,7 +85,7 @@ zalon_scsi_callback(struct parisc_device *dev)
 {
 	struct gsc_irq gsc_irq;
 	u32 zalon_vers;
-	int irq;
+	int irq, error = -ENODEV;
 	unsigned long zalon = dev->hpa;
 	unsigned long io_port = zalon + GSC_SCSI_ZALON_OFFSET;
 	static int unit = 0;
@@ -147,11 +147,18 @@ zalon_scsi_callback(struct parisc_device *dev)
 
 	dev_set_drvdata(&dev->dev, host);
 
-	scsi_add_host(host, &dev->dev);
+	error = scsi_add_host(host, &dev->dev);
+	if (error)
+		goto fail_free_irq;
 
+	scsi_scan_host(host);
 	return 0;
+
+ fail_free_irq:
+	free_irq(irq, host);
  fail:
-	return -ENODEV;
+	ncr53c8xx_release(host);
+	return error;
 }
 
 static struct parisc_device_id zalon_tbl[] = {

@@ -742,7 +742,7 @@ int journal_get_write_access(handle_t *handle,
 	/* We do not want to get caught playing with fields which the
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
-	rc = do_get_write_access(handle, jh, 0, NULL);
+	rc = do_get_write_access(handle, jh, 0, credits);
 	journal_put_journal_head(jh);
 	return rc;
 }
@@ -1088,6 +1088,7 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
 	struct journal_head *jh = bh2jh(bh);
+	int console_loglevel_saved = console_loglevel;
 
 	jbd_debug(5, "journal_head %p\n", jh);
 	JBUFFER_TRACE(jh, "entry");
@@ -1106,16 +1107,6 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	if (jh->b_transaction == handle->h_transaction &&
 					jh->b_jlist == BJ_Metadata) {
 		JBUFFER_TRACE(jh, "fastpath");
-		console_verbose();
-		if (jh->b_transaction != journal->j_running_transaction) {
-			printk("jh->b_transaction=%p\n", jh->b_transaction);
-			printk("journal->j_running_transaction=%p\n",
-				journal->j_running_transaction);
-			printk("handle->h_transaction=%p\n",
-				handle->h_transaction);
-			printk("journal->j_committing_transaction=%p\n",
-				journal->j_committing_transaction);
-		}
 		J_ASSERT_JH(jh, jh->b_transaction ==
 					journal->j_running_transaction);
 		goto out_unlock_bh;
@@ -1156,6 +1147,7 @@ out_unlock_bh:
 	jbd_unlock_bh_state(bh);
 out:
 	JBUFFER_TRACE(jh, "exit");
+	console_loglevel = console_loglevel_saved;
 	return 0;
 }
 
@@ -1327,9 +1319,6 @@ int journal_stop(handle_t *handle)
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
 	int old_handle_count, err;
-
-	if (!handle)
-		return 0;
 
 	J_ASSERT(transaction->t_updates > 0);
 	J_ASSERT(journal_current_handle() == handle);

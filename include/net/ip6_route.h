@@ -45,7 +45,8 @@ extern int			ip6_del_rt(struct rt6_info *,
 					   void *rtattr);
 
 extern int			ip6_rt_addr_add(struct in6_addr *addr,
-						struct net_device *dev);
+						struct net_device *dev,
+						int anycast);
 
 extern int			ip6_rt_addr_del(struct in6_addr *addr,
 						struct net_device *dev);
@@ -116,6 +117,13 @@ static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 	np->daddr_cache = daddr;
 	np->dst_cookie = rt->rt6i_node ? rt->rt6i_node->fn_sernum : 0;
 	write_unlock(&sk->sk_dst_lock);
+}
+
+static inline int ipv6_unicast_destination(struct sk_buff *skb)
+{
+	struct rt6_info *rt = (struct rt6_info *) skb->dst;
+
+	return rt->rt6i_flags & RTF_LOCAL;
 }
 
 #endif

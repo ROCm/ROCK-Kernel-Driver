@@ -32,7 +32,6 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/efi.h>
 
 #define MSDOS_MBR_SIGNATURE 0xaa55

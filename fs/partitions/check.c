@@ -16,7 +16,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
-#include <linux/blk.h>
 #include <linux/kmod.h>
 #include <linux/ctype.h>
 #include <linux/devfs_fs_kernel.h>
@@ -348,6 +347,9 @@ void register_disk(struct gendisk *disk)
 		return;
 	}
 
+	/* always add handle for the whole disk */
+	devfs_add_partitioned(disk);
+
 	/* No such device (e.g., media were just removed) */
 	if (!get_capacity(disk))
 		return;
@@ -356,7 +358,6 @@ void register_disk(struct gendisk *disk)
 	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
 		return;
 	state = check_partition(disk, bdev);
-	devfs_add_partitioned(disk);
 	if (state) {
 		for (j = 1; j < state->limit; j++) {
 			sector_t size = state->parts[j].size;

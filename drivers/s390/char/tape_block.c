@@ -13,7 +13,6 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
-#include <linux/blk.h>
 #include <linux/interrupt.h>
 #include <linux/buffer_head.h>
 

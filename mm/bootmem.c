@@ -183,7 +183,7 @@ restart_scan:
 	for (i = preferred; i < eidx; i += incr) {
 		unsigned long j;
 		i = find_next_zero_bit(bdata->node_bootmem_map, eidx, i);
-		i = (i + incr - 1) & -incr;
+		i = ALIGN(i, incr);
 		if (test_bit(i, bdata->node_bootmem_map))
 			continue;
 		for (j = i + 1; j < i + areasize; ++j) {
@@ -195,7 +195,7 @@ restart_scan:
 		start = i;
 		goto found;
 	fail_block:
-		;
+		i = ALIGN(j, incr);
 	}
 
 	if (preferred > offset) {

@@ -130,8 +130,9 @@ static void fix_read_capacity(Scsi_Cmnd *srb)
 void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
 {
 	/* Pad the ATAPI command with zeros 
+	 *
 	 * NOTE: This only works because a Scsi_Cmnd struct field contains
-	 * a unsigned char cmnd[12], so we know we have storage available
+	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
 	for (; srb->cmd_len<12; srb->cmd_len++)
 		srb->cmnd[srb->cmd_len] = 0;
@@ -149,13 +150,10 @@ void usb_stor_qic157_command(Scsi_Cmnd *srb, struct us_data *us)
 
 void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 {
-	int old_cmnd = 0;
-
-	/* Fix some commands -- this is a form of mode translation
-	 * ATAPI devices only accept 12 byte long commands 
+	/* Pad the ATAPI command with zeros 
 	 *
 	 * NOTE: This only works because a Scsi_Cmnd struct field contains
-	 * a unsigned char cmnd[12], so we know we have storage available
+	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
 
 	/* Pad the ATAPI command with zeros */
@@ -165,60 +163,10 @@ void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 	/* set command length to 12 bytes */
 	srb->cmd_len = 12;
 
-	/* determine the correct (or minimum) data length for these commands */
-	switch (srb->cmnd[0]) {
-
-		/* change MODE_SENSE/MODE_SELECT from 6 to 10 byte commands */
-	case MODE_SENSE:
-	case MODE_SELECT:
-		/* save the command so we can tell what it was */
-		old_cmnd = srb->cmnd[0];
-
-		srb->cmnd[11] = 0;
-		srb->cmnd[10] = 0;
-		srb->cmnd[9] = 0;
-		srb->cmnd[8] = srb->cmnd[4];
-		srb->cmnd[7] = 0;
-		srb->cmnd[6] = 0;
-		srb->cmnd[5] = 0;
-		srb->cmnd[4] = 0;
-		srb->cmnd[3] = 0;
-		srb->cmnd[2] = srb->cmnd[2];
-		srb->cmnd[1] = srb->cmnd[1];
-		srb->cmnd[0] = srb->cmnd[0] | 0x40;
-		break;
-
-		/* change READ_6/WRITE_6 to READ_10/WRITE_10, which 
-		 * are ATAPI commands */
-	case WRITE_6:
-	case READ_6:
-		srb->cmnd[11] = 0;
-		srb->cmnd[10] = 0;
-		srb->cmnd[9] = 0;
-		srb->cmnd[8] = srb->cmnd[4];
-		srb->cmnd[7] = 0;
-		srb->cmnd[6] = 0;
-		srb->cmnd[5] = srb->cmnd[3];
-		srb->cmnd[4] = srb->cmnd[2];
-		srb->cmnd[3] = srb->cmnd[1] & 0x1F;
-		srb->cmnd[2] = 0;
-		srb->cmnd[1] = srb->cmnd[1] & 0xE0;
-		srb->cmnd[0] = srb->cmnd[0] | 0x20;
-		break;
-	} /* end switch on cmnd[0] */
-
-	/* convert MODE_SELECT data here */
-	if (old_cmnd == MODE_SELECT)
-		usb_stor_scsiSense6to10(srb);
-
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+
 	if (srb->result == SAM_STAT_GOOD) {
-
-		/* Fix the MODE_SENSE data if we translated the command */
-		if (old_cmnd == MODE_SENSE)
-			usb_stor_scsiSense10to6(srb);
-
 		/* fix the INQUIRY data if necessary */
 		fix_inquiry_data(srb);
 	}
@@ -227,51 +175,28 @@ void usb_stor_ATAPI_command(Scsi_Cmnd *srb, struct us_data *us)
 
 void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 {
-	int old_cmnd = 0;
-
 	/* fix some commands -- this is a form of mode translation
 	 * UFI devices only accept 12 byte long commands 
 	 *
 	 * NOTE: This only works because a Scsi_Cmnd struct field contains
-	 * a unsigned char cmnd[12], so we know we have storage available
+	 * a unsigned char cmnd[16], so we know we have storage available
 	 */
+
+	/* Pad the ATAPI command with zeros */
+	for (; srb->cmd_len<12; srb->cmd_len++)
+		srb->cmnd[srb->cmd_len] = 0;
 
 	/* set command length to 12 bytes (this affects the transport layer) */
 	srb->cmd_len = 12;
 
-	/* determine the correct (or minimum) data length for these commands */
+	/* XXX We should be constantly re-evaluating the need for these */
+
+	/* determine the correct data length for these commands */
 	switch (srb->cmnd[0]) {
 
 		/* for INQUIRY, UFI devices only ever return 36 bytes */
 	case INQUIRY:
 		srb->cmnd[4] = 36;
-		break;
-
-		/* change MODE_SENSE/MODE_SELECT from 6 to 10 byte commands */
-	case MODE_SENSE:
-	case MODE_SELECT:
-		/* save the command so we can tell what it was */
-		old_cmnd = srb->cmnd[0];
-
-		srb->cmnd[11] = 0;
-		srb->cmnd[10] = 0;
-		srb->cmnd[9] = 0;
-
-		/* if we're sending data, we send all.	If getting data, 
-		 * get the minimum */
-		if (srb->cmnd[0] == MODE_SELECT)
-			srb->cmnd[8] = srb->cmnd[4];
-		else
-			srb->cmnd[8] = 8;
-
-		srb->cmnd[7] = 0;
-		srb->cmnd[6] = 0;
-		srb->cmnd[5] = 0;
-		srb->cmnd[4] = 0;
-		srb->cmnd[3] = 0;
-		srb->cmnd[2] = srb->cmnd[2];
-		srb->cmnd[1] = srb->cmnd[1];
-		srb->cmnd[0] = srb->cmnd[0] | 0x40;
 		break;
 
 		/* again, for MODE_SENSE_10, we get the minimum (8) */
@@ -284,38 +209,12 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 	case REQUEST_SENSE:
 		srb->cmnd[4] = 18;
 		break;
-
-		/* change READ_6/WRITE_6 to READ_10/WRITE_10, which 
-		 * are UFI commands */
-	case WRITE_6:
-	case READ_6:
-		srb->cmnd[11] = 0;
-		srb->cmnd[10] = 0;
-		srb->cmnd[9] = 0;
-		srb->cmnd[8] = srb->cmnd[4];
-		srb->cmnd[7] = 0;
-		srb->cmnd[6] = 0;
-		srb->cmnd[5] = srb->cmnd[3];
-		srb->cmnd[4] = srb->cmnd[2];
-		srb->cmnd[3] = srb->cmnd[1] & 0x1F;
-		srb->cmnd[2] = 0;
-		srb->cmnd[1] = srb->cmnd[1] & 0xE0;
-		srb->cmnd[0] = srb->cmnd[0] | 0x20;
-		break;
 	} /* end switch on cmnd[0] */
-
-	/* convert MODE_SELECT data here */
-	if (old_cmnd == MODE_SELECT)
-		usb_stor_scsiSense6to10(srb);
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+
 	if (srb->result == SAM_STAT_GOOD) {
-
-		/* Fix the MODE_SENSE data if we translated the command */
-		if (old_cmnd == MODE_SENSE)
-			usb_stor_scsiSense10to6(srb);
-
 		/* Fix the data for an INQUIRY, if necessary */
 		fix_inquiry_data(srb);
 	}
@@ -323,68 +222,10 @@ void usb_stor_ufi_command(Scsi_Cmnd *srb, struct us_data *us)
 
 void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 {
-	int old_cmnd = 0;
-
-	/* This code supports devices which do not support {READ|WRITE}_6
-	 * Apparently, neither Windows or MacOS will use these commands,
-	 * so some devices do not support them
-	 */
-	if (us->flags & US_FL_MODE_XLATE) {
-		US_DEBUGP("Invoking Mode Translation\n");
-		/* save the old command for later */
-		old_cmnd = srb->cmnd[0];
-
-		switch (srb->cmnd[0]) {
-		/* change READ_6/WRITE_6 to READ_10/WRITE_10 */
-		case WRITE_6:
-		case READ_6:
-			srb->cmd_len = 12;
-			srb->cmnd[11] = 0;
-			srb->cmnd[10] = 0;
-			srb->cmnd[9] = 0;
-			srb->cmnd[8] = srb->cmnd[4];
-			srb->cmnd[7] = 0;
-			srb->cmnd[6] = 0;
-			srb->cmnd[5] = srb->cmnd[3];
-			srb->cmnd[4] = srb->cmnd[2];
-			srb->cmnd[3] = srb->cmnd[1] & 0x1F;
-			srb->cmnd[2] = 0;
-			srb->cmnd[1] = srb->cmnd[1] & 0xE0;
-			srb->cmnd[0] = srb->cmnd[0] | 0x20;
-			break;
-
-		/* convert MODE_SELECT data here */
-		case MODE_SENSE:
-		case MODE_SELECT:
-			srb->cmd_len = 12;
-			srb->cmnd[11] = 0;
-			srb->cmnd[10] = 0;
-			srb->cmnd[9] = 0;
-			srb->cmnd[8] = srb->cmnd[4];
-			srb->cmnd[7] = 0;
-			srb->cmnd[6] = 0;
-			srb->cmnd[5] = 0;
-			srb->cmnd[4] = 0;
-			srb->cmnd[3] = 0;
-			srb->cmnd[2] = srb->cmnd[2];
-			srb->cmnd[1] = srb->cmnd[1];
-			srb->cmnd[0] = srb->cmnd[0] | 0x40;
-			break;
-		} /* switch (srb->cmnd[0]) */
-	} /* if (us->flags & US_FL_MODE_XLATE) */
-
-	/* convert MODE_SELECT data here */
-	if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SELECT))
-		usb_stor_scsiSense6to10(srb);
-
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
+
 	if (srb->result == SAM_STAT_GOOD) {
-
-		/* Fix the MODE_SENSE data if we translated the command */
-		if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE))
-			usb_stor_scsiSense10to6(srb);
-
 		/* Fix the INQUIRY data if necessary */
 		fix_inquiry_data(srb);
 

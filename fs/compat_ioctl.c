@@ -52,7 +52,7 @@
 #include <linux/raw.h>
 #include <linux/smb_fs.h>
 #include <linux/blkpg.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/rtc.h>
 #include <linux/pci.h>

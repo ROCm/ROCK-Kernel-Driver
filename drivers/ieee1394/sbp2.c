@@ -52,7 +52,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/version.h>

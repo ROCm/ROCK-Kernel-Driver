@@ -11,8 +11,11 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/kernel_stat.h>
+
 #include <asm/lowcore.h>
 #include <asm/s390_ext.h>
+#include <asm/irq.h>
 
 /*
  * Simple hash strategy: index = code & 0xff;
@@ -96,6 +99,11 @@ int unregister_early_external_interrupt(__u16 code, ext_int_handler_t handler,
 	} else
 		ext_int_hash[index] = p->next;
 	return 0;
+}
+
+void do_extint(void)
+{
+	kstat_cpu(smp_processor_id()).irqs[EXTERNAL_INTERRUPT]++;
 }
 
 EXPORT_SYMBOL(register_external_interrupt);

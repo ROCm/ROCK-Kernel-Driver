@@ -40,7 +40,7 @@
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/version.h>
 #include <linux/isapnp.h>
 #include "scsi.h"

@@ -111,7 +111,6 @@
 #include <linux/major.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
 #include <linux/blkpg.h>
 
 #include <asm/system.h>

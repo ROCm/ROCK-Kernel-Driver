@@ -52,8 +52,6 @@
 #define MD_DRIVER
 #define DEVICE_NR(device) (minor(device))
 
-#include <linux/blk.h>
-
 #define DEBUG 0
 #define dprintk(x...) ((void)(DEBUG && printk(x)))
 

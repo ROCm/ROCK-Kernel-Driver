@@ -6,7 +6,7 @@
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/mount.h>
-#include <linux/blk.h>
+#include <linux/major.h>
 #include <linux/root_dev.h>
 
 asmlinkage long sys_unlink(const char *name);

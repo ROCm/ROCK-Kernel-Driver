@@ -56,6 +56,7 @@ unsigned long __per_cpu_offset[NR_CPUS];
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
@@ -709,6 +710,8 @@ cpu_init (void)
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
+
+			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
 		}
 	}
 	cpu_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
@@ -716,19 +719,18 @@ cpu_init (void)
 	cpu_data = __phys_per_cpu_start;
 #endif /* !CONFIG_SMP */
 
-	cpu_info = cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-#ifdef CONFIG_NUMA
-	cpu_info->node_data = get_node_data_ptr();
-#endif
-
 	get_max_cacheline_size();
 
 	/*
 	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called
 	 * ia64_mmu_init() yet.  And we can't call ia64_mmu_init() first because it
 	 * depends on the data returned by identify_cpu().  We break the dependency by
-	 * accessing cpu_data() the old way, through identity mapped space.
+	 * accessing cpu_data() through the canonical per-CPU address.
 	 */
+	cpu_info = cpu_data + ((char *) &__ia64_per_cpu_var(cpu_info) - __per_cpu_start);
+#ifdef CONFIG_NUMA
+	cpu_info->node_data = get_node_data_ptr();
+#endif
 	identify_cpu(cpu_info);
 
 #ifdef CONFIG_MCKINLEY

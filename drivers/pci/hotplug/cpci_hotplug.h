@@ -75,7 +75,6 @@ extern int cpci_hp_register_controller(struct cpci_hp_controller *controller);
 extern int cpci_hp_unregister_controller(struct cpci_hp_controller *controller);
 extern int cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last);
 extern int cpci_hp_unregister_bus(struct pci_bus *bus);
-extern struct slot *cpci_find_slot(struct pci_bus *bus, unsigned int devfn);
 extern int cpci_hp_start(void);
 extern int cpci_hp_stop(void);
 

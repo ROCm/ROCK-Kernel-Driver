@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.98 $
+ *   $Revision: 1.100 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -16,10 +16,12 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/kernel_stat.h>
 
 #include <asm/hardirq.h>
 #include <asm/cio.h>
 #include <asm/delay.h>
+#include <asm/irq.h>
 
 #include "airq.h"
 #include "cio.h"
@@ -442,6 +444,11 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 			if (sch->schib.pmcw.ena)
 				break;
 		}
+		if (ret == -EBUSY) {
+			struct irb irb;
+			if (tsch(sch->irq, &irb) != 0)
+				break;
+		}
 	}
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (2, dbf_txt);
@@ -608,6 +615,7 @@ do_IRQ (struct pt_regs regs)
 	tpi_info = (struct tpi_info *) __LC_SUBCHANNEL_ID;
 	irb = (struct irb *) __LC_IRB;
 	do {
+		kstat_cpu(smp_processor_id()).irqs[IO_INTERRUPT]++;
 		/*
 		 * Non I/O-subchannel thin interrupts are processed differently
 		 */

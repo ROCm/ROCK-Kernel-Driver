@@ -16,7 +16,6 @@
 #include <linux/interrupt.h>
 #include <linux/ctype.h>
 #include <linux/major.h>
-#include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/buffer_head.h>
 

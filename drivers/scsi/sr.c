@@ -43,7 +43,7 @@
 #include <linux/cdrom.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
 #include "scsi.h"
@@ -533,7 +533,7 @@ static int sr_probe(struct device *dev)
 
 	snprintf(disk->devfs_name, sizeof(disk->devfs_name),
 			"%s/cd", sdev->devfs_name);
-	disk->driverfs_dev = &sdev->sdev_driverfs_dev;
+	disk->driverfs_dev = &sdev->sdev_gendev;
 	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);
 	disk->private_data = &cd->driver;

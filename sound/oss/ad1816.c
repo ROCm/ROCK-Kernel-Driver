@@ -1,15 +1,15 @@
 /*
  *
- * AD1816 lowlevel sound driver for Linux 2.2.0 and above
+ * AD1816 lowlevel sound driver for Linux 2.6.0 and above
  *
- * Copyright (C) 1998 by Thorsten Knabe <tek@rbg.informatik.tu-darmstadt.de>
+ * Copyright (C) 1998-2003 by Thorsten Knabe <linux@thorsten-knabe.de>
  *
  * Based on the CS4232/AD1848 driver Copyright (C) by Hannu Savolainen 1993-1996
  *
  *
- * version: 1.3.1
- * status: experimental
- * date: 1999/4/18
+ * version: 1.5
+ * status: beta
+ * date: 2003/07/15
  *
  * Changes:
  *	Oleg Drokin: Some cleanup of load/unload functions.	1998/11/24
@@ -30,7 +30,16 @@
  *	Christoph Hellwig: Added isapnp support			2000/03/15
  *
  *	Arnaldo Carvalho de Melo: get rid of check_region	2001/10/07
+ *      
+ *      Thorsten Knabe: Compiling with CONFIG_PNP enabled
+ *	works again. It is now possible to use more than one 
+ *	AD1816 sound card. Sample rate now may be changed during
+ *	playback/capture. printk() uses log levels everywhere.
+ *	SMP fixes. DMA handling fixes.
+ *	Other minor code cleanup.				2003/07/15
+ *
  */
+
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -42,9 +51,6 @@
 #include "sound_config.h"
 
 #define DEBUGNOISE(x)
-#define DEBUGINFO(x)
-#define DEBUGLOG(x)
-#define DEBUGWARN(x)
 
 #define CHECK_FOR_POWER { int timeout=100; \
   while (timeout > 0 && (inb(devc->base)&0x80)!= 0x80) {\
@@ -63,33 +69,27 @@ typedef struct
 	int            dma_playback;
         int            dma_capture;
   
-        int            speed;         /* open */
+	int            opened;         /* open */
+        int            speed;	
 	int            channels;
 	int            audio_format;
-	unsigned char  format_bits;
         int            audio_mode; 
-	int            opened;
   
         int            recmask;        /* setup */
+	unsigned char  format_bits;
 	int            supported_devices;
 	int            supported_rec_devices;
 	unsigned short levels[SOUND_MIXER_NRDEVICES];
+					/* misc */
+	struct pnp_dev *pnpdev;	 /* configured via pnp */
         int            dev_no;   /* this is the # in audio_devs and NOT 
 				    in ad1816_info */
-	int            irq_ok;
-	int            *osp;
 	spinlock_t	lock;  
 } ad1816_info;
 
 static int nr_ad1816_devs;
 static int ad1816_clockfreq = 33000;
 static int options;
-
-/* for backward mapping of irq to sound device */
-
-static volatile char irq2dev[17] = {-1, -1, -1, -1, -1, -1, -1, -1,
-				    -1, -1, -1, -1, -1, -1, -1, -1, -1};
-
 
 /* supported audio formats */
 static int  ad_format_mask =
@@ -105,33 +105,22 @@ static ad1816_info dev_info[MAX_AUDIO_DEV];
 
 static int ad_read (ad1816_info * devc, int reg)
 {
-	unsigned long   flags;
 	int result;
 	
 	CHECK_FOR_POWER;
-
-	spin_lock_irqsave(&devc->lock,flags); /* make register access atomic */
 	outb ((unsigned char) (reg & 0x3f), devc->base+0);
 	result = inb(devc->base+2);
 	result+= inb(devc->base+3)<<8;
-	spin_unlock_irqrestore(&devc->lock,flags);
-	
 	return (result);
 }
 
 
 static void ad_write (ad1816_info * devc, int reg, int data)
 {
-	unsigned long flags;
-	
 	CHECK_FOR_POWER;
-	
-	spin_lock_irqsave(&devc->lock,flags); /* make register access atomic */
 	outb ((unsigned char) (reg & 0xff), devc->base+0);
 	outb ((unsigned char) (data & 0xff),devc->base+2);
 	outb ((unsigned char) ((data>>8)&0xff),devc->base+3);
-	spin_unlock_irqrestore(&devc->lock,flags);
-
 }
 
 /* ------------------------------------------------------------------- */
@@ -144,7 +133,7 @@ static void ad1816_halt_input (int dev)
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	unsigned char buffer;
 	
-	DEBUGINFO (printk("ad1816: halt_input called\n"));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: halt_input called\n"));
 	
 	spin_lock_irqsave(&devc->lock,flags); 
 	
@@ -176,7 +165,7 @@ static void ad1816_halt_output (int dev)
 	
 	unsigned char buffer;
 
-	DEBUGINFO (printk("ad1816: halt_output called!\n"));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: halt_output called!\n"));
 
 	spin_lock_irqsave(&devc->lock,flags); 
 	/* Mute pcm output */
@@ -210,7 +199,7 @@ static void ad1816_output_block (int dev, unsigned long buf,
 	unsigned long cnt;
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	
-	DEBUGINFO(printk("ad1816: output_block called buf=%ld count=%d flags=%d\n",buf,count,intrflag));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: output_block called buf=%ld count=%d flags=%d\n",buf,count,intrflag));
   
 	cnt = count/4 - 1;
   
@@ -231,7 +220,7 @@ static void ad1816_start_input (int dev, unsigned long buf, int count,
 	unsigned long  cnt;
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	
-	DEBUGINFO(printk("ad1816: start_input called buf=%ld count=%d flags=%d\n",buf,count,intrflag));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: start_input called buf=%ld count=%d flags=%d\n",buf,count,intrflag));
 
 	cnt = count/4 - 1;
 
@@ -239,7 +228,6 @@ static void ad1816_start_input (int dev, unsigned long buf, int count,
 
 	/* set transfer count */
 	ad_write (devc, 10, cnt & 0xffff); 
-
 	devc->audio_mode |= PCM_ENABLE_INPUT;
 	spin_unlock_irqrestore(&devc->lock,flags);
 }
@@ -251,33 +239,19 @@ static int ad1816_prepare_for_input (int dev, int bsize, int bcount)
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	unsigned char fmt_bits;
 	
-	DEBUGINFO (printk ("ad1816: prepare_for_input called: bsize=%d bcount=%d\n",bsize,bcount));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: prepare_for_input called: bsize=%d bcount=%d\n",bsize,bcount));
 
 	spin_lock_irqsave(&devc->lock,flags);
-	
 	fmt_bits= (devc->format_bits&0x7)<<3;
 	
 	/* set mono/stereo mode */
 	if (devc->channels > 1) {
 		fmt_bits |=0x4;
 	}
-
 	/* set Mono/Stereo in playback/capture register */
 	outb( (inb(devc->base+8) & ~0x3C)|fmt_bits, devc->base+8); 
 	outb( (inb(devc->base+9) & ~0x3C)|fmt_bits, devc->base+9);
-  
-	/* If compiled into kernel, AD1816_CLOCK is defined, so use it */
-#ifdef AD1816_CLOCK 
-	ad1816_clockfreq=AD1816_CLOCK;
-#endif
 
-	/* capture/playback frequency correction for soundcards 
-	   with clock chips != 33MHz (allowed range 5 - 100 kHz) */
-
-	if (ad1816_clockfreq<5000 || ad1816_clockfreq>100000) {
-		ad1816_clockfreq=33000;
-	}
-	
 	freq=((unsigned int)devc->speed*33000)/ad1816_clockfreq; 
 
 	/* write playback/capture speeds */
@@ -297,7 +271,7 @@ static int ad1816_prepare_for_output (int dev, int bsize, int bcount)
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	unsigned char fmt_bits;
 
-	DEBUGINFO (printk ("ad1816: prepare_for_output called: bsize=%d bcount=%d\n",bsize,bcount));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: prepare_for_output called: bsize=%d bcount=%d\n",bsize,bcount));
 
 	spin_lock_irqsave(&devc->lock,flags);
 
@@ -310,17 +284,6 @@ static int ad1816_prepare_for_output (int dev, int bsize, int bcount)
 	/* write format bits to playback/capture registers */
 	outb( (inb(devc->base+8) & ~0x3C)|fmt_bits, devc->base+8); 
 	outb( (inb(devc->base+9) & ~0x3C)|fmt_bits, devc->base+9);
-  
-#ifdef AD1816_CLOCK 
-	ad1816_clockfreq=AD1816_CLOCK;
-#endif
-
-	/* capture/playback frequency correction for soundcards 
-	   with clock chips != 33MHz (allowed range 5 - 100 kHz)*/
-
-	if (ad1816_clockfreq<5000 || ad1816_clockfreq>100000) {
-		ad1816_clockfreq=33000;
-	}
   
 	freq=((unsigned int)devc->speed*33000)/ad1816_clockfreq; 
 	
@@ -340,7 +303,7 @@ static void ad1816_trigger (int dev, int state)
 	unsigned long flags;
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 
-	DEBUGINFO (printk("ad1816: trigger called! (devc=%d,devc->base=%d\n", devc, devc->base));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: trigger called! (devc=%d,devc->base=%d\n", devc, devc->base));
 
 	/* mode may have changed */
 
@@ -388,10 +351,17 @@ static void ad1816_reset (int dev)
 /* set playback speed */
 static int ad1816_set_speed (int dev, int arg)
 {
+	unsigned long flags;
+	unsigned int freq;
+	int ret;
+
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	
+	spin_lock_irqsave(&devc->lock, flags);
 	if (arg == 0) {
-		return devc->speed;
+		ret = devc->speed;
+		spin_unlock_irqrestore(&devc->lock, flags);
+		return ret;
 	}
 	/* range checking */
 	if (arg < 4000) {
@@ -400,14 +370,23 @@ static int ad1816_set_speed (int dev, int arg)
 	if (arg > 55000) {
 		arg = 55000;
 	}
-
 	devc->speed = arg;
-	return devc->speed;
+
+	/* change speed during playback */
+	freq=((unsigned int)devc->speed*33000)/ad1816_clockfreq; 
+	/* write playback/capture speeds */
+	ad_write (devc, 2, freq & 0xffff);	
+	ad_write (devc, 3, freq & 0xffff);	
+
+	ret = devc->speed;
+	spin_unlock_irqrestore(&devc->lock, flags);
+	return ret;
 
 }
 
 static unsigned int ad1816_set_bits (int dev, unsigned int arg)
 {
+	unsigned long flags;
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 	
 	static struct format_tbl {
@@ -428,10 +407,13 @@ static unsigned int ad1816_set_bits (int dev, unsigned int arg)
 
 	int  i, n = sizeof (format2bits) / sizeof (struct format_tbl);
 
+	spin_lock_irqsave(&devc->lock, flags);
 	/* return current format */
-	if (arg == 0)
-		return devc->audio_format;
-	
+	if (arg == 0) {
+	  	arg = devc->audio_format;
+		spin_unlock_irqrestore(&devc->lock, flags);
+		return arg;
+	}
 	devc->audio_format = arg;
 
 	/* search matching format bits */
@@ -439,12 +421,15 @@ static unsigned int ad1816_set_bits (int dev, unsigned int arg)
 		if (format2bits[i].format == arg) {
 			devc->format_bits = format2bits[i].bits;
 			devc->audio_format = arg;
+			spin_unlock_irqrestore(&devc->lock, flags);
 			return arg;
 		}
 
 	/* Still hanging here. Something must be terribly wrong */
 	devc->format_bits = 0;
-	return devc->audio_format = AFMT_U8;
+	devc->audio_format = AFMT_U8;
+	spin_unlock_irqrestore(&devc->lock, flags);
+	return(AFMT_U8); 
 }
 
 static short ad1816_set_channels (int dev, short arg)
@@ -486,9 +471,8 @@ static int ad1816_open (int dev, int mode)
 	devc->speed = 8000;
 	devc->audio_format=AFMT_U8;
 	devc->channels=1;
-
-	ad1816_reset(devc->dev_no); /* halt all pending output */
 	spin_unlock_irqrestore(&devc->lock,flags);
+	ad1816_reset(devc->dev_no); /* halt all pending output */
 	return 0;
 }
 
@@ -497,17 +481,15 @@ static void ad1816_close (int dev) /* close device */
 	unsigned long flags;
 	ad1816_info    *devc = (ad1816_info *) audio_devs[dev]->devc;
 
-	spin_lock_irqsave(&devc->lock,flags);
-
 	/* halt all pending output */
 	ad1816_reset(devc->dev_no); 
-	
+
+	spin_lock_irqsave(&devc->lock,flags);
 	devc->opened = 0;
 	devc->audio_mode = 0;
 	devc->speed = 8000;
 	devc->audio_format=AFMT_U8;
 	devc->format_bits = 0;
-
 	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
@@ -543,25 +525,13 @@ static struct audio_driver ad1816_audio_driver =
 static irqreturn_t ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 {
 	unsigned char	status;
-	ad1816_info	*devc;
-	int		dev;
-
+	ad1816_info	*devc = (ad1816_info *)dev_id;
 	
 	if (irq < 0 || irq > 15) {
 	        printk(KERN_WARNING "ad1816: Got bogus interrupt %d\n", irq);
 		return IRQ_NONE;
 	}
 
-	dev = irq2dev[irq];
-	
-	if (dev < 0 || dev >= num_audiodevs) {
-	        printk(KERN_WARNING "ad1816: IRQ2AD1816-mapping failed for "
-				    "irq %d device %d\n", irq,dev);
-		return IRQ_NONE;
-	}
-
-	devc = (ad1816_info *) audio_devs[dev]->devc;
-	
 	spin_lock(&devc->lock);
 
 	/* read interrupt register */
@@ -569,18 +539,19 @@ static irqreturn_t ad1816_interrupt (int irq, void *dev_id, struct pt_regs *dumm
 	/* Clear all interrupt  */
 	outb (~status, devc->base+1);	
 
-	DEBUGNOISE (printk("ad1816: Got interrupt subclass %d\n",status));
-	
-	devc->irq_ok=1;
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: Got interrupt subclass %d\n",status));
 
-	if (status == 0)
-		DEBUGWARN(printk ("ad1816: interrupt: Got interrupt, but no reason?\n"));
+	if (status == 0) {
+		DEBUGNOISE(printk(KERN_DEBUG "ad1816: interrupt: Got interrupt, but no source.\n"));
+		spin_unlock(&devc->lock);
+		return IRQ_NONE;
+	}
 
 	if (devc->opened && (devc->audio_mode & PCM_ENABLE_INPUT) && (status&64))
-		DMAbuf_inputintr (dev);
+		DMAbuf_inputintr (devc->dev_no);
 
 	if (devc->opened && (devc->audio_mode & PCM_ENABLE_OUTPUT) && (status & 128))
-		DMAbuf_outputintr (dev, 1);
+		DMAbuf_outputintr (devc->dev_no, 1);
 
 	spin_unlock(&devc->lock);
 	return IRQ_HANDLED;
@@ -671,9 +642,11 @@ static unsigned short default_mixer_levels[SOUND_MIXER_NRDEVICES] =
 static int
 ad1816_set_recmask (ad1816_info * devc, int mask)
 {
+  	unsigned long 	flags;
 	unsigned char   recdev;
 	int             i, n;
 	
+	spin_lock_irqsave(&devc->lock, flags);
 	mask &= devc->supported_rec_devices;
 	
 	n = 0;
@@ -733,6 +706,7 @@ ad1816_set_recmask (ad1816_info * devc, int mask)
 		  (ad_read (devc, 20) & 0x8f8f) | recdev | (recdev<<8));
 
 	devc->recmask = mask;
+	spin_unlock_irqrestore(&devc->lock, flags);
 	return mask;
 }
 
@@ -760,7 +734,7 @@ change_bits (int *regval, int dev, int chn, int newval)
 static int
 ad1816_mixer_get (ad1816_info * devc, int dev)
 {
-	DEBUGINFO(printk("ad1816: mixer_get called!\n"));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: mixer_get called!\n"));
 	
 	/* range check + supported mixer check */
 	if (dev < 0 || dev >= SOUND_MIXER_NRDEVICES )
@@ -781,8 +755,9 @@ ad1816_mixer_set (ad1816_info * devc, int dev, int value)
 	int   regoffs;
 	int   val;
 	int   valmute;
+	unsigned long flags;
 
-	DEBUGINFO(printk("ad1816: mixer_set called!\n"));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: mixer_set called!\n"));
 	
 	if (dev < 0 || dev >= SOUND_MIXER_NRDEVICES )
 		return -(EINVAL);
@@ -813,6 +788,7 @@ ad1816_mixer_set (ad1816_info * devc, int dev, int value)
 	/* sanity check */
 	if (mix_devices[dev][LEFT_CHN].nbits == 0)
 		return -(EINVAL);
+	spin_lock_irqsave(&devc->lock, flags);
 
 	/* keep precise volume internal */
 	devc->levels[dev] = retvol;
@@ -840,8 +816,10 @@ ad1816_mixer_set (ad1816_info * devc, int dev, int value)
 	 */
  
 	/* Was just a mono channel */
-	if (mix_devices[dev][RIGHT_CHN].nbits == 0)
+	if (mix_devices[dev][RIGHT_CHN].nbits == 0) {
+		spin_unlock_irqrestore(&devc->lock, flags);
 		return retvol;		
+	}
 
 	regoffs = mix_devices[dev][RIGHT_CHN].regno;
 	val = ad_read (devc, regoffs);
@@ -857,7 +835,7 @@ ad1816_mixer_set (ad1816_info * devc, int dev, int value)
 			valmute &= ~0x80;
 	}
 	ad_write (devc, regoffs, valmute); /* mute */
-	
+	spin_unlock_irqrestore(&devc->lock, flags);
        	return retvol;
 }
 
@@ -901,7 +879,7 @@ ad1816_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 	ad1816_info    *devc = mixer_devs[dev]->devc;
 	int val;
   
-	DEBUGINFO(printk("ad1816: mixer_ioctl called!\n"));
+	DEBUGNOISE(printk(KERN_DEBUG "ad1816: mixer_ioctl called!\n"));
   
 	/* Mixer ioctl */
 	if (((cmd >> 8) & 0xff) == 'M') { 
@@ -980,83 +958,91 @@ static struct mixer_operations ad1816_mixer_operations = {
 
 /* ------------------------------------------------------------------- */
 
-/* stuff for card recognition, init and unloading */
+/* stuff for card recognition, init and unloading PNP ...*/
 
 
-/* replace with probe routine */
-static int __init probe_ad1816 ( struct address_info *hw_config )
+/* check if AD1816 present at specified hw_config and register device with OS 
+ * return 1 if initialization was successful, 0 otherwise
+ */
+static int __init ad1816_init_card (struct address_info *hw_config, 
+	struct pnp_dev *pnp)
 {
-	ad1816_info    *devc = &dev_info[nr_ad1816_devs];
-	int io_base=hw_config->io_base;
-	int *osp=hw_config->osp;
+	ad1816_info    *devc = NULL;
 	int tmp;
+	int oss_devno = -1;
 
-	printk(KERN_INFO "ad1816: AD1816 sounddriver "
-			 "Copyright (C) 1998 by Thorsten Knabe\n");
-	printk(KERN_INFO "ad1816: io=0x%x, irq=%d, dma=%d, dma2=%d, "
-			 "clockfreq=%d, options=%d isadmabug=%d\n",
+	printk(KERN_INFO "ad1816: initializing card: io=0x%x, irq=%d, dma=%d, "
+			 "dma2=%d, clockfreq=%d, options=%d isadmabug=%d "
+			 "%s\n",
 	       hw_config->io_base,
 	       hw_config->irq,
 	       hw_config->dma,
 	       hw_config->dma2,
 	       ad1816_clockfreq,
 	       options,
-	       isa_dma_bridge_buggy);
+	       isa_dma_bridge_buggy,
+	       pnp?"(PNP)":"");
 
-	if (!request_region(io_base, 16, "AD1816 Sound")) {
-		printk(KERN_WARNING "ad1816: I/O port 0x%03x not free\n",
-				    io_base);
-		goto err;
-	}
-
-	DEBUGLOG(printk ("ad1816: detect(%x)\n", io_base));
-	
+	/* ad1816_info structure remaining ? */
 	if (nr_ad1816_devs >= MAX_AUDIO_DEV) {
-		printk(KERN_WARNING "ad1816: detect error - step 0\n");
-		goto out_release_region;
+		printk(KERN_WARNING "ad1816: no more ad1816_info structures "
+			"left\n");
+		goto out;
 	}
 
-	devc->base = io_base;
-	devc->irq_ok = 0;
-	devc->irq = 0;
+	devc = &dev_info[nr_ad1816_devs];
+	devc->base = hw_config->io_base;
+	devc->irq = hw_config->irq;
+	devc->dma_playback=hw_config->dma;
+	devc->dma_capture=hw_config->dma2;
 	devc->opened = 0;
-	devc->osp = osp;
+	devc->pnpdev = pnp;
 	spin_lock_init(&devc->lock);
 
+	if (!request_region(devc->base, 16, "AD1816 Sound")) {
+		printk(KERN_WARNING "ad1816: I/O port 0x%03x not free\n",
+				    devc->base);
+		goto out;
+	}
+
+	printk(KERN_INFO "ad1816: Examining AD1816 at address 0x%03x.\n", 
+		devc->base);
+	
+
+	/* tests for ad1816 */
 	/* base+0: bit 1 must be set but not 255 */
 	tmp=inb(devc->base);
 	if ( (tmp&0x80)==0 || tmp==255 ) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 or chip is not active (Test 0)\n"));
+		printk (KERN_INFO "ad1816: Chip is not an AD1816 or chip "
+			"is not active (Test 0)\n");
 		goto out_release_region;
 	}
-
 
 	/* writes to ireg 8 are copied to ireg 9 */
 	ad_write(devc,8,12345); 
 	if (ad_read(devc,9)!=12345) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 (Test 1)\n"));
+		printk(KERN_INFO "ad1816: Chip is not an AD1816 (Test 1)\n");
 		goto out_release_region;
 	}
   
 	/* writes to ireg 8 are copied to ireg 9 */
 	ad_write(devc,8,54321); 
 	if (ad_read(devc,9)!=54321) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 (Test 2)\n"));
+		printk(KERN_INFO "ad1816: Chip is not an AD1816 (Test 2)\n");
 		goto out_release_region;
 	}
-
 
 	/* writes to ireg 10 are copied to ireg 11 */
 	ad_write(devc,10,54321); 
 	if (ad_read(devc,11)!=54321) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 (Test 3)\n"));
+		printk (KERN_INFO "ad1816: Chip is not an AD1816 (Test 3)\n");
 		goto out_release_region;
 	}
 
 	/* writes to ireg 10 are copied to ireg 11 */
 	ad_write(devc,10,12345); 
 	if (ad_read(devc,11)!=12345) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 (Test 4)\n"));
+		printk (KERN_INFO "ad1816: Chip is not an AD1816 (Test 4)\n");
 		goto out_release_region;
 	}
 
@@ -1064,35 +1050,12 @@ static int __init probe_ad1816 ( struct address_info *hw_config )
 	tmp=inb(devc->base+1);
 	outb(0xff,devc->base+1); 
 	if (inb(devc->base+1)!=tmp) {
-		DEBUGLOG (printk ("ad1816: Chip is not an AD1816 (Test 5)\n"));
+		printk(KERN_INFO "ad1816: Chip is not an AD1816 (Test 5)\n");
 		goto out_release_region;
 	}
-
   
-	DEBUGLOG (printk ("ad1816: detect() - Detected OK\n"));
-	DEBUGLOG (printk ("ad1816: AD1816 Version: %d\n",ad_read(devc,45)));
-
-	/* detection was successful */
-	return 1; 
-out_release_region:
-	release_region(io_base, 16);
-	/* detection was NOT successful */
-err:	return 0;
-}
-
-
-/* allocate resources from the kernel. If any allocation fails, free
-   all allocated resources and exit attach.
-  
- */
-
-static void __init attach_ad1816 (struct address_info *hw_config)
-{
-	int             my_dev;
-	char            dev_name[100];
-	ad1816_info    *devc = &dev_info[nr_ad1816_devs];
-
-	devc->base = hw_config->io_base;	
+	printk(KERN_INFO "ad1816: AD1816 (version %d) successfully detected!\n",
+		ad_read(devc,45));
 
 	/* disable all interrupts */
 	ad_write(devc,1,0);     
@@ -1101,62 +1064,54 @@ static void __init attach_ad1816 (struct address_info *hw_config)
 	outb (0, devc->base+1);	
 
 	/* allocate irq */
-	if (hw_config->irq < 0 || hw_config->irq > 15)
+	if (devc->irq < 0 || devc->irq > 15)
 		goto out_release_region;
-	if (request_irq(hw_config->irq, ad1816_interrupt,0,
-			"SoundPort", hw_config->osp) < 0)	{
+	if (request_irq(devc->irq, ad1816_interrupt,0,
+			"SoundPort", devc) < 0)	{
 	        printk(KERN_WARNING "ad1816: IRQ in use\n");
 		goto out_release_region;
 	}
-	devc->irq=hw_config->irq;
 
 	/* DMA stuff */
-	if (sound_alloc_dma (hw_config->dma, "Sound System")) {
+	if (sound_alloc_dma (devc->dma_playback, "Sound System")) {
 		printk(KERN_WARNING "ad1816: Can't allocate DMA%d\n",
-				    hw_config->dma);
+				    devc->dma_playback);
 		goto out_free_irq;
 	}
-	devc->dma_playback=hw_config->dma;
 	
-	if ( hw_config->dma2 != -1 && hw_config->dma2 != hw_config->dma) {
-		if (sound_alloc_dma(hw_config->dma2,
+	if ( devc->dma_capture >= 0 && 
+	  	devc->dma_capture != devc->dma_playback) {
+		if (sound_alloc_dma(devc->dma_capture,
 				    "Sound System (capture)")) {
 			printk(KERN_WARNING "ad1816: Can't allocate DMA%d\n",
-					    hw_config->dma2);
+					    devc->dma_capture);
 			goto out_free_dma;
 		}
-		devc->dma_capture=hw_config->dma2;
 		devc->audio_mode=DMA_AUTOMODE|DMA_DUPLEX;
 	} else {
-	        devc->dma_capture=-1;
+	  	printk(KERN_WARNING "ad1816: Only one DMA channel "
+			"available/configured. No duplex operation possible\n");
 		devc->audio_mode=DMA_AUTOMODE;
 	}
 
-	sprintf (dev_name,"AD1816 audio driver");
-  
-	conf_printf2 (dev_name,
-		      devc->base, devc->irq, hw_config->dma, hw_config->dma2);
+	conf_printf2 ("AD1816 audio driver",
+		      devc->base, devc->irq, devc->dma_playback, 
+		      devc->dma_capture);
 
 	/* register device */
-	if ((my_dev = sound_install_audiodrv (AUDIO_DRIVER_VERSION,
-					      dev_name,
+	if ((oss_devno = sound_install_audiodrv (AUDIO_DRIVER_VERSION,
+					      "AD1816 audio driver",
 					      &ad1816_audio_driver,
 					      sizeof (struct audio_driver),
 					      devc->audio_mode,
 					      ad_format_mask,
 					      devc,
-					      hw_config->dma, 
-					      hw_config->dma2)) < 0) {
+					      devc->dma_playback, 
+					      devc->dma_capture)) < 0) {
 		printk(KERN_WARNING "ad1816: Can't install sound driver\n");
 		goto out_free_dma_2;
 	}
 
-	/* fill rest of structure with reasonable default values */
-	irq2dev[hw_config->irq] = devc->dev_no = my_dev;
-	devc->opened = 0;
-	devc->irq_ok = 0;
-	devc->osp = hw_config->osp;  
-	nr_ad1816_devs++;
 
 	ad_write(devc,32,0x80f0); /* sound system mode */
 	if (options&1) {
@@ -1186,25 +1141,30 @@ static void __init attach_ad1816 (struct address_info *hw_config)
 	ad1816_mixer_reset (devc); 
   
 	/* register mixer */
-	if ((audio_devs[my_dev]->mixer_dev=sound_install_mixer(
+	if ((audio_devs[oss_devno]->mixer_dev=sound_install_mixer(
 				       MIXER_DRIVER_VERSION,
-				       dev_name,
+				       "AD1816 audio driver",
 				       &ad1816_mixer_operations,
 				       sizeof (struct mixer_operations),
-				       devc)) >= 0) {
-		audio_devs[my_dev]->min_fragment = 0;
+				       devc)) < 0) {
+	  	printk(KERN_WARNING "Can't install mixer\n");
 	}
-out:	return;
+	/* make ad1816_info active */
+	nr_ad1816_devs++;
+	printk(KERN_INFO "ad1816: card successfully installed!\n");
+	return 1;
+	/* error handling */
 out_free_dma_2:
-	if (devc->dma_capture >= 0)
-	        sound_free_dma(hw_config->dma2);
+	if (devc->dma_capture >= 0 && devc->dma_capture != devc->dma_playback)
+	        sound_free_dma(devc->dma_capture);
 out_free_dma:
-	sound_free_dma(hw_config->dma);
+	sound_free_dma(devc->dma_playback);
 out_free_irq:
-	free_irq(hw_config->irq,hw_config->osp);
+	free_irq(devc->irq, devc);
 out_release_region:
-	release_region(hw_config->io_base, 16);
-	goto out;
+	release_region(devc->base, 16);
+out:
+	return 0;
 }
 
 static void __exit unload_card(ad1816_info *devc)
@@ -1212,7 +1172,7 @@ static void __exit unload_card(ad1816_info *devc)
 	int  mixer, dev = 0;
 	
 	if (devc != NULL) {
-		DEBUGLOG (printk("ad1816: Unloading card at base=%x\n",devc->base));
+		printk("ad1816: Unloading card at address 0x%03x\n",devc->base);
 		
 		dev = devc->dev_no;
 		mixer = audio_devs[dev]->mixer_dev;
@@ -1221,26 +1181,29 @@ static void __exit unload_card(ad1816_info *devc)
 		if(mixer>=0) {
 			sound_unload_mixerdev(mixer);
 		}
+		/* unreg audiodev */
 		sound_unload_audiodev(dev);
 		
 		/* free dma channels */
-		if (devc->dma_capture>=0) {
+		if (devc->dma_capture>=0 && 
+		  	devc->dma_capture != devc->dma_playback) {
 			sound_free_dma(devc->dma_capture);
 		}
-
-		/* card won't get added if resources could not be allocated
-		   thus we need not ckeck if allocation was successful */
 		sound_free_dma (devc->dma_playback);
-		free_irq(devc->irq, devc->osp);
+		/* free irq */
+		free_irq(devc->irq, devc);
+		/* free io */
 		release_region (devc->base, 16);
-		
-		DEBUGLOG (printk("ad1816: Unloading card at base=%x was successful\n",devc->base));
+#ifdef __ISAPNP__
+		if (devc->pnpdev) {
+		  	pnp_disable_dev(devc->pnpdev);
+			pnp_device_detach(devc->pnpdev);
+		}
+#endif
 		
 	} else
 		printk(KERN_WARNING "ad1816: no device/card specified\n");
 }
-
-static struct address_info cfg;
 
 static int __initdata io = -1;
 static int __initdata irq = -1;
@@ -1248,18 +1211,11 @@ static int __initdata dma = -1;
 static int __initdata dma2 = -1;
 
 #ifdef __ISAPNP__
-struct pci_dev	*ad1816_dev  = NULL;
-
-static int activated	= 1;
-
+/* use isapnp for configuration */
 static int isapnp	= 1;
 static int isapnpjump	= 0;
-
 MODULE_PARM(isapnp, "i");
 MODULE_PARM(isapnpjump, "i");
-
-#else
-static int isapnp = 0;
 #endif
 
 MODULE_PARM(io,"i");
@@ -1270,51 +1226,6 @@ MODULE_PARM(ad1816_clockfreq,"i");
 MODULE_PARM(options,"i");
 
 #ifdef __ISAPNP__
-
-static struct pci_dev *activate_dev(char *devname, char *resname, struct pci_dev *dev)
-{
-	int err;
-	
-	if(dev->active) {
-		activated = 0;
-		return(dev);
-	}
-
-	if((err = dev->activate(dev)) < 0) {
-		printk(KERN_ERR "ad1816: %s %s config failed (out of resources?)[%d]\n",
-			devname, resname, err);
-		dev->deactivate(dev);
-		return(NULL);
-	}
-		
-	return(dev);
-}
-
-static struct pci_dev *ad1816_init_generic(struct pci_bus *bus, struct pci_dev *card,
-	struct address_info *hw_config)
-{
-	if((ad1816_dev = isapnp_find_dev(bus, card->vendor, card->device, NULL))) {
-		ad1816_dev->prepare(ad1816_dev);
-		
-		if((ad1816_dev = activate_dev("Analog Devices 1816(A)", "ad1816", ad1816_dev))) {
-			hw_config->io_base	= ad1816_dev->resource[2].start;
-			hw_config->irq		= ad1816_dev->irq_resource[0].start;
-			hw_config->dma		= ad1816_dev->dma_resource[0].start;
-			hw_config->dma2		= ad1816_dev->dma_resource[1].start;
-		}
-	}
-	
-	return(ad1816_dev);
-}
-
-static struct ad1816_data {
-	struct pci_dev * (*initfunc)(struct pci_bus*, struct pci_dev *, struct address_info *);
-	char *name;
-} ad1816_pnp_data[] __initdata = {
-	{ &ad1816_init_generic, "Analog Devices 1815" },
-	{ &ad1816_init_generic, "Analog Devices 1816A" }
-};
-
 static struct {
 	unsigned short card_vendor, card_device;
 	unsigned short vendor;
@@ -1323,107 +1234,101 @@ static struct {
 } isapnp_ad1816_list[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7150), 
-		&ad1816_pnp_data[0] },
+		0 },
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7180),
-		&ad1816_pnp_data[1] },
+		0 },
 	{0}
 };
 
 MODULE_DEVICE_TABLE(isapnp, isapnp_ad1816_list);
 
-static int __init ad1816_init_isapnp(struct address_info *hw_config,
-	struct pci_bus *bus, struct pci_dev *card, int slot)
-{
-	struct pci_dev *idev = NULL;
-	
-	/* You missed the init func? That's bad. */
-	if(isapnp_ad1816_list[slot].data->initfunc) {
-		char *busname = bus->name[0] ? bus->name : isapnp_ad1816_list[slot].data->name;
-		
-		printk(KERN_INFO "ad1816: %s detected\n", busname);
-		
-		/* Initialize this baby. */
-		if((idev = isapnp_ad1816_list[slot].data->initfunc(bus, card, hw_config))) {
-			/* We got it. */
 
-			printk(KERN_NOTICE "ad1816: ISAPnP reports '%s' at i/o %#x, irq %d, dma %d, %d\n",
-				busname,
-				hw_config->io_base, hw_config->irq, hw_config->dma,
-				hw_config->dma2);
-			return 1;
-		} else
-			printk(KERN_INFO "ad1816: Failed to initialize %s\n", busname);
-	} else
-		printk(KERN_ERR "ad1816: Bad entry in ad1816.c PnP table\n");
-	
-	return 0;
+void __init ad1816_config_pnp_card(struct pnp_card *card, unsigned short vendor,
+	unsigned short function)
+{
+	struct address_info cfg;
+  	struct pnp_dev *card_dev = pnp_find_dev(card, vendor, function, NULL);
+	if (!card_dev) return;
+	if (pnp_device_attach(card_dev) < 0) {
+	  	printk(KERN_WARNING "ad1816: Failed to attach PnP device\n");
+		return;
+	}
+	if (pnp_activate_dev(card_dev) < 0) {
+		printk(KERN_WARNING "ad1816: Failed to activate PnP device\n");
+		pnp_device_detach(card_dev);
+		return;
+	}
+	cfg.io_base = pnp_port_start(card_dev, 2);
+	cfg.irq = pnp_irq(card_dev, 0);
+	cfg.dma = pnp_irq(card_dev, 0);
+	cfg.dma2 = pnp_irq(card_dev, 1);
+	if (!ad1816_init_card(&cfg, card_dev)) {
+	  	pnp_disable_dev(card_dev);
+		pnp_device_detach(card_dev);
+	}
 }
 
-/*
- * Actually this routine will detect and configure only the first card with successful
- * initialization. isapnpjump could be used to jump to a specific entry.
- * Please always add entries at the end of the array.
- * Should this be fixed? - azummo
- */
-
-int __init ad1816_probe_isapnp(struct address_info *hw_config)
+void __init ad1816_config_pnp_cards(void)
 {
+	int nr_pnp_cfg;
 	int i;
 	
 	/* Count entries in isapnp_ad1816_list */
-	for (i = 0; isapnp_ad1816_list[i].vendor != 0; i++)
-		;
+	for (nr_pnp_cfg = 0; isapnp_ad1816_list[nr_pnp_cfg].card_vendor != 0; 
+		nr_pnp_cfg++);
 	/* Check and adjust isapnpjump */
-	if( isapnpjump < 0 || isapnpjump > ( i - 1 ) ) {
-		printk(KERN_ERR "ad1816: Valid range for isapnpjump is 0-%d. Adjusted to 0.\n", i-1);
+	if( isapnpjump < 0 || isapnpjump >= nr_pnp_cfg) {
+		printk(KERN_WARNING 
+			"ad1816: Valid range for isapnpjump is 0-%d. "
+			"Adjusted to 0.\n", nr_pnp_cfg-1);
 		isapnpjump = 0;
 	}
-
-	 for (i = isapnpjump; isapnp_ad1816_list[i].vendor != 0; i++) {
-	 	struct pci_dev *card = NULL;
-		
-		while ((card = isapnp_find_dev(NULL, isapnp_ad1816_list[i].vendor,
-		  isapnp_ad1816_list[i].function, card)))
-			if(ad1816_init_isapnp(hw_config, card->bus, card, i))
-				return 0;
+	for (i = isapnpjump; isapnp_ad1816_list[i].card_vendor != 0; i++) {
+	 	struct pnp_card *card = NULL;
+		/* iterate over all pnp cards */		
+		while ((card = pnp_find_card(isapnp_ad1816_list[i].card_vendor,
+		              	isapnp_ad1816_list[i].card_device, card))) 
+			ad1816_config_pnp_card(card, 
+				isapnp_ad1816_list[i].vendor,
+				isapnp_ad1816_list[i].function);
 	}
-
-	return -ENODEV;
 }
 #endif
 
+/* module initialization */
 static int __init init_ad1816(void)
 {
+	printk(KERN_INFO "ad1816: AD1816 sounddriver "
+			 "Copyright (C) 1998-2003 by Thorsten Knabe and "
+			 "others\n");
+#ifdef AD1816_CLOCK 
+	/* set ad1816_clockfreq if set during compilation */
+	ad1816_clockfreq=AD1816_CLOCK;
+#endif
+	if (ad1816_clockfreq<5000 || ad1816_clockfreq>100000) {
+		ad1816_clockfreq=33000;
+	}
 
 #ifdef __ISAPNP__
-	if(isapnp && (ad1816_probe_isapnp(&cfg) < 0) ) {
-		printk(KERN_NOTICE "ad1816: No ISAPnP cards found, trying standard ones...\n");
-		isapnp = 0;
-	}
+	/* configure PnP cards */
+	if(isapnp) ad1816_config_pnp_cards();
 #endif
-
-	if( isapnp == 0) {
-		cfg.io_base	= io;
-		cfg.irq		= irq;
-		cfg.dma		= dma;
-		cfg.dma2	= dma2;
+	/* configure card by module params */
+	if (io != -1 && irq != -1 && dma != -1) {
+		struct address_info cfg;
+		cfg.io_base = io;
+		cfg.irq = irq;
+		cfg.dma = dma;
+		cfg.dma2 = dma2;
+		ad1816_init_card(&cfg, NULL);
 	}
-
-	if (cfg.io_base == -1 || cfg.irq == -1 || cfg.dma == -1 || cfg.dma2 == -1) {
-		printk(KERN_INFO "ad1816: dma, dma2, irq and io must be set.\n");
-		return -EINVAL;
-	}
-
-	if (probe_ad1816(&cfg) == 0) {
-		return -ENODEV;
-	}
-
-	attach_ad1816(&cfg);
-
+	if (nr_ad1816_devs <= 0)
+	  	return -ENODEV;
 	return 0;
 }
 
+/* module cleanup */
 static void __exit cleanup_ad1816 (void)
 {
 	int          i;
@@ -1435,18 +1340,14 @@ static void __exit cleanup_ad1816 (void)
 		unload_card(devc);
 	}     
 	nr_ad1816_devs=0;
-
-#ifdef __ISAPNP__
-	if(activated)
-		if(ad1816_dev)
-			ad1816_dev->deactivate(ad1816_dev);
-#endif
+	printk(KERN_INFO "ad1816: driver unloaded!\n");
 }
 
 module_init(init_ad1816);
 module_exit(cleanup_ad1816);
 
 #ifndef MODULE
+/* kernel command line parameter evaluation */
 static int __init setup_ad1816(char *str)
 {
 	/* io, irq, dma, dma2 */
@@ -1458,7 +1359,6 @@ static int __init setup_ad1816(char *str)
 	irq	= ints[2];
 	dma	= ints[3];
 	dma2	= ints[4];
-
 	return 1;
 }
 

@@ -1520,6 +1520,7 @@ void __init sabre_init(int pnode, char *model_name)
 	u32 busrange[2];
 	u32 vdma[2];
 	u32 upa_portid, dma_mask;
+	u64 clear_irq;
 	int bus;
 
 	hummingbird_p = 0;
@@ -1595,6 +1596,16 @@ void __init sabre_init(int pnode, char *model_name)
 
 	printk("PCI: Found SABRE, main regs at %016lx, wsync at %016lx\n",
 	       p->controller_regs, pci_dma_wsync);
+
+	/* Clear interrupts */
+
+	/* PCI first */
+	for (clear_irq = SABRE_ICLR_A_SLOT0; clear_irq < SABRE_ICLR_B_SLOT0 + 0x80; clear_irq += 8)
+		sabre_write(p->controller_regs + clear_irq, 0x0UL);
+
+	/* Then OBIO */
+	for (clear_irq = SABRE_ICLR_SCSI; clear_irq < SABRE_ICLR_SCSI + 0x80; clear_irq += 8)
+		sabre_write(p->controller_regs + clear_irq, 0x0UL);
 
 	/* Error interrupts are enabled later after the bus scan. */
 	sabre_write(p->controller_regs + SABRE_PCICTRL,

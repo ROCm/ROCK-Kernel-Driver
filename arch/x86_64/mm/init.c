@@ -19,9 +19,6 @@
 #include <linux/swap.h>
 #include <linux/smp.h>
 #include <linux/init.h>
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>
-#endif
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/proc_fs.h>

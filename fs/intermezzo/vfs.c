@@ -66,7 +66,7 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
-#include <linux/blk.h>
+#include <linux/genhd.h>
 
 #include "intermezzo_fs.h"
 #include "intermezzo_psdev.h"

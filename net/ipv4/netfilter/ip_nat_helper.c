@@ -191,7 +191,7 @@ ip_nat_mangle_tcp_packet(struct sk_buff **pskb,
 				   csum_partial((char *)tcph, tcph->doff*4,
 						(*pskb)->csum));
 	adjust_tcp_sequence(ntohl(tcph->seq),
-			    (int)match_len - (int)rep_len,
+			    (int)rep_len - (int)match_len,
 			    ct, ctinfo);
 	return 1;
 }

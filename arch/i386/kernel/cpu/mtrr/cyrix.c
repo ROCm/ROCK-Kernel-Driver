@@ -330,16 +330,16 @@ cyrix_arr_init(void)
 	set_mtrr_done(&ctxt);	/* flush cache and disable MAPEN */
 
 	if (ccrc[5])
-		printk("mtrr: ARR usage was not enabled, enabled manually\n");
+		printk(KERN_INFO "mtrr: ARR usage was not enabled, enabled manually\n");
 	if (ccrc[3])
-		printk("mtrr: ARR3 cannot be changed\n");
+		printk(KERN_INFO "mtrr: ARR3 cannot be changed\n");
 /*
     if ( ccrc[1] & 0x80) printk ("mtrr: SMM memory access through ARR3 disabled\n");
     if ( ccrc[1] & 0x04) printk ("mtrr: SMM memory access disabled\n");
     if ( ccrc[1] & 0x02) printk ("mtrr: SMM mode disabled\n");
 */
 	if (ccrc[6])
-		printk("mtrr: ARR3 was write protected, unprotected\n");
+		printk(KERN_INFO "mtrr: ARR3 was write protected, unprotected\n");
 }
 
 static struct mtrr_ops cyrix_mtrr_ops = {

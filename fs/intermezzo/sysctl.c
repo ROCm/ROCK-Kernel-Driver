@@ -36,7 +36,6 @@
 #include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <linux/utsname.h>
-#include <linux/blk.h>
 
 #include "intermezzo_fs.h"
 #include "intermezzo_psdev.h"

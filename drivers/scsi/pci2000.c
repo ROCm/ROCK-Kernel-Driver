@@ -35,7 +35,7 @@
  ****************************************************************************/
 #define PCI2000_VERSION		"1.20"
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

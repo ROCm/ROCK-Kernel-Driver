@@ -138,7 +138,7 @@
 #include <linux/errno.h>
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
@@ -3043,9 +3043,13 @@ acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	acornscsi_resetcard(ashost);
 
 	ret = scsi_add_host(host, &ec->dev);
-	if (ret == 0)
-		goto out;
+	if (ret)
+		goto err_7;
 
+	scsi_scan_host(host);
+	goto out;
+
+ err_7:
 	free_irq(host->irq, ashost);
  err_6:
 	release_region(host->io_port, 2048);

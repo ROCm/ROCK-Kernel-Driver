@@ -69,7 +69,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR GOLDSTAR_CDROM_MAJOR
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #define gscd_port gscd		/* for compatible parameter passing with "insmod" */
 #include "gscd.h"
 

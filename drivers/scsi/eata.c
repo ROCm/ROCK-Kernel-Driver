@@ -486,7 +486,7 @@
 #include <asm/system.h>
 #include <asm/byteorder.h>
 #include <linux/proc_fs.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/stat.h>
 #include <linux/pci.h>

@@ -1375,3 +1375,8 @@ _GLOBAL(sys_call_table)
 	.long sys_clock_gettime
 	.long sys_clock_getres
 	.long sys_clock_nanosleep
+	.long sys_ni_syscall	/* reserved for swapcontext */
+	.long sys_tgkill	/* 250 */
+	.long sys_utimes
+	.long sys_statfs64
+	.long sys_fstatfs64

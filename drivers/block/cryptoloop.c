@@ -26,7 +26,6 @@
 #include <linux/crypto.h>
 #include <linux/blkdev.h>
 #include <linux/loop.h>
-#include <linux/blk.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 

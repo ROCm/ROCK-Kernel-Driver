@@ -10,7 +10,7 @@
 #ifndef __QETH_MPC_H__
 #define __QETH_MPC_H__
 
-#define VERSION_QETH_MPC_H "$Revision: 1.15 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.16 $"
 
 #define QETH_IPA_TIMEOUT (card->ipa_timeout)
 #define QETH_MPC_TIMEOUT 2000
@@ -188,7 +188,7 @@ extern unsigned char DM_ACT[];
 #define IPA_CMD_ASS_ARP_QUERY_INFO 0x0104
 #define IPA_CMD_ASS_ARP_QUERY_STATS 0x0204
 
-#define IPA_CHECKSUM_ENABLE_MASK 0x001a
+#define IPA_CHECKSUM_DEFAULT_ENABLE_MASK 0x001a
 
 #define IPA_CMD_ASS_FILTER_SET_TYPES 0x0003
 

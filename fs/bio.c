@@ -18,7 +18,7 @@
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/bio.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/kernel.h>

@@ -38,16 +38,14 @@ static int irq[IP2_MAX_BOARDS] = { -1, -1, -1, -1 };
 
 static int poll_only = 0;
 
-#	if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
-		MODULE_AUTHOR("Doug McNash");
-		MODULE_DESCRIPTION("Computone IntelliPort Plus Driver");
-		MODULE_PARM(irq,"1-"__MODULE_STRING(IP2_MAX_BOARDS) "i");
-		MODULE_PARM_DESC(irq,"Interrupts for IntelliPort Cards");
-		MODULE_PARM(io,"1-"__MODULE_STRING(IP2_MAX_BOARDS) "i");
-		MODULE_PARM_DESC(io,"I/O ports for IntelliPort Cards");
-		MODULE_PARM(poll_only,"1i");
-		MODULE_PARM_DESC(poll_only,"Do not use card interrupts");
-#	endif	/* LINUX_VERSION */
+MODULE_AUTHOR("Doug McNash");
+MODULE_DESCRIPTION("Computone IntelliPort Plus Driver");
+MODULE_PARM(irq,"1-"__MODULE_STRING(IP2_MAX_BOARDS) "i");
+MODULE_PARM_DESC(irq,"Interrupts for IntelliPort Cards");
+MODULE_PARM(io,"1-"__MODULE_STRING(IP2_MAX_BOARDS) "i");
+MODULE_PARM_DESC(io,"I/O ports for IntelliPort Cards");
+MODULE_PARM(poll_only,"1i");
+MODULE_PARM_DESC(poll_only,"Do not use card interrupts");
 
 
 //======================================================================

@@ -205,6 +205,7 @@ void pci_config_write32(u32 *addr, u32 val)
 extern void sabre_init(int, char *);
 extern void psycho_init(int, char *);
 extern void schizo_init(int, char *);
+extern void tomatillo_init(int, char *);
 
 static struct {
 	char *model_name;
@@ -216,12 +217,14 @@ static struct {
 	{ "SUNW,psycho", psycho_init },
 	{ "pci108e,8000", psycho_init },
 	{ "SUNW,schizo", schizo_init },
-	{ "pci108e,8001", schizo_init }
+	{ "pci108e,8001", schizo_init },
+	{ "SUNW,tomatillo", tomatillo_init },
+	{ "pci108e,a801", tomatillo_init },
 };
 #define PCI_NUM_CONTROLLER_TYPES (sizeof(pci_controller_table) / \
 				  sizeof(pci_controller_table[0]))
 
-static void pci_controller_init(char *model_name, int namelen, int node)
+static int pci_controller_init(char *model_name, int namelen, int node)
 {
 	int i;
 
@@ -230,12 +233,14 @@ static void pci_controller_init(char *model_name, int namelen, int node)
 			     pci_controller_table[i].model_name,
 			     namelen)) {
 			pci_controller_table[i].init(node, model_name);
-			return;
+			return 1;
 		}
 	}
 	printk("PCI: Warning unknown controller, model name [%s]\n",
 	       model_name);
 	printk("PCI: Ignoring controller...\n");
+
+	return 0;
 }
 
 static int pci_is_controller(char *model_name, int namelen, int node)
@@ -252,37 +257,47 @@ static int pci_is_controller(char *model_name, int namelen, int node)
 	return 0;
 }
 
-/* Is there some PCI controller in the system?  */
-int pcic_present(void)
+
+static int pci_controller_scan(int (*handler)(char *, int, int))
 {
-	char namebuf[16];
+	char namebuf[64];
 	int node;
+	int count = 0;
 
 	node = prom_getchild(prom_root_node);
 	while ((node = prom_searchsiblings(node, "pci")) != 0) {
-		int len, ret;
+		int len;
 
-		len = prom_getproperty(node, "model",
-				       namebuf, sizeof(namebuf));
+		if ((len = prom_getproperty(node, "model", namebuf, sizeof(namebuf))) > 0 ||
+		    (len = prom_getproperty(node, "compatible", namebuf, sizeof(namebuf))) > 0) {
+			int item_len = 0;
 
-		ret = 0;
-		if (len > 0) {
-			ret = pci_is_controller(namebuf, len, node);
-		} else {
-			len = prom_getproperty(node, "compatible",
-					       namebuf, sizeof(namebuf));
-			if (len > 0)
-				ret = pci_is_controller(namebuf, len, node);
+			/* Our value may be a multi-valued string in the
+			 * case of some compatible properties. For sanity,
+			 * only try the first one. */
+
+			while (namebuf[item_len] && len) {
+				len--;
+				item_len++;
+			}
+
+			if (handler(namebuf, item_len, node))
+				count++;
 		}
-		if (ret)
-			return ret;
 
 		node = prom_getsibling(node);
 		if (!node)
 			break;
 	}
 
-	return 0;
+	return count;
+}
+
+
+/* Is there some PCI controller in the system?  */
+int pcic_present(void)
+{
+	return pci_controller_scan(pci_is_controller);
 }
 
 /* Find each controller in the system, attach and initialize
@@ -292,28 +307,9 @@ int pcic_present(void)
  */
 static void pci_controller_probe(void)
 {
-	char namebuf[16];
-	int node;
-
 	printk("PCI: Probing for controllers.\n");
-	node = prom_getchild(prom_root_node);
-	while ((node = prom_searchsiblings(node, "pci")) != 0) {
-		int len;
 
-		len = prom_getproperty(node, "model",
-				       namebuf, sizeof(namebuf));
-		if (len > 0)
-			pci_controller_init(namebuf, len, node);
-		else {
-			len = prom_getproperty(node, "compatible",
-					       namebuf, sizeof(namebuf));
-			if (len > 0)
-				pci_controller_init(namebuf, len, node);
-		}
-		node = prom_getsibling(node);
-		if (!node)
-			break;
-	}
+	pci_controller_scan(pci_controller_init);
 }
 
 static void pci_scan_each_controller_bus(void)
@@ -804,25 +800,20 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 
 /* Return the domain nuber for this pci bus */
 
-int pci_domain_nr(struct pci_bus *bus)
+int pci_domain_nr(struct pci_bus *pbus)
 {
-	struct pcidev_cookie *cookie = bus->sysdata;
+	struct pci_pbm_info *pbm = pbus->sysdata;
 	int ret;
 
-	if (cookie != NULL) {
-		struct pci_pbm_info *pbm = cookie->pbm;
-		if (pbm == NULL || pbm->parent == NULL) {
-			ret = -ENXIO;
-		} else {
-			struct pci_controller_info *p = pbm->parent;
-
-			ret = p->index;
-			if (p->pbms_same_domain == 0)
-				ret = ((ret << 1) +
-				       ((pbm == &pbm->parent->pbm_B) ? 1 : 0));
-		}
-	} else {
+	if (pbm == NULL || pbm->parent == NULL) {
 		ret = -ENXIO;
+	} else {
+		struct pci_controller_info *p = pbm->parent;
+
+		ret = p->index;
+		if (p->pbms_same_domain == 0)
+			ret = ((ret << 1) +
+			       ((pbm == &pbm->parent->pbm_B) ? 1 : 0));
 	}
 
 	return ret;

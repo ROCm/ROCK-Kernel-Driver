@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/anna.c -- Anna V850E2 evaluation chip/board
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -21,8 +21,8 @@
 #include <asm/machdep.h>
 #include <asm/atomic.h>
 #include <asm/page.h>
-#include <asm/nb85e_timer_d.h>
-#include <asm/nb85e_uart.h>
+#include <asm/v850e_timer_d.h>
+#include <asm/v850e_uart.h>
 
 #include "mach.h"
 
@@ -41,32 +41,34 @@ static void anna_led_tick (void);
 
 void __init mach_early_init (void)
 {
-	ANNA_ILBEN  = 0;
-	ANNA_CSC(0) = 0x402F;
-	ANNA_CSC(1) = 0x4000;
-	ANNA_BPC    = 0;
-	ANNA_BSC    = 0xAAAA;
-	ANNA_BEC    = 0;
-	ANNA_BHC    = 0xFFFF;	/* icache all memory, dcache all */
-	ANNA_BCT(0) = 0xB088;
-	ANNA_BCT(1) = 0x0008;
-	ANNA_DWC(0) = 0x0027;
-	ANNA_DWC(1) = 0;
-	ANNA_BCC    = 0x0006;
-	ANNA_ASC    = 0;
-	ANNA_LBS    = 0x0089;
-	ANNA_SCR3   = 0x21A9;
-	ANNA_RFS3   = 0x8121;
+	ANNA_ILBEN    = 0;
 
-	nb85e_intc_disable_irqs ();
+	V850E2_CSC(0) = 0x402F;
+	V850E2_CSC(1) = 0x4000;
+	V850E2_BPC    = 0;
+	V850E2_BSC    = 0xAAAA;
+	V850E2_BEC    = 0;
+
+#if 0
+	V850E2_BHC    = 0xFFFF;	/* icache all memory, dcache all */
+#else
+	V850E2_BHC    = 0;	/* cache no memory */
+#endif
+	V850E2_BCT(0) = 0xB088;
+	V850E2_BCT(1) = 0x0008;
+	V850E2_DWC(0) = 0x0027;
+	V850E2_DWC(1) = 0;
+	V850E2_BCC    = 0x0006;
+	V850E2_ASC    = 0;
+	V850E2_LBS    = 0x0089;
+	V850E2_SCR(3) = 0x21A9;
+	V850E2_RFS(3) = 0x8121;
+
+	v850e_intc_disable_irqs ();
 }
 
 void __init mach_setup (char **cmdline)
 {
-#ifdef CONFIG_V850E_NB85E_UART_CONSOLE
-	nb85e_uart_cons_init (1);
-#endif
-
 	ANNA_PORT_PM (LEDS_PORT) = 0;	/* Make all LED pins output pins.  */
 	mach_tick = anna_led_tick;
 }
@@ -95,12 +97,12 @@ void mach_gettimeofday (struct timespec *tv)
 void __init mach_sched_init (struct irqaction *timer_action)
 {
 	/* Start hardware timer.  */
-	nb85e_timer_d_configure (0, HZ);
+	v850e_timer_d_configure (0, HZ);
 	/* Install timer interrupt handler.  */
 	setup_irq (IRQ_INTCMD(0), timer_action);
 }
 
-static struct nb85e_intc_irq_init irq_inits[] = {
+static struct v850e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, 		NUM_MACH_IRQS,	1, 7 },
 	{ "PIN", IRQ_INTP(0),   IRQ_INTP_NUM,   1, 4 },
 	{ "CCC", IRQ_INTCCC(0),	IRQ_INTCCC_NUM, 1, 5 },
@@ -118,7 +120,7 @@ static struct hw_interrupt_type hw_itypes[NUM_IRQ_INITS];
 
 void __init mach_init_irqs (void)
 {
-	nb85e_intc_init_irq_types (irq_inits, hw_itypes);
+	v850e_intc_init_irq_types (irq_inits, hw_itypes);
 }
 
 void machine_restart (char *__unused)

@@ -19,7 +19,7 @@
  *
  *	Mitsuru KANDA @USAGI       : IPv6 Support 
  * 	Kazunori MIYAZAWA @USAGI   :
- * 	Kunihiro Ishiguro          :
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 	
  * 	This file is derived from net/ipv4/esp.c
  */
@@ -317,7 +317,7 @@ void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, esph->spi, IPPROTO_ESP, AF_INET6);
 	if (!x)
 		return;
-	printk(KERN_DEBUG "pmtu discvovery on SA ESP/%08x/"
+	printk(KERN_DEBUG "pmtu discovery on SA ESP/%08x/"
 			"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n", 
 			ntohl(esph->spi), NIP6(iph->daddr));
 	xfrm_state_put(x);

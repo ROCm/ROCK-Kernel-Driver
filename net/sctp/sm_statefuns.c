@@ -3862,7 +3862,7 @@ sctp_disposition_t sctp_sf_do_9_2_start_shutdown(
 	 * in the Cumulative TSN Ack field the last sequential TSN it
 	 * has received from the peer.
 	 */
-	reply = sctp_make_shutdown(asoc);
+	reply = sctp_make_shutdown(asoc, NULL);
 	if (!reply)
 		goto nomem;
 
@@ -4179,7 +4179,7 @@ sctp_disposition_t sctp_sf_t2_timer_expire(const struct sctp_endpoint *ep,
 
 	switch (asoc->state) {
 	case SCTP_STATE_SHUTDOWN_SENT:
-		reply = sctp_make_shutdown(asoc);
+		reply = sctp_make_shutdown(asoc, NULL);
 		break;
 
 	case SCTP_STATE_SHUTDOWN_ACK_SENT:

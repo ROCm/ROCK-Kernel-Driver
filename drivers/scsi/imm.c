@@ -24,7 +24,7 @@
 void imm_reset_pulse(unsigned int base);
 static int device_check(int host_no);
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>

@@ -80,6 +80,23 @@ static struct device_driver usb_generic_driver = {
 
 static int usb_generic_driver_data;
 
+/* deallocate hcd/hardware state ... and nuke all pending urbs */
+static void nuke_urbs(struct usb_device *dev)
+{
+	void (*disable)(struct usb_device *, int);
+	int i;
+
+	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->disable)
+		return;
+	dbg("nuking urbs assigned to %s", dev->dev.bus_id);
+
+	disable = dev->bus->op->disable;
+	for (i = 0; i < 15; i++) {
+		disable(dev, i);
+		disable(dev, USB_DIR_IN | i);
+	}
+}
+
 /* needs to be called with BKL held */
 int usb_device_probe(struct device *dev)
 {
@@ -115,6 +132,9 @@ int usb_device_remove(struct device *dev)
 	driver = to_usb_driver(dev->driver);
 
 	down(&driver->serialize);
+
+	/* release all urbs for this device */
+	nuke_urbs(interface_to_usbdev(intf));
 
 	if (intf->driver && intf->driver->disconnect)
 		intf->driver->disconnect(intf);
@@ -896,6 +916,9 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
+	/* deallocate hcd/hardware state ... and nuke all pending urbs */
+	nuke_urbs(dev);
+
 	/* disconnect() drivers from interfaces (a key side effect) */
 	dev_dbg (&dev->dev, "unregistering interfaces\n");
 	if (dev->actconfig) {
@@ -905,16 +928,6 @@ void usb_disconnect(struct usb_device **pdev)
 			/* remove this interface */
 			interface = &dev->actconfig->interface[i];
 			device_unregister(&interface->dev);
-		}
-	}
-
-	/* deallocate hcd/hardware state */
-	if (ops->disable) {
-		void	(*disable)(struct usb_device *, int) = ops->disable;
-
-		for (i = 0; i < 15; i++) {
-			disable (dev, i);
-			disable (dev, USB_DIR_IN | i);
 		}
 	}
 

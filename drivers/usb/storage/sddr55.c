@@ -91,13 +91,14 @@ sddr55_bulk_transport(struct us_data *us, int direction,
 static int sddr55_status(struct us_data *us)
 {
 	int result;
-	unsigned char command[8] = {
-		0, 0, 0, 0, 0, 0xb0, 0, 0x80
-	};
-	unsigned char status[8];
+	unsigned char *command = us->iobuf;
+	unsigned char *status = us->iobuf;
 	struct sddr55_card_info *info = (struct sddr55_card_info *)us->extra;
 
 	/* send command */
+	memset(command, 0, 8);
+	command[5] = 0xB0;
+	command[7] = 0x80;
 	result = sddr55_bulk_transport(us,
 		SCSI_DATA_WRITE, command, 8);
 
@@ -158,10 +159,8 @@ static int sddr55_read_data(struct us_data *us,
 		int use_sg) {
 
 	int result = USB_STOR_TRANSPORT_GOOD;
-	unsigned char command[8] = {
-		0, 0, 0, 0, 0, 0xb0, 0, 0x85
-	};
-	unsigned char status[8];
+	unsigned char *command = us->iobuf;
+	unsigned char *status = us->iobuf;
 	struct sddr55_card_info *info = (struct sddr55_card_info *)us->extra;
 
 	unsigned int pba;
@@ -205,11 +204,15 @@ static int sddr55_read_data(struct us_data *us,
 
 			address = (pba << info->blockshift) + page;
 
+			command[0] = 0;
 			command[1] = LSB_of(address>>16);
 			command[2] = LSB_of(address>>8);
 			command[3] = LSB_of(address);
 
+			command[4] = 0;
+			command[5] = 0xB0;
 			command[6] = LSB_of(pages << (1 - info->smallpageshift));
+			command[7] = 0x85;
 
 			/* send command */
 			result = sddr55_bulk_transport(us,
@@ -274,10 +277,8 @@ static int sddr55_write_data(struct us_data *us,
 		int use_sg) {
 
 	int result = USB_STOR_TRANSPORT_GOOD;
-	unsigned char command[8] = {
-		0, 0, 0, 0, 0, 0xb0, 0, 0x86
-	};
-	unsigned char status[8];
+	unsigned char *command = us->iobuf;
+	unsigned char *status = us->iobuf;
 	struct sddr55_card_info *info = (struct sddr55_card_info *)us->extra;
 
 	unsigned int pba;
@@ -380,6 +381,8 @@ static int sddr55_write_data(struct us_data *us,
 		command[6] = MSB_of(lba % 1000);
 
 		command[4] |= LSB_of(pages >> info->smallpageshift);
+		command[5] = 0xB0;
+		command[7] = 0x86;
 
 		/* send command */
 		result = sddr55_bulk_transport(us,
@@ -473,11 +476,12 @@ static int sddr55_read_deviceID(struct us_data *us,
 		unsigned char *deviceID) {
 
 	int result;
-	unsigned char command[8] = {
-		0, 0, 0, 0, 0, 0xb0, 0, 0x84
-	};
-	unsigned char content[64];
+	unsigned char *command = us->iobuf;
+	unsigned char *content = us->iobuf;
 
+	memset(command, 0, 8);
+	command[5] = 0xB0;
+	command[7] = 0x84;
 	result = sddr55_bulk_transport(us, SCSI_DATA_WRITE, command, 8);
 
 	US_DEBUGP("Result of send_control for device ID is %d\n",
@@ -598,7 +602,7 @@ static int sddr55_read_map(struct us_data *us) {
 	struct sddr55_card_info *info = (struct sddr55_card_info *)(us->extra);
 	int numblocks;
 	unsigned char *buffer;
-	unsigned char command[8] = { 0, 0, 0, 0, 0, 0xb0, 0, 0x8a};	
+	unsigned char *command = us->iobuf;
 	int i;
 	unsigned short lba;
 	unsigned short max_lba;
@@ -614,7 +618,10 @@ static int sddr55_read_map(struct us_data *us) {
 	if (!buffer)
 		return -1;
 
+	memset(command, 0, 8);
+	command[5] = 0xB0;
 	command[6] = numblocks * 2 / 256;
+	command[7] = 0x8A;
 
 	result = sddr55_bulk_transport(us, SCSI_DATA_WRITE, command, 8);
 

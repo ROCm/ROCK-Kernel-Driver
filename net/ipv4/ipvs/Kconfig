@@ -147,7 +147,7 @@ config	IP_VS_WLC
 	  unsure, say N.
 
 config	IP_VS_LBLC
-	tristate "locality-based least-connection with replication scheduling"
+	tristate "locality-based least-connection scheduling"
         depends on IP_VS
 	---help---
 	  The locality-based least-connection scheduling algorithm is for
@@ -163,7 +163,7 @@ config	IP_VS_LBLC
 	  unsure, say N.
 
 config  IP_VS_LBLCR
-	tristate "locality-based least-connection with replication schedulin"
+	tristate "locality-based least-connection with replication scheduling"
         depends on IP_VS
 	---help---
 	  The locality-based least-connection with replication scheduling

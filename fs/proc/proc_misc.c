@@ -388,10 +388,8 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		system += kstat_cpu(i).cpustat.system;
 		idle += kstat_cpu(i).cpustat.idle;
 		iowait += kstat_cpu(i).cpustat.iowait;
-#if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat_cpu(i).irqs[j];
-#endif
 	}
 
 	len = sprintf(page, "cpu  %u %u %u %u %u\n",
@@ -412,7 +410,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
-#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
+#if !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
@@ -440,7 +438,6 @@ static int devices_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
-#if !defined(CONFIG_ARCH_S390)
 extern int show_interrupts(struct seq_file *p, void *v);
 static int interrupts_open(struct inode *inode, struct file *file)
 {
@@ -466,7 +463,6 @@ static struct file_operations proc_interrupts_operations = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
-#endif
 
 static int filesystems_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -646,9 +642,7 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("partitions", 0, &proc_partitions_operations);
-#if !defined(CONFIG_ARCH_S390)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
-#endif
 	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 	create_seq_entry("buddyinfo",S_IRUGO, &fragmentation_file_operations);
 	create_seq_entry("vmstat",S_IRUGO, &proc_vmstat_file_operations);
