@@ -1355,6 +1355,23 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	return rq;
 }
+/**
+ * blk_requeue_request - put a request back on queue
+ * @q:		request queue where request should be inserted
+ * @rq:		request to be inserted
+ *
+ * Description:
+ *    Drivers often keep queueing requests until the hardware cannot accept
+ *    more, when that condition happens we need to put the request back
+ *    on the queue. Must be called with queue lock held.
+ */
+void blk_requeue_request(request_queue_t *q, struct request *rq)
+{
+	if (blk_rq_tagged(rq))
+		blk_queue_end_tag(q, rq);
+
+	elv_requeue_request(q, rq);
+}
 
 /**
  * blk_insert_request - insert a special request in to a request queue
@@ -2339,6 +2356,7 @@ EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
 EXPORT_SYMBOL(blk_put_request);
 EXPORT_SYMBOL(blk_insert_request);
+EXPORT_SYMBOL(blk_requeue_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 EXPORT_SYMBOL(blk_queue_merge_bvec);
