@@ -472,7 +472,6 @@ int hci_unregister_notifier(struct notifier_block *nb);
 int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *param);
 int hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags);
 int hci_send_sco(struct hci_conn *conn, struct sk_buff *skb);
-int hci_send_raw(struct sk_buff *skb);
 
 void *hci_sent_cmd_data(struct hci_dev *hdev, __u16 ogf, __u16 ocf);
 
@@ -490,7 +489,7 @@ struct hci_pinfo {
 };
 
 /* HCI security filter */
-#define HCI_SFLT_MAX_OGF 4
+#define HCI_SFLT_MAX_OGF  5
 
 struct hci_sec_filter {
 	unsigned long type_mask;

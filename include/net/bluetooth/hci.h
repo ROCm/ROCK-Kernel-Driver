@@ -385,7 +385,7 @@ struct hci_rp_write_link_policy {
 } __attribute__ ((packed));
 
 /* Status params */
-#define OGF_STATUS_PARAM 	0x05
+#define OGF_STATUS_PARAM	0x05
 
 /* Testing commands */
 #define OGF_TESTING_CMD		0x3E
