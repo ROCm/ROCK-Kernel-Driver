@@ -83,7 +83,7 @@ EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(naca);
 EXPORT_SYMBOL(__down);
 
-/* EXPORT_SYMBOL(csum_partial); already in net/netsyms.c */
+EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);
 EXPORT_SYMBOL(ip_fast_csum);
 EXPORT_SYMBOL(csum_tcpudp_magic);
