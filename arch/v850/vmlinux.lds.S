@@ -24,9 +24,12 @@
 	
 /* Interrupt vectors.  */
 #define INTV_CONTENTS							      \
+		. = ALIGN (0x10) ;					      \
 		__intv_start = . ;					      \
 			*(.intv.reset)	/* Reset vector */		      \
+		. = __intv_start + 0x10 ;				      \
 			*(.intv.common)	/* Vectors common to all v850e proc */\
+		. = __intv_start + 0x80 ;				      \
 			*(.intv.mach)	/* Machine-specific int. vectors.  */ \
 		__intv_end = . ;
 
