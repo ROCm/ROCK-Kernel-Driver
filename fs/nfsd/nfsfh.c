@@ -322,9 +322,11 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 	struct inode * inode = dentry->d_inode;
 	struct dentry *parent = dentry->d_parent;
 	__u32 *datap;
+	dev_t ex_dev = exp->ex_dentry->d_inode->i_sb->s_dev;
 
 	dprintk("nfsd: fh_compose(exp %02x:%02x/%ld %s/%s, ino=%ld)\n",
-		MAJOR(exp->ex_dev), MINOR(exp->ex_dev), (long) exp->ex_ino,
+		MAJOR(ex_dev), MINOR(ex_dev),
+		(long) exp->ex_dentry->d_inode->i_ino,
 		parent->d_name.name, dentry->d_name.name,
 		(inode ? inode->i_ino : 0));
 
@@ -351,9 +353,9 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		memset(&fhp->fh_handle.fh_base, 0, NFS_FHSIZE);
 		fhp->fh_handle.fh_size = NFS_FHSIZE;
 		fhp->fh_handle.ofh_dcookie = 0xfeebbaca;
-		fhp->fh_handle.ofh_dev =  htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
+		fhp->fh_handle.ofh_dev =  htonl((MAJOR(ex_dev)<<16)| MINOR(ex_dev));
 		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
-		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_ino);
+		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_dentry->d_inode->i_ino);
 		fhp->fh_handle.ofh_dirino = ino_t_to_u32(parent_ino(dentry));
 		if (inode)
 			_fh_update_old(dentry, exp, &fhp->fh_handle);
@@ -370,8 +372,8 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		} else {
 			fhp->fh_handle.fh_fsid_type = 0;
 			/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-			*datap++ = htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
-			*datap++ = ino_t_to_u32(exp->ex_ino);
+			*datap++ = htonl((MAJOR(ex_dev)<<16)| MINOR(ex_dev));
+			*datap++ = ino_t_to_u32(exp->ex_dentry->d_inode->i_ino);
 			fhp->fh_handle.fh_size = 3*4;
 		}
 		if (inode) {

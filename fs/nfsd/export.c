@@ -70,15 +70,17 @@ static svc_client *		clients;
 svc_export *
 exp_get(svc_client *clp, dev_t dev, ino_t ino)
 {
-	struct list_head *head, *p;
-	
+	struct list_head *head;
+	svc_export *exp;
+
 	if (!clp)
 		return NULL;
 
 	head = &clp->cl_export[EXPORT_HASH(dev)];
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (exp->ex_ino == ino && exp->ex_dev ==  dev)
+	list_for_each_entry(exp, head, ex_hash) {
+		struct inode *inode = exp->ex_dentry->d_inode;
+		if (inode->i_ino == ino && 
+		    inode->i_sb->s_dev ==  dev)
 			return exp;
 	}
 	return NULL;
@@ -338,8 +340,6 @@ exp_export(struct nfsctl_export *nxp)
 	exp->ex_mnt = mntget(nd.mnt);
 	exp->ex_dentry = dget(nd.dentry);
 	exp->ex_flags = nxp->ex_flags;
-	exp->ex_dev = dev;
-	exp->ex_ino = ino;
 	exp->ex_anon_uid = nxp->ex_anon_uid;
 	exp->ex_anon_gid = nxp->ex_anon_gid;
 	exp->ex_fsid = nxp->ex_dev;
@@ -376,8 +376,6 @@ exp_do_unexport(svc_export *unexp)
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
-	if (unexp->ex_dev != inode->i_sb->s_dev || unexp->ex_ino != inode->i_ino)
-		printk(KERN_WARNING "nfsd: bad dentry in unexport!\n");
 	dput(dentry);
 	mntput(mnt);
 
