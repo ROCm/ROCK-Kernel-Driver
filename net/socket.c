@@ -315,7 +315,7 @@ static struct super_operations sockfs_ops = {
 	statfs:		sockfs_statfs,
 };
 
-static struct super_block * sockfs_read_super(struct super_block *sb, void *data, int silent)
+static int sockfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *root;
 	sb->s_blocksize = 1024;
@@ -324,23 +324,34 @@ static struct super_block * sockfs_read_super(struct super_block *sb, void *data
 	sb->s_op = &sockfs_ops;
 	root = new_inode(sb);
 	if (!root)
-		return NULL;
+		return -ENOMEM;
 	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
 	root->i_uid = root->i_gid = 0;
 	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
 	sb->s_root = d_alloc(NULL, &(const struct qstr) { "socket:", 7, 0 });
 	if (!sb->s_root) {
 		iput(root);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root->d_sb = sb;
 	sb->s_root->d_parent = sb->s_root;
 	d_instantiate(sb->s_root, root);
-	return sb;
+	return 0;
+}
+
+static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, sockfs_fill_super);
 }
 
 static struct vfsmount *sock_mnt;
-static DECLARE_FSTYPE(sock_fs_type, "sockfs", sockfs_read_super, FS_NOMOUNT);
+
+static struct file_system_type sock_fs_type = {
+	name:		"sockfs",
+	get_sb:		sockfs_get_sb,
+	fs_flags:	FS_NOMOUNT,
+};
 static int sockfs_delete_dentry(struct dentry *dentry)
 {
 	return 1;
