@@ -390,7 +390,7 @@ static int ether1394_init_dev (struct net_device *dev)
 	/* Some constants */
 	dev->watchdog_timeo	= ETHER1394_TIMEOUT;
 	dev->flags		= IFF_BROADCAST; /* | IFF_MULTICAST someday */
-	dev->features		= NETIF_F_NO_CSUM|NETIF_F_SG|NETIF_F_HIGHDMA|NETIF_F_FRAGLIST;
+	dev->features		= NETIF_F_HIGHDMA;
 	dev->addr_len		= ETH1394_ALEN;
 	dev->hard_header_len 	= ETH1394_HLEN;
 	dev->type		= ARPHRD_IEEE1394;
@@ -1423,12 +1423,6 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	u16 dgl;
 	struct packet_task *ptask;
 	struct node_entry *ne;
-
-	if (skb_is_nonlinear(skb)) {
-		ret = skb_linearize(skb, kmflags);
-		if(ret)
-			goto fail;
-	}
 
 	ptask = kmem_cache_alloc(packet_task_cache, kmflags);
 	if(ptask == NULL) {
