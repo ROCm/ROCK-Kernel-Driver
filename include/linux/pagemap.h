@@ -262,10 +262,7 @@ static inline int fault_in_pages_writeable(char __user *uaddr, int size)
 	return ret;
 }
 
-/*
- * returns zero on success, -EFAULT on failure
- */
-static inline int fault_in_pages_readable(const char __user *uaddr, int size)
+static inline void fault_in_pages_readable(const char __user *uaddr, int size)
 {
 	volatile char c;
 	int ret;
@@ -276,9 +273,8 @@ static inline int fault_in_pages_readable(const char __user *uaddr, int size)
 
 		if (((unsigned long)uaddr & PAGE_MASK) !=
 				((unsigned long)end & PAGE_MASK))
-		 	ret = __get_user(c, (char *)end);
+		 	__get_user(c, (char *)end);
 	}
-	return ret;
 }
 
 #endif /* _LINUX_PAGEMAP_H */

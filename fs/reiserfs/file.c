@@ -601,35 +601,8 @@ void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pa
     }
 }
 
-static int prefault_pages_for_write(loff_t pos, const char *buf, 
-                                     size_t count)
-{
-    unsigned long off;
-    unsigned long bytes;
-    int status;
-
-    /* looks like fault_in_pages_readable only does 1 page, so lets make
-     * a loop
-     */
-    do {
-	off = (pos & (PAGE_CACHE_SIZE - 1));
-	bytes = PAGE_CACHE_SIZE - off;
-	if (bytes > count)
-	    bytes = count;
-	status = fault_in_pages_readable(buf, bytes);
-	if (status)
-	    return -EFAULT;
-        count -= bytes;
-	buf += bytes;
-	pos += bytes;
-    } while(count > 0);
-    return 0;
-}
-
 /* This function will copy data from userspace to specified pages within
- * supplied byte range, this returns zero if all went well, or -EFAULT if
- * it was unable to copy some pages
- */
+   supplied byte range */
 int reiserfs_copy_from_user_to_file_region(
 				loff_t pos, /* In-file position */
 				int num_pages, /* Number of pages affected */
@@ -645,36 +618,24 @@ int reiserfs_copy_from_user_to_file_region(
     long page_fault=0; // status of copy_from_user.
     int i; // loop counter.
     int offset; // offset in page
-    int zero_all = 0;
 
     for ( i = 0, offset = (pos & (PAGE_CACHE_SIZE-1)); i < num_pages ; i++,offset=0) {
 	int count = min_t(int,PAGE_CACHE_SIZE-offset,write_bytes); // How much of bytes to write to this page
 	struct page *page=prepared_pages[i]; // Current page we process.
-	char *kaddr;
+
+	fault_in_pages_readable( buf, count);
 
 	/* Copy data from userspace to the current page */
-	kaddr = kmap_atomic(page, KM_USER0);
-	if (zero_all)
-	    memset(kaddr+offset, 0, count);
-	else {
-	    /* we need to make sure we don't
-	     * take a page fault, otherwise we end up with a lock
-	     * inversion deadlock against the log.  inc_preempt_count
-	     * should do the trick.
-	     */
-	    inc_preempt_count();
-	    page_fault = __copy_from_user(kaddr+offset, buf, count);
-	    dec_preempt_count();
-	}
-	kunmap_atomic(kaddr, KM_USER0);
-
+	kmap(page);
+	page_fault = __copy_from_user(page_address(page)+offset, buf, count); // Copy the data.
 	/* Flush processor's dcache for this page */
 	flush_dcache_page(page);
+	kunmap(page);
 	buf+=count;
 	write_bytes-=count;
 
 	if (page_fault)
-	    zero_all = 1;
+	    break; // Was there a fault? abort.
     }
 
     return page_fault?-EFAULT:0;
@@ -1315,7 +1276,6 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	int blocks_to_allocate; /* how much blocks we need to allocate for
 				   this iteration */
         
-	int page_fault;
         /*  (pos & (PAGE_CACHE_SIZE-1)) is an idiom for offset into a page of pos*/
 	num_pages = !!((pos+count) & (PAGE_CACHE_SIZE - 1)) + /* round up partial
 							  pages */
@@ -1374,15 +1334,6 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	/* First we correct our estimate of how many blocks we need */
 	reiserfs_release_claimed_blocks(inode->i_sb, (num_pages << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits)) - blocks_to_allocate );
 
-	/* prefault the pages now, this the last possible moment before
-	 * we start a transaction
-	 */
-	res = prefault_pages_for_write(pos, buf, write_bytes);
-	if (res) {
-	    reiserfs_unprepare_pages(prepared_pages, num_pages);
-	    break;
-	}
-
 	if ( blocks_to_allocate > 0) {/*We only allocate blocks if we need to*/
 	    /* Fill in all the possible holes and append the file if needed */
 	    res = reiserfs_allocate_blocks_for_region(&th, inode, pos, num_pages, write_bytes, prepared_pages, blocks_to_allocate);
@@ -1401,7 +1352,11 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
    crash */
 
 	/* Copy data from user-supplied buffer to file's pages */
-	page_fault = reiserfs_copy_from_user_to_file_region(pos, num_pages, write_bytes, prepared_pages, buf);
+	res = reiserfs_copy_from_user_to_file_region(pos, num_pages, write_bytes, prepared_pages, buf);
+	if ( res ) {
+	    reiserfs_unprepare_pages(prepared_pages, num_pages);
+	    break;
+	}
 
 	/* Send the pages to disk and unlock them. */
 	res = reiserfs_submit_file_region_for_write(&th, inode, pos, num_pages,
@@ -1409,16 +1364,10 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	if ( res )
 	    break;
 
-	/* if we get a page fault, leave all the counters alone.
-	 * we'll retry this exact same section of the write again
-	 * after closing and restarting the transaction
-	 */
-	if (!page_fault) {
-	    already_written += write_bytes;
-	    buf += write_bytes;
-	    *ppos = pos += write_bytes;
-	    count -= write_bytes;
-	}
+	already_written += write_bytes;
+	buf += write_bytes;
+	*ppos = pos += write_bytes;
+	count -= write_bytes;
 	balance_dirty_pages_ratelimited(inode->i_mapping);
     }
 

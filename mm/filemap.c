@@ -1832,11 +1832,15 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	int left;
 
 	kaddr = kmap_atomic(page, KM_USER0);
-	inc_preempt_count();
 	left = __copy_from_user(kaddr + offset, buf, bytes);
-	dec_preempt_count();
 	kunmap_atomic(kaddr, KM_USER0);
 
+	if (left != 0) {
+		/* Do it the slow way */
+		kaddr = kmap(page);
+		left = __copy_from_user(kaddr + offset, buf, bytes);
+		kunmap(page);
+	}
 	return bytes - left;
 }
 
@@ -2128,9 +2132,7 @@ __generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		 * same page as we're writing to, without it being marked
 		 * up-to-date.
 		 */
-		status = fault_in_pages_readable(buf, bytes);
-		if (status < 0)
-			break;
+		fault_in_pages_readable(buf, bytes);
 
 		page = __grab_cache_page(mapping,index,&cached_page,&lru_pvec);
 		if (!page) {
@@ -2173,6 +2175,9 @@ __generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 							&iov_base, status);
 			}
 		}
+		if (unlikely(copied != bytes))
+			if (status >= 0)
+				status = -EFAULT;
 		unlock_page(page);
 		mark_page_accessed(page);
 		page_cache_release(page);
