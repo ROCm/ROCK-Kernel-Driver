@@ -53,29 +53,52 @@ void __init profile_init(void)
 #ifdef CONFIG_PROFILING
  
 static DECLARE_RWSEM(profile_rwsem);
-static struct notifier_block * exit_task_notifier;
-static struct notifier_block * exit_mmap_notifier;
-static struct notifier_block * exec_unmap_notifier;
+static rwlock_t handoff_lock = RW_LOCK_UNLOCKED;
+static struct notifier_block * task_exit_notifier;
+static struct notifier_block * task_free_notifier;
+static struct notifier_block * munmap_notifier;
  
-void profile_exit_task(struct task_struct * task)
+void profile_task_exit(struct task_struct * task)
 {
 	down_read(&profile_rwsem);
-	notifier_call_chain(&exit_task_notifier, 0, task);
+	notifier_call_chain(&task_exit_notifier, 0, task);
 	up_read(&profile_rwsem);
 }
  
-void profile_exit_mmap(struct mm_struct * mm)
+int profile_handoff_task(struct task_struct * task)
+{
+	int ret;
+	read_lock(&handoff_lock);
+	ret = notifier_call_chain(&task_free_notifier, 0, task);
+	read_unlock(&handoff_lock);
+	return (ret == NOTIFY_OK) ? 1 : 0;
+}
+
+void profile_munmap(unsigned long addr)
 {
 	down_read(&profile_rwsem);
-	notifier_call_chain(&exit_mmap_notifier, 0, mm);
+	notifier_call_chain(&munmap_notifier, 0, (void *)addr);
 	up_read(&profile_rwsem);
 }
 
-void profile_exec_unmap(struct mm_struct * mm)
+int task_handoff_register(struct notifier_block * n)
 {
-	down_read(&profile_rwsem);
-	notifier_call_chain(&exec_unmap_notifier, 0, mm);
-	up_read(&profile_rwsem);
+	int err = -EINVAL;
+
+	write_lock(&handoff_lock);
+	err = notifier_chain_register(&task_free_notifier, n);
+	write_unlock(&handoff_lock);
+	return err;
+}
+
+int task_handoff_unregister(struct notifier_block * n)
+{
+	int err = -EINVAL;
+
+	write_lock(&handoff_lock);
+	err = notifier_chain_unregister(&task_free_notifier, n);
+	write_unlock(&handoff_lock);
+	return err;
 }
 
 int profile_event_register(enum profile_type type, struct notifier_block * n)
@@ -85,14 +108,11 @@ int profile_event_register(enum profile_type type, struct notifier_block * n)
 	down_write(&profile_rwsem);
  
 	switch (type) {
-		case EXIT_TASK:
-			err = notifier_chain_register(&exit_task_notifier, n);
+		case PROFILE_TASK_EXIT:
+			err = notifier_chain_register(&task_exit_notifier, n);
 			break;
-		case EXIT_MMAP:
-			err = notifier_chain_register(&exit_mmap_notifier, n);
-			break;
-		case EXEC_UNMAP:
-			err = notifier_chain_register(&exec_unmap_notifier, n);
+		case PROFILE_MUNMAP:
+			err = notifier_chain_register(&munmap_notifier, n);
 			break;
 	}
  
@@ -109,14 +129,11 @@ int profile_event_unregister(enum profile_type type, struct notifier_block * n)
 	down_write(&profile_rwsem);
  
 	switch (type) {
-		case EXIT_TASK:
-			err = notifier_chain_unregister(&exit_task_notifier, n);
+		case PROFILE_TASK_EXIT:
+			err = notifier_chain_unregister(&task_exit_notifier, n);
 			break;
-		case EXIT_MMAP:
-			err = notifier_chain_unregister(&exit_mmap_notifier, n);
-			break;
-		case EXEC_UNMAP:
-			err = notifier_chain_unregister(&exec_unmap_notifier, n);
+		case PROFILE_MUNMAP:
+			err = notifier_chain_unregister(&munmap_notifier, n);
 			break;
 	}
 
@@ -156,6 +173,8 @@ void profile_hook(struct pt_regs * regs)
 
 EXPORT_SYMBOL_GPL(register_profile_notifier);
 EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+EXPORT_SYMBOL_GPL(task_handoff_register);
+EXPORT_SYMBOL_GPL(task_handoff_unregister);
 
 #endif /* CONFIG_PROFILING */
 

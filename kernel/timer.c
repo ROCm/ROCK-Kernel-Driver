@@ -233,6 +233,8 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	spin_unlock_irqrestore(&base->lock, flags);
 }
 
+EXPORT_SYMBOL(add_timer_on);
+
 /***
  * mod_timer - modify a timer's timeout
  * @timer: the timer to be modified

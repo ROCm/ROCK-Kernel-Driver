@@ -787,6 +787,8 @@ asmlinkage NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
 
+	profile_task_exit(tsk);
+
 	if (unlikely(in_interrupt()))
 		panic("Aiee, killing interrupt handler!");
 	if (unlikely(!tsk->pid))
@@ -803,8 +805,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 				current->comm, current->pid,
 				preempt_count());
 
-	profile_exit_task(tsk);
- 
 	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
 		current->ptrace_message = code;
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);

@@ -1650,10 +1650,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	if (mpnt->vm_start >= end)
 		return 0;
 
-	/* Something will probably happen, so notify. */
-	if (mpnt->vm_file && (mpnt->vm_flags & VM_EXEC))
-		profile_exec_unmap(mm);
- 
 	/*
 	 * If we need to split any vma, do it now to save pain later.
 	 *
@@ -1695,6 +1691,8 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 {
 	int ret;
 	struct mm_struct *mm = current->mm;
+
+	profile_munmap(addr);
 
 	down_write(&mm->mmap_sem);
 	ret = do_munmap(mm, addr, len);
@@ -1798,8 +1796,6 @@ void exit_mmap(struct mm_struct *mm)
 	struct vm_area_struct *vma;
 	unsigned long nr_accounted = 0;
 
-	profile_exit_mmap(mm);
- 
 	lru_add_drain();
 
 	spin_lock(&mm->page_table_lock);
