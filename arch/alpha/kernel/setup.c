@@ -77,10 +77,11 @@ int boot_cpuid;
 
  * "srmcons" specified in the boot command arguments allows us to
  * see kernel messages during the period of time before the true
- * console device is "registered" during console_init(). As of this
- * version (2.4.10), time_init() is the last Alpha-specific code
- * called before console_init(), so we put "unregister" code
- * there to prevent schizophrenic console behavior later... ;-}
+ * console device is "registered" during console_init(). 
+ * As of this version (2.5.59), console_init() will call
+ * disable_early_printk() as the last action before initializing
+ * the console drivers. That's the last possible time srmcons can be 
+ * unregistered without interfering with console behavior.
  *
  * By default, OFF; set it with a bootcommand arg of "srmcons" or 
  * "console=srm". The meaning of these two args is:
@@ -657,6 +658,15 @@ setup_arch(char **cmdline_p)
 	setup_smp();
 #endif
 	paging_init();
+}
+
+void __init
+disable_early_printk(void)
+{
+	if (alpha_using_srm && srmcons_output) {
+		unregister_srm_console();
+		srmcons_output = 0;
+	}
 }
 
 static char sys_unknown[] = "Unknown";
