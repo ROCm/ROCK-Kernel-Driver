@@ -401,6 +401,21 @@ void agp_generic_enable(u32 mode)
 	minor = (ncapid >> 16) & 0xf;
 	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",major, minor);
 
+#ifdef CONFIG_AGP3
+	if(major >= 3) {
+		u32 agp_3_0;
+
+		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
+		/* Check to see if we are operating in 3.0 mode */
+		if((agp_3_0 >> 3) & 0x1) {
+			agp_3_0_node_enable(mode, minor);
+			return;
+		} else {
+			printk (KERN_INFO PFX "not in AGP 3.0 mode, falling back to 2.x\n");
+		}
+	}
+#endif
+
 	if (major < 3) {
 		pci_read_config_dword(agp_bridge->dev,
 			      agp_bridge->capndx + PCI_AGP_STATUS, &command);
@@ -412,17 +427,6 @@ void agp_generic_enable(u32 mode)
 			       agp_bridge->capndx + PCI_AGP_COMMAND, command);
 		agp_device_command(command, 0);
 	}
-
-#ifdef CONFIG_AGP3
-	if(major >= 3) {
-		u32 agp_3_0;
-
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
-		/* Check to see if we are operating in 3.0 mode */
-		if((agp_3_0 >> 3) & 0x1)
-			agp_3_0_node_enable(mode, minor);
-	}
-#endif
 }
 
 int agp_generic_create_gatt_table(void)
