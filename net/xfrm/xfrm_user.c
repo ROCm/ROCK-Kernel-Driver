@@ -241,6 +241,7 @@ static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
 	return x;
 
 error:
+	x->km.state = XFRM_STATE_DEAD;
 	xfrm_state_put(x);
 error_no_put:
 	*errp = err;

@@ -1749,11 +1749,10 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 			goto done;
 	} else if (pmc->sfmode != omode) {
 		/* allow mode switches for empty-set filters */
+		ip_mc_add_src(in_dev, &mreqs->imr_multiaddr, omode, 0, 0, 0);
 		ip_mc_del_src(in_dev, &mreqs->imr_multiaddr, pmc->sfmode, 0, 
 			0, 0);
 		pmc->sfmode = omode;
-		ip_mc_add_src(in_dev, &mreqs->imr_multiaddr, pmc->sfmode, 0, 
-			0, 0);
 	}
 
 	psl = pmc->sflist;

@@ -1629,7 +1629,8 @@ struct neigh_sysctl_table {
 };
 
 int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
-			  int p_id, int pdev_id, char *p_name)
+			  int p_id, int pdev_id, char *p_name, 
+			  proc_handler *handler)
 {
 	struct neigh_sysctl_table *t = kmalloc(sizeof(*t), GFP_KERNEL);
 	const char *dev_name_source = NULL;
@@ -1643,6 +1644,10 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 	t->neigh_vars[1].data  = &p->ucast_probes;
 	t->neigh_vars[2].data  = &p->app_probes;
 	t->neigh_vars[3].data  = &p->retrans_time;
+	if (handler) {
+		t->neigh_vars[3].proc_handler = handler;
+		t->neigh_vars[3].extra1 = dev;
+	}
 	t->neigh_vars[4].data  = &p->base_reachable_time;
 	t->neigh_vars[5].data  = &p->delay_probe_time;
 	t->neigh_vars[6].data  = &p->gc_staletime;

@@ -621,6 +621,21 @@ struct net_device *__dev_get_by_flags(unsigned short if_flags, unsigned short ma
 }
 
 /**
+ *	dev_valid_name - check if name is okay for network device
+ *	@name: name string
+ *
+ *	Network device names need to be valid file names to
+ *	to allow sysfs to work
+ */
+int dev_valid_name(const char *name)
+{
+	return !(*name == '\0' 
+		 || !strcmp(name, ".")
+		 || !strcmp(name, "..")
+		 || strchr(name, '/'));
+}
+
+/**
  *	dev_alloc_name - allocate a name for a device
  *	@dev: device
  *	@name: name format string
@@ -658,6 +673,41 @@ int dev_alloc_name(struct net_device *dev, const char *name)
 		}
 	}
 	return -ENFILE;	/* Over 100 of the things .. bail out! */
+}
+
+
+/**
+ *	dev_change_name - change name of a device
+ *	@dev: device
+ *	@name: name (or format string) must be at least IFNAMSIZ
+ *
+ *	Change name of a device, can pass format strings "eth%d".
+ *	for wildcarding.
+ */
+int dev_change_name(struct net_device *dev, char *newname)
+{
+	ASSERT_RTNL();
+
+	if (dev->flags & IFF_UP)
+		return -EBUSY;
+
+	if (!dev_valid_name(newname))
+		return -EINVAL;
+
+	if (strchr(newname, '%')) {
+		int err = dev_alloc_name(dev, newname);
+		if (err < 0)
+			return err;
+		strcpy(newname, dev->name);
+	}
+	else if (__dev_get_by_name(newname))
+		return -EEXIST;
+	else
+		strlcpy(dev->name, newname, IFNAMSIZ);
+
+	class_device_rename(&dev->class_dev, dev->name);
+	notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
+	return 0;
 }
 
 /**
@@ -946,11 +996,29 @@ int dev_close(struct net_device *dev)
  *	The notifier passed is linked into the kernel structures and must
  *	not be reused until it has been unregistered. A negative errno code
  *	is returned on a failure.
+ *
+ * 	When registered all registration and up events are replayed
+ *	to the new notifier to allow device to have a race free 
+ *	view of the network device list.
  */
 
 int register_netdevice_notifier(struct notifier_block *nb)
 {
-	return notifier_chain_register(&netdev_chain, nb);
+	struct net_device *dev;
+	int err;
+
+	rtnl_lock();
+	err = notifier_chain_register(&netdev_chain, nb);
+	if (!err) {
+		for (dev = dev_base; dev; dev = dev->next) {
+			nb->notifier_call(nb, NETDEV_REGISTER, dev);
+
+			if (dev->flags & IFF_UP) 
+				nb->notifier_call(nb, NETDEV_UP, dev);
+		}
+	}
+	rtnl_unlock();
+	return err;
 }
 
 /**
@@ -2341,20 +2409,8 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			return 0;
 
 		case SIOCSIFNAME:
-			if (dev->flags & IFF_UP)
-				return -EBUSY;
 			ifr->ifr_newname[IFNAMSIZ-1] = '\0';
-			if (__dev_get_by_name(ifr->ifr_newname))
-				return -EEXIST;
-			err = class_device_rename(&dev->class_dev, 
-						  ifr->ifr_newname);
-			if (!err) {
-				strlcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
-
-				notifier_call_chain(&netdev_chain,
-						    NETDEV_CHANGENAME, dev);
-			}
-			return err;
+			return dev_change_name(dev, ifr->ifr_newname);
 
 		/*
 		 *	Unknown or private ioctl
@@ -2487,6 +2543,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 		 */
 		case SIOCGMIIPHY:
 		case SIOCGMIIREG:
+		case SIOCSIFNAME:
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);
@@ -2518,7 +2575,6 @@ int dev_ioctl(unsigned int cmd, void *arg)
 		case SIOCDELMULTI:
 		case SIOCSIFHWBROADCAST:
 		case SIOCSIFTXQLEN:
-		case SIOCSIFNAME:
 		case SIOCSMIIREG:
 		case SIOCBONDENSLAVE:
 		case SIOCBONDRELEASE:
@@ -2667,6 +2723,11 @@ int register_netdevice(struct net_device *dev)
 				ret = -EIO;
 			goto out_err;
 		}
+	}
+ 
+	if (!dev_valid_name(dev->name)) {
+		ret = -EINVAL;
+		goto out_err;
 	}
 
 	dev->ifindex = dev_new_index();

@@ -44,7 +44,10 @@
 #define	RTM_DELTFILTER	(RTM_BASE+29)
 #define	RTM_GETTFILTER	(RTM_BASE+30)
 
-#define	RTM_MAX		(RTM_BASE+31)
+#define RTM_NEWPREFIX	(RTM_BASE+36)
+#define RTM_GETPREFIX	(RTM_BASE+38)
+
+#define	RTM_MAX		(RTM_BASE+39)
 
 /* 
    Generic structure for encapsulation of optional route information.
@@ -459,6 +462,34 @@ struct ifinfomsg
 	unsigned	ifi_change;		/* IFF_* change mask */
 };
 
+/********************************************************************
+ *		prefix information 
+ ****/
+
+struct prefixmsg
+{
+	unsigned char	prefix_family;
+	int		prefix_ifindex;
+	unsigned char	prefix_type;
+	unsigned char	prefix_len;
+	unsigned char	prefix_flags;
+};
+
+enum 
+{
+	PREFIX_UNSPEC,
+	PREFIX_ADDRESS,
+	PREFIX_CACHEINFO,
+};
+
+#define PREFIX_MAX	PREFIX_CACHEINFO
+
+struct prefix_cacheinfo
+{
+	__u32	preferred_time;
+	__u32	valid_time;
+};
+
 /* The struct should be in sync with struct net_device_stats */
 struct rtnl_link_stats
 {
@@ -558,9 +589,18 @@ enum
 	IFLA_INET6_CONF,	/* sysctl parameters		*/
 	IFLA_INET6_STATS,	/* statistics			*/
 	IFLA_INET6_MCAST,	/* MC things. What of them?	*/
+	IFLA_INET6_CACHEINFO,	/* time values and max reasm size */
 };
 
-#define IFLA_INET6_MAX	IFLA_INET6_MCAST
+struct ifla_cacheinfo
+{
+	__u32	max_reasm_len;
+	__u32	tstamp;		/* ipv6InterfaceTable updated timestamp */
+	__u32	reachable_time;
+	__u32	retrans_time;
+};
+
+#define IFLA_INET6_MAX	IFLA_INET6_CACHEINFO
 
 /*****************************************************************
  *		Traffic control messages.
@@ -611,9 +651,12 @@ enum
 #define RTMGRP_IPV6_IFADDR	0x100
 #define RTMGRP_IPV6_MROUTE	0x200
 #define RTMGRP_IPV6_ROUTE	0x400
+#define RTMGRP_IPV6_IFINFO	0x800
 
 #define RTMGRP_DECnet_IFADDR    0x1000
 #define RTMGRP_DECnet_ROUTE     0x4000
+
+#define RTMGRP_IPV6_PREFIX	0x20000
 
 /* End of information exported to user level */
 

@@ -802,7 +802,6 @@ static int __init inet6_init(void)
 	if (if6_proc_init())
 		goto proc_if6_fail;
 #endif
-	ipv6_netdev_notif_init();
 	ipv6_packet_init();
 	ip6_route_init();
 	ip6_flowlabel_init();
@@ -869,7 +868,6 @@ static void inet6_exit(void)
 #endif
 	/* Cleanup code parts. */
 	sit_cleanup();
-	ipv6_netdev_notif_cleanup();
 	ip6_flowlabel_cleanup();
 	addrconf_cleanup();
 	ip6_route_cleanup();

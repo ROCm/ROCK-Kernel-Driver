@@ -8,6 +8,7 @@
 #define _NET_FLOW_H
 
 #include <linux/in6.h>
+#include <asm/atomic.h>
 
 struct flowi {
 	int	oif;

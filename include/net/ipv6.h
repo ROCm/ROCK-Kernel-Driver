@@ -401,11 +401,7 @@ extern int			ipv6_getsockopt(struct sock *sk, int level,
 
 extern void			ipv6_packet_init(void);
 
-extern void			ipv6_netdev_notif_init(void);
-
 extern void			ipv6_packet_cleanup(void);
-
-extern void			ipv6_netdev_notif_cleanup(void);
 
 extern int 			ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len);
 extern void			ipv6_icmp_error(struct sock *sk, struct sk_buff *skb, int err, u16 port,
