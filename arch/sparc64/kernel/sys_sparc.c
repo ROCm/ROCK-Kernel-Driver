@@ -252,7 +252,7 @@ asmlinkage int sparc64_newuname(struct new_utsname * name)
 	int ret = sys_newuname(name);
 	
 	if (current->personality == PER_LINUX32 && !ret) {
-		ret = copy_to_user(name->machine, "sparc\0\0", 8);
+		ret = copy_to_user(name->machine, "sparc\0\0", 8) ? -EFAULT : 0;
 	}
 	return ret;
 }

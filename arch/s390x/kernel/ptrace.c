@@ -122,7 +122,7 @@ int ptrace_usercopy(addr_t realuseraddr, addr_t copyaddr, int len,
 				retval = clear_user(copyptr, len);
 			else
 				retval = copy_to_user(copyptr,realuserptr,len);
-                        retval = (retval == -EFAULT) ? -EIO : 0;
+                        retval = retval ? -EIO : 0;
 		}      
 	} else {
 		if (writeuser)

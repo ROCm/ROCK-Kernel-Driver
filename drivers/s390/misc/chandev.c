@@ -3151,7 +3151,7 @@ static int chandev_write_proc(struct file *file, const char *buffer,
 	buff=vmalloc(count+1);
 	if(buff)
 	{
-		rc = copy_from_user(buff,buffer,count);
+		rc = copy_from_user(buff,buffer,count) ? -EFAULT : 0;
 		if (rc)
 			goto chandev_write_exit;
 		chandev_do_setup(FALSE,buff,count);
