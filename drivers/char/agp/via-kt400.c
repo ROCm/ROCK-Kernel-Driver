@@ -166,6 +166,14 @@ static struct pci_device_id agp_via_pci_table[] __initdata = {
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_VIA,
+	.device		= PCI_DEVICE_ID_VIA_8367_0,
+	.subvendor	= PCI_VENDOR_ID_VIA,
+	.subdevice	= PCI_DEVICE_ID_VIA_8377_0,
+	},
 	{ }
 };
 
