@@ -751,7 +751,7 @@ int __init ide_probe_for_cmd640x (void)
 	 */
 	put_cmd640_reg(0x5b, 0xbd);
 	if (get_cmd640_reg(0x5b) != 0xbd) {
-		printk("ide: cmd640 init failed: wrong value in reg 0x5b\n");
+		printk(KERN_ERR "ide: cmd640 init failed: wrong value in reg 0x5b\n");
 		return 0;
 	}
 	put_cmd640_reg(0x5b, 0);
@@ -836,7 +836,7 @@ int __init ide_probe_for_cmd640x (void)
 		cmd_hwif1->tuneproc = &cmd640_tune_drive;
 #endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
 	}
-	printk("%s: %sserialized, secondary interface %s\n", cmd_hwif1->name,
+	printk(KERN_INFO "%s: %sserialized, secondary interface %s\n", cmd_hwif1->name,
 		cmd_hwif0->serialized ? "" : "not ", port2);
 
 	/*
