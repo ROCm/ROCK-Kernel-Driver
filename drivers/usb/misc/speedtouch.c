@@ -290,7 +290,7 @@ struct sk_buff *udsl_atm_alloc_tx (struct atm_vcc *vcc, unsigned int size)
 
 int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
 {
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) atm_dev->dev_data;
+	struct udsl_instance_data *instance = atm_dev->dev_data;
 	int left = *pos;
 
 	if (!left--)
@@ -325,8 +325,8 @@ int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
 ****************************************************************************/
 int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 {
-	struct udsl_atm_dev_data *dev_data = (struct udsl_atm_dev_data *) vcc->dev_data;
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) vcc->dev->dev_data;
+	struct udsl_atm_dev_data *dev_data = vcc->dev_data;
+	struct udsl_instance_data *instance = vcc->dev->dev_data;
 	struct sk_buff *new = NULL;
 	int err;
 
@@ -442,7 +442,7 @@ void udsl_atm_processqueue (unsigned long data)
 int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
 	struct udsl_atm_dev_data *dev_data;
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) vcc->dev->dev_data;
+	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
 	PDEBUG ("udsl_atm_open called\n");
 
@@ -451,8 +451,7 @@ int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 
 	MOD_INC_USE_COUNT;
-	dev_data =
-	    (struct udsl_atm_dev_data *) kmalloc (sizeof (struct udsl_atm_dev_data), GFP_KERNEL);
+	dev_data = kmalloc (sizeof (struct udsl_atm_dev_data), GFP_KERNEL);
 	if (!dev_data)
 		return -ENOMEM;
 
@@ -480,8 +479,8 @@ int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 void udsl_atm_close (struct atm_vcc *vcc)
 {
-	struct udsl_atm_dev_data *dev_data = (struct udsl_atm_dev_data *) vcc->dev_data;
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) vcc->dev->dev_data;
+	struct udsl_atm_dev_data *dev_data = vcc->dev_data;
+	struct udsl_instance_data *instance = vcc->dev->dev_data;
 
 	PDEBUG ("udsl_atm_close called\n");
 
@@ -532,7 +531,7 @@ struct udsl_cb {
 
 static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 {
-	struct udsl_usb_send_data_context *ctx = (struct udsl_usb_send_data_context *) urb->context;
+	struct udsl_usb_send_data_context *ctx = urb->context;
 	struct udsl_instance_data *instance = ctx->instance;
 	int err;
 
@@ -658,7 +657,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 	PDEBUG ("udsl_usb_receive_data entered, got packet %p with length %d an status %d\n", urb,
 		urb->actual_length, urb->status);
 
-	ctx = (struct udsl_data_ctx *) urb->context;
+	ctx = urb->context;
 	if (!ctx || !ctx->skb)
 		return;
 
@@ -717,9 +716,7 @@ int udsl_usb_data_init (struct udsl_instance_data *instance)
 		usb_maxpacket (instance->usb_dev,
 			       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT), 0));
 
-	instance->rcvbufs =
-	    (struct udsl_data_ctx *) kmalloc (sizeof (struct udsl_data_ctx) * UDSL_NUMBER_RCV_URBS,
-					      GFP_KERNEL);
+	instance->rcvbufs = kmalloc (sizeof (struct udsl_data_ctx) * UDSL_NUMBER_RCV_URBS, GFP_KERNEL);
 	if (!instance->rcvbufs)
 		return -ENOMEM;
 
