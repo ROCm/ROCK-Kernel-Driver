@@ -1585,11 +1585,12 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
 	if (!sreq)
 		return -ENOMEM;
 
-		sreq->sr_data_direction = DMA_NONE;
-        scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
+	sreq->sr_data_direction = DMA_NONE;
+	scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
 
 	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-	    (sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION &&
+	    ((sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION ||
+	     (sreq->sr_sense_buffer[2] & 0x0f) == NOT_READY) &&
 	    sdev->removable) {
 		sdev->changed = 1;
 		sreq->sr_result = 0;
