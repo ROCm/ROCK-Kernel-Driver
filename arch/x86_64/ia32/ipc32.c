@@ -271,7 +271,7 @@ semctl32 (int first, int second, int third, void *uptr)
 		fourth.__pad = &s;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_semctl(first, second, third|IPC_64, fourth);
+		err = sys_semctl(first, second, third, fourth);
 		set_fs(old_fs);
 		if (!err)
 			err = put_semid((void *)A(pad), &s, version);
@@ -396,7 +396,7 @@ msgctl32 (int first, int second, void *uptr)
 	      case MSG_STAT:
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_msgctl(first, second|IPC_64, (void *) &m64);
+		err = sys_msgctl(first, second, (void *) &m64);
 		set_fs(old_fs);
 		if (version == IPC_64) {
 			if (!access_ok(VERIFY_WRITE, up64, sizeof(*up64))) {
@@ -529,7 +529,7 @@ shmctl32 (int first, int second, void *uptr)
 	      case IPC_INFO:
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second|IPC_64, (struct shmid_ds *)&smi);
+		err = sys_shmctl(first, second, (struct shmid_ds *)&smi);
 		set_fs(old_fs);
 
 		if (version == IPC_64) {
@@ -587,7 +587,7 @@ shmctl32 (int first, int second, void *uptr)
 	      case SHM_STAT:
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_shmctl(first, second|IPC_64, (void *) &s64);
+		err = sys_shmctl(first, second, (void *) &s64);
 		set_fs(old_fs);
 		
 		if (err < 0)
