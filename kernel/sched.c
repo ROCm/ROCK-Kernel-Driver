@@ -182,7 +182,7 @@
 		((MAX_TIMESLICE - MIN_TIMESLICE) * \
 			(MAX_PRIO-1 - (p)->static_prio) / (MAX_USER_PRIO-1)))
 
-static inline unsigned int task_timeslice(task_t *p)
+static unsigned int task_timeslice(task_t *p)
 {
 	return BASE_TIMESLICE(p);
 }
@@ -273,7 +273,7 @@ const unsigned long scheduling_functions_end_here =
  * interrupts.  Note the ordering: we can safely lookup the task_rq without
  * explicitly disabling preemption.
  */
-static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
+static runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 {
 	struct runqueue *rq;
 
@@ -296,7 +296,7 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 /*
  * rq_lock - lock a given runqueue and disable interrupts.
  */
-static inline runqueue_t *this_rq_lock(void)
+static runqueue_t *this_rq_lock(void)
 {
 	runqueue_t *rq;
 
@@ -315,7 +315,7 @@ static inline void rq_unlock(runqueue_t *rq)
 /*
  * Adding/removing a task to/from a priority array:
  */
-static inline void dequeue_task(struct task_struct *p, prio_array_t *array)
+static void dequeue_task(struct task_struct *p, prio_array_t *array)
 {
 	array->nr_active--;
 	list_del(&p->run_list);
@@ -323,7 +323,7 @@ static inline void dequeue_task(struct task_struct *p, prio_array_t *array)
 		__clear_bit(p->prio, array->bitmap);
 }
 
-static inline void enqueue_task(struct task_struct *p, prio_array_t *array)
+static void enqueue_task(struct task_struct *p, prio_array_t *array)
 {
 	list_add_tail(&p->run_list, array->queue + p->prio);
 	__set_bit(p->prio, array->bitmap);
@@ -451,7 +451,7 @@ static void recalc_task_prio(task_t *p, unsigned long long now)
  * Update all the scheduling statistics stuff. (sleep average
  * calculation, priority modifiers, etc.)
  */
-static inline void activate_task(task_t *p, runqueue_t *rq)
+static void activate_task(task_t *p, runqueue_t *rq)
 {
 	unsigned long long now = sched_clock();
 
@@ -487,7 +487,7 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 /*
  * deactivate_task - remove a task from the runqueue.
  */
-static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
+static void deactivate_task(struct task_struct *p, runqueue_t *rq)
 {
 	rq->nr_running--;
 	if (p->state == TASK_UNINTERRUPTIBLE)
@@ -504,7 +504,7 @@ static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
  * the target CPU.
  */
 #ifdef CONFIG_SMP
-static inline void resched_task(task_t *p)
+static void resched_task(task_t *p)
 {
 	int need_resched, nrpolling;
 
@@ -975,7 +975,7 @@ void fastcall sched_exit(task_t * p)
  * with the lock held can cause deadlocks; see schedule() for
  * details.)
  */
-static inline void finish_task_switch(task_t *prev)
+static void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
@@ -1096,7 +1096,7 @@ unsigned long nr_iowait(void)
  * Note this does not disable interrupts like task_rq_lock,
  * you need to do so manually before calling.
  */
-static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
+static void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	if (rq1 == rq2)
 		spin_lock(&rq1->lock);
@@ -1117,7 +1117,7 @@ static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
  * Note this does not restore interrupts like task_rq_unlock,
  * you need to do so manually after calling.
  */
-static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
+static void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	spin_unlock(&rq1->lock);
 	if (rq1 != rq2)
@@ -1239,7 +1239,7 @@ out:
 /*
  * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
  */
-static inline void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
+static void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
 {
 	if (unlikely(!spin_trylock(&busiest->lock))) {
 		if (busiest < this_rq) {
