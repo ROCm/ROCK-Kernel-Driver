@@ -78,7 +78,7 @@ extern int sscanf(const char *, const char *, ...)
 extern int vsscanf(const char *, const char *, va_list);
 
 extern int get_option(char **str, int *pint);
-extern char *get_options(char *str, int nints, int *ints);
+extern char *get_options(const char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);
 extern void dev_probe_lock(void);
 extern void dev_probe_unlock(void);

@@ -34,6 +34,7 @@
 #include <linux/workqueue.h>
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
+#include <linux/moduleparam.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -133,9 +134,10 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 
 __setup("profile=", profile_setup);
 
-static int __init checksetup(char *line)
+static int __init obsolete_checksetup(char *line)
 {
-	struct kernel_param *p;
+	struct obs_kernel_param *p;
+	extern struct obs_kernel_param __setup_start, __setup_end;
 
 	p = &__setup_start;
 	do {
@@ -218,73 +220,44 @@ static int __init quiet_kernel(char *str)
 __setup("debug", debug_kernel);
 __setup("quiet", quiet_kernel);
 
-/*
- * This is a simple kernel command line parsing function: it parses
- * the command line, and fills in the arguments/environment to init
- * as appropriate. Any cmd-line option is taken to be an environment
- * variable if it contains the character '='.
- *
- * This routine also checks for options meant for the kernel.
- * These options are not given to init - they are for internal kernel use only.
- */
-static void __init parse_options(char *line)
+/* Unknown boot options get handed to init, unless they look like
+   failed parameters */
+static int __init unknown_bootoption(char *param, char *val)
 {
-	char *next,*quote;
-	int args, envs;
+	/* Change NUL term back to "=", to make "param" the whole string. */
+	if (val)
+		val[-1] = '=';
 
-	if (!*line)
-		return;
-	args = 0;
-	envs = 1;	/* TERM is set to 'linux' by default */
-	next = line;
-	while ((line = next) != NULL) {
-                quote = strchr(line,'"');
-                next = strchr(line, ' ');
-                while (next != NULL && quote != NULL && quote < next) {
-                        /* we found a left quote before the next blank
-                         * now we have to find the matching right quote
-                         */
-                        next = strchr(quote+1, '"');
-                        if (next != NULL) {
-                                quote = strchr(next+1, '"');
-                                next = strchr(next+1, ' ');
-                        }
-                }
-                if (next != NULL)
-                        *next++ = 0;
-		if (!strncmp(line,"init=",5)) {
-			line += 5;
-			execute_command = line;
-			/* In case LILO is going to boot us with default command line,
-			 * it prepends "auto" before the whole cmdline which makes
-			 * the shell think it should execute a script with such name.
-			 * So we ignore all arguments entered _before_ init=... [MJ]
-			 */
-			args = 0;
-			continue;
-		}
-		if (checksetup(line))
-			continue;
-		
-		/*
-		 * Then check if it's an environment variable or
-		 * an option.
-		 */
-		if (strchr(line,'=')) {
-			if (envs >= MAX_INIT_ENVS)
-				break;
-			envp_init[++envs] = line;
-		} else {
-			if (args >= MAX_INIT_ARGS)
-				break;
-			if (*line)
-				argv_init[++args] = line;
-		}
+	/* Handle obsolete-style parameters */
+	if (obsolete_checksetup(param))
+		return 0;
+
+	/* Preemptive maintenance for "why didn't my mispelled command
+           line work?" */
+	if (strchr(param, '.') && (!val || strchr(param, '.') < val)) {
+		printk(KERN_ERR "Unknown boot option `%s': ignoring\n", param);
+		return 0;
 	}
-	argv_init[args+1] = NULL;
-	envp_init[envs+1] = NULL;
-}
 
+	if (val) {
+		/* Environment option */
+		unsigned int i;
+		for (i = 0; envp_init[i]; i++) {
+			if (i == MAX_INIT_ENVS)
+				panic("Too many boot env vars at `%s'", param);
+		}
+		envp_init[i] = param;
+	} else {
+		/* Command line option */
+		unsigned int i;
+		for (i = 0; argv_init[i]; i++) {
+			if (i == MAX_INIT_ARGS)
+				panic("Too many boot init vars at `%s'",param);
+		}
+		argv_init[i] = param;
+	}
+	return 0;
+}
 
 extern void setup_arch(char **);
 extern void cpu_idle(void);
@@ -379,6 +352,7 @@ asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
 	extern char saved_command_line[];
+	extern struct kernel_param __start___param, __stop___param;
 /*
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
@@ -390,7 +364,9 @@ asmlinkage void __init start_kernel(void)
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
-	parse_options(command_line);
+	parse_args("Booting kernel", command_line, &__start___param,
+		   &__stop___param - &__start___param,
+		   &unknown_bootoption);
 	trap_init();
 	extable_init();
 	rcu_init();
