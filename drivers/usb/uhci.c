@@ -1492,6 +1492,9 @@ static int uhci_submit_urb(struct urb *urb, int mem_flags)
 		return -ENODEV;
 	}
 
+	/* increment the reference count of the urb, as we now also control it */
+	urb = usb_get_urb(urb);
+
 	uhci = (struct uhci *)urb->dev->bus->hcpriv;
 
 	INIT_LIST_HEAD(&urb->urb_list);
@@ -1505,6 +1508,7 @@ static int uhci_submit_urb(struct urb *urb, int mem_flags)
 		/* Since we can have problems on the out path */
 		spin_unlock_irqrestore(&urb->lock, flags);
 		usb_dec_dev_use(urb->dev);
+		usb_put_urb(urb);
 
 		return ret;
 	}
@@ -2299,6 +2303,7 @@ static void uhci_call_completion(struct urb *urb)
 			/* We decrement the usage count after we're done */
 			/*  with everything */
 			usb_dec_dev_use(dev);
+			usb_put_urb(urb);
 		}
 	}
 }
