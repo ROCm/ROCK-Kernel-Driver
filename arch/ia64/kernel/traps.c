@@ -186,6 +186,10 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		sig = SIGSEGV; code = __SEGV_PSTKOVF;
 		break;
 
+	      case 0x3f000 ... 0x3ffff:	/* bundle-update in progress */
+		sig = SIGILL; code = __ILL_BNDMOD;
+		break;
+
 	      default:
 		if (break_num < 0x40000 || break_num > 0x100000)
 			die_if_kernel("Bad break", regs, break_num);
