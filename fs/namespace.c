@@ -1048,15 +1048,9 @@ void __init mnt_init(unsigned long mempages)
 	if (!mnt_cache)
 		panic("Cannot create vfsmount cache");
 
-	mempages >>= (16 - PAGE_SHIFT);
-	mempages *= sizeof(struct list_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
-		;
-
-	do {
-		mount_hashtable = (struct list_head *)
-			__get_free_pages(GFP_ATOMIC, order);
-	} while (mount_hashtable == NULL && --order >= 0);
+	order = 0; 
+	mount_hashtable = (struct list_head *)
+		__get_free_pages(GFP_ATOMIC, order);
 
 	if (!mount_hashtable)
 		panic("Failed to allocate mount hash table\n");

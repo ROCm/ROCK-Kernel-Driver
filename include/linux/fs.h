@@ -207,6 +207,7 @@ extern void update_atime (struct inode *);
 extern void buffer_init(unsigned long);
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);
+extern void files_init(unsigned long);
 
 /* bh state bits */
 enum bh_state_bits {
@@ -517,6 +518,14 @@ extern spinlock_t files_lock;
 extern int init_private_file(struct file *, struct dentry *, int);
 
 #define	MAX_NON_LFS	((1UL<<31) - 1)
+
+/* Page cache limit. The filesystems should put that into their s_maxbytes 
+   limits, otherwise bad things can happen in VM. */ 
+#if BITS_PER_LONG==32
+#define MAX_LFS_FILESIZE	(((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG-1))-1) 
+#elif BITS_PER_LONG==64
+#define MAX_LFS_FILESIZE 	0x7fffffffffffffff
+#endif
 
 #define FL_POSIX	1
 #define FL_FLOCK	2
@@ -1512,8 +1521,6 @@ static inline int is_mounted(kdev_t dev)
 	}
 	return 0;
 }
-unsigned long generate_cluster(kdev_t, int b[], int);
-unsigned long generate_cluster_swab32(kdev_t, int b[], int);
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 

@@ -1544,7 +1544,7 @@ udf_read_super(struct super_block *sb, void *options, int silent)
 		iput(inode);
 		goto error_out;
 	}
-	sb->s_maxbytes = ~0ULL;
+	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	return sb;
 
 error_out:

@@ -1130,7 +1130,7 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 	/* Inform the kernel about which super operations are available. */
 	sb->s_op = &ntfs_super_operations;
 	sb->s_magic = NTFS_SUPER_MAGIC;
-	sb->s_maxbytes = ~0ULL >> 1;
+	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	ntfs_debug(DEBUG_OTHER, "Reading special files\n");
 	if (ntfs_load_special_files(vol)) {
 		ntfs_error("Error loading special files\n");

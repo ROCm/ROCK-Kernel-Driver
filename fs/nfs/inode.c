@@ -455,6 +455,8 @@ nfs_read_super(struct super_block *sb, void *raw_data, int silent)
                 server->namelen = maxlen;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
+	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
+		sb->s_maxbytes = MAX_LFS_FILESIZE; 
 
 	/* Fire up the writeback cache */
 	if (nfs_reqlist_alloc(server) < 0) {
