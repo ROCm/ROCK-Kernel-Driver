@@ -6,10 +6,15 @@
  * NFS file delegation management
  *
  */
+#include <linux/config.h>
+#include <linux/completion.h>
+#include <linux/module.h>
+#include <linux/sched.h>
+#include <linux/spinlock.h>
+
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_xdr.h>
-#include <linux/spinlock.h>
 
 #include "delegation.h"
 
@@ -139,6 +144,75 @@ restart:
 		goto restart;
 	}
 	spin_unlock(&clp->cl_lock);
+}
+
+struct recall_threadargs {
+	struct inode *inode;
+	struct nfs4_client *clp;
+	const nfs4_stateid *stateid;
+
+	struct completion started;
+	int result;
+};
+
+static int recall_thread(void *data)
+{
+	struct recall_threadargs *args = (struct recall_threadargs *)data;
+	struct inode *inode = igrab(args->inode);
+	struct nfs4_client *clp = NFS_SERVER(inode)->nfs4_state;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_delegation *delegation;
+
+	daemonize("nfsv4-delegreturn");
+
+	nfs_msync_inode(inode);
+	down_read(&clp->cl_sem);
+	down_write(&nfsi->rwsem);
+	spin_lock(&clp->cl_lock);
+	delegation = nfsi->delegation;
+	if (delegation != NULL && memcmp(delegation->stateid.data,
+				args->stateid->data,
+				sizeof(delegation->stateid.data)) == 0) {
+		list_del_init(&delegation->super_list);
+		nfsi->delegation = NULL;
+		args->result = 0;
+	} else {
+		delegation = NULL;
+		args->result = -ENOENT;
+	}
+	spin_unlock(&clp->cl_lock);
+	complete(&args->started);
+	up_write(&nfsi->rwsem);
+	up_read(&clp->cl_sem);
+	nfs_msync_inode(inode);
+
+	if (delegation != NULL)
+		nfs_do_return_delegation(inode, delegation);
+	iput(inode);
+	module_put_and_exit(0);
+}
+
+/*
+ * Asynchronous delegation recall!
+ */
+int nfs_async_inode_return_delegation(struct inode *inode, const nfs4_stateid *stateid)
+{
+	struct recall_threadargs data = {
+		.inode = inode,
+		.stateid = stateid,
+	};
+	int status;
+
+	init_completion(&data.started);
+	__module_get(THIS_MODULE);
+	status = kernel_thread(recall_thread, &data, CLONE_KERNEL);
+	if (status < 0)
+		goto out_module_put;
+	wait_for_completion(&data.started);
+	return data.result;
+out_module_put:
+	module_put(THIS_MODULE);
+	return status;
 }
 
 /*

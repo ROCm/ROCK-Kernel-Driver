@@ -46,6 +46,8 @@
 #include <linux/workqueue.h>
 #include <linux/bitops.h>
 
+#include "callback.h"
+
 #define OPENOWNER_POOL_SIZE	8
 
 static spinlock_t		state_spinlock = SPIN_LOCK_UNLOCKED;
@@ -94,22 +96,26 @@ nfs4_alloc_client(struct in_addr *addr)
 {
 	struct nfs4_client *clp;
 
-	if ((clp = kmalloc(sizeof(*clp), GFP_KERNEL))) {
-		memset(clp, 0, sizeof(*clp));
-		memcpy(&clp->cl_addr, addr, sizeof(clp->cl_addr));
-		init_rwsem(&clp->cl_sem);
-		INIT_LIST_HEAD(&clp->cl_delegations);
-		INIT_LIST_HEAD(&clp->cl_state_owners);
-		INIT_LIST_HEAD(&clp->cl_unused);
-		spin_lock_init(&clp->cl_lock);
-		atomic_set(&clp->cl_count, 1);
-		INIT_WORK(&clp->cl_recoverd, nfs4_recover_state, clp);
-		INIT_WORK(&clp->cl_renewd, nfs4_renew_state, clp);
-		INIT_LIST_HEAD(&clp->cl_superblocks);
-		init_waitqueue_head(&clp->cl_waitq);
-		rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS4 client");
-		clp->cl_state = 1 << NFS4CLNT_OK;
+	if (nfs_callback_up() < 0)
+		return NULL;
+	if ((clp = kmalloc(sizeof(*clp), GFP_KERNEL)) == NULL) {
+		nfs_callback_down();
+		return NULL;
 	}
+	memset(clp, 0, sizeof(*clp));
+	memcpy(&clp->cl_addr, addr, sizeof(clp->cl_addr));
+	init_rwsem(&clp->cl_sem);
+	INIT_LIST_HEAD(&clp->cl_delegations);
+	INIT_LIST_HEAD(&clp->cl_state_owners);
+	INIT_LIST_HEAD(&clp->cl_unused);
+	spin_lock_init(&clp->cl_lock);
+	atomic_set(&clp->cl_count, 1);
+	INIT_WORK(&clp->cl_recoverd, nfs4_recover_state, clp);
+	INIT_WORK(&clp->cl_renewd, nfs4_renew_state, clp);
+	INIT_LIST_HEAD(&clp->cl_superblocks);
+	init_waitqueue_head(&clp->cl_waitq);
+	rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS4 client");
+	clp->cl_state = 1 << NFS4CLNT_OK;
 	return clp;
 }
 
@@ -132,25 +138,52 @@ nfs4_free_client(struct nfs4_client *clp)
 	if (clp->cl_rpcclient)
 		rpc_shutdown_client(clp->cl_rpcclient);
 	kfree(clp);
+	nfs_callback_down();
+}
+
+static struct nfs4_client *__nfs4_find_client(struct in_addr *addr)
+{
+	struct nfs4_client *clp;
+	list_for_each_entry(clp, &nfs4_clientid_list, cl_servers) {
+		if (memcmp(&clp->cl_addr, addr, sizeof(clp->cl_addr)) == 0) {
+			atomic_inc(&clp->cl_count);
+			return clp;
+		}
+	}
+	return NULL;
+}
+
+struct nfs4_client *nfs4_find_client(struct in_addr *addr)
+{
+	struct nfs4_client *clp;
+	spin_lock(&state_spinlock);
+	clp = __nfs4_find_client(addr);
+	spin_unlock(&state_spinlock);
+	return clp;
 }
 
 struct nfs4_client *
 nfs4_get_client(struct in_addr *addr)
 {
-	struct nfs4_client *new, *clp = NULL;
+	struct nfs4_client *clp, *new = NULL;
 
-	new = nfs4_alloc_client(addr);
 	spin_lock(&state_spinlock);
-	list_for_each_entry(clp, &nfs4_clientid_list, cl_servers) {
-		if (memcmp(&clp->cl_addr, addr, sizeof(clp->cl_addr)) == 0)
-			goto found;
+	for (;;) {
+		clp = __nfs4_find_client(addr);
+		if (clp != NULL)
+			break;
+		clp = new;
+		if (clp != NULL) {
+			list_add(&clp->cl_servers, &nfs4_clientid_list);
+			new = NULL;
+			break;
+		}
+		spin_unlock(&state_spinlock);
+		new = nfs4_alloc_client(addr);
+		spin_lock(&state_spinlock);
+		if (new == NULL)
+			break;
 	}
-	if (new)
-		list_add(&new->cl_servers, &nfs4_clientid_list);
-	spin_unlock(&state_spinlock);
-	return new;
-found:
-	atomic_inc(&clp->cl_count);
 	spin_unlock(&state_spinlock);
 	if (new)
 		nfs4_free_client(new);

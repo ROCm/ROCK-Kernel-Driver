@@ -686,6 +686,7 @@ extern void destroy_nfsv4_state(struct nfs_server *);
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
 extern int nfs4_init_client(struct nfs4_client *clp);
+extern struct nfs4_client *nfs4_find_client(struct in_addr *);
 extern u32 nfs4_alloc_lockowner_id(struct nfs4_client *);
 
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
@@ -729,6 +730,7 @@ struct nfs4_mount_data;
 #define NFSDBG_XDR		0x0020
 #define NFSDBG_FILE		0x0040
 #define NFSDBG_ROOT		0x0080
+#define NFSDBG_CALLBACK		0x0100
 #define NFSDBG_ALL		0xFFFF
 
 #ifdef __KERNEL__

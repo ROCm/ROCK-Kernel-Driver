@@ -22,6 +22,7 @@ struct nfs_delegation {
 
 int nfs_inode_set_delegation(struct inode *inode, struct rpc_cred *cred, struct nfs_openres *res);
 int nfs_inode_return_delegation(struct inode *inode);
+int nfs_async_inode_return_delegation(struct inode *inode, const nfs4_stateid *stateid);
 
 struct inode *nfs_delegation_find_inode(struct nfs4_client *clp, const struct nfs_fh *fhandle);
 void nfs_return_all_delegations(struct super_block *sb);
