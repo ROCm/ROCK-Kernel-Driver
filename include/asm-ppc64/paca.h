@@ -18,7 +18,7 @@
 
 #include	<linux/config.h>
 #include	<asm/types.h>
-#include	<asm/iSeries/ItLpPaca.h>
+#include	<asm/lppaca.h>
 #include	<asm/iSeries/ItLpRegSave.h>
 #include	<asm/mmu.h>
 

@@ -29,7 +29,7 @@
 #include <asm/processor.h>
 
 #include <asm/paca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/rtas.h>

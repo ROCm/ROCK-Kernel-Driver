@@ -27,7 +27,7 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include <asm/iSeries/HvLpConfig.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>

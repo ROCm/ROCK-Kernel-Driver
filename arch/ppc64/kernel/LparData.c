@@ -16,7 +16,7 @@
 #include <asm/naca.h>
 #include <asm/abs_addr.h>
 #include <asm/iSeries/ItLpNaca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpRegSave.h>
 #include <asm/paca.h>
 #include <asm/iSeries/HvReleaseData.h>

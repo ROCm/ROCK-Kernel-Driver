@@ -25,7 +25,6 @@
 #include <asm/abs_addr.h>
 
 #include <asm/iSeries/ItLpNaca.h>
-#include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpRegSave.h>
 #include <asm/iSeries/HvReleaseData.h>
 #include <asm/iSeries/LparMap.h>

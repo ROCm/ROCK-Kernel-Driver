@@ -17,7 +17,7 @@
 #include <asm/prom.h>
 #include <asm/systemcfg.h>
 #include <asm/paca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 
 
 static DEFINE_PER_CPU(struct cpu, cpu_devices);
