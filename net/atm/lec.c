@@ -797,8 +797,8 @@ lec_vcc_attach(struct atm_vcc *vcc, void *arg)
 	vcc->pop = lec_pop;
         lec_vcc_added(dev_lec[ioc_data.dev_num]->priv, 
                       &ioc_data, vcc, vcc->push);
-        vcc->push = lec_push;
         vcc->proto_data = dev_lec[ioc_data.dev_num];
+        vcc->push = lec_push;
         return 0;
 }
 
