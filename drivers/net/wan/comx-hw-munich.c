@@ -32,16 +32,16 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
+#include <linux/ioport.h>
+#include <linux/pci.h>
+#include <linux/init.h>
+
 #include <asm/delay.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/init.h>
 
 #define COMX_NEW
 

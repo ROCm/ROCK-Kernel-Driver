@@ -37,9 +37,9 @@
  *	Known problem: this driver wasn't tested on multiprocessor machine.
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/fcntl.h>
 #include <linux/ioport.h>
@@ -47,6 +47,14 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/pci.h>
+#include <linux/skbuff.h>
+#include <linux/timer.h>
+#include <linux/init.h>
+
+#include <net/arp.h>
 
 #include <asm/io.h>
 #include <asm/types.h>
@@ -54,19 +62,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/timer.h>
-#include <linux/init.h>
-
-#include <net/arp.h>
-#include <linux/pci.h>
-
-#include <linux/config.h>
 #include "sbni.h"
-
 
 /* device private data */
 

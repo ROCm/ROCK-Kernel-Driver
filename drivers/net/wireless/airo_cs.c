@@ -24,19 +24,14 @@
 #ifdef __IN_PCMCIA_PACKAGE__
 #include <pcmcia/k_compat.h>
 #endif
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-
-#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <asm/system.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -44,6 +39,9 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
 
 /*
    All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If

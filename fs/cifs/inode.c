@@ -314,14 +314,24 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
-	/* BB Should we close the file if it is already open from our client? */
-
 	full_path = build_path_from_dentry(direntry);
 
 	rc = CIFSSMBDelFile(xid, pTcon, full_path, cifs_sb->local_nls);
 
 	if (!rc) {
 		direntry->d_inode->i_nlink--;
+	} else if (rc == -ETXTBSY) {
+		int oplock = FALSE;
+		__u16 netfid;
+
+		rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, DELETE, 
+				CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
+				&netfid, &oplock, cifs_sb->local_nls);
+		if(rc==0) {
+			CIFSSMBClose(xid, pTcon, netfid);
+			/* BB In the future chain close with the NTCreateX to narrow window */
+			direntry->d_inode->i_nlink--;
+		}
 	}
 	cifsInode = CIFS_I(direntry->d_inode);
 	cifsInode->time = 0;	/* will force revalidate to get info when needed */
@@ -454,6 +464,11 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 
 	rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 			   cifs_sb_source->local_nls);
+	if(rc == -EEXIST) {
+		cifs_unlink(target_inode, target_direntry);
+		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
+				   cifs_sb_source->local_nls);
+	}
 	if (fromName)
 		kfree(fromName);
 	if (toName)

@@ -52,6 +52,7 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
 
 	clear_page_dirty(page);
 	ClearPageUptodate(page);
+	ClearPageMappedToDisk(page);
 	remove_from_page_cache(page);
 	page_cache_release(page);	/* pagecache ref */
 }

@@ -52,14 +52,9 @@
 
 #include <linux/string.h>
 #include <linux/module.h>
-
-#include <asm/uaccess.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/net.h>
 #include <linux/inetdevice.h>
@@ -68,7 +63,6 @@
 #include <linux/init.h>
 #include <linux/if_ether.h>
 #include <linux/if_pppox.h>
-#include <net/sock.h>
 #include <linux/ppp_channel.h>
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
@@ -78,7 +72,9 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+#include <net/sock.h>
 
+#include <asm/uaccess.h>
 
 static int __attribute__((unused)) pppoe_debug = 7;
 #define PPPOE_HASH_BITS 4

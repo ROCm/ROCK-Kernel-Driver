@@ -1,5 +1,5 @@
 /*
- *  $Id: longrun.c,v 1.12 2002/09/29 23:43:10 db Exp $
+ *  $Id: longrun.c,v 1.14 2002/10/31 21:17:40 db Exp $
  *
  * (C) 2002  Dominik Brodowski <linux@brodo.de>
  *
@@ -67,13 +67,13 @@ static void longrun_get_policy(struct cpufreq_policy *policy)
  * Sets a new CPUFreq policy on LongRun-capable processors. This function
  * has to be called with cpufreq_driver locked.
  */
-static void longrun_set_policy(struct cpufreq_policy *policy)
+static int longrun_set_policy(struct cpufreq_policy *policy)
 {
 	u32 msr_lo, msr_hi;
 	u32 pctg_lo, pctg_hi;
 
 	if (!longrun_driver || !policy)
-		return;
+		return -EINVAL;
 
 	pctg_lo = (policy->min - longrun_low_freq) / 
 		((longrun_high_freq - longrun_low_freq) / 100);
@@ -105,7 +105,7 @@ static void longrun_set_policy(struct cpufreq_policy *policy)
 	msr_hi |= pctg_hi;
 	wrmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 
-	return;
+	return 0;
 }
 
 
@@ -115,16 +115,16 @@ static void longrun_set_policy(struct cpufreq_policy *policy)
  * Validates a new CPUFreq policy. This function has to be called with 
  * cpufreq_driver locked.
  */
-static void longrun_verify_policy(struct cpufreq_policy *policy)
+static int longrun_verify_policy(struct cpufreq_policy *policy)
 {
 	if (!policy || !longrun_driver)
-		return;
+		return -EINVAL;
 
 	policy->cpu = 0;
 	cpufreq_verify_within_limits(policy, 0, 
 		longrun_driver->policy[0].max_cpu_freq);
 
-	return;
+	return 0;
 }
 
 
@@ -252,20 +252,22 @@ static int __init longrun_init(void)
 	longrun_get_policy(&driver->policy[0]);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = longrun_low_freq;
+	driver->cpu_min_freq[0] = longrun_low_freq;
 	driver->cpu_cur_freq[0] = longrun_high_freq; /* dummy value */
 #endif
 
 	driver->verify         = &longrun_verify_policy;
 	driver->setpolicy      = &longrun_set_policy;
-	result = cpufreq_register(driver);
-	if (result) {
-		kfree(driver);
-		return result;
-	}
+
 	longrun_driver = driver;
 
-	return 0;
+	result = cpufreq_register(driver);
+	if (result) {
+		longrun_driver = NULL;
+		kfree(driver);
+	}
+
+	return result;
 }
 
 

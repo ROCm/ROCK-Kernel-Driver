@@ -918,7 +918,6 @@ __udf_read_inode(struct inode *inode)
 	 * Set defaults, but the inode is still incomplete!
 	 * Note: get_new_inode() sets the following on a new inode:
 	 *      i_sb = sb
-	 *      i_dev = sb->s_dev;
 	 *      i_no = ino
 	 *      i_flags = sb->s_flags
 	 *      i_state = 0

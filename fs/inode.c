@@ -102,7 +102,6 @@ static struct inode *alloc_inode(struct super_block *sb)
 		struct address_space * const mapping = &inode->i_data;
 
 		inode->i_sb = sb;
-		inode->i_dev = sb->s_dev;
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_flags = 0;
 		atomic_set(&inode->i_count, 1);
@@ -147,12 +146,10 @@ void destroy_inode(struct inode *inode)
 	if (inode_has_buffers(inode))
 		BUG();
 	security_ops->inode_free_security(inode);
-	if (inode->i_sb->s_op->destroy_inode) {
+	if (inode->i_sb->s_op->destroy_inode)
 		inode->i_sb->s_op->destroy_inode(inode);
-	} else {
-		BUG_ON(inode->i_data.page_tree.rnode != NULL);
+	else
 		kmem_cache_free(inode_cachep, (inode));
-	}
 }
 
 
@@ -1269,4 +1266,22 @@ void __init inode_init(unsigned long mempages)
 		panic("cannot create inode slab cache");
 
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
+}
+
+void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
+{
+	inode->i_mode = mode;
+	if (S_ISCHR(mode)) {
+		inode->i_fop = &def_chr_fops;
+		inode->i_rdev = to_kdev_t(rdev);
+		inode->i_cdev = cdget(rdev);
+	} else if (S_ISBLK(mode)) {
+		inode->i_fop = &def_blk_fops;
+		inode->i_rdev = to_kdev_t(rdev);
+	} else if (S_ISFIFO(mode))
+		inode->i_fop = &def_fifo_fops;
+	else if (S_ISSOCK(mode))
+		inode->i_fop = &bad_sock_fops;
+	else
+		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n", mode);
 }

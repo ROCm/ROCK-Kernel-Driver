@@ -99,30 +99,27 @@
   
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/string.h>
 #include <linux/in.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/irq.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/mca.h>
-
 #include <linux/spinlock.h>
+
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/irq.h>
 
 #ifndef NET_DEBUG
 #define NET_DEBUG 4

@@ -236,9 +236,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -247,19 +245,18 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-
 #include <linux/time.h>
 #include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/ctype.h>
+
+#include <asm/uaccess.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
 
 #ifdef CONFIG_MCA
 #include <linux/mca.h>

@@ -34,6 +34,7 @@
 #include <linux/types.h>
 #include <linux/ipc.h>
 #include <linux/namei.h>
+#include <linux/uio.h>
 
 #include <asm/fpu.h>
 #include <asm/io.h>

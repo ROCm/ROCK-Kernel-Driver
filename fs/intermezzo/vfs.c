@@ -182,7 +182,7 @@ inline void presto_debug_fail_blkdev(struct presto_file_set *fset,
 {
         int minor = presto_f2m(fset);
         int errorval = izo_channels[minor].uc_errorval;
-        kdev_t dev = to_kdev_t(fset->fset_dentry->d_inode->i_dev);
+        kdev_t dev = to_kdev_t(fset->fset_dentry->d_inode->i_sb->s_dev);
 
         if (errorval && errorval == (long)value && !is_read_only(dev)) {
                 CDEBUG(D_SUPER, "setting device %s read only\n", kdevname(dev));
@@ -763,7 +763,7 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
                 goto exit_lock;
 
         error = -EXDEV;
-        if (dir->d_inode->i_dev != inode->i_dev)
+        if (dir->d_inode->i_sb->s_dev != inode->i_sb->s_dev)
                 goto exit_lock;
 
         /*
@@ -1820,7 +1820,7 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_dev != old_dir->i_dev)
+        if (new_dir->i_sb->s_dev != old_dir->i_sb->s_dev)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)
@@ -1901,7 +1901,7 @@ int presto_rename_other(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_dev != old_dir->i_dev)
+        if (new_dir->i_sb->s_dev != old_dir->i_sb->s_dev)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)

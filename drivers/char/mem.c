@@ -377,6 +377,7 @@ static ssize_t write_null(struct file * file, const char * buf,
 	return count;
 }
 
+#ifdef CONFIG_MMU
 /*
  * For fun, we are using the MMU for this.
  */
@@ -476,6 +477,29 @@ static int mmap_zero(struct file * file, struct vm_area_struct * vma)
 		return -EAGAIN;
 	return 0;
 }
+#else /* CONFIG_MMU */
+static ssize_t read_zero(struct file * file, char * buf, 
+			 size_t count, loff_t *ppos)
+{
+	unsigned long left;
+
+	if (!count)
+		return 0;
+
+	for (left = count; left > 0; left--, buf++) {
+		if (put_user(0, buf))
+			return -EFAULT;
+		cond_resched();
+	}
+
+	return count;
+}
+
+static int mmap_zero(struct file * file, struct vm_area_struct * vma)
+{
+	return -ENOSYS;
+}
+#endif /* CONFIG_MMU */
 
 static ssize_t write_full(struct file * file, const char * buf,
 			  size_t count, loff_t *ppos)

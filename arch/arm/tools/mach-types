@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sat Sep 21 13:39:13 2002
+# Last update: Sat Nov 16 15:57:50 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -71,7 +71,7 @@ mvi			SA1100_MVI		MVI			58
 jupiter			SA1100_JUPITER		JUPITER			59
 psionw			ARCH_PSIONW		PSIONW			60
 aln			SA1100_ALN		ALN			61
-epxa10db		ARCH_CAMELOT		CAMELOT			62
+epxa			ARCH_CAMELOT		CAMELOT			62
 gds2200			SA1100_GDS2200		GDS2200			63
 psion_series7		SA1100_PSION_SERIES7	PSION_SERIES7		64
 xfile			SA1100_XFILE		XFILE			65
@@ -242,3 +242,19 @@ killbear		SA1100_KILLBEAR		KILLBEAR		230
 yoho			ARCH_YOHO		YOHO			231
 jasper			ARCH_JASPER		JASPER			232
 dsc25			ARCH_DSC25		DSC25			233
+innovator		ARCH_INNOVATOR		INNOVATOR		234
+ramses			ARCH_RAMSES		RAMSES			235
+s28x			ARCH_S28X		S28X			236
+mport3			ARCH_MPORT3		MPORT3			237
+pxa_eagle250		ARCH_PXA_EAGLE250	PXA_EAGLE250		238
+pdb			ARCH_PDB		PDB			239
+blue_2g			SA1100_BLUE_2G		BLUE_2G			240
+bluearch		SA1100_BLUEARCH		BLUEARCH		241
+ixdp2400		ARCH_IXMB2400		IXMB2400		242
+ixdp2800		ARCH_IXMB2800		IXMB2800		243
+explorer		SA1100_EXPLORER		EXPLORER		244
+ixdp425			ARCH_IXDP425		IXDP425			245
+chimp			ARCH_CHIMP		CHIMP			246
+stork_nest		ARCH_STORK_NEST		STORK_NEST		247
+stork_egg		ARCH_STORK_EGG		STORK_EGG		248
+wismo			SA1100_WISMO		WISMO			249

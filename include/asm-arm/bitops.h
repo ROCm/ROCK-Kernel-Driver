@@ -5,7 +5,7 @@
  * Big endian support: Copyright 2001, Nicolas Pitre
  *  reworked by rmk.
  *
- * bit 0 is the LSB of addr; bit 32 is the LSB of (addr+1).
+ * bit 0 is the LSB of an "unsigned long" quantity.
  *
  * Please note that the code in this file should never be included
  * from user space.  Many of these are not implemented in assembler
@@ -26,34 +26,39 @@
 
 /*
  * These functions are the basis of our bit ops.
- * First, the atomic bitops.
  *
- * The endian issue for these functions is handled by the macros below.
+ * First, the atomic bitops. These use native endian.
  */
-static inline void
-____atomic_set_bit_mask(unsigned int mask, volatile unsigned char *p)
+static inline void ____atomic_set_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	*p |= mask;
 	local_irq_restore(flags);
 }
 
-static inline void
-____atomic_clear_bit_mask(unsigned int mask, volatile unsigned char *p)
+static inline void ____atomic_clear_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	*p &= ~mask;
 	local_irq_restore(flags);
 }
 
-static inline void
-____atomic_change_bit_mask(unsigned int mask, volatile unsigned char *p)
+static inline void ____atomic_change_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	*p ^= mask;
@@ -61,10 +66,13 @@ ____atomic_change_bit_mask(unsigned int mask, volatile unsigned char *p)
 }
 
 static inline int
-____atomic_test_and_set_bit_mask(unsigned int mask, volatile unsigned char *p)
+____atomic_test_and_set_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	res = *p;
@@ -75,10 +83,13 @@ ____atomic_test_and_set_bit_mask(unsigned int mask, volatile unsigned char *p)
 }
 
 static inline int
-____atomic_test_and_clear_bit_mask(unsigned int mask, volatile unsigned char *p)
+____atomic_test_and_clear_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	res = *p;
@@ -89,10 +100,13 @@ ____atomic_test_and_clear_bit_mask(unsigned int mask, volatile unsigned char *p)
 }
 
 static inline int
-____atomic_test_and_change_bit_mask(unsigned int mask, volatile unsigned char *p)
+____atomic_test_and_change_bit(unsigned int bit, unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
+	unsigned long mask = 1UL << (bit & 31);
+
+	p += bit >> 5;
 
 	local_irq_save(flags);
 	res = *p;
@@ -103,61 +117,64 @@ ____atomic_test_and_change_bit_mask(unsigned int mask, volatile unsigned char *p
 }
 
 /*
- * Now the non-atomic variants.  We let the compiler handle all optimisations
- * for these.
+ * Now the non-atomic variants.  We let the compiler handle all
+ * optimisations for these.  These are all _native_ endian.
  */
-static inline void ____nonatomic_set_bit(int nr, volatile void *p)
+static inline void __set_bit(int nr, volatile unsigned long *p)
 {
-	((unsigned char *) p)[nr >> 3] |= (1U << (nr & 7));
+	p[nr >> 5] |= (1UL << (nr & 31));
 }
 
-static inline void ____nonatomic_clear_bit(int nr, volatile void *p)
+static inline void __clear_bit(int nr, volatile unsigned long *p)
 {
-	((unsigned char *) p)[nr >> 3] &= ~(1U << (nr & 7));
+	p[nr >> 5] &= ~(1UL << (nr & 31));
 }
 
-static inline void ____nonatomic_change_bit(int nr, volatile void *p)
+static inline void __change_bit(int nr, volatile unsigned long *p)
 {
-	((unsigned char *) p)[nr >> 3] ^= (1U << (nr & 7));
+	p[nr >> 5] ^= (1UL << (nr & 31));
 }
 
-static inline int ____nonatomic_test_and_set_bit(int nr, volatile void *p)
+static inline int __test_and_set_bit(int nr, volatile unsigned long *p)
 {
-	unsigned int mask = 1 << (nr & 7);
-	unsigned int oldval;
+	unsigned long oldval, mask = 1UL << (nr & 31);
 
-	oldval = ((unsigned char *) p)[nr >> 3];
-	((unsigned char *) p)[nr >> 3] = oldval | mask;
+	p += nr >> 5;
+
+	oldval = *p;
+	*p = oldval | mask;
 	return oldval & mask;
 }
 
-static inline int ____nonatomic_test_and_clear_bit(int nr, volatile void *p)
+static inline int __test_and_clear_bit(int nr, volatile unsigned long *p)
 {
-	unsigned int mask = 1 << (nr & 7);
-	unsigned int oldval;
+	unsigned long oldval, mask = 1UL << (nr & 31);
 
-	oldval = ((unsigned char *) p)[nr >> 3];
-	((unsigned char *) p)[nr >> 3] = oldval & ~mask;
+	p += nr >> 5;
+
+	oldval = *p;
+	*p = oldval & ~mask;
 	return oldval & mask;
 }
 
-static inline int ____nonatomic_test_and_change_bit(int nr, volatile void *p)
+static inline int __test_and_change_bit(int nr, volatile unsigned long *p)
 {
-	unsigned int mask = 1 << (nr & 7);
-	unsigned int oldval;
+	unsigned long oldval, mask = 1UL << (nr & 31);
 
-	oldval = ((unsigned char *) p)[nr >> 3];
-	((unsigned char *) p)[nr >> 3] = oldval ^ mask;
+	p += nr >> 5;
+
+	oldval = *p;
+	*p = oldval ^ mask;
 	return oldval & mask;
 }
 
 /*
  * This routine doesn't need to be atomic.
  */
-static inline int ____test_bit(int nr, const void * p)
+static inline int __test_bit(int nr, const unsigned long * p)
 {
-    return ((volatile unsigned char *) p)[nr >> 3] & (1U << (nr & 7));
-}	
+	return p[nr >> 5] & (1UL << (nr & 31));
+}
 
 /*
  *  A note about Endian-ness.
@@ -187,24 +204,24 @@ static inline int ____test_bit(int nr, const void * p)
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */
-extern void _set_bit_le(int nr, volatile void * p);
-extern void _clear_bit_le(int nr, volatile void * p);
-extern void _change_bit_le(int nr, volatile void * p);
-extern int _test_and_set_bit_le(int nr, volatile void * p);
-extern int _test_and_clear_bit_le(int nr, volatile void * p);
-extern int _test_and_change_bit_le(int nr, volatile void * p);
+extern void _set_bit_le(int nr, unsigned long * p);
+extern void _clear_bit_le(int nr, unsigned long * p);
+extern void _change_bit_le(int nr, unsigned long * p);
+extern int _test_and_set_bit_le(int nr, unsigned long * p);
+extern int _test_and_clear_bit_le(int nr, unsigned long * p);
+extern int _test_and_change_bit_le(int nr, unsigned long * p);
 extern int _find_first_zero_bit_le(void * p, unsigned size);
 extern int _find_next_zero_bit_le(void * p, int size, int offset);
 
 /*
  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
  */
-extern void _set_bit_be(int nr, volatile void * p);
-extern void _clear_bit_be(int nr, volatile void * p);
-extern void _change_bit_be(int nr, volatile void * p);
-extern int _test_and_set_bit_be(int nr, volatile void * p);
-extern int _test_and_clear_bit_be(int nr, volatile void * p);
-extern int _test_and_change_bit_be(int nr, volatile void * p);
+extern void _set_bit_be(int nr, unsigned long * p);
+extern void _clear_bit_be(int nr, unsigned long * p);
+extern void _change_bit_be(int nr, unsigned long * p);
+extern int _test_and_set_bit_be(int nr, unsigned long * p);
+extern int _test_and_clear_bit_be(int nr, unsigned long * p);
+extern int _test_and_change_bit_be(int nr, unsigned long * p);
 extern int _find_first_zero_bit_be(void * p, unsigned size);
 extern int _find_next_zero_bit_be(void * p, int size, int offset);
 
@@ -214,21 +231,16 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
  */
 #define	ATOMIC_BITOP_LE(name,nr,p)		\
 	(__builtin_constant_p(nr) ?		\
-	 ____atomic_##name##_mask(1 << ((nr) & 7), \
-			((unsigned char *)(p)) + ((nr) >> 3)) : \
+	 ____atomic_##name(nr, p) :		\
 	 _##name##_le(nr,p))
 
 #define	ATOMIC_BITOP_BE(name,nr,p)		\
 	(__builtin_constant_p(nr) ?		\
-	 ____atomic_##name##_mask(1 << ((nr) & 7), \
-			((unsigned char *)(p)) + (((nr) >> 3) ^ 3)) : \
+	 ____atomic_##name(nr, p) :		\
 	 _##name##_be(nr,p))
 
-#define NONATOMIC_BITOP_LE(name,nr,p)	\
+#define NONATOMIC_BITOP(name,nr,p)		\
 	(____nonatomic_##name(nr, p))
-
-#define NONATOMIC_BITOP_BE(name,nr,p)	\
-	(____nonatomic_##name(nr ^ 0x18, p))
 
 #ifndef __ARMEB__
 /*
@@ -240,20 +252,11 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #define test_and_set_bit(nr,p)		ATOMIC_BITOP_LE(test_and_set_bit,nr,p)
 #define test_and_clear_bit(nr,p)	ATOMIC_BITOP_LE(test_and_clear_bit,nr,p)
 #define test_and_change_bit(nr,p)	ATOMIC_BITOP_LE(test_and_change_bit,nr,p)
-#define test_bit(nr,p)			____test_bit(nr,p)
+#define test_bit(nr,p)			__test_bit(nr,p)
 #define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
 #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_le(p,sz,off)
 
-/*
- * These are the little endian, non-atomic definitions.
- */
-#define __set_bit(nr,p)			NONATOMIC_BITOP_LE(set_bit,nr,p)
-#define __clear_bit(nr,p)		NONATOMIC_BITOP_LE(clear_bit,nr,p)
-#define __change_bit(nr,p)		NONATOMIC_BITOP_LE(change_bit,nr,p)
-#define __test_and_set_bit(nr,p)	NONATOMIC_BITOP_LE(test_and_set_bit,nr,p)
-#define __test_and_clear_bit(nr,p)	NONATOMIC_BITOP_LE(test_and_clear_bit,nr,p)
-#define __test_and_change_bit(nr,p)	NONATOMIC_BITOP_LE(test_and_change_bit,nr,p)
-#define __test_bit(nr,p)		____test_bit(nr,p)
+#define WORD_BITOFF_TO_LE(x)		((x))
 
 #else
 
@@ -266,20 +269,11 @@ extern int _find_next_zero_bit_be(void * p, int size, int offset);
 #define test_and_set_bit(nr,p)		ATOMIC_BITOP_BE(test_and_set_bit,nr,p)
 #define test_and_clear_bit(nr,p)	ATOMIC_BITOP_BE(test_and_clear_bit,nr,p)
 #define test_and_change_bit(nr,p)	ATOMIC_BITOP_BE(test_and_change_bit,nr,p)
-#define test_bit(nr,p)			____test_bit((nr) ^ 0x18, p)
+#define test_bit(nr,p)			__test_bit(nr,p)
 #define find_first_zero_bit(p,sz)	_find_first_zero_bit_be(p,sz)
 #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_be(p,sz,off)
 
-/*
- * These are the big endian, non-atomic definitions.
- */
-#define __set_bit(nr,p)			NONATOMIC_BITOP_BE(set_bit,nr,p)
-#define __clear_bit(nr,p)		NONATOMIC_BITOP_BE(clear_bit,nr,p)
-#define __change_bit(nr,p)		NONATOMIC_BITOP_BE(change_bit,nr,p)
-#define __test_and_set_bit(nr,p)	NONATOMIC_BITOP_BE(test_and_set_bit,nr,p)
-#define __test_and_clear_bit(nr,p)	NONATOMIC_BITOP_BE(test_and_clear_bit,nr,p)
-#define __test_and_change_bit(nr,p)	NONATOMIC_BITOP_BE(test_and_change_bit,nr,p)
-#define __test_bit(nr,p)		____test_bit((nr) ^ 0x18, p)
+#define WORD_BITOFF_TO_LE(x)		((x) ^ 0x18)
 
 #endif
 
@@ -361,21 +355,31 @@ static inline int sched_find_first_bit(unsigned long *b)
  * Ext2 is defined to use little-endian byte ordering.
  * These do not need to be atomic.
  */
-#define ext2_set_bit(nr,p)			NONATOMIC_BITOP_LE(test_and_set_bit,nr,p)
-#define ext2_clear_bit(nr,p)			NONATOMIC_BITOP_LE(test_and_clear_bit,nr,p)
-#define ext2_test_bit(nr,p)			__test_bit(nr,p)
-#define ext2_find_first_zero_bit(p,sz)		_find_first_zero_bit_le(p,sz)
-#define ext2_find_next_zero_bit(p,sz,off)	_find_next_zero_bit_le(p,sz,off)
+#define ext2_set_bit(nr,p)			\
+		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define ext2_clear_bit(nr,p)			\
+		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define ext2_test_bit(nr,p)			\
+		__test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define ext2_find_first_zero_bit(p,sz)		\
+		_find_first_zero_bit_le(p,sz)
+#define ext2_find_next_zero_bit(p,sz,off)	\
+		_find_next_zero_bit_le(p,sz,off)
 
 /*
  * Minix is defined to use little-endian byte ordering.
  * These do not need to be atomic.
  */
-#define minix_set_bit(nr,p)			NONATOMIC_BITOP_LE(set_bit,nr,p)
-#define minix_test_bit(nr,p)			__test_bit(nr,p)
-#define minix_test_and_set_bit(nr,p)		NONATOMIC_BITOP_LE(test_and_set_bit,nr,p)
-#define minix_test_and_clear_bit(nr,p)		NONATOMIC_BITOP_LE(test_and_clear_bit,nr,p)
-#define minix_find_first_zero_bit(p,sz)		_find_first_zero_bit_le(p,sz)
+#define minix_set_bit(nr,p)			\
+		__set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define minix_test_bit(nr,p)			\
+		__test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define minix_test_and_set_bit(nr,p)		\
+		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define minix_test_and_clear_bit(nr,p)		\
+		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
+#define minix_find_first_zero_bit(p,sz)		\
+		_find_first_zero_bit_le(p,sz)
 
 #endif /* __KERNEL__ */
 

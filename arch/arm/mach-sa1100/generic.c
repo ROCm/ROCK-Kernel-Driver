@@ -67,7 +67,7 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
  * scaling, so we force min=max, and set the policy to "performance".
  * If we can't generate the precise frequency requested, round it up.
  */
-void sa11x0_verify_speed(struct cpufreq_policy *policy)
+int sa11x0_verify_speed(struct cpufreq_policy *policy)
 {
 	if (policy->max > policy->max_cpu_freq)
 		policy->max = policy->max_cpu_freq;
@@ -75,6 +75,7 @@ void sa11x0_verify_speed(struct cpufreq_policy *policy)
 	policy->max = cclk_frequency_100khz[sa11x0_freq_to_ppcr(policy->max)] * 100;
 	policy->min = policy->max;
 	policy->policy = CPUFREQ_POLICY_POWERSAVE;
+	return 0;
 }
 
 unsigned int sa11x0_getspeed(void)

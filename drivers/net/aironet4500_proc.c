@@ -9,28 +9,25 @@
  *
  *
  */
-#include <linux/module.h>
-#include <linux/init.h>
 #include <linux/config.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/module.h>
+#include <linux/if_arp.h>
+#include <linux/init.h>
+#include <linux/ioport.h>
 #include <linux/kernel.h>
-
 #include <linux/version.h>
-
-#include <linux/sched.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/in.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/if_arp.h>
-#include <linux/ioport.h>
 
 #ifdef CONFIG_PROC_FS
 

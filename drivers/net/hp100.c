@@ -99,7 +99,6 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -107,17 +106,16 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-
 #include <linux/types.h>
 #include <linux/config.h>	/* for CONFIG_PCI */
 #include <linux/delay.h>
 #include <linux/init.h>
+
+#include <asm/bitops.h>
+#include <asm/io.h>
 
 #define LINUX_2_1
 typedef struct net_device_stats hp100_stats_t;

@@ -18,6 +18,7 @@
 	10.03.00 looks like softnet take us back to normal on SMP
  */
 
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/config.h>
@@ -28,17 +29,16 @@
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
+#include <linux/ip.h>
+#include <linux/time.h>
 
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/system.h>
 #include <asm/byteorder.h>
 #include <asm/irq.h>
-#include <linux/time.h>
-#include <linux/sched.h>
-#include <linux/delay.h>
+
 #include "aironet4500.h"
-#include <linux/ip.h>
 
 
 int bap_sleep = 10 ;

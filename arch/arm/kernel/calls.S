@@ -141,10 +141,10 @@ __syscall_start:
 		.long	sys_adjtimex
 /* 125 */	.long	sys_mprotect
 		.long	sys_sigprocmask
-		.long	sys_create_module
+		.long	sys_ni_syscall		/* was sys_create_module */
 		.long	sys_init_module
 		.long	sys_delete_module
-/* 130 */	.long	sys_get_kernel_syms
+/* 130 */	.long	sys_ni_syscall		/* was sys_get_kernel_syms */
 		.long	sys_quotactl
 		.long	sys_getpgid
 		.long	sys_fchdir
@@ -181,7 +181,7 @@ __syscall_start:
 		.long	sys_setresuid16
 /* 165 */	.long	sys_getresuid16
 		.long	sys_ni_syscall
-		.long	sys_query_module
+		.long	sys_ni_syscall		/* was sys_query_module */
 		.long	sys_poll
 		.long	sys_nfsservctl
 /* 170 */	.long	sys_setresgid16

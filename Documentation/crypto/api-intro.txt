@@ -73,6 +73,13 @@ add the following line to /etc/modules.conf:
 
   alias des3_ede des
 
+The Null algorithms reside in the crypto_null module, so these lines
+should also be added:
+
+  alias cipher_null crypto_null
+  alias digest_null crypto_null
+  alias compress_null crypto_null
+
 
 DEVELOPER NOTES
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: speedstep.c,v 1.57 2002/11/05 12:01:12 db Exp $
+ *  $Id: speedstep.c,v 1.58 2002/11/11 15:35:46 db Exp $
  *
  * (C) 2001  Dave Jones, Arjan van de ven.
  * (C) 2002  Dominik Brodowski <linux@brodo.de>
@@ -567,10 +567,10 @@ static int speedstep_detect_speeds (void)
  *
  * Sets a new CPUFreq policy.
  */
-static void speedstep_setpolicy (struct cpufreq_policy *policy)
+static int speedstep_setpolicy (struct cpufreq_policy *policy)
 {
 	if (!speedstep_driver || !policy)
-		return;
+		return -EINVAL;
 
 	if (policy->min > speedstep_low_freq) 
 		speedstep_set_state(SPEEDSTEP_HIGH, 1);
@@ -585,6 +585,7 @@ static void speedstep_setpolicy (struct cpufreq_policy *policy)
 				speedstep_set_state(SPEEDSTEP_HIGH, 1);
 		}
 	}
+	return 0;
 }
 
 
@@ -595,11 +596,11 @@ static void speedstep_setpolicy (struct cpufreq_policy *policy)
  * Limit must be within speedstep_low_freq and speedstep_high_freq, with
  * at least one border included.
  */
-static void speedstep_verify (struct cpufreq_policy *policy)
+static int speedstep_verify (struct cpufreq_policy *policy)
 {
 	if (!policy || !speedstep_driver || 
 	    !speedstep_low_freq || !speedstep_high_freq)
-		return;
+		return -EINVAL;
 
 	policy->cpu = 0; /* UP only */
 
@@ -609,7 +610,7 @@ static void speedstep_verify (struct cpufreq_policy *policy)
 	    (policy->max < speedstep_high_freq))
 		policy->max = speedstep_high_freq;
 	
-	return;
+	return 0;
 }
 
 
@@ -654,12 +655,11 @@ static int __init speedstep_init(void)
 		speedstep_processor = speedstep_detect_processor();
 
 	if ((!speedstep_chipset) || (!speedstep_processor)) {
-		printk(KERN_INFO "a 0x%x b 0x%x\n", speedstep_processor, speedstep_chipset);
 		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this %s not (yet) available.\n", speedstep_chipset ? "processor" : "chipset");
 		return -ENODEV;
 	}
 
-	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.57 $\n");
+	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.58 $\n");
 	dprintk(KERN_DEBUG "cpufreq: chipset 0x%x - processor 0x%x\n", 
 	       speedstep_chipset, speedstep_processor);
 
@@ -693,7 +693,7 @@ static int __init speedstep_init(void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = speedstep_low_freq;
+	driver->cpu_min_freq[0] = speedstep_low_freq;
 	driver->cpu_cur_freq[0] = speed;
 #endif
 
@@ -707,14 +707,15 @@ static int __init speedstep_init(void)
 	driver->policy[0].policy = (speed == speedstep_low_freq) ? 
 	    CPUFREQ_POLICY_POWERSAVE : CPUFREQ_POLICY_PERFORMANCE;
 
-	result = cpufreq_register(driver);
-	if (result) {
-		kfree(driver);
-		return result;
-	}
 	speedstep_driver = driver;
 
-	return 0;
+	result = cpufreq_register(driver);
+	if (result) {
+		speedstep_driver = NULL;
+		kfree(driver);
+	}
+
+	return result;
 }
 
 

@@ -71,16 +71,12 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
 #include <linux/string.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
@@ -88,6 +84,10 @@
 #include <linux/hdlcdrv.h>
 #include <linux/baycom.h>
 #include <linux/parport.h>
+
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/uaccess.h>
 
 /* --------------------------------------------------------------------- */
 

@@ -48,16 +48,16 @@ static const char *version = "smc-ultra32.c: 06/97 v1.00\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include "8390.h"
 
 int ultra32_probe(struct net_device *dev);

@@ -688,12 +688,13 @@ __kernel_execve:
 	.ent	sys_fork
 sys_fork:
 	.prologue 0
-	mov	$sp, $19
+	mov	$sp, $21
 	bsr	$1, do_switch_stack
-	/* A fork is the same as clone(SIGCHLD, 0);  */
 	bis	$31, SIGCHLD, $16
 	mov	$31, $17
 	mov	$31, $18
+	mov	$31, $19
+	mov	$31, $20
 	jsr	$26, alpha_clone
 	bsr	$1, undo_switch_stack
 	ret
@@ -704,10 +705,9 @@ sys_fork:
 	.ent	sys_clone
 sys_clone:
 	.prologue 0
-	mov	$sp, $19
+	mov	$sp, $21
 	bsr	$1, do_switch_stack
-	/* $16, $17, $18, $19 come from the user; $19 is used later
-	   via pt_regs->r19.  */
+	/* $16, $17, $18, $19, $20 come from the user.  */
 	jsr	$26, alpha_clone
 	bsr	$1, undo_switch_stack
 	ret
@@ -718,8 +718,8 @@ sys_clone:
 	.ent	sys_vfork
 sys_vfork:
 	.prologue 0
-	bsr	$1, do_switch_stack
 	mov	$sp, $16
+	bsr	$1, do_switch_stack
 	jsr	$26, alpha_vfork
 	bsr	$1, undo_switch_stack
 	ret

@@ -28,17 +28,12 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -54,6 +49,10 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ciscode.h>
 #include <pcmcia/ds.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/uaccess.h>
 
 /* Ositech Seven of Diamonds firmware */
 #include "ositech.h"

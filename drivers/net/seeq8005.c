@@ -32,7 +32,6 @@ static const char version[] =
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -42,15 +41,16 @@ static const char version[] =
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <linux/errno.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 #include "seeq8005.h"
 
 /* First, a few definitions that the brave might change. */

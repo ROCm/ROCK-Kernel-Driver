@@ -24,9 +24,7 @@ static const char version[] =
 
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
 #include <linux/netdevice.h>

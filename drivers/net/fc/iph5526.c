@@ -37,26 +37,27 @@ static const char *version =
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
-#include <asm/system.h>
-#include <asm/io.h>
-
 #include <linux/netdevice.h>
-#include <linux/fcdevice.h> /* had the declarations for init_fcdev among others + includes if_fcdevice.h */
-
 #include <linux/blk.h>
+#include <linux/fcdevice.h> /* had the declarations for init_fcdev among
+			       others + includes if_fcdevice.h */
+
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "../../fc4/fcp.h"
+
+#include <asm/system.h>
+#include <asm/io.h>
 
 /* driver specific header files */
 #include "tach.h"

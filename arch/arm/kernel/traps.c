@@ -24,6 +24,7 @@
 #include <linux/ptrace.h>
 #include <linux/elf.h>
 #include <linux/interrupt.h>
+#include <linux/kallsyms.h>
 #include <linux/init.h>
 
 #include <asm/atomic.h>

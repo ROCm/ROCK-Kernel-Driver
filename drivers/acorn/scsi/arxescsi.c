@@ -411,7 +411,7 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	return ret;
 }
 
-static void __devexit arxescsi_release(struct expansion_card *ec)
+static void __devexit arxescsi_remove(struct expansion_card *ec)
 {
 	struct Scsi_Host *host = ecard_get_drvdata(ec);
 

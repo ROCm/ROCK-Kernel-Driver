@@ -83,16 +83,22 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Proctor (rnp@netlink.co.nz
 
 #include <linux/module.h>
 
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/if_ether.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/mca.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/wait.h>
 #include <linux/ethtool.h>
 
 #include <asm/uaccess.h>
@@ -100,13 +106,6 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Proctor (rnp@netlink.co.nz
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <linux/errno.h>
-#include <linux/init.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/if_ether.h>
 
 #include "3c527.h"
 

@@ -1215,7 +1215,7 @@ static void handle_stripe(struct stripe_head *sh)
 			generic_make_request(bi);
 		} else {
 			PRINTK("skip op %ld on disc %d for sector %llu\n", bi->bi_rw, i, (unsigned long long)sh->sector);
-			clear_bit(R5_LOCKED, &dev->flags);
+			clear_bit(R5_LOCKED, &sh->dev[i].flags);
 			set_bit(STRIPE_HANDLE, &sh->state);
 		}
 	}

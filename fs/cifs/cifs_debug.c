@@ -85,7 +85,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s HowManyMounts: %d ServerOS: %s  ServerNOS: %s  Capabilities: 0x%x\n",
+			    "\n%d) Name: %s  Domain: %s HowManyMounts: %d ServerOS: %s  ServerNOS: %s\n\tCapabilities: 0x%x",
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
@@ -107,7 +107,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) %s UseCount: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x and PathComponentLengthMax: %d",
+			    "\n%d) %s UseCount: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentLengthMax: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,

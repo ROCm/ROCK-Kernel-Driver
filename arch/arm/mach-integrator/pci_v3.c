@@ -379,7 +379,7 @@ static int __init pci_v3_setup_resources(struct resource **resource)
 	 */
 	resource[0] = &ioport_resource;
 	resource[1] = &non_mem;
-//	resource[2] = &pre_mem;
+	resource[2] = &pre_mem;
 
 	return 1;
 }

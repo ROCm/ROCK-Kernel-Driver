@@ -411,8 +411,8 @@ static int cpci_configure_bridge(struct pci_bus* bus, struct pci_dev* dev)
 	 * Update the bridge resources of the bridge to accommodate devices
 	 * behind it.
 	 */
-	pbus_size_bridges(child);
-	pbus_assign_resources(child);
+	pci_bus_size_bridges(child);
+	pci_bus_assign_resources(child);
 
 	/* Enable resource mapping via command register */
 	command = PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE | PCI_COMMAND_PARITY | PCI_COMMAND_SERR;

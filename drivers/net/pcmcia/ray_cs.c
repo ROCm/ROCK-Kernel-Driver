@@ -31,25 +31,18 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/init.h>
-
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/byteorder.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
-#include <asm/uaccess.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -61,6 +54,11 @@
 
 #ifdef CONFIG_NET_PCMCIA_RADIO
 #include <linux/wireless.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/byteorder.h>
+#include <asm/uaccess.h>
 
 /* Warning : these stuff will slow down the driver... */
 #define WIRELESS_SPY		/* Enable spying addresses */

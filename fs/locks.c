@@ -297,11 +297,20 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		return -EINVAL;
 	}
 
-	if (((start += l->l_start) < 0) || (l->l_len < 0))
-		return -EINVAL;
+	/* POSIX-1996 leaves the case l->l_len < 0 undefined;
+	   POSIX-2001 defines it. */
+	start += l->l_start;
 	end = start + l->l_len - 1;
+	if (l->l_len < 0) {
+		end = start - 1;
+		start += l->l_len;
+	}
+
+	if (start < 0)
+		return -EINVAL;
 	if (l->l_len > 0 && end < 0)
 		return -EOVERFLOW;
+
 	fl->fl_start = start;	/* we record the absolute position */
 	fl->fl_end = end;
 	if (l->l_len == 0)
@@ -1766,7 +1775,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 #else
 	/* kdevname is a broken interface.  but we expose it to userspace */
 	out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
-			inode ? kdevname(to_kdev_t(inode->i_dev)) : "<none>",
+			inode ? kdevname(to_kdev_t(inode->i_sb->s_dev)) : "<none>",
 			inode ? inode->i_ino : 0);
 #endif
 	if (IS_POSIX(fl)) {

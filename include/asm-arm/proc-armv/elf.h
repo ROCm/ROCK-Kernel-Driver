@@ -9,11 +9,15 @@
 /*
  * 32-bit code is always OK.  Some cpus can do 26-bit, some can't.
  */
-#define ELF_PROC_OK(x)							 \
-	(( (elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 1) == 1)      || \
-	 (!(elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 3) == 0)      || \
-	 ( (elf_hwcap & HWCAP_26BIT) && (x)->e_flags & EF_ARM_APCS26) || \
-	 ((x)->e_flags & EF_ARM_APCS26) == 0)
+#define ELF_PROC_OK(x)	(ELF_THUMB_OK(x) && ELF_26BIT_OK(x))
+
+#define ELF_THUMB_OK(x) \
+	(( (elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 1) == 1) || \
+	 (!(elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 3) == 0))
+
+#define ELF_26BIT_OK(x) \
+	(( (elf_hwcap & HWCAP_26BIT) && (x)->e_flags & EF_ARM_APCS26) || \
+	  ((x)->e_flags & EF_ARM_APCS26) == 0)
 
 /* Old NetWinder binaries were compiled in such a way that the iBCS
    heuristic always trips on them.  Until these binaries become uncommon

@@ -251,6 +251,27 @@ get_mem_size_limit(char *s)
         return end >> PAGE_SHIFT; /* Return the PFN of the limit. */
 }
 
+#ifdef CONFIG_BLK_DEV_INITRD
+void * __init
+move_initrd(unsigned long mem_limit)
+{
+	void *start;
+	unsigned long size;
+
+	size = initrd_end - initrd_start;
+	start = __alloc_bootmem(size, PAGE_SIZE, 0);
+	if (!start || __pa(start) + size > mem_limit) {
+		initrd_start = initrd_end = 0;
+		return NULL;
+	}
+	memmove(start, (void *)initrd_start, size);
+	initrd_start = (unsigned long)start;
+	initrd_end = initrd_start + size;
+	printk("initrd moved to %p\n", start);
+	return start;
+}
+#endif
+
 #ifndef CONFIG_DISCONTIGMEM
 static void __init
 setup_memory(void *kernel_end)
@@ -379,11 +400,11 @@ setup_memory(void *kernel_end)
 		       (void *) initrd_start, INITRD_SIZE);
 
 		if ((void *)initrd_end > phys_to_virt(PFN_PHYS(max_low_pfn))) {
-			printk("initrd extends beyond end of memory "
-			       "(0x%08lx > 0x%p)\ndisabling initrd\n",
-			       initrd_end,
-			       phys_to_virt(PFN_PHYS(max_low_pfn)));
-			initrd_start = initrd_end = 0;
+			if (!move_initrd(PFN_PHYS(max_low_pfn)))
+				printk("initrd extends beyond end of memory "
+				       "(0x%08lx > 0x%p)\ndisabling initrd\n",
+				       initrd_end,
+				       phys_to_virt(PFN_PHYS(max_low_pfn)));
 		} else {
 			reserve_bootmem(virt_to_phys((void *)initrd_start),
 					INITRD_SIZE);

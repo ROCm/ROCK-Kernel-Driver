@@ -193,7 +193,7 @@ irq_prio_ld:	.byte	40,40,41,40,42,42,42,42,43,43,43,43,43,43,43,43
 
 		mov	\irqstat, #0x0C
 		strb	\irqstat, [r4, #0x20]		@outb(0x0C, 0x20) /* Poll command */
-		ldrb	\irqnr, [r4, #0x10]		@irq = inb(0x20) & 7
+		ldrb	\irqnr, [r4, #0x20]		@irq = inb(0x20) & 7
 		and	\irqstat, \irqnr, #0x80
 		teq	\irqstat, #0
 		beq	43f

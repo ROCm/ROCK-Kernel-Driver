@@ -14,9 +14,9 @@
 #ifndef __ASM_ARCH_MEMORY_H
 #define __ASM_ARCH_MEMORY_H
 
-#define TASK_SIZE		(3u * 1024 * 1024 * 1024)
+#define TASK_SIZE		(0xbf000000)
 #define TASK_SIZE_26		(64u * 1024 * 1024)
-#define TASK_UNMAPPED_BASE	(1u * 1024 * 1024 * 1024)
+#define TASK_UNMAPPED_BASE	(0x40000000)
 
 #define PAGE_OFFSET		0xc0000000
 #define PHYS_OFFSET		0x20000000

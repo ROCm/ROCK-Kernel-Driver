@@ -27,17 +27,16 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/netdevice.h>
+#include <linux/trdevice.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include <linux/netdevice.h>
-#include <linux/trdevice.h>
 #include "tms380tr.h"
 #include "abyss.h"            /* Madge-specific constants */
 

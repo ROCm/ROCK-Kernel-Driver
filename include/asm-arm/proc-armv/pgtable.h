@@ -123,8 +123,8 @@
 
 static inline void pmd_clear(pmd_t *pmdp)
 {
-	pmdp[0], __pmd(0));
-	pmdp[1], __pmd(0));
+	pmdp[0] = __pmd(0);
+	pmdp[1] = __pmd(0);
 	cpu_flush_pmd(pmdp);
 }
 

@@ -48,7 +48,7 @@
 
 #include <linux/intermezzo_fs.h>
 
-static kmem_cache_t * presto_dentry_slab;
+kmem_cache_t * presto_dentry_slab;
 
 /* called when a cache lookup succeeds */
 static int presto_d_revalidate(struct dentry *de, int flag)

@@ -503,12 +503,12 @@ void sched_exit(task_t * p)
  * schedule_tail - first thing a freshly forked thread must call.
  * @prev: the thread we just switched away from.
  */
-#if CONFIG_SMP || CONFIG_PREEMPT
 asmlinkage void schedule_tail(task_t *prev)
 {
 	finish_arch_switch(this_rq(), prev);
+	if (current->set_child_tid)
+		put_user(current->pid, current->set_child_tid);
 }
-#endif
 
 /*
  * context_switch - switch to the new MM and the new
@@ -856,7 +856,7 @@ static inline void idle_tick(runqueue_t *rq)
 
 #endif
 
-DEFINE_PER_CPU(struct kernel_stat, kstat);
+DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 
 /*
  * We place interactive tasks back into the active array, if possible.
@@ -1745,13 +1745,15 @@ void io_schedule(void)
 	atomic_dec(&rq->nr_iowait);
 }
 
-void io_schedule_timeout(long timeout)
+long io_schedule_timeout(long timeout)
 {
 	struct runqueue *rq = this_rq();
+	long ret;
 
 	atomic_inc(&rq->nr_iowait);
-	schedule_timeout(timeout);
+	ret = schedule_timeout(timeout);
 	atomic_dec(&rq->nr_iowait);
+	return ret;
 }
 
 /**
@@ -1835,6 +1837,24 @@ out_nounlock:
 out_unlock:
 	read_unlock(&tasklist_lock);
 	return retval;
+}
+
+static inline struct task_struct *eldest_child(struct task_struct *p)
+{
+	if (list_empty(&p->children)) return NULL;
+	return list_entry(p->children.next,struct task_struct,sibling);
+}
+
+static inline struct task_struct *older_sibling(struct task_struct *p)
+{
+	if (p->sibling.prev==&p->parent->children) return NULL;
+	return list_entry(p->sibling.prev,struct task_struct,sibling);
+}
+
+static inline struct task_struct *younger_sibling(struct task_struct *p)
+{
+	if (p->sibling.next==&p->parent->children) return NULL;
+	return list_entry(p->sibling.next,struct task_struct,sibling);
 }
 
 static void show_task(task_t * p)

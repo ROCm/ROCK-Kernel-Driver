@@ -24,3 +24,4 @@ EXPORT_SYMBOL(inet6_bind);
 EXPORT_SYMBOL(inet6_getname);
 EXPORT_SYMBOL(inet6_ioctl);
 EXPORT_SYMBOL(ipv6_get_saddr);
+EXPORT_SYMBOL(ipv6_chk_addr);

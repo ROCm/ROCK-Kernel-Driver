@@ -23,7 +23,7 @@ static struct sock *xfrm_nl;
 
 static int verify_one_alg(struct rtattr **xfrma, enum xfrm_attr_type_t type)
 {
-	struct rtattr *rt = xfrma[type];
+	struct rtattr *rt = xfrma[type - 1];
 	struct xfrm_algo *algp;
 
 	if (!rt)
@@ -73,23 +73,23 @@ static int verify_newsa_info(struct xfrm_usersa_info *p,
 	err = -EINVAL;
 	switch (p->id.proto) {
 	case IPPROTO_AH:
-		if (!xfrma[XFRMA_ALG_AUTH]	||
-		    xfrma[XFRMA_ALG_CRYPT]	||
-		    xfrma[XFRMA_ALG_COMP])
+		if (!xfrma[XFRMA_ALG_AUTH-1]	||
+		    xfrma[XFRMA_ALG_CRYPT-1]	||
+		    xfrma[XFRMA_ALG_COMP-1])
 			goto out;
 		break;
 
 	case IPPROTO_ESP:
-		if ((!xfrma[XFRMA_ALG_AUTH] &&
-		     !xfrma[XFRMA_ALG_CRYPT])	||
-		    xfrma[XFRMA_ALG_COMP])
+		if ((!xfrma[XFRMA_ALG_AUTH-1] &&
+		     !xfrma[XFRMA_ALG_CRYPT-1])	||
+		    xfrma[XFRMA_ALG_COMP-1])
 			goto out;
 		break;
 
 	case IPPROTO_COMP:
-		if (!xfrma[XFRMA_ALG_COMP]	||
-		    xfrma[XFRMA_ALG_AUTH]	||
-		    xfrma[XFRMA_ALG_CRYPT])
+		if (!xfrma[XFRMA_ALG_COMP-1]	||
+		    xfrma[XFRMA_ALG_AUTH-1]	||
+		    xfrma[XFRMA_ALG_CRYPT-1])
 			goto out;
 		break;
 
@@ -162,11 +162,11 @@ static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
 
 	copy_from_user_state(x, p);
 
-	if ((err = attach_one_algo(&x->aalg, xfrma[XFRMA_ALG_AUTH])))
+	if ((err = attach_one_algo(&x->aalg, xfrma[XFRMA_ALG_AUTH-1])))
 		goto error;
-	if ((err = attach_one_algo(&x->ealg, xfrma[XFRMA_ALG_CRYPT])))
+	if ((err = attach_one_algo(&x->ealg, xfrma[XFRMA_ALG_CRYPT-1])))
 		goto error;
-	if ((err = attach_one_algo(&x->calg, xfrma[XFRMA_ALG_COMP])))
+	if ((err = attach_one_algo(&x->calg, xfrma[XFRMA_ALG_COMP-1])))
 		goto error;
 
 	err = -ENOENT;
@@ -485,7 +485,7 @@ static void copy_templates(struct xfrm_policy *xp, struct xfrm_user_tmpl *ut,
 
 static int copy_user_tmpl(struct xfrm_policy *pol, struct rtattr **xfrma)
 {
-	struct rtattr *rt = xfrma[XFRMA_TMPL];
+	struct rtattr *rt = xfrma[XFRMA_TMPL-1];
 	struct xfrm_user_tmpl *utmpl;
 	int nr;
 

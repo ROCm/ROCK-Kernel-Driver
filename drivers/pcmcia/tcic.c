@@ -36,20 +36,18 @@
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/string.h>
-
-#include <asm/io.h>
-#include <asm/bitops.h>
-#include <asm/system.h>
-
-#include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
+
+#include <asm/io.h>
+#include <asm/bitops.h>
+#include <asm/system.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -89,10 +87,10 @@ static u_int irq_mask = 0xffff;
 static int irq_list[16] = { -1 };
 
 /* The card status change interrupt -- 0 means autoselect */
-static int cs_irq = 0;
+static int cs_irq;
 
 /* Poll status interval -- 0 means default to interrupt */
-static int poll_interval = 0;
+static int poll_interval;
 
 /* Delay for card status double-checking */
 static int poll_quick = HZ/20;
@@ -125,17 +123,17 @@ typedef struct socket_info_t {
 } socket_info_t;
 
 static struct timer_list poll_timer;
-static int tcic_timer_pending = 0;
+static int tcic_timer_pending;
 
 static int sockets;
 static socket_info_t socket_table[2];
 
 static socket_cap_t tcic_cap = {
-    /* only 16-bit cards, memory windows must be size-aligned */
-    SS_CAP_PCCARD | SS_CAP_MEM_ALIGN,
-    0x4cf8,		/* irq 14, 11, 10, 7, 6, 5, 4, 3 */
-    0x1000,		/* 4K minimum window size */
-    0, 0		/* No PCI or CardBus support */
+	/* only 16-bit cards, memory windows must be size-aligned */
+	.features = SS_CAP_PCCARD | SS_CAP_MEM_ALIGN,
+	.irq_mask = 0x4cf8,		/* irq 14, 11, 10, 7, 6, 5, 4, 3 */
+	.map_size = 0x1000,		/* 4K minimum window size */
+	/* No PCI or CardBus support */
 };
 
 /*====================================================================*/
@@ -235,7 +233,7 @@ static int to_ns(int cycles)
 
 static volatile u_int irq_hits;
 
-static void __init irq_count(int irq, void *dev, struct pt_regs *regs)
+static void __init tcic_irq_count(int irq, void *dev, struct pt_regs *regs)
 {
     irq_hits++;
 }
@@ -245,11 +243,11 @@ static u_int __init try_irq(int irq)
     u_short cfg;
 
     irq_hits = 0;
-    if (request_irq(irq, irq_count, 0, "irq scan", irq_count) != 0)
+    if (request_irq(irq, tcic_irq_count, 0, "irq scan", tcic_irq_count) != 0)
 	return -1;
     mdelay(10);
     if (irq_hits) {
-	free_irq(irq, irq_count);
+	free_irq(irq, tcic_irq_count);
 	return -1;
     }
 
@@ -260,7 +258,7 @@ static u_int __init try_irq(int irq)
     tcic_setb(TCIC_ICSR, TCIC_ICSR_ERR | TCIC_ICSR_JAM);
 
     udelay(1000);
-    free_irq(irq, irq_count);
+    free_irq(irq, tcic_irq_count);
 
     /* Turn off interrupts */
     tcic_setb(TCIC_IENA, TCIC_IENA_CFG_OFF);
@@ -301,9 +299,9 @@ static u_int __init irq_scan(u_int mask0)
 	/* Fallback: just find interrupts that aren't in use */
 	for (i = 0; i < 16; i++)
 	    if ((mask0 & (1 << i)) &&
-		(request_irq(i, irq_count, 0, "x", irq_count) == 0)) {
+		(request_irq(i, tcic_irq_count, 0, "x", tcic_irq_count) == 0)) {
 		mask1 |= (1 << i);
-		free_irq(i, irq_count);
+		free_irq(i, tcic_irq_count);
 	    }
 	printk("default");
     }
@@ -983,18 +981,18 @@ static int tcic_suspend(unsigned int sock)
 }
 
 static struct pccard_operations tcic_operations = {
-	tcic_init,
-	tcic_suspend,
-	tcic_register_callback,
-	tcic_inquire_socket,
-	tcic_get_status,
-	tcic_get_socket,
-	tcic_set_socket,
-	tcic_get_io_map,
-	tcic_set_io_map,
-	tcic_get_mem_map,
-	tcic_set_mem_map,
-	tcic_proc_setup
+	.init		   = tcic_init,
+	.suspend	   = tcic_suspend,
+	.register_callback = tcic_register_callback,
+	.inquire_socket	   = tcic_inquire_socket,
+	.get_status	   = tcic_get_status,
+	.get_socket	   = tcic_get_socket,
+	.set_socket	   = tcic_set_socket,
+	.get_io_map	   = tcic_get_io_map,
+	.set_io_map	   = tcic_set_io_map,
+	.get_mem_map	   = tcic_get_mem_map,
+	.set_mem_map	   = tcic_set_mem_map,
+	.proc_setup	   = tcic_proc_setup,
 };
 
 /*====================================================================*/

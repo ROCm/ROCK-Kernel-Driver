@@ -116,6 +116,7 @@ EXPORT_SYMBOL(sock_sendmsg);
 EXPORT_SYMBOL(sock_recvmsg);
 EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
+EXPORT_SYMBOL(sk_send_sigurg);
 EXPORT_SYMBOL(sock_wake_async);
 EXPORT_SYMBOL(sock_alloc_send_skb);
 EXPORT_SYMBOL(sock_alloc_send_pskb);
