@@ -59,8 +59,8 @@ z8530book.sgml: z8530book.tmpl $(TOPDIR)/drivers/net/wan/z85230.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/net/wan/z85230.c \
 		<z8530book.tmpl >z8530book.sgml
 
-via-audio.sgml: via-audio.tmpl $(TOPDIR)/drivers/sound/via82cxxx_audio.c
-	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/sound/via82cxxx_audio.c \
+via-audio.sgml: via-audio.tmpl $(TOPDIR)/sound/oss/via82cxxx_audio.c
+	$(TOPDIR)/scripts/docgen $(TOPDIR)/sound/oss/via82cxxx_audio.c \
 		<via-audio.tmpl >via-audio.sgml
 
 tulip-user.sgml: tulip-user.tmpl
@@ -100,8 +100,8 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/drivers/hotplug/pci_hotplug_core.c \
 		$(TOPDIR)/drivers/hotplug/pci_hotplug_util.c \
 		$(TOPDIR)/drivers/block/ll_rw_blk.c \
-		$(TOPDIR)/drivers/sound/sound_core.c \
-		$(TOPDIR)/drivers/sound/sound_firmware.c \
+		$(TOPDIR)/sound/sound_core.c \
+		$(TOPDIR)/sound/sound_firmware.c \
 		$(TOPDIR)/drivers/net/wan/syncppp.c \
 		$(TOPDIR)/drivers/net/wan/z85230.c \
 		$(TOPDIR)/drivers/usb/hcd.c \

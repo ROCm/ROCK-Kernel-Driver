@@ -2,7 +2,7 @@ Driver
 ------
 
 Informations about Audio Excel DSP 16 driver can be found in the source
-file lowlevel/aedsp16.c
+file aedsp16.c
 Please, read the head of the source before using it. It contain useful
 informations.
 
