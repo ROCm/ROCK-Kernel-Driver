@@ -334,7 +334,7 @@ int wl3501_flash_writeb(struct wl3501_card *this, u16 page, u16 addr,
 static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 			      int len)
 {
-	int i;
+	int i, rc = -EIO;
 	u32 bf_addr = *(u32 *)bf;
 	int running = wl3501_hold_sutro(this);
 	u16 flash_id = wl3501_get_flash_id(this);
@@ -351,7 +351,7 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 				       "wl3501_flash_erase_sector(0) failed\n");
 				if (running)
 					wl3501_unhold_sutro(this);
-				return 0;
+				goto out;
 			}
 		}
 	} else if (flash_id != 0xf51d) {
@@ -360,7 +360,7 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 		       flash_id);
 		if (running)
 			wl3501_unhold_sutro(this);
-		return 0;
+		goto out;
 	}
 
 	/* Programming flash ROM byte by byte */
@@ -370,7 +370,7 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 			       "wl3501_flash_writeb(buf[%d]) failed!\n", i);
 			if (running)
 				wl3501_unhold_sutro(this);
-			return 0;
+			goto out;
 		}
 		bf++;
 	}
@@ -384,7 +384,9 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 	if (running)
 		wl3501_unhold_sutro(this);
 #endif
-	return 1;
+	rc = 0;
+out:
+	return rc;
 }
 
 /**
@@ -1699,12 +1701,13 @@ static void wl3501_set_multicast_list(struct net_device *dev)
  */
 static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	int rc = 0;
+	int rc = -ENODEV;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_ioctl_parm parm;
-	struct wl3501_ioctl_blk *blk = (struct wl3501_ioctl_blk *)
-	    &rq->ifr_data;
-	unsigned char bf[1028];
+	struct wl3501_ioctl_blk *blk = (struct wl3501_ioctl_blk *)&rq->ifr_data;
+
+	if (!netif_device_present(dev))
+		goto out;
 
 	switch (blk->cmd) {
 	case WL3501_IOCTL_CMD_SET_RESET: /* Reset drv - needed after set */
@@ -1713,14 +1716,20 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			break;
 		rc = wl3501_reset(dev);
 		break;
-	case WL3501_IOCTL_CMD_WRITE_FLASH: /* Write firmware into Flash */
+	case WL3501_IOCTL_CMD_WRITE_FLASH: { /* Write firmware into Flash */
+		unsigned char bf[1028];
+
 		rc = -EPERM;
 		if (!capable(CAP_NET_ADMIN))
+			break;
+		rc = -EFBIG;
+		if (blk->len > sizeof(bf))
 			break;
 		rc = -EFAULT;
 		if (copy_from_user(bf, blk->data, blk->len))
 			break;
-		rc = wl3501_write_flash(this, bf, blk->len) ? 0 : -EIO;
+		rc = wl3501_write_flash(this, bf, blk->len);
+	}
 		break;
 	case WL3501_IOCTL_CMD_GET_PARAMETER:
 		parm.def_chan = this->def_chan;
@@ -1753,6 +1762,7 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	default:
 		rc = -EOPNOTSUPP;
 	}
+out:
 	return rc;
 }
 
