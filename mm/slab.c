@@ -612,6 +612,26 @@ static void stop_cpu_timer(int cpu)
 }
 #endif
 
+static struct array_cache *alloc_arraycache(int cpu, int entries, int batchcount)
+{
+	int memsize = sizeof(void*)*entries+sizeof(struct array_cache);
+	struct array_cache *nc = NULL;
+
+	if (cpu != -1) {
+		nc = kmem_cache_alloc_node(kmem_find_general_cachep(memsize,
+					GFP_KERNEL), cpu_to_node(cpu));
+	}
+	if (!nc)
+		nc = kmalloc(memsize, GFP_KERNEL);
+	if (nc) {
+		nc->avail = 0;
+		nc->limit = entries;
+		nc->batchcount = batchcount;
+		nc->touched = 0;
+	}
+	return nc;
+}
+
 static int __devinit cpuup_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
@@ -623,17 +643,11 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 	case CPU_UP_PREPARE:
 		down(&cache_chain_sem);
 		list_for_each_entry(cachep, &cache_chain, next) {
-			int memsize;
 			struct array_cache *nc;
 
-			memsize = sizeof(void*)*cachep->limit+sizeof(struct array_cache);
-			nc = kmalloc(memsize, GFP_KERNEL);
+			nc = alloc_arraycache(cpu, cachep->limit, cachep->batchcount);
 			if (!nc)
 				goto bad;
-			nc->avail = 0;
-			nc->limit = cachep->limit;
-			nc->batchcount = cachep->batchcount;
-			nc->touched = 0;
 
 			spin_lock_irq(&cachep->spinlock);
 			cachep->array[cpu] = nc;
@@ -829,23 +843,32 @@ __initcall(cpucache_init);
  * did not request dmaable memory, we might get it, but that
  * would be relatively rare and ignorable.
  */
-static inline void *kmem_getpages(kmem_cache_t *cachep, unsigned long flags)
+static void *kmem_getpages(kmem_cache_t *cachep, int flags, int nodeid)
 {
+	struct page *page;
 	void *addr;
+	int i;
 
 	flags |= cachep->gfpflags;
-	addr = (void*)__get_free_pages(flags, cachep->gfporder);
-	if (addr) {
-		int i = (1 << cachep->gfporder);
-		struct page *page = virt_to_page(addr);
+	if (likely(nodeid == -1)) {
+		addr = (void*)__get_free_pages(flags, cachep->gfporder);
+		if (!addr)
+			return NULL;
+		page = virt_to_page(addr);
+	} else {
+		page = alloc_pages_node(nodeid, flags, cachep->gfporder);
+		if (!page)
+			return NULL;
+		addr = page_address(page);
+	}
 
-		if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
-			atomic_add(i, &slab_reclaim_pages);
-		add_page_state(nr_slab, i);
-		while (i--) {
-			SetPageSlab(page);
-			page++;
-		}
+	i = (1 << cachep->gfporder);
+	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
+		atomic_add(i, &slab_reclaim_pages);
+	add_page_state(nr_slab, i);
+	while (i--) {
+		SetPageSlab(page);
+		page++;
 	}
 	return addr;
 }
@@ -1650,6 +1673,21 @@ static void kmem_flagcheck(kmem_cache_t *cachep, int flags)
 	}
 }
 
+static void set_slab_attr(kmem_cache_t *cachep, struct slab *slabp, void *objp)
+{
+	int i;
+	struct page *page;
+
+	/* Nasty!!!!!! I hope this is OK. */
+	i = 1 << cachep->gfporder;
+	page = virt_to_page(objp);
+	do {
+		SET_PAGE_CACHE(page, cachep);
+		SET_PAGE_SLAB(page, slabp);
+		page++;
+	} while (--i);
+}
+
 /*
  * Grow (by 1) the number of slabs within a cache.  This is called by
  * kmem_cache_alloc() when there are no active objs left in a cache.
@@ -1657,10 +1695,9 @@ static void kmem_flagcheck(kmem_cache_t *cachep, int flags)
 static int cache_grow (kmem_cache_t * cachep, int flags)
 {
 	struct slab	*slabp;
-	struct page	*page;
 	void		*objp;
 	size_t		 offset;
-	unsigned int	 i, local_flags;
+	int		 local_flags;
 	unsigned long	 ctor_flags;
 
 	/* Be lazy and only check for valid flags here,
@@ -1706,21 +1743,14 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 
 
 	/* Get mem for the objs. */
-	if (!(objp = kmem_getpages(cachep, flags)))
+	if (!(objp = kmem_getpages(cachep, flags, -1)))
 		goto failed;
 
 	/* Get slab management. */
 	if (!(slabp = alloc_slabmgmt(cachep, objp, offset, local_flags)))
 		goto opps1;
 
-	/* Nasty!!!!!! I hope this is OK. */
-	i = 1 << cachep->gfporder;
-	page = virt_to_page(objp);
-	do {
-		SET_PAGE_CACHE(page, cachep);
-		SET_PAGE_SLAB(page, slabp);
-		page++;
-	} while (--i);
+	set_slab_attr(cachep, slabp, objp);
 
 	cache_init_objs(cachep, slabp, ctor_flags);
 
@@ -2226,6 +2256,81 @@ out:
 }
 
 /**
+ * kmem_cache_alloc_node - Allocate an object on the specified node
+ * @cachep: The cache to allocate from.
+ * @flags: See kmalloc().
+ * @nodeid: node number of the target node.
+ *
+ * Identical to kmem_cache_alloc, except that this function is slow
+ * and can sleep. And it will allocate memory on the given node, which
+ * can improve the performance for cpu bound structures.
+ */
+void *kmem_cache_alloc_node(kmem_cache_t *cachep, int nodeid)
+{
+	size_t offset;
+	void *objp;
+	struct slab *slabp;
+	kmem_bufctl_t next;
+
+	/* The main algorithms are not node aware, thus we have to cheat:
+	 * We bypass all caches and allocate a new slab.
+	 * The following code is a streamlined copy of cache_grow().
+	 */
+
+	/* Get colour for the slab, and update the next value. */
+	spin_lock_irq(&cachep->spinlock);
+	offset = cachep->colour_next;
+	cachep->colour_next++;
+	if (cachep->colour_next >= cachep->colour)
+		cachep->colour_next = 0;
+	offset *= cachep->colour_off;
+	spin_unlock_irq(&cachep->spinlock);
+
+	/* Get mem for the objs. */
+	if (!(objp = kmem_getpages(cachep, GFP_KERNEL, nodeid)))
+		goto failed;
+
+	/* Get slab management. */
+	if (!(slabp = alloc_slabmgmt(cachep, objp, offset, GFP_KERNEL)))
+		goto opps1;
+
+	set_slab_attr(cachep, slabp, objp);
+	cache_init_objs(cachep, slabp, SLAB_CTOR_CONSTRUCTOR);
+
+	/* The first object is ours: */
+	objp = slabp->s_mem + slabp->free*cachep->objsize;
+	slabp->inuse++;
+	next = slab_bufctl(slabp)[slabp->free];
+#if DEBUG
+	slab_bufctl(slabp)[slabp->free] = BUFCTL_FREE;
+#endif
+	slabp->free = next;
+
+	/* add the remaining objects into the cache */
+	spin_lock_irq(&cachep->spinlock);
+	check_slabp(cachep, slabp);
+	STATS_INC_GROWN(cachep);
+	/* Make slab active. */
+	if (slabp->free == BUFCTL_END) {
+		list_add_tail(&slabp->list, &(list3_data(cachep)->slabs_full));
+	} else {
+		list_add_tail(&slabp->list,
+				&(list3_data(cachep)->slabs_partial));
+		list3_data(cachep)->free_objects += cachep->num-1;
+	}
+	spin_unlock_irq(&cachep->spinlock);
+	objp = cache_alloc_debugcheck_after(cachep, GFP_KERNEL, objp,
+					__builtin_return_address(0));
+	return objp;
+opps1:
+	kmem_freepages(cachep, objp);
+failed:
+	return NULL;
+
+}
+EXPORT_SYMBOL(kmem_cache_alloc_node);
+
+/**
  * kmalloc - allocate memory
  * @size: how many bytes of memory are required.
  * @flags: the type of memory to allocate.
@@ -2289,7 +2394,10 @@ void *__alloc_percpu(size_t size, size_t align)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))
 			continue;
-		pdata->ptrs[i] = kmalloc(size, GFP_KERNEL);
+		pdata->ptrs[i] = kmem_cache_alloc_node(
+				kmem_find_general_cachep(size, GFP_KERNEL),
+				cpu_to_node(i));
+
 		if (!pdata->ptrs[i])
 			goto unwind_oom;
 		memset(pdata->ptrs[i], 0, size);
@@ -2428,19 +2536,15 @@ static int do_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount, in
 
 	memset(&new.new,0,sizeof(new.new));
 	for (i = 0; i < NR_CPUS; i++) {
-		struct array_cache *ccnew;
-
-		ccnew = kmalloc(sizeof(void*)*limit+
-				sizeof(struct array_cache), GFP_KERNEL);
-		if (!ccnew) {
-			for (i--; i >= 0; i--) kfree(new.new[i]);
-			return -ENOMEM;
+		if (cpu_online(i)) {
+			new.new[i] = alloc_arraycache(i, limit, batchcount);
+			if (!new.new[i]) {
+				for (i--; i >= 0; i--) kfree(new.new[i]);
+				return -ENOMEM;
+			}
+		} else {
+			new.new[i] = NULL;
 		}
-		ccnew->avail = 0;
-		ccnew->limit = limit;
-		ccnew->batchcount = batchcount;
-		ccnew->touched = 0;
-		new.new[i] = ccnew;
 	}
 	new.cachep = cachep;
 
@@ -2462,14 +2566,9 @@ static int do_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount, in
 		spin_unlock_irq(&cachep->spinlock);
 		kfree(ccold);
 	}
-	new_shared = kmalloc(sizeof(void*)*batchcount*shared+
-				sizeof(struct array_cache), GFP_KERNEL);
+	new_shared = alloc_arraycache(-1, batchcount*shared, 0xbaadf00d);
 	if (new_shared) {
 		struct array_cache *old;
-		new_shared->avail = 0;
-		new_shared->limit = batchcount*shared;
-		new_shared->batchcount = 0xbaadf00d;
-		new_shared->touched = 0;
 
 		spin_lock_irq(&cachep->spinlock);
 		old = cachep->lists.shared;
