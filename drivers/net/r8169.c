@@ -1743,10 +1743,19 @@ static void rtl8169_schedule_work(struct net_device *dev, void (*task)(void *))
 
 static void rtl8169_wait_for_quiescence(struct net_device *dev)
 {
+	struct rtl8169_private *tp = netdev_priv(dev);
+	void __iomem *ioaddr = tp->mmio_addr;
+
 	synchronize_irq(dev->irq);
 
 	/* Wait for any pending NAPI task to complete */
 	netif_poll_disable(dev);
+
+	RTL_W16(IntrMask, 0x0000);
+
+	RTL_W16(IntrStatus, 0xffff);
+
+	netif_poll_enable(dev);
 }
 
 static void rtl8169_reinit_task(void *_data)
