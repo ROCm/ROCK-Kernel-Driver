@@ -257,62 +257,6 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpu
 
 
 /*********************************************************************
- *                      CPUFREQ USERSPACE GOVERNOR                   *
- *********************************************************************/
-#ifdef CONFIG_CPU_FREQ_24_API
-
-int __deprecated cpufreq_setmax(unsigned int cpu);
-int __deprecated cpufreq_set(unsigned int kHz, unsigned int cpu);
-
-
-/* /proc/sys/cpu */
-enum {
-	CPU_NR   = 1,           /* compatibilty reasons */
-	CPU_NR_0 = 1,
-	CPU_NR_1 = 2,
-	CPU_NR_2 = 3,
-	CPU_NR_3 = 4,
-	CPU_NR_4 = 5,
-	CPU_NR_5 = 6,
-	CPU_NR_6 = 7,
-	CPU_NR_7 = 8,
-	CPU_NR_8 = 9,
-	CPU_NR_9 = 10,
-	CPU_NR_10 = 11,
-	CPU_NR_11 = 12,
-	CPU_NR_12 = 13,
-	CPU_NR_13 = 14,
-	CPU_NR_14 = 15,
-	CPU_NR_15 = 16,
-	CPU_NR_16 = 17,
-	CPU_NR_17 = 18,
-	CPU_NR_18 = 19,
-	CPU_NR_19 = 20,
-	CPU_NR_20 = 21,
-	CPU_NR_21 = 22,
-	CPU_NR_22 = 23,
-	CPU_NR_23 = 24,
-	CPU_NR_24 = 25,
-	CPU_NR_25 = 26,
-	CPU_NR_26 = 27,
-	CPU_NR_27 = 28,
-	CPU_NR_28 = 29,
-	CPU_NR_29 = 30,
-	CPU_NR_30 = 31,
-	CPU_NR_31 = 32,
-};
-
-/* /proc/sys/cpu/{0,1,...,(NR_CPUS-1)} */
-enum {
-	CPU_NR_FREQ_MAX = 1,
-	CPU_NR_FREQ_MIN = 2,
-	CPU_NR_FREQ = 3,
-};
-
-#endif /* CONFIG_CPU_FREQ_24_API */
-
-
-/*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *
  *********************************************************************/
 
