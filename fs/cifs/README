@@ -271,8 +271,6 @@ Misc /proc/fs/cifs Flags and Debug Info
 Informational pseudo-files:
 DebugData		Displays information about active CIFS sessions
 			and shares.
-SimultaneousOps		Counter which holds maximum number of
-			simultaneous outstanding SMB/CIFS requests.
 Stats			Lists summary resource usage information as well as per
 			share statistics, if CONFIG_CIFS_STATS in enabled
 			in the kernel configuration.
