@@ -1666,7 +1666,6 @@ void cleanup_module(void)
 {
 	struct net_device *next_dev;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (root_corkscrew_dev) {
 		next_dev =
 		    ((struct corkscrew_private *) root_corkscrew_dev->

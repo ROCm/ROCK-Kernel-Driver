@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/ioport.h>		/* request_region, check_region */
+#include <asm/atomic.h>
 #include <asm/ebus.h>			/* EBus device					*/
 #include <asm/oplib.h>			/* OpenProm Library 			*/
 #include <asm/uaccess.h>		/* put_/get_user			*/
@@ -86,27 +87,23 @@ static inline int d7s_obpflipped(void)
 	return ((-1 != prom_getintdefault(opt_node, "d7s-flipped?", -1)) ? 0 : 1);
 }
 
+static atomic_t d7s_users = ATOMIC_INIT(0);
+
 static int d7s_open(struct inode *inode, struct file *f)
 {
 	if (D7S_MINOR != minor(inode->i_rdev))
 		return -ENODEV;
-
-	MOD_INC_USE_COUNT;
+	atomic_inc(&d7s_users);
 	return 0;
 }
 
 static int d7s_release(struct inode *inode, struct file *f)
 {
-	if (D7S_MINOR != minor(inode->i_rdev))
-		return -ENODEV;
-	
-	MOD_DEC_USE_COUNT;
-
 	/* Reset flipped state to OBP default only if
 	 * no other users have the device open and we
 	 * are not operating in solaris-compat mode
 	 */
-	if (0 == MOD_IN_USE && 0 == sol_compat) {
+	if (atomic_dec_and_test(&d7s_users) && !sol_compat) {
 		int regval = 0;
 
 		regval = readb(d7s_regs);

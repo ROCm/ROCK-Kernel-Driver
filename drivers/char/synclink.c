@@ -3119,11 +3119,6 @@ int mgsl_ioctl_common(struct mgsl_struct *info, unsigned int cmd, unsigned long 
 			return mgsl_wait_event(info,(int*)arg);
 		case MGSL_IOCLOOPTXDONE:
 			return mgsl_loopmode_send_done(info);
-		case MGSL_IOCCLRMODCOUNT:
-			while(MOD_IN_USE)
-				MOD_DEC_USE_COUNT;
-			return 0;
-
 		/* Wait for modem input (DCD,RI,DSR,CTS) change
 		 * as specified by mask in arg (TIOCM_RNG/DSR/CD/CTS)
 		 */
@@ -3328,8 +3323,7 @@ cleanup:
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_close(%s) exit, count=%d\n", __FILE__,__LINE__,
 			tty->driver.name, info->count);
-	if(MOD_IN_USE)
-		MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT;
 			
 }	/* end of mgsl_close() */
 
@@ -3689,8 +3683,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	
 cleanup:			
 	if (retval) {
-		if(MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
+		MOD_DEC_USE_COUNT;
 		if(info->count)
 			info->count--;
 	}

@@ -247,7 +247,6 @@ cleanup_module(void)
 {
 	struct ptifddi *pp;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (root_pti_dev) {
 		pp = root_pti_dev->next_module;
 

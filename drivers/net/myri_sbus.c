@@ -1137,7 +1137,6 @@ static int __init myri_sbus_probe(void)
 static void __exit myri_sbus_cleanup(void)
 {
 #ifdef MODULE
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (root_myri_dev) {
 		struct myri_eth *next = root_myri_dev->next_module;
 

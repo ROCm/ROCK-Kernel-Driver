@@ -826,8 +826,7 @@ static int open(struct tty_struct *tty, struct file *filp)
 
 cleanup:
 	if (retval) {
-		if(MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
+		MOD_DEC_USE_COUNT;
 		if(info->count)
 			info->count--;
 	}
@@ -926,8 +925,7 @@ cleanup:
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):%s close() exit, count=%d\n", __FILE__,__LINE__,
 			tty->driver.name, info->count);
-	if(MOD_IN_USE)
-		MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT;
 }
 
 /* Called by tty_hangup() when a hangup is signaled.
@@ -1415,10 +1413,6 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 		return wait_mgsl_event(info,(int*)arg);
 	case MGSL_IOCLOOPTXDONE:
 		return 0; // TODO: Not supported, need to document
-	case MGSL_IOCCLRMODCOUNT:
-		while(MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
-		return 0;
 		/* Wait for modem input (DCD,RI,DSR,CTS) change
 		 * as specified by mask in arg (TIOCM_RNG/DSR/CD/CTS)
 		 */

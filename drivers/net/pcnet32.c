@@ -1737,7 +1737,6 @@ static void __exit pcnet32_cleanup_module(void)
 {
     struct net_device *next_dev;
 
-    /* No need to check MOD_IN_USE, as sys_delete_module() checks. */
     while (pcnet32_dev) {
 	struct pcnet32_private *lp = pcnet32_dev->priv;
 	next_dev = lp->next;
