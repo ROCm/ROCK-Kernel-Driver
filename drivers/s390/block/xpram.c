@@ -423,7 +423,7 @@ static int __init xpram_setup_sizes(unsigned long pages)
 	return 0;
 }
 
-static struct request_queue xpram_queue;
+static struct request_queue *xpram_queue;
 
 static int __init xpram_setup_blkdev(void)
 {
@@ -450,8 +450,13 @@ static int __init xpram_setup_blkdev(void)
 	 * Assign the other needed values: make request function, sizes and
 	 * hardsect size. All the minor devices feature the same value.
 	 */
-	blk_queue_make_request(&xpram_queue, xpram_make_request);
-	blk_queue_hardsect_size(&xpram_queue, 4096);
+	xpram_queue = blk_alloc_queue(GFP_KERNEL);
+	if (!xpram_queue) {
+		rc = -ENOMEM;
+		goto out_unreg;
+	}
+	blk_queue_make_request(xpram_queue, xpram_make_request);
+	blk_queue_hardsect_size(xpram_queue, 4096);
 
 	/*
 	 * Setup device structures.
@@ -467,7 +472,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->first_minor = i;
 		disk->fops = &xpram_devops;
 		disk->private_data = &xpram_devices[i];
-		disk->queue = &xpram_queue;
+		disk->queue = xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
 		sprintf(disk->devfs_name, "slram/%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
@@ -475,6 +480,9 @@ static int __init xpram_setup_blkdev(void)
 	}
 
 	return 0;
+out_unreg:
+	devfs_remove("slram");
+	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 out:
 	while (i--)
 		put_disk(xpram_disks[i]);
@@ -493,6 +501,7 @@ static void __exit xpram_exit(void)
 	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");
+	blk_cleanup_queue(xpram_queue);
 	sysdev_unregister(&xpram_sys_device);
 	sysdev_class_unregister(&xpram_sysclass);
 }

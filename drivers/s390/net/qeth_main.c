@@ -1,6 +1,6 @@
 /*
  * 
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.17 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.18 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.77.2.17 $	 $Date: 2004/06/02 07:35:20 $
+ *    $Revision: 1.77.2.18 $	 $Date: 2004/06/04 13:02:34 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.77.2.17 $"
+#define VERSION_QETH_C "$Revision: 1.77.2.18 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -4082,21 +4082,43 @@ out_error:
 
 static int
 qeth_send_ipa_arp_cmd(struct qeth_card *card, struct qeth_cmd_buffer *iob,
-		      int len, int (*reply_cb)
-			      		(struct qeth_card *,
-					 struct qeth_reply*, unsigned long),
+		      int len, int (*reply_cb)(struct qeth_card *,
+					       struct qeth_reply *,
+					       unsigned long),
 		      void *reply_param)
 {
-	int rc;
-	
 	QETH_DBF_TEXT(trace,4,"sendarp");
 
 	memcpy(iob->data, IPA_PDU_HEADER, IPA_PDU_HEADER_SIZE);
 	memcpy(QETH_IPA_CMD_DEST_ADDR(iob->data),
 	       &card->token.ulp_connection_r, QETH_MPC_TOKEN_LENGTH);
-	rc = qeth_send_control_data(card, IPA_PDU_HEADER_SIZE + len, iob,
+	return qeth_send_control_data(card, IPA_PDU_HEADER_SIZE + len, iob,
+				      reply_cb, reply_param);
+}
+
+static int
+qeth_send_ipa_snmp_cmd(struct qeth_card *card, struct qeth_cmd_buffer *iob,
+		      int len, int (*reply_cb)(struct qeth_card *,
+					       struct qeth_reply *,
+					       unsigned long),
+		      void *reply_param)
+{
+	u16 s1, s2;
+
+	QETH_DBF_TEXT(trace,4,"sendsnmp");
+
+	memcpy(iob->data, IPA_PDU_HEADER, IPA_PDU_HEADER_SIZE);
+	memcpy(QETH_IPA_CMD_DEST_ADDR(iob->data),
+	       &card->token.ulp_connection_r, QETH_MPC_TOKEN_LENGTH);
+	/* adjust PDU length fields in IPA_PDU_HEADER */
+	s1 = (u32) IPA_PDU_HEADER_SIZE + len;
+	s2 = (u32) len;
+	memcpy(QETH_IPA_PDU_LEN_TOTAL(iob->data), &s1, 2);
+	memcpy(QETH_IPA_PDU_LEN_PDU1(iob->data), &s2, 2);
+	memcpy(QETH_IPA_PDU_LEN_PDU2(iob->data), &s2, 2);
+	memcpy(QETH_IPA_PDU_LEN_PDU3(iob->data), &s2, 2);
+	return qeth_send_control_data(card, IPA_PDU_HEADER_SIZE + len, iob,
 				    reply_cb, reply_param);
-	return rc;
 }
 
 static struct qeth_cmd_buffer *
@@ -4139,8 +4161,7 @@ qeth_arp_query(struct qeth_card *card, char *udata)
 
 	rc = qeth_send_ipa_arp_cmd(card, iob,
 				   QETH_SETASS_BASE_LEN+QETH_ARP_CMD_LEN,
-				   qeth_arp_query_cb,
-				   (void *)&qinfo);
+				   qeth_arp_query_cb, (void *)&qinfo);
 	if (rc) {
 		tmp = rc;
 		PRINT_WARN("Error while querying ARP cache on %s: %s "
@@ -4186,9 +4207,10 @@ qeth_snmp_command_cb(struct qeth_card *card, struct qeth_reply *reply,
 	}
 	data_len = *((__u16*)QETH_IPA_PDU_LEN_PDU1(data));
 	if (cmd->data.setadapterparms.hdr.seq_no == 1)
-		data_len -= (__u16)((char*)&snmp->request - (char *)cmd);
-	else
 		data_len -= (__u16)((char *)&snmp->data - (char *)cmd);
+	else
+		data_len -= (__u16)((char*)&snmp->request - (char *)cmd);
+
 	/* check if there is enough room in userspace */
 	if ((qinfo->udata_len - qinfo->udata_offset) < data_len) {
 		QETH_DBF_TEXT_(trace, 4, "scer3%i", -ENOMEM);
@@ -4197,15 +4219,17 @@ qeth_snmp_command_cb(struct qeth_card *card, struct qeth_reply *reply,
 	}
 	QETH_DBF_TEXT_(trace, 4, "snore%i",
 		       cmd->data.setadapterparms.hdr.used_total);
-	QETH_DBF_TEXT_(trace, 4, "sseqn%i", cmd->data.setassparms.hdr.seq_no);
+	QETH_DBF_TEXT_(trace, 4, "sseqn%i", cmd->data.setadapterparms.hdr.seq_no);
 	/*copy entries to user buffer*/
 	if (cmd->data.setadapterparms.hdr.seq_no == 1) {
 		memcpy(qinfo->udata + qinfo->udata_offset,
-		       (char *)snmp,offsetof(struct qeth_snmp_cmd,data));
+		       (char *)snmp,
+		       data_len + offsetof(struct qeth_snmp_cmd,data));
 		qinfo->udata_offset += offsetof(struct qeth_snmp_cmd, data);
-	}
+	} else {
 	memcpy(qinfo->udata + qinfo->udata_offset,
-	       (char *)&snmp->data, data_len);
+		       (char *)&snmp->request, data_len);
+	}
 	qinfo->udata_offset += data_len;
 	/* check if all replies received ... */
 		QETH_DBF_TEXT_(trace, 4, "srtot%i",
@@ -4248,7 +4272,8 @@ qeth_snmp_command(struct qeth_card *card, char *udata)
 {
 	struct qeth_cmd_buffer *iob;
 	struct qeth_ipa_cmd *cmd;
-	struct qeth_snmp_ureq ureq;
+	struct qeth_snmp_ureq *ureq;
+	int req_len;
 	struct qeth_arp_query_info qinfo = {0, };
 	int rc = 0;
 
@@ -4261,30 +4286,39 @@ qeth_snmp_command(struct qeth_card *card, char *udata)
 			   "on %s!\n", card->info.if_name);
 		return -EOPNOTSUPP;
 	}
-	if (copy_from_user(&ureq, udata, sizeof(struct qeth_snmp_ureq)))
+	/* skip 4 bytes (data_len struct member) to get req_len */
+	if (copy_from_user(&req_len, udata + sizeof(int), sizeof(int)))
 		return -EFAULT;
-	qinfo.udata_len = ureq.hdr.data_len;
-	if (!(qinfo.udata = kmalloc(qinfo.udata_len, GFP_KERNEL)))
+	ureq = kmalloc(req_len, GFP_KERNEL);
+	if (!ureq) {
+		QETH_DBF_TEXT(trace, 2, "snmpnome");
 		return -ENOMEM;
+	}
+	if (copy_from_user(ureq, udata, req_len)){
+		kfree(ureq);
+		return -EFAULT;
+	}
+	qinfo.udata_len = ureq->hdr.data_len;
+	if (!(qinfo.udata = kmalloc(qinfo.udata_len, GFP_KERNEL))){
+		kfree(ureq);
+		return -ENOMEM;
+	}
 	memset(qinfo.udata, 0, qinfo.udata_len);
 	qinfo.udata_offset = sizeof(struct qeth_snmp_ureq_hdr);
 
 	iob = qeth_get_adapter_cmd(card, IPA_SETADP_SET_SNMP_CONTROL,
-				   QETH_SNMP_SETADP_CMDLENGTH+ureq.hdr.req_len);
+				   QETH_SNMP_SETADP_CMDLENGTH + req_len);
 	cmd = (struct qeth_ipa_cmd *)(iob->data+IPA_PDU_HEADER_SIZE);
-	memcpy(&cmd->data.setadapterparms.data.snmp, &ureq.cmd,
-	       sizeof(struct qeth_snmp_cmd));
-	rc = qeth_send_ipa_arp_cmd(card, iob,
-				   QETH_SETADP_BASE_LEN + QETH_ARP_DATA_SIZE +
-				   ureq.hdr.req_len, qeth_snmp_command_cb,
-				   (void *)&qinfo);
+	memcpy(&cmd->data.setadapterparms.data.snmp, &ureq->cmd, req_len);
+	rc = qeth_send_ipa_snmp_cmd(card, iob, QETH_SETADP_BASE_LEN + req_len,
+				    qeth_snmp_command_cb, (void *)&qinfo);
 	if (rc)
 		PRINT_WARN("SNMP command failed on %s: (0x%x)\n",
 			   card->info.if_name, rc);
 	 else
 		copy_to_user(udata, qinfo.udata, qinfo.udata_len);
 
-
+	kfree(ureq);
 	kfree(qinfo.udata);
 	return rc;
 }

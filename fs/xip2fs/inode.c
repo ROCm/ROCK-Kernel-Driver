@@ -242,6 +242,7 @@ out:
 	return -EROFS;
 }
 
+#if 0
 static int xip2_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
@@ -305,6 +306,7 @@ xip2_readpages(struct file *file, struct address_space *mapping,
 	pagevec_lru_add(&lru_pvec);
 	return 0;
 }
+#endif
 
 static sector_t xip2_bmap(struct address_space *mapping, sector_t block)
 {
@@ -321,14 +323,14 @@ static sector_t xip2_bmap(struct address_space *mapping, sector_t block)
 }
 
 struct address_space_operations xip2_aops = {
-	.readpage	= xip2_readpage,
-	.readpages	= xip2_readpages,
+//	.readpage	= xip2_readpage,
+//	.readpages	= xip2_readpages,
 	.bmap		= xip2_bmap,
 };
 
 struct address_space_operations xip2_nobh_aops = {
-	.readpage	= xip2_readpage,
-	.readpages	= xip2_readpages,
+//	.readpage	= xip2_readpage,
+//	.readpages	= xip2_readpages,
 	.bmap		= xip2_bmap,
 };
 
