@@ -1016,11 +1016,11 @@ recovery_error:
 /**
  * void journal_destroy() - Release a journal_t structure.
  * @journal: Journal to act on.
-* 
+ *
  * Release a journal_t structure once it is no longer in use by the
  * journaled object.
  */
-void journal_destroy (journal_t *journal)
+void journal_destroy(journal_t *journal)
 {
 	/* Wait for the commit thread to wake up and die. */
 	journal_kill_thread(journal);
@@ -1031,12 +1031,19 @@ void journal_destroy (journal_t *journal)
 
 	/* Force any old transactions to disk */
 	lock_journal(journal);
-	while (journal->j_checkpoint_transactions != NULL)
+
+	/* Totally anal locking here... */
+	spin_lock(&journal->j_list_lock);
+	while (journal->j_checkpoint_transactions != NULL) {
+		spin_unlock(&journal->j_list_lock);
 		log_do_checkpoint(journal, 1);
+		spin_lock(&journal->j_list_lock);
+	}
 
 	J_ASSERT(journal->j_running_transaction == NULL);
 	J_ASSERT(journal->j_committing_transaction == NULL);
 	J_ASSERT(journal->j_checkpoint_transactions == NULL);
+	spin_unlock(&journal->j_list_lock);
 
 	/* We can now mark the journal as empty. */
 	journal->j_tail = 0;
@@ -1237,8 +1244,13 @@ int journal_flush(journal_t *journal)
 
 	/* ...and flush everything in the log out to disk. */
 	lock_journal(journal);
-	while (!err && journal->j_checkpoint_transactions != NULL)
+	spin_lock(&journal->j_list_lock);
+	while (!err && journal->j_checkpoint_transactions != NULL) {
+		spin_unlock(&journal->j_list_lock);
 		err = log_do_checkpoint(journal, journal->j_maxlen);
+		spin_lock(&journal->j_list_lock);
+	}
+	spin_unlock(&journal->j_list_lock);
 	cleanup_journal_tail(journal);
 
 	/* Finally, mark the journal as really needing no recovery.
