@@ -303,6 +303,7 @@ struct device {
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+	u64		*dma_mask;	/* dma mask (if dma'able device) */
 
 	void	(*release)(struct device * dev);
 };

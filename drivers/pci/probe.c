@@ -448,6 +448,7 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 
 	/* now put in global tree */
 	strcpy(dev->dev.bus_id,dev->slot_name);
+	dev->dev.dma_mask = &dev->dma_mask;
 
 	device_register(&dev->dev);
 	return dev;
