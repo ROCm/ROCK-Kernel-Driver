@@ -394,6 +394,7 @@ map_unwritten(
 	unsigned long		p_offset,
 	int			block_bits,
 	xfs_iomap_t		*iomapp,
+	int			startio,
 	int			all_bh)
 {
 	struct buffer_head	*bh = curr;
@@ -469,7 +470,7 @@ map_unwritten(
 				break;
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
-			convert_page(inode, page, iomapp, pb, 1, all_bh);
+			convert_page(inode, page, iomapp, pb, startio, all_bh);
 		}
 
 		if (tindex == tlast &&
@@ -479,7 +480,7 @@ map_unwritten(
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
-				convert_page(inode, page, iomapp, pb, 1, all_bh);
+				convert_page(inode, page, iomapp, pb, startio, all_bh);
 			}
 		}
 	}
@@ -584,7 +585,7 @@ convert_page(
 		if (buffer_unwritten(bh) && !bh->b_end_io) {
 			ASSERT(tmp->iomap_flags & IOMAP_UNWRITTEN);
 			map_unwritten(inode, page, head, bh,
-						offset, bbits, tmp, all_bh);
+					offset, bbits, tmp, startio, all_bh);
 		} else if (! (buffer_unwritten(bh) && buffer_locked(bh))) {
 			map_buffer_at_offset(page, bh, offset, bbits, tmp);
 			if (buffer_unwritten(bh)) {
@@ -717,8 +718,8 @@ page_state_convert(
 				if (!bh->b_end_io) {
 					err = map_unwritten(inode, page,
 							head, bh, p_offset,
-							inode->i_blkbits,
-							iomp, unmapped);
+							inode->i_blkbits, iomp,
+							startio, unmapped);
 					if (err) {
 						goto error;
 					}
