@@ -3094,3 +3094,5 @@ EXPORT_SYMBOL(netdev_unregister_fc);
 EXPORT_SYMBOL(netdev_fastroute);
 EXPORT_SYMBOL(netdev_fastroute_obstacles);
 #endif
+
+EXPORT_PER_CPU_SYMBOL(softnet_data);

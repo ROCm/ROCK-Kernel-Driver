@@ -8,27 +8,18 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/types.h>
-#include <linux/net.h>
-#include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/fddidevice.h>
 #include <linux/trdevice.h>
 #include <linux/fcdevice.h>
-#include <linux/tty.h>
-#include <net/snmp.h>
-#include <net/checksum.h>
+#include <net/ip.h>
 #include <linux/etherdevice.h>
 #ifdef CONFIG_HIPPI
 #include <linux/hippidevice.h>
 #endif
 #include <net/pkt_sched.h>
-#include <linux/if_bridge.h>
-#include <linux/if_vlan.h>
-#include <linux/random.h>
 
 #ifdef CONFIG_INET
-#include <net/inet_common.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
 #include <net/ah.h>
 #endif
@@ -44,10 +35,6 @@ extern void destroy_EII_client(struct datalink_proto *);
 extern void destroy_8023_client(struct datalink_proto *);
 #endif
 
-#ifdef CONFIG_ATALK_MODULE
-#include <net/sock.h>
-#endif
-
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
 
@@ -59,7 +46,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
 #ifdef CONFIG_INET
-EXPORT_SYMBOL(inet_peer_idlock);
 
 /* Route manipulation */
 
@@ -105,7 +91,6 @@ EXPORT_SYMBOL(hippi_type_trans);
 #endif
 
 #ifdef CONFIG_NET_SCHED
-PSCHED_EXPORTLIST;
 EXPORT_SYMBOL(pfifo_qdisc_ops);
 EXPORT_SYMBOL(bfifo_qdisc_ops);
 #ifdef CONFIG_NET_ESTIMATOR
@@ -117,7 +102,5 @@ EXPORT_SYMBOL(qdisc_kill_estimator);
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);
 #endif
-
-EXPORT_PER_CPU_SYMBOL(softnet_data);
 
 #endif  /* CONFIG_NET */
