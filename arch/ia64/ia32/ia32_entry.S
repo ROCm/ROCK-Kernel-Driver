@@ -297,8 +297,8 @@ ia32_syscall_table:
 	data8 sys_getpriority
 	data8 sys_setpriority
 	data8 sys32_ni_syscall	  /* old profil syscall holder */
-	data8 sys32_statfs
-	data8 sys32_fstatfs	  /* 100 */
+	data8 compat_sys_statfs
+	data8 compat_sys_fstatfs	  /* 100 */
 	data8 sys32_ioperm
 	data8 sys32_socketcall
 	data8 sys_syslog

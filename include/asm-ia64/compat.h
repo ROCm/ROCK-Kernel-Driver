@@ -61,11 +61,24 @@ struct compat_stat {
 };
 
 struct compat_flock {
-       short		l_type;
-       short		l_whence;
-       compat_off_t	l_start;
-       compat_off_t	l_len;
-       compat_pid_t	l_pid;
+	short		l_type;
+	short		l_whence;
+	compat_off_t	l_start;
+	compat_off_t	l_len;
+	compat_pid_t	l_pid;
+};
+
+struct compat_statfs {
+	int		f_type;
+	int		f_bsize;
+	int		f_blocks;
+	int		f_bfree;
+	int		f_bavail;
+	int		f_files;
+	int		f_ffree;
+	compat_fsid_t	f_fsid;
+	int		f_namelen;	/* SunOS ignores this field. */
+	int		f_spare[6];
 };
 
 typedef u32		compat_old_sigset_t;	/* at least 32 bits */

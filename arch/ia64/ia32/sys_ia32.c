@@ -609,61 +609,6 @@ sys32_pipe (int *fd)
 	return retval;
 }
 
-static inline int
-put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
-{
-	int err;
-
-	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(*ubuf)))
-		return -EFAULT;
-
-	err = __put_user(kbuf->f_type, &ubuf->f_type);
-	err |= __put_user(kbuf->f_bsize, &ubuf->f_bsize);
-	err |= __put_user(kbuf->f_blocks, &ubuf->f_blocks);
-	err |= __put_user(kbuf->f_bfree, &ubuf->f_bfree);
-	err |= __put_user(kbuf->f_bavail, &ubuf->f_bavail);
-	err |= __put_user(kbuf->f_files, &ubuf->f_files);
-	err |= __put_user(kbuf->f_ffree, &ubuf->f_ffree);
-	err |= __put_user(kbuf->f_namelen, &ubuf->f_namelen);
-	err |= __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]);
-	err |= __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]);
-	return err;
-}
-
-extern asmlinkage long sys_statfs(const char * path, struct statfs * buf);
-
-asmlinkage long
-sys32_statfs (const char *path, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_statfs(path, &s);
-	set_fs(old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
-extern asmlinkage long sys_fstatfs(unsigned int fd, struct statfs * buf);
-
-asmlinkage long
-sys32_fstatfs (unsigned int fd, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_fstatfs(fd, &s);
-	set_fs(old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
 static inline long
 get_tv32 (struct timeval *o, struct compat_timeval *i)
 {
