@@ -155,6 +155,10 @@ extern void nf_reinject(struct sk_buff *skb,
 
 extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
 
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+extern void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
+#endif
+
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);
 #endif

@@ -52,3 +52,4 @@ EXPORT_SYMBOL(ip6_flush_pending_frames);
 EXPORT_SYMBOL(ip6_push_pending_frames);
 EXPORT_SYMBOL(ip6_dst_lookup);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
+EXPORT_SYMBOL(ipv6_skip_exthdr);
