@@ -32,6 +32,9 @@ struct reiserfs_inode_info {
 
     __u32 i_first_direct_byte; // offset of first byte stored in direct item.
 
+    /* copy of persistent inode flags read from sd_attrs. */
+    __u32 i_attrs;
+
     int i_prealloc_block; /* first unused block of a sequence of unused blocks */
     int i_prealloc_count; /* length of that sequence */
     struct list_head i_prealloc_list; /* per-transaction list of inodes which

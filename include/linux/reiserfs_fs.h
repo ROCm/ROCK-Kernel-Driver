@@ -872,11 +872,41 @@ struct stat_data_v1
 #define set_sd_v1_first_direct_byte(sdp,v) \
                                 ((sdp)->sd_first_direct_byte = cpu_to_le32(v))
 
+#include <linux/ext2_fs.h>
+
+/* inode flags stored in sd_attrs (nee sd_reserved) */
+
+/* we want common flags to have the same values as in ext2,
+   so chattr(1) will work without problems */
+#define REISERFS_IMMUTABLE_FL EXT2_IMMUTABLE_FL
+#define REISERFS_SYNC_FL      EXT2_SYNC_FL
+#define REISERFS_NOATIME_FL   EXT2_NOATIME_FL
+#define REISERFS_NODUMP_FL    EXT2_NODUMP_FL
+#define REISERFS_SECRM_FL     EXT2_SECRM_FL
+#define REISERFS_UNRM_FL      EXT2_UNRM_FL
+#define REISERFS_COMPR_FL     EXT2_COMPR_FL
+/* persistent flag to disable tails on per-file basic.
+   Note, that is inheritable: mark directory with this and
+   all new files inside will not have tails. 
+
+   Teodore Tso allocated EXT2_NODUMP_FL (0x00008000) for this. Change
+   numeric constant to ext2 macro when available. */
+#define REISERFS_NOTAIL_FL    (0x00008000) /* EXT2_NOTAIL_FL */
+
+/* persistent flags that file inherits from the parent directory */
+#define REISERFS_INHERIT_MASK ( REISERFS_IMMUTABLE_FL |	\
+				REISERFS_SYNC_FL |	\
+				REISERFS_NOATIME_FL |	\
+				REISERFS_NODUMP_FL |	\
+				REISERFS_SECRM_FL |	\
+				REISERFS_COMPR_FL |	\
+				REISERFS_NOTAIL_FL )
+
 /* Stat Data on disk (reiserfs version of UFS disk inode minus the
    address blocks) */
 struct stat_data {
     __u16 sd_mode;	/* file type, permissions */
-    __u16 sd_reserved;
+    __u16 sd_attrs;     /* persistent inode flags */
     __u32 sd_nlink;	/* number of hard links */
     __u64 sd_size;	/* file size */
     __u32 sd_uid;		/* owner */
@@ -929,6 +959,8 @@ struct stat_data {
 #define set_sd_v2_rdev(sdp,v)   ((sdp)->u.sd_rdev = cpu_to_le32(v))
 #define sd_v2_generation(sdp)   (le32_to_cpu((sdp)->u.sd_generation))
 #define set_sd_v2_generation(sdp,v) ((sdp)->u.sd_generation = cpu_to_le32(v))
+#define sd_v2_attrs(sdp)         (le16_to_cpu((sdp)->sd_attrs))
+#define set_sd_v2_attrs(sdp,v)   ((sdp)->sd_attrs = cpu_to_le16(v))
 
 
 /***************************************************************************/
@@ -1871,6 +1903,9 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * inode);
 void reiserfs_update_sd (struct reiserfs_transaction_handle *th, struct inode * inode);
 
+void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode );
+void i_attrs_to_sd_attrs( struct inode *inode, __u16 *sd_attrs );
+
 /* namei.c */
 inline void set_de_name_and_namelen (struct reiserfs_dir_entry * de);
 int search_by_entry_key (struct super_block * sb, const struct cpu_key * key, 
@@ -2145,6 +2180,12 @@ int reiserfs_unpack (struct inode * inode, struct file * filp);
  
 /* ioctl's command */
 #define REISERFS_IOC_UNPACK		_IOW(0xCD,1,long)
+/* define following flags to be the same as in ext2, so that chattr(1),
+   lsattr(1) will work with us. */
+#define REISERFS_IOC_GETFLAGS		EXT2_IOC_GETFLAGS
+#define REISERFS_IOC_SETFLAGS		EXT2_IOC_SETFLAGS
+#define REISERFS_IOC_GETVERSION		EXT2_IOC_GETVERSION
+#define REISERFS_IOC_SETVERSION		EXT2_IOC_SETVERSION
 
 /* Locking primitives */
 /* Right now we are still falling back to (un)lock_kernel, but eventually that
