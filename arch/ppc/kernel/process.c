@@ -321,6 +321,24 @@ release_thread(struct task_struct *t)
 }
 
 /*
+ * This gets called before we allocate a new thread and copy
+ * the current task into it.
+ */
+void prepare_to_copy(struct task_struct *tsk)
+{
+	struct pt_regs *regs = tsk->thread.regs;
+
+	if (regs == NULL)
+		return;
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+#ifdef CONFIG_ALTIVEC
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
+}
+
+/*
  * Copy a thread..
  */
 int
@@ -348,6 +366,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	} else {
 		childregs->gpr[1] = usp;
 		p->thread.regs = childregs;
+		if (clone_flags & CLONE_SETTLS)
+			childregs->gpr[2] = childregs->gpr[6];
 	}
 	childregs->gpr[3] = 0;  /* Result from fork() */
 	sp -= STACK_FRAME_OVERHEAD;
@@ -366,29 +386,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
 	kregs->nip = (unsigned long)ret_from_fork;
-
-	/*
-	 * copy fpu info - assume lazy fpu switch now always
-	 *  -- Cort
-	 */
-	if (regs->msr & MSR_FP) {
-		giveup_fpu(current);
-		childregs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1);
-	}
-	memcpy(&p->thread.fpr, &current->thread.fpr, sizeof(p->thread.fpr));
-	p->thread.fpscr = current->thread.fpscr;
-
-#ifdef CONFIG_ALTIVEC
-	/*
-	 * copy altiVec info - assume lazy altiVec switch
-	 * - kumar
-	 */
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-	memcpy(&p->thread.vr, &current->thread.vr, sizeof(p->thread.vr));
-	p->thread.vscr = current->thread.vscr;
-	childregs->msr &= ~MSR_VEC;
-#endif /* CONFIG_ALTIVEC */
 
 	p->thread.last_syscall = -1;
 
@@ -444,15 +441,17 @@ int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 	return put_user(val, (unsigned int *) adr);
 }
 
-int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
+int sys_clone(unsigned long clone_flags, unsigned long usp, int *parent_tidp,
+	      void *child_threadptr, int *child_tidp, int p6,
 	      struct pt_regs *regs)
 {
  	struct task_struct *p;
 
 	CHECK_FULL_REGS(regs);
-	if (p2 == 0)
-		p2 = regs->gpr[1];	/* stack pointer for child */
- 	p = do_fork(p1 & ~CLONE_IDLETASK, p2, regs, 0, (int *)p3, (int *)p4);
+	if (usp == 0)
+		usp = regs->gpr[1];	/* stack pointer for child */
+ 	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
+		    parent_tidp, child_tidp);
  	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
