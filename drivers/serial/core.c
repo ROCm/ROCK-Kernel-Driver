@@ -1450,6 +1450,9 @@ uart_block_til_ready(struct file *filp, struct uart_info *info)
 	if (signal_pending(current))
 		return -ERESTARTSYS;
 
+	if (info->tty->flags & (1 << TTY_IO_ERROR))
+		return 0;
+
 	if (tty_hung_up_p(filp) || !(info->flags & UIF_INITIALIZED))
 		return (port->flags & UPF_HUP_NOTIFY) ?
 			-EAGAIN : -ERESTARTSYS;
