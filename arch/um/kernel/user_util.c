@@ -80,11 +80,10 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	int status, ret;
 
 	while(1){
-		ret = waitpid(pid, &status, WUNTRACED);
+		CATCH_EINTR(ret = waitpid(pid, &status, WUNTRACED));
 		if((ret < 0) ||
 		   !WIFSTOPPED(status) || (WSTOPSIG(status) != sig)){
 			if(ret < 0){
-				if(errno == EINTR) continue;
 				printk("wait failed, errno = %d\n",
 				       errno);
 			}
@@ -124,8 +123,7 @@ int __raw(int fd, int complain, int now)
 	int err;
 	int when;
 
-	while (((err = tcgetattr(fd, &tt)) < 0) && errno == EINTR)
-		;
+	CATCH_EINTR(err = tcgetattr(fd, &tt));
 
 	if (err < 0) {
 		if (complain)
@@ -140,8 +138,8 @@ int __raw(int fd, int complain, int now)
 	else
 		when = TCSADRAIN;
 
-	while (((err = tcsetattr(fd, when, &tt)) < 0) && errno == EINTR)
-		;
+	CATCH_EINTR(err = tcsetattr(fd, when, &tt));
+
 	if (err < 0) {
 		if (complain)
 			printk("tcsetattr failed, errno = %d\n", errno);

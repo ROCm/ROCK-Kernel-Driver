@@ -16,6 +16,7 @@
 #include <net/if.h>
 #include "user.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "net_user.h"
 #include "etap.h"
 #include "helper.h"
@@ -125,7 +126,8 @@ static int etap_tramp(char *dev, char *gate, int control_me,
 	if(c != 1){
 		printk("etap_tramp : uml_net failed\n");
 		err = -EINVAL;
-		if(waitpid(pid, &status, 0) < 0)
+		CATCH_EINTR(n = waitpid(pid, &status, 0));
+		if(n < 0)
 			err = -errno;
 		else if(!WIFEXITED(status) || (WEXITSTATUS(status) != 1))
 			printk("uml_net didn't exit with status 1\n");

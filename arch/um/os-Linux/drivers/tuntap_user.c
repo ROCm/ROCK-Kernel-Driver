@@ -18,6 +18,7 @@
 #include "net_user.h"
 #include "tuntap.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "user.h"
 #include "helper.h"
 #include "os.h"
@@ -108,7 +109,7 @@ static int tuntap_open_tramp(char *gate, int *fd_out, int me, int remote,
 		       errno);
 		return(-errno);
 	}
-	waitpid(pid, NULL, 0);
+	CATCH_EINTR(waitpid(pid, NULL, 0));
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 	if(cmsg == NULL){

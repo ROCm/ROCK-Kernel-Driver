@@ -192,7 +192,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	printf("tracing thread pid = %d\n", tracing_pid);
 
 	pid = clone(signal_tramp, sp, CLONE_FILES | SIGCHLD, init_proc);
-	n = waitpid(pid, &status, WUNTRACED);
+	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 	if(n < 0){
 		printf("waitpid on idle thread failed, errno = %d\n", errno);
 		exit(1);
@@ -233,7 +233,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	}
 	set_cmdline("(tracing thread)");
 	while(1){
-		pid = waitpid(-1, &status, WUNTRACED);
+		CATCH_EINTR(pid = waitpid(-1, &status, WUNTRACED));
 		if(pid <= 0){
 			if(errno != ECHILD){
 				printf("wait failed - errno = %d\n", errno);

@@ -81,7 +81,7 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 			panic("handle_trap - continuing to end of syscall failed, "
 			      "errno = %d\n", errno);
 
-		err = waitpid(pid, &status, WUNTRACED);
+		CATCH_EINTR(err = waitpid(pid, &status, WUNTRACED));
 		if((err < 0) || !WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
 			panic("handle_trap - failed to wait at end of syscall, "
 			      "errno = %d, status = %d\n", errno, status);
@@ -121,7 +121,7 @@ void start_userspace(int cpu)
 		panic("start_userspace : clone failed, errno = %d", errno);
 
 	do {
-		n = waitpid(pid, &status, WUNTRACED);
+		CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 		if(n < 0)
 			panic("start_userspace : wait failed, errno = %d", 
 			      errno);
@@ -154,7 +154,7 @@ void userspace(union uml_pt_regs *regs)
 		panic("userspace - PTRACE_%s failed, errno = %d\n",
 		       local_using_sysemu ? "SYSEMU" : "SYSCALL", errno);
 	while(1){
-		err = waitpid(pid, &status, WUNTRACED);
+		CATCH_EINTR(err = waitpid(pid, &status, WUNTRACED));
 		if(err < 0)
 			panic("userspace - waitpid failed, errno = %d\n", 
 			      errno);

@@ -92,6 +92,7 @@ extern void arch_init_thread(void);
 extern int __raw(int fd, int complain, int now);
 #define raw(fd, complain) __raw((fd), (complain), 1)
 
+#define CATCH_EINTR(expr) while ( ((expr) < 0) && errno == EINTR)
 #endif
 
 /*

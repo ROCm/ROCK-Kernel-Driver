@@ -272,7 +272,7 @@ void fake_child_exit(void)
 
 	child_proxy(1, W_EXITCODE(0, 0));
 	while(debugger.waiting == 1){
-		pid = waitpid(debugger.pid, &status, WUNTRACED);
+		CATCH_EINTR(pid = waitpid(debugger.pid, &status, WUNTRACED));
 		if(pid != debugger.pid){
 			printk("fake_child_exit - waitpid failed, "
 			       "errno = %d\n", errno);
@@ -280,7 +280,7 @@ void fake_child_exit(void)
 		}
 		debugger_proxy(status, debugger.pid);
 	}
-	pid = waitpid(debugger.pid, &status, WUNTRACED);
+	CATCH_EINTR(pid = waitpid(debugger.pid, &status, WUNTRACED));
 	if(pid != debugger.pid){
 		printk("fake_child_exit - waitpid failed, "
 		       "errno = %d\n", errno);

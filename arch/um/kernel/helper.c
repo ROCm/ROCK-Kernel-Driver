@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include "user.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "os.h"
 
 struct helper_data {
@@ -96,7 +97,7 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 		goto out_kill;
 	}
 	else if(n != 0){
-		waitpid(pid, NULL, 0);
+		CATCH_EINTR(n = waitpid(pid, NULL, 0));
 		pid = -errno;
 	}
 

@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include "os.h"
 #include "user.h"
+#include "user_util.h"
 
 #define ARBITRARY_ADDR -1
 #define FAILURE_PID    -1
@@ -87,7 +88,7 @@ void os_kill_process(int pid, int reap_child)
 {
 	kill(pid, SIGKILL);
 	if(reap_child)
-		waitpid(pid, NULL, 0);
+		CATCH_EINTR(waitpid(pid, NULL, 0));
 		
 }
 

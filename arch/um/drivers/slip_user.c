@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <sched.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/termios.h>
 #include <sys/wait.h>
 #include <sys/signal.h>
@@ -100,7 +100,9 @@ static int slip_tramp(char **argv, int fd)
 			printk("%s", output);
 			kfree(output);
 		}
-		if(waitpid(pid, &status, 0) < 0) err = errno;
+		CATCH_EINTR(err = waitpid(pid, &status, 0));
+		if(err < 0)
+			err = errno;
 		else if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0)){
 			printk("'%s' didn't exit with status 0\n", argv[0]);
 			err = -EINVAL;

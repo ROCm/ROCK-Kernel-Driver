@@ -125,7 +125,7 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 	/* Start the process and wait for it to kill itself */
 	new_pid = clone(outer_tramp, (void *) sp, clone_flags, &arg);
 	if(new_pid < 0) return(-errno);
-	while(((err = waitpid(new_pid, &status, 0)) < 0) && (errno == EINTR)) ;
+	CATCH_EINTR(err = waitpid(new_pid, &status, 0));
 	if(err < 0) panic("Waiting for outer trampoline failed - errno = %d", 
 			  errno);
 	if(!WIFSIGNALED(status) || (WTERMSIG(status) != SIGKILL))
@@ -171,7 +171,7 @@ static int start_ptraced_child(void **stack_out)
 	pid = clone(ptrace_child, (void *) sp, SIGCHLD, NULL);
 	if(pid < 0)
 		panic("check_ptrace : clone failed, errno = %d", errno);
-	n = waitpid(pid, &status, WUNTRACED);
+	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 	if(n < 0)
 		panic("check_ptrace : wait failed, errno = %d", errno);
 	if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGSTOP))
@@ -188,7 +188,7 @@ static void stop_ptraced_child(int pid, void *stack, int exitcode)
 
 	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
 		panic("check_ptrace : ptrace failed, errno = %d", errno);
-	n = waitpid(pid, &status, 0);
+	CATCH_EINTR(n = waitpid(pid, &status, 0));
 	if(!WIFEXITED(status) || (WEXITSTATUS(status) != exitcode))
 		panic("check_ptrace : child exited with status 0x%x", status);
 
@@ -226,7 +226,8 @@ static void __init check_sysemu(void)
 	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
 		struct user_regs_struct regs;
 
-		if (waitpid(pid, &status, WUNTRACED) < 0)
+		CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
+		if (n < 0)
 			panic("check_ptrace : wait failed, errno = %d", errno);
 		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
 			panic("check_ptrace : expected SIGTRAP, "
@@ -267,7 +268,7 @@ void __init check_ptrace(void)
 		if(ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0)
 			panic("check_ptrace : ptrace failed, errno = %d", 
 			      errno);
-		n = waitpid(pid, &status, WUNTRACED);
+		CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 		if(n < 0)
 			panic("check_ptrace : wait failed, errno = %d", errno);
 		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))

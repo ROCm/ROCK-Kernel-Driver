@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <sched.h>
 #include <string.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include "user_util.h"
@@ -113,13 +113,13 @@ static void slirp_close(int fd, void *data)
 	}
 #endif
 
-	err = waitpid(pri->pid, &status, WNOHANG);
-	if(err<0) {
+	CATCH_EINTR(err = waitpid(pri->pid, &status, WNOHANG));
+	if(err < 0) {
 		printk("slirp_close: waitpid returned %d\n", errno);
 		return;
 	}
 
-	if(err==0) {
+	if(err == 0) {
 		printk("slirp_close: process %d has not exited\n");
 		return;
 	}
