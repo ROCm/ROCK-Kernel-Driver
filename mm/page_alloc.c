@@ -898,7 +898,7 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 
 	val->totalram = pgdat->node_size;
 	val->freeram = nr_free_pages_pgdat(pgdat);
-	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].spanned_pages;
+	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].present_pages;
 	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
 	val->mem_unit = PAGE_SIZE;
 }
