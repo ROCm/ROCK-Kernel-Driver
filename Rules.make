@@ -136,8 +136,8 @@ ifeq ($(strip $(export-objs)),)
 # If we don't export any symbols in this dir, just descend
 # ---------------------------------------------------------------------------
 
-fastdep: sub_dirs
-	@echo -n
+fastdep: $(subdir-ym)
+	@/bin/true
 
 else
 
@@ -206,7 +206,7 @@ $(MODVERDIR)/%.ver: %.c FORCE
 
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
-fastdep: $(targets) sub_dirs
+fastdep: $(targets) $(subdir-ym)
 	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
 	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
 
@@ -221,13 +221,13 @@ ifeq ($(MAKECMDGOALS),modules_install)
 
 .PHONY: modules_install
 
-modules_install: sub_dirs
+modules_install: $(subdir-ym)
 ifneq ($(obj-m),)
 	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
 	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
 	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
 else
-	@echo -n
+	@/bin/true
 endif
 
 else # ! modules_install
@@ -248,8 +248,8 @@ endif
 #	The echo suppresses the "Nothing to be done for first_rule"
 first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 	    $(if $(KBUILD_MODULES),$(obj-m)) \
-	    sub_dirs
-	@echo -n
+	    $(subdir-ym)
+	@/bin/true
 
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ targets += $(real-objs-y) $(real-objs-m) $(EXTRA_TARGETS) $(MAKECMDGOALS)
 # ---------------------------------------------------------------------------
 
 # To build objects in subdirs, we need to descend into the directories
-$(sort $(subdir-obj-y)): sub_dirs ;
+$(sort $(subdir-obj-y)): $(subdir-ym) ;
 
 #
 # Rule to compile a set of .o files into one .o file
@@ -454,12 +454,10 @@ cmd_gzip = gzip -f -9 < $< > $@
 # Descending
 # ---------------------------------------------------------------------------
 
-.PHONY: sub_dirs $(subdir-ym)
-
-sub_dirs: $(subdir-ym)
+.PHONY: $(subdir-ym)
 
 $(subdir-ym):
-	@$(MAKE) -C $@ $(MAKECMDGOALS)
+	@$(call descend,$@,$(MAKECMDGOALS))
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
@@ -573,4 +571,9 @@ define do_cmd
              echo "$(2)" &&)) \
         $(2)
 endef
+
+#	$(call descend,<dir>,<target>)
+#	Recursively call a sub-make in <dir> with target <target> 
+
+descend = $(MAKE) -C $(1) $(2)
 

@@ -52,13 +52,6 @@ CROSS_COMPILE 	=
 
 all:	vmlinux
 
-#	Print entire command lines instead of short version
-#	For now, leave the default
-
-ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 1
-endif
-
 # 	Decide whether to build built-in, modular, or both.
 #	Normally, just do built-in.
 
@@ -105,6 +98,12 @@ export KBUILD_MODULES KBUILD_BUILTIN
 # If it is set to "silent_", nothing wil be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
 
+#	For now, leave verbose as default
+
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 1
+endif
+
 #	If the user wants quiet mode, echo short versions of the commands 
 #	only and suppress the 'Entering/Leaving directory' messages
 
@@ -120,7 +119,7 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
 endif
 
-export quiet
+export quiet KBUILD_VERBOSE
 
 #
 # Include the make variables (CC, etc...)
@@ -183,7 +182,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	@$(MAKE) -C scripts
+	@$(call descend,scripts,)
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -276,12 +275,6 @@ LIBS		+= $(patsubst %/, %/lib.a, $(libs-y))
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
 
-# boot target
-# ---------------------------------------------------------------------------
-
-boot: vmlinux
-	@$(MAKE) -C arch/$(ARCH)/boot
-
 # Build vmlinux
 # ---------------------------------------------------------------------------
 
@@ -314,7 +307,7 @@ define rule_vmlinux
 	echo '  Generating build number'
 	. scripts/mkversion > .tmp_version
 	mv -f .tmp_version .version
-	+$(MAKE) -C init
+	+$(call descend,init,)
 	$(call cmd,link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
@@ -363,7 +356,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	@$(MAKE) -C $@
+	@$(call descend,$@,)
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -386,17 +379,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 %.i: %.c FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 %.o: %.c FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 %.lst: %.c FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 %.s: %.S FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 %.o: %.S FORCE
-	@$(MAKE) -C $(@D) $(@F)
+	@$(call descend,$(@D),$(@F))
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
@@ -481,7 +474,7 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	$(update-if-changed)
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
+	@$(call descend,$(patsubst _sfdep_%,%,$@),fastdep)
 
 else # !CONFIG_MODVERSIONS
 
@@ -533,7 +526,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	@$(MAKE) -C $(patsubst _modinst_%, %, $@) modules_install
+	$(descend,$(patsubst _modinst_%,%,$@),modules_install)
 
 else # CONFIG_MODULES
 
@@ -631,11 +624,11 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 xconfig:
-	@$(MAKE) -C scripts kconfig.tk
+	@$(call descend,scripts,kconfig.tk)
 	wish -f scripts/kconfig.tk
 
 menuconfig:
-	@$(MAKE) -C scripts lxdialog
+	@$(call descend,scripts,lxdialog)
 	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
@@ -734,7 +727,7 @@ mrproper: clean archmrproper
 		-type f -print | xargs rm -f
 	@rm -rf $(MRPROPER_DIRS)
 	@rm -f $(MRPROPER_FILES)
-	@$(MAKE) -C scripts mrproper
+	@$(call descend,scripts,mrproper)
 	@$(MAKE) -f Documentation/DocBook/Makefile mrproper
 
 distclean: mrproper
@@ -909,5 +902,9 @@ define update-if-changed
 	fi
 endef
 
+#	$(call descend,<dir>,<target>)
+#	Recursively call a sub-make in <dir> with target <target> 
+
+descend = $(MAKE) -C $(1) $(2)
 
 FORCE:
