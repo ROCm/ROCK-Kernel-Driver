@@ -1757,12 +1757,10 @@ e100_watchdog(struct net_device *dev)
 				e100_set_multi(dev);
 			}
 		}
-
-		/* Update the statistics needed by the upper interface */
-		/* This should be the last statistic related command
-		 * as it's async. now */
-		e100_dump_stats_cntrs(bdp);
 	}
+	/* Issue command to dump statistics from device.        */
+	/* Check for command completion on next watchdog timer. */
+	e100_dump_stats_cntrs(bdp);
 
 	wmb();
 
@@ -2554,6 +2552,7 @@ e100_update_stats(struct e100_private *bdp)
 	pcmd_complete = e100_cmd_complete_location(bdp);
 	if (*pcmd_complete != le32_to_cpu(DUMP_RST_STAT_COMPLETED) &&
 	    *pcmd_complete != le32_to_cpu(DUMP_STAT_COMPLETED)) {
+		*pcmd_complete = 0;
 		return false;
 	}
 
