@@ -31,7 +31,7 @@ struct shmem_sb_info {
 
 static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
 {
-	return list_entry(inode, struct shmem_inode_info, vfs_inode);
+	return container_of(inode, struct shmem_inode_info, vfs_inode);
 }
 
 #endif

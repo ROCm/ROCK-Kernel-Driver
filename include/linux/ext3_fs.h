@@ -447,7 +447,7 @@ struct ext3_super_block {
 #define EXT3_SB(sb)	(&((sb)->u.ext3_sb))
 static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 {
-	return list_entry(inode, struct ext3_inode_info, vfs_inode);
+	return container_of(inode, struct ext3_inode_info, vfs_inode);
 }
 #else
 /* Assume that user mode programs are passing in an ext3fs superblock, not

@@ -784,7 +784,7 @@ extern void ufs_truncate (struct inode *);
 
 static inline struct ufs_inode_info *UFS_I(struct inode *inode)
 {
-	return list_entry(inode, struct ufs_inode_info, vfs_inode);
+	return container_of(inode, struct ufs_inode_info, vfs_inode);
 }
 
 #endif	/* __KERNEL__ */

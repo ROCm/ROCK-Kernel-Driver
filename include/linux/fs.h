@@ -412,12 +412,12 @@ struct socket_alloc {
 
 static inline struct socket *SOCKET_I(struct inode *inode)
 {
-	return &list_entry(inode, struct socket_alloc, vfs_inode)->socket;
+	return &container_of(inode, struct socket_alloc, vfs_inode)->socket;
 }
 
 static inline struct inode *SOCK_INODE(struct socket *socket)
 {
-	return &list_entry(socket, struct socket_alloc, socket)->vfs_inode;
+	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
 }
 
 /* will die */

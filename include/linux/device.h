@@ -160,6 +160,8 @@ struct device {
 	void	(*release)(struct device * dev);
 };
 
+#define to_device(d) container_of(d, struct device, dir)
+
 static inline struct device *
 list_to_dev(struct list_head *node)
 {

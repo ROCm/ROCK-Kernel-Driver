@@ -179,7 +179,7 @@ static inline struct isofs_sb_info *ISOFS_SB(struct super_block *sb)
 
 static inline struct iso_inode_info *ISOFS_I(struct inode *inode)
 {
-	return list_entry(inode, struct iso_inode_info, vfs_inode);
+	return container_of(inode, struct iso_inode_info, vfs_inode);
 }
 
 static inline int isonum_711(char *p)

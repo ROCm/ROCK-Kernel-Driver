@@ -199,7 +199,7 @@ static inline struct ncp_server *NCP_SBP(struct super_block *sb)
 #define NCP_SERVER(inode)	NCP_SBP((inode)->i_sb)
 static inline struct ncp_inode_info *NCP_FINFO(struct inode *inode)
 {
-	return list_entry(inode, struct ncp_inode_info, vfs_inode);
+	return container_of(inode, struct ncp_inode_info, vfs_inode);
 }
 
 #ifdef DEBUG_NCP_MALLOC
