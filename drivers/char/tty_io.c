@@ -122,6 +122,9 @@ EXPORT_SYMBOL(tty_std_termios);
 LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
+/* Semaphore to protect creating and releasing a tty */
+static DECLARE_MUTEX(tty_sem);
+
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
 extern int pty_limit;		/* Config limit on Unix98 ptys */
@@ -141,6 +144,8 @@ int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg);
 static int tty_fasync(int fd, struct file * filp, int on);
 extern void rs_360_init(void);
+static void release_mem(struct tty_struct *tty, int idx);
+
 
 static struct tty_struct *alloc_tty_struct(void)
 {
@@ -765,21 +770,6 @@ ssize_t redirected_tty_write(struct file * file, const char * buf, size_t count,
 	return tty_write(file, buf, count, ppos);
 }
 
-/* Semaphore to protect creating and releasing a tty */
-static DECLARE_MUTEX(tty_sem);
-
-static void down_tty_sem(int index)
-{
-	down(&tty_sem);
-}
-
-static void up_tty_sem(int index)
-{
-	up(&tty_sem);
-}
-
-static void release_mem(struct tty_struct *tty, int idx);
-
 static inline void tty_line_name(struct tty_driver *driver, int index, char *p)
 {
 	sprintf(p, "%s%d", driver->name, index + driver->name_base);
@@ -803,7 +793,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 	 * Check whether we need to acquire the tty semaphore to avoid
 	 * race conditions.  For now, play it safe.
 	 */
-	down_tty_sem(idx);
+	down(&tty_sem);
 
 	/* check whether we're reopening an existing tty */
 	if (driver->flags & TTY_DRIVER_DEVPTS_MEM) {
@@ -987,7 +977,7 @@ success:
 	
 	/* All paths come through here to release the semaphore */
 end_init:
-	up_tty_sem(idx);
+	up(&tty_sem);
 	return retval;
 
 	/* Release locally allocated memory ... nothing placed in slots */
