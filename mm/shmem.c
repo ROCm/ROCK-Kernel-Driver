@@ -597,7 +597,7 @@ repeat:
 	shmem_recalc_inode(inode);
 	if (entry->val) {
 		/* Look it up and read it in.. */
-		page = find_get_page(&swapper_space, entry->val);
+		page = lookup_swap_cache(*entry);
 		if (!page) {
 			swp_entry_t swap = *entry;
 			spin_unlock (&info->lock);
@@ -800,7 +800,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 			inode->i_op = &shmem_inode_operations;
 			inode->i_fop = &shmem_file_operations;
 			spin_lock (&shmem_ilock);
-			list_add_tail(&SHMEM_I(inode)->list, &shmem_inodes);
+			list_add_tail(&info->list, &shmem_inodes);
 			spin_unlock (&shmem_ilock);
 			break;
 		case S_IFDIR:
@@ -1086,7 +1086,7 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_files = sbinfo->max_inodes;
 	buf->f_ffree = sbinfo->free_inodes;
 	spin_unlock (&sbinfo->stat_lock);
-	buf->f_namelen = 255;
+	buf->f_namelen = NAME_MAX;
 	return 0;
 }
 
