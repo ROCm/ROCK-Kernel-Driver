@@ -815,14 +815,14 @@ static void fbcon_init(struct vc_data *vc, int init)
 				vc->vc_pos += logo_lines * vc->vc_size_row;
 			}
 		}
-		if (CON_IS_VISIBLE(vc) && vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
-			accel_clear_margins(vc, info, 0);
-			update_screen(vc->vc_num);
-		}
 		scr_memsetw((unsigned short *) vc->vc_origin,
 			    vc->vc_video_erase_char,
 			    vc->vc_size_row * logo_lines);
 
+		if (CON_IS_VISIBLE(vc) && vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
+			accel_clear_margins(vc, info, 0);
+			update_screen(vc->vc_num);
+		}
 		if (save) {
 			q = (unsigned short *) (vc->vc_origin +
 						vc->vc_size_row *
@@ -1698,14 +1698,10 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	var.yres = height * fh;
 	x_diff = info->var.xres - var.xres;
 	y_diff = info->var.yres - var.yres;
-	if (x_diff < 0 || x_diff > fw || (y_diff < 0 || y_diff > fh) ||
-	    (info->flags & FBINFO_MISC_MODESWITCH)) {
+	if (x_diff < 0 || x_diff > fw || (y_diff < 0 || y_diff > fh)) {
 		char mode[40];
 
 		DPRINTK("attempting resize %ix%i\n", var.xres, var.yres);
-		if (!info->fbops->fb_set_par)
-			return -EINVAL;
-
 		snprintf(mode, 40, "%ix%i", var.xres, var.yres);
 		err = fb_find_mode(&var, info, mode, info->monspecs.modedb,
 				   info->monspecs.modedb_len, NULL,
@@ -1715,11 +1711,10 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		if (CON_IS_VISIBLE(vc)) {
 			var.activate = FB_ACTIVATE_NOW |
-				(info->flags & FBINFO_MISC_MODESWITCH) ?
-				FB_ACTIVATE_FORCE : 0;
+				FB_ACTIVATE_FORCE;
 			fb_set_var(info, &var);
+			info->flags &= ~FBINFO_MISC_MODESWITCH;
 		}
-		info->flags &= ~FBINFO_MISC_MODESWITCH;
 	}
 	updatescrollmode(p, info, vc);
 	return 0;
@@ -1771,6 +1766,13 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 
  	fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
+
+	if (info->flags & FBINFO_MISC_MODESWITCH) {
+		if (info->fbops->fb_set_par)
+			info->fbops->fb_set_par(info);
+		info->flags &= ~FBINFO_MISC_MODESWITCH;
+	}
+
 	switch (p->scrollmode) {
 	case SCROLL_WRAP:
 		scrollback_phys_max = p->vrows - vc->vc_rows;
@@ -1793,16 +1795,6 @@ static int fbcon_switch(struct vc_data *vc)
 	if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
 		accel_clear_margins(vc, info, 0);
 	if (logo_shown == -2) {
-		struct fb_fillrect rect;
-		int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
-
-		rect.color = attr_bgcol_ec(bgshift, vc);
-		rect.rop = ROP_COPY;
-		rect.dx = rect.dy = 0;
-		rect.width = info->var.xres;
-		rect.height = logo_lines * vc->vc_font.height;
-		info->fbops->fb_fillrect(info, &rect);
-
 		logo_shown = fg_console;
 		/* This is protected above by initmem_freed */
 		fb_show_logo(info);

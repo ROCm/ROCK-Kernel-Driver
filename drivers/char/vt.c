@@ -2711,6 +2711,10 @@ int take_over_console(const struct consw *csw, int first, int last, int deflt)
 			save_screen(i);
 		old_was_color = vc_cons[i].d->vc_can_do_color;
 		vc_cons[i].d->vc_sw->con_deinit(vc_cons[i].d);
+		origin = (unsigned long) screenbuf;
+		visible_origin = origin;
+		scr_end = origin + screenbuf_size;
+		pos = origin + video_size_row*y + 2*x;
 		visual_init(i, 0);
 		update_attr(i);
 
