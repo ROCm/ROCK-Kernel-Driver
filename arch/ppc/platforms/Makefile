@@ -43,7 +43,7 @@ obj-$(CONFIG_PCORE)		+= pcore.o
 obj-$(CONFIG_POWERPMC250)	+= powerpmc250.o
 obj-$(CONFIG_PPLUS)		+= pplus.o
 obj-$(CONFIG_PRPMC750)		+= prpmc750.o
-obj-$(CONFIG_PRPMC800)		+= prpmc800_setup.o prpmc800_pci.o
+obj-$(CONFIG_PRPMC800)		+= prpmc800.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint.o
 obj-$(CONFIG_SPRUCE)		+= spruce.o
 
