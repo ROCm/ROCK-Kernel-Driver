@@ -163,8 +163,8 @@ struct xfrm_usersa_id {
 
 struct xfrm_userspi_info {
 	struct xfrm_usersa_info		info;
-	u32				min;
-	u32				max;
+	__u32				min;
+	__u32				max;
 };
 
 struct xfrm_userpolicy_info {
