@@ -62,7 +62,6 @@ static int __init divert_init(void)
 static void __exit divert_exit(void)
 {
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   int i;
 
   spin_lock_irqsave(&divert_lock, flags);
