@@ -2,7 +2,7 @@
  * intf.c - class-specific interface management
  */
 
-#define DEBUG 1
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
