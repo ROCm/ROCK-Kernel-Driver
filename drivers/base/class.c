@@ -58,10 +58,12 @@ int devclass_add_device(struct device * dev)
 	if (cls) {
 		pr_debug("adding device '%s' to class '%s'\n",
 			 dev->name,cls->name);
-		if (cls->add_device)
+		if (cls->add_device) 
 			error = cls->add_device(dev);
-		if (!error)
+		if (!error) {
 			enum_device(cls,dev);
+			interface_add(cls,dev);
+		}
 	}
 	return error;
 }
@@ -72,6 +74,7 @@ void devclass_remove_device(struct device * dev)
 	if (cls) {
 		pr_debug("removing device '%s' from class '%s'\n",
 			 dev->name,cls->name);
+		interface_remove(cls,dev);
 		unenum_device(cls,dev);
 		if (cls->remove_device)
 			cls->remove_device(dev);
@@ -81,6 +84,7 @@ void devclass_remove_device(struct device * dev)
 int devclass_register(struct device_class * cls)
 {
 	INIT_LIST_HEAD(&cls->drivers);
+	INIT_LIST_HEAD(&cls->intf_list);
 
 	pr_debug("registering device class '%s'\n",cls->name);
 

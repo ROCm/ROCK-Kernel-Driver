@@ -35,5 +35,18 @@ extern void devclass_drv_unlink(struct device_driver *);
 extern int devclass_dev_link(struct device_class *, struct device *);
 extern void devclass_dev_unlink(struct device_class *, struct device *);
 
+extern int devclass_add_device(struct device *);
+extern void devclass_remove_device(struct device *);
+
+extern int intf_make_dir(struct device_interface *);
+extern void intf_remove_dir(struct device_interface *);
+
+extern int intf_dev_link(struct intf_data *);
+extern void intf_dev_unlink(struct intf_data *);
+
+extern int interface_add(struct device_class *, struct device *);
+extern void interface_remove(struct device_class *, struct device *);
+
+
 extern int driver_attach(struct device_driver * drv);
 extern void driver_detach(struct device_driver * drv);

@@ -173,6 +173,7 @@ struct device_class {
 
 	struct list_head	node;
 	struct list_head	drivers;
+	struct list_head	intf_list;
 
 	struct driver_dir_entry	dir;
 	struct driver_dir_entry	driver_dir;
@@ -203,6 +204,56 @@ extern int devclass_create_file(struct device_class *, struct devclass_attribute
 extern void devclass_remove_file(struct device_class *, struct devclass_attribute *);
 
 
+/*
+ * device interfaces
+ * These are the logical interfaces of device classes. 
+ * These entities map directly to specific userspace interfaces, like 
+ * device nodes.
+ * Interfaces are registered with the device class they belong to. When
+ * a device is registered with the class, each interface's add_device 
+ * callback is called. It is up to the interface to decide whether or not
+ * it supports the device.
+ */
+
+struct intf_data;
+
+struct device_interface {
+	char			* name;
+	struct device_class	* devclass;
+
+	struct list_head	node;
+	struct list_head	devices;
+	struct driver_dir_entry	dir;
+
+	u32			devnum;
+
+	int (*add_device)	(struct device *);
+	int (*remove_device)	(struct intf_data *);
+};
+
+extern int interface_register(struct device_interface *);
+extern void interface_unregister(struct device_interface *);
+
+
+/*
+ * intf_data - per-device data for an interface
+ * Each interface typically has a per-device data structure 
+ * that it allocates. It should embed one of these structures 
+ * in that structure and call interface_add_data() to add it
+ * to the device's list.
+ * That will also enumerate the device within the interface
+ * and create a driverfs symlink for it.
+ */
+struct intf_data {
+	struct list_head	node;
+	struct device_interface	* intf;
+	struct device		* dev;
+	u32			intf_num;
+};
+
+extern int interface_add_data(struct intf_data *);
+
+
 
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
@@ -210,6 +261,7 @@ struct device {
 	struct list_head bus_list;	/* node in bus's list */
 	struct list_head driver_list;
 	struct list_head children;
+	struct list_head intf_list;
 	struct device 	* parent;
 
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
