@@ -272,9 +272,9 @@ S:	Maintained
 
 BTTV VIDEO4LINUX DRIVER
 P:	Gerd Knorr
-M:	kraxel@goldbach.in-berlin.de
+M:	kraxel@bytesex.org
 L:	video4linux-list@redhat.com
-W:	http://me.in-berlin.de/~kraxel/bttv.html
+W:	http://bytesex.org/bttv/
 S:	Maintained
 
 BUSLOGIC SCSI DRIVER
@@ -1752,10 +1752,10 @@ W:	http://rio500.sourceforge.net
 S:	Maintained
 
 VIDEO FOR LINUX
-P:	Alan Cox
-M:	Alan.Cox@linux.org
+P:	Gerd Knorr
+M:	kraxel@bytesex.org
 W:	http://roadrunner.swansea.linux.org.uk/v4l.shtml
-S:	Maintained for 2.2 only
+S:	Maintained
 
 WAN ROUTER & SANGOMA WANPIPE DRIVERS & API (X.25, FRAME RELAY, PPP, CISCO HDLC)
 P:	Nenad Corbic
