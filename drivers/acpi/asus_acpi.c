@@ -1210,20 +1210,24 @@ static int __init asus_acpi_init(void)
 {
 	int result;
 
+	if (acpi_disabled)
+		return -ENODEV;
+
 	asus_proc_dir = proc_mkdir(PROC_ASUS, acpi_root_dir);
 	if (!asus_proc_dir) {
 		printk(KERN_ERR "Asus ACPI: Unable to create /proc entry\n");
-		return(-ENODEV);
+		return -ENODEV;
 	}
 	asus_proc_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&asus_hotk_driver);
-	if (result < 0) {
+	if (result < 1) {
+		acpi_bus_unregister_driver(&asus_hotk_driver);
 		remove_proc_entry(PROC_ASUS, acpi_root_dir);
-		return(-ENODEV);
+		return -ENODEV;
 	}
 
-	return(0);
+	return 0;
 }
 
 
