@@ -67,7 +67,8 @@ struct cfg_device_info cfg_device_list[] = {
 
 	{"COMPAQ", "MSA1000", 2, FO_NOTIFY_TYPE_SPINUP, 
 		qla2x00_combine_by_lunid, NULL, NULL, NULL },
-
+	{"HITACHI", "OPEN-", 1, FO_NOTIFY_TYPE_NONE,   
+		qla2x00_combine_by_lunid, NULL, NULL, NULL },
 	{"HP", "OPEN-", 1, FO_NOTIFY_TYPE_NONE,   
 		qla2x00_combine_by_lunid, NULL, NULL, NULL },
 	{"COMPAQ", "HSV110 (C)COMPAQ", 4, FO_NOTIFY_TYPE_SPINUP,   
@@ -137,6 +138,43 @@ qla2x00_failover_cleanup(srb_t *sp)
 	sp->flags = sp->flags & ~(SRB_RETRY|SRB_FAILOVER|SRB_FO_CANCEL);
 }
 
+int
+qla2x00_suspend_failover_targets(scsi_qla_host_t *ha)
+{
+	unsigned long flags;
+	struct list_head *list, *temp;
+	srb_t *sp;
+	int count;
+	os_tgt_t *tq;
+
+	spin_lock_irqsave(&ha->list_lock, flags);
+	count = ha->failover_cnt;
+	list_for_each_safe(list, temp, &ha->failover_queue) {
+		sp = list_entry(ha->failover_queue.next, srb_t, list);
+		tq = sp->tgt_queue;
+		if (!(test_bit(TQF_SUSPENDED, &tq->flags)))
+			set_bit(TQF_SUSPENDED, &tq->flags);
+	}
+	spin_unlock_irqrestore(&ha->list_lock, flags);
+
+	return count;
+}
+
+srb_t *
+qla2x00_failover_next_request(scsi_qla_host_t *ha)
+{
+	unsigned long flags;
+	srb_t *sp = NULL;
+
+	spin_lock_irqsave(&ha->list_lock, flags);
+	if (!list_empty(&ha->failover_queue)) {
+		sp = list_entry(ha->failover_queue.next, srb_t, list);
+		__del_from_failover_queue(ha, sp);
+	}
+	spin_unlock_irqrestore(&ha->list_lock, flags);
+
+	return sp;
+}
 
 /*
  *  qla2x00_process_failover
@@ -156,11 +194,9 @@ qla2x00_process_failover(scsi_qla_host_t *ha)
 	os_lun_t	*lq;
 	srb_t       *sp;
 	fc_port_t *fcport;
-	struct list_head failover_queue, *list, *temp;
-	unsigned long flags;
 	uint32_t    t, l;
 	scsi_qla_host_t *vis_ha = ha;
-	int first;
+	int count, i;
 
 	DEBUG2(printk(KERN_INFO "%s: hba %ld active=%ld, retry=%d, "
 			"done=%ld, failover=%d, scsi retry=%d commands.\n",
@@ -172,114 +208,84 @@ qla2x00_process_failover(scsi_qla_host_t *ha)
 			ha->failover_cnt,
 			ha->scsi_retry_q_cnt);)
 
+	/* Prevent acceptance of new I/O requests for failover target. */
+	count = qla2x00_suspend_failover_targets(ha);
+
 	/*
 	 * Process all the commands in the failover queue. Attempt to failover
 	 * then either complete the command as is or requeue for retry.
-	 *
-	 * Note: We always failover on the visible HBA, usually the first
-	 * one we find.
 	 */
+	for (i = 0; i < count ; i++) {
+		sp = qla2x00_failover_next_request(ha);
+		if (!sp)
+			break;
 
-	INIT_LIST_HEAD(&failover_queue);
-
-	/* Prevent or allow acceptance of new I/O requests. */
-	spin_lock_irqsave(&ha->list_lock, flags);
-	list_splice_init(&ha->failover_queue, &failover_queue);
-	ha->failover_cnt = 0;
-	first = 0;
-	list_for_each_safe(list, temp, &failover_queue) {
-		sp = list_entry(failover_queue.next, srb_t, list);
-		sp->state = SRB_NO_QUEUE_STATE;
-		tq = sp->tgt_queue;
-		if (!test_bit(TQF_SUSPENDED, &tq->flags))
-			set_bit(TQF_SUSPENDED, &tq->flags);
-
-		/* Get first entry to find our visible adapter. */
-		if (!first) {
+		qla2x00_extend_timeout(sp->cmd, 360);
+		if (i == 0)
 			vis_ha =
 			    (scsi_qla_host_t *)sp->cmd->device->host->hostdata;
-			first++;
-		}
-		qla2x00_extend_timeout(sp->cmd, 60*30);
-	}
-	spin_unlock_irqrestore(&ha->list_lock,flags);
-
-	list_for_each_safe(list, temp, &failover_queue) {
-		sp = list_entry(failover_queue.next, srb_t, list);
 
 		tq = sp->tgt_queue;
 		lq = sp->lun_queue;
 		fcport = lq->fclun->fcport;
 
-		/* Remove srb from failover queue. */
-		list_del_init(&sp->list);
-		
-
-		DEBUG(printk("%s(): pid %ld retrycnt=%d,"
-		    	 	 "fcport =%p, state=0x%x, \nloop state=0x%x"
-		    	 	 " fclun=%p, lq fclun=%p, lq=%p, lun=%d\n",
-				__func__,
-				sp->cmd->serial_number,
-				sp->cmd->retries,
-				fcport,
-		  		 atomic_read(&fcport->state),
-				 atomic_read(&ha->loop_state),
-			 	 sp->fclun, lq->fclun, lq, lq->fclun->lun);)
-		if ( sp->err_id == SRB_ERR_DEVICE &&
-		     sp->fclun == lq->fclun && 
-		     atomic_read(&fcport->state) == FCS_ONLINE) {
-		    if( !(qla2x00_test_active_lun(fcport, sp->fclun))  ) { 
-			 DEBUG2(printk("scsi(%ld) %s Detected INACTIVE Port 0x%02x \n",
-				ha->host_no,__func__,fcport->loop_id);)
-			 sp->err_id = SRB_ERR_OTHER;
-		 	 sp->cmd->sense_buffer[2] = 0;
-		 	 sp->cmd->result = DID_BUS_BUSY << 16;
-		    }	
+		DEBUG(printk("%s(): pid %ld retrycnt=%d, fcport =%p, "
+		    "state=0x%x, \nloop state=0x%x fclun=%p, lq fclun=%p, "
+		    "lq=%p, lun=%d\n", __func__, sp->cmd->serial_number,
+		    sp->cmd->retries, fcport, atomic_read(&fcport->state),
+		    atomic_read(&ha->loop_state), sp->fclun, lq->fclun, lq,
+		    lq->fclun->lun));
+		if (sp->err_id == SRB_ERR_DEVICE && sp->fclun == lq->fclun &&
+		    atomic_read(&fcport->state) == FCS_ONLINE) {
+			if (!(qla2x00_test_active_lun(fcport, sp->fclun))) { 
+				DEBUG2(printk("scsi(%ld) %s Detected INACTIVE "
+				    "Port 0x%02x \n", ha->host_no, __func__,
+				    fcport->loop_id));
+				sp->err_id = SRB_ERR_OTHER;
+				sp->cmd->sense_buffer[2] = 0;
+				sp->cmd->result = DID_BUS_BUSY << 16;
+			}	
 		}
-		if( (sp->flags & SRB_GOT_SENSE ) ) {
+		if ((sp->flags & SRB_GOT_SENSE)) {
 		 	 sp->flags &= ~SRB_GOT_SENSE;
 		 	 sp->cmd->sense_buffer[0] = 0;
 		 	 sp->cmd->result = DID_BUS_BUSY << 16;
 		 	 sp->cmd->host_scribble = (unsigned char *) NULL;
 		}
+
 		/*** Select an alternate path ***/
 		/* 
 		 * If the path has already been change by a previous request
 		 * sp->fclun != lq->fclun
 		 */
-		if (sp->fclun != lq->fclun ||
-		    (sp->err_id != SRB_ERR_OTHER &&
-			(atomic_read(&fcport->ha->loop_state) != LOOP_DEAD) &&
-		  	atomic_read(&fcport->state) != FCS_DEVICE_DEAD)) {
-
+		if (sp->fclun != lq->fclun || (sp->err_id != SRB_ERR_OTHER &&
+		    (atomic_read(&fcport->ha->loop_state) != LOOP_DEAD) &&
+		    atomic_read(&fcport->state) != FCS_DEVICE_DEAD)) {
 			qla2x00_failover_cleanup(sp);
-		} else if (qla2x00_cfg_failover(ha, lq->fclun,
-						tq, sp) == NULL) {
+		} else if (qla2x00_cfg_failover(ha,
+		    lq->fclun, tq, sp) == NULL) {
 			/*
 			 * We ran out of paths, so just retry the status which
 			 * is already set in the cmd. We want to serialize the 
 			 * failovers, so we make them go thur visible HBA.
 			 */
 			printk(KERN_INFO
-				"%s(): Ran out of paths - pid %ld - retrying\n",
-				__func__,
-				sp->cmd->serial_number);
+			    "%s(): Ran out of paths - pid %ld - retrying\n",
+			    __func__, sp->cmd->serial_number);
 		} else {
 			qla2x00_failover_cleanup(sp);
 
 		}
 		add_to_done_queue(ha, sp);
-	} /* list_for_each_safe */
+	}
 
 	for (t = 0; t < vis_ha->max_targets; t++) {
 		if ((tq = vis_ha->otgt[t]) == NULL)
 			continue;
 		if (test_and_clear_bit(TQF_SUSPENDED, &tq->flags)) {
 			/* EMPTY */
-			DEBUG2(printk("%s(): remove suspend for "
-					"target %d\n",
-					__func__,
-					t);)
+			DEBUG2(printk("%s(): remove suspend for target %d\n",
+			    __func__, t));
 		}
 		for (l = 0; l < vis_ha->max_luns; l++) {
 			if ((lq = (os_lun_t *) tq->olun[l]) == NULL)
@@ -288,9 +294,7 @@ qla2x00_process_failover(scsi_qla_host_t *ha)
 			if( test_and_clear_bit(LUN_MPIO_BUSY, &lq->q_flag) ) {
 				/* EMPTY */
 				DEBUG(printk("%s(): remove suspend for "
-						"lun %d\n",
-						__func__,
-						lq->fclun->lun);)
+				    "lun %d\n", __func__, lq->fclun->lun));
 			}
 		}
 	}
@@ -364,6 +368,9 @@ qla2x00_do_fo_check(scsi_qla_host_t *ha, srb_t *sp, scsi_qla_host_t *vis_ha)
 	 * failover on that status.
 	 */
 	if (sp->lun_queue->fclun->fcport->flags & FCF_FAILOVER_DISABLE)
+		return 0;
+
+	if (sp->lun_queue->fclun->flags & FLF_VISIBLE_LUN)
 		return 0;
 
 	if (!qla2x00_fo_check(ha, sp))

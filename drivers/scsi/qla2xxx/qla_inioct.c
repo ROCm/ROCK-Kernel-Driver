@@ -188,6 +188,10 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 
 	DEBUG9(printk("qla2x00_update_nvram: exiting.\n");)
 
+	/* Schedule DPC to restart the RISC */
+	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+	up(ha->dpc_wait);
+
 	return 0;
 }
 
@@ -447,7 +451,8 @@ qla2x00_send_loopback(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	return pext->Status;
 }
 
-int qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
+int
+qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
 	uint8_t		*usr_tmp;
 	uint32_t	addr;
@@ -545,7 +550,7 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 
 	/* Go with update */
 	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-	status = qla2x00_set_flash_image(ha, kern_tmp);
+	status = qla2x00_set_flash_image(ha, kern_tmp, 0, FLASH_IMAGE_SIZE);
 	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
 
 	/* Schedule DPC to restart the RISC */

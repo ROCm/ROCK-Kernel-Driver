@@ -1157,14 +1157,16 @@ qla2x00_fo_get_tgt(mp_host_t *host, scsi_qla_host_t *ha, EXT_IOCTL *pext,
 					    dp->nodename,
 					    EXT_DEF_WWN_NAME_SIZE);
 					DEBUG4(printk(KERN_INFO 
-						"%s XP device:copy the node name from mp_dev:%0x\n",
+						"%s XP device:copy the node "
+						"name from mp_dev:%0x\n",
 						__func__,dp->nodename[7]);)
 				} else {
 					memcpy(entry->WorldWideName,
 					    fcport->node_name,
 					    EXT_DEF_WWN_NAME_SIZE);
 					DEBUG4(printk(KERN_INFO 
-						"%s :copy the node name from fcport:%0x\n",
+						"%s :copy the node name from "
+						"fcport:%0x\n",
 						__func__,dp->nodename[7]);)
 				}
 
@@ -1208,7 +1210,7 @@ qla2x00_fo_get_tgt(mp_host_t *host, scsi_qla_host_t *ha, EXT_IOCTL *pext,
 	DEBUG9(printk("%s(%ld): after checking fcport list. got %d entries.\n",
 	    __func__, host->ha->host_no, cnt);)
 
-	/* For ports not found but were in config file, return unconfigured
+	/* For ports not found but were in config file, return configured
 	 * status so agent will try to issue commands to it and GUI will display
 	 * them as missing.
 	 */
@@ -1259,11 +1261,7 @@ qla2x00_fo_get_tgt(mp_host_t *host, scsi_qla_host_t *ha, EXT_IOCTL *pext,
 
 				entry->TargetId = dp->dev_id;
 				entry->Dev_No = path->id;
-				/*
-				entry->MultipathControl = path->mp_byte
-				    | MP_MASK_UNCONFIGURED;
-				    */
-				entry->MultipathControl = MP_MASK_UNCONFIGURED;
+				entry->MultipathControl = path->mp_byte;
 				cnt++;
 
 				DEBUG9_10(printk("%s: found missing device. "
@@ -1714,7 +1712,7 @@ qla2x00_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 	fcport = lq->fclun->fcport;
 	switch (cp->sense_buffer[2] & 0xf) {
 	case NOT_READY:
-		if ((fcport->flags & FCF_MSA_DEVICE)) {
+		if (fcport->flags & (FCF_MSA_DEVICE | FCF_EVA_DEVICE)) {
 			/*
 			 * if we can't access port 
 			 */
@@ -1727,9 +1725,9 @@ qla2x00_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 		break;
 
 	case UNIT_ATTENTION:
-		if ((fcport->flags & FCF_EVA_DEVICE)) {
+		if (fcport->flags & FCF_EVA_DEVICE) {
 			if ((cp->sense_buffer[12] == 0xa &&
-				cp->sense_buffer[13] == 0x8)) {
+			    cp->sense_buffer[13] == 0x8)) {
 				sp->err_id = SRB_ERR_DEVICE;
 				return 1;
 			}

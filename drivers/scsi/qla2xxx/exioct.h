@@ -462,6 +462,9 @@ typedef struct {
 
 /* Request struct */
 
+#define EXT_HN_BI_FW_VALID	1
+#define EXT_HN_BI_EFI_VALID	2
+#define EXT_HN_BI_FCODE_VALID	4
 
 /*
  * Response struct
@@ -484,7 +487,11 @@ typedef struct _EXT_HBA_NODE {
 	UINT32    DriverAttr;				/* 4 */
 	UINT32    FWAttr;				/* 4 */
 
-	UINT32    Reserved[8];				/* 32 */
+	UINT32    BIValid;				/* 4 */
+	UINT8     BIFwVersion[4];			/* 4 */
+	UINT8     BIEfiVersion[4];			/* 4 */
+	UINT8     BIFCodeVersion[4];			/* 4 */
+	UINT32    Reserved[4];				/* 16 */
 } EXT_HBA_NODE, *PEXT_HBA_NODE;				/* 696 */
 
 /* HBA node query interface type */
@@ -853,6 +860,7 @@ typedef struct _EXT_ASYNC_EVENT {
 #define	EXT_DEF_GET_HIDDEN_DEVICE	0x4
 #define	EXT_DEF_GET_FABRIC_DEVICE	0x8
 #define	EXT_DEF_GET_LOOP_DEVICE		0x10
+#define EXT_DEF_GET_TRUE_NN_DEVICE	0x1000
 
 /* Each entry in device database */
 typedef struct _EXT_DEVICEDATAENTRY

@@ -59,7 +59,6 @@
 /* Default: IOCTL pass-thru command timeout in seconds.   */
 #define QLA_PT_CMD_TOV		(66)
 #endif
-
 /*
  * Some vendor subsystems do not recover properly after a device reset.  Define
  * the following to force a logout after a successful device reset.

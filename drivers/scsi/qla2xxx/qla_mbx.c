@@ -279,6 +279,9 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 			DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): "
 			    "timeout schedule isp_abort_needed.\n",
 			    ha->host_no);)
+			qla_printk(KERN_WARNING, ha,
+			    "Mailbox command timeout occured. Scheduling ISP "
+			    "abort.\n");
 			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 			if (ha->dpc_wait && !ha->dpc_active) 
 				up(ha->dpc_wait);
@@ -290,6 +293,9 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 			    "calling abort_isp\n", ha->host_no);)
 			DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): "
 			    "timeout calling abort_isp\n", ha->host_no);)
+			qla_printk(KERN_WARNING, ha,
+			    "Mailbox command timeout occured. Issuing ISP "
+			    "abort.\n");
 
 			set_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
 			clear_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
@@ -981,7 +987,6 @@ qla2x00_abort_command(scsi_qla_host_t *ha, srb_t *sp)
 
 	if (atomic_read(&ha->loop_state) == LOOP_DOWN ||
 	    atomic_read(&fcport->state) == FCS_DEVICE_LOST) {
-		/* v2.19.8 Ignore abort request if port is down */
 		return 1;
 	}
 
@@ -1062,6 +1067,9 @@ qla2x00_abort_device(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun)
 	qla2x00_marker(ha, loop_id, lun, MK_SYNC_ID_LUN);
 
 	if (rval != QLA_SUCCESS) {
+		qla_printk(KERN_WARNING, ha,
+		    "Failed Abort Device Mailbox command. Scheduling ISP "
+		    "abort.\n");
 		set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 		if (ha->dpc_wait && !ha->dpc_active) 
 			up(ha->dpc_wait);
@@ -1598,7 +1606,7 @@ qla2x00_get_port_name(scsi_qla_host_t *ha, uint16_t loop_id, uint8_t *name,
  *	BIT_1 = mailbox error.
  */
 uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id,
+qla2x00_get_link_status(scsi_qla_host_t *ha, uint16_t loop_id,
     link_stat_t *ret_buf, uint16_t *status)
 {
 	int rval;

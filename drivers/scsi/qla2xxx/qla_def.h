@@ -154,6 +154,9 @@
 #define RD_REG_BYTE(addr)		readb(addr)
 #define RD_REG_WORD(addr)		readw(addr)
 #define RD_REG_DWORD(addr)		readl(addr)
+#define RD_REG_BYTE_RELAXED(addr)	readb_relaxed(addr)
+#define RD_REG_WORD_RELAXED(addr)	readw_relaxed(addr)
+#define RD_REG_DWORD_RELAXED(addr)	readl_relaxed(addr)
 #define WRT_REG_BYTE(addr, data)	writeb(data,addr)
 #define WRT_REG_WORD(addr, data)	writew(data,addr)
 #define WRT_REG_DWORD(addr, data)	writel(data,addr)
@@ -209,19 +212,10 @@
 #define MAX_OUTSTANDING_COMMANDS	1024
 
 /* ISP request and response entry counts (37-65535) */
-#define REQUEST_ENTRY_CNT		2048	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT_2100		128	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT_2200		2048	/* Number of request entries. */
 #define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
 #define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
-
-/* Calculations for SG segments */
-#define SEGS_PER_REQUEST_32	3 
-#define SEGS_PER_CONT_32	7
-#define SG_SEGMENTS_32 (SEGS_PER_REQUEST_32 + \
-    (SEGS_PER_CONT_32 * (REQUEST_ENTRY_CNT - 2)))     
-#define SEGS_PER_REQUEST_64	2 
-#define SEGS_PER_CONT_64	5
-#define SG_SEGMENTS_64 (SEGS_PER_REQUEST_64 + \
-    (SEGS_PER_CONT_64 * (REQUEST_ENTRY_CNT - 2)))     
 
 /*
  * SCSI Request Block 
@@ -294,7 +288,8 @@ typedef struct srb {
 
 #define SRB_BUSY		BIT_8	/* Command is in busy retry state */
 #define SRB_FO_CANCEL		BIT_9	/* Command don't need to do failover */
-#define	SRB_IOCTL		BIT_10	/* IOCTL command. */
+#define SRB_IOCTL		BIT_10	/* IOCTL command. */
+#define SRB_TAPE		BIT_11	/* FCP2 (Tape) command. */
 
 /*
  * SRB state definitions
@@ -2136,6 +2131,7 @@ typedef struct scsi_qla_host {
 	request_t       *request_ring_ptr;  /* Current address. */
 	uint16_t        req_ring_index;     /* Current index. */
 	uint16_t        req_q_cnt;          /* Number of available entries. */
+	uint16_t	request_q_length;
 
 	dma_addr_t	response_dma;       /* Physical address. */
 	response_t      *response_ring;     /* Base virtual address */
@@ -2359,12 +2355,20 @@ typedef struct scsi_qla_host {
 	dma_addr_t  ioctl_mem_phys;
 	uint32_t    ioctl_mem_size;
 
-	struct scsi_cmnd *ioctl_err_cmd;	 
+	struct scsi_cmnd *ioctl_err_cmd;
+
+	/* PCI expansion ROM image information. */
+	unsigned long	code_types;
+#define ROM_CODE_TYPE_BIOS	0
+#define ROM_CODE_TYPE_FCODE	1
+#define ROM_CODE_TYPE_EFI	3
+
+	uint8_t		bios_revision[2];
+	uint8_t		efi_revision[2];
+	uint8_t		fcode_revision[16];
 #endif
 	uint8_t     node_name[WWN_SIZE];
 	uint8_t     nvram_version; 
-	uint8_t     optrom_major; 
-	uint8_t     optrom_minor; 
 	uint32_t    isp_abort_cnt;
 
 	/* Adapter I/O statistics for failover */

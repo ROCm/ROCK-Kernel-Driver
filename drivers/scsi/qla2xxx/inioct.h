@@ -85,6 +85,7 @@
 #define	INT_CC_UPDATE_NVRAM		EXT_CC_RESERVED0F_OS
 #define	INT_CC_SWAP_TARGET_DEVICE	EXT_CC_RESERVED0G_OS
 #define	INT_CC_READ_OPTION_ROM		EXT_CC_RESERVED0H_OS
+#define	INT_CC_GET_OPTION_ROM_LAYOUT	EXT_CC_RESERVED0I_OS
 #define	INT_CC_LEGACY_LOOPBACK		EXT_CC_RESERVED0Z_OS
 
 
@@ -129,6 +130,108 @@ typedef struct _INT_LOOPBACK_RSP
 /* definition for interpreting CommandSent field */
 #define INT_DEF_LB_LOOPBACK_CMD 	0
 #define INT_DEF_LB_ECHO_CMD		1
+
+/* definition for option rom */
+#define INT_OPT_ROM_REGION_NONE		0
+#define INT_OPT_ROM_REGION_BIOS		1
+#define INT_OPT_ROM_REGION_FCODE	2
+#define INT_OPT_ROM_REGION_EFI		3
+#define INT_OPT_ROM_REGION_VPD		4
+#define INT_OPT_ROM_REGION_FW1		5
+#define INT_OPT_ROM_REGION_FW2		6
+#define INT_OPT_ROM_REGION_BOOT		7
+#define INT_OPT_ROM_REGION_PCI_CFG	8
+#define INT_OPT_ROM_REGION_ALL		0xF
+#define INT_OPT_ROM_REGION_PHBIOS	0x11 //Bios with pci hdr
+#define INT_OPT_ROM_REGION_PHFCODE  	0x12 //Fcode with pci hdr
+#define INT_OPT_ROM_REGION_PHEFI  	0x13 //Efi with pci hdr
+#define INT_OPT_ROM_REGION_PHVPD  	0x14 // Vpd with pci hdr
+#define INT_OPT_ROM_REGION_PHEC_FW	0x15 // Efi compressed Fw with pci hdr
+#define INT_OPT_ROM_REGION_BCFW	               0x16 // Bios compressed Fw
+#define INT_OPT_ROM_REGION_INVALID	0xFFFFFFFF
+
+// Image device id (PCI_DATA_STRUCTURE.DeviceId) 
+
+#define INT_PDS_DID_VPD                  0x0001
+#define INT_PDS_DID_ISP23XX_FW  0x0003
+
+// Image code type (PCI_DATA_STRUCTURE.CodeType)
+
+#define INT_PDS_CT_X86                      0x0000
+#define INT_PDS_CT_PCI_OPEN_FW  0x0001
+#define INT_PDS_CT_HP_PA_RISC     0x0002
+#define INT_PDS_CT_EFI                      0x0003
+
+// Last image indicator (PCI_DATA_STRUCTURE.Indicator)
+
+#define INT_PDS_ID_LAST_IMAGE   0x80
+
+typedef struct _INT_PCI_ROM_HEADER
+{
+    UINT16 Signature;       // 0xAA55
+    UINT8  Reserved[0x16];
+    UINT16 PcirOffset;      // Relative pointer to pci data structure
+
+} INT_PCI_ROM_HEADER, *PINT_PCI_ROM_HEADER;
+#define INT_PCI_ROM_HEADER_SIGNATURE            0xAA55
+
+typedef struct _INT_PCI_DATA_STRUCT
+{
+    UINT32 Signature;       // 'PCIR'
+    UINT16 VendorId;
+    UINT16 DeviceId;        // Image type
+    UINT16 Reserved0;
+    UINT16 Length;          // Size of this structure
+    UINT8  Revision;
+    UINT8  ClassCode[3];
+    UINT16 ImageLength;     // Total image size (512 byte segments)
+    UINT16 CodeRevision;
+    UINT8  CodeType;
+    UINT8  Indicator;       // 0x80 indicates last this is image
+    UINT16 Reserved1;
+} INT_PCI_DATA_STRUCT, *PINT_PCI_DATA_STRUCT;
+#define INT_PCI_DATA_STRUCT_SIGNATURE   0x52494350 //'R', 'I', 'C', 'P'
+
+typedef struct _INT_LZHEADER
+{
+    UINT16 LzMagicNum;      // 'LZ'
+    UINT16 Reserved1;
+    UINT32 CompressedSize;
+    UINT32 UnCompressedSize;
+    struct 
+    {
+        UINT16 sub;
+        UINT16 minor;
+        UINT16 majorLo;
+        UINT16 majorHi;     // Usually always zero
+    } RiscFwRev;
+    UINT8 Reserved2[12];
+} INT_LZHEADER, *PINT_LZHEADER;
+#define INT_PCI_FW_LZ_HEADER_SIGNATURE  0x5A4C //'Z', 'L'
+
+typedef struct _INT_OPT_ROM_REGION
+{
+    UINT32  Region;
+    UINT32  Size;
+    UINT32  Beg;
+    UINT32  End;
+} INT_OPT_ROM_REGION, *PINT_OPT_ROM_REGION;
+
+typedef struct _INT_OPT_ROM_LAYOUT
+{
+    UINT32      Size;			// Size of the option rom
+    UINT32      NoOfRegions;
+    INT_OPT_ROM_REGION	Region[1];
+} INT_OPT_ROM_LAYOUT, *PINT_OPT_ROM_LAYOUT;
+
+#define	OPT_ROM_MAX_REGIONS	0xF
+#define OPT_ROM_SIZE_1      0x20000  // 128k
+#define OPT_ROM_SIZE_2      0x100000 // M
+
+typedef struct _OPT_ROM_TABLE
+{
+	INT_OPT_ROM_REGION  Region;
+} OPT_ROM_TABLE, *POPT_ROM_TABLE;
 
 #ifdef _MSC_VER
 #pragma pack()

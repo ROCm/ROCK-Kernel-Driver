@@ -107,12 +107,9 @@ static int qla2x00_get_statistics(scsi_qla_host_t *, EXT_IOCTL *, int);
 static int qla2x00_get_fc_statistics(scsi_qla_host_t *, EXT_IOCTL *, int);
 static int qla2x00_get_port_summary(scsi_qla_host_t *, EXT_IOCTL *, int);
 static int qla2x00_get_fcport_summary(scsi_qla_host_t *, EXT_DEVICEDATAENTRY *,
-    void *, uint32_t, uint32_t *, uint32_t *);
-#if 0
+    void *, uint32_t, uint32_t, uint32_t *, uint32_t *);
 static int qla2x00_std_missing_port_summary(scsi_qla_host_t *,
     EXT_DEVICEDATAENTRY *, void *, uint32_t, uint32_t *, uint32_t *);
-#endif
-
 static int qla2x00_query_driver(scsi_qla_host_t *, EXT_IOCTL *, int);
 static int qla2x00_query_fw(scsi_qla_host_t *, EXT_IOCTL *, int);
 
@@ -1391,6 +1388,7 @@ qla2x00_query_hba_node(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	int		ret = 0;
 	uint32_t	i, transfer_size;
 	EXT_HBA_NODE	*ptmp_hba_node;
+	uint8_t		*next_str;
 
  	DEBUG9(printk("%s(%ld): inst=%ld entered.\n",
  	    __func__, ha->host_no, ha->instance);)
@@ -1422,8 +1420,40 @@ qla2x00_query_hba_node(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	    ha->fw_minor_version, 
 	    ha->fw_subminor_version);
 
-	sprintf((char *)(ptmp_hba_node->OptRomVersion),"%d.%d",
-	    ha->optrom_major, ha->optrom_minor);
+	/* Option ROM version string. */
+	memset(ptmp_hba_node->OptRomVersion, 0,
+	    sizeof(ptmp_hba_node->OptRomVersion));
+	next_str = ptmp_hba_node->OptRomVersion;
+	sprintf(next_str, "0.00");
+	if (test_bit(ROM_CODE_TYPE_BIOS, &ha->code_types)) {
+		sprintf(next_str, "%d.%d", ha->bios_revision[1],
+		    ha->bios_revision[0]);
+	}
+	/* Extended Option ROM versions. */
+	ptmp_hba_node->BIValid = 0;
+	memset(ptmp_hba_node->BIFwVersion, 0,
+	    sizeof(ptmp_hba_node->BIFwVersion));
+	memset(ptmp_hba_node->BIEfiVersion, 0,
+	    sizeof(ptmp_hba_node->BIEfiVersion));
+	memset(ptmp_hba_node->BIFCodeVersion, 0,
+	    sizeof(ptmp_hba_node->BIFCodeVersion));
+	if (test_bit(ROM_CODE_TYPE_FCODE, &ha->code_types)) {
+		unsigned int barray[3];
+
+		memset (barray, 0, sizeof(barray));
+		ptmp_hba_node->BIValid |= EXT_HN_BI_FCODE_VALID;
+		sscanf(ha->fcode_revision, "%u.%u.%u", &barray[0], &barray[1],
+		    &barray[2]);
+		ptmp_hba_node->BIFCodeVersion[0] = barray[0];
+		ptmp_hba_node->BIFCodeVersion[1] = barray[1];
+		ptmp_hba_node->BIFCodeVersion[2] = barray[2];
+
+	}
+	if (test_bit(ROM_CODE_TYPE_EFI, &ha->code_types)) {
+		ptmp_hba_node->BIValid |= EXT_HN_BI_FCODE_VALID;
+		ptmp_hba_node->BIEfiVersion[0] = ha->efi_revision[1];
+		ptmp_hba_node->BIEfiVersion[1] = ha->efi_revision[0];
+	}
 
 	ptmp_hba_node->InterfaceType = EXT_DEF_FC_INTF_TYPE;
 	ptmp_hba_node->PortCount = 1;
@@ -1867,7 +1897,10 @@ qla2x00_query_disc_tgt(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	}
 
 	tgt_fcport = tq->fcport;
-	memcpy(ptmp_disc_target->WWNN, tgt_fcport->node_name, WWN_SIZE);
+	if (tgt_fcport->flags & FCF_XP_DEVICE)
+		memcpy(ptmp_disc_target->WWNN, tq->node_name, WWN_SIZE);
+	else
+		memcpy(ptmp_disc_target->WWNN, tgt_fcport->node_name, WWN_SIZE);
 	memcpy(ptmp_disc_target->WWPN, tgt_fcport->port_name, WWN_SIZE);
 
 	ptmp_disc_target->Id[0] = 0;
@@ -2419,6 +2452,7 @@ qla2x00_get_port_summary(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	uint32_t	port_cnt = 0;
 	uint32_t	top_xfr_size;
 	uint32_t	usr_no_of_entries = 0;
+	uint32_t	device_types;
 	void		*start_of_entry_list;
 	fc_port_t	*fcport;
 
@@ -2451,6 +2485,19 @@ qla2x00_get_port_summary(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return (ret);
 	}
 
+	/* Get device types to query. */
+	device_types = 0;
+	ret = copy_from_user(&device_types, pext->RequestAdr,
+	    sizeof(device_types));
+	if (ret) {
+		pext->Status = EXT_STATUS_COPY_ERR;
+		DEBUG9_10(printk("%s(%ld): inst=%ld ERROR"
+		    "copy_from_user() of struct failed (%d).\n",
+		    __func__, ha->host_no, ha->instance, ret);)
+		qla2x00_free_ioctl_scrap_mem(ha);
+		return (ret);
+	}
+
 	/* Get maximum number of entries allowed in response buf */
 	usr_no_of_entries = pext->ResponseLen / sizeof(EXT_DEVICEDATAENTRY);
 
@@ -2461,9 +2508,8 @@ qla2x00_get_port_summary(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	start_of_entry_list = (void *)(pext->ResponseAdr) + top_xfr_size;
 
 	/* Start copying from devices that exist. */
-	ret = qla2x00_get_fcport_summary(ha, pdd_entry,
-	    start_of_entry_list, usr_no_of_entries,
-	    &entry_cnt, &pext->Status);
+	ret = qla2x00_get_fcport_summary(ha, pdd_entry, start_of_entry_list,
+	    device_types, usr_no_of_entries, &entry_cnt, &pext->Status);
 
 	DEBUG9(printk("%s(%ld): after get_fcport_summary, entry_cnt=%d.\n",
 	    __func__, ha->host_no, entry_cnt);)
@@ -2473,11 +2519,9 @@ qla2x00_get_port_summary(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	 */
 	if (ret == 0) {
 		if (!qla2x00_failover_enabled(ha)) {
-#if 0
 			ret = qla2x00_std_missing_port_summary(ha, pdd_entry,
 			    start_of_entry_list, usr_no_of_entries,
 			    &entry_cnt, &pext->Status);
-#endif
 		} else {
 			ret = qla2x00_fo_missing_port_summary(ha, pdd_entry,
 			    start_of_entry_list, usr_no_of_entries,
@@ -2561,8 +2605,8 @@ qla2x00_get_port_summary(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
  */
 static int
 qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
-    void *pstart_of_entry_list, uint32_t max_entries, uint32_t *pentry_cnt,
-    uint32_t *ret_status)
+    void *pstart_of_entry_list, uint32_t device_types, uint32_t max_entries,
+    uint32_t *pentry_cnt, uint32_t *ret_status)
 {
 	int		ret = QLA_SUCCESS;
 	uint8_t		*usr_temp, *kernel_tmp;
@@ -2608,8 +2652,6 @@ qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
 		}
 
 		/* copy from fcport to dd_entry */
-		memcpy(pdd_entry->NodeWWN, fcport->node_name, WWN_SIZE);
-		memcpy(pdd_entry->PortWWN, fcport->port_name, WWN_SIZE);
 
 		for (b = 0; b < 3 ; b++)
 			pdd_entry->PortID[b] = fcport->d_id.r.d_id[2-b];
@@ -2633,9 +2675,20 @@ qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
 			if (memcmp(fcport->port_name, tq->fcport->port_name,
 			    EXT_DEF_WWN_NAME_SIZE) == 0) {
 				pdd_entry->TargetAddress.Target = tgt;
+				if ((fcport->flags & FCF_XP_DEVICE) &&
+				    !(device_types &
+					EXT_DEF_GET_TRUE_NN_DEVICE)) {
+					memcpy(pdd_entry->NodeWWN,
+					    tq->node_name, WWN_SIZE);
+				} else {
+					memcpy(pdd_entry->NodeWWN,
+					    fcport->node_name, WWN_SIZE);
+				}
 				break;
 			}
 		}
+		memcpy(pdd_entry->PortWWN, fcport->port_name, WWN_SIZE);
+
 		pdd_entry->TargetAddress.Lun    = 0;
 		pdd_entry->DeviceFlags          = 0;
 		pdd_entry->LoopID               = fcport->loop_id;
@@ -2677,6 +2730,90 @@ qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
 /*
  * qla2x00_fo_missing_port_summary is in qla_fo.c
  */
+
+static int
+qla2x00_std_missing_port_summary(scsi_qla_host_t *ha,
+    EXT_DEVICEDATAENTRY *pdd_entry, void *pstart_of_entry_list,
+    uint32_t max_entries, uint32_t *pentry_cnt, uint32_t *ret_status)
+{
+	int		ret = QLA_SUCCESS;
+	uint8_t		*usr_temp, *kernel_tmp;
+	uint16_t	idx;
+	uint32_t	b;
+	uint32_t	current_offset;
+	uint32_t	transfer_size;
+	os_tgt_t	*tq;
+
+	DEBUG9(printk("%s(%ld): inst=%ld entered.\n",
+	    __func__, ha->host_no, ha->instance);)
+
+	for (idx = 0; idx < MAX_FIBRE_DEVICES && *pentry_cnt < max_entries;
+	    idx++) {
+		if ((tq = TGT_Q(ha, idx)) == NULL)
+			continue;
+
+		/* Target present in configuration data but 
+		 * missing during device discovery*/
+		if (tq->fcport == NULL) {
+			DEBUG10(printk("%s: returning missing device "
+			    "%02x%02x%02x%02x%02x%02x%02x%02x.\n",
+			    __func__,
+			    tq->port_name[0],tq->port_name[1],
+			    tq->port_name[2],tq->port_name[3],
+			    tq->port_name[4],tq->port_name[5],
+			    tq->port_name[6],tq->port_name[7]);)
+
+			/* This device was not found. Return
+			 * as unconfigured.
+			 */
+			memcpy(pdd_entry->NodeWWN, tq->node_name, WWN_SIZE);
+			memcpy(pdd_entry->PortWWN, tq->port_name, WWN_SIZE);
+
+			for (b = 0; b < 3 ; b++)
+				pdd_entry->PortID[b] = 0;
+
+			/* assume fabric dev so api won't translate 
+			 * the portid from loopid */
+			pdd_entry->ControlFlags = EXT_DEF_GET_FABRIC_DEVICE;
+
+			pdd_entry->TargetAddress.Bus    = 0;
+			pdd_entry->TargetAddress.Target = idx;
+			pdd_entry->TargetAddress.Lun    = 0;
+			pdd_entry->DeviceFlags          = 0;
+			pdd_entry->LoopID               = 0;
+			pdd_entry->BaseLunNumber        = 0;
+
+			current_offset = *pentry_cnt *
+			    sizeof(EXT_DEVICEDATAENTRY);
+
+			transfer_size = sizeof(EXT_DEVICEDATAENTRY);
+
+			/* now copy up this dd_entry to user */
+			usr_temp = (uint8_t *)pstart_of_entry_list +
+			    current_offset;
+			kernel_tmp = (uint8_t *)pdd_entry;
+			ret = copy_to_user(usr_temp, kernel_tmp,
+			    transfer_size);
+			if (ret) {
+				*ret_status = EXT_STATUS_COPY_ERR;
+				DEBUG9_10(printk("%s(%ld): inst=%ld "
+				    "ERROR copy rsp list buffer.\n",
+				    __func__, ha->host_no,
+				    ha->instance);)
+				break;
+			} else {
+				*pentry_cnt+=1;
+			}
+		}
+		if (ret || *ret_status)
+			break;
+	}
+
+	DEBUG9(printk("%s(%ld): inst=%ld exiting. ret=%d.\n", __func__,
+	    ha->host_no, ha->instance, ret);)
+
+	return ret;
+}
 
 /*
  * qla2x00_query_driver

@@ -41,7 +41,7 @@ static mp_path_t * qla2x00_allocate_path(mp_host_t *, uint16_t, fc_port_t *,
     uint16_t);
 static mp_path_list_t * qla2x00_allocate_path_list(void);
 
-static mp_host_t * qla2x00_find_host_by_name(uint8_t *);
+static mp_host_t * qla2x00_find_host_by_portname(uint8_t *);
 
 static mp_device_t * qla2x00_find_or_allocate_mp_dev (mp_host_t *, uint16_t,
     fc_port_t *);
@@ -618,15 +618,15 @@ qla2x00_cfg_path_discovery(scsi_qla_host_t *ha)
 
 	ENTER("qla2x00_cfg_path_discovery");
 
-	name = 	&ha->init_cb->node_name[0];
+	name = 	&ha->init_cb->port_name[0];
 
 	set_bit(CFG_ACTIVE, &ha->cfg_flags);
 	/* Initialize the path tree for this adapter */
-	host = qla2x00_find_host_by_name(name);
+	host = qla2x00_find_host_by_portname(name);
 	if (mp_config_required) {
 		if (host == NULL ) {
 			DEBUG4(printk("cfg_path_discovery: host not found, "
-				"node name = "
+				"port name = "
 				"%02x%02x%02x%02x%02x%02x%02x%02x\n",
 				name[0], name[1], name[2], name[3],
 				name[4], name[5], name[6], name[7]);)
@@ -1968,12 +1968,12 @@ qla2x00_cfg_find_host(scsi_qla_host_t *ha)
 }
 
 /*
- *  qla2x00_find_host_by_name
+ *  qla2x00_find_host_by_portname
  *      Look through the existing multipath tree, and find
- *      a host adapter to match the specified name.
+ *      a host adapter to match the specified portname.
  *
  *  Input:
- *      name = node name to match.
+ *      name = portname to match.
  *
  *  Return:
  *      Pointer to new host, or NULL if no match found.
@@ -1982,12 +1982,12 @@ qla2x00_cfg_find_host(scsi_qla_host_t *ha)
  *      Kernel context.
  */
 mp_host_t *
-qla2x00_find_host_by_name(uint8_t   *name)
+qla2x00_find_host_by_portname(uint8_t *name)
 {
 	mp_host_t     *host;		/* Host found and null if not */
 
 	for (host = mp_hosts_base; (host); host = host->next) {
-		if (memcmp(host->nodename, name, WWN_SIZE) == 0)
+		if (memcmp(host->portname, name, WWN_SIZE) == 0)
 			break;
 	}
 	return host;
@@ -2137,16 +2137,20 @@ qla2x00_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 		    "scsi status 0x%x, rval=%d\n",__func__,
 		    fclun->lun, comp_status, scsi_status, rval);)
 
-			/* if port not logged in then try and login */
-			if (fclun->lun == 0 && 
-			    	comp_status == CS_PORT_LOGGED_OUT && 
-				atomic_read(&fclun->fcport->state) 
-				!= FCS_DEVICE_DEAD) {
-
-				next_loopid = 0;
-				qla2x00_fabric_login(ha, fclun->fcport,
-				    &next_loopid);
-			}
+		/* if port not logged in then try and login */
+		if (fclun->lun == 0 && comp_status == CS_PORT_LOGGED_OUT &&
+		    atomic_read(&fclun->fcport->state) != FCS_DEVICE_DEAD) {
+			if (fclun->fcport->flags & FCF_FABRIC_DEVICE) {
+				/* login and update database */
+ 				next_loopid = 0;
+ 				qla2x00_fabric_login(ha, fclun->fcport,
+ 				    &next_loopid);
+			} else {
+				/* Loop device gone but no LIP... */
+				rval = QLA_FUNCTION_FAILED;
+				break;
+ 			}
+		}
 	} while ((rval != QLA_SUCCESS ||
 	    comp_status != CS_COMPLETE) && 
 		retry--);
@@ -2635,7 +2639,7 @@ qla2x00_combine_by_lunid( void *vhost, uint16_t dev_id,
 	 	*/
 		path->config = 1;
 	} else {
-		if ((fcport->flags & FCF_MSA_DEVICE)) {
+		if (mp_initialized && fcport->flags & FCF_MSA_DEVICE) {
 			 qla2x00_test_active_port(fcport); 
 		}
 		list_for_each_entry(fclun, &fcport->fcluns, list) {
@@ -2661,7 +2665,7 @@ qla2x00_combine_by_lunid( void *vhost, uint16_t dev_id,
 			}
 
 			/* set the lun active flag */
-			if( (fcport->flags & FCF_EVA_DEVICE) ) { 
+			if (mp_initialized && fcport->flags & FCF_EVA_DEVICE) { 
 			     qla2x00_test_active_lun( 
 				path->port, fclun );
 			}
@@ -3548,21 +3552,32 @@ qla2x00_find_or_allocate_path(mp_host_t *host, mp_device_t *dp,
 
 			/* Update port with bitmask info */
 			path = qla2x00_allocate_path(host, id, port, dev_id);
-			DEBUG3(printk("%s: allocated new path %p, adding "
-			    "path id %d, mp_byte=0x%x "
-			    "port=%p-%02x%02x%02x%02x%02x%02x%02x%02x\n",
-			    __func__, path, id,
-			    path->mp_byte,
-			    path->port,
-			    path->port->port_name[0], path->port->port_name[1],
-			    path->port->port_name[2], path->port->port_name[3],
-			    path->port->port_name[4], path->port->port_name[5],
-			    path->port->port_name[6], path->port->port_name[7]
-			    );)
-			qla2x00_add_path(path_list, path);
+			if (path) {
+#if defined(QL_DEBUG_LEVEL_3)
+				printk("%s: allocated new path %p, adding path "
+				    "id %d, mp_byte=0x%x\n", __func__, path,
+				    id, path->mp_byte);
+				if (path->port)
+					printk("port=%p-"
+					   "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+					   path->port,
+					   path->port->port_name[0],
+					   path->port->port_name[1],
+					   path->port->port_name[2],
+					   path->port->port_name[3],
+					   path->port->port_name[4],
+					   path->port->port_name[5],
+					   path->port->port_name[6],
+					   path->port->port_name[7]);
+#endif
+				qla2x00_add_path(path_list, path);
 
-			/* Reconcile the new path against the existing ones. */
-			qla2x00_setup_new_path(dp, path, port);
+				/*
+				 * Reconcile the new path against the existing
+				 * ones.
+				 */
+				qla2x00_setup_new_path(dp, path, port);
+			}
 		} else {
 			/* EMPTY */
 			DEBUG4(printk("%s: Err exit, no space to add path.\n",
@@ -4149,14 +4164,17 @@ qla2x00_find_best_port(mp_device_t *dp,
 }
 
 void
-qla2x00_find_all_active_ports(void) 
+qla2x00_find_all_active_ports(srb_t *sp) 
 {
 	scsi_qla_host_t *ha;
 	fc_port_t *fcport;
 	fc_lun_t *fclun;
+	uint16_t lun;
 
 	DEBUG2(printk(KERN_INFO
 	    "%s: Scanning for active ports...\n", __func__);)
+
+	lun = sp->lun_queue->fclun->lun;
 
 	read_lock(&qla_hostlist_lock);
 	list_for_each_entry(ha, &qla_hostlist, list) {
@@ -4164,16 +4182,22 @@ qla2x00_find_all_active_ports(void)
 			if (fcport->port_type != FCT_TARGET)
 				continue;
 
-			list_for_each_entry(fclun, &fcport->fcluns, list) {
-				 if (fclun->flags & FLF_VISIBLE_LUN)
-					 continue;
+			if (fcport->flags & (FCF_EVA_DEVICE | FCF_MSA_DEVICE)) {
+				list_for_each_entry(fclun, &fcport->fcluns,
+				    list) {
+					if (fclun->flags & FLF_VISIBLE_LUN)
+						continue;
+					if (lun != fclun->lun)
+						continue;
 
-				 qla2x00_test_active_lun(fcport, fclun);
+					qla2x00_test_active_lun(fcport, fclun);
+				}
 			}
-       		 	if ((fcport->flags & FCF_MSA_DEVICE))
-				 qla2x00_test_active_port(fcport);
+			if ((fcport->flags & FCF_MSA_DEVICE))
+				qla2x00_test_active_port(fcport);
 		}
 	}
+	read_unlock(&qla_hostlist_lock);
 
 	DEBUG2(printk(KERN_INFO
 	    "%s: Done Scanning ports...\n", __func__);)
@@ -4213,7 +4237,7 @@ qla2x00_smart_path(mp_device_t *dp,
 	DEBUG2(printk("Entering %s - sp err = %d, instance =%d\n", 
 		__func__, sp->err_id, (int)host->instance);)
 
-	qla2x00_find_all_active_ports();
+	qla2x00_find_all_active_ports(sp);
  
 	if( sp != NULL ) {
 		fclun = sp->lun_queue->fclun;
@@ -4979,9 +5003,10 @@ qla2x00_map_os_targets(mp_host_t *host)
 				path->port->os_target_id = t;
 				if (TGT_Q(ha, t) == NULL) {
 					tgt = qla2x00_tgt_alloc(ha, t);
-					memcpy(tgt->node_name,
-							dp->nodename,
-							WWN_SIZE);
+					memcpy(tgt->node_name,dp->nodename,
+					    WWN_SIZE);
+					memcpy(tgt->port_name,
+					    path->port->port_name, WWN_SIZE);
 					tgt->fcport = path->port;
 				}
 				DEBUG3(printk("%s(%ld): host instance =%d, "

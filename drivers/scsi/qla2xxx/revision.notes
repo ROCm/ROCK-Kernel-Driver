@@ -5,6 +5,11 @@
  *
  * Revision History
  *
+ *  Rev  8.00.00b12	April 23, 2004	DG/RA/AV
+ *	- Resync with Linux Kernel 2.6.6-rc2-mm1.
+ *	- Resync with 7.00.00b27.
+ *	- Add new 2300/2322 IPX and 6312/6322 FLX firmwares (3.02.28):
+ *
  *  Rev  8.00.00b11	February 27, 2004	DG/RA/AV
  *	- Resync with Linux Kernel 2.6.3-mm3.
  *	- Resync with 7.00.00b17.
