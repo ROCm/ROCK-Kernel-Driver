@@ -168,10 +168,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	udbg_puthex((unsigned long)naca);
 	udbg_putc('\n');
 
-	udbg_puts("naca->processorCount       = 0x");
-	udbg_puthex(naca->processorCount);
-	udbg_putc('\n');
-
 	udbg_puts("naca->physicalMemorySize   = 0x");
 	udbg_puthex(naca->physicalMemorySize);
 	udbg_putc('\n');
