@@ -470,17 +470,17 @@ static loff_t eeprom_lseek(struct file * file, loff_t offset, int orig)
   /* truncate position */
   if (file->f_pos < 0)
   {
-    file->f_pos = 0;    
-    unlock_kernel();
+    file->f_pos = 0;
     ret = -EOVERFLOW;
   }
-  
+
   if (file->f_pos >= eeprom.size)
   {
     file->f_pos = eeprom.size - 1;
     ret = -EOVERFLOW;
   }
 
+  unlock_kernel();
   return ( ret );
 }
 
