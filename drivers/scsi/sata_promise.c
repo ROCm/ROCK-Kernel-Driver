@@ -35,7 +35,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.89"
+#define DRV_VERSION	"0.90"
 
 
 enum {
