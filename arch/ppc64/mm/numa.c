@@ -30,6 +30,9 @@ int nr_cpus_in_node[MAX_NUMNODES] = { [0 ... (MAX_NUMNODES -1)] = 0};
 struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
+EXPORT_SYMBOL(node_data);
+EXPORT_SYMBOL(numa_memory_lookup_table);
+
 static inline void map_cpu_to_node(int cpu, int node)
 {
 	dbg("cpu %d maps to domain %d\n", cpu, node);
