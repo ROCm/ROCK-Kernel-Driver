@@ -122,7 +122,7 @@ enum radeon_chips {
 	RADEON_NE,
 	RADEON_NF,
 	RADEON_NG,
-	RADEON_QM	/* LN (my Radeon 9100) */
+	RADEON_QM
 };
 
 enum radeon_arch {
@@ -170,7 +170,7 @@ static struct radeon_chip_info {
 	{ "9700 NE", RADEON_R300 },
 	{ "9700 NF", RADEON_R300 },
 	{ "9700 NG", RADEON_R300 },
-	{ "9100 QM", RADEON_R200 } /* LN (my Radeon 9100) */
+	{ "9100 QM", RADEON_R200 }
 };
 
 
@@ -215,7 +215,7 @@ static struct pci_device_id radeonfb_pci_table[] __devinitdata = {
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_NE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_NE},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_NF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_NF},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_NG, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_NG},
-	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_QM, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_QM}, /* LN (my Radeon 9100) */
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_QM, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_QM},
 	{ 0, }
 };
 MODULE_DEVICE_TABLE(pci, radeonfb_pci_table);
@@ -894,16 +894,6 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, char *bios_seg)
 				rinfo->pll.ref_div = 12;
 				rinfo->pll.ref_clk = 2700;
 				break;
-			case PCI_DEVICE_ID_ATI_RADEON_ND:
-			case PCI_DEVICE_ID_ATI_RADEON_NE:
-			case PCI_DEVICE_ID_ATI_RADEON_NF:
-			case PCI_DEVICE_ID_ATI_RADEON_NG:
-				rinfo->pll.ppll_max = 40000;
-				rinfo->pll.ppll_min = 20000;
-				rinfo->pll.xclk = 27000;
-				rinfo->pll.ref_div = 12;
-				rinfo->pll.ref_clk = 2700;
-				break;
 			case PCI_DEVICE_ID_ATI_RADEON_QD:
 			case PCI_DEVICE_ID_ATI_RADEON_QE:
 			case PCI_DEVICE_ID_ATI_RADEON_QF:
@@ -1310,7 +1300,6 @@ static int __devinit radeon_init_disp (struct radeonfb_info *rinfo)
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	var.activate = FB_ACTIVATE_NOW;
-	fb_set_var(&var, info);
         return 0;
 }
 
