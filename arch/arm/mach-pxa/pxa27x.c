@@ -21,100 +21,98 @@
 
 #include "generic.h"
 
-/* Crystal clock : 13-MHZ*/
+/* Crystal clock: 13MHz */
 #define BASE_CLK	13000000
 
 /*
  * Get the clock frequency as reflected by CCSR and the turbo flag.
  * We assume these values have been applied via a fcs.
  * If info is not 0 we also display the current settings.
- *
- * For more details, refer to Bulverde Manual, section 3.8.2.1
  */
 unsigned int get_clk_frequency_khz( int info)
 {
-	unsigned long ccsr, turbo, b, ht;
-	unsigned int l, L, m, M, n2, N, S, cccra;
+	unsigned long ccsr, clkcfg;
+	unsigned int l, L, m, M, n2, N, S;
+       	int cccr_a, t, ht, b;
 
 	ccsr = CCSR;
-	cccra = CCCR & (0x1 << 25);
+	cccr_a = CCCR & (1 << 25);
 
 	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
-	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (turbo) );
-	b = (turbo & (0x1 << 3));
-	ht = (turbo & (0x1 << 2));
+	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
+	t  = clkcfg & (1 << 1);
+	ht = clkcfg & (1 << 2);
+	b  = clkcfg & (1 << 3);
 
 	l  = ccsr & 0x1f;
 	n2 = (ccsr>>7) & 0xf;
-	if (l == 31) {
-		/* The calculation from the Yellow Book is incorrect:
-		   it says M=4 for L=21-30 (which is easy to calculate
-		   by subtracting 1 and then dividing by 10, but not
-		   with 31, so we'll do it manually */
-		m = 1 << 2;
-	} else {
-		m = 1 << ((l-1)/10);
-	}
+	m  = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
 
-	L = l * BASE_CLK;
-	N = (n2 * L) / 2;
-	S = (b) ? L : (L/2);
-	if (cccra == 0)
-		M = L/m;
-	else
-		M = (b) ? L : (L/2);
+	L  = l * BASE_CLK;
+	N  = (L * n2) / 2;
+	M  = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
+	S  = (b) ? L : (L/2);
 
 	if (info) {
 		printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
 			L / 1000000, (L % 1000000) / 10000, l );
-		printk( KERN_INFO "Memory clock: %d.%02dMHz (/%d)\n",
-			M / 1000000, (M % 1000000) / 10000, m );
 		printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, %sactive)\n",
 			N / 1000000, (N % 1000000)/10000, n2 / 2, (n2 % 2)*5,
-			(turbo & 1) ? "" : "in" );
+			(t) ? "" : "in" );
+		printk( KERN_INFO "Memory clock: %d.%02dMHz (/%d)\n",
+			M / 1000000, (M % 1000000) / 10000, m );
 		printk( KERN_INFO "System bus clock: %d.%02dMHz \n",
 			S / 1000000, (S % 1000000) / 10000 );
 	}
 
-	return (turbo & 1) ? (N/1000) : (L/1000);
+	return (t) ? (N/1000) : (L/1000);
 }
 
 /*
  * Return the current mem clock frequency in units of 10kHz as
  * reflected by CCCR[A], B, and L
  */
-unsigned int get_lclk_frequency_10khz(void)
+unsigned int get_memclk_frequency_10khz(void)
 {
-	unsigned long ccsr, clkcfg, b;
-	unsigned int l, L, m, M, cccra;
-
-	cccra = CCCR & (0x1 << 25);
-
-	/* Read clkcfg register to obtain b */
-	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
-	b = (clkcfg & (0x1 << 3));
+	unsigned long ccsr, clkcfg;
+	unsigned int l, L, m, M;
+       	int cccr_a, b;
 
 	ccsr = CCSR;
-	l  =  ccsr & 0x1f;
-	if (l == 31) {
-		/* The calculation from the Yellow Book is incorrect:
-		   it says M=4 for L=21-30 (which is easy to calculate
-		   by subtracting 1 and then dividing by 10, but not
-		   with 31, so we'll do it manually */
-		m = 1 << 2;
-	} else {
-		m = 1 << ((l-1)/10);
-	}
+	cccr_a = CCCR & (1 << 25);
+
+	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
+	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
+	b = clkcfg & (1 << 3);
+
+	l = ccsr & 0x1f;
+	m = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
 
 	L = l * BASE_CLK;
-	if (cccra == 0)
-		M = L/m;
-	else
-		M = (b) ? L : L/2;
+	M = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
 
 	return (M / 10000);
 }
 
-EXPORT_SYMBOL(get_clk_frequency_khz);
-EXPORT_SYMBOL(get_lclk_frequency_10khz);
+/*
+ * Return the current LCD clock frequency in units of 10kHz as
+ */
+unsigned int get_lcdclk_frequency_10khz(void)
+{
+	unsigned long ccsr;
+	unsigned int l, L, k, K;
 
+	ccsr = CCSR;
+
+	l = ccsr & 0x1f;
+	k = (l <= 7) ? 1 : (l <= 16) ? 2 : 4;
+
+	L = l * BASE_CLK;
+	K = L / k;
+
+	return (K / 10000);
+}
+
+EXPORT_SYMBOL(get_clk_frequency_khz);
+EXPORT_SYMBOL(get_memclk_frequency_10khz);
+EXPORT_SYMBOL(get_lcdclk_frequency_10khz);
