@@ -116,6 +116,7 @@ static struct usb_driver pl2303_driver = {
 #define VENDOR_READ_REQUEST		0x01
 
 #define UART_STATE			0x08
+#define UART_STATE_TRANSIENT_MASK	0x74
 #define UART_DCD			0x01
 #define UART_DSR			0x02
 #define UART_BREAK_ERROR		0x04
@@ -662,6 +663,7 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	unsigned char *data = urb->transfer_buffer;
 	unsigned long flags;
 	int status;
+	u8 uart_state;
 
 	dbg("%s (%d)", __FUNCTION__, port->number);
 
@@ -690,8 +692,10 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 
 	/* Save off the uart status for others to look at */
+	uart_state = data[UART_STATE];
 	spin_lock_irqsave(&priv->lock, flags);
-	priv->line_status = data[UART_STATE];
+	uart_state |= (priv->line_status & UART_STATE_TRANSIENT_MASK);
+	priv->line_status = uart_state;
 	spin_unlock_irqrestore(&priv->lock, flags);
 		
 exit:
@@ -752,6 +756,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	spin_lock_irqsave(&priv->lock, flags);
 	status = priv->line_status;
+	priv->line_status &= ~UART_STATE_TRANSIENT_MASK;
 	spin_unlock_irqrestore(&priv->lock, flags);
 	wake_up_interruptible (&priv->delta_msr_wait);
 
