@@ -3043,14 +3043,27 @@ static int __init hp100_module_init(void)
 	int err;
 
 	err = hp100_isa_init();
-
+	if (err && err != -ENODEV)
+		goto out;
 #ifdef CONFIG_EISA
-	err |= eisa_driver_register(&hp100_eisa_driver);
+	err = eisa_driver_register(&hp100_eisa_driver);
+	if (err && err != -ENODEV) 
+		goto out2;
 #endif
 #ifdef CONFIG_PCI
-	err |= pci_module_init(&hp100_pci_driver);
+	err = pci_module_init(&hp100_pci_driver);
+	if (err && err != -ENODEV) 
+		goto out3;
 #endif
+ out:
 	return err;
+ out3:
+#ifdef CONFIG_EISA
+	eisa_driver_unregister (&hp100_eisa_driver);
+ out2:
+#endif
+	hp100_isa_cleanup();
+	goto out;
 }
 
 
