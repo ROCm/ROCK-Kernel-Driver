@@ -515,12 +515,12 @@ static int emu8k_pcm_silence(snd_pcm_substream_t *subs,
 static int emu8k_pcm_copy(snd_pcm_substream_t *subs,
 			  int voice,
 			  snd_pcm_uframes_t pos,
-			  void *src,
+			  void __user *src,
 			  snd_pcm_uframes_t count)
 {
 	emu8k_pcm_t *rec = subs->runtime->private_data;
 	emu8000_t *emu = rec->emu;
-	unsigned short *buf = src;
+	unsigned short __user *buf = src;
 
 	snd_emu8000_write_wait(emu, 1);
 	EMU8000_SMALW_WRITE(emu, pos + rec->loop_start[0]);

@@ -1324,7 +1324,7 @@ static int drain_dac(struct m3_state *s, int nonblock)
     return 0;
 }
 
-static ssize_t m3_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t m3_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
     struct m3_state *s = (struct m3_state *)file->private_data;
     ssize_t ret;
@@ -1405,7 +1405,7 @@ out:
     return ret;
 }
 
-static ssize_t m3_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t m3_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
     struct m3_state *s = (struct m3_state *)file->private_data;
     ssize_t ret;
@@ -1584,6 +1584,8 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
     count_info cinfo;
     int val, mapped, ret;
     unsigned char fmtm, fmtd;
+    void __user *argp = (void __user *)arg;
+    int __user *p = argp;
 
     VALIDATE_STATE(s);
 
@@ -1594,7 +1596,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 
     switch (cmd) {
     case OSS_GETVERSION:
-        return put_user(SOUND_VERSION, (int *)arg);
+        return put_user(SOUND_VERSION, p);
 
     case SNDCTL_DSP_SYNC:
         if (file->f_mode & FMODE_WRITE)
@@ -1606,7 +1608,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         return 0;
 
     case SNDCTL_DSP_GETCAPS:
-        return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, (int *)arg);
+        return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, p);
         
     case SNDCTL_DSP_RESET:
         spin_lock_irqsave(&card->lock, flags);
@@ -1624,7 +1626,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         return 0;
 
     case SNDCTL_DSP_SPEED:
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         spin_lock_irqsave(&card->lock, flags);
         if (val >= 0) {
             if (file->f_mode & FMODE_READ) {
@@ -1639,10 +1641,10 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
             }
         }
         spin_unlock_irqrestore(&card->lock, flags);
-        return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, (int *)arg);
+        return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, p);
         
     case SNDCTL_DSP_STEREO:
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         spin_lock_irqsave(&card->lock, flags);
         fmtd = 0;
         fmtm = ~0;
@@ -1667,7 +1669,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         return 0;
 
     case SNDCTL_DSP_CHANNELS:
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         spin_lock_irqsave(&card->lock, flags);
         if (val != 0) {
             fmtd = 0;
@@ -1692,13 +1694,13 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         }
         spin_unlock_irqrestore(&card->lock, flags);
         return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (ESS_FMT_STEREO << ESS_ADC_SHIFT) 
-                       : (ESS_FMT_STEREO << ESS_DAC_SHIFT))) ? 2 : 1, (int *)arg);
+                       : (ESS_FMT_STEREO << ESS_DAC_SHIFT))) ? 2 : 1, p);
         
     case SNDCTL_DSP_GETFMTS: /* Returns a mask */
-        return put_user(AFMT_U8|AFMT_S16_LE, (int *)arg);
+        return put_user(AFMT_U8|AFMT_S16_LE, p);
         
     case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         spin_lock_irqsave(&card->lock, flags);
         if (val != AFMT_QUERY) {
             fmtd = 0;
@@ -1727,7 +1729,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
             : (ESS_FMT_16BIT << ESS_DAC_SHIFT))) ? 
                 AFMT_S16_LE : 
                 AFMT_U8, 
-            (int *)arg);
+            p);
         
     case SNDCTL_DSP_POST:
         return 0;
@@ -1738,10 +1740,10 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
             val |= PCM_ENABLE_INPUT;
         if ((file->f_mode & FMODE_WRITE) && (s->enable & DAC_RUNNING)) 
             val |= PCM_ENABLE_OUTPUT;
-        return put_user(val, (int *)arg);
+        return put_user(val, p);
         
     case SNDCTL_DSP_SETTRIGGER:
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         if (file->f_mode & FMODE_READ) {
             if (val & PCM_ENABLE_INPUT) {
                 if (!s->dma_adc.ready && (ret =  prog_dmabuf(s, 1)))
@@ -1772,7 +1774,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         abinfo.fragstotal = s->dma_dac.numfrag;
         abinfo.fragments = abinfo.bytes >> s->dma_dac.fragshift;      
         spin_unlock_irqrestore(&card->lock, flags);
-        return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+        return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
     case SNDCTL_DSP_GETISPACE:
         if (!(file->f_mode & FMODE_READ))
@@ -1786,7 +1788,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         abinfo.fragstotal = s->dma_adc.numfrag;
         abinfo.fragments = abinfo.bytes >> s->dma_adc.fragshift;      
         spin_unlock_irqrestore(&card->lock, flags);
-        return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+        return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
         
     case SNDCTL_DSP_NONBLOCK:
         file->f_flags |= O_NONBLOCK;
@@ -1799,7 +1801,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         m3_update_ptr(s);
         val = s->dma_dac.count;
         spin_unlock_irqrestore(&card->lock, flags);
-        return put_user(val, (int *)arg);
+        return put_user(val, p);
 
     case SNDCTL_DSP_GETIPTR:
         if (!(file->f_mode & FMODE_READ))
@@ -1812,7 +1814,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         if (s->dma_adc.mapped)
             s->dma_adc.count &= s->dma_adc.fragsize-1;
         spin_unlock_irqrestore(&card->lock, flags);
-	if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+	if (copy_to_user(argp, &cinfo, sizeof(cinfo)))
 		return -EFAULT;
 	return 0;
 
@@ -1827,7 +1829,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         if (s->dma_dac.mapped)
             s->dma_dac.count &= s->dma_dac.fragsize-1;
         spin_unlock_irqrestore(&card->lock, flags);
-	if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+	if (copy_to_user(argp, &cinfo, sizeof(cinfo)))
 		return -EFAULT;
 	return 0;
 
@@ -1835,14 +1837,14 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         if (file->f_mode & FMODE_WRITE) {
             if ((val = prog_dmabuf(s, 0)))
                 return val;
-            return put_user(s->dma_dac.fragsize, (int *)arg);
+            return put_user(s->dma_dac.fragsize, p);
         }
         if ((val = prog_dmabuf(s, 1)))
             return val;
-        return put_user(s->dma_adc.fragsize, (int *)arg);
+        return put_user(s->dma_adc.fragsize, p);
 
     case SNDCTL_DSP_SETFRAGMENT:
-        get_user_ret(val, (int *)arg, -EFAULT);
+        get_user_ret(val, p, -EFAULT);
         spin_lock_irqsave(&card->lock, flags);
         if (file->f_mode & FMODE_READ) {
             s->dma_adc.ossfragshift = val & 0xffff;
@@ -1871,7 +1873,7 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         if ((file->f_mode & FMODE_READ && s->dma_adc.subdivision) ||
             (file->f_mode & FMODE_WRITE && s->dma_dac.subdivision))
             return -EINVAL;
-                get_user_ret(val, (int *)arg, -EFAULT);
+                get_user_ret(val, p, -EFAULT);
         if (val != 1 && val != 2 && val != 4)
             return -EINVAL;
         if (file->f_mode & FMODE_READ)
@@ -1881,15 +1883,15 @@ static int m3_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         return 0;
 
     case SOUND_PCM_READ_RATE:
-        return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, (int *)arg);
+        return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, p);
 
     case SOUND_PCM_READ_CHANNELS:
         return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (ESS_FMT_STEREO << ESS_ADC_SHIFT) 
-                       : (ESS_FMT_STEREO << ESS_DAC_SHIFT))) ? 2 : 1, (int *)arg);
+                       : (ESS_FMT_STEREO << ESS_DAC_SHIFT))) ? 2 : 1, p);
 
     case SOUND_PCM_READ_BITS:
         return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (ESS_FMT_16BIT << ESS_ADC_SHIFT) 
-                       : (ESS_FMT_16BIT << ESS_DAC_SHIFT))) ? 16 : 8, (int *)arg);
+                       : (ESS_FMT_16BIT << ESS_DAC_SHIFT))) ? 16 : 8, p);
 
     case SOUND_PCM_WRITE_FILTER:
     case SNDCTL_DSP_SETSYNCRO:

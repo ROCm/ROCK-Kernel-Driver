@@ -417,7 +417,7 @@ void emu10k1_waveout_getxfersize(struct woinst *woinst, u32 *total_free_bytes)
  * Notice that the voice buffer is actually a set of disjointed memory pages.
  *
  */
-static void copy_block(void **dst, u32 str, u8 *src, u32 len)
+static void copy_block(void **dst, u32 str, u8 __user *src, u32 len)
 {
 	unsigned int pg;
 	unsigned int pgoff;
@@ -451,7 +451,7 @@ static void copy_block(void **dst, u32 str, u8 *src, u32 len)
  * Notice that the voice buffer is actually a set of disjointed memory pages.
  *
  */
-static void copy_ilv_block(struct woinst *woinst, u32 str, u8 *src, u32 len) 
+static void copy_ilv_block(struct woinst *woinst, u32 str, u8 __user *src, u32 len) 
 {
         unsigned int pg;
 	unsigned int pgoff;
@@ -524,7 +524,7 @@ static void fill_block(struct woinst *woinst, u32 str, u8 data, u32 len)
  * previously added to the buffer are overwritten.
  *
  */
-void emu10k1_waveout_xferdata(struct woinst *woinst, u8 *data, u32 *size)
+void emu10k1_waveout_xferdata(struct woinst *woinst, u8 __user *data, u32 *size)
 {
 	struct waveout_buffer *buffer = &woinst->buffer;
 	struct voice_mem *mem = &woinst->voice[0].mem;

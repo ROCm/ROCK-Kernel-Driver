@@ -1220,7 +1220,7 @@ out0:
  * machine and drained by this loop.
  */
 static ssize_t
-ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+ymf_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
 	struct ymf_dmabuf *dmabuf = &state->rpcm.dmabuf;
@@ -1335,7 +1335,7 @@ ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+ymf_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
 	struct ymf_dmabuf *dmabuf = &state->wpcm.dmabuf;
@@ -1568,11 +1568,13 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	count_info cinfo;
 	int redzone;
 	int val;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	switch (cmd) {
 	case OSS_GETVERSION:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETVER) arg 0x%lx\n", cmd, arg);
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_RESET:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(RESET)\n", cmd);
@@ -1614,7 +1616,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	case SNDCTL_DSP_SPEED: /* set smaple rate */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		YMFDBGX("ymf_ioctl: cmd 0x%x(SPEED) sp %d\n", cmd, val);
 		if (val >= 8000 && val <= 48000) {
@@ -1637,7 +1639,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
 		}
-		return put_user(state->format.rate, (int *)arg);
+		return put_user(state->format.rate, p);
 
 	/*
 	 * OSS manual does not mention SNDCTL_DSP_STEREO at all.
@@ -1646,7 +1648,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	 * However, mpg123 calls it. I wonder, why Michael Hipp used it.
 	 */
 	case SNDCTL_DSP_STEREO: /* set stereo or mono channel */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		YMFDBGX("ymf_ioctl: cmd 0x%x(STEREO) st %d\n", cmd, val);
 		if (file->f_mode & FMODE_WRITE) {
@@ -1676,23 +1678,23 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				return val;
 			val = state->wpcm.dmabuf.fragsize;
 			YMFDBGX("ymf_ioctl: GETBLK w %d\n", val);
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 		}
 		if (file->f_mode & FMODE_READ) {
 			if ((val = prog_dmabuf(state, 1)))
 				return val;
 			val = state->rpcm.dmabuf.fragsize;
 			YMFDBGX("ymf_ioctl: GETBLK r %d\n", val);
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 		}
 		return -EINVAL;
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask of supported sample format*/
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETFMTS)\n", cmd);
-		return put_user(AFMT_S16_LE|AFMT_U8, (int *)arg);
+		return put_user(AFMT_S16_LE|AFMT_U8, p);
 
 	case SNDCTL_DSP_SETFMT: /* Select sample format */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		YMFDBGX("ymf_ioctl: cmd 0x%x(SETFMT) fmt %d\n", cmd, val);
 		if (val == AFMT_S16_LE || val == AFMT_U8) {
@@ -1715,10 +1717,10 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
 		}
-		return put_user(state->format.format, (int *)arg);
+		return put_user(state->format.format, p);
 
 	case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		YMFDBGX("ymf_ioctl: cmd 0x%x(CHAN) ch %d\n", cmd, val);
 		if (val != 0) {
@@ -1745,7 +1747,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				}
 			}
 		}
-		return put_user(state->format.voices, (int *)arg);
+		return put_user(state->format.voices, p);
 
 	case SNDCTL_DSP_POST:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(POST)\n", cmd);
@@ -1768,7 +1770,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		YMFDBGX("ymf_ioctl: cmd 0x%x(SETFRAG) fr 0x%04x:%04x(%d:%d)\n",
 		    cmd,
@@ -1799,7 +1801,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		abinfo.fragstotal = dmabuf->numfrag;
 		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETISPACE)\n", cmd);
@@ -1814,7 +1816,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		abinfo.fragstotal = dmabuf->numfrag;
 		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_NONBLOCK:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(NONBLOCK)\n", cmd);
@@ -1824,8 +1826,8 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_GETCAPS:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETCAPS)\n", cmd);
 		/* return put_user(DSP_CAP_REALTIME|DSP_CAP_TRIGGER|DSP_CAP_MMAP,
-			    (int *)arg); */
-		return put_user(0, (int *)arg);
+			    p); */
+		return put_user(0, p);
 
 	case SNDCTL_DSP_GETIPTR:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETIPTR)\n", cmd);
@@ -1839,7 +1841,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		YMFDBGX("ymf_ioctl: GETIPTR ptr %d bytes %d\n",
 		    cinfo.ptr, cinfo.bytes);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(GETOPTR)\n", cmd);
@@ -1853,7 +1855,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		YMFDBGX("ymf_ioctl: GETOPTR ptr %d bytes %d\n",
 		    cinfo.ptr, cinfo.bytes);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_SETDUPLEX:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(SETDUPLEX)\n", cmd);
@@ -1861,15 +1863,15 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 
 	case SOUND_PCM_READ_RATE:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(READ_RATE)\n", cmd);
-		return put_user(state->format.rate, (int *)arg);
+		return put_user(state->format.rate, p);
 
 	case SOUND_PCM_READ_CHANNELS:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(READ_CH)\n", cmd);
-		return put_user(state->format.voices, (int *)arg);
+		return put_user(state->format.voices, p);
 
 	case SOUND_PCM_READ_BITS:
 		YMFDBGX("ymf_ioctl: cmd 0x%x(READ_BITS)\n", cmd);
-		return put_user(AFMT_S16_LE, (int *)arg);
+		return put_user(AFMT_S16_LE, p);
 
 	case SNDCTL_DSP_MAPINBUF:
 	case SNDCTL_DSP_MAPOUTBUF:

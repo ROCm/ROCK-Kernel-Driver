@@ -337,7 +337,7 @@ static int pf_open(struct inode *inode, struct file *file)
 static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct pf_unit *pf = inode->i_bdev->bd_disk->private_data;
-	struct hd_geometry *geo = (struct hd_geometry *) arg;
+	struct hd_geometry __user *geo = (struct hd_geometry __user *) arg;
 	struct hd_geometry g;
 	sector_t capacity;
 

@@ -35,7 +35,7 @@ MODULE_SUPPORTED_DEVICE("sound");
 char *snd_seq_fm_id = SNDRV_SEQ_INSTR_ID_OPL2_3;
 
 static int snd_seq_fm_put(void *private_data, snd_seq_kinstr_t *instr,
-			  char *instr_data, long len, int atomic, int cmd)
+			  char __user *instr_data, long len, int atomic, int cmd)
 {
 	fm_instrument_t *ip;
 	fm_xinstrument_t ix;
@@ -77,7 +77,8 @@ static int snd_seq_fm_put(void *private_data, snd_seq_kinstr_t *instr,
 }
 
 static int snd_seq_fm_get(void *private_data, snd_seq_kinstr_t *instr,
-			  char *instr_data, long len, int atomic, int cmd)
+			  char __user *instr_data, long len, int atomic,
+			  int cmd)
 {
 	fm_instrument_t *ip;
 	fm_xinstrument_t ix;

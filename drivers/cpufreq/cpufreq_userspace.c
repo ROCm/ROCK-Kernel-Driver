@@ -206,7 +206,7 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 		if (oldlen != sizeof(unsigned int))
 			return -EINVAL;
 
-		if (put_user(cpufreq_get(cpu), (unsigned int *)oldval) ||
+		if (put_user(cpufreq_get(cpu), (unsigned int __user *)oldval) ||
 		    put_user(sizeof(unsigned int), oldlenp))
 			return -EFAULT;
 	}
@@ -216,7 +216,7 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 		if (newlen != sizeof(unsigned int))
 			return -EINVAL;
 
-		if (get_user(freq, (unsigned int *)newval))
+		if (get_user(freq, (unsigned int __user *)newval))
 			return -EFAULT;
 
 		cpufreq_set(freq, cpu);

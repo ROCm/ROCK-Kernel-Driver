@@ -980,13 +980,13 @@ static void set_ac3(struct cm_state *s, unsigned rate)
 	spin_unlock_irqrestore(&s->lock, flags);
 }
 
-static int trans_ac3(struct cm_state *s, void *dest, const char *source, int size)
+static int trans_ac3(struct cm_state *s, void *dest, const char __user *source, int size)
 {
 	int   i = size / 2;
 	unsigned long data;
 	unsigned short data16;
 	unsigned long *dst = (unsigned long *) dest;
-	unsigned short *src = (unsigned short *)source;
+	unsigned short __user *src = (unsigned short __user *)source;
 	int err;
 
 	do {
@@ -1639,6 +1639,8 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 	unsigned long flags;
 	int i, val, j;
 	unsigned char l, r, rl, rr;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	VALIDATE_STATE(s);
         if (cmd == SOUND_MIXER_INFO) {
@@ -1647,7 +1649,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 		strlcpy(info.id, "cmpci", sizeof(info.id));
 		strlcpy(info.name, "C-Media PCI", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user(argp, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -1656,50 +1658,50 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 		memset(&info, 0, sizeof(info));
 		strlcpy(info.id, "cmpci", sizeof(info.id));
 		strlcpy(info.name, "C-Media cmpci", sizeof(info.name));
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user(argp, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
 	if (cmd == OSS_GETVERSION)
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 	if (_IOC_TYPE(cmd) != 'M' || _SIOC_SIZE(cmd) != sizeof(int))
                 return -EINVAL;
         if (_SIOC_DIR(cmd) == _SIOC_READ) {
                 switch (_IOC_NR(cmd)) {
                 case SOUND_MIXER_RECSRC: /* Arg contains a bit for each recording source */
 			val = mixer_recmask(s);
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_OUTSRC: /* Arg contains a bit for each recording source */
 			val = mixer_outmask(s);
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_DEVMASK: /* Arg contains a bit for each supported device */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].type)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_RECMASK: /* Arg contains a bit for each supported recording source */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].rec)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_OUTMASK: /* Arg contains a bit for each supported recording source */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].play)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                  case SOUND_MIXER_STEREODEVS: /* Mixer channels supporting stereo */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].type && mixtable[i].type != MT_4MUTEMONO)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_CAPS:
-			return put_user(0, (int *)arg);
+			return put_user(0, p);
 
 		default:
 			i = _IOC_NR(cmd);
@@ -1707,7 +1709,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
                                 return -EINVAL;
 			if (!volidx[i])
 				return -EINVAL;
-			return put_user(s->mix.vol[volidx[i]-1], (int *)arg);
+			return put_user(s->mix.vol[volidx[i]-1], p);
 		}
 	}
         if (_SIOC_DIR(cmd) != (_SIOC_READ|_SIOC_WRITE))
@@ -1715,7 +1717,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 	s->mix.modcnt++;
 	switch (_IOC_NR(cmd)) {
 	case SOUND_MIXER_RECSRC: /* Arg contains a bit for each recording source */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		i = generic_hweight32(val);
 		for (j = i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
@@ -1734,7 +1736,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 		return 0;
 
 	case SOUND_MIXER_OUTSRC: /* Arg contains a bit for each recording source */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		for (j = i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
 			if (!(val & (1 << i)))
@@ -1754,7 +1756,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 		i = _IOC_NR(cmd);
 		if (i >= SOUND_MIXER_NRDEVICES || !mixtable[i].type)
 			return -EINVAL;
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		l = val & 0xff;
 		r = (val >> 8) & 0xff;
@@ -1829,7 +1831,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 		if (!volidx[i])
 			return -EINVAL;
 		s->mix.vol[volidx[i]-1] = val;
-		return put_user(s->mix.vol[volidx[i]-1], (int *)arg);
+		return put_user(s->mix.vol[volidx[i]-1], p);
 	}
 }
 
@@ -1914,7 +1916,7 @@ static int drain_dac(struct cm_state *s, int nonblock)
 
 /* --------------------------------------------------------------------- */
 
-static ssize_t cm_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t cm_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct cm_state *s = (struct cm_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -1975,11 +1977,11 @@ static ssize_t cm_read(struct file *file, char *buffer, size_t count, loff_t *pp
 		}
 		if (s->status & DO_BIGENDIAN_R) {
 			int	i, err;
-			unsigned char *src, *dst;
+			unsigned char *src;
+			char __user *dst = buffer;
 			unsigned char data[2];
 
 			src = (unsigned char *) (s->dma_adc.rawbuf + swptr);
-			dst = (unsigned char *) buffer;
 			// copy left/right sample at one time
 			for (i = 0; i < cnt / 2; i++) {
 				data[0] = src[1];
@@ -2016,7 +2018,7 @@ out:
 	return ret;
 }
 
-static ssize_t cm_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t cm_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct cm_state *s = (struct cm_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -2116,10 +2118,10 @@ static ssize_t cm_write(struct file *file, const char *buffer, size_t count, lof
 			swptr = (swptr + 2 * cnt) % s->dma_dac.dmasize;
 		} else if ((s->status & DO_DUAL_DAC) && (s->status & DO_BIGENDIAN_W)) {
 			int	i, err;
-			unsigned char *src, *dst0, *dst1;
+			const char __user *src = buffer;
+			unsigned char *dst0, *dst1;
 			unsigned char data[8];
 
-			src = (unsigned char *) buffer;
 			dst0 = (unsigned char *) (s->dma_dac.rawbuf + swptr);
 			dst1 = (unsigned char *) (s->dma_adc.rawbuf + swptr);
 			// copy left/right sample at one time
@@ -2170,9 +2172,9 @@ static ssize_t cm_write(struct file *file, const char *buffer, size_t count, lof
 			swptr = (swptr + cnt) % s->dma_dac.dmasize;
 		} else if (s->status & DO_DUAL_DAC) {
 			int	i, err;
-			unsigned long *src, *dst0, *dst1;
+			unsigned long __user *src = (unsigned long __user *) buffer;
+			unsigned long *dst0, *dst1;
 
-			src = (unsigned long *) buffer;
 			dst0 = (unsigned long *) (s->dma_dac.rawbuf + swptr);
 			dst1 = (unsigned long *) (s->dma_adc.rawbuf + swptr);
 			// copy left/right sample at one time
@@ -2189,10 +2191,10 @@ static ssize_t cm_write(struct file *file, const char *buffer, size_t count, lof
 			swptr = (swptr + cnt) % s->dma_dac.dmasize;
 		} else if (s->status & DO_BIGENDIAN_W) {
 			int	i, err;
-			unsigned char *src, *dst;
+			const char __user *src = buffer;
+			unsigned char *dst;
 			unsigned char data[2];
 
-			src = (unsigned char *) buffer;
 			dst = (unsigned char *) (s->dma_dac.rawbuf + swptr);
 			// swap hi/lo bytes for each sample
 			for (i = 0; i < cnt / 2; i++) {
@@ -2330,13 +2332,15 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         count_info cinfo;
 	int val, mapped, ret;
 	unsigned char fmtm, fmtd;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	VALIDATE_STATE(s);
         mapped = ((file->f_mode & FMODE_WRITE) && s->dma_dac.mapped) ||
 		((file->f_mode & FMODE_READ) && s->dma_adc.mapped);
 	switch (cmd) {
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_SYNC:
 		if (file->f_mode & FMODE_WRITE)
@@ -2347,7 +2351,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		return 0;
 
 	case SNDCTL_DSP_GETCAPS:
-		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP | DSP_CAP_BIND, (int *)arg);
+		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP | DSP_CAP_BIND, p);
 
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
@@ -2365,7 +2369,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		return 0;
 
         case SNDCTL_DSP_SPEED:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val >= 0) {
 			if (file->f_mode & FMODE_READ) {
@@ -2383,10 +2387,10 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				set_dac_rate(s, val);
 			}
 		}
-		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, (int *)arg);
+		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, p);
 
         case SNDCTL_DSP_STEREO:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		fmtd = 0;
 		fmtm = ~0;
@@ -2417,7 +2421,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		return 0;
 
         case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != 0) {
 			fmtd = 0;
@@ -2449,18 +2453,18 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			if ((s->capability & CAN_MULTI_CH)
 			     && (file->f_mode & FMODE_WRITE)) {
 				val = set_dac_channels(s, val);
-				return put_user(val, (int *)arg);
+				return put_user(val, p);
 			}
 		}
 		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_STEREO << CM_CFMT_ADCSHIFT)
-					   : (CM_CFMT_STEREO << CM_CFMT_DACSHIFT))) ? 2 : 1, (int *)arg);
+					   : (CM_CFMT_STEREO << CM_CFMT_DACSHIFT))) ? 2 : 1, p);
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask */
                 return put_user(AFMT_S16_BE|AFMT_S16_LE|AFMT_U8|
-			((s->capability & CAN_AC3) ? AFMT_AC3 : 0), (int *)arg);
+			((s->capability & CAN_AC3) ? AFMT_AC3 : 0), p);
 
 	case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != AFMT_QUERY) {
 			fmtd = 0;
@@ -2503,9 +2507,9 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			}
 			set_fmt(s, fmtm, fmtd);
 		}
-		if (s->status & DO_AC3) return put_user(AFMT_AC3, (int *)arg);
+		if (s->status & DO_AC3) return put_user(AFMT_AC3, p);
 		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_16BIT << CM_CFMT_ADCSHIFT)
-					   : (CM_CFMT_16BIT << CM_CFMT_DACSHIFT))) ? val : AFMT_U8, (int *)arg);
+					   : (CM_CFMT_16BIT << CM_CFMT_DACSHIFT))) ? val : AFMT_U8, p);
 
 	case SNDCTL_DSP_POST:
                 return 0;
@@ -2517,16 +2521,16 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			 (s->enable & ENDAC) &&
 			 (s->enable & ENADC))
 				val |= PCM_ENABLE_OUTPUT;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 		}
 		if (file->f_mode & FMODE_READ && s->enable & ENADC)
 			val |= PCM_ENABLE_INPUT;
 		if (file->f_mode & FMODE_WRITE && s->enable & ENDAC)
 			val |= PCM_ENABLE_OUTPUT;
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			if (val & PCM_ENABLE_INPUT) {
@@ -2568,7 +2572,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
                 abinfo.fragstotal = s->dma_dac.numfrag;
                 abinfo.fragments = abinfo.bytes >> s->dma_dac.fragshift;
 		spin_unlock_irqrestore(&s->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -2582,7 +2586,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
                 abinfo.fragstotal = s->dma_adc.numfrag;
                 abinfo.fragments = abinfo.bytes >> s->dma_adc.fragshift;
 		spin_unlock_irqrestore(&s->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
         case SNDCTL_DSP_NONBLOCK:
                 file->f_flags |= O_NONBLOCK;
@@ -2595,7 +2599,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		cm_update_ptr(s);
                 val = s->dma_dac.count;
 		spin_unlock_irqrestore(&s->lock, flags);
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
         case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -2608,7 +2612,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		if (s->dma_adc.mapped)
 			s->dma_adc.count &= s->dma_adc.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-                return copy_to_user((void *)arg, &cinfo, sizeof(cinfo))  ? -EFAULT : 0;
+                return copy_to_user(argp, &cinfo, sizeof(cinfo))  ? -EFAULT : 0;
 
         case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
@@ -2625,7 +2629,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				s->dma_adc.count &= s->dma_adc.fragsize-1;
 		}
 		spin_unlock_irqrestore(&s->lock, flags);
-                return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
+                return copy_to_user(argp, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
         case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
@@ -2634,16 +2638,16 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			if (s->status & DO_DUAL_DAC) {
 				if ((val = prog_dmabuf(s, 1)))
 					return val;
-				return put_user(2 * s->dma_dac.fragsize, (int *)arg);
+				return put_user(2 * s->dma_dac.fragsize, p);
 			}
-			return put_user(s->dma_dac.fragsize, (int *)arg);
+			return put_user(s->dma_dac.fragsize, p);
 		}
 		if ((val = prog_dmabuf(s, 1)))
 			return val;
-		return put_user(s->dma_adc.fragsize, (int *)arg);
+		return put_user(s->dma_adc.fragsize, p);
 
         case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			s->dma_adc.ossfragshift = val & 0xffff;
@@ -2675,7 +2679,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		if ((file->f_mode & FMODE_READ && s->dma_adc.subdivision) ||
 		    (file->f_mode & FMODE_WRITE && s->dma_dac.subdivision))
 			return -EINVAL;
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -2689,22 +2693,22 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		return 0;
 
         case SOUND_PCM_READ_RATE:
-		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, (int *)arg);
+		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, p);
 
         case SOUND_PCM_READ_CHANNELS:
-		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_STEREO << CM_CFMT_ADCSHIFT) : (CM_CFMT_STEREO << CM_CFMT_DACSHIFT))) ? 2 : 1, (int *)arg);
+		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_STEREO << CM_CFMT_ADCSHIFT) : (CM_CFMT_STEREO << CM_CFMT_DACSHIFT))) ? 2 : 1, p);
 
         case SOUND_PCM_READ_BITS:
-		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_16BIT << CM_CFMT_ADCSHIFT) : (CM_CFMT_16BIT << CM_CFMT_DACSHIFT))) ? 16 : 8, (int *)arg);
+		return put_user((s->fmt & ((file->f_mode & FMODE_READ) ? (CM_CFMT_16BIT << CM_CFMT_ADCSHIFT) : (CM_CFMT_16BIT << CM_CFMT_DACSHIFT))) ? 16 : 8, p);
 
         case SOUND_PCM_READ_FILTER:
-		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, (int *)arg);
+		return put_user((file->f_mode & FMODE_READ) ? s->rateadc : s->ratedac, p);
 
 	case SNDCTL_DSP_GETCHANNELMASK:
-		return put_user(DSP_BIND_FRONT|DSP_BIND_SURR|DSP_BIND_CENTER_LFE|DSP_BIND_SPDIF, (int *)arg);
+		return put_user(DSP_BIND_FRONT|DSP_BIND_SURR|DSP_BIND_CENTER_LFE|DSP_BIND_SPDIF, p);
 
 	case SNDCTL_DSP_BIND_CHANNEL:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val == DSP_BIND_QUERY) {
 			val = DSP_BIND_FRONT;
@@ -2757,7 +2761,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				}
 			}
 		}
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SOUND_PCM_WRITE_FILTER:
 	case SNDCTL_DSP_MAPINBUF:
@@ -2765,47 +2769,47 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_SETSYNCRO:
                 return -EINVAL;
 	case SNDCTL_SPDIF_COPYRIGHT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdif_copyright(s, val);
                 return 0;
 	case SNDCTL_SPDIF_LOOP:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdif_loop(s, val);
                 return 0;
 	case SNDCTL_SPDIF_MONITOR:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdif_monitor(s, val);
                 return 0;
 	case SNDCTL_SPDIF_LEVEL:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifout_level(s, val);
                 return 0;
 	case SNDCTL_SPDIF_INV:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifin_inverse(s, val);
                 return 0;
 	case SNDCTL_SPDIF_SEL2:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifin_channel2(s, val);
                 return 0;
 	case SNDCTL_SPDIF_VALID:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifin_valid(s, val);
                 return 0;
 	case SNDCTL_SPDIFOUT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifout(s, val ? s->ratedac : 0);
                 return 0;
 	case SNDCTL_SPDIFIN:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_spdifin(s, val ? s->rateadc : 0);
                 return 0;

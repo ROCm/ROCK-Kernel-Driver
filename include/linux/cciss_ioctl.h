@@ -167,7 +167,7 @@ typedef struct _IOCTL_Command_struct {
   RequestBlock_struct      Request;
   ErrorInfo_struct  	   error_info; 
   WORD			   buf_size;  /* size in bytes of the buf */
-  BYTE			   *buf;
+  BYTE			   __user *buf;
 } IOCTL_Command_struct;
 
 typedef struct _BIG_IOCTL_Command_struct {
@@ -177,7 +177,7 @@ typedef struct _BIG_IOCTL_Command_struct {
   DWORD			   malloc_size; /* < MAX_KMALLOC_SIZE in cciss.c */
   DWORD			   buf_size;    /* size in bytes of the buf */
   				        /* < malloc_size * MAXSGENTRIES */
-  BYTE			   *buf;
+  BYTE			   __user *buf;
 } BIG_IOCTL_Command_struct;
 
 typedef struct _LogvolInfo_struct{

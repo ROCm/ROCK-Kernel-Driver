@@ -2595,11 +2595,10 @@ static int read_audio(struct cdrom_read_audio *ra)
 						retval = -EIO;
 						goto exit_read_audio;
 					}
-				} else if (copy_to_user((char *)(ra->buf +
+				} else if (copy_to_user(ra->buf +
 							       (CD_FRAMESIZE_RAW
-								* cframe)),
-							(char *)
-							       readahead_buffer,
+								* cframe),
+						        readahead_buffer,
 							CD_FRAMESIZE_RAW)) {
 					retval = -EFAULT;
 					goto exit_read_audio;
@@ -2612,8 +2611,7 @@ static int read_audio(struct cdrom_read_audio *ra)
 				retval = -EIO;
 				goto exit_read_audio;
 			}
-		} else if (copy_to_user((char *)(ra->buf + (CD_FRAMESIZE_RAW *
-							    cframe)),
+		} else if (copy_to_user(ra->buf + (CD_FRAMESIZE_RAW * cframe),
 					(char *)readahead_buffer,
 					CD_FRAMESIZE_RAW)) {
 			retval = -EFAULT;
@@ -2945,6 +2943,7 @@ static int scd_audio_ioctl(struct cdrom_device_info *cdi,
 static int scd_dev_ioctl(struct cdrom_device_info *cdi,
 			 unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
 	int i;
 
 	switch (cmd) {
@@ -2959,7 +2958,7 @@ static int scd_dev_ioctl(struct cdrom_device_info *cdi,
 				return -EIO;
 			}
 
-			if (copy_from_user(&ra, (char *) arg, sizeof(ra)))
+			if (copy_from_user(&ra, argp, sizeof(ra)))
 				return -EFAULT;
 
 			if (ra.nframes == 0) {

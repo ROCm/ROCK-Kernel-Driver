@@ -330,12 +330,12 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 		case HDIO_GETGEO:
 		{
 			struct hd_geometry g;
-			struct hd_geometry *geometry = (struct hd_geometry *) arg;
+			struct hd_geometry __user *geom= (void __user *)arg;
 			g.heads = p->heads;
 			g.sectors = p->sectors;
 			g.cylinders = p->cylinders;
 			g.start = get_start_sect(inode->i_bdev);
-			return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
+			return copy_to_user(geom, &g, sizeof(g)) ? -EFAULT : 0;
 		}
 		case HDIO_SET_DMA:
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
@@ -354,9 +354,9 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			}
 			return 0;
 		case HDIO_GET_DMA:
-			return put_user(!nodma, (long *) arg);
+			return put_user(!nodma, (long __user *) arg);
 		case HDIO_GET_MULTCOUNT:
-			return put_user(xd_maxsectors, (long *) arg);
+			return put_user(xd_maxsectors, (long __user *) arg);
 		default:
 			return -EINVAL;
 	}
