@@ -20,6 +20,7 @@
 #include <linux/smp_lock.h>
 #include <linux/ioctl.h>
 #include <linux/if.h>
+#include <linux/if_bridge.h>
 #include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/raid/md.h>
@@ -3072,18 +3073,19 @@ static int do_wireless_ioctl(unsigned int fd, unsigned int cmd, unsigned long ar
 	return sys_ioctl(fd, cmd, (unsigned long) iwr);
 }
 
-/* Emulate old style bridge ioctls */
-static int do_bridge_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+/* Since old style bridge ioctl's endup using SIOCDEVPRIVATE
+ * for some operations; this forces use of the newer bridge-utils that
+ * use compatiable ioctls
+ */
+static int old_bridge_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	u32 tmp;
-	unsigned long *argbuf = compat_alloc_user_space(3 * sizeof(unsigned long)); 
-	int i;	
-	for (i = 0; i < 3; i++) {
-		if (get_user(tmp, i + ((u32 *)arg)) ||
-		    put_user(tmp, i + argbuf))
-			return -EFAULT;
-	}
-	return sys_ioctl(fd, cmd, (unsigned long)argbuf);
+
+	if (get_user(tmp, (u32 *) arg))
+		return -EFAULT;
+	if (tmp == BRCTL_GET_VERSION)
+		return BRCTL_VERSION + 1;
+	return -EINVAL;
 }
 
 #undef CODE
@@ -3133,6 +3135,8 @@ HANDLE_IOCTL(SIOCBONDINFOQUERY, bond_ioctl)
 HANDLE_IOCTL(SIOCBONDCHANGEACTIVE, bond_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
+HANDLE_IOCTL(SIOCBRADDIF, dev_ifsioc)
+HANDLE_IOCTL(SIOCBRDELIF, dev_ifsioc)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */
 HANDLE_IOCTL(SIOCRTMSG, ret_einval)
 HANDLE_IOCTL(SIOCGSTAMP, do_siocgstamp)
@@ -3263,8 +3267,8 @@ HANDLE_IOCTL(SIOCSIWNICKN, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCGIWNICKN, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCSIWENCODE, do_wireless_ioctl)
 HANDLE_IOCTL(SIOCGIWENCODE, do_wireless_ioctl)
-HANDLE_IOCTL(SIOCSIFBR, do_bridge_ioctl)
-HANDLE_IOCTL(SIOCGIFBR, do_bridge_ioctl)
+HANDLE_IOCTL(SIOCSIFBR, old_bridge_ioctl)
+HANDLE_IOCTL(SIOCGIFBR, old_bridge_ioctl)
 
 #undef DECLARES
 #endif
