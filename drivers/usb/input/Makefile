@@ -16,6 +16,7 @@ endif
 obj-$(CONFIG_USB_HID)		+= hid.o
 obj-$(CONFIG_USB_KBD)		+= usbkbd.o
 obj-$(CONFIG_USB_MOUSE)		+= usbmouse.o
+obj-$(CONFIG_USB_AIPTEK)	+= aiptek.o
 obj-$(CONFIG_USB_WACOM)		+= wacom.o
 
 

@@ -62,6 +62,17 @@ CONFIG_USB_MOUSE
 
   If even remotely unsure, say N.
 
+CONFIG_USB_AIPTEK
+  Say Y here if you want to use the USB version of the Aiptek 6000U
+  or Aiptek 8000U tablet.  Make sure to say Y to "Mouse support"
+  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
+  (CONFIG_INPUT_EVDEV) as well.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called aiptek.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_USB_WACOM
   Say Y here if you want to use the USB version of the Wacom Intuos
   or Graphire tablet.  Make sure to say Y to "Mouse support"
