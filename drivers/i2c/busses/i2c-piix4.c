@@ -51,37 +51,37 @@ struct sd {
 };
 
 /* PIIX4 SMBus address offsets */
-#define SMBHSTSTS (0 + piix4_smba)
-#define SMBHSLVSTS (1 + piix4_smba)
-#define SMBHSTCNT (2 + piix4_smba)
-#define SMBHSTCMD (3 + piix4_smba)
-#define SMBHSTADD (4 + piix4_smba)
-#define SMBHSTDAT0 (5 + piix4_smba)
-#define SMBHSTDAT1 (6 + piix4_smba)
-#define SMBBLKDAT (7 + piix4_smba)
-#define SMBSLVCNT (8 + piix4_smba)
-#define SMBSHDWCMD (9 + piix4_smba)
-#define SMBSLVEVT (0xA + piix4_smba)
-#define SMBSLVDAT (0xC + piix4_smba)
+#define SMBHSTSTS	(0 + piix4_smba)
+#define SMBHSLVSTS	(1 + piix4_smba)
+#define SMBHSTCNT	(2 + piix4_smba)
+#define SMBHSTCMD	(3 + piix4_smba)
+#define SMBHSTADD	(4 + piix4_smba)
+#define SMBHSTDAT0	(5 + piix4_smba)
+#define SMBHSTDAT1	(6 + piix4_smba)
+#define SMBBLKDAT	(7 + piix4_smba)
+#define SMBSLVCNT	(8 + piix4_smba)
+#define SMBSHDWCMD	(9 + piix4_smba)
+#define SMBSLVEVT	(0xA + piix4_smba)
+#define SMBSLVDAT	(0xC + piix4_smba)
 
 /* PCI Address Constants */
-#define SMBBA     0x090
-#define SMBHSTCFG 0x0D2
-#define SMBSLVC   0x0D3
-#define SMBSHDW1  0x0D4
-#define SMBSHDW2  0x0D5
-#define SMBREV    0x0D6
+#define SMBBA		0x090
+#define SMBHSTCFG	0x0D2
+#define SMBSLVC		0x0D3
+#define SMBSHDW1	0x0D4
+#define SMBSHDW2	0x0D5
+#define SMBREV		0x0D6
 
 /* Other settings */
-#define MAX_TIMEOUT 500
-#define  ENABLE_INT9 0
+#define MAX_TIMEOUT	500
+#define  ENABLE_INT9	0
 
 /* PIIX4 constants */
-#define PIIX4_QUICK      0x00
-#define PIIX4_BYTE       0x04
-#define PIIX4_BYTE_DATA  0x08
-#define PIIX4_WORD_DATA  0x0C
-#define PIIX4_BLOCK_DATA 0x14
+#define PIIX4_QUICK		0x00
+#define PIIX4_BYTE		0x04
+#define PIIX4_BYTE_DATA		0x08
+#define PIIX4_WORD_DATA		0x0C
+#define PIIX4_BLOCK_DATA	0x14
 
 /* insmod parameters */
 
@@ -138,7 +138,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		goto END;
 	}
 
-/* Determine the address of the SMBus areas */
+	/* Determine the address of the SMBus areas */
 	if (force_addr) {
 		piix4_smba = force_addr & 0xfff0;
 		force = 0;
@@ -161,8 +161,8 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 	}
 
 	pci_read_config_byte(PIIX4_dev, SMBHSTCFG, &temp);
-/* If force_addr is set, we program the new address here. Just to make
-   sure, we disable the PIIX4 first. */
+	/* If force_addr is set, we program the new address here. Just to make
+	   sure, we disable the PIIX4 first. */
 	if (force_addr) {
 		pci_write_config_byte(PIIX4_dev, SMBHSTCFG, temp & 0xfe);
 		pci_write_config_word(PIIX4_dev, SMBBA, piix4_smba);
@@ -171,12 +171,14 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 			"new address %04x!\n", piix4_smba);
 	} else if ((temp & 1) == 0) {
 		if (force) {
-/* This should never need to be done, but has been noted that
-   many Dell machines have the SMBus interface on the PIIX4
-   disabled!? NOTE: This assumes I/O space and other allocations WERE
-   done by the Bios!  Don't complain if your hardware does weird 
-   things after enabling this. :') Check for Bios updates before
-   resorting to this.  */
+			/* This should never need to be done, but has been
+			 * noted that many Dell machines have the SMBus
+			 * interface on the PIIX4 disabled!? NOTE: This assumes
+			 * I/O space and other allocations WERE done by the
+			 * Bios!  Don't complain if your hardware does weird
+			 * things after enabling this. :') Check for Bios
+			 * updates before resorting to this.
+			 */
 			pci_write_config_byte(PIIX4_dev, SMBHSTCFG,
 					      temp | 1);
 			dev_printk(KERN_NOTICE, &PIIX4_dev->dev,
@@ -202,10 +204,9 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 	dev_dbg(&PIIX4_dev->dev, "SMBREV = 0x%X\n", temp);
 	dev_dbg(&PIIX4_dev->dev, "SMBA = 0x%X\n", piix4_smba);
 
-      END:
+END:
 	return error_return;
 }
-
 
 /* Internally used pause function */
 static void piix4_do_pause(unsigned int amount)
@@ -377,7 +378,6 @@ static s32 piix4_access(struct i2c_adapter * adap, u16 addr,
 	return 0;
 }
 
-
 static u32 piix4_func(struct i2c_adapter *adapter)
 {
 	return I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
@@ -398,8 +398,6 @@ static struct i2c_adapter piix4_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_PIIX4,
 	.algo		= &smbus_algorithm,
 };
-
-
 
 static struct pci_device_id piix4_ids[] __devinitdata = {
 	{
@@ -443,7 +441,7 @@ static struct pci_device_id piix4_ids[] __devinitdata = {
 static int __devinit piix4_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;
-	
+
 	retval = piix4_setup(dev, id);
 	if (retval)
 		return retval;
@@ -484,8 +482,6 @@ static void __exit i2c_piix4_exit(void)
 	pci_unregister_driver(&piix4_driver);
 	release_region(piix4_smba, 8);
 }
-
-
 
 MODULE_AUTHOR
     ("Frodo Looijaard <frodol@dds.nl> and Philip Edelbrock <phil@netroedge.com>");
