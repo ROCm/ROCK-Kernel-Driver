@@ -84,7 +84,7 @@ MODULE_LICENSE("GPL");
 /* respectively. This makes sure that the algorithm works. Some chips   */
 /* might not like this, as they have an internal timeout of some mils	*/
 /*
-#define SLO_IO      jif=jiffies;while(jiffies<=jif+i2c_table[minor].veryslow)\
+#define SLO_IO      jif=jiffies;while(time_before_eq(jiffies,jif+i2c_table[minor].veryslow))\
                         if (need_resched) schedule();
 */
 

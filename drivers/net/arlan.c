@@ -1124,24 +1124,6 @@ static int __init arlan_probe_everywhere(struct net_device *dev)
 	return -ENODEV;
 }
 
-static int __init arlan_find_devices(void)
-{
-	int m;
-	int found = 0;
-
-	ARLAN_DEBUG_ENTRY("arlan_find_devices");
-	if (mem != 0 && numDevices == 1)	/* Check a single specified location. */
-		return 1;
-	for (m =(int) phys_to_virt(0xc0000); m <=(int) phys_to_virt(0xDE000); m += 0x2000)
-	{
-		if (arlan_check_fingerprint(m) == 0)
-			found++;
-	}
-	ARLAN_DEBUG_EXIT("arlan_find_devices");
-
-	return found;
-}
-
 
 static int arlan_change_mtu(struct net_device *dev, int new_mtu)
 {
@@ -1199,7 +1181,7 @@ static int __init
 			return 0;
 		}
 		ap = dev->priv;
-		ap->config = dev->priv + sizeof(struct arlan_private);
+		ap->conf = dev->priv + sizeof(struct arlan_private);
 		ap->init_etherdev_alloc = 1;
 	} else {
 		dev = devs;
@@ -1209,7 +1191,7 @@ static int __init
 			return 0;
 		}
 		ap = dev->priv;
-		ap->config = dev->priv + sizeof(struct arlan_private);
+		ap->conf = dev->priv + sizeof(struct arlan_private);
 		memset(ap, 0, sizeof(*ap));
 	}
 
@@ -2006,6 +1988,24 @@ int __init arlan_probe(struct net_device *dev)
 }
 
 #ifdef  MODULE
+
+static int __init arlan_find_devices(void)
+{
+	int m;
+	int found = 0;
+
+	ARLAN_DEBUG_ENTRY("arlan_find_devices");
+	if (mem != 0 && numDevices == 1)	/* Check a single specified location. */
+		return 1;
+	for (m =(int) phys_to_virt(0xc0000); m <=(int) phys_to_virt(0xDE000); m += 0x2000)
+	{
+		if (arlan_check_fingerprint(m) == 0)
+			found++;
+	}
+	ARLAN_DEBUG_EXIT("arlan_find_devices");
+
+	return found;
+}
 
 int init_module(void)
 {

@@ -242,6 +242,8 @@ static int __init elanfreq_init(void)
 			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!driver)
 		return -ENOMEM;
+	memset(driver, 0, sizeof(struct cpufreq_driver) +
+			NR_CPUS * sizeof(struct cpufreq_policy));
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
@@ -260,8 +262,6 @@ static int __init elanfreq_init(void)
 
 	driver->verify        = &elanfreq_verify;
 	driver->setpolicy     = &elanfreq_setpolicy;
-	driver->init = NULL;
-	driver->exit = NULL;
 	strncpy(driver->name, "elanfreq", CPUFREQ_NAME_LEN);
 
 	driver->policy[0].cpu    = 0;

@@ -141,13 +141,33 @@ int max_queued_signals = 1024;
 	(((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_DFL) &&	\
 	 ((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_IGN))
 
-#define sig_ignored(t, signr) \
-	(!((t)->ptrace & PT_PTRACED) && \
-	 (t)->sighand->action[(signr)-1].sa.sa_handler == SIG_IGN)
-
 #define sig_fatal(t, signr) \
 	(!T(signr, SIG_KERNEL_IGNORE_MASK|SIG_KERNEL_STOP_MASK) && \
 	 (t)->sighand->action[(signr)-1].sa.sa_handler == SIG_DFL)
+
+static inline int sig_ignored(struct task_struct *t, int sig)
+{
+	void * handler;
+
+	/*
+	 * Tracers always want to know about signals..
+	 */
+	if (t->ptrace & PT_PTRACED)
+		return 0;
+
+	/*
+	 * Blocked signals are never ignored, since the
+	 * signal handler may change by the time it is
+	 * unblocked.
+	 */
+	if (sigismember(&t->blocked, sig))
+		return 0;
+
+	/* Is it explicitly or implicitly ignored? */
+	handler = t->sighand->action[sig-1].sa.sa_handler;
+	return   handler == SIG_IGN ||
+		(handler == SIG_DFL && sig_kernel_ignore(sig));
+}
 
 /*
  * Re-calculate pending state from the set of locally pending
@@ -642,7 +662,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * TIF_SIGPENDING
 			 */
 			state = TASK_STOPPED;
-			if (!sigismember(&t->blocked, SIGCONT)) {
+			if (sig_user_defined(t, SIGCONT) && !sigismember(&t->blocked, SIGCONT)) {
 				set_tsk_thread_flag(t, TIF_SIGPENDING);
 				state |= TASK_INTERRUPTIBLE;
 			}

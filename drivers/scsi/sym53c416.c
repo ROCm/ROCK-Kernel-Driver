@@ -272,7 +272,7 @@ static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, u
 		{
 			i = jiffies + timeout;
 			spin_unlock_irqrestore(&sym53c416_lock, flags);
-			while(jiffies < i && (inb(base + PIO_INT_REG) & EMPTY) && timeout)
+			while(time_before(jiffies, i) && (inb(base + PIO_INT_REG) & EMPTY) && timeout)
 				if(inb(base + PIO_INT_REG) & SCI)
 					timeout = 0;
 			spin_lock_irqsave(&sym53c416_lock, flags);
@@ -316,7 +316,7 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 		{
 			i = jiffies + timeout;
 			spin_unlock_irqrestore(&sym53c416_lock, flags);
-			while(jiffies < i && (inb(base + PIO_INT_REG) & FULL) && timeout)
+			while(time_before(jiffies, i) && (inb(base + PIO_INT_REG) & FULL) && timeout)
 				;
 			spin_lock_irqsave(&sym53c416_lock, flags);
 			if(inb(base + PIO_INT_REG) & FULL)
@@ -552,7 +552,7 @@ static int sym53c416_probeirq(int base, int scsi_id)
 	outb(0x00, base + DEST_BUS_ID);
 	/* Wait for interrupt to occur */
 	i = jiffies + 20;
-	while(i > jiffies && !(inb(base + STATUS_REG) & SCI))
+	while(time_before(jiffies, i) && !(inb(base + STATUS_REG) & SCI))
 		barrier();
 	if(time_before_eq(i, jiffies))	/* timed out */
 		return 0;

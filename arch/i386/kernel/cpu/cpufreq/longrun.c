@@ -54,7 +54,7 @@ static void longrun_get_policy(struct cpufreq_policy *policy)
 
 	policy->min = longrun_low_freq + msr_lo * 
 		((longrun_high_freq - longrun_low_freq) / 100);
-	policy->min = longrun_low_freq + msr_hi * 
+	policy->max = longrun_low_freq + msr_hi * 
 		((longrun_high_freq - longrun_low_freq) / 100);
 	policy->cpu = 0;
 }
@@ -241,6 +241,8 @@ static int __init longrun_init(void)
 			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!driver)
 		return -ENOMEM;
+	memset(driver, 0, sizeof(struct cpufreq_driver) +
+			NR_CPUS * sizeof(struct cpufreq_policy));
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
@@ -251,8 +253,7 @@ static int __init longrun_init(void)
 	driver->policy[0].cpuinfo.min_freq = longrun_low_freq;
 	driver->policy[0].cpuinfo.max_freq = longrun_high_freq;
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	driver->init = NULL;
-	driver->exit = NULL;
+
 	strncpy(driver->name, "longrun", CPUFREQ_NAME_LEN);
 
 	longrun_get_policy(&driver->policy[0]);

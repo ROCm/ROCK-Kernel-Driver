@@ -801,7 +801,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			return -ENOMEM;
 		if (addr & ~PAGE_MASK)
 			return -EINVAL;
-		if (is_file_hugepages(file)) {
+		if (file && is_file_hugepages(file)) {
 			unsigned long ret;
 
 			ret = is_aligned_hugepage_range(addr, len);

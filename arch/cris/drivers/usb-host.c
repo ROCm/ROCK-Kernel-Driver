@@ -459,7 +459,8 @@ static int etrax_usb_unlink_intr_urb(struct urb *urb)
 	*R_DMA_CH8_SUB2_CMD = IO_STATE(R_DMA_CH8_SUB2_CMD, cmd, stop);
 	/* Somehow wait for the DMA to finish current activities */
 	i = jiffies + 100;
-	while (jiffies < i);	
+	while (time_before(jiffies, i))
+		;
 	
 	first_ep = &TxIntrEPList[0];
 	tmp_ep = first_ep;

@@ -293,7 +293,8 @@ int allow_signal(int sig)
 	spin_unlock_irq(&current->sighand->siglock);
 	return 0;
 }
-	
+
+EXPORT_SYMBOL(allow_signal);
 
 /*
  *	Put all the gunge required to become a kernel thread without

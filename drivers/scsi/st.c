@@ -3618,7 +3618,7 @@ __setup("st=", st_setup);
 static ssize_t st_device_kdev_read(struct device *dev, char *page)
 {
 	kdev_t kdev; 
-	kdev.value=(int)dev->driver_data;
+	kdev.value=(unsigned long)dev->driver_data;
 	return sprintf(page, "%x\n",kdev.value);
 }
 static DEVICE_ATTR(kdev,S_IRUGO,st_device_kdev_read,NULL);
