@@ -422,9 +422,11 @@ sysfs_in_offsets(7);
 sysfs_in_offsets(8);
 
 #define device_create_file_in(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_in_input##offset); \
 device_create_file(&client->dev, &dev_attr_in_min##offset); \
-device_create_file(&client->dev, &dev_attr_in_max##offset);
+device_create_file(&client->dev, &dev_attr_in_max##offset); \
+} while (0);
 
 #define show_fan_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
