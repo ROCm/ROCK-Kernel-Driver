@@ -151,6 +151,8 @@ ebsa110_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 count;
 
+	write_seqlock(&xtime_lock);
+
 	/* latch and read timer 1 */
 	__raw_writeb(0x40, PIT_CTRL);
 	count = __raw_readb(PIT_T1);
@@ -162,6 +164,8 @@ ebsa110_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	__raw_writeb(count >> 8, PIT_T1);
 
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

@@ -64,7 +64,9 @@ h7202_timerx_demux_handler(unsigned int irq_unused, struct irqdesc *desc,
 	mask = CPU_REG (TIMER_VIRT, TIMER_TOPSTAT);
 
 	if ( mask & TSTAT_T0INT ) {
+		write_seqlock(&xtime_lock);
 		timer_tick(regs);
+		write_sequnlock(&xtime_lock);
 		if( mask == TSTAT_T0INT )
 			return;
 	}

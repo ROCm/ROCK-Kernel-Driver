@@ -29,9 +29,13 @@ static unsigned long timer1_gettimeoffset (void)
 static irqreturn_t
 timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
+
 	*CSR_TIMER1_CLR = 0;
 
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

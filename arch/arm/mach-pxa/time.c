@@ -75,6 +75,8 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int next_match;
 
+	write_seqlock(&xtime_lock);
+
 	/* Loop until we get ahead of the free running timer.
 	 * This ensures an exact clock tick count and time accuracy.
 	 * IRQs are disabled inside the loop to ensure coherence between
@@ -95,6 +97,8 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
 	} while( (signed long)(next_match - OSCR) <= 8 );
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

@@ -43,11 +43,13 @@ __initcall(epxa10db_rtc_init);
 static irqreturn_t
 epxa10db_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 
 	// ...clear the interrupt
 	*TIMER0_CR(IO_ADDRESS(EXC_TIMER00_BASE))|=TIMER0_CR_CI_MSK;
 
 	timer_tick(regs);
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

@@ -88,8 +88,9 @@ static unsigned long s3c2410_gettimeoffset (void)
 static irqreturn_t
 s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 	timer_tick(regs);
-
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 
