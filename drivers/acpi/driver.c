@@ -55,7 +55,7 @@ struct acpi_run_entry
 
 static spinlock_t acpi_event_lock = SPIN_LOCK_UNLOCKED;
 static volatile u32 acpi_event_status = 0;
-static volatile acpi_sstate_t acpi_event_state = ACPI_S0;
+static volatile acpi_sstate_t acpi_event_state = ACPI_STATE_S0;
 static DECLARE_WAIT_QUEUE_HEAD(acpi_event_wait);
 
 static volatile int acpi_thread_pid = -1;
@@ -243,7 +243,7 @@ acpi_do_event(ctl_table * ctl,
 /*
  * Enter system sleep state
  */
-static int 
+/*static int 
 acpi_do_sleep(ctl_table * ctl,
 	      int write,
 	      struct file *file,
@@ -257,13 +257,13 @@ acpi_do_sleep(ctl_table * ctl,
 		}
 	}
 	else {
-		int status = acpi_enter_sx(ACPI_S1);
+		int status = acpi_enter_sx(ACPI_STATE_S1);
 		if (status)
 			return status;
 	}
 	file->f_pos += *len;
 	return 0;
-}
+}*/
 
 
 /*
@@ -382,7 +382,8 @@ static struct ctl_table acpi_table[] =
 	 &acpi_c3_enter_latency, sizeof(acpi_c3_enter_latency),
 	 0644, NULL, &acpi_do_ulong},
 
-	{ACPI_SLEEP, "sleep", NULL, 0, 0600, NULL, &acpi_do_sleep},
+/* until it actually works */
+/*	{ACPI_SLEEP, "sleep", NULL, 0, 0600, NULL, &acpi_do_sleep},*/
 
 	{ACPI_EVENT, "event", NULL, 0, 0400, NULL, &acpi_do_event},
 
@@ -415,7 +416,9 @@ static struct ctl_table acpi_dir_table[] =
 static int
 acpi_thread(void *context)
 {
-	ACPI_PHYSICAL_ADDRESS rsdp_phys;
+	ACPI_PHYSICAL_ADDRESS	rsdp_phys;
+	ACPI_BUFFER		buffer;
+	ACPI_SYSTEM_INFO	sys_info;
 
 	/*
 	 * initialize
@@ -437,8 +440,6 @@ acpi_thread(void *context)
 	rsdp_phys = efi.acpi;
 #endif
 		
-	printk(KERN_ERR "ACPI: System description tables found\n");
-	
 	if (!ACPI_SUCCESS(acpi_find_and_load_tables(rsdp_phys)))
 		return -ENODEV;
 
@@ -447,6 +448,17 @@ acpi_thread(void *context)
 		acpi_terminate();
 		return -ENODEV;
 	}
+
+	buffer.length  = sizeof(sys_info);
+	buffer.pointer = &sys_info;
+
+	if (!ACPI_SUCCESS (acpi_get_system_info(&buffer))) {
+		printk(KERN_ERR "ACPI: Could not get system info\n");
+		acpi_terminate();
+		return -ENODEV;
+	}
+
+	printk(KERN_INFO "ACPI: Core Subsystem version [%x]\n", sys_info.acpi_ca_version);
 
 	if (!ACPI_SUCCESS(acpi_enable_subsystem(ACPI_FULL_INITIALIZATION))) {
 		printk(KERN_ERR "ACPI: Subsystem enable failed\n");

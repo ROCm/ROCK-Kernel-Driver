@@ -21,7 +21,11 @@ void __delay(unsigned long loops)
 
 inline void __const_udelay(unsigned long xloops)
 {
-	xloops *= current_cpu_data.loops_per_jiffy;
+	__asm__("dmulu.l	%0, %2\n\t"
+		"sts	mach, %0"
+		: "=r" (xloops)
+		: "0" (xloops), "r" (current_cpu_data.loops_per_jiffy)
+		: "macl", "mach");
 	__delay(xloops * HZ);
 }
 

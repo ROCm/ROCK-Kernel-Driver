@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amstorob - AML Interpreter object store support, store to object
- *              $Revision: 20 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -40,281 +40,383 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_aml_store_object_to_object
+ * FUNCTION:    Acpi_aml_copy_buffer_to_buffer
  *
- * PARAMETERS:  *Val_desc           - Value to be stored
- *              *Dest_desc          - Object to receive the value
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Target_desc         - Destination object of the copy
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store an object to another object.
- *
- *              The Assignment of an object to another (not named) object
- *              is handled here.
- *              The val passed in will replace the current value (if any)
- *              with the input value.
- *
- *              When storing into an object the data is converted to the
- *              target object type then stored in the object.  This means
- *              that the target object type (for an initialized target) will
- *              not be changed by a store operation.
- *
- *              This module allows destination types of Number, String,
- *              and Buffer.
+ * DESCRIPTION: Copy a buffer object to another buffer object.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-acpi_aml_store_object_to_object (
-	ACPI_OPERAND_OBJECT     *val_desc,
-	ACPI_OPERAND_OBJECT     *dest_desc,
-	ACPI_WALK_STATE         *walk_state)
+acpi_aml_copy_buffer_to_buffer (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc)
 {
-	ACPI_STATUS             status = AE_OK;
-	u8                      *buffer = NULL;
-	u32                     length = 0;
-	OBJECT_TYPE_INTERNAL    destination_type = dest_desc->common.type;
+	u32                     length;
+	u8                      *buffer;
+
+ 	   /*
+	 * We know that Source_desc is a buffer by now
+	 */
+	buffer = (u8 *) source_desc->buffer.pointer;
+	length = source_desc->buffer.length;
+
+	/*
+	 * Buffer is a static allocation,
+	 * only place what will fit in the buffer.
+	 */
+	if (length <= target_desc->buffer.length) {
+		/* Clear existing buffer and copy in the new one */
+
+		MEMSET(target_desc->buffer.pointer, 0, target_desc->buffer.length);
+		MEMCPY(target_desc->buffer.pointer, buffer, length);
+	}
+
+	else {
+		/*
+		 * Truncate the source, copy only what will fit
+		 */
+		MEMCPY(target_desc->buffer.pointer, buffer, target_desc->buffer.length);
+
+	}
+
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_copy_string_to_string
+ *
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Target_desc         - Destination object of the copy
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Copy a String object to another String object
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_copy_string_to_string (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc)
+{
+	u32                     length;
+	u8                      *buffer;
 
 
 	/*
-	 *  Assuming the parameters are valid!!!
+	 * We know that Source_desc is a string by now.
 	 */
-	ACPI_ASSERT((dest_desc) && (val_desc));
+	buffer = (u8 *) source_desc->string.pointer;
+	length = source_desc->string.length;
 
 	/*
-	 *  First ensure we have a value that can be stored in the target
+	 * Setting a string value replaces the old string
 	 */
-	switch (destination_type)
-	{
-		/* Type of Name's existing value */
+	if (length < target_desc->string.length) {
+		/* Clear old string and copy in the new one */
 
-	case ACPI_TYPE_INTEGER:
+		MEMSET(target_desc->string.pointer, 0, target_desc->string.length);
+		MEMCPY(target_desc->string.pointer, buffer, length);
+	}
 
+	else {
 		/*
-		 *  These cases all require only number values or values that
-		 *  can be converted to numbers.
-		 *
-		 *  If value is not a Number, try to resolve it to one.
+		 * Free the current buffer, then allocate a buffer
+		 * large enough to hold the value
 		 */
-
-		if (val_desc->common.type != ACPI_TYPE_INTEGER) {
-			/*
-			 *  Initially not a number, convert
-			 */
-			status = acpi_aml_resolve_to_value (&val_desc, walk_state);
-			if (ACPI_SUCCESS (status) &&
-				(val_desc->common.type != ACPI_TYPE_INTEGER))
-			{
-				/*
-				 *  Conversion successful but still not a number
-				 */
-				status = AE_AML_OPERAND_TYPE;
-			}
-		}
-
-		break;
-
-	case ACPI_TYPE_STRING:
-	case ACPI_TYPE_BUFFER:
-
-		/*
-		 *  Storing into a Field in a region or into a buffer or into
-		 *  a string all is essentially the same.
-		 *
-		 *  If value is not a valid type, try to resolve it to one.
-		 */
-
-		if ((val_desc->common.type != ACPI_TYPE_INTEGER) &&
-			(val_desc->common.type != ACPI_TYPE_BUFFER) &&
-			(val_desc->common.type != ACPI_TYPE_STRING))
+		if (target_desc->string.pointer &&
+			!acpi_tb_system_table_pointer (target_desc->string.pointer))
 		{
 			/*
-			 *  Initially not a valid type, convert
+			 * Only free if not a pointer into the DSDT
 			 */
-			status = acpi_aml_resolve_to_value (&val_desc, walk_state);
-			if (ACPI_SUCCESS (status) &&
-				(val_desc->common.type != ACPI_TYPE_INTEGER) &&
-				(val_desc->common.type != ACPI_TYPE_BUFFER) &&
-				(val_desc->common.type != ACPI_TYPE_STRING))
-			{
-				/*
-				 *  Conversion successful but still not a valid type
-				 */
-				status = AE_AML_OPERAND_TYPE;
-			}
+			acpi_cm_free(target_desc->string.pointer);
 		}
-		break;
 
+		target_desc->string.pointer = acpi_cm_allocate (length + 1);
+		target_desc->string.length = length;
 
-	default:
+		if (!target_desc->string.pointer) {
+			return (AE_NO_MEMORY);
+		}
 
-		/*
-		 * TBD: [Unhandled] What other combinations must be implemented?
-		 */
-		status = AE_NOT_IMPLEMENTED;
-		break;
+		MEMCPY(target_desc->string.pointer, buffer, length);
 	}
 
-	/* Exit now if failure above */
+	return (AE_OK);
+}
 
-	if (ACPI_FAILURE (status)) {
-		goto clean_up_and_bail_out;
-	}
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_copy_integer_to_index_field
+ *
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Target_desc         - Destination object of the copy
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Write an Integer to an Index Field
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_index_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc)
+{
+	ACPI_STATUS             status;
+	u8                      locked;
+
 
 	/*
-	 * Acpi_everything is ready to execute now, We have
-	 * a value we can handle, just perform the update
+	 * Get the global lock if needed
 	 */
+	locked = acpi_aml_acquire_global_lock (target_desc->index_field.lock_rule);
 
-	switch (destination_type)
-	{
+	/*
+	 * Set Index value to select proper Data register
+	 * perform the update (Set index)
+	 */
+	status = acpi_aml_access_named_field (ACPI_WRITE,
+			 target_desc->index_field.index,
+			 &target_desc->index_field.value,
+			 sizeof (target_desc->index_field.value));
+	if (ACPI_SUCCESS (status)) {
+		/* Set_index was successful, next set Data value */
 
-	case ACPI_TYPE_STRING:
+		status = acpi_aml_access_named_field (ACPI_WRITE,
+				   target_desc->index_field.data,
+				   &source_desc->integer.value,
+				   sizeof (source_desc->integer.value));
 
-		/*
-		 *  Perform the update
-		 */
-
-		switch (val_desc->common.type)
-		{
-		case ACPI_TYPE_INTEGER:
-			buffer = (u8 *) &val_desc->integer.value;
-			length = sizeof (val_desc->integer.value);
-			break;
-
-		case ACPI_TYPE_BUFFER:
-			buffer = (u8 *) val_desc->buffer.pointer;
-			length = val_desc->buffer.length;
-			break;
-
-		case ACPI_TYPE_STRING:
-			buffer = (u8 *) val_desc->string.pointer;
-			length = val_desc->string.length;
-			break;
-		}
-
-		/*
-		 *  Setting a string value replaces the old string
-		 */
-
-		if (length < dest_desc->string.length) {
-			/*
-			 *  Zero fill, not willing to do pointer arithmetic for
-			 *  architecture independence.  Just clear the whole thing
-			 */
-			MEMSET(dest_desc->string.pointer, 0, dest_desc->string.length);
-			MEMCPY(dest_desc->string.pointer, buffer, length);
-		}
-		else {
-			/*
-			 *  Free the current buffer, then allocate a buffer
-			 *  large enough to hold the value
-			 */
-			if ( dest_desc->string.pointer &&
-				!acpi_tb_system_table_pointer (dest_desc->string.pointer))
-			{
-				/*
-				 *  Only free if not a pointer into the DSDT
-				 */
-
-				acpi_cm_free(dest_desc->string.pointer);
-			}
-
-			dest_desc->string.pointer = acpi_cm_allocate (length + 1);
-			dest_desc->string.length = length;
-
-			if (!dest_desc->string.pointer) {
-				status = AE_NO_MEMORY;
-				goto clean_up_and_bail_out;
-			}
-
-			MEMCPY(dest_desc->string.pointer, buffer, length);
-		}
-		break;
-
-
-	case ACPI_TYPE_BUFFER:
-
-		/*
-		 *  Perform the update to the buffer
-		 */
-
-		switch (val_desc->common.type)
-		{
-		case ACPI_TYPE_INTEGER:
-			buffer = (u8 *) &val_desc->integer.value;
-			length = sizeof (val_desc->integer.value);
-			break;
-
-		case ACPI_TYPE_BUFFER:
-			buffer = (u8 *) val_desc->buffer.pointer;
-			length = val_desc->buffer.length;
-			break;
-
-		case ACPI_TYPE_STRING:
-			buffer = (u8 *) val_desc->string.pointer;
-			length = val_desc->string.length;
-			break;
-		}
-
-		/*
-		 * If the buffer is uninitialized,
-		 *  memory needs to be allocated for the copy.
-		 */
-		if(0 == dest_desc->buffer.length) {
-			dest_desc->buffer.pointer = acpi_cm_callocate(length);
-			dest_desc->buffer.length = length;
-
-			if (!dest_desc->buffer.pointer) {
-				status = AE_NO_MEMORY;
-				goto clean_up_and_bail_out;
-			}
-		}
-
-		/*
-		 *  Buffer is a static allocation,
-		 *  only place what will fit in the buffer.
-		 */
-		if (length <= dest_desc->buffer.length) {
-			/*
-			 *  Zero fill first, not willing to do pointer arithmetic for
-			 *  architecture independence.  Just clear the whole thing
-			 */
-			MEMSET(dest_desc->buffer.pointer, 0, dest_desc->buffer.length);
-			MEMCPY(dest_desc->buffer.pointer, buffer, length);
-		}
-		else {
-			/*
-			 *  truncate, copy only what will fit
-			 */
-			MEMCPY(dest_desc->buffer.pointer, buffer, dest_desc->buffer.length);
-		}
-		break;
-
-	case ACPI_TYPE_INTEGER:
-
-		dest_desc->integer.value = val_desc->integer.value;
-
-		/* Truncate value if we are executing from a 32-bit ACPI table */
-
-		acpi_aml_truncate_for32bit_table (dest_desc, walk_state);
-		break;
-
-	default:
-
-		/*
-		 * All other types than Alias and the various Fields come here.
-		 * Store Val_desc as the new value of the Name, and set
-		 * the Name's type to that of the value being stored in it.
-		 * Val_desc reference count is incremented by Attach_object.
-		 */
-
-		status = AE_NOT_IMPLEMENTED;
-		break;
 	}
 
-clean_up_and_bail_out:
+
+
+	/*
+	 * Release global lock if we acquired it earlier
+	 */
+	acpi_aml_release_global_lock (locked);
 
 	return (status);
 }
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_copy_integer_to_bank_field
+ *
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Target_desc         - Destination object of the copy
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Write an Integer to a Bank Field
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_bank_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc)
+{
+	ACPI_STATUS             status;
+	u8                      locked;
+
+
+	/*
+	 * Get the global lock if needed
+	 */
+	locked = acpi_aml_acquire_global_lock (target_desc->index_field.lock_rule);
+
+
+	/*
+	 * Set Bank value to select proper Bank
+	 * Perform the update (Set Bank Select)
+	 */
+
+	status = acpi_aml_access_named_field (ACPI_WRITE,
+			 target_desc->bank_field.bank_select,
+			 &target_desc->bank_field.value,
+			 sizeof (target_desc->bank_field.value));
+	if (ACPI_SUCCESS (status)) {
+		/* Set bank select successful, set data value  */
+
+		status = acpi_aml_access_named_field (ACPI_WRITE,
+				   target_desc->bank_field.bank_select,
+				   &source_desc->bank_field.value,
+				   sizeof (source_desc->bank_field.value));
+	}
+
+
+
+	/*
+	 * Release global lock if we acquired it earlier
+	 */
+	acpi_aml_release_global_lock (locked);
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_copy_data_to_named_field
+ *
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Node                - Destination Namespace node
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Copy raw data to a Named Field.  No implicit conversion
+ *              is performed on the source object
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_copy_data_to_named_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_NAMESPACE_NODE     *node)
+{
+	ACPI_STATUS             status;
+	u8                      locked;
+	u32                     length;
+	u8                      *buffer;
+
+
+	/*
+	 * Named fields (Create_xxx_field) - We don't perform any conversions on the
+	 * source operand, just use the raw data
+	 */
+	switch (source_desc->common.type)
+	{
+	case ACPI_TYPE_INTEGER:
+		buffer = (u8 *) &source_desc->integer.value;
+		length = sizeof (source_desc->integer.value);
+		break;
+
+	case ACPI_TYPE_BUFFER:
+		buffer = (u8 *) source_desc->buffer.pointer;
+		length = source_desc->buffer.length;
+		break;
+
+	case ACPI_TYPE_STRING:
+		buffer = (u8 *) source_desc->string.pointer;
+		length = source_desc->string.length;
+		break;
+
+	default:
+		return (AE_TYPE);
+	}
+
+	/*
+	 * Get the global lock if needed before the update
+	 * TBD: not needed!
+	 */
+	locked = acpi_aml_acquire_global_lock (source_desc->field.lock_rule);
+
+	status = acpi_aml_access_named_field (ACPI_WRITE,
+			  node, buffer, length);
+
+	acpi_aml_release_global_lock (locked);
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_copy_integer_to_field_unit
+ *
+ * PARAMETERS:  Source_desc         - Source object to copy
+ *              Target_desc         - Destination object of the copy
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Write an Integer to a Field Unit.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_field_unit (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc)
+{
+	ACPI_STATUS             status = AE_OK;
+	u8                      *location = NULL;
+	u32                     mask;
+	u32                     new_value;
+	u8                      locked = FALSE;
+
+
+	/*
+	 * If the Field Buffer and Index have not been previously evaluated,
+	 * evaluate them and save the results.
+	 */
+	if (!(target_desc->common.flags & AOPOBJ_DATA_VALID)) {
+		status = acpi_ds_get_field_unit_arguments (target_desc);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
+	}
+
+	if ((!target_desc->field_unit.container ||
+		ACPI_TYPE_BUFFER != target_desc->field_unit.container->common.type))
+	{
+		return (AE_AML_INTERNAL);
+	}
+
+	/*
+	 * Get the global lock if needed
+	 */
+	locked = acpi_aml_acquire_global_lock (target_desc->field_unit.lock_rule);
+
+	/*
+	 * TBD: [Unhandled] REMOVE this limitation
+	 * Make sure the operation is within the limits of our implementation
+	 * this is not a Spec limitation!!
+	 */
+	if (target_desc->field_unit.length + target_desc->field_unit.bit_offset > 32) {
+		return (AE_NOT_IMPLEMENTED);
+	}
+
+	/* Field location is (base of buffer) + (byte offset) */
+
+	location = target_desc->field_unit.container->buffer.pointer
+			  + target_desc->field_unit.offset;
+
+	/*
+	 * Construct Mask with 1 bits where the field is,
+	 * 0 bits elsewhere
+	 */
+	mask = ((u32) 1 << target_desc->field_unit.length) - ((u32)1
+			   << target_desc->field_unit.bit_offset);
+
+	/* Zero out the field in the buffer */
+
+	MOVE_UNALIGNED32_TO_32 (&new_value, location);
+	new_value &= ~mask;
+
+	/*
+	 * Shift and mask the new value into position,
+	 * and or it into the buffer.
+	 */
+	new_value |= (source_desc->integer.value << target_desc->field_unit.bit_offset) &
+			 mask;
+
+	/* Store back the value */
+
+	MOVE_UNALIGNED32_TO_32 (location, &new_value);
+
+	return (AE_OK);
+}
+
 

@@ -28,19 +28,6 @@
 #include <linux/wait.h>
 #endif /* __KERNEL__ */
 
-/*
- * System sleep states
- */
-enum
-{
-	ACPI_S0, /* working */
-	ACPI_S1, /* sleep */
-	ACPI_S2, /* sleep */
-	ACPI_S3, /* sleep */
-	ACPI_S4, /* non-volatile sleep */
-	ACPI_S5, /* soft-off */
-};
-
 typedef int acpi_sstate_t;
 
 /*

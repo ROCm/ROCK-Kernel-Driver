@@ -388,10 +388,8 @@ static int exec_mmap(void)
 
 	old_mm = current->mm;
 	if (old_mm && atomic_read(&old_mm->mm_users) == 1) {
-		flush_cache_mm(old_mm);
 		mm_release();
 		exit_mmap(old_mm);
-		flush_tlb_mm(old_mm);
 		return 0;
 	}
 

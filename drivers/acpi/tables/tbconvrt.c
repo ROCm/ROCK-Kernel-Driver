@@ -312,11 +312,11 @@ acpi_tb_convert_table_fadt (void)
 		/* No 0.71 equivalence. Leave pre-zeroed. */
 		/* FADT2->Flush_stride = 0; */
 
-		/* Processor’s duty cycle index in processor's P_CNT reg*/
+		/* Processor's duty cycle index in processor's P_CNT reg*/
 		/* No 0.71 equivalence. Leave pre-zeroed. */
 		/* FADT2->Duty_offset = 0; */
 
-		/* Processor’s duty cycle value bit width in P_CNT register.*/
+		/* Processor's duty cycle value bit width in P_CNT register.*/
 		/* No 0.71 equivalence. Leave pre-zeroed. */
 		/* FADT2->Duty_width = 0; */
 

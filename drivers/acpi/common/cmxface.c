@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: cmxface - External interfaces for "global" ACPI functions
- *              $Revision: 58 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
@@ -304,16 +304,22 @@ acpi_get_system_info (
 	out_buffer->length = sizeof (ACPI_SYSTEM_INFO);
 	info_ptr = (ACPI_SYSTEM_INFO *) out_buffer->pointer;
 
-	/* TBD [Future]: need a version number, or use the version string */
-	info_ptr->acpi_ca_version   = 0x1234;
+	info_ptr->acpi_ca_version   = ACPI_CA_VERSION;
 
 	/* System flags (ACPI capabilities) */
 
 	info_ptr->flags             = acpi_gbl_system_flags;
 
 	/* Timer resolution - 24 or 32 bits  */
-
-	info_ptr->timer_resolution  = acpi_hw_pmt_resolution ();
+	if (!acpi_gbl_FADT) {
+		info_ptr->timer_resolution = 0;
+	}
+	else if (acpi_gbl_FADT->tmr_val_ext == 0) {
+		info_ptr->timer_resolution = 24;
+	}
+	else {
+		info_ptr->timer_resolution = 32;
+	}
 
 	/* Clear the reserved fields */
 

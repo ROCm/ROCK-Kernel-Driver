@@ -9,6 +9,7 @@
  * May-July 1998
  * January-March,July,September,October,Dezember 1999
  * January,February,July,November 2000
+ * January 2001
  *
  * lvm is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,6 +58,8 @@
  *    26/06/2000 - implemented snapshot persistency and resizing support
  *    02/11/2000 - added hash table size member to lv structure
  *    12/11/2000 - removed unneeded timestamp definitions
+ *    24/12/2000 - removed LVM_TO_{CORE,DISK}*, use cpu_{from, to}_le*
+ *                 instead - Christoph Hellwig
  *
  */
 
@@ -64,11 +67,9 @@
 #ifndef _LVM_H_INCLUDE
 #define _LVM_H_INCLUDE
 
-#define	_LVM_KERNEL_H_VERSION	"LVM 0.9 (13/11/2000)"
+#define	_LVM_KERNEL_H_VERSION	"LVM 0.9.1_beta2 (18/01/2001)"
 
-#include <linux/config.h>
 #include <linux/version.h>
-#include <endian.h>
 
 /*
  * preprocessor definitions
@@ -77,8 +78,7 @@
 #define	LVM_TOTAL_RESET
 
 #ifdef __KERNEL__
-#define LVM_GET_INODE
-#undef	LVM_HD_NAME /* display nice names in /proc/partitions */
+#undef LVM_HD_NAME /* display nice names in /proc/partitions */
 
 /* lots of debugging output (see driver source)
    #define DEBUG_LVM_GET_INFO
@@ -109,6 +109,7 @@
 
 #ifdef __KERNEL__
 #include <linux/spinlock.h>
+
 #include <asm/semaphore.h>
 #endif				/* #ifdef __KERNEL__ */
 
@@ -216,15 +217,13 @@
  *
  *   1K                volume group structure              ~200 byte
  *
- *   5K                time stamp structure                ~
- *
  *   6K                namelist of physical volumes        128 byte each
  *
- *   6k + n * 128byte  n logical volume structures         ~300 byte each
+ *   6k + n * ~300byte n logical volume structures         ~300 byte each
  *
- *   + m * 328byte     m physical extent alloc. structs    4 byte each
+ *   + m * 4byte       m physical extent alloc. structs    4 byte each
  *
- *   End of disk -     first physical extent               typical 4 megabyte
+ *   End of disk -     first physical extent               typically 4 megabyte
  *   PE total *
  *   PE size
  *
@@ -292,7 +291,7 @@
 #define	LVM_MAX_PE_SIZE		( 16L * 1024L * 1024L / SECTOR_SIZE * 1024)	/* 16GB in sectors */
 #define	LVM_DEFAULT_PE_SIZE	( 4096L * 1024 / SECTOR_SIZE)	/* 4 MB in sectors */
 #define	LVM_DEFAULT_STRIPE_SIZE	16L	/* 16 KB  */
-#define	LVM_MIN_STRIPE_SIZE	( PAGE_SIZE>>9)		/* PAGESIZE in sectors */
+#define	LVM_MIN_STRIPE_SIZE	( PAGE_SIZE/SECTOR_SIZE)	/* PAGESIZE in sectors */
 #define	LVM_MAX_STRIPE_SIZE	( 512L * 1024 / SECTOR_SIZE)	/* 512 KB in sectors */
 #define	LVM_MAX_STRIPES		128	/* max # of stripes */
 #define	LVM_MAX_SIZE            ( 1024LU * 1024 / SECTOR_SIZE * 1024 * 1024)	/* 1TB[sectors] */
@@ -324,51 +323,6 @@
 	COW_table_entries_per_PE = LVM_GET_COW_TABLE_CHUNKS_PER_PE(vg, lv); \
 	COW_table_chunks_per_PE = ( COW_table_entries_per_PE * sizeof(lv_COW_table_disk_t) / SECTOR_SIZE + lv->lv_chunk_size - 1) / lv->lv_chunk_size; \
 	COW_table_entries_per_PE - COW_table_chunks_per_PE;})
-
-
-/* to disk and to core data conversion macros */
-#if __BYTE_ORDER == __BIG_ENDIAN
-
-#define LVM_TO_CORE16(x) ( \
-        ((uint16_t)((((uint16_t)(x) & 0x00FFU) << 8) | \
-                    (((uint16_t)(x) & 0xFF00U) >> 8))))
-
-#define LVM_TO_DISK16(x) LVM_TO_CORE16(x)
-
-#define LVM_TO_CORE32(x) ( \
-        ((uint32_t)((((uint32_t)(x) & 0x000000FFU) << 24) | \
-                    (((uint32_t)(x) & 0x0000FF00U) << 8))) \
-                    (((uint32_t)(x) & 0x00FF0000U) >> 8))) \
-                    (((uint32_t)(x) & 0xFF000000U) >> 24))))
-
-#define LVM_TO_DISK32(x) LVM_TO_CORE32(x)
-
-#define LVM_TO_CORE64(x) \
-        ((uint64_t)((((uint64_t)(x) & 0x00000000000000FFULL) << 56) | \
-                    (((uint64_t)(x) & 0x000000000000FF00ULL) << 40) | \
-                    (((uint64_t)(x) & 0x0000000000FF0000ULL) << 24) | \
-                    (((uint64_t)(x) & 0x00000000FF000000ULL) <<  8) | \
-                    (((uint64_t)(x) & 0x000000FF00000000ULL) >>  8) | \
-                    (((uint64_t)(x) & 0x0000FF0000000000ULL) >> 24) | \
-                    (((uint64_t)(x) & 0x00FF000000000000ULL) >> 40) | \
-                    (((uint64_t)(x) & 0xFF00000000000000ULL) >> 56))) 
-
-#define LVM_TO_DISK64(x) LVM_TO_CORE64(x)
-
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
-
-#define LVM_TO_CORE16(x) x
-#define LVM_TO_DISK16(x) x
-#define LVM_TO_CORE32(x) x
-#define LVM_TO_DISK32(x) x
-#define LVM_TO_CORE64(x) x
-#define LVM_TO_DISK64(x) x
-
-#else
-
-#error "__BYTE_ORDER must be defined as __LITTLE_ENDIAN or __BIG_ENDIAN"
-
-#endif /* #if __BYTE_ORDER == __BIG_ENDIAN */
 
 
 /*
@@ -687,6 +641,8 @@ typedef struct lv_v4 {
 	wait_queue_head_t lv_snapshot_wait;
 	int	lv_snapshot_use_rate;
 	void	*vg;
+
+	uint lv_allocated_snapshot_le;
 #else
 	char dummy[200];
 #endif

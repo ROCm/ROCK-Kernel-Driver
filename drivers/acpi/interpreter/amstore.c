@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amstore - AML Interpreter object store support
- *              $Revision: 119 $
+ *              $Revision: 121 $
  *
  *****************************************************************************/
 
@@ -64,12 +64,7 @@ acpi_aml_exec_store (
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_STATUS             status = AE_OK;
-	ACPI_OPERAND_OBJECT     *delete_dest_desc = NULL;
-	ACPI_OPERAND_OBJECT     *tmp_desc;
-	ACPI_NAMESPACE_NODE     *node = NULL;
-	u8                      value = 0;
-	u32                     length;
-	u32                     i;
+	ACPI_OPERAND_OBJECT     *ref_desc = dest_desc;
 
 
 	/* Validate parameters */
@@ -78,27 +73,23 @@ acpi_aml_exec_store (
 		return (AE_AML_NO_OPERAND);
 	}
 
-	/* Examine the datatype of the Dest_desc */
+	/* Dest_desc can be either a namespace node or an ACPI object */
 
 	if (VALID_DESCRIPTOR_TYPE (dest_desc, ACPI_DESC_TYPE_NAMED)) {
-		/* Dest is an ACPI_HANDLE, create a new object */
+		/*
+		 * Dest is a namespace node,
+		 * Storing an object into a Name "container"
+		 */
+		status = acpi_aml_store_object_to_node (val_desc,
+				 (ACPI_NAMESPACE_NODE *) dest_desc, walk_state);
 
-		node = (ACPI_NAMESPACE_NODE *) dest_desc;
-		dest_desc = acpi_cm_create_internal_object (INTERNAL_TYPE_REFERENCE);
-		if (!dest_desc) {
-			/* Allocation failure  */
+		/* All done, that's it */
 
-			return (AE_NO_MEMORY);
-		}
-
-		/* Build a new Reference wrapper around the handle */
-
-		dest_desc->reference.op_code = AML_NAME_OP;
-		dest_desc->reference.object = node;
+		return (status);
 	}
 
 
-	/* Destination object must be of type Reference */
+	/* Destination object must be an object of type Reference */
 
 	if (dest_desc->common.type != INTERNAL_TYPE_REFERENCE) {
 		/* Destination is not an Reference */
@@ -106,36 +97,130 @@ acpi_aml_exec_store (
 		return (AE_AML_OPERAND_TYPE);
 	}
 
-	/* Examine the Reference opcode */
 
-	switch (dest_desc->reference.op_code)
+	/*
+	 * Examine the Reference opcode.  These cases are handled:
+	 *
+	 * 1) Store to Name (Change the object associated with a name)
+	 * 2) Store to an indexed area of a Buffer or Package
+	 * 3) Store to a Method Local or Arg
+	 * 4) Store to the debug object
+	 * 5) Store to a constant -- a noop
+	 */
+
+	switch (ref_desc->reference.op_code)
 	{
 
 	case AML_NAME_OP:
 
-		/*
-		 *  Storing into a Name
-		 */
-		delete_dest_desc = dest_desc;
-		status = acpi_aml_store_object_to_node (val_desc, dest_desc->reference.object,
-				  walk_state);
+		/* Storing an object into a Name "container" */
 
-		break;  /* Case Name_op */
+		status = acpi_aml_store_object_to_node (val_desc, ref_desc->reference.object,
+				  walk_state);
+		break;
 
 
 	case AML_INDEX_OP:
 
-		delete_dest_desc = dest_desc;
+		/* Storing to an Index (pointer into a packager or buffer) */
+
+		status = acpi_aml_store_object_to_index (val_desc, ref_desc, walk_state);
+		break;
+
+
+	case AML_LOCAL_OP:
+
+		status = acpi_ds_method_data_set_value (MTH_TYPE_LOCAL,
+				  (ref_desc->reference.offset), val_desc, walk_state);
+		break;
+
+
+	case AML_ARG_OP:
+
+		status = acpi_ds_method_data_set_value (MTH_TYPE_ARG,
+				  (ref_desc->reference.offset), val_desc, walk_state);
+		break;
+
+
+	case AML_DEBUG_OP:
 
 		/*
-		 * Valid source value and destination reference pointer.
+		 * Storing to the Debug object causes the value stored to be
+		 * displayed and otherwise has no effect -- see ACPI Specification
 		 *
-		 * ACPI Specification 1.0B section 15.2.3.4.2.13:
-		 * Destination should point to either a buffer or a package
+		 * TBD: print known object types "prettier".
 		 */
 
+		break;
+
+
+	case AML_ZERO_OP:
+	case AML_ONE_OP:
+	case AML_ONES_OP:
+
 		/*
-		 * Actually, storing to a package is not so simple.  The source must be
+		 * Storing to a constant is a no-op -- see ACPI Specification
+		 * Delete the reference descriptor, however
+		 */
+		break;
+
+
+	default:
+
+		/* TBD: [Restructure] use object dump routine !! */
+
+		status = AE_AML_INTERNAL;
+		break;
+
+	}   /* switch (Ref_desc->Reference.Op_code) */
+
+
+	/* Always delete the reference descriptor object */
+
+	if (ref_desc) {
+		acpi_cm_remove_reference (ref_desc);
+	}
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_store_object_to_index
+ *
+ * PARAMETERS:  *Val_desc           - Value to be stored
+ *              *Node           - Named object to recieve the value
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Store the object to the named object.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_store_object_to_index (
+	ACPI_OPERAND_OBJECT     *val_desc,
+	ACPI_OPERAND_OBJECT     *dest_desc,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status = AE_OK;
+	ACPI_OPERAND_OBJECT     *obj_desc;
+	u32                     length;
+	u32                     i;
+	u8                      value = 0;
+
+
+	/*
+	 * Destination must be a reference pointer, and
+	 * must point to either a buffer or a package
+	 */
+
+	switch (dest_desc->reference.target_type)
+	{
+	case ACPI_TYPE_PACKAGE:
+		/*
+		 * Storing to a package element is not simple.  The source must be
 		 * evaluated and converted to the type of the destination and then the
 		 * source is copied into the destination - we can't just point to the
 		 * source object.
@@ -145,8 +230,8 @@ acpi_aml_exec_store (
 			 * The object at *(Dest_desc->Reference.Where) is the
 			 *  element within the package that is to be modified.
 			 */
-			tmp_desc = *(dest_desc->reference.where);
-			if (tmp_desc) {
+			obj_desc = *(dest_desc->reference.where);
+			if (obj_desc) {
 				/*
 				 * If the Destination element is a package, we will delete
 				 *  that object and construct a new one.
@@ -155,41 +240,39 @@ acpi_aml_exec_store (
 				 *      to be packages?
 				 *       && (Val_desc->Common.Type == ACPI_TYPE_PACKAGE)
 				 */
-				if (tmp_desc->common.type == ACPI_TYPE_PACKAGE) {
+				if (obj_desc->common.type == ACPI_TYPE_PACKAGE) {
 					/*
 					 * Take away the reference for being part of a package and
 					 * delete
 					 */
-					acpi_cm_remove_reference (tmp_desc);
-					acpi_cm_remove_reference (tmp_desc);
+					acpi_cm_remove_reference (obj_desc);
+					acpi_cm_remove_reference (obj_desc);
 
-					tmp_desc = NULL;
+					obj_desc = NULL;
 				}
 			}
 
-			if (!tmp_desc) {
+			if (!obj_desc) {
 				/*
-				 * If the Tmp_desc is NULL, that means an uninitialized package
-				 * has been used as a destination, therefore, we must create
-				 * the destination element to match the type of the source
-				 * element NOTE: Val_desc can be of any type.
+				 * If the Obj_desc is NULL, it means that an uninitialized package
+				 * element has been used as a destination (this is OK), therefore,
+				 * we must create the destination element to match the type of the
+				 * source element NOTE: Val_desc can be of any type.
 				 */
-				tmp_desc = acpi_cm_create_internal_object (val_desc->common.type);
-				if (!tmp_desc) {
-					status = AE_NO_MEMORY;
-					goto cleanup;
+				obj_desc = acpi_cm_create_internal_object (val_desc->common.type);
+				if (!obj_desc) {
+					return (AE_NO_MEMORY);
 				}
 
 				/*
 				 * If the source is a package, copy the source to the new dest
 				 */
-				if (ACPI_TYPE_PACKAGE == tmp_desc->common.type) {
+				if (ACPI_TYPE_PACKAGE == obj_desc->common.type) {
 					status = acpi_aml_build_copy_internal_package_object (
-							 val_desc, tmp_desc, walk_state);
+							 val_desc, obj_desc, walk_state);
 					if (ACPI_FAILURE (status)) {
-						acpi_cm_remove_reference (tmp_desc);
-						tmp_desc = NULL;
-						goto cleanup;
+						acpi_cm_remove_reference (obj_desc);
+						return (status);
 					}
 				}
 
@@ -199,38 +282,31 @@ acpi_aml_exec_store (
 				 * part of the parent package
 				 */
 
-				*(dest_desc->reference.where) = tmp_desc;
-				acpi_cm_add_reference (tmp_desc);
+				*(dest_desc->reference.where) = obj_desc;
+				acpi_cm_add_reference (obj_desc);
 			}
 
-			if (ACPI_TYPE_PACKAGE != tmp_desc->common.type) {
+			if (ACPI_TYPE_PACKAGE != obj_desc->common.type) {
 				/*
 				 * The destination element is not a package, so we need to
 				 * convert the contents of the source (Val_desc) and copy into
-				 * the destination (Tmp_desc)
+				 * the destination (Obj_desc)
 				 */
-				status = acpi_aml_store_object_to_object (val_desc, tmp_desc,
+				status = acpi_aml_store_object_to_object (val_desc, obj_desc,
 						  walk_state);
 				if (ACPI_FAILURE (status)) {
 					/*
 					 * An error occurrered when copying the internal object
 					 * so delete the reference.
 					 */
-					status = AE_AML_OPERAND_TYPE;
+					return (AE_AML_OPERAND_TYPE);
 				}
 			}
-
-			break;
 		}
+		break;
 
-		/*
-		 * Check that the destination is a Buffer Field type
-		 */
-		if (dest_desc->reference.target_type != ACPI_TYPE_BUFFER_FIELD) {
-			status = AE_AML_OPERAND_TYPE;
-			break;
-		}
 
+	case ACPI_TYPE_BUFFER_FIELD:
 		/*
 		 * Storing into a buffer at a location defined by an Index.
 		 *
@@ -239,13 +315,11 @@ acpi_aml_exec_store (
 		 */
 
 		/*
-		 * Set the Tmp_desc to the destination object and type check.
+		 * Set the Obj_desc to the destination object and type check.
 		 */
-		tmp_desc = dest_desc->reference.object;
-
-		if (tmp_desc->common.type != ACPI_TYPE_BUFFER) {
-			status = AE_AML_OPERAND_TYPE;
-			break;
+		obj_desc = dest_desc->reference.object;
+		if (obj_desc->common.type != ACPI_TYPE_BUFFER) {
+			return (AE_AML_OPERAND_TYPE);
 		}
 
 		/*
@@ -256,15 +330,15 @@ acpi_aml_exec_store (
 		switch (val_desc->common.type)
 		{
 		/*
-		 * If the type is Integer, the Length is 4.
+		 * If the type is Integer, assign bytewise
 		 * This loop to assign each of the elements is somewhat
-		 *  backward because of the Big Endian-ness of IA-64
+		 * backward because of the Big Endian-ness of IA-64
 		 */
 		case ACPI_TYPE_INTEGER:
-			length = 4;
+			length = sizeof (ACPI_INTEGER);
 			for (i = length; i != 0; i--) {
 				value = (u8)(val_desc->integer.value >> (MUL_8 (i - 1)));
-				tmp_desc->buffer.pointer[dest_desc->reference.offset] = value;
+				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
 
@@ -276,7 +350,7 @@ acpi_aml_exec_store (
 			length = val_desc->buffer.length;
 			for (i = 0; i < length; i++) {
 				value = *(val_desc->buffer.pointer + i);
-				tmp_desc->buffer.pointer[dest_desc->reference.offset] = value;
+				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
 
@@ -288,7 +362,7 @@ acpi_aml_exec_store (
 			length = val_desc->string.length;
 			for (i = 0; i < length; i++) {
 				value = *(val_desc->string.pointer + i);
-				tmp_desc->buffer.pointer[dest_desc->reference.offset] = value;
+				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
 
@@ -299,80 +373,207 @@ acpi_aml_exec_store (
 			status = AE_AML_OPERAND_TYPE;
 			break;
 		}
+		break;
+
+
+	default:
+		status = AE_AML_OPERAND_TYPE;
+		break;
+	}
+
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_store_object_to_node
+ *
+ * PARAMETERS:  *Source_desc           - Value to be stored
+ *              *Node               - Named object to recieve the value
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Store the object to the named object.
+ *
+ *              The Assignment of an object to a named object is handled here
+ *              The val passed in will replace the current value (if any)
+ *              with the input value.
+ *
+ *              When storing into an object the data is converted to the
+ *              target object type then stored in the object.  This means
+ *              that the target object type (for an initialized target) will
+ *              not be changed by a store operation.
+ *
+ *              NOTE: the global lock is acquired early.  This will result
+ *              in the global lock being held a bit longer.  Also, if the
+ *              function fails during set up we may get the lock when we
+ *              don't really need it.  I don't think we care.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_store_object_to_node (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_NAMESPACE_NODE     *node,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status = AE_OK;
+	ACPI_OPERAND_OBJECT     *target_desc;
+	OBJECT_TYPE_INTERNAL    target_type = ACPI_TYPE_ANY;
+
+
+	/*
+	 * Assuming the parameters were already validated
+	 */
+	ACPI_ASSERT((node) && (source_desc));
+
+
+	/*
+	 * Get current type of the node, and object attached to Node
+	 */
+	target_type = acpi_ns_get_type (node);
+	target_desc = acpi_ns_get_attached_object (node);
+
+
+	/*
+	 * Resolve the source object to an actual value
+	 * (If it is a reference object)
+	 */
+	status = acpi_aml_resolve_object (&source_desc, target_type, walk_state);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+
+	/*
+	 * Do the actual store operation
+	 */
+	switch (target_type)
+	{
+	case INTERNAL_TYPE_DEF_FIELD:
+
+		/* Raw data copy for target types Integer/String/Buffer */
+
+		status = acpi_aml_copy_data_to_named_field (source_desc, node);
+		break;
+
+
+	case ACPI_TYPE_INTEGER:
+	case ACPI_TYPE_STRING:
+	case ACPI_TYPE_BUFFER:
+	case INTERNAL_TYPE_BANK_FIELD:
+	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_FIELD_UNIT:
 
 		/*
-		 * If we had an error, break out of this case statement.
+		 * These target types are all of type Integer/String/Buffer, and
+		 * therefore support implicit conversion before the store.
+		 *
+		 * Copy and/or convert the source object to a new target object
 		 */
+		status = acpi_aml_store_object (source_desc, target_type, &target_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
-			break;
+			return (status);
 		}
 
 		/*
-		 * Set the return pointer
+		 * Store the new Target_desc as the new value of the Name, and set
+		 * the Name's type to that of the value being stored in it.
+		 * Source_desc reference count is incremented by Attach_object.
 		 */
-		dest_desc = tmp_desc;
-
-		break;
-
-	case AML_ZERO_OP:
-	case AML_ONE_OP:
-	case AML_ONES_OP:
-
-		/*
-		 * Storing to a constant is a no-op -- see ACPI Specification
-		 * Delete the result descriptor.
-		 */
-
-		delete_dest_desc = dest_desc;
-		break;
-
-
-	case AML_LOCAL_OP:
-
-		status = acpi_ds_method_data_set_value (MTH_TYPE_LOCAL,
-				  (dest_desc->reference.offset), val_desc, walk_state);
-		delete_dest_desc = dest_desc;
-		break;
-
-
-	case AML_ARG_OP:
-
-		status = acpi_ds_method_data_set_value (MTH_TYPE_ARG,
-				  (dest_desc->reference.offset), val_desc, walk_state);
-		delete_dest_desc = dest_desc;
-		break;
-
-
-	case AML_DEBUG_OP:
-
-		/*
-		 * Storing to the Debug object causes the value stored to be
-		 * displayed and otherwise has no effect -- see ACPI Specification
-		 */
-
-		delete_dest_desc = dest_desc;
+		status = acpi_ns_attach_object (node, target_desc, target_type);
 		break;
 
 
 	default:
 
-		/* TBD: [Restructure] use object dump routine !! */
+		/* No conversions for all other types.  Just attach the source object */
 
-		delete_dest_desc = dest_desc;
-		status = AE_AML_INTERNAL;
+		status = acpi_ns_attach_object (node, source_desc, source_desc->common.type);
 
-	}   /* switch(Dest_desc->Reference.Op_code) */
-
-
-cleanup:
-
-	/* Cleanup and exit*/
-
-	if (delete_dest_desc) {
-		acpi_cm_remove_reference (delete_dest_desc);
+		break;
 	}
+
 
 	return (status);
 }
 
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_store_object_to_object
+ *
+ * PARAMETERS:  *Source_desc           - Value to be stored
+ *              *Dest_desc          - Object to receive the value
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Store an object to another object.
+ *
+ *              The Assignment of an object to another (not named) object
+ *              is handled here.
+ *              The val passed in will replace the current value (if any)
+ *              with the input value.
+ *
+ *              When storing into an object the data is converted to the
+ *              target object type then stored in the object.  This means
+ *              that the target object type (for an initialized target) will
+ *              not be changed by a store operation.
+ *
+ *              This module allows destination types of Number, String,
+ *              and Buffer.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_store_object_to_object (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *dest_desc,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status = AE_OK;
+	OBJECT_TYPE_INTERNAL    destination_type = dest_desc->common.type;
+
+
+	/*
+	 *  Assuming the parameters are valid!
+	 */
+	ACPI_ASSERT((dest_desc) && (source_desc));
+
+
+	/*
+	 * From this interface, we only support Integers/Strings/Buffers
+	 */
+	switch (destination_type)
+	{
+	case ACPI_TYPE_INTEGER:
+	case ACPI_TYPE_STRING:
+	case ACPI_TYPE_BUFFER:
+		break;
+
+	default:
+		return (AE_NOT_IMPLEMENTED);
+	}
+
+
+	/*
+	 * Resolve the source object to an actual value
+	 * (If it is a reference object)
+	 */
+	status = acpi_aml_resolve_object (&source_desc, destination_type, walk_state);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+
+	/*
+	 * Copy and/or convert the source object to the destination object
+	 */
+	status = acpi_aml_store_object (source_desc, destination_type, &dest_desc, walk_state);
+
+
+	return (status);
+}
 

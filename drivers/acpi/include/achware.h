@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 50 $
+ *       $Revision: 53 $
  *
  *****************************************************************************/
 
@@ -25,6 +25,10 @@
 
 #ifndef __ACHWARE_H__
 #define __ACHWARE_H__
+
+
+/* PM Timer ticks per second (HZ) */
+#define PM_TIMER_FREQUENCY  3579545
 
 
 /* Prototypes */
@@ -92,6 +96,10 @@ void
 acpi_hw_clear_acpi_status (
    void);
 
+u32
+acpi_hw_get_bit_shift (
+	u32                     mask);
+
 
 /* GPE support */
 
@@ -121,89 +129,21 @@ acpi_hw_obtain_sleep_type_register_data (
 	u8                      *slp_typ_b);
 
 
-/* Cx State Prototypes */
-
-ACPI_STATUS
-acpi_hw_enter_c1(
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     *pm_timer_ticks);
-
-ACPI_STATUS
-acpi_hw_enter_c2(
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     *pm_timer_ticks);
-
-ACPI_STATUS
-acpi_hw_enter_c3(
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     *pm_timer_ticks);
-
-ACPI_STATUS
-acpi_hw_enter_cx (
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     *pm_timer_ticks);
-
-ACPI_STATUS
-acpi_hw_set_cx (
-	u32                     cx_state);
-
-ACPI_STATUS
-acpi_hw_get_cx_info (
-	u32                     cx_states[]);
-
-ACPI_STATUS
-acpi_hw_get_cx_handler (
-	u32                     cx_state,
-	ACPI_C_STATE_HANDLER    *handler);
-
-ACPI_STATUS
-acpi_hw_set_cx_handler (
-	u32                     cx_state,
-	ACPI_C_STATE_HANDLER    handler);
-
-
-/* Throttling Prototypes */
-
-void
-acpi_hw_enable_throttling (
-	ACPI_IO_ADDRESS         pblk_address);
-
-void
-acpi_hw_disable_throttling (
-	ACPI_IO_ADDRESS         pblk_address);
-
-u32
-acpi_hw_get_duty_cycle (
-	u8                      duty_offset,
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     num_throttle_states);
-
-void
-acpi_hw_program_duty_cycle (
-	u8                      duty_offset,
-	u32                     duty_cycle,
-	ACPI_IO_ADDRESS         pblk_address,
-	u32                     num_throttle_states);
-
-NATIVE_UINT
-acpi_hw_local_pow (
-	NATIVE_UINT             x,
-	NATIVE_UINT             y);
-
-
 /* ACPI Timer prototypes */
 
-u32
-acpi_hw_pmt_ticks (
-	void);
-
-u32
-acpi_hw_pmt_resolution (
-	void);
+ACPI_STATUS
+acpi_get_timer_resolution (
+	u32                     *resolution);
 
 ACPI_STATUS
 acpi_get_timer (
-	u32                     *out_ticks);
+	u32                     *ticks);
+
+ACPI_STATUS
+acpi_get_timer_duration (
+	u32                     start_ticks,
+	u32                     end_ticks,
+	u32                     *time_elapsed);
 
 
 #endif /* __ACHWARE_H__ */

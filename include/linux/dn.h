@@ -143,6 +143,5 @@ struct dn_addr {
 #define SIOCGNETADDR  _IOR(DECNET_IOCTL_BASE, 0xe1, struct dn_naddr)
 #define OSIOCSNETADDR _IOW(DECNET_IOCTL_BASE, 0xe0, int)
 #define OSIOCGNETADDR _IOR(DECNET_IOCTL_BASE, 0xe1, int)
-/* #define SIOCATEOR _IOR(DECNET_IOCTL_BASE, 0x01, int) */
 
 #endif /* _LINUX_DN_H */

@@ -49,99 +49,99 @@ ENTRY(csum_partial)
 	   * Fortunately, it is easy to convert 2-byte alignment to 4-byte
 	   * alignment for the unrolled loop.
 	   */
-	mov	$r5, $r1
-	mov	$r4, $r0
-	tst	#2, $r0		! Check alignment.
+	mov	r5, r1
+	mov	r4, r0
+	tst	#2, r0		! Check alignment.
 	bt	2f		! Jump if alignment is ok.
 	!
-	add	#-2, $r5	! Alignment uses up two bytes.
-	cmp/pz	$r5		!
+	add	#-2, r5	! Alignment uses up two bytes.
+	cmp/pz	r5		!
 	bt/s	1f		! Jump if we had at least two bytes.
 	 clrt
 	bra	6f
-	 add	#2, $r5		! $r5 was < 2.  Deal with it.
+	 add	#2, r5		! r5 was < 2.  Deal with it.
 1:
-	mov.w	@$r4+, $r0
-	extu.w	$r0, $r0
-	addc	$r0, $r6
+	mov.w	@r4+, r0
+	extu.w	r0, r0
+	addc	r0, r6
 	bf	2f
-	add	#1, $r6
+	add	#1, r6
 2:
-	mov	#-5, $r0
-	shld	$r0, $r5
-	tst	$r5, $r5
+	mov	#-5, r0
+	shld	r0, r5
+	tst	r5, r5
 	bt/s	4f		! if it's =0, go to 4f
 	 clrt
 	.align	2
 3:
-	mov.l	@$r4+, $r0
-	mov.l	@$r4+, $r2
-	mov.l	@$r4+, $r3
-	addc	$r0, $r6
-	mov.l	@$r4+, $r0
-	addc	$r2, $r6
-	mov.l	@$r4+, $r2
-	addc	$r3, $r6
-	mov.l	@$r4+, $r3
-	addc	$r0, $r6
-	mov.l	@$r4+, $r0
-	addc	$r2, $r6
-	mov.l	@$r4+, $r2
-	addc	$r3, $r6
-	addc	$r0, $r6
-	addc	$r2, $r6
-	movt	$r0	
-	dt	$r5
+	mov.l	@r4+, r0
+	mov.l	@r4+, r2
+	mov.l	@r4+, r3
+	addc	r0, r6
+	mov.l	@r4+, r0
+	addc	r2, r6
+	mov.l	@r4+, r2
+	addc	r3, r6
+	mov.l	@r4+, r3
+	addc	r0, r6
+	mov.l	@r4+, r0
+	addc	r2, r6
+	mov.l	@r4+, r2
+	addc	r3, r6
+	addc	r0, r6
+	addc	r2, r6
+	movt	r0	
+	dt	r5
 	bf/s	3b
-	 cmp/eq	#1, $r0
-	! here, we know $r5==0
-	addc	$r5, $r6		! add carry to $r6
+	 cmp/eq	#1, r0
+	! here, we know r5==0
+	addc	r5, r6			! add carry to r6
 4:
-	mov	$r1, $r0
-	and	#0x1c, $r0
-	tst	$r0, $r0
+	mov	r1, r0
+	and	#0x1c, r0
+	tst	r0, r0
 	bt/s	6f
-	 mov	$r0, $r5
-	shlr2	$r5
-	mov	#0, $r2
+	 mov	r0, r5
+	shlr2	r5
+	mov	#0, r2
 5:
-	addc	$r2, $r6
-	mov.l	@$r4+, $r2
-	movt	$r0
-	dt	$r5
+	addc	r2, r6
+	mov.l	@r4+, r2
+	movt	r0
+	dt	r5
 	bf/s	5b
-	 cmp/eq	#1, $r0
-	addc	$r2, $r6
-	addc	$r5, $r6	! $r5==0 here, so it means add carry-bit
+	 cmp/eq	#1, r0
+	addc	r2, r6
+	addc	r5, r6		! r5==0 here, so it means add carry-bit
 6:
-	mov	$r1, $r5
-	mov	#3, $r0
-	and	$r0, $r5
-	tst	$r5, $r5
+	mov	r1, r5
+	mov	#3, r0
+	and	r0, r5
+	tst	r5, r5
 	bt	9f		! if it's =0 go to 9f
-	mov	#2, $r1
-	cmp/hs  $r1, $r5
+	mov	#2, r1
+	cmp/hs  r1, r5
 	bf	7f
-	mov.w	@r4+, $r0
-	extu.w	$r0, $r0
-	cmp/eq	$r1, $r5
+	mov.w	@r4+, r0
+	extu.w	r0, r0
+	cmp/eq	r1, r5
 	bt/s	8f
 	 clrt
-	shll16	$r0
-	addc	$r0, $r6
+	shll16	r0
+	addc	r0, r6
 7:
-	mov.b	@$r4+, $r0
-	extu.b	$r0, $r0
+	mov.b	@r4+, r0
+	extu.b	r0, r0
 #ifndef	__LITTLE_ENDIAN__
-	shll8	$r0
+	shll8	r0
 #endif
 8:
-	addc	$r0, $r6
-	mov	#0, $r0
-	addc	$r0, $r6 
+	addc	r0, r6
+	mov	#0, r0
+	addc	r0, r6 
 9:
 	rts
-	 mov	$r6, $r0
+	 mov	r6, r0
 
 /*
 unsigned int csum_partial_copy_generic (const char *src, char *dst, int len, 
@@ -159,14 +159,14 @@ unsigned int csum_partial_copy_generic (const char *src, char *dst, int len,
  *	  them all but there's no guarantee.
  */
 
-#define SRC(x,y)			\
-	9999: x,y;			\
+#define SRC(...)			\
+	9999: __VA_ARGS__ ;		\
 	.section __ex_table, "a";	\
 	.long 9999b, 6001f	;	\
 	.previous
 
-#define DST(x,y)			\
-	9999: x,y;			\
+#define DST(...)			\
+	9999: __VA_ARGS__ ;		\
 	.section __ex_table, "a";	\
 	.long 9999b, 6002f	;	\
 	.previous
@@ -202,7 +202,7 @@ ENTRY(csum_partial_copy_generic)
 	bt/s	1f
 	 clrt
 	bra	4f
-	 add	#2,r6			! $r6 was < 2.	Deal with it.
+	 add	#2,r6			! r6 was < 2.	Deal with it.
 
 3:	! Handle different src and dest alinments.
 	! This is not common, so simple byte by byte copy will do.
@@ -211,7 +211,8 @@ ENTRY(csum_partial_copy_generic)
 	tst	r6, r6
 	bt	4f
 	clrt
-SRC(5:	mov.b	@r4+,r0	)
+5:	
+SRC(	mov.b	@r4+,r0 )
 DST(	mov.b	r0,@r5	)
 	add	#1, r5
 SRC(	mov.b	@r4+,r1	)
@@ -244,7 +245,8 @@ DST(	mov.b	r1,@r5	)
 	! src and dest equally aligned, but to a two byte boundary.
 	! Handle first two bytes as a special case
 	.align	5
-SRC(1:	mov.w	@r4+,r0	)
+1:	
+SRC(	mov.w	@r4+,r0	)
 DST(	mov.w	r0,@r5	)
 	add	#2,r5
 	extu.w	r0,r0
@@ -258,7 +260,8 @@ DST(	mov.w	r0,@r5	)
 	tst	r6,r6
 	bt/s	2f
 	 clrt
-SRC(1:	mov.l	@r4+,r0	)
+1:	
+SRC(	mov.l	@r4+,r0	)
 SRC(	mov.l	@r4+,r1	)
 	addc	r0,r7
 DST(	mov.l	r0,@r5	)
@@ -276,7 +279,7 @@ DST(	mov.l	r0,@r5	)
 DST(	mov.l	r1,@r5	)
 	add	#4,r5
 
-SRC(	mov.l	@r4+,r0 )
+SRC(	mov.l	@r4+,r0 	)
 SRC(	mov.l	@r4+,r1	)
 	addc	r0,r7
 DST(	mov.l	r0,@r5	)
@@ -307,7 +310,8 @@ DST(	mov.l	r1,@r5	)
 	bf/s	4f
 	 clrt
 	shlr2	r6
-SRC(3:	mov.l	@r4+,r0	)
+3:	
+SRC(	mov.l	@r4+,r0	)
 	addc	r0,r7
 DST(	mov.l	r0,@r5	)
 	add	#4,r5
@@ -334,7 +338,8 @@ DST(	mov.w	r0,@r5	)
 	 clrt
 	shll16	r0
 	addc	r0,r7
-SRC(5:	mov.b	@r4+,r0	)
+5:	
+SRC(	mov.b	@r4+,r0	)
 DST(	mov.b	r0,@r5	)
 	extu.b	r0,r0
 #ifndef	__LITTLE_ENDIAN__

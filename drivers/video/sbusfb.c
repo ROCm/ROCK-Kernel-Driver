@@ -678,7 +678,7 @@ static int sbusfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		int end, count, index;
 		struct fbcmap *cmap;
 		
-		if (!fb->loadcmap)
+		if (!fb->loadcmap || !fb->color_map)
 			return -EINVAL;
 		i = verify_area (VERIFY_READ, (void *) arg, sizeof (struct fbcmap));
 		if (i) return i;
@@ -1110,6 +1110,8 @@ sizechange:
 	}
 	
 	if (!p) {
+		if (fb->color_map)
+			kfree(fb->color_map);
 		kfree(fb);
 		return;
 	}
@@ -1147,6 +1149,8 @@ sizechange:
 	sbusfb_set_var(var, -1, &fb->info);
 
 	if (register_framebuffer(&fb->info) < 0) {
+		if (fb->color_map)
+			kfree(fb->color_map);
 		kfree(fb);
 		return;
 	}

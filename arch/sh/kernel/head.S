@@ -37,40 +37,40 @@ ENTRY(empty_zero_page)
  */
 ENTRY(_stext)
 	!			Initialize Status Register
-	mov.l	1f, $r0		! MD=1, RB=0, BL=0, IMASK=0xF
-	ldc	$r0, $sr
+	mov.l	1f, r0		! MD=1, RB=0, BL=0, IMASK=0xF
+	ldc	r0, sr
 	!			Initialize global interrupt mask
-	mov	#0, $r0
-	ldc	$r0, $r6_bank
+	mov	#0, r0
+	ldc	r0, r6_bank
 	!
-	mov.l	2f, $r0
-	mov	$r0, $r15	! Set initial r15 (stack pointer)
-	mov	#0x20, $r1	!
-	shll8	$r1		! $r1 = 8192
-	sub	$r1, $r0	!
-	ldc	$r0, $r7_bank	! ... and init_task
+	mov.l	2f, r0
+	mov	r0, r15		! Set initial r15 (stack pointer)
+	mov	#0x20, r1	!
+	shll8	r1		! r1 = 8192
+	sub	r1, r0		!
+	ldc	r0, r7_bank	! ... and init_task
 	!
 #if defined(__SH4__)
 	!                       Initialize fpu
-	mov.l   7f, $r0
-	jsr     @$r0
+	mov.l   7f, r0
+	jsr     @r0
 	 nop
 #endif
 	!			Enable cache
-	mov.l	6f, $r0
-	jsr	@$r0
+	mov.l	6f, r0
+	jsr	@r0
 	 nop
 	!			Clear BSS area
-	mov.l	3f, $r1
-	add	#4, $r1
-	mov.l	4f, $r2
-	mov	#0, $r0
-9:	cmp/hs	$r2, $r1
+	mov.l	3f, r1
+	add	#4, r1
+	mov.l	4f, r2
+	mov	#0, r0
+9:	cmp/hs	r2, r1
 	bf/s	9b		! while (r1 < r2)
-	 mov.l	$r0,@-$r2
+	 mov.l	r0,@-r2
 	!			Start kernel
-	mov.l	5f, $r0
-	jmp	@$r0
+	mov.l	5f, r0
+	jmp	@r0
 	 nop
 
 	.balign 4

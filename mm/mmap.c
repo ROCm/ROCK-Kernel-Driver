@@ -883,6 +883,8 @@ void exit_mmap(struct mm_struct * mm)
 	mm->rss = 0;
 	mm->total_vm = 0;
 	mm->locked_vm = 0;
+
+	flush_cache_mm(mm);
 	while (mpnt) {
 		struct vm_area_struct * next = mpnt->vm_next;
 		unsigned long start = mpnt->vm_start;
@@ -895,13 +897,13 @@ void exit_mmap(struct mm_struct * mm)
 		}
 		mm->map_count--;
 		remove_shared_vm_struct(mpnt);
-		flush_cache_range(mm, start, end);
 		zap_page_range(mm, start, size);
 		if (mpnt->vm_file)
 			fput(mpnt->vm_file);
 		kmem_cache_free(vm_area_cachep, mpnt);
 		mpnt = next;
 	}
+	flush_tlb_mm(mm);
 
 	/* This is just debugging */
 	if (mm->map_count)

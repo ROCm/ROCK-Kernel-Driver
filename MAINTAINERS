@@ -196,6 +196,12 @@ L:	linux-kernel@vger.kernel.org
 W:	http://www.ocston.org/~tigran/patches/bfs
 S:	Maintained
 
+BLOCK LAYER
+P:	Jens Axboe
+M:	axboe@suse.de
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 BTTV VIDEO4LINUX DRIVER
 P:	Gerd Knorr
 M:	kraxel@goldbach.in-berlin.de

@@ -58,7 +58,6 @@ struct dn_scp                                   /* Session Control Port */
 	unsigned short		segsize_rem;
 	unsigned short		segsize_loc;
 
-	unsigned char           at_eor;
 	unsigned char		nonagle;
 	unsigned char		multi_ireq;
 	unsigned char		accept_mode;

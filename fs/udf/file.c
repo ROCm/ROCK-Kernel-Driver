@@ -86,6 +86,7 @@ static int udf_adinicb_writepage(struct page *page)
 	brelse(bh);
 	SetPageUptodate(page);
 	kunmap(page);
+	UnlockPage(page);
 	return 0;
 }
 

@@ -39,8 +39,6 @@
 extern int mac_floppy_init(void);
 #endif
 
-extern int lvm_init(void);
-
 /*
  * For the allocated request tables
  */
@@ -1120,12 +1118,25 @@ sorry:
 extern int stram_device_init (void);
 #endif
 
-/*
- * First step of what used to be end_request
+
+/**
+ * end_that_request_first - end I/O on one buffer.
+ * @req:      the request being processed
+ * @uptodate: 0 for I/O error
+ * @name:     the name printed for an I/O error
  *
- * 0 means continue with end_that_request_last,
- * 1 means we are done
- */
+ * Description:
+ *     Ends I/O on the first buffer attached to @req, and sets it up
+ *     for the next buffer_head (if any) in the cluster.
+ *     
+ * Return:
+ *     0 - we are done with this request, call end_that_request_last()
+ *     1 - still buffers pending for this request
+ *
+ * Caveat: 
+ *     Drivers implementing their own end_request handling must call
+ *     blk_finished_io() appropriately.
+ **/
 
 int end_that_request_first (struct request *req, int uptodate, char *name)
 {
@@ -1198,17 +1209,10 @@ int __init blk_dev_init(void)
 	 * use half of RAM
 	 */
 	high_queued_sectors = (total_ram * 2) / 3;
-	low_queued_sectors = high_queued_sectors - MB(128);
-	if (low_queued_sectors < 0)
-		low_queued_sectors = total_ram / 2;
-
-	/*
-	 * for big RAM machines (>= 384MB), use more for I/O
-	 */
-	if (total_ram >= MB(384)) {
-		high_queued_sectors = (total_ram * 4) / 5;
+	low_queued_sectors = high_queued_sectors / 3;
+	if (high_queued_sectors - low_queued_sectors > MB(128))
 		low_queued_sectors = high_queued_sectors - MB(128);
-	}
+
 
 	/*
 	 * make it sectors (512b)
@@ -1336,9 +1340,6 @@ int __init blk_dev_init(void)
 #endif
 #ifdef CONFIG_SUN_JSFLASH
 	jsfd_init();
-#endif
-#ifdef CONFIG_BLK_DEV_LVM
-	lvm_init();
 #endif
 	return 0;
 };

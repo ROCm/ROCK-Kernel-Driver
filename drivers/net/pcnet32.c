@@ -685,6 +685,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
     
     if (a == NULL) {
       printk(KERN_ERR "pcnet32: No access methods\n");
+      pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
       return -ENODEV;
     }
     lp->a = *a;
@@ -731,6 +732,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
 	    printk(", probed IRQ %d.\n", dev->irq);
 	else {
 	    printk(", failed to detect IRQ line.\n");
+	    pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
 	    return -ENODEV;
 	}
     }

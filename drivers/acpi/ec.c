@@ -400,8 +400,6 @@ ec_region_setup (
 {
 	FUNCTION_TRACE("acpi_ec_region_setup");
 
-	printk("acpi_ec_region_setup\n");
-
 	if (function == ACPI_REGION_DEACTIVATE)
 	{
 		if (*region_context)

@@ -678,7 +678,7 @@ void get_capabilities(int i)
 					 CDC_DVD | CDC_DVD_RAM |
 					 CDC_SELECT_DISC | CDC_SELECT_SPEED);
 		scsi_free(buffer, 512);
-		printk("sr%i: scsi-1 drive\n");
+		printk("sr%i: scsi-1 drive\n", i);
 		return;
 	}
 	n = buffer[3] + 4;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 39 $
+ *              $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -120,6 +120,12 @@ acpi_psx_execute (
 	if (!op) {
 		return (AE_NO_MEMORY);
 	}
+
+
+	/* Init new op with the method name and pointer back to the NS node */
+
+	acpi_ps_set_name (op, method_node->name);
+	op->node = method_node;
 
 	/*
 	 * The walk of the parse tree is where we actually execute the method

@@ -420,17 +420,12 @@ static int i2ob_merge_requests(request_queue_t *q,
 {
 	int max_segments = i2ob_dev[MINOR(req->rq_dev)].max_segments;
 	int total_segments = req->nr_segments + next->nr_segments;
-	int same_segment;
 
 	if (__max_segments < max_segments)
 		max_segments = __max_segments;
 
-	same_segment = 0;
 	if (req->bhtail->b_data + req->bhtail->b_size == next->bh->b_data)
-	{
 		total_segments--;
-		same_segment = 1;
-	}
     
 	if (total_segments > max_segments)
 		return 0;

@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 87 $
+ *              $Revision: 88 $
  *
  ******************************************************************************/
 
@@ -37,7 +37,7 @@
 /* This matches the #defines in actypes.h. */
 
 NATIVE_CHAR                 *sleep_state_table[] = {"\\_S0_","\\_S1_","\\_S2_","\\_S3_",
-			  "\\_S4_","\\_S4_b","\\_S5_"};
+			  "\\_S4_","\\_S5_","\\_S4_b"};
 
 
 /*******************************************************************************
@@ -53,7 +53,7 @@ NATIVE_CHAR                 *sleep_state_table[] = {"\\_S0_","\\_S1_","\\_S2_","
  *
  ******************************************************************************/
 
-static u32
+u32
 acpi_hw_get_bit_shift (
 	u32                     mask)
 {
@@ -581,13 +581,8 @@ acpi_hw_register_read (
 
 	case PM1_CONTROL: /* 16-bit access */
 
-		if (register_id != SLP_TYPE_B) {
-			value |= acpi_hw_low_level_read (16, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
-		}
-
-		if (register_id != SLP_TYPE_A) {
-			value |= acpi_hw_low_level_read (16, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
-		}
+		value =  acpi_hw_low_level_read (16, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
+		value |= acpi_hw_low_level_read (16, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
 		break;
 
 
@@ -696,30 +691,20 @@ acpi_hw_register_write (
 
 	case PM1_CONTROL: /* 16-bit access */
 
-		/*
-		 * If SLP_TYP_A or SLP_TYP_B, only write to one reg block.
-		 * Otherwise, write to both.
-		 */
-		if (register_id == SLP_TYPE_A) {
-			acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
-		}
-		else if (register_id == SLP_TYPE_B) {
-			acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
-		}
-		else {
-			/* disable/re-enable interrupts if sleeping */
-			if (register_id == SLP_EN) {
-				disable();
-			}
+		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
+		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
+		break;
 
-			acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
-			acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
 
-			if (register_id == SLP_EN) {
-				enable();
-			}
-		}
+	case PM1_a_CONTROL: /* 16-bit access */
 
+		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
+		break;
+
+
+	case PM1_b_CONTROL: /* 16-bit access */
+
+		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
 		break;
 
 

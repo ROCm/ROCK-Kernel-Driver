@@ -203,7 +203,6 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	udf_release_data(bh);
 
 	inode->i_data.a_ops->writepage(page);
-	UnlockPage(page);
 	page_cache_release(page);
 
 	mark_inode_dirty(inode);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 162 $
+ *       $Revision: 163 $
  *
  *****************************************************************************/
 
@@ -249,8 +249,9 @@ typedef UINT64                          ACPI_INTEGER;
 #define ACPI_STATE_S2                   (u8) 2
 #define ACPI_STATE_S3                   (u8) 3
 #define ACPI_STATE_S4                   (u8) 4
-#define ACPI_STATE_S4_bIOS              (u8) 5
-#define ACPI_STATE_S5                   (u8) 6
+#define ACPI_STATE_S5                   (u8) 5
+/* let's pretend S4_bIOS didn't exist for now. ASG */
+#define ACPI_STATE_S4_bIOS              (u8) 6
 #define ACPI_S_STATES_MAX               ACPI_STATE_S5
 
 

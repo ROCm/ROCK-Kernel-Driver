@@ -43,7 +43,7 @@ bss_start_addr:
 end_addr:
 	.long	_end
 init_sr:
-	.long	0x40000000	/* Privileged mode, Bank=0, Block=0, I3-I0=0 */
+	.long	0x400000F0	/* Privileged mode, Bank=0, Block=0, IMASK=0xF */
 init_stack_addr:
 	.long	stack_start
 decompress_kernel_addr:

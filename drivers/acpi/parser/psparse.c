@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 73 $
+ *              $Revision: 74 $
  *
  *****************************************************************************/
 
@@ -537,7 +537,9 @@ acpi_ps_parse_loop (
 				 */
 
 				status = acpi_ds_get_predicate_value (walk_state, NULL, TRUE);
-				if (ACPI_FAILURE (status)) {
+				if (ACPI_FAILURE (status) &&
+					((status & AE_CODE_MASK) != AE_CODE_CONTROL))
+				{
 					return (status);
 				}
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 89 $
+ *       $Revision: 91 $
  *
  *****************************************************************************/
 
@@ -85,6 +85,12 @@ acpi_aml_convert_to_buffer (
 
 ACPI_STATUS
 acpi_aml_convert_to_string (
+	ACPI_OPERAND_OBJECT     **obj_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+ACPI_STATUS
+acpi_aml_convert_to_target_type (
+	OBJECT_TYPE_INTERNAL    destination_type,
 	ACPI_OPERAND_OBJECT     **obj_desc,
 	ACPI_WALK_STATE         *walk_state);
 
@@ -438,17 +444,75 @@ acpi_aml_exec_store (
 	ACPI_WALK_STATE         *walk_state);
 
 ACPI_STATUS
-acpi_aml_store_object_to_object (
+acpi_aml_store_object_to_index (
 	ACPI_OPERAND_OBJECT     *val_desc,
 	ACPI_OPERAND_OBJECT     *dest_desc,
 	ACPI_WALK_STATE         *walk_state);
 
 ACPI_STATUS
 acpi_aml_store_object_to_node (
-	ACPI_OPERAND_OBJECT     *val_desc,
+	ACPI_OPERAND_OBJECT     *source_desc,
 	ACPI_NAMESPACE_NODE     *node,
 	ACPI_WALK_STATE         *walk_state);
 
+ACPI_STATUS
+acpi_aml_store_object_to_object (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *dest_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+
+/*
+ *
+ */
+
+ACPI_STATUS
+acpi_aml_resolve_object (
+	ACPI_OPERAND_OBJECT     **source_desc_ptr,
+	OBJECT_TYPE_INTERNAL    target_type,
+	ACPI_WALK_STATE         *walk_state);
+
+ACPI_STATUS
+acpi_aml_store_object (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	OBJECT_TYPE_INTERNAL    target_type,
+	ACPI_OPERAND_OBJECT     **target_desc_ptr,
+	ACPI_WALK_STATE         *walk_state);
+
+
+/*
+ * amcopy - object copy
+ */
+
+ACPI_STATUS
+acpi_aml_copy_buffer_to_buffer (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc);
+
+ACPI_STATUS
+acpi_aml_copy_string_to_string (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc);
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_index_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc);
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_bank_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc);
+
+ACPI_STATUS
+acpi_aml_copy_data_to_named_field (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_NAMESPACE_NODE     *node);
+
+ACPI_STATUS
+acpi_aml_copy_integer_to_field_unit (
+	ACPI_OPERAND_OBJECT     *source_desc,
+	ACPI_OPERAND_OBJECT     *target_desc);
 
 /*
  * amutils - interpreter/scanner utilities

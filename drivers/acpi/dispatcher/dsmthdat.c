@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 38 $
+ *              $Revision: 39 $
  *
  ******************************************************************************/
 
@@ -40,7 +40,7 @@
  *
  * FUNCTION:    Acpi_ds_method_data_init
  *
- * PARAMETERS:  *Obj_desc
+ * PARAMETERS:  Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -97,7 +97,7 @@ acpi_ds_method_data_init (
  *
  * FUNCTION:    Acpi_ds_method_data_delete_all
  *
- * PARAMETERS:  None
+ * PARAMETERS:  Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -153,7 +153,9 @@ acpi_ds_method_data_delete_all (
  *
  * FUNCTION:    Acpi_ds_method_data_init_args
  *
- * PARAMETERS:  None
+ * PARAMETERS:  *Params         - Pointer to a parameter list for the method
+ *              Max_param_count - The arg count for this method
+ *              Walk_state      - Current walk state object
  *
  * RETURN:      Status
  *
@@ -214,6 +216,7 @@ acpi_ds_method_data_init_args (
  *              Index               - Which local_var or argument to get
  *              Entry               - Pointer to where a pointer to the stack
  *                                    entry is returned.
+ *              Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -276,6 +279,7 @@ acpi_ds_method_data_get_entry (
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument to get
  *              Object              - Object to be inserted into the stack entry
+ *              Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -320,6 +324,7 @@ acpi_ds_method_data_set_entry (
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument whose type
  *                                      to get
+ *              Walk_state          - Current walk state object
  *
  * RETURN:      Data type of selected Arg or Local
  *              Used only in Exec_monadic2()/Type_op.
@@ -366,6 +371,7 @@ acpi_ds_method_data_get_type (
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument whose type
  *                                      to get
+ *              Walk_state          - Current walk state object
  *
  * RETURN:      Get the Node associated with a local or arg.
  *
@@ -418,7 +424,8 @@ acpi_ds_method_data_get_nte (
  *
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument to get
- *              *Dest_desc           - Descriptor into which selected Arg
+ *              Walk_state          - Current walk state object
+ *              *Dest_desc          - Ptr to Descriptor into which selected Arg
  *                                    or Local value should be copied
  *
  * RETURN:      Status
@@ -474,10 +481,12 @@ acpi_ds_method_data_get_value (
 		switch (type)
 		{
 		case MTH_TYPE_ARG:
+
 			return (AE_AML_UNINITIALIZED_ARG);
 			break;
 
 		case MTH_TYPE_LOCAL:
+
 			return (AE_AML_UNINITIALIZED_LOCAL);
 			break;
 		}
@@ -502,6 +511,7 @@ acpi_ds_method_data_get_value (
  *
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument to delete
+ *              Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -548,7 +558,6 @@ acpi_ds_method_data_delete_value (
 		 * Decrement the reference count by one to balance the
 		 * increment when the object was stored in the slot.
 		 */
-
 		acpi_cm_remove_reference (object);
 	}
 
@@ -563,18 +572,14 @@ acpi_ds_method_data_delete_value (
  *
  * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
  *              Index               - Which local_var or argument to set
- *              *Src_desc           - Value to be stored
- *              *Dest_desc          - Descriptor into which *Src_desc
- *                                    can be copied, or NULL if one must
- *                                    be allocated for the purpose.  If
- *                                    provided, this descriptor will be
- *                                    used for the new value.
+ *              Src_desc            - Value to be stored
+ *              Walk_state          - Current walk state
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Store a value in an Arg or Local.  The Src_desc is installed
  *              as the new value for the Arg or Local and the reference count
- *              is incremented.
+ *              for Src_desc is incremented.
  *
  ******************************************************************************/
 
@@ -644,7 +649,6 @@ acpi_ds_method_data_set_value (
 			 * Store this object into the Node
 			 * (do the indirect store)
 			 */
-
 			status = acpi_ns_attach_object ((ACPI_NAMESPACE_NODE *) *entry, src_desc,
 					   src_desc->common.type);
 			return (status);
@@ -652,10 +656,18 @@ acpi_ds_method_data_set_value (
 
 
 		/*
-		 * Otherwise, just delete the existing object
+		 * Perform "Implicit conversion" of the new object to the type of the
+		 * existing object
+		 */
+		status = acpi_aml_convert_to_target_type ((*entry)->common.type, &src_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
+		}
+
+		/*
+		 * Delete the existing object
 		 * before storing the new one
 		 */
-
 		acpi_ds_method_data_delete_value (type, index, walk_state);
 	}
 
@@ -666,7 +678,6 @@ acpi_ds_method_data_set_value (
 	 * Install the new object in the stack entry
 	 * (increments the object reference count by one)
 	 */
-
 	status = acpi_ds_method_data_set_entry (type, index, src_desc, walk_state);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: amfldio - Aml Field I/O
- *              $Revision: 35 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -405,8 +405,6 @@ acpi_aml_write_field_data_with_update_rule (
 
 	merged_value = field_value;
 
-	/* Check if update rule needs to be applied (not if mask is all ones) */
-
 
 	/* Decode the update rule */
 
@@ -415,13 +413,17 @@ acpi_aml_write_field_data_with_update_rule (
 
 	case UPDATE_PRESERVE:
 
-		/*
-		 * Read the current contents of the byte/word/dword containing
-		 * the field, and merge with the new field value.
-		 */
-		status = acpi_aml_read_field_data (obj_desc, this_field_byte_offset,
-				   bit_granularity, &current_value);
-		merged_value |= (current_value & ~mask);
+		/* Check if update rule needs to be applied (not if mask is all ones) */
+
+		if (((1 << bit_granularity) -1) & ~mask) {
+			/*
+			 * Read the current contents of the byte/word/dword containing
+			 * the field, and merge with the new field value.
+			 */
+			status = acpi_aml_read_field_data (obj_desc, this_field_byte_offset,
+					   bit_granularity, &current_value);
+			merged_value |= (current_value & ~mask);
+		}
 		break;
 
 

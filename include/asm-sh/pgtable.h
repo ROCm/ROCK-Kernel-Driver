@@ -39,6 +39,7 @@ extern void paging_init(void);
 #define flush_dcache_page(page)			do { } while (0)
 #define flush_icache_range(start, end)		do { } while (0)
 #define flush_icache_page(vma,pg)		do { } while (0)
+#define flush_cache_sigtramp(vaddr)		do { } while (0)
 #elif defined(__SH4__)
 /*
  *  Caches are broken on SH-4, so we need them.
@@ -52,6 +53,7 @@ extern void flush_page_to_ram(struct page *page);
 extern void flush_dcache_page(struct page *pg);
 extern void flush_icache_range(unsigned long start, unsigned long end);
 extern void flush_icache_page(struct vm_area_struct *vma, struct page *pg);
+extern void flush_cache_sigtramp(unsigned long addr);
 #endif
 
 /*
@@ -125,11 +127,7 @@ extern unsigned long empty_zero_page[1024];
 /* Hardware flags: SZ=1 (4k-byte) */
 #define _PAGE_FLAGS_HARD		0x00000010
 
-#if defined(__sh3__)
-#define _PAGE_SHARED	_PAGE_HW_SHARED
-#elif defined(__SH4__)
 #define _PAGE_SHARED	_PAGE_U0_SHARED
-#endif
 
 #define _PAGE_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define _KERNPG_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY)

@@ -288,6 +288,9 @@
  * 4.59  Aug 11, 2000	- Fix changer problem in cdrom_read_toc, we weren't
  *			  correctly sensing a disc change.
  *			- Rearranged some code
+ *			- Use extended sense on drives that support it for
+ *			  correctly reporting tray status -- from
+ *			  Michael D Johnson <johnsom@orst.edu>
  *
  *************************************************************************/
  
@@ -759,16 +762,13 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
  * changed 5 parameters to 3 for dvd-ram
  * struct packet_command *pc; now packet_command_t *pc;
  */
-#undef CLASSIC_PACKET_STRUCT
 static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 					  struct packet_command *pc,
 					  ide_handler_t *handler)
 {
-#ifdef CLASSIC_PACKET_STRUCT
 	unsigned char *cmd_buf	= pc->c;
 	int cmd_len		= sizeof(pc->c);
 	unsigned int timeout	= pc->timeout;
-#endif
 	ide_startstop_t startstop;
 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
@@ -786,22 +786,10 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	}
 
 	/* Arm the interrupt handler. */
-#ifdef CLASSIC_PACKET_STRUCT
-	/* Arm the interrupt handler. */
 	ide_set_handler (drive, handler, timeout, cdrom_timer_expiry);
 
 	/* Send the command to the device. */
 	atapi_output_bytes (drive, cmd_buf, cmd_len);
-#else /* !CLASSIC_PACKET_STRUCT */
-	/* Arm the interrupt handler. */
-//	ide_set_handler (drive, handler, (unsigned int) pc->timeout, cdrom_timer_expiry);
-	ide_set_handler (drive, handler, pc->timeout, cdrom_timer_expiry);
-
-	/* Send the command to the device. */
-//	atapi_output_bytes (drive, (void *)pc->c, (unsigned int) sizeof(pc->c));
-	atapi_output_bytes (drive, pc->c, sizeof(pc->c));
-#endif /* CLASSIC_PACKET_STRUCT */
-
 	return ide_started;
 }
 
@@ -1884,9 +1872,6 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	   If it is, just return. */
 	(void) cdrom_check_status(drive, sense);
 
-	if (CDROM_STATE_FLAGS(drive)->toc_valid)
-		return 0;
-
 	/* First read just the header, so we know how long the TOC is. */
 	stat = cdrom_read_tocentry(drive, 0, 1, 0, (char *) &toc->hdr,
 				    sizeof(struct atapi_toc_header), sense);
@@ -2324,11 +2309,17 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 		    sense.ascq == 0x04)
 			return CDS_DISC_OK;
 
+
+		/*
+		 * If not using Mt Fuji extended media tray reports,
+		 * just return TRAY_OPEN since ATAPI doesn't provide
+		 * any other way to detect this...
+		 */
 		if (sense.sense_key == NOT_READY) {
-			/* ATAPI doesn't have anything that can help
-			   us decide whether the drive is really
-			   emtpy or the tray is just open. irk. */
-			return CDS_TRAY_OPEN;
+			if (sense.asc == 0x3a && (!sense.ascq||sense.ascq == 1))
+				return CDS_NO_DISC;
+			else
+				return CDS_TRAY_OPEN;
 		}
 
 		return CDS_DRIVE_NOT_READY;
@@ -2597,7 +2588,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	if (CDROM_CONFIG_FLAGS (drive)->dvd_r|CDROM_CONFIG_FLAGS (drive)->dvd_ram)
         	printk (" DVD%s%s", 
         	(CDROM_CONFIG_FLAGS (drive)->dvd_r)? "-R" : "", 
-        	(CDROM_CONFIG_FLAGS (drive)->dvd_ram)? "AM" : "");
+        	(CDROM_CONFIG_FLAGS (drive)->dvd_ram)? "-RAM" : "");
 
         if (CDROM_CONFIG_FLAGS (drive)->cd_r|CDROM_CONFIG_FLAGS (drive)->cd_rw) 
         	printk (" CD%s%s", 

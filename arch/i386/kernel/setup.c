@@ -1401,9 +1401,6 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 					wrmsr (0x1107, lo, hi);
 
 					set_bit(X86_FEATURE_CX8, &c->x86_capability);
-					rdmsr (0x80000001, lo, hi);
-					if (hi & (1<<31))
-						set_bit(X86_FEATURE_3DNOW, &c->x86_capability);
 
 					get_model_name(c);
 					display_cacheinfo(c);
@@ -1874,7 +1871,8 @@ static int __init id_and_try_enable_cpuid(struct cpuinfo_x86 *c)
 	/* Detect Cyrix with disabled CPUID */
 	if ( c->x86 == 4 && test_cyrix_52div() ) {
 		strcpy(c->x86_vendor_id, "CyrixInstead");
-	}
+	        c->x86_vendor = X86_VENDOR_CYRIX;
+	} else
 
 	/* Detect NexGen with old hypercode */
 	if ( deep_magic_nexgen_probe() ) {

@@ -7,22 +7,23 @@
  * April-May,July-August,November 1998
  * January-March,May,July,September,October 1999
  * January,February,July,September-November 2000
+ * January 2001
  *
  *
  * LVM driver is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
+ *
  * LVM driver is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA. 
+ * Boston, MA 02111-1307, USA.
  *
  */
 
@@ -138,13 +139,21 @@
  *    01/11/2000 - added memory information on hash tables to
  *                 lvm_proc_get_global_info()
  *    02/11/2000 - implemented /proc/lvm/ hierarchy
- *    07/12/2000 - make sure lvm_make_request_fn returns correct value - 0 or 1 - NeilBrown
+ *    22/11/2000 - changed lvm_do_create_proc_entry_of_pv () to work
+ *                 with devfs
+ *    26/11/2000 - corrected #ifdef locations for PROC_FS
+ *    28/11/2000 - fixed lvm_do_vg_extend() NULL pointer BUG
+ *               - fixed lvm_do_create_proc_entry_of_pv() buffer tampering BUG
+ *    08/01/2001 - Removed conditional compiles related to PROC_FS,
+ *                 procfs is always supported now. (JT)
+ *    12/01/2001 - avoided flushing logical volume in case of shrinking
+ *                 because of unecessary overhead in case of heavy updates
  *
  */
 
 
-static char *lvm_version = "LVM version 0.9  by Heinz Mauelshagen  (13/11/2000)\n";
-static char *lvm_short_version = "version 0.9 (13/11/2000)";
+static char *lvm_version = "LVM version 0.9.1_beta2  by Heinz Mauelshagen  (18/01/2001)\n";
+static char *lvm_short_version = "version 0.9.1_beta2 (18/01/2001)";
 
 #define MAJOR_NR	LVM_BLK_MAJOR
 #define	DEVICE_OFF(device)
@@ -190,6 +199,8 @@ static char *lvm_short_version = "version 0.9 (13/11/2000)";
 #include <linux/errno.h>
 #include <linux/lvm.h>
 
+#include "lvm-snap.h"
+
 #define	LVM_CORRECT_READ_AHEAD( a) \
    if      ( a < LVM_MIN_READ_AHEAD || \
              a > LVM_MAX_READ_AHEAD) a = LVM_MAX_READ_AHEAD;
@@ -198,19 +209,28 @@ static char *lvm_short_version = "version 0.9 (13/11/2000)";
 #  define WRITEA WRITE
 #endif
 
+/* debug macros */
+#ifdef DEBUG_IOCTL
+#define P_IOCTL(fmt, args...) printk(KERN_DEBUG "lvm ioctl: " fmt, ## args)
+#else
+#define P_IOCTL(fmt, args...)
+#endif
+
+#ifdef DEBUG_MAP
+#define P_MAP(fmt, args...) printk(KERN_DEBUG "lvm map: " fmt, ## args)
+#else
+#define P_MAP(fmt, args...)
+#endif
+
+#ifdef DEBUG_KFREE
+#define P_KFREE(fmt, args...) printk(KERN_DEBUG "lvm kfree: " fmt, ## args)
+#else
+#define P_KFREE(fmt, args...)
+#endif
+
 /*
  * External function prototypes
  */
-#ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
-#else
-extern int lvm_init(void);
-#endif
-
-static void lvm_dummy_device_request(request_queue_t *);
-#define	DEVICE_REQUEST	lvm_dummy_device_request
-
 static int lvm_make_request_fn(request_queue_t*, int, struct buffer_head*);
 
 static int lvm_blk_ioctl(struct inode *, struct file *, uint, ulong);
@@ -224,41 +244,28 @@ static int lvm_user_bmap(struct inode *, struct lv_bmap *);
 
 static int lvm_chr_ioctl(struct inode *, struct file *, uint, ulong);
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 int lvm_proc_read_vg_info(char *, char **, off_t, int, int *, void *);
 int lvm_proc_read_lv_info(char *, char **, off_t, int, int *, void *);
 int lvm_proc_read_pv_info(char *, char **, off_t, int, int *, void *);
 static int lvm_proc_get_global_info(char *, char **, off_t, int, int *, void *);
-void lvm_do_create_proc_entry_of_vg ( vg_t *);
-inline void lvm_do_remove_proc_entry_of_vg ( vg_t *);
-inline void lvm_do_create_proc_entry_of_lv ( vg_t *, lv_t *);
-inline void lvm_do_remove_proc_entry_of_lv ( vg_t *, lv_t *);
-inline void lvm_do_create_proc_entry_of_pv ( vg_t *, pv_t *);
-inline void lvm_do_remove_proc_entry_of_pv ( vg_t *, pv_t *);
-#endif
 
-#ifdef LVM_HD_NAME
-void lvm_hd_name(char *, int);
-#endif
+void lvm_do_create_devfs_entry_of_vg ( vg_t *);
+
+void lvm_do_create_proc_entry_of_vg ( vg_t *);
+void lvm_do_remove_proc_entry_of_vg ( vg_t *);
+void lvm_do_create_proc_entry_of_lv ( vg_t *, lv_t *);
+void lvm_do_remove_proc_entry_of_lv ( vg_t *, lv_t *);
+void lvm_do_create_proc_entry_of_pv ( vg_t *, pv_t *);
+void lvm_do_remove_proc_entry_of_pv ( vg_t *, pv_t *);
+
 /* End external function prototypes */
 
 
 /*
  * Internal function prototypes
  */
+static void lvm_cleanup(void);
 static void lvm_init_vars(void);
-
-/* external snapshot calls */
-extern inline int lvm_get_blksize(kdev_t);
-extern int lvm_snapshot_alloc(lv_t *);
-extern void lvm_snapshot_fill_COW_page(vg_t *, lv_t *);
-extern int lvm_snapshot_COW(kdev_t, ulong, ulong, ulong, lv_t *);
-extern int lvm_snapshot_remap_block(kdev_t *, ulong *, ulong, lv_t *);
-extern void lvm_snapshot_release(lv_t *); 
-extern int lvm_write_COW_table_block(vg_t *, lv_t *);
-extern inline void lvm_hash_link(lv_block_exception_t *, kdev_t, ulong, lv_t *);
-extern int lvm_snapshot_alloc_hash_table(lv_t *);
-extern void lvm_drop_snapshot(lv_t *, char *);
 
 #ifdef LVM_HD_NAME
 extern void (*lvm_hd_name_ptr) (char *, int);
@@ -288,9 +295,9 @@ static int lvm_do_vg_reduce(vg_t *, void *);
 static int lvm_do_vg_rename(vg_t *, void *);
 static int lvm_do_vg_remove(int);
 static void lvm_geninit(struct gendisk *);
-#ifdef LVM_GET_INODE
-static struct inode *lvm_get_inode(int);
-void lvm_clear_inode(struct inode *);
+static char *lvm_show_uuid ( char *);
+#ifdef LVM_HD_NAME
+void lvm_hd_name(char *, int);
 #endif
 /* END Internal function prototypes */
 
@@ -298,12 +305,10 @@ void lvm_clear_inode(struct inode *);
 /* volume group descriptor area pointers */
 static vg_t *vg[ABS_MAX_VG];
 
-#ifdef	CONFIG_DEVFS_FS
 static devfs_handle_t lvm_devfs_handle;
 static devfs_handle_t vg_devfs_handle[MAX_VG];
 static devfs_handle_t ch_devfs_handle[MAX_VG];
 static devfs_handle_t lv_devfs_handle[MAX_LV];
-#endif
 
 static pv_t *pvp = NULL;
 static lv_t *lvp = NULL;
@@ -340,18 +345,15 @@ static int loadtime = 0;
 static uint vg_count = 0;
 static long lvm_chr_open_count = 0;
 static ushort lvm_iop_version = LVM_DRIVER_IOP_VERSION;
-static DECLARE_WAIT_QUEUE_HEAD(lvm_snapshot_wait);
 static DECLARE_WAIT_QUEUE_HEAD(lvm_wait);
 static DECLARE_WAIT_QUEUE_HEAD(lvm_map_wait);
 
 static spinlock_t lvm_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t lvm_snapshot_lock = SPIN_LOCK_UNLOCKED;
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 static struct proc_dir_entry *lvm_proc_dir = NULL;
 static struct proc_dir_entry *lvm_proc_vg_subdir = NULL;
 struct proc_dir_entry *pde = NULL;
-#endif
 
 static struct file_operations lvm_chr_fops =
 {
@@ -360,7 +362,7 @@ static struct file_operations lvm_chr_fops =
 	ioctl:		lvm_chr_ioctl,
 };
 
-#define BLOCK_DEVICE_OPERATIONS
+
 /* block device operations structure needed for 2.3.38? and above */
 static struct block_device_operations lvm_blk_dops =
 {
@@ -391,22 +393,10 @@ static struct gendisk lvm_gendisk =
 	NULL,			/* pointer to next gendisk struct (internal) */
 };
 
-
-#ifdef MODULE
-/*
- * Module initialization...
- */
-int init_module(void)
-#else
 /*
  * Driver initialization...
  */
-#ifdef __initfunc
-__initfunc(int lvm_init(void))
-#else
-int __init lvm_init(void)
-#endif
-#endif				/* #ifdef MODULE */
+int lvm_init(void)
 {
 	struct gendisk *gendisk_ptr = NULL;
 
@@ -414,11 +404,7 @@ int __init lvm_init(void)
 		printk(KERN_ERR "%s -- register_chrdev failed\n", lvm_name);
 		return -EIO;
 	}
-#ifdef BLOCK_DEVICE_OPERATIONS
 	if (register_blkdev(MAJOR_NR, lvm_name, &lvm_blk_dops) < 0)
-#else
-	if (register_blkdev(MAJOR_NR, lvm_name, &lvm_blk_fops) < 0)
-#endif
 	{
 		printk("%s -- register_blkdev failed\n", lvm_name);
 		if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
@@ -426,21 +412,17 @@ int __init lvm_init(void)
 		return -EIO;
 	}
 
-#ifdef	CONFIG_DEVFS_FS
 	lvm_devfs_handle = devfs_register(
 		0 , "lvm", 0, 0, LVM_CHAR_MAJOR,
 		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
 		&lvm_chr_fops, NULL);
-#endif
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_proc_dir = create_proc_entry (LVM_DIR, S_IFDIR, &proc_root);
 	if (lvm_proc_dir != NULL) {
 		lvm_proc_vg_subdir = create_proc_entry (LVM_VG_SUBDIR, S_IFDIR, lvm_proc_dir);
 		pde = create_proc_entry(LVM_GLOBAL, S_IFREG, lvm_proc_dir);
 		if ( pde != NULL) pde->read_proc = &lvm_proc_get_global_info;
 	}
-#endif
 
 	lvm_init_vars();
 	lvm_geninit(&lvm_gendisk);
@@ -464,8 +446,8 @@ int __init lvm_init(void)
 	lvm_hd_name_ptr = lvm_hd_name;
 #endif
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), lvm_make_request_fn);
+
 
 	/* optional read root VGDA */
 /*
@@ -483,20 +465,17 @@ int __init lvm_init(void)
 	       lvm_version, lvm_name);
 
 	return 0;
-} /* init_module() / lvm_init() */
+} /* lvm_init() */
 
 
-#ifdef MODULE
 /*
- * Module cleanup...
+ * cleanup...
  */
-void cleanup_module(void)
+static void lvm_cleanup(void)
 {
 	struct gendisk *gendisk_ptr = NULL, *gendisk_ptr_prev = NULL;
 
-#ifdef	CONFIG_DEVFS_FS
 	devfs_unregister (lvm_devfs_handle);
-#endif
 
 	if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0) {
 		printk(KERN_ERR "%s -- unregister_chrdev failed\n", lvm_name);
@@ -504,7 +483,7 @@ void cleanup_module(void)
 	if (unregister_blkdev(MAJOR_NR, lvm_name) < 0) {
 		printk(KERN_ERR "%s -- unregister_blkdev failed\n", lvm_name);
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+
 
 	gendisk_ptr = gendisk_ptr_prev = gendisk_head;
 	while (gendisk_ptr != NULL) {
@@ -521,11 +500,9 @@ void cleanup_module(void)
 	blksize_size[MAJOR_NR] = NULL;
 	hardsect_size[MAJOR_NR] = NULL;
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	remove_proc_entry(LVM_GLOBAL, lvm_proc_dir);
 	remove_proc_entry(LVM_VG_SUBDIR, lvm_proc_dir);
 	remove_proc_entry(LVM_DIR, &proc_root);
-#endif
 
 #ifdef LVM_HD_NAME
 	/* reference from linux/drivers/block/genhd.c */
@@ -535,18 +512,13 @@ void cleanup_module(void)
 	printk(KERN_INFO "%s -- Module successfully deactivated\n", lvm_name);
 
 	return;
-}	/* void cleanup_module() */
-#endif	/* #ifdef MODULE */
+}	/* lvm_cleanup() */
 
 
 /*
  * support function to initialize lvm variables
  */
-#ifdef __initfunc
-__initfunc(void lvm_init_vars(void))
-#else
 void __init lvm_init_vars(void)
-#endif
 {
 	int v;
 
@@ -626,13 +598,9 @@ static int lvm_chr_ioctl(struct inode *inode, struct file *file,
 	/* otherwise cc will complain about unused variables */
 	(void) lvm_lock;
 
-
-#ifdef DEBUG_IOCTL
-	printk(KERN_DEBUG
-	       "%s -- lvm_chr_ioctl: command: 0x%X  MINOR: %d  "
-	       "VG#: %d  mode: 0x%X\n",
-	       lvm_name, command, minor, VG_CHR(minor), file->f_mode);
-#endif
+	P_IOCTL("%s -- lvm_chr_ioctl: command: 0x%X  MINOR: %d  "
+		"VG#: %d  mode: 0x%X\n",
+		lvm_name, command, minor, VG_CHR(minor), file->f_mode);
 
 #ifdef LVM_TOTAL_RESET
 	if (lvm_reset_spindown > 0) return -EACCES;
@@ -890,14 +858,12 @@ static int lvm_blk_open(struct inode *inode, struct file *file)
 		if (lv_ptr->lv_status & LV_SPINDOWN) return -EPERM;
 
 		/* Check inactive LV and open for read/write */
-		if (file->f_mode & O_RDWR) {
-			if (!(lv_ptr->lv_status & LV_ACTIVE)) return -EPERM;
-			if (!(lv_ptr->lv_access & LV_WRITE))  return -EACCES;
-		}
+		if (!(lv_ptr->lv_status & LV_ACTIVE))
+			return -EPERM;
+		if (!(lv_ptr->lv_access & LV_WRITE) &&
+		    (file->f_mode & FMODE_WRITE))
+			return -EACCES;
 
-#ifndef BLOCK_DEVICE_OPERATIONS
-		file->f_op = &lvm_blk_fops;
-#endif
 
                 /* be sure to increment VG counter */
 		if (lv_ptr->lv_open == 0) vg_ptr->lv_open++;
@@ -930,24 +896,18 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 	void *arg = (void *) a;
 	struct hd_geometry *hd = (struct hd_geometry *) a;
 
-#ifdef DEBUG_IOCTL
-	printk(KERN_DEBUG
-	       "%s -- lvm_blk_ioctl MINOR: %d  command: 0x%X  arg: %X  "
-	       "VG#: %dl  LV#: %d\n",
-	       lvm_name, minor, command, (ulong) arg,
-	       VG_BLK(minor), LV_BLK(minor));
-#endif
+	P_IOCTL("%s -- lvm_blk_ioctl MINOR: %d  command: 0x%X  arg: %X  "
+		"VG#: %dl  LV#: %d\n",
+		lvm_name, minor, command, (ulong) arg,
+		VG_BLK(minor), LV_BLK(minor));
 
 	switch (command) {
 	case BLKGETSIZE:
 		/* return device size */
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- BLKGETSIZE: %u\n",
-		       lvm_name, lv_ptr->lv_size);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- BLKGETSIZE: %u\n",
+			lvm_name, lv_ptr->lv_size);
 		if (put_user(lv_ptr->lv_size, (long *)arg))
-			return -EFAULT; 
+			return -EFAULT;
 		break;
 
 
@@ -955,10 +915,8 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 		/* flush buffer cache */
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- BLKFLSBUF\n", lvm_name);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- BLKFLSBUF\n", lvm_name);
+
 		fsync_dev(inode->i_rdev);
 		invalidate_buffers(inode->i_rdev);
 		break;
@@ -968,11 +926,9 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 		/* set read ahead for block device */
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- BLKRASET: %d sectors for %02X:%02X\n",
-		       lvm_name, (long) arg, MAJOR(inode->i_rdev), minor);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- BLKRASET: %d sectors for %02X:%02X\n",
+			lvm_name, (long) arg, MAJOR(inode->i_rdev), minor);
+
 		if ((long) arg < LVM_MIN_READ_AHEAD ||
 		    (long) arg > LVM_MAX_READ_AHEAD)
 			return -EINVAL;
@@ -982,10 +938,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 
 	case BLKRAGET:
 		/* get current read ahead setting */
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- BLKRAGET\n", lvm_name);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- BLKRAGET\n", lvm_name);
 		if (put_user(lv_ptr->lv_read_ahead, (long *)arg))
 			return -EFAULT;
 		break;
@@ -993,10 +946,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 
 	case HDIO_GETGEO:
 		/* get disk geometry */
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- HDIO_GETGEO\n", lvm_name);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- HDIO_GETGEO\n", lvm_name);
 		if (hd == NULL)
 			return -EINVAL;
 		{
@@ -1016,11 +966,8 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 		}
 
-#ifdef DEBUG_IOCTL
-		printk(KERN_DEBUG
-		       "%s -- lvm_blk_ioctl -- cylinders: %d\n",
-		       lvm_name, lv_ptr->lv_size / heads / sectors);
-#endif
+		P_IOCTL("%s -- lvm_blk_ioctl -- cylinders: %d\n",
+			lvm_name, lv_ptr->lv_size / heads / sectors);
 		break;
 
 
@@ -1127,22 +1074,22 @@ static int lvm_user_bmap(struct inode *inode, struct lv_bmap *user_result)
 	struct buffer_head bh;
 	unsigned long block;
 	int err;
-	
+
 	if (get_user(block, &user_result->lv_block))
-	return -EFAULT;
-	
+		return -EFAULT;
+
 	memset(&bh,0,sizeof bh);
 	bh.b_rsector = block;
 	bh.b_dev = bh.b_rdev = inode->i_dev;
 	bh.b_size = lvm_get_blksize(bh.b_dev);
 	if ((err=lvm_map(&bh, READ)) < 0)  {
-	printk("lvm map failed: %d\n", err);
-	return -EINVAL;
+		printk("lvm map failed: %d\n", err);
+		return -EINVAL;
 	}
-	
-	return put_user(  kdev_t_to_nr(bh.b_rdev), &user_result->lv_dev) ||
+
+	return put_user(kdev_t_to_nr(bh.b_rdev), &user_result->lv_dev) ||
 	put_user(bh.b_rsector, &user_result->lv_block) ? -EFAULT : 0;
-}     
+}
 
 
 /*
@@ -1168,7 +1115,7 @@ int lvm_vg_info(vg_t *vg_ptr, char *buf) {
 		     vg_ptr->pe_total,
 		     vg_ptr->pe_allocated * vg_ptr->pe_size >> 1,
 	     	     vg_ptr->pe_allocated,
-		     (vg_ptr->pe_total - vg_ptr->pe_allocated) *	
+		     (vg_ptr->pe_total - vg_ptr->pe_allocated) *
 	     	     vg_ptr->pe_size >> 1,
 		     vg_ptr->pe_total - vg_ptr->pe_allocated);
 	return sz;
@@ -1263,7 +1210,6 @@ int lvm_pv_info(pv_t *pv_ptr, char *buf) {
 }
 
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 /*
  * Support functions /proc-Filesystem
  */
@@ -1325,10 +1271,7 @@ static int lvm_proc_get_global_info(char *page, char **start, off_t pos, int cou
 		lv_block_exception_t_bytes *= sizeof(lv_block_exception_t);
 
 		if (buf != NULL) {
-#ifdef DEBUG_KFREE
-			printk(KERN_DEBUG
-			       "%s -- vfree %d\n", lvm_name, __LINE__);
-#endif
+			P_KFREE("%s -- vfree %d\n", lvm_name, __LINE__);
 			lock_kernel();
 			vfree(buf);
 			unlock_kernel();
@@ -1452,7 +1395,6 @@ static int lvm_proc_get_global_info(char *page, char **start, off_t pos, int cou
 	else
 		return count;
 } /* lvm_proc_get_global_info() */
-#endif /* #if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS */
 
 
 /*
@@ -1478,7 +1420,7 @@ int lvm_proc_read_vg_info(char *page, char **start, off_t off,
 	sz += sprintf ( page+sz, "PE size:      %u\n", vg->pe_size / 2);
 	sz += sprintf ( page+sz, "PE total:     %u\n", vg->pe_total);
 	sz += sprintf ( page+sz, "PE allocated: %u\n", vg->pe_allocated);
-	sz += sprintf ( page+sz, "uuid:         %s\n", vg->vg_uuid);
+	sz += sprintf ( page+sz, "uuid:         %s\n", lvm_show_uuid(vg->vg_uuid));
 
 	return sz;
 }
@@ -1525,7 +1467,7 @@ int lvm_proc_read_pv_info(char *page, char **start, off_t off,
 	sz += sprintf ( page+sz, "PE allocated: %u\n", pv->pe_allocated);
 	sz += sprintf ( page+sz, "device:       %02u:%02u\n",
                         MAJOR(pv->pv_dev), MINOR(pv->pv_dev));
-	sz += sprintf ( page+sz, "uuid:         %s\n", pv->pv_uuid);
+	sz += sprintf ( page+sz, "uuid:         %s\n", lvm_show_uuid(pv->pv_uuid));
 
 
 	return sz;
@@ -1565,15 +1507,13 @@ static int lvm_map(struct buffer_head *bh, int rw)
 		       lvm_name, lv->lv_name);
 		return -1;
 	}
-#ifdef DEBUG_MAP
-	printk(KERN_DEBUG
-	       "%s - lvm_map minor:%d  *rdev: %02d:%02d  *rsector: %lu  "
-	       "size:%lu\n",
-	       lvm_name, minor,
-	       MAJOR(rdev_tmp),
-	       MINOR(rdev_tmp),
-	       rsector_tmp, size);
-#endif
+
+	P_MAP("%s - lvm_map minor:%d  *rdev: %02d:%02d  *rsector: %lu  "
+	      "size:%lu\n",
+	      lvm_name, minor,
+	      MAJOR(rdev_tmp),
+	      MINOR(rdev_tmp),
+	      rsector_tmp, size);
 
 	if (rsector_tmp + size > lv->lv_size) {
 		printk(KERN_ALERT
@@ -1595,15 +1535,13 @@ lvm_second_remap:
 		    (rsector_tmp % vg_this->pe_size);
 		rdev_tmp = lv->lv_current_pe[index].dev;
 
-#ifdef DEBUG_MAP
-		printk(KERN_DEBUG
-		       "lv_current_pe[%ld].pe: %ld  rdev: %02d:%02d  rsector:%ld\n",
+		P_MAP("lv_current_pe[%ld].pe: %ld  rdev: %02d:%02d  "
+		      "rsector:%ld\n",
 		       index,
 		       lv->lv_current_pe[index].pe,
 		       MAJOR(rdev_tmp),
 		       MINOR(rdev_tmp),
 		       rsector_tmp);
-#endif
 
 		/* striped mapping */
 	} else {
@@ -1624,9 +1562,7 @@ lvm_second_remap:
 		rdev_tmp = lv->lv_current_pe[index].dev;
 	}
 
-#ifdef DEBUG_MAP
-	printk(KERN_DEBUG
-	     "lv_current_pe[%ld].pe: %ld  rdev: %02d:%02d  rsector:%ld\n"
+	P_MAP("lv_current_pe[%ld].pe: %ld  rdev: %02d:%02d  rsector:%ld\n"
 	       "stripe_length: %ld  stripe_index: %ld\n",
 	       index,
 	       lv->lv_current_pe[index].pe,
@@ -1635,7 +1571,6 @@ lvm_second_remap:
 	       rsector_tmp,
 	       stripe_length,
 	       stripe_index);
-#endif
 
 	/* handle physical extents on the move */
 	if (pe_lock_req.lock == LOCK_PE) {
@@ -1659,6 +1594,8 @@ lvm_second_remap:
 	if (lv->lv_access & (LV_SNAPSHOT|LV_SNAPSHOT_ORG)) {
 		/* original logical volume */
 		if (lv->lv_access & LV_SNAPSHOT_ORG) {
+			/* Serializes the access to the lv_snapshot_next list */
+			down(&lv->lv_snapshot_sem);
 			if (rw == WRITE || rw == WRITEA)
 			{
 				lv_t *lv_ptr;
@@ -1669,7 +1606,8 @@ lvm_second_remap:
 				     lv_ptr = lv_ptr->lv_snapshot_next) {
 					/* Check for inactive snapshot */
 					if (!(lv_ptr->lv_status & LV_ACTIVE)) continue;
-					down(&lv->lv_snapshot_org->lv_snapshot_sem);
+					/* Serializes the COW with the accesses to the snapshot device */
+					down(&lv_ptr->lv_snapshot_sem);
 					/* do we still have exception storage for this snapshot free? */
 					if (lv_ptr->lv_block_exception != NULL) {
 						rdev_sav = rdev_tmp;
@@ -1690,9 +1628,10 @@ lvm_second_remap:
 						rdev_tmp = rdev_sav;
 						rsector_tmp = rsector_sav;
 					}
-					up(&lv->lv_snapshot_org->lv_snapshot_sem);
+					up(&lv_ptr->lv_snapshot_sem);
 				}
 			}
+			up(&lv->lv_snapshot_sem);
 		} else {
 			/* remap snapshot logical volume */
 			down(&lv->lv_snapshot_sem);
@@ -1733,31 +1672,12 @@ void lvm_hd_name(char *buf, int minor)
 
 
 /*
- * this one never should be called...
- */
-static void lvm_dummy_device_request(request_queue_t * t)
-{
-	printk(KERN_EMERG
-	     "%s -- oops, got lvm request for %02d:%02d [sector: %lu]\n",
-	       lvm_name,
-	       MAJOR(CURRENT->rq_dev),
-	       MINOR(CURRENT->rq_dev),
-	       CURRENT->sector);
-	return;
-}
-
-
-/*
  * make request function
  */
 static int lvm_make_request_fn(request_queue_t *q,
 			       int rw,
-			       struct buffer_head *bh)
-{
-	if (lvm_map(bh, rw)<0)
-		return 0; /* failure, buffer_IO_error has been called, don't recurse */
-	else
-		return 1; /* all ok, mapping done, call lower level driver */
+			       struct buffer_head *bh) {
+	return (lvm_map(bh, rw) < 0) ? 0 : 1;
 }
 
 
@@ -1774,10 +1694,8 @@ static int lvm_do_lock_lvm(void)
 lock_try_again:
 	spin_lock(&lvm_lock);
 	if (lock != 0 && lock != current->pid) {
-#ifdef DEBUG_IOCTL
-		printk(KERN_INFO "lvm_do_lock_lvm: %s is locked by pid %d ...\n",
-		       lvm_name, lock);
-#endif
+		P_IOCTL("lvm_do_lock_lvm: %s is locked by pid %d ...\n",
+			lvm_name, lock);
 		spin_unlock(&lvm_lock);
 		interruptible_sleep_on(&lvm_wait);
 		if (current->sigpending != 0)
@@ -1966,6 +1884,8 @@ int lvm_do_vg_create(int minor, void *arg)
 		}
 	}
 
+	lvm_do_create_devfs_entry_of_vg ( vg_ptr);
+
 	/* Second path to correct snapshot logical volumes which are not
 	   in place during first path above */
 	for (l = 0; l < ls; l++) {
@@ -1980,18 +1900,7 @@ int lvm_do_vg_create(int minor, void *arg)
 		}
 	}
 
-#ifdef	CONFIG_DEVFS_FS
-	vg_devfs_handle[vg_ptr->vg_number] = devfs_mk_dir(0, vg_ptr->vg_name, NULL);
-	ch_devfs_handle[vg_ptr->vg_number] = devfs_register(
-		vg_devfs_handle[vg_ptr->vg_number] , "group",
-		DEVFS_FL_DEFAULT, LVM_CHAR_MAJOR, vg_ptr->vg_number,
-		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-		&lvm_chr_fops, NULL);
-#endif
-
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_create_proc_entry_of_vg ( vg_ptr);
-#endif
 
 	vfree(snap_lv_ptr);
 
@@ -2021,25 +1930,15 @@ static int lvm_do_vg_extend(vg_t *vg_ptr, void *arg)
 		for (p = 0; p < vg_ptr->pv_max; p++) {
 			if ( ( pv_ptr = vg_ptr->pv[p]) == NULL) {
 				ret = lvm_do_pv_create(arg, vg_ptr, p);
-				lvm_do_create_proc_entry_of_pv ( vg_ptr, pv_ptr);
 				if ( ret != 0) return ret;
-	
-				/* We don't need the PE list
-				   in kernel space like LVs pe_t list */
-				pv_ptr->pe = NULL;
-				vg_ptr->pv_cur++;
-				vg_ptr->pv_act++;
-				vg_ptr->pe_total +=
-				    pv_ptr->pe_total;
-#ifdef LVM_GET_INODE
-				/* insert a dummy inode for fs_may_mount */
-				pv_ptr->inode = lvm_get_inode(pv_ptr->pv_dev);
-#endif
+				pv_ptr = vg_ptr->pv[p];
+				vg_ptr->pe_total += pv_ptr->pe_total;
+				lvm_do_create_proc_entry_of_pv(vg_ptr, pv_ptr);
 				return 0;
 			}
 		}
 	}
-return -EPERM;
+	return -EPERM;
 } /* lvm_do_vg_extend() */
 
 
@@ -2060,10 +1959,6 @@ static int lvm_do_vg_reduce(vg_t *vg_ptr, void *arg) {
 		    strcmp(pv_ptr->pv_name,
 			       pv_name) == 0) {
 			if (pv_ptr->lv_cur > 0) return -EPERM;
-			vg_ptr->pe_total -=
-			    pv_ptr->pe_total;
-			vg_ptr->pv_cur--;
-			vg_ptr->pv_act--;
 			lvm_do_pv_remove(vg_ptr, p);
 			/* Make PV pointer array contiguous */
 			for (; p < vg_ptr->pv_max - 1; p++)
@@ -2091,9 +1986,7 @@ static int lvm_do_vg_rename(vg_t *vg_ptr, void *arg)
 	if (copy_from_user(vg_name, arg, sizeof(vg_name)) != 0)
 		return -EFAULT;
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_remove_proc_entry_of_vg ( vg_ptr);
-#endif
 
 	strncpy ( vg_ptr->vg_name, vg_name, sizeof ( vg_name)-1);
 	for ( l = 0; l < vg_ptr->lv_max; l++)
@@ -2115,9 +2008,7 @@ static int lvm_do_vg_rename(vg_t *vg_ptr, void *arg)
 		strncpy(pv_ptr->vg_name, vg_name, NAME_LEN);
 	}
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_create_proc_entry_of_vg ( vg_ptr);
-#endif
 
 	return 0;
 } /* lvm_do_vg_rename */
@@ -2166,27 +2057,17 @@ static int lvm_do_vg_remove(int minor)
 	/* free PVs */
 	for (i = 0; i < vg_ptr->pv_max; i++) {
 		if ((pv_ptr = vg_ptr->pv[i]) != NULL) {
-#ifdef DEBUG_KFREE
-			printk(KERN_DEBUG
-			       "%s -- kfree %d\n", lvm_name, __LINE__);
-#endif
+			P_KFREE("%s -- kfree %d\n", lvm_name, __LINE__);
 			lvm_do_pv_remove(vg_ptr, i);
 		}
 	}
 
-#ifdef	CONFIG_DEVFS_FS
 	devfs_unregister (ch_devfs_handle[vg_ptr->vg_number]);
 	devfs_unregister (vg_devfs_handle[vg_ptr->vg_number]);
-#endif
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_remove_proc_entry_of_vg ( vg_ptr);
-#endif
 
-#ifdef DEBUG_KFREE
-	printk(KERN_DEBUG "%s -- kfree %d\n", lvm_name, __LINE__);
-#endif
-
+	P_KFREE("%s -- kfree %d\n", lvm_name, __LINE__);
 	kfree(vg_ptr);
 	vg[VG_CHR(minor)] = NULL;
 
@@ -2222,11 +2103,6 @@ static int lvm_do_pv_create(pv_t *pvp, vg_t *vg_ptr, ulong p) {
 	vg_ptr->pv_act++;
 	vg_ptr->pv_cur++;
 
-#ifdef LVM_GET_INODE
-	/* insert a dummy inode for fs_may_mount */
-	pv_ptr->inode = lvm_get_inode(pv_ptr->pv_dev);
-#endif
-
 	return 0;
 } /* lvm_do_pv_create() */
 
@@ -2237,11 +2113,8 @@ static int lvm_do_pv_create(pv_t *pvp, vg_t *vg_ptr, ulong p) {
 static int lvm_do_pv_remove(vg_t *vg_ptr, ulong p) {
 	pv_t *pv_ptr = vg_ptr->pv[p];
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_remove_proc_entry_of_pv ( vg_ptr, pv_ptr);
-#endif
-	vg_ptr->pe_total -=
-	    pv_ptr->pe_total;
+	vg_ptr->pe_total -= pv_ptr->pe_total;
 	vg_ptr->pv_cur--;
 	vg_ptr->pv_act--;
 #ifdef LVM_GET_INODE
@@ -2320,11 +2193,9 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 			       "%s -- LV_CREATE: vmalloc error LV_CURRENT_PE of %d Byte "
 			       "at line %d\n",
 			       lvm_name, size, __LINE__);
-#ifdef DEBUG_KFREE
-			printk(KERN_DEBUG "%s -- kfree %d\n", lvm_name, __LINE__);
-#endif
+			P_KFREE("%s -- kfree %d\n", lvm_name, __LINE__);
 			kfree(lv_ptr);
-			vg[VG_CHR(minor)]->lv[l] = NULL;
+			vg_ptr->lv[l] = NULL;
 			return -ENOMEM;
 		}
 		if (copy_from_user(lv_ptr->lv_current_pe, pep, size)) {
@@ -2354,9 +2225,8 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 					       "%s -- lvm_do_lv_create: vmalloc error LV_BLOCK_EXCEPTION "
 					       "of %d byte at line %d\n",
 					       lvm_name, size, __LINE__);
-#ifdef DEBUG_KFREE
-					printk(KERN_DEBUG "%s -- kfree %d\n", lvm_name, __LINE__);
-#endif
+					P_KFREE("%s -- kfree %d\n", lvm_name,
+						__LINE__);
 					kfree(lv_ptr);
 					vg_ptr->lv[l] = NULL;
 					return -ENOMEM;
@@ -2364,7 +2234,7 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 				if (copy_from_user(lv_ptr->lv_block_exception, lvbe, size)) {
 					vfree(lv_ptr->lv_block_exception);
 					kfree(lv_ptr);
-					vg[VG_CHR(minor)]->lv[l] = NULL;
+					vg_ptr->lv[l] = NULL;
 					return -EFAULT;
 				}
 				/* point to the original logical volume */
@@ -2372,33 +2242,32 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 
 				lv_ptr->lv_snapshot_minor = 0;
 				lv_ptr->lv_snapshot_org = lv_ptr;
-				lv_ptr->lv_snapshot_prev = NULL;
-				/* walk thrugh the snapshot list */
-				while (lv_ptr->lv_snapshot_next != NULL)
-					lv_ptr = lv_ptr->lv_snapshot_next;
-				/* now lv_ptr points to the last existing snapshot in the chain */
-				vg_ptr->lv[l]->lv_snapshot_prev = lv_ptr;
 				/* our new one now back points to the previous last in the chain
 				   which can be the original logical volume */
 				lv_ptr = vg_ptr->lv[l];
 				/* now lv_ptr points to our new last snapshot logical volume */
-				lv_ptr->lv_snapshot_org = lv_ptr->lv_snapshot_prev->lv_snapshot_org;
-				lv_ptr->lv_snapshot_next = NULL;
 				lv_ptr->lv_current_pe = lv_ptr->lv_snapshot_org->lv_current_pe;
+				lv_ptr->lv_allocated_snapshot_le = lv_ptr->lv_allocated_le;
 				lv_ptr->lv_allocated_le = lv_ptr->lv_snapshot_org->lv_allocated_le;
 				lv_ptr->lv_current_le = lv_ptr->lv_snapshot_org->lv_current_le;
 				lv_ptr->lv_size = lv_ptr->lv_snapshot_org->lv_size;
 				lv_ptr->lv_stripes = lv_ptr->lv_snapshot_org->lv_stripes;
 				lv_ptr->lv_stripesize = lv_ptr->lv_snapshot_org->lv_stripesize;
+
+				/* Update the VG PE(s) used by snapshot reserve space. */
+				vg_ptr->pe_allocated += lv_ptr->lv_allocated_snapshot_le;
+
 				if ((ret = lvm_snapshot_alloc(lv_ptr)) != 0)
 				{
 					vfree(lv_ptr->lv_block_exception);
 					kfree(lv_ptr);
-					vg[VG_CHR(minor)]->lv[l] = NULL;
+					vg_ptr->lv[l] = NULL;
 					return ret;
 				}
 				for ( e = 0; e < lv_ptr->lv_remap_ptr; e++)
-					lvm_hash_link (lv_ptr->lv_block_exception + e, lv_ptr->lv_block_exception[e].rdev_org, lv_ptr->lv_block_exception[e].rsector_org, lv_ptr);
+					lvm_hash_link (lv_ptr->lv_block_exception + e,
+						       lv_ptr->lv_block_exception[e].rdev_org,
+						       lv_ptr->lv_block_exception[e].rsector_org, lv_ptr);
 				/* need to fill the COW exception table data
 				   into the page for disk i/o */
 				lvm_snapshot_fill_COW_page(vg_ptr, lv_ptr);
@@ -2426,9 +2295,8 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 	vg_ptr->lv_cur++;
 	lv_ptr->lv_status = lv_status_save;
 
-#ifdef	CONFIG_DEVFS_FS
 	{
-	char *lv_tmp, *lv_buf = NULL;
+	char *lv_tmp, *lv_buf = lv->lv_name;
 
 	strtok(lv->lv_name, "/");       /* /dev */
 	while((lv_tmp = strtok(NULL, "/")) != NULL)
@@ -2440,24 +2308,29 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 		S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		&lvm_blk_dops, NULL);
 	}
-#endif
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_create_proc_entry_of_lv ( vg_ptr, lv_ptr);
-#endif
 
 	/* optionally add our new snapshot LV */
 	if (lv_ptr->lv_access & LV_SNAPSHOT) {
+		lv_t *org = lv_ptr->lv_snapshot_org, *last;
+
 		/* sync the original logical volume */
-		fsync_dev(lv_ptr->lv_snapshot_org->lv_dev);
+		fsync_dev(org->lv_dev);
 #ifdef	LVM_VFS_ENHANCEMENT
 		/* VFS function call to sync and lock the filesystem */
-		fsync_dev_lockfs(lv_ptr->lv_snapshot_org->lv_dev);
+		fsync_dev_lockfs(org->lv_dev);
 #endif
-		lv_ptr->lv_snapshot_org->lv_access |= LV_SNAPSHOT_ORG;
-		lv_ptr->lv_access &= ~LV_SNAPSHOT_ORG;
-		/* put ourselve into the chain */
-		lv_ptr->lv_snapshot_prev->lv_snapshot_next = lv_ptr;
+
+		down(&org->lv_snapshot_sem);
+		org->lv_access |= LV_SNAPSHOT_ORG;
+		lv_ptr->lv_access &= ~LV_SNAPSHOT_ORG; /* this can only hide an userspace bug */
+
+		/* Link in the list of snapshot volumes */
+		for (last = org; last->lv_snapshot_next; last = last->lv_snapshot_next);
+		lv_ptr->lv_snapshot_prev = last;
+		last->lv_snapshot_next = lv_ptr;
+		up(&org->lv_snapshot_sem);
 	}
 
 	/* activate the logical volume */
@@ -2513,6 +2386,31 @@ static int lvm_do_lv_remove(int minor, char *lv_name, int l)
 	    lv_ptr->lv_snapshot_next != NULL)
 		return -EPERM;
 
+	if (lv_ptr->lv_access & LV_SNAPSHOT) {
+		/*
+		 * Atomically make the the snapshot invisible
+		 * to the original lv before playing with it.
+		 */
+		lv_t * org = lv_ptr->lv_snapshot_org;
+		down(&org->lv_snapshot_sem);
+
+		/* remove this snapshot logical volume from the chain */
+		lv_ptr->lv_snapshot_prev->lv_snapshot_next = lv_ptr->lv_snapshot_next;
+		if (lv_ptr->lv_snapshot_next != NULL) {
+			lv_ptr->lv_snapshot_next->lv_snapshot_prev =
+			    lv_ptr->lv_snapshot_prev;
+		}
+		up(&org->lv_snapshot_sem);
+
+		/* no more snapshots? */
+		if (!org->lv_snapshot_next)
+			org->lv_access &= ~LV_SNAPSHOT_ORG;
+		lvm_snapshot_release(lv_ptr);
+
+		/* Update the VG PE(s) used by snapshot reserve space. */
+		vg_ptr->pe_allocated -= lv_ptr->lv_allocated_snapshot_le;
+	}
+
 	lv_ptr->lv_status |= LV_SPINDOWN;
 
 	/* sync the buffers */
@@ -2532,7 +2430,8 @@ static int lvm_do_lv_remove(int minor, char *lv_name, int l)
 	vg_lv_map[MINOR(lv_ptr->lv_dev)].vg_number = ABS_MAX_VG;
 	vg_lv_map[MINOR(lv_ptr->lv_dev)].lv_number = -1;
 
-	/* correct the PE count in PVs if this is no snapshot logical volume */
+	/* correct the PE count in PVs if this is not a snapshot
+           logical volume */
 	if (!(lv_ptr->lv_access & LV_SNAPSHOT)) {
 		/* only if this is no snapshot logical volume because
 		   we share the lv_current_pe[] structs with the
@@ -2546,31 +2445,13 @@ static int lvm_do_lv_remove(int minor, char *lv_name, int l)
 			}
 		}
 		vfree(lv_ptr->lv_current_pe);
-	/* LV_SNAPSHOT */
-	} else {
-		/* remove this snapshot logical volume from the chain */
-		lv_ptr->lv_snapshot_prev->lv_snapshot_next = lv_ptr->lv_snapshot_next;
-		if (lv_ptr->lv_snapshot_next != NULL) {
-			lv_ptr->lv_snapshot_next->lv_snapshot_prev =
-			    lv_ptr->lv_snapshot_prev;
-		}
-		/* no more snapshots? */
-		if (lv_ptr->lv_snapshot_org->lv_snapshot_next == NULL)
-			lv_ptr->lv_snapshot_org->lv_access &= ~LV_SNAPSHOT_ORG;
-		lvm_snapshot_release(lv_ptr);
 	}
 
-#ifdef	CONFIG_DEVFS_FS
 	devfs_unregister(lv_devfs_handle[lv_ptr->lv_number]);
-#endif
 
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 	lvm_do_remove_proc_entry_of_lv ( vg_ptr, lv_ptr);
-#endif
 
-#ifdef DEBUG_KFREE
-	printk(KERN_DEBUG "%s -- kfree %d\n", lvm_name, __LINE__);
-#endif
+	P_KFREE("%s -- kfree %d\n", lvm_name, __LINE__);
 	kfree(lv_ptr);
 	vg_ptr->lv[l] = NULL;
 	vg_ptr->lv_cur--;
@@ -2638,21 +2519,24 @@ static int lvm_do_lv_extend_reduce(int minor, char *lv_name, lv_t *lv)
 		}
 		memcpy(lvbe,
 		       lv_ptr->lv_block_exception,
-		       (lv->lv_remap_end > lv_ptr->lv_remap_end ? lv_ptr->lv_remap_ptr : lv->lv_remap_end) * sizeof(lv_block_exception_t));
+		       (lv->lv_remap_end > lv_ptr->lv_remap_end ?
+			lv_ptr->lv_remap_ptr : lv->lv_remap_end) * sizeof(lv_block_exception_t));
 
 		lv_ptr->lv_block_exception = lvbe;
 		lv_ptr->lv_remap_end = lv->lv_remap_end;
 		if (lvm_snapshot_alloc_hash_table(lv_ptr) != 0)
 		{
-			lvm_drop_snapshot(lv_ptr, "hash_alloc");
+			lvm_drop_snapshot(lv_ptr, "no memory for hash table");
 			up(&lv_ptr->lv_snapshot_org->lv_snapshot_sem);
 			vfree(lvbe_old);
 			vfree(lvs_hash_table_old);
-			return 1;
+			return -ENOMEM;
 		}
 
 		for (e = 0; e < lv_ptr->lv_remap_ptr; e++)
-			lvm_hash_link (lv_ptr->lv_block_exception + e, lv_ptr->lv_block_exception[e].rdev_org, lv_ptr->lv_block_exception[e].rsector_org, lv_ptr);
+			lvm_hash_link (lv_ptr->lv_block_exception + e,
+				       lv_ptr->lv_block_exception[e].rdev_org,
+				       lv_ptr->lv_block_exception[e].rsector_org, lv_ptr);
 
 		up(&lv_ptr->lv_snapshot_org->lv_snapshot_sem);
 
@@ -2676,15 +2560,6 @@ static int lvm_do_lv_extend_reduce(int minor, char *lv_name, lv_t *lv)
 		vfree(pe);
 		return -EFAULT;
 	}
-
-#ifdef DEBUG
-	printk(KERN_DEBUG
-	       "%s -- fsync_dev and "
-	       "invalidate_buffers for %s [%s] in %s\n",
-	       lvm_name, lv_ptr->lv_name,
-	       kdevname(lv_ptr->lv_dev),
-	       vg_ptr->vg_name);
-#endif
 
 	/* reduce allocation counters on PV(s) */
 	for (le = 0; le < lv_ptr->lv_allocated_le; le++) {
@@ -2713,9 +2588,6 @@ static int lvm_do_lv_extend_reduce(int minor, char *lv_name, lv_t *lv)
 
 	/* save # of old allocated logical extents */
 	old_allocated_le = lv_ptr->lv_allocated_le;
-
-        /* in case of shrinking -> let's flush */
-        if ( end > lv->lv_current_le) fsync_dev(lv_ptr->lv_dev);
 
 	/* copy preloaded LV */
 	memcpy((char *) lv_ptr, (char *) lv, sizeof(lv_t));
@@ -2914,15 +2786,11 @@ static int lvm_do_lv_rename(vg_t *vg_ptr, lv_req_t *lv_req, lv_t *lv)
 		if ( (lv_ptr = vg_ptr->lv[l]) == NULL) continue;
 		if (lv_ptr->lv_dev == lv->lv_dev)
 		{
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 			lvm_do_remove_proc_entry_of_lv ( vg_ptr, lv_ptr);
-#endif
 			strncpy(lv_ptr->lv_name,
 				lv_req->lv_name,
 				NAME_LEN);
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 			lvm_do_create_proc_entry_of_lv ( vg_ptr, lv_ptr);
-#endif
 			break;
 		}
 	}
@@ -3004,9 +2872,22 @@ static int lvm_do_pv_status(vg_t *vg_ptr, void *arg)
 
 
 /*
+ * create a devfs entry for a volume group
+ */
+void lvm_do_create_devfs_entry_of_vg ( vg_t *vg_ptr) {
+	vg_devfs_handle[vg_ptr->vg_number] = devfs_mk_dir(0, vg_ptr->vg_name, NULL);
+	ch_devfs_handle[vg_ptr->vg_number] = devfs_register(
+		vg_devfs_handle[vg_ptr->vg_number] , "group",
+		DEVFS_FL_DEFAULT, LVM_CHAR_MAJOR, vg_ptr->vg_number,
+		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
+		&lvm_chr_fops, NULL);
+}
+
+
+/*
  * create a /proc entry for a logical volume
  */
-inline void lvm_do_create_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
+void lvm_do_create_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
 	char *basename;
 
 	if ( vg_ptr->lv_subdir_pde != NULL) {
@@ -3026,7 +2907,7 @@ inline void lvm_do_create_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
 /*
  * remove a /proc entry for a logical volume
  */
-inline void lvm_do_remove_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
+void lvm_do_remove_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
 	char *basename;
 
 	if ( vg_ptr->lv_subdir_pde != NULL) {
@@ -3041,13 +2922,17 @@ inline void lvm_do_remove_proc_entry_of_lv ( vg_t *vg_ptr, lv_t *lv_ptr) {
 /*
  * create a /proc entry for a physical volume
  */
-inline void lvm_do_create_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
+void lvm_do_create_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
+	int offset = 0;
 	char *basename;
+	char buffer[NAME_LEN];
 
-	basename = strrchr(pv_ptr->pv_name, '/');
-	if (basename == NULL) basename = pv_ptr->pv_name;
-	else		      basename++;
-	pde = create_proc_entry(basename, S_IFREG, vg_ptr->pv_subdir_pde);
+	basename = pv_ptr->pv_name;
+	if (strncmp(basename, "/dev/", 5) == 0) offset = 5;
+	strncpy(buffer, basename + offset, sizeof(buffer));
+	basename = buffer;
+	while ( ( basename = strchr ( basename, '/')) != NULL) *basename = '_';
+	pde = create_proc_entry(buffer, S_IFREG, vg_ptr->pv_subdir_pde);
 	if ( pde != NULL) {
 		pde->read_proc = lvm_proc_read_pv_info;
 		pde->data = pv_ptr;
@@ -3058,7 +2943,7 @@ inline void lvm_do_create_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
 /*
  * remove a /proc entry for a physical volume
  */
-inline void lvm_do_remove_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
+void lvm_do_remove_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
 	char *basename;
 
 	basename = strrchr(pv_ptr->pv_name, '/');
@@ -3074,7 +2959,6 @@ inline void lvm_do_remove_proc_entry_of_pv ( vg_t *vg_ptr, pv_t *pv_ptr) {
 /*
  * create a /proc entry for a volume group
  */
-#if defined CONFIG_LVM_PROC_FS && defined CONFIG_PROC_FS
 void lvm_do_create_proc_entry_of_vg ( vg_t *vg_ptr) {
 	int l, p;
 	pv_t *pv_ptr;
@@ -3090,24 +2974,25 @@ void lvm_do_create_proc_entry_of_vg ( vg_t *vg_ptr) {
 			pde->read_proc = lvm_proc_read_vg_info;
 			pde->data = vg_ptr;
 		}
-		vg_ptr->lv_subdir_pde =
-			create_proc_entry(LVM_LV_SUBDIR, S_IFDIR,
-					  vg_ptr->vg_dir_pde);
-		vg_ptr->pv_subdir_pde =
-			create_proc_entry(LVM_PV_SUBDIR, S_IFDIR,
-					  vg_ptr->vg_dir_pde);
-	}
-
-	if ( vg_ptr->pv_subdir_pde != NULL) {
-		for ( l = 0; l < vg_ptr->lv_max; l++) {
-			if ( ( lv_ptr = vg_ptr->lv[l]) == NULL) continue;
-			lvm_do_create_proc_entry_of_lv ( vg_ptr, lv_ptr);
-		}
-		for ( p = 0; p < vg_ptr->pv_max; p++) {
-			if ( ( pv_ptr = vg_ptr->pv[p]) == NULL) continue;
-			lvm_do_create_proc_entry_of_pv ( vg_ptr, pv_ptr);
-		}
-	}
+                pde = create_proc_entry(LVM_LV_SUBDIR, S_IFDIR,
+                                        vg_ptr->vg_dir_pde);
+                if ( pde != NULL) {
+                        vg_ptr->lv_subdir_pde = pde;
+                        for ( l = 0; l < vg_ptr->lv_max; l++) {
+				if ( ( lv_ptr = vg_ptr->lv[l]) == NULL) continue;
+				lvm_do_create_proc_entry_of_lv ( vg_ptr, lv_ptr);
+                        }
+                }
+                pde = create_proc_entry(LVM_PV_SUBDIR, S_IFDIR,
+                                        vg_ptr->vg_dir_pde);
+                if ( pde != NULL) {
+                        vg_ptr->pv_subdir_pde = pde;
+			for ( p = 0; p < vg_ptr->pv_max; p++) {
+				if ( ( pv_ptr = vg_ptr->pv[p]) == NULL) continue;
+				lvm_do_create_proc_entry_of_pv ( vg_ptr, pv_ptr);
+                        }
+                }
+        }
 }
 
 /*
@@ -3133,18 +3018,12 @@ void lvm_do_remove_proc_entry_of_vg ( vg_t *vg_ptr) {
 		remove_proc_entry(vg_ptr->vg_name, lvm_proc_vg_subdir);
 	}
 }
-#endif
 
 
 /*
  * support function initialize gendisk variables
  */
-#ifdef __initfunc
-__initfunc(void lvm_geninit(struct gendisk *lvm_gdisk))
-#else
-void __init
- lvm_geninit(struct gendisk *lvm_gdisk)
-#endif
+void __init lvm_geninit(struct gendisk *lvm_gdisk)
 {
 	int i = 0;
 
@@ -3166,39 +3045,30 @@ void __init
 } /* lvm_gen_init() */
 
 
-#ifdef LVM_GET_INODE
 /*
- * support function to get an empty inode
- *
- * Gets an empty inode to be inserted into the inode hash,
- * so that a physical volume can't be mounted.
- * This is analog to drivers/block/md.c
- *
- * Is this the real thing?
- *
+ * return a pointer to a '-' padded uuid
  */
-struct inode *lvm_get_inode(int dev)
-{
-	struct inode *inode_this = NULL;
+static char *lvm_show_uuid ( char *uuidstr) {
+	int i, j;
+	static char uuid[NAME_LEN] = { 0, };
 
-	/* Lock the device by inserting a dummy inode. */
-	inode_this = get_empty_inode();
-	inode_this->i_dev = dev;
-	insert_inode_hash(inode_this);
-	return inode_this;
+	memset ( uuid, 0, NAME_LEN);
+
+	i = 6;
+	memcpy ( uuid, uuidstr, i);
+	uuidstr += i;
+
+	for ( j = 0; j < 6; j++) {
+		uuid[i++] = '-';
+		memcpy ( &uuid[i], uuidstr, 4);
+		uuidstr += 4;
+		i += 4;
+	}
+
+	memcpy ( &uuid[i], uuidstr, 2 );
+
+	return uuid;
 }
 
-
-/*
- * support function to clear an inode
- *
- */
-void lvm_clear_inode(struct inode *inode)
-{
-#ifdef I_FREEING
-	inode->i_state |= I_FREEING;
-#endif
-	clear_inode(inode);
-	return;
-}
-#endif /* #ifdef LVM_GET_INODE */
+module_init(lvm_init);
+module_exit(lvm_cleanup);

@@ -59,16 +59,16 @@ void static inline set_interrupt_registers(int ip)
 {
 	unsigned long __dummy;
 
-	asm volatile("ldc	%2, $r6_bank\n\t"
-		     "stc	$sr, %0\n\t"
+	asm volatile("ldc	%2, r6_bank\n\t"
+		     "stc	sr, %0\n\t"
 		     "and	#0xf0, %0\n\t"
 		     "shlr2	%0\n\t"
 		     "cmp/eq	#0x3c, %0\n\t"
 		     "bt/s	1f	! CLI-ed\n\t"
-		     " stc	$sr, %0\n\t"
+		     " stc	sr, %0\n\t"
 		     "and	%1, %0\n\t"
 		     "or	%2, %0\n\t"
-		     "ldc	%0, $sr\n"
+		     "ldc	%0, sr\n"
 		     "1:"
 		     : "=&z" (__dummy)
 		     : "r" (~0xf0), "r" (ip << 4)

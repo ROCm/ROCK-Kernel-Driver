@@ -1384,9 +1384,11 @@ static void via_cleanup(void)
 	aper_size_info_8 *previous_size;
 
 	previous_size = A_SIZE_8(agp_bridge.previous_size);
-	pci_write_config_dword(agp_bridge.dev, VIA_ATTBASE, 0);
 	pci_write_config_byte(agp_bridge.dev, VIA_APSIZE,
 			      previous_size->size_value);
+	/* Do not disable by writing 0 to VIA_ATTBASE, it screws things up
+	 * during reinitialization.
+	 */
 }
 
 static void via_tlbflush(agp_memory * mem)
@@ -2373,9 +2375,10 @@ static int __init agp_find_supported_device(void)
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "agpgart: Detected an "
 				       "Intel i815, but could not find the"
-				       " secondary device.\n");
-				agp_bridge.type = NOT_SUPPORTED;
-				return -ENODEV;
+				       " secondary device.\n"
+				       "Assuming user has added an external AGP"
+				       " card\n");
+				break;
 			}
 			printk(KERN_INFO PFX "agpgart: Detected an Intel i815 "
 			       "Chipset.\n");

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 97 $
+ *       $Revision: 100 $
  *
  *****************************************************************************/
 
@@ -74,7 +74,7 @@ typedef u32                         ACPI_MUTEX_HANDLE;
 #define NUM_MTX                     MAX_MTX+1
 
 
-#ifdef ACPI_DEBUG
+#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
 #ifdef DEFINE_ACPI_GLOBALS
 
 /* Names for the mutexes used in the subsystem */
@@ -593,6 +593,7 @@ typedef struct acpi_walk_state
 	ACPI_GENERIC_STATE      *scope_info;                        /* Stack of nested scopes */
 	ACPI_PARSE_STATE        *parser_state;                      /* Current state of parser */
 	u8                      *aml_last_while;
+	ACPI_OPCODE_INFO        *op_info;                           /* Info on current opcode */
 	ACPI_PARSE_DOWNWARDS    descending_callback;
 	ACPI_PARSE_UPWARDS      ascending_callback;
 
@@ -607,6 +608,7 @@ typedef struct acpi_walk_state
 	u32                     parse_flags;
 	u8                      walk_type;
 	u8                      return_used;
+	u16                     opcode;                             /* Current AML opcode */
 	u32                     prev_arg_types;
 
 	/* Debug support */
@@ -730,14 +732,16 @@ typedef struct acpi_get_devices_info
 #define PM1_STS                     0x0100
 #define PM1_EN                      0x0200
 #define PM1_CONTROL                 0x0300
-#define PM2_CONTROL                 0x0400
-#define PM_TIMER                    0x0500
-#define PROCESSOR_BLOCK             0x0600
-#define GPE0_STS_BLOCK              0x0700
-#define GPE0_EN_BLOCK               0x0800
-#define GPE1_STS_BLOCK              0x0900
-#define GPE1_EN_BLOCK               0x0A00
-#define SMI_CMD_BLOCK               0x0B00
+#define PM1_a_CONTROL               0x0400
+#define PM1_b_CONTROL               0x0500
+#define PM2_CONTROL                 0x0600
+#define PM_TIMER                    0x0700
+#define PROCESSOR_BLOCK             0x0800
+#define GPE0_STS_BLOCK              0x0900
+#define GPE0_EN_BLOCK               0x0A00
+#define GPE1_STS_BLOCK              0x0B00
+#define GPE1_EN_BLOCK               0x0C00
+#define SMI_CMD_BLOCK               0x0D00
 
 /*
  * Address space bitmasks for mmio or io spaces

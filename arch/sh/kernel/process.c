@@ -14,6 +14,8 @@
 #define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
+#include <linux/config.h>
+
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -31,6 +33,7 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/irq.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -39,8 +42,9 @@
 #include <asm/processor.h>
 #include <asm/mmu_context.h>
 #include <asm/elf.h>
-
-#include <linux/irq.h>
+#ifdef CONFIG_SH_STANDARD_BIOS
+#include <asm/sh_bios.h>
+#endif
 
 static int hlt_counter=0;
 
@@ -79,11 +83,17 @@ void cpu_idle(void *unused)
 }
 
 void machine_restart(char * __unused)
-{ /* Need to set MMU_TTB?? */
+{
+#ifdef CONFIG_SH_STANDARD_BIOS
+	sh_bios_shutdown(1);
+#endif
 }
 
 void machine_halt(void)
 {
+#ifdef CONFIG_SH_STANDARD_BIOS
+	sh_bios_shutdown(0);
+#endif
 }
 
 void machine_power_off(void)
@@ -93,7 +103,7 @@ void machine_power_off(void)
 void show_regs(struct pt_regs * regs)
 {
 	printk("\n");
-	printk("PC  : %08lx SP  : %08lx SR  : %08lx TEA : %08lx\n",
+	printk("PC  : %08lx SP  : %08lx SR  : %08lx TEA : %08x\n",
 	       regs->pc, regs->regs[15], regs->sr, ctrl_inl(MMU_TEA));
 	printk("R0  : %08lx R1  : %08lx R2  : %08lx R3  : %08lx\n",
 	       regs->regs[0],regs->regs[1],
@@ -144,12 +154,12 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	register unsigned long __sc9 __asm__ ("r9") = (long) fn;
 
 	__asm__("trapa	#0x12\n\t" 	/* Linux/SH system call */
-		"tst	#0xff, $r0\n\t"	/* child or parent? */
+		"tst	#0xff, r0\n\t"	/* child or parent? */
 		"bf	1f\n\t"		/* parent - jump */
-		"jsr	@$r9\n\t"	/* call fn */
-		" mov	$r8, $r4\n\t"	/* push argument */
-		"mov	$r0, $r4\n\t"	/* return value to arg of exit */
-		"mov	%1, $r3\n\t"	/* exit */
+		"jsr	@r9\n\t"	/* call fn */
+		" mov	r8, r4\n\t"	/* push argument */
+		"mov	r0, r4\n\t"	/* return value to arg of exit */
+		"mov	%1, r3\n\t"	/* exit */
 		"trapa	#0x11\n"
 		"1:"
 		: "=z" (__sc0)
@@ -285,7 +295,7 @@ void __switch_to(struct task_struct *prev, struct task_struct *next)
 	 * Restore the kernel mode register
 	 *   	k7 (r7_bank1)
 	 */
-	asm volatile("ldc	%0, $r7_bank"
+	asm volatile("ldc	%0, r7_bank"
 		     : /* no output */
 		     :"r" (next));
 }
@@ -376,7 +386,7 @@ unsigned long get_wchan(struct task_struct *p)
 asmlinkage void print_syscall(int x)
 {
 	unsigned long flags, sr;
-	asm("stc	$sr, %0": "=r" (sr));
+	asm("stc	sr, %0": "=r" (sr));
 	save_and_cli(flags);
 	printk("%c: %c %c, %c: SYSCALL\n", (x&63)+32,
 	       (current->flags&PF_USEDFPU)?'C':' ',

@@ -1450,15 +1450,6 @@ CONFIG_BLK_DEV_LVM
   want), say M here and read Documentation/modules.txt. The module
   will be called lvm-mod.o.
 
-Logical Volume Manager /proc file system information
-CONFIG_LVM_PROC_FS
-  If you say Y here, you are able to access overall Logical Volume
-  Manager, Volume Group, Logical and Physical Volume information in
-  /proc/lvm.
-
-  To use this option, you have to check, that the "/proc file system
-  support" (CONFIG_PROC_FS) is enabled too.
-
 Multiple devices driver support
 CONFIG_BLK_DEV_MD
   This driver lets you combine several hard disk partitions into one
@@ -1564,20 +1555,6 @@ CONFIG_MD_RAID5
   Documentation/modules.txt.
 
   If unsure, say Y.
-
-RAID Boot support
-CONFIG_MD_BOOT
-  To boot with an initial raid volume (any type) you can select
-  autodetect, or answer Y here and appropriate options to the kernel
-  at boot time.
-  For lilo and loadlin options see the file Documentation/md.txt.
-
-RAID AutoDetect support
-CONFIG_AUTODETECT_RAID
-  An alternative to "Raid Boot support" is autodetect support.
-  With this selected, any partitons of type 0xFD will be considered for
-  inclusion in a RAID array.  Information in the RAID-superblock on
-  the partition will determine how it is included.
 
 Support for Acer PICA 1 chipset
 CONFIG_ACER_PICA_61

@@ -36,7 +36,7 @@
 #include "check.h"
 #include "msdos.h"
 
-#if CONFIG_BLK_DEV_MD && CONFIG_AUTODETECT_RAID
+#if CONFIG_BLK_DEV_MD
 extern void md_autodetect_dev(kdev_t dev);
 #endif
 
@@ -136,7 +136,7 @@ static void extended_partition(struct gendisk *hd, kdev_t dev)
 			add_gd_partition(hd, current_minor,
 					 this_sector+START_SECT(p)*sector_size,
 					 NR_SECTS(p)*sector_size);
-#if CONFIG_BLK_DEV_MD && CONFIG_AUTODETECT_RAID
+#if CONFIG_BLK_DEV_MD
 			if (SYS_IND(p) == LINUX_RAID_PARTITION) {
 			    md_autodetect_dev(MKDEV(hd->major,current_minor));
 			}
@@ -448,7 +448,7 @@ check_table:
 			continue;
 		add_gd_partition(hd, minor, first_sector+START_SECT(p)*sector_size,
 				 NR_SECTS(p)*sector_size);
-#if CONFIG_BLK_DEV_MD && CONFIG_AUTODETECT_RAID
+#if CONFIG_BLK_DEV_MD
 		if (SYS_IND(p) == LINUX_RAID_PARTITION) {
 			md_autodetect_dev(MKDEV(hd->major,minor));
 		}

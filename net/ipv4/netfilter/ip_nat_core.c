@@ -438,8 +438,27 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 								conntrack));
 				ret = 1;
 				goto clear_fulls;
+			} else if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
+				/* Try implicit source NAT; protocol
+                                   may be able to play with ports to
+                                   make it unique. */
+				struct ip_nat_range r
+					= { IP_NAT_RANGE_MAP_IPS, 
+					    tuple->src.ip, tuple->src.ip,
+					    { 0 }, { 0 } };
+				DEBUGP("Trying implicit mapping\n");
+				if (proto->unique_tuple(tuple, &r,
+							IP_NAT_MANIP_SRC,
+							conntrack)) {
+					/* Must be unique. */
+					IP_NF_ASSERT(!ip_nat_used_tuple
+						     (tuple, conntrack));
+					ret = 1;
+					goto clear_fulls;
+				}
 			}
-			DEBUGP("Protocol can't get unique tuple.\n");
+			DEBUGP("Protocol can't get unique tuple %u.\n",
+			       hooknum);
 		}
 
 		/* Eliminate that from range, and try again. */

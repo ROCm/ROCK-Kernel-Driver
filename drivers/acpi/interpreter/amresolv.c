@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amresolv - AML Interpreter object resolution
- *              $Revision: 80 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -150,7 +150,7 @@ acpi_aml_get_field_unit_value (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Convert Reference entries on Obj_stack to Rvalues
+ * DESCRIPTION: Convert Reference objects to values
  *
  ******************************************************************************/
 

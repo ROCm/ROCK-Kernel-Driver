@@ -121,6 +121,10 @@ acpi_os_unmap_memory (
 	void                    *logical_address,
 	u32                     length);
 
+ACPI_STATUS
+acpi_os_get_physical_address (
+	void                    *logical_address,
+	ACPI_PHYSICAL_ADDRESS   *physical_address);
 
 /*
  * Interrupt handlers

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.168 2001/01/01 01:46:15 davem Exp $
+/* $Id: entry.S,v 1.169 2001/01/25 21:47:20 davem Exp $
  * arch/sparc/kernel/entry.S:  Sparc trap low-level entry points.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -999,6 +999,7 @@ C_LABEL(invalid_segment_patch1):
 
 	ld	[%l4 + 0x18], %l3
 	inc	%l3			! sun4c_kernel_ring.num_entries++
+	st	%l3, [%l4 + 0x18]
 	b	4f
 	 ld	[%l6 + 0x08], %l5
 

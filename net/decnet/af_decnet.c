@@ -439,7 +439,6 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	scp->info_loc = 0x03; /* NSP version 4.1 */
 	scp->segsize_rem = 230; /* Default: Updated by remote segsize */
 	scp->segsize_loc = 1450; /* Best guess for ethernet */
-	scp->at_eor = 1;
 	scp->nonagle = 0;
 	scp->multi_ireq = 1;
 	scp->accept_mode = ACC_IMMED;
@@ -1121,18 +1120,6 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		release_sock(sk);
 		return val;
 
-#ifdef SIOCATEOR
-	case SIOCATEOR:
-		lock_sock(sk);
-		val = scp->at_eor;
-		if (scp->state != DN_RUN)
-			val = -ENOTCONN;
-		if (sock->type != SOCK_SEQPACKET)
-			val = -EINVAL;
-		release_sock(sk);
-		return val;
-#endif /* SIOCATEOR */
-
 #ifdef CONFIG_DECNET_ROUTER
 	case SIOCADDRT:
 	case SIOCDELRT:
@@ -1768,14 +1755,10 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 
 	rv = copied;
 
-	if (!(flags & (MSG_PEEK|MSG_OOB)))
-		scp->at_eor = 0;
 
-	if (eor && (sk->type == SOCK_SEQPACKET)) {
+	if (eor && (sk->type == SOCK_SEQPACKET))
 		msg->msg_flags |= MSG_EOR;
-		if (!(flags & (MSG_PEEK|MSG_OOB)))
-			scp->at_eor = 1;
-	}
+
 out:
 	if (rv == 0)
 		rv = (flags & MSG_PEEK) ? -sk->err : sock_error(sk);
@@ -2042,12 +2025,12 @@ static void dn_printable_object(struct sockaddr_dn *dn, unsigned char *buf)
 {
 	int i;
     
-	switch (dn->sdn_objnamel) {
+	switch (dn_ntohs(dn->sdn_objnamel)) {
 		case 0:
 			sprintf(buf, "%d", dn->sdn_objnum);
 			break;
 		default:
-			for (i = 0; i < dn->sdn_objnamel; i++) {
+			for (i = 0; i < dn_ntohs(dn->sdn_objnamel); i++) {
 				buf[i] = dn->sdn_objname[i];
 				if (IS_NOT_PRINTABLE(buf[i]))
 					buf[i] = '.';

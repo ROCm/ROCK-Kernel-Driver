@@ -81,11 +81,3 @@ EXPORT_SYMBOL(acpi_set_current_resources);
 EXPORT_SYMBOL(acpi_enable_event);
 EXPORT_SYMBOL(acpi_disable_event);
 EXPORT_SYMBOL(acpi_clear_event);
-
-EXPORT_SYMBOL(acpi_get_processor_throttling_info);
-EXPORT_SYMBOL(acpi_get_processor_throttling_state);
-EXPORT_SYMBOL(acpi_set_processor_throttling_state);
-
-EXPORT_SYMBOL(acpi_get_processor_cx_info);
-EXPORT_SYMBOL(acpi_set_processor_sleep_state);
-EXPORT_SYMBOL(acpi_processor_sleep);

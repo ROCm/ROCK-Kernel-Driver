@@ -21,6 +21,14 @@
  *
  */
 
+/*
+ * Changelog
+ *
+ *    05/07/2000 - implemented persistent snapshot support
+ *    23/11/2000 - used cpu_to_le64 rather than my own macro
+ *
+ */
+
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
@@ -30,7 +38,9 @@
 #include <linux/lvm.h>
 
 
-static char *lvm_snap_version __attribute__ ((unused)) = "LVM 0.9 snapshot code (13/11/2000)\n";
+#include "lvm-snap.h"
+
+static char *lvm_snap_version __attribute__ ((unused)) = "LVM 0.9.1_beta2 snapshot code (18/01/2001)\n";
 
 extern const char *const lvm_name;
 extern int lvm_blocksizes[];
@@ -214,10 +224,10 @@ void lvm_snapshot_fill_COW_page(vg_t * vg, lv_t * lv_snap)
 	memset(lv_COW_table, 0, blksize_snap);
 	for ( ; is < lv_snap->lv_remap_ptr; is++, id++) {
 		/* store new COW_table entry */
-		lv_COW_table[id].pv_org_number = LVM_TO_DISK64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[is].rdev_org));
-		lv_COW_table[id].pv_org_rsector = LVM_TO_DISK64(lv_snap->lv_block_exception[is].rsector_org);
-		lv_COW_table[id].pv_snap_number = LVM_TO_DISK64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[is].rdev_new));
-		lv_COW_table[id].pv_snap_rsector = LVM_TO_DISK64(lv_snap->lv_block_exception[is].rsector_new);
+		lv_COW_table[id].pv_org_number = cpu_to_le64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[is].rdev_org));
+		lv_COW_table[id].pv_org_rsector = cpu_to_le64(lv_snap->lv_block_exception[is].rsector_org);
+		lv_COW_table[id].pv_snap_number = cpu_to_le64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[is].rdev_new));
+		lv_COW_table[id].pv_snap_rsector = cpu_to_le64(lv_snap->lv_block_exception[is].rsector_new);
 	}
 }
 
@@ -227,8 +237,7 @@ void lvm_snapshot_fill_COW_page(vg_t * vg, lv_t * lv_snap)
  *
  */
 
-int lvm_write_COW_table_block(vg_t * vg,
-			      lv_t * lv_snap)
+int lvm_write_COW_table_block(vg_t * vg, lv_t * lv_snap)
 {
 	int blksize_snap;
 	int end_of_table;
@@ -268,10 +277,10 @@ int lvm_write_COW_table_block(vg_t * vg,
 	blocks[0] = (snap_pe_start + COW_table_sector_offset) >> (blksize_snap >> 10);
 
 	/* store new COW_table entry */
-	lv_COW_table[idx_COW_table].pv_org_number = LVM_TO_DISK64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[idx].rdev_org));
-	lv_COW_table[idx_COW_table].pv_org_rsector = LVM_TO_DISK64(lv_snap->lv_block_exception[idx].rsector_org);
-	lv_COW_table[idx_COW_table].pv_snap_number = LVM_TO_DISK64(lvm_pv_get_number(vg, snap_phys_dev));
-	lv_COW_table[idx_COW_table].pv_snap_rsector = LVM_TO_DISK64(lv_snap->lv_block_exception[idx].rsector_new);
+	lv_COW_table[idx_COW_table].pv_org_number = cpu_to_le64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[idx].rdev_org));
+	lv_COW_table[idx_COW_table].pv_org_rsector = cpu_to_le64(lv_snap->lv_block_exception[idx].rsector_org);
+	lv_COW_table[idx_COW_table].pv_snap_number = cpu_to_le64(lvm_pv_get_number(vg, snap_phys_dev));
+	lv_COW_table[idx_COW_table].pv_snap_rsector = cpu_to_le64(lv_snap->lv_block_exception[idx].rsector_new);
 
 	length_tmp = iobuf->length;
 	iobuf->length = blksize_snap;
@@ -568,6 +577,7 @@ void lvm_snapshot_release(lv_t * lv)
 	}
 	if (lv->lv_iobuf)
 	{
+	        kiobuf_wait_for_io(lv->lv_iobuf);
 		unmap_kiobuf(lv->lv_iobuf);
 		free_kiovec(1, &lv->lv_iobuf);
 		lv->lv_iobuf = NULL;

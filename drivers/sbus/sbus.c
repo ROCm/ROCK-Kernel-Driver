@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.91 2000/11/08 05:04:06 davem Exp $
+/* $Id: sbus.c,v 1.92 2001/01/25 17:15:59 davem Exp $
  * sbus.c:  SBus support routines.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -238,10 +238,14 @@ static void __init __apply_ranges_to_regs(struct linux_prom_ranges *ranges,
 					break;
 			}
 			if (rngnum == num_ranges) {
-				prom_printf("sbus_apply_ranges: Cannot find matching "
-					    "range nregs[%d] nranges[%d].\n",
-					    num_regs, num_ranges);
-				prom_halt();
+				/* We used to flag this as an error.  Actually
+				 * some devices do not report the regs as we expect.
+				 * For example, see SUNW,pln device.  In that case
+				 * the reg property is in a format internal to that
+				 * node, ie. it is not in the SBUS register space
+				 * per se. -DaveM
+				 */
+				return;
 			}
 			regs[regnum].which_io = ranges[rngnum].ot_parent_space;
 			regs[regnum].phys_addr += ranges[rngnum].ot_parent_base;

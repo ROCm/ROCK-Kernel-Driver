@@ -22,6 +22,7 @@
 #define GET_ARRAY_INFO		_IOR (MD_MAJOR, 0x11, mdu_array_info_t)
 #define GET_DISK_INFO		_IOR (MD_MAJOR, 0x12, mdu_disk_info_t)
 #define PRINT_RAID_DEBUG	_IO (MD_MAJOR, 0x13)
+#define RAID_AUTORUN		_IO (MD_MAJOR, 0x14)
 
 /* configuration */
 #define CLEAR_ARRAY		_IO (MD_MAJOR, 0x20)

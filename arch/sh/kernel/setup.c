@@ -503,8 +503,8 @@ int get_cpuinfo(char *buffer)
 		       "cache size\t: 8K-byte/16K-byte\n");
 #endif
 	p += sprintf(p, "bogomips\t: %lu.%02lu\n\n",
-		     (loops_per_jiffy+2500)/(500000/HZ),
-		     ((loops_per_jiffy+2500)/(5000/HZ)) % 100);
+		     loops_per_jiffy/(500000/HZ),
+		     (loops_per_jiffy/(5000/HZ)) % 100);
 	p += sprintf(p, "Machine: %s\n", sh_mv.mv_name);
 
 #define PRINT_CLOCK(name, value) \

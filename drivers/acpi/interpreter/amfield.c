@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: amfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 76 $
+ *              $Revision: 77 $
  *
  *****************************************************************************/
 
@@ -174,7 +174,8 @@ acpi_aml_access_named_field (
 	u32                     byte_field_length;
 
 
-	/* Basic data checking */
+	/* Parameter validation */
+
 	if ((!named_field) || (ACPI_READ == mode && !buffer)) {
 		return (AE_AML_INTERNAL);
 	}
@@ -227,7 +228,7 @@ acpi_aml_access_named_field (
 
 	/* TBD: should these round down to a power of 2? */
 
-	if (DIV_8(bit_granularity) > byte_field_length) {
+	if (DIV_8 (bit_granularity) > byte_field_length) {
 		bit_granularity = MUL_8(byte_field_length);
 	}
 

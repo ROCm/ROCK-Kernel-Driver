@@ -47,21 +47,6 @@ acpi_fetch_fadt(void)
 		return -ENODEV;
 	}
 
-	if (acpi_fadt.plvl2_lat
-	    && acpi_fadt.plvl2_lat <= ACPI_MAX_P_LVL2_LAT) {
-		acpi_c2_exit_latency
-			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl2_lat);
-		acpi_c2_enter_latency
-			= ACPI_MICROSEC_TO_TMR_TICKS(ACPI_TMR_HZ / 1000);
-	}
-	if (acpi_fadt.plvl3_lat
-	    && acpi_fadt.plvl3_lat <= ACPI_MAX_P_LVL3_LAT) {
-		acpi_c3_exit_latency
-			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat);
-		acpi_c3_enter_latency
-			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat * 5);
-	}
-
 	return 0;
 }
 
@@ -71,11 +56,7 @@ acpi_fetch_fadt(void)
 int
 acpi_find_and_load_tables(u64 rsdp)
 {
-	if (ACPI_SUCCESS(acpi_load_tables(rsdp)))
-	{
-		printk(KERN_INFO "ACPI: System description tables loaded\n");
-	}
-	else {
+	if (!ACPI_SUCCESS(acpi_load_tables(rsdp))) {
 		printk(KERN_INFO "ACPI: System description table load failed\n");
 		acpi_terminate();
 		return -1;

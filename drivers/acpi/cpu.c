@@ -39,6 +39,9 @@ static int acpi_c3_tested = 0;
 static int acpi_max_c_state = 1;
 static int acpi_pm_tmr_len;
 
+#define MAX_C2_LATENCY		100
+#define MAX_C3_LATENCY		1000
+
 /*
  * Clear busmaster activity flag
  */
@@ -251,10 +254,7 @@ static ACPI_STATUS
 acpi_found_cpu(ACPI_HANDLE handle, u32 level, void *ctx, void **value)
 {
 	ACPI_OBJECT obj;
-	ACPI_CX_STATE lat[4];
-	ACPI_CPU_THROTTLING_STATE throttle[ACPI_MAX_THROTTLE];
 	ACPI_BUFFER buf;
-	int i, count;
 
 	buf.length = sizeof(obj);
 	buf.pointer = &obj;
@@ -273,41 +273,28 @@ acpi_found_cpu(ACPI_HANDLE handle, u32 level, void *ctx, void **value)
 
 	acpi_pblk = obj.processor.pblk_address;
 
-	buf.length = sizeof(lat);
-	buf.pointer = lat;
-	if (!ACPI_SUCCESS(acpi_get_processor_cx_info(handle, &buf)))
-		return AE_OK;
-
-	if (lat[2].latency < MAX_CX_STATE_LATENCY) {
-		printk(KERN_INFO "ACPI: System firmware supports: C2");
-		acpi_c2_exit_latency = lat[2].latency;
+	if (acpi_fadt.plvl2_lat
+	    && acpi_fadt.plvl2_lat <= MAX_C2_LATENCY) {
+		acpi_c2_exit_latency
+			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl2_lat);
+		acpi_c2_enter_latency
+			= ACPI_MICROSEC_TO_TMR_TICKS(ACPI_TMR_HZ / 1000);
 		acpi_max_c_state = 2;
+
+		printk(KERN_INFO "ACPI: System firmware supports: C2");
 	
-		if (lat[3].latency < MAX_CX_STATE_LATENCY) {
-			printk(" C3");
-			acpi_c3_exit_latency = lat[3].latency;
+		if (acpi_fadt.plvl3_lat
+		    && acpi_fadt.plvl3_lat <= MAX_C3_LATENCY) {
+			acpi_c3_exit_latency
+				= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat);
+			acpi_c3_enter_latency
+				= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat * 5);
 			acpi_max_c_state = 3;
+
+			printk(" C3");
 		}
+
 		printk("\n");
-	}
-
-	memset(throttle, 0, sizeof(throttle));
-	buf.length = sizeof(throttle);
-	buf.pointer = throttle;
-
-	if (!ACPI_SUCCESS(acpi_get_processor_throttling_info(handle, &buf)))
-		return AE_OK;
-
-	for (i = 0, count = 0; i < ACPI_MAX_THROTTLE; i++) {
-		if (throttle[i].percent_of_clock)
-			count++;
-	}
-
-	/* 0% throttled really doesn't count */
-	count--;
-
-	if (count > 0) {
-		DEBUG_PRINT(ACPI_INFO, ("%d throttling states\n", count));
 	}
 
 	return AE_OK;

@@ -234,22 +234,107 @@ static int pirq_cyrix_set(struct pci_dev *router, struct pci_dev *dev, int pirq,
 	return 1;
 }
 
+/*
+ *	PIRQ routing for SiS 85C503 router used in several SiS chipsets
+ *	According to the SiS 5595 datasheet (preliminary V1.0, 12/24/1997)
+ *	the related registers work as follows:
+ *	
+ *	general: one byte per re-routable IRQ,
+ *		 bit 7      IRQ mapping enabled (0) or disabled (1)
+ *		 bits [6:4] reserved
+ *		 bits [3:0] IRQ to map to
+ *		     allowed: 3-7, 9-12, 14-15
+ *		     reserved: 0, 1, 2, 8, 13
+ *
+ *	individual registers in device config space:
+ *
+ *	0x41/0x42/0x43/0x44:	PCI INT A/B/C/D - bits as in general case
+ *
+ *	0x61:			IDEIRQ: bits as in general case - but:
+ *				bits [6:5] must be written 01
+ *				bit 4 channel-select primary (0), secondary (1)
+ *
+ *	0x62:			USBIRQ: bits as in general case - but:
+ *				bit 4 OHCI function disabled (0), enabled (1)
+ *	
+ *	0x6a:			ACPI/SCI IRQ - bits as in general case
+ *
+ *	0x7e:			Data Acq. Module IRQ - bits as in general case
+ *
+ *	Apparently there are systems implementing PCI routing table using both
+ *	link values 0x01-0x04 and 0x41-0x44 for PCI INTA..D, but register offsets
+ *	like 0x62 as link values for USBIRQ e.g. So there is no simple
+ *	"register = offset + pirq" relation.
+ *	Currently we support PCI INTA..D and USBIRQ and try our best to handle
+ *	both link mappings.
+ *	IDE/ACPI/DAQ mapping is currently unsupported (left untouched as set by BIOS).
+ */
+
 static int pirq_sis_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
 	u8 x;
-	int reg = 0x41 + (pirq - 'A') ;
+	int reg = pirq;
 
-	pci_read_config_byte(router, reg, &x);
+	switch(pirq) {
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+			reg += 0x40;
+		case 0x41:
+		case 0x42:
+		case 0x43:
+		case 0x44:
+		case 0x62:
+			pci_read_config_byte(router, reg, &x);
+			if (reg != 0x62)
+				break;
+			if (!(x & 0x40))
+				return 0;
+			break;
+		case 0x61:
+		case 0x6a:
+		case 0x7e:
+			printk("SiS pirq: advanced IDE/ACPI/DAQ mapping not yet implemented\n");
+			return 0;
+		default:			
+			printk("SiS router pirq escape (%d)\n", pirq);
+			return 0;
+	}
 	return (x & 0x80) ? 0 : (x & 0x0f);
 }
 
 static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
 	u8 x;
-	int reg = 0x41 + (pirq - 'A') ;
+	int reg = pirq;
 
-	pci_read_config_byte(router, reg, &x);
-	x = (pirq & 0x20) ? 0 : (irq & 0x0f);
+	switch(pirq) {
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+			reg += 0x40;
+		case 0x41:
+		case 0x42:
+		case 0x43:
+		case 0x44:
+		case 0x62:
+			x = (irq&0x0f) ? (irq&0x0f) : 0x80;
+			if (reg != 0x62)
+				break;
+			/* always mark OHCI enabled, as nothing else knows about this */
+			x |= 0x40;
+			break;
+		case 0x61:
+		case 0x6a:
+		case 0x7e:
+			printk("advanced SiS pirq mapping not yet implemented\n");
+			return 0;
+		default:			
+			printk("SiS router pirq escape (%d)\n", pirq);
+			return 0;
+	}
 	pci_write_config_byte(router, reg, x);
 
 	return 1;
@@ -462,18 +547,9 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		irq = pirq & 0xf;
 		DBG(" -> hardcoded IRQ %d\n", irq);
 		msg = "Hardcoded";
-		if (dev->irq && dev->irq != irq) {
-			printk("IRQ routing conflict in pirq table! Try 'pci=autoirq'\n");
-			return 0;
-		}
 	} else if (r->get && (irq = r->get(pirq_router_dev, dev, pirq))) {
 		DBG(" -> got IRQ %d\n", irq);
 		msg = "Found";
-		/* We refuse to override the dev->irq information. Give a warning! */
-	    	if (dev->irq && dev->irq != irq) {
-	    		printk("IRQ routing conflict in pirq table! Try 'pci=autoirq'\n");
-	    		return 0;
-	    	}
 	} else if (newirq && r->set && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
 		DBG(" -> assigning IRQ %d", newirq);
 		if (r->set(pirq_router_dev, dev, pirq, newirq)) {
@@ -504,6 +580,11 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		if (!info)
 			continue;
 		if (info->irq[pin].link == pirq) {
+			/* We refuse to override the dev->irq information. Give a warning! */
+		    	if (dev2->irq && dev2->irq != irq) {
+		    		printk("IRQ routing conflict in pirq table for device %s\n", dev2->slot_name);
+		    		continue;
+		    	}
 			dev2->irq = irq;
 			pirq_penalty[irq]++;
 			if (dev != dev2)

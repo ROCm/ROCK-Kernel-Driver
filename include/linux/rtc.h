@@ -8,7 +8,7 @@
  * Copyright (C) 1999 Hewlett-Packard Co.
  * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
  */
-#ifndef _LINUX_RTC_H
+#ifndef _LINUX_RTC_H_
 #define _LINUX_RTC_H_
 
 /*

@@ -2409,6 +2409,7 @@ int __init irda_proto_init(void)
 #endif
 	return 0;
 }
+module_init(irda_proto_init);
 
 /*
  * Function irda_proto_cleanup (void)
@@ -2429,11 +2430,9 @@ void irda_proto_cleanup(void)
 	
         return;
 }
-module_init(irda_proto_init);
 module_exit(irda_proto_cleanup);
  
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("The Linux IrDA Protocol Subsystem"); 
 MODULE_PARM(irda_debug, "1l");
 #endif /* MODULE */
-

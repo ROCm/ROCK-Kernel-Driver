@@ -413,13 +413,12 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
 
 	if (!po)
-		goto abort_put;
+		goto abort;
 
 	sk = po->sk;
 
 	pppox_unbind_sock(sk);
 
- abort_put:
 	sock_put(sk);
  abort:
 	kfree_skb(skb);

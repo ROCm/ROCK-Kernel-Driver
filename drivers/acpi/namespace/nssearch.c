@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  ******************************************************************************/
 
@@ -68,8 +68,6 @@ acpi_ns_search_node (
 	ACPI_NAMESPACE_NODE     **return_node)
 {
 	ACPI_NAMESPACE_NODE     *next_node;
-
-
 
 
 	/*

@@ -395,6 +395,7 @@ EXPORT_SYMBOL(unmap_kiobuf);
 EXPORT_SYMBOL(lock_kiovec);
 EXPORT_SYMBOL(unlock_kiovec);
 EXPORT_SYMBOL(brw_kiovec);
+EXPORT_SYMBOL(kiobuf_wait_for_io);
 
 /* dma handling */
 EXPORT_SYMBOL(request_dma);

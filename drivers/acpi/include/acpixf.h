@@ -285,6 +285,10 @@ acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   *physical_address);
 
 ACPI_STATUS
+acpi_enter_sleep_state (
+	u8 sleep_state);
+
+ACPI_STATUS
 acpi_get_processor_throttling_info (
 	ACPI_HANDLE             processor_handle,
 	ACPI_BUFFER             *user_buffer);

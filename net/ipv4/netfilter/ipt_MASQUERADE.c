@@ -68,6 +68,7 @@ masquerade_target(struct sk_buff **pskb,
 	struct ip_nat_multi_range newrange;
 	u_int32_t newsrc;
 	struct rtable *rt;
+	struct rt_key key;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
 
@@ -82,10 +83,14 @@ masquerade_target(struct sk_buff **pskb,
 
 	mr = targinfo;
 
-	if (ip_route_output(&rt, (*pskb)->nh.iph->daddr,
-			    0,
-			    RT_TOS((*pskb)->nh.iph->tos)|RTO_CONN,
-			    out->ifindex) != 0) {
+	key.dst = (*pskb)->nh.iph->daddr;
+	key.src = 0; /* Unknown: that's what we're trying to establish */
+	key.tos = RT_TOS((*pskb)->nh.iph->tos)|RTO_CONN;
+	key.oif = out->ifindex;
+#ifdef CONFIG_IP_ROUTE_FWMARK
+	key.fwmark = (*pskb)->nfmark;
+#endif
+	if (ip_route_output_key(&rt, &key) != 0) {
 		/* Shouldn't happen */
 		printk("MASQUERADE: No route: Rusty's brain broke!\n");
 		return NF_DROP;

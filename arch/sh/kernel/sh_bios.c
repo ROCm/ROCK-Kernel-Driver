@@ -1,4 +1,4 @@
-/* $Id: sh_bios.c,v 1.3 2000/09/30 03:43:30 gniibe Exp $
+/* $Id: sh_bios.c,v 1.5 2001/01/08 08:42:32 gniibe Exp $
  *
  *  linux/arch/sh/kernel/sh_bios.c
  *  C interface for trapping into the standard LinuxSH BIOS.
@@ -7,13 +7,12 @@
  *
  */
 
-#include <linux/config.h>
 #include <asm/sh_bios.h>
 
-#ifdef CONFIG_SH_STANDARD_BIOS
-
 #define BIOS_CALL_CONSOLE_WRITE     	0
-#define BIOS_CALL_READ_BLOCK     	1   	/* not implemented */
+#define BIOS_CALL_READ_BLOCK     	1
+#define BIOS_CALL_ETH_NODE_ADDR		10
+#define BIOS_CALL_SHUTDOWN		11
 #define BIOS_CALL_CHAR_OUT     	    	0x1f  	/* TODO: hack */
 #define BIOS_CALL_GDB_GET_MODE_PTR     	0xfe
 #define BIOS_CALL_GDB_DETACH     	0xff
@@ -66,5 +65,12 @@ void sh_bios_gdb_detach(void)
     sh_bios_call(BIOS_CALL_GDB_DETACH, 0, 0, 0, 0);
 }
 
-#endif
+void sh_bios_get_node_addr (unsigned char *node_addr)
+{
+    sh_bios_call(BIOS_CALL_ETH_NODE_ADDR, 0, (long)node_addr, 0, 0);
+}
 
+void sh_bios_shutdown(unsigned int how)
+{
+    sh_bios_call(BIOS_CALL_SHUTDOWN, how, 0, 0, 0);
+}

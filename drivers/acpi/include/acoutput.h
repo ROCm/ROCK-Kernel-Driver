@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acoutput.h -- debug output
- *       $Revision: 68 $
+ *       $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -58,6 +58,7 @@
 #define BATTERY                     0x00040000
 
 #define DEBUGGER                    0x00100000
+#define COMPILER                    0x00200000
 #define ALL_COMPONENTS              0x001FFFFF
 
 #define COMPONENT_DEFAULT           (ALL_COMPONENTS)

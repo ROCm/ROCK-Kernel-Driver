@@ -235,7 +235,7 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 	unsigned int status;
 
 	/* Get IRQ number */
-	asm volatile("stc	$r2_bank, %0\n\t"
+	asm volatile("stc	r2_bank, %0\n\t"
 		     "shlr2	%0\n\t"
 		     "shlr2	%0\n\t"
 		     "shlr	%0\n\t"

@@ -1,7 +1,8 @@
+
 /******************************************************************************
  *
- * Module Name: hwacpi - ACPI hardware functions - mode and timer
- *              $Revision: 35 $
+ * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
+ *              $Revision: 36 $
  *
  *****************************************************************************/
 
@@ -303,49 +304,4 @@ acpi_hw_get_mode_capabilities (void)
 	return (acpi_gbl_system_flags & SYS_MODES_MASK);
 }
 
-
-/******************************************************************************
- *
- * FUNCTION:    Acpi_hw_pmt_ticks
- *
- * PARAMETERS:  none
- *
- * RETURN:      Current value of the ACPI PMT (timer)
- *
- * DESCRIPTION: Obtains current value of ACPI PMT
- *
- ******************************************************************************/
-
-u32
-acpi_hw_pmt_ticks (void)
-{
-	u32                      ticks;
-
-	ticks = acpi_os_in32 ((ACPI_IO_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address));
-
-	return (ticks);
-}
-
-
-/******************************************************************************
- *
- * FUNCTION:    Acpi_hw_pmt_resolution
- *
- * PARAMETERS:  none
- *
- * RETURN:      Number of bits of resolution in the PMT (either 24 or 32)
- *
- * DESCRIPTION: Obtains resolution of the ACPI PMT (either 24bit or 32bit)
- *
- ******************************************************************************/
-
-u32
-acpi_hw_pmt_resolution (void)
-{
-	if (0 == acpi_gbl_FADT->tmr_val_ext) {
-		return (24);
-	}
-
-	return (32);
-}
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: amconvrt - Object conversion routines
- *              $Revision: 2 $
+ *              $Revision: 3 $
  *
  *****************************************************************************/
 
@@ -35,6 +35,121 @@
 
 #define _COMPONENT          INTERPRETER
 	 MODULE_NAME         ("amconvrt")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_convert_to_target_type
+ *
+ * PARAMETERS:  *Obj_desc       - Object to be converted.
+ *              Walk_state      - Current method state
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION:
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_convert_to_target_type (
+	OBJECT_TYPE_INTERNAL    destination_type,
+	ACPI_OPERAND_OBJECT     **obj_desc,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status = AE_OK;
+
+
+	/*
+	 * If required by the target,
+	 * perform implicit conversion on the source before we store it.
+	 */
+
+	switch (GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args))
+	{
+	case ARGI_SIMPLE_TARGET:
+	case ARGI_FIXED_TARGET:
+	case ARGI_INTEGER_REF:      /* Handles Increment, Decrement cases */
+
+		switch (destination_type)
+		{
+		case INTERNAL_TYPE_DEF_FIELD:
+			/*
+			 * Named field can always handle conversions
+			 */
+			break;
+
+		default:
+			/* No conversion allowed for these types */
+
+			if (destination_type != (*obj_desc)->common.type) {
+				status = AE_TYPE;
+			}
+		}
+		break;
+
+
+	case ARGI_TARGETREF:
+
+		switch (destination_type)
+		{
+		case ACPI_TYPE_INTEGER:
+		case ACPI_TYPE_FIELD_UNIT:
+		case INTERNAL_TYPE_BANK_FIELD:
+		case INTERNAL_TYPE_INDEX_FIELD:
+			/*
+			 * These types require an Integer operand.  We can convert
+			 * a Buffer or a String to an Integer if necessary.
+			 */
+			status = acpi_aml_convert_to_integer (obj_desc, walk_state);
+			break;
+
+
+		case ACPI_TYPE_STRING:
+
+			/*
+			 * The operand must be a String.  We can convert an
+			 * Integer or Buffer if necessary
+			 */
+			status = acpi_aml_convert_to_string (obj_desc, walk_state);
+			break;
+
+
+		case ACPI_TYPE_BUFFER:
+
+			/*
+			 * The operand must be a String.  We can convert an
+			 * Integer or Buffer if necessary
+			 */
+			status = acpi_aml_convert_to_buffer (obj_desc, walk_state);
+			break;
+		}
+		break;
+
+
+	case ARGI_REFERENCE:
+		/*
+		 * Create_xxxx_field cases - we are storing the field object into the name
+		 */
+		break;
+
+
+	default:
+		status = AE_AML_INTERNAL;
+	}
+
+
+	/*
+	 * Source-to-Target conversion semantics:
+	 *
+	 * If conversion to the target type cannot be performed, then simply
+	 * overwrite the target with the new object and type.
+	 */
+	if (status == AE_TYPE) {
+		status = AE_OK;
+	}
+
+	return (status);
+}
 
 
 /*******************************************************************************
@@ -159,7 +274,11 @@ acpi_aml_convert_to_integer (
 	/* Save the Result, delete original descriptor, store new descriptor */
 
 	ret_desc->integer.value = result;
-	acpi_cm_remove_reference (*obj_desc);
+
+	if (walk_state->opcode != AML_STORE_OP) {
+		acpi_cm_remove_reference (*obj_desc);
+	}
+
 	*obj_desc = ret_desc;
 
 	return (AE_OK);
@@ -234,7 +353,9 @@ acpi_aml_convert_to_buffer (
 
 		/* Return the new buffer descriptor */
 
-		acpi_cm_remove_reference (*obj_desc);
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_cm_remove_reference (*obj_desc);
+		}
 		*obj_desc = ret_desc;
 		break;
 
@@ -330,7 +451,9 @@ acpi_aml_convert_to_string (
 
 		/* Return the new buffer descriptor */
 
-		acpi_cm_remove_reference (*obj_desc);
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_cm_remove_reference (*obj_desc);
+		}
 		*obj_desc = ret_desc;
 
 		return (AE_OK);
@@ -380,7 +503,9 @@ acpi_aml_convert_to_string (
 
 		/* Return the new buffer descriptor */
 
-		acpi_cm_remove_reference (*obj_desc);
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_cm_remove_reference (*obj_desc);
+		}
 		*obj_desc = ret_desc;
 		break;
 

@@ -17,7 +17,6 @@
  *	Arnaldo C. de Melo	Got rid of attach_uart401
  */
  
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 

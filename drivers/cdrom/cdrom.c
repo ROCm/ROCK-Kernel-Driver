@@ -295,11 +295,11 @@ MODULE_PARM(check_media_type, "i");
 
 /* These are used to simplify getting data in from and back to user land */
 #define IOCTL_IN(arg, type, in)					\
-	if (copy_from_user(&in, (type *) arg, sizeof in))	\
+	if (copy_from_user(&(in), (type *) (arg), sizeof (in)))	\
 		return -EFAULT;
 
 #define IOCTL_OUT(arg, type, out) \
-	if (copy_to_user((type *) arg, &out, sizeof out))	\
+	if (copy_to_user((type *) (arg), &(out), sizeof (out)))	\
 		return -EFAULT;
 
 /* The (cdo->capability & ~cdi->mask & CDC_XXX) construct was used in

@@ -14,15 +14,19 @@
 extern int coda_debug;
 extern int coda_print_entry;
 
+static ViceFid NullFID = { 0, 0, 0 };
+
 inline int coda_fideq(ViceFid *fid1, ViceFid *fid2)
 {
-	if (fid1->Vnode != fid2->Vnode)
-		return 0;
-	if (fid1->Volume != fid2->Volume)
-		return 0;
-	if (fid1->Unique != fid2->Unique)
-		return 0;
+	if (fid1->Vnode != fid2->Vnode)   return 0;
+	if (fid1->Volume != fid2->Volume) return 0;
+	if (fid1->Unique != fid2->Unique) return 0;
 	return 1;
+}
+
+static int coda_inocmp(struct inode *inode, unsigned long ino, void *opaque)
+{
+	return (coda_fideq((ViceFid *)opaque, &(ITOC(inode)->c_fid)));
 }
 
 static struct inode_operations coda_symlink_inode_operations = {
@@ -62,7 +66,8 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 	struct coda_inode_info *cii;
 	ino_t ino = attr->va_fileid;
 
-	inode = iget(sb, ino);
+	inode = iget4(sb, ino, coda_inocmp, fid);
+
 	if ( !inode ) { 
 		CDEBUG(D_CNODE, "coda_iget: no inode\n");
 		return ERR_PTR(-ENOMEM);
@@ -70,25 +75,16 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 
 	/* check if the inode is already initialized */
 	cii = ITOC(inode);
-	if (cii->c_fid.Volume != 0 || cii->c_fid.Vnode != 0 || cii->c_fid.Unique != 0) {
-		/* see if it is the right one (might have an inode collision) */
-		if ( !coda_fideq(fid, &cii->c_fid) ) {
-			printk("coda_iget: initialized inode old %s new %s!\n",
-					coda_f2s(&cii->c_fid), coda_f2s2(fid));
-			iput(inode);
-			return ERR_PTR(-ENOENT);
-		}
-		/* we will still replace the attributes, type might have changed */
-		goto out;
+	if (coda_fideq(&cii->c_fid, &NullFID)) {
+		/* new, empty inode found... initializing */
+		cii->c_fid   = *fid;
+		cii->c_vnode = inode;
 	}
 
-	/* new, empty inode found... initializing */
+	/* we shouldnt see inode collisions anymore */
+	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();
 
-	/* Initialize the Coda inode info structure */
-	cii->c_fid   = *fid;
-	cii->c_vnode = inode;
-
-out:
+	/* always replace the attributes, type might have changed */
 	coda_fill_inode(inode, attr);
 	return inode;
 }
@@ -107,7 +103,6 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
         ENTRY;
 
 	/* We get inode numbers from Venus -- see venus source */
-
 	error = venus_getattr(sb, fid, &attr);
 	if ( error ) {
 	    CDEBUG(D_CNODE, 
@@ -183,7 +178,7 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 			if ( coda_fideq(&cii->c_fid, fid) ) {
 				inode = cii->c_vnode;
 				CDEBUG(D_INODE, "volume root, found %ld\n", inode->i_ino);
-				iget(sb, inode->i_ino);
+				iget4(sb, inode->i_ino, coda_inocmp, fid);
 				return inode;
 			}
 		}
@@ -192,7 +187,7 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 
 	/* fid is not weird: ino should be computable */
 	nr = coda_f2i(fid);
-	inode = iget(sb, nr);
+	inode = iget4(sb, nr, coda_inocmp, fid);
 	if ( !inode ) {
 		printk("coda_fid_to_inode: null from iget, sb %p, nr %ld.\n",
 		       sb, (long)nr);
@@ -202,18 +197,11 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 	/* check if this inode is linked to a cnode */
 	cii = ITOC(inode);
 
-	/* make sure this is the one we want */
-	if ( coda_fideq(fid, &cii->c_fid) ) {
-                CDEBUG(D_INODE, "found %ld\n", inode->i_ino);
-                return inode;
-        }
+	/* we shouldn't have inode collisions anymore */
+	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();
 
-#if 0
-        printk("coda_fid2inode: bad cnode (ino %ld, fid %s)", nr, coda_f2s(fid));
-#endif
-        iput(inode);
-        return NULL;
-
+        CDEBUG(D_INODE, "found %ld\n", inode->i_ino);
+        return inode;
 }
 
 /* the CONTROL inode is made without asking attributes from Venus */

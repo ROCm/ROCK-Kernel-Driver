@@ -2033,68 +2033,65 @@ abort:
 struct {
 	int set;
 	int noautodetect;
+} raid_setup_args md__initdata;
 
-} raid_setup_args md__initdata = { 0, 0 };
-
-void md_setup_drive(void) md__init;
+void md_setup_drive (void) md__init;
 
 /*
  * Searches all registered partitions for autorun RAID arrays
  * at boot time.
  */
-#ifdef CONFIG_AUTODETECT_RAID
-static int detected_devices[128] md__initdata = { 0, };
-static int dev_cnt=0;
+static int detected_devices[128] md__initdata;
+static int dev_cnt;
+
 void md_autodetect_dev(kdev_t dev)
 {
 	if (dev_cnt >= 0 && dev_cnt < 127)
 		detected_devices[dev_cnt++] = dev;
 }
-#endif
 
-int md__init md_run_setup(void)
+
+static void autostart_arrays (void)
 {
-#ifdef CONFIG_AUTODETECT_RAID
 	mdk_rdev_t *rdev;
 	int i;
 
-	if (raid_setup_args.noautodetect)
-		printk(KERN_INFO "skipping autodetection of RAID arrays\n");
-	else {
+	printk(KERN_INFO "autodetecting RAID arrays\n");
 
-		printk(KERN_INFO "autodetecting RAID arrays\n");
+	for (i=0; i<dev_cnt; i++) {
+		kdev_t dev = detected_devices[i];
 
-		for (i=0; i<dev_cnt; i++) {
-			kdev_t dev = detected_devices[i];
-
-			if (md_import_device(dev,1)) {
-				printk(KERN_ALERT "could not import %s!\n",
-				       partition_name(dev));
-				continue;
-			}
-			/*
-			 * Sanity checks:
-			 */
-			rdev = find_rdev_all(dev);
-			if (!rdev) {
-				MD_BUG();
-				continue;
-			}
-			if (rdev->faulty) {
-				MD_BUG();
-				continue;
-			}
-			md_list_add(&rdev->pending, &pending_raid_disks);
+		if (md_import_device(dev,1)) {
+			printk(KERN_ALERT "could not import %s!\n",
+			       partition_name(dev));
+			continue;
 		}
-
-		autorun_devices(-1);
+		/*
+		 * Sanity checks:
+		 */
+		rdev = find_rdev_all(dev);
+		if (!rdev) {
+			MD_BUG();
+			continue;
+		}
+		if (rdev->faulty) {
+			MD_BUG();
+			continue;
+		}
+		md_list_add(&rdev->pending, &pending_raid_disks);
 	}
 
+	autorun_devices(-1);
+}
+
+int md__init md_run_setup(void)
+{
+	if (raid_setup_args.noautodetect)
+		printk(KERN_INFO "skipping autodetection of RAID arrays\n");
+	else
+		autostart_arrays();
 	dev_cnt = -1; /* make sure further calls to md_autodetect_dev are ignored */
-#endif
-#ifdef CONFIG_MD_BOOT
 	md_setup_drive();
-#endif
 	return 0;
 }
 
@@ -2557,6 +2554,11 @@ static int md_ioctl (struct inode *inode, struct file *file,
 			err = 0;
 			md_print_devices();
 			goto done_unlock;
+
+		case RAID_AUTORUN:
+			err = 0;
+			autostart_arrays();
+			goto done;
 
 		case BLKGETSIZE:   /* Return device size */
 			if (!arg) {
@@ -3639,14 +3641,12 @@ int md__init md_init (void)
 	return (0);
 }
 
-#ifdef CONFIG_MD_BOOT
-#define MAX_MD_BOOT_DEVS	8
-struct {
-	unsigned long set;
-	int pers[MAX_MD_BOOT_DEVS];
-	int chunk[MAX_MD_BOOT_DEVS];
-	kdev_t devices[MAX_MD_BOOT_DEVS][MD_SB_DISKS];
-} md_setup_args md__initdata = { 0, };
+static struct {
+	char device_set [MAX_MD_DEVS];
+	int pers[MAX_MD_DEVS];
+	int chunk[MAX_MD_DEVS];
+	kdev_t devices[MAX_MD_DEVS][MD_SB_DISKS];
+} md_setup_args md__initdata;
 
 /*
  * Parse the command-line parameters given our kernel, but do not
@@ -3676,10 +3676,10 @@ static int md__init md_setup(char *str)
 		printk("md: Too few arguments supplied to md=.\n");
 		return 0;
 	}
-	if (minor >= MAX_MD_BOOT_DEVS) {
+	if (minor >= MAX_MD_DEVS) {
 		printk ("md: Minor device number too high.\n");
 		return 0;
-	} else if (md_setup_args.set & (1 << minor)) {
+	} else if (md_setup_args.device_set[minor]) {
 		printk ("md: Warning - md=%d,... has been specified twice;\n"
 			"    will discard the first definition.\n", minor);
 	}
@@ -3737,7 +3737,7 @@ static int md__init md_setup(char *str)
 	printk ("md: Will configure md%d (%s) from %s, below.\n",
 		minor, pername, devnames);
 	md_setup_args.devices[minor][i] = (kdev_t) 0;
-	md_setup_args.set |= (1 << minor);
+	md_setup_args.device_set[minor] = 1;
 	return 1;
 }
 
@@ -3747,10 +3747,11 @@ void md__init md_setup_drive(void)
 	kdev_t dev;
 	mddev_t*mddev;
 
-	for (minor = 0; minor < MAX_MD_BOOT_DEVS; minor++) {
+	for (minor = 0; minor < MAX_MD_DEVS; minor++) {
 		mdu_disk_info_t dinfo;
-		int err=0;
-		if (!(md_setup_args.set & (1 << minor)))
+
+		int err = 0;
+		if (!md_setup_args.device_set[minor])
 			continue;
 		printk("md: Loading md%d.\n", minor);
 		if (mddev_map[minor].mddev) {
@@ -3776,7 +3777,7 @@ void md__init md_setup_drive(void)
 			ainfo.layout = 0;
 			ainfo.chunk_size = md_setup_args.chunk[minor];
 			err = set_array_info(mddev, &ainfo);
-			for (i=0; !err && (dev = md_setup_args.devices[minor][i]); i++) {
+			for (i = 0; !err && (dev = md_setup_args.devices[minor][i]); i++) {
 				dinfo.number = i;
 				dinfo.raid_disk = i;
 				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
@@ -3807,7 +3808,6 @@ void md__init md_setup_drive(void)
 }
 
 __setup("md=", md_setup);
-#endif
 
 #ifdef MODULE
 int init_module (void)
@@ -3859,9 +3859,7 @@ void cleanup_module (void)
 #endif
 
 __initcall(md_init);
-#if defined(CONFIG_AUTODETECT_RAID) || defined(CONFIG_MD_BOOT)
 __initcall(md_run_setup);
-#endif
 
 MD_EXPORT_SYMBOL(md_size);
 MD_EXPORT_SYMBOL(register_md_personality);

@@ -244,6 +244,22 @@ void flush_icache_range(unsigned long start, unsigned long end)
 }
 
 /*
+ * Write back the D-cache and purge the I-cache for signal trampoline. 
+ */
+void flush_cache_sigtramp(unsigned long addr)
+{
+	unsigned long v, index;
+
+	v = addr & ~(L1_CACHE_BYTES-1);
+	asm volatile("ocbwb	%0"
+		     : /* no output */
+		     : "m" (__m(v)));
+
+	index = CACHE_IC_ADDRESS_ARRAY| (v&CACHE_IC_ENTRY_MASK);
+	ctrl_outl(0, index);	/* Clear out Valid-bit */
+}
+
+/*
  * Invalidate the I-cache of the page (don't need to write back D-cache).
  *
  * Called from kernel/ptrace.c, mm/memory.c after flush_page_to_ram is called.
