@@ -53,6 +53,11 @@ static inline int multi_timer_check(int apic, int irq)
 	return 0;
 }
 
+static inline int apicid_to_node(int logical_apicid)
+{
+	return 0;
+}
+
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	return  mps_cpu;

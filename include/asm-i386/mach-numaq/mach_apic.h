@@ -47,14 +47,14 @@ static inline int generate_logical_apicid(int quad, int phys_apicid)
 	return ( (quad << 4) + (phys_apicid ? phys_apicid << 1 : 1) );
 }
 
-static inline int apicid_to_quad(int logical_apicid) 
+static inline int apicid_to_node(int logical_apicid) 
 {
 	return (logical_apicid >> 4);
 }
 
 static inline unsigned long apicid_to_cpu_present(int logical_apicid)
 {
-	return ( (logical_apicid&0xf) << (4*apicid_to_quad(logical_apicid)) );
+	return ( (logical_apicid&0xf) << (4*apicid_to_node(logical_apicid)) );
 }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)

@@ -32,6 +32,11 @@ static inline void clustered_apic_check(void)
 		(x86_summit ? "Summit" : "Flat"), nr_ioapics);
 }
 
+static inline int apicid_to_node(int logical_apicid)
+{
+	return (logical_apicid >> 5);          /* 2 clusterids per CEC */
+}
+
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (x86_summit)
