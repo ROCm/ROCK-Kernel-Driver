@@ -107,8 +107,11 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 			ptepage->mapping = (void *) mm;
 			ptepage->index = address & PMD_MASK;
 		}
-	} else
+	} else {
 		pte = (pte_t *)early_get_page();
+		if (pte)
+			clear_page(pte);
+	}
 	return pte;
 }
 
