@@ -118,6 +118,10 @@ static ssize_t pp_read (struct file * file, char * buf, size_t count,
 		return -EINVAL;
 	}
 
+	/* Trivial case. */
+	if (count == 0)
+		return 0;
+
 	kbuffer = kmalloc(min_t(size_t, count, PP_BUFFER_SIZE), GFP_KERNEL);
 	if (!kbuffer) {
 		return -ENOMEM;
