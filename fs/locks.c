@@ -2063,4 +2063,4 @@ static int __init filelock_init(void)
 	return 0;
 }
 
-module_init(filelock_init)
+core_initcall(filelock_init);
