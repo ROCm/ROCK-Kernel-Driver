@@ -522,7 +522,7 @@ int check_disk_change(struct block_device *bdev)
 
 EXPORT_SYMBOL(check_disk_change);
 
-static void bd_set_size(struct block_device *bdev, loff_t size)
+void bd_set_size(struct block_device *bdev, loff_t size)
 {
 	unsigned bsize = bdev_hardsect_size(bdev);
 
@@ -535,6 +535,7 @@ static void bd_set_size(struct block_device *bdev, loff_t size)
 	bdev->bd_block_size = bsize;
 	bdev->bd_inode->i_blkbits = blksize_bits(bsize);
 }
+EXPORT_SYMBOL(bd_set_size);
 
 static int do_open(struct block_device *bdev, struct file *file)
 {
