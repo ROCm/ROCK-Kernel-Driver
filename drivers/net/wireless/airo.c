@@ -1025,6 +1025,7 @@ struct airo_info {
 #define FLAG_802_11    0x200
 #define FLAG_PENDING_XMIT   0x400
 #define FLAG_PENDING_XMIT11 0x800
+#define FLAG_PCI    0x1000
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -4093,6 +4094,7 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 		return -ENODEV;
 
 	pci_set_drvdata(pdev, dev);
+	((struct airo_info *)dev->priv)->flags |= FLAG_PCI;
 	return 0;
 }
 
@@ -4134,11 +4136,19 @@ static int __init airo_init_module( void )
 
 static void __exit airo_cleanup_module( void )
 {
+	int is_pci = 0;
 	while( airo_devices ) {
 		printk( KERN_INFO "airo: Unregistering %s\n", airo_devices->dev->name );
+#ifdef CONFIG_PCI
+		if (((struct airo_info *)airo_devices->dev->priv)->flags & FLAG_PCI)
+			is_pci = 1;
+#endif
 		stop_airo_card( airo_devices->dev, 1 );
 	}
 	remove_proc_entry("aironet", proc_root_driver);
+
+	if (is_pci)
+		pci_unregister_driver(&airo_driver);
 }
 
 #ifdef WIRELESS_EXT
