@@ -385,35 +385,6 @@ static int usb_stor_control_thread(void * __us)
 				us->srb->result = CHECK_CONDITION << 1;
 		}
 
-		/* our device has gone - pretend not ready */
-		else if (!(us->flags & US_FL_DEV_ATTACHED)) {
-			US_DEBUGP("Request is for removed device\n");
-			/* For REQUEST_SENSE, it's the data.  But
-			 * for anything else, it should look like
-			 * we auto-sensed for it.
-			 */
-			if (us->srb->cmnd[0] == REQUEST_SENSE) {
-				memcpy(us->srb->request_buffer, 
-				       usb_stor_sense_notready, 
-				       sizeof(usb_stor_sense_notready));
-				us->srb->result = GOOD << 1;
-			} else if(us->srb->cmnd[0] == INQUIRY) {
-				/* INQUIRY should always work, per spec... */
-				unsigned char data_ptr[36] = {
-				    0x20, 0x80, 0x02, 0x02,
-				    0x1F, 0x00, 0x00, 0x00};
-				US_DEBUGP("Faking INQUIRY command for disconnected device\n");
-				fill_inquiry_response(us, data_ptr, 36);
-				us->srb->result = GOOD << 1;
-			} else {
-				/* not ready */
-				memcpy(us->srb->sense_buffer, 
-				       usb_stor_sense_notready, 
-				       sizeof(usb_stor_sense_notready));
-				us->srb->result = CHECK_CONDITION << 1;
-			}
-		}  /* !(us->flags & US_FL_DEV_ATTACHED) */
-
 		/* Handle those devices which need us to fake 
 		 * their inquiry data */
 		else if ((us->srb->cmnd[0] == INQUIRY) &&
@@ -537,7 +508,6 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 	}
 
 	/* mark the device as gone */
-	ss->flags &= ~ US_FL_DEV_ATTACHED;
 	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
 }
@@ -691,7 +661,6 @@ static int storage_probe(struct usb_interface *intf,
 	/* copy over the subclass and protocol data */
 	ss->subclass = subclass;
 	ss->protocol = protocol;
-	ss->flags = flags | US_FL_DEV_ATTACHED;
 	ss->unusual_dev = unusual_dev;
 
 	/* copy over the endpoint data */

@@ -77,7 +77,6 @@ struct us_unusual_dev {
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
 
-#define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
 #define US_FLIDX_CAN_CANCEL  18  /* 0x00040000  okay to cancel current_urb? */
 #define US_FLIDX_CANCEL_SG   19  /* 0x00080000	okay to cancel current_sg?  */
 
@@ -100,7 +99,6 @@ struct us_data {
 	/* The device we're working with
 	 * It's important to note:
 	 *    (o) you must hold dev_semaphore to change pusb_dev
-	 *    (o) DEV_ATTACHED in flags should change whenever pusb_dev does
 	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */

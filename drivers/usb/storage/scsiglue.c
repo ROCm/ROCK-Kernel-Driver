@@ -197,11 +197,10 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	/* lock the device pointers */
 	down(&(us->dev_semaphore));
 
-	/* if the device was removed, then we're already reset */
-	if (!(us->flags & US_FL_DEV_ATTACHED))
-		result = SUCCESS;
-	else
-		result = us->transport_reset(us);
+	/* do the reset */
+	result = us->transport_reset(us);
+
+	/* unlock */
 	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
@@ -214,31 +213,27 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
  * disconnect/reconnect for all drivers which have claimed
  * interfaces, including ourself. */
 /* This is always called with scsi_lock(srb->host) held */
+
+/* FIXME: This needs to be re-examined in the face of the new
+ * hotplug system -- this will implicitly cause a detach/reattach of
+ * usb-storage, which is not what we want now.
+ *
+ * Can we just skip over usb-storage in the while loop?
+ */
 static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us;
 	int i;
 	int result;
-	struct usb_device *pusb_dev_save;
 
 	/* we use the usb_reset_device() function to handle this for us */
 	US_DEBUGP("bus_reset() called\n");
 
+       	us = (struct us_data *)srb->host->hostdata[0];
 	scsi_unlock(srb->host);
 
-	/* if the device has been removed, this worked */
-	down(&us->dev_semaphore);
-	if (!(us->flags & US_FL_DEV_ATTACHED)) {
-		US_DEBUGP("-- device removed already\n");
-		up(&us->dev_semaphore);
-		scsi_lock(srb->host);
-		return SUCCESS;
-	}
-	pusb_dev_save = us->pusb_dev;
-	up(&us->dev_semaphore);
-
 	/* attempt to reset the port */
-	result = usb_reset_device(pusb_dev_save);
+	result = usb_reset_device(us->pusb_dev);
 	US_DEBUGP("usb_reset_device returns %d\n", result);
 	if (result < 0) {
 		scsi_lock(srb->host);
@@ -248,9 +243,9 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
 	/* This functionality really should be provided by the khubd thread */
-	for (i = 0; i < pusb_dev_save->actconfig->desc.bNumInterfaces; i++) {
+	for (i = 0; i < us->pusb_dev->actconfig->desc.bNumInterfaces; i++) {
  		struct usb_interface *intf =
-			&pusb_dev_save->actconfig->interface[i];
+			&us->pusb_dev->actconfig->interface[i];
 
 		/* if this is an unclaimed interface, skip it */
 		if (!intf->driver) {
@@ -313,10 +308,6 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 	/* show the protocol and transport */
 	SPRINTF("     Protocol: %s\n", us->protocol_name);
 	SPRINTF("    Transport: %s\n", us->transport_name);
-
-	/* show attached status of the device */
-	SPRINTF("     Attached: %s\n", (us->flags & US_FL_DEV_ATTACHED ?
-			"Yes" : "No"));
 
 	/*
 	 * Calculate start of next buffer, and return value.
