@@ -359,14 +359,7 @@ typedef struct isdn_net_local_s {
 #ifdef CONFIG_ISDN_PPP
   unsigned int           mpppcfg;
   long                   mp_seqno;
-
-  struct isdn_ppp_compressor *compressor;
-  struct isdn_ppp_compressor *decompressor;
-  void                  *comp_stat;
-  void                  *decomp_stat;
-  unsigned long          compflags;
-  struct ippp_ccp_reset *reset;
-
+  struct ippp_ccp        *ccp;
   unsigned long          debug;
 #ifdef CONFIG_ISDN_PPP_VJ
   unsigned char         *cbuf;
@@ -434,15 +427,8 @@ typedef struct isdn_net_dev_s {
   struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
   unsigned int           pppcfg;
-  unsigned int           pppmru;
   unsigned int           pppseq;       /* last seq no seen                 */
-
-  struct isdn_ppp_compressor *compressor;
-  struct isdn_ppp_compressor *decompressor;
-  void                  *comp_stat;
-  void                  *decomp_stat;
-  unsigned long          compflags;
-  struct ippp_ccp_reset *reset;
+  struct ippp_ccp        *ccp;
   unsigned long          debug;
 
   ippp_bundle * pb;		/* pointer to the common bundle structure

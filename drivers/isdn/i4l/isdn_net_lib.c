@@ -2054,17 +2054,11 @@ static inline void
 isdn_net_dec_frame_cnt(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
-	int was_busy;
-
-	was_busy = isdn_net_local_busy(mlp);
 
 	idev->frame_cnt--;
 
 	if (isdn_net_dev_busy(idev))
 		isdn_BUG();
-
-	if (!was_busy)
-		return;
 
 	if (!skb_queue_empty(&idev->super_tx_queue))
 		tasklet_schedule(&idev->tlet);
@@ -2257,10 +2251,11 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 void
 isdn_net_write_super(isdn_net_dev *idev, struct sk_buff *skb)
 {
-	if (!isdn_net_dev_busy(idev))
+	if (!isdn_net_dev_busy(idev)) {
 		isdn_net_writebuf_skb(idev, skb);
-	else
+	} else {
 		skb_queue_tail(&idev->super_tx_queue, skb);
+	}
 }
 
 /* ====================================================================== */

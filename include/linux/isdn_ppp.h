@@ -8,7 +8,6 @@
 #ifndef _LINUX_ISDN_PPP_H
 #define _LINUX_ISDN_PPP_H
 
-
 #define CALLTYPE_INCOMING 0x1
 #define CALLTYPE_OUTGOING 0x2
 #define CALLTYPE_CALLBACK 0x4
@@ -64,7 +63,8 @@ struct isdn_ppp_comp_data {
 
 
 #include <linux/config.h>
-
+#include <linux/skbuff.h>
+#include <linux/ppp_defs.h>
 
 #define DECOMP_ERR_NOMEM	(-10)
 
@@ -172,8 +172,8 @@ enum ippp_ccp_reset_states {
 
 struct ippp_ccp_reset_state {
   enum ippp_ccp_reset_states state;	/* State of this transaction */
-  struct ippp_ccp_reset *icr;           /* Backlink */
-  unsigned char id;			/* Backlink id index */
+  struct ippp_ccp *ccp;                 /* Backlink */
+  unsigned char id;			/* id index */
   unsigned char ta:1;			/* The timer is active (flag) */
   unsigned char expra:1;		/* We expect a ResetAck at all */
   int dlen;				/* Databytes stored in data */
@@ -189,10 +189,6 @@ struct ippp_ccp_reset_state {
 struct ippp_ccp_reset {
   struct ippp_ccp_reset_state *rs[256];	/* One per possible id */
   unsigned char lastid;			/* Last id allocated by the engine */
-  void (*xmit_reset)(void *priv, int proto, unsigned char code,
-		     unsigned char id, unsigned char *data, int len);
-  void (*kick_up)(void *priv);
-  void *priv;
 };
 
 #endif /* __KERNEL__ */

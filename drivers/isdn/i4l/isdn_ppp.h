@@ -15,10 +15,16 @@
 extern struct file_operations isdn_ppp_fops;
 extern struct isdn_netif_ops isdn_ppp_ops;
 
-extern int isdn_ppp_init(void);
-extern void isdn_ppp_cleanup(void);
-extern int isdn_ppp_dial_slave(char *);
-extern int isdn_ppp_hangup_slave(char *);
+int isdn_ppp_init(void);
+void isdn_ppp_cleanup(void);
+int isdn_ppp_dial_slave(char *);
+int isdn_ppp_hangup_slave(char *);
+
+void
+isdn_ppp_frame_log(char *info, char *data, int len, int maxlen, 
+		   int unit, int slot);
+int
+isdn_ppp_strip_proto(struct sk_buff *skb);
 
 #define IPPP_OPEN	0x01
 #define IPPP_CONNECT	0x02
