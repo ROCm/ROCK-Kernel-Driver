@@ -1187,8 +1187,6 @@ out_ret:
 	return retval;
 }
 
-EXPORT_SYMBOL(do_execve);
-
 int set_binfmt(struct linux_binfmt *new)
 {
 	struct linux_binfmt *old = current->binfmt;

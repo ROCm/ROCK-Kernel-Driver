@@ -268,8 +268,6 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	return retval;
 }
 
-EXPORT_SYMBOL(do_select);
-
 static void *select_bits_alloc(int size)
 {
 	return kmalloc(6 * size, GFP_KERNEL);
