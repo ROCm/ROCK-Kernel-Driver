@@ -2,7 +2,7 @@
  * drivers/base/cpu.c - basic CPU class support
  */
 
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
@@ -12,6 +12,7 @@
 struct sysdev_class cpu_sysdev_class = {
 	set_kset_name("cpu"),
 };
+
 
 /*
  * register_cpu - Setup a driverfs device for a CPU.
