@@ -237,12 +237,6 @@ EXPORT_SYMBOL(adb_try_handler_change);
 EXPORT_SYMBOL(cuda_request);
 EXPORT_SYMBOL(cuda_poll);
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_PMAC_BACKLIGHT
-EXPORT_SYMBOL(get_backlight_level);
-EXPORT_SYMBOL(set_backlight_level);
-EXPORT_SYMBOL(set_backlight_enable);
-EXPORT_SYMBOL(register_backlight_controller);
-#endif /* CONFIG_PMAC_BACKLIGHT */
 #ifdef CONFIG_PPC_MULTIPLATFORM
 EXPORT_SYMBOL(_machine);
 #endif
