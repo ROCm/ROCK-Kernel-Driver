@@ -149,7 +149,6 @@ struct urbp {
 };
 
 struct dummy {
-	struct usb_hcd			hcd;		/* must come first! */
 	spinlock_t			lock;
 
 	/*
@@ -178,12 +177,17 @@ struct dummy {
 
 static inline struct dummy *hcd_to_dummy (struct usb_hcd *hcd)
 {
-	return container_of(hcd, struct dummy, hcd);
+	return (struct dummy *) (hcd->hcd_priv);
+}
+
+static inline struct usb_hcd *dummy_to_hcd (struct dummy *dum)
+{
+	return container_of((void *) dum, struct usb_hcd, hcd_priv);
 }
 
 static inline struct device *dummy_dev (struct dummy *dum)
 {
-	return dum->hcd.self.controller;
+	return dummy_to_hcd(dum)->self.controller;
 }
 
 static inline struct dummy *ep_to_dummy (struct dummy_ep *ep)
@@ -1368,7 +1372,7 @@ return_urb:
 			ep->already_seen = ep->setup_stage = 0;
 
 		spin_unlock (&dum->lock);
-		usb_hcd_giveback_urb (&dum->hcd, urb, 0);
+		usb_hcd_giveback_urb (dummy_to_hcd(dum), urb, 0);
 		spin_lock (&dum->lock);
 
 		goto restart;
@@ -1570,20 +1574,6 @@ static int dummy_hub_control (
 
 /*-------------------------------------------------------------------------*/
 
-static struct usb_hcd *dummy_alloc (void)
-{
-	struct dummy		*dum;
-
-	dum = kmalloc (sizeof *dum, SLAB_KERNEL);
-	if (dum == NULL)
-		return NULL;
-	the_controller = dum;
-	memset (dum, 0, sizeof *dum);
-	return &dum->hcd;
-}
-
-/*-------------------------------------------------------------------------*/
-
 static inline ssize_t
 show_urb (char *buf, size_t size, struct urb *urb)
 {
@@ -1711,12 +1701,13 @@ static int dummy_h_get_frame (struct usb_hcd *hcd)
 
 static const struct hc_driver dummy_hcd = {
 	.description =		(char *) driver_name,
+	.product_desc =		"Dummy host controller",
+	.hcd_priv_size =	sizeof(struct dummy),
+
 	.flags =		HCD_USB2,
 
 	.start =		dummy_start,
 	.stop =			dummy_stop,
-
-	.hcd_alloc = 		dummy_alloc,
 
 	.urb_enqueue = 		dummy_urb_enqueue,
 	.urb_dequeue = 		dummy_urb_dequeue,
@@ -1737,7 +1728,7 @@ static int dummy_probe (struct device *dev)
 
 	dev_info (dev, "%s, driver " DRIVER_VERSION "\n", driver_desc);
 
-	hcd = dummy_alloc ();
+	hcd = usb_create_hcd (&dummy_hcd);
 	if (hcd == NULL) {
 		dev_dbg (dev, "hcd_alloc failed\n");
 		return -ENOMEM;
@@ -1745,9 +1736,8 @@ static int dummy_probe (struct device *dev)
 
 	dev_set_drvdata (dev, hcd);
 	dum = hcd_to_dummy (hcd);
+	the_controller = dum;
 
-	hcd->driver = (struct hc_driver *) &dummy_hcd;
-	hcd->description = dummy_hcd.description;
 	hcd->self.controller = dev;
 
 	/* FIXME don't require the pci-based buffer/alloc impls;
@@ -1760,13 +1750,7 @@ static int dummy_probe (struct device *dev)
 		goto err1;
 	}
 
-	usb_bus_init (&hcd->self);
-	hcd->self.op = &usb_hcd_operations;
-	hcd->self.release = &usb_hcd_release;
-	hcd->self.hcpriv = hcd;
 	hcd->self.bus_name = dev->bus_id;
-	hcd->product_desc = "Dummy host controller";
-
 	usb_register_bus (&hcd->self);
 
 	if ((retval = dummy_start (hcd)) < 0) 
@@ -1774,7 +1758,7 @@ static int dummy_probe (struct device *dev)
 	return retval;
 
 err1:
-	kfree (hcd);
+	usb_put_hcd (hcd);
 	dev_set_drvdata (dev, NULL);
 	return retval;
 }
