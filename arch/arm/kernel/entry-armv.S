@@ -1584,9 +1584,6 @@ ENTRY(__trap_init)
 		str	r3, [r2], #4
 		cmp	r0, r1
 		blt	1b
-#ifdef CONFIG_BDI2000_XSCALE
-		bkpt	1
-#endif
 		LOADREGS(fd, sp!, {r4 - r6, pc})
 
 		.data
