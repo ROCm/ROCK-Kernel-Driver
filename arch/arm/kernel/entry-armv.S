@@ -60,15 +60,20 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 /*
  * SVC mode handlers
  */
+	.macro	svc_entry, sym
+	sub	sp, sp, #S_FRAME_SIZE
+	stmia	sp, {r0 - r12}			@ save r0 - r12
+	ldr	r2, .LC\sym
+	add	r0, sp, #S_FRAME_SIZE
+	ldmia	r2, {r2 - r4}			@ get pc, cpsr
+	add	r5, sp, #S_SP
+	mov	r1, lr
+	stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+	.endm
+
 		.align	5
-__dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r2, .LCabt
-		add	r0, sp, #S_FRAME_SIZE
-		ldmia	r2, {r2 - r4}			@ get pc, cpsr
-		add	r5, sp, #S_SP
-		mov	r1, lr
-		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__dabt_svc:
+		svc_entry abt
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
@@ -91,14 +96,8 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 		.align	5
-__irq_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r7, .LCirq
-		add	r5, sp, #S_FRAME_SIZE
-		ldmia	r7, {r7 - r9}
-		add	r4, sp, #S_SP
-		mov	r6, lr
-		stmia	r4, {r5, r6, r7, r8, r9}	@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__irq_svc:
+		svc_entry irq
 #ifdef CONFIG_PREEMPT
 		get_thread_info r8
 		ldr	r9, [r8, #TI_PREEMPT]		@ get preempt count
@@ -148,16 +147,10 @@ svc_preempt:	teq	r9, #0				@ was preempt count = 0
 #endif
 
 		.align	5
-__und_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r3, .LCund
-		mov	r4, lr
-		ldmia	r3, {r5 - r7}
-		add	r3, sp, #S_FRAME_SIZE
-		add	r2, sp, #S_SP
-		stmia	r2, {r3 - r7}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__und_svc:
+		svc_entry und
 
-		ldr	r0, [r5, #-4]			@ r0 = instruction
+		ldr	r0, [r2, #-4]			@ r0 = instruction
 		adrsvc	al, r9, 1f			@ r9 = normal FP return
 		bl	call_fpe			@ lr = undefined instr return
 
@@ -170,14 +163,8 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		ldmia	sp, {r0 - pc}^			@ Restore SVC registers
 
 		.align	5
-__pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r2, .LCabt
-		add	r0, sp, #S_FRAME_SIZE
-		ldmia	r2, {r2 - r4}			@ get pc, cpsr
-		add	r5, sp, #S_SP
-		mov	r1, lr
-		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__pabt_svc:
+		svc_entry abt
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
