@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 88 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
@@ -216,7 +216,7 @@ acpi_ds_begin_method_execution (
 		 * interpreter if we block
 		 */
 		status = acpi_ex_system_wait_semaphore (obj_desc->method.semaphore,
-				 WAIT_FOREVER);
+				 ACPI_WAIT_FOREVER);
 	}
 
 	/*

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 131 $
+ *              $Revision: 132 $
  *
  *****************************************************************************/
 
@@ -612,7 +612,7 @@ cleanup:
 
 acpi_status
 acpi_acquire_global_lock (
-	u32                     timeout,
+	u16                     timeout,
 	u32                     *handle)
 {
 	acpi_status             status;
