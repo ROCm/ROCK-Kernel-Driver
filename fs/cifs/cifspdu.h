@@ -911,22 +911,22 @@ typedef struct smb_com_transaction_change_notify_req {
 	struct smb_hdr hdr;     /* wct = 23 */
 	__u8 MaxSetupCount;
 	__u16 Reserved;
-	__u32 TotalParameterCount;
-	__u32 TotalDataCount;
-	__u32 MaxParameterCount;
-	__u32 MaxDataCount;
-	__u32 ParameterCount;
-	__u32 ParameterOffset;
-	__u32 DataCount;
-	__u32 DataOffset;
+	__le32 TotalParameterCount;
+	__le32 TotalDataCount;
+	__le32 MaxParameterCount;
+	__le32 MaxDataCount;
+	__le32 ParameterCount;
+	__le32 ParameterOffset;
+	__le32 DataCount;
+	__le32 DataOffset;
 	__u8 SetupCount; /* four setup words follow subcommand */
 	/* SNIA spec incorrectly included spurious pad here */
-	__u16 SubCommand;/* 4 = Change Notify */
-	__u32 CompletionFilter;  /* operation to monitor */
+	__le16 SubCommand;/* 4 = Change Notify */
+	__le32 CompletionFilter;  /* operation to monitor */
 	__u16 Fid;
 	__u8 WatchTree;  /* 1 = Monitor subdirectories */
 	__u8 Reserved2;
-	__u16 ByteCount;
+	__le16 ByteCount;
 /* __u8 Pad[3];*/
 /*	__u8 Data[1];*/
 } TRANSACT_CHANGE_NOTIFY_REQ;
@@ -934,14 +934,14 @@ typedef struct smb_com_transaction_change_notify_req {
 typedef struct smb_com_transaction_change_notify_rsp {
 	struct smb_hdr hdr;	/* wct = 18 */
 	__u8 Reserved[3];
-	__u32 TotalParameterCount;
-	__u32 TotalDataCount;
-	__u32 ParameterCount;
-	__u32 ParameterOffset;
-	__u32 ParameterDisplacement;
-	__u32 DataCount;
-	__u32 DataOffset;
-	__u32 DataDisplacement;
+	__le32 TotalParameterCount;
+	__le32 TotalDataCount;
+	__le32 ParameterCount;
+	__le32 ParameterOffset;
+	__le32 ParameterDisplacement;
+	__le32 DataCount;
+	__le32 DataOffset;
+	__le32 DataDisplacement;
 	__u8 SetupCount;   /* 0 */
 	__u16 ByteCount;
 	/* __u8 Pad[3]; */

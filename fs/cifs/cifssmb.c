@@ -3007,7 +3007,6 @@ int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Fid = netfid; /* file handle always le */
 	pSMB->ByteCount = 0;
 
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			(struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
