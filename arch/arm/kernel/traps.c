@@ -204,6 +204,7 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 		asm("mov%? %0, fp" : "=r" (fp));
 
 	c_backtrace(fp, 0x10);
+	barrier();
 }
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
