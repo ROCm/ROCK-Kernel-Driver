@@ -503,18 +503,8 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL(task_out_intr);
 
-#undef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-
 ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 {
-#ifdef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-	ide_hwif_t *hwif		= HWIF(drive);
-	char *pBuf			= NULL;
-	unsigned int nsect = 0, msect	= drive->mult_count;
-        u8 stat;
-	unsigned long flags;
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
-
 	ide_task_t *args = rq->special;
 	ide_startstop_t startstop;
 
@@ -525,31 +515,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 			drive->addressing ? "MULTWRITE_EXT" : "MULTWRITE");
 		return startstop;
 	}
-#ifdef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-		pBuf = task_map_rq(rq, &flags);
-		DTF("Pre-Multiwrite: %p, nsect: %d, msect: %d, " \
-			"rq->current_nr_sectors: %ld\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		msect -= nsect;
-		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-		task_unmap_rq(rq, pBuf, &flags);
-		rq->current_nr_sectors -= nsect;
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				if (!rq->bio) {
-					stat = hwif->INB(IDE_STATUS_REG);
-					return ide_stopped;
-				}
-		}
-	} while (msect);
-	rq->errors = 0;
-	return ide_started;
-#else /* ! ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
 	if (!(drive_is_ready(drive))) {
 		int i;
 		for (i=0; i<100; i++) {
@@ -563,7 +528,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 	 * move the DATA-TRANSFER T-Bar as BSY != 0. <andre@linux-ide.org>
 	 */
 	return args->handler(drive);
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
 }
 
 EXPORT_SYMBOL(pre_task_mulout_intr);
@@ -632,7 +596,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		return ide_started;
 	}
 
-#ifndef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
 	if (HWGROUP(drive)->handler != NULL) {
 		unsigned long lflags;
 		spin_lock_irqsave(&ide_lock, lflags);
@@ -640,7 +603,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		del_timer(&HWGROUP(drive)->timer);
 		spin_unlock_irqrestore(&ide_lock, lflags);
 	}
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
 
 	do {
 		nsect = rq->current_nr_sectors;
