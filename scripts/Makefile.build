@@ -49,15 +49,12 @@ O_TARGET := $(obj)/built-in.o
 endif
 endif
 
-ifdef CONFIG_MODVERSIONS
-modules := $(obj-m)
-touch-module = @echo $(@:.o=.ko) > .tmp_versions/$(@F:.o=.mod)
-else
-modules := $(obj-m:.o=.ko)
-endif
+# We keep a list of all modules in $(MODVERDIR)
+
+touch-module = @echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod)
 
 __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
-	 $(if $(KBUILD_MODULES),$(modules)) \
+	 $(if $(KBUILD_MODULES),$(obj-m)) \
 	 $(subdir-ym) $(build-targets)
 	@:
 
@@ -155,6 +152,8 @@ cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 quiet_cmd_cc_o_c = CC $(quiet_modtag)  $@
 cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
+# Built-in and composite module parts
+
 %.o: %.c FORCE
 ifdef CONFIG_MODVERSIONS
 	$(call if_changed_rule,vcc_o_c)
@@ -162,13 +161,14 @@ else
 	$(call if_changed_dep,cc_o_c)
 endif
 
-# For modversioning, we need to special case single-part modules
-# to mark them in $(MODVERDIR)
+# Single-part modules are special since we need to mark them in $(MODVERDIR)
 
-ifdef CONFIG_MODVERSIONS
 $(single-used-m): %.o: %.c FORCE
 	$(touch-module)
+ifdef CONFIG_MODVERSIONS
 	$(call if_changed_rule,vcc_o_c)
+else
+	$(call if_changed_dep,cc_o_c)
 endif
 
 quiet_cmd_cc_lst_c = MKLST   $@
@@ -266,29 +266,6 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,link_multi-m)
 
 targets += $(multi-used-y) $(multi-used-m)
-
-#
-# Rule to link modules ( .o -> .ko )
-#
-
-# With CONFIG_MODVERSIONS, generation of the final .ko is handled
-# by scripts/Makefile.modver
-ifndef CONFIG_MODVERSIONS
-
-quiet_cmd_link_module = LD [M]  $@
-cmd_link_module = $(LD) $(ld_flags) $(LDFLAGS_MODULE) -o $@ $< init/vermagic.o
-
-# Don't rebuilt vermagic.o unless we actually are in the init/ dir
-ifneq ($(obj),init)
-init/vermagic.o: ;
-endif
-
-$(single-used-m:.o=.ko) $(multi-used-m:.o=.ko): %.ko: %.o init/vermagic.o FORCE
-	$(call if_changed,link_module)
-
-targets += $(single-used-m:.o=.ko) $(multi-used-m:.o=.ko)
-
-endif
 
 # Compile programs on the host
 # ===========================================================================

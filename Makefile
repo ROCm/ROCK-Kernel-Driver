@@ -405,16 +405,14 @@ $(SUBDIRS): prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
-ifdef CONFIG_MODVERSIONS
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
-	$(Q)mkdir $(MODVERDIR)
 else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
-	@echo '***          inconsistencies with module symbol versions'
+	@echo '***          inconsistencies'
 endif
-endif
+	$(Q)mkdir -p $(MODVERDIR)
 endif
 	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
@@ -518,16 +516,10 @@ all: modules
 
 #	Build modules
 
-.PHONY: modules __modversions
-modules: $(SUBDIRS) __modversions
-
-ifdef CONFIG_MODVERSIONS
-
-__modversions: vmlinux $(SUBDIRS)
-	@echo '  Recording module symbol versions.';
+.PHONY: modules
+modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
+	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modver
-
-endif
 
 #	Install modules
 
