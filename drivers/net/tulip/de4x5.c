@@ -2242,8 +2242,13 @@ static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 		return -ENODEV;
 
 	/* Ok, the device seems to be for us. */
-	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private))))
-		return -ENOMEM;
+	if (pci_enable_device (pdev))
+		return -ENODEV;
+
+	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private)))) {
+		error = -ENOMEM;
+		goto disable_dev;
+	}
 
 	lp = netdev_priv(dev);
 	lp->bus = PCI;
@@ -2327,6 +2332,8 @@ static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
  free_dev:
 	free_netdev (dev);
+ disable_dev:
+	pci_disable_device (pdev);
 	return error;
 }
 
@@ -2341,6 +2348,7 @@ static void __devexit de4x5_pci_remove (struct pci_dev *pdev)
 	unregister_netdev (dev);
 	free_netdev (dev);
 	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
+	pci_disable_device (pdev);
 }
 
 static struct pci_device_id de4x5_pci_tbl[] = {
