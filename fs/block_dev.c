@@ -100,9 +100,21 @@ static int
 blkdev_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh, int create)
 {
+	unsigned long lblock;
 	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
 
+	/* 
+	 * are we trying to get_block a partial block at the end of the
+	 * device?  If reading, just return an unmapped hole.  If
+	 * writing send -EIO.
+	 */
+	lblock = i_size_read(inode) >> inode->i_blkbits;
+	if (iblock >= lblock) {
+		if (create)
+			return -EIO;
+		return 0;
+	}
 	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
 	set_buffer_mapped(bh);
