@@ -57,6 +57,15 @@ num_online_cpus(void)
 	return hweight64(cpu_online_map);
 }
 
+extern inline int
+any_online_cpu(unsigned int mask)
+{
+        if (mask & cpu_online_map)
+                return __ffs(mask & cpu_online_map);
+
+        return -1;
+}
+
 extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
 
 #else /* CONFIG_SMP */
