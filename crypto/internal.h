@@ -46,6 +46,10 @@ static inline void crypto_yield(struct crypto_tfm *tfm)
 		cond_resched();
 }
 
+#ifdef CONFIG_KMOD
+void crypto_alg_autoload(u32 algid);
+#endif
+
 void crypto_init_digest_ops(struct crypto_tfm *tfm);
 void crypto_init_cipher_ops(struct crypto_tfm *tfm);
 void crypto_init_compress_ops(struct crypto_tfm *tfm);

@@ -25,76 +25,6 @@
 static LIST_HEAD(crypto_alg_list);
 static struct rw_semaphore crypto_alg_sem;
 
-static void *c_start(struct seq_file *m, loff_t *pos)
-{
-	struct list_head *v;
-	loff_t n = *pos;
-
-	down_read(&crypto_alg_sem);
-	list_for_each(v, &crypto_alg_list)
-		if (!n--)
-			return list_entry(v, struct crypto_alg, cra_list);
-	return NULL;
-}
-
-static void *c_next(struct seq_file *m, void *p, loff_t *pos)
-{
-	struct list_head *v = p;
-	
-	(*pos)++;
-	v = v->next;
-	return (v == &crypto_alg_list) ?
-		NULL : list_entry(v, struct crypto_alg, cra_list);
-}
-
-static void c_stop(struct seq_file *m, void *p)
-{
-	up_read(&crypto_alg_sem);
-}
-
-static int c_show(struct seq_file *m, void *p)
-{
-	struct crypto_alg *alg = (struct crypto_alg *)p;
-	
-	seq_printf(m, "name       : %s\n", alg->cra_name);
-	seq_printf(m, "id         : 0x%08x\n", alg->cra_id);
-	seq_printf(m, "blocksize  : %Zd\n", alg->cra_blocksize);
-	
-	switch (alg->cra_id & CRYPTO_TYPE_MASK) {
-	case CRYPTO_TYPE_CIPHER:
-		seq_printf(m, "keysize    : %Zd\n", alg->cra_cipher.cia_keysize);
-		seq_printf(m, "ivsize     : %Zd\n", alg->cra_cipher.cia_ivsize);
-		break;
-		
-	case CRYPTO_TYPE_DIGEST:
-		seq_printf(m, "digestsize : %Zd\n",
-		           alg->cra_digest.dia_digestsize);
-		break;
-	}
-
-	seq_putc(m, '\n');
-	return 0;
-}
-
-static struct seq_operations crypto_seq_ops = {
-	.start		= c_start,
-	.next		= c_next,
-	.stop		= c_stop,
-	.show		= c_show
-};
-
-static int crypto_info_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &crypto_seq_ops);
-}
-        
-struct file_operations proc_crypto_ops = {
-	.open		= crypto_info_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release
-};
-
 static inline int crypto_alg_get(struct crypto_alg *alg)
 {
 	if (alg->cra_module)
@@ -105,7 +35,8 @@ static inline int crypto_alg_get(struct crypto_alg *alg)
 
 static inline void crypto_alg_put(struct crypto_alg *alg)
 {
-	__MOD_DEC_USE_COUNT(alg->cra_module);
+	if (alg->cra_module)
+		__MOD_DEC_USE_COUNT(alg->cra_module);
 }
 
 struct crypto_alg *crypto_alg_lookup(u32 algid)
@@ -149,15 +80,18 @@ static void crypto_init_ops(struct crypto_tfm *tfm)
 	}
 }
 
-/*
- * Todo: try and load the module if the lookup fails.
- */
 struct crypto_tfm *crypto_alloc_tfm(u32 id)
 {
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;
 
 	alg = crypto_alg_lookup(id & CRYPTO_ALG_MASK);
+#ifdef CONFIG_KMOD
+	if (alg == NULL) {
+		crypto_alg_autoload(id & CRYPTO_ALG_MASK);
+		alg = crypto_alg_lookup(id & CRYPTO_ALG_MASK);
+	}
+#endif
 	if (alg == NULL)
 		goto out;
 	
@@ -250,6 +184,76 @@ out:
 	up_write(&crypto_alg_sem);
 	return ret;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	struct list_head *v;
+	loff_t n = *pos;
+
+	down_read(&crypto_alg_sem);
+	list_for_each(v, &crypto_alg_list)
+		if (!n--)
+			return list_entry(v, struct crypto_alg, cra_list);
+	return NULL;
+}
+
+static void *c_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	struct list_head *v = p;
+	
+	(*pos)++;
+	v = v->next;
+	return (v == &crypto_alg_list) ?
+		NULL : list_entry(v, struct crypto_alg, cra_list);
+}
+
+static void c_stop(struct seq_file *m, void *p)
+{
+	up_read(&crypto_alg_sem);
+}
+
+static int c_show(struct seq_file *m, void *p)
+{
+	struct crypto_alg *alg = (struct crypto_alg *)p;
+	
+	seq_printf(m, "name       : %s\n", alg->cra_name);
+	seq_printf(m, "id         : 0x%08x\n", alg->cra_id);
+	seq_printf(m, "blocksize  : %Zd\n", alg->cra_blocksize);
+	
+	switch (alg->cra_id & CRYPTO_TYPE_MASK) {
+	case CRYPTO_TYPE_CIPHER:
+		seq_printf(m, "keysize    : %Zd\n", alg->cra_cipher.cia_keysize);
+		seq_printf(m, "ivsize     : %Zd\n", alg->cra_cipher.cia_ivsize);
+		break;
+		
+	case CRYPTO_TYPE_DIGEST:
+		seq_printf(m, "digestsize : %Zd\n",
+		           alg->cra_digest.dia_digestsize);
+		break;
+	}
+
+	seq_putc(m, '\n');
+	return 0;
+}
+
+static struct seq_operations crypto_seq_ops = {
+	.start		= c_start,
+	.next		= c_next,
+	.stop		= c_stop,
+	.show		= c_show
+};
+
+static int crypto_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &crypto_seq_ops);
+}
+        
+struct file_operations proc_crypto_ops = {
+	.open		= crypto_info_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release
+};
 
 static int __init init_crypto(void)
 {
