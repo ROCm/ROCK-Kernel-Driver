@@ -152,14 +152,14 @@ struct run_ctxt {
         uid_t            fsuid;
         gid_t            fsgid;
         mm_segment_t     fs;
-	int              ngroups;
-	gid_t	         groups[NGROUPS];
+        struct group_info * group_info;
+/*	int              ngroups;
+	gid_t	         groups[NGROUPS];*/
 
 };
 
 static inline void push_ctxt(struct run_ctxt *save, struct run_ctxt *new)
 {
-        int i;
         save->fs = get_fs();
         save->pwd = dget(current->fs->pwd);
         save->pwdmnt = mntget(current->fs->pwdmnt);
@@ -167,9 +167,10 @@ static inline void push_ctxt(struct run_ctxt *save, struct run_ctxt *new)
         save->fsuid = current->fsuid;
         save->root = current->fs->root;
         save->rootmnt = current->fs->rootmnt;
-        save->ngroups = current->ngroups;
+        save->group_info = current->group_info;
+/*      save->ngroups = current->ngroups;
         for (i = 0; i< current->ngroups; i++) 
-                save->groups[i] = current->groups[i];
+                save->groups[i] = current->groups[i];*/
 
         set_fs(new->fs);
         lock_kernel();
@@ -179,18 +180,17 @@ static inline void push_ctxt(struct run_ctxt *save, struct run_ctxt *new)
         unlock_kernel();
         current->fsuid = new->fsuid;
         current->fsgid = new->fsgid;
-        if (new->ngroups > 0) {
+        /*if (new->ngroups > 0) {
                 current->ngroups = new->ngroups;
                 for (i = 0; i< new->ngroups; i++) 
                         current->groups[i] = new->groups[i];
-        }
+        }*/
+        current->group_info = new->group_info;
         
 }
 
 static inline void pop_ctxt(struct run_ctxt *saved)
 {
-        int i;
-
         set_fs(saved->fs);
         lock_kernel();
         set_fs_pwd(current->fs, saved->pwdmnt, saved->pwd);
@@ -199,10 +199,12 @@ static inline void pop_ctxt(struct run_ctxt *saved)
         unlock_kernel();
         current->fsuid = saved->fsuid;
         current->fsgid = saved->fsgid;
+        current->group_info = saved->group_info;
+/*
         current->ngroups = saved->ngroups;
         for (i = 0; i< saved->ngroups; i++) 
                 current->groups[i] = saved->groups[i];
-
+*/
         mntput(saved->pwdmnt);
         dput(saved->pwd);
 }
@@ -392,7 +394,7 @@ struct presto_file_data {
         uid_t fd_fsuid;
         gid_t fd_fsgid;
         int fd_ngroups;
-        gid_t fd_groups[NGROUPS_MAX];
+        gid_t fd_groups[NGROUPS_SMALL];
         /* information how to complete the close operation */
         struct lento_vfs_context fd_info;
         struct presto_version fd_version;
