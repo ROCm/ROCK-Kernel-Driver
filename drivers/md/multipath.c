@@ -70,7 +70,7 @@ static void mp_pool_free(void *mpb, void *data)
 	kfree(mpb);
 }
 
-static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdev)
+static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdevp)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i, disks = MD_SB_DISKS;
@@ -82,10 +82,10 @@ static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdev)
 
 	spin_lock_irq(&conf->device_lock);
 	for (i = 0; i < disks; i++) {
-		if (conf->multipaths[i].operational &&
-			conf->multipaths[i].rdev) {
-			*rdev = conf->multipaths[i].rdev;
-			atomic_inc(&(*rdev)->nr_pending);
+		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
+		if (rdev && rdev->in_sync) {
+			*rdevp = rdev;
+			atomic_inc(&rdev->nr_pending);
 			spin_unlock_irq(&conf->device_lock);
 			return 0;
 		}
@@ -158,10 +158,11 @@ static int multipath_read_balance (multipath_conf_t *conf)
 {
 	int disk;
 
-	for (disk = 0; disk < MD_SB_DISKS; disk++)	
-		if (conf->multipaths[disk].operational &&
-			conf->multipaths[disk].rdev)
+	for (disk = 0; disk < MD_SB_DISKS; disk++) {
+		mdk_rdev_t *rdev = conf->multipaths[disk].rdev;
+		if (rdev && rdev->in_sync)
 			return disk;
+	}
 	BUG();
 	return 0;
 }
@@ -204,7 +205,8 @@ static int multipath_status (char *page, mddev_t *mddev)
 						 conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
 		sz += sprintf (page+sz, "%s",
-			conf->multipaths[i].operational ? "U" : "_");
+			       conf->multipaths[i].rdev && 
+			       conf->multipaths[i].rdev->in_sync ? "U" : "_");
 	sz += sprintf (page+sz, "]");
 	return sz;
 }
@@ -219,28 +221,13 @@ static int multipath_status (char *page, mddev_t *mddev)
 "multipath: IO failure on %s, disabling IO path. \n" \
 "	Operation continuing on %d IO paths.\n"
 
-static void mark_disk_bad (mddev_t *mddev, int failed)
-{
-	multipath_conf_t *conf = mddev_to_conf(mddev);
-	struct multipath_info *multipath = conf->multipaths+failed;
-
-	multipath->operational = 0;
-	mddev->sb_dirty = 1;
-	conf->working_disks--;
-	printk (DISK_FAILED, bdev_partition_name (multipath->rdev->bdev),
-				 conf->working_disks);
-}
 
 /*
  * Careful, this can execute in IRQ contexts as well!
  */
-static int multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
+static void multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	struct multipath_info * multipaths = conf->multipaths;
-	int disks = MD_SB_DISKS;
-	int i;
-
 
 	if (conf->working_disks <= 1) {
 		/*
@@ -248,24 +235,21 @@ static int multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 		 * first check if this is a queued request for a device
 		 * which has just failed.
 		 */
-		for (i = 0; i < disks; i++) {
-			if (multipaths[i].rdev == rdev && !multipaths[i].operational)
-				return 0;
-		}
 		printk (LAST_DISK);
-		return 1; /* leave it active... it's all we have */
+		/* leave it active... it's all we have */
 	} else {
 		/*
 		 * Mark disk as unusable
 		 */
-		for (i = 0; i < disks; i++) {
-			if (multipaths[i].rdev == rdev && multipaths[i].operational) {
-				mark_disk_bad(mddev, i);
-				break;
-			}
+		if (!rdev->faulty) {
+			rdev->in_sync = 0;
+			rdev->faulty = 1;
+			mddev->sb_dirty = 1;
+			conf->working_disks--;
+			printk (DISK_FAILED, bdev_partition_name (rdev->bdev),
+				conf->working_disks);
 		}
 	}
-	return 0;
 }
 
 #undef LAST_DISK
@@ -290,7 +274,7 @@ static void print_multipath_conf (multipath_conf_t *conf)
 		tmp = conf->multipaths + i;
 		if (tmp->rdev)
 			printk(" disk%d, o:%d, dev:%s\n",
-				i,tmp->operational,
+				i,!tmp->rdev->faulty,
 			       bdev_partition_name(tmp->rdev->bdev));
 	}
 }
@@ -308,7 +292,6 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	for (path=0; path<mddev->raid_disks; path++) 
 		if ((p=conf->multipaths+path)->rdev == NULL) {
 			p->rdev = rdev;
-			p->operational = 1;
 			conf->working_disks++;
 			rdev->raid_disk = path;
 			found = 1;
@@ -329,8 +312,8 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 	spin_lock_irq(&conf->device_lock);
 
 	if (p->rdev) {
-		if (p->operational ||
-		    (p->rdev && atomic_read(&p->rdev->nr_pending))) {
+		if (p->rdev->in_sync ||
+		    atomic_read(&p->rdev->nr_pending)) {
 			printk(KERN_ERR "hot-remove-disk, slot %d is identified but is still operational!\n", number);
 			err = -EBUSY;
 			goto abort;
@@ -474,18 +457,8 @@ static int multipath_run (mddev_t *mddev)
 
 		disk = conf->multipaths + disk_idx;
 		disk->rdev = rdev;
-		if (rdev->faulty) 
-			disk->operational = 0;
-		else {
-
-			/*
-			 * Mark all disks as active to start with, there are no
-			 * spares.  multipath_read_balance deals with choose
-			 * the "best" operational device.
-			 */
-			disk->operational = 1;
+		if (!rdev->faulty) 
 			conf->working_disks++;
-		}
 	}
 
 	conf->raid_disks = mddev->raid_disks;

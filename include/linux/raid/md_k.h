@@ -154,6 +154,16 @@ struct mdk_rdev_s
 	mdp_super_t	*sb;
 	unsigned long	sb_offset;
 
+	/* A device can be in one of three states based on two flags:
+	 * Not working:   faulty==1 in_sync==0
+	 * Fully working: faulty==0 in_sync==1
+	 * Working, but not
+	 * in sync with array
+	 *                faulty==0 in_sync==0
+	 *
+	 * It can never have faulty==1, in_sync==1
+	 * This reduces the burden of testing multiple flags in many cases
+	 */
 	int faulty;			/* if faulty do not issue IO requests */
 	int in_sync;			/* device is a full member of the array */
 
@@ -227,7 +237,10 @@ struct mdk_personality_s
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
-	int (*error_handler)(mddev_t *mddev, mdk_rdev_t *rdev);
+	/* error_handler must set ->faulty and clear ->in_sync
+	 * if appropriate, and should abort recovery if needed 
+	 */
+	void (*error_handler)(mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_add_disk) (mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
 	int (*spare_active) (mddev_t *mddev);

@@ -365,9 +365,6 @@ static void free_disk_sb(mdk_rdev_t * rdev)
 		rdev->sb_page = NULL;
 		rdev->sb_offset = 0;
 		rdev->size = 0;
-	} else {
-		if (!rdev->faulty)
-			MD_BUG();
 	}
 }
 
@@ -586,7 +583,6 @@ static void export_rdev(mdk_rdev_t * rdev)
 	md_autodetect_dev(rdev->bdev->bd_dev);
 #endif
 	unlock_rdev(rdev);
-	rdev->faulty = 0;
 	kfree(rdev);
 }
 
@@ -671,9 +667,9 @@ static void print_sb(mdp_super_t *sb)
 
 static void print_rdev(mdk_rdev_t *rdev)
 {
-	printk(KERN_INFO "md: rdev %s, SZ:%08ld F:%d DN:%d ",
+	printk(KERN_INFO "md: rdev %s, SZ:%08ld F:%d S:%d DN:%d ",
 		bdev_partition_name(rdev->bdev),
-		rdev->size, rdev->faulty, rdev->desc_nr);
+		rdev->size, rdev->faulty, rdev->in_sync, rdev->desc_nr);
 	if (rdev->sb) {
 		printk(KERN_INFO "md: rdev superblock:\n");
 		print_sb(rdev->sb);
@@ -1006,6 +1002,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 	}
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
+	rdev->in_sync = 0;
 	atomic_set(&rdev->nr_pending, 0);
 
 	size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
@@ -2182,14 +2179,13 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 {
 	mdk_rdev_t *rdev;
-	int ret;
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
 		return 0;
 
-	ret = md_error(mddev, rdev);
-	return ret;
+	md_error(mddev, rdev);
+	return 1;
 }
 
 static int md_ioctl(struct inode *inode, struct file *file,
@@ -2604,9 +2600,8 @@ static void md_recover_arrays(void)
 }
 
 
-int md_error(mddev_t *mddev, mdk_rdev_t *rdev)
+void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
-
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
 		MD_MAJOR,mdidx(mddev),MAJOR(bdev->bd_dev),MINOR(bdev->bd_dev),
 		__builtin_return_address(0),__builtin_return_address(1),
@@ -2614,25 +2609,15 @@ int md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	if (!mddev) {
 		MD_BUG();
-		return 0;
+		return;
 	}
 
 	if (!rdev || rdev->faulty)
-		return 0;
-	if (!mddev->pers->error_handler
-			|| mddev->pers->error_handler(mddev,rdev) <= 0) {
-		rdev->faulty = 1;
-		rdev->in_sync = 0;
-	} else
-		return 1;
-	/*
-	 * if recovery was running, stop it now.
-	 */
-	if (mddev->recovery_running) 
-		mddev->recovery_running = -EIO;
+		return;
+	if (!mddev->pers->error_handler)
+		return;
+	mddev->pers->error_handler(mddev,rdev);
 	md_recover_arrays();
-
-	return 0;
 }
 
 static int status_unused(char * page)
@@ -3510,7 +3495,7 @@ static int __init raid_setup(char *str)
 	return 1;
 }
 
-int __init md_run_setup(void)
+static int __init md_run_setup(void)
 {
 	if (raid_setup_args.noautodetect)
 		printk(KERN_INFO "md: Skipping autodetection of RAID arrays. (raid=noautodetect)\n");

@@ -6,11 +6,6 @@
 
 struct multipath_info {
 	mdk_rdev_t	*rdev;
-
-	/*
-	 * State bits:
-	 */
-	int		operational;
 };
 
 struct multipath_private_data {
