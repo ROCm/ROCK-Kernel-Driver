@@ -1240,22 +1240,25 @@ static int rivafb_blank(int blank, struct fb_info *info)
 	vesa = CRTCin(par, 0x1a) & ~0xc0;	/* sync on/off */
 
 	NVTRACE_ENTER();
-	if (blank) {
+
+	if (blank)
 		tmp |= 0x20;
-		switch (blank - 1) {
-		case VESA_NO_BLANKING:
-			break;
-		case VESA_VSYNC_SUSPEND:
-			vesa |= 0x80;
-			break;
-		case VESA_HSYNC_SUSPEND:
-			vesa |= 0x40;
-			break;
-		case VESA_POWERDOWN:
-			vesa |= 0xc0;
-			break;
-		}
+
+	switch (blank) {
+	case FB_BLANK_UNBLANK:
+	case FB_BLANK_NORMAL:
+		break;
+	case FB_BLANK_VSYNC_SUSPEND:
+		vesa |= 0x80;
+		break;
+	case FB_BLANK_HSYNC_SUSPEND:
+		vesa |= 0x40;
+		break;
+	case FB_BLANK_POWERDOWN:
+		vesa |= 0xc0;
+		break;
 	}
+
 	SEQout(par, 0x01, tmp);
 	CRTCout(par, 0x1a, vesa);
 
@@ -1266,6 +1269,7 @@ static int rivafb_blank(int blank, struct fb_info *info)
 #endif
 
 	NVTRACE_LEAVE();
+
 	return 0;
 }
 
