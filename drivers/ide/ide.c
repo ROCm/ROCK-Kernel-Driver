@@ -181,13 +181,13 @@ spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
 
-#if defined(__mc68000__) || defined(CONFIG_APUS)
+#ifdef IDE_ARCH_LOCK
 /*
  * ide_lock is used by the Atari code to obtain access to the IDE interrupt,
  * which is shared between several drivers.
  */
 static int	ide_intr_lock;
-#endif /* __mc68000__ || CONFIG_APUS */
+#endif /* IDE_ARCH_LOCK */
 
 #ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
@@ -1092,7 +1092,7 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 				 */
 
 				/* for atari only */
-				ide_release_lock(&ide_lock);
+				ide_release_lock(&ide_intr_lock);
 				hwgroup->busy = 0;
 			}
 

@@ -682,10 +682,9 @@ static void compute_parity(struct stripe_head *sh, int method)
 	raid5_conf_t *conf = sh->raid_conf;
 	int i, pd_idx = sh->pd_idx, disks = conf->raid_disks, count;
 	void *ptr[MAX_XOR_BLOCKS];
-	struct bio *chosen[MD_SB_DISKS];
+	struct bio *chosen;
 
 	PRINTK("compute_parity, stripe %llu, method %d\n", (unsigned long long)sh->sector, method);
-	memset(chosen, 0, sizeof(chosen));
 
 	count = 1;
 	ptr[0] = page_address(sh->dev[pd_idx].page);
@@ -699,10 +698,10 @@ static void compute_parity(struct stripe_head *sh, int method)
 			if (sh->dev[i].towrite &&
 			    test_bit(R5_UPTODATE, &sh->dev[i].flags)) {
 				ptr[count++] = page_address(sh->dev[i].page);
-				chosen[i] = sh->dev[i].towrite;
+				chosen = sh->dev[i].towrite;
 				sh->dev[i].towrite = NULL;
 				if (sh->dev[i].written) BUG();
-				sh->dev[i].written = chosen[i];
+				sh->dev[i].written = chosen;
 				check_xor();
 			}
 		}
@@ -711,10 +710,10 @@ static void compute_parity(struct stripe_head *sh, int method)
 		memset(ptr[0], 0, STRIPE_SIZE);
 		for (i= disks; i-- ;)
 			if (i!=pd_idx && sh->dev[i].towrite) {
-				chosen[i] = sh->dev[i].towrite;
+				chosen = sh->dev[i].towrite;
 				sh->dev[i].towrite = NULL;
 				if (sh->dev[i].written) BUG();
-				sh->dev[i].written = chosen[i];
+				sh->dev[i].written = chosen;
 			}
 		break;
 	case CHECK_PARITY:
@@ -726,9 +725,9 @@ static void compute_parity(struct stripe_head *sh, int method)
 	}
 	
 	for (i = disks; i--;)
-		if (chosen[i]) {
+		if (sh->dev[i].written) {
 			sector_t sector = sh->dev[i].sector;
-			copy_data(1, chosen[i], sh->dev[i].page, sector);
+			copy_data(1, sh->dev[i].written, sh->dev[i].page, sector);
 
 			set_bit(R5_LOCKED, &sh->dev[i].flags);
 			set_bit(R5_UPTODATE, &sh->dev[i].flags);
@@ -745,7 +744,7 @@ static void compute_parity(struct stripe_head *sh, int method)
 		break;
 	case READ_MODIFY_WRITE:
 		for (i = disks; i--;)
-			if (chosen[i]) {
+			if (sh->dev[i].written) {
 				ptr[count++] = page_address(sh->dev[i].page);
 				check_xor();
 			}
@@ -836,6 +835,7 @@ static void handle_stripe(struct stripe_head *sh)
 	int i;
 	int syncing;
 	int locked=0, uptodate=0, to_read=0, to_write=0, failed=0, written=0;
+	int non_overwrite = 0;
 	int failed_num=0;
 	struct r5dev *dev;
 
@@ -851,8 +851,6 @@ static void handle_stripe(struct stripe_head *sh)
 	for (i=disks; i--; ) {
 		mdk_rdev_t *rdev;
 		dev = &sh->dev[i];
-		clear_bit(R5_Wantread, &dev->flags);
-		clear_bit(R5_Wantwrite, &dev->flags);
 		clear_bit(R5_Insync, &dev->flags);
 		clear_bit(R5_Syncio, &dev->flags);
 
@@ -885,7 +883,11 @@ static void handle_stripe(struct stripe_head *sh)
 
 		
 		if (dev->toread) to_read++;
-		if (dev->towrite) to_write++;
+		if (dev->towrite) {
+			to_write++;
+			if (!test_bit(R5_OVERWRITE, &dev->flags))
+				non_overwrite++;
+		}
 		if (dev->written) written++;
 		rdev = conf->disks[i].rdev; /* FIXME, should I be looking rdev */
 		if (!rdev || !rdev->in_sync) {
@@ -977,12 +979,19 @@ static void handle_stripe(struct stripe_head *sh)
 
 	/* Now we might consider reading some blocks, either to check/generate
 	 * parity, or to satisfy requests
+	 * or to load a block that is being partially written.
 	 */
-	if (to_read || (syncing && (uptodate+failed < disks))) {
+	if (to_read || non_overwrite || (syncing && (uptodate+failed < disks))) {
 		for (i=disks; i--;) {
 			dev = &sh->dev[i];
 			if (!test_bit(R5_LOCKED, &dev->flags) && !test_bit(R5_UPTODATE, &dev->flags) &&
-			    (dev->toread || syncing || (failed && sh->dev[failed_num].toread))) {
+			    (dev->toread ||
+			     (dev->towrite && !test_bit(R5_OVERWRITE, &dev->flags)) ||
+			     syncing ||
+			     (failed && (sh->dev[failed_num].toread ||
+					 (sh->dev[failed_num].towrite && !test_bit(R5_OVERWRITE, &sh->dev[failed_num].flags))))
+				    )
+				) {
 				/* we would like to get this block, possibly
 				 * by computing it, but we might not be able to
 				 */
@@ -1160,48 +1169,56 @@ static void handle_stripe(struct stripe_head *sh)
 		bi->bi_size = 0;
 		bi->bi_end_io(bi, bytes, 0);
 	}
-	for (i=disks; i-- ;) 
-		if (sh->dev[i].flags & ((1<<R5_Wantwrite)|(1<<R5_Wantread))) {
-			struct bio *bi = &sh->dev[i].req;
-			mdk_rdev_t *rdev ;
+	for (i=disks; i-- ;) {
+		int rw;
+		struct bio *bi;
+		mdk_rdev_t *rdev;
+		if (test_and_clear_bit(R5_Wantwrite, &sh->dev[i].flags))
+			rw = 1;
+		else if (test_and_clear_bit(R5_Wantread, &sh->dev[i].flags))
+			rw = 0;
+		else
+			continue;
+ 
+		bi = &sh->dev[i].req;
+ 
+		bi->bi_rw = rw;
+		if (rw)
+			bi->bi_end_io = raid5_end_write_request;
+		else
+			bi->bi_end_io = raid5_end_read_request;
+ 
+		spin_lock_irq(&conf->device_lock);
+		rdev = conf->disks[i].rdev;
+		if (rdev && rdev->faulty)
+			rdev = NULL;
+		if (rdev)
+			atomic_inc(&rdev->nr_pending);
+		spin_unlock_irq(&conf->device_lock);
+ 
+		if (rdev) {
+			if (test_bit(R5_Syncio, &sh->dev[i].flags))
+				md_sync_acct(rdev, STRIPE_SECTORS);
 
-			bi->bi_rw = 0;
-			if (test_bit(R5_Wantread, &sh->dev[i].flags))
-				bi->bi_end_io = raid5_end_read_request;
-			else {
-				bi->bi_end_io = raid5_end_write_request;
-				bi->bi_rw = 1;
-			}
-
-			spin_lock_irq(&conf->device_lock);
-			rdev = conf->disks[i].rdev;
-			if (rdev && rdev->faulty)
-				rdev = NULL;
-			if (rdev)
-				atomic_inc(&rdev->nr_pending);
-			spin_unlock_irq(&conf->device_lock);
-
-			if (rdev) {
-				if (test_bit(R5_Syncio, &sh->dev[i].flags))
-					md_sync_acct(rdev, STRIPE_SECTORS);
-
-				bi->bi_bdev = rdev->bdev;
-				PRINTK("for %llu schedule op %ld on disc %d\n", (unsigned long long)sh->sector, bi->bi_rw, i);
-				atomic_inc(&sh->count);
-				bi->bi_sector = sh->sector;
-				bi->bi_flags = 1 << BIO_UPTODATE;
-				bi->bi_vcnt = 1;	
-				bi->bi_idx = 0;
-				bi->bi_io_vec = &sh->dev[i].vec;
-				bi->bi_size = STRIPE_SIZE;
-				bi->bi_next = NULL;
-				generic_make_request(bi);
-			} else {
-				PRINTK("skip op %ld on disc %d for sector %llu\n", bi->bi_rw, i, (unsigned long long)sh->sector);
-				clear_bit(R5_LOCKED, &dev->flags);
-				set_bit(STRIPE_HANDLE, &sh->state);
-			}
+			bi->bi_bdev = rdev->bdev;
+			PRINTK("for %llu schedule op %ld on disc %d\n", (unsigned long long)sh->sector, bi->bi_rw, i);
+			atomic_inc(&sh->count);
+			bi->bi_sector = sh->sector;
+			bi->bi_flags = 1 << BIO_UPTODATE;
+			bi->bi_vcnt = 1;	
+			bi->bi_idx = 0;
+			bi->bi_io_vec = &sh->dev[i].vec;
+			bi->bi_io_vec[0].bv_len = STRIPE_SIZE;
+			bi->bi_io_vec[0].bv_offset = 0;
+			bi->bi_size = STRIPE_SIZE;
+			bi->bi_next = NULL;
+			generic_make_request(bi);
+		} else {
+			PRINTK("skip op %ld on disc %d for sector %llu\n", bi->bi_rw, i, (unsigned long long)sh->sector);
+			clear_bit(R5_LOCKED, &dev->flags);
+			set_bit(STRIPE_HANDLE, &sh->state);
 		}
+	}
 }
 
 static inline void raid5_activate_delayed(raid5_conf_t *conf)

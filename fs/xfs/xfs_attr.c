@@ -1170,6 +1170,7 @@ restart:
 	state->args = args;
 	state->mp = mp;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_attr_node_ents;
 
 	/*
 	 * Search to see if name already exists, and get back a pointer
@@ -1337,6 +1338,7 @@ restart:
 		state->args = args;
 		state->mp = mp;
 		state->blocksize = state->mp->m_sb.sb_blocksize;
+		state->node_ents = state->mp->m_attr_node_ents;
 		state->inleaf = 0;
 		error = xfs_da_node_lookup_int(state, &retval);
 		if (error)
@@ -1428,6 +1430,7 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_attr_node_ents;
 
 	/*
 	 * Search to see if name exists, and get back a pointer to it.
@@ -1695,6 +1698,7 @@ xfs_attr_node_get(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_attr_node_ents;
 
 	/*
 	 * Search to see if name exists, and get back a pointer to it.

@@ -35,6 +35,7 @@ int main(void)
 	DEFINE(TASK_PTRACE, offsetof(struct task_struct, ptrace));
 	DEFINE(TASK_MM, offsetof(struct task_struct, mm));
 	DEFINE(TASK_PERSONALITY, offsetof(struct task_struct, personality));
+	DEFINE(TASK_PID, offsetof(struct task_struct, pid));
 	BLANK();
 	DEFINE(TASK_REGS, offsetof(struct task_struct, thread.regs));
 	DEFINE(TASK_PT_PSW, offsetof(struct task_struct, thread.regs.gr[ 0]));

@@ -4,7 +4,9 @@
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
  *  Based on the work of:
- *	unknown author
+ *	Russell King
+ *
+ * Fixes by Russell King.
  */
 
 /*
@@ -32,44 +34,42 @@
  */
 
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/serio.h>
 
 #include <asm/irq.h>
 #include <asm/hardware.h>
 #include <asm/io.h>
-#include <asm/iomd.h>
+#include <asm/hardware/iomd.h>
 #include <asm/system.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
-static inline void rpckbd_write(unsigned char val)
+extern struct pt_regs *kbd_pt_regs;
+
+static int rpckbd_write(struct serio *port, unsigned char val)
 {
 	while (!(iomd_readb(IOMD_KCTRL) & (1 << 7)))
 		cpu_relax();
 
 	iomd_writeb(val, IOMD_KARTTX);
-}
 
-static struct serio rpckbd_port =
-{
-	.type	= SERIO_8042,
-	.write	= rpckbd_write,
-	.name	= "RiscPC PS/2 kbd port",
-	.phys	= "rpckbd/serio0",
-};
+	return 0;
+}
 
 static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
+	struct serio *port = dev_id;
 	unsigned int byte;
 	kbd_pt_regs = regs;
 
 	while (iomd_readb(IOMD_KCTRL) & (1 << 5)) {
 		byte = iomd_readb(IOMD_KARTRX);
 
-		serio_interrupt(&rpckbd_port, byte, 0);
+		serio_interrupt(port, byte, 0);
 	}
 }
 
@@ -77,34 +77,52 @@ static void rpckbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
 }
 
-static int __init rpckbd_init(void)
+static int rpckbd_open(struct serio *port)
 {
 	/* Reset the keyboard state machine. */
 	iomd_writeb(0, IOMD_KCTRL);
 	iomd_writeb(8, IOMD_KCTRL);
 	iomd_readb(IOMD_KARTRX);
 
-	if (request_irq(IRQ_KEYBOARDRX, rpckbd_rx, 0, "rpckbd", NULL) != 0) {
-		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard receive IRQ!\n")
+	if (request_irq(IRQ_KEYBOARDRX, rpckbd_rx, 0, "rpckbd", port) != 0) {
+		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard receive IRQ\n");
 		return -EBUSY;
 	}
 
-	if (request_irq(IRQ_KEYBOARDTX, rpckbd_tx, 0, "rpckbd", NULL) != 0) {
-		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard transmit IRQ!\n")
+	if (request_irq(IRQ_KEYBOARDTX, rpckbd_tx, 0, "rpckbd", port) != 0) {
+		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard transmit IRQ\n");
 		free_irq(IRQ_KEYBOARDRX, NULL);
 		return -EBUSY;
 	}
 
-	register_serio_port(&rpckbd_port);
+	return 0;
+}
+
+static void rpckbd_close(struct serio *port)
+{
+	free_irq(IRQ_KEYBOARDRX, port);
+	free_irq(IRQ_KEYBOARDTX, port);	
+}
+
+static struct serio rpckbd_port =
+{
+	.type	= SERIO_8042,
+	.open	= rpckbd_open,
+	.close	= rpckbd_close,
+	.write	= rpckbd_write,
+	.name	= "RiscPC PS/2 kbd port",
+	.phys	= "rpckbd/serio0",
+};
+
+static int __init rpckbd_init(void)
+{
+	serio_register_port(&rpckbd_port);
 	return 0;
 }
 
 static void __exit rpckbd_exit(void)
 {
-	free_irq(IRQ_KEYBOARDRX, NULL);
-	free_irq(IRQ_KEYBOARDTX, NULL);	
-
-	unregister_serio_port(&rpckbd_port);
+	serio_unregister_port(&rpckbd_port);
 }
 
 module_init(rpckbd_init);

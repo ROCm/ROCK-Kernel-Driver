@@ -13,6 +13,9 @@
 struct poll_table_page;
 
 typedef struct poll_table_struct {
+	int queue;
+	void *priv;
+	void (*qproc)(void *, wait_queue_head_t *);
 	int error;
 	struct poll_table_page * table;
 } poll_table;
@@ -25,11 +28,23 @@ static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_addres
 		__pollwait(filp, wait_address, p);
 }
 
-static inline void poll_initwait(poll_table* pt)
+static inline void poll_initwait_ex(poll_table* pt, int queue,
+				    void (*qproc)(void *, wait_queue_head_t *),
+				    void *priv)
 {
+	pt->queue = queue;
+	pt->qproc = qproc;
+	pt->priv = priv;
 	pt->error = 0;
 	pt->table = NULL;
 }
+
+static inline void poll_initwait(poll_table* pt)
+{
+
+	poll_initwait_ex(pt, 1, NULL, NULL);
+}
+
 extern void poll_freewait(poll_table* pt);
 
 

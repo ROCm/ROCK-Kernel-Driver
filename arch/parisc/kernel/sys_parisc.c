@@ -147,6 +147,40 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 }
 
 
+/* Fucking broken ABI */
+
+extern asmlinkage long sys_truncate64(const char *, loff_t);
+extern asmlinkage long sys_ftruncate64(unsigned int, loff_t);
+extern asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
+					size_t count, loff_t pos);
+extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
+					size_t count, loff_t pos);
+
+asmlinkage long parisc_truncate64(const char * path,
+					unsigned int high, unsigned int low)
+{
+	return sys_truncate(path, (loff_t)high << 32 | low);
+}
+
+asmlinkage long parisc_ftruncate64(unsigned int fd,
+					unsigned int high, unsigned int low)
+{
+	return sys_ftruncate(fd, (loff_t)high << 32 | low);
+}
+
+asmlinkage ssize_t parisc_pread64(unsigned int fd, char *buf, size_t count,
+					unsigned int high, unsigned int low)
+{
+	return sys_pread64(fd, buf, count, (loff_t)high << 32 | low);
+}
+
+asmlinkage ssize_t parisc_pwrite64(unsigned int fd, const char *buf,
+			size_t count, unsigned int high, unsigned int low)
+{
+	return sys_pwrite64(fd, buf, count, (loff_t)high << 32 | low);
+}
+
+
 /*
  * FIXME, please remove this crap as soon as possible
  *

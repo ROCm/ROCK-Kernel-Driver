@@ -56,7 +56,7 @@ sys_call_table:
 /*175*/	.long sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.long sys_flistxattr, sys_removexattr, sys_lremovexattr, sys_sigpending, sys_query_module
 /*185*/	.long sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sys_newuname
-/*190*/	.long sys_init_module, sys_personality, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
+/*190*/	.long sys_init_module, sys_personality, sparc_remap_file_pages, sys_nis_syscall, sys_nis_syscall
 /*195*/	.long sys_nis_syscall, sys_nis_syscall, sys_getppid, sparc_sigaction, sys_sgetmask
 /*200*/	.long sys_ssetmask, sys_sigsuspend, sys_newlstat, sys_uselib, old_readdir
 /*205*/	.long sys_readahead, sys_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall

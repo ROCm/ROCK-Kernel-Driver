@@ -949,6 +949,7 @@ static void snd_hdsp_midi_output_trigger(snd_rawmidi_substream_t * substream, in
 	spin_lock_irqsave (&hmidi->lock, flags);
 	if (up) {
 		if (!hmidi->istimer) {
+			init_timer(&hmidi->timer);
 			hmidi->timer.function = snd_hdsp_midi_output_timer;
 			hmidi->timer.data = (unsigned long) hmidi;
 			hmidi->timer.expires = 1 + jiffies;

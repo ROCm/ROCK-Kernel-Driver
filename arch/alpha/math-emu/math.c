@@ -86,11 +86,13 @@ void cleanup_module(void)
 
 
 /*
- * Emulate the floating point instruction at address PC.  Returns 0 if
- * emulation fails.  Notice that the kernel does not and cannot use FP
- * regs.  This is good because it means that instead of
- * saving/restoring all fp regs, we simply stick the result of the
- * operation into the appropriate register.
+ * Emulate the floating point instruction at address PC.  Returns -1 if the
+ * instruction to be emulated is illegal (such as with the opDEC trap), else
+ * the SI_CODE for a SIGFPE signal, else 0 if everything's ok.
+ *
+ * Notice that the kernel does not and cannot use FP regs.  This is good
+ * because it means that instead of saving/restoring all fp regs, we simply
+ * stick the result of the operation into the appropriate register.
  */
 long
 alpha_fp_emul (unsigned long pc)
@@ -102,6 +104,7 @@ alpha_fp_emul (unsigned long pc)
 	unsigned long fa, fb, fc, func, mode, src;
 	unsigned long res, va, vb, vc, swcr, fpcr;
 	__u32 insn;
+	long si_code;
 
 	MOD_INC_USE_COUNT;
 
@@ -306,10 +309,19 @@ done:
 		wrfpcr(fpcr);
 
 		/* Do we generate a signal?  */
-		if (_fex & swcr & IEEE_TRAP_ENABLE_MASK) {
-			MOD_DEC_USE_COUNT;
-			return 0;
+		_fex = _fex & swcr & IEEE_TRAP_ENABLE_MASK;
+		si_code = 0;
+		if (_fex) {
+			if (_fex & IEEE_TRAP_ENABLE_DNO) si_code = FPE_FLTUND;
+			if (_fex & IEEE_TRAP_ENABLE_INE) si_code = FPE_FLTRES;
+			if (_fex & IEEE_TRAP_ENABLE_UNF) si_code = FPE_FLTUND;
+			if (_fex & IEEE_TRAP_ENABLE_OVF) si_code = FPE_FLTOVF;
+			if (_fex & IEEE_TRAP_ENABLE_DZE) si_code = FPE_FLTDIV;
+			if (_fex & IEEE_TRAP_ENABLE_INV) si_code = FPE_FLTINV;
 		}
+
+		MOD_DEC_USE_COUNT;
+		return si_code;
 	}
 
 	/* We used to write the destination register here, but DEC FORTRAN
@@ -317,20 +329,20 @@ done:
 	   immediately after the operations above.  */
 
 	MOD_DEC_USE_COUNT;
-	return 1;
+	return 0;
 
 bad_insn:
 	printk(KERN_ERR "alpha_fp_emul: Invalid FP insn %#x at %#lx\n",
 	       insn, pc);
 	MOD_DEC_USE_COUNT;
-	return 0;
+	return -1;
 }
 
 long
 alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 {
 	unsigned long trigger_pc = regs->pc - 4;
-	unsigned long insn, opcode, rc, no_signal = 0;
+	unsigned long insn, opcode, rc, si_code = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -384,7 +396,7 @@ alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 		if (!write_mask) {
 			/* Re-execute insns in the trap-shadow.  */
 			regs->pc = trigger_pc + 4;
-			no_signal = alpha_fp_emul(trigger_pc);
+			si_code = alpha_fp_emul(trigger_pc);
 			goto egress;
 		}
 		trigger_pc -= 4;
@@ -392,5 +404,5 @@ alpha_fp_emul_imprecise (struct pt_regs *regs, unsigned long write_mask)
 
 egress:
 	MOD_DEC_USE_COUNT;
-	return no_signal;
+	return si_code;
 }

@@ -52,9 +52,6 @@
 #include <asm/atomic.h>
 #include <net/dst.h>
 #include <net/scm.h>
-#include <linux/fs.h>
-#include <linux/file.h>
-#include <linux/fcblist.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -110,6 +107,7 @@ struct sock {
 	wait_queue_head_t	*sleep;		/* Sock wait queue			*/
 	struct dst_entry	*dst_cache;	/* Destination cache			*/
 	rwlock_t		dst_lock;
+	struct xfrm_policy	*policy[2];
 	atomic_t		rmem_alloc;	/* Receive queue bytes committed	*/
 	struct sk_buff_head	receive_queue;	/* Incoming packets			*/
 	atomic_t		wmem_alloc;	/* Transmit queue bytes committed	*/
@@ -769,13 +767,8 @@ static inline unsigned long sock_wspace(struct sock *sk)
 
 static inline void sk_wake_async(struct sock *sk, int how, int band)
 {
-	if (sk->socket) {
-		if (sk->socket->file)
-			file_send_notify(sk->socket->file, ion_band_table[band - POLL_IN],
-					 poll_band_table[band - POLL_IN]);
-		if (sk->socket->fasync_list)
-			sock_wake_async(sk->socket, how, band);
-	}
+	if (sk->socket && sk->socket->fasync_list)
+		sock_wake_async(sk->socket, how, band);
 }
 
 #define SOCK_MIN_SNDBUF 2048

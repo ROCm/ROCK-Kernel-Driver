@@ -92,17 +92,6 @@ extern void release_thread(struct task_struct *);
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 extern void dump_thread(struct pt_regs *regs, struct user *u);
 
-static inline void release_segments(struct mm_struct *mm)
-{
-}
-
-static inline void copy_segments(struct task_struct *p, 
-				 struct mm_struct *new_mm)
-{
-}
-
-#define forget_segments() do ; while(0)
-
 extern unsigned long thread_saved_pc(struct task_struct *t);
 
 #define init_stack	(init_thread_union.stack)

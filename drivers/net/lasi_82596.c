@@ -93,7 +93,6 @@
 #include <asm/irq.h>
 
 #include <asm/pdc.h>
-#include <asm/gsc.h>
 #include <asm/cache.h>
 
 static char version[] __devinitdata =

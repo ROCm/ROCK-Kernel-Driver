@@ -68,7 +68,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	.global	binstr
 binstr:

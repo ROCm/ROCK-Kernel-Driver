@@ -258,7 +258,7 @@ struct alpha_machine_vector alphabook1_mv __initmv = {
 	DO_LCA_IO,
 	DO_LCA_BUS,
 	.machine_check		= lca_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -289,7 +289,7 @@ struct alpha_machine_vector avanti_mv __initmv = {
 	DO_APECS_IO,
 	DO_APECS_BUS,
 	.machine_check		= apecs_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -318,7 +318,7 @@ struct alpha_machine_vector noname_mv __initmv = {
 	DO_LCA_IO,
 	DO_LCA_BUS,
 	.machine_check		= lca_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -356,7 +356,7 @@ struct alpha_machine_vector p2k_mv __initmv = {
 	DO_LCA_IO,
 	DO_LCA_BUS,
 	.machine_check		= lca_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -385,7 +385,7 @@ struct alpha_machine_vector xl_mv __initmv = {
 	DO_APECS_IO,
 	BUS(apecs),
 	.machine_check		= apecs_machine_check,
-	.max_dma_address	= ALPHA_XL_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_XL_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= XL_DEFAULT_MEM_BASE,
 

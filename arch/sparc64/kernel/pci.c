@@ -479,8 +479,8 @@ void pcibios_update_irq(struct pci_dev *pdev, int irq)
 {
 }
 
-void pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
-			       struct pbus_set_ranges_data *pranges)
+void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
+					 struct pbus_set_ranges_data *pranges)
 {
 }
 

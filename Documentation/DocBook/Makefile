@@ -160,8 +160,6 @@ clean-files := $(DOCBOOKS) \
 	$(patsubst %.fig,%.png, $(IMG-parportbook)) \
 	$(C-procfs-example)
 
-ifneq ($(wildcard $(BOOKS)),)
-clean-rule := rm -rf $(wildcard $(BOOKS))
+ifneq ($(wildcard $(patsubst %.html,%,$(HTML))),)
+clean-rule := rm -rf $(wildcard $(patsubst %.html,%,$(HTML)))
 endif
-
-include $(TOPDIR)/Rules.make

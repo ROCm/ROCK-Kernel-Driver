@@ -78,29 +78,29 @@ static int hpfb_setcolreg(unsigned regno, unsigned red, unsigned green,
                            unsigned blue, unsigned transp,
                            struct fb_info *info)
 {
-	while (readw(fb_regs + 0x6002) & 0x4) udelay(1);
-	writew(0, fb_regs + 0x60f0);
-	writew(regno, fb_regs + 0x60b8);
-	writew(red, fb_regs + 0x60b2);
-	writew(green, fb_regs + 0x60b4);
-	writew(blue, fb_regs + 0x60b6);
-	writew(0xff, fb_regs + 0x60f0);
+	while (in_be16(fb_regs + 0x6002) & 0x4) udelay(1);
+	out_be16(fb_regs + 0x60f0, 0);
+	out_be16(fb_regs + 0x60b8, regno);
+	out_be16(fb_regs + 0x60b2, red);
+	out_be16(fb_regs + 0x60b4, green);
+	out_be16(fb_regs + 0x60b6, blue);
+	out_be16(fb_regs + 0x60f0, 0xff);
 	udelay(100);
-	writew(0xffff, fb_regs + 0x60ba);
+	out_be16(fb_regs + 0x60ba, 0xffff);
 	return 0;
 }
 
 void hpfb_copyarea(struct fb_info *info, struct fb_copyarea *area) 
 {
-	while (readb(fb_regs + BUSY) & fb_bitmask);
-	writeb(0x3, fb_regs + WMRR);
-	writew(area->sx, fb_regs + SOURCE_X);
-	writew(area->sy, fb_regs + SOURCE_Y);
-	writew(area->dx, fb_regs + DEST_X);
-	writew(area->dy, fb_regs + DEST_Y);
-	writew(area->height, fb_regs + WHEIGHT);
-	writew(area->width, fb_regs + WWIDTH);
-	writeb(fb_bitmask, fb_regs + WMOVE);
+	while (in_8(fb_regs + BUSY) & fb_bitmask);
+	out_8(fb_regs + WMRR, 0x3);
+	out_be16(fb_regs + SOURCE_X, area->sx);
+	out_be16(fb_regs + SOURCE_Y, area->sy);
+	out_be16(fb_regs + DEST_X, area->dx);
+	out_be16(fb_regs + DEST_Y, area->dy);
+	out_be16(fb_regs + WHEIGHT, area->height);
+	out_be16(fb_regs + WWIDTH, area->width);
+	out_8(fb_regs + WMOVE, fb_bitmask);
 }
 
 static struct fb_ops hpfb_ops = {
@@ -121,38 +121,37 @@ int __init hpfb_init_one(unsigned long base)
 {
 	unsigned long fboff;
 
-	fboff = (readb(base + TOPCAT_FBOMSB) << 8) 
-		| readb(base + TOPCAT_FBOLSB);
+	fboff = (in_8(base + TOPCAT_FBOMSB) << 8) | in_8(base + TOPCAT_FBOLSB);
 
-	hpfb_fix.smem_start = 0xf0000000 | (readb(base + fboff) << 16);
+	hpfb_fix.smem_start = 0xf0000000 | (in_8(base + fboff) << 16);
 	fb_regs = base;
 
 #if 0
 	/* This is the magic incantation NetBSD uses to make Catseye boards work. */
-	writeb(0, base+0x4800);
-	writeb(0, base+0x4510);
-	writeb(0, base+0x4512);
-	writeb(0, base+0x4514);
-	writeb(0, base+0x4516);
-	writeb(0x90, base+0x4206);
+	out_8(base+0x4800, 0);
+	out_8(base+0x4510, 0);
+	out_8(base+0x4512, 0);
+	out_8(base+0x4514, 0);
+	out_8(base+0x4516, 0);
+	out_8(base+0x4206, 0x90);
 #endif
 	/* 
 	 *	Give the hardware a bit of a prod and work out how many bits per
 	 *	pixel are supported.
 	 */
 	
-	writeb(0xff, base + TC_WEN);
-	writeb(0xff, base + TC_FBEN);
-	writeb(0xff, hpfb_fix.smem_start);
-	fb_bitmask = readb(hpfb_fix.smem_start);
+	out_8(base + TC_WEN, 0xff);
+	out_8(base + TC_FBEN, 0xff);
+	out_8(hpfb_fix.smem_start, 0xff);
+	fb_bitmask = in_8(hpfb_fix.smem_start);
 
 	/*
 	 *	Enable reading/writing of all the planes.
 	 */
-	writeb(fb_bitmask, base + TC_WEN);
-	writeb(fb_bitmask, base + TC_REN);
-	writeb(fb_bitmask, base + TC_FBEN);
-	writeb(0x1, base + TC_NBLANK);
+	out_8(base + TC_WEN, fb_bitmask);
+	out_8(base + TC_REN, fb_bitmask);
+	out_8(base + TC_FBEN, fb_bitmask);
+	out_8(base + TC_NBLANK, 0x1);
 
 	/*
 	 *	Let there be consoles..

@@ -5291,6 +5291,7 @@ timeout(struct net_device *dev, void (*fn)(u_long data), u_long data, u_long mse
     if (dt==0) dt=1;
     
     /* Set up timer */
+    init_timer(&lp->timer);
     lp->timer.expires = jiffies + dt;
     lp->timer.function = fn;
     lp->timer.data = data;

@@ -31,13 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/major.h>
-#include <linux/namei.h>
-#include <linux/pagemap.h>
-
-#ifndef EVMS_MAJOR
-#define EVMS_MAJOR	117
-#endif
 
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
@@ -537,8 +530,6 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 }
 
-extern void xfs_refcache_sbdirty(struct super_block*);
-
 /*
  * xfs_mountfs
  *
@@ -570,6 +561,7 @@ xfs_mountfs(
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
+	uint		uquotaondisk = 0, gquotaondisk = 0;
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
 	int		agno, noio;
@@ -810,12 +802,6 @@ xfs_mountfs(
 		return(0);
 	}
 
-	/*
-	 * Set up timer list structure for nfs refcache
-	 */
-	init_timer(&mp->m_sbdirty_timer);
-	mp->m_sbdirty_timer.function = (void (*)(unsigned long)) xfs_refcache_sbdirty;
-
 	/* Initialize the I/O function vector with XFS functions */
 	mp->m_io_ops = xfs_iocore_xfs;
 
@@ -914,7 +900,6 @@ xfs_mountfs(
 		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
 		      mp->m_dev, (unsigned long long)rip->i_ino);
-		rvp->v_flag |= VPURGE;
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
@@ -928,6 +913,11 @@ xfs_mountfs(
 	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
 
+	if (quotaondisk) {
+		uquotaondisk = mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT;
+		gquotaondisk = mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT;
+	}
+
 	/*
 	 * If the device itself is read-only, we can't allow
 	 * the user to change the state of quota on the mount -
@@ -935,14 +925,16 @@ xfs_mountfs(
 	 * which would lead to an I/O error and shutdown
 	 */
 
-	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
-	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
-	      xfs_dev_is_read_only(mp, "changing quota state")) {
+	if (((uquotaondisk && !XFS_IS_UQUOTA_ON(mp)) ||
+	    (!uquotaondisk &&  XFS_IS_UQUOTA_ON(mp)) ||
+	     (gquotaondisk && !XFS_IS_GQUOTA_ON(mp)) ||
+	    (!gquotaondisk &&  XFS_IS_GQUOTA_ON(mp)))  &&
+	    xfs_dev_is_read_only(mp, "changing quota state")) {
 		cmn_err(CE_WARN,
-			"XFS: device %s is read-only, cannot change "
-			"quota state.  Please mount with%s quota option.",
-			mp->m_fsname, quotaondisk ? "" : "out");
-		rvp->v_flag |= VPURGE;
+			"XFS: please mount with%s%s%s.",
+			(!quotaondisk ? "out quota" : ""),
+			(uquotaondisk ? " usrquota" : ""),
+			(gquotaondisk ? " grpquota" : ""));
 		VN_RELE(rvp);
 		vn_remove(rvp);
 		error = XFS_ERROR(EPERM);
@@ -957,7 +949,6 @@ xfs_mountfs(
 		 * Free up the root inode.
 		 */
 		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
-		rvp->v_flag |= VPURGE;
 		VMAP(rvp, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
@@ -1730,69 +1721,4 @@ xfs_check_frozen(
 
 	if (level == XFS_FREEZE_TRANS)
 		atomic_inc(&mp->m_active_trans);
-}
-
-int
-xfs_blkdev_get(
-	const char		*name,
-	struct block_device	**bdevp)
-{
-	struct nameidata	nd;
-	int			error = 0;
-
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	if (error) {
-		printk("XFS: Invalid device [%s], error=%d\n",
-				name, error);
-		return error;
-	}
-
-	/* I think we actually want bd_acquire here..  --hch */
-	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
-	if (*bdevp) {
-		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	} else {
-		error = -ENOMEM;
-	}
-
-	path_release(&nd);
-	return -error;
-}
-
-void
-xfs_blkdev_put(
-	struct block_device	*bdev)
-{
-	blkdev_put(bdev, BDEV_FS);
-}
-
-void
-xfs_free_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
-	kfree(btp);
-}
-
-xfs_buftarg_t *
-xfs_alloc_buftarg(
-	struct block_device	*bdev)
-{
-	xfs_buftarg_t		*btp;
-
-	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
-
-	btp->pbr_dev =  bdev->bd_dev;
-	btp->pbr_bdev = bdev;
-	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	btp->pbr_blocksize = PAGE_CACHE_SIZE;
-
-	switch (MAJOR(btp->pbr_dev)) {
-	case MD_MAJOR:
-	case EVMS_MAJOR:
-		btp->pbr_flags = PBR_ALIGNED_ONLY;
-		break;
-	}
-
-	return btp;
 }

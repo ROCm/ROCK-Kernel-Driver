@@ -15,7 +15,7 @@
  * limitations under the License. 
  *
  * The initial developer of the original code is David A. Hinds
- * <dhinds@pcmcia.sourceforge.org>.  Portions created by David A. Hinds
+ * <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  *
  * Alternatively, the contents of this file may be used under the

@@ -207,7 +207,7 @@
 #define __NR_uname              189 /* Linux Specific                              */
 #define __NR_init_module        190 /* Linux Specific                              */
 #define __NR_personality        191 /* Linux Specific                              */
-/* #define __NR_prof            192    Linux Specific                              */
+#define __NR_remap_file_pages   192 /* Linux Specific                              */
 /* #define __NR_break           193    Linux Specific                              */
 /* #define __NR_lock            194    Linux Specific                              */
 /* #define __NR_mpx             195    Linux Specific                              */

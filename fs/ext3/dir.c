@@ -314,7 +314,7 @@ void ext3_htree_free_dir_info(struct dir_private_info *p)
 /*
  * Given a directory entry, enter it into the fname rb tree.
  */
-void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
+int ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 			     __u32 minor_hash,
 			     struct ext3_dir_entry_2 *dirent)
 {
@@ -329,6 +329,8 @@ void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 	/* Create and allocate the fname structure */
 	len = sizeof(struct fname) + dirent->name_len + 1;
 	new_fn = kmalloc(len, GFP_KERNEL);
+	if (!new_fn)
+		return -ENOMEM;
 	memset(new_fn, 0, len);
 	new_fn->hash = hash;
 	new_fn->minor_hash = minor_hash;
@@ -350,7 +352,7 @@ void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 		    (new_fn->minor_hash == fname->minor_hash)) {
 			new_fn->next = fname->next;
 			fname->next = new_fn;
-			return;
+			return 0;
 		}
 			
 		if (new_fn->hash < fname->hash)
@@ -365,6 +367,7 @@ void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 
 	rb_link_node(&new_fn->rb_hash, parent, p);
 	rb_insert_color(&new_fn->rb_hash, &info->root);
+	return 0;
 }
 
 

@@ -1,11 +1,6 @@
 #
 # Makefile for the linux/parisc floating point code
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definition is now in the main makefile...
 
 obj-y	 := frnd.o driver.o decode_exc.o fpudispatch.o denormal.o \
 		dfmpy.o sfmpy.o sfsqrt.o dfsqrt.o dfadd.o fmpyfadd.o \
@@ -16,6 +11,4 @@ obj-y	 := frnd.o driver.o decode_exc.o fpudispatch.o denormal.o \
 # Math emulation code beyond the FRND is required for 712/80i and
 # other very old or stripped-down PA-RISC CPUs -- not currently supported
 
-obj-$CONFIG_MATH_EMULATION	+= unimplemented-math-emulation.o
-
-include $(TOPDIR)/Rules.make
+obj-$(CONFIG_MATH_EMULATION)	+= unimplemented-math-emulation.o

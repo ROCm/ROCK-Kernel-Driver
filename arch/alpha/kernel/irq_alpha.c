@@ -147,10 +147,10 @@ process_mcheck_info(unsigned long vector, unsigned long la_ptr,
 
 	mchk_header = (struct el_common *)la_ptr;
 
-	printk(KERN_CRIT "%s machine check: vector=0x%lx pc=0x%lx code=0x%lx\n",
+	printk(KERN_CRIT "%s machine check: vector=0x%lx pc=0x%lx code=0x%x\n",
 	       machine, vector, regs->pc, mchk_header->code);
 
-	switch ((unsigned int) mchk_header->code) {
+	switch (mchk_header->code) {
 	/* Machine check reasons.  Defined according to PALcode sources.  */
 	case 0x80: reason = "tag parity error"; break;
 	case 0x82: reason = "tag control parity error"; break;

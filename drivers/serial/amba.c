@@ -231,7 +231,7 @@ static void ambauart_tx_chars(struct uart_port *port)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		ambauart_stop_tx(port);
+		ambauart_stop_tx(port, 0);
 		return;
 	}
 
@@ -248,7 +248,7 @@ static void ambauart_tx_chars(struct uart_port *port)
 		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
-		ambauart_stop_tx(port);
+		ambauart_stop_tx(port, 0);
 }
 
 static void ambauart_modem_status(struct uart_port *port)

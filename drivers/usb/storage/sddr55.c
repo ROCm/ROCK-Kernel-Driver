@@ -746,7 +746,6 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 	unsigned short pages;
 	struct sddr55_card_info *info;
 
-	srb->resid = 0;
 	if (!us->extra) {
 		us->extra = kmalloc(
 			sizeof(struct sddr55_card_info), GFP_NOIO);

@@ -230,9 +230,8 @@ static void fbcon_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 
 static void cursor_timer_handler(unsigned long dev_addr);
 
-static struct timer_list cursor_timer = {
-    function: cursor_timer_handler
-};
+static struct timer_list cursor_timer =
+		TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
 
 static void cursor_timer_handler(unsigned long dev_addr)
 {
@@ -627,7 +626,7 @@ static void fbcon_setup(int con, int init, int logo)
     }
     
     if (!fontwidthvalid(p,fontwidth(p))) {
-#ifdef CONFIG_FBCON_MAC
+#if defined(CONFIG_FBCON_MAC) && defined(CONFIG_MAC)
 	if (MACH_IS_MAC)
 	    /* ++Geert: hack to make 6x11 fonts work on mac */
 	    p->dispsw = &fbcon_mac;

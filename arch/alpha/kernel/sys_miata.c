@@ -238,6 +238,8 @@ miata_init_pci(void)
 static void
 miata_kill_arch(int mode)
 {
+	cia_kill_arch(mode);
+
 	switch(mode) {
 	case LINUX_REBOOT_CMD_RESTART:
 		/* Who said DEC engineers have no sense of humor? ;-)  */ 
@@ -267,7 +269,7 @@ struct alpha_machine_vector miata_mv __initmv = {
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= DEFAULT_MEM_BASE,
 	.pci_dac_offset		= PYXIS_DAC_OFFSET,

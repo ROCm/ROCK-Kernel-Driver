@@ -37,7 +37,6 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/ptrace.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>

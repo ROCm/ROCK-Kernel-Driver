@@ -594,23 +594,12 @@ ENTRY(anakin_active_irqs)
 		add	\base, \base, #0x00d00000
 		ldr	\irqstat, [\base, #0]		@ ICIP
 		ldr	\irqnr, [\base, #4]		@ ICMR
-		ands	\irqstat, \irqstat, \irqnr
-		mov	\irqnr, #0
+		ands	\irqnr, \irqstat, \irqnr
 		beq	1001f
-		tst	\irqstat, #0xff00
-		moveq	\irqstat, \irqstat, lsr #8
-		addeq	\irqnr, \irqnr, #8
-		tsteq	\irqstat, #0xff00
-		moveq	\irqstat, \irqstat, lsr #8
-		addeq	\irqnr, \irqnr, #8
-		tst	\irqstat, #0x0f00
-		moveq	\irqstat, \irqstat, lsr #4
-		addeq	\irqnr, \irqnr, #4
-		tst	\irqstat, #0x0300
-		moveq	\irqstat, \irqstat, lsr #2
-		addeq	\irqnr, \irqnr, #2
-		tst	\irqstat, #0x0100
-		addeqs	\irqnr, \irqnr, #1
+		rsb	\irqstat, \irqnr, #0
+		and	\irqstat, \irqstat, \irqnr
+		clz	\irqnr, \irqstat
+		rsb	\irqnr, \irqnr, #23
 1001:
 		.endm
 

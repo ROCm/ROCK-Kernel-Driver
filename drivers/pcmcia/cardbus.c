@@ -2,7 +2,7 @@
   
     Cardbus device configuration
     
-    cardbus.c 1.63 1999/11/08 20:47:02
+    cardbus.c 1.87 2002/10/24 06:11:41
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -15,7 +15,7 @@
     rights and limitations under the License.
 
     The initial developer of the original code is David A. Hinds
-    <dhinds@pcmcia.sourceforge.org>.  Portions created by David A. Hinds
+    <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
@@ -175,8 +175,8 @@ static int cb_setup_cis_mem(socket_info_t * s, struct pci_dev *dev, struct resou
     
 =====================================================================*/
 
-void read_cb_mem(socket_info_t * s, u_char fn, int space,
-		 u_int addr, u_int len, void *ptr)
+int read_cb_mem(socket_info_t * s, u_char fn, int space,
+		u_int addr, u_int len, void *ptr)
 {
 	struct pci_dev *dev;
 	struct resource *res;
@@ -194,7 +194,7 @@ void read_cb_mem(socket_info_t * s, u_char fn, int space,
 			goto fail;
 		for (; len; addr++, ptr++, len--)
 			pci_readb(dev, addr, (u_char *) ptr);
-		return;
+		return 0;
 	}
 
 	res = dev->resource + space - 1;
@@ -214,11 +214,11 @@ void read_cb_mem(socket_info_t * s, u_char fn, int space,
 		goto fail;
 
 	memcpy_fromio(ptr, s->cb_cis_virt + addr, len);
-	return;
+	return 0;
 
 fail:
 	memset(ptr, 0xff, len);
-	return;
+	return -1;
 }
 
 /*=====================================================================

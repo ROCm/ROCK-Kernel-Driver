@@ -17,7 +17,6 @@
    icons) these files will provide "cooked" data.  Otherwise they will
    simply provide raw access (read-only of course) to the ROM.  */
 
-#include <linux/ptrace.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/nubus.h>

@@ -305,7 +305,7 @@ struct alpha_machine_vector noritake_mv __initmv = {
 	DO_APECS_IO,
 	DO_APECS_BUS,
 	.machine_check		= noritake_apecs_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= EISA_DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -316,7 +316,6 @@ struct alpha_machine_vector noritake_mv __initmv = {
 	.init_irq		= noritake_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= common_init_pci,
-	.kill_arch		= NULL,
 	.pci_map_irq		= noritake_map_irq,
 	.pci_swizzle		= noritake_swizzle,
 };
@@ -331,7 +330,7 @@ struct alpha_machine_vector noritake_primo_mv __initmv = {
 	DO_CIA_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= EISA_DEFAULT_IO_BASE,
 	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
@@ -342,6 +341,7 @@ struct alpha_machine_vector noritake_primo_mv __initmv = {
 	.init_irq		= noritake_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= cia_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= noritake_map_irq,
 	.pci_swizzle		= noritake_swizzle,
 };

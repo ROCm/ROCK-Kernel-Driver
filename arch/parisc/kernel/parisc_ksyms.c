@@ -79,13 +79,9 @@ extern int $global$;
 EXPORT_SYMBOL_NOVERS($global$);
 #endif
 
-#include <asm/gsc.h>
 EXPORT_SYMBOL(register_parisc_driver);
 EXPORT_SYMBOL(unregister_parisc_driver);
 EXPORT_SYMBOL(pdc_iodc_read);
-#ifdef CONFIG_GSC
-EXPORT_SYMBOL(gsc_alloc_irq);
-#endif
 
 #include <asm/io.h>
 EXPORT_SYMBOL(__ioremap);

@@ -223,15 +223,6 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		struct inet_protocol *ipprot;
 
 	resubmit:
-
-		/* Fuck... This IS ugly. */
-		if (protocol != IPPROTO_AH &&
-		    protocol != IPPROTO_ESP &&
-		    !xfrm_policy_check(XFRM_POLICY_IN, skb)) {
-			kfree_skb(skb);
-			return 0;
-		}
-
 		hash = protocol & (MAX_INET_PROTOS - 1);
 		raw_sk = raw_v4_htable[hash];
 
@@ -242,7 +233,14 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			raw_v4_input(skb, skb->nh.iph, hash);
 
 		if ((ipprot = inet_protos[hash]) != NULL) {
-			int ret = ipprot->handler(skb);
+			int ret;
+
+			if (!ipprot->no_policy &&
+			    !xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+				kfree_skb(skb);
+				return 0;
+			}
+			ret = ipprot->handler(skb);
 			if (ret < 0) {
 				protocol = -ret;
 				goto resubmit;
@@ -250,9 +248,11 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			IP_INC_STATS_BH(IpInDelivers);
 		} else {
 			if (!raw_sk) {
-				IP_INC_STATS_BH(IpInUnknownProtos);
-				icmp_send(skb, ICMP_DEST_UNREACH,
-					  ICMP_PROT_UNREACH, 0);
+				if (xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+					IP_INC_STATS_BH(IpInUnknownProtos);
+					icmp_send(skb, ICMP_DEST_UNREACH,
+						  ICMP_PROT_UNREACH, 0);
+				}
 			} else
 				IP_INC_STATS_BH(IpInDelivers);
 			kfree_skb(skb);

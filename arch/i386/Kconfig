@@ -14,6 +14,14 @@ config X86
 	  486, 586, Pentiums, and various instruction-set-compatible chips by
 	  AMD, Cyrix, and others.
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config SBUS
 	bool
 
@@ -329,7 +337,6 @@ config PREEMPT
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
-	default y if SMP
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -439,7 +446,7 @@ config X86_MCE
 	  the 386 and 486, so nearly everyone can say Y here.
 
 config X86_MCE_NONFATAL
-	bool "Check for non-fatal errors on Athlon/Duron"
+	bool "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
 	depends on X86_MCE
 	help
 	  Enabling this feature starts a timer that triggers every 5 seconds which
@@ -448,12 +455,12 @@ config X86_MCE_NONFATAL
 	  Disable this if you don't want to see these messages.
 	  Seeing the messages this option prints out may be indicative of dying hardware,
 	  or out-of-spec (ie, overclocked) hardware.
-	  This option only does something on hardware with Intel P6 style MCE.
-	  (Pentium Pro and above, AMD Athlon/Duron)
+	  This option only does something on certain CPUs.
+	  (AMD Athlon/Duron and Intel Pentium 4)
 
 config X86_MCE_P4THERMAL
 	bool "check for P4 thermal throttling interrupt."
-	depends on X86_MCE && X86_UP_APIC
+	depends on X86_MCE && (X86_UP_APIC || SMP)
 	help
 	  Enabling this feature will cause a message to be printed when the P4
 	  enters thermal throttling.
@@ -471,25 +478,18 @@ config CPU_FREQ
 	  If in doubt, say N.
 
 config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4.)"
+	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
 	depends on CPU_FREQ
-	---help---
+	help
 	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. Note
-	  that some drivers do not support this interface or offer less
-	  functionality. 
-
-	  If you say N here, you'll be able to control CPUFreq using the
-	  new /proc/cpufreq interface.
+	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
+	  uses /proc/cpufreq instead. Please note that some drivers do not 
+	  work well with the 2.4. /proc/sys/cpu sysctl interface, so if in
+	  doubt, say N here.
 
 	  For details, take a look at linux/Documentation/cpufreq. 
 
 	  If in doubt, say N.
-
-config CPU_FREQ_26_API
-	bool
-	depends on CPU_FREQ && !CPU_FREQ_24_API
-	default y
 
 config X86_POWERNOW_K6
 	tristate "AMD Mobile K6-2/K6-3 PowerNow!"
@@ -554,7 +554,7 @@ config X86_P4_CLOCKMOD
 
 config X86_LONGRUN
 	tristate "Transmeta LongRun"
-	depends on CPU_FREQ && !CPU_FREQ_24_API
+	depends on CPU_FREQ
 	help
 	  This adds the CPUFreq driver for Transmeta Crusoe processors which
 	  support LongRun.

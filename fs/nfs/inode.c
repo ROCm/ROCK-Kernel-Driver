@@ -117,7 +117,7 @@ nfs_delete_inode(struct inode * inode)
 	/*
 	 * The following can never actually happen...
 	 */
-	if (nfs_have_writebacks(inode) || nfs_have_read(inode)) {
+	if (nfs_have_writebacks(inode)) {
 		printk(KERN_ERR "nfs_delete_inode: inode %ld has pending RPC requests\n", inode->i_ino);
 	}
 
@@ -1555,11 +1555,9 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&nfsi->vfs_inode);
-		INIT_LIST_HEAD(&nfsi->read);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
 		INIT_LIST_HEAD(&nfsi->writeback);
-		nfsi->nread = 0;
 		nfsi->ndirty = 0;
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;

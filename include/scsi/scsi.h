@@ -15,6 +15,13 @@
 */
 
 /*
+ * SCSI command lengths
+ */
+
+extern const unsigned char scsi_command_size[8];
+#define COMMAND_SIZE(opcode) scsi_command_size[((opcode) >> 5) & 7]
+
+/*
  *      SCSI opcodes
  */
 

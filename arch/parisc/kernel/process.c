@@ -35,7 +35,6 @@
 #include <asm/pgalloc.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/gsc.h>
 #include <asm/processor.h>
 #include <asm/pdc_chassis.h>
 

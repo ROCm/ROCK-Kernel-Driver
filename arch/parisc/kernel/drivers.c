@@ -23,7 +23,6 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/pdc.h>
-#include <asm/gsc.h>
 
 /* See comments in include/asm-parisc/pci.h */
 struct pci_dma_ops *hppa_dma_ops;

@@ -50,32 +50,55 @@ static int stock_freq;
 MODULE_PARM(stock_freq, "i");
 
 static struct cpufreq_driver *cpufreq_p4_driver;
-static unsigned int cpufreq_p4_old_state = 0;
 
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 {
 	u32 l, h;
 	unsigned long cpus_allowed;
-	struct cpufreq_freqs    freqs;
+	struct cpufreq_freqs freqs;
+	int hyperthreading = 0;
+	int affected_cpu_map = 0;
+	int sibling = 0;
 
 	if (!cpu_online(cpu) || (newstate > DC_DISABLE) || 
 		(newstate == DC_RESV))
 		return -EINVAL;
-	cpu = cpu >> 1; /* physical CPU #nr */
-
-	/* notifiers */
-	freqs.old = stock_freq * cpufreq_p4_old_state / 8;
-	freqs.new = stock_freq * newstate / 8;
-	freqs.cpu = 2*cpu;
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	freqs.cpu++;
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	/* switch to physical CPU where state is to be changed*/
 	cpus_allowed = current->cpus_allowed;
-	set_cpus_allowed(current, 3 << (2 * cpu));
-	BUG_ON(cpu != (smp_processor_id() >> 1));
+
+	/* only run on CPU to be set, or on its sibling */
+	affected_cpu_map = 1 << cpu;
+#ifdef CONFIG_X86_HT
+	hyperthreading = ((cpu_has_ht) && (smp_num_siblings == 2));
+	if (hyperthreading) {
+		sibling = cpu_sibling_map[cpu];
+		affected_cpu_map |= (1 << sibling);
+	}
+#endif
+	set_cpus_allowed(current, affected_cpu_map);
+	BUG_ON(!(smp_processor_id() & affected_cpu_map));
+
+	/* get current state */
+	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
+	l = l >> 1;
+	l &= 0x7;
+
+	if (l == newstate) {
+		set_cpus_allowed(current, cpus_allowed);
+		return 0;
+	}
+
+	/* notifiers */
+	freqs.old = stock_freq * l / 8;
+	freqs.new = stock_freq * newstate / 8;
+	freqs.cpu = cpu;
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	if (hyperthreading) {
+		freqs.cpu = sibling;
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	}
 
 	rdmsr(MSR_IA32_THERM_STATUS, l, h);
 	if (l & 0x01)
@@ -86,10 +109,10 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
 	if (newstate == DC_DISABLE) {
-		printk(KERN_INFO PFX "CPU#%d,%d disabling modulation\n", cpu, (cpu + 1));
+		printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu);
 		wrmsr(MSR_IA32_THERM_CONTROL, l & ~(1<<4), h);
 	} else {
-		printk(KERN_INFO PFX "CPU#%d,%d setting duty cycle to %d%%\n", cpu, (cpu + 1), ((125 * newstate) / 10));
+		printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n", cpu, ((125 * newstate) / 10));
 		/* bits 63 - 5	: reserved 
 		 * bit  4	: enable/disable
 		 * bits 3-1	: duty cycle
@@ -104,9 +127,10 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 
 	/* notifiers */
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	freqs.cpu--;
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	cpufreq_p4_old_state = newstate;
+	if (hyperthreading) {
+		freqs.cpu = cpu;
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	}
 
 	return 0;
 }
@@ -123,7 +147,7 @@ static void cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 
 	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
 	{
-		for (i=8; i>0; i++)
+		for (i=8; i>0; i--)
 			if ((policy->min <= ((stock_freq / 8) * i)) &&
 			    (policy->max >= ((stock_freq / 8) * i))) 
 			{
@@ -131,7 +155,7 @@ static void cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 				number_states++;
 			}
 	} else {
-		for (i=0; i<=8; i--)
+		for (i=1; i<=8; i++)
 			if ((policy->min <= ((stock_freq / 8) * i)) &&
 			    (policy->max >= ((stock_freq / 8) * i))) 
 			{
@@ -143,9 +167,9 @@ static void cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 	/* if (number_states == 1) */
 	{
 		if (policy->cpu == CPUFREQ_ALL_CPUS) {
-			for (i=0; i<(NR_CPUS/2); i++)
-				if (cpu_online(2*i))
-					cpufreq_p4_setdc((2*i), newstate);
+			for (i=0; i<NR_CPUS; i++)
+				if (cpu_online(i))
+					cpufreq_p4_setdc(i, newstate);
 		} else {
 			cpufreq_p4_setdc(policy->cpu, newstate);
 		}
@@ -235,7 +259,6 @@ int __init cpufreq_p4_init(void)
 	for (i=0;i<NR_CPUS;i++)
 		driver->cpu_cur_freq[i] = stock_freq;
 #endif
-	cpufreq_p4_old_state  = DC_DISABLE;
 
 	driver->verify        = &cpufreq_p4_verify;
 	driver->setpolicy     = &cpufreq_p4_setpolicy;

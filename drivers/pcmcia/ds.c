@@ -316,6 +316,7 @@ static int ds_event(event_t event, int priority,
 	s->state &= ~SOCKET_PRESENT;
 	if (!(s->state & SOCKET_REMOVAL_PENDING)) {
 	    s->state |= SOCKET_REMOVAL_PENDING;
+	    init_timer(&s->removal);
 	    s->removal.expires = jiffies + HZ/10;
 	    add_timer(&s->removal);
 	}

@@ -23,7 +23,7 @@
 
 	|section 8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	nrm_set
 	|xref	round

@@ -67,6 +67,12 @@ SECTIONS
 	__initcall_end = .;
   }
 
+  .init.ramfs ALIGN(8192): {
+	__initramfs_start = .;
+	*(.init.ramfs)
+	__initramfs_end = .;
+  }
+
   .data.percpu ALIGN(64): {
 	__per_cpu_start = .;
 	*(.data.percpu)

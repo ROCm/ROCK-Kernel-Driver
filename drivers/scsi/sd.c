@@ -83,6 +83,7 @@ struct scsi_disk {
 	unsigned	RCD : 1;	/* state of disk RCD bit */
 };
 
+static int sd_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */
 static LIST_HEAD(sd_devlist);
 static spinlock_t sd_devlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -106,7 +107,6 @@ static struct Scsi_Device_Template sd_template = {
 	.name		= "disk",
 	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
-	.blk		= 1,
 	.detect		= sd_detect,
 	.attach		= sd_attach,
 	.detach		= sd_detach,
@@ -700,15 +700,17 @@ static int check_scsidisk_media_change(struct gendisk *disk)
 				 * check_disk_change */
 	}
 
-	/* Using Start/Stop enables differentiation between drive with
+	/* Using TEST_UNIT_READY enables differentiation between drive with
 	 * no cartridge loaded - NOT READY, drive with changed cartridge -
 	 * UNIT ATTENTION, or with same cartridge - GOOD STATUS.
-	 * This also handles drives that auto spin down. eg iomega jaz 1GB
-	 * as this will spin up the drive.
+	 *
+	 * Drives that auto spin down. eg iomega jaz 1G, will be started
+	 * by sd_spinup_disk() from sd_init_onedisk(), which happens whenever
+	 * sd_revalidate() is called.
 	 */
 	retval = -ENODEV;
 	if (scsi_block_when_processing_errors(sdp))
-		retval = scsi_ioctl(sdp, SCSI_IOCTL_START_UNIT, NULL);
+		retval = scsi_ioctl(sdp, SCSI_IOCTL_TEST_UNIT_READY, NULL);
 
 	if (retval) {		/* Unable to test, unit probably not ready.
 				 * This usually means there is no disc in the
@@ -794,10 +796,9 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		if (sd_media_not_present(sdkp, SRpnt))
 			return;
 
-		/* Look for non-removable devices that return NOT_READY.
+		/* Look for devices that return NOT_READY.
 		 * Issue command to spin up drive for these cases. */
-		if (the_result && !sdp->removable &&
-		    SRpnt->sr_sense_buffer[2] == NOT_READY) {
+		if (the_result && SRpnt->sr_sense_buffer[2] == NOT_READY) {
 			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
@@ -1178,7 +1179,6 @@ static int sd_detect(struct scsi_device * sdp)
 	SCSI_LOG_HLQUEUE(3, printk("sd_detect: type=%d\n", sdp->type));
 	if (sdp->type != TYPE_DISK && sdp->type != TYPE_MOD)
 		return 0;
-	sd_template.dev_noticed++;
 	return 1;
 }
 
@@ -1212,9 +1212,12 @@ static int sd_attach(struct scsi_device * sdp)
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 
+	if (scsi_slave_attach(sdp))
+		goto out;
+
 	sdkp = kmalloc(sizeof(*sdkp), GFP_KERNEL);
 	if (!sdkp)
-		goto out;
+		goto out_detach;
 
 	gd = alloc_disk(16);
 	if (!gd)
@@ -1227,7 +1230,7 @@ static int sd_attach(struct scsi_device * sdp)
 	 * XXX  use find_first_zero_bit on it.  This will happen at the
 	 * XXX  same time template->nr_* goes away.		--hch
 	 */
-	dsk_nr = sd_template.nr_dev++;
+	dsk_nr = sd_nr_dev++;
 
 	sdkp->device = sdp;
 	sdkp->driver = &sd_template;
@@ -1263,8 +1266,9 @@ static int sd_attach(struct scsi_device * sdp)
 
 out_free:
 	kfree(sdkp);
+out_detach:
+	scsi_slave_detach(sdp);
 out:
-	sdp->attached--;
 	return 1;
 }
 
@@ -1312,9 +1316,8 @@ static void sd_detach(struct scsi_device * sdp)
 
 	sd_devlist_remove(sdkp);
 	del_gendisk(sdkp->disk);
-	sdp->attached--;
-	sd_template.dev_noticed--;
-	sd_template.nr_dev--;
+	scsi_slave_detach(sdp);
+	sd_nr_dev--;
 	put_disk(sdkp->disk);
 	kfree(sdkp);
 }

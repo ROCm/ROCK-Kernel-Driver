@@ -4,6 +4,4 @@
 
 obj-y		:= ksyms.o config.o ints.o time.o reboot.o
 
-obj-$(CONFIG_VT)	+= hil.o
-
 include $(TOPDIR)/Rules.make

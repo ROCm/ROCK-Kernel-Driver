@@ -159,8 +159,7 @@ struct mac_serial {
 	int			xmit_head;
 	int			xmit_tail;
 	int			xmit_cnt;
-	struct tq_struct	tqueue;
-	struct tq_struct	tqueue_hangup;
+	struct work_struct	tqueue;
 	struct termios		normal_termios;
 	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;

@@ -1375,8 +1375,7 @@ static void cs_nosound(unsigned long xx)
 	restore_flags(flags);
 }
 
-static struct timer_list beep_timer = {
-	.function = cs_nosound
+static struct timer_list beep_timer = TIMER_INITIALIZER(cs_nosound, 0, 0);
 };
 
 static void cs_mksound(unsigned int hz, unsigned int ticks)

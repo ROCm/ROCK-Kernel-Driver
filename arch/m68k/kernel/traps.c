@@ -881,9 +881,10 @@ void show_trace_task(struct task_struct *tsk)
 	show_trace((unsigned long *)tsk->thread.esp0);
 }
 
-static void dump_stack(struct frame *fp)
+void show_registers(struct pt_regs *regs)
 {
-	unsigned long *stack, *endstack, addr;
+	struct frame *fp = (struct frame *)regs;
+	unsigned long addr;
 	int i;
 
 	addr = (unsigned long)&fp->un;
@@ -938,9 +939,22 @@ static void dump_stack(struct frame *fp)
 	default:
 	    printk("\n");
 	}
+	show_stack((unsigned long *)addr);
 
-	stack = (unsigned long *)addr;
-	endstack = (unsigned long *)((addr + THREAD_SIZE - 1) & -THREAD_SIZE);
+	printk("Code: ");
+	for (i = 0; i < 10; i++)
+		printk("%04x ", 0xffff & ((short *) fp->ptregs.pc)[i]);
+	printk ("\n");
+}
+
+extern void show_stack(unsigned long *stack)
+{
+	unsigned long *endstack;
+	int i;
+
+	if (!stack)
+		stack = (unsigned long *)&stack;
+	endstack = (unsigned long *)(((unsigned long)stack + THREAD_SIZE - 1) & -THREAD_SIZE);
 
 	printk("Stack from %08lx:", (unsigned long)stack);
 	for (i = 0; i < kstack_depth_to_print; i++) {
@@ -951,12 +965,17 @@ static void dump_stack(struct frame *fp)
 		printk(" %08lx", *stack++);
 	}
 	printk("\n");
-	show_trace((unsigned long *)addr);
+	show_trace(stack);
+}
 
-	printk("Code: ");
-	for (i = 0; i < 10; i++)
-		printk("%04x ", 0xffff & ((short *) fp->ptregs.pc)[i]);
-	printk ("\n");
+/*
+ * The architecture-independent backtrace generator
+ */
+void dump_stack(void)
+{
+	unsigned long stack;
+
+	show_trace(&stack);
 }
 
 void bad_super_trap (struct frame *fp)
@@ -1129,7 +1148,7 @@ void die_if_kernel (char *str, struct pt_regs *fp, int nr)
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, PAGE_SIZE+(unsigned long)current);
-	dump_stack((struct frame *)fp);
+	show_stack((unsigned long *)fp);
 	do_exit(SIGSEGV);
 }
 

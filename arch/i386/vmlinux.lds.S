@@ -79,7 +79,7 @@ SECTIONS
   __initcall_end = .;
   . = ALIGN(4096);
   __initramfs_start = .;
-  .init.ramfs : { *(.init.initramfs) }
+  .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
   . = ALIGN(32);
   __per_cpu_start = .;

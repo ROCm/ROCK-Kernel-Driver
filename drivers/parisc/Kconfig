@@ -1,0 +1,103 @@
+menu "Bus options (PCI, PCMCIA, EISA, GSC, ISA)"
+
+config GSC
+	bool "VSC/GSC/HSC bus support"
+	default y
+	help
+	  The VSC, GSC and HSC busses were used from the earliest 700-series
+	  workstations up to and including the C360/J2240 workstations.  They
+	  were also used in servers from the E-class to the K-class.  They
+	  are not found in B1000, C3000, J5000, A500, L1000, N4000 and upwards.
+	  If in doubt, say "Y".
+
+config IOMMU_CCIO
+	bool "U2/Uturn I/O MMU"
+	depends on GSC
+	help
+	  Say Y here to enable DMA management routines for the first
+	  generation of PA-RISC cache-coherent machines.  Programs the
+	  U2/Uturn chip in "Virtual Mode" and use the I/O MMU.
+
+config GSC_LASI
+	bool "Lasi I/O support"
+	depends on GSC
+	help
+	  Say Y here to directly support the Lasi controller chip found on
+	  PA-RISC workstations.  Linux-oriented documentation for this chip
+	  can be found at <http://www.parisc-linux.org/documentation/>.
+
+config GSC_WAX
+	bool "Wax I/O support"
+	depends on GSC
+	help
+	  Say Y here to support the Wax GSC to EISA Bridge found in some older
+	  systems, including B/C/D/R class.  Some machines use Wax for other
+	  purposes, such as providing one of the serial ports or being an
+	  interface chip for an X.25 GSC card.
+
+config EISA
+	bool "EISA support"
+	depends on GSC
+	help
+	  Say Y here if you have an EISA bus in your machine.  This code
+	  supports both the Mongoose & Wax EISA adapters.  It is sadly
+	  incomplete and lacks support for card-to-host DMA.
+
+config ISA
+	bool
+	depends on EISA
+
+config PCI
+	bool "PCI support"
+	help
+	  All recent HP machines have PCI slots, and you should say Y here
+	  if you have a recent machine.  If you are convinced you do not have
+	  PCI slots in your machine (eg a 712), then you may say "N" here.
+	  Beware that some GSC cards have a Dino onboard and PCI inside them,
+	  so it may be safest to say "Y" anyway.
+
+config GSC_DINO
+	bool "GSCtoPCI/Dino PCI support"
+	depends on PCI && GSC
+	help
+	  Say Y here to support the Dino & Cujo GSC to PCI bridges found in
+	  machines from the B132 to the C360, the J2240 and the A180.  Some
+	  GSC/HSC cards (eg gigabit & dual 100 Mbit Ethernet) have a Dino on
+	  the card, and you also need to say Y here if you have such a card.
+	  If in doubt, say Y.
+
+config PCI_LBA
+	bool "LBA/Elroy PCI support"
+	depends on PCI
+	help
+	  Say Y here to support the Elroy PCI Lower Bus Adapter.  This is
+	  present on B, C, J, L and N-class machines with 4-digit model
+	  numbers and the A400/A500.
+
+config IOSAPIC
+	bool
+	depends on PCI_LBA
+	default y
+
+config IOMMU_SBA
+	bool
+	depends on PCI_LBA
+	default y
+
+#config PCI_EPIC
+#	bool "EPIC/SAGA PCI support"
+#	depends on PCI
+
+config SUPERIO
+	bool
+	depends on PCI
+	help
+	  Say Y here to support the SuperIO chip found in Bxxxx, C3xxx and
+	  J5xxx+ machines.
+
+source "drivers/pci/Kconfig"
+
+config CHASSIS_LCD_LED
+	bool "Chassis LCD and LED support"
+
+endmenu

@@ -599,7 +599,7 @@ static int ext2_readpage(struct file *file, struct page *page)
 }
 
 static int
-ext2_readpages(struct address_space *mapping,
+ext2_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
 	return mpage_readpages(mapping, pages, nr_pages, ext2_get_block);
@@ -1015,7 +1015,6 @@ void ext2_read_inode (struct inode * inode)
 	}
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
-	inode->i_version = ++event;
 	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 	ei->i_faddr = le32_to_cpu(raw_inode->i_faddr);
 	ei->i_frag_no = raw_inode->i_frag;

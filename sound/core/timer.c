@@ -849,6 +849,7 @@ static int snd_timer_register_system(void)
 		snd_timer_free(timer);
 		return -ENOMEM;
 	}
+	init_timer(tlist);
 	tlist->function = snd_timer_s_function;
 	tlist->data = (unsigned long) timer;
 	timer->private_data = tlist;

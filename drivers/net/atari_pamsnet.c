@@ -169,7 +169,7 @@ static void pamsnet_tick(unsigned long);
 
 static void pamsnet_intr(int irq, void *data, struct pt_regs *fp);
 
-static struct timer_list pamsnet_timer = { function: amsnet_tick };
+static struct timer_list pamsnet_timer = TIMER_INITIALIZER(amsnet_tick, 0, 0);
 
 #define STRAM_ADDR(a)	(((a) & 0xff000000) == 0)
 

@@ -18,8 +18,8 @@ struct thread_info {
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
+	.task		= &tsk,			\
+	.exec_domain	= &default_exec_domain,	\
 }
 
 /* THREAD_SIZE should be 8k, so handle differently for 4k and 8k machines */
@@ -60,6 +60,9 @@ extern int thread_flag_fixme(void);
 	case TIF_NEED_RESCHED:				\
 		tsk->thread.work.need_resched = val;	\
 		break;					\
+	case TIF_SYSCALL_TRACE:				\
+		tsk->thread.work.syscall_trace = val;	\
+		break;					\
 	default:					\
 		thread_flag_fixme();			\
 	}						\
@@ -73,6 +76,9 @@ extern int thread_flag_fixme(void);
 		break;					\
 	case TIF_NEED_RESCHED:				\
 		___res = tsk->thread.work.need_resched;	\
+		break;					\
+	case TIF_SYSCALL_TRACE:				\
+		___res = tsk->thread.work.syscall_trace;\
 		break;					\
 	default:					\
 		___res = thread_flag_fixme();		\

@@ -95,12 +95,8 @@ e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags)
 		test_info [E100_EEPROM_TEST_FAIL] = true;
 	}
 
-	/* fully recover only if the device is open*/
-	if (netif_running(dev))  {
-		e100_deisolate_driver(bdp, true, false);
-	} else {
-    		e100_deisolate_driver(bdp, false, false);
-	}
+	e100_deisolate_driver(bdp, false);
+
 	/*Let card recover from the test*/
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ * 2);

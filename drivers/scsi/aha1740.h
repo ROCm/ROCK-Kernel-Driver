@@ -13,8 +13,8 @@
 #include <linux/types.h>
 
 /* Eisa Enhanced mode operation - slot locating and addressing */
-#define MINEISA 1   /* I don't have an EISA Spec to know these ranges, so I */
-#define MAXEISA 8   /* Just took my machine's specifications.  Adjust to fit.*/
+#define MINEISA 1		/* I don't have an EISA Spec to know these ranges, so I */
+#define MAXEISA 8		/* Just took my machine's specifications.  Adjust to fit. */
 		    /* I just saw an ad, and bumped this from 6 to 8 */
 #define	SLOTBASE(x)	((x << 12) + 0xc80)
 #define SLOTSIZE	0x5c
@@ -75,14 +75,14 @@
 #define	ATTN_START	0x40	/* Start CCB */
 #define	ATTN_ABORT	0x50	/* Abort CCB */
 
-#define G2CNTRL_HRST	0x80		/* Hard Reset */
-#define G2CNTRL_IRST	0x40		/* Clear EISA Interrupt */
-#define G2CNTRL_HRDY	0x20		/* Sets HOST ready */
+#define G2CNTRL_HRST	0x80	/* Hard Reset */
+#define G2CNTRL_IRST	0x40	/* Clear EISA Interrupt */
+#define G2CNTRL_HRDY	0x20	/* Sets HOST ready */
 
 /* This is used with scatter-gather */
 struct aha1740_chain {
-  u32  dataptr;		/* Location of data */
-  u32  datalen;		/* Size of this part of chain */
+	u32 dataptr;		/* Location of data */
+	u32 datalen;		/* Size of this part of chain */
 };
 
 /* These belong in scsi.h */
@@ -107,40 +107,40 @@ struct aha1740_chain {
 #define MAX_STATUS 32
 
 struct ecb {			/* Enhanced Control Block 6.1 */
-  u16	cmdw;			/* Command Word */
-  /* Flag Word 1 */
-  u16		cne:1,		/* Control Block Chaining */
-	:6,	di:1,		/* Disable Interrupt */
-	:2,	ses:1,		/* Suppress Underrun error */
-	:1,	sg:1,		/* Scatter/Gather */
-	:1,	dsb:1,		/* Disable Status Block */
-		ars:1;		/* Automatic Request Sense */
-  /* Flag Word 2 */
-  u16		lun:3,		/* Logical Unit */
-		tag:1,		/* Tagged Queuing */
-		tt:2,		/* Tag Type */
-		nd:1,		/* No Disconnect */
-	:1,	dat:1,		/* Data transfer - check direction */
-		dir:1,		/* Direction of transfer 1 = datain */
-		st:1,		/* Suppress Transfer */
-		chk:1,		/* Calculate Checksum */
-	:2,	rec:1,	:1;	/* Error Recovery */
-  u16	nil0;			/* nothing */
-  u32	dataptr;		/* Data or Scatter List ptr */
-  u32	datalen;		/* Data or Scatter List len */
-  u32	statusptr;		/* Status Block ptr */
-  u32	linkptr;		/* Chain Address */
-  u32	nil1;			/* nothing */
-  u32	senseptr;		/* Sense Info Pointer */
-  u8	senselen;		/* Sense Length */
-  u8	cdblen;			/* CDB Length */
-  u16	datacheck;		/* Data checksum */
-  u8	cdb[MAX_CDB];		/* CDB area */
+	u16 cmdw;		/* Command Word */
+	/* Flag Word 1 */
+	u16 cne:1,		/* Control Block Chaining */
+	:6, di:1,		/* Disable Interrupt */
+	:2, ses:1,		/* Suppress Underrun error */
+	:1, sg:1,		/* Scatter/Gather */
+	:1, dsb:1,		/* Disable Status Block */
+	 ars:1;			/* Automatic Request Sense */
+	/* Flag Word 2 */
+	u16 lun:3,		/* Logical Unit */
+	 tag:1,			/* Tagged Queuing */
+	 tt:2,			/* Tag Type */
+	 nd:1,			/* No Disconnect */
+	:1, dat:1,		/* Data transfer - check direction */
+	 dir:1,			/* Direction of transfer 1 = datain */
+	 st:1,			/* Suppress Transfer */
+	 chk:1,			/* Calculate Checksum */
+	:2, rec:1,:1;		/* Error Recovery */
+	u16 nil0;		/* nothing */
+	u32 dataptr;		/* Data or Scatter List ptr */
+	u32 datalen;		/* Data or Scatter List len */
+	u32 statusptr;		/* Status Block ptr */
+	u32 linkptr;		/* Chain Address */
+	u32 nil1;		/* nothing */
+	u32 senseptr;		/* Sense Info Pointer */
+	u8 senselen;		/* Sense Length */
+	u8 cdblen;		/* CDB Length */
+	u16 datacheck;		/* Data checksum */
+	u8 cdb[MAX_CDB];	/* CDB area */
 /* Hardware defined portion ends here, rest is driver defined */
-  u8	sense[MAX_SENSE];	/* Sense area */ 
-  u8	status[MAX_STATUS];	/* Status area */
-  Scsi_Cmnd *SCpnt;		/* Link to the SCSI Command Block */
-  void (*done)(Scsi_Cmnd *);	/* Completion Function */
+	u8 sense[MAX_SENSE];	/* Sense area */
+	u8 status[MAX_STATUS];	/* Status area */
+	Scsi_Cmnd *SCpnt;	/* Link to the SCSI Command Block */
+	void (*done) (Scsi_Cmnd *);	/* Completion Function */
 };
 
 #define	AHA1740CMD_NOP	 0x00	/* No OP */
@@ -152,23 +152,15 @@ struct ecb {			/* Enhanced Control Block 6.1 */
 #define AHA1740CMD_RINQ  0x0a	/* Read Host Adapter Inquiry Data */
 #define AHA1740CMD_TARG  0x10	/* Target SCSI Command */
 
-int aha1740_detect(Scsi_Host_Template *);
-int aha1740_command(Scsi_Cmnd *);
-int aha1740_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int aha1740_abort(Scsi_Cmnd *);
-int aha1740_reset(Scsi_Cmnd *, unsigned int);
-int aha1740_biosparam(struct scsi_device *, struct block_device *,
-		sector_t, int*);
-int aha1740_proc_info(char *buffer, char **start, off_t offset,
-                               int length, int hostno, int inout);
+static int aha1740_detect(Scsi_Host_Template *);
+static int aha1740_command(Scsi_Cmnd *);
+static int aha1740_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int aha1740_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
+static int aha1740_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
 
 #define AHA1740_ECBS 32
 #define AHA1740_SCATTER 16
 #define AHA1740_CMDLUN 1
-
-#ifndef NULL
-	#define NULL 0
-#endif
 
 #define AHA1740 {  proc_name:      "aha1740",				\
 		   proc_info:      aha1740_proc_info,	                \
@@ -176,8 +168,6 @@ int aha1740_proc_info(char *buffer, char **start, off_t offset,
 		   detect:         aha1740_detect,			\
 		   command:        aha1740_command,			\
 		   queuecommand:   aha1740_queuecommand,		\
-		   abort:          aha1740_abort,			\
-		   reset:          aha1740_reset,			\
 		   bios_param:     aha1740_biosparam,                   \
 		   can_queue:      AHA1740_ECBS, 			\
 		   this_id:        7, 					\

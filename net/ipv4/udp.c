@@ -104,6 +104,7 @@
 #include <net/route.h>
 #include <net/inet_common.h>
 #include <net/checksum.h>
+#include <net/xfrm.h>
 
 /*
  *	Snmp MIB for the UDP layer
@@ -600,7 +601,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				    .uli_u = { .ports =
 					       { .sport = inet->sport,
 						 .dport = dport } } };
-		err = ip_route_output_key(&rt, &fl);
+		err = ip_route_output_flow(&rt, &fl, sk, msg->msg_flags&MSG_DONTWAIT);
 		if (err)
 			goto out;
 
@@ -943,6 +944,10 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	/*
 	 *	Charge it to the socket, dropping if the queue is full.
 	 */
+	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+		kfree_skb(skb);
+		return -1;
+	}
 
 #if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
@@ -1070,6 +1075,9 @@ int udp_rcv(struct sk_buff *skb)
 		return 0;
 	}
 
+	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb))
+		goto drop;
+
 	/* No socket. Drop packet silently, if checksum is wrong */
 	if (udp_checksum_complete(skb))
 		goto csum_error;
@@ -1110,6 +1118,7 @@ csum_error:
 			NIPQUAD(daddr),
 			ntohs(uh->dest),
 			ulen));
+drop:
 	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
 	return(0);

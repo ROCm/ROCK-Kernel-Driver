@@ -22,7 +22,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/hardware/amba_kmi.h>
-#include <asm/mach/amba_kmi.h>
 
 extern struct pt_regs *kbd_pt_regs;
 

@@ -275,7 +275,7 @@ struct alpha_machine_vector takara_mv __initmv = {
 	DO_CIA_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
@@ -286,7 +286,7 @@ struct alpha_machine_vector takara_mv __initmv = {
 	.init_irq		= takara_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= takara_init_pci,
-	.kill_arch		= NULL,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= takara_map_irq,
 	.pci_swizzle		= takara_swizzle,
 };

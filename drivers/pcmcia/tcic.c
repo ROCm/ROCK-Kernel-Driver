@@ -15,7 +15,7 @@
     rights and limitations under the License.
 
     The initial developer of the original code is David A. Hinds
-    <dhinds@pcmcia.sourceforge.org>.  Portions created by David A. Hinds
+    <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
@@ -67,7 +67,7 @@ static const char *version =
 #define DEBUG(n, args...)
 #endif
 
-MODULE_AUTHOR("David Hinds <dhinds@pcmcia.sourceforge.org>");
+MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("Databook TCIC-2 PCMCIA socket driver");
 MODULE_LICENSE("Dual MPL/GPL");
 

@@ -31,8 +31,8 @@ struct Sun_Machine_Models Sun_Machines[NUM_SUN_MACHINES] = {
 { "Sun 3/60", (SM_SUN3 | SM_3_60) },
 { "Sun 3/E", (SM_SUN3 | SM_3_E) },
 /* Now, Sun3x's */
-{ "Sun 3/460 Series", (SM_SUN3 | SM_3_460) },
-{ "Sun 3/80", (SM_SUN3 | SM_3_80) },
+{ "Sun 3/460 Series", (SM_SUN3X | SM_3_460) },
+{ "Sun 3/80", (SM_SUN3X | SM_3_80) },
 /* Then, Sun4's */
 //{ "Sun 4/100 Series", (SM_SUN4 | SM_4_110) },
 //{ "Sun 4/200 Series", (SM_SUN4 | SM_4_260) },

@@ -26,10 +26,10 @@ __RXACCT_DECL(atomic_t rxrpc_message_count);
 LIST_HEAD(rxrpc_calls);
 DECLARE_RWSEM(rxrpc_calls_sem);
 
-unsigned rxrpc_call_rcv_timeout		= 30;
-unsigned rxrpc_call_acks_timeout	= 30;
-unsigned rxrpc_call_dfr_ack_timeout	= 5;
-unsigned short rxrpc_call_max_resend	= 10;
+unsigned rxrpc_call_rcv_timeout		= HZ/3;
+unsigned rxrpc_call_acks_timeout	= HZ/3;
+unsigned rxrpc_call_dfr_ack_timeout	= HZ/20;
+unsigned short rxrpc_call_max_resend	= HZ/10;
 
 const char *rxrpc_call_states[] = {
 	"COMPLETE",
@@ -128,6 +128,22 @@ static void __rxrpc_call_ackr_timeout(unsigned long _call)
 	call->flags |= RXRPC_CALL_ACKR_TIMO;
 	rxrpc_krxiod_queue_call(call);
 }
+
+/*****************************************************************************/
+/*
+ * calculate a timeout based on an RTT value
+ */
+static inline unsigned long __rxrpc_rtt_based_timeout(struct rxrpc_call *call, unsigned long val)
+{
+	unsigned long expiry = call->conn->peer->rtt / (1000000/HZ);
+
+	expiry += 10;
+	if (expiry<HZ/25) expiry = HZ/25;
+	if (expiry>HZ) expiry = HZ;
+
+	_leave(" = %lu jiffies",expiry);
+	return jiffies + expiry;
+} /* end __rxrpc_rtt_based_timeout() */
 
 /*****************************************************************************/
 /*
@@ -321,7 +337,10 @@ int rxrpc_incoming_call(struct rxrpc_connection *conn,
 
 	spin_lock(&conn->lock);
 
-	if (!conn->channels[cix]) {
+	if (!conn->channels[cix] ||
+	    conn->channels[cix]->app_call_state == RXRPC_CSTATE_COMPLETE ||
+	    conn->channels[cix]->app_call_state == RXRPC_CSTATE_ERROR
+	    ) {
 		conn->channels[cix] = call;
 		rxrpc_get_connection(conn);
 		ret = 0;
@@ -329,9 +348,10 @@ int rxrpc_incoming_call(struct rxrpc_connection *conn,
 
 	spin_unlock(&conn->lock);
 
-	if (ret<0) free_page((unsigned long)call);
-
-	_leave(" = %p",call);
+	if (ret<0) {
+		free_page((unsigned long)call);
+		call = NULL;
+	}
 
 	if (ret==0) {
 		down_write(&rxrpc_calls_sem);
@@ -341,6 +361,7 @@ int rxrpc_incoming_call(struct rxrpc_connection *conn,
 		*_call = call;
 	}
 
+	_leave(" = %d [%p]",ret,call);
 	return ret;
 } /* end rxrpc_incoming_call() */
 
@@ -367,7 +388,8 @@ void rxrpc_put_call(struct rxrpc_call *call)
 		return;
 	}
 
-	conn->channels[ntohl(call->chan_ix)] = NULL;
+	if (conn->channels[ntohl(call->chan_ix)]==call)
+		conn->channels[ntohl(call->chan_ix)] = NULL;
 
 	spin_unlock(&conn->lock);
 
@@ -1005,7 +1027,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 	}
 
 	/* next in sequence - simply append into the call's ready queue */
-	_debug("Call add packet %d to readyq (+%d => %d bytes)",
+	_debug("Call add packet %d to readyq (+%Zd => %Zd bytes)",
 	       msg->seq,msg->dsize,call->app_ready_qty);
 
 	spin_lock(&call->lock);
@@ -1021,7 +1043,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 			break;
 
 		/* next in sequence - just move list-to-list */
-		_debug("Call transfer packet %d to readyq (+%d => %d bytes)",
+		_debug("Call transfer packet %d to readyq (+%Zd => %Zd bytes)",
 		       pmsg->seq,pmsg->dsize,call->app_ready_qty);
 
 		call->app_ready_seq = pmsg->seq;
@@ -1156,7 +1178,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 	/* otherwise just invoke the data function whenever we can satisfy its desire for more
 	 * data
 	 */
-	_proto("Rx Received Op Data: st=%u qty=%u mk=%u%s",
+	_proto("Rx Received Op Data: st=%u qty=%Zu mk=%Zu%s",
 	       call->app_call_state,call->app_ready_qty,call->app_mark,
 	       call->app_last_rcv ? " last-rcvd" : "");
 
@@ -1394,7 +1416,7 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 	char resend, now_complete;
 	u8 acks[16];
 
-	_enter("%p{apc=%u ads=%u},%p,%u,%u",
+	_enter("%p{apc=%u ads=%u},%p,%u,%Zu",
 	       call,call->acks_pend_cnt,call->acks_dftv_seq,msg,seq,count);
 
 	/* handle re-ACK'ing of definitively ACK'd packets (may be out-of-order ACKs) */
@@ -1443,7 +1465,7 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 		}
 
 		_proto("Rx ACK of packets #%u-#%u [%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c] (pend=%u)",
-		       seq,seq+chunk-1,
+		       seq,(unsigned)(seq+chunk-1),
 		       _acktype[acks[0x0]],
 		       _acktype[acks[0x1]],
 		       _acktype[acks[0x2]],
@@ -1552,7 +1574,7 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 	size_t qty;
 	int ret;
 
-	_enter("%p{as=%d buf=%p qty=%u/%u}",
+	_enter("%p{as=%d buf=%p qty=%Zu/%Zu}",
 	       call,call->app_async_read,call->app_read_buf,call->app_ready_qty,call->app_mark);
 
 	/* check the state */
@@ -1560,7 +1582,7 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 	case RXRPC_CSTATE_SRVR_RCV_ARGS:
 	case RXRPC_CSTATE_CLNT_RCV_REPLY:
 		if (call->app_last_rcv) {
-			printk("%s(%p,%p,%d): Inconsistent call state (%s, last pkt)",
+			printk("%s(%p,%p,%Zd): Inconsistent call state (%s, last pkt)",
 			      __FUNCTION__,call,call->app_read_buf,call->app_mark,
 			      rxrpc_call_states[call->app_call_state]);
 			BUG();
@@ -1574,7 +1596,7 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 
 	case RXRPC_CSTATE_SRVR_SND_REPLY:
 		if (!call->app_last_rcv) {
-			printk("%s(%p,%p,%d): Inconsistent call state (%s, not last pkt)",
+			printk("%s(%p,%p,%Zd): Inconsistent call state (%s, not last pkt)",
 			      __FUNCTION__,call,call->app_read_buf,call->app_mark,
 			      rxrpc_call_states[call->app_call_state]);
 			BUG();
@@ -1616,11 +1638,11 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 		/* drag as much data as we need out of this packet */
 		qty = min(call->app_mark,msg->dsize);
 
-		_debug("reading %u from skb=%p off=%lu",qty,msg->pkt,msg->offset);
+		_debug("reading %Zu from skb=%p off=%lu",qty,msg->pkt,msg->offset);
 
 		if (call->app_read_buf)
 			if (skb_copy_bits(msg->pkt,msg->offset,call->app_read_buf,qty)<0)
-				panic("%s: Failed to copy data from packet: (%p,%p,%d)",
+				panic("%s: Failed to copy data from packet: (%p,%p,%Zd)",
 				      __FUNCTION__,call,call->app_read_buf,qty);
 
 		/* if that packet is now empty, discard it */
@@ -1673,7 +1695,7 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 	}
 
 	if (call->app_last_rcv) {
-		_debug("Insufficient data (%u/%u)",call->app_ready_qty,call->app_mark);
+		_debug("Insufficient data (%Zu/%Zu)",call->app_ready_qty,call->app_mark);
 		call->app_async_read = 0;
 		call->app_mark = RXRPC_APP_MARK_EOF;
 		call->app_read_buf = NULL;
@@ -1703,7 +1725,7 @@ int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int
 {
 	int ret;
 
-	_enter("%p{arq=%u},%p,%d,%x",call,call->app_ready_qty,buffer,size,flags);
+	_enter("%p{arq=%Zu},%p,%Zd,%x",call,call->app_ready_qty,buffer,size,flags);
 
 	spin_lock(&call->lock);
 
@@ -1799,7 +1821,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 	char *buf;
 	int ret;
 
-	_enter("%p,%u,%p,%02x,%x,%d,%p",call,sioc,siov,rxhdr_flags,alloc_flags,dup_data,size_sent);
+	_enter("%p,%Zu,%p,%02x,%x,%d,%p",call,sioc,siov,rxhdr_flags,alloc_flags,dup_data,size_sent);
 
 	*size_sent = 0;
 	size = 0;
@@ -1827,7 +1849,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 		size += sptr->iov_len;
 	}
 
-	_debug("- size=%u mtu=%u",size,call->conn->mtu_size);
+	_debug("- size=%Zu mtu=%Zu",size,call->conn->mtu_size);
 
 	do {
 		/* make sure there's a message under construction */
@@ -1837,7 +1859,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 						0,NULL,alloc_flags,&call->snd_nextmsg);
 			if (ret<0)
 				goto out;
-			_debug("- allocated new message [ds=%u]",call->snd_nextmsg->dsize);
+			_debug("- allocated new message [ds=%Zu]",call->snd_nextmsg->dsize);
 		}
 
 		msg = call->snd_nextmsg;
@@ -1857,7 +1879,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 		space = call->conn->mtu_size - msg->dsize;
 		chunk = min(space,size);
 
-		_debug("- [before] space=%u chunk=%u",space,chunk);
+		_debug("- [before] space=%Zu chunk=%Zu",space,chunk);
 
 		while (!siov->iov_len)
 			siov++;
@@ -1916,7 +1938,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 			}
 		}
 
-		_debug("- [loaded] chunk=%u size=%u",chunk,size);
+		_debug("- [loaded] chunk=%Zu size=%Zu",chunk,size);
 
 		/* dispatch the message when full, final or requesting ACK */
 		if (msg->dsize>=call->conn->mtu_size || rxhdr_flags) {
@@ -1929,7 +1951,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 
 	ret = 0;
  out:
-	_leave(" = %d (%d queued, %d rem)",ret,*size_sent,size);
+	_leave(" = %d (%Zd queued, %Zd rem)",ret,*size_sent,size);
 	return ret;
 
 } /* end rxrpc_call_write_data() */
@@ -1960,7 +1982,7 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 			msg->hdr.flags |= RXRPC_MORE_PACKETS;
 		}
 
-		_proto("Sending DATA message { ds=%u dc=%u df=%02lu }",
+		_proto("Sending DATA message { ds=%Zu dc=%u df=%02lu }",
 		       msg->dsize,msg->dcount,msg->dfree);
 
 		/* queue and adjust call state */
@@ -1993,7 +2015,8 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 
 		call->acks_pend_cnt++;
 
-		mod_timer(&call->acks_timeout,jiffies + rxrpc_call_acks_timeout);
+		mod_timer(&call->acks_timeout,
+			  __rxrpc_rtt_based_timeout(call,rxrpc_call_acks_timeout));
 
 		spin_unlock(&call->lock);
 
@@ -2061,7 +2084,7 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
 		spin_unlock(&call->lock);
 
 		/* send each message again (and ignore any errors we might incur) */
-		_proto("Resending DATA message { ds=%u dc=%u df=%02lu }",
+		_proto("Resending DATA message { ds=%Zu dc=%u df=%02lu }",
 		       msg->dsize,msg->dcount,msg->dfree);
 
 		if (rxrpc_conn_sendmsg(call->conn,msg)==0)
@@ -2073,7 +2096,7 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
 	}
 
 	/* reset the timeout */
-	mod_timer(&call->acks_timeout,jiffies + rxrpc_call_acks_timeout);
+	mod_timer(&call->acks_timeout,__rxrpc_rtt_based_timeout(call,rxrpc_call_acks_timeout));
 
 	spin_unlock(&call->lock);
 

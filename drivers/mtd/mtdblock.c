@@ -394,8 +394,8 @@ static void handle_mtdblock_request(void)
 
 	while (!blk_queue_empty(&mtd_queue)) {
 		struct request *req = elv_next_request(&mtd_queue);
-		spin_unlock_irq(mtd_queue.queue_lock);
 		struct mtdblk_dev **p = req->rq_disk->private_data;
+		spin_unlock_irq(mtd_queue.queue_lock);
 		mtdblk = *p;
 		res = 0;
 
@@ -551,7 +551,7 @@ static void mtd_notify_add(struct mtd_info* mtd)
 		disk->major = MAJOR_NR;
 		disk->first_minor = mtd->index;
 		disk->fops = &mtd_fops;
-		sprintf(disk->disk_name, "mtd%d", mtd->index);
+		sprintf(disk->disk_name, "mtdblock%d", mtd->index);
 
 		mtddisk[mtd->index] = disk;
 		set_capacity(disk, mtd->size / 512);

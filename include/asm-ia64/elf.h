@@ -65,11 +65,15 @@ extern void ia64_init_addr_space (void);
 #define ELF_NGREG	128	/* we really need just 72 but let's leave some headroom... */
 #define ELF_NFPREG	128	/* f0 and f1 could be omitted, but so what... */
 
+typedef unsigned long elf_fpxregset_t;
+
 typedef unsigned long elf_greg_t;
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 typedef struct ia64_fpreg elf_fpreg_t;
 typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
+
 
 struct pt_regs;	/* forward declaration... */
 extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
@@ -88,6 +92,14 @@ extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
 struct elf64_hdr;
 extern void ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter);
 #define SET_PERSONALITY(ex, ibcs2)	ia64_set_personality(&(ex), ibcs2)
+
+extern int dump_task_regs(struct task_struct *, elf_gregset_t *);
+extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
+
+#define ELF_CORE_COPY_TASK_REGS(tsk, elf_gregs) dump_task_regs(tsk, elf_gregs)
+#define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
+
+
 #endif
 
 #endif /* _ASM_IA64_ELF_H */

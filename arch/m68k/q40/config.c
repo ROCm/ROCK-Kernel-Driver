@@ -59,6 +59,8 @@ void q40_halt(void);
 extern void q40_waitbut(void);
 void q40_set_vectors (void);
 
+extern void q40_mksound(unsigned int /*freq*/, unsigned int /*ticks*/ );
+
 extern char *saved_command_line;
 extern char m68k_debug_device[];
 static void q40_mem_console_write(struct console *co, const char *b,
@@ -181,7 +183,7 @@ void __init config_q40(void)
     mach_get_model       = q40_get_model;
     mach_get_hardware_list = q40_get_hardware_list;
 
-#ifdef CONFIG_INPUT_M68K_BEEP
+#if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
     mach_beep            = q40_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT

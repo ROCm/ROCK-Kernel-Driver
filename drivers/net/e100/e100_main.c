@@ -135,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.24-k1";
+char e100_driver_version[]="2.1.24-k2";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -935,13 +935,6 @@ e100_open(struct net_device *dev)
 
 	bdp = dev->priv;
 
-	read_lock(&(bdp->isolate_lock));
-
-	if (bdp->driver_isolated) {
-		rc = -EBUSY;
-		goto exit;
-	}
-
 	/* setup the tcb pool */
 	if (!e100_alloc_tcb_pool(bdp)) {
 		rc = -ENOMEM;
@@ -990,7 +983,6 @@ e100_open(struct net_device *dev)
 err_exit:
 	e100_clear_pools(bdp);
 exit:
-	read_unlock(&(bdp->isolate_lock));
 	return rc;
 }
 
@@ -1007,9 +999,6 @@ e100_close(struct net_device *dev)
 	bdp->cur_dplx_mode = 0;
 	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
-
-	/* set the isolate flag to false, so e100_open can be called */
-	bdp->driver_isolated = false;
 
 	return 0;
 }
@@ -1030,13 +1019,6 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 	int rc = 0;
 	int notify_stop = false;
 	struct e100_private *bdp = dev->priv;
-
-	read_lock(&(bdp->isolate_lock));
-
-	if (bdp->driver_isolated) {
-		rc = -EBUSY;
-		goto exit2;
-	}
 
 	if (!spin_trylock(&bdp->bd_non_tx_lock)) {
 		notify_stop = true;
@@ -1060,7 +1042,6 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 exit1:
 	spin_unlock(&bdp->bd_non_tx_lock);
 exit2:
-	read_unlock(&(bdp->isolate_lock));
 	if (notify_stop) {
 		netif_stop_queue(dev);
 	}
@@ -1115,18 +1096,11 @@ e100_set_mac(struct net_device *dev, void *addr)
 
 	bdp = dev->priv;
 
-	read_lock(&(bdp->isolate_lock));
-
-	if (bdp->driver_isolated) {
-		goto exit;
-	}
 	if (e100_setup_iaaddr(bdp, (u8 *) (p_sockaddr->sa_data))) {
 		memcpy(&(dev->dev_addr[0]), p_sockaddr->sa_data, ETH_ALEN);
 		rc = 0;
 	}
 
-exit:
-	read_unlock(&(bdp->isolate_lock));
 	return rc;
 }
 
@@ -1180,10 +1154,6 @@ e100_set_multi(struct net_device *dev)
 	unsigned char promisc_enbl;
 	unsigned char mulcast_enbl;
 
-	read_lock(&(bdp->isolate_lock));
-	if (bdp->driver_isolated) {
-		goto exit;
-	}
 	promisc_enbl = ((dev->flags & IFF_PROMISC) == IFF_PROMISC);
 	mulcast_enbl = ((dev->flags & IFF_ALLMULTI) ||
 			(dev->mc_count > MAX_MULTICAST_ADDRS));
@@ -1195,14 +1165,11 @@ e100_set_multi(struct net_device *dev)
 	e100_config(bdp);
 
 	if (promisc_enbl || mulcast_enbl) {
-		goto exit;	/* no need for Multicast Cmd */
+		return;	/* no need for Multicast Cmd */
 	}
 
 	/* get the multicast CB */
 	e100_set_multi_exec(dev);
-
-exit:
-	read_unlock(&(bdp->isolate_lock));
 }
 
 static int
@@ -1308,8 +1275,6 @@ e100_sw_init(struct e100_private *bdp)
 	spin_lock_init(&(bdp->bd_non_tx_lock));
 	spin_lock_init(&(bdp->config_lock));
 	spin_lock_init(&(bdp->mdi_access_lock));
-	bdp->isolate_lock = RW_LOCK_UNLOCKED;
-	bdp->driver_isolated = false;
 
 	return 1;
 }
@@ -1625,12 +1590,8 @@ e100_watchdog(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
 
-	read_lock(&(bdp->isolate_lock));
-	if (bdp->driver_isolated) {
-		goto exit;
-	}
 	if (!netif_running(dev)) {
-		goto exit;
+		return;
 	}
 	e100_get_mdix_status(bdp);
 
@@ -1721,9 +1682,6 @@ e100_watchdog(struct net_device *dev)
 
 	if (list_empty(&bdp->active_rx_list))
 		e100_trigger_SWI(bdp);
-
-exit:
-	read_unlock(&(bdp->isolate_lock));
 }
 
 /**
@@ -1828,11 +1786,6 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		return;
 	}
 
-	read_lock(&(bdp->isolate_lock));
-	if (bdp->driver_isolated) {
-		goto exit;
-	}
-
 	/* SWI intr (triggered by watchdog) is signal to allocate new skb buffers */
 	if (intr_status & SCB_STATUS_ACK_SWI) {
 		e100_alloc_skbs(bdp);
@@ -1849,9 +1802,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		e100_tx_srv(bdp);
 	}
 
-exit:
 	e100_set_intr_mask(bdp);
-	read_unlock(&(bdp->isolate_lock));
 }
 
 /**
@@ -2656,7 +2607,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	if (in_interrupt())
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
-	if (netif_running(bdp->device) && (!bdp->driver_isolated))
+	if (netif_running(bdp->device) && netif_carrier_ok(bdp->device))
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
@@ -3054,33 +3005,32 @@ err:
 void
 e100_isolate_driver(struct e100_private *bdp)
 {
-	write_lock_irq(&(bdp->isolate_lock));
-	bdp->driver_isolated = true;
-	write_unlock_irq(&(bdp->isolate_lock));
-
-	del_timer_sync(&bdp->watchdog_timer);
-
-	del_timer_sync(&bdp->hwi_timer);
-	/* If in middle of cable diag, */
-	if (bdp->hwi_started) {
-		bdp->hwi_started = 0;
-		e100_hwi_restore(bdp);
-	}
-
-	if (netif_running(bdp->device))
-		netif_stop_queue(bdp->device);
-
-	bdp->last_tcb = NULL;
-
+	if (netif_running(bdp->device)) {
+		e100_dis_intr(bdp);
+		del_timer_sync(&bdp->watchdog_timer);
+		del_timer_sync(&bdp->hwi_timer);
+		/* If in middle of cable diag, */
+		if (bdp->hwi_started) {
+			bdp->hwi_started = 0;
+			e100_hwi_restore(bdp);
+		}
+		netif_carrier_off(bdp->device);
+		netif_stop_queue(bdp->device); 
+		bdp->last_tcb = NULL;
+	} 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 }
 
 void
 e100_set_speed_duplex(struct e100_private *bdp)
 {
+	if (netif_carrier_ok(bdp->device))
+		e100_isolate_driver(bdp);
 	e100_phy_set_speed_duplex(bdp, true);
 	e100_config_fc(bdp);	/* re-config flow-control if necessary */
 	e100_config(bdp);	
+	if (netif_carrier_ok(bdp->device))
+		e100_deisolate_driver(bdp, false);
 }
 
 static void
@@ -3160,29 +3110,21 @@ e100_hw_reset_recover(struct e100_private *bdp, u32 reset_cmd)
 }
 
 void
-e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
+e100_deisolate_driver(struct e100_private *bdp, u8 full_reset)
 {
-	if (full_init) {
-		e100_sw_reset(bdp, PORT_SOFTWARE_RESET);
-		if (!e100_hw_reset_recover(bdp, PORT_SOFTWARE_RESET))
-			printk(KERN_ERR "e100: e100_deisolate_driver:"
-			       " HW SOFTWARE reset recover failed\n");
-	}
+	u32 cmd = full_reset ? PORT_SOFTWARE_RESET : PORT_SELECTIVE_RESET;
+	e100_sw_reset(bdp, cmd);
+	if (cmd == PORT_SOFTWARE_RESET) {
+		if (!e100_hw_reset_recover(bdp, cmd))
+			printk(KERN_ERR "e100: e100_deisolate_driver:" 
+		       		" device configuration failed\n");
+	} 
 
-	if (recover) {
+	if (netif_running(bdp->device)) {
 
 		bdp->next_cu_cmd = START_WAIT;
 		bdp->last_tcb = NULL;
 
-		/* lets reset the chip */
-		if (!full_init) {
-			e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
-
-			if (!e100_hw_reset_recover(bdp, PORT_SELECTIVE_RESET)) {
-				printk(KERN_ERR "e100: e100_deisolate_driver:"
-				       " HW reset recover failed\n");
-			}
-		}
 		e100_start_ru(bdp);
 
 		/* relaunch watchdog timer in 2 sec */
@@ -3192,14 +3134,9 @@ e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
 		// or have unsent frames on the tcb chain
 		e100_tcb_add_C_bit(bdp);
 		e100_tx_srv(bdp);
-
+		netif_wake_queue(bdp->device);
 		e100_set_intr_mask(bdp);
-
-		if (netif_running(bdp->device))
-			netif_wake_queue(bdp->device);
 	}
-
-	bdp->driver_isolated = false;
 }
 
 static int
@@ -4165,22 +4102,17 @@ e100_resume(struct pci_dev *pcid)
 {
 	struct net_device *netdev = pci_get_drvdata(pcid);
 	struct e100_private *bdp = netdev->priv;
-	u8 recover = false;
-	u8 full_init = false;
+	u8 full_reset = false;
 
 	pci_set_power_state(pcid, 0);
 	pci_enable_wake(pcid, 0, 0);	/* Clear PME status and disable PME */
 	pci_restore_state(pcid, bdp->pci_state);
 
-	if (netif_running(netdev)) {
-		recover = true;
-	}
-
 	if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
-		full_init = true;
+		full_reset = true;
 	}
 
-	e100_deisolate_driver(bdp, recover, full_init);
+	e100_deisolate_driver(bdp, full_reset);
 
 	return 0;
 }

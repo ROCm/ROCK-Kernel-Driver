@@ -331,6 +331,7 @@ xfs_buf_item_format(
 			vecp++;
 			first_bit = next_bit;
 			last_bit = next_bit;
+			nbits = 1;
 		} else {
 			last_bit++;
 			nbits++;
@@ -1029,12 +1030,12 @@ xfs_buf_iodone_callbacks(
 		}
 
 		if ((XFS_BUF_TARGET_DEV(bp) != lastdev) ||
-		    ((lbolt - lasttime) > 500)) {
+		    (time_after(jiffies, (lasttime + 5*HZ)))) {
+			lasttime = jiffies;
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%Lx in %s",
 			      XFS_BUF_TARGET_DEV(bp),
 			      XFS_BUF_ADDR(bp), mp->m_fsname);
-			lasttime = lbolt;
 		}
 		lastdev = XFS_BUF_TARGET_DEV(bp);
 

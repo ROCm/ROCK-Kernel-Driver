@@ -343,6 +343,7 @@ static int snd_card_dummy_capture_open(snd_pcm_substream_t * substream)
 		return -ENOMEM;
 	}
 	memset(runtime->dma_area, 0, runtime->dma_bytes);
+	init_timer(&dpcm->timer);
 	dpcm->timer.data = (unsigned long) dpcm;
 	dpcm->timer.function = snd_card_dummy_pcm_timer_function;
 	spin_lock_init(&dpcm->lock);

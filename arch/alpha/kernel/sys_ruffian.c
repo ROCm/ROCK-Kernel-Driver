@@ -85,6 +85,7 @@ ruffian_init_rtc(void)
 static void
 ruffian_kill_arch (int mode)
 {
+	cia_kill_arch(mode);
 #if 0
 	/* This only causes re-entry to ARCSBIOS */
 	/* Perhaps this works for other PYXIS as well?  */
@@ -218,7 +219,7 @@ struct alpha_machine_vector ruffian_mv __initmv = {
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_RUFFIAN_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_RUFFIAN_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= DEFAULT_MEM_BASE,
 	.pci_dac_offset		= PYXIS_DAC_OFFSET,

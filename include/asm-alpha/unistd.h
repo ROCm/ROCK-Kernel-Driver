@@ -552,9 +552,9 @@ static inline long close(int fd)
 }
 
 extern off_t sys_lseek(int, off_t, int);
-static inline off_t lseek(int fd, off_t off, int whense)
+static inline off_t lseek(int fd, off_t off, int whence)
 {
-	return sys_lseek(fd, off, whense);
+	return sys_lseek(fd, off, whence);
 }
 
 extern long sys_exit(int);
@@ -565,14 +565,14 @@ static inline long _exit(int value)
 
 #define exit(x) _exit(x)
 
-extern long sys_write(int, const char *, int);
-static inline long write(int fd, const char * buf, int nr)
+extern long sys_write(int, const char *, size_t);
+static inline long write(int fd, const char * buf, size_t nr)
 {
 	return sys_write(fd, buf, nr);
 }
 
-extern long sys_read(int, char *, int);
-static inline long read(int fd, char * buf, int nr)
+extern long sys_read(int, char *, size_t);
+static inline long read(int fd, char * buf, size_t nr)
 {
 	return sys_read(fd, buf, nr);
 }

@@ -1,5 +1,5 @@
 /*
- * $Id: cmdline.c,v 1.4 2002/09/13 01:18:38 jamey Exp $
+ * $Id: cmdline.c,v 1.5 2002/11/06 22:40:04 rmk Exp $
  *
  * Read flash partition table from command line
  *
@@ -92,6 +92,11 @@ static struct mtd_partition * newpart(char *s,
 	else
 	{
 		size = memparse(s, &s);
+		if (!size)
+		{
+			printk(KERN_ERR ERRP "couldn't parse number from input string\n");
+			return 0;
+		}
 		if (size < PAGE_SIZE)
 		{
 			printk(KERN_ERR ERRP "partition size too small (%lx)\n", size);
@@ -105,8 +110,13 @@ static struct mtd_partition * newpart(char *s,
         /* check for offset */
         if (*s == '@') 
 	{
-           s++;
-           offset = memparse(s, &s);
+                s++;
+                offset = memparse(s, &s);
+		if (!offset)
+		{
+			printk(KERN_ERR ERRP "couldn't parse number from input string\n");
+			return 0;
+		}
         }
         /* now look for name */
 	if (*s == '(')
@@ -241,6 +251,17 @@ static int mtdpart_setup_real(char *s)
 				0,		/* first partition */
 				(unsigned char**)&this_mtd, /* out: extra mem */
 				mtd_id_len + 1 + sizeof(*this_mtd));
+		if(!parts)
+		{
+			/*
+			 * An error occurred. We're either:
+			 * a) out of memory, or
+			 * b) in the middle of the partition spec
+			 * Either way, this mtd is hosed and we're
+			 * unlikely to succeed in parsing any more
+			 */
+			 return 0;
+		 }
 
 		/* enter results */	    
 		this_mtd->parts = parts;

@@ -137,15 +137,15 @@ static int xor_status(struct loop_device *lo, struct loop_info *info)
 }
 
 struct loop_func_table none_funcs = { 
-	number: LO_CRYPT_NONE,
-	transfer: transfer_none,
-	init: none_status,
+	.number = LO_CRYPT_NONE,
+	.transfer = transfer_none,
+	.init = none_status,
 }; 	
 
 struct loop_func_table xor_funcs = { 
-	number: LO_CRYPT_XOR,
-	transfer: transfer_xor,
-	init: xor_status
+	.number = LO_CRYPT_XOR,
+	.transfer = transfer_xor,
+	.init = xor_status
 }; 	
 
 /* xfer_funcs[0] is special - its release function is never called */ 
@@ -969,10 +969,10 @@ static int lo_release(struct inode *inode, struct file *file)
 }
 
 static struct block_device_operations lo_fops = {
-	owner:		THIS_MODULE,
-	open:		lo_open,
-	release:	lo_release,
-	ioctl:		lo_ioctl,
+	.owner =	THIS_MODULE,
+	.open =		lo_open,
+	.release =	lo_release,
+	.ioctl =	lo_ioctl,
 };
 
 /*

@@ -153,7 +153,7 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 	for (slot = bridge->slots; slot; slot = slot->next)
 		if (slot->device == device) {
 			if (slot->sun != sun)
-				warn("sibling found, but _SUN doesn't match!");
+				warn("sibling found, but _SUN doesn't match!\n");
 			break;
 		}
 
@@ -177,7 +177,7 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 		bridge->nr_slots++;
 
-		dbg("found ACPI PCI Hotplug slot at PCI %02x:%02x Slot:0x%x",
+		dbg("found ACPI PCI Hotplug slot at PCI %02x:%02x Slot:%d\n",
 		    slot->bridge->bus, slot->device, slot->sun);
 	}
 
@@ -202,7 +202,7 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 					     newfunc);
 
 	if (ACPI_FAILURE(status)) {
-		err("failed to register interrupt notify handler");
+		err("failed to register interrupt notify handler\n");
 		return status;
 	}
 
@@ -302,21 +302,21 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 			switch (resource_type) {
 			case ACPI_MEMORY_RANGE:
 				if (cache_attribute == ACPI_PREFETCHABLE_MEMORY) {
-					dbg("resource type: prefetchable memory 0x%x - 0x%x", (u32)min_address_range, (u32)max_address_range);
+					dbg("resource type: prefetchable memory 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
 					res = acpiphp_make_resource(min_address_range,
 							    address_length);
 					if (!res) {
-						err("out of memory");
+						err("out of memory\n");
 						return;
 					}
 					res->next = bridge->p_mem_head;
 					bridge->p_mem_head = res;
 				} else {
-					dbg("resource type: memory 0x%x - 0x%x", (u32)min_address_range, (u32)max_address_range);
+					dbg("resource type: memory 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
 					res = acpiphp_make_resource(min_address_range,
 							    address_length);
 					if (!res) {
-						err("out of memory");
+						err("out of memory\n");
 						return;
 					}
 					res->next = bridge->mem_head;
@@ -324,22 +324,22 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 				}
 				break;
 			case ACPI_IO_RANGE:
-				dbg("resource type: io 0x%x - 0x%x", (u32)min_address_range, (u32)max_address_range);
+				dbg("resource type: io 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
 				res = acpiphp_make_resource(min_address_range,
 						    address_length);
 				if (!res) {
-					err("out of memory");
+					err("out of memory\n");
 					return;
 				}
 				res->next = bridge->io_head;
 				bridge->io_head = res;
 				break;
 			case ACPI_BUS_NUMBER_RANGE:
-				dbg("resource type: bus number %d - %d", (u32)min_address_range, (u32)max_address_range);
+				dbg("resource type: bus number %d - %d\n", (u32)min_address_range, (u32)max_address_range);
 				res = acpiphp_make_resource(min_address_range,
 						    address_length);
 				if (!res) {
-					err("out of memory");
+					err("out of memory\n");
 					return;
 				}
 				res->next = bridge->bus_head;
@@ -356,10 +356,9 @@ decode_acpi_resource (acpi_resource *resource, struct acpiphp_bridge *bridge)
 	acpiphp_resource_sort_and_combine(&bridge->mem_head);
 	acpiphp_resource_sort_and_combine(&bridge->p_mem_head);
 	acpiphp_resource_sort_and_combine(&bridge->bus_head);
-#if 1
-	info("ACPI _CRS resource:");
+
+	dbg("ACPI _CRS resource:\n");
 	acpiphp_dump_resource(bridge);
-#endif
 }
 
 
@@ -368,7 +367,7 @@ static struct pci_bus *find_pci_bus(const struct list_head *list, int bus)
 {
 	const struct list_head *l;
 
-	list_for_each(l, list) {
+	list_for_each (l, list) {
 		struct pci_bus *b = pci_bus_b(l);
 		if (b->number == bus)
 			return b;
@@ -404,7 +403,7 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 	status = acpi_evaluate_object(bridge->handle, "_HPP", NULL, &buffer);
 
 	if (ACPI_FAILURE(status)) {
-		dbg("_HPP evaluation failed");
+		dbg("_HPP evaluation failed\n");
 		return;
 	}
 
@@ -412,13 +411,13 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 
 	if (!package || package->type != ACPI_TYPE_PACKAGE ||
 	    package->package.count != 4 || !package->package.elements) {
-		err("invalid _HPP object; ignoring");
+		err("invalid _HPP object; ignoring\n");
 		goto err_exit;
 	}
 
 	for (i = 0; i < 4; i++) {
 		if (package->package.elements[i].type != ACPI_TYPE_INTEGER) {
-			err("invalid _HPP parameter type; ignoring");
+			err("invalid _HPP parameter type; ignoring\n");
 			goto err_exit;
 		}
 	}
@@ -428,7 +427,7 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 	bridge->hpp.enable_SERR = package->package.elements[2].integer.value;
 	bridge->hpp.enable_PERR = package->package.elements[3].integer.value;
 
-	dbg("_HPP parameter = (%02x, %02x, %02x, %02x)",
+	dbg("_HPP parameter = (%02x, %02x, %02x, %02x)\n",
 	    bridge->hpp.cache_line_size,
 	    bridge->hpp.latency_timer,
 	    bridge->hpp.enable_SERR,
@@ -463,15 +462,13 @@ static void init_bridge_misc (struct acpiphp_bridge *bridge)
 					     bridge);
 
 	if (ACPI_FAILURE(status)) {
-		err("failed to register interrupt notify handler");
+		err("failed to register interrupt notify handler\n");
 	}
 
 	list_add(&bridge->list, &bridge_list);
 
-#if 1
-	dbg("Bridge resource:");
+	dbg("Bridge resource:\n");
 	acpiphp_dump_resource(bridge);
-#endif
 }
 
 
@@ -507,7 +504,7 @@ static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 	status = acpi_get_current_resources(handle, &buffer);
 
 	if (ACPI_FAILURE(status)) {
-		err("failed to decode bridge resources");
+		err("failed to decode bridge resources\n");
 		kfree(bridge);
 		return;
 	}
@@ -535,7 +532,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 
 	bridge = kmalloc(sizeof(struct acpiphp_bridge), GFP_KERNEL);
 	if (bridge == NULL) {
-		err("out of memory");
+		err("out of memory\n");
 		return;
 	}
 
@@ -547,14 +544,14 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 
 	bridge->pci_dev = pci_find_slot(bus, PCI_DEVFN(dev, fn));
 	if (!bridge->pci_dev) {
-		err("Can't get pci_dev");
+		err("Can't get pci_dev\n");
 		kfree(bridge);
 		return;
 	}
 
 	bridge->pci_bus = bridge->pci_dev->subordinate;
 	if (!bridge->pci_bus) {
-		err("This is not a PCI-to-PCI bridge!");
+		err("This is not a PCI-to-PCI bridge!\n");
 		kfree(bridge);
 		return;
 	}
@@ -580,10 +577,10 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		limit = ((limit << 8) & 0xf000) + 0xfff;
 		bridge->io_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->io_head) {
-			err("out of memory");
+			err("out of memory\n");
 			return;
 		}
-		dbg("16bit I/O range: %04x-%04x",
+		dbg("16bit I/O range: %04x-%04x\n",
 		    (u32)bridge->io_head->base,
 		    (u32)(bridge->io_head->base + bridge->io_head->length - 1));
 		break;
@@ -594,18 +591,18 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		limit = (((u32)tmp16 << 16) | ((limit << 8) & 0xf000)) + 0xfff;
 		bridge->io_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->io_head) {
-			err("out of memory");
+			err("out of memory\n");
 			return;
 		}
-		dbg("32bit I/O range: %08x-%08x",
+		dbg("32bit I/O range: %08x-%08x\n",
 		    (u32)bridge->io_head->base,
 		    (u32)(bridge->io_head->base + bridge->io_head->length - 1));
 		break;
 	case 0x0f:
-		dbg("I/O space unsupported");
+		dbg("I/O space unsupported\n");
 		break;
 	default:
-		warn("Unknown I/O range type");
+		warn("Unknown I/O range type\n");
 	}
 
 	/* Memory resources (mandatory for P2P bridge) */
@@ -615,10 +612,10 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 	limit = ((tmp16 & 0xfff0) << 16) | 0xfffff;
 	bridge->mem_head = acpiphp_make_resource((u64)base, limit - base + 1);
 	if (!bridge->mem_head) {
-		err("out of memory");
+		err("out of memory\n");
 		return;
 	}
-	dbg("32bit Memory range: %08x-%08x",
+	dbg("32bit Memory range: %08x-%08x\n",
 	    (u32)bridge->mem_head->base,
 	    (u32)(bridge->mem_head->base + bridge->mem_head->length-1));
 
@@ -634,10 +631,10 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		limit = ((limit & 0xfff0) << 16) | 0xfffff;
 		bridge->p_mem_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->p_mem_head) {
-			err("out of memory");
+			err("out of memory\n");
 			return;
 		}
-		dbg("32bit Prefetchable memory range: %08x-%08x",
+		dbg("32bit Prefetchable memory range: %08x-%08x\n",
 		    (u32)bridge->p_mem_head->base,
 		    (u32)(bridge->p_mem_head->base + bridge->p_mem_head->length - 1));
 		break;
@@ -649,10 +646,10 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 
 		bridge->p_mem_head = acpiphp_make_resource(base64, limit64 - base64 + 1);
 		if (!bridge->p_mem_head) {
-			err("out of memory");
+			err("out of memory\n");
 			return;
 		}
-		dbg("64bit Prefetchable memory range: %08x%08x-%08x%08x",
+		dbg("64bit Prefetchable memory range: %08x%08x-%08x%08x\n",
 		    (u32)(bridge->p_mem_head->base >> 32),
 		    (u32)(bridge->p_mem_head->base & 0xffffffff),
 		    (u32)((bridge->p_mem_head->base + bridge->p_mem_head->length - 1) >> 32),
@@ -661,7 +658,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 	case 0x0f:
 		break;
 	default:
-		warn("Unknown prefetchale memory type");
+		warn("Unknown prefetchale memory type\n");
 	}
 
 	init_bridge_misc(bridge);
@@ -689,7 +686,7 @@ find_p2p_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	status = acpi_evaluate_integer(handle, "_ADR", NULL, &tmp);
 	if (ACPI_FAILURE(status)) {
-		dbg("%s: _ADR evaluation failure", __FUNCTION__);
+		dbg("%s: _ADR evaluation failure\n", __FUNCTION__);
 		return AE_OK;
 	}
 
@@ -706,7 +703,7 @@ find_p2p_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	/* check if this bridge has ejectable slots */
 	if (detect_ejectable_slots(handle) > 0) {
-		dbg("found PCI-to-PCI bridge at PCI %02x:%02x.%d", bus, device, function);
+		dbg("found PCI-to-PCI bridge at PCI %s\n", dev->slot_name);
 		add_p2p_bridge(handle, seg, bus, device, function);
 	}
 
@@ -727,7 +724,7 @@ static int add_bridges (acpi_handle *handle)
 	if (ACPI_SUCCESS(status)) {
 		status = acpi_evaluate_integer(handle, "_STA", NULL, &tmp);
 		if (ACPI_FAILURE(status)) {
-			dbg("%s: _STA evaluation failure", __FUNCTION__);
+			dbg("%s: _STA evaluation failure\n", __FUNCTION__);
 			return 0;
 		}
 		if ((tmp & ACPI_STA_FUNCTIONING) == 0)
@@ -746,13 +743,13 @@ static int add_bridges (acpi_handle *handle)
 	if (ACPI_SUCCESS(status)) {
 		bus = tmp;
 	} else {
-		warn("can't get bus number, assuming 0");
+		warn("can't get bus number, assuming 0\n");
 		bus = 0;
 	}
 
 	/* check if this bridge has ejectable slots */
 	if (detect_ejectable_slots(handle) > 0) {
-		dbg("found PCI host-bus bridge with hot-pluggable slots");
+		dbg("found PCI host-bus bridge with hot-pluggable slots\n");
 		add_host_bridge(handle, seg, bus);
 		return 0;
 	}
@@ -764,7 +761,7 @@ static int add_bridges (acpi_handle *handle)
 				     find_p2p_bridge, &tmp, NULL);
 
 	if (ACPI_FAILURE(status))
-		warn("find_p2p_bridge faied (error code = 0x%x)",status);
+		warn("find_p2p_bridge faied (error code = 0x%x)\n",status);
 
 	return 0;
 }
@@ -782,7 +779,7 @@ find_host_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	status = acpi_get_object_info(handle, &info);
 	if (ACPI_FAILURE(status)) {
-		dbg("%s: failed to get bridge information", __FUNCTION__);
+		dbg("%s: failed to get bridge information\n", __FUNCTION__);
 		return AE_OK;		/* continue */
 	}
 
@@ -793,7 +790,7 @@ find_host_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 	    (info.valid & ACPI_VALID_HID) &&
 	    strcmp(info.hardware_id, ACPI_PCI_HOST_HID) == 0) {
 		acpi_get_name(handle, ACPI_SINGLE_NAME, &buffer);
-		dbg("checking PCI-hotplug capable bridges under [%s]", objname);
+		dbg("checking PCI-hotplug capable bridges under [%s]\n", objname);
 		add_bridges(handle);
 	}
 	return AE_OK;
@@ -811,15 +808,15 @@ static int power_on_slot (struct acpiphp_slot *slot)
 	if (slot->flags & SLOT_POWEREDON)
 		goto err_exit;
 
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		if (func->flags & FUNC_HAS_PS0) {
-			dbg("%s: executing _PS0 on %02x:%02x.%d", __FUNCTION__,
-			    slot->bridge->bus, slot->device, func->function);
+			dbg("%s: executing _PS0 on %s\n", __FUNCTION__,
+			    func->pci_dev->slot_name);
 			status = acpi_evaluate_object(func->handle, "_PS0", NULL, NULL);
 			if (ACPI_FAILURE(status)) {
-				warn("%s: _PS0 failed", __FUNCTION__);
+				warn("%s: _PS0 failed\n", __FUNCTION__);
 				retval = -1;
 				goto err_exit;
 			}
@@ -849,27 +846,27 @@ static int power_off_slot (struct acpiphp_slot *slot)
 	if ((slot->flags & SLOT_POWEREDON) == 0)
 		goto err_exit;
 
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		if (func->flags & FUNC_HAS_PS3) {
-			dbg("%s: executing _PS3 on %02x:%02x.%d", __FUNCTION__,
-			    slot->bridge->bus, slot->device, func->function);
+			dbg("%s: executing _PS3 on %s\n", __FUNCTION__,
+			    func->pci_dev->slot_name);
 			status = acpi_evaluate_object(func->handle, "_PS3", NULL, NULL);
 			if (ACPI_FAILURE(status)) {
-				warn("%s: _PS3 failed", __FUNCTION__);
+				warn("%s: _PS3 failed\n", __FUNCTION__);
 				retval = -1;
 				goto err_exit;
 			}
 		}
 	}
 
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		if (func->flags & FUNC_HAS_EJ0) {
-			dbg("%s: executing _EJ0 on %02x:%02x.%d", __FUNCTION__,
-			    slot->bridge->bus, slot->device, func->function);
+			dbg("%s: executing _EJ0 on %s\n", __FUNCTION__,
+			    func->pci_dev->slot_name);
 
 			/* _EJ0 method take one argument */
 			arg_list.count = 1;
@@ -879,7 +876,7 @@ static int power_off_slot (struct acpiphp_slot *slot)
 
 			status = acpi_evaluate_object(func->handle, "_EJ0", &arg_list, NULL);
 			if (ACPI_FAILURE(status)) {
-				warn("%s: _EJ0 failed", __FUNCTION__);
+				warn("%s: _EJ0 failed\n", __FUNCTION__);
 				retval = -1;
 				goto err_exit;
 			}
@@ -919,7 +916,7 @@ static int enable_device (struct acpiphp_slot *slot)
 	dev = pci_find_slot(slot->bridge->bus, PCI_DEVFN(slot->device, 0));
 	if (dev) {
 		/* This case shouldn't happen */
-		err("pci_dev structure already exists.");
+		err("pci_dev structure already exists.\n");
 		retval = -1;
 		goto err_exit;
 	}
@@ -941,7 +938,7 @@ static int enable_device (struct acpiphp_slot *slot)
 	dev = pci_scan_slot (&dev0);
 
 	if (!dev) {
-		err("No new device found");
+		err("No new device found\n");
 		retval = -1;
 		goto err_exit;
 	}
@@ -953,7 +950,7 @@ static int enable_device (struct acpiphp_slot *slot)
 	}
 
 	/* associate pci_dev to our representation */
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		func->pci_dev = pci_find_slot(slot->bridge->bus,
@@ -970,10 +967,8 @@ static int enable_device (struct acpiphp_slot *slot)
 
 	slot->flags |= SLOT_ENABLED;
 
-#if 1
-	dbg("Available resources:");
+	dbg("Available resources:\n");
 	acpiphp_dump_resource(slot->bridge);
-#endif
 
  err_exit:
 	return retval;
@@ -993,14 +988,14 @@ static int disable_device (struct acpiphp_slot *slot)
 	if (!(slot->flags & SLOT_ENABLED))
 		goto err_exit;
 
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		if (func->pci_dev) {
 			if (acpiphp_unconfigure_function(func) == 0) {
 				func->pci_dev = NULL;
 			} else {
-				err("failed to unconfigure device");
+				err("failed to unconfigure device\n");
 				retval = -1;
 				goto err_exit;
 			}
@@ -1033,7 +1028,7 @@ static unsigned int get_slot_status (struct acpiphp_slot *slot)
 	struct list_head *l;
 	struct acpiphp_func *func;
 
-	list_for_each(l, &slot->funcs) {
+	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		if (func->flags & FUNC_HAS_STA) {
@@ -1063,7 +1058,7 @@ static unsigned int get_slot_status (struct acpiphp_slot *slot)
 /**
  * handle_hotplug_event_bridge - handle ACPI event on bridges
  *
- * @handle: Notify()'ed acpi_handle 
+ * @handle: Notify()'ed acpi_handle
  * @type: Notify code
  * @context: pointer to acpiphp_bridge structure
  *
@@ -1084,28 +1079,28 @@ static void handle_hotplug_event_bridge (acpi_handle handle, u32 type, void *con
 	switch (type) {
 	case ACPI_NOTIFY_BUS_CHECK:
 		/* bus re-enumerate */
-		dbg("%s: Bus check notify on %s", __FUNCTION__, objname);
+		dbg("%s: Bus check notify on %s\n", __FUNCTION__, objname);
 		acpiphp_check_bridge(bridge);
 		break;
 
 	case ACPI_NOTIFY_DEVICE_CHECK:
 		/* device check */
-		dbg("%s: Device check notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device check notify on %s\n", __FUNCTION__, objname);
 		acpiphp_check_bridge(bridge);
 		break;
 
 	case ACPI_NOTIFY_DEVICE_WAKE:
 		/* wake event */
-		dbg("%s: Device wake notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device wake notify on %s\n", __FUNCTION__, objname);
 		break;
 
 	case ACPI_NOTIFY_EJECT_REQUEST:
 		/* request device eject */
-		dbg("%s: Device eject notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device eject notify on %s\n", __FUNCTION__, objname);
 		break;
 
 	default:
-		warn("notify_handler: unknown event type 0x%x for %s", type, objname);
+		warn("notify_handler: unknown event type 0x%x for %s\n", type, objname);
 		break;
 	}
 }
@@ -1114,7 +1109,7 @@ static void handle_hotplug_event_bridge (acpi_handle handle, u32 type, void *con
 /**
  * handle_hotplug_event_func - handle ACPI event on functions (i.e. slots)
  *
- * @handle: Notify()'ed acpi_handle 
+ * @handle: Notify()'ed acpi_handle
  * @type: Notify code
  * @context: pointer to acpiphp_func structure
  *
@@ -1135,29 +1130,29 @@ static void handle_hotplug_event_func (acpi_handle handle, u32 type, void *conte
 	switch (type) {
 	case ACPI_NOTIFY_BUS_CHECK:
 		/* bus re-enumerate */
-		dbg("%s: Bus check notify on %s", __FUNCTION__, objname);
+		dbg("%s: Bus check notify on %s\n", __FUNCTION__, objname);
 		acpiphp_enable_slot(func->slot);
 		break;
 
 	case ACPI_NOTIFY_DEVICE_CHECK:
 		/* device check : re-enumerate from parent bus */
-		dbg("%s: Device check notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device check notify on %s\n", __FUNCTION__, objname);
 		acpiphp_check_bridge(func->slot->bridge);
 		break;
 
 	case ACPI_NOTIFY_DEVICE_WAKE:
 		/* wake event */
-		dbg("%s: Device wake notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device wake notify on %s\n", __FUNCTION__, objname);
 		break;
 
 	case ACPI_NOTIFY_EJECT_REQUEST:
 		/* request device eject */
-		dbg("%s: Device eject notify on %s", __FUNCTION__, objname);
+		dbg("%s: Device eject notify on %s\n", __FUNCTION__, objname);
 		acpiphp_disable_slot(func->slot);
 		break;
 
 	default:
-		warn("notify_handler: unknown event type 0x%x for %s", type, objname);
+		warn("notify_handler: unknown event type 0x%x for %s\n", type, objname);
 		break;
 	}
 }
@@ -1179,7 +1174,7 @@ int acpiphp_glue_init (void)
 				     NULL, NULL);
 
 	if (ACPI_FAILURE(status)) {
-		err("%s: acpi_walk_namespace() failed", __FUNCTION__);
+		err("%s: acpi_walk_namespace() failed\n", __FUNCTION__);
 		return -1;
 	}
 
@@ -1200,12 +1195,12 @@ void acpiphp_glue_exit (void)
 	struct acpiphp_func *func;
 	acpi_status status;
 
-	list_for_each_safe(l1, n1, &bridge_list) {
+	list_for_each_safe (l1, n1, &bridge_list) {
 		bridge = (struct acpiphp_bridge *)l1;
 		slot = bridge->slots;
 		while (slot) {
 			next = slot->next;
-			list_for_each_safe(l2, n2, &slot->funcs) {
+			list_for_each_safe (l2, n2, &slot->funcs) {
 				func = list_entry(l2, struct acpiphp_func, sibling);
 				acpiphp_free_resource(&func->io_head);
 				acpiphp_free_resource(&func->mem_head);
@@ -1215,7 +1210,7 @@ void acpiphp_glue_exit (void)
 								    ACPI_SYSTEM_NOTIFY,
 								    handle_hotplug_event_func);
 				if (ACPI_FAILURE(status))
-					err("failed to remove notify handler");
+					err("failed to remove notify handler\n");
 				kfree(func);
 			}
 			kfree(slot);
@@ -1224,7 +1219,7 @@ void acpiphp_glue_exit (void)
 		status = acpi_remove_notify_handler(bridge->handle, ACPI_SYSTEM_NOTIFY,
 						    handle_hotplug_event_bridge);
 		if (ACPI_FAILURE(status))
-			err("failed to remove notify handler");
+			err("failed to remove notify handler\n");
 
 		acpiphp_free_resource(&bridge->io_head);
 		acpiphp_free_resource(&bridge->mem_head);
@@ -1247,13 +1242,13 @@ int acpiphp_get_num_slots (void)
 
 	num_slots = 0;
 
-	list_for_each(node, &bridge_list) {
+	list_for_each (node, &bridge_list) {
 		bridge = (struct acpiphp_bridge *)node;
-		dbg("Bus%d %dslot(s)", bridge->bus, bridge->nr_slots);
+		dbg("Bus%d %dslot(s)\n", bridge->bus, bridge->nr_slots);
 		num_slots += bridge->nr_slots;
 	}
 
-	dbg("Total %dslots", num_slots);
+	dbg("Total %dslots\n", num_slots);
 	return num_slots;
 }
 
@@ -1271,7 +1266,7 @@ int acpiphp_for_each_slot(acpiphp_callback fn, void *data)
 	struct acpiphp_slot *slot;
 	int retval = 0;
 
-	list_for_each(node, &bridge_list) {
+	list_for_each (node, &bridge_list) {
 		bridge = (struct acpiphp_bridge *)node;
 		for (slot = bridge->slots; slot; slot = slot->next) {
 			retval = fn(slot, data);
@@ -1292,7 +1287,7 @@ struct acpiphp_slot *get_slot_from_id (int id)
 	struct acpiphp_bridge *bridge;
 	struct acpiphp_slot *slot;
 
-	list_for_each(node, &bridge_list) {
+	list_for_each (node, &bridge_list) {
 		bridge = (struct acpiphp_bridge *)node;
 		for (slot = bridge->slots; slot; slot = slot->next)
 			if (slot->id == id)
@@ -1300,7 +1295,7 @@ struct acpiphp_slot *get_slot_from_id (int id)
 	}
 
 	/* should never happen! */
-	err("%s: no object for id %d",__FUNCTION__, id);
+	err("%s: no object for id %d\n",__FUNCTION__, id);
 	return 0;
 }
 
@@ -1352,7 +1347,7 @@ int acpiphp_disable_slot (struct acpiphp_slot *slot)
 	acpiphp_resource_sort_and_combine(&slot->bridge->mem_head);
 	acpiphp_resource_sort_and_combine(&slot->bridge->p_mem_head);
 	acpiphp_resource_sort_and_combine(&slot->bridge->bus_head);
-	dbg("Available resources:");
+	dbg("Available resources:\n");
 	acpiphp_dump_resource(slot->bridge);
 
  err_exit:
@@ -1380,7 +1375,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta != ACPI_STA_ALL) {
 				retval = acpiphp_disable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling");
+					err("Error occured in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}
@@ -1391,7 +1386,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta == ACPI_STA_ALL) {
 				retval = acpiphp_enable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling");
+					err("Error occured in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}
@@ -1400,7 +1395,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 		}
 	}
 
-	dbg("%s: %d enabled, %d disabled", __FUNCTION__, enabled, disabled);
+	dbg("%s: %d enabled, %d disabled\n", __FUNCTION__, enabled, disabled);
 
  err_exit:
 	return retval;

@@ -222,6 +222,13 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/PT DIGITAL BOARD PORT
+P:	Stefan Eletzhofer
+M:	stefan.eletzhofer@eletztrick.de
+L:	linux-arm-kernel@lists.arm.linux.org.uk
+W:	http://www.arm.linux.org.uk/
+S:	Maintained
+
 ARM/SHARK MACHINE SUPPORT
 P:	Alexander Schulz
 M:	alex@shark-linux.de
@@ -316,6 +323,27 @@ M:	coda@cs.cmu.edu
 L:	codalist@coda.cs.cmu.edu
 W:	http://www.coda.cs.cmu.edu/
 S:	Maintained
+
+COMPACTPCI HOTPLUG CORE
+P:	Scott Murray
+M:	scottm@somanetworks.com
+M:	scott@spiteful.org
+L:	pcihpd-discuss@lists.sourceforge.net
+S:	Supported
+
+COMPACTPCI HOTPLUG ZIATECH ZT5550 DRIVER
+P:	Scott Murray
+M:	scottm@somanetworks.com
+M:	scott@spiteful.org
+L:	pcihpd-discuss@lists.sourceforge.net
+S:	Supported
+
+COMPACTPCI HOTPLUG GENERIC DRIVER
+P:	Scott Murray
+M:	scottm@somanetworks.com
+M:	scott@spiteful.org
+L:	pcihpd-discuss@lists.sourceforge.net
+S:	Supported
 
 COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
 P:	Amy Vanzant-Hodge 
@@ -1294,7 +1322,7 @@ S:	Maintained
 
 PCMCIA SUBSYSTEM
 P:	David Hinds
-M:	dhinds@zen.stanford.edu
+M:	dahinds@users.sourceforge.net
 L:	linux-kernel@vger.kernel.org
 W:	http://pcmcia-cs.sourceforge.net
 S:	Maintained
@@ -1407,7 +1435,7 @@ S:	Supported
 SA1100 SUPPORT
 P:	Nicolas Pitre
 M:	nico@cam.org
-L:	sa1100-linux@pa.dec.com
+L:	linux-arm@lists.arm.linux.org.uk
 S:	Maintained
 
 SBPCD CDROM DRIVER
@@ -1582,6 +1610,13 @@ M:	kkojima@rr.iij4u.or.jp
 L:	linux-sh@m17n.org
 W:	http://www.m17n.org/linux-sh/
 W:	http://www.rr.iij4u.or.jp/~kkojima/linux-sh4.html
+S:	Maintained
+
+SUN3/3X
+P:	Sam Creasey
+M:	sammy@sammy.net
+L:	sun3-list@redhat.com
+W:	http://sammy.net/sun3/
 S:	Maintained
 
 SVGA HANDLING

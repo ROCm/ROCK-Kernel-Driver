@@ -10,7 +10,7 @@ export-objs := alpha_ksyms.o
 
 obj-y    := entry.o traps.o process.o init_task.o osf_sys.o irq.o \
 	    irq_alpha.o signal.o setup.o ptrace.o time.o semaphore.o \
-	    alpha_ksyms.o systbls.o
+	    alpha_ksyms.o systbls.o err_common.o
 
 #
 # FIXME!

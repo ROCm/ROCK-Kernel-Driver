@@ -516,13 +516,6 @@ nfs_try_to_free_pages(struct nfs_server *server)
 			continue;
 		}
 #endif
-		/* OK, so we try to free up some pending readaheads */
-		nfs_scan_lru_read(server, &head);
-		if (!list_empty(&head)) {
-			spin_unlock(&nfs_wreq_lock);
-			nfs_pagein_list(&head, server->rpages);
-			continue;
-		}
 		/* Last resort: we try to flush out single requests */
 		nfs_scan_lru_dirty(server, &head);
 		if (!list_empty(&head)) {

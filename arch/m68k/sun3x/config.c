@@ -17,37 +17,30 @@
 #include <asm/sun3xprom.h>
 #include <asm/sun3ints.h>
 #include <asm/setup.h>
+#include <asm/oplib.h>
 
 #include "time.h"
 
 volatile char *clock_va;
 extern volatile unsigned char *sun3_intreg;
 
-
-int __init sun3x_keyb_init(void)
-{
-	return 0;
-}
-
-int sun3x_kbdrate(struct kbd_repeat *r)
-{
-	return 0;
-}
-
-void sun3x_kbd_leds(unsigned int i)
-{
-
-}
+extern void sun3_get_model(char *model);
 
 void sun3_leds(unsigned int i)
 {
 
 }
 
-/* should probably detect types of these eventually. */
-static void sun3x_get_model(char *model)
+static int sun3x_get_hardware_list(char *buffer)
 {
-	sprintf(model, "Sun3x");
+	
+	int len = 0;
+
+	len += sprintf(buffer + len, "PROM Revision:\t%s\n",
+		       romvec->pv_monid);
+	
+	return len;
+
 }
 
 /*
@@ -60,12 +53,6 @@ void __init config_sun3x(void)
 
 	mach_get_irq_list	 = show_sun3_interrupts;
 	mach_max_dma_address = 0xffffffff; /* we can DMA anywhere, whee */
-
-#ifdef CONFIG_VT
-	mach_keyb_init       = sun3x_keyb_init;
-	mach_kbdrate         = sun3x_kbdrate;
-	mach_kbd_leds        = sun3x_kbd_leds;
-#endif
 
 	mach_default_handler = &sun3_default_handler;
 	mach_sched_init      = sun3x_sched_init;
