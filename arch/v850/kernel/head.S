@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/head.S -- Lowest-level startup code
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -115,7 +115,14 @@ C_ENTRY(start):
 	jarl	CSYM(memset), lp
 #endif
 
-	// Start Linux kernel.
+	// What happens if the main kernel function returns (it shouldn't)
 	mov	hilo(CSYM(machine_halt)), lp
-	jr	CSYM(start_kernel)
+
+	// Start the linux kernel.  We use an indirect jump to get extra
+	// range, because on some platforms this initial startup code
+	// (and the associated platform-specific code in mach_early_init)
+	// are located far away from the main kernel, e.g. so that they
+	// can initialize RAM first and copy the kernel or something.
+	mov	hilo(CSYM(start_kernel)), r12
+	jmp	[r12]
 C_END(start)
