@@ -269,7 +269,7 @@ static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid
 
 	dprintk(KERN_DEBUG PFX
 		"ph1 (cpu%d): start, currfid 0x%x, currvid 0x%x, reqvid 0x%x, rvo 0x%x\n",
-		smp_processor_id();
+		smp_processor_id(),
 		data->currfid, data->currvid, reqvid, data->rvo);
 
 	while (data->currvid > reqvid) {
