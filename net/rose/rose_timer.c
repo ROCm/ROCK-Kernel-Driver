@@ -5,6 +5,7 @@
  * (at your option) any later version.
  *
  * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) 2002 Ralf Baechle DO1GRB (ralf@gnu.org)
  */
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -130,6 +131,7 @@ static void rose_heartbeat_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 	rose_cb *rose = rose_sk(sk);
 
+	bh_lock_sock(sk);
 	switch (rose->state) {
 	case ROSE_STATE_0:
 		/* Magic here: If we listen() and a new link dies before it
@@ -157,6 +159,7 @@ static void rose_heartbeat_expiry(unsigned long param)
 	}
 
 	rose_start_heartbeat(sk);
+	bh_unlock_sock(sk);
 }
 
 static void rose_timer_expiry(unsigned long param)
@@ -164,6 +167,7 @@ static void rose_timer_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 	rose_cb *rose = rose_sk(sk);
 
+	bh_lock_sock(sk);
 	switch (rose->state) {
 	case ROSE_STATE_1:	/* T1 */
 	case ROSE_STATE_4:	/* T2 */
@@ -184,12 +188,14 @@ static void rose_timer_expiry(unsigned long param)
 		}
 		break;
 	}
+	bh_unlock_sock(sk);
 }
 
 static void rose_idletimer_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
 
+	bh_lock_sock(sk);
 	rose_clear_queues(sk);
 
 	rose_write_internal(sk, ROSE_CLEAR_REQUEST);
@@ -205,4 +211,5 @@ static void rose_idletimer_expiry(unsigned long param)
 		sk->state_change(sk);
 
 	sk->dead = 1;
+	bh_unlock_sock(sk);
 }

@@ -10,6 +10,7 @@
  * Copyright (C) Darryl Miles G7LED (dlm@g7led.demon.co.uk)
  * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
  * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
+ * Copyright (C) 2002 Ralf Baechle DO1GRB (ralf@gnu.org)
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -138,11 +139,14 @@ unsigned long ax25_display_timer(struct timer_list *timer)
 
 static void ax25_heartbeat_expiry(unsigned long param)
 {
-	ax25_cb *ax25 = (ax25_cb *)param;
 	int proto = AX25_PROTO_STD_SIMPLEX;
+	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
 	if (ax25->ax25_dev)
 		proto = ax25->ax25_dev->values[AX25_VALUES_PROTOCOL];
+
+	bh_lock_sock(sk);
 
 	switch (proto) {
 	case AX25_PROTO_STD_SIMPLEX:
@@ -159,12 +163,15 @@ static void ax25_heartbeat_expiry(unsigned long param)
 		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t1timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -178,12 +185,15 @@ static void ax25_t1timer_expiry(unsigned long param)
 		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t2timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -197,12 +207,15 @@ static void ax25_t2timer_expiry(unsigned long param)
 		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t3timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -218,12 +231,15 @@ static void ax25_t3timer_expiry(unsigned long param)
 		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_idletimer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
 	case AX25_PROTO_STD_DUPLEX:
@@ -239,4 +255,5 @@ static void ax25_idletimer_expiry(unsigned long param)
 		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
