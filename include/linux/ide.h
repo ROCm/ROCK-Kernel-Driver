@@ -1096,7 +1096,6 @@ typedef struct ide_settings_s {
 
 extern struct semaphore ide_setting_sem;
 extern int ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
-extern void ide_remove_setting(ide_drive_t *drive, char *name);
 extern ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
 extern int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
 extern int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);

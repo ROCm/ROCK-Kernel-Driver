@@ -1092,26 +1092,6 @@ static void __ide_remove_setting (ide_drive_t *drive, char *name)
 }
 
 /**
- *	ide_remove_setting	-	remove an ide setting option
- *	@drive: drive to use
- *	@name: setting name
- *
- *	Removes the setting named from the device if it is present.
- *	The function takes the settings_lock to protect against 
- *	parallel changes. This function must not be called from IRQ
- *	context.
- */
- 
-void ide_remove_setting (ide_drive_t *drive, char *name)
-{
-	down(&ide_setting_sem);
-	__ide_remove_setting(drive, name);
-	up(&ide_setting_sem);
-}
-
-EXPORT_SYMBOL(ide_remove_setting);
-
-/**
  *	ide_find_setting_by_ioctl	-	find a drive specific ioctl
  *	@drive: drive to scan
  *	@cmd: ioctl command to handle
