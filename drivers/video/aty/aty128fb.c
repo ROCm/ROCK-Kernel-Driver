@@ -924,7 +924,7 @@ static void __init aty128_get_pllinfo(struct aty128fb_par *par, unsigned char *b
 
 }           
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
 {
 	/* I simplified this code as we used to miss the signatures in
@@ -946,7 +946,7 @@ static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
         }
 	return rom_base;
 }
-#endif /* __i386__ */
+#endif
 #endif /* ndef(__sparc__) */
 
 /* fill in known card constants if pll_block is not available */
@@ -1950,7 +1950,7 @@ static int __init aty128_probe(struct pci_dev *pdev, const struct pci_device_id 
 
 #ifndef __sparc__
 	bios = aty128_map_ROM(par, pdev);
-#ifdef __i386__
+#ifdef CONFIG_X86
 	if (bios == NULL)
 		bios = aty128_find_mem_vbios(par);
 #endif
