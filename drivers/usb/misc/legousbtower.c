@@ -379,7 +379,7 @@ static ssize_t tower_read (struct file *file, char *buffer, size_t count, loff_t
 	int retval = 0;
 	int timeout = 0;
 
-	dbg(2," %s : enter, count = %d", __func__, count);
+	dbg(2," %s : enter, count = %Zd", __func__, count);
 
 	dev = (struct lego_usb_tower *)file->private_data;
 	
@@ -479,7 +479,7 @@ static ssize_t tower_write (struct file *file, const char *buffer, size_t count,
 	int retval = 0;
 	int timeout = 0;
 
-	dbg(2," %s : enter, count = %d", __func__, count);
+	dbg(2," %s : enter, count = %Zd", __func__, count);
 
 	dev = (struct lego_usb_tower *)file->private_data;
 
@@ -528,14 +528,14 @@ static ssize_t tower_write (struct file *file, const char *buffer, size_t count,
 				goto exit;
 			}
 
-			dbg(4," %s : in progress, count = %d", __func__, count);
+			dbg(4," %s : in progress, count = %Zd", __func__, count);
 		} else {
-			dbg(4," %s : sending, count = %d", __func__, count);
+			dbg(4," %s : sending, count = %Zd", __func__, count);
 
 			/* write the data into interrupt_out_buffer from userspace */
 			buffer_size = dev->interrupt_out_endpoint->wMaxPacketSize;
 			bytes_to_write = count > buffer_size ? buffer_size : count;
-			dbg(4," %s : buffer_size = %d, count = %d, bytes_to_write = %d", __func__, buffer_size, count, bytes_to_write);
+			dbg(4," %s : buffer_size = %Zd, count = %Zd, bytes_to_write = %Zd", __func__, buffer_size, count, bytes_to_write);
 
 			if (copy_from_user (dev->interrupt_out_buffer, buffer, bytes_to_write) != 0) {
 				retval = -EFAULT;
