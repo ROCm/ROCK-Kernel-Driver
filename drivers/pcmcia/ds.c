@@ -109,6 +109,7 @@ struct pcmcia_bus_socket {
 	struct device		*socket_dev;
 	struct list_head	socket_list;
 	unsigned int		socket_no; /* deprecated */
+	struct pcmcia_socket	*parent;
 };
 
 #define SOCKET_PRESENT		0x01
@@ -832,13 +833,12 @@ static struct file_operations ds_fops = {
 	.poll		= ds_poll,
 };
 
-static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int socket_nr)
+static int __devinit pcmcia_bus_add_socket(struct pcmcia_socket *socket, struct device *dev, unsigned int socket_nr)
 {
 	client_reg_t client_reg;
 	bind_req_t bind;
-	struct pcmcia_bus_socket *s, *tmp_s;
+	struct pcmcia_bus_socket *s;
 	int ret;
-	int i;
 
 	s = kmalloc(sizeof(struct pcmcia_bus_socket), GFP_KERNEL);
 	if(!s)
@@ -855,24 +855,12 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
 
-	/* find the lowest, unused socket no. Please note that this is a
-	 * temporary workaround until "struct pcmcia_socket" is introduced
-	 * into cs.c which will include this number, and which will be
-	 * accessible to ds.c directly */
-	i = 0;
- next_try:
-	list_for_each_entry(tmp_s, &bus_socket_list, socket_list) {
-		if (tmp_s->socket_no == i) {
-			i++;
-			goto next_try;
-		}
-	}
-	s->socket_no = i;
-
 	/* initialize data */
 	s->socket_dev = dev;
 	INIT_WORK(&s->removal, handle_removal, s);
-    
+	s->socket_no = socket->sock;
+	s->parent = socket;
+
 	/* Set up hotline to Card Services */
 	client_reg.dev_info = bind.dev_info = &dev_info;
 
@@ -901,6 +889,7 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 		return -EINVAL;
 	}
 
+	socket->pcmcia = s;
 	list_add(&s->socket_list, &bus_socket_list);
 
 	return 0;
@@ -918,7 +907,7 @@ static int pcmcia_bus_add_socket_dev(struct class_device *class_dev)
 
 	down_write(&bus_socket_list_rwsem);
         for (i = 0; i < cls_d->nsock; i++)
-		ret += pcmcia_bus_add_socket(class_dev->dev, i);
+		ret += pcmcia_bus_add_socket(&cls_d->s_info[i], class_dev->dev, i);
 	up_write(&bus_socket_list_rwsem);
 
 	return ret;
@@ -939,6 +928,7 @@ static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
 	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
 		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
 		if (bus_sock->socket_dev == class_dev->dev) {
+			bus_sock->parent.pcmcia = NULL;
 			pcmcia_deregister_client(bus_sock->handle);
 			list_del(&bus_sock->socket_list);
 			kfree(bus_sock);
@@ -1008,18 +998,13 @@ module_exit(exit_pcmcia_bus);
 
 /* helpers for backwards-compatible functions */
 
-
 static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr)
 {
-	struct pcmcia_bus_socket * s;
-	down_read(&bus_socket_list_rwsem);
-	list_for_each_entry(s, &bus_socket_list, socket_list)
-		if (s->socket_no == nr) {
-			up_read(&bus_socket_list_rwsem);
-			return s;
-		}
-	up_read(&bus_socket_list_rwsem);
-	return NULL;
+	struct pcmcia_socket * s = pcmcia_get_socket_by_nr(nr);
+	if (s && s->pcmcia)
+		return s->pcmcia;
+	else
+		return NULL;
 }
 
 /* backwards-compatible accessing of driver --- by name! */

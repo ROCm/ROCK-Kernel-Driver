@@ -128,6 +128,11 @@ socket_state_t dead_socket = {
 socket_t sockets = 0;
 socket_info_t *socket_table[MAX_SOCK];
 
+/* List of all sockets, protected by a rwsem */
+static LIST_HEAD(pcmcia_socket_list);
+static DECLARE_RWSEM(pcmcia_socket_list_rwsem);
+
+
 #ifdef CONFIG_PROC_FS
 struct proc_dir_entry *proc_pccard = NULL;
 #endif
@@ -349,6 +354,9 @@ int pcmcia_register_socket(struct class_device *class_dev)
 			if (socket_table[j] == NULL) break;
 		socket_table[j] = s;
 		if (j == sockets) sockets++;
+		down_write(&pcmcia_socket_list_rwsem);
+		list_add(&s->socket_list, &pcmcia_socket_list);
+		up_write(&pcmcia_socket_list_rwsem);
 
 		init_socket(s);
 		s->ss_entry->inquire_socket(s->sock, &s->cap);
@@ -432,7 +440,13 @@ void pcmcia_unregister_socket(struct class_device *class_dev)
 			s->clients = s->clients->next;
 			kfree(client);
 		}
+
+		down_write(&pcmcia_socket_list_rwsem);
+		list_del(&s->socket_list);
+		up_write(&pcmcia_socket_list_rwsem);
+
 		s->ss_entry = NULL;
+
 		socket_table[socket] = NULL;
 		for (j = socket; j < sockets-1; j++)
 			socket_table[j] = socket_table[j+1];
@@ -442,6 +456,24 @@ void pcmcia_unregister_socket(struct class_device *class_dev)
 	}
 	kfree(cls_d->s_info);
 } /* pcmcia_unregister_socket */
+
+
+struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr)
+{
+	struct pcmcia_socket *s;
+
+	down_read(&pcmcia_socket_list_rwsem);
+	list_for_each_entry(s, &pcmcia_socket_list, socket_list)
+		if (s->sock == nr) {
+			up_read(&pcmcia_socket_list_rwsem);
+			return s;
+		}
+	up_read(&pcmcia_socket_list_rwsem);
+
+	return NULL;
+
+}
+EXPORT_SYMBOL(pcmcia_get_socket_by_nr);
 
 
 /*======================================================================

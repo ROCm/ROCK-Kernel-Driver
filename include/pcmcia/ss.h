@@ -201,7 +201,6 @@ struct region_t;
 struct pcmcia_socket {
 	spinlock_t			lock;
 	struct pccard_operations *	ss_entry;
-	u_int				sock;
 	socket_state_t			socket;
 	socket_cap_t			cap;
 	u_int				state;
@@ -224,7 +223,11 @@ struct pcmcia_socket {
 	u_int				fake_cis_len;
 	char				*fake_cis;
 
-	/* deprecated */
+	struct list_head		socket_list;
+
+ 	/* deprecated */
+	unsigned int			sock;		/* socket number */
+
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry		*proc;
 #endif
@@ -239,7 +242,7 @@ struct pcmcia_socket {
 	unsigned int			thread_events;
 
 	/* pcmcia (16-bit) */
-
+	struct pcmcia_bus_socket	*pcmcia;
 
 	/* cardbus (32-bit) */
 #ifdef CONFIG_CARDBUS
@@ -248,5 +251,6 @@ struct pcmcia_socket {
 #endif
 };
 
+__deprecated struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr);
 
 #endif /* _LINUX_SS_H */
