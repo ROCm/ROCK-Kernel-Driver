@@ -520,6 +520,8 @@ static int __init agp_amdk8_init(void)
 	if (ret_val)
 		agp_bridge.type = NOT_SUPPORTED;
 
+	agp_bridge.type = AMD_8151;
+
 	return ret_val;
 }
 
