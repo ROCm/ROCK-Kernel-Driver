@@ -161,6 +161,10 @@ struct cache_deferred_req {
  * INIT copies key information from "item" to "new"
  * UPDATE copies content information from "item" to "tmp"
  * INPLACE is true if updates can happen inplace rather than allocating a new structure
+ *
+ * WARNING: any substantial changes to this must be reflected in
+ *   net/sunrpc/svcauth.c(auth_domain_lookup)
+ *  which is a similar routine that is open-coded.
  */
 #define DefineCacheLookup(RTN,MEMBER,FNAME,ARGS,SETUP,DETAIL,HASHFN,TEST,INIT,UPDATE,INPLACE)	\
 RTN *FNAME ARGS										\
