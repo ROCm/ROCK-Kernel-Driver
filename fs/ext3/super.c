@@ -1207,8 +1207,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
-	sb->s_maxbytes = ext3_max_size(sb->s_blocksize_bits);
-
 	hblock = bdev_hardsect_size(sb->s_bdev);
 	if (sb->s_blocksize != blocksize) {
 		/*
@@ -1239,6 +1237,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 			goto failed_mount;
 		}
 	}
+
+	sb->s_maxbytes = ext3_max_size(sb->s_blocksize_bits);
 
 	if (le32_to_cpu(es->s_rev_level) == EXT3_GOOD_OLD_REV) {
 		sbi->s_inode_size = EXT3_GOOD_OLD_INODE_SIZE;
