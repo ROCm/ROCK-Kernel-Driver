@@ -330,7 +330,7 @@ acpi_system_write_sleep (
 	
 	state = simple_strtoul(state_string, NULL, 0);
 	
-	if (sleep_states[state])
+	if (!sleep_states[state])
 		return_VALUE(-ENODEV);
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
