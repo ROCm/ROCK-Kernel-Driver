@@ -542,7 +542,7 @@ static void __init s3triofb_of_init(struct device_node *dp)
 	return;
 
     printk("fb%d: S3 Trio frame buffer device on %s\n",
-	   GET_FB_IDX(fb_info.node), dp->full_name);
+	   minor(fb_info.node), dp->full_name);
 }
 
 

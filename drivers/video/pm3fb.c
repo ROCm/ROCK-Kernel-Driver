@@ -1647,7 +1647,7 @@ static void pm3fb_common_init(struct pm3fb_info *l_fb_info)
 	pm3fb_write_mode(l_fb_info);
 	
 	printk("fb%d: %s, using %uK of video memory (%s)\n",
-	       GET_FB_IDX(l_fb_info->gen.info.node),
+	       minor(l_fb_info->gen.info.node),
 	       permedia3_name, (u32) (l_fb_info->fb_size >> 10),
 	       cardbase[l_fb_info->board_type].cardname);
 }

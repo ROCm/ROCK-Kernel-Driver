@@ -22,7 +22,6 @@
 
 #include <linux/vt_kern.h>
 #include <linux/consolemap.h>
-#include <linux/console_struct.h>
 #include <linux/selection.h>
 
 #ifndef MIN
