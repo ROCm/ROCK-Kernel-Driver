@@ -1209,8 +1209,9 @@ static int __init ace_init(struct net_device *dev)
 	switch(tig_ver){
 #ifndef CONFIG_ACENIC_OMIT_TIGON_I
 	case 4:
-		printk(KERN_INFO "  Tigon I  (Rev. 4), Firmware: %i.%i.%i, ",
-		       tigonFwReleaseMajor, tigonFwReleaseMinor,
+	case 5:
+		printk(KERN_INFO "  Tigon I  (Rev. %i), Firmware: %i.%i.%i, ",
+		       tig_ver, tigonFwReleaseMajor, tigonFwReleaseMinor,
 		       tigonFwReleaseFix);
 		writel(0, &regs->LocalCtrl);
 		ap->version = 1;
@@ -1235,7 +1236,7 @@ static int __init ace_init(struct net_device *dev)
 		break;
 	default:
 		printk(KERN_WARNING "  Unsupported Tigon version detected "
-		       "(%i), ", tig_ver);
+		       "(%i)\n", tig_ver);
 		ecode = -ENODEV;
 		goto init_error;
 	}
