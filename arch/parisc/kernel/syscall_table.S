@@ -84,7 +84,7 @@
 	ENTRY_DIFF(lseek)
 	ENTRY_SAME(getpid)		/* 20 */
 	/* the 'void * data' parameter may need re-packing in wide */
-	ENTRY_DIFF(mount)
+	ENTRY_COMP(mount)
 	/* concerned about struct sockaddr in wide/narrow */
 	/* ---> I think sockaddr is OK unless the compiler packs the struct */
 	/*      differently to align the char array */

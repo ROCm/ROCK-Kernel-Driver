@@ -326,7 +326,7 @@ ia32_sys_call_table:
 	.quad sys_stat
 	.quad sys32_lseek
 	.quad sys_getpid		/* 20 */
-	.quad sys_mount	/* mount  */
+	.quad compat_sys_mount	/* mount  */
 	.quad sys_oldumount	/* old_umount  */
 	.quad sys_setuid16
 	.quad sys_getuid16
