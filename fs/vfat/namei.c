@@ -204,37 +204,6 @@ static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 	return 1;
 }
 
-#ifdef DEBUG
-
-static void dump_fat(struct super_block *sb,int start)
-{
-	printk("[");
-	while (start) {
-		printk("%d ",start);
-		start = fat_access(sb,start,-1);
-		if (!start) {
-			printk("ERROR");
-			break;
-		}
-		if (start == -1) break;
-	}
-	printk("]\n");
-}
-
-static void dump_de(struct msdos_dir_entry *de)
-{
-	int i;
-	unsigned char *p = (unsigned char *) de;
-	printk("[");
-
-	for (i = 0; i < 32; i++, p++) {
-		printk("%02x ", *p);
-	}
-	printk("]\n");
-}
-
-#endif
-
 /* MS-DOS "device special files" */
 
 static const char *reserved3_names[] = {
