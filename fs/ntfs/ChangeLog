@@ -20,6 +20,10 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.1 - WIP
+
+	- Add handling for initialized_size != data_size in compressed files.
+
 2.1.0 - First steps towards write support: implement file overwrite.
 
 	- Add configuration option for developmental write support with an

@@ -2,8 +2,8 @@
  * compress.c - NTFS kernel compressed attributes handling.
  *		Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -44,7 +44,7 @@ typedef enum {
 	 * The maximum compression block size is by definition 16 * the cluster
 	 * size, with the maximum supported cluster size being 4kiB. Thus the
 	 * maximum compression buffer size is 64kiB, so we use this when
-	 * initializing the per-CPU buffers.
+	 * initializing the compression buffer.
 	 */
 	NTFS_MAX_CB_SIZE	= 64 * 1024,
 } ntfs_compression_constants;
@@ -86,6 +86,40 @@ void free_compression_buffers(void)
 	BUG_ON(!ntfs_compression_buffer);
 	vfree(ntfs_compression_buffer);
 	ntfs_compression_buffer = NULL;
+}
+
+/**
+ * zero_partial_compressed_page - zero out of bounds compressed page region
+ */
+static void zero_partial_compressed_page(ntfs_inode *ni, struct page *page)
+{
+	u8 *kp = page_address(page);
+	unsigned int kp_ofs;
+
+	ntfs_debug("Zeroing page region outside initialized size.");
+	if (((s64)page->index << PAGE_CACHE_SHIFT) >= ni->initialized_size) {
+		/*
+		 * FIXME: Using clear_page() will become wrong when we get
+		 * PAGE_CACHE_SIZE != PAGE_SIZE but for now there is no problem.
+		 */
+		clear_page(kp);
+		return;
+	}
+	kp_ofs = ni->initialized_size & ~PAGE_CACHE_MASK;
+	memset(kp + kp_ofs, 0, PAGE_CACHE_SIZE - kp_ofs);
+	return;
+}
+
+/**
+ * handle_bounds_compressed_page - test for&handle out of bounds compressed page
+ */
+static inline void handle_bounds_compressed_page(ntfs_inode *ni,
+		struct page *page)
+{
+	if ((page->index >= (ni->initialized_size >> PAGE_CACHE_SHIFT)) &&
+			(ni->initialized_size < VFS_I(ni)->i_size))
+		zero_partial_compressed_page(ni, page);
+	return;
 }
 
 /**
@@ -173,19 +207,29 @@ return_error:
 		/* We can sleep from now on, so we drop lock. */
 		spin_unlock(&ntfs_cb_lock);
 		/* Second stage: finalize completed pages. */
-		for (i = 0; i < nr_completed_pages; i++) {
-			int di = completed_pages[i];
+		if (nr_completed_pages > 0) {
+			struct page *page = dest_pages[completed_pages[0]];
+			ntfs_inode *ni = NTFS_I(page->mapping->host);
 
-			dp = dest_pages[di];
-			flush_dcache_page(dp);
-			kunmap(dp);
-			SetPageUptodate(dp);
-			unlock_page(dp);
-			if (di == xpage)
-				*xpage_done = 1;
-			else
-				page_cache_release(dp);
-			dest_pages[di] = NULL;
+			for (i = 0; i < nr_completed_pages; i++) {
+				int di = completed_pages[i];
+
+				dp = dest_pages[di];
+				/*
+				 * If we are outside the initialized size, zero
+				 * the out of bounds page range.
+				 */
+				handle_bounds_compressed_page(ni, dp);
+				flush_dcache_page(dp);
+				kunmap(dp);
+				SetPageUptodate(dp);
+				unlock_page(dp);
+				if (di == xpage)
+					*xpage_done = 1;
+				else
+					page_cache_release(dp);
+				dest_pages[di] = NULL;
+			}
 		}
 		return err;
 	}
@@ -763,6 +807,11 @@ lock_retry_remap:
 		for (; cur2_page < cb_max_page; cur2_page++) {
 			page = pages[cur2_page];
 			if (page) {
+				/*
+				 * If we are outside the initialized size, zero
+				 * the out of bounds page range.
+				 */
+				handle_bounds_compressed_page(ni, page);
 				flush_dcache_page(page);
 				kunmap(page);
 				SetPageUptodate(page);
