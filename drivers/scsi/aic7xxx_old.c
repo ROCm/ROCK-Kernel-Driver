@@ -10392,7 +10392,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
   aic7xxx_done_cmds_complete(p);
   /* If the command was already complete or just completed, then we didn't
    * do a reset, return FAILED */
-  if(!scb->flags & SCB_ACTIVE)
+  if(!(scb->flags & SCB_ACTIVE))
     return FAILED;
 
   pause_sequencer(p);
@@ -10615,7 +10615,7 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
   aic7xxx_done_cmds_complete(p);
   /* If the command was already complete or just completed, then we didn't
    * do a reset, return FAILED */
-  if(!scb->flags & SCB_ACTIVE)
+  if(!(scb->flags & SCB_ACTIVE))
     return FAILED;
 
   pause_sequencer(p);
