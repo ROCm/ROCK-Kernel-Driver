@@ -15,7 +15,11 @@
 #include <asm/asmmacro.h>
 #include <asm/page.h>
 
-#define EK(y,x...)  x
+#if __GNUC__ >= 3
+# define EK(y...) EX(y)
+#else
+# define EK(y,x...)  x
+#endif
 
 GLOBAL_ENTRY(bcopy)
 	.regstk 3,0,0,0
@@ -173,14 +177,14 @@ EK(.ex_handler, (p16)	st8	[dst1]=r38,16)
 EX(.ex_handler, (p6)	ld8	t1=[src0])
 	mov	ar.lc=saved_lc
 	mov	ar.pfs=saved_pfs
-EX(.ex_handler, (p7)	ld8	t2=[src1],8)
+EX(.ex_hndlr_s, (p7)	ld8	t2=[src1],8)
 	cmp.le	p8,p0=24,tmp
 	and	r21=-8,tmp
 	;;
-EX(.ex_handler, (p8)	ld8	t3=[src1])
-EK(.ex_handler, (p6)	st8	[dst0]=t1)	// store byte 1
+EX(.ex_hndlr_s, (p8)	ld8	t3=[src1])
+EX(.ex_handler, (p6)	st8	[dst0]=t1)	// store byte 1
 	and	in2=7,tmp	// remaining length
-EX(.ex_handler, (p7)	st8	[dst1]=t2,8)	// store byte 2
+EX(.ex_hndlr_d, (p7)	st8	[dst1]=t2,8)	// store byte 2
 	add	src0=src0,r21	// setting up src pointer
 	add	dst0=dst0,r21	// setting up dest pointer
 	;;
@@ -214,8 +218,8 @@ EX(.ex_handler, (p8)	st8	[dst1]=t3)	// store byte 3
 	add cnt = -(2*PREFETCH_DIST) - 1, cnt
 	// same as .line_copy loop, but with all predicated-off instructions removed:
 .prefetch_loop:
-EX(.ex_handler_lcpy, (p[A])	ld8 v[A] = [src_pre_mem], 128)		// M0
-EK(.ex_handler_lcpy, (p[B])	st8 [dst_pre_mem] = v[B], 128)		// M2
+EX(.ex_hndlr_lcpy_1, (p[A])	ld8 v[A] = [src_pre_mem], 128)		// M0
+EK(.ex_hndlr_lcpy_1, (p[B])	st8 [dst_pre_mem] = v[B], 128)		// M2
 	br.ctop.sptk .prefetch_loop
 	;;
 	cmp.eq p16, p0 = r0, r0			// reset p16 to 1
@@ -356,7 +360,7 @@ EK(.ex_handler, (p9)	ld8	r37=[src1],8)
 // that the loop produces.
 .noloop:
 EX(.ex_handler, (p6)	ld8	r37=[src1],8)
-	nop.m	0
+	add	src0=8,src0
 (p6)	shl	r25=r30,3
 	;;
 EX(.ex_handler, (p6)	ld8	r27=[src1])
@@ -568,18 +572,31 @@ END(memcpy)
 #define saved_rtlink	loc1
 #define saved_pfs_stack	loc2
 
+.ex_hndlr_s:
+	add	src0=8,src0
+	br.sptk .ex_handler
+	;;
+.ex_hndlr_d:
+	add	dst0=8,dst0
+	br.sptk .ex_handler
+	;;
+.ex_hndlr_lcpy_1:
+	mov	src1=src_pre_mem
+	mov	dst1=dst_pre_mem
+	cmp.gtu	p10,p11=src_pre_mem,saved_in1
+	cmp.gtu	p12,p13=dst_pre_mem,saved_in0
+	;;
+(p10)	add	src0=8,saved_in1
+(p11)	mov	src0=saved_in1
+(p12)	add	dst0=8,saved_in0
+(p13)	mov	dst0=saved_in0
+	br.sptk	.ex_handler
 .ex_handler_lcpy:
-	// in long copy block, the preload addresses should always ahead
-	// of the other two src/det pointers.  Furthermore, src1/dst1 should
+	// in line_copy block, the preload addresses should always ahead
+	// of the other two src/dst pointers.  Furthermore, src1/dst1 should
 	// always ahead of src0/dst0.
-	cmp.ltu	p10,p11=src_pre_l2,src_pre_mem
-	cmp.ltu	p12,p13=dst_pre_l2,dst_pre_mem
-	;;
-(p10)	mov	src1=src_pre_mem
-(p11)	mov	src1=src_pre_l2
-(p12)	mov	dst1=dst_pre_mem
-(p13)	mov	dst1=dst_pre_l2
-	;;
+	mov	src1=src_pre_mem
+	mov	dst1=dst_pre_mem
 .ex_handler:
 	mov	pr=saved_pr,-1		// first restore pr, lc, and pfs
 	mov	ar.lc=saved_lc
@@ -599,8 +616,8 @@ END(memcpy)
 (p6)	dep	F = r0,dst1,0,PAGE_SHIFT // usr dst round down to page boundary
 (p7)	dep	F = r0,src1,0,PAGE_SHIFT // usr src round down to page boundary
 	;;
-(p6)	cmp.le	p14,p0=F,saved_in0	// bad address to start with
-(p7)	cmp.le	p14,p0=F,saved_in1	// here too
+(p6)	cmp.le	p14,p0=dst0,saved_in0	// no progress has been made on store
+(p7)	cmp.le	p14,p0=src0,saved_in1	// no progress has been made on load
 	mov	retval=saved_in2
 (p8)	ld1	tmp=[src1]		// force an oops for memcpy call
 (p8)	st1	[dst1]=r0		// force an oops for memcpy call
