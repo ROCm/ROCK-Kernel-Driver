@@ -35,6 +35,7 @@
 #include <asm/system.h>
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <net/ip_vs.h>
 
@@ -480,54 +481,103 @@ int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff *skb)
 }
 
 
+#ifdef CONFIG_PROC_FS
 /*
  *	/proc/net/ip_vs_app entry function
  */
-static int
-ip_vs_app_getinfo(char *buffer, char **start, off_t offset, int length)
+#define SEQ_START_TOKEN	((void *)1)
+
+static struct ip_vs_app *ip_vs_app_idx(loff_t pos)
 {
-	off_t pos=0;
-	int len=0;
-	char temp[64];
-	struct ip_vs_app *app, *inc;
+	loff_t off = 0;
 	struct list_head *e, *i;
 
-	pos = 64;
-	if (pos > offset) {
-		len += sprintf(buffer+len, "%-63s\n",
-			       "prot port    usecnt name");
+	list_for_each(e, &ip_vs_app_list) {
+		struct ip_vs_app *app
+			= list_entry(e, struct ip_vs_app, a_list);
+		list_for_each (i, &app->incs_list) {
+			if (off == pos)
+				return list_entry(i, struct ip_vs_app, a_list);
+			++off;
+		}	
 	}
+	return NULL;
 
+}
+
+static void *ip_vs_app_seq_start(struct seq_file *seq, loff_t *pos)
+{
 	down(&__ip_vs_app_mutex);
-	list_for_each (e, &ip_vs_app_list) {
+	
+	return *pos ? ip_vs_app_idx(*pos - 1) : SEQ_START_TOKEN;
+}
+
+static void *ip_vs_app_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct ip_vs_app *inc, *app;
+	struct list_head *i, *e;
+
+	++*pos;
+	if (v == SEQ_START_TOKEN)
+		return ip_vs_app_idx(0);
+	
+	inc = v;
+	app = inc->app;
+
+	if ((i = inc->a_list.next) != &app->incs_list)
+		return list_entry(i, struct ip_vs_app, a_list);
+
+	/* go on to next application */
+	for (e = app->a_list.next; e != &ip_vs_app_list; e = e->next) {
 		app = list_entry(e, struct ip_vs_app, a_list);
 		list_for_each (i, &app->incs_list) {
-			inc = list_entry(i, struct ip_vs_app, a_list);
-
-			pos += 64;
-			if (pos <= offset)
-				continue;
-			sprintf(temp, "%-3s  %-7u %-6d %-17s",
-				ip_vs_proto_name(inc->protocol),
-				ntohs(inc->port),
-				atomic_read(&inc->usecnt),
-				inc->name);
-			len += sprintf(buffer+len, "%-63s\n", temp);
-			if (pos >= offset+length)
-				goto done;
+			return list_entry(i, struct ip_vs_app, a_list);
 		}
 	}
-  done:
-	up(&__ip_vs_app_mutex);
-
-	*start = buffer+len-(pos-offset);       /* Start of wanted data */
-	len = pos-offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-	return len;
+	return NULL;
 }
+
+static void ip_vs_app_seq_stop(struct seq_file *seq, void *v)
+{
+	up(&__ip_vs_app_mutex);
+}
+
+static int ip_vs_app_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == SEQ_START_TOKEN)
+		seq_puts(seq, "prot port    usecnt name\n");
+	else {
+		const struct ip_vs_app *inc = v;
+
+		seq_printf(seq, "%-3s  %-7u %-6d %-17s\n",
+			   ip_vs_proto_name(inc->protocol),
+			   ntohs(inc->port),
+			   atomic_read(&inc->usecnt),
+			   inc->name);
+	}
+	return 0;
+}
+
+static struct seq_operations ip_vs_app_seq_ops = {
+	.start = ip_vs_app_seq_start,
+	.next  = ip_vs_app_seq_next,
+	.stop  = ip_vs_app_seq_stop,
+	.show  = ip_vs_app_seq_show,
+};
+
+static int ip_vs_app_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ip_vs_app_seq_ops);
+}
+
+static struct file_operations ip_vs_app_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = ip_vs_app_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+#endif
 
 
 /*
@@ -577,7 +627,7 @@ int ip_vs_skb_replace(struct sk_buff *skb, int pri,
 int ip_vs_app_init(void)
 {
 	/* we will replace it with proc_net_ipvs_create() soon */
-	proc_net_create("ip_vs_app", 0, ip_vs_app_getinfo);
+	proc_net_fops_create("ip_vs_app", 0, &ip_vs_app_fops);
 	return 0;
 }
 
