@@ -99,6 +99,8 @@ extern int llc_conn_remove_acked_pdus(struct sock *conn, u8 nr,
 extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *daddr,
 					   struct llc_addr *laddr);
+extern struct sock *llc_lookup_listener(struct llc_sap *sap,
+					struct llc_addr *laddr);
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
 #endif /* LLC_CONN_H */

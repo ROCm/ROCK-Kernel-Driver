@@ -65,24 +65,14 @@ int llc_conn_ac_conn_ind(struct sock *sk, struct sk_buff *skb)
 	sap = llc_sap_find(dsap);
 	if (sap) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-		union llc_u_prim_data *prim_data = prim->data;
 		struct llc_opt *llc = llc_sk(sk);
 
-		prim_data->conn.daddr.lsap = dsap;
 		llc_pdu_decode_sa(skb, llc->daddr.mac);
 		llc_pdu_decode_da(skb, llc->laddr.mac);
 		llc->dev = skb->dev;
-		prim_data->conn.pri = 0;
-		prim_data->conn.sk  = sk;
-		prim_data->conn.dev = skb->dev;
-		memcpy(&prim_data->conn.daddr, &llc->laddr, sizeof(llc->laddr));
-		memcpy(&prim_data->conn.saddr, &llc->daddr, sizeof(llc->daddr));
-		prim->data   = prim_data;
-		prim->prim   = LLC_CONN_PRIM;
-		prim->sap    = llc->sap;
-		ev->flag     = 1;
-		ev->ind_prim = prim;
+		/* FIXME: find better way to notify upper layer */
+		ev->flag     = LLC_CONN_PRIM + 1;
+		ev->ind_prim = (void *)1;
 		rc = 0;
 	}
 	return rc;

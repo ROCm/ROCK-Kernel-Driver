@@ -923,6 +923,7 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	memcpy(&newllc->addr, &llc->addr, sizeof(newllc->addr));
 	memcpy(newllc->addr.sllc_dmac, newllc->daddr.mac, IFHWADDRLEN);
 	newllc->addr.sllc_dsap = newllc->daddr.lsap;
+	newllc->link = llc_ui_next_link_no(newllc->laddr.lsap);
 
 	/* put original socket back into a clean listen state. */
 	sk->state = TCP_LISTEN;
@@ -1379,48 +1380,6 @@ out:;
 }
 
 /**
- *	llc_ui_ind_conn - handle CONNECT indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle CONNECT indication.
- */
-static void llc_ui_ind_conn(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_conn *prim_data = &prim->data->conn;
-	struct sock* newsk = prim_data->sk, *parent;
-	struct llc_opt *newllc = llc_sk(newsk);
-	struct sk_buff *skb2;
-
-	parent = llc_ui_find_sk_by_addr(&newllc->laddr, &prim_data->saddr,
-					prim_data->dev);
-	if (!parent) {
-		dprintk("%s: can't find a parent :-(\n", __FUNCTION__);
-		goto out;
-	}
-	dprintk("%s: found parent of remote %02X, its local %02X\n", __FUNCTION__,
-		newllc->daddr.lsap, llc_sk(parent)->laddr.lsap);
-	if (parent->type != SOCK_STREAM || parent->state != TCP_LISTEN) {
-		dprintk("%s: bad parent :-(\n", __FUNCTION__);
-		goto out_put;
-	}
-	if (prim->data->conn.status) {
-		dprintk("%s: bad status :-(\n", __FUNCTION__);
-		goto out_put; /* bad status. */
-	}
-	/* give this connection a link number. */
-	newllc->link = llc_ui_next_link_no(newllc->laddr.lsap);
-	skb2 = alloc_skb(0, GFP_ATOMIC);
-	if (!skb2)
-		goto out_put;
-	skb2->sk = newsk;
-	skb_queue_tail(&parent->receive_queue, skb2);
-	parent->state_change(parent);
-out_put:
-	sock_put(parent);
-out:;
-}
-
-/**
  *	llc_ui_ind_disc - handle DISC indication
  *	@prim: Primitive block provided by the llc layer.
  *
@@ -1465,7 +1424,9 @@ static int llc_ui_indicate(struct llc_prim_if_block *prim)
 		case LLC_DATAUNIT_PRIM:
 			llc_ui_ind_dataunit(prim);	break;
 		case LLC_CONN_PRIM:
-			llc_ui_ind_conn(prim);		break;
+			dprintk("%s: shouldn't happen, LLC_CONN_PRIM "
+				"is gone for ->ind()...\n", __FUNCTION__);
+			break;
 		case LLC_DATA_PRIM:
 			dprintk("%s: shouldn't happen, LLC_DATA_PRIM "
 				"is gone for ->ind()...\n", __FUNCTION__);

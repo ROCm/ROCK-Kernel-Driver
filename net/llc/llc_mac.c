@@ -123,24 +123,34 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 
 		sk = llc_lookup_established(sap, &saddr, &daddr);
 		if (!sk) {
-			struct llc_opt *llc;
-
-			dprintk("%s: llc_lookup_established failed\n", __FUNCTION__);
 			/*
-			 * FIXME: here we'll pass the sk->family of the
-			 * listening socket, if found, when
-			 * llc_lookup_listener is added in the next patches.
+			 * Didn't find an active connection; verify if there
+			 * is a listening socket for this llc addr
 			 */
-			sk = llc_sk_alloc(PF_LLC, GFP_ATOMIC);
-			if (!sk)
+			struct llc_opt *llc;
+			struct sock *parent;
+			
+			parent = llc_lookup_listener(sap, &daddr);
+
+			if (!parent) {
+				dprintk("llc_lookup_listener failed!\n");
 				goto drop;
+			}
+
+			sk = llc_sk_alloc(parent->family, GFP_ATOMIC);
+			if (!sk) {
+				sock_put(parent);
+				goto drop;
+			}
 			llc = llc_sk(sk);
 			memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
 			memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
 			llc_sap_assign_sock(sap, sk);
 			sock_hold(sk);
-		}
-		skb->sk = sk;
+			sock_put(parent);
+			skb->sk = parent;
+		} else
+			skb->sk = sk;
 		bh_lock_sock(sk);
 		if (!sk->lock.users) {
 			/* rc = */ llc_conn_rcv(sk, skb);

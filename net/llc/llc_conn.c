@@ -18,6 +18,7 @@
 #include <net/llc_sap.h>
 #include <net/llc_conn.h>
 #include <net/sock.h>
+#include <linux/tcp.h>
 #include <net/llc_main.h>
 #include <net/llc_c_ev.h>
 #include <net/llc_c_ac.h>
@@ -61,7 +62,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	/*
 	 * FIXME: this will vanish as soon I get rid of the double sock crap
 	 */
-	if (flag != LLC_DATA_PRIM + 1)
+	if (flag != LLC_DATA_PRIM + 1 && flag != LLC_CONN_PRIM + 1)
 		llc_conn_free_ev(skb);
 	else if (ind_prim && cfm_prim)
 		skb_get(skb);
@@ -73,7 +74,8 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		 * FIXME: this will be saner as soon I get rid of the double
 		 *	  sock crap
 		 */
-		if (flag == LLC_DATA_PRIM + 1) {
+		switch (flag) {
+		case LLC_DATA_PRIM + 1:
 			if (sock_queue_rcv_skb(skb->sk, skb)) {
 				/*
 				 * FIXME: have to sync the LLC state
@@ -86,8 +88,18 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 				       __FUNCTION__);
 				kfree_skb(skb);
 			}
-		} else
+			break;
+		case LLC_CONN_PRIM + 1: {
+			struct sock *parent = skb->sk;
+
+			skb->sk = sk;
+			skb_queue_tail(&parent->receive_queue, skb);
+			sk->state_change(parent);
+		}
+			break;
+		default:
 			llc->sap->ind(ind_prim);
+		}
 	}
 	if (!cfm_prim)  /* confirmation not required */
 		goto out;
@@ -425,6 +437,39 @@ struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 			rc = llc->sk;
 			break;
 		}
+	}
+	if (rc)
+		sock_hold(rc);
+out:
+	spin_unlock_bh(&sap->sk_list.lock);
+	return rc;
+}
+
+/**
+ *	llc_lookup_listener - Finds listener for local MAC + SAP
+ *	@sap: SAP
+ *	@laddr: address of local LLC (MAC + SAP)
+ *
+ *	Search connection list of the SAP and finds connection listening on
+ *	local mac, and local sap. Returns pointer for parent socket found,
+ *	%NULL otherwise.
+ */
+struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
+{
+	struct sock *rc = NULL;
+	struct list_head *entry;
+
+	spin_lock_bh(&sap->sk_list.lock);
+	if (list_empty(&sap->sk_list.list))
+		goto out;
+	list_for_each(entry, &sap->sk_list.list) {
+		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+
+		if (llc->sk->type != SOCK_STREAM || llc->sk->state != TCP_LISTEN ||
+		    llc->laddr.lsap != laddr->lsap ||
+		    !llc_mac_match(llc->laddr.mac, laddr->mac))
+			continue;
+		rc = llc->sk;
 	}
 	if (rc)
 		sock_hold(rc);
