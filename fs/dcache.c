@@ -538,13 +538,18 @@ resume:
 		struct list_head *tmp = next;
 		struct dentry *dentry = list_entry(tmp, struct dentry, d_child);
 		next = tmp->next;
-		list_del_init(&dentry->d_lru);
 
-		/* don't add non zero d_count dentries 
-		 * back to d_lru list
+		if (!list_empty(&dentry->d_lru)) {
+			dentry_stat.nr_unused--;
+			list_del_init(&dentry->d_lru);
+		}
+		/* 
+		 * move only zero ref count dentries to the end 
+		 * of the unused list for prune_dcache
 		 */
 		if (!atomic_read(&dentry->d_count)) {
 			list_add(&dentry->d_lru, dentry_unused.prev);
+			dentry_stat.nr_unused++;
 			found++;
 		}
 		/*
@@ -609,13 +614,18 @@ void shrink_dcache_anon(struct hlist_head *head)
 		spin_lock(&dcache_lock);
 		hlist_for_each(lp, head) {
 			struct dentry *this = hlist_entry(lp, struct dentry, d_hash);
-			list_del(&this->d_lru);
+			if (!list_empty(&this->d_lru)) {
+				dentry_stat.nr_unused--;
+				list_del(&this->d_lru);
+			}
 
-			/* don't add non zero d_count dentries 
-			 * back to d_lru list
+			/* 
+			 * move only zero ref count dentries to the end 
+			 * of the unused list for prune_dcache
 			 */
 			if (!atomic_read(&this->d_count)) {
 				list_add_tail(&this->d_lru, &dentry_unused);
+				dentry_stat.nr_unused++;
 				found++;
 			}
 		}
