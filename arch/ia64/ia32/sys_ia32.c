@@ -8,6 +8,7 @@
  * Copyright (C) 1997		David S. Miller (davem@caip.rutgers.edu)
  * Copyright (C) 2000-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2004		Gordon Jin <gordon.jin@intel.com>
  *
  * These routines maintain argument size conversion between 32bit and 64bit
  * environment.
@@ -48,6 +49,7 @@
 #include <linux/ipc.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
+#include <linux/mman.h>
 
 #include <asm/intrinsics.h>
 #include <asm/semaphore.h>
@@ -250,6 +252,376 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 	return ret;
 }
 
+/* SLAB cache for partial_page structures */
+kmem_cache_t *partial_page_cachep;
+
+/*
+ * init partial_page_list.
+ * return 0 means kmalloc fail.
+ */
+struct partial_page_list*
+ia32_init_pp_list(void)
+{
+	struct partial_page_list *p;
+
+	if ((p = kmalloc(sizeof(*p), GFP_KERNEL)) == NULL)
+		return p;
+	p->pp_head = 0;
+	p->ppl_rb = RB_ROOT;
+	p->pp_hint = 0;
+	atomic_set(&p->pp_count, 1);
+	return p;
+}
+
+/*
+ * Search for the partial page with @start in partial page list @ppl.
+ * If finds the partial page, return the found partial page.
+ * Else, return 0 and provide @pprev, @rb_link, @rb_parent to
+ * be used by later ia32_insert_pp().
+ */
+static struct partial_page *
+ia32_find_pp(struct partial_page_list *ppl, unsigned int start,
+	struct partial_page **pprev, struct rb_node ***rb_link,
+	struct rb_node **rb_parent)
+{
+	struct partial_page *pp;
+	struct rb_node **__rb_link, *__rb_parent, *rb_prev;
+
+	pp = ppl->pp_hint;
+	if (pp && pp->base == start)
+		return pp;
+
+	__rb_link = &ppl->ppl_rb.rb_node;
+	rb_prev = __rb_parent = NULL;
+
+	while (*__rb_link) {
+		__rb_parent = *__rb_link;
+		pp = rb_entry(__rb_parent, struct partial_page, pp_rb);
+
+		if (pp->base == start) {
+			ppl->pp_hint = pp;
+			return pp;
+		} else if (pp->base < start) {
+			rb_prev = __rb_parent;
+			__rb_link = &__rb_parent->rb_right;
+		} else {
+			__rb_link = &__rb_parent->rb_left;
+		}
+	}
+
+	*rb_link = __rb_link;
+	*rb_parent = __rb_parent;
+	*pprev = NULL;
+	if (rb_prev)
+		*pprev = rb_entry(rb_prev, struct partial_page, pp_rb);
+	return NULL;
+}
+
+/*
+ * insert @pp into @ppl.
+ */
+static void
+ia32_insert_pp(struct partial_page_list *ppl, struct partial_page *pp,
+	 struct partial_page *prev, struct rb_node **rb_link,
+	struct rb_node *rb_parent)
+{
+	/* link list */
+	if (prev) {
+		pp->next = prev->next;
+		prev->next = pp;
+	} else {
+		ppl->pp_head = pp;
+		if (rb_parent)
+			pp->next = rb_entry(rb_parent,
+				struct partial_page, pp_rb);
+		else
+			pp->next = NULL;
+	}
+
+	/* link rb */
+	rb_link_node(&pp->pp_rb, rb_parent, rb_link);
+	rb_insert_color(&pp->pp_rb, &ppl->ppl_rb);
+
+	ppl->pp_hint = pp;
+}
+
+/*
+ * delete @pp from partial page list @ppl.
+ */
+static void
+ia32_delete_pp(struct partial_page_list *ppl, struct partial_page *pp,
+	struct partial_page *prev)
+{
+	if (prev) {
+		prev->next = pp->next;
+		if (ppl->pp_hint == pp)
+			ppl->pp_hint = prev;
+	} else {
+		ppl->pp_head = pp->next;
+		if (ppl->pp_hint == pp)
+			ppl->pp_hint = pp->next;
+	}
+	rb_erase(&pp->pp_rb, &ppl->ppl_rb);
+	kmem_cache_free(partial_page_cachep, pp);
+}
+
+static struct partial_page *
+pp_prev(struct partial_page *pp)
+{
+	struct rb_node *prev = rb_prev(&pp->pp_rb);
+	if (prev)
+		return rb_entry(prev, struct partial_page, pp_rb);
+	else
+		return NULL;
+}
+
+/*
+ * Set the range between @start and @end in bitmap.
+ * @start and @end should be IA32 page aligned and in the same IA64 page.
+ */
+static int
+__ia32_set_pp(unsigned int start, unsigned int end)
+{
+	struct partial_page *pp, *prev;
+	struct rb_node ** rb_link, *rb_parent;
+	unsigned int pstart, start_bit, end_bit, i;
+
+	pstart = PAGE_START(start);
+	start_bit = (start % PAGE_SIZE) / IA32_PAGE_SIZE;
+	end_bit = (end % PAGE_SIZE) / IA32_PAGE_SIZE;
+	if (end_bit == 0)
+		end_bit = PAGE_SIZE / IA32_PAGE_SIZE;
+	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+					&rb_link, &rb_parent);
+	if (pp) {
+		for (i = start_bit; i < end_bit; i++)
+			set_bit(i, &pp->bitmap);
+		/*
+		 * Check: if this partial page has been set to a full page,
+		 * then delete it.
+		 */
+		if (find_first_zero_bit(&pp->bitmap, sizeof(pp->bitmap)*8) >=
+				PAGE_SIZE/IA32_PAGE_SIZE) {
+			ia32_delete_pp(current->thread.ppl, pp, pp_prev(pp));
+		}
+		return 0;
+	}
+
+	/* new a partial_page */
+	pp = kmem_cache_alloc(partial_page_cachep, GFP_KERNEL);
+	if (!pp)
+		return -ENOMEM;
+	pp->base = pstart;
+	pp->bitmap = 0;
+	for (i=start_bit; i<end_bit; i++)
+		set_bit(i, &(pp->bitmap));
+	pp->next = NULL;
+	ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
+	return 0;
+}
+
+/*
+ * locking version of ia32_set_pp().
+ * Use mm->mmap_sem to protect partial_page_list.
+ */
+static void
+ia32_set_pp(unsigned int start, unsigned int end)
+{
+	down_write(&current->mm->mmap_sem);
+	{
+		__ia32_set_pp(start, end);
+	}
+	up_write(&current->mm->mmap_sem);
+}
+
+/*
+ * Unset the range between @start and @end in bitmap.
+ * @start and @end should be IA32 page aligned and in the same IA64 page.
+ * After doing that, if the bitmap is 0, then free the page and return 1,
+ * 	else return 0;
+ * If not find the partial page in the list, then
+ * 	If the vma exists, then the full page is set to a partial page;
+ *	Else return -ENOMEM.
+ */
+static int
+__ia32_unset_pp(unsigned int start, unsigned int end)
+{
+	struct partial_page *pp, *prev;
+	struct rb_node ** rb_link, *rb_parent;
+	unsigned int pstart, start_bit, end_bit, i;
+	struct vm_area_struct *vma;
+
+	pstart = PAGE_START(start);
+	start_bit = (start % PAGE_SIZE) / IA32_PAGE_SIZE;
+	end_bit = (end % PAGE_SIZE) / IA32_PAGE_SIZE;
+	if (end_bit == 0)
+		end_bit = PAGE_SIZE / IA32_PAGE_SIZE;
+
+	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+					&rb_link, &rb_parent);
+	if (pp) {
+		for (i = start_bit; i < end_bit; i++)
+			clear_bit(i, &pp->bitmap);
+		if (pp->bitmap == 0) {
+			ia32_delete_pp(current->thread.ppl, pp, pp_prev(pp));
+			return 1;
+		}
+		return 0;
+	}
+
+	vma = find_vma(current->mm, pstart);
+	if (!vma || vma->vm_start > pstart) {
+		return -ENOMEM;
+	}
+
+	/* new a partial_page */
+	pp = kmem_cache_alloc(partial_page_cachep, GFP_KERNEL);
+	if (!pp)
+		return -ENOMEM;
+	pp->base = pstart;
+	pp->bitmap = 0;
+	for (i = 0; i < start_bit; i++)
+		set_bit(i, &(pp->bitmap));
+	for (i = end_bit; i < PAGE_SIZE / IA32_PAGE_SIZE; i++)
+		set_bit(i, &(pp->bitmap));
+	pp->next = NULL;
+	ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
+	return 0;
+}
+
+/*
+ * locking version of ia32_unset_pp().
+ * Use mm->mmap_sem to protect partial_page_list.
+ */
+static int
+ia32_unset_pp(unsigned int start, unsigned int end)
+{
+	int ret;
+
+	down_write(&current->mm->mmap_sem);
+	{
+		ret = __ia32_unset_pp(start, end);
+	}
+	up_write(&current->mm->mmap_sem);
+
+	return ret;
+}
+
+/*
+ * Compare the range between @start and @end with bitmap in partial page:
+ * Take this as example: the range is the 1st and 2nd 4K page.
+ * Return 0 if they fit bitmap exactly, i.e. bitmap = 00000011;
+ * Return 1 if the range doesn't cover whole bitmap, e.g. bitmap = 00001111;
+ * Return -ENOMEM if the range exceeds the bitmap, e.g. bitmap = 00000001 or
+ * 	bitmap = 00000101.
+ */
+static int
+ia32_compare_pp(unsigned int start, unsigned int end)
+{
+	struct partial_page *pp, *prev;
+	struct rb_node ** rb_link, *rb_parent;
+	unsigned int pstart, start_bit, end_bit, size;
+	unsigned int first_bit, next_zero_bit;	/* the first range in bitmap */
+
+	pstart = PAGE_START(start);
+
+	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+					&rb_link, &rb_parent);
+	if (!pp)
+		return 1;
+
+	start_bit = (start % PAGE_SIZE) / IA32_PAGE_SIZE;
+	end_bit = (end % PAGE_SIZE) / IA32_PAGE_SIZE;
+	size = sizeof(pp->bitmap) * 8;
+	first_bit = find_first_bit(&pp->bitmap, size);
+	next_zero_bit = find_next_zero_bit(&pp->bitmap, size, first_bit);
+	if ((start_bit < first_bit) || (end_bit > next_zero_bit)) {
+		/* exceeds the first range in bitmap */
+		return -ENOMEM;
+	} else if ((start_bit == first_bit) && (end_bit == next_zero_bit)) {
+		first_bit = find_next_bit(&pp->bitmap, size, next_zero_bit);
+		if ((next_zero_bit < first_bit) && (first_bit < size))
+			return 1;	/* has next range */
+		else
+			return 0; 	/* no next range */
+	} else
+		return 1;
+}
+
+static void
+ia32_do_drop_pp_list(struct partial_page_list *ppl)
+{
+	struct partial_page *pp = ppl->pp_head;
+
+	while (pp) {
+		struct partial_page *next = pp->next;
+		kmem_cache_free(partial_page_cachep, pp);
+		pp = next;
+	}
+
+	kfree(ppl);
+}
+
+void
+ia32_drop_partial_page_list(struct task_struct *task)
+{
+	struct partial_page_list* ppl = task->thread.ppl;
+
+	if (ppl && atomic_dec_and_test(&ppl->pp_count))
+		ia32_do_drop_pp_list(ppl);
+}
+
+/*
+ * Copy current->thread.ppl to ppl (already initialized).
+ */
+static int
+ia32_do_copy_pp_list(struct partial_page_list *ppl)
+{
+	struct partial_page *pp, *tmp, *prev;
+	struct rb_node **rb_link, *rb_parent;
+
+	ppl->pp_head = NULL;
+	ppl->pp_hint = NULL;
+	ppl->ppl_rb = RB_ROOT;
+	rb_link = &ppl->ppl_rb.rb_node;
+	rb_parent = NULL;
+	prev = NULL;
+
+	for (pp = current->thread.ppl->pp_head; pp; pp = pp->next) {
+		tmp = kmem_cache_alloc(partial_page_cachep, GFP_KERNEL);
+		if (!tmp)
+			return -ENOMEM;
+		*tmp = *pp;
+		ia32_insert_pp(ppl, tmp, prev, rb_link, rb_parent);
+		prev = tmp;
+		rb_link = &tmp->pp_rb.rb_right;
+		rb_parent = &tmp->pp_rb;
+	}
+	return 0;
+}
+
+int
+ia32_copy_partial_page_list(struct task_struct *p, unsigned long clone_flags)
+{
+	int retval = 0;
+
+	if (clone_flags & CLONE_VM) {
+		atomic_inc(&current->thread.ppl->pp_count);
+		p->thread.ppl = current->thread.ppl;
+	} else {
+		p->thread.ppl = ia32_init_pp_list();
+		if (!p->thread.ppl)
+			return -ENOMEM;
+		down_write(&current->mm->mmap_sem);
+		{
+			retval = ia32_do_copy_pp_list(p->thread.ppl);
+		}
+		up_write(&current->mm->mmap_sem);
+	}
+
+	return retval;
+}
+
 static unsigned long
 emulate_mmap (struct file *file, unsigned long start, unsigned long len, int prot, int flags,
 	      loff_t off)
@@ -274,7 +646,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 				return ret;
 			pstart += PAGE_SIZE;
 			if (pstart >= pend)
-				return start;	/* done */
+				goto out;	/* done */
 		}
 		if (end < pend) {
 			if (flags & MAP_SHARED)
@@ -287,7 +659,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 				return ret;
 			pend -= PAGE_SIZE;
 			if (pstart >= pend)
-				return start;	/* done */
+				goto out;	/* done */
 		}
 	} else {
 		/*
@@ -341,6 +713,19 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 		if (!(prot & PROT_WRITE) && sys_mprotect(pstart, pend - pstart, prot) < 0)
 			return -EINVAL;
 	}
+
+out:
+	if (end < PAGE_ALIGN(start)) {
+		ia32_set_pp((unsigned int)start, (unsigned int)end);
+	} else {
+		if (start > PAGE_START(start)) {
+			ia32_set_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
+		}
+		if (end < PAGE_ALIGN(end)) {
+			ia32_set_pp((unsigned int)PAGE_START(end), (unsigned int)end);
+		}
+	}
+
 	return start;
 }
 
@@ -478,11 +863,45 @@ sys32_munmap (unsigned int start, unsigned int len)
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_munmap(start, end - start);
 #else
+	unsigned int pstart, pend;
+
+	if (OFFSET4K(start))
+		return -EINVAL;
+
+	end = IA32_PAGE_ALIGN(end);
 	if (start >= end)
 		return -EINVAL;
 
-	start = PAGE_ALIGN(start);
-	end = PAGE_START(end);
+	pstart = PAGE_ALIGN(start);
+	pend = PAGE_START(end);
+
+	if (end < PAGE_ALIGN(start)) {
+		ret = ia32_unset_pp((unsigned int)start, (unsigned int)end);
+		if (ret == 1) {
+			start = PAGE_START(start);
+			end = PAGE_ALIGN(end);
+		} else
+			return ret;
+	} else {
+		if (offset_in_page(start)) {
+			ret = ia32_unset_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
+			if (ret == 1)
+				start = PAGE_START(start);
+			else if (ret == 0)
+				start = PAGE_ALIGN(start);
+			else
+				return ret;
+		}
+		if (offset_in_page(end)) {
+			ret = ia32_unset_pp((unsigned int)PAGE_START(end), (unsigned int)end);
+			if (ret == 1)
+				end = PAGE_ALIGN(end);
+			else if (ret == 0)
+				end = PAGE_START(end);
+			else
+				return ret;
+		}
+	}
 
 	if (start >= end)
 		return 0;
@@ -540,6 +959,51 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 
 	down(&ia32_mmap_sem);
 	{
+		if (end < PAGE_ALIGN(start)) {
+			/* start and end are in the same IA64 (partial) page */
+			retval = ia32_compare_pp((unsigned int)start, (unsigned int)end);
+			if (retval < 0)	{
+				/* start~end beyond the mapped area */
+				goto out;
+			}
+			else if (retval == 0) {
+				/* start~end fits the mapped area well */
+				start = PAGE_START(start);
+				end = PAGE_ALIGN(end);
+			}
+			else {
+				/* start~end doesn't cover all mapped area in this IA64 page */
+				/* So call mprotect_subpage to deal with new prot issue */
+				goto subpage;
+			}
+		} else {
+			if (offset_in_page(start)) {
+				retval = ia32_compare_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
+				if (retval < 0)	{
+					goto out;
+				}
+				else if (retval == 0) {
+					start = PAGE_START(start);
+				}
+				else {
+					goto subpage;
+				}
+			}
+			if (offset_in_page(end)) {
+				retval = ia32_compare_pp((unsigned int)PAGE_START(end), (unsigned int)end);
+				if (retval < 0)	{
+					goto out;
+				}
+				else if (retval == 0) {
+					end = PAGE_ALIGN(end);
+				}
+				else {
+					goto subpage;
+				}
+			}
+		}
+
+  subpage:
 		if (offset_in_page(start)) {
 			/* start address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(start), prot);
@@ -565,6 +1029,64 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 	up(&ia32_mmap_sem);
 	return retval;
 #endif
+}
+
+asmlinkage long
+sys32_mremap (unsigned int addr, unsigned int old_len, unsigned int new_len,
+		unsigned int flags, unsigned int new_addr)
+{
+	long ret;
+
+#if PAGE_SHIFT <= IA32_PAGE_SHIFT
+	ret = sys_mremap(addr, old_len, new_len, flags, new_addr);
+#else
+	unsigned int old_end, new_end;
+
+	if (OFFSET4K(addr))
+		return -EINVAL;
+
+	old_len = IA32_PAGE_ALIGN(old_len);
+	new_len = IA32_PAGE_ALIGN(new_len);
+	old_end = addr + old_len;
+	new_end = addr + new_len;
+
+	if (!new_len)
+		return -EINVAL;
+
+	if ((flags & MREMAP_FIXED) && (OFFSET4K(new_addr)))
+			return -EINVAL;
+
+	if (old_len >= new_len) {
+		ret = sys32_munmap(addr + new_len, old_len - new_len);
+		if (ret && old_len != new_len)
+			return ret;
+		ret = addr;
+		if (!(flags & MREMAP_FIXED) || (new_addr == addr))
+			return ret;
+		old_len = new_len;
+	}
+
+	addr = PAGE_START(addr);
+	old_len = PAGE_ALIGN(old_end) - addr;
+	new_len = PAGE_ALIGN(new_end) - addr;
+
+	down(&ia32_mmap_sem);
+	{
+		ret = sys_mremap(addr, old_len, new_len, flags, new_addr);
+	}
+	up(&ia32_mmap_sem);
+
+	if ((ret >= 0) && (old_len < new_len)) {	/* mremap expand successfully */
+		if (new_end <= PAGE_ALIGN(old_end)) {
+			/* old_end and new_end are in the same IA64 page */
+			ia32_set_pp(old_end, new_end);
+		} else {
+			ia32_set_pp((unsigned int)PAGE_START(new_end), new_end);
+			ia32_set_pp(old_end, (unsigned int)PAGE_ALIGN(old_end));
+		}
+	}
+#endif
+	return ret;
 }
 
 asmlinkage long

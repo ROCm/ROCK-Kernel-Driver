@@ -267,6 +267,8 @@ ia64_mca_log_sal_error_record(int sal_info_type)
  */
 #ifndef PLATFORM_MCA_HANDLERS
 
+#ifdef CONFIG_ACPI
+
 static irqreturn_t
 ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
@@ -280,6 +282,8 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
 	return IRQ_HANDLED;
 }
+
+#endif /* CONFIG_ACPI */
 
 static void
 show_min_state (pal_min_state_area_t *minstate)
@@ -967,6 +971,8 @@ ia64_mca_cmc_poll (unsigned long dummy)
  * Outputs
  * 	handled
  */
+#ifdef CONFIG_ACPI
+
 static irqreturn_t
 ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
@@ -1002,6 +1008,8 @@ ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 	return IRQ_HANDLED;
 }
+
+#endif /* CONFIG_ACPI */
 
 /*
  *  ia64_mca_cpe_poll

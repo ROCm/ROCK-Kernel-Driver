@@ -230,6 +230,7 @@ struct desc_struct {
 
 #define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8)
 
+struct partial_page_list;
 #endif
 
 struct thread_struct {
@@ -251,6 +252,7 @@ struct thread_struct {
 	__u64 fdr;			/* IA32 fp except. data reg */
 	__u64 old_k1;			/* old value of ar.k1 */
 	__u64 old_iob;			/* old IOBase value */
+	struct partial_page_list *ppl;	/* partial page list for 4K page size issue */
         /* cached TLS descriptors. */
 	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];
 
@@ -260,7 +262,8 @@ struct thread_struct {
 				.fir =		0,			\
 				.fdr =		0,			\
 				.old_k1 =	0,			\
-				.old_iob =	0,
+				.old_iob =	0,			\
+				.ppl =		0,
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
