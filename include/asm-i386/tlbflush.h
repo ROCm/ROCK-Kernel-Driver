@@ -10,8 +10,8 @@
 		unsigned int tmpreg;					\
 									\
 		__asm__ __volatile__(					\
-			"movl %%cr3, %0;  # flush TLB \n"		\
-			"movl %0, %%cr3;              \n"		\
+			"movl %%cr3, %0;              \n"		\
+			"movl %0, %%cr3;  # flush TLB \n"		\
 			: "=r" (tmpreg)					\
 			:: "memory");					\
 	} while (0)
@@ -26,8 +26,8 @@
 									\
 		__asm__ __volatile__(					\
 			"movl %1, %%cr4;  # turn off PGE     \n"	\
-			"movl %%cr3, %0;  # flush TLB        \n"	\
-			"movl %0, %%cr3;                     \n"	\
+			"movl %%cr3, %0;                     \n"	\
+			"movl %0, %%cr3;  # flush TLB        \n"	\
 			"movl %2, %%cr4;  # turn PGE back on \n"	\
 			: "=&r" (tmpreg)				\
 			: "r" (mmu_cr4_features & ~X86_CR4_PGE),	\
@@ -129,7 +129,7 @@ struct tlb_state
 {
 	struct mm_struct *active_mm;
 	int state;
-	char __cacheline_padding[24];
+	char __cacheline_padding[L1_CACHE_BYTES-8];
 };
 extern struct tlb_state cpu_tlbstate[NR_CPUS];
 
