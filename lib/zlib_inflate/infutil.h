@@ -11,7 +11,7 @@
 #ifndef _INFUTIL_H
 #define _INFUTIL_H
 
-#include "zconf.h"
+#include <linux/zconf.h>
 #include "inftrees.h"
 #include "infcodes.h"
 
