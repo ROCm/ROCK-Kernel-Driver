@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#107 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#108 $
  *
  * $FreeBSD$
  */
@@ -230,7 +230,6 @@ static int		ahc_check_patch(struct ahc_softc *ahc,
 					u_int start_instr, u_int *skip_addr);
 static void		ahc_download_instr(struct ahc_softc *ahc,
 					   u_int instrptr, uint8_t *dconsts);
-static int		ahc_probe_stack_size(struct ahc_softc *ahc);
 #ifdef AHC_TARGET_MODE
 static void		ahc_queue_lstate_event(struct ahc_softc *ahc,
 					       struct ahc_tmode_lstate *lstate,
@@ -1166,6 +1165,13 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			       ahc_name(ahc), scbptr, scb_index);
 			ahc_dump_card_state(ahc);
 		} else {
+#ifdef AHC_DEBUG
+			if ((ahc_debug & AHC_SHOW_SELTO) != 0) {
+				ahc_print_path(ahc, scb);
+				printf("Saw Selection Timeout for SCB 0x%x\n",
+				       scb_index);
+			}
+#endif
 			/*
 			 * Force a renegotiation with this target just in
 			 * case the cable was pulled and will later be
@@ -1178,13 +1184,6 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			ahc_force_renegotiation(ahc);
 			ahc_set_transaction_status(scb, CAM_SEL_TIMEOUT);
 			ahc_freeze_devq(ahc, scb);
-#ifdef AHC_DEBUG
-			if ((ahc_debug & AHC_SHOW_SELTO) != 0) {
-				ahc_print_path(ahc, scb);
-				printf("Saw Selection Timeout for SCB 0x%x\n",
-				       scb_index);
-			}
-#endif
 		}
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
 		ahc_restart(ahc);
@@ -4005,8 +4004,6 @@ ahc_free(struct ahc_softc *ahc)
 		free(ahc->name, M_DEVBUF);
 	if (ahc->seep_config != NULL)
 		free(ahc->seep_config, M_DEVBUF);
-	if (ahc->saved_stack != NULL)
-		free(ahc->saved_stack, M_DEVBUF);
 #ifndef __FreeBSD__
 	free(ahc, M_DEVBUF);
 #endif
@@ -4541,12 +4538,6 @@ ahc_init(struct ahc_softc *ahc)
 	u_int	 tagenable;
 	size_t	 driver_data_size;
 	uint32_t physaddr;
-
-	ahc->stack_size = ahc_probe_stack_size(ahc);
-	ahc->saved_stack = malloc(ahc->stack_size * sizeof(uint16_t),
-				  M_DEVBUF, M_NOWAIT);
-	if (ahc->saved_stack == NULL)
-		return (ENOMEM);
 
 #ifdef AHC_DEBUG_SEQUENCER
 	ahc->flags |= AHC_SEQUENCER_DEBUG;
@@ -6657,41 +6648,6 @@ ahc_download_instr(struct ahc_softc *ahc, u_int instrptr, uint8_t *dconsts)
 	}
 }
 
-static int
-ahc_probe_stack_size(struct ahc_softc *ahc)
-{
-	int last_probe;
-
-	last_probe = 0;
-	while (1) {
-		int i;
-
-		/*
-		 * We avoid using 0 as a pattern to avoid
-		 * confusion if the stack implementation
-		 * "back-fills" with zeros when "poping'
-		 * entries.
-		 */
-		for (i = 1; i <= last_probe+1; i++) {
-		       ahc_outb(ahc, STACK, i & 0xFF);
-		       ahc_outb(ahc, STACK, (i >> 8) & 0xFF);
-		}
-
-		/* Verify */
-		for (i = last_probe+1; i > 0; i--) {
-			u_int stack_entry;
-
-			stack_entry = ahc_inb(ahc, STACK)
-				    |(ahc_inb(ahc, STACK) << 8);
-			if (stack_entry != i)
-				goto sized;
-		}
-		last_probe++;
-	}
-sized:
-	return (last_probe);
-}
-
 int
 ahc_print_register(ahc_reg_parse_entry_t *table, u_int num_entries,
 		   const char *name, u_int address, u_int value,
@@ -6770,6 +6726,7 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	cur_col = 0;
 	if ((ahc->features & AHC_DT) != 0)
 		ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
+	ahc_error_print(ahc_inb(ahc, ERROR), &cur_col, 50);
 	ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
 	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &cur_col, 50);
 	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &cur_col, 50);
@@ -6789,11 +6746,8 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	if (cur_col != 0)
 		printf("\n");
 	printf("STACK:");
-	for (i = 0; i < ahc->stack_size; i++) {
-		ahc->saved_stack[i] =
-		    ahc_inb(ahc, STACK)|(ahc_inb(ahc, STACK) << 8);
-	       printf(" 0x%x", ahc->saved_stack[i]);
-	}
+	for (i = 0; i < STACK_SIZE; i++)
+	       printf(" 0x%x", ahc_inb(ahc, STACK)|(ahc_inb(ahc, STACK) << 8));
 	printf("\nSCB count = %d\n", ahc->scb_data->numscbs);
 	printf("Kernel NEXTQSCB = %d\n", ahc->next_queued_scb->hscb->tag);
 	printf("Card NEXTQSCB = %d\n", ahc_inb(ahc, NEXT_QUEUED_SCB));

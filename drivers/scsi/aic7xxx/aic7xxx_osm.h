@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#115 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#118 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -301,7 +301,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.25"
+#define AIC7XXX_DRIVER_VERSION "6.2.26"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -864,6 +864,7 @@ ahc_list_unlock(unsigned long *flags)
 #define PCIM_CMD_BUSMASTEREN	0x0004
 #define PCIM_CMD_MWRICEN	0x0010
 #define PCIM_CMD_PERRESPEN	0x0040
+#define	PCIM_CMD_SERRESPEN	0x0100
 #define PCIR_STATUS		0x06
 #define PCIR_REVID		0x08
 #define PCIR_PROGIF		0x09

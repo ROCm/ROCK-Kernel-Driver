@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#167 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#169 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -576,6 +576,7 @@ static void ahc_linux_run_device_queue(struct ahc_softc*,
 static void ahc_linux_setup_tag_info(char *p, char *end, char *s);
 static void ahc_linux_setup_tag_info_global(char *p);
 static void ahc_linux_setup_dv(char *p, char *end, char *s);
+static int  aic7xxx_setup(char *s);
 static int  ahc_linux_next_unit(void);
 static void ahc_runq_tasklet(unsigned long data);
 static int  ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
@@ -1766,7 +1767,7 @@ ahc_linux_setup_dv(char *p, char *end, char *s)
  * to a parameter with a ':' between the parameter and the value.
  * ie. aic7xxx=stpwlev:1,extended
  */
-int
+static int
 aic7xxx_setup(char *s)
 {
 	int	i, n;
@@ -1890,7 +1891,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0; target < host->max_id; target++) {
+	for (target = 0; target < host->max_id*host->max_channel+1; target++) {
 		u_int channel;
 
 		channel = 0;
