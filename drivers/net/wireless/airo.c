@@ -2101,6 +2101,28 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				}
 			}
 			if (len) {
+#if WIRELESS_EXT > 15
+#ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
+				if (apriv->spy_data.spy_number > 0) {
+					char *sa;
+					struct iw_quality wstats;
+					/* Prepare spy data : addr + qual */
+					sa = (char*)buffer + ((apriv->flags & FLAG_802_11) ? 10 : 6);
+					if (!(apriv->flags & FLAG_802_11)) {
+						bap_setup (apriv, fid, 8, BAP0);
+						bap_read (apriv, (u16*)hdr.rssi, 2, BAP0);
+					}
+					wstats.qual = hdr.rssi[0];
+					if (apriv->rssi)
+						wstats.level = 0x100 - apriv->rssi[hdr.rssi[1]].rssidBm;
+					else
+						wstats.level = (hdr.rssi[1] + 321) / 2;
+					wstats.updated = 3;	
+					/* Update spy records */
+					wireless_spy_update(dev, sa, &wstats);
+				}
+#endif /* IW_WIRELESS_SPY */
+#else /* WIRELESS_EXT > 15 */
 #ifdef WIRELESS_SPY
 				if (apriv->spy_number > 0) {
 					int i;
@@ -2126,6 +2148,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 						}
 				}
 #endif /* WIRELESS_SPY  */
+#endif /* WIRELESS_EXT > 15 */
 				OUT4500( apriv, EVACK, EV_RX);
 
 				if (apriv->flags & FLAG_802_11) {
@@ -2157,17 +2180,17 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				if ( ( apriv->fids[i] & 0xffff ) == fid ) {
 					len = apriv->fids[i] >> 16;
 					index = i;
-					/* Set up to be used again */
-					apriv->fids[i] &= 0xffff;
 				}
 			}
 			if (index != -1) {
-				netif_wake_queue(dev);
 				if (status & EV_TXEXC)
 					get_tx_error(apriv, index);
-			}
-			OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
-			if (index==-1) {
+				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
+				/* Set up to be used again */
+				apriv->fids[index] &= 0xffff;
+				netif_wake_queue(dev);
+			} else {
+				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
 				printk( KERN_ERR "airo: Unallocated FID was used to xmit\n" );
 			}
 		}
@@ -5349,6 +5372,7 @@ static int airo_get_scan(struct net_device *dev,
 }
 #endif	/* WIRELESS_EXT > 13 */
 
+#if WIRELESS_EXT <= 15
 #ifdef WIRELESS_SPY
 /*------------------------------------------------------------------*/
 /*
@@ -5411,6 +5435,7 @@ static int airo_get_spy(struct net_device *dev,
 	return 0;
 }
 #endif			/* WIRELESS_SPY */
+#endif /* WIRELESS_EXT <= 15 */
 
 /*------------------------------------------------------------------*/
 /*
@@ -5481,6 +5506,12 @@ static const iw_handler		airo_handler[] =
 	(iw_handler) NULL,			/* SIOCGIWPRIV */
 	(iw_handler) NULL,			/* SIOCSIWSTATS */
 	(iw_handler) NULL,			/* SIOCGIWSTATS */
+#if WIRELESS_EXT > 15
+	iw_handler_set_spy,			/* SIOCSIWSPY */
+	iw_handler_get_spy,			/* SIOCGIWSPY */
+	iw_handler_set_thrspy,			/* SIOCSIWTHRSPY */
+	iw_handler_get_thrspy,			/* SIOCGIWTHRSPY */
+#else /* WIRELESS_EXT > 15 */
 #ifdef WIRELESS_SPY
 	(iw_handler) airo_set_spy,		/* SIOCSIWSPY */
 	(iw_handler) airo_get_spy,		/* SIOCGIWSPY */
@@ -5490,6 +5521,7 @@ static const iw_handler		airo_handler[] =
 #endif	/* WIRELESS_SPY */
 	(iw_handler) NULL,			/* -- hole -- */
 	(iw_handler) NULL,			/* -- hole -- */
+#endif /* WIRELESS_EXT > 15 */
 	(iw_handler) airo_set_wap,		/* SIOCSIWAP */
 	(iw_handler) airo_get_wap,		/* SIOCGIWAP */
 	(iw_handler) NULL,			/* -- hole -- */
@@ -5543,6 +5575,11 @@ static const struct iw_handler_def	airo_handler_def =
 	.standard	= (iw_handler *) airo_handler,
 	.private	= (iw_handler *) airo_private_handler,
 	.private_args	= (struct iw_priv_args *) airo_private_args,
+#if WIRELESS_EXT > 15
+	.spy_offset	= ((void *) (&((struct airo_info *) NULL)->spy_data) -
+			   (void *) NULL),
+#endif /* WIRELESS_EXT > 15 */
+
 };
 
 #endif /* WIRELESS_EXT > 12 */
