@@ -1,5 +1,5 @@
 /*
- * $Id: video-buf.c,v 1.12 2004/10/11 14:53:13 kraxel Exp $
+ * $Id: video-buf.c,v 1.13 2004/10/13 10:39:00 kraxel Exp $
  *
  * generic helper functions for video4linux capture buffers, to handle
  * memory management and PCI DMA.  Right now bttv + saa7134 use it.
@@ -9,7 +9,7 @@
  * into PAGE_SIZE chunks).  They also assume the driver does not need
  * to touch the video data (thus it is probably not useful for USB 1.1
  * as data often must be uncompressed by the drivers).
- * 
+ *
  * (c) 2001-2004 Gerd Knorr <kraxel@bytesex.org> [SUSE Labs]
  *
  * This program is free software; you can redistribute it and/or modify
@@ -66,7 +66,7 @@ videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
 		sglist[i].length = PAGE_SIZE;
 	}
 	return sglist;
-	
+
  err:
 	kfree(sglist);
 	return NULL;
@@ -193,7 +193,7 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 {
 	MAGIC_CHECK(dma->magic,MAGIC_DMABUF);
 	BUG_ON(0 == dma->nr_pages);
-	
+
 	if (dma->pages) {
 		dma->sglist = videobuf_pages_to_sg(dma->pages, dma->nr_pages,
 						   dma->offset);
@@ -289,7 +289,7 @@ int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr)
 {
 	int retval = 0;
 	DECLARE_WAITQUEUE(wait, current);
-	
+
 	MAGIC_CHECK(vb->magic,MAGIC_BUFFER);
 	add_wait_queue(&vb->done, &wait);
 	while (vb->state == STATE_ACTIVE || vb->state == STATE_QUEUED) {
@@ -355,7 +355,7 @@ videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb,
 	err = videobuf_dma_pci_map(pci,&vb->dma);
 	if (0 != err)
 		return err;
-		
+
 	return 0;
 }
 
@@ -383,11 +383,11 @@ videobuf_queue_init(struct videobuf_queue *q,
 	INIT_LIST_HEAD(&q->stream);
 }
 
-int 
+int
 videobuf_queue_is_busy(struct videobuf_queue *q)
 {
 	int i;
-	
+
 	if (q->streaming) {
 		dprintk(1,"busy: streaming active\n");
 		return 1;
@@ -636,7 +636,7 @@ videobuf_qbuf(void *priv, struct videobuf_queue *q,
 	retval = q->ops->buf_prepare(priv,buf,field);
 	if (0 != retval)
 		goto done;
-	
+
 	list_add_tail(&buf->stream,&q->stream);
 	if (q->streaming) {
 		spin_lock_irqsave(q->irqlock,flags);
@@ -644,7 +644,7 @@ videobuf_qbuf(void *priv, struct videobuf_queue *q,
 		spin_unlock_irqrestore(q->irqlock,flags);
 	}
 	retval = 0;
-	
+
  done:
 	up(&q->lock);
 	return retval;
@@ -656,7 +656,7 @@ videobuf_dqbuf(void *priv, struct videobuf_queue *q,
 {
 	struct videobuf_buffer *buf;
 	int retval;
-	
+
 	down(&q->lock);
 	retval = -EBUSY;
 	if (q->reading)
@@ -697,7 +697,7 @@ int videobuf_streamon(void *priv, struct videobuf_queue *q)
 	struct list_head *list;
 	unsigned long flags;
 	int retval;
-	
+
 	down(&q->lock);
 	retval = -EBUSY;
 	if (q->reading)
@@ -756,7 +756,7 @@ videobuf_read_zerocopy(void *priv, struct videobuf_queue *q,
 	retval = q->ops->buf_prepare(priv,q->read_buf,field);
 	if (0 != retval)
 		goto done;
-	
+
         /* start capture & wait */
 	spin_lock_irqsave(q->irqlock,flags);
 	q->ops->buf_queue(priv,q->read_buf);
@@ -890,7 +890,7 @@ int videobuf_read_start(void *priv, struct videobuf_queue *q)
 void videobuf_read_stop(void *priv, struct videobuf_queue *q)
 {
 	int i;
-	
+
 	videobuf_queue_cancel(priv,q);
 	INIT_LIST_HEAD(&q->stream);
 	for (i = 0; i < VIDEO_MAX_FRAME; i++) {
@@ -910,7 +910,7 @@ ssize_t videobuf_read_stream(void *priv, struct videobuf_queue *q,
 	unsigned int *fc, bytes;
 	int err, retval;
 	unsigned long flags;
-	
+
 	dprintk(2,"%s\n",__FUNCTION__);
 	down(&q->lock);
 	retval = -EBUSY;
@@ -950,7 +950,7 @@ ssize_t videobuf_read_stream(void *priv, struct videobuf_queue *q,
 				*fc = q->read_buf->field_count >> 1;
 				dprintk(1,"vbihack: %d\n",*fc);
 			}
-			
+
 			/* copy stuff */
 			bytes = count;
 			if (bytes > q->read_buf->size - q->read_off)
