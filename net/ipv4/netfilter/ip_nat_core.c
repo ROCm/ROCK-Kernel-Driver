@@ -773,9 +773,9 @@ do_bindings(struct ip_conntrack *ct,
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       htons(info->manips[i].manip.u.all));
-			if (manip_pkt(proto, pskb, 0,
-				      &info->manips[i].manip,
-				      info->manips[i].maniptype) < 0) {
+			if (!manip_pkt(proto, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype)) {
 				READ_UNLOCK(&ip_nat_lock);
 				return NF_DROP;
 			}
@@ -927,11 +927,11 @@ icmp_reply_translation(struct sk_buff **pskb,
 			       ? "DST" : "SRC",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       ntohs(info->manips[i].manip.u.udp.port));
-			if (manip_pkt(inside->ip.protocol, pskb,
-				      (*pskb)->nh.iph->ihl*4
-				      + sizeof(inside->icmp),
-				      &info->manips[i].manip,
-				      !info->manips[i].maniptype) < 0)
+			if (!manip_pkt(inside->ip.protocol, pskb,
+				       (*pskb)->nh.iph->ihl*4
+				       + sizeof(inside->icmp),
+				       &info->manips[i].manip,
+				       !info->manips[i].maniptype))
 				goto unlock_fail;
 
 			/* Outer packet needs to have IP header NATed like
@@ -943,9 +943,9 @@ icmp_reply_translation(struct sk_buff **pskb,
 			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip));
-			if (manip_pkt(0, pskb, 0,
-				      &info->manips[i].manip,
-				      info->manips[i].maniptype) < 0)
+			if (!manip_pkt(0, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype))
 				goto unlock_fail;
 		}
 	}
