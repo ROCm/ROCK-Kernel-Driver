@@ -131,6 +131,17 @@ static inline void eeh_writel(u32 val, void *addr) {
 	volatile u32 *vaddr = (volatile u32 *)IO_TOKEN_TO_ADDR(addr);
 	out_le32(vaddr, val);
 }
+static inline u64 eeh_readq(void *addr) {
+	volatile u64 *vaddr = (volatile u64 *)IO_TOKEN_TO_ADDR(addr);
+	u64 val = in_le64(vaddr);
+	if (EEH_POSSIBLE_ERROR(addr, vaddr, val))
+		return eeh_check_failure(addr, val);
+	return val;
+}
+static inline void eeh_writeq(u64 val, void *addr) {
+	volatile u64 *vaddr = (volatile u64 *)IO_TOKEN_TO_ADDR(addr);
+	out_le64(vaddr, val);
+}
 
 static inline void eeh_memset_io(void *addr, int c, unsigned long n) {
 	void *vaddr = (void *)IO_TOKEN_TO_ADDR(addr);
