@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/oldlatches.c
+ *  linux/arch/arm26/kernel/latches.c
  *
  *  Copyright (C) David Alan Gilbert 1995/1996,2000
  *  Copyright (C) Ian Molton 2003
@@ -46,7 +46,7 @@ void oldlatch_bupdate(unsigned char mask,unsigned char newdata)
 	unsigned long flags;
 
 	BUG_ON(!machine_is_archimedes());
-	
+
 
 	local_irq_save(flags);//FIXME: was local_save_flags
 	latch_b_copy = (latch_b_copy & ~mask) | newdata;

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/head-armo.S
+ *  linux/arch/arm26/kernel/head.S
  *
  *  Copyright (C) 1994-2000 Russell King
  *  Copyright (C) 2003 Ian Molton
@@ -22,10 +22,13 @@
  */
 		.section ".init.text",#alloc,#execinstr
 ENTRY(stext)
-__entry:	cmp	pc, #0x02000000
+
+__entry:
+		cmp	pc, #0x02000000
 		ldrlt	pc, LC0			@ if 0x01800000, call at 0x02080000
 		teq	r0, #0                  @ Check for old calling method
 		blne	oldparams		@ Move page if old
+
 		adr	r0, LC0
 		ldmib	r0, {r2-r5, sp}		@ Setup stack (and fetch other values)
 
@@ -49,7 +52,6 @@ __entry:	cmp	pc, #0x02000000
                cmp     r4, r5
                blt     1b
 #endif
-
 		mov	fp, #0
 		b	start_kernel
 
@@ -69,7 +71,7 @@ arm2_id:	.long	0x41560200  @ ARM2 and 250 dont have a CPUID
 arm250_id:	.long	0x41560250  @ So we create some after probing for them
 		.align
 
-oldparams:	mov	r4, #0x02000000
+oldparams:	mov     r4, #0x02000000
 		add	r3, r4, #0x00080000
 		add	r4, r4, #0x0007c000
 1:		ldmia	r0!, {r5 - r12}

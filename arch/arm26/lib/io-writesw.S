@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-writesw-armv3.S
+ *  linux/arch/arm26/lib/io-writesw.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

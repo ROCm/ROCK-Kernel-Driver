@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm26/lib/calls.h
+ *  linux/arch/arm26/kernel/calls.S
  *
  *  Copyright (C) 2003 Ian Molton
  *
@@ -8,8 +8,11 @@
  * published by the Free Software Foundation.
  *
  *  FIXME
- *  This file is included twice in entry-common.S which may not be necessary
+ *  This file is included twice in entry.S which may not be necessary
  */
+
+//FIXME - clearly NR_syscalls is never defined here
+
 #ifndef NR_syscalls
 #define NR_syscalls 256
 #else

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/mm-armo.c
+ *  linux/arch/arm26/mm/memc.c
  *
  *  Copyright (C) 1998-2000 Russell King
  *

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-readsw-armv3.S
+ *  linux/arch/arm26/lib/io-readsw.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

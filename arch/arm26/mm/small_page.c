@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/small_page.c
+ *  linux/arch/arm26/mm/small_page.c
  *
  *  Copyright (C) 1996  Russell King
  *  Copyright (C) 2003  Ian Molton
@@ -12,6 +12,8 @@
  *   26/01/1996	RMK	Cleaned up various areas to make little more generic
  *   07/02/1999	RMK	Support added for 16K and 32K page sizes
  *			containing 8K blocks
+ *   23/05/2004 IM	Fixed to use struct page->lru (thanks wli)
+ *
  */
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -36,6 +38,7 @@
  *  granularity than the page size.  This is typically used for the
  *  second level page tables on 32-bit ARMs.
  *
+ * FIXME - this comment is *out of date*
  * Theory:
  *  We "misuse" the Linux memory management system.  We use alloc_page
  *  to allocate a page and then mark it as reserved.  The Linux memory
@@ -86,7 +89,7 @@ static unsigned long __get_small_page(int priority, struct order *order)
 		if (list_empty(&order->queue))
 			goto need_new_page;
 
-		page = list_entry(order->queue.next, struct page, list);
+		page = list_entry(order->queue.next, struct page, lru);
 again:
 #ifdef PEDANTIC
 		if (USED_MAP(page) & ~order->all_used)
