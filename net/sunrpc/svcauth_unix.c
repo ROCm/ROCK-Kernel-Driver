@@ -116,11 +116,31 @@ static inline void ip_map_update(struct ip_map *new, struct ip_map *item)
 	new->m_add_change = item->m_add_change;
 }
 
+static void ip_map_request(struct cache_detail *cd,
+				  struct cache_head *h,
+				  char **bpp, int *blen)
+{
+	char text_addr[20];
+	struct ip_map *im = container_of(h, struct ip_map, h);
+	__u32 addr = im->m_addr.s_addr;
+	
+	snprintf(text_addr, 20, "%u.%u.%u.%u",
+		 ntohl(addr) >> 24 & 0xff,
+		 ntohl(addr) >> 16 & 0xff,
+		 ntohl(addr) >>  8 & 0xff,
+		 ntohl(addr) >>  0 & 0xff);
+
+	add_word(bpp, blen, im->m_class);
+	add_word(bpp, blen, text_addr);
+	(*bpp)[-1] = '\n';
+}
+
 struct cache_detail ip_map_cache = {
 	.hash_size	= IP_HASHMAX,
 	.hash_table	= ip_table,
 	.name		= "auth.unix.ip",
 	.cache_put	= ip_map_put,
+	.cache_request	= ip_map_request,
 };
 
 static DefineSimpleCacheLookup(ip_map)
