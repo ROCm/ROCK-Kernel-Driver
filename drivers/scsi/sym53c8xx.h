@@ -91,8 +91,6 @@ int sym53c8xx_release(struct Scsi_Host *);
 			info:           sym53c8xx_info, 	\
 			queuecommand:   sym53c8xx_queue_command,\
 			slave_attach:   sym53c8xx_slave_attach, \
-			abort:          sym53c8xx_abort,	\
-			reset:          sym53c8xx_reset,	\
 			bios_param:     scsicam_bios_param,	\
 			can_queue:      SCSI_NCR_CAN_QUEUE,	\
 			this_id:        7,			\

@@ -9125,12 +9125,9 @@ static int ncr53c8xx_proc_info(char *buffer, char **start, off_t offset,
 printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 #endif
 
-	for (host = first_host; host; host = host->next) {
-		if (host->hostt == the_template && host->host_no == hostno) {
-			host_data = (struct host_data *) host->hostdata;
-			ncb = host_data->ncb;
-			break;
-		}
+	if ((host = scsi_host_hn_get(hostno)) != NULL) {
+		host_data = (struct host_data *) host->hostdata;
+		ncb = host_data->ncb;
 	}
 
 	if (!ncb)

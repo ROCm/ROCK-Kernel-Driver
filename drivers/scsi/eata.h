@@ -21,11 +21,7 @@ static int eata2x_slave_attach(Scsi_Device *);
                 detect:                  eata2x_detect,                      \
                 release:                 eata2x_release,                     \
                 queuecommand:            eata2x_queuecommand,                \
-                abort:                   NULL,                               \
-                reset:                   NULL,                               \
                 eh_abort_handler:        eata2x_abort,                       \
-                eh_device_reset_handler: NULL,                               \
-                eh_bus_reset_handler:    NULL,                               \
                 eh_host_reset_handler:   eata2x_reset,                       \
                 bios_param:              eata2x_biosparam,                   \
 		slave_attach:		 eata2x_slave_attach,		     \

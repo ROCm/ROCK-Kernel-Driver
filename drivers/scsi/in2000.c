@@ -832,7 +832,7 @@ int i;
 
 static void in2000_intr (int irqnum, void * dev_id, struct pt_regs *ptregs)
 {
-struct Scsi_Host *instance;
+struct Scsi_Host *instance = dev_id;
 struct IN2000_hostdata *hostdata;
 Scsi_Cmnd *patch, *cmd;
 uchar asr, sr, phs, id, lun, *ucp, msg;
@@ -842,14 +842,6 @@ unsigned short *sp;
 unsigned short f;
 unsigned long flags;
 
-   for (instance = instance_list; instance; instance = instance->next) {
-      if (instance->irq == irqnum)
-         break;
-      }
-   if (!instance) {
-      printk("*** Hmm... interrupts are screwed up! ***\n");
-      return;
-      }
    hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
 /* Get the spin_lock and disable further ints, for SMP */
@@ -2046,7 +2038,7 @@ char buf[32];
       write1_io(0,IO_FIFO_READ);             /* start fifo out in read mode */
       write1_io(0,IO_INTR_MASK);    /* allow all ints */
       x = int_tab[(switches & (SW_INT0 | SW_INT1)) >> SW_INT_SHIFT];
-      if (request_irq(x, in2000_intr, SA_INTERRUPT, "in2000", NULL)) {
+      if (request_irq(x, in2000_intr, SA_INTERRUPT, "in2000", instance)) {
          printk("in2000_detect: Unable to allocate IRQ.\n");
          detect_count--;
          continue;
@@ -2215,10 +2207,7 @@ Scsi_Cmnd *cmd;
 int x,i;
 static int stop = 0;
 
-   for (instance=instance_list; instance; instance=instance->next) {
-      if (instance->host_no == hn)
-         break;
-      }
+   instance = scsi_host_hn_get(hn);
    if (!instance) {
       printk("*** Hmm... Can't find host #%d!\n",hn);
       return (-ESRCH);

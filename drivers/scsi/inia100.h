@@ -88,23 +88,11 @@ extern int inia100_biosparam(Scsi_Disk *, struct block_device *, int *);
 #define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
 #define INIA100	{ \
-	module:		NULL,						\
 	proc_name:	"inia100", \
-	proc_info:	NULL,				\
 	name:		inia100_REVID, \
 	detect:		inia100_detect, \
 	release:	inia100_release, \
-	info:		NULL,					\
-	command:	NULL, \
 	queuecommand:	inia100_queue, \
- 	eh_strategy_handler: NULL, \
- 	eh_abort_handler: NULL, \
- 	eh_device_reset_handler: NULL, \
- 	eh_bus_reset_handler: NULL, \
- 	eh_host_reset_handler: NULL, \
-	abort:		inia100_abort, \
-	reset:		inia100_reset, \
-	slave_attach:	NULL, \
 	bios_param:	inia100_biosparam, \
 	can_queue:	1, \
 	this_id:	1, \

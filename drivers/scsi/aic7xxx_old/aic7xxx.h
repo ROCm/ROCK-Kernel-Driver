@@ -35,13 +35,6 @@
 	release: aic7xxx_release,				\
 	info: aic7xxx_info,					\
 	queuecommand: aic7xxx_queue,				\
-	eh_strategy_handler: NULL,				\
-	eh_abort_handler: NULL,					\
-	eh_device_reset_handler: NULL,				\
-	eh_bus_reset_handler: NULL,				\
-	eh_host_reset_handler: NULL,				\
-	abort: aic7xxx_abort,					\
-	reset: aic7xxx_reset,					\
 	slave_attach: aic7xxx_slave_attach,			\
 	slave_detach: aic7xxx_slave_detach,			\
 	bios_param: aic7xxx_biosparam,				\
@@ -58,8 +51,6 @@ extern int aic7xxx_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 extern int aic7xxx_biosparam(Disk *, struct block_device *, int[]);
 extern int aic7xxx_detect(Scsi_Host_Template *);
 extern int aic7xxx_command(Scsi_Cmnd *);
-extern int aic7xxx_reset(Scsi_Cmnd *, unsigned int);
-extern int aic7xxx_abort(Scsi_Cmnd *);
 extern int aic7xxx_release(struct Scsi_Host *);
 extern int aic7xxx_slave_attach(Scsi_Device *);
 extern void aic7xxx_slave_detach(Scsi_Device *);

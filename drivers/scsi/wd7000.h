@@ -49,7 +49,6 @@ static int wd7000_biosparam(Disk *, struct block_device *, int *);
 	detect:			wd7000_detect,			\
 	command:		wd7000_command,			\
 	queuecommand:		wd7000_queuecommand,		\
-	abort:			wd7000_abort,			\
 	eh_bus_reset_handler:	wd7000_bus_reset,		\
 	eh_device_reset_handler:wd7000_device_reset,		\
 	eh_host_reset_handler:	wd7000_host_reset,		\

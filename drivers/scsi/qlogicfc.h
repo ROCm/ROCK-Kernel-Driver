@@ -87,7 +87,6 @@ int isp2x00_biosparam(Disk *, struct block_device *, int[]);
         info:                   isp2x00_info,                              \
         queuecommand:           isp2x00_queuecommand,                      \
         eh_abort_handler:       isp2x00_abort,                             \
-        reset:                  isp2x00_reset,                             \
         bios_param:             isp2x00_biosparam,                         \
         can_queue:              QLOGICFC_REQ_QUEUE_LEN,                    \
         this_id:                -1,                                        \

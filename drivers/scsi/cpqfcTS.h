@@ -28,8 +28,6 @@ extern int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg);
  queuecommand:           cpqfcTS_queuecommand,   \
  eh_device_reset_handler:   cpqfcTS_eh_device_reset,   \
  eh_abort_handler:       cpqfcTS_eh_abort,       \
- reset:                  cpqfcTS_reset,          \
- abort:                  cpqfcTS_abort,		 \
  bios_param:             cpqfcTS_biosparam,      \
  can_queue:              CPQFCTS_REQ_QUEUE_LEN,  \
  this_id:                -1,                     \

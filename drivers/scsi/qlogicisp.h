@@ -75,8 +75,6 @@ int isp1020_biosparam(Disk *, struct block_device *, int[]);
 	release:		isp1020_release,			   \
 	info:			isp1020_info,				   \
 	queuecommand:		isp1020_queuecommand,			   \
-	abort:			isp1020_abort,				   \
-	reset:			isp1020_reset,				   \
 	bios_param:		isp1020_biosparam,			   \
 	can_queue:		QLOGICISP_REQ_QUEUE_LEN,		   \
 	this_id:		-1,					   \
