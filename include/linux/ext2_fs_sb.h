@@ -17,14 +17,6 @@
 #define _LINUX_EXT2_FS_SB
 
 /*
- * The following is not needed anymore since the descriptors buffer
- * heads are now dynamically allocated
- */
-/* #define EXT2_MAX_GROUP_DESC	8 */
-
-#define EXT2_MAX_GROUP_LOADED	8
-
-/*
  * second extended-fs super-block data in memory
  */
 struct ext2_sb_info {
@@ -41,12 +33,6 @@ struct ext2_sb_info {
 	struct buffer_head * s_sbh;	/* Buffer containing the super block */
 	struct ext2_super_block * s_es;	/* Pointer to the super block in the buffer */
 	struct buffer_head ** s_group_desc;
-	unsigned short s_loaded_inode_bitmaps;
-	unsigned short s_loaded_block_bitmaps;
-	unsigned long s_inode_bitmap_number[EXT2_MAX_GROUP_LOADED];
-	struct buffer_head * s_inode_bitmap[EXT2_MAX_GROUP_LOADED];
-	unsigned long s_block_bitmap_number[EXT2_MAX_GROUP_LOADED];
-	struct buffer_head * s_block_bitmap[EXT2_MAX_GROUP_LOADED];
 	unsigned long  s_mount_opt;
 	uid_t s_resuid;
 	gid_t s_resgid;
