@@ -1643,3 +1643,7 @@ config X86_BIOS_REBOOT
 	depends on !VOYAGER
 	default y
 
+config X86_TRAMPOLINE
+	bool
+	depends on SMP
+	default y
