@@ -390,6 +390,7 @@ static int inet_create(struct socket *sock, int protocol)
 	inet->id = 0;
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->destruct = inet_sock_destruct;
 	sk->zapped	= 0;
@@ -882,7 +883,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 struct proto_ops inet_stream_ops = {
 	.family =	PF_INET,
-
+	.owner =	THIS_MODULE,
 	.release =	inet_release,
 	.bind =		inet_bind,
 	.connect =	inet_stream_connect,
@@ -903,7 +904,7 @@ struct proto_ops inet_stream_ops = {
 
 struct proto_ops inet_dgram_ops = {
 	.family =	PF_INET,
-
+	.owner =	THIS_MODULE,
 	.release =	inet_release,
 	.bind =		inet_bind,
 	.connect =	inet_dgram_connect,
