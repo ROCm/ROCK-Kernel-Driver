@@ -475,8 +475,6 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 	*left_over = wastage;
 }
 
-#if DEBUG
-
 #define slab_error(cachep, msg) __slab_error(__FUNCTION__, cachep, msg)
 
 static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
@@ -485,8 +483,6 @@ static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
 		function, cachep->name, msg);
 	dump_stack();
 }
-
-#endif
 
 /*
  * Start the reap timer running on the target CPU.  We run at around 1 to 2Hz.
@@ -1307,6 +1303,8 @@ int kmem_cache_shrink(kmem_cache_t *cachep)
  */
 int kmem_cache_destroy (kmem_cache_t * cachep)
 {
+	int i;
+
 	if (!cachep || in_interrupt())
 		BUG();
 
@@ -1319,21 +1317,19 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 	up(&cache_chain_sem);
 
 	if (__cache_shrink(cachep)) {
-		printk(KERN_ERR "kmem_cache_destroy: Can't free all objects %p\n",
-		       cachep);
+		slab_error(cachep, "Can't free all objects");
 		down(&cache_chain_sem);
 		list_add(&cachep->next,&cache_chain);
 		up(&cache_chain_sem);
 		return 1;
 	}
-	{
-		int i;
-		for (i = 0; i < NR_CPUS; i++)
-			kfree(cachep->array[i]);
-		/* NUMA: free the list3 structures */
-		kfree(cachep->lists.shared);
-		cachep->lists.shared = NULL;
-	}
+
+	for (i = 0; i < NR_CPUS; i++)
+		kfree(cachep->array[i]);
+
+	/* NUMA: free the list3 structures */
+	kfree(cachep->lists.shared);
+	cachep->lists.shared = NULL;
 	kmem_cache_free(&cache_cache, cachep);
 
 	return 0;
