@@ -299,8 +299,8 @@ needs_val:
  *
  * Change the mount options of an already mounted ntfs filesystem.
  *
- * NOTE: The VFS set the @sb->s_flags remount flags to @flags after
- * ntfs_remount() returns successfully (i.e. returns 0). Otherwise,
+ * NOTE:  The VFS sets the @sb->s_flags remount flags to @flags after
+ * ntfs_remount() returns successfully (i.e. returns 0).  Otherwise,
  * @sb->s_flags are not changed.
  */
 static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
@@ -308,26 +308,33 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	ntfs_volume *vol = NTFS_SB(sb);
 
 	ntfs_debug("Entering with remount options string: %s", opt);
-
 #ifndef NTFS_RW
 	/* For read-only compiled driver, enforce all read-only flags. */
 	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-#else
+#else /* ! NTFS_RW */
 	/*
 	 * For the read-write compiled driver, if we are remounting read-write,
-	 * make sure there aren't any volume errors.
+	 * make sure there aren't any volume errors and empty the lofgile.
 	 */
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
+		static const char *es = ".  Cannot remount read-write.";
+
 		if (NVolErrors(vol)) {
-			ntfs_error(sb, "Volume has errors and is read-only. "
-					"Cannot remount read-write.");
+			ntfs_error(sb, "Volume has errors and is read-only%s",
+					es);
+			return -EROFS;
+		}
+		if (!ntfs_empty_logfile(vol->logfile_ino)) {
+			ntfs_error(sb, "Failed to empty journal $LogFile%s",
+					es);
+			NVolSetErrors(vol);
 			return -EROFS;
 		}
 	}
 	// TODO:  For now we enforce no atime and dir atime updates as they are
 	// not implemented.
 	*flags |= MS_NOATIME | MS_NODIRATIME;
-#endif
+#endif /* ! NTFS_RW */
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
 	// ro->rw, as well as with sync->async and vice versa remounts.
@@ -345,7 +352,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	if (!parse_options(vol, opt))
 		return -EINVAL;
-
+	ntfs_debug("Done.");
 	return 0;
 }
 
@@ -1156,10 +1163,25 @@ get_ctx_vol_failed:
 					!vol->logfile_ino ? es1 : es2, es3);
 		/* This will prevent a read-write remount. */
 		NVolSetErrors(vol);
+	/* If a read-write mount, empty the logfile. */
+	} else if (!(sb->s_flags & MS_RDONLY) &&
+			!ntfs_empty_logfile(vol->logfile_ino)) {
+		static const char *es1 = "Failed to empty $LogFile";
+		static const char *es2 = ".  Mount in Windows.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
 	}
-	// FIXME: Empty the logfile, but only if not read-only.
-	// FIXME: What happens if someone remounts rw? We need to empty the file
-	// then. We need a flag to tell us whether we have done it already.
 #endif
 	/*
 	 * Get the inode for the attribute definitions file and parse the
@@ -2124,4 +2146,3 @@ MODULE_PARM_DESC(debug_msgs, "Enable debug messages.");
 
 module_init(init_ntfs_fs)
 module_exit(exit_ntfs_fs)
-

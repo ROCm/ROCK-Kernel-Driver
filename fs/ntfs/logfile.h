@@ -298,6 +298,8 @@ extern BOOL ntfs_check_logfile(struct inode *log_vi);
 
 extern BOOL ntfs_is_logfile_clean(struct inode *log_vi);
 
+extern BOOL ntfs_empty_logfile(struct inode *log_vi);
+
 #endif /* NTFS_RW */
 
 #endif /* _LINUX_NTFS_LOGFILE_H */

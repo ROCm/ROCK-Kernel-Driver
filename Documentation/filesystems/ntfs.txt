@@ -273,6 +273,18 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.8:
+	- Read the $MFT mirror and compare it to the $MFT and if the two do not
+	  match, force a read-only mount and do not allow read-write remounts.
+	- Read and parse the $LogFile journal and if it indicates that the
+	  volume was not shutdown cleanly, force a read-only mount and do not
+	  allow read-write remounts.  If the $LogFile indicates a clean
+	  shutdown and a read-write (re)mount is requested, empty $LogFile to
+	  ensure that Windows cannot cause data corruption by replaying a stale
+	  journal after Linux has written to the volume.
+	- Improve time handling so that the NTFS time is fully preserved when
+	  converted to kernel time and only up to 99 nano-seconds are lost when
+	  kernel time is converted to NTFS time.
 2.1.7:
 	- Enable NFS exporting of mounted NTFS volumes.
 2.1.6:

@@ -19,7 +19,7 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.8-WIP
+2.1.8 - Handle $MFT mirror and $LogFile, improve time ihandling, and cleanups.
 
 	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
 	- Modify fs/ntfs/time.c::ntfs2utc(), get_current_ntfs_time(), and
@@ -52,6 +52,10 @@ ToDo:
 	  think that a volume is dirty when in fact it is clean.  This should
 	  only affect volumes that have not been shutdown cleanly and did not
 	  have any pending, non-check-pointed i/o.
+	- If the $LogFile indicates a clean shutdown and a read-write (re)mount
+	  is requested, empty $LogFile by overwriting it with 0xff bytes to
+	  ensure that Windows cannot cause data corruption by replaying a stale
+	  journal after Linux has written to the volume.
 
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 
@@ -661,7 +665,7 @@ tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
 	- Change parameters to find_attr() and lookup_attr(). We no longer
 	  pass in the upcase table and its length. These can be gotten from
 	  ctx->ntfs_ino->vol->upcase{_len}. Update all callers.
-	- Cleanups in attrib.c. 
+	- Cleanups in attrib.c.
 	- Implement merging of run lists, attrib.c::merge_run_lists() and its
 	  helpers. (Richard Russon)
 	- Attribute lists part 2, attribute extents and multi part run lists:
