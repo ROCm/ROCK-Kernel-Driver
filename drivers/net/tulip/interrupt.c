@@ -291,7 +291,7 @@ throttle:
 #endif
 }
 
-static inline void phy_interrupt (struct net_device *dev)
+static inline unsigned int phy_interrupt (struct net_device *dev)
 {
 #ifdef __hppa__
 	int csr12 = inl(dev->base_addr + CSR12) & 0xff;
@@ -307,13 +307,17 @@ static inline void phy_interrupt (struct net_device *dev)
 		spin_unlock(&tp->lock);
 		/* clear irq ack bit */
 		outl(csr12 & ~0x02, dev->base_addr + CSR12);
+
+		return 1;
 	}
 #endif
+
+	return 0;
 }
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
@@ -328,15 +332,16 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int maxtx = TX_RING_SIZE;
 	int maxoi = TX_RING_SIZE;
 	unsigned int work_count = tulip_max_interrupt_work;
+	unsigned int handled = 0;
 
 	/* Let's see whether the interrupt really is for us */
 	csr5 = inl(ioaddr + CSR5);
 
-        if (tp->flags & HAS_PHY_IRQ)
-	        phy_interrupt (dev);
+        if (tp->flags & HAS_PHY_IRQ) 
+	        handled = phy_interrupt (dev);
     
 	if ((csr5 & (NormalIntr|AbnormalIntr)) == 0)
-		return;
+		return IRQ_RETVAL(handled);
 
 	tp->nir++;
 
@@ -578,4 +583,5 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_DEBUG "%s: exiting interrupt, csr5=%#4.4x.\n",
 			   dev->name, inl(ioaddr + CSR5));
 
+	return IRQ_HANDLED;
 }

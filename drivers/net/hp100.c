@@ -320,7 +320,7 @@ static void hp100_misc_interrupt(struct net_device *dev);
 static void hp100_update_stats(struct net_device *dev);
 static void hp100_clear_stats(struct hp100_private *lp, int ioaddr);
 static void hp100_set_multicast_list(struct net_device *dev);
-static void hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void hp100_start_interface(struct net_device *dev);
 static void hp100_stop_interface(struct net_device *dev);
 static void hp100_load_eeprom(struct net_device *dev, u_short ioaddr);
@@ -2271,7 +2271,7 @@ static void hp100_set_multicast_list(struct net_device *dev)
  *  hardware interrupt handling
  */
 
-static void hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct hp100_private *lp = (struct hp100_private *) dev->priv;
@@ -2280,7 +2280,7 @@ static void hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	u_int val;
 
 	if (dev == NULL)
-		return;
+		return IRQ_NONE;
 	ioaddr = dev->base_addr;
 
 	spin_lock(&lp->lock);
@@ -2302,7 +2302,7 @@ static void hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (val == 0) {		/* might be a shared interrupt */
 		spin_unlock(&lp->lock);
 		hp100_ints_on();
-		return;
+		return IRQ_NONE;
 	}
 	/* We're only interested in those interrupts we really enabled. */
 	/* val &= hp100_inw( IRQ_MASK ); */
@@ -2394,6 +2394,7 @@ static void hp100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_unlock(&lp->lock);
 	hp100_ints_on();
+	return IRQ_HANDLED;
 }
 
 /*

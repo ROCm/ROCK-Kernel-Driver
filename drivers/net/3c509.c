@@ -192,7 +192,7 @@ static ushort id_read_eeprom(int index);
 static ushort read_eeprom(int ioaddr, int index);
 static int el3_open(struct net_device *dev);
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void update_stats(struct net_device *dev);
 static struct net_device_stats *el3_get_stats(struct net_device *dev);
 static int el3_rx(struct net_device *dev);
@@ -882,7 +882,7 @@ el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The EL3 interrupt handler. */
-static void
+static irqreturn_t
 el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
@@ -892,7 +892,7 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk ("el3_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	lp = (struct el3_private *)dev->priv;
@@ -967,7 +967,7 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			   inw(ioaddr + EL3_STATUS));
 	}
 	spin_unlock(&lp->lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 

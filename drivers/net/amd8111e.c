@@ -780,16 +780,18 @@ static struct net_device_stats *amd8111e_get_stats(struct net_device * dev)
 /*
 This is device interrupt function. It handles transmit, receive and link change interrupts.
 */
-static void amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 
 	struct net_device * dev = (struct net_device *) dev_id;
 	struct amd8111e_priv *lp = dev->priv;
 	void * mmio = lp->mmio;
 	unsigned int intr0;
+	int handled = 0;
 
 	if(dev == NULL)
-		return;
+		return IRQ_NONE;
 
 	spin_lock (&lp->lock);
 	/* disabling interrupt */
@@ -802,7 +804,8 @@ static void amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!(intr0 & INTR))
 		goto err_no_interrupt;
-		 
+
+	handled = 1;
 	/* Current driver processes 3 interrupts : RINT,TINT,LCINT */
 	writel(intr0, mmio + INT0);
 
@@ -823,7 +826,7 @@ static void amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 err_no_interrupt:
 	writel( VAL0 | INTREN,mmio + CMD0);
 	spin_unlock(&lp->lock);
-	return;
+	return IRQ_RETVAL(handled);
 
 }
 /*
