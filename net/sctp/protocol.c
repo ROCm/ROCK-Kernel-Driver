@@ -119,8 +119,7 @@ static inline void sctp_v4_get_local_addr_list(sctp_protocol_t *proto,
 
 	for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) {
 		/* Add the address to the local list.  */
-		/* XXX BUG: sleeping allocation with lock held -DaveM */
-		addr = t_new(struct sockaddr_storage_list, GFP_KERNEL);
+		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
 		if (addr) {
 			INIT_LIST_HEAD(&addr->list);
 			addr->a.v4.sin_family = AF_INET;
@@ -157,8 +156,7 @@ static inline void sctp_v6_get_local_addr_list(sctp_protocol_t *proto,
 	read_lock_bh(&in6_dev->lock);
 	for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
 		/* Add the address to the local list.  */
-		/* XXX BUG: sleeping allocation with lock held -DaveM */
-		addr = t_new(struct sockaddr_storage_list, GFP_KERNEL);
+		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
 		if (addr) {
 			addr->a.v6.sin6_family = AF_INET6;
 			addr->a.v6.sin6_port = 0;
