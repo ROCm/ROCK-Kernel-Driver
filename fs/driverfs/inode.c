@@ -701,7 +701,8 @@ static void __remove_file(struct dentry * dentry)
 
 	vfs_unlink(dentry->d_parent->d_inode,dentry);
 
-	unlock_dir(dentry);
+	up(&dentry->d_inode->i_sem);
+	dput(dentry);
 
 	/* remove reference count from when file was created */
 	dput(dentry);
@@ -741,7 +742,8 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		}
 		node = node->next;
 	}
-	unlock_dir(dentry);
+	up(&dentry->d_inode->i_sem);
+	dput(dentry);
 }
 
 /**
@@ -760,8 +762,9 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	if (!dir->dentry)
 		goto done;
 
-	/* lock the directory while we remove the files */
 	dentry = dget(dir->dentry);
+	dget(dentry->d_parent);
+	down(&dentry->d_parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
 	node = dir->files.next;
@@ -776,11 +779,9 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 		node = dir->files.next;
 	}
 
-	/* now lock the parent, so we can remove this directory */
-	lock_parent(dentry);
-
 	vfs_rmdir(dentry->d_parent->d_inode,dentry);
-	double_unlock(dentry,dentry->d_parent);
+	up(&dentry->d_parent->d_inode->i_sem);
+	up(&dentry->d_inode->i_sem);
 
 	/* remove reference count from when directory was created */
 	dput(dentry);
