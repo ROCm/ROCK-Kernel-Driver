@@ -50,7 +50,7 @@ extern int shrink_mem(void);
 extern void drain_local_pages(void);
 
 /* kernel/suspend.c */
-extern void software_suspend(void);
+extern int software_suspend(void);
 extern void software_resume(void);
 
 extern int register_suspend_notifier(struct notifier_block *);
@@ -72,8 +72,9 @@ extern void do_suspend_lowlevel(int resume);
 extern void do_suspend_lowlevel_s4bios(int resume);
 
 #else	/* CONFIG_SOFTWARE_SUSPEND */
-static inline void software_suspend(void)
+static inline int software_suspend(void)
 {
+	return -EPERM;
 }
 #define software_resume()		do { } while(0)
 #define register_suspend_notifier(a)	do { } while(0)

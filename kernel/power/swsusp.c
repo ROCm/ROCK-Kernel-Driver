@@ -352,15 +352,10 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 	int pfn;
 	struct page *page;
 	
-#ifdef CONFIG_DISCONTIGMEM
-	panic("Discontingmem not supported");
-#else
 	BUG_ON (max_pfn != num_physpages);
-#endif
+
 	for (pfn = 0; pfn < max_pfn; pfn++) {
 		page = pfn_to_page(pfn);
-		if (PageHighMem(page))
-			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
 
 		if (!PageReserved(page)) {
 			if (PageNosave(page))
@@ -700,7 +695,7 @@ void do_magic_suspend_2(void)
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
 }
 
-static void do_software_suspend(void)
+static int do_software_suspend(void)
 {
 	arch_prepare_suspend();
 	if (pm_prepare_console())
@@ -735,20 +730,30 @@ static void do_software_suspend(void)
 	software_suspend_enabled = 1;
 	MDELAY(1000);
 	pm_restore_console();
+	return 0;
 }
 
-/*
- * This is main interface to the outside world. It needs to be
- * called from process context.
+
+/**
+ *	software_suspend - initiate suspend-to-swap transition.
+ *
+ *	This is main interface to the outside world. It needs to be
+ *	called from process context.
  */
-void software_suspend(void)
+
+int software_suspend(void)
 {
 	if(!software_suspend_enabled)
-		return;
+		return -EINVAL;
+
+#if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
+	printk("swsusp is not supported with high- or discontig-mem.\n");
+	return -EPERM;
+#endif
 
 	software_suspend_enabled = 0;
 	might_sleep();
-	do_software_suspend();
+	return do_software_suspend();
 }
 
 /* More restore stuff */
