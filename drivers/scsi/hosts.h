@@ -29,6 +29,9 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 
+struct scsi_host_cmd_pool;
+
+
 /* It is senseless to set SG_ALL any higher than this - the performance
  *  does not get any better, and it wastes memory
  */
@@ -375,6 +378,7 @@ struct Scsi_Host
     struct list_head      sh_list;
     struct list_head	  my_devices;
 
+    struct scsi_host_cmd_pool *cmd_pool;
     spinlock_t            free_list_lock;
     struct list_head      free_list;   /* backup store of cmd structs */
 
@@ -392,7 +396,6 @@ struct Scsi_Host
     unsigned int            eh_kill:1; /* set when killing the eh thread */
     wait_queue_head_t       host_wait;
     Scsi_Host_Template    * hostt;
-    atomic_t                host_active; /* commands checked out */
     volatile unsigned short host_busy;   /* commands actually active on low-level */
     volatile unsigned short host_failed; /* commands that failed. */
     
