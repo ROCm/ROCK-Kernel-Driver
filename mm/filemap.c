@@ -449,41 +449,6 @@ not_found:
 	return page;
 }
 
-/*
- * By the time this is called, the page is locked and
- * we don't have to worry about any races any more.
- *
- * Start the IO..
- */
-static int writeout_one_page(struct page *page)
-{
-	struct buffer_head *bh, *head = page->buffers;
-
-	bh = head;
-	do {
-		if (buffer_locked(bh) || !buffer_dirty(bh) || !buffer_uptodate(bh))
-			continue;
-
-		bh->b_flushtime = jiffies;
-		ll_rw_block(WRITE, 1, &bh);	
-	} while ((bh = bh->b_this_page) != head);
-	return 0;
-}
-
-int waitfor_one_page(struct page *page)
-{
-	int error = 0;
-	struct buffer_head *bh, *head = page->buffers;
-
-	bh = head;
-	do {
-		wait_on_buffer(bh);
-		if (buffer_req(bh) && !buffer_uptodate(bh))
-			error = -EIO;
-	} while ((bh = bh->b_this_page) != head);
-	return error;
-}
-
 static int do_buffer_fdatasync(struct list_head *head, unsigned long start, unsigned long end, int (*fn)(struct page *))
 {
 	struct list_head *curr;
