@@ -1166,8 +1166,6 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	bc = netdev_priv(dev);
 	if (cmd != SIOCDEVPRIVATE)
 		return -ENOIOCTLCMD;
-	if (get_user(cmd, (int *)ifr->ifr_data))
-		return -EFAULT;
 
 	if (copy_from_user(&hi, ifr->ifr_data, sizeof(hi)))
 		return -EFAULT;

@@ -823,7 +823,7 @@ config EFI
 	This option is only useful on systems that have EFI firmware
 	and will result in a kernel image that is ~8k larger.  In addition,
 	you must use the latest ELILO loader available at
-	<ftp://ftp.hpl.hp.com/pub/linux-ia64/> in order to take advantage of
+	<http://elilo.sourceforge.net> in order to take advantage of
 	kernel initialization using EFI information (neither GRUB nor LILO know
 	anything about EFI).  However, even with this option, the resultant
 	kernel should continue to boot on existing non-EFI platforms.

@@ -164,7 +164,7 @@ end:
  */
 static int cpufreq_proc_write (
         struct file		*file,
-        const char		*buffer,
+        const char		__user *buffer,
         unsigned long		count,
         void			*data)
 {

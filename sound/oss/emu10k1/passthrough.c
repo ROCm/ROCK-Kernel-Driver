@@ -131,7 +131,7 @@ int emu10k1_pt_setup(struct emu10k1_wavedevice *wave_dev)
 	return 0;
 }
 
-ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
+ssize_t emu10k1_pt_write(struct file *file, const char __user *buffer, size_t count)
 {
 	struct emu10k1_wavedevice *wave_dev = (struct emu10k1_wavedevice *) file->private_data;
 	struct emu10k1_card *card = wave_dev->card;
@@ -177,10 +177,9 @@ ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
 	blocks = (count-bytes_copied)/PT_BLOCKSIZE;
 	blocks_copied = 0;
 	while (blocks > 0) {
-		u16 *bufptr = (u16 *) buffer + (bytes_copied/2);
+		u16 __user *bufptr = (u16 __user *) buffer + (bytes_copied/2);
 		copy_from_user(pt->buf, bufptr, PT_BLOCKSIZE);
-		bufptr = (u16 *) pt->buf;
-		r = pt_putblock(wave_dev, bufptr, nonblock);
+		r = pt_putblock(wave_dev, (u16 *)pt->buf, nonblock);
 		if (r) {
 			if (bytes_copied)
 				return bytes_copied;

@@ -176,8 +176,8 @@ static int modes_defined;
 static ST_buffer *new_tape_buffer(int, int, int);
 static int enlarge_buffer(ST_buffer *, int, int);
 static void normalize_buffer(ST_buffer *);
-static int append_to_buffer(const char *, ST_buffer *, int);
-static int from_buffer(ST_buffer *, char *, int);
+static int append_to_buffer(const char __user *, ST_buffer *, int);
+static int from_buffer(ST_buffer *, char __user *, int);
 static void move_buffer_data(ST_buffer *, int);
 static void buf_to_sg(ST_buffer *, unsigned int);
 
@@ -1276,7 +1276,7 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 }
 
 
-static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is_read)
+static int setup_buffering(Scsi_Tape *STp, const char __user *buf, size_t count, int is_read)
 {
 	int i, bufsize, retval = 0;
 	ST_buffer *STbp = STp->buffer;
@@ -1348,7 +1348,7 @@ static void release_buffering(Scsi_Tape *STp)
 
 /* Write command */
 static ssize_t
- st_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
+st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 {
 	ssize_t total;
 	ssize_t i, do_count, blks, transfer;
@@ -1356,7 +1356,7 @@ static ssize_t
 	int undone, retry_eot = 0, scode;
 	int async_write;
 	unsigned char cmd[MAX_COMMAND_SIZE];
-	const char *b_point;
+	const char __user *b_point;
 	Scsi_Request *SRpnt = NULL;
 	Scsi_Tape *STp = filp->private_data;
 	ST_mode *STm;
@@ -1817,7 +1817,7 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 
 /* Read command */
 static ssize_t
- st_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+st_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 {
 	ssize_t total;
 	ssize_t retval = 0;
@@ -3527,7 +3527,7 @@ static void normalize_buffer(ST_buffer * STbuffer)
 
 /* Move data from the user buffer to the tape buffer. Returns zero (success) or
    negative error code. */
-static int append_to_buffer(const char *ubp, ST_buffer * st_bp, int do_count)
+static int append_to_buffer(const char __user *ubp, ST_buffer * st_bp, int do_count)
 {
 	int i, cnt, res, offset;
 
@@ -3558,7 +3558,7 @@ static int append_to_buffer(const char *ubp, ST_buffer * st_bp, int do_count)
 
 /* Move data from the tape buffer to the user buffer. Returns zero (success) or
    negative error code. */
-static int from_buffer(ST_buffer * st_bp, char *ubp, int do_count)
+static int from_buffer(ST_buffer * st_bp, char __user *ubp, int do_count)
 {
 	int i, cnt, res, offset;
 

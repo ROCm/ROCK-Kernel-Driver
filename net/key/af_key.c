@@ -2726,7 +2726,7 @@ static int pfkey_recvmsg(struct kiocb *kiocb,
 	int copied, err;
 
 	err = -EINVAL;
-	if (flags & ~(MSG_PEEK|MSG_DONTWAIT|MSG_TRUNC))
+	if (flags & ~(MSG_PEEK|MSG_DONTWAIT|MSG_TRUNC|MSG_CMSG_COMPAT))
 		goto out;
 
 	msg->msg_namelen = 0;

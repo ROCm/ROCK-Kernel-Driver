@@ -6,19 +6,6 @@
 #ifndef _QLOGICPTI_H
 #define _QLOGICPTI_H
 
-#include <linux/config.h>
-
-/* #include "scsi.h" */
-#include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_device.h>
-#include <scsi/scsi_eh.h>
-#include <scsi/scsi_request.h>
-#include <scsi/scsi_tcq.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_host.h>
-
-#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
-
 /* Qlogic/SBUS controller registers. */
 #define SBUS_CFG1	0x006UL
 #define SBUS_CTRL	0x008UL
@@ -342,6 +329,8 @@ struct dev_param {
 struct pti_queue_entry {
 	char __opaque[QUEUE_ENTRY_LEN];
 };
+
+struct scsi_cmnd;
 
 /* Software state for the driver. */
 struct qlogicpti {

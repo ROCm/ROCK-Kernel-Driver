@@ -67,7 +67,7 @@ struct dst_entry
 	struct xfrm_state	*xfrm;
 
 	int			(*input)(struct sk_buff*);
-	int			(*output)(struct sk_buff*);
+	int			(*output)(struct sk_buff**);
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	__u32			tclassid;
@@ -219,7 +219,7 @@ static inline int dst_output(struct sk_buff *skb)
 	int err;
 
 	for (;;) {
-		err = skb->dst->output(skb);
+		err = skb->dst->output(&skb);
 
 		if (likely(err == 0))
 			return err;

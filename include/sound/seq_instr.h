@@ -79,9 +79,9 @@ struct snd_seq_kinstr_ops {
 	char *instr_type;
 	int (*info)(void *private_data, char *info_data, long len);
 	int (*put)(void *private_data, snd_seq_kinstr_t *kinstr,
-		   char *instr_data, long len, int atomic, int cmd);
+		   char __user *instr_data, long len, int atomic, int cmd);
 	int (*get)(void *private_data, snd_seq_kinstr_t *kinstr,
-		   char *instr_data, long len, int atomic, int cmd);
+		   char __user *instr_data, long len, int atomic, int cmd);
 	int (*get_size)(void *private_data, snd_seq_kinstr_t *kinstr, long *size);
 	int (*remove)(void *private_data, snd_seq_kinstr_t *kinstr, int atomic);
 	void (*notify)(void *private_data, snd_seq_kinstr_t *kinstr, int what);

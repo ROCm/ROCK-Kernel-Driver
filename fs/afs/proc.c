@@ -27,7 +27,7 @@ static void *afs_proc_cells_start(struct seq_file *p, loff_t *pos);
 static void *afs_proc_cells_next(struct seq_file *p, void *v, loff_t *pos);
 static void afs_proc_cells_stop(struct seq_file *p, void *v);
 static int afs_proc_cells_show(struct seq_file *m, void *v);
-static ssize_t afs_proc_cells_write(struct file *file, const char *buf,
+static ssize_t afs_proc_cells_write(struct file *file, const char __user *buf,
 				    size_t size, loff_t *_pos);
 
 static struct seq_operations afs_proc_cells_ops = {
@@ -47,9 +47,10 @@ static struct file_operations afs_proc_cells_fops = {
 
 static int afs_proc_rootcell_open(struct inode *inode, struct file *file);
 static int afs_proc_rootcell_release(struct inode *inode, struct file *file);
-static ssize_t afs_proc_rootcell_read(struct file *file, char *buf,
+static ssize_t afs_proc_rootcell_read(struct file *file, char __user *buf,
 				      size_t size, loff_t *_pos);
-static ssize_t afs_proc_rootcell_write(struct file *file, const char *buf,
+static ssize_t afs_proc_rootcell_write(struct file *file,
+				       const char __user *buf,
 				       size_t size, loff_t *_pos);
 
 static struct file_operations afs_proc_rootcell_fops = {
@@ -278,7 +279,7 @@ static int afs_proc_cells_show(struct seq_file *m, void *v)
  * handle writes to /proc/fs/afs/cells
  * - to add cells: echo "add <cellname> <IP>[:<IP>][:<IP>]"
  */
-static ssize_t afs_proc_cells_write(struct file *file, const char *buf,
+static ssize_t afs_proc_cells_write(struct file *file, const char __user *buf,
 				    size_t size, loff_t *_pos)
 {
 	char *kbuf, *name, *args;
@@ -363,7 +364,7 @@ static int afs_proc_rootcell_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t afs_proc_rootcell_read(struct file *file, char *buf,
+static ssize_t afs_proc_rootcell_read(struct file *file, char __user *buf,
 				      size_t size, loff_t *_pos)
 {
 	return 0;
@@ -374,7 +375,8 @@ static ssize_t afs_proc_rootcell_read(struct file *file, char *buf,
  * handle writes to /proc/fs/afs/rootcell
  * - to initialize rootcell: echo "cell.name:192.168.231.14"
  */
-static ssize_t afs_proc_rootcell_write(struct file *file, const char *buf,
+static ssize_t afs_proc_rootcell_write(struct file *file,
+				       const char __user *buf,
 				       size_t size, loff_t *_pos)
 {
 	char *kbuf, *s;

@@ -905,10 +905,10 @@ MODULE_PARM_DESC(irqs, "Sets the interrupt of each interface, the"
 		 " has an interrupt.  Otherwise, set it to zero or leave"
 		 " it blank.");
 
-
-#if defined(CONFIG_ACPI_INTERPETER) || defined(CONFIG_X86) || defined(CONFIG_PCI)
 #define IPMI_MEM_ADDR_SPACE 1
 #define IPMI_IO_ADDR_SPACE  2
+
+#if defined(CONFIG_ACPI_INTERPETER) || defined(CONFIG_X86) || defined(CONFIG_PCI)
 static int is_new_interface(int intf, u8 addr_space, unsigned long base_addr)
 {
 	int i;

@@ -201,14 +201,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 			if (!hwif->ide_dma_read(drive))
 				return ide_started;
 			break;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		case WIN_READDMA_QUEUED:
-		case WIN_READDMA_QUEUED_EXT:
-			return __ide_dma_queued_read(drive);
-		case WIN_WRITEDMA_QUEUED:
-		case WIN_WRITEDMA_QUEUED_EXT:
-			return __ide_dma_queued_write(drive);
-#endif
 		default:
 			if (task->handler == NULL)
 				return ide_stopped;
@@ -350,27 +342,6 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 			return ide_started;  
 		}
 	}
-#if 0
-
-	/*
-	 * Holding point for a brain dump of a thought :-/
-	 */
-
-	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat)) {
-		DTF("%s: READ attempting to recover last " \
-			"sector counter status=0x%02x\n",
-			drive->name, stat);
-		rq->current_nr_sectors++;
-		return DRIVER(drive)->error(drive, "task_in_intr", stat);
-        }
-	if (!rq->current_nr_sectors)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
-			return ide_stopped;
-
-	if (--rq->current_nr_sectors <= 0)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
-			return ide_stopped;
-#endif
 
 	pBuf = task_map_rq(rq, &flags);
 	DTF("Read: %p, rq->current_nr_sectors: %d, stat: %02x\n",
@@ -546,13 +517,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 
 	ide_task_t *args = rq->special;
 	ide_startstop_t startstop;
-
-#if 0
-	/*
-	 * assign private copy for multi-write
-	 */
-	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
-#endif
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
 			drive->bad_wstat, WAIT_DRQ)) {

@@ -135,7 +135,7 @@ struct sndrv_hwdep_dsp_status {
 struct sndrv_hwdep_dsp_image {
 	unsigned int index;		/* W: DSP index */
 	unsigned char name[64];		/* W: ID (e.g. file name) */
-	unsigned char *image;		/* W: binary image */
+	unsigned char __user *image;	/* W: binary image */
 	size_t length;			/* W: size of image in bytes */
 	unsigned long driver_data;	/* W: driver-specific data */
 };
@@ -446,13 +446,13 @@ struct sndrv_pcm_sync_ptr {
 
 struct sndrv_xferi {
 	sndrv_pcm_sframes_t result;
-	void *buf;
+	void __user *buf;
 	sndrv_pcm_uframes_t frames;
 };
 
 struct sndrv_xfern {
 	sndrv_pcm_sframes_t result;
-	void **bufs;
+	void __user * __user *bufs;
 	sndrv_pcm_uframes_t frames;
 };
 
@@ -776,7 +776,7 @@ struct sndrv_ctl_elem_list {
 	unsigned int space;		/* W: count of element IDs to get */
 	unsigned int used;		/* R: count of element IDs set */
 	unsigned int count;		/* R: count of all elements */
-	struct sndrv_ctl_elem_id *pids; /* R: IDs */
+	struct sndrv_ctl_elem_id __user *pids; /* R: IDs */
 	unsigned char reserved[50];
 };
 

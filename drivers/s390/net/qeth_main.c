@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.112 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.118 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.112 $	 $Date: 2004/05/19 09:28:21 $
+ *    $Revision: 1.118 $	 $Date: 2004/06/02 06:34:52 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.112 $"
+#define VERSION_QETH_C "$Revision: 1.118 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -91,7 +91,8 @@ static debug_info_t *qeth_dbf_control = NULL;
 static debug_info_t *qeth_dbf_trace = NULL;
 static debug_info_t *qeth_dbf_sense = NULL;
 static debug_info_t *qeth_dbf_qerr = NULL;
-static char qeth_dbf_text_buf[255];
+
+DEFINE_PER_CPU(char[256], qeth_dbf_txt_buf);
 
 /**
  * some more definitions and declarations
@@ -4182,9 +4183,10 @@ qeth_snmp_command_cb(struct qeth_card *card, struct qeth_reply *reply,
 	}
 	data_len = *((__u16*)QETH_IPA_PDU_LEN_PDU1(data));
 	if (cmd->data.setadapterparms.hdr.seq_no == 1)
-		data_len -= (__u16)((char*)&snmp->request - (char *)cmd);
-	else
 		data_len -= (__u16)((char *)&snmp->data - (char *)cmd);
+	else
+		data_len -= (__u16)((char*)&snmp->request - (char *)cmd);
+
 	/* check if there is enough room in userspace */
 	if ((qinfo->udata_len - qinfo->udata_offset) < data_len) {
 		QETH_DBF_TEXT_(trace, 4, "scer3%i", -ENOMEM);
@@ -4193,15 +4195,17 @@ qeth_snmp_command_cb(struct qeth_card *card, struct qeth_reply *reply,
 	}
 	QETH_DBF_TEXT_(trace, 4, "snore%i",
 		       cmd->data.setadapterparms.hdr.used_total);
-	QETH_DBF_TEXT_(trace, 4, "sseqn%i", cmd->data.setassparms.hdr.seq_no);
+	QETH_DBF_TEXT_(trace, 4, "sseqn%i", cmd->data.setadapterparms.hdr.seq_no);
 	/*copy entries to user buffer*/
 	if (cmd->data.setadapterparms.hdr.seq_no == 1) {
 		memcpy(qinfo->udata + qinfo->udata_offset,
-		       (char *)snmp,offsetof(struct qeth_snmp_cmd,data));
+		       (char *)snmp,
+		       data_len + offsetof(struct qeth_snmp_cmd,data));
 		qinfo->udata_offset += offsetof(struct qeth_snmp_cmd, data);
+	} else {
+		memcpy(qinfo->udata + qinfo->udata_offset,
+		       (char *)&snmp->request, data_len);
 	}
-	memcpy(qinfo->udata + qinfo->udata_offset,
-	       (char *)&snmp->data, data_len);
 	qinfo->udata_offset += data_len;
 	/* check if all replies received ... */
 		QETH_DBF_TEXT_(trace, 4, "srtot%i",
@@ -4212,7 +4216,6 @@ qeth_snmp_command_cb(struct qeth_card *card, struct qeth_reply *reply,
 	    cmd->data.setadapterparms.hdr.used_total)
 		return 1;
 	return 0;
-
 }
 
 static struct qeth_cmd_buffer *
@@ -4279,7 +4282,6 @@ qeth_snmp_command(struct qeth_card *card, char *udata)
 			   card->info.if_name, rc);
 	 else
 		copy_to_user(udata, qinfo.udata, qinfo.udata_len);
-
 
 	kfree(qinfo.udata);
 	return rc;
@@ -4476,13 +4478,17 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		rc = qeth_snmp_command(card, rq->ifr_ifru.ifru_data);
 		break;
 	case SIOC_QETH_GET_CARD_TYPE:
+		if ((card->info.type == QETH_CARD_TYPE_OSAE) &&
+		    !card->info.guestlan)
+			return 1;
+		return 0;
 		break;
 	case SIOCGMIIPHY:
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		mii_data->phy_id = 0;
 		break;
 	case SIOCGMIIREG:
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		if (mii_data->phy_id != 0)
 			rc = -EINVAL;
 		else
@@ -4497,7 +4503,7 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			rc = -EPERM;
 			break;
 		}
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		if (mii_data->phy_id != 0)
 			rc = -EINVAL;
 		else

@@ -239,7 +239,7 @@ extern void ia64_load_extra (struct task_struct *task);
  * the latest fph state from another CPU.  In other words: eager save, lazy restore.
  */
 # define switch_to(prev,next,last) do {						\
-	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
+	if (ia64_psr(ia64_task_regs(prev))->mfh && ia64_is_local_fpu_owner(prev)) {				\
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
 		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
 		__ia64_save_fpu((prev)->thread.fph);				\

@@ -342,12 +342,12 @@ static int br2684_mac_addr(struct net_device *dev, void *p)
 
 #ifdef CONFIG_ATM_BR2684_IPFILTER
 /* this IOCTL is experimental. */
-static int br2684_setfilt(struct atm_vcc *atmvcc, unsigned long arg)
+static int br2684_setfilt(struct atm_vcc *atmvcc, void __user *arg)
 {
 	struct br2684_vcc *brvcc;
 	struct br2684_filter_set fs;
 
-	if (copy_from_user(&fs, (void *) arg, sizeof fs))
+	if (copy_from_user(&fs, arg, sizeof fs))
 		return -EFAULT;
 	if (fs.ifspec.method != BR2684_FIND_BYNOTHING) {
 		/*
@@ -494,7 +494,7 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	netif_rx(skb);
 }
 
-static int br2684_regvcc(struct atm_vcc *atmvcc, unsigned long arg)
+static int br2684_regvcc(struct atm_vcc *atmvcc, void __user *arg)
 {
 /* assign a vcc to a dev
 Note: we do not have explicit unassign, but look at _push()
@@ -507,7 +507,7 @@ Note: we do not have explicit unassign, but look at _push()
 	struct net_device *net_dev;
 	struct atm_backend_br2684 be;
 
-	if (copy_from_user(&be, (void *) arg, sizeof be))
+	if (copy_from_user(&be, arg, sizeof be))
 		return -EFAULT;
 	brvcc = kmalloc(sizeof(struct br2684_vcc), GFP_KERNEL);
 	if (!brvcc)
@@ -593,7 +593,7 @@ static void br2684_setup(struct net_device *netdev)
 	INIT_LIST_HEAD(&brdev->brvccs);
 }
 
-static int br2684_create(unsigned long arg)
+static int br2684_create(void __user *arg)
 {
 	int err;
 	struct net_device *netdev;
@@ -602,7 +602,7 @@ static int br2684_create(unsigned long arg)
 
 	DPRINTK("br2684_create\n");
 
-	if (copy_from_user(&ni, (void *) arg, sizeof ni)) {
+	if (copy_from_user(&ni, arg, sizeof ni)) {
 		return -EFAULT;
 	}
 	if (ni.media != BR2684_MEDIA_ETHERNET || ni.mtu != 1500) {
@@ -642,13 +642,14 @@ static int br2684_ioctl(struct socket *sock, unsigned int cmd,
 	unsigned long arg)
 {
 	struct atm_vcc *atmvcc = ATM_SD(sock);
+	void __user *argp = (void __user *)arg;
 
 	int err;
 	switch(cmd) {
 	case ATM_SETBACKEND:
 	case ATM_NEWBACKENDIF: {
 		atm_backend_t b;
-		err = get_user(b, (atm_backend_t *) arg);
+		err = get_user(b, (atm_backend_t __user *) argp);
 		if (err)
 			return -EFAULT;
 		if (b != ATM_BACKEND_BR2684)
@@ -656,9 +657,9 @@ static int br2684_ioctl(struct socket *sock, unsigned int cmd,
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		if (cmd == ATM_SETBACKEND)
-			return br2684_regvcc(atmvcc, arg);
+			return br2684_regvcc(atmvcc, argp);
 		else
-			return br2684_create(arg);
+			return br2684_create(argp);
 		}
 #ifdef CONFIG_ATM_BR2684_IPFILTER
 	case BR2684_SETFILT:
@@ -666,7 +667,7 @@ static int br2684_ioctl(struct socket *sock, unsigned int cmd,
 			return -ENOIOCTLCMD;
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		err = br2684_setfilt(atmvcc, arg);
+		err = br2684_setfilt(atmvcc, argp);
 		return err;
 #endif /* CONFIG_ATM_BR2684_IPFILTER */
 	}

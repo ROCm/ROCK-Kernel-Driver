@@ -1,5 +1,5 @@
 /*
- * $Id: synclinkmp.c,v 4.19 2004/03/08 15:29:23 paulkf Exp $
+ * $Id: synclinkmp.c,v 4.22 2004/06/03 14:50:10 paulkf Exp $
  *
  * Device driver for Microgate SyncLink Multiport
  * high speed multiprotocol serial adapter.
@@ -494,7 +494,7 @@ MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 
 static char *driver_name = "SyncLink MultiPort driver";
-static char *driver_version = "$Revision: 4.19 $";
+static char *driver_version = "$Revision: 4.22 $";
 
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
@@ -3781,56 +3781,7 @@ static struct tty_operations ops = {
 	.tiocmset = tiocmset,
 };
 
-/* Driver initialization entry point.
- */
-
-static int __init synclinkmp_init(void)
-{
-	if (break_on_load) {
-	 	synclinkmp_get_text_ptr();
-  		BREAKPOINT();
-	}
-
- 	printk("%s %s\n", driver_name, driver_version);
-
-	synclinkmp_adapter_count = -1;
-	pci_register_driver(&synclinkmp_pci_driver);
-
-	if ( !synclinkmp_device_list ) {
-		printk("%s(%d):No SyncLink devices found.\n",__FILE__,__LINE__);
-		return -ENODEV;
-	}
-
-	serial_driver = alloc_tty_driver(synclinkmp_device_count);
-	if (!serial_driver)
-		return -ENOMEM;
-
-	/* Initialize the tty_driver structure */
-
-	serial_driver->owner = THIS_MODULE;
-	serial_driver->driver_name = "synclinkmp";
-	serial_driver->name = "ttySLM";
-	serial_driver->major = ttymajor;
-	serial_driver->minor_start = 64;
-	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver->subtype = SERIAL_TYPE_NORMAL;
-	serial_driver->init_termios = tty_std_termios;
-	serial_driver->init_termios.c_cflag =
-		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver->flags = TTY_DRIVER_REAL_RAW;
-	tty_set_operations(serial_driver, &ops);
-	if (tty_register_driver(serial_driver) < 0)
-		printk("%s(%d):Couldn't register serial driver\n",
-			__FILE__,__LINE__);
-
- 	printk("%s %s, tty major#%d\n",
-		driver_name, driver_version,
-		serial_driver->major);
-
-	return 0;
-}
-
-static void __exit synclinkmp_exit(void)
+static void synclinkmp_cleanup(void)
 {
 	unsigned long flags;
 	int rc;
@@ -3839,10 +3790,12 @@ static void __exit synclinkmp_exit(void)
 
 	printk("Unloading %s %s\n", driver_name, driver_version);
 
-	if ((rc = tty_unregister_driver(serial_driver)))
-		printk("%s(%d) failed to unregister tty driver err=%d\n",
-		       __FILE__,__LINE__,rc);
-	put_tty_driver(serial_driver);
+	if (serial_driver) {
+		if ((rc = tty_unregister_driver(serial_driver)))
+			printk("%s(%d) failed to unregister tty driver err=%d\n",
+			       __FILE__,__LINE__,rc);
+		put_tty_driver(serial_driver);
+	}
 
 	info = synclinkmp_device_list;
 	while(info) {
@@ -3880,6 +3833,69 @@ static void __exit synclinkmp_exit(void)
 	}
 
 	pci_unregister_driver(&synclinkmp_pci_driver);
+}
+
+/* Driver initialization entry point.
+ */
+
+static int __init synclinkmp_init(void)
+{
+	int rc;
+
+	if (break_on_load) {
+	 	synclinkmp_get_text_ptr();
+  		BREAKPOINT();
+	}
+
+ 	printk("%s %s\n", driver_name, driver_version);
+
+	if ((rc = pci_register_driver(&synclinkmp_pci_driver)) < 0) {
+		printk("%s:failed to register PCI driver, error=%d\n",__FILE__,rc);
+		return rc;
+	}
+
+	serial_driver = alloc_tty_driver(128);
+	if (!serial_driver) {
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	/* Initialize the tty_driver structure */
+
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "synclinkmp";
+	serial_driver->name = "ttySLM";
+	serial_driver->major = ttymajor;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
+		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &ops);
+	if ((rc = tty_register_driver(serial_driver)) < 0) {
+		printk("%s(%d):Couldn't register serial driver\n",
+			__FILE__,__LINE__);
+		put_tty_driver(serial_driver);
+		serial_driver = NULL;
+		goto error;
+	}
+
+ 	printk("%s %s, tty major#%d\n",
+		driver_name, driver_version,
+		serial_driver->major);
+
+	return 0;
+
+error:
+	synclinkmp_cleanup();
+	return rc;
+}
+
+static void __exit synclinkmp_exit(void)
+{
+	synclinkmp_cleanup();
 }
 
 module_init(synclinkmp_init);

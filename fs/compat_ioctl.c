@@ -218,9 +218,14 @@ static int get_video_buffer32(struct video_buffer *kp, struct video_buffer32 __u
 {
 	u32 tmp;
 
-	if(get_user(tmp, &up->base))
+	if (get_user(tmp, &up->base))
 		return -EFAULT;
-	kp->base = compat_ptr(tmp);
+
+	/* This is actually a physical address stored
+	 * as a void pointer.
+	 */
+	kp->base = (void *)(unsigned long) tmp;
+
 	__get_user(kp->height, &up->height);
 	__get_user(kp->width, &up->width);
 	__get_user(kp->depth, &up->depth);
@@ -3107,7 +3112,8 @@ static int do_ncp_getmountuid2(unsigned int fd, unsigned int cmd, unsigned long 
 	set_fs(old_fs);
 
 	if (!err)
-		err = put_user(kuid, (unsigned int *)compat_ptr(arg));
+		err = put_user(kuid,
+			       (unsigned int __user *) compat_ptr(arg));
 
 	return err;
 }
@@ -3187,7 +3193,8 @@ static int do_ncp_setobjectname(unsigned int fd, unsigned int cmd, unsigned long
 static int do_ncp_getprivatedata(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ncp_privatedata_ioctl_32 n32, __user *p32 = compat_ptr(arg);
-	struct ncp_privatedata_ioctl *p = __user compat_alloc_user_space(sizeof(*p));
+	struct ncp_privatedata_ioctl __user *p =
+		compat_alloc_user_space(sizeof(*p));
 	u32 len;
 	int err;
 
@@ -3209,8 +3216,10 @@ static int do_ncp_getprivatedata(unsigned int fd, unsigned int cmd, unsigned lon
 
 static int do_ncp_setprivatedata(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct ncp_privatedata_ioctl_32 n32, *p32 = compat_ptr(arg);
-	struct ncp_privatedata_ioctl *p = compat_alloc_user_space(sizeof(*p));
+	struct ncp_privatedata_ioctl_32 n32;
+	struct ncp_privatedata_ioctl_32 __user *p32 = compat_ptr(arg);
+	struct ncp_privatedata_ioctl __user *p =
+		compat_alloc_user_space(sizeof(*p));
 
 	if (copy_from_user(&n32, p32, sizeof(n32)) ||
 	    put_user(n32.len, &p->len) ||

@@ -429,6 +429,9 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(event));
 
+	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
+			SCTP_STATE(SCTP_STATE_CLOSED));
+
 	/* SEND_FAILED sent later when cleaning up the association. */
 	asoc->outqueue.error = error;
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
@@ -456,6 +459,10 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
+
+	/* Set sk_err to ECONNRESET on a 1-1 style socket. */
+	if (!sctp_style(asoc->base.sk, UDP))
+		asoc->base.sk->sk_err = ECONNRESET; 
 
 	/* SEND_FAILED sent later when cleaning up the association. */
 	asoc->outqueue.error = error;
@@ -1271,6 +1278,9 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_PROCESS_OPERR:
 			sctp_cmd_process_operr(commands, asoc, chunk);
+			break;
+		case SCTP_CMD_CLEAR_INIT_TAG:
+			asoc->peer.i.init_tag = 0;
 			break;
 		default:
 			printk(KERN_WARNING "Impossible command: %u, %p\n",

@@ -136,7 +136,6 @@ void device_trigger_reprobe(struct subchannel *);
 
 /* Helper functions for vary on/off. */
 void device_set_waiting(struct subchannel *);
-void device_call_nopath_notify(struct subchannel *);
 
 /* Helper functions to build lists for the slow path. */
 int css_enqueue_subchannel_slow(unsigned long schid);
@@ -144,4 +143,7 @@ void css_walk_subchannel_slow_list(void (*fn)(unsigned long));
 void css_clear_subchannel_slow_list(void);
 int css_slow_subchannels_exist(void);
 extern int need_rescan;
+
+extern struct workqueue_struct *slow_path_wq;
+extern struct work_struct slow_path_work;
 #endif

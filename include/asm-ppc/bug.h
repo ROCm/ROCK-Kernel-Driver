@@ -23,26 +23,30 @@ struct bug_entry {
 		: : "i" (__LINE__), "i" (__FILE__), "i" (__FUNCTION__)); \
 } while (0)
 
-#define BUG_ON(x) do {						\
-	__asm__ __volatile__(					\
-		"1:	twnei %0,0\n"				\
-		".section __bug_table,\"a\"\n\t"		\
-		"	.long 1b,%1,%2,%3\n"			\
-		".previous"					\
-		: : "r" (x), "i" (__LINE__), "i" (__FILE__),	\
-		    "i" (__FUNCTION__));			\
+#define BUG_ON(x) do {							\
+	if (!__builtin_constant_p(x) || (x)) {				\
+		__asm__ __volatile__(					\
+			"1:	twnei %0,0\n"				\
+			".section __bug_table,\"a\"\n\t"		\
+			"	.long 1b,%1,%2,%3\n"			\
+			".previous"					\
+			: : "r" (x), "i" (__LINE__), "i" (__FILE__),	\
+			    "i" (__FUNCTION__));			\
+	}								\
 } while (0)
 
-#define PAGE_BUG(page) do { BUG(); } while (0)
+#define PAGE_BUG(page)	BUG()
 
-#define WARN_ON(x) do {						\
-	__asm__ __volatile__(					\
-		"1:	twnei %0,0\n"				\
-		".section __bug_table,\"a\"\n\t"		\
-		"	.long 1b,%1,%2,%3\n"			\
-		".previous"					\
-		: : "r" (x), "i" (__LINE__ + BUG_WARNING_TRAP),	\
-		    "i" (__FILE__), "i" (__FUNCTION__));	\
+#define WARN_ON(x) do {							\
+	if (!__builtin_constant_p(x) || (x)) {				\
+		__asm__ __volatile__(					\
+			"1:	twnei %0,0\n"				\
+			".section __bug_table,\"a\"\n\t"		\
+			"	.long 1b,%1,%2,%3\n"			\
+			".previous"					\
+			: : "r" (x), "i" (__LINE__ + BUG_WARNING_TRAP),	\
+			    "i" (__FILE__), "i" (__FUNCTION__));	\
+	}								\
 } while (0)
 
 #endif

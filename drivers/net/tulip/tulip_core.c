@@ -830,7 +830,7 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct tulip_private *np = netdev_priv(dev);
 	u32 ethcmd;
@@ -859,14 +859,14 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	const unsigned int phy_idx = 0;
 	int phy = tp->phys[phy_idx] & 0x1f;
 	unsigned int regnum = data->reg_num;
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)

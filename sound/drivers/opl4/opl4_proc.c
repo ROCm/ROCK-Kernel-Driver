@@ -50,7 +50,7 @@ static int snd_opl4_mem_proc_release(snd_info_entry_t *entry,
 }
 
 static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_data,
-				   struct file *file, char *_buf, long count)
+				   struct file *file, char __user *_buf, long count)
 {
 	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
 	long size;
@@ -76,7 +76,7 @@ static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_d
 }
 
 static long snd_opl4_mem_proc_write(snd_info_entry_t *entry, void *file_private_data,
-				    struct file *file, const char *_buf, long count)
+				    struct file *file, const char __user *_buf, long count)
 {
 	opl4_t *opl4 = snd_magic_cast(opl4_t, entry->private_data, return -ENXIO);
 	long size;

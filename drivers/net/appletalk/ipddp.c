@@ -259,7 +259,7 @@ static struct ipddp_route* ipddp_find_route(struct ipddp_route *rt)
 
 static int ipddp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-        struct ipddp_route *rt = (struct ipddp_route *)ifr->ifr_data;
+        struct ipddp_route __user *rt = ifr->ifr_data;
         struct ipddp_route rcp;
 
         if(!capable(CAP_NET_ADMIN))

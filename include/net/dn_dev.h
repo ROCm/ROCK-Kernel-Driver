@@ -155,7 +155,7 @@ struct rtnode_hello_message
 extern void dn_dev_init(void);
 extern void dn_dev_cleanup(void);
 
-extern int dn_dev_ioctl(unsigned int cmd, void *arg);
+extern int dn_dev_ioctl(unsigned int cmd, void __user *arg);
 
 extern void dn_dev_devices_off(void);
 extern void dn_dev_devices_on(void);

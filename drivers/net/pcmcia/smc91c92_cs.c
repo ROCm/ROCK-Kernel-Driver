@@ -2119,12 +2119,12 @@ static int smc_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
     return 0;
 }
 
-static int smc_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int smc_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
     u32 ethcmd;
     struct smc_private *smc = netdev_priv(dev);
 
-    if (get_user(ethcmd, (u32 *)useraddr))
+    if (get_user(ethcmd, (u32 __user *)useraddr))
 	return -EFAULT;
 
     switch (ethcmd) {
@@ -2221,7 +2221,7 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     u_short saved_bank;
     ioaddr_t ioaddr = dev->base_addr;
 
-    mii = (struct mii_ioctl_data *) &rq->ifr_data;
+    mii = if_mii(rq);
     if (!netif_running(dev))
     	return -EINVAL;
 
@@ -2229,7 +2229,7 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     case SIOCETHTOOL:
 	saved_bank = inw(ioaddr + BANK_SELECT);
 	SMC_SELECT_BANK(3);
-	rc = smc_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	rc = smc_ethtool_ioctl(dev, rq->ifr_data);
 	SMC_SELECT_BANK(saved_bank);
 	break;
 

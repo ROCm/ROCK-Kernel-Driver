@@ -6,7 +6,7 @@
  *
  *  Rewritten to use page cache, (C) 1998 Stephen Tweedie
  */
-
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
@@ -19,7 +19,8 @@
 
 /*
  * swapper_space is a fiction, retained to simplify the path through
- * vmscan's shrink_list.  Only those fields initialized below are used.
+ * vmscan's shrink_list, to make sync_page look nicer, and to allow
+ * future use of radix_tree tags in the swap cache.
  */
 static struct address_space_operations swap_aops = {
 	.writepage	= swap_writepage,
@@ -36,8 +37,10 @@ struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
 	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.a_ops		= &swap_aops,
+	.i_mmap_nonlinear = LIST_HEAD_INIT(swapper_space.i_mmap_nonlinear),
 	.backing_dev_info = &swap_backing_dev_info,
 };
+EXPORT_SYMBOL(swapper_space);
 
 #define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)
 

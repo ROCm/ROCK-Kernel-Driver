@@ -597,126 +597,112 @@ static inline u16 rx_q_entry_to_rx_channel (u32 x) {
 
 // p ranges from 1 to a power of 2
 #define CR_MAXPEXP 4
-
+ 
 static int make_rate (const hrz_dev * dev, u32 c, rounding r,
-		      u16 * bits, unsigned int * actual) {
+		      u16 * bits, unsigned int * actual)
+{
+	// note: rounding the rate down means rounding 'p' up
+	const unsigned long br = test_bit(ultra, &dev->flags) ? BR_ULT : BR_HRZ;
   
-  // note: rounding the rate down means rounding 'p' up
+	u32 div = CR_MIND;
+	u32 pre;
   
-  const unsigned long br = test_bit(ultra, &dev->flags) ? BR_ULT : BR_HRZ;
+	// br_exp and br_man are used to avoid overflowing (c*maxp*2^d) in
+	// the tests below. We could think harder about exact possibilities
+	// of failure...
   
-  u32 div = CR_MIND;
-  u32 pre;
+	unsigned long br_man = br;
+	unsigned int br_exp = 0;
   
-  // local fn to build the timer bits
-  int set_cr (void) {
-    // paranoia
-    if (div > CR_MAXD || (!pre) || pre > 1<<CR_MAXPEXP) {
-      PRINTD (DBG_QOS, "set_cr internal failure: d=%u p=%u",
-	      div, pre);
-      return -EINVAL;
-    } else {
-      if (bits)
-	*bits = (div<<CLOCK_SELECT_SHIFT) | (pre-1);
-      if (actual) {
-	*actual = (br + (pre<<div) - 1) / (pre<<div);
-	PRINTD (DBG_QOS, "actual rate: %u", *actual);
-      }
-      return 0;
-    }
-  }
+	PRINTD (DBG_QOS|DBG_FLOW, "make_rate b=%lu, c=%u, %s", br, c,
+		r == round_up ? "up" : r == round_down ? "down" : "nearest");
   
-  // br_exp and br_man are used to avoid overflowing (c*maxp*2^d) in
-  // the tests below. We could think harder about exact possibilities
-  // of failure...
+	// avoid div by zero
+	if (!c) {
+		PRINTD (DBG_QOS|DBG_ERR, "zero rate is not allowed!");
+		return -EINVAL;
+	}
   
-  unsigned long br_man = br;
-  unsigned int br_exp = 0;
+	while (br_exp < CR_MAXPEXP + CR_MIND && (br_man % 2 == 0)) {
+		br_man = br_man >> 1;
+		++br_exp;
+	}
+	// (br >>br_exp) <<br_exp == br and
+	// br_exp <= CR_MAXPEXP+CR_MIND
   
-  PRINTD (DBG_QOS|DBG_FLOW, "make_rate b=%lu, c=%u, %s", br, c,
-	  (r == round_up) ? "up" : (r == round_down) ? "down" : "nearest");
+	if (br_man <= (c << (CR_MAXPEXP+CR_MIND-br_exp))) {
+		// Equivalent to: B <= (c << (MAXPEXP+MIND))
+		// take care of rounding
+		switch (r) {
+			case round_down:
+				pre = (br+(c<<div)-1)/(c<<div);
+				// but p must be non-zero
+				if (!pre)
+					pre = 1;
+				break;
+			case round_nearest:
+				pre = (br+(c<<div)/2)/(c<<div);
+				// but p must be non-zero
+				if (!pre)
+					pre = 1;
+				break;
+			default:	/* round_up */
+				pre = br/(c<<div);
+				// but p must be non-zero
+				if (!pre)
+					return -EINVAL;
+		}
+		PRINTD (DBG_QOS, "A: p=%u, d=%u", pre, div);
+		goto got_it;
+	}
   
-  // avoid div by zero
-  if (!c) {
-    PRINTD (DBG_QOS|DBG_ERR, "zero rate is not allowed!");
-    return -EINVAL;
-  }
-  
-  while (br_exp < CR_MAXPEXP + CR_MIND && (br_man % 2 == 0)) {
-    br_man = br_man >> 1;
-    ++br_exp;
-  }
-  // (br >>br_exp) <<br_exp == br and
-  // br_exp <= CR_MAXPEXP+CR_MIND
-  
-  if (br_man <= (c << (CR_MAXPEXP+CR_MIND-br_exp))) {
-    // Equivalent to: B <= (c << (MAXPEXP+MIND))
-    // take care of rounding
-    switch (r) {
-      case round_down:
-	pre = (br+(c<<div)-1)/(c<<div);
-	// but p must be non-zero
-	if (!pre)
-	  pre = 1;
-	break;
-      case round_nearest:
-	pre = (br+(c<<div)/2)/(c<<div);
-	// but p must be non-zero
-	if (!pre)
-	  pre = 1;
-	break;
-      case round_up:
-	pre = br/(c<<div);
-	// but p must be non-zero
-	if (!pre)
-	  return -EINVAL;
-	break;
-    }
-    PRINTD (DBG_QOS, "A: p=%u, d=%u", pre, div);
-    return set_cr ();
-  }
-  
-  // at this point we have
-  // d == MIND and (c << (MAXPEXP+MIND)) < B
-  while (div < CR_MAXD) {
-    div++;
-    if (br_man <= (c << (CR_MAXPEXP+div-br_exp))) {
-      // Equivalent to: B <= (c << (MAXPEXP+d))
-      // c << (MAXPEXP+d-1) < B <= c << (MAXPEXP+d)
-      // 1 << (MAXPEXP-1) < B/2^d/c <= 1 << MAXPEXP
-      // MAXP/2 < B/c2^d <= MAXP
-      // take care of rounding
-      switch (r) {
-	case round_down:
-	  pre = (br+(c<<div)-1)/(c<<div);
-	  break;
-	case round_nearest:
-	  pre = (br+(c<<div)/2)/(c<<div);
-	  break;
-	case round_up:
-	  pre = br/(c<<div);
-	  break;
-      }
-      PRINTD (DBG_QOS, "B: p=%u, d=%u", pre, div);
-      return set_cr ();
-    }
-  }
-  // at this point we have
-  // d == MAXD and (c << (MAXPEXP+MAXD)) < B
-  // but we cannot go any higher
-  // take care of rounding
-  switch (r) {
-    case round_down:
-      return -EINVAL;
-      break;
-    case round_nearest:
-      break;
-    case round_up:
-      break;
-  }
-  pre = 1 << CR_MAXPEXP;
-  PRINTD (DBG_QOS, "C: p=%u, d=%u", pre, div);
-  return set_cr ();
+	// at this point we have
+	// d == MIND and (c << (MAXPEXP+MIND)) < B
+	while (div < CR_MAXD) {
+		div++;
+		if (br_man <= (c << (CR_MAXPEXP+div-br_exp))) {
+			// Equivalent to: B <= (c << (MAXPEXP+d))
+			// c << (MAXPEXP+d-1) < B <= c << (MAXPEXP+d)
+			// 1 << (MAXPEXP-1) < B/2^d/c <= 1 << MAXPEXP
+			// MAXP/2 < B/c2^d <= MAXP
+			// take care of rounding
+			switch (r) {
+				case round_down:
+					pre = (br+(c<<div)-1)/(c<<div);
+					break;
+				case round_nearest:
+					pre = (br+(c<<div)/2)/(c<<div);
+					break;
+				default: /* round_up */
+					pre = br/(c<<div);
+			}
+			PRINTD (DBG_QOS, "B: p=%u, d=%u", pre, div);
+			goto got_it;
+		}
+	}
+	// at this point we have
+	// d == MAXD and (c << (MAXPEXP+MAXD)) < B
+	// but we cannot go any higher
+	// take care of rounding
+	if (r == round_down)
+		return -EINVAL;
+	pre = 1 << CR_MAXPEXP;
+	PRINTD (DBG_QOS, "C: p=%u, d=%u", pre, div);
+got_it:
+	// paranoia
+	if (div > CR_MAXD || (!pre) || pre > 1<<CR_MAXPEXP) {
+		PRINTD (DBG_QOS, "set_cr internal failure: d=%u p=%u",
+			div, pre);
+		return -EINVAL;
+	} else {
+		if (bits)
+			*bits = (div<<CLOCK_SELECT_SHIFT) | (pre-1);
+		if (actual) {
+			*actual = (br + (pre<<div) - 1) / (pre<<div);
+			PRINTD (DBG_QOS, "actual rate: %u", *actual);
+		}
+		return 0;
+	}
 }
 
 static int make_rate_with_tolerance (const hrz_dev * dev, u32 c, rounding r, unsigned int tol,
@@ -1823,22 +1809,22 @@ static void hrz_reset (const hrz_dev * dev) {
 
 /********** read the burnt in address **********/
 
-static u16 __init read_bia (const hrz_dev * dev, u16 addr) {
+static inline void WRITE_IT_WAIT (const hrz_dev *dev, u32 ctrl)
+{
+	wr_regl (dev, CONTROL_0_REG, ctrl);
+	udelay (5);
+}
   
+static inline void CLOCK_IT (const hrz_dev *dev, u32 ctrl)
+{
+	// DI must be valid around rising SK edge
+	WRITE_IT_WAIT(dev, ctrl & ~SEEPROM_SK);
+	WRITE_IT_WAIT(dev, ctrl | SEEPROM_SK);
+}
+
+static u16 __init read_bia (const hrz_dev * dev, u16 addr)
+{
   u32 ctrl = rd_regl (dev, CONTROL_0_REG);
-  
-  void WRITE_IT_WAIT (void) {
-    wr_regl (dev, CONTROL_0_REG, ctrl);
-    udelay (5);
-  }
-  
-  void CLOCK_IT (void) {
-    // DI must be valid around rising SK edge
-    ctrl &= ~SEEPROM_SK;
-    WRITE_IT_WAIT();
-    ctrl |= SEEPROM_SK;
-    WRITE_IT_WAIT();
-  }
   
   const unsigned int addr_bits = 6;
   const unsigned int data_bits = 16;
@@ -1848,17 +1834,17 @@ static u16 __init read_bia (const hrz_dev * dev, u16 addr) {
   u16 res;
   
   ctrl &= ~(SEEPROM_CS | SEEPROM_SK | SEEPROM_DI);
-  WRITE_IT_WAIT();
+  WRITE_IT_WAIT(dev, ctrl);
   
   // wake Serial EEPROM and send 110 (READ) command
   ctrl |=  (SEEPROM_CS | SEEPROM_DI);
-  CLOCK_IT();
+  CLOCK_IT(dev, ctrl);
   
   ctrl |= SEEPROM_DI;
-  CLOCK_IT();
+  CLOCK_IT(dev, ctrl);
   
   ctrl &= ~SEEPROM_DI;
-  CLOCK_IT();
+  CLOCK_IT(dev, ctrl);
   
   for (i=0; i<addr_bits; i++) {
     if (addr & (1 << (addr_bits-1)))
@@ -1866,7 +1852,7 @@ static u16 __init read_bia (const hrz_dev * dev, u16 addr) {
     else
       ctrl &= ~SEEPROM_DI;
     
-    CLOCK_IT();
+    CLOCK_IT(dev, ctrl);
     
     addr = addr << 1;
   }
@@ -1878,14 +1864,14 @@ static u16 __init read_bia (const hrz_dev * dev, u16 addr) {
   for (i=0;i<data_bits;i++) {
     res = res >> 1;
     
-    CLOCK_IT();
+    CLOCK_IT(dev, ctrl);
     
     if (rd_regl (dev, CONTROL_0_REG) & SEEPROM_DO)
       res |= (1 << (data_bits-1));
   }
   
   ctrl &= ~(SEEPROM_SK | SEEPROM_CS);
-  WRITE_IT_WAIT();
+  WRITE_IT_WAIT(dev, ctrl);
   
   return res;
 }

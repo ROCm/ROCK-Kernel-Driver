@@ -36,7 +36,6 @@
 #include <linux/cpufreq.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/notifier.h>
 #include <linux/spinlock.h>
 
 #include <asm/hardware.h>
@@ -111,6 +110,32 @@ sa1100_pcmcia_set_mecr(struct soc_pcmcia_socket *skt, unsigned int cpu_clock)
 	return 0;
 }
 
+#ifdef CONFIG_CPU_FREQ
+static int
+sa1100_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+			       unsigned long val,
+			       struct cpufreq_freqs *freqs)
+{
+	switch (val) {
+	case CPUFREQ_PRECHANGE:
+		if (freqs->new > freqs->old)
+			sa1100_pcmcia_set_mecr(skt, freqs->new);
+		break;
+
+	case CPUFREQ_POSTCHANGE:
+		if (freqs->new < freqs->old)
+			sa1100_pcmcia_set_mecr(skt, freqs->new);
+		break;
+	case CPUFREQ_RESUMECHANGE:
+		sa1100_pcmcia_set_mecr(skt, freqs->new);
+		break;
+	}
+
+	return 0;
+}
+
+#endif
+
 static int
 sa1100_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
 {
@@ -152,90 +177,23 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
 	/* Provide our SA11x0 specific timing routines. */
 	ops->set_timing  = sa1100_pcmcia_set_timing;
 	ops->show_timing = sa1100_pcmcia_show_timing;
+#ifdef CONFIG_CPU_FREQ
+	ops->frequency_change = sa1100_pcmcia_frequency_change;
+#endif
 
 	return soc_common_drv_pcmcia_probe(dev, ops, first, nr);
 }
 EXPORT_SYMBOL(sa11xx_drv_pcmcia_probe);
 
-#ifdef CONFIG_CPU_FREQ
-
-/* sa1100_pcmcia_update_mecr()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * When sa1100_pcmcia_notifier() decides that a MECR adjustment (due
- * to a core clock frequency change) is needed, this routine establishes
- * new BS_xx values consistent with the clock speed `clock'.
- */
-static void sa1100_pcmcia_update_mecr(unsigned int clock)
-{
-	struct soc_pcmcia_socket *skt;
-
-	down(&soc_pcmcia_sockets_lock);
-	list_for_each_entry(skt, &soc_pcmcia_sockets, node)
-		sa1100_pcmcia_set_mecr(skt, clock);
-	up(&soc_pcmcia_sockets_lock);
-}
-
-/* sa1100_pcmcia_notifier()
- * ^^^^^^^^^^^^^^^^^^^^^^^^
- * When changing the processor core clock frequency, it is necessary
- * to adjust the MECR timings accordingly. We've recorded the timings
- * requested by Card Services, so this is just a matter of finding
- * out what our current speed is, and then recomputing the new MECR
- * values.
- *
- * Returns: 0 on success, -1 on error
- */
-static int
-sa1100_pcmcia_notifier(struct notifier_block *nb, unsigned long val,
-		       void *data)
-{
-	struct cpufreq_freqs *freqs = data;
-
-	switch (val) {
-	case CPUFREQ_PRECHANGE:
-		if (freqs->new > freqs->old)
-			sa1100_pcmcia_update_mecr(freqs->new);
-		break;
-
-	case CPUFREQ_POSTCHANGE:
-		if (freqs->new < freqs->old)
-			sa1100_pcmcia_update_mecr(freqs->new);
-		break;
-	case CPUFREQ_RESUMECHANGE:
-		sa1100_pcmcia_update_mecr(freqs->new);
-		break;
-	}
-
-	return 0;
-}
-
-static struct notifier_block sa1100_pcmcia_notifier_block = {
-	.notifier_call	= sa1100_pcmcia_notifier
-};
-
 static int __init sa11xx_pcmcia_init(void)
 {
-	int ret;
-
-	printk(KERN_INFO "SA11xx PCMCIA\n");
-
-	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block,
-					CPUFREQ_TRANSITION_NOTIFIER);
-	if (ret < 0)
-		printk(KERN_ERR "Unable to register CPU frequency change "
-			"notifier (%d)\n", ret);
-
-	return ret;
+	return 0;
 }
 module_init(sa11xx_pcmcia_init);
 
-static void __exit sa11xx_pcmcia_exit(void)
-{
-	cpufreq_unregister_notifier(&sa1100_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
-}
+static void __exit sa11xx_pcmcia_exit(void) {}
 
 module_exit(sa11xx_pcmcia_exit);
-#endif
 
 MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");
 MODULE_DESCRIPTION("Linux PCMCIA Card Services: SA-11xx core socket driver");

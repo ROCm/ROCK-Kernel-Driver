@@ -320,7 +320,7 @@ edd_show_info_flags(struct edd_device *edev, char *buf)
 }
 
 static ssize_t
-edd_show_legacy_cylinders(struct edd_device *edev, char *buf)
+edd_show_legacy_max_cylinder(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info;
 	char *p = buf;
@@ -330,12 +330,12 @@ edd_show_legacy_cylinders(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_cylinders);
+	p += snprintf(p, left, "%u\n", info->legacy_max_cylinder);
 	return (p - buf);
 }
 
 static ssize_t
-edd_show_legacy_heads(struct edd_device *edev, char *buf)
+edd_show_legacy_max_head(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info;
 	char *p = buf;
@@ -345,12 +345,12 @@ edd_show_legacy_heads(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_heads);
+	p += snprintf(p, left, "%u\n", info->legacy_max_head);
 	return (p - buf);
 }
 
 static ssize_t
-edd_show_legacy_sectors(struct edd_device *edev, char *buf)
+edd_show_legacy_sectors_per_track(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info;
 	char *p = buf;
@@ -360,7 +360,7 @@ edd_show_legacy_sectors(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_sectors);
+	p += snprintf(p, left, "%u\n", info->legacy_sectors_per_track);
 	return (p - buf);
 }
 
@@ -375,7 +375,7 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
+	p += scnprintf(p, left, "%u\n", info->params.num_default_cylinders);
 	return (p - buf);
 }
 
@@ -390,7 +390,7 @@ edd_show_default_heads(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.num_default_heads);
+	p += scnprintf(p, left, "%u\n", info->params.num_default_heads);
 	return (p - buf);
 }
 
@@ -405,7 +405,7 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.sectors_per_track);
+	p += scnprintf(p, left, "%u\n", info->params.sectors_per_track);
 	return (p - buf);
 }
 
@@ -420,7 +420,7 @@ edd_show_sectors(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
+	p += scnprintf(p, left, "%llu\n", info->params.number_of_sectors);
 	return (p - buf);
 }
 
@@ -436,7 +436,7 @@ edd_show_sectors(struct edd_device *edev, char *buf)
  */
 
 static int
-edd_has_legacy_cylinders(struct edd_device *edev)
+edd_has_legacy_max_cylinder(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
@@ -444,11 +444,11 @@ edd_has_legacy_cylinders(struct edd_device *edev)
 	info = edd_dev_get_info(edev);
 	if (!info)
 		return -EINVAL;
-	return info->legacy_cylinders > 0;
+	return info->legacy_max_cylinder > 0;
 }
 
 static int
-edd_has_legacy_heads(struct edd_device *edev)
+edd_has_legacy_max_head(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
@@ -456,11 +456,11 @@ edd_has_legacy_heads(struct edd_device *edev)
 	info = edd_dev_get_info(edev);
 	if (!info)
 		return -EINVAL;
-	return info->legacy_heads > 0;
+	return info->legacy_max_head > 0;
 }
 
 static int
-edd_has_legacy_sectors(struct edd_device *edev)
+edd_has_legacy_sectors_per_track(struct edd_device *edev)
 {
 	struct edd_info *info;
 	if (!edev)
@@ -468,7 +468,7 @@ edd_has_legacy_sectors(struct edd_device *edev)
 	info = edd_dev_get_info(edev);
 	if (!info)
 		return -EINVAL;
-	return info->legacy_sectors > 0;
+	return info->legacy_sectors_per_track > 0;
 }
 
 static int
@@ -555,12 +555,14 @@ static EDD_DEVICE_ATTR(version, 0444, edd_show_version, NULL);
 static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, NULL);
 static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags, NULL);
 static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors, NULL);
-static EDD_DEVICE_ATTR(legacy_cylinders, 0444, edd_show_legacy_cylinders,
-		       edd_has_legacy_cylinders);
-static EDD_DEVICE_ATTR(legacy_heads, 0444, edd_show_legacy_heads,
-		       edd_has_legacy_heads);
-static EDD_DEVICE_ATTR(legacy_sectors, 0444, edd_show_legacy_sectors,
-		       edd_has_legacy_sectors);
+static EDD_DEVICE_ATTR(legacy_max_cylinder, 0444,
+                       edd_show_legacy_max_cylinder,
+		       edd_has_legacy_max_cylinder);
+static EDD_DEVICE_ATTR(legacy_max_head, 0444, edd_show_legacy_max_head,
+		       edd_has_legacy_max_head);
+static EDD_DEVICE_ATTR(legacy_sectors_per_track, 0444,
+                       edd_show_legacy_sectors_per_track,
+		       edd_has_legacy_sectors_per_track);
 static EDD_DEVICE_ATTR(default_cylinders, 0444, edd_show_default_cylinders,
 		       edd_has_default_cylinders);
 static EDD_DEVICE_ATTR(default_heads, 0444, edd_show_default_heads,
@@ -587,9 +589,9 @@ static struct attribute * def_attrs[] = {
 
 /* These attributes are conditional and only added for some devices. */
 static struct edd_attribute * edd_attrs[] = {
-	&edd_attr_legacy_cylinders,
-	&edd_attr_legacy_heads,
-	&edd_attr_legacy_sectors,
+	&edd_attr_legacy_max_cylinder,
+	&edd_attr_legacy_max_head,
+	&edd_attr_legacy_sectors_per_track,
 	&edd_attr_default_cylinders,
 	&edd_attr_default_heads,
 	&edd_attr_default_sectors_per_track,

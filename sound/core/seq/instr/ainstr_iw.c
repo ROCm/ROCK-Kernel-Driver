@@ -60,7 +60,7 @@ static int snd_seq_iwffff_copy_env_from_stream(__u32 req_stype,
 					       iwffff_layer_t *lp,
 					       iwffff_env_t *ep,
 					       iwffff_xenv_t *ex,
-					       char **data,
+					       char __user **data,
 					       long *len,
 					       int gfp_mask)
 {
@@ -126,7 +126,7 @@ static int snd_seq_iwffff_copy_env_from_stream(__u32 req_stype,
 
 static int snd_seq_iwffff_copy_wave_from_stream(snd_iwffff_ops_t *ops,
 						iwffff_layer_t *lp,
-					        char **data,
+					        char __user **data,
 					        long *len,
 					        int atomic)
 {
@@ -230,7 +230,8 @@ static void snd_seq_iwffff_instr_free(snd_iwffff_ops_t *ops,
 }
 
 static int snd_seq_iwffff_put(void *private_data, snd_seq_kinstr_t *instr,
-			      char *instr_data, long len, int atomic, int cmd)
+			      char __user *instr_data, long len, int atomic,
+			      int cmd)
 {
 	snd_iwffff_ops_t *ops = (snd_iwffff_ops_t *)private_data;
 	iwffff_instrument_t *ip;
@@ -350,7 +351,7 @@ static int snd_seq_iwffff_copy_env_to_stream(__u32 req_stype,
 					     iwffff_layer_t *lp,
 					     iwffff_xenv_t *ex,
 					     iwffff_env_t *ep,
-					     char **data,
+					     char __user **data,
 					     long *len)
 {
 	iwffff_env_record_t *rp;
@@ -395,7 +396,7 @@ static int snd_seq_iwffff_copy_env_to_stream(__u32 req_stype,
 
 static int snd_seq_iwffff_copy_wave_to_stream(snd_iwffff_ops_t *ops,
 					      iwffff_layer_t *lp,
-					      char **data,
+					      char __user **data,
 					      long *len,
 					      int atomic)
 {
@@ -449,14 +450,14 @@ static int snd_seq_iwffff_copy_wave_to_stream(snd_iwffff_ops_t *ops,
 }
 
 static int snd_seq_iwffff_get(void *private_data, snd_seq_kinstr_t *instr,
-			      char *instr_data, long len, int atomic, int cmd)
+			      char __user *instr_data, long len, int atomic, int cmd)
 {
 	snd_iwffff_ops_t *ops = (snd_iwffff_ops_t *)private_data;
 	iwffff_instrument_t *ip;
 	iwffff_xinstrument_t ix;
 	iwffff_layer_t *lp;
 	iwffff_xlayer_t lx;
-	char *layer_instr_data;
+	char __user *layer_instr_data;
 	int err;
 	
 	if (cmd != SNDRV_SEQ_INSTR_GET_CMD_FULL)

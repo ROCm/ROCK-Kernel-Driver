@@ -15,11 +15,12 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
+#include <asm/io.h>
 #include <asm/hardware.h>
+#include <asm/arch/lubbock.h>
 
 
 #define ROM_ADDR	0x00000000

@@ -1396,8 +1396,8 @@ e100_close(struct net_device *dev)
 static int
 e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct mii_ioctl_data *data = if_mii(ifr);
+	struct net_local *np = netdev_priv(dev);
 
 	spin_lock(&np->lock); /* Preempt protection */
 	switch (cmd) {

@@ -123,6 +123,12 @@ struct ipmi_channel
 	unsigned char protocol;
 };
 
+struct ipmi_proc_entry
+{
+	char                   *name;
+	struct ipmi_proc_entry *next;
+};
+
 #define IPMI_IPMB_NUM_SEQ	64
 #define IPMI_MAX_CHANNELS       8
 struct ipmi_smi
@@ -148,6 +154,11 @@ struct ipmi_smi
 	/* This is the lower-layer's sender routine. */
 	struct ipmi_smi_handlers *handlers;
 	void                     *send_info;
+
+	/* A list of proc entries for this interface.  This does not
+	   need a lock, only one thread creates it and only one thread
+	   destroys it. */
+	struct ipmi_proc_entry *proc_entries;
 
 	/* A table of sequence numbers for this interface.  We use the
            sequence numbers for IPMB messages that go out of the
@@ -1515,18 +1526,36 @@ int ipmi_smi_add_proc_entry(ipmi_smi_t smi, char *name,
 			    read_proc_t *read_proc, write_proc_t *write_proc,
 			    void *data, struct module *owner)
 {
-	struct proc_dir_entry *file;
-	int                   rv = 0;
+	struct proc_dir_entry  *file;
+	int                    rv = 0;
+	struct ipmi_proc_entry *entry;
+
+	/* Create a list element. */
+	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+	entry->name = kmalloc(strlen(name)+1, GFP_KERNEL);
+	if (!entry->name) {
+		kfree(entry);
+		return -ENOMEM;
+	}
+	strcpy(entry->name, name);
 
 	file = create_proc_entry(name, 0, smi->proc_dir);
-	if (!file)
+	if (!file) {
+		kfree(entry->name);
+		kfree(entry);
 		rv = -ENOMEM;
-	else {
+	} else {
 		file->nlink = 1;
 		file->data = data;
 		file->read_proc = read_proc;
 		file->write_proc = write_proc;
 		file->owner = owner;
+
+		/* Stick it on the list. */
+		entry->next = smi->proc_entries;
+		smi->proc_entries = entry;
 	}
 
 	return rv;
@@ -1560,6 +1589,21 @@ static int add_proc_entries(ipmi_smi_t smi, int num)
 					     smi, THIS_MODULE);
 
 	return rv;
+}
+
+static void remove_proc_entries(ipmi_smi_t smi)
+{
+	struct ipmi_proc_entry *entry;
+
+	while (smi->proc_entries) {
+		entry = smi->proc_entries;
+		smi->proc_entries = entry->next;
+
+		remove_proc_entry(entry->name, smi->proc_dir);
+		kfree(entry->name);
+		kfree(entry);
+	}
+	remove_proc_entry(smi->proc_dir_name, proc_ipmi_root);
 }
 
 static int
@@ -1749,8 +1793,7 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 
 	if (rv) {
 		if (new_intf->proc_dir)
-			remove_proc_entry(new_intf->proc_dir_name,
-					  proc_ipmi_root);
+			remove_proc_entries(new_intf);
 		kfree(new_intf);
 	}
 
@@ -1806,8 +1849,7 @@ int ipmi_unregister_smi(ipmi_smi_t intf)
 	{
 		for (i=0; i<MAX_IPMI_INTERFACES; i++) {
 			if (ipmi_interfaces[i] == intf) {
-				remove_proc_entry(intf->proc_dir_name,
-						  proc_ipmi_root);
+				remove_proc_entries(intf);
 				spin_lock_irqsave(&interfaces_lock, flags);
 				ipmi_interfaces[i] = NULL;
 				clean_up_interface_data(intf);

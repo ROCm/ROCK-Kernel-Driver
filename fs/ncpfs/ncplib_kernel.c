@@ -1002,7 +1002,7 @@ out:
  */
 int
 ncp_read_bounce(struct ncp_server *server, const char *file_id,
-	 __u32 offset, __u16 to_read, char *target, int *bytes_read,
+	 __u32 offset, __u16 to_read, char __user *target, int *bytes_read,
 	 void* bounce, __u32 bufsize)
 {
 	int result;

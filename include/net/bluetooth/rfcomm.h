@@ -348,7 +348,7 @@ struct rfcomm_dev_list_req {
 	struct   rfcomm_dev_info dev_info[0];
 };
 
-int  rfcomm_dev_ioctl(struct sock *sk, unsigned int cmd, unsigned long arg);
+int  rfcomm_dev_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
 int  rfcomm_init_ttys(void);
 void rfcomm_cleanup_ttys(void);
 

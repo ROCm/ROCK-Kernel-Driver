@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <asm/byteorder.h>
 
@@ -37,7 +38,15 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include <linux/module.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_request.h>
+#include <scsi/scsi_tcq.h>
+#include <scsi/scsi_host.h>
+
+
 
 #define MAX_TARGETS	16
 #define MAX_LUNS	8	/* 32 for 1.31 F/W */

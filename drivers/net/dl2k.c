@@ -107,7 +107,7 @@ static int change_mtu (struct net_device *dev, int new_mtu);
 static void set_multicast (struct net_device *dev);
 static struct net_device_stats *get_stats (struct net_device *dev);
 static int clear_stats (struct net_device *dev);
-static int rio_ethtool_ioctl (struct net_device *dev, void *useraddr);
+static int rio_ethtool_ioctl (struct net_device *dev, void __user *useraddr);
 static int rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static int rio_close (struct net_device *dev);
 static int find_miiphy (struct net_device *dev);
@@ -1195,7 +1195,7 @@ set_multicast (struct net_device *dev)
 }
 
 static int
-rio_ethtool_ioctl (struct net_device *dev, void *useraddr)
+rio_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
 	struct netdev_private *np = dev->priv;
        	u32 ethcmd;
@@ -1325,7 +1325,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int phy_addr;
 	struct netdev_private *np = dev->priv;
-	struct mii_data *miidata = (struct mii_data *) &rq->ifr_data;
+	struct mii_data *miidata = (struct mii_data *) &rq->ifr_ifru;
 	
 	struct netdev_desc *desc;
 	int i;
@@ -1333,7 +1333,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	phy_addr = np->phy_addr;
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return rio_ethtool_ioctl (dev, (void *) rq->ifr_data);		
+		return rio_ethtool_ioctl(dev, rq->ifr_data);		
 	case SIOCDEVPRIVATE:
 		break;
 	

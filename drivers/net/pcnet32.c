@@ -2170,14 +2170,13 @@ static void mdio_write(struct net_device *dev, int phy_id, int reg_num, int val)
 static int pcnet32_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     struct pcnet32_private *lp = dev->priv;
-    struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
     int rc;
     unsigned long flags;
 
     /* SIOC[GS]MIIxxx ioctls */
     if (lp->mii) {
 	spin_lock_irqsave(&lp->lock, flags);
-	rc = generic_mii_ioctl(&lp->mii_if, data, cmd, NULL);
+	rc = generic_mii_ioctl(&lp->mii_if, if_mii(rq), cmd, NULL);
 	spin_unlock_irqrestore(&lp->lock, flags);
     } else {
 	rc = -EOPNOTSUPP;

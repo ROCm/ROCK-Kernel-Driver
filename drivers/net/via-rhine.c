@@ -1875,14 +1875,13 @@ static struct ethtool_ops netdev_ethtool_ops = {
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct rhine_private *rp = netdev_priv(dev);
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
 	spin_lock_irq(&rp->lock);
-	rc = generic_mii_ioctl(&rp->mii_if, data, cmd, NULL);
+	rc = generic_mii_ioctl(&rp->mii_if, if_mii(rq), cmd, NULL);
 	spin_unlock_irq(&rp->lock);
 
 	return rc;

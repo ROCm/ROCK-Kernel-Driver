@@ -556,7 +556,7 @@ typedef struct host_bsq_entry {
 
 typedef struct host_cmdq_entry {
     struct cp_cmdq_entry* cp_entry;    /* addr of cp resident cmd queue entry */
-    enum   status*        status;      /* addr of host resident status        */
+    enum status *status;	       /* addr of host resident status        */
 } host_cmdq_entry_t;
 
 
@@ -668,7 +668,7 @@ typedef struct bs_spec {
 
 typedef struct init_block {
     enum opcode  opcode;               /* initialize command             */
-    enum status  status;	       /* related status word            */
+    enum status	 status;	       /* related status word            */
     u32          receive_threshold;    /* not used                       */
     u32          num_connect;          /* ATM connections                */
     u32          cmd_queue_len;        /* length of command queue        */
@@ -826,28 +826,6 @@ typedef struct fore200e_bus {
     void                 (*irq_ack)(struct fore200e*);
     int                  (*proc_read)(struct fore200e*, char*);
 } fore200e_bus_t;
-
-
-#if defined(CONFIG_ATM_FORE200E_SBA)
-#  if defined(CONFIG_ATM_FORE200E_PCA)
-#    define FORE200E_DMA_BIDIRECTIONAL PCI_DMA_BIDIRECTIONAL
-#    define FORE200E_DMA_TODEVICE      PCI_DMA_TODEVICE
-#    define FORE200E_DMA_FROMDEVICE    PCI_DMA_FROMDEVICE
-#  else
-#    define FORE200E_DMA_BIDIRECTIONAL SBUS_DMA_BIDIRECTIONAL
-#    define FORE200E_DMA_TODEVICE      SBUS_DMA_TODEVICE
-#    define FORE200E_DMA_FROMDEVICE    SBUS_DMA_FROMDEVICE
-#  endif
-#else
-#  ifndef CONFIG_ATM_FORE200E_PCA
-#    warning compiling the fore200e driver without any hardware support enabled!
-#    include <linux/pci.h>
-#  endif
-#  define FORE200E_DMA_BIDIRECTIONAL PCI_DMA_BIDIRECTIONAL
-#  define FORE200E_DMA_TODEVICE      PCI_DMA_TODEVICE
-#  define FORE200E_DMA_FROMDEVICE    PCI_DMA_FROMDEVICE
-#endif
-
 
 /* vc mapping */
 

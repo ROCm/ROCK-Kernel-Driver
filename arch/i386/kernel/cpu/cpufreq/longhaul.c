@@ -42,12 +42,15 @@ static int vrmrev;
 /* Module parameters */
 static int dont_scale_voltage;
 static int debug;
-static int debug;
 
-static void dprintk(const char *msg, ...)
+static void dprintk(const char *fmt, ...)
 {
-	if (debug == 1)
-		printk(msg);
+	va_list args;
+	if (debug == 0)
+		return;
+	va_start(args, fmt);
+	printk(fmt, args);
+	va_end(args);
 }
 
 
@@ -79,11 +82,7 @@ static int longhaul_get_cpu_mult (void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul_version==2) {
-		if (lo & (1<<27))
-			invalue+=16;
-	}
-	if (longhaul_version==4) {
+	if (longhaul_version==2 || longhaul_version==3) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
@@ -162,7 +161,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		longhaul.bits.RevisionKey = 3;
 		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
-	case 4:
+	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
 		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
@@ -227,7 +226,7 @@ static int guess_fsb(int maxmult)
 static int __init longhaul_get_ranges (void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
-	unsigned long invalue,invalue2;
+	unsigned long invalue;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
@@ -235,7 +234,8 @@ static int __init longhaul_get_ranges (void)
 	unsigned int j, k = 0;
 	union msr_longhaul longhaul;
 	unsigned long lo, hi;
-	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
+	unsigned int eblcr_fsb_table_v1[] = { 66, 133, 100, -1 };
+	unsigned int eblcr_fsb_table_v2[] = { 133, 100, -1, 66 };
 
 	switch (longhaul_version) {
 	case 1:
@@ -246,7 +246,7 @@ static int __init longhaul_get_ranges (void)
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
 		if (c->x86_model==6)
-			fsb = eblcr_fsb_table[invalue];
+			fsb = eblcr_fsb_table_v1[invalue];
 		else
 			fsb = guess_fsb(maxmult);
 		break;
@@ -265,53 +265,38 @@ static int __init longhaul_get_ranges (void)
 		else
 			minmult = multipliers[invalue];
 
-		switch (longhaul.bits.MaxMHzFSB) {
-		case 0x0:	fsb=133;
-				break;
-		case 0x1:	fsb=100;
-				break;
-		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
-			return -EINVAL;
-		case 0x3:	fsb=66;
-				break;
-		}
+		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 
-	case 4:
+	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
-		//TODO: Nehemiah may have borken MaxMHzBR.
-		// need to extrapolate from FSB.
-
-		invalue2 = longhaul.bits.MinMHzBR;
-		invalue = longhaul.bits.MaxMHzBR;
-		if (longhaul.bits.MaxMHzBR4)
-			invalue += 16;
-		maxmult=multipliers[invalue];
-
+		/*
+		 * TODO: This code works, but raises a lot of questions.
+		 * - Some Nehemiah's seem to have broken Min/MaxMHzBR's.
+		 *   We get around this by using a hardcoded multiplier of 5.0x
+		 *   for the minimimum speed, and the speed we booted up at for the max.
+		 *   This is done in longhaul_get_cpu_mult() by reading the EBLCR register.
+		 * - According to some VIA documentation EBLCR is only
+		 *   in pre-Nehemiah C3s. How this still works is a mystery.
+		 *   We're possibly using something undocumented and unsupported,
+		 *   But it works, so we don't grumble.
+		 */
+		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
-		printk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
-		printk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
-
-		minmult=50;
-
-		switch (longhaul.bits.MaxMHzFSB) {
-		case 0x0:	fsb=133;
-				break;
-		case 0x1:	fsb=100;
-				break;
-		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
-			return -EINVAL;
-		case 0x3:	fsb=66;
-				break;
-		}
-
+		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 	}
 
 	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
 		 minmult/10, minmult%10, maxmult/10, maxmult%10);
+
+	if (fsb == -1) {
+		printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
+		return -EINVAL;
+	}
+
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
 	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
@@ -480,7 +465,7 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 9:
-		longhaul_version=4;
+		longhaul_version=3;
 		numscales=32;
 		switch (c->x86_mask) {
 		case 0 ... 1:

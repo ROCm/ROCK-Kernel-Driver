@@ -29,7 +29,7 @@
 int use_coda_close;
 
 static ssize_t
-coda_file_read(struct file *coda_file, char *buf, size_t count, loff_t *ppos)
+coda_file_read(struct file *coda_file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct coda_file_info *cfi;
 	struct file *host_file;
@@ -45,7 +45,7 @@ coda_file_read(struct file *coda_file, char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-coda_file_write(struct file *coda_file, const char *buf, size_t count, loff_t *ppos)
+coda_file_write(struct file *coda_file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *host_inode, *coda_inode = coda_file->f_dentry->d_inode;
 	struct coda_file_info *cfi;

@@ -417,9 +417,9 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	return 0;
 }
 
-static void list_version_get_needed(struct target_type *tt, void *param)
+static void list_version_get_needed(struct target_type *tt, void *needed_param)
 {
-    int *needed = param;
+    size_t *needed = needed_param;
 
     *needed += strlen(tt->name);
     *needed += sizeof(tt->version);
@@ -1133,7 +1133,7 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
  * As well as checking the version compatibility this always
  * copies the kernel interface version out.
  */
-static int check_version(unsigned int cmd, struct dm_ioctl *user)
+static int check_version(unsigned int cmd, struct dm_ioctl __user *user)
 {
 	uint32_t version[3];
 	int r = 0;
@@ -1168,7 +1168,7 @@ static void free_params(struct dm_ioctl *param)
 	vfree(param);
 }
 
-static int copy_params(struct dm_ioctl *user, struct dm_ioctl **param)
+static int copy_params(struct dm_ioctl __user *user, struct dm_ioctl **param)
 {
 	struct dm_ioctl tmp, *dmi;
 
@@ -1225,7 +1225,7 @@ static int ctl_ioctl(struct inode *inode, struct file *file,
 	int r = 0;
 	unsigned int cmd;
 	struct dm_ioctl *param;
-	struct dm_ioctl *user = (struct dm_ioctl *) u;
+	struct dm_ioctl __user *user = (struct dm_ioctl __user *) u;
 	ioctl_fn fn = NULL;
 	size_t param_size;
 

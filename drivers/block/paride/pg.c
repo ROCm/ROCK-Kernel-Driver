@@ -212,9 +212,9 @@ MODULE_PARM(drive3, "1-6i");
 
 static int pg_open(struct inode *inode, struct file *file);
 static int pg_release(struct inode *inode, struct file *file);
-static ssize_t pg_read(struct file *filp, char *buf,
+static ssize_t pg_read(struct file *filp, char __user *buf,
 		       size_t count, loff_t * ppos);
-static ssize_t pg_write(struct file *filp, const char *buf,
+static ssize_t pg_write(struct file *filp, const char __user *buf,
 			size_t count, loff_t * ppos);
 static int pg_detect(void);
 
@@ -571,7 +571,7 @@ static int pg_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t pg_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+static ssize_t pg_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct pg *dev = filp->private_data;
 	struct pg_write_hdr hdr;
@@ -582,7 +582,7 @@ static ssize_t pg_write(struct file *filp, const char *buf, size_t count, loff_t
 	if (count < hs)
 		return -EINVAL;
 
-	if (copy_from_user((char *) &hdr, buf, hs))
+	if (copy_from_user(&hdr, buf, hs))
 		return -EFAULT;
 
 	if (hdr.magic != PG_MAGIC)
@@ -619,7 +619,7 @@ static ssize_t pg_write(struct file *filp, const char *buf, size_t count, loff_t
 	return count;
 }
 
-static ssize_t pg_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+static ssize_t pg_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct pg *dev = filp->private_data;
 	struct pg_read_hdr hdr;
@@ -651,7 +651,7 @@ static ssize_t pg_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	hdr.duration = (jiffies - dev->start + HZ / 2) / HZ;
 	hdr.scsi = dev->status & 0x0f;
 
-	if (copy_to_user(buf, (char *) &hdr, hs))
+	if (copy_to_user(buf, &hdr, hs))
 		return -EFAULT;
 	if (copy > 0)
 		if (copy_to_user(buf + hs, dev->bufptr, copy))

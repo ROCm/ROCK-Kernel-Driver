@@ -1961,12 +1961,12 @@ static void set_rx_mode(struct net_device *dev)
 	spin_unlock_irq(&np->lock);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct netdev_private *np = dev->priv;
 	u32 cmd;
 
-	if (get_user(cmd, (u32 *)useraddr))
+	if (get_user(cmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (cmd) {
@@ -2417,11 +2417,11 @@ static int netdev_get_eeprom(struct net_device *dev, u8 *buf)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = 1;

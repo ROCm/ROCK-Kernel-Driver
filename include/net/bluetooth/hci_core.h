@@ -358,12 +358,12 @@ int hci_dev_open(__u16 dev);
 int hci_dev_close(__u16 dev);
 int hci_dev_reset(__u16 dev);
 int hci_dev_reset_stat(__u16 dev);
-int hci_dev_cmd(unsigned int cmd, unsigned long arg);
-int hci_get_dev_list(unsigned long arg);
-int hci_get_dev_info(unsigned long arg);
-int hci_get_conn_list(unsigned long arg);
-int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg);
-int hci_inquiry(unsigned long arg);
+int hci_dev_cmd(unsigned int cmd, void __user *arg);
+int hci_get_dev_list(void __user *arg);
+int hci_get_dev_info(void __user *arg);
+int hci_get_conn_list(void __user *arg);
+int hci_get_conn_info(struct hci_dev *hdev, void __user *arg);
+int hci_inquiry(void __user *arg);
 
 void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb);
 

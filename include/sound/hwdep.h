@@ -32,8 +32,8 @@ typedef struct sndrv_hwdep_dsp_image snd_hwdep_dsp_image_t;
 
 typedef struct _snd_hwdep_ops {
 	long long (*llseek) (snd_hwdep_t *hw, struct file * file, long long offset, int orig);
-	long (*read) (snd_hwdep_t * hw, char *buf, long count, loff_t *offset);
-	long (*write) (snd_hwdep_t * hw, const char *buf, long count, loff_t *offset);
+	long (*read) (snd_hwdep_t * hw, char __user *buf, long count, loff_t *offset);
+	long (*write) (snd_hwdep_t * hw, const char __user *buf, long count, loff_t *offset);
 	int (*open) (snd_hwdep_t * hw, struct file * file);
 	int (*release) (snd_hwdep_t * hw, struct file * file);
 	unsigned int (*poll) (snd_hwdep_t * hw, struct file * file, poll_table * wait);

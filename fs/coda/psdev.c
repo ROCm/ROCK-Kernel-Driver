@@ -88,7 +88,7 @@ static int coda_psdev_ioctl(struct inode * inode, struct file * filp,
 	switch(cmd) {
 	case CIOC_KERNEL_VERSION:
 		data = CODA_KERNEL_VERSION;
-		return put_user(data, (int *) arg);
+		return put_user(data, (int __user *) arg);
 	default:
 		return -ENOTTY;
 	}
@@ -100,7 +100,7 @@ static int coda_psdev_ioctl(struct inode * inode, struct file * filp,
  *	Receive a message written by Venus to the psdev
  */
  
-static ssize_t coda_psdev_write(struct file *file, const char *buf, 
+static ssize_t coda_psdev_write(struct file *file, const char __user *buf, 
 				size_t nbytes, loff_t *off)
 {
         struct venus_comm *vcp = (struct venus_comm *) file->private_data;
@@ -212,7 +212,7 @@ out:
  *	Read a message from the kernel to Venus
  */
 
-static ssize_t coda_psdev_read(struct file * file, char * buf, 
+static ssize_t coda_psdev_read(struct file * file, char __user * buf, 
 			       size_t nbytes, loff_t *off)
 {
 	DECLARE_WAITQUEUE(wait, current);

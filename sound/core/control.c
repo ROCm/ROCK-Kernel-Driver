@@ -512,7 +512,7 @@ snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 }
 
 static int snd_ctl_card_info(snd_card_t * card, snd_ctl_file_t * ctl,
-			     unsigned int cmd, unsigned long arg)
+			     unsigned int cmd, void __user *arg)
 {
 	snd_ctl_card_info_t info;
 
@@ -526,12 +526,12 @@ static int snd_ctl_card_info(snd_card_t * card, snd_ctl_file_t * ctl,
 	strlcpy(info.mixername, card->mixername, sizeof(info.mixername));
 	strlcpy(info.components, card->components, sizeof(info.components));
 	up_read(&snd_ioctl_rwsem);
-	if (copy_to_user((void *) arg, &info, sizeof(snd_ctl_card_info_t)))
+	if (copy_to_user(arg, &info, sizeof(snd_ctl_card_info_t)))
 		return -EFAULT;
 	return 0;
 }
 
-static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
+static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t __user *_list)
 {
 	struct list_head *plist;
 	snd_ctl_elem_list_t list;
@@ -593,7 +593,7 @@ static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
 	return 0;
 }
 
-static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
+static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t __user *_info)
 {
 	snd_card_t *card = ctl->card;
 	snd_ctl_elem_info_t info;
@@ -636,7 +636,7 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 	return result;
 }
 
-static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
+static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t __user *_control)
 {
 	snd_ctl_elem_value_t *control;
 	snd_kcontrol_t *kctl;
@@ -676,7 +676,7 @@ static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 	return result;
 }
 
-static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_control)
+static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t __user *_control)
 {
 	snd_card_t *card = file->card;
 	snd_ctl_elem_value_t *control;
@@ -726,7 +726,7 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	return result;
 }
 
-static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
+static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t __user *_id)
 {
 	snd_card_t *card = file->card;
 	snd_ctl_elem_id_t id;
@@ -754,7 +754,7 @@ static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	return result;
 }
 
-static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
+static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t __user *_id)
 {
 	snd_card_t *card = file->card;
 	snd_ctl_elem_id_t id;
@@ -840,7 +840,7 @@ static void snd_ctl_elem_user_free(snd_kcontrol_t * kcontrol)
 	kfree(kcontrol->private_data);
 }
 
-static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t *_info, int replace)
+static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_info, int replace)
 {
 	snd_card_t *card = file->card;
 	snd_ctl_elem_info_t info;
@@ -965,7 +965,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t *_info, in
 	return 0;
 }
 
-static int snd_ctl_elem_remove(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
+static int snd_ctl_elem_remove(snd_ctl_file_t *file, snd_ctl_elem_id_t __user *_id)
 {
 	snd_ctl_elem_id_t id;
 
@@ -974,7 +974,7 @@ static int snd_ctl_elem_remove(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	return snd_ctl_remove_unlocked_id(file, &id);
 }
 
-static int snd_ctl_subscribe_events(snd_ctl_file_t *file, int *ptr)
+static int snd_ctl_subscribe_events(snd_ctl_file_t *file, int __user *ptr)
 {
 	int subscribe;
 	if (get_user(subscribe, ptr))
@@ -1029,6 +1029,8 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	snd_card_t *card;
 	struct list_head *list;
 	snd_kctl_ioctl_t *p;
+	void __user *argp = (void __user *)arg;
+	int __user *ip = argp;
 	int err;
 
 	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
@@ -1036,31 +1038,31 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	snd_assert(card != NULL, return -ENXIO);
 	switch (cmd) {
 	case SNDRV_CTL_IOCTL_PVERSION:
-		return put_user(SNDRV_CTL_VERSION, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_CTL_VERSION, ip) ? -EFAULT : 0;
 	case SNDRV_CTL_IOCTL_CARD_INFO:
-		return snd_ctl_card_info(card, ctl, cmd, arg);
+		return snd_ctl_card_info(card, ctl, cmd, argp);
 	case SNDRV_CTL_IOCTL_ELEM_LIST:
-		return snd_ctl_elem_list(ctl->card, (snd_ctl_elem_list_t *) arg);
+		return snd_ctl_elem_list(ctl->card, argp);
 	case SNDRV_CTL_IOCTL_ELEM_INFO:
-		return snd_ctl_elem_info(ctl, (snd_ctl_elem_info_t *) arg);
+		return snd_ctl_elem_info(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_READ:
-		return snd_ctl_elem_read(ctl->card, (snd_ctl_elem_value_t *) arg);
+		return snd_ctl_elem_read(ctl->card, argp);
 	case SNDRV_CTL_IOCTL_ELEM_WRITE:
-		return snd_ctl_elem_write(ctl, (snd_ctl_elem_value_t *) arg);
+		return snd_ctl_elem_write(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_LOCK:
-		return snd_ctl_elem_lock(ctl, (snd_ctl_elem_id_t *) arg);
+		return snd_ctl_elem_lock(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_UNLOCK:
-		return snd_ctl_elem_unlock(ctl, (snd_ctl_elem_id_t *) arg);
+		return snd_ctl_elem_unlock(ctl, argp);
 	case SNDRV_CTL_IOCTL_ELEM_ADD:
-		return snd_ctl_elem_add(ctl, (snd_ctl_elem_info_t *) arg, 0);
+		return snd_ctl_elem_add(ctl, argp, 0);
 	case SNDRV_CTL_IOCTL_ELEM_REPLACE:
-		return snd_ctl_elem_add(ctl, (snd_ctl_elem_info_t *) arg, 1);
+		return snd_ctl_elem_add(ctl, argp, 1);
 	case SNDRV_CTL_IOCTL_ELEM_REMOVE:
-		return snd_ctl_elem_remove(ctl, (snd_ctl_elem_id_t *) arg);
+		return snd_ctl_elem_remove(ctl, argp);
 	case SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS:
-		return snd_ctl_subscribe_events(ctl, (int *) arg);
+		return snd_ctl_subscribe_events(ctl, ip);
 	case SNDRV_CTL_IOCTL_POWER:
-		if (get_user(err, (int *)arg))
+		if (get_user(err, ip))
 			return -EFAULT;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -1075,9 +1077,9 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 		return err;
 	case SNDRV_CTL_IOCTL_POWER_STATE:
 #ifdef CONFIG_PM
-		return put_user(card->power_state, (int *)arg) ? -EFAULT : 0;
+		return put_user(card->power_state, ip) ? -EFAULT : 0;
 #else
-		return put_user(SNDRV_CTL_POWER_D0, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_CTL_POWER_D0, ip) ? -EFAULT : 0;
 #endif
 	}
 	down_read(&snd_ioctl_rwsem);
@@ -1094,7 +1096,7 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	return -ENOTTY;
 }
 
-static ssize_t snd_ctl_read(struct file *file, char *buffer, size_t count, loff_t * offset)
+static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count, loff_t * offset)
 {
 	snd_ctl_file_t *ctl;
 	int err = 0;

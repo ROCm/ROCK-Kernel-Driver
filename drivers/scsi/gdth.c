@@ -3520,7 +3520,7 @@ static void gdth_readapp_event(gdth_ha_str *ha,
     GDTH_UNLOCK_HA(ha, flags);
 }
 
-static void gdth_clear_events()
+static void gdth_clear_events(void)
 {
     TRACE(("gdth_clear_events()"));
 
@@ -5293,13 +5293,13 @@ static int gdth_close(struct inode *inode, struct file *filep)
     return 0;
 }
 
-static int ioc_event(unsigned long arg)
+static int ioc_event(void __user *arg)
 {
     gdth_ioctl_event evt;
     gdth_ha_str *ha;
     ulong flags;
 
-    if (copy_from_user(&evt, (char *)arg, sizeof(gdth_ioctl_event)) ||
+    if (copy_from_user(&evt, arg, sizeof(gdth_ioctl_event)) ||
         evt.ionode >= gdth_ctr_count)
         return -EFAULT;
     ha = HADATA(gdth_ctr_tab[evt.ionode]);
@@ -5324,19 +5324,19 @@ static int ioc_event(unsigned long arg)
     } else {
         gdth_readapp_event(ha, evt.erase, &evt.event);
     }     
-    if (copy_to_user((char *)arg, &evt, sizeof(gdth_ioctl_event)))
+    if (copy_to_user(arg, &evt, sizeof(gdth_ioctl_event)))
         return -EFAULT;
     return 0;
 }
 
-static int ioc_lockdrv(unsigned long arg)
+static int ioc_lockdrv(void __user *arg)
 {
     gdth_ioctl_lockdrv ldrv;
     unchar i, j;
     ulong flags;
     gdth_ha_str *ha;
 
-    if (copy_from_user(&ldrv, (char *)arg, sizeof(gdth_ioctl_lockdrv)) ||
+    if (copy_from_user(&ldrv, arg, sizeof(gdth_ioctl_lockdrv)) ||
         ldrv.ionode >= gdth_ctr_count)
         return -EFAULT;
     ha = HADATA(gdth_ctr_tab[ldrv.ionode]);
@@ -5362,7 +5362,7 @@ static int ioc_lockdrv(unsigned long arg)
     return 0;
 }
 
-static int ioc_resetdrv(unsigned long arg, char *cmnd)
+static int ioc_resetdrv(void __user *arg, char *cmnd)
 {
     gdth_ioctl_reset res;
     gdth_cmd_str cmd;
@@ -5376,7 +5376,7 @@ static int ioc_resetdrv(unsigned long arg, char *cmnd)
         Scsi_Cmnd scp;
 #endif
 
-    if (copy_from_user(&res, (char *)arg, sizeof(gdth_ioctl_reset)) ||
+    if (copy_from_user(&res, arg, sizeof(gdth_ioctl_reset)) ||
         res.ionode >= gdth_ctr_count || res.number >= MAX_HDRIVES)
         return -EFAULT;
     hanum = res.ionode;
@@ -5418,12 +5418,12 @@ static int ioc_resetdrv(unsigned long arg, char *cmnd)
     gdth_do_cmd(&scp, &cmd, cmnd, 30);
     res.status = (ushort)scp.SCp.Status;
 #endif
-    if (copy_to_user((char *)arg, &res, sizeof(gdth_ioctl_reset)))
+    if (copy_to_user(arg, &res, sizeof(gdth_ioctl_reset)))
         return -EFAULT;
     return 0;
 }
 
-static int ioc_general(unsigned long arg, char *cmnd)
+static int ioc_general(void __user *arg, char *cmnd)
 {
     gdth_ioctl_general gen;
     char *buf = NULL;
@@ -5438,7 +5438,7 @@ static int ioc_general(unsigned long arg, char *cmnd)
         Scsi_Cmnd scp;
 #endif
         
-    if (copy_from_user(&gen, (char *)arg, sizeof(gdth_ioctl_general)) ||
+    if (copy_from_user(&gen, arg, sizeof(gdth_ioctl_general)) ||
         gen.ionode >= gdth_ctr_count)
         return -EFAULT;
     hanum = gen.ionode; 
@@ -5447,7 +5447,7 @@ static int ioc_general(unsigned long arg, char *cmnd)
         if (!(buf = gdth_ioctl_alloc(hanum, gen.data_len + gen.sense_len, 
                                      FALSE, &paddr)))
             return -EFAULT;
-        if (copy_from_user(buf, (char *)arg + sizeof(gdth_ioctl_general),  
+        if (copy_from_user(buf, arg + sizeof(gdth_ioctl_general),  
                            gen.data_len + gen.sense_len)) {
             gdth_ioctl_free(hanum, gen.data_len+gen.sense_len, buf, paddr);
             return -EFAULT;
@@ -5559,12 +5559,12 @@ static int ioc_general(unsigned long arg, char *cmnd)
     gen.info = scp.SCp.Message;
 #endif
 
-    if (copy_to_user((char *)arg + sizeof(gdth_ioctl_general), buf, 
+    if (copy_to_user(arg + sizeof(gdth_ioctl_general), buf, 
                      gen.data_len + gen.sense_len)) {
         gdth_ioctl_free(hanum, gen.data_len+gen.sense_len, buf, paddr);
         return -EFAULT; 
     } 
-    if (copy_to_user((char *)arg, &gen, 
+    if (copy_to_user(arg, &gen, 
         sizeof(gdth_ioctl_general) - sizeof(gdth_cmd_str))) {
         gdth_ioctl_free(hanum, gen.data_len+gen.sense_len, buf, paddr);
         return -EFAULT;
@@ -5573,7 +5573,7 @@ static int ioc_general(unsigned long arg, char *cmnd)
     return 0;
 }
  
-static int ioc_hdrlist(unsigned long arg, char *cmnd)
+static int ioc_hdrlist(void __user *arg, char *cmnd)
 {
     gdth_ioctl_rescan rsc;
     gdth_cmd_str cmd;
@@ -5588,7 +5588,7 @@ static int ioc_hdrlist(unsigned long arg, char *cmnd)
     Scsi_Cmnd scp;
 #endif
         
-    if (copy_from_user(&rsc, (char *)arg, sizeof(gdth_ioctl_rescan)) ||
+    if (copy_from_user(&rsc, arg, sizeof(gdth_ioctl_rescan)) ||
         rsc.ionode >= gdth_ctr_count)
         return -EFAULT;
     hanum = rsc.ionode;
@@ -5652,12 +5652,12 @@ static int ioc_hdrlist(unsigned long arg, char *cmnd)
     scsi_release_command(scp);
 #endif       
  
-    if (copy_to_user((char *)arg, &rsc, sizeof(gdth_ioctl_rescan)))
+    if (copy_to_user(arg, &rsc, sizeof(gdth_ioctl_rescan)))
         return -EFAULT;
     return 0;
 }
 
-static int ioc_rescan(unsigned long arg, char *cmnd)
+static int ioc_rescan(void __user *arg, char *cmnd)
 {
     gdth_ioctl_rescan rsc;
     gdth_cmd_str cmd;
@@ -5674,7 +5674,7 @@ static int ioc_rescan(unsigned long arg, char *cmnd)
     Scsi_Cmnd scp;
 #endif
         
-    if (copy_from_user(&rsc, (char *)arg, sizeof(gdth_ioctl_rescan)) ||
+    if (copy_from_user(&rsc, arg, sizeof(gdth_ioctl_rescan)) ||
         rsc.ionode >= gdth_ctr_count)
         return -EFAULT;
     hanum = rsc.ionode;
@@ -5852,7 +5852,7 @@ static int ioc_rescan(unsigned long arg, char *cmnd)
     scsi_release_command(scp);
 #endif       
  
-    if (copy_to_user((char *)arg, &rsc, sizeof(gdth_ioctl_rescan)))
+    if (copy_to_user(arg, &rsc, sizeof(gdth_ioctl_rescan)))
         return -EFAULT;
     return 0;
 }
@@ -5870,6 +5870,7 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
 #endif
     ulong flags;
     char cmnd[MAX_COMMAND_SIZE];   
+    void __user *argp = (void __user *)arg;
 
     memset(cmnd, 0xff, 12);
     
@@ -5879,7 +5880,7 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
       case GDTIOCTL_CTRCNT:
       { 
         int cnt = gdth_ctr_count;
-        if (put_user(cnt, (int *)arg))
+        if (put_user(cnt, (int __user *)argp))
                 return -EFAULT;
         break;
       }
@@ -5887,7 +5888,7 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
       case GDTIOCTL_DRVERS:
       { 
         int ver = (GDTH_VERSION<<8) | GDTH_SUBVERSION;
-        if (put_user(ver, (int *)arg))
+        if (put_user(ver, (int __user *)argp))
                 return -EFAULT;
         break;
       }
@@ -5899,7 +5900,7 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
         osv.version = (unchar)(LINUX_VERSION_CODE >> 16);
         osv.subversion = (unchar)(LINUX_VERSION_CODE >> 8);
         osv.revision = (ushort)(LINUX_VERSION_CODE & 0xff);
-        if (copy_to_user((char *)arg, &osv, sizeof(gdth_ioctl_osvers)))
+        if (copy_to_user(argp, &osv, sizeof(gdth_ioctl_osvers)))
                 return -EFAULT;
         break;
       }
@@ -5908,7 +5909,7 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
       { 
         gdth_ioctl_ctrtype ctrt;
         
-        if (copy_from_user(&ctrt, (char *)arg, sizeof(gdth_ioctl_ctrtype)) ||
+        if (copy_from_user(&ctrt, argp, sizeof(gdth_ioctl_ctrtype)) ||
             ctrt.ionode >= gdth_ctr_count)
             return -EFAULT;
         ha = HADATA(gdth_ctr_tab[ctrt.ionode]);
@@ -5930,26 +5931,26 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
         }
         ctrt.info = ha->brd_phys;
         ctrt.oem_id = ha->oem_id;
-        if (copy_to_user((char *)arg, &ctrt, sizeof(gdth_ioctl_ctrtype)))
+        if (copy_to_user(argp, &ctrt, sizeof(gdth_ioctl_ctrtype)))
             return -EFAULT;
         break;
       }
         
       case GDTIOCTL_GENERAL:
-        return ioc_general(arg, cmnd);
+        return ioc_general(argp, cmnd);
 
       case GDTIOCTL_EVENT:
-        return ioc_event(arg);
+        return ioc_event(argp);
 
       case GDTIOCTL_LOCKDRV:
-        return ioc_lockdrv(arg);
+        return ioc_lockdrv(argp);
 
       case GDTIOCTL_LOCKCHN:
       {
         gdth_ioctl_lockchn lchn;
         unchar i, j;
 
-        if (copy_from_user(&lchn, (char *)arg, sizeof(gdth_ioctl_lockchn)) ||
+        if (copy_from_user(&lchn, argp, sizeof(gdth_ioctl_lockchn)) ||
             lchn.ionode >= gdth_ctr_count)
             return -EFAULT;
         ha = HADATA(gdth_ctr_tab[lchn.ionode]);
@@ -5978,17 +5979,17 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
       }
 
       case GDTIOCTL_RESCAN:
-        return ioc_rescan(arg, cmnd);
+        return ioc_rescan(argp, cmnd);
 
       case GDTIOCTL_HDRLIST:
-        return ioc_hdrlist(arg, cmnd);
+        return ioc_hdrlist(argp, cmnd);
 
       case GDTIOCTL_RESET_BUS:
       {
         gdth_ioctl_reset res;
         int hanum, rval;
 
-        if (copy_from_user(&res, (char *)arg, sizeof(gdth_ioctl_reset)) ||
+        if (copy_from_user(&res, argp, sizeof(gdth_ioctl_reset)) ||
             res.ionode >= gdth_ctr_count)
             return -EFAULT;
         hanum = res.ionode; 
@@ -6025,13 +6026,13 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
         rval = gdth_eh_bus_reset(&scp);
         res.status = (rval == SUCCESS ? S_OK : S_GENERR);
 #endif
-        if (copy_to_user((char *)arg, &res, sizeof(gdth_ioctl_reset)))
+        if (copy_to_user(argp, &res, sizeof(gdth_ioctl_reset)))
             return -EFAULT;
         break;
       }
 
       case GDTIOCTL_RESET_DRV:
-        return ioc_resetdrv(arg, cmnd);
+        return ioc_resetdrv(argp, cmnd);
 
       default:
         break; 

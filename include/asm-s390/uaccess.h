@@ -326,12 +326,12 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 	return n;
 }
 
-extern long __copy_in_user_asm(const void *from, long n, void *to);
+extern unsigned long __copy_in_user_asm(const void *from, long n, void *to);
 
 static inline unsigned long
 __copy_in_user(void __user *to, const void __user *from, unsigned long n)
 {
-	__copy_in_user_asm(from, n, to);
+	return __copy_in_user_asm(from, n, to);
 }
 
 static inline unsigned long

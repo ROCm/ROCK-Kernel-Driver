@@ -68,7 +68,7 @@ enum sel_inos {
 	SEL_DISABLE	/* disable SELinux until next reboot */
 };
 
-static ssize_t sel_read_enforce(struct file *filp, char *buf,
+static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	char *page;
@@ -105,7 +105,7 @@ out:
 }
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
-static ssize_t sel_write_enforce(struct file * file, const char * buf,
+static ssize_t sel_write_enforce(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 
 {
@@ -155,7 +155,7 @@ static struct file_operations sel_enforce_ops = {
 };
 
 #ifdef CONFIG_SECURITY_SELINUX_DISABLE
-static ssize_t sel_write_disable(struct file * file, const char * buf,
+static ssize_t sel_write_disable(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 
 {
@@ -201,7 +201,7 @@ static struct file_operations sel_disable_ops = {
 	.write		= sel_write_disable,
 };
 
-static ssize_t sel_read_policyvers(struct file *filp, char *buf,
+static ssize_t sel_read_policyvers(struct file *filp, char __user *buf,
                                    size_t count, loff_t *ppos)
 {
 	char *page;
@@ -244,7 +244,7 @@ static struct file_operations sel_policyvers_ops = {
 /* declaration for sel_write_load */
 static int sel_make_bools(void);
 
-static ssize_t sel_read_mls(struct file *filp, char *buf,
+static ssize_t sel_read_mls(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	char *page;
@@ -284,7 +284,7 @@ static struct file_operations sel_mls_ops = {
 	.read		= sel_read_mls,
 };
 
-static ssize_t sel_write_load(struct file * file, const char * buf,
+static ssize_t sel_write_load(struct file * file, const char __user * buf,
 			      size_t count, loff_t *ppos)
 
 {
@@ -334,7 +334,7 @@ static struct file_operations sel_load_ops = {
 };
 
 
-static ssize_t sel_write_context(struct file * file, const char * buf,
+static ssize_t sel_write_context(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 
 {
@@ -406,7 +406,7 @@ struct argresp {
  * possibly a read which collects the result - which is stored in a
  * file-local buffer.
  */
-static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t *pos)
+static ssize_t TA_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
 	ino_t ino =  file->f_dentry->d_inode->i_ino;
 	struct argresp *ar;
@@ -445,7 +445,7 @@ static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t 
 	return rv;
 }
 
-static ssize_t TA_read(struct file *file, char *buf, size_t size, loff_t *pos)
+static ssize_t TA_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
 {
 	struct argresp *ar;
 	ssize_t rv = 0;
@@ -744,7 +744,7 @@ static struct inode *sel_make_inode(struct super_block *sb, int mode)
 
 #define BOOL_INO_OFFSET 30
 
-static ssize_t sel_read_bool(struct file *filep, char *buf,
+static ssize_t sel_read_bool(struct file *filep, char __user *buf,
 			     size_t count, loff_t *ppos)
 {
 	char *page = NULL;
@@ -806,7 +806,7 @@ out:
 	return ret;
 }
 
-static ssize_t sel_write_bool(struct file *filep, const char *buf,
+static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	char *page = NULL;
@@ -865,7 +865,8 @@ static struct file_operations sel_bool_ops = {
 	.write          = sel_write_bool,
 };
 
-static ssize_t sel_commit_bools_write(struct file *filep, const char *buf,
+static ssize_t sel_commit_bools_write(struct file *filep,
+				      const char __user *buf,
 				      size_t count, loff_t *ppos)
 {
 	char *page = NULL;
