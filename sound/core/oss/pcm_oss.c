@@ -2173,6 +2173,8 @@ static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
 	if (err < 0)
 		return err;
 	runtime->oss.mmap_bytes = area->vm_end - area->vm_start;
+	runtime->silence_threshold = 0;
+	runtime->silence_size = 0;
 #ifdef OSS_DEBUG
 	printk("pcm_oss: mmap ok, bytes = 0x%x\n", runtime->oss.mmap_bytes);
 #endif
