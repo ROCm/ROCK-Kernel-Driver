@@ -46,6 +46,7 @@ struct rwsem_waiter;
 extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *));
+extern struct rw_semaphore *FASTCALL(rwsem_downgrade_write(struct rw_semaphore *sem));
 
 /*
  * the semaphore definition
@@ -193,6 +194,31 @@ LOCK_PREFIX	"  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 ->
 		: "=m"(sem->count)
 		: "a"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS), "m"(sem->count)
 		: "memory", "cc", "edx");
+}
+
+/*
+ * downgrade write lock to read lock
+ */
+static inline void __downgrade_write(struct rw_semaphore *sem)
+{
+	__asm__ __volatile__(
+		"# beginning __downgrade_write\n\t"
+LOCK_PREFIX	"  addl      %2,(%%eax)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001 */
+		"  js        2f\n\t" /* jump if the lock is being waited upon */
+		"1:\n\t"
+		LOCK_SECTION_START("")
+		"2:\n\t"
+		"  pushl     %%ecx\n\t"
+		"  pushl     %%edx\n\t"
+		"  call      rwsem_downgrade_wake\n\t"
+		"  popl      %%edx\n\t"
+		"  popl      %%ecx\n\t"
+		"  jmp       1b\n"
+		LOCK_SECTION_END
+		"# ending __downgrade_write\n"
+		: "=m"(sem->count)
+		: "a"(sem), "i"(-RWSEM_WAITING_BIAS), "m"(sem->count)
+		: "memory", "cc");
 }
 
 /*
