@@ -274,14 +274,23 @@ static void wait_on_dquot(struct dquot *dquot)
 
 #define mark_dquot_dirty(dquot) ((dquot)->dq_sb->dq_op->mark_dirty(dquot))
 
-/* No locks needed here as ANY_DQUOT_DIRTY is used just by sync and so the
- * worst what can happen is that dquot is not written by concurrent sync... */
 int dquot_mark_dquot_dirty(struct dquot *dquot)
 {
-	set_bit(DQ_MOD_B, &(dquot)->dq_flags);
-	set_bit(DQF_ANY_DQUOT_DIRTY_B, &(sb_dqopt((dquot)->dq_sb)->
-		info[(dquot)->dq_type].dqi_flags));
+	spin_lock(&dq_list_lock);
+	if (!test_and_set_bit(DQ_MOD_B, &dquot->dq_flags))
+		list_add(&dquot->dq_dirty, &sb_dqopt(dquot->dq_sb)->
+				info[dquot->dq_type].dqi_dirty_list);
+	spin_unlock(&dq_list_lock);
 	return 0;
+}
+
+/* This function needs dq_list_lock */
+static inline int clear_dquot_dirty(struct dquot *dquot)
+{
+	if (!test_and_clear_bit(DQ_MOD_B, &dquot->dq_flags))
+		return 0;
+	list_del_init(&dquot->dq_dirty);
+	return 1;
 }
 
 void mark_info_dirty(struct super_block *sb, int type)
@@ -328,11 +337,17 @@ int dquot_commit(struct dquot *dquot)
 	struct quota_info *dqopt = sb_dqopt(dquot->dq_sb);
 
 	down(&dqopt->dqio_sem);
-	clear_bit(DQ_MOD_B, &dquot->dq_flags);
+	spin_lock(&dq_list_lock);
+	if (!clear_dquot_dirty(dquot)) {
+		spin_unlock(&dq_list_lock);
+		goto out_sem;
+	}
+	spin_unlock(&dq_list_lock);
 	/* Inactive dquot can be only if there was error during read/init
 	 * => we have better not writing it */
 	if (test_bit(DQ_ACTIVE_B, &dquot->dq_flags))
 		ret = dqopt->ops[dquot->dq_type]->commit_dqblk(dquot);
+out_sem:
 	up(&dqopt->dqio_sem);
 	if (info_dirty(&dqopt->info[dquot->dq_type]))
 		dquot->dq_sb->dq_op->write_info(dquot->dq_sb, dquot->dq_type);
@@ -392,42 +407,38 @@ static void invalidate_dquots(struct super_block *sb, int type)
 
 int vfs_quota_sync(struct super_block *sb, int type)
 {
-	struct list_head *head;
+	struct list_head *dirty;
 	struct dquot *dquot;
 	struct quota_info *dqopt = sb_dqopt(sb);
 	int cnt;
 
 	down(&dqopt->dqonoff_sem);
-restart:
-	/* At this point any dirty dquot will definitely be written so we can clear
-	   dirty flag from info */
-	spin_lock(&dq_data_lock);
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
-		if ((cnt == type || type == -1) && sb_has_quota_enabled(sb, cnt))
-			clear_bit(DQF_ANY_DQUOT_DIRTY_B, &dqopt->info[cnt].dqi_flags);
-	spin_unlock(&dq_data_lock);
-	spin_lock(&dq_list_lock);
-	list_for_each(head, &inuse_list) {
-		dquot = list_entry(head, struct dquot, dq_inuse);
-		if (sb && dquot->dq_sb != sb)
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (type != -1 && cnt != type)
 			continue;
-                if (type != -1 && dquot->dq_type != type)
+		if (!sb_has_quota_enabled(sb, cnt))
 			continue;
-		if (!dquot_dirty(dquot))
-			continue;
-		/* Dirty and inactive can be only bad dquot... */
-		if (!test_bit(DQ_ACTIVE_B, &dquot->dq_flags))
-			continue;
-		/* Now we have active dquot from which someone is holding reference so we
-		 * can safely just increase use count */
-		atomic_inc(&dquot->dq_count);
-		dqstats.lookups++;
+		spin_lock(&dq_list_lock);
+		dirty = &dqopt->info[cnt].dqi_dirty_list;
+		while (!list_empty(dirty)) {
+			dquot = list_entry(dirty->next, struct dquot, dq_dirty);
+			/* Dirty and inactive can be only bad dquot... */
+			if (!test_bit(DQ_ACTIVE_B, &dquot->dq_flags)) {
+				clear_dquot_dirty(dquot);
+				continue;
+			}
+			/* Now we have active dquot from which someone is
+ 			 * holding reference so we can safely just increase
+			 * use count */
+			atomic_inc(&dquot->dq_count);
+			dqstats.lookups++;
+			spin_unlock(&dq_list_lock);
+			sb->dq_op->write_dquot(dquot);
+			dqput(dquot);
+			spin_lock(&dq_list_lock);
+		}
 		spin_unlock(&dq_list_lock);
-		sb->dq_op->write_dquot(dquot);
-		dqput(dquot);
-		goto restart;
 	}
-	spin_unlock(&dq_list_lock);
 
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
 		if ((cnt == type || type == -1) && sb_has_quota_enabled(sb, cnt)
@@ -515,7 +526,7 @@ we_slept:
 		goto we_slept;
 	}
 	/* Clear flag in case dquot was inactive (something bad happened) */
-	clear_bit(DQ_MOD_B, &dquot->dq_flags);
+	clear_dquot_dirty(dquot);
 	if (test_bit(DQ_ACTIVE_B, &dquot->dq_flags)) {
 		spin_unlock(&dq_list_lock);
 		dquot_release(dquot);
@@ -544,6 +555,7 @@ static struct dquot *get_empty_dquot(struct super_block *sb, int type)
 	INIT_LIST_HEAD(&dquot->dq_free);
 	INIT_LIST_HEAD(&dquot->dq_inuse);
 	INIT_HLIST_NODE(&dquot->dq_hash);
+	INIT_LIST_HEAD(&dquot->dq_dirty);
 	dquot->dq_sb = sb;
 	dquot->dq_type = type;
 	atomic_set(&dquot->dq_count, 1);
@@ -1373,6 +1385,7 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 
 	dqopt->ops[type] = fmt->qf_ops;
 	dqopt->info[type].dqi_format = fmt;
+	INIT_LIST_HEAD(&dqopt->info[type].dqi_dirty_list);
 	down(&dqopt->dqio_sem);
 	if ((error = dqopt->ops[type]->read_file_info(sb, type)) < 0) {
 		up(&dqopt->dqio_sem);

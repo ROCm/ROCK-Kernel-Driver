@@ -114,9 +114,10 @@ restart:
 	list_for_each(head, &super_blocks) {
 		struct super_block *sb = list_entry(head, struct super_block, s_list);
 
+		/* This test just improves performance so it needn't be reliable... */
 		for (cnt = 0, dirty = 0; cnt < MAXQUOTAS; cnt++)
 			if ((type == cnt || type == -1) && sb_has_quota_enabled(sb, cnt)
-			    && info_any_dquot_dirty(&sb_dqopt(sb)->info[cnt]))
+			    && info_any_dirty(&sb_dqopt(sb)->info[cnt]))
 				dirty = 1;
 		if (!dirty)
 			continue;

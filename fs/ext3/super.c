@@ -2174,14 +2174,16 @@ static int ext3_write_dquot(struct dquot *dquot)
 	return ret;
 }
 
-static int ext3_mark_dquot_dirty(struct dquot * dquot)
+static int ext3_mark_dquot_dirty(struct dquot *dquot)
 {
 	/* Are we journalling quotas? */
-	if (EXT3_SB(dquot->dq_sb)->s_qf_names[0] ||
-	    EXT3_SB(dquot->dq_sb)->s_qf_names[1])
+	if (EXT3_SB(dquot->dq_sb)->s_qf_names[USRQUOTA] ||
+	    EXT3_SB(dquot->dq_sb)->s_qf_names[GRPQUOTA]) {
+		dquot_mark_dquot_dirty(dquot);
 		return ext3_write_dquot(dquot);
-	else
+	} else {
 		return dquot_mark_dquot_dirty(dquot);
+	}
 }
 
 static int ext3_write_info(struct super_block *sb, int type)
