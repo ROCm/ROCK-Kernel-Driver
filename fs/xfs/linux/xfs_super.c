@@ -762,17 +762,6 @@ linvfs_clear_inode(
 }
 
 STATIC void
-linvfs_put_inode(
-	struct inode		*ip)
-{
-	vnode_t			*vp = LINVFS_GET_VP(ip);
-	int			error;
-
-	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
-		VOP_RELEASE(vp, error);
-}
-
-STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
 {
@@ -989,7 +978,6 @@ STATIC struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,
 	.destroy_inode		= linvfs_destroy_inode,
 	.write_inode		= linvfs_write_inode,
-	.put_inode		= linvfs_put_inode,
 	.clear_inode		= linvfs_clear_inode,
 	.put_super		= linvfs_put_super,
 	.write_super		= linvfs_write_super,
