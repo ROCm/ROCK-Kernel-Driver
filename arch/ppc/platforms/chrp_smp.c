@@ -77,25 +77,20 @@ smp_chrp_give_timebase(void)
 	spin_unlock(&timebase_lock);
 
 	while (timebase_upper || timebase_lower)
-		rmb();
+		barrier();
 	call_rtas("thaw-time-base", 0, 1, NULL);
 }
 
 void __devinit
 smp_chrp_take_timebase(void)
 {
-	int done = 0;
-
-	while (!done) {
-		spin_lock(&timebase_lock);
-		if (timebase_upper || timebase_lower) {
-			set_tb(timebase_upper, timebase_lower);
-			timebase_upper = 0;
-			timebase_lower = 0;
-			done = 1;
-		}
-		spin_unlock(&timebase_lock);
-	}
+	while (!(timebase_upper || timebase_lower))
+		barrier();
+	spin_lock(&timebase_lock);
+	set_tb(timebase_upper, timebase_lower);
+	timebase_upper = 0;
+	timebase_lower = 0;
+	spin_unlock(&timebase_lock);
 	printk("CPU %i taken timebase\n", smp_processor_id());
 }
 
