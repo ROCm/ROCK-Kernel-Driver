@@ -146,3 +146,8 @@ int cpu_idle(void)
 }
 
 #endif /* CONFIG_PPC_ISERIES */
+
+void default_idle(void)
+{
+	barrier();
+}
