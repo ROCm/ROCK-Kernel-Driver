@@ -524,10 +524,14 @@ static ssize_t mousedev_read(struct file * file, char __user * buffer, size_t co
 	if (!list->ready && !list->buffer && (file->f_flags & O_NONBLOCK))
 		return -EAGAIN;
 
-	retval = wait_event_interruptible(list->mousedev->wait, list->ready || list->buffer);
+	retval = wait_event_interruptible(list->mousedev->wait,
+					  !list->mousedev->exist || list->ready || list->buffer);
 
 	if (retval)
 		return retval;
+
+	if (!list->mousedev->exist)
+		return -ENODEV;
 
 	if (!list->buffer && list->ready) {
 		mousedev_packet(list, list->ps2);

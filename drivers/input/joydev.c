@@ -232,8 +232,10 @@ static ssize_t joydev_read(struct file *file, char __user *buf, size_t count, lo
 		&& list->head == list->tail && (file->f_flags & O_NONBLOCK))
 			return -EAGAIN;
 
-	retval = wait_event_interruptible(list->joydev->wait, list->joydev->exist
-		&& (list->startup < joydev->nabs + joydev->nkey || list->head != list->tail));
+	retval = wait_event_interruptible(list->joydev->wait,
+		 			  !list->joydev->exist ||
+					  list->startup < joydev->nabs + joydev->nkey ||
+					  list->head != list->tail);
 
 	if (retval)
 		return retval;
